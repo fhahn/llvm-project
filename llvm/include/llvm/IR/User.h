@@ -255,6 +255,39 @@ public:
   /// Returns the descriptor co-allocated with this User instance.
   MutableArrayRef<uint8_t> getDescriptor();
 
+  // --- REBASE: Still needed?
+  /// Set the number of operands on a GlobalVariable.
+  ///
+  /// GlobalVariable always allocates space for a single operands, but
+  /// doesn't always use it.
+  ///
+  /// FIXME: As that the number of operands is used to find the start of
+  /// the allocated memory in operator delete, we need to always think we have
+  /// 1 operand before delete.
+  void setGlobalVariableNumOperands(unsigned NumOps) {
+    assert(NumOps <= 1 && "GlobalVariable can only have 0 or 1 operands");
+    NumUserOperands = NumOps;
+  }
+
+  /// FIXME: As the number of operands is used to find the start of the
+  /// allocated memory in operator delete, we need to always think we have 3
+  /// operands before delete.
+  void setStoreInstNumOperands(unsigned NumOps) {
+    assert((2 <= NumOps) && (NumOps <= 3) &&
+           "StoreInst can only have 2 or 3 operands");
+    NumUserOperands = NumOps;
+  }
+
+  /// FIXME: As the number of operands is used to find the start of the
+  /// allocated memory in operator delete, we need to always think we have 2
+  /// operands before delete.
+  void setLoadInstNumOperands(unsigned NumOps) {
+    assert((1 <= NumOps) && (NumOps <= 2) &&
+           "LoadInst can only have 1 or 2 operands");
+    NumUserOperands = NumOps;
+  }
+
+  // --- REBASE: end
   /// Subclasses with hung off uses need to manage the operand count
   /// themselves.  In these instances, the operand count isn't used to find the
   /// OperandList, so there's no issue in having the operand count change.
