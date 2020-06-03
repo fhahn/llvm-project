@@ -397,7 +397,6 @@ void PredicateInfoBuilder::addInfoFor(SmallVectorImpl<Value *> &OpsToRename,
   auto &OperandInfo = getOrCreateValueInfo(Op);
   if (OperandInfo.Infos.empty())
     OpsToRename.push_back(Op);
-  PI.AllInfos.push_back(PB);
   OperandInfo.Infos.push_back(PB);
 }
 

@@ -52,8 +52,6 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallSet.h"
-#include "llvm/ADT/ilist.h"
-#include "llvm/ADT/ilist_node.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/IR/Value.h"
@@ -80,7 +78,7 @@ struct PredicateConstraint {
 
 // Base class for all predicate information we provide.
 // All of our predicate information has at least a comparison.
-class PredicateBase : public ilist_node<PredicateBase> {
+class PredicateBase {
 public:
   PredicateType Type;
   // The original operand before we renamed it.
@@ -110,6 +108,7 @@ protected:
   PredicateBase(PredicateType PT, Value *Op, Value *Condition)
       : Type(PT), OriginalOp(Op), Condition(Condition) {}
 };
+static_assert(sizeof(PredicateBase) <= 40, "size of object changed");
 
 // Provides predicate information for assumes.  Since assumes are always true,
 // we simply provide the assume instruction, so you can tell your relative
@@ -198,9 +197,6 @@ protected:
 
 private:
   Function &F;
-
-  // This owns the all the predicate infos in the function, placed or not.
-  iplist<PredicateBase> AllInfos;
 
   // This maps from copy operands to Predicate Info. Note that it does not own
   // the Predicate Info, they belong to the ValueInfo structs in the ValueInfos
