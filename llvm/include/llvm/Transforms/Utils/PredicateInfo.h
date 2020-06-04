@@ -59,6 +59,7 @@
 #include "llvm/IR/Value.h"
 #include "llvm/IR/ValueHandle.h"
 #include "llvm/Pass.h"
+#include "llvm/Support/Allocator.h"
 
 namespace llvm {
 
@@ -207,6 +208,8 @@ private:
   DenseMap<const Value *, const PredicateBase *> PredicateMap;
   // The set of ssa_copy declarations we created with our custom mangling.
   SmallSet<AssertingVH<Function>, 20> CreatedDeclarations;
+
+  mutable BumpPtrAllocator PredicateAllocator;
 };
 
 // This pass does eager building and then printing of PredicateInfo. It is used

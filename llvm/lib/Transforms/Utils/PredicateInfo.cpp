@@ -273,6 +273,8 @@ class PredicateInfoBuilder {
   // edges.
   DenseSet<std::pair<BasicBlock *, BasicBlock *>> EdgeUsesOnly;
 
+  BumpPtrAllocator &PredicateAllocator;
+
   ValueInfo &getOrCreateValueInfo(Value *);
   const ValueInfo &getValueInfo(Value *) const;
 
@@ -294,8 +296,9 @@ class PredicateInfoBuilder {
 
 public:
   PredicateInfoBuilder(PredicateInfo &PI, Function &F, DominatorTree &DT,
-                       AssumptionCache &AC)
-      : PI(PI), F(F), DT(DT), AC(AC) {
+                       AssumptionCache &AC,
+                       BumpPtrAllocator &PredicateAllocator)
+      : PI(PI), F(F), DT(DT), AC(AC), PredicateAllocator(PredicateAllocator) {
     // Push an empty operand info so that we can detect 0 as not finding one
     ValueInfos.resize(1);
   }
@@ -502,7 +505,7 @@ void PredicateInfoBuilder::processSwitch(
   for (auto C : SI->cases()) {
     BasicBlock *TargetBlock = C.getCaseSuccessor();
     if (SwitchEdges.lookup(TargetBlock) == 1) {
-      PredicateSwitch *PS = new PredicateSwitch(
+      PredicateSwitch *PS = new (PredicateAllocator) PredicateSwitch(
           Op, SI->getParent(), TargetBlock, C.getCaseValue(), SI);
       addInfoFor(OpsToRename, Op, PS);
       if (!TargetBlock->getSinglePredecessor())
@@ -770,7 +773,7 @@ PredicateInfoBuilder::getValueInfo(Value *Operand) const {
 PredicateInfo::PredicateInfo(Function &F, DominatorTree &DT,
                              AssumptionCache &AC)
     : F(F) {
-  PredicateInfoBuilder Builder(*this, F, DT, AC);
+  PredicateInfoBuilder Builder(*this, F, DT, AC, PredicateAllocator);
   Builder.buildPredicateInfo();
 }
 
