@@ -24,6 +24,8 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Analysis/AssumptionCache.h"
+#include "llvm/Analysis/ConstantFolding.h"
 #include "llvm/Analysis/DomTreeUpdater.h"
 #include "llvm/Analysis/GlobalsModRef.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
@@ -36,6 +38,7 @@
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/IR/Type.h"
@@ -66,12 +69,14 @@ STATISTIC(NumInstReplaced,
 // runSCCP() - Run the Sparse Conditional Constant Propagation algorithm,
 // and return true if the function was modified.
 static bool runSCCP(Function &F, const DataLayout &DL,
-                    const TargetLibraryInfo *TLI, DomTreeUpdater &DTU) {
+                    const TargetLibraryInfo *TLI, DomTreeUpdater &DTU,
+                    std::unique_ptr<PredicateInfo> PI) {
   LLVM_DEBUG(dbgs() << "SCCP on function '" << F.getName() << "'\n");
   SCCPSolver Solver(
       DL, [TLI](Function &F) -> const TargetLibraryInfo & { return *TLI; },
       F.getContext());
 
+  Solver.addAnalysis(F, {std::move(PI), nullptr, nullptr, nullptr});
   // Mark the first block of the function as being executable.
   Solver.markBlockExecutable(&F.front());
 
@@ -121,15 +126,31 @@ static bool runSCCP(Function &F, const DataLayout &DL,
     if (!DeadBB->hasAddressTaken())
       DTU.deleteBB(DeadBB);
 
+  for (BasicBlock &BB : F) {
+    for (BasicBlock::iterator BI = BB.begin(), E = BB.end(); BI != E;) {
+      Instruction *Inst = &*BI++;
+      if (Solver.getPredicateInfoFor(Inst)) {
+        if (auto *II = dyn_cast<IntrinsicInst>(Inst)) {
+          if (II->getIntrinsicID() == Intrinsic::ssa_copy) {
+            Value *Op = II->getOperand(0);
+            Inst->replaceAllUsesWith(Op);
+            Inst->eraseFromParent();
+          }
+        }
+      }
+    }
+  }
   return MadeChanges;
 }
 
 PreservedAnalyses SCCPPass::run(Function &F, FunctionAnalysisManager &AM) {
   const DataLayout &DL = F.getParent()->getDataLayout();
   auto &TLI = AM.getResult<TargetLibraryAnalysis>(F);
-  auto *DT = AM.getCachedResult<DominatorTreeAnalysis>(F);
+  auto &DT = AM.getResult<DominatorTreeAnalysis>(F);
   DomTreeUpdater DTU(DT, DomTreeUpdater::UpdateStrategy::Lazy);
-  if (!runSCCP(F, DL, &TLI, DTU))
+  if (!runSCCP(F, DL, &TLI, DTU,
+               std::make_unique<PredicateInfo>(
+                   F, DT, AM.getResult<AssumptionAnalysis>(F))))
     return PreservedAnalyses::all();
 
   auto PA = PreservedAnalyses();
@@ -154,6 +175,8 @@ public:
   }
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
+    AU.addRequired<AssumptionCacheTracker>();
+    AU.addRequired<DominatorTreeWrapperPass>();
     AU.addRequired<TargetLibraryInfoWrapperPass>();
     AU.addPreserved<GlobalsAAWrapperPass>();
     AU.addPreserved<DominatorTreeWrapperPass>();
@@ -165,12 +188,18 @@ public:
     if (skipFunction(F))
       return false;
     const DataLayout &DL = F.getParent()->getDataLayout();
+    DominatorTree &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
+
     const TargetLibraryInfo *TLI =
         &getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(F);
     auto *DTWP = getAnalysisIfAvailable<DominatorTreeWrapperPass>();
     DomTreeUpdater DTU(DTWP ? &DTWP->getDomTree() : nullptr,
                        DomTreeUpdater::UpdateStrategy::Lazy);
-    return runSCCP(F, DL, TLI, DTU);
+    return runSCCP(
+        F, DL, TLI, DTU,
+        std::make_unique<PredicateInfo>(
+            F, DT,
+            getAnalysis<AssumptionCacheTracker>().getAssumptionCache(F)));
   }
 };
 
@@ -180,6 +209,8 @@ char SCCPLegacyPass::ID = 0;
 
 INITIALIZE_PASS_BEGIN(SCCPLegacyPass, "sccp",
                       "Sparse Conditional Constant Propagation", false, false)
+INITIALIZE_PASS_DEPENDENCY(AssumptionCacheTracker)
+INITIALIZE_PASS_DEPENDENCY(DominatorTreeWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(TargetLibraryInfoWrapperPass)
 INITIALIZE_PASS_END(SCCPLegacyPass, "sccp",
                     "Sparse Conditional Constant Propagation", false, false)
