@@ -856,6 +856,10 @@ void TargetPassConfig::addIRPasses() {
   if (!DisableVerify)
     addPass(createVerifierPass());
 
+  // Lower matrix intrinsics, if they have not been lowered by the middle-end
+  // already.
+  addPass(createLowerMatrixIntrinsicsMinimalPass());
+
   if (getOptLevel() != CodeGenOpt::None) {
     switch (UseCFLAA) {
     case CFLAAType::Steensgaard:

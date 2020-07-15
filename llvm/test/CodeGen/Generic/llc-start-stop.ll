@@ -18,13 +18,13 @@
 ; RUN: llc < %s -debug-pass=Structure -start-after=loop-reduce -o /dev/null 2>&1 | FileCheck %s -check-prefix=START-AFTER
 ; START-AFTER: -aa -mergeicmps
 ; START-AFTER: FunctionPass Manager
-; START-AFTER-NEXT: Dominator Tree Construction
+; START-AFTER-NEXT: Lower the matrix intrinsics (minimal)
 
 ; RUN: llc < %s -debug-pass=Structure -start-before=loop-reduce -o /dev/null 2>&1 | FileCheck %s -check-prefix=START-BEFORE
 ; START-BEFORE: -machine-branch-prob -regalloc-evict -domtree
 ; START-BEFORE: FunctionPass Manager
 ; START-BEFORE: Loop Strength Reduction
-; START-BEFORE-NEXT: Basic Alias Analysis (stateless AA impl)
+; START-AFTER-NEXT: Dominator Tree Construction
 
 ; RUN: not --crash llc < %s -start-before=nonexistent -o /dev/null 2>&1 | FileCheck %s -check-prefix=NONEXISTENT-START-BEFORE
 ; RUN: not --crash llc < %s -stop-before=nonexistent -o /dev/null 2>&1 | FileCheck %s -check-prefix=NONEXISTENT-STOP-BEFORE
