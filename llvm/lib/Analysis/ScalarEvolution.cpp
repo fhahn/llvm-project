@@ -1864,6 +1864,16 @@ ScalarEvolution::getZeroExtendExpr(const SCEV *Op, Type *Ty, unsigned Depth) {
           }
   }
 
+  // zext (A umax B) --> (zext A) umax (zext B), if one operands is a constant.
+  if (auto *SM = dyn_cast<SCEVUMaxExpr>(Op)) {
+    const SCEV *Op0 = SM->getOperand(0);
+    const SCEV *Op1 = SM->getOperand(1);
+    if (SM->getNumOperands() == 2 &&
+        (isa<SCEVConstant>(Op0) || isa<SCEVConstant>(Op1)))
+      return getUMaxExpr(getZeroExtendExpr(SM->getOperand(0), Ty),
+                         getZeroExtendExpr(SM->getOperand(1), Ty));
+  }
+
   // The cast wasn't folded; create an explicit cast node.
   // Recompute the insert position, as it may have been invalidated.
   if (const SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP)) return S;
@@ -3311,6 +3321,34 @@ const SCEV *ScalarEvolution::getUDivExpr(const SCEV *LHS,
          "SCEVUDivExpr operand can't be pointer!");
   assert(LHS->getType() == RHS->getType() &&
          "SCEVUDivExpr operand types don't match!");
+
+  // Try to shift udiv across an addition even when no wrapping info is
+  // present, using the fact that (B - A)  will be in [0, B+1), if
+  // B s>= A and A s>= 0.
+  //
+  // (-C1 + X) /u C2 can be transformed to (C1 /u C2) + (X /u C2), if
+  //   * C1 % C2 == 0
+  //   * X % C2 == 0
+  //   * X s>= C1
+  //   * C1 s>= 0
+  //
+  // If C1 and C2 are constants, at least one of udiv expression can be
+  // eliminated. This pattern is commonly created for trip counts
+  // involving pointer IVs, where a multiple of the element width
+  // is subtracted.
+  const SCEVAddExpr *Add = dyn_cast<SCEVAddExpr>(LHS);
+  const SCEVConstant *C = dyn_cast<SCEVConstant>(RHS);
+  if (Add && C && Add->getNumOperands() == 2) {
+    unsigned MultTrailing = C->getAPInt().countTrailingZeros();
+    auto *NegOp0 = getNegativeSCEV(Add->getOperand(0));
+    if (GetMinTrailingZeros(Add->getOperand(0)) >= MultTrailing &&
+        GetMinTrailingZeros(Add->getOperand(1)) >= MultTrailing &&
+        isKnownNonNegative(NegOp0) &&
+        isKnownPredicate(CmpInst::ICMP_SGE, Add->getOperand(1), NegOp0)) {
+      return getMinusSCEV(getUDivExactExpr(Add->getOperand(1), RHS),
+                          getUDivExactExpr(NegOp0, RHS));
+    }
+  }
 
   FoldingSetNodeID ID;
   ID.AddInteger(scUDivExpr);
@@ -9647,7 +9685,6 @@ ScalarEvolution::howFarToZero(const SCEV *V, const Loop *L, bool ControlsExit,
   // First compute the unsigned distance from zero in the direction of Step.
   bool CountDown = StepC->getAPInt().isNegative();
   const SCEV *Distance = CountDown ? Start : getNegativeSCEV(Start);
-
   // Handle unitary steps, which cannot wraparound.
   // 1*N = -Start; -1*N = Start (mod 2^BW), so:
   //   N = Distance (as unsigned)
@@ -10683,7 +10720,10 @@ bool ScalarEvolution::isLoopEntryGuardedByCond(const Loop *L,
   if (isKnownViaNonRecursiveReasoning(Pred, LHS, RHS))
     return true;
 
-  return isBasicBlockEntryGuardedByCond(L->getHeader(), Pred, LHS, RHS);
+  if (isBasicBlockEntryGuardedByCond(L->getHeader(), Pred, LHS, RHS))
+    return true;
+  return isBasicBlockEntryGuardedByCond(
+      L->getHeader(), Pred, applyLoopGuards(LHS, L), applyLoopGuards(RHS, L));
 }
 
 bool ScalarEvolution::isImpliedCond(ICmpInst::Predicate Pred, const SCEV *LHS,
@@ -11588,10 +11628,42 @@ static bool isKnownPredicateExtendIdiom(ICmpInst::Predicate Pred,
   return false;
 }
 
+bool ScalarEvolution::isKnownPredicateViaSubIdiom(ICmpInst::Predicate Pred,
+                                                  const SCEV *LHS,
+                                                  const SCEV *RHS) {
+  // Handle Y - X u<= Y, if X s>= 0 and Y u>= X. In that case, the result of (Y
+  // - X) will be in [0, Y+1) expression won't wrap in the unsigned sense. Apply
+  // similar reasoning for Y - X u< Y, if X s> 0.
+  auto *Add = dyn_cast<SCEVAddExpr>(LHS);
+  if (Add && Add->getNumOperands() == 2 &&
+      (Pred == CmpInst::ICMP_ULE || Pred == CmpInst::ICMP_ULT)) {
+    auto *X = Add->getOperand(0);
+    auto *Y = Add->getOperand(1);
+    auto Check = [this, Pred, RHS](const SCEV *X, const SCEV *Y) {
+      // For Y - X u<= Y, check X s>= 0,  for Y - X u< Y, check X s> 0.
+      bool CheckX = Pred == CmpInst::ICMP_ULE ? isKnownNonPositive(X)
+                                              : isKnownPositive(X);
+      return Y == RHS && CheckX && isKnownNonNegative(Y) &&
+             isKnownPredicateViaConstantRanges(CmpInst::ICMP_UGE, Y,
+                                               getNegativeSCEV(X));
+    };
+
+    // Handle (-1) * X + Y variant.
+    if (Check(X, Y))
+      return true;
+
+    // Handle swapped variant Y + (-1) * X variant.
+    if (Check(Y, X))
+      return true;
+  }
+  return false;
+}
+
 bool
 ScalarEvolution::isKnownViaNonRecursiveReasoning(ICmpInst::Predicate Pred,
                                            const SCEV *LHS, const SCEV *RHS) {
   return isKnownPredicateExtendIdiom(Pred, LHS, RHS) ||
+         isKnownPredicateViaSubIdiom(Pred, LHS, RHS) ||
          isKnownPredicateViaConstantRanges(Pred, LHS, RHS) ||
          IsKnownPredicateViaMinOrMax(*this, Pred, LHS, RHS) ||
          IsKnownPredicateViaAddRecStart(*this, Pred, LHS, RHS) ||
