@@ -1556,6 +1556,8 @@ private:
     return Pair.first->second;
   }
 
+  DenseMap<const Loop *, DenseMap<const SCEV *, const SCEV *>> LoopGuardsCache;
+
   /// Determine the range for a particular SCEV.
   /// NOTE: This returns a reference to an entry in a cache. It must be
   /// copied if its needed for longer.
