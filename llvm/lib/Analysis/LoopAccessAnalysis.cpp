@@ -390,7 +390,7 @@ bool RuntimeCheckingPtrGroup::addPointer(unsigned Index, const SCEV *Start,
                                          const SCEV *End, unsigned AS,
                                          bool NeedsFreeze,
                                          ScalarEvolution &SE) {
-  assert(AddressSpace == AS &&
+  assert((Members.empty() || AddressSpace == AS) &&
          "all pointers in a checking group must be in the same address space");
 
   // Compare the starts and ends with the known minimum and maximum

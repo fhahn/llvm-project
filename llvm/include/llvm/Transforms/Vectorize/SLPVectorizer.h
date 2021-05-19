@@ -55,6 +55,14 @@ class BoUpSLP;
 
 } // end namespace slpvectorizer
 
+struct SLPVectorizerResult {
+  bool MadeAnyChange;
+  bool MadeCFGChange;
+
+  SLPVectorizerResult(bool MadeAnyChange, bool MadeCFGChange)
+      : MadeAnyChange(MadeAnyChange), MadeCFGChange(MadeCFGChange) {}
+};
+
 struct SLPVectorizerPass : public PassInfoMixin<SLPVectorizerPass> {
   using StoreList = SmallVector<StoreInst *, 8>;
   using StoreListMap = MapVector<Value *, StoreList>;
@@ -76,10 +84,12 @@ public:
   PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
 
   // Glue for old PM.
-  bool runImpl(Function &F, ScalarEvolution *SE_, TargetTransformInfo *TTI_,
-               TargetLibraryInfo *TLI_, AAResults *AA_, LoopInfo *LI_,
-               DominatorTree *DT_, AssumptionCache *AC_, DemandedBits *DB_,
-               OptimizationRemarkEmitter *ORE_);
+  SLPVectorizerResult runImpl(Function &F, ScalarEvolution *SE_,
+                              TargetTransformInfo *TTI_,
+                              TargetLibraryInfo *TLI_, AAResults *AA_,
+                              LoopInfo *LI_, DominatorTree *DT_,
+                              AssumptionCache *AC_, DemandedBits *DB_,
+                              OptimizationRemarkEmitter *ORE_);
 
 private:
   /// Collect store and getelementptr instructions and organize them
@@ -158,6 +168,11 @@ private:
                            unsigned Idx, unsigned MinVF);
 
   bool vectorizeStores(ArrayRef<StoreInst *> Stores, slpvectorizer::BoUpSLP &R);
+
+  SLPVectorizerResult
+  vectorizeBlockWithVersioning(BasicBlock *BB,
+                               const SmallPtrSetImpl<Value *> &TrackedObjects,
+                               slpvectorizer::BoUpSLP &R);
 
   /// The store instructions in a basic block organized by base pointer.
   StoreListMap Stores;

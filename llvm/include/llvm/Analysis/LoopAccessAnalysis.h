@@ -338,6 +338,11 @@ struct RuntimeCheckingPtrGroup {
   /// Create a new pointer checking group containing a single
   /// pointer, with index \p Index in RtCheck.
   RuntimeCheckingPtrGroup(unsigned Index, RuntimePointerChecking &RtCheck);
+  RuntimeCheckingPtrGroup(unsigned Index, const SCEV *Start, const SCEV *End,
+                          unsigned AS, bool NeedsFreeze)
+      : High(End), Low(Start), AddressSpace(AS), NeedsFreeze(NeedsFreeze) {
+    Members.push_back(Index);
+  }
 
   /// Tries to add the pointer recorded in RtCheck at index
   /// \p Index to this pointer checking group. We can only add a pointer

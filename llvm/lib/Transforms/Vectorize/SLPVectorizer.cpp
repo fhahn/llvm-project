@@ -35,6 +35,7 @@
 #include "llvm/Analysis/AssumptionCache.h"
 #include "llvm/Analysis/CodeMetrics.h"
 #include "llvm/Analysis/DemandedBits.h"
+#include "llvm/Analysis/DomTreeUpdater.h"
 #include "llvm/Analysis/GlobalsModRef.h"
 #include "llvm/Analysis/IVDescriptors.h"
 #include "llvm/Analysis/LoopAccessAnalysis.h"
@@ -61,6 +62,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Intrinsics.h"
+#include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/IR/PatternMatch.h"
@@ -84,9 +86,12 @@
 #include "llvm/Support/KnownBits.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/InjectTLIMappings.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/LoopUtils.h"
+#include "llvm/Transforms/Utils/ScalarEvolutionExpander.h"
 #include "llvm/Transforms/Vectorize.h"
 #include <algorithm>
 #include <cassert>
@@ -108,6 +113,10 @@ using namespace slpvectorizer;
 #define DEBUG_TYPE "SLP"
 
 STATISTIC(NumVectorInstructions, "Number of vector instructions generated");
+STATISTIC(NumVersioningSuccessful,
+          "Number of times versioning was tried and beneficial");
+STATISTIC(NumVersioningFailed,
+          "Number of times versioning was tried but was not beneficial");
 
 cl::opt<bool> RunSLPVectorization("vectorize-slp", cl::init(true), cl::Hidden,
                                   cl::desc("Run the SLP vectorization passes"));
@@ -176,6 +185,10 @@ static cl::opt<int> RootLookAheadMaxDepth(
 static cl::opt<bool>
     ViewSLPTree("view-slp-tree", cl::Hidden,
                 cl::desc("Display the SLP trees with Graphviz"));
+
+static cl::opt<bool> EnableMemoryVersioning(
+    "slp-memory-versioning", cl::init(false), cl::Hidden,
+    cl::desc("Enable memory versioning for SLP vectorization."));
 
 // Limit the number of alias checks. The limit is chosen so that
 // it has no negative effect on the llvm benchmarks.
@@ -956,6 +969,52 @@ static bool doesNotNeedToSchedule(ArrayRef<Value *> VL) {
          (all_of(VL, isUsedOutsideBlock) || all_of(VL, areAllOperandsNonInsts));
 }
 
+namespace {
+/// Models a memory access to an underlying object with SCEV pointer expression
+/// and access type.
+struct AccessInfo {
+  Value *UnderlyingObj;
+  const SCEV *PtrSCEV;
+  Type *AccessTy;
+
+  AccessInfo(Value *UnderlyingObj = nullptr, const SCEV *PtrSCEV = nullptr,
+             Type *AccessTy = nullptr)
+      : UnderlyingObj(UnderlyingObj), PtrSCEV(PtrSCEV), AccessTy(AccessTy) {}
+
+  /// Returns the AccessInfo for \p I. If \p I isn't a memory instruction or the
+  /// pointer cannot be converted to a SCEV, return an empty object.
+  static AccessInfo get(Instruction &I, ScalarEvolution &SE,
+                        DominatorTree &DT) {
+    BasicBlock *BB = I.getParent();
+    auto GetPtrAndAccessTy = [](Instruction *I) -> std::pair<Value *, Type *> {
+      if (auto *L = dyn_cast<LoadInst>(I)) {
+        if (isValidElementType(L->getType()))
+          return {L->getPointerOperand(), L->getType()};
+      }
+      if (auto *S = dyn_cast<StoreInst>(I))
+        if (isValidElementType(S->getValueOperand()->getType()))
+          return {S->getPointerOperand(), S->getValueOperand()->getType()};
+      return {nullptr, nullptr};
+    };
+    Value *Ptr;
+    Type *AccessTy;
+    std::tie(Ptr, AccessTy) = GetPtrAndAccessTy(&I);
+    if (!Ptr)
+      return {};
+    Value *Obj = getUnderlyingObject(Ptr);
+    if (!Obj)
+      return {};
+    auto *Start = SE.getSCEV(Ptr);
+
+    PHINode *PN = dyn_cast<PHINode>(Obj);
+    if (!SE.properlyDominates(Start, BB) &&
+        !(PN && DT.dominates(PN->getParent(), BB)))
+      return {};
+    return {Obj, Start, AccessTy};
+  }
+};
+} // anonymous namespace
+
 namespace slpvectorizer {
 
 /// Bottom Up SLP Vectorizer.
@@ -965,6 +1024,18 @@ class BoUpSLP {
   class ShuffleInstructionBuilder;
 
 public:
+  /// Set of objects we need to generate runtime checks for.
+  SmallPtrSet<Value *, 8> TrackedObjects;
+
+  SmallSet<std::pair<Value *, Value *>, 8> DepObjs;
+
+  /// Cache for alias results.
+  /// TODO: consider moving this to the AliasAnalysis itself.
+  using AliasCacheKey = std::pair<Instruction *, Instruction *>;
+  DenseMap<AliasCacheKey, Optional<bool>> AliasCache;
+
+  bool CollectMemAccess = false;
+
   using ValueList = SmallVector<Value *, 8>;
   using InstrList = SmallVector<Instruction *, 16>;
   using ValueSet = SmallPtrSet<Value *, 16>;
@@ -1097,6 +1168,17 @@ public:
   /// sink reordering in the graph closer to the root node and merge it later
   /// during analysis.
   void reorderBottomToTop(bool IgnoreReorder = false);
+
+  void removeDeletedInstructions() {
+    for (auto *I : DeletedInstructions) {
+      I->dropAllReferences();
+    }
+    for (auto *I : DeletedInstructions) {
+      assert(I->use_empty() && "trying to erase instruction with users.");
+      I->eraseFromParent();
+    }
+    DeletedInstructions.clear();
+  }
 
   /// \return The vector element size in bits to use when vectorizing the
   /// expression tree ending at \p V. If V is a store, the size is the width of
@@ -2834,11 +2916,11 @@ private:
     return aliased;
   }
 
-  using AliasCacheKey = std::pair<Instruction *, Instruction *>;
+  /*using AliasCacheKey = std::pair<Instruction *, Instruction *>;*/
 
-  /// Cache for alias results.
-  /// TODO: consider moving this to the AliasAnalysis itself.
-  DenseMap<AliasCacheKey, std::optional<bool>> AliasCache;
+  /*/// Cache for alias results.*/
+  /*/// TODO: consider moving this to the AliasAnalysis itself.*/
+  /*DenseMap<AliasCacheKey, std::optional<bool>> AliasCache;*/
 
   // Cache for pointerMayBeCaptured calls inside AA.  This is preserved
   // globally through SLP because we don't perform any action which
@@ -3544,15 +3626,11 @@ BoUpSLP::~BoUpSLP() {
     }
     I->dropAllReferences();
   }
-  for (auto *I : DeletedInstructions) {
-    assert(I->use_empty() &&
-           "trying to erase instruction with users.");
-    I->eraseFromParent();
-  }
 
   // Cleanup any dead scalar code feeding the vectorized instructions
   RecursivelyDeleteTriviallyDeadInstructions(DeadInsts, TLI);
 
+  removeDeletedInstructions();
 #ifdef EXPENSIVE_CHECKS
   // If we could guarantee that this call is not extremely slow, we could
   // remove the ifdef limitation (see PR47712).
@@ -10592,9 +10670,37 @@ void BoUpSLP::BlockScheduling::calculateDependencies(ScheduleData *SD,
           // balance between reduced runtime and accurate dependencies.
           numAliased++;
 
+          ScheduleData *DestBundle = DepDest->FirstInBundle;
+          // If this bundle is not scheduled and no versioned code has been
+          // generated yet, try to collect the bounds of the accesses to
+          // generate runtime checks.
+          if (!DestBundle->IsScheduled && SLP->CollectMemAccess) {
+            auto *Src = getLoadStorePointerOperand(SrcInst);
+            auto *Dst = getLoadStorePointerOperand(DepDest->Inst);
+
+            if (SrcInst->getParent() == DepDest->Inst->getParent() && Src &&
+                Dst) {
+              auto SrcObjAndPtr = AccessInfo::get(*SrcInst, *SLP->SE, *SLP->DT);
+              auto DstObjAndPtr =
+                  AccessInfo::get(*DepDest->Inst, *SLP->SE, *SLP->DT);
+              if (!SrcObjAndPtr.UnderlyingObj || !DstObjAndPtr.UnderlyingObj ||
+                  SrcObjAndPtr.UnderlyingObj == DstObjAndPtr.UnderlyingObj)
+                SLP->TrackedObjects.clear();
+              else {
+                SLP->TrackedObjects.insert(SrcObjAndPtr.UnderlyingObj);
+                SLP->TrackedObjects.insert(DstObjAndPtr.UnderlyingObj);
+
+                Value *A = SrcObjAndPtr.UnderlyingObj;
+                Value *B = DstObjAndPtr.UnderlyingObj;
+                if (A > B)
+                  std::swap(A, B);
+                SLP->DepObjs.insert({A, B});
+              }
+            }
+          }
+
           DepDest->MemoryDependencies.push_back(BundleMember);
           BundleMember->Dependencies++;
-          ScheduleData *DestBundle = DepDest->FirstInBundle;
           if (!DestBundle->IsScheduled) {
             BundleMember->incrementUnscheduledDeps(1);
           }
@@ -11040,7 +11146,7 @@ struct SLPVectorizer : public FunctionPass {
     auto *DB = &getAnalysis<DemandedBitsWrapperPass>().getDemandedBits();
     auto *ORE = &getAnalysis<OptimizationRemarkEmitterWrapperPass>().getORE();
 
-    return Impl.runImpl(F, SE, TTI, TLI, AA, LI, DT, AC, DB, ORE);
+    return Impl.runImpl(F, SE, TTI, TLI, AA, LI, DT, AC, DB, ORE).MadeAnyChange;
   }
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
@@ -11056,9 +11162,11 @@ struct SLPVectorizer : public FunctionPass {
     AU.addRequired<InjectTLIMappingsLegacy>();
     AU.addPreserved<LoopInfoWrapperPass>();
     AU.addPreserved<DominatorTreeWrapperPass>();
-    AU.addPreserved<AAResultsWrapperPass>();
     AU.addPreserved<GlobalsAAWrapperPass>();
-    AU.setPreservesCFG();
+    if (!EnableMemoryVersioning) {
+      AU.addPreserved<AAResultsWrapperPass>();
+      AU.setPreservesCFG();
+    }
   }
 };
 
@@ -11075,23 +11183,374 @@ PreservedAnalyses SLPVectorizerPass::run(Function &F, FunctionAnalysisManager &A
   auto *DB = &AM.getResult<DemandedBitsAnalysis>(F);
   auto *ORE = &AM.getResult<OptimizationRemarkEmitterAnalysis>(F);
 
-  bool Changed = runImpl(F, SE, TTI, TLI, AA, LI, DT, AC, DB, ORE);
-  if (!Changed)
+  auto Result = runImpl(F, SE, TTI, TLI, AA, LI, DT, AC, DB, ORE);
+  if (!Result.MadeAnyChange)
     return PreservedAnalyses::all();
 
   PreservedAnalyses PA;
-  PA.preserveSet<CFGAnalyses>();
+  if (!Result.MadeCFGChange)
+    PA.preserveSet<CFGAnalyses>();
+  PA.preserve<LoopAnalysis>();
+  PA.preserve<DominatorTreeAnalysis>();
   return PA;
 }
 
-bool SLPVectorizerPass::runImpl(Function &F, ScalarEvolution *SE_,
-                                TargetTransformInfo *TTI_,
-                                TargetLibraryInfo *TLI_, AAResults *AA_,
-                                LoopInfo *LI_, DominatorTree *DT_,
-                                AssumptionCache *AC_, DemandedBits *DB_,
-                                OptimizationRemarkEmitter *ORE_) {
+/// Restore the original CFG by removing \p VectorBB and folding \p CheckBB, \p
+/// ScalarBB, \p MergeBB and \p Tail into a single block, like in the original
+/// IR.
+static void undoVersionedBlocks(BasicBlock *CheckBB, BasicBlock *ScalarBB,
+                                DomTreeUpdater &DTU, LoopInfo *LI,
+                                BasicBlock *VectorBB, StringRef OriginalBBName,
+                                BasicBlock *MergeBB, BasicBlock *Tail) {
+  CheckBB->setName(OriginalBBName);
+  CheckBB->getTerminator()->eraseFromParent();
+  ;
+  {
+    IRBuilder<> Builder(CheckBB);
+    Builder.CreateBr(ScalarBB);
+  }
+  DTU.applyUpdates({{DominatorTree::Delete, CheckBB, VectorBB}});
+  LI->removeBlock(VectorBB);
+  VectorBB->getTerminator()->eraseFromParent();
+  ;
+  {
+    IRBuilder<> Builder(VectorBB);
+    Builder.CreateUnreachable();
+  }
+  DTU.applyUpdates({{DominatorTree::Delete, VectorBB, MergeBB}});
+  DTU.deleteBB(VectorBB);
+  MergeBlockIntoPredecessor(MergeBB, &DTU, LI);
+  if (Tail)
+    MergeBlockIntoPredecessor(Tail, &DTU, LI);
+  MergeBlockIntoPredecessor(ScalarBB, &DTU, LI);
+  NumVersioningFailed++;
+}
+
+SLPVectorizerResult SLPVectorizerPass::vectorizeBlockWithVersioning(
+    BasicBlock *BB, const SmallPtrSetImpl<Value *> &TrackedObjects,
+    slpvectorizer::BoUpSLP &R) {
+  // Try to vectorize BB with versioning.
+  //
+  // First, collect all memory bounds for accesses in the block.
+  //
+  // Next, split off the region between the first and last tracked memory
+  // access.
+  //
+  // Then, duplicate the split off region, one will remain scalar and one will
+  // be annotated with noalias metadata.
+  //
+  // Then introduce placeholder blocks for the memory runtime checks (branch to
+  // either scalar or versioned blocks) and a merge block joining the control
+  // flow from scalar and versioned blocks.
+  //
+  // Then, add noalias metadata for memory accessed in the versioned block and
+  // run SLP vectorization on the versioned block.
+  //
+  // Now compare the cost of the scalar block against the cost of the vector
+  // block + the cost of the runtime checks. If the vector cost is less than the
+  // scalar cost, generate runtime checks in the check block. Otherwise remove
+  // all temporary blocks and restore the original IR.
+
+  bool Changed = false;
+  bool CFGChanged = false;
+  R.AliasCache.clear();
+
+  // First, clean up deleted instructions, so they are not re-used during SCEV
+  // expansion.
+  R.optimizeGatherSequence();
+  R.removeDeletedInstructions();
+
+  auto &DL = BB->getModule()->getDataLayout();
+  // Collect up-to-date memory bounds for tracked objects. Also collect the
+  // first and last memory instruction using a tracked object.
+  MapVector<Value *, RuntimeCheckingPtrGroup> MemBounds;
+  SmallPtrSet<Value *, 4> WrittenObjs;
+  // First instruction that accesses an object we collect bounds for.
+  Instruction *FirstTrackedInst = nullptr;
+  // Last instruction that accesses an object we collect bounds for.
+  Instruction *LastTrackedInst = nullptr;
+
+  DenseMap<Value *, unsigned> ObjOrder;
+  unsigned Order = 0;
+  for (Instruction &I : *BB) {
+    auto ObjAndStart = AccessInfo::get(I, *SE, *DT);
+    if (!ObjAndStart.UnderlyingObj)
+      continue;
+    auto *Obj = ObjAndStart.UnderlyingObj;
+    const auto *Start = ObjAndStart.PtrSCEV;
+
+    if (I.mayWriteToMemory())
+      WrittenObjs.insert(Obj);
+
+    unsigned AS = Obj->getType()->getPointerAddressSpace();
+
+    // We know that the Start is dereferenced, hence adding one should not
+    // overflow:
+    Type *IdxTy = DL.getIndexType(Obj->getType());
+    const SCEV *EltSizeSCEV =
+        SE->getStoreSizeOfExpr(IdxTy, ObjAndStart.AccessTy);
+    auto *End = SE->getAddExpr(Start, EltSizeSCEV);
+
+    if (TrackedObjects.find(Obj) != TrackedObjects.end())
+      MemBounds.insert({Obj, {0, Start, End, AS, false}});
+    auto BoundsIter = MemBounds.find(Obj);
+    if (BoundsIter == MemBounds.end())
+      continue;
+    BoundsIter->second.addPointer(0, Start, End, AS, false, *SE);
+
+    if (ObjOrder.find(Obj) == ObjOrder.end()) {
+      ObjOrder[Obj] = Order++;
+    }
+    if (!FirstTrackedInst)
+      FirstTrackedInst = &I;
+    LastTrackedInst = &I;
+  }
+
+  // Not enough memory access bounds for runtime checks.
+  if (MemBounds.size() < 2 || WrittenObjs.empty())
+    return {Changed, CFGChanged};
+
+  // Check if all uses between the first and last tracked instruction are inside
+  // the region. If that is not the case, PHIs would need to be added when
+  // duplicating the block.
+  auto AllUsesInside = [FirstTrackedInst, LastTrackedInst](BasicBlock *BB) {
+    return all_of(make_range(FirstTrackedInst->getIterator(),
+                             std::next(LastTrackedInst->getIterator())),
+                  [LastTrackedInst, BB](Instruction &I) {
+                    return all_of(I.users(), [LastTrackedInst, BB](User *U) {
+                      if (auto *UserI = dyn_cast<Instruction>(U))
+                        return UserI->getParent() == BB &&
+                               !isa<PHINode>(UserI) &&
+                               (UserI->comesBefore(LastTrackedInst) ||
+                                UserI == LastTrackedInst);
+                      return true;
+                    });
+                  });
+  };
+  if (!AllUsesInside(BB))
+    return {Changed, CFGChanged};
+
+  SmallVector<std::pair<Value *, RuntimeCheckingPtrGroup *>> BoundGroups;
+  for (auto &B : MemBounds)
+    BoundGroups.emplace_back(B.first, &B.second);
+
+  // Create a RuntimePointerCheck for all groups in BoundGroups.
+  SmallVector<PointerDiffInfo> PointerChecks;
+  uint64_t MaxDist = 0;
+
+  for (auto &P : R.DepObjs) {
+    Value *SrcObj = P.first;
+    Value *SinkObj = P.second;
+    if (ObjOrder[SrcObj] > ObjOrder[SinkObj])
+      std::swap(SrcObj, SinkObj);
+
+    auto &SrcGroup = MemBounds.find(SrcObj)->second;
+    auto &SinkGroup = MemBounds.find(SinkObj)->second;
+    bool SrcWrites = WrittenObjs.contains(SrcObj);
+    bool SinkWrites = WrittenObjs.contains(SinkObj);
+    if (!SrcWrites && !SinkWrites)
+      continue;
+    const SCEV *CurDist =
+        SE->getUMaxExpr(SE->getMinusSCEV(SrcGroup.High, SrcGroup.Low),
+                        SE->getMinusSCEV(SinkGroup.High, SinkGroup.Low));
+    if (auto *C = dyn_cast<SCEVConstant>(CurDist)) {
+      MaxDist = std::max(MaxDist, C->getValue()->getZExtValue());
+      IntegerType *IntTy = IntegerType::get(
+          BB->getContext(), DL.getPointerSizeInBits(SinkGroup.AddressSpace));
+      const SCEV *SinkStartInt = SE->getPtrToIntExpr(SinkGroup.Low, IntTy);
+      const SCEV *SrcStartInt = SE->getPtrToIntExpr(SrcGroup.Low, IntTy);
+      if (isa<SCEVCouldNotCompute>(SinkStartInt) ||
+          isa<SCEVCouldNotCompute>(SrcStartInt)) {
+        return {Changed, CFGChanged};
+      }
+
+      PointerChecks.emplace_back(SinkStartInt, SrcStartInt, 1, false);
+    } else
+      return {Changed, CFGChanged};
+  }
+
+  // Duplicate BB now and set up block and branches for memory checks.
+  std::string OriginalBBName = BB->getName().str();
+  IRBuilder<> ChkBuilder(BB->getFirstNonPHI());
+  DomTreeUpdater DTU(DT, DomTreeUpdater::UpdateStrategy::Eager);
+
+  BasicBlock *Tail = nullptr;
+  if (LastTrackedInst->getNextNode() != BB->getTerminator())
+    Tail = SplitBlock(BB, LastTrackedInst->getNextNode(), &DTU, LI, nullptr,
+                      OriginalBBName + ".tail");
+  auto *CheckBB = BB;
+  BB = SplitBlock(BB, FirstTrackedInst, &DTU, LI, nullptr,
+                  OriginalBBName + ".slpmemcheck");
+  for (Use &U : make_early_inc_range(BB->uses())) {
+    BasicBlock *UserBB = cast<Instruction>(U.getUser())->getParent();
+    if (UserBB == CheckBB)
+      continue;
+
+    U.set(CheckBB);
+    DTU.applyUpdates({{DT->Delete, UserBB, BB}});
+    DTU.applyUpdates({{DT->Insert, UserBB, CheckBB}});
+  }
+  CFGChanged = true;
+
+  auto *MergeBB = BB;
+  BasicBlock *ScalarBB =
+      splitBlockBefore(BB, BB->getTerminator(), &DTU, LI, nullptr,
+                       OriginalBBName + ".slpversioned");
+
+  ValueToValueMapTy VMap;
+  BasicBlock *VectorBB = CloneBasicBlock(ScalarBB, VMap, "", BB->getParent());
+  ScalarBB->setName(OriginalBBName + ".scalar");
+  MergeBB->setName(OriginalBBName + ".merge");
+  SmallVector<BasicBlock *> Tmp;
+  Tmp.push_back(VectorBB);
+  remapInstructionsInBlocks(Tmp, VMap);
+  auto *Term = CheckBB->getTerminator();
+  ChkBuilder.SetInsertPoint(CheckBB->getTerminator());
+  ChkBuilder.CreateCondBr(ChkBuilder.getTrue(), ScalarBB, VectorBB);
+  Term->eraseFromParent();
+  DTU.applyUpdates({{DT->Insert, CheckBB, VectorBB}});
+  if (auto *L = LI->getLoopFor(CheckBB))
+    L->addBasicBlockToLoop(VectorBB, *LI);
+  Changed = true;
+
+  // Add !noalias metadata to memory accesses in the versioned block.
+  LLVMContext &Ctx = BB->getContext();
+  MDBuilder MDB(Ctx);
+  MDNode *Domain = MDB.createAnonymousAliasScopeDomain("SLPVerDomain");
+
+  DenseMap<const RuntimeCheckingPtrGroup *, MDNode *> GroupToScope;
+  for (const auto &Group : MemBounds)
+    GroupToScope[&Group.second] = MDB.createAnonymousAliasScope(Domain);
+
+  for (Instruction &I : *VectorBB) {
+    auto *Ptr = getLoadStorePointerOperand(&I);
+    if (!Ptr)
+      continue;
+
+    auto *PtrSCEV = SE->getSCEV(Ptr);
+    Value *Obj = getUnderlyingObject(Ptr);
+    if (!Obj) {
+      if (auto *GEP = dyn_cast<GetElementPtrInst>(Ptr))
+        Obj = GEP->getOperand(0);
+      else
+        continue;
+    }
+
+    auto BoundsIter = MemBounds.find(Obj);
+    if (BoundsIter == MemBounds.end())
+      continue;
+    auto *LowerBound = BoundsIter->second.Low;
+    auto *UpperBound = BoundsIter->second.High;
+    auto *Scope = GroupToScope.find(&BoundsIter->second)->second;
+
+    auto *LowerSub = SE->getMinusSCEV(PtrSCEV, LowerBound);
+    auto *UpperSub = SE->getMinusSCEV(UpperBound, PtrSCEV);
+    if (!isa<SCEVCouldNotCompute>(LowerSub) &&
+        !isa<SCEVCouldNotCompute>(UpperSub) &&
+        SE->isKnownNonNegative(LowerSub) && SE->isKnownNonNegative(UpperSub)) {
+      I.setMetadata(
+          LLVMContext::MD_alias_scope,
+          MDNode::concatenate(I.getMetadata(LLVMContext::MD_alias_scope),
+                              MDNode::get(Ctx, Scope)));
+
+      SmallVector<Metadata *, 4> NonAliasing;
+      for (auto &KV : GroupToScope) {
+        if (KV.first == &BoundsIter->second)
+          continue;
+        NonAliasing.push_back(KV.second);
+      }
+      I.setMetadata(LLVMContext::MD_noalias,
+                    MDNode::concatenate(I.getMetadata(LLVMContext::MD_noalias),
+                                        MDNode::get(Ctx, NonAliasing)));
+    }
+  }
+
+  DTU.flush();
+  DT->updateDFSNumbers();
+  collectSeedInstructions(VectorBB);
+
+  // Vectorize trees that end at stores.
+  assert(!Stores.empty() && "should have stores when versioning");
+  LLVM_DEBUG(dbgs() << "SLP: Found stores for " << Stores.size()
+                    << " underlying objects.\n");
+  bool AnyVectorized = vectorizeStoreChains(R);
+  Changed |= AnyVectorized;
+
+  InstructionCost SLPCost = 0;
+  InstructionCost ScalarCost = 0;
+  if (AnyVectorized) {
+    R.optimizeGatherSequence();
+    R.removeDeletedInstructions();
+    for (Instruction &I : *ScalarBB)
+      ScalarCost += TTI->getInstructionCost(&I, TTI::TCK_RecipThroughput);
+    for (Instruction &I : make_early_inc_range(reverse(*VectorBB))) {
+      if (isInstructionTriviallyDead(&I, TLI)) {
+        I.eraseFromParent();
+        continue;
+      }
+      SLPCost += TTI->getInstructionCost(&I, TTI::TCK_RecipThroughput);
+    }
+
+    // Estimate the size of the runtime checks, consisting of computing lower &
+    // upper bounds (2), the overlap checks (2) and the AND/OR to combine the
+    // checks.
+    SLPCost += 5 * PointerChecks.size() + MemBounds.size();
+  }
+
+  if (!AnyVectorized || SLPCost >= ScalarCost) {
+    // Vectorization not beneficial or possible. Restore original state by
+    // removing the introduced blocks.
+    R.getORE()->emit([&]() {
+      OptimizationRemarkMissed Rem(SV_NAME, "VersioningNotBeneficial",
+                                   &*ScalarBB->begin());
+      Rem << "Tried to version block but was not beneficial";
+      if (AnyVectorized) {
+        Rem << ore::NV("VectorCost", SLPCost)
+            << " >= " << ore::NV("ScalarCost", ScalarCost);
+      } else
+        Rem << "(nothing vectorized)";
+      return Rem;
+    });
+    Changed = false;
+    CFGChanged = false;
+    undoVersionedBlocks(CheckBB, ScalarBB, DTU, LI, VectorBB, OriginalBBName,
+                        MergeBB, Tail);
+  } else {
+    R.getORE()->emit(
+        OptimizationRemark(SV_NAME, "VersioningSuccessful", &*ScalarBB->begin())
+        << "SLP vectorization with versioning is beneficial "
+        << ore::NV("VectorCost", SLPCost) << " < "
+        << ore::NV("ScalarCost", ScalarCost)
+        << ore::NV("AnyVectorized", AnyVectorized));
+
+    ChkBuilder.SetInsertPoint(CheckBB->getTerminator());
+    SCEVExpander Exp(*SE, BB->getParent()->getParent()->getDataLayout(),
+                     "memcheck");
+    Value *MemoryOverlap = addDiffRuntimeChecks(
+        CheckBB->getTerminator(), PointerChecks, Exp,
+        [MaxDist](IRBuilderBase &B, unsigned Bits) {
+          return B.getIntN(Bits, MaxDist);
+        },
+        1);
+    /*    Value *MemoryOverlap =*/
+    /*addRuntimeChecks(CheckBB->getTerminator(), nullptr, PointerChecks, Exp);*/
+    assert(MemoryOverlap &&
+           "runtime checks required, but no checks generated in IR?");
+    cast<BranchInst>(CheckBB->getTerminator())->setCondition(MemoryOverlap);
+    NumVersioningSuccessful++;
+  }
+  DTU.flush();
+  DT->updateDFSNumbers();
+
+  return {Changed, CFGChanged};
+}
+
+SLPVectorizerResult SLPVectorizerPass::runImpl(
+    Function &F, ScalarEvolution *SE_, TargetTransformInfo *TTI_,
+    TargetLibraryInfo *TLI_, AAResults *AA_, LoopInfo *LI_, DominatorTree *DT_,
+    AssumptionCache *AC_, DemandedBits *DB_, OptimizationRemarkEmitter *ORE_) {
   if (!RunSLPVectorization)
-    return false;
+    return {false, false};
   SE = SE_;
   TTI = TTI_;
   TLI = TLI_;
@@ -11105,18 +11564,19 @@ bool SLPVectorizerPass::runImpl(Function &F, ScalarEvolution *SE_,
   Stores.clear();
   GEPs.clear();
   bool Changed = false;
+  bool CFGChanged = false;
 
   // If the target claims to have no vector registers don't attempt
   // vectorization.
   if (!TTI->getNumberOfRegisters(TTI->getRegisterClassForType(true))) {
     LLVM_DEBUG(
         dbgs() << "SLP: Didn't find any vector registers for target, abort.\n");
-    return false;
+    return {false, false};
   }
 
   // Don't vectorize when the attribute NoImplicitFloat is used.
   if (F.hasFnAttribute(Attribute::NoImplicitFloat))
-    return false;
+    return {false, false};
 
   LLVM_DEBUG(dbgs() << "SLP: Analyzing blocks in " << F.getName() << ".\n");
 
@@ -11130,21 +11590,31 @@ bool SLPVectorizerPass::runImpl(Function &F, ScalarEvolution *SE_,
   // Update DFS numbers now so that we can use them for ordering.
   DT->updateDFSNumbers();
 
+  SmallVector<BasicBlock *, 4> BlocksToRetry;
+  SmallVector<SmallPtrSet<Value *, 8>, 4> BoundsToUse;
   // Scan the blocks in the function in post order.
   for (auto *BB : post_order(&F.getEntryBlock())) {
     // Start new block - clear the list of reduction roots.
     R.clearReductionData();
     collectSeedInstructions(BB);
 
+    bool VectorizedBlock = false;
     // Vectorize trees that end at stores.
     if (!Stores.empty()) {
       LLVM_DEBUG(dbgs() << "SLP: Found stores for " << Stores.size()
                         << " underlying objects.\n");
-      Changed |= vectorizeStoreChains(R);
+      R.TrackedObjects.clear();
+
+      if (EnableMemoryVersioning)
+        R.CollectMemAccess = BB->size() <= 300;
+
+      VectorizedBlock = vectorizeStoreChains(R);
+
+      R.CollectMemAccess = false;
     }
 
     // Vectorize trees that end at reductions.
-    Changed |= vectorizeChainsInBlock(BB, R);
+    VectorizedBlock |= vectorizeChainsInBlock(BB, R);
 
     // Vectorize the index computations of getelementptr instructions. This
     // is primarily intended to catch gather-like idioms ending at
@@ -11152,15 +11622,30 @@ bool SLPVectorizerPass::runImpl(Function &F, ScalarEvolution *SE_,
     if (!GEPs.empty()) {
       LLVM_DEBUG(dbgs() << "SLP: Found GEPs for " << GEPs.size()
                         << " underlying objects.\n");
-      Changed |= vectorizeGEPIndices(BB, R);
+      VectorizedBlock |= vectorizeGEPIndices(BB, R);
     }
+
+    if (!VectorizedBlock && !R.TrackedObjects.empty()) {
+      BlocksToRetry.push_back(BB);
+      BoundsToUse.push_back(R.TrackedObjects);
+    }
+    R.TrackedObjects.clear();
+    Changed |= VectorizedBlock;
+  }
+
+  for (unsigned I = 0; I != BlocksToRetry.size(); I++) {
+    auto Status =
+        vectorizeBlockWithVersioning(BlocksToRetry[I], BoundsToUse[I], R);
+    Changed |= Status.MadeAnyChange;
+    CFGChanged |= Status.MadeCFGChange;
   }
 
   if (Changed) {
     R.optimizeGatherSequence();
     LLVM_DEBUG(dbgs() << "SLP: vectorized \"" << F.getName() << "\"\n");
   }
-  return Changed;
+
+  return {Changed, CFGChanged};
 }
 
 bool SLPVectorizerPass::vectorizeStoreChain(ArrayRef<Value *> Chain, BoUpSLP &R,
