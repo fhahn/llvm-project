@@ -4556,6 +4556,7 @@ void SelectionDAGBuilder::visitLoad(const LoadInst &I) {
   SmallVector<SDValue, 4> Values(NumValues);
   SmallVector<SDValue, 4> Chains(std::min(MaxParallelChains, NumValues));
 
+  const auto *PtrProvenance = I.getOptionalPtrProvenance().value_or(nullptr);
   unsigned ChainI = 0;
   for (unsigned i = 0; i != NumValues; ++i, ++ChainI) {
     // Serializing loads here may result in excessive register pressure, and
@@ -4575,7 +4576,7 @@ void SelectionDAGBuilder::visitLoad(const LoadInst &I) {
     // TODO: MachinePointerInfo only supports a fixed length offset.
     MachinePointerInfo PtrInfo =
         !Offsets[i].isScalable() || Offsets[i].isZero()
-            ? MachinePointerInfo(SV, Offsets[i].getKnownMinValue())
+            ? MachinePointerInfo(SV, Offsets[i].getKnownMinValue(), 0, PtrProvenance)
             : MachinePointerInfo();
 
     SDValue A = DAG.getObjectPtrOffset(dl, Ptr, Offsets[i]);
@@ -4702,6 +4703,7 @@ void SelectionDAGBuilder::visitStore(const StoreInst &I) {
 
   auto MMOFlags = TLI.getStoreMemOperandFlags(I, DAG.getDataLayout());
 
+  const auto *PtrProvenance = I.getOptionalPtrProvenance().value_or(nullptr);
   unsigned ChainI = 0;
   for (unsigned i = 0; i != NumValues; ++i, ++ChainI) {
     // See visitLoad comments.
@@ -4715,7 +4717,7 @@ void SelectionDAGBuilder::visitStore(const StoreInst &I) {
     // TODO: MachinePointerInfo only supports a fixed length offset.
     MachinePointerInfo PtrInfo =
         !Offsets[i].isScalable() || Offsets[i].isZero()
-            ? MachinePointerInfo(PtrV, Offsets[i].getKnownMinValue())
+            ? MachinePointerInfo(PtrV, Offsets[i].getKnownMinValue(), 0, PtrProvenance)
             : MachinePointerInfo();
 
     SDValue Add = DAG.getObjectPtrOffset(dl, Ptr, Offsets[i]);
@@ -7377,6 +7379,7 @@ void SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I,
   case Intrinsic::ptr_annotation:
   case Intrinsic::launder_invariant_group:
   case Intrinsic::strip_invariant_group:
+  case Intrinsic::experimental_ptr_provenance:
     // Drop the intrinsic, but forward the value
     setValue(&I, getValue(I.getOperand(0)));
     return;
