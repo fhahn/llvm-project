@@ -445,11 +445,17 @@ bool isIntrinsicReturningPointerAliasingArgumentWithoutCapturing(
 /// original object being addressed. Note that the returned value has pointer
 /// type if the specified value does. If the \p MaxLookup value is non-zero, it
 /// limits the number of instructions to be stripped off.
-const Value *getUnderlyingObject(const Value *V, unsigned MaxLookup = 6);
-inline Value *getUnderlyingObject(Value *V, unsigned MaxLookup = 6) {
+/// When FollowProvenance is set, the provenance side of
+/// llvm.experimental.ptr.provenance is taken. For provenance,
+/// `UnknownProvenance` indicates that any valid object can be the underlying
+/// object.
+
+const Value *getUnderlyingObject(const Value *V, unsigned MaxLookup = 6, bool FollowProvenance = false);
+inline Value *getUnderlyingObject(Value *V, unsigned MaxLookup = 6, bool FollowProvenance = false) {
   // Force const to avoid infinite recursion.
   const Value *VConst = V;
-  return const_cast<Value *>(getUnderlyingObject(VConst, MaxLookup));
+  return const_cast<Value *>(
+      getUnderlyingObject(VConst, MaxLookup, FollowProvenance));
 }
 
 /// Like getUnderlyingObject(), but will try harder to find a single underlying
@@ -484,9 +490,12 @@ const Value *getUnderlyingObjectAggressive(const Value *V);
 /// Since A[i] and A[i-1] are independent pointers, getUnderlyingObjects
 /// should not assume that Curr and Prev share the same underlying object thus
 /// it shouldn't look through the phi above.
+/// When FollowProvenance is set, the provenance side of
+/// llvm.experimental.ptr.provenance is taken.
 void getUnderlyingObjects(const Value *V,
                           SmallVectorImpl<const Value *> &Objects,
-                          const LoopInfo *LI = nullptr, unsigned MaxLookup = 6);
+                          const LoopInfo *LI = nullptr, unsigned MaxLookup = 6,
+                          bool FollowProvenance = false);
 
 /// This is a wrapper around getUnderlyingObjects and adds support for basic
 /// ptrtoint+arithmetic+inttoptr sequences.
