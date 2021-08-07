@@ -10683,8 +10683,8 @@ void BoUpSLP::BlockScheduling::calculateDependencies(ScheduleData *SD,
               auto SrcObjAndPtr = AccessInfo::get(*SrcInst, *SLP->SE, *SLP->DT);
               auto DstObjAndPtr =
                   AccessInfo::get(*DepDest->Inst, *SLP->SE, *SLP->DT);
-              if (!SrcObjAndPtr.UnderlyingObj || !DstObjAndPtr.UnderlyingObj ||
-                  SrcObjAndPtr.UnderlyingObj == DstObjAndPtr.UnderlyingObj)
+              if (!SrcObjAndPtr.UnderlyingObj ||
+                  !DstObjAndPtr.UnderlyingObj)
                 SLP->TrackedObjects.clear();
               else {
                 SLP->TrackedObjects.insert(SrcObjAndPtr.UnderlyingObj);
@@ -11306,8 +11306,22 @@ SLPVectorizerResult SLPVectorizerPass::vectorizeBlockWithVersioning(
     LastTrackedInst = &I;
   }
 
+  // Weed out bounds with small range, runtime checks for those are unlikely to
+  // be profitable over all.
+  for (auto &P : make_early_inc_range(MemBounds)) {
+    auto *Distance = SE->getMinusSCEV(P.second.High, P.second.Low);
+    if (isa<SCEVCouldNotCompute>(Distance) ||
+        !SE->isKnownPredicate(CmpInst::ICMP_UGE, Distance,
+                              SE->getConstant(Distance->getType(), 4)))
+      MemBounds.erase(P.first);
+
+    if (BB->getParent()->getName() == "x264_mb_cache_mv_p8x8")
+      dbgs() << "DIST " << *Distance << " " << *P.second.High << " "
+             << *P.second.Low << "\n";
+  }
+
   // Not enough memory access bounds for runtime checks.
-  if (MemBounds.size() < 2 || WrittenObjs.empty())
+  if (MemBounds.size() < 2 || WrittenObjs.empty() || MemBounds.size() > 4)
     return {Changed, CFGChanged};
 
   // Check if all uses between the first and last tracked instruction are inside
@@ -11470,7 +11484,7 @@ SLPVectorizerResult SLPVectorizerPass::vectorizeBlockWithVersioning(
   collectSeedInstructions(VectorBB);
 
   // Vectorize trees that end at stores.
-  assert(!Stores.empty() && "should have stores when versioning");
+  // assert(!Stores.empty() && "should have stores when versioning");
   LLVM_DEBUG(dbgs() << "SLP: Found stores for " << Stores.size()
                     << " underlying objects.\n");
   bool AnyVectorized = vectorizeStoreChains(R);
@@ -11605,8 +11619,13 @@ SLPVectorizerResult SLPVectorizerPass::runImpl(
                         << " underlying objects.\n");
       R.TrackedObjects.clear();
 
-      if (EnableMemoryVersioning)
-        R.CollectMemAccess = BB->size() <= 300;
+      if (EnableMemoryVersioning) {
+        R.CollectMemAccess =
+            BB->size() > 10 &&
+            BB->size() <=
+                300; //&& any_of(Stores, [](const decltype(Stores.front()) &P) {
+                     //return P.second.size() >= 4; });
+      }
 
       VectorizedBlock = vectorizeStoreChains(R);
 
@@ -11625,7 +11644,7 @@ SLPVectorizerResult SLPVectorizerPass::runImpl(
       VectorizedBlock |= vectorizeGEPIndices(BB, R);
     }
 
-    if (!VectorizedBlock && !R.TrackedObjects.empty()) {
+    if (!R.TrackedObjects.empty()) {
       BlocksToRetry.push_back(BB);
       BoundsToUse.push_back(R.TrackedObjects);
     }

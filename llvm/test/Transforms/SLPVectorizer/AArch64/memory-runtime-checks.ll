@@ -1057,6 +1057,7 @@ define i32 @block_partly_vectorized_without_versioning(ptr readonly %arg, ptr no
 ; CHECK-LABEL: @block_partly_vectorized_without_versioning(
 ; CHECK-NEXT:  bb:
 ; CHECK-NEXT:    [[T:%.*]] = alloca <16 x i8>, align 16
+<<<<<<< HEAD
 ; CHECK-NEXT:    [[T5:%.*]] = getelementptr inbounds i8, ptr [[ARG3:%.*]], i64 1
 ; CHECK-NEXT:    [[T6:%.*]] = getelementptr inbounds i8, ptr [[ARG3]], i64 2
 ; CHECK-NEXT:    [[T7:%.*]] = getelementptr inbounds i8, ptr [[ARG3]], i64 3
@@ -1079,6 +1080,46 @@ define i32 @block_partly_vectorized_without_versioning(ptr readonly %arg, ptr no
 ; CHECK-NEXT:    call void @foo(ptr nonnull [[T]])
 ; CHECK-NEXT:    [[T26:%.*]] = load i8, ptr [[ARG3]], align 1
 ; CHECK-NEXT:    [[T27:%.*]] = load i8, ptr [[ARG2:%.*]], align 1
+=======
+; CHECK-NEXT:    [[T4:%.*]] = getelementptr inbounds <16 x i8>, <16 x i8>* [[T]], i64 0, i64 0
+; CHECK-NEXT:    [[T5:%.*]] = getelementptr inbounds i8, i8* [[ARG3:%.*]], i64 1
+; CHECK-NEXT:    [[T6:%.*]] = getelementptr inbounds i8, i8* [[ARG3]], i64 2
+; CHECK-NEXT:    [[T7:%.*]] = getelementptr inbounds i8, i8* [[ARG3]], i64 3
+; CHECK-NEXT:    [[T8:%.*]] = getelementptr inbounds i8, i8* [[ARG3]], i64 4
+; CHECK-NEXT:    [[T9:%.*]] = getelementptr inbounds i8, i8* [[ARG3]], i64 5
+; CHECK-NEXT:    [[T10:%.*]] = getelementptr inbounds i8, i8* [[ARG3]], i64 6
+; CHECK-NEXT:    [[T11:%.*]] = getelementptr inbounds i8, i8* [[ARG3]], i64 7
+; CHECK-NEXT:    [[T12:%.*]] = getelementptr inbounds i8, i8* [[ARG3]], i64 8
+; CHECK-NEXT:    [[T13:%.*]] = getelementptr inbounds i8, i8* [[ARG3]], i64 9
+; CHECK-NEXT:    [[T14:%.*]] = getelementptr inbounds i8, i8* [[ARG3]], i64 10
+; CHECK-NEXT:    [[T15:%.*]] = getelementptr inbounds i8, i8* [[ARG3]], i64 11
+; CHECK-NEXT:    [[T16:%.*]] = getelementptr inbounds i8, i8* [[ARG3]], i64 12
+; CHECK-NEXT:    [[T17:%.*]] = getelementptr inbounds i8, i8* [[ARG3]], i64 13
+; CHECK-NEXT:    [[T18:%.*]] = getelementptr inbounds i8, i8* [[ARG3]], i64 14
+; CHECK-NEXT:    [[T19:%.*]] = bitcast i8* [[ARG1:%.*]] to <16 x i8>*
+; CHECK-NEXT:    [[A_GEP_0:%.*]] = getelementptr i8, i8* [[A:%.*]], i64 0
+; CHECK-NEXT:    [[B_GEP_0:%.*]] = getelementptr i8, i8* [[B:%.*]], i64 0
+; CHECK-NEXT:    [[R_GEP_0:%.*]] = getelementptr i8, i8* [[ARG1]], i64 0
+; CHECK-NEXT:    [[TMP0:%.*]] = bitcast i8* [[A_GEP_0]] to <16 x i8>*
+; CHECK-NEXT:    [[TMP1:%.*]] = load <16 x i8>, <16 x i8>* [[TMP0]], align 1
+; CHECK-NEXT:    [[TMP2:%.*]] = bitcast i8* [[B_GEP_0]] to <16 x i8>*
+; CHECK-NEXT:    [[TMP3:%.*]] = load <16 x i8>, <16 x i8>* [[TMP2]], align 1
+; CHECK-NEXT:    [[TMP4:%.*]] = xor <16 x i8> [[TMP1]], [[TMP3]]
+; CHECK-NEXT:    [[TMP5:%.*]] = bitcast i8* [[R_GEP_0]] to <16 x i8>*
+; CHECK-NEXT:    store <16 x i8> [[TMP4]], <16 x i8>* [[TMP5]], align 1
+; CHECK-NEXT:    [[T21:%.*]] = getelementptr inbounds i8, i8* [[ARG3]], i64 15
+; CHECK-NEXT:    [[T22:%.*]] = bitcast i8* [[ARG3]] to <16 x i8>*
+; CHECK-NEXT:    call void @foo(i8* nonnull [[T4]])
+; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, i8* [[ARG3]], i64 16
+; CHECK-NEXT:    [[SCEVGEP65:%.*]] = getelementptr i8, i8* [[ARG2:%.*]], i64 16
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult i8* [[ARG3]], [[SCEVGEP65]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult i8* [[ARG2]], [[SCEVGEP]]
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], label [[BB_SCALAR:%.*]], label [[BB_SLPVERSIONED1:%.*]]
+; CHECK:       bb.scalar:
+; CHECK-NEXT:    [[T26:%.*]] = load i8, i8* [[ARG3]], align 1
+; CHECK-NEXT:    [[T27:%.*]] = load i8, i8* [[ARG2]], align 1
+>>>>>>> 5ed056af8d99 (Generalize a bit.)
 ; CHECK-NEXT:    [[T28:%.*]] = xor i8 [[T27]], [[T26]]
 ; CHECK-NEXT:    store i8 [[T28]], ptr [[ARG2]], align 1
 ; CHECK-NEXT:    [[T29:%.*]] = load i8, ptr [[T5]], align 1
@@ -1155,8 +1196,23 @@ define i32 @block_partly_vectorized_without_versioning(ptr readonly %arg, ptr no
 ; CHECK-NEXT:    [[T86:%.*]] = getelementptr inbounds i8, ptr [[ARG2]], i64 15
 ; CHECK-NEXT:    [[T87:%.*]] = load i8, ptr [[T86]], align 1
 ; CHECK-NEXT:    [[T88:%.*]] = xor i8 [[T87]], [[T85]]
+<<<<<<< HEAD
 ; CHECK-NEXT:    store i8 [[T88]], ptr [[T86]], align 1
+=======
+; CHECK-NEXT:    store i8 [[T88]], i8* [[T86]], align 1
+; CHECK-NEXT:    br label [[BB_MERGE:%.*]]
+; CHECK:       bb.merge:
+>>>>>>> 5ed056af8d99 (Generalize a bit.)
 ; CHECK-NEXT:    ret i32 1
+; CHECK:       bb.slpversioned1:
+; CHECK-NEXT:    [[TMP6:%.*]] = bitcast i8* [[ARG3]] to <16 x i8>*
+; CHECK-NEXT:    [[TMP7:%.*]] = load <16 x i8>, <16 x i8>* [[TMP6]], align 1, !alias.scope !35, !noalias !38
+; CHECK-NEXT:    [[TMP8:%.*]] = bitcast i8* [[ARG2]] to <16 x i8>*
+; CHECK-NEXT:    [[TMP9:%.*]] = load <16 x i8>, <16 x i8>* [[TMP8]], align 1, !alias.scope !38, !noalias !35
+; CHECK-NEXT:    [[TMP10:%.*]] = xor <16 x i8> [[TMP9]], [[TMP7]]
+; CHECK-NEXT:    [[TMP11:%.*]] = bitcast i8* [[ARG2]] to <16 x i8>*
+; CHECK-NEXT:    store <16 x i8> [[TMP10]], <16 x i8>* [[TMP11]], align 1, !alias.scope !38, !noalias !35
+; CHECK-NEXT:    br label [[BB_MERGE]]
 ;
 bb:
   %t = alloca <16 x i8>, align 16

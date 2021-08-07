@@ -239,6 +239,7 @@ entry:
 
 define void @tiny_vector_gather(ptr %a, ptr %v1, ptr %v2) {
 ; CHECK-LABEL: @tiny_vector_gather(
+<<<<<<< HEAD
 ; CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr [[V1:%.*]], align 4
 ; CHECK-NEXT:    [[TMP2:%.*]] = load i32, ptr [[V2:%.*]], align 4
 ; CHECK-NEXT:    store i32 [[TMP1]], ptr [[A:%.*]], align 16
@@ -256,6 +257,27 @@ define void @tiny_vector_gather(ptr %a, ptr %v1, ptr %v2) {
 ; CHECK-NEXT:    store i32 [[TMP1]], ptr [[PTR6]], align 8
 ; CHECK-NEXT:    [[PTR7:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 7
 ; CHECK-NEXT:    store i32 [[TMP2]], ptr [[PTR7]], align 4
+=======
+; CHECK-NEXT:  .scalar:
+; CHECK-NEXT:    [[TMP0:%.*]] = load i32, i32* [[V1:%.*]], align 4
+; CHECK-NEXT:    [[TMP1:%.*]] = load i32, i32* [[V2:%.*]], align 4
+; CHECK-NEXT:    [[PTR0:%.*]] = getelementptr inbounds i32, i32* [[A:%.*]], i64 0
+; CHECK-NEXT:    store i32 [[TMP0]], i32* [[PTR0]], align 16
+; CHECK-NEXT:    [[PTR1:%.*]] = getelementptr inbounds i32, i32* [[A]], i64 1
+; CHECK-NEXT:    store i32 [[TMP1]], i32* [[PTR1]], align 4
+; CHECK-NEXT:    [[PTR2:%.*]] = getelementptr inbounds i32, i32* [[A]], i64 2
+; CHECK-NEXT:    store i32 [[TMP0]], i32* [[PTR2]], align 8
+; CHECK-NEXT:    [[PTR3:%.*]] = getelementptr inbounds i32, i32* [[A]], i64 3
+; CHECK-NEXT:    store i32 [[TMP1]], i32* [[PTR3]], align 4
+; CHECK-NEXT:    [[PTR4:%.*]] = getelementptr inbounds i32, i32* [[A]], i64 4
+; CHECK-NEXT:    store i32 [[TMP0]], i32* [[PTR4]], align 16
+; CHECK-NEXT:    [[PTR5:%.*]] = getelementptr inbounds i32, i32* [[A]], i64 5
+; CHECK-NEXT:    store i32 [[TMP1]], i32* [[PTR5]], align 4
+; CHECK-NEXT:    [[PTR6:%.*]] = getelementptr inbounds i32, i32* [[A]], i64 6
+; CHECK-NEXT:    store i32 [[TMP0]], i32* [[PTR6]], align 8
+; CHECK-NEXT:    [[PTR7:%.*]] = getelementptr inbounds i32, i32* [[A]], i64 7
+; CHECK-NEXT:    store i32 [[TMP1]], i32* [[PTR7]], align 4
+>>>>>>> 5ed056af8d99 (Generalize a bit.)
 ; CHECK-NEXT:    ret void
 ;
   %1 = load i32, ptr %v1, align 4
