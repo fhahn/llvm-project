@@ -187,7 +187,7 @@ static cl::opt<bool>
                 cl::desc("Display the SLP trees with Graphviz"));
 
 static cl::opt<bool> EnableMemoryVersioning(
-    "slp-memory-versioning", cl::init(false), cl::Hidden,
+    "slp-memory-versioning", cl::init(true), cl::Hidden,
     cl::desc("Enable memory versioning for SLP vectorization."));
 
 // Limit the number of alias checks. The limit is chosen so that
