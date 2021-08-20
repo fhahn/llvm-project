@@ -287,6 +287,7 @@ typedef enum {
   LLVMPoisonValueValueKind,
   LLVMConstantTargetNoneValueKind,
   LLVMConstantPtrAuthValueKind,
+  LLVMUnknownProvenanceValueKind
 } LLVMValueKind;
 
 typedef enum {
@@ -2197,6 +2198,19 @@ LLVMBool LLVMIsNull(LLVMValueRef Val);
  * specified type.
  */
 LLVMValueRef LLVMConstPointerNull(LLVMTypeRef Ty);
+
+/**
+ * Determine whether a value instance is unknown_provenance.
+ *
+ * @see llvm::UnknownProvenance
+ */
+LLVMBool LLVMIsUnknownProvenance(LLVMValueRef Val);
+
+/**
+ * Obtain a constant that is an constant pointer pointing to unknown_provenance
+ * for a specified type.
+ */
+LLVMValueRef LLVMGetUnknownProvenance(LLVMTypeRef Ty);
 
 /**
  * @defgroup LLVMCCoreValueConstantScalar Scalar constants
