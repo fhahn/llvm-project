@@ -684,7 +684,7 @@ visitPointers(Value *StartPtr, const Loop &InnermostLoop,
       for (const Use &Inc : PN->incoming_values())
         WorkList.push_back(Inc);
     } else
-      AddPointer(Ptr, PSE.getSE()->getSCEV(Ptr));
+      AddPointer(Ptr, replaceSymbolicStrideSCEV(PSE, SymbolicStrides, Ptr));
   }
 }
 
@@ -763,7 +763,7 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
     SmallVector<MemAccessInfo, 4> AccessInfos;
     for (const auto &A : AS) {
       Value *Ptr = A.getValue();
-      const SCEV *PtrScev = PSE.getSE()->getSCEV(Ptr);
+      const SCEV *PtrScev = replaceSymbolicStrideSCEV(PSE, StridesMap, Ptr);
       bool IsWrite = Accesses.count(MemAccessInfo(Ptr, true, PtrScev));
 
       if (IsWrite)
@@ -933,8 +933,8 @@ void AccessAnalysis::processMemAccesses(ValueToValueMap &SymbolicStrides) {
           if (UseDeferred && !IsReadOnlyPtr)
             continue;
 
-          const SCEV *PtrExpr = PSE.getSE()->getSCEV(Ptr);
-
+          const SCEV *PtrExpr =
+              replaceSymbolicStrideSCEV(PSE, SymbolicStrides, Ptr);
           // Otherwise, the pointer must be in the PtrAccessSet, either as a
           // read or a write.
           assert(((IsReadOnlyPtr && UseDeferred) || IsWrite ||

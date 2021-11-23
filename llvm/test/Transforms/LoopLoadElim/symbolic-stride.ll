@@ -59,8 +59,8 @@ for.end:                                          ; preds = %for.body
 define void @two_strides(i32* noalias nocapture %A, i32* noalias nocapture readonly %B, i64 %N,
                          i64 %stride.1, i64 %stride.2) {
 
-; TWO_STRIDE_SPEC: %ident.check = icmp ne i64 %stride.2, 1
-; TWO_STRIDE_SPEC: %ident.check1 = icmp ne i64 %stride.1, 1
+; TWO_STRIDE_SPEC: %ident.check = icmp ne i64 %stride.1, 1
+; TWO_STRIDE_SPEC: %ident.check1 = icmp ne i64 %stride.2, 1
 ; NO_TWO_STRIDE_SPEC-NOT: %ident.check{{.*}} = icmp ne i64 %stride{{.*}}, 1
 
 entry:

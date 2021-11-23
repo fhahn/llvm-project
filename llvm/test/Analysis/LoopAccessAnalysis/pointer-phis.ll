@@ -206,6 +206,10 @@ define i32 @store_with_pointer_phi_incoming_phi(double* %A, double* %B, double* 
 ; CHECK-NEXT:          %v8 = load double, double* %arrayidx, align 8 ->
 ; CHECK-NEXT:          store double %mul16, double* %ptr.2, align 8
 ; CHECK-EMPTY:
+; CHECK-NEXT:      Unknown:
+; CHECK-NEXT:          %v8 = load double, double* %arrayidx, align 8 ->
+; CHECK-NEXT:          store double %mul16, double* %ptr.2, align 8
+; CHECK-EMPTY:
 ; CHECK-NEXT:    Run-time memory checks:
 ; CHECK-NEXT:    Check 0:
 ; CHECK-NEXT:      Comparing group ([[GROUP_C:.+]]):
@@ -278,6 +282,10 @@ define i32 @store_with_pointer_phi_incoming_phi_irreducible_cycle(double* %A, do
 ; CHECK-NEXT:  loop.header:
 ; CHECK-NEXT:    Report: unsafe dependent memory operations in loop. Use #pragma loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
 ; CHECK-NEXT:    Dependences:
+; CHECK-NEXT:      Unknown:
+; CHECK-NEXT:          %v8 = load double, double* %arrayidx, align 8 ->
+; CHECK-NEXT:          store double %mul16, double* %ptr.3, align 8
+; CHECK-EMPTY:
 ; CHECK-NEXT:      Unknown:
 ; CHECK-NEXT:          %v8 = load double, double* %arrayidx, align 8 ->
 ; CHECK-NEXT:          store double %mul16, double* %ptr.3, align 8
@@ -429,6 +437,14 @@ define void @phi_load_store_memdep_check(i1 %c, i16* %A, i16* %B, i16* %C) {
 ; CHECK-NEXT:      Unknown:
 ; CHECK-NEXT:          store i16 %lv, i16* %A, align 1 ->
 ; CHECK-NEXT:          %lv2 = load i16, i16* %A, align 1
+; CHECK-EMPTY:
+; CHECK-NEXT:      Unknown:
+; CHECK-NEXT:          %lv3 = load i16, i16* %c.sink, align 2 ->
+; CHECK-NEXT:          store i16 %add, i16* %c.sink, align 1
+; CHECK-EMPTY:
+; CHECK-NEXT:      Unknown:
+; CHECK-NEXT:          %lv3 = load i16, i16* %c.sink, align 2 ->
+; CHECK-NEXT:          store i16 %add, i16* %c.sink, align 1
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    Run-time memory checks:
 ; CHECK-NEXT:    Check 0:
