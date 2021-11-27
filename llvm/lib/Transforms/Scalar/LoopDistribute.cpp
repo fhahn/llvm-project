@@ -510,24 +510,24 @@ public:
     SmallVector<int, 8> PtrToPartitions(N);
     for (unsigned I = 0; I < N; ++I) {
       Value *Ptr = RtPtrCheck->Pointers[I].PointerValue;
-      auto Instructions =
-          LAI.getInstructionsForAccess(Ptr, RtPtrCheck->Pointers[I].IsWritePtr);
+/*      auto Instructions =*/
+          /*LAI.getInstructionsForAccess(Ptr, RtPtrCheck->Pointers[I].IsWritePtr, {});*/
 
       int &Partition = PtrToPartitions[I];
       // First set it to uninitialized.
       Partition = -2;
-      for (Instruction *Inst : Instructions) {
-        // Note that this could be -1 if Inst is duplicated across multiple
-        // partitions.
-        int ThisPartition = this->InstToPartitionId[Inst];
-        if (Partition == -2)
-          Partition = ThisPartition;
-        // -1 means belonging to multiple partitions.
-        else if (Partition == -1)
-          break;
-        else if (Partition != (int)ThisPartition)
-          Partition = -1;
-      }
+  /*    for (Instruction *Inst : Instructions) {*/
+        /*// Note that this could be -1 if Inst is duplicated across multiple*/
+        /*// partitions.*/
+        /*int ThisPartition = this->InstToPartitionId[Inst];*/
+        /*if (Partition == -2)*/
+          /*Partition = ThisPartition;*/
+        /*// -1 means belonging to multiple partitions.*/
+        /*else if (Partition == -1)*/
+          /*break;*/
+        /*else if (Partition != (int)ThisPartition)*/
+          /*Partition = -1;*/
+      /*}*/
       assert(Partition != -2 && "Pointer not belonging to any partition");
     }
 

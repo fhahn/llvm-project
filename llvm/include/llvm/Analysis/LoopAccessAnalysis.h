@@ -52,9 +52,9 @@ struct VectorizerParams {
 
 struct MemAccessInfo {
   PointerIntPair<Value *, 1, bool> ValueAndBool;
-  MemAccessInfo(Value *V, bool B, const SCEV *PtrExpr = nullptr)
+  MemAccessInfo(Value *V, bool B, const SCEV *PtrExpr)
       : ValueAndBool(V, B), PtrExpr(PtrExpr) {}
-   MemAccessInfo() : ValueAndBool(nullptr) {}
+  MemAccessInfo() : ValueAndBool(nullptr) {}
   MemAccessInfo(PointerIntPair<Value *, 1, bool> V) : ValueAndBool(V) {}
 
   const SCEV *PtrExpr = nullptr;
@@ -69,7 +69,7 @@ struct MemAccessInfo {
     return ValueAndBool < RHS.ValueAndBool;
   }
   bool operator==(const MemAccessInfo &RHS) const {
-    return ValueAndBool == RHS.ValueAndBool;// && PtrExpr == RHS.PtrExpr;
+    return ValueAndBool == RHS.ValueAndBool && PtrExpr == RHS.PtrExpr;
   }
 };
 
@@ -288,8 +288,9 @@ public:
   }
 
   /// Find the set of instructions that read or write via \p Ptr.
-  SmallVector<Instruction *, 4> getInstructionsForAccess(Value *Ptr,
-                                                         bool isWrite) const;
+  SmallVector<Instruction *, 4>
+  getInstructionsForAccess(Value *Ptr, bool isWrite,
+                           const ValueToValueMap &SymbolicStrides) const;
 
 private:
   /// A wrapper around ScalarEvolution, used to add runtime SCEV checks, and
@@ -604,9 +605,10 @@ public:
 
   /// Return the list of instructions that use \p Ptr to read or write
   /// memory.
-  SmallVector<Instruction *, 4> getInstructionsForAccess(Value *Ptr,
-                                                         bool isWrite) const {
-    return DepChecker->getInstructionsForAccess(Ptr, isWrite);
+  SmallVector<Instruction *, 4>
+  getInstructionsForAccess(Value *Ptr, bool isWrite,
+                           const ValueToValueMap &SymbolicStrides) const {
+    return DepChecker->getInstructionsForAccess(Ptr, isWrite, SymbolicStrides);
   }
 
   /// If an access has a symbolic strides, this maps the pointer value to
