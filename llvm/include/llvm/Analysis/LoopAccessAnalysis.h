@@ -50,6 +50,49 @@ struct VectorizerParams {
   static unsigned RuntimeMemoryCheckThreshold;
 };
 
+struct MemAccessInfo {
+  PointerIntPair<Value *, 1, bool> ValueAndBool;
+  MemAccessInfo(Value *V, bool B) : ValueAndBool(V, B) {}
+  MemAccessInfo() : ValueAndBool(nullptr) {}
+  MemAccessInfo(PointerIntPair<Value *, 1, bool> V) : ValueAndBool(V) {}
+
+  const SCEV *PtrExpr = nullptr;
+
+  Value *getPointer() { return ValueAndBool.getPointer(); }
+  bool isWrite() { return ValueAndBool.getInt(); }
+  Value *getPointer() const { return ValueAndBool.getPointer(); }
+  bool isWrite() const { return ValueAndBool.getInt(); }
+  const SCEV *getPtrExpr() const { return PtrExpr; }
+
+  bool operator<(const MemAccessInfo &RHS) const {
+    return ValueAndBool < RHS.ValueAndBool;
+  }
+  bool operator==(const MemAccessInfo &RHS) const {
+    return ValueAndBool == RHS.ValueAndBool && PtrExpr == RHS.PtrExpr;
+  }
+};
+
+template <> struct DenseMapInfo<MemAccessInfo> {
+  using Ty = DenseMapInfo<PointerIntPair<Value *, 1, bool>>;
+
+  static MemAccessInfo getEmptyKey() {
+    return MemAccessInfo(Ty::getEmptyKey());
+  }
+
+  static MemAccessInfo getTombstoneKey() {
+    return MemAccessInfo(Ty::getTombstoneKey());
+  }
+
+  static unsigned getHashValue(MemAccessInfo V) {
+    uintptr_t IV = reinterpret_cast<uintptr_t>(V.ValueAndBool.getOpaqueValue());
+    return unsigned(IV) ^ unsigned(IV >> 9);
+  }
+
+  static bool isEqual(const MemAccessInfo &LHS, const MemAccessInfo &RHS) {
+    return LHS == RHS;
+  }
+};
+
 /// Checks memory dependences among accesses to the same underlying
 /// object to determine whether there vectorization is legal or not (and at
 /// which vectorization factor).
@@ -86,7 +129,6 @@ struct VectorizerParams {
 ///
 class MemoryDepChecker {
 public:
-  typedef PointerIntPair<Value *, 1, bool> MemAccessInfo;
   typedef SmallVector<MemAccessInfo, 8> MemAccessInfoList;
   /// Set of potential dependent memory accesses.
   typedef EquivalenceClasses<MemAccessInfo> DepCandidates;
@@ -388,12 +430,15 @@ public:
     /// SCEV for the access.
     const SCEV *Expr;
 
+    /// SCEV for the access.
+    const SCEV *PtrExpr;
+
     PointerInfo(Value *PointerValue, const SCEV *Start, const SCEV *End,
                 bool IsWritePtr, unsigned DependencySetId, unsigned AliasSetId,
-                const SCEV *Expr)
+                const SCEV *Expr, const SCEV *PtrExpr)
         : PointerValue(PointerValue), Start(Start), End(End),
           IsWritePtr(IsWritePtr), DependencySetId(DependencySetId),
-          AliasSetId(AliasSetId), Expr(Expr) {}
+          AliasSetId(AliasSetId), Expr(Expr), PtrExpr(PtrExpr) {}
   };
 
   RuntimePointerChecking(ScalarEvolution *SE) : Need(false), SE(SE) {}
@@ -410,8 +455,8 @@ public:
   /// according to the assumptions that we've made during the analysis.
   /// The method might also version the pointer stride according to \p Strides,
   /// and add new predicates to \p PSE.
-  void insert(Loop *Lp, Value *Ptr, bool WritePtr, unsigned DepSetId,
-              unsigned ASId, const ValueToValueMap &Strides,
+  void insert(Loop *Lp, Value *Ptr, const SCEV *PtrExpr, const SCEV *Sc,
+              bool WritePtr, unsigned DepSetId, unsigned ASId,
               PredicatedScalarEvolution &PSE);
 
   /// No run-time memory checking is necessary.

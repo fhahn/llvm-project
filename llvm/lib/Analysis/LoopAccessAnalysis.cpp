@@ -189,12 +189,11 @@ RuntimeCheckingPtrGroup::RuntimeCheckingPtrGroup(
 ///
 /// There is no conflict when the intervals are disjoint:
 /// NoConflict = (P2.Start >= P1.End) || (P1.Start >= P2.End)
-void RuntimePointerChecking::insert(Loop *Lp, Value *Ptr, bool WritePtr,
+void RuntimePointerChecking::insert(Loop *Lp, Value *Ptr, const SCEV *PtrExpr,
+                                    const SCEV *Sc, bool WritePtr,
                                     unsigned DepSetId, unsigned ASId,
-                                    const ValueToValueMap &Strides,
                                     PredicatedScalarEvolution &PSE) {
   // Get the stride replaced scev.
-  const SCEV *Sc = replaceSymbolicStrideSCEV(PSE, Strides, Ptr);
   ScalarEvolution *SE = PSE.getSE();
 
   const SCEV *ScStart;
@@ -231,7 +230,8 @@ void RuntimePointerChecking::insert(Loop *Lp, Value *Ptr, bool WritePtr,
       SE->getStoreSizeOfExpr(IdxTy, Ptr->getType()->getPointerElementType());
   ScEnd = SE->getAddExpr(ScEnd, EltSizeSCEV);
 
-  Pointers.emplace_back(Ptr, ScStart, ScEnd, WritePtr, DepSetId, ASId, Sc);
+  Pointers.emplace_back(Ptr, ScStart, ScEnd, WritePtr, DepSetId, ASId, Sc,
+                        PtrExpr);
 }
 
 SmallVector<RuntimePointerCheck, 4>
@@ -388,8 +388,7 @@ void RuntimePointerChecking::groupChecks(
     if (Seen.count(I))
       continue;
 
-    MemoryDepChecker::MemAccessInfo Access(Pointers[I].PointerValue,
-                                           Pointers[I].IsWritePtr);
+    MemAccessInfo Access(Pointers[I].PointerValue, Pointers[I].IsWritePtr);
 
     SmallVector<RuntimeCheckingPtrGroup, 2> Groups;
     auto LeaderI = DepCands.findValue(DepCands.getLeaderValue(Access));
@@ -513,7 +512,6 @@ namespace {
 class AccessAnalysis {
 public:
   /// Read or write access location.
-  typedef PointerIntPair<Value *, 1, bool> MemAccessInfo;
   typedef SmallVector<MemAccessInfo, 8> MemAccessInfoList;
 
   AccessAnalysis(Loop *TheLoop, AAResults *AA, LoopInfo *LI,
@@ -723,8 +721,9 @@ bool AccessAnalysis::createCheckForAccess(RuntimePointerChecking &RtCheck,
     // Each access has its own dependence set.
     DepId = RunningDepId++;
 
-  bool IsWrite = Access.getInt();
-  RtCheck.insert(TheLoop, Ptr, IsWrite, DepId, ASId, StridesMap, PSE);
+  bool IsWrite = Access.isWrite();
+  RtCheck.insert(TheLoop, Ptr,replaceSymbolicStrideSCEV(PSE, StridesMap, Ptr),replaceSymbolicStrideSCEV(PSE, StridesMap, Ptr),
+                IsWrite, DepId, ASId, PSE);
   LLVM_DEBUG(dbgs() << "LAA: Found a runtime check ptr:" << *Ptr << '\n');
 
   return true;
@@ -887,9 +886,11 @@ void AccessAnalysis::processMemAccesses() {
   LLVM_DEBUG(dbgs() << "LAA:   Accesses(" << Accesses.size() << "):\n");
   LLVM_DEBUG({
     for (auto A : Accesses)
-      dbgs() << "\t" << *A.getPointer() << " (" <<
-                (A.getInt() ? "write" : (ReadOnlyPtr.count(A.getPointer()) ?
-                                         "read-only" : "read")) << ")\n";
+      dbgs() << "\t" << *A.getPointer() << " ("
+             << (A.isWrite() ? "write"
+                             : (ReadOnlyPtr.count(A.getPointer()) ? "read-only"
+                                                                  : "read"))
+             << ")\n";
   });
 
   // The AliasSetTracker has nicely partitioned our pointers by metadata
@@ -925,7 +926,7 @@ void AccessAnalysis::processMemAccesses() {
           if (AC.getPointer() != Ptr)
             continue;
 
-          bool IsWrite = AC.getInt();
+          bool IsWrite = AC.isWrite();
 
           // If we're using the deferred access set, then it contains only
           // reads.
@@ -1518,8 +1519,8 @@ MemoryDepChecker::isDependent(const MemAccessInfo &A, unsigned AIdx,
 
   Value *APtr = A.getPointer();
   Value *BPtr = B.getPointer();
-  bool AIsWrite = A.getInt();
-  bool BIsWrite = B.getInt();
+  bool AIsWrite = A.isWrite();
+  bool BIsWrite = B.isWrite();
   Type *ATy = APtr->getType()->getPointerElementType();
   Type *BTy = BPtr->getType()->getPointerElementType();
 
@@ -1712,7 +1713,7 @@ bool MemoryDepChecker::areDepsSafe(DepCandidates &AccessSets,
                                    const ValueToValueMap &Strides) {
 
   MaxSafeDepDistBytes = -1;
-  SmallPtrSet<MemAccessInfo, 8> Visited;
+  DenseSet<MemAccessInfo> Visited;
   for (MemAccessInfo CurAccess : CheckDeps) {
     if (Visited.count(CurAccess))
       continue;
@@ -1730,7 +1731,7 @@ bool MemoryDepChecker::areDepsSafe(DepCandidates &AccessSets,
     // Check every access pair.
     while (AI != AE) {
       Visited.insert(*AI);
-      bool AIIsWrite = AI->getInt();
+      bool AIIsWrite = AI->isWrite();
       // Check loads only against next equivalent class, but stores also against
       // other stores in the same equivalence class - to the same address.
       EquivalenceClasses<MemAccessInfo>::member_iterator OI =
