@@ -52,8 +52,9 @@ struct VectorizerParams {
 
 struct MemAccessInfo {
   PointerIntPair<Value *, 1, bool> ValueAndBool;
-  MemAccessInfo(Value *V, bool B) : ValueAndBool(V, B) {}
-  MemAccessInfo() : ValueAndBool(nullptr) {}
+  MemAccessInfo(Value *V, bool B, const SCEV *PtrExpr = nullptr)
+      : ValueAndBool(V, B), PtrExpr(PtrExpr) {}
+   MemAccessInfo() : ValueAndBool(nullptr) {}
   MemAccessInfo(PointerIntPair<Value *, 1, bool> V) : ValueAndBool(V) {}
 
   const SCEV *PtrExpr = nullptr;
@@ -68,7 +69,7 @@ struct MemAccessInfo {
     return ValueAndBool < RHS.ValueAndBool;
   }
   bool operator==(const MemAccessInfo &RHS) const {
-    return ValueAndBool == RHS.ValueAndBool && PtrExpr == RHS.PtrExpr;
+    return ValueAndBool == RHS.ValueAndBool;// && PtrExpr == RHS.PtrExpr;
   }
 };
 
@@ -219,11 +220,11 @@ public:
 
   /// Register the location (instructions are given increasing numbers)
   /// of a write access.
-  void addAccess(StoreInst *SI);
+  void addAccess(StoreInst *SI, const ValueToValueMap &SymbolicStrides);
 
   /// Register the location (instructions are given increasing numbers)
   /// of a write access.
-  void addAccess(LoadInst *LI);
+  void addAccess(LoadInst *LI, const ValueToValueMap &SymbolicStrides);
 
   /// Check whether the dependencies between the accesses are safe.
   ///

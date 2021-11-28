@@ -521,19 +521,19 @@ public:
         IsRTCheckAnalysisNeeded(false), PSE(PSE) {}
 
   /// Register a load  and whether it is only read from.
-  void addLoad(MemoryLocation &Loc, bool IsReadOnly) {
+  void addLoad(MemoryLocation &Loc, bool IsReadOnly, const SCEV *PtrScev) {
     Value *Ptr = const_cast<Value*>(Loc.Ptr);
     AST.add(Ptr, LocationSize::beforeOrAfterPointer(), Loc.AATags);
-    Accesses.insert(MemAccessInfo(Ptr, false));
+    Accesses.insert(MemAccessInfo(Ptr, false, PtrScev));
     if (IsReadOnly)
       ReadOnlyPtr.insert(Ptr);
   }
 
   /// Register a store.
-  void addStore(MemoryLocation &Loc) {
+  void addStore(MemoryLocation &Loc, const SCEV *PtrScev) {
     Value *Ptr = const_cast<Value*>(Loc.Ptr);
     AST.add(Ptr, LocationSize::beforeOrAfterPointer(), Loc.AATags);
-    Accesses.insert(MemAccessInfo(Ptr, true));
+    Accesses.insert(MemAccessInfo(Ptr, true, PtrScev));
   }
 
   /// Check if we can emit a run-time no-alias check for \p Access.
@@ -664,8 +664,11 @@ static bool isNoWrap(PredicatedScalarEvolution &PSE,
   return false;
 }
 
-static void visitPointers(Value *StartPtr, const Loop &InnermostLoop,
-                          function_ref<void(Value *)> AddPointer) {
+static void
+visitPointers(Value *StartPtr, const Loop &InnermostLoop,
+              PredicatedScalarEvolution &PSE,
+              const ValueToValueMap &SymbolicStrides,
+              function_ref<void(Value *, const SCEV *)> AddPointer) {
   SmallPtrSet<Value *, 8> Visited;
   SmallVector<Value *> WorkList;
   WorkList.push_back(StartPtr);
@@ -683,7 +686,7 @@ static void visitPointers(Value *StartPtr, const Loop &InnermostLoop,
       for (const Use &Inc : PN->incoming_values())
         WorkList.push_back(Inc);
     } else
-      AddPointer(Ptr);
+      AddPointer(Ptr, PSE.getSE()->getSCEV(Ptr));
   }
 }
 
@@ -1287,19 +1290,23 @@ bool llvm::isConsecutiveAccess(Value *A, Value *B, const DataLayout &DL,
   return Diff && *Diff == 1;
 }
 
-void MemoryDepChecker::addAccess(StoreInst *SI) {
-  visitPointers(SI->getPointerOperand(), *InnermostLoop,
-                [this, SI](Value *Ptr) {
-                  Accesses[MemAccessInfo(Ptr, true)].push_back(AccessIdx);
+void MemoryDepChecker::addAccess(StoreInst *SI,
+                                 const ValueToValueMap &SymbolicStrides) {
+  visitPointers(SI->getPointerOperand(), *InnermostLoop, PSE, SymbolicStrides,
+                [this, SI](Value *Ptr, const SCEV *PtrScev) {
+                  Accesses[MemAccessInfo(Ptr, true, PtrScev)].push_back(
+                      AccessIdx);
                   InstMap.push_back(SI);
                   ++AccessIdx;
                 });
 }
 
-void MemoryDepChecker::addAccess(LoadInst *LI) {
-  visitPointers(LI->getPointerOperand(), *InnermostLoop,
-                [this, LI](Value *Ptr) {
-                  Accesses[MemAccessInfo(Ptr, false)].push_back(AccessIdx);
+void MemoryDepChecker::addAccess(LoadInst *LI,
+                                 const ValueToValueMap &SymbolicStrides) {
+  visitPointers(LI->getPointerOperand(), *InnermostLoop, PSE, SymbolicStrides,
+                [this, LI](Value *Ptr, const SCEV *PtrScev) {
+                  Accesses[MemAccessInfo(Ptr, false, PtrScev)].push_back(
+                      AccessIdx);
                   InstMap.push_back(LI);
                   ++AccessIdx;
                 });
@@ -1924,9 +1931,10 @@ void LoopAccessInfo::analyzeLoop(AAResults *AA, LoopInfo *LI,
         }
         NumLoads++;
         Loads.push_back(Ld);
-        DepChecker->addAccess(Ld);
         if (EnableMemAccessVersioningOfLoop)
           collectStridedAccess(Ld);
+
+        DepChecker->addAccess(Ld, SymbolicStrides);
         continue;
       }
 
@@ -1948,9 +1956,11 @@ void LoopAccessInfo::analyzeLoop(AAResults *AA, LoopInfo *LI,
         }
         NumStores++;
         Stores.push_back(St);
-        DepChecker->addAccess(St);
+
         if (EnableMemAccessVersioningOfLoop)
           collectStridedAccess(St);
+
+        DepChecker->addAccess(St, SymbolicStrides);
       }
     } // Next instr.
   } // Next block.
@@ -2004,10 +2014,11 @@ void LoopAccessInfo::analyzeLoop(AAResults *AA, LoopInfo *LI,
       if (blockNeedsPredication(ST->getParent(), TheLoop, DT))
         Loc.AATags.TBAA = nullptr;
 
-      visitPointers(const_cast<Value *>(Loc.Ptr), *TheLoop,
-                    [&Accesses, Loc](Value *Ptr) {
+      visitPointers(const_cast<Value *>(Loc.Ptr), *TheLoop, *PSE,
+                    SymbolicStrides,
+                    [&Accesses, Loc](Value *Ptr, const SCEV *PtrScev) {
                       MemoryLocation NewLoc = Loc.getWithNewPtr(Ptr);
-                      Accesses.addStore(NewLoc);
+                      Accesses.addStore(NewLoc, PtrScev);
                     });
     }
   }
@@ -2052,11 +2063,12 @@ void LoopAccessInfo::analyzeLoop(AAResults *AA, LoopInfo *LI,
     if (blockNeedsPredication(LD->getParent(), TheLoop, DT))
       Loc.AATags.TBAA = nullptr;
 
-    visitPointers(const_cast<Value *>(Loc.Ptr), *TheLoop,
-                  [&Accesses, Loc, IsReadOnlyPtr](Value *Ptr) {
-                    MemoryLocation NewLoc = Loc.getWithNewPtr(Ptr);
-                    Accesses.addLoad(NewLoc, IsReadOnlyPtr);
-                  });
+    visitPointers(
+        const_cast<Value *>(Loc.Ptr), *TheLoop, *PSE, SymbolicStrides,
+        [&Accesses, Loc, IsReadOnlyPtr](Value *Ptr, const SCEV *PtrScev) {
+          MemoryLocation NewLoc = Loc.getWithNewPtr(Ptr);
+          Accesses.addLoad(NewLoc, IsReadOnlyPtr, PtrScev);
+        });
   }
 
   // If we write (or read-write) to a single destination and there are no
