@@ -294,7 +294,6 @@ PreservedAnalyses FunctionToLoopPassAdaptor::run(Function &F,
     PreservedAnalyses PassPA;
     {
       TimeTraceScope TimeScope(Pass->name());
-      LoopPassPrettyStackEntry StackEntry(Pass->name(), *L);
       PassPA = Pass->run(*L, LAM, LAR, Updater);
     }
 
