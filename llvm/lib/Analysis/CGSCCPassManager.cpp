@@ -87,6 +87,7 @@ PassManager<LazyCallGraph::SCC, CGSCCAnalysisManager, LazyCallGraph &,
     PreservedAnalyses PassPA;
     {
       TimeTraceScope TimeScope(Pass->name());
+      CGSCCPassPrettyStackEntry StackEntry(Pass->name(), *C);
       PassPA = Pass->run(*C, AM, G, UR);
     }
 
@@ -1236,4 +1237,8 @@ LazyCallGraph::SCC &llvm::updateCGAndAnalysisManagerForCGSCCPass(
     FunctionAnalysisManager &FAM) {
   return updateCGAndAnalysisManagerForPass(G, InitialC, N, AM, UR, FAM,
                                            /* FunctionPass */ false);
+}
+
+void CGSCCPassPrettyStackEntry::print(raw_ostream &OS) const {
+  OS << "Running pass '" << PassName << "' on CGSCC '" << SCC->getName() << "'.\n";
 }

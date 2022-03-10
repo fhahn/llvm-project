@@ -62,6 +62,18 @@ using HasRunOnLoopT = decltype(std::declval<PassT>().run(
 
 } // namespace
 
+class LoopPassPrettyStackEntry : public PrettyStackTraceEntry {
+  StringRef PassName;
+  const Loop *L;
+
+public:
+  LoopPassPrettyStackEntry(StringRef PassName, const Loop &L)
+      : PassName(PassName), L(&L) {}
+
+  /// print - Emit information about this stack frame to OS.
+  void print(raw_ostream &OS) const override;
+};
+
 // Explicit specialization and instantiation declarations for the pass manager.
 // See the comments on the definition of the specialization for details on how
 // it differs from the primary template.
@@ -395,6 +407,7 @@ Optional<PreservedAnalyses> LoopPassManager::runSinglePass(
   PreservedAnalyses PA;
   {
     TimeTraceScope TimeScope(Pass->name(), IR.getName());
+    LoopPassPrettyStackEntry StackEntry(Pass->name(), L);
     PA = Pass->run(IR, AM, AR, U);
   }
 

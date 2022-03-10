@@ -113,6 +113,19 @@ extern template class AllAnalysesOn<LazyCallGraph::SCC>;
 
 extern template class AnalysisManager<LazyCallGraph::SCC, LazyCallGraph &>;
 
+class CGSCCPassPrettyStackEntry : public PrettyStackTraceEntry {
+  StringRef PassName;
+  LazyCallGraph::SCC *SCC;
+
+public:
+  CGSCCPassPrettyStackEntry(StringRef PassName, LazyCallGraph::SCC &SCC)
+      : PassName(PassName), SCC(&SCC) {}
+
+  /// print - Emit information about this stack frame to OS.
+  void print(raw_ostream &OS) const override;
+};
+
+
 /// The CGSCC analysis manager.
 ///
 /// See the documentation for the AnalysisManager template for detail
