@@ -135,6 +135,7 @@ add_llvm_component_library(LLVMAnalysis
   Trace.cpp
   TrainingLogger.cpp
   TypeBasedAliasAnalysis.cpp
+  TypeBasedAliasAnalysisVerifier.cpp
   TypeMetadataUtils.cpp
   UniformityAnalysis.cpp
   ScopedNoAliasAA.cpp

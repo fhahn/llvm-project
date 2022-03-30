@@ -24,6 +24,7 @@
 #include "llvm/Analysis/ProfileSummaryInfo.h"
 #include "llvm/Analysis/ScopedNoAliasAA.h"
 #include "llvm/Analysis/TypeBasedAliasAnalysis.h"
+#include "llvm/Analysis/TypeBasedAliasAnalysisVerifier.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Pass.h"
 #include "llvm/Passes/OptimizationLevel.h"
@@ -1579,6 +1580,7 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
   if (!LTOPreLink)
     MPM.addPass(RelLookupTableConverterPass());
 
+  MPM.addPass(createModuleToFunctionPassAdaptor(TypeBasedAAVerifierPass()));
   return MPM;
 }
 

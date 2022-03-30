@@ -74,6 +74,7 @@
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Analysis/TypeBasedAliasAnalysis.h"
+<<<<<<< HEAD
 #include "llvm/Analysis/UniformityAnalysis.h"
 #include "llvm/CodeGen/AssignmentTrackingAnalysis.h"
 #include "llvm/CodeGen/AtomicExpand.h"
@@ -125,6 +126,7 @@
 #include "llvm/CodeGen/WasmEHPrepare.h"
 #include "llvm/CodeGen/WinEHPrepare.h"
 #include "llvm/IR/DebugInfo.h"
+#include "llvm/Analysis/TypeBasedAliasAnalysisVerifier.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/IR/PrintPasses.h"

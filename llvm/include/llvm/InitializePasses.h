@@ -306,6 +306,7 @@ void initializeTargetTransformInfoWrapperPassPass(PassRegistry &);
 void initializeTLSVariableHoistLegacyPassPass(PassRegistry &);
 void initializeTwoAddressInstructionLegacyPassPass(PassRegistry &);
 void initializeTypeBasedAAWrapperPassPass(PassRegistry &);
+void initializeTypeBasedAAVerifierLegacyPassPass(PassRegistry &);
 void initializeTypePromotionLegacyPass(PassRegistry &);
 void initializeInitUndefPass(PassRegistry &);
 void initializeUniformityInfoWrapperPassPass(PassRegistry &);

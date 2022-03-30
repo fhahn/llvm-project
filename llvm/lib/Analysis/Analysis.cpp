@@ -60,6 +60,7 @@ void llvm::initializeAnalysis(PassRegistry &Registry) {
   initializeStackSafetyInfoWrapperPassPass(Registry);
   initializeTargetTransformInfoWrapperPassPass(Registry);
   initializeTypeBasedAAWrapperPassPass(Registry);
+  initializeTypeBasedAAVerifierLegacyPassPass(Registry);
   initializeScopedNoAliasAAWrapperPassPass(Registry);
   initializeLCSSAVerificationPassPass(Registry);
   initializeMemorySSAWrapperPassPass(Registry);
