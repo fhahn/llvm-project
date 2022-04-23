@@ -1497,6 +1497,7 @@ bool SCCPInstVisitor::resolvedUndefsIn(Function &F) {
           if (LV.isUnknownOrUndef()) {
             markOverdefined(LV, &I);
             MadeChange = true;
+            break;
           }
         }
         continue;
@@ -1525,7 +1526,11 @@ bool SCCPInstVisitor::resolvedUndefsIn(Function &F) {
 
       markOverdefined(&I);
       MadeChange = true;
+      break;
     }
+
+    if (MadeChange)
+      return true;
 
     // Check to see if we have a branch or switch on an undefined value.  If so
     // we force the branch to go one way or the other to make the successor
