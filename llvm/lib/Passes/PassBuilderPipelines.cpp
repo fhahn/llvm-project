@@ -314,6 +314,7 @@ PassBuilder::buildO1FunctionSimplificationPipeline(OptimizationLevel Level,
 
   LPM2.addPass(LoopIdiomRecognizePass());
   LPM2.addPass(IndVarSimplifyPass());
+  LPM2.addPass(LoopSimplifyCFGPass());
 
   for (auto &C : LateLoopOptimizationsEPCallbacks)
     C(LPM2, Level);
@@ -499,6 +500,7 @@ PassBuilder::buildFunctionSimplificationPipeline(OptimizationLevel Level,
 
   LPM2.addPass(LoopIdiomRecognizePass());
   LPM2.addPass(IndVarSimplifyPass());
+  LPM2.addPass(LoopSimplifyCFGPass());
 
   for (auto &C : LateLoopOptimizationsEPCallbacks)
     C(LPM2, Level);
@@ -1703,6 +1705,7 @@ PassBuilder::buildLTODefaultPipeline(OptimizationLevel Level,
   if (EnableLoopFlatten && Level.getSpeedupLevel() > 1)
     LPM.addPass(LoopFlattenPass());
   LPM.addPass(IndVarSimplifyPass());
+  LPM.addPass(LoopSimplifyCFGPass());
   LPM.addPass(LoopDeletionPass());
   // FIXME: Add loop interchange.
 
