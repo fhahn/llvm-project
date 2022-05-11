@@ -14,8 +14,6 @@ define i32 @main() #0 {
 ; CHECK:       for.body.preheader:
 ; CHECK-NEXT:    br label [[FOR_BODY:%.*]]
 ; CHECK:       for.body:
-; CHECK-NEXT:    br label [[FOR_INC:%.*]]
-; CHECK:       for.inc:
 ; CHECK-NEXT:    br i1 false, label [[FOR_BODY]], label [[EXIT_LOOPEXIT:%.*]]
 ; CHECK:       exit.loopexit:
 ; CHECK-NEXT:    br label [[EXIT]]

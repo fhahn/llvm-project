@@ -23,6 +23,13 @@ namespace llvm {
 
 class LPMUpdater;
 class Loop;
+class MemorySSAUpdater;
+class LoopInfo;
+class DominatorTree;
+
+bool simplifyLoopCFG(Loop &L, DominatorTree &DT, LoopInfo &LI,
+                     ScalarEvolution &SE, MemorySSAUpdater *MSSAU,
+                     bool &IsLoopDeleted);
 
 /// Performs basic CFG simplifications to assist other loop passes.
 class LoopSimplifyCFGPass : public PassInfoMixin<LoopSimplifyCFGPass> {

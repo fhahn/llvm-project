@@ -7,13 +7,15 @@
 define i32 @test_01(i32* %p) {
 ; CHECK-LABEL: @test_01(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[LEN:%.*]] = load i32, i32* [[P:%.*]], align 4, [[RNG0:!range !.*]]
+; CHECK-NEXT:    [[LEN:%.*]] = load i32, i32* [[P:%.*]], align 4, !range [[RNG0:![0-9]+]]
+; CHECK-NEXT:    switch i32 0, label [[ENTRY_SPLIT:%.*]] [
+; CHECK-NEXT:    i32 1, label [[FAIL:%.*]]
+; CHECK-NEXT:    ]
+; CHECK:       entry.split:
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
-; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ [[LEN]], [[ENTRY:%.*]] ], [ [[IV_NEXT:%.*]], [[BACKEDGE:%.*]] ]
+; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ [[LEN]], [[ENTRY_SPLIT]] ], [ [[IV_NEXT:%.*]], [[LOOP]] ]
 ; CHECK-NEXT:    [[IV_NEXT]] = add nsw i32 [[IV]], -1
-; CHECK-NEXT:    br i1 true, label [[BACKEDGE]], label [[FAIL:%.*]]
-; CHECK:       backedge:
 ; CHECK-NEXT:    [[LOOP_COND:%.*]] = icmp ne i32 [[IV]], 0
 ; CHECK-NEXT:    br i1 [[LOOP_COND]], label [[LOOP]], label [[EXIT:%.*]]
 ; CHECK:       fail:
@@ -46,7 +48,7 @@ exit:
 define i32 @test_01_neg(i32* %p) {
 ; CHECK-LABEL: @test_01_neg(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[LEN:%.*]] = load i32, i32* [[P:%.*]], align 4, [[RNG0]]
+; CHECK-NEXT:    [[LEN:%.*]] = load i32, i32* [[P:%.*]], align 4, !range [[RNG0]]
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ [[LEN]], [[ENTRY:%.*]] ], [ [[IV_NEXT:%.*]], [[BACKEDGE:%.*]] ]
@@ -87,13 +89,15 @@ exit:
 define i32 @test_02(i32* %p) {
 ; CHECK-LABEL: @test_02(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[LEN:%.*]] = load i32, i32* [[P:%.*]], align 4, [[RNG1:!range !.*]]
+; CHECK-NEXT:    [[LEN:%.*]] = load i32, i32* [[P:%.*]], align 4, !range [[RNG1:![0-9]+]]
+; CHECK-NEXT:    switch i32 0, label [[ENTRY_SPLIT:%.*]] [
+; CHECK-NEXT:    i32 1, label [[FAIL:%.*]]
+; CHECK-NEXT:    ]
+; CHECK:       entry.split:
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
-; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ [[LEN]], [[ENTRY:%.*]] ], [ [[IV_NEXT:%.*]], [[BACKEDGE:%.*]] ]
+; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ [[LEN]], [[ENTRY_SPLIT]] ], [ [[IV_NEXT:%.*]], [[LOOP]] ]
 ; CHECK-NEXT:    [[IV_NEXT]] = add i32 [[IV]], 1
-; CHECK-NEXT:    br i1 true, label [[BACKEDGE]], label [[FAIL:%.*]]
-; CHECK:       backedge:
 ; CHECK-NEXT:    [[LOOP_COND:%.*]] = icmp ne i32 [[IV]], 0
 ; CHECK-NEXT:    br i1 [[LOOP_COND]], label [[LOOP]], label [[EXIT:%.*]]
 ; CHECK:       fail:
@@ -126,7 +130,7 @@ exit:
 define i32 @test_02_neg(i32* %p) {
 ; CHECK-LABEL: @test_02_neg(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[LEN:%.*]] = load i32, i32* [[P:%.*]], align 4, [[RNG1]]
+; CHECK-NEXT:    [[LEN:%.*]] = load i32, i32* [[P:%.*]], align 4, !range [[RNG1]]
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ [[LEN]], [[ENTRY:%.*]] ], [ [[IV_NEXT:%.*]], [[BACKEDGE:%.*]] ]
@@ -165,13 +169,15 @@ exit:
 define i32 @test_03(i32* %p) {
 ; CHECK-LABEL: @test_03(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[LEN:%.*]] = load i32, i32* [[P:%.*]], align 4, [[RNG2:!range !.*]]
+; CHECK-NEXT:    [[LEN:%.*]] = load i32, i32* [[P:%.*]], align 4, !range [[RNG2:![0-9]+]]
+; CHECK-NEXT:    switch i32 0, label [[ENTRY_SPLIT:%.*]] [
+; CHECK-NEXT:    i32 1, label [[FAIL:%.*]]
+; CHECK-NEXT:    ]
+; CHECK:       entry.split:
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
-; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ [[LEN]], [[ENTRY:%.*]] ], [ [[IV_NEXT:%.*]], [[BACKEDGE:%.*]] ]
+; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ [[LEN]], [[ENTRY_SPLIT]] ], [ [[IV_NEXT:%.*]], [[LOOP]] ]
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i32 [[IV]], 1
-; CHECK-NEXT:    br i1 true, label [[BACKEDGE]], label [[FAIL:%.*]]
-; CHECK:       backedge:
 ; CHECK-NEXT:    [[LOOP_COND:%.*]] = icmp ne i32 [[IV]], 1000
 ; CHECK-NEXT:    br i1 [[LOOP_COND]], label [[LOOP]], label [[EXIT:%.*]]
 ; CHECK:       fail:
@@ -203,13 +209,15 @@ exit:
 define i32 @test_04(i32* %p) {
 ; CHECK-LABEL: @test_04(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[LEN:%.*]] = load i32, i32* [[P:%.*]], align 4, [[RNG2]]
+; CHECK-NEXT:    [[LEN:%.*]] = load i32, i32* [[P:%.*]], align 4, !range [[RNG2]]
+; CHECK-NEXT:    switch i32 0, label [[ENTRY_SPLIT:%.*]] [
+; CHECK-NEXT:    i32 1, label [[FAIL:%.*]]
+; CHECK-NEXT:    ]
+; CHECK:       entry.split:
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
-; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ [[LEN]], [[ENTRY:%.*]] ], [ [[IV_NEXT:%.*]], [[BACKEDGE:%.*]] ]
+; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ [[LEN]], [[ENTRY_SPLIT]] ], [ [[IV_NEXT:%.*]], [[LOOP]] ]
 ; CHECK-NEXT:    [[IV_NEXT]] = add nsw i32 [[IV]], -1
-; CHECK-NEXT:    br i1 true, label [[BACKEDGE]], label [[FAIL:%.*]]
-; CHECK:       backedge:
 ; CHECK-NEXT:    [[LOOP_COND:%.*]] = icmp ne i32 [[IV]], 0
 ; CHECK-NEXT:    br i1 [[LOOP_COND]], label [[LOOP]], label [[EXIT:%.*]]
 ; CHECK:       fail:

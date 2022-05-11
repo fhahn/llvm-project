@@ -16,14 +16,6 @@ define internal fastcc void @func_2() unnamed_addr {
 ; CHECK:       for.cond884:
 ; CHECK-NEXT:    br i1 false, label [[FOR_BODY888:%.*]], label [[LBL_2898_LOOPEXIT:%.*]]
 ; CHECK:       for.body888:
-; CHECK-NEXT:    br label [[FOR_COND918:%.*]]
-; CHECK:       for.cond918:
-; CHECK-NEXT:    br label [[FOR_END926:%.*]]
-; CHECK:       for.end926:
-; CHECK-NEXT:    br label [[FOR_COND936:%.*]]
-; CHECK:       for.cond936:
-; CHECK-NEXT:    br label [[FOR_END987:%.*]]
-; CHECK:       for.end987:
 ; CHECK-NEXT:    br label [[FOR_COND884]]
 ;
 lbl_2898.preheader:

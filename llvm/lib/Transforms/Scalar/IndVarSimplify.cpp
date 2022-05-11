@@ -74,6 +74,7 @@
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/Scalar/LoopSimplifyCFG.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/LoopUtils.h"
@@ -167,6 +168,8 @@ class IndVarSimplify {
 
   bool sinkUnusedInvariants(Loop *L);
 
+  bool SimplifyCFG = false;
+
 public:
   IndVarSimplify(LoopInfo *LI, ScalarEvolution *SE, DominatorTree *DT,
                  const DataLayout &DL, TargetLibraryInfo *TLI,
@@ -177,7 +180,7 @@ public:
       MSSAU = std::make_unique<MemorySSAUpdater>(MSSA);
   }
 
-  bool run(Loop *L);
+  std::pair<bool, bool> run(Loop *L);
 };
 
 } // end anonymous namespace
@@ -1331,10 +1334,10 @@ static void replaceWithInvariantCond(
 }
 
 static bool optimizeLoopExitWithUnknownExitCount(
-    const Loop *L, BranchInst *BI, BasicBlock *ExitingBB,
-    const SCEV *MaxIter, bool Inverted, bool SkipLastIter,
-    ScalarEvolution *SE, SCEVExpander &Rewriter,
-    SmallVectorImpl<WeakTrackingVH> &DeadInsts) {
+    const Loop *L, BranchInst *BI, BasicBlock *ExitingBB, const SCEV *MaxIter,
+    bool Inverted, bool SkipLastIter, ScalarEvolution *SE,
+    SCEVExpander &Rewriter, SmallVectorImpl<WeakTrackingVH> &DeadInsts,
+    bool &SimplifyCFG) {
   ICmpInst::Predicate Pred;
   Value *LHS, *RHS;
   BasicBlock *TrueSucc, *FalseSucc;
@@ -1353,6 +1356,7 @@ static bool optimizeLoopExitWithUnknownExitCount(
   if (Inverted)
     Pred = CmpInst::getInversePredicate(Pred);
 
+  SimplifyCFG = true;
   const SCEV *LHSS = SE->getSCEVAtScope(LHS, L);
   const SCEV *RHSS = SE->getSCEVAtScope(RHS, L);
   // Can we prove it to be trivially true?
@@ -1390,9 +1394,11 @@ static bool optimizeLoopExitWithUnknownExitCount(
   // Can we prove it to be trivially true?
   if (SE->isKnownPredicateAt(LIP->Pred, LIP->LHS, LIP->RHS, BI))
     foldExit(L, ExitingBB, Inverted, DeadInsts);
-  else
+  else {
     replaceWithInvariantCond(L, ExitingBB, LIP->Pred, LIP->LHS, LIP->RHS,
                              Rewriter, DeadInsts);
+    SimplifyCFG = false;
+  }
 
   return true;
 }
@@ -1599,9 +1605,13 @@ bool IndVarSimplify::optimizeLoopExits(Loop *L, SCEVExpander &Rewriter) {
       // will remain the same within iteration space?
       auto *BI = cast<BranchInst>(ExitingBB->getTerminator());
       auto OptimizeCond = [&](bool Inverted, bool SkipLastIter) {
-        return optimizeLoopExitWithUnknownExitCount(
+        bool SC = false;
+        auto Res = optimizeLoopExitWithUnknownExitCount(
             L, BI, ExitingBB, MaxExitCount, Inverted, SkipLastIter, SE,
-            Rewriter, DeadInsts);
+            Rewriter, DeadInsts, SC);
+        if (Res)
+          this->SimplifyCFG |= SC;
+        return Res;
       };
 
       // TODO: We might have proved that we can skip the last iteration for
@@ -1822,6 +1832,7 @@ bool IndVarSimplify::predicateLoopExits(Loop *L, SCEVExpander &Rewriter) {
     if (ExitCount == ExactBTC) {
       NewCond = L->contains(BI->getSuccessor(0)) ?
         B.getFalse() : B.getTrue();
+      SimplifyCFG = true;
     } else {
       Value *ECV = Rewriter.expandCodeFor(ExitCount);
       if (!ExactBTCV)
@@ -1850,7 +1861,7 @@ bool IndVarSimplify::predicateLoopExits(Loop *L, SCEVExpander &Rewriter) {
 //  IndVarSimplify driver. Manage several subpasses of IV simplification.
 //===----------------------------------------------------------------------===//
 
-bool IndVarSimplify::run(Loop *L) {
+std::pair<bool, bool> IndVarSimplify::run(Loop *L) {
   // We need (and expect!) the incoming loop to be in LCSSA.
   assert(L->isRecursivelyLCSSAForm(*DT, *LI) &&
          "LCSSA required to run indvars!");
@@ -1865,7 +1876,7 @@ bool IndVarSimplify::run(Loop *L) {
   //    we've manually inserted one.
   //  - LFTR relies on having a single backedge.
   if (!L->isLoopSimplifyForm())
-    return false;
+    return {false, false};
 
 #ifndef NDEBUG
   // Used below for a consistency check only
@@ -2026,6 +2037,12 @@ bool IndVarSimplify::run(Loop *L) {
   assert(L->isRecursivelyLCSSAForm(*DT, *LI) &&
          "Indvars did not preserve LCSSA!");
 
+  bool ChangedCFG = SimplifyCFG;
+  if (SimplifyCFG) {
+    bool Foo;
+    simplifyLoopCFG(*L, *DT, *LI, *SE, MSSAU.get(), Foo);
+  }
+
   // Verify that LFTR, and any other change have not interfered with SCEV's
   // ability to compute trip count.  We may have *changed* the exit count, but
   // only by reducing it.
@@ -2047,7 +2064,7 @@ bool IndVarSimplify::run(Loop *L) {
     MSSAU->getMemorySSA()->verifyMemorySSA();
 #endif
 
-  return Changed;
+  return {Changed, ChangedCFG};
 }
 
 PreservedAnalyses IndVarSimplifyPass::run(Loop &L, LoopAnalysisManager &AM,
@@ -2058,11 +2075,18 @@ PreservedAnalyses IndVarSimplifyPass::run(Loop &L, LoopAnalysisManager &AM,
 
   IndVarSimplify IVS(&AR.LI, &AR.SE, &AR.DT, DL, &AR.TLI, &AR.TTI, AR.MSSA,
                      WidenIndVars && AllowIVWidening);
-  if (!IVS.run(&L))
+  bool Changed, ChangedCFG;
+  std::tie(Changed, ChangedCFG) = IVS.run(&L);
+  if (!Changed)
     return PreservedAnalyses::all();
 
   auto PA = getLoopPassPreservedAnalyses();
-  PA.preserveSet<CFGAnalyses>();
+  if (!ChangedCFG)
+    PA.preserveSet<CFGAnalyses>();
+  else {
+    PA.preserve<DominatorTreeAnalysis>();
+    PA.preserve<LoopAnalysis>();
+  }
   if (AR.MSSA)
     PA.preserve<MemorySSAAnalysis>();
   return PA;
@@ -2095,11 +2119,10 @@ struct IndVarSimplifyLegacyPass : public LoopPass {
       MSSA = &MSSAAnalysis->getMSSA();
 
     IndVarSimplify IVS(LI, SE, DT, DL, TLI, TTI, MSSA, AllowIVWidening);
-    return IVS.run(L);
+    return IVS.run(L).first;
   }
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
-    AU.setPreservesCFG();
     AU.addPreserved<MemorySSAWrapperPass>();
     getLoopAnalysisUsage(AU);
   }

@@ -13,16 +13,18 @@
 define void @test_predicated_simple_unsigned(i32* %p, i32* %arr) {
 ; CHECK-LABEL: @test_predicated_simple_unsigned(
 ; CHECK-NEXT:  preheader:
-; CHECK-NEXT:    [[LEN:%.*]] = load i32, i32* [[P:%.*]], align 4, [[RNG0:!range !.*]]
+; CHECK-NEXT:    [[LEN:%.*]] = load i32, i32* [[P:%.*]], align 4, !range [[RNG0:![0-9]+]]
+; CHECK-NEXT:    switch i32 0, label [[PREHEADER_SPLIT:%.*]] [
+; CHECK-NEXT:    i32 1, label [[FAIL:%.*]]
+; CHECK-NEXT:    ]
+; CHECK:       preheader.split:
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
-; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ [[LEN]], [[PREHEADER:%.*]] ], [ [[IV_NEXT:%.*]], [[BACKEDGE:%.*]] ]
+; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ [[LEN]], [[PREHEADER_SPLIT]] ], [ [[IV_NEXT:%.*]], [[RANGE_CHECK_BLOCK:%.*]] ]
 ; CHECK-NEXT:    [[ZERO_COND:%.*]] = icmp eq i32 [[IV]], 0
-; CHECK-NEXT:    br i1 [[ZERO_COND]], label [[EXIT:%.*]], label [[RANGE_CHECK_BLOCK:%.*]]
+; CHECK-NEXT:    br i1 [[ZERO_COND]], label [[EXIT:%.*]], label [[RANGE_CHECK_BLOCK]]
 ; CHECK:       range_check_block:
 ; CHECK-NEXT:    [[IV_NEXT]] = sub i32 [[IV]], 1
-; CHECK-NEXT:    br i1 true, label [[BACKEDGE]], label [[FAIL:%.*]]
-; CHECK:       backedge:
 ; CHECK-NEXT:    [[EL_PTR:%.*]] = getelementptr i32, i32* [[P]], i32 [[IV]]
 ; CHECK-NEXT:    [[EL:%.*]] = load i32, i32* [[EL_PTR]], align 4
 ; CHECK-NEXT:    [[LOOP_COND:%.*]] = icmp eq i32 [[EL]], 0
@@ -62,16 +64,18 @@ fail:
 define void @test_predicated_simple_signed(i32* %p, i32* %arr) {
 ; CHECK-LABEL: @test_predicated_simple_signed(
 ; CHECK-NEXT:  preheader:
-; CHECK-NEXT:    [[LEN:%.*]] = load i32, i32* [[P:%.*]], align 4, [[RNG0]]
+; CHECK-NEXT:    [[LEN:%.*]] = load i32, i32* [[P:%.*]], align 4, !range [[RNG0]]
+; CHECK-NEXT:    switch i32 0, label [[PREHEADER_SPLIT:%.*]] [
+; CHECK-NEXT:    i32 1, label [[FAIL:%.*]]
+; CHECK-NEXT:    ]
+; CHECK:       preheader.split:
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
-; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ [[LEN]], [[PREHEADER:%.*]] ], [ [[IV_NEXT:%.*]], [[BACKEDGE:%.*]] ]
+; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ [[LEN]], [[PREHEADER_SPLIT]] ], [ [[IV_NEXT:%.*]], [[RANGE_CHECK_BLOCK:%.*]] ]
 ; CHECK-NEXT:    [[ZERO_COND:%.*]] = icmp eq i32 [[IV]], 0
-; CHECK-NEXT:    br i1 [[ZERO_COND]], label [[EXIT:%.*]], label [[RANGE_CHECK_BLOCK:%.*]]
+; CHECK-NEXT:    br i1 [[ZERO_COND]], label [[EXIT:%.*]], label [[RANGE_CHECK_BLOCK]]
 ; CHECK:       range_check_block:
 ; CHECK-NEXT:    [[IV_NEXT]] = sub i32 [[IV]], 1
-; CHECK-NEXT:    br i1 true, label [[BACKEDGE]], label [[FAIL:%.*]]
-; CHECK:       backedge:
 ; CHECK-NEXT:    [[EL_PTR:%.*]] = getelementptr i32, i32* [[P]], i32 [[IV]]
 ; CHECK-NEXT:    [[EL:%.*]] = load i32, i32* [[EL_PTR]], align 4
 ; CHECK-NEXT:    [[LOOP_COND:%.*]] = icmp eq i32 [[EL]], 0

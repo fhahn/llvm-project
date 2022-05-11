@@ -673,9 +673,9 @@ static bool mergeBlocksIntoPredecessors(Loop &L, DominatorTree &DT,
   return Changed;
 }
 
-static bool simplifyLoopCFG(Loop &L, DominatorTree &DT, LoopInfo &LI,
-                            ScalarEvolution &SE, MemorySSAUpdater *MSSAU,
-                            bool &IsLoopDeleted) {
+bool llvm::simplifyLoopCFG(Loop &L, DominatorTree &DT, LoopInfo &LI,
+                           ScalarEvolution &SE, MemorySSAUpdater *MSSAU,
+                           bool &IsLoopDeleted) {
   bool Changed = false;
 
   // Constant-fold terminators with known constant conditions.

@@ -29,8 +29,6 @@ define void @_Z3fn1v() {
 ; CHECK:       .preheader.lr.ph:
 ; CHECK-NEXT:    br label [[DOTPREHEADER:%.*]]
 ; CHECK:       .preheader:
-; CHECK-NEXT:    br label [[X17:%.*]]
-; CHECK:       x17:
 ; CHECK-NEXT:    br i1 false, label [[DOTPREHEADER]], label [[DOT_CRIT_EDGE_8:%.*]]
 ; CHECK:       ._crit_edge.8:
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, i8* [[K_09]], i64 [[TMP5]]
