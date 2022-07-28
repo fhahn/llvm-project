@@ -371,7 +371,7 @@ static bool isLTOPreLink(ThinOrFullLTOPhase Phase) {
 FunctionPassManager
 PassBuilder::buildO1FunctionSimplificationPipeline(OptimizationLevel Level,
                                                    ThinOrFullLTOPhase Phase) {
-
+  
   FunctionPassManager FPM;
 
   if (AreStatisticsEnabled())
@@ -1284,6 +1284,12 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
   const bool LTOPreLink = isLTOPreLink(LTOPhase);
   ModulePassManager MPM;
 
+  // MPM.addPass(LoopExtractionAnalysisPass());
+
+  // Optimize globals now that the module is fully simplified.
+  MPM.addPass(GlobalOptPass());
+  MPM.addPass(GlobalDCEPass());
+
   // Run partial inlining pass to partially inline functions that have
   // large bodies.
   if (RunPartialInlining)
@@ -1334,7 +1340,7 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
   // the vectorizer will be able to use them to help recognize vectorizable
   // memory operations.
   MPM.addPass(RecomputeGlobalsAAPass());
-
+  MPM.addPass(GlobalDCEPass());
   MPM.addPass(LoopExtractionAnalysisPass());
 
   invokeOptimizerEarlyEPCallbacks(MPM, Level);
