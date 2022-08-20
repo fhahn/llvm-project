@@ -1079,12 +1079,20 @@ struct DSEState {
       // because we might miss read clobbers in different iterations of a loop,
       // for example.
       // TODO: Add support for phi translation to handle the loop case.
-      if (isa<MemoryPhi>(UseAccess))
-        return false;
-
+      if (isa<MemoryPhi>(UseAccess)) {
+        PushMemUses(cast<MemoryPhi>(UseAccess));
+        continue;
+      }
       // TODO: Checking for aliasing is expensive. Consider reducing the amount
       // of times this is called and/or caching it.
       Instruction *UseInst = cast<MemoryUseOrDef>(UseAccess)->getMemoryInst();
+
+      if (!isGuaranteedLoopIndependent(UseInst, Def->getMemoryInst(), *MaybeLoc)) {
+        LLVM_DEBUG(dbgs() << "  ... not guaranteed loop independent\n");
+        return false;
+      }
+
+
       if (isReadClobber(*MaybeLoc, UseInst)) {
         LLVM_DEBUG(dbgs() << "  ... hit read clobber " << *UseInst << ".\n");
         return false;

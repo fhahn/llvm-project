@@ -10,10 +10,8 @@ define void @memoryphi_translate_1(i1 %c) {
 ; CHECK-NEXT:    [[A_2:%.*]] = alloca i8, align 1
 ; CHECK-NEXT:    br i1 [[C:%.*]], label [[THEN:%.*]], label [[ELSE:%.*]]
 ; CHECK:       then:
-; CHECK-NEXT:    store i8 0, i8* [[A_1]], align 1
 ; CHECK-NEXT:    br label [[END:%.*]]
 ; CHECK:       else:
-; CHECK-NEXT:    store i8 9, i8* [[A_2]], align 1
 ; CHECK-NEXT:    br label [[END]]
 ; CHECK:       end:
 ; CHECK-NEXT:    [[P:%.*]] = phi i8* [ [[A_1]], [[THEN]] ], [ [[A_2]], [[ELSE]] ]
@@ -52,7 +50,6 @@ define i8 @memoryphi_translate_2(i1 %c) {
 ; CHECK-NEXT:    store i8 0, i8* [[A_1]], align 1
 ; CHECK-NEXT:    br label [[END:%.*]]
 ; CHECK:       else:
-; CHECK-NEXT:    store i8 9, i8* [[A_2]], align 1
 ; CHECK-NEXT:    br label [[END]]
 ; CHECK:       end:
 ; CHECK-NEXT:    [[P:%.*]] = phi i8* [ [[A_1]], [[THEN]] ], [ [[A_2]], [[ELSE]] ]
@@ -90,7 +87,6 @@ define i8 @memoryphi_translate_3(i1 %c) {
 ; CHECK-NEXT:    [[A_2:%.*]] = alloca i8, align 1
 ; CHECK-NEXT:    br i1 [[C:%.*]], label [[THEN:%.*]], label [[ELSE:%.*]]
 ; CHECK:       then:
-; CHECK-NEXT:    store i8 0, i8* [[A_1]], align 1
 ; CHECK-NEXT:    br label [[END:%.*]]
 ; CHECK:       else:
 ; CHECK-NEXT:    store i8 9, i8* [[A_2]], align 1
@@ -166,11 +162,9 @@ define void @memoryphi_translate_5(i1 %cond) {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[A:%.*]] = alloca i8, align 1
 ; CHECK-NEXT:    [[B:%.*]] = alloca i8, align 1
-; CHECK-NEXT:    [[C:%.*]] = alloca i8, align 1
 ; CHECK-NEXT:    store i8 0, i8* [[A]], align 1
 ; CHECK-NEXT:    br i1 [[COND:%.*]], label [[COND_TRUE:%.*]], label [[COND_END:%.*]]
 ; CHECK:       cond.true:
-; CHECK-NEXT:    store i8 0, i8* [[C]], align 1
 ; CHECK-NEXT:    br label [[COND_END]]
 ; CHECK:       cond.end:
 ; CHECK-NEXT:    [[P:%.*]] = phi i8* [ [[B]], [[COND_TRUE]] ], [ [[A]], [[ENTRY:%.*]] ]
