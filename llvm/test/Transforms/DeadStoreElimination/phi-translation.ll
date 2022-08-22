@@ -162,7 +162,6 @@ define void @memoryphi_translate_5(i1 %cond) {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[A:%.*]] = alloca i8, align 1
 ; CHECK-NEXT:    [[B:%.*]] = alloca i8, align 1
-; CHECK-NEXT:    store i8 0, i8* [[A]], align 1
 ; CHECK-NEXT:    br i1 [[COND:%.*]], label [[COND_TRUE:%.*]], label [[COND_END:%.*]]
 ; CHECK:       cond.true:
 ; CHECK-NEXT:    br label [[COND_END]]
@@ -235,8 +234,6 @@ define void @test_trans_null(i1 %c, i16* %ptr) {
 ; CHECK:       else:
 ; CHECK-NEXT:    call void @fn()
 ; CHECK-NEXT:    [[BC:%.*]] = bitcast i8* undef to i16*
-; CHECK-NEXT:    [[GEP_1:%.*]] = getelementptr inbounds i16, i16* [[BC]], i64 2
-; CHECK-NEXT:    store i16 8, i16* [[GEP_1]], align 2
 ; CHECK-NEXT:    br label [[EXIT]]
 ; CHECK:       exit:
 ; CHECK-NEXT:    [[P:%.*]] = phi i16* [ [[PTR:%.*]], [[THEN]] ], [ [[BC]], [[ELSE]] ]

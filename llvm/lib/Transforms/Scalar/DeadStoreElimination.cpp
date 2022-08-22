@@ -2014,20 +2014,23 @@ static bool eliminateDeadStores(Function &F, AliasAnalysis &AA, MemorySSA &MSSA,
     unsigned WalkerStepLimit = MemorySSAUpwardsStepLimit;
     unsigned PartialLimit = MemorySSAPartialStoreLimit;
     // Worklist of MemoryAccesses that may be killed by KillingDef.
-    SetVector<MemoryAccess *> ToCheck;
-    ToCheck.insert(KillingDef->getDefiningAccess());
+    SmallVector<std::pair<MemoryAccess *, MemoryLocation>> ToCheck;
+    ToCheck.emplace_back(KillingDef->getDefiningAccess(), KillingLoc);
 
     bool Shortend = false;
     bool IsMemTerm = State.isMemTerminatorInst(KillingI);
     // Check if MemoryAccesses in the worklist are killed by KillingDef.
     for (unsigned I = 0; I < ToCheck.size(); I++) {
-      MemoryAccess *Current = ToCheck[I];
+      MemoryAccess *Current;
+      MemoryLocation CurrentLoc;
+      std::tie(Current, CurrentLoc) = ToCheck[I];
       if (State.SkipStores.count(Current))
         continue;
 
+      const Value *SILocUnd = getUnderlyingObject(CurrentLoc.Ptr);
       Optional<MemoryAccess *> MaybeDeadAccess = State.getDomMemoryDef(
-          KillingDef, Current, KillingLoc, KillingUndObj, ScanLimit,
-          WalkerStepLimit, IsMemTerm, PartialLimit);
+          KillingDef, Current, CurrentLoc, SILocUnd, ScanLimit, WalkerStepLimit,
+          IsMemTerm, PartialLimit);
 
       if (!MaybeDeadAccess) {
         LLVM_DEBUG(dbgs() << "  finished walk\n");
@@ -2038,24 +2041,39 @@ static bool eliminateDeadStores(Function &F, AliasAnalysis &AA, MemorySSA &MSSA,
       LLVM_DEBUG(dbgs() << " Checking if we can kill " << *DeadAccess);
       if (isa<MemoryPhi>(DeadAccess)) {
         LLVM_DEBUG(dbgs() << "\n  ... adding incoming values to worklist\n");
+        BasicBlock *PhiBlock = DeadAccess->getBlock();
+        SmallPtrSet<BasicBlock *, 4> Predecessors(pred_begin(PhiBlock),
+                                                  pred_end(PhiBlock));
         for (Value *V : cast<MemoryPhi>(DeadAccess)->incoming_values()) {
           MemoryAccess *IncomingAccess = cast<MemoryAccess>(V);
           BasicBlock *IncomingBlock = IncomingAccess->getBlock();
-          BasicBlock *PhiBlock = DeadAccess->getBlock();
 
           // We only consider incoming MemoryAccesses that come before the
           // MemoryPhi. Otherwise we could discover candidates that do not
           // strictly dominate our starting def.
           if (State.PostOrderNumbers[IncomingBlock] >
-              State.PostOrderNumbers[PhiBlock])
-            ToCheck.insert(IncomingAccess);
+              State.PostOrderNumbers[PhiBlock]) {
+            auto NewLoc = CurrentLoc;
+            PHITransAddr Addr(const_cast<Value *>(CurrentLoc.Ptr), State.DL,
+                              nullptr);
+            if (Addr.NeedsPHITranslationFromBlock(PhiBlock) &&
+                Predecessors.count(IncomingBlock)) {
+              if (Addr.IsPotentiallyPHITranslatable() &&
+                  !Addr.PHITranslateValue(PhiBlock, IncomingBlock, &DT,
+                                          false)) {
+                assert(Addr.getAddr() && "phi translation unsuccessful?");
+                NewLoc = CurrentLoc.getWithNewPtr(Addr.getAddr());
+              }
+            }
+            ToCheck.emplace_back(IncomingAccess, NewLoc);
+          }
         }
         continue;
       }
       auto *DeadDefAccess = cast<MemoryDef>(DeadAccess);
       Instruction *DeadI = DeadDefAccess->getMemoryInst();
       LLVM_DEBUG(dbgs() << " (" << *DeadI << ")\n");
-      ToCheck.insert(DeadDefAccess->getDefiningAccess());
+      ToCheck.emplace_back(DeadDefAccess->getDefiningAccess(), CurrentLoc);
       NumGetDomMemoryDefPassed++;
 
       if (!DebugCounter::shouldExecute(MemorySSACounter))
@@ -2077,13 +2095,13 @@ static bool eliminateDeadStores(Function &F, AliasAnalysis &AA, MemorySSA &MSSA,
         int64_t KillingOffset = 0;
         int64_t DeadOffset = 0;
         OverwriteResult OR = State.isOverwrite(
-            KillingI, DeadI, KillingLoc, DeadLoc, KillingOffset, DeadOffset);
+            KillingI, DeadI, CurrentLoc, DeadLoc, KillingOffset, DeadOffset);
         if (OR == OW_MaybePartial) {
           auto Iter = State.IOLs.insert(
               std::make_pair<BasicBlock *, InstOverlapIntervalsTy>(
                   DeadI->getParent(), InstOverlapIntervalsTy()));
           auto &IOL = Iter.first->second;
-          OR = isPartialOverwrite(KillingLoc, DeadLoc, KillingOffset,
+          OR = isPartialOverwrite(CurrentLoc, DeadLoc, KillingOffset,
                                   DeadOffset, DeadI, IOL);
         }
 
