@@ -771,6 +771,9 @@ struct DSEState {
   /// Keep track of instructions (partly) overlapping with killing MemoryDefs per
   /// basic block.
   MapVector<BasicBlock *, InstOverlapIntervalsTy> IOLs;
+
+  SetVector<Instruction *> ToRemove;
+
   // Check if there are root nodes that are terminated by UnreachableInst.
   // Those roots pessimize post-dominance queries. If there are such roots,
   // fall back to CFG scan starting from all non-unreachable roots.
@@ -1591,52 +1594,64 @@ struct DSEState {
     return {MaybeDeadAccess};
   }
 
+  /// Deletes the dead instruction \p DeadInst and queue's any of it's operands
+  /// for removal, if they become dead.
+  void deleteSingleInstruction(Instruction *DeadInst,
+                               MemorySSAUpdater &Updater) {
+    ++NumFastOther;
+
+    // Try to preserve debug information attached to the dead instruction.
+    salvageDebugInfo(*DeadInst);
+    salvageKnowledge(DeadInst);
+
+    // Remove the Instruction from MSSA.
+    if (MemoryAccess *MA = MSSA.getMemoryAccess(DeadInst)) {
+      if (MemoryDef *MD = dyn_cast<MemoryDef>(MA)) {
+        SkipStores.insert(MD);
+        if (auto *SI = dyn_cast<StoreInst>(MD->getMemoryInst())) {
+          if (SI->getValueOperand()->getType()->isPointerTy()) {
+            const Value *UO = getUnderlyingObject(SI->getValueOperand());
+            if (CapturedBeforeReturn.erase(UO))
+              ShouldIterateEndOfFunctionDSE = true;
+            InvisibleToCallerAfterRet.erase(UO);
+          }
+        }
+      }
+
+      Updater.removeMemoryAccess(MA);
+    }
+
+    auto I = IOLs.find(DeadInst->getParent());
+    if (I != IOLs.end())
+      I->second.erase(DeadInst);
+    // Remove its operands
+    for (Use &O : DeadInst->operands())
+      if (Instruction *OpI = dyn_cast<Instruction>(O)) {
+        O = nullptr;
+        if (isInstructionTriviallyDead(OpI, &TLI))
+          ToRemove.insert(OpI);
+      }
+
+    EI.removeInstruction(DeadInst);
+    DeadInst->eraseFromParent();
+  }
+
+  /// Delete all instructions in ToRemove and any of their operands, if they
+  /// become dead.
+  void deleteRemainingInsts() {
+    --NumFastOther;
+
+    MemorySSAUpdater Updater(&MSSA);
+    for (unsigned I = 0; I != ToRemove.size(); ++I)
+      deleteSingleInstruction(ToRemove[I], Updater);
+    ToRemove.clear();
+  }
+
   // Delete dead memory defs
   void deleteDeadInstruction(Instruction *SI) {
     MemorySSAUpdater Updater(&MSSA);
-    SmallVector<Instruction *, 32> NowDeadInsts;
-    NowDeadInsts.push_back(SI);
     --NumFastOther;
-
-    while (!NowDeadInsts.empty()) {
-      Instruction *DeadInst = NowDeadInsts.pop_back_val();
-      ++NumFastOther;
-
-      // Try to preserve debug information attached to the dead instruction.
-      salvageDebugInfo(*DeadInst);
-      salvageKnowledge(DeadInst);
-
-      // Remove the Instruction from MSSA.
-      if (MemoryAccess *MA = MSSA.getMemoryAccess(DeadInst)) {
-        if (MemoryDef *MD = dyn_cast<MemoryDef>(MA)) {
-          SkipStores.insert(MD);
-          if (auto *SI = dyn_cast<StoreInst>(MD->getMemoryInst())) {
-            if (SI->getValueOperand()->getType()->isPointerTy()) {
-              const Value *UO = getUnderlyingObject(SI->getValueOperand());
-              if (CapturedBeforeReturn.erase(UO))
-                ShouldIterateEndOfFunctionDSE = true;
-              InvisibleToCallerAfterRet.erase(UO);
-            }
-          }
-        }
-
-        Updater.removeMemoryAccess(MA);
-      }
-
-      auto I = IOLs.find(DeadInst->getParent());
-      if (I != IOLs.end())
-        I->second.erase(DeadInst);
-      // Remove its operands
-      for (Use &O : DeadInst->operands())
-        if (Instruction *OpI = dyn_cast<Instruction>(O)) {
-          O = nullptr;
-          if (isInstructionTriviallyDead(OpI, &TLI))
-            NowDeadInsts.push_back(OpI);
-        }
-
-      EI.removeInstruction(DeadInst);
-      DeadInst->eraseFromParent();
-    }
+    deleteSingleInstruction(SI, Updater);
   }
 
   // Check for any extra throws between \p KillingI and \p DeadI that block
@@ -1716,6 +1731,10 @@ struct DSEState {
           LLVM_DEBUG(dbgs() << "   ... MemoryDef is not accessed until the end "
                                "of the function\n");
           deleteDeadInstruction(DefI);
+          // Remove the instructions that become dead after removing DefI,
+          // because
+          // it may enable further removal of unused memory instructions.
+          deleteRemainingInsts();
           ++NumFastStores;
           MadeChange = true;
         }
@@ -2131,6 +2150,7 @@ static bool eliminateDeadStores(Function &F, AliasAnalysis &AA, MemorySSA &MSSA,
       MadeChange |= State.removePartiallyOverlappedStores(KV.second);
 
   MadeChange |= State.eliminateRedundantStoresOfExistingValues();
+  State.deleteRemainingInsts();
   MadeChange |= State.eliminateDeadWritesAtEndOfFunction();
   return MadeChange;
 }
