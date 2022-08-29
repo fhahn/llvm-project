@@ -6410,6 +6410,31 @@ InstructionCost BoUpSLP::getEntryCost(const TreeEntry *E,
     case Instruction::And:
     case Instruction::Or:
     case Instruction::Xor: {
+      unsigned ScalarFusable = 0;
+      for (unsigned i = 0, e = VL.size(); i < e; ++i) {
+        const Instruction *I = cast<Instruction>(VL[i]);
+        if (I->hasOneUse()) {
+          const Instruction *UserI = cast<Instruction>(*I->user_begin());
+          if (ShuffleOrOp != Instruction::FMul)
+            continue;
+
+          bool IsCand = UserI->getOpcode() == Instruction::FSub ||
+                        UserI->getOpcode() == Instruction::FAdd;
+          if (IsCand && UserI->getOperand(0) == I) {
+            IntrinsicCostAttributes ICA(
+                Intrinsic::fmuladd, VL[i]->getType(),
+                {VL[i]->getType(), VL[i]->getType(), VL[i]->getType()},
+                UserI->getFastMathFlags());
+            ScalarFusable +=
+                TTI->getIntrinsicInstrCost(ICA, TTI::TCK_RecipThroughput) ==
+                TargetTransformInfo::TCC_Basic;
+          }
+        }
+      }
+
+      if (ScalarFusable == VecTy->getNumElements())
+        return -1;
+
       TTI::OperandValueInfo Op1Info = {TTI::OK_AnyValue, TTI::OP_None};
 
       // Certain instructions can be cheaper to vectorize if they have a
@@ -6425,7 +6450,8 @@ InstructionCost BoUpSLP::getEntryCost(const TreeEntry *E,
       if (NeedToShuffleReuses) {
         CommonCost -= (EntryVF - VL.size()) * ScalarEltCost;
       }
-      InstructionCost ScalarCost = VecTy->getNumElements() * ScalarEltCost;
+      InstructionCost ScalarCost =
+          (VecTy->getNumElements() - ScalarFusable) * ScalarEltCost;
       for (unsigned I = 0, Num = VL0->getNumOperands(); I < Num; ++I) {
         if (all_of(VL, [I](Value *V) {
               return isConstant(cast<Instruction>(V)->getOperand(I));

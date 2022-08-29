@@ -5,18 +5,20 @@
 ; adds may look profitable, but is not because it eliminates generation of
 ; floating-point FMAs that would be more profitable.
 
-; FIXME: We generate a horizontal reduction today.
-
 define void @hr() {
 ; CHECK-LABEL: @hr(
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
-; CHECK-NEXT:    [[PHI0:%.*]] = phi double [ 0.000000e+00, [[TMP0:%.*]] ], [ [[OP_RDX:%.*]], [[LOOP]] ]
+; CHECK-NEXT:    [[PHI0:%.*]] = phi double [ 0.000000e+00, [[TMP0:%.*]] ], [ [[ADD3:%.*]], [[LOOP]] ]
 ; CHECK-NEXT:    [[CVT0:%.*]] = uitofp i16 0 to double
-; CHECK-NEXT:    [[TMP1:%.*]] = insertelement <4 x double> <double poison, double 0.000000e+00, double 0.000000e+00, double 0.000000e+00>, double [[CVT0]], i32 0
-; CHECK-NEXT:    [[TMP2:%.*]] = fmul fast <4 x double> zeroinitializer, [[TMP1]]
-; CHECK-NEXT:    [[TMP3:%.*]] = call fast double @llvm.vector.reduce.fadd.v4f64(double -0.000000e+00, <4 x double> [[TMP2]])
-; CHECK-NEXT:    [[OP_RDX]] = fadd fast double [[TMP3]], [[PHI0]]
+; CHECK-NEXT:    [[MUL0:%.*]] = fmul fast double 0.000000e+00, [[CVT0]]
+; CHECK-NEXT:    [[ADD0:%.*]] = fadd fast double [[MUL0]], [[PHI0]]
+; CHECK-NEXT:    [[MUL1:%.*]] = fmul fast double 0.000000e+00, 0.000000e+00
+; CHECK-NEXT:    [[ADD1:%.*]] = fadd fast double [[MUL1]], [[ADD0]]
+; CHECK-NEXT:    [[MUL2:%.*]] = fmul fast double 0.000000e+00, 0.000000e+00
+; CHECK-NEXT:    [[ADD2:%.*]] = fadd fast double [[MUL2]], [[ADD1]]
+; CHECK-NEXT:    [[MUL3:%.*]] = fmul fast double 0.000000e+00, 0.000000e+00
+; CHECK-NEXT:    [[ADD3]] = fadd fast double [[MUL3]], [[ADD2]]
 ; CHECK-NEXT:    br i1 true, label [[EXIT:%.*]], label [[LOOP]]
 ; CHECK:       exit:
 ; CHECK-NEXT:    ret void
