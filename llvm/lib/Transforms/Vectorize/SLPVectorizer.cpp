@@ -7779,8 +7779,14 @@ BoUpSLP::getEntryCost(const TreeEntry *E, ArrayRef<Value *> VectorizedVals,
       unsigned OpIdx = isa<UnaryOperator>(VL0) ? 0 : 1;
       TTI::OperandValueInfo Op1Info = getOperandInfo(VL, 0);
       TTI::OperandValueInfo Op2Info = getOperandInfo(VL, OpIdx);
+      SmallVector<const Value *> Operands(cast<Instruction>(VL[0])->operand_values());
+      // Populate vector with context instructions.
+      SmallVector<const Instruction *> OpsForVector = {VL0};
+      for (unsigned I = 1; I != VL.size(); ++I)
+        OpsForVector.push_back(cast<Instruction>(VL[I]));
+
       return TTI->getArithmeticInstrCost(ShuffleOrOp, VecTy, CostKind, Op1Info,
-                                         Op2Info) +
+                                         Op2Info, Operands, OpsForVector) +
              CommonCost;
     };
     return GetCostDiff(GetScalarCost, GetVectorCost);
@@ -7797,6 +7803,108 @@ BoUpSLP::getEntryCost(const TreeEntry *E, ArrayRef<Value *> VectorizedVals,
     };
     auto *LI0 = cast<LoadInst>(VL0);
     auto GetVectorCost = [=](InstructionCost CommonCost) {
+/*=======*/
+      /*LLVM_DEBUG(dumpTreeCosts(E, CommonCost, VecCost, ScalarCost));*/
+      /*return CommonCost + VecCost - ScalarCost;*/
+    /*}*/
+    /*case Instruction::FNeg:*/
+    /*case Instruction::Add:*/
+    /*case Instruction::FAdd:*/
+    /*case Instruction::Sub:*/
+    /*case Instruction::FSub:*/
+    /*case Instruction::Mul:*/
+    /*case Instruction::FMul:*/
+    /*case Instruction::UDiv:*/
+    /*case Instruction::SDiv:*/
+    /*case Instruction::FDiv:*/
+    /*case Instruction::URem:*/
+    /*case Instruction::SRem:*/
+    /*case Instruction::FRem:*/
+    /*case Instruction::Shl:*/
+    /*case Instruction::LShr:*/
+    /*case Instruction::AShr:*/
+    /*case Instruction::And:*/
+    /*case Instruction::Or:*/
+    /*case Instruction::Xor: {*/
+      /*TTI::OperandValueInfo Op1Info = {TTI::OK_AnyValue, TTI::OP_None};*/
+
+      /*// Certain instructions can be cheaper to vectorize if they have a*/
+      /*// constant second vector operand.*/
+      /*const unsigned OpIdx = isa<BinaryOperator>(VL0) ? 1 : 0;*/
+      /*auto Op2Info = getOperandInfo(VL, OpIdx);*/
+
+      /*SmallVector<const Value *, 4> Operands(VL0->operand_values());*/
+      /*InstructionCost ScalarCost = 0;*/
+      /*for (unsigned i = 0, e = VL.size(); i < e; ++i)*/
+        /*ScalarCost += TTI->getArithmeticInstrCost(*/
+            /*E->getOpcode(), ScalarTy, CostKind, Op1Info, Op2Info, Operands,*/
+            /*isa<Instruction>(VL[i]) ? cast<Instruction>(VL[i]) : nullptr);*/
+
+      /*if (NeedToShuffleReuses) {*/
+        /*CommonCost -=*/
+            /*(EntryVF - VL.size()) **/
+            /*TTI->getArithmeticInstrCost(E->getOpcode(), ScalarTy, CostKind,*/
+                                        /*Op1Info, Op2Info, Operands);*/
+      /*}*/
+
+      /*for (unsigned I = 0, Num = VL0->getNumOperands(); I < Num; ++I) {*/
+        /*if (all_of(VL, [I](Value *V) {*/
+              /*return isConstant(cast<Instruction>(V)->getOperand(I));*/
+            /*}))*/
+          /*Operands[I] = ConstantVector::getNullValue(VecTy);*/
+      /*}*/
+
+      /*// Populate vector with context instructions.*/
+      /*SmallVector<const Instruction *> OpsForVector = {VL0};*/
+      /*for (unsigned I = 1; I != VL.size(); ++I)*/
+        /*OpsForVector.push_back(cast<Instruction>(VL[I]));*/
+
+      /*InstructionCost VecCost =*/
+          /*TTI->getArithmeticInstrCost(E->getOpcode(), VecTy, CostKind, Op1Info,*/
+                                      /*Op2Info, Operands, OpsForVector);*/
+
+      /*LLVM_DEBUG(dumpTreeCosts(E, CommonCost, VecCost, ScalarCost));*/
+      /*return CommonCost + VecCost - ScalarCost;*/
+    /*}*/
+    /*case Instruction::GetElementPtr: {*/
+      /*TargetTransformInfo::OperandValueKind Op1VK =*/
+          /*TargetTransformInfo::OK_AnyValue;*/
+      /*TargetTransformInfo::OperandValueKind Op2VK =*/
+          /*any_of(VL,*/
+                 /*[](Value *V) {*/
+                   /*return isa<GetElementPtrInst>(V) &&*/
+                          /*!isConstant(*/
+                              /*cast<GetElementPtrInst>(V)->getOperand(1));*/
+                 /*})*/
+              /*? TargetTransformInfo::OK_AnyValue*/
+              /*: TargetTransformInfo::OK_UniformConstantValue;*/
+
+      /*InstructionCost ScalarEltCost = TTI->getArithmeticInstrCost(*/
+          /*Instruction::Add, ScalarTy, CostKind,*/
+          /*{Op1VK, TargetTransformInfo::OP_None},*/
+          /*{Op2VK, TargetTransformInfo::OP_None});*/
+      /*if (NeedToShuffleReuses) {*/
+        /*CommonCost -= (EntryVF - VL.size()) * ScalarEltCost;*/
+      /*}*/
+      /*InstructionCost ScalarCost = VecTy->getNumElements() * ScalarEltCost;*/
+      /*InstructionCost VecCost = TTI->getArithmeticInstrCost(*/
+          /*Instruction::Add, VecTy, CostKind,*/
+          /*{Op1VK, TargetTransformInfo::OP_None},*/
+          /*{Op2VK, TargetTransformInfo::OP_None});*/
+      /*LLVM_DEBUG(dumpTreeCosts(E, CommonCost, VecCost, ScalarCost));*/
+      /*return CommonCost + VecCost - ScalarCost;*/
+    /*}*/
+    /*case Instruction::Load: {*/
+      /*// Cost of wide load - cost of scalar loads.*/
+      /*Align Alignment = cast<LoadInst>(VL0)->getAlign();*/
+      /*InstructionCost ScalarEltCost =*/
+          /*TTI->getMemoryOpCost(Instruction::Load, ScalarTy, Alignment, 0,*/
+                               /*CostKind, {TTI::OK_AnyValue, TTI::OP_None}, VL0);*/
+      /*if (NeedToShuffleReuses) {*/
+        /*CommonCost -= (EntryVF - VL.size()) * ScalarEltCost;*/
+      /*}*/
+      /*InstructionCost ScalarLdCost = VecTy->getNumElements() * ScalarEltCost;*/
+/*>>>>>>> 4572e30d5f72 ([SLP] Pass full scalar and vector context instructions to TTI.)*/
       InstructionCost VecLdCost;
       if (E->State == TreeEntry::Vectorize) {
         VecLdCost = TTI->getMemoryOpCost(
