@@ -7785,9 +7785,18 @@ BoUpSLP::getEntryCost(const TreeEntry *E, ArrayRef<Value *> VectorizedVals,
       for (unsigned I = 1; I != VL.size(); ++I)
         OpsForVector.push_back(cast<Instruction>(VL[I]));
 
-      return TTI->getArithmeticInstrCost(ShuffleOrOp, VecTy, CostKind, Op1Info,
-                                         Op2Info, Operands, OpsForVector) +
+      auto VecCost = TTI->getArithmeticInstrCost(ShuffleOrOp, VecTy, CostKind, Op1Info,
+                                         Op2Info, Operands, OpsForVector);
+      if (VecCost == 0) {
+        // The vector instruction is considered free so it can likely be folded
+        // with it's users. This means there's no need to consider re-ordered
+        // costs for the folded instruction.
+        CommonCost = 0;
+      }
+      return VecCost + 
              CommonCost;
+
+
     };
     return GetCostDiff(GetScalarCost, GetVectorCost);
   }

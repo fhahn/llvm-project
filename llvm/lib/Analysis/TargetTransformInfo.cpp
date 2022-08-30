@@ -834,10 +834,36 @@ InstructionCost TargetTransformInfo::getArithmeticInstrCost(
     unsigned Opcode, Type *Ty, TTI::TargetCostKind CostKind,
     OperandValueInfo Op1Info, OperandValueInfo Op2Info,
     ArrayRef<const Value *> Args, ArrayRef<const Instruction *> CxtIs) const {
-  InstructionCost Cost =
-      TTIImpl->getArithmeticInstrCost(Opcode, Ty, CostKind,
-                                      Op1Info, Op2Info,
-                                      Args, CxtIs);
+
+  InstructionCost Cost = TTIImpl->getArithmeticInstrCost(
+      Opcode, Ty, CostKind, Op1Info, Op2Info, Args, CxtIs);
+
+  // Check the context instructions to see if we have FMUL instructions that can
+  // be fused with their users to a fmuladd/fmulsub instruction. In those cases,
+  // consider the FMUL free if the cost of the fmuladd/fmulsub is less than or
+  // equal to the cost of the FMUL alone.
+  if (((isa<VectorType>(Ty) && CxtIs.size() > 1) || CxtIs.size() == 1) &&
+      all_of(CxtIs, [&](const Instruction *CxtI) {
+        if (CxtI && CxtI->getOpcode() == Opcode && CxtI->hasOneUse() &&
+            Opcode == Instruction::FMul && CxtI->hasAllowReassoc()) {
+          const Instruction *UserI = cast<Instruction>(*CxtI->user_begin());
+          bool IsCandOpcode = UserI->getOpcode() == Instruction::FSub ||
+                              UserI->getOpcode() == Instruction::FAdd;
+          if (IsCandOpcode && UserI->getOperand(0) == CxtI &&
+              UserI->hasAllowReassoc()) {
+            // TODO: How can we estimate the cost of fmulsub for which we don't
+            // have an intrinsic?
+            FastMathFlags FMF = CxtI->getFastMathFlags();
+            FMF &= UserI->getFastMathFlags();
+            IntrinsicCostAttributes ICA(Intrinsic::fmuladd, Ty, {Ty, Ty, Ty},
+                                        FMF);
+            return getIntrinsicInstrCost(ICA, TTI::TCK_RecipThroughput) <= Cost;
+          }
+        }
+        return false;
+      }))
+    return 0;
+
   assert(Cost >= 0 && "TTI should not produce negative costs!");
   return Cost;
 }
