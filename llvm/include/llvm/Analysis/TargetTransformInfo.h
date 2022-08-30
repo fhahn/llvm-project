@@ -1208,7 +1208,7 @@ public:
       TTI::OperandValueInfo Opd1Info = {TTI::OK_AnyValue, TTI::OP_None},
       TTI::OperandValueInfo Opd2Info = {TTI::OK_AnyValue, TTI::OP_None},
       ArrayRef<const Value *> Args = ArrayRef<const Value *>(),
-      const Instruction *CxtI = nullptr) const;
+      ArrayRef<const Instruction *> CxtIs = {}) const;
 
   /// \return The cost of a shuffle instruction of kind Kind and of type Tp.
   /// The exact mask may be passed as Mask, or else the array will be empty.
@@ -1895,7 +1895,7 @@ public:
   virtual InstructionCost getArithmeticInstrCost(
       unsigned Opcode, Type *Ty, TTI::TargetCostKind CostKind,
       OperandValueInfo Opd1Info, OperandValueInfo Opd2Info,
-      ArrayRef<const Value *> Args, const Instruction *CxtI = nullptr) = 0;
+      ArrayRef<const Value *> Args, ArrayRef<const Instruction *> CxtIs) = 0;
 
   virtual InstructionCost getShuffleCost(ShuffleKind Kind, VectorType *Tp,
                                          ArrayRef<int> Mask,
@@ -2484,13 +2484,14 @@ public:
                                             BlockFrequencyInfo *BFI) override {
     return Impl.getEstimatedNumberOfCaseClusters(SI, JTSize, PSI, BFI);
   }
-  InstructionCost getArithmeticInstrCost(
-      unsigned Opcode, Type *Ty, TTI::TargetCostKind CostKind,
-      OperandValueInfo Opd1Info, OperandValueInfo Opd2Info,
-      ArrayRef<const Value *> Args,
-      const Instruction *CxtI = nullptr) override {
+  InstructionCost
+  getArithmeticInstrCost(unsigned Opcode, Type *Ty,
+                         TTI::TargetCostKind CostKind,
+                         OperandValueInfo Opd1Info, OperandValueInfo Opd2Info,
+                         ArrayRef<const Value *> Args,
+                         ArrayRef<const Instruction *> CxtIs = {}) override {
     return Impl.getArithmeticInstrCost(Opcode, Ty, CostKind, Opd1Info, Opd2Info,
-                                       Args, CxtI);
+                                       Args, CxtIs);
   }
 
   InstructionCost getShuffleCost(ShuffleKind Kind, VectorType *Tp,

@@ -833,11 +833,11 @@ TargetTransformInfo::getOperandInfo(const Value *V) {
 InstructionCost TargetTransformInfo::getArithmeticInstrCost(
     unsigned Opcode, Type *Ty, TTI::TargetCostKind CostKind,
     OperandValueInfo Op1Info, OperandValueInfo Op2Info,
-    ArrayRef<const Value *> Args, const Instruction *CxtI) const {
+    ArrayRef<const Value *> Args, ArrayRef<const Instruction *> CxtIs) const {
   InstructionCost Cost =
       TTIImpl->getArithmeticInstrCost(Opcode, Ty, CostKind,
                                       Op1Info, Op2Info,
-                                      Args, CxtI);
+                                      Args, CxtIs);
   assert(Cost >= 0 && "TTI should not produce negative costs!");
   return Cost;
 }

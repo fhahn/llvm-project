@@ -505,8 +505,7 @@ public:
   InstructionCost getArithmeticInstrCost(
       unsigned Opcode, Type *Ty, TTI::TargetCostKind CostKind,
       TTI::OperandValueInfo Opd1Info, TTI::OperandValueInfo Opd2Info,
-      ArrayRef<const Value *> Args,
-      const Instruction *CxtI = nullptr) const {
+      ArrayRef<const Value *> Args, ArrayRef<const Instruction *> CxtIs) const {
     // Widenable conditions will eventually lower into constants, so some
     // operations with them will be trivially optimized away.
     auto IsWidenableCondition = [](const Value *V) {
@@ -1090,7 +1089,7 @@ public:
         Cost += static_cast<T *>(this)->getArithmeticInstrCost(
             Instruction::Add, GEP->getType(), CostKind,
             {TTI::OK_AnyValue, TTI::OP_None}, {TTI::OK_AnyValue, TTI::OP_None},
-            std::nullopt);
+            std::nullopt, std::nullopt);
       } else {
         SmallVector<const Value *> Indices(GEP->indices());
         Cost += static_cast<T *>(this)->getGEPCost(GEP->getSourceElementType(),

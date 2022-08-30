@@ -1316,8 +1316,7 @@ InstructionCost ARMTTIImpl::getShuffleCost(TTI::ShuffleKind Kind,
 InstructionCost ARMTTIImpl::getArithmeticInstrCost(
     unsigned Opcode, Type *Ty, TTI::TargetCostKind CostKind,
     TTI::OperandValueInfo Op1Info, TTI::OperandValueInfo Op2Info,
-    ArrayRef<const Value *> Args,
-    const Instruction *CxtI) {
+    ArrayRef<const Value *> Args, ArrayRef<const Instruction *> CxtIs) {
   int ISDOpcode = TLI->InstructionOpcodeToISD(Opcode);
   if (ST->isThumb() && CostKind == TTI::TCK_CodeSize && Ty->isIntegerTy(1)) {
     // Make operations on i1 relatively expensive as this often involves
@@ -1405,13 +1404,13 @@ InstructionCost ARMTTIImpl::getArithmeticInstrCost(
     if (ST->isThumb1Only() || Ty->isVectorTy())
       return false;
 
-    if (!CxtI || !CxtI->hasOneUse() || !CxtI->isShift())
+    if (CxtIs.size() != 1 || !CxtIs[0]->hasOneUse() || !CxtIs[0]->isShift())
       return false;
     if (!Op2Info.isUniform() || !Op2Info.isConstant())
       return false;
 
     // Folded into a ADC/ADD/AND/BIC/CMP/EOR/MVN/ORR/ORN/RSB/SBC/SUB
-    switch (cast<Instruction>(CxtI->user_back())->getOpcode()) {
+    switch (cast<Instruction>(CxtIs[0]->user_back())->getOpcode()) {
     case Instruction::Add:
     case Instruction::Sub:
     case Instruction::And:

@@ -1535,21 +1535,21 @@ InstructionCost RISCVTTIImpl::getVectorInstrCost(unsigned Opcode, Type *Val,
 InstructionCost RISCVTTIImpl::getArithmeticInstrCost(
     unsigned Opcode, Type *Ty, TTI::TargetCostKind CostKind,
     TTI::OperandValueInfo Op1Info, TTI::OperandValueInfo Op2Info,
-    ArrayRef<const Value *> Args, const Instruction *CxtI) {
+    ArrayRef<const Value *> Args, ArrayRef<const Instruction *> CxtIs) {
 
   // TODO: Handle more cost kinds.
   if (CostKind != TTI::TCK_RecipThroughput)
     return BaseT::getArithmeticInstrCost(Opcode, Ty, CostKind, Op1Info, Op2Info,
-                                         Args, CxtI);
+                                         Args, CxtIs);
 
   if (isa<FixedVectorType>(Ty) && !ST->useRVVForFixedLengthVectors())
     return BaseT::getArithmeticInstrCost(Opcode, Ty, CostKind, Op1Info, Op2Info,
-                                         Args, CxtI);
+                                         Args, CxtIs);
 
   // Skip if scalar size of Ty is bigger than ELEN.
   if (isa<VectorType>(Ty) && Ty->getScalarSizeInBits() > ST->getELEN())
     return BaseT::getArithmeticInstrCost(Opcode, Ty, CostKind, Op1Info, Op2Info,
-                                         Args, CxtI);
+                                         Args, CxtIs);
 
   // Legalize the type.
   std::pair<InstructionCost, MVT> LT = getTypeLegalizationCost(Ty);
@@ -1557,7 +1557,7 @@ InstructionCost RISCVTTIImpl::getArithmeticInstrCost(
   // TODO: Handle scalar type.
   if (!LT.second.isVector())
     return BaseT::getArithmeticInstrCost(Opcode, Ty, CostKind, Op1Info, Op2Info,
-                                         Args, CxtI);
+                                         Args, CxtIs);
 
 
   auto getConstantMatCost =
@@ -1601,7 +1601,7 @@ InstructionCost RISCVTTIImpl::getArithmeticInstrCost(
   default:
     return ConstantMatCost +
            BaseT::getArithmeticInstrCost(Opcode, Ty, CostKind, Op1Info, Op2Info,
-                                         Args, CxtI);
+                                         Args, CxtIs);
   }
 }
 

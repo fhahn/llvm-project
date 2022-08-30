@@ -2563,13 +2563,12 @@ InstructionCost AArch64TTIImpl::getVectorInstrCost(const Instruction &I,
 InstructionCost AArch64TTIImpl::getArithmeticInstrCost(
     unsigned Opcode, Type *Ty, TTI::TargetCostKind CostKind,
     TTI::OperandValueInfo Op1Info, TTI::OperandValueInfo Op2Info,
-    ArrayRef<const Value *> Args,
-    const Instruction *CxtI) {
+    ArrayRef<const Value *> Args, ArrayRef<const Instruction *> CxtIs) {
 
   // TODO: Handle more cost kinds.
   if (CostKind != TTI::TCK_RecipThroughput)
-    return BaseT::getArithmeticInstrCost(Opcode, Ty, CostKind, Op1Info,
-                                         Op2Info, Args, CxtI);
+    return BaseT::getArithmeticInstrCost(Opcode, Ty, CostKind, Op1Info, Op2Info,
+                                         Args, CxtIs);
 
   // Legalize the type.
   std::pair<InstructionCost, MVT> LT = getTypeLegalizationCost(Ty);

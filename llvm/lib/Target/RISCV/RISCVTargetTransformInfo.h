@@ -184,7 +184,7 @@ public:
       TTI::OperandValueInfo Op1Info = {TTI::OK_AnyValue, TTI::OP_None},
       TTI::OperandValueInfo Op2Info = {TTI::OK_AnyValue, TTI::OP_None},
       ArrayRef<const Value *> Args = ArrayRef<const Value *>(),
-      const Instruction *CxtI = nullptr);
+       ArrayRef<const Instruction *> CxtIs = ArrayRef<const Instruction*>()) ;
 
   bool isElementTypeLegalForScalableVector(Type *Ty) const {
     return TLI->isLegalElementTypeForRVV(TLI->getValueType(DL, Ty));
