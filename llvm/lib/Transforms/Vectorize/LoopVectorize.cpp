@@ -597,10 +597,6 @@ protected:
   void clearReductionWrapFlags(VPReductionPHIRecipe *PhiR,
                                VPTransformState &State);
 
-  /// Iteratively sink the scalarized operands of a predicated instruction into
-  /// the block that was created for it.
-  void sinkScalarOperands(Instruction *PredInst);
-
   /// Shrinks vector element sizes to the smallest bitwidth they can be legally
   /// represented as.
   void truncateToMinimalBitwidths(VPTransformState &State);
@@ -723,9 +719,6 @@ protected:
 
   /// A list of all bypass blocks. The first block is the entry of the loop.
   SmallVector<BasicBlock *, 4> LoopBypassBlocks;
-
-  /// Store instructions that were predicated.
-  SmallVector<Instruction *, 4> PredicatedInstructions;
 
   /// Trip count of the original loop.
   Value *TripCount = nullptr;
@@ -2894,11 +2887,6 @@ void InnerLoopVectorizer::scalarizeInstruction(const Instruction *Instr,
   // If we just cloned a new assumption, add it the assumption cache.
   if (auto *II = dyn_cast<AssumeInst>(Cloned))
     AC->registerAssumption(II);
-
-  // End if-block.
-  bool IfPredicateInstr = RepRecipe->getParent()->getParent()->isReplicator();
-  if (IfPredicateInstr)
-    PredicatedInstructions.push_back(Cloned);
 }
 
 Value *InnerLoopVectorizer::getOrCreateTripCount(BasicBlock *InsertBlock) {
@@ -3781,9 +3769,6 @@ void InnerLoopVectorizer::fixVectorizedLoop(VPTransformState &State,
   for (const auto &KV : Plan.getLiveOuts())
     KV.second->fixPhi(Plan, State);
 
-  for (Instruction *PI : PredicatedInstructions)
-    sinkScalarOperands(&*PI);
-
   // Remove redundant induction instructions.
   cse(VectorLoop->getHeader());
 
@@ -4170,81 +4155,6 @@ void InnerLoopVectorizer::clearReductionWrapFlags(VPReductionPHIRecipe *PhiR,
             Worklist.push_back(V);
       }
   }
-}
-
-void InnerLoopVectorizer::sinkScalarOperands(Instruction *PredInst) {
-  // The basic block and loop containing the predicated instruction.
-  auto *PredBB = PredInst->getParent();
-  auto *VectorLoop = LI->getLoopFor(PredBB);
-
-  // Initialize a worklist with the operands of the predicated instruction.
-  SetVector<Value *> Worklist(PredInst->op_begin(), PredInst->op_end());
-
-  // Holds instructions that we need to analyze again. An instruction may be
-  // reanalyzed if we don't yet know if we can sink it or not.
-  SmallVector<Instruction *, 8> InstsToReanalyze;
-
-  // Returns true if a given use occurs in the predicated block. Phi nodes use
-  // their operands in their corresponding predecessor blocks.
-  auto isBlockOfUsePredicated = [&](Use &U) -> bool {
-    auto *I = cast<Instruction>(U.getUser());
-    BasicBlock *BB = I->getParent();
-    if (auto *Phi = dyn_cast<PHINode>(I))
-      BB = Phi->getIncomingBlock(
-          PHINode::getIncomingValueNumForOperand(U.getOperandNo()));
-    return BB == PredBB;
-  };
-
-  // Iteratively sink the scalarized operands of the predicated instruction
-  // into the block we created for it. When an instruction is sunk, it's
-  // operands are then added to the worklist. The algorithm ends after one pass
-  // through the worklist doesn't sink a single instruction.
-  bool Changed;
-  do {
-    // Add the instructions that need to be reanalyzed to the worklist, and
-    // reset the changed indicator.
-    Worklist.insert(InstsToReanalyze.begin(), InstsToReanalyze.end());
-    InstsToReanalyze.clear();
-    Changed = false;
-
-    while (!Worklist.empty()) {
-      auto *I = dyn_cast<Instruction>(Worklist.pop_back_val());
-
-      // We can't sink an instruction if it is a phi node, is not in the loop,
-      // may have side effects or may read from memory.
-      // TODO Could dor more granular checking to allow sinking a load past non-store instructions.
-      if (!I || isa<PHINode>(I) || !VectorLoop->contains(I) ||
-          I->mayHaveSideEffects() || I->mayReadFromMemory())
-          continue;
-
-      // If the instruction is already in PredBB, check if we can sink its
-      // operands. In that case, VPlan's sinkScalarOperands() succeeded in
-      // sinking the scalar instruction I, hence it appears in PredBB; but it
-      // may have failed to sink I's operands (recursively), which we try
-      // (again) here.
-      if (I->getParent() == PredBB) {
-        Worklist.insert(I->op_begin(), I->op_end());
-        continue;
-      }
-
-      // It's legal to sink the instruction if all its uses occur in the
-      // predicated block. Otherwise, there's nothing to do yet, and we may
-      // need to reanalyze the instruction.
-      if (!llvm::all_of(I->uses(), isBlockOfUsePredicated)) {
-        InstsToReanalyze.push_back(I);
-        continue;
-      }
-
-      // Move the instruction to the beginning of the predicated block, and add
-      // it's operands to the worklist.
-      I->moveBefore(&*PredBB->getFirstInsertionPt());
-      Worklist.insert(I->op_begin(), I->op_end());
-
-      // The sinking may have enabled other instructions to be sunk, so we will
-      // need to iterate.
-      Changed = true;
-    }
-  } while (Changed);
 }
 
 void InnerLoopVectorizer::fixNonInductionPHIs(VPlan &Plan,
@@ -9574,8 +9484,7 @@ void VPReplicateRecipe::execute(VPTransformState &State) {
         all_of(operands(), [](VPValue *Op) {
           return Op->isDefinedOutsideVectorRegions();
         })) {
-      State.ILV->scalarizeInstruction(Instr, this, VPIteration(0, 0),
-                                      State);
+      State.ILV->scalarizeInstruction(Instr, this, VPIteration(0, 0), State);
       if (user_begin() != user_end()) {
         for (unsigned Part = 1; Part < State.UF; ++Part)
           State.set(this, State.get(this, VPIteration(0, 0)),
@@ -9587,8 +9496,7 @@ void VPReplicateRecipe::execute(VPTransformState &State) {
     // Uniform within VL means we need to generate lane 0 only for each
     // unrolled copy.
     for (unsigned Part = 0; Part < State.UF; ++Part)
-      State.ILV->scalarizeInstruction(Instr, this, VPIteration(Part, 0),
-                                       State);
+      State.ILV->scalarizeInstruction(Instr, this, VPIteration(Part, 0), State);
     return;
   }
 
@@ -9596,8 +9504,8 @@ void VPReplicateRecipe::execute(VPTransformState &State) {
   // needs a single copy of the store.
   if (isa<StoreInst>(Instr) && !getOperand(1)->hasDefiningRecipe()) {
     auto Lane = VPLane::getLastLaneForVF(State.VF);
-    State.ILV->scalarizeInstruction(
-        Instr, this, VPIteration(State.UF - 1, Lane), State);
+    State.ILV->scalarizeInstruction(Instr, this,
+                                    VPIteration(State.UF - 1, Lane), State);
     return;
   }
 
