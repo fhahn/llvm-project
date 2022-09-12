@@ -503,9 +503,11 @@ void VPlanTransforms::removeDeadRecipes(VPlan &Plan) {
   }
 }
 
-static VPValue *createScalarIVSteps(VPlan &Plan, const InductionDescriptor &ID,
-                                    ScalarEvolution &SE, Instruction *TruncI,
-                                    Type *IVTy, VPValue *StartV) {
+static VPScalarIVStepsRecipe *createScalarIVSteps(VPlan &Plan,
+                                                  const InductionDescriptor &ID,
+                                                  ScalarEvolution &SE,
+                                                  Instruction *TruncI,
+                                                  Type *IVTy, VPValue *StartV) {
   VPBasicBlock *HeaderVPBB = Plan.getVectorLoopRegion()->getEntryBasicBlock();
   auto IP = HeaderVPBB->getFirstNonPhi();
   VPCanonicalIVPHIRecipe *CanonicalIV = Plan.getCanonicalIV();
@@ -525,11 +527,60 @@ static VPValue *createScalarIVSteps(VPlan &Plan, const InductionDescriptor &ID,
   return Steps;
 }
 
-void VPlanTransforms::optimizeInductions(VPlan &Plan, ScalarEvolution &SE) {
+void VPlanTransforms::optimizeInductions(VPlan &Plan, ScalarEvolution &SE,
+                                         BasicBlock *OrigLoopLatch) {
   SmallVector<VPRecipeBase *> ToRemove;
   VPBasicBlock *HeaderVPBB = Plan.getVectorLoopRegion()->getEntryBasicBlock();
   bool HasOnlyVectorVFs = !Plan.hasVF(ElementCount::getFixed(1));
+  bool HasScalableVFs = Plan.hasScalableVFs();
   for (VPRecipeBase &Phi : HeaderVPBB->phis()) {
+    if (auto *PtrIV = dyn_cast<VPWidenPointerInductionRecipe>(&Phi)) {
+      if (any_of(PtrIV->users(),
+                 [PtrIV](VPUser *U) { return !U->usesScalars(PtrIV); }))
+        continue;
+
+      bool OnlyFirstLaneUsed = vputils::onlyFirstLaneUsed(PtrIV);
+      if (HasScalableVFs && !OnlyFirstLaneUsed)
+        continue;
+
+      const InductionDescriptor &ID = PtrIV->getInductionDescriptor();
+      VPValue *StartV = Plan.getVPValueOrAddLiveIn(
+          ConstantInt::get(ID.getStep()->getType(), 0));
+      VPRecipeBase *Steps = createScalarIVSteps(
+          Plan, ID, SE, nullptr, ID.getStep()->getType(), StartV);
+
+      bool IsUniform = false;
+      if (OnlyFirstLaneUsed) {
+        Steps = cast<VPRecipeBase>(Steps->getOperand(0)->getDefiningRecipe());
+        IsUniform = true;
+      }
+
+      const DataLayout &DL =
+          PtrIV->getUnderlyingInstr()->getModule()->getDataLayout();
+      GetElementPtrInst *GEP2 = GetElementPtrInst::Create(
+          ID.getElementType(), PoisonValue::get(ID.getStartValue()->getType()),
+          {PoisonValue::get(DL.getIndexType(ID.getStartValue()->getType()))});
+      Plan.addTmpInst(GEP2);
+      SmallVector<VPValue *> Ops = {PtrIV->getOperand(0),
+                                    Steps->getVPSingleValue()};
+      auto *Recipe = new VPReplicateRecipe(
+          GEP2, nullptr, make_range(Ops.begin(), Ops.end()), IsUniform);
+
+      if (isa<VPCanonicalIVPHIRecipe>(Steps))
+        Recipe->insertBefore(&*HeaderVPBB->getFirstNonPhi());
+      else
+        Recipe->insertAfter(Steps);
+      PtrIV->replaceAllUsesWith(Recipe);
+
+      continue;
+    }
+    auto *IV = dyn_cast<VPWidenIntOrFpInductionRecipe>(&Phi);
+    if (!IV)
+      continue;
+    if (HasOnlyVectorVFs &&
+        none_of(IV->users(), [IV](VPUser *U) { return U->usesScalars(IV); }))
+      continue;
+
     auto *WideIV = dyn_cast<VPWidenIntOrFpInductionRecipe>(&Phi);
     if (!WideIV)
       continue;

@@ -279,7 +279,8 @@ for.end:
 ; CHECK:       %index = phi i64 [ 0, %vector.ph ], [ %index.next, %vector.body ]
 ; CHECK-NOT:   getelementptr
 ; CHECK:       [[SHL:%.+]] = shl i64 %index, 2
-; CHECK:       %next.gep = getelementptr i8, ptr %a, i64 [[SHL]]
+; CHECK:       [[GEP:%.+]] = getelementptr i8, ptr %a, i64 [[SHL]]
+; CHECK:       store <4 x i32> {{.*}}, ptr [[GEP]]
 ; CHECK-NOT:   getelementptr
 ; CHECK:       br i1 {{.*}}, label %middle.block, label %vector.body
 ;
@@ -311,16 +312,13 @@ for.end:
 ; INTER:     vector.body
 ; INTER:       %index = phi i64 [ 0, %vector.ph ], [ %index.next, %vector.body ]
 ; INTER:       %[[I0:.+]] = shl i64 %index, 4
-; INTER:       %next.gep = getelementptr i8, ptr %a, i64 %[[I0]]
-; INTER:       %[[S1:.+]] = shl i64 %index, 4
-; INTER:       %[[I1:.+]] = or i64 %[[S1]], 16
-; INTER:       %next.gep2 = getelementptr i8, ptr %a, i64 %[[I1]]
-; INTER:       %[[S2:.+]] = shl i64 %index, 4
-; INTER:       %[[I2:.+]] = or i64 %[[S2]], 32
-; INTER:       %next.gep3 = getelementptr i8, ptr %a, i64 %[[I2]]
-; INTER:       %[[S3:.+]] = shl i64 %index, 4
-; INTER:       %[[I3:.+]] = or i64 %[[S3]], 48
-; INTER:       %next.gep4 = getelementptr i8, ptr %a, i64 %[[I3]]
+; INTER:       %[[I1:.+]] = or i64 %[[I0]], 16
+; INTER:       %[[I2:.+]] = or i64 %[[I0]], 32
+; INTER:       %[[I3:.+]] = or i64 %[[I0]], 48
+; INTER:       getelementptr i8, ptr %a, i64 %[[I0]]
+; INTER:       getelementptr i8, ptr %a, i64 %[[I1]]
+; INTER:       getelementptr i8, ptr %a, i64 %[[I2]]
+; INTER:       getelementptr i8, ptr %a, i64 %[[I3]]
 ; INTER:       br i1 {{.*}}, label %middle.block, label %vector.body
 ;
 define void @pointer_iv_non_uniform_0(ptr %a, i64 %n) {
@@ -360,17 +358,14 @@ for.end:
 ; CHECK-NOT: LV: Found uniform instruction: %p = phi ptr [%tmp1, %for.body], [%a, %entry]
 ; CHECK:     vector.body
 ; CHECK:       %index = phi i64 [ 0, %vector.ph ], [ %index.next, %vector.body ]
-; CHECK:       [[SHL1:%.+]] = shl i64 %index, 4
-; CHECK:       %next.gep = getelementptr i8, ptr %a, i64 [[SHL1]]
-; CHECK:       [[SHL2:%.+]] = shl i64 %index, 4
-; CHECK:       %[[I1:.+]] = or i64 [[SHL2]], 16
-; CHECK:       %next.gep2 = getelementptr i8, ptr %a, i64 %[[I1]]
-; CHECK:       [[SHL3:%.+]] = shl i64 %index, 4
-; CHECK:       %[[I2:.+]] = or i64 [[SHL3]], 32
-; CHECK:       %next.gep3 = getelementptr i8, ptr %a, i64 %[[I2]]
-; CHECK:       [[SHL4:%.+]] = shl i64 %index, 4
-; CHECK:       %[[I3:.+]] = or i64 [[SHL4]], 48
-; CHECK:       %next.gep4 = getelementptr i8, ptr %a, i64 %[[I3]]
+; CHECK:       [[SHL:%.+]] = shl i64 %index, 4
+; CHECK:       %[[I1:.+]] = or i64 [[SHL]], 16
+; CHECK:       %[[I2:.+]] = or i64 [[SHL]], 32
+; CHECK:       %[[I3:.+]] = or i64 [[SHL]], 48
+; CHECK:       getelementptr i8, ptr %a, i64 [[SHL]]
+; CHECK:       getelementptr i8, ptr %a, i64 %[[I1]]
+; CHECK:       getelementptr i8, ptr %a, i64 %[[I2]]
+; CHECK:       getelementptr i8, ptr %a, i64 %[[I3]]
 ; CHECK:       br i1 {{.*}}, label %middle.block, label %vector.body
 ;
 define void @pointer_iv_non_uniform_1(ptr %a, i64 %n) {
@@ -404,9 +399,9 @@ for.end:
 ; CHECK:       %pointer.phi = phi ptr [ %a, %vector.ph ], [ %ptr.ind, %vector.body ]
 ; CHECK:       %index = phi i64 [ 0, %vector.ph ], [ %index.next, %vector.body ]
 ; CHECK:       %[[PTRVEC:.+]] = getelementptr i8, ptr %pointer.phi, <4 x i64> <i64 0, i64 4, i64 8, i64 12>
-; CHECK:       [[SHL:%.+]] = shl i64 %index, 3
-; CHECK:       %next.gep = getelementptr i8, ptr %b, i64 [[SHL]]
-; CHECK:       store <4 x ptr> %[[PTRVEC]], ptr %next.gep, align 8
+; CHECK        [[SHL:%.+]] = shl i64 %index, 3
+; CHECK:       [[NEXTGEP:%.+]] = getelementptr i8, ptr %b, i64 [[SHL]]
+; CHECK:       store <4 x ptr> %[[PTRVEC]], ptr [[NEXTGEP]], align 8
 ; CHECK:       %ptr.ind = getelementptr i8, ptr %pointer.phi, i64 16
 ; CHECK:       br i1 {{.*}}, label %middle.block, label %vector.body
 ;

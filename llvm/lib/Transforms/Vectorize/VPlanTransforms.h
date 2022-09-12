@@ -66,7 +66,8 @@ struct VPlanTransforms {
   /// provide them by building scalar steps off of the canonical scalar IV and
   /// update the original IV's users. This is an optional optimization to reduce
   /// the needs of vector extracts.
-  static void optimizeInductions(VPlan &Plan, ScalarEvolution &SE);
+  static void optimizeInductions(VPlan &Plan, ScalarEvolution &SE,
+                                 BasicBlock *OrigLoopLatch);
 
   /// Remove redundant EpxandSCEVRecipes in \p Plan's entry block by replacing
   /// them with already existing recipes expanding the same SCEV expression.

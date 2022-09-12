@@ -3,7 +3,7 @@
 
 ; TODO: This still crashes with inbounds on the GEPs.
 define void @test(ptr %p1.start, ptr %p2.start, ptr %p1.end) {
-; CHECK-LABEL: @test(
+; CHECK-LABEL: define {{[^@]+}}@test(
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
@@ -40,7 +40,7 @@ exit:
 }
 
 define void @store_pointer_induction(ptr %start, ptr %end) {
-; CHECK-LABEL: @store_pointer_induction(
+; CHECK-LABEL: define {{[^@]+}}@store_pointer_induction(
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[START2:%.*]] = ptrtoint ptr [[START:%.*]] to i64
 ; CHECK-NEXT:    [[END1:%.*]] = ptrtoint ptr [[END:%.*]] to i64

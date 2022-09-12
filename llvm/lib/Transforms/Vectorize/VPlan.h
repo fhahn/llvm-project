@@ -1212,17 +1212,13 @@ public:
 class VPWidenPointerInductionRecipe : public VPHeaderPHIRecipe {
   const InductionDescriptor &IndDesc;
 
-  bool IsScalarAfterVectorization;
-
 public:
   /// Create a new VPWidenPointerInductionRecipe for \p Phi with start value \p
   /// Start.
   VPWidenPointerInductionRecipe(PHINode *Phi, VPValue *Start, VPValue *Step,
-                                const InductionDescriptor &IndDesc,
-                                bool IsScalarAfterVectorization)
+                                const InductionDescriptor &IndDesc)
       : VPHeaderPHIRecipe(VPDef::VPWidenPointerInductionSC, Phi),
-        IndDesc(IndDesc),
-        IsScalarAfterVectorization(IsScalarAfterVectorization) {
+        IndDesc(IndDesc) {
     addOperand(Start);
     addOperand(Step);
   }
@@ -1234,17 +1230,14 @@ public:
   /// Generate vector values for the pointer induction.
   void execute(VPTransformState &State) override;
 
-  /// Returns true if only scalar values will be generated.
-  bool onlyScalarsGenerated(ElementCount VF);
-
-  /// Returns the induction descriptor for the recipe.
-  const InductionDescriptor &getInductionDescriptor() const { return IndDesc; }
-
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   /// Print the recipe.
   void print(raw_ostream &O, const Twine &Indent,
              VPSlotTracker &SlotTracker) const override;
 #endif
+
+  /// Returns the induction descriptor for the recipe.
+  const InductionDescriptor &getInductionDescriptor() const { return IndDesc; }
 };
 
 /// A recipe for handling header phis that are widened in the vector loop.
@@ -1493,6 +1486,12 @@ public:
     assert(is_contained(operands(), Op) &&
            "Op must be an operand of the recipe");
     return Op == getAddr() && !llvm::is_contained(getStoredValues(), Op);
+  }
+
+  bool usesScalars(const VPValue *Op) const override {
+    assert(is_contained(operands(), Op) &&
+           "Op must be an operand of the recipe");
+    return Op == getAddr();
   }
 };
 
@@ -2263,6 +2262,8 @@ class VPlan {
   /// Values used outside the plan.
   MapVector<PHINode *, VPLiveOut *> LiveOuts;
 
+  SmallVector<Instruction *> TmpInsts;
+
 public:
   VPlan(VPBlockBase *Entry = nullptr) : Entry(Entry) {
     if (Entry)
@@ -2327,6 +2328,10 @@ public:
     assert(hasUF(UF) && "Cannot set the UF not already in plan");
     UFs.clear();
     UFs.insert(UF);
+  }
+
+  bool hasScalableVFs() const {
+    return any_of(VFs, [](ElementCount VF) { return VF.isScalable(); });
   }
 
   /// Return a string with the name of the plan and the applicable VFs and UFs.
@@ -2424,6 +2429,14 @@ public:
 
   const MapVector<PHINode *, VPLiveOut *> &getLiveOuts() const {
     return LiveOuts;
+  }
+
+  void addTmpInst(Instruction *I) { TmpInsts.push_back(I); }
+
+  void clearTmpInsts() {
+    for (Instruction *I : TmpInsts)
+      I->deleteValue();
+    TmpInsts.clear();
   }
 
 private:

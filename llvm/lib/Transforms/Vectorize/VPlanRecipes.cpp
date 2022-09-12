@@ -1115,7 +1115,8 @@ bool VPCanonicalIVPHIRecipe::isCanonical(
     InductionDescriptor::InductionKind Kind, VPValue *Start, VPValue *Step,
     Type *Ty) const {
   // The types must match and it must be an integer induction.
-  if (Ty != getScalarType() || Kind != InductionDescriptor::IK_IntInduction)
+  if (Ty != getScalarType() || (Kind != InductionDescriptor::IK_IntInduction &&
+                                Kind != InductionDescriptor::IK_PtrInduction))
     return false;
   // Start must match the start value of this canonical induction.
   if (Start != getStartValue())
@@ -1127,11 +1128,6 @@ bool VPCanonicalIVPHIRecipe::isCanonical(
 
   ConstantInt *StepC = dyn_cast<ConstantInt>(Step->getLiveInIRValue());
   return StepC && StepC->isOne();
-}
-
-bool VPWidenPointerInductionRecipe::onlyScalarsGenerated(ElementCount VF) {
-  return IsScalarAfterVectorization &&
-         (!VF.isScalable() || vputils::onlyFirstLaneUsed(this));
 }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)

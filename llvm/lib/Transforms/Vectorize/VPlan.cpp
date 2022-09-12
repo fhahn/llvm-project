@@ -597,6 +597,8 @@ VPlan::~VPlan() {
     delete TripCount;
   if (BackedgeTakenCount)
     delete BackedgeTakenCount;
+
+  clearTmpInsts();
 }
 
 VPActiveLaneMaskPHIRecipe *VPlan::getActiveLaneMaskPhi() {
@@ -644,7 +646,7 @@ void VPlan::prepareToExecute(Value *TripCountV, Value *VectorTripCountV,
     assert(all_of(IV->users(),
                   [](const VPUser *U) {
                     if (isa<VPScalarIVStepsRecipe>(U) ||
-                        isa<VPDerivedIVRecipe>(U))
+                        isa<VPDerivedIVRecipe>(U) || isa<VPReplicateRecipe>(U))
                       return true;
                     auto *VPI = cast<VPInstruction>(U);
                     return VPI->getOpcode() ==
@@ -694,11 +696,6 @@ void VPlan::execute(VPTransformState *State) {
         Phi = cast<PHINode>(State->get(R.getVPSingleValue(), 0));
       } else {
         auto *WidenPhi = cast<VPWidenPointerInductionRecipe>(&R);
-        // TODO: Split off the case that all users of a pointer phi are scalar
-        // from the VPWidenPointerInductionRecipe.
-        if (WidenPhi->onlyScalarsGenerated(State->VF))
-          continue;
-
         auto *GEP = cast<GetElementPtrInst>(State->get(WidenPhi, 0));
         Phi = cast<PHINode>(GEP->getPointerOperand());
       }

@@ -2508,7 +2508,11 @@ static Value *emitTransformedIndex(IRBuilderBase &B, Value *Index,
     return B.CreateMul(X, Y);
   };
 
-  switch (ID.getKind()) {
+  auto Kind = ID.getKind();
+  if (Kind == InductionDescriptor::IK_PtrInduction &&
+      StartValue->getType()->isIntegerTy())
+    Kind = InductionDescriptor::IK_IntInduction;
+  switch (Kind) {
   case InductionDescriptor::IK_IntInduction: {
     assert(!isa<VectorType>(Index->getType()) &&
            "Vector indices not supported for integer inductions yet");
@@ -8309,13 +8313,7 @@ VPRecipeBase *VPRecipeBuilder::tryToOptimizeInductionPHI(
   if (auto *II = Legal->getPointerInductionDescriptor(Phi)) {
     VPValue *Step = vputils::getOrCreateVPValueForSCEVExpr(Plan, II->getStep(),
                                                            *PSE.getSE());
-    return new VPWidenPointerInductionRecipe(
-        Phi, Operands[0], Step, *II,
-        LoopVectorizationPlanner::getDecisionAndClampRange(
-            [&](ElementCount VF) {
-              return CM.isScalarAfterVectorization(Phi, VF);
-            },
-            Range));
+    return new VPWidenPointerInductionRecipe(Phi, Operands[0], Step, *II);
   }
   return nullptr;
 }
@@ -9099,7 +9097,9 @@ std::optional<VPlanPtr> LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(
   // in ways that accessing values using original IR values is incorrect.
   Plan->disableValue2VPValue();
 
-  VPlanTransforms::optimizeInductions(*Plan, *PSE.getSE());
+  VPlanTransforms::removeDeadRecipes(*Plan);
+  VPlanTransforms::optimizeInductions(*Plan, *PSE.getSE(),
+                                      OrigLoop->getLoopLatch());
   VPlanTransforms::removeDeadRecipes(*Plan);
 
   VPlanTransforms::createAndOptimizeReplicateRegions(*Plan);
@@ -9398,37 +9398,6 @@ void VPWidenPointerInductionRecipe::execute(VPTransformState &State) {
   auto *IVR = getParent()->getPlan()->getCanonicalIV();
   PHINode *CanonicalIV = cast<PHINode>(State.get(IVR, 0));
 
-  if (onlyScalarsGenerated(State.VF)) {
-    // This is the normalized GEP that starts counting at zero.
-    Value *PtrInd = State.Builder.CreateSExtOrTrunc(
-        CanonicalIV, IndDesc.getStep()->getType());
-    // Determine the number of scalars we need to generate for each unroll
-    // iteration. If the instruction is uniform, we only need to generate the
-    // first lane. Otherwise, we generate all VF values.
-    bool IsUniform = vputils::onlyFirstLaneUsed(this);
-    assert((IsUniform || !State.VF.isScalable()) &&
-           "Cannot scalarize a scalable VF");
-    unsigned Lanes = IsUniform ? 1 : State.VF.getFixedValue();
-
-    for (unsigned Part = 0; Part < State.UF; ++Part) {
-      Value *PartStart =
-          createStepForVF(State.Builder, PtrInd->getType(), State.VF, Part);
-
-      for (unsigned Lane = 0; Lane < Lanes; ++Lane) {
-        Value *Idx = State.Builder.CreateAdd(
-            PartStart, ConstantInt::get(PtrInd->getType(), Lane));
-        Value *GlobalIdx = State.Builder.CreateAdd(PtrInd, Idx);
-
-        Value *Step = State.get(getOperand(1), VPIteration(Part, Lane));
-        Value *SclrGep = emitTransformedIndex(
-            State.Builder, GlobalIdx, IndDesc.getStartValue(), Step, IndDesc);
-        SclrGep->setName("next.gep");
-        State.set(this, SclrGep, VPIteration(Part, Lane));
-      }
-    }
-    return;
-  }
-
   Type *PhiType = IndDesc.getStep()->getType();
 
   // Build a pointer phi
@@ -9506,7 +9475,8 @@ void VPDerivedIVRecipe::execute(VPTransformState &State) {
   }
   assert(DerivedIV != CanonicalIV && "IV didn't need transforming?");
 
-  State.set(this, DerivedIV, VPIteration(0, 0));
+  for (unsigned Part = 0; Part != State.UF; ++Part)
+    State.set(this, DerivedIV, VPIteration(Part, 0));
 }
 
 void VPScalarIVStepsRecipe::execute(VPTransformState &State) {
