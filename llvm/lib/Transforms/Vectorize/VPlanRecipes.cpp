@@ -46,7 +46,10 @@ bool VPRecipeBase::mayWriteToMemory() const {
   case VPWidenMemoryInstructionSC: {
     return cast<VPWidenMemoryInstructionRecipe>(this)->isStore();
   }
-  case VPReplicateSC:
+  case VPReplicateSC: {
+    auto *R = cast<VPReplicateRecipe>(this);
+    return R->getInstruction().mayWriteToMemory();
+  }
   case VPWidenCallSC:
     return cast<Instruction>(getVPSingleValue()->getUnderlyingValue())
         ->mayWriteToMemory();
@@ -79,7 +82,10 @@ bool VPRecipeBase::mayReadFromMemory() const {
   case VPWidenMemoryInstructionSC: {
     return !cast<VPWidenMemoryInstructionRecipe>(this)->isStore();
   }
-  case VPReplicateSC:
+  case VPReplicateSC: {
+    auto *R = cast<VPReplicateRecipe>(this);
+    return R->getInstruction().mayReadFromMemory();
+  }
   case VPWidenCallSC:
     return cast<Instruction>(getVPSingleValue()->getUnderlyingValue())
         ->mayReadFromMemory();
@@ -150,7 +156,7 @@ bool VPRecipeBase::mayHaveSideEffects() const {
     return mayWriteToMemory();
   case VPReplicateSC: {
     auto *R = cast<VPReplicateRecipe>(this);
-    return R->getUnderlyingInstr()->mayHaveSideEffects();
+    return R->getInstruction().mayHaveSideEffects();
   }
   default:
     return true;
@@ -968,11 +974,11 @@ void VPReplicateRecipe::print(raw_ostream &O, const Twine &Indent,
                               VPSlotTracker &SlotTracker) const {
   O << Indent << (IsUniform ? "CLONE " : "REPLICATE ");
 
-  if (!getUnderlyingInstr()->getType()->isVoidTy()) {
+  if (!Instr->getType()->isVoidTy()) {
     printAsOperand(O, SlotTracker);
     O << " = ";
   }
-  if (auto *CB = dyn_cast<CallBase>(getUnderlyingInstr())) {
+  if (auto *CB = dyn_cast<CallBase>(Instr)) {
     O << "call @" << CB->getCalledFunction()->getName() << "(";
     interleaveComma(make_range(op_begin(), op_begin() + (getNumOperands() - 1)),
                     O, [&O, &SlotTracker](VPValue *Op) {
@@ -980,7 +986,7 @@ void VPReplicateRecipe::print(raw_ostream &O, const Twine &Indent,
                     });
     O << ")";
   } else {
-    O << Instruction::getOpcodeName(getUnderlyingInstr()->getOpcode()) << " ";
+    O << Instruction::getOpcodeName(Instr->getOpcode()) << " ";
     printOperands(O, SlotTracker);
   }
 

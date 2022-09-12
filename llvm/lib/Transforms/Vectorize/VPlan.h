@@ -1543,6 +1543,11 @@ public:
 /// single copy of widened type for all lanes. If the instruction is known to be
 /// uniform only one copy, per lane zero, will be generated.
 class VPReplicateRecipe : public VPRecipeBase, public VPValue {
+  /// The instruction being replicated. It is only used for opcode, type info,
+  /// attributes and metadata. Operands and uses of the result are modeled in
+  /// VPlan.
+  const Instruction *Instr;
+
   /// Indicator if only a single replica per lane is needed.
   bool IsUniform;
 
@@ -1551,9 +1556,11 @@ class VPReplicateRecipe : public VPRecipeBase, public VPValue {
 
 public:
   template <typename IterT>
-  VPReplicateRecipe(Instruction *I, iterator_range<IterT> Operands,
-                    bool IsUniform, VPValue *Mask = nullptr)
-      : VPRecipeBase(VPDef::VPReplicateSC, Operands), VPValue(this, I),
+  VPReplicateRecipe(const Instruction *I, Value *UnderlyingValue,
+                    iterator_range<IterT> Operands, bool IsUniform,
+                  VPValue *Mask = nullptr)
+      : VPRecipeBase(VPDef::VPReplicateSC, Operands),
+        VPValue(this, UnderlyingValue), Instr(I),
         IsUniform(IsUniform), IsPredicated(Mask) {
     if (Mask)
       addOperand(Mask);
@@ -1602,6 +1609,8 @@ public:
     assert(isPredicated() && "Trying to get the mask of a unpredicated recipe");
     return getOperand(getNumOperands() - 1);
   }
+
+  const Instruction &getInstruction() const { return *Instr; }
 };
 
 /// A recipe for generating conditional branches on the bits of a mask.

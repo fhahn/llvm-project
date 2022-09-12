@@ -8634,7 +8634,7 @@ VPRecipeOrVPValueTy VPRecipeBuilder::handleReplication(Instruction *I,
     BlockInMask = createBlockInMask(I->getParent(), Plan);
   }
 
-  auto *Recipe = new VPReplicateRecipe(I, Plan.mapToVPValues(I->operands()),
+  auto *Recipe = new VPReplicateRecipe(I, I, Plan.mapToVPValues(I->operands()),
                                        IsUniform, BlockInMask);
   return toVPRecipeResult(Recipe);
 }
@@ -9580,17 +9580,16 @@ void VPReductionRecipe::execute(VPTransformState &State) {
 }
 
 void VPReplicateRecipe::execute(VPTransformState &State) {
-  Instruction *UI = getUnderlyingInstr();
   if (State.Instance) { // Generate a single instance.
     assert(!State.VF.isScalable() && "Can't scalarize a scalable vector");
-    State.ILV->scalarizeInstruction(UI, this, *State.Instance, State);
+    State.ILV->scalarizeInstruction(Instr, this, *State.Instance, State);
     // Insert scalar instance packing it into a vector.
     if (State.VF.isVector() && shouldPack()) {
       // If we're constructing lane 0, initialize to start from poison.
       if (State.Instance->Lane.isFirstLane()) {
         assert(!State.VF.isScalable() && "VF is assumed to be non scalable.");
-        Value *Poison = PoisonValue::get(
-            VectorType::get(UI->getType(), State.VF));
+        Value *Poison =
+            PoisonValue::get(VectorType::get(Instr->getType(), State.VF));
         State.set(this, Poison, State.Instance->Part);
       }
       State.ILV->packScalarIntoVectorValue(this, *State.Instance, State);
@@ -9601,11 +9600,12 @@ void VPReplicateRecipe::execute(VPTransformState &State) {
   if (IsUniform) {
     // If the recipe is uniform across all parts (instead of just per VF), only
     // generate a single instance.
-    if ((isa<LoadInst>(UI) || isa<StoreInst>(UI)) &&
+    if ((isa<LoadInst>(Instr) || isa<StoreInst>(Instr)) &&
         all_of(operands(), [](VPValue *Op) {
           return Op->isDefinedOutsideVectorRegions();
         })) {
-      State.ILV->scalarizeInstruction(UI, this, VPIteration(0, 0), State);
+      State.ILV->scalarizeInstruction(Instr, this, VPIteration(0, 0),
+                                      State);
       if (user_begin() != user_end()) {
         for (unsigned Part = 1; Part < State.UF; ++Part)
           State.set(this, State.get(this, VPIteration(0, 0)),
@@ -9617,16 +9617,17 @@ void VPReplicateRecipe::execute(VPTransformState &State) {
     // Uniform within VL means we need to generate lane 0 only for each
     // unrolled copy.
     for (unsigned Part = 0; Part < State.UF; ++Part)
-      State.ILV->scalarizeInstruction(UI, this, VPIteration(Part, 0), State);
+      State.ILV->scalarizeInstruction(Instr, this, VPIteration(Part, 0),
+                                       State);
     return;
   }
 
   // A store of a loop varying value to a loop invariant address only
-  // needs only the last copy of the store.
-  if (isa<StoreInst>(UI) && !getOperand(1)->hasDefiningRecipe()) {
+  // needs a single copy of the store.
+  if (isa<StoreInst>(Instr) && !getOperand(1)->hasDefiningRecipe()) {
     auto Lane = VPLane::getLastLaneForVF(State.VF);
-    State.ILV->scalarizeInstruction(UI, this, VPIteration(State.UF - 1, Lane),
-                                    State);
+    State.ILV->scalarizeInstruction(
+        Instr, this, VPIteration(State.UF - 1, Lane), State);
     return;
   }
 
@@ -9635,7 +9636,8 @@ void VPReplicateRecipe::execute(VPTransformState &State) {
   const unsigned EndLane = State.VF.getKnownMinValue();
   for (unsigned Part = 0; Part < State.UF; ++Part)
     for (unsigned Lane = 0; Lane < EndLane; ++Lane)
-      State.ILV->scalarizeInstruction(UI, this, VPIteration(Part, Lane), State);
+      State.ILV->scalarizeInstruction(Instr, this, VPIteration(Part, Lane),
+                                      State);
 }
 
 void VPWidenMemoryInstructionRecipe::execute(VPTransformState &State) {

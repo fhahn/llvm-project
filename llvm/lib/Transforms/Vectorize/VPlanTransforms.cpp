@@ -166,9 +166,10 @@ static bool sinkScalarOperands(VPlan &Plan) {
     if (NeedsDuplicating) {
       if (ScalarVFOnly)
         continue;
-      Instruction *I = cast<Instruction>(
-          cast<VPReplicateRecipe>(SinkCandidate)->getUnderlyingValue());
-      auto *Clone = new VPReplicateRecipe(I, SinkCandidate->operands(), true);
+      const Instruction *I =
+          &cast<VPReplicateRecipe>(SinkCandidate)->getInstruction();
+      auto *Clone = new VPReplicateRecipe(I, nullptr, SinkCandidate->operands(),
+                                          true);
       // TODO: add ".cloned" suffix to name of Clone's VPValue.
 
       Clone->insertBefore(SinkCandidate);
@@ -328,7 +329,7 @@ static VPRegionBlock *createReplicateRegion(VPReplicateRecipe *PredRecipe,
   // Replace predicated replicate recipe with a replicate recipe without a
   // mask but in the replicate region.
   auto *RecipeWithoutMask = new VPReplicateRecipe(
-      PredRecipe->getUnderlyingInstr(),
+      PredRecipe->getUnderlyingInstr(), PredRecipe->getUnderlyingInstr(),
       make_range(PredRecipe->op_begin(), std::prev(PredRecipe->op_end())),
       PredRecipe->isUniform());
   auto *Pred = new VPBasicBlock(Twine(RegionName) + ".if", RecipeWithoutMask);
