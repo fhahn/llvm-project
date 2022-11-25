@@ -23,6 +23,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <type_traits>
 #include <utility>
 
@@ -299,13 +300,20 @@ public:
     return static_cast<unsigned>(hash_combine_range(Data, Data + Size));
   }
 
-  bool operator==(FoldingSetNodeIDRef) const;
+  bool operator==(const FoldingSetNodeIDRef &RHS) const {
+    if (Size != RHS.Size) return false;
+    return memcmp(Data, RHS.Data, Size*sizeof(*Data)) == 0;
+  }
 
-  bool operator!=(FoldingSetNodeIDRef RHS) const { return !(*this == RHS); }
+  bool operator!=(const FoldingSetNodeIDRef &RHS) const { return !(*this == RHS); }
 
   /// Used to compare the "ordering" of two nodes as defined by the
   /// profiled bits and their ordering defined by memcmp().
-  bool operator<(FoldingSetNodeIDRef) const;
+  bool operator<(const FoldingSetNodeIDRef &RHS) const {
+    if (Size != RHS.Size)
+      return Size < RHS.Size;
+    return memcmp(Data, RHS.Data, Size*sizeof(*Data)) < 0;
+  }
 
   const unsigned *getData() const { return Data; }
   size_t getSize() const { return Size; }
@@ -372,16 +380,24 @@ public:
   }
 
   /// operator== - Used to compare two nodes to each other.
-  bool operator==(const FoldingSetNodeID &RHS) const;
-  bool operator==(const FoldingSetNodeIDRef RHS) const;
+  bool operator==(const FoldingSetNodeID &RHS) const {
+    return *this == FoldingSetNodeIDRef(RHS.Bits.data(), RHS.Bits.size());
+  }
+  bool operator==(const FoldingSetNodeIDRef RHS) const {
+    return FoldingSetNodeIDRef(Bits.data(), Bits.size()) == RHS;
+  }
 
   bool operator!=(const FoldingSetNodeID &RHS) const { return !(*this == RHS); }
   bool operator!=(const FoldingSetNodeIDRef RHS) const { return !(*this ==RHS);}
 
   /// Used to compare the "ordering" of two nodes as defined by the
   /// profiled bits and their ordering defined by memcmp().
-  bool operator<(const FoldingSetNodeID &RHS) const;
-  bool operator<(const FoldingSetNodeIDRef RHS) const;
+  bool operator<(const FoldingSetNodeID &RHS) const {
+    return *this < FoldingSetNodeIDRef(RHS.Bits.data(), RHS.Bits.size());
+  }
+  bool operator<(const FoldingSetNodeIDRef RHS) const {
+    return FoldingSetNodeIDRef(Bits.data(), Bits.size()) < RHS;
+  }
 
   /// Intern - Copy this node's data to a memory region allocated from the
   /// given allocator and return a FoldingSetNodeIDRef describing the

@@ -22,22 +22,6 @@
 using namespace llvm;
 
 //===----------------------------------------------------------------------===//
-// FoldingSetNodeIDRef Implementation
-
-bool FoldingSetNodeIDRef::operator==(FoldingSetNodeIDRef RHS) const {
-  if (Size != RHS.Size) return false;
-  return memcmp(Data, RHS.Data, Size*sizeof(*Data)) == 0;
-}
-
-/// Used to compare the "ordering" of two nodes as defined by the
-/// profiled bits and their ordering defined by memcmp().
-bool FoldingSetNodeIDRef::operator<(FoldingSetNodeIDRef RHS) const {
-  if (Size != RHS.Size)
-    return Size < RHS.Size;
-  return memcmp(Data, RHS.Data, Size*sizeof(*Data)) < 0;
-}
-
-//===----------------------------------------------------------------------===//
 // FoldingSetNodeID Implementation
 
 /// Add* - Add various data types to Bit data.
@@ -101,28 +85,6 @@ void FoldingSetNodeID::AddString(StringRef String) {
 // AddNodeID - Adds the Bit data of another ID to *this.
 void FoldingSetNodeID::AddNodeID(const FoldingSetNodeID &ID) {
   Bits.append(ID.Bits.begin(), ID.Bits.end());
-}
-
-/// operator== - Used to compare two nodes to each other.
-///
-bool FoldingSetNodeID::operator==(const FoldingSetNodeID &RHS) const {
-  return *this == FoldingSetNodeIDRef(RHS.Bits.data(), RHS.Bits.size());
-}
-
-/// operator== - Used to compare two nodes to each other.
-///
-bool FoldingSetNodeID::operator==(FoldingSetNodeIDRef RHS) const {
-  return FoldingSetNodeIDRef(Bits.data(), Bits.size()) == RHS;
-}
-
-/// Used to compare the "ordering" of two nodes as defined by the
-/// profiled bits and their ordering defined by memcmp().
-bool FoldingSetNodeID::operator<(const FoldingSetNodeID &RHS) const {
-  return *this < FoldingSetNodeIDRef(RHS.Bits.data(), RHS.Bits.size());
-}
-
-bool FoldingSetNodeID::operator<(FoldingSetNodeIDRef RHS) const {
-  return FoldingSetNodeIDRef(Bits.data(), Bits.size()) < RHS;
 }
 
 /// Intern - Copy this node's data to a memory region allocated from the
