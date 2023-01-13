@@ -342,9 +342,12 @@ removeAllNonTerminatorAndEHPadInstructions(BasicBlock *BB);
 
 /// Insert an unreachable instruction before the specified
 /// instruction, making it and the rest of the code in the block dead.
+/// If \p DT is not nullptr, update it directly; in that case, DTU must be
+/// nullptr.
 unsigned changeToUnreachable(Instruction *I, bool PreserveLCSSA = false,
                              DomTreeUpdater *DTU = nullptr,
-                             MemorySSAUpdater *MSSAU = nullptr);
+                             MemorySSAUpdater *MSSAU = nullptr,
+                             DominatorTree *DT = nullptr);
 
 /// Convert the CallInst to InvokeInst with the specified unwind edge basic
 /// block.  This also splits the basic block where CI is located, because
@@ -494,6 +497,14 @@ Value *invertCondition(Value *Condition);
 /// If we can infer one attribute from another on the declaration of a
 /// function, explicitly materialize the maximal set in the IR.
 bool inferAttributesFromOthers(Function &F);
+
+/// Update the \p DT for \p BB using its predecessors. This can be used to
+/// update the dominator tree if predecessors of  \p BB have been added or
+/// removed or if the DT for its predecessors changed. The function assumes the
+/// dominator tree is valid for all predecessors and sets \p BB's immediate
+/// dominator to the nearest common dominator of all predecessors. \p BB cannot
+/// be a predecessor of itself.
+void updateDominatorTreeUsingPredecessors(BasicBlock *BB, DominatorTree &DT);
 
 } // end namespace llvm
 

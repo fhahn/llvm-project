@@ -2232,8 +2232,8 @@ llvm::removeAllNonTerminatorAndEHPadInstructions(BasicBlock *BB) {
 }
 
 unsigned llvm::changeToUnreachable(Instruction *I, bool PreserveLCSSA,
-                                   DomTreeUpdater *DTU,
-                                   MemorySSAUpdater *MSSAU) {
+                                   DomTreeUpdater *DTU, MemorySSAUpdater *MSSAU,
+                                   DominatorTree *DT) {
   BasicBlock *BB = I->getParent();
 
   if (MSSAU)
@@ -2261,11 +2261,18 @@ unsigned llvm::changeToUnreachable(Instruction *I, bool PreserveLCSSA,
     ++NumInstrsRemoved;
   }
   if (DTU) {
+    assert(!DT && "cannot use both DT and DTU for updates");
     SmallVector<DominatorTree::UpdateType, 8> Updates;
     Updates.reserve(UniqueSuccessors.size());
     for (BasicBlock *UniqueSuccessor : UniqueSuccessors)
       Updates.push_back({DominatorTree::Delete, BB, UniqueSuccessor});
     DTU->applyUpdates(Updates);
+  }
+
+  if (DT) {
+    assert(!DTU && "cannot use both DT and DTU for updates");
+    for (BasicBlock *UniqueSuccessor : UniqueSuccessors)
+      updateDominatorTreeUsingPredecessors(UniqueSuccessor, *DT);
   }
   return NumInstrsRemoved;
 }
@@ -3515,4 +3522,27 @@ bool llvm::inferAttributesFromOthers(Function &F) {
   // can infer by inspecting arguments of argmemonly-ish functions.
 
   return Changed;
+}
+
+void llvm::updateDominatorTreeUsingPredecessors(BasicBlock *BB,
+                                                DominatorTree &DT) {
+  if (pred_empty(BB)) {
+    for (BasicBlock *N : depth_first(BB))
+      DT.eraseNode(N);
+    return;
+  }
+
+  DomTreeNode *BBNode = DT.getNode(BB);
+  // BB is unreachable, nothing to update.
+  if (!BBNode)
+    return;
+
+  assert(
+      all_of(predecessors(BB), [BB](BasicBlock *Pred) { return Pred != BB; }) &&
+      "BB is a predecessor of itself");
+  auto PredI = pred_begin(BB);
+  BasicBlock *NewIDom = *PredI;
+  for (PredI = std::next(PredI); PredI != pred_end(BB); ++PredI)
+    NewIDom = DT.findNearestCommonDominator(NewIDom, *PredI);
+  BBNode->setIDom(DT.getNode(NewIDom));
 }

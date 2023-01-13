@@ -15,6 +15,7 @@
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/DebugInfo.h"
+#include "llvm/IR/Dominators.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
@@ -1086,4 +1087,85 @@ TEST(Local, CanReplaceOperandWithVariable) {
   EXPECT_FALSE(canReplaceOperandWithVariable(GCRoot, 2));
 
   BB0->dropAllReferences();
+}
+
+static BasicBlock *getBasicBlockByName(Function &F, StringRef Name) {
+  for (BasicBlock &BB : F)
+    if (BB.getName() == Name)
+      return &BB;
+  llvm_unreachable("Expected to find basic block!");
+}
+
+static Value *getArgumentByName(Function &F, StringRef Name) {
+  for (Argument &A : F.args())
+    if (A.getName() == Name)
+      return &A;
+  llvm_unreachable("Expected to find argument!");
+}
+
+TEST(Local, updateDominatorTreeUsingPredecessors) {
+  LLVMContext C;
+  std::unique_ptr<Module> M = parseIR(C, R"IR(
+define i32 @test(i1 %cond) {
+entry:
+  br i1 %cond, label %bb0, label %bb1
+
+bb0:
+  br label %bb1
+
+bb1:
+  %phi = phi i32 [ 0, %entry ], [ 1, %bb0 ]
+  ret i32 %phi
+}
+)IR");
+  Function *F = M->getFunction("test");
+  DominatorTree DT(*F);
+
+  BasicBlock *Entry = getBasicBlockByName(*F, "entry");
+  BasicBlock *BB0 = getBasicBlockByName(*F, "bb0");
+  BasicBlock *BB1 = getBasicBlockByName(*F, "bb1");
+
+  // Remove edge from entry -> bb1.
+  Entry->getTerminator()->eraseFromParent();
+  BranchInst::Create(BB0, Entry);
+  updateDominatorTreeUsingPredecessors(BB1, &DT);
+  EXPECT_TRUE(DT.verify());
+
+  // Remove edge from bb0 -> bb1.
+  BB0->getTerminator()->eraseFromParent();
+  new UnreachableInst(C, BB0);
+  updateDominatorTreeUsingPredecessors(BB1, &DT);
+  EXPECT_TRUE(DT.verify());
+
+  M = parseIR(C, R"IR(
+define i32 @test(i1 %cond) {
+entry:
+  br label %bb0
+
+bb0:
+  br i1 %cond, label %bb1, label %bb0
+
+bb1:
+  %phi = phi i32 [ 0, %entry ], [ 1, %bb0 ]
+  ret i32 %phi
+}
+)IR");
+  F = M->getFunction("test");
+  DT.recalculate(*F);
+
+  Entry = getBasicBlockByName(*F, "entry");
+  BB0 = getBasicBlockByName(*F, "bb0");
+  BB1 = getBasicBlockByName(*F, "bb1");
+
+  // Remove edge from bb0 -> bb0.
+  BB0->getTerminator()->eraseFromParent();
+  BranchInst::Create(BB1, BB0);
+  updateDominatorTreeUsingPredecessors(BB1, &DT);
+  EXPECT_TRUE(DT.verify());
+
+  // Add edge from entry -> bb1.
+  Entry->getTerminator()->eraseFromParent();
+  BranchInst::Create(BB0, BB1, getArgumentByName(*F, "cond"), Entry);
+  updateDominatorTreeUsingPredecessors(BB1, &DT);
+  EXPECT_TRUE(DT.verify());
 }

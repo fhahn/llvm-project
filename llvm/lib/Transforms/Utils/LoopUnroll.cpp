@@ -680,8 +680,6 @@ LoopUnrollResult llvm::UnrollLoop(Loop *L, UnrollLoopOptions ULO, LoopInfo *LI,
   assert(!UnrollVerifyDomtree ||
          DT->verify(DominatorTree::VerificationLevel::Fast));
 
-  DomTreeUpdater DTU(DT, DomTreeUpdater::UpdateStrategy::Lazy);
-
   auto SetDest = [&](BasicBlock *Src, bool WillExit, bool ExitOnTrue) {
     auto *Term = cast<BranchInst>(Src->getTerminator());
     const unsigned Idx = ExitOnTrue ^ WillExit;
@@ -695,7 +693,12 @@ LoopUnrollResult llvm::UnrollLoop(Loop *L, UnrollLoopOptions ULO, LoopInfo *LI,
     BranchInst::Create(Dest, Term);
     Term->eraseFromParent();
 
-    DTU.applyUpdates({{DominatorTree::Delete, Src, DeadSucc}});
+    updateDominatorTreeUsingPredecessors(DeadSucc, *DT);
+    for (DomTreeNode *Child : to_vector(DT->getNode(Src)->children())) {
+      if (L->contains(Child->getBlock()))
+        continue;
+      updateDominatorTreeUsingPredecessors(Child->getBlock(), *DT);
+    }
   };
 
   auto WillExit = [&](const ExitInfo &Info, unsigned i, unsigned j,
@@ -757,7 +760,9 @@ LoopUnrollResult llvm::UnrollLoop(Loop *L, UnrollLoopOptions ULO, LoopInfo *LI,
 
   // When completely unrolling, the last latch becomes unreachable.
   if (!LatchIsExiting && CompletelyUnroll)
-    changeToUnreachable(Latches.back()->getTerminator(), PreserveLCSSA, &DTU);
+    changeToUnreachable(Latches.back()->getTerminator(), PreserveLCSSA,
+                        /*DTU=*/nullptr,
+                        /*MSSAU=*/nullptr, DT);
 
   // Merge adjacent basic blocks, if possible.
   for (BasicBlock *Latch : Latches) {
@@ -769,16 +774,15 @@ LoopUnrollResult llvm::UnrollLoop(Loop *L, UnrollLoopOptions ULO, LoopInfo *LI,
     if (Term && Term->isUnconditional()) {
       BasicBlock *Dest = Term->getSuccessor(0);
       BasicBlock *Fold = Dest->getUniquePredecessor();
-      if (MergeBlockIntoPredecessor(Dest, &DTU, LI)) {
+      if (MergeBlockIntoPredecessor(
+              Dest, /*DTU=*/nullptr, LI, /*MSSAU=*/nullptr, /*MemDep=*/nullptr,
+              /*PredecessorWithTwoSuccessors=*/false, DT)) {
         // Dest has been folded into Fold. Update our worklists accordingly.
         std::replace(Latches.begin(), Latches.end(), Dest, Fold);
         llvm::erase_value(UnrolledLoopBlocks, Dest);
       }
     }
   }
-  // Apply updates to the DomTree.
-  DT = &DTU.getDomTree();
-
   assert(!UnrollVerifyDomtree ||
          DT->verify(DominatorTree::VerificationLevel::Fast));
 
