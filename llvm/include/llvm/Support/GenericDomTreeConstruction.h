@@ -176,10 +176,11 @@ struct SemiNCAInfo {
   //
   // If SuccOrder is specified then in this order the DFS traverses the children
   // otherwise the order is implied by the results of getChildren().
-  template <bool IsReverse = false, typename DescendCondition>
+  template <bool IsReverse = false, bool LimitSteps = false,
+            typename DescendCondition>
   unsigned runDFS(NodePtr V, unsigned LastNum, DescendCondition Condition,
-                  unsigned AttachToNum,
-                  const NodeOrderMap *SuccOrder = nullptr) {
+                  unsigned AttachToNum, const NodeOrderMap *SuccOrder = nullptr,
+                  unsigned Threshold = 0) {
     assert(V);
     SmallVector<NodePtr, 64> WorkList = {V};
     if (NodeToInfo.count(V) != 0) NodeToInfo[V].Parent = AttachToNum;
@@ -190,6 +191,9 @@ struct SemiNCAInfo {
 
       // Visited nodes always have positive DFS numbers.
       if (BBInfo.DFSNum != 0) continue;
+
+      if (LimitSteps && LastNum > Threshold)
+        return std::numeric_limits<unsigned>::max();
       BBInfo.DFSNum = BBInfo.Semi = ++LastNum;
       BBInfo.Label = BB;
       NumToNode.push_back(BB);
@@ -997,7 +1001,18 @@ struct SemiNCAInfo {
                       << "\n");
 
     SemiNCAInfo SNCA(BUI);
-    SNCA.runDFS(ToIDom, 0, DescendBelow, 0);
+    if (BUI->NumLegalized > 10) {
+      unsigned LastDFSNum = SNCA.runDFS<false, true>(ToIDom, 0, DescendBelow, 0, nullptr,
+                                              DT.DomTreeNodes.size() / 40);
+      if (LastDFSNum == std::numeric_limits<unsigned>::max()) {
+        LLVM_DEBUG(dbgs() << "Too many nodes found during DFS, rebuild entire tree.\n");
+        CalculateFromScratch(DT, BUI);
+        return;
+      }
+    } else {
+      SNCA.runDFS<false>(ToIDom, 0, DescendBelow, 0);
+    }
+
     LLVM_DEBUG(dbgs() << "\tRunning Semi-NCA\n");
     SNCA.runSemiNCA(DT, Level);
     SNCA.reattachExistingSubtree(DT, PrevIDomSubTree);
