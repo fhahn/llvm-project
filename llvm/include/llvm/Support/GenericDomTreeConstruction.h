@@ -1080,7 +1080,14 @@ struct SemiNCAInfo {
 
     SemiNCAInfo SNCA(BUI);
     unsigned LastDFSNum =
-        SNCA.runDFS(ToTN->getBlock(), 0, DescendAndCollect, 0);
+        SNCA.runDFS<false, true>(ToTN->getBlock(), 0, DescendAndCollect, 0,
+                                 nullptr, DT.DomTreeNodes.size() / 40);
+    if (LastDFSNum == std::numeric_limits<unsigned>::max()) {
+      LLVM_DEBUG(
+          dbgs() << "Too many nodes found during DFS, rebuild entire tree.\n");
+      CalculateFromScratch(DT, BUI);
+      return;
+    }
 
     TreeNodePtr MinNode = ToTN;
 
