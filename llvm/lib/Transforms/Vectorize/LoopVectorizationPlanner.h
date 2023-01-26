@@ -267,7 +267,7 @@ class LoopVectorizationPlanner {
   LoopVectorizationLegality *Legal;
 
   /// The profitability analysis.
-  LoopVectorizationCostModel &CM;
+  SmallVector<LoopVectorizationCostModel *> CMs;
 
   /// The interleaved access analysis.
   InterleavedAccessInfo &IAI;
@@ -290,16 +290,18 @@ public:
   LoopVectorizationPlanner(Loop *L, LoopInfo *LI, const TargetLibraryInfo *TLI,
                            const TargetTransformInfo *TTI,
                            LoopVectorizationLegality *Legal,
-                           LoopVectorizationCostModel &CM,
+                           ArrayRef<LoopVectorizationCostModel *> CMs,
                            InterleavedAccessInfo &IAI,
                            PredicatedScalarEvolution &PSE,
                            const LoopVectorizeHints &Hints,
                            OptimizationRemarkEmitter *ORE)
-      : OrigLoop(L), LI(LI), TLI(TLI), TTI(TTI), Legal(Legal), CM(CM), IAI(IAI),
-        PSE(PSE), Hints(Hints), ORE(ORE) {}
+      : OrigLoop(L), LI(LI), TLI(TLI), TTI(TTI), Legal(Legal), CMs(CMs),
+        IAI(IAI), PSE(PSE), Hints(Hints), ORE(ORE) {}
 
   /// Plan how to best vectorize, return the best VF and its cost, or
   /// std::nullopt if vectorization and interleaving should be avoided up front.
+  void plan(ElementCount UserVF, unsigned UserIC,
+            LoopVectorizationCostModel &CM);
   std::optional<VectorizationFactor> plan(ElementCount UserVF, unsigned UserIC);
 
   /// Use the VPlan-native path to plan how to best vectorize, return the best
@@ -327,6 +329,16 @@ public:
   bool hasPlanWithVF(ElementCount VF) const {
     return any_of(VPlans,
                   [&](const VPlanPtr &Plan) { return Plan->hasVF(VF); });
+/*    return any_of(*/
+        /*VPlans,*/
+        /*[&](const std::pair<VPlanPtr,*/
+                            /*SmallVector<std::pair<VectorizationFactor, bool>>>*/
+                /*&Plan) {*/
+          /*return any_of(Plan.second,*/
+                        /*[VF](const std::pair<VectorizationFactor, bool> &P) {*/
+                          /*return P.first.Width == VF;*/
+                        /*});*/
+        /*});*/
   }
 
   /// Test a \p Predicate on a \p Range of VF's. Return the value of applying
@@ -358,13 +370,14 @@ protected:
   /// Build VPlans for power-of-2 VF's between \p MinVF and \p MaxVF inclusive,
   /// according to the information gathered by Legal when it checked if it is
   /// legal to vectorize the loop.
-  void buildVPlans(ElementCount MinVF, ElementCount MaxVF);
+  void buildVPlans(ElementCount MinVF, ElementCount MaxVF,
+                   LoopVectorizationCostModel &CM);
 
 private:
   /// Build a VPlan according to the information gathered by Legal. \return a
   /// VPlan for vectorization factors \p Range.Start and up to \p Range.End
   /// exclusive, possibly decreasing \p Range.End.
-  VPlanPtr buildVPlan(VFRange &Range);
+  VPlanPtr buildVPlan(VFRange &Range, LoopVectorizationCostModel &CM);
 
   /// Build a VPlan using VPRecipes according to the information gather by
   /// Legal. This method is only used for the legacy inner loop vectorizer.
@@ -372,13 +385,16 @@ private:
   /// returned VPlan is valid for. If no VPlan can be built for the input range,
   /// set the largest included VF to the maximum VF for which no plan could be
   /// built.
-  std::optional<VPlanPtr> tryToBuildVPlanWithVPRecipes(
-      VFRange &Range, SmallPtrSetImpl<Instruction *> &DeadInstructions);
+  std::optional<VPlanPtr>
+  tryToBuildVPlanWithVPRecipes(VFRange &Range,
+                               SmallPtrSetImpl<Instruction *> &DeadInstructions,
+                               LoopVectorizationCostModel &CM);
 
   /// Build VPlans for power-of-2 VF's between \p MinVF and \p MaxVF inclusive,
   /// according to the information gathered by Legal when it checked if it is
   /// legal to vectorize the loop. This method creates VPlans using VPRecipes.
-  void buildVPlansWithVPRecipes(ElementCount MinVF, ElementCount MaxVF);
+  void buildVPlansWithVPRecipes(ElementCount MinVF, ElementCount MaxVF,
+                                LoopVectorizationCostModel &CM);
 
   // Adjust the recipes for reductions. For in-loop reductions the chain of
   // instructions leading from the loop exit instr to the phi need to be
@@ -387,7 +403,8 @@ private:
   // between the phi and live-out recipes when folding the tail.
   void adjustRecipesForReductions(VPBasicBlock *LatchVPBB, VPlanPtr &Plan,
                                   VPRecipeBuilder &RecipeBuilder,
-                                  ElementCount MinVF);
+                                  ElementCount MinVF,
+                                  LoopVectorizationCostModel &CM);
 
   /// Returns true when Factor A is more profitable than Factor B.
   bool isMoreProfitable(const VectorizationFactor &A,
