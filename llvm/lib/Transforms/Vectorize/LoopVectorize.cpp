@@ -1162,18 +1162,17 @@ using ElementCountSet = SmallSet<ElementCount, 16, ElementCountComparator>;
 /// different operations.
 class LoopVectorizationCostModel {
 public:
-  LoopVectorizationCostModel(ScalarEpilogueLowering SEL, Loop *L,
-                             PredicatedScalarEvolution &PSE, LoopInfo *LI,
-                             LoopVectorizationLegality *Legal,
-                             const TargetTransformInfo &TTI,
-                             const TargetLibraryInfo *TLI, DemandedBits *DB,
-                             AssumptionCache *AC,
-                             OptimizationRemarkEmitter *ORE, const Function *F,
-                             const LoopVectorizeHints *Hints,
-                             InterleavedAccessInfo &IAI)
+  LoopVectorizationCostModel(
+      ScalarEpilogueLowering SEL, Loop *L, PredicatedScalarEvolution &PSE,
+      LoopInfo *LI, LoopVectorizationLegality *Legal,
+      const TargetTransformInfo &TTI, const TargetLibraryInfo *TLI,
+      DemandedBits *DB, AssumptionCache *AC, OptimizationRemarkEmitter *ORE,
+      const Function *F, const LoopVectorizeHints *Hints,
+      InterleavedAccessInfo &IAI, bool ForceFoldTailByMasking = false)
       : ScalarEpilogueStatus(SEL), TheLoop(L), PSE(PSE), LI(LI), Legal(Legal),
         TTI(TTI), TLI(TLI), DB(DB), AC(AC), ORE(ORE), TheFunction(F),
-        Hints(Hints), InterleaveInfo(IAI) {}
+        Hints(Hints), InterleaveInfo(IAI),
+        CanFoldTailByMasking(ForceFoldTailByMasking) {}
 
   /// \return An upper bound for the vectorization factors (both fixed and
   /// scalable). If the factors are 0, vectorization and interleaving should be
@@ -1711,9 +1710,6 @@ private:
   /// iterations to execute in the scalar loop.
   ScalarEpilogueLowering ScalarEpilogueStatus = CM_ScalarEpilogueAllowed;
 
-  /// All blocks of loop are to be masked to fold tail of scalar iterations.
-  bool CanFoldTailByMasking = false;
-
   /// A map holding scalar costs for different vectorization factors. The
   /// presence of a cost for an instruction in the mapping indicates that the
   /// instruction will be scalarized when vectorizing with the associated
@@ -1840,6 +1836,9 @@ public:
   /// The interleave access information contains groups of interleaved accesses
   /// with the same stride and close to each other.
   InterleavedAccessInfo &InterleaveInfo;
+
+  /// All blocks of loop are to be masked to fold tail of scalar iterations.
+  bool CanFoldTailByMasking;
 
   /// Values to ignore in the cost model.
   SmallPtrSet<const Value *, 16> ValuesToIgnore;
@@ -10247,9 +10246,17 @@ bool LoopVectorizePass::processLoop(Loop *L) {
   // Use the cost model.
   LoopVectorizationCostModel CM(SEL, L, PSE, LI, &LVL, *TTI, TLI, DB, AC, ORE,
                                 F, &Hints, IAI);
+  InterleavedAccessInfo FoldTailIAI(PSE, L, DT, LI, LVL.getLAI());
+  // Analyze interleaved memory accesses.
+  if (UseInterleaved)
+    FoldTailIAI.analyzeInterleaving(useMaskedInterleavedAccesses(*TTI));
+  LoopVectorizationCostModel FoldTailCM(CM_ScalarEpilogueNotAllowedUsePredicate,
+                                        L, PSE, LI, &LVL, *TTI, TLI, DB, AC,
+                                        ORE, F, &Hints, FoldTailIAI, true);
+
   // Use the planner for vectorization.
-  LoopVectorizationPlanner LVP(L, LI, TLI, TTI, &LVL, {&CM}, IAI, PSE, Hints,
-                               ORE);
+  LoopVectorizationPlanner LVP(L, LI, TLI, TTI, &LVL, {&CM, &FoldTailCM}, IAI,
+                               PSE, Hints, ORE);
 
   // Get user vectorization factor and interleave count.
   ElementCount UserVF = Hints.getWidth();
