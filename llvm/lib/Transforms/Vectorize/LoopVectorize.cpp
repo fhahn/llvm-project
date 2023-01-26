@@ -5322,8 +5322,8 @@ bool LoopVectorizationPlanner::isMoreProfitable(
 
   unsigned MaxTripCount = PSE.getSE()->getSmallConstantMaxTripCount(OrigLoop);
 
-  if (!A.Width.isScalable() && !B.Width.isScalable() &&
-      CM.foldTailByMasking() && MaxTripCount) {
+  if (!A.Width.isScalable() && !B.Width.isScalable() && MaxTripCount) {
+    // CM.foldTailByMasking() && MaxTripCount) {
     // If we are folding the tail and the trip count is a known (possibly small)
     // constant, the trip count will be rounded up to an integer number of
     // iterations. The total cost will be PerIterationCost*ceil(TripCount/VF),
@@ -5378,8 +5378,8 @@ VectorizationFactor LoopVectorizationPlanner::selectVectorizationFactor() {
                                        ExpectedCost);
   VectorizationFactor ChosenFactor = ScalarCost;
   LLVM_DEBUG(dbgs() << "LV: Scalar loop costs: " << ExpectedCost << ".\n");
-  assert(hasPlanWithVF(ElementCount::getFixed(1)) &&
-         "Expected Scalar VF to be a candidate");
+  /*assert(hasPlanWithVF(ElementCount::getFixed(1)) &&*/
+  /*"Expected Scalar VF to be a candidate");*/
 
   bool ForceVectorization = Hints.getForce() == LoopVectorizeHints::FK_Enabled;
   if (ForceVectorization && VPlans.size() > 1) {
@@ -5500,12 +5500,12 @@ VectorizationFactor LoopVectorizationPlanner::selectEpilogueVectorizationFactor(
     return Result;
   }
 
-  if (!CM.isScalarEpilogueAllowed()) {
-    LLVM_DEBUG(
-        dbgs() << "LEV: Unable to vectorize epilogue because no epilogue is "
-                  "allowed.\n";);
-    return Result;
-  }
+  /*  if (!CM.isScalarEpilogueAllowed()) {*/
+  /*LLVM_DEBUG(*/
+  /*dbgs() << "LEV: Unable to vectorize epilogue because no epilogue is "*/
+  /*"allowed.\n";);*/
+  /*return Result;*/
+  /*}*/
 
   // Not really a cost consideration, but check for unsupported cases here to
   // simplify the logic.
@@ -7440,7 +7440,7 @@ LoopVectorizationPlanner::planInVPlanNativePath(ElementCount UserVF) {
       VF = ElementCount::getFixed(determineVPlanVF(
           TTI->getRegisterBitWidth(TargetTransformInfo::RGK_FixedWidthVector)
               .getFixedValue(),
-          CM));
+          *CMs[0]));
       LLVM_DEBUG(dbgs() << "LV: VPlan computed VF " << VF << ".\n");
 
       // Make sure we have a VF > 1 for stress testing.
@@ -7455,7 +7455,7 @@ LoopVectorizationPlanner::planInVPlanNativePath(ElementCount UserVF) {
            "VF needs to be a power of two");
     LLVM_DEBUG(dbgs() << "LV: Using " << (!UserVF.isZero() ? "user " : "")
                       << "VF " << VF << " to build VPlans.\n");
-    buildVPlans(VF, VF);
+    buildVPlans(VF, VF, *CMs[0]);
 
     // For VPlan build stress testing, we bail out after VPlan construction.
     if (VPlanBuildStressTest)
@@ -7472,13 +7472,27 @@ LoopVectorizationPlanner::planInVPlanNativePath(ElementCount UserVF) {
 
 std::optional<VectorizationFactor>
 LoopVectorizationPlanner::plan(ElementCount UserVF, unsigned UserIC) {
+  std::optional<VectorizationFactor> Best;
+
+  for (LoopVectorizationCostModel *CM : CMs)
+    plan(UserVF, UserIC, *CM);
+
+  // Select the optimal vectorization factor.
+  VectorizationFactor VF = selectVectorizationFactor();
+  assert((VF.Width.isScalar() || VF.ScalarCost > 0) &&
+         "when vectorizing, the scalar cost must be non-zero.");
+  return VF;
+}
+
+void LoopVectorizationPlanner::plan(ElementCount UserVF, unsigned UserIC,
+                                    LoopVectorizationCostModel &CM) {
   assert(OrigLoop->isInnermost() && "Inner loop expected.");
   CM.collectValuesToIgnore();
   CM.collectElementTypesForWidening();
 
   FixedScalableVFPair MaxFactors = CM.computeMaxVF(UserVF, UserIC);
   if (!MaxFactors) // Cases that should not to be vectorized nor interleaved.
-    return std::nullopt;
+    return;
 
   // Invalidate interleave groups if all blocks of loop will be predicated.
   if (CM.blockNeedsPredicationForAnyReason(OrigLoop->getHeader()) &&
@@ -7505,9 +7519,10 @@ LoopVectorizationPlanner::plan(ElementCount UserVF, unsigned UserIC) {
     if (CM.selectUserVectorizationFactor(UserVF)) {
       LLVM_DEBUG(dbgs() << "LV: Using user VF " << UserVF << ".\n");
       CM.collectInLoopReductions();
-      buildVPlansWithVPRecipes(UserVF, UserVF);
+      buildVPlansWithVPRecipes(UserVF, UserVF, CM);
+      VPlans[0].second[0].Cost = 0;
       LLVM_DEBUG(printPlans(dbgs()));
-      return {{UserVF, 0, 0}};
+      return;
     } else
       reportVectorizationInfo("UserVF ignored because of invalid costs.",
                               "InvalidCost", ORE, OrigLoop);
@@ -7528,17 +7543,19 @@ LoopVectorizationPlanner::plan(ElementCount UserVF, unsigned UserIC) {
 
     // Collect the instructions (and their associated costs) that will be more
     // profitable to scalarize.
-    if (VF.isVector())
+    if (VF.isVector()) {
       CM.collectInstsToScalarize(VF);
+    }
   }
 
   CM.collectInLoopReductions();
-  buildVPlansWithVPRecipes(ElementCount::getFixed(1), MaxFactors.FixedVF);
-  buildVPlansWithVPRecipes(ElementCount::getScalable(1), MaxFactors.ScalableVF);
+  buildVPlansWithVPRecipes(ElementCount::getFixed(1), MaxFactors.FixedVF, CM);
+  buildVPlansWithVPRecipes(ElementCount::getScalable(1), MaxFactors.ScalableVF,
+                           CM);
 
   LLVM_DEBUG(printPlans(dbgs()));
-  if (!MaxFactors.hasVector())
-    return VectorizationFactor::Disabled();
+  /*  if (!MaxFactors.hasVector())*/
+  /*return VectorizationFactor::Disabled();*/
 
   // Emit a report of VFs with invalid costs in the loop.
   if (!InvalidCosts.empty()) {
@@ -7599,10 +7616,6 @@ LoopVectorizationPlanner::plan(ElementCount UserVF, unsigned UserIC) {
         Subset = Tail.take_front(Subset.size() + 1);
     } while (!Tail.empty());
   }
-  // Select the optimal vectorization factor.
-  VectorizationFactor VF = selectVectorizationFactor();
-  assert((VF.Width.isScalar() || VF.ScalarCost > 0) && "when vectorizing, the scalar cost must be non-zero.");
-  return VF;
 }
 
 VPlan &LoopVectorizationPlanner::getBestPlanFor(ElementCount VF) const {
@@ -8063,11 +8076,12 @@ bool LoopVectorizationPlanner::getDecisionAndClampRange(
 /// vectorization decision can potentially shorten this sub-range during
 /// buildVPlan().
 void LoopVectorizationPlanner::buildVPlans(ElementCount MinVF,
-                                           ElementCount MaxVF) {
+                                           ElementCount MaxVF,
+                                           LoopVectorizationCostModel &CM) {
   auto MaxVFPlusOne = MaxVF.getWithIncrement(1);
   for (ElementCount VF = MinVF; ElementCount::isKnownLT(VF, MaxVFPlusOne);) {
     VFRange SubRange = {VF, MaxVFPlusOne};
-    VPlans.emplace_back(buildVPlan(SubRange),
+    VPlans.emplace_back(buildVPlan(SubRange, CM),
                         SmallVector<VectorizationFactor>());
     VF = SubRange.End;
   }
@@ -8706,8 +8720,8 @@ VPRecipeBuilder::tryToCreateWidenRecipe(Instruction *Instr,
   return toVPRecipeResult(tryToWiden(Instr, Operands, VPBB, Plan));
 }
 
-void LoopVectorizationPlanner::buildVPlansWithVPRecipes(ElementCount MinVF,
-                                                        ElementCount MaxVF) {
+void LoopVectorizationPlanner::buildVPlansWithVPRecipes(
+    ElementCount MinVF, ElementCount MaxVF, LoopVectorizationCostModel &CM) {
   assert(OrigLoop->isInnermost() && "Inner loop expected.");
 
   // Add assume instructions we need to drop to DeadInstructions, to prevent
@@ -8722,7 +8736,7 @@ void LoopVectorizationPlanner::buildVPlansWithVPRecipes(ElementCount MinVF,
   auto MaxVFPlusOne = MaxVF.getWithIncrement(1);
   for (ElementCount VF = MinVF; ElementCount::isKnownLT(VF, MaxVFPlusOne);) {
     VFRange SubRange = {VF, MaxVFPlusOne};
-    auto Plan = buildVPlanWithVPRecipes(SubRange, DeadInstructions);
+    auto Plan = buildVPlanWithVPRecipes(SubRange, DeadInstructions, CM);
     SmallVector<VectorizationFactor> Costs;
     for (ElementCount CostVF = VF;
          ElementCount::isKnownLT(CostVF, SubRange.End); CostVF *= 2) {
@@ -8835,7 +8849,8 @@ static void addUsersInExitBlock(VPBasicBlock *HeaderVPBB,
 }
 
 VPlanPtr LoopVectorizationPlanner::buildVPlanWithVPRecipes(
-    VFRange &Range, SmallPtrSetImpl<Instruction *> &DeadInstructions) {
+    VFRange &Range, SmallPtrSetImpl<Instruction *> &DeadInstructions,
+    LoopVectorizationCostModel &CM) {
 
   SmallPtrSet<const InterleaveGroup<Instruction> *, 1> InterleaveGroups;
 
@@ -8869,7 +8884,7 @@ VPlanPtr LoopVectorizationPlanner::buildVPlanWithVPRecipes(
   // placeholders for its members' Recipes which we'll be replacing with a
   // single VPInterleaveRecipe.
   for (InterleaveGroup<Instruction> *IG : IAI.getInterleaveGroups()) {
-    auto applyIG = [IG, this](ElementCount VF) -> bool {
+    auto applyIG = [IG, &CM](ElementCount VF) -> bool {
       return (VF.isVector() && // Query is illegal for VF == 1
               CM.getWideningDecision(IG->getInsertPos(), VF) ==
                   LoopVectorizationCostModel::CM_Interleave);
@@ -9015,7 +9030,7 @@ VPlanPtr LoopVectorizationPlanner::buildVPlanWithVPRecipes(
 
   // Adjust the recipes for any inloop reductions.
   adjustRecipesForReductions(cast<VPBasicBlock>(TopRegion->getExiting()), Plan,
-                             RecipeBuilder, Range.Start);
+                             RecipeBuilder, Range.Start, CM);
 
   // Sink users of fixed-order recurrence past the recipe defining the previous
   // value and introduce FirstOrderRecurrenceSplice VPInstructions.
@@ -9079,7 +9094,8 @@ VPlanPtr LoopVectorizationPlanner::buildVPlanWithVPRecipes(
   return Plan;
 }
 
-VPlanPtr LoopVectorizationPlanner::buildVPlan(VFRange &Range) {
+VPlanPtr LoopVectorizationPlanner::buildVPlan(VFRange &Range,
+                                              LoopVectorizationCostModel &CM) {
   // Outer loop handling: They may require CFG and instruction level
   // transformations before even evaluating whether vectorization is profitable.
   // Since we cannot modify the incoming IR, we need to build VPlan upfront in
@@ -9122,7 +9138,7 @@ VPlanPtr LoopVectorizationPlanner::buildVPlan(VFRange &Range) {
 // and live-out recipes when folding the tail.
 void LoopVectorizationPlanner::adjustRecipesForReductions(
     VPBasicBlock *LatchVPBB, VPlanPtr &Plan, VPRecipeBuilder &RecipeBuilder,
-    ElementCount MinVF) {
+    ElementCount MinVF, LoopVectorizationCostModel &CM) {
   for (const auto &Reduction : CM.getInLoopReductionChains()) {
     PHINode *Phi = Reduction.first;
     const RecurrenceDescriptor &RdxDesc =
@@ -9891,7 +9907,8 @@ static bool processLoopInVPlanNativePath(
   // Use the planner for outer loop vectorization.
   // TODO: CM is not used at this point inside the planner. Turn CM into an
   // optional argument if we don't need it in the future.
-  LoopVectorizationPlanner LVP(L, LI, TLI, TTI, LVL, CM, IAI, PSE, Hints, ORE);
+  LoopVectorizationPlanner LVP(L, LI, TLI, TTI, LVL, ArrayRef(&CM), IAI, PSE,
+                               Hints, ORE);
 
   // Get user vectorization factor.
   ElementCount UserVF = Hints.getWidth();
@@ -10231,7 +10248,8 @@ bool LoopVectorizePass::processLoop(Loop *L) {
   LoopVectorizationCostModel CM(SEL, L, PSE, LI, &LVL, *TTI, TLI, DB, AC, ORE,
                                 F, &Hints, IAI);
   // Use the planner for vectorization.
-  LoopVectorizationPlanner LVP(L, LI, TLI, TTI, &LVL, CM, IAI, PSE, Hints, ORE);
+  LoopVectorizationPlanner LVP(L, LI, TLI, TTI, &LVL, {&CM}, IAI, PSE, Hints,
+                               ORE);
 
   // Get user vectorization factor and interleave count.
   ElementCount UserVF = Hints.getWidth();
