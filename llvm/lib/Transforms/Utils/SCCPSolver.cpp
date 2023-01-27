@@ -946,9 +946,7 @@ void SCCPInstVisitor::getFeasibleSuccessors(Instruction &TI,
       return;
     }
 
-    // TODO: Switch on undef is UB. Stop passing false once the rest of LLVM
-    // is ready.
-    if (SCValue.isConstantRange(/*UndefAllowed=*/false)) {
+    if (SCValue.isConstantRange()) {
       const ConstantRange &Range = SCValue.getConstantRange();
       for (const auto &Case : SI->cases()) {
         const APInt &CaseValue = Case.getCaseValue()->getValue();

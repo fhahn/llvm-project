@@ -263,14 +263,11 @@ define i32 @test_switch_range_may_include_undef(i1 %c.1, i1 %c.2, i32 %x) {
 ; CHECK-NEXT:    [[P:%.*]] = phi i32 [ 0, [[THEN_1]] ], [ 2, [[ELSE_1]] ], [ undef, [[ELSE_2]] ]
 ; CHECK-NEXT:    switch i32 [[P]], label [[SWITCH_DEFAULT:%.*]] [
 ; CHECK-NEXT:    i32 0, label [[END_1:%.*]]
-; CHECK-NEXT:    i32 3, label [[END_2:%.*]]
 ; CHECK-NEXT:    ]
 ; CHECK:       switch.default:
 ; CHECK-NEXT:    ret i32 -1
 ; CHECK:       end.1:
 ; CHECK-NEXT:    ret i32 10
-; CHECK:       end.2:
-; CHECK-NEXT:    ret i32 20
 ;
 entry:
   br i1 %c.1, label %then.1, label %else.1
