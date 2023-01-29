@@ -2786,7 +2786,7 @@ void LoopVectorizationCostModel::collectLoopScalars(ElementCount VF) {
     // load/store instruction \p I.
     auto IsDirectLoadStoreFromPtrIndvar = [&](Instruction *Indvar,
                                               Instruction *I) {
-      return Induction.second.getKind() ==
+      return Induction.second->getKind() ==
                  InductionDescriptor::IK_PtrInduction &&
              (isa<LoadInst>(I) || isa<StoreInst>(I)) &&
              Indvar == getLoadStorePointerOperand(I) && IsScalarUse(I, Indvar);
@@ -6272,6 +6272,7 @@ LoopVectorizationCostModel::getInstructionCost(Instruction *I,
   case Instruction::PHI: {
     auto *Phi = cast<PHINode>(I);
 
+    VectorTy = toVectorTy(RetTy, VF);
     // First-order recurrences are replaced by vector shuffles inside the loop.
     if (VF.isVector() && Legal->isFixedOrderRecurrence(Phi)) {
       SmallVector<int> Mask(VF.getKnownMinValue());
@@ -6719,7 +6720,7 @@ void LoopVectorizationCostModel::collectValuesToIgnore() {
   // Ignore type-casting instructions we identified during induction
   // detection.
   for (const auto &Induction : Legal->getInductionVars()) {
-    const InductionDescriptor &IndDes = Induction.second;
+    const InductionDescriptor &IndDes = *Induction.second;
     VecValuesToIgnore.insert_range(IndDes.getCastInsts());
   }
 }
@@ -8408,7 +8409,12 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(
   // Sink users of fixed-order recurrence past the recipe defining the previous
   // value and introduce FirstOrderRecurrenceSplice VPInstructions.
   if (!RUN_VPLAN_PASS(VPlanTransforms::adjustFixedOrderRecurrences, *Plan,
-                      Builder))
+                      Builder, OrigLoop, PSE,
+                      [this](PHINode *PN,
+                             const InductionDescriptor &ID) -> const InductionDescriptor & {
+                        SmallPtrSet<Value *, 1> AllowedExit;
+                        return Legal->addInductionPhi(PN, ID, AllowedExit);
+                      }))
     return nullptr;
 
   // Add SCEV predicates from surviving induction recipes to the main PSE.

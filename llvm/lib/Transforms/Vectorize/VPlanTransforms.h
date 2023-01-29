@@ -138,7 +138,7 @@ struct VPlanTransforms {
   /// the appropriate widened recipe for each one.
   static void createHeaderPhiRecipes(
       VPlan &Plan, PredicatedScalarEvolution &PSE, Loop &OrigLoop,
-      const MapVector<PHINode *, InductionDescriptor> &Inductions,
+      const MapVector<PHINode *, std::unique_ptr<InductionDescriptor>> &Inductions,
       const MapVector<PHINode *, RecurrenceDescriptor> &Reductions,
       const SmallPtrSetImpl<const PHINode *> &FixedOrderRecurrences,
       const SmallPtrSetImpl<PHINode *> &InLoopReductions, bool AllowReordering,
@@ -212,7 +212,11 @@ struct VPlanTransforms {
   /// \returns true if all users of fixed-order recurrences could be re-arranged
   /// as needed or false if it is not possible. In the latter case, \p Plan is
   /// not valid.
-  static bool adjustFixedOrderRecurrences(VPlan &Plan, VPBuilder &Builder);
+  static bool adjustFixedOrderRecurrences(
+      VPlan &Plan, VPBuilder &Builder, Loop *L, PredicatedScalarEvolution &PSE,
+      function_ref<const InductionDescriptor &(PHINode *,
+                                               const InductionDescriptor &)>
+          AddInduction);
 
   /// Check if \p Plan contains any FMaxNum or FMinNum reductions. If they do,
   /// try to update the vector loop to exit early if any input is NaN and resume

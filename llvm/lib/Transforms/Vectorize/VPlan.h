@@ -2326,6 +2326,10 @@ public:
   static inline bool classof(const VPSingleDefRecipe *R) {
     return isa<VPHeaderPHIRecipe>(static_cast<const VPRecipeBase *>(R));
   }
+  static inline bool classof(const VPUser *U) {
+    auto *R = dyn_cast<VPRecipeBase>(U);
+    return R && classof(R);
+  }
 
   /// Generate the phi nodes.
   void execute(VPTransformState &State) override = 0;
@@ -4665,6 +4669,8 @@ class VPlan {
            "scalar header must be a leaf node");
   }
 
+  SmallVector<std::unique_ptr<InductionDescriptor>> ExtraIndDescs;
+
 public:
   /// Construct a VPlan for \p L. This will create VPIRBasicBlocks wrapping the
   /// original preheader and scalar header of \p L, to be used as entry and
@@ -4929,6 +4935,11 @@ public:
   /// Clone the current VPlan, update all VPValues of the new VPlan and cloned
   /// recipes to refer to the clones, and return it.
   LLVM_ABI_FOR_TEST VPlan *duplicate();
+
+  InductionDescriptor &addInductionDescriptor() {
+    ExtraIndDescs.emplace_back(new InductionDescriptor());
+    return *ExtraIndDescs.back();
+  }
 
   /// Create a new VPBasicBlock with \p Name and containing \p Recipe if
   /// present. The returned block is owned by the VPlan and deleted once the

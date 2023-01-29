@@ -102,6 +102,33 @@ define void @do_not_replace_first_order_recurrence_with_versioned_iv_for_pointer
 ; CHECK-NEXT:    [[TMP10:%.*]] = trunc i64 [[N_VEC]] to i32
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
+<<<<<<< HEAD
+; CHECK-NEXT:    [[TMP15:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = trunc i64 [[TMP15]] to i32
+; CHECK-NEXT:    [[TMP11:%.*]] = add i32 [[OFFSET_IDX]], 1
+; CHECK-NEXT:    [[TMP13:%.*]] = zext i32 [[TMP11]] to i64
+=======
+<<<<<<< HEAD
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i32> [ <i32 0, i32 1, i32 2, i32 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VECTOR_RECUR:%.*]] = phi <4 x i64> [ <i64 poison, i64 poison, i64 poison, i64 0>, %[[VECTOR_PH]] ], [ [[TMP10:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP11:%.*]] = add <4 x i32> [[VEC_IND]], splat (i32 1)
+; CHECK-NEXT:    [[TMP10]] = zext <4 x i32> [[TMP11]] to <4 x i64>
+; CHECK-NEXT:    [[TMP13:%.*]] = extractelement <4 x i64> [[TMP10]], i32 0
+; CHECK-NEXT:    [[TMP12:%.*]] = shufflevector <4 x i64> [[VECTOR_RECUR]], <4 x i64> [[TMP10]], <4 x i32> <i32 3, i32 4, i32 5, i32 6>
+>>>>>>> 108672e1aefc ([VPlan] Move mayHaveSideeffects for FORs check to VPlan.)
+; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr inbounds double, ptr [[X]], i64 [[TMP13]]
+; CHECK-NEXT:    [[TMP16:%.*]] = getelementptr inbounds double, ptr [[Y]], i64 [[TMP15]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x double>, ptr [[TMP14]], align 8
+; CHECK-NEXT:    store <4 x double> [[WIDE_LOAD]], ptr [[TMP16]], align 8
+<<<<<<< HEAD
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP15]], 4
+; CHECK-NEXT:    [[TMP17:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+=======
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
+; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
+; CHECK-NEXT:    [[TMP17:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
+=======
 ; CHECK-NEXT:    [[TMP15:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = trunc i64 [[TMP15]] to i32
 ; CHECK-NEXT:    [[TMP11:%.*]] = add i32 [[OFFSET_IDX]], 1
@@ -112,6 +139,8 @@ define void @do_not_replace_first_order_recurrence_with_versioned_iv_for_pointer
 ; CHECK-NEXT:    store <4 x double> [[WIDE_LOAD]], ptr [[TMP16]], align 8
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP15]], 4
 ; CHECK-NEXT:    [[TMP17:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+>>>>>>> 97ca24ca915e ([VPlan] Move mayHaveSideeffects for FORs check to VPlan.)
+>>>>>>> 108672e1aefc ([VPlan] Move mayHaveSideeffects for FORs check to VPlan.)
 ; CHECK-NEXT:    br i1 [[TMP17]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[SMAX3]], [[N_VEC]]

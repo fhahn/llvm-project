@@ -2471,8 +2471,11 @@ static bool hoistPreviousBeforeFORUsers(VPFirstOrderRecurrencePHIRecipe *FOR,
 }
 
 using namespace llvm::VPlanPatternMatch;
-bool VPlanTransforms::adjustFixedOrderRecurrences(VPlan &Plan,
-                                                  VPBuilder &LoopBuilder) {
+bool VPlanTransforms::adjustFixedOrderRecurrences(
+    VPlan &Plan, VPBuilder &LoopBuilder, Loop *L, PredicatedScalarEvolution &PSE,
+    function_ref<const InductionDescriptor &(PHINode *,
+                                             const InductionDescriptor &)>
+        AddInduction) {
   VPDominatorTree VPDT(Plan);
   VPTypeAnalysis TypeInfo(Plan);
 
@@ -2482,13 +2485,12 @@ bool VPlanTransforms::adjustFixedOrderRecurrences(VPlan &Plan,
     if (auto *FOR = dyn_cast<VPFirstOrderRecurrencePHIRecipe>(&R))
       RecurrencePhis.push_back(FOR);
 
+
   for (VPFirstOrderRecurrencePHIRecipe *FOR : RecurrencePhis) {
     if (FOR->getNumOperands() == 3) {
       if (any_of(FOR->users(), [](VPUser *U) {
             return isa<VPRecipeBase>(U) &&
-                   match(cast<VPRecipeBase>(U),
-                         m_Binary<Instruction::GetElementPtr>(m_VPValue(),
-                                                              m_VPValue()));
+            isa<VPReplicateRecipe>(U) && cast<VPReplicateRecipe>(U)->getOpcode() == Instruction::GetElementPtr;
           })) {
         FOR->replaceAllUsesWith(FOR->getOperand(2));
         FOR->eraseFromParent();
@@ -2575,6 +2577,7 @@ bool VPlanTransforms::adjustFixedOrderRecurrences(VPlan &Plan,
       cast<VPInstruction>(U)->replaceAllUsesWith(Sel);
     }
   }
+
   return true;
 }
 

@@ -697,10 +697,11 @@ bool LoopVectorizationLegality::canVectorizeOuterLoop() {
   return Result;
 }
 
-void LoopVectorizationLegality::addInductionPhi(
+const InductionDescriptor &LoopVectorizationLegality::addInductionPhi(
     PHINode *Phi, const InductionDescriptor &ID,
     SmallPtrSetImpl<Value *> &AllowedExit) {
-  Inductions[Phi] = ID;
+  std::unique_ptr<InductionDescriptor> IDPtr(new InductionDescriptor(ID));
+  Inductions[Phi] = std::move(IDPtr);
 
   // In case this induction also comes with casts that we know we can ignore
   // in the vectorized loop body, record them here. All casts could be recorded
@@ -751,6 +752,7 @@ void LoopVectorizationLegality::addInductionPhi(
   }
 
   LLVM_DEBUG(dbgs() << "LV: Found an induction variable.\n");
+  return *Inductions[Phi];
 }
 
 bool LoopVectorizationLegality::setupOuterLoopInductions() {
@@ -1373,7 +1375,7 @@ bool LoopVectorizationLegality::canVectorizeFPMath(
   // Exact FP induction vars, which we cannot vectorize.
   if (!EnableStrictReductions ||
       any_of(getInductionVars(), [&](auto &Induction) -> bool {
-        InductionDescriptor IndDesc = Induction.second;
+        InductionDescriptor IndDesc = *Induction.second;
         return IndDesc.getExactFPMathInst();
       }))
     return false;
@@ -1420,7 +1422,7 @@ const InductionDescriptor *
 LoopVectorizationLegality::getIntOrFpInductionDescriptor(PHINode *Phi) const {
   if (!isInductionPhi(Phi))
     return nullptr;
-  auto &ID = getInductionVars().find(Phi)->second;
+  auto &ID = *getInductionVars().find(Phi)->second;
   if (ID.getKind() == InductionDescriptor::IK_IntInduction ||
       ID.getKind() == InductionDescriptor::IK_FpInduction)
     return &ID;
@@ -1431,7 +1433,7 @@ const InductionDescriptor *
 LoopVectorizationLegality::getPointerInductionDescriptor(PHINode *Phi) const {
   if (!isInductionPhi(Phi))
     return nullptr;
-  auto &ID = getInductionVars().find(Phi)->second;
+  auto &ID = *getInductionVars().find(Phi)->second;
   if (ID.getKind() == InductionDescriptor::IK_PtrInduction)
     return &ID;
   return nullptr;

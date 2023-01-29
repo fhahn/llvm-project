@@ -701,7 +701,7 @@ createWidenInductionRecipe(PHINode *Phi, VPPhi *PhiR, VPIRValue *Start,
 
 void VPlanTransforms::createHeaderPhiRecipes(
     VPlan &Plan, PredicatedScalarEvolution &PSE, Loop &OrigLoop,
-    const MapVector<PHINode *, InductionDescriptor> &Inductions,
+    const MapVector<PHINode *, std::unique_ptr<InductionDescriptor>> &Inductions,
     const MapVector<PHINode *, RecurrenceDescriptor> &Reductions,
     const SmallPtrSetImpl<const PHINode *> &FixedOrderRecurrences,
     const SmallPtrSetImpl<PHINode *> &InLoopReductions, bool AllowReordering,
@@ -743,7 +743,7 @@ void VPlanTransforms::createHeaderPhiRecipes(
         if (PredIt != InductionPredicateMap.end())
           Preds = PredIt->second;
         auto *WideIV = createWidenInductionRecipe(
-            Phi, PhiR, Start, InductionIt->second, Plan, PSE, OrigLoop,
+            Phi, PhiR, Start, *InductionIt->second, Plan, PSE, OrigLoop,
             PhiR->getDebugLoc(), Preds);
         FOR->addOperand(WideIV);
       }
@@ -756,7 +756,7 @@ void VPlanTransforms::createHeaderPhiRecipes(
       ArrayRef<const SCEVPredicate *> Preds;
       if (PredIt != InductionPredicateMap.end())
         Preds = PredIt->second;
-      return createWidenInductionRecipe(Phi, PhiR, Start, InductionIt->second,
+      return createWidenInductionRecipe(Phi, PhiR, Start, *InductionIt->second,
                                         Plan, PSE, OrigLoop,
                                         PhiR->getDebugLoc(), Preds);
     }
