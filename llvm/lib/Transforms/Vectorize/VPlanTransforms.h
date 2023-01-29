@@ -43,7 +43,11 @@ struct VPlanTransforms {
   /// \returns true if all users of fixed-order recurrences could be re-arranged
   /// as needed or false if it is not possible. In the latter case, \p Plan is
   /// not valid.
-  static bool adjustFixedOrderRecurrences(VPlan &Plan, VPBuilder &Builder);
+  static bool adjustFixedOrderRecurrences(
+      VPlan &Plan, VPBuilder &Builder, Loop *L, PredicatedScalarEvolution &PSE,
+      function_ref<const InductionDescriptor &(PHINode *,
+                                               const InductionDescriptor &)>
+          AddInduction);
 
   /// Clear NSW/NUW flags from reduction instructions if necessary.
   static void clearReductionWrapFlags(VPlan &Plan);

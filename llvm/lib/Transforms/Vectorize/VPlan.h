@@ -1672,6 +1672,11 @@ public:
     return B && B->getVPDefID() >= VPRecipeBase::VPFirstHeaderPHISC &&
            B->getVPDefID() <= VPRecipeBase::VPLastHeaderPHISC;
   }
+  static inline bool classof(const VPUser *U) {
+    auto *R = dyn_cast<VPRecipeBase>(U);
+    return R && R->getVPDefID() >= VPRecipeBase::VPFirstHeaderPHISC &&
+           R->getVPDefID() <= VPRecipeBase::VPLastPHISC;
+  }
 
   /// Generate the phi nodes.
   void execute(VPTransformState &State) override = 0;
@@ -3172,6 +3177,8 @@ class VPlan {
   /// been modeled in VPlan directly.
   DenseMap<const SCEV *, VPValue *> SCEVToExpansion;
 
+  SmallVector<std::unique_ptr<InductionDescriptor>> ExtraIndDescs;
+
 public:
   DenseMap<const InductionDescriptor *, std::unique_ptr<SCEVUnionPredicate>>
       SCEVPredicates;
@@ -3358,6 +3365,11 @@ public:
   /// Clone the current VPlan, update all VPValues of the new VPlan and cloned
   /// recipes to refer to the clones, and return it.
   VPlan *duplicate();
+
+  InductionDescriptor &addInductionDescriptor() {
+    ExtraIndDescs.emplace_back(new InductionDescriptor());
+    return *ExtraIndDescs.back();
+  }
 };
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)

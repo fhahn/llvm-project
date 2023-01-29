@@ -802,8 +802,12 @@ sinkRecurrenceUsersAfterPrevious(VPFirstOrderRecurrencePHIRecipe *FOR,
 }
 
 using namespace llvm::VPlanPatternMatch;
-bool VPlanTransforms::adjustFixedOrderRecurrences(VPlan &Plan,
-                                                  VPBuilder &LoopBuilder) {
+bool VPlanTransforms::adjustFixedOrderRecurrences(
+    VPlan &Plan, VPBuilder &LoopBuilder, Loop *L, PredicatedScalarEvolution &PSE,
+    function_ref<const InductionDescriptor &(PHINode *,
+                                             const InductionDescriptor &)>
+        AddInduction) {
+>>>>>>> 664dc6cc8c98 ([VPlan] Move mayHaveSideeffects for FORs check to VPlan.)
   VPDominatorTree VPDT;
   VPDT.recalculate(Plan);
 
@@ -815,13 +819,14 @@ bool VPlanTransforms::adjustFixedOrderRecurrences(VPlan &Plan,
 
   VPBuilder MiddleBuilder(
       cast<VPBasicBlock>(Plan.getVectorLoopRegion()->getSingleSuccessor()));
+  SmallVector<VPFirstOrderRecurrencePHIRecipe *> IllegalFORs;
+  VPBasicBlock *VectorHeader =
+      Plan.getVectorLoopRegion()->getEntry()->getEntryBasicBlock();
   for (VPFirstOrderRecurrencePHIRecipe *FOR : RecurrencePhis) {
     if (FOR->getNumOperands() == 3) {
       if (any_of(FOR->users(), [](VPUser *U) {
             return isa<VPRecipeBase>(U) &&
-                   match(cast<VPRecipeBase>(U),
-                         m_Binary<Instruction::GetElementPtr>(m_VPValue(),
-                                                              m_VPValue()));
+            isa<VPReplicateRecipe>(U) && cast<VPReplicateRecipe>(U)->getOpcode() == Instruction::GetElementPtr;
           })) {
         FOR->replaceAllUsesWith(FOR->getOperand(2));
         FOR->eraseFromParent();
@@ -967,6 +972,7 @@ bool VPlanTransforms::adjustFixedOrderRecurrences(VPlan &Plan,
         {}, "vector.recur.extract");
     Plan.addLiveOut(cast<PHINode>(FOR->getUnderlyingInstr()), Resume);
   }
+
   return true;
 }
 

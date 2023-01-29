@@ -990,7 +990,6 @@ bool RecurrenceDescriptor::isFixedOrderRecurrence(PHINode *Phi, Loop *TheLoop,
   // not need to vectorize the initial value prior to the first iteration of the
   // loop.
   // TODO: Consider extending this sinking to handle memory instructions.
-
   SmallPtrSet<Value *, 8> Seen;
   BasicBlock *PhiBB = Phi->getParent();
   SmallVector<Instruction *, 8> WorkList;
@@ -1006,7 +1005,6 @@ bool RecurrenceDescriptor::isFixedOrderRecurrence(PHINode *Phi, Loop *TheLoop,
       return true;
 
     if (SinkCandidate->getParent() != PhiBB ||
-        SinkCandidate->mayHaveSideEffects() ||
         SinkCandidate->mayReadFromMemory() || SinkCandidate->isTerminator())
       return false;
 

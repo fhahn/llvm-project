@@ -3080,7 +3080,7 @@ void InnerLoopVectorizer::createInductionResumeValues(
   // start value.
   for (const auto &InductionEntry : Legal->getInductionVars()) {
     PHINode *OrigPhi = InductionEntry.first;
-    const InductionDescriptor &II = InductionEntry.second;
+    const InductionDescriptor &II = *InductionEntry.second;
     PHINode *BCResumeVal = createInductionResumeValue(
         OrigPhi, II, getExpandedStep(II, ExpandedSCEVs), LoopBypassBlocks,
         AdditionalBypass);
@@ -3427,7 +3427,7 @@ void InnerLoopVectorizer::fixVectorizedLoop(VPTransformState &State,
 
     // Fix-up external users of the induction variables.
     for (const auto &Entry : Legal->getInductionVars())
-      fixupIVUsers(Entry.first, Entry.second,
+      fixupIVUsers(Entry.first, *Entry.second,
                    getOrCreateVectorTripCount(VectorLoop->getLoopPreheader()),
                    IVEndValues[Entry.first], LoopMiddleBlock,
                    VectorLoop->getHeader(), Plan, State);
@@ -3735,7 +3735,7 @@ void LoopVectorizationCostModel::collectLoopScalars(ElementCount VF) {
     // load/store instruction \p I.
     auto IsDirectLoadStoreFromPtrIndvar = [&](Instruction *Indvar,
                                               Instruction *I) {
-      return Induction.second.getKind() ==
+      return Induction.second->getKind() ==
                  InductionDescriptor::IK_PtrInduction &&
              (isa<LoadInst>(I) || isa<StoreInst>(I)) &&
              Indvar == getLoadStorePointerOperand(I) && isScalarUse(I, Indvar);
@@ -6812,6 +6812,7 @@ LoopVectorizationCostModel::getInstructionCost(Instruction *I, ElementCount VF,
   case Instruction::PHI: {
     auto *Phi = cast<PHINode>(I);
 
+    VectorTy = ToVectorTy(RetTy, VF);
     // First-order recurrences are replaced by vector shuffles inside the loop.
     if (VF.isVector() && Legal->isFixedOrderRecurrence(Phi)) {
       SmallVector<int> Mask(VF.getKnownMinValue());
@@ -7098,7 +7099,7 @@ void LoopVectorizationCostModel::collectValuesToIgnore() {
   // Ignore type-casting instructions we identified during induction
   // detection.
   for (const auto &Induction : Legal->getInductionVars()) {
-    const InductionDescriptor &IndDes = Induction.second;
+    const InductionDescriptor &IndDes = *Induction.second;
     const SmallVectorImpl<Instruction *> &Casts = IndDes.getCastInsts();
     VecValuesToIgnore.insert(Casts.begin(), Casts.end());
   }
@@ -8792,7 +8793,13 @@ LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(VFRange &Range) {
 
   // Sink users of fixed-order recurrence past the recipe defining the previous
   // value and introduce FirstOrderRecurrenceSplice VPInstructions.
-  if (!VPlanTransforms::adjustFixedOrderRecurrences(*Plan, Builder))
+  if (!VPlanTransforms::adjustFixedOrderRecurrences(
+          *Plan, Builder, OrigLoop, PSE,
+          [this](PHINode *PN,
+                 const InductionDescriptor &ID) -> const InductionDescriptor & {
+            SmallPtrSet<Value *, 1> AllowedExit;
+            return Legal->addInductionPhi(PN, ID, AllowedExit);
+          }))
     return nullptr;
 
   if (useActiveLaneMask(Style)) {

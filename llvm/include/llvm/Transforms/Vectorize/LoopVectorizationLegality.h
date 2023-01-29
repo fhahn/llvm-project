@@ -256,7 +256,8 @@ public:
 
   /// InductionList saves induction variables and maps them to the
   /// induction descriptor.
-  using InductionList = MapVector<PHINode *, InductionDescriptor>;
+  using InductionList =
+      MapVector<PHINode *, std::unique_ptr<InductionDescriptor>>;
 
   /// RecurrenceSet contains the phi nodes that are recurrences other than
   /// inductions and reductions.
@@ -404,6 +405,13 @@ public:
 
   DominatorTree *getDominatorTree() const { return DT; }
 
+  /// Updates the vectorization state by adding \p Phi to the inductions list.
+  /// This can set \p Phi as the main induction of the loop if \p Phi is a
+  /// better choice for the main induction than the existing one.
+  const InductionDescriptor &
+  addInductionPhi(PHINode *Phi, const InductionDescriptor &ID,
+                  SmallPtrSetImpl<Value *> &AllowedExit);
+
 private:
   /// Return true if the pre-header, exiting and latch blocks of \p Lp and all
   /// its nested loops are considered legal for vectorization. These legal
@@ -456,12 +464,6 @@ private:
   bool
   blockCanBePredicated(BasicBlock *BB, SmallPtrSetImpl<Value *> &SafePtrs,
                        SmallPtrSetImpl<const Instruction *> &MaskedOp) const;
-
-  /// Updates the vectorization state by adding \p Phi to the inductions list.
-  /// This can set \p Phi as the main induction of the loop if \p Phi is a
-  /// better choice for the main induction than the existing one.
-  void addInductionPhi(PHINode *Phi, const InductionDescriptor &ID,
-                       SmallPtrSetImpl<Value *> &AllowedExit);
 
   /// The loop that we evaluate.
   Loop *TheLoop;
