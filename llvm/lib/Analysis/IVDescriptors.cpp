@@ -1004,8 +1004,7 @@ bool RecurrenceDescriptor::isFixedOrderRecurrence(PHINode *Phi, Loop *TheLoop,
                       SinkCandidate)) // We already are good w/o sinking.
       return true;
 
-    if (SinkCandidate->getParent() != PhiBB ||
-        SinkCandidate->mayReadFromMemory() || SinkCandidate->isTerminator())
+    if (SinkCandidate->getParent() != PhiBB || SinkCandidate->isTerminator())
       return false;
 
     // If we reach a PHI node that is not dominated by Previous, we reached a
