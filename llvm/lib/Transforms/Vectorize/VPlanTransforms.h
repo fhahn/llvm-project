@@ -45,6 +45,7 @@ struct VPlanTransforms {
   /// not valid.
   static bool adjustFixedOrderRecurrences(
       VPlan &Plan, VPBuilder &Builder, Loop *L, PredicatedScalarEvolution &PSE,
+      AAResults &AA,
       function_ref<const InductionDescriptor &(PHINode *,
                                                const InductionDescriptor &)>
           AddInduction);

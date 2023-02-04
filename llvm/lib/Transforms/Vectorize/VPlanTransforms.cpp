@@ -20,7 +20,9 @@
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/IVDescriptors.h"
+#include "llvm/Analysis/ValueTracking.h"
 #include "llvm/Analysis/VectorUtils.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/PatternMatch.h"
@@ -742,12 +744,25 @@ static bool properlyDominates(const VPRecipeBase *A, const VPRecipeBase *B,
   return VPDT.properlyDominates(ParentA, ParentB);
 }
 
+static Value *getUnderlyingObject(VPValue *V) {
+  if (auto *R = dyn_cast<VPReplicateRecipe>(V)) {
+    auto *GEP = dyn_cast_or_null<GetElementPtrInst>(R->getUnderlyingValue());
+    if (GEP)
+      return getUnderlyingObject(R->getOperand(0));
+  }
+  if (auto *GEP = dyn_cast<VPWidenGEPRecipe>(V))
+    return getUnderlyingObject(GEP->getOperand(0));
+  if (!V->getDefiningRecipe())
+    return getUnderlyingObject(V->getLiveInIRValue());
+  return nullptr;
+}
+
 /// Sink users of \p FOR after the recipe defining the previous value \p
 /// Previous of the recurrence. \returns true if all users of \p FOR could be
 /// re-arranged as needed or false if it is not possible.
 static bool
 sinkRecurrenceUsersAfterPrevious(VPFirstOrderRecurrencePHIRecipe *FOR,
-                                 VPRecipeBase *Previous,
+                                 VPRecipeBase *Previous, AAResults &AA,
                                  VPDominatorTree &VPDT) {
   // Collect recipes that need sinking.
   SmallVector<VPRecipeBase *> WorkList;
@@ -765,11 +780,24 @@ sinkRecurrenceUsersAfterPrevious(VPFirstOrderRecurrencePHIRecipe *FOR,
       return true;
 
     if (SinkCandidate->mayHaveSideEffects()) {
-      if (!isa<VPWidenMemoryRecipe>(SinkCandidate))
+      auto *WriteR = dyn_cast<VPWidenStoreRecipe>(SinkCandidate);
+      if (!WriteR)
         return false;
       if (any_of(make_range(std::next(SinkCandidate->getIterator()),
                             std::next(Previous->getIterator())),
-                 [&](VPRecipeBase &R) { return R.mayReadOrWriteMemory(); }))
+                 [&](VPRecipeBase &R) {
+                   if (WriteR) {
+                     if (auto *MemR =
+                             dyn_cast<VPWidenMemoryRecipe>(&R)) {
+                       Value *ObjA = getUnderlyingObject(WriteR->getAddr());
+                       Value *ObjB = getUnderlyingObject(MemR->getAddr());
+                       if (!ObjA || !ObjB || !AA.isNoAlias(ObjA, ObjB))
+                         return true;
+                       return false;
+                     }
+                   }
+                   return R.mayHaveSideEffects();
+                 }))
         return false;
     }
 
@@ -812,6 +840,7 @@ sinkRecurrenceUsersAfterPrevious(VPFirstOrderRecurrencePHIRecipe *FOR,
 using namespace llvm::VPlanPatternMatch;
 bool VPlanTransforms::adjustFixedOrderRecurrences(
     VPlan &Plan, VPBuilder &LoopBuilder, Loop *L, PredicatedScalarEvolution &PSE,
+    AAResults &AA,
     function_ref<const InductionDescriptor &(PHINode *,
                                              const InductionDescriptor &)>
         AddInduction) {
@@ -853,7 +882,7 @@ bool VPlanTransforms::adjustFixedOrderRecurrences(
       Previous = PrevPhi->getBackedgeValue()->getDefiningRecipe();
     }
 
-    if (!sinkRecurrenceUsersAfterPrevious(FOR, Previous, VPDT)) {
+    if (!sinkRecurrenceUsersAfterPrevious(FOR, Previous, AA, VPDT)) {
       if (FOR->getNumOperands() == 3) {
         FOR->replaceAllUsesWith(FOR->getOperand(2));
         FOR->eraseFromParent();

@@ -30,6 +30,7 @@
 
 namespace llvm {
 
+class AAResults;
 class LoopInfo;
 class DominatorTree;
 class LoopVectorizationLegality;
@@ -322,6 +323,8 @@ class LoopVectorizationPlanner {
 
   PredicatedScalarEvolution &PSE;
 
+  AAResults &AA;
+
   const LoopVectorizeHints &Hints;
 
   OptimizationRemarkEmitter *ORE;
@@ -339,10 +342,10 @@ public:
       Loop *L, LoopInfo *LI, DominatorTree *DT, const TargetLibraryInfo *TLI,
       const TargetTransformInfo &TTI, LoopVectorizationLegality *Legal,
       LoopVectorizationCostModel &CM, InterleavedAccessInfo &IAI,
-      PredicatedScalarEvolution &PSE, const LoopVectorizeHints &Hints,
+      PredicatedScalarEvolution &PSE, AAResults &AA,const LoopVectorizeHints &Hints,
       OptimizationRemarkEmitter *ORE)
       : OrigLoop(L), LI(LI), DT(DT), TLI(TLI), TTI(TTI), Legal(Legal), CM(CM),
-        IAI(IAI), PSE(PSE), Hints(Hints), ORE(ORE) {}
+        IAI(IAI), PSE(PSE), AA(AA), Hints(Hints), ORE(ORE) {}
 
   /// Plan how to best vectorize, return the best VF and its cost, or
   /// std::nullopt if vectorization and interleaving should be avoided up front.
