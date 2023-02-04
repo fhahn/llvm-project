@@ -34,6 +34,7 @@ class GeneratedRTChecks;
 
 namespace llvm {
 
+class AAResults;
 class LoopInfo;
 class DominatorTree;
 class LoopVectorizationLegality;
@@ -510,6 +511,8 @@ class LoopVectorizationPlanner {
 
   PredicatedScalarEvolution &PSE;
 
+  AAResults &AA;
+
   const LoopVectorizeHints &Hints;
 
   OptimizationRemarkEmitter *ORE;
@@ -543,10 +546,10 @@ public:
       Loop *L, LoopInfo *LI, DominatorTree *DT, const TargetLibraryInfo *TLI,
       const TargetTransformInfo &TTI, LoopVectorizationLegality *Legal,
       LoopVectorizationCostModel &CM, InterleavedAccessInfo &IAI,
-      PredicatedScalarEvolution &PSE, const LoopVectorizeHints &Hints,
+      PredicatedScalarEvolution &PSE, AAResults &AA,const LoopVectorizeHints &Hints,
       OptimizationRemarkEmitter *ORE)
       : OrigLoop(L), LI(LI), DT(DT), TLI(TLI), TTI(TTI), Legal(Legal), CM(CM),
-        IAI(IAI), PSE(PSE), Hints(Hints), ORE(ORE) {}
+        IAI(IAI), PSE(PSE), AA(AA), Hints(Hints), ORE(ORE) {}
 
   /// Build VPlans for the specified \p UserVF and \p UserIC if they are
   /// non-zero or all applicable candidate VFs otherwise. If vectorization and

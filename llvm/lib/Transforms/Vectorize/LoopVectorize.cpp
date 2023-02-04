@@ -605,6 +605,9 @@ protected:
   /// Dominator Tree.
   DominatorTree *DT;
 
+  /// Alias Analysis.
+  AAResults *AA;
+
   /// Target Transform Info.
   const TargetTransformInfo *TTI;
 
@@ -8409,7 +8412,7 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(
   // Sink users of fixed-order recurrence past the recipe defining the previous
   // value and introduce FirstOrderRecurrenceSplice VPInstructions.
   if (!RUN_VPLAN_PASS(VPlanTransforms::adjustFixedOrderRecurrences, *Plan,
-                      Builder, OrigLoop, PSE,
+                      Builder, OrigLoop, PSE, AA,
                       [this](PHINode *PN,
                              const InductionDescriptor &ID) -> const InductionDescriptor & {
                         SmallPtrSet<Value *, 1> AllowedExit;
@@ -8774,7 +8777,7 @@ static bool processLoopInVPlanNativePath(
     Loop *L, PredicatedScalarEvolution &PSE, LoopInfo *LI, DominatorTree *DT,
     LoopVectorizationLegality *LVL, TargetTransformInfo *TTI,
     TargetLibraryInfo *TLI, DemandedBits *DB, AssumptionCache *AC,
-    OptimizationRemarkEmitter *ORE,
+    AAResults &AA, OptimizationRemarkEmitter *ORE,
     std::function<BlockFrequencyInfo &()> GetBFI, bool OptForSize,
     LoopVectorizeHints &Hints, LoopVectorizationRequirements &Requirements) {
 
@@ -8794,7 +8797,7 @@ static bool processLoopInVPlanNativePath(
   // Use the planner for outer loop vectorization.
   // TODO: CM is not used at this point inside the planner. Turn CM into an
   // optional argument if we don't need it in the future.
-  LoopVectorizationPlanner LVP(L, LI, DT, TLI, *TTI, LVL, CM, IAI, PSE, Hints,
+  LoopVectorizationPlanner LVP(L, LI, DT, TLI, *TTI, LVL, CM, IAI, PSE, AA, Hints,
                                ORE);
 
   // Get user vectorization factor.
@@ -9527,7 +9530,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
   // pipeline.
   if (!L->isInnermost())
     return processLoopInVPlanNativePath(L, PSE, LI, DT, &LVL, TTI, TLI, DB, AC,
-                                        ORE, GetBFI, OptForSize, Hints,
+                                        *AA, ORE, GetBFI, OptForSize, Hints,
                                         Requirements);
 
   assert(L->isInnermost() && "Inner loop expected.");
@@ -9633,7 +9636,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
   LoopVectorizationCostModel CM(SEL, L, PSE, LI, &LVL, *TTI, TLI, DB, AC, ORE,
                                 GetBFI, F, &Hints, IAI, OptForSize);
   // Use the planner for vectorization.
-  LoopVectorizationPlanner LVP(L, LI, DT, TLI, *TTI, &LVL, CM, IAI, PSE, Hints,
+  LoopVectorizationPlanner LVP(L, LI, DT, TLI, *TTI, &LVL, CM, IAI, PSE, *AA, Hints,
                                ORE);
 
   // Get user vectorization factor and interleave count.

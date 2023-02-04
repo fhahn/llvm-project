@@ -64,6 +64,7 @@
 
 namespace llvm {
 
+class AAResults;
 class AssumptionCache;
 class BlockFrequencyInfo;
 class DemandedBits;
@@ -148,11 +149,11 @@ public:
   std::function<BlockFrequencyInfo &()> GetBFI;
   TargetLibraryInfo *TLI;
   DemandedBits *DB;
+  AAResults *AA;
   AssumptionCache *AC;
   LoopAccessInfoManager *LAIs;
   OptimizationRemarkEmitter *ORE;
   ProfileSummaryInfo *PSI;
-  AAResults *AA;
 
   LLVM_ABI PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
   LLVM_ABI void
