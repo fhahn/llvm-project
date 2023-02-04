@@ -799,6 +799,15 @@ sinkRecurrenceUsersAfterPrevious(VPFirstOrderRecurrencePHIRecipe *FOR,
                    return R.mayHaveSideEffects();
                  }))
         return false;
+
+      if (SinkCandidate->mayReadFromMemory()) {
+        if (SinkCandidate->getParent() != Previous->getParent())
+          return false;
+        if (any_of(make_range(SinkCandidate->getIterator(),
+                              std::next(Previous->getIterator())),
+                   [](VPRecipeBase &R) { return R.mayHaveSideEffects(); }))
+          return false;
+      }
     }
 
     WorkList.push_back(SinkCandidate);
