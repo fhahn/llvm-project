@@ -2337,8 +2337,14 @@ sinkRecurrenceUsersAfterPrevious(VPFirstOrderRecurrencePHIRecipe *FOR,
         VPDT.properlyDominates(Previous, SinkCandidate))
       return true;
 
-    if (cannotHoistOrSinkRecipe(*SinkCandidate))
-      return false;
+    if (cannotHoistOrSinkRecipe(*SinkCandidate)) {
+      if (!isa<VPWidenMemoryRecipe>(SinkCandidate))
+        return false;
+      if (any_of(make_range(std::next(SinkCandidate->getIterator()),
+                            std::next(Previous->getIterator())),
+                 [&](VPRecipeBase &R) { return R.mayReadOrWriteMemory(); }))
+        return false;
+    }
 
     WorkList.push_back(SinkCandidate);
     return true;
@@ -2348,6 +2354,8 @@ sinkRecurrenceUsersAfterPrevious(VPFirstOrderRecurrencePHIRecipe *FOR,
   WorkList.push_back(FOR);
   for (unsigned I = 0; I != WorkList.size(); ++I) {
     VPRecipeBase *Current = WorkList[I];
+    if (Current->getNumDefinedValues() == 0)
+      continue;
     assert(Current->getNumDefinedValues() == 1 &&
            "only recipes with a single defined value expected");
 
