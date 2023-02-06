@@ -1432,8 +1432,9 @@ createReplacement(ICmpInst *ICmp, const Loop *L, BasicBlock *ExitingBB,
 }
 
 static bool optimizeLoopExitWithUnknownExitCount(
-    const Loop *L, BranchInst *BI, BasicBlock *ExitingBB, const SCEV *MaxIter,
-    bool SkipLastIter, ScalarEvolution *SE, SCEVExpander &Rewriter,
+    const Loop *L, BranchInst *BI, BasicBlock *ExitingBB,
+    const SCEV *CurrMaxIter, const SCEV *MaxIter, bool SkipLastIter,
+    ScalarEvolution *SE, SCEVExpander &Rewriter,
     SmallVectorImpl<WeakTrackingVH> &DeadInsts) {
   assert(
       (L->contains(BI->getSuccessor(0)) != L->contains(BI->getSuccessor(1))) &&
@@ -1481,25 +1482,37 @@ static bool optimizeLoopExitWithUnknownExitCount(
   // same exit count. For all other icmp's, we could use one less iteration,
   // because their value on the last iteration doesn't really matter.
   SmallPtrSet<ICmpInst *, 4> ICmpsFailingOnLastIter;
-  if (!SkipLastIter && LeafConditions.size() > 1 &&
-      SE->getExitCount(L, ExitingBB,
-                       ScalarEvolution::ExitCountKind::SymbolicMaximum) ==
-          MaxIter)
-    for (auto *ICmp : LeafConditions) {
-      auto EL = SE->computeExitLimitFromCond(L, ICmp, Inverted,
-                                             /*ControlsExit*/ false);
-      auto *ExitMax = EL.SymbolicMaxNotTaken;
-      if (isa<SCEVCouldNotCompute>(ExitMax))
-        continue;
-      // They could be of different types (specifically this happens after
-      // IV widening).
-      auto *WiderType =
-          SE->getWiderType(ExitMax->getType(), MaxIter->getType());
-      auto *WideExitMax = SE->getNoopOrZeroExtend(ExitMax, WiderType);
-      auto *WideMaxIter = SE->getNoopOrZeroExtend(MaxIter, WiderType);
-      if (WideExitMax == WideMaxIter)
-        ICmpsFailingOnLastIter.insert(ICmp);
+  if (!SkipLastIter && LeafConditions.size() > 1) {
+    auto *CurrBBExitCount = SE->getExitCount(
+        L, ExitingBB, ScalarEvolution::ExitCountKind::SymbolicMaximum);
+    if (!isa<SCEVCouldNotCompute>(CurrBBExitCount)) {
+      auto *ExitCountUpToCurrBB =
+          isa<SCEVCouldNotCompute>(CurrMaxIter)
+              ? CurrBBExitCount
+              : SE->getUMinFromMismatchedTypes(CurrBBExitCount, CurrMaxIter);
+      if (ExitCountUpToCurrBB == MaxIter)
+        for (auto *ICmp : LeafConditions) {
+          auto EL = SE->computeExitLimitFromCond(L, ICmp, Inverted,
+                                                 /*ControlsExit*/ false);
+          auto *ExitMax = EL.SymbolicMaxNotTaken;
+          if (isa<SCEVCouldNotCompute>(ExitMax))
+            continue;
+          auto *MaxUpToCurrentICmp =
+              isa<SCEVCouldNotCompute>(CurrMaxIter)
+                  ? ExitMax
+                  : SE->getUMinFromMismatchedTypes(CurrMaxIter, ExitMax);
+          // They could be of different types (specifically this happens after
+          // IV widening).
+          auto *WiderType = SE->getWiderType(ExitMax->getType(),
+                                             MaxUpToCurrentICmp->getType());
+          auto *WideMaxUpToCurrentICmp =
+              SE->getNoopOrZeroExtend(MaxUpToCurrentICmp, WiderType);
+          auto *WideMaxIter = SE->getNoopOrZeroExtend(MaxIter, WiderType);
+          if (WideMaxUpToCurrentICmp == WideMaxIter)
+            ICmpsFailingOnLastIter.insert(ICmp);
+        }
     }
+  }
 
   bool Changed = false;
   for (auto *OldCond : LeafConditions) {
@@ -1757,9 +1770,9 @@ bool IndVarSimplify::optimizeLoopExits(Loop *L, SCEVExpander &Rewriter) {
       // will remain the same within iteration space?
       auto *BI = cast<BranchInst>(ExitingBB->getTerminator());
       auto OptimizeCond = [&](bool SkipLastIter) {
-        return optimizeLoopExitWithUnknownExitCount(L, BI, ExitingBB,
-                                                    MaxBECount, SkipLastIter,
-                                                    SE, Rewriter, DeadInsts);
+        return optimizeLoopExitWithUnknownExitCount(
+            L, BI, ExitingBB, CurrMaxExit, MaxBECount, SkipLastIter, SE,
+            Rewriter, DeadInsts);
       };
 
       // TODO: We might have proved that we can skip the last iteration for
