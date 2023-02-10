@@ -248,6 +248,7 @@ struct FixedScalableVFPair {
   bool hasVector() const { return FixedVF.isVector() || ScalableVF.isVector(); }
 };
 
+using VectorizationCostTy = std::pair<InstructionCost, bool>;
 /// Planner drives the vectorization process after having passed
 /// Legality checks.
 class LoopVectorizationPlanner {
@@ -278,10 +279,13 @@ class LoopVectorizationPlanner {
 
   OptimizationRemarkEmitter *ORE;
 
-  SmallVector<VPlanPtr, 4> VPlans;
+  SmallVector<std::pair<VPlanPtr, SmallVector<VectorizationFactor>>, 4> VPlans;
 
   /// A builder used to construct the current plan.
   VPBuilder Builder;
+
+  using InstructionVFPair = std::pair<Instruction *, ElementCount>;
+  SmallVector<InstructionVFPair> InvalidCosts;
 
 public:
   LoopVectorizationPlanner(Loop *L, LoopInfo *LI, const TargetLibraryInfo *TLI,
@@ -322,8 +326,11 @@ public:
   /// Look through the existing plans and return true if we have one with all
   /// the vectorization factors in question.
   bool hasPlanWithVF(ElementCount VF) const {
-    return any_of(VPlans,
-                  [&](const VPlanPtr &Plan) { return Plan->hasVF(VF); });
+    return any_of(
+        VPlans,
+        [&](const std::pair<VPlanPtr, SmallVector<VectorizationFactor>> &Plan) {
+          return Plan.first->hasVF(VF);
+        });
   }
 
   /// Test a \p Predicate on a \p Range of VF's. Return the value of applying
@@ -335,6 +342,15 @@ public:
 
   /// Check if the number of runtime checks exceeds the threshold.
   bool requiresTooManyRuntimeChecks() const;
+
+  /// \return The most profitable vectorization factor and the cost of that VF.
+  /// This method checks every VF in \p CandidateVFs. If UserVF is not ZERO
+  /// then this vectorization factor will be selected if vectorization is
+  /// possible.
+  VectorizationFactor selectVectorizationFactor();
+
+  VectorizationFactor
+  selectEpilogueVectorizationFactor(const ElementCount MaxVF);
 
 protected:
   /// Build VPlans for power-of-2 VF's between \p MinVF and \p MaxVF inclusive,
@@ -367,6 +383,20 @@ private:
   void adjustRecipesForReductions(VPBasicBlock *LatchVPBB, VPlanPtr &Plan,
                                   VPRecipeBuilder &RecipeBuilder,
                                   ElementCount MinVF);
+
+  std::optional<unsigned> getVScaleForTuning() const;
+
+  bool isMoreProfitable(const VectorizationFactor &A,
+                        const VectorizationFactor &B) const;
+  /// Determines if we have the infrastructure to vectorize loop \p L and its
+  /// epilogue, assuming the main loop is vectorized by \p VF.
+  bool isCandidateForEpilogueVectorization(const Loop &L,
+                                           const ElementCount VF) const;
+
+  /// Returns true if epilogue vectorization is considered profitable, and
+  /// false otherwise.
+  /// \p VF is the vectorization factor chosen for the original loop.
+  bool isEpilogueVectorizationProfitable(const ElementCount VF) const;
 };
 
 } // namespace llvm
