@@ -9,7 +9,7 @@ define void @f0() {
 ; CHECK-NEXT:    %v0 = phi i16 [ 2, %b0 ], [ %v2, %b1 ]
 ; CHECK-NEXT:    --> {2,+,1}<nuw><nsw><%b1> U: [2,4) S: [2,4) Exits: 3 LoopDispositions: { %b1: Computable }
 ; CHECK-NEXT:    %v1 = phi i16 [ 1, %b0 ], [ %v3, %b1 ]
-; CHECK-NEXT:    --> {1,+,2,+,1}<%b1> U: full-set S: full-set Exits: 3 LoopDispositions: { %b1: Computable }
+; CHECK-NEXT:    --> {1,+,2,+,1}<nsw><%b1> U: [1,-32768) S: [1,-32768) Exits: 3 LoopDispositions: { %b1: Computable }
 ; CHECK-NEXT:    %v2 = add nsw i16 %v0, 1
 ; CHECK-NEXT:    --> {3,+,1}<nuw><nsw><%b1> U: [3,5) S: [3,5) Exits: 4 LoopDispositions: { %b1: Computable }
 ; CHECK-NEXT:    %v3 = add nsw i16 %v1, %v0
