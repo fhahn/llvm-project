@@ -522,13 +522,13 @@ define i64 @test_09(i32 %param) {
 ; CHECK:       %iv1.next = add nuw nsw i64 %iv1, 1
 ; CHECK-NEXT:    -->  {1,+,1}<nuw><nsw><%loop1>
 ; CHECK:       %iv2 = phi i32 [ %iv2.next, %loop2 ], [ %param, %loop2.preheader ]
-; CHECK-NEXT:    -->  {%param,+,1}<%loop2>
+; CHECK-NEXT:    -->  {%param,+,1}<nsw><%loop2>
 ; CHECK:       %iv2.next = add i32 %iv2, 1
-; CHECK-NEXT:    -->  {(1 + %param),+,1}<%loop2>
+; CHECK-NEXT:    -->  {(1 + %param),+,1}<nw><%loop2>
 ; CHECK:       %iv2.ext = sext i32 %iv2.next to i64
-; CHECK-NEXT:    -->  (sext i32 {(1 + %param),+,1}<%loop2> to i64)
+; CHECK-NEXT:    -->  (sext i32 {(1 + %param),+,1}<nw><%loop2> to i64)
 ; CHECK:       %ret = mul i64 %iv1, %iv2.ext
-; CHECK-NEXT:    -->  ((sext i32 {(1 + %param),+,1}<%loop2> to i64) * {0,+,1}<nuw><nsw><%loop1>)
+; CHECK-NEXT:    -->  ((sext i32 {(1 + %param),+,1}<nw><%loop2> to i64) * {0,+,1}<nuw><nsw><%loop1>)
 
 entry:
   br label %outer.loop
@@ -579,13 +579,13 @@ define i64 @test_10(i32 %param) {
 ; CHECK:       %uncle.outer.next = add i64 %uncle, 1
 ; CHECK-NEXT:  -->  {1,+,1}<nuw><nsw><%uncle.loop>
 ; CHECK:       %iv2 = phi i32 [ %iv2.next, %loop2 ], [ %param, %loop2.preheader ]
-; CHECK-NEXT:  -->  {%param,+,1}<%loop2>
+; CHECK-NEXT:  -->  {%param,+,1}<nsw><%loop2>
 ; CHECK:       %iv2.next = add i32 %iv2, 1
-; CHECK-NEXT:  -->  {(1 + %param),+,1}<%loop2>
+; CHECK-NEXT:  -->  {(1 + %param),+,1}<nw><%loop2>
 ; CHECK:       %iv2.ext = sext i32 %iv2.next to i64
-; CHECK-NEXT:  -->  (sext i32 {(1 + %param),+,1}<%loop2> to i64)
+; CHECK-NEXT:  -->  (sext i32 {(1 + %param),+,1}<nw><%loop2> to i64)
 ; CHECK:       %ret = mul i64 %iv1, %iv2.ext
-; CHECK-NEXT:  -->  ((sext i32 {(1 + %param),+,1}<%loop2> to i64) * {0,+,1}<nuw><nsw><%loop1>)
+; CHECK-NEXT:  -->  ((sext i32 {(1 + %param),+,1}<nw><%loop2> to i64) * {0,+,1}<nuw><nsw><%loop1>)
 
 entry:
   br label %outer.loop

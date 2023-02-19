@@ -155,11 +155,10 @@ define i32 @start.from.sibling.iv(ptr %len.ptr, ptr %sibling.len.ptr) {
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ [[SIBLING_IV_NEXT_LCSSA]], [[PREHEADER]] ], [ [[IV_NEXT:%.*]], [[BACKEDGE:%.*]] ]
-; CHECK-NEXT:    [[SIGNED_CMP:%.*]] = icmp slt i32 [[IV]], [[LEN]]
+; CHECK-NEXT:    [[SIGNED_CMP:%.*]] = icmp ult i32 [[IV]], [[LEN]]
 ; CHECK-NEXT:    br i1 [[SIGNED_CMP]], label [[SIGNED_PASSED:%.*]], label [[FAILED_SIGNED:%.*]]
 ; CHECK:       signed.passed:
-; CHECK-NEXT:    [[UNSIGNED_CMP:%.*]] = icmp ult i32 [[IV]], [[LEN]]
-; CHECK-NEXT:    br i1 [[UNSIGNED_CMP]], label [[BACKEDGE]], label [[FAILED_UNSIGNED:%.*]]
+; CHECK-NEXT:    br i1 true, label [[BACKEDGE]], label [[FAILED_UNSIGNED:%.*]]
 ; CHECK:       backedge:
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i32 [[IV]], 1
 ; CHECK-NEXT:    [[COND:%.*]] = call i1 @cond()

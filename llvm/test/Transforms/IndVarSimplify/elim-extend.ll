@@ -129,7 +129,6 @@ define void @nestedIV(ptr %address, i32 %limit) nounwind {
 ; CHECK-NEXT:    br i1 [[INNERPRECMP]], label [[INNERLOOP_PREHEADER:%.*]], label [[OUTERMERGE]]
 ; CHECK:       innerloop.preheader:
 ; CHECK-NEXT:    [[TMP1:%.*]] = sext i32 [[INNERCOUNT]] to i64
-; CHECK-NEXT:    [[WIDE_TRIP_COUNT:%.*]] = sext i32 [[LIMITDEC]] to i64
 ; CHECK-NEXT:    br label [[INNERLOOP:%.*]]
 ; CHECK:       innerloop:
 ; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ [[TMP1]], [[INNERLOOP_PREHEADER]] ], [ [[INDVARS_IV_NEXT:%.*]], [[INNERLOOP]] ]
@@ -138,7 +137,8 @@ define void @nestedIV(ptr %address, i32 %limit) nounwind {
 ; CHECK-NEXT:    store i8 0, ptr [[ADR2]], align 1
 ; CHECK-NEXT:    [[ADR3:%.*]] = getelementptr i8, ptr [[ADDRESS]], i64 [[INDVARS_IV_NEXT]]
 ; CHECK-NEXT:    store i8 0, ptr [[ADR3]], align 1
-; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp ne i64 [[INDVARS_IV_NEXT]], [[WIDE_TRIP_COUNT]]
+; CHECK-NEXT:    [[LFTR_WIDEIV:%.*]] = trunc i64 [[INDVARS_IV_NEXT]] to i32
+; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp ne i32 [[LFTR_WIDEIV]], [[LIMITDEC]]
 ; CHECK-NEXT:    br i1 [[EXITCOND]], label [[INNERLOOP]], label [[INNEREXIT:%.*]]
 ; CHECK:       innerexit:
 ; CHECK-NEXT:    [[INNERCOUNT_LCSSA_WIDE:%.*]] = phi i64 [ [[INDVARS_IV_NEXT]], [[INNERLOOP]] ]

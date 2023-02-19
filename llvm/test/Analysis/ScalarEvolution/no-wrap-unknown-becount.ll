@@ -137,7 +137,7 @@ loop:
   %iv.inc = add i32 %iv, 3
   %iv.zext = zext i32 %iv to i64
 ; CHECK:  %iv.zext = zext i32 %iv to i64
-; CHECK-NEXT:  -->  {0,+,3}<nuw><%loop>
+; CHECK-NEXT:  -->  {0,+,3}<nuw><nsw><%loop>
   %cmp = icmp ult i32 %iv, 10000
   call void(i1, ...) @llvm.experimental.guard(i1 %cmp) [ "deopt"() ]
   %c = load volatile i1, ptr %cond

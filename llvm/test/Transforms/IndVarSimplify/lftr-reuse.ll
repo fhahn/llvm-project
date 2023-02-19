@@ -243,7 +243,7 @@ define void @geplftr(ptr %base, i32 %x, i32 %y, i32 %n) nounwind {
 ; CHECK-NEXT:    [[APTR:%.*]] = phi ptr [ [[INCDEC_PTR:%.*]], [[LOOP]] ], [ [[ADD_PTR10]], [[LOOP_PREHEADER]] ]
 ; CHECK-NEXT:    [[INCDEC_PTR]] = getelementptr inbounds i8, ptr [[APTR]], i32 1
 ; CHECK-NEXT:    store i8 3, ptr [[APTR]], align 1
-; CHECK-NEXT:    [[INC]] = add nuw i32 [[I]], 1
+; CHECK-NEXT:    [[INC]] = add i32 [[I]], 1
 ; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp ne i32 [[INC]], [[LIM]]
 ; CHECK-NEXT:    br i1 [[EXITCOND]], label [[LOOP]], label [[EXIT_LOOPEXIT:%.*]]
 ; CHECK:       exit.loopexit:

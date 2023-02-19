@@ -5672,6 +5672,8 @@ const SCEV *ScalarEvolution::createSimpleAffineAddRec(PHINode *PN,
   if (auto *AR = dyn_cast<SCEVAddRecExpr>(PHISCEV)) {
     Flags = (SCEV::NoWrapFlags)(Flags | proveNoWrapViaConstantRanges(AR));
     setNoWrapFlags(const_cast<SCEVAddRecExpr *>(AR), Flags);
+    auto NewFlags = proveNoSignedWrapViaInduction(AR);
+    setNoWrapFlags(const_cast<SCEVAddRecExpr *>(AR), NewFlags);
   }
 
   // We can add Flags to the post-inc expression only if we
@@ -5800,9 +5802,10 @@ const SCEV *ScalarEvolution::createAddRecFromPHI(PHINode *PN) {
         insertValueToMap(PN, PHISCEV);
 
         if (auto *AR = dyn_cast<SCEVAddRecExpr>(PHISCEV)) {
-
           Flags = (SCEV::NoWrapFlags)(Flags | proveNoWrapViaConstantRanges(AR));
           setNoWrapFlags(const_cast<SCEVAddRecExpr *>(AR), Flags);
+          auto NewFlags = proveNoSignedWrapViaInduction(AR);
+          setNoWrapFlags(const_cast<SCEVAddRecExpr *>(AR), NewFlags);
         }
 
         // We can add Flags to the post-inc expression only if we
