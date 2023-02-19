@@ -757,13 +757,13 @@ define i64 @test_09(i32 %param) {
 ; CHECK-NEXT:    %iv1.next = add nuw nsw i64 %iv1, 1
 ; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop1> U: [1,4) S: [1,4) Exits: 3 LoopDispositions: { %loop1: Computable }
 ; CHECK-NEXT:    %iv2 = phi i32 [ %iv2.next, %loop2 ], [ %param, %loop2.preheader ]
-; CHECK-NEXT:    --> {%param,+,1}<%loop2> U: full-set S: full-set Exits: (2 smax %param) LoopDispositions: { %loop2: Computable }
+; CHECK-NEXT:    --> {%param,+,1}<nsw><%loop2> U: full-set S: full-set Exits: (2 smax %param) LoopDispositions: { %loop2: Computable }
 ; CHECK-NEXT:    %iv2.next = add i32 %iv2, 1
-; CHECK-NEXT:    --> {(1 + %param),+,1}<%loop2> U: full-set S: full-set Exits: (1 + (2 smax %param))<nuw> LoopDispositions: { %loop2: Computable }
+; CHECK-NEXT:    --> {(1 + %param),+,1}<nw><%loop2> U: full-set S: full-set Exits: (1 + (2 smax %param))<nuw> LoopDispositions: { %loop2: Computable }
 ; CHECK-NEXT:    %iv2.ext = sext i32 %iv2.next to i64
-; CHECK-NEXT:    --> (sext i32 {(1 + %param),+,1}<%loop2> to i64) U: [-2147483648,2147483648) S: [-2147483648,2147483648) --> (sext i32 (1 + (2 smax %param))<nuw> to i64) U: [-2147483648,2147483648) S: [-2147483648,2147483648)
+; CHECK-NEXT:    --> (sext i32 {(1 + %param),+,1}<nw><%loop2> to i64) U: [-2147483648,2147483648) S: [-2147483648,2147483648) --> (sext i32 (1 + (2 smax %param))<nuw> to i64) U: [-2147483648,2147483648) S: [-2147483648,2147483648)
 ; CHECK-NEXT:    %ret = mul i64 %iv1, %iv2.ext
-; CHECK-NEXT:    --> ((sext i32 {(1 + %param),+,1}<%loop2> to i64) * {0,+,1}<nuw><nsw><%loop1>) U: [-4294967296,4294967295) S: [-4294967296,4294967295) --> (2 * (sext i32 (1 + (2 smax %param))<nuw> to i64))<nsw> U: [0,-1) S: [-4294967296,4294967295)
+; CHECK-NEXT:    --> ((sext i32 {(1 + %param),+,1}<nw><%loop2> to i64) * {0,+,1}<nuw><nsw><%loop1>) U: [-4294967296,4294967295) S: [-4294967296,4294967295) --> (2 * (sext i32 (1 + (2 smax %param))<nuw> to i64))<nsw> U: [0,-1) S: [-4294967296,4294967295)
 ; CHECK-NEXT:  Determining loop execution counts for: @test_09
 ; CHECK-NEXT:  Loop %loop2: backedge-taken count is ((-1 * %param) + (2 smax %param))
 ; CHECK-NEXT:  Loop %loop2: constant max backedge-taken count is i32 -2147483646
@@ -778,7 +778,6 @@ define i64 @test_09(i32 %param) {
 ; CHECK-NEXT:    symbolic max exit count for guarded: i32 2
 ; CHECK-NEXT:  Loop %loop1: Trip multiple is 1
 ;
-
 entry:
   br label %outer.loop
 
@@ -828,13 +827,13 @@ define i64 @test_10(i32 %param) {
 ; CHECK-NEXT:    %uncle.outer.next = add i64 %uncle, 1
 ; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%uncle.loop> U: [1,2) S: [1,2) Exits: <<Unknown>> LoopDispositions: { %uncle.loop: Computable, %loop1: Invariant }
 ; CHECK-NEXT:    %iv2 = phi i32 [ %iv2.next, %loop2 ], [ %param, %loop2.preheader ]
-; CHECK-NEXT:    --> {%param,+,1}<%loop2> U: full-set S: full-set Exits: (2 smax %param) LoopDispositions: { %loop2: Computable }
+; CHECK-NEXT:    --> {%param,+,1}<nsw><%loop2> U: full-set S: full-set Exits: (2 smax %param) LoopDispositions: { %loop2: Computable }
 ; CHECK-NEXT:    %iv2.next = add i32 %iv2, 1
-; CHECK-NEXT:    --> {(1 + %param),+,1}<%loop2> U: full-set S: full-set Exits: (1 + (2 smax %param))<nuw> LoopDispositions: { %loop2: Computable }
+; CHECK-NEXT:    --> {(1 + %param),+,1}<nw><%loop2> U: full-set S: full-set Exits: (1 + (2 smax %param))<nuw> LoopDispositions: { %loop2: Computable }
 ; CHECK-NEXT:    %iv2.ext = sext i32 %iv2.next to i64
-; CHECK-NEXT:    --> (sext i32 {(1 + %param),+,1}<%loop2> to i64) U: [-2147483648,2147483648) S: [-2147483648,2147483648) --> (sext i32 (1 + (2 smax %param))<nuw> to i64) U: [-2147483648,2147483648) S: [-2147483648,2147483648)
+; CHECK-NEXT:    --> (sext i32 {(1 + %param),+,1}<nw><%loop2> to i64) U: [-2147483648,2147483648) S: [-2147483648,2147483648) --> (sext i32 (1 + (2 smax %param))<nuw> to i64) U: [-2147483648,2147483648) S: [-2147483648,2147483648)
 ; CHECK-NEXT:    %ret = mul i64 %iv1, %iv2.ext
-; CHECK-NEXT:    --> ((sext i32 {(1 + %param),+,1}<%loop2> to i64) * {0,+,1}<nuw><nsw><%loop1>) U: [-4294967296,4294967295) S: [-4294967296,4294967295) --> (2 * (sext i32 (1 + (2 smax %param))<nuw> to i64))<nsw> U: [0,-1) S: [-4294967296,4294967295)
+; CHECK-NEXT:    --> ((sext i32 {(1 + %param),+,1}<nw><%loop2> to i64) * {0,+,1}<nuw><nsw><%loop1>) U: [-4294967296,4294967295) S: [-4294967296,4294967295) --> (2 * (sext i32 (1 + (2 smax %param))<nuw> to i64))<nsw> U: [0,-1) S: [-4294967296,4294967295)
 ; CHECK-NEXT:  Determining loop execution counts for: @test_10
 ; CHECK-NEXT:  Loop %loop2: backedge-taken count is ((-1 * %param) + (2 smax %param))
 ; CHECK-NEXT:  Loop %loop2: constant max backedge-taken count is i32 -2147483646
@@ -856,7 +855,6 @@ define i64 @test_10(i32 %param) {
 ; CHECK-NEXT:    symbolic max exit count for loop1: ***COULDNOTCOMPUTE***
 ; CHECK-NEXT:    symbolic max exit count for uncle.loop.backedge: i64 0
 ;
-
 entry:
   br label %outer.loop
 

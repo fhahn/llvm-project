@@ -21,7 +21,7 @@ define void @test_1(ptr %cond_buf, ptr %len_buf) {
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ 0, [[ENTRY:%.*]] ], [ [[IV_INC:%.*]], [[LOOP]] ]
-; CHECK-NEXT:    [[IV_INC]] = add nsw i32 [[IV]], 1
+; CHECK-NEXT:    [[IV_INC]] = add nuw nsw i32 [[IV]], 1
 ; CHECK-NEXT:    call void (i1, ...) @llvm.experimental.guard(i1 true) [ "deopt"() ]
 ; CHECK-NEXT:    [[IV_INC_CMP:%.*]] = icmp ult i32 [[IV_INC]], [[LEN]]
 ; CHECK-NEXT:    call void (i1, ...) @llvm.experimental.guard(i1 [[IV_INC_CMP]]) [ "deopt"() ]
@@ -104,7 +104,7 @@ define void @test_3(ptr %cond_buf, ptr %len_buf) {
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ 0, [[ENTRY:%.*]] ], [ [[IV_INC:%.*]], [[LOOP]] ]
-; CHECK-NEXT:    [[IV_INC]] = add nsw i32 [[IV]], 1
+; CHECK-NEXT:    [[IV_INC]] = add nuw nsw i32 [[IV]], 1
 ; CHECK-NEXT:    call void (i1, ...) @llvm.experimental.guard(i1 true) [ "deopt"() ]
 ; CHECK-NEXT:    [[IV_INC_CMP:%.*]] = icmp slt i32 [[IV_INC]], [[LEN]]
 ; CHECK-NEXT:    call void (i1, ...) @llvm.experimental.guard(i1 [[IV_INC_CMP]]) [ "deopt"() ]
@@ -147,7 +147,7 @@ define void @test_4(ptr %cond_buf, ptr %len_buf) {
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ 0, [[ENTRY:%.*]] ], [ [[IV_INC:%.*]], [[BE:%.*]] ]
-; CHECK-NEXT:    [[IV_INC]] = add i32 [[IV]], 1
+; CHECK-NEXT:    [[IV_INC]] = add nuw i32 [[IV]], 1
 ; CHECK-NEXT:    [[COND:%.*]] = load volatile i1, ptr [[COND_BUF]], align 1
 ; CHECK-NEXT:    br i1 [[COND]], label [[LEFT:%.*]], label [[BE]]
 ; CHECK:       left:
