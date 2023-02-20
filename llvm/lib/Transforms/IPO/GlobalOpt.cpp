@@ -206,8 +206,13 @@ CleanupPointerRootUsers(GlobalVariable *GV,
   // chain of computation and the store to the global in Dead[n].second.
   SmallVector<std::pair<Instruction *, Instruction *>, 32> Dead;
 
+  SmallVector<User *> Worklist(GV->users());
+  SmallPtrSet<User *, 8> Seen;
   // Constants can't be pointers to dynamically allocated memory.
-  for (User *U : llvm::make_early_inc_range(GV->users())) {
+  while (!Worklist.empty()) {
+    User *U = Worklist.pop_back_val();
+    if (!Seen.insert(U).second)
+      continue;
     if (StoreInst *SI = dyn_cast<StoreInst>(U)) {
       Value *V = SI->getValueOperand();
       if (isa<Constant>(V)) {
@@ -238,7 +243,8 @@ CleanupPointerRootUsers(GlobalVariable *GV,
       if (CE->use_empty()) {
         CE->destroyConstant();
         Changed = true;
-      }
+      } else
+        append_range(Worklist, CE->users());
     } else if (Constant *C = dyn_cast<Constant>(U)) {
       if (isSafeToDestroyConstant(C)) {
         C->destroyConstant();
