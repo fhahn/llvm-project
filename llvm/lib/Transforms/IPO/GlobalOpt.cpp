@@ -393,8 +393,24 @@ static bool collectSRATypes(DenseMap<uint64_t, GlobalPart> &Parts,
       if (isa<ScalableVectorType>(Ty))
         return false;
 
+      auto IsStored = [GV](Value *V) {
+        auto *SI = dyn_cast<StoreInst>(V);
+        if (!SI)
+          return false;
+
+        auto *GlobalVar = dyn_cast<GlobalVariable>(GV);
+        Constant *StoredConst = dyn_cast<Constant>(SI->getOperand(0));
+        if (!GlobalVar || !StoredConst)
+          return true;
+
+        // Don't consider stores that only write the initializer value.
+        return StoredConst != GlobalVar->getInitializer() &&
+               !(StoredConst->isNullValue() &&
+                 GlobalVar->getInitializer()->isNullValue());
+      };
+
       It->second.IsLoaded |= isa<LoadInst>(V);
-      It->second.IsStored |= isa<StoreInst>(V);
+      It->second.IsStored |= IsStored(V);
       continue;
     }
 
