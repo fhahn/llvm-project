@@ -403,6 +403,33 @@ static bool collectSRATypes(DenseMap<uint64_t, GlobalPart> &Parts,
         if (!GlobalVar || !StoredConst)
           return true;
 
+        // Check if all users (or their users) are guaranteed to trigger UB if
+        // null is loaded. If the location is only stored to once, don't
+        // consider that store; it can be removed later. NOTE: At the moment the
+        // code does not track writes that may overlap the location or other
+        // overlapping address computations. The heuristic here is for
+        // cost-modeling only, so won't impact correctness.
+        std::function<bool(User *)> CheckUsers = [&](User *GlobalUser) -> bool {
+          if (GlobalUser == SI)
+            return true;
+
+          return isa<LoadInst>(GlobalUser) &&
+                 GlobalUser->getType()->isPointerTy() &&
+                 !NullPointerIsDefined(
+                     nullptr /* F */,
+                     GlobalUser->getType()->getPointerAddressSpace()) &&
+                 all_of(GlobalUser->users(), [GlobalUser](User *LoadUser) {
+                   return isa<CallBase>(LoadUser) &&
+                          cast<CallBase>(LoadUser)->getCalledOperand() ==
+                              GlobalUser;
+                 });
+        };
+        bool IsStoredOnce = GlobalVar->getInitializer()->isNullValue() &&
+                            !NullPointerIsDefined(nullptr /* F */, 0) &&
+                            all_of(SI->getOperand(1)->users(), CheckUsers);
+        if (IsStoredOnce)
+          return false;
+
         // Don't consider stores that only write the initializer value.
         return StoredConst != GlobalVar->getInitializer() &&
                !(StoredConst->isNullValue() &&

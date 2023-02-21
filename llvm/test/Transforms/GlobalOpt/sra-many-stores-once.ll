@@ -12,68 +12,36 @@ declare i32 @fn2()
 declare i32 @fn3()
 
 ;.
-; CHECK: @[[GLOBAL_20PTR:[a-zA-Z0-9_$"\\.-]+]] = internal unnamed_addr global [[STRUCT_20PTR:%.*]] zeroinitializer
+; CHECK: @[[GLOBAL_20PTR_0:[a-zA-Z0-9_$"\\.-]+]] = internal unnamed_addr global ptr null
 ;.
 
-; FIXME: The loads from @global.20ptr cannot load null, as the loaded value are
+; The loads from @global.20ptr cannot load null, as the loaded value are
 ; used as called operands. The loads and stores can be removed.
 define void @test_stored_once_call_with_nullptr_ub() {
 ; CHECK-LABEL: @test_stored_once_call_with_nullptr_ub(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    store ptr @fn0, ptr @global.20ptr, align 8
-; CHECK-NEXT:    store ptr @fn1, ptr @global.20ptr, align 8
-; CHECK-NEXT:    store ptr @fn2, ptr getelementptr inbounds ([[STRUCT_20PTR:%.*]], ptr @global.20ptr, i64 0, i32 1), align 8
-; CHECK-NEXT:    store ptr @fn3, ptr getelementptr inbounds ([[STRUCT_20PTR]], ptr @global.20ptr, i64 0, i32 2), align 8
-; CHECK-NEXT:    store ptr @fn0, ptr getelementptr inbounds ([[STRUCT_20PTR]], ptr @global.20ptr, i64 0, i32 3), align 8
-; CHECK-NEXT:    store ptr @fn1, ptr getelementptr inbounds ([[STRUCT_20PTR]], ptr @global.20ptr, i64 0, i32 4), align 8
-; CHECK-NEXT:    store ptr @fn2, ptr getelementptr inbounds ([[STRUCT_20PTR]], ptr @global.20ptr, i64 0, i32 5), align 8
-; CHECK-NEXT:    store ptr @fn3, ptr getelementptr inbounds ([[STRUCT_20PTR]], ptr @global.20ptr, i64 0, i32 6), align 8
-; CHECK-NEXT:    store ptr @fn0, ptr getelementptr inbounds ([[STRUCT_20PTR]], ptr @global.20ptr, i64 0, i32 7), align 8
-; CHECK-NEXT:    store ptr @fn1, ptr getelementptr inbounds ([[STRUCT_20PTR]], ptr @global.20ptr, i64 0, i32 8), align 8
-; CHECK-NEXT:    store ptr @fn2, ptr getelementptr inbounds ([[STRUCT_20PTR]], ptr @global.20ptr, i64 0, i32 9), align 8
-; CHECK-NEXT:    store ptr @fn3, ptr getelementptr inbounds ([[STRUCT_20PTR]], ptr @global.20ptr, i64 0, i32 10), align 8
-; CHECK-NEXT:    store ptr @fn0, ptr getelementptr inbounds ([[STRUCT_20PTR]], ptr @global.20ptr, i64 0, i32 11), align 8
-; CHECK-NEXT:    store ptr @fn1, ptr getelementptr inbounds ([[STRUCT_20PTR]], ptr @global.20ptr, i64 0, i32 12), align 8
-; CHECK-NEXT:    store ptr @fn2, ptr getelementptr inbounds ([[STRUCT_20PTR]], ptr @global.20ptr, i64 0, i32 13), align 8
-; CHECK-NEXT:    store ptr @fn3, ptr getelementptr inbounds ([[STRUCT_20PTR]], ptr @global.20ptr, i64 0, i32 14), align 8
-; CHECK-NEXT:    store ptr @fn0, ptr getelementptr inbounds ([[STRUCT_20PTR]], ptr @global.20ptr, i64 0, i32 15), align 8
-; CHECK-NEXT:    store ptr @fn1, ptr getelementptr inbounds ([[STRUCT_20PTR]], ptr @global.20ptr, i64 0, i32 16), align 8
-; CHECK-NEXT:    [[L0:%.*]] = load ptr, ptr @global.20ptr, align 8
+; CHECK-NEXT:    store ptr @fn0, ptr @global.20ptr.0, align 8
+; CHECK-NEXT:    store ptr @fn1, ptr @global.20ptr.0, align 8
+; CHECK-NEXT:    [[L0:%.*]] = load ptr, ptr @global.20ptr.0, align 8
 ; CHECK-NEXT:    call void [[L0]]()
-; CHECK-NEXT:    [[L1:%.*]] = load ptr, ptr getelementptr inbounds ([[STRUCT_20PTR]], ptr @global.20ptr, i64 0, i32 1), align 8
-; CHECK-NEXT:    call void [[L1]]()
-; CHECK-NEXT:    [[L2:%.*]] = load ptr, ptr getelementptr inbounds ([[STRUCT_20PTR]], ptr @global.20ptr, i64 0, i32 2), align 8
-; CHECK-NEXT:    call void [[L2]]()
-; CHECK-NEXT:    [[L3:%.*]] = load ptr, ptr getelementptr inbounds ([[STRUCT_20PTR]], ptr @global.20ptr, i64 0, i32 3), align 8
-; CHECK-NEXT:    call void [[L3]]()
-; CHECK-NEXT:    [[L4:%.*]] = load ptr, ptr getelementptr inbounds ([[STRUCT_20PTR]], ptr @global.20ptr, i64 0, i32 4), align 8
-; CHECK-NEXT:    call void [[L4]]()
-; CHECK-NEXT:    [[L5:%.*]] = load ptr, ptr getelementptr inbounds ([[STRUCT_20PTR]], ptr @global.20ptr, i64 0, i32 5), align 8
-; CHECK-NEXT:    call void [[L5]]()
-; CHECK-NEXT:    [[L6:%.*]] = load ptr, ptr getelementptr inbounds ([[STRUCT_20PTR]], ptr @global.20ptr, i64 0, i32 6), align 8
-; CHECK-NEXT:    call void [[L6]]()
-; CHECK-NEXT:    [[L7:%.*]] = load ptr, ptr @global.20ptr, align 8
+; CHECK-NEXT:    call void @fn2()
+; CHECK-NEXT:    call void @fn3()
+; CHECK-NEXT:    call void @fn0()
+; CHECK-NEXT:    call void @fn1()
+; CHECK-NEXT:    call void @fn2()
+; CHECK-NEXT:    call void @fn3()
+; CHECK-NEXT:    [[L7:%.*]] = load ptr, ptr @global.20ptr.0, align 8
 ; CHECK-NEXT:    call void [[L7]]()
-; CHECK-NEXT:    [[L8:%.*]] = load ptr, ptr getelementptr inbounds ([[STRUCT_20PTR]], ptr @global.20ptr, i64 0, i32 7), align 8
-; CHECK-NEXT:    call void [[L8]]()
-; CHECK-NEXT:    [[L9:%.*]] = load ptr, ptr getelementptr inbounds ([[STRUCT_20PTR]], ptr @global.20ptr, i64 0, i32 8), align 8
-; CHECK-NEXT:    call void [[L9]]()
-; CHECK-NEXT:    [[L10:%.*]] = load ptr, ptr getelementptr inbounds ([[STRUCT_20PTR]], ptr @global.20ptr, i64 0, i32 9), align 8
-; CHECK-NEXT:    call void [[L10]]()
-; CHECK-NEXT:    [[L11:%.*]] = load ptr, ptr getelementptr inbounds ([[STRUCT_20PTR]], ptr @global.20ptr, i64 0, i32 10), align 8
-; CHECK-NEXT:    call void [[L11]]()
-; CHECK-NEXT:    [[L12:%.*]] = load ptr, ptr getelementptr inbounds ([[STRUCT_20PTR]], ptr @global.20ptr, i64 0, i32 11), align 8
-; CHECK-NEXT:    call void [[L12]]()
-; CHECK-NEXT:    [[L13:%.*]] = load ptr, ptr getelementptr inbounds ([[STRUCT_20PTR]], ptr @global.20ptr, i64 0, i32 12), align 8
-; CHECK-NEXT:    call void [[L13]]()
-; CHECK-NEXT:    [[L14:%.*]] = load ptr, ptr getelementptr inbounds ([[STRUCT_20PTR]], ptr @global.20ptr, i64 0, i32 13), align 8
-; CHECK-NEXT:    call void [[L14]]()
-; CHECK-NEXT:    [[L15:%.*]] = load ptr, ptr getelementptr inbounds ([[STRUCT_20PTR]], ptr @global.20ptr, i64 0, i32 14), align 8
-; CHECK-NEXT:    call void [[L15]]()
-; CHECK-NEXT:    [[L16:%.*]] = load ptr, ptr getelementptr inbounds ([[STRUCT_20PTR]], ptr @global.20ptr, i64 0, i32 15), align 8
-; CHECK-NEXT:    call void [[L16]]()
-; CHECK-NEXT:    [[L17:%.*]] = load ptr, ptr getelementptr inbounds ([[STRUCT_20PTR]], ptr @global.20ptr, i64 0, i32 16), align 8
-; CHECK-NEXT:    call void [[L17]]()
+; CHECK-NEXT:    call void @fn0()
+; CHECK-NEXT:    call void @fn1()
+; CHECK-NEXT:    call void @fn2()
+; CHECK-NEXT:    call void @fn3()
+; CHECK-NEXT:    call void @fn0()
+; CHECK-NEXT:    call void @fn1()
+; CHECK-NEXT:    call void @fn2()
+; CHECK-NEXT:    call void @fn3()
+; CHECK-NEXT:    call void @fn0()
+; CHECK-NEXT:    call void @fn1()
 ; CHECK-NEXT:    ret void
 ;
 entry:
