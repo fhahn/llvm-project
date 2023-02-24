@@ -14099,36 +14099,45 @@ void ScalarEvolution::verify() const {
     if (ValidLoops.insert(L).second)
       Worklist.append(L->begin(), L->end());
   }
-  for (const auto &KV : ValueExprMap) {
-#ifndef NDEBUG
+  for (const auto &[VH, Expr] : ValueExprMap) {
     // Check for SCEV expressions referencing invalid/deleted loops.
-    if (auto *AR = dyn_cast<SCEVAddRecExpr>(KV.second)) {
+    if (auto *AR = dyn_cast<SCEVAddRecExpr>(Expr)) {
       assert(ValidLoops.contains(AR->getLoop()) &&
              "AddRec references invalid loop");
     }
-#endif
 
     // Check that the value is also part of the reverse map.
-    auto It = ExprValueMap.find(KV.second);
-    if (It == ExprValueMap.end() || !It->second.contains(KV.first)) {
-      dbgs() << "Value " << *KV.first
+    auto It = ExprValueMap.find(Expr);
+    if (It == ExprValueMap.end() || !It->second.contains(VH)) {
+      dbgs() << "Value " << *VH
              << " is in ValueExprMap but not in ExprValueMap\n";
       std::abort();
     }
 
-    if (auto *I = dyn_cast<Instruction>(&*KV.first)) {
-      if (!ReachableBlocks.contains(I->getParent()))
-        continue;
-      const SCEV *OldSCEV = SCM.visit(KV.second);
-      const SCEV *NewSCEV = SE2.getSCEV(I);
-      const SCEV *Delta = GetDelta(OldSCEV, NewSCEV);
-      if (Delta && !Delta->isZero()) {
-        dbgs() << "SCEV for value " << *I << " changed!\n"
-               << "Old: " << *OldSCEV << "\n"
-               << "New: " << *NewSCEV << "\n"
-               << "Delta: " << *Delta << "\n";
-        std::abort();
-      }
+    auto *I = dyn_cast<Instruction>(&*VH);
+    if (!I)
+      continue;
+    if (!isa<SCEVUnknown>(Expr) &&
+        (!isa<PHINode>(I) || !isa<SCEVAddRecExpr>(Expr))) {
+      for (Value *Op : I->operands())
+        if (!ValueExprMap.count(Op) && !isa<PHINode>(Op)) {
+          dbgs() << "Value " << *I << " is in ValueExprMap but its operand "
+                 << *Op << " is not\n";
+          std::abort();
+        }
+    }
+
+    if (!ReachableBlocks.contains(I->getParent()))
+      continue;
+    const SCEV *OldSCEV = SCM.visit(Expr);
+    const SCEV *NewSCEV = SE2.getSCEV(I);
+    const SCEV *Delta = GetDelta(OldSCEV, NewSCEV);
+    if (Delta && !Delta->isZero()) {
+      dbgs() << "SCEV for value " << *I << " changed!\n"
+             << "Old: " << *OldSCEV << "\n"
+             << "New: " << *NewSCEV << "\n"
+             << "Delta: " << *Delta << "\n";
+      std::abort();
     }
   }
 
