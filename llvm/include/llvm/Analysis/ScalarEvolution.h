@@ -2049,7 +2049,8 @@ private:
   /// from ValueExprMap and collect SCEV expressions in \p ToForget
   void visitAndClearUsers(SmallVectorImpl<Instruction *> &Worklist,
                           SmallPtrSetImpl<Instruction *> &Visited,
-                          SmallVectorImpl<const SCEV *> &ToForget);
+                          SmallVectorImpl<const SCEV *> &ToForget,
+                          const Loop *CurrL);
 
 #ifndef NDEBUG
   /// Iterate over instructions in \p Worklist and their users. Assert all users

@@ -8364,7 +8364,7 @@ void ScalarEvolution::forgetAllLoops() {
 void ScalarEvolution::visitAndClearUsers(
     SmallVectorImpl<Instruction *> &Worklist,
     SmallPtrSetImpl<Instruction *> &Visited,
-    SmallVectorImpl<const SCEV *> &ToForget) {
+    SmallVectorImpl<const SCEV *> &ToForget, const Loop *CurrL) {
   while (!Worklist.empty()) {
     Instruction *I = Worklist.pop_back_val();
     if (!isSCEVable(I->getType()))
@@ -8377,9 +8377,10 @@ void ScalarEvolution::visitAndClearUsers(
       ToForget.push_back(It->second);
       if (PHINode *PN = dyn_cast<PHINode>(I))
         ConstantEvolutionLoopExitValue.erase(PN);
-    }
-
-    PushDefUseChildren(I, Worklist, Visited);
+      PushDefUseChildren(I, Worklist, Visited);
+    } else if ((CurrL && LI.getLoopFor(I->getParent()) == CurrL) ||
+               isa<PHINode>(I))
+      PushDefUseChildren(I, Worklist, Visited);
   }
 }
 
@@ -8448,7 +8449,7 @@ void ScalarEvolution::forgetLoop(const Loop *L) {
 #ifndef NDEBUG
     PushLoopPHIs(CurrL, VerificationWorklist, VerificationVisited);
 #endif
-    visitAndClearUsers(Worklist, Visited, ToForget);
+    visitAndClearUsers(Worklist, Visited, ToForget, CurrL);
 
     LoopPropertiesCache.erase(CurrL);
     // Forget all contained loops too, to avoid dangling entries in the
@@ -8476,7 +8477,8 @@ void ScalarEvolution::forgetValue(Value *V) {
   SmallVector<const SCEV *, 8> ToForget;
   Worklist.push_back(I);
   Visited.insert(I);
-  visitAndClearUsers(Worklist, Visited, ToForget);
+  visitAndClearUsers(Worklist, Visited, ToForget,
+                     LI.getLoopFor(I->getParent()));
 
   forgetMemoizedResults(ToForget);
 
