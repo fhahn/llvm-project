@@ -8367,6 +8367,8 @@ void ScalarEvolution::visitAndClearUsers(
     SmallVectorImpl<const SCEV *> &ToForget) {
   while (!Worklist.empty()) {
     Instruction *I = Worklist.pop_back_val();
+    if (!isSCEVable(I->getType()))
+      continue;
 
     ValueExprMapType::iterator It =
         ValueExprMap.find_as(static_cast<Value *>(I));
@@ -8381,11 +8383,41 @@ void ScalarEvolution::visitAndClearUsers(
   }
 }
 
+#ifndef NDEBUG
+void ScalarEvolution::verifyAllUsersClearedFromMap(
+    SmallVectorImpl<Instruction *> &Worklist,
+    SmallPtrSetImpl<Instruction *> &Visited) {
+  while (!Worklist.empty()) {
+    Instruction *I = Worklist.pop_back_val();
+    // If I is an SCEVUnknown and we reached it via a non-SCEVable operand,
+    // invalidation for the instruction stops here as the SCEV def-use chain is
+    // broken by the SCEVUnknown.
+    if (any_of(I->operands(),
+               [this, &Visited](Value *Op) {
+                 auto *OpI = dyn_cast<Instruction>(Op);
+                 return OpI && Visited.contains(OpI) &&
+                        !isSCEVable(Op->getType());
+               }) &&
+        isSCEVable(I->getType()) &&
+        cast_if_present<SCEVUnknown>(getExistingSCEV(I)))
+      continue;
+    assert(ValueExprMap.count(I) == 0 &&
+           "entry for I has not been removed properly");
+    PushDefUseChildren(I, Worklist, Visited);
+  }
+}
+#endif
+
 void ScalarEvolution::forgetLoop(const Loop *L) {
   SmallVector<const Loop *, 16> LoopWorklist(1, L);
   SmallVector<Instruction *, 32> Worklist;
   SmallPtrSet<Instruction *, 16> Visited;
   SmallVector<const SCEV *, 16> ToForget;
+
+#ifndef NDEBUG
+  SmallVector<Instruction *, 16> VerificationWorklist;
+  SmallPtrSet<Instruction *, 8> VerificationVisited;
+#endif
 
   // Iterate over all the loops and sub-loops to drop SCEV information.
   while (!LoopWorklist.empty()) {
@@ -8413,6 +8445,9 @@ void ScalarEvolution::forgetLoop(const Loop *L) {
 
     // Drop information about expressions based on loop-header PHIs.
     PushLoopPHIs(CurrL, Worklist, Visited);
+#ifndef NDEBUG
+    PushLoopPHIs(CurrL, VerificationWorklist, VerificationVisited);
+#endif
     visitAndClearUsers(Worklist, Visited, ToForget);
 
     LoopPropertiesCache.erase(CurrL);
@@ -8421,6 +8456,10 @@ void ScalarEvolution::forgetLoop(const Loop *L) {
     LoopWorklist.append(CurrL->begin(), CurrL->end());
   }
   forgetMemoizedResults(ToForget);
+
+#ifndef NDEBUG
+  verifyAllUsersClearedFromMap(VerificationWorklist, VerificationVisited);
+#endif
 }
 
 void ScalarEvolution::forgetTopmostLoop(const Loop *L) {
@@ -8440,6 +8479,14 @@ void ScalarEvolution::forgetValue(Value *V) {
   visitAndClearUsers(Worklist, Visited, ToForget);
 
   forgetMemoizedResults(ToForget);
+
+#ifndef NDEBUG
+  SmallVector<Instruction *, 16> VerificationWorklist;
+  SmallPtrSet<Instruction *, 8> VerificationVisited;
+  Worklist.push_back(cast<Instruction>(V));
+  Visited.insert(cast<Instruction>(V));
+  verifyAllUsersClearedFromMap(VerificationWorklist, VerificationVisited);
+#endif
 }
 
 void ScalarEvolution::forgetLoopDispositions() { LoopDispositions.clear(); }

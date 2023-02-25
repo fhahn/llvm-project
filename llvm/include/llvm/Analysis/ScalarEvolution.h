@@ -2051,6 +2051,13 @@ private:
                           SmallPtrSetImpl<Instruction *> &Visited,
                           SmallVectorImpl<const SCEV *> &ToForget);
 
+#ifndef NDEBUG
+  /// Iterate over instructions in \p Worklist and their users. Assert all users
+  /// have been removed from ValueExprMap.
+  void verifyAllUsersClearedFromMap(SmallVectorImpl<Instruction *> &Worklist,
+                                    SmallPtrSetImpl<Instruction *> &Visited);
+#endif
+
   /// Return an existing SCEV for V if there is one, otherwise return nullptr.
   const SCEV *getExistingSCEV(Value *V);
 
