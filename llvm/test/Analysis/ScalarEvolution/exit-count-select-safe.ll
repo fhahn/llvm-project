@@ -469,9 +469,9 @@ define i32 @computeSCEVAtScope(i32 %d.0) {
 ; CHECK-NEXT:    %inc3 = add nsw i32 %e.1, 1
 ; CHECK-NEXT:    --> {(1 + %d.0),+,1}<nw><%for.cond> U: full-set S: full-set Exits: 1 LoopDispositions: { %for.cond: Computable, %while.cond: Variant }
 ; CHECK-NEXT:    %f.1 = phi i32 [ %inc8, %for.body5 ], [ 0, %for.cond4.preheader ]
-; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%for.cond4> U: [0,1) S: [0,1) Exits: 0 LoopDispositions: { %for.cond4: Computable, %while.cond: Variant }
+; CHECK-NEXT:    --> 0 U: [0,1) S: [0,1) Exits: 0 LoopDispositions: { %for.cond4: Invariant, %while.cond: Invariant }
 ; CHECK-NEXT:    %inc8 = add i32 %f.1, 1
-; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%for.cond4> U: [1,2) S: [1,2) Exits: 1 LoopDispositions: { %for.cond4: Computable, %while.cond: Variant }
+; CHECK-NEXT:    --> 1 U: [1,2) S: [1,2) Exits: 1 LoopDispositions: { %for.cond4: Invariant, %while.cond: Invariant }
 ; CHECK-NEXT:  Determining loop execution counts for: @computeSCEVAtScope
 ; CHECK-NEXT:  Loop %for.cond: backedge-taken count is (-1 * %d.0)
 ; CHECK-NEXT:  Loop %for.cond: constant max backedge-taken count is -1
@@ -1318,11 +1318,11 @@ define i32 @logical_and_zero_arg1(i32 %n) {
 ; CHECK-LABEL: 'logical_and_zero_arg1'
 ; CHECK-NEXT:  Classifying expressions for: @logical_and_zero_arg1
 ; CHECK-NEXT:    %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
-; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,1) S: [0,1) Exits: 0 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> 0 U: [0,1) S: [0,1) Exits: 0 LoopDispositions: { %loop: Invariant }
 ; CHECK-NEXT:    %i.next = add i32 %i, 1
-; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,2) S: [1,2) Exits: 1 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> 1 U: [1,2) S: [1,2) Exits: 1 LoopDispositions: { %loop: Invariant }
 ; CHECK-NEXT:    %cond = select i1 %cond_p0, i1 %cond_p1, i1 false
-; CHECK-NEXT:    --> (%cond_p0 umin_seq %cond_p1) U: full-set S: full-set Exits: false LoopDispositions: { %loop: Variant }
+; CHECK-NEXT:    --> (%cond_p0 umin_seq %cond_p1) U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:  Determining loop execution counts for: @logical_and_zero_arg1
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is 0
 ; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is 0
@@ -1348,11 +1348,11 @@ define i32 @logical_and_zero_arg2(i32 %n) {
 ; CHECK-LABEL: 'logical_and_zero_arg2'
 ; CHECK-NEXT:  Classifying expressions for: @logical_and_zero_arg2
 ; CHECK-NEXT:    %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
-; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,1) S: [0,1) Exits: 0 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> 0 U: [0,1) S: [0,1) Exits: 0 LoopDispositions: { %loop: Invariant }
 ; CHECK-NEXT:    %i.next = add i32 %i, 1
-; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,2) S: [1,2) Exits: 1 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> 1 U: [1,2) S: [1,2) Exits: 1 LoopDispositions: { %loop: Invariant }
 ; CHECK-NEXT:    %cond = select i1 %cond_p0, i1 %cond_p1, i1 false
-; CHECK-NEXT:    --> (%cond_p1 umin %cond_p0) U: full-set S: full-set Exits: false LoopDispositions: { %loop: Variant }
+; CHECK-NEXT:    --> (%cond_p1 umin %cond_p0) U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:  Determining loop execution counts for: @logical_and_zero_arg2
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is 0
 ; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is 0

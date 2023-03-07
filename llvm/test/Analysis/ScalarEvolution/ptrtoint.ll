@@ -170,17 +170,11 @@ define void @ptrtoint_of_nullptr(ptr %out0) {
 
 ; A constant inttoptr argument of an ptrtoint is still bad.
 define void @ptrtoint_of_constantexpr_inttoptr(ptr %out0) {
-; X64-LABEL: 'ptrtoint_of_constantexpr_inttoptr'
-; X64-NEXT:  Classifying expressions for: @ptrtoint_of_constantexpr_inttoptr
-; X64-NEXT:    %p0 = ptrtoint ptr inttoptr (i64 42 to ptr) to i64
-; X64-NEXT:    --> (ptrtoint ptr inttoptr (i64 42 to ptr) to i64) U: [42,43) S: [42,43)
-; X64-NEXT:  Determining loop execution counts for: @ptrtoint_of_constantexpr_inttoptr
-;
-; X32-LABEL: 'ptrtoint_of_constantexpr_inttoptr'
-; X32-NEXT:  Classifying expressions for: @ptrtoint_of_constantexpr_inttoptr
-; X32-NEXT:    %p0 = ptrtoint ptr inttoptr (i64 42 to ptr) to i64
-; X32-NEXT:    --> (zext i32 (ptrtoint ptr inttoptr (i64 42 to ptr) to i32) to i64) U: [42,43) S: [42,43)
-; X32-NEXT:  Determining loop execution counts for: @ptrtoint_of_constantexpr_inttoptr
+; ALL-LABEL: 'ptrtoint_of_constantexpr_inttoptr'
+; ALL-NEXT:  Classifying expressions for: @ptrtoint_of_constantexpr_inttoptr
+; ALL-NEXT:    %p0 = ptrtoint ptr inttoptr (i64 42 to ptr) to i64
+; ALL-NEXT:    --> 42 U: [42,43) S: [42,43)
+; ALL-NEXT:  Determining loop execution counts for: @ptrtoint_of_constantexpr_inttoptr
 ;
   %p0 = ptrtoint ptr inttoptr (i64 42 to ptr) to i64
   store i64 %p0, ptr %out0

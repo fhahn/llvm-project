@@ -13,71 +13,71 @@ define i32 @pr58402_large_number_of_zext(ptr %dst) {
 ; CHECK-NEXT:    %conv = zext i1 %cmp to i32
 ; CHECK-NEXT:    --> (zext i1 %cmp to i32) U: [0,2) S: [0,2) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
 ; CHECK-NEXT:    %i = and i32 %conv, -2
-; CHECK-NEXT:    --> (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw> U: [0,1) S: [0,1) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 0 U: [0,1) S: [0,1) Exits: 0 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:    %add7 = add i32 %i, 4
-; CHECK-NEXT:    --> (4 + (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw>)<nuw><nsw> U: [4,5) S: [4,5) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 4 U: [4,5) S: [4,5) Exits: 4 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:    %i1 = and i32 %add7, -2
-; CHECK-NEXT:    --> (2 * ((4 + (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw> U: [4,5) S: [4,5) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 4 U: [4,5) S: [4,5) Exits: 4 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:    %add7.1 = add i32 %i1, 4
-; CHECK-NEXT:    --> (4 + (2 * ((4 + (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> U: [8,9) S: [8,9) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 8 U: [8,9) S: [8,9) Exits: 8 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:    %i2 = and i32 %add7.1, -2
-; CHECK-NEXT:    --> (2 * ((4 + (2 * ((4 + (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw> U: [8,9) S: [8,9) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 8 U: [8,9) S: [8,9) Exits: 8 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:    %add7.2 = add i32 %i2, 4
-; CHECK-NEXT:    --> (4 + (2 * ((4 + (2 * ((4 + (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> U: [12,13) S: [12,13) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 12 U: [12,13) S: [12,13) Exits: 12 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:    %i3 = and i32 %add7.2, -2
-; CHECK-NEXT:    --> (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw> U: [12,13) S: [12,13) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 12 U: [12,13) S: [12,13) Exits: 12 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:    %add7.3 = add i32 %i3, 4
-; CHECK-NEXT:    --> (4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> U: [16,17) S: [16,17) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 16 U: [16,17) S: [16,17) Exits: 16 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:    %i4 = and i32 %add7.3, -2
-; CHECK-NEXT:    --> (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw> U: [16,17) S: [16,17) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 16 U: [16,17) S: [16,17) Exits: 16 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:    %add7.4 = add i32 %i4, 4
-; CHECK-NEXT:    --> (4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> U: [20,21) S: [20,21) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 20 U: [20,21) S: [20,21) Exits: 20 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:    %i5 = and i32 %add7.4, -2
-; CHECK-NEXT:    --> (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw> U: [20,21) S: [20,21) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 20 U: [20,21) S: [20,21) Exits: 20 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:    %add7.5 = add i32 %i5, 4
-; CHECK-NEXT:    --> (4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> U: [24,25) S: [24,25) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 24 U: [24,25) S: [24,25) Exits: 24 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:    %i6 = and i32 %add7.5, -2
-; CHECK-NEXT:    --> (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw> U: [24,25) S: [24,25) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 24 U: [24,25) S: [24,25) Exits: 24 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:    %add7.6 = add i32 %i6, 4
-; CHECK-NEXT:    --> (4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> U: [28,29) S: [28,29) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 28 U: [28,29) S: [28,29) Exits: 28 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:    %i7 = and i32 %add7.6, -2
-; CHECK-NEXT:    --> (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw> U: [28,29) S: [28,29) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 28 U: [28,29) S: [28,29) Exits: 28 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:    %add7.7 = add i32 %i7, 4
-; CHECK-NEXT:    --> (4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> U: [32,33) S: [32,33) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 32 U: [32,33) S: [32,33) Exits: 32 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:    %i8 = and i32 %add7.7, -2
-; CHECK-NEXT:    --> (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw> U: [32,33) S: [32,33) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 32 U: [32,33) S: [32,33) Exits: 32 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:    %add7.8 = add i32 %i8, 4
-; CHECK-NEXT:    --> (4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> U: [36,37) S: [36,37) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 36 U: [36,37) S: [36,37) Exits: 36 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:    %i9 = and i32 %add7.8, -2
-; CHECK-NEXT:    --> (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw> U: [36,37) S: [36,37) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 36 U: [36,37) S: [36,37) Exits: 36 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:    %add7.9 = add i32 %i9, 4
-; CHECK-NEXT:    --> (4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> U: [40,41) S: [40,41) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 40 U: [40,41) S: [40,41) Exits: 40 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:    %i10 = and i32 %add7.9, -2
-; CHECK-NEXT:    --> (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw> U: [40,41) S: [40,41) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 40 U: [40,41) S: [40,41) Exits: 40 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:    %add7.10 = add i32 %i10, 4
-; CHECK-NEXT:    --> (4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> U: [44,45) S: [44,45) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 44 U: [44,45) S: [44,45) Exits: 44 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:    %i11 = and i32 %add7.10, -2
-; CHECK-NEXT:    --> (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw> U: [44,45) S: [44,45) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 44 U: [44,45) S: [44,45) Exits: 44 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:    %add7.11 = add i32 %i11, 4
-; CHECK-NEXT:    --> (4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> U: [48,49) S: [48,49) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 48 U: [48,49) S: [48,49) Exits: 48 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:    %i12 = and i32 %add7.11, -2
-; CHECK-NEXT:    --> (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw> U: [48,49) S: [48,49) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 48 U: [48,49) S: [48,49) Exits: 48 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:    %add7.12 = add i32 %i12, 4
-; CHECK-NEXT:    --> (4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> U: [52,53) S: [52,53) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 52 U: [52,53) S: [52,53) Exits: 52 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:    %i13 = and i32 %add7.12, -2
-; CHECK-NEXT:    --> (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw> U: [52,53) S: [52,53) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 52 U: [52,53) S: [52,53) Exits: 52 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:    %add7.13 = add i32 %i13, 4
-; CHECK-NEXT:    --> (4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> U: [56,57) S: [56,57) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 56 U: [56,57) S: [56,57) Exits: 56 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:    %i14 = and i32 %add7.13, -2
-; CHECK-NEXT:    --> (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw> U: [56,57) S: [56,57) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 56 U: [56,57) S: [56,57) Exits: 56 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:    %add7.14 = add i32 %i14, 4
-; CHECK-NEXT:    --> (4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> U: [60,61) S: [60,61) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 60 U: [60,61) S: [60,61) Exits: 60 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:    %i15 = and i32 %add7.14, -2
-; CHECK-NEXT:    --> (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw> U: [60,61) S: [60,61) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 60 U: [60,61) S: [60,61) Exits: 60 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:    %add7.15 = add i32 %i15, 4
-; CHECK-NEXT:    --> (4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> U: [64,65) S: [64,65) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 64 U: [64,65) S: [64,65) Exits: 64 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:    %i16 = and i32 %add7.15, -2
-; CHECK-NEXT:    --> (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((4 + (2 * ((zext i1 %cmp to i32) /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw>)<nuw><nsw> /u 2))<nuw><nsw> U: [64,65) S: [64,65) Exits: <<Unknown>> LoopDispositions: { %header: Variant }
+; CHECK-NEXT:    --> 64 U: [64,65) S: [64,65) Exits: 64 LoopDispositions: { %header: Invariant }
 ; CHECK-NEXT:  Determining loop execution counts for: @pr58402_large_number_of_zext
 ; CHECK-NEXT:  Loop %header: <multiple exits> Unpredictable backedge-taken count.
 ; CHECK-NEXT:  Loop %header: Unpredictable constant max backedge-taken count.

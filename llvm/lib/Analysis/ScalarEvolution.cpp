@@ -7375,6 +7375,12 @@ const SCEV *ScalarEvolution::createSCEVIter(Value *V) {
     }
 
     if (CreatedSCEV) {
+      if (CreatedSCEV->getType()->isIntegerTy()) {
+        auto R = getUnsignedRange(CreatedSCEV);
+        if (const APInt *E = R.getSingleElement()) {
+          CreatedSCEV = getConstant(*E);
+        }
+      }
       insertValueToMap(CurV, CreatedSCEV);
     } else {
       // Queue CurV for SCEV creation, followed by its's operands which need to

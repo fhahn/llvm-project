@@ -617,11 +617,11 @@ define void @test_ashr_zero_shift() {
 ; CHECK-NEXT:    %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
 ; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,5) S: [0,5) Exits: 4 LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.ashr = phi i64 [ 1023, %entry ], [ %iv.ashr.next, %loop ]
-; CHECK-NEXT:    --> %iv.ashr U: [1023,1024) S: [1023,1024) Exits: 1023 LoopDispositions: { %loop: Variant }
+; CHECK-NEXT:    --> 1023 U: [1023,1024) S: [1023,1024) Exits: 1023 LoopDispositions: { %loop: Invariant }
 ; CHECK-NEXT:    %iv.next = add i64 %iv, 1
 ; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,6) S: [1,6) Exits: 5 LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.ashr.next = ashr i64 %iv.ashr, 0
-; CHECK-NEXT:    --> %iv.ashr U: [1023,1024) S: [1023,1024) Exits: 1023 LoopDispositions: { %loop: Variant }
+; CHECK-NEXT:    --> 1023 U: [1023,1024) S: [1023,1024) Exits: 1023 LoopDispositions: { %loop: Invariant }
 ; CHECK-NEXT:  Determining loop execution counts for: @test_ashr_zero_shift
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is 4
 ; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is 4
@@ -748,11 +748,11 @@ define void @test_lshr_zero_shift() {
 ; CHECK-NEXT:    %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
 ; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,5) S: [0,5) Exits: 4 LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.lshr = phi i64 [ 1023, %entry ], [ %iv.lshr.next, %loop ]
-; CHECK-NEXT:    --> %iv.lshr U: [1023,1024) S: [1023,1024) Exits: 1023 LoopDispositions: { %loop: Variant }
+; CHECK-NEXT:    --> 1023 U: [1023,1024) S: [1023,1024) Exits: 1023 LoopDispositions: { %loop: Invariant }
 ; CHECK-NEXT:    %iv.next = add i64 %iv, 1
 ; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,6) S: [1,6) Exits: 5 LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.lshr.next = lshr i64 %iv.lshr, 0
-; CHECK-NEXT:    --> %iv.lshr U: [1023,1024) S: [1023,1024) Exits: 1023 LoopDispositions: { %loop: Variant }
+; CHECK-NEXT:    --> 1023 U: [1023,1024) S: [1023,1024) Exits: 1023 LoopDispositions: { %loop: Invariant }
 ; CHECK-NEXT:  Determining loop execution counts for: @test_lshr_zero_shift
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is 4
 ; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is 4

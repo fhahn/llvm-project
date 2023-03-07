@@ -13,7 +13,7 @@ define i32 @ashr(i32 %a) {
 ; CHECK-LABEL: 'ashr'
 ; CHECK-NEXT:  Classifying expressions for: @ashr
 ; CHECK-NEXT:    %ashr = ashr i32 %a, 31
-; CHECK-NEXT:    --> %ashr U: [0,1) S: [0,1)
+; CHECK-NEXT:    --> 0 U: [0,1) S: [0,1)
 ; CHECK-NEXT:  Determining loop execution counts for: @ashr
 ;
   %ashr = ashr i32 %a, 31
@@ -109,9 +109,9 @@ define i32 @phi_div() {
 ; CHECK-LABEL: 'phi_div'
 ; CHECK-NEXT:  Classifying expressions for: @phi_div
 ; CHECK-NEXT:    %range.1 = phi i32 [ 0, %entry ], [ %shr, %loop ]
-; CHECK-NEXT:    --> %range.1 U: [0,1) S: [0,1) Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
+; CHECK-NEXT:    --> 0 U: [0,1) S: [0,1) Exits: 0 LoopDispositions: { %loop: Invariant }
 ; CHECK-NEXT:    %shr = lshr i32 %range.1, 1
-; CHECK-NEXT:    --> (%range.1 /u 2) U: [0,1) S: [0,1) Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
+; CHECK-NEXT:    --> 0 U: [0,1) S: [0,1) Exits: 0 LoopDispositions: { %loop: Invariant }
 ; CHECK-NEXT:  Determining loop execution counts for: @phi_div
 ; CHECK-NEXT:  Loop %loop: <multiple exits> Unpredictable backedge-taken count.
 ; CHECK-NEXT:  Loop %loop: Unpredictable constant max backedge-taken count.

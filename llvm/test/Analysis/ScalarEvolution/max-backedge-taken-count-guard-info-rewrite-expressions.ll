@@ -250,9 +250,9 @@ define i32 @rewrite_zext_with_info_from_icmp_ne(i32 %N) {
 ; CHECK-NEXT:    %n.vec = and i64 %n.rnd.up, 8589934588
 ; CHECK-NEXT:    --> (4 * ((4 + (zext i32 (-1 + (zext i2 (trunc i32 %N to i2) to i32))<nsw> to i64))<nuw><nsw> /u 4))<nuw><nsw> U: [4,4294967297) S: [4,4294967297)
 ; CHECK-NEXT:    %iv = phi i64 [ 0, %loop.ph ], [ %iv.next, %loop ]
-; CHECK-NEXT:    --> {0,+,4}<nuw><nsw><%loop> U: [0,1) S: [0,1) Exits: 0 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> 0 U: [0,1) S: [0,1) Exits: 0 LoopDispositions: { %loop: Invariant }
 ; CHECK-NEXT:    %iv.next = add i64 %iv, 4
-; CHECK-NEXT:    --> {4,+,4}<nuw><nsw><%loop> U: [4,5) S: [4,5) Exits: 4 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> 4 U: [4,5) S: [4,5) Exits: 4 LoopDispositions: { %loop: Invariant }
 ; CHECK-NEXT:  Determining loop execution counts for: @rewrite_zext_with_info_from_icmp_ne
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is 0
 ; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is 0
