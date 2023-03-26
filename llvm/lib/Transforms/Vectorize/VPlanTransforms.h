@@ -83,6 +83,8 @@ struct VPlanTransforms {
   /// not valid.
   static bool adjustFixedOrderRecurrences(VPlan &Plan, VPBuilder &Builder);
 
+  static void scalarizeGEPs(VPlan &Plan);
+
   /// Optimize \p Plan based on \p BestVF and \p BestUF. This may restrict the
   /// resulting plan to \p BestVF and \p BestUF.
   static void optimizeForVFAndUF(VPlan &Plan, ElementCount BestVF,

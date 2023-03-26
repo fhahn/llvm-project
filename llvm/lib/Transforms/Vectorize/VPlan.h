@@ -1031,12 +1031,6 @@ class VPWidenGEPRecipe : public VPRecipeBase, public VPValue {
     return getOperand(I + 1)->isDefinedOutsideVectorRegions();
   }
 
-  bool areAllOperandsInvariant() const {
-    return all_of(operands(), [](VPValue *Op) {
-      return Op->isDefinedOutsideVectorRegions();
-    });
-  }
-
 public:
   template <typename IterT>
   VPWidenGEPRecipe(GetElementPtrInst *GEP, iterator_range<IterT> Operands)
@@ -1048,6 +1042,12 @@ public:
 
   /// Generate the gep nodes.
   void execute(VPTransformState &State) override;
+
+  bool areAllOperandsInvariant() const {
+    return all_of(operands(), [](VPValue *Op) {
+      return Op->isDefinedOutsideVectorRegions();
+    });
+  }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   /// Print the recipe.

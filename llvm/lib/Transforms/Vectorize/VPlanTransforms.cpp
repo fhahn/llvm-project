@@ -878,3 +878,22 @@ bool VPlanTransforms::adjustFixedOrderRecurrences(VPlan &Plan,
   }
   return true;
 }
+
+void VPlanTransforms::scalarizeGEPs(VPlan &Plan) {
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_deep(Plan.getEntry()))) {
+    // The recipes in the block are processed in reverse order, to catch chains
+    // of dead recipes.
+    for (VPRecipeBase &R : make_early_inc_range(reverse(*VPBB))) {
+      auto *GEP = dyn_cast<VPWidenGEPRecipe>(&R);
+      if (!GEP || !GEP->areAllOperandsInvariant())
+        continue;
+
+      auto *Clone = new VPReplicateRecipe(GEP->getUnderlyingInstr(),
+                                          GEP->operands(), true);
+      Clone->insertBefore(GEP);
+      GEP->replaceAllUsesWith(Clone);
+      GEP->eraseFromParent();
+    }
+  }
+}
