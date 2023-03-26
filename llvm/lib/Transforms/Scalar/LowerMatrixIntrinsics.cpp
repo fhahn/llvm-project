@@ -940,6 +940,78 @@ public:
     }
   }
 
+  void optimizeVectorOps(ArrayRef<Instruction *> MatrixOps, SmallPtrSetImpl<Instruction*> &FusedInsts) {
+    SmallVector<Instruction *> VectorOps;
+
+    for (Instruction *I : MatrixOps) {
+      auto S = ShapeMap.find(I);
+      assert(S != ShapeMap.end());
+      if (S->second.NumColumns != 1 && S->second.NumRows != 1)
+        continue;
+      VectorOps.push_back(I);
+    }
+
+    SmallPtrSet<Value *, 8> Seen;
+
+    for (Instruction *I : VectorOps) {
+      if (Seen.find(I) != Seen.end())
+        continue;
+
+      SmallVector<Value *> Worklist;
+      Worklist.push_back(I);
+      SmallVector<Value *> ToFlatten;
+      bool NotSupported = false;
+      InstructionCost Cost= 0;
+      while (!Worklist.empty()) {
+        Value *Curr = Worklist.pop_back_val();
+        if (!Seen.insert(Curr).second)
+          continue;
+
+        if (ShapeMap.find(Curr) == ShapeMap.end())
+          continue;
+        auto *CI = dyn_cast<Instruction>(Curr);
+        if (match(Curr, m_CombineOr(
+                             m_Load(m_Value()),
+                             m_CombineOr(m_Store(m_Value(), m_Value()),
+                             m_CombineOr(m_Add(m_Value(), m_Value()),
+                             m_Sub(m_Value(), m_Value())))))) {
+        } else if (match(Curr, 
+                             m_Intrinsic<Intrinsic::matrix_transpose>())) {
+          NotSupported = true;
+        } else if (CI) {
+          Cost = InstructionCost::getInvalid();
+        }
+        ToFlatten.push_back(Curr);
+        for (Value *User : Curr->users())
+          Worklist.push_back(User);
+
+        if (CI) {
+          for (Value *Op: CI->operands())
+            Worklist.push_back(Op);
+        }
+      }
+
+      if (NotSupported)
+        continue;
+      for (Value *I : ToFlatten) {
+        if (I->getType()->isVoidTy())
+          continue;
+        Value *Op;
+        if (match(I, 
+                             m_Intrinsic<Intrinsic::matrix_transpose>(m_Value(Op)))) {
+          I->replaceAllUsesWith(Op);
+          FusedInsts.insert(cast<Instruction>(I));
+          cast<Instruction>(I)->eraseFromParent();
+          I = Op;
+        }
+        ShapeInfo S = ShapeMap[I];
+        if (S.NumColumns != 1)
+          ShapeMap[I] = S.t();
+      }
+    }
+
+  }
+
   bool Visit() {
     SmallVector<Instruction *, 32> WorkList;
 
@@ -999,6 +1071,7 @@ public:
 
     // Second, try to fuse candidates.
     SmallPtrSet<Instruction *, 16> FusedInsts;
+    optimizeVectorOps(MatrixInsts, FusedInsts);
     for (CallInst *CI : MaybeFusableInsts)
       LowerMatrixMultiplyFused(CI, FusedInsts);
 

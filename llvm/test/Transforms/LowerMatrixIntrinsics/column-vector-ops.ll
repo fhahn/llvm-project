@@ -6,46 +6,9 @@ define <8 x i64> @transpose_add_i64_v8(<8 x i64> %a, <8 x i64> %b) {
 ; CHECK-LABEL: @transpose_add_i64_v8(
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[SPLIT:%.*]] = shufflevector <8 x i64> [[A:%.*]], <8 x i64> poison, <8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7>
-; CHECK-NEXT:    [[TMP0:%.*]] = extractelement <8 x i64> [[SPLIT]], i64 0
-; CHECK-NEXT:    [[TMP1:%.*]] = insertelement <1 x i64> poison, i64 [[TMP0]], i64 0
-; CHECK-NEXT:    [[TMP2:%.*]] = extractelement <8 x i64> [[SPLIT]], i64 1
-; CHECK-NEXT:    [[TMP3:%.*]] = insertelement <1 x i64> poison, i64 [[TMP2]], i64 0
-; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <8 x i64> [[SPLIT]], i64 2
-; CHECK-NEXT:    [[TMP5:%.*]] = insertelement <1 x i64> poison, i64 [[TMP4]], i64 0
-; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <8 x i64> [[SPLIT]], i64 3
-; CHECK-NEXT:    [[TMP7:%.*]] = insertelement <1 x i64> poison, i64 [[TMP6]], i64 0
-; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <8 x i64> [[SPLIT]], i64 4
-; CHECK-NEXT:    [[TMP9:%.*]] = insertelement <1 x i64> poison, i64 [[TMP8]], i64 0
-; CHECK-NEXT:    [[TMP10:%.*]] = extractelement <8 x i64> [[SPLIT]], i64 5
-; CHECK-NEXT:    [[TMP11:%.*]] = insertelement <1 x i64> poison, i64 [[TMP10]], i64 0
-; CHECK-NEXT:    [[TMP12:%.*]] = extractelement <8 x i64> [[SPLIT]], i64 6
-; CHECK-NEXT:    [[TMP13:%.*]] = insertelement <1 x i64> poison, i64 [[TMP12]], i64 0
-; CHECK-NEXT:    [[TMP14:%.*]] = extractelement <8 x i64> [[SPLIT]], i64 7
-; CHECK-NEXT:    [[TMP15:%.*]] = insertelement <1 x i64> poison, i64 [[TMP14]], i64 0
-; CHECK-NEXT:    [[SPLIT1:%.*]] = shufflevector <8 x i64> [[B:%.*]], <8 x i64> poison, <1 x i32> zeroinitializer
-; CHECK-NEXT:    [[SPLIT2:%.*]] = shufflevector <8 x i64> [[B]], <8 x i64> poison, <1 x i32> <i32 1>
-; CHECK-NEXT:    [[SPLIT3:%.*]] = shufflevector <8 x i64> [[B]], <8 x i64> poison, <1 x i32> <i32 2>
-; CHECK-NEXT:    [[SPLIT4:%.*]] = shufflevector <8 x i64> [[B]], <8 x i64> poison, <1 x i32> <i32 3>
-; CHECK-NEXT:    [[SPLIT5:%.*]] = shufflevector <8 x i64> [[B]], <8 x i64> poison, <1 x i32> <i32 4>
-; CHECK-NEXT:    [[SPLIT6:%.*]] = shufflevector <8 x i64> [[B]], <8 x i64> poison, <1 x i32> <i32 5>
-; CHECK-NEXT:    [[SPLIT7:%.*]] = shufflevector <8 x i64> [[B]], <8 x i64> poison, <1 x i32> <i32 6>
-; CHECK-NEXT:    [[SPLIT8:%.*]] = shufflevector <8 x i64> [[B]], <8 x i64> poison, <1 x i32> <i32 7>
-; CHECK-NEXT:    [[TMP16:%.*]] = add <1 x i64> [[TMP1]], [[SPLIT1]]
-; CHECK-NEXT:    [[TMP17:%.*]] = add <1 x i64> [[TMP3]], [[SPLIT2]]
-; CHECK-NEXT:    [[TMP18:%.*]] = add <1 x i64> [[TMP5]], [[SPLIT3]]
-; CHECK-NEXT:    [[TMP19:%.*]] = add <1 x i64> [[TMP7]], [[SPLIT4]]
-; CHECK-NEXT:    [[TMP20:%.*]] = add <1 x i64> [[TMP9]], [[SPLIT5]]
-; CHECK-NEXT:    [[TMP21:%.*]] = add <1 x i64> [[TMP11]], [[SPLIT6]]
-; CHECK-NEXT:    [[TMP22:%.*]] = add <1 x i64> [[TMP13]], [[SPLIT7]]
-; CHECK-NEXT:    [[TMP23:%.*]] = add <1 x i64> [[TMP15]], [[SPLIT8]]
-; CHECK-NEXT:    [[TMP24:%.*]] = shufflevector <1 x i64> [[TMP16]], <1 x i64> [[TMP17]], <2 x i32> <i32 0, i32 1>
-; CHECK-NEXT:    [[TMP25:%.*]] = shufflevector <1 x i64> [[TMP18]], <1 x i64> [[TMP19]], <2 x i32> <i32 0, i32 1>
-; CHECK-NEXT:    [[TMP26:%.*]] = shufflevector <1 x i64> [[TMP20]], <1 x i64> [[TMP21]], <2 x i32> <i32 0, i32 1>
-; CHECK-NEXT:    [[TMP27:%.*]] = shufflevector <1 x i64> [[TMP22]], <1 x i64> [[TMP23]], <2 x i32> <i32 0, i32 1>
-; CHECK-NEXT:    [[TMP28:%.*]] = shufflevector <2 x i64> [[TMP24]], <2 x i64> [[TMP25]], <4 x i32> <i32 0, i32 1, i32 2, i32 3>
-; CHECK-NEXT:    [[TMP29:%.*]] = shufflevector <2 x i64> [[TMP26]], <2 x i64> [[TMP27]], <4 x i32> <i32 0, i32 1, i32 2, i32 3>
-; CHECK-NEXT:    [[TMP30:%.*]] = shufflevector <4 x i64> [[TMP28]], <4 x i64> [[TMP29]], <8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7>
-; CHECK-NEXT:    ret <8 x i64> [[TMP30]]
+; CHECK-NEXT:    [[SPLIT1:%.*]] = shufflevector <8 x i64> [[B:%.*]], <8 x i64> poison, <8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7>
+; CHECK-NEXT:    [[TMP0:%.*]] = add <8 x i64> [[SPLIT]], [[SPLIT1]]
+; CHECK-NEXT:    ret <8 x i64> [[TMP0]]
 ;
 entry:
   %a.t = call <8 x i64> @llvm.matrix.transpose.v8i64(<8 x i64> %a, i32 8, i32 1)
@@ -58,53 +21,9 @@ declare <8 x i64> @llvm.matrix.transpose.v8i64(<8 x i64>, i32, i32)
 define void @transpose_add_store_i64_v8(<8 x i64> %a, <8 x i64> %b, ptr %dst) {
 ; CHECK-LABEL: @transpose_add_store_i64_v8(
 ; CHECK-NEXT:    [[SPLIT:%.*]] = shufflevector <8 x i64> [[A:%.*]], <8 x i64> poison, <8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7>
-; CHECK-NEXT:    [[TMP1:%.*]] = extractelement <8 x i64> [[SPLIT]], i64 0
-; CHECK-NEXT:    [[TMP2:%.*]] = insertelement <1 x i64> poison, i64 [[TMP1]], i64 0
-; CHECK-NEXT:    [[TMP3:%.*]] = extractelement <8 x i64> [[SPLIT]], i64 1
-; CHECK-NEXT:    [[TMP4:%.*]] = insertelement <1 x i64> poison, i64 [[TMP3]], i64 0
-; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <8 x i64> [[SPLIT]], i64 2
-; CHECK-NEXT:    [[TMP6:%.*]] = insertelement <1 x i64> poison, i64 [[TMP5]], i64 0
-; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <8 x i64> [[SPLIT]], i64 3
-; CHECK-NEXT:    [[TMP8:%.*]] = insertelement <1 x i64> poison, i64 [[TMP7]], i64 0
-; CHECK-NEXT:    [[TMP9:%.*]] = extractelement <8 x i64> [[SPLIT]], i64 4
-; CHECK-NEXT:    [[TMP10:%.*]] = insertelement <1 x i64> poison, i64 [[TMP9]], i64 0
-; CHECK-NEXT:    [[TMP11:%.*]] = extractelement <8 x i64> [[SPLIT]], i64 5
-; CHECK-NEXT:    [[TMP12:%.*]] = insertelement <1 x i64> poison, i64 [[TMP11]], i64 0
-; CHECK-NEXT:    [[TMP13:%.*]] = extractelement <8 x i64> [[SPLIT]], i64 6
-; CHECK-NEXT:    [[TMP14:%.*]] = insertelement <1 x i64> poison, i64 [[TMP13]], i64 0
-; CHECK-NEXT:    [[TMP15:%.*]] = extractelement <8 x i64> [[SPLIT]], i64 7
-; CHECK-NEXT:    [[TMP16:%.*]] = insertelement <1 x i64> poison, i64 [[TMP15]], i64 0
-; CHECK-NEXT:    [[SPLIT1:%.*]] = shufflevector <8 x i64> [[B:%.*]], <8 x i64> poison, <1 x i32> zeroinitializer
-; CHECK-NEXT:    [[SPLIT2:%.*]] = shufflevector <8 x i64> [[B]], <8 x i64> poison, <1 x i32> <i32 1>
-; CHECK-NEXT:    [[SPLIT3:%.*]] = shufflevector <8 x i64> [[B]], <8 x i64> poison, <1 x i32> <i32 2>
-; CHECK-NEXT:    [[SPLIT4:%.*]] = shufflevector <8 x i64> [[B]], <8 x i64> poison, <1 x i32> <i32 3>
-; CHECK-NEXT:    [[SPLIT5:%.*]] = shufflevector <8 x i64> [[B]], <8 x i64> poison, <1 x i32> <i32 4>
-; CHECK-NEXT:    [[SPLIT6:%.*]] = shufflevector <8 x i64> [[B]], <8 x i64> poison, <1 x i32> <i32 5>
-; CHECK-NEXT:    [[SPLIT7:%.*]] = shufflevector <8 x i64> [[B]], <8 x i64> poison, <1 x i32> <i32 6>
-; CHECK-NEXT:    [[SPLIT8:%.*]] = shufflevector <8 x i64> [[B]], <8 x i64> poison, <1 x i32> <i32 7>
-; CHECK-NEXT:    [[TMP17:%.*]] = add <1 x i64> [[TMP2]], [[SPLIT1]]
-; CHECK-NEXT:    [[TMP18:%.*]] = add <1 x i64> [[TMP4]], [[SPLIT2]]
-; CHECK-NEXT:    [[TMP19:%.*]] = add <1 x i64> [[TMP6]], [[SPLIT3]]
-; CHECK-NEXT:    [[TMP20:%.*]] = add <1 x i64> [[TMP8]], [[SPLIT4]]
-; CHECK-NEXT:    [[TMP21:%.*]] = add <1 x i64> [[TMP10]], [[SPLIT5]]
-; CHECK-NEXT:    [[TMP22:%.*]] = add <1 x i64> [[TMP12]], [[SPLIT6]]
-; CHECK-NEXT:    [[TMP23:%.*]] = add <1 x i64> [[TMP14]], [[SPLIT7]]
-; CHECK-NEXT:    [[TMP24:%.*]] = add <1 x i64> [[TMP16]], [[SPLIT8]]
-; CHECK-NEXT:    store <1 x i64> [[TMP17]], ptr [[DST:%.*]], align 64
-; CHECK-NEXT:    [[VEC_GEP:%.*]] = getelementptr i64, ptr [[DST]], i64 1
-; CHECK-NEXT:    store <1 x i64> [[TMP18]], ptr [[VEC_GEP]], align 8
-; CHECK-NEXT:    [[VEC_GEP9:%.*]] = getelementptr i64, ptr [[DST]], i64 2
-; CHECK-NEXT:    store <1 x i64> [[TMP19]], ptr [[VEC_GEP9]], align 16
-; CHECK-NEXT:    [[VEC_GEP10:%.*]] = getelementptr i64, ptr [[DST]], i64 3
-; CHECK-NEXT:    store <1 x i64> [[TMP20]], ptr [[VEC_GEP10]], align 8
-; CHECK-NEXT:    [[VEC_GEP11:%.*]] = getelementptr i64, ptr [[DST]], i64 4
-; CHECK-NEXT:    store <1 x i64> [[TMP21]], ptr [[VEC_GEP11]], align 32
-; CHECK-NEXT:    [[VEC_GEP12:%.*]] = getelementptr i64, ptr [[DST]], i64 5
-; CHECK-NEXT:    store <1 x i64> [[TMP22]], ptr [[VEC_GEP12]], align 8
-; CHECK-NEXT:    [[VEC_GEP13:%.*]] = getelementptr i64, ptr [[DST]], i64 6
-; CHECK-NEXT:    store <1 x i64> [[TMP23]], ptr [[VEC_GEP13]], align 16
-; CHECK-NEXT:    [[VEC_GEP14:%.*]] = getelementptr i64, ptr [[DST]], i64 7
-; CHECK-NEXT:    store <1 x i64> [[TMP24]], ptr [[VEC_GEP14]], align 8
+; CHECK-NEXT:    [[SPLIT1:%.*]] = shufflevector <8 x i64> [[B:%.*]], <8 x i64> poison, <8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7>
+; CHECK-NEXT:    [[TMP1:%.*]] = add <8 x i64> [[SPLIT]], [[SPLIT1]]
+; CHECK-NEXT:    store <8 x i64> [[TMP1]], ptr [[DST:%.*]], align 64
 ; CHECK-NEXT:    ret void
 ;
   %a.t = call <8 x i64> @llvm.matrix.transpose.v8i64(<8 x i64> %a, i32 8, i32 1)
