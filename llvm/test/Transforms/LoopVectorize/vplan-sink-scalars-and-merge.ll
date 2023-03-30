@@ -912,8 +912,8 @@ define void @sinking_requires_duplication(ptr %addr) {
 ; CHECK-NEXT: <x1> vector loop: {
 ; CHECK-NEXT: vector.body:
 ; CHECK-NEXT:   EMIT vp<[[CAN_IV:%.+]]> = CANONICAL-INDUCTION
-; CHECK-NEXT:   vp<[[STEPS:%.+]]> = SCALAR-STEPS vp<[[CAN_IV]]>, ir<1>
-; CHECK-NEXT:   CLONE vp<[[CLONED_GEP:%.+]]> = getelementptr ir<%addr>, vp<[[STEPS]]>
+; CHECK-NEXT:   vp<[[STEPS1:%.+]]> = SCALAR-STEPS vp<[[CAN_IV]]>, ir<1>
+; CHECK-NEXT:   CLONE vp<[[CLONED_GEP:%.+]]> = getelementptr ir<%addr>, vp<[[STEPS1]]>
 ; CHECK-NEXT:   WIDEN ir<%0> = load vp<[[CLONED_GEP]]>
 ; CHECK-NEXT:   WIDEN ir<%pred> = fcmp oeq ir<%0>, ir<0.000000e+00>
 ; CHECK-NEXT:   EMIT vp<[[MASK:%.+]]> = not ir<%pred>
@@ -925,6 +925,7 @@ define void @sinking_requires_duplication(ptr %addr) {
 ; CHECK-NEXT:   Successor(s): pred.store.if, pred.store.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:   pred.store.if:
+; CHECK-NEXT:     vp<[[STEPS:%.+]]> = SCALAR-STEPS vp<[[CAN_IV]]>, ir<1>
 ; CHECK-NEXT:     REPLICATE ir<%gep> = getelementptr ir<%addr>, vp<[[STEPS]]>
 ; CHECK-NEXT:     REPLICATE store ir<1.000000e+01>, ir<%gep>
 ; CHECK-NEXT:   Successor(s): pred.store.continue
@@ -1045,8 +1046,8 @@ define void @ptr_induction_remove_dead_recipe(ptr %start, ptr %end) {
 ; CHECK-NEXT:   vector.body:
 ; CHECK-NEXT:     EMIT vp<[[CAN_IV:%.+]]> = CANONICAL-INDUCTION
 ; CHECK-NEXT:     vp<[[TRANS_IV:%.+]]> = DERIVED-IV  ir<0> + vp<[[CAN_IV]]> * ir<-1>
-; CHECK-NEXT:     vp<[[STEPS:%.+]]> = SCALAR-STEPS vp<[[TRANS_IV]]>
-; CHECK-NEXT:     CLONE vp<[[SCALAR_PTR_IV:%.+]]> = getelementptr ir<%start>, vp<[[STEPS]]>
+; CHECK-NEXT:     vp<[[STEPS1:%.+]]> = SCALAR-STEPS vp<[[TRANS_IV]]>
+; CHECK-NEXT:     CLONE vp<[[SCALAR_PTR_IV:%.+]]> = getelementptr ir<%start>, vp<[[STEPS1]]>
 ; CHECK-NEXT:     CLONE vp<[[CLONED_GEP:%.+]]> = getelementptr vp<[[SCALAR_PTR_IV]]>, ir<-1>
 ; CHECK-NEXT:     WIDEN ir<%l> = load vp<[[CLONED_GEP]]>
 ; CHECK-NEXT:     WIDEN ir<%c.1> = icmp eq ir<%l>, ir<0>
@@ -1059,6 +1060,7 @@ define void @ptr_induction_remove_dead_recipe(ptr %start, ptr %end) {
 ; CHECK-NEXT:     Successor(s): pred.store.if, pred.store.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:     pred.store.if:
+; CHECK-NEXT:       vp<[[STEPS:%.+]]> = SCALAR-STEPS vp<[[TRANS_IV]]>
 ; CHECK-NEXT:       REPLICATE vp<[[SCALAR_PTR_IV:%.+]]> = getelementptr ir<%start>, vp<[[STEPS]]>
 ; CHECK-NEXT:       REPLICATE ir<%ptr.iv.next> = getelementptr vp<[[SCALAR_PTR_IV]]>, ir<-1>
 ; CHECK-NEXT:       REPLICATE store ir<95>, ir<%ptr.iv.next>

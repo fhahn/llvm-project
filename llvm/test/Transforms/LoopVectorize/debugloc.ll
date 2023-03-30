@@ -1,3 +1,4 @@
+; VEC-NEXT:    [[TMP0:%.*]] = add i64 [[INDEX]], 0
 ; RUN: opt -S < %s -passes=loop-vectorize -force-vector-interleave=1 -force-vector-width=2 | FileCheck %s
 
 target datalayout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:128:128-a0:0:64-s0:64:64-f80:128:128-n8:16:32:64-S128"
@@ -68,6 +69,7 @@ define i32 @test_debug_loc_on_branch_in_loop(ptr noalias %src, ptr noalias %dst)
 ; CHECK-NOT:  !dbg
 ; CHECK-EMPTY:
 ; CHECK-NEXT: pred.store.if:
+; CHECK-NEXT:   add i64 %index, 0, !dbg [[LOC3]]
 ; CHECK-NEXT:   [[GEP:%.+]] = getelementptr inbounds i32, ptr %dst, i64 {{.+}}, !dbg [[LOC3]]
 ; CHECK-NEXT:   store i32 0, ptr [[GEP]], align 4, !dbg [[LOC3]]
 ; CHECK-NEXT:   br label %pred.store.continue, !dbg [[LOC3]]
@@ -108,6 +110,7 @@ define i32 @test_different_debug_loc_on_replicate_recipe(ptr noalias %src, ptr n
 ; CHECK-NOT:  !dbg
 ; CHECK-EMPTY:
 ; CHECK-NEXT: pred.store.if:
+; CHECK-NEXT:   add i64 %index, 0, !dbg [[LOC4]]
 ; CHECK-NEXT:   [[GEP:%.+]] = getelementptr inbounds i32, ptr %dst, i64 {{.+}}, !dbg [[LOC5:!.+]]
 ; CHECK-NEXT:   store i32 0, ptr [[GEP]], align 4, !dbg [[LOC5]]
 ; CHECK-NEXT:   br label %pred.store.continue, !dbg [[LOC4]]

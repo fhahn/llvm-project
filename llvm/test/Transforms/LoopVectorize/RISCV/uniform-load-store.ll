@@ -1096,40 +1096,41 @@ define void @uniform_store_of_loop_varying(ptr noalias nocapture %a, ptr noalias
 ; TF-FIXEDLEN:       vector.body:
 ; TF-FIXEDLEN-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[PRED_STORE_CONTINUE6:%.*]] ]
 ; TF-FIXEDLEN-NEXT:    [[TMP0:%.*]] = add i64 [[INDEX]], 0
+; TF-FIXEDLEN-NEXT:    [[TMP1:%.*]] = add i64 [[INDEX]], 0
 ; TF-FIXEDLEN-NEXT:    [[ACTIVE_LANE_MASK:%.*]] = call <4 x i1> @llvm.get.active.lane.mask.v4i1.i64(i64 [[TMP0]], i64 1025)
-; TF-FIXEDLEN-NEXT:    [[TMP1:%.*]] = extractelement <4 x i1> [[ACTIVE_LANE_MASK]], i32 0
-; TF-FIXEDLEN-NEXT:    br i1 [[TMP1]], label [[PRED_STORE_IF:%.*]], label [[PRED_STORE_CONTINUE:%.*]]
+; TF-FIXEDLEN-NEXT:    [[TMP2:%.*]] = extractelement <4 x i1> [[ACTIVE_LANE_MASK]], i32 0
+; TF-FIXEDLEN-NEXT:    br i1 [[TMP2]], label [[PRED_STORE_IF:%.*]], label [[PRED_STORE_CONTINUE:%.*]]
 ; TF-FIXEDLEN:       pred.store.if:
 ; TF-FIXEDLEN-NEXT:    store i64 [[TMP0]], ptr [[B:%.*]], align 8
 ; TF-FIXEDLEN-NEXT:    br label [[PRED_STORE_CONTINUE]]
 ; TF-FIXEDLEN:       pred.store.continue:
-; TF-FIXEDLEN-NEXT:    [[TMP2:%.*]] = extractelement <4 x i1> [[ACTIVE_LANE_MASK]], i32 1
-; TF-FIXEDLEN-NEXT:    br i1 [[TMP2]], label [[PRED_STORE_IF1:%.*]], label [[PRED_STORE_CONTINUE2:%.*]]
+; TF-FIXEDLEN-NEXT:    [[TMP3:%.*]] = extractelement <4 x i1> [[ACTIVE_LANE_MASK]], i32 1
+; TF-FIXEDLEN-NEXT:    br i1 [[TMP3]], label [[PRED_STORE_IF1:%.*]], label [[PRED_STORE_CONTINUE2:%.*]]
 ; TF-FIXEDLEN:       pred.store.if1:
-; TF-FIXEDLEN-NEXT:    [[TMP3:%.*]] = add i64 [[INDEX]], 1
-; TF-FIXEDLEN-NEXT:    store i64 [[TMP3]], ptr [[B]], align 8
+; TF-FIXEDLEN-NEXT:    [[TMP4:%.*]] = add i64 [[INDEX]], 1
+; TF-FIXEDLEN-NEXT:    store i64 [[TMP4]], ptr [[B]], align 8
 ; TF-FIXEDLEN-NEXT:    br label [[PRED_STORE_CONTINUE2]]
 ; TF-FIXEDLEN:       pred.store.continue2:
-; TF-FIXEDLEN-NEXT:    [[TMP4:%.*]] = extractelement <4 x i1> [[ACTIVE_LANE_MASK]], i32 2
-; TF-FIXEDLEN-NEXT:    br i1 [[TMP4]], label [[PRED_STORE_IF3:%.*]], label [[PRED_STORE_CONTINUE4:%.*]]
+; TF-FIXEDLEN-NEXT:    [[TMP5:%.*]] = extractelement <4 x i1> [[ACTIVE_LANE_MASK]], i32 2
+; TF-FIXEDLEN-NEXT:    br i1 [[TMP5]], label [[PRED_STORE_IF3:%.*]], label [[PRED_STORE_CONTINUE4:%.*]]
 ; TF-FIXEDLEN:       pred.store.if3:
-; TF-FIXEDLEN-NEXT:    [[TMP5:%.*]] = add i64 [[INDEX]], 2
-; TF-FIXEDLEN-NEXT:    store i64 [[TMP5]], ptr [[B]], align 8
+; TF-FIXEDLEN-NEXT:    [[TMP6:%.*]] = add i64 [[INDEX]], 2
+; TF-FIXEDLEN-NEXT:    store i64 [[TMP6]], ptr [[B]], align 8
 ; TF-FIXEDLEN-NEXT:    br label [[PRED_STORE_CONTINUE4]]
 ; TF-FIXEDLEN:       pred.store.continue4:
-; TF-FIXEDLEN-NEXT:    [[TMP6:%.*]] = extractelement <4 x i1> [[ACTIVE_LANE_MASK]], i32 3
-; TF-FIXEDLEN-NEXT:    br i1 [[TMP6]], label [[PRED_STORE_IF5:%.*]], label [[PRED_STORE_CONTINUE6]]
+; TF-FIXEDLEN-NEXT:    [[TMP7:%.*]] = extractelement <4 x i1> [[ACTIVE_LANE_MASK]], i32 3
+; TF-FIXEDLEN-NEXT:    br i1 [[TMP7]], label [[PRED_STORE_IF5:%.*]], label [[PRED_STORE_CONTINUE6]]
 ; TF-FIXEDLEN:       pred.store.if5:
-; TF-FIXEDLEN-NEXT:    [[TMP7:%.*]] = add i64 [[INDEX]], 3
-; TF-FIXEDLEN-NEXT:    store i64 [[TMP7]], ptr [[B]], align 8
+; TF-FIXEDLEN-NEXT:    [[TMP8:%.*]] = add i64 [[INDEX]], 3
+; TF-FIXEDLEN-NEXT:    store i64 [[TMP8]], ptr [[B]], align 8
 ; TF-FIXEDLEN-NEXT:    br label [[PRED_STORE_CONTINUE6]]
 ; TF-FIXEDLEN:       pred.store.continue6:
-; TF-FIXEDLEN-NEXT:    [[TMP8:%.*]] = getelementptr inbounds i64, ptr [[A:%.*]], i64 [[TMP0]]
-; TF-FIXEDLEN-NEXT:    [[TMP9:%.*]] = getelementptr inbounds i64, ptr [[TMP8]], i32 0
-; TF-FIXEDLEN-NEXT:    call void @llvm.masked.store.v4i64.p0(<4 x i64> [[BROADCAST_SPLAT]], ptr [[TMP9]], i32 8, <4 x i1> [[ACTIVE_LANE_MASK]])
+; TF-FIXEDLEN-NEXT:    [[TMP9:%.*]] = getelementptr inbounds i64, ptr [[A:%.*]], i64 [[TMP1]]
+; TF-FIXEDLEN-NEXT:    [[TMP10:%.*]] = getelementptr inbounds i64, ptr [[TMP9]], i32 0
+; TF-FIXEDLEN-NEXT:    call void @llvm.masked.store.v4i64.p0(<4 x i64> [[BROADCAST_SPLAT]], ptr [[TMP10]], i32 8, <4 x i1> [[ACTIVE_LANE_MASK]])
 ; TF-FIXEDLEN-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 4
-; TF-FIXEDLEN-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1028
-; TF-FIXEDLEN-NEXT:    br i1 [[TMP10]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP10:![0-9]+]]
+; TF-FIXEDLEN-NEXT:    [[TMP11:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1028
+; TF-FIXEDLEN-NEXT:    br i1 [[TMP11]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP10:![0-9]+]]
 ; TF-FIXEDLEN:       middle.block:
 ; TF-FIXEDLEN-NEXT:    br i1 true, label [[FOR_END:%.*]], label [[SCALAR_PH]]
 ; TF-FIXEDLEN:       scalar.ph:

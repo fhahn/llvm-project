@@ -107,6 +107,65 @@ void VPlanTransforms::VPInstructionsToVPRecipes(
   }
 }
 
+static void simplifyUniformGEPs(VPlan &Plan) {
+  auto Iter = vp_depth_first_deep(Plan.getEntry());
+  bool Changed = false;
+  // First, collect the operands of all recipes in replicate blocks as seeds for
+  // sinking.
+  SmallVector<VPScalarIVStepsRecipe *> StepsRecipes;
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(Iter)) {
+    for (auto &Recipe : *VPBB) {
+      auto *Steps = dyn_cast<VPScalarIVStepsRecipe>(&Recipe);
+      if (!Steps)
+        continue;
+      StepsRecipes.push_back(Steps);
+    }
+  }
+
+  for (VPScalarIVStepsRecipe *Steps : StepsRecipes) {
+    if (vputils::onlyFirstLaneUsed(Steps))
+      continue;
+    SmallVector<VPRecipeBase *> ToUpdate;
+    bool OtherUsers = false;
+    for (VPUser *U : Steps->users()) {
+      auto *Clone = dyn_cast<VPReplicateRecipe>(U);
+      if (Clone && Clone->isUniform() &&
+          isa<GetElementPtrInst>(Clone->getInstruction())) {
+        ToUpdate.push_back(Clone);
+        continue;
+      }
+      if (auto *R = dyn_cast<VPRecipeBase>(U))
+        if (R->getParent() != Steps->getParent())
+          OtherUsers = true;
+    }
+    if (!OtherUsers || ToUpdate.empty())
+      continue;
+    VPScalarIVStepsRecipe *Steps2 = nullptr;
+    for (VPScalarIVStepsRecipe *S : StepsRecipes) {
+      if (vputils::onlyFirstLaneUsed(S) &&
+          &S->getIndDesc() == &Steps->getIndDesc() &&
+          S->getOperand(0) == Steps->getOperand(0) &&
+          S->getOperand(1) == Steps->getOperand(1)) {
+        Steps2 = S;
+        break;
+      }
+    }
+    if (!Steps2) {
+      Steps2 = new VPScalarIVStepsRecipe(
+          Steps->getIndDesc(), Steps->getOperand(0), Steps->getOperand(1));
+      Steps2->insertAfter(Steps);
+      StepsRecipes.push_back(Steps2);
+    }
+
+    for (VPRecipeBase *R : ToUpdate) {
+      for (unsigned OpIdx = 0; OpIdx != R->getNumOperands(); ++OpIdx) {
+        if (R->getOperand(OpIdx) == Steps)
+          R->setOperand(OpIdx, Steps2);
+      }
+    }
+  }
+}
+
 static bool sinkScalarOperands(VPlan &Plan) {
   auto Iter = vp_depth_first_deep(Plan.getEntry());
   bool Changed = false;
@@ -386,6 +445,7 @@ void VPlanTransforms::createAndOptimizeReplicateRegions(VPlan &Plan) {
 
   bool ShouldSimplify = true;
   while (ShouldSimplify) {
+    simplifyUniformGEPs(Plan);
     ShouldSimplify = sinkScalarOperands(Plan);
     ShouldSimplify |= mergeReplicateRegionsIntoSuccessors(Plan);
     ShouldSimplify |= VPlanTransforms::mergeBlocksIntoPredecessors(Plan);
@@ -600,6 +660,7 @@ void VPlanTransforms::optimizeInductions(VPlan &Plan, ScalarEvolution &SE,
     for (VPUser *U : Users) {
       if (HasOnlyVectorVFs && !U->usesScalars(WideIV))
         continue;
+
       for (unsigned I = 0, E = U->getNumOperands(); I != E; I++) {
         if (U->getOperand(I) != WideIV)
           continue;

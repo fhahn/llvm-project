@@ -10,7 +10,8 @@ define i32 @pred_select_const_i32_from_icmp(ptr noalias nocapture readonly %src1
 ; CHECK-VF2IC1-NEXT:    [[TMP5:%.*]] = extractelement <2 x i1> [[TMP4]], i32 0
 ; CHECK-VF2IC1-NEXT:    br i1 [[TMP5]], label %pred.load.if, label %pred.load.continue
 ; CHECK-VF2IC1:       pred.load.if:
-; CHECK-VF2IC1-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i32, ptr [[SRC2:%.*]], i64 {{%.*}}
+; CHECK-VF2IC1-NEXT:    [[INC:%.*]] = add i64 %index, 0
+; CHECK-VF2IC1-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i32, ptr [[SRC2:%.*]], i64 [[INC]]
 ; CHECK-VF2IC1-NEXT:    [[TMP7:%.*]] = load i32, ptr [[TMP6]], align 4
 ; CHECK-VF2IC1-NEXT:    [[TMP8:%.*]] = insertelement <2 x i32> poison, i32 [[TMP7]], i32 0
 ; CHECK-VF2IC1-NEXT:    br label %pred.load.continue

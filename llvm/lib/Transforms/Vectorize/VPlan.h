@@ -1993,6 +1993,8 @@ public:
            "Op must be an operand of the recipe");
     return true;
   }
+
+  const InductionDescriptor &getIndDesc() const { return IndDesc; }
 };
 
 /// VPBasicBlock serves as the leaf of the Hierarchical Control-Flow Graph. It
