@@ -1361,27 +1361,48 @@ public:
     if (!IsIntVec && !FMF.allowReassoc())
       return;
 
-    auto IsSupportedArg = [](Value *Op, unsigned N) {
+    // Returns the cost benefit of using \p Op with the dot product lowering. If
+    // the returned cost is < 0, the argument is cheaper to use in the
+    // dot-product lowering. An invalid cost is return if the operand is not
+    // supported by the lowering code.
+    auto GetCostForArg = [this](Value *Op, unsigned N) {
       if (!isa<Instruction>(Op))
-        return true;
-      return match(Op, m_OneUse(m_CombineOr(
-                           m_Load(m_Value()),
-                           m_Intrinsic<Intrinsic::matrix_column_major_load>(
-                               m_Value(), m_SpecificInt(N)))));
+        return InstructionCost(0);
+
+      if (match(Op, m_OneUse(m_CombineOr(
+                        m_Load(m_Value()),
+                        m_Intrinsic<Intrinsic::matrix_column_major_load>(
+                            m_Value(), m_SpecificInt(1)))))) {
+        FixedVectorType *VecTy = cast<FixedVectorType>(Op->getType());
+        Type *EltTy = VecTy->getElementType();
+        if (N == 1)
+          return InstructionCost(0);
+
+        return TTI.getMemoryOpCost(Instruction::Load, VecTy, Align(1), 0) -
+               N * TTI.getMemoryOpCost(Instruction::Load, EltTy, Align(1), 0);
+      }
+
+      return InstructionCost::getInvalid();
     };
-    if (!IsSupportedArg(RHS, RShape.NumColumns))
+    auto LHSCost = GetCostForArg(LHS, LShape.NumColumns);
+    if (!LHSCost.isValid())
       return;
 
     // We compare the costs of a vector.reduce.add to sequential add.
     int AddOpCode = IsIntVec ? Instruction::Add : Instruction::FAdd;
-    FastMathFlags FMFReassoc;
-    FMFReassoc.setAllowReassoc();
-    InstructionCost ReductionCost = TTI.getArithmeticReductionCost(
-        AddOpCode, cast<VectorType>(LHS->getType()), FMFReassoc);
+    int MulOpCode = IsIntVec ? Instruction::Mul : Instruction::FMul;
+    InstructionCost ReductionCost =
+        TTI.getArithmeticReductionCost(
+            AddOpCode, cast<VectorType>(LHS->getType()),
+            IsIntVec ? std::nullopt : std::optional(FMF)) +
+        TTI.getArithmeticInstrCost(MulOpCode, LHS->getType());
     InstructionCost SequentialAddCost =
         TTI.getArithmeticInstrCost(AddOpCode, ElementType) *
-        (LShape.NumColumns - 1);
-    if (ReductionCost >= SequentialAddCost)
+            (LShape.NumColumns - 1) +
+        TTI.getArithmeticInstrCost(MulOpCode, ElementType) *
+            (LShape.NumColumns);
+    if ((LHSCost + ReductionCost - SequentialAddCost) >=
+        InstructionCost(0))
       return;
 
     FusedInsts.insert(MatMul);
