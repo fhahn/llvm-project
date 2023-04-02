@@ -1343,6 +1343,8 @@ public:
   void lowerDotProduct(CallInst *MatMul,
                        SmallPtrSet<Instruction *, 16> &FusedInsts,
                        FastMathFlags FMF) {
+    if (MatrixLayout != MatrixLayoutTy::ColumnMajor)
+      return;
     ShapeInfo LShape(MatMul->getArgOperand(2), MatMul->getArgOperand(3));
     ShapeInfo RShape(MatMul->getArgOperand(3), MatMul->getArgOperand(4));
 
@@ -1367,8 +1369,7 @@ public:
                            m_Intrinsic<Intrinsic::matrix_column_major_load>(
                                m_Value(), m_SpecificInt(N)))));
     };
-    if (!IsSupportedArg(RHS, RShape.NumColumns) ||
-        !IsSupportedArg(LHS, LShape.NumColumns))
+    if (!IsSupportedArg(RHS, RShape.NumColumns))
       return;
 
     // We compare the costs of a vector.reduce.add to sequential add.
@@ -1385,30 +1386,7 @@ public:
 
     FusedInsts.insert(MatMul);
     IRBuilder<> Builder(MatMul);
-    auto FlattenArg = [&Builder, &FusedInsts](Value *Op) -> Value * {
-      // Matmul must be the only user of loads because we don't use LowerLoad
-      // for row vectors (LowerLoad results in scalar loads and shufflevectors
-      // instead of single vector load).
-      if (!match(Op, m_CombineOr(
-                         m_Load(m_Value()),
-                         m_Intrinsic<Intrinsic::matrix_column_major_load>()))) {
-        return Op;
-      }
-      FusedInsts.insert(cast<Instruction>(Op));
-
-      // If vector uses the builtin load, lower to a LoadInst
-      Value *Ptr;
-      if (match(Op, m_Intrinsic<Intrinsic::matrix_column_major_load>(
-                        m_Value(Ptr)))) {
-        auto *NewLoad = Builder.CreateLoad(Op->getType(), Ptr);
-        Op->replaceAllUsesWith(NewLoad);
-        cast<Instruction>(Op)->eraseFromParent();
-        return NewLoad;
-      }
-      return Op;
-    };
-    LHS = FlattenArg(LHS);
-    RHS = FlattenArg(RHS);
+    ShapeMap[LHS] = ShapeMap[LHS].t();
 
     // Insert mul/fmul and llvm.vector.reduce.fadd
     Value *Mul =
