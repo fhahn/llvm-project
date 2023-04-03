@@ -8049,8 +8049,7 @@ bool LoopVectorizationPlanner::getDecisionAndClampRange(
   assert(!Range.isEmpty() && "Trying to test an empty VF range.");
   bool PredicateAtRangeStart = Predicate(Range.Start);
 
-  for (ElementCount TmpVF = Range.Start * 2;
-       ElementCount::isKnownLT(TmpVF, Range.End); TmpVF *= 2)
+  for (ElementCount TmpVF : VFRange(Range.Start * 2, Range.End))
     if (Predicate(TmpVF) != PredicateAtRangeStart) {
       Range.End = TmpVF;
       break;
@@ -8896,9 +8895,9 @@ VPlanPtr LoopVectorizationPlanner::buildVPlanWithVPRecipes(
   // so this function is better to be conservative, rather than to split
   // it up into different VPlans.
   bool IVUpdateMayOverflow = false;
-  for (ElementCount VF = Range.Start;
-       ElementCount::isKnownLT(VF, Range.End); VF *= 2)
+  for (ElementCount VF : Range) {
     IVUpdateMayOverflow |= !isIndvarOverflowCheckKnownFalse(&CM, VF);
+  }
 
   Instruction *DLInst =
       getDebugLocFromInstOrOperands(Legal->getPrimaryInduction());
@@ -9041,9 +9040,9 @@ VPlanPtr LoopVectorizationPlanner::buildVPlanWithVPRecipes(
       }
   }
 
-  for (ElementCount VF = Range.Start; ElementCount::isKnownLT(VF, Range.End);
-       VF *= 2)
+  for (ElementCount VF : Range) {
     Plan->addVF(VF);
+  }
   Plan->setName("Initial VPlan");
 
   // From this point onwards, VPlan-to-VPlan transformations may change the plan
@@ -9077,9 +9076,9 @@ VPlanPtr LoopVectorizationPlanner::buildVPlan(VFRange &Range) {
   VPlanHCFGBuilder HCFGBuilder(OrigLoop, LI, *Plan);
   HCFGBuilder.buildHierarchicalCFG();
 
-  for (ElementCount VF = Range.Start; ElementCount::isKnownLT(VF, Range.End);
-       VF *= 2)
+  for (ElementCount VF : Range) {
     Plan->addVF(VF);
+  }
 
   SmallPtrSet<Instruction *, 1> DeadInstructions;
   VPlanTransforms::VPInstructionsToVPRecipes(
