@@ -3720,12 +3720,7 @@ void InnerLoopVectorizer::fixVectorizedLoop(VPTransformState &State,
 
   VPBasicBlock *LatchVPBB = Plan.getVectorLoopRegion()->getExitingBasicBlock();
   Loop *VectorLoop = LI->getLoopFor(State.CFG.VPBB2IRBB[LatchVPBB]);
-  if (Cost->requiresScalarEpilogue(VF)) {
-    // No edge from the middle block to the unique exit block has been inserted
-    // and there is nothing to fix from vector loop; phis should have incoming
-    // from scalar loop only.
-    Plan.clearLiveOuts();
-  } else {
+  if (!Cost->requiresScalarEpilogue(VF)) {
     // If we inserted an edge from the middle block to the unique exit block,
     // update uses outside the loop (phis) to account for the newly inserted
     // edge.
@@ -8808,7 +8803,14 @@ static void addCanonicalIVRecipes(VPlan &Plan, Type *IdxTy, DebugLoc DL,
 // original exit block.
 static void addUsersInExitBlock(VPBasicBlock *HeaderVPBB,
                                 VPBasicBlock *MiddleVPBB, Loop *OrigLoop,
-                                VPlan &Plan) {
+                                VPlan &Plan, bool RequiresScalarEpilogue) {
+  if (RequiresScalarEpilogue) {
+    // No edge from the middle block to the unique exit block has been inserted
+    // and there is nothing to fix from vector loop; phis should have incoming
+    // from scalar loop only.
+
+    return;
+  }
   BasicBlock *ExitBB = OrigLoop->getUniqueExitBlock();
   BasicBlock *ExitingBB = OrigLoop->getExitingBlock();
   // Only handle single-exit loops with unique exit blocks for now.
@@ -8984,7 +8986,15 @@ VPlanPtr LoopVectorizationPlanner::buildVPlanWithVPRecipes(
   // After here, VPBB should not be used.
   VPBB = nullptr;
 
-  addUsersInExitBlock(HeaderVPBB, MiddleVPBB, OrigLoop, *Plan);
+  auto RequiresScalarEpilogue = [this](ElementCount VF) {
+    return CM.requiresScalarEpilogue(VF);
+  };
+  assert(
+      (all_of(Range, RequiresScalarEpilogue) ||
+       none_of(Range, RequiresScalarEpilogue)) &&
+      "all VFs in range must agree on whether a scalar epilogue is required");
+  addUsersInExitBlock(HeaderVPBB, MiddleVPBB, OrigLoop, *Plan,
+                      all_of(Range, RequiresScalarEpilogue));
 
   assert(isa<VPRegionBlock>(Plan->getVectorLoopRegion()) &&
          !Plan->getVectorLoopRegion()->getEntryBasicBlock()->empty() &&
