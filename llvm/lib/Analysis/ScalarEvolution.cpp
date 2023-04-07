@@ -2702,6 +2702,20 @@ const SCEV *ScalarEvolution::getAddExpr(SmallVectorImpl<const SCEV *> &Ops,
         NewOps[0] = getConstant(ConstAdd);
         return getAddExpr(NewOps, PreservedFlags);
       }
+    } else {
+
+      auto *ZExtExpr = dyn_cast<SCEVZeroExtendExpr>(B);
+      if  (ZExtExpr && C) {
+        auto *Inner = ZExtExpr->getOperand(0);
+        auto *CTrunc = getTruncateExpr(C, Inner->getType());
+        if (!isa<SCEVTruncateExpr>(CTrunc)) {
+          auto RC = getUnsignedRange(CTrunc);
+
+          auto RB = getUnsignedRange(Inner);
+          if (!RC.add(RB).isWrappedSet())
+            return getZeroExtendExpr(getAddExpr(Inner, CTrunc, OrigFlags, Depth + 1), B->getType());
+        }
+      }
     }
   }
 
