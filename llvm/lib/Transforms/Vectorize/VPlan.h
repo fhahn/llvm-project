@@ -2375,7 +2375,7 @@ protected:
 /// VPWidenPointerInductionRecipe), providing shared functionality, including
 /// retrieving the step value, induction descriptor and original phi node.
 class VPWidenInductionRecipe : public VPHeaderPHIRecipe {
-  const InductionDescriptor &IndDesc;
+  InductionDescriptor IndDesc;
   SmallVector<const SCEVPredicate *, 2> Predicates;
 
 public:
@@ -4026,6 +4026,9 @@ class VPDerivedIVRecipe : public VPSingleDefRecipe {
 
   /// Name to use for the generated IR instruction for the derived IV.
   std::string Name;
+
+  /// Induction descriptor for the induction the canonical IV is transformed to.
+  const InductionDescriptor IndDesc;
 
 public:
   VPDerivedIVRecipe(const InductionDescriptor &IndDesc, VPIRValue *Start,
