@@ -8402,6 +8402,7 @@ void ScalarEvolution::forgetAllLoops() {
   PredicatedSCEVRewrites.clear();
   FoldCache.clear();
   FoldCacheUser.clear();
+  LoopGuardInfo.clear();
 }
 void ScalarEvolution::visitAndClearUsers(
     SmallVectorImpl<Instruction *> &Worklist,
@@ -8438,6 +8439,7 @@ void ScalarEvolution::forgetLoop(const Loop *L) {
     // Drop any stored trip count value.
     forgetBackedgeTakenCounts(CurrL, /* Predicated */ false);
     forgetBackedgeTakenCounts(CurrL, /* Predicated */ true);
+    LoopGuardInfo.erase(L);
 
     // Drop information about predicated SCEV rewrites for this loop.
     for (auto I = PredicatedSCEVRewrites.begin();
@@ -14953,7 +14955,8 @@ public:
   }
 };
 
-const SCEV *ScalarEvolution::applyLoopGuards(const SCEV *Expr, const Loop *L) {
+DenseMap<const SCEV *, const SCEV *>
+ScalarEvolution::collectLoopGuards(const SCEV *Expr, const Loop *L) {
   SmallVector<const SCEV *> ExprsToRewrite;
   auto CollectCondition = [&](ICmpInst::Predicate Predicate, const SCEV *LHS,
                               const SCEV *RHS,
@@ -15362,9 +15365,6 @@ const SCEV *ScalarEvolution::applyLoopGuards(const SCEV *Expr, const Loop *L) {
     }
   }
 
-  if (RewriteMap.empty())
-    return Expr;
-
   // Now that all rewrite information is collect, rewrite the collected
   // expressions with the information in the map. This applies information to
   // sub-expressions.
@@ -15376,6 +15376,28 @@ const SCEV *ScalarEvolution::applyLoopGuards(const SCEV *Expr, const Loop *L) {
       RewriteMap.insert({Expr, Rewriter.visit(RewriteTo)});
     }
   }
+
+  return RewriteMap;
+}
+
+const SCEV *ScalarEvolution::applyLoopGuards(const SCEV *Expr, const Loop *L) {
+  auto Iter = LoopGuardInfo.find(L);
+  if (Iter == LoopGuardInfo.end()) {
+    LoopGuardInfo[L] = collectLoopGuards(Expr, L);
+  } else {
+#ifndef NDEBUG
+/*    auto CurrentGuards = collectLoopGuards(Expr, L);*/
+    /*DenseMap<const SCEV *, const SCEV *> &RewriteMap = LoopGuardInfo[L];*/
+    /*assert(RewriteMap.size() <= CurrentGuards.size());*/
+    /*for (auto &KV : RewriteMap)*/
+      /*assert(CurrentGuards.count(KV.first) &&*/
+             /*CurrentGuards[KV.first] == KV.second);*/
+#endif
+  }
+
+  DenseMap<const SCEV *, const SCEV *> &RewriteMap = LoopGuardInfo[L];
+  if (RewriteMap.empty())
+    return Expr;
 
   SCEVLoopGuardRewriter Rewriter(*this, RewriteMap);
   return Rewriter.visit(Expr);

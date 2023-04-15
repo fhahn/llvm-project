@@ -1437,6 +1437,8 @@ private:
   /// Memoized values for the GetMinTrailingZeros
   DenseMap<const SCEV *, uint32_t> MinTrailingZerosCache;
 
+  DenseMap<const Loop *, DenseMap<const SCEV *, const SCEV *>> LoopGuardInfo;
+
   /// Return the Value set from which the SCEV expr is generated.
   ArrayRef<Value *> getSCEVValues(const SCEV *S);
 
@@ -1894,6 +1896,8 @@ private:
   std::pair<const BasicBlock *, const BasicBlock *>
   getPredecessorWithUniqueSuccessorForBB(const BasicBlock *BB) const;
 
+  DenseMap<const SCEV *, const SCEV *> collectLoopGuards(const SCEV *Expr,
+                                                         const Loop *L);
   /// Test whether the condition described by Pred, LHS, and RHS is true
   /// whenever the given FoundCondValue value evaluates to true in given
   /// Context. If Context is nullptr, then the found predicate is true
