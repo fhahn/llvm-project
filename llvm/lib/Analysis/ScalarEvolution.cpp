@@ -2344,6 +2344,8 @@ bool ScalarEvolution::willNotOverflow(Instruction::BinaryOps BinOp, bool Signed,
   // TODO: Support mul.
   if (BinOp == Instruction::Mul)
     return false;
+  if (auto *L = LI.getLoopFor(CtxI->getParent()))
+         B = applyLoopGuards(B, L);
   auto *RHSC = dyn_cast<SCEVConstant>(RHS);
   // TODO: Lift this limitation.
   if (!RHSC)
