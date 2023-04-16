@@ -6622,7 +6622,7 @@ const ConstantRange &ScalarEvolution::getRangeRef(
     // If there's no unsigned wrap, the value will never be less than its
     // initial value.
     if (AddRec->hasNoUnsignedWrap()) {
-      APInt UnsignedMinValue = getUnsignedRangeMin(AddRec->getStart());
+      APInt UnsignedMinValue = getUnsignedRangeMin(applyLoopGuards(AddRec->getStart(), AddRec->getLoop()));
       if (!UnsignedMinValue.isZero())
         ConservativeResult = ConservativeResult.intersectWith(
             ConstantRange(UnsignedMinValue, APInt(BitWidth, 0)), RangeType);
@@ -6662,7 +6662,7 @@ const ConstantRange &ScalarEvolution::getRangeRef(
       if (!isa<SCEVCouldNotCompute>(MaxBECount) &&
           getTypeSizeInBits(MaxBECount->getType()) <= BitWidth) {
         auto RangeFromAffine = getRangeForAffineAR(
-            AddRec->getStart(), AddRec->getStepRecurrence(*this), MaxBECount,
+            applyLoopGuards(AddRec->getStart(), AddRec->getLoop()), applyLoopGuards(AddRec->getStepRecurrence(*this), AddRec->getLoop()), MaxBECount,
             BitWidth);
         ConservativeResult =
             ConservativeResult.intersectWith(RangeFromAffine, RangeType);
