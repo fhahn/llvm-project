@@ -4781,6 +4781,9 @@ void LoopVectorizationCostModel::collectLoopUniforms(ElementCount VF) {
       if (!Ptr)
         continue;
 
+      if (isa<Instruction>(Ptr) && Legal->isUniform(Ptr))
+        addToWorklistIfAllowed(cast<Instruction>(Ptr));
+
       if (isUniformMemOpUse(&I))
         addToWorklistIfAllowed(&I);
 

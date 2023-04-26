@@ -166,19 +166,16 @@ define void @test_invar_gep(i8* %store_dest) #0 {
 ; CHECK-NEXT:    [[TMP10:%.*]] = add i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP11:%.*]] = add i64 [[INDEX]], 3
 ; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr i8, ptr [[STORE_DEST:%.*]], i64 0
-; CHECK-NEXT:    [[DOTSPLATINSERT1:%.*]] = insertelement <vscale x 4 x ptr> poison, ptr [[TMP12]], i64 0
-; CHECK-NEXT:    [[DOTSPLAT2:%.*]] = shufflevector <vscale x 4 x ptr> [[DOTSPLATINSERT1]], <vscale x 4 x ptr> poison, <vscale x 4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP13:%.*]] = call i32 @llvm.vscale.i32()
 ; CHECK-NEXT:    [[TMP14:%.*]] = mul i32 [[TMP13]], 4
 ; CHECK-NEXT:    [[TMP15:%.*]] = sub i32 [[TMP14]], 1
 ; CHECK-NEXT:    [[TMP16:%.*]] = extractelement <vscale x 4 x i64> [[TMP7]], i32 [[TMP15]]
-; CHECK-NEXT:    [[TMP17:%.*]] = extractelement <vscale x 4 x ptr> [[DOTSPLAT2]], i32 0
-; CHECK-NEXT:    store i64 [[TMP16]], ptr [[TMP17]], align 1
-; CHECK-NEXT:    [[TMP18:%.*]] = call i64 @llvm.vscale.i64()
-; CHECK-NEXT:    [[TMP19:%.*]] = mul i64 [[TMP18]], 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP19]]
-; CHECK-NEXT:    [[TMP20:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP20]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
+; CHECK-NEXT:    store i64 [[TMP16]], ptr [[TMP12]], align 1
+; CHECK-NEXT:    [[TMP17:%.*]] = call i64 @llvm.vscale.i64()
+; CHECK-NEXT:    [[TMP18:%.*]] = mul i64 [[TMP17]], 4
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP18]]
+; CHECK-NEXT:    [[TMP19:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP19]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
 ; CHECK:       middle.block:
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 100, [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH]]
