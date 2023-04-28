@@ -285,7 +285,7 @@ UseCaptureInfo llvm::DetermineUseCaptureKind(const Use &U, const Value *Base) {
           II->getIntrinsicID() == Intrinsic::provenance_noalias ||
           II->getIntrinsicID() == Intrinsic::experimental_ptr_provenance ||
           II->getIntrinsicID() == Intrinsic::noalias_copy_guard)
-        return UseCaptureKind::PASSTHROUGH;
+        return UseCaptureInfo::passthrough();
 
     // Not captured if the callee is readonly, doesn't return a copy through
     // its return value and doesn't unwind or diverge (a readonly function can
