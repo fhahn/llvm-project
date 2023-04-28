@@ -140,7 +140,7 @@ private:
 
   AliasResult aliasCheck(const Value *V1, LocationSize V1Size, const Value *V2,
                          LocationSize V2Size, AAQueryInfo &AAQI,
-                         const Instruction *CtxI);
+                         const Instruction *CtxI, bool StripNoAlias);
 
   AliasResult aliasCheckRecursive(const Value *V1, LocationSize V1Size,
                                   const Value *V2, LocationSize V2Size,
