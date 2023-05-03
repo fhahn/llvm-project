@@ -14924,9 +14924,23 @@ public:
 
   const SCEV *visitZeroExtendExpr(const SCEVZeroExtendExpr *Expr) {
     auto I = Map.find(Expr);
-    if (I == Map.end())
+    if (I == Map.end()) {
+      unsigned Bitwidth = Expr->getType()->getScalarSizeInBits() / 2;
+      while (Bitwidth >= 8 &&
+             Bitwidth > Expr->getOperand(0)->getType()->getScalarSizeInBits()) {
+
+        Type *NarrowTy = IntegerType::get(SE.getContext(), Bitwidth);
+        auto *NarrowExt = SE.getZeroExtendExpr(Expr->getOperand(0), NarrowTy);
+        auto I = Map.find(NarrowExt);
+        if (I != Map.end()) {
+          return SE.getZeroExtendExpr(I->second, Expr->getType());
+        }
+        Bitwidth = Bitwidth / 2;
+      }
+
       return SCEVRewriteVisitor<SCEVLoopGuardRewriter>::visitZeroExtendExpr(
           Expr);
+    }
     return I->second;
   }
 
