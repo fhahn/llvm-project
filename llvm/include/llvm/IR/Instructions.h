@@ -297,6 +297,12 @@ public:
     else
       return std::nullopt;
   }
+  void copyOptionalPtrProvenance(const LoadInst *Rhs) {
+    if (Rhs->hasPtrProvenanceOperand())
+      setPtrProvenanceOperand(Rhs->getPtrProvenanceOperand());
+    else if (hasPtrProvenanceOperand())
+      removePtrProvenanceOperand();
+  }
   // Methods for support type inquiry through isa, cast, and dyn_cast:
   static bool classof(const Instruction *I) {
     return I->getOpcode() == Instruction::Load;
@@ -457,6 +463,12 @@ public:
       return getPtrProvenanceOperand();
     else
       return std::nullopt;
+  }
+  void copyOptionalPtrProvenance(const StoreInst *Rhs) {
+    if (Rhs->hasPtrProvenanceOperand())
+      setPtrProvenanceOperand(Rhs->getPtrProvenanceOperand());
+    else if (hasPtrProvenanceOperand())
+      removePtrProvenanceOperand();
   }
   // Methods for support type inquiry through isa, cast, and dyn_cast:
   static bool classof(const Instruction *I) {
