@@ -258,6 +258,10 @@ static cl::opt<bool> EnableConstraintElimination(
     cl::desc(
         "Enable pass to eliminate conditions based on linear constraints"));
 
+static cl::opt<bool> UseLightAttributor("enable-light-attributor",
+                                        cl::init(true), cl::Hidden,
+                                        cl::desc(""));
+
 static cl::opt<AttributorRunOption> AttributorRun(
     "attributor-enable", cl::Hidden, cl::init(AttributorRunOption::NONE),
     cl::desc("Enable the attributor inter-procedural deduction pass"),
@@ -882,7 +886,11 @@ PassBuilder::buildInlinerPipeline(OptimizationLevel Level,
   // simplification pipeline, so this only needs to run when it could affect the
   // function simplification pipeline, which is only the case with recursive
   // functions.
-  MainCGPipeline.addPass(PostOrderFunctionAttrsPass(/*SkipNonRecursive*/ true));
+  if (UseLightAttributor)
+    MainCGPipeline.addPass(AttributorLightCGSCCPass());
+  else
+    MainCGPipeline.addPass(
+        PostOrderFunctionAttrsPass(/*SkipNonRecursive*/ true));
 
   // When at O3 add argument promotion to the pass pipeline.
   // FIXME: It isn't at all clear why this should be limited to O3.
@@ -904,7 +912,10 @@ PassBuilder::buildInlinerPipeline(OptimizationLevel Level,
 
   // Finally, deduce any function attributes based on the fully simplified
   // function.
-  MainCGPipeline.addPass(PostOrderFunctionAttrsPass());
+  if (UseLightAttributor)
+    MainCGPipeline.addPass(AttributorLightCGSCCPass());
+  else
+    MainCGPipeline.addPass(PostOrderFunctionAttrsPass());
 
   // Mark that the function is fully simplified and that it shouldn't be
   // simplified again if we somehow revisit it due to CGSCC mutations unless
