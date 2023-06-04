@@ -1465,8 +1465,9 @@ public:
     // Do the analysis once.
     if (VF.isScalar() || Uniforms.contains(VF))
       return;
-    setCostBasedWideningDecision(VF);
     collectLoopUniforms(VF);
+    setCostBasedWideningDecision(VF);
+    collectLoopUniformAfterVectorization(VF);
     collectLoopScalars(VF);
   }
 
@@ -1827,6 +1828,7 @@ private:
   /// vectorized loop, each corresponding to an iteration of the original
   /// scalar loop.
   void collectLoopUniforms(ElementCount VF);
+  void collectLoopUniformAfterVectorization(ElementCount VF);
 
   /// Collect the instructions that are scalar after vectorization. An
   /// instruction is scalar if it is known to be uniform or will be scalarized
@@ -4699,16 +4701,15 @@ void LoopVectorizationCostModel::collectLoopUniforms(ElementCount VF) {
   // Collect instructions inside the loop that will remain uniform after
   // vectorization.
 
+  // Worklist containing uniform instructions demanding lane 0.
+  SetVector<Instruction *> Worklist;
+
   // Global values, params and instructions outside of current loop are out of
   // scope.
   auto isOutOfScope = [&](Value *V) -> bool {
     Instruction *I = dyn_cast<Instruction>(V);
     return (!I || !TheLoop->contains(I));
   };
-
-  // Worklist containing uniform instructions demanding lane 0.
-  SetVector<Instruction *> Worklist;
-  BasicBlock *Latch = TheLoop->getLoopLatch();
 
   // Add uniform instructions demanding lane 0 to the worklist. Instructions
   // that are scalar with predication must not be considered uniform after
@@ -4729,13 +4730,6 @@ void LoopVectorizationCostModel::collectLoopUniforms(ElementCount VF) {
     LLVM_DEBUG(dbgs() << "LV: Found uniform instruction: " << *I << "\n");
     Worklist.insert(I);
   };
-
-  // Start with the conditional branch. If the branch condition is an
-  // instruction contained in the loop that is only used by the branch, it is
-  // uniform.
-  auto *Cmp = dyn_cast<Instruction>(Latch->getTerminator()->getOperand(0));
-  if (Cmp && TheLoop->contains(Cmp) && Cmp->hasOneUse())
-    addToWorklistIfAllowed(Cmp);
 
   auto PrevVF = VF.divideCoefficientBy(2);
   // Return true if all lanes perform the same memory operation, and we can
@@ -4758,12 +4752,109 @@ void LoopVectorizationCostModel::collectLoopUniforms(ElementCount VF) {
     return TheLoop->isLoopInvariant(cast<StoreInst>(I)->getValueOperand());
   };
 
+  // Scan the loop for instructions which are either a) known to have only
+  // lane 0 demanded or b) are uses which demand only lane 0 of their operand.
+  for (auto *BB : TheLoop->blocks())
+    for (auto &I : *BB) {
+      if (IntrinsicInst *II = dyn_cast<IntrinsicInst>(&I)) {
+        switch (II->getIntrinsicID()) {
+        case Intrinsic::sideeffect:
+        case Intrinsic::experimental_noalias_scope_decl:
+        case Intrinsic::assume:
+        case Intrinsic::lifetime_start:
+        case Intrinsic::lifetime_end:
+            if (TheLoop->hasLoopInvariantOperands(&I))
+            addToWorklistIfAllowed(&I);
+            break;
+        default:
+            break;
+        }
+      }
+
+      // ExtractValue instructions must be uniform, because the operands are
+      // known to be loop-invariant.
+      if (auto *EVI = dyn_cast<ExtractValueInst>(&I)) {
+        assert(isOutOfScope(EVI->getAggregateOperand()) &&
+               "Expected aggregate value to be loop invariant");
+        addToWorklistIfAllowed(EVI);
+        continue;
+      }
+
+      /*    if (Legal->isUniform(&I, VF)) {*/
+      /*addToWorklistIfAllowed(&I);*/
+      /*continue;*/
+      /*}*/
+
+      // If there's no pointer operand, there's nothing to do.
+      auto *Ptr = getLoadStorePointerOperand(&I);
+      if (!Ptr)
+        continue;
+
+      if (isUniformMemOpUse(&I))
+        addToWorklistIfAllowed(&I);
+    }
+
+  Uniforms[VF].insert(Worklist.begin(), Worklist.end());
+}
+
+void LoopVectorizationCostModel::collectLoopUniformAfterVectorization(
+    ElementCount VF) {
+  // We should not collect Uniforms more than once per VF. Right now,
+  // this function is called from collectUniformsAndScalars(), which
+  // already does this check. Collecting Uniforms for VF=1 does not make any
+  // sense.
+
+  assert(VF.isVector() &&
+         "This function should not be visited twice for the same VF");
+
+  // We now know that the loop is vectorizable!
+  // Collect instructions inside the loop that will remain uniform after
+  // vectorization.
+
+  // Global values, params and instructions outside of current loop are out of
+  // scope.
+  auto isOutOfScope = [&](Value *V) -> bool {
+    Instruction *I = dyn_cast<Instruction>(V);
+    return (!I || !TheLoop->contains(I));
+  };
+
+  // Worklist containing uniform instructions demanding lane 0.
+  SetVector<Instruction *> Worklist;
+
+  // Add uniform instructions demanding lane 0 to the worklist. Instructions
+  // that are scalar with predication must not be considered uniform after
+  // vectorization, because that would create an erroneous replicating region
+  // where only a single instance out of VF should be formed.
+  // TODO: optimize such seldom cases if found important, see PR40816.
+  auto addToWorklistIfAllowed = [&](Instruction *I) -> void {
+    if (isOutOfScope(I)) {
+      LLVM_DEBUG(dbgs() << "LV: Found not uniform due to scope: " << *I
+                        << "\n");
+      return;
+    }
+    if (isScalarWithPredication(I, VF)) {
+      LLVM_DEBUG(dbgs() << "LV: Found not uniform being ScalarWithPredication: "
+                        << *I << "\n");
+      return;
+    }
+    LLVM_DEBUG(dbgs() << "LV: Found uniform instruction: " << *I << "\n");
+    Worklist.insert(I);
+  };
+
+  // Start with the conditional branch. If the branch condition is an
+  // instruction contained in the loop that is only used by the branch, it is
+  // uniform.
+  BasicBlock *Latch = TheLoop->getLoopLatch();
+  auto *Cmp = dyn_cast<Instruction>(Latch->getTerminator()->getOperand(0));
+  if (Cmp && TheLoop->contains(Cmp) && Cmp->hasOneUse())
+    addToWorklistIfAllowed(Cmp);
+
   auto isUniformDecision = [&](Instruction *I, ElementCount VF) {
     InstWidening WideningDecision = getWideningDecision(I, VF);
     assert(WideningDecision != CM_Unknown &&
            "Widening decision should be ready at this moment");
 
-    if (isUniformMemOpUse(I))
+    if (Uniforms[VF].count(I))
       return true;
 
     return (WideningDecision == CM_Widen ||
@@ -4792,37 +4883,10 @@ void LoopVectorizationCostModel::collectLoopUniforms(ElementCount VF) {
   // lane 0 demanded or b) are uses which demand only lane 0 of their operand.
   for (auto *BB : TheLoop->blocks())
     for (auto &I : *BB) {
-      if (IntrinsicInst *II = dyn_cast<IntrinsicInst>(&I)) {
-        switch (II->getIntrinsicID()) {
-        case Intrinsic::sideeffect:
-        case Intrinsic::experimental_noalias_scope_decl:
-        case Intrinsic::assume:
-        case Intrinsic::lifetime_start:
-        case Intrinsic::lifetime_end:
-          if (TheLoop->hasLoopInvariantOperands(&I))
-            addToWorklistIfAllowed(&I);
-          break;
-        default:
-          break;
-        }
-      }
-
-      // ExtractValue instructions must be uniform, because the operands are
-      // known to be loop-invariant.
-      if (auto *EVI = dyn_cast<ExtractValueInst>(&I)) {
-        assert(isOutOfScope(EVI->getAggregateOperand()) &&
-               "Expected aggregate value to be loop invariant");
-        addToWorklistIfAllowed(EVI);
-        continue;
-      }
-
       // If there's no pointer operand, there's nothing to do.
       auto *Ptr = getLoadStorePointerOperand(&I);
       if (!Ptr)
         continue;
-
-      if (isUniformMemOpUse(&I))
-        addToWorklistIfAllowed(&I);
 
       if (isVectorizedMemAccessUse(&I, Ptr))
         HasUniformUse.insert(Ptr);
@@ -4864,7 +4928,8 @@ void LoopVectorizationCostModel::collectLoopUniforms(ElementCount VF) {
       auto *OI = cast<Instruction>(OV);
       if (llvm::all_of(OI->users(), [&](User *U) -> bool {
             auto *J = cast<Instruction>(U);
-            return Worklist.count(J) || isVectorizedMemAccessUse(J, OI);
+            return Worklist.count(J) || Uniforms[VF].count(J) ||
+                   isVectorizedMemAccessUse(J, OI);
           }))
         addToWorklistIfAllowed(OI);
     }
@@ -4885,7 +4950,7 @@ void LoopVectorizationCostModel::collectLoopUniforms(ElementCount VF) {
     auto UniformInd = llvm::all_of(Ind->users(), [&](User *U) -> bool {
       auto *I = cast<Instruction>(U);
       return I == IndUpdate || !TheLoop->contains(I) || Worklist.count(I) ||
-             isVectorizedMemAccessUse(I, Ind);
+             Uniforms[VF].count(I) || isVectorizedMemAccessUse(I, Ind);
     });
     if (!UniformInd)
       continue;
@@ -4896,6 +4961,7 @@ void LoopVectorizationCostModel::collectLoopUniforms(ElementCount VF) {
         llvm::all_of(IndUpdate->users(), [&](User *U) -> bool {
           auto *I = cast<Instruction>(U);
           return I == Ind || !TheLoop->contains(I) || Worklist.count(I) ||
+                 Uniforms[VF].count(I) ||
                  isVectorizedMemAccessUse(I, IndUpdate);
         });
     if (!UniformIndUpdate)
