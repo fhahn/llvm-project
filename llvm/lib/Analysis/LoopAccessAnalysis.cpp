@@ -185,6 +185,21 @@ RuntimeCheckingPtrGroup::RuntimeCheckingPtrGroup(
   Members.push_back(Index);
 }
 
+static const SCEVAddRecExpr *getNarrowedAddRec(const SCEV *Expr, unsigned AccessTySize, const Loop *L, ScalarEvolution &SE) {
+  auto *Add = dyn_cast<SCEVAddExpr>(Expr);
+  if (!Add)
+    return nullptr;
+  
+  if (!SE.isLoopInvariant(Add->getOperand(1), L))
+    return nullptr;
+
+  auto *ZExt = dyn_cast<SCEVZeroExtendExpr>(SE.getUDivExpr(Add->getOperand(0), SE.getConstant(Add->getType(),AccessTySize)));
+  if (!ZExt)
+    return nullptr;
+
+  return dyn_cast<SCEVAddRecExpr>(ZExt->getOperand());
+}
+
 /// Calculate Start and End points of memory access.
 /// Let's assume A is the first access and B is a memory access on N-th loop
 /// iteration. Then B is calculated as:
@@ -210,6 +225,11 @@ void RuntimePointerChecking::insert(Loop *Lp, Value *Ptr, const SCEV *PtrExpr,
 
   if (SE->isLoopInvariant(PtrExpr, Lp)) {
     ScStart = ScEnd = PtrExpr;
+  } else if(auto *Add = dyn_cast<SCEVAddExpr>(PtrExpr)) {
+    assert(getNarrowedAddRec(PtrExpr, AccessTy->getScalarSizeInBits() / 8, Lp, *SE));
+
+    ScStart = SE->getAddExpr(Add->getOperand(1), SE->getConstant(SE->getUnsignedRange(Add->getOperand(0)).getUnsignedMin()));
+    ScEnd = SE->getAddExpr(Add->getOperand(1), SE->getConstant(SE->getUnsignedRange(Add->getOperand(0)).getUnsignedMax()));
   } else {
     const SCEVAddRecExpr *AR = dyn_cast<SCEVAddRecExpr>(PtrExpr);
     assert(AR && "Invalid addrec expression");
@@ -748,8 +768,13 @@ static bool hasComputableBounds(PredicatedScalarEvolution &PSE, Value *Ptr,
 
   const SCEVAddRecExpr *AR = dyn_cast<SCEVAddRecExpr>(PtrScev);
 
-  if (!AR && Assume)
-    AR = PSE.getAsAddRec(Ptr);
+  if (!AR) {
+    if (auto *AR = getNarrowedAddRec(PtrScev, 4, L, *PSE.getSE()))
+      return AR->isAffine();
+
+    if (Assume)
+      AR = PSE.getAsAddRec(Ptr);
+  }
 
   if (!AR)
     return false;
@@ -1382,6 +1407,11 @@ std::optional<int64_t> llvm::getPtrStride(PredicatedScalarEvolution &PSE,
   const SCEV *PtrScev = replaceSymbolicStrideSCEV(PSE, StridesMap, Ptr);
 
   const SCEVAddRecExpr *AR = dyn_cast<SCEVAddRecExpr>(PtrScev);
+  bool NarrowAR = false;
+  if (!AR && !ShouldCheckWrap) {
+    AR = getNarrowedAddRec(PtrScev, AccessTy->getScalarSizeInBits() / 8, Lp, *PSE.getSE());
+    NarrowAR = true;
+  }
   if (Assume && !AR)
     AR = PSE.getAsAddRec(Ptr);
 
@@ -1420,6 +1450,8 @@ std::optional<int64_t> llvm::getPtrStride(PredicatedScalarEvolution &PSE,
 
   int64_t StepVal = APStepVal.getSExtValue();
 
+  if (NarrowAR)
+    StepVal *= Size;
   // Strided access.
   int64_t Stride = StepVal / Size;
   int64_t Rem = StepVal % Size;
