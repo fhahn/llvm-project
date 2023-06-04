@@ -1320,7 +1320,10 @@ public:
   }
 
   /// Returns true if \p I is known to be uniform after vectorization.
-  bool isUniformAfterVectorization(Instruction *I, ElementCount VF) const {
+  bool isUniformAfterVectorization(Value *V, ElementCount VF) const {
+    auto *I = dyn_cast<Instruction>(V);
+    if (!I)
+      return true;
     // Pseudo probe needs to be duplicated for each unrolled iteration and
     // vector lane so that profiled loop trip count can be accurately
     // accumulated instead of being under counted.
@@ -4717,12 +4720,7 @@ void LoopVectorizationCostModel::collectLoopUniforms(ElementCount VF) {
   // where only a single instance out of VF should be formed.
   // TODO: optimize such seldom cases if found important, see PR40816.
   auto addToWorklistIfAllowed = [&](Instruction *I) -> void {
-    if (isOutOfScope(I)) {
-      LLVM_DEBUG(dbgs() << "LV: Found not uniform due to scope: "
-                        << *I << "\n");
-      return;
-    }
-    if (isScalarWithPredication(I, VF)) {
+    if (!isOutOfScope(I) && isScalarWithPredication(I, VF)) {
       LLVM_DEBUG(dbgs() << "LV: Found not uniform being ScalarWithPredication: "
                         << *I << "\n");
       return;
@@ -4780,15 +4778,13 @@ void LoopVectorizationCostModel::collectLoopUniforms(ElementCount VF) {
         continue;
       }
 
-      /*    if (Legal->isUniform(&I, VF)) {*/
-      /*addToWorklistIfAllowed(&I);*/
-      /*continue;*/
-      /*}*/
-
       // If there's no pointer operand, there's nothing to do.
       auto *Ptr = getLoadStorePointerOperand(&I);
       if (!Ptr)
         continue;
+
+      if (isa<Instruction>(Ptr) && Legal->isUniform(cast<Instruction>(Ptr), VF))
+        addToWorklistIfAllowed(cast<Instruction>(Ptr));
 
       if (isUniformMemOpUse(&I))
         addToWorklistIfAllowed(&I);
@@ -6636,7 +6632,7 @@ LoopVectorizationCostModel::getConsecutiveMemOpCost(Instruction *I,
 InstructionCost
 LoopVectorizationCostModel::getUniformMemOpCost(Instruction *I,
                                                 ElementCount VF) {
-  assert(Legal->isUniformMemOp(*I, VF));
+//  assert(isUniformAfterVectorization(I, VF));
 
   Type *ValTy = getLoadStoreType(I);
   auto *VectorTy = cast<VectorType>(ToVectorTy(ValTy, VF));
@@ -7007,7 +7003,7 @@ void LoopVectorizationCostModel::setCostBasedWideningDecision(ElementCount VF) {
       if (isa<StoreInst>(&I) && isScalarWithPredication(&I, VF))
         NumPredStores++;
 
-      if (Legal->isUniformMemOp(I, VF)) {
+      if (isUniformAfterVectorization(Ptr, VF)) {
         auto isLegalToScalarize = [&]() {
           if (!VF.isScalable())
             // Scalarization of fixed length vectors "just works".
