@@ -185,6 +185,33 @@ RuntimeCheckingPtrGroup::RuntimeCheckingPtrGroup(
   Members.push_back(Index);
 }
 
+static const SCEVAddRecExpr *getNarrowedAddRec(const SCEV *Expr,
+                                               unsigned AccessTySize,
+                                               const Loop *L,
+                                               ScalarEvolution &SE) {
+  auto *Add = dyn_cast<SCEVAddExpr>(Expr);
+  if (!Add)
+    return nullptr;
+
+  if (!SE.isLoopInvariant(Add->getOperand(1), L))
+    return nullptr;
+
+  auto *ZExt = dyn_cast<SCEVZeroExtendExpr>(SE.getUDivExpr(
+      Add->getOperand(0), SE.getConstant(Add->getType(), AccessTySize)));
+  if (!ZExt)
+    return nullptr;
+
+  if (auto *AR = dyn_cast<SCEVAddRecExpr>(ZExt->getOperand())) {
+    return cast<SCEVAddRecExpr>(SE.getAddRecExpr(
+        SE.getZeroExtendExpr(AR->getStart(), ZExt->getType()),
+        SE.getMulExpr(
+            SE.getConstant(ZExt->getType(), AccessTySize),
+            SE.getZeroExtendExpr(AR->getStepRecurrence(SE), ZExt->getType())),
+        AR->getLoop(), AR->getNoWrapFlags()));
+  }
+  return nullptr;
+}
+
 /// Calculate Start and End points of memory access.
 /// Let's assume A is the first access and B is a memory access on N-th loop
 /// iteration. Then B is calculated as:
@@ -210,6 +237,18 @@ void RuntimePointerChecking::insert(Loop *Lp, Value *Ptr, const SCEV *PtrExpr,
 
   if (SE->isLoopInvariant(PtrExpr, Lp)) {
     ScStart = ScEnd = PtrExpr;
+  } else if (auto *Add = dyn_cast<SCEVAddExpr>(PtrExpr)) {
+    assert(getNarrowedAddRec(PtrExpr, AccessTy->getScalarSizeInBits() / 8, Lp,
+                             *SE));
+
+    ScStart = SE->getAddExpr(
+        Add->getOperand(1),
+        SE->getConstant(
+            SE->getUnsignedRange(Add->getOperand(0)).getUnsignedMin()));
+    ScEnd = SE->getAddExpr(
+        Add->getOperand(1),
+        SE->getConstant(
+            SE->getUnsignedRange(Add->getOperand(0)).getUnsignedMax()));
   } else {
     const SCEVAddRecExpr *AR = dyn_cast<SCEVAddRecExpr>(PtrExpr);
     assert(AR && "Invalid addrec expression");
@@ -751,8 +790,13 @@ static bool hasComputableBounds(PredicatedScalarEvolution &PSE, Value *Ptr,
 
   const SCEVAddRecExpr *AR = dyn_cast<SCEVAddRecExpr>(PtrScev);
 
-  if (!AR && Assume)
-    AR = PSE.getAsAddRec(Ptr);
+  if (!AR) {
+    if (auto *AR = getNarrowedAddRec(PtrScev, 4, L, *PSE.getSE()))
+      return AR->isAffine();
+
+    if (Assume)
+      AR = PSE.getAsAddRec(Ptr);
+  }
 
   if (!AR)
     return false;
@@ -1368,31 +1412,14 @@ static bool isNoWrapAddRec(Value *Ptr, const SCEVAddRecExpr *AR,
 }
 
 /// Check whether the access through \p Ptr has a constant stride.
-std::optional<int64_t> llvm::getPtrStride(PredicatedScalarEvolution &PSE,
-                                          Type *AccessTy, Value *Ptr,
-                                          const Loop *Lp,
-                                          const DenseMap<Value *, const SCEV *> &StridesMap,
-                                          bool Assume, bool ShouldCheckWrap) {
+static std::optional<int64_t> getPtrStride1(PredicatedScalarEvolution &PSE,
+                                            Value *Ptr,
+                                            const SCEVAddRecExpr *AR,
+                                            Type *AccessTy, const Loop *Lp,
+                                            bool Assume, bool ShouldCheckWrap) {
   Type *Ty = Ptr->getType();
   assert(Ty->isPointerTy() && "Unexpected non-ptr");
 
-  if (isa<ScalableVectorType>(AccessTy)) {
-    LLVM_DEBUG(dbgs() << "LAA: Bad stride - Scalable object: " << *AccessTy
-                      << "\n");
-    return std::nullopt;
-  }
-
-  const SCEV *PtrScev = replaceSymbolicStrideSCEV(PSE, StridesMap, Ptr);
-
-  const SCEVAddRecExpr *AR = dyn_cast<SCEVAddRecExpr>(PtrScev);
-  if (Assume && !AR)
-    AR = PSE.getAsAddRec(Ptr);
-
-  if (!AR) {
-    LLVM_DEBUG(dbgs() << "LAA: Bad stride - Not an AddRecExpr pointer " << *Ptr
-                      << " SCEV: " << *PtrScev << "\n");
-    return std::nullopt;
-  }
 
   // The access function must stride over the innermost loop.
   if (Lp != AR->getLoop()) {
@@ -1465,6 +1492,44 @@ std::optional<int64_t> llvm::getPtrStride(PredicatedScalarEvolution &PSE,
       dbgs() << "LAA: Bad stride - Pointer may wrap in the address space "
              << *Ptr << " SCEV: " << *AR << "\n");
   return std::nullopt;
+}
+
+std::optional<int64_t>
+llvm::getPtrStride(PredicatedScalarEvolution &PSE, Type *AccessTy, Value *Ptr,
+                   const Loop *Lp,
+                   const DenseMap<Value *, const SCEV *> &StridesMap,
+                   bool Assume, bool ShouldCheckWrap) {
+  Type *Ty = Ptr->getType();
+  assert(Ty->isPointerTy() && "Unexpected non-ptr");
+
+  if (isa<ScalableVectorType>(AccessTy)) {
+    LLVM_DEBUG(dbgs() << "LAA: Bad stride - Scalable object: " << *AccessTy
+                      << "\n");
+    return std::nullopt;
+  }
+
+  const SCEV *PtrScev = replaceSymbolicStrideSCEV(PSE, StridesMap, Ptr);
+
+  const SCEVAddRecExpr *AR = dyn_cast<SCEVAddRecExpr>(PtrScev);
+  bool NarrowAR = false;
+  if (!AR && !ShouldCheckWrap) {
+    if (auto *AR = getNarrowedAddRec(
+            PtrScev, AccessTy->getScalarSizeInBits() / 8, Lp, *PSE.getSE())) {
+      if (auto Stride = getPtrStride1(PSE, Ptr, AR, AccessTy, Lp, Assume,
+                                      ShouldCheckWrap))
+        return Stride;
+    }
+  }
+  if (Assume && !AR)
+    AR = PSE.getAsAddRec(Ptr);
+
+  if (!AR) {
+    LLVM_DEBUG(dbgs() << "LAA: Bad stride - Not an AddRecExpr pointer " << *Ptr
+                      << " SCEV: " << *PtrScev << "\n");
+    return std::nullopt;
+  }
+
+  return getPtrStride1(PSE, Ptr, AR, AccessTy, Lp, Assume, ShouldCheckWrap);
 }
 
 std::optional<int> llvm::getPointersDiff(Type *ElemTyA, Value *PtrA,
