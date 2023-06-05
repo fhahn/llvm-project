@@ -1902,6 +1902,56 @@ public:
 };
 } // end namespace llvm
 
+static bool isPredicateAlwaysFalse(const SCEVPredicate &Pred,
+                                   ScalarEvolution &SE, unsigned VFxUF) {
+  // Check if \p WrapPred overflows for \p ExitCount.
+  auto ProveFalse = [&SE](const SCEVWrapPredicate *WrapPred,
+                          const SCEV *ExitCount) {
+    const SCEVAddRecExpr *AR = WrapPred->getExpr();
+    auto *Step = AR->getStepRecurrence(SE);
+    auto *L = AR->getLoop();
+    auto *WideTy = IntegerType::get(L->getHeader()->getContext(),
+                                    AR->getType()->getScalarSizeInBits() * 2);
+    const SCEV *Start = nullptr;
+    // Try to create a wide version of AR by extending the operands to WideTy.
+    if (WrapPred->getFlags() & SCEVWrapPredicate::IncrementNSSW) {
+      Start = SE.getSignExtendExpr(AR->getStart(), WideTy);
+    } else if (WrapPred->getFlags() & SCEVWrapPredicate::IncrementNUSW) {
+      Start = SE.getZeroExtendExpr(AR->getStart(), WideTy);
+    } else
+      return false;
+
+    // Note: Step is always sign-extended to match SCEVWrapPredicate's
+    // definition of NSSW/NUSW.
+    auto *WideAR = cast<SCEVAddRecExpr>(SE.getAddRecExpr(
+        Start, SE.getSignExtendExpr(Step, WideTy), L, SCEV::FlagAnyWrap));
+
+    // Evaluate both AddRec at ExitCount. There is a wrap if both AddRecs are
+    // not equal.
+    const SCEV *AtEnd =
+        SE.getZeroExtendExpr(AR->evaluateAtIteration(ExitCount, SE), WideTy);
+    const SCEV *AtEndWide = WideAR->evaluateAtIteration(ExitCount, SE);
+    return SE.isKnownPredicate(CmpInst::ICMP_NE, AtEnd, AtEndWide);
+  };
+
+  auto *UnionPred = cast<SCEVUnionPredicate>(&Pred);
+  return any_of(UnionPred->getPredicates(), [&](const SCEVPredicate *Pred) {
+    auto *WrapPred = dyn_cast<SCEVWrapPredicate>(Pred);
+    if (!WrapPred)
+      return false;
+    SmallVector<const SCEVPredicate *, 4> Preds;
+    const SCEVAddRecExpr *AR = WrapPred->getExpr();
+    if (!AR->getType()->isIntegerTy())
+      return false;
+    const SCEV *ExitCount =
+        SE.getPredicatedBackedgeTakenCount(AR->getLoop(), Preds);
+
+    // Check if we can prove that WrapPred wraps for some concrete trip counts.
+    return ProveFalse(WrapPred, SE.getConstant(ExitCount->getType(), VFxUF)) ||
+           ProveFalse(WrapPred, ExitCount);
+  });
+}
+
 namespace {
 /// Helper struct to manage generating runtime checks for vectorization.
 ///
@@ -7566,6 +7616,7 @@ LoopVectorizationPlanner::planInVPlanNativePath(ElementCount UserVF) {
 std::optional<VectorizationFactor>
 LoopVectorizationPlanner::plan(ElementCount UserVF, unsigned UserIC) {
   assert(OrigLoop->isInnermost() && "Inner loop expected.");
+
   CM.collectValuesToIgnore();
   CM.collectElementTypesForWidening();
 
@@ -10398,6 +10449,10 @@ bool LoopVectorizePass::processLoop(Loop *L) {
 
   // Override IC if user provided an interleave count.
   IC = UserIC > 0 ? UserIC : IC;
+
+  if (isPredicateAlwaysFalse(PSE.getPredicate(), *PSE.getSE(),
+                             VF.Width.getKnownMinValue() * IC))
+    return false;
 
   // Emit diagnostic messages, if any.
   const char *VAPassName = Hints.vectorizeAnalysisPassName();
