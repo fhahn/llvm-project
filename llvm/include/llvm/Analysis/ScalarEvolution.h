@@ -244,6 +244,8 @@ public:
   /// assumptions were made and nothing needs to be checked at run-time.
   virtual bool isAlwaysTrue() const = 0;
 
+  virtual bool isAlwaysFalse(ScalarEvolution &SE) const = 0;
+
   /// Returns true if this predicate implies \p N.
   virtual bool implies(const SCEVPredicate *N) const = 0;
 
@@ -293,6 +295,8 @@ public:
   bool implies(const SCEVPredicate *N) const override;
   void print(raw_ostream &OS, unsigned Depth = 0) const override;
   bool isAlwaysTrue() const override;
+
+  bool isAlwaysFalse(ScalarEvolution &SE) const override  { return false; }
 
   ICmpInst::Predicate getPredicate() const { return Pred; }
 
@@ -400,6 +404,7 @@ public:
   bool implies(const SCEVPredicate *N) const override;
   void print(raw_ostream &OS, unsigned Depth = 0) const override;
   bool isAlwaysTrue() const override;
+  bool isAlwaysFalse(ScalarEvolution &SE) const override ;
 
   /// Methods for support type inquiry through isa, cast, and dyn_cast:
   static bool classof(const SCEVPredicate *P) {
@@ -433,6 +438,7 @@ public:
 
   /// Implementation of the SCEVPredicate interface
   bool isAlwaysTrue() const override;
+  bool isAlwaysFalse(ScalarEvolution &SE) const override;
   bool implies(const SCEVPredicate *N) const override;
   void print(raw_ostream &OS, unsigned Depth) const override;
 

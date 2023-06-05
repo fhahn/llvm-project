@@ -1953,6 +1953,8 @@ public:
 
       SCEVCheckCond = SCEVExp.expandCodeForPredicate(
           &UnionPred, SCEVCheckBlock->getTerminator());
+      auto *CI = dyn_cast<ConstantInt>(SCEVCheckCond);
+      assert(!UnionPred.isAlwaysFalse(*SCEVExp.getSE()) || (CI && CI->isOne()) );
     }
 
     const auto &RtPtrChecking = *LAI.getRuntimePointerChecking();

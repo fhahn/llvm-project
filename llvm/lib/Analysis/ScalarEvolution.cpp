@@ -14649,6 +14649,20 @@ bool SCEVWrapPredicate::isAlwaysTrue() const {
   return IFlags == IncrementAnyWrap;
 }
 
+bool SCEVWrapPredicate::isAlwaysFalse(ScalarEvolution &SE) const {
+     SmallVector<const SCEVPredicate *, 4> Pred;
+  const SCEV *ExitCount =
+      SE.getPredicatedBackedgeTakenCount(AR->getLoop(), Pred);
+
+
+  if (getFlags() & SCEVWrapPredicate::IncrementNUSW) {
+    CmpInst::Predicate CmpPred = SE.isKnownPositive(AR->getStepRecurrence(SE)) ? CmpInst::ICMP_ULE : CmpInst::ICMP_UGE;
+    const SCEV *AtEnd = AR->evaluateAtIteration(ExitCount, SE);
+    return SE.isKnownPredicate(CmpPred, AtEnd, AR->getStart());
+  }
+  return false;
+}
+
 void SCEVWrapPredicate::print(raw_ostream &OS, unsigned Depth) const {
   OS.indent(Depth) << *getExpr() << " Added Flags: ";
   if (SCEVWrapPredicate::IncrementNUSW & getFlags())
@@ -14689,6 +14703,11 @@ SCEVUnionPredicate::SCEVUnionPredicate(ArrayRef<const SCEVPredicate *> Preds)
 bool SCEVUnionPredicate::isAlwaysTrue() const {
   return all_of(Preds,
                 [](const SCEVPredicate *I) { return I->isAlwaysTrue(); });
+}
+
+bool SCEVUnionPredicate::isAlwaysFalse(ScalarEvolution &SE) const {
+  return all_of(Preds,
+                [&SE](const SCEVPredicate *I) { return I->isAlwaysFalse(SE); });
 }
 
 bool SCEVUnionPredicate::implies(const SCEVPredicate *N) const {
