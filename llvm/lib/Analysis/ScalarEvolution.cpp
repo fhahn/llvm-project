@@ -10869,8 +10869,10 @@ bool ScalarEvolution::isKnownViaInduction(ICmpInst::Predicate Pred,
 
 bool ScalarEvolution::isKnownPredicate(ICmpInst::Predicate Pred,
                                        const SCEV *LHS, const SCEV *RHS) {
+  ICmpInst::Predicate OrigPred = Pred;
   // Canonicalize the inputs first.
   (void)SimplifyICmpOperands(Pred, LHS, RHS);
+
 
   if (isKnownViaInduction(Pred, LHS, RHS))
     return true;
@@ -10879,7 +10881,18 @@ bool ScalarEvolution::isKnownPredicate(ICmpInst::Predicate Pred,
     return true;
 
   // Otherwise see what can be done with some simple reasoning.
-  return isKnownViaNonRecursiveReasoning(Pred, LHS, RHS);
+  if (isKnownViaNonRecursiveReasoning(Pred, LHS, RHS))
+    return true;
+
+  if (OrigPred == Pred && Pred == CmpInst::ICMP_NE) {
+    if (isKnownPredicate(CmpInst::ICMP_UGT, LHS, RHS))
+      return true;
+
+    if (isKnownPredicate(CmpInst::ICMP_ULT, LHS, RHS))
+      return true;
+  }
+
+  return false;
 }
 
 std::optional<bool> ScalarEvolution::evaluatePredicate(ICmpInst::Predicate Pred,
