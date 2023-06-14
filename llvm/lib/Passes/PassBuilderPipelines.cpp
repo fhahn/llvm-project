@@ -1244,17 +1244,22 @@ void PassBuilder::addVectorPasses(OptimizationLevel Level,
     // the CFG mess this may created if allowed to modify CFG, so forbid that.
     FPM.addPass(SROAPass(SROAOptions::PreserveCFG));
     FPM.addPass(InstCombinePass());
-    FPM.addPass(createFunctionToLoopPassAdaptor(
+
+
+    ExtraUnrollPassManager ExtraPasses;
+    ExtraPasses.addPass(createFunctionToLoopPassAdaptor(
         IndVarSimplifyPass()));
-  FPM.addPass(createFunctionToLoopPassAdaptor(
+  ExtraPasses.addPass(createFunctionToLoopPassAdaptor(
         LoopIdiomRecognizePass()));
-    FPM.addPass(InstCombinePass());
+    ExtraPasses.addPass(InstCombinePass());
     FPM.addPass(createFunctionToLoopPassAdaptor(
         LICMPass(PTO.LicmMssaOptCap, PTO.LicmMssaNoAccForPromotionCap,
                  /*AllowSpeculation=*/true),
         /*UseMemorySSA=*/true, /*UseBlockFrequencyInfo=*/false));
-    FPM.addPass(SimplifyCFGPass());
-    FPM.addPass(EarlyCSEPass());
+    ExtraPasses.addPass(SimplifyCFGPass());
+    ExtraPasses.addPass(EarlyCSEPass());
+    ExtraPasses.addPass(GVNPass());
+    FPM.addPass(std::move(ExtraPasses));
   }
 
   // Now that we've vectorized and unrolled loops, we may have more refined

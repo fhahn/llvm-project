@@ -22,6 +22,39 @@ class Function;
 class Loop;
 class LPMUpdater;
 
+/// A marker to determine if extra passes after loop vectorization should be
+/// run.
+struct ShouldRunExtraUnrollPasses
+    : public AnalysisInfoMixin<ShouldRunExtraUnrollPasses> {
+  static AnalysisKey Key;
+  struct Result {
+    bool invalidate(Function &F, const PreservedAnalyses &PA,
+                    FunctionAnalysisManager::Invalidator &) {
+      // Check whether the analysis has been explicitly invalidated. Otherwise,
+      // it remains preserved.
+      auto PAC = PA.getChecker<ShouldRunExtraUnrollPasses>();
+      return !PAC.preservedWhenStateless();
+    }
+  };
+
+  Result run(Function &F, FunctionAnalysisManager &FAM) { return Result(); }
+};
+
+/// A pass manager to run a set of extra function simplification passes after
+/// vectorization, if requested. LoopVectorize caches the
+/// ShouldRunExtraUnrollPasses analysis to request extra simplifications, if
+/// they could be beneficial.
+struct ExtraUnrollPassManager : public FunctionPassManager {
+  PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM) {
+    auto PA = PreservedAnalyses::all();
+    if (AM.getCachedResult<ShouldRunExtraUnrollPasses>(F))
+      PA.intersect(FunctionPassManager::run(F, AM));
+    PA.abandon<ShouldRunExtraUnrollPasses>();
+    return PA;
+  }
+};
+
+
 /// Loop unroll pass that only does full loop unrolling and peeling.
 class LoopFullUnrollPass : public PassInfoMixin<LoopFullUnrollPass> {
   const int OptLevel;

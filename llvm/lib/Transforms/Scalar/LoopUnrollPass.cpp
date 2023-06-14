@@ -1477,6 +1477,8 @@ Pass *llvm::createLoopUnrollPass(int OptLevel, bool OnlyWhenForced,
       AllowPeeling == -1 ? std::nullopt : std::optional<bool>(AllowPeeling));
 }
 
+
+AnalysisKey ShouldRunExtraUnrollPasses::Key;
 PreservedAnalyses LoopFullUnrollPass::run(Loop &L, LoopAnalysisManager &AM,
                                           LoopStandardAnalysisResults &AR,
                                           LPMUpdater &Updater) {
@@ -1604,6 +1606,7 @@ PreservedAnalyses LoopUnrollPass::run(Function &F,
   SmallPriorityWorklist<Loop *, 4> Worklist;
   appendLoopsToWorklist(LI, Worklist);
 
+  bool Unrolled = false;
   while (!Worklist.empty()) {
     // Because the LoopInfo stores the loops in RPO, we walk the worklist
     // from back to front so that we work forward across the CFG, which
@@ -1632,6 +1635,7 @@ PreservedAnalyses LoopUnrollPass::run(Function &F,
         UnrollOpts.AllowRuntime, UnrollOpts.AllowUpperBound, LocalAllowPeeling,
         UnrollOpts.AllowProfileBasedPeeling, UnrollOpts.FullUnrollMaxCount);
     Changed |= Result != LoopUnrollResult::Unmodified;
+    Unrolled |= Result != LoopUnrollResult::Unmodified;
 
     // The parent must not be damaged by unrolling!
 #ifndef NDEBUG
@@ -1647,7 +1651,13 @@ PreservedAnalyses LoopUnrollPass::run(Function &F,
   if (!Changed)
     return PreservedAnalyses::all();
 
-  return getLoopPassPreservedAnalyses();
+  auto PA = getLoopPassPreservedAnalyses();
+  if (Unrolled) {
+    AM.getResult<ShouldRunExtraUnrollPasses>(F);
+    PA.preserve<ShouldRunExtraUnrollPasses>();
+  }
+
+  return PA;
 }
 
 void LoopUnrollPass::printPipeline(
