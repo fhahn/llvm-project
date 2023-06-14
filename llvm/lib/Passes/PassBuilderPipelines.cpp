@@ -1245,9 +1245,16 @@ void PassBuilder::addVectorPasses(OptimizationLevel Level,
     FPM.addPass(SROAPass(SROAOptions::PreserveCFG));
     FPM.addPass(InstCombinePass());
     FPM.addPass(createFunctionToLoopPassAdaptor(
+        IndVarSimplifyPass()));
+  FPM.addPass(createFunctionToLoopPassAdaptor(
+        LoopIdiomRecognizePass()));
+    FPM.addPass(InstCombinePass());
+    FPM.addPass(createFunctionToLoopPassAdaptor(
         LICMPass(PTO.LicmMssaOptCap, PTO.LicmMssaNoAccForPromotionCap,
                  /*AllowSpeculation=*/true),
         /*UseMemorySSA=*/true, /*UseBlockFrequencyInfo=*/false));
+    FPM.addPass(SimplifyCFGPass());
+    FPM.addPass(EarlyCSEPass());
   }
 
   // Now that we've vectorized and unrolled loops, we may have more refined
