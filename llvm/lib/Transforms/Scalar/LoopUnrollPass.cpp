@@ -1635,7 +1635,7 @@ PreservedAnalyses LoopUnrollPass::run(Function &F,
         UnrollOpts.AllowRuntime, UnrollOpts.AllowUpperBound, LocalAllowPeeling,
         UnrollOpts.AllowProfileBasedPeeling, UnrollOpts.FullUnrollMaxCount);
     Changed |= Result != LoopUnrollResult::Unmodified;
-    Unrolled |= Result != LoopUnrollResult::Unmodified;
+    Unrolled |= Result == LoopUnrollResult::PartiallyUnrolled;
 
     // The parent must not be damaged by unrolling!
 #ifndef NDEBUG
