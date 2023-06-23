@@ -203,7 +203,7 @@ define i1 @and_select_not_used_for_branch(i32 %x, i32 %y,i32 %z) {
 ; CHECK-NEXT:    br i1 [[AND]], label [[THEN:%.*]], label [[EXIT:%.*]]
 ; CHECK:       then:
 ; CHECK-NEXT:    [[C_4:%.*]] = icmp eq i32 [[Z:%.*]], 0
-; CHECK-NEXT:    [[SEL:%.*]] = select i1 [[C_4]], i1 [[C_1]], i1 false
+; CHECK-NEXT:    [[SEL:%.*]] = select i1 [[C_4]], i1 true, i1 false
 ; CHECK-NEXT:    br label [[EXIT]]
 ; CHECK:       exit:
 ; CHECK-NEXT:    [[RES:%.*]] = phi i1 [ [[C_1]], [[ENTRY:%.*]] ], [ [[SEL]], [[THEN]] ]
@@ -236,10 +236,10 @@ define i1 @and_select_scope_limited(i32 %x, i32 %y, i32 %z) {
 ; CHECK-NEXT:    br i1 [[AND]], label [[THEN:%.*]], label [[EXIT:%.*]]
 ; CHECK:       then:
 ; CHECK-NEXT:    [[C_4:%.*]] = icmp eq i32 [[Z:%.*]], 0
-; CHECK-NEXT:    [[SEL:%.*]] = select i1 [[C_4]], i1 [[C_1]], i1 false
+; CHECK-NEXT:    [[SEL:%.*]] = select i1 [[C_4]], i1 true, i1 false
 ; CHECK-NEXT:    br i1 [[SEL]], label [[T_1:%.*]], label [[EXIT]]
 ; CHECK:       t.1:
-; CHECK-NEXT:    ret i1 [[C_1]]
+; CHECK-NEXT:    ret i1 true
 ; CHECK:       exit:
 ; CHECK-NEXT:    [[RES:%.*]] = phi i1 [ [[C_1]], [[ENTRY:%.*]] ], [ [[SEL]], [[THEN]] ]
 ; CHECK-NEXT:    ret i1 [[RES]]
