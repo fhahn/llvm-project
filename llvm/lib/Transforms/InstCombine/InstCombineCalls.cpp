@@ -1365,6 +1365,30 @@ static Instruction *foldBitOrderCrossLogicOp(Value *V,
   return nullptr;
 }
 
+static bool isEph(Value *V, SmallPtrSetImpl<Instruction *> &Users, unsigned Depth = 0) {
+  if (Depth > 6)
+    return false;
+  if (isa<Constant>(V))
+    return true;
+if (any_of(V->users(), [&Users](const User *U) {
+                                                                   return !Users.contains(cast<Instruction>(U));
+                                                                   }))
+return false;
+
+        auto *I = dyn_cast<Instruction>(V);
+        if (!I)
+          return true;
+
+        if (I->mayHaveSideEffects() || I->isTerminator())
+          return false;
+        if (isa<LoadInst, CallInst>(I))
+          return true;
+        Users.insert(I);
+        return all_of(I->operands(), [&](Value *Op) {
+                      return isEph(Op, Users, Depth +1 );
+                      });
+      }
+
 /// CallInst simplification. This mostly only handles folding of intrinsic
 /// instructions. For normal calls, it allows visitCallBase to do the heavy
 /// lifting.
@@ -2611,6 +2635,16 @@ Instruction *InstCombinerImpl::visitCallInst(CallInst &CI) {
     SmallVector<OperandBundleDef, 4> OpBundles;
     II->getOperandBundlesAsDefs(OpBundles);
 
+    {
+    Value *A, *B;
+    CmpInst::Predicate Pred;
+    if (DropAssumes && match(IIOperand, m_ICmp(Pred, m_Value(A), m_Value(B)))) {
+      SmallPtrSet<Instruction *, 8> Users;
+      Users.insert(cast<Instruction>(IIOperand));
+      if (isEph(A, Users) && isEph(B, Users))
+      return eraseInstFromFunction(*II);
+    }
+    }
     /// This will remove the boolean Condition from the assume given as
     /// argument and remove the assume if it becomes useless.
     /// always returns nullptr for use as a return values.

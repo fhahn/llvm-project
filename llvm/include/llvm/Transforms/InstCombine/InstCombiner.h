@@ -81,6 +81,8 @@ protected:
   // combining and will be updated to reflect any changes.
   LoopInfo *LI;
 
+  bool DropAssumes = false;
+
   bool MadeIRChange = false;
 
 public:
@@ -89,10 +91,10 @@ public:
                TargetLibraryInfo &TLI, TargetTransformInfo &TTI,
                DominatorTree &DT, OptimizationRemarkEmitter &ORE,
                BlockFrequencyInfo *BFI, ProfileSummaryInfo *PSI,
-               const DataLayout &DL, LoopInfo *LI)
+               const DataLayout &DL, LoopInfo *LI, bool DropAssumes)
       : TTI(TTI), Builder(Builder), Worklist(Worklist),
         MinimizeSize(MinimizeSize), AA(AA), AC(AC), TLI(TLI), DT(DT), DL(DL),
-        SQ(DL, &TLI, &DT, &AC), ORE(ORE), BFI(BFI), PSI(PSI), LI(LI) {}
+        SQ(DL, &TLI, &DT, &AC), ORE(ORE), BFI(BFI), PSI(PSI), LI(LI), DropAssumes(DropAssumes) {}
 
   virtual ~InstCombiner() = default;
 

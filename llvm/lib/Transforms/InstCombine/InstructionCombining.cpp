@@ -4154,7 +4154,7 @@ static bool combineInstructionsOverFunction(
     Function &F, InstructionWorklist &Worklist, AliasAnalysis *AA,
     AssumptionCache &AC, TargetLibraryInfo &TLI, TargetTransformInfo &TTI,
     DominatorTree &DT, OptimizationRemarkEmitter &ORE, BlockFrequencyInfo *BFI,
-    ProfileSummaryInfo *PSI, unsigned MaxIterations, LoopInfo *LI) {
+    ProfileSummaryInfo *PSI, unsigned MaxIterations, LoopInfo *LI, bool DropAssumes) {
   auto &DL = F.getParent()->getDataLayout();
 
   /// Builder - This is an IRBuilder that automatically inserts new
@@ -4198,7 +4198,7 @@ static bool combineInstructionsOverFunction(
     MadeIRChange |= prepareICWorklistFromFunction(F, DL, &TLI, Worklist);
 
     InstCombinerImpl IC(Worklist, Builder, F.hasMinSize(), AA, AC, TLI, TTI, DT,
-                        ORE, BFI, PSI, DL, LI);
+                        ORE, BFI, PSI, DL, LI, DropAssumes);
     IC.MaxArraySizeForCombine = MaxArraySize;
 
     if (!IC.run())
@@ -4253,7 +4253,7 @@ PreservedAnalyses InstCombinePass::run(Function &F,
       &AM.getResult<BlockFrequencyAnalysis>(F) : nullptr;
 
   if (!combineInstructionsOverFunction(F, Worklist, AA, AC, TLI, TTI, DT, ORE,
-                                       BFI, PSI, Options.MaxIterations, LI))
+                                       BFI, PSI, Options.MaxIterations, LI, Options.DropAssumes))
     // No changes, all analyses are preserved.
     return PreservedAnalyses::all();
 
@@ -4303,7 +4303,7 @@ bool InstructionCombiningPass::runOnFunction(Function &F) {
 
   return combineInstructionsOverFunction(F, Worklist, AA, AC, TLI, TTI, DT, ORE,
                                          BFI, PSI,
-                                         InstCombineDefaultMaxIterations, LI);
+                                         InstCombineDefaultMaxIterations, LI, false);
 }
 
 char InstructionCombiningPass::ID = 0;

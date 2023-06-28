@@ -30,6 +30,7 @@ static constexpr unsigned InstCombineDefaultMaxIterations = 1000;
 struct InstCombineOptions {
   bool UseLoopInfo = false;
   unsigned MaxIterations = InstCombineDefaultMaxIterations;
+  bool DropAssumes = false;
 
   InstCombineOptions() = default;
 
