@@ -5650,7 +5650,7 @@ bool LoopVectorizationCostModel::isEpilogueVectorizationProfitable(
 }
 
 VectorizationFactor LoopVectorizationPlanner::selectEpilogueVectorizationFactor(
-    const ElementCount MainLoopVF) {
+    const ElementCount MainLoopVF, unsigned IC) {
   VectorizationFactor Result = VectorizationFactor::Disabled();
   if (!EnableEpilogueVectorization) {
     LLVM_DEBUG(dbgs() << "LEV: Epilogue vectorization is disabled.\n");
@@ -5706,13 +5706,27 @@ VectorizationFactor LoopVectorizationPlanner::selectEpilogueVectorizationFactor(
       EstimatedRuntimeVF *= *VScale;
   }
 
-  for (auto &NextVF : ProfitableVFs)
+  ScalarEvolution &SE = *PSE.getSE();
+  const SCEV *TC =
+      createTripCountSCEV(Legal->getWidestInductionType(), PSE, OrigLoop);
+  const SCEV *RemainingIterations = SE.getURemExpr(
+      TC, SE.getConstant(TC->getType(), MainLoopVF.getKnownMinValue() * IC));
+  for (auto &NextVF : ProfitableVFs) {
+    // If NextVF is less than the number of remaining iterations, the epilogue
+    // loop would be dead. Skip such factors.
+    if (!MainLoopVF.isScalable() && !NextVF.Width.isScalable() &&
+        SE.isKnownPredicate(CmpInst::ICMP_ULT, RemainingIterations,
+                            SE.getConstant(RemainingIterations->getType(),
+                                           NextVF.Width.getKnownMinValue())))
+      continue;
+
     if (((!NextVF.Width.isScalable() && MainLoopVF.isScalable() &&
           ElementCount::isKnownLT(NextVF.Width, EstimatedRuntimeVF)) ||
          ElementCount::isKnownLT(NextVF.Width, MainLoopVF)) &&
         (Result.Width.isScalar() || isMoreProfitable(NextVF, Result)) &&
         hasPlanWithVF(NextVF.Width))
       Result = NextVF;
+  }
 
   if (Result != VectorizationFactor::Disabled())
     LLVM_DEBUG(dbgs() << "LEV: Vectorizing epilogue loop with VF = "
@@ -10464,7 +10478,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
 
       // Consider vectorizing the epilogue too if it's profitable.
       VectorizationFactor EpilogueVF =
-          LVP.selectEpilogueVectorizationFactor(VF.Width);
+          LVP.selectEpilogueVectorizationFactor(VF.Width, IC);
       if (EpilogueVF.Width.isVector()) {
 
         // The first pass vectorizes the main loop and creates a scalar epilogue
