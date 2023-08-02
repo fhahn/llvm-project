@@ -43,6 +43,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/GlobalsModRef.h"
+#include "llvm/Analysis/LoopInfo.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/Constants.h"
@@ -50,9 +51,12 @@
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/Analysis/MustExecute.h"
+#include "llvm/Analysis/DomTreeUpdater.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Use.h"
+#include "llvm/IR/Dominators.h"
 #include "llvm/IR/Value.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/ArrayRecycler.h"
@@ -565,8 +569,12 @@ public:
 //===----------------------------------------------------------------------===//
 
 class GVNSink {
+  DominatorTree &DT;
+  LoopInfo &LI;
+  DomTreeUpdater DTU;
+
 public:
-  GVNSink() = default;
+  GVNSink(DominatorTree &DT, LoopInfo &LI) : DT(DT), LI(LI), DTU(DT, DomTreeUpdater::UpdateStrategy::Lazy) {}
 
   bool run(Function &F) {
     LLVM_DEBUG(dbgs() << "GVNSink: running on function @" << F.getName()
@@ -816,7 +824,7 @@ unsigned GVNSink::sinkBB(BasicBlock *BBEnd) {
   if (C.Blocks.size() < NumOrigPreds) {
     LLVM_DEBUG(dbgs() << " -- Splitting edge to ";
                BBEnd->printAsOperand(dbgs()); dbgs() << "\n");
-    InsertBB = SplitBlockPredecessors(BBEnd, C.Blocks, ".gvnsink.split");
+    InsertBB = SplitBlockPredecessors(BBEnd, C.Blocks, ".gvnsink.split", &DTU, &LI);
     if (!InsertBB) {
       LLVM_DEBUG(dbgs() << " -- FAILED to split edge!\n");
       // Edge couldn't be split.
@@ -886,8 +894,13 @@ void GVNSink::sinkLastInstruction(ArrayRef<BasicBlock *> Blocks,
 } // end anonymous namespace
 
 PreservedAnalyses GVNSinkPass::run(Function &F, FunctionAnalysisManager &AM) {
-  GVNSink G;
+  auto &DT = AM.getResult<DominatorTreeAnalysis>(F);
+  auto &LI = AM.getResult<LoopAnalysis>(F);
+  GVNSink G(DT, LI);
   if (!G.run(F))
     return PreservedAnalyses::all();
-  return PreservedAnalyses::none();
+  PreservedAnalyses PA;
+  PA.preserve<DominatorTreeAnalysis>();
+  PA.preserve<LoopAnalysis>();
+  return PA;
 }
