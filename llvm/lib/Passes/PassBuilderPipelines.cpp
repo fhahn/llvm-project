@@ -231,7 +231,7 @@ static cl::opt<bool>
                    cl::desc("Enable the GVN hoisting pass (default = off)"));
 
 static cl::opt<bool>
-    EnableGVNSink("enable-gvn-sink",
+    EnableGVNSink("enable-gvn-sink", cl::init(true),
                   cl::desc("Enable the GVN sinking pass (default = off)"));
 
 // This option is used in simplifying testing SampleFDO optimizations for
