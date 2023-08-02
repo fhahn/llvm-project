@@ -573,10 +573,14 @@ class GVNSink {
   LoopInfo &LI;
   DomTreeUpdater DTU;
 
+  bool ContainsIrreducibleLoops;
+
 public:
   GVNSink(DominatorTree &DT, LoopInfo &LI) : DT(DT), LI(LI), DTU(DT, DomTreeUpdater::UpdateStrategy::Lazy) {}
 
   bool run(Function &F) {
+    ContainsIrreducibleLoops = mayContainIrreducibleControl(F, &LI);
+
     LLVM_DEBUG(dbgs() << "GVNSink: running on function @" << F.getName()
                       << "\n");
 
@@ -790,6 +794,19 @@ unsigned GVNSink::sinkBB(BasicBlock *BBEnd) {
   llvm::erase_if(Preds, [](BasicBlock *BB) {
     return BB->getTerminator()->getNumSuccessors() != 1;
   });
+
+  if (ContainsIrreducibleLoops) {
+    if (any_of(Preds, [&Preds](BasicBlock *BB) {
+          BasicBlock *P = BB->getSinglePredecessor();
+          return !P || P != Preds[0]->getSinglePredecessor();
+        }))
+      return 0;
+  } else {
+    if (any_of(Preds, [&Preds, this](BasicBlock *BB) {
+          return LI.getLoopFor(BB) != LI.getLoopFor(Preds[0]);
+        }))
+      return 0;
+  }
 
   LockstepReverseIterator LRI(Preds);
   SmallVector<SinkingInstructionCandidate, 4> Candidates;
