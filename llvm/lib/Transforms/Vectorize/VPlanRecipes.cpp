@@ -660,39 +660,46 @@ void VPRecipeWithIRFlags::printFlags(raw_ostream &O) const {
 void VPWidenRecipe::execute(VPTransformState &State) {
   auto &I = *cast<Instruction>(getUnderlyingValue());
   auto &Builder = State.Builder;
-  switch (I.getOpcode()) {
-  case Instruction::Call:
-  case Instruction::Br:
-  case Instruction::PHI:
-  case Instruction::GetElementPtr:
-  case Instruction::Select:
-    llvm_unreachable("This instruction is handled by a different recipe.");
-  case Instruction::UDiv:
-  case Instruction::SDiv:
-  case Instruction::SRem:
-  case Instruction::URem:
-  case Instruction::Add:
-  case Instruction::FAdd:
-  case Instruction::Sub:
-  case Instruction::FSub:
-  case Instruction::FNeg:
-  case Instruction::Mul:
-  case Instruction::FMul:
-  case Instruction::FDiv:
-  case Instruction::FRem:
-  case Instruction::Shl:
-  case Instruction::LShr:
-  case Instruction::AShr:
-  case Instruction::And:
-  case Instruction::Or:
-  case Instruction::Xor: {
-    // Just widen unops and binops.
-    State.setDebugLocFromInst(&I);
+  State.setDebugLocFromInst(&I);
 
-    for (unsigned Part = 0; Part < State.UF; ++Part) {
-      SmallVector<Value *, 2> Ops;
-      for (VPValue *VPOp : operands())
-        Ops.push_back(State.get(VPOp, Part));
+  for (unsigned Part = 0; Part < State.UF; ++Part) {
+    SmallVector<Value *, 2> Ops;
+    for (VPValue *VPOp : operands())
+      Ops.push_back(State.get(VPOp, Part));
+
+    switch (I.getOpcode()) {
+    case Instruction::Call:
+    case Instruction::Br:
+    case Instruction::PHI:
+    case Instruction::GetElementPtr:
+    case Instruction::Select:
+      llvm_unreachable("This instruction is handled by a different recipe.");
+    case Instruction::UDiv:
+    case Instruction::SDiv:
+    case Instruction::SRem:
+    case Instruction::URem:
+      if (isMasked()) {
+        Value *One = ConstantInt::get(Ops[1]->getType(), 1u, false);
+        Ops[1] = Builder.CreateSelect(Ops[2], Ops[1], One);
+        Ops.pop_back();
+      }
+      [[fallthrough]];
+    case Instruction::Add:
+    case Instruction::FAdd:
+    case Instruction::Sub:
+    case Instruction::FSub:
+    case Instruction::FNeg:
+    case Instruction::Mul:
+    case Instruction::FMul:
+    case Instruction::FDiv:
+    case Instruction::FRem:
+    case Instruction::Shl:
+    case Instruction::LShr:
+    case Instruction::AShr:
+    case Instruction::And:
+    case Instruction::Or:
+    case Instruction::Xor: {
+      // Just widen unops and binops.
 
       Value *V = Builder.CreateNAryOp(I.getOpcode(), Ops);
 
@@ -702,50 +709,41 @@ void VPWidenRecipe::execute(VPTransformState &State) {
       // Use this vector value for all users of the original instruction.
       State.set(this, V, Part);
       State.addMetadata(V, &I);
+
+      break;
     }
+    case Instruction::Freeze: {
+      State.setDebugLocFromInst(&I);
 
-    break;
-  }
-  case Instruction::Freeze: {
-    State.setDebugLocFromInst(&I);
-
-    for (unsigned Part = 0; Part < State.UF; ++Part) {
-      Value *Op = State.get(getOperand(0), Part);
-
-      Value *Freeze = Builder.CreateFreeze(Op);
+      Value *Freeze = Builder.CreateFreeze(Ops[0]);
       State.set(this, Freeze, Part);
+      break;
     }
-    break;
-  }
-  case Instruction::ICmp:
-  case Instruction::FCmp: {
-    // Widen compares. Generate vector compares.
-    bool FCmp = (I.getOpcode() == Instruction::FCmp);
-    auto *Cmp = cast<CmpInst>(&I);
-    State.setDebugLocFromInst(Cmp);
-    for (unsigned Part = 0; Part < State.UF; ++Part) {
-      Value *A = State.get(getOperand(0), Part);
-      Value *B = State.get(getOperand(1), Part);
+    case Instruction::ICmp:
+    case Instruction::FCmp: {
+      // Widen compares. Generate vector compares.
+      bool FCmp = (I.getOpcode() == Instruction::FCmp);
+      auto *Cmp = cast<CmpInst>(&I);
+      State.setDebugLocFromInst(Cmp);
       Value *C = nullptr;
       if (FCmp) {
         // Propagate fast math flags.
         IRBuilder<>::FastMathFlagGuard FMFG(Builder);
         Builder.setFastMathFlags(Cmp->getFastMathFlags());
-        C = Builder.CreateFCmp(Cmp->getPredicate(), A, B);
+        C = Builder.CreateFCmp(Cmp->getPredicate(), Ops[0], Ops[1]);
       } else {
-        C = Builder.CreateICmp(Cmp->getPredicate(), A, B);
+        C = Builder.CreateICmp(Cmp->getPredicate(), Ops[0], Ops[1]);
       }
       State.set(this, C, Part);
       State.addMetadata(C, &I);
+      break;
     }
-
-    break;
+    default:
+      // This instruction is not vectorized by simple widening.
+      LLVM_DEBUG(dbgs() << "LV: Found an unhandled instruction: " << I);
+      llvm_unreachable("Unhandled instruction!");
+    } // end of switch.
   }
-  default:
-    // This instruction is not vectorized by simple widening.
-    LLVM_DEBUG(dbgs() << "LV: Found an unhandled instruction: " << I);
-    llvm_unreachable("Unhandled instruction!");
-  } // end of switch.
 }
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 void VPWidenRecipe::print(raw_ostream &O, const Twine &Indent,

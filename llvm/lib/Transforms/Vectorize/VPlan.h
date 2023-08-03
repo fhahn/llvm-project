@@ -1169,6 +1169,10 @@ public:
   void print(raw_ostream &O, const Twine &Indent,
              VPSlotTracker &SlotTracker) const override;
 #endif
+
+  unsigned getNumNonMaskOperands() const override {
+    return getUnderlyingInstr()->getNumOperands();
+  }
 };
 
 /// VPWidenCastRecipe is a recipe to create vector cast instructions.
@@ -1794,12 +1798,15 @@ class VPReplicateRecipe : public VPRecipeWithIRFlags, public VPValue {
 public:
   template <typename IterT>
   VPReplicateRecipe(Instruction *I, iterator_range<IterT> Operands,
-                    bool IsUniform, VPValue *Mask = nullptr)
+                    bool IsUniform, bool IsPredicated = false)
       : VPRecipeWithIRFlags(VPDef::VPReplicateSC, Operands, *I),
-        VPValue(this, I), IsUniform(IsUniform) {
-    if (Mask)
-      addOperand(Mask);
-  }
+/*<<<<<<< HEAD*/
+        /*VPValue(this, I), IsUniform(IsUniform) {*/
+    /*if (Mask)*/
+      /*addOperand(Mask);*/
+  /*}*/
+/*=======*/
+        VPValue(this, I), IsUniform(IsUniform) {}
 
   ~VPReplicateRecipe() override = default;
 

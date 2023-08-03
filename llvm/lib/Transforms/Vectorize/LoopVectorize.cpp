@@ -8108,8 +8108,6 @@ VPRecipeBase *VPRecipeBuilder::tryToWidenMemory(Instruction *I,
     return nullptr;
 
   VPValue *Mask = nullptr;
-  if (Legal->isMaskRequired(I))
-    Mask = createBlockInMask(I->getParent(), *Plan);
 
   // Determine if the pointer operand of the access is either consecutive or
   // reverse consecutive.
@@ -8323,13 +8321,6 @@ VPWidenCallRecipe *VPRecipeBuilder::tryToWidenCall(CallInst *CI,
       //   2) No mask is required for the block, but the only available
       //      vector variant at this VF requires a mask, so we synthesize an
       //      all-true mask.
-      VPValue *Mask = nullptr;
-      if (Legal->isMaskRequired(CI))
-        Mask = createBlockInMask(CI->getParent(), *Plan);
-      else
-        Mask = Plan->getVPValueOrAddLiveIn(ConstantInt::getTrue(
-            IntegerType::getInt1Ty(Variant->getFunctionType()->getContext())));
-
       VFShape Shape = VFShape::get(*CI, VariantVF, /*HasGlobalPred=*/true);
       unsigned MaskPos = 0;
 
@@ -8340,7 +8331,12 @@ VPWidenCallRecipe *VPRecipeBuilder::tryToWidenCall(CallInst *CI,
           break;
         }
 
-      Ops.insert(Ops.begin() + MaskPos, Mask);
+      if (!Legal->isMaskRequired(CI)) {
+        VPValue *Mask = Plan->getVPValueOrAddLiveIn(ConstantInt::getTrue(
+            IntegerType::getInt1Ty(Variant->getFunctionType()->getContext())));
+
+        Ops.push_back(Mask);
+      }
     }
 
     return new VPWidenCallRecipe(*CI, make_range(Ops.begin(), Ops.end()),
@@ -8373,23 +8369,7 @@ VPRecipeBase *VPRecipeBuilder::tryToWiden(Instruction *I,
   case Instruction::SDiv:
   case Instruction::UDiv:
   case Instruction::SRem:
-  case Instruction::URem: {
-    // If not provably safe, use a select to form a safe divisor before widening the
-    // div/rem operation itself.  Otherwise fall through to general handling below.
-    if (CM.isPredicatedInst(I)) {
-      SmallVector<VPValue *> Ops(Operands.begin(), Operands.end());
-      VPValue *Mask = createBlockInMask(I->getParent(), *Plan);
-      VPValue *One = Plan->getVPValueOrAddLiveIn(
-          ConstantInt::get(I->getType(), 1u, false));
-      auto *SafeRHS =
-         new VPInstruction(Instruction::Select, {Mask, Ops[1], One},
-                           I->getDebugLoc());
-      VPBB->appendRecipe(SafeRHS);
-      Ops[1] = SafeRHS;
-      return new VPWidenRecipe(*I, make_range(Ops.begin(), Ops.end()));
-    }
-    [[fallthrough]];
-  }
+  case Instruction::URem:
   case Instruction::Add:
   case Instruction::And:
   case Instruction::AShr:
@@ -8462,7 +8442,6 @@ VPRecipeOrVPValueTy VPRecipeBuilder::handleReplication(Instruction *I,
       break;
     }
   }
-  VPValue *BlockInMask = nullptr;
   if (!IsPredicated) {
     // Finalize the recipe for Instr, first if it is not predicated.
     LLVM_DEBUG(dbgs() << "LV: Scalarizing:" << *I << "\n");
@@ -8472,11 +8451,10 @@ VPRecipeOrVPValueTy VPRecipeBuilder::handleReplication(Instruction *I,
     // added initially. Masked replicate recipes will later be placed under an
     // if-then construct to prevent side-effects. Generate recipes to compute
     // the block mask for this region.
-    BlockInMask = createBlockInMask(I->getParent(), Plan);
   }
 
   auto *Recipe = new VPReplicateRecipe(I, Plan.mapToVPValues(I->operands()),
-                                       IsUniform, BlockInMask);
+                                       IsUniform, IsPredicated);
   return toVPRecipeResult(Recipe);
 }
 
@@ -8831,6 +8809,12 @@ LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(VFRange &Range) {
       }
       // Otherwise, add the new recipe.
       VPRecipeBase *Recipe = cast<VPRecipeBase *>(RecipeOrValue);
+
+      bool IsPredicated = CM.isPredicatedInst(&I);
+      if (IsPredicated)
+        Recipe->addOperand(
+            RecipeBuilder.createBlockInMask(I.getParent(), *Plan));
+
       for (auto *Def : Recipe->definedValues()) {
         auto *UV = Def->getUnderlyingValue();
         Plan->addVPValue(UV, Def);
