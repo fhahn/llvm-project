@@ -1054,11 +1054,13 @@ public:
         Instruction::OtherOpsEnd + 1, // Combines the incoming and previous
                                       // values of a first-order recurrence.
     Not,
+    ICmpULE,
+    ICmpUGT,
     SLPLoad,
     SLPStore,
     ActiveLaneMask,
-    CalculateTripCountMinusVF,
-    // Increment the canonical IV separately for each unrolled part.
+    // The next op is similar to the above, but instead increment the
+    // canonical IV separately for each unrolled part.
     CanonicalIVIncrementForPart,
     BranchOnCount,
     BranchOnCond
@@ -1165,7 +1167,6 @@ public:
     default:
       return false;
     case VPInstruction::ActiveLaneMask:
-    case VPInstruction::CalculateTripCountMinusVF:
     case VPInstruction::CanonicalIVIncrementForPart:
     case VPInstruction::BranchOnCount:
       return true;

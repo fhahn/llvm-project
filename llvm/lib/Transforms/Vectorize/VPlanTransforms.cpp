@@ -1072,8 +1072,19 @@ static VPActiveLaneMaskPHIRecipe *addVPLaneMaskPhiAndUpdateExitBranch(
     // uses a modified trip count and the induction variable increment is
     // done after the active.lane.mask intrinsic is called.
     IncrementValue = CanonicalIVPHI;
-    TripCount = Builder.createNaryOp(VPInstruction::CalculateTripCountMinusVF,
-                                     {TC}, DL);
+      auto *Sub = new VPInstruction(Instruction::Sub,
+                                    {TC, &Plan.getVFxUF()}, DL);
+      auto *Cmp = new VPInstruction(VPInstruction::ICmpUGT,
+                                    {TC, &Plan.getVFxUF()}, DL);
+      auto *Select = new VPInstruction(
+          Instruction::Select,
+          {Cmp, Sub, Plan.getVPValueOrAddLiveIn(ConstantInt::get(CanonicalIVPHI->getScalarType(), 0))},
+          DL);
+
+      TripCount = Select;
+      VecPreheader->appendRecipe(Sub);
+      VecPreheader->appendRecipe(Cmp);
+      VecPreheader->appendRecipe(Select);
   }
   auto *EntryIncrement = Builder.createOverflowingOp(
       VPInstruction::CanonicalIVIncrementForPart, {StartV}, {false, false}, DL,

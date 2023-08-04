@@ -119,7 +119,6 @@ bool VPRecipeBase::mayHaveSideEffects() const {
     switch (cast<VPInstruction>(this)->getOpcode()) {
     case Instruction::ICmp:
     case VPInstruction::Not:
-    case VPInstruction::CalculateTripCountMinusVF:
     case VPInstruction::CanonicalIVIncrementForPart:
       return false;
     default:
@@ -274,10 +273,12 @@ Value *VPInstruction::generateInstruction(VPTransformState &State,
     if (Part != 0 && vputils::onlyFirstPartUsed(this))
       return State.get(this, 0);
 
-    Value *A = State.get(getOperand(0), Part);
-    Value *B = State.get(getOperand(1), Part);
-    auto *Res =
-        Builder.CreateBinOp((Instruction::BinaryOps)getOpcode(), A, B, Name);
+    Value *A = getParent()->getParent() ? State.get(getOperand(0), Part)
+                                        : State.get(getOperand(0), {0, 0});
+    Value *B = getParent()->getParent() ? State.get(getOperand(1), Part)
+                                        : State.get(getOperand(1), {0, 0});
+
+    Value *Res = Builder.CreateBinOp((Instruction::BinaryOps)getOpcode(), A, B, Name);
     if (auto *I = dyn_cast<Instruction>(Res))
       setFlags(I);
     return Res;
@@ -293,10 +294,21 @@ Value *VPInstruction::generateInstruction(VPTransformState &State,
     Value *B = State.get(getOperand(1), Part);
     return Builder.CreateCmp(getPredicate(), A, B, Name);
   }
+  case VPInstruction::ICmpUGT: {
+    Value *A = getParent()->getParent() ? State.get(getOperand(0), Part)
+                                        : State.get(getOperand(0), {0, 0});
+    Value *B = getParent()->getParent() ? State.get(getOperand(1), Part)
+                                        : State.get(getOperand(1), {0, 0});
+
+    return Builder.CreateICmpUGT(A, B, Name);
+  }
   case Instruction::Select: {
-    Value *Cond = State.get(getOperand(0), Part);
-    Value *Op1 = State.get(getOperand(1), Part);
-    Value *Op2 = State.get(getOperand(2), Part);
+    Value *Cond = getParent()->getParent() ? State.get(getOperand(0), Part)
+                                           : State.get(getOperand(0), {0, 0});
+    Value *Op1 = getParent()->getParent() ? State.get(getOperand(1), Part)
+                                          : State.get(getOperand(1), {0, 0});
+    Value *Op2 = getParent()->getParent() ? State.get(getOperand(2), Part)
+                                          : State.get(getOperand(2), {0, 0});
     return Builder.CreateSelect(Cond, Op1, Op2, Name);
   }
   case VPInstruction::ActiveLaneMask: {
@@ -331,15 +343,6 @@ Value *VPInstruction::generateInstruction(VPTransformState &State,
       return PartMinus1;
     Value *V2 = State.get(getOperand(1), Part);
     return Builder.CreateVectorSplice(PartMinus1, V2, -1, Name);
-  }
-  case VPInstruction::CalculateTripCountMinusVF: {
-    Value *ScalarTC = State.get(getOperand(0), {0, 0});
-    Value *Step =
-        createStepForVF(Builder, ScalarTC->getType(), State.VF, State.UF);
-    Value *Sub = Builder.CreateSub(ScalarTC, Step);
-    Value *Cmp = Builder.CreateICmp(CmpInst::Predicate::ICMP_UGT, ScalarTC, Step);
-    Value *Zero = ConstantInt::get(ScalarTC->getType(), 0);
-    return Builder.CreateSelect(Cmp, Sub, Zero);
   }
   case VPInstruction::CanonicalIVIncrementForPart: {
     auto *IV = State.get(getOperand(0), VPIteration(0, 0));
@@ -449,6 +452,12 @@ void VPInstruction::print(raw_ostream &O, const Twine &Indent,
   case VPInstruction::Not:
     O << "not";
     break;
+  case VPInstruction::ICmpULE:
+    O << "icmp ule";
+    break;
+  case VPInstruction::ICmpUGT:
+    O << "icmp ugt";
+    break;
   case VPInstruction::SLPLoad:
     O << "combined load";
     break;
@@ -463,9 +472,6 @@ void VPInstruction::print(raw_ostream &O, const Twine &Indent,
     break;
   case VPInstruction::BranchOnCond:
     O << "branch-on-cond";
-    break;
-  case VPInstruction::CalculateTripCountMinusVF:
-    O << "TC > VF ? TC - VF : 0";
     break;
   case VPInstruction::CanonicalIVIncrementForPart:
     O << "VF * Part +";
