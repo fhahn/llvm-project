@@ -1668,9 +1668,7 @@ public:
 class VPInterleaveRecipe : public VPRecipeBase {
   const InterleaveGroup<Instruction> *IG;
 
-  /// Indicates if the interleave group is in a conditional block and requires a
-  /// mask.
-  bool HasMask = false;
+  unsigned NumNonMaskOperands;
 
   /// Indicates if gaps between members of the group need to be masked out or if
   /// unusued gaps can be loaded speculatively.
@@ -1691,10 +1689,9 @@ public:
 
     for (auto *SV : StoredValues)
       addOperand(SV);
-    if (Mask) {
-      HasMask = true;
+    NumNonMaskOperands = getNumOperands();
+    if (Mask)
       addOperand(Mask);
-    }
   }
   ~VPInterleaveRecipe() override = default;
 
@@ -1705,8 +1702,6 @@ public:
     return getOperand(0); // Address is the 1st, mandatory operand.
   }
 
-
-  void setHasMask() { HasMask = true; }
   /// Return the VPValues stored by this interleave group. If it is a load
   /// interleave group, return an empty ArrayRef.
   ArrayRef<VPValue *> getStoredValues() const {
@@ -1730,7 +1725,7 @@ public:
   /// Returns the number of stored operands of this interleave group. Returns 0
   /// for load interleave groups.
   unsigned getNumStoreOperands() const {
-    return getNumOperands() - (HasMask ? 2 : 1);
+    return getNumNonMaskOperands() - 1;
   }
 
   /// The recipe only uses the first lane of the address.
@@ -1742,7 +1737,7 @@ public:
 
   /// Returns the number of operands excluding mask operands.
   unsigned getNumNonMaskOperands() const override {
-    return HasMask ? getNumOperands() - 1 : getNumOperands();
+    return NumNonMaskOperands;
   }
 };
 
