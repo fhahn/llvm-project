@@ -1224,13 +1224,16 @@ class VPWidenCallRecipe : public VPRecipeBase, public VPValue {
   /// VF with a valid variant.
   Function *Variant;
 
+  bool NeedsMask = false;
+
 public:
   template <typename IterT>
   VPWidenCallRecipe(CallInst &I, iterator_range<IterT> CallArguments,
                     Intrinsic::ID VectorIntrinsicID,
-                    Function *Variant = nullptr)
+                    Function *Variant = nullptr, bool NeedsMask = false)
       : VPRecipeBase(VPDef::VPWidenCallSC, CallArguments), VPValue(this, &I),
-        VectorIntrinsicID(VectorIntrinsicID), Variant(Variant) {}
+        VectorIntrinsicID(VectorIntrinsicID), Variant(Variant),
+        NeedsMask(NeedsMask) {}
 
   ~VPWidenCallRecipe() override = default;
 
@@ -1244,6 +1247,12 @@ public:
   void print(raw_ostream &O, const Twine &Indent,
              VPSlotTracker &SlotTracker) const override;
 #endif
+
+  unsigned getNumNonMaskOperands() const override {
+    return NeedsMask ? Variant->arg_size() - 1 : getNumOperands();
+  }
+
+  bool needsMask() const { return NeedsMask; }
 };
 
 /// A recipe for widening select instructions.
@@ -1785,6 +1794,9 @@ public:
   VPValue *getCondOp() const {
     return getNumOperands() > 2 ? getOperand(2) : nullptr;
   }
+
+  /// Returns the number of operands excluding mask operands.
+  unsigned getNumNonMaskOperands() const override { return 2; }
 };
 
 /// VPReplicateRecipe replicates a given instruction producing multiple scalar
@@ -1946,10 +1958,6 @@ class VPWidenMemoryInstructionRecipe : public VPRecipeBase {
     if (!Mask)
       return;
     addOperand(Mask);
-  }
-
-  bool isMasked() const {
-    return isStore() ? getNumOperands() == 3 : getNumOperands() == 2;
   }
 
 public:

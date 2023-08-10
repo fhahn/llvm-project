@@ -8043,45 +8043,123 @@ VPValue *VPRecipeBuilder::createBlockInMask(BasicBlock *BB, VPlan &Plan) {
   return BlockMaskCache[BB] = BlockMask;
 }
 
-void VPRecipeBuilder::createHeaderMask(VPlan &Plan) {
-  BasicBlock *Header = OrigLoop->getHeader();
-
-  // When not folding the tail, use nullptr to model all-true mask.
-  if (!CM.foldTailByMasking()) {
-    BlockMaskCache[Header] = nullptr;
-    return;
+static bool mayCauseUB(unsigned Opcode) {
+  switch (Opcode) {
+  case Instruction::UDiv:
+  case Instruction::URem:
+  case Instruction::SDiv:
+  case Instruction::SRem:
+    return true;
+  default:
+    return false;
   }
+}
 
+static void performTailFolding(VPlan &Plan, TailFoldingStyle TFStyle,
+                               Type *BoolTy) {
+  VPRegionBlock *TopRegion = Plan.getVectorLoopRegion();
+  VPBasicBlock *Header = TopRegion->getEntryBasicBlock();
+  VPBuilder Builder;
+  VPValue *HeaderMask = nullptr;
+  // First, introduce recipes to compute the mask for the vector loop header.
+  //
   // If we're using the active lane mask for control flow, then we get the
   // mask from the active lane mask PHI that is cached in the VPlan.
-  TailFoldingStyle TFStyle = CM.getTailFoldingStyle();
   if (useActiveLaneMaskForControlFlow(TFStyle)) {
-    BlockMaskCache[Header] = Plan.getActiveLaneMaskPhi();
-    return;
-  }
-
-  // Introduce the early-exit compare IV <= BTC to form header block mask.
-  // This is used instead of IV < TC because TC may wrap, unlike BTC. Start by
-  // constructing the desired canonical IV in the header block as its first
-  // non-phi instructions.
-
-  VPBasicBlock *HeaderVPBB = Plan.getVectorLoopRegion()->getEntryBasicBlock();
-  auto NewInsertionPoint = HeaderVPBB->getFirstNonPhi();
-  auto *IV = new VPWidenCanonicalIVRecipe(Plan.getCanonicalIV());
-  HeaderVPBB->insert(IV, NewInsertionPoint);
-
-  VPBuilder::InsertPointGuard Guard(Builder);
-  Builder.setInsertPoint(HeaderVPBB, NewInsertionPoint);
-  VPValue *BlockMask = nullptr;
-  if (useActiveLaneMask(TFStyle)) {
-    VPValue *TC = Plan.getTripCount();
-    BlockMask = Builder.createNaryOp(VPInstruction::ActiveLaneMask, {IV, TC},
-                                     nullptr, "active.lane.mask");
+    HeaderMask = Plan.getActiveLaneMaskPhi();
   } else {
-    VPValue *BTC = Plan.getOrCreateBackedgeTakenCount();
-    BlockMask = Builder.createNaryOp(VPInstruction::ICmpULE, {IV, BTC});
+    // Introduce the early-exit compare IV <= BTC to form header block mask.
+    // This is used instead of IV < TC because TC may wrap, unlike BTC. Start by
+    // constructing the desired canonical IV in the header block as its first
+    // non-phi instructions.
+    auto NewInsertionPoint = Header->getFirstNonPhi();
+    auto *IV = new VPWidenCanonicalIVRecipe(Plan.getCanonicalIV());
+    Header->insert(IV, Header->getFirstNonPhi());
+
+    VPBuilder::InsertPointGuard Guard(Builder);
+    Builder.setInsertPoint(Header, NewInsertionPoint);
+    if (useActiveLaneMask(TFStyle)) {
+      VPValue *TC = Plan.getTripCount();
+      HeaderMask = Builder.createNaryOp(VPInstruction::ActiveLaneMask, {IV, TC},
+                                        nullptr, "active.lane.mask");
+    } else {
+      VPValue *BTC = Plan.getOrCreateBackedgeTakenCount();
+      HeaderMask = Builder.createNaryOp(VPInstruction::ICmpULE, {IV, BTC});
+    }
   }
-  BlockMaskCache[Header] = BlockMask;
+
+  // Iterate over all recipes and adjust their masks as needed.
+  auto Iter = vp_depth_first_deep(Plan.getEntry());
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(Iter)) {
+    VPValue *BlockMask = nullptr;
+    VPValue *NewMask = nullptr;
+
+    auto OrWithHeaderMask = [&](VPValue *BlockInMask, VPRecipeBase *InsertPt) {
+      if (!NewMask) {
+        VPBuilder::InsertPointGuard Guard(Builder);
+        Builder.setInsertPoint(InsertPt->getParent(), InsertPt->getIterator());
+        VPValue *False =
+            Plan.getVPValueOrAddLiveIn(ConstantInt::getFalse(BoolTy));
+        NewMask = Builder.createSelect(HeaderMask, BlockInMask, False, {});
+      }
+      return NewMask;
+    };
+
+    auto NeedsNewMask = [&](VPRecipeBase &R) {
+      if (auto *RepR = dyn_cast<VPReplicateRecipe>(&R)) {
+        return !RepR->isUniform() &&
+               (RepR->mayHaveSideEffects() || RepR->mayReadFromMemory() ||
+                mayCauseUB(RepR->getUnderlyingInstr()->getOpcode()));
+      }
+      if (auto *CallR = dyn_cast<VPWidenCallRecipe>(&R))
+        return CallR->needsMask();
+
+      return isa<VPReductionRecipe, VPWidenMemoryInstructionRecipe,
+                 VPInterleaveRecipe>(&R);
+    };
+    for (VPRecipeBase &R : *VPBB) {
+      if (R.isMasked()) {
+        if (!BlockMask) {
+          BlockMask = R.getMask();
+        }
+        assert(BlockMask == R.getMask());
+        R.setOperand(R.getNumOperands() - 1, OrWithHeaderMask(BlockMask, &R));
+        continue;
+      }
+      if (NeedsNewMask(R)) {
+        R.addOperand(HeaderMask);
+        continue;
+      }
+      if (auto *Blend = dyn_cast<VPBlendRecipe>(&R)) {
+        for (unsigned I = 0; I < Blend->getNumIncomingValues(); ++I) {
+          VPValue *Cond = Blend->getMask(I);
+          R.setOperand(R.getNumOperands() - 1, OrWithHeaderMask(Cond, &R));
+        }
+      } else if (auto *BOM = dyn_cast<VPBranchOnMaskRecipe>(&R)) {
+        if (auto *Cond = BOM->getMask()) {
+          if (!BlockMask)
+            BlockMask = Cond;
+          R.setOperand(R.getNumOperands() - 1, OrWithHeaderMask(BlockMask, &R));
+        } else
+          R.addOperand(HeaderMask);
+      }
+    }
+  }
+
+  // If tail is folded by masking, introduce selects between the phi
+  // and the live-out instruction of each reduction, at the beginning of the
+  // dedicated latch block.
+  VPBasicBlock *Latch = cast<VPBasicBlock>(TopRegion->getExiting());
+  Builder.setInsertPoint(Latch, Latch->begin());
+  for (VPRecipeBase &R : Header->phis()) {
+    VPReductionPHIRecipe *PhiR = dyn_cast<VPReductionPHIRecipe>(&R);
+    if (!PhiR || PhiR->isInLoop())
+      continue;
+    auto *Red = PhiR->getBackedgeValue();
+    assert(Red->getDefiningRecipe()->getParent() != Latch &&
+           "reduction recipe must be defined before latch");
+    Builder.createNaryOp(Instruction::Select, {HeaderMask, Red, PhiR});
+  }
 }
 
 VPRecipeBase *VPRecipeBuilder::tryToWidenMemory(Instruction *I,
@@ -8340,7 +8418,7 @@ VPWidenCallRecipe *VPRecipeBuilder::tryToWidenCall(CallInst *CI,
     }
 
     return new VPWidenCallRecipe(*CI, make_range(Ops.begin(), Ops.end()),
-                                 Intrinsic::not_intrinsic, Variant);
+                                 Intrinsic::not_intrinsic, Variant, NeedsMask);
   }
 
   return nullptr;
@@ -8756,9 +8834,6 @@ LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(VFRange &Range) {
                         DLInst ? DLInst->getDebugLoc() : DebugLoc(),
                         CM.getTailFoldingStyle(IVUpdateMayOverflow));
 
-  // Proactively create header. Masks for other blocks are created on demand.
-  RecipeBuilder.createHeaderMask(*Plan);
-
   // Scan the body of the loop in a topological order to visit each basic block
   // after having visited its predecessor basic blocks.
   LoopBlocksDFS DFS(OrigLoop);
@@ -8811,9 +8886,11 @@ LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(VFRange &Range) {
       VPRecipeBase *Recipe = cast<VPRecipeBase *>(RecipeOrValue);
 
       bool IsPredicated = CM.isPredicatedInst(&I);
-      if (IsPredicated)
-        Recipe->addOperand(
-            RecipeBuilder.createBlockInMask(I.getParent(), *Plan));
+      if (IsPredicated) {
+        auto *M = RecipeBuilder.createBlockInMask(I.getParent(), *Plan);
+        if (M)
+          Recipe->addOperand(M);
+      }
 
       for (auto *Def : Recipe->definedValues()) {
         auto *UV = Def->getUnderlyingValue();
@@ -8898,6 +8975,12 @@ LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(VFRange &Range) {
         MemberR->eraseFromParent();
       }
   }
+
+  // Update Plan to fold the tail by masking.
+  if (CM.foldTailByMasking())
+    performTailFolding(
+        *Plan, CM.getTailFoldingStyle(),
+        IntegerType::get(OrigLoop->getHeader()->getContext(), 1));
 
   for (ElementCount VF : Range)
     Plan->addVF(VF);
@@ -9087,25 +9170,6 @@ void LoopVectorizationPlanner::adjustRecipesForReductions(
       LinkVPBB->appendRecipe(RedRecipe);
       CurrentLink->getVPSingleValue()->replaceAllUsesWith(RedRecipe);
       PreviousLink = RedRecipe;
-    }
-  }
-
-  // If tail is folded by masking, introduce selects between the phi
-  // and the live-out instruction of each reduction, at the beginning of the
-  // dedicated latch block.
-  if (CM.foldTailByMasking()) {
-    Builder.setInsertPoint(LatchVPBB, LatchVPBB->begin());
-    for (VPRecipeBase &R :
-         Plan->getVectorLoopRegion()->getEntryBasicBlock()->phis()) {
-      VPReductionPHIRecipe *PhiR = dyn_cast<VPReductionPHIRecipe>(&R);
-      if (!PhiR || PhiR->isInLoop())
-        continue;
-      VPValue *Cond =
-          RecipeBuilder.createBlockInMask(OrigLoop->getHeader(), *Plan);
-      VPValue *Red = PhiR->getBackedgeValue();
-      assert(Red->getDefiningRecipe()->getParent() != LatchVPBB &&
-             "reduction recipe must be defined before latch");
-      Builder.createNaryOp(Instruction::Select, {Cond, Red, PhiR});
     }
   }
 
