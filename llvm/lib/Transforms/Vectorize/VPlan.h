@@ -1796,15 +1796,12 @@ class VPReplicateRecipe : public VPRecipeWithIRFlags, public VPValue {
   /// Indicator if only a single replica per lane is needed.
   bool IsUniform;
 
-  /// Indicator if the replicas are also predicated.
-  bool IsPredicated;
-
 public:
   template <typename IterT>
   VPReplicateRecipe(Instruction *I, iterator_range<IterT> Operands,
                     bool IsUniform, VPValue *Mask = nullptr)
       : VPRecipeWithIRFlags(VPDef::VPReplicateSC, Operands, *I),
-        VPValue(this, I), IsUniform(IsUniform), IsPredicated(Mask) {
+        VPValue(this, I), IsUniform(IsUniform) {
     if (Mask)
       addOperand(Mask);
   }
@@ -1826,7 +1823,7 @@ public:
 
   bool isUniform() const { return IsUniform; }
 
-  bool isPredicated() const { return IsPredicated; }
+  bool isPredicated() const { return getUnderlyingInstr()->getNumOperands() + 1 == getNumOperands(); }
 
   /// Returns true if the recipe only uses the first lane of operand \p Op.
   bool onlyFirstLaneUsed(const VPValue *Op) const override {
