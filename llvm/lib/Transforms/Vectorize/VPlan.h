@@ -2110,9 +2110,8 @@ class VPActiveLaneMaskPHIRecipe : public VPHeaderPHIRecipe {
   DebugLoc DL;
 
 public:
-  VPActiveLaneMaskPHIRecipe(VPValue *StartMask, DebugLoc DL)
-      : VPHeaderPHIRecipe(VPDef::VPActiveLaneMaskPHISC, nullptr, StartMask),
-        DL(DL) {}
+  VPActiveLaneMaskPHIRecipe(DebugLoc DL)
+      : VPHeaderPHIRecipe(VPDef::VPActiveLaneMaskPHISC, nullptr), DL(DL) {}
 
   ~VPActiveLaneMaskPHIRecipe() override = default;
 
