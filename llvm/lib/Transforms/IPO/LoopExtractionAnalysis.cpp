@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/Transforms/IPO/ExtractGV.h"
 #include "llvm/Analysis/AssumptionCache.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
@@ -186,9 +187,11 @@ bool LoopExtractionAnalyzer::runOnModule(Module &M) {
   
   // Create remark emitter with hotness information attached
   legacy::PassManager PM;
-  PM.add(createGVExtractionPass(GVs));
-  PM.add(createStripDeadPrototypesPass());
-  PM.run(*ClonedModPtr);
+  ModulePassManager MPM;
+  MPM.addPass(ExtractGVPass(GVs));
+  MPM.addPass(StripDeadPrototypesPass());
+  ModuleAnalysisManager MAM;
+  MPM.run(*ClonedModPtr, MAM);
 
   M.getContext().setDiagnosticsHotnessRequested(true);
   ClonedModPtr->getContext().setDiagnosticsHotnessRequested(true);

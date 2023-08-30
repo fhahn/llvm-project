@@ -1,3 +1,4 @@
+#include "llvm/TargetParser/Triple.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/Analysis/AssumptionCache.h"
@@ -21,7 +22,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Dominators.h"
-#include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/PassManager.h"
 #include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/DiagnosticPrinter.h"
 
@@ -31,8 +32,7 @@
 #include "llvm/Transforms/Vectorize.h"
 
 #include "llvm/MC/TargetRegistry.h"
-#include "llvm/MC/SubtargetFeature.h"
-
+#include "llvm/TargetParser/SubtargetFeature.h"
 #include "llvm/IRReader/IRReader.h"
 
 #include "llvm/Target/TargetMachine.h"
@@ -106,7 +106,7 @@ public:
     const DiagnosticInfoOptimizationBase *DIOB =
       cast<DiagnosticInfoOptimizationBase>(&DI);
     if (DIOB) {
-      const Optional<uint64_t> Hotness = DIOB->getHotness();
+      const std::optional<uint64_t> Hotness = DIOB->getHotness();
       if (Hotness)
         dbgs() << "Hotness: " << Hotness.value() << "\n";
     }
@@ -156,18 +156,10 @@ private:
 };
 
 
-legacy::FunctionPassManager createFPM(Module &M) {
-  legacy::FunctionPassManager FPM(&M);
+FunctionPassManager createFPM(Module &M) {
+  FunctionPassManager FPM;
 
-  std::string Msg;
-  const Target *T = TargetRegistry::lookupTarget(M.getTargetTriple(), Msg);
-  SubtargetFeatures Features;
-  Features.getDefaultSubtargetFeatures(Triple(M.getTargetTriple()));
-
-  const TargetMachine *TM = T->createTargetMachine(M.getTargetTriple(), "", Features.getString(), TargetOptions(), Reloc::Static, M.getCodeModel(), CodeGenOpt::Default);
-
-  FPM.add(createTargetTransformInfoWrapperPass(TM->getTargetIRAnalysis()));
-  FPM.add(createLoopVectorizePass());
+  FPM.addPass(LoopVectorizePass());
 
   return FPM;
 }
@@ -213,7 +205,15 @@ void printLoopSummaries(Module &M) {
       NumDeterminableBounds++;
     }
     
-    FPM.run(F);
+    std::string Msg;
+    const Target *T = TargetRegistry::lookupTarget(M.getTargetTriple(), Msg);
+    SubtargetFeatures Features;
+    Features.getDefaultSubtargetFeatures(Triple(M.getTargetTriple()));
+    const TargetMachine *TM = T->createTargetMachine(M.getTargetTriple(), "", Features.getString(), TargetOptions(), Reloc::Static, M.getCodeModel(), CodeGenOpt::Default);
+    FunctionAnalysisManager FAM;
+    FAM.registerPass([&]() { return TM->getTargetIRAnalysis(); });
+
+    FPM.run(F, FAM);
     dbgs() << "Vectorized: ";
     switch (VectorizeRes) {
       case VectorizationResult::Success:
@@ -237,7 +237,7 @@ std::unique_ptr<Module> ModulePointer;
 std::vector<LoopDetails> LoopsVec;
 //MemoryBuffer *MB;
 
-LoopDetails AnalyzeLoops(Function &F, legacy::FunctionPassManager &FPM) {
+LoopDetails AnalyzeLoops(Function &F, FunctionPassManager &FPM) {
   LoopDetails Details;
   Details.F = &F;
   
@@ -276,7 +276,16 @@ LoopDetails AnalyzeLoops(Function &F, legacy::FunctionPassManager &FPM) {
   }
   
   // Find it it has been vectorized of not
-  FPM.run(F);
+  std::string Msg;
+  auto TargetTriple = F.getParent()->getTargetTriple();
+  const Target *T = TargetRegistry::lookupTarget(TargetTriple, Msg);
+  SubtargetFeatures Features;
+  Features.getDefaultSubtargetFeatures(Triple(TargetTriple));
+  const TargetMachine *TM = T->createTargetMachine(TargetTriple, "", Features.getString(), TargetOptions(), Reloc::Static, F.getParent()->getCodeModel(), CodeGenOpt::Default);
+  FunctionAnalysisManager FAM;
+  FAM.registerPass([&]() { return TM->getTargetIRAnalysis(); });
+
+  FPM.run(F, FAM);
   Details.VecRes = VectorizeRes;
   
   return Details;

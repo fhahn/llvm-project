@@ -62,6 +62,7 @@ set(LLVM_TEST_DEPENDS
           UnitTests
           bugpoint
           count
+          loop-analyzer
           llc
           lli
           lli-child-target
