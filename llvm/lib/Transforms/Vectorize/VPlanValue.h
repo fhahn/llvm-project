@@ -191,7 +191,7 @@ public:
   /// Returns true if the VPValue is defined outside any vector regions, i.e. it
   /// is a live-in value.
   /// TODO: Also handle recipes defined in pre-header blocks.
-  bool isDefinedOutsideVectorRegions() const { return !hasDefiningRecipe(); }
+  bool isDefinedOutsideVectorRegions() const;
 
   /// Returns the name associated with the VPValue. In case the VPValue has a
   /// defining recipe, look up the name in the containing VPlan. In case it is a

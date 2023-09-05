@@ -239,6 +239,8 @@ Value *VPTransformState::get(VPValue *Def, const VPIteration &Instance) {
   return Extract;
 }
 
+Value *VPTransformState::get(VPValue *Def) { return get(Def, 0); }
+
 Value *VPTransformState::get(VPValue *Def, unsigned Part) {
   // If Values have been set for this Def return the one relevant for \p Part.
   if (hasVectorValue(Def, Part))
@@ -297,16 +299,17 @@ Value *VPTransformState::get(VPValue *Def, unsigned Part) {
     LastLane = 0;
   }
 
-  auto *LastInst = cast<Instruction>(get(Def, {Part, LastLane}));
-  // Set the insert point after the last scalarized instruction or after the
-  // last PHI, if LastInst is a PHI. This ensures the insertelement sequence
-  // will directly follow the scalar definitions.
   auto OldIP = Builder.saveIP();
-  auto NewIP =
-      isa<PHINode>(LastInst)
-          ? BasicBlock::iterator(LastInst->getParent()->getFirstNonPHI())
-          : std::next(BasicBlock::iterator(LastInst));
-  Builder.SetInsertPoint(&*NewIP);
+  if (auto *LastInst = dyn_cast<Instruction>(get(Def, {Part, LastLane}))) {
+    // Set the insert point after the last scalarized instruction or after the
+    // last PHI, if LastInst is a PHI. This ensures the insertelement sequence
+    // will directly follow the scalar definitions.
+    auto NewIP =
+        isa<PHINode>(LastInst)
+            ? BasicBlock::iterator(LastInst->getParent()->getFirstNonPHI())
+            : std::next(BasicBlock::iterator(LastInst));
+    Builder.SetInsertPoint(&*NewIP);
+  }
 
   // However, if we are vectorizing, we need to construct the vector values.
   // If the value is known to be uniform after vectorization, we can just
@@ -321,7 +324,8 @@ Value *VPTransformState::get(VPValue *Def, unsigned Part) {
   } else {
     // Initialize packing with insertelements to start from undef.
     assert(!VF.isScalable() && "VF is assumed to be non scalable.");
-    Value *Undef = PoisonValue::get(VectorType::get(LastInst->getType(), VF));
+    Value *Undef =
+        PoisonValue::get(VectorType::get(ScalarValue->getType(), VF));
     set(Def, Undef, Part);
     for (unsigned Lane = 0; Lane < VF.getKnownMinValue(); ++Lane)
       packScalarIntoVectorValue(Def, {Part, Lane});
@@ -717,7 +721,7 @@ void VPRegionBlock::execute(VPTransformState *State) {
   // Enter replicating mode.
   State->Instance = VPIteration(0, 0);
 
-  for (unsigned Part = 0, UF = State->UF; Part < UF; ++Part) {
+  for (unsigned Part = 0; Part < 1; ++Part) {
     State->Instance->Part = Part;
     assert(!State->VF.isScalable() && "VF is assumed to be non scalable.");
     for (unsigned Lane = 0, VF = State->VF.getKnownMinValue(); Lane < VF;
@@ -809,6 +813,12 @@ void VPlan::prepareToExecute(Value *TripCountV, Value *VectorTripCountV,
   State.set(&VFxUF,
             createStepForVF(Builder, TripCountV->getType(), State.VF, State.UF),
             VPIteration(0, 0));
+  if (!State.VF.isScalable()) {
+    State.set(&VF, createStepForVF(Builder, TripCountV->getType(), State.VF, 1),
+              VPIteration(0, 0));
+  } else {
+    State.set(&VF, State.get(&VFxUF, VPIteration(0, 0)), VPIteration(0, 0));
+  }
 
   // When vectorizing the epilogue loop, the canonical induction start value
   // needs to be changed from zero to the value after the main vector loop.
@@ -877,6 +887,9 @@ void VPlan::execute(VPTransformState *State) {
       // Move the last step to the end of the latch block. This ensures
       // consistent placement of all induction updates.
       Instruction *Inc = cast<Instruction>(Phi->getIncomingValue(1));
+      if (isa<VPWidenIntOrFpInductionRecipe>(&R) && R.getNumOperands() == 3)
+        Inc->setOperand(0, State->get(R.getOperand(2)));
+
       Inc->moveBefore(VectorLatchBB->getTerminator()->getPrevNode());
       continue;
     }
@@ -892,13 +905,16 @@ void VPlan::execute(VPTransformState *State) {
                              cast<VPReductionPHIRecipe>(PhiR)->isOrdered());
     unsigned LastPartForNewPhi = SinglePartNeeded ? 1 : State->UF;
 
-    for (unsigned Part = 0; Part < LastPartForNewPhi; ++Part) {
+    for (unsigned Part = 0; Part < 1; ++Part) {
       Value *Phi = State->get(PhiR, Part);
       Value *Val =
           isa<VPCanonicalIVPHIRecipe>(PhiR)
               ? State->get(PhiR->getBackedgeValue(), VPIteration(Part, 0))
               : State->get(PhiR->getBackedgeValue(),
                            SinglePartNeeded ? State->UF - 1 : Part);
+      /*=======*/
+      /*State->get(PhiR->getBackedgeValue(), SinglePartNeeded ? 0 : Part);*/
+      /*>>>>>>> 8b2558a3a852 ([VPlt fetch orian] Foo.)*/
       cast<PHINode>(Phi)->addIncoming(Val, VectorLatchBB);
     }
   }
@@ -1300,6 +1316,10 @@ void VPlanIngredient::print(raw_ostream &O) const {
 #endif
 
 template void DomTreeBuilder::Calculate<VPDominatorTree>(VPDominatorTree &DT);
+
+bool VPValue::isDefinedOutsideVectorRegions() const {
+  return !hasDefiningRecipe() || !getDefiningRecipe()->getParent()->getParent();
+}
 
 void VPValue::replaceAllUsesWith(VPValue *New) {
   replaceUsesWithIf(New, [](VPUser &, unsigned) { return true; });

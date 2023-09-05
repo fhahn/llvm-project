@@ -99,6 +99,8 @@ struct VPlanTransforms {
   static void dropPoisonGeneratingRecipes(
       VPlan &Plan, function_ref<bool(BasicBlock *)> BlockNeedsPredication);
 
+  static void interleave(VPlan &Plan, unsigned IC, LLVMContext &Ctx);
+
 private:
   /// Remove redundant VPBasicBlocks by merging them into their predecessor if
   /// the predecessor has a single successor.

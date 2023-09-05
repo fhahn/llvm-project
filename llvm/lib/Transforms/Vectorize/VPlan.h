@@ -164,6 +164,7 @@ private:
 
 public:
   VPLane(unsigned Lane, Kind LaneKind) : Lane(Lane), LaneKind(LaneKind) {}
+  VPLane(unsigned Lane) : Lane(Lane), LaneKind(Kind::First) {}
 
   static VPLane getFirstLane() { return VPLane(0, VPLane::Kind::First); }
 
@@ -239,7 +240,7 @@ struct VPTransformState {
                    DominatorTree *DT, IRBuilderBase &Builder,
                    InnerLoopVectorizer *ILV, VPlan *Plan, LLVMContext &Ctx)
       : VF(VF), UF(UF), LI(LI), DT(DT), Builder(Builder), ILV(ILV), Plan(Plan),
-        LVer(nullptr), TypeAnalysis(Ctx) {}
+        LVer(nullptr), TypeAnalysis(*Plan, Ctx) {}
 
   /// The chosen Vectorization and Unroll Factors of the loop being vectorized.
   ElementCount VF;
@@ -267,10 +268,15 @@ struct VPTransformState {
   /// method will delegate the call to ILV in such cases in order to provide
   /// callers a consistent API.
   /// \see set.
+  Value *get(VPValue *Def);
   Value *get(VPValue *Def, unsigned Part);
 
   /// Get the generated Value for a given VPValue and given Part and Lane.
   Value *get(VPValue *Def, const VPIteration &Instance);
+
+  Value *get(VPValue *Def, const VPLane &Lane) {
+    return get(Def, VPIteration(0, Lane));
+  }
 
   bool hasVectorValue(VPValue *Def, unsigned Part) {
     auto I = Data.PerPartOutput.find(Def);
@@ -289,6 +295,8 @@ struct VPTransformState {
   }
 
   /// Set the generated Value for a given VPValue and a given Part.
+  void set(VPValue *Def, Value *V) { set(Def, V, 0); }
+
   void set(VPValue *Def, Value *V, unsigned Part) {
     if (!Data.PerPartOutput.count(Def)) {
       DataState::PerPartValuesTy Entry(UF);
@@ -302,6 +310,10 @@ struct VPTransformState {
     assert(Iter != Data.PerPartOutput.end() &&
            "need to overwrite existing value");
     Iter->second[Part] = V;
+  }
+
+  void set(VPValue *Def, Value *V, const VPLane &Lane) {
+    set(Def, V, VPIteration(0, Lane));
   }
 
   /// Set the generated scalar \p V for \p Def and the given \p Instance.
@@ -2398,6 +2410,9 @@ public:
     return getStartValue()->getLiveInIRValue()->getType();
   }
 
+  /// Returns the scalar type of the induction.
+  Type *getScalarType() { return getOperand(0)->getLiveInIRValue()->getType(); }
+
   /// Returns true if the recipe only uses the first lane of operand \p Op.
   bool onlyFirstLaneUsed(const VPValue *Op) const override {
     assert(is_contained(operands(), Op) &&
@@ -2867,6 +2882,7 @@ class VPlan {
 
   /// Represents the loop-invariant VF * UF of the vector loop region.
   VPValue VFxUF;
+  VPValue VF;
 
   /// Holds a mapping between Values and their corresponding VPValue inside
   /// VPlan.
@@ -2954,6 +2970,7 @@ public:
 
   /// Returns VF * UF of the vector loop region.
   VPValue &getVFxUF() { return VFxUF; }
+  VPValue &getVF() { return VF; }
 
   /// Mark the plan to indicate that using Value2VPValue is not safe any
   /// longer, because it may be stale.

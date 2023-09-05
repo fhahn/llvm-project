@@ -373,6 +373,7 @@ void VPlanTransforms::createAndOptimizeReplicateRegions(VPlan &Plan) {
     ShouldSimplify |= VPlanTransforms::mergeBlocksIntoPredecessors(Plan);
   }
 }
+
 bool VPlanTransforms::mergeBlocksIntoPredecessors(VPlan &Plan) {
   SmallVector<VPBasicBlock *> WorkList;
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
@@ -510,7 +511,7 @@ static VPValue *createScalarIVSteps(VPlan &Plan,
   }
 
   // Truncate base induction if needed.
-  VPTypeAnalysis TypeInfo(SE.getContext());
+  VPTypeAnalysis TypeInfo(Plan, SE.getContext());
   Type *ResultTy = TypeInfo.inferScalarType(BaseIV);
   if (TruncI) {
     Type *TruncTy = TruncI->getType();
@@ -918,7 +919,7 @@ static void simplifyRecipe(VPRecipeBase &R, VPTypeAnalysis &TypeInfo) {
 #ifndef NDEBUG
     // Verify that the cached type info is for both A and its users is still
     // accurate by comparing it to freshly computed types.
-    VPTypeAnalysis TypeInfo2(TypeInfo.getContext());
+    VPTypeAnalysis TypeInfo2(*R.getParent()->getPlan(), TypeInfo.getContext());
     assert(TypeInfo.inferScalarType(A) == TypeInfo2.inferScalarType(A));
     for (VPUser *U : A->users()) {
       auto *R = dyn_cast<VPRecipeBase>(U);
@@ -939,7 +940,7 @@ static void simplifyRecipe(VPRecipeBase &R, VPTypeAnalysis &TypeInfo) {
 static void simplifyRecipes(VPlan &Plan, LLVMContext &Ctx) {
   ReversePostOrderTraversal<VPBlockDeepTraversalWrapper<VPBlockBase *>> RPOT(
       Plan.getEntry());
-  VPTypeAnalysis TypeInfo(Ctx);
+  VPTypeAnalysis TypeInfo(Plan, Ctx);
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(RPOT)) {
     for (VPRecipeBase &R : make_early_inc_range(*VPBB)) {
       simplifyRecipe(R, TypeInfo);
@@ -960,7 +961,7 @@ void VPlanTransforms::truncateToMinimalBitwidths(
   // other uses have different types for their operands, making them invalidly
   // typed.
   DenseMap<VPValue *, VPWidenCastRecipe *> ProcessedTruncs;
-  VPTypeAnalysis TypeInfo(Ctx);
+  VPTypeAnalysis TypeInfo(Plan, Ctx);
   VPBasicBlock *PH = Plan.getEntry();
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
            vp_depth_first_deep(Plan.getVectorLoopRegion()))) {
@@ -1322,4 +1323,193 @@ void VPlanTransforms::dropPoisonGeneratingRecipes(
       }
     }
   }
+}
+
+static VPValue *getInterleavedValue(
+    DenseMap<VPValue *, SmallVector<VPValue *>> &InterleavedValues, VPValue *V,
+    unsigned IC) {
+
+  if (V->isDefinedOutsideVectorRegions())
+    return V;
+  if (IC == 0)
+    return V;
+  if (V->isLiveIn())
+    return V;
+  return InterleavedValues[V][IC - 1];
+}
+
+void VPlanTransforms::interleave(VPlan &Plan, unsigned IC, LLVMContext &Ctx) {
+  assert(IC > 0);
+  if (IC == 1)
+    return;
+  DenseMap<VPValue *, SmallVector<VPValue *>> InterleavedValues;
+
+  VPTypeAnalysis TypeInfo(Plan, Ctx);
+  ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>> RPOT(
+      Plan.getVectorLoopRegion()->getEntry());
+  Type *CanIVIntTy = nullptr;
+  SmallVector<SmallVector<VPHeaderPHIRecipe *>> PhisToRemap;
+  for (VPBlockBase *VPB : RPOT) {
+    auto *VPR = dyn_cast<VPRegionBlock>(VPB);
+    if (VPR) {
+      for (unsigned I = 1; I != IC; ++I) {
+        auto *Copy = VPR->clone();
+        VPBlockUtils::insertBlockAfter(Copy, VPB);
+
+        ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>>
+            RPOT(Copy);
+        for (VPBasicBlock *VPBB :
+             VPBlockUtils::blocksOnly<VPBasicBlock>(RPOT)) {
+          if (VPBB->getParent() != Copy)
+            break;
+          for (auto &CopyR : *VPBB) {
+            for (unsigned Idx = 0; Idx != CopyR.getNumOperands(); ++Idx) {
+              if (VPBB->getParent() == Copy)
+                continue;
+              CopyR.setOperand(Idx,
+                               getInterleavedValue(InterleavedValues,
+                                                   CopyR.getOperand(Idx), I));
+            }
+          }
+        }
+      }
+      continue;
+    }
+    auto *VPBB = cast<VPBasicBlock>(VPB);
+    for (VPRecipeBase &R : make_early_inc_range(*VPBB)) {
+      if (auto *VPI = dyn_cast<VPInstruction>(&R))
+        if (VPI->getOpcode() == VPInstruction::BranchOnCount ||
+            VPI->getOpcode() ==
+                /*VPInstruction::CanonicalIVIncrement*/ Instruction::Add)
+          continue;
+
+      VPRecipeBase *InsertPt = &R;
+      if (auto *CanIV = dyn_cast<VPCanonicalIVPHIRecipe>(&R)) {
+        VPValue *Prev = R.getVPSingleValue();
+        CanIVIntTy = CanIV->getScalarType();
+        for (unsigned I = 1; I != IC; ++I) {
+          /*          auto *Inc = new
+           * VPInstruction(VPInstruction::CanonicalIVIncrementForPart, {Prev,
+           * Plan.getVPValueOrAddLiveIn(ConstantInt::get(CanIV->getScalarType(),
+           * I)) }, {false, false});*/
+          /*Inc->insertAfter(InsertPt);*/
+          /*InsertPt = Inc;*/
+          auto Ins = InterleavedValues.insert({R.getVPSingleValue(), {}});
+          Ins.first->second.push_back(CanIV);
+        }
+        continue;
+      }
+      if (auto DerivedIV = dyn_cast<VPDerivedIVRecipe>(&R)) {
+        for (unsigned I = 1; I != IC; ++I) {
+          auto Ins = InterleavedValues.insert({DerivedIV, {}});
+          Ins.first->second.push_back(DerivedIV);
+        }
+        continue;
+      }
+      if (auto *IV = dyn_cast<VPWidenIntOrFpInductionRecipe>(&R)) {
+        for (unsigned I = 1; I != IC; ++I) {
+          auto Ins = InterleavedValues.insert({R.getVPSingleValue(), {}});
+          VPValue *Step = &Plan.getVF();
+          if (TypeInfo.inferScalarType(Step) != TypeInfo.inferScalarType(IV)) {
+            Step = new VPWidenCastRecipe(Instruction::Trunc, Step,
+                                         IV->getScalarType());
+            Step->getDefiningRecipe()->insertAfter(InsertPt);
+            InsertPt = Step->getDefiningRecipe();
+          }
+
+          auto *Add = new VPInstruction(
+              Instruction::Add,
+              {
+                  getInterleavedValue(InterleavedValues, R.getVPSingleValue(),
+                                      I - 1),
+                  Step,
+              },
+              R.getDebugLoc());
+          Add->insertAfter(InsertPt);
+          InsertPt = Add;
+          Ins.first->second.push_back(Add);
+        }
+        R.addOperand(getInterleavedValue(InterleavedValues,
+                                         R.getVPSingleValue(), IC - 1));
+        continue;
+      }
+
+      for (unsigned I = 1; I != IC; ++I) {
+        if (isa<VPReplicateRecipe>(&R) &&
+            (isa<LoadInst, StoreInst>(
+                R.getVPSingleValue()->getUnderlyingValue())) &&
+            all_of(R.operands(), [](VPValue *Op) {
+              return Op->isDefinedOutsideVectorRegions();
+            })) {
+          unsigned Idx = 0;
+          for (VPValue *Res : R.definedValues()) {
+            auto Ins = InterleavedValues.insert({Res, {}});
+            Ins.first->second.push_back(Res);
+            Idx++;
+          }
+          continue;
+        }
+
+        VPRecipeBase *Copy = R.clone();
+        Copy->insertAfter(InsertPt);
+        InsertPt = Copy;
+        unsigned Idx = 0;
+        for (VPValue *Res : R.definedValues()) {
+          auto Ins = InterleavedValues.insert({Res, {}});
+          Ins.first->second.push_back(Copy->getVPValue(Idx));
+          Idx++;
+        }
+
+        if (isa<VPWidenPointerInductionRecipe>(&R)) {
+          Copy->addOperand(R.getVPSingleValue());
+          Copy->addOperand(
+              Plan.getVPValueOrAddLiveIn(ConstantInt::get(CanIVIntTy, I)));
+          continue;
+        }
+
+        if (auto *H = dyn_cast<VPHeaderPHIRecipe>(Copy)) {
+          if (I == 1)
+            PhisToRemap.emplace_back();
+          PhisToRemap.back().push_back(H);
+          continue;
+        }
+        for (unsigned Idx = 0; Idx != Copy->getNumOperands(); ++Idx)
+          Copy->setOperand(Idx, getInterleavedValue(InterleavedValues,
+                                                    Copy->getOperand(Idx), I));
+        if (auto *ScalarIVSteps = dyn_cast<VPScalarIVStepsRecipe>(Copy)) {
+          ScalarIVSteps->addOperand(
+              Plan.getVPValueOrAddLiveIn(ConstantInt::get(CanIVIntTy, I)));
+        }
+        if (isa<VPVectorPointerRecipe>(R)) {
+          Copy->setOperand(0, R.getOperand(0));
+          Copy->addOperand(
+              Plan.getVPValueOrAddLiveIn(ConstantInt::get(CanIVIntTy, I)));
+        }
+      }
+    }
+  }
+  for (auto &R : PhisToRemap) {
+    unsigned I = 1;
+    for (VPHeaderPHIRecipe *H : R) {
+      for (unsigned Idx = 0; Idx != H->getNumOperands(); ++Idx)
+        H->setOperand(
+            Idx, getInterleavedValue(InterleavedValues, H->getOperand(Idx), I));
+      I++;
+    }
+  }
+
+  for (VPRecipeBase &R :
+       *cast<VPBasicBlock>(Plan.getVectorLoopRegion()->getSingleSuccessor())) {
+    if (getOpcodeForRecipe(R) == VPInstruction::ComputeReductionResult) {
+      for (unsigned I = 1; I != IC; ++I) {
+        R.addOperand(
+            getInterleavedValue(InterleavedValues, R.getOperand(1), I));
+      }
+      continue;
+    }
+  }
+
+  for (const auto &[_, LO] : Plan.getLiveOuts())
+    LO->setOperand(
+        0, getInterleavedValue(InterleavedValues, LO->getOperand(0), IC - 1));
 }

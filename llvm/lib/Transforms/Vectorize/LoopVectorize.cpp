@@ -558,8 +558,7 @@ public:
   /// inclusive. Uses the VPValue operands from \p RepRecipe instead of \p
   /// Instr's operands.
   void scalarizeInstruction(const Instruction *Instr,
-                            VPReplicateRecipe *RepRecipe,
-                            const VPIteration &Instance,
+                            VPReplicateRecipe *RepRecipe, const VPLane &Lane,
                             VPTransformState &State);
 
   /// Try to vectorize interleaved access group \p Group with the base address
@@ -2405,7 +2404,6 @@ void InnerLoopVectorizer::vectorizeInterleaveGroup(
   auto *VecTy = VectorType::get(ScalarTy, VF * InterleaveFactor);
 
   // Prepare for the new pointers.
-  SmallVector<Value *, 2> AddrParts;
   unsigned Index = Group->getIndex(Instr);
 
   // TODO: extend the masked interleaved-group support to reversed access.
@@ -2428,40 +2426,37 @@ void InnerLoopVectorizer::vectorizeInterleaveGroup(
   } else
     Idx = Builder.getInt32(-Index);
 
-  for (unsigned Part = 0; Part < UF; Part++) {
-    Value *AddrPart = State.get(Addr, VPIteration(Part, 0));
-    if (auto *I = dyn_cast<Instruction>(AddrPart))
-      State.setDebugLocFrom(I->getDebugLoc());
+  Value *AddrV = State.get(Addr, VPLane(0));
+  if (auto *I = dyn_cast<Instruction>(AddrV))
+    State.setDebugLocFrom(I->getDebugLoc());
 
-    // Notice current instruction could be any index. Need to adjust the address
-    // to the member of index 0.
-    //
-    // E.g.  a = A[i+1];     // Member of index 1 (Current instruction)
-    //       b = A[i];       // Member of index 0
-    // Current pointer is pointed to A[i+1], adjust it to A[i].
-    //
-    // E.g.  A[i+1] = a;     // Member of index 1
-    //       A[i]   = b;     // Member of index 0
-    //       A[i+2] = c;     // Member of index 2 (Current instruction)
-    // Current pointer is pointed to A[i+2], adjust it to A[i].
+  // Notice current instruction could be any index. Need to adjust the address
+  // to the member of index 0.
+  //
+  // E.g.  a = A[i+1];     // Member of index 1 (Current instruction)
+  //       b = A[i];       // Member of index 0
+  // Current pointer is pointed to A[i+1], adjust it to A[i].
+  //
+  // E.g.  A[i+1] = a;     // Member of index 1
+  //       A[i]   = b;     // Member of index 0
+  //       A[i+2] = c;     // Member of index 2 (Current instruction)
+  // Current pointer is pointed to A[i+2], adjust it to A[i].
 
-    bool InBounds = false;
-    if (auto *gep = dyn_cast<GetElementPtrInst>(AddrPart->stripPointerCasts()))
-      InBounds = gep->isInBounds();
-    AddrPart = Builder.CreateGEP(ScalarTy, AddrPart, Idx, "", InBounds);
-    AddrParts.push_back(AddrPart);
-  }
+  bool InBounds = false;
+  if (auto *gep = dyn_cast<GetElementPtrInst>(AddrV->stripPointerCasts()))
+    InBounds = gep->isInBounds();
+  AddrV = Builder.CreateGEP(ScalarTy, AddrV, Idx, "", InBounds);
 
   State.setDebugLocFrom(Instr->getDebugLoc());
   Value *PoisonVec = PoisonValue::get(VecTy);
 
-  auto CreateGroupMask = [this, &BlockInMask, &State, &InterleaveFactor](
-                             unsigned Part, Value *MaskForGaps) -> Value * {
+  auto CreateGroupMask = [this, &BlockInMask, &State,
+                          &InterleaveFactor](Value *MaskForGaps) -> Value * {
     if (VF.isScalable()) {
       assert(!MaskForGaps && "Interleaved groups with gaps are not supported.");
       assert(InterleaveFactor == 2 &&
              "Unsupported deinterleave factor for scalable vectors");
-      auto *BlockInMaskPart = State.get(BlockInMask, Part);
+      auto *BlockInMaskPart = State.get(BlockInMask);
       SmallVector<Value *, 2> Ops = {BlockInMaskPart, BlockInMaskPart};
       auto *MaskTy =
           VectorType::get(Builder.getInt1Ty(), VF.getKnownMinValue() * 2, true);
@@ -2473,7 +2468,7 @@ void InnerLoopVectorizer::vectorizeInterleaveGroup(
     if (!BlockInMask)
       return MaskForGaps;
 
-    Value *BlockInMaskPart = State.get(BlockInMask, Part);
+    Value *BlockInMaskPart = State.get(BlockInMask);
     Value *ShuffledMask = Builder.CreateShuffleVector(
         BlockInMaskPart,
         createReplicatedMask(InterleaveFactor, VF.getKnownMinValue()),
@@ -2493,54 +2488,47 @@ void InnerLoopVectorizer::vectorizeInterleaveGroup(
     }
 
     // For each unroll part, create a wide load for the group.
-    SmallVector<Value *, 2> NewLoads;
-    for (unsigned Part = 0; Part < UF; Part++) {
-      Instruction *NewLoad;
-      if (BlockInMask || MaskForGaps) {
-        assert(useMaskedInterleavedAccesses(*TTI) &&
-               "masked interleaved groups are not allowed.");
-        Value *GroupMask = CreateGroupMask(Part, MaskForGaps);
-        NewLoad =
-            Builder.CreateMaskedLoad(VecTy, AddrParts[Part], Group->getAlign(),
-                                     GroupMask, PoisonVec, "wide.masked.vec");
-      }
-      else
-        NewLoad = Builder.CreateAlignedLoad(VecTy, AddrParts[Part],
-                                            Group->getAlign(), "wide.vec");
-      Group->addMetadata(NewLoad);
-      NewLoads.push_back(NewLoad);
-    }
+    Instruction *NewLoad;
+    if (BlockInMask || MaskForGaps) {
+      assert(useMaskedInterleavedAccesses(*TTI) &&
+             "masked interleaved groups are not allowed.");
+      Value *GroupMask = CreateGroupMask(MaskForGaps);
+      NewLoad =
+          Builder.CreateMaskedLoad(VecTy, AddrV, Group->getAlign(), GroupMask,
+                                   PoisonVec, "wide.masked.vec");
+    } else
+      NewLoad = Builder.CreateAlignedLoad(VecTy, AddrV, Group->getAlign(),
+                                          "wide.vec");
+    Group->addMetadata(NewLoad);
 
     if (VecTy->isScalableTy()) {
       assert(InterleaveFactor == 2 &&
              "Unsupported deinterleave factor for scalable vectors");
 
-      for (unsigned Part = 0; Part < UF; ++Part) {
         // Scalable vectors cannot use arbitrary shufflevectors (only splats),
         // so must use intrinsics to deinterleave.
-        Value *DI = Builder.CreateIntrinsic(
-            Intrinsic::experimental_vector_deinterleave2, VecTy, NewLoads[Part],
-            /*FMFSource=*/nullptr, "strided.vec");
-        unsigned J = 0;
-        for (unsigned I = 0; I < InterleaveFactor; ++I) {
-          Instruction *Member = Group->getMember(I);
+      Value *DI = Builder.CreateIntrinsic(
+          Intrinsic::experimental_vector_deinterleave2, VecTy, NewLoad,
+          /*FMFSource=*/nullptr, "strided.vec");
+      unsigned J = 0;
+      for (unsigned I = 0; I < InterleaveFactor; ++I) {
+        Instruction *Member = Group->getMember(I);
 
-          if (!Member)
-            continue;
+        if (!Member)
+          continue;
 
-          Value *StridedVec = Builder.CreateExtractValue(DI, I);
-          // If this member has different type, cast the result type.
-          if (Member->getType() != ScalarTy) {
-            VectorType *OtherVTy = VectorType::get(Member->getType(), VF);
-            StridedVec = createBitOrPointerCast(StridedVec, OtherVTy, DL);
-          }
-
-          if (Group->isReverse())
-            StridedVec = Builder.CreateVectorReverse(StridedVec, "reverse");
-
-          State.set(VPDefs[J], StridedVec, Part);
-          ++J;
+        Value *StridedVec = Builder.CreateExtractValue(DI, I);
+        // If this member has different type, cast the result type.
+        if (Member->getType() != ScalarTy) {
+          VectorType *OtherVTy = VectorType::get(Member->getType(), VF);
+          StridedVec = createBitOrPointerCast(StridedVec, OtherVTy, DL);
         }
+
+        if (Group->isReverse())
+          StridedVec = Builder.CreateVectorReverse(StridedVec, "reverse");
+
+        State.set(VPDefs[J], StridedVec);
+        ++J;
       }
 
       return;
@@ -2558,22 +2546,20 @@ void InnerLoopVectorizer::vectorizeInterleaveGroup(
 
       auto StrideMask =
           createStrideMask(I, InterleaveFactor, VF.getKnownMinValue());
-      for (unsigned Part = 0; Part < UF; Part++) {
-        Value *StridedVec = Builder.CreateShuffleVector(
-            NewLoads[Part], StrideMask, "strided.vec");
+      Value *StridedVec =
+          Builder.CreateShuffleVector(NewLoad, StrideMask, "strided.vec");
 
-        // If this member has different type, cast the result type.
-        if (Member->getType() != ScalarTy) {
-          assert(!VF.isScalable() && "VF is assumed to be non scalable.");
-          VectorType *OtherVTy = VectorType::get(Member->getType(), VF);
-          StridedVec = createBitOrPointerCast(StridedVec, OtherVTy, DL);
-        }
-
-        if (Group->isReverse())
-          StridedVec = Builder.CreateVectorReverse(StridedVec, "reverse");
-
-        State.set(VPDefs[J], StridedVec, Part);
+      // If this member has different type, cast the result type.
+      if (Member->getType() != ScalarTy) {
+        assert(!VF.isScalable() && "VF is assumed to be non scalable.");
+        VectorType *OtherVTy = VectorType::get(Member->getType(), VF);
+        StridedVec = createBitOrPointerCast(StridedVec, OtherVTy, DL);
       }
+
+      if (Group->isReverse())
+        StridedVec = Builder.CreateVectorReverse(StridedVec, "reverse");
+
+      State.set(VPDefs[J], StridedVec);
       ++J;
     }
     return;
@@ -2589,61 +2575,58 @@ void InnerLoopVectorizer::vectorizeInterleaveGroup(
          "masked interleaved groups are not allowed.");
   assert((!MaskForGaps || !VF.isScalable()) &&
          "masking gaps for scalable vectors is not yet supported.");
-  for (unsigned Part = 0; Part < UF; Part++) {
-    // Collect the stored vector from each member.
-    SmallVector<Value *, 4> StoredVecs;
-    unsigned StoredIdx = 0;
-    for (unsigned i = 0; i < InterleaveFactor; i++) {
-      assert((Group->getMember(i) || MaskForGaps) &&
-             "Fail to get a member from an interleaved store group");
-      Instruction *Member = Group->getMember(i);
+  // Collect the stored vector from each member.
+  SmallVector<Value *, 4> StoredVecs;
+  unsigned StoredIdx = 0;
+  for (unsigned i = 0; i < InterleaveFactor; i++) {
+    assert((Group->getMember(i) || MaskForGaps) &&
+           "Fail to get a member from an interleaved store group");
+    Instruction *Member = Group->getMember(i);
 
-      // Skip the gaps in the group.
-      if (!Member) {
-        Value *Undef = PoisonValue::get(SubVT);
-        StoredVecs.push_back(Undef);
-        continue;
-      }
-
-      Value *StoredVec = State.get(StoredValues[StoredIdx], Part);
-      ++StoredIdx;
-
-      if (Group->isReverse())
-        StoredVec = Builder.CreateVectorReverse(StoredVec, "reverse");
-
-      // If this member has different type, cast it to a unified type.
-
-      if (StoredVec->getType() != SubVT)
-        StoredVec = createBitOrPointerCast(StoredVec, SubVT, DL);
-
-      StoredVecs.push_back(StoredVec);
+    // Skip the gaps in the group.
+    if (!Member) {
+      Value *Undef = PoisonValue::get(SubVT);
+      StoredVecs.push_back(Undef);
+      continue;
     }
 
-    // Interleave all the smaller vectors into one wider vector.
-    Value *IVec = interleaveVectors(Builder, StoredVecs, "interleaved.vec");
-    Instruction *NewStoreInstr;
-    if (BlockInMask || MaskForGaps) {
-      Value *GroupMask = CreateGroupMask(Part, MaskForGaps);
-      NewStoreInstr = Builder.CreateMaskedStore(IVec, AddrParts[Part],
-                                                Group->getAlign(), GroupMask);
-    } else
-      NewStoreInstr =
-          Builder.CreateAlignedStore(IVec, AddrParts[Part], Group->getAlign());
+    Value *StoredVec = State.get(StoredValues[StoredIdx]);
+    ++StoredIdx;
 
-    Group->addMetadata(NewStoreInstr);
+    if (Group->isReverse())
+      StoredVec = Builder.CreateVectorReverse(StoredVec, "reverse");
+
+    // If this member has different type, cast it to a unified type.
+
+    if (StoredVec->getType() != SubVT)
+      StoredVec = createBitOrPointerCast(StoredVec, SubVT, DL);
+
+    StoredVecs.push_back(StoredVec);
   }
+
+  // Interleave all the smaller vectors into one wider vector.
+  Value *IVec = interleaveVectors(Builder, StoredVecs, "interleaved.vec");
+  Instruction *NewStoreInstr;
+  if (BlockInMask || MaskForGaps) {
+    Value *GroupMask = CreateGroupMask(MaskForGaps);
+    NewStoreInstr =
+        Builder.CreateMaskedStore(IVec, AddrV, Group->getAlign(), GroupMask);
+  } else
+    NewStoreInstr = Builder.CreateAlignedStore(IVec, AddrV, Group->getAlign());
+
+  Group->addMetadata(NewStoreInstr);
 }
 
 void InnerLoopVectorizer::scalarizeInstruction(const Instruction *Instr,
                                                VPReplicateRecipe *RepRecipe,
-                                               const VPIteration &Instance,
+                                               const VPLane &Lane,
                                                VPTransformState &State) {
   assert(!Instr->getType()->isAggregateType() && "Can't handle vectors");
 
   // llvm.experimental.noalias.scope.decl intrinsics must only be duplicated for
   // the first lane and part.
   if (isa<NoAliasScopeDeclInst>(Instr))
-    if (!Instance.isFirstIteration())
+    if (!Lane.isFirstLane())
       return;
 
   // Does this instruction return a value ?
@@ -2668,10 +2651,10 @@ void InnerLoopVectorizer::scalarizeInstruction(const Instruction *Instr,
   // Replace the operands of the cloned instructions with their scalar
   // equivalents in the new loop.
   for (const auto &I : enumerate(RepRecipe->operands())) {
-    auto InputInstance = Instance;
+    auto InputInstance = Lane;
     VPValue *Operand = I.value();
     if (vputils::isUniformAfterVectorization(Operand))
-      InputInstance.Lane = VPLane::getFirstLane();
+      InputInstance = VPLane::getFirstLane();
     Cloned->setOperand(I.index(), State.get(Operand, InputInstance));
   }
   State.addNewMetadata(Cloned, Instr);
@@ -2679,7 +2662,7 @@ void InnerLoopVectorizer::scalarizeInstruction(const Instruction *Instr,
   // Place the cloned scalar in the new loop.
   State.Builder.Insert(Cloned);
 
-  State.set(RepRecipe, Cloned, Instance);
+  State.set(RepRecipe, Cloned, Lane);
 
   // If we just cloned a new assumption, add it the assumption cache.
   if (auto *II = dyn_cast<AssumeInst>(Cloned))
@@ -7392,7 +7375,7 @@ static void createAndCollectMergePhiForReduction(
 
   TrackingVH<Value> ReductionStartValue = RdxDesc.getRecurrenceStartValue();
   Value *FinalValue =
-      State.get(RedResult, VPIteration(State.UF - 1, VPLane::getFirstLane()));
+      State.get(RedResult, VPIteration(0, VPLane::getFirstLane()));
   auto *ResumePhi =
       dyn_cast<PHINode>(PhiR->getStartValue()->getUnderlyingValue());
 
@@ -7450,6 +7433,8 @@ LoopVectorizationPlanner::executePlan(
   LLVM_DEBUG(dbgs() << "Executing best plan with VF=" << BestVF << ", UF=" << BestUF
                     << '\n');
 
+  VPlanTransforms::interleave(BestVPlan, BestUF,
+                              OrigLoop->getHeader()->getModule()->getContext());
   if (!IsEpilogueVectorization)
     VPlanTransforms::optimizeForVFAndUF(BestVPlan, BestVF, BestUF, PSE);
 
@@ -7520,6 +7505,26 @@ LoopVectorizationPlanner::executePlan(
     createAndCollectMergePhiForReduction(dyn_cast<VPInstruction>(&R),
                                          ReductionResumeValues, State, OrigLoop,
                                          State.CFG.VPBB2IRBB[ExitVPBB]);
+    /*=======*/
+    /*for (VPRecipeBase &R : *cast<VPBasicBlock>(*/
+    /*BestVPlan.getVectorLoopRegion()->getSingleSuccessor())) {*/
+
+    /*auto *Red = dyn_cast<VPInstruction>(&R);*/
+    /*if (!Red || Red->getOpcode() != VPInstruction::ComputeReductionResult)*/
+    /*continue;*/
+
+    /*Value *FinalValue =*/
+    /*State.get(Red, VPIteration(0, VPLane::getLastLaneForVF(State.VF)));*/
+    /*auto *PhiR = cast<VPReductionPHIRecipe>(Red->getOperand(0));*/
+    /*assert(FinalValue->hasOneUse() || PhiR->isInLoop() ||*/
+    /*PhiR->getRecurrenceDescriptor().IntermediateStore);*/
+
+    /*PHINode *MergePhi = nullptr;*/
+    /*for (Value *U : FinalValue->users())*/
+    /*if (auto *P = dyn_cast<PHINode>(U))*/
+    /*MergePhi = P;*/
+    /*ReductionResumeValues[&PhiR->getRecurrenceDescriptor()] = MergePhi;*/
+    /*>>>>>>> 324a5801ea67 ([VPlt fetch orian] Foo.)*/
   }
 
   // 2.6. Maintain Loop Hints
@@ -9134,39 +9139,51 @@ void VPWidenPointerInductionRecipe::execute(VPTransformState &State) {
 
   auto *IVR = getParent()->getPlan()->getCanonicalIV();
   PHINode *CanonicalIV = cast<PHINode>(State.get(IVR, 0));
+  unsigned Part = 0;
+  if (getNumOperands() == 4)
+    Part = cast<ConstantInt>(getOperand(3)->getLiveInIRValue())->getZExtValue();
   Type *PhiType = IndDesc.getStep()->getType();
 
   // Build a pointer phi
   Value *ScalarStartValue = getStartValue()->getLiveInIRValue();
   Type *ScStValueType = ScalarStartValue->getType();
-  PHINode *NewPointerPhi =
-      PHINode::Create(ScStValueType, 2, "pointer.phi", CanonicalIV);
+  PHINode *NewPointerPhi = nullptr;
 
   BasicBlock *VectorPH = State.CFG.getPreheaderBBFor(this);
-  NewPointerPhi->addIncoming(ScalarStartValue, VectorPH);
+  if (getNumOperands() == 4) {
+    auto *GEP = cast<GetElementPtrInst>(State.get(getOperand(2)));
+    NewPointerPhi = cast<PHINode>(GEP->getPointerOperand());
+  } else {
+    NewPointerPhi =
+        PHINode::Create(ScStValueType, 2, "pointer.phi", CanonicalIV);
+    NewPointerPhi->addIncoming(ScalarStartValue, VectorPH);
+  }
 
   // A pointer induction, performed by using a gep
   Instruction *InductionLoc = &*State.Builder.GetInsertPoint();
 
-  Value *ScalarStepValue = State.get(getOperand(1), VPIteration(0, 0));
   Value *RuntimeVF = getRuntimeVF(State.Builder, PhiType, State.VF);
+  Value *ScalarStepValue = State.get(getOperand(1), VPIteration(0, 0));
   Value *NumUnrolledElems =
       State.Builder.CreateMul(RuntimeVF, ConstantInt::get(PhiType, State.UF));
-  Value *InductionGEP = GetElementPtrInst::Create(
-      State.Builder.getInt8Ty(), NewPointerPhi,
-      State.Builder.CreateMul(ScalarStepValue, NumUnrolledElems), "ptr.ind",
-      InductionLoc);
+
   // Add induction update using an incorrect block temporarily. The phi node
   // will be fixed after VPlan execution. Note that at this point the latch
   // block cannot be used, as it does not exist yet.
   // TODO: Model increment value in VPlan, by turning the recipe into a
   // multi-def and a subclass of VPHeaderPHIRecipe.
-  NewPointerPhi->addIncoming(InductionGEP, VectorPH);
+  if (getNumOperands() != 4) {
+    Value *InductionGEP = GetElementPtrInst::Create(
+        State.Builder.getInt8Ty(), NewPointerPhi,
+        State.Builder.CreateMul(ScalarStepValue, NumUnrolledElems), "ptr.ind",
+        InductionLoc);
+
+    NewPointerPhi->addIncoming(InductionGEP, VectorPH);
+  }
 
   // Create UF many actual address geps that use the pointer
   // phi as base and a vectorized version of the step value
   // (<step*0, ..., step*N>) as offset.
-  for (unsigned Part = 0; Part < State.UF; ++Part) {
     Type *VecPhiType = VectorType::get(PhiType, State.VF);
     Value *StartOffsetScalar =
         State.Builder.CreateMul(RuntimeVF, ConstantInt::get(PhiType, Part));
@@ -9176,7 +9193,7 @@ void VPWidenPointerInductionRecipe::execute(VPTransformState &State) {
     StartOffset = State.Builder.CreateAdd(
         StartOffset, State.Builder.CreateStepVector(VecPhiType));
 
-    assert(ScalarStepValue == State.get(getOperand(1), VPIteration(Part, 0)) &&
+    assert(ScalarStepValue == State.get(getOperand(1), VPIteration(0, 0)) &&
            "scalar step must be the same across all parts");
     Value *GEP = State.Builder.CreateGEP(
         State.Builder.getInt8Ty(), NewPointerPhi,
@@ -9184,8 +9201,7 @@ void VPWidenPointerInductionRecipe::execute(VPTransformState &State) {
             StartOffset,
             State.Builder.CreateVectorSplat(State.VF, ScalarStepValue),
             "vector.gep"));
-    State.set(this, GEP, Part);
-  }
+    State.set(this, GEP, 0);
 }
 
 void VPDerivedIVRecipe::execute(VPTransformState &State) {
@@ -9222,23 +9238,21 @@ void VPReductionRecipe::execute(VPTransformState &State) {
   // Propagate the fast-math flags carried by the underlying instruction.
   IRBuilderBase::FastMathFlagGuard FMFGuard(State.Builder);
   State.Builder.setFastMathFlags(RdxDesc.getFastMathFlags());
-  for (unsigned Part = 0; Part < State.UF; ++Part) {
-    Value *NewVecOp = State.get(getVecOp(), Part);
-    if (VPValue *Cond = getCondOp()) {
-      Value *NewCond = State.VF.isVector() ? State.get(Cond, Part)
-                                           : State.get(Cond, {Part, 0});
-      VectorType *VecTy = dyn_cast<VectorType>(NewVecOp->getType());
-      Type *ElementTy = VecTy ? VecTy->getElementType() : NewVecOp->getType();
-      Value *Iden = RdxDesc.getRecurrenceIdentity(Kind, ElementTy,
-                                                  RdxDesc.getFastMathFlags());
-      if (State.VF.isVector()) {
-        Iden =
-            State.Builder.CreateVectorSplat(VecTy->getElementCount(), Iden);
-      }
-
-      Value *Select = State.Builder.CreateSelect(NewCond, NewVecOp, Iden);
-      NewVecOp = Select;
+  Value *NewVecOp = State.get(getVecOp());
+  if (VPValue *Cond = getCondOp()) {
+    Value *NewCond =
+        State.VF.isVector() ? State.get(Cond) : State.get(Cond, VPLane(0));
+    VectorType *VecTy = dyn_cast<VectorType>(NewVecOp->getType());
+    Type *ElementTy = VecTy ? VecTy->getElementType() : NewVecOp->getType();
+    Value *Iden = RdxDesc.getRecurrenceIdentity(Kind, ElementTy,
+                                                RdxDesc.getFastMathFlags());
+    if (State.VF.isVector()) {
+      Iden = State.Builder.CreateVectorSplat(VecTy->getElementCount(), Iden);
     }
+
+    Value *Select = State.Builder.CreateSelect(NewCond, NewVecOp, Iden);
+    NewVecOp = Select;
+  }
     Value *NewRed;
     Value *NextInChain;
     if (IsOrdered) {
@@ -9251,7 +9265,7 @@ void VPReductionRecipe::execute(VPTransformState &State) {
             NewVecOp);
       PrevInChain = NewRed;
     } else {
-      PrevInChain = State.get(getChainOp(), Part);
+      PrevInChain = State.get(getChainOp());
       NewRed = createTargetReduction(State.Builder, RdxDesc, NewVecOp);
     }
     if (RecurrenceDescriptor::isMinMaxRecurrenceKind(Kind)) {
@@ -9262,15 +9276,14 @@ void VPReductionRecipe::execute(VPTransformState &State) {
     else
       NextInChain = State.Builder.CreateBinOp(
           (Instruction::BinaryOps)RdxDesc.getOpcode(Kind), NewRed, PrevInChain);
-    State.set(this, NextInChain, Part);
-  }
+    State.set(this, NextInChain);
 }
 
 void VPReplicateRecipe::execute(VPTransformState &State) {
   Instruction *UI = getUnderlyingInstr();
   if (State.Instance) { // Generate a single instance.
     assert(!State.VF.isScalable() && "Can't scalarize a scalable vector");
-    State.ILV->scalarizeInstruction(UI, this, *State.Instance, State);
+    State.ILV->scalarizeInstruction(UI, this, State.Instance->Lane, State);
     // Insert scalar instance packing it into a vector.
     if (State.VF.isVector() && shouldPack()) {
       // If we're constructing lane 0, initialize to start from poison.
@@ -9292,38 +9305,30 @@ void VPReplicateRecipe::execute(VPTransformState &State) {
         all_of(operands(), [](VPValue *Op) {
           return Op->isDefinedOutsideVectorRegions();
         })) {
-      State.ILV->scalarizeInstruction(UI, this, VPIteration(0, 0), State);
-      if (user_begin() != user_end()) {
-        for (unsigned Part = 1; Part < State.UF; ++Part)
-          State.set(this, State.get(this, VPIteration(0, 0)),
-                    VPIteration(Part, 0));
-      }
+      State.ILV->scalarizeInstruction(UI, this, VPLane(0), State);
       return;
     }
 
-    // Uniform within VL means we need to generate lane 0 only for each
-    // unrolled copy.
-    for (unsigned Part = 0; Part < State.UF; ++Part)
-      State.ILV->scalarizeInstruction(UI, this, VPIteration(Part, 0), State);
+    // Uniform within VL means we need to generate lane 0 only.
+    State.ILV->scalarizeInstruction(UI, this, VPLane(0), State);
     return;
   }
 
   // A store of a loop varying value to a uniform address only needs the last
   // copy of the store.
+  // TODO: Need to handle in interleaving.
   if (isa<StoreInst>(UI) &&
       vputils::isUniformAfterVectorization(getOperand(1))) {
     auto Lane = VPLane::getLastLaneForVF(State.VF);
-    State.ILV->scalarizeInstruction(UI, this, VPIteration(State.UF - 1, Lane),
-                                    State);
+    State.ILV->scalarizeInstruction(UI, this, Lane, State);
     return;
   }
 
   // Generate scalar instances for all VF lanes of all UF parts.
   assert(!State.VF.isScalable() && "Can't scalarize a scalable vector");
   const unsigned EndLane = State.VF.getKnownMinValue();
-  for (unsigned Part = 0; Part < State.UF; ++Part)
     for (unsigned Lane = 0; Lane < EndLane; ++Lane)
-      State.ILV->scalarizeInstruction(UI, this, VPIteration(Part, Lane), State);
+      State.ILV->scalarizeInstruction(UI, this, Lane, State);
 }
 
 void VPWidenMemoryInstructionRecipe::execute(VPTransformState &State) {
@@ -9344,31 +9349,27 @@ void VPWidenMemoryInstructionRecipe::execute(VPTransformState &State) {
   bool CreateGatherScatter = !isConsecutive();
 
   auto &Builder = State.Builder;
-  InnerLoopVectorizer::VectorParts BlockInMaskParts(State.UF);
+  Value *BlockInMask = nullptr;
   bool isMaskRequired = getMask();
   if (isMaskRequired) {
     // Mask reversal is only needed for non-all-one (null) masks, as reverse of
     // a null all-one mask is a null mask.
-    for (unsigned Part = 0; Part < State.UF; ++Part) {
-      Value *Mask = State.get(getMask(), Part);
-      if (isReverse())
-        Mask = Builder.CreateVectorReverse(Mask, "reverse");
-      BlockInMaskParts[Part] = Mask;
-    }
+    Value *Mask = State.get(getMask());
+    if (isReverse())
+      Mask = Builder.CreateVectorReverse(Mask, "reverse");
+    BlockInMask = Mask;
   }
 
   // Handle Stores:
   if (SI) {
     State.setDebugLocFrom(SI->getDebugLoc());
 
-    for (unsigned Part = 0; Part < State.UF; ++Part) {
       Instruction *NewSI = nullptr;
-      Value *StoredVal = State.get(StoredValue, Part);
+      Value *StoredVal = State.get(StoredValue);
       if (CreateGatherScatter) {
-        Value *MaskPart = isMaskRequired ? BlockInMaskParts[Part] : nullptr;
-        Value *VectorGep = State.get(getAddr(), Part);
+        Value *VectorGep = State.get(getAddr());
         NewSI = Builder.CreateMaskedScatter(StoredVal, VectorGep, Alignment,
-                                            MaskPart);
+                                            BlockInMask);
       } else {
         if (isReverse()) {
           // If we store to reverse consecutive memory locations, then we need
@@ -9377,35 +9378,33 @@ void VPWidenMemoryInstructionRecipe::execute(VPTransformState &State) {
           // We don't want to update the value in the map as it might be used in
           // another expression. So don't call resetVectorValue(StoredVal).
         }
-        auto *VecPtr = State.get(getAddr(), Part);
+        auto *VecPtr = State.get(getAddr());
         if (isMaskRequired)
           NewSI = Builder.CreateMaskedStore(StoredVal, VecPtr, Alignment,
-                                            BlockInMaskParts[Part]);
+                                            BlockInMask);
         else
           NewSI = Builder.CreateAlignedStore(StoredVal, VecPtr, Alignment);
       }
       State.addMetadata(NewSI, SI);
-    }
     return;
   }
 
   // Handle loads.
   assert(LI && "Must have a load instruction");
   State.setDebugLocFrom(LI->getDebugLoc());
-  for (unsigned Part = 0; Part < State.UF; ++Part) {
     Value *NewLI;
     if (CreateGatherScatter) {
-      Value *MaskPart = isMaskRequired ? BlockInMaskParts[Part] : nullptr;
-      Value *VectorGep = State.get(getAddr(), Part);
-      NewLI = Builder.CreateMaskedGather(DataTy, VectorGep, Alignment, MaskPart,
-                                         nullptr, "wide.masked.gather");
+      Value *VectorGep = State.get(getAddr());
+      NewLI =
+          Builder.CreateMaskedGather(DataTy, VectorGep, Alignment, BlockInMask,
+                                     nullptr, "wide.masked.gather");
       State.addMetadata(NewLI, LI);
     } else {
-      auto *VecPtr = State.get(getAddr(), Part);
+      auto *VecPtr = State.get(getAddr());
       if (isMaskRequired)
-        NewLI = Builder.CreateMaskedLoad(
-            DataTy, VecPtr, Alignment, BlockInMaskParts[Part],
-            PoisonValue::get(DataTy), "wide.masked.load");
+        NewLI = Builder.CreateMaskedLoad(DataTy, VecPtr, Alignment, BlockInMask,
+                                         PoisonValue::get(DataTy),
+                                         "wide.masked.load");
       else
         NewLI =
             Builder.CreateAlignedLoad(DataTy, VecPtr, Alignment, "wide.load");
@@ -9416,8 +9415,7 @@ void VPWidenMemoryInstructionRecipe::execute(VPTransformState &State) {
         NewLI = Builder.CreateVectorReverse(NewLI, "reverse");
     }
 
-    State.set(getVPSingleValue(), NewLI, Part);
-  }
+    State.set(getVPSingleValue(), NewLI);
 }
 
 // Determine how to lower the scalar epilogue, which depends on 1) optimising
