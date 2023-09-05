@@ -84,6 +84,8 @@ struct VPlanTransforms {
                              const MapVector<Instruction *, uint64_t> &MinBWs,
                              LLVMContext &Ctx);
 
+  static void interleave(VPlan &Plan, unsigned IC, LLVMContext &Ctx);
+
 private:
   /// Remove redundant VPBasicBlocks by merging them into their predecessor if
   /// the predecessor has a single successor.

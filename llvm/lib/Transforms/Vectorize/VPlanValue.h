@@ -191,7 +191,7 @@ public:
   /// Returns true if the VPValue is defined outside any vector regions, i.e. it
   /// is a live-in value.
   /// TODO: Also handle recipes defined in pre-header blocks.
-  bool isDefinedOutsideVectorRegions() const { return !hasDefiningRecipe(); }
+  bool isDefinedOutsideVectorRegions() const;
 };
 
 typedef DenseMap<Value *, VPValue *> Value2VPValueTy;

@@ -24,6 +24,7 @@ class VPWidenMemoryInstructionRecipe;
 struct VPWidenSelectRecipe;
 class VPReplicateRecipe;
 class Type;
+class VPlan;
 
 /// An analysis for type-inference for VPValues.
 /// It infers the scalar type for a given VPValue by bottom-up traversing
@@ -35,6 +36,7 @@ class Type;
 /// of the previously inferred types.
 class VPTypeAnalysis {
   DenseMap<const VPValue *, Type *> CachedTypes;
+  VPlan &Plan;
   LLVMContext &Ctx;
 
   Type *inferScalarTypeForRecipe(const VPBlendRecipe *R);
@@ -47,7 +49,7 @@ class VPTypeAnalysis {
   Type *inferScalarTypeForRecipe(const VPReplicateRecipe *R);
 
 public:
-  VPTypeAnalysis(LLVMContext &Ctx) : Ctx(Ctx) {}
+  VPTypeAnalysis(VPlan &Plan, LLVMContext &Ctx) : Plan(Plan), Ctx(Ctx) {}
 
   /// Infer the type of \p V. Returns the scalar type of \p V.
   Type *inferScalarType(const VPValue *V);
