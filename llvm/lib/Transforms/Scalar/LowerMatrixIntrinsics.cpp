@@ -931,6 +931,23 @@ public:
     }
   }
 
+/*  bool optimizeSmallVectorOps() {*/
+    /*bool Changed = false;*/
+    /*for (BasicBlock &BB : reverse(Func)) {*/
+      /*for (Instruction &I : BB) {*/
+        /*auto SI = ShapeMap.find(&I);*/
+        /*if (SI == ShapeMap.end())*/
+          /*continue;*/
+        /*if (!isa<LoadInst>(&I) || !I.getType()->isVectorTy() || cast<VectorType>(I.getType())->getElementCount().getKnownMinValue() != 3)*/
+          /*continue;*/
+
+
+      /*}*/
+    /*}*/
+    /*return Changed;*/
+  /*}*/
+
+
   bool Visit() {
     SmallVector<Instruction *, 32> WorkList;
 
@@ -970,6 +987,8 @@ public:
         dbgs() << "Dump after matrix transpose optimization:\n";
         Func.print(dbgs());
       }
+
+      //optimizeSmallVectorOps();
     }
 
     bool Changed = false;
