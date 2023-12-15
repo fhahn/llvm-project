@@ -1254,9 +1254,10 @@ void MachineMemOperand::print(raw_ostream &OS, ModuleSlotTracker &MST,
        << "unknown-address";
   }
   MachineOperand::printOperandOffset(OS, getOffset());
-  if (getPtrProvenance()) {
+  auto AAInfo = getAAInfo();
+  if (AAInfo.PtrProvenance) {
     OS << ", ptr_provenance ";
-    MIRFormatter::printIRValue(OS, *getPtrProvenance(), MST);
+    MIRFormatter::printIRValue(OS, *AAInfo.PtrProvenance, MST);
   }
   if (!getSize().hasValue() ||
       (!getSize().isZero() &&
@@ -1264,7 +1265,6 @@ void MachineMemOperand::print(raw_ostream &OS, ModuleSlotTracker &MST,
     OS << ", align " << getAlign().value();
   if (getAlign() != getBaseAlign())
     OS << ", basealign " << getBaseAlign().value();
-  auto AAInfo = getAAInfo();
   if (AAInfo.TBAA) {
     OS << ", !tbaa ";
     AAInfo.TBAA->printAsOperand(OS, MST);
