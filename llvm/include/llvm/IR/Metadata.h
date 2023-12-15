@@ -762,18 +762,18 @@ std::optional<Value *> mergePtrProvenance(std::optional<Value *> Lhs,
 /// memory access used by the alias-analysis infrastructure.
 struct AAMDNodes {
   explicit AAMDNodes() = default;
-  explicit AAMDNodes(MDNode *T, MDNode *TS, MDNode *S, MDNode *N)
-      : TBAA(T), TBAAStruct(TS), Scope(S), NoAlias(N) {}
+  explicit AAMDNodes(MDNode *T, MDNode *TS, MDNode *S, MDNode *N, Value *P)
+      : TBAA(T), TBAAStruct(TS), Scope(S), NoAlias(N), PtrProvenance(P) {}
 
   bool operator==(const AAMDNodes &A) const {
     return TBAA == A.TBAA && TBAAStruct == A.TBAAStruct && Scope == A.Scope &&
-           NoAlias == A.NoAlias;
+           NoAlias == A.NoAlias && PtrProvenance == A.PtrProvenance;
   }
 
   bool operator!=(const AAMDNodes &A) const { return !(*this == A); }
 
   explicit operator bool() const {
-    return TBAA || TBAAStruct || Scope || NoAlias;
+    return TBAA || TBAAStruct || Scope || NoAlias || PtrProvenance;
   }
 
   /// The tag for type-based alias analysis.
@@ -787,6 +787,9 @@ struct AAMDNodes {
 
   /// The tag specifying the noalias scope.
   MDNode *NoAlias = nullptr;
+
+  /// The ptr_provenance path (if available)
+  Value *PtrProvenance = nullptr;
 
   // Shift tbaa Metadata node to start off bytes later
   static MDNode *shiftTBAA(MDNode *M, size_t off);
@@ -809,6 +812,7 @@ struct AAMDNodes {
     Result.TBAAStruct = Other.TBAAStruct == TBAAStruct ? TBAAStruct : nullptr;
     Result.Scope = Other.Scope == Scope ? Scope : nullptr;
     Result.NoAlias = Other.NoAlias == NoAlias ? NoAlias : nullptr;
+    Result.MergeInPtrProvenance(*this, Other);
     return Result;
   }
 
@@ -821,6 +825,7 @@ struct AAMDNodes {
         TBAAStruct ? shiftTBAAStruct(TBAAStruct, Offset) : nullptr;
     Result.Scope = Scope;
     Result.NoAlias = NoAlias;
+    Result.PtrProvenance = PtrProvenance;
     return Result;
   }
 
@@ -836,6 +841,7 @@ struct AAMDNodes {
     Result.TBAAStruct = TBAAStruct;
     Result.Scope = Scope;
     Result.NoAlias = NoAlias;
+    Result.PtrProvenance = PtrProvenance;
     return Result;
   }
 
@@ -857,18 +863,30 @@ struct AAMDNodes {
   AAMDNodes adjustForAccess(size_t Offset, Type *AccessTy,
                             const DataLayout &DL);
   AAMDNodes adjustForAccess(size_t Offset, unsigned AccessSize);
+
+private:
+  /// Combine two PtrProvenance values. Resets NoAlias when not compatible.
+  void MergeInPtrProvenance(const AAMDNodes &Lhs, const AAMDNodes &Rhs) {
+    if (Lhs.PtrProvenance != Rhs.PtrProvenance) {
+      // Clear NoAlias information if there is no agreement on provenance.
+      NoAlias = nullptr;
+      PtrProvenance = nullptr;
+    } else {
+      PtrProvenance = Lhs.PtrProvenance;
+    }
+  }
 };
 
 // Specialize DenseMapInfo for AAMDNodes.
 template<>
 struct DenseMapInfo<AAMDNodes> {
   static inline AAMDNodes getEmptyKey() {
-    return AAMDNodes(DenseMapInfo<MDNode *>::getEmptyKey(),
-                     nullptr, nullptr, nullptr);
+    return AAMDNodes(DenseMapInfo<MDNode *>::getEmptyKey(), nullptr, nullptr,
+                     nullptr, nullptr);
   }
 
   static inline AAMDNodes getTombstoneKey() {
-    return AAMDNodes(DenseMapInfo<MDNode *>::getTombstoneKey(),
+    return AAMDNodes(DenseMapInfo<MDNode *>::getTombstoneKey(), nullptr,
                      nullptr, nullptr, nullptr);
   }
 
@@ -876,7 +894,8 @@ struct DenseMapInfo<AAMDNodes> {
     return DenseMapInfo<MDNode *>::getHashValue(Val.TBAA) ^
            DenseMapInfo<MDNode *>::getHashValue(Val.TBAAStruct) ^
            DenseMapInfo<MDNode *>::getHashValue(Val.Scope) ^
-           DenseMapInfo<MDNode *>::getHashValue(Val.NoAlias);
+           DenseMapInfo<MDNode *>::getHashValue(Val.NoAlias) ^
+           DenseMapInfo<Value *>::getHashValue(Val.PtrProvenance);
   }
 
   static bool isEqual(const AAMDNodes &LHS, const AAMDNodes &RHS) {
