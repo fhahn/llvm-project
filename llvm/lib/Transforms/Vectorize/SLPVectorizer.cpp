@@ -10721,6 +10721,13 @@ ResTy BoUpSLP::processBuildVector(const TreeEntry *E, Args &...Params) {
   };
   BVTy ShuffleBuilder(Params...);
   if (E->isNonPowOf2Vec()) {
+    if (isSplat(E->Scalars)) {
+      SmallVector<int> Mask(VF, 0);
+      Value *BV =
+          ShuffleBuilder.gather(ArrayRef(E->Scalars).slice(0, 1), Mask.size());
+      ShuffleBuilder.add(BV, Mask);
+      return ShuffleBuilder.finalize(E->ReuseShuffleIndices);
+    }
     Value *BV = ShuffleBuilder.gather(E->Scalars, 0, nullptr, true);
     SmallVector<int> Mask(VF, PoisonMaskElem);
     std::iota(Mask.begin(), Mask.begin() + E->Scalars.size(), 0);
