@@ -3177,6 +3177,13 @@ InstructionCost AArch64TTIImpl::getMemoryOpCost(unsigned Opcode, Type *Ty,
     return LT.first;
 
   if (useNeonVector(Ty)) {
+    if (cast<FixedVectorType>(Ty)->getNumElements() == 3 &&
+        Ty->getScalarSizeInBits() == 8) {
+      if (Opcode == Instruction::Load)
+        return 3;
+      if (I && isa<TruncInst>(I->getOperand(0)))
+        return 3;
+    }
     // Check truncating stores and extending loads.
     if (Ty->getScalarSizeInBits() != LT.second.getScalarSizeInBits()) {
       // v4i8 types are lowered to scalar a load/store and sshll/xtn.
