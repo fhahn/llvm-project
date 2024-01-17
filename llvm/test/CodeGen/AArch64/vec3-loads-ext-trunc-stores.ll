@@ -324,17 +324,15 @@ define <3 x i32> @load_v3i32(ptr %src) {
 define void @store_trunc_from_64bits(ptr %src, ptr %dst) {
 ; CHECK-LABEL: store_trunc_from_64bits:
 ; CHECK:       ; %bb.0: ; %entry
-; CHECK-NEXT:    sub sp, sp, #16
-; CHECK-NEXT:    .cfi_def_cfa_offset 16
-; CHECK-NEXT:    ldr s0, [x0]
-; CHECK-NEXT:    ldrh w8, [x0, #4]
-; CHECK-NEXT:    mov.h v0[2], w8
-; CHECK-NEXT:    xtn.8b v0, v0
-; CHECK-NEXT:    str s0, [sp, #12]
-; CHECK-NEXT:    ldrh w9, [sp, #12]
-; CHECK-NEXT:    strb w8, [x1, #2]
-; CHECK-NEXT:    strh w9, [x1]
-; CHECK-NEXT:    add sp, sp, #16
+; CHECK-NEXT:    ldr w8, [x0]
+; CHECK-NEXT:    add x9, x0, #4
+; CHECK-NEXT:    ld1r.4h { v0 }, [x9]
+; CHECK-NEXT:    fmov s1, w8
+; CHECK-NEXT:    strb w8, [x1]
+; CHECK-NEXT:    add x8, x1, #1
+; CHECK-NEXT:    st1.b { v1 }[2], [x8]
+; CHECK-NEXT:    add x8, x1, #2
+; CHECK-NEXT:    st1.b { v0 }[4], [x8]
 ; CHECK-NEXT:    ret
 ;
 ; BE-LABEL: store_trunc_from_64bits:
@@ -566,17 +564,13 @@ entry:
 define void @shift_trunc_store(ptr %src, ptr %dst) {
 ; CHECK-LABEL: shift_trunc_store:
 ; CHECK:       ; %bb.0:
-; CHECK-NEXT:    sub sp, sp, #16
-; CHECK-NEXT:    .cfi_def_cfa_offset 16
 ; CHECK-NEXT:    ldr q0, [x0]
-; CHECK-NEXT:    shrn.4h v0, v0, #16
-; CHECK-NEXT:    xtn.8b v1, v0
-; CHECK-NEXT:    umov.h w8, v0[2]
-; CHECK-NEXT:    str s1, [sp, #12]
-; CHECK-NEXT:    ldrh w9, [sp, #12]
-; CHECK-NEXT:    strb w8, [x1, #2]
-; CHECK-NEXT:    strh w9, [x1]
-; CHECK-NEXT:    add sp, sp, #16
+; CHECK-NEXT:    add x8, x1, #1
+; CHECK-NEXT:    add x9, x1, #2
+; CHECK-NEXT:    ushr.4s v0, v0, #16
+; CHECK-NEXT:    st1.b { v0 }[4], [x8]
+; CHECK-NEXT:    st1.b { v0 }[8], [x9]
+; CHECK-NEXT:    st1.b { v0 }[0], [x1]
 ; CHECK-NEXT:    ret
 ;
 ; BE-LABEL: shift_trunc_store:
@@ -680,17 +674,14 @@ define void @shift_trunc_store_align_4(ptr %src, ptr %dst) {
 define void @shift_trunc_store_const_offset_1(ptr %src, ptr %dst) {
 ; CHECK-LABEL: shift_trunc_store_const_offset_1:
 ; CHECK:       ; %bb.0:
-; CHECK-NEXT:    sub sp, sp, #16
-; CHECK-NEXT:    .cfi_def_cfa_offset 16
 ; CHECK-NEXT:    ldr q0, [x0]
-; CHECK-NEXT:    shrn.4h v0, v0, #16
-; CHECK-NEXT:    xtn.8b v1, v0
-; CHECK-NEXT:    umov.h w8, v0[2]
-; CHECK-NEXT:    str s1, [sp, #12]
-; CHECK-NEXT:    ldrh w9, [sp, #12]
-; CHECK-NEXT:    strb w8, [x1, #3]
-; CHECK-NEXT:    sturh w9, [x1, #1]
-; CHECK-NEXT:    add sp, sp, #16
+; CHECK-NEXT:    add x8, x1, #2
+; CHECK-NEXT:    add x9, x1, #3
+; CHECK-NEXT:    ushr.4s v0, v0, #16
+; CHECK-NEXT:    st1.b { v0 }[4], [x8]
+; CHECK-NEXT:    add x8, x1, #1
+; CHECK-NEXT:    st1.b { v0 }[8], [x9]
+; CHECK-NEXT:    st1.b { v0 }[0], [x8]
 ; CHECK-NEXT:    ret
 ;
 ; BE-LABEL: shift_trunc_store_const_offset_1:
@@ -719,17 +710,14 @@ define void @shift_trunc_store_const_offset_1(ptr %src, ptr %dst) {
 define void @shift_trunc_store_const_offset_3(ptr %src, ptr %dst) {
 ; CHECK-LABEL: shift_trunc_store_const_offset_3:
 ; CHECK:       ; %bb.0:
-; CHECK-NEXT:    sub sp, sp, #16
-; CHECK-NEXT:    .cfi_def_cfa_offset 16
 ; CHECK-NEXT:    ldr q0, [x0]
-; CHECK-NEXT:    shrn.4h v0, v0, #16
-; CHECK-NEXT:    xtn.8b v1, v0
-; CHECK-NEXT:    umov.h w8, v0[2]
-; CHECK-NEXT:    str s1, [sp, #12]
-; CHECK-NEXT:    ldrh w9, [sp, #12]
-; CHECK-NEXT:    strb w8, [x1, #5]
-; CHECK-NEXT:    sturh w9, [x1, #3]
-; CHECK-NEXT:    add sp, sp, #16
+; CHECK-NEXT:    add x8, x1, #4
+; CHECK-NEXT:    add x9, x1, #5
+; CHECK-NEXT:    ushr.4s v0, v0, #16
+; CHECK-NEXT:    st1.b { v0 }[4], [x8]
+; CHECK-NEXT:    add x8, x1, #3
+; CHECK-NEXT:    st1.b { v0 }[8], [x9]
+; CHECK-NEXT:    st1.b { v0 }[0], [x8]
 ; CHECK-NEXT:    ret
 ;
 ; BE-LABEL: shift_trunc_store_const_offset_3:
