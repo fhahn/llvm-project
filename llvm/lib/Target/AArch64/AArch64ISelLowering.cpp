@@ -5936,6 +5936,7 @@ SDValue AArch64TargetLowering::LowerStore128(SDValue Op,
 
 SDValue AArch64TargetLowering::LowerLOAD(SDValue Op,
                                          SelectionDAG &DAG) const {
+
   SDLoc DL(Op);
   LoadSDNode *LoadNode = cast<LoadSDNode>(Op);
   assert(LoadNode && "Expected custom lowering of a load node");
@@ -18208,10 +18209,40 @@ static SDValue performConcatVectorsCombine(SDNode *N,
 static SDValue
 performExtractSubvectorCombine(SDNode *N, TargetLowering::DAGCombinerInfo &DCI,
                                SelectionDAG &DAG) {
+  EVT VT = N->getValueType(0);
+  if (false && VT == MVT::v16i8) {
+    SDValue Concat = N->getOperand(0);
+    const ConstantSDNode *C0 = dyn_cast<ConstantSDNode>(N->getOperand(1));
+    if (C0 && C0->isZero() && Concat.getOpcode() == ISD::CONCAT_VECTORS) {
+      auto *L = dyn_cast<LoadSDNode>(Concat.getOperand(0).getNode());
+      if (L && all_of(iterator_range(Concat->op_begin() + 1, Concat->op_end()),
+                      [](SDValue Op) { return Op.isUndef(); }))
+        dbgs() << "YEAH\n";
+      SDValue L16 =
+          DAG.getLoad(MVT::i16, SDLoc(L), L->getChain(), L->getBasePtr(),
+                      L->getPointerInfo(), L->getOriginalAlign());
+      SDValue L8 =
+          DAG.getLoad(MVT::i8, SDLoc(L), L->getChain(),
+                      DAG.getMemBasePlusOffset(L->getBasePtr(),
+                                               TypeSize::getFixed(2), SDLoc(L)),
+                      L->getPointerInfo(), L->getOriginalAlign());
+      SDValue Ext16 = DAG.getNode(ISD::ZERO_EXTEND, SDLoc(L), MVT::i32, L16);
+      SDValue Ext8 = DAG.getNode(ISD::ZERO_EXTEND, SDLoc(L), MVT::i32, L8);
+      SDValue Shr = DAG.getNode(ISD::SHL, SDLoc(L), MVT::i32, Ext8,
+                                DAG.getConstant(16, SDLoc(L), MVT::i32));
+      SDValue Or = DAG.getNode(ISD::OR, SDLoc(L), MVT::i32, Ext16, Shr);
+      SDValue Cast = DAG.getNode(ISD::BITCAST, SDLoc(L), MVT::v4i8, Or);
+      SDValue Res =
+          DAG.getNode(ISD::CONCAT_VECTORS, SDLoc(L), MVT::v16i8, Cast,
+                      DAG.getUNDEF(MVT::v4i8), DAG.getUNDEF(MVT::v4i8),
+                      DAG.getUNDEF(MVT::v4i8));
+      return Res;
+    }
+  }
+
   if (DCI.isBeforeLegalizeOps())
     return SDValue();
 
-  EVT VT = N->getValueType(0);
   if (!VT.isScalableVector() || VT.getVectorElementType() != MVT::i1)
     return SDValue();
 
