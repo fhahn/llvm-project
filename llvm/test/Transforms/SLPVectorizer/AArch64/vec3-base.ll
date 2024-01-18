@@ -295,3 +295,55 @@ entry:
 declare float @llvm.fmuladd.f32(float, float, float)
 
 declare double @llvm.fmuladd.f64(double, double, double)
+
+define void @vec3_reductions(ptr %dst, ptr noalias %src1, ptr %src2, i64 %start) {
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop ]
+  %red.0 = phi i32 [ 0, %entry ], [ %add, %loop ]
+  %red.1 = phi i32 [ 0, %entry ], [ %add11, %loop ]
+  %red.2 = phi i32 [ 0, %entry ], [ %add14, %loop ]
+  %sub = sub nsw i64 %iv, %start
+  %arrayidx = getelementptr inbounds i32, ptr %src1, i64 %sub
+  %l.inv = load i32, ptr %arrayidx, align 4
+  %iv.mul = mul nsw i64 %iv, 3
+  %add.ptr = getelementptr inbounds i8, ptr %src2, i64 %iv.mul
+  %incdec.ptr = getelementptr inbounds i8, ptr %add.ptr, i64 1
+  %l.0 = load i8, ptr %add.ptr, align 1
+  %conv = zext i8 %l.0 to i32
+  %mul7 = mul nsw i32 %l.inv, %conv
+  %add = add nsw i32 %mul7, %red.0
+  %incdec.ptr8 = getelementptr inbounds i8, ptr %add.ptr, i64 2
+  %l.1 = load i8, ptr %incdec.ptr, align 1
+  %conv9 = zext i8 %l.1 to i32
+  %mul10 = mul nsw i32 %l.inv, %conv9
+  %add11 = add nsw i32 %mul10, %red.1
+  %l.2 = load i8, ptr %incdec.ptr8, align 1
+  %conv12 = zext i8 %l.2 to i32
+  %mul13 = mul nsw i32 %l.inv, %conv12
+  %add14 = add nsw i32 %mul13, %red.2
+  %iv.next = add nsw i64 %iv, 1
+  %lftr.wideiv = trunc i64 %iv.next to i32
+  %exitcond.not = icmp eq i64 100, %iv.next
+  br i1 %exitcond.not, label %exit, label %loop
+
+exit:
+  %res.red.0 = phi i32 [ %add14, %loop ]
+  %res.red.1 = phi i32 [ %add11, %loop ]
+  %res.red.2 = phi i32 [ %add, %loop ]
+  %shr = lshr i32 %res.red.2, 16
+  %conv15 = trunc i32 %shr to i8
+  %incdec.ptr16 = getelementptr inbounds i8, ptr %dst, i64 1
+  store i8 %conv15, ptr %dst, align 1
+  %shr17 = lshr i32 %res.red.1, 16
+  %conv18 = trunc i32 %shr17 to i8
+  %incdec.ptr19 = getelementptr inbounds i8, ptr %dst, i64 2
+  store i8 %conv18, ptr %incdec.ptr16, align 1
+  %shr20 = lshr i32 %res.red.0, 16
+  %conv21 = trunc i32 %shr20 to i8
+  %incdec.ptr22 = getelementptr inbounds i8, ptr %dst, i64 3
+  store i8 %conv21, ptr %incdec.ptr19, align 1
+  ret void
+}
