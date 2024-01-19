@@ -21274,18 +21274,13 @@ static SDValue combineV3I8LoadExt(LoadSDNode *LD, SelectionDAG &DAG) {
       MVT::i8, DL, Chain, DAG.getMemBasePlusOffset(BasePtr, Offset2, DL),
       LD->getPointerInfo(), commonAlignment(LD->getOriginalAlign(), Offset2));
 
-  // Extend to i32.
-  SDValue Ext16 = DAG.getNode(ISD::ZERO_EXTEND, DL, MVT::i32, L16);
-  SDValue Ext8 = DAG.getNode(ISD::ZERO_EXTEND, DL, MVT::i32, L8);
+  SDValue UndefVector = DAG.getUNDEF(MVT::v4i16);
+  SDValue Ins16 = DAG.getNode(ISD::SPLAT_VECTOR, DL, MVT::v4i16, L16);
 
-  // Pack 2 x i8 and 1 x i8 in an i32 and convert to v4i8.
-  SDValue Shr = DAG.getNode(ISD::SHL, DL, MVT::i32, Ext8,
-                            DAG.getConstant(16, DL, MVT::i32));
-  SDValue Or = DAG.getNode(ISD::OR, DL, MVT::i32, Ext16, Shr);
-  SDValue Cast = DAG.getNode(ISD::BITCAST, DL, MVT::v4i8, Or);
-
-  // Extract v3i8 again.
-  SDValue Extract = DAG.getNode(ISD::EXTRACT_SUBVECTOR, DL, MemVT, Cast,
+  SDValue Cast = DAG.getNode(ISD::BITCAST, DL, MVT::v8i8, Ins16);
+  SDValue Ins8 = DAG.getNode(ISD::INSERT_VECTOR_ELT, DL, MVT::v8i8, Cast, L8,
+                                DAG.getConstant(2, DL, MVT::i64));
+  SDValue Extract = DAG.getNode(ISD::EXTRACT_SUBVECTOR, DL, MemVT, Ins8,
                                 DAG.getConstant(0, DL, MVT::i64));
   SDValue TokenFactor = DAG.getNode(
       ISD::TokenFactor, DL, MVT::Other,

@@ -5,10 +5,8 @@
 define <16 x i8> @load_v3i8(ptr %src) {
 ; CHECK-LABEL: load_v3i8:
 ; CHECK:       ; %bb.0:
-; CHECK-NEXT:    ldrb w8, [x0, #2]
-; CHECK-NEXT:    ldrh w9, [x0]
-; CHECK-NEXT:    orr w8, w9, w8, lsl #16
-; CHECK-NEXT:    fmov s0, w8
+; CHECK-NEXT:    ld1r.4h { v0 }, [x0], #2
+; CHECK-NEXT:    ld1.b { v0 }[2], [x0]
 ; CHECK-NEXT:    ret
 ;
 ; BE-LABEL: load_v3i8:
@@ -38,12 +36,13 @@ define <16 x i8> @load_v3i8(ptr %src) {
 define <4 x i32> @load_v3i8_to_4xi32(ptr %src) {
 ; CHECK-LABEL: load_v3i8_to_4xi32:
 ; CHECK:       ; %bb.0:
-; CHECK-NEXT:    ldrb w8, [x0, #2]
-; CHECK-NEXT:    ldrh w9, [x0]
+; CHECK-NEXT:    ld1r.4h { v0 }, [x0], #2
 ; CHECK-NEXT:    movi.2d v1, #0x0000ff000000ff
-; CHECK-NEXT:    orr w8, w9, w8, lsl #16
+; CHECK-NEXT:    umov.b w8, v0[0]
+; CHECK-NEXT:    umov.b w9, v0[1]
 ; CHECK-NEXT:    fmov s0, w8
-; CHECK-NEXT:    zip1.8b v0, v0, v0
+; CHECK-NEXT:    mov.h v0[1], w9
+; CHECK-NEXT:    ld1.b { v0 }[4], [x0]
 ; CHECK-NEXT:    ushll.4s v0, v0, #0
 ; CHECK-NEXT:    and.16b v0, v0, v1
 ; CHECK-NEXT:    ret
@@ -413,15 +412,18 @@ entry:
 define void @load_ext_to_64bits(ptr %src, ptr %dst) {
 ; CHECK-LABEL: load_ext_to_64bits:
 ; CHECK:       ; %bb.0: ; %entry
-; CHECK-NEXT:    ldrb w8, [x0, #2]
-; CHECK-NEXT:    ldrh w9, [x0]
-; CHECK-NEXT:    orr w8, w9, w8, lsl #16
-; CHECK-NEXT:    fmov s0, w8
+; CHECK-NEXT:    ld1r.4h { v0 }, [x0], #2
+; CHECK-NEXT:    umov.b w8, v0[0]
+; CHECK-NEXT:    umov.b w9, v0[1]
+; CHECK-NEXT:    fmov s1, w8
+; CHECK-NEXT:    umov.b w8, v0[3]
+; CHECK-NEXT:    mov.h v1[1], w9
+; CHECK-NEXT:    ld1.b { v1 }[4], [x0]
+; CHECK-NEXT:    mov.h v1[3], w8
 ; CHECK-NEXT:    add x8, x1, #4
-; CHECK-NEXT:    zip1.8b v0, v0, v0
-; CHECK-NEXT:    bic.4h v0, #255, lsl #8
-; CHECK-NEXT:    st1.h { v0 }[2], [x8]
-; CHECK-NEXT:    str s0, [x1]
+; CHECK-NEXT:    bic.4h v1, #255, lsl #8
+; CHECK-NEXT:    st1.h { v1 }[2], [x8]
+; CHECK-NEXT:    str s1, [x1]
 ; CHECK-NEXT:    ret
 ;
 ; BE-LABEL: load_ext_to_64bits:
