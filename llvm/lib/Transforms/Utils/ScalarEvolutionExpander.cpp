@@ -851,7 +851,11 @@ static bool IsIncrementNSW(ScalarEvolution &SE, const SCEVAddRecExpr *AR) {
                                             SE.getSignExtendExpr(AR, WideTy));
   const SCEV *ExtendAfterOp =
     SE.getSignExtendExpr(SE.getAddExpr(AR, Step), WideTy);
-  return ExtendAfterOp == OpAfterExtend;
+  if (ExtendAfterOp == OpAfterExtend)
+    return true;
+
+  return SE.willNotOverflow(Instruction::Add, true, AR,
+                            AR->getStepRecurrence(SE));
 }
 
 static bool IsIncrementNUW(ScalarEvolution &SE, const SCEVAddRecExpr *AR) {
@@ -866,6 +870,12 @@ static bool IsIncrementNUW(ScalarEvolution &SE, const SCEVAddRecExpr *AR) {
   const SCEV *ExtendAfterOp =
     SE.getZeroExtendExpr(SE.getAddExpr(AR, Step), WideTy);
   return ExtendAfterOp == OpAfterExtend;
+
+  if (ExtendAfterOp == OpAfterExtend)
+    return true;
+
+  return SE.willNotOverflow(Instruction::Add, false, AR,
+                            AR->getStepRecurrence(SE));
 }
 
 /// getAddRecExprPHILiterally - Helper for expandAddRecExprLiterally. Expand
