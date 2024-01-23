@@ -180,7 +180,7 @@ static cl::opt<bool>
                 cl::desc("Display the SLP trees with Graphviz"));
 
 static cl::opt<bool> VectorizeWithPadding(
-    "slp-vectorize-with-padding", cl::init(false), cl::Hidden,
+    "slp-vectorize-with-padding", cl::init(true), cl::Hidden,
     cl::desc("Try to vectorize non-power-of-2 operations using padding."));
 
 // Limit the number of alias checks. The limit is chosen so that

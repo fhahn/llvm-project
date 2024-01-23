@@ -388,6 +388,8 @@ static InstructionCost computeSpeculationCost(const User *I,
   assert((!isa<Instruction>(I) ||
           isSafeToSpeculativelyExecute(cast<Instruction>(I))) &&
          "Instruction is not safe to speculatively execute!");
+  if (I->getType()->isVectorTy() && cast<VectorType>(I->getType())->getElementCount().getKnownMinValue() == 3)
+    return 5;
   return TTI.getInstructionCost(I, TargetTransformInfo::TCK_SizeAndLatency);
 }
 

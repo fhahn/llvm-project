@@ -3183,7 +3183,7 @@ InstructionCost AArch64TTIImpl::getMemoryOpCost(unsigned Opcode, Type *Ty,
   if (useNeonVector(Ty)) {
     if (auto *VecTy = dyn_cast<FixedVectorType>(Ty))
       if (VecTy->getNumElements() == 3 && VecTy->getElementType()->isIntegerTy(8))
-        return InstructionCost(3);
+        return InstructionCost(2);
 
     // Check truncating stores and extending loads.
     if (Ty->getScalarSizeInBits() != LT.second.getScalarSizeInBits()) {
