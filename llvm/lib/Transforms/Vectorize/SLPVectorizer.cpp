@@ -15382,7 +15382,7 @@ bool SLPVectorizerPass::tryToVectorizeList(ArrayRef<Value *> VL, BoUpSLP &R,
 
   unsigned Sz = R.getVectorElementSize(I0);
   unsigned MinVF = R.getMinVF(Sz);
-  unsigned MaxVF = std::max<unsigned>(llvm::bit_floor(VL.size()), MinVF);
+  unsigned MaxVF = std::max<unsigned>(VectorizeNonPowerOf2 ? VL.size() : bit_floor(VL.size()), MinVF);
   MaxVF = std::min(R.getMaximumVF(Sz, S.getOpcode()), MaxVF);
   if (MaxVF < 2) {
     R.getORE()->emit([&]() {
@@ -15411,7 +15411,7 @@ bool SLPVectorizerPass::tryToVectorizeList(ArrayRef<Value *> VL, BoUpSLP &R,
     for (unsigned I = NextInst; I < MaxInst; ++I) {
       unsigned ActualVF = std::min(MaxInst - I, VF);
 
-      if (!isPowerOf2_32(ActualVF))
+      if (!VectorizeNonPowerOf2 && !isPowerOf2_32(ActualVF))
         continue;
 
       if (MaxVFOnly && ActualVF < MaxVF)
@@ -15460,6 +15460,10 @@ bool SLPVectorizerPass::tryToVectorizeList(ArrayRef<Value *> VL, BoUpSLP &R,
         NextInst = I + 1;
         Changed = true;
       }
+    }
+    if (!isPowerOf2_32(VF)) {
+      // Restart with first power-of-2 VF as next VF.
+      VF = bit_floor(VF) * 2;
     }
   }
 
