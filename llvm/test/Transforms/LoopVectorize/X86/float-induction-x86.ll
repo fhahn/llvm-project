@@ -113,7 +113,6 @@ define void @fp_iv_loop2(ptr noalias nocapture %A, i32 %N) {
 ; AUTO_VEC:       for.body:
 ; AUTO_VEC-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ 0, [[FOR_BODY_PREHEADER_NEW]] ], [ [[INDVARS_IV_NEXT_7:%.*]], [[FOR_BODY]] ]
 ; AUTO_VEC-NEXT:    [[X_06:%.*]] = phi float [ 1.000000e+00, [[FOR_BODY_PREHEADER_NEW]] ], [ [[CONV1_7:%.*]], [[FOR_BODY]] ]
-; AUTO_VEC-NEXT:    [[NITER:%.*]] = phi i64 [ 0, [[FOR_BODY_PREHEADER_NEW]] ], [ [[NITER_NEXT_7:%.*]], [[FOR_BODY]] ]
 ; AUTO_VEC-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds float, ptr [[A:%.*]], i64 [[INDVARS_IV]]
 ; AUTO_VEC-NEXT:    store float [[X_06]], ptr [[ARRAYIDX]], align 4
 ; AUTO_VEC-NEXT:    [[CONV1:%.*]] = fadd float [[X_06]], 5.000000e-01
@@ -146,11 +145,10 @@ define void @fp_iv_loop2(ptr noalias nocapture %A, i32 %N) {
 ; AUTO_VEC-NEXT:    store float [[CONV1_6]], ptr [[ARRAYIDX_7]], align 4
 ; AUTO_VEC-NEXT:    [[CONV1_7]] = fadd float [[CONV1_6]], 5.000000e-01
 ; AUTO_VEC-NEXT:    [[INDVARS_IV_NEXT_7]] = add nuw nsw i64 [[INDVARS_IV]], 8
-; AUTO_VEC-NEXT:    [[NITER_NEXT_7]] = add i64 [[NITER]], 8
-; AUTO_VEC-NEXT:    [[NITER_NCMP_7:%.*]] = icmp eq i64 [[NITER_NEXT_7]], [[UNROLL_ITER]]
+; AUTO_VEC-NEXT:    [[NITER_NCMP_7:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT_7]], [[UNROLL_ITER]]
 ; AUTO_VEC-NEXT:    br i1 [[NITER_NCMP_7]], label [[FOR_END_LOOPEXIT_UNR_LCSSA]], label [[FOR_BODY]]
 ; AUTO_VEC:       for.end.loopexit.unr-lcssa:
-; AUTO_VEC-NEXT:    [[INDVARS_IV_UNR:%.*]] = phi i64 [ 0, [[FOR_BODY_PREHEADER]] ], [ [[INDVARS_IV_NEXT_7]], [[FOR_BODY]] ]
+; AUTO_VEC-NEXT:    [[INDVARS_IV_UNR:%.*]] = phi i64 [ 0, [[FOR_BODY_PREHEADER]] ], [ [[UNROLL_ITER]], [[FOR_BODY]] ]
 ; AUTO_VEC-NEXT:    [[X_06_UNR:%.*]] = phi float [ 1.000000e+00, [[FOR_BODY_PREHEADER]] ], [ [[CONV1_7]], [[FOR_BODY]] ]
 ; AUTO_VEC-NEXT:    [[LCMP_MOD_NOT:%.*]] = icmp eq i64 [[XTRAITER]], 0
 ; AUTO_VEC-NEXT:    br i1 [[LCMP_MOD_NOT]], label [[FOR_END]], label [[FOR_BODY_EPIL:%.*]]
@@ -162,7 +160,7 @@ define void @fp_iv_loop2(ptr noalias nocapture %A, i32 %N) {
 ; AUTO_VEC-NEXT:    store float [[X_06_EPIL]], ptr [[ARRAYIDX_EPIL]], align 4
 ; AUTO_VEC-NEXT:    [[CONV1_EPIL]] = fadd float [[X_06_EPIL]], 5.000000e-01
 ; AUTO_VEC-NEXT:    [[INDVARS_IV_NEXT_EPIL]] = add nuw nsw i64 [[INDVARS_IV_EPIL]], 1
-; AUTO_VEC-NEXT:    [[EPIL_ITER_NEXT]] = add i64 [[EPIL_ITER]], 1
+; AUTO_VEC-NEXT:    [[EPIL_ITER_NEXT]] = add nuw nsw i64 [[EPIL_ITER]], 1
 ; AUTO_VEC-NEXT:    [[EPIL_ITER_CMP_NOT:%.*]] = icmp eq i64 [[EPIL_ITER_NEXT]], [[XTRAITER]]
 ; AUTO_VEC-NEXT:    br i1 [[EPIL_ITER_CMP_NOT]], label [[FOR_END]], label [[FOR_BODY_EPIL]], !llvm.loop [[LOOP4:![0-9]+]]
 ; AUTO_VEC:       for.end:
@@ -272,7 +270,6 @@ define double @external_use_without_fast_math(ptr %a, i64 %n) {
 ; AUTO_VEC:       for.body:
 ; AUTO_VEC-NEXT:    [[I:%.*]] = phi i64 [ 0, [[ENTRY_NEW]] ], [ [[I_NEXT_7:%.*]], [[FOR_BODY]] ]
 ; AUTO_VEC-NEXT:    [[J:%.*]] = phi double [ 0.000000e+00, [[ENTRY_NEW]] ], [ [[J_NEXT_7:%.*]], [[FOR_BODY]] ]
-; AUTO_VEC-NEXT:    [[NITER:%.*]] = phi i64 [ 0, [[ENTRY_NEW]] ], [ [[NITER_NEXT_7:%.*]], [[FOR_BODY]] ]
 ; AUTO_VEC-NEXT:    [[T0:%.*]] = getelementptr double, ptr [[A:%.*]], i64 [[I]]
 ; AUTO_VEC-NEXT:    store double [[J]], ptr [[T0]], align 8
 ; AUTO_VEC-NEXT:    [[I_NEXT:%.*]] = or disjoint i64 [[I]], 1
@@ -305,12 +302,11 @@ define double @external_use_without_fast_math(ptr %a, i64 %n) {
 ; AUTO_VEC-NEXT:    store double [[J_NEXT_6]], ptr [[T0_7]], align 8
 ; AUTO_VEC-NEXT:    [[I_NEXT_7]] = add nuw nsw i64 [[I]], 8
 ; AUTO_VEC-NEXT:    [[J_NEXT_7]] = fadd double [[J_NEXT_6]], 3.000000e+00
-; AUTO_VEC-NEXT:    [[NITER_NEXT_7]] = add i64 [[NITER]], 8
-; AUTO_VEC-NEXT:    [[NITER_NCMP_7:%.*]] = icmp eq i64 [[NITER_NEXT_7]], [[UNROLL_ITER]]
+; AUTO_VEC-NEXT:    [[NITER_NCMP_7:%.*]] = icmp eq i64 [[I_NEXT_7]], [[UNROLL_ITER]]
 ; AUTO_VEC-NEXT:    br i1 [[NITER_NCMP_7]], label [[FOR_END_UNR_LCSSA]], label [[FOR_BODY]]
 ; AUTO_VEC:       for.end.unr-lcssa:
 ; AUTO_VEC-NEXT:    [[J_LCSSA_PH:%.*]] = phi double [ undef, [[ENTRY:%.*]] ], [ [[J_NEXT_6]], [[FOR_BODY]] ]
-; AUTO_VEC-NEXT:    [[I_UNR:%.*]] = phi i64 [ 0, [[ENTRY]] ], [ [[I_NEXT_7]], [[FOR_BODY]] ]
+; AUTO_VEC-NEXT:    [[I_UNR:%.*]] = phi i64 [ 0, [[ENTRY]] ], [ [[UNROLL_ITER]], [[FOR_BODY]] ]
 ; AUTO_VEC-NEXT:    [[J_UNR:%.*]] = phi double [ 0.000000e+00, [[ENTRY]] ], [ [[J_NEXT_7]], [[FOR_BODY]] ]
 ; AUTO_VEC-NEXT:    [[LCMP_MOD_NOT:%.*]] = icmp eq i64 [[XTRAITER]], 0
 ; AUTO_VEC-NEXT:    br i1 [[LCMP_MOD_NOT]], label [[FOR_END:%.*]], label [[FOR_BODY_EPIL:%.*]]
@@ -322,7 +318,7 @@ define double @external_use_without_fast_math(ptr %a, i64 %n) {
 ; AUTO_VEC-NEXT:    store double [[J_EPIL]], ptr [[T0_EPIL]], align 8
 ; AUTO_VEC-NEXT:    [[I_NEXT_EPIL]] = add nuw nsw i64 [[I_EPIL]], 1
 ; AUTO_VEC-NEXT:    [[J_NEXT_EPIL]] = fadd double [[J_EPIL]], 3.000000e+00
-; AUTO_VEC-NEXT:    [[EPIL_ITER_NEXT]] = add i64 [[EPIL_ITER]], 1
+; AUTO_VEC-NEXT:    [[EPIL_ITER_NEXT]] = add nuw nsw i64 [[EPIL_ITER]], 1
 ; AUTO_VEC-NEXT:    [[EPIL_ITER_CMP_NOT:%.*]] = icmp eq i64 [[EPIL_ITER_NEXT]], [[XTRAITER]]
 ; AUTO_VEC-NEXT:    br i1 [[EPIL_ITER_CMP_NOT]], label [[FOR_END]], label [[FOR_BODY_EPIL]], !llvm.loop [[LOOP8:![0-9]+]]
 ; AUTO_VEC:       for.end:

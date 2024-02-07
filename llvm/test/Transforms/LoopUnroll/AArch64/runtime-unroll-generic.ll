@@ -18,7 +18,6 @@ define void @runtime_unroll_generic(i32 %arg_0, ptr %arg_1, ptr %arg_2, ptr %arg
 ; CHECK-A55-NEXT:    br label [[FOR_BODY6:%.*]]
 ; CHECK-A55:       for.body6:
 ; CHECK-A55-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ 0, [[FOR_BODY6_PREHEADER_NEW]] ], [ [[INDVARS_IV_NEXT_3:%.*]], [[FOR_BODY6]] ]
-; CHECK-A55-NEXT:    [[NITER:%.*]] = phi i64 [ 0, [[FOR_BODY6_PREHEADER_NEW]] ], [ [[NITER_NEXT_3:%.*]], [[FOR_BODY6]] ]
 ; CHECK-A55-NEXT:    [[ARRAYIDX10:%.*]] = getelementptr inbounds i16, ptr [[ARG_2:%.*]], i64 [[INDVARS_IV]]
 ; CHECK-A55-NEXT:    [[TMP1:%.*]] = load i16, ptr [[ARRAYIDX10]], align 2
 ; CHECK-A55-NEXT:    [[CONV:%.*]] = sext i16 [[TMP1]] to i32
@@ -67,14 +66,13 @@ define void @runtime_unroll_generic(i32 %arg_0, ptr %arg_1, ptr %arg_2, ptr %arg
 ; CHECK-A55-NEXT:    [[ADD21_3:%.*]] = add nsw i32 [[MUL16_3]], [[TMP12]]
 ; CHECK-A55-NEXT:    store i32 [[ADD21_3]], ptr [[ARRAYIDX20_3]], align 4
 ; CHECK-A55-NEXT:    [[INDVARS_IV_NEXT_3]] = add nuw nsw i64 [[INDVARS_IV]], 4
-; CHECK-A55-NEXT:    [[NITER_NEXT_3]] = add i64 [[NITER]], 4
-; CHECK-A55-NEXT:    [[NITER_NCMP_3:%.*]] = icmp eq i64 [[NITER_NEXT_3]], [[UNROLL_ITER]]
+; CHECK-A55-NEXT:    [[NITER_NCMP_3:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT_3]], [[UNROLL_ITER]]
 ; CHECK-A55-NEXT:    br i1 [[NITER_NCMP_3]], label [[FOR_END_LOOPEXIT_UNR_LCSSA]], label [[FOR_BODY6]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK-A55:       for.end.loopexit.unr-lcssa:
-; CHECK-A55-NEXT:    [[INDVARS_IV_UNR:%.*]] = phi i64 [ 0, [[FOR_BODY6_PREHEADER]] ], [ [[INDVARS_IV_NEXT_3]], [[FOR_BODY6]] ]
+; CHECK-A55-NEXT:    [[INDVARS_IV_UNR:%.*]] = phi i64 [ 0, [[FOR_BODY6_PREHEADER]] ], [ [[UNROLL_ITER]], [[FOR_BODY6]] ]
 ; CHECK-A55-NEXT:    [[LCMP_MOD_NOT:%.*]] = icmp eq i64 [[XTRAITER]], 0
-; CHECK-A55-NEXT:    br i1 [[LCMP_MOD_NOT]], label [[FOR_END]], label [[FOR_BODY6_EPIL:%.*]]
-; CHECK-A55:       for.body6.epil:
+; CHECK-A55-NEXT:    br i1 [[LCMP_MOD_NOT]], label [[FOR_END]], label [[FOR_BODY6_EPIL_PREHEADER:%.*]]
+; CHECK-A55:       for.body6.epil.preheader:
 ; CHECK-A55-NEXT:    [[ARRAYIDX10_EPIL:%.*]] = getelementptr inbounds i16, ptr [[ARG_2]], i64 [[INDVARS_IV_UNR]]
 ; CHECK-A55-NEXT:    [[TMP13:%.*]] = load i16, ptr [[ARRAYIDX10_EPIL]], align 2
 ; CHECK-A55-NEXT:    [[CONV_EPIL:%.*]] = sext i16 [[TMP13]] to i32

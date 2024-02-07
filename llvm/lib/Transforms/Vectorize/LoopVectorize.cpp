@@ -485,7 +485,7 @@ using SCEV2ValueTy = DenseMap<const SCEV *, Value *>;
 
 namespace llvm {
 
-AnalysisKey ShouldRunExtraVectorPasses::Key;
+template <> AnalysisKey ShouldRunExtraVectorPasses::Key{};
 
 AnalysisKey ShouldRunExtraUnrollPasses::Key;
 

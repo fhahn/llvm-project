@@ -1199,7 +1199,7 @@ void PassBuilder::addVectorPasses(OptimizationLevel Level,
   FPM.addPass(InstCombinePass());
 
   if (Level.getSpeedupLevel() > 1 && ExtraVectorizerPasses) {
-    ExtraVectorPassManager ExtraPasses;
+    ExtraPassManager<ShouldRunExtraVectorPasses> ExtraPasses;
     // At higher optimization levels, try to clean up any runtime overlap and
     // alignment checks inserted by the vectorizer. We want to track correlated
     // runtime checks for two inner loops in the same outer loop, fold any
@@ -1272,14 +1272,6 @@ void PassBuilder::addVectorPasses(OptimizationLevel Level,
     FPM.addPass(LoopUnrollPass(LoopUnrollOptions(
         Level.getSpeedupLevel(), /*OnlyWhenForced=*/!PTO.LoopUnrolling,
         PTO.ForgetAllSCEVInLoopUnroll)));
-  {
-    ExtraLoopPassManager<ShouldRunExtraUnrollPasses> ExtraPasses;
-    ExtraPasses.addPass((IndVarSimplifyPass(false, true)));
-    // ExtraPasses.addPass(GVNPass());
-    // ExtraPasses.addPass(EarlyCSEPass(true /* Enable mem-ssa. */));
-    FPM.addPass(createFunctionToLoopPassAdaptor(std::move(ExtraPasses)));
-  }
-
     FPM.addPass(WarnMissedTransformationsPass());
     // Now that we are done with loop unrolling, be it either by LoopVectorizer,
     // or LoopUnroll passes, some variable-offset GEP's into alloca's could have
@@ -1294,6 +1286,13 @@ void PassBuilder::addVectorPasses(OptimizationLevel Level,
     FPM.addPass(InferAlignmentPass());
   FPM.addPass(InstCombinePass());
 
+  {
+    ExtraPassManager<ShouldRunExtraUnrollPasses> ExtraPasses;
+    ExtraPasses.addPass(createFunctionToLoopPassAdaptor(IndVarSimplifyPass()));
+     ExtraPasses.addPass(GVNPass());
+   // ExtraPasses.addPass(EarlyCSEPass(true /* Enable mem-ssa. */));
+    FPM.addPass(std::move(ExtraPasses));
+  }
 
   // This is needed for two reasons:
   //   1. It works around problems that instcombine introduces, such as sinking

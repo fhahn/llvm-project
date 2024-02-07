@@ -31,10 +31,10 @@ define void @test(i32 %0) {
 ; CHECK-NEXT:    [[NITER_NCMP_1:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT_1]], [[UNROLL_ITER]]
 ; CHECK-NEXT:    br i1 [[NITER_NCMP_1]], label [[FOR_COND_CLEANUP_LOOPEXIT_UNR_LCSSA]], label [[FOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       for.cond.cleanup.loopexit.unr-lcssa:
-; CHECK-NEXT:    [[INDVARS_IV_UNR:%.*]] = phi i64 [ 0, [[FOR_BODY_PREHEADER]] ], [ [[INDVARS_IV_NEXT_1]], [[FOR_BODY]] ]
+; CHECK-NEXT:    [[INDVARS_IV_UNR:%.*]] = phi i64 [ 0, [[FOR_BODY_PREHEADER]] ], [ [[UNROLL_ITER]], [[FOR_BODY]] ]
 ; CHECK-NEXT:    [[LCMP_MOD_NOT:%.*]] = icmp eq i64 [[XTRAITER]], 0
-; CHECK-NEXT:    br i1 [[LCMP_MOD_NOT]], label [[FOR_COND_CLEANUP]], label [[FOR_BODY_EPIL:%.*]]
-; CHECK:       for.body.epil:
+; CHECK-NEXT:    br i1 [[LCMP_MOD_NOT]], label [[FOR_COND_CLEANUP]], label [[FOR_BODY_EPIL_PREHEADER:%.*]]
+; CHECK:       for.body.epil.preheader:
 ; CHECK-NEXT:    [[CALL15_EPIL:%.*]] = load volatile <8 x half>, ptr null, align 4294967296
 ; CHECK-NEXT:    [[ARRAYIDX17_EPIL:%.*]] = getelementptr <8 x half>, ptr null, i64 [[INDVARS_IV_UNR]]
 ; CHECK-NEXT:    store <8 x half> poison, ptr [[ARRAYIDX17_EPIL]], align 16

@@ -1602,7 +1602,7 @@ PreservedAnalyses LoopUnrollPass::run(Function &F,
   SmallPriorityWorklist<Loop *, 4> Worklist;
   appendLoopsToWorklist(LI, Worklist);
 
-  auto PA = getLoopPassPreservedAnalyses();
+  bool PartiallyUnrolled = false;
   while (!Worklist.empty()) {
     // Because the LoopInfo stores the loops in RPO, we walk the worklist
     // from back to front so that we work forward across the CFG, which
@@ -1631,11 +1631,7 @@ PreservedAnalyses LoopUnrollPass::run(Function &F,
         UnrollOpts.AllowRuntime, UnrollOpts.AllowUpperBound, LocalAllowPeeling,
         UnrollOpts.AllowProfileBasedPeeling, UnrollOpts.FullUnrollMaxCount);
     Changed |= Result != LoopUnrollResult::Unmodified;
-    if (Result == LoopUnrollResult::PartiallyUnrolled) {
-      auto &E = AM.getResult<ShouldRunExtraUnrollPasses>(F);
-      E.Loops.insert(&L);
-      PA.preserve<ShouldRunExtraUnrollPasses>();
-    }
+    PartiallyUnrolled |= Result == LoopUnrollResult::PartiallyUnrolled;
 
     // The parent must not be damaged by unrolling!
 #ifndef NDEBUG
@@ -1651,6 +1647,11 @@ PreservedAnalyses LoopUnrollPass::run(Function &F,
   if (!Changed)
     return PreservedAnalyses::all();
 
+  auto PA = getLoopPassPreservedAnalyses();
+  if (PartiallyUnrolled) {
+    AM.getResult<ShouldRunExtraUnrollPasses>(F);
+    PA.preserve<ShouldRunExtraUnrollPasses>();
+  }
   return PA;
 }
 

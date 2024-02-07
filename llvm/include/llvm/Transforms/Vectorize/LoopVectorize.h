@@ -83,15 +83,16 @@ extern cl::opt<bool> EnableLoopVectorization;
 
 /// A marker to determine if extra passes after loop vectorization should be
 /// run.
-struct ShouldRunExtraVectorPasses
-    : public AnalysisInfoMixin<ShouldRunExtraVectorPasses> {
+template <unsigned X>
+struct ShouldRunExtraPasses
+    : public AnalysisInfoMixin<ShouldRunExtraPasses<X>> {
   static AnalysisKey Key;
   struct Result {
     bool invalidate(Function &F, const PreservedAnalyses &PA,
                     FunctionAnalysisManager::Invalidator &) {
       // Check whether the analysis has been explicitly invalidated. Otherwise,
       // it remains preserved.
-      auto PAC = PA.getChecker<ShouldRunExtraVectorPasses>();
+      auto PAC = PA.getChecker<ShouldRunExtraPasses<X>>();
       return !PAC.preservedWhenStateless();
     }
   };
@@ -99,16 +100,20 @@ struct ShouldRunExtraVectorPasses
   Result run(Function &F, FunctionAnalysisManager &FAM) { return Result(); }
 };
 
-// A pass manager to run a set of extra function simplification passes after
+using ShouldRunExtraVectorPasses = ShouldRunExtraPasses<0>;
+template <> AnalysisKey ShouldRunExtraVectorPasses::Key;
+
+/// A pass manager to run a set of extra function simplification passes after
 /// vectorization, if requested. LoopVectorize caches the
 /// ShouldRunExtraVectorPasses analysis to request extra simplifications, if
 /// they could be beneficial.
-struct ExtraVectorPassManager : public FunctionPassManager {
+template <typename MarkerT>
+struct ExtraPassManager : public FunctionPassManager {
   PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM) {
     auto PA = PreservedAnalyses::all();
-    if (AM.getCachedResult<ShouldRunExtraVectorPasses>(F))
+    if (AM.getCachedResult<MarkerT>(F))
       PA.intersect(FunctionPassManager::run(F, AM));
-    PA.abandon<ShouldRunExtraVectorPasses>();
+    PA.abandon<MarkerT>();
     return PA;
   }
 };
