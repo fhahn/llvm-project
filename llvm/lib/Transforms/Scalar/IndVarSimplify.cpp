@@ -137,6 +137,8 @@ class IndVarSimplify {
   SmallVector<WeakTrackingVH, 16> DeadInsts;
   bool WidenIndVars;
 
+  bool Lightweigth;
+
   bool handleFloatingPointIV(Loop *L, PHINode *PH);
   bool rewriteNonIntegerIVs(Loop *L);
 
@@ -162,9 +164,9 @@ class IndVarSimplify {
 public:
   IndVarSimplify(LoopInfo *LI, ScalarEvolution *SE, DominatorTree *DT,
                  const DataLayout &DL, TargetLibraryInfo *TLI,
-                 TargetTransformInfo *TTI, MemorySSA *MSSA, bool WidenIndVars)
+                 TargetTransformInfo *TTI, MemorySSA *MSSA, bool WidenIndVars, bool Lightweigth)
       : LI(LI), SE(SE), DT(DT), DL(DL), TLI(TLI), TTI(TTI),
-        WidenIndVars(WidenIndVars) {
+        WidenIndVars(WidenIndVars), Lightweigth(Lightweigth) {
     if (MSSA)
       MSSAU = std::make_unique<MemorySSAUpdater>(MSSA);
   }
@@ -1902,7 +1904,7 @@ bool IndVarSimplify::run(Loop *L) {
   bool Changed = false;
   // If there are any floating-point recurrences, attempt to
   // transform them to use integer recurrences.
-  Changed |= rewriteNonIntegerIVs(L);
+  Changed |= !Lightweigth && rewriteNonIntegerIVs(L);
 
   // Create a rewriter object which we'll use to transform the code with.
   SCEVExpander Rewriter(*SE, DL, "indvars");
@@ -1917,13 +1919,13 @@ bool IndVarSimplify::run(Loop *L) {
   // other expressions involving loop IVs have been evaluated. This helps SCEV
   // set no-wrap flags before normalizing sign/zero extension.
   Rewriter.disableCanonicalMode();
-  Changed |= simplifyAndExtend(L, Rewriter, LI);
+  Changed |= !Lightweigth && simplifyAndExtend(L, Rewriter, LI);
 
   // Check to see if we can compute the final value of any expressions
   // that are recurrent in the loop, and substitute the exit values from the
   // loop into any instructions outside of the loop that use the final values
   // of the current expressions.
-  if (ReplaceExitValue != NeverRepl) {
+  if (!Lightweigth && ReplaceExitValue != NeverRepl) {
     if (int Rewrites = rewriteLoopExitValues(L, LI, TLI, SE, TTI, Rewriter, DT,
                                              ReplaceExitValue, DeadInsts)) {
       NumReplaced += Rewrites;
@@ -1936,10 +1938,10 @@ bool IndVarSimplify::run(Loop *L) {
 
   // Try to convert exit conditions to unsigned and rotate computation
   // out of the loop.  Note: Handles invalidation internally if needed.
-  Changed |= canonicalizeExitCondition(L);
+  Changed |= !Lightweigth && canonicalizeExitCondition(L);
 
   // Try to eliminate loop exits based on analyzeable exit counts
-  if (optimizeLoopExits(L, Rewriter))  {
+  if (!Lightweigth && optimizeLoopExits(L, Rewriter))  {
     Changed = true;
     // Given we've changed exit counts, notify SCEV
     // Some nested loops may share same folded exit basic block,
@@ -1957,7 +1959,7 @@ bool IndVarSimplify::run(Loop *L) {
 
   // If we have a trip count expression, rewrite the loop's exit condition
   // using it.
-  if (!DisableLFTR) {
+  if (!Lightweigth && !DisableLFTR) {
     BasicBlock *PreHeader = L->getLoopPreheader();
 
     SmallVector<BasicBlock*, 16> ExitingBlocks;
@@ -2052,7 +2054,7 @@ PreservedAnalyses IndVarSimplifyPass::run(Loop &L, LoopAnalysisManager &AM,
   const DataLayout &DL = F->getParent()->getDataLayout();
 
   IndVarSimplify IVS(&AR.LI, &AR.SE, &AR.DT, DL, &AR.TLI, &AR.TTI, AR.MSSA,
-                     WidenIndVars && AllowIVWidening);
+                     WidenIndVars && AllowIVWidening, Lightweigth);
   if (!IVS.run(&L))
     return PreservedAnalyses::all();
 

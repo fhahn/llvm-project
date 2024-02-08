@@ -1274,7 +1274,7 @@ void PassBuilder::addVectorPasses(OptimizationLevel Level,
         PTO.ForgetAllSCEVInLoopUnroll)));
   {
     ExtraLoopPassManager<ShouldRunExtraUnrollPasses> ExtraPasses;
-    ExtraPasses.addPass((IndVarSimplifyPass()));
+    ExtraPasses.addPass((IndVarSimplifyPass(false, true)));
     // ExtraPasses.addPass(GVNPass());
     // ExtraPasses.addPass(EarlyCSEPass(true /* Enable mem-ssa. */));
     FPM.addPass(createFunctionToLoopPassAdaptor(std::move(ExtraPasses)));
