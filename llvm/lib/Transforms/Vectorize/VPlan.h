@@ -1386,6 +1386,13 @@ public:
 
   /// Returns the result type of the cast.
   Type *getResultType() const { return ResultTy; }
+
+  bool onlyFirstLaneUsed(const VPValue *Op) const override {
+    // At the moment, only uniform codegen is implemented.
+    assert(is_contained(operands(), Op) &&
+           "Op must be an operand of the recipe");
+    return true;
+  }
 };
 
 /// A recipe for widening Call instructions.
