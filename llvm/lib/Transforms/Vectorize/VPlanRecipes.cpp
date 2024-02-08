@@ -127,6 +127,7 @@ bool VPRecipeBase::mayHaveSideEffects() const {
     case VPInstruction::Not:
     case VPInstruction::CalculateTripCountMinusVF:
     case VPInstruction::CanonicalIVIncrementForPart:
+    case VPInstruction::PtrAdd:
       return false;
     default:
       return true;
@@ -274,24 +275,27 @@ VPInstruction::VPInstruction(unsigned Opcode,
   assert(isFPMathOp() && "this op can't take fast-math flags");
 }
 
-Value *VPInstruction::generateInstruction(VPTransformState &State,
-                                          unsigned Part) {
+bool VPInstruction::generatesScalars() const {
+  if (Opcode == VPInstruction::FirstOrderRecurrenceSplice ||
+      Opcode == VPInstruction::ActiveLaneMask)
+    return false;
+
+  return Opcode == VPInstruction::ComputeReductionResult ||
+         Opcode == VPInstruction::PtrAdd || vputils::onlyFirstLaneUsed(this);
+}
+
+Value *VPInstruction::generatePerLane(VPTransformState &State,
+                                      const VPIteration &Lane) {
   IRBuilderBase &Builder = State.Builder;
   Builder.SetCurrentDebugLocation(getDebugLoc());
   std::string Name = getParent()->getPlan()->getName(this);
 
-  if (Instruction::isBinaryOp(getOpcode())) {
-    bool OnlyFirstLaneUsed = vputils::onlyFirstLaneUsed(this);
-    if (Part != 0 && vputils::onlyFirstPartUsed(this))
-      return OnlyFirstLaneUsed ? State.get(this, VPIteration(0, 0))
-                               : State.get(this, 0);
+  if (Lane.Part > 0 && vputils::onlyFirstPartUsed(this))
+    return State.get(this, VPIteration(0, Lane.Lane.getKnownLane()));
 
-    Value *A = OnlyFirstLaneUsed
-                   ? State.get(getOperand(0), VPIteration(Part, 0))
-                   : State.get(getOperand(0), Part);
-    Value *B = OnlyFirstLaneUsed
-                   ? State.get(getOperand(1), VPIteration(Part, 0))
-                   : State.get(getOperand(1), Part);
+  if (Instruction::isBinaryOp(getOpcode())) {
+    Value *A = State.get(getOperand(0), Lane);
+    Value *B = State.get(getOperand(1), Lane);
     auto *Res =
         Builder.CreateBinOp((Instruction::BinaryOps)getOpcode(), A, B, Name);
     if (auto *I = dyn_cast<Instruction>(Res))
@@ -301,78 +305,42 @@ Value *VPInstruction::generateInstruction(VPTransformState &State,
 
   switch (getOpcode()) {
   case VPInstruction::Not: {
-    Value *A = State.get(getOperand(0), Part);
+    Value *A = State.get(getOperand(0), Lane);
     return Builder.CreateNot(A, Name);
   }
-  case Instruction::ICmp: {
-    Value *A = State.get(getOperand(0), Part);
-    Value *B = State.get(getOperand(1), Part);
-    return Builder.CreateCmp(getPredicate(), A, B, Name);
-  }
   case Instruction::Select: {
-    Value *Cond = State.get(getOperand(0), Part);
-    Value *Op1 = State.get(getOperand(1), Part);
-    Value *Op2 = State.get(getOperand(2), Part);
+    Value *Cond = State.get(getOperand(0), Lane);
+    Value *Op1 = State.get(getOperand(1), Lane);
+    Value *Op2 = State.get(getOperand(2), Lane);
     return Builder.CreateSelect(Cond, Op1, Op2, Name);
-  }
-  case VPInstruction::ActiveLaneMask: {
-    // Get first lane of vector induction variable.
-    Value *VIVElem0 = State.get(getOperand(0), VPIteration(Part, 0));
-    // Get the original loop tripcount.
-    Value *ScalarTC = State.get(getOperand(1), VPIteration(Part, 0));
-
-    auto *Int1Ty = Type::getInt1Ty(Builder.getContext());
-    auto *PredTy = VectorType::get(Int1Ty, State.VF);
-    return Builder.CreateIntrinsic(Intrinsic::get_active_lane_mask,
-                                   {PredTy, ScalarTC->getType()},
-                                   {VIVElem0, ScalarTC}, nullptr, Name);
-  }
-  case VPInstruction::FirstOrderRecurrenceSplice: {
-    // Generate code to combine the previous and current values in vector v3.
-    //
-    //   vector.ph:
-    //     v_init = vector(..., ..., ..., a[-1])
-    //     br vector.body
-    //
-    //   vector.body
-    //     i = phi [0, vector.ph], [i+4, vector.body]
-    //     v1 = phi [v_init, vector.ph], [v2, vector.body]
-    //     v2 = a[i, i+1, i+2, i+3];
-    //     v3 = vector(v1(3), v2(0, 1, 2))
-
-    // For the first part, use the recurrence phi (v1), otherwise v2.
-    auto *V1 = State.get(getOperand(0), 0);
-    Value *PartMinus1 = Part == 0 ? V1 : State.get(getOperand(1), Part - 1);
-    if (!PartMinus1->getType()->isVectorTy())
-      return PartMinus1;
-    Value *V2 = State.get(getOperand(1), Part);
-    return Builder.CreateVectorSplice(PartMinus1, V2, -1, Name);
   }
   case VPInstruction::CalculateTripCountMinusVF: {
     Value *ScalarTC = State.get(getOperand(0), {0, 0});
     Value *Step =
         createStepForVF(Builder, ScalarTC->getType(), State.VF, State.UF);
     Value *Sub = Builder.CreateSub(ScalarTC, Step);
-    Value *Cmp = Builder.CreateICmp(CmpInst::Predicate::ICMP_UGT, ScalarTC, Step);
+    Value *Cmp =
+        Builder.CreateICmp(CmpInst::Predicate::ICMP_UGT, ScalarTC, Step);
     Value *Zero = ConstantInt::get(ScalarTC->getType(), 0);
     return Builder.CreateSelect(Cmp, Sub, Zero);
   }
   case VPInstruction::CanonicalIVIncrementForPart: {
     auto *IV = State.get(getOperand(0), VPIteration(0, 0));
-    if (Part == 0)
+    if (Lane.Part == 0)
       return IV;
 
     // The canonical IV is incremented by the vectorization factor (num of SIMD
     // elements) times the unroll part.
-    Value *Step = createStepForVF(Builder, IV->getType(), State.VF, Part);
+    Value *Step = createStepForVF(Builder, IV->getType(), State.VF, Lane.Part);
     return Builder.CreateAdd(IV, Step, Name, hasNoUnsignedWrap(),
                              hasNoSignedWrap());
   }
+
   case VPInstruction::BranchOnCond: {
-    if (Part != 0)
+    if (Lane.Part != 0)
       return nullptr;
 
-    Value *Cond = State.get(getOperand(0), VPIteration(Part, 0));
+    Value *Cond = State.get(getOperand(0), Lane);
     VPRegionBlock *ParentRegion = getParent()->getParent();
     VPBasicBlock *Header = ParentRegion->getEntryBasicBlock();
 
@@ -390,11 +358,11 @@ Value *VPInstruction::generateInstruction(VPTransformState &State,
     return CondBr;
   }
   case VPInstruction::BranchOnCount: {
-    if (Part != 0)
+    if (Lane.Part != 0)
       return nullptr;
     // First create the compare.
-    Value *IV = State.get(getOperand(0), VPIteration(0, 0));
-    Value *TC = State.get(getOperand(1), VPIteration(0, 0));
+    Value *IV = State.get(getOperand(0), Lane);
+    Value *TC = State.get(getOperand(1), Lane);
     Value *Cond = Builder.CreateICmpEQ(IV, TC);
 
     // Now create the branch.
@@ -414,7 +382,7 @@ Value *VPInstruction::generateInstruction(VPTransformState &State,
     return CondBr;
   }
   case VPInstruction::ComputeReductionResult: {
-    if (Part != 0)
+    if (Lane.Part != 0)
       return State.get(this, VPIteration(0, 0));
 
     // FIXME: The cross-recipe dependency on VPReductionPHIRecipe is temporary
@@ -491,6 +459,89 @@ Value *VPInstruction::generateInstruction(VPTransformState &State,
 
     return ReducedPartRdx;
   }
+  case VPInstruction::PtrAdd: {
+    auto *P = Builder.CreatePtrAdd(State.get(getOperand(0), Lane),
+                                   State.get(getOperand(1), Lane), Name);
+    return P;
+  }
+  default:
+    llvm_unreachable("Unsupported opcode for instruction");
+  }
+}
+
+Value *VPInstruction::generatePerPart(VPTransformState &State, unsigned Part) {
+  IRBuilderBase &Builder = State.Builder;
+  Builder.SetCurrentDebugLocation(getDebugLoc());
+  std::string Name = getParent()->getPlan()->getName(this);
+
+  if (Instruction::isBinaryOp(getOpcode())) {
+    bool OnlyFirstLaneUsed = vputils::onlyFirstLaneUsed(this);
+    if (Part != 0 && vputils::onlyFirstPartUsed(this))
+      return OnlyFirstLaneUsed ? State.get(this, VPIteration(0, 0))
+                               : State.get(this, 0);
+
+    Value *A = OnlyFirstLaneUsed
+                   ? State.get(getOperand(0), VPIteration(Part, 0))
+                   : State.get(getOperand(0), Part);
+    Value *B = OnlyFirstLaneUsed
+                   ? State.get(getOperand(1), VPIteration(Part, 0))
+                   : State.get(getOperand(1), Part);
+    auto *Res =
+        Builder.CreateBinOp((Instruction::BinaryOps)getOpcode(), A, B, Name);
+    if (auto *I = dyn_cast<Instruction>(Res))
+      setFlags(I);
+    return Res;
+  }
+
+  switch (getOpcode()) {
+  case VPInstruction::Not: {
+    Value *A = State.get(getOperand(0), Part);
+    return Builder.CreateNot(A, Name);
+  }
+  case Instruction::ICmp: {
+    Value *A = State.get(getOperand(0), Part);
+    Value *B = State.get(getOperand(1), Part);
+    return Builder.CreateCmp(getPredicate(), A, B, Name);
+  }
+  case Instruction::Select: {
+    Value *Cond = State.get(getOperand(0), Part);
+    Value *Op1 = State.get(getOperand(1), Part);
+    Value *Op2 = State.get(getOperand(2), Part);
+    return Builder.CreateSelect(Cond, Op1, Op2, Name);
+  }
+  case VPInstruction::ActiveLaneMask: {
+    // Get first lane of vector induction variable.
+    Value *VIVElem0 = State.get(getOperand(0), VPIteration(Part, 0));
+    // Get the original loop tripcount.
+    Value *ScalarTC = State.get(getOperand(1), VPIteration(Part, 0));
+
+    auto *Int1Ty = Type::getInt1Ty(Builder.getContext());
+    auto *PredTy = VectorType::get(Int1Ty, State.VF);
+    return Builder.CreateIntrinsic(Intrinsic::get_active_lane_mask,
+                                   {PredTy, ScalarTC->getType()},
+                                   {VIVElem0, ScalarTC}, nullptr, Name);
+  }
+  case VPInstruction::FirstOrderRecurrenceSplice: {
+    // Generate code to combine the previous and current values in vector v3.
+    //
+    //   vector.ph:
+    //     v_init = vector(..., ..., ..., a[-1])
+    //     br vector.body
+    //
+    //   vector.body
+    //     i = phi [0, vector.ph], [i+4, vector.body]
+    //     v1 = phi [v_init, vector.ph], [v2, vector.body]
+    //     v2 = a[i, i+1, i+2, i+3];
+    //     v3 = vector(v1(3), v2(0, 1, 2))
+
+    // For the first part, use the recurrence phi (v1), otherwise v2.
+    auto *V1 = State.get(getOperand(0), 0);
+    Value *PartMinus1 = Part == 0 ? V1 : State.get(getOperand(1), Part - 1);
+    if (!PartMinus1->getType()->isVectorTy())
+      return PartMinus1;
+    Value *V2 = State.get(getOperand(1), Part);
+    return Builder.CreateVectorSplice(PartMinus1, V2, -1, Name);
+  }
   default:
     llvm_unreachable("Unsupported opcode for instruction");
   }
@@ -516,18 +567,25 @@ void VPInstruction::execute(VPTransformState &State) {
   if (hasFastMathFlags())
     State.Builder.setFastMathFlags(getFastMathFlags());
   for (unsigned Part = 0; Part < State.UF; ++Part) {
-    Value *GeneratedValue = generateInstruction(State, Part);
+    if (generatesScalars()) {
+      unsigned NumLanes =
+          vputils::onlyFirstLaneUsed(this) ? 1 : State.VF.getKnownMinValue();
+      if (getOpcode() == VPInstruction::ComputeReductionResult)
+        NumLanes = 1;
+      for (unsigned Lane = 0; Lane != NumLanes; ++Lane) {
+        Value *P = generatePerLane(State, VPIteration(Part, Lane));
+        State.set(this, P, VPIteration(Part, Lane));
+      }
+      continue;
+    }
+
+    Value *GeneratedValue = generatePerPart(State, Part);
     if (!hasResult())
       continue;
-    assert(GeneratedValue && "generateInstruction must produce a value");
-    if (GeneratedValue->getType()->isVectorTy())
-      State.set(this, GeneratedValue, Part);
-    else {
-      assert((getOpcode() == VPInstruction::ComputeReductionResult ||
-              State.VF.isScalar() || vputils::onlyFirstLaneUsed(this)) &&
-             "scalar value but not only first lane used");
-      State.set(this, GeneratedValue, VPIteration(Part, 0));
-    }
+    assert(GeneratedValue &&
+           (State.VF.isScalar() || GeneratedValue->getType()->isVectorTy()) &&
+           "generateInstruction must produce a vector value");
+    State.set(this, GeneratedValue, Part);
   }
 }
 bool VPInstruction::onlyFirstLaneUsed(const VPValue *Op) const {
@@ -539,6 +597,7 @@ bool VPInstruction::onlyFirstLaneUsed(const VPValue *Op) const {
   default:
     return false;
   case Instruction::ICmp:
+  case VPInstruction::PtrAdd:
     // TODO: Cover additional opcodes.
     return vputils::onlyFirstLaneUsed(this);
   case VPInstruction::ActiveLaneMask:
@@ -595,6 +654,9 @@ void VPInstruction::print(raw_ostream &O, const Twine &Indent,
     break;
   case VPInstruction::ComputeReductionResult:
     O << "compute-reduction-result";
+    break;
+  case VPInstruction::PtrAdd:
+    O << "ptradd";
     break;
   default:
     O << Instruction::getOpcodeName(getOpcode());

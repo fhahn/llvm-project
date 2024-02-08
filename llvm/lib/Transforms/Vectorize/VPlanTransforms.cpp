@@ -494,15 +494,18 @@ void VPlanTransforms::removeDeadRecipes(VPlan &Plan) {
   }
 }
 
-static VPValue *createScalarIVSteps(VPlan &Plan, const InductionDescriptor &ID,
+static VPValue *createScalarIVSteps(VPlan &Plan,
+                                    InductionDescriptor::InductionKind Kind,
+                                    Instruction::BinaryOps InductionOpcode,
+                                    FPMathOperator *FPBinOp,
                                     ScalarEvolution &SE, Instruction *TruncI,
                                     VPValue *StartV, VPValue *Step,
                                     VPBasicBlock::iterator IP) {
   VPBasicBlock *HeaderVPBB = Plan.getVectorLoopRegion()->getEntryBasicBlock();
   VPCanonicalIVPHIRecipe *CanonicalIV = Plan.getCanonicalIV();
   VPSingleDefRecipe *BaseIV = CanonicalIV;
-  if (!CanonicalIV->isCanonical(ID.getKind(), StartV, Step)) {
-    BaseIV = new VPDerivedIVRecipe(ID, StartV, CanonicalIV, Step);
+  if (!CanonicalIV->isCanonical(Kind, StartV, Step)) {
+    BaseIV = new VPDerivedIVRecipe(Kind, FPBinOp, StartV, CanonicalIV, Step);
     HeaderVPBB->insert(BaseIV, IP);
   }
 
@@ -531,7 +534,9 @@ static VPValue *createScalarIVSteps(VPlan &Plan, const InductionDescriptor &ID,
     VecPreheader->appendRecipe(Step->getDefiningRecipe());
   }
 
-  VPScalarIVStepsRecipe *Steps = new VPScalarIVStepsRecipe(ID, BaseIV, Step);
+  VPScalarIVStepsRecipe *Steps = new VPScalarIVStepsRecipe(
+      BaseIV, Step, InductionOpcode,
+      FPBinOp ? FPBinOp->getFastMathFlags() : FastMathFlags());
   HeaderVPBB->insert(Steps, IP);
   return Steps;
 }
@@ -542,6 +547,33 @@ void VPlanTransforms::optimizeInductions(VPlan &Plan, ScalarEvolution &SE) {
   bool HasOnlyVectorVFs = !Plan.hasVF(ElementCount::getFixed(1));
   VPBasicBlock::iterator InsertPt = HeaderVPBB->getFirstNonPhi();
   for (VPRecipeBase &Phi : HeaderVPBB->phis()) {
+    // Replace wide pointer inductions which have only their scalars used by
+    // PtrAdd(IndStart, ScalarIVSteps (0, Step)).
+    if (auto *PtrIV = dyn_cast<VPWidenPointerInductionRecipe>(&Phi)) {
+      if (!PtrIV->onlyScalarsGenerated(Plan.hasScalableVF()))
+        continue;
+
+      const InductionDescriptor &ID = PtrIV->getInductionDescriptor();
+      VPValue *StartV = Plan.getVPValueOrAddLiveIn(
+          ConstantInt::get(ID.getStep()->getType(), 0));
+      VPValue *StepV = PtrIV->getOperand(1);
+      VPRecipeBase *Steps =
+          createScalarIVSteps(Plan, InductionDescriptor::IK_IntInduction, Instruction::Add, nullptr, SE,
+                              nullptr, StartV, StepV,
+                              InsertPt)
+              ->getDefiningRecipe();
+
+      auto *Recipe =
+          new VPInstruction(VPInstruction::PtrAdd,
+                            {PtrIV->getStartValue(), Steps->getVPSingleValue()},
+                            PtrIV->getDebugLoc());
+
+      Recipe->insertAfter(Steps);
+      Plan.setName(Recipe, "next.gep");
+      PtrIV->replaceAllUsesWith(Recipe);
+      continue;
+    }
+
     auto *WideIV = dyn_cast<VPWidenIntOrFpInductionRecipe>(&Phi);
     if (!WideIV)
       continue;
@@ -551,9 +583,10 @@ void VPlanTransforms::optimizeInductions(VPlan &Plan, ScalarEvolution &SE) {
       continue;
 
     const InductionDescriptor &ID = WideIV->getInductionDescriptor();
-    VPValue *Steps = createScalarIVSteps(Plan, ID, SE, WideIV->getTruncInst(),
-                                         WideIV->getStartValue(),
-                                         WideIV->getStepValue(), InsertPt);
+    VPValue *Steps = createScalarIVSteps(
+        Plan, ID.getKind(), ID.getInductionOpcode(), dyn_cast_or_null<FPMathOperator>(ID.getInductionBinOp()), SE, WideIV->getTruncInst(), WideIV->getStartValue(),
+        WideIV->getStepValue(), InsertPt
+        );
 
     // Update scalar users of IV to use Step instead.
     if (!HasOnlyVectorVFs)

@@ -1113,8 +1113,10 @@ define void @ptr_induction_remove_dead_recipe(ptr %start, ptr %end) {
 ; CHECK-NEXT: <x1> vector loop: {
 ; CHECK-NEXT:   vector.body:
 ; CHECK-NEXT:     EMIT vp<[[CAN_IV:%.+]]> = CANONICAL-INDUCTION
-; CHECK-NEXT:     EMIT vp<%ptr.iv> = WIDEN-POINTER-INDUCTION ir<%start>, -1
-; CHECK-NEXT:     CLONE vp<%ptr.iv.next.cloned> = getelementptr inbounds vp<%ptr.iv>, ir<-1>
+; CHECK-NEXT:     vp<[[DEV_IV:%.+]]> = DERIVED-IV ir<0> + vp<%3> * ir<-1>
+; CHECK-NEXT:     vp<[[STEPS:%.+]]> = SCALAR-STEPS vp<[[DEV_IV]]>, ir<-1>
+; CHECK-NEXT:     EMIT vp<[[PTR_IV:%.+]]> = ptradd ir<%start>, vp<[[STEPS]]>
+; CHECK-NEXT:     CLONE vp<%ptr.iv.next.cloned> = getelementptr inbounds vp<[[PTR_IV]]>, ir<-1>
 ; CHECK-NEXT:     vp<[[VEC_PTR:%.+]]> = vector-pointer (reverse) vp<%ptr.iv.next.cloned>
 ; CHECK-NEXT:     WIDEN vp<%l> = load vp<[[VEC_PTR]]>
 ; CHECK-NEXT:     WIDEN vp<%c.1> = icmp eq vp<%l>, ir<0>
@@ -1127,7 +1129,7 @@ define void @ptr_induction_remove_dead_recipe(ptr %start, ptr %end) {
 ; CHECK-NEXT:     Successor(s): pred.store.if, pred.store.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:     pred.store.if:
-; CHECK-NEXT:       REPLICATE vp<%ptr.iv.next> = getelementptr inbounds vp<%ptr.iv>, ir<-1>
+; CHECK-NEXT:       REPLICATE vp<%ptr.iv.next> = getelementptr inbounds vp<[[PTR_IV]]>, ir<-1>
 ; CHECK-NEXT:       REPLICATE store ir<95>, vp<%ptr.iv.next>
 ; CHECK-NEXT:     Successor(s): pred.store.continue
 ; CHECK-EMPTY:
