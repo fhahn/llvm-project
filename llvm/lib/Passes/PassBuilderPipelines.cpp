@@ -1272,6 +1272,14 @@ void PassBuilder::addVectorPasses(OptimizationLevel Level,
     FPM.addPass(LoopUnrollPass(LoopUnrollOptions(
         Level.getSpeedupLevel(), /*OnlyWhenForced=*/!PTO.LoopUnrolling,
         PTO.ForgetAllSCEVInLoopUnroll)));
+  {
+    ExtraLoopPassManager<ShouldRunExtraUnrollPasses> ExtraPasses;
+    ExtraPasses.addPass((IndVarSimplifyPass()));
+    // ExtraPasses.addPass(GVNPass());
+    // ExtraPasses.addPass(EarlyCSEPass(true /* Enable mem-ssa. */));
+    FPM.addPass(createFunctionToLoopPassAdaptor(std::move(ExtraPasses)));
+  }
+
     FPM.addPass(WarnMissedTransformationsPass());
     // Now that we are done with loop unrolling, be it either by LoopVectorizer,
     // or LoopUnroll passes, some variable-offset GEP's into alloca's could have
@@ -1285,6 +1293,7 @@ void PassBuilder::addVectorPasses(OptimizationLevel Level,
   if (EnableInferAlignmentPass)
     FPM.addPass(InferAlignmentPass());
   FPM.addPass(InstCombinePass());
+
 
   // This is needed for two reasons:
   //   1. It works around problems that instcombine introduces, such as sinking

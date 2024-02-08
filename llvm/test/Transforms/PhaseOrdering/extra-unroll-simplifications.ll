@@ -20,7 +20,6 @@ define void @test(i32 %0) {
 ; CHECK-NEXT:    br label [[FOR_BODY:%.*]]
 ; CHECK:       for.body:
 ; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ 0, [[FOR_BODY_PREHEADER_NEW]] ], [ [[INDVARS_IV_NEXT_1:%.*]], [[FOR_BODY]] ]
-; CHECK-NEXT:    [[NITER:%.*]] = phi i64 [ 0, [[FOR_BODY_PREHEADER_NEW]] ], [ [[NITER_NEXT_1:%.*]], [[FOR_BODY]] ]
 ; CHECK-NEXT:    [[CALL15:%.*]] = load volatile <8 x half>, ptr null, align 4294967296
 ; CHECK-NEXT:    [[ARRAYIDX17:%.*]] = getelementptr <8 x half>, ptr null, i64 [[INDVARS_IV]]
 ; CHECK-NEXT:    store <8 x half> poison, ptr [[ARRAYIDX17]], align 32
@@ -28,9 +27,8 @@ define void @test(i32 %0) {
 ; CHECK-NEXT:    [[CALL15_1:%.*]] = load volatile <8 x half>, ptr null, align 4294967296
 ; CHECK-NEXT:    [[ARRAYIDX17_1:%.*]] = getelementptr <8 x half>, ptr null, i64 [[INDVARS_IV_NEXT]]
 ; CHECK-NEXT:    store <8 x half> poison, ptr [[ARRAYIDX17_1]], align 16
-; CHECK-NEXT:    [[INDVARS_IV_NEXT_1]] = add nuw nsw i64 [[INDVARS_IV]], 2
-; CHECK-NEXT:    [[NITER_NEXT_1]] = add i64 [[NITER]], 2
-; CHECK-NEXT:    [[NITER_NCMP_1:%.*]] = icmp eq i64 [[NITER_NEXT_1]], [[UNROLL_ITER]]
+; CHECK-NEXT:    [[INDVARS_IV_NEXT_1]] = add i64 [[INDVARS_IV]], 2
+; CHECK-NEXT:    [[NITER_NCMP_1:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT_1]], [[UNROLL_ITER]]
 ; CHECK-NEXT:    br i1 [[NITER_NCMP_1]], label [[FOR_COND_CLEANUP_LOOPEXIT_UNR_LCSSA]], label [[FOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       for.cond.cleanup.loopexit.unr-lcssa:
 ; CHECK-NEXT:    [[INDVARS_IV_UNR:%.*]] = phi i64 [ 0, [[FOR_BODY_PREHEADER]] ], [ [[INDVARS_IV_NEXT_1]], [[FOR_BODY]] ]
