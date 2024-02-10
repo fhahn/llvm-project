@@ -392,8 +392,6 @@ Value *VPInstruction::generatePerLane(VPTransformState &State,
   }
   case VPInstruction::ComputeReductionResult: {
     unsigned NumParts = getNumOperands() - 1;
-    if (Part != 0)
-      return State.get(this, VPIteration(0, 0));
 
     // FIXME: The cross-recipe dependency on VPReductionPHIRecipe is temporary
     // and will be removed by breaking up the recipe further.
@@ -545,8 +543,7 @@ Value *VPInstruction::generatePerPart(VPTransformState &State, unsigned Part) {
     //     v3 = vector(v1(3), v2(0, 1, 2))
 
     // For the first part, use the recurrence phi (v1), otherwise v2.
-    auto *V1 = State.get(getOperand(0), 0);
-    Value *PartMinus1 = Part == 0 ? V1 : State.get(getOperand(1), Part - 1);
+    Value *PartMinus1 = State.get(getOperand(0));
     if (!PartMinus1->getType()->isVectorTy())
       return PartMinus1;
     Value *V2 = State.get(getOperand(1));
@@ -576,27 +573,25 @@ void VPInstruction::execute(VPTransformState &State) {
          "Recipe not a FPMathOp but has fast-math flags?");
   if (hasFastMathFlags())
     State.Builder.setFastMathFlags(getFastMathFlags());
-  for (unsigned Part = 0; Part < State.UF; ++Part) {
-    if (generatesScalars()) {
-      unsigned NumLanes =
-          vputils::onlyFirstLaneUsed(this) ? 1 : State.VF.getKnownMinValue();
-      if (getOpcode() == VPInstruction::ComputeReductionResult)
-        NumLanes = 1;
-      for (unsigned Lane = 0; Lane != NumLanes; ++Lane) {
-        Value *P = generatePerLane(State, VPIteration(Part, Lane));
-        State.set(this, P, VPIteration(Part, Lane));
-      }
-      continue;
+  if (generatesScalars()) {
+    unsigned NumLanes =
+        vputils::onlyFirstLaneUsed(this) ? 1 : State.VF.getKnownMinValue();
+    if (getOpcode() == VPInstruction::ComputeReductionResult)
+      NumLanes = 1;
+    for (unsigned Lane = 0; Lane != NumLanes; ++Lane) {
+      Value *P = generatePerLane(State, VPIteration(0, Lane));
+      State.set(this, P, VPIteration(0, Lane));
     }
-
-    Value *GeneratedValue = generatePerPart(State, Part);
-    if (!hasResult())
-      continue;
-    assert(GeneratedValue &&
-           (State.VF.isScalar() || GeneratedValue->getType()->isVectorTy()) &&
-           "generateInstruction must produce a vector value");
-    State.set(this, GeneratedValue, Part);
+    return;
   }
+
+  Value *GeneratedValue = generatePerPart(State, 0);
+  if (!hasResult())
+    return;
+  assert(GeneratedValue &&
+         (State.VF.isScalar() || GeneratedValue->getType()->isVectorTy()) &&
+         "generateInstruction must produce a vector value");
+  State.set(this, GeneratedValue);
 }
 bool VPInstruction::onlyFirstLaneUsed(const VPValue *Op) const {
   assert(is_contained(operands(), Op) && "Op must be an operand of the recipe");
@@ -1895,13 +1890,16 @@ void VPReductionPHIRecipe::execute(VPTransformState &State) {
     }
   }
 
-  for (unsigned Part = 0; Part < LastPartForNewPhi; ++Part) {
-    Value *EntryPart = State.get(this, Part);
+  unsigned Part = getNumOperands() == 2
+                      ? 0
+                      : cast<ConstantInt>(getOperand(2)->getLiveInIRValue())
+                            ->getZExtValue();
+
+    Value *EntryPart = State.get(this);
     // Make sure to add the reduction start value only to the
     // first unroll part.
     Value *StartVal = (Part == 0) ? StartV : Iden;
     cast<PHINode>(EntryPart)->addIncoming(StartVal, VectorPH);
-  }
 }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)

@@ -3473,7 +3473,7 @@ void InnerLoopVectorizer::fixFixedOrderRecurrence(
   // Extract the last vector element in the middle block. This will be the
   // initial value for the recurrence when jumping to the scalar loop.
   VPValue *PreviousDef = PhiR->getBackedgeValue();
-  Value *Incoming = State.get(PreviousDef, UF - 1);
+  Value *Incoming = State.get(PreviousDef,0 );
   auto *ExtractForScalar = Incoming;
   auto *IdxTy = Builder.getInt32Ty();
   Value *RuntimeVF = nullptr;

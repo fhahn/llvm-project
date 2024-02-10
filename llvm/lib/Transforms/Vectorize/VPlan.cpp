@@ -813,11 +813,9 @@ void VPlan::prepareToExecute(Value *TripCountV, Value *VectorTripCountV,
   State.set(&VFxUF,
             createStepForVF(Builder, TripCountV->getType(), State.VF, State.UF),
             VPIteration(0, 0));
-  if (!State.VF.isScalable()) {
+  if (VF.getNumUsers() > 0) {
     State.set(&VF, createStepForVF(Builder, TripCountV->getType(), State.VF, 1),
               VPIteration(0, 0));
-  } else {
-    State.set(&VF, State.get(&VFxUF, VPIteration(0, 0)), VPIteration(0, 0));
   }
 
   // When vectorizing the epilogue loop, the canonical induction start value
@@ -903,15 +901,14 @@ void VPlan::execute(VPTransformState *State) {
                             isa<VPFirstOrderRecurrencePHIRecipe>(PhiR) ||
                             (isa<VPReductionPHIRecipe>(PhiR) &&
                              cast<VPReductionPHIRecipe>(PhiR)->isOrdered());
-    unsigned LastPartForNewPhi = SinglePartNeeded ? 1 : State->UF;
 
     for (unsigned Part = 0; Part < 1; ++Part) {
       Value *Phi = State->get(PhiR, Part);
       Value *Val =
           isa<VPCanonicalIVPHIRecipe>(PhiR)
               ? State->get(PhiR->getBackedgeValue(), VPIteration(Part, 0))
-              : State->get(PhiR->getBackedgeValue(),
-                           SinglePartNeeded ? State->UF - 1 : Part);
+              : State->get(PhiR->getBackedgeValue()
+                           );
       /*=======*/
       /*State->get(PhiR->getBackedgeValue(), SinglePartNeeded ? 0 : Part);*/
       /*>>>>>>> 8b2558a3a852 ([VPlt fetch orian] Foo.)*/

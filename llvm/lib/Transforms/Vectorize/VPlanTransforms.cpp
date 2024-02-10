@@ -1357,18 +1357,25 @@ void VPlanTransforms::interleave(VPlan &Plan, unsigned IC, LLVMContext &Ctx) {
         VPBlockUtils::insertBlockAfter(Copy, VPB);
 
         ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>>
-            RPOT(Copy);
-        for (VPBasicBlock *VPBB :
-             VPBlockUtils::blocksOnly<VPBasicBlock>(RPOT)) {
-          if (VPBB->getParent() != Copy)
+            RPOT(Copy->getEntry());
+        ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>>
+            RPOT2(VPR->getEntry());
+        for (const auto &[New, Old] :
+             zip(VPBlockUtils::blocksOnly<VPBasicBlock>(RPOT), VPBlockUtils::blocksOnly<VPBasicBlock>(RPOT2))) {
+          if (New->getParent() != Copy)
             break;
-          for (auto &CopyR : *VPBB) {
+          for (const auto &[CopyR, OrigR] : zip(*New, *Old)) {
             for (unsigned Idx = 0; Idx != CopyR.getNumOperands(); ++Idx) {
-              if (VPBB->getParent() == Copy)
-                continue;
               CopyR.setOperand(Idx,
                                getInterleavedValue(InterleavedValues,
                                                    CopyR.getOperand(Idx), I));
+            }
+
+            unsigned Idx = 0;
+            for (VPValue *Res : OrigR.definedValues()) {
+              auto Ins = InterleavedValues.insert({Res, {}});
+              Ins.first->second.push_back(CopyR.getVPValue(Idx));
+              Idx++;
             }
           }
         }
@@ -1383,6 +1390,8 @@ void VPlanTransforms::interleave(VPlan &Plan, unsigned IC, LLVMContext &Ctx) {
                 /*VPInstruction::CanonicalIVIncrement*/ Instruction::Add)
           continue;
 
+      if (isa<VPFirstOrderRecurrencePHIRecipe>(&R))
+        continue;
       VPRecipeBase *InsertPt = &R;
       if (auto *CanIV = dyn_cast<VPCanonicalIVPHIRecipe>(&R)) {
         VPValue *Prev = R.getVPSingleValue();
@@ -1407,14 +1416,14 @@ void VPlanTransforms::interleave(VPlan &Plan, unsigned IC, LLVMContext &Ctx) {
         continue;
       }
       if (auto *IV = dyn_cast<VPWidenIntOrFpInductionRecipe>(&R)) {
+          auto InsertPt = VPBB->getFirstNonPhi();
         for (unsigned I = 1; I != IC; ++I) {
           auto Ins = InterleavedValues.insert({R.getVPSingleValue(), {}});
           VPValue *Step = &Plan.getVF();
           if (TypeInfo.inferScalarType(Step) != TypeInfo.inferScalarType(IV)) {
             Step = new VPWidenCastRecipe(Instruction::Trunc, Step,
                                          IV->getScalarType());
-            Step->getDefiningRecipe()->insertAfter(InsertPt);
-            InsertPt = Step->getDefiningRecipe();
+            Step->getDefiningRecipe()->insertBefore(*VPBB, InsertPt);
           }
 
           auto *Add = new VPInstruction(
@@ -1425,8 +1434,7 @@ void VPlanTransforms::interleave(VPlan &Plan, unsigned IC, LLVMContext &Ctx) {
                   Step,
               },
               R.getDebugLoc());
-          Add->insertAfter(InsertPt);
-          InsertPt = Add;
+          Add->insertBefore(*VPBB,InsertPt);
           Ins.first->second.push_back(Add);
         }
         R.addOperand(getInterleavedValue(InterleavedValues,
@@ -1460,12 +1468,37 @@ void VPlanTransforms::interleave(VPlan &Plan, unsigned IC, LLVMContext &Ctx) {
           Idx++;
         }
 
+        if (auto *VPI = dyn_cast<VPInstruction>(&R)) {
+          if (VPI->getOpcode() == VPInstruction::FirstOrderRecurrenceSplice) {
+            Copy->setOperand(0, getInterleavedValue(InterleavedValues, R.getOperand(1), I - 1));
+            Copy->setOperand(1, getInterleavedValue(InterleavedValues, R.getOperand(1), I));
+            continue;
+          }
+        }
         if (isa<VPWidenPointerInductionRecipe>(&R)) {
           Copy->addOperand(R.getVPSingleValue());
           Copy->addOperand(
               Plan.getVPValueOrAddLiveIn(ConstantInt::get(CanIVIntTy, I)));
           continue;
         }
+
+        if (auto *RdxPhi = dyn_cast<VPReductionPHIRecipe>(&R)) {
+          Copy->addOperand(
+              Plan.getVPValueOrAddLiveIn(ConstantInt::get(CanIVIntTy, I)));
+
+/*          VPValue *StartV = RdxPhi->getStartValue();*/
+          /*auto &RdxDesc = RdxPhi->getRecurrenceDescriptor();*/
+          /*RecurKind RK = RdxDesc.getRecurrenceKind();*/
+
+          /*if (!RecurrenceDescriptor::isMinMaxRecurrenceKind(RK) &&*/
+              /*!RecurrenceDescriptor::isAnyOfRecurrenceKind(RK)) {*/
+            /*StartV = Plan.getVPValueOrAddLiveIn(RdxDesc.getRecurrenceIdentity(RK, StartV->getLiveInIRValue()->getType(),*/
+                                                 /*RdxDesc.getFastMathFlags()));*/
+
+            /*}*/
+          /*Copy->setOperand(0, StartV);*/
+        }
+
 
         if (auto *H = dyn_cast<VPHeaderPHIRecipe>(Copy)) {
           if (I == 1)
