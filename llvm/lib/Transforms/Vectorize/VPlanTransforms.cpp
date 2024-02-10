@@ -1420,10 +1420,23 @@ void VPlanTransforms::interleave(VPlan &Plan, unsigned IC, LLVMContext &Ctx) {
         for (unsigned I = 1; I != IC; ++I) {
           auto Ins = InterleavedValues.insert({R.getVPSingleValue(), {}});
           VPValue *Step = &Plan.getVF();
-          if (TypeInfo.inferScalarType(Step) != TypeInfo.inferScalarType(IV)) {
+          auto S = IV->getOperand(1)->isLiveIn() ? dyn_cast<ConstantInt>(IV->getOperand(1)->getLiveInIRValue()) : nullptr;
+         if (TypeInfo.inferScalarType(Step) != TypeInfo.inferScalarType(IV)) {
             Step = new VPWidenCastRecipe(Instruction::Trunc, Step,
                                          IV->getScalarType());
             Step->getDefiningRecipe()->insertBefore(*VPBB, InsertPt);
+          }
+
+          if (!S || S->getZExtValue() != 1) {
+            auto *Mul = new VPInstruction(
+                Instruction::Mul,
+                {
+                    Step,
+                    IV->getOperand(1)
+                },
+                R.getDebugLoc() );
+            Mul->insertBefore(*VPBB,InsertPt);
+            Step = Mul;
           }
 
           auto *Add = new VPInstruction(
@@ -1435,6 +1448,7 @@ void VPlanTransforms::interleave(VPlan &Plan, unsigned IC, LLVMContext &Ctx) {
               },
               R.getDebugLoc());
           Add->insertBefore(*VPBB,InsertPt);
+          Plan.setName(Add, "step.add." + std::to_string(I));
           Ins.first->second.push_back(Add);
         }
         R.addOperand(getInterleavedValue(InterleavedValues,
@@ -1443,20 +1457,37 @@ void VPlanTransforms::interleave(VPlan &Plan, unsigned IC, LLVMContext &Ctx) {
       }
 
       for (unsigned I = 1; I != IC; ++I) {
+/*        if (isa<VPReplicateRecipe>(&R) &&*/
+            /*(isa<LoadInst, StoreInst>(*/
+                /*R.getVPSingleValue()->getUnderlyingValue())) &&*/
+            /*all_of(R.operands(), [](VPValue *Op) {*/
+              /*return Op->isDefinedOutsideVectorRegions();*/
+            /*})) {*/
+          /*unsigned Idx = 0;*/
+          /*for (VPValue *Res : R.definedValues()) {*/
+            /*auto Ins = InterleavedValues.insert({Res, {}});*/
+            /*Ins.first->second.push_back(Res);*/
+            /*Idx++;*/
+          /*}*/
+          /*continue;*/
+        /*}*/
+
         if (isa<VPReplicateRecipe>(&R) &&
-            (isa<LoadInst, StoreInst>(
+            (isa<StoreInst>(
                 R.getVPSingleValue()->getUnderlyingValue())) &&
-            all_of(R.operands(), [](VPValue *Op) {
-              return Op->isDefinedOutsideVectorRegions();
-            })) {
+              R.getOperand(1)->isDefinedOutsideVectorRegions()
+            ) {
           unsigned Idx = 0;
           for (VPValue *Res : R.definedValues()) {
             auto Ins = InterleavedValues.insert({Res, {}});
             Ins.first->second.push_back(Res);
             Idx++;
           }
+          R.setOperand(0, getInterleavedValue(InterleavedValues,
+                                                    R.getOperand(0), IC - 1));
           continue;
         }
+
 
         VPRecipeBase *Copy = R.clone();
         Copy->insertAfter(InsertPt);
@@ -1465,6 +1496,9 @@ void VPlanTransforms::interleave(VPlan &Plan, unsigned IC, LLVMContext &Ctx) {
         for (VPValue *Res : R.definedValues()) {
           auto Ins = InterleavedValues.insert({Res, {}});
           Ins.first->second.push_back(Copy->getVPValue(Idx));
+          std::string N = Plan.getName(Res);
+          if (!N.empty())
+          Plan.setName(Copy->getVPValue(Idx), N + "." + std::to_string(I));
           Idx++;
         }
 
@@ -1501,6 +1535,8 @@ void VPlanTransforms::interleave(VPlan &Plan, unsigned IC, LLVMContext &Ctx) {
 
 
         if (auto *H = dyn_cast<VPHeaderPHIRecipe>(Copy)) {
+          if (isa<VPFirstOrderRecurrencePHIRecipe>(H))
+            continue;
           if (I == 1)
             PhisToRemap.emplace_back();
           PhisToRemap.back().push_back(H);
@@ -1529,6 +1565,14 @@ void VPlanTransforms::interleave(VPlan &Plan, unsigned IC, LLVMContext &Ctx) {
             Idx, getInterleavedValue(InterleavedValues, H->getOperand(Idx), I));
       I++;
     }
+  }
+
+  for (VPRecipeBase &H : Plan.getVectorLoopRegion()->getEntryBasicBlock()->phis()) {
+    if (!isa<VPFirstOrderRecurrencePHIRecipe>(&H)) {
+      continue;
+    }
+    H.setOperand(1, getInterleavedValue(InterleavedValues, H.getOperand(1), IC -1));
+
   }
 
   for (VPRecipeBase &R :
