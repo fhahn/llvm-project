@@ -1352,9 +1352,11 @@ void VPlanTransforms::interleave(VPlan &Plan, unsigned IC, LLVMContext &Ctx) {
   for (VPBlockBase *VPB : RPOT) {
     auto *VPR = dyn_cast<VPRegionBlock>(VPB);
     if (VPR) {
+      VPBlockBase *InsertPt = VPB;
       for (unsigned I = 1; I != IC; ++I) {
         auto *Copy = VPR->clone();
-        VPBlockUtils::insertBlockAfter(Copy, VPB);
+        VPBlockUtils::insertBlockAfter(Copy, InsertPt);
+        InsertPt = Copy;
 
         ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>>
             RPOT(Copy->getEntry());
@@ -1457,20 +1459,20 @@ void VPlanTransforms::interleave(VPlan &Plan, unsigned IC, LLVMContext &Ctx) {
       }
 
       for (unsigned I = 1; I != IC; ++I) {
-/*        if (isa<VPReplicateRecipe>(&R) &&*/
-            /*(isa<LoadInst, StoreInst>(*/
-                /*R.getVPSingleValue()->getUnderlyingValue())) &&*/
-            /*all_of(R.operands(), [](VPValue *Op) {*/
-              /*return Op->isDefinedOutsideVectorRegions();*/
-            /*})) {*/
-          /*unsigned Idx = 0;*/
-          /*for (VPValue *Res : R.definedValues()) {*/
-            /*auto Ins = InterleavedValues.insert({Res, {}});*/
-            /*Ins.first->second.push_back(Res);*/
-            /*Idx++;*/
-          /*}*/
-          /*continue;*/
-        /*}*/
+        if (isa<VPReplicateRecipe>(&R) && cast<VPReplicateRecipe>(&R)->isUniform() && 
+            (isa<LoadInst, StoreInst>(
+                R.getVPSingleValue()->getUnderlyingValue())) &&
+            all_of(R.operands(), [](VPValue *Op) {
+              return Op->isDefinedOutsideVectorRegions();
+            })) {
+          unsigned Idx = 0;
+          for (VPValue *Res : R.definedValues()) {
+            auto Ins = InterleavedValues.insert({Res, {}});
+            Ins.first->second.push_back(Res);
+            Idx++;
+          }
+          continue;
+        }
 
         if (isa<VPReplicateRecipe>(&R) &&
             (isa<StoreInst>(
