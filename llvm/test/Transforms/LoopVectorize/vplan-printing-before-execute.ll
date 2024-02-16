@@ -7,8 +7,6 @@ target datalayout = "e-m:o-i64:64-i128:128-n32:64-S128"
 define void @test_tc_less_than_16(ptr %A, i64 %N) {
 ; CHECK:      LV: Scalarizing:  %cmp =
 ; CHECK-NEXT: VPlan 'Initial VPlan for VF={8},UF>=1' {
-; CHECK-NEXT: Live-in vp<[[VFxUF:%.+]]> = VF * UF
-; CHECK-NEXT: Live-in vp<[[VTC:%.+]]> = vector-trip-count
 ; CHECK-NEXT: vp<[[TC:%.+]]> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT: ph:
@@ -20,15 +18,13 @@ define void @test_tc_less_than_16(ptr %A, i64 %N) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT: <x1> vector loop: {
 ; CHECK-NEXT:   vector.body:
-; CHECK-NEXT:     EMIT vp<[[CAN_IV:%.+]]> = CANONICAL-INDUCTION ir<0>, vp<[[CAN_IV_NEXT:%.+]]>
+; CHECK-NEXT:     EMIT vp<[[CAN_IV:%.+]]> = CANONICAL-INDUCTION ir<0>
 ; CHECK-NEXT:     EMIT ir<%p.src> = WIDEN-POINTER-INDUCTION ir<%A>, 1
 ; CHECK-NEXT:     vp<[[VPTR:%.]]> = vector-pointer ir<%p.src>
 ; CHECK-NEXT:     WIDEN ir<%l> = load vp<[[VPTR]]>
 ; CHECK-NEXT:     WIDEN ir<%add> = add nsw ir<%l>, ir<10>
 ; CHECK-NEXT:     vp<[[VPTR2:%.+]]> = vector-pointer ir<%p.src>
 ; CHECK-NEXT:     WIDEN store vp<[[VPTR2]]>, ir<%add>
-; CHECK-NEXT:     EMIT vp<[[CAN_IV_NEXT]]> = add nuw vp<[[CAN_IV:%.+]]>, vp<[[VFxUF]]>
-; CHECK-NEXT:     EMIT branch-on-count vp<[[CAN_IV_NEXT]]>, vp<[[VTC]]>
 ; CHECK-NEXT:   No successors
 ; CHECK-NEXT: }
 ; CHECK-NEXT: Successor(s): middle.block
