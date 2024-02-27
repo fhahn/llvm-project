@@ -84,7 +84,6 @@ define void @test_three_blocks(ptr nocapture %Output, ptr nocapture readonly %Co
 ; CHECK:       for.body:
 ; CHECK-NEXT:    [[J_010:%.*]] = phi i32 [ 0, [[FOR_BODY_PREHEADER_NEW]] ], [ [[INC_3]], [[FOR_INC_3]] ]
 ; CHECK-NEXT:    [[TEMP_09:%.*]] = phi i32 [ 0, [[FOR_BODY_PREHEADER_NEW]] ], [ [[TEMP_1_3]], [[FOR_INC_3]] ]
-; CHECK-NEXT:    [[NITER:%.*]] = phi i32 [ 0, [[FOR_BODY_PREHEADER_NEW]] ], [ [[NITER_NEXT_3:%.*]], [[FOR_INC_3]] ]
 ; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i32, ptr [[CONDITION]], i32 [[J_010]]
 ; CHECK-NEXT:    [[I:%.*]] = load i32, ptr [[ARRAYIDX]], align 4
 ; CHECK-NEXT:    [[TOBOOL:%.*]] = icmp eq i32 [[I]], 0
@@ -132,9 +131,8 @@ define void @test_three_blocks(ptr nocapture %Output, ptr nocapture readonly %Co
 ; CHECK-NEXT:    br label [[FOR_INC_3]]
 ; CHECK:       for.inc.3:
 ; CHECK-NEXT:    [[TEMP_1_3]] = phi i32 [ [[ADD_3]], [[IF_THEN_3]] ], [ [[TEMP_1_2]], [[FOR_INC_2]] ]
-; CHECK-NEXT:    [[INC_3]] = add nuw i32 [[J_010]], 4
-; CHECK-NEXT:    [[NITER_NEXT_3]] = add i32 [[NITER]], 4
-; CHECK-NEXT:    [[NITER_NCMP_3:%.*]] = icmp eq i32 [[NITER_NEXT_3]], [[UNROLL_ITER]]
+; CHECK-NEXT:    [[INC_3]] = add i32 [[J_010]], 4
+; CHECK-NEXT:    [[NITER_NCMP_3:%.*]] = icmp eq i32 [[INC_3]], [[UNROLL_ITER]]
 ; CHECK-NEXT:    br i1 [[NITER_NCMP_3]], label [[FOR_COND_CLEANUP_LOOPEXIT_UNR_LCSSA_LOOPEXIT]], label [[FOR_BODY]]
 ;
 entry:

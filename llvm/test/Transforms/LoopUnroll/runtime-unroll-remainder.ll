@@ -65,7 +65,6 @@ define i32 @unroll(ptr nocapture readonly %a, ptr nocapture readonly %b, i32 %N)
 ; CHECK:       for.body:
 ; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ 0, [[FOR_BODY_LR_PH_NEW]] ], [ [[INDVARS_IV_NEXT_3]], [[FOR_BODY]] ]
 ; CHECK-NEXT:    [[C_010:%.*]] = phi i32 [ 0, [[FOR_BODY_LR_PH_NEW]] ], [ [[ADD_3]], [[FOR_BODY]] ]
-; CHECK-NEXT:    [[NITER:%.*]] = phi i64 [ 0, [[FOR_BODY_LR_PH_NEW]] ], [ [[NITER_NEXT_3:%.*]], [[FOR_BODY]] ]
 ; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[INDVARS_IV]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = load i32, ptr [[ARRAYIDX]], align 4
 ; CHECK-NEXT:    [[ARRAYIDX2:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[INDVARS_IV]]
@@ -93,9 +92,8 @@ define i32 @unroll(ptr nocapture readonly %a, ptr nocapture readonly %b, i32 %N)
 ; CHECK-NEXT:    [[TMP14:%.*]] = load i32, ptr [[ARRAYIDX2_3]], align 4
 ; CHECK-NEXT:    [[MUL_3:%.*]] = mul nsw i32 [[TMP14]], [[TMP13]]
 ; CHECK-NEXT:    [[ADD_3]] = add nsw i32 [[MUL_3]], [[ADD_2]]
-; CHECK-NEXT:    [[INDVARS_IV_NEXT_3]] = add nuw nsw i64 [[INDVARS_IV]], 4
-; CHECK-NEXT:    [[NITER_NEXT_3]] = add i64 [[NITER]], 4
-; CHECK-NEXT:    [[NITER_NCMP_3:%.*]] = icmp eq i64 [[NITER_NEXT_3]], [[UNROLL_ITER]]
+; CHECK-NEXT:    [[INDVARS_IV_NEXT_3]] = add i64 [[INDVARS_IV]], 4
+; CHECK-NEXT:    [[NITER_NCMP_3:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT_3]], [[UNROLL_ITER]]
 ; CHECK-NEXT:    br i1 [[NITER_NCMP_3]], label [[FOR_COND_CLEANUP_LOOPEXIT_UNR_LCSSA_LOOPEXIT]], label [[FOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ;
 entry:

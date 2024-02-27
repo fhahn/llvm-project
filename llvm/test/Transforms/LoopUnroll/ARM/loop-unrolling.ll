@@ -65,7 +65,7 @@ entry:
 for.body:
 ; CHECK-NOUNROLL: [[IV0:%[a-z.0-9]+]] = phi i32 [ 0, [[PRE:%[a-z.0-9]+]] ], [ [[IV2:%[a-z.0-9]+]], %for.body ]
 ; CHECK-NOUNROLL: [[IV1:%[a-z.0-9]+]] = add nuw nsw i32 [[IV0]], 1
-; CHECK-NOUNROLL: [[IV2]] = add nuw i32 [[IV0]], 2
+; CHECK-NOUNROLL: [[IV2]] = add i32 [[IV0]], 2
 ; CHECK-NOUNROLL: br
 
 ; CHECK-UNROLL: [[IV0:%[a-z.0-9]+]] = phi i32 [ 0, [[PRE:%[a-z.0-9]+]] ], [ [[IV4:%[a-z.0-9]+]], %for.body ]

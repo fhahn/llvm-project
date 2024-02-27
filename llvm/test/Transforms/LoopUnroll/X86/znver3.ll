@@ -560,7 +560,6 @@ define i32 @test2(ptr %ary, i64 %n) "target-cpu"="znver3" {
 ; CHECK:       for.body:
 ; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ 0, [[ENTRY_NEW]] ], [ [[INDVARS_IV_NEXT_7:%.*]], [[FOR_BODY]] ]
 ; CHECK-NEXT:    [[SUM:%.*]] = phi i32 [ 0, [[ENTRY_NEW]] ], [ [[SUM_NEXT_7:%.*]], [[FOR_BODY]] ]
-; CHECK-NEXT:    [[NITER:%.*]] = phi i64 [ 0, [[ENTRY_NEW]] ], [ [[NITER_NEXT_7:%.*]], [[FOR_BODY]] ]
 ; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i32, ptr [[ARY]], i64 [[INDVARS_IV]]
 ; CHECK-NEXT:    [[VAL:%.*]] = load i32, ptr [[ARRAYIDX]], align 4
 ; CHECK-NEXT:    [[DUMMY1:%.*]] = mul i32 [[VAL]], [[VAL]]
@@ -992,9 +991,8 @@ define i32 @test2(ptr %ary, i64 %n) "target-cpu"="znver3" {
 ; CHECK-NEXT:    [[DUMMY49_7:%.*]] = mul i32 [[DUMMY48_7]], [[DUMMY48_7]]
 ; CHECK-NEXT:    [[DUMMY50_7:%.*]] = mul i32 [[DUMMY49_7]], [[DUMMY49_7]]
 ; CHECK-NEXT:    [[SUM_NEXT_7]] = add nsw i32 [[DUMMY50_7]], [[SUM_NEXT_6]]
-; CHECK-NEXT:    [[INDVARS_IV_NEXT_7]] = add nuw nsw i64 [[INDVARS_IV]], 8
-; CHECK-NEXT:    [[NITER_NEXT_7]] = add i64 [[NITER]], 8
-; CHECK-NEXT:    [[NITER_NCMP_7:%.*]] = icmp eq i64 [[NITER_NEXT_7]], [[UNROLL_ITER]]
+; CHECK-NEXT:    [[INDVARS_IV_NEXT_7]] = add i64 [[INDVARS_IV]], 8
+; CHECK-NEXT:    [[NITER_NCMP_7:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT_7]], [[UNROLL_ITER]]
 ; CHECK-NEXT:    br i1 [[NITER_NCMP_7]], label [[FOR_COND_CLEANUP_UNR_LCSSA_LOOPEXIT:%.*]], label [[FOR_BODY]]
 ; CHECK:       for.cond.cleanup.unr-lcssa.loopexit:
 ; CHECK-NEXT:    [[SUM_NEXT_LCSSA_PH_PH:%.*]] = phi i32 [ [[SUM_NEXT_7]], [[FOR_BODY]] ]

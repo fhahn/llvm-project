@@ -1012,7 +1012,7 @@ bool simplifyLoopIVs(Loop *L, ScalarEvolution *SE, DominatorTree *DT,
 #ifndef NDEBUG
   Rewriter.setDebugType(DEBUG_TYPE);
 #endif
-  bool Changed = false;
+  bool Changed = Rewriter.replaceCongruentIVs(L, DT, Dead, TTI) != 0;
   for (BasicBlock::iterator I = L->getHeader()->begin(); isa<PHINode>(I); ++I) {
     Changed |=
         simplifyUsersOfIV(cast<PHINode>(I), SE, DT, LI, TTI, Dead, Rewriter);

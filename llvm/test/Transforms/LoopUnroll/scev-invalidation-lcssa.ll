@@ -36,10 +36,8 @@ define i32 @f(i1 %cond1) #0 !prof !0 {
 ; CHECK-NEXT:    br label [[LOOP2:%.*]]
 ; CHECK:       loop2:
 ; CHECK-NEXT:    [[PHI:%.*]] = phi i64 [ 0, [[ENTRY2_NEW]] ], [ [[INC_7:%.*]], [[LOOP2]] ]
-; CHECK-NEXT:    [[NITER:%.*]] = phi i64 [ 0, [[ENTRY2_NEW]] ], [ [[NITER_NEXT_7:%.*]], [[LOOP2]] ]
 ; CHECK-NEXT:    [[INC_7]] = add i64 [[PHI]], 8
-; CHECK-NEXT:    [[NITER_NEXT_7]] = add i64 [[NITER]], 8
-; CHECK-NEXT:    [[NITER_NCMP_7:%.*]] = icmp eq i64 [[NITER_NEXT_7]], [[UNROLL_ITER]]
+; CHECK-NEXT:    [[NITER_NCMP_7:%.*]] = icmp eq i64 [[INC_7]], [[UNROLL_ITER]]
 ; CHECK-NEXT:    br i1 [[NITER_NCMP_7]], label [[EXIT2_UNR_LCSSA_LOOPEXIT:%.*]], label [[LOOP2]]
 ; CHECK:       exit2.unr-lcssa.loopexit:
 ; CHECK-NEXT:    [[PHI_UNR_PH:%.*]] = phi i64 [ [[INC_7]], [[LOOP2]] ]

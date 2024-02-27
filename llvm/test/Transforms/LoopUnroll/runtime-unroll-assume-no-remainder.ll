@@ -97,7 +97,6 @@ define dso_local void @cannotProveDivisibleTC(ptr noalias nocapture %a, ptr noal
 ; CHECK-NEXT:    br label [[FOR_BODY:%.*]]
 ; CHECK:       for.body:
 ; CHECK-NEXT:    [[I_011:%.*]] = phi i32 [ 0, [[FOR_BODY_PREHEADER_NEW]] ], [ [[INC_1:%.*]], [[FOR_BODY]] ]
-; CHECK-NEXT:    [[NITER:%.*]] = phi i32 [ 0, [[FOR_BODY_PREHEADER_NEW]] ], [ [[NITER_NEXT_1:%.*]], [[FOR_BODY]] ]
 ; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i8, ptr [[B:%.*]], i32 [[I_011]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = load i8, ptr [[ARRAYIDX]], align 1
 ; CHECK-NEXT:    [[ADD:%.*]] = add i8 [[TMP2]], 3
@@ -109,9 +108,8 @@ define dso_local void @cannotProveDivisibleTC(ptr noalias nocapture %a, ptr noal
 ; CHECK-NEXT:    [[ADD_1:%.*]] = add i8 [[TMP3]], 3
 ; CHECK-NEXT:    [[ARRAYIDX4_1:%.*]] = getelementptr inbounds i8, ptr [[A]], i32 [[INC]]
 ; CHECK-NEXT:    store i8 [[ADD_1]], ptr [[ARRAYIDX4_1]], align 1
-; CHECK-NEXT:    [[INC_1]] = add nuw nsw i32 [[I_011]], 2
-; CHECK-NEXT:    [[NITER_NEXT_1]] = add i32 [[NITER]], 2
-; CHECK-NEXT:    [[NITER_NCMP_1:%.*]] = icmp ne i32 [[NITER_NEXT_1]], [[UNROLL_ITER]]
+; CHECK-NEXT:    [[INC_1]] = add i32 [[I_011]], 2
+; CHECK-NEXT:    [[NITER_NCMP_1:%.*]] = icmp ne i32 [[INC_1]], [[UNROLL_ITER]]
 ; CHECK-NEXT:    br i1 [[NITER_NCMP_1]], label [[FOR_BODY]], label [[EXIT_LOOPEXIT_UNR_LCSSA_LOOPEXIT:%.*]], !llvm.loop [[LOOP2:![0-9]+]]
 ; CHECK:       exit.loopexit.unr-lcssa.loopexit:
 ; CHECK-NEXT:    [[I_011_UNR_PH:%.*]] = phi i32 [ [[INC_1]], [[FOR_BODY]] ]

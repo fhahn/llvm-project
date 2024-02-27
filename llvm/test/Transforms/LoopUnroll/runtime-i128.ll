@@ -17,7 +17,6 @@ define void @test(i128 %n, i128 %m) {
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i128 [ 0, [[ENTRY_NEW]] ], [ [[IV_NEXT_7:%.*]], [[LOOP]] ]
-; CHECK-NEXT:    [[NITER:%.*]] = phi i128 [ 0, [[ENTRY_NEW]] ], [ [[NITER_NEXT_7:%.*]], [[LOOP]] ]
 ; CHECK-NEXT:    call void @foo()
 ; CHECK-NEXT:    call void @foo()
 ; CHECK-NEXT:    call void @foo()
@@ -27,8 +26,7 @@ define void @test(i128 %n, i128 %m) {
 ; CHECK-NEXT:    call void @foo()
 ; CHECK-NEXT:    call void @foo()
 ; CHECK-NEXT:    [[IV_NEXT_7]] = add i128 [[IV]], 8
-; CHECK-NEXT:    [[NITER_NEXT_7]] = add i128 [[NITER]], 8
-; CHECK-NEXT:    [[NITER_NCMP_7:%.*]] = icmp ne i128 [[NITER_NEXT_7]], [[UNROLL_ITER]]
+; CHECK-NEXT:    [[NITER_NCMP_7:%.*]] = icmp ne i128 [[IV_NEXT_7]], [[UNROLL_ITER]]
 ; CHECK-NEXT:    br i1 [[NITER_NCMP_7]], label [[LOOP]], label [[EXIT_UNR_LCSSA_LOOPEXIT:%.*]]
 ; CHECK:       exit.unr-lcssa.loopexit:
 ; CHECK-NEXT:    [[IV_UNR_PH:%.*]] = phi i128 [ [[IV_NEXT_7]], [[LOOP]] ]

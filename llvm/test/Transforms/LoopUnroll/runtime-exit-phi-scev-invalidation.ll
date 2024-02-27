@@ -26,7 +26,6 @@ define void @pr56282() {
 ; CHECK-NEXT:    br label [[INNER_1_HEADER:%.*]]
 ; CHECK:       inner.1.header:
 ; CHECK-NEXT:    [[INNER_1_IV:%.*]] = phi i64 [ 0, [[OUTER_HEADER_NEW]] ], [ [[INNER_1_IV_NEXT_7:%.*]], [[INNER_1_LATCH_7:%.*]] ]
-; CHECK-NEXT:    [[NITER:%.*]] = phi i64 [ 0, [[OUTER_HEADER_NEW]] ], [ [[NITER_NEXT_7:%.*]], [[INNER_1_LATCH_7]] ]
 ; CHECK-NEXT:    [[V:%.*]] = call i32 @get()
 ; CHECK-NEXT:    [[C_1:%.*]] = icmp ugt i32 [[V]], 0
 ; CHECK-NEXT:    br i1 [[C_1]], label [[INNER_1_LATCH:%.*]], label [[EXIT_DEOPT_LOOPEXIT:%.*]]
@@ -55,13 +54,12 @@ define void @pr56282() {
 ; CHECK-NEXT:    [[C_1_6:%.*]] = icmp ugt i32 [[V_6]], 0
 ; CHECK-NEXT:    br i1 [[C_1_6]], label [[INNER_1_LATCH_6:%.*]], label [[EXIT_DEOPT_LOOPEXIT]]
 ; CHECK:       inner.1.latch.6:
-; CHECK-NEXT:    [[INNER_1_IV_NEXT_7]] = add nuw nsw i64 [[INNER_1_IV]], 8
+; CHECK-NEXT:    [[INNER_1_IV_NEXT_7]] = add i64 [[INNER_1_IV]], 8
 ; CHECK-NEXT:    [[V_7:%.*]] = call i32 @get()
 ; CHECK-NEXT:    [[C_1_7:%.*]] = icmp ugt i32 [[V_7]], 0
 ; CHECK-NEXT:    br i1 [[C_1_7]], label [[INNER_1_LATCH_7]], label [[EXIT_DEOPT_LOOPEXIT]]
 ; CHECK:       inner.1.latch.7:
-; CHECK-NEXT:    [[NITER_NEXT_7]] = add i64 [[NITER]], 8
-; CHECK-NEXT:    [[NITER_NCMP_7:%.*]] = icmp ne i64 [[NITER_NEXT_7]], [[UNROLL_ITER]]
+; CHECK-NEXT:    [[NITER_NCMP_7:%.*]] = icmp ne i64 [[INNER_1_IV_NEXT_7]], [[UNROLL_ITER]]
 ; CHECK-NEXT:    br i1 [[NITER_NCMP_7]], label [[INNER_1_HEADER]], label [[OUTER_MIDDLE_UNR_LCSSA_LOOPEXIT:%.*]]
 ; CHECK:       outer.middle.unr-lcssa.loopexit:
 ; CHECK-NEXT:    [[V_LCSSA1_PH_PH:%.*]] = phi i32 [ [[V_7]], [[INNER_1_LATCH_7]] ]

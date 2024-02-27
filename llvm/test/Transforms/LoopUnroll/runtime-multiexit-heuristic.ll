@@ -26,7 +26,6 @@ define i32 @test1(ptr nocapture %a, i64 %n) {
 ; CHECK:       header:
 ; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ 0, [[ENTRY_NEW]] ], [ [[INDVARS_IV_NEXT_7:%.*]], [[LATCH_7:%.*]] ]
 ; CHECK-NEXT:    [[SUM_02:%.*]] = phi i32 [ 0, [[ENTRY_NEW]] ], [ [[ADD_7:%.*]], [[LATCH_7]] ]
-; CHECK-NEXT:    [[NITER:%.*]] = phi i64 [ 0, [[ENTRY_NEW]] ], [ [[NITER_NEXT_7:%.*]], [[LATCH_7]] ]
 ; CHECK-NEXT:    br label [[FOR_EXITING_BLOCK:%.*]]
 ; CHECK:       for.exiting_block:
 ; CHECK-NEXT:    [[CMP:%.*]] = icmp eq i64 [[TMP0]], 42
@@ -92,8 +91,7 @@ define i32 @test1(ptr nocapture %a, i64 %n) {
 ; CHECK-NEXT:    [[TMP10:%.*]] = load i32, ptr [[ARRAYIDX_7]], align 4
 ; CHECK-NEXT:    [[ADD_7]] = add nsw i32 [[TMP10]], [[ADD_6]]
 ; CHECK-NEXT:    [[INDVARS_IV_NEXT_7]] = add i64 [[INDVARS_IV]], 8
-; CHECK-NEXT:    [[NITER_NEXT_7]] = add i64 [[NITER]], 8
-; CHECK-NEXT:    [[NITER_NCMP_7:%.*]] = icmp eq i64 [[NITER_NEXT_7]], [[UNROLL_ITER]]
+; CHECK-NEXT:    [[NITER_NCMP_7:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT_7]], [[UNROLL_ITER]]
 ; CHECK-NEXT:    br i1 [[NITER_NCMP_7]], label [[LATCHEXIT_UNR_LCSSA_LOOPEXIT:%.*]], label [[HEADER]]
 ; CHECK:       latchexit.unr-lcssa.loopexit:
 ; CHECK-NEXT:    br label [[LATCHEXIT_UNR_LCSSA]]
@@ -173,7 +171,6 @@ define i32 @test1(ptr nocapture %a, i64 %n) {
 ; ENABLED:       header:
 ; ENABLED-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ 0, [[ENTRY_NEW]] ], [ [[INDVARS_IV_NEXT_7:%.*]], [[LATCH_7:%.*]] ]
 ; ENABLED-NEXT:    [[SUM_02:%.*]] = phi i32 [ 0, [[ENTRY_NEW]] ], [ [[ADD_7:%.*]], [[LATCH_7]] ]
-; ENABLED-NEXT:    [[NITER:%.*]] = phi i64 [ 0, [[ENTRY_NEW]] ], [ [[NITER_NEXT_7:%.*]], [[LATCH_7]] ]
 ; ENABLED-NEXT:    br label [[FOR_EXITING_BLOCK:%.*]]
 ; ENABLED:       for.exiting_block:
 ; ENABLED-NEXT:    [[CMP:%.*]] = icmp eq i64 [[N]], 42
@@ -246,8 +243,7 @@ define i32 @test1(ptr nocapture %a, i64 %n) {
 ; ENABLED-NEXT:    [[TMP10:%.*]] = load i32, ptr [[ARRAYIDX_7]], align 4
 ; ENABLED-NEXT:    [[ADD_7]] = add nsw i32 [[TMP10]], [[ADD_6]]
 ; ENABLED-NEXT:    [[INDVARS_IV_NEXT_7]] = add i64 [[INDVARS_IV]], 8
-; ENABLED-NEXT:    [[NITER_NEXT_7]] = add i64 [[NITER]], 8
-; ENABLED-NEXT:    [[NITER_NCMP_7:%.*]] = icmp eq i64 [[NITER_NEXT_7]], [[UNROLL_ITER]]
+; ENABLED-NEXT:    [[NITER_NCMP_7:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT_7]], [[UNROLL_ITER]]
 ; ENABLED-NEXT:    br i1 [[NITER_NCMP_7]], label [[LATCHEXIT_UNR_LCSSA_LOOPEXIT:%.*]], label [[HEADER]]
 ; ENABLED:       latchexit.unr-lcssa.loopexit:
 ; ENABLED-NEXT:    [[SUM_0_LCSSA_PH_PH:%.*]] = phi i32 [ [[ADD_7]], [[LATCH_7]] ]
@@ -387,7 +383,6 @@ define i32 @test2(ptr nocapture %a, i64 %n) {
 ; ENABLED:       header:
 ; ENABLED-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ 0, [[ENTRY_NEW]] ], [ [[INDVARS_IV_NEXT_7:%.*]], [[LATCH_7:%.*]] ]
 ; ENABLED-NEXT:    [[SUM_02:%.*]] = phi i32 [ 0, [[ENTRY_NEW]] ], [ [[ADD_7:%.*]], [[LATCH_7]] ]
-; ENABLED-NEXT:    [[NITER:%.*]] = phi i64 [ 0, [[ENTRY_NEW]] ], [ [[NITER_NEXT_7:%.*]], [[LATCH_7]] ]
 ; ENABLED-NEXT:    br label [[FOR_EXITING_BLOCK:%.*]]
 ; ENABLED:       for.exiting_block:
 ; ENABLED-NEXT:    [[CMP:%.*]] = icmp eq i64 [[N]], 42
@@ -460,8 +455,7 @@ define i32 @test2(ptr nocapture %a, i64 %n) {
 ; ENABLED-NEXT:    [[TMP10:%.*]] = load i32, ptr [[ARRAYIDX_7]], align 4
 ; ENABLED-NEXT:    [[ADD_7]] = add nsw i32 [[TMP10]], [[ADD_6]]
 ; ENABLED-NEXT:    [[INDVARS_IV_NEXT_7]] = add i64 [[INDVARS_IV]], 8
-; ENABLED-NEXT:    [[NITER_NEXT_7]] = add i64 [[NITER]], 8
-; ENABLED-NEXT:    [[NITER_NCMP_7:%.*]] = icmp eq i64 [[NITER_NEXT_7]], [[UNROLL_ITER]]
+; ENABLED-NEXT:    [[NITER_NCMP_7:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT_7]], [[UNROLL_ITER]]
 ; ENABLED-NEXT:    br i1 [[NITER_NCMP_7]], label [[LATCHEXIT_UNR_LCSSA_LOOPEXIT:%.*]], label [[HEADER]]
 ; ENABLED:       latchexit.unr-lcssa.loopexit:
 ; ENABLED-NEXT:    [[SUM_0_LCSSA_PH_PH:%.*]] = phi i32 [ [[ADD_7]], [[LATCH_7]] ]
@@ -754,7 +748,6 @@ define i32 @test5(ptr nocapture %a, i64 %n) {
 ; CHECK:       header:
 ; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ 0, [[ENTRY_NEW]] ], [ [[INDVARS_IV_NEXT_7:%.*]], [[LATCH_7:%.*]] ]
 ; CHECK-NEXT:    [[SUM_02:%.*]] = phi i32 [ 0, [[ENTRY_NEW]] ], [ [[ADD_7:%.*]], [[LATCH_7]] ]
-; CHECK-NEXT:    [[NITER:%.*]] = phi i64 [ 0, [[ENTRY_NEW]] ], [ [[NITER_NEXT_7:%.*]], [[LATCH_7]] ]
 ; CHECK-NEXT:    br label [[FOR_EXITING_BLOCK:%.*]]
 ; CHECK:       for.exiting_block:
 ; CHECK-NEXT:    [[CMP:%.*]] = icmp eq i64 [[TMP0]], 42
@@ -820,8 +813,7 @@ define i32 @test5(ptr nocapture %a, i64 %n) {
 ; CHECK-NEXT:    [[TMP10:%.*]] = load i32, ptr [[ARRAYIDX_7]], align 4
 ; CHECK-NEXT:    [[ADD_7]] = add nsw i32 [[TMP10]], [[ADD_6]]
 ; CHECK-NEXT:    [[INDVARS_IV_NEXT_7]] = add i64 [[INDVARS_IV]], 8
-; CHECK-NEXT:    [[NITER_NEXT_7]] = add i64 [[NITER]], 8
-; CHECK-NEXT:    [[NITER_NCMP_7:%.*]] = icmp eq i64 [[NITER_NEXT_7]], [[UNROLL_ITER]]
+; CHECK-NEXT:    [[NITER_NCMP_7:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT_7]], [[UNROLL_ITER]]
 ; CHECK-NEXT:    br i1 [[NITER_NCMP_7]], label [[LATCHEXIT_UNR_LCSSA_LOOPEXIT:%.*]], label [[HEADER]]
 ; CHECK:       latchexit.unr-lcssa.loopexit:
 ; CHECK-NEXT:    br label [[LATCHEXIT_UNR_LCSSA]]
@@ -906,7 +898,6 @@ define i32 @test5(ptr nocapture %a, i64 %n) {
 ; ENABLED:       header:
 ; ENABLED-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ 0, [[ENTRY_NEW]] ], [ [[INDVARS_IV_NEXT_7:%.*]], [[LATCH_7:%.*]] ]
 ; ENABLED-NEXT:    [[SUM_02:%.*]] = phi i32 [ 0, [[ENTRY_NEW]] ], [ [[ADD_7:%.*]], [[LATCH_7]] ]
-; ENABLED-NEXT:    [[NITER:%.*]] = phi i64 [ 0, [[ENTRY_NEW]] ], [ [[NITER_NEXT_7:%.*]], [[LATCH_7]] ]
 ; ENABLED-NEXT:    br label [[FOR_EXITING_BLOCK:%.*]]
 ; ENABLED:       for.exiting_block:
 ; ENABLED-NEXT:    [[CMP:%.*]] = icmp eq i64 [[N]], 42
@@ -979,8 +970,7 @@ define i32 @test5(ptr nocapture %a, i64 %n) {
 ; ENABLED-NEXT:    [[TMP10:%.*]] = load i32, ptr [[ARRAYIDX_7]], align 4
 ; ENABLED-NEXT:    [[ADD_7]] = add nsw i32 [[TMP10]], [[ADD_6]]
 ; ENABLED-NEXT:    [[INDVARS_IV_NEXT_7]] = add i64 [[INDVARS_IV]], 8
-; ENABLED-NEXT:    [[NITER_NEXT_7]] = add i64 [[NITER]], 8
-; ENABLED-NEXT:    [[NITER_NCMP_7:%.*]] = icmp eq i64 [[NITER_NEXT_7]], [[UNROLL_ITER]]
+; ENABLED-NEXT:    [[NITER_NCMP_7:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT_7]], [[UNROLL_ITER]]
 ; ENABLED-NEXT:    br i1 [[NITER_NCMP_7]], label [[LATCHEXIT_UNR_LCSSA_LOOPEXIT:%.*]], label [[HEADER]]
 ; ENABLED:       latchexit.unr-lcssa.loopexit:
 ; ENABLED-NEXT:    [[SUM_0_LCSSA_PH_PH:%.*]] = phi i32 [ [[ADD_7]], [[LATCH_7]] ]
