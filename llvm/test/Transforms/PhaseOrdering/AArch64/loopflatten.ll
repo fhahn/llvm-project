@@ -7,23 +7,31 @@ target triple = "aarch64"
 define dso_local void @_Z3fooPiii(ptr %A, i32 %N, i32 %M) #0 {
 ; CHECK-LABEL: @_Z3fooPiii(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[CMP3:%.*]] = icmp sgt i32 [[N:%.*]], 0
 ; CHECK-NEXT:    [[CMP21:%.*]] = icmp sgt i32 [[M:%.*]], 0
-; CHECK-NEXT:    [[OR_COND:%.*]] = select i1 [[CMP3]], i1 [[CMP21]], i1 false
-; CHECK-NEXT:    br i1 [[OR_COND]], label [[FOR_COND1_PREHEADER_LR_PH_SPLIT_US:%.*]], label [[FOR_COND_CLEANUP:%.*]]
-; CHECK:       for.cond1.preheader.lr.ph.split.us:
-; CHECK-NEXT:    [[TMP0:%.*]] = zext nneg i32 [[M]] to i64
-; CHECK-NEXT:    [[TMP1:%.*]] = zext nneg i32 [[N]] to i64
-; CHECK-NEXT:    [[FLATTEN_TRIPCOUNT:%.*]] = mul nuw nsw i64 [[TMP0]], [[TMP1]]
-; CHECK-NEXT:    br label [[FOR_COND1_PREHEADER_US:%.*]]
+; CHECK-NEXT:    br i1 [[CMP21]], label [[FOR_COND1_PREHEADER_LR_PH_SPLIT_US:%.*]], label [[FOR_COND_CLEANUP:%.*]]
+; CHECK:       for.cond1.preheader.lr.ph:
+; CHECK-NEXT:    [[CMP22:%.*]] = icmp sgt i32 [[CMP3:%.*]], 0
+; CHECK-NEXT:    [[OR_COND:%.*]] = zext i32 [[CMP3]] to i64
+; CHECK-NEXT:    [[TMP0:%.*]] = sext i32 [[CMP3]] to i64
+; CHECK-NEXT:    [[WIDE_TRIP_COUNT11:%.*]] = zext nneg i32 [[M]] to i64
+; CHECK-NEXT:    br i1 [[CMP22]], label [[FOR_COND1_PREHEADER_US1:%.*]], label [[FOR_COND_CLEANUP]]
 ; CHECK:       for.cond1.preheader.us:
-; CHECK-NEXT:    [[INDVAR6:%.*]] = phi i64 [ [[INDVAR_NEXT7:%.*]], [[FOR_COND1_PREHEADER_US]] ], [ 0, [[FOR_COND1_PREHEADER_LR_PH_SPLIT_US]] ]
-; CHECK-NEXT:    [[ARRAYIDX_US:%.*]] = getelementptr inbounds i32, ptr [[A:%.*]], i64 [[INDVAR6]]
+; CHECK-NEXT:    [[INDVAR6:%.*]] = phi i64 [ [[INDVAR_NEXT7:%.*]], [[FOR_COND1_PREHEADER_US:%.*]] ], [ 0, [[FOR_COND1_PREHEADER_LR_PH_SPLIT_US]] ]
+; CHECK-NEXT:    [[TMP1:%.*]] = mul nsw i64 [[INDVAR6]], [[TMP0]]
+; CHECK-NEXT:    [[INVARIANT_GEP:%.*]] = getelementptr i32, ptr [[A:%.*]], i64 [[TMP1]]
+; CHECK-NEXT:    br label [[FOR_BODY4_US:%.*]]
+; CHECK:       for.body4.us:
+; CHECK-NEXT:    [[INDVARS_IV_US:%.*]] = phi i64 [ 0, [[FOR_COND1_PREHEADER_US1]] ], [ [[INDVARS_IV_NEXT_US:%.*]], [[FOR_BODY4_US]] ]
+; CHECK-NEXT:    [[ARRAYIDX_US:%.*]] = getelementptr i32, ptr [[INVARIANT_GEP]], i64 [[INDVARS_IV_US]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = load i32, ptr [[ARRAYIDX_US]], align 4
 ; CHECK-NEXT:    tail call void @_Z1fi(i32 [[TMP2]])
-; CHECK-NEXT:    [[INDVAR_NEXT7]] = add nuw i64 [[INDVAR6]], 1
-; CHECK-NEXT:    [[EXITCOND_NOT:%.*]] = icmp eq i64 [[INDVAR_NEXT7]], [[FLATTEN_TRIPCOUNT]]
-; CHECK-NEXT:    br i1 [[EXITCOND_NOT]], label [[FOR_COND_CLEANUP]], label [[FOR_COND1_PREHEADER_US]]
+; CHECK-NEXT:    [[INDVARS_IV_NEXT_US]] = add nuw nsw i64 [[INDVARS_IV_US]], 1
+; CHECK-NEXT:    [[EXITCOND_US_NOT:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT_US]], [[OR_COND]]
+; CHECK-NEXT:    br i1 [[EXITCOND_US_NOT]], label [[FOR_COND1_PREHEADER_US]], label [[FOR_BODY4_US]]
+; CHECK:       for.cond1.for.cond.cleanup3_crit_edge.us:
+; CHECK-NEXT:    [[INDVAR_NEXT7]] = add nuw nsw i64 [[INDVAR6]], 1
+; CHECK-NEXT:    [[EXITCOND12_US_NOT:%.*]] = icmp eq i64 [[INDVAR_NEXT7]], [[WIDE_TRIP_COUNT11]]
+; CHECK-NEXT:    br i1 [[EXITCOND12_US_NOT]], label [[FOR_COND_CLEANUP]], label [[FOR_COND1_PREHEADER_US1]]
 ; CHECK:       for.cond.cleanup:
 ; CHECK-NEXT:    ret void
 ;

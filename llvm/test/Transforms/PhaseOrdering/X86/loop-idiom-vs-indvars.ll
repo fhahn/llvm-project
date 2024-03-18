@@ -13,8 +13,31 @@ define i32 @cttz(i32 %n, ptr %p1) {
 ; ALL-NEXT:  entry:
 ; ALL-NEXT:    [[TMP0:%.*]] = shl i32 [[N:%.*]], 1
 ; ALL-NEXT:    [[TMP1:%.*]] = tail call i32 @llvm.cttz.i32(i32 [[TMP0]], i1 false), !range [[RNG0:![0-9]+]]
+; ALL-NEXT:    [[TMP5:%.*]] = sub nuw nsw i32 33, [[TMP1]]
+; ALL-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ugt i32 [[TMP1]], 17
+; ALL-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[WHILE_COND_PREHEADER:%.*]], label [[VECTOR_PH:%.*]]
+; ALL:       vector.ph:
+; ALL-NEXT:    [[N_VEC:%.*]] = and i32 [[TMP5]], 48
+; ALL-NEXT:    [[IND_END:%.*]] = and i32 [[TMP5]], 15
+; ALL-NEXT:    [[TMP6:%.*]] = icmp eq i32 [[N_VEC]], 16
+; ALL-NEXT:    [[BIN_RDX:%.*]] = select i1 [[TMP6]], <8 x i32> <i32 44, i32 2, i32 2, i32 2, i32 2, i32 2, i32 2, i32 2>, <8 x i32> <i32 46, i32 4, i32 4, i32 4, i32 4, i32 4, i32 4, i32 4>
+; ALL-NEXT:    [[TMP4:%.*]] = tail call i32 @llvm.vector.reduce.add.v8i32(<8 x i32> [[BIN_RDX]])
+; ALL-NEXT:    [[CMP_N:%.*]] = icmp eq i32 [[TMP5]], [[N_VEC]]
+; ALL-NEXT:    br i1 [[CMP_N]], label [[WHILE_END:%.*]], label [[WHILE_COND_PREHEADER]]
+; ALL:       while.cond.preheader:
+; ALL-NEXT:    [[TCPHI_PH:%.*]] = phi i32 [ [[TMP5]], [[ENTRY:%.*]] ], [ [[IND_END]], [[VECTOR_PH]] ]
+; ALL-NEXT:    [[WHATEVER_PH:%.*]] = phi i32 [ 42, [[ENTRY]] ], [ [[TMP4]], [[VECTOR_PH]] ]
+; ALL-NEXT:    br label [[WHILE_COND:%.*]]
+; ALL:       while.cond:
+; ALL-NEXT:    [[TCPHI:%.*]] = phi i32 [ [[TCDEC:%.*]], [[WHILE_COND]] ], [ [[TCPHI_PH]], [[WHILE_COND_PREHEADER]] ]
+; ALL-NEXT:    [[WHATEVER:%.*]] = phi i32 [ [[WHATEVER_NEXT:%.*]], [[WHILE_COND]] ], [ [[WHATEVER_PH]], [[WHILE_COND_PREHEADER]] ]
+; ALL-NEXT:    [[TCDEC]] = add nsw i32 [[TCPHI]], -1
+; ALL-NEXT:    [[TOBOOL:%.*]] = icmp eq i32 [[TCDEC]], 0
+; ALL-NEXT:    [[WHATEVER_NEXT]] = add nuw nsw i32 [[WHATEVER]], 1
+; ALL-NEXT:    br i1 [[TOBOOL]], label [[WHILE_END]], label [[WHILE_COND]], !llvm.loop [[LOOP1:![0-9]+]]
+; ALL:       while.end:
+; ALL-NEXT:    [[TMP3:%.*]] = phi i32 [ [[TMP4]], [[VECTOR_PH]] ], [ [[WHATEVER_NEXT]], [[WHILE_COND]] ]
 ; ALL-NEXT:    [[TMP2:%.*]] = sub nuw nsw i32 32, [[TMP1]]
-; ALL-NEXT:    [[TMP3:%.*]] = sub nuw nsw i32 75, [[TMP1]]
 ; ALL-NEXT:    store i32 [[TMP3]], ptr [[P1:%.*]], align 4
 ; ALL-NEXT:    ret i32 [[TMP2]]
 ;

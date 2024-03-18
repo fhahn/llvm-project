@@ -12,14 +12,14 @@ define i1 @test_order_1(ptr %this, ptr noalias %other, i1 %tobool9.not, i32 %cal
 ; CHECK:       for.cond.preheader:
 ; CHECK-NEXT:    [[CMP40_NOT3:%.*]] = icmp slt i32 [[CALL]], 1
 ; CHECK-NEXT:    br i1 [[CMP40_NOT3]], label [[FOR_COND41_PREHEADER_PREHEADER:%.*]], label [[FOR_COND_CLEANUP:%.*]]
-; CHECK:       for.cond41.preheader.preheader:
+; CHECK:       for.cond41.preheader.lr.ph:
 ; CHECK-NEXT:    [[TMP0:%.*]] = sext i32 [[CALL]] to i64
 ; CHECK-NEXT:    br label [[FOR_COND41_PREHEADER:%.*]]
 ; CHECK:       for.cond:
 ; CHECK-NEXT:    [[INDVARS_IV_NEXT:%.*]] = add nsw i64 [[INDVARS_IV:%.*]], 1
-; CHECK-NEXT:    [[TMP1:%.*]] = and i64 [[INDVARS_IV_NEXT]], 4294967295
-; CHECK-NEXT:    [[EXITCOND_NOT:%.*]] = icmp eq i64 [[TMP1]], 1
-; CHECK-NEXT:    br i1 [[EXITCOND_NOT]], label [[FOR_COND_CLEANUP]], label [[FOR_COND41_PREHEADER]]
+; CHECK-NEXT:    [[INDVARS:%.*]] = trunc i64 [[INDVARS_IV_NEXT]] to i32
+; CHECK-NEXT:    [[CMP40_NOT:%.*]] = icmp slt i32 [[INDVARS]], 1
+; CHECK-NEXT:    br i1 [[CMP40_NOT]], label [[FOR_COND41_PREHEADER]], label [[FOR_COND_CLEANUP]]
 ; CHECK:       for.cond41.preheader:
 ; CHECK-NEXT:    [[INDVARS_IV]] = phi i64 [ [[TMP0]], [[FOR_COND41_PREHEADER_PREHEADER]] ], [ [[INDVARS_IV_NEXT]], [[FOR_COND:%.*]] ]
 ; CHECK-NEXT:    [[CALL431:%.*]] = load volatile i32, ptr [[OTHER]], align 4

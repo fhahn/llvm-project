@@ -10,12 +10,12 @@ define void @partial_unroll_forced(i32 %N, ptr %src, ptr noalias %dst) {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[CMP141:%.*]] = icmp sgt i32 [[N]], 0
 ; CHECK-NEXT:    br i1 [[CMP141]], label [[LOOP_LATCH_PREHEADER:%.*]], label [[EXIT:%.*]]
-; CHECK:       loop.latch.preheader:
+; CHECK:       loop.latch.lr.ph:
 ; CHECK-NEXT:    [[WIDE_TRIP_COUNT:%.*]] = zext nneg i32 [[N]] to i64
 ; CHECK-NEXT:    [[XTRAITER:%.*]] = and i64 [[WIDE_TRIP_COUNT]], 1
 ; CHECK-NEXT:    [[TMP0:%.*]] = icmp eq i32 [[N]], 1
 ; CHECK-NEXT:    br i1 [[TMP0]], label [[EXIT_LOOPEXIT_UNR_LCSSA:%.*]], label [[LOOP_LATCH_PREHEADER_NEW:%.*]]
-; CHECK:       loop.latch.preheader.new:
+; CHECK:       loop.latch.lr.ph.new:
 ; CHECK-NEXT:    [[UNROLL_ITER:%.*]] = and i64 [[WIDE_TRIP_COUNT]], 2147483646
 ; CHECK-NEXT:    br label [[LOOP_LATCH:%.*]]
 ; CHECK:       loop.latch:
