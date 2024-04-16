@@ -940,6 +940,15 @@ static void simplifyRecipe(VPRecipeBase &R, VPTypeAnalysis &TypeInfo) {
 #endif
   }
 
+  VPValue *B;
+  VPValue *C;
+  VPValue *D;
+  if (match(&R, m_Or(m_LogicalAnd(m_VPValue(A), m_VPValue(B)),
+                     m_LogicalAnd(m_VPValue(C), m_Not(m_VPValue(D))))) &&
+      A == C && B == D) {
+    R.getVPSingleValue()->replaceAllUsesWith(A);
+  }
+
   if (match(&R, m_CombineOr(m_Mul(m_VPValue(A), m_SpecificInt(1)),
                             m_Mul(m_SpecificInt(1), m_VPValue(A)))))
     return R.getVPSingleValue()->replaceAllUsesWith(A);
