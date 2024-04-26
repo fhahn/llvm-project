@@ -1491,18 +1491,69 @@ define void @_ZN7DataOutILi3EE13build_patchesEjj(i64 %sub.ptr.lhs.cast.i394) per
 ; PRED-LABEL: define void @_ZN7DataOutILi3EE13build_patchesEjj(
 ; PRED-SAME: i64 [[SUB_PTR_LHS_CAST_I394:%.*]]) personality ptr null {
 ; PRED-NEXT:  entry:
+; PRED-NEXT:    [[UMAX1:%.*]] = call i64 @llvm.umax.i64(i64 [[SUB_PTR_LHS_CAST_I394]], i64 1)
+; PRED-NEXT:    br i1 false, label [[SCALAR_PH:%.*]], label [[VECTOR_SCEVCHECK:%.*]]
+; PRED:       vector.scevcheck:
+; PRED-NEXT:    [[UMAX:%.*]] = call i64 @llvm.umax.i64(i64 [[SUB_PTR_LHS_CAST_I394]], i64 1)
+; PRED-NEXT:    [[TMP0:%.*]] = add i64 [[UMAX]], -1
+; PRED-NEXT:    [[TMP1:%.*]] = icmp ugt i64 [[TMP0]], 4294967295
+; PRED-NEXT:    [[TMP2:%.*]] = trunc i64 [[TMP0]] to i32
+; PRED-NEXT:    [[TMP3:%.*]] = add i32 1, [[TMP2]]
+; PRED-NEXT:    [[TMP4:%.*]] = icmp ult i32 [[TMP3]], 1
+; PRED-NEXT:    [[TMP5:%.*]] = icmp ugt i64 [[TMP0]], 4294967295
+; PRED-NEXT:    [[TMP6:%.*]] = or i1 [[TMP4]], [[TMP5]]
+; PRED-NEXT:    br i1 [[TMP6]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
+; PRED:       vector.ph:
+; PRED-NEXT:    [[N_RND_UP:%.*]] = add i64 [[UMAX1]], 1
+; PRED-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[N_RND_UP]], 2
+; PRED-NEXT:    [[N_VEC:%.*]] = sub i64 [[N_RND_UP]], [[N_MOD_VF]]
+; PRED-NEXT:    [[IND_END:%.*]] = trunc i64 [[N_VEC]] to i32
+; PRED-NEXT:    [[TRIP_COUNT_MINUS_1:%.*]] = sub i64 [[UMAX1]], 1
+; PRED-NEXT:    [[BROADCAST_SPLATINSERT3:%.*]] = insertelement <2 x i64> poison, i64 [[TRIP_COUNT_MINUS_1]], i64 0
+; PRED-NEXT:    [[BROADCAST_SPLAT4:%.*]] = shufflevector <2 x i64> [[BROADCAST_SPLATINSERT3]], <2 x i64> poison, <2 x i32> zeroinitializer
 ; PRED-NEXT:    br label [[FOR_BODY159:%.*]]
+; PRED:       vector.body:
+; PRED-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[PRED_STORE_CONTINUE6:%.*]] ]
+; PRED-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i64> poison, i64 [[INDEX]], i64 0
+; PRED-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x i64> [[BROADCAST_SPLATINSERT]], <2 x i64> poison, <2 x i32> zeroinitializer
+; PRED-NEXT:    [[VEC_IV:%.*]] = add <2 x i64> [[BROADCAST_SPLAT]], <i64 0, i64 1>
+; PRED-NEXT:    [[TMP7:%.*]] = icmp ule <2 x i64> [[VEC_IV]], [[BROADCAST_SPLAT4]]
+; PRED-NEXT:    [[TMP8:%.*]] = extractelement <2 x i1> [[TMP7]], i32 0
+; PRED-NEXT:    br i1 [[TMP8]], label [[PRED_STORE_IF:%.*]], label [[PRED_STORE_CONTINUE:%.*]]
+; PRED:       pred.store.if:
+; PRED-NEXT:    [[TMP9:%.*]] = add i64 [[INDEX]], 0
+; PRED-NEXT:    [[TMP10:%.*]] = getelementptr %"struct.DataOutBase::Patch", ptr null, i64 [[TMP9]], i32 2
+; PRED-NEXT:    store i32 0, ptr [[TMP10]], align 8
+; PRED-NEXT:    br label [[PRED_STORE_CONTINUE]]
+; PRED:       pred.store.continue:
+; PRED-NEXT:    [[TMP11:%.*]] = extractelement <2 x i1> [[TMP7]], i32 1
+; PRED-NEXT:    br i1 [[TMP11]], label [[PRED_STORE_IF5:%.*]], label [[PRED_STORE_CONTINUE6]]
+; PRED:       pred.store.if5:
+; PRED-NEXT:    [[TMP12:%.*]] = add i64 [[INDEX]], 1
+; PRED-NEXT:    [[TMP13:%.*]] = getelementptr %"struct.DataOutBase::Patch", ptr null, i64 [[TMP12]], i32 2
+; PRED-NEXT:    store i32 0, ptr [[TMP13]], align 8
+; PRED-NEXT:    br label [[PRED_STORE_CONTINUE6]]
+; PRED:       pred.store.continue6:
+; PRED-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 2
+; PRED-NEXT:    [[TMP14:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; PRED-NEXT:    br i1 [[TMP14]], label [[MIDDLE_BLOCK:%.*]], label [[FOR_BODY159]], !llvm.loop [[LOOP16:![0-9]+]]
+; PRED:       middle.block:
+; PRED-NEXT:    br i1 true, label [[FOR_COND_CLEANUP158_LOOPEXIT:%.*]], label [[SCALAR_PH]]
+; PRED:       scalar.ph:
+; PRED-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], [[MIDDLE_BLOCK]] ], [ 0, [[ENTRY:%.*]] ], [ 0, [[VECTOR_SCEVCHECK]] ]
+; PRED-NEXT:    [[BC_RESUME_VAL2:%.*]] = phi i32 [ [[IND_END]], [[MIDDLE_BLOCK]] ], [ 0, [[ENTRY]] ], [ 0, [[VECTOR_SCEVCHECK]] ]
+; PRED-NEXT:    br label [[FOR_BODY160:%.*]]
 ; PRED:       for.cond.cleanup158.loopexit:
 ; PRED-NEXT:    ret void
 ; PRED:       for.body159:
-; PRED-NEXT:    [[CONV154478:%.*]] = phi i64 [ [[CONV154:%.*]], [[FOR_BODY159]] ], [ 0, [[ENTRY:%.*]] ]
-; PRED-NEXT:    [[I_0477:%.*]] = phi i32 [ [[INC164:%.*]], [[FOR_BODY159]] ], [ 0, [[ENTRY]] ]
+; PRED-NEXT:    [[CONV154478:%.*]] = phi i64 [ [[CONV154:%.*]], [[FOR_BODY160]] ], [ [[BC_RESUME_VAL]], [[SCALAR_PH]] ]
+; PRED-NEXT:    [[I_0477:%.*]] = phi i32 [ [[INC164:%.*]], [[FOR_BODY160]] ], [ [[BC_RESUME_VAL2]], [[SCALAR_PH]] ]
 ; PRED-NEXT:    [[PATCH_INDEX:%.*]] = getelementptr %"struct.DataOutBase::Patch", ptr null, i64 [[CONV154478]], i32 2
 ; PRED-NEXT:    store i32 0, ptr [[PATCH_INDEX]], align 8
 ; PRED-NEXT:    [[INC164]] = add i32 [[I_0477]], 1
 ; PRED-NEXT:    [[CONV154]] = zext i32 [[INC164]] to i64
 ; PRED-NEXT:    [[CMP157:%.*]] = icmp ult i64 [[CONV154]], [[SUB_PTR_LHS_CAST_I394]]
-; PRED-NEXT:    br i1 [[CMP157]], label [[FOR_BODY159]], label [[FOR_COND_CLEANUP158_LOOPEXIT:%.*]]
+; PRED-NEXT:    br i1 [[CMP157]], label [[FOR_BODY160]], label [[FOR_COND_CLEANUP158_LOOPEXIT]], !llvm.loop [[LOOP17:![0-9]+]]
 ;
 entry:
   br label %for.body159
@@ -1633,7 +1684,7 @@ define void @f883b(ptr %result, ptr %arg1, i16 %0) #1 {
 ; PRED:       vector.body:
 ; PRED-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
 ; PRED-NEXT:    [[TMP1:%.*]] = add i64 [[INDEX]], 0
-; PRED-NEXT:    [[TMP2:%.*]] = load i64, ptr [[ARG1]], align 8, !alias.scope [[META16:![0-9]+]]
+; PRED-NEXT:    [[TMP2:%.*]] = load i64, ptr [[ARG1]], align 8, !alias.scope [[META18:![0-9]+]]
 ; PRED-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <16 x i64> poison, i64 [[TMP2]], i64 0
 ; PRED-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <16 x i64> [[BROADCAST_SPLATINSERT]], <16 x i64> poison, <16 x i32> zeroinitializer
 ; PRED-NEXT:    [[TMP3:%.*]] = trunc <16 x i64> [[BROADCAST_SPLAT]] to <16 x i8>
@@ -1641,10 +1692,10 @@ define void @f883b(ptr %result, ptr %arg1, i16 %0) #1 {
 ; PRED-NEXT:    [[TMP5:%.*]] = and <16 x i8> [[TMP3]], [[TMP4]]
 ; PRED-NEXT:    [[TMP6:%.*]] = getelementptr i8, ptr [[RESULT]], i64 [[TMP1]]
 ; PRED-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr [[TMP6]], i32 0
-; PRED-NEXT:    store <16 x i8> [[TMP5]], ptr [[TMP7]], align 1, !alias.scope [[META19:![0-9]+]], !noalias [[META16]]
+; PRED-NEXT:    store <16 x i8> [[TMP5]], ptr [[TMP7]], align 1, !alias.scope [[META21:![0-9]+]], !noalias [[META18]]
 ; PRED-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 16
 ; PRED-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[INDEX_NEXT]], 0
-; PRED-NEXT:    br i1 [[TMP8]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP21:![0-9]+]]
+; PRED-NEXT:    br i1 [[TMP8]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP23:![0-9]+]]
 ; PRED:       middle.block:
 ; PRED-NEXT:    br i1 true, label [[FOR_END:%.*]], label [[SCALAR_PH]]
 ; PRED:       scalar.ph:
@@ -1660,7 +1711,7 @@ define void @f883b(ptr %result, ptr %arg1, i16 %0) #1 {
 ; PRED-NEXT:    store i8 [[CONV13]], ptr [[ARRAYIDX15]], align 1
 ; PRED-NEXT:    [[INDVARS_IV_NEXT]] = add i64 [[INDVARS_IV1]], 1
 ; PRED-NEXT:    [[EXITCOND_NOT:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT]], 0
-; PRED-NEXT:    br i1 [[EXITCOND_NOT]], label [[FOR_END]], label [[FOR_BODY]], !llvm.loop [[LOOP22:![0-9]+]]
+; PRED-NEXT:    br i1 [[EXITCOND_NOT]], label [[FOR_END]], label [[FOR_BODY]], !llvm.loop [[LOOP24:![0-9]+]]
 ; PRED:       for.end:
 ; PRED-NEXT:    ret void
 ;
@@ -1737,11 +1788,13 @@ attributes #0 = { "target-features"="+aes,+complxnum,+crc,+dotprod,+fp-armv8,+fp
 ; PRED: [[LOOP13]] = distinct !{[[LOOP13]], [[META2]], [[META1]]}
 ; PRED: [[LOOP14]] = distinct !{[[LOOP14]], [[META1]], [[META2]]}
 ; PRED: [[LOOP15]] = distinct !{[[LOOP15]], [[META1]]}
-; PRED: [[META16]] = !{[[META17:![0-9]+]]}
-; PRED: [[META17]] = distinct !{[[META17]], [[META18:![0-9]+]]}
-; PRED: [[META18]] = distinct !{[[META18]], !"LVerDomain"}
-; PRED: [[META19]] = !{[[META20:![0-9]+]]}
-; PRED: [[META20]] = distinct !{[[META20]], [[META18]]}
-; PRED: [[LOOP21]] = distinct !{[[LOOP21]], [[META1]], [[META2]]}
-; PRED: [[LOOP22]] = distinct !{[[LOOP22]], [[META1]]}
+; PRED: [[LOOP16]] = distinct !{[[LOOP16]], [[META1]], [[META2]]}
+; PRED: [[LOOP17]] = distinct !{[[LOOP17]], [[META1]]}
+; PRED: [[META18]] = !{[[META19:![0-9]+]]}
+; PRED: [[META19]] = distinct !{[[META19]], [[META20:![0-9]+]]}
+; PRED: [[META20]] = distinct !{[[META20]], !"LVerDomain"}
+; PRED: [[META21]] = !{[[META22:![0-9]+]]}
+; PRED: [[META22]] = distinct !{[[META22]], [[META20]]}
+; PRED: [[LOOP23]] = distinct !{[[LOOP23]], [[META1]], [[META2]]}
+; PRED: [[LOOP24]] = distinct !{[[LOOP24]], [[META1]]}
 ;.

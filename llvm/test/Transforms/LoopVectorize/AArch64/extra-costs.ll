@@ -530,18 +530,69 @@ define void @zext_iv_increment(ptr %dst, i64 %sub.ptr.rhs.cast.i533) {
 ; PRED-LABEL: define void @zext_iv_increment(
 ; PRED-SAME: ptr [[DST:%.*]], i64 [[SUB_PTR_RHS_CAST_I533:%.*]]) {
 ; PRED-NEXT:  entry:
+; PRED-NEXT:    [[UMAX1:%.*]] = call i64 @llvm.umax.i64(i64 [[SUB_PTR_RHS_CAST_I533]], i64 1)
+; PRED-NEXT:    br i1 false, label [[SCALAR_PH:%.*]], label [[VECTOR_SCEVCHECK:%.*]]
+; PRED:       vector.scevcheck:
+; PRED-NEXT:    [[UMAX:%.*]] = call i64 @llvm.umax.i64(i64 [[SUB_PTR_RHS_CAST_I533]], i64 1)
+; PRED-NEXT:    [[TMP0:%.*]] = add i64 [[UMAX]], -1
+; PRED-NEXT:    [[TMP1:%.*]] = icmp ugt i64 [[TMP0]], 4294967295
+; PRED-NEXT:    [[TMP2:%.*]] = trunc i64 [[TMP0]] to i32
+; PRED-NEXT:    [[TMP3:%.*]] = add i32 1, [[TMP2]]
+; PRED-NEXT:    [[TMP4:%.*]] = icmp ult i32 [[TMP3]], 1
+; PRED-NEXT:    [[TMP5:%.*]] = icmp ugt i64 [[TMP0]], 4294967295
+; PRED-NEXT:    [[TMP6:%.*]] = or i1 [[TMP4]], [[TMP5]]
+; PRED-NEXT:    br i1 [[TMP6]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
+; PRED:       vector.ph:
+; PRED-NEXT:    [[N_RND_UP:%.*]] = add i64 [[UMAX1]], 1
+; PRED-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[N_RND_UP]], 2
+; PRED-NEXT:    [[N_VEC:%.*]] = sub i64 [[N_RND_UP]], [[N_MOD_VF]]
+; PRED-NEXT:    [[IND_END:%.*]] = trunc i64 [[N_VEC]] to i32
+; PRED-NEXT:    [[TRIP_COUNT_MINUS_1:%.*]] = sub i64 [[UMAX1]], 1
+; PRED-NEXT:    [[BROADCAST_SPLATINSERT3:%.*]] = insertelement <2 x i64> poison, i64 [[TRIP_COUNT_MINUS_1]], i64 0
+; PRED-NEXT:    [[BROADCAST_SPLAT4:%.*]] = shufflevector <2 x i64> [[BROADCAST_SPLATINSERT3]], <2 x i64> poison, <2 x i32> zeroinitializer
 ; PRED-NEXT:    br label [[FOR_BODY174:%.*]]
+; PRED:       vector.body:
+; PRED-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[PRED_STORE_CONTINUE6:%.*]] ]
+; PRED-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i64> poison, i64 [[INDEX]], i64 0
+; PRED-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x i64> [[BROADCAST_SPLATINSERT]], <2 x i64> poison, <2 x i32> zeroinitializer
+; PRED-NEXT:    [[VEC_IV:%.*]] = add <2 x i64> [[BROADCAST_SPLAT]], <i64 0, i64 1>
+; PRED-NEXT:    [[TMP7:%.*]] = icmp ule <2 x i64> [[VEC_IV]], [[BROADCAST_SPLAT4]]
+; PRED-NEXT:    [[TMP8:%.*]] = extractelement <2 x i1> [[TMP7]], i32 0
+; PRED-NEXT:    br i1 [[TMP8]], label [[PRED_STORE_IF:%.*]], label [[PRED_STORE_CONTINUE:%.*]]
+; PRED:       pred.store.if:
+; PRED-NEXT:    [[TMP9:%.*]] = add i64 [[INDEX]], 0
+; PRED-NEXT:    [[TMP10:%.*]] = getelementptr { i32, i32, i32 }, ptr [[DST]], i64 [[TMP9]], i32 2
+; PRED-NEXT:    store i32 0, ptr [[TMP10]], align 8
+; PRED-NEXT:    br label [[PRED_STORE_CONTINUE]]
+; PRED:       pred.store.continue:
+; PRED-NEXT:    [[TMP11:%.*]] = extractelement <2 x i1> [[TMP7]], i32 1
+; PRED-NEXT:    br i1 [[TMP11]], label [[PRED_STORE_IF5:%.*]], label [[PRED_STORE_CONTINUE6]]
+; PRED:       pred.store.if5:
+; PRED-NEXT:    [[TMP12:%.*]] = add i64 [[INDEX]], 1
+; PRED-NEXT:    [[TMP13:%.*]] = getelementptr { i32, i32, i32 }, ptr [[DST]], i64 [[TMP12]], i32 2
+; PRED-NEXT:    store i32 0, ptr [[TMP13]], align 8
+; PRED-NEXT:    br label [[PRED_STORE_CONTINUE6]]
+; PRED:       pred.store.continue6:
+; PRED-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 2
+; PRED-NEXT:    [[TMP14:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; PRED-NEXT:    br i1 [[TMP14]], label [[MIDDLE_BLOCK:%.*]], label [[FOR_BODY174]], !llvm.loop [[LOOP6:![0-9]+]]
+; PRED:       middle.block:
+; PRED-NEXT:    br i1 true, label [[FOR_COND_CLEANUP173_LOOPEXIT:%.*]], label [[SCALAR_PH]]
+; PRED:       scalar.ph:
+; PRED-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], [[MIDDLE_BLOCK]] ], [ 0, [[ENTRY:%.*]] ], [ 0, [[VECTOR_SCEVCHECK]] ]
+; PRED-NEXT:    [[BC_RESUME_VAL2:%.*]] = phi i32 [ [[IND_END]], [[MIDDLE_BLOCK]] ], [ 0, [[ENTRY]] ], [ 0, [[VECTOR_SCEVCHECK]] ]
+; PRED-NEXT:    br label [[FOR_BODY175:%.*]]
 ; PRED:       for.cond.cleanup173.loopexit:
 ; PRED-NEXT:    ret void
 ; PRED:       for.body174:
-; PRED-NEXT:    [[CONV169801:%.*]] = phi i64 [ [[CONV169:%.*]], [[FOR_BODY174]] ], [ 0, [[ENTRY:%.*]] ]
-; PRED-NEXT:    [[I167_0800:%.*]] = phi i32 [ [[INC179:%.*]], [[FOR_BODY174]] ], [ 0, [[ENTRY]] ]
+; PRED-NEXT:    [[CONV169801:%.*]] = phi i64 [ [[CONV169:%.*]], [[FOR_BODY175]] ], [ [[BC_RESUME_VAL]], [[SCALAR_PH]] ]
+; PRED-NEXT:    [[I167_0800:%.*]] = phi i32 [ [[INC179:%.*]], [[FOR_BODY175]] ], [ [[BC_RESUME_VAL2]], [[SCALAR_PH]] ]
 ; PRED-NEXT:    [[PATCH_INDEX:%.*]] = getelementptr { i32, i32, i32 }, ptr [[DST]], i64 [[CONV169801]], i32 2
 ; PRED-NEXT:    store i32 0, ptr [[PATCH_INDEX]], align 8
 ; PRED-NEXT:    [[INC179]] = add i32 [[I167_0800]], 1
 ; PRED-NEXT:    [[CONV169]] = zext i32 [[INC179]] to i64
 ; PRED-NEXT:    [[CMP172:%.*]] = icmp ult i64 [[CONV169]], [[SUB_PTR_RHS_CAST_I533]]
-; PRED-NEXT:    br i1 [[CMP172]], label [[FOR_BODY174]], label [[FOR_COND_CLEANUP173_LOOPEXIT:%.*]]
+; PRED-NEXT:    br i1 [[CMP172]], label [[FOR_BODY175]], label [[FOR_COND_CLEANUP173_LOOPEXIT]], !llvm.loop [[LOOP7:![0-9]+]]
 ;
 entry:
   br label %for.body174
@@ -882,7 +933,7 @@ define void @invar_cond_chain_2(ptr %I, i32 %0) {
 ; PRED:       pred.store.continue11:
 ; PRED-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 4
 ; PRED-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; PRED-NEXT:    br i1 [[TMP12]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
+; PRED-NEXT:    br i1 [[TMP12]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; PRED:       middle.block:
 ; PRED-NEXT:    br i1 true, label [[FOR_COND_CLEANUP312_LOOPEXIT:%.*]], label [[SCALAR_PH]]
 ; PRED:       scalar.ph:
@@ -902,7 +953,7 @@ define void @invar_cond_chain_2(ptr %I, i32 %0) {
 ; PRED:       if.end327:
 ; PRED-NEXT:    [[INCDEC_PTR329]] = getelementptr inbounds i8, ptr [[__BEGIN3_01197]], i64 4
 ; PRED-NEXT:    [[CMP311_NOT:%.*]] = icmp eq ptr [[__BEGIN3_01197]], [[I]]
-; PRED-NEXT:    br i1 [[CMP311_NOT]], label [[FOR_COND_CLEANUP312_LOOPEXIT]], label [[FOR_BODY313]], !llvm.loop [[LOOP7:![0-9]+]]
+; PRED-NEXT:    br i1 [[CMP311_NOT]], label [[FOR_COND_CLEANUP312_LOOPEXIT]], label [[FOR_BODY313]], !llvm.loop [[LOOP9:![0-9]+]]
 ;
 entry:
   br label %for.body313
@@ -967,9 +1018,9 @@ define void @latch_branch_cost() {
 ; PRED-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; PRED:       vector.body:
 ; PRED-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[PRED_STORE_CONTINUE6:%.*]] ]
-; PRED-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, [[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], [[PRED_STORE_CONTINUE6]] ]
-; PRED-NEXT:    [[TMP0:%.*]] = icmp ule <4 x i64> [[VEC_IND]], <i64 99, i64 99, i64 99, i64 99>
-; PRED-NEXT:    [[TMP1:%.*]] = extractelement <4 x i1> [[TMP0]], i32 0
+; PRED-NEXT:    [[VEC_IND:%.*]] = phi <8 x i64> [ <i64 0, i64 1, i64 2, i64 3, i64 4, i64 5, i64 6, i64 7>, [[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], [[PRED_STORE_CONTINUE6]] ]
+; PRED-NEXT:    [[TMP0:%.*]] = icmp ule <8 x i64> [[VEC_IND]], <i64 99, i64 99, i64 99, i64 99, i64 99, i64 99, i64 99, i64 99>
+; PRED-NEXT:    [[TMP1:%.*]] = extractelement <8 x i1> [[TMP0]], i32 0
 ; PRED-NEXT:    br i1 [[TMP1]], label [[PRED_STORE_IF:%.*]], label [[PRED_STORE_CONTINUE:%.*]]
 ; PRED:       pred.store.if:
 ; PRED-NEXT:    [[TMP2:%.*]] = add i64 [[INDEX]], 0
@@ -977,7 +1028,7 @@ define void @latch_branch_cost() {
 ; PRED-NEXT:    store i8 0, ptr [[TMP3]], align 1
 ; PRED-NEXT:    br label [[PRED_STORE_CONTINUE]]
 ; PRED:       pred.store.continue:
-; PRED-NEXT:    [[TMP4:%.*]] = extractelement <4 x i1> [[TMP0]], i32 1
+; PRED-NEXT:    [[TMP4:%.*]] = extractelement <8 x i1> [[TMP0]], i32 1
 ; PRED-NEXT:    br i1 [[TMP4]], label [[PRED_STORE_IF1:%.*]], label [[PRED_STORE_CONTINUE2:%.*]]
 ; PRED:       pred.store.if1:
 ; PRED-NEXT:    [[TMP5:%.*]] = add i64 [[INDEX]], 1
@@ -985,7 +1036,7 @@ define void @latch_branch_cost() {
 ; PRED-NEXT:    store i8 0, ptr [[TMP6]], align 1
 ; PRED-NEXT:    br label [[PRED_STORE_CONTINUE2]]
 ; PRED:       pred.store.continue2:
-; PRED-NEXT:    [[TMP7:%.*]] = extractelement <4 x i1> [[TMP0]], i32 2
+; PRED-NEXT:    [[TMP7:%.*]] = extractelement <8 x i1> [[TMP0]], i32 2
 ; PRED-NEXT:    br i1 [[TMP7]], label [[PRED_STORE_IF3:%.*]], label [[PRED_STORE_CONTINUE4:%.*]]
 ; PRED:       pred.store.if3:
 ; PRED-NEXT:    [[TMP8:%.*]] = add i64 [[INDEX]], 2
@@ -993,22 +1044,54 @@ define void @latch_branch_cost() {
 ; PRED-NEXT:    store i8 0, ptr [[TMP9]], align 1
 ; PRED-NEXT:    br label [[PRED_STORE_CONTINUE4]]
 ; PRED:       pred.store.continue4:
-; PRED-NEXT:    [[TMP10:%.*]] = extractelement <4 x i1> [[TMP0]], i32 3
-; PRED-NEXT:    br i1 [[TMP10]], label [[PRED_STORE_IF5:%.*]], label [[PRED_STORE_CONTINUE6]]
+; PRED-NEXT:    [[TMP10:%.*]] = extractelement <8 x i1> [[TMP0]], i32 3
+; PRED-NEXT:    br i1 [[TMP10]], label [[PRED_STORE_IF5:%.*]], label [[PRED_STORE_CONTINUE7:%.*]]
 ; PRED:       pred.store.if5:
 ; PRED-NEXT:    [[TMP11:%.*]] = add i64 [[INDEX]], 3
 ; PRED-NEXT:    [[TMP12:%.*]] = getelementptr [100 x [120 x i8]], ptr null, i64 0, i64 [[TMP11]]
 ; PRED-NEXT:    store i8 0, ptr [[TMP12]], align 1
-; PRED-NEXT:    br label [[PRED_STORE_CONTINUE6]]
+; PRED-NEXT:    br label [[PRED_STORE_CONTINUE7]]
 ; PRED:       pred.store.continue6:
-; PRED-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 4
-; PRED-NEXT:    [[VEC_IND_NEXT]] = add <4 x i64> [[VEC_IND]], <i64 4, i64 4, i64 4, i64 4>
-; PRED-NEXT:    [[TMP13:%.*]] = icmp eq i64 [[INDEX_NEXT]], 100
-; PRED-NEXT:    br i1 [[TMP13]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
+; PRED-NEXT:    [[TMP13:%.*]] = extractelement <8 x i1> [[TMP0]], i32 4
+; PRED-NEXT:    br i1 [[TMP13]], label [[PRED_STORE_IF7:%.*]], label [[PRED_STORE_CONTINUE8:%.*]]
+; PRED:       pred.store.if7:
+; PRED-NEXT:    [[TMP14:%.*]] = add i64 [[INDEX]], 4
+; PRED-NEXT:    [[TMP15:%.*]] = getelementptr [100 x [120 x i8]], ptr null, i64 0, i64 [[TMP14]]
+; PRED-NEXT:    store i8 0, ptr [[TMP15]], align 1
+; PRED-NEXT:    br label [[PRED_STORE_CONTINUE8]]
+; PRED:       pred.store.continue8:
+; PRED-NEXT:    [[TMP16:%.*]] = extractelement <8 x i1> [[TMP0]], i32 5
+; PRED-NEXT:    br i1 [[TMP16]], label [[PRED_STORE_IF9:%.*]], label [[PRED_STORE_CONTINUE10:%.*]]
+; PRED:       pred.store.if9:
+; PRED-NEXT:    [[TMP17:%.*]] = add i64 [[INDEX]], 5
+; PRED-NEXT:    [[TMP18:%.*]] = getelementptr [100 x [120 x i8]], ptr null, i64 0, i64 [[TMP17]]
+; PRED-NEXT:    store i8 0, ptr [[TMP18]], align 1
+; PRED-NEXT:    br label [[PRED_STORE_CONTINUE10]]
+; PRED:       pred.store.continue10:
+; PRED-NEXT:    [[TMP19:%.*]] = extractelement <8 x i1> [[TMP0]], i32 6
+; PRED-NEXT:    br i1 [[TMP19]], label [[PRED_STORE_IF11:%.*]], label [[PRED_STORE_CONTINUE12:%.*]]
+; PRED:       pred.store.if11:
+; PRED-NEXT:    [[TMP20:%.*]] = add i64 [[INDEX]], 6
+; PRED-NEXT:    [[TMP21:%.*]] = getelementptr [100 x [120 x i8]], ptr null, i64 0, i64 [[TMP20]]
+; PRED-NEXT:    store i8 0, ptr [[TMP21]], align 1
+; PRED-NEXT:    br label [[PRED_STORE_CONTINUE12]]
+; PRED:       pred.store.continue12:
+; PRED-NEXT:    [[TMP22:%.*]] = extractelement <8 x i1> [[TMP0]], i32 7
+; PRED-NEXT:    br i1 [[TMP22]], label [[PRED_STORE_IF13:%.*]], label [[PRED_STORE_CONTINUE6]]
+; PRED:       pred.store.if13:
+; PRED-NEXT:    [[TMP23:%.*]] = add i64 [[INDEX]], 7
+; PRED-NEXT:    [[TMP24:%.*]] = getelementptr [100 x [120 x i8]], ptr null, i64 0, i64 [[TMP23]]
+; PRED-NEXT:    store i8 0, ptr [[TMP24]], align 1
+; PRED-NEXT:    br label [[PRED_STORE_CONTINUE6]]
+; PRED:       pred.store.continue14:
+; PRED-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 8
+; PRED-NEXT:    [[VEC_IND_NEXT]] = add <8 x i64> [[VEC_IND]], <i64 8, i64 8, i64 8, i64 8, i64 8, i64 8, i64 8, i64 8>
+; PRED-NEXT:    [[TMP25:%.*]] = icmp eq i64 [[INDEX_NEXT]], 104
+; PRED-NEXT:    br i1 [[TMP25]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP10:![0-9]+]]
 ; PRED:       middle.block:
 ; PRED-NEXT:    br i1 true, label [[FOR_END:%.*]], label [[SCALAR_PH]]
 ; PRED:       scalar.ph:
-; PRED-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ 100, [[MIDDLE_BLOCK]] ], [ 0, [[ENTRY:%.*]] ]
+; PRED-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ 104, [[MIDDLE_BLOCK]] ], [ 0, [[ENTRY:%.*]] ]
 ; PRED-NEXT:    br label [[FOR_BODY:%.*]]
 ; PRED:       for.body:
 ; PRED-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ [[BC_RESUME_VAL]], [[SCALAR_PH]] ], [ [[INDVARS_IV_NEXT:%.*]], [[FOR_BODY]] ]
@@ -1016,7 +1099,7 @@ define void @latch_branch_cost() {
 ; PRED-NEXT:    store i8 0, ptr [[ARRAYIDX]], align 1
 ; PRED-NEXT:    [[INDVARS_IV_NEXT]] = add i64 [[INDVARS_IV]], 1
 ; PRED-NEXT:    [[EXITCOND_NOT:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT]], 100
-; PRED-NEXT:    br i1 [[EXITCOND_NOT]], label [[FOR_END]], label [[FOR_BODY]], !llvm.loop [[LOOP9:![0-9]+]]
+; PRED-NEXT:    br i1 [[EXITCOND_NOT]], label [[FOR_END]], label [[FOR_BODY]], !llvm.loop [[LOOP11:![0-9]+]]
 ; PRED:       for.end:
 ; PRED-NEXT:    ret void
 ;
@@ -1059,7 +1142,9 @@ for.end:                                          ; preds = %for.body
 ; PRED: [[LOOP4]] = distinct !{[[LOOP4]], [[META1]], [[META2]]}
 ; PRED: [[LOOP5]] = distinct !{[[LOOP5]], [[META2]], [[META1]]}
 ; PRED: [[LOOP6]] = distinct !{[[LOOP6]], [[META1]], [[META2]]}
-; PRED: [[LOOP7]] = distinct !{[[LOOP7]], [[META2]], [[META1]]}
+; PRED: [[LOOP7]] = distinct !{[[LOOP7]], [[META1]]}
 ; PRED: [[LOOP8]] = distinct !{[[LOOP8]], [[META1]], [[META2]]}
 ; PRED: [[LOOP9]] = distinct !{[[LOOP9]], [[META2]], [[META1]]}
+; PRED: [[LOOP10]] = distinct !{[[LOOP10]], [[META1]], [[META2]]}
+; PRED: [[LOOP11]] = distinct !{[[LOOP11]], [[META2]], [[META1]]}
 ;.
