@@ -1988,13 +1988,16 @@ static bool InstrumentAllFunctions(
 
 PreservedAnalyses
 PGOInstrumentationGenCreateVar::run(Module &M, ModuleAnalysisManager &MAM) {
-  createProfileFileNameVar(M, CSInstrName);
+  appendToCompilerUsed(M, createProfileFileNameVar(M, CSInstrName));
+  appendToUsed(M, createProfileFileNameVar(M, CSInstrName));
   // The variable in a comdat may be discarded by LTO. Ensure the declaration
   // will be retained.
-  appendToCompilerUsed(
-      M, createIRLevelProfileFlagVar(M, PGOInstrumentationType::CSFDO));
+  appendToCompilerUsed(M, createIRLevelProfileFlagVar(M, /*IsCS=*/true));
+  appendToUsed(M, createIRLevelProfileFlagVar(M, /*IsCS=*/true));
+
   if (ProfileSampling)
     createProfileSamplingVar(M);
+
   PreservedAnalyses PA;
   PA.preserve<FunctionAnalysisManagerModuleProxy>();
   PA.preserveSet<AllAnalysesOn<Function>>();

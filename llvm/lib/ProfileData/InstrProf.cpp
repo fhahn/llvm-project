@@ -1540,9 +1540,9 @@ bool canRenameComdatFunc(const Function &F, bool CheckAddressTaken) {
 }
 
 // Create the variable for the profile file name.
-void createProfileFileNameVar(Module &M, StringRef InstrProfileOutput) {
+GlobalValue *createProfileFileNameVar(Module &M, StringRef InstrProfileOutput) {
   if (InstrProfileOutput.empty())
-    return;
+    return nullptr;
   Constant *ProfileNameConst =
       ConstantDataArray::getString(M.getContext(), InstrProfileOutput, true);
   GlobalVariable *ProfileNameVar = new GlobalVariable(
@@ -1555,6 +1555,7 @@ void createProfileFileNameVar(Module &M, StringRef InstrProfileOutput) {
     ProfileNameVar->setComdat(M.getOrInsertComdat(
         StringRef(INSTR_PROF_QUOTE(INSTR_PROF_PROFILE_NAME_VAR))));
   }
+  return ProfileNameVar;
 }
 
 Error OverlapStats::accumulateCounts(const std::string &BaseFilename,
