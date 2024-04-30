@@ -1355,7 +1355,7 @@ struct Header {
 } // end namespace RawInstrProf
 
 // Create the variable for the profile file name.
-void createProfileFileNameVar(Module &M, StringRef InstrProfileOutput);
+GlobalValue *createProfileFileNameVar(Module &M, StringRef InstrProfileOutput);
 
 // Whether to compress function names in profile records, and filenames in
 // code coverage mappings. Used by the Instrumentation library and unit tests.

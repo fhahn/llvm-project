@@ -132,17 +132,13 @@ cl::opt<std::string>
 LTOCodeGenerator::LTOCodeGenerator(LLVMContext &Context)
     : Context(Context), MergedModule(new Module("ld-temp.o", Context)),
       TheLinker(new Linker(*MergedModule)) {
-  Context.setDiscardValueNames(LTODiscardValueNames);
   Context.enableDebugTypeODRUniquing();
 
   Config.CodeModel = std::nullopt;
-  Config.StatsFile = LTOStatsFile;
   Config.PreCodeGenPassesHook = [](legacy::PassManager &PM) {
     PM.add(createObjCARCContractPass());
   };
 
-  Config.RunCSIRInstr = LTORunCSIRInstr;
-  Config.CSIRProfile = LTOCSIRProfile;
 }
 
 LTOCodeGenerator::~LTOCodeGenerator() = default;
@@ -574,6 +570,8 @@ bool LTOCodeGenerator::optimize() {
 
   // libLTO parses options late, so re-set them here.
   Context.setDiscardValueNames(LTODiscardValueNames);
+  Config.RunCSIRInstr = LTORunCSIRInstr;
+  Config.CSIRProfile = LTOCSIRProfile;
 
   auto DiagFileOrErr = lto::setupLLVMOptimizationRemarks(
       Context, RemarksFilename, RemarksPasses, RemarksFormat,

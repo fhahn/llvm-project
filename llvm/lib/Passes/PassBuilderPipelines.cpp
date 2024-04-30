@@ -1396,12 +1396,12 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
   // cross-module inline has not been done yet. The context sensitive
   // instrumentation is after all the inlines are done.
   if (!LTOPreLink && PGOOpt) {
-    if (PGOOpt->CSAction == PGOOptions::CSIRInstr)
+    if (PGOOpt->CSAction == PGOOptions::CSIRInstr) {
       addPGOInstrPasses(MPM, Level, /*RunProfileGen=*/true,
                         /*IsCS=*/true, PGOOpt->AtomicCounterUpdate,
                         PGOOpt->CSProfileGenFile, PGOOpt->ProfileRemappingFile,
                         PGOOpt->FS);
-    else if (PGOOpt->CSAction == PGOOptions::CSIRUse)
+    } else if (PGOOpt->CSAction == PGOOptions::CSIRUse)
       addPGOInstrPasses(MPM, Level, /*RunProfileGen=*/false,
                         /*IsCS=*/true, PGOOpt->AtomicCounterUpdate,
                         PGOOpt->ProfileFile, PGOOpt->ProfileRemappingFile,
