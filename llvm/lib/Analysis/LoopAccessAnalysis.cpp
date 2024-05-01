@@ -1947,7 +1947,7 @@ getDependenceDistanceStrideAndSize(
     const AccessAnalysis::MemAccessInfo &B, Instruction *BInst,
     const DenseMap<Value *, const SCEV *> &Strides,
     const DenseMap<Value *, SmallVector<const Value *, 16>> &UnderlyingObjects,
-    PredicatedScalarEvolution &PSE, const Loop *InnermostLoop) {
+    PredicatedScalarEvolution &PSE, const Loop *InnermostLoop, bool &FoundNonConstantDistanceDependence ) {
   auto &DL = InnermostLoop->getHeader()->getModule()->getDataLayout();
   auto &SE = *PSE.getSE();
   auto [APtr, AIsWrite] = A;
@@ -1972,6 +1972,13 @@ getDependenceDistanceStrideAndSize(
 
   const SCEV *Src = PSE.getSCEV(APtr);
   const SCEV *Sink = PSE.getSCEV(BPtr);
+
+
+  if (SE.isLoopInvariant(Src, InnermostLoop) ||SE.isLoopInvariant(Sink, InnermostLoop)) {
+    FoundNonConstantDistanceDependence = true;
+    LLVM_DEBUG(dbgs() << "Loop invariant pointer access\n");
+    return MemoryDepChecker::Dependence::Unknown;
+  }
 
   // If the induction step is negative we have to invert source and sink of the
   // dependence when measuring the distance between them. We should not swap
@@ -2002,6 +2009,7 @@ getDependenceDistanceStrideAndSize(
   if (!StrideAPtr || !StrideBPtr || (StrideAPtr > 0 && StrideBPtr < 0) ||
       (StrideAPtr < 0 && StrideBPtr > 0)) {
     LLVM_DEBUG(dbgs() << "Pointer access with non-constant stride\n");
+    FoundNonConstantDistanceDependence =true;
     return MemoryDepChecker::Dependence::Unknown;
   }
 
@@ -2026,7 +2034,7 @@ MemoryDepChecker::Dependence::DepType MemoryDepChecker::isDependent(
   // the dependence between A and B.
   auto Res = getDependenceDistanceStrideAndSize(
       A, InstMap[AIdx], B, InstMap[BIdx], Strides, UnderlyingObjects, PSE,
-      InnermostLoop);
+      InnermostLoop, FoundNonConstantDistanceDependence );
   if (std::holds_alternative<Dependence::DepType>(Res))
     return std::get<Dependence::DepType>(Res);
 

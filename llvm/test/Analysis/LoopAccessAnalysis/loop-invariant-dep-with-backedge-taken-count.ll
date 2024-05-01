@@ -7,15 +7,21 @@
 define void @test_distance_greater_than_BTC_100(ptr %a) {
 ; CHECK-LABEL: 'test_distance_greater_than_BTC_100'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
-; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Unknown:
-; CHECK-NEXT:            %l = load i32, ptr %gep.x, align 4 ->
-; CHECK-NEXT:            store i32 %l, ptr %gep, align 4
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group ([[GRP1:0x[0-9a-f]+]]):
+; CHECK-NEXT:          %gep = getelementptr i32, ptr %a, i32 %iv
+; CHECK-NEXT:        Against group ([[GRP2:0x[0-9a-f]+]]):
+; CHECK-NEXT:          %gep.x = getelementptr i32, ptr %a, i32 100
 ; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group [[GRP1]]:
+; CHECK-NEXT:          (Low: %a High: (400 + %a))
+; CHECK-NEXT:            Member: {%a,+,4}<nw><%loop>
+; CHECK-NEXT:        Group [[GRP2]]:
+; CHECK-NEXT:          (Low: (400 + %a) High: (404 + %a))
+; CHECK-NEXT:            Member: (400 + %a)
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
@@ -42,15 +48,21 @@ exit:
 define void @test_distance_much_greater_than_BTC_100(ptr %a) {
 ; CHECK-LABEL: 'test_distance_much_greater_than_BTC_100'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
-; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Unknown:
-; CHECK-NEXT:            %l = load i32, ptr %gep.x, align 4 ->
-; CHECK-NEXT:            store i32 %l, ptr %gep, align 4
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group ([[GRP3:0x[0-9a-f]+]]):
+; CHECK-NEXT:          %gep = getelementptr i32, ptr %a, i32 %iv
+; CHECK-NEXT:        Against group ([[GRP4:0x[0-9a-f]+]]):
+; CHECK-NEXT:          %gep.x = getelementptr i32, ptr %a, i32 200
 ; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group [[GRP3]]:
+; CHECK-NEXT:          (Low: %a High: (400 + %a))
+; CHECK-NEXT:            Member: {%a,+,4}<nw><%loop>
+; CHECK-NEXT:        Group [[GRP4]]:
+; CHECK-NEXT:          (Low: (800 + %a) High: (804 + %a))
+; CHECK-NEXT:            Member: (800 + %a)
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
@@ -77,15 +89,21 @@ exit:
 define void @test_distance_equal_BTC_100(ptr %a) {
 ; CHECK-LABEL: 'test_distance_equal_BTC_100'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
-; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Unknown:
-; CHECK-NEXT:            %l = load i32, ptr %gep.x, align 4 ->
-; CHECK-NEXT:            store i32 %l, ptr %gep, align 4
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group ([[GRP5:0x[0-9a-f]+]]):
+; CHECK-NEXT:          %gep = getelementptr i32, ptr %a, i32 %iv
+; CHECK-NEXT:        Against group ([[GRP6:0x[0-9a-f]+]]):
+; CHECK-NEXT:          %gep.x = getelementptr i32, ptr %a, i32 99
 ; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group [[GRP5]]:
+; CHECK-NEXT:          (Low: %a High: (400 + %a))
+; CHECK-NEXT:            Member: {%a,+,4}<nw><%loop>
+; CHECK-NEXT:        Group [[GRP6]]:
+; CHECK-NEXT:          (Low: (396 + %a) High: (400 + %a))
+; CHECK-NEXT:            Member: (396 + %a)
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
@@ -112,15 +130,21 @@ exit:
 define void @test_distance_greater_than_BTC_10000(ptr %a) {
 ; CHECK-LABEL: 'test_distance_greater_than_BTC_10000'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
-; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Unknown:
-; CHECK-NEXT:            %l = load i32, ptr %gep.x, align 4 ->
-; CHECK-NEXT:            store i32 %l, ptr %gep, align 4
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group ([[GRP7:0x[0-9a-f]+]]):
+; CHECK-NEXT:          %gep = getelementptr i32, ptr %a, i32 %iv
+; CHECK-NEXT:        Against group ([[GRP8:0x[0-9a-f]+]]):
+; CHECK-NEXT:          %gep.x = getelementptr i32, ptr %a, i32 10000
 ; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group [[GRP7]]:
+; CHECK-NEXT:          (Low: %a High: (40000 + %a))
+; CHECK-NEXT:            Member: {%a,+,4}<nw><%loop>
+; CHECK-NEXT:        Group [[GRP8]]:
+; CHECK-NEXT:          (Low: (40000 + %a) High: (40004 + %a))
+; CHECK-NEXT:            Member: (40000 + %a)
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
@@ -147,15 +171,21 @@ exit:
 define void @test_distance_equal_to_BTC_10000(ptr %a) {
 ; CHECK-LABEL: 'test_distance_equal_to_BTC_10000'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
-; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Unknown:
-; CHECK-NEXT:            %l = load i32, ptr %gep.x, align 4 ->
-; CHECK-NEXT:            store i32 %l, ptr %gep, align 4
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group ([[GRP9:0x[0-9a-f]+]]):
+; CHECK-NEXT:          %gep = getelementptr i32, ptr %a, i32 %iv
+; CHECK-NEXT:        Against group ([[GRP10:0x[0-9a-f]+]]):
+; CHECK-NEXT:          %gep.x = getelementptr i32, ptr %a, i32 9999
 ; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group [[GRP9]]:
+; CHECK-NEXT:          (Low: %a High: (400000 + %a))
+; CHECK-NEXT:            Member: {%a,+,4}<nw><%loop>
+; CHECK-NEXT:        Group [[GRP10]]:
+; CHECK-NEXT:          (Low: (39996 + %a) High: (40000 + %a))
+; CHECK-NEXT:            Member: (39996 + %a)
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
@@ -182,21 +212,21 @@ exit:
 define void @test_btc_is_unknown_value(ptr %a, i32 %N) {
 ; CHECK-LABEL: 'test_btc_is_unknown_value'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
-; CHECK-NEXT:  Unknown data dependence.
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Unknown:
-; CHECK-NEXT:            %l = load i32, ptr %gep.x, align 4 ->
-; CHECK-NEXT:            store i32 %l, ptr %gep, align 4
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group ([[GRP11:0x[0-9a-f]+]]):
+; CHECK-NEXT:          %gep = getelementptr i32, ptr %a, i32 %iv
+; CHECK-NEXT:        Against group ([[GRP12:0x[0-9a-f]+]]):
+; CHECK-NEXT:          %gep.x = getelementptr i32, ptr %a, i32 100
 ; CHECK-NEXT:      Grouped accesses:
-; CHECK-NEXT:        Group [[GRP1:0x[0-9a-f]+]]:
-; CHECK-NEXT:          (Low: (400 + %a) High: (404 + %a))
-; CHECK-NEXT:            Member: (400 + %a)
-; CHECK-NEXT:        Group [[GRP2:0x[0-9a-f]+]]:
+; CHECK-NEXT:        Group [[GRP11]]:
 ; CHECK-NEXT:          (Low: %a High: (4 + (4 * (zext i32 (-1 + %N) to i64))<nuw><nsw> + %a))
 ; CHECK-NEXT:            Member: {%a,+,4}<nw><%loop>
+; CHECK-NEXT:        Group [[GRP12]]:
+; CHECK-NEXT:          (Low: (400 + %a) High: (404 + %a))
+; CHECK-NEXT:            Member: (400 + %a)
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:

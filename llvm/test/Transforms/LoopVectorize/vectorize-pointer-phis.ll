@@ -109,7 +109,8 @@ exit:                                             ; preds = %loop.latch
 
 define i32 @load_with_pointer_phi_outside_loop(ptr %A, ptr %B, ptr %C, i1 %c.0, i1 %c.1) {
 ; CHECK-LABEL: @load_with_pointer_phi_outside_loop
-; CHECK-NOT: vector.body
+; CHECK: memcheck
+; CHECK: vector.body
 ;
 entry:
   br i1 %c.0, label %if.then, label %if.else
@@ -141,7 +142,8 @@ exit:                                             ; preds = %loop.latch
 
 define i32 @store_with_pointer_phi_outside_loop(ptr %A, ptr %B, ptr %C, i1 %c.0, i1 %c.1) {
 ; CHECK-LABEL: @store_with_pointer_phi_outside_loop
-; CHECK-NOT: vector.body
+; CHECK: memcheck
+; CHECK: vector.body
 ;
 entry:
   br i1 %c.0, label %if.then, label %if.else
