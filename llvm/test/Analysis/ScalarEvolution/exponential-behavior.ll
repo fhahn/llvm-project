@@ -6,6 +6,7 @@ define void @f(i32 %n, ptr %ptr) {
 ; CHECK-LABEL: 'f'
 ; CHECK-NEXT:  Determining loop execution counts for: @f
 ; CHECK-NEXT:  Loop %loop: <multiple exits> Unpredictable backedge-taken count.
+; CHECK-NEXT:  backedge-taken count for computable exits is i32 0
 ; CHECK-NEXT:    exit count for loop: i32 0
 ; CHECK-NEXT:    exit count for be: ***COULDNOTCOMPUTE***
 ; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 0

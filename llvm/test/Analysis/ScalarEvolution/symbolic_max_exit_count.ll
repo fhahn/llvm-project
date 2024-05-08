@@ -16,6 +16,7 @@ define i32 @test_simple_case(i32 %start, i32 %len) {
 ; CHECK-NEXT:    --> %loop_cond U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:  Determining loop execution counts for: @test_simple_case
 ; CHECK-NEXT:  Loop %loop: <multiple exits> Unpredictable backedge-taken count.
+; CHECK-NEXT:  backedge-taken count for computable exits is %start
 ; CHECK-NEXT:    exit count for loop: %start
 ; CHECK-NEXT:    exit count for range_check_block: ***COULDNOTCOMPUTE***
 ; CHECK-NEXT:    exit count for backedge: ***COULDNOTCOMPUTE***
@@ -233,6 +234,7 @@ define i32 @test_mixup_constant_symbolic(i32 %end, i32 %len) {
 ; CHECK-NEXT:    --> %loop_cond U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:  Determining loop execution counts for: @test_mixup_constant_symbolic
 ; CHECK-NEXT:  Loop %loop: <multiple exits> Unpredictable backedge-taken count.
+; CHECK-NEXT:  backedge-taken count for computable exits is (1000 umin %end)
 ; CHECK-NEXT:    exit count for loop: %end
 ; CHECK-NEXT:    exit count for range_check_block: i32 1000
 ; CHECK-NEXT:    exit count for backedge: ***COULDNOTCOMPUTE***
@@ -282,6 +284,7 @@ define i32 @test_mixup_constant_symbolic_merged(i32 %end, i32 %len) {
 ; CHECK-NEXT:    --> %loop_cond U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:  Determining loop execution counts for: @test_mixup_constant_symbolic_merged
 ; CHECK-NEXT:  Loop %loop: <multiple exits> Unpredictable backedge-taken count.
+; CHECK-NEXT:  backedge-taken count for computable exits is (1000 umin %end)
 ; CHECK-NEXT:    exit count for loop: (1000 umin %end)
 ; CHECK-NEXT:    exit count for backedge: ***COULDNOTCOMPUTE***
 ; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 1000

@@ -7,6 +7,7 @@ define i8 @f() {
 ; CHECK-LABEL: 'f'
 ; CHECK-NEXT:  Determining loop execution counts for: @f
 ; CHECK-NEXT:  Loop %bb: <multiple exits> Unpredictable backedge-taken count.
+; CHECK-NEXT:  backedge-taken count for computable exits is i8 1
 ; CHECK-NEXT:    exit count for bb: ***COULDNOTCOMPUTE***
 ; CHECK-NEXT:    exit count for bb2: i8 1
 ; CHECK-NEXT:  Loop %bb: constant max backedge-taken count is i8 1

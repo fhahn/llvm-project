@@ -24,6 +24,7 @@ define i32 @test_01(i32 %start, ptr %p, ptr %q) {
 ; CHECK-NEXT:    --> {(-1 + (zext i32 %start to i64))<nsw>,+,-1}<nsw><%loop> U: [-4294967296,4294967295) S: [-1,4294967295) Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @test_01
 ; CHECK-NEXT:  Loop %loop: <multiple exits> Unpredictable backedge-taken count.
+; CHECK-NEXT:  backedge-taken count for computable exits is (zext i32 %start to i64)
 ; CHECK-NEXT:    exit count for loop: (zext i32 %start to i64)
 ; CHECK-NEXT:    exit count for backedge: ***COULDNOTCOMPUTE***
 ; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 4294967295

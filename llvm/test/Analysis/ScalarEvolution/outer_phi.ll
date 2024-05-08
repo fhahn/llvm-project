@@ -18,6 +18,7 @@ define i32 @test_01(i32 %a, i32 %b) {
 ; CHECK-NEXT:    --> %outer.loop.cond U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %outer: Variant, %inner: Invariant }
 ; CHECK-NEXT:  Determining loop execution counts for: @test_01
 ; CHECK-NEXT:  Loop %inner: <multiple exits> Unpredictable backedge-taken count.
+; CHECK-NEXT:  backedge-taken count for computable exits is %b
 ; CHECK-NEXT:    exit count for inner: %b
 ; CHECK-NEXT:    exit count for inner.backedge: ***COULDNOTCOMPUTE***
 ; CHECK-NEXT:  Loop %inner: constant max backedge-taken count is i32 2147483647
@@ -80,6 +81,7 @@ define i32 @test_02(i32 %a, i32 %b) {
 ; CHECK-NEXT:    --> %outer.loop.cond U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %outer: Variant, %inner: Invariant }
 ; CHECK-NEXT:  Determining loop execution counts for: @test_02
 ; CHECK-NEXT:  Loop %inner: <multiple exits> Unpredictable backedge-taken count.
+; CHECK-NEXT:  backedge-taken count for computable exits is ((-1 * %outer.iv) + (%b smax %outer.iv))
 ; CHECK-NEXT:    exit count for inner: ((-1 * %outer.iv) + (%b smax %outer.iv))
 ; CHECK-NEXT:    exit count for inner.backedge: ***COULDNOTCOMPUTE***
 ; CHECK-NEXT:  Loop %inner: constant max backedge-taken count is i32 -1

@@ -862,6 +862,9 @@ public:
     /// An expression exactly describing the number of times the backedge has
     /// executed when a loop is exited.
     Exact,
+    /// An expression exactly describing the number of times the backedge has
+    /// executed when a loop is exited *ignoring* uncountable exits.
+    ExactCountable,
     /// A constant which provides an upper bound on the exact trip count.
     ConstantMaximum,
     /// An expression which provides an upper bound on the exact trip count.
@@ -911,6 +914,10 @@ public:
   const SCEV *getSymbolicMaxBackedgeTakenCount(const Loop *L) {
     return getBackedgeTakenCount(L, SymbolicMaximum);
   }
+
+  const SCEV *getBackedgeTakenCountForCountableExits(const Loop *L);
+
+  const SCEV *getPredicatedBackedgeTakenCountForCountableExits(const Loop *L, SmallVector<const SCEVPredicate *, 4> &Predicates);
 
   /// Return true if the backedge taken count is either the value returned by
   /// getConstantMaxBackedgeTakenCount or zero.
@@ -1531,7 +1538,7 @@ private:
     /// If we allowed SCEV predicates to be generated when populating this
     /// vector, this information can contain them and therefore a
     /// SCEVPredicate argument should be added to getExact.
-    const SCEV *getExact(const Loop *L, ScalarEvolution *SE,
+    const SCEV *getExact(const Loop *L, ScalarEvolution *SE, bool SkipUncountable = false,
                          SmallVector<const SCEVPredicate *, 4> *Predicates = nullptr) const;
 
     /// Return the number of times this loop exit may fall through to the back
@@ -1549,11 +1556,11 @@ private:
                                ScalarEvolution *SE) const;
 
     /// Get the symbolic max backedge taken count for the loop.
-    const SCEV *getSymbolicMax(const Loop *L, ScalarEvolution *SE);
+    const SCEV *getSymbolicMax(const Loop *L, ScalarEvolution *SE, SmallVector<const SCEVPredicate *, 4> *Predicates = nullptr);
 
     /// Get the symbolic max backedge taken count for the particular loop exit.
     const SCEV *getSymbolicMax(const BasicBlock *ExitingBlock,
-                               ScalarEvolution *SE) const;
+                               ScalarEvolution *SE, SmallVector<const SCEVPredicate *, 4> *Predicates = nullptr) const;
 
     /// Return true if the number of times this backedge is taken is either the
     /// value returned by getConstantMax or zero.
@@ -1746,7 +1753,7 @@ private:
 
   /// Similar to getBackedgeTakenInfo, but will add predicates as required
   /// with the purpose of returning complete information.
-  const BackedgeTakenInfo &getPredicatedBackedgeTakenInfo(const Loop *L);
+  BackedgeTakenInfo &getPredicatedBackedgeTakenInfo(const Loop *L);
 
   /// Compute the number of times the specified loop will iterate.
   /// If AllowPredicates is set, we will create new SCEV predicates as
@@ -1764,7 +1771,7 @@ private:
   /// Return a symbolic upper bound for the backedge taken count of the loop.
   /// This is more general than getConstantMaxBackedgeTakenCount as it returns
   /// an arbitrary expression as opposed to only constants.
-  const SCEV *computeSymbolicMaxBackedgeTakenCount(const Loop *L);
+  const SCEV *computeSymbolicMaxBackedgeTakenCount(const Loop *L, SmallVector<const SCEVPredicate *, 4> *Predicates = nullptr);
 
   // Helper functions for computeExitLimitFromCond to avoid exponential time
   // complexity.
@@ -2315,6 +2322,8 @@ public:
 
   /// Get the (predicated) backedge count for the analyzed loop.
   const SCEV *getBackedgeTakenCount();
+
+  const SCEV *getBackedgeTakenCountForCountableExits();
 
   /// Adds a new predicate.
   void addPredicate(const SCEVPredicate &Pred);

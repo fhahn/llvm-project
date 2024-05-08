@@ -207,6 +207,7 @@ define void @test_other_exit(i32 %N) mustprogress {
 ; CHECK-LABEL: 'test_other_exit'
 ; CHECK-NEXT:  Determining loop execution counts for: @test_other_exit
 ; CHECK-NEXT:  Loop %for.body: <multiple exits> Unpredictable backedge-taken count.
+; CHECK-NEXT:  backedge-taken count for computable exits is i32 9
 ; CHECK-NEXT:    exit count for for.body: i32 9
 ; CHECK-NEXT:    exit count for for.latch: ***COULDNOTCOMPUTE***
 ; CHECK-NEXT:  Loop %for.body: constant max backedge-taken count is i32 9

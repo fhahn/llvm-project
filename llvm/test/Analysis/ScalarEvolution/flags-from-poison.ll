@@ -529,6 +529,7 @@ define void @test-add-not-header3(ptr %input, i32 %offset, i32 %numIterations,
 ; CHECK-NEXT:    --> %cond U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:  Determining loop execution counts for: @test-add-not-header3
 ; CHECK-NEXT:  Loop %loop: <multiple exits> Unpredictable backedge-taken count.
+; CHECK-NEXT:  backedge-taken count for computable exits is (-1 + %numIterations)
 ; CHECK-NEXT:    exit count for loop: ***COULDNOTCOMPUTE***
 ; CHECK-NEXT:    exit count for loop2: (-1 + %numIterations)
 ; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 -1
@@ -1546,6 +1547,7 @@ define void @test-sext-sub(ptr %input, i32 %sub, i32 %numIterations) {
 ; CHECK-NEXT:    --> {1,+,1}<nuw><%loop> U: [1,0) S: [1,0) Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @test-sext-sub
 ; CHECK-NEXT:  Loop %loop: <multiple exits> Unpredictable backedge-taken count.
+; CHECK-NEXT:  backedge-taken count for computable exits is (-1 + %numIterations)
 ; CHECK-NEXT:    exit count for loop: ***COULDNOTCOMPUTE***
 ; CHECK-NEXT:    exit count for cont: (-1 + %numIterations)
 ; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 -1

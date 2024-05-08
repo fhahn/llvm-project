@@ -28,6 +28,7 @@ define void @test(ptr %arg) {
 ; CHECK-NEXT:    --> %ptr2.next U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop.header: Variant, %loop2.header: Invariant }
 ; CHECK-NEXT:  Determining loop execution counts for: @test
 ; CHECK-NEXT:  Loop %loop2.header: <multiple exits> Unpredictable backedge-taken count.
+; CHECK-NEXT:  backedge-taken count for computable exits is i1 false
 ; CHECK-NEXT:    exit count for loop2.header: ***COULDNOTCOMPUTE***
 ; CHECK-NEXT:    exit count for loop2.latch: i1 false
 ; CHECK-NEXT:  Loop %loop2.header: constant max backedge-taken count is i1 false

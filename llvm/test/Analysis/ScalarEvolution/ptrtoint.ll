@@ -550,6 +550,7 @@ define void @ptrtoint_of_integer(ptr %arg, i64 %arg1, i1 %arg2) local_unnamed_ad
 ; X64-NEXT:    --> {2,+,1}<nw><%bb8> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %bb8: Computable }
 ; X64-NEXT:  Determining loop execution counts for: @ptrtoint_of_integer
 ; X64-NEXT:  Loop %bb8: <multiple exits> Unpredictable backedge-taken count.
+; X64-NEXT:  backedge-taken count for computable exits is (-2 + (-1 * %arg1) + (ptrtoint ptr %arg to i64))
 ; X64-NEXT:    exit count for bb8: ***COULDNOTCOMPUTE***
 ; X64-NEXT:    exit count for bb10: (-2 + (-1 * %arg1) + (ptrtoint ptr %arg to i64))
 ; X64-NEXT:  Loop %bb8: constant max backedge-taken count is i64 -1
@@ -569,6 +570,7 @@ define void @ptrtoint_of_integer(ptr %arg, i64 %arg1, i1 %arg2) local_unnamed_ad
 ; X32-NEXT:    --> {2,+,1}<nw><%bb8> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %bb8: Computable }
 ; X32-NEXT:  Determining loop execution counts for: @ptrtoint_of_integer
 ; X32-NEXT:  Loop %bb8: <multiple exits> Unpredictable backedge-taken count.
+; X32-NEXT:  backedge-taken count for computable exits is (-2 + (zext i32 (ptrtoint ptr %arg to i32) to i64) + (-1 * %arg1))
 ; X32-NEXT:    exit count for bb8: ***COULDNOTCOMPUTE***
 ; X32-NEXT:    exit count for bb10: (-2 + (zext i32 (ptrtoint ptr %arg to i32) to i64) + (-1 * %arg1))
 ; X32-NEXT:  Loop %bb8: constant max backedge-taken count is i64 -1
