@@ -4,6 +4,7 @@
 ; RUN: opt -S < %s -p loop-vectorize -enable-early-exit-vectorization -vectorizer-no-mem-fault \
 ; RUN:    -mattr=+sve -mtriple aarch64-linux-gnu | FileCheck %s --check-prefixes=CHECK,NO_FAULT
 
+declare void @init_mem(ptr, i64);
 
 define i64 @same_exit_block_pre_inc_use1() {
 ; CHECK-LABEL: define i64 @same_exit_block_pre_inc_use1(
@@ -11,6 +12,8 @@ define i64 @same_exit_block_pre_inc_use1() {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[P1:%.*]] = alloca [1024 x i8], align 4
 ; CHECK-NEXT:    [[P2:%.*]] = alloca [1024 x i8], align 4
+; CHECK-NEXT:    call void @init_mem(ptr [[P1]], i64 1024)
+; CHECK-NEXT:    call void @init_mem(ptr [[P2]], i64 1024)
 ; CHECK-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
 ; CHECK-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP2]], 16
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 40, [[TMP3]]
@@ -93,6 +96,8 @@ define i64 @same_exit_block_pre_inc_use1() {
 entry:
   %p1 = alloca [1024 x i8]
   %p2 = alloca [1024 x i8]
+  call void @init_mem(ptr %p1, i64 1024)
+  call void @init_mem(ptr %p2, i64 1024)
   br label %loop
 
 loop:
@@ -121,6 +126,8 @@ define i64 @same_exit_block_pre_inc_use1_gep_two_indices() {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[P1:%.*]] = alloca [1024 x i8], align 4
 ; CHECK-NEXT:    [[P2:%.*]] = alloca [1024 x i8], align 4
+; CHECK-NEXT:    call void @init_mem(ptr [[P1]], i64 1024)
+; CHECK-NEXT:    call void @init_mem(ptr [[P2]], i64 1024)
 ; CHECK-NEXT:    [[TMP0:%.*]] = call i64 @llvm.vscale.i64()
 ; CHECK-NEXT:    [[TMP1:%.*]] = mul i64 [[TMP0]], 16
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 40, [[TMP1]]
@@ -203,6 +210,8 @@ define i64 @same_exit_block_pre_inc_use1_gep_two_indices() {
 entry:
   %p1 = alloca [1024 x i8]
   %p2 = alloca [1024 x i8]
+  call void @init_mem(ptr %p1, i64 1024)
+  call void @init_mem(ptr %p2, i64 1024)
   br label %loop
 
 loop:
@@ -231,6 +240,8 @@ define i64 @same_exit_block_pre_inc_use1_alloca_diff_type() {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[P1:%.*]] = alloca [40 x i32], align 4
 ; CHECK-NEXT:    [[P2:%.*]] = alloca [40 x i32], align 4
+; CHECK-NEXT:    call void @init_mem(ptr [[P1]], i64 1024)
+; CHECK-NEXT:    call void @init_mem(ptr [[P2]], i64 1024)
 ; CHECK-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
 ; CHECK-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP2]], 16
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 40, [[TMP3]]
@@ -313,6 +324,8 @@ define i64 @same_exit_block_pre_inc_use1_alloca_diff_type() {
 entry:
   %p1 = alloca [40 x i32]
   %p2 = alloca [40 x i32]
+  call void @init_mem(ptr %p1, i64 1024)
+  call void @init_mem(ptr %p2, i64 1024)
   br label %loop
 
 loop:
@@ -447,6 +460,8 @@ define i64 @same_exit_block_pre_inc_use2() {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[P1:%.*]] = alloca [1024 x i8], align 4
 ; CHECK-NEXT:    [[P2:%.*]] = alloca [1024 x i8], align 4
+; CHECK-NEXT:    call void @init_mem(ptr [[P1]], i64 1024)
+; CHECK-NEXT:    call void @init_mem(ptr [[P2]], i64 1024)
 ; CHECK-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
 ; CHECK-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP2]], 16
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 40, [[TMP3]]
@@ -528,6 +543,8 @@ define i64 @same_exit_block_pre_inc_use2() {
 entry:
   %p1 = alloca [1024 x i8]
   %p2 = alloca [1024 x i8]
+  call void @init_mem(ptr %p1, i64 1024)
+  call void @init_mem(ptr %p2, i64 1024)
   br label %loop
 
 loop:
@@ -555,6 +572,8 @@ define i64 @same_exit_block_pre_inc_use3() {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[P1:%.*]] = alloca [1024 x i8], align 4
 ; CHECK-NEXT:    [[P2:%.*]] = alloca [1024 x i8], align 4
+; CHECK-NEXT:    call void @init_mem(ptr [[P1]], i64 1024)
+; CHECK-NEXT:    call void @init_mem(ptr [[P2]], i64 1024)
 ; CHECK-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
 ; CHECK-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP2]], 16
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 40, [[TMP3]]
@@ -644,6 +663,8 @@ define i64 @same_exit_block_pre_inc_use3() {
 entry:
   %p1 = alloca [1024 x i8]
   %p2 = alloca [1024 x i8]
+  call void @init_mem(ptr %p1, i64 1024)
+  call void @init_mem(ptr %p2, i64 1024)
   br label %loop
 
 loop:
@@ -673,6 +694,8 @@ define i64 @same_exit_block_pre_inc_use4() {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[P1:%.*]] = alloca [1024 x i64], align 8
 ; CHECK-NEXT:    [[P2:%.*]] = alloca [1024 x i64], align 8
+; CHECK-NEXT:    call void @init_mem(ptr [[P1]], i64 1024)
+; CHECK-NEXT:    call void @init_mem(ptr [[P2]], i64 1024)
 ; CHECK-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
 ; CHECK-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP2]], 2
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 40, [[TMP3]]
@@ -747,6 +770,8 @@ define i64 @same_exit_block_pre_inc_use4() {
 entry:
   %p1 = alloca [1024 x i64]
   %p2 = alloca [1024 x i64]
+  call void @init_mem(ptr %p1, i64 1024)
+  call void @init_mem(ptr %p2, i64 1024)
   br label %loop
 
 loop:
@@ -774,6 +799,8 @@ define i64 @same_exit_block_post_inc_use() {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[P1:%.*]] = alloca [1024 x i8], align 4
 ; CHECK-NEXT:    [[P2:%.*]] = alloca [1024 x i8], align 4
+; CHECK-NEXT:    call void @init_mem(ptr [[P1]], i64 1024)
+; CHECK-NEXT:    call void @init_mem(ptr [[P2]], i64 1024)
 ; CHECK-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
 ; CHECK-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP2]], 16
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 40, [[TMP3]]
@@ -857,6 +884,8 @@ define i64 @same_exit_block_post_inc_use() {
 entry:
   %p1 = alloca [1024 x i8]
   %p2 = alloca [1024 x i8]
+  call void @init_mem(ptr %p1, i64 1024)
+  call void @init_mem(ptr %p2, i64 1024)
   br label %loop
 
 loop:
@@ -884,6 +913,8 @@ define i64 @same_exit_block_post_inc_use2() {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[P1:%.*]] = alloca [1024 x i8], align 4
 ; CHECK-NEXT:    [[P2:%.*]] = alloca [1024 x i8], align 4
+; CHECK-NEXT:    call void @init_mem(ptr [[P1]], i64 1024)
+; CHECK-NEXT:    call void @init_mem(ptr [[P2]], i64 1024)
 ; CHECK-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
 ; CHECK-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP2]], 16
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 40, [[TMP3]]
@@ -970,6 +1001,8 @@ define i64 @same_exit_block_post_inc_use2() {
 entry:
   %p1 = alloca [1024 x i8]
   %p2 = alloca [1024 x i8]
+  call void @init_mem(ptr %p1, i64 1024)
+  call void @init_mem(ptr %p2, i64 1024)
   br label %loop
 
 loop:
@@ -997,6 +1030,8 @@ define i64 @same_exit_block_phi_of_consts() {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[P1:%.*]] = alloca [1024 x i8], align 4
 ; CHECK-NEXT:    [[P2:%.*]] = alloca [1024 x i8], align 4
+; CHECK-NEXT:    call void @init_mem(ptr [[P1]], i64 1024)
+; CHECK-NEXT:    call void @init_mem(ptr [[P2]], i64 1024)
 ; CHECK-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
 ; CHECK-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP2]], 16
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 40, [[TMP3]]
@@ -1055,6 +1090,8 @@ define i64 @same_exit_block_phi_of_consts() {
 entry:
   %p1 = alloca [1024 x i8]
   %p2 = alloca [1024 x i8]
+  call void @init_mem(ptr %p1, i64 1024)
+  call void @init_mem(ptr %p2, i64 1024)
   br label %loop
 
 loop:
@@ -1083,6 +1120,8 @@ define i64 @diff_exit_block_pre_inc_use1() {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[P1:%.*]] = alloca [1024 x i8], align 4
 ; CHECK-NEXT:    [[P2:%.*]] = alloca [1024 x i8], align 4
+; CHECK-NEXT:    call void @init_mem(ptr [[P1]], i64 1024)
+; CHECK-NEXT:    call void @init_mem(ptr [[P2]], i64 1024)
 ; CHECK-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
 ; CHECK-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP2]], 16
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 40, [[TMP3]]
@@ -1168,6 +1207,8 @@ define i64 @diff_exit_block_pre_inc_use1() {
 entry:
   %p1 = alloca [1024 x i8]
   %p2 = alloca [1024 x i8]
+  call void @init_mem(ptr %p1, i64 1024)
+  call void @init_mem(ptr %p2, i64 1024)
   br label %loop
 
 loop:
@@ -1199,6 +1240,8 @@ define i64 @diff_exit_block_pre_inc_use2() {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[P1:%.*]] = alloca [1024 x i8], align 4
 ; CHECK-NEXT:    [[P2:%.*]] = alloca [1024 x i8], align 4
+; CHECK-NEXT:    call void @init_mem(ptr [[P1]], i64 1024)
+; CHECK-NEXT:    call void @init_mem(ptr [[P2]], i64 1024)
 ; CHECK-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
 ; CHECK-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP2]], 16
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 40, [[TMP3]]
@@ -1283,6 +1326,8 @@ define i64 @diff_exit_block_pre_inc_use2() {
 entry:
   %p1 = alloca [1024 x i8]
   %p2 = alloca [1024 x i8]
+  call void @init_mem(ptr %p1, i64 1024)
+  call void @init_mem(ptr %p2, i64 1024)
   br label %loop
 
 loop:
@@ -1314,6 +1359,8 @@ define i64 @diff_exit_block_pre_inc_use3() {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[P1:%.*]] = alloca [1024 x i8], align 4
 ; CHECK-NEXT:    [[P2:%.*]] = alloca [1024 x i8], align 4
+; CHECK-NEXT:    call void @init_mem(ptr [[P1]], i64 1024)
+; CHECK-NEXT:    call void @init_mem(ptr [[P2]], i64 1024)
 ; CHECK-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
 ; CHECK-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP2]], 16
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 40, [[TMP3]]
@@ -1401,6 +1448,8 @@ define i64 @diff_exit_block_pre_inc_use3() {
 entry:
   %p1 = alloca [1024 x i8]
   %p2 = alloca [1024 x i8]
+  call void @init_mem(ptr %p1, i64 1024)
+  call void @init_mem(ptr %p2, i64 1024)
   br label %loop
 
 loop:
@@ -1431,6 +1480,8 @@ define i64 @diff_exit_block_phi_of_consts() {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[P1:%.*]] = alloca [1024 x i8], align 4
 ; CHECK-NEXT:    [[P2:%.*]] = alloca [1024 x i8], align 4
+; CHECK-NEXT:    call void @init_mem(ptr [[P1]], i64 1024)
+; CHECK-NEXT:    call void @init_mem(ptr [[P2]], i64 1024)
 ; CHECK-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
 ; CHECK-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP2]], 16
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 40, [[TMP3]]
@@ -1490,6 +1541,8 @@ define i64 @diff_exit_block_phi_of_consts() {
 entry:
   %p1 = alloca [1024 x i8]
   %p2 = alloca [1024 x i8]
+  call void @init_mem(ptr %p1, i64 1024)
+  call void @init_mem(ptr %p2, i64 1024)
   br label %loop
 
 loop:
@@ -1520,6 +1573,8 @@ define i64 @diff_exit_block_post_inc_use1() {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[P1:%.*]] = alloca [1024 x i8], align 4
 ; CHECK-NEXT:    [[P2:%.*]] = alloca [1024 x i8], align 4
+; CHECK-NEXT:    call void @init_mem(ptr [[P1]], i64 1024)
+; CHECK-NEXT:    call void @init_mem(ptr [[P2]], i64 1024)
 ; CHECK-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
 ; CHECK-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP2]], 16
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 40, [[TMP3]]
@@ -1606,6 +1661,8 @@ define i64 @diff_exit_block_post_inc_use1() {
 entry:
   %p1 = alloca [1024 x i8]
   %p2 = alloca [1024 x i8]
+  call void @init_mem(ptr %p1, i64 1024)
+  call void @init_mem(ptr %p2, i64 1024)
   br label %loop
 
 loop:
@@ -1638,6 +1695,8 @@ define i64 @diff_exit_block_post_inc_use2() {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[P1:%.*]] = alloca [1024 x i8], align 4
 ; CHECK-NEXT:    [[P2:%.*]] = alloca [1024 x i8], align 4
+; CHECK-NEXT:    call void @init_mem(ptr [[P1]], i64 1024)
+; CHECK-NEXT:    call void @init_mem(ptr [[P2]], i64 1024)
 ; CHECK-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
 ; CHECK-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP2]], 16
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 40, [[TMP3]]
@@ -1727,6 +1786,8 @@ define i64 @diff_exit_block_post_inc_use2() {
 entry:
   %p1 = alloca [1024 x i8]
   %p2 = alloca [1024 x i8]
+  call void @init_mem(ptr %p1, i64 1024)
+  call void @init_mem(ptr %p2, i64 1024)
   br label %loop
 
 loop:
@@ -1761,6 +1822,8 @@ define i64 @early_exit_on_last_block() {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[P1:%.*]] = alloca [1024 x i8], align 4
 ; CHECK-NEXT:    [[P2:%.*]] = alloca [1024 x i8], align 4
+; CHECK-NEXT:    call void @init_mem(ptr [[P1]], i64 1024)
+; CHECK-NEXT:    call void @init_mem(ptr [[P2]], i64 1024)
 ; CHECK-NEXT:    br label [[LAND_RHS:%.*]]
 ; CHECK:       loop:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ [[INDEX_NEXT:%.*]], [[SEARCH:%.*]] ], [ 3, [[ENTRY:%.*]] ]
@@ -1781,6 +1844,8 @@ define i64 @early_exit_on_last_block() {
 entry:
   %p1 = alloca [1024 x i8]
   %p2 = alloca [1024 x i8]
+  call void @init_mem(ptr %p1, i64 1024)
+  call void @init_mem(ptr %p2, i64 1024)
   br label %loop
 
 loop:
@@ -1811,6 +1876,8 @@ define i64 @multiple_exits_one_early() {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[P1:%.*]] = alloca [1024 x i8], align 4
 ; CHECK-NEXT:    [[P2:%.*]] = alloca [1024 x i8], align 4
+; CHECK-NEXT:    call void @init_mem(ptr [[P1]], i64 1024)
+; CHECK-NEXT:    call void @init_mem(ptr [[P2]], i64 1024)
 ; CHECK-NEXT:    [[TMP6:%.*]] = call i64 @llvm.vscale.i64()
 ; CHECK-NEXT:    [[TMP7:%.*]] = mul i64 [[TMP6]], 16
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ule i64 62, [[TMP7]]
@@ -1896,6 +1963,8 @@ define i64 @multiple_exits_one_early() {
 entry:
   %p1 = alloca [1024 x i8]
   %p2 = alloca [1024 x i8]
+  call void @init_mem(ptr %p1, i64 1024)
+  call void @init_mem(ptr %p2, i64 1024)
   br label %loop
 
 loop:
@@ -1929,6 +1998,8 @@ define i64 @multiple_early_exits() {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[P1:%.*]] = alloca [1024 x i8], align 4
 ; CHECK-NEXT:    [[P2:%.*]] = alloca [1024 x i8], align 4
+; CHECK-NEXT:    call void @init_mem(ptr [[P1]], i64 1024)
+; CHECK-NEXT:    call void @init_mem(ptr [[P2]], i64 1024)
 ; CHECK-NEXT:    br label [[LAND_RHS:%.*]]
 ; CHECK:       search1:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ [[INDEX_NEXT:%.*]], [[FOR_INC1:%.*]] ], [ 3, [[ENTRY:%.*]] ]
@@ -1952,6 +2023,8 @@ define i64 @multiple_early_exits() {
 entry:
   %p1 = alloca [1024 x i8]
   %p2 = alloca [1024 x i8]
+  call void @init_mem(ptr %p1, i64 1024)
+  call void @init_mem(ptr %p2, i64 1024)
   br label %search1
 
 search1:
@@ -1984,6 +2057,8 @@ define i64 @early_exit_infinite_loop() {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[P1:%.*]] = alloca [1024 x i8], align 4
 ; CHECK-NEXT:    [[P2:%.*]] = alloca [1024 x i8], align 4
+; CHECK-NEXT:    call void @init_mem(ptr [[P1]], i64 1024)
+; CHECK-NEXT:    call void @init_mem(ptr [[P2]], i64 1024)
 ; CHECK-NEXT:    br label [[LAND_RHS:%.*]]
 ; CHECK:       loop:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ [[INDEX_NEXT:%.*]], [[FOR_INC:%.*]] ], [ 3, [[ENTRY:%.*]] ]
@@ -2004,6 +2079,8 @@ define i64 @early_exit_infinite_loop() {
 entry:
   %p1 = alloca [1024 x i8]
   %p2 = alloca [1024 x i8]
+  call void @init_mem(ptr %p1, i64 1024)
+  call void @init_mem(ptr %p2, i64 1024)
   br label %loop
 
 loop:
@@ -2032,6 +2109,8 @@ define i64 @same_exit_block_pre_inc_use_inv_cond(i1 %cond) {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[P1:%.*]] = alloca [1024 x i8], align 4
 ; CHECK-NEXT:    [[P2:%.*]] = alloca [1024 x i8], align 4
+; CHECK-NEXT:    call void @init_mem(ptr [[P1]], i64 1024)
+; CHECK-NEXT:    call void @init_mem(ptr [[P2]], i64 1024)
 ; CHECK-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
 ; CHECK-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP2]], 16
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 40, [[TMP3]]
@@ -2112,6 +2191,8 @@ define i64 @same_exit_block_pre_inc_use_inv_cond(i1 %cond) {
 entry:
   %p1 = alloca [1024 x i8]
   %p2 = alloca [1024 x i8]
+  call void @init_mem(ptr %p1, i64 1024)
+  call void @init_mem(ptr %p2, i64 1024)
   br label %loop
 
 loop:
@@ -2134,12 +2215,140 @@ loop.end:
 }
 
 
+define i64 @same_exit_block_pre_inc_use1_reverse() {
+; CHECK-LABEL: define i64 @same_exit_block_pre_inc_use1_reverse(
+; CHECK-SAME: ) #[[ATTR0]] {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[P1:%.*]] = alloca [1024 x i8], align 4
+; CHECK-NEXT:    [[P2:%.*]] = alloca [1024 x i8], align 4
+; CHECK-NEXT:    call void @init_mem(ptr [[P1]], i64 1024)
+; CHECK-NEXT:    call void @init_mem(ptr [[P2]], i64 1024)
+; CHECK-NEXT:    [[TMP0:%.*]] = call i64 @llvm.vscale.i64()
+; CHECK-NEXT:    [[TMP1:%.*]] = mul i64 [[TMP0]], 16
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 1023, [[TMP1]]
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
+; CHECK:       vector.ph:
+; CHECK-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
+; CHECK-NEXT:    [[TMP3:%.*]] = mul i64 [[TMP2]], 16
+; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i64 1023, [[TMP3]]
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 1023, [[N_MOD_VF]]
+; CHECK-NEXT:    [[IND_END:%.*]] = sub i64 1023, [[N_VEC]]
+; CHECK-NEXT:    [[TMP4:%.*]] = call i64 @llvm.vscale.i64()
+; CHECK-NEXT:    [[TMP5:%.*]] = mul i64 [[TMP4]], 16
+; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
+; CHECK:       vector.body:
+; CHECK-NEXT:    [[INDEX1:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT5:%.*]], [[LOOP_INC4:%.*]] ]
+; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = sub i64 1023, [[INDEX1]]
+; CHECK-NEXT:    [[TMP6:%.*]] = call <vscale x 16 x i64> @llvm.experimental.stepvector.nxv16i64()
+; CHECK-NEXT:    [[DOTSPLATINSERT:%.*]] = insertelement <vscale x 16 x i64> poison, i64 [[OFFSET_IDX]], i64 0
+; CHECK-NEXT:    [[DOTSPLAT:%.*]] = shufflevector <vscale x 16 x i64> [[DOTSPLATINSERT]], <vscale x 16 x i64> poison, <vscale x 16 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP7:%.*]] = add <vscale x 16 x i64> zeroinitializer, [[TMP6]]
+; CHECK-NEXT:    [[TMP8:%.*]] = mul <vscale x 16 x i64> [[TMP7]], shufflevector (<vscale x 16 x i64> insertelement (<vscale x 16 x i64> poison, i64 -1, i64 0), <vscale x 16 x i64> poison, <vscale x 16 x i32> zeroinitializer)
+; CHECK-NEXT:    [[TMP9:%.*]] = add <vscale x 16 x i64> [[DOTSPLAT]], [[TMP8]]
+; CHECK-NEXT:    [[TMP10:%.*]] = add i64 [[OFFSET_IDX]], 0
+; CHECK-NEXT:    [[TMP11:%.*]] = add i64 [[OFFSET_IDX]], -1
+; CHECK-NEXT:    [[TMP12:%.*]] = add i64 [[OFFSET_IDX]], -2
+; CHECK-NEXT:    [[TMP13:%.*]] = add i64 [[OFFSET_IDX]], -3
+; CHECK-NEXT:    [[TMP14:%.*]] = add i64 [[OFFSET_IDX]], -4
+; CHECK-NEXT:    [[TMP15:%.*]] = add i64 [[OFFSET_IDX]], -5
+; CHECK-NEXT:    [[TMP16:%.*]] = add i64 [[OFFSET_IDX]], -6
+; CHECK-NEXT:    [[TMP17:%.*]] = add i64 [[OFFSET_IDX]], -7
+; CHECK-NEXT:    [[TMP18:%.*]] = add i64 [[OFFSET_IDX]], -8
+; CHECK-NEXT:    [[TMP19:%.*]] = add i64 [[OFFSET_IDX]], -9
+; CHECK-NEXT:    [[TMP20:%.*]] = add i64 [[OFFSET_IDX]], -10
+; CHECK-NEXT:    [[TMP21:%.*]] = add i64 [[OFFSET_IDX]], -11
+; CHECK-NEXT:    [[TMP22:%.*]] = add i64 [[OFFSET_IDX]], -12
+; CHECK-NEXT:    [[TMP23:%.*]] = add i64 [[OFFSET_IDX]], -13
+; CHECK-NEXT:    [[TMP24:%.*]] = add i64 [[OFFSET_IDX]], -14
+; CHECK-NEXT:    [[TMP25:%.*]] = add i64 [[OFFSET_IDX]], -15
+; CHECK-NEXT:    [[TMP26:%.*]] = getelementptr inbounds i8, ptr [[P1]], i64 [[TMP10]]
+; CHECK-NEXT:    [[TMP27:%.*]] = call i64 @llvm.vscale.i64()
+; CHECK-NEXT:    [[TMP28:%.*]] = mul i64 [[TMP27]], 16
+; CHECK-NEXT:    [[TMP29:%.*]] = mul i64 0, [[TMP28]]
+; CHECK-NEXT:    [[TMP30:%.*]] = sub i64 1, [[TMP28]]
+; CHECK-NEXT:    [[TMP31:%.*]] = getelementptr inbounds i8, ptr [[TMP26]], i64 [[TMP29]]
+; CHECK-NEXT:    [[TMP32:%.*]] = getelementptr inbounds i8, ptr [[TMP31]], i64 [[TMP30]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <vscale x 16 x i8>, ptr [[TMP32]], align 1
+; CHECK-NEXT:    [[REVERSE:%.*]] = call <vscale x 16 x i8> @llvm.vector.reverse.nxv16i8(<vscale x 16 x i8> [[WIDE_LOAD]])
+; CHECK-NEXT:    [[TMP33:%.*]] = getelementptr inbounds i8, ptr [[P2]], i64 [[TMP10]]
+; CHECK-NEXT:    [[TMP34:%.*]] = call i64 @llvm.vscale.i64()
+; CHECK-NEXT:    [[TMP35:%.*]] = mul i64 [[TMP34]], 16
+; CHECK-NEXT:    [[TMP36:%.*]] = mul i64 0, [[TMP35]]
+; CHECK-NEXT:    [[TMP37:%.*]] = sub i64 1, [[TMP35]]
+; CHECK-NEXT:    [[TMP38:%.*]] = getelementptr inbounds i8, ptr [[TMP33]], i64 [[TMP36]]
+; CHECK-NEXT:    [[TMP39:%.*]] = getelementptr inbounds i8, ptr [[TMP38]], i64 [[TMP37]]
+; CHECK-NEXT:    [[WIDE_LOAD2:%.*]] = load <vscale x 16 x i8>, ptr [[TMP39]], align 1
+; CHECK-NEXT:    [[REVERSE3:%.*]] = call <vscale x 16 x i8> @llvm.vector.reverse.nxv16i8(<vscale x 16 x i8> [[WIDE_LOAD2]])
+; CHECK-NEXT:    [[TMP40:%.*]] = icmp eq <vscale x 16 x i8> [[REVERSE]], [[REVERSE3]]
+; CHECK-NEXT:    [[TMP41:%.*]] = xor <vscale x 16 x i1> [[TMP40]], shufflevector (<vscale x 16 x i1> insertelement (<vscale x 16 x i1> poison, i1 true, i64 0), <vscale x 16 x i1> poison, <vscale x 16 x i32> zeroinitializer)
+; CHECK-NEXT:    [[TMP42:%.*]] = call i1 @llvm.vector.reduce.or.nxv16i1(<vscale x 16 x i1> [[TMP41]])
+; CHECK-NEXT:    br i1 [[TMP42]], label [[VECTOR_EARLY_EXIT:%.*]], label [[LOOP_INC4]]
+; CHECK:       loop.inc4:
+; CHECK-NEXT:    [[INDEX_NEXT5]] = add nuw i64 [[INDEX1]], [[TMP5]]
+; CHECK-NEXT:    [[TMP43:%.*]] = icmp eq i64 [[INDEX_NEXT5]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP43]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP38:![0-9]+]]
+; CHECK:       vector.early.exit:
+; CHECK-NEXT:    [[TMP44:%.*]] = call i64 @llvm.experimental.cttz.elts.i64.nxv16i1(<vscale x 16 x i1> [[TMP41]], i1 true)
+; CHECK-NEXT:    [[TMP45:%.*]] = add i64 [[TMP44]], [[INDEX1]]
+; CHECK-NEXT:    [[IND_EARLY_ESCAPE:%.*]] = sub i64 1023, [[TMP45]]
+; CHECK-NEXT:    br label [[LOOP_END:%.*]]
+; CHECK:       middle.block:
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 1023, [[N_VEC]]
+; CHECK-NEXT:    br i1 [[CMP_N]], label [[LOOP_END]], label [[SCALAR_PH]]
+; CHECK:       scalar.ph:
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[IND_END]], [[MIDDLE_BLOCK]] ], [ 1023, [[ENTRY:%.*]] ]
+; CHECK-NEXT:    br label [[LOOP:%.*]]
+; CHECK:       loop:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ [[INDEX_NEXT:%.*]], [[LOOP_INC:%.*]] ], [ [[BC_RESUME_VAL]], [[SCALAR_PH]] ]
+; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i8, ptr [[P1]], i64 [[INDEX]]
+; CHECK-NEXT:    [[LD1:%.*]] = load i8, ptr [[ARRAYIDX]], align 1
+; CHECK-NEXT:    [[ARRAYIDX1:%.*]] = getelementptr inbounds i8, ptr [[P2]], i64 [[INDEX]]
+; CHECK-NEXT:    [[LD2:%.*]] = load i8, ptr [[ARRAYIDX1]], align 1
+; CHECK-NEXT:    [[CMP3:%.*]] = icmp eq i8 [[LD1]], [[LD2]]
+; CHECK-NEXT:    br i1 [[CMP3]], label [[LOOP_INC]], label [[LOOP_END]]
+; CHECK:       loop.inc:
+; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], -1
+; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp eq i64 [[INDEX_NEXT]], 0
+; CHECK-NEXT:    br i1 [[EXITCOND]], label [[LOOP_END]], label [[LOOP]], !llvm.loop [[LOOP39:![0-9]+]]
+; CHECK:       loop.end:
+; CHECK-NEXT:    [[RETVAL:%.*]] = phi i64 [ [[INDEX]], [[LOOP]] ], [ 1024, [[LOOP_INC]] ], [ [[IND_EARLY_ESCAPE]], [[VECTOR_EARLY_EXIT]] ], [ 1024, [[MIDDLE_BLOCK]] ]
+; CHECK-NEXT:    ret i64 [[RETVAL]]
+;
+entry:
+  %p1 = alloca [1024 x i8]
+  %p2 = alloca [1024 x i8]
+  call void @init_mem(ptr %p1, i64 1024)
+  call void @init_mem(ptr %p2, i64 1024)
+  br label %loop
+
+loop:
+  %index = phi i64 [ %index.next, %loop.inc ], [ 1023, %entry ]
+  %arrayidx = getelementptr inbounds i8, ptr %p1, i64 %index
+  %ld1 = load i8, ptr %arrayidx, align 1
+  %arrayidx1 = getelementptr inbounds i8, ptr %p2, i64 %index
+  %ld2 = load i8, ptr %arrayidx1, align 1
+  %cmp3 = icmp eq i8 %ld1, %ld2
+  br i1 %cmp3, label %loop.inc, label %loop.end
+
+loop.inc:
+  %index.next = add i64 %index, -1
+  %exitcond = icmp eq i64 %index.next, 0
+  br i1 %exitcond, label %loop.end, label %loop
+
+loop.end:
+  %retval = phi i64 [ %index, %loop ], [ 1024, %loop.inc ]
+  ret i64 %retval
+}
+
+
 define i64 @same_exit_block_pre_inc_use1_with_reduction() {
 ; CHECK-LABEL: define i64 @same_exit_block_pre_inc_use1_with_reduction(
 ; CHECK-SAME: ) #[[ATTR0]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[P1:%.*]] = alloca [1024 x i8], align 4
 ; CHECK-NEXT:    [[P2:%.*]] = alloca [1024 x i8], align 4
+; CHECK-NEXT:    call void @init_mem(ptr [[P1]], i64 1024)
+; CHECK-NEXT:    call void @init_mem(ptr [[P2]], i64 1024)
 ; CHECK-NEXT:    br label [[LAND_RHS:%.*]]
 ; CHECK:       loop:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ [[INDEX_NEXT:%.*]], [[FOR_INC:%.*]] ], [ 3, [[ENTRY:%.*]] ]
@@ -2165,6 +2374,8 @@ define i64 @same_exit_block_pre_inc_use1_with_reduction() {
 entry:
   %p1 = alloca [1024 x i8]
   %p2 = alloca [1024 x i8]
+  call void @init_mem(ptr %p1, i64 1024)
+  call void @init_mem(ptr %p2, i64 1024)
   br label %loop
 
 loop:
@@ -2197,6 +2408,8 @@ define i64 @same_exit_block_pre_inc_use1_too_small_allocas() {
 ; MAY_FAULT-NEXT:  entry:
 ; MAY_FAULT-NEXT:    [[P1:%.*]] = alloca [42 x i8], align 4
 ; MAY_FAULT-NEXT:    [[P2:%.*]] = alloca [42 x i8], align 4
+; MAY_FAULT-NEXT:    call void @init_mem(ptr [[P1]], i64 1024)
+; MAY_FAULT-NEXT:    call void @init_mem(ptr [[P2]], i64 1024)
 ; MAY_FAULT-NEXT:    br label [[LAND_RHS:%.*]]
 ; MAY_FAULT:       loop:
 ; MAY_FAULT-NEXT:    [[INDEX:%.*]] = phi i64 [ [[INDEX_NEXT:%.*]], [[FOR_INC:%.*]] ], [ 3, [[ENTRY:%.*]] ]
@@ -2219,6 +2432,8 @@ define i64 @same_exit_block_pre_inc_use1_too_small_allocas() {
 ; NO_FAULT-NEXT:  entry:
 ; NO_FAULT-NEXT:    [[P1:%.*]] = alloca [42 x i8], align 4
 ; NO_FAULT-NEXT:    [[P2:%.*]] = alloca [42 x i8], align 4
+; NO_FAULT-NEXT:    call void @init_mem(ptr [[P1]], i64 1024)
+; NO_FAULT-NEXT:    call void @init_mem(ptr [[P2]], i64 1024)
 ; NO_FAULT-NEXT:    [[TMP1:%.*]] = call i64 @llvm.vscale.i64()
 ; NO_FAULT-NEXT:    [[TMP2:%.*]] = mul i64 [[TMP1]], 16
 ; NO_FAULT-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 40, [[TMP2]]
@@ -2270,7 +2485,7 @@ define i64 @same_exit_block_pre_inc_use1_too_small_allocas() {
 ; NO_FAULT:       loop.inc3:
 ; NO_FAULT-NEXT:    [[INDEX_NEXT4]] = add nuw i64 [[INDEX1]], [[TMP6]]
 ; NO_FAULT-NEXT:    [[TMP34:%.*]] = icmp eq i64 [[INDEX_NEXT4]], [[N_VEC]]
-; NO_FAULT-NEXT:    br i1 [[TMP34]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP38:![0-9]+]]
+; NO_FAULT-NEXT:    br i1 [[TMP34]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP40:![0-9]+]]
 ; NO_FAULT:       vector.early.exit:
 ; NO_FAULT-NEXT:    [[TMP35:%.*]] = call i64 @llvm.experimental.cttz.elts.i64.nxv16i1(<vscale x 16 x i1> [[TMP32]], i1 true)
 ; NO_FAULT-NEXT:    [[TMP36:%.*]] = add i64 [[TMP35]], [[INDEX1]]
@@ -2293,7 +2508,7 @@ define i64 @same_exit_block_pre_inc_use1_too_small_allocas() {
 ; NO_FAULT:       loop.inc:
 ; NO_FAULT-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 1
 ; NO_FAULT-NEXT:    [[EXITCOND:%.*]] = icmp ne i64 [[INDEX_NEXT]], 43
-; NO_FAULT-NEXT:    br i1 [[EXITCOND]], label [[LAND_RHS]], label [[FOR_END_LOOPEXIT]], !llvm.loop [[LOOP39:![0-9]+]]
+; NO_FAULT-NEXT:    br i1 [[EXITCOND]], label [[LAND_RHS]], label [[FOR_END_LOOPEXIT]], !llvm.loop [[LOOP41:![0-9]+]]
 ; NO_FAULT:       loop.end:
 ; NO_FAULT-NEXT:    [[START_0_LCSSA:%.*]] = phi i64 [ [[INDEX]], [[LAND_RHS]] ], [ 43, [[FOR_INC]] ], [ [[IND_EARLY_ESCAPE]], [[VECTOR_EARLY_EXIT]] ], [ 43, [[MIDDLE_BLOCK]] ]
 ; NO_FAULT-NEXT:    ret i64 [[START_0_LCSSA]]
@@ -2301,6 +2516,8 @@ define i64 @same_exit_block_pre_inc_use1_too_small_allocas() {
 entry:
   %p1 = alloca [42 x i8]
   %p2 = alloca [42 x i8]
+  call void @init_mem(ptr %p1, i64 1024)
+  call void @init_mem(ptr %p2, i64 1024)
   br label %loop
 
 loop:
@@ -2398,7 +2615,7 @@ define i64 @same_exit_block_pre_inc_use1_too_small_deref_ptrs(ptr dereferenceabl
 ; NO_FAULT:       loop.inc3:
 ; NO_FAULT-NEXT:    [[INDEX_NEXT4]] = add nuw i64 [[INDEX1]], [[TMP6]]
 ; NO_FAULT-NEXT:    [[TMP34:%.*]] = icmp eq i64 [[INDEX_NEXT4]], [[N_VEC]]
-; NO_FAULT-NEXT:    br i1 [[TMP34]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP40:![0-9]+]]
+; NO_FAULT-NEXT:    br i1 [[TMP34]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP42:![0-9]+]]
 ; NO_FAULT:       vector.early.exit:
 ; NO_FAULT-NEXT:    [[TMP35:%.*]] = call i64 @llvm.experimental.cttz.elts.i64.nxv16i1(<vscale x 16 x i1> [[TMP32]], i1 true)
 ; NO_FAULT-NEXT:    [[TMP36:%.*]] = add i64 [[TMP35]], [[INDEX1]]
@@ -2421,7 +2638,7 @@ define i64 @same_exit_block_pre_inc_use1_too_small_deref_ptrs(ptr dereferenceabl
 ; NO_FAULT:       loop.inc:
 ; NO_FAULT-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 1
 ; NO_FAULT-NEXT:    [[EXITCOND:%.*]] = icmp ne i64 [[INDEX_NEXT]], 43
-; NO_FAULT-NEXT:    br i1 [[EXITCOND]], label [[LAND_RHS]], label [[FOR_END_LOOPEXIT]], !llvm.loop [[LOOP41:![0-9]+]]
+; NO_FAULT-NEXT:    br i1 [[EXITCOND]], label [[LAND_RHS]], label [[FOR_END_LOOPEXIT]], !llvm.loop [[LOOP43:![0-9]+]]
 ; NO_FAULT:       loop.end:
 ; NO_FAULT-NEXT:    [[START_0_LCSSA:%.*]] = phi i64 [ [[INDEX]], [[LAND_RHS]] ], [ 43, [[FOR_INC]] ], [ [[IND_EARLY_ESCAPE]], [[VECTOR_EARLY_EXIT]] ], [ 43, [[MIDDLE_BLOCK]] ]
 ; NO_FAULT-NEXT:    ret i64 [[START_0_LCSSA]]
@@ -2524,7 +2741,7 @@ define i64 @same_exit_block_pre_inc_use1_unknown_ptrs(ptr %p1, ptr %p2) {
 ; NO_FAULT:       loop.inc3:
 ; NO_FAULT-NEXT:    [[INDEX_NEXT4]] = add nuw i64 [[INDEX1]], [[TMP6]]
 ; NO_FAULT-NEXT:    [[TMP34:%.*]] = icmp eq i64 [[INDEX_NEXT4]], [[N_VEC]]
-; NO_FAULT-NEXT:    br i1 [[TMP34]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP42:![0-9]+]]
+; NO_FAULT-NEXT:    br i1 [[TMP34]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP44:![0-9]+]]
 ; NO_FAULT:       vector.early.exit:
 ; NO_FAULT-NEXT:    [[TMP35:%.*]] = call i64 @llvm.experimental.cttz.elts.i64.nxv16i1(<vscale x 16 x i1> [[TMP32]], i1 true)
 ; NO_FAULT-NEXT:    [[TMP36:%.*]] = add i64 [[TMP35]], [[INDEX1]]
@@ -2547,7 +2764,7 @@ define i64 @same_exit_block_pre_inc_use1_unknown_ptrs(ptr %p1, ptr %p2) {
 ; NO_FAULT:       loop.inc:
 ; NO_FAULT-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 1
 ; NO_FAULT-NEXT:    [[EXITCOND:%.*]] = icmp ne i64 [[INDEX_NEXT]], 43
-; NO_FAULT-NEXT:    br i1 [[EXITCOND]], label [[LAND_RHS]], label [[FOR_END_LOOPEXIT]], !llvm.loop [[LOOP43:![0-9]+]]
+; NO_FAULT-NEXT:    br i1 [[EXITCOND]], label [[LAND_RHS]], label [[FOR_END_LOOPEXIT]], !llvm.loop [[LOOP45:![0-9]+]]
 ; NO_FAULT:       loop.end:
 ; NO_FAULT-NEXT:    [[START_0_LCSSA:%.*]] = phi i64 [ [[INDEX]], [[LAND_RHS]] ], [ 43, [[FOR_INC]] ], [ [[IND_EARLY_ESCAPE]], [[VECTOR_EARLY_EXIT]] ], [ 43, [[MIDDLE_BLOCK]] ]
 ; NO_FAULT-NEXT:    ret i64 [[START_0_LCSSA]]
@@ -2612,6 +2829,8 @@ loop.end:
 ; MAY_FAULT: [[LOOP35]] = distinct !{[[LOOP35]], [[META2]], [[META1]]}
 ; MAY_FAULT: [[LOOP36]] = distinct !{[[LOOP36]], [[META1]], [[META2]]}
 ; MAY_FAULT: [[LOOP37]] = distinct !{[[LOOP37]], [[META2]], [[META1]]}
+; MAY_FAULT: [[LOOP38]] = distinct !{[[LOOP38]], [[META1]], [[META2]]}
+; MAY_FAULT: [[LOOP39]] = distinct !{[[LOOP39]], [[META2]], [[META1]]}
 ;.
 ; NO_FAULT: [[LOOP0]] = distinct !{[[LOOP0]], [[META1:![0-9]+]], [[META2:![0-9]+]]}
 ; NO_FAULT: [[META1]] = !{!"llvm.loop.isvectorized", i32 1}
@@ -2657,4 +2876,6 @@ loop.end:
 ; NO_FAULT: [[LOOP41]] = distinct !{[[LOOP41]], [[META2]], [[META1]]}
 ; NO_FAULT: [[LOOP42]] = distinct !{[[LOOP42]], [[META1]], [[META2]]}
 ; NO_FAULT: [[LOOP43]] = distinct !{[[LOOP43]], [[META2]], [[META1]]}
+; NO_FAULT: [[LOOP44]] = distinct !{[[LOOP44]], [[META1]], [[META2]]}
+; NO_FAULT: [[LOOP45]] = distinct !{[[LOOP45]], [[META2]], [[META1]]}
 ;.
