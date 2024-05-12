@@ -60,7 +60,7 @@ define void @ptrtoaddr_of_gep(ptr %in, ptr %out0) {
 ; CHECK-LABEL: 'ptrtoaddr_of_gep'
 ; CHECK-NEXT:  Classifying expressions for: @ptrtoaddr_of_gep
 ; CHECK-NEXT:    %in_adj = getelementptr inbounds i8, ptr %in, i64 42
-; CHECK-NEXT:    --> (42 + %in) U: full-set S: full-set
+; CHECK-NEXT:    --> (42 + %in)(u nuw) U: full-set S: full-set
 ; CHECK-NEXT:    %p0 = ptrtoaddr ptr %in_adj to i64
 ; CHECK-NEXT:    --> (42 + (ptrtoaddr ptr %in to i64)) U: full-set S: full-set
 ; CHECK-NEXT:  Determining loop execution counts for: @ptrtoaddr_of_gep
@@ -107,7 +107,7 @@ define void @ptrtoaddr_unstable_gep(ptr addrspace(2) %in, ptr %out) {
 ; CHECK-LABEL: 'ptrtoaddr_unstable_gep'
 ; CHECK-NEXT:  Classifying expressions for: @ptrtoaddr_unstable_gep
 ; CHECK-NEXT:    %gep = getelementptr inbounds i8, ptr addrspace(2) %in, i64 42
-; CHECK-NEXT:    --> (42 + %in) U: full-set S: full-set
+; CHECK-NEXT:    --> (42 + %in)(u nuw) U: full-set S: full-set
 ; CHECK-NEXT:    %p = ptrtoaddr ptr addrspace(2) %gep to i64
 ; CHECK-NEXT:    --> %p U: full-set S: full-set
 ; CHECK-NEXT:  Determining loop execution counts for: @ptrtoaddr_unstable_gep
@@ -148,7 +148,7 @@ define void @ptrtoaddr_nonintegral_stable_gep(ptr addrspace(3) %in, ptr %out) {
 ; CHECK-LABEL: 'ptrtoaddr_nonintegral_stable_gep'
 ; CHECK-NEXT:  Classifying expressions for: @ptrtoaddr_nonintegral_stable_gep
 ; CHECK-NEXT:    %gep = getelementptr inbounds i8, ptr addrspace(3) %in, i64 42
-; CHECK-NEXT:    --> (42 + %in) U: full-set S: full-set
+; CHECK-NEXT:    --> (42 + %in)(u nuw) U: full-set S: full-set
 ; CHECK-NEXT:    %p = ptrtoaddr ptr addrspace(3) %gep to i64
 ; CHECK-NEXT:    --> (42 + (ptrtoaddr ptr addrspace(3) %in to i64)) U: full-set S: full-set
 ; CHECK-NEXT:  Determining loop execution counts for: @ptrtoaddr_nonintegral_stable_gep
