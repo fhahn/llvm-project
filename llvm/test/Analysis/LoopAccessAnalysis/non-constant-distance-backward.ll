@@ -27,10 +27,10 @@ define void @backward_min_distance_8(ptr %A, i64 %N) {
 ; COMMON-NEXT:          %gep = getelementptr inbounds i8, ptr %A, i64 %iv
 ; COMMON-NEXT:      Grouped accesses:
 ; COMMON-NEXT:        Group GRP0:
-; COMMON-NEXT:          (Low: {(1 + %A)<nuw>,+,1}<nuw><%outer.header> High: {(257 + %A),+,1}<nw><%outer.header>)
+; COMMON-NEXT:          (Low: {(1 + %A)<nuw>,+,1}<nuw><%outer.header> High: {(257 + %A),+,1}<nw><%outer.header>(u nuw))
 ; COMMON-NEXT:            Member: {{\{\{}}(1 + %A)<nuw>,+,1}<nuw><%outer.header>,+,1}<nuw><%loop>
 ; COMMON-NEXT:        Group GRP1:
-; COMMON-NEXT:          (Low: %A High: (256 + %A))
+; COMMON-NEXT:          (Low: %A High: (256 + %A)(u nuw))
 ; COMMON-NEXT:            Member: {%A,+,1}<nuw><%loop>
 ; COMMON-EMPTY:
 ; COMMON-NEXT:      Non vectorizable stores to invariant address were not found in loop.
@@ -115,10 +115,10 @@ define void @backward_min_distance_120(ptr %A, i64 %N) {
 ; VW128-NEXT:          %gep = getelementptr inbounds i8, ptr %A, i64 %iv
 ; VW128-NEXT:      Grouped accesses:
 ; VW128-NEXT:        Group GRP0:
-; VW128-NEXT:          (Low: {(15 + %A)<nuw>,+,1}<nuw><%outer.header> High: {(271 + %A),+,1}<nw><%outer.header>)
+; VW128-NEXT:          (Low: {(15 + %A)<nuw>,+,1}<nuw><%outer.header> High: {(271 + %A),+,1}<nw><%outer.header>(u nuw))
 ; VW128-NEXT:            Member: {{\{\{}}(15 + %A)<nuw>,+,1}<nuw><%outer.header>,+,1}<nuw><%loop>
 ; VW128-NEXT:        Group GRP1:
-; VW128-NEXT:          (Low: %A High: (256 + %A))
+; VW128-NEXT:          (Low: %A High: (256 + %A)(u nuw))
 ; VW128-NEXT:            Member: {%A,+,1}<nuw><%loop>
 ; VW128-EMPTY:
 ; VW128-NEXT:      Non vectorizable stores to invariant address were not found in loop.
@@ -148,10 +148,10 @@ define void @backward_min_distance_120(ptr %A, i64 %N) {
 ; MAXLEN-NEXT:          %gep = getelementptr inbounds i8, ptr %A, i64 %iv
 ; MAXLEN-NEXT:      Grouped accesses:
 ; MAXLEN-NEXT:        Group GRP0:
-; MAXLEN-NEXT:          (Low: {(15 + %A)<nuw>,+,1}<nuw><%outer.header> High: {(271 + %A),+,1}<nw><%outer.header>)
+; MAXLEN-NEXT:          (Low: {(15 + %A)<nuw>,+,1}<nuw><%outer.header> High: {(271 + %A),+,1}<nw><%outer.header>(u nuw))
 ; MAXLEN-NEXT:            Member: {{\{\{}}(15 + %A)<nuw>,+,1}<nuw><%outer.header>,+,1}<nuw><%loop>
 ; MAXLEN-NEXT:        Group GRP1:
-; MAXLEN-NEXT:          (Low: %A High: (256 + %A))
+; MAXLEN-NEXT:          (Low: %A High: (256 + %A)(u nuw))
 ; MAXLEN-NEXT:            Member: {%A,+,1}<nuw><%loop>
 ; MAXLEN-EMPTY:
 ; MAXLEN-NEXT:      Non vectorizable stores to invariant address were not found in loop.
@@ -236,10 +236,10 @@ define void @backward_min_distance_128(ptr %A, i64 %N) {
 ; VW128-NEXT:          %gep = getelementptr inbounds i8, ptr %A, i64 %iv
 ; VW128-NEXT:      Grouped accesses:
 ; VW128-NEXT:        Group GRP0:
-; VW128-NEXT:          (Low: {(16 + %A)<nuw>,+,1}<nuw><%outer.header> High: {(272 + %A),+,1}<nw><%outer.header>)
+; VW128-NEXT:          (Low: {(16 + %A)<nuw>,+,1}<nuw><%outer.header> High: {(272 + %A),+,1}<nw><%outer.header>(u nuw))
 ; VW128-NEXT:            Member: {{\{\{}}(16 + %A)<nuw>,+,1}<nuw><%outer.header>,+,1}<nuw><%loop>
 ; VW128-NEXT:        Group GRP1:
-; VW128-NEXT:          (Low: %A High: (256 + %A))
+; VW128-NEXT:          (Low: %A High: (256 + %A)(u nuw))
 ; VW128-NEXT:            Member: {%A,+,1}<nuw><%loop>
 ; VW128-EMPTY:
 ; VW128-NEXT:      Non vectorizable stores to invariant address were not found in loop.
@@ -269,10 +269,10 @@ define void @backward_min_distance_128(ptr %A, i64 %N) {
 ; MAXLEN-NEXT:          %gep = getelementptr inbounds i8, ptr %A, i64 %iv
 ; MAXLEN-NEXT:      Grouped accesses:
 ; MAXLEN-NEXT:        Group GRP0:
-; MAXLEN-NEXT:          (Low: {(16 + %A)<nuw>,+,1}<nuw><%outer.header> High: {(272 + %A),+,1}<nw><%outer.header>)
+; MAXLEN-NEXT:          (Low: {(16 + %A)<nuw>,+,1}<nuw><%outer.header> High: {(272 + %A),+,1}<nw><%outer.header>(u nuw))
 ; MAXLEN-NEXT:            Member: {{\{\{}}(16 + %A)<nuw>,+,1}<nuw><%outer.header>,+,1}<nuw><%loop>
 ; MAXLEN-NEXT:        Group GRP1:
-; MAXLEN-NEXT:          (Low: %A High: (256 + %A))
+; MAXLEN-NEXT:          (Low: %A High: (256 + %A)(u nuw))
 ; MAXLEN-NEXT:            Member: {%A,+,1}<nuw><%loop>
 ; MAXLEN-EMPTY:
 ; MAXLEN-NEXT:      Non vectorizable stores to invariant address were not found in loop.
@@ -383,10 +383,10 @@ define void @backward_min_distance_256(ptr %A, i64 %N) {
 ; MAXLEN-NEXT:          %gep = getelementptr inbounds i8, ptr %A, i64 %iv
 ; MAXLEN-NEXT:      Grouped accesses:
 ; MAXLEN-NEXT:        Group GRP0:
-; MAXLEN-NEXT:          (Low: {(32 + %A)<nuw>,+,1}<nuw><%outer.header> High: {(288 + %A),+,1}<nw><%outer.header>)
+; MAXLEN-NEXT:          (Low: {(32 + %A)<nuw>,+,1}<nuw><%outer.header> High: {(288 + %A),+,1}<nw><%outer.header>(u nuw))
 ; MAXLEN-NEXT:            Member: {{\{\{}}(32 + %A)<nuw>,+,1}<nuw><%outer.header>,+,1}<nuw><%loop>
 ; MAXLEN-NEXT:        Group GRP1:
-; MAXLEN-NEXT:          (Low: %A High: (256 + %A))
+; MAXLEN-NEXT:          (Low: %A High: (256 + %A)(u nuw))
 ; MAXLEN-NEXT:            Member: {%A,+,1}<nuw><%loop>
 ; MAXLEN-EMPTY:
 ; MAXLEN-NEXT:      Non vectorizable stores to invariant address were not found in loop.

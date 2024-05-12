@@ -35,21 +35,10 @@ exit:
 define i32 @may_overlap_true_dep_different_size(ptr %d) {
 ; CHECK-LABEL: 'may_overlap_true_dep_different_size'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Report: cannot check memory dependencies at runtime
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:      Run-time memory checks:
-; CHECK-NEXT:      Check 0:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.128.iv = getelementptr i64, ptr %gep.128, i64 %iv
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %gep.iv = getelementptr i32, ptr %d, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
-; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: (127 + %d) High: (383 + %d))
-; CHECK-NEXT:            Member: {(127 + %d),+,8}<nw><%loop>
-; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %d High: (128 + %d))
-; CHECK-NEXT:            Member: {%d,+,4}<nw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
@@ -109,21 +98,10 @@ exit:
 define void @may_overlap_stores_with_different_sizes(ptr %dst) {
 ; CHECK-LABEL: 'may_overlap_stores_with_different_sizes'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Report: cannot check memory dependencies at runtime
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:      Run-time memory checks:
-; CHECK-NEXT:      Check 0:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.iv = getelementptr i16, ptr %dst, i64 %iv
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %gep.dst.128.iv = getelementptr i8, ptr %gep.dst.128, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
-; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %dst High: (130 + %dst))
-; CHECK-NEXT:            Member: {%dst,+,2}<nw><%loop>
-; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: (128 + %dst)<nuw> High: (193 + %dst))
-; CHECK-NEXT:            Member: {(128 + %dst)<nuw>,+,1}<nw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:

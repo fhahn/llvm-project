@@ -44,13 +44,13 @@ define void @Test(ptr nocapture %obj, i64 %z) #0 {
 ; CHECK-NEXT:          %1 = getelementptr inbounds %struct.s, ptr %obj, i64 0, i32 1, i64 %i
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: {(256 + %obj)<nuw>,+,128}<nuw><%.outer.preheader> High: {(256 + (4 * %z) + %obj),+,128}<nw><%.outer.preheader>)
+; CHECK-NEXT:          (Low: {(256 + %obj)<nuw>,+,128}<nuw><%.outer.preheader> High: {(256 + (4 * %z) + %obj),+,128}<nw><%.outer.preheader>(u nuw))
 ; CHECK-NEXT:            Member: {{\{\{}}(256 + %obj)<nuw>,+,128}<nuw><%.outer.preheader>,+,4}<nuw><%.inner>
 ; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %obj High: ((4 * %z) + %obj))
+; CHECK-NEXT:          (Low: %obj High: ((4 * %z) + %obj)(u nuw))
 ; CHECK-NEXT:            Member: {%obj,+,4}<nuw><%.inner>
 ; CHECK-NEXT:        Group GRP2:
-; CHECK-NEXT:          (Low: {(128 + %obj)<nuw>,+,4}<nuw><%.outer.preheader> High: {(132 + %obj),+,4}<nw><%.outer.preheader>)
+; CHECK-NEXT:          (Low: {(128 + %obj)<nuw>,+,4}<nuw><%.outer.preheader> High: {(132 + %obj),+,4}<nw><%.outer.preheader>(u nuw))
 ; CHECK-NEXT:            Member: {(128 + %obj)<nuw>,+,4}<nuw><%.outer.preheader>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.

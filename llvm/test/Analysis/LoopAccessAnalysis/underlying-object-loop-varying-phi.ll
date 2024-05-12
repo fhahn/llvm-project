@@ -81,7 +81,7 @@ define void @indirect_ptr_recurrences_read_write_may_alias_no_tbaa(ptr %A, ptr %
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: (8 + %B)<nuw> High: (40 + %B))
+; CHECK-NEXT:          (Low: (8 + %B)<nuw> High: (40 + %B)(u nuw))
 ; CHECK-NEXT:            Member: {(8 + %B)<nuw>,+,8}<nuw><%loop>
 ; CHECK-NEXT:      Generated run-time checks are incomplete
 ; CHECK-EMPTY:
@@ -122,10 +122,10 @@ define void @indirect_ptr_recurrences_read_write_may_alias_different_obj(ptr %A,
 ; CHECK-NEXT:          %gep.B = getelementptr inbounds ptr, ptr %B, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: (8 + %C)<nuw> High: (36 + %C))
+; CHECK-NEXT:          (Low: (8 + %C)<nuw> High: (36 + %C)(u nuw))
 ; CHECK-NEXT:            Member: {(8 + %C)<nuw>,+,8}<nuw><%loop>
 ; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: (8 + %B)<nuw> High: (40 + %B))
+; CHECK-NEXT:          (Low: (8 + %B)<nuw> High: (40 + %B)(u nuw))
 ; CHECK-NEXT:            Member: {(8 + %B)<nuw>,+,8}<nuw><%loop>
 ; CHECK-NEXT:      Generated run-time checks are incomplete
 ; CHECK-EMPTY:

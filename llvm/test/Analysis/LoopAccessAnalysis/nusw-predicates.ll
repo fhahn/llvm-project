@@ -16,10 +16,10 @@ define void @int_and_pointer_predicate(ptr %v, i32 %N) {
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %v High: (2 + %v))
+; CHECK-NEXT:          (Low: %v High: (2 + %v)(u nuw))
 ; CHECK-NEXT:            Member: %v
 ; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %v High: (6 + (4 * (trunc i32 %N to i16)) + %v))
+; CHECK-NEXT:          (Low: %v High: (6 + (4 * (trunc i32 %N to i16)) + %v)(u nuw))
 ; CHECK-NEXT:            Member: {%v,+,4}<%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
@@ -84,16 +84,16 @@ define void @int_and_multiple_pointer_predicates(ptr %v, ptr %w, i32 %N) {
 ; CHECK-NEXT:          %gep.w = getelementptr { i16, i16 }, ptr %w, i16 %iv.i16
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %v High: (2 + %v))
+; CHECK-NEXT:          (Low: %v High: (2 + %v)(u nuw))
 ; CHECK-NEXT:            Member: %v
 ; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %v High: (6 + (4 * (trunc i32 %N to i16)) + %v))
+; CHECK-NEXT:          (Low: %v High: (6 + (4 * (trunc i32 %N to i16)) + %v)(u nuw))
 ; CHECK-NEXT:            Member: {%v,+,4}<%loop>
 ; CHECK-NEXT:        Group GRP2:
-; CHECK-NEXT:          (Low: %w High: (2 + %w))
+; CHECK-NEXT:          (Low: %w High: (2 + %w)(u nuw))
 ; CHECK-NEXT:            Member: %w
 ; CHECK-NEXT:        Group GRP3:
-; CHECK-NEXT:          (Low: %w High: (6 + (4 * (trunc i32 %N to i16)) + %w))
+; CHECK-NEXT:          (Low: %w High: (6 + (4 * (trunc i32 %N to i16)) + %w)(u nuw))
 ; CHECK-NEXT:            Member: {%w,+,4}<%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
