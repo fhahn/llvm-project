@@ -2858,6 +2858,8 @@ const SCEV *ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
         break;
       // If we have an add, expand the add operands onto the end of the operands
       // list.
+      // CommonFlags = maskFlags(CommonFlags, setFlags(Add->getNoWrapFlags(),
+      // static_cast<SCEV::NoWrapFlags>(Ops[Idx].getInt())));
       Ops.erase(Ops.begin()+Idx);
       append_range(Ops, Add->operands());
       DeletedAdd = true;
@@ -3910,8 +3912,9 @@ const SCEV *ScalarEvolution::getAddRecExpr(SmallVectorImpl<SCEVUse> &Operands,
   return getOrCreateAddRecExpr(Operands, L, Flags);
 }
 
-const SCEV *ScalarEvolution::getGEPExpr(GEPOperator *GEP,
-                                        ArrayRef<SCEVUse> IndexExprs) {
+SCEVUse ScalarEvolution::getGEPExpr(GEPOperator *GEP,
+                                    ArrayRef<SCEVUse> IndexExprs,
+                                    bool UseCtx) {
   const SCEV *BaseExpr = getSCEV(GEP->getPointerOperand());
   // getSCEV(Base)->getType() has the same address space as Base->getType()
   // because SCEV::getType() preserves the address space.
@@ -3927,12 +3930,14 @@ const SCEV *ScalarEvolution::getGEPExpr(GEPOperator *GEP,
       NW = GEPNoWrapFlags::none();
   }
 
-  return getGEPExpr(BaseExpr, IndexExprs, GEP->getSourceElementType(), NW);
+  return getGEPExpr(BaseExpr, IndexExprs, GEP->getSourceElementType(), NW,
+                    UseCtx, GEP->isInBounds());
 }
 
-const SCEV *ScalarEvolution::getGEPExpr(SCEVUse BaseExpr,
-                                        ArrayRef<SCEVUse> IndexExprs,
-                                        Type *SrcElementTy, GEPNoWrapFlags NW) {
+SCEVUse ScalarEvolution::getGEPExpr(SCEVUse BaseExpr,
+                                    ArrayRef<SCEVUse> IndexExprs,
+                                    Type *SrcElementTy, GEPNoWrapFlags NW,
+                                    bool UseCtx, bool IsInBounds) {
   SCEV::NoWrapFlags OffsetWrap = SCEV::FlagAnyWrap;
   if (NW.hasNoUnsignedSignedWrap())
     OffsetWrap = setFlags(OffsetWrap, SCEV::FlagNSW);
@@ -3990,6 +3995,9 @@ const SCEV *ScalarEvolution::getGEPExpr(SCEVUse BaseExpr,
   auto *GEPExpr = getAddExpr(BaseExpr, Offset, BaseWrap);
   assert(BaseExpr->getType() == GEPExpr->getType() &&
          "GEP should not change type mid-flight.");
+  if (UseCtx && BaseWrap != SCEV::FlagNUW && IsInBounds &&
+      isKnownNonNegative(Offset))
+    return SCEVUse(&*GEPExpr, 2);
   return GEPExpr;
 }
 
@@ -4741,12 +4749,24 @@ void ScalarEvolution::insertValueToMap(Value *V, const SCEV *S) {
 
 /// Return an existing SCEV if it exists, otherwise analyze the expression and
 /// create a new one.
-const SCEV *ScalarEvolution::getSCEV(Value *V) {
+SCEVUse ScalarEvolution::getSCEV(Value *V, bool UseCtx) {
   assert(isSCEVable(V->getType()) && "Value is not SCEVable!");
 
-  if (const SCEV *S = getExistingSCEV(V))
+  if (!getExistingSCEV(V))
+    createSCEVIter(V);
+  const SCEV *S = getExistingSCEV(V);
+  if (!UseCtx)
     return S;
-  return createSCEVIter(V);
+  // If use-context flags are requested and V is a GEP, recompute via
+  // getGEPExpr with UseCtx=true to obtain use-specific no-wrap flags. The
+  // sub-SCEVs are already cached so this is cheap.
+  auto *GEP = dyn_cast<GEPOperator>(V);
+  if (!GEP)
+    return S;
+  SmallVector<SCEVUse, 4> IndexExprs;
+  for (Value *Index : GEP->indices())
+    IndexExprs.push_back(getSCEV(Index));
+  return getGEPExpr(GEP, IndexExprs, /*UseCtx=*/true);
 }
 
 const SCEV *ScalarEvolution::getExistingSCEV(Value *V) {
@@ -6432,9 +6452,9 @@ createNodeForSelectViaUMinSeq(ScalarEvolution *SE, Value *Cond, Value *TrueVal,
   if (!isa<ConstantInt>(TrueVal) && !isa<ConstantInt>(FalseVal))
     return std::nullopt;
 
-  const auto *SECond = SE->getSCEV(Cond);
-  const auto *SETrue = SE->getSCEV(TrueVal);
-  const auto *SEFalse = SE->getSCEV(FalseVal);
+  SCEVUse SECond = SE->getSCEV(Cond);
+  SCEVUse SETrue = SE->getSCEV(TrueVal);
+  SCEVUse SEFalse = SE->getSCEV(FalseVal);
   return createNodeForSelectViaUMinSeq(SE, SECond, SETrue, SEFalse);
 }
 
@@ -9292,7 +9312,7 @@ ScalarEvolution::ExitLimit ScalarEvolution::computeExitLimitFromCondImpl(
     NWR.getEquivalentICmp(Pred, NewRHSC, Offset);
     if (!ExitIfTrue)
       Pred = ICmpInst::getInversePredicate(Pred);
-    auto *LHS = getSCEV(WO->getLHS());
+    SCEVUse LHS = getSCEV(WO->getLHS());
     if (Offset != 0)
       LHS = getAddExpr(LHS, getConstant(Offset));
     auto EL = computeExitLimitFromICmp(L, Pred, LHS, getConstant(NewRHSC),
@@ -12750,7 +12770,7 @@ bool ScalarEvolution::isImpliedCondOperandsViaShift(CmpPredicate Pred,
   using namespace PatternMatch;
   if (match(SUFoundRHS->getValue(),
             m_LShr(m_Value(Shiftee), m_Value(ShiftValue)))) {
-    auto *ShifteeS = getSCEV(Shiftee);
+    SCEVUse ShifteeS = getSCEV(Shiftee);
     // Prove one of the following:
     // LHS <u (shiftee >> shiftvalue) && shiftee <=u RHS ---> LHS <u RHS
     // LHS <=u (shiftee >> shiftvalue) && shiftee <=u RHS ---> LHS <=u RHS
@@ -14244,8 +14264,8 @@ void ScalarEvolution::print(raw_ostream &OS) const {
       if (isSCEVable(I.getType()) && !isa<CmpInst>(I)) {
         OS << I << '\n';
         OS << "  -->  ";
-        const SCEV *SV = SE.getSCEV(&I);
-        SV->print(OS);
+        SCEVUse SV = SE.getSCEV(&I, /*UseCtx=*/true);
+        SV.print(OS);
         if (!isa<SCEVCouldNotCompute>(SV)) {
           OS << " U: ";
           SE.getUnsignedRange(SV).print(OS);
@@ -15590,7 +15610,7 @@ void PredicatedScalarEvolution::print(raw_ostream &OS, unsigned Depth) const {
       if (!SE.isSCEVable(I.getType()))
         continue;
 
-      auto *Expr = SE.getSCEV(&I);
+      SCEVUse Expr = SE.getSCEV(&I);
       auto II = RewriteMap.find(Expr);
 
       if (II == RewriteMap.end())
@@ -16073,8 +16093,8 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
       if (auto *Cmp = dyn_cast<ICmpInst>(Cond)) {
         auto Predicate =
             EnterIfTrue ? Cmp->getPredicate() : Cmp->getInversePredicate();
-        const auto *LHS = SE.getSCEV(Cmp->getOperand(0));
-        const auto *RHS = SE.getSCEV(Cmp->getOperand(1));
+        SCEVUse LHS = SE.getSCEV(Cmp->getOperand(0));
+        SCEVUse RHS = SE.getSCEV(Cmp->getOperand(1));
         // If LHS is a constant, apply information to the other expression.
         // TODO: If LHS is not a constant, check if using CompareSCEVComplexity
         // can improve results.

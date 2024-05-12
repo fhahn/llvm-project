@@ -660,7 +660,7 @@ public:
 
   /// Return a SCEV expression for the full generality of the specified
   /// expression.
-  LLVM_ABI const SCEV *getSCEV(Value *V);
+  LLVM_ABI SCEVUse getSCEV(Value *V, bool UseCtx = false);
 
   /// Return an existing SCEV for V if there is one, otherwise return nullptr.
   LLVM_ABI const SCEV *getExistingSCEV(Value *V);
@@ -745,12 +745,13 @@ public:
   /// \p GEP The GEP. The indices contained in the GEP itself are ignored,
   /// instead we use IndexExprs.
   /// \p IndexExprs The expressions for the indices.
-  LLVM_ABI const SCEV *getGEPExpr(GEPOperator *GEP,
-                                  ArrayRef<SCEVUse> IndexExprs);
-  LLVM_ABI const SCEV *getGEPExpr(SCEVUse BaseExpr,
-                                  ArrayRef<SCEVUse> IndexExprs,
-                                  Type *SrcElementTy,
-                                  GEPNoWrapFlags NW = GEPNoWrapFlags::none());
+  LLVM_ABI SCEVUse getGEPExpr(GEPOperator *GEP,
+                              ArrayRef<SCEVUse> IndexExprs,
+                              bool UseCtx = false);
+  LLVM_ABI SCEVUse getGEPExpr(SCEVUse BaseExpr, ArrayRef<SCEVUse> IndexExprs,
+                              Type *SrcElementTy,
+                              GEPNoWrapFlags NW = GEPNoWrapFlags::none(),
+                              bool UseCtx = false, bool IsInBounds = false);
   LLVM_ABI const SCEV *getAbsExpr(const SCEV *Op, bool IsNSW);
   LLVM_ABI const SCEV *getMinMaxExpr(SCEVTypes Kind,
                                      SmallVectorImpl<SCEVUse> &Operands);

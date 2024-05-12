@@ -1273,7 +1273,7 @@ Value *SCEVExpander::tryToReuseLCSSAPhi(const SCEVAddRecExpr *S) {
   for (auto &PN : EB->phis()) {
     if (!SE.isSCEVable(PN.getType()))
       continue;
-    auto *ExitSCEV = SE.getSCEV(&PN);
+    SCEVUse ExitSCEV = SE.getSCEV(&PN);
     if (!isa<SCEVAddRecExpr>(ExitSCEV))
       continue;
     Type *PhiTy = PN.getType();

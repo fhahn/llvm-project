@@ -1426,7 +1426,7 @@ define void @ptr_induction_early_exit_eq_1_with_align_on_load(ptr %a, ptr %b, pt
 ; CHECK-NEXT:    %ld1 = load ptr, ptr %ptr.iv, align 8
 ; CHECK-NEXT:    --> %ld1 U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:    %ptr.iv.next = getelementptr inbounds i8, ptr %ptr.iv, i64 8
-; CHECK-NEXT:    --> {(8 + %a_),+,8}<nw><%loop> U: [0,-7) S: [-9223372036854775808,9223372036854775801) Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(8 + %a_),+,8}<nw><%loop>(u nuw) U: [0,-7) S: [-9223372036854775808,9223372036854775801) Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @ptr_induction_early_exit_eq_1_with_align_on_load
 ; CHECK-NEXT:  Loop %loop: <multiple exits> Unpredictable backedge-taken count.
 ; CHECK-NEXT:    exit count for loop: ***COULDNOTCOMPUTE***
@@ -1465,7 +1465,7 @@ define void @ptr_induction_early_exit_eq_1_with_align_on_arguments(ptr align 8 %
 ; CHECK-NEXT:    %ld1 = load ptr, ptr %ptr.iv, align 8
 ; CHECK-NEXT:    --> %ld1 U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:    %ptr.iv.next = getelementptr inbounds i8, ptr %ptr.iv, i64 8
-; CHECK-NEXT:    --> {(8 + %a),+,8}<nw><%loop> U: [0,-7) S: [-9223372036854775808,9223372036854775801) Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(8 + %a),+,8}<nw><%loop>(u nuw) U: [0,-7) S: [-9223372036854775808,9223372036854775801) Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @ptr_induction_early_exit_eq_1_with_align_on_arguments
 ; CHECK-NEXT:  Loop %loop: <multiple exits> Unpredictable backedge-taken count.
 ; CHECK-NEXT:    exit count for loop: ***COULDNOTCOMPUTE***
@@ -1506,7 +1506,7 @@ define void @ptr_induction_early_exit_eq_1_align_assumption_1(ptr %a, ptr %b, pt
 ; CHECK-NEXT:    %ld1 = load ptr, ptr %ptr.iv, align 8
 ; CHECK-NEXT:    --> %ld1 U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:    %ptr.iv.next = getelementptr inbounds i8, ptr %ptr.iv, i64 8
-; CHECK-NEXT:    --> {(8 + %a_),+,8}<nw><%loop> U: [0,-7) S: [-9223372036854775808,9223372036854775801) Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(8 + %a_),+,8}<nw><%loop>(u nuw) U: [0,-7) S: [-9223372036854775808,9223372036854775801) Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @ptr_induction_early_exit_eq_1_align_assumption_1
 ; CHECK-NEXT:  Loop %loop: <multiple exits> Unpredictable backedge-taken count.
 ; CHECK-NEXT:    exit count for loop: ***COULDNOTCOMPUTE***
@@ -1551,7 +1551,7 @@ define void @ptr_induction_early_exit_eq_1_align_assumption_2(ptr %a, ptr %b, pt
 ; CHECK-NEXT:    %ld1 = load ptr, ptr %ptr.iv, align 8
 ; CHECK-NEXT:    --> %ld1 U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:    %ptr.iv.next = getelementptr inbounds i8, ptr %ptr.iv, i64 8
-; CHECK-NEXT:    --> {(8 + %a_),+,8}<nw><%loop> U: [0,-7) S: [-9223372036854775808,9223372036854775801) Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(8 + %a_),+,8}<nw><%loop>(u nuw) U: [0,-7) S: [-9223372036854775808,9223372036854775801) Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @ptr_induction_early_exit_eq_1_align_assumption_2
 ; CHECK-NEXT:  Loop %loop: <multiple exits> Unpredictable backedge-taken count.
 ; CHECK-NEXT:    exit count for loop: ***COULDNOTCOMPUTE***
@@ -1594,7 +1594,7 @@ define void @ptr_induction_early_exit_eq_2(ptr %a, i64 %n, ptr %c) {
 ; CHECK-NEXT:    %ld1 = load ptr, ptr %ptr.iv, align 8
 ; CHECK-NEXT:    --> %ld1 U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:    %ptr.iv.next = getelementptr inbounds i8, ptr %ptr.iv, i64 8
-; CHECK-NEXT:    --> {(8 + %a),+,8}<nw><%loop> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(8 + %a),+,8}<nw><%loop>(u nuw) U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @ptr_induction_early_exit_eq_2
 ; CHECK-NEXT:  Loop %loop: <multiple exits> Unpredictable backedge-taken count.
 ; CHECK-NEXT:    exit count for loop: ***COULDNOTCOMPUTE***

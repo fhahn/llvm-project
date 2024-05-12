@@ -88,13 +88,6 @@ LLVM_ABI bool isDereferenceableAndAlignedInLoop(
     AssumptionCache *AC = nullptr,
     SmallVectorImpl<const SCEVPredicate *> *Predicates = nullptr);
 
-/// Overload for isDereferenceableAndAlignedInLoop taking the pointer and access
-/// size directly as SCEVs.
-LLVM_ABI bool isDereferenceableAndAlignedInLoop(
-    const SCEV *PtrSCEV, Align Alignment, const SCEV *EltSizeSCEV, Loop *L,
-    ScalarEvolution &SE, DominatorTree &DT, AssumptionCache *AC = nullptr,
-    SmallVectorImpl<const SCEVPredicate *> *Predicates = nullptr);
-
 /// Returns true if the loop contains read-only memory accesses and doesn't
 /// throw. Puts loads that may fault into \p NonDereferenceableAndAlignedLoads.
 LLVM_ABI bool

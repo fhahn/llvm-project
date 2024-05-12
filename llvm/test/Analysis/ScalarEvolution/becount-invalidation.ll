@@ -21,7 +21,7 @@ define void @test(ptr %arg) {
 ; CHECK-NEXT:    %val = load i64, ptr %ptr1.dummy, align 8
 ; CHECK-NEXT:    --> %val U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop2.header: Variant, %loop.header: Variant }
 ; CHECK-NEXT:    %ptr1.next.next = getelementptr inbounds i64, ptr %ptr1.next, i64 1
-; CHECK-NEXT:    --> {(8 + %ptr2),+,8}<nw><%loop2.header> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop2.header: Computable, %loop.header: Variant }
+; CHECK-NEXT:    --> {(8 + %ptr2),+,8}<nw><%loop2.header>(u nuw) U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop2.header: Computable, %loop.header: Variant }
 ; CHECK-NEXT:    %iv.next = add i64 %iv, 1
 ; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop2.header> U: [1,2) S: [1,2) Exits: <<Unknown>> LoopDispositions: { %loop2.header: Computable, %loop.header: Variant }
 ; CHECK-NEXT:    %ptr2.next = phi ptr [ %ptr1, %if ], [ %arg, %else ]

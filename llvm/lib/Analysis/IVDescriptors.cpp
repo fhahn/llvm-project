@@ -393,9 +393,9 @@ static RecurrenceDescriptor getMinMaxRecurrence(PHINode *Phi, Loop *TheLoop,
 
   // Validate all stores go to same invariant address and are in the same block.
   StoreInst *IntermediateStore = nullptr;
-  const SCEV *StorePtrSCEV = nullptr;
+  SCEVUse StorePtrSCEV = nullptr;
   for (StoreInst *SI : Stores) {
-    const SCEV *Ptr = SE->getSCEV(SI->getPointerOperand());
+    SCEVUse Ptr = SE->getSCEV(SI->getPointerOperand());
     if (!SE->isLoopInvariant(Ptr, TheLoop) ||
         (StorePtrSCEV && StorePtrSCEV != Ptr))
       return {};
@@ -557,10 +557,10 @@ bool RecurrenceDescriptor::AddReductionVar(
         return false;
       }
 
-      const SCEV *PtrScev = SE->getSCEV(SI->getPointerOperand());
+      SCEVUse PtrScev = SE->getSCEV(SI->getPointerOperand());
       // Check it is the same address as previous stores
       if (IntermediateStore) {
-        const SCEV *OtherScev =
+        SCEVUse OtherScev =
             SE->getSCEV(IntermediateStore->getPointerOperand());
 
         if (OtherScev != PtrScev) {
@@ -1572,7 +1572,7 @@ bool InductionDescriptor::isInductionPHI(PHINode *Phi, const Loop *TheLoop,
   if (PhiTy->isFloatingPointTy())
     return isFPInductionPHI(Phi, TheLoop, PSE.getSE(), D);
 
-  const SCEV *PhiScev = PSE.getSCEV(Phi);
+  SCEVUse PhiScev = PSE.getSCEV(Phi);
   const auto *AR = dyn_cast<SCEVAddRecExpr>(PhiScev);
 
   // We need this expression to be an AddRecExpr.
@@ -1610,7 +1610,7 @@ bool InductionDescriptor::isInductionPHI(
     return false;
 
   // Check that the PHI is consecutive.
-  const SCEV *PhiScev = Expr ? Expr : SE->getSCEV(Phi);
+  SCEVUse PhiScev = Expr ? SCEVUse(Expr) : SE->getSCEV(Phi);
   const SCEV *Step;
 
   // FIXME: We are currently matching the specific loop TheLoop; if it doesn't
