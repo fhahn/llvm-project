@@ -42,21 +42,10 @@ exit:
 define void @test_distance_positive_backwards(ptr %A) {
 ; CHECK-LABEL: 'test_distance_positive_backwards'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Report: cannot check memory dependencies at runtime
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:      Run-time memory checks:
-; CHECK-NEXT:      Check 0:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.A.400 = getelementptr inbounds i32, ptr %A.1, i64 %iv
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %gep.A = getelementptr inbounds i8, ptr %A, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
-; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: (1 + %A)<nuw> High: (405 + %A))
-; CHECK-NEXT:            Member: {(1 + %A)<nuw>,+,4}<nuw><%loop>
-; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %A High: (101 + %A))
-; CHECK-NEXT:            Member: {%A,+,1}<nuw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
@@ -95,10 +84,10 @@ define void @test_distance_positive_via_assume(ptr %A, i64 %off) {
 ; CHECK-NEXT:          %gep.A = getelementptr inbounds i8, ptr %A, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: (%off + %A) High: (404 + %off + %A))
+; CHECK-NEXT:          (Low: (%off + %A) High: (404 + %off + %A)(u nuw))
 ; CHECK-NEXT:            Member: {(%off + %A),+,4}<nw><%loop>
 ; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %A High: (101 + %A))
+; CHECK-NEXT:          (Low: %A High: (101 + %A)(u nuw))
 ; CHECK-NEXT:            Member: {%A,+,1}<nuw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.

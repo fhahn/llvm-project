@@ -31,14 +31,14 @@ define void @rtchecks_needed(ptr %a, ptr %b, ptr %c) {
 ; CHECK-NEXT:          %arrayidxC = getelementptr inbounds i16, ptr %c, i64 %storemerge3
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %a High: (42 + %a))
+; CHECK-NEXT:          (Low: %a High: (42 + %a)(u nuw))
 ; CHECK-NEXT:            Member: {%a,+,2}<nuw><%for.body>
 ; CHECK-NEXT:            Member: {(2 + %a),+,2}<nw><%for.body>
 ; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %b High: (40 + %b))
+; CHECK-NEXT:          (Low: %b High: (40 + %b)(u nuw))
 ; CHECK-NEXT:            Member: {%b,+,2}<nuw><%for.body>
 ; CHECK-NEXT:        Group GRP2:
-; CHECK-NEXT:          (Low: %c High: (40 + %c))
+; CHECK-NEXT:          (Low: %c High: (40 + %c)(u nuw))
 ; CHECK-NEXT:            Member: {%c,+,2}<nuw><%for.body>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.

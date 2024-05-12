@@ -20,10 +20,10 @@ define void @pointer_after_object_does_not_wrap(i32 %y, ptr %s, ptr %p) {
 ; CHECK-NEXT:          %gep1.iv = getelementptr inbounds i8, ptr %s, i32 %iv
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: (%y + %p) High: (2147483647 + %p))
+; CHECK-NEXT:          (Low: (%y + %p) High: (2147483647 + %p)(u nuw))
 ; CHECK-NEXT:            Member: {(%y + %p),+,1}<nw><%loop>
 ; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: (%y + %s) High: (2147483647 + %s))
+; CHECK-NEXT:          (Low: (%y + %s) High: (2147483647 + %s)(u nuw))
 ; CHECK-NEXT:            Member: {(%y + %s),+,1}<nw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
@@ -63,10 +63,10 @@ define void @pointer_after_object_would_wrap(i32 %y, ptr %s, ptr %p) {
 ; CHECK-NEXT:          %gep1.iv = getelementptr inbounds i8, ptr %s, i32 %iv
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: (%y + %p) High: (-2147483648 + %p))
+; CHECK-NEXT:          (Low: (%y + %p) High: (-2147483648 + %p)(u nuw))
 ; CHECK-NEXT:            Member: {(%y + %p),+,1}<nw><%loop>
 ; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: (%y + %s) High: (-2147483648 + %s))
+; CHECK-NEXT:          (Low: (%y + %s) High: (-2147483648 + %s)(u nuw))
 ; CHECK-NEXT:            Member: {(%y + %s),+,1}<nw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.

@@ -20,7 +20,7 @@ define void @test_inbounds_gep_used_in_predicated_block(ptr %A, i64 %n) {
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %A High: (-4611686018427387705 + %A))
+; CHECK-NEXT:          (Low: %A High: (-4611686018427387705 + %A)(u nuw))
 ; CHECK-NEXT:            Member: {%A,+,4611686018427387906}<%loop.header>
 ; CHECK-NEXT:            Member: {%A,+,4611686018427387905}<%loop.header>
 ; CHECK-EMPTY:
@@ -69,7 +69,7 @@ define void @test_inbounds_gep_used_in_predicated_block_stored_value_operand(ptr
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %A High: (-4611686018427387705 + %A))
+; CHECK-NEXT:          (Low: %A High: (-4611686018427387705 + %A)(u nuw))
 ; CHECK-NEXT:            Member: {%A,+,4611686018427387906}<%loop.header>
 ; CHECK-NEXT:            Member: {%A,+,4611686018427387905}<%loop.header>
 ; CHECK-EMPTY:
@@ -120,7 +120,7 @@ define void @test_inbounds_gep_used_in_predicated_block_non_memop_user(ptr %A, i
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %A High: (-4611686018427387705 + %A))
+; CHECK-NEXT:          (Low: %A High: (-4611686018427387705 + %A)(u nuw))
 ; CHECK-NEXT:            Member: {%A,+,4611686018427387906}<%loop.header>
 ; CHECK-NEXT:            Member: {%A,+,4611686018427387905}<%loop.header>
 ; CHECK-EMPTY:
@@ -168,8 +168,8 @@ exit:
 define i32 @test_nusw_gep_with_load_user_outside_loop(ptr %A) {
 ; CHECK-LABEL: 'test_nusw_gep_with_load_user_outside_loop'
 ; CHECK-NEXT:    loop.header:
-; CHECK-NEXT:      Report: unsafe dependent memory operations in loop.
-; CHECK-NEXT:      Unknown data dependence.
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unknown data dependence.
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:        Unknown:
 ; CHECK-NEXT:            store i32 0, ptr %A, align 4 ->
@@ -178,7 +178,7 @@ define i32 @test_nusw_gep_with_load_user_outside_loop(ptr %A) {
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: (-392 + %A) High: (8 + %A))
+; CHECK-NEXT:          (Low: (-392 + %A) High: (8 + %A)(u nuw))
 ; CHECK-NEXT:            Member: {(4 + %A),+,-4}<%loop.header>
 ; CHECK-NEXT:            Member: %A
 ; CHECK-EMPTY:
@@ -187,7 +187,7 @@ define i32 @test_nusw_gep_with_load_user_outside_loop(ptr %A) {
 ; CHECK-NEXT:      {true,+,true}<%loop.header> Added Flags: <nusw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Expressions re-written:
-; CHECK-NEXT:      [PSE]  %gep = getelementptr nusw i32, ptr %A, i64 %and:
+; CHECK-NEXT:      [PSE] %gep = getelementptr nusw i32, ptr %A, i64 %and:
 ; CHECK-NEXT:        ((4 * (zext i1 {true,+,true}<%loop.header> to i64))<nuw><nsw> + %A)
 ; CHECK-NEXT:        --> {(4 + %A),+,-4}<%loop.header>
 ;
@@ -231,10 +231,10 @@ define void @test_header_existing(ptr %src, ptr %dst, i64 %start) {
 ; CHECK-NEXT:          %gep.src = getelementptr nusw { i8, i8, i32 }, ptr %src, i64 %iv.next
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %dst High: (1 + %dst))
+; CHECK-NEXT:          (Low: %dst High: (1 + %dst)(u nuw))
 ; CHECK-NEXT:            Member: %dst
 ; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: (8 + (8 * %start) + %src) High: (809 + %src))
+; CHECK-NEXT:          (Low: (8 + (8 * %start) + %src) High: (809 + %src)(u nuw))
 ; CHECK-NEXT:            Member: {(8 + (8 * %start) + %src),+,8}<%loop.header>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.

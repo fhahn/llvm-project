@@ -319,11 +319,11 @@ static bool evaluatePtrAddRecAtMaxBTCWillNotWrap(
          SE.isKnownPredicate(CmpInst::ICMP_ULE, StartOffset, DerefBytesSCEV);
 }
 
-std::pair<const SCEV *, const SCEV *> llvm::getStartAndEndForAccess(
+std::pair<SCEVUse, SCEVUse> llvm::getStartAndEndForAccess(
     const Loop *Lp, const SCEV *PtrExpr, Type *AccessTy, const SCEV *BTC,
     const SCEV *MaxBTC, ScalarEvolution *SE,
     DenseMap<std::pair<const SCEV *, const SCEV *>,
-             std::pair<const SCEV *, const SCEV *>> *PointerBounds,
+             std::pair<SCEVUse, SCEVUse>> *PointerBounds,
     DominatorTree *DT, AssumptionCache *AC,
     std::optional<ScalarEvolution::LoopGuards> &LoopGuards) {
   auto &DL = Lp->getHeader()->getDataLayout();
@@ -335,14 +335,14 @@ std::pair<const SCEV *, const SCEV *> llvm::getStartAndEndForAccess(
                                  PointerBounds, DT, AC, LoopGuards);
 }
 
-std::pair<const SCEV *, const SCEV *> llvm::getStartAndEndForAccess(
+std::pair<SCEVUse, SCEVUse> llvm::getStartAndEndForAccess(
     const Loop *Lp, const SCEV *PtrExpr, const SCEV *EltSizeSCEV,
     const SCEV *BTC, const SCEV *MaxBTC, ScalarEvolution *SE,
     DenseMap<std::pair<const SCEV *, const SCEV *>,
-             std::pair<const SCEV *, const SCEV *>> *PointerBounds,
+             std::pair<SCEVUse, SCEVUse>> *PointerBounds,
     DominatorTree *DT, AssumptionCache *AC,
     std::optional<ScalarEvolution::LoopGuards> &LoopGuards) {
-  std::pair<const SCEV *, const SCEV *> *PtrBoundsPair;
+  std::pair<SCEVUse, SCEVUse> *PtrBoundsPair;
   if (PointerBounds) {
     auto [Iter, Ins] = PointerBounds->insert(
         {{PtrExpr, EltSizeSCEV},
@@ -352,8 +352,8 @@ std::pair<const SCEV *, const SCEV *> llvm::getStartAndEndForAccess(
     PtrBoundsPair = &Iter->second;
   }
 
-  const SCEV *ScStart;
-  const SCEV *ScEnd;
+  SCEVUse ScStart;
+  SCEVUse ScEnd;
 
   auto &DL = Lp->getHeader()->getDataLayout();
   if (SE->isLoopInvariant(PtrExpr, Lp)) {
@@ -406,9 +406,12 @@ std::pair<const SCEV *, const SCEV *> llvm::getStartAndEndForAccess(
   assert(SE->isLoopInvariant(ScEnd, Lp) && "ScEnd needs to be invariant");
 
   // Add the size of the pointed element to ScEnd.
-  ScEnd = SE->getAddExpr(ScEnd, EltSizeSCEV);
+  // TODO: this computes one-past-the-end. ScEnd + EltSizeSCEV - 1 is the last
+  // accessed byte. Not entirely sure if one-past-the-end must also not wrap? If
+  // it does, could compute and use last accessed byte instead.
+  ScEnd = SCEVUse(SE->getAddExpr(ScEnd.getPointer(), EltSizeSCEV), 2);
 
-  std::pair<const SCEV *, const SCEV *> Res = {ScStart, ScEnd};
+  std::pair<SCEVUse, SCEVUse> Res = {ScStart, ScEnd};
   if (PointerBounds)
     *PtrBoundsPair = Res;
   return Res;
@@ -429,8 +432,8 @@ void RuntimePointerChecking::insert(Loop *Lp, Value *Ptr, const SCEV *PtrExpr,
   assert(!isa<SCEVCouldNotCompute>(ScStart) &&
          !isa<SCEVCouldNotCompute>(ScEnd) &&
          "must be able to compute both start and end expressions");
-  Pointers.emplace_back(Ptr, ScStart, ScEnd, WritePtr, DepSetId, ASId, PtrExpr,
-                        NeedsFreeze);
+  Pointers.emplace_back(Ptr, ScStart, ScEnd, WritePtr, DepSetId,
+                        ASId, PtrExpr, NeedsFreeze);
 }
 
 bool RuntimePointerChecking::tryToCreateDiffCheck(
@@ -545,6 +548,11 @@ SmallVector<RuntimePointerCheck, 4> RuntimePointerChecking::generateChecks() {
       if (needsChecking(CGI, CGJ)) {
         CanUseDiffCheck = CanUseDiffCheck && tryToCreateDiffCheck(CGI, CGJ);
         Checks.emplace_back(&CGI, &CGJ);
+        if (SE->isKnownPredicate(CmpInst::ICMP_UGT, CGI.High, CGJ.Low) &&
+            SE->isKnownPredicate(CmpInst::ICMP_ULE, CGI.Low, CGJ.High)) {
+          AlwaysFalse = true;
+          return {};
+        }
       }
     }
   }
@@ -585,8 +593,8 @@ bool RuntimeCheckingPtrGroup::addPointer(
       RtCheck.Pointers[Index].NeedsFreeze, *RtCheck.SE);
 }
 
-bool RuntimeCheckingPtrGroup::addPointer(unsigned Index, const SCEV *Start,
-                                         const SCEV *End, unsigned AS,
+bool RuntimeCheckingPtrGroup::addPointer(unsigned Index, SCEVUse Start,
+                                         SCEVUse End, unsigned AS,
                                          bool NeedsFreeze,
                                          ScalarEvolution &SE) {
   assert(AddressSpace == AS &&
@@ -595,11 +603,11 @@ bool RuntimeCheckingPtrGroup::addPointer(unsigned Index, const SCEV *Start,
   // Compare the starts and ends with the known minimum and maximum
   // of this set. We need to know how we compare against the min/max
   // of the set in order to be able to emit memchecks.
-  const SCEV *Min0 = getMinFromExprs(Start, Low, &SE);
+  const SCEV *Min0 = getMinFromExprs(Start, Low.getPointer(), &SE);
   if (!Min0)
     return false;
 
-  const SCEV *Min1 = getMinFromExprs(End, High, &SE);
+  const SCEV *Min1 = getMinFromExprs(End.getPointer(), High.getPointer(), &SE);
   if (!Min1)
     return false;
 
@@ -608,7 +616,7 @@ bool RuntimeCheckingPtrGroup::addPointer(unsigned Index, const SCEV *Start,
     Low = Start;
 
   // Update the high bound expression if we've found a new max value.
-  if (Min1 != End)
+  if (Min1 != End.getPointer())
     High = End;
 
   Members.push_back(Index);
@@ -797,7 +805,7 @@ void RuntimePointerChecking::print(raw_ostream &OS, unsigned Depth) const {
   auto PtrIndices = getPtrToIdxMap(CheckingGroups);
   for (const auto &CG : CheckingGroups) {
     OS.indent(Depth + 2) << "Group GRP" << PtrIndices.at(&CG) << ":\n";
-    OS.indent(Depth + 4) << "(Low: " << *CG.Low << " High: " << *CG.High
+    OS.indent(Depth + 4) << "(Low: " << CG.Low << " High: " << CG.High
                          << ")\n";
     for (unsigned Member : CG.Members) {
       OS.indent(Depth + 6) << "Member: " << *Pointers[Member].Expr << "\n";
@@ -1510,6 +1518,7 @@ bool AccessAnalysis::canCheckPtrAtRT(
   // If we can do run-time checks, but there are no checks, no runtime checks
   // are needed. This can happen when all pointers point to the same underlying
   // object for example.
+  CanDoRT &= !RtCheck.AlwaysFalse;
   RtCheck.Need = CanDoRT ? RtCheck.getNumberOfChecks() != 0 : MayNeedRTCheck;
 
   bool CanDoRTIfNeeded = !RtCheck.Need || CanDoRT;
