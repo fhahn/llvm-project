@@ -302,13 +302,13 @@ bool llvm::isDereferenceableAndAlignedInLoop(
         Ptr, LI->getAlign(), EltSize, DL, &*L->getHeader()->getFirstNonPHIIt(),
         AC, &DT);
 
-  const SCEV *EltSizeSCEV = SE.getConstant(EltSize);
-  return isDereferenceableAndAlignedInLoop(PtrSCEV, LI->getAlign(), EltSizeSCEV,
-                                           L, SE, DT, AC, Predicates);
+  return isDereferenceableAndAlignedInLoop(PtrSCEV, LI->getAlign(),
+                                           LI->getType(), L, SE, DT, AC,
+                                           Predicates);
 }
 
 bool llvm::isDereferenceableAndAlignedInLoop(
-    const SCEV *PtrSCEV, Align Alignment, const SCEV *EltSizeSCEV, Loop *L,
+    const SCEV *PtrSCEV, Align Alignment, Type *AccessTy, Loop *L,
     ScalarEvolution &SE, DominatorTree &DT, AssumptionCache *AC,
     SmallVectorImpl<const SCEVPredicate *> *Predicates) {
   auto *AddRec = dyn_cast<SCEVAddRecExpr>(PtrSCEV);
@@ -322,7 +322,9 @@ bool llvm::isDereferenceableAndAlignedInLoop(
   if (!Step)
     return false;
 
-  const APInt &EltSize = cast<SCEVConstant>(EltSizeSCEV)->getAPInt();
+  auto &DL = L->getHeader()->getDataLayout();
+  const APInt EltSize(DL.getIndexTypeSizeInBits(PtrSCEV->getType()),
+                      DL.getTypeStoreSize(AccessTy).getFixedValue());
   // For the moment, restrict ourselves to the case where the access size is a
   // multiple of the requested alignment and the base is aligned.
   // TODO: generalize if a case found which warrants
@@ -343,9 +345,8 @@ bool llvm::isDereferenceableAndAlignedInLoop(
     return false;
   std::optional<ScalarEvolution::LoopGuards> LoopGuards;
 
-  auto &DL = L->getHeader()->getDataLayout();
   const auto &[AccessStart, AccessEnd] =
-      getStartAndEndForAccess(L, PtrSCEV, EltSizeSCEV, BECount, MaxBECount, &SE,
+      getStartAndEndForAccess(L, PtrSCEV, AccessTy, BECount, MaxBECount, &SE,
                               nullptr, &DT, AC, LoopGuards);
   if (isa<SCEVCouldNotCompute>(AccessStart) ||
       isa<SCEVCouldNotCompute>(AccessEnd))

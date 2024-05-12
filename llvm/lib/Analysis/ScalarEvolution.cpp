@@ -11442,7 +11442,14 @@ bool ScalarEvolution::isKnownPredicate(CmpPredicate Pred, SCEVUse LHS,
     return true;
 
   // Otherwise see what can be done with some simple reasoning.
-  return isKnownViaNonRecursiveReasoning(Pred, LHS, RHS);
+  if (isKnownViaNonRecursiveReasoning(Pred, LHS, RHS))
+    return true;
+
+  // Try the no-overflow check with use-specific flags merged in.
+  if (LHS.getFlags() != 0 || RHS.getFlags() != 0)
+    return isKnownPredicateViaNoOverflow(Pred, LHS, RHS);
+
+  return false;
 }
 
 std::optional<bool> ScalarEvolution::evaluatePredicate(CmpPredicate Pred,
@@ -11784,13 +11791,14 @@ bool ScalarEvolution::isKnownPredicateViaNoOverflow(CmpPredicate Pred,
     if (!isa<SCEVConstant>(YConstOp))
       return false;
 
-    // When matching ADDs with NUW flags (and unsigned predicates), only the
-    // second ADD (with the larger constant) requires NUW.
-    if ((YFlagsPresent & ExpectedFlags) != ExpectedFlags)
-      return false;
-    if (ExpectedFlags != SCEV::FlagNUW &&
-        (XFlagsPresent & ExpectedFlags) != ExpectedFlags) {
-      return false;
+    if (YNonConstOp != Y && ExpectedFlags == SCEV::FlagNUW) {
+      if ((YFlagsPresent & ExpectedFlags) != ExpectedFlags)
+        return false;
+    } else {
+      if ((XFlagsPresent & ExpectedFlags) != ExpectedFlags)
+        return false;
+      if ((YFlagsPresent & ExpectedFlags) != ExpectedFlags)
+        return false;
     }
 
     OutC1 = cast<SCEVConstant>(XConstOp)->getAPInt();
@@ -12413,10 +12421,12 @@ bool ScalarEvolution::isImpliedCondBalancedTypes(
 bool ScalarEvolution::splitBinaryAdd(SCEVUse Expr, const SCEV *&L,
                                      const SCEV *&R,
                                      SCEV::NoWrapFlags &Flags) {
-  if (!match(Expr, m_scev_Add(m_SCEV(L), m_SCEV(R))))
+  const SCEV *ExprPtr = Expr.getPointer();
+  if (!match(ExprPtr, m_scev_Add(m_SCEV(L), m_SCEV(R))))
     return false;
 
-  Flags = cast<SCEVAddExpr>(Expr)->getNoWrapFlags();
+  Flags = setFlags(cast<SCEVAddExpr>(ExprPtr)->getNoWrapFlags(),
+                   static_cast<SCEV::NoWrapFlags>(Expr.getFlags()));
   return true;
 }
 

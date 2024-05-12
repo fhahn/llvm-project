@@ -14,10 +14,10 @@ define void @all_exits_dominate_latch_countable_exits_at_most_500_iterations_kno
 ; CHECK-NEXT:          %gep.A = getelementptr inbounds i32, ptr %A, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %B High: (2000 + %B)<nuw>)
+; CHECK-NEXT:          (Low: %B High: (2000 + %B)<nuw>(u nuw))
 ; CHECK-NEXT:            Member: {%B,+,4}<nuw><%loop.header>
 ; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %A High: (2000 + %A)<nuw>)
+; CHECK-NEXT:          (Low: %A High: (2000 + %A)<nuw>(u nuw))
 ; CHECK-NEXT:            Member: {%A,+,4}<nuw><%loop.header>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
@@ -62,21 +62,10 @@ e.2:
 define void @all_exits_dominate_latch_countable_exits_at_most_501_iterations_known_deref(ptr dereferenceable(2000) %A, ptr dereferenceable(2000) %B) {
 ; CHECK-LABEL: 'all_exits_dominate_latch_countable_exits_at_most_501_iterations_known_deref'
 ; CHECK-NEXT:    loop.header:
-; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Report: cannot identify array bounds
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:      Run-time memory checks:
-; CHECK-NEXT:      Check 0:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.B = getelementptr inbounds i32, ptr %B, i64 %iv
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %gep.A = getelementptr inbounds i32, ptr %A, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
-; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %B High: inttoptr (i64 -1 to ptr))
-; CHECK-NEXT:            Member: {%B,+,4}<nuw><%loop.header>
-; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %A High: inttoptr (i64 -1 to ptr))
-; CHECK-NEXT:            Member: {%A,+,4}<nuw><%loop.header>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
@@ -131,10 +120,10 @@ define void @all_exits_dominate_latch_countable_exits_at_most_500_iterations_not
 ; CHECK-NEXT:          %gep.A = getelementptr inbounds i32, ptr %A, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %B High: inttoptr (i64 -1 to ptr))
+; CHECK-NEXT:          (Low: %B High: inttoptr (i64 -1 to ptr)(u nuw))
 ; CHECK-NEXT:            Member: {%B,+,4}<nuw><%loop.header>
 ; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %A High: inttoptr (i64 -1 to ptr))
+; CHECK-NEXT:          (Low: %A High: inttoptr (i64 -1 to ptr)(u nuw))
 ; CHECK-NEXT:            Member: {%A,+,4}<nuw><%loop.header>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
@@ -189,10 +178,10 @@ define i32 @all_exits_dominate_latch_countable_exits_at_most_1000_iterations_kno
 ; CHECK-NEXT:          %gep.A = getelementptr inbounds i32, ptr %A, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %B High: (4000 + %B)<nuw>)
+; CHECK-NEXT:          (Low: %B High: (4000 + %B)<nuw>(u nuw))
 ; CHECK-NEXT:            Member: {%B,+,4}<nuw><%loop.header>
 ; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %A High: (4000 + %A)<nuw>)
+; CHECK-NEXT:          (Low: %A High: (4000 + %A)<nuw>(u nuw))
 ; CHECK-NEXT:            Member: {%A,+,4}<nuw><%loop.header>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
@@ -237,21 +226,10 @@ e.2:
 define i32 @all_exits_dominate_latch_countable_exits_at_most_1001_iterations_known_deref(ptr dereferenceable(4000) %A, ptr dereferenceable(4000) %B) {
 ; CHECK-LABEL: 'all_exits_dominate_latch_countable_exits_at_most_1001_iterations_known_deref'
 ; CHECK-NEXT:    loop.header:
-; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Report: cannot identify array bounds
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:      Run-time memory checks:
-; CHECK-NEXT:      Check 0:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.B = getelementptr inbounds i32, ptr %B, i64 %iv
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %gep.A = getelementptr inbounds i32, ptr %A, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
-; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %B High: inttoptr (i64 -1 to ptr))
-; CHECK-NEXT:            Member: {%B,+,4}<nuw><%loop.header>
-; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %A High: inttoptr (i64 -1 to ptr))
-; CHECK-NEXT:            Member: {%A,+,4}<nuw><%loop.header>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
@@ -305,10 +283,10 @@ define i32 @all_exits_dominate_latch_countable_exits_at_most_1000_iterations_not
 ; CHECK-NEXT:          %gep.A = getelementptr inbounds i32, ptr %A, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %B High: inttoptr (i64 -1 to ptr))
+; CHECK-NEXT:          (Low: %B High: inttoptr (i64 -1 to ptr)(u nuw))
 ; CHECK-NEXT:            Member: {%B,+,4}<nuw><%loop.header>
 ; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %A High: inttoptr (i64 -1 to ptr))
+; CHECK-NEXT:          (Low: %A High: inttoptr (i64 -1 to ptr)(u nuw))
 ; CHECK-NEXT:            Member: {%A,+,4}<nuw><%loop.header>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
@@ -398,21 +376,10 @@ e.2:
 define i32 @b3_does_not_dominate_latch_known_deref(ptr dereferenceable(4000) %A, ptr dereferenceable(4000) %B) {
 ; CHECK-LABEL: 'b3_does_not_dominate_latch_known_deref'
 ; CHECK-NEXT:    loop.header:
-; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Report: cannot identify array bounds
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:      Run-time memory checks:
-; CHECK-NEXT:      Check 0:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.B = getelementptr inbounds i32, ptr %B, i64 %iv
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %gep.A = getelementptr inbounds i32, ptr %A, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
-; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %B High: inttoptr (i64 -1 to ptr))
-; CHECK-NEXT:            Member: {%B,+,4}<nuw><%loop.header>
-; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %A High: inttoptr (i64 -1 to ptr))
-; CHECK-NEXT:            Member: {%A,+,4}<nuw><%loop.header>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
@@ -463,10 +430,10 @@ define i32 @b3_does_not_dominate_latch_not_known_deref(ptr %A, ptr %B) {
 ; CHECK-NEXT:          %gep.A = getelementptr inbounds i32, ptr %A, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %B High: inttoptr (i64 -1 to ptr))
+; CHECK-NEXT:          (Low: %B High: inttoptr (i64 -1 to ptr)(u nuw))
 ; CHECK-NEXT:            Member: {%B,+,4}<nuw><%loop.header>
 ; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %A High: inttoptr (i64 -1 to ptr))
+; CHECK-NEXT:          (Low: %A High: inttoptr (i64 -1 to ptr)(u nuw))
 ; CHECK-NEXT:            Member: {%A,+,4}<nuw><%loop.header>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
@@ -518,10 +485,10 @@ define void @all_exits_dominate_latch_countable_exits_at_most_500_iterations_kno
 ; CHECK-NEXT:          %gep.A = getelementptr inbounds i32, ptr %A, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %B High: (2000 + %B))
+; CHECK-NEXT:          (Low: %B High: (2000 + %B)(u nuw))
 ; CHECK-NEXT:            Member: {%B,+,4}<nuw><%loop.header>
 ; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %A High: (2000 + %A))
+; CHECK-NEXT:          (Low: %A High: (2000 + %A)(u nuw))
 ; CHECK-NEXT:            Member: {%A,+,4}<nuw><%loop.header>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
@@ -578,10 +545,10 @@ define void @all_exits_dominate_latch_countable_exits_at_most_500_iterations_kno
 ; CHECK-NEXT:          %gep.A = getelementptr inbounds i32, ptr %A, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %B High: (2000 + %B))
+; CHECK-NEXT:          (Low: %B High: (2000 + %B)(u nuw))
 ; CHECK-NEXT:            Member: {%B,+,4}<nuw><%loop.header>
 ; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %A High: (2000 + %A))
+; CHECK-NEXT:          (Low: %A High: (2000 + %A)(u nuw))
 ; CHECK-NEXT:            Member: {%A,+,4}<nuw><%loop.header>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
@@ -644,10 +611,10 @@ define void @all_exits_dominate_latch_countable_exits_at_most_500_iterations_kno
 ; CHECK-NEXT:          %gep.A = getelementptr inbounds i32, ptr %A, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %B High: inttoptr (i64 -1 to ptr))
+; CHECK-NEXT:          (Low: %B High: inttoptr (i64 -1 to ptr)(u nuw))
 ; CHECK-NEXT:            Member: {%B,+,4}<nuw><%loop.header>
 ; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %A High: (2000 + %A))
+; CHECK-NEXT:          (Low: %A High: (2000 + %A)(u nuw))
 ; CHECK-NEXT:            Member: {%A,+,4}<nuw><%loop.header>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
@@ -710,10 +677,10 @@ define void @all_exits_dominate_latch_countable_exits_at_most_500_iterations_der
 ; CHECK-NEXT:          %gep.A = getelementptr inbounds i32, ptr %A, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %B High: inttoptr (i64 -1 to ptr))
+; CHECK-NEXT:          (Low: %B High: inttoptr (i64 -1 to ptr)(u nuw))
 ; CHECK-NEXT:            Member: {%B,+,4}<nuw><%loop.header>
 ; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %A High: inttoptr (i64 -1 to ptr))
+; CHECK-NEXT:          (Low: %A High: inttoptr (i64 -1 to ptr)(u nuw))
 ; CHECK-NEXT:            Member: {%A,+,4}<nuw><%loop.header>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
@@ -770,10 +737,10 @@ define void @all_exits_dominate_latch_countable_exits_at_most_500_iterations_kno
 ; CHECK-NEXT:          %gep.A = getelementptr inbounds i32, ptr %A, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %B High: (2000 + %B))
+; CHECK-NEXT:          (Low: %B High: (2000 + %B)(u nuw))
 ; CHECK-NEXT:            Member: {%B,+,4}<nuw><%loop.header>
 ; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %A High: (2000 + %A))
+; CHECK-NEXT:          (Low: %A High: (2000 + %A)(u nuw))
 ; CHECK-NEXT:            Member: {%A,+,4}<nuw><%loop.header>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
@@ -830,10 +797,10 @@ define void @all_exits_dominate_latch_countable_exits_at_most_500_iterations_kno
 ; CHECK-NEXT:          %gep.A = getelementptr inbounds i32, ptr %A, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %B High: inttoptr (i64 -1 to ptr))
+; CHECK-NEXT:          (Low: %B High: inttoptr (i64 -1 to ptr)(u nuw))
 ; CHECK-NEXT:            Member: {%B,+,4}<nuw><%loop.header>
 ; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %A High: inttoptr (i64 -1 to ptr))
+; CHECK-NEXT:          (Low: %A High: inttoptr (i64 -1 to ptr)(u nuw))
 ; CHECK-NEXT:            Member: {%A,+,4}<nuw><%loop.header>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.

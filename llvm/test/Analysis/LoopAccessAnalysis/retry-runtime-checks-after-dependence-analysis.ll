@@ -24,13 +24,13 @@ define void @dependency_check_and_runtime_checks_needed_gepb_is_inbounds_iv2_ste
 ; CHECK-NEXT:          %gep.a.iv.off = getelementptr inbounds float, ptr %a, i64 %iv.offset
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %a High: ((4 * %n) + %a))
+; CHECK-NEXT:          (Low: %a High: ((4 * %n) + %a)(u nuw))
 ; CHECK-NEXT:            Member: {%a,+,4}<nuw><%loop>
 ; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %b High: (-16 + (20 * %n) + %b))
+; CHECK-NEXT:          (Low: %b High: (-16 + (20 * %n) + %b)(u nuw))
 ; CHECK-NEXT:            Member: {%b,+,20}<%loop>
 ; CHECK-NEXT:        Group GRP2:
-; CHECK-NEXT:          (Low: ((4 * %offset) + %a) High: ((4 * %offset) + (4 * %n) + %a))
+; CHECK-NEXT:          (Low: ((4 * %offset) + %a) High: ((4 * %offset) + (4 * %n) + %a)(u nuw))
 ; CHECK-NEXT:            Member: {((4 * %offset) + %a),+,4}<%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
@@ -85,13 +85,13 @@ define void @dependency_check_and_runtime_checks_needed_gepb_not_inbounds_iv2_st
 ; CHECK-NEXT:          %gep.a.iv.off = getelementptr inbounds float, ptr %a, i64 %iv.offset
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %a High: ((4 * %n) + %a))
+; CHECK-NEXT:          (Low: %a High: ((4 * %n) + %a)(u nuw))
 ; CHECK-NEXT:            Member: {%a,+,4}<nuw><%loop>
 ; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %b High: (-1 + (5 * %n) + %b))
+; CHECK-NEXT:          (Low: %b High: (-1 + (5 * %n) + %b)(u nuw))
 ; CHECK-NEXT:            Member: {%b,+,5}<%loop>
 ; CHECK-NEXT:        Group GRP2:
-; CHECK-NEXT:          (Low: ((4 * %offset) + %a) High: ((4 * %offset) + (4 * %n) + %a))
+; CHECK-NEXT:          (Low: ((4 * %offset) + %a) High: ((4 * %offset) + (4 * %n) + %a)(u nuw))
 ; CHECK-NEXT:            Member: {((4 * %offset) + %a),+,4}<%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
@@ -147,13 +147,13 @@ define void @dependency_check_and_runtime_checks_needed_gepb_is_inbounds_iv2_ste
 ; CHECK-NEXT:          %gep.a.iv.off = getelementptr inbounds float, ptr %a, i64 %iv.offset
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %a High: ((4 * %n) + %a))
+; CHECK-NEXT:          (Low: %a High: ((4 * %n) + %a)(u nuw))
 ; CHECK-NEXT:            Member: {%a,+,4}<nuw><%loop>
 ; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %b High: (3 + %n + %b))
+; CHECK-NEXT:          (Low: %b High: (3 + %n + %b)(u nuw))
 ; CHECK-NEXT:            Member: {%b,+,1}<%loop>
 ; CHECK-NEXT:        Group GRP2:
-; CHECK-NEXT:          (Low: ((4 * %offset) + %a) High: ((4 * %offset) + (4 * %n) + %a))
+; CHECK-NEXT:          (Low: ((4 * %offset) + %a) High: ((4 * %offset) + (4 * %n) + %a)(u nuw))
 ; CHECK-NEXT:            Member: {((4 * %offset) + %a),+,4}<%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
@@ -213,13 +213,13 @@ define void @dependency_check_and_runtime_checks_needed_gepb_not_inbounds_iv2_st
 ; CHECK-NEXT:          %gep.a.iv.off = getelementptr inbounds float, ptr %a, i64 %iv.offset
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %a High: ((4 * %n) + %a))
+; CHECK-NEXT:          (Low: %a High: ((4 * %n) + %a)(u nuw))
 ; CHECK-NEXT:            Member: {%a,+,4}<nuw><%loop>
 ; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %b High: (3 + %n + %b))
+; CHECK-NEXT:          (Low: %b High: (3 + %n + %b)(u nuw))
 ; CHECK-NEXT:            Member: {%b,+,1}<%loop>
 ; CHECK-NEXT:        Group GRP2:
-; CHECK-NEXT:          (Low: ((4 * %offset) + %a) High: ((4 * %offset) + (4 * %n) + %a))
+; CHECK-NEXT:          (Low: ((4 * %offset) + %a) High: ((4 * %offset) + (4 * %n) + %a)(u nuw))
 ; CHECK-NEXT:            Member: {((4 * %offset) + %a),+,4}<%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
@@ -278,13 +278,13 @@ define void @dependency_check_and_runtime_checks_needed_gepb_may_wrap(ptr %a, pt
 ; CHECK-NEXT:          %gep.a.iv.off = getelementptr inbounds float, ptr %a, i64 %iv.offset
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %a High: ((4 * %n) + %a))
+; CHECK-NEXT:          (Low: %a High: ((4 * %n) + %a)(u nuw))
 ; CHECK-NEXT:            Member: {%a,+,4}<nuw><%loop>
 ; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %b High: (-4 + (8 * %n) + %b))
+; CHECK-NEXT:          (Low: %b High: (-4 + (8 * %n) + %b)(u nuw))
 ; CHECK-NEXT:            Member: {%b,+,8}<%loop>
 ; CHECK-NEXT:        Group GRP2:
-; CHECK-NEXT:          (Low: ((4 * %offset) + %a) High: ((4 * %offset) + (4 * %n) + %a))
+; CHECK-NEXT:          (Low: ((4 * %offset) + %a) High: ((4 * %offset) + (4 * %n) + %a)(u nuw))
 ; CHECK-NEXT:            Member: {((4 * %offset) + %a),+,4}<%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
@@ -340,13 +340,13 @@ define void @retry_after_dep_check_with_unknown_offset(ptr %A, i32 %offset) {
 ; CHECK-NEXT:        ptr %A
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: (100 + %A) High: (96 + (8 * (zext i32 %offset to i64))<nuw><nsw> + %A))
+; CHECK-NEXT:          (Low: (100 + %A) High: (96 + (8 * (zext i32 %offset to i64))<nuw><nsw> + %A)(u nuw))
 ; CHECK-NEXT:            Member: {(100 + %A),+,8}<%loop>
 ; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: (100 + (8 * (zext i32 %offset to i64))<nuw><nsw> + %A) High: (96 + (16 * (zext i32 %offset to i64))<nuw><nsw> + %A))
+; CHECK-NEXT:          (Low: (100 + (8 * (zext i32 %offset to i64))<nuw><nsw> + %A) High: (96 + (16 * (zext i32 %offset to i64))<nuw><nsw> + %A)(u nuw))
 ; CHECK-NEXT:            Member: {(100 + (8 * (zext i32 %offset to i64))<nuw><nsw> + %A),+,8}<%loop>
 ; CHECK-NEXT:        Group GRP2:
-; CHECK-NEXT:          (Low: %A High: (4 + %A))
+; CHECK-NEXT:          (Low: %A High: (4 + %A)(u nuw))
 ; CHECK-NEXT:            Member: %A
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
