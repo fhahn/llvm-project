@@ -289,9 +289,9 @@ static bool AreEquivalentAddressValues(const Value *A, const Value *B) {
 bool llvm::isDereferenceableAndAlignedInLoop(
     LoadInst *LI, Loop *L, ScalarEvolution &SE, DominatorTree &DT,
     AssumptionCache *AC, SmallVectorImpl<const SCEVPredicate *> *Predicates) {
+  const Align Alignment = LI->getAlign();
   auto &DL = LI->getDataLayout();
   Value *Ptr = LI->getPointerOperand();
-  const SCEV *PtrSCEV = SE.getSCEV(Ptr);
   APInt EltSize(DL.getIndexTypeSizeInBits(Ptr->getType()),
                 DL.getTypeStoreSize(LI->getType()).getFixedValue());
 
@@ -299,9 +299,10 @@ bool llvm::isDereferenceableAndAlignedInLoop(
   // access is safe within the loop w/o needing predication.
   if (L->isLoopInvariant(Ptr))
     return isDereferenceableAndAlignedPointer(
-        Ptr, LI->getAlign(), EltSize, DL, &*L->getHeader()->getFirstNonPHIIt(),
+        Ptr, Alignment, EltSize, DL, &*L->getHeader()->getFirstNonPHIIt(),
         AC, &DT);
 
+  const SCEV *PtrSCEV = SE.getSCEV(Ptr);
   return isDereferenceableAndAlignedInLoop(PtrSCEV, LI->getAlign(),
                                            LI->getType(), L, SE, DT, AC,
                                            Predicates);
