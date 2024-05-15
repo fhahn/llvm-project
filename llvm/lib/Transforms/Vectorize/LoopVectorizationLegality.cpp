@@ -1507,31 +1507,6 @@ bool LoopVectorizationLegality::canVectorize(bool UseVPlanNativePath) {
       return false;
   }
 
-  SmallVector<BasicBlock *> Exiting;
-  TheLoop->getExitingBlocks(Exiting);
-  // Check if eexit count for any exit that may execute unconditionally may in
-  // introduce UB. Note that we can skip checks in the header or if there's a
-  // single exit, as in those cases we know that the exit count will be
-  // evaluated in each loop iteration. There are other cases where the exiting
-  // block executes on each loop iteration, but we don't have a cheap way to
-  // check at the moment.
-  ScalarEvolution &SE = *PSE.getSE();
-  if (Exiting.size() > 1 && any_of(Exiting, [this, &SE](BasicBlock *E) {
-        if (TheLoop->getHeader() == E)
-          return false;
-        const SCEV *EC = SE.getExitCount(TheLoop, E);
-        return !isa<SCEVCouldNotCompute>(EC) &&
-               SCEVExpander::expansionMayIntroduceUB(EC);
-      })) {
-    LLVM_DEBUG(
-        dbgs()
-        << "LV: Expanding the trip count expression may introduce UB.\n");
-    if (DoExtraAnalysis)
-      Result = false;
-    else
-      return false;
-  }
-
   LLVM_DEBUG(dbgs() << "LV: We can vectorize this loop"
                     << (LAI->getRuntimePointerChecking()->Need
                             ? " (with a runtime bound check)"

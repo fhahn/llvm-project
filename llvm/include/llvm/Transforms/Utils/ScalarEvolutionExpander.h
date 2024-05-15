@@ -418,9 +418,9 @@ public:
   BasicBlock::iterator findInsertPointAfter(Instruction *I,
                                             Instruction *MustDominate) const;
 
-  /// Returns true if expanding \p Expr may introduce UB (e.g. because the
+  /// If \p L contains exits which may execute conditionally and contain UDiv expressions with divisors that can be 0, expanding \p BTC may introduce new UB. In that case, rewrite UDiv(A, B) -> UDiv(A, UMAX(1, B)). If B is 0, that exit cannot be taken. 
   /// expression contains an UDiv expression).
-  static bool expansionMayIntroduceUB(const SCEV *Expr);
+  static const SCEV *rewriteBackedgeTakenCountToRemoveUB(const SCEV *BTC, Loop *L, ScalarEvolution &SE);
 
 private:
   LLVMContext &getContext() const { return SE.getContext(); }

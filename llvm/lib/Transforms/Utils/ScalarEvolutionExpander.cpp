@@ -161,9 +161,49 @@ SCEVExpander::findInsertPointAfter(Instruction *I,
   return IP;
 }
 
-bool SCEVExpander::expansionMayIntroduceUB(const SCEV *Expr) {
-  return SCEVExprContains(Expr,
-                          [](const SCEV *Op) { return isa<SCEVUDivExpr>(Op); });
+namespace {
+struct SCEVUDivRewriter : public SCEVRewriteVisitor<SCEVUDivRewriter > {
+  SCEVUDivRewriter(ScalarEvolution &SE)
+      : SCEVRewriteVisitor(SE) {}
+
+  static const SCEV *rewrite(const SCEV *Scev, ScalarEvolution &SE) {
+    SCEVUDivRewriter Rewriter(SE);
+    return Rewriter.visit(Scev);
+  }
+
+  const SCEV *visitUDivExpr(const SCEVUDivExpr *Expr) {
+    auto *LHS = visit(Expr->getLHS());
+    auto *RHS = visit(Expr->getRHS());
+    return SE.getUDivExpr(LHS, SE.getUMaxExpr(SE.getOne(RHS->getType()), RHS));
+  }
+};
+
+const SCEV *SCEVExpander::rewriteBackedgeTakenCountToRemoveUBveUB(const SCEV *Expr, Loop *L, ScalarEvolution &SE) {
+  SmallVector<BasicBlock *> Exiting;
+  L->getExitingBlocks(Exiting);
+  // Check if exit count for any exit that may execute unconditionally may in
+  // introduce UB. Note that we can skip checks in the header or if there's a
+  // single exit, as in those cases we know that the exit count will be
+  // evaluated in each loop iteration. There are other cases where the exiting
+  // block executes on each loop iteration, but we don't have a cheap way to
+  // check at the moment.
+
+  if (Exiting.size() > 1 && any_of(Exiting, [L, &SE](BasicBlock *E) {
+        if (L->getHeader() == E)
+          return false;
+        const SCEV *EC = SE.getExitCount(L, E);
+        return SCEVExprContains(EC,
+                          [&SE](const SCEV *Op) {
+                          auto *UDiv =dyn_cast<SCEVUDivExpr>(Op);
+                          if (!UDiv)
+                          return false;
+
+                          return !SE.isKnownNonZero(UDiv->getOperand(1)); });
+      })) {
+      return SCEVUDivRewriter::rewrite(Expr, SE);
+  }
+  return Expr;
+
 }
 
 BasicBlock::iterator
