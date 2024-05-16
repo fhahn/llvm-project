@@ -132,8 +132,6 @@ bool VPRecipeBase::mayHaveSideEffects() const {
   case VPInstructionSC:
     switch (cast<VPInstruction>(this)->getOpcode()) {
     case Instruction::Or:
-    case Instruction::ICmp:
-    case Instruction::Select:
     case VPInstruction::Not:
     case VPInstruction::CalculateTripCountMinusVF:
     case VPInstruction::CanonicalIVIncrementForPart:
@@ -295,6 +293,8 @@ bool VPInstruction::canGenerateScalarForFirstLane() const {
     return true;
 
   switch (Opcode) {
+  case Instruction::ICmp:
+  case Instruction::Select:
   case VPInstruction::BranchOnCond:
   case VPInstruction::BranchOnCount:
   case VPInstruction::CalculateTripCountMinusVF:
@@ -302,6 +302,7 @@ bool VPInstruction::canGenerateScalarForFirstLane() const {
   case VPInstruction::ComputeReductionResult:
   case VPInstruction::PtrAdd:
   case VPInstruction::ExplicitVectorLength:
+  case VPInstruction::ReduceOr:
     return true;
   default:
     return false;
@@ -341,14 +342,20 @@ Value *VPInstruction::generatePerPart(VPTransformState &State, unsigned Part) {
     return Builder.CreateNot(A, Name);
   }
   case Instruction::ICmp: {
-    Value *A = State.get(getOperand(0), Part);
-    Value *B = State.get(getOperand(1), Part);
+    bool OnlyFirstLaneUsed = vputils::onlyFirstLaneUsed(this);
+    if (Part != 0 && vputils::onlyFirstPartUsed(this))
+      return State.get(this, 0, OnlyFirstLaneUsed);
+    Value *A = State.get(getOperand(0), Part, OnlyFirstLaneUsed);
+    Value *B = State.get(getOperand(1), Part, OnlyFirstLaneUsed);
     return Builder.CreateCmp(getPredicate(), A, B, Name);
   }
   case Instruction::Select: {
-    Value *Cond = State.get(getOperand(0), Part);
-    Value *Op1 = State.get(getOperand(1), Part);
-    Value *Op2 = State.get(getOperand(2), Part);
+    bool OnlyFirstLaneUsed = vputils::onlyFirstLaneUsed(this);
+    if (Part != 0 && vputils::onlyFirstPartUsed(this))
+      return State.get(this, 0, OnlyFirstLaneUsed);
+    Value *Cond = State.get(getOperand(0), Part, OnlyFirstLaneUsed);
+    Value *Op1 = State.get(getOperand(1), Part, OnlyFirstLaneUsed);
+    Value *Op2 = State.get(getOperand(2), Part, OnlyFirstLaneUsed);
     return Builder.CreateSelect(Cond, Op1, Op2, Name);
   }
   case VPInstruction::ActiveLaneMask: {
@@ -570,6 +577,11 @@ Value *VPInstruction::generatePerPart(VPTransformState &State, unsigned Part) {
     Value *Addend = State.get(getOperand(1), Part, /* IsScalar */ true);
     return Builder.CreatePtrAdd(Ptr, Addend, Name);
   }
+  case VPInstruction::ReduceOr: {
+    Value *A = State.get(getOperand(0), Part);
+    return Builder.CreateOrReduce(A);
+  }
+
   default:
     llvm_unreachable("Unsupported opcode for instruction");
   }
@@ -598,7 +610,8 @@ void VPInstruction::execute(VPTransformState &State) {
   bool GeneratesPerFirstLaneOnly =
       canGenerateScalarForFirstLane() &&
       (vputils::onlyFirstLaneUsed(this) ||
-       getOpcode() == VPInstruction::ComputeReductionResult);
+       getOpcode() == VPInstruction::ComputeReductionResult ||
+       getOpcode() == VPInstruction::ReduceOr);
   bool GeneratesPerAllLanes = doesGeneratePerAllLanes();
   for (unsigned Part = 0; Part < State.UF; ++Part) {
     if (GeneratesPerAllLanes) {
@@ -633,6 +646,8 @@ bool VPInstruction::onlyFirstLaneUsed(const VPValue *Op) const {
   default:
     return false;
   case Instruction::ICmp:
+  case Instruction::Select:
+  case Instruction::Or:
   case VPInstruction::PtrAdd:
     // TODO: Cover additional opcodes.
     return vputils::onlyFirstLaneUsed(this);
@@ -641,6 +656,7 @@ bool VPInstruction::onlyFirstLaneUsed(const VPValue *Op) const {
   case VPInstruction::CalculateTripCountMinusVF:
   case VPInstruction::CanonicalIVIncrementForPart:
   case VPInstruction::BranchOnCount:
+  case VPInstruction::BranchOnCond:
     return true;
   };
   llvm_unreachable("switch should return");

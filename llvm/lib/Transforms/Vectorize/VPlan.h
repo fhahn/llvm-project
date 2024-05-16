@@ -237,7 +237,8 @@ struct VPIteration {
 struct VPTransformState {
   VPTransformState(ElementCount VF, unsigned UF, LoopInfo *LI,
                    DominatorTree *DT, IRBuilderBase &Builder,
-                   InnerLoopVectorizer *ILV, VPlan *Plan, LLVMContext &Ctx);
+                   InnerLoopVectorizer *ILV, VPlan *Plan, LLVMContext &Ctx,
+                   Loop *OrigLoop);
 
   /// The chosen Vectorization and Unroll Factors of the loop being vectorized.
   ElementCount VF;
@@ -412,6 +413,8 @@ struct VPTransformState {
 
   /// VPlan-based type analysis.
   VPTypeAnalysis TypeAnalysis;
+
+  Loop *OrigLoop;
 };
 
 /// VPBlockBase is the building block of the Hierarchical Control-Flow Graph.
@@ -1184,6 +1187,7 @@ public:
     // operand). Only generates scalar values (either for the first lane only or
     // for all lanes, depending on its uses).
     PtrAdd,
+    ReduceOr,
   };
 
 private:

@@ -743,6 +743,8 @@ protected:
   // so we can later fix-up the external users of the induction variables.
   DenseMap<PHINode *, Value *> IVEndValues;
 
+  SmallVector<PHINode *> ExitPhis;
+
   /// BFI and PSI are used to check for profile guided size optimizations.
   BlockFrequencyInfo *BFI;
   ProfileSummaryInfo *PSI;
@@ -980,7 +982,7 @@ Value *getRuntimeVF(IRBuilderBase &B, Type *Ty, ElementCount VF) {
 
 const SCEV *createTripCountSCEV(Type *IdxTy, PredicatedScalarEvolution &PSE,
                                 Loop *OrigLoop) {
-  const SCEV *BackedgeTakenCount = PSE.getBackedgeTakenCount();
+  const SCEV *BackedgeTakenCount = PSE.getBackedgeTakenCountForCountableExits();
   assert(!isa<SCEVCouldNotCompute>(BackedgeTakenCount) && "Invalid loop count");
 
   ScalarEvolution &SE = *PSE.getSE();
@@ -1468,8 +1470,8 @@ public:
       return false;
     // If we might exit from anywhere but the latch, must run the exiting
     // iteration in scalar form.
-    if (TheLoop->getExitingBlock() != TheLoop->getLoopLatch())
-      return true;
+    /*    if (TheLoop->getExitingBlock() != TheLoop->getLoopLatch())*/
+    /*return true;*/
     return IsVectorizing && InterleaveInfo.requiresScalarEpilogue();
   }
 
@@ -2880,11 +2882,19 @@ void InnerLoopVectorizer::emitIterationCountCheck(BasicBlock *Bypass) {
 
   // Update dominator for Bypass & LoopExit (if needed).
   DT->changeImmediateDominator(Bypass, TCCheckBlock);
-  if (!Cost->requiresScalarEpilogue(VF.isVector()))
-    // If there is an epilogue which must run, there's no edge from the
-    // middle block to exit blocks  and thus no need to update the immediate
-    // dominator of the exit blocks.
-    DT->changeImmediateDominator(LoopExitBlock, TCCheckBlock);
+
+  if (OrigLoop->getUniqueExitBlock()) {
+    if (!Cost->requiresScalarEpilogue(VF.isVector()))
+      // If there is an epilogue which must run, there's no edge from the
+      // middle block to exit blocks  and thus no need to update the immediate
+      // dominator of the exit blocks.
+      DT->changeImmediateDominator(LoopExitBlock, TCCheckBlock);
+  } else {
+    SmallVector<BasicBlock *> ExitBlocks;
+    OrigLoop->getExitBlocks(ExitBlocks);
+    for (BasicBlock *Exit : ExitBlocks)
+      DT->changeImmediateDominator(Exit, TCCheckBlock);
+  }
 
   BranchInst &BI =
       *BranchInst::Create(Bypass, LoopVectorPreHeader, CheckMinIters);
@@ -2961,9 +2971,14 @@ void InnerLoopVectorizer::createVectorLoopSkeleton(StringRef Prefix) {
   LoopScalarBody = OrigLoop->getHeader();
   LoopVectorPreHeader = OrigLoop->getLoopPreheader();
   assert(LoopVectorPreHeader && "Invalid loop structure");
-  LoopExitBlock = OrigLoop->getUniqueExitBlock(); // may be nullptr
-  assert((LoopExitBlock || Cost->requiresScalarEpilogue(VF.isVector())) &&
-         "multiple exit loop without required epilogue?");
+
+  BasicBlock *Latch = OrigLoop->getLoopLatch();
+  BasicBlock *TrueSucc =
+      cast<BranchInst>(Latch->getTerminator())->getSuccessor(0);
+  BasicBlock *FalseSucc =
+      cast<BranchInst>(Latch->getTerminator())->getSuccessor(1);
+  // assert((LoopExitBlock || Cost->requiresScalarEpilogue(VF.isVector())) &&
+  //       "multiple exit loop without required epilogue?");
 
   LoopMiddleBlock =
       SplitBlock(LoopVectorPreHeader, LoopVectorPreHeader->getTerminator(), DT,
@@ -2974,30 +2989,48 @@ void InnerLoopVectorizer::createVectorLoopSkeleton(StringRef Prefix) {
 
   auto *ScalarLatchTerm = OrigLoop->getLoopLatch()->getTerminator();
 
-  // Set up the middle block terminator.  Two cases:
-  // 1) If we know that we must execute the scalar epilogue, emit an
-  //    unconditional branch.
-  // 2) Otherwise, we must have a single unique exit block (due to how we
-  //    implement the multiple exit case).  In this case, set up a conditional
-  //    branch from the middle block to the loop scalar preheader, and the
-  //    exit block.  completeLoopSkeleton will update the condition to use an
-  //    iteration check, if required to decide whether to execute the remainder.
-  BranchInst *BrInst =
-      Cost->requiresScalarEpilogue(VF.isVector())
-          ? BranchInst::Create(LoopScalarPreHeader)
-          : BranchInst::Create(LoopExitBlock, LoopScalarPreHeader,
-                               Builder.getTrue());
-  BrInst->setDebugLoc(ScalarLatchTerm->getDebugLoc());
-  ReplaceInstWithInst(LoopMiddleBlock->getTerminator(), BrInst);
+  LoopExitBlock = OrigLoop->getUniqueExitBlock(); // may be nullptr
+  if (!LoopExitBlock) {
+    SmallVector<BasicBlock *> ExitBlocks;
+    OrigLoop->getExitBlocks(ExitBlocks);
+    auto *Switch = Builder.CreateSwitch(Builder.getInt8(0), LoopScalarPreHeader,
+                                        ExitBlocks.size());
+    unsigned I = 0;
+    for (auto *Exit : ExitBlocks) {
+      Switch->addCase(Builder.getInt8(I), Exit);
+      ++I;
+      DT->changeImmediateDominator(Exit, LoopMiddleBlock);
+      for (auto &P : Exit->phis())
+        ExitPhis.push_back(&P);
+    }
+    ReplaceInstWithInst(LoopMiddleBlock->getTerminator(), Switch);
+  } else {
 
-  // Update dominator for loop exit. During skeleton creation, only the vector
-  // pre-header and the middle block are created. The vector loop is entirely
-  // created during VPlan exection.
-  if (!Cost->requiresScalarEpilogue(VF.isVector()))
-    // If there is an epilogue which must run, there's no edge from the
-    // middle block to exit blocks  and thus no need to update the immediate
-    // dominator of the exit blocks.
-    DT->changeImmediateDominator(LoopExitBlock, LoopMiddleBlock);
+    // Set up the middle block terminator.  Two cases:
+    // 1) If we know that we must execute the scalar epilogue, emit an
+    //    unconditional branch.
+    // 2) Otherwise, we must have a single unique exit block (due to how we
+    //    implement the multiple exit case).  In this case, set up a conditional
+    //    branch from the middle block to the loop scalar preheader, and the
+    //    exit block.  completeLoopSkeleton will update the condition to use an
+    //    iteration check, if required to decide whether to execute the
+    //    remainder.
+    BranchInst *BrInst =
+        Cost->requiresScalarEpilogue(VF.isVector())
+            ? BranchInst::Create(LoopScalarPreHeader)
+            : BranchInst::Create(LoopExitBlock, LoopScalarPreHeader,
+                                 Builder.getTrue());
+    BrInst->setDebugLoc(ScalarLatchTerm->getDebugLoc());
+    ReplaceInstWithInst(LoopMiddleBlock->getTerminator(), BrInst);
+    // Update dominator for loop exit. During skeleton creation, only the vector
+    // pre-header and the middle block are created. The vector loop is entirely
+    // created during VPlan exection.
+    if (!Cost->requiresScalarEpilogue(VF.isVector()))
+      // If there is an epilogue which must run, there's no edge from the
+      // middle block to exit blocks  and thus no need to update the immediate
+      // dominator of the exit blocks.
+      DT->changeImmediateDominator(LoopExitBlock, LoopMiddleBlock);
+  }
 }
 
 PHINode *InnerLoopVectorizer::createInductionResumeValue(
@@ -3101,34 +3134,37 @@ BasicBlock *InnerLoopVectorizer::completeLoopSkeleton() {
 
   auto *ScalarLatchTerm = OrigLoop->getLoopLatch()->getTerminator();
 
-  // Add a check in the middle block to see if we have completed
-  // all of the iterations in the first vector loop.  Three cases:
-  // 1) If we require a scalar epilogue, there is no conditional branch as
-  //    we unconditionally branch to the scalar preheader.  Do nothing.
-  // 2) If (N - N%VF) == N, then we *don't* need to run the remainder.
-  //    Thus if tail is to be folded, we know we don't need to run the
-  //    remainder and we can use the previous value for the condition (true).
-  // 3) Otherwise, construct a runtime check.
-  if (!Cost->requiresScalarEpilogue(VF.isVector()) &&
-      !Cost->foldTailByMasking()) {
-    // Here we use the same DebugLoc as the scalar loop latch terminator instead
-    // of the corresponding compare because they may have ended up with
-    // different line numbers and we want to avoid awkward line stepping while
-    // debugging. Eg. if the compare has got a line number inside the loop.
-    // TODO: At the moment, CreateICmpEQ will simplify conditions with constant
-    // operands. Perform simplification directly on VPlan once the branch is
-    // modeled there.
-    IRBuilder<> B(LoopMiddleBlock->getTerminator());
-    B.SetCurrentDebugLocation(ScalarLatchTerm->getDebugLoc());
-    Value *CmpN = B.CreateICmpEQ(Count, VectorTripCount, "cmp.n");
-    BranchInst &BI = *cast<BranchInst>(LoopMiddleBlock->getTerminator());
-    BI.setCondition(CmpN);
-    if (hasBranchWeightMD(*ScalarLatchTerm)) {
-      // Assume that `Count % VectorTripCount` is equally distributed.
-      unsigned TripCount = UF * VF.getKnownMinValue();
-      assert(TripCount > 0 && "trip count should not be zero");
-      const uint32_t Weights[] = {1, TripCount - 1};
-      setBranchWeights(BI, Weights);
+  if (OrigLoop->getUniqueExitBlock()) {
+    // Add a check in the middle block to see if we have completed
+    // all of the iterations in the first vector loop.  Three cases:
+    // 1) If we require a scalar epilogue, there is no conditional branch as
+    //    we unconditionally branch to the scalar preheader.  Do nothing.
+    // 2) If (N - N%VF) == N, then we *don't* need to run the remainder.
+    //    Thus if tail is to be folded, we know we don't need to run the
+    //    remainder and we can use the previous value for the condition (true).
+    // 3) Otherwise, construct a runtime check.
+    if (!Cost->requiresScalarEpilogue(VF.isVector()) &&
+        !Cost->foldTailByMasking()) {
+      // Here we use the same DebugLoc as the scalar loop latch terminator
+      // instead of the corresponding compare because they may have ended up
+      // with different line numbers and we want to avoid awkward line stepping
+      // while debugging. Eg. if the compare has got a line number inside the
+      // loop.
+      // TODO: At the moment, CreateICmpEQ will simplify conditions with
+      // constant operands. Perform simplification directly on VPlan once the
+      // branch is modeled there.
+      IRBuilder<> B(LoopMiddleBlock->getTerminator());
+      B.SetCurrentDebugLocation(ScalarLatchTerm->getDebugLoc());
+      Value *CmpN = B.CreateICmpEQ(Count, VectorTripCount, "cmp.n");
+      BranchInst &BI = *cast<BranchInst>(LoopMiddleBlock->getTerminator());
+      BI.setCondition(CmpN);
+      if (hasBranchWeightMD(*ScalarLatchTerm)) {
+        // Assume that `Count % VectorTripCount` is equally distributed.
+        unsigned TripCount = UF * VF.getKnownMinValue();
+        assert(TripCount > 0 && "trip count should not be zero");
+        const uint32_t Weights[] = {1, TripCount - 1};
+        setBranchWeights(BI, Weights);
+      }
     }
   }
 
@@ -3216,9 +3252,28 @@ void InnerLoopVectorizer::fixupIVUsers(PHINode *OrigPhi,
   // value (the value that feeds into the phi from the loop latch).
   // We allow both, but they, obviously, have different values.
 
-  assert(OrigLoop->getUniqueExitBlock() && "Expected a single exit block");
+  // assert(OrigLoop->getUniqueExitBlock() && "Expected a single exit block");
 
   DenseMap<Value *, Value *> MissingVals;
+
+  if (!OrigLoop->getUniqueExitBlock()) {
+    auto *C= cast<SelectInst>(MiddleBlock->getTerminator()->getOperand(0))->getOperand(0);
+    auto *Mask = cast<CallInst>(C)->getArgOperand(0);
+    IRBuilder B(MiddleBlock->getTerminator());
+      auto *TTZ = B.CreateIntrinsic(
+                 Intrinsic::experimental_cttz_elts, {EndValue->getType(), Mask->getType()},
+                          {Mask, B.getInt1(/*ZeroIsPoison=*/true)});
+      auto *IV = State.get(Plan.getCanonicalIV(), 0, true);
+      auto *IVNext = State.get(Plan.getCanonicalIV()->getBackedgeValue(), 0, true);
+      auto *Sub = B.CreateAdd(IV, TTZ);
+      EndValue= B.CreateSelect(C, Sub, IVNext);
+      auto *Phi = &*(LoopScalarPreHeader->phis().begin());
+      Phi->setIncomingValueForBlock(MiddleBlock, EndValue);
+      for(auto *P : ExitPhis) {
+
+        P->addIncoming(EndValue, MiddleBlock);
+      }
+  }
 
   // An external user of the last iteration's value should see the value that
   // the remainder loop uses to initialize its own IV.
@@ -4187,7 +4242,9 @@ void LoopVectorizationCostModel::collectLoopUniforms(ElementCount VF) {
   TheLoop->getExitingBlocks(Exiting);
   for (BasicBlock *E : Exiting) {
     auto *Cmp = dyn_cast<Instruction>(E->getTerminator()->getOperand(0));
-    if (Cmp && TheLoop->contains(Cmp) && Cmp->hasOneUse())
+    if (Cmp && TheLoop->contains(Cmp) && Cmp->hasOneUse() &&
+        (E == TheLoop->getLoopLatch() ||
+         !isa<SCEVCouldNotCompute>(PSE.getBackedgeTakenCount())))
       addToWorklistIfAllowed(Cmp);
   }
 
@@ -7535,7 +7592,7 @@ LoopVectorizationPlanner::executePlan(
   // Perform the actual loop transformation.
   VPTransformState State(BestVF, BestUF, LI,
                          EnableVPlanNativePath ? nullptr : DT, ILV.Builder,
-                         &ILV, &BestVPlan, OrigLoop->getHeader()->getContext());
+                         &ILV, &BestVPlan, OrigLoop->getHeader()->getContext(), OrigLoop);
 
   // 0. Generate SCEV-dependent code into the preheader, including TripCount,
   // before making any changes to the CFG.
@@ -7625,6 +7682,17 @@ LoopVectorizationPlanner::executePlan(
     LoopVectorizeHints Hints(L, true, *ORE);
     Hints.setAlreadyVectorized();
   }
+
+  if (!OrigLoop->getUniqueExitBlock()) {
+  VPBasicBlock *MiddleVPBB =
+      cast<VPBasicBlock>(BestVPlan.getVectorLoopRegion()->getSingleSuccessor());
+  auto *VPV = dyn_cast<VPInstruction>(&MiddleVPBB->back());
+  if (VPV && VPV->getOpcode() == Instruction::Select) {
+    cast<SwitchInst>(State.CFG.VPBB2IRBB[MiddleVPBB]->getTerminator())
+        ->setCondition(State.get(VPV, 0, true));
+  }
+  }
+
   TargetTransformInfo::UnrollingPreferences UP;
   TTI.getUnrollingPreferences(L, *PSE.getSE(), UP, ORE);
   if (!UP.UnrollVectorizedLoop || CanonicalIVStartValue)
@@ -8002,12 +8070,6 @@ VPValue *VPRecipeBuilder::createEdgeMask(BasicBlock *Src, BasicBlock *Dst) {
   assert(BI && "Unexpected terminator found");
 
   if (!BI->isConditional() || BI->getSuccessor(0) == BI->getSuccessor(1))
-    return EdgeMaskCache[Edge] = SrcMask;
-
-  // If source is an exiting block, we know the exit edge is dynamically dead
-  // in the vector loop, and thus we don't need to restrict the mask.  Avoid
-  // adding uses of an otherwise potentially dead instruction.
-  if (OrigLoop->isLoopExiting(Src))
     return EdgeMaskCache[Edge] = SrcMask;
 
   VPValue *EdgeMask = getVPValueOrAddLiveIn(BI->getCondition(), Plan);
@@ -8866,6 +8928,91 @@ LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(VFRange &Range) {
     VPlanTransforms::addActiveLaneMask(*Plan, ForControlFlow,
                                        WithoutRuntimeCheck);
   }
+
+  SmallVector<BasicBlock *> Exiting;
+  OrigLoop->getExitingBlocks(Exiting);
+
+  if (Exiting.size() > 1) {
+    VPBuilder::InsertPointGuard Guard(Builder);
+    Builder.setInsertPoint(LatchVPBB->getTerminator());
+    auto *MiddleVPBB =
+        cast<VPBasicBlock>(Plan->getVectorLoopRegion()->getSingleSuccessor());
+
+  VPValue *EarlyExitTaken = nullptr;
+  SmallVector<VPValue *> ExitTaken;
+  SmallVector<PHINode*> ExitPhis;
+  SmallVector<Value*> ExitValues;
+  for (BasicBlock *E : Exiting) {
+    if (E == OrigLoop->getLoopLatch())
+      continue;
+    BasicBlock *TrueSucc =
+        cast<BranchInst>(E->getTerminator())->getSuccessor(0);
+    BasicBlock *FalseSucc =
+        cast<BranchInst>(E->getTerminator())->getSuccessor(1);
+    VPValue *M = RecipeBuilder.getBlockInMask(
+        OrigLoop->contains(TrueSucc) ? TrueSucc : FalseSucc);
+
+      auto *N = Builder.createNot(M);
+      auto *EC = Builder.createNaryOp(VPInstruction::ReduceOr, {N});
+      ExitTaken.push_back(EC);
+      if (EarlyExitTaken)
+        EarlyExitTaken = Builder.createOr(EarlyExitTaken, EC);
+      else
+        EarlyExitTaken = EC;
+      BasicBlock *ExitBlock =
+          !OrigLoop->contains(TrueSucc) ? TrueSucc : FalseSucc;
+
+    for (PHINode &PH : ExitBlock->phis()) {
+      Value *EV = PH.getIncomingValueForBlock(E);
+      ExitPhis.push_back(&PH);
+      ExitValues.push_back(EV);
+    }
+    auto *LatchExitTaken =
+        new VPInstruction(Instruction::ICmp, CmpInst::ICMP_EQ,
+                          Plan->getTripCount(), &Plan->getVectorTripCount());
+    MiddleVPBB->appendRecipe(LatchExitTaken);
+    ExitTaken.push_back(LatchExitTaken);
+
+    VPValue *SelSucc = Plan->getOrAddLiveIn(ConstantInt::get(
+        IntegerType::get(OrigLoop->getHeader()->getContext(), 8), 10));
+    char Off = ExitTaken.size() - 1;
+    for (VPValue *C : reverse(ExitTaken)) {
+      auto *Sel = new VPInstruction(
+          Instruction::Select,
+          {C,
+           Plan->getOrAddLiveIn(ConstantInt::get(
+               IntegerType::get(OrigLoop->getHeader()->getContext(), 8), Off)),
+           SelSucc});
+      MiddleVPBB->appendRecipe(Sel);
+      SelSucc = Sel;
+      --Off;
+    }
+  }
+
+  if (ExitValues.size() == 2) {
+  auto *FinalValue = new VPInstruction(Instruction::ICmp, CmpInst::ICMP_EQ,
+                                   Plan->getCanonicalIV(),
+                                   &Plan->getVectorTripCount());
+  }
+
+
+
+  VPValue *SelSucc = Plan->getOrAddLiveIn(ConstantInt::get(IntegerType::get(OrigLoop->getHeader()->getContext(), 8), 10));
+  char Off = ExitTaken.size() -1;
+  for (VPValue *C : reverse(ExitTaken)) {
+    auto *Sel = new VPInstruction(Instruction::Select, { C, Plan->getOrAddLiveIn(ConstantInt::get(IntegerType::get(OrigLoop->getHeader()->getContext(), 8), Off)), SelSucc});
+  MiddleVPBB->appendRecipe(Sel);
+  SelSucc = Sel;
+  --Off;
+  }
+
+  auto *Term = dyn_cast<VPInstruction>(LatchVPBB->getTerminator());
+  auto *Cmp = Builder.createICmp(CmpInst::ICMP_EQ, Term->getOperand(0), Term->getOperand(1));
+  auto *E = Builder.createOr(Cmp, EarlyExitTaken);
+  Builder.createNaryOp(VPInstruction::BranchOnCond, E);
+  Term->eraseFromParent();
+  }
+
   return Plan;
 }
 
@@ -10400,8 +10547,8 @@ PreservedAnalyses LoopVectorizePass::run(Function &F,
     // only for non-VPlan-native path.
     // TODO: Preserve Dominator analysis for VPlan-native path.
     if (!EnableVPlanNativePath) {
-      PA.preserve<DominatorTreeAnalysis>();
-      PA.preserve<ScalarEvolutionAnalysis>();
+      //PA.preserve<DominatorTreeAnalysis>();
+      //PA.preserve<ScalarEvolutionAnalysis>();
     }
 
     PA.preserve<LoopAnalysis>();

@@ -2792,6 +2792,8 @@ bool LoopAccessInfo::blockNeedsPredication(BasicBlock *BB, Loop *TheLoop,
                                            DominatorTree *DT)  {
   assert(TheLoop->contains(BB) && "Unknown block used");
 
+  if (!TheLoop->getExitingBlock())
+    return true;
   // Blocks that do not dominate the latch need predication.
   BasicBlock* Latch = TheLoop->getLoopLatch();
   return !DT->dominates(BB, Latch);
