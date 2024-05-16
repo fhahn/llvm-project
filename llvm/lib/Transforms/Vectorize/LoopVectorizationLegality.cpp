@@ -1514,7 +1514,7 @@ bool LoopVectorizationLegality::canVectorize(bool UseVPlanNativePath) {
       return false;
   }
 
-  if (isa<SCEVCouldNotCompute>(PSE.getBackedgeTakenCount())) {
+  if (isa<SCEVCouldNotCompute>(PSE.getSymbolicMaxBackedgeTakenCount())) {
     reportVectorizationFailure("could not determine number of loop iterations",
                                "could not determine number of loop iterations",
                                "CantComputeNumberOfIterations", ORE, TheLoop);
