@@ -468,6 +468,7 @@ void VPIRBasicBlock::execute(VPTransformState *State) {
     assert(PredBB && "Predecessor basic-block not found building successor.");
     LLVM_DEBUG(dbgs() << "LV: draw edge from" << PredBB->getName() << '\n');
 
+<<<<<<< HEAD
     auto *PredBBTerminator = PredBB->getTerminator();
     auto *TermBr = cast<BranchInst>(PredBBTerminator);
     // Set each forward successor here when it is created, excluding
@@ -478,6 +479,44 @@ void VPIRBasicBlock::execute(VPTransformState *State) {
            "Trying to reset an existing successor block.");
     TermBr->setSuccessor(idx, IRBB);
     State->CFG.DTU.applyUpdates({{DominatorTree::Insert, PredBB, IRBB}});
+=======
+    auto *TermBr = dyn_cast<BranchInst>(PredBBTerminator);
+    if (TermBr) {
+      // Set each forward successor here when it is created, excluding
+      // backedges. A backward successor is set when the branch is created.
+      unsigned idx = PredVPSuccessors.front() == this ? 0 : 1;
+      assert(!TermBr->getSuccessor(idx) &&
+             "Trying to reset an existing successor block.");
+      TermBr->setSuccessor(idx, IRBB);
+    }
+  }
+
+  for (auto *Fixup : FixupPhis) {
+    // Create phi nodes to merge from the  backedge-taken check block.
+    PHINode *BCResumeVal =
+        PHINode::Create(Fixup->OrigPhi->getType(), 3, "bc.resume.val",
+                        WrappedBlock->getFirstNonPHI());
+    // Copy original phi DL over to the new one.
+    BCResumeVal->setDebugLoc(Fixup->OrigPhi->getDebugLoc());
+
+    BasicBlock *Inc = State->CFG.VPBB2IRBB[Fixup->IncVPBB];
+    // The new PHI merges the original incoming value, in case of a bypass,
+    // or the value at the end of the vectorized loop.
+    BCResumeVal->addIncoming(Fixup->getOperand(0)->getLiveInIRValue(), Inc);
+
+    auto V = to_vector(predecessors(WrappedBlock));
+    for (BasicBlock *BB : reverse(V)) {
+      if (BB == Inc) {
+        continue;
+      }
+      if (BB == Fixup->BypassBB) {
+        BCResumeVal->addIncoming(Fixup->BypassEndVal, BB);
+        continue;
+      }
+      BCResumeVal->addIncoming(Fixup->ID.getStartValue(), BB);
+    }
+    Fixup->OrigPhi->setIncomingValueForBlock(WrappedBlock, BCResumeVal);
+>>>>>>> b7421a9eaec3 (Induction resume values)
   }
 }
 

@@ -681,6 +681,12 @@ protected:
   // correct start value of reduction PHIs when vectorizing the epilogue.
   SmallMapVector<const RecurrenceDescriptor *, PHINode *, 4>
       ReductionResumeValues;
+<<<<<<< HEAD
+=======
+
+  SmallVector<std::tuple<PHINode *, Value *, BasicBlock *, Value *>>
+      InductionResumeValues;
+>>>>>>> b7421a9eaec3 (Induction resume values)
 };
 
 class InnerLoopUnroller : public InnerLoopVectorizer {
@@ -2611,6 +2617,7 @@ PHINode *InnerLoopVectorizer::createInductionResumeValue(
     }
   }
 
+<<<<<<< HEAD
   // Create phi nodes to merge from the  backedge-taken check block.
   PHINode *BCResumeVal =
       PHINode::Create(OrigPhi->getType(), 3, "bc.resume.val",
@@ -2632,6 +2639,11 @@ PHINode *InnerLoopVectorizer::createInductionResumeValue(
     BCResumeVal->setIncomingValueForBlock(AdditionalBypass.first,
                                           EndValueFromAdditionalBypass);
   return BCResumeVal;
+=======
+  InductionResumeValues.emplace_back(OrigPhi, EndValue, AdditionalBypass.first,
+                                     EndValueFromAdditionalBypass);
+  return EndValue;
+>>>>>>> b7421a9eaec3 (Induction resume values)
 }
 
 /// Return the expanded step for \p ID using \p ExpandedSCEVs to look up SCEV
@@ -7540,6 +7552,31 @@ LoopVectorizationPlanner::executePlan(
   assert(DT->verify(DominatorTree::VerificationLevel::Fast));
 #endif
 
+<<<<<<< HEAD
+=======
+  VPBasicBlock *MiddleVPBB =
+      cast<VPBasicBlock>(BestVPlan.getVectorLoopRegion()->getSingleSuccessor());
+
+  using namespace llvm::VPlanPatternMatch;
+  VPIRBasicBlock *WrappedPH;
+  if (MiddleVPBB->begin() != MiddleVPBB->end() &&
+      match(&MiddleVPBB->back(), m_BranchOnCond(m_VPValue()))) {
+    WrappedPH = cast<VPIRBasicBlock>(MiddleVPBB->getSuccessors()[1]);
+  } else
+    WrappedPH = cast<VPIRBasicBlock>(MiddleVPBB->getSuccessors()[0]);
+
+  WrappedPH->resetBlock(OrigLoop->getLoopPreheader());
+  for (const auto &[OrigPhi, EndVal, Bypass, BypassEndVal] :
+       ILV.InductionResumeValues) {
+    auto *ID = OrigPhi->getType()->isPointerTy()
+                   ? Legal->getPointerInductionDescriptor(OrigPhi)
+                   : Legal->getIntOrFpInductionDescriptor(OrigPhi);
+    WrappedPH->addFixupPhi(new VPFixupPhi(OrigPhi, *ID,
+                                          BestVPlan.getOrAddLiveIn(EndVal),
+                                          MiddleVPBB, Bypass, BypassEndVal));
+  }
+
+>>>>>>> b7421a9eaec3 (Induction resume values)
   // Only use noalias metadata when using memory checks guaranteeing no overlap
   // across all iterations.
   const LoopAccessInfo *LAI = ILV.Legal->getLAI();
@@ -10112,6 +10149,20 @@ bool LoopVectorizePass::processLoop(Loop *L) {
           ExpandR->eraseFromParent();
         }
 
+<<<<<<< HEAD
+=======
+        VPBasicBlock *MiddleVPBB = cast<VPBasicBlock>(
+            BestMainPlan->getVectorLoopRegion()->getSingleSuccessor());
+
+        using namespace llvm::VPlanPatternMatch;
+        VPIRWrapperBlock *WrappedPH;
+        if (MiddleVPBB->begin() != MiddleVPBB->end() &&
+            match(&MiddleVPBB->back(), m_BranchOnCond(m_VPValue()))) {
+          WrappedPH = cast<VPIRWrapperBlock>(MiddleVPBB->getSuccessors()[1]);
+        } else
+          WrappedPH = cast<VPIRWrapperBlock>(MiddleVPBB->getSuccessors()[0]);
+
+>>>>>>> b7421a9eaec3 (Induction resume values)
         // Ensure that the start values for any VPWidenIntOrFpInductionRecipe,
         // VPWidenPointerInductionRecipe and VPReductionPHIRecipes are updated
         // before vectorizing the epilogue loop.

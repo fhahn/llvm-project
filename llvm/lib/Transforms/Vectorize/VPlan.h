@@ -3112,6 +3112,22 @@ public:
   }
 };
 
+<<<<<<< HEAD
+=======
+struct VPFixupPhi : public VPUser {
+  PHINode *OrigPhi;
+  const InductionDescriptor &ID;
+  VPBasicBlock *IncVPBB;
+  BasicBlock *BypassBB;
+  Value *BypassEndVal;
+
+  VPFixupPhi(PHINode *OrigPhi, const InductionDescriptor &ID, VPValue *Inc,
+             VPBasicBlock *IncVPBB, BasicBlock *BypassBB, Value *BypassEndVal)
+      : VPUser({Inc}, VPUser::VPUserID::LiveOut), OrigPhi(OrigPhi), ID(ID),
+        IncVPBB(IncVPBB), BypassBB(BypassBB), BypassEndVal(BypassEndVal) {}
+};
+
+>>>>>>> b7421a9eaec3 (Induction resume values)
 /// VPBasicBlock serves as the leaf of the Hierarchical Control-Flow Graph. It
 /// holds a sequence of zero or more VPRecipe's each representing a sequence of
 /// output IR instructions. All PHI-like recipes must come before any non-PHI recipes.
