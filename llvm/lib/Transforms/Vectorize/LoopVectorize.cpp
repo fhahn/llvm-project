@@ -182,11 +182,11 @@ static cl::opt<bool> EnableEpilogueVectorization(
     cl::desc("Enable vectorization of epilogue loops."));
 
 static cl::opt<bool> EnableEarlyExitVectorization(
-    "enable-early-exit-vectorization", cl::init(false), cl::Hidden,
+    "enable-early-exit-vectorization", cl::init(true), cl::Hidden,
     cl::desc("Enable vectorization of early exit loops."));
 
 static cl::opt<bool> AssumeNoMemFault(
-    "vectorizer-no-mem-fault", cl::init(false), cl::Hidden,
+    "vectorizer-no-mem-fault", cl::init(true), cl::Hidden,
     cl::desc("Assume vectorized loops will not have memory faults, which is "
              "potentially unsafe but can be useful for testing vectorization "
              "of early exit loops."));

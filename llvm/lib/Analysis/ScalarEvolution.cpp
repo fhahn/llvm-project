@@ -13619,7 +13619,8 @@ static void PrintLoopInfo(raw_ostream &OS, ScalarEvolution *SE,
     }
 
   SmallVector<const SCEVPredicate *, 4> Preds;
-  auto *PBT = SE->getPredicatedBackedgeTakenCount(L, Preds);
+      SmallVector<const SCEVPredicate *, 4> SpecPreds;
+  auto *PBT = SE->getPredicatedBackedgeTakenCount(L, SpecPreds, true);
   if (PBT != BTC || !Preds.empty()) {
     OS << "Loop ";
     L->getHeader()->printAsOperand(OS, /*PrintType=*/false);
@@ -13629,7 +13630,7 @@ static void PrintLoopInfo(raw_ostream &OS, ScalarEvolution *SE,
       PrintSCEVWithTypeHint(OS, PBT);
     } else {
       SmallVector<const SCEVPredicate *, 4> SpecPreds;
-      PBT = SE->getPredicatedBackedgeTakenCount(L, SpecPreds);
+      PBT = SE->getPredicatedBackedgeTakenCount(L, SpecPreds, true);
       if (!isa<SCEVCouldNotCompute>(PBT)) {
         OS << "Speculative predicated backedge-taken count is ";
         PrintSCEVWithTypeHint(OS, PBT);
