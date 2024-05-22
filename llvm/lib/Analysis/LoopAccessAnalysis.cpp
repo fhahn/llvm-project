@@ -213,7 +213,9 @@ getStartAndEndForAccess(const Loop *Lp, const SCEV *PtrExpr, Type *AccessTy,
 
   if (SE->isLoopInvariant(PtrExpr, Lp)) {
     ScStart = ScEnd = PtrExpr;
-  } else if (auto *AR = dyn_cast<SCEVAddRecExpr>(PtrExpr)) {
+  } else {
+    const SCEVAddRecExpr *AR = dyn_cast<SCEVAddRecExpr>(PtrExpr);
+    assert(AR && "Invalid addrec expression");
     const SCEV *Ex = PSE.getBackedgeTakenCount();
 
     ScStart = AR->getStart();
@@ -232,9 +234,7 @@ getStartAndEndForAccess(const Loop *Lp, const SCEV *PtrExpr, Type *AccessTy,
       ScStart = SE->getUMinExpr(ScStart, ScEnd);
       ScEnd = SE->getUMaxExpr(AR->getStart(), ScEnd);
     }
-  } else
-    return {SE->getCouldNotCompute(), SE->getCouldNotCompute()};
-
+  }
   assert(SE->isLoopInvariant(ScStart, Lp) && "ScStart needs to be invariant");
   assert(SE->isLoopInvariant(ScEnd, Lp)&& "ScEnd needs to be invariant");
 
@@ -256,9 +256,6 @@ void RuntimePointerChecking::insert(Loop *Lp, Value *Ptr, const SCEV *PtrExpr,
                                     bool NeedsFreeze) {
   const auto &[ScStart, ScEnd] =
       getStartAndEndForAccess(Lp, PtrExpr, AccessTy, PSE);
-  assert(!isa<SCEVCouldNotCompute>(ScStart) &&
-         !isa<SCEVCouldNotCompute>(ScEnd) &&
-         "must be able to compute both start and end expressions");
   Pointers.emplace_back(Ptr, ScStart, ScEnd, WritePtr, DepSetId, ASId, PtrExpr,
                         NeedsFreeze);
 }
@@ -1989,25 +1986,6 @@ getDependenceDistanceStrideAndSize(
       isLoopVariantIndirectAddress(UnderlyingObjects.find(BPtr)->second, SE,
                                    InnermostLoop))
     return MemoryDepChecker::Dependence::IndirectUnsafe;
-
-  // Check if we can prove that Sink only accesses memory after Src's end or
-  // vice versa.
-  if (SE.isLoopInvariant(Src, InnermostLoop) || SE.isLoopInvariant(Sink, InnermostLoop)) {
-  const auto &[SrcStart, SrcEnd] =
-      getStartAndEndForAccess(InnermostLoop, Src, ATy, PSE);
-  const auto &[SinkStart, SinkEnd] =
-      getStartAndEndForAccess(InnermostLoop, Sink, BTy, PSE);
-
-  if (!isa<SCEVCouldNotCompute>(SrcStart) &&
-      !isa<SCEVCouldNotCompute>(SrcEnd) &&
-      !isa<SCEVCouldNotCompute>(SinkStart) &&
-      !isa<SCEVCouldNotCompute>(SinkEnd)) {
-    if (SE.isKnownPredicate(CmpInst::ICMP_ULE, SrcEnd, SinkStart))
-      return MemoryDepChecker::Dependence::NoDep;
-    if (SE.isKnownPredicate(CmpInst::ICMP_ULE, SinkEnd, SrcStart))
-      return MemoryDepChecker::Dependence::NoDep;
-  }
-  }
 
   // Need accesses with constant strides and the same direction. We don't want
   // to vectorize "A[B[i]] += ..." and similar code or pointer arithmetic that
