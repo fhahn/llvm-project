@@ -184,9 +184,9 @@ public:
 
   MemoryDepChecker(PredicatedScalarEvolution &PSE, const Loop *L,
                    const DenseMap<Value *, const SCEV *> &SymbolicStrides,
-                   unsigned MaxTargetVectorWidthInBits)
+                   unsigned MaxTargetVectorWidthInBits, bool ExpensiveChecks)
       : PSE(PSE), InnermostLoop(L), SymbolicStrides(SymbolicStrides),
-        MaxTargetVectorWidthInBits(MaxTargetVectorWidthInBits) {}
+        MaxTargetVectorWidthInBits(MaxTargetVectorWidthInBits),   ExpensiveChecks(ExpensiveChecks){}
 
   /// Register the location (instructions are given increasing numbers)
   /// of a write access.
@@ -339,6 +339,7 @@ private:
            std::pair<const SCEV *, const SCEV *>>
       PointerBounds;
 
+  bool ExpensiveChecks;
   /// Check whether there is a plausible dependence between the two
   /// accesses.
   ///
@@ -396,7 +397,8 @@ private:
       const MemAccessInfo &A, Instruction *AInst, const MemAccessInfo &B,
       Instruction *BInst,
       const DenseMap<Value *, SmallVector<const Value *, 16>>
-          &UnderlyingObjects);
+          &UnderlyingObjects,
+          bool ExpensiveChecks);
 };
 
 class RuntimePointerChecking;
@@ -631,7 +633,7 @@ class LoopAccessInfo {
 public:
   LoopAccessInfo(Loop *L, ScalarEvolution *SE, const TargetTransformInfo *TTI,
                  const TargetLibraryInfo *TLI, AAResults *AA, DominatorTree *DT,
-                 LoopInfo *LI);
+                 LoopInfo *LI, bool ExpensiveChecks);
 
   /// Return true we can analyze the memory accesses in the loop and there are
   /// no memory dependence cycles. Note that for dependences between loads &
@@ -857,11 +859,12 @@ class LoopAccessInfoManager {
   LoopInfo &LI;
   TargetTransformInfo *TTI;
   const TargetLibraryInfo *TLI = nullptr;
+  bool ExpensiveChecks = true;
 
 public:
   LoopAccessInfoManager(ScalarEvolution &SE, AAResults &AA, DominatorTree &DT,
                         LoopInfo &LI, TargetTransformInfo *TTI,
-                        const TargetLibraryInfo *TLI)
+                        const TargetLibraryInfo *TLI, bool ExpensiveChecks = true)
       : SE(SE), AA(AA), DT(DT), LI(LI), TTI(TTI), TLI(TLI) {}
 
   const LoopAccessInfo &getInfo(Loop &L);
@@ -870,6 +873,8 @@ public:
 
   bool invalidate(Function &F, const PreservedAnalyses &PA,
                   FunctionAnalysisManager::Invalidator &Inv);
+
+  void setExpensiveChecks(bool E) { ExpensiveChecks = E; }
 };
 
 /// This analysis provides dependence information for the memory

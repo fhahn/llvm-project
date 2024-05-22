@@ -696,6 +696,7 @@ PreservedAnalyses LoopLoadEliminationPass::run(Function &F,
   auto *BFI = (PSI && PSI->hasProfileSummary()) ?
       &AM.getResult<BlockFrequencyAnalysis>(F) : nullptr;
   LoopAccessInfoManager &LAIs = AM.getResult<LoopAccessAnalysis>(F);
+  LAIs.setExpensiveChecks(false);
 
   bool Changed = eliminateLoadsAcrossLoops(F, LI, DT, BFI, PSI, &SE, &AC, LAIs);
 
