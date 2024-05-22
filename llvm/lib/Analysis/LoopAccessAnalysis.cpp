@@ -1895,7 +1895,8 @@ std::variant<MemoryDepChecker::Dependence::DepType,
              MemoryDepChecker::DepDistanceStrideAndSizeInfo>
 MemoryDepChecker::getDependenceDistanceStrideAndSize(
     const AccessAnalysis::MemAccessInfo &A, Instruction *AInst,
-    const AccessAnalysis::MemAccessInfo &B, Instruction *BInst) {
+    const AccessAnalysis::MemAccessInfo &B, Instruction *BInst,
+        bool ExpensiveChecks) {
   const auto &DL = InnermostLoop->getHeader()->getDataLayout();
   auto &SE = *PSE.getSE();
   const auto &[APtr, AIsWrite] = A;
@@ -1938,21 +1939,22 @@ MemoryDepChecker::getDependenceDistanceStrideAndSize(
                     << ": " << *Dist << "\n");
 
   // Check if we can prove that Sink only accesses memory after Src's end or
-  // vice versa. At the moment this is limited to cases where either source or
-  // sink are loop invariant to avoid compile-time increases. This is not
-  // required for correctness.
-  const auto &[SrcStart, SrcEnd] =
-      getStartAndEndForAccess(InnermostLoop, Src, ATy, PSE, PointerBounds);
-  const auto &[SinkStart, SinkEnd] =
-      getStartAndEndForAccess(InnermostLoop, Sink, BTy, PSE, PointerBounds);
-  if (!isa<SCEVCouldNotCompute>(SrcStart) &&
-      !isa<SCEVCouldNotCompute>(SrcEnd) &&
-      !isa<SCEVCouldNotCompute>(SinkStart) &&
-      !isa<SCEVCouldNotCompute>(SinkEnd)) {
-    if (SE.isKnownPredicate(CmpInst::ICMP_ULE, SrcEnd, SinkStart))
-      return MemoryDepChecker::Dependence::NoDep;
-    if (SE.isKnownPredicate(CmpInst::ICMP_ULE, SinkEnd, SrcStart))
-      return MemoryDepChecker::Dependence::NoDep;
+  // vice versa.
+  if (ExpensiveChecks || (SE.isLoopInvariant(Src, InnermostLoop) ||
+                          SE.isLoopInvariant(Sink, InnermostLoop))) {
+    const auto &[SrcStart, SrcEnd] =
+        getStartAndEndForAccess(InnermostLoop, Src, ATy, PSE, PointerBounds);
+    const auto &[SinkStart, SinkEnd] =
+        getStartAndEndForAccess(InnermostLoop, Sink, BTy, PSE, PointerBounds);
+    if (!isa<SCEVCouldNotCompute>(SrcStart) &&
+        !isa<SCEVCouldNotCompute>(SrcEnd) &&
+        !isa<SCEVCouldNotCompute>(SinkStart) &&
+        !isa<SCEVCouldNotCompute>(SinkEnd)) {
+      if (SE.isKnownPredicate(CmpInst::ICMP_ULE, SrcEnd, SinkStart))
+        return MemoryDepChecker::Dependence::NoDep;
+      if (SE.isKnownPredicate(CmpInst::ICMP_ULE, SinkEnd, SrcStart))
+        return MemoryDepChecker::Dependence::NoDep;
+    }
   }
 
   // Need accesses with constant strides and the same direction for further
@@ -2003,7 +2005,7 @@ MemoryDepChecker::isDependent(const MemAccessInfo &A, unsigned AIdx,
   // Get the dependence distance, stride, type size and what access writes for
   // the dependence between A and B.
   auto Res =
-      getDependenceDistanceStrideAndSize(A, InstMap[AIdx], B, InstMap[BIdx]);
+      getDependenceDistanceStrideAndSize(A, InstMap[AIdx], B, InstMap[BIdx], ExpensiveChecks);
   if (std::holds_alternative<Dependence::DepType>(Res))
     return std::get<Dependence::DepType>(Res);
 
@@ -2991,7 +2993,7 @@ void LoopAccessInfo::collectStridedAccess(Value *MemAccess) {
 LoopAccessInfo::LoopAccessInfo(Loop *L, ScalarEvolution *SE,
                                const TargetTransformInfo *TTI,
                                const TargetLibraryInfo *TLI, AAResults *AA,
-                               DominatorTree *DT, LoopInfo *LI)
+                               DominatorTree *DT, LoopInfo *LI, bool ExpensiveChecks)
     : PSE(std::make_unique<PredicatedScalarEvolution>(*SE, *L)),
       PtrRtChecking(nullptr), TheLoop(L) {
   unsigned MaxTargetVectorWidthInBits = std::numeric_limits<unsigned>::max();
@@ -3010,7 +3012,7 @@ LoopAccessInfo::LoopAccessInfo(Loop *L, ScalarEvolution *SE,
       MaxTargetVectorWidthInBits = std::numeric_limits<unsigned>::max();
   }
   DepChecker = std::make_unique<MemoryDepChecker>(*PSE, L, SymbolicStrides,
-                                                  MaxTargetVectorWidthInBits);
+                                                  MaxTargetVectorWidthInBits, ExpensiveChecks);
   PtrRtChecking = std::make_unique<RuntimePointerChecking>(*DepChecker, SE);
   if (canAnalyzeLoop())
     CanVecMem = analyzeLoop(AA, LI, TLI, DT);
@@ -3069,8 +3071,7 @@ const LoopAccessInfo &LoopAccessInfoManager::getInfo(Loop &L) {
 
   if (Inserted)
     It->second =
-        std::make_unique<LoopAccessInfo>(&L, &SE, TTI, TLI, &AA, &DT, &LI);
-
+        std::make_unique<LoopAccessInfo>(&L, &SE, TTI, TLI, &AA, &DT, &LI, ExpensiveChecks);
   return *It->second;
 }
 void LoopAccessInfoManager::clear() {
