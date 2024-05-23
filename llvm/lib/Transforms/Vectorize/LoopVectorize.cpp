@@ -2783,22 +2783,37 @@ void InnerLoopVectorizer::fixupIVUsers(PHINode *OrigPhi,
   DenseMap<Value *, Value *> MissingVals;
 
   if (!OrigLoop->getUniqueExitBlock()) {
-    auto *C= cast<SelectInst>(MiddleBlock->getTerminator()->getOperand(0))->getOperand(0);
-    auto *Mask = cast<CallInst>(C)->getArgOperand(0);
-    IRBuilder B(MiddleBlock->getTerminator());
-      auto *TTZ = B.CreateIntrinsic(
-                 Intrinsic::experimental_cttz_elts, {EndValue->getType(), Mask->getType()},
-                          {Mask, B.getInt1(/*ZeroIsPoison=*/true)});
-      auto *IV = State.get(Plan.getCanonicalIV(), 0, true);
-      auto *IVNext = State.get(Plan.getCanonicalIV()->getBackedgeValue(), 0, true);
-      auto *Sub = B.CreateAdd(IV, TTZ);
-      EndValue= B.CreateSelect(C, Sub, IVNext);
-      auto *Phi = &*(LoopScalarPreHeader->phis().begin());
-      Phi->setIncomingValueForBlock(MiddleBlock, EndValue);
-      for(auto *P : ExitPhis) {
+    BasicBlock *ExitingBB =
+        MiddleBlock->getSinglePredecessor()->getSinglePredecessor();
+    BasicBlock *New = BasicBlock::Create(
+        ExitingBB->getContext(), "eb", ExitingBB->getParent(),
+        cast<BranchInst>(MiddleBlock->getTerminator())->getSuccessor(1));
+    auto *C = cast<CallInst>(ExitingBB->getTerminator()->getOperand(0));
 
-        P->addIncoming(EndValue, MiddleBlock);
-      }
+    BasicBlock *ExitBB =
+        cast<BranchInst>(ExitingBB->getTerminator())->getSuccessor(0);
+    cast<BranchInst>(ExitingBB->getTerminator())->setSuccessor(0, New);
+    auto *Mask = cast<CallInst>(C)->getArgOperand(0);
+
+    IRBuilder B(New);
+
+    auto *TTZ = B.CreateIntrinsic(Intrinsic::experimental_cttz_elts,
+                                  {EndValue->getType(), Mask->getType()},
+                                  {Mask, B.getInt1(/*ZeroIsPoison=*/true)});
+    auto *IV = State.get(Plan.getCanonicalIV(), 0, true);
+    // auto *IVNext = State.get(Plan.getCanonicalIV()->getBackedgeValue(), 0,
+    // true);
+    auto *Sub = B.CreateAdd(IV, TTZ);
+    // EndValue= B.CreateSelect(C, Sub, IVNext);
+    B.CreateBr(ExitBB);
+    //     auto *Phi = &*(LoopScalarPreHeader->phis().begin());
+    //      Phi->setIncomingValueForBlock(MiddleBlock, EndValue);
+
+    auto *Phi2 = &*(ExitBB->phis().begin());
+    Phi2->addIncoming(Sub, New);
+    /*      for(auto *P : ExitPhis) {*/
+    /*P->addIncoming(EndValue, MiddleBlock);*/
+    return;
   }
 
   // An external user of the last iteration's value should see the value that
@@ -7661,16 +7676,6 @@ LoopVectorizationPlanner::executePlan(
     Hints.setAlreadyVectorized();
   }
 
-  if (!OrigLoop->getUniqueExitBlock()) {
-  VPBasicBlock *MiddleVPBB =
-      cast<VPBasicBlock>(BestVPlan.getVectorLoopRegion()->getSingleSuccessor());
-  auto *VPV = dyn_cast<VPInstruction>(&MiddleVPBB->back());
-  if (VPV && VPV->getOpcode() == Instruction::Select) {
-    cast<SwitchInst>(State.CFG.VPBB2IRBB[MiddleVPBB]->getTerminator())
-        ->setCondition(State.get(VPV, 0, true));
-  }
-  }
-
   TargetTransformInfo::UnrollingPreferences UP;
   TTI.getUnrollingPreferences(L, *PSE.getSE(), UP, ORE);
   if (!UP.UnrollVectorizedLoop || CanonicalIVStartValue)
@@ -9211,27 +9216,12 @@ LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(VFRange &Range) {
     }
   }
 
-  if (ExitValues.size() == 2) {
-  auto *FinalValue = new VPInstruction(Instruction::ICmp, CmpInst::ICMP_EQ,
-                                   Plan->getCanonicalIV(),
-                                   &Plan->getVectorTripCount());
-  }
-
-
-
-  VPValue *SelSucc = Plan->getOrAddLiveIn(ConstantInt::get(IntegerType::get(OrigLoop->getHeader()->getContext(), 8), 10));
-  char Off = ExitTaken.size() -1;
-  for (VPValue *C : reverse(ExitTaken)) {
-    auto *Sel = new VPInstruction(Instruction::Select, { C, Plan->getOrAddLiveIn(ConstantInt::get(IntegerType::get(OrigLoop->getHeader()->getContext(), 8), Off)), SelSucc});
-  MiddleVPBB->appendRecipe(Sel);
-  SelSucc = Sel;
-  --Off;
-  }
-
   auto *Term = dyn_cast<VPInstruction>(LatchVPBB->getTerminator());
-  auto *Cmp = Builder.createICmp(CmpInst::ICMP_EQ, Term->getOperand(0), Term->getOperand(1));
+  auto *Cmp = Builder.createICmp(CmpInst::ICMP_EQ, Term->getOperand(0),
+                                 Term->getOperand(1));
   auto *E = Builder.createOr(Cmp, EarlyExitTaken);
-  Builder.createNaryOp(VPInstruction::BranchOnCond, E);
+  Builder.createNaryOp(VPInstruction::BranchMultipleConds,
+                       {EarlyExitTaken, Cmp});
   Term->eraseFromParent();
   }
 

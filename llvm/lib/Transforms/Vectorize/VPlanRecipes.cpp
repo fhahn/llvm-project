@@ -528,6 +528,37 @@ Value *VPInstruction::generatePerPart(VPTransformState &State, unsigned Part) {
     CondBr->setSuccessor(1, State.CFG.VPBB2IRBB[Header]);
     return CondBr;
   }
+  case VPInstruction::BranchMultipleConds: {
+    if (Part != 0)
+      return nullptr;
+
+    VPRegionBlock *ParentRegion = getParent()->getParent();
+    VPBasicBlock *Header = ParentRegion->getEntryBasicBlock();
+
+    assert(getNumOperands() == 2);
+
+    Value *Cond1 = State.get(getOperand(0), VPIteration(Part, 0));
+    Value *Cond2 = State.get(getOperand(1), VPIteration(Part, 0));
+    BasicBlock *BB = Builder.GetInsertBlock();
+    BasicBlock *BB2 =
+        BB->splitBasicBlock(BB->getTerminator(), BB->getName() + ".split");
+
+    Builder.SetInsertPoint(BB->getTerminator());
+    BranchInst *CondBr1 = Builder.CreateCondBr(Cond1, BB, BB2);
+
+    Builder.SetInsertPoint(BB2->getTerminator());
+    BranchInst *CondBr2 = Builder.CreateCondBr(Cond2, BB2, nullptr);
+    CondBr2->setSuccessor(1, State.CFG.VPBB2IRBB[Header]);
+
+    assert(getParent()->isExiting());
+    CondBr1->setSuccessor(0, nullptr);
+    CondBr2->setSuccessor(0, nullptr);
+    BB->getTerminator()->eraseFromParent();
+    BB2->getTerminator()->eraseFromParent();
+    State.CFG.PrevBB = BB2;
+    return CondBr2;
+  }
+
   case VPInstruction::BranchOnCount: {
     if (Part != 0)
       return nullptr;
@@ -780,6 +811,7 @@ bool VPInstruction::onlyFirstLaneUsed(const VPValue *Op) const {
   case VPInstruction::BranchOnCount:
   case VPInstruction::BranchOnCond:
   case VPInstruction::ResumePhi:
+  case VPInstruction::BranchMultipleConds:
     return true;
   };
   llvm_unreachable("switch should return");
@@ -798,6 +830,7 @@ bool VPInstruction::onlyFirstPartUsed(const VPValue *Op) const {
     return vputils::onlyFirstPartUsed(this);
   case VPInstruction::BranchOnCount:
   case VPInstruction::BranchOnCond:
+  case VPInstruction::BranchMultipleConds:
   case VPInstruction::CanonicalIVIncrementForPart:
     return true;
   };
@@ -843,6 +876,9 @@ void VPInstruction::print(raw_ostream &O, const Twine &Indent,
     break;
   case VPInstruction::BranchOnCond:
     O << "branch-on-cond";
+    break;
+  case VPInstruction::BranchMultipleConds:
+    O << "branch-on-multi-cond";
     break;
   case VPInstruction::CalculateTripCountMinusVF:
     O << "TC > VF ? TC - VF : 0";
