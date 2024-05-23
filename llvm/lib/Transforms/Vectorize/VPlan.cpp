@@ -465,11 +465,22 @@ void VPBasicBlock::execute(VPTransformState *State) {
     VPBasicBlock *ExitingVPBB = PredVPB->getExitingBasicBlock();
     assert(PredVPB->getSingleSuccessor() == this &&
            "predecessor must have the current block as only successor");
+    SmallVector<BasicBlock *> ExitBlocks;
+    State->OrigLoop->getExitBlocks(ExitBlocks);
     BasicBlock *ExitingBB = State->CFG.VPBB2IRBB[ExitingVPBB];
-    // The Exit block of a loop is always set to be successor 0 of the Exiting
-    // block.
-    cast<BranchInst>(ExitingBB->getTerminator())->setSuccessor(0, NewBB);
-    State->CFG.DTU.applyUpdates({{DominatorTree::Insert, ExitingBB, NewBB}});
+    if (ExitBlocks.size() == 2) {
+      BasicBlock *BEBB =
+          cast<BranchInst>(ExitingBB->getTerminator())->getSuccessor(1);
+      State->LI->getLoopFor(ExitingBB)->addBasicBlockToLoop(BEBB, *State->LI);
+      cast<BranchInst>(ExitingBB->getTerminator())
+          ->setSuccessor(0, ExitBlocks[0]);
+      cast<BranchInst>(BEBB->getTerminator())->setSuccessor(0, NewBB);
+    } else {
+      // The Exit block of a loop is always set to be successor 0 of the Exiting
+      // block.
+      cast<BranchInst>(ExitingBB->getTerminator())->setSuccessor(0, NewBB);
+      State->CFG.DTU.applyUpdates({{DominatorTree::Insert, ExitingBB, NewBB}});
+    }
   } else if (PrevVPBB && /* A */
              !((SingleHPred = getSingleHierarchicalPredecessor()) &&
                SingleHPred->getExitingBasicBlock() == PrevVPBB &&
@@ -565,9 +576,11 @@ static bool hasConditionalTerminator(const VPBasicBlock *VPBB) {
   }
 
   const VPRecipeBase *R = &VPBB->back();
-  bool IsCondBranch = isa<VPBranchOnMaskRecipe>(R) ||
-                      match(R, m_BranchOnCond(m_VPValue())) ||
-                      match(R, m_BranchOnCount(m_VPValue(), m_VPValue()));
+  bool IsCondBranch =
+      isa<VPBranchOnMaskRecipe>(R) || match(R, m_BranchOnCond(m_VPValue())) ||
+      match(R, m_BranchOnCount(m_VPValue(), m_VPValue())) ||
+      (isa<VPInstruction>(R) && cast<VPInstruction>(R)->getOpcode() ==
+                                    VPInstruction::BranchMultipleConds);
   (void)IsCondBranch;
 
   if (VPBB->getNumSuccessors() >= 2 ||
@@ -843,6 +856,12 @@ void VPlan::execute(VPTransformState *State) {
 
   VPBasicBlock *LatchVPBB = getVectorLoopRegion()->getExitingBasicBlock();
   BasicBlock *VectorLatchBB = State->CFG.VPBB2IRBB[LatchVPBB];
+
+  SmallVector<BasicBlock *> ExitBlocks;
+  State->OrigLoop->getExitBlocks(ExitBlocks);
+  if (ExitBlocks.size() == 2)
+    VectorLatchBB =
+        cast<BranchInst>(VectorLatchBB->getTerminator())->getSuccessor(1);
 
   // Fix the latch value of canonical, reduction and first-order recurrences
   // phis in the vector loop.

@@ -290,8 +290,10 @@ bool llvm::verifyVPlanIsValid(const VPlan &Plan) {
   }
 
   auto *LastInst = dyn_cast<VPInstruction>(std::prev(Exiting->end()));
-  if (!LastInst || (LastInst->getOpcode() != VPInstruction::BranchOnCount &&
-                    LastInst->getOpcode() != VPInstruction::BranchOnCond)) {
+  if (!LastInst ||
+      (LastInst->getOpcode() != VPInstruction::BranchOnCount &&
+       LastInst->getOpcode() != VPInstruction::BranchOnCond &&
+       LastInst->getOpcode() != VPInstruction::BranchMultipleConds)) {
     errs() << "VPlan vector loop exit must end with BranchOnCount or "
               "BranchOnCond VPInstruction\n";
     return false;

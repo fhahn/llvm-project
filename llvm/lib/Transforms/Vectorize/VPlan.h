@@ -1181,6 +1181,7 @@ public:
     CanonicalIVIncrementForPart,
     BranchOnCount,
     BranchOnCond,
+    BranchMultipleConds,
     ComputeReductionResult,
     LogicalAnd, // Non-poison propagating logical And.
     // Add an offset in bytes (second operand) to a base pointer (first
@@ -1304,6 +1305,7 @@ public:
     case Instruction::AtomicRMW:
     case VPInstruction::BranchOnCond:
     case VPInstruction::BranchOnCount:
+    case VPInstruction::BranchMultipleConds:
       return false;
     default:
       return true;
@@ -1323,6 +1325,7 @@ public:
     default:
       return false;
     case VPInstruction::BranchOnCount:
+    case VPInstruction::BranchMultipleConds:
     case VPInstruction::CanonicalIVIncrementForPart:
       return true;
     };
