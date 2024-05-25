@@ -28,6 +28,7 @@
 
 #include "llvm/ADT/MapVector.h"
 #include "llvm/Analysis/LoopAccessAnalysis.h"
+#include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Support/TypeSize.h"
 #include "llvm/Transforms/Utils/LoopUtils.h"
 
@@ -245,9 +246,9 @@ public:
       LoopAccessInfoManager &LAIs, LoopInfo *LI, OptimizationRemarkEmitter *ORE,
       LoopVectorizationRequirements *R, LoopVectorizeHints *H, DemandedBits *DB,
       AssumptionCache *AC, BlockFrequencyInfo *BFI, ProfileSummaryInfo *PSI)
-      : TheLoop(L), LI(LI), PSE(PSE), TTI(TTI), TLI(TLI), DT(DT), LAIs(LAIs),
-        ORE(ORE), Requirements(R), Hints(H), DB(DB), AC(AC), BFI(BFI),
-        PSI(PSI) {}
+      : TheLoop(L), LI(LI), PSE(PSE), IndPSE(*PSE.getSE(), *L), TTI(TTI),
+        TLI(TLI), DT(DT), LAIs(LAIs), ORE(ORE), Requirements(R), Hints(H),
+        DB(DB), AC(AC), BFI(BFI), PSI(PSI) {}
 
   /// ReductionList contains the reduction descriptors for all
   /// of the reductions that were found in the loop.
@@ -391,6 +392,8 @@ public:
     return &PSE;
   }
 
+  PredicatedScalarEvolution &getIndPSE() { return IndPSE; }
+
   Loop *getLoop() const { return TheLoop; }
 
   LoopInfo *getLoopInfo() const { return LI; }
@@ -472,6 +475,8 @@ private:
   /// of new predicates if this is required to enable vectorization and
   /// unrolling.
   PredicatedScalarEvolution &PSE;
+
+  PredicatedScalarEvolution IndPSE;
 
   /// Target Transform Info.
   TargetTransformInfo *TTI;

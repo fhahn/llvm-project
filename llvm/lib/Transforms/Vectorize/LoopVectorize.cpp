@@ -4267,7 +4267,8 @@ bool LoopVectorizationCostModel::runtimeChecksRequired() {
     return true;
   }
 
-  if (!PSE.getPredicate().isAlwaysTrue()) {
+  if (!PSE.getPredicate().isAlwaysTrue() ||
+      !Legal->getIndPSE().getPredicate().isAlwaysTrue()) {
     reportVectorizationFailure("Runtime SCEV check is required with -Os/-Oz",
         "runtime SCEV checks needed. Enable vectorization of this "
         "loop with '#pragma clang loop vectorize(enable)' when "
@@ -8080,6 +8081,14 @@ createWidenInductionRecipes(PHINode *Phi, Instruction *PhiOrTrunc,
   assert(SE.isLoopInvariant(IndDesc.getStep(), &OrigLoop) &&
          "step must be loop invariant");
 
+  if (SE.isSCEVable(Phi->getType())) {
+    PredicatedScalarEvolution PSE(SE, OrigLoop);
+    PSE.getAsAddRec(Phi);
+    SmallVector<const SCEVPredicate *> L;
+    L.push_back(&PSE.getPredicate());
+    auto P = std::make_unique<SCEVUnionPredicate>(L);
+    Plan.SCEVPredicates.emplace_back(std::move(P));
+  }
   VPValue *Step =
       vputils::getOrCreateVPValueForSCEVExpr(Plan, IndDesc.getStep(), SE);
   if (auto *TruncI = dyn_cast<TruncInst>(PhiOrTrunc)) {
@@ -9934,8 +9943,15 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     unsigned SelectedIC = std::max(IC, UserIC);
     //  Optimistically generate runtime checks if they are needed. Drop them if
     //  they turn out to not be profitable.
-    if (VF.Width.isVector() || SelectedIC > 1)
-      Checks.Create(L, *LVL.getLAI(), PSE.getPredicate(), VF.Width, SelectedIC);
+    if (VF.Width.isVector() || SelectedIC > 1) {
+      VPlan &BestPlan = LVP.getBestPlanFor(VF.Width);
+      PredicatedScalarEvolution PSE2(*PSE.getSE(), *L);
+      for (auto &P : BestPlan.SCEVPredicates)
+        PSE2.addPredicate(*P);
+      PSE2.addPredicate(PSE.getPredicate());
+      Checks.Create(L, *LVL.getLAI(), PSE2.getPredicate(), VF.Width,
+                    SelectedIC);
+    }
 
     // Check if it is profitable to vectorize with runtime checks.
     bool ForceVectorization =

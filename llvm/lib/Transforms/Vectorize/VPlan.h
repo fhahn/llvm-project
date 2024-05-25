@@ -3173,6 +3173,7 @@ class VPlan {
   DenseMap<const SCEV *, VPValue *> SCEVToExpansion;
 
 public:
+  SmallVector<std::unique_ptr<SCEVUnionPredicate>> SCEVPredicates;
   /// Construct a VPlan with original preheader \p Preheader, trip count \p TC
   /// and \p Entry to the plan. At the moment, \p Preheader and \p Entry need to
   /// be disconnected, as the bypass blocks between them are not yet modeled in

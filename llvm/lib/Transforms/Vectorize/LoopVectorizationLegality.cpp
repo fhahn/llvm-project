@@ -722,7 +722,8 @@ void LoopVectorizationLegality::addInductionPhi(
   // on predicates that only hold within the loop, since allowing the exit
   // currently means re-using this SCEV outside the loop (see PR33706 for more
   // details).
-  if (PSE.getPredicate().isAlwaysTrue()) {
+  if (PSE.getPredicate().isAlwaysTrue() &&
+      IndPSE.getPredicate().isAlwaysTrue()) {
     AllowedExit.insert(Phi);
     AllowedExit.insert(Phi->getIncomingValueForBlock(TheLoop->getLoopLatch()));
   }
@@ -860,7 +861,7 @@ bool LoopVectorizationLegality::canVectorizeInstrs() {
         // By recording these, we can then reason about ways to vectorize each
         // of these NotAllowedExit.
         InductionDescriptor ID;
-        if (InductionDescriptor::isInductionPHI(Phi, TheLoop, PSE, ID) &&
+        if (InductionDescriptor::isInductionPHI(Phi, TheLoop, IndPSE, ID) &&
             !isDisallowedStridedPointerInduction(ID)) {
           addInductionPhi(Phi, ID, AllowedExit);
           Requirements->addExactFPMathInst(ID.getExactFPMathInst());
@@ -875,7 +876,8 @@ bool LoopVectorizationLegality::canVectorizeInstrs() {
 
         // As a last resort, coerce the PHI to a AddRec expression
         // and re-try classifying it a an induction PHI.
-        if (InductionDescriptor::isInductionPHI(Phi, TheLoop, PSE, ID, true) &&
+        if (InductionDescriptor::isInductionPHI(Phi, TheLoop, IndPSE, ID,
+                                                true) &&
             !isDisallowedStridedPointerInduction(ID)) {
           addInductionPhi(Phi, ID, AllowedExit);
           continue;
@@ -1017,7 +1019,8 @@ bool LoopVectorizationLegality::canVectorizeInstrs() {
         // used outside the loop only if the SCEV predicates within the loop is
         // same as outside the loop. Allowing the exit means reusing the SCEV
         // outside the loop.
-        if (PSE.getPredicate().isAlwaysTrue()) {
+        if (PSE.getPredicate().isAlwaysTrue() &&
+            IndPSE.getPredicate().isAlwaysTrue()) {
           AllowedExit.insert(&I);
           continue;
         }
@@ -1526,7 +1529,8 @@ bool LoopVectorizationLegality::canVectorize(bool UseVPlanNativePath) {
   if (Hints->getForce() == LoopVectorizeHints::FK_Enabled)
     SCEVThreshold = PragmaVectorizeSCEVCheckThreshold;
 
-  if (PSE.getPredicate().getComplexity() > SCEVThreshold) {
+  if ((PSE.getPredicate().getComplexity() +
+       IndPSE.getPredicate().getComplexity()) > SCEVThreshold) {
     reportVectorizationFailure("Too many SCEV checks needed",
         "Too many SCEV assumptions need to be made and checked at runtime",
         "TooManySCEVRunTimeChecks", ORE, TheLoop);
