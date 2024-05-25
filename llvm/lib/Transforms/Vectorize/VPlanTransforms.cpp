@@ -1054,6 +1054,14 @@ void VPlanTransforms::clearReductionWrapFlags(VPlan &Plan) {
 
 /// Try to simplify recipe \p R.
 static void simplifyRecipe(VPRecipeBase &R, VPTypeAnalysis &TypeInfo) {
+  if (auto *ReplicateR = dyn_cast<VPReplicateRecipe>(&R)) {
+    if (!ReplicateR->mayHaveSideEffects() && !ReplicateR->isUniform() && !ReplicateR->isPredicated() && vputils::onlyFirstLaneUsed(ReplicateR)) {
+      auto *UniformR = new VPReplicateRecipe(ReplicateR->getUnderlyingInstr(), R.operands(), true);
+      UniformR->insertBefore(ReplicateR);
+      ReplicateR->replaceAllUsesWith(UniformR);
+
+    }
+  }
   using namespace llvm::VPlanPatternMatch;
   // Try to remove redundant blend recipes.
   if (auto *Blend = dyn_cast<VPBlendRecipe>(&R)) {
