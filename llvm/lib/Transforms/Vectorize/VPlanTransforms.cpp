@@ -1306,6 +1306,19 @@ static VPIRValue *tryToFoldLiveIns(VPSingleDefRecipe &R,
 
 /// Try to simplify VPSingleDefRecipe \p Def.
 static void simplifyRecipe(VPSingleDefRecipe *Def, VPTypeAnalysis &TypeInfo) {
+  // Convert non-uniform replicate recipes to uniform when only the first lane
+  // is used.
+  if (auto *ReplicateR = dyn_cast<VPReplicateRecipe>(Def)) {
+    if (!ReplicateR->mayHaveSideEffects() && !ReplicateR->isSingleScalar() &&
+        !ReplicateR->isPredicated() &&
+        vputils::onlyFirstLaneUsed(ReplicateR)) {
+      auto *UniformR = new VPReplicateRecipe(
+          ReplicateR->getUnderlyingInstr(), Def->operands(), true);
+      UniformR->insertBefore(ReplicateR);
+      ReplicateR->replaceAllUsesWith(UniformR);
+    }
+  }
+
   VPlan *Plan = Def->getParent()->getPlan();
 
   // Simplification of live-in IR values for SingleDef recipes using
