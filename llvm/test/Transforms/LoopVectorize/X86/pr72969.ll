@@ -52,6 +52,7 @@ define void @test(ptr %p) {
 ; VEC:       vector.ph:
 ; VEC-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[TMP4]], 4
 ; VEC-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP4]], [[N_MOD_VF]]
+; VEC-NEXT:    [[IND_END1:%.*]] = add i64 1, [[N_VEC]]
 ; VEC-NEXT:    [[DOTCAST:%.*]] = trunc i64 [[N_VEC]] to i16
 ; VEC-NEXT:    [[IND_END:%.*]] = add i16 1, [[DOTCAST]]
 ; VEC-NEXT:    br label [[VECTOR_BODY:%.*]]
@@ -87,6 +88,7 @@ define void @test(ptr %p) {
 ; VEC-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH]]
 ; VEC:       scalar.ph:
 ; VEC-NEXT:    [[SCALAR_RECUR_INIT:%.*]] = phi i64 [ 1, [[VECTOR_SCEVCHECK]] ], [ 1, [[ENTRY:%.*]] ], [ [[VECTOR_RECUR_EXTRACT]], [[MIDDLE_BLOCK]] ]
+; VEC-NEXT:    [[BC_RESUME_VAL1:%.*]] = phi i64 [ [[IND_END1]], [[MIDDLE_BLOCK]] ], [ 1, [[ENTRY]] ], [ 1, [[VECTOR_SCEVCHECK]] ]
 ; VEC-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i16 [ [[IND_END]], [[MIDDLE_BLOCK]] ], [ 1, [[ENTRY]] ], [ 1, [[VECTOR_SCEVCHECK]] ]
 ; VEC-NEXT:    [[BC_RESUME_VAL3:%.*]] = phi i64 [ [[N_VEC]], [[MIDDLE_BLOCK]] ], [ 0, [[ENTRY]] ], [ 0, [[VECTOR_SCEVCHECK]] ]
 ; VEC-NEXT:    br label [[FOR_BODY:%.*]]

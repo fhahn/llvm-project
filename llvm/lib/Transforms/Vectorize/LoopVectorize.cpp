@@ -8087,7 +8087,7 @@ createWidenInductionRecipes(PHINode *Phi, Instruction *PhiOrTrunc,
     SmallVector<const SCEVPredicate *> L;
     L.push_back(&PSE.getPredicate());
     auto P = std::make_unique<SCEVUnionPredicate>(L);
-    Plan.SCEVPredicates.emplace_back(std::move(P));
+    Plan.SCEVPredicates.insert({&IndDesc, std::move(P)});
   }
   VPValue *Step =
       vputils::getOrCreateVPValueForSCEVExpr(Plan, IndDesc.getStep(), SE);
@@ -8100,6 +8100,8 @@ createWidenInductionRecipes(PHINode *Phi, Instruction *PhiOrTrunc,
 
 VPHeaderPHIRecipe *VPRecipeBuilder::tryToOptimizeInductionPHI(
     PHINode *Phi, ArrayRef<VPValue *> Operands, VFRange &Range) {
+  if (Legal->isFixedOrderRecurrence(Phi))
+    return nullptr;
 
   // Check if this is an integer or fp induction. If so, build the recipe that
   // produces its scalar and vector values.
@@ -8339,6 +8341,16 @@ void VPRecipeBuilder::fixHeaderPhis() {
     VPRecipeBase *IncR =
         getRecipe(cast<Instruction>(PN->getIncomingValueForBlock(OrigLatch)));
     R->addOperand(IncR->getVPSingleValue());
+    auto *FOR = dyn_cast<VPFirstOrderRecurrencePHIRecipe>(R);
+    if (!FOR)
+      continue;
+    PHINode *Phi = cast<PHINode>(FOR->getUnderlyingValue());
+    if (auto *II = Legal->getIntOrFpInductionDescriptor(Phi)) {
+      auto *Ind = createWidenInductionRecipes(
+          Phi, Phi, FOR->getStartValue(), *II, Plan, *PSE.getSE(), *OrigLoop);
+      Ind->insertBefore(FOR);
+      FOR->addOperand(Ind);
+    }
   }
 }
 
@@ -9946,7 +9958,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     if (VF.Width.isVector() || SelectedIC > 1) {
       VPlan &BestPlan = LVP.getBestPlanFor(VF.Width);
       PredicatedScalarEvolution PSE2(*PSE.getSE(), *L);
-      for (auto &P : BestPlan.SCEVPredicates)
+      for (auto &[_, P] : BestPlan.SCEVPredicates)
         PSE2.addPredicate(*P);
       PSE2.addPredicate(PSE.getPredicate());
       Checks.Create(L, *LVL.getLAI(), PSE2.getPredicate(), VF.Width,

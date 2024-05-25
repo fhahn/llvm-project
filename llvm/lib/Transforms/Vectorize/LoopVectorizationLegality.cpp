@@ -868,10 +868,11 @@ bool LoopVectorizationLegality::canVectorizeInstrs() {
           continue;
         }
 
+        bool IsSupported = false;
         if (RecurrenceDescriptor::isFixedOrderRecurrence(Phi, TheLoop, DT)) {
           AllowedExit.insert(Phi);
           FixedOrderRecurrences.insert(Phi);
-          continue;
+          IsSupported = true;
         }
 
         // As a last resort, coerce the PHI to a AddRec expression
@@ -880,8 +881,10 @@ bool LoopVectorizationLegality::canVectorizeInstrs() {
                                                 true) &&
             !isDisallowedStridedPointerInduction(ID)) {
           addInductionPhi(Phi, ID, AllowedExit);
-          continue;
+          IsSupported = true;
         }
+        if (IsSupported)
+          continue;
 
         reportVectorizationFailure("Found an unidentified PHI",
             "value that could not be identified as "
