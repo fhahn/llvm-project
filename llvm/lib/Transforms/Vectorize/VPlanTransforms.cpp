@@ -1574,3 +1574,9 @@ void VPlanTransforms::dropPoisonGeneratingRecipes(
     }
   }
 }
+
+void VPlanTransforms::tryToRealignLoop(VPlan &Plan) {
+  auto Iter = vp_depth_first_deep(Plan->getVectorLoopRegion());
+  for (VPRecipeBase &R : Iter) {
+  }
+}
