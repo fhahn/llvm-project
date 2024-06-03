@@ -106,6 +106,8 @@ struct VPlanTransforms {
   /// this transformation.
   /// \returns true if the transformation succeeds, or false if it doesn't.
   static bool tryAddExplicitVectorLength(VPlan &Plan);
+
+  static void tryToRealignLoop(VPlan &Plan);
 };
 
 } // namespace llvm

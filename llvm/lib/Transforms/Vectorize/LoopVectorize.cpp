@@ -7339,6 +7339,7 @@ LoopVectorizationPlanner::executePlan(
   (void)IsEpilogueVectorization;
 
   VPlanTransforms::optimizeForVFAndUF(BestVPlan, BestVF, BestUF, PSE);
+  VPlanTransforms::tryToRealignLoop(BestVPlan);
 
   LLVM_DEBUG(dbgs() << "Executing best plan with VF=" << BestVF
                     << ", UF=" << BestUF << '\n');

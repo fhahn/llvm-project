@@ -1622,3 +1622,73 @@ void VPlanTransforms::dropPoisonGeneratingRecipes(
     }
   }
 }
+
+void VPlanTransforms::tryToRealignLoop(VPlan &Plan) {
+  VPRegionBlock *VectorLoop = Plan.getVectorLoopRegion();
+  VPBasicBlock *Header = VectorLoop->getEntryBasicBlock();
+  if (Header != VectorLoop->getExiting())
+    return;
+
+   auto *MiddleBB = cast<VPBasicBlock>(VectorLoop->getSingleSuccessor());
+   auto *BranchOnCond = dyn_cast_or_null<VPInstruction>(MiddleBB->getTerminator());
+   if (!BranchOnCond)
+     return;
+
+  auto *CanIV = Plan.getCanonicalIV();
+  bool SeenStore = false;
+  for (VPRecipeBase &R : *Header) {
+    if (R.mayWriteToMemory() && !isa<VPWidenMemoryRecipe, VPCanonicalIVPHIRecipe>(&R))
+      return;
+
+    if (!isa<VPWidenMemoryRecipe>(&R))
+      continue;
+
+    if (isa<VPWidenLoadRecipe>(&R) && SeenStore)
+      return;
+
+  using namespace llvm::VPlanPatternMatch;
+  auto IsSupportedPtr = [&Plan](VPValue *V) {
+    auto *Addr = dyn_cast<VPVectorPointerRecipe>(V);
+    if (!Addr)
+      return false;
+    VPRecipeBase *DefR = Addr->getDefiningRecipe();
+    if (!DefR)
+      return true;
+    auto *RepR = dyn_cast<VPReplicateRecipe>(DefR);
+    if (!RepR || !RepR->isUniform() || RepR->getNumOperands() != 2)
+      return false;
+
+    VPValue *Base, *Offset;
+    return match(DefR->getOperand(0), m_Binary<Instruction::GetElementPtr>(m_VPValue(Base), m_VPValue(Offset))) && isa<VPScalarIVStepsRecipe>(Offset) && cast<VPScalarIVStepsRecipe>(Offset)->getOperand(0) == Plan.getCanonicalIV();
+  };
+    if (IsSupportedPtr(R.getOperand(0)))
+      return;
+    SeenStore |= isa<VPWidenStoreRecipe>(&R);
+  }
+
+  VPBuilder BPH(cast<VPBasicBlock>(VectorLoop->getSinglePredecessor()));
+  VPValue *RemIters = BPH.createNaryOp(Instruction::URem, {Plan.getTripCount(), &Plan.getVFxUF()}, {}, "rem.iters");
+  VPValue *NeedsAlign = BPH.createICmp(CmpInst::ICMP_NE, RemIters, Plan.getOrAddLiveIn(ConstantInt::get(Plan.getCanonicalIV()->getScalarType(), 0)), {}, "needs.align");
+  VPValue *Offset = BPH.createNaryOp(Instruction::Sub, {&Plan.getVFxUF(), RemIters}, {}, "offset");
+  VPValue *ResetCnt = BPH.createNaryOp(Instruction::Sub, {Plan.getTripCount(), &Plan.getVFxUF()}, {}, "reset.cnt");
+
+  VPInstruction *Sub = BPH.createNaryOp(Instruction::Sub, {&Plan.getVFxUF(), Plan.getOrAddLiveIn(ConstantInt::get(Plan.getCanonicalIV()->getScalarType(), 1))}, {}, "rnd.up.tc");
+  VPInstruction *RndUpVecTC1 = BPH.createNaryOp(Instruction::Add, {Plan.getTripCount(), Sub}, {}, "rnd.up.tc");
+  VPInstruction *RndUpVecTC2 = BPH.createNaryOp(Instruction::URem, {RndUpVecTC1, &Plan.getVFxUF()}, {}, "rnd.up.tc");
+  VPInstruction *RndUpVecTC = BPH.createNaryOp(Instruction::Sub, {RndUpVecTC1, RndUpVecTC2}, {}, "rnd.up.tc");
+  Plan.getVectorTripCount().replaceAllUsesWith(RndUpVecTC);
+
+
+  auto *IVInc = cast<VPInstruction>(Plan.getCanonicalIV()->getBackedgeValue());
+  IVInc->moveBefore(*Header, Header->getFirstNonPhi());
+  VPBuilder B(IVInc->getNextNode());
+  VPValue *IsLastIter = B.createICmp(CmpInst::ICMP_EQ, IVInc, RndUpVecTC);
+  VPValue *AlignIter = B.createNaryOp(Instruction::And, {NeedsAlign, IsLastIter});
+  VPValue *Sel = B.createSelect(AlignIter, ResetCnt, CanIV);
+
+  CanIV->replaceUsesWithIf(Sel, [CanIV, RemIters, Sel](VPUser &U, unsigned) {
+                           return !isa<VPInstruction>(&U) || (cast<VPInstruction>(&U) !=  CanIV->getBackedgeValue() && cast<VPInstruction>(&U) != RemIters&& cast<VPInstruction>(&U) != Sel);
+                           });
+
+   BranchOnCond->setOperand(0, Plan.getOrAddLiveIn(ConstantInt::getTrue(Plan.getCanonicalIV()->getScalarType()->getContext())));
+}
