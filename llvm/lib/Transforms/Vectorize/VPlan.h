@@ -1199,6 +1199,8 @@ public:
     // operand). Only generates scalar values (either for the first lane only or
     // for all lanes, depending on its uses).
     PtrAdd,
+    StepForVF,
+    RuntimeVF,
   };
 
 private:
@@ -3153,7 +3155,7 @@ class VPlan {
   VPValue *BackedgeTakenCount = nullptr;
 
   /// Represents the vector trip count.
-  VPValue VectorTripCount;
+  VPValue *VectorTripCount;
 
   /// Represents the loop-invariant VF * UF of the vector loop region.
   VPValue VFxUF;
@@ -3207,7 +3209,7 @@ public:
   /// pre-header, followed by a region for the vector loop, followed by the
   /// middle VPBasicBlock.
   static VPlanPtr createInitialVPlan(const SCEV *TripCount,
-                                     ScalarEvolution &PSE, BasicBlock *PH);
+                                     ScalarEvolution &PSE, BasicBlock *PH, bool FoldTailByMasking, bool RequiresScalarEpilogue);
 
   /// Prepare the plan for execution, setting up the required live-in values.
   void prepareToExecute(Value *TripCount, Value *VectorTripCount,
@@ -3241,7 +3243,7 @@ public:
   }
 
   /// The vector trip count.
-  VPValue &getVectorTripCount() { return VectorTripCount; }
+  VPValue &getVectorTripCount() { return *VectorTripCount; }
 
   /// Returns VF * UF of the vector loop region.
   VPValue &getVFxUF() { return VFxUF; }

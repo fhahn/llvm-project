@@ -16,6 +16,7 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "LoopVectorizationPlanner.h"
 #include "VPlan.h"
 #include "VPlanCFG.h"
 #include "VPlanDominatorTree.h"
@@ -784,12 +785,38 @@ VPlan::~VPlan() {
 }
 
 VPlanPtr VPlan::createInitialVPlan(const SCEV *TripCount, ScalarEvolution &SE,
-                                   BasicBlock *PH) {
+                                   BasicBlock *PH, bool FoldTailByMasking, bool RequiresScalarEpilogue) {
   VPIRBasicBlock *Preheader = new VPIRBasicBlock(PH);
   VPBasicBlock *VecPreheader = new VPBasicBlock("vector.ph");
   auto Plan = std::make_unique<VPlan>(Preheader, VecPreheader);
   Plan->TripCount =
       vputils::getOrCreateVPValueForSCEVExpr(*Plan, TripCount, SE);
+
+  VPBuilder Builder(VecPreheader);
+  VPValue *Step = Builder.createNaryOp(VPInstruction::StepForVF, {});
+  VPValue *TC = Plan->TripCount ;
+
+  // If the tail is to be folded by masking, round the number of iterations N
+  // up to a multiple of Step instead of rounding down. This is done by first
+  // adding Step-1 and then rounding down. Note that it's ok if this addition
+  // overflows: the vector induction variable will eventually wrap to zero given
+  // that it starts at zero and its Step is a power of two; the loop will then
+  // exit, with the last early-exit vector comparison also producing all-true.
+  // For scalable vectors the VF is not guaranteed to be a power of 2, but this
+  // is accounted for in emitIterationCountCheck that adds an overflow check.
+  if (FoldTailByMasking) {
+/*    assert(isPowerOf2_32(VF.getKnownMinValue() * UF) &&*/
+           /*"VF*UF must be a power of 2 when folding tail by masking");*/
+    VPValue *NumLanes = Builder.createNaryOp(VPInstruction::RuntimeVF, {});
+    Type *Ty = TripCount->getType();
+    TC = Builder.createNaryOp(Instruction::Add,
+                              {TC, Builder.createNaryOp(Instruction::Sub, {NumLanes, Plan->getOrAddLiveIn(ConstantInt::get(Ty, 1))})}, {}, "n.rnd.up");
+  }
+
+
+  VPValue *R = Builder.createNaryOp(Instruction::URem, {TC, Step});
+  Plan->VectorTripCount = Builder.createNaryOp(Instruction::Sub, {Plan->TripCount , R});
+
   // Create empty VPRegionBlock, to be filled during processing later.
   auto *TopRegion = new VPRegionBlock("vector loop", false /*isReplicator*/);
   VPBlockUtils::insertBlockAfter(TopRegion, VecPreheader);
@@ -809,8 +836,6 @@ void VPlan::prepareToExecute(Value *TripCountV, Value *VectorTripCountV,
                                    "trip.count.minus.1");
     BackedgeTakenCount->setUnderlyingValue(TCMO);
   }
-
-  VectorTripCount.setUnderlyingValue(VectorTripCountV);
 
   IRBuilder<> Builder(State.CFG.PrevBB->getTerminator());
   // FIXME: Model VF * UF computation completely in VPlan.
@@ -930,9 +955,9 @@ void VPlan::printLiveIns(raw_ostream &O) const {
     O << " = VF * UF";
   }
 
-  if (VectorTripCount.getNumUsers() > 0) {
+  if (VectorTripCount && VectorTripCount->getNumUsers() > 0) {
     O << "\nLive-in ";
-    VectorTripCount.printAsOperand(O, SlotTracker);
+    VectorTripCount->printAsOperand(O, SlotTracker);
     O << " = vector-trip-count";
   }
 
@@ -1065,7 +1090,7 @@ VPlan *VPlan::duplicate() {
     Old2NewVPValues[OldLiveIn] =
         NewPlan->getOrAddLiveIn(OldLiveIn->getLiveInIRValue());
   }
-  Old2NewVPValues[&VectorTripCount] = &NewPlan->VectorTripCount;
+  Old2NewVPValues[VectorTripCount] = NewPlan->VectorTripCount;
   Old2NewVPValues[&VFxUF] = &NewPlan->VFxUF;
   if (BackedgeTakenCount) {
     NewPlan->BackedgeTakenCount = new VPValue();
@@ -1380,7 +1405,8 @@ void VPSlotTracker::assignName(const VPValue *V) {
 void VPSlotTracker::assignNames(const VPlan &Plan) {
   if (Plan.VFxUF.getNumUsers() > 0)
     assignName(&Plan.VFxUF);
-  assignName(&Plan.VectorTripCount);
+/*  if (Plan.VectorTripCount)*/
+    /*assignName(Plan.VectorTripCount);*/
   if (Plan.BackedgeTakenCount)
     assignName(Plan.BackedgeTakenCount);
   for (VPValue *LI : Plan.VPLiveInsToFree)

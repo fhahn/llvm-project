@@ -303,6 +303,8 @@ bool VPInstruction::canGenerateScalarForFirstLane() const {
   case VPInstruction::CanonicalIVIncrementForPart:
   case VPInstruction::PtrAdd:
   case VPInstruction::ExplicitVectorLength:
+  case VPInstruction::StepForVF:
+  case VPInstruction::RuntimeVF:
     return true;
   default:
     return false;
@@ -594,6 +596,10 @@ Value *VPInstruction::generatePerPart(VPTransformState &State, unsigned Part) {
     Value *Addend = State.get(getOperand(1), Part, /* IsScalar */ true);
     return Builder.CreatePtrAdd(Ptr, Addend, Name);
   }
+  case VPInstruction::StepForVF:
+    return createStepForVF(Builder, getParent()->getPlan()->getCanonicalIV()->getScalarType(), State.VF, State.UF);
+  case VPInstruction::RuntimeVF:
+    return getRuntimeVF(Builder, getParent()->getPlan()->getCanonicalIV()->getScalarType(), State.VF * State.UF);
   default:
     llvm_unreachable("Unsupported opcode for instruction");
   }
