@@ -61,6 +61,9 @@ bool VPRecipeBase::mayWriteToMemory() const {
   case VPBranchOnMaskSC:
   case VPScalarIVStepsSC:
   case VPPredInstPHISC:
+  case VPVectorPointerSC:
+    return false;
+  case VPInstructionSC:
     return false;
   case VPBlendSC:
   case VPReductionSC:
@@ -100,6 +103,7 @@ bool VPRecipeBase::mayReadFromMemory() const {
   case VPBranchOnMaskSC:
   case VPPredInstPHISC:
   case VPScalarIVStepsSC:
+  case VPVectorPointerSC:
   case VPWidenStoreEVLSC:
   case VPWidenStoreSC:
     return false;
@@ -129,6 +133,7 @@ bool VPRecipeBase::mayHaveSideEffects() const {
   case VPDerivedIVSC:
   case VPPredInstPHISC:
   case VPScalarCastSC:
+  case VPVectorPointerSC:
     return false;
   case VPInstructionSC:
     switch (cast<VPInstruction>(this)->getOpcode()) {
@@ -333,6 +338,8 @@ bool VPInstruction::canGenerateScalarForFirstLane() const {
   if (isVectorToScalar())
     return true;
   switch (Opcode) {
+  case Instruction::ICmp:
+  case Instruction::Select:
   case VPInstruction::BranchOnCond:
   case VPInstruction::BranchOnCount:
   case VPInstruction::CalculateTripCountMinusVF:
@@ -380,9 +387,10 @@ Value *VPInstruction::generatePerPart(VPTransformState &State, unsigned Part) {
     return Builder.CreateCmp(getPredicate(), A, B, Name);
   }
   case Instruction::Select: {
-    Value *Cond = State.get(getOperand(0), Part);
-    Value *Op1 = State.get(getOperand(1), Part);
-    Value *Op2 = State.get(getOperand(2), Part);
+    bool OnlyFirstLaneUsed = vputils::onlyFirstLaneUsed(this);
+    Value *Cond = State.get(getOperand(0), Part, OnlyFirstLaneUsed);
+    Value *Op1 = State.get(getOperand(1), Part, OnlyFirstLaneUsed);
+    Value *Op2 = State.get(getOperand(2), Part, OnlyFirstLaneUsed);
     return Builder.CreateSelect(Cond, Op1, Op2, Name);
   }
   case VPInstruction::ActiveLaneMask: {
@@ -703,6 +711,7 @@ bool VPInstruction::onlyFirstLaneUsed(const VPValue *Op) const {
   default:
     return false;
   case Instruction::ICmp:
+  case Instruction::Select:
   case VPInstruction::PtrAdd:
     // TODO: Cover additional opcodes.
     return vputils::onlyFirstLaneUsed(this);

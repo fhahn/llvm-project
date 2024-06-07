@@ -1576,7 +1576,41 @@ void VPlanTransforms::dropPoisonGeneratingRecipes(
 }
 
 void VPlanTransforms::tryToRealignLoop(VPlan &Plan) {
-  auto Iter = vp_depth_first_deep(Plan->getVectorLoopRegion());
-  for (VPRecipeBase &R : Iter) {
+  VPRegionBlock *VectorLoop = Plan.getVectorLoopRegion();
+  VPBasicBlock *Header = VectorLoop->getEntryBasicBlock();
+  if (Header != VectorLoop->getExiting())
+    return;
+
+  auto *CanIV = Plan.getCanonicalIV();
+  bool SeenStore = false;
+  for (VPRecipeBase &R : *Header) {
+    if (R.mayWriteToMemory() && !isa<VPWidenMemoryRecipe, VPCanonicalIVPHIRecipe>(&R))
+      return;
+
+    if (!isa<VPWidenMemoryRecipe>(&R))
+      continue;
+
+    if (isa<VPWidenLoadRecipe>(&R) && SeenStore)
+      return;
+
+    VPValue *Base, *Offset;
+  using namespace llvm::VPlanPatternMatch;
+  auto *Addr = dyn_cast<VPVectorPointerRecipe>(R.getOperand(0));
+    if (!Addr || !match(Addr->getOperand(0), m_Binary<Instruction::GetElementPtr>(m_VPValue(Base), m_VPValue(Offset))) || !isa<VPScalarIVStepsRecipe>(Offset) || cast<VPScalarIVStepsRecipe>(Offset)->getOperand(0) != Plan.getCanonicalIV())
+      return;
+    SeenStore |= isa<VPWidenStoreRecipe>(&R);
   }
+
+  VPBuilder BPH(cast<VPBasicBlock>(VectorLoop->getSinglePredecessor()));
+  VPValue *RemIters = B.createNaryOp(Instruction::URem, {Plan.getTripCount(), Plan.getVFxUF()});
+  VPValue *NeedsAlign = B.createICmp(CmpInst::ICMP_EQ, RemIters, ConstantInt::get(Plan.getCanonicalIV()->getScalarType(), 0));
+
+  VPBuilder B(&*Header->getFirstNonPhi());
+  VPValue *IsLastIter = B.createICmp(CmpInst::ICMP_NE, Plan.getCanonicalIV(), Plan.getVectorTripCount());
+  VPValue *AlignIter = B.createNaryOp(Instruction::And, {NeedsAlign, IsLasteIter});
+  VPValue *Sel = B.createSelect(Cmp, CanIV, RemIters);
+
+  CanIV->replaceUsesWithIf(Sel, [CanIV, Cmp, RemIters, Sel](VPUser &U, unsigned) {
+                           return !isa<VPInstruction>(&U) || (cast<VPInstruction>(&U) !=  CanIV->getBackedgeValue() && cast<VPInstruction>(&U) != Cmp && cast<VPInstruction>(&U) != RemIters&& cast<VPInstruction>(&U) != Sel);
+                           });
 }
