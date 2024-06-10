@@ -10160,6 +10160,27 @@ bool LoopVectorizePass::processLoop(Loop *L) {
 
         VPlan &BestPlan = LVP.getBestPlanFor(VF.Width);
         LVP.executePlan(VF.Width, IC, BestPlan, LB, DT, false);
+  if (!CM.requiresScalarEpilogue(true) && !LB.areSafetyChecksAdded()) {
+  ScalarEvolution &SE = *PSE.getSE();
+  const SCEV *TailLoopBTC = SE.getBackedgeTakenCount(L);
+  if (!isa<SCEVCouldNotCompute>(TailLoopBTC)) {
+    SCEVExpander Exp(SE, L->getHeader()->getModule()->getDataLayout(),
+                     "tc.assumption");
+
+    auto *PH = L->getLoopPreheader();
+    Value *ExpBTC = Exp.expandCodeFor(TailLoopBTC, TailLoopBTC->getType(),
+                                      PH->getTerminator());
+    IRBuilder<> Builder(PH->getTerminator());
+    auto *C = Builder.CreateICmpULT(
+        ExpBTC,
+        ConstantInt::get(ExpBTC->getType(), std::max(VF.MinProfitableTripCount.getKnownMinValue(), VF.Width.getKnownMinValue() * IC) - 1));
+    auto *A = cast<AssumeInst>(Builder.CreateAssumption(C));
+    AC->registerAssumption(A);
+    SE.forgetLoop(L);
+  }
+
+  }
+
         ++LoopsVectorized;
 
         // Add metadata to disable runtime unrolling a scalar loop when there
