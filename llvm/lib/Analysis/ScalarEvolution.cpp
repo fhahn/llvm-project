@@ -15042,6 +15042,14 @@ public:
       FlagMask = ScalarEvolution::setFlags(FlagMask, SCEV::FlagNSW);
   }
 
+  const SCEV *visit(const SCEV *S) {
+    auto I = Map.find(S);
+    if (I != Map.end())
+      return I->second;
+
+    return SCEVRewriteVisitor<SCEVLoopGuardRewriter>::visit(S);
+  }
+
   const SCEV *visitAddRecExpr(const SCEVAddRecExpr *Expr) { return Expr; }
 
   const SCEV *visitUnknown(const SCEVUnknown *Expr) {
