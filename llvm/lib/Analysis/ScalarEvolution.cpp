@@ -15442,11 +15442,22 @@ const SCEV *ScalarEvolution::applyLoopGuards(const SCEV *Expr, const Loop *L) {
           EnqueueOperands(SMax);
         break;
       case CmpInst::ICMP_UGT:
-      case CmpInst::ICMP_UGE:
+      case CmpInst::ICMP_UGE: {
         To = getUMaxExpr(FromRewritten, RHS);
         if (auto *UMin = dyn_cast<SCEVUMinExpr>(FromRewritten))
           EnqueueOperands(UMin);
+        auto *S = dyn_cast<SCEVAddExpr>(FromRewritten);
+        if (Predicate == CmpInst::ICMP_UGT && S && S->getNumOperands() == 2 && isa<SCEVMulExpr>(S->getOperand(0))) {
+          auto *Neg1 = getConstant(S->getType(), -1);
+          auto *M = cast<SCEVMulExpr>(S->getOperand(0));
+          if (M->getOperand(0) == getConstant(S->getType(), -1)) {
+            auto *From2 = getMinusSCEV(getMinusSCEV(M->getOperand(1), S->getOperand(1)), getConstant(M->getType(), 1));
+            auto *To2 = getUMinExpr(From2, getAddExpr(getMulExpr(RHS, Neg1), Neg1));
+            AddRewrite(From2, From2, To2);
+          }
+        }
         break;
+      }
       case CmpInst::ICMP_SGT:
       case CmpInst::ICMP_SGE:
         To = getSMaxExpr(FromRewritten, RHS);
