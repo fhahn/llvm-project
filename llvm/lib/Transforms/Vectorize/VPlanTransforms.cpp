@@ -1581,6 +1581,11 @@ void VPlanTransforms::tryToRealignLoop(VPlan &Plan) {
   if (Header != VectorLoop->getExiting())
     return;
 
+   auto *MiddleBB = cast<VPBasicBlock>(VectorLoop->getSingleSuccessor());
+   auto *BranchOnCond = dyn_cast_or_null<VPInstruction>(MiddleBB->getTerminator());
+   if (!BranchOnCond)
+     return;
+
   auto *CanIV = Plan.getCanonicalIV();
   bool SeenStore = false;
   for (VPRecipeBase &R : *Header) {
@@ -1593,10 +1598,22 @@ void VPlanTransforms::tryToRealignLoop(VPlan &Plan) {
     if (isa<VPWidenLoadRecipe>(&R) && SeenStore)
       return;
 
-    VPValue *Base, *Offset;
   using namespace llvm::VPlanPatternMatch;
-  auto *Addr = dyn_cast<VPVectorPointerRecipe>(R.getOperand(0));
-    if (!Addr || !match(Addr->getOperand(0), m_Binary<Instruction::GetElementPtr>(m_VPValue(Base), m_VPValue(Offset))) || !isa<VPScalarIVStepsRecipe>(Offset) || cast<VPScalarIVStepsRecipe>(Offset)->getOperand(0) != Plan.getCanonicalIV())
+  auto IsSupportedPtr = [&Plan](VPValue *V) {
+    auto *Addr = dyn_cast<VPVectorPointerRecipe>(V);
+    if (!Addr)
+      return false;
+    VPRecipeBase *DefR = Addr->getDefiningRecipe();
+    if (!DefR)
+      return true;
+    auto *RepR = dyn_cast<VPReplicateRecipe>(DefR);
+    if (!RepR || !RepR->isUniform() || RepR->getNumOperands() != 2)
+      return false;
+
+    VPValue *Base, *Offset;
+    return match(DefR->getOperand(0), m_Binary<Instruction::GetElementPtr>(m_VPValue(Base), m_VPValue(Offset))) && isa<VPScalarIVStepsRecipe>(Offset) && cast<VPScalarIVStepsRecipe>(Offset)->getOperand(0) == Plan.getCanonicalIV();
+  };
+    if (IsSupportedPtr(R.getOperand(0)))
       return;
     SeenStore |= isa<VPWidenStoreRecipe>(&R);
   }
@@ -1625,7 +1642,5 @@ void VPlanTransforms::tryToRealignLoop(VPlan &Plan) {
                            return !isa<VPInstruction>(&U) || (cast<VPInstruction>(&U) !=  CanIV->getBackedgeValue() && cast<VPInstruction>(&U) != RemIters&& cast<VPInstruction>(&U) != Sel);
                            });
 
-   auto *MiddleBB = cast<VPBasicBlock>(VectorLoop->getSingleSuccessor());
-   auto *BranchOnCond = cast<VPInstruction>(MiddleBB->getTerminator());
    BranchOnCond->setOperand(0, Plan.getOrAddLiveIn(ConstantInt::getTrue(Plan.getCanonicalIV()->getScalarType()->getContext())));
 }
