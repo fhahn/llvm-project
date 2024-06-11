@@ -7441,6 +7441,9 @@ LoopVectorizationPlanner::executePlan(
     LoopVectorizeHints Hints(L, true, *ORE);
     Hints.setAlreadyVectorized();
   }
+    assert(State.CFG.DTU.getDomTree().verify(
+        DominatorTree::VerificationLevel::Fast) &&
+      "DT not preserved correctly");
   TargetTransformInfo::UnrollingPreferences UP;
   TTI.getUnrollingPreferences(L, *PSE.getSE(), UP, ORE);
   if (!UP.UnrollVectorizedLoop || CanonicalIVStartValue)
@@ -10223,7 +10226,16 @@ LoopVectorizeResult LoopVectorizePass::runImpl(
     // transform.
     Changed |= formLCSSARecursively(*L, *DT, LI, SE);
 
+    assert(DT->verify(
+        DominatorTree::VerificationLevel::Fast) &&
+      "DT not preserved correctly");
+
+
     Changed |= CFGChanged |= processLoop(L);
+
+    assert(DT->verify(
+        DominatorTree::VerificationLevel::Fast) &&
+      "DT not preserved correctly");
 
     if (Changed) {
       LAIs->clear();
