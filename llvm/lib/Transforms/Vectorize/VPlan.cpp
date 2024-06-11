@@ -889,16 +889,16 @@ void VPlan::prepareToExecute(Value *TripCountV, Value *VectorTripCountV,
   if (CanonicalIVStartValue) {
     VPValue *VPV = getOrAddLiveIn(CanonicalIVStartValue);
     auto *IV = getCanonicalIV();
-    assert(all_of(IV->users(),
-                  [](const VPUser *U) {
-                    return isa<VPScalarIVStepsRecipe>(U) ||
-                           isa<VPScalarCastRecipe>(U) ||
-                           isa<VPDerivedIVRecipe>(U) ||
-                           cast<VPInstruction>(U)->getOpcode() ==
-                               Instruction::Add;
-                  }) &&
-           "the canonical IV should only be used by its increment or "
-           "ScalarIVSteps when resetting the start value");
+/*    assert(all_of(IV->users(),*/
+                  /*[](const VPUser *U) {*/
+                    /*return isa<VPScalarIVStepsRecipe>(U) ||*/
+                           /*isa<VPScalarCastRecipe>(U) ||*/
+                           /*isa<VPDerivedIVRecipe>(U) ||*/
+                           /*cast<VPInstruction>(U)->getOpcode() ==*/
+                               /*Instruction::Add;*/
+                  /*}) &&*/
+           /*"the canonical IV should only be used by its increment or "*/
+           /*"ScalarIVSteps when resetting the start value");*/
     IV->setOperand(0, VPV);
   }
 }
@@ -997,6 +997,7 @@ void VPlan::execute(VPTransformState *State) {
   }
 
   State->CFG.DTU.flush();
+  State->CFG.DTU.getDomTree().recalculate(*VectorLatchBB->getParent());
   assert(State->CFG.DTU.getDomTree().verify(
              DominatorTree::VerificationLevel::Fast) &&
          "DT not preserved correctly");

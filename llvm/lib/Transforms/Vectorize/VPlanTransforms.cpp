@@ -1589,6 +1589,8 @@ void VPlanTransforms::tryToRealignLoop(VPlan &Plan) {
   auto *CanIV = Plan.getCanonicalIV();
   bool SeenStore = false;
   for (VPRecipeBase &R : *Header) {
+    if (isa<VPReductionPHIRecipe, VPFirstOrderRecurrencePHIRecipe>(&R))
+      return;
     if (R.mayWriteToMemory() && !isa<VPWidenMemoryRecipe, VPCanonicalIVPHIRecipe>(&R))
       return;
 
@@ -1632,7 +1634,8 @@ void VPlanTransforms::tryToRealignLoop(VPlan &Plan) {
 
 
   auto *IVInc = cast<VPInstruction>(Plan.getCanonicalIV()->getBackedgeValue());
-  IVInc->moveBefore(*Header, Header->getFirstNonPhi());
+  if (IVInc != &*Header->getFirstNonPhi())
+    IVInc->moveBefore(*Header, Header->getFirstNonPhi());
   VPBuilder B(IVInc->getNextNode());
   VPValue *IsLastIter = B.createICmp(CmpInst::ICMP_EQ, IVInc, RndUpVecTC);
   VPValue *AlignIter = B.createNaryOp(Instruction::And, {NeedsAlign, IsLastIter});
