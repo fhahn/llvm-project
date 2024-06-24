@@ -494,8 +494,7 @@ public:
   /// This returns an array of int where the I-th entry corresponds to I-th
   /// entry in LAI.getRuntimePointerCheck().  If the pointer is used in multiple
   /// partitions its entry is set to -1.
-  SmallVector<int, 8>
-  computePartitionSetForPointers(const LoopAccessInfo &LAI) {
+  SmallVector<int, 8> computePartitionSetForPointers(LoopAccessInfo &LAI) {
     const RuntimePointerChecking *RtPtrCheck = LAI.getRuntimePointerChecking();
 
     unsigned N = RtPtrCheck->Pointers.size();
@@ -948,7 +947,7 @@ private:
 
   // Analyses used.
   LoopInfo *LI;
-  const LoopAccessInfo *LAI = nullptr;
+  LoopAccessInfo *LAI = nullptr;
   DominatorTree *DT;
   ScalarEvolution *SE;
   LoopAccessInfoManager &LAIs;

@@ -1,4 +1,4 @@
-//===- LoopVersioning.cpp - Utility to version a loop ---------------------===//
+t //===- LoopVersioning.cpp - Utility to version a loop ---------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -38,12 +38,12 @@ static cl::opt<bool>
                     cl::desc("Add no-alias annotation for instructions that "
                              "are disambiguated by memchecks"));
 
-LoopVersioning::LoopVersioning(const LoopAccessInfo &LAI,
+LoopVersioning::LoopVersioning(LoopAccessInfo &LAI,
                                ArrayRef<RuntimePointerCheck> Checks, Loop *L,
                                LoopInfo *LI, DominatorTree *DT,
                                ScalarEvolution *SE)
     : VersionedLoop(L), AliasChecks(Checks), Preds(LAI.getPSE().getPredicate()),
-      LAI(LAI), LI(LI), DT(DT), SE(SE) {}
+       LAI(LAI), LI(LI), DT(DT), SE(SE) {}
 
 void LoopVersioning::versionLoop(
     const SmallVectorImpl<Instruction *> &DefsUsedOutside) {
@@ -274,7 +274,7 @@ bool runImpl(LoopInfo *LI, LoopAccessInfoManager &LAIs, DominatorTree *DT,
     if (!L->isLoopSimplifyForm() || !L->isRotatedForm() ||
         !L->getExitingBlock())
       continue;
-    const LoopAccessInfo &LAI = LAIs.getInfo(*L);
+    LoopAccessInfo &LAI = LAIs.getInfo(*L);
     if (!LAI.hasConvergentOp() &&
         (LAI.getNumRuntimePointerChecks() ||
          !LAI.getPSE().getPredicate().isAlwaysTrue())) {
