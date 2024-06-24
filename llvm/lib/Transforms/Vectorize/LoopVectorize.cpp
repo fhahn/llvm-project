@@ -10262,7 +10262,7 @@ LoopVectorizeResult LoopVectorizePass::runImpl(
     Changed |= CFGChanged |= processLoop(L);
 
     if (Changed) {
-      LAIs->clear();
+      LAIs->clearRed();
 
 #ifndef NDEBUG
       if (VerifySCEV)
@@ -10311,6 +10311,7 @@ PreservedAnalyses LoopVectorizePass::run(Function &F,
     PA.preserve<LoopAnalysis>();
     PA.preserve<DominatorTreeAnalysis>();
     PA.preserve<ScalarEvolutionAnalysis>();
+    PA.preserve<LoopAccessAnalysis>();
 
     if (Result.MadeCFGChange) {
       // Making CFG changes likely means a loop got vectorized. Indicate that

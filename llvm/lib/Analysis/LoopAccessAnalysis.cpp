@@ -3081,6 +3081,18 @@ const LoopAccessInfo &LoopAccessInfoManager::getInfo(Loop &L) {
 
   return *It->second;
 }
+void LoopAccessInfoManager::clearRed() {
+  SmallVector<Loop *> ToRemove;
+  for (const auto &[L, LAI] : LoopAccessInfoMap) {
+    if (
+        LAI->getRuntimePointerChecking()->getChecks().empty())
+      continue;
+    ToRemove.push_back(L);
+  }
+
+  for (Loop *L : ToRemove)
+    LoopAccessInfoMap.erase(L);
+}
 
 bool LoopAccessInfoManager::invalidate(
     Function &F, const PreservedAnalyses &PA,
