@@ -360,11 +360,11 @@ public:
   bool isUniformMemOp(Instruction &I, ElementCount VF) const;
 
   /// Returns the information that we collected about runtime memory check.
-  const RuntimePointerChecking *getRuntimePointerChecking() const {
+  const RuntimePointerChecking *getRuntimePointerChecking() {
     return LAI->getRuntimePointerChecking();
   }
 
-  const LoopAccessInfo *getLAI() const { return LAI; }
+  LoopAccessInfo *getLAI() const { return LAI; }
 
   bool isSafeForAnyVectorWidth() const {
     return LAI->getDepChecker().isSafeForAnyVectorWidth();
@@ -485,7 +485,7 @@ private:
   // LoopAccess analysis.
   LoopAccessInfoManager &LAIs;
 
-  const LoopAccessInfo *LAI = nullptr;
+  LoopAccessInfo *LAI = nullptr;
 
   /// Interface to emit optimization remarks.
   OptimizationRemarkEmitter *ORE;

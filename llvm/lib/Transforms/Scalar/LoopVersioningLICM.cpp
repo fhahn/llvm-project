@@ -133,7 +133,7 @@ private:
   ScalarEvolution *SE;
 
   // Current Loop's LoopAccessInfo
-  const LoopAccessInfo *LAI = nullptr;
+  LoopAccessInfo *LAI = nullptr;
 
   // Proxy for retrieving LoopAccessInfo.
   LoopAccessInfoManager &LAIs;

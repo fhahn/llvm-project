@@ -38,14 +38,12 @@ static cl::opt<bool>
                     cl::desc("Add no-alias annotation for instructions that "
                              "are disambiguated by memchecks"));
 
-LoopVersioning::LoopVersioning(const LoopAccessInfo &LAI,
+LoopVersioning::LoopVersioning(LoopAccessInfo &LAI,
                                ArrayRef<RuntimePointerCheck> Checks, Loop *L,
                                LoopInfo *LI, DominatorTree *DT,
                                ScalarEvolution *SE)
     : VersionedLoop(L), AliasChecks(Checks.begin(), Checks.end()),
-      Preds(LAI.getPSE().getPredicate()), LAI(LAI), LI(LI), DT(DT),
-      SE(SE) {
-}
+      Preds(LAI.getPSE().getPredicate()), LAI(LAI), LI(LI), DT(DT), SE(SE) {}
 
 void LoopVersioning::versionLoop(
     const SmallVectorImpl<Instruction *> &DefsUsedOutside) {
@@ -276,7 +274,7 @@ bool runImpl(LoopInfo *LI, LoopAccessInfoManager &LAIs, DominatorTree *DT,
     if (!L->isLoopSimplifyForm() || !L->isRotatedForm() ||
         !L->getExitingBlock())
       continue;
-    const LoopAccessInfo &LAI = LAIs.getInfo(*L);
+    LoopAccessInfo &LAI = LAIs.getInfo(*L);
     if (!LAI.hasConvergentOp() &&
         (LAI.getNumRuntimePointerChecks() ||
          !LAI.getPSE().getPredicate().isAlwaysTrue())) {

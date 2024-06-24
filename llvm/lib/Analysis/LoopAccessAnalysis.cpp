@@ -647,170 +647,6 @@ void RuntimePointerChecking::print(raw_ostream &OS, unsigned Depth) const {
 
 namespace {
 
-/// Analyses memory accesses in a loop.
-///
-/// Checks whether run time pointer checks are needed and builds sets for data
-/// dependence checking.
-class AccessAnalysis {
-public:
-  /// Read or write access location.
-  typedef PointerIntPair<Value *, 1, bool> MemAccessInfo;
-  typedef SmallVector<MemAccessInfo, 8> MemAccessInfoList;
-
-  AccessAnalysis(Loop *TheLoop, AAResults *AA, LoopInfo *LI,
-                 MemoryDepChecker::DepCandidates &DA,
-                 PredicatedScalarEvolution &PSE,
-                 SmallPtrSetImpl<MDNode *> &LoopAliasScopes)
-      : TheLoop(TheLoop), BAA(*AA), AST(BAA), LI(LI), DepCands(DA), PSE(PSE),
-        LoopAliasScopes(LoopAliasScopes) {
-    // We're analyzing dependences across loop iterations.
-    BAA.enableCrossIterationMode();
-  }
-
-  /// Register a load  and whether it is only read from.
-  void addLoad(MemoryLocation &Loc, Type *AccessTy, bool IsReadOnly) {
-    Value *Ptr = const_cast<Value *>(Loc.Ptr);
-    AST.add(adjustLoc(Loc));
-    Accesses[MemAccessInfo(Ptr, false)].insert(AccessTy);
-    if (IsReadOnly)
-      ReadOnlyPtr.insert(Ptr);
-  }
-
-  /// Register a store.
-  void addStore(MemoryLocation &Loc, Type *AccessTy) {
-    Value *Ptr = const_cast<Value *>(Loc.Ptr);
-    AST.add(adjustLoc(Loc));
-    Accesses[MemAccessInfo(Ptr, true)].insert(AccessTy);
-  }
-
-  /// Check if we can emit a run-time no-alias check for \p Access.
-  ///
-  /// Returns true if we can emit a run-time no alias check for \p Access.
-  /// If we can check this access, this also adds it to a dependence set and
-  /// adds a run-time to check for it to \p RtCheck. If \p Assume is true,
-  /// we will attempt to use additional run-time checks in order to get
-  /// the bounds of the pointer.
-  bool createCheckForAccess(RuntimePointerChecking &RtCheck,
-                            MemAccessInfo Access, Type *AccessTy,
-                            const DenseMap<Value *, const SCEV *> &Strides,
-                            DenseMap<Value *, unsigned> &DepSetId,
-                            Loop *TheLoop, unsigned &RunningDepId,
-                            unsigned ASId, bool ShouldCheckStride, bool Assume);
-
-  /// Check whether we can check the pointers at runtime for
-  /// non-intersection.
-  ///
-  /// Returns true if we need no check or if we do and we can generate them
-  /// (i.e. the pointers have computable bounds).
-  bool canCheckPtrAtRT(RuntimePointerChecking &RtCheck, ScalarEvolution *SE,
-                       Loop *TheLoop, const DenseMap<Value *, const SCEV *> &Strides,
-                       Value *&UncomputablePtr, bool ShouldCheckWrap = false);
-
-  /// Goes over all memory accesses, checks whether a RT check is needed
-  /// and builds sets of dependent accesses.
-  void buildDependenceSets() {
-    processMemAccesses();
-  }
-
-  /// Initial processing of memory accesses determined that we need to
-  /// perform dependency checking.
-  ///
-  /// Note that this can later be cleared if we retry memcheck analysis without
-  /// dependency checking (i.e. FoundNonConstantDistanceDependence).
-  bool isDependencyCheckNeeded() { return !CheckDeps.empty(); }
-
-  /// We decided that no dependence analysis would be used.  Reset the state.
-  void resetDepChecks(MemoryDepChecker &DepChecker) {
-    CheckDeps.clear();
-    DepChecker.clearDependences();
-  }
-
-  MemAccessInfoList &getDependenciesToCheck() { return CheckDeps; }
-
-  const DenseMap<Value *, SmallVector<const Value *, 16>> &
-  getUnderlyingObjects() {
-    return UnderlyingObjects;
-  }
-
-private:
-  typedef MapVector<MemAccessInfo, SmallSetVector<Type *, 1>> PtrAccessMap;
-
-  /// Adjust the MemoryLocation so that it represents accesses to this
-  /// location across all iterations, rather than a single one.
-  MemoryLocation adjustLoc(MemoryLocation Loc) const {
-    // The accessed location varies within the loop, but remains within the
-    // underlying object.
-    Loc.Size = LocationSize::beforeOrAfterPointer();
-    Loc.AATags.Scope = adjustAliasScopeList(Loc.AATags.Scope);
-    Loc.AATags.NoAlias = adjustAliasScopeList(Loc.AATags.NoAlias);
-    return Loc;
-  }
-
-  /// Drop alias scopes that are only valid within a single loop iteration.
-  MDNode *adjustAliasScopeList(MDNode *ScopeList) const {
-    if (!ScopeList)
-      return nullptr;
-
-    // For the sake of simplicity, drop the whole scope list if any scope is
-    // iteration-local.
-    if (any_of(ScopeList->operands(), [&](Metadata *Scope) {
-          return LoopAliasScopes.contains(cast<MDNode>(Scope));
-        }))
-      return nullptr;
-
-    return ScopeList;
-  }
-
-  /// Go over all memory access and check whether runtime pointer checks
-  /// are needed and build sets of dependency check candidates.
-  void processMemAccesses();
-
-  /// Map of all accesses. Values are the types used to access memory pointed to
-  /// by the pointer.
-  PtrAccessMap Accesses;
-
-  /// The loop being checked.
-  const Loop *TheLoop;
-
-  /// List of accesses that need a further dependence check.
-  MemAccessInfoList CheckDeps;
-
-  /// Set of pointers that are read only.
-  SmallPtrSet<Value*, 16> ReadOnlyPtr;
-
-  /// Batched alias analysis results.
-  BatchAAResults BAA;
-
-  /// An alias set tracker to partition the access set by underlying object and
-  //intrinsic property (such as TBAA metadata).
-  AliasSetTracker AST;
-
-  LoopInfo *LI;
-
-  /// Sets of potentially dependent accesses - members of one set share an
-  /// underlying pointer. The set "CheckDeps" identfies which sets really need a
-  /// dependence check.
-  MemoryDepChecker::DepCandidates &DepCands;
-
-  /// Initial processing of memory accesses determined that we may need
-  /// to add memchecks.  Perform the analysis to determine the necessary checks.
-  ///
-  /// Note that, this is different from isDependencyCheckNeeded.  When we retry
-  /// memcheck analysis without dependency checking
-  /// (i.e. FoundNonConstantDistanceDependence), isDependencyCheckNeeded is
-  /// cleared while this remains set if we have potentially dependent accesses.
-  bool IsRTCheckAnalysisNeeded = false;
-
-  /// The SCEV predicate containing all the SCEV-related assumptions.
-  PredicatedScalarEvolution &PSE;
-
-  DenseMap<Value *, SmallVector<const Value *, 16>> UnderlyingObjects;
-
-  /// Alias scopes that are declared inside the loop, and as such not valid
-  /// across iterations.
-  SmallPtrSetImpl<MDNode *> &LoopAliasScopes;
-};
-
 } // end anonymous namespace
 
 /// Check whether a pointer can participate in a runtime bounds check.
@@ -1144,12 +980,15 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
   // We assign a consecutive id to access from different alias sets.
   // Accesses between different groups doesn't need to be checked.
   unsigned ASId = 0;
-  for (auto &AS : AST) {
+
+  /// An alias set tracker to partition the access set by underlying object and
+  // intrinsic property (such as TBAA metadata).
+
+  for (auto &AP : ASPointers) {
     int NumReadPtrChecks = 0;
     int NumWritePtrChecks = 0;
     bool CanDoAliasSetRT = true;
     ++ASId;
-    auto ASPointers = AS.getPointers();
 
     // We assign consecutive id to access from different dependence sets.
     // Accesses within the same set don't need a runtime check.
@@ -1161,7 +1000,7 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
     // First, count how many write and read accesses are in the alias set. Also
     // collect MemAccessInfos for later.
     SmallVector<MemAccessInfo, 4> AccessInfos;
-    for (const Value *ConstPtr : ASPointers) {
+    for (const Value *ConstPtr : AP) {
       Value *Ptr = const_cast<Value *>(ConstPtr);
       bool IsWrite = Accesses.count(MemAccessInfo(Ptr, true));
       if (IsWrite)
@@ -1175,8 +1014,8 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
     // or a single write and no reads.
     if (NumWritePtrChecks == 0 ||
         (NumWritePtrChecks == 1 && NumReadPtrChecks == 0)) {
-      assert((ASPointers.size() <= 1 ||
-              all_of(ASPointers,
+      assert((AP.size() <= 1 ||
+              all_of(AP,
                      [this](const Value *Ptr) {
                        MemAccessInfo AccessWrite(const_cast<Value *>(Ptr),
                                                  true);
@@ -1287,7 +1126,6 @@ void AccessAnalysis::processMemAccesses() {
   // read-only pointers.
 
   LLVM_DEBUG(dbgs() << "LAA: Processing memory accesses...\n");
-  LLVM_DEBUG(dbgs() << "  AST: "; AST.dump());
   LLVM_DEBUG(dbgs() << "LAA:   Accesses(" << Accesses.size() << "):\n");
   LLVM_DEBUG({
     for (const auto &[A, _] : Accesses)
@@ -1302,11 +1140,10 @@ void AccessAnalysis::processMemAccesses() {
   // compatibility and potential for underlying-object overlap. As a result, we
   // only need to check for potential pointer dependencies within each alias
   // set.
-  for (const auto &AS : AST) {
+  for (const auto &AP : ASPointers) {
     // Note that both the alias-set tracker and the alias sets themselves used
     // ordered collections internally and so the iteration order here is
     // deterministic.
-    auto ASPointers = AS.getPointers();
 
     bool SetHasWrite = false;
 
@@ -1323,7 +1160,7 @@ void AccessAnalysis::processMemAccesses() {
       bool UseDeferred = SetIteration > 0;
       PtrAccessMap &S = UseDeferred ? DeferredAccesses : Accesses;
 
-      for (const Value *ConstPtr : ASPointers) {
+      for (const Value *ConstPtr : AP) {
         Value *Ptr = const_cast<Value *>(ConstPtr);
 
         // For a single memory access in AliasSetTracker, Accesses may contain
@@ -2399,7 +2236,6 @@ bool LoopAccessInfo::analyzeLoop(AAResults *AA, LoopInfo *LI,
   // Holds the Load and Store instructions.
   SmallVector<LoadInst *, 16> Loads;
   SmallVector<StoreInst *, 16> Stores;
-  SmallPtrSet<MDNode *, 8> LoopAliasScopes;
 
   // Holds all the different accesses in the loop.
   unsigned NumReads = 0;
@@ -2523,10 +2359,6 @@ bool LoopAccessInfo::analyzeLoop(AAResults *AA, LoopInfo *LI,
     return true;
   }
 
-  MemoryDepChecker::DepCandidates DependentAccesses;
-  AccessAnalysis Accesses(TheLoop, AA, LI, DependentAccesses, *PSE,
-                          LoopAliasScopes);
-
   // Holds the analyzed pointers. We don't want to call getUnderlyingObjects
   // multiple times on the same object. If the ptr is accessed twice, once
   // for read and once for write, it will only appear once (on the write
@@ -2537,6 +2369,8 @@ bool LoopAccessInfo::analyzeLoop(AAResults *AA, LoopInfo *LI,
   // Record uniform store addresses to identify if we have multiple stores
   // to the same address.
   SmallPtrSet<Value *, 16> UniformStores;
+
+  AliasSetTracker AST(Accesses.BAA);
 
   for (StoreInst *ST : Stores) {
     Value *Ptr = ST->getPointerOperand();
@@ -2562,9 +2396,13 @@ bool LoopAccessInfo::analyzeLoop(AAResults *AA, LoopInfo *LI,
         Loc.AATags.TBAA = nullptr;
 
       visitPointers(const_cast<Value *>(Loc.Ptr), *TheLoop,
-                    [&Accesses, AccessTy, Loc](Value *Ptr) {
+                    [this, AccessTy, Loc, &AST](Value *Ptr) {
                       MemoryLocation NewLoc = Loc.getWithNewPtr(Ptr);
-                      Accesses.addStore(NewLoc, AccessTy);
+                      Ptr = const_cast<Value *>(NewLoc.Ptr);
+                      AST.add(this->Accesses.adjustLoc(NewLoc));
+                      this->Accesses
+                          .Accesses[MemoryDepChecker::MemAccessInfo(Ptr, true)]
+                          .insert(AccessTy);
                     });
     }
   }
@@ -2609,12 +2447,21 @@ bool LoopAccessInfo::analyzeLoop(AAResults *AA, LoopInfo *LI,
     if (blockNeedsPredication(LD->getParent(), TheLoop, DT))
       Loc.AATags.TBAA = nullptr;
 
-    visitPointers(const_cast<Value *>(Loc.Ptr), *TheLoop,
-                  [&Accesses, AccessTy, Loc, IsReadOnlyPtr](Value *Ptr) {
-                    MemoryLocation NewLoc = Loc.getWithNewPtr(Ptr);
-                    Accesses.addLoad(NewLoc, AccessTy, IsReadOnlyPtr);
-                  });
+    visitPointers(
+        const_cast<Value *>(Loc.Ptr), *TheLoop,
+        [this, AccessTy, Loc, IsReadOnlyPtr, &AST](Value *Ptr) {
+          MemoryLocation NewLoc = Loc.getWithNewPtr(Ptr);
+          Ptr = const_cast<Value *>(NewLoc.Ptr);
+          AST.add(Accesses.adjustLoc(NewLoc));
+          Accesses.Accesses[MemoryDepChecker::MemAccessInfo(Ptr, false)].insert(
+              AccessTy);
+          if (IsReadOnlyPtr)
+            Accesses.ReadOnlyPtr.insert(Ptr);
+        });
   }
+
+  for (const auto &AS : AST)
+    Accesses.ASPointers.push_back(AS.getPointers());
 
   // If we write (or read-write) to a single destination and there are no
   // other reads in this loop then is it safe to vectorize.
@@ -3002,7 +2849,8 @@ LoopAccessInfo::LoopAccessInfo(Loop *L, ScalarEvolution *SE,
                                const TargetLibraryInfo *TLI, AAResults *AA,
                                DominatorTree *DT, LoopInfo *LI, bool ExpensiveChecks)
     : PSE(std::make_unique<PredicatedScalarEvolution>(*SE, *L)),
-      PtrRtChecking(nullptr), TheLoop(L) {
+      PtrRtChecking(nullptr), TheLoop(L),
+      Accesses(L, AA, LI, DependentAccesses, *PSE, LoopAliasScopes) {
   unsigned MaxTargetVectorWidthInBits = std::numeric_limits<unsigned>::max();
   if (TTI) {
     TypeSize FixedWidth =
@@ -3073,7 +2921,7 @@ void LoopAccessInfo::print(raw_ostream &OS, unsigned Depth) const {
   PSE->print(OS, Depth);
 }
 
-const LoopAccessInfo &LoopAccessInfoManager::getInfo(Loop &L) {
+LoopAccessInfo &LoopAccessInfoManager::getInfo(Loop &L) {
   auto [It, Inserted] = LoopAccessInfoMap.insert({&L, nullptr});
 
   if (Inserted)
@@ -3081,17 +2929,20 @@ const LoopAccessInfo &LoopAccessInfoManager::getInfo(Loop &L) {
         std::make_unique<LoopAccessInfo>(&L, &SE, TTI, TLI, &AA, &DT, &LI, ExpensiveChecks);
   return *It->second;
 }
+
 void LoopAccessInfoManager::clearRed() {
-  SmallVector<Loop *> ToRemove;
   for (const auto &[L, LAI] : LoopAccessInfoMap) {
-    if (
+    if (LAI->PtrRtChecking->NeedsRegen ||
         LAI->getRuntimePointerChecking()->getChecks().empty())
       continue;
-    ToRemove.push_back(L);
-  }
 
-  for (Loop *L : ToRemove)
-    LoopAccessInfoMap.erase(L);
+    LAI->PtrRtChecking->NeedsRegen = true;
+    LAI->PtrRtChecking->Pointers.clear();
+    LAI->PtrRtChecking->CheckingGroups.clear();
+    LAI->PtrRtChecking->Checks.clear();
+    LAI->PtrRtChecking->DiffChecks.clear();
+    LAI->DepChecker->getPointerBounds().clear();
+  }
 }
 
 bool LoopAccessInfoManager::invalidate(

@@ -169,9 +169,9 @@ namespace {
 /// The per-loop class that does most of the work.
 class LoadEliminationForLoop {
 public:
-  LoadEliminationForLoop(Loop *L, LoopInfo *LI, const LoopAccessInfo &LAI,
+  LoadEliminationForLoop(Loop *L, LoopInfo *LI, LoopAccessInfo &LAI,
                          DominatorTree *DT, BlockFrequencyInfo *BFI,
-                         ProfileSummaryInfo* PSI)
+                         ProfileSummaryInfo *PSI)
       : L(L), LI(LI), LAI(LAI), DT(DT), BFI(BFI), PSI(PSI), PSE(LAI.getPSE()) {}
 
   /// Look through the loop-carried and loop-independent dependences in
@@ -180,7 +180,7 @@ public:
   /// Note that no candidate is returned if LAA has failed to analyze the loop
   /// (e.g. if it's not bottom-tested, contains volatile memops, etc.)
   std::forward_list<StoreToLoadForwardingCandidate>
-  findStoreToLoadDependences(const LoopAccessInfo &LAI) {
+  findStoreToLoadDependences(LoopAccessInfo &LAI) {
     std::forward_list<StoreToLoadForwardingCandidate> Candidates;
 
     const auto &DepChecker = LAI.getDepChecker();
@@ -635,7 +635,7 @@ private:
 
   // Analyses used.
   LoopInfo *LI;
-  const LoopAccessInfo &LAI;
+  LoopAccessInfo &LAI;
   DominatorTree *DT;
   BlockFrequencyInfo *BFI;
   ProfileSummaryInfo *PSI;

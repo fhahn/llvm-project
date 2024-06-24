@@ -902,8 +902,7 @@ static bool CanWidenIV(FlattenInfo &FI, DominatorTree *DT, LoopInfo *LI,
 static bool FlattenLoopPair(FlattenInfo &FI, DominatorTree *DT, LoopInfo *LI,
                             ScalarEvolution *SE, AssumptionCache *AC,
                             const TargetTransformInfo *TTI, LPMUpdater *U,
-                            MemorySSAUpdater *MSSAU,
-                            const LoopAccessInfo &LAI) {
+                            MemorySSAUpdater *MSSAU, LoopAccessInfo &LAI) {
   LLVM_DEBUG(
       dbgs() << "Loop flattening running on outer loop "
              << FI.OuterLoop->getHeader()->getName() << " and inner loop "

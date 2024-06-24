@@ -15,6 +15,8 @@
 #define LLVM_ANALYSIS_LOOPACCESSANALYSIS_H
 
 #include "llvm/ADT/EquivalenceClasses.h"
+#include "llvm/Analysis/AliasAnalysis.h"
+#include "llvm/Analysis/AliasSetTracker.h"
 #include "llvm/Analysis/LoopAnalysisManager.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/IR/DiagnosticInfo.h"
@@ -447,15 +449,17 @@ struct PointerDiffInfo {
         NeedsFreeze(NeedsFreeze) {}
 };
 
+class LoopAccessInfoManager;
 /// Holds information about the memory runtime legality checks to verify
 /// that a group of pointers do not overlap.
 class RuntimePointerChecking {
   friend struct RuntimeCheckingPtrGroup;
+  friend class LoopAccessInfoManager;
 
 public:
   struct PointerInfo {
     /// Holds the pointer value that we need to check.
-    TrackingVH<Value> PointerValue;
+    Value *PointerValue;
     /// Holds the smallest byte address accessed by the pointer throughout all
     /// iterations of the loop.
     const SCEV *Start;
@@ -484,6 +488,8 @@ public:
 
   RuntimePointerChecking(MemoryDepChecker &DC, ScalarEvolution *SE)
       : DC(DC), SE(SE) {}
+
+  bool NeedsRegen = false;
 
   /// Reset the state of the pointer runtime information.
   void reset() {
@@ -626,7 +632,159 @@ private:
 ///
 /// Checks for both memory dependences and the SCEV predicates contained in the
 /// PSE must be emitted in order for the results of this analysis to be valid.
+
+/// Analyses memory accesses in a loop.
+///
+/// Checks whether run time pointer checks are needed and builds sets for data
+/// dependence checking.
+class LoopAccessInfo;
+class AccessAnalysis {
+  friend class LoopAccessInfoManager;
+  friend class LoopAccessInfo;
+
+public:
+  /// Read or write access location.
+  typedef PointerIntPair<Value *, 1, bool> MemAccessInfo;
+  typedef SmallVector<MemAccessInfo, 8> MemAccessInfoList;
+
+  AccessAnalysis(Loop *TheLoop, AAResults *AA, LoopInfo *LI,
+                 MemoryDepChecker::DepCandidates &DA,
+                 PredicatedScalarEvolution &PSE,
+                 SmallPtrSetImpl<MDNode *> &LoopAliasScopes)
+      : TheLoop(TheLoop), BAA(*AA), LI(LI), DepCands(DA), PSE(PSE),
+        LoopAliasScopes(LoopAliasScopes) {
+    // We're analyzing dependences across loop iterations.
+    BAA.enableCrossIterationMode();
+  }
+
+  /// Check if we can emit a run-time no-alias check for \p Access.
+  ///
+  /// Returns true if we can emit a run-time no alias check for \p Access.
+  /// If we can check this access, this also adds it to a dependence set and
+  /// adds a run-time to check for it to \p RtCheck. If \p Assume is true,
+  /// we will attempt to use additional run-time checks in order to get
+  /// the bounds of the pointer.
+  bool createCheckForAccess(RuntimePointerChecking &RtCheck,
+                            MemAccessInfo Access, Type *AccessTy,
+                            const DenseMap<Value *, const SCEV *> &Strides,
+                            DenseMap<Value *, unsigned> &DepSetId,
+                            Loop *TheLoop, unsigned &RunningDepId,
+                            unsigned ASId, bool ShouldCheckStride, bool Assume);
+
+  /// Check whether we can check the pointers at runtime for
+  /// non-intersection.
+  ///
+  /// Returns true if we need no check or if we do and we can generate them
+  /// (i.e. the pointers have computable bounds).
+  bool canCheckPtrAtRT(RuntimePointerChecking &RtCheck, ScalarEvolution *SE,
+                       Loop *TheLoop,
+                       const DenseMap<Value *, const SCEV *> &Strides,
+                       Value *&UncomputablePtr, bool ShouldCheckWrap = false);
+
+  /// Goes over all memory accesses, checks whether a RT check is needed
+  /// and builds sets of dependent accesses.
+  void buildDependenceSets() { processMemAccesses(); }
+
+  /// Initial processing of memory accesses determined that we need to
+  /// perform dependency checking.
+  ///
+  /// Note that this can later be cleared if we retry memcheck analysis without
+  /// dependency checking (i.e. FoundNonConstantDistanceDependence).
+  bool isDependencyCheckNeeded() { return !CheckDeps.empty(); }
+
+  /// We decided that no dependence analysis would be used.  Reset the state.
+  void resetDepChecks(MemoryDepChecker &DepChecker) {
+    CheckDeps.clear();
+    DepChecker.clearDependences();
+  }
+
+  MemAccessInfoList &getDependenciesToCheck() { return CheckDeps; }
+
+  const DenseMap<Value *, SmallVector<const Value *, 16>> &
+  getUnderlyingObjects() {
+    return UnderlyingObjects;
+  }
+
+private:
+  typedef MapVector<MemAccessInfo, SmallSetVector<Type *, 1>> PtrAccessMap;
+
+  /// Adjust the MemoryLocation so that it represents accesses to this
+  /// location across all iterations, rather than a single one.
+  MemoryLocation adjustLoc(MemoryLocation Loc) const {
+    // The accessed location varies within the loop, but remains within the
+    // underlying object.
+    Loc.Size = LocationSize::beforeOrAfterPointer();
+    Loc.AATags.Scope = adjustAliasScopeList(Loc.AATags.Scope);
+    Loc.AATags.NoAlias = adjustAliasScopeList(Loc.AATags.NoAlias);
+    return Loc;
+  }
+
+  /// Drop alias scopes that are only valid within a single loop iteration.
+  MDNode *adjustAliasScopeList(MDNode *ScopeList) const {
+    if (!ScopeList)
+      return nullptr;
+
+    // For the sake of simplicity, drop the whole scope list if any scope is
+    // iteration-local.
+    if (any_of(ScopeList->operands(), [&](Metadata *Scope) {
+          return LoopAliasScopes.contains(cast<MDNode>(Scope));
+        }))
+      return nullptr;
+
+    return ScopeList;
+  }
+
+  /// Go over all memory access and check whether runtime pointer checks
+  /// are needed and build sets of dependency check candidates.
+  void processMemAccesses();
+
+  /// Map of all accesses. Values are the types used to access memory pointed to
+  /// by the pointer.
+  PtrAccessMap Accesses;
+
+  /// The loop being checked.
+  const Loop *TheLoop;
+
+  /// List of accesses that need a further dependence check.
+  MemAccessInfoList CheckDeps;
+
+  /// Set of pointers that are read only.
+  SmallPtrSet<Value *, 16> ReadOnlyPtr;
+
+  /// Batched alias analysis results.
+  BatchAAResults BAA;
+
+  LoopInfo *LI;
+
+  /// Sets of potentially dependent accesses - members of one set share an
+  /// underlying pointer. The set "CheckDeps" identfies which sets really need a
+  /// dependence check.
+  MemoryDepChecker::DepCandidates &DepCands;
+
+  /// Initial processing of memory accesses determined that we may need
+  /// to add memchecks.  Perform the analysis to determine the necessary checks.
+  ///
+  /// Note that, this is different from isDependencyCheckNeeded.  When we retry
+  /// memcheck analysis without dependency checking
+  /// (i.e. FoundNonConstantDistanceDependence), isDependencyCheckNeeded is
+  /// cleared while this remains set if we have potentially dependent accesses.
+  bool IsRTCheckAnalysisNeeded = false;
+
+  /// The SCEV predicate containing all the SCEV-related assumptions.
+  PredicatedScalarEvolution &PSE;
+
+  DenseMap<Value *, SmallVector<const Value *, 16>> UnderlyingObjects;
+
+  /// Alias scopes that are declared inside the loop, and as such not valid
+  /// across iterations.
+  SmallPtrSetImpl<MDNode *> &LoopAliasScopes;
+
+  SmallVector<SmallVector<const Value *, 8>> ASPointers;
+};
+
 class LoopAccessInfo {
+  friend class LoopAccessInfoManager;
+
 public:
   LoopAccessInfo(Loop *L, ScalarEvolution *SE, const TargetTransformInfo *TTI,
                  const TargetLibraryInfo *TLI, AAResults *AA, DominatorTree *DT,
@@ -645,7 +803,8 @@ public:
   /// not legal to insert them.
   bool hasConvergentOp() const { return HasConvergentOp; }
 
-  const RuntimePointerChecking *getRuntimePointerChecking() const {
+  const RuntimePointerChecking *getRuntimePointerChecking() {
+    canCheckPtrAtRT();
     return PtrRtChecking.get();
   }
 
@@ -714,6 +873,15 @@ public:
   /// associated with this predicate.
   const PredicatedScalarEvolution &getPSE() const { return *PSE; }
 
+  void canCheckPtrAtRT() {
+    Value *UncomputablePtr;
+    if (PtrRtChecking->NeedsRegen) {
+      PtrRtChecking->NeedsRegen = false;
+      Accesses.canCheckPtrAtRT(*PtrRtChecking, PSE->getSE(), TheLoop,
+                               SymbolicStrides, UncomputablePtr, false);
+    }
+  }
+
 private:
   /// Analyze the loop. Returns true if all memory access in the loop can be
   /// vectorized.
@@ -779,6 +947,9 @@ private:
   /// If an access has a symbolic strides, this maps the pointer value to
   /// the stride symbol.
   DenseMap<Value *, const SCEV *> SymbolicStrides;
+  SmallPtrSet<MDNode *, 8> LoopAliasScopes;
+  MemoryDepChecker::DepCandidates DependentAccesses;
+  AccessAnalysis Accesses;
 };
 
 /// Return the SCEV corresponding to a pointer with the symbolic stride
@@ -864,7 +1035,7 @@ public:
                         const TargetLibraryInfo *TLI, bool ExpensiveChecks = true)
       : SE(SE), AA(AA), DT(DT), LI(LI), TTI(TTI), TLI(TLI) {}
 
-  const LoopAccessInfo &getInfo(Loop &L);
+  LoopAccessInfo &getInfo(Loop &L);
 
   void clear() { LoopAccessInfoMap.clear(); }
   void clearRed();
