@@ -3089,8 +3089,7 @@ void LoopAccessInfoManager::clear() {
   // moment, that is loops requiring memory or SCEV runtime checks, as those cache
   // SCEVs, e.g. for pointer expressions.
   for (const auto &[L, LAI] : LoopAccessInfoMap) {
-    if (LAI->getRuntimePointerChecking()->getChecks().empty() &&
-        LAI->getPSE().getPredicate().isAlwaysTrue())
+        if (LAI->getRuntimePointerChecking()->getChecks().empty())
       continue;
     ToRemove.push_back(L);
   }
