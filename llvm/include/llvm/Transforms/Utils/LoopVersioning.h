@@ -44,9 +44,8 @@ public:
   /// It uses runtime check provided by the user. If \p UseLAIChecks is true,
   /// we will retain the default checks made by LAI. Otherwise, construct an
   /// object having no checks and we expect the user to add them.
-  LoopVersioning(const LoopAccessInfo &LAI,
-                 ArrayRef<RuntimePointerCheck> Checks, Loop *L, LoopInfo *LI,
-                 DominatorTree *DT, ScalarEvolution *SE);
+  LoopVersioning(LoopAccessInfo &LAI, ArrayRef<RuntimePointerCheck> Checks,
+                 Loop *L, LoopInfo *LI, DominatorTree *DT, ScalarEvolution *SE);
 
   /// Performs the CFG manipulation part of versioning the loop including
   /// the DominatorTree and LoopInfo updates.
@@ -138,7 +137,7 @@ private:
       GroupToNonAliasingScopeList;
 
   /// Analyses used.
-  const LoopAccessInfo &LAI;
+  LoopAccessInfo &LAI;
   LoopInfo *LI;
   DominatorTree *DT;
   ScalarEvolution *SE;
