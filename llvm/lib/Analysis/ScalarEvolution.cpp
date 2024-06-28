@@ -10490,8 +10490,10 @@ ScalarEvolution::ExitLimit ScalarEvolution::howFarToZero(const SCEV *V,
   if (!isLoopInvariant(Step, L))
     return getCouldNotCompute();
 
+  const auto &[RewriteMap, PreserveNUW, PreserveNSW] = collectLoopGuards(L);
   // Specialize step for this loop so we get context sensitive facts below.
-  const SCEV *StepWLG = applyLoopGuards(Step, L);
+  const SCEV *StepWLG =
+      applyLoopGuards(Step, L, RewriteMap, PreserveNUW, PreserveNSW);
 
   // For positive steps (counting up until unsigned overflow):
   //   N = -Start/Step (as unsigned)
@@ -10508,7 +10510,8 @@ ScalarEvolution::ExitLimit ScalarEvolution::howFarToZero(const SCEV *V,
   //   N = Distance (as unsigned)
   if (StepC &&
       (StepC->getValue()->isOne() || StepC->getValue()->isMinusOne())) {
-    APInt MaxBECount = getUnsignedRangeMax(applyLoopGuards(Distance, L));
+    APInt MaxBECount = getUnsignedRangeMax(
+        applyLoopGuards(Distance, L, RewriteMap, PreserveNUW, PreserveNSW));
     MaxBECount = APIntOps::umin(MaxBECount, getUnsignedRangeMax(Distance));
 
     // When a loop like "for (int i = 0; i != n; ++i) { /* body */ }" is rotated,
@@ -10549,7 +10552,8 @@ ScalarEvolution::ExitLimit ScalarEvolution::howFarToZero(const SCEV *V,
         getUDivExpr(Distance, CountDown ? getNegativeSCEV(Step) : Step);
     const SCEV *ConstantMax = getCouldNotCompute();
     if (Exact != getCouldNotCompute()) {
-      APInt MaxInt = getUnsignedRangeMax(applyLoopGuards(Exact, L));
+      APInt MaxInt = getUnsignedRangeMax(
+          applyLoopGuards(Exact, L, RewriteMap, PreserveNUW, PreserveNSW));
       ConstantMax =
           getConstant(APIntOps::umin(MaxInt, getUnsignedRangeMax(Exact)));
     }
@@ -10566,7 +10570,8 @@ ScalarEvolution::ExitLimit ScalarEvolution::howFarToZero(const SCEV *V,
 
   const SCEV *M = E;
   if (E != getCouldNotCompute()) {
-    APInt MaxWithGuards = getUnsignedRangeMax(applyLoopGuards(E, L));
+    APInt MaxWithGuards = getUnsignedRangeMax(
+        applyLoopGuards(E, L, RewriteMap, PreserveNUW, PreserveNSW));
     M = getConstant(APIntOps::umin(MaxWithGuards, getUnsignedRangeMax(E)));
   }
   auto *S = isa<SCEVCouldNotCompute>(E) ? M : E;
@@ -15096,7 +15101,7 @@ class SCEVLoopGuardRewriter : public SCEVRewriteVisitor<SCEVLoopGuardRewriter> {
 
 public:
   SCEVLoopGuardRewriter(ScalarEvolution &SE,
-                        DenseMap<const SCEV *, const SCEV *> &M,
+                        const DenseMap<const SCEV *, const SCEV *> &M,
                         bool PreserveNUW, bool PreserveNSW)
       : SCEVRewriteVisitor(SE), Map(M) {
     if (PreserveNUW)
@@ -15191,7 +15196,8 @@ public:
   }
 };
 
-const SCEV *ScalarEvolution::applyLoopGuards(const SCEV *Expr, const Loop *L) {
+std::tuple<DenseMap<const SCEV *, const SCEV *>, bool, bool>
+ScalarEvolution::collectLoopGuards(const Loop *L) {
   SmallVector<const SCEV *> ExprsToRewrite;
   auto CollectCondition = [&](ICmpInst::Predicate Predicate, const SCEV *LHS,
                               const SCEV *RHS,
@@ -15600,9 +15606,6 @@ const SCEV *ScalarEvolution::applyLoopGuards(const SCEV *Expr, const Loop *L) {
     }
   }
 
-  if (RewriteMap.empty())
-    return Expr;
-
   // Let the rewriter preserve NUW/NSW flags if the unsigned/signed ranges of
   // the replacement expressions are contained in the ranges of the replaced
   // expressions.
@@ -15626,6 +15629,21 @@ const SCEV *ScalarEvolution::applyLoopGuards(const SCEV *Expr, const Loop *L) {
       RewriteMap.insert({Expr, Rewriter.visit(RewriteTo)});
     }
   }
+  return {RewriteMap, PreserveNUW, PreserveNSW};
+}
+
+const SCEV *ScalarEvolution::applyLoopGuards(const SCEV *Expr, const Loop *L) {
+  const auto &[RewriteMap, PreserveNUW, PreserveNSW] = collectLoopGuards(L);
+  return applyLoopGuards(Expr, L, RewriteMap, PreserveNUW, PreserveNSW);
+}
+
+const SCEV *ScalarEvolution::applyLoopGuards(
+    const SCEV *Expr, const Loop *L,
+    const DenseMap<const SCEV *, const SCEV *> &RewriteMap, bool PreserveNUW,
+    bool PreserveNSW) {
+  if (RewriteMap.empty())
+    return Expr;
+
   SCEVLoopGuardRewriter Rewriter(*this, RewriteMap, PreserveNUW, PreserveNSW);
   return Rewriter.visit(Expr);
 }
