@@ -327,6 +327,9 @@ private:
   /// backwards-vectorizable or unknown (triggering a runtime check).
   unsigned MaxTargetVectorWidthInBits = 0;
 
+  std::optional<DenseMap<const SCEV *, const SCEV *>> RewriteMap = std::nullopt;
+  bool PreserveNUW;
+  bool PreserveNSW;
   /// Check whether there is a plausible dependence between the two
   /// accesses.
   ///

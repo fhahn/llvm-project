@@ -2056,8 +2056,17 @@ MemoryDepChecker::Dependence::DepType MemoryDepChecker::isDependent(
       LLVM_DEBUG(dbgs() << "LAA: Strided accesses are independent\n");
       return Dependence::NoDep;
     }
-  } else
-    Dist = SE.applyLoopGuards(Dist, InnermostLoop);
+  } else {
+    if (!RewriteMap) {
+      auto Res = SE.collectLoopGuards(InnermostLoop);
+      RewriteMap = {std::get<0>(Res)};
+      PreserveNUW = std::move(std::get<1>(Res));
+      PreserveNSW = std::move(std::get<2>(Res));
+    }
+
+    Dist = SE.applyLoopGuards(Dist, InnermostLoop, *RewriteMap, PreserveNUW,
+                              PreserveNSW);
+  }
 
   // Negative distances are not plausible dependencies.
   if (SE.isKnownNonPositive(Dist)) {
