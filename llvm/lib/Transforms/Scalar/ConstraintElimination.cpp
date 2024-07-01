@@ -928,7 +928,14 @@ void State::addInfoForInductions(BasicBlock &BB) {
     InLoopSucc = cast<BranchInst>(BB.getTerminator())->getSuccessor(0);
   else if (Pred == CmpInst::ICMP_EQ)
     InLoopSucc = cast<BranchInst>(BB.getTerminator())->getSuccessor(1);
-  else
+  else if (Pred == CmpInst::ICMP_ULT) {
+    SmallVector<BasicBlock *> PredsOfExit(predecessors(cast<BranchInst>(BB.getTerminator())->getSuccessor(1)));
+    if (PredsOfExit.size() == 1 || !all_of(PredsOfExit, [L, this](BasicBlock *Pred) {
+                                           return L == LI.getLoopFor(Pred); }))
+      return;
+
+    InLoopSucc = cast<BranchInst>(BB.getTerminator())->getSuccessor(0);
+  } else
     return;
 
   if (!L->contains(InLoopSucc) || !L->isLoopExiting(&BB) || InLoopSucc == &BB)
@@ -948,6 +955,27 @@ void State::addInfoForInductions(BasicBlock &BB) {
     assert(SE.getSCEV(StartValue) == StartSCEV && "inconsistent start value");
   }
 
+  APInt StepOffset;
+  if (auto *C = dyn_cast<SCEVConstant>(AR->getStepRecurrence(SE)))
+    StepOffset = C->getAPInt();
+  else
+    return;
+
+  if (Pred == CmpInst::ICMP_ULT) {
+    if (!StepOffset.isOne())
+      return;
+
+    ConditionTy Precond = {CmpInst::ICMP_ULE, StartValue, B};
+    SmallVector<BasicBlock *> ExitBBs;
+    L->getExitBlocks(ExitBBs);
+    for (BasicBlock *EB : ExitBBs) {
+      WorkList.emplace_back(FactOrCheck::getConditionFact(
+          DT.getNode(EB), CmpInst::ICMP_ULE, A, B, Precond));
+    }
+
+    return;
+  }
+
   DomTreeNode *DTN = DT.getNode(InLoopSucc);
   auto IncUnsigned = SE.getMonotonicPredicateType(AR, CmpInst::ICMP_UGT);
   auto IncSigned = SE.getMonotonicPredicateType(AR, CmpInst::ICMP_SGT);
@@ -963,12 +991,6 @@ void State::addInfoForInductions(BasicBlock &BB) {
   if (MonotonicallyIncreasingSigned)
     WorkList.push_back(
         FactOrCheck::getConditionFact(DTN, CmpInst::ICMP_SGE, PN, StartValue));
-
-  APInt StepOffset;
-  if (auto *C = dyn_cast<SCEVConstant>(AR->getStepRecurrence(SE)))
-    StepOffset = C->getAPInt();
-  else
-    return;
 
   // Make sure the bound B is loop-invariant.
   if (!L->isLoopInvariant(B))
