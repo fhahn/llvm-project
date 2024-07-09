@@ -596,6 +596,10 @@ public:
   /// index \p I and \p J to prove their independence.
   bool needsChecking(unsigned I, unsigned J) const;
 
+  /// Returns true if runtime checks are needed for any pointers in
+  /// CheckingGroups.
+  bool needsChecking() const;
+
   /// Return PointerInfo for pointer at index \p PtrIdx.
   const PointerInfo &getPointerInfo(unsigned PtrIdx) const {
     return Pointers[PtrIdx];

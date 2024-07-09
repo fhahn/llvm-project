@@ -397,6 +397,19 @@ bool RuntimePointerChecking::needsChecking(
   return false;
 }
 
+bool RuntimePointerChecking::needsChecking() const {
+  for (unsigned I = 0; I < CheckingGroups.size(); ++I) {
+    for (unsigned J = I + 1; J < CheckingGroups.size(); ++J) {
+      const RuntimeCheckingPtrGroup &CGI = CheckingGroups[I];
+      const RuntimeCheckingPtrGroup &CGJ = CheckingGroups[J];
+
+      if (needsChecking(CGI, CGJ))
+        return true;
+    }
+  }
+  return false;
+}
+
 /// Compare \p I and \p J and return the minimum.
 /// Return nullptr in case we couldn't find an answer.
 static const SCEV *getMinFromExprs(const SCEV *I, const SCEV *J,
@@ -2686,6 +2699,9 @@ bool LoopAccessInfo::analyzeLoop(AAResults *AA, const LoopInfo *LI,
     }
   }
 
+  assert(PtrRtChecking->Need == PtrRtChecking->needsChecking() &&
+         "Incorrectly claimed runtime checks are needed.");
+
   if (HasConvergentOp) {
     recordAnalysis("CantInsertRuntimeCheckWithConvergent")
         << "cannot add control dependency to convergent operation";
@@ -2697,7 +2713,7 @@ bool LoopAccessInfo::analyzeLoop(AAResults *AA, const LoopInfo *LI,
   if (DepsAreSafe) {
     LLVM_DEBUG(
         dbgs() << "LAA: No unsafe dependent memory operations in loop.  We"
-               << (PtrRtChecking->Need ? "" : " don't")
+               << (PtrRtChecking->needsChecking() ? "" : " don't")
                << " need runtime memory checks.\n");
     return true;
   }
@@ -2987,7 +3003,10 @@ void LoopAccessInfo::print(raw_ostream &OS, unsigned Depth) const {
       OS << ", with a maximum safe store-load forward width of " << SLDist
          << " bits";
     }
-    if (PtrRtChecking->Need)
+
+    assert(PtrRtChecking->Need == PtrRtChecking->needsChecking() &&
+           "Incorrectly claimed runtime checks are needed.");
+    if (PtrRtChecking->needsChecking())
       OS << " with run-time checks";
     OS << "\n";
   }
