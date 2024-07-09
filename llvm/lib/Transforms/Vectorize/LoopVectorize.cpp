@@ -8751,15 +8751,9 @@ static void addLiveOutsForFirstOrderRecurrences(VPlan &Plan) {
 }
 
 VPlanPtr
-LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(VFRange &Range) {
-
-  SmallPtrSet<const InterleaveGroup<Instruction> *, 1> InterleaveGroups;
-
-  // ---------------------------------------------------------------------------
-  // Build initial VPlan: Scan the body of the loop in a topological order to
-  // visit each basic block after having visited its predecessor basic blocks.
-  // ---------------------------------------------------------------------------
-
+VPlanPtr createVPlanSkeleton(Loop *L, LoopVectorizationCostModel &CM,
+                             LoopVectorizationLegality &Legal,
+                             TailFoldingStyle Style, VFRange &Range) {
   // Create initial VPlan skeleton, having a basic block for the pre-header
   // which contains SCEV expansions that need to happen before the CFG is
   // modified; a basic block for the vector pre-header, followed by a region for
@@ -8768,15 +8762,25 @@ LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(VFRange &Range) {
 
   bool RequiresScalarEpilogueCheck =
       LoopVectorizationPlanner::getDecisionAndClampRange(
-          [this](ElementCount VF) {
+          [CM](ElementCount VF) {
             return !CM.requiresScalarEpilogue(VF.isVector());
           },
           Range);
   VPlanPtr Plan = VPlan::createInitialVPlan(
-      createTripCountSCEV(Legal->getWidestInductionType(), PSE, OrigLoop),
-      *PSE.getSE(), RequiresScalarEpilogueCheck, CM.foldTailByMasking(),
-      OrigLoop);
+      createTripCountSCEV(Legal.getWidestInductionType(), CM.PSE, L),
+      *CM.PSE.getSE(), RequiresScalarEpilogueCheck, CM.foldTailByMasking(), L);
 
+  DebugLoc DL = getDebugLocFromInstOrOperands(Legal.getPrimaryInduction());
+  // When not folding the tail, we know that the induction increment will not
+  // overflow.
+  bool HasNUW = Style == TailFoldingStyle::None;
+  addCanonicalIVRecipes(*Plan, Legal.getWidestInductionType(), HasNUW, DL);
+
+  return Plan;
+}
+
+VPlanPtr
+LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(VFRange &Range) {
   // Don't use getDecisionAndClampRange here, because we don't know the UF
   // so this function is better to be conservative, rather than to split
   // it up into different VPlans.
@@ -8784,14 +8788,18 @@ LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(VFRange &Range) {
   bool IVUpdateMayOverflow = false;
   for (ElementCount VF : Range)
     IVUpdateMayOverflow |= !isIndvarOverflowCheckKnownFalse(&CM, VF);
-
-  DebugLoc DL = getDebugLocFromInstOrOperands(Legal->getPrimaryInduction());
   TailFoldingStyle Style = CM.getTailFoldingStyle(IVUpdateMayOverflow);
-  // When not folding the tail, we know that the induction increment will not
-  // overflow.
-  bool HasNUW = Style == TailFoldingStyle::None;
-  addCanonicalIVRecipes(*Plan, Legal->getWidestInductionType(), HasNUW, DL);
 
+  // ---------------------------------------------------------------------------
+  // Create initial VPlan skeleton, incuding the vector loop region, with header
+  // and latch VPBBs, containing the canonical induction recipes.
+  // ---------------------------------------------------------------------------
+  VPlanPtr Plan = createVPlanSkeleton(OrigLoop, CM, *Legal, Style, Range);
+
+  // ---------------------------------------------------------------------------
+  // Populate initial VPlan: Scan the body of the loop in a topological order to
+  // visit each basic block after having visited its predecessor basic blocks.
+  // ---------------------------------------------------------------------------
   VPRecipeBuilder RecipeBuilder(*Plan, OrigLoop, TLI, Legal, CM, PSE, Builder);
 
   // ---------------------------------------------------------------------------
@@ -8803,6 +8811,7 @@ LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(VFRange &Range) {
   // Range, add it to the set of groups to be later applied to the VPlan and add
   // placeholders for its members' Recipes which we'll be replacing with a
   // single VPInterleaveRecipe.
+  SmallPtrSet<const InterleaveGroup<Instruction> *, 1> InterleaveGroups;
   for (InterleaveGroup<Instruction> *IG : IAI.getInterleaveGroups()) {
     auto applyIG = [IG, this](ElementCount VF) -> bool {
       bool Result = (VF.isVector() && // Query is illegal for VF == 1
