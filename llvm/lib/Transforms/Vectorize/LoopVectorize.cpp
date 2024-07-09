@@ -8779,28 +8779,12 @@ VPlanPtr createVPlanSkeleton(Loop *L, LoopVectorizationCostModel &CM,
   return Plan;
 }
 
-VPlanPtr
-LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(VFRange &Range) {
-  // Don't use getDecisionAndClampRange here, because we don't know the UF
-  // so this function is better to be conservative, rather than to split
-  // it up into different VPlans.
-  // TODO: Consider using getDecisionAndClampRange here to split up VPlans.
-  bool IVUpdateMayOverflow = false;
-  for (ElementCount VF : Range)
-    IVUpdateMayOverflow |= !isIndvarOverflowCheckKnownFalse(&CM, VF);
-  TailFoldingStyle Style = CM.getTailFoldingStyle(IVUpdateMayOverflow);
+void LoopVectorizationPlanner::createRecipesForLoop(VPlan &P, VFRange &Range) {
 
   // ---------------------------------------------------------------------------
-  // Create initial VPlan skeleton, incuding the vector loop region, with header
-  // and latch VPBBs, containing the canonical induction recipes.
-  // ---------------------------------------------------------------------------
-  VPlanPtr Plan = createVPlanSkeleton(OrigLoop, CM, *Legal, Style, Range);
-
-  // ---------------------------------------------------------------------------
-  // Populate initial VPlan: Scan the body of the loop in a topological order to
+  // Build initial VPlan: Scan the body of the loop in a topological order to
   // visit each basic block after having visited its predecessor basic blocks.
   // ---------------------------------------------------------------------------
-  VPRecipeBuilder RecipeBuilder(*Plan, OrigLoop, TLI, Legal, CM, PSE, Builder);
 
   // ---------------------------------------------------------------------------
   // Pre-construction: record ingredients whose recipes we'll need to further
@@ -8811,7 +8795,7 @@ LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(VFRange &Range) {
   // Range, add it to the set of groups to be later applied to the VPlan and add
   // placeholders for its members' Recipes which we'll be replacing with a
   // single VPInterleaveRecipe.
-  SmallPtrSet<const InterleaveGroup<Instruction> *, 1> InterleaveGroups;
+ SmallPtrSet<const InterleaveGroup<Instruction> *, 1> InterleaveGroups;
   for (InterleaveGroup<Instruction> *IG : IAI.getInterleaveGroups()) {
     auto applyIG = [IG, this](ElementCount VF) -> bool {
       bool Result = (VF.isVector() && // Query is illegal for VF == 1
@@ -8833,12 +8817,12 @@ LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(VFRange &Range) {
   // Construct recipes for the instructions in the loop
   // ---------------------------------------------------------------------------
 
+   VPRecipeBuilder RecipeBuilder(P, OrigLoop, TLI, Legal, CM, PSE, Builder);
   // Scan the body of the loop in a topological order to visit each basic block
   // after having visited its predecessor basic blocks.
   LoopBlocksDFS DFS(OrigLoop);
   DFS.perform(LI);
-
-  VPBasicBlock *HeaderVPBB = Plan->getVectorLoopRegion()->getEntryBasicBlock();
+  VPBasicBlock *HeaderVPBB = P.getVectorLoopRegion()->getEntryBasicBlock();
   VPBasicBlock *VPBB = HeaderVPBB;
   BasicBlock *HeaderBB = OrigLoop->getHeader();
   bool NeedsMasks =
@@ -8866,7 +8850,7 @@ LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(VFRange &Range) {
       SmallVector<VPValue *, 4> Operands;
       auto *Phi = dyn_cast<PHINode>(Instr);
       if (Phi && Phi->getParent() == HeaderBB) {
-        Operands.push_back(Plan->getOrAddLiveIn(
+        Operands.push_back(P.getOrAddLiveIn(
             Phi->getIncomingValueForBlock(OrigLoop->getLoopPreheader())));
       } else {
         auto OpRange = RecipeBuilder.mapToVPValues(Instr->operands());
@@ -8915,14 +8899,15 @@ LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(VFRange &Range) {
     // and there is nothing to fix from vector loop; phis should have incoming
     // from scalar loop only.
   } else
-    addUsersInExitBlock(HeaderVPBB, OrigLoop, RecipeBuilder, *Plan);
+    addUsersInExitBlock(HeaderVPBB, OrigLoop, RecipeBuilder, P);
 
-  assert(isa<VPRegionBlock>(Plan->getVectorLoopRegion()) &&
-         !Plan->getVectorLoopRegion()->getEntryBasicBlock()->empty() &&
+  assert(isa<VPRegionBlock>(P.getVectorLoopRegion()) &&
+         !P.getVectorLoopRegion()->getEntryBasicBlock()->empty() &&
          "entry block must be set to a VPRegionBlock having a non-empty entry "
          "VPBasicBlock");
   RecipeBuilder.fixHeaderPhis();
 
+<<<<<<< HEAD
   addLiveOutsForFirstOrderRecurrences(*Plan);
 
   // ---------------------------------------------------------------------------
@@ -8933,6 +8918,8 @@ LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(VFRange &Range) {
   // Adjust the recipes for any inloop reductions.
   adjustRecipesForReductions(Plan, RecipeBuilder, Range.Start);
 
+=======
+>>>>>>> ba87ce52b7d2 ([VPlan] Factor out code that creates the recipes in the loop.)
   // Interleave memory: for each Interleave Group we marked earlier as relevant
   // for this VPlan, replace the Recipes widening its memory instructions with a
   // single VPInterleaveRecipe at its insertion point.
@@ -8963,6 +8950,38 @@ LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(VFRange &Range) {
         MemberR->eraseFromParent();
       }
   }
+
+  // Adjust the recipes for any inloop reductions.
+  adjustRecipesForReductions(P, RecipeBuilder, Range.Start);
+}
+
+VPlanPtr
+LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(VFRange &Range) {
+  // Don't use getDecisionAndClampRange here, because we don't know the UF
+  // so this function is better to be conservative, rather than to split
+  // it up into different VPlans.
+  // TODO: Consider using getDecisionAndClampRange here to split up VPlans.
+  bool IVUpdateMayOverflow = false;
+  for (ElementCount VF : Range)
+    IVUpdateMayOverflow |= !isIndvarOverflowCheckKnownFalse(&CM, VF);
+  TailFoldingStyle Style = CM.getTailFoldingStyle(IVUpdateMayOverflow);
+
+  // ---------------------------------------------------------------------------
+  // Create initial VPlan skeleton, incuding the vector loop region, with header
+  // and latch VPBBs, containing the canonical induction recipes.
+  // ---------------------------------------------------------------------------
+  VPlanPtr Plan = createVPlanSkeleton(OrigLoop, CM, *Legal, Style, Range);
+
+  // ---------------------------------------------------------------------------
+  // Populate initial VPlan: Scan the body of the loop in a topological order to
+  // visit each basic block after having visited its predecessor basic blocks.
+  // ---------------------------------------------------------------------------
+  createRecipesForLoop(*Plan, Range);
+
+   // ---------------------------------------------------------------------------
+  // Transform initial VPlan: Apply previously taken decisions, in order, to
+  // bring the VPlan to its final state.
+  // ---------------------------------------------------------------------------
 
   for (ElementCount VF : Range)
     Plan->addVF(VF);
@@ -9073,8 +9092,8 @@ VPlanPtr LoopVectorizationPlanner::buildVPlan(VFRange &Range) {
 // with a boolean reduction phi node to check if the condition is true in any
 // iteration. The final value is selected by the final ComputeReductionResult.
 void LoopVectorizationPlanner::adjustRecipesForReductions(
-    VPlanPtr &Plan, VPRecipeBuilder &RecipeBuilder, ElementCount MinVF) {
-  VPRegionBlock *VectorLoopRegion = Plan->getVectorLoopRegion();
+    VPlan &Plan, VPRecipeBuilder &RecipeBuilder, ElementCount MinVF) {
+  VPRegionBlock *VectorLoopRegion = Plan.getVectorLoopRegion();
   VPBasicBlock *Header = VectorLoopRegion->getEntryBasicBlock();
   // Gather all VPReductionPHIRecipe and sort them so that Intermediate stores
   // sank outside of the loop would keep the same order as they had in the
@@ -9243,7 +9262,7 @@ void LoopVectorizationPlanner::adjustRecipesForReductions(
       cast<VPBasicBlock>(VectorLoopRegion->getSingleSuccessor());
   VPBasicBlock::iterator IP = MiddleVPBB->getFirstNonPhi();
   for (VPRecipeBase &R :
-       Plan->getVectorLoopRegion()->getEntryBasicBlock()->phis()) {
+       Plan.getVectorLoopRegion()->getEntryBasicBlock()->phis()) {
     VPReductionPHIRecipe *PhiR = dyn_cast<VPReductionPHIRecipe>(&R);
     if (!PhiR)
       continue;
@@ -9280,7 +9299,7 @@ void LoopVectorizationPlanner::adjustRecipesForReductions(
       Select->getVPSingleValue()->replaceAllUsesWith(Or);
 
       // Convert the reduction phi to operate on bools.
-      PhiR->setOperand(0, Plan->getOrAddLiveIn(ConstantInt::getFalse(
+      PhiR->setOperand(0, Plan.getOrAddLiveIn(ConstantInt::getFalse(
                               OrigLoop->getHeader()->getContext())));
     }
 
@@ -9356,7 +9375,7 @@ void LoopVectorizationPlanner::adjustRecipesForReductions(
         [](VPUser &User, unsigned) { return isa<VPLiveOut>(&User); });
   }
 
-  VPlanTransforms::clearReductionWrapFlags(*Plan);
+  VPlanTransforms::clearReductionWrapFlags(Plan);
 }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)

@@ -431,6 +431,8 @@ private:
   /// built.
   VPlanPtr tryToBuildVPlanWithVPRecipes(VFRange &Range);
 
+  void createRecipesForLoop(VPlan &P, VFRange &Range);
+
   /// Build VPlans for power-of-2 VF's between \p MinVF and \p MaxVF inclusive,
   /// according to the information gathered by Legal when it checked if it is
   /// legal to vectorize the loop. This method creates VPlans using VPRecipes.
@@ -441,7 +443,7 @@ private:
   // converted to reductions, with one operand being vector and the other being
   // the scalar reduction chain. For other reductions, a select is introduced
   // between the phi and live-out recipes when folding the tail.
-  void adjustRecipesForReductions(VPlanPtr &Plan,
+  void adjustRecipesForReductions(VPlan &Plan,
                                   VPRecipeBuilder &RecipeBuilder,
                                   ElementCount MinVF);
 
