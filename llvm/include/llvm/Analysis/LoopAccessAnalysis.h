@@ -503,8 +503,7 @@ public:
 
   /// Generate the checks and store it.  This also performs the grouping
   /// of pointers to reduce the number of memchecks necessary.
-  void generateChecks(MemoryDepChecker::DepCandidates &DepCands,
-                      bool UseDependencies);
+  void generateChecks();
 
   /// Returns the checks that generateChecks created. They can be used to ensure
   /// no read/write accesses overlap across all loop iterations.
@@ -570,6 +569,13 @@ public:
 
   ScalarEvolution *getSE() const { return SE; }
 
+  void takeDepCands(MemoryDepChecker::DepCandidates DC) {
+    assert(!DepCands && "DepCands already set");
+    DepCands = DC;
+  }
+
+  bool runtimeChecksGenerated() const { return RuntimeChecksGenerated; }
+
 private:
   /// Groups pointers such that a single memcheck is required
   /// between two different groups. This will clear the CheckingGroups vector
@@ -577,9 +583,6 @@ private:
   /// is true, otherwise we will create a separate group for each pointer.
   void groupChecks(MemoryDepChecker::DepCandidates &DepCands,
                    bool UseDependencies);
-
-  /// Generate the checks and return them.
-  SmallVector<RuntimePointerCheck, 4> generateChecks();
 
   /// Try to create add a new (pointer-difference, access size) pair to
   /// DiffCheck for checking groups \p CGI and \p CGJ. If pointer-difference
@@ -602,6 +605,10 @@ private:
   /// A list of (pointer-difference, access size) pairs that can be used to
   /// prove that there are no vectorization-preventing dependencies.
   SmallVector<PointerDiffInfo> DiffChecks;
+
+  std::optional<MemoryDepChecker::DepCandidates> DepCands;
+
+  bool RuntimeChecksGenerated = false;
 };
 
 /// Drive the analysis of memory accesses in the loop
@@ -645,13 +652,19 @@ public:
   bool hasConvergentOp() const { return HasConvergentOp; }
 
   const RuntimePointerChecking *getRuntimePointerChecking() const {
-    return PtrRtChecking.get();
+    auto *Res = PtrRtChecking.get();
+    if (!Res->runtimeChecksGenerated()) {
+      if (Res->Need)
+        Res->generateChecks();
+      Res->Need &= Res->needsChecking();
+    }
+    return Res;
   }
 
   /// Number of memchecks required to prove independence of otherwise
   /// may-alias pointers.
   unsigned getNumRuntimePointerChecks() const {
-    return PtrRtChecking->getNumberOfChecks();
+    return getRuntimePointerChecking()->getNumberOfChecks();
   }
 
   /// Return true if the block BB needs to be predicated in order for the loop
