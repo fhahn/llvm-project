@@ -57,7 +57,7 @@ void LoopVersioning::versionLoop(
 
   // Add the memcheck in the original preheader (this is empty initially).
   BasicBlock *RuntimeCheckBB = VersionedLoop->getLoopPreheader();
-  const auto &RtPtrChecking = *LAI.getRuntimePointerChecking();
+  const auto RuntimeChecks = LAI.getRuntimeChecks();
 
   SCEVExpander Exp2(*RtPtrChecking.getSE(),
                     VersionedLoop->getHeader()->getDataLayout(),

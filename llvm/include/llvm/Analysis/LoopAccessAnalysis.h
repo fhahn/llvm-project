@@ -611,6 +611,24 @@ private:
   bool RuntimeChecksGenerated = false;
 };
 
+struct RuntimeChecks {
+  RuntimeChecks(bool Need, const SmallVectorImpl<RuntimePointerCheck> &Checks,
+                std::optional<ArrayRef<PointerDiffInfo>> DiffChecks)
+      : Need(Need), Checks(Checks.begin(), Checks.end()),
+        DiffChecks(DiffChecks) {}
+
+  /// This flag indicates if we need to add the runtime check.
+  bool Need = false;
+
+  /// Set of run-time checks required to establish independence of
+  /// otherwise may-aliasing pointers in the loop.
+  SmallVector<RuntimePointerCheck, 4> Checks;
+
+  /// A list of (pointer-difference, access size) pairs that can be used to
+  /// prove that there are no vectorization-preventing dependencies.
+  std::optional<SmallVector<PointerDiffInfo>> DiffChecks;
+};
+
 /// Drive the analysis of memory accesses in the loop
 ///
 /// This class is responsible for analyzing the memory accesses of a loop.  It
@@ -726,6 +744,14 @@ public:
   /// associated with this predicate.
   const PredicatedScalarEvolution &getPSE() const { return *PSE; }
 
+  RuntimeChecks getRuntimeChecks() {
+    if (!Checks)
+      Checks = std::make_optional<RuntimeChecks>(
+          PtrRtChecking->Need, PtrRtChecking->getChecks(),
+          PtrRtChecking->getDiffChecks());
+    return *Checks;
+  }
+
 private:
   /// Analyze the loop. Returns true if all memory access in the loop can be
   /// vectorized.
@@ -791,6 +817,8 @@ private:
   /// If an access has a symbolic strides, this maps the pointer value to
   /// the stride symbol.
   DenseMap<Value *, const SCEV *> SymbolicStrides;
+
+  std::optional<RuntimeChecks> Checks;
 };
 
 /// Return the SCEV corresponding to a pointer with the symbolic stride
