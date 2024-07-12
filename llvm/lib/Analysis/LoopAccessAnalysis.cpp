@@ -1943,10 +1943,12 @@ MemoryDepChecker::getDependenceDistanceStrideAndSize(
   // vice versa.
   if (ExpensiveChecks || (SE.isLoopInvariant(Src, InnermostLoop) ||
                           SE.isLoopInvariant(Sink, InnermostLoop))) {
-    const auto &[SrcStart, SrcEnd] =
+    auto [SrcStart, SrcEnd] =
         getStartAndEndForAccess(InnermostLoop, Src, ATy, PSE, PointerBounds);
-    const auto &[SinkStart, SinkEnd] =
+    auto [SinkStart, SinkEnd] =
         getStartAndEndForAccess(InnermostLoop, Sink, BTy, PSE, PointerBounds);
+    SrcEnd = SE.applyLoopGuards(SrcEnd, InnermostLoop);
+    SinkStart = SE.applyLoopGuards(SinkStart, InnermostLoop);
     if (!isa<SCEVCouldNotCompute>(SrcStart) &&
         !isa<SCEVCouldNotCompute>(SrcEnd) &&
         !isa<SCEVCouldNotCompute>(SinkStart) &&
@@ -1955,6 +1957,30 @@ MemoryDepChecker::getDependenceDistanceStrideAndSize(
         return MemoryDepChecker::Dependence::NoDep;
       if (SE.isKnownPredicate(CmpInst::ICMP_ULE, SinkEnd, SrcStart))
         return MemoryDepChecker::Dependence::NoDep;
+
+      if (SE.getPointerBase(SinkStart) == SE.getPointerBase(SrcEnd)) {
+        auto *A1 = SE.removePointerBase(SrcEnd);
+        auto *A2 = SE.removePointerBase(SinkStart);
+        auto Minus = SE.getMinusSCEV(A2, A1);
+        if (SE.isKnownNonNegative(Minus)) {
+          return MemoryDepChecker::Dependence::NoDep;
+        }
+
+      }
+auto *S = SE.getMinusSCEV(SinkStart, SrcEnd);
+      auto *A1 = dyn_cast<SCEVAddExpr>(SrcEnd);
+      auto *A2 = dyn_cast<SCEVAddExpr>(SinkStart);
+      if (A1 && A2 && A1->getOperand(A1->getNumOperands()-1) == A2->getOperand(A2->getNumOperands()-1)) {
+        auto *B = A1->getOperand(A1->getNumOperands()-1);
+        auto S1= SE.getMinusSCEV(A1, B);
+        auto S2= SE.getMinusSCEV(A2, B);
+        auto Minus = SE.getMinusSCEV(S2, S1);
+
+        if (SE.isKnownNonNegative(Minus)) {
+          return MemoryDepChecker::Dependence::NoDep;
+        }
+      }
+
     }
   }
 
