@@ -1277,6 +1277,7 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
   RtCheck.Need = CanDoRT ? RtCheck.getNumberOfChecks() != 0 : MayNeedRTCheck;
 
   bool CanDoRTIfNeeded = !RtCheck.Need || CanDoRT;
+  assert(CanDoRTIfNeeded == (CanDoRT || !MayNeedRTCheck));
   if (!CanDoRTIfNeeded)
     RtCheck.reset();
   return CanDoRTIfNeeded;
