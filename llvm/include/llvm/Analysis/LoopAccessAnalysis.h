@@ -580,6 +580,7 @@ public:
 
   bool runtimeChecksGenerated() const { return RuntimeChecksGenerated; }
 
+  MemoryDepChecker &DC;
 private:
   /// Groups pointers such that a single memcheck is required
   /// between two different groups. This will clear the CheckingGroups vector
@@ -594,7 +595,6 @@ private:
   bool tryToCreateDiffCheck(const RuntimeCheckingPtrGroup &CGI,
                             const RuntimeCheckingPtrGroup &CGJ);
 
-  MemoryDepChecker &DC;
 
   /// Holds a pointer to the ScalarEvolution analysis.
   ScalarEvolution *SE;

@@ -706,7 +706,7 @@ public:
                             const DenseMap<Value *, const SCEV *> &Strides,
                             DenseMap<Value *, unsigned> &DepSetId,
                             Loop *TheLoop, unsigned &RunningDepId,
-                            unsigned ASId, bool ShouldCheckStride, bool Assume);
+                            unsigned ASId, bool Assume);
 
   /// Check whether we can check the pointers at runtime for
   /// non-intersection.
@@ -718,7 +718,21 @@ public:
                   MemoryDepChecker::DepCandidates &DepCands,
                   ScalarEvolution *SE, Loop *TheLoop,
                   const DenseMap<Value *, const SCEV *> &Strides,
-                  Value *&UncomputablePtr, bool ShouldCheckWrap = false);
+                  Value *&UncomputablePtr);
+
+  std::pair<bool, bool> canCheckWrap(
+    RuntimePointerChecking &RtCheck,
+    ScalarEvolution *SE, Loop *TheLoop,
+    const DenseMap<Value *, const SCEV *> &StridesMap
+    );
+
+bool createWrapCheckForAccess(
+    RuntimePointerChecking &RtCheck,
+    RuntimePointerChecking::PointerInfo &Pointer,
+    MemAccessInfo Access, Type *AccessTy,
+    const DenseMap<Value *, const SCEV *> &StridesMap,
+    Loop *TheLoop,
+    bool Assume);
 
   /// Goes over all memory accesses, checks whether a RT check is needed
   /// and builds sets of dependent accesses.
@@ -1076,12 +1090,75 @@ findForkedPointer(PredicatedScalarEvolution &PSE,
   return {{replaceSymbolicStrideSCEV(PSE, StridesMap, Ptr), false}};
 }
 
+bool AccessAnalysis::createWrapCheckForAccess(
+    RuntimePointerChecking &RtCheck,
+    RuntimePointerChecking::PointerInfo &Pointer,
+    MemAccessInfo Access, 
+    Type *AccessTy,
+    const DenseMap<Value *, const SCEV *> &StridesMap,
+    Loop *TheLoop,
+    bool Assume) {
+  Value *Ptr = Access.getPointer();
+
+  SmallVector<PointerIntPair<const SCEV *, 1, bool>> TranslatedPtrs =
+      findForkedPointer(PSE, StridesMap, Ptr, TheLoop);
+  // Skip wrap checking when translating pointers.
+  if (TranslatedPtrs.size() > 1)
+    return false;
+
+  const SCEV *PtrExpr = TranslatedPtrs[0].getPointer();
+  // When we run after a failing dependency check we have to make sure
+  // we don't have wrapping pointers.
+  if (TranslatedPtrs.size() > 1)
+    return false;
+
+  if (!isNoWrap(PSE, StridesMap, Ptr, AccessTy, TheLoop)) {
+    auto *Expr = PSE.getSCEV(Ptr);
+    if (!Assume || !isa<SCEVAddRecExpr>(Expr))
+      return false;
+    PSE.setNoOverflow(Ptr, SCEVWrapPredicate::IncrementNUSW);
+  }
+  // If there's only one option for Ptr, look it up after bounds and wrap
+  // checking, because assumptions might have been added to PSE.
+  PtrExpr = replaceSymbolicStrideSCEV(PSE, StridesMap, Ptr);
+  const auto &[ScStart, ScEnd] = getStartAndEndForAccess(
+      TheLoop, PtrExpr, AccessTy, PSE, RtCheck.DC.getPointerBounds());
+  Pointer.Expr = PtrExpr;
+  Pointer.Start = ScStart;
+  Pointer.End= ScEnd;
+  return true;
+}
+
+
+std::pair<bool, bool> AccessAnalysis::canCheckWrap(
+    RuntimePointerChecking &RtCheck,
+    ScalarEvolution *SE, Loop *TheLoop,
+    const DenseMap<Value *, const SCEV *> &StridesMap
+    ) {
+
+  unsigned RunningDepId = 1;
+  for (auto &P : RtCheck.Pointers) {
+      Value *Ptr = P.PointerValue;
+      MemAccessInfo Access(Ptr, true);
+      if (!Accesses.contains(Access))
+        Access = MemAccessInfo(Ptr, false);
+      for (const auto &AccessTy : Accesses[Access]) {
+    if (!createWrapCheckForAccess(RtCheck, P, Access, AccessTy, StridesMap, TheLoop, true))
+      return {false, false};
+      }
+
+      P.DependencySetId = RunningDepId;
+      RunningDepId++;
+  }
+  return {RunningDepId > 1, true};
+}
+
 bool AccessAnalysis::createCheckForAccess(
     RuntimePointerChecking &RtCheck, MemoryDepChecker::DepCandidates &DepCands,
     MemAccessInfo Access, Type *AccessTy,
     const DenseMap<Value *, const SCEV *> &StridesMap,
     DenseMap<Value *, unsigned> &DepSetId, Loop *TheLoop,
-    unsigned &RunningDepId, unsigned ASId, bool ShouldCheckWrap, bool Assume) {
+    unsigned &RunningDepId, unsigned ASId, bool Assume) {
   Value *Ptr = Access.getPointer();
 
   SmallVector<PointerIntPair<const SCEV *, 1, bool>> TranslatedPtrs =
@@ -1092,20 +1169,6 @@ bool AccessAnalysis::createCheckForAccess(
     if (!hasComputableBounds(PSE, Ptr, PtrExpr, TheLoop, Assume))
       return false;
 
-    // When we run after a failing dependency check we have to make sure
-    // we don't have wrapping pointers.
-    if (ShouldCheckWrap) {
-      // Skip wrap checking when translating pointers.
-      if (TranslatedPtrs.size() > 1)
-        return false;
-
-      if (!isNoWrap(PSE, StridesMap, Ptr, AccessTy, TheLoop)) {
-        auto *Expr = PSE.getSCEV(Ptr);
-        if (!Assume || !isa<SCEVAddRecExpr>(Expr))
-          return false;
-        PSE.setNoOverflow(Ptr, SCEVWrapPredicate::IncrementNUSW);
-      }
-    }
     // If there's only one option for Ptr, look it up after bounds and wrap
     // checking, because assumptions might have been added to PSE.
     if (TranslatedPtrs.size() == 1)
@@ -1139,8 +1202,8 @@ bool AccessAnalysis::createCheckForAccess(
 std::pair<bool, bool> AccessAnalysis::canCheckPtrAtRT(
     RuntimePointerChecking &RtCheck, MemoryDepChecker::DepCandidates &DepCands,
     ScalarEvolution *SE, Loop *TheLoop,
-    const DenseMap<Value *, const SCEV *> &StridesMap, Value *&UncomputablePtr,
-    bool ShouldCheckWrap) {
+    const DenseMap<Value *, const SCEV *> &StridesMap, Value *&UncomputablePtr
+    ) {
   // Find pointers with computable bounds. We are going to use this information
   // to place a runtime bound check.
   bool CanDoRT = true;
@@ -1199,7 +1262,7 @@ std::pair<bool, bool> AccessAnalysis::canCheckPtrAtRT(
       for (const auto &AccessTy : Accesses[Access]) {
         if (!createCheckForAccess(RtCheck, DepCands, Access, AccessTy,
                                   StridesMap, DepSetId, TheLoop, RunningDepId,
-                                  ASId, ShouldCheckWrap, false)) {
+                                  ASId, false)) {
           LLVM_DEBUG(dbgs() << "LAA: Can't find bounds for ptr:"
                             << *Access.getPointer() << '\n');
           Retries.push_back({Access, AccessTy});
@@ -1229,7 +1292,7 @@ std::pair<bool, bool> AccessAnalysis::canCheckPtrAtRT(
       for (const auto &[Access, AccessTy] : Retries) {
         if (!createCheckForAccess(RtCheck, DepCands, Access, AccessTy,
                                   StridesMap, DepSetId, TheLoop, RunningDepId,
-                                  ASId, ShouldCheckWrap, /*Assume=*/true)) {
+                                  ASId, /*Assume=*/true)) {
           CanDoAliasSetRT = false;
           UncomputablePtr = Access.getPointer();
           break;
@@ -2639,7 +2702,7 @@ bool LoopAccessInfo::analyzeLoop(AAResults *AA, LoopInfo *LI,
   Value *UncomputablePtr = nullptr;
   auto [MayNeedRTChecks, CanDoRT] = Accesses.canCheckPtrAtRT(
       *PtrRtChecking, DependentAccesses, PSE->getSE(), TheLoop, SymbolicStrides,
-      UncomputablePtr, false);
+      UncomputablePtr);
   if (MayNeedRTChecks && !CanDoRT) {
     auto *I = dyn_cast_or_null<Instruction>(UncomputablePtr);
     recordAnalysis("CantIdentifyArrayBounds", I)
@@ -2665,25 +2728,19 @@ bool LoopAccessInfo::analyzeLoop(AAResults *AA, LoopInfo *LI,
       // Clear the dependency checks. We assume they are not needed.
       Accesses.resetDepChecks(*DepChecker);
 
-      PtrRtChecking->reset();
-
       auto *SE = PSE->getSE();
       UncomputablePtr = nullptr;
-      const auto [MayNeedRTChecks_, CanDoRT_] = Accesses.canCheckPtrAtRT(
-          *PtrRtChecking, DependentAccesses, SE, TheLoop, SymbolicStrides,
-          UncomputablePtr, true);
-
-      // Check that we found the bounds for the pointer.
-      if (MayNeedRTChecks_ && !CanDoRT_) {
+      const auto [NeedsRTCheck, CanDoCheck ] = Accesses.canCheckWrap(*PtrRtChecking,        SE, TheLoop,
+        SymbolicStrides);
+      if (!CanDoCheck) {
         auto *I = dyn_cast_or_null<Instruction>(UncomputablePtr);
         recordAnalysis("CantCheckMemDepsAtRunTime", I)
             << "cannot check memory dependencies at runtime";
         LLVM_DEBUG(dbgs() << "LAA: Can't vectorize with memory checks\n");
         return false;
       }
-      MayNeedRTChecks = MayNeedRTChecks_;
-      CanDoRT = CanDoRT_;
       DepsAreSafe = true;
+      MayNeedRTChecks |= NeedsRTCheck;
     }
   }
   if (!Accesses.isDependencyCheckNeeded()) {
