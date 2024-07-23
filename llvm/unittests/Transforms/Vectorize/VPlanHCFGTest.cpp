@@ -134,8 +134,8 @@ compound=true
   N2 -> N4 [ label="" ltail=cluster_N3]
   N4 [label =
     "middle.block:\l" +
-    "  EMIT vp\<%2\> = icmp eq vp\<%1\>, vp\<%0\>\l" +
-    "  EMIT branch-on-cond vp\<%2\>\l" +
+    "  EMIT vp\<%cmp.n\> = icmp eq vp\<%1\>, vp\<%0\>\l" +
+    "  EMIT branch-on-cond vp\<%cmp.n\>\l" +
     "Successor(s): ir-bb\<for.end\>, scalar.ph\l"
   ]
   N4 -> N5 [ label="T"]

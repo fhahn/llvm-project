@@ -1397,6 +1397,8 @@ public:
   /// Returns true if this VPInstruction's operands are single scalars and the
   /// result is also a single scalar.
   bool isSingleScalar() const;
+
+  StringRef getName() const { return Name; }
 };
 
 /// VPWidenRecipe is a recipe for producing a widened instruction using the

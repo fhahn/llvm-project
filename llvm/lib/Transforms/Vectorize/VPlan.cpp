@@ -1517,6 +1517,12 @@ void VPSlotTracker::assignName(const VPValue *V) {
   assert(!VPValue2Name.contains(V) && "VPValue already has a name!");
   auto *UV = V->getUnderlyingValue();
   if (!UV) {
+    if (auto *VPI = dyn_cast_or_null<VPInstruction>(V->getDefiningRecipe())) {
+      if (!VPI->getName().empty()) {
+        VPValue2Name[V] = (Twine("vp<%") + Twine(VPI->getName()) + ">").str();
+        return;
+      }
+    }
     VPValue2Name[V] = (Twine("vp<%") + Twine(NextSlot) + ">").str();
     NextSlot++;
     return;
