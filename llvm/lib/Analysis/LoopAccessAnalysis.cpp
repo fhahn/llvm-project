@@ -2674,8 +2674,6 @@ bool LoopAccessInfo::analyzeLoop(AAResults *AA, const LoopInfo *LI,
       // Clear the dependency checks. We assume they are not needed.
       Accesses.resetDepChecks(*DepChecker);
 
-      DepCands =
-          EquivalenceClasses<llvm::PointerIntPair<llvm::Value *, 1, bool>>();
       PtrRtChecking->reset();
 
       auto *SE = PSE->getSE();
