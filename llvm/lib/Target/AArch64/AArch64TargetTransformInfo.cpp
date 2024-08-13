@@ -3678,6 +3678,33 @@ void AArch64TTIImpl::getUnrollingPreferences(Loop *L, ScalarEvolution &SE,
       EnableFalkorHWPFUnrollFix)
     getFalkorUnrollingPreferences(L, SE, UP);
 
+  InstructionCost Size = 0;
+  unsigned NumBlocks = 0;
+  for (auto *BB : L->getBlocks()) {
+    for (auto &I : *BB) {
+      SmallVector<const Value *, 4> Operands(I.operand_values());
+      Size += getInstructionCost(&I, Operands, TTI::TCK_CodeSize);
+      if (isa<CallBase>(&I) && !isa<IntrinsicInst>(&I)) {
+        Size = 16;
+        break;
+      }
+    }
+    NumBlocks += 1;
+  }
+  if (Size < 16 && !isa<SCEVConstant>(SE.getBackedgeTakenCount(L))) {
+    unsigned UC = std::max(16 / *Size.getValue(), 2ll);
+    while (UC <= 8 && UC * *Size.getValue() <= 32) {
+    if ((UC * *Size.getValue() % 16) == 0 || (UC * *Size.getValue() % 16) > *Size.getValue() %16 ) {
+      UP.Count = UC;
+      UP.Partial = true;
+      return;
+    }
+    UC++;
+   }
+
+  }
+
+
   // Scan the loop: don't unroll loops with calls as this could prevent
   // inlining. Don't unroll vector loops either, as they don't benefit much from
   // unrolling.

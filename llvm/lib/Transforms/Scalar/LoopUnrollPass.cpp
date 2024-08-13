@@ -1292,11 +1292,17 @@ tryToUnrollLoop(Loop *L, DominatorTree &DT, LoopInfo *LI, ScalarEvolution &SE,
   // computeUnrollCount() decides whether it is beneficial to use upper bound to
   // fully unroll the loop.
   bool UseUpperBound = false;
+
+  unsigned TargetCount = UP.Count;
   bool IsCountSetExplicitly = computeUnrollCount(
       L, TTI, DT, LI, &AC, SE, EphValues, &ORE, TripCount, MaxTripCount,
       MaxOrZero, TripMultiple, UCE, UP, PP, UseUpperBound);
-  if (!UP.Count)
-    return LoopUnrollResult::Unmodified;
+  if (!UP.Count) {
+    if (TargetCount > 0 && !OnlyFullUnroll && !hasRuntimeUnrollDisablePragma(L)) {
+      UP.Count = TargetCount;
+    } else
+      return LoopUnrollResult::Unmodified;
+  }
 
   UP.Runtime &= UCE.ConvergenceAllowsRuntime;
 
