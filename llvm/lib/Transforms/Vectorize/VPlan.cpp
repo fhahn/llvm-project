@@ -1421,6 +1421,14 @@ void VPlanIngredient::print(raw_ostream &O) const {
 
 #endif
 
+
+bool VPValue::isDefinedOutsideVectorRegions() const { 
+  auto *R = getDefiningRecipe();
+  if (!R)
+    return true;
+  return !R->getParent()->getParent();
+}
+
 void VPValue::replaceAllUsesWith(VPValue *New) {
   replaceUsesWithIf(New, [](VPUser &, unsigned) { return true; });
 }
