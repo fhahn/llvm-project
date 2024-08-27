@@ -6776,6 +6776,12 @@ void LoopVectorizationCostModel::collectValuesToIgnore() {
         if (Br->isConditional())
           DeadOps.push_back(&I);
       }
+
+      // Signgle-entry phis are redundant and will be removed by VPlan transforms.
+      if (auto *Phi = dyn_cast<PHINode>(&I)) {
+        if (Phi->getNumIncomingValues() == 1)
+          ValuesToIgnore.insert(&I);
+      }
     }
 
   // Mark ops feeding interleave group members as free, if they are only used
