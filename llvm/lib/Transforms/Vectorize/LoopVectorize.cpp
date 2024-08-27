@@ -2389,7 +2389,8 @@ void InnerLoopVectorizer::scalarizeInstruction(const Instruction *Instr,
     AC->registerAssumption(II);
 
   // End if-block.
-  bool IfPredicateInstr = RepRecipe->getParent()->getParent()->isReplicator();
+  VPRegionBlock *Parent = RepRecipe->getParent()->getParent();
+  bool IfPredicateInstr = Parent ? Parent->isReplicator() : false;
   if (IfPredicateInstr)
     PredicatedInstructions.push_back(Cloned);
 }
@@ -7269,7 +7270,7 @@ planContainsAdditionalSimplifications(VPlan &Plan, ElementCount VF,
   };
 
   DenseSet<Instruction *> SeenInstrs;
-  auto Iter = vp_depth_first_deep(Plan.getEntry());
+  auto Iter = vp_depth_first_deep(Plan.getVectorLoopRegion()->getEntry());
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(Iter)) {
     for (VPRecipeBase &R : *VPBB) {
       if (auto *IR = dyn_cast<VPInterleaveRecipe>(&R)) {

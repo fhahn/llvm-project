@@ -114,6 +114,8 @@ struct VPlanTransforms {
   static void createInterleaveGroups(
       const SmallPtrSetImpl<const InterleaveGroup<Instruction> *> &InterleaveGroups,
       VPRecipeBuilder &RecipeBuilder, bool ScalarEpilogueAllowed);
+
+  static void licm(VPlan &Plan);
 };
 
 } // namespace llvm
