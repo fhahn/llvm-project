@@ -1027,6 +1027,8 @@ bool SelectOptimizeImpl::isConvertToBranchProfitableBase(
     return true;
   }
 
+  if (any_of(ASI, [](SelectLike SI) { return SI.getI()->hasOneUser() && (isa<StoreInst>(*SI.getI()->user_begin()) || isa<LoadInst>(*SI.getI()->user_begin())); }))
+    return true;
   ORmiss << "Not profitable to convert to branch (base heuristic).";
   EmitAndPrintRemark(ORE, ORmiss);
   return false;
