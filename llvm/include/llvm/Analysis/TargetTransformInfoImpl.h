@@ -429,6 +429,11 @@ public:
       return false;
     // If the select is a logical-and/logical-or then it is better treated as a
     // and/or by the backend.
+    CmpInst::Predicate Pred;
+    if (match(I, m_Add(m_Value(), m_ZExt(m_ICmp(Pred, m_Value(), m_Value())))))
+      return true;
+    if (match(I, m_Add(m_Value(), m_SExt(m_ICmp(Pred, m_Value(), m_Value())))))
+      return true;
     return isa<SelectInst>(I) &&
            !match(I, m_CombineOr(m_LogicalAnd(m_Value(), m_Value()),
                                  m_LogicalOr(m_Value(), m_Value())));

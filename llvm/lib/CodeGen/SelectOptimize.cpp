@@ -151,6 +151,19 @@ public:
           X->getType()->isIntegerTy(1))
         return SelectLike(I);
 
+    CmpInst::Predicate Pred;
+    if (PatternMatch::match(I, m_Add(m_Value(), m_ZExt(m_ICmp(Pred, m_Value(), m_Value())))))
+      return SelectLike(I);
+    if (PatternMatch::match(I, m_Add(m_Value(), m_ZExt(m_Not(m_ICmp(Pred, m_Value(), m_Value()))))))
+      return SelectLike(I);
+ 
+    if (PatternMatch::match(I, m_Add(m_Value(), m_SExt(m_Not(m_ICmp(Pred, m_Value(), m_Value()))))))
+      return SelectLike(I);
+    if (PatternMatch::match(I, m_Add(m_Value(), m_SExt(m_ICmp(Pred, m_Value(), m_Value())))))
+      return SelectLike(I);
+
+
+
       return SelectLike(nullptr);
     }
 
@@ -184,6 +197,10 @@ public:
         if (PatternMatch::match(BO->getOperand(1),
                                 m_OneUse(m_ZExt(m_Value(X)))))
           return X;
+        if (PatternMatch::match(BO->getOperand(1),
+                                m_OneUse(m_SExt(m_Value(X)))))
+          return X;
+ 
       }
 
       llvm_unreachable("Unhandled case in getCondition");
@@ -228,12 +245,24 @@ public:
       // Or(zext) case - return the operand which is not the zext.
       if (auto *BO = dyn_cast<BinaryOperator>(I)) {
         Value *X;
+        if (BO->getOpcode() == Instruction::Add) {
+          if (PatternMatch::match(BO->getOperand(1),
+                                  m_OneUse(m_ZExt(m_Value(X)))))
+            return nullptr;
+          if (PatternMatch::match(BO->getOperand(1),
+                                  m_OneUse(m_SExt(m_Not(m_Value(X))))))
+            return BO->getOperand(0);
+          if (PatternMatch::match(BO->getOperand(1),
+                                  m_OneUse(m_SExt(m_Value(X)))))
+            return nullptr;
+        }
+
         if (PatternMatch::match(BO->getOperand(0),
                                 m_OneUse(m_ZExt(m_Value(X)))))
           return BO->getOperand(1);
-        if (PatternMatch::match(BO->getOperand(1),
-                                m_OneUse(m_ZExt(m_Value(X)))))
-          return BO->getOperand(0);
+
+
+
       }
 
       llvm_unreachable("Unhandled case in getFalseValue");
@@ -249,7 +278,13 @@ public:
                                          : Scaled64::getZero();
 
       // Or case - add the cost of an extra Or to the cost of the False case.
-      if (isa<BinaryOperator>(I))
+      if (isa<BinaryOperator>(I)) {
+        if (I->getOpcode() == Instruction::Add) {
+          if (auto *OpI = dyn_cast<Instruction>(I->getOperand(0)))
+            return InstCostMap.contains(OpI) ? InstCostMap[OpI].NonPredCost
+                                           : Scaled64::getZero();
+          return Scaled64::getZero();
+        }
         if (auto I = dyn_cast<Instruction>(getFalseValue()))
           if (InstCostMap.contains(I)) {
             InstructionCost OrCost = TTI->getArithmeticInstrCost(
@@ -260,6 +295,7 @@ public:
             return InstCostMap[I].NonPredCost +
                    Scaled64::get(*OrCost.getValue());
           }
+      }
 
       return Scaled64::getZero();
     }
@@ -275,10 +311,19 @@ public:
                                          : Scaled64::getZero();
 
       // Or case - return the cost of the false case
-      if (isa<BinaryOperator>(I))
+      if (isa<BinaryOperator>(I)) {
+        if (I->getOpcode() == Instruction::Add) {
+          InstructionCost AddCost = TTI->getArithmeticInstrCost(
+                    Instruction::Or, I->getType(), TargetTransformInfo::TCK_Latency,
+                    {TargetTransformInfo::OK_AnyValue,
+                     TargetTransformInfo::OP_None},
+                    {TTI::OK_UniformConstantValue, TTI::OP_PowerOf2});
+          return getTrueOpCost(InstCostMap, TTI) + Scaled64::get(*AddCost.getValue());
+        }
         if (auto I = dyn_cast<Instruction>(getFalseValue()))
           if (InstCostMap.contains(I))
             return InstCostMap[I].NonPredCost;
+      }
 
       return Scaled64::getZero();
     }
@@ -518,8 +563,9 @@ void SelectOptimizeImpl::optimizeSelectsInnerLoops(Function &F,
       continue;
 
     SelectGroups SIGroups;
-    for (BasicBlock *BB : L->getBlocks())
-      collectSelectGroups(*BB, SIGroups);
+    for (BasicBlock *BB : L->getBlocks()) {
+        collectSelectGroups(*BB, SIGroups);
+    }
 
     findProfitableSIGroupsInnerLoops(L, SIGroups, ProfSIGroups);
   }
@@ -544,6 +590,34 @@ getTrueOrFalseValue(SelectOptimizeImpl::SelectLike SI, bool isTrue,
   }
 
   if (isa<BinaryOperator>(SI.getI())) {
+    Instruction *I = SI.getI();
+    if (I->getOpcode() == Instruction::Add) {
+      if (match(I->getOperand(1), m_SExt(m_Not(m_Value())))) {
+        if (isTrue) {
+          return I->getOperand(0);
+        } else
+          return IB.CreateAdd(I->getOperand(0), ConstantInt::get(I->getType(), -1));
+      }
+      if (match(I->getOperand(1), m_SExt(m_Value()))) {
+        if (isTrue) {
+          return IB.CreateAdd(I->getOperand(0), ConstantInt::get(I->getType(), -1));
+        } else
+          return I->getOperand(0);
+      }
+       if (match(I->getOperand(1), m_ZExt(m_Not(m_Value())))) {
+        if (isTrue) {
+          return I->getOperand(0);
+        } else
+          return IB.CreateAdd(I->getOperand(0), ConstantInt::get(I->getType(), 1));
+      }
+
+      if (match(I->getOperand(1), m_ZExt(m_Value()))) {
+        if (isTrue) {
+          return IB.CreateAdd(I->getOperand(0), ConstantInt::get(I->getType(), 1));
+        } else
+          return I->getOperand(0);
+      }
+    }
     assert(SI.getI()->getOpcode() == Instruction::Or &&
            "Only currently handling Or instructions.");
     V = SI.getFalseValue();
@@ -770,8 +844,16 @@ void SelectOptimizeImpl::convertProfitableSIGroups(SelectGroups &ProfSIGroups) {
     IB.CreateCondBr(CondFr, TT, FT, SI.getI());
 
     // Remove the old select instructions, now that they are not longer used.
-    for (auto SI : ASI)
+    for (auto SI : ASI) {
+      Instruction *Extra = nullptr;
+      if (SI.getI()->getOpcode()  == Instruction::Add) {
+        Extra = cast<Instruction>(SI.getI()->getOperand(1));
+      }
+
       SI.getI()->eraseFromParent();
+      if (Extra)
+      Extra->eraseFromParent();
+    }
   }
 }
 
@@ -801,10 +883,16 @@ void SelectOptimizeImpl::collectSelectGroups(BasicBlock &BB,
           continue;
         }
 
+        if (isa<ZExtInst, SExtInst>(NI)) {
+          ++BBIt;
+          continue;
+        }
+
+
         // We only allow selects in the same group, not other select-like
         // instructions.
-        if (!isa<SelectInst>(NI))
-          break;
+/*        if (!isa<SelectInst>(NI))*/
+          /*break;*/
 
         SelectLike NSI = SelectLike::match(NI);
         if (NSI && SI.getCondition() == NSI.getCondition()) {
