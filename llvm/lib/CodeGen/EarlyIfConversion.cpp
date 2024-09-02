@@ -1091,6 +1091,7 @@ bool EarlyIfConverter::run(MachineFunction &MF) {
   LLVM_DEBUG(dbgs() << "********** EARLY IF-CONVERSION **********\n"
                     << "********** Function: " << MF.getName() << '\n');
 
+    return false;
   // Only run if conversion if the target wants it.
   const TargetSubtargetInfo &STI = MF.getSubtarget();
   if (!STI.enableEarlyIfConversion())
