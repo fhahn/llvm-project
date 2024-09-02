@@ -1082,6 +1082,7 @@ bool EarlyIfConverter::runOnMachineFunction(MachineFunction &MF) {
   if (skipFunction(MF.getFunction()))
     return false;
 
+    return false;
   // Only run if conversion if the target wants it.
   const TargetSubtargetInfo &STI = MF.getSubtarget();
   if (!STI.enableEarlyIfConversion())
