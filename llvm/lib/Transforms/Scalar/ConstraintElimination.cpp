@@ -197,6 +197,8 @@ struct State {
   /// controlling the loop header.
   void addInfoForInductions(BasicBlock &BB);
 
+  void addInfoForInduction(ICmpInst *Cond, Loop *L);
+
   /// Returns true if we can add a known condition from BB to its successor
   /// block Succ.
   bool canAddSuccessor(BasicBlock &BB, BasicBlock *Succ) const {
@@ -900,18 +902,14 @@ static void dumpConstraint(ArrayRef<int64_t> C,
 }
 #endif
 
-void State::addInfoForInductions(BasicBlock &BB) {
-  auto *L = LI.getLoopFor(&BB);
-  if (!L || L->getHeader() != &BB)
-    return;
-
+void State::addInfoForInduction(ICmpInst *Cond, Loop *L) {
   Value *A;
   Value *B;
   CmpInst::Predicate Pred;
 
-  if (!match(BB.getTerminator(),
-             m_Br(m_ICmp(Pred, m_Value(A), m_Value(B)), m_Value(), m_Value())))
+  if (!match(Cond, m_ICmp(Pred, m_Value(A), m_Value(B))))
     return;
+
   PHINode *PN = dyn_cast<PHINode>(A);
   if (!PN) {
     Pred = CmpInst::getSwappedPredicate(Pred);
@@ -919,10 +917,11 @@ void State::addInfoForInductions(BasicBlock &BB) {
     PN = dyn_cast<PHINode>(A);
   }
 
-  if (!PN || PN->getParent() != &BB || PN->getNumIncomingValues() != 2 ||
-      !SE.isSCEVable(PN->getType()))
+  if (!PN || PN->getParent() != L->getHeader() ||
+      PN->getNumIncomingValues() != 2 || !SE.isSCEVable(PN->getType()))
     return;
 
+  BasicBlock &BB = *Cond->getParent();
   BasicBlock *InLoopSucc = nullptr;
   if (Pred == CmpInst::ICMP_NE)
     InLoopSucc = cast<BranchInst>(BB.getTerminator())->getSuccessor(0);
@@ -1045,6 +1044,32 @@ void State::addInfoForInductions(BasicBlock &BB) {
   for (BasicBlock *EB : ExitBBs) {
     WorkList.emplace_back(FactOrCheck::getConditionFact(
         DT.getNode(EB), CmpInst::ICMP_ULE, A, B, Precond));
+  }
+}
+
+void State::addInfoForInductions(BasicBlock &BB) {
+  auto *L = LI.getLoopFor(&BB);
+  if (!L)
+    return;
+  if (L->getHeader() != &BB)
+    return;
+
+  SmallVector<CmpInst *> Conditions;
+
+  BasicBlock *Curr = &BB;
+  while (L->isLoopExiting(Curr)) {
+    if (L->isLoopLatch(Curr))
+      break;
+    auto *Term = dyn_cast<BranchInst>(Curr->getTerminator());
+    if (!Term)
+      break;
+    if (isa<ICmpInst>(Term->getCondition()))
+      addInfoForInduction(cast<ICmpInst>(Term->getCondition()), L);
+
+    Curr = L->contains(Term->getSuccessor(0)) ? Term->getSuccessor(0)
+                                              : Term->getSuccessor(1);
+    if (Curr == L->getHeader())
+      break;
   }
 }
 
