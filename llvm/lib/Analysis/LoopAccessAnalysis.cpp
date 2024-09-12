@@ -831,8 +831,8 @@ static bool isNoWrap(PredicatedScalarEvolution &PSE,
   if (PSE.getSE()->isLoopInvariant(PtrScev, L))
     return true;
 
-  int64_t Stride = getPtrStride(PSE, AccessTy, Ptr, L, Strides).value_or(0);
-  return Stride == 1 ||
+  int64_t Stride = getPtrStride(PSE, AccessTy, Ptr, L, Strides, true).value_or(0);
+  return Stride ||
          PSE.hasNoOverflow(Ptr, SCEVWrapPredicate::IncrementNUSW);
 }
 
