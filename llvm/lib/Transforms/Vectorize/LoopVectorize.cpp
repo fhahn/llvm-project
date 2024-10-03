@@ -7232,10 +7232,13 @@ LoopVectorizationPlanner::precomputeCosts(VPlan &Plan, ElementCount VF,
                                                  ChainOps.end());
     // Also include the operands of instructions in the chain, as the cost-model
     // may mark extends as free.
-    for (auto *ChainOp : ChainOps) {
+    for (unsigned Idx = 0; Idx != ChainOpsAndOperands.size(); ++Idx) {
+      Instruction *ChainOp = ChainOpsAndOperands[Idx];
       for (Value *Op : ChainOp->operands()) {
-        if (auto *I = dyn_cast<Instruction>(Op))
-          ChainOpsAndOperands.insert(I);
+        if (auto *I = dyn_cast<Instruction>(Op)) {
+          if (OrigLoop->contains(I))
+            ChainOpsAndOperands.insert(I);
+        }
       }
     }
 

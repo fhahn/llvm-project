@@ -1462,6 +1462,58 @@ void VPWidenCastRecipe::execute(VPTransformState &State) {
   State.addMetadata(Cast, cast_or_null<Instruction>(getUnderlyingValue()));
 }
 
+InstructionCost VPWidenCastRecipe::computeCost(ElementCount VF,
+                                               VPCostContext &Ctx) const {
+  auto ComputeCCH = [&](VPRecipeBase *R) -> TTI::CastContextHint {
+    if (VF.isScalar())
+      return TTI::CastContextHint::Normal;
+
+    if (auto *MemR = dyn_cast<VPWidenMemoryRecipe>(R)) {
+      if (!MemR->isConsecutive())
+        return TTI::CastContextHint::GatherScatter;
+      if (MemR->isReverse())
+        return TTI::CastContextHint::Reversed;
+      if (MemR->getMask())
+        return TTI::CastContextHint::Masked;
+
+      return TTI::CastContextHint::Normal;
+    }
+    if (isa<VPInterleaveRecipe>(R))
+      return TTI::CastContextHint::Interleave;
+    if (auto *RepR = dyn_cast<VPReplicateRecipe>(R)) {
+      if (getParent()->getEnclosingLoopRegion() == getParent()->getParent())
+        return TTI::CastContextHint::Normal;
+      return TTI::CastContextHint::Masked;
+    }
+    return TTI::CastContextHint::None;
+  };
+
+  unsigned Opcode = getOpcode();
+  TTI::CastContextHint CCH = TTI::CastContextHint::None;
+  // For Trunc, the context is the only user, which must be a StoreInst.
+  if (Opcode == Instruction::Trunc || Opcode == Instruction::FPTrunc) {
+    if (getNumUsers() == 1) {
+      VPRecipeBase *UserR = cast<VPRecipeBase>(*user_begin());
+      if (UserR->mayWriteToMemory())
+        CCH = ComputeCCH(UserR);
+    }
+    // For Z/Sext, the context is the operand, which must be a LoadInst.
+  } else if (Opcode == Instruction::ZExt || Opcode == Instruction::SExt ||
+             Opcode == Instruction::FPExt) {
+    if (VPRecipeBase *R = getOperand(0)->getDefiningRecipe())
+      CCH = ComputeCCH(R);
+  }
+
+  Type *SrcVecTy = ToVectorTy(Ctx.Types.inferScalarType(getOperand(0)), VF);
+  Type *VectorTy =
+      ToVectorTy(Ctx.Types.inferScalarType(getVPSingleValue()), VF);
+
+  TTI::TargetCostKind CostKind = TTI::TCK_RecipThroughput;
+  return Ctx.TTI.getCastInstrCost(
+      Opcode, VectorTy, SrcVecTy, CCH, CostKind,
+      dyn_cast_or_null<Instruction>(getUnderlyingValue()));
+}
+
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 void VPWidenCastRecipe::print(raw_ostream &O, const Twine &Indent,
                               VPSlotTracker &SlotTracker) const {
