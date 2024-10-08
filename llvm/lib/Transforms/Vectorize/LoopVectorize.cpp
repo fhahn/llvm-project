@@ -10082,7 +10082,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     LLVM_DEBUG(dbgs() << "LV: Interleave Count is " << IC << '\n');
   }
 
-  bool DisableRuntimeUnroll = false;
+  bool DisableRuntimeUnroll = true;
   MDNode *OrigLoopID = L->getLoopID();
   {
     using namespace ore;
