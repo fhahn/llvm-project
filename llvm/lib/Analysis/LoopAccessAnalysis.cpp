@@ -1179,7 +1179,7 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
       for (const auto &AccessTy : Accesses[Access]) {
         if (!createCheckForAccess(RtCheck, Access, AccessTy, StridesMap,
                                   DepSetId, TheLoop, RunningDepId, ASId,
-                                  ShouldCheckWrap, false)) {
+                                  true, false)) {
           LLVM_DEBUG(dbgs() << "LAA: Can't find bounds for ptr:"
                             << *Access.getPointer() << '\n');
           Retries.emplace_back(Access, AccessTy);
@@ -1442,8 +1442,10 @@ static bool isNoWrapAddRec(Value *Ptr, const SCEVAddRecExpr *AR,
         isa<ConstantInt>(OBO->getOperand(1))) {
       const SCEV *OpScev = PSE.getSCEV(OBO->getOperand(0));
 
-      if (auto *OpAR = dyn_cast<SCEVAddRecExpr>(OpScev))
+      if (auto *OpAR = dyn_cast<SCEVAddRecExpr>(OpScev)) {
+        //assert(!(OpAR->getLoop() == L && OpAR->getNoWrapFlags(SCEV::FlagNSW)));
         return OpAR->getLoop() == L && OpAR->getNoWrapFlags(SCEV::FlagNSW);
+      }
     }
 
   return false;
