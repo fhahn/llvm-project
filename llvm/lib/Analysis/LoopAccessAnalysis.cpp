@@ -679,7 +679,7 @@ public:
                             const DenseMap<Value *, const SCEV *> &Strides,
                             DenseMap<Value *, unsigned> &DepSetId,
                             Loop *TheLoop, unsigned &RunningDepId,
-                            unsigned ASId, bool ShouldCheckStride, bool Assume);
+                            unsigned ASId, bool Assume);
 
   /// Check whether we can check the pointers at runtime for
   /// non-intersection.
@@ -687,8 +687,9 @@ public:
   /// Returns true if we need no check or if we do and we can generate them
   /// (i.e. the pointers have computable bounds).
   bool canCheckPtrAtRT(RuntimePointerChecking &RtCheck, ScalarEvolution *SE,
-                       Loop *TheLoop, const DenseMap<Value *, const SCEV *> &Strides,
-                       Value *&UncomputablePtr, bool ShouldCheckWrap = false);
+                       Loop *TheLoop,
+                       const DenseMap<Value *, const SCEV *> &Strides,
+                       Value *&UncomputablePtr);
 
   /// Goes over all memory accesses, checks whether a RT check is needed
   /// and builds sets of dependent accesses.
@@ -1130,13 +1131,11 @@ findForkedPointer(PredicatedScalarEvolution &PSE,
   return {{replaceSymbolicStrideSCEV(PSE, StridesMap, Ptr), false}};
 }
 
-bool AccessAnalysis::createCheckForAccess(RuntimePointerChecking &RtCheck,
-                                          MemAccessInfo Access, Type *AccessTy,
-                                          const DenseMap<Value *, const SCEV *> &StridesMap,
-                                          DenseMap<Value *, unsigned> &DepSetId,
-                                          Loop *TheLoop, unsigned &RunningDepId,
-                                          unsigned ASId, bool ShouldCheckWrap,
-                                          bool Assume) {
+bool AccessAnalysis::createCheckForAccess(
+    RuntimePointerChecking &RtCheck, MemAccessInfo Access, Type *AccessTy,
+    const DenseMap<Value *, const SCEV *> &StridesMap,
+    DenseMap<Value *, unsigned> &DepSetId, Loop *TheLoop,
+    unsigned &RunningDepId, unsigned ASId, bool Assume) {
   Value *Ptr = Access.getPointer();
 
   SmallVector<PointerIntPair<const SCEV *, 1, bool>> TranslatedPtrs =
@@ -1147,16 +1146,14 @@ bool AccessAnalysis::createCheckForAccess(RuntimePointerChecking &RtCheck,
     if (!hasComputableBounds(PSE, Ptr, PtrExpr, TheLoop, Assume))
       return false;
 
-    // When we run after a failing dependency check we have to make sure
-    // we don't have wrapping pointers.
-    if (ShouldCheckWrap) {
-      // Skip wrap checking when translating pointers.
-      if (TranslatedPtrs.size() > 1)
-        return false;
+    // We have to make sure we don't have wrapping pointers.
+    // Skip wrap checking when translating pointers.
+    if (TranslatedPtrs.size() > 1)
+      return false;
 
-      if (!isNoWrap(PSE, StridesMap, Ptr, AccessTy, TheLoop, Assume))
-        return false;
-    }
+    if (!isNoWrap(PSE, StridesMap, Ptr, AccessTy, TheLoop, Assume))
+      return false;
+
     // If there's only one option for Ptr, look it up after bounds and wrap
     // checking, because assumptions might have been added to PSE.
     if (TranslatedPtrs.size() == 1)
@@ -1187,10 +1184,10 @@ bool AccessAnalysis::createCheckForAccess(RuntimePointerChecking &RtCheck,
   return true;
 }
 
-bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
-                                     ScalarEvolution *SE, Loop *TheLoop,
-                                     const DenseMap<Value *, const SCEV *> &StridesMap,
-                                     Value *&UncomputablePtr, bool ShouldCheckWrap) {
+bool AccessAnalysis::canCheckPtrAtRT(
+    RuntimePointerChecking &RtCheck, ScalarEvolution *SE, Loop *TheLoop,
+    const DenseMap<Value *, const SCEV *> &StridesMap,
+    Value *&UncomputablePtr) {
   // Find pointers with computable bounds. We are going to use this information
   // to place a runtime bound check.
   bool CanDoRT = true;
@@ -1250,7 +1247,7 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
       for (const auto &AccessTy : Accesses[Access]) {
         if (!createCheckForAccess(RtCheck, Access, AccessTy, StridesMap,
                                   DepSetId, TheLoop, RunningDepId, ASId,
-                                  ShouldCheckWrap, false)) {
+                                  false)) {
           LLVM_DEBUG(dbgs() << "LAA: Can't find bounds for ptr:"
                             << *Access.getPointer() << '\n');
           Retries.emplace_back(Access, AccessTy);
@@ -1280,7 +1277,7 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
       for (const auto &[Access, AccessTy] : Retries) {
         if (!createCheckForAccess(RtCheck, Access, AccessTy, StridesMap,
                                   DepSetId, TheLoop, RunningDepId, ASId,
-                                  ShouldCheckWrap, /*Assume=*/true)) {
+                                  /*Assume=*/true)) {
           CanDoAliasSetRT = false;
           UncomputablePtr = Access.getPointer();
           break;
@@ -1462,6 +1459,61 @@ void AccessAnalysis::processMemAccesses() {
       }
     }
   }
+}
+
+/// Return true if an AddRec pointer \p Ptr is unsigned non-wrapping,
+/// i.e. monotonically increasing/decreasing.
+static bool isNoWrapAddRec(Value *Ptr, const SCEVAddRecExpr *AR,
+                           PredicatedScalarEvolution &PSE, const Loop *L) {
+
+  // FIXME: This should probably only return true for NUW.
+  if (AR->getNoWrapFlags(SCEV::NoWrapMask))
+    return true;
+
+  if (PSE.hasNoOverflow(Ptr, SCEVWrapPredicate::IncrementNUSW))
+    return true;
+
+  // Scalar evolution does not propagate the non-wrapping flags to values that
+  // are derived from a non-wrapping induction variable because non-wrapping
+  // could be flow-sensitive.
+  //
+  // Look through the potentially overflowing instruction to try to prove
+  // non-wrapping for the *specific* value of Ptr.
+
+  // The arithmetic implied by an nusw GEP can't overflow.
+  const auto *GEP = dyn_cast<GetElementPtrInst>(Ptr);
+  if (!GEP || !GEP->hasNoUnsignedSignedWrap())
+    return false;
+
+  // Make sure there is only one non-const index and analyze that.
+  Value *NonConstIndex = nullptr;
+  for (Value *Index : GEP->indices())
+    if (!isa<ConstantInt>(Index)) {
+      if (NonConstIndex)
+        return false;
+      NonConstIndex = Index;
+    }
+  if (!NonConstIndex)
+    // The recurrence is on the pointer, ignore for now.
+    return false;
+
+  // The index in GEP is signed.  It is non-wrapping if it's derived from a NSW
+  // AddRec using a NSW operation.
+  if (auto *OBO = dyn_cast<OverflowingBinaryOperator>(NonConstIndex))
+    if (OBO->hasNoSignedWrap() &&
+        // Assume constant for other the operand so that the AddRec can be
+        // easily found.
+        isa<ConstantInt>(OBO->getOperand(1))) {
+      const SCEV *OpScev = PSE.getSCEV(OBO->getOperand(0));
+
+      if (auto *OpAR = dyn_cast<SCEVAddRecExpr>(OpScev)) {
+        // assert(!(OpAR->getLoop() == L &&
+        // OpAR->getNoWrapFlags(SCEV::FlagNSW)));
+        return OpAR->getLoop() == L && OpAR->getNoWrapFlags(SCEV::FlagNSW);
+      }
+    }
+
+  return false;
 }
 
 /// Check whether the access through \p Ptr has a constant stride.
@@ -2668,9 +2720,8 @@ bool LoopAccessInfo::analyzeLoop(AAResults *AA, const LoopInfo *LI,
   // Find pointers with computable bounds. We are going to use this information
   // to place a runtime bound check.
   Value *UncomputablePtr = nullptr;
-  bool CanDoRTIfNeeded =
-      Accesses.canCheckPtrAtRT(*PtrRtChecking, PSE->getSE(), TheLoop,
-                               SymbolicStrides, UncomputablePtr, false);
+  bool CanDoRTIfNeeded = Accesses.canCheckPtrAtRT(
+      *PtrRtChecking, PSE->getSE(), TheLoop, SymbolicStrides, UncomputablePtr);
   if (!CanDoRTIfNeeded) {
     const auto *I = dyn_cast_or_null<Instruction>(UncomputablePtr);
     recordAnalysis("CantIdentifyArrayBounds", I)
@@ -2701,7 +2752,7 @@ bool LoopAccessInfo::analyzeLoop(AAResults *AA, const LoopInfo *LI,
       auto *SE = PSE->getSE();
       UncomputablePtr = nullptr;
       CanDoRTIfNeeded = Accesses.canCheckPtrAtRT(
-          *PtrRtChecking, SE, TheLoop, SymbolicStrides, UncomputablePtr, true);
+          *PtrRtChecking, SE, TheLoop, SymbolicStrides, UncomputablePtr);
 
       // Check that we found the bounds for the pointer.
       if (!CanDoRTIfNeeded) {
