@@ -1424,6 +1424,10 @@ static bool isNoWrapAddRec(Value *Ptr, const SCEVAddRecExpr *AR,
     // The recurrence is on the pointer, ignore for now.
     return false;
 
+  const SCEV *IdxSCEV = PSE.getSCEV(NonConstIndex);
+  if (PSE.getSE()->isKnownNonNegative(IdxSCEV))
+    return true;
+
   // The index in GEP is signed.  It is non-wrapping if it's derived from a NSW
   // AddRec using a NSW operation.
   if (auto *OBO = dyn_cast<OverflowingBinaryOperator>(NonConstIndex))
