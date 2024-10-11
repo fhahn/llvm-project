@@ -549,9 +549,8 @@ protected:
 
   /// Set up the values of the IVs correctly when exiting the vector loop.
   virtual void fixupIVUsers(PHINode *OrigPhi, const InductionDescriptor &II,
-                    Value *VectorTripCount, Value *EndValue,
-                    BasicBlock *MiddleBlock, VPlan &Plan,
-                    VPTransformState &State);
+                            Value *VectorTripCount, BasicBlock *MiddleBlock,
+                            VPlan &Plan, VPTransformState &State);
 
   /// Iteratively sink the scalarized operands of a predicated instruction into
   /// the block that was created for it.
@@ -671,10 +670,6 @@ protected:
   // Record whether runtime checks are added.
   bool AddedSafetyChecks = false;
 
-  // Holds the end values for each induction variable. We save the end values
-  // so we can later fix-up the external users of the induction variables.
-  DenseMap<PHINode *, Value *> IVEndValues;
-
   /// BFI and PSI are used to check for profile guided size optimizations.
   BlockFrequencyInfo *BFI;
   ProfileSummaryInfo *PSI;
@@ -789,9 +784,8 @@ protected:
   void printDebugTracesAtEnd() override;
 
   void fixupIVUsers(PHINode *OrigPhi, const InductionDescriptor &II,
-                    Value *VectorTripCount, Value *EndValue,
-                    BasicBlock *MiddleBlock, VPlan &Plan,
-                    VPTransformState &State) override {};
+                    Value *VectorTripCount, BasicBlock *MiddleBlock,
+                    VPlan &Plan, VPTransformState &State) override {};
 };
 
 // A specialized derived class of inner loop vectorizer that performs
@@ -2584,7 +2578,7 @@ void InnerLoopVectorizer::createInductionResumeValue(
   assert(VectorTripCount && "Expected valid arguments");
 
   Instruction *OldInduction = Legal->getPrimaryInduction();
-  Value *&EndValue = IVEndValues[OrigPhi];
+  Value *EndValue = nullptr;
   Value *EndValueFromAdditionalBypass = AdditionalBypass.second;
   if (OrigPhi == OldInduction) {
     // We know what the end value is.
@@ -2739,7 +2733,7 @@ InnerLoopVectorizer::createVectorizedLoopSkeleton(
 // value for the IV when arriving directly from the middle block.
 void InnerLoopVectorizer::fixupIVUsers(PHINode *OrigPhi,
                                        const InductionDescriptor &II,
-                                       Value *VectorTripCount, Value *EndValue,
+                                       Value *VectorTripCount,
                                        BasicBlock *MiddleBlock, VPlan &Plan,
                                        VPTransformState &State) {
   // There are two kinds of external IV usages - those that use the value
@@ -2750,6 +2744,10 @@ void InnerLoopVectorizer::fixupIVUsers(PHINode *OrigPhi,
   assert(OrigLoop->getUniqueExitBlock() && "Expected a single exit block");
 
   DenseMap<Value *, Value *> MissingVals;
+
+  Value *EndValue = cast<PHINode>(OrigPhi->getIncomingValueForBlock(
+                                      OrigLoop->getLoopPreheader()))
+                        ->getIncomingValueForBlock(MiddleBlock);
 
   // An external user of the last iteration's value should see the value that
   // the remainder loop uses to initialize its own IV.
@@ -2954,8 +2952,8 @@ void InnerLoopVectorizer::fixVectorizedLoop(VPTransformState &State,
     // Fix-up external users of the induction variables.
     for (const auto &Entry : Legal->getInductionVars())
       fixupIVUsers(Entry.first, Entry.second,
-                   getOrCreateVectorTripCount(nullptr),
-                   IVEndValues[Entry.first], LoopMiddleBlock, Plan, State);
+                   getOrCreateVectorTripCount(nullptr), LoopMiddleBlock, Plan,
+                   State);
   }
 
   for (Instruction *PI : PredicatedInstructions)
