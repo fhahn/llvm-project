@@ -36,7 +36,7 @@ define i32 @pred_select_const_i32_from_icmp(ptr noalias nocapture readonly %src1
 ; CHECK-VF2IC1-NEXT:    %cmp.n = icmp eq i64 %n, %n.vec
 ; CHECK-VF2IC1:       scalar.ph:
 ; CHECK-VF2IC1:         [[BC_RESUME_VAL:%.*]] = phi i64 [ {{%.*}}, %middle.block ], [ 0, %entry ]
-; CHECK-VF2IC1-NEXT:    [[BC_MERGE_RDX:%.*]] = phi i32 [ [[RDX_SELECT]], %middle.block ], [ 0, %entry ]
+; CHECK-VF2IC1-NEXT:    [[BC_MERGE_RDX:%.*]] = phi i32 [ 0, %entry ], [ [[RDX_SELECT]], %middle.block ]
 ; CHECK-VF2IC1-NEXT:    br label %for.body
 ; CHECK-VF2IC1:       for.body:
 ; CHECK-VF2IC1:         [[R_012:%.*]] = phi i32 [ [[R_1:%.*]], %for.inc ], [ [[BC_MERGE_RDX]], %scalar.ph ]
@@ -93,7 +93,7 @@ define i32 @pred_select_const_i32_from_icmp(ptr noalias nocapture readonly %src1
 ; CHECK-VF1IC2:         br i1 %cmp.n, label %for.end.loopexit, label %scalar.ph
 ; CHECK-VF1IC2:       scalar.ph:
 ; CHECK-VF1IC2-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ {{%.*}}, %middle.block ], [ 0, %entry ]
-; CHECK-VF1IC2-NEXT:    [[BC_MERGE_RDX:%.*]] = phi i32 [ [[RDX_SELECT]], %middle.block ], [ 0, %entry ]
+; CHECK-VF1IC2-NEXT:    [[BC_MERGE_RDX:%.*]] = phi i32 [ 0, %entry ], [ [[RDX_SELECT]], %middle.block ]
 ; CHECK-VF1IC2-NEXT:    br label %for.body
 ; CHECK-VF1IC2:       for.body:
 ; CHECK-VF1IC2-NEXT:    [[I_013:%.*]] = phi i64 [ [[INC:%.*]], %for.inc ], [ [[BC_RESUME_VAL]], %scalar.ph ]

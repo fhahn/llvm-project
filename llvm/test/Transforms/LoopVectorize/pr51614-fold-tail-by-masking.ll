@@ -64,7 +64,7 @@ define dso_local i16 @reverse_interleave_load_fold_mask() optsize {
 ; CHECK-NEXT:    br i1 true, label [[EXIT:%.*]], label [[SCALAR_PH]]
 ; CHECK:       scalar.ph:
 ; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i16 [ -1, [[MIDDLE_BLOCK]] ], [ 41, [[ENTRY:%.*]] ]
-; CHECK-NEXT:    [[BC_MERGE_RDX:%.*]] = phi i16 [ [[TMP28]], [[MIDDLE_BLOCK]] ], [ 0, [[ENTRY]] ]
+; CHECK-NEXT:    [[BC_MERGE_RDX:%.*]] = phi i16 [ 0, [[ENTRY]] ], [ [[TMP28]], [[MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i16 [ [[BC_RESUME_VAL]], [[SCALAR_PH]] ], [ [[IVMINUS1:%.*]], [[LOOP]] ]
@@ -77,7 +77,7 @@ define dso_local i16 @reverse_interleave_load_fold_mask() optsize {
 ; CHECK-NEXT:    [[ADD:%.*]] = add nsw i16 [[TMP29]], [[TMP30]]
 ; CHECK-NEXT:    [[PREVSUM]] = add nsw i16 [[SUM]], [[ADD]]
 ; CHECK-NEXT:    [[CMP:%.*]] = icmp ugt i16 [[IV]], 1
-; CHECK-NEXT:    br i1 [[CMP]], label [[LOOP]], label [[EXIT]], !llvm.loop [[LOOP2:![0-9]+]]
+; CHECK-NEXT:    br i1 [[CMP]], label [[LOOP]], label [[EXIT]], !llvm.loop [[LOOP3:![0-9]+]]
 ; CHECK:       exit:
 ; CHECK-NEXT:    [[PREVSUM_LCSSA:%.*]] = phi i16 [ [[PREVSUM]], [[LOOP]] ], [ [[TMP28]], [[MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    ret i16 [[PREVSUM_LCSSA]]
