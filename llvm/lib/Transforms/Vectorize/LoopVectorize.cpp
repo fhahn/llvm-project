@@ -467,11 +467,12 @@ public:
                       ElementCount MinProfitableTripCount,
                       unsigned UnrollFactor, LoopVectorizationLegality *LVL,
                       LoopVectorizationCostModel *CM, BlockFrequencyInfo *BFI,
-                      ProfileSummaryInfo *PSI, GeneratedRTChecks &RTChecks)
+                      ProfileSummaryInfo *PSI, GeneratedRTChecks &RTChecks,
+                      VPlan &Plan)
       : OrigLoop(OrigLoop), PSE(PSE), LI(LI), DT(DT), TLI(TLI), TTI(TTI),
         AC(AC), ORE(ORE), VF(VecWidth), UF(UnrollFactor),
         Builder(PSE.getSE()->getContext()), Legal(LVL), Cost(CM), BFI(BFI),
-        PSI(PSI), RTChecks(RTChecks) {
+        PSI(PSI), RTChecks(RTChecks), Plan(Plan) {
     // Query this against the original loop and save it here because the profile
     // of the original loop header may change as the transformation happens.
     OptForSizeBasedOnProfile = llvm::shouldOptimizeForSize(
@@ -680,6 +681,8 @@ protected:
   /// Structure to hold information about generated runtime checks, responsible
   /// for cleaning the checks, if vectorization turns out unprofitable.
   GeneratedRTChecks &RTChecks;
+
+  VPlan &Plan;
 };
 
 /// Encapsulate information regarding vectorization of a loop and its epilogue.
@@ -721,10 +724,10 @@ public:
       OptimizationRemarkEmitter *ORE, EpilogueLoopVectorizationInfo &EPI,
       LoopVectorizationLegality *LVL, llvm::LoopVectorizationCostModel *CM,
       BlockFrequencyInfo *BFI, ProfileSummaryInfo *PSI,
-      GeneratedRTChecks &Checks)
+      GeneratedRTChecks &Checks, VPlan &Plan)
       : InnerLoopVectorizer(OrigLoop, PSE, LI, DT, TLI, TTI, AC, ORE,
                             EPI.MainLoopVF, EPI.MainLoopVF, EPI.MainLoopUF, LVL,
-                            CM, BFI, PSI, Checks),
+                            CM, BFI, PSI, Checks, Plan),
         EPI(EPI) {}
 
   // Override this function to handle the more complex control flow around the
@@ -761,9 +764,9 @@ public:
       OptimizationRemarkEmitter *ORE, EpilogueLoopVectorizationInfo &EPI,
       LoopVectorizationLegality *LVL, llvm::LoopVectorizationCostModel *CM,
       BlockFrequencyInfo *BFI, ProfileSummaryInfo *PSI,
-      GeneratedRTChecks &Check)
+      GeneratedRTChecks &Check, VPlan &Plan)
       : InnerLoopAndEpilogueVectorizer(OrigLoop, PSE, LI, DT, TLI, TTI, AC, ORE,
-                                       EPI, LVL, CM, BFI, PSI, Check) {}
+                                       EPI, LVL, CM, BFI, PSI, Check, Plan) {}
   /// Implements the interface for creating a vectorized skeleton using the
   /// *main loop* strategy (ie the first pass of vplan execution).
   std::pair<BasicBlock *, Value *>
@@ -790,9 +793,9 @@ public:
       OptimizationRemarkEmitter *ORE, EpilogueLoopVectorizationInfo &EPI,
       LoopVectorizationLegality *LVL, llvm::LoopVectorizationCostModel *CM,
       BlockFrequencyInfo *BFI, ProfileSummaryInfo *PSI,
-      GeneratedRTChecks &Checks)
+      GeneratedRTChecks &Checks, VPlan &Plan)
       : InnerLoopAndEpilogueVectorizer(OrigLoop, PSE, LI, DT, TLI, TTI, AC, ORE,
-                                       EPI, LVL, CM, BFI, PSI, Checks) {
+                                       EPI, LVL, CM, BFI, PSI, Checks, Plan) {
     TripCount = EPI.TripCount;
   }
   /// Implements the interface for creating a vectorized skeleton using the
@@ -2071,6 +2074,7 @@ public:
 
     // Mark the check as used, to prevent it from being removed during cleanup.
     MemRuntimeCheckCond = nullptr;
+
     return MemCheckBlock;
   }
 };
@@ -2476,6 +2480,15 @@ void InnerLoopVectorizer::emitIterationCountCheck(BasicBlock *Bypass) {
     setBranchWeights(BI, MinItersBypassWeights, /*IsExpected=*/false);
   ReplaceInstWithInst(TCCheckBlock->getTerminator(), &BI);
   LoopBypassBlocks.push_back(TCCheckBlock);
+
+  VPBasicBlock *CheckVPBB = Plan.getEntry();
+  VPRegionBlock *VectorRegion = Plan.getVectorLoopRegion();
+  VPBlockBase *VectorPH = Plan.getVectorLoopRegion()->getSinglePredecessor();
+  VPBlockBase *ScalarPH = Plan.getScalarPH();
+  VPBlockUtils::disconnectBlocks(Plan.getEntry(), VectorPH);
+
+  VPBlockUtils::connectBlocks(CheckVPBB, ScalarPH);
+  VPBlockUtils::connectBlocks(CheckVPBB, VectorPH);
 }
 
 BasicBlock *InnerLoopVectorizer::emitSCEVChecks(BasicBlock *Bypass) {
@@ -2527,6 +2540,17 @@ BasicBlock *InnerLoopVectorizer::emitMemRuntimeChecks(BasicBlock *Bypass) {
   LoopBypassBlocks.push_back(MemCheckBlock);
 
   AddedSafetyChecks = true;
+
+  VPBlockBase *VectorPH = Plan.getVectorLoopRegion()->getSinglePredecessor();
+  VPBlockBase *Pred = VectorPH->getSinglePredecessor();
+  VPBlockBase *ScalarPH = Plan.getScalarPH();
+  VPBlockUtils::disconnectBlocks(Pred, VectorPH);
+  VPIRBasicBlock *MemCheckVPIRBB =
+      VPIRBasicBlock::fromBasicBlock(MemCheckBlock);
+
+  VPBlockUtils::connectBlocks(Pred, MemCheckVPIRBB);
+  VPBlockUtils::connectBlocks(MemCheckVPIRBB, ScalarPH);
+  VPBlockUtils::connectBlocks(MemCheckVPIRBB, VectorPH);
 
   return MemCheckBlock;
 }
@@ -7569,6 +7593,8 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
     State.CFG.PrevBB = OrigLoop->getLoopPreheader();
     State.Builder.SetInsertPoint(OrigLoop->getLoopPreheader()->getTerminator());
     BestVPlan.getPreheader()->execute(&State);
+    cast<BranchInst>(State.CFG.PrevBB->getTerminator())
+        ->setOperand(0, OrigLoop->getHeader());
   }
   if (!ILV.getTripCount())
     ILV.setTripCount(State.get(BestVPlan.getTripCount(), VPLane(0)));
@@ -7792,6 +7818,15 @@ EpilogueVectorizerMainLoop::emitIterationCountCheck(BasicBlock *Bypass,
   if (hasBranchWeightMD(*OrigLoop->getLoopLatch()->getTerminator()))
     setBranchWeights(BI, MinItersBypassWeights, /*IsExpected=*/false);
   ReplaceInstWithInst(TCCheckBlock->getTerminator(), &BI);
+
+  VPBasicBlock *CheckVPBB = Plan.getEntry();
+  VPRegionBlock *VectorRegion = Plan.getVectorLoopRegion();
+  VPBlockBase *VectorPH = Plan.getVectorLoopRegion()->getSinglePredecessor();
+  VPBlockBase *ScalarPH = Plan.getScalarPH();
+  VPBlockUtils::disconnectBlocks(Plan.getEntry(), VectorPH);
+
+  VPBlockUtils::connectBlocks(CheckVPBB, ScalarPH);
+  VPBlockUtils::connectBlocks(CheckVPBB, VectorPH);
 
   return TCCheckBlock;
 }
@@ -9621,7 +9656,7 @@ static bool processLoopInVPlanNativePath(
     GeneratedRTChecks Checks(*PSE.getSE(), DT, LI, TTI,
                              F->getDataLayout(), AddBranchWeights);
     InnerLoopVectorizer LB(L, PSE, LI, DT, TLI, TTI, AC, ORE, VF.Width,
-                           VF.Width, 1, LVL, &CM, BFI, PSI, Checks);
+                           VF.Width, 1, LVL, &CM, BFI, PSI, Checks, BestPlan);
     LLVM_DEBUG(dbgs() << "Vectorizing outer loop in \""
                       << L->getHeader()->getParent()->getName() << "\"\n");
     LVP.executePlan(VF.Width, 1, BestPlan, LB, DT, false);
@@ -10109,11 +10144,11 @@ bool LoopVectorizePass::processLoop(Loop *L) {
       assert(IC > 1 && "interleave count should not be 1 or 0");
       // If we decided that it is not legal to vectorize the loop, then
       // interleave it.
+      VPlan &BestPlan = LVP.getPlanFor(VF.Width);
       InnerLoopVectorizer Unroller(
           L, PSE, LI, DT, TLI, TTI, AC, ORE, ElementCount::getFixed(1),
-          ElementCount::getFixed(1), IC, &LVL, &CM, BFI, PSI, Checks);
+          ElementCount::getFixed(1), IC, &LVL, &CM, BFI, PSI, Checks, BestPlan);
 
-      VPlan &BestPlan = LVP.getPlanFor(VF.Width);
       LVP.executePlan(VF.Width, IC, BestPlan, Unroller, DT, false);
 
       ORE->emit([&]() {
@@ -10130,15 +10165,16 @@ bool LoopVectorizePass::processLoop(Loop *L) {
       VectorizationFactor EpilogueVF =
           LVP.selectEpilogueVectorizationFactor(VF.Width, IC);
       if (EpilogueVF.Width.isVector()) {
+        std::unique_ptr<VPlan> BestMainPlan(BestPlan.duplicate());
 
         // The first pass vectorizes the main loop and creates a scalar epilogue
         // to be vectorized by executing the plan (potentially with a different
         // factor) again shortly afterwards.
         EpilogueLoopVectorizationInfo EPI(VF.Width, IC, EpilogueVF.Width, 1);
         EpilogueVectorizerMainLoop MainILV(L, PSE, LI, DT, TLI, TTI, AC, ORE,
-                                           EPI, &LVL, &CM, BFI, PSI, Checks);
+                                           EPI, &LVL, &CM, BFI, PSI, Checks,
+                                           *BestMainPlan);
 
-        std::unique_ptr<VPlan> BestMainPlan(BestPlan.duplicate());
         auto ExpandedSCEVs = LVP.executePlan(EPI.MainLoopVF, EPI.MainLoopUF,
                                              *BestMainPlan, MainILV, DT, true);
         ++LoopsVectorized;
@@ -10147,11 +10183,11 @@ bool LoopVectorizePass::processLoop(Loop *L) {
         // edges from the first pass.
         EPI.MainLoopVF = EPI.EpilogueVF;
         EPI.MainLoopUF = EPI.EpilogueUF;
+        VPlan &BestEpiPlan = LVP.getPlanFor(EPI.EpilogueVF);
         EpilogueVectorizerEpilogueLoop EpilogILV(L, PSE, LI, DT, TLI, TTI, AC,
                                                  ORE, EPI, &LVL, &CM, BFI, PSI,
-                                                 Checks);
+                                                 Checks, BestEpiPlan);
 
-        VPlan &BestEpiPlan = LVP.getPlanFor(EPI.EpilogueVF);
         VPRegionBlock *VectorLoop = BestEpiPlan.getVectorLoopRegion();
         VPBasicBlock *Header = VectorLoop->getEntryBasicBlock();
         Header->setName("vec.epilog.vector.body");
@@ -10234,7 +10270,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
       } else {
         InnerLoopVectorizer LB(L, PSE, LI, DT, TLI, TTI, AC, ORE, VF.Width,
                                VF.MinProfitableTripCount, IC, &LVL, &CM, BFI,
-                               PSI, Checks);
+                               PSI, Checks, BestPlan);
         LVP.executePlan(VF.Width, IC, BestPlan, LB, DT, false);
         ++LoopsVectorized;
 

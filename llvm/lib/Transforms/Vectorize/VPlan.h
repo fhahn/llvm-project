@@ -3631,9 +3631,6 @@ public:
       : Entry(Entry), Preheader(Preheader) {
     Entry->setPlan(this);
     Preheader->setPlan(this);
-    assert(Preheader->getNumSuccessors() == 0 &&
-           Preheader->getNumPredecessors() == 0 &&
-           "preheader must be disconnected");
   }
 
   ~VPlan();
@@ -3770,12 +3767,9 @@ public:
 #endif
 
   /// Returns the VPRegionBlock of the vector loop.
-  VPRegionBlock *getVectorLoopRegion() {
-    return cast<VPRegionBlock>(getEntry()->getSingleSuccessor());
-  }
-  const VPRegionBlock *getVectorLoopRegion() const {
-    return cast<VPRegionBlock>(getEntry()->getSingleSuccessor());
-  }
+  VPRegionBlock *getVectorLoopRegion();
+
+  const VPRegionBlock *getVectorLoopRegion() const;
 
   /// Returns the canonical induction recipe of the vector loop.
   VPCanonicalIVPHIRecipe *getCanonicalIV() {
@@ -3809,6 +3803,8 @@ public:
   /// Clone the current VPlan, update all VPValues of the new VPlan and cloned
   /// recipes to refer to the clones, and return it.
   VPlan *duplicate();
+
+  VPBasicBlock *getScalarPH();
 };
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
