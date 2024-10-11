@@ -189,7 +189,7 @@ define void @bug18724(i1 %cond, ptr %ptr, i1 %cond.2, i64 %v.1, i32 %v.2) {
 ; UNROLL-NEXT:    store i32 [[TMP9]], ptr [[TMP7]], align 4
 ; UNROLL-NEXT:    store i32 [[TMP10]], ptr [[TMP8]], align 4
 ; UNROLL-NEXT:    br label [[PRED_STORE_CONTINUE3]]
-; UNROLL:       pred.store.continue3:
+; UNROLL:       pred.store.continue4:
 ; UNROLL-NEXT:    [[TMP11:%.*]] = add i32 [[VEC_PHI]], 1
 ; UNROLL-NEXT:    [[TMP12:%.*]] = add i32 [[VEC_PHI1]], 1
 ; UNROLL-NEXT:    [[TMP13:%.*]] = xor i1 [[COND_2]], true
@@ -262,10 +262,10 @@ define void @bug18724(i1 %cond, ptr %ptr, i1 %cond.2, i64 %v.1, i32 %v.2) {
 ; UNROLL-NOSIMPLIFY-NEXT:    br label [[PRED_STORE_CONTINUE]]
 ; UNROLL-NOSIMPLIFY:       pred.store.continue:
 ; UNROLL-NOSIMPLIFY-NEXT:    br i1 [[COND_2]], label [[PRED_STORE_IF2:%.*]], label [[PRED_STORE_CONTINUE3]]
-; UNROLL-NOSIMPLIFY:       pred.store.if2:
+; UNROLL-NOSIMPLIFY:       pred.store.if3:
 ; UNROLL-NOSIMPLIFY-NEXT:    store i32 [[TMP9]], ptr [[TMP7]], align 4
 ; UNROLL-NOSIMPLIFY-NEXT:    br label [[PRED_STORE_CONTINUE3]]
-; UNROLL-NOSIMPLIFY:       pred.store.continue3:
+; UNROLL-NOSIMPLIFY:       pred.store.continue4:
 ; UNROLL-NOSIMPLIFY-NEXT:    [[TMP10:%.*]] = add i32 [[VEC_PHI]], 1
 ; UNROLL-NOSIMPLIFY-NEXT:    [[TMP11:%.*]] = add i32 [[VEC_PHI1]], 1
 ; UNROLL-NOSIMPLIFY-NEXT:    [[TMP12:%.*]] = xor i1 [[COND_2]], true
@@ -343,13 +343,13 @@ define void @bug18724(i1 %cond, ptr %ptr, i1 %cond.2, i64 %v.1, i32 %v.2) {
 ; VEC:       pred.store.continue:
 ; VEC-NEXT:    [[TMP12:%.*]] = extractelement <2 x i1> [[BROADCAST_SPLAT]], i32 1
 ; VEC-NEXT:    br i1 [[TMP12]], label [[PRED_STORE_IF1:%.*]], label [[PRED_STORE_CONTINUE2]]
-; VEC:       pred.store.if1:
+; VEC:       pred.store.if2:
 ; VEC-NEXT:    [[TMP13:%.*]] = add i64 [[OFFSET_IDX]], 1
 ; VEC-NEXT:    [[TMP14:%.*]] = getelementptr inbounds [768 x i32], ptr [[PTR]], i64 0, i64 [[TMP13]]
 ; VEC-NEXT:    [[TMP15:%.*]] = extractelement <2 x i32> [[WIDE_LOAD]], i32 1
 ; VEC-NEXT:    store i32 [[TMP15]], ptr [[TMP14]], align 4
 ; VEC-NEXT:    br label [[PRED_STORE_CONTINUE2]]
-; VEC:       pred.store.continue2:
+; VEC:       pred.store.continue3:
 ; VEC-NEXT:    [[TMP16:%.*]] = add <2 x i32> [[VEC_PHI]], <i32 1, i32 1>
 ; VEC-NEXT:    [[TMP17:%.*]] = xor <2 x i1> [[BROADCAST_SPLAT]], <i1 true, i1 true>
 ; VEC-NEXT:    [[PREDPHI]] = select <2 x i1> [[TMP17]], <2 x i32> [[VEC_PHI]], <2 x i32> [[TMP16]]
