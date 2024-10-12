@@ -969,6 +969,20 @@ static void simplifyRecipe(VPRecipeBase &R, VPTypeAnalysis &TypeInfo) {
 
   if (match(&R, m_c_Mul(m_VPValue(A), m_SpecificInt(1))))
     return R.getVPSingleValue()->replaceAllUsesWith(A);
+
+  if (auto *DerivedIV = dyn_cast<VPDerivedIVRecipe>(&R)) {
+    VPValue *Start = DerivedIV->getStartValue();
+    VPValue *Step = DerivedIV->getStepValue();
+    if (Step->isLiveIn() && Start->isLiveIn()) {
+      auto *StartC = dyn_cast<ConstantInt>(Start->getLiveInIRValue());
+      auto *StepC = dyn_cast<ConstantInt>(Step->getLiveInIRValue());
+      if (StartC && StartC->isZero() && StepC && StepC->isOne() && TypeInfo.inferScalarType(DerivedIV) == TypeInfo.inferScalarType(DerivedIV->getOperand(1))) {
+        DerivedIV->replaceAllUsesWith(DerivedIV->getOperand(1)); 
+        DerivedIV->eraseFromParent();
+      }
+      
+    }
+  }
 }
 
 /// Move loop-invariant recipes out of the vector loop region in \p Plan.
