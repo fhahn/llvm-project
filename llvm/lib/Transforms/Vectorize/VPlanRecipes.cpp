@@ -415,7 +415,10 @@ Value *VPInstruction::generate(VPTransformState &State) {
   IRBuilderBase &Builder = State.Builder;
 
   if (Instruction::isBinaryOp(getOpcode())) {
-    bool OnlyFirstLaneUsed = vputils::onlyFirstLaneUsed(this);
+  bool OnlyFirstLaneUsed =
+          vputils::onlyFirstLaneUsed(this) || (all_of(operands(), [](VPValue *Op) {
+                                                      return vputils::isUniformAfterVectorization(Op);
+                                                      });
     Value *A = State.get(getOperand(0), OnlyFirstLaneUsed);
     Value *B = State.get(getOperand(1), OnlyFirstLaneUsed);
     auto *Res =
@@ -722,12 +725,8 @@ void VPInstruction::execute(VPTransformState &State) {
   if (!hasResult())
     return;
   assert(GeneratedValue && "generate must produce a value");
-  assert(
-      (GeneratedValue->getType()->isVectorTy() == !GeneratesPerFirstLaneOnly ||
-       State.VF.isScalar()) &&
-      "scalar value but not only first lane defined");
   State.set(this, GeneratedValue,
-            /*IsScalar*/ GeneratesPerFirstLaneOnly);
+            /*IsScalar*/ !GeneratedValue->getType()->isVectorTy());
 }
 
 bool VPInstruction::onlyFirstLaneUsed(const VPValue *Op) const {
