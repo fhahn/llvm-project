@@ -131,13 +131,23 @@ struct MatchRecipeAndOpcode<Opcode, RecipeTy, RecipeTys...> {
            MatchRecipeAndOpcode<Opcode, RecipeTys...>::match(R);
   }
 };
+template <typename Fn, typename... Ty>
+void CheckTupleElements(Fn &F, Ty &&...Ops) {
+  (F(std::forward<Ty>(Ops)), ...);
+}
 } // namespace detail
 
-template <typename Op0_t, unsigned Opcode, typename... RecipeTys>
-struct UnaryRecipe_match {
-  Op0_t Op0;
+template <typename Ops_t, unsigned Opcode, bool Commutative,
+          typename... RecipeTys>
+struct Recipe_match {
+  Ops_t Ops;
 
-  UnaryRecipe_match(Op0_t Op0) : Op0(Op0) {}
+  Recipe_match(Ops_t Ops) : Ops(Ops) {}
+  template <typename A_t, typename B_t>
+  Recipe_match(A_t A, B_t B) : Ops({A, B}) {
+    static_assert(std::tuple_size<Ops_t>::value == 2 &&
+                  "constructor can only be used for binary matcher");
+  }
 
   bool match(const VPValue *V) const {
     auto *DefR = V->getDefiningRecipe();
@@ -151,11 +161,42 @@ struct UnaryRecipe_match {
   bool match(const VPRecipeBase *R) const {
     if (!detail::MatchRecipeAndOpcode<Opcode, RecipeTys...>::match(R))
       return false;
-    assert(R->getNumOperands() == 1 &&
+    assert(R->getNumOperands() == std::tuple_size<Ops_t>::value &&
            "recipe with matched opcode does not have 1 operands");
-    return Op0.match(R->getOperand(0));
+    bool AllMatched = true;
+    unsigned Idx = 0;
+    auto IsMatch = [&Idx, &AllMatched, R](auto Op) {
+      AllMatched &= Op.match(R->getOperand(Idx));
+      Idx += 1;
+    };
+    std::apply(
+        [&](auto const &...Ops) {
+          detail::CheckTupleElements(IsMatch, Ops...);
+        },
+        Ops);
+    if (AllMatched)
+      return true;
+    if (!Commutative)
+      return false;
+
+    AllMatched = true;
+    Idx = R->getNumOperands() - 1;
+    auto IsMatch2 = [&Idx, &AllMatched, R](auto Op) {
+      AllMatched &= Op.match(R->getOperand(Idx));
+      Idx -= 1;
+    };
+    std::apply(
+        [&](auto const &...Ops) {
+          detail::CheckTupleElements(IsMatch2, Ops...);
+        },
+        Ops);
+    return AllMatched;
   }
 };
+
+template <typename Op0_t, unsigned Opcode, typename... RecipeTys>
+using UnaryRecipe_match =
+    Recipe_match<std::tuple<Op0_t>, Opcode, false, RecipeTys...>;
 
 template <typename Op0_t, unsigned Opcode>
 using UnaryVPInstruction_match =
@@ -168,32 +209,8 @@ using AllUnaryRecipe_match =
 
 template <typename Op0_t, typename Op1_t, unsigned Opcode, bool Commutative,
           typename... RecipeTys>
-struct BinaryRecipe_match {
-  Op0_t Op0;
-  Op1_t Op1;
-
-  BinaryRecipe_match(Op0_t Op0, Op1_t Op1) : Op0(Op0), Op1(Op1) {}
-
-  bool match(const VPValue *V) const {
-    auto *DefR = V->getDefiningRecipe();
-    return DefR && match(DefR);
-  }
-
-  bool match(const VPSingleDefRecipe *R) const {
-    return match(static_cast<const VPRecipeBase *>(R));
-  }
-
-  bool match(const VPRecipeBase *R) const {
-    if (!detail::MatchRecipeAndOpcode<Opcode, RecipeTys...>::match(R))
-      return false;
-    assert(R->getNumOperands() == 2 &&
-           "recipe with matched opcode does not have 2 operands");
-    if (Op0.match(R->getOperand(0)) && Op1.match(R->getOperand(1)))
-      return true;
-    return Commutative && Op0.match(R->getOperand(1)) &&
-           Op1.match(R->getOperand(0));
-  }
-};
+using BinaryRecipe_match =
+    Recipe_match<std::tuple<Op0_t, Op1_t>, Opcode, Commutative, RecipeTys...>;
 
 template <typename Op0_t, typename Op1_t, unsigned Opcode>
 using BinaryVPInstruction_match =
