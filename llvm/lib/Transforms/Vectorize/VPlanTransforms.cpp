@@ -1133,7 +1133,7 @@ void VPlanTransforms::truncateToMinimalBitwidths(
   DenseMap<VPValue *, VPWidenCastRecipe *> ProcessedTruncs;
   Type *CanonicalIVType = Plan.getCanonicalIV()->getScalarType();
   VPTypeAnalysis TypeInfo(CanonicalIVType);
-  VPBasicBlock *PH = Plan.getEntry();
+  VPBasicBlock *PH = cast<VPBasicBlock>(Plan.getVectorLoopRegion()->getSinglePredecessor());
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
            vp_depth_first_deep(Plan.getVectorLoopRegion()))) {
     for (VPRecipeBase &R : make_early_inc_range(*VPBB)) {
