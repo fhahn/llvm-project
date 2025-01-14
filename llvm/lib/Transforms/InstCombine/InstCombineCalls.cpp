@@ -3233,9 +3233,9 @@ Instruction *InstCombinerImpl::visitCallInst(CallInst &CI) {
         if (!RK || RK.AttrKind != Attribute::Alignment ||
             !isPowerOf2_64(RK.ArgValue))
           continue;
-        SetVector<const Instruction *> WorkList;
+        SetVector<const Value *> WorkList;
         bool AlignNeeded = false;
-        WorkList.insert(II);
+        WorkList.insert(RK.WasOn);
         for (unsigned I = 0; I != WorkList.size(); ++I) {
           if (auto *LI = dyn_cast<LoadInst>(WorkList[I])) {
             if (auto *AlignMD = LI->getMetadata(LLVMContext::MD_align)) {
@@ -3245,6 +3245,17 @@ Instruction *InstCombinerImpl::visitCallInst(CallInst &CI) {
                 AlignNeeded = true;
                 break;
               }
+
+              if (LI->getAlign().value() < RK.ArgValue) {
+                AlignNeeded = true;
+                break;
+              }
+            }
+          }
+          if (auto *SI = dyn_cast<StoreInst>(WorkList[I])) {
+            if (SI->getAlign().value() < RK.ArgValue) {
+              AlignNeeded = true;
+              break;
             }
           }
           if (isa<ICmpInst>(WorkList[I])) {
@@ -3259,8 +3270,10 @@ Instruction *InstCombinerImpl::visitCallInst(CallInst &CI) {
           for (const User *U : WorkList[I]->users())
             WorkList.insert(cast<Instruction>(U));
         }
-        auto *New = CallBase::removeOperandBundle(II, OBU.getTagID());
-        return New;
+        if (!AlignNeeded) {
+          auto *New = CallBase::removeOperandBundle(II, OBU.getTagID());
+          return New;
+        }
       }
     }
 
