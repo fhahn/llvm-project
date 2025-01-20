@@ -1251,6 +1251,7 @@ bool RAGreedy::trySplitAroundHintReg(MCPhysReg Hint,
   // Compute the cost of assigning a non Hint physical register to VirtReg.
   // We define it as the total frequency of broken COPY instructions to/from
   // Hint register, and after split, they can be deleted.
+  bool UsedAcrossLoop = false;
   for (const MachineInstr &Instr : MRI->reg_nodbg_instructions(Reg)) {
     if (!TII->isFullCopyInstr(Instr))
       continue;
@@ -1278,6 +1279,16 @@ bool RAGreedy::trySplitAroundHintReg(MCPhysReg Hint,
   unsigned NumCands = 0;
   unsigned BestCand = NoCand;
   SA->analyze(&VirtReg);
+
+  ArrayRef<SplitAnalysis::BlockInfo> UseBlocks = SA->getUseBlocks();
+  for (unsigned I = 0; I != UseBlocks.size(); ++I) {
+    const SplitAnalysis::BlockInfo &BI = UseBlocks[I];
+    UsedAcrossLoop |= Loops->getLoopFor(BI.MBB) != nullptr;
+  }
+
+  if (UsedAcrossLoop)
+    Cost *= BranchProbability(70, 100);
+
   calculateRegionSplitCostAroundReg(Hint, Order, Cost, NumCands, BestCand);
   if (BestCand == NoCand)
     return false;
