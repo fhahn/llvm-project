@@ -8070,14 +8070,6 @@ void EpilogueVectorizerEpilogueLoop::printDebugTracesAtEnd() {
   });
 }
 
-iterator_range<mapped_iterator<Use *, std::function<VPValue *(Value *)>>>
-VPRecipeBuilder::mapToVPValues(User::op_range Operands) {
-  std::function<VPValue *(Value *)> Fn = [this](Value *Op) {
-    return getVPValueOrAddLiveIn(Op);
-  };
-  return map_range(Operands, Fn);
-}
-
 void VPRecipeBuilder::createSwitchEdgeMasks(SwitchInst *SI) {
   BasicBlock *Src = SI->getParent();
   assert(!OrigLoop->isLoopExiting(Src) &&
@@ -9362,15 +9354,6 @@ LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(VFRange &Range) {
       // VPlan.
       Instruction *Instr = SingleDef->getUnderlyingInstr();
       Builder.setInsertPoint(SingleDef);
-      SmallVector<VPValue *, 4> Operands;
-      auto *Phi = dyn_cast<PHINode>(Instr);
-      if (Phi && Phi->getParent() == HeaderBB) {
-        Operands.push_back(Plan->getOrAddLiveIn(
-            Phi->getIncomingValueForBlock(OrigLoop->getLoopPreheader())));
-      } else {
-        auto OpRange = RecipeBuilder.mapToVPValues(Instr->operands());
-        Operands = {OpRange.begin(), OpRange.end()};
-      }
 
       // The stores with invariant address inside the loop will be deleted, and
       // in the exit block, a uniform store recipe will be created for the final
@@ -9383,14 +9366,14 @@ LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(VFRange &Range) {
           R.eraseFromParent();
           continue;
         }
-        auto *Recipe = new VPReplicateRecipe(
-            SI, make_range(Operands.begin(), Operands.end()),
-            true /* IsUniform */);
+        auto *Recipe =
+            new VPReplicateRecipe(SI, R.operands(), true /* IsUniform */);
         Recipe->insertBefore(*MiddleVPBB, MBIP);
         R.eraseFromParent();
         continue;
       }
 
+      SmallVector<VPValue *, 4> Operands(R.operands());
       VPRecipeBase *Recipe =
           RecipeBuilder.tryToCreateWidenRecipe(Instr, Operands, Range, VPBB);
       if (!Recipe)
