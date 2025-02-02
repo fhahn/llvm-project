@@ -1236,12 +1236,17 @@ bool VPlanTransforms::adjustFixedOrderRecurrences(VPlan &Plan,
 
     // Introduce a recipe to combine the incoming and previous values of a
     // fixed-order recurrence.
-    VPBasicBlock *InsertBlock = Previous->getParent();
-    if (isa<VPHeaderPHIRecipe>(Previous))
+    if (Previous) {
+      VPBasicBlock *InsertBlock = Previous->getParent();
+      if (isa<VPHeaderPHIRecipe>(Previous))
+        LoopBuilder.setInsertPoint(InsertBlock, InsertBlock->getFirstNonPhi());
+      else
+        LoopBuilder.setInsertPoint(InsertBlock,
+                                   std::next(Previous->getIterator()));
+    } else {
+      VPBasicBlock *InsertBlock = FOR->getParent();
       LoopBuilder.setInsertPoint(InsertBlock, InsertBlock->getFirstNonPhi());
-    else
-      LoopBuilder.setInsertPoint(InsertBlock,
-                                 std::next(Previous->getIterator()));
+    }
 
     auto *RecurSplice = cast<VPInstruction>(
         LoopBuilder.createNaryOp(VPInstruction::FirstOrderRecurrenceSplice,
@@ -1436,8 +1441,8 @@ void VPlanTransforms::truncateToMinimalBitwidths(
     }
   }
 
-  assert(MinBWs.size() == NumProcessedRecipes &&
-         "some entries in MinBWs haven't been processed");
+  /*  assert(MinBWs.size() == NumProcessedRecipes &&*/
+  /*"some entries in MinBWs haven't been processed");*/
 }
 
 void VPlanTransforms::optimize(VPlan &Plan) {

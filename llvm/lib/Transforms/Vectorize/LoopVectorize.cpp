@@ -8990,7 +8990,8 @@ static VPInstruction *addResumePhiRecipeForInduction(
 /// original phis in the scalar header. End values for inductions are added to
 /// \p IVEndValues.
 static void addScalarResumePhis(VPRecipeBuilder &Builder, VPlan &Plan,
-                                DenseMap<VPValue *, VPValue *> &IVEndValues) {
+                                DenseMap<VPValue *, VPValue *> &IVEndValues,
+                                ScalarEvolution &SE) {
   VPTypeAnalysis TypeInfo(Plan.getCanonicalIV()->getScalarType());
   auto *ScalarPH = Plan.getScalarPreheader();
   auto *MiddleVPBB = cast<VPBasicBlock>(ScalarPH->getSinglePredecessor());
@@ -9006,6 +9007,14 @@ static void addScalarResumePhis(VPRecipeBuilder &Builder, VPlan &Plan,
     auto *ScalarPhiI = dyn_cast<PHINode>(&ScalarPhiIRI->getInstruction());
     if (!ScalarPhiI)
       break;
+
+    if (SE.isSCEVable(ScalarPhiI->getType())) {
+      auto *S = SE.getSCEV(ScalarPhiI);
+      if (auto *C = dyn_cast<SCEVConstant>(S)) {
+        ScalarPhiIRI->addOperand(Plan.getOrAddLiveIn(C->getValue()));
+        continue;
+      }
+    }
 
     // TODO: Extract final value from induction recipe initially, optimize to
     // pre-computed end value together in optimizeInductionExitUsers.
@@ -9050,8 +9059,8 @@ static void addScalarResumePhis(VPRecipeBuilder &Builder, VPlan &Plan,
 // Collect VPIRInstructions for phis in the exit blocks that are modeled
 // in VPlan and add the exiting VPValue as operand.
 static SetVector<VPIRInstruction *>
-collectUsersInExitBlocks(Loop *OrigLoop, VPRecipeBuilder &Builder,
-                         VPlan &Plan) {
+collectUsersInExitBlocks(Loop *OrigLoop, VPRecipeBuilder &Builder, VPlan &Plan,
+                         ScalarEvolution &SE) {
   SetVector<VPIRInstruction *> ExitUsersToFix;
   for (VPIRBasicBlock *ExitVPBB : Plan.getExitBlocks()) {
     for (VPRecipeBase &R : *ExitVPBB) {
@@ -9069,6 +9078,13 @@ collectUsersInExitBlocks(Loop *OrigLoop, VPRecipeBuilder &Builder,
       }
       BasicBlock *ExitingBB = OrigLoop->getLoopLatch();
       Value *IncomingValue = ExitPhi->getIncomingValueForBlock(ExitingBB);
+
+      if (SE.isSCEVable(IncomingValue->getType())) {
+        auto *S = SE.getSCEV(IncomingValue);
+        if (auto *C = dyn_cast<SCEVConstant>(S)) {
+          IncomingValue = C->getValue();
+        }
+      }
       VPValue *V = Builder.getVPValueOrAddLiveIn(IncomingValue);
       ExitIRI->addOperand(V);
       if (V->isLiveIn())
@@ -9237,6 +9253,26 @@ LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(VFRange &Range) {
   // Build hierarchical CFG.
   VPlanHCFGBuilder HCFGBuilder(OrigLoop, LI, *Plan);
   HCFGBuilder.buildHierarchicalCFG();
+
+  {
+    ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>>
+        RPOT(Plan->getVectorLoopRegion()->getEntry());
+    for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(RPOT)) {
+      for (VPRecipeBase &R : make_early_inc_range(*VPBB)) {
+        auto *VPI = dyn_cast<VPSingleDefRecipe>(&R);
+        if (!VPI || !VPI->getUnderlyingValue())
+          continue;
+        Value *UV = VPI->getUnderlyingValue();
+        if (!PSE.getSE()->isSCEVable(UV->getType()))
+          continue;
+        auto *S = PSE.getSE()->getSCEV(UV);
+        if (auto *C = dyn_cast<SCEVConstant>(S)) {
+          VPI->replaceAllUsesWith(Plan->getOrAddLiveIn(C->getValue()));
+          VPI->eraseFromParent();
+        }
+      }
+    }
+  }
 
   // Don't use getDecisionAndClampRange here, because we don't know the UF
   // so this function is better to be conservative, rather than to split
@@ -9435,9 +9471,9 @@ LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(VFRange &Range) {
                              RecipeBuilder);
   }
   DenseMap<VPValue *, VPValue *> IVEndValues;
-  addScalarResumePhis(RecipeBuilder, *Plan, IVEndValues);
+  addScalarResumePhis(RecipeBuilder, *Plan, IVEndValues, *PSE.getSE());
   SetVector<VPIRInstruction *> ExitUsersToFix =
-      collectUsersInExitBlocks(OrigLoop, RecipeBuilder, *Plan);
+      collectUsersInExitBlocks(OrigLoop, RecipeBuilder, *Plan, *PSE.getSE());
   addExitUsersForFirstOrderRecurrences(*Plan, ExitUsersToFix);
   addUsersInExitBlocks(*Plan, ExitUsersToFix);
 
@@ -9566,7 +9602,7 @@ VPlanPtr LoopVectorizationPlanner::buildVPlan(VFRange &Range) {
   DenseMap<VPValue *, VPValue *> IVEndValues;
   // TODO: IVEndValues are not used yet in the native path, to optimize exit
   // values.
-  addScalarResumePhis(RecipeBuilder, *Plan, IVEndValues);
+  addScalarResumePhis(RecipeBuilder, *Plan, IVEndValues, *PSE.getSE());
 
   assert(verifyVPlanIsValid(*Plan) && "VPlan is invalid");
   return Plan;
@@ -9737,7 +9773,8 @@ void LoopVectorizationPlanner::adjustRecipesForReductions(
     auto *NewExitingVPV = PhiR->getBackedgeValue();
     if (!PhiR->isInLoop() && CM.foldTailByMasking()) {
       VPValue *Cond = RecipeBuilder.getBlockInMask(OrigLoop->getHeader());
-      assert(OrigExitingVPV->getDefiningRecipe()->getParent() != LatchVPBB &&
+      assert((!OrigExitingVPV->getDefiningRecipe() ||
+              OrigExitingVPV->getDefiningRecipe()->getParent() != LatchVPBB) &&
              "reduction recipe must be defined before latch");
       Type *PhiTy = PhiR->getOperand(0)->getLiveInIRValue()->getType();
       std::optional<FastMathFlags> FMFs =
