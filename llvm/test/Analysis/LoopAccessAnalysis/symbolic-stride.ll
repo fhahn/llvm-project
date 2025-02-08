@@ -377,12 +377,6 @@ define void @single_stride_used_for_trip_count(ptr noalias %A, ptr noalias %B, i
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
-; CHECK-NEXT:        Group [[GRP5:0x[0-9a-f]+]]:
-; CHECK-NEXT:          (Low: (((4 * (-1 + %stride) * %stride) + %A) umin %A) High: (4 + (((4 * (-1 + %stride) * %stride) + %A) umax %A)))
-; CHECK-NEXT:            Member: {%A,+,(4 * %stride)}<%loop>
-; CHECK-NEXT:        Group [[GRP6:0x[0-9a-f]+]]:
-; CHECK-NEXT:          (Low: (4 + %A)<nuw> High: (4 + (4 * %stride) + %A))
-; CHECK-NEXT:            Member: {(4 + %A)<nuw>,+,4}<nuw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
@@ -420,15 +414,15 @@ define void @unknown_stride_equalto_tc(i32 %N, ptr %A, ptr %B, i32 %j)  {
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Check 0:
-; CHECK-NEXT:        Comparing group ([[GRP7:0x[0-9a-f]+]]):
+; CHECK-NEXT:        Comparing group ([[GRP5:0x[0-9a-f]+]]):
 ; CHECK-NEXT:        ptr %A
-; CHECK-NEXT:        Against group ([[GRP8:0x[0-9a-f]+]]):
+; CHECK-NEXT:        Against group ([[GRP6:0x[0-9a-f]+]]):
 ; CHECK-NEXT:          %arrayidx = getelementptr inbounds i16, ptr %B, i32 %add
 ; CHECK-NEXT:      Grouped accesses:
-; CHECK-NEXT:        Group [[GRP7]]:
+; CHECK-NEXT:        Group [[GRP5]]:
 ; CHECK-NEXT:          (Low: %A High: (4 + %A))
 ; CHECK-NEXT:            Member: %A
-; CHECK-NEXT:        Group [[GRP8]]:
+; CHECK-NEXT:        Group [[GRP6]]:
 ; CHECK-NEXT:          (Low: (((2 * (sext i32 %j to i64))<nsw> + %B) umin ((2 * (sext i32 %j to i64))<nsw> + (2 * (zext i32 (-1 + %N) to i64) * (sext i32 %N to i64)) + %B)) High: (2 + (((2 * (sext i32 %j to i64))<nsw> + %B) umax ((2 * (sext i32 %j to i64))<nsw> + (2 * (zext i32 (-1 + %N) to i64) * (sext i32 %N to i64)) + %B))))
 ; CHECK-NEXT:            Member: {((2 * (sext i32 %j to i64))<nsw> + %B),+,(2 * (sext i32 %N to i64))<nsw>}<%loop>
 ; CHECK-EMPTY:
@@ -471,15 +465,15 @@ define void @unknown_stride_equalto_zext_tc(i16 zeroext %N, ptr %A, ptr %B, i32 
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Check 0:
-; CHECK-NEXT:        Comparing group ([[GRP9:0x[0-9a-f]+]]):
+; CHECK-NEXT:        Comparing group ([[GRP7:0x[0-9a-f]+]]):
 ; CHECK-NEXT:        ptr %A
-; CHECK-NEXT:        Against group ([[GRP10:0x[0-9a-f]+]]):
+; CHECK-NEXT:        Against group ([[GRP8:0x[0-9a-f]+]]):
 ; CHECK-NEXT:          %arrayidx = getelementptr inbounds i16, ptr %B, i32 %add
 ; CHECK-NEXT:      Grouped accesses:
-; CHECK-NEXT:        Group [[GRP9]]:
+; CHECK-NEXT:        Group [[GRP7]]:
 ; CHECK-NEXT:          (Low: %A High: (4 + %A))
 ; CHECK-NEXT:            Member: %A
-; CHECK-NEXT:        Group [[GRP10]]:
+; CHECK-NEXT:        Group [[GRP8]]:
 ; CHECK-NEXT:          (Low: (((2 * (sext i32 %j to i64))<nsw> + %B) umin ((2 * (sext i32 %j to i64))<nsw> + (2 * (zext i32 (-1 + (zext i16 %N to i32))<nsw> to i64) * (zext i16 %N to i64)) + %B)) High: (2 + (((2 * (sext i32 %j to i64))<nsw> + %B) umax ((2 * (sext i32 %j to i64))<nsw> + (2 * (zext i32 (-1 + (zext i16 %N to i32))<nsw> to i64) * (zext i16 %N to i64)) + %B))))
 ; CHECK-NEXT:            Member: {((2 * (sext i32 %j to i64))<nsw> + %B),+,(2 * (zext i16 %N to i64))<nuw><nsw>}<%loop>
 ; CHECK-EMPTY:
@@ -522,15 +516,15 @@ define void @unknown_stride_equalto_sext_tc(i16 %N, ptr %A, ptr %B, i32 %j) {
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Check 0:
-; CHECK-NEXT:        Comparing group ([[GRP11:0x[0-9a-f]+]]):
+; CHECK-NEXT:        Comparing group ([[GRP9:0x[0-9a-f]+]]):
 ; CHECK-NEXT:        ptr %A
-; CHECK-NEXT:        Against group ([[GRP12:0x[0-9a-f]+]]):
+; CHECK-NEXT:        Against group ([[GRP10:0x[0-9a-f]+]]):
 ; CHECK-NEXT:          %arrayidx = getelementptr inbounds i16, ptr %B, i32 %add
 ; CHECK-NEXT:      Grouped accesses:
-; CHECK-NEXT:        Group [[GRP11]]:
+; CHECK-NEXT:        Group [[GRP9]]:
 ; CHECK-NEXT:          (Low: %A High: (4 + %A))
 ; CHECK-NEXT:            Member: %A
-; CHECK-NEXT:        Group [[GRP12]]:
+; CHECK-NEXT:        Group [[GRP10]]:
 ; CHECK-NEXT:          (Low: (((2 * (sext i32 %j to i64))<nsw> + %B) umin ((2 * (sext i32 %j to i64))<nsw> + (2 * (zext i32 (-1 + (sext i16 %N to i32))<nsw> to i64) * (sext i16 %N to i64)) + %B)) High: (2 + (((2 * (sext i32 %j to i64))<nsw> + %B) umax ((2 * (sext i32 %j to i64))<nsw> + (2 * (zext i32 (-1 + (sext i16 %N to i32))<nsw> to i64) * (sext i16 %N to i64)) + %B))))
 ; CHECK-NEXT:            Member: {((2 * (sext i32 %j to i64))<nsw> + %B),+,(2 * (sext i16 %N to i64))<nsw>}<%loop>
 ; CHECK-EMPTY:
@@ -573,15 +567,15 @@ define void @unknown_stride_equalto_trunc_tc(i64 %N, ptr %A, ptr %B, i32 %j) {
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Check 0:
-; CHECK-NEXT:        Comparing group ([[GRP13:0x[0-9a-f]+]]):
+; CHECK-NEXT:        Comparing group ([[GRP11:0x[0-9a-f]+]]):
 ; CHECK-NEXT:        ptr %A
-; CHECK-NEXT:        Against group ([[GRP14:0x[0-9a-f]+]]):
+; CHECK-NEXT:        Against group ([[GRP12:0x[0-9a-f]+]]):
 ; CHECK-NEXT:          %arrayidx = getelementptr inbounds i16, ptr %B, i32 %add
 ; CHECK-NEXT:      Grouped accesses:
-; CHECK-NEXT:        Group [[GRP13]]:
+; CHECK-NEXT:        Group [[GRP11]]:
 ; CHECK-NEXT:          (Low: %A High: (4 + %A))
 ; CHECK-NEXT:            Member: %A
-; CHECK-NEXT:        Group [[GRP14]]:
+; CHECK-NEXT:        Group [[GRP12]]:
 ; CHECK-NEXT:          (Low: (((2 * (sext i32 %j to i64))<nsw> + %B) umin ((2 * (sext i32 %j to i64))<nsw> + (2 * (zext i32 (-1 + (trunc i64 %N to i32)) to i64) * (sext i32 (trunc i64 %N to i32) to i64)) + %B)) High: (2 + (((2 * (sext i32 %j to i64))<nsw> + %B) umax ((2 * (sext i32 %j to i64))<nsw> + (2 * (zext i32 (-1 + (trunc i64 %N to i32)) to i64) * (sext i32 (trunc i64 %N to i32) to i64)) + %B))))
 ; CHECK-NEXT:            Member: {((2 * (sext i32 %j to i64))<nsw> + %B),+,(2 * (sext i32 (trunc i64 %N to i32) to i64))<nsw>}<%loop>
 ; CHECK-EMPTY:
