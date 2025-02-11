@@ -813,16 +813,102 @@ static bool hasComputableBounds(PredicatedScalarEvolution &PSE, Value *Ptr,
   return AR->isAffine();
 }
 
+/// Return true if an AddRec pointer \p Ptr is unsigned non-wrapping,
+/// i.e. monotonically increasing/decreasing.
+static bool isNoWrapAddRec(Value *Ptr, const SCEVAddRecExpr *AR,
+                           PredicatedScalarEvolution &PSE, const Loop *L) {
+
+  // FIXME: This should probably only return true for NUW.
+  if (AR->getNoWrapFlags(SCEV::NoWrapMask))
+    return true;
+
+  if (PSE.hasNoOverflow(Ptr, SCEVWrapPredicate::IncrementNUSW))
+    return true;
+
+  // Scalar evolution does not propagate the non-wrapping flags to values that
+  // are derived from a non-wrapping induction variable because non-wrapping
+  // could be flow-sensitive.
+  //
+  // Look through the potentially overflowing instruction to try to prove
+  // non-wrapping for the *specific* value of Ptr.
+
+  // The arithmetic implied by an nusw GEP can't overflow.
+  const auto *GEP = dyn_cast<GetElementPtrInst>(Ptr);
+  if (!GEP || !GEP->hasNoUnsignedSignedWrap())
+    return false;
+
+  // Make sure there is only one non-const index and analyze that.
+  Value *NonConstIndex = nullptr;
+  for (Value *Index : GEP->indices())
+    if (!isa<ConstantInt>(Index)) {
+      if (NonConstIndex)
+        return false;
+      NonConstIndex = Index;
+    }
+  if (!NonConstIndex)
+    // The recurrence is on the pointer, ignore for now.
+    return false;
+
+  // The index in GEP is signed.  It is non-wrapping if it's derived from a NSW
+  // AddRec using a NSW operation.
+  if (auto *OBO = dyn_cast<OverflowingBinaryOperator>(NonConstIndex))
+    if (OBO->hasNoSignedWrap() &&
+        // Assume constant for other the operand so that the AddRec can be
+        // easily found.
+        isa<ConstantInt>(OBO->getOperand(1))) {
+      const SCEV *OpScev = PSE.getSCEV(OBO->getOperand(0));
+
+      if (auto *OpAR = dyn_cast<SCEVAddRecExpr>(OpScev)) {
+        // assert(!(OpAR->getLoop() == L &&
+        // OpAR->getNoWrapFlags(SCEV::FlagNSW)));
+        return OpAR->getLoop() == L && OpAR->getNoWrapFlags(SCEV::FlagNSW);
+      }
+    }
+
+  return false;
+}
+
 /// Check whether a pointer address cannot wrap.
 static bool isNoWrap(PredicatedScalarEvolution &PSE,
                      const DenseMap<Value *, const SCEV *> &Strides, Value *Ptr,
                      Type *AccessTy, Loop *L, bool Assume) {
-  const SCEV *PtrScev = PSE.getSCEV(Ptr);
+  const SCEV *PtrScev = replaceSymbolicStrideSCEV(PSE, Strides, Ptr);
   if (PSE.getSE()->isLoopInvariant(PtrScev, L))
     return true;
 
-  return getPtrStride(PSE, AccessTy, Ptr, L, Strides, Assume).has_value() ||
-         PSE.hasNoOverflow(Ptr, SCEVWrapPredicate::IncrementNUSW);
+  if (getPtrStride(PSE, AccessTy, Ptr, L, Strides, Assume).has_value()) {
+    return true;
+  }
+  const SCEVAddRecExpr *AR = dyn_cast<SCEVAddRecExpr>(PtrScev);
+  if (Assume && !AR)
+    AR = PSE.getAsAddRec(Ptr);
+  if (!AR)
+    return false;
+
+  // The address calculation must not wrap. Otherwise, a dependence could be
+  // inverted.
+  if (isNoWrapAddRec(Ptr, AR, PSE, L))
+    return true;
+
+  // An nusw getelementptr that is an AddRec cannot wrap. If it would wrap,
+  // the distance between the previously accessed location and the wrapped
+  // location will be larger than half the pointer index type space. In that
+  // case, the GEP would be  poison and any memory access dependent on it would
+  // be immediate UB when executed.
+  if (auto *GEP = dyn_cast<GetElementPtrInst>(Ptr);
+      GEP && GEP->hasNoUnsignedSignedWrap())
+    return true;
+
+  if (Assume) {
+    PSE.setNoOverflow(Ptr, SCEVWrapPredicate::IncrementNUSW);
+    LLVM_DEBUG(dbgs() << "LAA: Pointer may wrap:\n"
+                      << "LAA:   Pointer: " << *Ptr << "\n"
+                      << "LAA:   SCEV: " << *AR << "\n"
+                      << "LAA:   Added an overflow assumption\n");
+    return true;
+  }
+
+  return PSE.hasNoOverflow(Ptr, SCEVWrapPredicate::IncrementNUSW);
 }
 
 static void visitPointers(Value *StartPtr, const Loop &InnermostLoop,
@@ -1376,58 +1462,6 @@ void AccessAnalysis::processMemAccesses() {
       }
     }
   }
-}
-
-/// Return true if an AddRec pointer \p Ptr is unsigned non-wrapping,
-/// i.e. monotonically increasing/decreasing.
-static bool isNoWrapAddRec(Value *Ptr, const SCEVAddRecExpr *AR,
-                           PredicatedScalarEvolution &PSE, const Loop *L) {
-
-  // FIXME: This should probably only return true for NUW.
-  if (AR->getNoWrapFlags(SCEV::NoWrapMask))
-    return true;
-
-  if (PSE.hasNoOverflow(Ptr, SCEVWrapPredicate::IncrementNUSW))
-    return true;
-
-  // Scalar evolution does not propagate the non-wrapping flags to values that
-  // are derived from a non-wrapping induction variable because non-wrapping
-  // could be flow-sensitive.
-  //
-  // Look through the potentially overflowing instruction to try to prove
-  // non-wrapping for the *specific* value of Ptr.
-
-  // The arithmetic implied by an nusw GEP can't overflow.
-  const auto *GEP = dyn_cast<GetElementPtrInst>(Ptr);
-  if (!GEP || !GEP->hasNoUnsignedSignedWrap())
-    return false;
-
-  // Make sure there is only one non-const index and analyze that.
-  Value *NonConstIndex = nullptr;
-  for (Value *Index : GEP->indices())
-    if (!isa<ConstantInt>(Index)) {
-      if (NonConstIndex)
-        return false;
-      NonConstIndex = Index;
-    }
-  if (!NonConstIndex)
-    // The recurrence is on the pointer, ignore for now.
-    return false;
-
-  // The index in GEP is signed.  It is non-wrapping if it's derived from a NSW
-  // AddRec using a NSW operation.
-  if (auto *OBO = dyn_cast<OverflowingBinaryOperator>(NonConstIndex))
-    if (OBO->hasNoSignedWrap() &&
-        // Assume constant for other the operand so that the AddRec can be
-        // easily found.
-        isa<ConstantInt>(OBO->getOperand(1))) {
-      const SCEV *OpScev = PSE.getSCEV(OBO->getOperand(0));
-
-      if (auto *OpAR = dyn_cast<SCEVAddRecExpr>(OpScev))
-        return OpAR->getLoop() == L && OpAR->getNoWrapFlags(SCEV::FlagNSW);
-    }
-
-  return false;
 }
 
 /// Check whether the access through \p Ptr has a constant stride.
