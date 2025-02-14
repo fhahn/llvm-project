@@ -574,6 +574,97 @@ bool CodeGenPrepare::run(Function &F, FunctionAnalysisManager &AM) {
   return _run(F);
 }
 
+static bool rewriteToEarlyContinue(Loop *L, DominatorTree *DT, LoopInfo *LI) {
+  BasicBlock *Header = L->getHeader();
+  BasicBlock *Latch = L->getLoopLatch();
+  if (!Latch || Header == Latch || !isa<BranchInst>(Header->getTerminator()) ||
+      !cast<BranchInst>(Header->getTerminator())->isConditional())
+    return false;
+
+  if (any_of(successors(Header), [Latch, L](BasicBlock *Succ) {
+        return Succ == Latch || !L->contains(Succ);
+      }))
+    return false;
+  if (any_of(*Latch, [DT, Header, Latch](Instruction &I) {
+        return any_of(I.operands(), [DT, Header, Latch](Value *V) {
+          return (isa<Instruction>(V) &&
+                  cast<Instruction>(V)->getParent() != Latch) &&
+                 !DT->dominates(V, Header->getTerminator());
+        });
+      }))
+    return false;
+  if (Latch->begin() != Latch->getFirstNonPHIIt())
+    return false;
+  SmallVector<std::pair<ICmpInst *, bool>> Conds;
+  if (L->getNumBlocks() < 3)
+    return false;
+
+  auto *Br = cast<BranchInst>(Header->getTerminator());
+  BasicBlock *NonExitingSucc = Br->getSuccessor(0);
+
+  if (any_of(Header->phis(), [Header, Latch, DT, NonExitingSucc](PHINode &PN) {
+        return any_of(PN.operands(), [Header, Latch, DT,
+                                      NonExitingSucc](Value *V) {
+          auto *I = dyn_cast<Instruction>(V);
+          return I && I->getParent() != Latch && I->getParent() != Header &&
+                 I->getParent() != NonExitingSucc && !DT->dominates(I, Header);
+        });
+      }))
+    return false;
+
+  for (BasicBlock *BB : L->blocks()) {
+    if (BB == Header || BB == Latch)
+      continue;
+    auto *Br = dyn_cast<BranchInst>(BB->getTerminator());
+    if (!Br)
+      return false;
+    if (!L->isLoopExiting(BB))
+      return false;
+    if (BB->sizeWithoutDebug() > 5)
+      return false;
+
+    if (any_of(*BB, [](Instruction &I) { return I.mayHaveSideEffects(); })) {
+      if (BB->getSinglePredecessor() == Header)
+      continue;
+      return false;
+    }
+
+    auto *Cmp = dyn_cast<ICmpInst>(Br->getCondition());
+    if (!Cmp || any_of(Cmp->operands(), [DT, Header](Value *V) {
+          return isa<Instruction>(V) &&
+                 !DT->dominates(V, Header->getTerminator());
+        }))
+      return false;
+    Conds.emplace_back(Cmp, L->contains(Br->getSuccessor(0)));
+  }
+  auto *NewBB = SplitBlock(Header, Br, DT, LI);
+  auto *NewC = Br->getCondition();
+  Br = cast<BranchInst>(Header->getTerminator());
+  IRBuilder<> Builder(Br);
+  if (Conds.empty() || Conds.size() > 2)
+    return false;
+  for (const auto &[C, NeedsNegate] : Conds) {
+    auto *New = Builder.CreateICmp(C->getPredicate(), C->getOperand(0),
+                                   C->getOperand(1));
+    if (NeedsNegate)
+      New = Builder.CreateNot(New);
+    NewC = Builder.CreateLogicalAnd(NewC, New);
+  }
+  Builder.CreateCondBr(NewC, Latch, NewBB);
+  for (PHINode &PN : NonExitingSucc->phis()) {
+    IRBuilder<> Builder(Latch, Latch->getFirstNonPHIIt());
+    auto *NewPN = Builder.CreatePHI(PN.getType(), 2);
+    NewPN->addIncoming(&PN, NonExitingSucc);
+    NewPN->addIncoming(PN.getIncomingValueForBlock(NewBB), Header);
+    PN.replaceUsesWithIf(NewPN, [Header, Latch, NewPN](Use &U) {
+      return NewPN != U.getUser() &&
+             (cast<Instruction>(U.getUser())->getParent() == Header ||
+              cast<Instruction>(U.getUser())->getParent() == Latch);
+    });
+  }
+  Br->eraseFromParent();
+  return true;
+}
 bool CodeGenPrepare::_run(Function &F) {
   bool EverMadeChange = false;
 
@@ -770,6 +861,10 @@ bool CodeGenPrepare::_run(Function &F) {
   if (VerifyBFIUpdates)
     verifyBFIUpdates(F);
 #endif
+
+  auto &DT = getDT(F);
+  for (Loop *L : *LI)
+    EverMadeChange |= rewriteToEarlyContinue(L, &DT, LI);
 
   return EverMadeChange;
 }
