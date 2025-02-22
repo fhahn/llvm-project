@@ -777,7 +777,6 @@ public:
   SCEVUse getGEPExpr(GEPOperator *GEP,
                      const SmallVectorImpl<SCEVUse> &IndexExprs);
   SCEVUse getAbsExpr(SCEVUse Op, bool IsNSW);
-  SCEVUse getMinMaxExpr(SCEVTypes Kind, ArrayRef<const SCEV *> Operands);
   SCEVUse getMinMaxExpr(SCEVTypes Kind, SmallVectorImpl<SCEVUse> &Operands);
   SCEVUse getSequentialMinMaxExpr(SCEVTypes Kind,
                                   SmallVectorImpl<SCEVUse> &Operands);
@@ -888,8 +887,6 @@ public:
 
   /// Promote the operands to the wider of the types using zero-extension, and
   /// then perform a umin operation with them. N-ary function.
-  SCEVUse getUMinFromMismatchedTypes(ArrayRef<const SCEV *> Ops,
-                                     bool Sequential = false);
   SCEVUse getUMinFromMismatchedTypes(SmallVectorImpl<SCEVUse> &Ops,
                                      bool Sequential = false);
 
@@ -1184,7 +1181,7 @@ public:
 
   /// Test if the given expression is known to be a power of 2.  OrNegative
   /// allows matching negative power of 2s, and OrZero allows matching 0.
-  bool isKnownToBeAPowerOfTwo(const SCEV *S, bool OrZero = false,
+  bool isKnownToBeAPowerOfTwo(SCEVUse S, bool OrZero = false,
                               bool OrNegative = false);
 
   /// Splits SCEV expression \p S into two SCEVs. One of them is obtained from
@@ -1921,7 +1918,7 @@ private:
 
   /// Returns SCEV for the first operand of a phi if all phi operands have
   /// identical opcodes and operands.
-  const SCEV *createNodeForPHIWithIdenticalOperands(PHINode *PN);
+  SCEVUse createNodeForPHIWithIdenticalOperands(PHINode *PN);
 
   /// Provide the special handling we need to analyze PHI SCEVs.
   SCEVUse createNodeForPHI(PHINode *PN);
@@ -2324,10 +2321,10 @@ private:
                                          const Instruction *B);
 
   /// Returns true if \p Op is guaranteed not to cause immediate UB.
-  bool isGuaranteedNotToCauseUB(const SCEV *Op);
+  bool isGuaranteedNotToCauseUB(SCEVUse Op);
 
   /// Returns true if \p Op is guaranteed to not be poison.
-  static bool isGuaranteedNotToBePoison(const SCEV *Op);
+  static bool isGuaranteedNotToBePoison(SCEVUse Op);
 
   /// Return true if the SCEV corresponding to \p I is never poison.  Proving
   /// this is more complex than proving that just \p I is never poison, since
@@ -2531,7 +2528,7 @@ public:
   SCEVUse getBackedgeTakenCount();
 
   /// Get the (predicated) symbolic max backedge count for the analyzed loop.
-  const SCEV *getSymbolicMaxBackedgeTakenCount();
+  SCEVUse getSymbolicMaxBackedgeTakenCount();
 
   /// Returns the upper bound of the loop trip count as a normal unsigned
   /// value, or 0 if the trip count is unknown.
