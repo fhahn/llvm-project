@@ -68,8 +68,8 @@ extern bool VerifySCEV;
 class SCEV;
 
 struct SCEVUse : public PointerIntPair<const SCEV *, 3> {
-  SCEVUse() : PointerIntPair(nullptr, 0) {}
-  SCEVUse(const SCEV *S) : PointerIntPair(S, 0) {}
+  SCEVUse() : PointerIntPair() { setFromOpaqueValue(nullptr); }
+  SCEVUse(const SCEV *S) : PointerIntPair() {setFromOpaqueValue((void*) S); }
   SCEVUse(const SCEV *S, int Flags) : PointerIntPair(S, Flags) {}
 
   operator const SCEV *() const { return getPointer(); }
