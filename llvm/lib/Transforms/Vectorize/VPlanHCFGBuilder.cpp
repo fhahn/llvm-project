@@ -347,8 +347,7 @@ void PlainCFGBuilder::createVPInstructionsForVPBB(VPBasicBlock *VPBB,
       } else {
         // Build VPInstruction for any arbitrary Instruction without specific
         // representation in VPlan.
-        NewR = cast<VPInstruction>(
-            VPIRBuilder.createNaryOp(Inst->getOpcode(), VPOperands, Inst));
+        NewR = VPIRBuilder.createNaryOp(Inst->getOpcode(), VPOperands, Inst);
       }
     }
 
