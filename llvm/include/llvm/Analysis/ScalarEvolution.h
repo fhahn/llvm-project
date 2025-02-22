@@ -72,9 +72,9 @@ struct SCEVUse : public PointerIntPair<const SCEV *, 3> {
   SCEVUse(const SCEV *S) : PointerIntPair() {setFromOpaqueValue((void*) S); }
   SCEVUse(const SCEV *S, int Flags) : PointerIntPair(S, Flags) {}
 
-  operator const SCEV *() const { return getPointer(); }
-  const SCEV *operator->() const { return getPointer(); }
-  const SCEV *operator->() { return getPointer(); }
+  operator const SCEV *() const { return ((const SCEV *)getRawPointer()); }
+  const SCEV *operator->() const { return ((const SCEV *)getRawPointer()); }
+  const SCEV *operator->() { return ((const SCEV *)getRawPointer()); }
 
   void *getRawPointer() const { return getOpaqueValue(); }
 
@@ -86,8 +86,8 @@ struct SCEVUse : public PointerIntPair<const SCEV *, 3> {
 
   bool operator==(const SCEVUse &RHS) const {
     assert(isCanonical() && RHS.isCanonical());
-    return getRawPointer() == RHS.getRawPointer() ||
-           getCanonical() == RHS.getCanonical();
+    return getRawPointer() == RHS.getRawPointer(); //||
+  //         getCanonical() == RHS.getCanonical();
   }
 
   bool operator==(const SCEV *RHS) const { return getRawPointer() == RHS; }
