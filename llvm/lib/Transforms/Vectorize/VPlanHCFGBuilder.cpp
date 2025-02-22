@@ -75,7 +75,7 @@ public:
       : TheLoop(Lp), LI(LI), Plan(P) {}
 
   /// Build plain CFG for TheLoop  and connects it to Plan's entry.
-  void buildPlainCFG(DenseMap<VPBlockBase *, BasicBlock *> &VPB2IRBB);
+  void buildPlainCFG();
 };
 } // anonymous namespace
 
@@ -340,10 +340,16 @@ void PlainCFGBuilder::createVPInstructionsForVPBB(VPBasicBlock *VPBB,
       for (Value *Op : Inst->operands())
         VPOperands.push_back(getOrCreateVPOperand(Op));
 
-      // Build VPInstruction for any arbitrary Instruction without specific
-      // representation in VPlan.
-      NewR = cast<VPInstruction>(
-          VPIRBuilder.createNaryOp(Inst->getOpcode(), VPOperands, Inst));
+      if (auto *ICmp = dyn_cast<ICmpInst>(Inst)) {
+        NewR = cast<VPInstruction>(VPIRBuilder.createICmp(
+            ICmp->getPredicate(), VPOperands[0], VPOperands[1]));
+        NewR->setUnderlyingValue(ICmp);
+      } else {
+        // Build VPInstruction for any arbitrary Instruction without specific
+        // representation in VPlan.
+        NewR = cast<VPInstruction>(
+            VPIRBuilder.createNaryOp(Inst->getOpcode(), VPOperands, Inst));
+      }
     }
 
     IRDef2VPValue[Inst] = NewR;
@@ -351,8 +357,7 @@ void PlainCFGBuilder::createVPInstructionsForVPBB(VPBasicBlock *VPBB,
 }
 
 // Main interface to build the plain CFG.
-void PlainCFGBuilder::buildPlainCFG(
-    DenseMap<VPBlockBase *, BasicBlock *> &VPB2IRBB) {
+void PlainCFGBuilder::buildPlainCFG() {
 
   // 1. Scan the body of the loop in a topological order to visit each basic
   // block after having visited its predecessor basic blocks. Create a VPBB for
@@ -468,14 +473,11 @@ void PlainCFGBuilder::buildPlainCFG(
 
   VPBlockUtils::connectBlocks(Plan.getEntry(),
                               getOrCreateVPBB(TheLoop->getHeader()));
-
-  for (const auto &[IRBB, VPB] : BB2VPBB)
-    VPB2IRBB[VPB] = IRBB;
 }
 
 void VPlanHCFGBuilder::buildPlainCFG() {
   PlainCFGBuilder PCFGBuilder(TheLoop, LI, Plan);
-  PCFGBuilder.buildPlainCFG(VPB2IRBB);
+  PCFGBuilder.buildPlainCFG();
 }
 
 // Public interface to build a H-CFG.

@@ -2138,8 +2138,9 @@ void VPlanTransforms::handleUncountableEarlyExit(
         !OrigLoop->contains(TrueSucc) ? TrueSucc : FalseSucc);
   }
 
-  VPValue *EarlyExitNotTakenCond = RecipeBuilder.getBlockInMask(
-      OrigLoop->contains(TrueSucc) ? TrueSucc : FalseSucc);
+  VPValue *EarlyExitNotTakenCond =
+      RecipeBuilder.getBlockInMask(cast<VPBasicBlock>(
+          Plan.getVectorLoopRegion()->getEntry()->getSingleSuccessor()));
   auto *EarlyExitTakenCond = Builder.createNot(EarlyExitNotTakenCond);
   IsEarlyExitTaken =
       Builder.createNaryOp(VPInstruction::AnyOf, {EarlyExitTakenCond});
