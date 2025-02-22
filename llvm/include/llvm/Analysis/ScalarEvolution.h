@@ -86,8 +86,8 @@ struct SCEVUse : public PointerIntPair<const SCEV *, 3> {
 
   bool operator==(const SCEVUse &RHS) const {
     assert(isCanonical() && RHS.isCanonical());
-    return getRawPointer() == RHS.getRawPointer() ||
-           getCanonical() == RHS.getCanonical();
+    return getRawPointer() == RHS.getRawPointer();// ||
+           //getCanonical() == RHS.getCanonical();
   }
 
   bool operator==(const SCEV *RHS) const { return getRawPointer() == RHS; }
