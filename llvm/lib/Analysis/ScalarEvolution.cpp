@@ -10702,7 +10702,7 @@ ScalarEvolution::ExitLimit ScalarEvolution::howFarToZero(SCEVUse V,
     return getCouldNotCompute();
 
   const SCEV *Distance =
-      CountDown ? Start : getNegativeSCEV(Start).getPointer();
+      CountDown ? Start : getNegativeSCEV(Start).getSCEVPointer();
   // Handle unitary steps, which cannot wraparound.
   // 1*N = -Start; -1*N = Start (mod 2^BW), so:
   //   N = Distance (as unsigned)
@@ -10746,7 +10746,7 @@ ScalarEvolution::ExitLimit ScalarEvolution::howFarToZero(SCEVUse V,
       return getCouldNotCompute();
 
     SCEVUse Exact = getUDivExpr(
-        Distance, CountDown ? getNegativeSCEV(Step).getPointer() : Step);
+        Distance, CountDown ? getNegativeSCEV(Step).getSCEVPointer() : Step);
     SCEVUse ConstantMax = getCouldNotCompute();
     if (Exact != getCouldNotCompute()) {
       APInt MaxInt = getUnsignedRangeMax(applyLoopGuards(Exact, Guards));
@@ -10817,7 +10817,7 @@ ScalarEvolution::getPredecessorWithUniqueSuccessorForBB(const BasicBlock *BB)
 /// front-end may have replicated the controlling expression.
 static bool HasSameValue(SCEVUse A, SCEVUse B) {
   // Quick check to see if they are the same SCEV, ignoring use-specific flags.
-  if (A.getPointer() == B.getPointer())
+  if (A.getSCEVPointer() == B.getSCEVPointer())
     return true;
 
   auto ComputesEqualValues = [](const Instruction *A, const Instruction *B) {
