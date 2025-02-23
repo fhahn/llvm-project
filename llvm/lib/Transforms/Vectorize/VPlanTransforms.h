@@ -52,6 +52,20 @@ struct VPlanTransforms {
       verifyVPlanIsValid(Plan);
   }
 
+  /// Create initial VPlan, having an "entry" VPBasicBlock (wrapping
+  /// original scalar pre-header) which contains SCEV expansions that need
+  /// to happen before the CFG is modified (when executing a VPlan for the
+  /// epilogue vector loop, the original entry needs to be replaced by a new
+  /// one); a VPBasicBlock for the vector pre-header, followed by a region for
+  /// the vector loop, followed by the middle VPBasicBlock. If a check is needed
+  /// to guard executing the scalar epilogue loop, it will be added to the
+  /// middle block, together with VPBasicBlocks for the scalar preheader and
+  /// exit blocks. \p InductionTy is the type of the canonical induction and
+  /// used for related values, like the trip count expression.
+  static void introduceTopLevelVectorLoopRegion(
+      VPlan &Plan, Type *InductionTy, PredicatedScalarEvolution &PSE,
+      bool RequiresScalarEpilogueCheck, bool TailFolded, Loop *TheLoop);
+
   /// Replaces the VPInstructions in \p Plan with corresponding
   /// widen recipes.
   static void
