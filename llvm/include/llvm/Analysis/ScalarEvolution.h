@@ -77,6 +77,7 @@ struct SCEVUse : public PointerIntPair<const SCEV *, 3> {
   const SCEV *operator->() { return ((const SCEV *)getRawPointer()); }
 
   void *getRawPointer() const { return getOpaqueValue(); }
+  const SCEV *getSCEVPointer() const { return ((const SCEV *)getOpaqueValue()); }
 
   bool isCanonical() const;
 
@@ -160,24 +161,24 @@ inline bool SCEVUse::isCanonical() const {
 template <typename To> [[nodiscard]] inline decltype(auto) dyn_cast(SCEVUse U) {
   assert(detail::isPresent(U.getPointer()) &&
          "dyn_cast on a non-existent value");
-  return CastInfo<To, const SCEV *>::doCastIfPossible(U.getPointer());
+  return CastInfo<To, const SCEV *>::doCastIfPossible(U.getSCEVPointer());
 }
 
 template <typename To>
 [[nodiscard]] inline decltype(auto) dyn_cast_if_present(SCEVUse U) {
   assert(detail::isPresent(U.getPointer()) &&
          "dyn_cast on a non-existent value");
-  return CastInfo<To, const SCEV *>::doCastIfPossible(U.getPointer());
+  return CastInfo<To, const SCEV *>::doCastIfPossible(U.getSCEVPointer());
 }
 
 template <typename To> [[nodiscard]] inline decltype(auto) cast(SCEVUse U) {
   assert(detail::isPresent(U.getPointer()) &&
          "dyn_cast on a non-existent value");
-  return CastInfo<To, const SCEV *>::doCast(U.getPointer());
+  return CastInfo<To, const SCEV *>::doCast(U.getSCEVPointer());
 }
 
 template <typename To> [[nodiscard]] inline bool isa(SCEVUse U) {
-  return CastInfo<To, const SCEV *>::isPossible(U.getPointer());
+  return CastInfo<To, const SCEV *>::isPossible(U.getSCEVPointer());
 }
 
 template <class X> auto dyn_cast_or_null(SCEVUse U) {
