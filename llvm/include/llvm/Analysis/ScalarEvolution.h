@@ -71,9 +71,12 @@ extern bool VerifySCEV;
 class SCEV : public FoldingSetNode {
   friend struct FoldingSetTrait<SCEV>;
 
+  const SCEV *CanonicalSCEV;
+
   /// A reference to an Interned FoldingSetNodeID for this node.  The
   /// ScalarEvolution's BumpPtrAllocator holds the data.
   FoldingSetNodeIDRef FastID;
+
 
   // The SCEV baseclass this node corresponds to
   const SCEVTypes SCEVType;
@@ -133,7 +136,7 @@ public:
 
   explicit SCEV(const FoldingSetNodeIDRef ID, SCEVTypes SCEVTy,
                 unsigned short ExpressionSize)
-      : FastID(ID), SCEVType(SCEVTy), ExpressionSize(ExpressionSize) {}
+      : FastID(ID), SCEVType(SCEVTy), ExpressionSize(ExpressionSize) { setCanonical(this); }
   SCEV(const SCEV &) = delete;
   SCEV &operator=(const SCEV &) = delete;
 
@@ -176,6 +179,10 @@ public:
 
   /// This method is used for debugging.
   void dump() const;
+
+  void setCanonical(const SCEV *S) { CanonicalSCEV = S; }
+
+  const SCEV *getCanonical() const { return CanonicalSCEV; }
 };
 
 // Specialize FoldingSetTrait for SCEV to avoid needing to compute
@@ -193,6 +200,8 @@ template <> struct FoldingSetTrait<SCEV> : DefaultFoldingSetTrait<SCEV> {
   }
 };
 
+static_assert(sizeof(FoldingSetNode) == 8);
+static_assert(sizeof(FoldingSetNodeIDRef ) == 16);
 inline raw_ostream &operator<<(raw_ostream &OS, const SCEV &S) {
   S.print(OS);
   return OS;
