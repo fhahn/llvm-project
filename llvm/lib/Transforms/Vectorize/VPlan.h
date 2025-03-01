@@ -1194,7 +1194,7 @@ public:
 /// cast/dyn_cast/isa and execute() implementation. A single VPValue operand is
 /// allowed, and it is used to add a new incoming value for the single
 /// predecessor VPBB.
-struct VPIRPhi : public VPIRInstruction {
+struct VPIRPhi : public VPIRInstruction, public VPPhiAccessors<VPIRPhi> {
   VPIRPhi(PHINode &PN) : VPIRInstruction(PN) {}
 
   static inline bool classof(const VPRecipeBase *U) {
