@@ -882,6 +882,7 @@ public:
     // Extracts the first active lane of a vector, where the first operand is
     // the predicate, and the second operand is the vector to extract.
     ExtractFirstActive,
+    Constant,
   };
 
 private:
@@ -1024,6 +1025,32 @@ public:
 
   /// Returns the symbolic name assigned to the VPInstruction.
   StringRef getName() const { return Name; }
+};
+
+
+class VPInstructionWithType : public VPInstruction {
+  Type *ResultTy;
+
+public:
+  VPInstructionWithType(unsigned Opcode, ArrayRef<VPValue *> Operands, Type *ResultTy, DebugLoc DL,
+                const Twine &Name = "") : VPInstruction(Opcode, Operands, DL, Name), ResultTy(ResultTy) {}
+
+  static inline bool classof(const VPRecipeBase *R) {
+    auto *VPI = dyn_cast<VPInstruction>(R);
+    return VPI && VPI->getOpcode() == VPInstruction::Constant;
+  }
+
+  void execute(VPTransformState &State) override {
+    //llvm_unreachable("VPInstruction::Constant should not be executed");
+  }
+
+  Type *getResultType() const { return ResultTy; }
+
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+  /// Print the recipe.
+  void print(raw_ostream &O, const Twine &Indent,
+             VPSlotTracker &SlotTracker) const override {}
+#endif
 };
 
 /// A recipe to wrap on original IR instruction not to be modified during
@@ -3456,13 +3483,13 @@ class VPlan {
   VPValue *BackedgeTakenCount = nullptr;
 
   /// Represents the vector trip count.
-  VPValue VectorTripCount;
+  VPValue *VectorTripCount = nullptr;
 
   /// Represents the vectorization factor of the loop.
-  VPValue VF;
+  VPValue *VF = nullptr;
 
   /// Represents the loop-invariant VF * UF of the vector loop region.
-  VPValue VFxUF;
+  VPValue *VFxUF = nullptr;
 
   /// Holds a mapping between Values and their corresponding VPValue inside
   /// VPlan.
@@ -3603,13 +3630,13 @@ public:
   }
 
   /// The vector trip count.
-  VPValue &getVectorTripCount() { return VectorTripCount; }
+  VPValue &getVectorTripCount() { return *VectorTripCount; }
 
   /// Returns the VF of the vector loop region.
-  VPValue &getVF() { return VF; };
+  VPValue &getVF() { return *VF; };
 
   /// Returns VF * UF of the vector loop region.
-  VPValue &getVFxUF() { return VFxUF; }
+  VPValue &getVFxUF() { return *VFxUF; }
 
   void addVF(ElementCount VF) { VFs.insert(VF); }
 

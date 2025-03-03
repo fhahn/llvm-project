@@ -908,6 +908,11 @@ VPlanPtr VPlan::createInitialVPlan(Type *InductionTy,
   Plan->TripCount =
       vputils::getOrCreateVPValueForSCEVExpr(*Plan, TripCount, SE);
 
+  VPBuilder B(VecPreheader);
+  Plan->BackedgeTakenCount = B.createConstant(InductionTy);
+  Plan->VectorTripCount = B.createConstant(InductionTy);
+  Plan->VF = B.createConstant(InductionTy);
+  Plan->VFxUF = B.createConstant(InductionTy);
   // Create VPRegionBlock, with empty header and latch blocks, to be filled
   // during processing later.
   VPBasicBlock *HeaderVPBB = Plan->createVPBasicBlock("vector.body");
@@ -970,21 +975,21 @@ void VPlan::prepareToExecute(Value *TripCountV, Value *VectorTripCountV,
     BackedgeTakenCount->setUnderlyingValue(TCMO);
   }
 
-  VectorTripCount.setUnderlyingValue(VectorTripCountV);
+  VectorTripCount->setUnderlyingValue(VectorTripCountV);
 
   IRBuilder<> Builder(State.CFG.PrevBB->getTerminator());
   // FIXME: Model VF * UF computation completely in VPlan.
-  assert((!getVectorLoopRegion() || VFxUF.getNumUsers()) &&
+  assert((!getVectorLoopRegion() || VFxUF->getNumUsers()) &&
          "VFxUF expected to always have users");
   unsigned UF = getUF();
-  if (VF.getNumUsers()) {
+  if (VF->getNumUsers()) {
     Value *RuntimeVF = getRuntimeVF(Builder, TCTy, State.VF);
-    VF.setUnderlyingValue(RuntimeVF);
-    VFxUF.setUnderlyingValue(
+    VF->setUnderlyingValue(RuntimeVF);
+    VFxUF->setUnderlyingValue(
         UF > 1 ? Builder.CreateMul(RuntimeVF, ConstantInt::get(TCTy, UF))
                : RuntimeVF);
   } else {
-    VFxUF.setUnderlyingValue(createStepForVF(Builder, TCTy, State.VF, UF));
+    VFxUF->setUnderlyingValue(createStepForVF(Builder, TCTy, State.VF, UF));
   }
 }
 
@@ -1110,21 +1115,21 @@ const VPRegionBlock *VPlan::getVectorLoopRegion() const {
 void VPlan::printLiveIns(raw_ostream &O) const {
   VPSlotTracker SlotTracker(this);
 
-  if (VF.getNumUsers() > 0) {
-    O << "\nLive-in ";
-    VF.printAsOperand(O, SlotTracker);
+  if (VF->getNumUsers() > 0) {
+    O << "\n ";
+    VF->printAsOperand(O, SlotTracker);
     O << " = VF";
   }
 
-  if (VFxUF.getNumUsers() > 0) {
-    O << "\nLive-in ";
-    VFxUF.printAsOperand(O, SlotTracker);
+  if (VFxUF->getNumUsers() > 0) {
+    O << "\n";
+    VFxUF->printAsOperand(O, SlotTracker);
     O << " = VF * UF";
   }
 
-  if (VectorTripCount.getNumUsers() > 0) {
-    O << "\nLive-in ";
-    VectorTripCount.printAsOperand(O, SlotTracker);
+  if (VectorTripCount->getNumUsers() > 0) {
+    O << "\n";
+    VectorTripCount->printAsOperand(O, SlotTracker);
     O << " = vector-trip-count";
   }
 
@@ -1249,13 +1254,12 @@ VPlan *VPlan::duplicate() {
     Old2NewVPValues[OldLiveIn] =
         NewPlan->getOrAddLiveIn(OldLiveIn->getLiveInIRValue());
   }
-  Old2NewVPValues[&VectorTripCount] = &NewPlan->VectorTripCount;
-  Old2NewVPValues[&VF] = &NewPlan->VF;
-  Old2NewVPValues[&VFxUF] = &NewPlan->VFxUF;
-  if (BackedgeTakenCount) {
-    NewPlan->BackedgeTakenCount = new VPValue();
+  Old2NewVPValues[VectorTripCount] = NewPlan->VectorTripCount;
+  Old2NewVPValues[VF] = NewPlan->VF;
+  Old2NewVPValues[VFxUF] = NewPlan->VFxUF;
+  if (BackedgeTakenCount)
     Old2NewVPValues[BackedgeTakenCount] = NewPlan->BackedgeTakenCount;
-  }
+
   assert(TripCount && "trip count must be set");
   if (TripCount->isLiveIn())
     Old2NewVPValues[TripCount] =
@@ -1542,13 +1546,6 @@ void VPSlotTracker::assignName(const VPValue *V) {
 }
 
 void VPSlotTracker::assignNames(const VPlan &Plan) {
-  if (Plan.VF.getNumUsers() > 0)
-    assignName(&Plan.VF);
-  if (Plan.VFxUF.getNumUsers() > 0)
-    assignName(&Plan.VFxUF);
-  assignName(&Plan.VectorTripCount);
-  if (Plan.BackedgeTakenCount)
-    assignName(Plan.BackedgeTakenCount);
   for (VPValue *LI : Plan.getLiveIns())
     assignName(LI);
 

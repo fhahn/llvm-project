@@ -255,7 +255,7 @@ Type *VPTypeAnalysis::inferScalarType(const VPValue *V) {
           .Case<VPBlendRecipe, VPInstruction, VPWidenRecipe, VPReplicateRecipe,
                 VPWidenCallRecipe, VPWidenMemoryRecipe, VPWidenSelectRecipe>(
               [this](const auto *R) { return inferScalarTypeForRecipe(R); })
-          .Case<VPWidenIntrinsicRecipe>([](const VPWidenIntrinsicRecipe *R) {
+          .Case<VPInstructionWithType, VPWidenIntrinsicRecipe>([](const auto *R) {
             return R->getResultType();
           })
           .Case<VPInterleaveRecipe>([V](const VPInterleaveRecipe *R) {
