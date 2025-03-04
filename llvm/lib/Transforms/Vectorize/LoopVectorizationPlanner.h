@@ -235,6 +235,12 @@ public:
         new VPInstruction(Ptr, Offset, GEPNoWrapFlags::inBounds(), DL, Name));
   }
 
+  VPInstruction *createConstant(Type *ResultTy, DebugLoc DL = {},
+                                const Twine &Name = "") {
+    return tryInsertInstruction(
+        new VPInstructionWithType(VPInstruction::Constant, {}, ResultTy, DL, Name));
+  }
+
   /// Convert the input value \p Current to the corresponding value of an
   /// induction with \p Start and \p Step values, using \p Start + \p Current *
   /// \p Step.

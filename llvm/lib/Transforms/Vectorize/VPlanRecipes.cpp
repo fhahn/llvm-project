@@ -979,6 +979,9 @@ Value *VPInstructionWithType::generate(VPTransformState &State) {
 }
 
 void VPInstructionWithType::execute(VPTransformState &State) {
+  // FIXME: Remove constants before execution.
+  if (getOpcode() == VPInstruction::Constant)
+    return;
   State.set(this, generate(State), VPLane(0));
 }
 

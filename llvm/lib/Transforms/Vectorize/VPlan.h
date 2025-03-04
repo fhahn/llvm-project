@@ -881,6 +881,7 @@ public:
     // Extracts the first active lane of a vector, where the first operand is
     // the predicate, and the second operand is the vector to extract.
     ExtractFirstActive,
+    Constant,
   };
 
 private:
@@ -1041,7 +1042,7 @@ public:
 
   static inline bool classof(const VPRecipeBase *R) {
     auto *VPI = dyn_cast<VPInstruction>(R);
-    return VPI && Instruction::isCast(VPI->getOpcode());
+    return VPI && (Instruction::isCast(VPI->getOpcode()) || VPI->getOpcode() == VPInstruction::Constant);
   }
 
   static inline bool classof(const VPUser *R) {
@@ -3454,13 +3455,13 @@ class VPlan {
   VPValue *BackedgeTakenCount = nullptr;
 
   /// Represents the vector trip count.
-  VPValue VectorTripCount;
+  VPValue *VectorTripCount = nullptr;
 
   /// Represents the vectorization factor of the loop.
-  VPValue VF;
+  VPValue *VF = nullptr;
 
   /// Represents the loop-invariant VF * UF of the vector loop region.
-  VPValue VFxUF;
+  VPValue *VFxUF = nullptr;
 
   /// Holds a mapping between Values and their corresponding VPValue inside
   /// VPlan.
@@ -3601,13 +3602,13 @@ public:
   }
 
   /// The vector trip count.
-  VPValue &getVectorTripCount() { return VectorTripCount; }
+  VPValue &getVectorTripCount() { return *VectorTripCount; }
 
   /// Returns the VF of the vector loop region.
-  VPValue &getVF() { return VF; };
+  VPValue &getVF() { return *VF; };
 
   /// Returns VF * UF of the vector loop region.
-  VPValue &getVFxUF() { return VFxUF; }
+  VPValue &getVFxUF() { return *VFxUF; }
 
   void addVF(ElementCount VF) { VFs.insert(VF); }
 
