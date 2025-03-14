@@ -377,7 +377,7 @@ define i64 @alac_seek(ptr %0) {
 ; CHECK-NEXT:    [[LSR_IV1:%.*]] = phi ptr [ [[SCEVGEP2:%.*]], [[FOR_BODY_I]] ], [ [[SCEVGEP]], [[ENTRY:%.*]] ]
 ; CHECK-NEXT:    [[LSR_IV:%.*]] = phi i64 [ [[LSR_IV_NEXT:%.*]], [[FOR_BODY_I]] ], [ [[TMP1]], [[ENTRY]] ]
 ; CHECK-NEXT:    [[TMP2:%.*]] = load i32, ptr [[LSR_IV1]], align 4
-; CHECK-NEXT:    [[LSR_IV_NEXT]] = add i64 [[LSR_IV]], -1
+; CHECK-NEXT:    [[LSR_IV_NEXT]] = add nsw i64 [[LSR_IV]], -1
 ; CHECK-NEXT:    [[SCEVGEP2]] = getelementptr i8, ptr [[LSR_IV1]], i64 4
 ; CHECK-NEXT:    [[EXITCOND_NOT_I:%.*]] = icmp eq i64 [[LSR_IV_NEXT]], 0
 ; CHECK-NEXT:    br i1 [[EXITCOND_NOT_I]], label [[ALAC_PAKT_BLOCK_OFFSET_EXIT:%.*]], label [[FOR_BODY_I]]

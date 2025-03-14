@@ -52,7 +52,7 @@ define void @infer.zext.0(ptr %c, i32 %start, ptr %buf) {
 ; CHECK-NEXT:    %idx = phi i32 [ %start, %entry ], [ %idx.inc, %loop ]
 ; CHECK-NEXT:    --> {%start,+,1}<nuw><%loop> U: full-set S: full-set Exits: (1 + %start) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %idx.inc = add nuw i32 %idx, 1
-; CHECK-NEXT:    --> {(1 + %start)<nuw>,+,1}<nuw><%loop> U: [1,0) S: [1,0) Exits: (2 + %start) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(1 + %start)<nuw>,+,1}<nuw><%loop> U: full-set S: full-set Exits: (2 + %start) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %idx.inc.sext = zext i32 %idx.inc to i64
 ; CHECK-NEXT:    --> {(1 + (zext i32 %start to i64))<nuw><nsw>,+,1}<nuw><%loop> U: [1,4294967298) S: [1,4294967298) Exits: (2 + (zext i32 %start to i64))<nuw><nsw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %buf.gep = getelementptr inbounds i32, ptr %buf, i32 %idx.inc

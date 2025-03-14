@@ -3022,7 +3022,27 @@ ScalarEvolution::getOrCreateAddRecExpr(ArrayRef<const SCEV *> Ops,
     LoopUsers[L].push_back(S);
     registerUser(S, Ops);
   }
+
   setNoWrapFlags(S, Flags);
+
+  auto Pos = BackedgeTakenCounts.find(L);
+  if (Pos == BackedgeTakenCounts.end() ||
+      (hasFlags(S->getNoWrapFlags(), SCEV::FlagNUW) &&
+       hasFlags(S->getNoWrapFlags(), SCEV::FlagNSW)))
+    return S;
+  auto *BTC = Pos->second.getExact(L, this);
+  if (isa<SCEVCouldNotCompute>(BTC))
+    return S;
+  if (!match(S->getStepRecurrence(*this), m_scev_One()) ||
+      S->getType() != BTC->getType() || containsAddRecurrence(S->getStart()))
+    return S;
+  auto *Add = getAddExpr(S->getStart(), BTC);
+  if (!hasFlags(S->getNoWrapFlags(), SCEV::FlagNUW) &&
+      isKnownPredicate(CmpInst::ICMP_UGE, Add, S->getStart()))
+    setNoWrapFlags(S, SCEV::FlagNUW);
+  if (!hasFlags(S->getNoWrapFlags(), SCEV::FlagNSW) &&
+      isKnownPredicate(CmpInst::ICMP_SGE, Add, S->getStart()))
+    setNoWrapFlags(S, SCEV::FlagNSW);
   return S;
 }
 
