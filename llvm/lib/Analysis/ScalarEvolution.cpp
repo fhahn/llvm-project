@@ -5102,6 +5102,22 @@ ScalarEvolution::proveNoWrapViaConstantRanges(const SCEVAddRecExpr *AR) {
   return Result;
 }
 
+static bool proveNoWrapViaBTC(const SCEVAddRecExpr *AR,
+                               ScalarEvolution &SE) {
+   const Loop *L = AR->getLoop();
+   const SCEV *BTC = SE.getBackedgeTakenCount(L);
+   if (isa<SCEVCouldNotCompute>(BTC))
+     return false;
+   if (!match(AR->getStepRecurrence(SE), m_scev_One()) ||
+       AR->getType() != BTC->getType())
+     return false;
+   // AR has a step of 1, it is NSSW/NUSW if Start + BTC >= Start.
+   auto *Add = SE.getAddExpr(AR->getStart(), BTC);
+   return SE.isKnownPredicate(
+                                  CmpInst::ICMP_SGE,
+                              Add, AR->getStart());
+ }
+
 SCEV::NoWrapFlags
 ScalarEvolution::proveNoSignedWrapViaInduction(const SCEVAddRecExpr *AR) {
   SCEV::NoWrapFlags Result = AR->getNoWrapFlags();
@@ -5761,7 +5777,11 @@ const SCEV *ScalarEvolution::createSimpleAffineAddRec(PHINode *PN,
   if (auto *AR = dyn_cast<SCEVAddRecExpr>(PHISCEV)) {
     setNoWrapFlags(const_cast<SCEVAddRecExpr *>(AR),
                    (SCEV::NoWrapFlags)(AR->getNoWrapFlags() |
-                                       proveNoWrapViaConstantRanges(AR) | proveNoSignedWrapViaInduction(AR)));
+                                       proveNoWrapViaConstantRanges(AR)));
+    if (!AR->hasNoSignedWrap() && proveNoWrapViaBTC(AR, *this)) {
+      setNoWrapFlags(const_cast<SCEVAddRecExpr *>(AR),
+                     (SCEV::NoWrapFlags)(AR->getNoWrapFlags() | SCEV::FlagNSW));
+    }
   }
 
   // We can add Flags to the post-inc expression only if we
@@ -5892,7 +5912,11 @@ const SCEV *ScalarEvolution::createAddRecFromPHI(PHINode *PN) {
         if (auto *AR = dyn_cast<SCEVAddRecExpr>(PHISCEV)) {
           setNoWrapFlags(const_cast<SCEVAddRecExpr *>(AR),
                          (SCEV::NoWrapFlags)(AR->getNoWrapFlags() |
-                                             proveNoWrapViaConstantRanges(AR) | proveNoSignedWrapViaInduction(AR)));
+                                             proveNoWrapViaConstantRanges(AR)));
+          if (!AR->hasNoSignedWrap() && proveNoWrapViaBTC(AR, *this)) {
+            setNoWrapFlags(const_cast<SCEVAddRecExpr *>(AR),
+                           (SCEV::NoWrapFlags)(AR->getNoWrapFlags() | SCEV::FlagNSW));
+          }
         }
 
         // We can add Flags to the post-inc expression only if we

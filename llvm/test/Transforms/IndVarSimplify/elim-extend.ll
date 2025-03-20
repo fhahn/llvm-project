@@ -129,6 +129,7 @@ define void @nestedIV(ptr %address, i32 %limit) nounwind {
 ; CHECK-NEXT:    [[INNERPRECMP:%.*]] = icmp sgt i32 [[LIMITDEC]], [[INNERCOUNT]]
 ; CHECK-NEXT:    br i1 [[INNERPRECMP]], label [[INNERLOOP_PREHEADER:%.*]], label [[OUTERMERGE]]
 ; CHECK:       innerloop.preheader:
+; CHECK-NEXT:    [[TMP2:%.*]] = sext i32 [[INNERCOUNT]] to i64
 ; CHECK-NEXT:    br label [[INNERLOOP:%.*]]
 ; CHECK:       innerloop:
 ; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ [[TMP2]], [[INNERLOOP_PREHEADER]] ], [ [[INDVARS_IV_NEXT:%.*]], [[INNERLOOP]] ]
@@ -137,6 +138,7 @@ define void @nestedIV(ptr %address, i32 %limit) nounwind {
 ; CHECK-NEXT:    store i8 0, ptr [[ADR2]], align 1
 ; CHECK-NEXT:    [[ADR3:%.*]] = getelementptr i8, ptr [[ADDRESS]], i64 [[INDVARS_IV_NEXT]]
 ; CHECK-NEXT:    store i8 0, ptr [[ADR3]], align 1
+; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp ne i64 [[INDVARS_IV_NEXT]], [[TMP0]]
 ; CHECK-NEXT:    br i1 [[EXITCOND]], label [[INNERLOOP]], label [[INNEREXIT:%.*]]
 ; CHECK:       innerexit:
 ; CHECK-NEXT:    [[INNERCOUNT_LCSSA_WIDE:%.*]] = phi i64 [ [[INDVARS_IV_NEXT]], [[INNERLOOP]] ]
