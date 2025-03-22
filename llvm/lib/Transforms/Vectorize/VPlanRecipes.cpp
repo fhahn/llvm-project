@@ -703,10 +703,15 @@ Value *VPInstruction::generate(VPTransformState &State) {
     assert(Offset > 0 && "Offset from end must be positive");
     Value *Res;
     if (State.VF.isVector()) {
-      assert(Offset <= State.VF.getKnownMinValue() &&
-             "invalid offset to extract from");
-      // Extract lane VF - Offset from the operand.
-      Res = State.get(getOperand(0), VPLane::getLaneFromEnd(State.VF, Offset));
+      if (isa<VPReductionRecipe>(getOperand(0))) {
+        Res = State.get(getOperand(0), true);
+      } else {
+        assert(Offset <= State.VF.getKnownMinValue() &&
+               "invalid offset to extract from");
+        // Extract lane VF - Offset from the operand.
+        Res =
+            State.get(getOperand(0), VPLane::getLaneFromEnd(State.VF, Offset));
+      }
     } else {
       assert(Offset <= 1 && "invalid offset to extract from");
       Res = State.get(getOperand(0));
@@ -894,6 +899,7 @@ bool VPInstruction::opcodeMayReadOrWriteFromMemory() const {
   case VPInstruction::AnyOf:
   case VPInstruction::CalculateTripCountMinusVF:
   case VPInstruction::CanonicalIVIncrementForPart:
+  case VPInstruction::ComputeReductionResult:
   case VPInstruction::ExtractFromEnd:
   case VPInstruction::FirstActiveLane:
   case VPInstruction::FirstOrderRecurrenceSplice:

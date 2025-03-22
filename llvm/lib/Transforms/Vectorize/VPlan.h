@@ -2288,6 +2288,11 @@ public:
     return R && classof(R);
   }
 
+  static inline bool classof(const VPValue *V) {
+    const VPRecipeBase *DefR = V->getDefiningRecipe();
+    return DefR && classof(DefR);
+  }
+
   /// Generate the reduction in the loop.
   void execute(VPTransformState &State) override;
 
