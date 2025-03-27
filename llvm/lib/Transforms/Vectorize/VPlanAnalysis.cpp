@@ -261,9 +261,10 @@ Type *VPTypeAnalysis::inferScalarType(const VPValue *V) {
                 VPPartialReductionRecipe>([this](const VPRecipeBase *R) {
             return inferScalarType(R->getOperand(0));
           })
-          // VPInstructionWithType must be handled before VPInstruction.
-          .Case<VPInstructionWithType, VPWidenIntrinsicRecipe>(
+          // VPResultType must be handled before VPInstruction.
+          .Case<VPResultType, VPWidenIntrinsicRecipe>(
               [](const auto *R) { return R->getResultType(); })
+
           .Case<VPBlendRecipe, VPInstruction, VPWidenRecipe, VPReplicateRecipe,
                 VPWidenCallRecipe, VPWidenMemoryRecipe, VPWidenSelectRecipe>(
               [this](const auto *R) { return inferScalarTypeForRecipe(R); })

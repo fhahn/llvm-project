@@ -1030,17 +1030,25 @@ public:
   }
 };
 
-/// A specialization of VPInstruction augmenting it with a dedicated result
-/// type, to be used when the opcode and operands of the VPInstruction don't
-/// directly determine the result type.
-class VPInstructionWithType : public VPInstruction {
+class VPResultType {
   /// Scalar result type produced by the recipe.
   Type *ResultTy;
 
 public:
+  VPResultType(Type *ResultTy) : ResultTy(ResultTy) {}
+  virtual ~VPResultType() = default;
+
+  Type *getResultType() const { return ResultTy; }
+};
+
+/// A specialization of VPInstruction augmenting it with a dedicated result
+/// type, to be used when the opcode and operands of the VPInstruction don't
+/// directly determine the result type.
+class VPInstructionWithType : public VPInstruction, public VPResultType {
+public:
   VPInstructionWithType(unsigned Opcode, ArrayRef<VPValue *> Operands,
                         Type *ResultTy, DebugLoc DL, const Twine &Name = "")
-      : VPInstruction(Opcode, Operands, DL, Name), ResultTy(ResultTy) {}
+      : VPInstruction(Opcode, Operands, DL, Name), VPResultType(ResultTy) {}
 
   static inline bool classof(const VPRecipeBase *R) { return isCast(R); }
 
@@ -1065,13 +1073,43 @@ public:
     return 0;
   }
 
-  Type *getResultType() const { return ResultTy; }
-
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   /// Print the recipe.
   void print(raw_ostream &O, const Twine &Indent,
              VPSlotTracker &SlotTracker) const override;
 #endif
+};
+
+template <> struct CastIsPossible<VPResultType, const VPRecipeBase *> {
+  static inline bool isPossible(const VPRecipeBase *f) {
+    return isa<VPInstructionWithType>(f);
+  }
+};
+
+template <>
+struct CastInfo<VPResultType, const VPRecipeBase *>
+    : public CastIsPossible<VPResultType, const VPRecipeBase *> {
+  using Self = CastInfo<VPResultType, const VPRecipeBase *>;
+
+  using CastReturnType =
+      typename cast_retty<VPResultType, VPRecipeBase *>::ret_type;
+
+  static inline VPResultType *doCast(const VPRecipeBase *f) {
+    auto *VPI =
+        const_cast<VPInstructionWithType *>(dyn_cast<VPInstructionWithType>(f));
+    return VPI;
+  }
+
+  // This assumes that you can construct the cast return type from `nullptr`.
+  // This is largely to support legacy use cases - if you don't want this
+  // behavior you should specialize CastInfo for your use case.
+  static inline VPResultType *castFailed() { return nullptr; }
+
+  static inline VPResultType *doCastIfPossible(const VPRecipeBase *f) {
+    if (!Self::isPossible(f))
+      return castFailed();
+    return doCast(f);
+  }
 };
 
 /// A recipe to wrap on original IR instruction not to be modified during
