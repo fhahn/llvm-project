@@ -156,13 +156,11 @@ end:
   ret i8 %l
 }
 
-; TODO: The store in %entry can be removed by translating %p through the phi.
 define void @memoryphi_translate_5(i1 %cond) {
 ; CHECK-LABEL: @memoryphi_translate_5(
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[A:%.*]] = alloca i8, align 1
 ; CHECK-NEXT:    [[B:%.*]] = alloca i8, align 1
-; CHECK-NEXT:    store i8 0, ptr [[A]], align 1
 ; CHECK-NEXT:    br i1 [[COND:%.*]], label [[COND_TRUE:%.*]], label [[COND_END:%.*]]
 ; CHECK:       cond.true:
 ; CHECK-NEXT:    br label [[COND_END]]
@@ -261,7 +259,6 @@ exit:
   store i16 8, ptr %gep.2, align 2
   ret void
 }
-
 
 declare void @use(ptr)
 declare void @fn()
