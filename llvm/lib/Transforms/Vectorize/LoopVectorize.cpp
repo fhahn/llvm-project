@@ -8320,7 +8320,7 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(
       // to construct recipes below to not use the underlying instruction.
       if (isa<VPCanonicalIVPHIRecipe, VPWidenCanonicalIVRecipe, VPBlendRecipe>(
               &R) ||
-          (isa<VPInstruction>(&R) && !UnderlyingValue))
+          (isa<VPInstruction, VPWidenPHIRecipe>(&R) && !UnderlyingValue))
         continue;
       assert(isa<VPInstruction>(&R) && UnderlyingValue && "unsupported recipe");
 

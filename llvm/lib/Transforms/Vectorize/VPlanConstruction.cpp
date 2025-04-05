@@ -560,6 +560,23 @@ static void simplifyLiveInsWithSCEV(VPlan &Plan, ScalarEvolution &SE) {
     return nullptr;
   };
 
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_shallow(Plan.getEntry()))) {
+    for (VPRecipeBase &R : make_early_inc_range(*VPBB)) {
+      auto *VPI = dyn_cast<VPSingleDefRecipe>(&R);
+      if (!VPI)
+        continue;
+      if (auto *Simp = GetSimplifiedLiveInViaSCEV(VPI)) {
+        for (VPUser *U : to_vector(VPI->users())) {
+          if (auto *VecPhiR = dyn_cast<VPPhi>(U))
+            VecPhiR->setUnderlyingValue(nullptr);
+          U->replaceUsesOfWith(VPI, Simp);
+        }
+        VPI->eraseFromParent();
+      }
+    }
+  }
+
   for (VPValue *LiveIn : Plan.getLiveIns()) {
     if (VPValue *SimplifiedLiveIn = GetSimplifiedLiveInViaSCEV(LiveIn))
       LiveIn->replaceAllUsesWith(SimplifiedLiveIn);

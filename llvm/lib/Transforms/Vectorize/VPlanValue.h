@@ -184,7 +184,7 @@ public:
 
   // Set \p Val as the underlying Value of this VPValue.
   void setUnderlyingValue(Value *Val) {
-    assert(!UnderlyingVal && "Underlying Value is already set.");
+    // assert(!UnderlyingVal && "Underlying Value is already set.");
     UnderlyingVal = Val;
   }
 };

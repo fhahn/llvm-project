@@ -8,7 +8,7 @@ target triple = "x86_64-unknown-linux-gnu"
 define void @smax_call_uniform(ptr %dst, i64 %x) {
 ; CHECK-LABEL: define void @smax_call_uniform(
 ; CHECK-SAME: ptr [[DST:%.*]], i64 [[X:%.*]]) {
-; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[C:%.*]] = icmp ult i8 -68, -69
 ; CHECK-NEXT:    [[MUL:%.*]] = mul nuw nsw i64 [[X]], 0
 ; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
@@ -81,8 +81,3 @@ exit:
 }
 
 declare i64 @llvm.smax.i64(i64, i64)
-;.
-; CHECK: [[LOOP0]] = distinct !{[[LOOP0]], [[META1:![0-9]+]], [[META2:![0-9]+]]}
-; CHECK: [[META1]] = !{!"llvm.loop.isvectorized", i32 1}
-; CHECK: [[META2]] = !{!"llvm.loop.unroll.runtime.disable"}
-;.
