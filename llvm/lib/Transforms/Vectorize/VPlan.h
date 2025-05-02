@@ -3263,6 +3263,46 @@ public:
   }
 };
 
+template <> struct CastIsPossible<VPPhiAccessors, const VPRecipeBase *> {
+  static inline bool isPossible(const VPRecipeBase *f) {
+    return isa<VPIRPhi, VPHeaderPHIRecipe, VPWidenPHIRecipe>(f);
+  }
+};
+
+template <>
+struct CastInfo<VPPhiAccessors, const VPRecipeBase *>
+    : public CastIsPossible<VPPhiAccessors, const VPRecipeBase *> {
+
+  using Self = CastInfo<VPPhiAccessors, const VPRecipeBase *>;
+
+  using CastReturnType =
+      typename cast_retty<VPPhiAccessors, VPRecipeBase *>::ret_type;
+
+  static inline VPPhiAccessors *doCast(const VPRecipeBase *R) {
+    return const_cast<VPPhiAccessors *>([R]() -> const VPPhiAccessors * {
+      switch (R->getVPDefID()) {
+      case VPDef::VPIRInstructionSC:
+        return cast<VPIRPhi>(R);
+      case VPDef::VPWidenPHISC:
+        return cast<VPWidenPHIRecipe>(R);
+      default:
+        return cast<VPHeaderPHIRecipe>(R);
+      }
+    }());
+  }
+
+  // This assumes that you can construct the cast return type from `nullptr`.
+  // This is largely to support legacy use cases - if you don't want this
+  // behavior you should specialize CastInfo for your use case.
+  static inline VPPhiAccessors *castFailed() { return nullptr; }
+
+  static inline VPPhiAccessors *doCastIfPossible(const VPRecipeBase *f) {
+    if (!Self::isPossible(f))
+      return castFailed();
+    return doCast(f);
+  }
+};
+
 /// VPBasicBlock serves as the leaf of the Hierarchical Control-Flow Graph. It
 /// holds a sequence of zero or more VPRecipe's each representing a sequence of
 /// output IR instructions. All PHI-like recipes must come before any non-PHI recipes.
