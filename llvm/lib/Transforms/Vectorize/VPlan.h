@@ -1168,22 +1168,21 @@ public:
 
 /// Helper type to provide functions to access incoming values and blocks for
 /// phi-like recipes. RecipeTy must be a sub-class of VPRecipeBase.
-template <typename RecipeTy> class VPPhiAccessors {
+class VPPhiAccessors {
+protected:
   /// Return a VPRecipeBase* to the current object.
-  const VPRecipeBase *getAsRecipe() const {
-    return static_cast<const RecipeTy *>(this);
-  }
+  virtual const VPRecipeBase *getAsRecipe() const = 0;
 
 public:
+  virtual ~VPPhiAccessors() = default;
+
   /// Returns the incoming VPValue with index \p Idx.
   VPValue *getIncomingValue(unsigned Idx) const {
     return getAsRecipe()->getOperand(Idx);
   }
 
   /// Returns the incoming block with index \p Idx.
-  const VPBasicBlock *getIncomingBlock(unsigned Idx) const {
-    return getAsRecipe()->getParent()->getCFGPredecessor(Idx);
-  }
+  const VPBasicBlock *getIncomingBlock(unsigned Idx) const;
 
   unsigned getNumIncomingValues() const {
     auto *R = getAsRecipe();
@@ -1197,7 +1196,8 @@ public:
 /// cast/dyn_cast/isa and execute() implementation. A single VPValue operand is
 /// allowed, and it is used to add a new incoming value for the single
 /// predecessor VPBB.
-struct VPIRPhi : public VPIRInstruction, public VPPhiAccessors<VPIRPhi> {
+struct VPIRPhi : public VPIRInstruction, public VPPhiAccessors {
+
   VPIRPhi(PHINode &PN) : VPIRInstruction(PN) {}
 
   static inline bool classof(const VPRecipeBase *U) {
@@ -1214,6 +1214,9 @@ struct VPIRPhi : public VPIRInstruction, public VPPhiAccessors<VPIRPhi> {
   void print(raw_ostream &O, const Twine &Indent,
              VPSlotTracker &SlotTracker) const override;
 #endif
+
+protected:
+  const VPRecipeBase *getAsRecipe() const override { return this; }
 };
 
 /// Helper to manage IR metadata for recipes. It filters out metadata that
@@ -1739,13 +1742,14 @@ public:
 ///  * VPWidenPointerInductionRecipe: Generate vector and scalar values for a
 ///    pointer induction. Produces either a vector PHI per-part or scalar values
 ///    per-lane based on the canonical induction.
-class VPHeaderPHIRecipe : public VPSingleDefRecipe,
-                          public VPPhiAccessors<VPHeaderPHIRecipe> {
+class VPHeaderPHIRecipe : public VPSingleDefRecipe, public VPPhiAccessors {
 protected:
   VPHeaderPHIRecipe(unsigned char VPDefID, Instruction *UnderlyingInstr,
                     VPValue *Start, DebugLoc DL = {})
       : VPSingleDefRecipe(VPDefID, ArrayRef<VPValue *>({Start}), UnderlyingInstr, DL) {
   }
+
+  const VPRecipeBase *getAsRecipe() const override { return this; }
 
 public:
   ~VPHeaderPHIRecipe() override = default;
@@ -1997,10 +2001,12 @@ public:
 /// recipe is placed in an entry block to a (non-replicate) region, it must have
 /// exactly 2 incoming values, the first from the predecessor of the region and
 /// the second from the exiting block of the region.
-class VPWidenPHIRecipe : public VPSingleDefRecipe,
-                         public VPPhiAccessors<VPWidenPHIRecipe> {
+class VPWidenPHIRecipe : public VPSingleDefRecipe, public VPPhiAccessors {
   /// Name to use for the generated IR instruction for the widened phi.
   std::string Name;
+
+protected:
+  const VPRecipeBase *getAsRecipe() const override { return this; }
 
 public:
   /// Create a new VPWidenPHIRecipe for \p Phi with start value \p Start and
@@ -2602,8 +2608,7 @@ public:
 /// order to merge values that are set under such a branch and feed their uses.
 /// The phi nodes can be scalar or vector depending on the users of the value.
 /// This recipe works in concert with VPBranchOnMaskRecipe.
-class VPPredInstPHIRecipe : public VPSingleDefRecipe,
-                            public VPPhiAccessors<VPPredInstPHIRecipe> {
+class VPPredInstPHIRecipe : public VPSingleDefRecipe {
 public:
   /// Construct a VPPredInstPHIRecipe given \p PredInst whose value needs a phi
   /// nodes after merging back from a Branch-on-Mask.
@@ -3367,6 +3372,11 @@ private:
   /// VPBasicBlock, and return it. Update the CFGState accordingly.
   BasicBlock *createEmptyBasicBlock(VPTransformState &State);
 };
+
+inline const VPBasicBlock *
+VPPhiAccessors::getIncomingBlock(unsigned Idx) const {
+  return getAsRecipe()->getParent()->getCFGPredecessor(Idx);
+}
 
 /// A special type of VPBasicBlock that wraps an existing IR basic block.
 /// Recipes of the block get added before the first non-phi instruction in the
