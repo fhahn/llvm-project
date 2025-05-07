@@ -1992,8 +1992,8 @@ PGOInstrumentationGenCreateVar::run(Module &M, ModuleAnalysisManager &MAM) {
   appendToUsed(M, createProfileFileNameVar(M, CSInstrName));
   // The variable in a comdat may be discarded by LTO. Ensure the declaration
   // will be retained.
-  appendToCompilerUsed(M, createIRLevelProfileFlagVar(M, /*IsCS=*/true));
-  appendToUsed(M, createIRLevelProfileFlagVar(M, /*IsCS=*/true));
+  appendToCompilerUsed(M, createIRLevelProfileFlagVar(M, PGOInstrumentationType::CSFDO));
+  appendToUsed(M, createIRLevelProfileFlagVar(M, PGOInstrumentationType::CSFDO));
 
   if (ProfileSampling)
     createProfileSamplingVar(M);
