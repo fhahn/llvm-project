@@ -64,10 +64,10 @@ inline bool isSingleScalar(const VPValue *VPV) {
     // Don't consider recipes in replicate regions as uniform yet; their first
     // lane cannot be accessed when executing the replicate region for other
     // lanes.
-    if (RegionOfR && RegionOfR->isReplicator())
+    if ((RegionOfR && RegionOfR->isReplicator()) || Rep->isPredicated())
       return false;
     return Rep->isSingleScalar() || (PreservesUniformity(Rep->getOpcode()) &&
-                                     all_of(Rep->operands(), isSingleScalar));
+                                     (all_of(Rep->operands(), isSingleScalar)  || onlyFirstLaneUsed(Rep)));
   }
   if (isa<VPWidenGEPRecipe, VPDerivedIVRecipe, VPBlendRecipe>(VPV))
     return all_of(VPV->getDefiningRecipe()->operands(), isSingleScalar);
