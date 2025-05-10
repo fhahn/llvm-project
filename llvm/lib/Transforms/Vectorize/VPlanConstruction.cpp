@@ -230,10 +230,16 @@ void PlainCFGBuilder::createVPInstructionsForVPBB(VPBasicBlock *VPBB,
       for (Value *Op : Inst->operands())
         VPOperands.push_back(getOrCreateVPOperand(Op));
 
-      // Build VPInstruction for any arbitrary Instruction without specific
-      // representation in VPlan.
-      NewR = cast<VPInstruction>(
-          VPIRBuilder.createNaryOp(Inst->getOpcode(), VPOperands, Inst));
+      if (auto *ICmp = dyn_cast<ICmpInst>(Inst)) {
+        NewR = cast<VPInstruction>(VPIRBuilder.createICmp(
+            ICmp->getPredicate(), VPOperands[0], VPOperands[1]));
+        NewR->setUnderlyingValue(ICmp);
+      } else {
+        // Build VPInstruction for any arbitrary Instruction without specific
+        // representation in VPlan.
+        NewR = cast<VPInstruction>(
+            VPIRBuilder.createNaryOp(Inst->getOpcode(), VPOperands, Inst));
+      }
     }
 
     IRDef2VPValue[Inst] = NewR;

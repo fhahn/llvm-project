@@ -24,13 +24,13 @@ define void @foo(i64 %n) {
 ; CHECK-NEXT:   EMIT ir<%gep.2> = getelementptr ir<@arr>, ir<0>, ir<%inner.iv>, ir<%outer.iv>
 ; CHECK-NEXT:   EMIT store ir<%add>, ir<%gep.2>
 ; CHECK-NEXT:   EMIT ir<%inner.iv.next> = add ir<%inner.iv>, ir<1>
-; CHECK-NEXT:   EMIT ir<%inner.ec> = icmp ir<%inner.iv.next>, ir<8>
+; CHECK-NEXT:   EMIT ir<%inner.ec> = icmp eq ir<%inner.iv.next>, ir<8>
 ; CHECK-NEXT:   EMIT branch-on-cond ir<%inner.ec>
 ; CHECK-NEXT: Successor(s): outer.latch, inner
 ; CHECK-EMPTY:
 ; CHECK-NEXT: outer.latch:
 ; CHECK-NEXT:   EMIT ir<%outer.iv.next> = add ir<%outer.iv>, ir<1>
-; CHECK-NEXT:   EMIT ir<%outer.ec> = icmp ir<%outer.iv.next>, ir<8>
+; CHECK-NEXT:   EMIT ir<%outer.ec> = icmp eq ir<%outer.iv.next>, ir<8>
 ; CHECK-NEXT:   EMIT branch-on-cond ir<%outer.ec>
 ; CHECK-NEXT: Successor(s): ir-bb<exit>, outer.header
 ; CHECK-EMPTY:
