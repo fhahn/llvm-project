@@ -2403,10 +2403,9 @@ void VPlanTransforms::dropPoisonGeneratingRecipes(
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(Iter)) {
     for (VPRecipeBase &Recipe : *VPBB) {
       if (auto *WidenRec = dyn_cast<VPWidenMemoryRecipe>(&Recipe)) {
-        Instruction &UnderlyingInstr = WidenRec->getIngredient();
         VPRecipeBase *AddrDef = WidenRec->getAddr()->getDefiningRecipe();
-        if (AddrDef && WidenRec->isConsecutive() &&
-            BlockNeedsPredication(UnderlyingInstr.getParent()))
+        if (AddrDef && WidenRec->isConsecutive() && false)
+            //BlockNeedsPredication(UnderlyingInstr.getParent()))
           CollectPoisonGeneratingInstrsInBackwardSlice(AddrDef);
       } else if (auto *InterleaveRec = dyn_cast<VPInterleaveRecipe>(&Recipe)) {
         VPRecipeBase *AddrDef = InterleaveRec->getAddr()->getDefiningRecipe();
@@ -3150,7 +3149,7 @@ void VPlanTransforms::narrowInterleaveGroups(VPlan &Plan, ElementCount VF,
 
     // Narrow wide load to uniform scalar load, as transformed VPlan will only
     // process one original iteration.
-    auto *N = new VPReplicateRecipe(&WideLoad->getIngredient(),
+    auto *N = new VPReplicateRecipe(cast<LoadInst>(WideLoad->getUnderlyingValue()),
                                     WideLoad->operands(), /*IsUniform*/ true,
                                     /*Mask*/ nullptr, *WideLoad);
     N->insertBefore(WideLoad);

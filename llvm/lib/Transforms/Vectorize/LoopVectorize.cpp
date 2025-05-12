@@ -7326,8 +7326,6 @@ static bool planContainsAdditionalSimplifications(VPlan &Plan,
   auto GetInstructionForCost = [](const VPRecipeBase *R) -> Instruction * {
     if (auto *S = dyn_cast<VPSingleDefRecipe>(R))
       return dyn_cast_or_null<Instruction>(S->getUnderlyingValue());
-    if (auto *WidenMem = dyn_cast<VPWidenMemoryRecipe>(R))
-      return &WidenMem->getIngredient();
     return nullptr;
   };
 
@@ -7335,15 +7333,6 @@ static bool planContainsAdditionalSimplifications(VPlan &Plan,
   auto Iter = vp_depth_first_deep(Plan.getVectorLoopRegion()->getEntry());
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(Iter)) {
     for (VPRecipeBase &R : *VPBB) {
-      if (auto *IR = dyn_cast<VPInterleaveRecipe>(&R)) {
-        auto *IG = IR->getInterleaveGroup();
-        unsigned NumMembers = IG->getNumMembers();
-        for (unsigned I = 0; I != NumMembers; ++I) {
-          if (Instruction *M = IG->getMember(I))
-            SeenInstrs.insert(M);
-        }
-        continue;
-      }
       // Unused FOR splices are removed by VPlan transforms, so the VPlan-based
       // cost model won't cost it whilst the legacy will.
       if (auto *FOR = dyn_cast<VPFirstOrderRecurrencePHIRecipe>(&R)) {
@@ -7388,6 +7377,8 @@ static bool planContainsAdditionalSimplifications(VPlan &Plan,
   return any_of(TheLoop->blocks(), [&SeenInstrs, &CostCtx,
                                     TheLoop](BasicBlock *BB) {
     return any_of(*BB, [&SeenInstrs, &CostCtx, TheLoop, BB](Instruction &I) {
+                  if (isa<LoadInst, StoreInst>(&I))
+                  return false;
       if (isa<PHINode>(&I) && BB == TheLoop->getHeader())
         return false;
       return !SeenInstrs.contains(&I) && !CostCtx.skipCostComputation(&I, true);

@@ -186,11 +186,6 @@ bool VPRecipeBase::mayHaveSideEffects() const {
   case VPWidenLoadSC:
   case VPWidenStoreEVLSC:
   case VPWidenStoreSC:
-    assert(
-        cast<VPWidenMemoryRecipe>(this)->getIngredient().mayHaveSideEffects() ==
-            mayWriteToMemory() &&
-        "mayHaveSideffects result for ingredient differs from this "
-        "implementation");
     return mayWriteToMemory();
   case VPReplicateSC: {
     auto *R = cast<VPReplicateRecipe>(this);
@@ -254,8 +249,6 @@ InstructionCost VPRecipeBase::cost(ElementCount VF, VPCostContext &Ctx) {
     UI = dyn_cast_or_null<Instruction>(S->getUnderlyingValue());
   else if (auto *IG = dyn_cast<VPInterleaveRecipe>(this))
     UI = IG->getInsertPos();
-  else if (auto *WidenMem = dyn_cast<VPWidenMemoryRecipe>(this))
-    UI = &WidenMem->getIngredient();
 
   InstructionCost RecipeCost;
   if (UI && Ctx.skipCostComputation(UI, VF.isVector())) {
@@ -2910,7 +2903,15 @@ void VPPredInstPHIRecipe::print(raw_ostream &O, const Twine &Indent,
 
 InstructionCost VPWidenMemoryRecipe::computeCost(ElementCount VF,
                                                  VPCostContext &Ctx) const {
-  Type *Ty = toVectorTy(getLoadStoreType(&Ingredient), VF);
+  Type *Ty = nullptr;
+  if (auto *L = dyn_cast<VPWidenLoadRecipe>(this))
+    Ty = L->getScalarType();
+  else if (auto *L = dyn_cast<VPWidenLoadEVLRecipe>(this))
+    Ty = L->getScalarType();
+  else
+    Ty = Ctx.Types.inferScalarType(getOperand(1));
+
+  Ty = toVectorTy(Ty, VF);
   unsigned AS = cast<PointerType>(Ctx.Types.inferScalarType(getAddr()))
                     ->getAddressSpace();
   unsigned Opcode = isa<VPWidenLoadRecipe, VPWidenLoadEVLRecipe>(this)
@@ -2921,12 +2922,12 @@ InstructionCost VPWidenMemoryRecipe::computeCost(ElementCount VF,
     // TODO: Using the original IR may not be accurate.
     // Currently, ARM will use the underlying IR to calculate gather/scatter
     // instruction cost.
-    const Value *Ptr = getLoadStorePointerOperand(&Ingredient);
+    const Value *Ptr = nullptr;
     assert(!Reverse &&
            "Inconsecutive memory access should not have the order.");
     return Ctx.TTI.getAddressComputationCost(Ty) +
            Ctx.TTI.getGatherScatterOpCost(Opcode, Ty, Ptr, IsMasked, Alignment,
-                                          Ctx.CostKind, &Ingredient);
+                                          Ctx.CostKind, nullptr);
   }
 
   InstructionCost Cost = 0;
@@ -2934,11 +2935,11 @@ InstructionCost VPWidenMemoryRecipe::computeCost(ElementCount VF,
     Cost +=
         Ctx.TTI.getMaskedMemoryOpCost(Opcode, Ty, Alignment, AS, Ctx.CostKind);
   } else {
-    TTI::OperandValueInfo OpInfo = Ctx.getOperandInfo(
+    TTI::OperandValueInfo OpInfo/* = Ctx.getOperandInfo(
         isa<VPWidenLoadRecipe, VPWidenLoadEVLRecipe>(this) ? getOperand(0)
-                                                           : getOperand(1));
+                                                           : getOperand(1))*/;
     Cost += Ctx.TTI.getMemoryOpCost(Opcode, Ty, Alignment, AS, Ctx.CostKind,
-                                    OpInfo, &Ingredient);
+                                    OpInfo, nullptr);
   }
   if (!Reverse)
     return Cost;
@@ -2949,7 +2950,7 @@ InstructionCost VPWidenMemoryRecipe::computeCost(ElementCount VF,
 }
 
 void VPWidenLoadRecipe::execute(VPTransformState &State) {
-  Type *ScalarDataTy = getLoadStoreType(&Ingredient);
+  Type *ScalarDataTy = getScalarType();
   auto *DataTy = VectorType::get(ScalarDataTy, State.VF);
   bool CreateGather = !isConsecutive();
 
@@ -3003,7 +3004,7 @@ static Instruction *createReverseEVL(IRBuilderBase &Builder, Value *Operand,
 }
 
 void VPWidenLoadEVLRecipe::execute(VPTransformState &State) {
-  Type *ScalarDataTy = getLoadStoreType(&Ingredient);
+  Type *ScalarDataTy = getScalarType();
   auto *DataTy = VectorType::get(ScalarDataTy, State.VF);
   bool CreateGather = !isConsecutive();
 
@@ -3049,7 +3050,7 @@ InstructionCost VPWidenLoadEVLRecipe::computeCost(ElementCount VF,
   // legacy model, it will always calculate the cost of mask.
   // TODO: Using getMemoryOpCost() instead of getMaskedMemoryOpCost when we
   // don't need to compare to the legacy cost model.
-  Type *Ty = toVectorTy(getLoadStoreType(&Ingredient), VF);
+  Type *Ty = toVectorTy(getScalarType(), VF);
   unsigned AS = cast<PointerType>(Ctx.Types.inferScalarType(getAddr()))
                     ->getAddressSpace();
   InstructionCost Cost = Ctx.TTI.getMaskedMemoryOpCost(

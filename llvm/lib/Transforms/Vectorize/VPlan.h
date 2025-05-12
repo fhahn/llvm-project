@@ -2966,8 +2966,6 @@ public:
 /// provided as the last operand.
 class VPWidenMemoryRecipe : public VPRecipeBase, public VPIRMetadata {
 protected:
-  Instruction &Ingredient;
-
   /// Whether the accessed addresses are consecutive.
   bool Consecutive;
 
@@ -2987,15 +2985,21 @@ protected:
     IsMasked = true;
   }
 
+  VPWidenMemoryRecipe(const char unsigned SC, 
+                      std::initializer_list<VPValue *> Operands,
+                      bool Consecutive, bool Reverse, const Align &Alignment,
+                      const VPIRMetadata &Metadata, DebugLoc DL)
+      : VPRecipeBase(SC, Operands, DL), VPIRMetadata(Metadata),
+        Consecutive(Consecutive), Reverse(Reverse),
+        Alignment(Alignment) {
+    assert((Consecutive || !Reverse) && "Reverse implies consecutive");
+  }
+
   VPWidenMemoryRecipe(const char unsigned SC, Instruction &I,
                       std::initializer_list<VPValue *> Operands,
                       bool Consecutive, bool Reverse,
                       const VPIRMetadata &Metadata, DebugLoc DL)
-      : VPRecipeBase(SC, Operands, DL), VPIRMetadata(Metadata), Ingredient(I),
-        Consecutive(Consecutive), Reverse(Reverse),
-        Alignment(getLoadStoreAlignment(&I)) {
-    assert((Consecutive || !Reverse) && "Reverse implies consecutive");
-  }
+      : VPWidenMemoryRecipe(SC, Operands, Consecutive, Reverse, getLoadStoreAlignment(&I), Metadata, DL) {}
 
 public:
   VPWidenMemoryRecipe *clone() override {
@@ -3021,6 +3025,8 @@ public:
   /// order.
   bool isReverse() const { return Reverse; }
 
+  const Align &getAlignment() const { return Alignment; }
+
   /// Return the address accessed by this recipe.
   VPValue *getAddr() const { return getOperand(0); }
 
@@ -3042,8 +3048,6 @@ public:
   /// Return the cost of this VPWidenMemoryRecipe.
   InstructionCost computeCost(ElementCount VF,
                               VPCostContext &Ctx) const override;
-
-  Instruction &getIngredient() const { return Ingredient; }
 };
 
 /// A recipe for widening load operations, using the address to load from and an
@@ -3059,12 +3063,14 @@ struct VPWidenLoadRecipe final : public VPWidenMemoryRecipe, public VPValue {
   }
 
   VPWidenLoadRecipe *clone() override {
-    return new VPWidenLoadRecipe(cast<LoadInst>(Ingredient), getAddr(),
+    return new VPWidenLoadRecipe(*cast<LoadInst>(getUnderlyingValue()), getAddr(),
                                  getMask(), Consecutive, Reverse, *this,
                                  getDebugLoc());
   }
 
   VP_CLASSOF_IMPL(VPDef::VPWidenLoadSC);
+
+  Type *getScalarType() const { return cast<LoadInst>(getUnderlyingValue())->getType(); }
 
   /// Generate a wide load or gather.
   void execute(VPTransformState &State) override;
@@ -3090,10 +3096,10 @@ struct VPWidenLoadRecipe final : public VPWidenMemoryRecipe, public VPValue {
 /// mask.
 struct VPWidenLoadEVLRecipe final : public VPWidenMemoryRecipe, public VPValue {
   VPWidenLoadEVLRecipe(VPWidenLoadRecipe &L, VPValue &EVL, VPValue *Mask)
-      : VPWidenMemoryRecipe(VPDef::VPWidenLoadEVLSC, L.getIngredient(),
+      : VPWidenMemoryRecipe(VPDef::VPWidenLoadEVLSC, *cast<LoadInst>(L.getUnderlyingValue()),
                             {L.getAddr(), &EVL}, L.isConsecutive(),
                             L.isReverse(), L, L.getDebugLoc()),
-        VPValue(this, &getIngredient()) {
+        VPValue(this, L.getUnderlyingValue()) {
     setMask(Mask);
   }
 
@@ -3101,6 +3107,8 @@ struct VPWidenLoadEVLRecipe final : public VPWidenMemoryRecipe, public VPValue {
 
   /// Return the EVL operand.
   VPValue *getEVL() const { return getOperand(1); }
+
+  Type *getScalarType() const { return cast<LoadInst>(getUnderlyingValue())->getType(); }
 
   /// Generate the wide load or gather.
   void execute(VPTransformState &State) override;
@@ -3128,18 +3136,25 @@ struct VPWidenLoadEVLRecipe final : public VPWidenMemoryRecipe, public VPValue {
 /// A recipe for widening store operations, using the stored value, the address
 /// to store to and an optional mask.
 struct VPWidenStoreRecipe final : public VPWidenMemoryRecipe {
-  VPWidenStoreRecipe(StoreInst &Store, VPValue *Addr, VPValue *StoredVal,
+  VPWidenStoreRecipe(StoreInst &SI, VPValue *Addr, VPValue *StoredVal,
                      VPValue *Mask, bool Consecutive, bool Reverse,
                      const VPIRMetadata &Metadata, DebugLoc DL)
-      : VPWidenMemoryRecipe(VPDef::VPWidenStoreSC, Store, {Addr, StoredVal},
-                            Consecutive, Reverse, Metadata, DL) {
+      : VPWidenStoreRecipe(Addr, StoredVal, Mask, Consecutive, Reverse, getLoadStoreAlignment(&SI),
+                            Metadata, DL) {
+  }
+
+  VPWidenStoreRecipe(VPValue *Addr, VPValue *StoredVal,
+                     VPValue *Mask, bool Consecutive, bool Reverse, const Align &Alignment,
+                     const VPIRMetadata &Metadata, DebugLoc DL)
+      : VPWidenMemoryRecipe(VPDef::VPWidenStoreSC, {Addr, StoredVal},
+                            Consecutive, Reverse, Alignment, Metadata, DL) {
     setMask(Mask);
   }
 
   VPWidenStoreRecipe *clone() override {
-    return new VPWidenStoreRecipe(cast<StoreInst>(Ingredient), getAddr(),
+    return new VPWidenStoreRecipe(getAddr(),
                                   getStoredValue(), getMask(), Consecutive,
-                                  Reverse, *this, getDebugLoc());
+                                  Reverse, getAlignment(), *this, getDebugLoc());
   }
 
   VP_CLASSOF_IMPL(VPDef::VPWidenStoreSC);
@@ -3171,9 +3186,9 @@ struct VPWidenStoreRecipe final : public VPWidenMemoryRecipe {
 /// length and an optional mask.
 struct VPWidenStoreEVLRecipe final : public VPWidenMemoryRecipe {
   VPWidenStoreEVLRecipe(VPWidenStoreRecipe &S, VPValue &EVL, VPValue *Mask)
-      : VPWidenMemoryRecipe(VPDef::VPWidenStoreEVLSC, S.getIngredient(),
+      : VPWidenMemoryRecipe(VPDef::VPWidenStoreEVLSC,
                             {S.getAddr(), S.getStoredValue(), &EVL},
-                            S.isConsecutive(), S.isReverse(), S,
+                            S.isConsecutive(), S.isReverse(), S.getAlignment(), S,
                             S.getDebugLoc()) {
     setMask(Mask);
   }
