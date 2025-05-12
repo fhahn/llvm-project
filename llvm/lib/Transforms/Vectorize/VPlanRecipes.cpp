@@ -3050,8 +3050,8 @@ InstructionCost VPWidenLoadEVLRecipe::computeCost(ElementCount VF,
   // TODO: Using getMemoryOpCost() instead of getMaskedMemoryOpCost when we
   // don't need to compare to the legacy cost model.
   Type *Ty = toVectorTy(getLoadStoreType(&Ingredient), VF);
-  unsigned AS =
-      getLoadStoreAddressSpace(const_cast<Instruction *>(&Ingredient));
+  unsigned AS = cast<PointerType>(Ctx.Types.inferScalarType(getAddr()))
+                    ->getAddressSpace();
   InstructionCost Cost = Ctx.TTI.getMaskedMemoryOpCost(
       Instruction::Load, Ty, Alignment, AS, Ctx.CostKind);
   if (!Reverse)
@@ -3160,9 +3160,9 @@ InstructionCost VPWidenStoreEVLRecipe::computeCost(ElementCount VF,
   // legacy model, it will always calculate the cost of mask.
   // TODO: Using getMemoryOpCost() instead of getMaskedMemoryOpCost when we
   // don't need to compare to the legacy cost model.
-  Type *Ty = toVectorTy(getLoadStoreType(&Ingredient), VF);
-  unsigned AS =
-      getLoadStoreAddressSpace(const_cast<Instruction *>(&Ingredient));
+  Type *Ty = toVectorTy(Ctx.Types.inferScalarType(getOperand(1)), VF);
+  unsigned AS = cast<PointerType>(Ctx.Types.inferScalarType(getAddr()))
+                    ->getAddressSpace();
   InstructionCost Cost = Ctx.TTI.getMaskedMemoryOpCost(
       Instruction::Store, Ty, Alignment, AS, Ctx.CostKind);
   if (!Reverse)
