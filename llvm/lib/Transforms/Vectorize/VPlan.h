@@ -2977,6 +2977,8 @@ protected:
   /// Whether the memory access is masked.
   bool IsMasked = false;
 
+  Align Alignment;
+
   void setMask(VPValue *Mask) {
     assert(!IsMasked && "cannot re-set mask");
     if (!Mask)
@@ -2990,7 +2992,8 @@ protected:
                       bool Consecutive, bool Reverse,
                       const VPIRMetadata &Metadata, DebugLoc DL)
       : VPRecipeBase(SC, Operands, DL), VPIRMetadata(Metadata), Ingredient(I),
-        Consecutive(Consecutive), Reverse(Reverse) {
+        Consecutive(Consecutive), Reverse(Reverse),
+        Alignment(getLoadStoreAlignment(&I)) {
     assert((Consecutive || !Reverse) && "Reverse implies consecutive");
   }
 
