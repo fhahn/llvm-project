@@ -2822,7 +2822,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
     case Builtin::BI__builtin_fmaxl:
     case Builtin::BI__builtin_fmaxf128:
       return RValue::get(emitBinaryMaybeConstrainedFPBuiltin(*this, E,
-                                   Intrinsic::maxnum,
+                                   Intrinsic::maximumnum,
                                    Intrinsic::experimental_constrained_maxnum));
 
     case Builtin::BIfmin:
@@ -2834,7 +2834,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
     case Builtin::BI__builtin_fminl:
     case Builtin::BI__builtin_fminf128:
       return RValue::get(emitBinaryMaybeConstrainedFPBuiltin(*this, E,
-                                   Intrinsic::minnum,
+                                   Intrinsic::minimumnum,
                                    Intrinsic::experimental_constrained_minnum));
 
     case Builtin::BIfmaximum_num:
