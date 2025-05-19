@@ -140,9 +140,24 @@ class BitstreamRemarkParserHelper
   friend class BitstreamBlockParserHelper<BitstreamRemarkParserHelper>;
 
 protected:
+  enum class ScopeKind {
+    None,
+    Remark,
+    Argument,
+  };
+  enum class BlockState {
+    Init,
+    BetweenRemarks,
+    InRemark,
+    EndOfBlock,
+  };
+
   SmallVector<uint64_t, 5> Record;
   StringRef RecordBlob;
   unsigned RecordID;
+
+  ScopeKind CurrScope = ScopeKind::None;
+  BlockState State = BlockState::Init;
 
 public:
   struct RemarkLoc {
@@ -155,6 +170,7 @@ public:
     std::optional<uint64_t> KeyIdx;
     std::optional<uint64_t> ValueIdx;
     std::optional<RemarkLoc> Loc;
+    bool IsInt = false;
 
     Argument(std::optional<uint64_t> KeyIdx, std::optional<uint64_t> ValueIdx)
         : KeyIdx(KeyIdx), ValueIdx(ValueIdx) {}
@@ -171,7 +187,7 @@ public:
   SmallVector<Argument, 8> Args;
 
   BitstreamRemarkParserHelper(BitstreamCursor &Stream)
-      : BitstreamBlockParserHelper(Stream, REMARK_BLOCK_ID, RemarkBlockName) {}
+      : BitstreamBlockParserHelper(Stream, REMARKS_BLOCK_ID, RemarksBlockName) {}
 
   /// Clear helper state and parse next remark block.
   Error parseNext();
@@ -179,6 +195,20 @@ public:
 protected:
   Error parseRecord(unsigned Code);
   Error handleRecord();
+
+  Error advance();
+  bool isRecordInRemark(unsigned RecordID) {
+    switch (RecordID) {
+      case RECORD_REMARK_DEBUG_LOC:
+      case RECORD_REMARK_HOTNESS:
+      case RECORD_REMARK_ARG_V:
+      case RECORD_REMARK_ARG_KV:
+      case RECORD_REMARK_ARG_KV_INT:
+        return true;
+      default:
+        return false;
+    }
+  }
 };
 
 /// Helper to parse any bitstream remark container.
@@ -224,6 +254,7 @@ struct BitstreamRemarkParser : public RemarkParser {
   /// Whether the metadata has already been parsed, so we can continue parsing
   /// remarks.
   bool IsMetaReady = false;
+  StringTable TmpStrTab;
   /// The common metadata used to decide how to parse the buffer.
   /// This is filled when parsing the metadata block.
   uint64_t ContainerVersion = 0;
@@ -234,6 +265,11 @@ struct BitstreamRemarkParser : public RemarkParser {
   /// Create a parser that expects to find a string table embedded in the
   /// stream.
   explicit BitstreamRemarkParser(StringRef Buf);
+
+  /// Create a parser that uses a pre-parsed string table.
+  BitstreamRemarkParser(StringRef Buf, ParsedStringTable StrTab)
+      : RemarkParser(Format::Bitstream), ParserHelper(Buf),
+        StrTab(std::move(StrTab)) {}
 
   Expected<std::unique_ptr<Remark>> next() override;
 

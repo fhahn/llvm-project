@@ -2748,8 +2748,10 @@ bool AsmPrinter::doFinalization(Module &M) {
   // Emit the remarks section contents.
   // FIXME: Figure out when is the safest time to emit this section. It should
   // not come after debug info.
-  if (remarks::RemarkStreamer *RS = M.getContext().getMainRemarkStreamer())
+  if (remarks::RemarkStreamer *RS = M.getContext().getMainRemarkStreamer()) {
+    RS->getSerializer().finalize();
     emitRemarksSection(*RS);
+  }
 
   TLOF.emitModuleMetadata(*OutStreamer, M);
 

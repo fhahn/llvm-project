@@ -23,6 +23,7 @@
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
+#include <cassert>
 #include <optional>
 #include <vector>
 
@@ -192,6 +193,15 @@ public:
 
   /// Retrieve the current position in the stream, in bits.
   uint64_t GetCurrentBitNo() const { return GetBufferOffset() * 8 + CurBit; }
+
+  /// Retrieve the current position in the block, in bits.
+  uint64_t GetCurrentBlockBitNo() const {
+    assert(!BlockScope.empty());
+    const Block &B = BlockScope.back();
+    assert(GetBufferOffset() > B.StartSizeWord);
+    size_t SizeInBytes = GetBufferOffset() - ((B.StartSizeWord + 1) * 4);
+    return SizeInBytes * 8 + CurBit;
+  }
 
   /// Retrieve the number of bits currently used to encode an abbrev ID.
   unsigned GetAbbrevIDWidth() const { return CurCodeSize; }

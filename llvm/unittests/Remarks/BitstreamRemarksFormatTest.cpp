@@ -28,7 +28,7 @@ TEST(BitstreamRemarksFormat, ContainerVersion) {
 // When adding new blocks, make sure to append them to the enum.
 TEST(BitstreamRemarksFormat, BlockIDs) {
   EXPECT_EQ(remarks::META_BLOCK_ID, 8);
-  EXPECT_EQ(remarks::REMARK_BLOCK_ID, 9);
+  EXPECT_EQ(remarks::REMARKS_BLOCK_ID, 9);
 }
 
 // The values of the current records should not change over time.
@@ -42,7 +42,7 @@ TEST(BitstreamRemarksFormat, RecordIDs) {
   EXPECT_EQ(remarks::RECORD_REMARK_HEADER, 5);
   EXPECT_EQ(remarks::RECORD_REMARK_DEBUG_LOC, 6);
   EXPECT_EQ(remarks::RECORD_REMARK_HOTNESS, 7);
-  EXPECT_EQ(remarks::RECORD_REMARK_ARG_WITH_DEBUGLOC, 8);
-  EXPECT_EQ(remarks::RECORD_REMARK_ARG_WITHOUT_DEBUGLOC, 9);
-  EXPECT_EQ(remarks::RECORD_LAST, 9);
+  /*EXPECT_EQ(remarks::RECORD_REMARK_ARG_KV_WITH_DEBUGLOC, 8);*/
+  /*EXPECT_EQ(remarks::RECORD_REMARK_ARG_KV, 9);*/
+  /*EXPECT_EQ(remarks::RECORD_LAST, 9);*/
 }

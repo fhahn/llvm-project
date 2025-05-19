@@ -136,50 +136,76 @@ Error BitstreamMetaParserHelper::parseRecord(unsigned Code) {
   return Error::success();
 }
 
-Error BitstreamRemarkParserHelper::parseRecord(unsigned Code) {
-  Record.clear();
-  Expected<unsigned> MaybeRecordID =
-      Stream.readRecord(Code, Record, &RecordBlob);
-  if (!MaybeRecordID)
-    return MaybeRecordID.takeError();
-  RecordID = *MaybeRecordID;
-  return handleRecord();
-}
-
 Error BitstreamRemarkParserHelper::handleRecord() {
   switch (RecordID) {
   case RECORD_REMARK_HEADER: {
-    if (Record.size() != 4)
+    if (Record.size() != 2)
       return malformedRecord(RemarkHeaderName);
+    PassNameIdx = Record[0];
+    FunctionNameIdx = Record[1];
+    break;
+  }
+  case RECORD_REMARK: {
+    if (Record.size() != 2)
+      return malformedRecord(RemarkName);
     Type = Record[0];
     RemarkNameIdx = Record[1];
-    PassNameIdx = Record[2];
-    FunctionNameIdx = Record[3];
+    CurrScope = ScopeKind::Remark;
     break;
   }
   case RECORD_REMARK_DEBUG_LOC: {
     if (Record.size() != 3)
       return malformedRecord(RemarkDebugLocName);
-    Loc = {Record[0], Record[1], Record[2]};
-    break;
+    RemarkLoc DLoc{Record[0], Record[1], Record[2]};
+    if (CurrScope == ScopeKind::Remark) {
+      Loc = DLoc;
+      break;
+    }
+    if (CurrScope == ScopeKind::Argument) {
+      Args.back().Loc = Loc;
+      break;
+    }
+    return unexpectedRecord(RemarkDebugLocName);
   }
   case RECORD_REMARK_HOTNESS: {
     if (Record.size() != 1)
       return malformedRecord(RemarkHotnessName);
+    if (CurrScope != ScopeKind::Remark)
+      return unexpectedRecord(RemarkHotnessName);
     Hotness = Record[0];
     break;
   }
-  case RECORD_REMARK_ARG_WITH_DEBUGLOC: {
-    if (Record.size() != 5)
-      return malformedRecord(RemarkArgWithDebugLocName);
-    auto &Arg = Args.emplace_back(Record[0], Record[1]);
-    Arg.Loc = {Record[2], Record[3], Record[4]};
+  case RECORD_REMARK_ARG_KV: {
+    if (Record.size() != 2)
+      return malformedRecord(RemarkArgKVName);
+    if (!(CurrScope == ScopeKind::Remark || CurrScope == ScopeKind::Argument))
+      return unexpectedRecord(RemarkArgKVName);
+    auto &Arg = Args.emplace_back();
+    Arg.KeyIdx = Record[0];
+    Arg.ValueIdx = Record[1];
+    CurrScope = ScopeKind::Argument;
     break;
   }
-  case RECORD_REMARK_ARG_WITHOUT_DEBUGLOC: {
+  case RECORD_REMARK_ARG_KV_INT: {
     if (Record.size() != 2)
-      return malformedRecord(RemarkArgWithoutDebugLocName);
-    Args.emplace_back(Record[0], Record[1]);
+      return malformedRecord(RemarkArgKVIntName);
+    if (!(CurrScope == ScopeKind::Remark || CurrScope == ScopeKind::Argument))
+      return unexpectedRecord(RemarkArgKVIntName);
+    auto &Arg = Args.emplace_back();
+    Arg.KeyIdx = Record[0];
+    Arg.ValueIdx = Record[1];
+    Arg.IsInt = true;
+    CurrScope = ScopeKind::Argument;
+    break;
+  }
+  case RECORD_REMARK_ARG_V: {
+    if (Record.size() != 1)
+      return malformedRecord(RemarkArgVName);
+    if (!(CurrScope == ScopeKind::Remark || CurrScope == ScopeKind::Argument))
+      return unexpectedRecord(RemarkArgVName);
+    auto &Arg = Args.emplace_back();
+    Arg.ValueIdx = Record[0];
+    CurrScope = ScopeKind::Argument;
     break;
   }
   default:
@@ -188,16 +214,72 @@ Error BitstreamRemarkParserHelper::handleRecord() {
   return Error::success();
 }
 
+Error BitstreamRemarkParserHelper::advance() {
+  while (true) {
+    Expected<BitstreamEntry> Next = Stream.advance();
+    if (!Next)
+      return Next.takeError();
+    switch (Next->Kind) {
+    case BitstreamEntry::EndBlock: {
+      State = BlockState::EndOfBlock;
+      return Error::success();
+    }
+    case BitstreamEntry::Error:
+      return error("Unexpected end of bitstream.");
+    case BitstreamEntry::SubBlock:
+      return unexpectedBlock(Next->ID);
+    case BitstreamEntry::Record: {
+      Record.clear();
+      Expected<unsigned> MaybeRecordID =
+          Stream.readRecord(Next->ID, Record, nullptr);
+      if (!MaybeRecordID)
+        return MaybeRecordID.takeError();
+      RecordID = *MaybeRecordID;
+
+      if (RecordID == RECORD_REMARK) {
+        State = BlockState::InRemark;
+        return Error::success();
+      }
+      if (State == BlockState::InRemark && !isRecordInRemark(RecordID)) {
+        State = BlockState::BetweenRemarks;
+        return Error::success();
+      }
+      if (Error E = handleRecord())
+        return E;
+      continue;
+    }
+    }
+  }
+}
+
 Error BitstreamRemarkParserHelper::parseNext() {
+  if (State == BlockState::Init) {
+    if (Error E = enterBlock())
+      return E;
+    if (Error E = advance())
+      return E;
+  }
+  if (State == BlockState::BetweenRemarks) {
+    if (Error E = handleRecord())
+      return E;
+    if (Error E = advance())
+      return E;
+  }
+  if (State == BlockState::EndOfBlock) {
+    return make_error<EndOfFileError>();
+  }
+  assert(State == BlockState::InRemark);
   Type.reset();
   RemarkNameIdx.reset();
-  PassNameIdx.reset();
-  FunctionNameIdx.reset();
+  /*PassNameIdx.reset();*/
+  /*FunctionNameIdx.reset();*/
   Hotness.reset();
   Loc.reset();
   Args.clear();
-
-  return parseBlock();
+  CurrScope = ScopeKind::None;
+  if (Error E = handleRecord())
+    return E;
+  return advance();
 }
 
 Error BitstreamParserHelper::expectMagic() {
@@ -258,7 +340,7 @@ Error BitstreamParserHelper::parseMeta() {
       return MaybeBlockID.takeError();
     if (*MaybeBlockID == META_BLOCK_ID)
       break;
-    if (*MaybeBlockID != REMARK_BLOCK_ID)
+    if (*MaybeBlockID != REMARKS_BLOCK_ID)
       return error("Unexpected block between meta blocks.");
     // Remember first remark block.
     if (!RemarkStartBitPos)
@@ -278,16 +360,19 @@ Error BitstreamParserHelper::parseMeta() {
 }
 
 Error BitstreamParserHelper::parseRemark() {
-  if (RemarkStartBitPos) {
-    RemarkStartBitPos.reset();
-  } else {
+  if (Error E = RemarksHelper->parseNext()) {
+    if (!E.isA<EndOfFileError>())
+      return E;
+    consumeError(std::move(E));
     auto MaybeBlockID = expectSubBlock(Stream);
     if (!MaybeBlockID)
       return MaybeBlockID.takeError();
-    if (*MaybeBlockID != REMARK_BLOCK_ID)
+    if (*MaybeBlockID != REMARKS_BLOCK_ID)
       return make_error<EndOfFileError>();
+    RemarksHelper.emplace(Stream);
+    return RemarksHelper->parseNext();
   }
-  return RemarksHelper->parseNext();
+  return Error::success();
 }
 
 Expected<std::unique_ptr<BitstreamRemarkParser>>
@@ -342,7 +427,7 @@ Error BitstreamRemarkParser::parseMeta() {
   case BitstreamRemarkContainerType::RemarksFile:
     return processFileContainerMeta();
   }
-  llvm_unreachable("Unknown BitstreamRemarkContainerType enum");
+  llvm_unreachable("Unknown BitstreamRemarkContainerType enum.");
 }
 
 Error BitstreamRemarkParser::processCommonMeta() {
@@ -410,6 +495,7 @@ Error BitstreamRemarkParser::processExternalFilePath() {
   if (Error E = parseMeta())
     return E;
 
+  // FIXME: This needs to be checked before
   if (ContainerType != BitstreamRemarkContainerType::RemarksFile)
     return ParserHelper->MetaHelper.error(
         "Wrong container type in external file.");
@@ -473,31 +559,33 @@ Expected<std::unique_ptr<Remark>> BitstreamRemarkParser::processRemark() {
     R.Hotness = *Helper.Hotness;
 
   for (const BitstreamRemarkParserHelper::Argument &Arg : Helper.Args) {
-    if (!Arg.KeyIdx)
-      return Helper.error("Missing key in remark argument.");
     if (!Arg.ValueIdx)
       return Helper.error("Missing value in remark argument.");
 
     // We have at least a key and a value, create an entry.
-    auto &RArg = R.Args.emplace_back();
-
-    if (Expected<StringRef> Key = (*StrTab)[*Arg.KeyIdx])
-      RArg.Key = *Key;
+    R.Args.emplace_back();
+    if (!Arg.KeyIdx)
+      R.Args.back().Key = RemarkKeyString;
+    else if (Expected<StringRef> Key = (*StrTab)[*Arg.KeyIdx])
+      R.Args.back().Key = *Key;
     else
       return Key.takeError();
 
-    if (Expected<StringRef> Value = (*StrTab)[*Arg.ValueIdx])
-      RArg.Val = *Value;
+    if (Arg.IsInt)
+      R.Args.back().Val = TmpStrTab.add(utostr(*Arg.ValueIdx)).second;
+    else if (Expected<StringRef> Value = (*StrTab)[*Arg.ValueIdx])
+      R.Args.back().Val = *Value;
     else
       return Value.takeError();
 
-    if (Arg.Loc) {
+    if (Arg.DbgLoc) {
+      auto &Loc = *Arg.DbgLoc;
       if (Expected<StringRef> SourceFileName =
-              (*StrTab)[Arg.Loc->SourceFileNameIdx]) {
-        RArg.Loc.emplace();
-        RArg.Loc->SourceFilePath = *SourceFileName;
-        RArg.Loc->SourceLine = Arg.Loc->SourceLine;
-        RArg.Loc->SourceColumn = Arg.Loc->SourceColumn;
+              (*StrTab)[Loc.SourceFileNameIdx]) {
+        R.Args.back().Loc.emplace();
+        R.Args.back().Loc->SourceFilePath = *SourceFileName;
+        R.Args.back().Loc->SourceLine = Loc.SourceLine;
+        R.Args.back().Loc->SourceColumn = Loc.SourceColumn;
       } else
         return SourceFileName.takeError();
     }

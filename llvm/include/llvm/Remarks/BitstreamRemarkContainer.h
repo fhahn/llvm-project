@@ -64,11 +64,12 @@ enum BlockIDs {
   META_BLOCK_ID = bitc::FIRST_APPLICATION_BLOCKID,
   /// One remark entry is represented using a REMARK_BLOCK. There can be
   /// multiple REMARK_BLOCKs in the same file.
-  REMARK_BLOCK_ID
+  REMARKS_BLOCK_ID
 };
 
 constexpr StringLiteral MetaBlockName("Meta");
-constexpr StringLiteral RemarkBlockName("Remark");
+constexpr StringLiteral RemarksBlockName("Remarks");
+constexpr StringLiteral RemarkKeyString("String");
 
 /// The possible records that can be encountered in the previously described
 /// blocks.
@@ -79,26 +80,31 @@ enum RecordIDs {
   RECORD_META_STRTAB,
   RECORD_META_EXTERNAL_FILE,
   // Remark block records.
+  RECORD_REMARK,
   RECORD_REMARK_HEADER,
   RECORD_REMARK_DEBUG_LOC,
+  RECORD_REMARK_DEBUG_LOC_FILE,
   RECORD_REMARK_HOTNESS,
-  RECORD_REMARK_ARG_WITH_DEBUGLOC,
-  RECORD_REMARK_ARG_WITHOUT_DEBUGLOC,
+  RECORD_REMARK_ARG_V,
+  RECORD_REMARK_ARG_KV_INT,
+  RECORD_REMARK_ARG_KV,
   // Helpers.
   RECORD_FIRST = RECORD_META_CONTAINER_INFO,
-  RECORD_LAST = RECORD_REMARK_ARG_WITHOUT_DEBUGLOC
+  RECORD_LAST = RECORD_REMARK_ARG_KV
 };
 
 constexpr StringLiteral MetaContainerInfoName("Container info");
 constexpr StringLiteral MetaRemarkVersionName("Remark version");
 constexpr StringLiteral MetaStrTabName("String table");
-constexpr StringLiteral MetaExternalFileName("External File");
+constexpr StringLiteral MetaExternalFileName("External file");
+constexpr StringLiteral RemarkName("Remark");
 constexpr StringLiteral RemarkHeaderName("Remark header");
 constexpr StringLiteral RemarkDebugLocName("Remark debug location");
+constexpr StringLiteral RemarkDebugLocFileName("Remark debug location file");
 constexpr StringLiteral RemarkHotnessName("Remark hotness");
-constexpr StringLiteral
-    RemarkArgWithDebugLocName("Argument with debug location");
-constexpr StringLiteral RemarkArgWithoutDebugLocName("Argument");
+constexpr StringLiteral RemarkArgKVName("Argument KV");
+constexpr StringLiteral RemarkArgVName("Argument V");
+constexpr StringLiteral RemarkArgKVIntName("Argument KV int");
 
 } // end namespace remarks
 } // end namespace llvm

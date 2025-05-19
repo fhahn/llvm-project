@@ -26,7 +26,7 @@ namespace llvm {
 namespace remarks {
 
 /// The current version of the remark entry.
-constexpr uint64_t CurrentRemarkVersion = 0;
+constexpr uint64_t CurrentRemarkVersion = 1;
 
 /// The debug location used to track a remark back to the source file.
 struct RemarkLocation {

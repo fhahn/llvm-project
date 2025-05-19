@@ -24,6 +24,8 @@ namespace remarks {
 
 struct Remarks;
 
+struct BitstreamRemarkScope {};
+
 /// Serialize the remarks to LLVM bitstream.
 /// This class provides ways to emit remarks in the LLVM bitstream format and
 /// its associated metadata.
@@ -43,11 +45,19 @@ struct BitstreamRemarkSerializerHelper {
   uint64_t RecordMetaRemarkVersionAbbrevID = 0;
   uint64_t RecordMetaStrTabAbbrevID = 0;
   uint64_t RecordMetaExternalFileAbbrevID = 0;
+  uint64_t RecordRemarkAbbrevID = 0;
+  uint64_t RecordRemarkTagAbbrevID = 0;
   uint64_t RecordRemarkHeaderAbbrevID = 0;
   uint64_t RecordRemarkDebugLocAbbrevID = 0;
+  uint64_t RecordRemarkDebugLocFileAbbrevID = 0;
   uint64_t RecordRemarkHotnessAbbrevID = 0;
-  uint64_t RecordRemarkArgWithDebugLocAbbrevID = 0;
-  uint64_t RecordRemarkArgWithoutDebugLocAbbrevID = 0;
+  // uint64_t RecordRemarkArgKVWithDebugLocAbbrevID = 0;
+  uint64_t RecordRemarkArgKVAbbrevID = 0;
+  uint64_t RecordRemarkArgKVIntAbbrevID = 0;
+  uint64_t RecordRemarkArgVAbbrevID = 0;
+
+  StringRef LastRemarkPass;
+  StringRef LastRemarkFunction;
 
   BitstreamRemarkSerializerHelper(BitstreamRemarkContainerType ContainerType,
                                   raw_ostream &OS);
@@ -87,6 +97,9 @@ struct BitstreamRemarkSerializerHelper {
   /// Emit the remaining metadata at the end of the file. Here we emit metadata
   /// that is only known once all remarks were emitted.
   void emitLateMetaBlock(const StringTable &StrTab);
+
+  void enterRemarksBlock();
+  void exitRemarksBlock();
 
   /// Emit a remark block. The string table is required.
   void emitRemark(const Remark &Remark, StringTable &StrTab);
