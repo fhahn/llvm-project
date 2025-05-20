@@ -1365,6 +1365,7 @@ public:
         unsigned Depth);
 
   public:
+    LoopGuards(ScalarEvolution &SE, DenseMap<const SCEV *, const SCEV *> RewriteMap) : RewriteMap(RewriteMap), SE(SE) {}
     /// Collect rewrite map for loop guards for loop \p L, together with flags
     /// indicating if NUW and NSW can be preserved during rewriting.
     LLVM_ABI static LoopGuards collect(const Loop *L, ScalarEvolution &SE);

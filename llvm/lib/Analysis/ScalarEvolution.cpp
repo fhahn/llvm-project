@@ -15955,10 +15955,8 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
       const SCEV *Rewritten = SCEVRewriteVisitor<SCEVLoopGuardRewriter>::visit(Expr);
       if (Rewritten != Expr)
         return Rewritten;
-/*      if (!isa<SCEVUMaxExpr>(Expr)) {*/
-        /*if (const SCEV *S = Map.lookup(Expr))*/
-          /*return S;*/
-      /*}*/
+      if (const SCEV *S = Map.lookup(Expr))
+        return S;
       return Expr;
     }
 
@@ -16006,6 +16004,12 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
         return S;
       return SCEVRewriteVisitor<SCEVLoopGuardRewriter>::visitUMinExpr(Expr);
     }
+
+/*    const SCEV *visitUMaxExpr(const SCEVUMaxExpr *Expr) {*/
+      /*if (const SCEV *S = Map.lookup(Expr))*/
+        /*return S;*/
+      /*return SCEVRewriteVisitor<SCEVLoopGuardRewriter>::visitUMaxExpr(Expr);*/
+    /*}*/
 
     const SCEV *visitSMinExpr(const SCEVSMinExpr *Expr) {
       if (const SCEV *S = Map.lookup(Expr))
