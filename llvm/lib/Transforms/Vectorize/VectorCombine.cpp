@@ -127,6 +127,7 @@ private:
   bool foldShuffleOfShuffles(Instruction &I);
   bool foldShuffleOfIntrinsics(Instruction &I);
   bool foldShuffleToIdentity(Instruction &I);
+  bool foldShuffleExtExtracts(Instruction &I);
   bool foldShuffleFromReductions(Instruction &I);
   bool foldCastFromReductions(Instruction &I);
   bool foldSelectShuffle(Instruction &I, bool FromReduction = false);
@@ -2777,6 +2778,63 @@ bool VectorCombine::foldShuffleToIdentity(Instruction &I) {
   return true;
 }
 
+bool VectorCombine::foldShuffleExtExtracts(Instruction &I) {
+  auto *Shuffle = cast<ShuffleVectorInst>(&I);
+
+  if (!Shuffle->isIdentityWithExtract() || !Shuffle->hasOneUse() ||
+      !isa<ZExtInst>(Shuffle->getOperand(0)))
+    return false;
+
+  auto *OuterZExt = dyn_cast<ZExtInst>(*Shuffle->user_begin());
+  if (!OuterZExt)
+    return false;
+
+  auto *InnerZExt = cast<ZExtInst>(Shuffle->getOperand(0));
+
+  Instruction *L;
+  Value *V;
+  if (!match(InnerZExt->getOperand(0),
+             m_OneUse(m_BitCast(m_OneUse(m_InsertElt(
+                 m_Value(V), m_OneUse(m_Instruction(L)), m_SpecificInt(0)))))))
+    return false;
+
+  auto *C = dyn_cast<ConstantVector>(V);
+  if (!isa<PoisonValue>(V) && (!C || !isa<PoisonValue>(C->getOperand(0))))
+    return false;
+
+  if (!isa<LoadInst>(L))
+    return false;
+
+  if (!all_of(OuterZExt->users(), IsaPred<ExtractElementInst>))
+    return false;
+
+  if (InnerZExt->getOperand(0)
+          ->getType()
+          ->getScalarType()
+          ->getScalarSizeInBits() != 8)
+    return false;
+
+  for (auto *U : to_vector(OuterZExt->users())) {
+    auto *Ext = cast<ExtractElementInst>(U);
+    unsigned Idx = cast<ConstantInt>(Ext->getIndexOperand())->getZExtValue();
+    auto *S = Builder.CreateLShr(L, Builder.getInt32(Idx * 8));
+    auto *A = Builder.CreateAnd(S, Builder.getInt32(255));
+    U->replaceAllUsesWith(A);
+    eraseInstruction(*Ext);
+  }
+
+  /*auto *NewLoad = cast<LoadInst>(Builder.CreateLoad(*/
+  /*FixedVectorType::get(InnerZExt->getOperand(0)->getType()->getScalarType(),
+   * cast<FixedVectorType>(OuterZExt->getType())->getNumElements()),*/
+  /*L->getOperand(0)));*/
+
+  /*auto *NewZExt = Builder.CreateZExt(NewLoad, OuterZExt->getType());*/
+  /*OuterZExt->replaceAllUsesWith(NewZExt);*/
+
+  dbgs() << "Match\n";
+  return true;
+}
+
 /// Given a commutative reduction, the order of the input lanes does not alter
 /// the results. We can use this to remove certain shuffles feeding the
 /// reduction, removing the need to shuffle at all.
@@ -3551,6 +3609,7 @@ bool VectorCombine::run() {
         break;
       case Instruction::ShuffleVector:
         MadeChange |= widenSubvectorLoad(I);
+        MadeChange |= foldShuffleExtExtracts(I);
         break;
       default:
         break;
