@@ -1842,7 +1842,7 @@ bool LoopVectorizationLegality::canVectorize(bool UseVPlanNativePath) {
 
   if (Result) {
     LLVM_DEBUG(dbgs() << "LV: We can vectorize this loop"
-                      << (LAI->getRuntimePointerChecking()->Need
+                      << (needsRuntimePointerChecks()
                               ? " (with a runtime bound check)"
                               : "")
                       << "!\n");

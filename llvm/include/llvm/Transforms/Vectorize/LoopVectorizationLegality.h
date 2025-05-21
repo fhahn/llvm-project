@@ -378,6 +378,9 @@ public:
   const RuntimePointerChecking *getRuntimePointerChecking() const {
     return LAI->getRuntimePointerChecking();
   }
+bool needsRuntimePointerChecks() const {
+    return LAI->getNumRuntimePointerChecks() > 0;
+  }
 
   const LoopAccessInfo *getLAI() const { return LAI; }
 

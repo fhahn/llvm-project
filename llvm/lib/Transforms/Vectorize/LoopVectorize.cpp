@@ -1864,7 +1864,7 @@ public:
     }
 
     const auto &RtPtrChecking = *LAI.getRuntimePointerChecking();
-    if (RtPtrChecking.Need) {
+    if (RtPtrChecking.getNumberOfChecks() > 0) {
       auto *Pred = SCEVCheckBlock ? SCEVCheckBlock : Preheader;
       MemCheckBlock = SplitBlock(Pred, Pred->getTerminator(), DT, LI, nullptr,
                                  "vector.memcheck");
@@ -3516,7 +3516,7 @@ void LoopVectorizationCostModel::collectLoopUniforms(ElementCount VF) {
 bool LoopVectorizationCostModel::runtimeChecksRequired() {
   LLVM_DEBUG(dbgs() << "LV: Performing code size checks.\n");
 
-  if (Legal->getRuntimePointerChecking()->Need) {
+  if (Legal->needsRuntimePointerChecks()) {
     reportVectorizationFailure("Runtime ptr check is required with -Os/-Oz",
         "runtime pointer checks needed. Enable vectorization of this "
         "loop with '#pragma clang loop vectorize(enable)' when "
@@ -3740,7 +3740,7 @@ FixedScalableVFPair LoopVectorizationCostModel::computeFeasibleMaxVF(
 
 FixedScalableVFPair
 LoopVectorizationCostModel::computeMaxVF(ElementCount UserVF, unsigned UserIC) {
-  if (Legal->getRuntimePointerChecking()->Need && TTI.hasBranchDivergence()) {
+  if (Legal->needsRuntimePointerChecks() && TTI.hasBranchDivergence()) {
     // TODO: It may be useful to do since it's still likely to be dynamically
     // uniform if the target can skip.
     reportVectorizationFailure(
@@ -5142,7 +5142,7 @@ LoopVectorizationCostModel::selectInterleaveCount(VPlan &Plan, ElementCount VF,
          return Legal->blockNeedsPredication(BB);
        }));
   bool ScalarInterleavingRequiresRuntimePointerCheck =
-      (VF.isScalar() && Legal->getRuntimePointerChecking()->Need);
+      (VF.isScalar() && Legal->needsRuntimePointerChecks());
 
   // We want to interleave small loops in order to reduce the loop overhead and
   // potentially expose ILP opportunities.

@@ -516,7 +516,6 @@ public:
 
   /// Reset the state of the pointer runtime information.
   void reset() {
-    Need = false;
     CanUseDiffCheck = true;
     Pointers.clear();
     Checks.clear();
@@ -574,9 +573,6 @@ public:
   void printChecks(raw_ostream &OS,
                    const SmallVectorImpl<RuntimePointerCheck> &Checks,
                    unsigned Depth = 0) const;
-
-  /// This flag indicates if we need to add the runtime check.
-  bool Need = false;
 
   /// Information about the pointers that may require checking.
   SmallVector<PointerInfo, 2> Pointers;

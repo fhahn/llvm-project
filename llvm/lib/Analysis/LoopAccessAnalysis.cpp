@@ -1331,11 +1331,7 @@ bool AccessAnalysis::canCheckPtrAtRT(
   // If we can do run-time checks, but there are no checks, no runtime checks
   // are needed. This can happen when all pointers point to the same underlying
   // object for example.
-  RtCheck.Need = CanDoRT ? RtCheck.getNumberOfChecks() != 0 : MayNeedRTCheck;
-
-  bool CanDoRTIfNeeded = !RtCheck.Need || CanDoRT;
-  assert(CanDoRTIfNeeded == (CanDoRT || !MayNeedRTCheck) &&
-         "CanDoRTIfNeeded depends on RtCheck.Need");
+  bool CanDoRTIfNeeded = CanDoRT || !MayNeedRTCheck;
   if (!CanDoRTIfNeeded)
     RtCheck.reset();
   return CanDoRTIfNeeded;
@@ -2424,7 +2420,6 @@ bool LoopAccessInfo::analyzeLoop(AAResults *AA, const LoopInfo *LI,
   HasConvergentOp = false;
 
   PtrRtChecking->Pointers.clear();
-  PtrRtChecking->Need = false;
 
   const bool IsAnnotatedParallel = TheLoop->isAnnotatedParallel();
 
@@ -2676,7 +2671,6 @@ bool LoopAccessInfo::analyzeLoop(AAResults *AA, const LoopInfo *LI,
       Accesses.resetDepChecks(*DepChecker);
 
       PtrRtChecking->reset();
-      PtrRtChecking->Need = true;
 
       UncomputablePtr = nullptr;
       CanDoRTIfNeeded = Accesses.canCheckPtrAtRT(
@@ -2705,7 +2699,7 @@ bool LoopAccessInfo::analyzeLoop(AAResults *AA, const LoopInfo *LI,
   if (DepsAreSafe) {
     LLVM_DEBUG(
         dbgs() << "LAA: No unsafe dependent memory operations in loop.  We"
-               << (PtrRtChecking->Need ? "" : " don't")
+               << (getNumRuntimePointerChecks() > 0 ? "" : " don't")
                << " need runtime memory checks.\n");
     return true;
   }
@@ -2995,7 +2989,7 @@ void LoopAccessInfo::print(raw_ostream &OS, unsigned Depth) const {
       OS << ", with a maximum safe store-load forward width of " << SLDist
          << " bits";
     }
-    if (PtrRtChecking->Need)
+    if (getNumRuntimePointerChecks() > 0)
       OS << " with run-time checks";
     OS << "\n";
   }
