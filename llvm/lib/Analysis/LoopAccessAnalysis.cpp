@@ -397,6 +397,19 @@ bool RuntimePointerChecking::needsChecking(
   return false;
 }
 
+bool RuntimePointerChecking::needsChecking() const {
+  for (unsigned I = 0; I < CheckingGroups.size(); ++I) {
+    for (unsigned J = I + 1; J < CheckingGroups.size(); ++J) {
+      const RuntimeCheckingPtrGroup &CGI = CheckingGroups[I];
+      const RuntimeCheckingPtrGroup &CGJ = CheckingGroups[J];
+
+      if (needsChecking(CGI, CGJ))
+        return true;
+    }
+  }
+  return false;
+}
+
 /// Compare \p I and \p J and return the minimum.
 /// Return nullptr in case we couldn't find an answer.
 static const SCEV *getMinFromExprs(const SCEV *I, const SCEV *J,
