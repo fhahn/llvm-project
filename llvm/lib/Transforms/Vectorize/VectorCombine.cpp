@@ -2805,13 +2805,30 @@ bool VectorCombine::foldShuffleExtExtracts(Instruction &I) {
   if (!isa<LoadInst>(L))
     return false;
 
-  if (!all_of(OuterZExt->users(), IsaPred<ExtractElementInst>))
-    return false;
-
   if (InnerZExt->getOperand(0)
           ->getType()
           ->getScalarType()
           ->getScalarSizeInBits() != 8)
+    return false;
+
+
+  auto *DstTy = cast<FixedVectorType>(OuterZExt->getType());
+  Type *ScalarDstTy = DstTy->getElementType();
+  auto *SrcTy = FixedVectorType::get(InnerZExt->getOperand(0)->getType()->getScalarType(),
+                                     DstTy->getNumElements());
+  InstructionCost VectorCost = TTI.getCastInstrCost(Instruction::ZExt, DstTy, SrcTy,
+                                  TTI::CastContextHint::None, CostKind);
+  unsigned ExtCnt = 0;
+  for (User *U : OuterZExt->users()) {
+    const APInt *Idx;
+    if (!match(U, m_ExtractElt(m_Value(), m_APInt(Idx))))
+      return false;
+    ExtCnt += 1;
+    VectorCost += TTI.getVectorInstrCost(Instruction::ExtractElement, DstTy, CostKind, Idx->getZExtValue());
+  }
+
+  InstructionCost ScalarCost = SrcTy->getNumElements() * (TTI.getArithmeticInstrCost(Instruction::And, ScalarDstTy, CostKind, {TTI::OK_AnyValue, TTI::OP_None}, {TTI::OK_NonUniformConstantValue, TTI::OP_None}) + TTI.getArithmeticInstrCost(Instruction::LShr, ScalarDstTy, CostKind, {TTI::OK_AnyValue, TTI::OP_None}, {TTI::OK_NonUniformConstantValue, TTI::OP_None}));;
+  if (ScalarCost > VectorCost)
     return false;
 
   for (auto *U : to_vector(OuterZExt->users())) {
@@ -2823,15 +2840,6 @@ bool VectorCombine::foldShuffleExtExtracts(Instruction &I) {
     eraseInstruction(*Ext);
   }
 
-  /*auto *NewLoad = cast<LoadInst>(Builder.CreateLoad(*/
-  /*FixedVectorType::get(InnerZExt->getOperand(0)->getType()->getScalarType(),
-   * cast<FixedVectorType>(OuterZExt->getType())->getNumElements()),*/
-  /*L->getOperand(0)));*/
-
-  /*auto *NewZExt = Builder.CreateZExt(NewLoad, OuterZExt->getType());*/
-  /*OuterZExt->replaceAllUsesWith(NewZExt);*/
-
-  dbgs() << "Match\n";
   return true;
 }
 
