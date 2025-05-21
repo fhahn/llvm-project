@@ -693,9 +693,10 @@ public:
   ///
   /// Returns true if we need no check or if we do and we can generate them
   /// (i.e. the pointers have computable bounds).
-  bool canCheckPtrAtRT(RuntimePointerChecking &RtCheck, Loop *TheLoop,
-                       const DenseMap<Value *, const SCEV *> &Strides,
-                       Value *&UncomputablePtr);
+  std::pair<bool, bool>
+  canCheckPtrAtRT(RuntimePointerChecking &RtCheck, Loop *TheLoop,
+                  const DenseMap<Value *, const SCEV *> &Strides,
+                  Value *&UncomputablePtr);
 
   /// Goes over all memory accesses, checks whether a RT check is needed
   /// and builds sets of dependent accesses.
@@ -1186,7 +1187,7 @@ bool AccessAnalysis::createCheckForAccess(
   return true;
 }
 
-bool AccessAnalysis::canCheckPtrAtRT(
+std::pair<bool, bool> AccessAnalysis::canCheckPtrAtRT(
     RuntimePointerChecking &RtCheck, Loop *TheLoop,
     const DenseMap<Value *, const SCEV *> &StridesMap,
     Value *&UncomputablePtr) {
@@ -1195,9 +1196,8 @@ bool AccessAnalysis::canCheckPtrAtRT(
   bool CanDoRT = true;
 
   bool MayNeedRTCheck = false;
-  if (!IsRTCheckAnalysisNeeded) return true;
-
-  bool IsDepCheckNeeded = isDependencyCheckNeeded();
+  if (!IsRTCheckAnalysisNeeded)
+    return {false, true};
 
   // We assign a consecutive id to access from different alias sets.
   // Accesses between different groups doesn't need to be checked.
@@ -1317,13 +1317,10 @@ bool AccessAnalysis::canCheckPtrAtRT(
         LLVM_DEBUG(
             dbgs() << "LAA: Runtime check would require comparison between"
                       " different address spaces\n");
-        return false;
+        return {MayNeedRTCheck, false};
       }
     }
   }
-
-  if (MayNeedRTCheck && CanDoRT)
-    RtCheck.generateChecks(DepCands, IsDepCheckNeeded);
 
   LLVM_DEBUG(dbgs() << "LAA: We need to do " << RtCheck.getNumberOfChecks()
                     << " pointer comparisons.\n");
@@ -1334,7 +1331,7 @@ bool AccessAnalysis::canCheckPtrAtRT(
   bool CanDoRTIfNeeded = CanDoRT || !MayNeedRTCheck;
   if (!CanDoRTIfNeeded)
     RtCheck.reset();
-  return CanDoRTIfNeeded;
+  return {MayNeedRTCheck, CanDoRT};
 }
 
 void AccessAnalysis::processMemAccesses() {
@@ -2644,10 +2641,10 @@ bool LoopAccessInfo::analyzeLoop(AAResults *AA, const LoopInfo *LI,
   // Find pointers with computable bounds. We are going to use this information
   // to place a runtime bound check.
   Value *UncomputablePtr = nullptr;
-  bool CanDoRTIfNeeded = Accesses.canCheckPtrAtRT(
+  auto [MayNeedRTChecks, CanDoRT] = Accesses.canCheckPtrAtRT(
       *PtrRtChecking, TheLoop, SymbolicStrides, UncomputablePtr);
-  if (!CanDoRTIfNeeded) {
-    const auto *I = dyn_cast_or_null<Instruction>(UncomputablePtr);
+  if (MayNeedRTChecks && !CanDoRT) {
+    auto *I = dyn_cast_or_null<Instruction>(UncomputablePtr);
     recordAnalysis("CantIdentifyArrayBounds", I)
         << "cannot identify array bounds";
     LLVM_DEBUG(dbgs() << "LAA: We can't vectorize because we can't find "
@@ -2673,20 +2670,25 @@ bool LoopAccessInfo::analyzeLoop(AAResults *AA, const LoopInfo *LI,
       PtrRtChecking->reset();
 
       UncomputablePtr = nullptr;
-      CanDoRTIfNeeded = Accesses.canCheckPtrAtRT(
+      const auto [MayNeedRTChecks_, CanDoRT_] = Accesses.canCheckPtrAtRT(
           *PtrRtChecking, TheLoop, SymbolicStrides, UncomputablePtr);
 
       // Check that we found the bounds for the pointer.
-      if (!CanDoRTIfNeeded) {
+      if (MayNeedRTChecks_ && !CanDoRT_) {
         auto *I = dyn_cast_or_null<Instruction>(UncomputablePtr);
         recordAnalysis("CantCheckMemDepsAtRunTime", I)
             << "cannot check memory dependencies at runtime";
         LLVM_DEBUG(dbgs() << "LAA: Can't vectorize with memory checks\n");
         return false;
       }
+      MayNeedRTChecks = MayNeedRTChecks_;
+      CanDoRT = CanDoRT_;
       DepsAreSafe = true;
     }
   }
+
+  if (MayNeedRTChecks)
+    PtrRtChecking->generateChecks(DepCands, Accesses.isDependencyCheckNeeded());
 
   if (HasConvergentOp) {
     recordAnalysis("CantInsertRuntimeCheckWithConvergent")
