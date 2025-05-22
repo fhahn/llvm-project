@@ -15841,17 +15841,14 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
     SmallVector<Value *, 8> Worklist;
     SmallPtrSet<Value *, 8> Visited;
     Worklist.push_back(Term);
+    SmallVector<ICmpInst*> ToProcess;
     while (!Worklist.empty()) {
       Value *Cond = Worklist.pop_back_val();
       if (!Visited.insert(Cond).second)
         continue;
 
       if (auto *Cmp = dyn_cast<ICmpInst>(Cond)) {
-        auto Predicate =
-            EnterIfTrue ? Cmp->getPredicate() : Cmp->getInversePredicate();
-        const auto *LHS = SE.getSCEV(Cmp->getOperand(0));
-        const auto *RHS = SE.getSCEV(Cmp->getOperand(1));
-        CollectCondition(Predicate, LHS, RHS, Guards.RewriteMap);
+        ToProcess.push_back(Cmp);
         continue;
       }
 
@@ -15861,6 +15858,23 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
         Worklist.push_back(L);
         Worklist.push_back(R);
       }
+    }
+
+    ToProcess = to_vector(ToProcess);
+    sort(ToProcess, [&](const CmpInst *A, const CmpInst *B) {
+         bool AConst = isa<SCEVConstant>(SE.getSCEV(A->getOperand(1)));
+         bool AEq = A->getPredicate() == CmpInst::ICMP_EQ;
+         bool BConst = isa<SCEVConstant>(SE.getSCEV(B->getOperand(1)));
+         bool BEq = B->getPredicate() == CmpInst::ICMP_EQ;
+         return std::tie(AConst, BEq)  < std::tie(BConst, AEq);
+         });
+    for (ICmpInst *Cmp : ToProcess) {
+        auto Predicate =
+            EnterIfTrue ? Cmp->getPredicate() : Cmp->getInversePredicate();
+        const auto *LHS = SE.getSCEV(Cmp->getOperand(0));
+        const auto *RHS = SE.getSCEV(Cmp->getOperand(1));
+        //dbgs() << *Cmp << "\n";
+        CollectCondition(Predicate, LHS, RHS, Guards.RewriteMap);
     }
   }
 
