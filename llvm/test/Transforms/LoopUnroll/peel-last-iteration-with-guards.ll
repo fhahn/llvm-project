@@ -79,22 +79,22 @@ define i32 @peel_with_guard_known_nonnegative_2(ptr %x, i32 %w) {
 ; CHECK-NEXT:    [[WIDE_TRIP_COUNT:%.*]] = zext nneg i32 [[W]] to i64
 ; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
 ; CHECK:       [[LOOP_HEADER]]:
-; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
-; CHECK-NEXT:    [[RED:%.*]] = phi i32 [ 0, %[[PH]] ], [ [[ADD:%.*]], %[[LOOP_LATCH]] ]
-; CHECK-NEXT:    [[CMP1:%.*]] = icmp eq i64 [[IV]], [[TMP0]]
-; CHECK-NEXT:    br i1 [[CMP1]], label %[[IF_THEN:.*]], label %[[LOOP_LATCH]]
+; CHECK-NEXT:    [[TMP5:%.*]] = phi i64 [ 0, %[[PH]] ], [ [[IV_NEXT_PEEL:%.*]], %[[LOOP_LATCH:.*]] ]
+; CHECK-NEXT:    [[TMP6:%.*]] = phi i32 [ 0, %[[PH]] ], [ [[ADD_PEEL:%.*]], %[[LOOP_LATCH]] ]
+; CHECK-NEXT:    [[CMP1_PEEL:%.*]] = icmp eq i64 [[TMP5]], [[TMP0]]
+; CHECK-NEXT:    br i1 [[CMP1_PEEL]], label %[[IF_THEN:.*]], label %[[LOOP_LATCH]]
 ; CHECK:       [[IF_THEN]]:
 ; CHECK-NEXT:    tail call void @foo()
 ; CHECK-NEXT:    br label %[[LOOP_LATCH]]
 ; CHECK:       [[LOOP_LATCH]]:
-; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds nuw i32, ptr [[X]], i64 [[IV]]
-; CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr [[ARRAYIDX]], align 4
-; CHECK-NEXT:    [[ADD]] = add nsw i32 [[TMP1]], [[RED]]
-; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
-; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[WIDE_TRIP_COUNT]]
-; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT_LOOPEXIT:.*]], label %[[LOOP_HEADER]]
+; CHECK-NEXT:    [[ARRAYIDX_PEEL:%.*]] = getelementptr inbounds nuw i32, ptr [[X]], i64 [[TMP5]]
+; CHECK-NEXT:    [[TMP7:%.*]] = load i32, ptr [[ARRAYIDX_PEEL]], align 4
+; CHECK-NEXT:    [[ADD_PEEL]] = add nsw i32 [[TMP7]], [[TMP6]]
+; CHECK-NEXT:    [[IV_NEXT_PEEL]] = add nuw nsw i64 [[TMP5]], 1
+; CHECK-NEXT:    [[EC_PEEL:%.*]] = icmp eq i64 [[IV_NEXT_PEEL]], [[WIDE_TRIP_COUNT]]
+; CHECK-NEXT:    br i1 [[EC_PEEL]], label %[[EXIT_LOOPEXIT:.*]], label %[[LOOP_HEADER]]
 ; CHECK:       [[EXIT_LOOPEXIT]]:
-; CHECK-NEXT:    [[ADD_LCSSA:%.*]] = phi i32 [ [[ADD]], %[[LOOP_LATCH]] ]
+; CHECK-NEXT:    [[ADD_LCSSA:%.*]] = phi i32 [ [[ADD_PEEL]], %[[LOOP_LATCH]] ]
 ; CHECK-NEXT:    br label %[[EXIT]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    [[RED_LCSSA:%.*]] = phi i32 [ 0, %[[ENTRY]] ], [ [[ADD_LCSSA]], %[[EXIT_LOOPEXIT]] ]

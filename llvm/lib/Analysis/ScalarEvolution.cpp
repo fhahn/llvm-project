@@ -15581,6 +15581,7 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
       Predicate = CmpInst::getSwappedPredicate(Predicate);
     }
 
+    unsigned StartSize = RewriteMap.size();
     // Check for a condition of the form (-C1 + X < C2).  InstCombine will
     // create this form when combining two checks of the form (X u< C2 + C1) and
     // (X >=u C1).
@@ -15931,6 +15932,7 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
   // Guards.RewriteMap. Conditions are processed in reverse order, so the
   // earliest conditions is processed first. This ensures the SCEVs with the
   // shortest dependency chains are constructed first.
+  SmallVector<std::tuple<CmpInst::Predicate, const SCEV *, const SCEV *>> ToProcess;
   for (auto [Term, EnterIfTrue] : reverse(Terms)) {
     SmallVector<Value *, 8> Worklist;
     SmallPtrSet<Value *, 8> Visited;
@@ -15945,7 +15947,9 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
             EnterIfTrue ? Cmp->getPredicate() : Cmp->getInversePredicate();
         const auto *LHS = SE.getSCEV(Cmp->getOperand(0));
         const auto *RHS = SE.getSCEV(Cmp->getOperand(1));
-        CollectCondition(Predicate, LHS, RHS, Guards.RewriteMap);
+//        dbgs() << "\n" << *Cmp << "\n";
+
+        ToProcess.emplace_back(Predicate, LHS, RHS);
         continue;
       }
 
@@ -15957,6 +15961,31 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
       }
     }
   }
+
+  ToProcess = to_vector(ToProcess);
+    sort(ToProcess, [&](const auto &A, const auto &B) {
+
+         const SCEV *X, *Y;
+         const auto &[APred, ALHS , ARHS] = A;
+         const auto &[BPred, BLHS , BRHS] = B;
+         bool AIsDiv = SE.matchURem(ALHS, X, Y) && ARHS->isZero();
+         bool BIsDiv = SE.matchURem(BLHS, X, Y) && BRHS->isZero();
+         return BIsDiv < AIsDiv;
+         /*bool AConst = isa<SCEVConstant>(ARHS);*/
+        /*// bool AEq = !(APred == CmpInst::ICMP_EQ || APred == CmpInst::ICMP_NE);*/
+         /*bool BConst = isa<SCEVConstant>(BRHS);*/
+         /*//bool BEq = !(BPred == CmpInst::ICMP_EQ || BPred == CmpInst::ICMP_NE);*/
+         /*return std::tie(AConst)  < std::tie(BConst);*/
+         });
+    for (const auto &[Predicate, LHS, RHS]: ToProcess) {
+        CollectCondition(Predicate, LHS, RHS, Guards.RewriteMap);
+    }
+
+/*    for (const auto &[Predicate, LHS, RHS]: reverse(ToProcess)) {*/
+        /*CollectCondition(Predicate, LHS, RHS, Guards.RewriteMap);*/
+    /*}*/
+
+
 
   // Let the rewriter preserve NUW/NSW flags if the unsigned/signed ranges of
   // the replacement expressions are contained in the ranges of the replaced
@@ -16096,6 +16125,11 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
   if (RewriteMap.empty())
     return Expr;
 
+/*  dbgs() << "RWM\n";*/
+  /*for (const auto &[From, To] : RewriteMap) {*/
+    /*dbgs() << "From " << *From << " to " << *To << "\n";*/
+    
+  /*}*/
   SCEVLoopGuardRewriter Rewriter(SE, *this);
   return Rewriter.visit(Expr);
 }
