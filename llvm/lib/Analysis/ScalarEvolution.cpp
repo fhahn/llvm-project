@@ -15781,16 +15781,6 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
   };
 
   SmallVector<PointerIntPair<Value *, 1, bool>> Terms;
-  // First, collect information from assumptions dominating the loop.
-  for (auto &AssumeVH : SE.AC.assumptions()) {
-    if (!AssumeVH)
-      continue;
-    auto *AssumeI = cast<CallInst>(AssumeVH);
-    if (!SE.DT.dominates(AssumeI, Block))
-      continue;
-    Terms.emplace_back(AssumeI->getOperand(0), true);
-  }
-
   // Second, collect information from llvm.experimental.guards dominating the loop.
   auto *GuardDecl = Intrinsic::getDeclarationIfExists(
       SE.F.getParent(), Intrinsic::experimental_guard);
@@ -15836,6 +15826,16 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
     SmallDenseMap<const BasicBlock *, LoopGuards> IncomingGuards;
     for (auto &Phi : Pair.second->phis())
       collectFromPHI(SE, Guards, Phi, VisitedBlocks, IncomingGuards, Depth);
+  }
+
+  // First, collect information from assumptions dominating the loop.
+  for (auto &AssumeVH : SE.AC.assumptions()) {
+    if (!AssumeVH)
+      continue;
+    auto *AssumeI = cast<CallInst>(AssumeVH);
+    if (!SE.DT.dominates(AssumeI, Block))
+      continue;
+    Terms.emplace_back(AssumeI->getOperand(0), true);
   }
 
   // Now apply the information from the collected conditions to
