@@ -14,14 +14,14 @@ define void @narrow_iv_precondition_order_1(ptr %start, i32 %base, i8 %n) {
 ; CHECK-NEXT:    [[PRE_1:%.*]] = icmp sgt i32 [[BASE]], [[N_EXT]]
 ; CHECK-NEXT:    br i1 [[PRE_1]], label %[[LOOP_PREHEADER:.*]], label %[[EXIT]]
 ; CHECK:       [[LOOP_PREHEADER]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = trunc i32 [[BASE]] to i8
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi ptr [ [[GEP:%.*]], %[[LOOP]] ], [ [[START]], %[[LOOP_PREHEADER]] ]
 ; CHECK-NEXT:    call void @foo()
 ; CHECK-NEXT:    [[END:%.*]] = load i8, ptr [[IV]], align 1
-; CHECK-NEXT:    [[END_EXT:%.*]] = zext i8 [[END]] to i32
 ; CHECK-NEXT:    [[GEP]] = getelementptr inbounds i8, ptr [[IV]], i64 1
-; CHECK-NEXT:    [[EC:%.*]] = icmp sgt i32 [[BASE]], [[END_EXT]]
+; CHECK-NEXT:    [[EC:%.*]] = icmp ugt i8 [[TMP0]], [[END]]
 ; CHECK-NEXT:    br i1 [[EC]], label %[[LOOP]], label %[[EXIT_LOOPEXIT:.*]]
 ; CHECK:       [[EXIT_LOOPEXIT]]:
 ; CHECK-NEXT:    br label %[[EXIT]]
