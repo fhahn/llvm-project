@@ -300,10 +300,6 @@ struct VPTransformState {
     /// header BasicBlock.
     BasicBlock *PrevBB = nullptr;
 
-    /// The last IR BasicBlock in the output IR. Set to the exit block of the
-    /// vector loop.
-    BasicBlock *ExitBB = nullptr;
-
     /// A mapping of each VPBasicBlock to the corresponding BasicBlock. In case
     /// of replication, maps the BasicBlock of the last replica created.
     SmallDenseMap<const VPBasicBlock *, BasicBlock *> VPBB2IRBB;

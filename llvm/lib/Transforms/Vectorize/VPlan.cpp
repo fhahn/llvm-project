@@ -393,8 +393,10 @@ BasicBlock *VPBasicBlock::createEmptyBasicBlock(VPTransformState &State) {
   // BB stands for IR BasicBlocks. VPBB stands for VPlan VPBasicBlocks.
   // Pred stands for Predessor. Prev stands for Previous - last visited/created.
   BasicBlock *PrevBB = CFG.PrevBB;
+  BasicBlock *InsertBeforeBB =
+      cast<VPIRBasicBlock>(getPlan()->getScalarPreheader())->getIRBasicBlock();
   BasicBlock *NewBB = BasicBlock::Create(PrevBB->getContext(), getName(),
-                                         PrevBB->getParent(), CFG.ExitBB);
+                                         PrevBB->getParent(), InsertBeforeBB);
   LLVM_DEBUG(dbgs() << "LV: created " << NewBB->getName() << '\n');
 
   return NewBB;
@@ -925,25 +927,27 @@ bool VPlan::isExitBlock(VPBlockBase *VPBB) {
 void VPlan::execute(VPTransformState *State) {
   // Initialize CFG state.
   State->CFG.PrevVPBB = nullptr;
-  State->CFG.ExitBB = State->CFG.PrevBB->getSingleSuccessor();
+  BasicBlock *ScalarPh =
+      cast<VPIRBasicBlock>(getScalarPreheader())->getIRBasicBlock();
 
-  // Disconnect VectorPreHeader from ExitBB in both the CFG and DT.
+  // Disconnect VectorPreHeader from ScalarPh in both the CFG and DT.
   BasicBlock *VectorPreHeader = State->CFG.PrevBB;
   cast<BranchInst>(VectorPreHeader->getTerminator())->setSuccessor(0, nullptr);
   State->CFG.DTU.applyUpdates(
-      {{DominatorTree::Delete, VectorPreHeader, State->CFG.ExitBB}});
+      {{DominatorTree::Delete, VectorPreHeader, ScalarPh}});
+
+  // Disconnect scalar preheader and scalar header, as the dominator tree edge
+  // will be updated as part of VPlan execution. This allows keeping the DTU
+  // logic generic during VPlan execution.
+  BasicBlock *ScalarHeader =
+      cast<VPIRBasicBlock>(getScalarHeader())->getIRBasicBlock();
+  State->CFG.DTU.applyUpdates(
+      {{DominatorTree::Delete, ScalarPh, ScalarHeader}});
 
   LLVM_DEBUG(dbgs() << "Executing best plan with VF=" << State->VF
                     << ", UF=" << getUF() << '\n');
   setName("Final VPlan");
   LLVM_DEBUG(dump());
-
-  // Disconnect scalar preheader and scalar header, as the dominator tree edge
-  // will be updated as part of VPlan execution. This allows keeping the DTU
-  // logic generic during VPlan execution.
-  BasicBlock *ScalarPh = State->CFG.ExitBB;
-  State->CFG.DTU.applyUpdates(
-      {{DominatorTree::Delete, ScalarPh, ScalarPh->getSingleSuccessor()}});
 
   ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>> RPOT(
       Entry);
