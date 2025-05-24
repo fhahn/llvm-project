@@ -952,8 +952,6 @@ void VPlan::execute(VPTransformState *State) {
   for (VPBlockBase *Block : RPOT)
     Block->execute(State);
 
-  State->CFG.DTU.flush();
-
   auto *LoopRegion = getVectorLoopRegion();
   if (!LoopRegion)
     return;
