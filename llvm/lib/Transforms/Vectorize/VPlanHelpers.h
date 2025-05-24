@@ -333,9 +333,6 @@ struct VPTransformState {
 
   /// VPlan-based type analysis.
   VPTypeAnalysis TypeAnalysis;
-
-  /// VPlan-based dominator tree.
-  VPDominatorTree VPDT;
 };
 
 /// Struct to hold various analysis needed for cost computations.
