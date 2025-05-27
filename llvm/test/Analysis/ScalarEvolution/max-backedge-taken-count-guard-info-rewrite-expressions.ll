@@ -808,14 +808,14 @@ define void @rewrite_add_rec() {
 ; CHECK-NEXT:    %n.vec = and i64 %sub, -2
 ; CHECK-NEXT:    --> (2 * ({9,+,-1}<nsw><%outer.header> /u 2))<nuw><nsw> U: [0,9) S: [0,9) Exits: 0 LoopDispositions: { %outer.header: Computable, %inner: Invariant }
 ; CHECK-NEXT:    %inner.iv = phi i64 [ 0, %inner.ph ], [ %inner.iv.next, %inner ]
-; CHECK-NEXT:    --> {0,+,2}<%inner> U: [0,-1) S: [-9223372036854775808,9223372036854775807) Exits: (2 * ((-2 + (2 * ({9,+,-1}<nsw><%outer.header> /u 2))<nuw><nsw>)<nsw> /u 2))<nuw> LoopDispositions: { %inner: Computable, %outer.header: Variant }
+; CHECK-NEXT:    --> {0,+,2}<nuw><nsw><%inner> U: [0,7) S: [0,7) Exits: (2 * ((-2 + (2 * ({9,+,-1}<nsw><%outer.header> /u 2))<nuw><nsw>)<nsw> /u 2))<nuw> LoopDispositions: { %inner: Computable, %outer.header: Variant }
 ; CHECK-NEXT:    %inner.iv.next = add i64 %inner.iv, 2
-; CHECK-NEXT:    --> {2,+,2}<%inner> U: [0,-1) S: [-9223372036854775808,9223372036854775807) Exits: (2 + (2 * ((-2 + (2 * ({9,+,-1}<nsw><%outer.header> /u 2))<nuw><nsw>)<nsw> /u 2))<nuw>) LoopDispositions: { %inner: Computable, %outer.header: Variant }
+; CHECK-NEXT:    --> {2,+,2}<nuw><nsw><%inner> U: [2,9) S: [2,9) Exits: (2 + (2 * ((-2 + (2 * ({9,+,-1}<nsw><%outer.header> /u 2))<nuw><nsw>)<nsw> /u 2))<nuw>) LoopDispositions: { %inner: Computable, %outer.header: Variant }
 ; CHECK-NEXT:    %iv.next = add i64 %iv, 1
 ; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%outer.header> U: [1,11) S: [1,11) Exits: 10 LoopDispositions: { %outer.header: Computable, %inner: Invariant }
 ; CHECK-NEXT:  Determining loop execution counts for: @rewrite_add_rec
 ; CHECK-NEXT:  Loop %inner: backedge-taken count is ((-2 + (2 * ({9,+,-1}<nsw><%outer.header> /u 2))<nuw><nsw>)<nsw> /u 2)
-; CHECK-NEXT:  Loop %inner: constant max backedge-taken count is i64 9223372036854775807
+; CHECK-NEXT:  Loop %inner: constant max backedge-taken count is i64 3
 ; CHECK-NEXT:  Loop %inner: symbolic max backedge-taken count is ((-2 + (2 * ({9,+,-1}<nsw><%outer.header> /u 2))<nuw><nsw>)<nsw> /u 2)
 ; CHECK-NEXT:  Loop %inner: Trip multiple is 1
 ; CHECK-NEXT:  Loop %outer.header: backedge-taken count is i64 9

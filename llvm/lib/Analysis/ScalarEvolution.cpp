@@ -15951,7 +15951,21 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
         FlagMask = ScalarEvolution::setFlags(FlagMask, SCEV::FlagNSW);
     }
 
-    const SCEV *visitAddRecExpr(const SCEVAddRecExpr *Expr) { return Expr; }
+    const SCEV *visit(const SCEV *Expr) {
+      const SCEV *Rewritten = SCEVRewriteVisitor<SCEVLoopGuardRewriter>::visit(Expr);
+      if (Rewritten != Expr)
+        return Rewritten;
+/*      if (!isa<SCEVUMaxExpr>(Expr)) {*/
+        /*if (const SCEV *S = Map.lookup(Expr))*/
+          /*return S;*/
+      /*}*/
+      return Expr;
+    }
+
+    const SCEV *visitAddRecExpr(const SCEVAddRecExpr *Expr) {
+        const SCEV *S = Map.lookup(Expr);
+        return S ? S : Expr;
+    }
 
     const SCEV *visitUnknown(const SCEVUnknown *Expr) {
       return Map.lookup_or(Expr, Expr);
