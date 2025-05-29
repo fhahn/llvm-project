@@ -72,7 +72,8 @@ bool vputils::isHeaderMask(const VPValue *V, VPlan &Plan) {
          IsWideCanonicalIV(A) && B == Plan.getOrCreateBackedgeTakenCount();
 }
 
-const SCEV *vputils::getSCEVExprForVPValue(VPValue *V, ScalarEvolution &SE) {
+const SCEV *vputils::getSCEVExprForVPValue(VPValue *V, ScalarEvolution &SE,
+                                           Loop *TheLoop) {
   if (V->isLiveIn())
     return SE.getSCEV(V->getLiveInIRValue());
 
@@ -80,6 +81,15 @@ const SCEV *vputils::getSCEVExprForVPValue(VPValue *V, ScalarEvolution &SE) {
   return TypeSwitch<const VPRecipeBase *, const SCEV *>(V->getDefiningRecipe())
       .Case<VPExpandSCEVRecipe>(
           [](const VPExpandSCEVRecipe *R) { return R->getSCEV(); })
+      .Case<VPWidenIntOrFpInductionRecipe>([TheLoop, &SE](const auto *R) {
+        if (!TheLoop)
+          return SE.getCouldNotCompute();
+
+        return SE.getAddRecExpr(
+            SE.getSCEV(R->getStartValue()->getUnderlyingValue()),
+            SE.getSCEV(R->getStepValue()->getUnderlyingValue()), TheLoop,
+            SCEV::FlagAnyWrap);
+      })
       .Default([&SE](const VPRecipeBase *) { return SE.getCouldNotCompute(); });
 }
 
