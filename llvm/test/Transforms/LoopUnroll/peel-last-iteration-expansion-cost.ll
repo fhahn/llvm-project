@@ -7,17 +7,41 @@ define i32 @test_expansion_cost_2(i32 %start, i32 %end) {
 ; BUDGET2-SAME: i32 [[START:%.*]], i32 [[END:%.*]]) {
 ; BUDGET2-NEXT:  [[ENTRY:.*]]:
 ; BUDGET2-NEXT:    [[SUB:%.*]] = add i32 [[END]], -1
+; BUDGET2-NEXT:    [[TMP0:%.*]] = sub i32 [[SUB]], [[START]]
+; BUDGET2-NEXT:    [[TMP1:%.*]] = icmp ne i32 [[TMP0]], 0
+; BUDGET2-NEXT:    br i1 [[TMP1]], label %[[ENTRY_SPLIT:.*]], label %[[EXIT_PEEL_BEGIN:.*]]
+; BUDGET2:       [[ENTRY_SPLIT]]:
 ; BUDGET2-NEXT:    br label %[[LOOP_HEADER:.*]]
 ; BUDGET2:       [[LOOP_HEADER]]:
-; BUDGET2-NEXT:    [[IV:%.*]] = phi i32 [ [[START]], %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
+; BUDGET2-NEXT:    [[IV:%.*]] = phi i32 [ [[START]], %[[ENTRY_SPLIT]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
 ; BUDGET2-NEXT:    [[C:%.*]] = icmp eq i32 [[IV]], [[SUB]]
 ; BUDGET2-NEXT:    br i1 [[C]], label %[[THEN:.*]], label %[[LOOP_LATCH]]
 ; BUDGET2:       [[THEN]]:
 ; BUDGET2-NEXT:    br label %[[LOOP_LATCH]]
 ; BUDGET2:       [[LOOP_LATCH]]:
 ; BUDGET2-NEXT:    [[IV_NEXT]] = add nsw i32 [[IV]], 1
-; BUDGET2-NEXT:    [[EC:%.*]] = icmp eq i32 [[IV_NEXT]], [[END]]
-; BUDGET2-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[LOOP_HEADER]]
+; BUDGET2-NEXT:    [[TMP2:%.*]] = sub i32 [[END]], 1
+; BUDGET2-NEXT:    [[EC:%.*]] = icmp eq i32 [[IV_NEXT]], [[TMP2]]
+; BUDGET2-NEXT:    br i1 [[EC]], label %[[EXIT_PEEL_BEGIN_LOOPEXIT:.*]], label %[[LOOP_HEADER]], !llvm.loop [[LOOP0:![0-9]+]]
+; BUDGET2:       [[EXIT_PEEL_BEGIN_LOOPEXIT]]:
+; BUDGET2-NEXT:    [[DOTPH:%.*]] = phi i32 [ [[IV_NEXT]], %[[LOOP_LATCH]] ]
+; BUDGET2-NEXT:    br label %[[EXIT_PEEL_BEGIN]]
+; BUDGET2:       [[EXIT_PEEL_BEGIN]]:
+; BUDGET2-NEXT:    [[TMP3:%.*]] = phi i32 [ [[START]], %[[ENTRY]] ], [ [[DOTPH]], %[[EXIT_PEEL_BEGIN_LOOPEXIT]] ]
+; BUDGET2-NEXT:    br label %[[LOOP_HEADER_PEEL:.*]]
+; BUDGET2:       [[LOOP_HEADER_PEEL]]:
+; BUDGET2-NEXT:    [[C_PEEL:%.*]] = icmp eq i32 [[TMP3]], [[SUB]]
+; BUDGET2-NEXT:    br i1 [[C_PEEL]], label %[[THEN_PEEL:.*]], label %[[LOOP_LATCH_PEEL:.*]]
+; BUDGET2:       [[THEN_PEEL]]:
+; BUDGET2-NEXT:    br label %[[LOOP_LATCH_PEEL]]
+; BUDGET2:       [[LOOP_LATCH_PEEL]]:
+; BUDGET2-NEXT:    [[IV_NEXT_PEEL:%.*]] = add nsw i32 [[TMP3]], 1
+; BUDGET2-NEXT:    [[EC_PEEL:%.*]] = icmp eq i32 [[IV_NEXT_PEEL]], [[END]]
+; BUDGET2-NEXT:    br i1 [[EC_PEEL]], label %[[EXIT_PEEL_NEXT:.*]], label %[[EXIT_PEEL_NEXT]]
+; BUDGET2:       [[EXIT_PEEL_NEXT]]:
+; BUDGET2-NEXT:    br label %[[LOOP_HEADER_PEEL_NEXT:.*]]
+; BUDGET2:       [[LOOP_HEADER_PEEL_NEXT]]:
+; BUDGET2-NEXT:    br label %[[EXIT:.*]]
 ; BUDGET2:       [[EXIT]]:
 ; BUDGET2-NEXT:    ret i32 0
 ;
@@ -31,30 +55,30 @@ define i32 @test_expansion_cost_2(i32 %start, i32 %end) {
 ; BUDGET3:       [[ENTRY_SPLIT]]:
 ; BUDGET3-NEXT:    br label %[[LOOP_HEADER:.*]]
 ; BUDGET3:       [[LOOP_HEADER]]:
-; BUDGET3-NEXT:    [[IV:%.*]] = phi i32 [ [[START]], %[[ENTRY_SPLIT]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
-; BUDGET3-NEXT:    [[C:%.*]] = icmp eq i32 [[IV]], [[SUB]]
-; BUDGET3-NEXT:    br i1 [[C]], label %[[THEN:.*]], label %[[LOOP_LATCH]]
+; BUDGET3-NEXT:    [[TMP3:%.*]] = phi i32 [ [[START]], %[[ENTRY_SPLIT]] ], [ [[IV_NEXT_PEEL:%.*]], %[[LOOP_LATCH:.*]] ]
+; BUDGET3-NEXT:    [[C_PEEL:%.*]] = icmp eq i32 [[TMP3]], [[SUB]]
+; BUDGET3-NEXT:    br i1 [[C_PEEL]], label %[[THEN:.*]], label %[[LOOP_LATCH]]
 ; BUDGET3:       [[THEN]]:
 ; BUDGET3-NEXT:    br label %[[LOOP_LATCH]]
 ; BUDGET3:       [[LOOP_LATCH]]:
-; BUDGET3-NEXT:    [[IV_NEXT]] = add nsw i32 [[IV]], 1
+; BUDGET3-NEXT:    [[IV_NEXT_PEEL]] = add nsw i32 [[TMP3]], 1
 ; BUDGET3-NEXT:    [[TMP2:%.*]] = sub i32 [[END]], 1
-; BUDGET3-NEXT:    [[EC:%.*]] = icmp eq i32 [[IV_NEXT]], [[TMP2]]
+; BUDGET3-NEXT:    [[EC:%.*]] = icmp eq i32 [[IV_NEXT_PEEL]], [[TMP2]]
 ; BUDGET3-NEXT:    br i1 [[EC]], label %[[EXIT_PEEL_BEGIN_LOOPEXIT:.*]], label %[[LOOP_HEADER]], !llvm.loop [[LOOP0:![0-9]+]]
 ; BUDGET3:       [[EXIT_PEEL_BEGIN_LOOPEXIT]]:
-; BUDGET3-NEXT:    [[DOTPH:%.*]] = phi i32 [ [[IV_NEXT]], %[[LOOP_LATCH]] ]
+; BUDGET3-NEXT:    [[DOTPH:%.*]] = phi i32 [ [[IV_NEXT_PEEL]], %[[LOOP_LATCH]] ]
 ; BUDGET3-NEXT:    br label %[[EXIT_PEEL_BEGIN]]
 ; BUDGET3:       [[EXIT_PEEL_BEGIN]]:
-; BUDGET3-NEXT:    [[TMP3:%.*]] = phi i32 [ [[START]], %[[ENTRY]] ], [ [[DOTPH]], %[[EXIT_PEEL_BEGIN_LOOPEXIT]] ]
+; BUDGET3-NEXT:    [[TMP4:%.*]] = phi i32 [ [[START]], %[[ENTRY]] ], [ [[DOTPH]], %[[EXIT_PEEL_BEGIN_LOOPEXIT]] ]
 ; BUDGET3-NEXT:    br label %[[LOOP_HEADER_PEEL:.*]]
 ; BUDGET3:       [[LOOP_HEADER_PEEL]]:
-; BUDGET3-NEXT:    [[C_PEEL:%.*]] = icmp eq i32 [[TMP3]], [[SUB]]
-; BUDGET3-NEXT:    br i1 [[C_PEEL]], label %[[THEN_PEEL:.*]], label %[[LOOP_LATCH_PEEL:.*]]
+; BUDGET3-NEXT:    [[C_PEEL1:%.*]] = icmp eq i32 [[TMP4]], [[SUB]]
+; BUDGET3-NEXT:    br i1 [[C_PEEL1]], label %[[THEN_PEEL:.*]], label %[[LOOP_LATCH_PEEL:.*]]
 ; BUDGET3:       [[THEN_PEEL]]:
 ; BUDGET3-NEXT:    br label %[[LOOP_LATCH_PEEL]]
 ; BUDGET3:       [[LOOP_LATCH_PEEL]]:
-; BUDGET3-NEXT:    [[IV_NEXT_PEEL:%.*]] = add nsw i32 [[TMP3]], 1
-; BUDGET3-NEXT:    [[EC_PEEL:%.*]] = icmp eq i32 [[IV_NEXT_PEEL]], [[END]]
+; BUDGET3-NEXT:    [[IV_NEXT_PEEL1:%.*]] = add nsw i32 [[TMP4]], 1
+; BUDGET3-NEXT:    [[EC_PEEL:%.*]] = icmp eq i32 [[IV_NEXT_PEEL1]], [[END]]
 ; BUDGET3-NEXT:    br i1 [[EC_PEEL]], label %[[EXIT_PEEL_NEXT:.*]], label %[[EXIT_PEEL_NEXT]]
 ; BUDGET3:       [[EXIT_PEEL_NEXT]]:
 ; BUDGET3-NEXT:    br label %[[LOOP_HEADER_PEEL_NEXT:.*]]
@@ -83,6 +107,9 @@ loop.latch:
 exit:
   ret i32 0
 }
+;.
+; BUDGET2: [[LOOP0]] = distinct !{[[LOOP0]], [[META1:![0-9]+]]}
+; BUDGET2: [[META1]] = !{!"llvm.loop.peeled.count", i32 1}
 ;.
 ; BUDGET3: [[LOOP0]] = distinct !{[[LOOP0]], [[META1:![0-9]+]]}
 ; BUDGET3: [[META1]] = !{!"llvm.loop.peeled.count", i32 1}

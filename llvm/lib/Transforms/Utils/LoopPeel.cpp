@@ -368,16 +368,35 @@ static bool shouldPeelLastIteration(Loop &L, CmpPredicate Pred,
     return false;
 
   const SCEV *BTC = SE.getBackedgeTakenCount(&L);
-  SCEVExpander Expander(SE, L.getHeader()->getDataLayout(), "loop-peel");
-  if (!SE.isKnownNonZero(BTC) &&
-      Expander.isHighCostExpansion(BTC, &L, SCEVCheapExpansionBudget, &TTI,
-                                   L.getLoopPredecessor()->getTerminator()))
-    return false;
-
   const SCEV *ValAtLastIter = LeftAR->evaluateAtIteration(BTC, SE);
   const SCEV *ValAtSecondToLastIter = LeftAR->evaluateAtIteration(
       SE.getMinusSCEV(BTC, SE.getOne(BTC->getType())), SE);
+  return SE.isKnownPredicate(ICmpInst::getInversePredicate(Pred), ValAtLastIter,
+                             RightSCEV) &&
+         SE.isKnownPredicate(Pred, ValAtSecondToLastIter, RightSCEV);
+}
 
+static bool shouldPeelLastIterationWithGuards(Loop &L, CmpPredicate Pred,
+                                              const SCEVAddRecExpr *LeftAR,
+                                              const SCEV *RightSCEV,
+                                              ScalarEvolution &SE,
+                                              const TargetTransformInfo &TTI) {
+  if (!canPeelLastIteration(L, SE))
+    return false;
+
+  const SCEV *BTC = SE.getBackedgeTakenCount(&L);
+  /*  const SCEV *UMax = SE.getUMaxExpr(BTC, SE.getOne(BTC->getType()));*/
+  /*UMax = SE.applyLoopGuards(UMax, &L);*/
+
+  auto *UMax = SE.applyLoopGuards(BTC, &L);
+  const SCEV *ValAtLastIter = LeftAR->evaluateAtIteration(UMax, SE);
+  const SCEV *ValAtSecondToLastIter = LeftAR->evaluateAtIteration(
+      SE.getMinusSCEV(UMax, SE.getOne(BTC->getType())), SE);
+
+  DenseMap<const SCEV *, const SCEV *> Map;
+  Map[BTC] = UMax;
+  // ScalarEvolution::LoopGuards Guards(SE, Map);
+  RightSCEV = SE.applyLoopGuards(RightSCEV, &L);
   return SE.isKnownPredicate(ICmpInst::getInversePredicate(Pred), ValAtLastIter,
                              RightSCEV) &&
          SE.isKnownPredicate(Pred, ValAtSecondToLastIter, RightSCEV);
@@ -484,8 +503,11 @@ countToEliminateCompares(Loop &L, unsigned MaxPeelCount, ScalarEvolution &SE,
     const SCEV *Step = LeftAR->getStepRecurrence(SE);
     if (!PeelWhilePredicateIsKnown(NewPeelCount, IterVal, RightSCEV, Step,
                                    Pred)) {
-      if (shouldPeelLastIteration(L, Pred, LeftAR, RightSCEV, SE, TTI))
+      if (shouldPeelLastIteration(L, Pred, LeftAR, RightSCEV, SE, TTI)) {
+        assert(shouldPeelLastIterationWithGuards(L, Pred, LeftAR, RightSCEV, SE,
+                                                 TTI));
         DesiredPeelCountLast = 1;
+      }
       return;
     }
 

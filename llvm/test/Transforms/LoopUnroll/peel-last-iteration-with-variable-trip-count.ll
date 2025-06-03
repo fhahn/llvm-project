@@ -238,6 +238,31 @@ inner.latch:
   %exitcond.not = icmp eq i32 %iv.next, %n
   br i1 %exitcond.not, label %outer.header, label %inner.header
 }
+
+
+define void @foo() {
+entry:
+  %0 = load i32, ptr null, align 4
+  %sub114 = add i32 %0, -1
+  %cmp115.peel = icmp eq i32 %sub114, 0
+  br i1 %cmp115.peel, label %for.cond.cleanup85, label %if.end113
+
+for.cond.cleanup85:                               ; preds = %if.end137, %entry
+  ret void
+
+if.end113:                                        ; preds = %if.end137, %entry
+  %i1.02 = phi i32 [ %inc, %if.end137 ], [ 1, %entry ]
+  %cmp115 = icmp eq i32 %i1.02, %sub114
+  br i1 %cmp115, label %if.then116, label %if.end137
+
+if.then116:                                       ; preds = %if.end113
+  br label %if.end137
+
+if.end137:                                        ; preds = %if.then116, %if.end113
+  %inc = add nuw i32 %i1.02, 1
+  %exitcond.not = icmp eq i32 %inc, %0
+  br i1 %exitcond.not, label %for.cond.cleanup85, label %if.end113
+}
 ;.
 ; CHECK: [[LOOP0]] = distinct !{[[LOOP0]], [[META1:![0-9]+]]}
 ; CHECK: [[META1]] = !{!"llvm.loop.peeled.count", i32 1}
