@@ -1784,7 +1784,7 @@ const SCEV *ScalarEvolution::getZeroExtendExprImpl(const SCEV *Op, Type *Ty,
 
   if (auto *SA = dyn_cast<SCEVAddExpr>(Op)) {
     // zext((A + B + ...)<nuw>) --> (zext(A) + zext(B) + ...)<nuw>
-    if (SA->hasNoUnsignedWrap()) {
+      if (SA->hasNoUnsignedWrap()) {
       // If the addition does not unsign overflow then we can, by definition,
       // commute the zero extension with the addition operation.
       SmallVector<const SCEV *, 4> Ops;
@@ -1792,6 +1792,14 @@ const SCEV *ScalarEvolution::getZeroExtendExprImpl(const SCEV *Op, Type *Ty,
         Ops.push_back(getZeroExtendExpr(Op, Ty, Depth + 1));
       return getAddExpr(Ops, SCEV::FlagNUW, Depth + 1);
     }
+
+  const SCEV *A;
+    const SCEV *B;
+    // zext (A + B)<nsw> -> (sext(A) + zext(B))<nsw> if zext (A + B)<nsw> >=s 0 and B >=s A.
+if (SA->hasNoSignedWrap() && isKnownNonNegative(SA) && match(SA, m_scev_Add(m_SCEV(A), m_SCEV(B))) && isKnownPredicate(CmpInst::ICMP_SGE, B, A)) {
+      SmallVector<const SCEV *, 4> Ops = { getSignExtendExpr(A, Ty, Depth + 1), getZeroExtendExpr(B, Ty, Depth + 1)};
+      return getAddExpr(Ops, SCEV::FlagNSW, Depth + 1);
+      }
 
     // zext(C + x + y + ...) --> (zext(D) + zext((C - D) + x + y + ...))
     // if D + (C - D + x + y + ...) could be proven to not unsigned wrap
