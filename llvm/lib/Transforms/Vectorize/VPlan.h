@@ -982,6 +982,8 @@ public:
     ReductionStartVector,
     // Creates a step vector starting from 0 to VF with a step of 1.
     StepVector,
+    UMin,
+    ExtractFirstLane,
 
   };
 
@@ -1325,20 +1327,22 @@ class VPWidenRecipe : public VPRecipeWithIRFlags, public VPIRMetadata {
   unsigned Opcode;
 
 public:
-  VPWidenRecipe(unsigned Opcode, ArrayRef<VPValue *> Operands,
-                const VPIRFlags &Flags, DebugLoc DL)
-      : VPRecipeWithIRFlags(VPDef::VPWidenSC, Operands, Flags, DL),
-        Opcode(Opcode) {}
-
   VPWidenRecipe(Instruction &I, ArrayRef<VPValue *> Operands)
       : VPRecipeWithIRFlags(VPDef::VPWidenSC, Operands, I), VPIRMetadata(I),
         Opcode(I.getOpcode()) {}
 
+  VPWidenRecipe(unsigned Opcode, ArrayRef<VPValue *> Operands,
+                const VPIRFlags &Flags, const VPIRMetadata &Metadata,
+                DebugLoc DL)
+      : VPRecipeWithIRFlags(VPDef::VPWidenSC, Operands, Flags, DL),
+        VPIRMetadata(Metadata), Opcode(Opcode) {}
+
   ~VPWidenRecipe() override = default;
 
   VPWidenRecipe *clone() override {
-    auto *R = new VPWidenRecipe(*getUnderlyingInstr(), operands());
-    R->transferFlags(*this);
+    auto *R =
+        new VPWidenRecipe(getOpcode(), operands(), *this, *this, getDebugLoc());
+    R->setUnderlyingValue(getUnderlyingValue());
     return R;
   }
 

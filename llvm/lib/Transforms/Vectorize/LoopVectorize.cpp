@@ -4459,8 +4459,13 @@ bool LoopVectorizationPlanner::isCandidateForEpilogueVectorization(
     ElementCount VF) const {
   // Cross iteration phis such as reductions need special handling and are
   // currently unsupported.
-  if (any_of(OrigLoop->getHeader()->phis(),
-             [&](PHINode &Phi) { return Legal->isFixedOrderRecurrence(&Phi); }))
+  if (any_of(OrigLoop->getHeader()->phis(), [&](PHINode &Phi) {
+        return Legal->isFixedOrderRecurrence(&Phi) ||
+               (Legal->isReductionVariable(&Phi) &&
+                Legal->getReductionVars()
+                        .find(&Phi)
+                        ->second.getRecurrenceKind() == RecurKind::FMaxNoNaNs);
+      }))
     return false;
 
   // Phis with uses outside of the loop require special handling and are
@@ -8664,6 +8669,141 @@ static void addExitUsersForFirstOrderRecurrences(
   }
 }
 
+static VPValue *getMinMaxCompareValue(VPSingleDefRecipe *MinMaxOp,
+                                      VPReductionPHIRecipe *RedPhi) {
+  auto *RepR = dyn_cast<VPReplicateRecipe>(MinMaxOp);
+  if (!isa<VPWidenIntrinsicRecipe>(MinMaxOp) &&
+      !isa<VPWidenSelectRecipe>(MinMaxOp) &&
+      !(RepR && (isa<SelectInst, IntrinsicInst>(RepR->getUnderlyingInstr()))))
+    return nullptr;
+
+  unsigned NumOps = MinMaxOp->getNumOperands();
+  if (MinMaxOp->getOperand(NumOps - 1) == RedPhi)
+    return MinMaxOp->getOperand(NumOps - 2);
+  return MinMaxOp->getOperand(NumOps - 1);
+}
+static bool addChecks(VPlan &Plan) {
+  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
+  VPValue *AnyOf = nullptr;
+  VPReductionPHIRecipe *RedPhiR = nullptr;
+  for (auto &R : LoopRegion->getEntryBasicBlock()->phis()) {
+    auto *Cur = dyn_cast<VPReductionPHIRecipe>(&R);
+    if (!Cur)
+      continue;
+    if (RedPhiR)
+      return false;
+    if (Cur->getRecurrenceKind() !=
+        RecurKind::FMaxNoNaNs)
+      continue;
+
+    RedPhiR = Cur;
+
+    VPSingleDefRecipe *MinMaxOp = dyn_cast<VPSingleDefRecipe>(
+        RedPhiR->getBackedgeValue()->getDefiningRecipe());
+    VPValue *In = getMinMaxCompareValue(MinMaxOp, RedPhiR);
+    if (!In)
+      return false;
+
+    auto *Cmp =
+        new VPInstruction(Instruction::FCmp, {In, In}, {CmpInst::FCMP_UNO}, {});
+    Cmp->insertBefore(MinMaxOp);
+
+    AnyOf = new VPInstruction(VPInstruction::AnyOf, {Cmp});
+    AnyOf->getDefiningRecipe()->insertAfter(Cmp);
+  }
+
+  if (!AnyOf)
+    return true;
+
+  auto *ScalarPH = Plan.getScalarPreheader();
+  if (ScalarPH->size() != 2)
+    return false;
+
+  auto *MiddleVPBB = Plan.getMiddleBlock();
+  auto *OrigRdxResult = cast<VPSingleDefRecipe>(&MiddleVPBB->front());
+  VPPhi *RdxResume = nullptr;
+  for (auto *U : OrigRdxResult->users()) {
+    if (auto *P = dyn_cast<VPPhi>(U)) {
+      RdxResume = P;
+      break;
+    }
+    auto *VPI = dyn_cast<VPInstruction>(U);
+    if (VPI && VPI->getNumUsers() == 1 &&
+        VPI->getOpcode() == Instruction::ExtractElement) {
+      RdxResume = cast<VPPhi>(VPI);
+      break;
+    }
+  }
+
+  auto *IVResume = cast<VPPhi>(&ScalarPH->front());
+  if (IVResume == RdxResume)
+    IVResume = cast<VPPhi>(std::next(ScalarPH->begin()));
+  if (IVResume->getOperand(0) != &Plan.getVectorTripCount())
+    return false;
+
+  VPBasicBlock *LatchVPBB = LoopRegion->getExitingBasicBlock();
+  VPBuilder Builder(LatchVPBB->getTerminator());
+  auto *LatchExitingBranch = cast<VPInstruction>(LatchVPBB->getTerminator());
+  assert(LatchExitingBranch->getOpcode() == VPInstruction::BranchOnCount &&
+         "Unexpected terminator");
+  auto *IsLatchExitTaken =
+      Builder.createICmp(CmpInst::ICMP_EQ, LatchExitingBranch->getOperand(0),
+                         LatchExitingBranch->getOperand(1));
+  auto *AnyExitTaken =
+      Builder.createNaryOp(Instruction::Or, {AnyOf, IsLatchExitTaken});
+  Builder.createNaryOp(VPInstruction::BranchOnCond, AnyExitTaken);
+  LatchExitingBranch->eraseFromParent();
+
+  auto *NewMiddle = MiddleVPBB->splitAt(MiddleVPBB->begin());
+  Builder.setInsertPoint(MiddleVPBB);
+  auto *NewTerm = Builder.createNaryOp(VPInstruction::BranchOnCond, AnyOf);
+  VPBlockUtils::connectBlocks(MiddleVPBB, ScalarPH);
+  MiddleVPBB->swapSuccessors();
+
+  auto *RdxResult = OrigRdxResult->clone();
+
+  RdxResult->setOperand(1, RedPhiR);
+
+  RdxResult->insertBefore(*MiddleVPBB, NewTerm->getIterator());
+  /*  auto *OrigExtract = &*std::next(NewMiddle->begin());*/
+  /*auto *Extract = OrigExtract->clone();*/
+  /*Extract->setOperand(0, cast<VPSingleDefRecipe>(RdxResult));*/
+  /*Extract->insertBefore(*MiddleVPBB, NewTerm->getIterator());*/
+
+  {
+    VPValue *T = IVResume->getOperand(1);
+    IVResume->setOperand(1, Plan.getCanonicalIV());
+    IVResume->addOperand(T);
+  }
+  {
+    VPValue *T = RdxResume->getOperand(1);
+    RdxResume->setOperand(1, cast<VPSingleDefRecipe>(RdxResult));
+    RdxResume->addOperand(T);
+  }
+  std::swap(ScalarPH->getPredecessors()[1], ScalarPH->getPredecessors().back());
+
+  Builder.setInsertPoint(OrigRdxResult->getParent(),
+                         std::next(OrigRdxResult->getIterator()));
+
+  auto *FinalMinMaxCmp = Builder.createNaryOp(
+      Instruction::FCmp, {OrigRdxResult->getOperand(1), OrigRdxResult},
+      VPIRFlags(CmpInst::FCMP_OEQ));
+
+  auto *IntTy = IntegerType::get(
+      Plan.getScalarHeader()->getIRBasicBlock()->getContext(), 32);
+  auto *Steps = Builder.createNaryOp(VPInstruction::StepVector, {}, IntTy);
+  auto *FinalIVSelect =
+      Builder.createSelect(FinalMinMaxCmp, Steps,
+                           Plan.getOrAddLiveIn(ConstantInt::get(IntTy, -1ull)));
+  auto *Res =
+      Builder.createNaryOp(VPInstruction::ExtractFirstLane,
+                           {OrigRdxResult->getOperand(1), FinalIVSelect});
+  OrigRdxResult->replaceUsesWithIf(Res, [FinalMinMaxCmp](VPUser &U, unsigned) {
+    return &U != FinalMinMaxCmp;
+  });
+  return true;
+}
+
 VPlanPtr LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(
     VPlanPtr Plan, VFRange &Range, LoopVersioning *LVer) {
 
@@ -8879,6 +9019,8 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(
 
   // Adjust the recipes for any inloop reductions.
   adjustRecipesForReductions(Plan, RecipeBuilder, Range.Start);
+  if (!addChecks(*Plan))
+    return nullptr;
 
   // Transform recipes to abstract recipes if it is legal and beneficial and
   // clamp the range for better cost estimation.

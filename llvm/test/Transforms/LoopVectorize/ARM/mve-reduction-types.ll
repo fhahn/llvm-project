@@ -952,19 +952,55 @@ define float @fmax_f32(ptr nocapture readonly %x, i32 %n) #0 {
 ; CHECK-NEXT:    [[CMP6:%.*]] = icmp sgt i32 [[N:%.*]], 0
 ; CHECK-NEXT:    br i1 [[CMP6]], label [[FOR_BODY_PREHEADER:%.*]], label [[FOR_COND_CLEANUP:%.*]]
 ; CHECK:       for.body.preheader:
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[N]], 4
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
+; CHECK:       vector.ph:
+; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i32 [[N]], 4
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i32 [[N]], [[N_MOD_VF]]
 ; CHECK-NEXT:    br label [[FOR_BODY:%.*]]
+; CHECK:       vector.body:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[FOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi <4 x float> [ zeroinitializer, [[VECTOR_PH]] ], [ [[TMP5:%.*]], [[FOR_BODY]] ]
+; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr inbounds float, ptr [[X:%.*]], i32 [[INDEX]]
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds float, ptr [[TMP14]], i32 0
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x float>, ptr [[TMP1]], align 4
+; CHECK-NEXT:    [[TMP2:%.*]] = fcmp fast ugt <4 x float> [[VEC_PHI]], [[WIDE_LOAD]]
+; CHECK-NEXT:    [[TMP3:%.*]] = fcmp uno <4 x float> [[WIDE_LOAD]], [[WIDE_LOAD]]
+; CHECK-NEXT:    [[TMP4:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP3]])
+; CHECK-NEXT:    [[TMP5]] = select <4 x i1> [[TMP2]], <4 x float> [[VEC_PHI]], <4 x float> [[WIDE_LOAD]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    [[TMP7:%.*]] = or i1 [[TMP4]], [[TMP6]]
+; CHECK-NEXT:    br i1 [[TMP7]], label [[MIDDLE_BLOCK:%.*]], label [[FOR_BODY]], !llvm.loop [[LOOP28:![0-9]+]]
+; CHECK:       middle.block:
+; CHECK-NEXT:    [[TMP8:%.*]] = call fast float @llvm.vector.reduce.fmax.v4f32(<4 x float> [[VEC_PHI]])
+; CHECK-NEXT:    br i1 [[TMP4]], label [[SCALAR_PH]], label [[MIDDLE_BLOCK_SPLIT:%.*]]
+; CHECK:       middle.block.split:
+; CHECK-NEXT:    [[TMP9:%.*]] = call fast float @llvm.vector.reduce.fmax.v4f32(<4 x float> [[TMP5]])
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x float> poison, float [[TMP9]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x float> [[BROADCAST_SPLATINSERT]], <4 x float> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP10:%.*]] = fcmp oeq <4 x float> [[TMP5]], [[BROADCAST_SPLAT]]
+; CHECK-NEXT:    [[TMP11:%.*]] = select <4 x i1> [[TMP10]], <4 x i32> <i32 0, i32 1, i32 2, i32 3>, <4 x i32> splat (i32 -1)
+; CHECK-NEXT:    [[TMP12:%.*]] = call i32 @llvm.vector.reduce.umin.v4i32(<4 x i32> [[TMP11]])
+; CHECK-NEXT:    [[TMP13:%.*]] = extractelement <4 x float> [[TMP5]], i32 [[TMP12]]
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i32 [[N]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[CMP_N]], label [[FOR_COND_CLEANUP_LOOPEXIT:%.*]], label [[SCALAR_PH]]
+; CHECK:       scalar.ph:
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i32 [ [[N_VEC]], [[MIDDLE_BLOCK_SPLIT]] ], [ [[INDEX]], [[MIDDLE_BLOCK]] ], [ 0, [[FOR_BODY_PREHEADER]] ]
+; CHECK-NEXT:    [[BC_MERGE_RDX:%.*]] = phi float [ [[TMP13]], [[MIDDLE_BLOCK_SPLIT]] ], [ [[TMP8]], [[MIDDLE_BLOCK]] ], [ 0.000000e+00, [[FOR_BODY_PREHEADER]] ]
+; CHECK-NEXT:    br label [[FOR_BODY1:%.*]]
 ; CHECK:       for.body:
-; CHECK-NEXT:    [[I_08:%.*]] = phi i32 [ [[INC:%.*]], [[FOR_BODY]] ], [ 0, [[FOR_BODY_PREHEADER]] ]
-; CHECK-NEXT:    [[R_07:%.*]] = phi float [ [[ADD:%.*]], [[FOR_BODY]] ], [ 0.000000e+00, [[FOR_BODY_PREHEADER]] ]
-; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds float, ptr [[X:%.*]], i32 [[I_08]]
+; CHECK-NEXT:    [[I_08:%.*]] = phi i32 [ [[INC:%.*]], [[FOR_BODY1]] ], [ [[BC_RESUME_VAL]], [[SCALAR_PH]] ]
+; CHECK-NEXT:    [[R_07:%.*]] = phi float [ [[ADD:%.*]], [[FOR_BODY1]] ], [ [[BC_MERGE_RDX]], [[SCALAR_PH]] ]
+; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds float, ptr [[X]], i32 [[I_08]]
 ; CHECK-NEXT:    [[TMP0:%.*]] = load float, ptr [[ARRAYIDX]], align 4
 ; CHECK-NEXT:    [[C:%.*]] = fcmp fast ugt float [[R_07]], [[TMP0]]
 ; CHECK-NEXT:    [[ADD]] = select i1 [[C]], float [[R_07]], float [[TMP0]]
 ; CHECK-NEXT:    [[INC]] = add nuw nsw i32 [[I_08]], 1
 ; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp eq i32 [[INC]], [[N]]
-; CHECK-NEXT:    br i1 [[EXITCOND]], label [[FOR_COND_CLEANUP_LOOPEXIT:%.*]], label [[FOR_BODY]]
+; CHECK-NEXT:    br i1 [[EXITCOND]], label [[FOR_COND_CLEANUP_LOOPEXIT]], label [[FOR_BODY1]], !llvm.loop [[LOOP29:![0-9]+]]
 ; CHECK:       for.cond.cleanup.loopexit:
-; CHECK-NEXT:    [[ADD_LCSSA:%.*]] = phi float [ [[ADD]], [[FOR_BODY]] ]
+; CHECK-NEXT:    [[ADD_LCSSA:%.*]] = phi float [ [[ADD]], [[FOR_BODY1]] ], [ [[TMP13]], [[MIDDLE_BLOCK_SPLIT]] ]
 ; CHECK-NEXT:    br label [[FOR_COND_CLEANUP]]
 ; CHECK:       for.cond.cleanup:
 ; CHECK-NEXT:    [[R_0_LCSSA:%.*]] = phi float [ 0.000000e+00, [[ENTRY:%.*]] ], [ [[ADD_LCSSA]], [[FOR_COND_CLEANUP_LOOPEXIT]] ]

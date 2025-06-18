@@ -528,19 +528,52 @@ for.end:                                          ; preds = %for.body, %entry
 define float @reduction_fmax(ptr nocapture %A, ptr nocapture %B) {
 ; CHECK-LABEL: @reduction_fmax(
 ; CHECK-NEXT:  entry:
+; CHECK-NEXT:    br i1 false, label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
+; CHECK:       vector.ph:
 ; CHECK-NEXT:    br label [[FOR_BODY:%.*]]
+; CHECK:       vector.body:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[FOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi <4 x float> [ splat (float 1.000000e+03), [[VECTOR_PH]] ], [ [[TMP5:%.*]], [[FOR_BODY]] ]
+; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds float, ptr [[A:%.*]], i32 [[INDEX]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x float>, ptr [[TMP0]], align 4
+; CHECK-NEXT:    [[TMP1:%.*]] = fcmp ogt <4 x float> [[VEC_PHI]], [[WIDE_LOAD]]
+; CHECK-NEXT:    [[TMP2:%.*]] = fcmp uno <4 x float> [[WIDE_LOAD]], zeroinitializer
+; CHECK-NEXT:    [[TMP3:%.*]] = bitcast <4 x i1> [[TMP2]] to i4
+; CHECK-NEXT:    [[TMP4:%.*]] = icmp ne i4 [[TMP3]], 0
+; CHECK-NEXT:    [[TMP5]] = select <4 x i1> [[TMP1]], <4 x float> [[VEC_PHI]], <4 x float> [[WIDE_LOAD]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i32 [[INDEX_NEXT]], 256
+; CHECK-NEXT:    [[TMP7:%.*]] = or i1 [[TMP4]], [[TMP6]]
+; CHECK-NEXT:    br i1 [[TMP7]], label [[MIDDLE_BLOCK:%.*]], label [[FOR_BODY]], !llvm.loop [[LOOP22:![0-9]+]]
+; CHECK:       middle.block:
+; CHECK-NEXT:    [[TMP8:%.*]] = call float @llvm.vector.reduce.fmax.v4f32(<4 x float> [[VEC_PHI]])
+; CHECK-NEXT:    br i1 [[TMP4]], label [[SCALAR_PH]], label [[MIDDLE_BLOCK_SPLIT:%.*]]
+; CHECK:       middle.block.split:
+; CHECK-NEXT:    [[TMP9:%.*]] = call float @llvm.vector.reduce.fmax.v4f32(<4 x float> [[TMP5]])
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x float> poison, float [[TMP9]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x float> [[BROADCAST_SPLATINSERT]], <4 x float> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP10:%.*]] = fcmp oeq <4 x float> [[TMP5]], [[BROADCAST_SPLAT]]
+; CHECK-NEXT:    [[TMP11:%.*]] = select <4 x i1> [[TMP10]], <4 x i32> <i32 0, i32 1, i32 2, i32 3>, <4 x i32> splat (i32 -1)
+; CHECK-NEXT:    [[TMP12:%.*]] = call i32 @llvm.vector.reduce.umin.v4i32(<4 x i32> [[TMP11]])
+; CHECK-NEXT:    [[TMP13:%.*]] = extractelement <4 x float> [[TMP5]], i32 [[TMP12]]
+; CHECK-NEXT:    br i1 false, label [[FOR_END:%.*]], label [[SCALAR_PH]]
+; CHECK:       scalar.ph:
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i32 [ 256, [[MIDDLE_BLOCK_SPLIT]] ], [ [[INDEX]], [[MIDDLE_BLOCK]] ], [ poison, [[ENTRY:%.*]] ]
+; CHECK-NEXT:    [[BC_MERGE_RDX:%.*]] = phi float [ [[TMP13]], [[MIDDLE_BLOCK_SPLIT]] ], [ [[TMP8]], [[MIDDLE_BLOCK]] ], [ poison, [[ENTRY]] ]
+; CHECK-NEXT:    br label [[FOR_BODY1:%.*]]
 ; CHECK:       for.body:
-; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i32 [ [[INDVARS_IV_NEXT:%.*]], [[FOR_BODY]] ], [ 0, [[ENTRY:%.*]] ]
-; CHECK-NEXT:    [[RESULT_08:%.*]] = phi float [ [[V0:%.*]], [[FOR_BODY]] ], [ 1.000000e+03, [[ENTRY]] ]
-; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds float, ptr [[A:%.*]], i32 [[INDVARS_IV]]
+; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i32 [ [[INDVARS_IV_NEXT:%.*]], [[FOR_BODY1]] ], [ [[BC_RESUME_VAL]], [[SCALAR_PH]] ]
+; CHECK-NEXT:    [[RESULT_08:%.*]] = phi float [ [[V0:%.*]], [[FOR_BODY1]] ], [ [[BC_MERGE_RDX]], [[SCALAR_PH]] ]
+; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds float, ptr [[A]], i32 [[INDVARS_IV]]
 ; CHECK-NEXT:    [[L0:%.*]] = load float, ptr [[ARRAYIDX]], align 4
 ; CHECK-NEXT:    [[C0:%.*]] = fcmp ogt float [[RESULT_08]], [[L0]]
 ; CHECK-NEXT:    [[V0]] = select i1 [[C0]], float [[RESULT_08]], float [[L0]]
 ; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add i32 [[INDVARS_IV]], 1
 ; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp eq i32 [[INDVARS_IV_NEXT]], 257
-; CHECK-NEXT:    br i1 [[EXITCOND]], label [[FOR_END:%.*]], label [[FOR_BODY]]
+; CHECK-NEXT:    br i1 [[EXITCOND]], label [[FOR_END]], label [[FOR_BODY1]], !llvm.loop [[LOOP23:![0-9]+]]
 ; CHECK:       for.end:
-; CHECK-NEXT:    ret float [[V0]]
+; CHECK-NEXT:    [[RESULT_0_LCSSA:%.*]] = phi float [ [[V0]], [[FOR_BODY1]] ], [ poison, [[MIDDLE_BLOCK_SPLIT]] ]
+; CHECK-NEXT:    ret float [[RESULT_0_LCSSA]]
 ;
 entry:
   br label %for.body

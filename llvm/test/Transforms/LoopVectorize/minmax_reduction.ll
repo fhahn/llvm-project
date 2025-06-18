@@ -829,9 +829,12 @@ for.end:
 }
 
 
-; Don't this into a max reduction. The no-nans-fp-math attribute is missing
+; Turn this into a max reduction with extra checks, as no-nans-fp-math
+; attribute is missing.
 ; CHECK-LABEL: @max_red_float_nans(
-; CHECK-NOT: <2 x float>
+; CHECK:       fcmp uno <2 x float> [[L1:%.+]], [[L1]]
+; CHECK-NEXT:  fcmp uno <2 x float> [[L2:%.+]], [[L2]]
+; CHECK:       select <2 x i1>
 
 define float @max_red_float_nans(float %max) {
 entry:
@@ -852,9 +855,12 @@ for.end:
   ret float %max.red.0
 }
 
-; As above, with the no-signed-zeros-fp-math attribute missing
+; Turn this into a max reduction with extra checks, as no-signed-zeros-fp-math
+; attribute is missing.
 ; CHECK-LABEL: @max_red_float_nsz(
-; CHECK-NOT: <2 x float>
+; CHECK:       fcmp uno <2 x float> [[L1:%.+]], [[L1]]
+; CHECK-NEXT:  fcmp uno <2 x float> [[L2:%.+]], [[L2]]
+; CHECK:       select <2 x i1>
 
 define float @max_red_float_nsz(float %max) #1 {
 entry:
@@ -1021,8 +1027,11 @@ for.body:                                         ; preds = %entry, %for.body
   br i1 %exitcond.not, label %for.cond.cleanup, label %for.body
 }
 
+; This is vectorized with extra checks as fast-math flags are missing.
 ; CHECK-LABEL: @fmax_intrinsic_nofast(
-; CHECK-NOT: <2 x float> @llvm.maxnum.v2f32
+; CHECK:       fcmp uno <2 x float> [[L1:%.+]], [[L1]]
+; CHECK-NEXT:  fcmp uno <2 x float> [[L2:%.+]], [[L2]]
+; CHECK:       call <2 x float> @llvm.maxnum.v2f32
 define float @fmax_intrinsic_nofast(ptr nocapture readonly %x) {
 entry:
   br label %for.body
