@@ -4699,6 +4699,13 @@ LoopVectorizationCostModel::selectInterleaveCount(VPlan &Plan, ElementCount VF,
       MaxInterleaveCount = ForceTargetMaxVectorInterleaveFactor;
   }
 
+  for (auto &P : Plan.getVectorLoopRegion()->getEntryBasicBlock()->phis()) {
+    auto *RedP = dyn_cast<VPReductionPHIRecipe>(&P);
+    if (RedP && RedP->getRecurrenceKind() == RecurKind::FCmpOGTSelect) {
+        MaxInterleaveCount = std::min(MaxInterleaveCount, 2u);
+    }
+  }
+
   unsigned EstimatedVF = getEstimatedRuntimeVF(VF, VScaleForTuning);
 
   // Try to get the exact trip count, or an estimate based on profiling data or
@@ -9538,7 +9545,7 @@ static InstructionCost calculateEarlyExitCost(VPCostContext &CostCtx,
 ///     extra work when exiting the loop early, such as calculating the final
 ///     exit values of variables used outside the loop.
 static bool isOutsideLoopWorkProfitable(GeneratedRTChecks &Checks,
-                                        VectorizationFactor &VF, Loop *L,
+                                        VectorizationFactor &VF, unsigned UF, Loop *L,
                                         PredicatedScalarEvolution &PSE,
                                         VPCostContext &CostCtx, VPlan &Plan,
                                         ScalarEpilogueLowering SEL,
@@ -9626,6 +9633,15 @@ static bool isOutsideLoopWorkProfitable(GeneratedRTChecks &Checks,
       dbgs() << "LV: Minimum required TC for runtime checks to be profitable:"
              << VF.MinProfitableTripCount << "\n");
 
+
+  for (auto &P : Plan.getVectorLoopRegion()->getEntryBasicBlock()->phis()) {
+    auto *RedP = dyn_cast<VPReductionPHIRecipe>(&P);
+    if (RedP && RedP->getRecurrenceKind() == RecurKind::FCmpOGTSelect) {
+      auto X = VF.Width.multiplyCoefficientBy(2 * UF);
+      if (ElementCount::isKnownLT(VF.MinProfitableTripCount, X))
+        VF.MinProfitableTripCount = X;
+    }
+  }
   // Skip vectorization if the expected trip count is less than the minimum
   // required trip count.
   if (auto ExpectedTC = getSmallBestKnownTC(PSE, L)) {
@@ -10100,7 +10116,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     VPCostContext CostCtx(CM.TTI, *CM.TLI, CM.Legal->getWidestInductionType(),
                           CM, CM.CostKind);
     if (!ForceVectorization &&
-        !isOutsideLoopWorkProfitable(Checks, VF, L, PSE, CostCtx,
+        !isOutsideLoopWorkProfitable(Checks, VF, IC, L, PSE, CostCtx,
                                      LVP.getPlanFor(VF.Width), SEL,
                                      CM.getVScaleForTuning())) {
       ORE->emit([&]() {
