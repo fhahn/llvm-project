@@ -846,25 +846,24 @@ Value *VPInstruction::generate(VPTransformState &State) {
     return Res->getType()->isIntegerTy(1) ? Res : Builder.CreateOrReduce(Res);
   }
   case VPInstruction::ExtractFirstLane: {
-    Value *Idx = nullptr;
-    Value *Vec = nullptr;
-    for (int I = getNumOperands(); I > 0; I -= 2) {
-      Value *CurVec = State.get(getOperand(I - 2));
-      Value *Op = State.get(getOperand(I - 1));
-      Value *CurIdx = Op->getType()->isVectorTy()
-                          ? Builder.CreateIntMinReduce(Op, false)
-                          : Op;
-      if (!Idx) {
-        Vec = CurVec;
-        Idx = CurIdx;
+    unsigned LastOpIdx = getNumOperands() - 1;
+    Value *LaneToExtract = State.get(getOperand(0), true);
+    Value *Res = nullptr;
+    Value *RuntimeVF =
+        getRuntimeVF(State.Builder, State.Builder.getInt64Ty(), State.VF);
+
+    for (unsigned Idx = 1; Idx != getNumOperands(); ++Idx) {
+      Value *L = Builder.CreateMul(RuntimeVF, Builder.getInt64(Idx - 1));
+      Value *S = Builder.CreateSub(LaneToExtract, L);
+      Value *Ext = Builder.CreateExtractElement(State.get(getOperand(Idx)), S);
+      if (Res) {
+        Value *Cmp = Builder.CreateICmpUGE(LaneToExtract, L);
+        Res = Builder.CreateSelect(Cmp, Ext, Res);
       } else {
-        Value *Found = Builder.CreateICmpNE(CurIdx, Builder.getInt32(-1));
-        Vec = Builder.CreateSelect(Found, CurVec, Vec);
-        Idx = Builder.CreateSelect(Found, CurIdx, Idx);
+        Res = Ext;
       }
     }
-    return Vec->getType()->isVectorTy() ? Builder.CreateExtractElement(Vec, Idx)
-                                        : Vec;
+    return Res;
   }
   case VPInstruction::FirstActiveLane: {
     if (getNumOperands() == 1) {

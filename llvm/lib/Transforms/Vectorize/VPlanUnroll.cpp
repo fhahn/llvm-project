@@ -367,7 +367,6 @@ void UnrollState::unrollBlock(VPBlockBase *VPB) {
                       m_VPValue(Op0), m_VPValue(Op1)))) {
       addUniformForAllParts(cast<VPInstruction>(&R));
       for (unsigned Part = 1; Part != UF; ++Part) {
-        R.addOperand(getValueForPart(Op0, Part));
         R.addOperand(getValueForPart(Op1, Part));
       }
       continue;

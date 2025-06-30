@@ -8672,9 +8672,9 @@ static void addExitUsersForFirstOrderRecurrences(
 static VPValue *getMinMaxCompareValue(VPSingleDefRecipe *MinMaxOp,
                                       VPReductionPHIRecipe *RedPhi) {
   auto *RepR = dyn_cast<VPReplicateRecipe>(MinMaxOp);
-  if (!isa<VPWidenIntrinsicRecipe>(MinMaxOp) &&
+  if (
       !isa<VPWidenSelectRecipe>(MinMaxOp) &&
-      !(RepR && (isa<SelectInst, IntrinsicInst>(RepR->getUnderlyingInstr()))))
+      !(RepR && (isa<SelectInst>(RepR->getUnderlyingInstr()))))
     return nullptr;
 
   unsigned NumOps = MinMaxOp->getNumOperands();
@@ -8682,24 +8682,35 @@ static VPValue *getMinMaxCompareValue(VPSingleDefRecipe *MinMaxOp,
     return MinMaxOp->getOperand(NumOps - 2);
   return MinMaxOp->getOperand(NumOps - 1);
 }
+
 static bool addChecks(VPlan &Plan) {
   VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
   VPValue *AnyOf = nullptr;
   VPReductionPHIRecipe *RedPhiR = nullptr;
+  VPRecipeWithIRFlags *MinMaxOp = nullptr;
+  VPWidenIntOrFpInductionRecipe *IV = nullptr;
   for (auto &R : LoopRegion->getEntryBasicBlock()->phis()) {
+    if (auto *C = dyn_cast<VPWidenIntOrFpInductionRecipe>(&R)) {
+      if (!C->isCanonical())
+        continue;
+      IV = C;
+      continue;
+    }
+
     auto *Cur = dyn_cast<VPReductionPHIRecipe>(&R);
     if (!Cur)
       continue;
     if (RedPhiR)
       return false;
-    if (Cur->getRecurrenceKind() !=
-        RecurKind::FMaxNoNaNs)
+    if (Cur->getRecurrenceKind() != RecurKind::FMaxNoNaNs)
       continue;
 
     RedPhiR = Cur;
 
-    VPSingleDefRecipe *MinMaxOp = dyn_cast<VPSingleDefRecipe>(
+    MinMaxOp = dyn_cast<VPRecipeWithIRFlags>(
         RedPhiR->getBackedgeValue()->getDefiningRecipe());
+    if (!MinMaxOp)
+      return false;
     VPValue *In = getMinMaxCompareValue(MinMaxOp, RedPhiR);
     if (!In)
       return false;
@@ -8712,7 +8723,7 @@ static bool addChecks(VPlan &Plan) {
     AnyOf->getDefiningRecipe()->insertAfter(Cmp);
   }
 
-  if (!AnyOf)
+  if (!AnyOf || !IV)
     return true;
 
   auto *ScalarPH = Plan.getScalarPreheader();
@@ -8740,6 +8751,32 @@ static bool addChecks(VPlan &Plan) {
     IVResume = cast<VPPhi>(std::next(ScalarPH->begin()));
   if (IVResume->getOperand(0) != &Plan.getVectorTripCount())
     return false;
+
+  auto *Cmp = cast<VPRecipeWithIRFlags>(MinMaxOp->getOperand(0));
+  CmpInst::Predicate Pred = Cmp->getPredicate();
+  if (MinMaxOp->getOperand(1) == RedPhiR)
+    Pred = CmpInst::getInversePredicate(Pred);
+  if (!CmpInst::isStrictPredicate(Pred))
+    return false;
+  LLVMContext &Ctx = Plan.getScalarHeader()->getIRBasicBlock()->getContext();
+  unsigned IVWidth = VPTypeAnalysis(Plan).inferScalarType(IV)->getScalarSizeInBits();
+  auto *IdxPhi = new VPReductionPHIRecipe(
+      nullptr, RecurKind::FindFirstIVSMin,
+      *Plan.getOrAddLiveIn(ConstantInt::get(Ctx, APInt::getSignedMaxValue(IVWidth))),
+      false, false, 1);
+  IdxPhi->insertBefore(RedPhiR);
+
+  VPInstruction *Sel = nullptr;
+  if (MinMaxOp->getOperand(1) == RedPhiR) {
+    Sel = new VPInstruction(Instruction::Select,
+                                {Cmp, IdxPhi, IV});
+  } else {
+    Sel = new VPInstruction(Instruction::Select,
+                                {Cmp, IV, IdxPhi});
+  }
+
+  Sel->insertAfter(MinMaxOp);
+  IdxPhi->addOperand(Sel);
 
   VPBasicBlock *LatchVPBB = LoopRegion->getExitingBasicBlock();
   VPBuilder Builder(LatchVPBB->getTerminator());
@@ -8789,15 +8826,22 @@ static bool addChecks(VPlan &Plan) {
       Instruction::FCmp, {OrigRdxResult->getOperand(1), OrigRdxResult},
       VPIRFlags(CmpInst::FCMP_OEQ));
 
-  auto *IntTy = IntegerType::get(
-      Plan.getScalarHeader()->getIRBasicBlock()->getContext(), 32);
-  auto *Steps = Builder.createNaryOp(VPInstruction::StepVector, {}, IntTy);
-  auto *FinalIVSelect =
-      Builder.createSelect(FinalMinMaxCmp, Steps,
-                           Plan.getOrAddLiveIn(ConstantInt::get(IntTy, -1ull)));
-  auto *Res =
-      Builder.createNaryOp(VPInstruction::ExtractFirstLane,
-                           {OrigRdxResult->getOperand(1), FinalIVSelect});
+  auto *Sel2 = Builder.createNaryOp(Instruction::Select,
+                                    {FinalMinMaxCmp, Sel,
+                                     Plan.getOrAddLiveIn(ConstantInt::get(
+                                         Ctx, APInt::getSignedMaxValue(IVWidth)))});
+  auto *FirstIV = Builder.createNaryOp(
+      VPInstruction::ComputeFindIVResult,
+      {IdxPhi, IV->getStartValue(),
+       Plan.getOrAddLiveIn(ConstantInt::get(Ctx, APInt::getSignedMaxValue(IVWidth))),
+       Sel2});
+
+  auto *SelLanes = Builder.createNaryOp(Instruction::ICmp, {Sel2, FirstIV},
+                                        VPIRFlags(CmpInst::ICMP_EQ));
+  auto *Sel3 = Builder.createNaryOp(VPInstruction::FirstActiveLane, {SelLanes});
+
+  auto *Res = Builder.createNaryOp(VPInstruction::ExtractFirstLane,
+                                   {Sel3, OrigRdxResult->getOperand(1)});
   OrigRdxResult->replaceUsesWithIf(Res, [FinalMinMaxCmp](VPUser &U, unsigned) {
     return &U != FinalMinMaxCmp;
   });
