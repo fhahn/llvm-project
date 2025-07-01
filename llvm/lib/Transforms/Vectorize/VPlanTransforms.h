@@ -196,7 +196,8 @@ struct VPlanTransforms {
                                          VPBasicBlock *LatchVPBB,
                                          VFRange &Range);
 
-  static bool handleFMaxReductionsWithoutFastMath(VPlan &Plan);
+  static bool handleFMaxReductionsWithoutFastMath(VPlan &Plan, Loop *OrigLoop,
+                                                  ScalarEvolution &SE);
 
   /// Replace loop regions with explicit CFG.
   static void dissolveLoopRegions(VPlan &Plan);

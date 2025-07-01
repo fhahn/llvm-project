@@ -629,7 +629,9 @@ void VPlanTransforms::attachCheckBlock(VPlan &Plan, Value *Cond,
   }
 }
 
-bool VPlanTransforms::handleFMaxReductionsWithoutFastMath(VPlan &Plan) {
+bool VPlanTransforms::handleFMaxReductionsWithoutFastMath(VPlan &Plan,
+                                                          Loop *OrigLoop,
+                                                          ScalarEvolution &SE) {
   VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
   VPReductionPHIRecipe *RedPhiR = nullptr;
   VPRecipeWithIRFlags *MaxOp = nullptr;
@@ -696,6 +698,31 @@ bool VPlanTransforms::handleFMaxReductionsWithoutFastMath(VPlan &Plan) {
   unsigned IVWidth =
       VPTypeAnalysis(Plan).inferScalarType(WideIV)->getScalarSizeInBits();
   LLVMContext &Ctx = Plan.getScalarHeader()->getIRBasicBlock()->getContext();
+  auto *TCScev = vputils::getSCEVExprForVPValue(Plan.getTripCount(), SE);
+  auto Range = SE.getUnsignedRange(TCScev);
+
+  if (IVWidth != 32 &&
+      Range.getUnsignedMax().ule(APInt::getMaxValue(32).zext(IVWidth))) {
+    WideIV = WideIV->clone();
+    VPlanTransforms::runPass(VPlanTransforms::removeDeadRecipes, Plan);
+    WideIV->insertBefore(RedPhiR);
+
+    IVWidth = 32;
+    VPBuilder Builder(cast<VPBasicBlock>(Plan.getVectorPreheader()));
+    auto *Step = Builder.createScalarZExtOrTrunc(
+        WideIV->getStepValue(), IntegerType::get(Ctx, IVWidth),
+        VPTypeAnalysis(Plan).inferScalarType(WideIV->getStepValue()), {});
+    WideIV->setStepValue(Step);
+
+    auto *VF = Builder.createScalarZExtOrTrunc(
+        WideIV->getOperand(2), IntegerType::get(Ctx, IVWidth),
+        VPTypeAnalysis(Plan).inferScalarType(WideIV->getOperand(2)), {});
+    WideIV->setOperand(2, VF);
+
+    WideIV->setStartValue(Plan.getOrAddLiveIn(
+        ConstantInt::getNullValue(IntegerType::get(Ctx, 32))));
+  }
+
   VPValue *UMinSentinel =
       Plan.getOrAddLiveIn(ConstantInt::get(Ctx, APInt::getMaxValue(IVWidth)));
   auto *IdxPhi = new VPReductionPHIRecipe(nullptr, RecurKind::FindFirstIVUMin,
@@ -726,9 +753,13 @@ bool VPlanTransforms::handleFMaxReductionsWithoutFastMath(VPlan &Plan) {
       VPIRFlags(CmpInst::FCMP_OEQ));
   auto *IndicesWithMaxValue = Builder.createNaryOp(
       Instruction::Select, {MaskFinalMaxValue, MinIdxSel, UMinSentinel});
-  auto *FirstMaxIdx = Builder.createNaryOp(
+  VPValue *FirstMaxIdx = Builder.createNaryOp(
       VPInstruction::ComputeFindIVResult,
       {IdxPhi, WideIV->getStartValue(), UMinSentinel, IndicesWithMaxValue});
+  FirstMaxIdx = Builder.createScalarZExtOrTrunc(
+      FirstMaxIdx, VPTypeAnalysis(Plan).inferScalarType(&Plan.getVFxUF()),
+      IntegerType::get(Ctx, IVWidth), {});
+
   // Convert the index of the first max value to an index in the vector lanes of
   // the partial reduction results. This ensures we select the first max value
   // and acts as a tie-breaker if the partial reductions contain signed zeros.

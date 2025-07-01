@@ -8819,7 +8819,8 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(
   // Adjust the recipes for any inloop reductions.
   adjustRecipesForReductions(Plan, RecipeBuilder, Range.Start);
   if (!VPlanTransforms::runPass(
-          VPlanTransforms::handleFMaxReductionsWithoutFastMath, *Plan))
+          VPlanTransforms::handleFMaxReductionsWithoutFastMath, *Plan, OrigLoop,
+          *PSE.getSE()))
     return nullptr;
 
   // Transform recipes to abstract recipes if it is legal and beneficial and
