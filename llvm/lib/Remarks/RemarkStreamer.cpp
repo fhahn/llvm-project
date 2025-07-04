@@ -70,3 +70,7 @@ bool RemarkStreamer::needsSection() const {
   // find all remarks for a linked binary)
   return RemarkSerializer->SerializerFormat == Format::Bitstream;
 }
+
+bool RemarkStreamer::shouldEmitBinaryBlobs() const {
+  return RemarkSerializer->SerializerFormat == Format::Bitstream;
+}

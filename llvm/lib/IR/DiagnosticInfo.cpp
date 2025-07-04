@@ -280,6 +280,10 @@ DiagnosticInfoOptimizationBase::Argument::Argument(StringRef Key,
   P.print(OS);
 }
 
+DiagnosticInfoOptimizationBase::Argument::Argument(StringRef Key, StringRef Val,
+                                                   const Module *M)
+    : Key(std::string(Key)), Val(Val), ModuleDump(M) {}
+
 DiagnosticInfoOptimizationBase::Argument::Argument(StringRef Key, DebugLoc Loc)
     : Key(std::string(Key)), Loc(Loc) {
   if (Loc) {

@@ -47,6 +47,7 @@ struct BitstreamRemarkSerializerHelper {
   uint64_t RecordMetaExternalFileAbbrevID = 0;
   uint64_t RecordRemarkAbbrevID = 0;
   uint64_t RecordRemarkTagAbbrevID = 0;
+  uint64_t RecordRemarkBlobAbbrevID = 0;
   uint64_t RecordRemarkHeaderAbbrevID = 0;
   uint64_t RecordRemarkDebugLocAbbrevID = 0;
   uint64_t RecordRemarkDebugLocFileAbbrevID = 0;

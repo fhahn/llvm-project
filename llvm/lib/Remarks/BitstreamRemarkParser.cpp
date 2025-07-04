@@ -208,6 +208,27 @@ Error BitstreamRemarkParserHelper::handleRecord() {
     CurrScope = ScopeKind::Argument;
     break;
   }
+  case RECORD_REMARK_BLOB: {
+    if (Record.size() != 0)
+      return malformedRecord(RemarkTagName);
+    if (CurrScope != ScopeKind::Remark)
+      return unexpectedRecord(RemarkTagName);
+    Blob = RecordBlob;
+    break;
+  }
+  case RECORD_REMARK_TAG: {
+    if (Record.size() != 1)
+      return malformedRecord(RemarkTagName);
+    if (CurrScope == ScopeKind::Remark) {
+      Tags.push_back(Tag::fromRaw(Record[0]));
+      break;
+    }
+    if (CurrScope == ScopeKind::Argument) {
+      Args.back().Tag = Tag::fromRaw(Record[0]);
+      break;
+    }
+    return unexpectedRecord(RemarkTagName);
+  }
   default:
     return unknownRecord(RecordID);
   }
@@ -231,7 +252,7 @@ Error BitstreamRemarkParserHelper::advance() {
     case BitstreamEntry::Record: {
       Record.clear();
       Expected<unsigned> MaybeRecordID =
-          Stream.readRecord(Next->ID, Record, nullptr);
+          Stream.readRecord(Next->ID, Record, &RecordBlob);
       if (!MaybeRecordID)
         return MaybeRecordID.takeError();
       RecordID = *MaybeRecordID;
@@ -240,7 +261,7 @@ Error BitstreamRemarkParserHelper::advance() {
         State = BlockState::InRemark;
         return Error::success();
       }
-      if (State == BlockState::InRemark && !isRecordInRemark(RecordID)) {
+      if (State == BlockState::InRemark && isRemarkBoundary(RecordID)) {
         State = BlockState::BetweenRemarks;
         return Error::success();
       }
@@ -275,7 +296,9 @@ Error BitstreamRemarkParserHelper::parseNext() {
   /*FunctionNameIdx.reset();*/
   Hotness.reset();
   Loc.reset();
+  Blob.reset();
   Args.clear();
+  Tags.clear();
   CurrScope = ScopeKind::None;
   if (Error E = handleRecord())
     return E;
@@ -484,6 +507,9 @@ Error BitstreamRemarkParser::processExternalFilePath() {
   if (std::error_code EC = BufferOrErr.getError())
     return createFileError(FullPath, EC);
 
+  // FIXME
+  /*if (TmpRemarkBuffer)*/
+  /*  return error("");*/
   TmpRemarkBuffer = std::move(*BufferOrErr);
 
   // Don't try to parse the file if it's empty.
@@ -558,6 +584,11 @@ Expected<std::unique_ptr<Remark>> BitstreamRemarkParser::processRemark() {
   if (Helper.Hotness)
     R.Hotness = *Helper.Hotness;
 
+  if (Helper.Blob)
+    R.Blob = Helper.Blob;
+
+  R.Tags.insert_range(Helper.Tags);
+
   for (const BitstreamRemarkParserHelper::Argument &Arg : Helper.Args) {
     if (!Arg.ValueIdx)
       return Helper.error("Missing value in remark argument.");
@@ -589,6 +620,8 @@ Expected<std::unique_ptr<Remark>> BitstreamRemarkParser::processRemark() {
       } else
         return SourceFileName.takeError();
     }
+
+    R.Args.back().Tag = Arg.Tag;
   }
 
   return std::move(Result);

@@ -77,6 +77,8 @@ public:
   bool matchesFilter(StringRef Str);
   /// Check if the remarks also need to have associated metadata in a section.
   bool needsSection() const;
+
+  bool shouldEmitBinaryBlobs() const;
 };
 } // end namespace remarks
 } // end namespace llvm

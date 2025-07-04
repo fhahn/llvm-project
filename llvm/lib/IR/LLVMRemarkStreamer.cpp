@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/IR/LLVMRemarkStreamer.h"
+#include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalValue.h"
@@ -58,7 +59,7 @@ toRemarkLocation(const DiagnosticLocation &DL) {
 
 /// LLVM Diagnostic -> Remark
 remarks::Remark
-LLVMRemarkStreamer::toRemark(const DiagnosticInfoOptimizationBase &Diag) const {
+LLVMRemarkStreamer::toRemark(const DiagnosticInfoOptimizationBase &Diag) {
   remarks::Remark R; // The result.
   R.RemarkType = toRemarkType(static_cast<DiagnosticKind>(Diag.getKind()));
   R.PassName = Diag.getPassName();
@@ -73,6 +74,23 @@ LLVMRemarkStreamer::toRemark(const DiagnosticInfoOptimizationBase &Diag) const {
     R.Args.back().Key = Arg.Key;
     R.Args.back().Val = Arg.Val;
     R.Args.back().Loc = toRemarkLocation(Arg.Loc);
+
+    if (Arg.ModuleDump) {
+      BCBuf.clear();
+      if (RS.shouldEmitBinaryBlobs()) {
+        BitcodeWriter BCWrite(BCBuf);
+        BCWrite.writeModule(*Arg.ModuleDump);
+        BCWrite.writeSymtab();
+        BCWrite.writeStrtab();
+        R.Blob = {BCBuf.data(), BCBuf.size()};
+        R.Tags.insert(remarks::Tag::BitCodeBlob);
+      } else {
+        raw_svector_ostream ModuleStrS(BCBuf);
+        Arg.ModuleDump->print(ModuleStrS, nullptr);
+        R.Blob = {BCBuf.data(), BCBuf.size()};
+        R.Tags.insert(remarks::Tag::IRBlob);
+      }
+    }
   }
 
   return R;

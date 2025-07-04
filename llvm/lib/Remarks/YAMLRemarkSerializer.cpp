@@ -13,6 +13,7 @@
 
 #include "llvm/Remarks/YAMLRemarkSerializer.h"
 #include "llvm/Remarks/Remark.h"
+#include "llvm/Support/Base64.h"
 #include "llvm/Support/FileSystem.h"
 #include <optional>
 
@@ -55,8 +56,21 @@ template <> struct MappingTraits<remarks::Remark *> {
     else
       llvm_unreachable("Unknown remark type");
 
+    /*for (auto Tag : Remark->Tags) {*/
+    /*  io.mapTag((Twine("!") + Tag.getName()).str(), true);*/
+    /*}*/
+
     mapRemarkHeader(io, Remark->PassName, Remark->RemarkName, Remark->Loc,
                     Remark->FunctionName, Remark->Hotness, Remark->Args);
+
+    if (Remark->Blob &&
+        Remark->Tags.containsAnyOf(
+            {remarks::Tag::GenericBinaryBlob, remarks::Tag::BitCodeBlob})) {
+      std::string BlobEnc = encodeBase64(*Remark->Blob);
+      io.mapRequired("Blob", BlobEnc);
+    } else {
+      io.mapOptional("Blob", Remark->Blob);
+    }
   }
 };
 
@@ -123,6 +137,8 @@ template <> struct MappingTraits<Argument> {
       io.mapRequired(A.Key, A.Val);
     }
     io.mapOptional("DebugLoc", A.Loc);
+    /*if (A.Tag)*/
+    /*  io.mapTag((Twine("!") + A.Tag->getName()).str(), true);*/
   }
 };
 

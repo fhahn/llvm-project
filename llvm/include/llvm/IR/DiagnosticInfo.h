@@ -537,6 +537,7 @@ public:
     std::string Val;
     // If set, the debug location corresponding to the value.
     DiagnosticLocation Loc;
+    const Module* ModuleDump = nullptr;
 
     explicit Argument(StringRef Str = "") : Key("String"), Val(Str) {}
     LLVM_ABI Argument(StringRef Key, const Value *V);
@@ -555,6 +556,7 @@ public:
     LLVM_ABI Argument(StringRef Key, DebugLoc dl);
     LLVM_ABI Argument(StringRef Key, InstructionCost C);
     LLVM_ABI Argument(StringRef Key, BranchProbability P);
+    LLVM_ABI Argument(StringRef Key, StringRef Value, const Module* M);
   };
 
   /// \p PassName is the name of the pass emitting this diagnostic. \p

@@ -15,7 +15,7 @@
 #define LLVM_REMARKS_BITSTREAMREMARKCONTAINER_H
 
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Bitstream/BitCodes.h"
+#include "llvm/Bitstream/BitCodeEnums.h"
 #include <cstdint>
 
 namespace llvm {
@@ -64,7 +64,7 @@ enum BlockIDs {
   META_BLOCK_ID = bitc::FIRST_APPLICATION_BLOCKID,
   /// One remark entry is represented using a REMARK_BLOCK. There can be
   /// multiple REMARK_BLOCKs in the same file.
-  REMARKS_BLOCK_ID
+  REMARKS_BLOCK_ID,
 };
 
 constexpr StringLiteral MetaBlockName("Meta");
@@ -83,11 +83,12 @@ enum RecordIDs {
   RECORD_REMARK,
   RECORD_REMARK_HEADER,
   RECORD_REMARK_DEBUG_LOC,
-  RECORD_REMARK_DEBUG_LOC_FILE,
   RECORD_REMARK_HOTNESS,
   RECORD_REMARK_ARG_V,
   RECORD_REMARK_ARG_KV_INT,
   RECORD_REMARK_ARG_KV,
+  RECORD_REMARK_TAG,
+  RECORD_REMARK_BLOB,
   // Helpers.
   RECORD_FIRST = RECORD_META_CONTAINER_INFO,
   RECORD_LAST = RECORD_REMARK_ARG_KV
@@ -105,6 +106,8 @@ constexpr StringLiteral RemarkHotnessName("Remark hotness");
 constexpr StringLiteral RemarkArgKVName("Argument KV");
 constexpr StringLiteral RemarkArgVName("Argument V");
 constexpr StringLiteral RemarkArgKVIntName("Argument KV int");
+constexpr StringLiteral RemarkTagName("Tag");
+constexpr StringLiteral RemarkBlobName("Blob");
 
 } // end namespace remarks
 } // end namespace llvm

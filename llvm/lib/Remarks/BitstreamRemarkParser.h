@@ -171,6 +171,7 @@ public:
     std::optional<uint64_t> ValueIdx;
     std::optional<RemarkLoc> Loc;
     bool IsInt = false;
+    std::optional<Tag> Tag;
 
     Argument(std::optional<uint64_t> KeyIdx, std::optional<uint64_t> ValueIdx)
         : KeyIdx(KeyIdx), ValueIdx(ValueIdx) {}
@@ -183,8 +184,10 @@ public:
   std::optional<uint64_t> FunctionNameIdx;
   std::optional<uint64_t> Hotness;
   std::optional<RemarkLoc> Loc;
+  std::optional<StringRef> Blob;
 
   SmallVector<Argument, 8> Args;
+  SmallVector<Tag, 8> Tags;
 
   BitstreamRemarkParserHelper(BitstreamCursor &Stream)
       : BitstreamBlockParserHelper(Stream, REMARKS_BLOCK_ID, RemarksBlockName) {}
@@ -197,13 +200,11 @@ protected:
   Error handleRecord();
 
   Error advance();
-  bool isRecordInRemark(unsigned RecordID) {
+
+  bool isRemarkBoundary(unsigned RecordID) {
     switch (RecordID) {
-      case RECORD_REMARK_DEBUG_LOC:
-      case RECORD_REMARK_HOTNESS:
-      case RECORD_REMARK_ARG_V:
-      case RECORD_REMARK_ARG_KV:
-      case RECORD_REMARK_ARG_KV_INT:
+      case RECORD_REMARK:
+      case RECORD_REMARK_HEADER:
         return true;
       default:
         return false;

@@ -35,10 +35,12 @@ class RemarkStreamer;
 /// objects.
 class LLVMRemarkStreamer {
   remarks::RemarkStreamer &RS;
+  SmallVector<char, 512> BCBuf;
+
   /// Convert diagnostics into remark objects.
   /// The lifetime of the members of the result is bound to the lifetime of
   /// the LLVM diagnostics.
-  remarks::Remark toRemark(const DiagnosticInfoOptimizationBase &Diag) const;
+  remarks::Remark toRemark(const DiagnosticInfoOptimizationBase &Diag);
 
 public:
   LLVMRemarkStreamer(remarks::RemarkStreamer &RS) : RS(RS) {}
