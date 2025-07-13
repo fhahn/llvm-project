@@ -1387,8 +1387,11 @@ static void narrowToSingleScalarRecipes(VPlan &Plan) {
   // based on VPlan analysis. Only process blocks in the loop region for now,
   // without traversing into nested regions, as recipes in replicate regions
   // cannot be converted yet.
-  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
-           vp_depth_first_shallow(Plan.getVectorLoopRegion()->getEntry()))) {
+  auto VPBBsOutsideLoopRegion = VPBlockUtils::blocksOnly<VPBasicBlock>(
+      vp_depth_first_shallow(Plan.getEntry()));
+  auto VPBBsInsideLoopRegion = VPBlockUtils::blocksOnly<VPBasicBlock>(
+      vp_depth_first_shallow(Plan.getVectorLoopRegion()->getEntry()));
+  for (VPBasicBlock *VPBB : concat<VPBasicBlock *>(VPBBsOutsideLoopRegion, VPBBsInsideLoopRegion)) {
     for (VPRecipeBase &R : make_early_inc_range(reverse(*VPBB))) {
       if (!isa<VPWidenRecipe, VPWidenSelectRecipe, VPReplicateRecipe>(&R))
         continue;
