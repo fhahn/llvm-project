@@ -936,6 +936,40 @@ VPlan::~VPlan() {
   if (BackedgeTakenCount)
     delete BackedgeTakenCount;
 }
+/*
+void VPlan::prepareToExecute(Value *TripCountV, Value *VectorTripCountV,
+                             VPTransformState &State) {
+  Type *TCTy = TripCountV->getType();
+  // Check if the backedge taken count is needed, and if so build it.
+  if (BackedgeTakenCount && BackedgeTakenCount->getNumUsers()) {
+    IRBuilder<> Builder(State.CFG.PrevBB->getTerminator());
+    auto *TCMO = Builder.CreateSub(TripCountV, ConstantInt::get(TCTy, 1),
+                                   "trip.count.minus.1");
+    BackedgeTakenCount->setUnderlyingValue(TCMO);
+  }
+
+  if (!VectorTripCount.getUnderlyingValue())
+    VectorTripCount.setUnderlyingValue(VectorTripCountV);
+  else
+    assert(VectorTripCount.getUnderlyingValue() == VectorTripCountV &&
+           "VectorTripCount set earlier must much VectorTripCountV");
+
+  IRBuilder<> Builder(State.CFG.PrevBB->getTerminator());
+  // FIXME: Model VF * UF computation completely in VPlan.
+  unsigned UF = getUF();
+  if (VF.getNumUsers()) {
+    Value *RuntimeVF = getRuntimeVF(Builder, TCTy, State.VF);
+    VF.setUnderlyingValue(RuntimeVF);
+    VFxUF.setUnderlyingValue(
+        UF > 1 ? Builder.CreateMul(RuntimeVF, ConstantInt::get(TCTy, UF))
+               : RuntimeVF);
+  } else {
+    VFxUF.setUnderlyingValue(createStepForVF(Builder, TCTy, State.VF, UF));
+  }
+
+  this->UF.setUnderlyingValue(ConstantInt::get(TCTy, UF));
+}
+*/
 
 VPIRBasicBlock *VPlan::getExitBlock(BasicBlock *IRBB) const {
   auto Iter = find_if(getExitBlocks(), [IRBB](const VPIRBasicBlock *VPIRBB) {
@@ -1201,6 +1235,7 @@ VPlan *VPlan::duplicate() {
   }
   Old2NewVPValues[&VectorTripCount] = &NewPlan->VectorTripCount;
   Old2NewVPValues[&VF] = &NewPlan->VF;
+  Old2NewVPValues[&UF] = &NewPlan->UF;
   Old2NewVPValues[&VFxUF] = &NewPlan->VFxUF;
   if (BackedgeTakenCount) {
     NewPlan->BackedgeTakenCount = new VPValue();
