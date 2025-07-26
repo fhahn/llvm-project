@@ -537,6 +537,17 @@ static void addInitialSkeleton(VPlan &Plan, Type *InductionTy, DebugLoc IVDL,
   Plan.getEntry()->swapSuccessors();
 
   createExtractsForLiveOuts(Plan, MiddleVPBB);
+
+  VPBuilder ScalarPHBuilder(ScalarPH);
+  for (const auto &[PhiR, ScalarPhiR] :
+       zip(drop_begin(HeaderVPBB->phis()), Plan.getScalarHeader()->phis())) {
+    auto *ScalarPhiIRI = cast<VPIRPhi>(&ScalarPhiR);
+
+    auto *VectorPhiR = cast<VPPhi>(&PhiR);
+    auto *ResumePhiR = ScalarPHBuilder.createScalarPhi(
+        {VectorPhiR, VectorPhiR->getOperand(0)}, VectorPhiR->getDebugLoc());
+    ScalarPhiIRI->addOperand(ResumePhiR);
+  }
 }
 
 /// Check \p Plan's live-in and replace them with constants, if they can be

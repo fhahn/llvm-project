@@ -1082,7 +1082,7 @@ private:
   OpcodeTy Opcode;
 
   /// An optional name that can be used for the generated IR instruction.
-  const std::string Name;
+  std::string Name;
 
   /// Returns true if we can generate a scalar for the first lane only if
   /// needed.
@@ -1182,6 +1182,8 @@ public:
 
   /// Returns the symbolic name assigned to the VPInstruction.
   StringRef getName() const { return Name; }
+
+  void setName(StringRef NewName) { Name = NewName.str(); }
 };
 
 /// A specialization of VPInstruction augmenting it with a dedicated result
@@ -2989,7 +2991,7 @@ public:
 /// which should be considered a single entity for cost-modeling and transforms.
 /// The recipe needs to be 'decomposed', i.e. replaced by its individual
 /// expression recipes, before execute. The individual expression recipes are
-/// completely disconnected from the def-use graph of other recipes not part of
+/// completely discontnected from the def-use graph of other recipes not part of
 /// the expression. Def-use edges between pairs of expression recipes remain
 /// intact, whereas every edge between an expression recipe and a recipe outside
 /// the expression is elevated to connect the non-expression recipe with the
