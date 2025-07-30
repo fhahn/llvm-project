@@ -3186,6 +3186,20 @@ const SCEV *ScalarEvolution::getMulExpr(SmallVectorImpl<const SCEV *> &Ops,
                                AddRec->getNoWrapFlags(FlagsMask));
         }
       }
+      if (auto *ZExt = dyn_cast<SCEVZeroExtendExpr>(Ops[1])) {
+        const SCEV *NarrowC =
+            getTruncateExpr(LHSC, ZExt->getOperand(0)->getType());
+        if (isa<SCEVAddExpr>(ZExt->getOperand(0)) &&
+            getZeroExtendExpr(NarrowC, ZExt->getType()) == LHSC &&
+            getUnsignedRange(ZExt->getOperand(0))
+                    .unsignedMulMayOverflow(getUnsignedRange(NarrowC)) ==
+                ConstantRange::OverflowResult::NeverOverflows) {
+          auto *Res = getMulExpr(NarrowC, ZExt->getOperand(0),
+                                 SCEV::FlagAnyWrap, Depth + 1);
+          if (isa<SCEVAddExpr>(Res))
+            return getZeroExtendExpr(Res, ZExt->getType());
+        }
+      }
     }
   }
 
