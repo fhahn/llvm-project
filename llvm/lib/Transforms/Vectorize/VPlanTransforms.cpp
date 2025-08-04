@@ -1362,7 +1362,6 @@ static void simplifyBlends(VPlan &Plan) {
 
       if (UniqueValues.size() == 1) {
         Blend->replaceAllUsesWith(*UniqueValues.begin());
-        Blend->eraseFromParent();
         continue;
       }
 
@@ -1398,11 +1397,7 @@ static void simplifyBlends(VPlan &Plan) {
           new VPBlendRecipe(cast_or_null<PHINode>(Blend->getUnderlyingValue()),
                             OperandsWithMask, Blend->getDebugLoc());
       NewBlend->insertBefore(&R);
-
-      VPValue *DeadMask = Blend->getMask(StartIndex);
       Blend->replaceAllUsesWith(NewBlend);
-      Blend->eraseFromParent();
-      recursivelyDeleteDeadRecipes(DeadMask);
 
       /// Simplify BLEND %a, %b, Not(%mask) -> BLEND %b, %a, %mask.
       VPValue *NewMask;
@@ -1410,12 +1405,9 @@ static void simplifyBlends(VPlan &Plan) {
           match(NewBlend->getMask(1), m_Not(m_VPValue(NewMask)))) {
         VPValue *Inc0 = NewBlend->getOperand(0);
         VPValue *Inc1 = NewBlend->getOperand(1);
-        VPValue *OldMask = NewBlend->getOperand(2);
         NewBlend->setOperand(0, Inc1);
         NewBlend->setOperand(1, Inc0);
         NewBlend->setOperand(2, NewMask);
-        if (OldMask->getNumUsers() == 0)
-          cast<VPInstruction>(OldMask)->eraseFromParent();
       }
     }
   }
