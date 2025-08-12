@@ -7476,6 +7476,7 @@ EpilogueVectorizerMainLoop::emitIterationCountCheck(BasicBlock *Bypass,
   LoopVectorPreHeader = SplitBlock(TCCheckBlock, TCCheckBlock->getTerminator(),
                                    static_cast<DominatorTree *>(nullptr), LI,
                                    nullptr, "vector.ph");
+
   if (ForEpilogue) {
     // Save the trip count so we don't have to regenerate it in the
     // vec.epilog.iter.check. This is safe to do because the trip count

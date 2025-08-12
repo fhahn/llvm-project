@@ -955,24 +955,25 @@ bool VPlan::isExitBlock(VPBlockBase *VPBB) {
 void VPlan::execute(VPTransformState *State) {
   // Initialize CFG state.
   State->CFG.PrevVPBB = nullptr;
-  State->CFG.ExitBB = State->CFG.PrevBB->getSingleSuccessor();
+  BasicBlock *ScalarPh =
+      cast<VPIRBasicBlock>(getScalarPreheader())->getIRBasicBlock();
+  State->CFG.ExitBB = ScalarPh;
 
   // Update VPDominatorTree since VPBasicBlock may be removed after State was
   // constructed.
   State->VPDT.recalculate(*this);
 
-  // Disconnect VectorPreHeader from ExitBB in both the CFG and DT.
+  // Disconnect VectorPreHeader from ScalarPh in both the CFG and DT.
   BasicBlock *VectorPreHeader = State->CFG.PrevBB;
   cast<BranchInst>(VectorPreHeader->getTerminator())->setSuccessor(0, nullptr);
   State->CFG.DTU.applyUpdates(
-      {{DominatorTree::Delete, VectorPreHeader, State->CFG.ExitBB}});
+      {{DominatorTree::Delete, VectorPreHeader, ScalarPh}});
 
   LLVM_DEBUG(dbgs() << "Executing best plan with VF=" << State->VF
                     << ", UF=" << getUF() << '\n');
   setName("Final VPlan");
   LLVM_DEBUG(dump());
 
-  BasicBlock *ScalarPh = State->CFG.ExitBB;
   if (getScalarPreheader()->getNumPredecessors() > 0) {
     // Disconnect scalar preheader and scalar header, as the dominator tree edge
     // will be updated as part of VPlan execution. This allows keeping the DTU
