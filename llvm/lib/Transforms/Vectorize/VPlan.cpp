@@ -334,14 +334,8 @@ Value *VPTransformState::get(const VPValue *Def, bool NeedsScalar) {
   }
 
   auto *LastInst = cast<Instruction>(get(Def, LastLane));
-  // Set the insert point after the last scalarized instruction or after the
-  // last PHI, if LastInst is a PHI. This ensures the insertelement sequence
-  // will directly follow the scalar definitions.
-  auto OldIP = Builder.saveIP();
-  auto NewIP = isa<PHINode>(LastInst)
-                   ? LastInst->getParent()->getFirstNonPHIIt()
-                   : std::next(BasicBlock::iterator(LastInst));
-  Builder.SetInsertPoint(&*NewIP);
+  IRBuilder<>::InsertPointGuard Guard(Builder);
+  Builder.SetInsertPoint(LastInst->getNextNode());
 
   // However, if we are vectorizing, we need to construct the vector values.
   // If the value is known to be uniform after vectorization, we can just
@@ -364,7 +358,6 @@ Value *VPTransformState::get(const VPValue *Def, bool NeedsScalar) {
       VectorValue = packScalarIntoVectorizedValue(Def, VectorValue, Lane);
     set(Def, VectorValue);
   }
-  Builder.restoreIP(OldIP);
   return VectorValue;
 }
 
