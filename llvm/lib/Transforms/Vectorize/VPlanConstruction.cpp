@@ -539,14 +539,17 @@ static void addInitialSkeleton(VPlan &Plan, Type *InductionTy, DebugLoc IVDL,
   createExtractsForLiveOuts(Plan, MiddleVPBB);
 
   VPBuilder ScalarPHBuilder(ScalarPH);
+  VPBuilder MiddleBuilder(MiddleVPBB, MiddleVPBB->getFirstNonPhi());
   for (const auto &[PhiR, ScalarPhiR] :
        zip(drop_begin(HeaderVPBB->phis()), Plan.getScalarHeader()->phis())) {
     auto *ScalarPhiIRI = cast<VPIRPhi>(&ScalarPhiR);
 
     auto *VectorPhiR = cast<VPPhi>(&PhiR);
-    auto *ResumePhiR = ScalarPHBuilder.createScalarPhi(
-        {VectorPhiR, VectorPhiR->getOperand(0)}, VectorPhiR->getDebugLoc());
-    ScalarPhiIRI->addOperand(ResumePhiR);
+      VPValue *ResumeFromVectorLoop = MiddleBuilder.createNaryOp(
+          VPInstruction::ExtractLastElement, {VectorPhiR->getOperand(1)}, {},
+          "vector.recur.extract");
+    ScalarPHBuilder.createScalarPhi(
+        {ResumeFromVectorLoop, VectorPhiR->getOperand(0)}, VectorPhiR->getDebugLoc());
   }
 }
 
