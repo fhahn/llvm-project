@@ -3400,6 +3400,9 @@ InstructionCost VPReplicateRecipe::computeCost(ElementCount VF,
   case Instruction::InsertValue:
     return Ctx.TTI.getInsertExtractValueCost(getOpcode(), Ctx.CostKind);
   }
+default:
+    assert(false);
+}
 
   return Ctx.getLegacyCost(UI, VF);
 }
