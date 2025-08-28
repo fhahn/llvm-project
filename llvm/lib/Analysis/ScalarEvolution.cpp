@@ -2335,6 +2335,10 @@ bool ScalarEvolution::willNotOverflow(Instruction::BinaryOps BinOp, bool Signed,
   const SCEV *B = (this->*Operation)(LHSB, RHSB, SCEV::FlagAnyWrap, 0);
   if (A == B)
     return true;
+
+  const SCEV *X;
+  if (BinOp == Instruction::Add && match(LHS, m_scev_Add(m_SCEV(X), m_SCEV())) && X == getNegativeSCEV(RHS))
+    return true;
   // Can we use context to prove the fact we need?
   if (!CtxI)
     return false;

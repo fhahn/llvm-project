@@ -239,7 +239,8 @@ static bool evaluatePtrAddRecAtMaxBTCWillNotWrap(
         L->getLoopPredecessor()->getTerminator(), DT);
     if (DerefRK) {
       DerefBytesSCEV = SE.getUMaxExpr(
-          DerefBytesSCEV, SE.getConstant(WiderTy, DerefRK.ArgValue));
+        //DerefBytesSCEV, SE.getConstant(WiderTy, DerefRK.ArgValue));
+          DerefBytesSCEV, SE.getSCEV(DerefRK.IRArgValue));
     }
   }
 
@@ -290,6 +291,7 @@ static bool evaluatePtrAddRecAtMaxBTCWillNotWrap(
           ScalarEvolution::LoopGuards::collect(AR->getLoop(), SE));
 
     EndBytes = SE.applyLoopGuards(EndBytes, *LoopGuards);
+    DerefBytesSCEV= SE.applyLoopGuards(DerefBytesSCEV, *LoopGuards);
     return SE.isKnownPredicate(CmpInst::ICMP_ULE, EndBytes, DerefBytesSCEV);
   }
 
