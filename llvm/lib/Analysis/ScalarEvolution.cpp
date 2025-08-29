@@ -16015,9 +16015,10 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
       // TODO: Could more generally apply guards to Add sub-expressions.
       if (isa<SCEVConstant>(Expr->getOperand(0)) &&
           Expr->getNumOperands() == 3) {
-        if (const SCEV *S = Map.lookup(
-                SE.getAddExpr(Expr->getOperand(1), Expr->getOperand(2))))
-          return SE.getAddExpr(Expr->getOperand(0), S);
+        if (const SCEV *SubAdd = SE.findExistingSCEVInCache(scAddExpr, to_vector(drop_begin(Expr->operands())))) {
+          if (const SCEV *S = Map.lookup(SubAdd))
+            return SE.getAddExpr(Expr->getOperand(0), S);
+        }
       }
       SmallVector<const SCEV *, 2> Operands;
       bool Changed = false;
