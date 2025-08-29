@@ -6682,11 +6682,6 @@ InstructionCost VPCostContext::getLegacyCost(Instruction *UI,
   return Cost;
 }
 
-bool VPCostContext::isLegacyUniformAfterVectorization(Instruction *I,
-                                                      ElementCount VF) const {
-  return CM.isUniformAfterVectorization(I, VF);
-}
-
 bool VPCostContext::skipCostComputation(Instruction *UI, bool IsVector) const {
   return CM.ValuesToIgnore.contains(UI) ||
          (IsVector && CM.VecValuesToIgnore.contains(UI)) ||
@@ -6907,8 +6902,7 @@ static bool planContainsAdditionalSimplifications(VPlan &Plan,
       /// legacy cost model, the legacy cost overestimates the actual cost.
       if (auto *RepR = dyn_cast<VPReplicateRecipe>(&R)) {
         if (RepR->isSingleScalar() &&
-            !CostCtx.isLegacyUniformAfterVectorization(
-                RepR->getUnderlyingInstr(), VF))
+            !CostCtx.CM.isUniformAfterVectorization(RepR->getUnderlyingInstr(), VF))
           return true;
       }
       if (Instruction *UI = GetInstructionForCost(&R)) {
