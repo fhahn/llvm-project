@@ -7190,7 +7190,6 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::finalizePlan(
 void LoopVectorizationPlanner::executePlan(ElementCount BestVF,
                                            VPlan &BestVPlan,
                                            InnerLoopVectorizer &ILV,
-                                           DominatorTree *DT,
                                            bool VectorizingEpilogue) {
   // Perform the actual loop transformation.
   VPTransformState State(&TTI, BestVF, LI, DT, ILV.AC, ILV.Builder, &BestVPlan,
@@ -9273,7 +9272,7 @@ static bool processLoopInVPlanNativePath(
                                  VF.MinProfitableTripCount);
     GeneratedRTChecks Checks(PSE, DT, LI, TTI, F->getDataLayout(), CM.CostKind);
     LVP.finalizePlan(BestPlan, VF.Width, /*UF=*/1, Checks);
-    LVP.executePlan(VF.Width, BestPlan, LB, DT, false);
+    LVP.executePlan(VF.Width, BestPlan, LB, false);
   }
 
   reportVectorization(ORE, L, VF, 1);
@@ -10137,7 +10136,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     auto ExpandedSCEVs = LVP.finalizePlan(*BestMainPlan, EPI.MainLoopVF,
                                               EPI.MainLoopUF, Checks);
     MainILV.setTripCount(BestMainPlan->getTripCount()->getLiveInIRValue());
-    LVP.executePlan(EPI.MainLoopVF, *BestMainPlan, MainILV, DT, false);
+    LVP.executePlan(EPI.MainLoopVF, *BestMainPlan, MainILV, false);
     ++LoopsVectorized;
 
     // Second pass vectorizes the epilogue and adjusts the control flow
@@ -10147,7 +10146,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     preparePlanForEpilogueVectorLoop(BestEpiPlan, L, ExpandedSCEVs, EPI);
 
     LVP.finalizePlan(BestEpiPlan, EPI.EpilogueVF, EPI.EpilogueUF, Checks);
-    LVP.executePlan(EPI.EpilogueVF, BestEpiPlan, EpilogILV, DT, true);
+    LVP.executePlan(EPI.EpilogueVF, BestEpiPlan, EpilogILV, true);
 
     fixScalarResumeValuesFromBypass(EpilogILV.getAdditionalBypassBlock(), L,
                                     BestEpiPlan, LVL, ExpandedSCEVs,
@@ -10164,7 +10163,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     LVP.addMinimumIterationCheck(BestPlan, VF.Width, IC,
                                  VF.MinProfitableTripCount);
     LVP.finalizePlan(BestPlan, VF.Width, IC, Checks);
-    LVP.executePlan(VF.Width, BestPlan, LB, DT, false);
+    LVP.executePlan(VF.Width, BestPlan, LB, false);
     ++LoopsVectorized;
   }
 

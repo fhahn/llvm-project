@@ -532,7 +532,7 @@ public:
   /// Generate the IR code for the vectorized loop captured in VPlan \p BestPlan
   /// according to the best selected \p VF.
   void executePlan(ElementCount VF, VPlan &BestPlan, InnerLoopVectorizer &LB,
-                   DominatorTree *DT, bool VectorizingEpilogue);
+                   bool VectorizingEpilogue);
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   void printPlans(raw_ostream &O);
