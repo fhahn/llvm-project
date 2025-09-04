@@ -35,6 +35,7 @@
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
+#include <cassert>
 #include <cstring>
 using namespace llvm;
 
@@ -88,10 +89,31 @@ public:
 
   void reset();
 };
+
+class LocalStatisticInfo {
+  std::vector<LocalTrackingStatistic *> Stats;
+
+public:
+  using const_iterator = decltype(Stats)::const_iterator;
+
+  void addStatistic(LocalTrackingStatistic *S) { Stats.push_back(S); }
+
+  void sort();
+  const_iterator begin() const { return Stats.begin(); }
+  const_iterator end() const { return Stats.end(); }
+
+  void reset() {
+    for (auto *Stat : Stats) {
+      Stat->Initialized = false;
+    }
+    Stats.clear();
+  }
+};
 } // end anonymous namespace
 
 static ManagedStatic<StatisticInfo> StatInfo;
-static ManagedStatic<sys::SmartMutex<true> > StatLock;
+static ManagedStatic<sys::SmartMutex<true>> StatLock;
+static thread_local LocalStatisticInfo LocalStatInfo;
 
 /// RegisterStatistic - The first time a statistic is bumped, this method is
 /// called.
@@ -117,6 +139,13 @@ void TrackingStatistic::RegisterStatistic() {
     // Remember we have been registered.
     Initialized.store(true, std::memory_order_release);
   }
+}
+
+void LocalTrackingStatistic::RegisterStatistic() {
+  assert(!Initialized);
+  if (AreStatisticsEnabled())
+    LocalStatInfo.addStatistic(this);
+  Initialized = true;
 }
 
 StatisticInfo::StatisticInfo() {
@@ -149,6 +178,19 @@ void StatisticInfo::sort() {
 
         return std::strcmp(LHS->getDesc(), RHS->getDesc()) < 0;
       });
+}
+
+void LocalStatisticInfo::sort() {
+  llvm::stable_sort(Stats, [](const LocalTrackingStatistic *LHS,
+                              const LocalTrackingStatistic *RHS) {
+    if (int Cmp = std::strcmp(LHS->getDebugType(), RHS->getDebugType()))
+      return Cmp < 0;
+
+    if (int Cmp = std::strcmp(LHS->getName(), RHS->getName()))
+      return Cmp < 0;
+
+    return std::strcmp(LHS->getDesc(), RHS->getDesc()) < 0;
+  });
 }
 
 void StatisticInfo::reset() {
@@ -263,6 +305,23 @@ std::vector<std::pair<StringRef, uint64_t>> llvm::GetStatistics() {
   return ReturnStats;
 }
 
+std::vector<std::pair<StringRef, std::vector<std::pair<StringRef, uint64_t>>>>
+llvm::GetLocalStatistics() {
+  std::vector<std::pair<StringRef, std::vector<std::pair<StringRef, uint64_t>>>>
+      ReturnStats;
+  LocalStatInfo.sort();
+
+  for (const auto &Stat : LocalStatInfo) {
+    if (ReturnStats.empty() || ReturnStats.back().first != Stat->getDebugType())
+      ReturnStats.emplace_back().first = Stat->getDebugType();
+    ReturnStats.back().second.emplace_back(Stat->getName(), Stat->getValue());
+  }
+  return ReturnStats;
+}
+
 void llvm::ResetStatistics() {
+  LocalStatInfo.reset();
   StatInfo->reset();
 }
+
+void llvm::ResetLocalStatistics() { LocalStatInfo.reset(); }
