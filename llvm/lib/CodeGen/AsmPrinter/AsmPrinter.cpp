@@ -2575,6 +2575,9 @@ void AsmPrinter::emitRemarksSection(remarks::RemarkStreamer &RS) {
   MCSection *RemarksSection =
       OutContext.getObjectFileInfo()->getRemarksSection();
   if (!RemarksSection) {
+    // FIXME: Fix warning wording
+    // Reword the warning because we can now use bitstream without YAML.
+    // Disable remarks-section by default unless available for binary format.
     OutContext.reportWarning(SMLoc(), "Current object file format does not "
                                       "support remarks sections. Use the yaml "
                                       "remark format instead.");
