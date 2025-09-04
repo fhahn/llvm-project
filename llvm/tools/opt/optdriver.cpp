@@ -287,6 +287,11 @@ static cl::opt<std::string> RemarksFormat(
     cl::desc("The format used for serializing remarks (default: YAML)"),
     cl::value_desc("format"), cl::init("yaml"));
 
+static cl::opt<std::string> FuncFilter(
+    "func-filter",
+    cl::desc("Filter for functions"),
+    cl::value_desc("format"));
+
 static cl::list<std::string>
     PassPlugins("load-pass-plugin",
                 cl::desc("Load passes from plugin library"));
@@ -564,6 +569,21 @@ optMain(int argc, char **argv,
   if (!M) {
     Err.print(argv[0], errs());
     return 1;
+  }
+
+  if (!FuncFilter.empty()) {
+    bool Found = false;
+    for (auto &F : *M) {
+      if (F.empty())
+        continue;
+      if (F.getName() == FuncFilter.getValue()) {
+        Found = true;
+        break;
+      }
+    }
+
+    if (!Found)
+      return 0;
   }
 
   // Strip debug info before running the verifier.
