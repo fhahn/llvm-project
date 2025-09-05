@@ -7242,21 +7242,30 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   //
   //===------------------------------------------------===//
 
+  // Add metadata to disable runtime unrolling a scalar loop when there
+  // are no runtime checks about strides and memory. A scalar loop that is
+  // rarely used is not worth unrolling.
+  bool DisableRuntimeUnroll =
+      none_of(BestVPlan.getEntry()->getSuccessors(),
+              [&BestVPlan](VPBlockBase *Succ) {
+                auto *SuccVPIRBB = dyn_cast<VPIRBasicBlock>(Succ);
+                return SuccVPIRBB &&
+                       SuccVPIRBB != BestVPlan.getScalarPreheader() &&
+                       SuccVPIRBB->getIRBasicBlock()->hasNPredecessors(0);
+              }) &&
+      !BestVF.isScalar();
+
   BestVPlan.execute(&State);
 
   // 2.6. Maintain Loop Hints
   // Keep all loop hints from the original loop on the vector loop (we'll
   // replace the vectorizer-specific hints below).
   VPBasicBlock *HeaderVPBB = vputils::getFirstLoopHeader(BestVPlan, State.VPDT);
-  // Add metadata to disable runtime unrolling a scalar loop when there
-  // are no runtime checks about strides and memory. A scalar loop that is
-  // rarely used is not worth unrolling.
-  bool DisableRuntimeUnroll = !ILV.RTChecks.hasChecks() && !BestVF.isScalar();
   updateLoopMetadataAndProfileInfo(
       HeaderVPBB ? LI->getLoopFor(State.CFG.VPBB2IRBB.lookup(HeaderVPBB))
                  : nullptr,
       HeaderVPBB, VectorizingEpilogue,
-      estimateElementCount(BestVF * BestUF, CM.getVScaleForTuning()),
+      estimateElementCount(BestVF * BestVPlan.getUF(), CM.getVScaleForTuning()),
       DisableRuntimeUnroll);
 
   // 3. Fix the vectorized code: take care of header phi's, live-outs,
