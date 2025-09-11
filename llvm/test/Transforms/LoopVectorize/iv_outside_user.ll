@@ -1028,7 +1028,7 @@ define i32 @test_iv_uniform_with_outside_use_scev_simplification(ptr %dst) {
 ; VEC:       [[MIDDLE_BLOCK]]:
 ; VEC-NEXT:    br label %[[E_EXIT:.*]]
 ; VEC:       [[E_EXIT]]:
-; VEC-NEXT:    ret i32 [[TMP5]]
+; VEC-NEXT:    ret i32 8
 ;
 ; INTERLEAVE-LABEL: define i32 @test_iv_uniform_with_outside_use_scev_simplification(
 ; INTERLEAVE-SAME: ptr [[DST:%.*]]) {
@@ -1051,7 +1051,7 @@ define i32 @test_iv_uniform_with_outside_use_scev_simplification(ptr %dst) {
 ; INTERLEAVE:       [[MIDDLE_BLOCK]]:
 ; INTERLEAVE-NEXT:    br label %[[E_EXIT:.*]]
 ; INTERLEAVE:       [[E_EXIT]]:
-; INTERLEAVE-NEXT:    ret i32 [[TMP5]]
+; INTERLEAVE-NEXT:    ret i32 8
 ;
 entry:
   %step.1 = sext i8 0 to i32
