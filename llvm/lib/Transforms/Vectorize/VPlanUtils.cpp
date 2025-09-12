@@ -252,3 +252,23 @@ vputils::getRecipesForUncountableExit(VPlan &Plan,
 
   return UncountableCondition;
 }
+
+unsigned vputils::getVFScaleFactor(VPRecipeBase *R) {
+  if (!R)
+    return 1;
+
+  using namespace VPlanPatternMatch;
+  if (auto *RR = dyn_cast<VPReductionPHIRecipe>(R))
+    return RR->getVFScaleFactor();
+
+  VPValue *SF;
+  if (match(R, m_Intrinsic<Intrinsic::vector_partial_reduce_add>(
+                   m_VPValue(), m_VPValue(), m_VPValue(SF))))
+    return cast<ConstantInt>(SF->getLiveInIRValue())->getZExtValue();
+
+  assert(
+      (!isa<VPInstruction>(R) || cast<VPInstruction>(R)->getOpcode() !=
+                                     VPInstruction::ReductionStartVector) &&
+      "getting scaling factor of reduction-start-vector not implemented yet");
+  return 1;
+}

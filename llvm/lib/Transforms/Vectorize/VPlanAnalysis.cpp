@@ -11,6 +11,7 @@
 #include "VPlanCFG.h"
 #include "VPlanDominatorTree.h"
 #include "VPlanHelpers.h"
+#include "VPlanPatternMatch.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Analysis/ScalarEvolution.h"
@@ -286,10 +287,10 @@ Type *VPTypeAnalysis::inferScalarType(const VPValue *V) {
               [](const auto *R) { return R->getScalarType(); })
           .Case<VPReductionRecipe, VPPredInstPHIRecipe, VPWidenPHIRecipe,
                 VPScalarIVStepsRecipe, VPWidenGEPRecipe, VPVectorPointerRecipe,
-                VPVectorEndPointerRecipe, VPWidenCanonicalIVRecipe,
-                VPPartialReductionRecipe>([this](const VPRecipeBase *R) {
-            return inferScalarType(R->getOperand(0));
-          })
+                VPVectorEndPointerRecipe, VPWidenCanonicalIVRecipe>(
+              [this](const VPRecipeBase *R) {
+                return inferScalarType(R->getOperand(0));
+              })
           // VPInstructionWithType must be handled before VPInstruction.
           .Case<VPInstructionWithType, VPWidenIntrinsicRecipe,
                 VPWidenCastRecipe>(
