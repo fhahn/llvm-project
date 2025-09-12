@@ -3535,30 +3535,62 @@ void VPlanTransforms::handleUncountableEarlyExit(VPBasicBlock *EarlyExitingVPBB,
   LatchExitingBranch->eraseFromParent();
 }
 
-/// This function tries convert extended in-loop reductions to
-/// VPExpressionRecipe and clamp the \p Range if it is beneficial and
-/// valid. The created recipe must be decomposed to its constituent
-/// recipes before execution.
+namespace {
+// Helper functions for reduction recipe abstraction.
+
+/// Get the vector operand for a reduction recipe (works with both
+/// VPReductionRecipe and VPWidenIntrinsicRecipe for partial reductions).
+VPValue *getReductionVecOp(VPRecipeBase *R) {
+  if (auto *Red = dyn_cast<VPReductionRecipe>(R))
+    return Red->getVecOp();
+  if (auto *Intr = dyn_cast<VPWidenIntrinsicRecipe>(R)) {
+    assert(Intr->getVectorIntrinsicID() ==
+           Intrinsic::vector_partial_reduce_add);
+    return Intr->getOperand(1);
+  }
+  llvm_unreachable("Unexpected recipe type");
+}
+
+/// Get the reduction opcode.
+unsigned getReductionOpcode(VPRecipeBase *R) {
+  if (auto *Red = dyn_cast<VPReductionRecipe>(R))
+    return RecurrenceDescriptor::getOpcode(Red->getRecurrenceKind());
+  if (auto *Intr = dyn_cast<VPWidenIntrinsicRecipe>(R)) {
+    assert(Intr->getVectorIntrinsicID() ==
+           Intrinsic::vector_partial_reduce_add);
+    return Instruction::Add;
+  }
+  llvm_unreachable("Unexpected recipe type");
+}
+
+/// Tries to convert extended in-loop reductions to VPExpressionRecipe, supporting
+/// both VPReductionRecipe and VPWidenIntrinsicRecipe.
+template <typename RedRecipeTy>
 static VPExpressionRecipe *
-tryToMatchAndCreateExtendedReduction(VPReductionRecipe *Red, VPCostContext &Ctx,
+tryToMatchAndCreateExtendedReduction(RedRecipeTy *Red, VPCostContext &Ctx,
                                      VFRange &Range) {
+  // For VPWidenIntrinsicRecipe, only handle partial reductions.
+  if constexpr (std::is_same_v<RedRecipeTy, VPWidenIntrinsicRecipe>) {
+    if (!match(Red, m_VectorPartialReduceAdd()))
+      return nullptr;
+  }
+
   Type *RedTy = Ctx.Types.inferScalarType(Red);
-  VPValue *VecOp = Red->getVecOp();
+  VPValue *VecOp = getReductionVecOp(Red);
+  unsigned Opcode = getReductionOpcode(Red);
+  bool IsPartial = match(Red, m_VectorPartialReduceAdd());
 
   // Clamp the range if using extended-reduction is profitable.
-  auto IsExtendedRedValidAndClampRange =
-      [&](unsigned Opcode, Instruction::CastOps ExtOpc, Type *SrcTy) -> bool {
+  auto IsExtendedRedValidAndClampRange = [&](Instruction::CastOps ExtOpc,
+                                             Type *SrcTy) -> bool {
     return LoopVectorizationPlanner::getDecisionAndClampRange(
         [&](ElementCount VF) {
-          auto *SrcVecTy = cast<VectorType>(toVectorTy(SrcTy, VF));
-          TTI::TargetCostKind CostKind = TTI::TCK_RecipThroughput;
-
-          InstructionCost ExtRedCost;
           InstructionCost ExtCost =
               cast<VPWidenCastRecipe>(VecOp)->computeCost(VF, Ctx);
-          InstructionCost RedCost = Red->computeCost(VF, Ctx);
+          InstructionCost RedCost = Red->cost(VF, Ctx);
 
-          if (isa<VPPartialReductionRecipe>(Red)) {
+          InstructionCost ExtRedCost;
+          if (IsPartial) {
             TargetTransformInfo::PartialReductionExtendKind ExtKind =
                 TargetTransformInfo::getPartialReductionExtendKind(ExtOpc);
             // FIXME: Move partial reduction creation, costing and clamping
@@ -3567,9 +3599,12 @@ tryToMatchAndCreateExtendedReduction(VPReductionRecipe *Red, VPCostContext &Ctx,
                 Opcode, SrcTy, nullptr, RedTy, VF, ExtKind,
                 llvm::TargetTransformInfo::PR_None, std::nullopt, Ctx.CostKind);
           } else {
+            auto *SrcVecTy = cast<VectorType>(toVectorTy(SrcTy, VF));
+            TTI::TargetCostKind CostKind = TTI::TCK_RecipThroughput;
+            auto *VPRed = cast<VPReductionRecipe>(Red);
             ExtRedCost = Ctx.TTI.getExtendedReductionCost(
                 Opcode, ExtOpc == Instruction::CastOps::ZExt, RedTy, SrcVecTy,
-                Red->getFastMathFlags(), CostKind);
+                VPRed->getFastMathFlags(), CostKind);
           }
           return ExtRedCost.isValid() && ExtRedCost < ExtCost + RedCost;
         },
@@ -3580,7 +3615,6 @@ tryToMatchAndCreateExtendedReduction(VPReductionRecipe *Red, VPCostContext &Ctx,
   // Match reduce(ext)).
   if (match(VecOp, m_ZExtOrSExt(m_VPValue(A))) &&
       IsExtendedRedValidAndClampRange(
-          RecurrenceDescriptor::getOpcode(Red->getRecurrenceKind()),
           cast<VPWidenCastRecipe>(VecOp)->getOpcode(),
           Ctx.Types.inferScalarType(A)))
     return new VPExpressionRecipe(cast<VPWidenCastRecipe>(VecOp), Red);
@@ -3588,20 +3622,23 @@ tryToMatchAndCreateExtendedReduction(VPReductionRecipe *Red, VPCostContext &Ctx,
   return nullptr;
 }
 
-/// This function tries convert extended in-loop reductions to
-/// VPExpressionRecipe and clamp the \p Range if it is beneficial
-/// and valid. The created VPExpressionRecipe must be decomposed to its
-/// constituent recipes before execution. Patterns of the
-/// VPExpressionRecipe:
-///   reduce.add(mul(...)),
-///   reduce.add(mul(ext(A), ext(B))),
-///   reduce.add(ext(mul(ext(A), ext(B)))).
-static VPExpressionRecipe *
-tryToMatchAndCreateMulAccumulateReduction(VPReductionRecipe *Red,
-                                          VPCostContext &Ctx, VFRange &Range) {
-  bool IsPartialReduction = isa<VPPartialReductionRecipe>(Red);
+} // namespace
 
-  unsigned Opcode = RecurrenceDescriptor::getOpcode(Red->getRecurrenceKind());
+/// Tries to convert extended in-loop multiply-accumulate reductions to
+/// VPExpressionRecipe, supporting both VPReductionRecipe and VPWidenIntrinsicRecipe.
+template <typename RedRecipeTy>
+static VPExpressionRecipe *
+tryToMatchAndCreateMulAccumulateReduction(RedRecipeTy *Red, VPCostContext &Ctx,
+                                          VFRange &Range) {
+  // For VPWidenIntrinsicRecipe, only handle partial reductions.
+  if constexpr (std::is_same_v<RedRecipeTy, VPWidenIntrinsicRecipe>) {
+    if (!match(Red, m_VectorPartialReduceAdd()))
+      return nullptr;
+  }
+
+  unsigned Opcode = getReductionOpcode(Red);
+  bool IsPartialReduction = match(Red, m_VectorPartialReduceAdd());
+
   if (Opcode != Instruction::Add && Opcode != Instruction::Sub)
     return nullptr;
 
@@ -3644,8 +3681,8 @@ tryToMatchAndCreateMulAccumulateReduction(VPReductionRecipe *Red,
                                                         SrcVecTy, CostKind);
           }
 
-          InstructionCost MulCost = Mul->computeCost(VF, Ctx);
-          InstructionCost RedCost = Red->computeCost(VF, Ctx);
+          InstructionCost MulCost = Mul->cost(VF, Ctx);
+          InstructionCost RedCost = Red->cost(VF, Ctx);
           InstructionCost ExtCost = 0;
           if (Ext0)
             ExtCost += Ext0->computeCost(VF, Ctx);
@@ -3660,14 +3697,21 @@ tryToMatchAndCreateMulAccumulateReduction(VPReductionRecipe *Red,
         Range);
   };
 
-  VPValue *VecOp = Red->getVecOp();
+  VPValue *VecOp = getReductionVecOp(Red);
   VPRecipeBase *Sub = nullptr;
   VPValue *A, *B;
   VPValue *Tmp = nullptr;
   // Sub reductions could have a sub between the add reduction and vec op.
-  if (match(VecOp, m_Sub(m_ZeroInt(), m_VPValue(Tmp)))) {
+  if (!IsPartialReduction && match(VecOp, m_Sub(m_ZeroInt(), m_VPValue(Tmp)))) {
     Sub = VecOp->getDefiningRecipe();
     VecOp = Tmp;
+  } else if (IsPartialReduction) {
+    auto *SubRecipe =
+        dyn_cast_if_present<VPWidenRecipe>(VecOp->getDefiningRecipe());
+    if (SubRecipe && match(SubRecipe, m_Sub(m_VPValue(), m_VPValue()))) {
+      Sub = SubRecipe;
+      VecOp = SubRecipe->getOperand(1);
+    }
   }
 
   // If ValB is a constant and can be safely extended, truncate it to the same
@@ -3691,7 +3735,7 @@ tryToMatchAndCreateMulAccumulateReduction(VPReductionRecipe *Red,
     // same, and it's been proven that the constant can be extended from
     // NarrowTy safely. Necessary since ExtA's extended operand would be
     // e.g. an i8, while the const will likely be an i32. This will be
-    // elided by later optimisations.
+    // elided by later optimizations.
     VPBuilder Builder(Mul);
     auto *Trunc =
         Builder.createWidenCast(Instruction::CastOps::Trunc, ValB, NarrowTy);
@@ -3732,7 +3776,18 @@ tryToMatchAndCreateMulAccumulateReduction(VPReductionRecipe *Red,
   // Match reduce.add(ext(mul(A, B))).
   if (match(VecOp, m_ZExtOrSExt(m_Mul(m_VPValue(A), m_VPValue(B))))) {
     auto *Ext = cast<VPWidenCastRecipe>(VecOp->getDefiningRecipe());
-    auto *Mul = cast<VPWidenRecipe>(Ext->getOperand(0)->getDefiningRecipe());
+    auto *Mul = dyn_cast_or_null<VPWidenRecipe>(
+        Ext->getOperand(0)->getDefiningRecipe());
+
+    // If mul is not found as a VPWidenRecipe (e.g., it's loop-invariant), still
+    // create an expression for partial reductions to keep the extend in the
+    // loop body.
+    if (!Mul && IsPartialReduction)
+      return new VPExpressionRecipe(Ext, Red);
+
+    if (!Mul)
+      return nullptr;
+
     auto *Ext0 = dyn_cast_if_present<VPWidenCastRecipe>(A->getDefiningRecipe());
     auto *Ext1 = dyn_cast_if_present<VPWidenCastRecipe>(B->getDefiningRecipe());
 
@@ -3767,13 +3822,25 @@ tryToMatchAndCreateMulAccumulateReduction(VPReductionRecipe *Red,
       Red->setOperand(1, Mul);
       return new VPExpressionRecipe(NewExt0, NewExt1, Mul, Red);
     }
+    // For partial reductions with wider extends pattern, if we can't apply the
+    // full transformation (e.g., mul has multiple uses), still create an
+    // expression to keep the outer extend in the loop body.
+    if (Ext0 && Ext1 && IsPartialReduction &&
+        (Ext->getOpcode() == Ext0->getOpcode() || Ext0 == Ext1) &&
+        Ext0->getOpcode() == Ext1->getOpcode())
+      return new VPExpressionRecipe(Ext, Red);
+    // For partial reductions, when we can't apply the full transformation
+    // (e.g., mul has multiple uses), still create an expression to keep the
+    // outer extend in the loop body.
+    if (IsPartialReduction)
+      return new VPExpressionRecipe(Ext, Red);
   }
   return nullptr;
 }
 
-/// This function tries to create abstract recipes from the reduction recipe for
-/// following optimizations and cost estimation.
-static void tryToCreateAbstractReductionRecipe(VPReductionRecipe *Red,
+/// Tries to create abstract recipes from a reduction recipe, supporting
+/// both VPReductionRecipe and VPWidenIntrinsicRecipe.
+static void tryToCreateAbstractReductionRecipe(VPSingleDefRecipe *Red,
                                                VPCostContext &Ctx,
                                                VFRange &Range) {
   VPExpressionRecipe *AbstractR = nullptr;
@@ -3798,6 +3865,9 @@ void VPlanTransforms::convertToAbstractRecipes(VPlan &Plan, VPCostContext &Ctx,
     for (VPRecipeBase &R : make_early_inc_range(*VPBB)) {
       if (auto *Red = dyn_cast<VPReductionRecipe>(&R))
         tryToCreateAbstractReductionRecipe(Red, Ctx, Range);
+      else if (match(&R, m_VectorPartialReduceAdd()))
+        tryToCreateAbstractReductionRecipe(
+            cast<VPWidenIntrinsicRecipe>(&R), Ctx, Range);
     }
   }
 }

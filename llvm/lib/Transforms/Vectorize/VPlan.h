@@ -553,7 +553,6 @@ public:
     case VPRecipeBase::VPWidenIntOrFpInductionSC:
     case VPRecipeBase::VPWidenPointerInductionSC:
     case VPRecipeBase::VPReductionPHISC:
-    case VPRecipeBase::VPPartialReductionSC:
       return true;
     case VPRecipeBase::VPBranchOnMaskSC:
     case VPRecipeBase::VPInterleaveEVLSC:
@@ -2717,8 +2716,7 @@ public:
 
   static inline bool classof(const VPRecipeBase *R) {
     return R->getVPDefID() == VPRecipeBase::VPReductionSC ||
-           R->getVPDefID() == VPRecipeBase::VPReductionEVLSC ||
-           R->getVPDefID() == VPRecipeBase::VPPartialReductionSC;
+           R->getVPDefID() == VPRecipeBase::VPReductionEVLSC;
   }
 
   static inline bool classof(const VPUser *U) {
@@ -2762,68 +2760,6 @@ public:
   VPValue *getCondOp() const {
     return isConditional() ? getOperand(getNumOperands() - 1) : nullptr;
   }
-};
-
-/// A recipe for forming partial reductions. In the loop, an accumulator and
-/// vector operand are added together and passed to the next iteration as the
-/// next accumulator. After the loop body, the accumulator is reduced to a
-/// scalar value.
-class VPPartialReductionRecipe : public VPReductionRecipe {
-  unsigned Opcode;
-
-  /// The divisor by which the VF of this recipe's output should be divided
-  /// during execution.
-  unsigned VFScaleFactor;
-
-public:
-  VPPartialReductionRecipe(Instruction *ReductionInst, VPValue *Op0,
-                           VPValue *Op1, VPValue *Cond, unsigned VFScaleFactor)
-      : VPPartialReductionRecipe(ReductionInst->getOpcode(), Op0, Op1, Cond,
-                                 VFScaleFactor, ReductionInst) {}
-  VPPartialReductionRecipe(unsigned Opcode, VPValue *Op0, VPValue *Op1,
-                           VPValue *Cond, unsigned ScaleFactor,
-                           Instruction *ReductionInst = nullptr)
-      : VPReductionRecipe(VPDef::VPPartialReductionSC, RecurKind::Add,
-                          FastMathFlags(), ReductionInst,
-                          ArrayRef<VPValue *>({Op0, Op1}), Cond, false, {}),
-        Opcode(Opcode), VFScaleFactor(ScaleFactor) {
-    [[maybe_unused]] auto *AccumulatorRecipe =
-        getChainOp()->getDefiningRecipe();
-    // When cloning as part of a VPExpressionRecipe the chain op could have
-    // replaced by a temporary VPValue, so it doesn't have a defining recipe.
-    assert((!AccumulatorRecipe ||
-            isa<VPReductionPHIRecipe>(AccumulatorRecipe) ||
-            isa<VPPartialReductionRecipe>(AccumulatorRecipe)) &&
-           "Unexpected operand order for partial reduction recipe");
-  }
-  ~VPPartialReductionRecipe() override = default;
-
-  VPPartialReductionRecipe *clone() override {
-    return new VPPartialReductionRecipe(Opcode, getOperand(0), getOperand(1),
-                                        getCondOp(), VFScaleFactor,
-                                        getUnderlyingInstr());
-  }
-
-  VP_CLASSOF_IMPL(VPDef::VPPartialReductionSC)
-
-  /// Generate the reduction in the loop.
-  void execute(VPTransformState &State) override;
-
-  /// Return the cost of this VPPartialReductionRecipe.
-  InstructionCost computeCost(ElementCount VF,
-                              VPCostContext &Ctx) const override;
-
-  /// Get the binary op's opcode.
-  unsigned getOpcode() const { return Opcode; }
-
-  /// Get the factor that the VF of this recipe's output should be scaled by.
-  unsigned getVFScaleFactor() const { return VFScaleFactor; }
-
-#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
-  /// Print the recipe.
-  void print(raw_ostream &O, const Twine &Indent,
-             VPSlotTracker &SlotTracker) const override;
-#endif
 };
 
 /// A recipe to represent inloop reduction operations with vector-predication
@@ -3038,24 +2974,42 @@ class VPExpressionRecipe : public VPSingleDefRecipe {
                      ArrayRef<VPSingleDefRecipe *> ExpressionRecipes);
 
 public:
-  VPExpressionRecipe(VPWidenCastRecipe *Ext, VPReductionRecipe *Red)
-      : VPExpressionRecipe(ExpressionTypes::ExtendedReduction, {Ext, Red}) {}
-  VPExpressionRecipe(VPWidenRecipe *Mul, VPReductionRecipe *Red)
-      : VPExpressionRecipe(ExpressionTypes::MulAccReduction, {Mul, Red}) {}
+  VPExpressionRecipe(VPWidenCastRecipe *Ext, VPSingleDefRecipe *Red)
+      : VPExpressionRecipe(ExpressionTypes::ExtendedReduction, {Ext, Red}) {
+    assert((isa<VPReductionRecipe>(Red) || isa<VPWidenIntrinsicRecipe>(Red)) &&
+           "Red must be a VPReductionRecipe or VPWidenIntrinsicRecipe");
+  }
+  VPExpressionRecipe(VPWidenRecipe *Mul, VPSingleDefRecipe *Red)
+      : VPExpressionRecipe(ExpressionTypes::MulAccReduction, {Mul, Red}) {
+    assert((isa<VPReductionRecipe>(Red) || isa<VPWidenIntrinsicRecipe>(Red)) &&
+           "Red must be a VPReductionRecipe or VPWidenIntrinsicRecipe");
+  }
   VPExpressionRecipe(VPWidenCastRecipe *Ext0, VPWidenCastRecipe *Ext1,
-                     VPWidenRecipe *Mul, VPReductionRecipe *Red)
+                     VPWidenRecipe *Mul, VPSingleDefRecipe *Red)
       : VPExpressionRecipe(ExpressionTypes::ExtMulAccReduction,
-                           {Ext0, Ext1, Mul, Red}) {}
+                           {Ext0, Ext1, Mul, Red}) {
+    assert((isa<VPReductionRecipe>(Red) || isa<VPWidenIntrinsicRecipe>(Red)) &&
+           "Red must be a VPReductionRecipe or VPWidenIntrinsicRecipe");
+  }
   VPExpressionRecipe(VPWidenCastRecipe *Ext0, VPWidenCastRecipe *Ext1,
                      VPWidenRecipe *Mul, VPWidenRecipe *Sub,
-                     VPReductionRecipe *Red)
+                     VPSingleDefRecipe *Red)
       : VPExpressionRecipe(ExpressionTypes::ExtNegatedMulAccReduction,
                            {Ext0, Ext1, Mul, Sub, Red}) {
     assert(Mul->getOpcode() == Instruction::Mul && "Expected a mul");
-    assert(Red->getRecurrenceKind() == RecurKind::Add &&
-           "Expected an add reduction");
+    assert((isa<VPReductionRecipe>(Red) || isa<VPWidenIntrinsicRecipe>(Red)) &&
+           "Red must be a VPReductionRecipe or VPWidenIntrinsicRecipe");
+    if (auto *VPRed = dyn_cast<VPReductionRecipe>(Red)) {
+      assert(VPRed->getRecurrenceKind() == RecurKind::Add &&
+             "Expected an add reduction");
+    } else {
+      assert(cast<VPWidenIntrinsicRecipe>(Red)->getVectorIntrinsicID() ==
+                 Intrinsic::vector_partial_reduce_add &&
+             "Expected a partial reduction add");
+    }
     assert(getNumOperands() >= 3 && "Expected at least three operands");
-    [[maybe_unused]] auto *SubConst = dyn_cast<ConstantInt>(getOperand(2)->getLiveInIRValue());
+    [[maybe_unused]] auto *SubConst =
+        dyn_cast<ConstantInt>(getOperand(2)->getLiveInIRValue());
     assert(SubConst && SubConst->getValue() == 0 &&
            Sub->getOpcode() == Instruction::Sub && "Expected a negating sub");
   }
@@ -3091,9 +3045,9 @@ public:
 
   /// Return the VPValue to use to infer the result type of the recipe.
   VPValue *getOperandOfResultType() const {
-    unsigned OpIdx =
-        cast<VPReductionRecipe>(ExpressionRecipes.back())->isConditional() ? 2
-                                                                           : 1;
+    unsigned OpIdx = 1;
+    if (auto *Red = dyn_cast<VPReductionRecipe>(ExpressionRecipes.back()))
+      OpIdx = Red->isConditional() ? 2 : 1;
     return getOperand(getNumOperands() - OpIdx);
   }
 
@@ -3102,10 +3056,7 @@ public:
   /// removed before codegen.
   void decompose();
 
-  unsigned getVFScaleFactor() const {
-    auto *PR = dyn_cast<VPPartialReductionRecipe>(ExpressionRecipes.back());
-    return PR ? PR->getVFScaleFactor() : 1;
-  }
+  unsigned getVFScaleFactor() const;
 
   /// Method for generating code, must not be called as this recipe is abstract.
   void execute(VPTransformState &State) override {
@@ -3131,6 +3082,11 @@ public:
 
   /// Returns true if the result of this VPExpressionRecipe is a single-scalar.
   bool isSingleScalar() const;
+
+  /// Returns the recipes included in this expression.
+  ArrayRef<VPSingleDefRecipe *> getExpressionRecipes() const {
+    return ExpressionRecipes;
+  }
 };
 
 /// VPPredInstPHIRecipe is a recipe for generating the phi nodes needed when

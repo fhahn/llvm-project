@@ -176,7 +176,6 @@ bool VPRecipeBase::mayHaveSideEffects() const {
     return cast<VPWidenIntrinsicRecipe>(this)->mayHaveSideEffects();
   case VPBlendSC:
   case VPReductionEVLSC:
-  case VPPartialReductionSC:
   case VPReductionSC:
   case VPScalarIVStepsSC:
   case VPVectorPointerSC:
@@ -304,119 +303,6 @@ bool VPRecipeBase::isScalarCast() const {
   auto *VPI = dyn_cast<VPInstruction>(this);
   return VPI && Instruction::isCast(VPI->getOpcode());
 }
-
-InstructionCost
-VPPartialReductionRecipe::computeCost(ElementCount VF,
-                                      VPCostContext &Ctx) const {
-  std::optional<unsigned> Opcode;
-  VPValue *Op = getVecOp();
-  uint64_t MulConst;
-  // If the partial reduction is predicated, a select will be operand 1.
-  // If it isn't predicated and the mul isn't operating on a constant, then it
-  // should have been turned into a VPExpressionRecipe.
-  // FIXME: Replace the entire function with this once all partial reduction
-  // variants are bundled into VPExpressionRecipe.
-  if (!match(Op, m_Select(m_VPValue(), m_VPValue(Op), m_VPValue())) &&
-      !match(Op, m_Mul(m_VPValue(), m_ConstantInt(MulConst)))) {
-    auto *PhiType = Ctx.Types.inferScalarType(getChainOp());
-    auto *InputType = Ctx.Types.inferScalarType(getVecOp());
-    return Ctx.TTI.getPartialReductionCost(getOpcode(), InputType, InputType,
-                                           PhiType, VF, TTI::PR_None,
-                                           TTI::PR_None, {}, Ctx.CostKind);
-  }
-
-  VPRecipeBase *OpR = Op->getDefiningRecipe();
-  Type *InputTypeA = nullptr, *InputTypeB = nullptr;
-  TTI::PartialReductionExtendKind ExtAType = TTI::PR_None,
-                                  ExtBType = TTI::PR_None;
-
-  auto GetExtendKind = [](VPRecipeBase *R) {
-    if (!R)
-      return TTI::PR_None;
-    auto *WidenCastR = dyn_cast<VPWidenCastRecipe>(R);
-    if (!WidenCastR)
-      return TTI::PR_None;
-    if (WidenCastR->getOpcode() == Instruction::CastOps::ZExt)
-      return TTI::PR_ZeroExtend;
-    if (WidenCastR->getOpcode() == Instruction::CastOps::SExt)
-      return TTI::PR_SignExtend;
-    return TTI::PR_None;
-  };
-
-  // Pick out opcode, type/ext information and use sub side effects from a widen
-  // recipe.
-  auto HandleWiden = [&](VPWidenRecipe *Widen) {
-    if (match(Widen, m_Sub(m_ZeroInt(), m_VPValue(Op)))) {
-      Widen = dyn_cast<VPWidenRecipe>(Op->getDefiningRecipe());
-    }
-    Opcode = Widen->getOpcode();
-    VPRecipeBase *ExtAR = Widen->getOperand(0)->getDefiningRecipe();
-    VPRecipeBase *ExtBR = Widen->getOperand(1)->getDefiningRecipe();
-    InputTypeA = Ctx.Types.inferScalarType(ExtAR ? ExtAR->getOperand(0)
-                                                 : Widen->getOperand(0));
-    InputTypeB = Ctx.Types.inferScalarType(ExtBR ? ExtBR->getOperand(0)
-                                                 : Widen->getOperand(1));
-    ExtAType = GetExtendKind(ExtAR);
-    ExtBType = GetExtendKind(ExtBR);
-
-    using namespace VPlanPatternMatch;
-    const APInt *C;
-    if (!ExtBR && match(Widen->getOperand(1), m_APInt(C)) &&
-        canConstantBeExtended(C, InputTypeA, ExtAType)) {
-      InputTypeB = InputTypeA;
-      ExtBType = ExtAType;
-    }
-  };
-
-  if (isa<VPWidenCastRecipe>(OpR)) {
-    InputTypeA = Ctx.Types.inferScalarType(OpR->getOperand(0));
-    ExtAType = GetExtendKind(OpR);
-  } else if (isa<VPReductionPHIRecipe>(OpR)) {
-    auto RedPhiOp1R = getOperand(1)->getDefiningRecipe();
-    if (isa<VPWidenCastRecipe>(RedPhiOp1R)) {
-      InputTypeA = Ctx.Types.inferScalarType(RedPhiOp1R->getOperand(0));
-      ExtAType = GetExtendKind(RedPhiOp1R);
-    } else if (auto Widen = dyn_cast<VPWidenRecipe>(RedPhiOp1R))
-      HandleWiden(Widen);
-  } else if (auto Widen = dyn_cast<VPWidenRecipe>(OpR)) {
-    HandleWiden(Widen);
-  } else if (auto Reduction = dyn_cast<VPPartialReductionRecipe>(OpR)) {
-    return Reduction->computeCost(VF, Ctx);
-  }
-  auto *PhiType = Ctx.Types.inferScalarType(getOperand(1));
-  return Ctx.TTI.getPartialReductionCost(getOpcode(), InputTypeA, InputTypeB,
-                                         PhiType, VF, ExtAType, ExtBType,
-                                         Opcode, Ctx.CostKind);
-}
-
-void VPPartialReductionRecipe::execute(VPTransformState &State) {
-  auto &Builder = State.Builder;
-
-  assert(getOpcode() == Instruction::Add &&
-         "Unhandled partial reduction opcode");
-
-  Value *BinOpVal = State.get(getOperand(1));
-  Value *PhiVal = State.get(getOperand(0));
-  assert(PhiVal && BinOpVal && "Phi and Mul must be set");
-
-  Type *RetTy = PhiVal->getType();
-
-  CallInst *V =
-      Builder.CreateIntrinsic(RetTy, Intrinsic::vector_partial_reduce_add,
-                              {PhiVal, BinOpVal}, nullptr, "partial.reduce");
-
-  State.set(this, V);
-}
-
-#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
-void VPPartialReductionRecipe::print(raw_ostream &O, const Twine &Indent,
-                                     VPSlotTracker &SlotTracker) const {
-  O << Indent << "PARTIAL-REDUCE ";
-  printAsOperand(O, SlotTracker);
-  O << " = " << Instruction::getOpcodeName(getOpcode()) << " ";
-  printOperands(O, SlotTracker);
-}
-#endif
 
 void VPIRFlags::intersectFlags(const VPIRFlags &Other) {
   assert(OpType == Other.OpType && "OpType must match");
@@ -1750,10 +1636,22 @@ void VPWidenIntrinsicRecipe::execute(VPTransformState &State) {
 
   SmallVector<Type *, 2> TysForDecl;
   // Add return type if intrinsic is overloaded on it.
-  if (isVectorIntrinsicWithOverloadTypeAtArg(VectorIntrinsicID, -1, State.TTI))
-    TysForDecl.push_back(VectorType::get(getResultType(), State.VF));
+  if (isVectorIntrinsicWithOverloadTypeAtArg(VectorIntrinsicID, -1,
+                                             State.TTI)) {
+    if (VectorIntrinsicID == Intrinsic::vector_partial_reduce_add) {
+      TysForDecl.push_back(VectorType::get(
+          getResultType(),
+          State.VF.divideCoefficientBy(
+              cast<ConstantInt>(getOperand(2)->getLiveInIRValue())
+                  ->getZExtValue())));
+    } else
+      TysForDecl.push_back(VectorType::get(getResultType(), State.VF));
+  }
   SmallVector<Value *, 4> Args;
   for (const auto &I : enumerate(operands())) {
+    if (VectorIntrinsicID == Intrinsic::vector_partial_reduce_add &&
+        I.index() == 2)
+      break;
     // Some intrinsics have a scalar argument - don't replace it with a
     // vector.
     Value *Arg;
@@ -1836,7 +1734,88 @@ static InstructionCost getCostForIntrinsics(Intrinsic::ID ID,
 InstructionCost VPWidenIntrinsicRecipe::computeCost(ElementCount VF,
                                                     VPCostContext &Ctx) const {
   SmallVector<const VPValue *> ArgOps(operands());
-  return getCostForIntrinsics(VectorIntrinsicID, ArgOps, *this, VF, Ctx);
+  if (VectorIntrinsicID != Intrinsic::vector_partial_reduce_add)
+    return getCostForIntrinsics(VectorIntrinsicID, ArgOps, *this, VF, Ctx);
+
+  // TODO: Cost for Ext/Mul/Accumulate should be computed together using
+  // VPExpressionRecipe.
+  std::optional<unsigned> Opcode;
+  VPValue *Op = getOperand(0);
+  VPRecipeBase *OpR = Op->getDefiningRecipe();
+
+  // If the partial reduction is predicated, a select will be operand 0
+  using namespace llvm::VPlanPatternMatch;
+  if (match(getOperand(1), m_Select(m_VPValue(), m_VPValue(Op), m_VPValue()))) {
+    OpR = Op->getDefiningRecipe();
+  }
+
+  Type *InputTypeA = nullptr, *InputTypeB = nullptr;
+  TTI::PartialReductionExtendKind ExtAType = TTI::PR_None,
+                                  ExtBType = TTI::PR_None;
+
+  auto GetExtendKind = [](VPRecipeBase *R) {
+    if (!R)
+      return TTI::PR_None;
+    auto *WidenCastR = dyn_cast<VPWidenCastRecipe>(R);
+    if (!WidenCastR)
+      return TTI::PR_None;
+    if (WidenCastR->getOpcode() == Instruction::CastOps::ZExt)
+      return TTI::PR_ZeroExtend;
+    if (WidenCastR->getOpcode() == Instruction::CastOps::SExt)
+      return TTI::PR_SignExtend;
+    return TTI::PR_None;
+  };
+
+  // Pick out opcode, type/ext information and use sub side effects from a widen
+  // recipe.
+  auto HandleWiden = [&](VPWidenRecipe *Widen) {
+    if (match(Widen, m_Sub(m_SpecificInt(0), m_VPValue(Op)))) {
+      Widen = dyn_cast<VPWidenRecipe>(Op->getDefiningRecipe());
+    }
+    Opcode = Widen->getOpcode();
+    VPRecipeBase *ExtAR = Widen->getOperand(0)->getDefiningRecipe();
+    VPRecipeBase *ExtBR = Widen->getOperand(1)->getDefiningRecipe();
+    InputTypeA = Ctx.Types.inferScalarType(ExtAR ? ExtAR->getOperand(0)
+                                                 : Widen->getOperand(0));
+    InputTypeB = Ctx.Types.inferScalarType(ExtBR ? ExtBR->getOperand(0)
+                                                 : Widen->getOperand(1));
+    ExtAType = GetExtendKind(ExtAR);
+    ExtBType = GetExtendKind(ExtBR);
+
+    if (!ExtBR && Widen->getOperand(1)->isLiveIn()) {
+      auto *CI =
+          dyn_cast<ConstantInt>(Widen->getOperand(1)->getLiveInIRValue());
+      if (CI && canConstantBeExtended(&CI->getValue(), InputTypeA, ExtAType)) {
+        InputTypeB = InputTypeA;
+        ExtBType = ExtAType;
+      }
+    }
+  };
+
+  if (isa<VPWidenCastRecipe>(OpR)) {
+    InputTypeA = Ctx.Types.inferScalarType(OpR->getOperand(0));
+    ExtAType = GetExtendKind(OpR);
+  } else if (isa<VPReductionPHIRecipe>(OpR)) {
+    auto RedPhiOp1R = getOperand(1)->getDefiningRecipe();
+    if (isa<VPWidenCastRecipe>(RedPhiOp1R)) {
+      InputTypeA = Ctx.Types.inferScalarType(RedPhiOp1R->getOperand(0));
+      ExtAType = GetExtendKind(RedPhiOp1R);
+    } else if (auto Widen = dyn_cast<VPWidenRecipe>(RedPhiOp1R))
+      HandleWiden(Widen);
+  } else if (auto Widen = dyn_cast<VPWidenRecipe>(OpR)) {
+    HandleWiden(Widen);
+  } else if (match(OpR, m_VectorPartialReduceAdd())) {
+    return cast<VPWidenIntrinsicRecipe>(OpR)->computeCost(VF, Ctx);
+  }
+
+  if (!InputTypeA)
+    return getCostForIntrinsics(VectorIntrinsicID, ArgOps, *this, VF, Ctx);
+
+  auto *PhiType = Ctx.Types.inferScalarType(getOperand(1));
+
+  return Ctx.TTI.getPartialReductionCost(Instruction::Add, InputTypeA,
+                                         InputTypeB, PhiType, VF, ExtAType,
+                                         ExtBType, Opcode, Ctx.CostKind);
 }
 
 StringRef VPWidenIntrinsicRecipe::getIntrinsicName() const {
@@ -2870,14 +2849,26 @@ InstructionCost VPExpressionRecipe::computeCost(ElementCount VF,
       toVectorTy(Ctx.Types.inferScalarType(getOperand(0)), VF));
   assert(RedTy->isIntegerTy() &&
          "VPExpressionRecipe only supports integer types currently.");
-  unsigned Opcode = RecurrenceDescriptor::getOpcode(
-      cast<VPReductionRecipe>(ExpressionRecipes.back())->getRecurrenceKind());
+
+  // Helper to get the opcode for the reduction operation.
+  auto GetReductionOpcode = [](VPSingleDefRecipe *Red) -> unsigned {
+    if (auto *ReductionRecipe = dyn_cast<VPReductionRecipe>(Red))
+      return RecurrenceDescriptor::getOpcode(
+          ReductionRecipe->getRecurrenceKind());
+    // VPWidenIntrinsicRecipe for vector_partial_reduce_add always uses Add.
+    assert(isa<VPWidenIntrinsicRecipe>(Red) &&
+           cast<VPWidenIntrinsicRecipe>(Red)->getVectorIntrinsicID() ==
+               Intrinsic::vector_partial_reduce_add &&
+           "Expected partial reduction add intrinsic");
+    return Instruction::Add;
+  };
+
+  unsigned Opcode = GetReductionOpcode(ExpressionRecipes.back());
   switch (ExpressionType) {
   case ExpressionTypes::ExtendedReduction: {
-    unsigned Opcode = RecurrenceDescriptor::getOpcode(
-        cast<VPReductionRecipe>(ExpressionRecipes[1])->getRecurrenceKind());
+    unsigned Opcode = GetReductionOpcode(ExpressionRecipes[1]);
     auto *ExtR = cast<VPWidenCastRecipe>(ExpressionRecipes[0]);
-    return isa<VPPartialReductionRecipe>(ExpressionRecipes.back())
+    return match(ExpressionRecipes.back(), m_VectorPartialReduceAdd())
                ? Ctx.TTI.getPartialReductionCost(
                      Opcode, Ctx.Types.inferScalarType(getOperand(0)), nullptr,
                      RedTy, VF,
@@ -2897,7 +2888,7 @@ InstructionCost VPExpressionRecipe::computeCost(ElementCount VF,
     Opcode = Instruction::Sub;
     [[fallthrough]];
   case ExpressionTypes::ExtMulAccReduction: {
-    if (isa<VPPartialReductionRecipe>(ExpressionRecipes.back())) {
+    if (match(ExpressionRecipes.back(), m_VectorPartialReduceAdd())) {
       auto *Ext0R = cast<VPWidenCastRecipe>(ExpressionRecipes[0]);
       auto *Ext1R = cast<VPWidenCastRecipe>(ExpressionRecipes[1]);
       auto *Mul = cast<VPWidenRecipe>(ExpressionRecipes[2]);
@@ -2937,7 +2928,31 @@ bool VPExpressionRecipe::isSingleScalar() const {
   // Cannot use vputils::isSingleScalar(), because all external operands
   // of the expression will be live-ins while bundled.
   return isa<VPReductionRecipe>(ExpressionRecipes.back()) &&
-         !isa<VPPartialReductionRecipe>(ExpressionRecipes.back());
+         !match(ExpressionRecipes.back(), m_VectorPartialReduceAdd());
+}
+
+unsigned VPExpressionRecipe::getVFScaleFactor() const {
+  uint64_t SF;
+  auto *LastRecipe = ExpressionRecipes.back();
+
+  // Check for VPWidenIntrinsicRecipe with partial reduction.
+  if (match(LastRecipe,
+            m_Intrinsic<Intrinsic::vector_partial_reduce_add>(
+                m_VPValue(), m_VPValue(), m_ConstantInt(SF))))
+    return SF;
+
+  // Check for VPReductionRecipe with partial reduction.
+  // When recipes are bundled into an expression, external operands are replaced
+  // with placeholders. The original operands are stored as operands of the
+  // VPExpressionRecipe itself. Look through all operands to find the
+  // VPReductionPHIRecipe, which contains the scale factor.
+  for (VPValue *Op : operands()) {
+    if (auto *PhiR =
+            dyn_cast_or_null<VPReductionPHIRecipe>(Op->getDefiningRecipe()))
+      return PhiR->getVFScaleFactor();
+  }
+
+  return 1;
 }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
@@ -2947,22 +2962,49 @@ void VPExpressionRecipe::print(raw_ostream &O, const Twine &Indent,
   O << Indent << "EXPRESSION ";
   printAsOperand(O, SlotTracker);
   O << " = ";
-  auto *Red = cast<VPReductionRecipe>(ExpressionRecipes.back());
-  unsigned Opcode = RecurrenceDescriptor::getOpcode(Red->getRecurrenceKind());
-  bool IsPartialReduction = isa<VPPartialReductionRecipe>(Red);
+
+  // The last recipe can be either VPReductionRecipe or VPWidenIntrinsicRecipe
+  VPSingleDefRecipe *LastRecipe = ExpressionRecipes.back();
+  auto *Red = dyn_cast<VPReductionRecipe>(LastRecipe);
+  auto *IntrRed = dyn_cast<VPWidenIntrinsicRecipe>(LastRecipe);
+
+  unsigned Opcode;
+  bool IsConditionalRed = false;
+  bool IsPartialReduction = false;
+
+  if (Red) {
+    Opcode = RecurrenceDescriptor::getOpcode(Red->getRecurrenceKind());
+    IsConditionalRed = Red->isConditional();
+    IsPartialReduction = match(Red, m_VectorPartialReduceAdd());
+  } else {
+    // For VPWidenIntrinsicRecipe, it's always a partial reduction with Add
+    assert(match(IntrRed, m_VectorPartialReduceAdd()) &&
+           "Expected partial reduction intrinsic");
+    Opcode = Instruction::Add;
+    IsConditionalRed = false;
+    IsPartialReduction = true;
+  }
 
   switch (ExpressionType) {
   case ExpressionTypes::ExtendedReduction: {
-    getOperand(1)->printAsOperand(O, SlotTracker);
+    // For partial reductions, the accumulator is inside the reduction recipe
+    VPValue *Accum;
+    if (IntrRed) {
+      Accum = ExpressionRecipes.back()->getOperand(0);
+    } else {
+      Accum = getOperand(1);
+    }
+    Accum->printAsOperand(O, SlotTracker);
     O << " + " << (IsPartialReduction ? "partial." : "") << "reduce.";
     O << Instruction::getOpcodeName(Opcode) << " (";
     getOperand(0)->printAsOperand(O, SlotTracker);
-    Red->printFlags(O);
+    if (Red)
+      Red->printFlags(O);
 
     auto *Ext0 = cast<VPWidenCastRecipe>(ExpressionRecipes[0]);
     O << Instruction::getOpcodeName(Ext0->getOpcode()) << " to "
       << *Ext0->getResultType();
-    if (Red->isConditional()) {
+    if (IsConditionalRed) {
       O << ", ";
       Red->getCondOp()->printAsOperand(O, SlotTracker);
     }
@@ -2970,11 +3012,12 @@ void VPExpressionRecipe::print(raw_ostream &O, const Twine &Indent,
     break;
   }
   case ExpressionTypes::ExtNegatedMulAccReduction: {
-    getOperand(getNumOperands() - 1)->printAsOperand(O, SlotTracker);
+    // Accumulator is always at operand 3 for ExtNegatedMulAccReduction
+    // (operand 0,1 are load results, operand 2 is constant 0, operand 3 is
+    // accumulator)
+    getOperand(3)->printAsOperand(O, SlotTracker);
     O << " + " << (IsPartialReduction ? "partial." : "") << "reduce.";
-    O << Instruction::getOpcodeName(
-             RecurrenceDescriptor::getOpcode(Red->getRecurrenceKind()))
-      << " (sub (0, mul";
+    O << Instruction::getOpcodeName(Opcode) << " (sub (0, mul";
     auto *Mul = cast<VPWidenRecipe>(ExpressionRecipes[2]);
     Mul->printFlags(O);
     O << "(";
@@ -2986,7 +3029,7 @@ void VPExpressionRecipe::print(raw_ostream &O, const Twine &Indent,
     auto *Ext1 = cast<VPWidenCastRecipe>(ExpressionRecipes[1]);
     O << " " << Instruction::getOpcodeName(Ext1->getOpcode()) << " to "
       << *Ext1->getResultType() << ")";
-    if (Red->isConditional()) {
+    if (IsConditionalRed) {
       O << ", ";
       Red->getCondOp()->printAsOperand(O, SlotTracker);
     }
@@ -2995,11 +3038,11 @@ void VPExpressionRecipe::print(raw_ostream &O, const Twine &Indent,
   }
   case ExpressionTypes::MulAccReduction:
   case ExpressionTypes::ExtMulAccReduction: {
-    getOperand(getNumOperands() - 1)->printAsOperand(O, SlotTracker);
+    // Accumulator is always at operand 2 for MulAcc/ExtMulAcc
+    // (operand 0,1 are load results, operand 2 is accumulator)
+    getOperand(2)->printAsOperand(O, SlotTracker);
     O << " + " << (IsPartialReduction ? "partial." : "") << "reduce.";
-    O << Instruction::getOpcodeName(
-             RecurrenceDescriptor::getOpcode(Red->getRecurrenceKind()))
-      << " (";
+    O << Instruction::getOpcodeName(Opcode) << " (";
     O << "mul";
     bool IsExtended = ExpressionType == ExpressionTypes::ExtMulAccReduction;
     auto *Mul = cast<VPWidenRecipe>(IsExtended ? ExpressionRecipes[2]
@@ -3021,7 +3064,7 @@ void VPExpressionRecipe::print(raw_ostream &O, const Twine &Indent,
       O << " " << Instruction::getOpcodeName(Ext1->getOpcode()) << " to "
         << *Ext1->getResultType() << ")";
     }
-    if (Red->isConditional()) {
+    if (IsConditionalRed) {
       O << ", ";
       Red->getCondOp()->printAsOperand(O, SlotTracker);
     }

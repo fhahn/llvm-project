@@ -212,6 +212,8 @@ bool llvm::isVectorIntrinsicWithOverloadTypeAtArg(
   case Intrinsic::powi:
   case Intrinsic::ldexp:
     return OpdIdx == -1 || OpdIdx == 1;
+  case Intrinsic::vector_partial_reduce_add:
+    return OpdIdx == -1 || OpdIdx == 1;
   default:
     return OpdIdx == -1;
   }

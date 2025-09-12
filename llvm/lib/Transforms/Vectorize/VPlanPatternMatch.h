@@ -845,6 +845,11 @@ m_Intrinsic(const T0 &Op0, const T1 &Op1, const T2 &Op2, const T3 &Op3) {
   return m_CombineAnd(m_Intrinsic<IntrID>(Op0, Op1, Op2), m_Argument<3>(Op3));
 }
 
+/// Convenience matcher for partial reduction intrinsics.
+inline IntrinsicID_match m_VectorPartialReduceAdd() {
+  return m_Intrinsic<Intrinsic::vector_partial_reduce_add>();
+}
+
 struct live_in_vpvalue {
   template <typename ITy> bool match(ITy *V) const {
     VPValue *Val = dyn_cast<VPValue>(V);

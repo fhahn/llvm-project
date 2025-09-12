@@ -175,7 +175,7 @@ bool vputils::isSingleScalar(const VPValue *VPV) {
     return VPI->isSingleScalar() || VPI->isVectorToScalar() ||
            (PreservesUniformity(VPI->getOpcode()) &&
             all_of(VPI->operands(), isSingleScalar));
-  if (isa<VPPartialReductionRecipe>(VPV))
+  if (match(VPV, m_VectorPartialReduceAdd()))
     return false;
   if (isa<VPReductionRecipe>(VPV))
     return true;
@@ -241,12 +241,27 @@ VPBasicBlock *vputils::getFirstLoopHeader(VPlan &Plan, VPDominatorTree &VPDT) {
 unsigned vputils::getVFScaleFactor(VPRecipeBase *R) {
   if (!R)
     return 1;
+
+  using namespace VPlanPatternMatch;
   if (auto *RR = dyn_cast<VPReductionPHIRecipe>(R))
     return RR->getVFScaleFactor();
-  if (auto *RR = dyn_cast<VPPartialReductionRecipe>(R))
-    return RR->getVFScaleFactor();
-  if (auto *ER = dyn_cast<VPExpressionRecipe>(R))
-    return ER->getVFScaleFactor();
+
+  if (auto *ExprR = dyn_cast<VPExpressionRecipe>(R))
+    return ExprR->getVFScaleFactor();
+
+  // Check for VPReductionRecipe with partial reduction.
+  // The chain operand points to the VPReductionPHIRecipe.
+  if (auto *RR = dyn_cast<VPReductionRecipe>(R)) {
+    if (auto *PhiR = dyn_cast_or_null<VPReductionPHIRecipe>(
+            RR->getChainOp()->getDefiningRecipe()))
+      return PhiR->getVFScaleFactor();
+  }
+
+  uint64_t SF;
+  if (match(R, m_Intrinsic<Intrinsic::vector_partial_reduce_add>(
+                   m_VPValue(), m_VPValue(), m_ConstantInt(SF))))
+    return SF;
+
   assert(
       (!isa<VPInstruction>(R) || cast<VPInstruction>(R)->getOpcode() !=
                                      VPInstruction::ReductionStartVector) &&

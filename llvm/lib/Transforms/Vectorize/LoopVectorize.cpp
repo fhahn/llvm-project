@@ -6958,10 +6958,6 @@ static bool planContainsAdditionalSimplifications(VPlan &Plan,
                              VPInstruction::FirstOrderRecurrenceSplice>())))
           return true;
       }
-      // The VPlan-based cost model is more accurate for partial reduction and
-      // comparing against the legacy cost isn't desirable.
-      if (isa<VPPartialReductionRecipe>(&R))
-        return true;
 
       // The VPlan-based cost model can analyze if recipes are scalar
       // recursively, but the legacy cost model cannot.
@@ -8144,6 +8140,7 @@ VPRecipeBase *
 VPRecipeBuilder::tryToCreatePartialReduction(Instruction *Reduction,
                                              ArrayRef<VPValue *> Operands,
                                              unsigned ScaleFactor) {
+  using namespace VPlanPatternMatch;
   assert(Operands.size() == 2 &&
          "Unexpected number of operands for partial reduction");
 
@@ -8151,7 +8148,7 @@ VPRecipeBuilder::tryToCreatePartialReduction(Instruction *Reduction,
   VPValue *Accumulator = Operands[1];
   VPRecipeBase *BinOpRecipe = BinOp->getDefiningRecipe();
   if (isa<VPReductionPHIRecipe>(BinOpRecipe) ||
-      isa<VPPartialReductionRecipe>(BinOpRecipe))
+      match(BinOpRecipe, m_VectorPartialReduceAdd()))
     std::swap(BinOp, Accumulator);
 
   if (ScaleFactor !=
@@ -8179,8 +8176,11 @@ VPRecipeBuilder::tryToCreatePartialReduction(Instruction *Reduction,
     VPValue *Zero = Plan.getConstantInt(Reduction->getType(), 0);
     BinOp = Builder.createSelect(Cond, BinOp, Zero, Reduction->getDebugLoc());
   }
-  return new VPPartialReductionRecipe(ReductionOpcode, Accumulator, BinOp, Cond,
-                                      ScaleFactor, Reduction);
+  return new VPWidenIntrinsicRecipe(Intrinsic::vector_partial_reduce_add,
+                                    {Accumulator, BinOp,
+                                     Plan.getOrAddLiveIn(ConstantInt::get(
+                                         Reduction->getType(), ScaleFactor))},
+                                    Reduction->getType());
 }
 
 void LoopVectorizationPlanner::buildVPlansWithVPRecipes(ElementCount MinVF,
@@ -8724,7 +8724,7 @@ void LoopVectorizationPlanner::adjustRecipesForReductions(
     // with fewer lanes than the VF. So the operands of the select would have
     // different numbers of lanes. Partial reductions mask the input instead.
     if (!PhiR->isInLoop() && CM.foldTailByMasking() &&
-        !isa<VPPartialReductionRecipe>(OrigExitingVPV->getDefiningRecipe())) {
+        !match(OrigExitingVPV, m_VectorPartialReduceAdd())) {
       VPValue *Cond = RecipeBuilder.getBlockInMask(PhiR->getParent());
       std::optional<FastMathFlags> FMFs =
           PhiTy->isFloatingPointTy()
