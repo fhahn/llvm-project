@@ -356,6 +356,10 @@ struct VPlanTransforms {
   static void
   addBranchWeightToMiddleTerminator(VPlan &Plan, ElementCount VF,
                                     std::optional<unsigned> VScaleForTuning);
+
+  static void tryToConvertToPartialReductions(VPlan &Plan,
+                                              const TargetTransformInfo &TTI,
+                                              VFRange &Range);
 };
 
 } // namespace llvm

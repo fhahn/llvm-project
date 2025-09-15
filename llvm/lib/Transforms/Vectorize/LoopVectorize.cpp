@@ -8715,6 +8715,8 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(
   // Adjust the recipes for any inloop reductions.
   adjustRecipesForReductions(Plan, RecipeBuilder, Range.Start);
 
+  VPlanTransforms::tryToConvertToPartialReductions(*Plan, TTI, Range);
+
   // Apply mandatory transformation to handle FP maxnum/minnum reduction with
   // NaNs if possible, bail out otherwise.
   if (!VPlanTransforms::runPass(VPlanTransforms::handleMaxMinNumReductions,

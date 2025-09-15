@@ -1636,6 +1636,7 @@ void VPWidenIntrinsicRecipe::execute(VPTransformState &State) {
     if (isVectorIntrinsicWithOverloadTypeAtArg(VectorIntrinsicID, I.index(),
                                                State.TTI))
       TysForDecl.push_back(Arg->getType());
+
     Args.push_back(Arg);
   }
 

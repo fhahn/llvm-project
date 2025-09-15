@@ -4165,3 +4165,106 @@ void VPlanTransforms::addBranchWeightToMiddleTerminator(
       MDB.createBranchWeights({1, VectorStep - 1}, /*IsExpected=*/false);
   MiddleTerm->addMetadata(LLVMContext::MD_prof, BranchWeights);
 }
+
+void VPlanTransforms::tryToConvertToPartialReductions(
+    VPlan &Plan, const TargetTransformInfo &TTI, VFRange &Range) {
+  VPTypeAnalysis TypeInfo(Plan);
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_shallow(Plan.getVectorLoopRegion()->getEntry()))) {
+    for (VPRecipeBase &R : make_early_inc_range(*VPBB)) {
+      VPValue *Phi, *A, *B;
+      if (!match(&R,
+                 m_c_Add(m_c_Mul(m_ZExt(m_VPValue(B)), m_SExt(m_VPValue(A))),
+                         m_VPValue(Phi))))
+        continue;
+
+      auto *PhiR = dyn_cast<VPReductionPHIRecipe>(Phi);
+      if (!PhiR)
+        continue;
+
+      Type *WideOpTy = TypeInfo.inferScalarType(Phi);
+      TypeSize WideOpSize = WideOpTy->getPrimitiveSizeInBits();
+      Type *NarrowOpTy = TypeInfo.inferScalarType(A);
+      TypeSize NarrowOpSize = NarrowOpTy->getPrimitiveSizeInBits();
+
+      if (!WideOpSize.hasKnownScalarFactor(NarrowOpSize))
+        continue;
+      unsigned ScaleFactor = WideOpSize.getKnownScalarFactor(NarrowOpSize);
+
+      if (!LoopVectorizationPlanner::getDecisionAndClampRange(
+              [&](ElementCount VF) {
+                InstructionCost Cost = TTI.getPartialReductionCost(
+                    Instruction::Add, NarrowOpTy, NarrowOpTy, WideOpTy, VF,
+                    TTI::PR_SignExtend, TTI::PR_SignExtend, Instruction::Mul,
+                    TTI::TCK_RecipThroughput);
+                return Cost.isValid();
+              },
+              Range)) {
+        continue;
+      }
+
+      auto *MulR =
+          cast<VPRecipeWithIRFlags>(R.getOperand(R.getOperand(1) != Phi));
+      VPValue *SExt =
+          MulR->getOperand(1) == A ? MulR->getOperand(1) : MulR->getOperand(0);
+
+      auto *Mul64 = new VPWidenRecipe(
+          Instruction::Mul,
+          {SExt, Plan.getOrAddLiveIn(ConstantInt::get(WideOpTy, 64))},
+          VPIRFlags(), VPIRMetadata(), DebugLoc::getUnknown());
+      Mul64->insertBefore(&R);
+      auto *Dot64 = new VPWidenIntrinsicRecipe(
+          Intrinsic::vector_partial_reduce_add,
+          {Phi, Mul64,
+           Plan.getOrAddLiveIn(ConstantInt::get(WideOpTy, ScaleFactor))},
+          WideOpTy);
+      Dot64->insertBefore(&R);
+
+      auto *Add128 = new VPWidenRecipe(
+          Instruction::Add,
+          {B, Plan.getOrAddLiveIn(ConstantInt::get(NarrowOpTy, 128))},
+          VPIRFlags(), VPIRMetadata(), DebugLoc::getUnknown());
+      Add128->insertBefore(&R);
+
+      auto *OtherMul64 = new VPWidenRecipe(
+          Instruction::Mul,
+          {SExt, Plan.getOrAddLiveIn(ConstantInt::get(WideOpTy, 64))},
+          VPIRFlags(), VPIRMetadata(), DebugLoc::getUnknown());
+      OtherMul64->insertBefore(&R);
+
+      auto *Dot128 = new VPWidenIntrinsicRecipe(
+          Intrinsic::vector_partial_reduce_add,
+          {Dot64, OtherMul64,
+           Plan.getOrAddLiveIn(ConstantInt::get(WideOpTy, ScaleFactor))},
+          WideOpTy);
+      Dot128->insertBefore(&R);
+
+      auto *Add128Ext =
+          new VPWidenCastRecipe(Instruction::SExt, Add128, WideOpTy);
+      Add128Ext->insertBefore(&R);
+      auto *MulDots =
+          new VPWidenRecipe(Instruction::Mul, {SExt, Add128Ext}, VPIRFlags(),
+                            VPIRMetadata(), DebugLoc::getUnknown());
+      MulDots->insertBefore(&R);
+      auto *Res = new VPWidenIntrinsicRecipe(
+          Intrinsic::vector_partial_reduce_add,
+          {Dot128, MulDots,
+           Plan.getOrAddLiveIn(ConstantInt::get(WideOpTy, ScaleFactor))},
+          WideOpTy);
+      Res->insertBefore(&R);
+      R.getVPSingleValue()->replaceAllUsesWith(Res);
+      R.eraseFromParent();
+
+      cast<VPInstruction>(PhiR->getOperand(0))
+          ->setOperand(
+              2, Plan.getOrAddLiveIn(ConstantInt::get(WideOpTy, ScaleFactor)));
+      auto *NewPhiR = new VPReductionPHIRecipe(
+          cast<PHINode>(PhiR->getUnderlyingInstr()), PhiR->getRecurrenceKind(),
+          *PhiR->getStartValue(), false, false, ScaleFactor);
+      NewPhiR->addOperand(PhiR->getOperand(1));
+      NewPhiR->insertBefore(PhiR);
+      PhiR->replaceAllUsesWith(NewPhiR);
+      PhiR->eraseFromParent();
+    }
+  }
+}
