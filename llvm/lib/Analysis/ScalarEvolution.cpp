@@ -16057,12 +16057,23 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
             SCEVRewriteVisitor<SCEVLoopGuardRewriter>::visit(Op));
         Changed |= Op != Operands.back();
       }
-      // We are only replacing operands with equivalent values, so transfer the
-      // flags from the original expression.
-      return !Changed ? Expr
-                      : SE.getAddExpr(Operands,
-                                      ScalarEvolution::maskFlags(
-                                          Expr->getNoWrapFlags(), FlagMask));
+      if (Changed) {
+        // We are only replacing operands with equivalent values, so transfer
+        // the flags from the original expression.
+        return SE.getAddExpr(Operands, ScalarEvolution::maskFlags(
+                                           Expr->getNoWrapFlags(), FlagMask));
+      }
+      if (const SCEV *S = Map.lookup(Expr))
+        return S;
+      if (isa<SCEVConstant>(Expr->getOperand(0)) &&
+          Expr->getNumOperands() == 2) {
+        auto *NewC =
+            SE.getAddExpr(Expr->getOperand(0), SE.getOne(Expr->getType()));
+        if (const SCEV *S =
+                Map.lookup(SE.getAddExpr(NewC, Expr->getOperand(1))))
+          return SE.getMinusSCEV(S, SE.getOne(Expr->getType()));
+      }
+      return Expr;
     }
 
     const SCEV *visitMulExpr(const SCEVMulExpr *Expr) {
