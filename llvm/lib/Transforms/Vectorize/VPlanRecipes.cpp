@@ -340,6 +340,18 @@ VPPartialReductionRecipe::computeCost(ElementCount VF,
                                                  : Widen->getOperand(1));
     ExtAType = GetExtendKind(ExtAR);
     ExtBType = GetExtendKind(ExtBR);
+
+    if (!ExtBR && Widen->getOperand(1)->isLiveIn()) {
+      auto *CI =
+          dyn_cast<ConstantInt>(Widen->getOperand(1)->getLiveInIRValue());
+      if (CI && CI->getValue()
+                        .trunc(InputTypeA->getScalarSizeInBits())
+                        .zext(CI->getType()->getScalarSizeInBits()) ==
+                    CI->getValue()) {
+        InputTypeB = InputTypeA;
+        ExtBType = ExtAType;
+      }
+    }
   };
 
   if (isa<VPWidenCastRecipe>(OpR)) {
