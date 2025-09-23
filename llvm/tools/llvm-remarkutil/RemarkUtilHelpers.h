@@ -256,5 +256,65 @@ public:
 
 using NV = RemarkBuilder::Argument;
 
+class RemarkRange {
+  RemarkParser &Parser;
+  mutable std::unique_ptr<Remark> Storage;
+  mutable Error Err = Error::success();
+
+public:
+  class iterator {
+    RemarkRange *Range;
+    bool AtEnd;
+
+  public:
+    explicit iterator(RemarkRange *R, bool End = false) 
+        : Range(R), AtEnd(End) {
+      if (!AtEnd) {
+        ++(*this);
+      }
+    }
+
+    iterator &operator++() {
+      auto MaybeRemark = Range->Parser.next();
+      if (!MaybeRemark) {
+        Error E = MaybeRemark.takeError();
+        if (E.isA<EndOfFileError>()) {
+          consumeError(std::move(E));
+          AtEnd = true;
+          Range->Storage.reset();
+        } else {
+          Range->Err = std::move(E);
+          AtEnd = true;
+        }
+        return *this;
+      }
+      Range->Storage = std::move(*MaybeRemark);
+      return *this;
+    }
+
+    Remark &operator*() const { return *Range->Storage; }
+    Remark *operator->() const { return Range->Storage.get(); }
+
+    bool operator==(const iterator &Other) const {
+      return AtEnd == Other.AtEnd;
+    }
+    bool operator!=(const iterator &Other) const {
+      return !(*this == Other);
+    }
+  };
+
+  explicit RemarkRange(RemarkParser &P) : Parser(P) {}
+
+  iterator begin() { return iterator(this); }
+  iterator end() { return iterator(this, true); }
+
+  Error takeError() { return std::move(Err); }
+};
+
+/// Create a range for iterating over remarks
+inline RemarkRange make_remarks_range(RemarkParser &Parser) {
+  return RemarkRange(Parser);
+}
+
 } // namespace remarks
 } // namespace llvm
