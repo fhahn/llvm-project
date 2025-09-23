@@ -12984,6 +12984,31 @@ SDValue DAGCombiner::visitPARTIAL_REDUCE_MLA(SDNode *N) {
   return SDValue();
 }
 
+static SDValue isExtendViaBuildVector(SDValue N) {
+  if (N->getOpcode() != ISD::BITCAST)
+    return SDValue();
+
+  auto *Shuffle = dyn_cast<ShuffleVectorSDNode>(N->getOperand(0));
+  if (!Shuffle || Shuffle->getValueType(0).getVectorNumElements() != 64)
+    return SDValue();
+
+  for (const auto &[I, M] : enumerate(Shuffle->getMask())) {
+    if (I % 4 == 0) {
+      if (I / 4 != M)
+        return SDValue();
+    } else if (M != 64)
+      return SDValue();
+  }
+
+  SDValue Concat = Shuffle->getOperand(0);
+  auto *BV = dyn_cast<BuildVectorSDNode>(Shuffle->getOperand(1));
+  if (Concat->getOpcode() != ISD::CONCAT_VECTORS ||
+      !isa<ConstantSDNode>(BV->getOperand(0)) ||
+      !cast<ConstantSDNode>(BV->getOperand(0))->isZero())
+    return SDValue();
+  return Concat->getOperand(0);
+}
+
 // partial_reduce_*mla(acc, mul(ext(a), ext(b)), splat(1))
 // -> partial_reduce_*mla(acc, a, b)
 //
@@ -13021,10 +13046,15 @@ SDValue DAGCombiner::foldPartialReduceMLAMulOp(SDNode *N) {
     return SDValue();
 
   unsigned LHSOpcode = LHS->getOpcode();
-  if (!ISD::isExtOpcode(LHSOpcode))
+  SDValue LHSExtOp;
+  if (auto Op = isExtendViaBuildVector(LHS)) {
+    LHSOpcode = ISD::ZERO_EXTEND;
+    LHSExtOp = Op;
+  } else if (ISD::isExtOpcode(LHSOpcode))
+    LHSExtOp = LHS->getOperand(0);
+  else
     return SDValue();
 
-  SDValue LHSExtOp = LHS->getOperand(0);
   EVT LHSExtOpVT = LHSExtOp.getValueType();
 
   // partial_reduce_*mla(acc, mul(ext(x), splat(C)), splat(1))
