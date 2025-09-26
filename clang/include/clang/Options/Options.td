@@ -4287,6 +4287,13 @@ def foptimization_record_passes_EQ : Joined<["-"], "foptimization-record-passes=
   HelpText<"Only include passes which match a specified regular expression in the generated optimization record (by default, include all passes)">,
   MetaVarName<"<regex>">;
 
+def fopt_runs : Joined<["-"], "fopt-runs=">,
+                Group<f_Group>,
+                Visibility<[ClangOption, CC1Option]>,
+                MetaVarName<"<N>">,
+                HelpText<"N is the number of times the optimizer is run">,
+                MarshallingInfoInt<CodeGenOpts<"OptRuns">, "1">;
+
 defm assumptions : BoolFOption<"assumptions",
   LangOpts<"CXXAssumptions">, DefaultTrue,
   NegFlag<SetFalse, [], [ClangOption, CC1Option],

@@ -7430,6 +7430,8 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   if (willEmitRemarks(Args) && checkRemarksOptions(D, Args, Triple))
     renderRemarksOptions(Args, CmdArgs, Triple, Input, Output, JA);
 
+  Args.AddLastArg(CmdArgs, options::OPT_fopt_runs);
+
   bool RewriteImports = Args.hasFlag(options::OPT_frewrite_imports,
                                      options::OPT_fno_rewrite_imports, false);
   if (RewriteImports)

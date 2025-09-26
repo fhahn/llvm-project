@@ -493,6 +493,8 @@ CODEGENOPT(ResMayAlias, 1, 0, Benign)
 ENUM_CODEGENOPT(WinX64EHUnwindV2, WinX64EHUnwindV2Mode,
                 2, WinX64EHUnwindV2Mode::Disabled, Benign)
 
+VALUE_CODEGENOPT(OptRuns, 8, 1)
+
 /// FIXME: Make DebugOptions its own top-level .def file.
 #include "DebugOptions.def"
 

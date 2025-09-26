@@ -1330,7 +1330,9 @@ void EmitAssemblyHelper::emitAssembly(BackendAction Action,
   cl::PrintOptionValues();
 
   std::unique_ptr<llvm::ToolOutputFile> ThinLinkOS, DwoOS;
-  RunOptimizationPipeline(Action, OS, ThinLinkOS, BC);
+  for (unsigned I = 0; I < CodeGenOpts.OptRuns; ++I) {
+    RunOptimizationPipeline(Action, OS, ThinLinkOS, BC);
+  }
   RunCodegenPipeline(Action, OS, DwoOS);
 
   if (ThinLinkOS)
