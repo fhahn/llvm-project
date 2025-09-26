@@ -47,7 +47,7 @@ using namespace llvm;
 #define SCOP_STAT(NAME, DESC)                                                  \
   {"polly-detect", "NAME", "Number of rejected regions: " DESC}
 
-static Statistic RejectStatistics[] = {
+static GlobalStatistic RejectStatistics[] = {
     SCOP_STAT(CFG, ""),
     SCOP_STAT(InvalidTerminator, "Unsupported terminator instruction"),
     SCOP_STAT(IrreducibleRegion, "Irreducible loops"),

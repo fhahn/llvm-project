@@ -210,7 +210,7 @@ STATISTIC(NumAffineLoopsOptimized, "Number of affine loops optimized");
 STATISTIC(NumBoxedLoopsOptimized, "Number of boxed loops optimized");
 
 #define THREE_STATISTICS(VARNAME, DESC)                                        \
-  static Statistic VARNAME[3] = {                                              \
+  static GlobalStatistic VARNAME[3] = {                                              \
       {DEBUG_TYPE, #VARNAME "0", DESC " (original)"},                          \
       {DEBUG_TYPE, #VARNAME "1", DESC " (after scheduler)"},                   \
       {DEBUG_TYPE, #VARNAME "2", DESC " (after optimizer)"}}

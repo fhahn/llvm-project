@@ -35,7 +35,7 @@ static cl::opt<bool>
                        cl::cat(PollyCategory));
 
 #define TWO_STATISTICS(VARNAME, DESC)                                          \
-  static llvm::Statistic VARNAME[2] = {                                        \
+  static llvm::GlobalStatistic VARNAME[2] = {                                  \
       {DEBUG_TYPE, #VARNAME "0", DESC " (first)"},                             \
       {DEBUG_TYPE, #VARNAME "1", DESC " (second)"}}
 

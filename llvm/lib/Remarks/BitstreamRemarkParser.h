@@ -173,6 +173,7 @@ public:
     bool IsInt = false;
     std::optional<Tag> Tag;
 
+    Argument() = default;
     Argument(std::optional<uint64_t> KeyIdx, std::optional<uint64_t> ValueIdx)
         : KeyIdx(KeyIdx), ValueIdx(ValueIdx) {}
   };

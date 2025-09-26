@@ -258,12 +258,10 @@ struct Argument {
 
   Argument() = default;
 
+  /*Argument(StringRef Key, StringRef Val) : Key(Key), Val(Val) {}*/
   Argument(StringRef Key, StringRef Val,
            std::optional<RemarkLocation> Loc = std::nullopt)
       : Key(Key), Val(Val), Loc(Loc) {}
-
-  Argument() = default;
-  Argument(StringRef Key, StringRef Val) : Key(Key), Val(Val) {}
 
   /// Implement operator<< on Argument.
   LLVM_ABI void print(raw_ostream &OS) const;
@@ -360,14 +358,6 @@ struct Remark {
 
   /// Implement operator<< on Remark.
   LLVM_ABI void print(raw_ostream &OS) const;
-
-  Argument *getArgByKey(StringRef Key) {
-    for (auto &Arg : Args) {
-      if (Arg.Key == Key)
-        return &Arg;
-    }
-    return nullptr;
-  }
 
 private:
   /// In order to avoid unwanted copies, "delete" the copy constructor.

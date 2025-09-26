@@ -609,8 +609,8 @@ Expected<std::unique_ptr<Remark>> BitstreamRemarkParser::processRemark() {
     else
       return Value.takeError();
 
-    if (Arg.DbgLoc) {
-      auto &Loc = *Arg.DbgLoc;
+    if (Arg.Loc) {
+      auto &Loc = *Arg.Loc;
       if (Expected<StringRef> SourceFileName =
               (*StrTab)[Loc.SourceFileNameIdx]) {
         R.Args.back().Loc.emplace();
