@@ -8636,7 +8636,7 @@ void LoopVectorizationPlanner::adjustRecipesForReductions(
                  "must be a select recipe");
           IndexOfFirstOperand = 1;
         } else {
-          assert((MinVF.isScalar() || isa<VPWidenRecipe>(CurrentLink)) &&
+          assert((MinVF.isScalar() || isa<VPWidenRecipe, VPPartialReductionRecipe>(CurrentLink)) &&
                  "Expected to replace a VPWidenSC");
           IndexOfFirstOperand = 0;
         }
