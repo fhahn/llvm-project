@@ -6428,6 +6428,11 @@ APInt ScalarEvolution::getConstantMultipleImpl(const SCEV *S) {
   case scUnknown: {
     // ask ValueTracking for known bits
     const SCEVUnknown *U = cast<SCEVUnknown>(S);
+    Instruction *CtxI = nullptr;
+    if (isa<Argument>(U->getValue()))
+      CtxI = &*F.getEntryBlock().begin();
+    else if (auto *I = dyn_cast<Instruction>(U->getValue()))
+      CtxI = I;
     unsigned Known =
         computeKnownBits(U->getValue(), getDataLayout(), &AC, nullptr, &DT)
             .countMinTrailingZeros();
