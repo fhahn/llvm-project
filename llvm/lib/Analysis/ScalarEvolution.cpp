@@ -15565,6 +15565,7 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
   assert(SE.DT.isReachableFromEntry(Block) && SE.DT.isReachableFromEntry(Pred));
 
   SmallVector<const SCEV *> ExprsToRewrite;
+  DenseMap<const SCEV *, const SCEV *> DivInfo;
   auto CollectCondition = [&](ICmpInst::Predicate Predicate, const SCEV *LHS,
                               const SCEV *RHS,
                               DenseMap<const SCEV *, const SCEV *>
@@ -15715,6 +15716,7 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
           const auto *Multiple =
               SE.getMulExpr(SE.getUDivExpr(RewrittenLHS, URemRHS), URemRHS);
           RewriteMap[LHSUnknown] = Multiple;
+          DivInfo[LHSUnknown] = Multiple;
           ExprsToRewrite.push_back(LHSUnknown);
           return;
         }
@@ -15746,12 +15748,23 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
     // existing rewrite because we want to chain further rewrites onto the
     // already rewritten value. Otherwise returns \p S.
     auto GetMaybeRewritten = [&](const SCEV *S) {
-      return RewriteMap.lookup_or(S, S);
+      if (auto *N = RewriteMap.lookup(S))
+        return N;
+      LoopGuards Guards(SE);
+      Guards.RewriteMap = DivInfo;
+      return  Guards.rewrite(S);
     };
+
+    auto GetMaybeRewrittenDivInfo = [&](const SCEV *S) {
+      LoopGuards Guards(SE);
+      Guards.RewriteMap = DivInfo;
+      return  Guards.rewrite(S);
+    };
+
 
     const SCEV *RewrittenLHS = GetMaybeRewritten(LHS);
     const SCEV *DividesBy = nullptr;
-    const APInt &Multiple = SE.getConstantMultiple(RewrittenLHS);
+    const APInt &Multiple = SE.getConstantMultiple(GetMaybeRewrittenDivInfo(RewrittenLHS));
     if (!Multiple.isOne())
       DividesBy = SE.getConstant(Multiple);
 
