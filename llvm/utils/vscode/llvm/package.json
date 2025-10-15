@@ -39,6 +39,17 @@
                     ".ll"
                 ],
                 "configuration": "./language-configuration.json"
+            },
+            {
+                "id": "vplan",
+                "aliases": [
+                    "VPlan",
+                    "vplan"
+                ],
+                "extensions": [
+                    ".vplan"
+                ],
+                "configuration": "./language-configuration.json"
             }
         ],
         "grammars": [
@@ -51,6 +62,11 @@
                 "language": "llvm",
                 "scopeName": "source.llvm",
                 "path": "./syntaxes/ll.tmLanguage.json"
+            },
+            {
+                "language": "vplan",
+                "scopeName": "source.vplan",
+                "path": "./syntaxes/vplan.tmLanguage.json"
             }
         ],
         "taskDefinitions": [
@@ -104,6 +120,65 @@
                         "message": 4
                     }
                 ]
+            }
+        ],
+        "themes": [
+            {
+                "label": "VPlan Dark",
+                "uiTheme": "vs-dark",
+                "path": "./themes/vplan-color-theme.json"
+            },
+            {
+                "label": "VPlan Light",
+                "uiTheme": "vs",
+                "path": "./themes/vplan-color-theme-light.json"
+            }
+        ],
+        "colors": [
+            {
+                "id": "vplan.blockName",
+                "description": "Color for VPlan block names",
+                "defaults": {
+                    "dark": "#4EC9B0",
+                    "light": "#267F99",
+                    "highContrast": "#4EC9B0"
+                }
+            },
+            {
+                "id": "vplan.irBlockName",
+                "description": "Color for IR basic block names",
+                "defaults": {
+                    "dark": "#DCDCAA",
+                    "light": "#795E26",
+                    "highContrast": "#DCDCAA"
+                }
+            },
+            {
+                "id": "vplan.instruction",
+                "description": "Color for VPlan instructions",
+                "defaults": {
+                    "dark": "#C586C0",
+                    "light": "#AF00DB",
+                    "highContrast": "#C586C0"
+                }
+            },
+            {
+                "id": "vplan.vpValue",
+                "description": "Color for VPlan values",
+                "defaults": {
+                    "dark": "#9CDCFE",
+                    "light": "#001080",
+                    "highContrast": "#9CDCFE"
+                }
+            },
+            {
+                "id": "vplan.irValue",
+                "description": "Color for IR values",
+                "defaults": {
+                    "dark": "#CE9178",
+                    "light": "#A31515",
+                    "highContrast": "#CE9178"
+                }
             }
         ]
     },

@@ -5,6 +5,7 @@
     (manually translated from `llvm/utils/vim/syntax/llvm.vim`)
  - TableGen files (.td) syntax highlighting.
     (translated from `llvm/utils/textmate`)
+ - VPlan files (.vplan) syntax highlighting with color themes.
  - PatternMatchers for LIT test output.
     (`$llvm-lit`, `$llvm-filecheck`)
  - Tasks to run LIT on current selected file.

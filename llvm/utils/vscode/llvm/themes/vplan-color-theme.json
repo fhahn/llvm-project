@@ -1,0 +1,133 @@
+{
+  "name": "VPlan Color Theme",
+  "type": "dark",
+  "colors": {},
+  "tokenColors": [
+    {
+      "name": "VPlan Block Names",
+      "scope": [
+        "entity.name.function.vplan"
+      ],
+      "settings": {
+        "foreground": "#4EC9B0",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "name": "IR Block Names",
+      "scope": [
+        "entity.name.type.class.vplan"
+      ],
+      "settings": {
+        "foreground": "#DCDCAA",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "name": "Predicated Block Names",
+      "scope": [
+        "entity.name.namespace.vplan"
+      ],
+      "settings": {
+        "foreground": "#4FC1FF",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "name": "VPlan Instructions",
+      "scope": [
+        "keyword.control.vplan"
+      ],
+      "settings": {
+        "foreground": "#C586C0",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "name": "IR Instructions",
+      "scope": [
+        "support.function.vplan"
+      ],
+      "settings": {
+        "foreground": "#DCDCAA"
+      }
+    },
+    {
+      "name": "VPlan Values",
+      "scope": [
+        "variable.parameter.vplan"
+      ],
+      "settings": {
+        "foreground": "#9CDCFE"
+      }
+    },
+    {
+      "name": "IR Values",
+      "scope": [
+        "variable.other.constant.vplan"
+      ],
+      "settings": {
+        "foreground": "#CE9178"
+      }
+    },
+    {
+      "name": "VPlan Header",
+      "scope": [
+        "entity.name.section.vplan"
+      ],
+      "settings": {
+        "foreground": "#569CD6",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "name": "Control Flow",
+      "scope": [
+        "keyword.control.flow.vplan"
+      ],
+      "settings": {
+        "foreground": "#C586C0"
+      }
+    },
+    {
+      "name": "Storage Modifiers",
+      "scope": [
+        "storage.modifier.vplan",
+        "storage.type.vplan"
+      ],
+      "settings": {
+        "foreground": "#569CD6"
+      }
+    },
+    {
+      "name": "Comments",
+      "scope": [
+        "comment.line.semicolon.vplan",
+        "comment.inline.vplan"
+      ],
+      "settings": {
+        "foreground": "#6A9955",
+        "fontStyle": "italic"
+      }
+    },
+    {
+      "name": "Numbers",
+      "scope": [
+        "constant.numeric.vplan",
+        "constant.numeric.float.vplan"
+      ],
+      "settings": {
+        "foreground": "#B5CEA8"
+      }
+    },
+    {
+      "name": "Comparison Operators",
+      "scope": [
+        "constant.language.vplan"
+      ],
+      "settings": {
+        "foreground": "#4EC9B0"
+      }
+    }
+  ]
+}

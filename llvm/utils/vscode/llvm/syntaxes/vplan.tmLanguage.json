@@ -1,0 +1,233 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "VPlan",
+  "scopeName": "source.vplan",
+  "patterns": [
+    {
+      "include": "#vplan-header"
+    },
+    {
+      "include": "#basic-blocks"
+    },
+    {
+      "include": "#vplan-instructions"
+    },
+    {
+      "include": "#vplan-values"
+    },
+    {
+      "include": "#ir-values"
+    },
+    {
+      "include": "#successors"
+    },
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#operators"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#debug-locations"
+    }
+  ],
+  "repository": {
+    "vplan-header": {
+      "patterns": [
+        {
+          "match": "^VPlan\\s+'([^']+)'",
+          "captures": {
+            "0": {
+              "name": "entity.name.section.vplan"
+            },
+            "1": {
+              "name": "string.quoted.single.vplan"
+            }
+          }
+        },
+        {
+          "match": "^(Live-in|vp<[^>]+>)\\s*(=)\\s*(.+)$",
+          "captures": {
+            "1": {
+              "name": "keyword.control.vplan"
+            },
+            "2": {
+              "name": "keyword.operator.assignment.vplan"
+            },
+            "3": {
+              "name": "variable.other.vplan"
+            }
+          }
+        }
+      ]
+    },
+    "basic-blocks": {
+      "patterns": [
+        {
+          "comment": "IR basic blocks like: ir-bb<for.body.preheader>:",
+          "match": "^\\s*(ir-bb)<([^>]+)>:",
+          "captures": {
+            "1": {
+              "name": "storage.type.vplan"
+            },
+            "2": {
+              "name": "entity.name.type.class.vplan"
+            }
+          }
+        },
+        {
+          "comment": "Special VPlan blocks with multiplicity like: <x1> vector loop:",
+          "match": "(<x[0-9]+>)\\s+([a-z][a-z.0-9_ -]+):",
+          "captures": {
+            "1": {
+              "name": "constant.numeric.vplan"
+            },
+            "2": {
+              "name": "entity.name.function.vplan"
+            }
+          }
+        },
+        {
+          "comment": "Standard block names like: vector.body:, middle.block:, scalar.ph:",
+          "match": "^\\s*([a-z][a-z.0-9_-]*):",
+          "captures": {
+            "1": {
+              "name": "entity.name.function.vplan"
+            }
+          }
+        },
+        {
+          "comment": "Predicated blocks like: pred.udiv.entry:, pred.sdiv.if:",
+          "match": "^\\s*(pred\\.[a-z]+\\.[a-z]+):",
+          "captures": {
+            "1": {
+              "name": "entity.name.namespace.vplan"
+            }
+          }
+        }
+      ]
+    },
+    "vplan-instructions": {
+      "patterns": [
+        {
+          "match": "\\b(EMIT|WIDEN|CLONE|REPLICATE|BLEND|WIDEN-INDUCTION|CANONICAL-INDUCTION|SCALAR-STEPS|WIDEN-INTRINSIC|WIDEN-GEP|WIDEN-SELECT|WIDEN-CAST|BRANCH-ON-MASK|BRANCH-ON-COND|PHI-PREDICATED-INSTRUCTION|FIRST-ORDER-RECURRENCE-PHI|INTERLEAVE-GROUP|EXPAND SCEV|DERIVED-IV|EMIT-SCALAR|extract-last-element|extract-penultimate-element|first-order splice|vector-pointer|logical-and|branch-on-count)\\b",
+          "name": "keyword.control.vplan"
+        },
+        {
+          "match": "\\b(load|store|add|sub|mul|div|udiv|sdiv|fadd|fsub|fmul|fdiv|frem|getelementptr|phi|icmp|fcmp|select|call|zext|sext|trunc|or|and|xor|shl|lshr|ashr|not)\\b",
+          "name": "support.function.vplan"
+        },
+        {
+          "match": "\\b(eq|ne|slt|sle|sgt|sge|ult|ule|ugt|uge|oeq|one|olt|ole|ogt|oge|ord|uno|ueq|une)\\b",
+          "name": "constant.language.vplan"
+        },
+        {
+          "match": "\\b(inbounds|nuw|nsw|exact|nnan|ninf|nsz|arcp|contract|afn|reassoc|fast|disjoint|nneg)\\b",
+          "name": "storage.modifier.vplan"
+        },
+        {
+          "match": "\\b(from index|to index|with factor|at)\\b",
+          "name": "keyword.other.vplan"
+        }
+      ]
+    },
+    "vplan-values": {
+      "patterns": [
+        {
+          "match": "vp<\\[*[^\\]>]+\\]*>",
+          "name": "variable.parameter.vplan"
+        }
+      ]
+    },
+    "ir-values": {
+      "patterns": [
+        {
+          "match": "ir<[^>]+>",
+          "name": "variable.other.constant.vplan"
+        },
+        {
+          "match": "ir%[a-zA-Z0-9_.]+",
+          "name": "variable.other.constant.vplan"
+        }
+      ]
+    },
+    "successors": {
+      "patterns": [
+        {
+          "match": "^\\s*(Successor\\(s\\)|No successors):",
+          "captures": {
+            "1": {
+              "name": "keyword.control.flow.vplan"
+            }
+          }
+        }
+      ]
+    },
+    "comments": {
+      "patterns": [
+        {
+          "match": ";.*$",
+          "name": "comment.line.semicolon.vplan"
+        },
+        {
+          "match": "\\(S->V\\)",
+          "name": "comment.inline.vplan"
+        },
+        {
+          "match": "\\(truncated to [^)]+\\)",
+          "name": "comment.inline.vplan"
+        },
+        {
+          "match": "\\(extra operand:[^)]+\\)",
+          "name": "comment.inline.vplan"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "match": "\\b[0-9]+\\b",
+          "name": "constant.numeric.vplan"
+        },
+        {
+          "match": "\\b[0-9]+\\.[0-9]+([eE][+-]?[0-9]+)?\\b",
+          "name": "constant.numeric.float.vplan"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "match": "=",
+          "name": "keyword.operator.assignment.vplan"
+        },
+        {
+          "match": "\\+|\\*|/",
+          "name": "keyword.operator.arithmetic.vplan"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "match": "@[a-zA-Z0-9_.]+",
+          "name": "variable.other.global.vplan"
+        }
+      ]
+    },
+    "debug-locations": {
+      "patterns": [
+        {
+          "match": "!dbg\\s+[^,\\s]+",
+          "name": "meta.preprocessor.vplan"
+        }
+      ]
+    }
+  }
+}
