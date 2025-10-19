@@ -98,7 +98,7 @@ bool vputils::isUniformAcrossVFsAndUFs(VPValue *V) {
 
   VPRecipeBase *R = V->getDefiningRecipe();
   if (R && V->isDefinedOutsideLoopRegions()) {
-    if (match(V->getDefiningRecipe(), m_CanonicalIVIncrementForPart()))
+    if (match(V, m_CanonicalIVIncrementForPart()))
       return false;
     return all_of(R->operands(), isUniformAcrossVFsAndUFs);
   }
