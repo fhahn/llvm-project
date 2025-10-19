@@ -787,8 +787,8 @@ static VPValue *optimizeEarlyExitInductionUser(VPlan &Plan,
                                                VPValue *Op,
                                                ScalarEvolution &SE) {
   VPValue *Incoming, *Mask;
-  if (!match(Op, m_VPInstruction<VPInstruction::ExtractLane>(
-                     m_FirstActiveLane(m_VPValue(Mask)), m_VPValue(Incoming))))
+  if (!match(Op, m_ExtractLane(m_FirstActiveLane(m_VPValue(Mask)),
+                               m_VPValue(Incoming))))
     return nullptr;
 
   auto *WideIV = getOptimizableIVOf(Incoming, SE);
@@ -1216,8 +1216,7 @@ static void simplifyRecipe(VPRecipeBase &R, VPTypeAnalysis &TypeInfo) {
   }
 
   // Look through ExtractPenultimateElement (BuildVector ....).
-  if (match(&R, m_VPInstruction<VPInstruction::ExtractPenultimateElement>(
-                    m_BuildVector()))) {
+  if (match(&R, m_ExtractPenultimateElement(m_BuildVector()))) {
     auto *BuildVector = cast<VPInstruction>(R.getOperand(0));
     Def->replaceAllUsesWith(
         BuildVector->getOperand(BuildVector->getNumOperands() - 2));
