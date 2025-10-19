@@ -552,11 +552,21 @@ static void addInitialSkeleton(VPlan &Plan, Type *InductionTy, DebugLoc IVDL,
 
 /// Check \p Plan's live-in and replace them with constants, if they can be
 /// simplified via SCEV.
-static void simplifyLiveInsWithSCEV(VPlan &Plan, ScalarEvolution &SE) {
+static void simplifyLiveInsWithSCEV(VPlan &Plan, ScalarEvolution &SE,
+                                    LoopInfo &LI, Loop *OrigLoop) {
   auto GetSimplifiedLiveInViaSCEV = [&](VPValue *VPV) -> VPValue * {
     const SCEV *Expr = vputils::getSCEVExprForVPValue(VPV, SE);
     if (auto *C = dyn_cast<SCEVConstant>(Expr))
       return Plan.getOrAddLiveIn(C->getValue());
+    if (auto *U = dyn_cast<SCEVUnknown>(Expr)) {
+      Value *V = U->getValue();
+      // Only use this value if it's not defined inside a loop, which ensures
+      // it dominates the loop preheader.
+      if (auto *I = dyn_cast<Instruction>(V))
+        if (LI.getLoopFor(I->getParent()))
+          return nullptr;
+      return Plan.getOrAddLiveIn(V);
+    }
     return nullptr;
   };
 
@@ -565,6 +575,10 @@ static void simplifyLiveInsWithSCEV(VPlan &Plan, ScalarEvolution &SE) {
     for (VPRecipeBase &R : make_early_inc_range(*VPBB)) {
       auto *VPI = dyn_cast<VPSingleDefRecipe>(&R);
       if (!VPI)
+        continue;
+      // Only simplify recipes that have an underlying IR value, to avoid
+      // simplifying VPlan-internal values like trip counts.
+      if (!VPI->getUnderlyingValue())
         continue;
       if (auto *Simp = GetSimplifiedLiveInViaSCEV(VPI)) {
         for (VPUser *U : to_vector(VPI->users())) {
@@ -591,7 +605,7 @@ VPlanTransforms::buildVPlan0(Loop *TheLoop, LoopInfo &LI, Type *InductionTy,
   PlainCFGBuilder Builder(TheLoop, &LI);
   std::unique_ptr<VPlan> VPlan0 = Builder.buildPlainCFG();
   addInitialSkeleton(*VPlan0, InductionTy, IVDL, PSE, TheLoop);
-  simplifyLiveInsWithSCEV(*VPlan0, *PSE.getSE());
+  simplifyLiveInsWithSCEV(*VPlan0, *PSE.getSE(), LI, TheLoop);
   return VPlan0;
 }
 
