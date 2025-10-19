@@ -939,7 +939,7 @@ static void recursivelyDeleteDeadRecipes(VPValue *V) {
       continue;
     if (!isDeadRecipe(*R))
       continue;
-    WorkList.append(R->op_begin(), R->op_end());
+    llvm::append_range(WorkList, R->operands());
     R->eraseFromParent();
   }
 }

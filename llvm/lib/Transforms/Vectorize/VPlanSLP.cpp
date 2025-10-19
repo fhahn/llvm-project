@@ -480,9 +480,7 @@ VPInstruction *VPlanSlp::buildGraph(ArrayRef<VPValue *> Values) {
       for (auto &Ops : FinalOrder) {
         VPInstruction *NewOp = buildGraph(Ops.second);
         Ops.first->replaceAllUsesWith(NewOp);
-        for (unsigned i = 0; i < CombinedOperands.size(); i++)
-          if (CombinedOperands[i] == Ops.first)
-            CombinedOperands[i] = NewOp;
+        llvm::replace(CombinedOperands, Ops.first, NewOp);
         delete Ops.first;
         Ops.first = NewOp;
       }
