@@ -316,8 +316,7 @@ void UnrollState::unrollRecipeByUF(VPRecipeBase &R) {
     // requiring it.
     if (isa<VPScalarIVStepsRecipe, VPWidenCanonicalIVRecipe,
             VPVectorPointerRecipe, VPVectorEndPointerRecipe>(Copy) ||
-        match(Copy,
-              m_VPInstruction<VPInstruction::CanonicalIVIncrementForPart>()))
+        match(Copy, m_CanonicalIVIncrementForPart()))
       Copy->addOperand(getConstantVPV(Part));
 
     if (isa<VPVectorPointerRecipe, VPVectorEndPointerRecipe>(R))

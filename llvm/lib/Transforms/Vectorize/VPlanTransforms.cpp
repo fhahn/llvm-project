@@ -1180,8 +1180,7 @@ static void simplifyRecipe(VPRecipeBase &R, VPTypeAnalysis &TypeInfo) {
           TypeInfo.inferScalarType(Def))
     return Def->replaceAllUsesWith(Def->getOperand(1));
 
-  if (match(Def, m_VPInstruction<VPInstruction::WideIVStep>(m_VPValue(X),
-                                                            m_One()))) {
+  if (match(Def, m_WideIVStep(m_VPValue(X), m_One()))) {
     Type *WideStepTy = TypeInfo.inferScalarType(Def);
     if (TypeInfo.inferScalarType(X) != WideStepTy)
       X = Builder.createWidenCast(Instruction::Trunc, X, WideStepTy);
@@ -1623,9 +1622,8 @@ static bool tryToReplaceALMWithWideALM(VPlan &Plan, ElementCount VF,
     assert(Index && "Expected index from ActiveLaneMask instruction");
 
     uint64_t Part;
-    if (match(Index,
-              m_VPInstruction<VPInstruction::CanonicalIVIncrementForPart>(
-                  m_VPValue(), m_ConstantInt(Part))))
+    if (match(Index, m_CanonicalIVIncrementForPart(m_VPValue(),
+                                                    m_ConstantInt(Part))))
       Phis[Part] = Phi;
     else
       // Anything other than a CanonicalIVIncrementForPart is part 0
@@ -3379,8 +3377,8 @@ void VPlanTransforms::convertToConcreteRecipes(VPlan &Plan) {
 
       VPValue *VectorStep;
       VPValue *ScalarStep;
-      if (!match(&R, m_VPInstruction<VPInstruction::WideIVStep>(
-                         m_VPValue(VectorStep), m_VPValue(ScalarStep))))
+      if (!match(&R, m_WideIVStep(m_VPValue(VectorStep),
+                                  m_VPValue(ScalarStep))))
         continue;
 
       // Expand WideIVStep.
