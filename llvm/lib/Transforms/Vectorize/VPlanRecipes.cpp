@@ -2503,8 +2503,8 @@ void VPWidenGEPRecipe::execute(VPTransformState &State) {
     //       collectLoopScalars() and teach getVectorValue() to broadcast
     //       the lane-zero scalar value.
     SmallVector<Value *> Ops;
-    for (unsigned I = 0, E = getNumOperands(); I != E; I++)
-      Ops.push_back(State.get(getOperand(I), VPLane(0)));
+    for (VPValue *Op : operands())
+      Ops.push_back(State.get(Op, VPLane(0)));
 
     auto *NewGEP =
         State.Builder.CreateGEP(getSourceElementType(), Ops[0], drop_begin(Ops),
