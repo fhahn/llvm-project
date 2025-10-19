@@ -2638,9 +2638,8 @@ static void transformRecipestoEVLRecipes(VPlan &Plan, VPValue &EVL) {
              vp_depth_first_deep(Plan.getVectorLoopRegion()->getEntry()))) {
       for (VPRecipeBase &R : *VPBB) {
         VPValue *V1, *V2;
-        if (!match(&R,
-                   m_VPInstruction<VPInstruction::FirstOrderRecurrenceSplice>(
-                       m_VPValue(V1), m_VPValue(V2))))
+        if (!match(&R, m_FirstOrderRecurrenceSplice(m_VPValue(V1),
+                                                    m_VPValue(V2))))
           continue;
         VPValue *Imm = Plan.getOrAddLiveIn(
             ConstantInt::getSigned(Type::getInt32Ty(Plan.getContext()), -1));
