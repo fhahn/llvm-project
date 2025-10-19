@@ -2651,7 +2651,7 @@ void VPBlendRecipe::print(raw_ostream &O, const Twine &Indent,
     O << " ";
     getIncomingValue(0)->printAsOperand(O, SlotTracker);
   } else {
-    for (unsigned I = 0, E = getNumIncomingValues(); I < E; ++I) {
+    for (unsigned I : seq(getNumIncomingValues())) {
       O << " ";
       getIncomingValue(I)->printAsOperand(O, SlotTracker);
       if (I == 0)

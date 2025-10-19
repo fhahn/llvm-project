@@ -463,7 +463,7 @@ static void createExtractsForLiveOuts(VPlan &Plan, VPBasicBlock *MiddleVPBB) {
 
     for (VPRecipeBase &R : EB->phis()) {
       auto *ExitIRI = cast<VPIRPhi>(&R);
-      for (unsigned Idx = 0; Idx != ExitIRI->getNumIncoming(); ++Idx) {
+      for (unsigned Idx : seq(ExitIRI->getNumIncoming())) {
         VPRecipeBase *Inc = ExitIRI->getIncomingValue(Idx)->getDefiningRecipe();
         if (!Inc)
           continue;

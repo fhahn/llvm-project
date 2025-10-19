@@ -913,7 +913,7 @@ VPlan::~VPlan() {
         for (auto *Def : R.definedValues())
           Def->replaceAllUsesWith(&DummyValue);
 
-        for (unsigned I = 0, E = R.getNumOperands(); I != E; I++)
+        for (unsigned I : seq(R.getNumOperands()))
           R.setOperand(I, &DummyValue);
       }
     }
@@ -1181,8 +1181,8 @@ static void remapOperands(VPBlockBase *Entry, VPBlockBase *NewEntry,
   for (VPBasicBlock *NewBB :
        VPBlockUtils::blocksOnly<VPBasicBlock>(NewDeepRPOT)) {
     for (VPRecipeBase &NewR : *NewBB)
-      for (unsigned I = 0, E = NewR.getNumOperands(); I != E; ++I) {
-        VPValue *NewOp = Old2NewVPValues.lookup(NewR.getOperand(I));
+      for (auto [I, Op] : enumerate(NewR.operands())) {
+        VPValue *NewOp = Old2NewVPValues.lookup(Op);
         NewR.setOperand(I, NewOp);
       }
   }
@@ -1428,8 +1428,8 @@ void VPValue::replaceUsesWithIf(
   for (unsigned J = 0; J < getNumUsers();) {
     VPUser *User = Users[J];
     bool RemovedUser = false;
-    for (unsigned I = 0, E = User->getNumOperands(); I < E; ++I) {
-      if (User->getOperand(I) != this || !ShouldReplace(*User, I))
+    for (auto [I, Op] : enumerate(User->operands())) {
+      if (Op != this || !ShouldReplace(*User, I))
         continue;
 
       RemovedUser = true;
@@ -1444,8 +1444,8 @@ void VPValue::replaceUsesWithIf(
 }
 
 void VPUser::replaceUsesOfWith(VPValue *From, VPValue *To) {
-  for (unsigned Idx = 0; Idx != getNumOperands(); ++Idx) {
-    if (getOperand(Idx) == From)
+  for (auto [Idx, Op] : enumerate(operands())) {
+    if (Op == From)
       setOperand(Idx, To);
   }
 }
