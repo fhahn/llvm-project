@@ -400,6 +400,18 @@ m_ExtractLastLanePerPart(const Op0_t &Op0) {
   return m_VPInstruction<VPInstruction::ExtractLastLanePerPart>(Op0);
 }
 
+template <typename Op0_t>
+inline VPInstruction_match<VPInstruction::ExtractPenultimateElement, Op0_t>
+m_ExtractPenultimateElement(const Op0_t &Op0) {
+  return m_VPInstruction<VPInstruction::ExtractPenultimateElement>(Op0);
+}
+
+template <typename Op0_t, typename Op1_t>
+inline VPInstruction_match<VPInstruction::ExtractLane, Op0_t, Op1_t>
+m_ExtractLane(const Op0_t &Op0, const Op1_t &Op1) {
+  return m_VPInstruction<VPInstruction::ExtractLane>(Op0, Op1);
+}
+
 template <typename Op0_t, typename Op1_t, typename Op2_t>
 inline VPInstruction_match<VPInstruction::ActiveLaneMask, Op0_t, Op1_t, Op2_t>
 m_ActiveLaneMask(const Op0_t &Op0, const Op1_t &Op1, const Op2_t &Op2) {
@@ -426,6 +438,31 @@ template <typename Op0_t>
 inline VPInstruction_match<VPInstruction::FirstActiveLane, Op0_t>
 m_FirstActiveLane(const Op0_t &Op0) {
   return m_VPInstruction<VPInstruction::FirstActiveLane>(Op0);
+}
+
+template <typename Op0_t, typename Op1_t>
+inline VPInstruction_match<VPInstruction::FirstOrderRecurrenceSplice, Op0_t,
+                           Op1_t>
+m_FirstOrderRecurrenceSplice(const Op0_t &Op0, const Op1_t &Op1) {
+  return m_VPInstruction<VPInstruction::FirstOrderRecurrenceSplice>(Op0, Op1);
+}
+
+template <typename Op0_t, typename Op1_t>
+inline VPInstruction_match<VPInstruction::WideIVStep, Op0_t, Op1_t>
+m_WideIVStep(const Op0_t &Op0, const Op1_t &Op1) {
+  return m_VPInstruction<VPInstruction::WideIVStep>(Op0, Op1);
+}
+
+inline VPInstruction_match<VPInstruction::CanonicalIVIncrementForPart>
+m_CanonicalIVIncrementForPart() {
+  return m_VPInstruction<VPInstruction::CanonicalIVIncrementForPart>();
+}
+
+template <typename Op0_t, typename Op1_t>
+inline VPInstruction_match<VPInstruction::CanonicalIVIncrementForPart, Op0_t,
+                           Op1_t>
+m_CanonicalIVIncrementForPart(const Op0_t &Op0, const Op1_t &Op1) {
+  return m_VPInstruction<VPInstruction::CanonicalIVIncrementForPart>(Op0, Op1);
 }
 
 template <unsigned Opcode, typename Op0_t>
