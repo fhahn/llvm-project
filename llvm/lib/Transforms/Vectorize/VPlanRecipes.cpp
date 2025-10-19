@@ -4211,10 +4211,8 @@ InstructionCost VPInterleaveBase::computeCost(ElementCount VF,
   auto *WideVecTy = VectorType::get(ValTy, VF * InterleaveFactor);
 
   // Holds the indices of existing members in the interleaved group.
-  SmallVector<unsigned, 4> Indices;
-  for (unsigned IF = 0; IF < InterleaveFactor; IF++)
-    if (IG->getMember(IF))
-      Indices.push_back(IF);
+  auto Indices = to_vector(make_filter_range(
+      seq(InterleaveFactor), [&](unsigned IF) { return IG->getMember(IF); }));
 
   // Calculate the cost of the whole interleaved group.
   InstructionCost Cost = Ctx.TTI.getInterleavedMemoryOpCost(

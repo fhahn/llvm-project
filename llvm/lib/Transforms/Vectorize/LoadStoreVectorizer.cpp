@@ -626,7 +626,7 @@ std::vector<Chain> Vectorizer::splitChainByContiguity(Chain &C) {
   std::vector<Chain> Ret;
   Ret.push_back({C.front()});
 
-  for (auto It = std::next(C.begin()), End = C.end(); It != End; ++It) {
+  for (const ChainElem &Elem : drop_begin(C)) {
     // `prev` accesses offsets [PrevDistFromBase, PrevReadEnd).
     auto &CurChain = Ret.back();
     const ChainElem &Prev = CurChain.back();
@@ -636,16 +636,16 @@ std::vector<Chain> Vectorizer::splitChainByContiguity(Chain &C) {
     APInt PrevReadEnd = Prev.OffsetFromLeader + SzBits / 8;
 
     // Add this instruction to the end of the current chain, or start a new one.
-    bool AreContiguous = It->OffsetFromLeader == PrevReadEnd;
+    bool AreContiguous = Elem.OffsetFromLeader == PrevReadEnd;
     LLVM_DEBUG(dbgs() << "LSV: Instructions are "
                       << (AreContiguous ? "" : "not ") << "contiguous: "
                       << *Prev.Inst << " (ends at offset " << PrevReadEnd
-                      << ") -> " << *It->Inst << " (starts at offset "
-                      << It->OffsetFromLeader << ")\n");
+                      << ") -> " << *Elem.Inst << " (starts at offset "
+                      << Elem.OffsetFromLeader << ")\n");
     if (AreContiguous)
-      CurChain.push_back(*It);
+      CurChain.push_back(Elem);
     else
-      Ret.push_back({*It});
+      Ret.push_back({Elem});
   }
 
   // Filter out length-1 chains, these are uninteresting.
