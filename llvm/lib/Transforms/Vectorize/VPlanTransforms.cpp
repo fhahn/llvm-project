@@ -1206,17 +1206,16 @@ static void simplifyRecipe(VPRecipeBase &R, VPTypeAnalysis &TypeInfo) {
   }
 
   // Look through ExtractLastElement (BuildVector ....).
-  if (match(&R, m_CombineOr(m_ExtractLastElement(m_BuildVector()),
-                            m_ExtractLastLanePerPart(m_BuildVector())))) {
-    auto *BuildVector = cast<VPInstruction>(R.getOperand(0));
+  VPInstruction *BuildVector;
+  if (match(&R, m_CombineOr(m_ExtractLastElement(m_BuildVector(BuildVector)),
+                            m_ExtractLastLanePerPart(m_BuildVector(BuildVector))))) {
     Def->replaceAllUsesWith(
         BuildVector->getOperand(BuildVector->getNumOperands() - 1));
     return;
   }
 
   // Look through ExtractPenultimateElement (BuildVector ....).
-  if (match(&R, m_ExtractPenultimateElement(m_BuildVector()))) {
-    auto *BuildVector = cast<VPInstruction>(R.getOperand(0));
+  if (match(&R, m_ExtractPenultimateElement(m_BuildVector(BuildVector)))) {
     Def->replaceAllUsesWith(
         BuildVector->getOperand(BuildVector->getNumOperands() - 2));
     return;

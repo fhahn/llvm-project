@@ -348,10 +348,46 @@ m_VPInstruction(const OpTys &...Ops) {
   return VPInstruction_match<Opcode, OpTys...>(Ops...);
 }
 
-/// BuildVector is matches only its opcode, w/o matching its operands as the
-/// number of operands is not fixed.
-inline VPInstruction_match<VPInstruction::BuildVector> m_BuildVector() {
-  return m_VPInstruction<VPInstruction::BuildVector>();
+/// BuildVector_match matches BuildVector and captures the VPInstruction.
+struct BuildVector_match {
+  VPInstruction **Captured = nullptr;
+
+  BuildVector_match(VPInstruction *&I) : Captured(&I) {}
+
+  bool match(VPValue *V) const {
+    auto *DefR = V->getDefiningRecipe();
+    return DefR && match(DefR);
+  }
+
+  bool match(const VPValue *V) const {
+    auto *DefR = V->getDefiningRecipe();
+    return DefR && match(DefR);
+  }
+
+  bool match(VPRecipeBase *R) const {
+    auto *VPI = dyn_cast<VPInstruction>(R);
+    if (VPI && VPI->getOpcode() == VPInstruction::BuildVector) {
+      if (Captured)
+        *Captured = VPI;
+      return true;
+    }
+    return false;
+  }
+
+  bool match(const VPRecipeBase *R) const {
+    auto *VPI = dyn_cast<VPInstruction>(R);
+    if (VPI && VPI->getOpcode() == VPInstruction::BuildVector) {
+      if (Captured)
+        *Captured = const_cast<VPInstruction *>(VPI);
+      return true;
+    }
+    return false;
+  }
+};
+
+/// BuildVector matches and captures the VPInstruction.
+inline BuildVector_match m_BuildVector(VPInstruction *&I) {
+  return BuildVector_match(I);
 }
 
 template <typename Op0_t>

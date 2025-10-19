@@ -501,9 +501,9 @@ cloneForLane(VPlan &Plan, VPBuilder &Builder, Type *IdxTy,
     }
 
     // Look through buildvector to avoid unnecessary extracts.
-    if (match(Op, m_BuildVector())) {
-      NewOps.push_back(
-          cast<VPInstruction>(Op)->getOperand(Lane.getKnownLane()));
+    VPInstruction *BuildVector;
+    if (match(Op, m_BuildVector(BuildVector))) {
+      NewOps.push_back(BuildVector->getOperand(Lane.getKnownLane()));
       continue;
     }
     VPValue *Idx =

@@ -272,8 +272,9 @@ Value *VPTransformState::get(const VPValue *Def, const VPLane &Lane) {
 
   // Look through BuildVector to avoid redundant extracts.
   // TODO: Remove once replicate regions are unrolled explicitly.
-  if (Lane.getKind() == VPLane::Kind::First && match(Def, m_BuildVector())) {
-    auto *BuildVector = cast<VPInstruction>(Def);
+  VPInstruction *BuildVector;
+  if (Lane.getKind() == VPLane::Kind::First &&
+      match(Def, m_BuildVector(BuildVector))) {
     return get(BuildVector->getOperand(Lane.getKnownLane()), true);
   }
 
