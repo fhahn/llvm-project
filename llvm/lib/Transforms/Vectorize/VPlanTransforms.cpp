@@ -4275,6 +4275,7 @@ static bool canNarrowOps(ArrayRef<VPValue *> Ops) {
   if (!isa<VPWidenRecipe, VPWidenCastRecipe>(Ops[0]))
     return false;
 
+  auto *WideMember0 = cast<VPSingleDefRecipe>(Ops[0]->getDefiningRecipe());
   for (const auto &[_, V] : enumerate(Ops)) {
       if (!isa<VPWidenRecipe, VPWidenCastRecipe>(V))
         return false;
