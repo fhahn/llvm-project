@@ -1195,16 +1195,10 @@ class VPInstructionWithType : public VPInstruction {
 
 public:
   VPInstructionWithType(unsigned Opcode, ArrayRef<VPValue *> Operands,
-                        Type *ResultTy, const VPIRFlags &Flags, DebugLoc DL,
+                        Type *ResultTy, 
+                        const VPIRFlags &Flags, const VPIRMetadata &Metadata, DebugLoc DL,
                         const Twine &Name = "")
-      : VPInstruction(Opcode, Operands, Flags, {}, DL, Name),
-        ResultTy(ResultTy) {}
-
-  VPInstructionWithType(unsigned Opcode, ArrayRef<VPValue *> Operands,
-                        Type *ResultTy, DebugLoc DL, const VPIRFlags &Flags,
-                        const VPIRMetadata &Metadata, const Twine &Name = "")
-      : VPInstruction(Opcode, Operands, Flags, Metadata, DL, Name),
-        ResultTy(ResultTy) {}
+      : VPInstruction(Opcode, Operands, Flags, Metadata, DL, Name), ResultTy(ResultTy) {}
 
   static inline bool classof(const VPRecipeBase *R) {
     // VPInstructionWithType are VPInstructions with specific opcodes requiring
@@ -1231,7 +1225,7 @@ public:
   VPInstruction *clone() override {
     SmallVector<VPValue *, 2> Operands(operands());
     auto *New =
-        new VPInstructionWithType(getOpcode(), Operands, getResultType(), *this,
+        new VPInstructionWithType(getOpcode(), Operands, getResultType(), *this, *this,
                                   getDebugLoc(), getName());
     New->setUnderlyingValue(getUnderlyingValue());
     return New;

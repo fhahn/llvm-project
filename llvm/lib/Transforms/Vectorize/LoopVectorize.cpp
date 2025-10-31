@@ -8133,9 +8133,16 @@ VPRecipeBase *VPRecipeBuilder::tryToCreateWidenRecipe(VPSingleDefRecipe *R,
     return new VPWidenSelectRecipe(*SI, Operands);
   }
 
-  if (auto *CI = dyn_cast<CastInst>(Instr)) {
-    return new VPWidenCastRecipe(CI->getOpcode(), Operands[0], CI->getType(),
-                                 *CI);
+  // Check if R is a scalar cast created during initial VPlan construction.
+  // If so, use the type and flags information from VPInstructionWithType.
+  if (R->isScalarCast()) {
+    auto *CastR = cast<VPInstructionWithType>(R);
+    auto Opcode = static_cast<Instruction::CastOps>(CastR->getOpcode());
+    auto *Widen = new VPWidenCastRecipe(Opcode, Operands[0],
+                                        CastR->getResultType(), *CastR, *CastR,
+                                        CastR->getDebugLoc());
+    Widen->setUnderlyingValue(CastR->getUnderlyingValue());
+    return Widen;
   }
 
   return tryToWiden(Instr, Operands);

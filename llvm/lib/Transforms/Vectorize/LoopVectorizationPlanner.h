@@ -172,10 +172,11 @@ public:
 
   VPInstruction *createNaryOp(unsigned Opcode, ArrayRef<VPValue *> Operands,
                               Type *ResultTy, const VPIRFlags &Flags = {},
+const VPIRMetadata &MD = {},
                               DebugLoc DL = DebugLoc::getUnknown(),
                               const Twine &Name = "") {
     return tryInsertInstruction(
-        new VPInstructionWithType(Opcode, Operands, ResultTy, Flags, DL, Name));
+        new VPInstructionWithType(Opcode, Operands, ResultTy, Flags, MD, DL, Name));
   }
 
   VPInstruction *createOverflowingOp(unsigned Opcode,
@@ -307,7 +308,7 @@ public:
                                   const VPIRFlags &Flags = {},
                                   const VPIRMetadata &Metadata = {}) {
     return tryInsertInstruction(
-        new VPInstructionWithType(Opcode, Op, ResultTy, DL, Flags, Metadata));
+        new VPInstructionWithType(Opcode, Op, ResultTy,  Flags, Metadata, DL));
   }
 
   VPValue *createScalarZExtOrTrunc(VPValue *Op, Type *ResultTy, Type *SrcTy,

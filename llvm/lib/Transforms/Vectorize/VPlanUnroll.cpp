@@ -162,7 +162,7 @@ void UnrollState::unrollWidenInductionByUF(
       IVTy->isPointerTy() ? TypeInfo.inferScalarType(ScalarStep) : IVTy;
   VPInstruction *VectorStep = Builder.createNaryOp(
       VPInstruction::WideIVStep, {&Plan.getVF(), ScalarStep}, VectorStepTy,
-      Flags, IV->getDebugLoc());
+      Flags, {}, IV->getDebugLoc());
 
   ToSkip.insert(VectorStep);
 
