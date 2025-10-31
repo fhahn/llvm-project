@@ -153,9 +153,12 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
         }
       })
       .Case<VPInstruction>([&SE, L](const VPInstruction *R) {
-        // Handle cast instructions.
+        // Handle cast instructions that are represented as VPInstructionWithType.
         if (Instruction::isCast(R->getOpcode())) {
-          auto *CastR = cast<VPInstructionWithType>(R);
+          auto *CastR = dyn_cast<VPInstructionWithType>(R);
+          if (!CastR)
+            return SE.getCouldNotCompute();
+
           const SCEV *Op = getSCEVExprForVPValue(CastR->getOperand(0), SE, L);
           if (isa<SCEVCouldNotCompute>(Op))
             return SE.getCouldNotCompute();
