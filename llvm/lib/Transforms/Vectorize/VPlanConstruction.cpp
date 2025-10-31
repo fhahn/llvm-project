@@ -569,9 +569,11 @@ static void simplifyLiveInsWithSCEV(VPlan &Plan, ScalarEvolution &SE) {
       if (auto *Simp = GetSimplifiedLiveInViaSCEV(VPI)) {
         for (VPUser *U : to_vector(VPI->users())) {
           if (auto *VecPhiR = dyn_cast<VPPhi>(U))
-            VecPhiR->setUnderlyingValue(nullptr);
+            continue;
+            //VecPhiR->setUnderlyingValue(nullptr);
           U->replaceUsesOfWith(VPI, Simp);
         }
+        if (VPI->getNumUsers() == 0)
         VPI->eraseFromParent();
       }
     }

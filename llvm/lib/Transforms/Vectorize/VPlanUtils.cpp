@@ -135,6 +135,71 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
                                  ->getSourceElementType();
         return SE.getGEPExpr(Base, IndexExprs, SrcElementTy);
       })
+      .Case<VPWidenCastRecipe>([&SE, L](const VPWidenCastRecipe *R) {
+        const SCEV *Op = getSCEVExprForVPValue(R->getOperand(0), SE, L);
+        if (isa<SCEVCouldNotCompute>(Op))
+          return SE.getCouldNotCompute();
+
+        Type *ResultTy = R->getResultType();
+        switch (R->getOpcode()) {
+        case Instruction::Trunc:
+          return SE.getTruncateExpr(Op, ResultTy);
+        case Instruction::ZExt:
+          return SE.getZeroExtendExpr(Op, ResultTy);
+        case Instruction::SExt:
+          return SE.getSignExtendExpr(Op, ResultTy);
+        default:
+          return SE.getCouldNotCompute();
+        }
+      })
+      .Case<VPInstruction>([&SE, L](const VPInstruction *R) {
+        // Handle cast instructions.
+        if (Instruction::isCast(R->getOpcode())) {
+          auto *CastR = cast<VPInstructionWithType>(R);
+          const SCEV *Op = getSCEVExprForVPValue(CastR->getOperand(0), SE, L);
+          if (isa<SCEVCouldNotCompute>(Op))
+            return SE.getCouldNotCompute();
+
+          Type *ResultTy = CastR->getResultType();
+          switch (CastR->getOpcode()) {
+          case Instruction::Trunc:
+            return SE.getTruncateExpr(Op, ResultTy);
+          case Instruction::ZExt:
+            return SE.getZeroExtendExpr(Op, ResultTy);
+          case Instruction::SExt:
+            return SE.getSignExtendExpr(Op, ResultTy);
+          default:
+            return SE.getCouldNotCompute();
+          }
+        }
+
+        // Handle binary operations that have direct SCEV support.
+        if (Instruction::isBinaryOp(R->getOpcode())) {
+          const SCEV *LHS = getSCEVExprForVPValue(R->getOperand(0), SE, L);
+          const SCEV *RHS = getSCEVExprForVPValue(R->getOperand(1), SE, L);
+          if (isa<SCEVCouldNotCompute>(LHS) || isa<SCEVCouldNotCompute>(RHS))
+            return SE.getCouldNotCompute();
+
+          switch (R->getOpcode()) {
+          case Instruction::Add:
+            return SE.getAddExpr(LHS, RHS);
+          case Instruction::Sub:
+            return SE.getMinusSCEV(LHS, RHS);
+          case Instruction::Mul:
+            return SE.getMulExpr(LHS, RHS);
+          case Instruction::UDiv:
+            return SE.getUDivExpr(LHS, RHS);
+          case Instruction::URem:
+            return SE.getURemExpr(LHS, RHS);
+          default:
+            // For other binary ops that don't have direct SCEV construction
+            // methods, return CouldNotCompute.
+            return SE.getCouldNotCompute();
+          }
+        }
+
+        return SE.getCouldNotCompute();
+      })
       .Default([&SE](const VPRecipeBase *) { return SE.getCouldNotCompute(); });
 }
 
