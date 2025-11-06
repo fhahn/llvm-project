@@ -2975,41 +2975,21 @@ class VPExpressionRecipe : public VPSingleDefRecipe {
 
 public:
   VPExpressionRecipe(VPWidenCastRecipe *Ext, VPSingleDefRecipe *Red)
-      : VPExpressionRecipe(ExpressionTypes::ExtendedReduction, {Ext, Red}) {
-    assert((isa<VPReductionRecipe>(Red) || isa<VPWidenIntrinsicRecipe>(Red)) &&
-           "Red must be a VPReductionRecipe or VPWidenIntrinsicRecipe");
-  }
+      : VPExpressionRecipe(ExpressionTypes::ExtendedReduction, {Ext, Red}) {}
   VPExpressionRecipe(VPWidenRecipe *Mul, VPSingleDefRecipe *Red)
-      : VPExpressionRecipe(ExpressionTypes::MulAccReduction, {Mul, Red}) {
-    assert((isa<VPReductionRecipe>(Red) || isa<VPWidenIntrinsicRecipe>(Red)) &&
-           "Red must be a VPReductionRecipe or VPWidenIntrinsicRecipe");
-  }
+      : VPExpressionRecipe(ExpressionTypes::MulAccReduction, {Mul, Red}) {}
   VPExpressionRecipe(VPWidenCastRecipe *Ext0, VPWidenCastRecipe *Ext1,
                      VPWidenRecipe *Mul, VPSingleDefRecipe *Red)
       : VPExpressionRecipe(ExpressionTypes::ExtMulAccReduction,
-                           {Ext0, Ext1, Mul, Red}) {
-    assert((isa<VPReductionRecipe>(Red) || isa<VPWidenIntrinsicRecipe>(Red)) &&
-           "Red must be a VPReductionRecipe or VPWidenIntrinsicRecipe");
-  }
+                           {Ext0, Ext1, Mul, Red}) {}
   VPExpressionRecipe(VPWidenCastRecipe *Ext0, VPWidenCastRecipe *Ext1,
                      VPWidenRecipe *Mul, VPWidenRecipe *Sub,
                      VPSingleDefRecipe *Red)
       : VPExpressionRecipe(ExpressionTypes::ExtNegatedMulAccReduction,
                            {Ext0, Ext1, Mul, Sub, Red}) {
     assert(Mul->getOpcode() == Instruction::Mul && "Expected a mul");
-    assert((isa<VPReductionRecipe>(Red) || isa<VPWidenIntrinsicRecipe>(Red)) &&
-           "Red must be a VPReductionRecipe or VPWidenIntrinsicRecipe");
-    if (auto *VPRed = dyn_cast<VPReductionRecipe>(Red)) {
-      assert(VPRed->getRecurrenceKind() == RecurKind::Add &&
-             "Expected an add reduction");
-    } else {
-      assert(cast<VPWidenIntrinsicRecipe>(Red)->getVectorIntrinsicID() ==
-                 Intrinsic::vector_partial_reduce_add &&
-             "Expected a partial reduction add");
-    }
     assert(getNumOperands() >= 3 && "Expected at least three operands");
-    [[maybe_unused]] auto *SubConst =
-        dyn_cast<ConstantInt>(getOperand(2)->getLiveInIRValue());
+    [[maybe_unused]] auto *SubConst = dyn_cast<ConstantInt>(getOperand(2)->getLiveInIRValue());
     assert(SubConst && SubConst->getValue() == 0 &&
            Sub->getOpcode() == Instruction::Sub && "Expected a negating sub");
   }
@@ -3082,11 +3062,6 @@ public:
 
   /// Returns true if the result of this VPExpressionRecipe is a single-scalar.
   bool isSingleScalar() const;
-
-  /// Returns the recipes included in this expression.
-  ArrayRef<VPSingleDefRecipe *> getExpressionRecipes() const {
-    return ExpressionRecipes;
-  }
 };
 
 /// VPPredInstPHIRecipe is a recipe for generating the phi nodes needed when

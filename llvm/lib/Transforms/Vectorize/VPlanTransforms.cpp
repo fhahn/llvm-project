@@ -3536,10 +3536,7 @@ void VPlanTransforms::handleUncountableEarlyExit(VPBasicBlock *EarlyExitingVPBB,
 }
 
 namespace {
-// Helper functions for reduction recipe abstraction.
 
-/// Get the vector operand for a reduction recipe (works with both
-/// VPReductionRecipe and VPWidenIntrinsicRecipe for partial reductions).
 VPValue *getReductionVecOp(VPRecipeBase *R) {
   if (auto *Red = dyn_cast<VPReductionRecipe>(R))
     return Red->getVecOp();
@@ -3551,7 +3548,6 @@ VPValue *getReductionVecOp(VPRecipeBase *R) {
   llvm_unreachable("Unexpected recipe type");
 }
 
-/// Get the reduction opcode.
 unsigned getReductionOpcode(VPRecipeBase *R) {
   if (auto *Red = dyn_cast<VPReductionRecipe>(R))
     return RecurrenceDescriptor::getOpcode(Red->getRecurrenceKind());
@@ -3565,26 +3561,24 @@ unsigned getReductionOpcode(VPRecipeBase *R) {
 
 /// Tries to convert extended in-loop reductions to VPExpressionRecipe, supporting
 /// both VPReductionRecipe and VPWidenIntrinsicRecipe.
-template <typename RedRecipeTy>
 static VPExpressionRecipe *
-tryToMatchAndCreateExtendedReduction(RedRecipeTy *Red, VPCostContext &Ctx,
+tryToMatchAndCreateExtendedReduction(VPSingleDefRecipe *Red, VPCostContext &Ctx,
                                      VFRange &Range) {
-  // For VPWidenIntrinsicRecipe, only handle partial reductions.
-  if constexpr (std::is_same_v<RedRecipeTy, VPWidenIntrinsicRecipe>) {
-    if (!match(Red, m_VectorPartialReduceAdd()))
-      return nullptr;
-  }
+  if (isa<VPWidenIntrinsicRecipe>(Red) && !match(Red, m_VectorPartialReduceAdd()))
+    return nullptr;
 
   Type *RedTy = Ctx.Types.inferScalarType(Red);
   VPValue *VecOp = getReductionVecOp(Red);
   unsigned Opcode = getReductionOpcode(Red);
   bool IsPartial = match(Red, m_VectorPartialReduceAdd());
 
-  // Clamp the range if using extended-reduction is profitable.
   auto IsExtendedRedValidAndClampRange = [&](Instruction::CastOps ExtOpc,
                                              Type *SrcTy) -> bool {
     return LoopVectorizationPlanner::getDecisionAndClampRange(
         [&](ElementCount VF) {
+          auto *SrcVecTy = cast<VectorType>(toVectorTy(SrcTy, VF));
+          TTI::TargetCostKind CostKind = TTI::TCK_RecipThroughput;
+
           InstructionCost ExtCost =
               cast<VPWidenCastRecipe>(VecOp)->computeCost(VF, Ctx);
           InstructionCost RedCost = Red->cost(VF, Ctx);
@@ -3599,12 +3593,9 @@ tryToMatchAndCreateExtendedReduction(RedRecipeTy *Red, VPCostContext &Ctx,
                 Opcode, SrcTy, nullptr, RedTy, VF, ExtKind,
                 llvm::TargetTransformInfo::PR_None, std::nullopt, Ctx.CostKind);
           } else {
-            auto *SrcVecTy = cast<VectorType>(toVectorTy(SrcTy, VF));
-            TTI::TargetCostKind CostKind = TTI::TCK_RecipThroughput;
-            auto *VPRed = cast<VPReductionRecipe>(Red);
             ExtRedCost = Ctx.TTI.getExtendedReductionCost(
                 Opcode, ExtOpc == Instruction::CastOps::ZExt, RedTy, SrcVecTy,
-                VPRed->getFastMathFlags(), CostKind);
+                cast<VPReductionRecipe>(Red)->getFastMathFlags(), CostKind);
           }
           return ExtRedCost.isValid() && ExtRedCost < ExtCost + RedCost;
         },
@@ -3612,7 +3603,6 @@ tryToMatchAndCreateExtendedReduction(RedRecipeTy *Red, VPCostContext &Ctx,
   };
 
   VPValue *A;
-  // Match reduce(ext)).
   if (match(VecOp, m_ZExtOrSExt(m_VPValue(A))) &&
       IsExtendedRedValidAndClampRange(
           cast<VPWidenCastRecipe>(VecOp)->getOpcode(),
@@ -3626,15 +3616,11 @@ tryToMatchAndCreateExtendedReduction(RedRecipeTy *Red, VPCostContext &Ctx,
 
 /// Tries to convert extended in-loop multiply-accumulate reductions to
 /// VPExpressionRecipe, supporting both VPReductionRecipe and VPWidenIntrinsicRecipe.
-template <typename RedRecipeTy>
 static VPExpressionRecipe *
-tryToMatchAndCreateMulAccumulateReduction(RedRecipeTy *Red, VPCostContext &Ctx,
+tryToMatchAndCreateMulAccumulateReduction(VPSingleDefRecipe *Red, VPCostContext &Ctx,
                                           VFRange &Range) {
-  // For VPWidenIntrinsicRecipe, only handle partial reductions.
-  if constexpr (std::is_same_v<RedRecipeTy, VPWidenIntrinsicRecipe>) {
-    if (!match(Red, m_VectorPartialReduceAdd()))
-      return nullptr;
-  }
+  if (isa<VPWidenIntrinsicRecipe>(Red) && !match(Red, m_VectorPartialReduceAdd()))
+    return nullptr;
 
   unsigned Opcode = getReductionOpcode(Red);
   bool IsPartialReduction = match(Red, m_VectorPartialReduceAdd());
@@ -3735,7 +3721,7 @@ tryToMatchAndCreateMulAccumulateReduction(RedRecipeTy *Red, VPCostContext &Ctx,
     // same, and it's been proven that the constant can be extended from
     // NarrowTy safely. Necessary since ExtA's extended operand would be
     // e.g. an i8, while the const will likely be an i32. This will be
-    // elided by later optimizations.
+    // elided by later optimisations.
     VPBuilder Builder(Mul);
     auto *Trunc =
         Builder.createWidenCast(Instruction::CastOps::Trunc, ValB, NarrowTy);
@@ -3779,9 +3765,6 @@ tryToMatchAndCreateMulAccumulateReduction(RedRecipeTy *Red, VPCostContext &Ctx,
     auto *Mul = dyn_cast_or_null<VPWidenRecipe>(
         Ext->getOperand(0)->getDefiningRecipe());
 
-    // If mul is not found as a VPWidenRecipe (e.g., it's loop-invariant), still
-    // create an expression for partial reductions to keep the extend in the
-    // loop body.
     if (!Mul && IsPartialReduction)
       return new VPExpressionRecipe(Ext, Red);
 
@@ -3822,16 +3805,6 @@ tryToMatchAndCreateMulAccumulateReduction(RedRecipeTy *Red, VPCostContext &Ctx,
       Red->setOperand(1, Mul);
       return new VPExpressionRecipe(NewExt0, NewExt1, Mul, Red);
     }
-    // For partial reductions with wider extends pattern, if we can't apply the
-    // full transformation (e.g., mul has multiple uses), still create an
-    // expression to keep the outer extend in the loop body.
-    if (Ext0 && Ext1 && IsPartialReduction &&
-        (Ext->getOpcode() == Ext0->getOpcode() || Ext0 == Ext1) &&
-        Ext0->getOpcode() == Ext1->getOpcode())
-      return new VPExpressionRecipe(Ext, Red);
-    // For partial reductions, when we can't apply the full transformation
-    // (e.g., mul has multiple uses), still create an expression to keep the
-    // outer extend in the loop body.
     if (IsPartialReduction)
       return new VPExpressionRecipe(Ext, Red);
   }

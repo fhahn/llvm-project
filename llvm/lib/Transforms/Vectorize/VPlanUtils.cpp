@@ -245,17 +245,8 @@ unsigned vputils::getVFScaleFactor(VPRecipeBase *R) {
   using namespace VPlanPatternMatch;
   if (auto *RR = dyn_cast<VPReductionPHIRecipe>(R))
     return RR->getVFScaleFactor();
-
-  if (auto *ExprR = dyn_cast<VPExpressionRecipe>(R))
-    return ExprR->getVFScaleFactor();
-
-  // Check for VPReductionRecipe with partial reduction.
-  // The chain operand points to the VPReductionPHIRecipe.
-  if (auto *RR = dyn_cast<VPReductionRecipe>(R)) {
-    if (auto *PhiR = dyn_cast_or_null<VPReductionPHIRecipe>(
-            RR->getChainOp()->getDefiningRecipe()))
-      return PhiR->getVFScaleFactor();
-  }
+  if (auto *ER = dyn_cast<VPExpressionRecipe>(R))
+    return ER->getVFScaleFactor();
 
   uint64_t SF;
   if (match(R, m_Intrinsic<Intrinsic::vector_partial_reduce_add>(

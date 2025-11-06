@@ -8176,11 +8176,10 @@ VPRecipeBuilder::tryToCreatePartialReduction(Instruction *Reduction,
     VPValue *Zero = Plan.getConstantInt(Reduction->getType(), 0);
     BinOp = Builder.createSelect(Cond, BinOp, Zero, Reduction->getDebugLoc());
   }
-  return new VPWidenIntrinsicRecipe(Intrinsic::vector_partial_reduce_add,
-                                    {Accumulator, BinOp,
-                                     Plan.getOrAddLiveIn(ConstantInt::get(
-                                         Reduction->getType(), ScaleFactor))},
-                                    Reduction->getType());
+  return new VPWidenIntrinsicRecipe(
+      Intrinsic::vector_partial_reduce_add,
+      {Accumulator, BinOp, Plan.getConstantInt(Reduction->getType(), ScaleFactor)},
+      Reduction->getType());
 }
 
 void LoopVectorizationPlanner::buildVPlansWithVPRecipes(ElementCount MinVF,
