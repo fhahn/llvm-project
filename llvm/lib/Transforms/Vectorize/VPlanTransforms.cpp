@@ -4255,7 +4255,7 @@ VPlanTransforms::expandSCEVs(VPlan &Plan, ScalarEvolution &SE) {
 /// must be the operand at index \p OpIdx for both the recipe at lane 0, \p
 /// WideMember0). A VPInterleaveRecipe can be narrowed to a wide load, if \p V
 /// is defined at \p Idx of a load interleave group.
-static bool canNarrowLoad(VPWidenRecipe *WideMember0, unsigned OpIdx,
+static bool canNarrowLoad(VPSingleDefRecipe *WideMember0, unsigned OpIdx,
                           VPValue *OpV, unsigned Idx) {
   VPValue *Member0Op = WideMember0->getOperand(OpIdx);
   VPRecipeBase *Member0OpR = Member0Op->getDefiningRecipe();
@@ -4272,15 +4272,16 @@ static bool canNarrowLoad(VPWidenRecipe *WideMember0, unsigned OpIdx,
 
 static bool canNarrowOps(ArrayRef<VPValue *> Ops) {
   SmallVector<VPValue *> Ops0;
-  auto *WideMember0 = dyn_cast<VPWidenRecipe>(Ops[0]);
-  if (!WideMember0)
+  if (!isa<VPWidenRecipe, VPWidenCastRecipe>(Ops[0]))
     return false;
 
   for (const auto &[_, V] : enumerate(Ops)) {
-    auto *R = dyn_cast<VPWidenRecipe>(V);
-    if (!R || R->getOpcode() != WideMember0->getOpcode() ||
-        R->getNumOperands() > 2)
-      return false;
+      if (!isa<VPWidenRecipe, VPWidenCastRecipe>(V))
+        return false;
+      auto *WideR = dyn_cast_or_null<VPSingleDefRecipe>(V->getDefiningRecipe());
+      if (!WideR ||
+          getOpcodeOrIntrinsicID(WideMember0) != getOpcodeOrIntrinsicID(WideR))
+        return false;
   }
 
   for (unsigned Idx = 0; Idx != WideMember0->getNumOperands(); ++Idx) {
@@ -4361,6 +4362,16 @@ narrowInterleaveGroupOp(VPValue *V, SmallPtrSetImpl<VPValue *> &NarrowedOps) {
       WideMember0->setOperand(
           Idx,
           narrowInterleaveGroupOp(WideMember0->getOperand(Idx), NarrowedOps));
+    return V;
+  }
+
+  if (auto *WideCastMember0 =
+          dyn_cast<VPWidenCastRecipe>(V->getDefiningRecipe())) {
+    for (unsigned Idx = 0, E = WideCastMember0->getNumOperands(); Idx != E;
+         ++Idx)
+      WideCastMember0->setOperand(
+          Idx, narrowInterleaveGroupOp(WideCastMember0->getOperand(Idx),
+                                       NarrowedOps));
     return V;
   }
 
