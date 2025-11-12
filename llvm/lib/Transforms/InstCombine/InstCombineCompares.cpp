@@ -4335,6 +4335,24 @@ Instruction *InstCombinerImpl::foldICmpIntrinsicWithConstant(ICmpInst &Cmp,
       Value *Add = Builder.CreateAdd(X, ConstantInt::get(Ty, Shift));
       return new ICmpInst(ICmpInst::ICMP_UGT, Add, ConstantInt::get(Ty, Limit));
     }
+    // icmp uge abs(x), C -> icmp ugt (x + (C-1)), (2*C - 2)
+    if (Pred == ICmpInst::ICMP_UGE) {
+      // Check for valid transformation (C must be > 0 for UGE).
+      if (C.isZero())
+        break;
+
+      APInt Shift = C - 1;
+      APInt Limit = 2 * C - 2;
+
+      // Check for overflow in Limit computation.
+      bool Overflow;
+      APInt DoubleC = C.uadd_ov(C, Overflow);
+      if (Overflow)
+        break;
+
+      Value *Add = Builder.CreateAdd(X, ConstantInt::get(Ty, Shift));
+      return new ICmpInst(ICmpInst::ICMP_UGT, Add, ConstantInt::get(Ty, Limit));
+    }
     break;
   }
   default:
