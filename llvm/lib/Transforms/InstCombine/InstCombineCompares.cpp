@@ -4307,6 +4307,20 @@ Instruction *InstCombinerImpl::foldICmpIntrinsicWithConstant(ICmpInst &Cmp,
       Value *Add = Builder.CreateAdd(X, ConstantInt::get(Ty, Shift));
       return new ICmpInst(ICmpInst::ICMP_ULE, Add, ConstantInt::get(Ty, Limit));
     }
+    // icmp ule abs(x), C -> icmp ule (x + C), (2*C)
+    if (Pred == ICmpInst::ICMP_ULE) {
+      APInt Shift = C;
+      APInt Limit = 2 * C;
+
+      // Check for overflow in Limit computation.
+      bool Overflow;
+      APInt DoubleC = C.uadd_ov(C, Overflow);
+      if (Overflow)
+        break;
+
+      Value *Add = Builder.CreateAdd(X, ConstantInt::get(Ty, Shift));
+      return new ICmpInst(ICmpInst::ICMP_ULE, Add, ConstantInt::get(Ty, Limit));
+    }
     break;
   }
   default:
