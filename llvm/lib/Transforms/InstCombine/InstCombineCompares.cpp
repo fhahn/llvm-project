@@ -4281,6 +4281,34 @@ Instruction *InstCombinerImpl::foldICmpIntrinsicWithConstant(ICmpInst &Cmp,
                             II->getArgOperand(1));
     }
     break;
+  case Intrinsic::abs: {
+    // Only fold if the abs has the poison flag set (second argument is true).
+    const APInt *PoisonFlag;
+    if (!match(II->getArgOperand(1), m_APInt(PoisonFlag)) ||
+        PoisonFlag->isZero())
+      break;
+
+    Value *X = II->getArgOperand(0);
+    // icmp ult abs(x), C -> icmp ule (x + (C-1)), (2*C - 2)
+    if (Pred == ICmpInst::ICMP_ULT) {
+      // Check for valid transformation (C must be > 0 for ULT).
+      if (C.isZero())
+        break;
+
+      APInt Shift = C - 1;
+      APInt Limit = 2 * C - 2;
+
+      // Check for overflow in Limit computation.
+      bool Overflow;
+      APInt DoubleC = C.uadd_ov(C, Overflow);
+      if (Overflow)
+        break;
+
+      Value *Add = Builder.CreateAdd(X, ConstantInt::get(Ty, Shift));
+      return new ICmpInst(ICmpInst::ICMP_ULE, Add, ConstantInt::get(Ty, Limit));
+    }
+    break;
+  }
   default:
     break;
   }
