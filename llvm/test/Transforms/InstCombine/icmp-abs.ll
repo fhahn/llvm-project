@@ -216,4 +216,201 @@ define i1 @icmp_sge_abs_mismatched_op(i4 %arg, i4 %arg2) {
   %abs = call i4 @llvm.abs.i4(i4 %arg, i1 true)
   %cmp = icmp sge i4 %abs, %arg2
   ret i1 %cmp
-  }
+}
+
+; Tests for abs(x) compared with constant folding
+
+declare i32 @llvm.abs.i32(i32, i1)
+declare i8 @llvm.abs.i8(i8, i1)
+declare <4 x i32> @llvm.abs.v4i32(<4 x i32>, i1)
+
+; Basic ULT case: abs(x) < C -> (x + (C-1)) <= (2*C - 2)
+define i1 @icmp_ult_abs_const(i32 %a) {
+; CHECK-LABEL: @icmp_ult_abs_const(
+; CHECK-NEXT:    [[ABS:%.*]] = call i32 @llvm.abs.i32(i32 [[A:%.*]], i1 true)
+; CHECK-NEXT:    [[CMP:%.*]] = icmp ult i32 [[ABS]], 32
+; CHECK-NEXT:    ret i1 [[CMP]]
+;
+  %abs = call i32 @llvm.abs.i32(i32 %a, i1 true)
+  %cmp = icmp ult i32 %abs, 32
+  ret i1 %cmp
+}
+
+; ULE case: abs(x) <= C -> (x + C) <= (2*C)
+define i1 @icmp_ule_abs_const(i32 %a) {
+; CHECK-LABEL: @icmp_ule_abs_const(
+; CHECK-NEXT:    [[ABS:%.*]] = call i32 @llvm.abs.i32(i32 [[A:%.*]], i1 true)
+; CHECK-NEXT:    [[CMP:%.*]] = icmp ule i32 [[ABS]], 32
+; CHECK-NEXT:    ret i1 [[CMP]]
+;
+  %abs = call i32 @llvm.abs.i32(i32 %a, i1 true)
+  %cmp = icmp ule i32 %abs, 32
+  ret i1 %cmp
+}
+
+; UGT case: abs(x) > C -> (x + C) > (2*C)
+define i1 @icmp_ugt_abs_const(i32 %a) {
+; CHECK-LABEL: @icmp_ugt_abs_const(
+; CHECK-NEXT:    [[ABS:%.*]] = call i32 @llvm.abs.i32(i32 [[A:%.*]], i1 true)
+; CHECK-NEXT:    [[CMP:%.*]] = icmp ugt i32 [[ABS]], 32
+; CHECK-NEXT:    ret i1 [[CMP]]
+;
+  %abs = call i32 @llvm.abs.i32(i32 %a, i1 true)
+  %cmp = icmp ugt i32 %abs, 32
+  ret i1 %cmp
+}
+
+; UGE case: abs(x) >= C -> (x + (C-1)) > (2*C - 2)
+define i1 @icmp_uge_abs_const(i32 %a) {
+; CHECK-LABEL: @icmp_uge_abs_const(
+; CHECK-NEXT:    [[ABS:%.*]] = call i32 @llvm.abs.i32(i32 [[A:%.*]], i1 true)
+; CHECK-NEXT:    [[CMP:%.*]] = icmp uge i32 [[ABS]], 32
+; CHECK-NEXT:    ret i1 [[CMP]]
+;
+  %abs = call i32 @llvm.abs.i32(i32 %a, i1 true)
+  %cmp = icmp uge i32 %abs, 32
+  ret i1 %cmp
+}
+
+; Test with smaller bit width
+define i1 @icmp_ult_abs_const_i8(i8 %a) {
+; CHECK-LABEL: @icmp_ult_abs_const_i8(
+; CHECK-NEXT:    [[ABS:%.*]] = call i8 @llvm.abs.i8(i8 [[A:%.*]], i1 true)
+; CHECK-NEXT:    [[CMP:%.*]] = icmp ult i8 [[ABS]], 10
+; CHECK-NEXT:    ret i1 [[CMP]]
+;
+  %abs = call i8 @llvm.abs.i8(i8 %a, i1 true)
+  %cmp = icmp ult i8 %abs, 10
+  ret i1 %cmp
+}
+
+; Test with C=1 (edge case)
+define i1 @icmp_ult_abs_const_one(i32 %a) {
+; CHECK-LABEL: @icmp_ult_abs_const_one(
+; CHECK-NEXT:    [[ABS:%.*]] = call i32 @llvm.abs.i32(i32 [[A:%.*]], i1 true)
+; CHECK-NEXT:    [[CMP:%.*]] = icmp ult i32 [[ABS]], 1
+; CHECK-NEXT:    ret i1 [[CMP]]
+;
+  %abs = call i32 @llvm.abs.i32(i32 %a, i1 true)
+  %cmp = icmp ult i32 %abs, 1
+  ret i1 %cmp
+}
+
+; Test with C=0 (should not fold for ULT)
+define i1 @icmp_ult_abs_const_zero(i32 %a) {
+; CHECK-LABEL: @icmp_ult_abs_const_zero(
+; CHECK-NEXT:    ret i1 false
+;
+  %abs = call i32 @llvm.abs.i32(i32 %a, i1 true)
+  %cmp = icmp ult i32 %abs, 0
+  ret i1 %cmp
+}
+
+; Test with poison flag = false (should not fold)
+define i1 @icmp_ult_abs_const_no_poison(i32 %a) {
+; CHECK-LABEL: @icmp_ult_abs_const_no_poison(
+; CHECK-NEXT:    [[ABS:%.*]] = call i32 @llvm.abs.i32(i32 [[A:%.*]], i1 false)
+; CHECK-NEXT:    [[CMP:%.*]] = icmp ult i32 [[ABS]], 32
+; CHECK-NEXT:    ret i1 [[CMP]]
+;
+  %abs = call i32 @llvm.abs.i32(i32 %a, i1 false)
+  %cmp = icmp ult i32 %abs, 32
+  ret i1 %cmp
+}
+
+; Test ULE with C=0 (should fold)
+define i1 @icmp_ule_abs_const_zero(i32 %a) {
+; CHECK-LABEL: @icmp_ule_abs_const_zero(
+; CHECK-NEXT:    [[ABS:%.*]] = call i32 @llvm.abs.i32(i32 [[A:%.*]], i1 true)
+; CHECK-NEXT:    [[CMP:%.*]] = icmp ule i32 [[ABS]], 0
+; CHECK-NEXT:    ret i1 [[CMP]]
+;
+  %abs = call i32 @llvm.abs.i32(i32 %a, i1 true)
+  %cmp = icmp ule i32 %abs, 0
+  ret i1 %cmp
+}
+
+; Test UGE with C=0 (should not fold)
+define i1 @icmp_uge_abs_const_zero(i32 %a) {
+; CHECK-LABEL: @icmp_uge_abs_const_zero(
+; CHECK-NEXT:    ret i1 true
+;
+  %abs = call i32 @llvm.abs.i32(i32 %a, i1 true)
+  %cmp = icmp uge i32 %abs, 0
+  ret i1 %cmp
+}
+
+; Test UGT with large constant
+define i1 @icmp_ugt_abs_const_large(i32 %a) {
+; CHECK-LABEL: @icmp_ugt_abs_const_large(
+; CHECK-NEXT:    [[ABS:%.*]] = call i32 @llvm.abs.i32(i32 [[A:%.*]], i1 true)
+; CHECK-NEXT:    [[CMP:%.*]] = icmp ugt i32 [[ABS]], 1000
+; CHECK-NEXT:    ret i1 [[CMP]]
+;
+  %abs = call i32 @llvm.abs.i32(i32 %a, i1 true)
+  %cmp = icmp ugt i32 %abs, 1000
+  ret i1 %cmp
+}
+
+; Test with vector type
+define <4 x i1> @icmp_ult_abs_const_vector(<4 x i32> %a) {
+; CHECK-LABEL: @icmp_ult_abs_const_vector(
+; CHECK-NEXT:    [[ABS:%.*]] = call <4 x i32> @llvm.abs.v4i32(<4 x i32> [[A:%.*]], i1 true)
+; CHECK-NEXT:    [[CMP:%.*]] = icmp ult <4 x i32> [[ABS]], splat (i32 32)
+; CHECK-NEXT:    ret <4 x i1> [[CMP]]
+;
+  %abs = call <4 x i32> @llvm.abs.v4i32(<4 x i32> %a, i1 true)
+  %cmp = icmp ult <4 x i32> %abs, <i32 32, i32 32, i32 32, i32 32>
+  ret <4 x i1> %cmp
+}
+
+; Test multiple predicates with same constant value
+define i1 @icmp_ule_abs_const_100(i32 %a) {
+; CHECK-LABEL: @icmp_ule_abs_const_100(
+; CHECK-NEXT:    [[ABS:%.*]] = call i32 @llvm.abs.i32(i32 [[A:%.*]], i1 true)
+; CHECK-NEXT:    [[CMP:%.*]] = icmp ule i32 [[ABS]], 100
+; CHECK-NEXT:    ret i1 [[CMP]]
+;
+  %abs = call i32 @llvm.abs.i32(i32 %a, i1 true)
+  %cmp = icmp ule i32 %abs, 100
+  ret i1 %cmp
+}
+
+define i1 @icmp_uge_abs_const_100(i32 %a) {
+; CHECK-LABEL: @icmp_uge_abs_const_100(
+; CHECK-NEXT:    [[ABS:%.*]] = call i32 @llvm.abs.i32(i32 [[A:%.*]], i1 true)
+; CHECK-NEXT:    [[CMP:%.*]] = icmp uge i32 [[ABS]], 100
+; CHECK-NEXT:    ret i1 [[CMP]]
+;
+  %abs = call i32 @llvm.abs.i32(i32 %a, i1 true)
+  %cmp = icmp uge i32 %abs, 100
+  ret i1 %cmp
+}
+
+; Signed comparison (canonicalized to unsigned, then folds)
+define i1 @icmp_slt_abs_const(i32 %a) {
+; CHECK-LABEL: @icmp_slt_abs_const(
+; CHECK-NEXT:    [[ABS:%.*]] = call i32 @llvm.abs.i32(i32 [[A:%.*]], i1 true)
+; CHECK-NEXT:    [[CMP:%.*]] = icmp slt i32 [[ABS]], 32
+; CHECK-NEXT:    ret i1 [[CMP]]
+;
+  %abs = call i32 @llvm.abs.i32(i32 %a, i1 true)
+  %cmp = icmp slt i32 %abs, 32
+  ret i1 %cmp
+}
+
+; Test with abs having multiple uses (should still fold)
+define i1 @icmp_ult_abs_const_multiuse(i32 %a) {
+; CHECK-LABEL: @icmp_ult_abs_const_multiuse(
+; CHECK-NEXT:    [[ABS:%.*]] = call i32 @llvm.abs.i32(i32 [[A:%.*]], i1 true)
+; CHECK-NEXT:    call void @use(i32 [[ABS]])
+; CHECK-NEXT:    [[CMP:%.*]] = icmp ult i32 [[ABS]], 32
+; CHECK-NEXT:    ret i1 [[CMP]]
+;
+  %abs = call i32 @llvm.abs.i32(i32 %a, i1 true)
+  call void @use(i32 %abs)
+  %cmp = icmp ult i32 %abs, 32
+  ret i1 %cmp
+}
+
+declare void @use(i32)
