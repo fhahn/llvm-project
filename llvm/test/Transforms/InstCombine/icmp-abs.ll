@@ -251,8 +251,8 @@ define i1 @icmp_ule_abs_const(i32 %a) {
 ; UGT case: abs(x) > C -> (x + C) > (2*C)
 define i1 @icmp_ugt_abs_const(i32 %a) {
 ; CHECK-LABEL: @icmp_ugt_abs_const(
-; CHECK-NEXT:    [[ABS:%.*]] = call i32 @llvm.abs.i32(i32 [[A:%.*]], i1 true)
-; CHECK-NEXT:    [[CMP:%.*]] = icmp samesign ugt i32 [[ABS]], 32
+; CHECK-NEXT:    [[TMP1:%.*]] = add i32 [[A:%.*]], -33
+; CHECK-NEXT:    [[CMP:%.*]] = icmp ult i32 [[TMP1]], -65
 ; CHECK-NEXT:    ret i1 [[CMP]]
 ;
   %abs = call i32 @llvm.abs.i32(i32 %a, i1 true)
@@ -263,8 +263,8 @@ define i1 @icmp_ugt_abs_const(i32 %a) {
 ; UGE case: abs(x) >= C -> (x + (C-1)) > (2*C - 2)
 define i1 @icmp_uge_abs_const(i32 %a) {
 ; CHECK-LABEL: @icmp_uge_abs_const(
-; CHECK-NEXT:    [[ABS:%.*]] = call i32 @llvm.abs.i32(i32 [[A:%.*]], i1 true)
-; CHECK-NEXT:    [[CMP:%.*]] = icmp samesign ugt i32 [[ABS]], 31
+; CHECK-NEXT:    [[TMP1:%.*]] = add i32 [[A:%.*]], -32
+; CHECK-NEXT:    [[CMP:%.*]] = icmp ult i32 [[TMP1]], -63
 ; CHECK-NEXT:    ret i1 [[CMP]]
 ;
   %abs = call i32 @llvm.abs.i32(i32 %a, i1 true)
@@ -341,8 +341,8 @@ define i1 @icmp_uge_abs_const_zero(i32 %a) {
 ; Test UGT with large constant
 define i1 @icmp_ugt_abs_const_large(i32 %a) {
 ; CHECK-LABEL: @icmp_ugt_abs_const_large(
-; CHECK-NEXT:    [[ABS:%.*]] = call i32 @llvm.abs.i32(i32 [[A:%.*]], i1 true)
-; CHECK-NEXT:    [[CMP:%.*]] = icmp samesign ugt i32 [[ABS]], 1000
+; CHECK-NEXT:    [[TMP1:%.*]] = add i32 [[A:%.*]], -1001
+; CHECK-NEXT:    [[CMP:%.*]] = icmp ult i32 [[TMP1]], -2001
 ; CHECK-NEXT:    ret i1 [[CMP]]
 ;
   %abs = call i32 @llvm.abs.i32(i32 %a, i1 true)
@@ -376,8 +376,8 @@ define i1 @icmp_ule_abs_const_100(i32 %a) {
 
 define i1 @icmp_uge_abs_const_100(i32 %a) {
 ; CHECK-LABEL: @icmp_uge_abs_const_100(
-; CHECK-NEXT:    [[ABS:%.*]] = call i32 @llvm.abs.i32(i32 [[A:%.*]], i1 true)
-; CHECK-NEXT:    [[CMP:%.*]] = icmp samesign ugt i32 [[ABS]], 99
+; CHECK-NEXT:    [[TMP1:%.*]] = add i32 [[A:%.*]], -100
+; CHECK-NEXT:    [[CMP:%.*]] = icmp ult i32 [[TMP1]], -199
 ; CHECK-NEXT:    ret i1 [[CMP]]
 ;
   %abs = call i32 @llvm.abs.i32(i32 %a, i1 true)
