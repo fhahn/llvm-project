@@ -4475,18 +4475,6 @@ void VPWidenPHIRecipe::print(raw_ostream &O, const Twine &Indent,
 }
 #endif
 
-// TODO: It would be good to use the existing VPWidenPHIRecipe instead and
-// remove VPActiveLaneMaskPHIRecipe.
-void VPActiveLaneMaskPHIRecipe::execute(VPTransformState &State) {
-  BasicBlock *VectorPH =
-      State.CFG.VPBB2IRBB.at(getParent()->getCFGPredecessor(0));
-  Value *StartMask = State.get(getOperand(0));
-  PHINode *Phi =
-      State.Builder.CreatePHI(StartMask->getType(), 2, "active.lane.mask");
-  Phi->addIncoming(StartMask, VectorPH);
-  State.set(this, Phi);
-}
-
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 void VPActiveLaneMaskPHIRecipe::print(raw_ostream &O, const Twine &Indent,
                                       VPSlotTracker &SlotTracker) const {

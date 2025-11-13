@@ -3526,9 +3526,8 @@ public:
 };
 
 /// A recipe for generating the active lane mask for the vector loop that is
-/// used to predicate the vector operations.
-/// TODO: It would be good to use the existing VPWidenPHIRecipe instead and
-/// remove VPActiveLaneMaskPHIRecipe.
+/// used to predicate the vector operations. This is an abstract recipe and must
+/// be converted to a VPWidenPHIRecipe before executing.
 class VPActiveLaneMaskPHIRecipe : public VPHeaderPHIRecipe {
 public:
   VPActiveLaneMaskPHIRecipe(VPValue *StartMask, DebugLoc DL)
@@ -3546,8 +3545,10 @@ public:
 
   VP_CLASSOF_IMPL(VPDef::VPActiveLaneMaskPHISC)
 
-  /// Generate the active lane mask phi of the vector loop.
-  void execute(VPTransformState &State) override;
+  void execute(VPTransformState &State) override {
+    llvm_unreachable("cannot execute this recipe, should be converted to "
+                     "VPWidenPHIRecipe via convertToConcreteRecipes");
+  }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   /// Print the recipe.

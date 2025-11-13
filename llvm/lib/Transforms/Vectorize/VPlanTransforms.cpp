@@ -3457,6 +3457,16 @@ void VPlanTransforms::convertToConcreteRecipes(VPlan &Plan) {
         continue;
       }
 
+      // Replace VPActiveLaneMaskPHIRecipe with VPWidenPHIRecipe.
+      if (auto *ALMPhi = dyn_cast<VPActiveLaneMaskPHIRecipe>(&R)) {
+        auto *WidenPhi = new VPWidenPHIRecipe(
+            nullptr, ALMPhi->operands(), ALMPhi->getDebugLoc(), "active.lane.mask");
+        ALMPhi->replaceAllUsesWith(WidenPhi);
+        WidenPhi->insertBefore(ALMPhi);
+        ToRemove.push_back(ALMPhi);
+        continue;
+      }
+
       // Expand VPBlendRecipe into VPInstruction::Select.
       VPBuilder Builder(&R);
       if (auto *Blend = dyn_cast<VPBlendRecipe>(&R)) {
