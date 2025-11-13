@@ -2268,21 +2268,16 @@ protected:
   const VPRecipeBase *getAsRecipe() const override { return this; }
 
 public:
-  /// Create a new VPWidenPHIRecipe for \p Phi with start value \p Start and
+  /// Create a new VPWidenPHIRecipe for \p Phi with operands \p Operands and
   /// debug location \p DL.
-  VPWidenPHIRecipe(PHINode *Phi, VPValue *Start = nullptr,
+  VPWidenPHIRecipe(PHINode *Phi, ArrayRef<VPValue *> Operands,
                    DebugLoc DL = DebugLoc::getUnknown(), const Twine &Name = "")
-      : VPSingleDefRecipe(VPDef::VPWidenPHISC, {}, Phi, DL), Name(Name.str()) {
-    if (Start)
-      addOperand(Start);
-  }
+      : VPSingleDefRecipe(VPDef::VPWidenPHISC, Operands, Phi, DL),
+        Name(Name.str()) {}
 
   VPWidenPHIRecipe *clone() override {
-    auto *C = new VPWidenPHIRecipe(cast<PHINode>(getUnderlyingValue()),
-                                   getOperand(0), getDebugLoc(), Name);
-    for (VPValue *Op : llvm::drop_begin(operands()))
-      C->addOperand(Op);
-    return C;
+    return new VPWidenPHIRecipe(cast<PHINode>(getUnderlyingValue()), operands(),
+                                getDebugLoc(), Name);
   }
 
   ~VPWidenPHIRecipe() override = default;

@@ -69,9 +69,8 @@ bool VPlanTransforms::tryToConvertVPInstructionsToVPRecipes(
         auto *Phi = cast<PHINode>(PhiR->getUnderlyingValue());
         const auto *II = GetIntOrFpInductionDescriptor(Phi);
         if (!II) {
-          NewRecipe = new VPWidenPHIRecipe(Phi, nullptr, PhiR->getDebugLoc());
-          for (VPValue *Op : PhiR->operands())
-            NewRecipe->addOperand(Op);
+          NewRecipe =
+              new VPWidenPHIRecipe(Phi, PhiR->operands(), PhiR->getDebugLoc());
         } else {
           VPValue *Start = Plan.getOrAddLiveIn(II->getStartValue());
           VPValue *Step =
