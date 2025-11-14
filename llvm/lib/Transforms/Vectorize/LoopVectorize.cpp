@@ -6923,16 +6923,17 @@ LoopVectorizationPlanner::precomputeCosts(VPlan &Plan, ElementCount VF,
     });
     Cost += ForcedCost;
   }
-  for (const auto &[Scalarized, ScalarCost] : CM.InstsToScalarize[VF]) {
-    if (CostCtx.skipCostComputation(Scalarized, VF.isVector()))
-      continue;
-    CostCtx.SkipCostComputation.insert(Scalarized);
-    LLVM_DEBUG({
-      dbgs() << "Cost of " << ScalarCost << " for VF " << VF
-             << ": profitable to scalarize " << *Scalarized << "\n";
-    });
-    Cost += ScalarCost;
-  }
+  if (!ForceTargetInstructionCost.getNumOccurrences())
+    for (const auto &[Scalarized, ScalarCost] : CM.InstsToScalarize[VF]) {
+      if (CostCtx.skipCostComputation(Scalarized, VF.isVector()))
+        continue;
+      CostCtx.SkipCostComputation.insert(Scalarized);
+      LLVM_DEBUG({
+        dbgs() << "Cost of " << ScalarCost << " for VF " << VF
+               << ": profitable to scalarize " << *Scalarized << "\n";
+      });
+      Cost += ScalarCost;
+    }
 
   return Cost;
 }

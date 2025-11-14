@@ -380,6 +380,24 @@ for.end:
   ret void
 }
 
+define void @forced_scalar_instr(ptr %gep.dst) {
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep = getelementptr i32, ptr %gep.dst, i64 %iv
+  %t = trunc i64 %iv to i32
+ %o = or i32 %t, 1
+  store i32 %o, ptr %gep, align 4
+  %iv.next = add i64 %iv, 1
+  %ec = icmp eq i64 %iv, 4
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
 attributes #0 = { "target-features"="+neon,+sve" vscale_range(1,16) }
 
 declare void @llvm.assume(i1 noundef)
