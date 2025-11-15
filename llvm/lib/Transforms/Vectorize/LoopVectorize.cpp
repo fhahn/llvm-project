@@ -5122,8 +5122,17 @@ InstructionCost LoopVectorizationCostModel::expectedCost(ElementCount VF) {
       InstructionCost C = getInstructionCost(&I, VF);
 
       // Check if we should override the cost.
-      if (C.isValid() && ForceTargetInstructionCost.getNumOccurrences() > 0)
-        C = InstructionCost(ForceTargetInstructionCost);
+      if (C.isValid() && ForceTargetInstructionCost.getNumOccurrences() > 0) {
+        if (VF.isVector() && isa<LoadInst, StoreInst>(&I) &&
+            getWideningDecision(&I, VF) == CM_Interleave) {
+          if (getInterleavedAccessGroup(&I)->getInsertPos() == &I)
+            C = InstructionCost(ForceTargetInstructionCost);
+          else
+            C = InstructionCost(0);
+        } else {
+          C = InstructionCost(ForceTargetInstructionCost);
+        }
+      }
 
       BlockCost += C;
       LLVM_DEBUG(dbgs() << "LV: Found an estimated cost of " << C << " for VF "

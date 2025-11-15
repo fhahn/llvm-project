@@ -398,7 +398,30 @@ exit:
   ret void
 }
 
+define void @interleave_group(ptr %dst) #1 {
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %iv.3 = mul i64 %iv, 3
+  %gep.0 = getelementptr i8, ptr %dst, i64 %iv.3
+  %gep.2 = getelementptr i8, ptr %gep.0, i64 2
+  store i8 0, ptr %gep.2, align 1
+  %gep.1 = getelementptr i8, ptr %gep.0, i64 1
+  store i8 0, ptr %gep.1, align 1
+  store i8 0, ptr %gep.0, align 1
+  %iv.next = add i64 %iv, 1
+  %ec = icmp eq i64 %iv, 100
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+
 attributes #0 = { "target-features"="+neon,+sve" vscale_range(1,16) }
+attributes #1 = { "target-cpu"="neoverse-512tvb" }
 
 declare void @llvm.assume(i1 noundef)
 declare i64 @llvm.umin.i64(i64, i64)
