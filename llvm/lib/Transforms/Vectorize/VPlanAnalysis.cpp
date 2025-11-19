@@ -436,10 +436,9 @@ SmallVector<VPRegisterUsage, 8> llvm::calculateRegisterUsageForPlan(
   // first occurences of each recipe and last occurrence of each VPValue.
   VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
   ReversePostOrderTraversal<VPBlockDeepTraversalWrapper<VPBlockBase *>> RPOT(
-      LoopRegion);
+      LoopRegion->getEntry());
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(RPOT)) {
-    if (!VPBB->getParent())
-      break;
+    assert(VPBB->getParent());
     for (VPRecipeBase &R : *VPBB) {
       Idx2Recipe.push_back(&R);
 

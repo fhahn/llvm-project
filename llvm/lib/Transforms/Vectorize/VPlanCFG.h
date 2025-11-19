@@ -64,18 +64,6 @@ class VPAllSuccessorsIterator
     return false;
   }
 
-  void skipToNextValid() {
-    while (SuccessorIdx < getEndIdx() &&
-           !isInFilterRegion(deref(Block, SuccessorIdx)))
-      SuccessorIdx++;
-  }
-
-  void skipToPrevValid() {
-    while (SuccessorIdx > 0 &&
-           !isInFilterRegion(deref(Block, SuccessorIdx - 1)))
-      SuccessorIdx--;
-  }
-
   /// Templated helper to dereference successor \p SuccIdx of \p Block. Used by
   /// both the const and non-const operator* implementations.
   template <typename T1> static T1 deref(T1 Block, unsigned SuccIdx) {
@@ -88,7 +76,7 @@ class VPAllSuccessorsIterator
     return getBlockWithSuccs(Block)->getSuccessors()[SuccIdx];
   }
 
-  size_t getEndIdx() const {
+  static size_t getEndIdx(BlockPtrTy Block) {
     if (auto *R = dyn_cast<VPRegionBlock>(Block))
       return 1;
     BlockPtrTy ParentWithSuccs = getBlockWithSuccs(Block);
@@ -103,18 +91,16 @@ public:
                           RegionPtrTy FilterRegion = nullptr,
                           bool SkipToValid = true)
       : Block(Block), SuccessorIdx(Idx), FilterRegion(FilterRegion) {
-    if (SkipToValid)
-      skipToNextValid();
+    if (SkipToValid) {
+      while (SuccessorIdx < getEndIdx(Block) &&
+             !isInFilterRegion(deref(Block, SuccessorIdx)))
+        ++SuccessorIdx;
+    }
   }
 
   static VPAllSuccessorsIterator end(BlockPtrTy Block,
                                      RegionPtrTy FilterRegion = nullptr) {
-    if (auto *R = dyn_cast<VPRegionBlock>(Block))
-      return {R, 1, FilterRegion, false};
-    BlockPtrTy ParentWithSuccs = getBlockWithSuccs(Block);
-    unsigned NumSuccessors =
-        ParentWithSuccs ? ParentWithSuccs->getNumSuccessors() : 0;
-    return {Block, NumSuccessors, FilterRegion, false};
+    return {Block, getEndIdx(Block), FilterRegion, false};
   }
 
   bool operator==(const VPAllSuccessorsIterator &R) const {
@@ -122,23 +108,25 @@ public:
   }
 
   NodeTy operator*() const {
-    BlockPtrTy B = deref(Block, SuccessorIdx);
     if constexpr (std::is_same_v<NodeTy, BlockPtrTy>)
-      return B;
+      return deref(Block, SuccessorIdx);
     else
-      return NodeTy{B, FilterRegion};
+      return {deref(Block, SuccessorIdx), FilterRegion};
   }
 
   VPAllSuccessorsIterator &operator++() {
-    SuccessorIdx++;
-    skipToNextValid();
+    do {
+      ++SuccessorIdx;
+    } while (SuccessorIdx < getEndIdx(Block) &&
+             !isInFilterRegion(deref(Block, SuccessorIdx)));
     return *this;
   }
 
   VPAllSuccessorsIterator &operator--() {
-    skipToPrevValid();
-    if (SuccessorIdx > 0)
-      SuccessorIdx--;
+    do {
+      --SuccessorIdx;
+    } while (SuccessorIdx > 0 &&
+             !isInFilterRegion(deref(Block, SuccessorIdx)));
     return *this;
   }
 
@@ -156,10 +144,7 @@ template <typename BlockTy> struct VPBlockWithRegion {
   RegionPtrTy FilterRegion;
 
   operator BlockTy() const { return Block; }
-  BlockTy operator->() const { return Block; }
-  explicit operator bool() const { return Block; }
   bool operator==(const VPBlockWithRegion &R) const { return Block == R.Block; }
-  bool operator!=(const VPBlockWithRegion &R) const { return !(*this == R); }
 };
 
 /// Helper for GraphTraits specialization that traverses through VPRegionBlocks.
@@ -191,11 +176,11 @@ template <> struct GraphTraits<VPBlockDeepTraversalWrapper<VPBlockBase *>> {
     return {N.getEntry(), N.getFilterRegion()};
   }
 
-  static inline ChildIteratorType child_begin(NodeRef N) {
+  static ChildIteratorType child_begin(NodeRef N) {
     return ChildIteratorType(N.Block, 0, N.FilterRegion);
   }
 
-  static inline ChildIteratorType child_end(NodeRef N) {
+  static ChildIteratorType child_end(NodeRef N) {
     return ChildIteratorType::end(N.Block, N.FilterRegion);
   }
 };
@@ -212,11 +197,11 @@ struct GraphTraits<VPBlockDeepTraversalWrapper<const VPBlockBase *>> {
     return {N.getEntry(), N.getFilterRegion()};
   }
 
-  static inline ChildIteratorType child_begin(NodeRef N) {
+  static ChildIteratorType child_begin(NodeRef N) {
     return ChildIteratorType(N.Block, 0, N.FilterRegion);
   }
 
-  static inline ChildIteratorType child_end(NodeRef N) {
+  static ChildIteratorType child_end(NodeRef N) {
     return ChildIteratorType::end(N.Block, N.FilterRegion);
   }
 };
@@ -307,28 +292,20 @@ vp_depth_first_deep(const VPBlockBase *G) {
   return depth_first(VPBlockDeepTraversalWrapper<const VPBlockBase *>(G));
 }
 
-} // namespace llvm
-
 // Specialize PointerLikeTypeTraits for VPBlockWithRegion.
-namespace llvm {
-
 template <typename BlockTy>
 struct PointerLikeTypeTraits<VPBlockWithRegion<BlockTy>> {
   using Wrapped = VPBlockWithRegion<BlockTy>;
   using PtrTraits = PointerLikeTypeTraits<BlockTy>;
 
-  static inline void *getAsVoidPointer(const Wrapped &P) {
+  static void *getAsVoidPointer(const Wrapped &P) {
     return const_cast<void *>(PtrTraits::getAsVoidPointer(P.Block));
   }
-  static inline Wrapped getFromVoidPointer(void *P) {
+  static Wrapped getFromVoidPointer(void *P) {
     return {PtrTraits::getFromVoidPointer(P), nullptr};
   }
   static constexpr int NumLowBitsAvailable = PtrTraits::NumLowBitsAvailable;
 };
-
-} // namespace llvm
-
-namespace llvm {
 
 // The following set of template specializations implement GraphTraits to treat
 // any VPBlockBase as a node in a graph of VPBlockBases. It's important to note
