@@ -4265,7 +4265,9 @@ static bool canNarrowLoad(VPWidenRecipe *WideMember0, unsigned OpIdx,
     return !W->getMask() && Member0Op == OpV;
   if (auto *IR = dyn_cast<VPInterleaveRecipe>(Member0OpR))
     return IR->getInterleaveGroup()->isFull() && IR->getVPValue(Idx) == OpV;
-  return false;
+  // Allow uniform values (broadcasts, replicates, etc.) if they match across
+  // all lanes.
+  return Member0Op == OpV;
 }
 
 /// Returns true if \p IR is a full interleave group with factor and number of
@@ -4349,6 +4351,13 @@ narrowInterleaveGroupOp(VPValue *V, SmallPtrSetImpl<VPValue *> &NarrowedOps) {
            "must be a single scalar load");
     NarrowedOps.insert(RepR);
     return RepR;
+  }
+
+  // If this is not a widen load, it must be a uniform value (like a broadcast
+  // or other recipe that doesn't need narrowing). Just return it as-is.
+  if (!isa<VPWidenLoadRecipe>(R)) {
+    NarrowedOps.insert(V);
+    return V;
   }
 
   auto *WideLoad = cast<VPWidenLoadRecipe>(R);
