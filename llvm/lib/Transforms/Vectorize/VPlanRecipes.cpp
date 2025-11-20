@@ -4482,7 +4482,7 @@ void VPReductionPHIRecipe::printRecipe(raw_ostream &O, const Twine &Indent,
 void VPWidenPHIRecipe::execute(VPTransformState &State) {
   Value *Op0 = State.get(getOperand(0));
   Type *VecTy = Op0->getType();
-  Instruction *VecPhi = State.Builder.CreatePHI(VecTy, 2, Name);
+  Instruction *VecPhi = State.Builder.CreatePHI(VecTy, 2, getName());
   State.set(this, VecPhi);
 }
 

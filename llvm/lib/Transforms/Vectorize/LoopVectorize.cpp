@@ -7592,8 +7592,8 @@ VPWidenMemoryRecipe *VPRecipeBuilder::tryToWidenMemory(VPInstruction *VPI,
   VPValue *Ptr = VPI->getOpcode() == Instruction::Load ? VPI->getOperand(0)
                                                        : VPI->getOperand(1);
   if (Consecutive) {
-    auto *GEP = dyn_cast<GetElementPtrInst>(
-        Ptr->getUnderlyingValue()->stripPointerCasts());
+    auto *GEP = dyn_cast_or_null<GetElementPtrInst>(
+        Ptr->getUnderlyingValue() ? Ptr->getUnderlyingValue()->stripPointerCasts() : nullptr);
     VPSingleDefRecipe *VectorPtr;
     if (Reverse) {
       // When folding the tail, we may compute an address that we don't in the
@@ -7671,9 +7671,9 @@ VPRecipeBuilder::tryToOptimizeInductionPHI(VPInstruction *VPI) {
   // Check if this is pointer induction. If so, build the recipe for it.
   if (auto *II = Legal->getPointerInductionDescriptor(Phi)) {
     VPValue *Step = vputils::getOrCreateVPValueForSCEVExpr(Plan, II->getStep());
-    return new VPWidenPointerInductionRecipe(Phi, VPI->getOperand(0), Step,
+    return new VPWidenPointerInductionRecipe(VPI->getOperand(0), Step,
                                              &Plan.getVFxUF(), *II,
-                                             VPI->getDebugLoc());
+                                             VPI->getDebugLoc(), Phi->getName());
   }
   return nullptr;
 }

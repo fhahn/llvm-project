@@ -1433,6 +1433,11 @@ void VPSlotTracker::assignName(const VPValue *V) {
     NextSlot++;
     return;
   }
+  if (V->getDefiningRecipe() && !V->getDefiningRecipe()->getName().empty()) {
+    VPValue2Name[V] = (Twine("vp<%") +  V->getDefiningRecipe()->getName()+ ">").str();
+    NextSlot++;
+    return;
+  }
 
   // Use the name of the underlying Value, wrapped in "ir<>", and versioned by
   // appending ".Number" to the name if there are multiple uses.

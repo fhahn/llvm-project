@@ -74,7 +74,7 @@ bool VPlanTransforms::tryToConvertVPInstructionsToVPRecipes(
         auto *Phi = cast<PHINode>(PhiR->getUnderlyingValue());
         const auto *II = GetIntOrFpInductionDescriptor(Phi);
         if (!II) {
-          NewRecipe = new VPWidenPHIRecipe(Phi, nullptr, PhiR->getDebugLoc());
+          NewRecipe = new VPWidenPHIRecipe(nullptr, PhiR->getDebugLoc());
           for (VPValue *Op : PhiR->operands())
             NewRecipe->addOperand(Op);
         } else {
@@ -3346,7 +3346,7 @@ expandVPWidenIntOrFpInduction(VPWidenIntOrFpInductionRecipe *WidenIVR,
                               DebugLoc::getUnknown(), "induction");
 
   // Create the widened phi of the vector IV.
-  auto *WidePHI = new VPWidenPHIRecipe(WidenIVR->getPHINode(), Init,
+  auto *WidePHI = new VPWidenPHIRecipe(Init,
                                        WidenIVR->getDebugLoc(), "vec.ind");
   WidePHI->insertBefore(WidenIVR);
 

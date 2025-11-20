@@ -393,6 +393,8 @@ class LLVM_ABI_FOR_TEST VPRecipeBase
   /// The debug location for the recipe.
   DebugLoc DL;
 
+  StringRef Name;
+
 public:
   VPRecipeBase(const unsigned char SC, ArrayRef<VPValue *> Operands,
                DebugLoc DL = DebugLoc::getUnknown())
@@ -482,6 +484,12 @@ public:
 
   /// Set the recipe's debug location to \p NewDL.
   void setDebugLoc(DebugLoc NewDL) { DL = NewDL; }
+
+  void setName(StringRef N) {
+    Name = N;
+  }
+
+  StringRef getName() const { return Name; }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   /// Print the recipe, delegating to printRecipe().
@@ -2288,11 +2296,12 @@ public:
   /// Create a new VPWidenPointerInductionRecipe for \p Phi with start value \p
   /// Start and the number of elements unrolled \p NumUnrolledElems, typically
   /// VF*UF.
-  VPWidenPointerInductionRecipe(PHINode *Phi, VPValue *Start, VPValue *Step,
+  VPWidenPointerInductionRecipe(VPValue *Start, VPValue *Step,
                                 VPValue *NumUnrolledElems,
-                                const InductionDescriptor &IndDesc, DebugLoc DL)
-      : VPWidenInductionRecipe(VPDef::VPWidenPointerInductionSC, Phi, Start,
+                                const InductionDescriptor &IndDesc, DebugLoc DL, StringRef Name)
+      : VPWidenInductionRecipe(VPDef::VPWidenPointerInductionSC, nullptr, Start,
                                Step, IndDesc, DL) {
+        setName(Name);
     addOperand(NumUnrolledElems);
   }
 
@@ -2300,8 +2309,8 @@ public:
 
   VPWidenPointerInductionRecipe *clone() override {
     return new VPWidenPointerInductionRecipe(
-        cast<PHINode>(getUnderlyingInstr()), getOperand(0), getOperand(1),
-        getOperand(2), getInductionDescriptor(), getDebugLoc());
+        getOperand(0), getOperand(1),
+        getOperand(2), getInductionDescriptor(), getDebugLoc(), getName());
   }
 
   VP_CLASSOF_IMPL(VPDef::VPWidenPointerInductionSC)
@@ -2330,22 +2339,20 @@ protected:
 /// the second from the exiting block of the region.
 class LLVM_ABI_FOR_TEST VPWidenPHIRecipe : public VPSingleDefRecipe,
                                            public VPPhiAccessors {
-  /// Name to use for the generated IR instruction for the widened phi.
-  std::string Name;
-
 public:
   /// Create a new VPWidenPHIRecipe for \p Phi with start value \p Start and
   /// debug location \p DL.
-  VPWidenPHIRecipe(PHINode *Phi, VPValue *Start = nullptr,
-                   DebugLoc DL = DebugLoc::getUnknown(), const Twine &Name = "")
-      : VPSingleDefRecipe(VPDef::VPWidenPHISC, {}, Phi, DL), Name(Name.str()) {
+  VPWidenPHIRecipe(VPValue *Start = nullptr,
+                   DebugLoc DL = DebugLoc::getUnknown(), StringRef Name= "")
+      : VPSingleDefRecipe(VPDef::VPWidenPHISC, {}, nullptr, DL) {
+        setName(Name);
     if (Start)
       addOperand(Start);
   }
 
   VPWidenPHIRecipe *clone() override {
-    auto *C = new VPWidenPHIRecipe(cast<PHINode>(getUnderlyingValue()),
-                                   getOperand(0), getDebugLoc(), Name);
+    auto *C = new VPWidenPHIRecipe(
+                                   getOperand(0), getDebugLoc(), getName());
     for (VPValue *Op : llvm::drop_begin(operands()))
       C->addOperand(Op);
     return C;
