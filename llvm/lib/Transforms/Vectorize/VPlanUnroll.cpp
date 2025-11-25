@@ -23,6 +23,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/Analysis/IVDescriptors.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/Intrinsics.h"
 
 using namespace llvm;
@@ -739,7 +740,7 @@ void VPlanTransforms::replicateByVF(VPlan &Plan, ElementCount VF) {
 /// VPReplicateRecipes are converted to single-scalar ones, branch-on-mask is
 /// converted into BranchOnCond and extracts are created as needed.
 static void convertRecipesInRegionBlocksToSingleScalar(
-    VPlan &Plan, Type *IdxTy, ElementCount VF,
+    VPlan &Plan, VPTypeAnalysis &TypeAnalysis, Type *IdxTy, ElementCount VF,
     ArrayRef<VPBlockBase *> RegionBlocks) {
   for (VPBlockBase *VPB : RegionBlocks) {
     for (VPRecipeBase &NewR : make_early_inc_range(*cast<VPBasicBlock>(VPB))) {
@@ -773,6 +774,17 @@ static void convertRecipesInRegionBlocksToSingleScalar(
                              {BranchOnMask->getOperand(0)},
                              BranchOnMask->getDebugLoc());
         BranchOnMask->eraseFromParent();
+      } else if (auto *PredPhi = dyn_cast<VPPredInstPHIRecipe>(&NewR)) {
+        assert(VF.isScalar() &&
+               "VPPredInstPHIRecipe only supported for scalar VFs currently");
+        VPValue *PredOp = PredPhi->getOperand(0);
+        VPValue *PoisonVal = Plan.getOrAddLiveIn(
+            PoisonValue::get(TypeAnalysis.inferScalarType(PredOp)));
+
+        VPPhi *NewPhi = Builder.createScalarPhi({PoisonVal, PredOp},
+                                                PredPhi->getDebugLoc());
+        PredPhi->replaceAllUsesWith(NewPhi);
+        PredPhi->eraseFromParent();
       }
     }
   }
@@ -822,14 +834,17 @@ void VPlanTransforms::unrollReplicateRegions(VPlan &Plan, ElementCount VF) {
       ReplicateRegions.push_back(Region);
   }
 
+  VPTypeAnalysis TypeAnalysis(Plan);
   Type *IdxTy = IntegerType::get(Plan.getContext(), 32);
   for (VPRegionBlock *Region : ReplicateRegions) {
     assert(!VF.isScalable() && "cannot replicate across scalable VFs");
 
-    // Skip regions with live-outs as packing scalar results back into vectors
-    // is not yet implemented.
     VPBlockBase *Exiting = Region->getExiting();
-    if (any_of(*cast<VPBasicBlock>(Exiting), IsaPred<VPPredInstPHIRecipe>))
+
+    // Skip regions with VPPredInstPHIRecipes for vector VF as packing them
+    // requires additional work.
+    if (!VF.isScalar() &&
+        any_of(*cast<VPBasicBlock>(Exiting), IsaPred<VPPredInstPHIRecipe>))
       continue;
 
     // Disconnect and dissolve the region.
@@ -848,7 +863,8 @@ void VPlanTransforms::unrollReplicateRegions(VPlan &Plan, ElementCount VF) {
     VPBlockUtils::connectBlocks(Pred, Entry);
 
     // Process lane 0: convert original blocks to single-scalar.
-    convertRecipesInRegionBlocksToSingleScalar(Plan, IdxTy, VF, RegionBlocks);
+    convertRecipesInRegionBlocksToSingleScalar(Plan, TypeAnalysis, IdxTy, VF,
+                                                RegionBlocks);
     SmallVector<std::pair<VPBlockBase *, VPBlockBase *>> LaneClones;
     LaneClones.push_back({Entry, Exiting});
 
