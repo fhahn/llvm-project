@@ -4527,8 +4527,22 @@ InstructionCost AArch64TTIImpl::getArithmeticInstrCost(
   case ISD::FDIV:
     // These nodes are marked as 'custom' just to lower them to SVE.
     // We know said lowering will incur no additional cost.
-    if (!Ty->getScalarType()->isFP128Ty())
+    if (!Ty->getScalarType()->isFP128Ty()) {
+      // Newer Apple CPUs (A17+, M4+) have reciprocal throughput of 1 for FMul.
+      if (Opcode == Instruction::FMul) {
+        switch (ST->getProcFamily()) {
+        case AArch64Subtarget::AppleA14:
+        case AArch64Subtarget::AppleA15:
+        case AArch64Subtarget::AppleA16:
+        case AArch64Subtarget::AppleA17:
+        case AArch64Subtarget::AppleM4:
+          return LT.first;
+        default:
+          break;
+        }
+      }
       return 2 * LT.first;
+    }
 
     return BaseT::getArithmeticInstrCost(Opcode, Ty, CostKind, Op1Info,
                                          Op2Info);
