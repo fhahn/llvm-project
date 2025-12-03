@@ -8612,6 +8612,11 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(
   // Adjust the recipes for any inloop reductions.
   adjustRecipesForReductions(Plan, RecipeBuilder, Range.Start);
 
+  // Optimize FindIV reductions by removing unnecessary sentinel checks when
+  // start equals sentinel.
+  VPlanTransforms::runPass(VPlanTransforms::optimizeFindIVSentinelChecks,
+                           *Plan);
+
   // Apply mandatory transformation to handle reductions with multiple in-loop
   // uses if possible, bail out otherwise.
   if (!VPlanTransforms::runPass(VPlanTransforms::handleMultiUseReductions,

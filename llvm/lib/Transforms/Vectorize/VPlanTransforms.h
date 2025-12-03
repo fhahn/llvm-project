@@ -296,6 +296,10 @@ struct VPlanTransforms {
   /// Perform instcombine-like simplifications on recipes in \p Plan.
   static void simplifyRecipes(VPlan &Plan);
 
+  /// Optimize FindIV reductions by removing unnecessary sentinel checks when
+  /// the start value equals the sentinel value.
+  static void optimizeFindIVSentinelChecks(VPlan &Plan);
+
   /// Remove BranchOnCond recipes with true or false conditions together with
   /// removing dead edges to their successors.
   static void removeBranchOnConst(VPlan &Plan);

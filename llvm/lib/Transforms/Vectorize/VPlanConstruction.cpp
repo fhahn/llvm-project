@@ -1140,11 +1140,16 @@ bool VPlanTransforms::handleMultiUseReductions(VPlan &Plan) {
     VPValue *MinMaxExiting = MinMaxResult->getOperand(1);
     auto *FinalMinMaxCmp =
         B.createICmp(CmpInst::ICMP_EQ, MinMaxExiting, MinMaxResult);
-    VPValue *Sentinel = FindIVResult->getOperand(2);
-    VPValue *LastIVExiting = FindIVResult->getOperand(3);
+    // Check if sentinel is present by matching operand count.
+    // optimizeFindIVSentinelChecks may have removed sentinel if start equals
+    // sentinel, leaving 3 operands instead of 4.
+    bool HasSentinel = FindIVResult->getNumOperands() == 4;
+    VPValue *Sentinel = HasSentinel ? FindIVResult->getOperand(2)
+                                    : FindIVResult->getOperand(1); // Use start
+    VPValue *LastIVExiting = FindIVResult->getOperand(HasSentinel ? 3 : 2);
     auto *FinalIVSelect =
         B.createSelect(FinalMinMaxCmp, LastIVExiting, Sentinel);
-    FindIVResult->setOperand(3, FinalIVSelect);
+    FindIVResult->setOperand(HasSentinel ? 3 : 2, FinalIVSelect);
   }
   return true;
 }

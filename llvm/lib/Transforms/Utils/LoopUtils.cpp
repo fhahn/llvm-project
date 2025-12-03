@@ -1393,6 +1393,12 @@ Value *llvm::createFindLastIVReduction(IRBuilderBase &Builder, Value *Src,
                       ? (IsMaxRdx ? Builder.CreateIntMaxReduce(Src, IsSigned)
                                   : Builder.CreateIntMinReduce(Src, IsSigned))
                       : Src;
+
+  // If Sentinel is null, skip the sentinel check. This happens when the start
+  // value equals the sentinel value, so no check is needed.
+  if (!Sentinel)
+    return MaxRdx;
+
   // Correct the final reduction result back to the start value if the maximum
   // reduction is sentinel value.
   Value *Cmp =

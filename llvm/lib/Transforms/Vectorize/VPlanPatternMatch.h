@@ -291,7 +291,8 @@ struct Recipe_match {
       return false;
 
     if (R->getNumOperands() != std::tuple_size<Ops_t>::value) {
-      assert(Opcode == Instruction::PHI &&
+      assert((Opcode == Instruction::PHI ||
+              Opcode == VPInstruction::ComputeFindIVResult) &&
              "non-variadic recipe with matched opcode does not have the "
              "expected number of operands");
       return false;

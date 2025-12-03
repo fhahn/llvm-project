@@ -2596,6 +2596,47 @@ void VPlanTransforms::removeBranchOnConst(VPlan &Plan) {
   }
 }
 
+/// Optimize FindIV reductions by removing unnecessary sentinel checks.
+/// The sentinel check can be skipped when start(FindIV) == sentinel.
+/// In this case, the result is the same whether iterations matched or not.
+void VPlanTransforms::optimizeFindIVSentinelChecks(VPlan &Plan) {
+  VPBasicBlock *MiddleVPBB = Plan.getMiddleBlock();
+  for (VPRecipeBase &R : make_early_inc_range(*MiddleVPBB)) {
+    // Match ComputeFindIVResult with sentinel: {phi, start, sentinel, parts...}
+    VPValue *Start, *Sentinel;
+    if (!match(&R, m_VPInstruction<VPInstruction::ComputeFindIVResult>(
+                       m_VPValue(), m_VPValue(Start), m_VPValue(Sentinel),
+                       m_VPValue())))
+      continue;
+
+    // Check if start == sentinel (same VPValue or equal constant values).
+    const APInt *StartC, *SentinelC;
+    bool CanSkipSentinel =
+        Start == Sentinel ||
+        (match(Start, m_APInt(StartC)) && match(Sentinel, m_APInt(SentinelC)) &&
+         *StartC == *SentinelC);
+
+    if (!CanSkipSentinel)
+      continue;
+
+    // Create a new instruction without the sentinel operand.
+    // New operands: {phi, start, part0, part1, ...}
+    auto *FindIVResult = cast<VPInstruction>(&R);
+    SmallVector<VPValue *> NewOperands;
+    NewOperands.push_back(FindIVResult->getOperand(0)); // phi
+    NewOperands.push_back(Start);
+    for (unsigned I = 3; I < FindIVResult->getNumOperands(); ++I)
+      NewOperands.push_back(FindIVResult->getOperand(I)); // parts
+
+    VPBuilder Builder(FindIVResult);
+    auto *NewFindIVResult = Builder.createNaryOp(
+        VPInstruction::ComputeFindIVResult, NewOperands,
+        FindIVResult->getDebugLoc());
+    FindIVResult->replaceAllUsesWith(NewFindIVResult);
+    FindIVResult->eraseFromParent();
+  }
+}
+
 void VPlanTransforms::optimize(VPlan &Plan) {
   runPass(removeRedundantCanonicalIVs, Plan);
   runPass(removeRedundantInductionCasts, Plan);

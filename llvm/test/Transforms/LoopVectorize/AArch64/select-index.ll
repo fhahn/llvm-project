@@ -612,13 +612,11 @@ define i32 @test_multi_use_reduction_with_trunc_iv(ptr %src, i32 %n) {
 ; CHECK-NEXT:    [[TMP14:%.*]] = select <4 x i1> [[TMP12]], <4 x i32> [[TMP8]], <4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[RDX_MINMAX5:%.*]] = call <4 x i32> @llvm.umax.v4i32(<4 x i32> [[TMP13]], <4 x i32> [[TMP14]])
 ; CHECK-NEXT:    [[TMP15:%.*]] = call i32 @llvm.vector.reduce.umax.v4i32(<4 x i32> [[RDX_MINMAX5]])
-; CHECK-NEXT:    [[RDX_SELECT_CMP:%.*]] = icmp ne i32 [[TMP15]], 0
-; CHECK-NEXT:    [[RDX_SELECT:%.*]] = select i1 [[RDX_SELECT_CMP]], i32 [[TMP15]], i32 0
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N_EXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT_LOOPEXIT:.*]], label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:
 ; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[TMP0]], %[[MIDDLE_BLOCK]] ], [ 1, %[[LOOP_PREHEADER]] ]
-; CHECK-NEXT:    [[BC_MERGE_RDX:%.*]] = phi i32 [ [[RDX_SELECT]], %[[MIDDLE_BLOCK]] ], [ 0, %[[LOOP_PREHEADER]] ]
+; CHECK-NEXT:    [[BC_MERGE_RDX:%.*]] = phi i32 [ [[TMP15]], %[[MIDDLE_BLOCK]] ], [ 0, %[[LOOP_PREHEADER]] ]
 ; CHECK-NEXT:    [[BC_MERGE_RDX6:%.*]] = phi i32 [ [[TMP10]], %[[MIDDLE_BLOCK]] ], [ 0, %[[LOOP_PREHEADER]] ]
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
@@ -635,7 +633,7 @@ define i32 @test_multi_use_reduction_with_trunc_iv(ptr %src, i32 %n) {
 ; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV1]], [[N_EXT]]
 ; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT_LOOPEXIT]], label %[[LOOP]], !llvm.loop [[LOOP11:![0-9]+]]
 ; CHECK:       [[EXIT_LOOPEXIT]]:
-; CHECK-NEXT:    [[MIN_IDX_NEXT_LCSSA:%.*]] = phi i32 [ [[MIN_IDX_NEXT]], %[[LOOP]] ], [ [[RDX_SELECT]], %[[MIDDLE_BLOCK]] ]
+; CHECK-NEXT:    [[MIN_IDX_NEXT_LCSSA:%.*]] = phi i32 [ [[MIN_IDX_NEXT]], %[[LOOP]] ], [ [[TMP15]], %[[MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    br label %[[EXIT]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    [[RES:%.*]] = phi i32 [ 0, %[[ENTRY]] ], [ [[MIN_IDX_NEXT_LCSSA]], %[[EXIT_LOOPEXIT]] ]

@@ -465,7 +465,8 @@ unsigned VPInstruction::getNumOperandsForOpcode(unsigned Opcode) {
   case VPInstruction::ReductionStartVector:
     return 3;
   case VPInstruction::ComputeFindIVResult:
-    return 4;
+    // Variable number of operands (3 or 4): phi, start, [optional sentinel], parts...
+    return -1u;
   case Instruction::Call:
   case Instruction::GetElementPtr:
   case Instruction::PHI:
@@ -739,10 +740,14 @@ Value *VPInstruction::generate(VPTransformState &State) {
     assert(!PhiR->isInLoop() &&
            "In-loop FindLastIV reduction is not supported yet");
 
-    // The recipe's operands are the reduction phi, the start value, the
-    // sentinel value, followed by one operand for each part of the reduction.
-    unsigned UF = getNumOperands() - 3;
-    Value *ReducedPartRdx = State.get(getOperand(3));
+    // The recipe's operands are the reduction phi, the start value, optionally
+    // the sentinel value (if start != sentinel), followed by one operand for
+    // each part of the reduction.
+    // Check if operand(2) is a live-in (sentinel) or a recipe-defined value (part).
+    bool HasSentinel = getOperand(2)->isLiveIn();
+    unsigned PartStartIdx = HasSentinel ? 3 : 2;
+    unsigned UF = getNumOperands() - PartStartIdx;
+    Value *ReducedPartRdx = State.get(getOperand(PartStartIdx));
     RecurKind MinMaxKind;
     bool IsSigned = RecurrenceDescriptor::isSignedRecurrenceKind(RK);
     if (RecurrenceDescriptor::isFindLastIVRecurrenceKind(RK))
@@ -751,10 +756,12 @@ Value *VPInstruction::generate(VPTransformState &State) {
       MinMaxKind = IsSigned ? RecurKind::SMin : RecurKind::UMin;
     for (unsigned Part = 1; Part < UF; ++Part)
       ReducedPartRdx = createMinMaxOp(Builder, MinMaxKind, ReducedPartRdx,
-                                      State.get(getOperand(3 + Part)));
+                                      State.get(getOperand(PartStartIdx + Part)));
 
     Value *Start = State.get(getOperand(1), true);
-    Value *Sentinel = getOperand(2)->getLiveInIRValue();
+    // Sentinel may be omitted if not needed. In that case, pass nullptr to
+    // createFindLastIVReduction to skip the sentinel check.
+    Value *Sentinel = HasSentinel ? getOperand(2)->getLiveInIRValue() : nullptr;
     return createFindLastIVReduction(Builder, ReducedPartRdx, RK, Start,
                                      Sentinel);
   }
