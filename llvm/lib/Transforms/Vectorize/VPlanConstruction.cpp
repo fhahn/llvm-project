@@ -997,43 +997,136 @@ bool VPlanTransforms::handleMaxMinNumReductions(VPlan &Plan) {
   return true;
 }
 
+/// Check if \p PhiR is an integer min/max reduction with uses outside the
+/// reduction chain. This detects patterns like argmin/argmax where the
+/// reduction phi has additional users beyond the reduction chain itself.
+static bool hasUsesOutsideReductionChainVPlan(VPReductionPHIRecipe *PhiR) {
+  RecurKind RdxKind = PhiR->getRecurrenceKind();
+  if (!RecurrenceDescriptor::isIntMinMaxRecurrenceKind(RdxKind))
+    return false;
+
+  VPValue *BackedgeValue = PhiR->getBackedgeValue();
+  VPRecipeBase *BackedgeRecipe = BackedgeValue->getDefiningRecipe();
+  if (!BackedgeRecipe)
+    return false;
+
+  // Helper to check if a recipe is a valid min/max with PhiR as an operand.
+  auto IsMinMaxWithPhi = [&](VPRecipeBase *R) {
+    switch (RdxKind) {
+    case RecurKind::SMax:
+      return match(R, m_SMax(m_VPValue(), m_VPValue()));
+    case RecurKind::SMin:
+      return match(R, m_SMin(m_VPValue(), m_VPValue()));
+    case RecurKind::UMax:
+      return match(R, m_UMax(m_VPValue(), m_VPValue()));
+    case RecurKind::UMin:
+      return match(R, m_UMin(m_VPValue(), m_VPValue()));
+    default:
+      return false;
+    }
+  };
+
+  // For tail-folded loops, look through select(mask, min_max, phi).
+  VPRecipeBase *MinMaxRecipe = BackedgeRecipe;
+  VPValue *TrueVal, *FalseVal;
+  if (match(BackedgeRecipe,
+            m_Select(m_VPValue(), m_VPValue(TrueVal), m_VPValue(FalseVal)))) {
+    VPValue *MinMaxVal =
+        FalseVal == PhiR ? TrueVal : (TrueVal == PhiR ? FalseVal : nullptr);
+    if (MinMaxVal && MinMaxVal->getDefiningRecipe() &&
+        IsMinMaxWithPhi(MinMaxVal->getDefiningRecipe()))
+      MinMaxRecipe = MinMaxVal->getDefiningRecipe();
+  }
+
+  if (!IsMinMaxWithPhi(MinMaxRecipe) ||
+      !is_contained(MinMaxRecipe->operands(), PhiR))
+    return false;
+
+  // Get the compare for select-based min/max (if any).
+  VPValue *SelCond;
+  VPRecipeBase *CmpRecipe = nullptr;
+  if (match(MinMaxRecipe,
+            m_Select(m_VPValue(SelCond), m_VPValue(), m_VPValue())))
+    CmpRecipe = SelCond->getDefiningRecipe();
+
+  // For in-loop VPReductionRecipe, get VecOp to identify related compares.
+  VPValue *VecOp = nullptr;
+  if (auto *RedRecipe = dyn_cast<VPReductionRecipe>(MinMaxRecipe))
+    VecOp = RedRecipe->getVecOp();
+
+  // Check if any phi user is outside the expected reduction chain.
+  return any_of(PhiR->users(), [&](VPUser *U) {
+    auto *R = dyn_cast<VPRecipeBase>(U);
+    if (!R)
+      return false;
+    if (match(R, m_VPInstruction<VPInstruction::ComputeReductionResult>()))
+      return false;
+    if (R == BackedgeRecipe || R == MinMaxRecipe || R == CmpRecipe)
+      return false;
+    // Tail-fold select: select(mask, backedge_value, phi).
+    if (match(R, m_Select(m_VPValue(), m_Specific(BackedgeValue),
+                          m_Specific(PhiR))) ||
+        match(R, m_Select(m_VPValue(), m_Specific(PhiR),
+                          m_Specific(BackedgeValue))))
+      return false;
+    // In-loop compare for VPReductionRecipe.
+    if (VecOp && isa<VPWidenRecipe>(R) && is_contained(R->operands(), VecOp))
+      return false;
+    return true;
+  });
+}
+
 bool VPlanTransforms::handleMultiUseReductions(VPlan &Plan) {
   for (auto &PhiR : make_early_inc_range(
            Plan.getVectorLoopRegion()->getEntryBasicBlock()->phis())) {
     auto *MinMaxPhiR = dyn_cast<VPReductionPHIRecipe>(&PhiR);
-    // TODO: check for multi-uses in VPlan directly.
-    if (!MinMaxPhiR || !MinMaxPhiR->hasUsesOutsideReductionChain())
+    if (!MinMaxPhiR)
       continue;
 
-    // MinMaxPhiR has users outside the reduction cycle in the loop. Check if
-    // the only other user is a FindLastIV reduction. MinMaxPhiR must have
-    // exactly 3 users: 1) the min/max operation, the compare of a FindLastIV
-    // reduction and ComputeReductionResult. The comparisom must compare
-    // MinMaxPhiR against the min/max operand used for the min/max reduction
-    // and only be used by the select of the FindLastIV reduction.
+    // Only handle integer min/max reductions with uses outside the reduction
+    // chain (used for FindLastIV patterns). Float min/max reductions are
+    // handled by handleMaxMinNumReductions.
+    if (!hasUsesOutsideReductionChainVPlan(MinMaxPhiR))
+      continue;
+
     RecurKind RdxKind = MinMaxPhiR->getRecurrenceKind();
-    assert(
-        RecurrenceDescriptor::isIntMinMaxRecurrenceKind(RdxKind) &&
-        "only min/max recurrences support users outside the reduction chain");
+    VPValue *BackedgeValue = MinMaxPhiR->getBackedgeValue();
 
-    auto *MinMaxOp =
-        dyn_cast<VPRecipeWithIRFlags>(MinMaxPhiR->getBackedgeValue());
-    if (!MinMaxOp)
+    // MinMaxPhiR has users outside the reduction cycle in the loop. Check if
+    // the only other user is a FindLastIV reduction. The comparison must
+    // compare MinMaxPhiR against the min/max operand used for the min/max
+    // reduction and only be used by the select of the FindLastIV reduction.
+    VPRecipeBase *BackedgeRecipe = BackedgeValue->getDefiningRecipe();
+    if (!BackedgeRecipe)
       return false;
 
-    // Check that MinMaxOp is a VPWidenIntrinsicRecipe or VPReplicateRecipe
-    // with an intrinsic that matches the reduction kind.
-    Intrinsic::ID ExpectedIntrinsicID = getMinMaxReductionIntrinsicOp(RdxKind);
-    if (!match(MinMaxOp, m_Intrinsic(ExpectedIntrinsicID)))
-      return false;
+    // BackedgeValue must have 2 users: the phi (as operand) and
+    // ComputeReductionResult.
+    assert(BackedgeValue->getNumUsers() == 2 &&
+           "BackedgeValue must have exactly 2 users");
 
-    // MinMaxOp must have 2 users: 1) MinMaxPhiR and 2) ComputeReductionResult
-    // (asserted below).
-    assert(MinMaxOp->getNumUsers() == 2 &&
-           "MinMaxOp must have exactly 2 users");
-    VPValue *MinMaxOpValue = MinMaxOp->getOperand(0);
+    // For tail-folded loops, the backedge value is a select:
+    // select(mask, min_max_result, phi). Look through the select to get
+    // the actual min/max operation.
+    VPValue *TrueVal, *FalseVal;
+    if (match(BackedgeRecipe,
+              m_Select(m_VPValue(), m_VPValue(TrueVal), m_VPValue(FalseVal)))) {
+      VPValue *MinMaxVal = nullptr;
+      if (FalseVal == MinMaxPhiR)
+        MinMaxVal = TrueVal;
+      else if (TrueVal == MinMaxPhiR)
+        MinMaxVal = FalseVal;
+
+      if (MinMaxVal) {
+        BackedgeRecipe = MinMaxVal->getDefiningRecipe();
+        if (!BackedgeRecipe)
+          return false;
+      }
+    }
+
+    VPValue *MinMaxOpValue = BackedgeRecipe->getOperand(0);
     if (MinMaxOpValue == MinMaxPhiR)
-      MinMaxOpValue = MinMaxOp->getOperand(1);
+      MinMaxOpValue = BackedgeRecipe->getOperand(1);
 
     VPValue *CmpOpA;
     VPValue *CmpOpB;
@@ -1047,20 +1140,22 @@ bool VPlanTransforms::handleMultiUseReductions(VPlan &Plan) {
     if (MinMaxOpValue != CmpOpB)
       Pred = CmpInst::getSwappedPredicate(Pred);
 
-    // MinMaxPhiR must have exactly 3 users:
-    // * MinMaxOp,
+    // MinMaxPhiR must have exactly 3 or 4 users:
+    // * BackedgeRecipe (the min/max operation): 1 or 2 users
+    //   - Intrinsic: 1 user
+    //   - Select-based: 2 users (compare + select)
     // * Cmp (that's part of a FindLastIV chain),
     // * ComputeReductionResult.
-    if (MinMaxPhiR->getNumUsers() != 3)
+    if (MinMaxPhiR->getNumUsers() != 3 && MinMaxPhiR->getNumUsers() != 4)
       return false;
 
     VPInstruction *MinMaxResult =
         findUserOf<VPInstruction::ComputeReductionResult>(MinMaxPhiR);
-    assert(is_contained(MinMaxPhiR->users(), MinMaxOp) &&
-           "one user must be MinMaxOp");
+    assert(is_contained(MinMaxPhiR->users(), BackedgeRecipe) &&
+           "one user must be BackedgeRecipe");
     assert(MinMaxResult && "MinMaxResult must be a user of MinMaxPhiR");
-    assert(is_contained(MinMaxOp->users(), MinMaxResult) &&
-           "MinMaxResult must be a user of MinMaxOp (and of MinMaxPhiR");
+    assert(is_contained(BackedgeValue->users(), MinMaxResult) &&
+           "MinMaxResult must be a user of BackedgeValue (and of MinMaxPhiR");
 
     // Cmp must be used by the select of a FindLastIV chain.
     VPValue *Sel = dyn_cast<VPSingleDefRecipe>(Cmp->getSingleUser());

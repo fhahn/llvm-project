@@ -462,27 +462,27 @@ exit:
 define i32 @test_predicated_smin(ptr %src) {
 ; CHECK-LABEL: define i32 @test_predicated_smin(
 ; CHECK-SAME: ptr [[SRC:%.*]]) {
-; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
-; CHECK:       [[VECTOR_PH]]:
-; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
-; CHECK:       [[VECTOR_BODY]]:
-; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[PREDPHI:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
+; CHECK:       [[LOOP_HEADER]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
+; CHECK-NEXT:    [[MIN:%.*]] = phi i32 [ 0, %[[ENTRY]] ], [ [[MIN_MERGE:%.*]], %[[LOOP_LATCH]] ]
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr float, ptr [[SRC]], i64 [[INDEX]]
-; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x float>, ptr [[TMP0]], align 4
-; CHECK-NEXT:    [[TMP1:%.*]] = fcmp une <4 x float> [[WIDE_LOAD]], zeroinitializer
-; CHECK-NEXT:    [[TMP2:%.*]] = fdiv <4 x float> [[WIDE_LOAD]], splat (float 3.000000e+00)
-; CHECK-NEXT:    [[TMP3:%.*]] = fptosi <4 x float> [[TMP2]] to <4 x i32>
-; CHECK-NEXT:    [[TMP4:%.*]] = call <4 x i32> @llvm.smin.v4i32(<4 x i32> [[VEC_PHI]], <4 x i32> [[TMP3]])
-; CHECK-NEXT:    [[PREDPHI]] = select <4 x i1> [[TMP1]], <4 x i32> [[TMP4]], <4 x i32> [[VEC_PHI]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
-; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[INDEX_NEXT]], 112
-; CHECK-NEXT:    br i1 [[TMP5]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP9:![0-9]+]]
-; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[TMP6:%.*]] = call i32 @llvm.vector.reduce.smin.v4i32(<4 x i32> [[PREDPHI]])
-; CHECK-NEXT:    br label %[[EXIT:.*]]
+; CHECK-NEXT:    [[L:%.*]] = load float, ptr [[TMP0]], align 4
+; CHECK-NEXT:    [[C:%.*]] = fcmp une float [[L]], 0.000000e+00
+; CHECK-NEXT:    br i1 [[C]], label %[[THEN:.*]], label %[[LOOP_LATCH]]
+; CHECK:       [[THEN]]:
+; CHECK-NEXT:    [[DIV:%.*]] = fdiv float [[L]], 3.000000e+00
+; CHECK-NEXT:    [[DIV_I32:%.*]] = fptosi float [[DIV]] to i32
+; CHECK-NEXT:    [[MIN_NEXT:%.*]] = tail call i32 @llvm.smin.i32(i32 [[MIN]], i32 [[DIV_I32]])
+; CHECK-NEXT:    br label %[[LOOP_LATCH]]
+; CHECK:       [[LOOP_LATCH]]:
+; CHECK-NEXT:    [[MIN_MERGE]] = phi i32 [ [[MIN_NEXT]], %[[THEN]] ], [ [[MIN]], %[[LOOP_HEADER]] ]
+; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[INDEX]], 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[INDEX]], 111
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[LOOP_HEADER]]
 ; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    [[TMP6:%.*]] = phi i32 [ [[MIN_MERGE]], %[[LOOP_LATCH]] ]
 ; CHECK-NEXT:    ret i32 [[TMP6]]
 ;
 entry:
@@ -545,7 +545,7 @@ define i32 @smax_reduction_multiple_incoming(ptr %src, i32 %n, i1 %cond) {
 ; CHECK-NEXT:    [[TMP5]] = call <4 x i32> @llvm.smax.v4i32(<4 x i32> [[VEC_PHI]], <4 x i32> [[WIDE_LOAD]])
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP10:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP9:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[TMP7:%.*]] = call i32 @llvm.vector.reduce.smax.v4i32(<4 x i32> [[TMP5]])
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i32 [[TMP1]], [[N_VEC]]
@@ -562,7 +562,7 @@ define i32 @smax_reduction_multiple_incoming(ptr %src, i32 %n, i1 %cond) {
 ; CHECK-NEXT:    [[MAX_NEXT]] = tail call i32 @llvm.smax.i32(i32 [[MAX]], i32 [[L]])
 ; CHECK-NEXT:    [[IV_NEXT]] = add i32 [[IV]], 1
 ; CHECK-NEXT:    [[EC:%.*]] = icmp eq i32 [[IV]], [[N]]
-; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP_HEADER]], !llvm.loop [[LOOP11:![0-9]+]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP_HEADER]], !llvm.loop [[LOOP10:![0-9]+]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    [[MAX_NEXT_LCSSA:%.*]] = phi i32 [ [[MAX_NEXT]], %[[LOOP_HEADER]] ], [ [[TMP7]], %[[MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    ret i32 [[MAX_NEXT_LCSSA]]

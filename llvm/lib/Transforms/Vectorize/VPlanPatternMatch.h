@@ -914,6 +914,87 @@ template <typename T> inline OneUse_match<T> m_OneUse(const T &SubPattern) {
   return SubPattern;
 }
 
+// Convenience matchers for min/max intrinsics.
+inline IntrinsicID_match m_SMax() { return m_Intrinsic<Intrinsic::smax>(); }
+inline IntrinsicID_match m_SMin() { return m_Intrinsic<Intrinsic::smin>(); }
+inline IntrinsicID_match m_UMax() { return m_Intrinsic<Intrinsic::umax>(); }
+inline IntrinsicID_match m_UMin() { return m_Intrinsic<Intrinsic::umin>(); }
+
+/// Matches min/max patterns: either intrinsics or select(icmp pred, a, b), a, b
+template <typename Pred_t, typename LHS_t, typename RHS_t> struct MaxMin_match {
+  LHS_t L;
+  RHS_t R;
+
+  MaxMin_match(const LHS_t &LHS, const RHS_t &RHS) : L(LHS), R(RHS) {}
+
+  template <typename OpTy> bool match(OpTy *V) const {
+    auto MatchOps = [this](VPValue *Op0, VPValue *Op1) {
+      return L.match(Op0) && R.match(Op1);
+    };
+
+    VPValue *A, *B;
+    // Check for intrinsic form.
+    if (m_Intrinsic<Pred_t::IntrinsicID>(m_VPValue(A), m_VPValue(B)).match(V))
+      return MatchOps(A, B);
+
+    // Check for select-based form: select(icmp pred a, b), a, b
+    CmpPredicate Pred;
+    return VPlanPatternMatch::match(
+               V, m_Select(m_Cmp(Pred, m_VPValue(A), m_VPValue(B)),
+                           m_Deferred(A), m_Deferred(B))) &&
+           Pred_t::match(Pred) && MatchOps(A, B);
+  }
+};
+
+struct smax_pred_ty {
+  static constexpr Intrinsic::ID IntrinsicID = Intrinsic::smax;
+  static bool match(ICmpInst::Predicate Pred) {
+    return Pred == CmpInst::ICMP_SGT || Pred == CmpInst::ICMP_SGE;
+  }
+};
+struct smin_pred_ty {
+  static constexpr Intrinsic::ID IntrinsicID = Intrinsic::smin;
+  static bool match(ICmpInst::Predicate Pred) {
+    return Pred == CmpInst::ICMP_SLT || Pred == CmpInst::ICMP_SLE;
+  }
+};
+struct umax_pred_ty {
+  static constexpr Intrinsic::ID IntrinsicID = Intrinsic::umax;
+  static bool match(ICmpInst::Predicate Pred) {
+    return Pred == CmpInst::ICMP_UGT || Pred == CmpInst::ICMP_UGE;
+  }
+};
+struct umin_pred_ty {
+  static constexpr Intrinsic::ID IntrinsicID = Intrinsic::umin;
+  static bool match(ICmpInst::Predicate Pred) {
+    return Pred == CmpInst::ICMP_ULT || Pred == CmpInst::ICMP_ULE;
+  }
+};
+
+template <typename LHS_t, typename RHS_t>
+inline MaxMin_match<smax_pred_ty, LHS_t, RHS_t> m_SMax(const LHS_t &L,
+                                                       const RHS_t &R) {
+  return MaxMin_match<smax_pred_ty, LHS_t, RHS_t>(L, R);
+}
+
+template <typename LHS_t, typename RHS_t>
+inline MaxMin_match<smin_pred_ty, LHS_t, RHS_t> m_SMin(const LHS_t &L,
+                                                       const RHS_t &R) {
+  return MaxMin_match<smin_pred_ty, LHS_t, RHS_t>(L, R);
+}
+
+template <typename LHS_t, typename RHS_t>
+inline MaxMin_match<umax_pred_ty, LHS_t, RHS_t> m_UMax(const LHS_t &L,
+                                                       const RHS_t &R) {
+  return MaxMin_match<umax_pred_ty, LHS_t, RHS_t>(L, R);
+}
+
+template <typename LHS_t, typename RHS_t>
+inline MaxMin_match<umin_pred_ty, LHS_t, RHS_t> m_UMin(const LHS_t &L,
+                                                       const RHS_t &R) {
+  return MaxMin_match<umin_pred_ty, LHS_t, RHS_t>(L, R);
+}
+
 } // namespace llvm::VPlanPatternMatch
 
 #endif
