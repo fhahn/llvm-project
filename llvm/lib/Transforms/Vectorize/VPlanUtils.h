@@ -124,7 +124,6 @@ inline VPRecipeBase *findRecipe(VPValue *Start, PredT Pred) {
   }
   return nullptr;
 }
-
 } // namespace vputils
 
 //===----------------------------------------------------------------------===//
@@ -276,7 +275,6 @@ public:
   /// Returns true if \p VPB is a loop latch, using isHeader().
   static bool isLatch(const VPBlockBase *VPB, const VPDominatorTree &VPDT);
 };
-
 } // namespace llvm
 
 #endif
