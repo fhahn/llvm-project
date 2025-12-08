@@ -4783,10 +4783,9 @@ X86TTIImpl::getIntrinsicInstrCost(const IntrinsicCostAttributes &ICA,
   return BaseT::getIntrinsicInstrCost(ICA, CostKind);
 }
 
-InstructionCost X86TTIImpl::getVectorInstrCost(unsigned Opcode, Type *Val,
-                                               TTI::TargetCostKind CostKind,
-                                               unsigned Index, const Value *Op0,
-                                               const Value *Op1) const {
+InstructionCost X86TTIImpl::getVectorInstrCost(
+    unsigned Opcode, Type *Val, TTI::TargetCostKind CostKind, unsigned Index,
+    const Value *Op0, const Value *Op1, TTI::VectorInstrContext VIC) const {
   static const CostTblEntry SLMCostTbl[] = {
      { ISD::EXTRACT_VECTOR_ELT,       MVT::i8,      4 },
      { ISD::EXTRACT_VECTOR_ELT,       MVT::i16,     4 },
@@ -4928,14 +4927,15 @@ InstructionCost X86TTIImpl::getVectorInstrCost(unsigned Opcode, Type *Val,
     return ShuffleCost + IntOrFpCost + RegisterFileMoveCost;
   }
 
-  return BaseT::getVectorInstrCost(Opcode, Val, CostKind, Index, Op0, Op1) +
+  return BaseT::getVectorInstrCost(Opcode, Val, CostKind, Index, Op0, Op1,
+                                   VIC) +
          RegisterFileMoveCost;
 }
 
 InstructionCost X86TTIImpl::getScalarizationOverhead(
     VectorType *Ty, const APInt &DemandedElts, bool Insert, bool Extract,
-    TTI::TargetCostKind CostKind, bool ForPoisonSrc,
-    ArrayRef<Value *> VL) const {
+    TTI::TargetCostKind CostKind, bool ForPoisonSrc, ArrayRef<Value *> VL,
+    TTI::VectorInstrContext VIC) const {
   assert(DemandedElts.getBitWidth() ==
              cast<FixedVectorType>(Ty)->getNumElements() &&
          "Vector size mismatch");
@@ -4967,7 +4967,8 @@ InstructionCost X86TTIImpl::getScalarizationOverhead(
         continue;
       Cost += getVectorInstrCost(Instruction::InsertElement, Ty, CostKind, I,
                                  Constant::getNullValue(Ty),
-                                 VL.empty() ? nullptr : VL[I]);
+                                 VL.empty() ? nullptr : VL[I],
+                                 TTI::VectorInstrContext::None);
     }
     return Cost;
   }
@@ -5752,7 +5753,8 @@ X86TTIImpl::getArithmeticReductionCost(unsigned Opcode, VectorType *ValTy,
 
   // Add the final extract element to the cost.
   return ReductionCost + getVectorInstrCost(Instruction::ExtractElement, Ty,
-                                            CostKind, 0, nullptr, nullptr);
+                                            CostKind, 0, nullptr, nullptr,
+                                            TTI::VectorInstrContext::None);
 }
 
 InstructionCost X86TTIImpl::getMinMaxCost(Intrinsic::ID IID, Type *Ty,
@@ -5931,7 +5933,8 @@ X86TTIImpl::getMinMaxReductionCost(Intrinsic::ID IID, VectorType *ValTy,
 
   // Add the final extract element to the cost.
   return MinMaxCost + getVectorInstrCost(Instruction::ExtractElement, Ty,
-                                         CostKind, 0, nullptr, nullptr);
+                                         CostKind, 0, nullptr, nullptr,
+                                         TTI::VectorInstrContext::None);
 }
 
 /// Calculate the cost of materializing a 64-bit value. This helper

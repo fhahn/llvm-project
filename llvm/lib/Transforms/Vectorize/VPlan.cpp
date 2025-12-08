@@ -1695,7 +1695,7 @@ VPCostContext::getOperandInfo(VPValue *V) const {
 
 InstructionCost VPCostContext::getScalarizationOverhead(
     Type *ResultTy, ArrayRef<const VPValue *> Operands, ElementCount VF,
-    bool AlwaysIncludeReplicatingR) {
+    TTI::VectorInstrContext VIC, bool AlwaysIncludeReplicatingR) {
   if (VF.isScalar())
     return 0;
 
@@ -1706,8 +1706,8 @@ InstructionCost VPCostContext::getScalarizationOverhead(
          to_vector(getContainedTypes(toVectorizedTy(ResultTy, VF)))) {
       ScalarizationCost += TTI.getScalarizationOverhead(
           cast<VectorType>(VectorTy), APInt::getAllOnes(VF.getFixedValue()),
-          /*Insert=*/true,
-          /*Extract=*/false, CostKind);
+          /*Insert=*/true, /*Extract=*/false, CostKind,
+          /*ForPoisonSrc=*/true, {}, VIC);
     }
   }
   // Compute the cost of scalarizing the operands, skipping ones that do not
@@ -1725,5 +1725,5 @@ InstructionCost VPCostContext::getScalarizationOverhead(
     Tys.push_back(toVectorizedTy(Types.inferScalarType(Op), VF));
   }
   return ScalarizationCost +
-         TTI.getOperandsScalarizationOverhead(Tys, CostKind);
+         TTI.getOperandsScalarizationOverhead(Tys, CostKind, VIC);
 }
