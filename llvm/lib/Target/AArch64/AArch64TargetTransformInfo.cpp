@@ -4163,6 +4163,44 @@ InstructionCost AArch64TTIImpl::getVectorInstrCostHelper(
                                        : ST->getVectorInsertExtractBaseCost();
 }
 
+InstructionCost AArch64TTIImpl::getVectorInstrCostHelper(
+    unsigned Opcode, Type *Val, TTI::TargetCostKind CostKind, unsigned Index,
+    TTI::VectorInstrContext VIC, const Instruction *I, Value *Scalar,
+    ArrayRef<std::tuple<Value *, User *, int>> ScalarUserAndIdx) const {
+  // For None context, delegate to existing implementation.
+  if (VIC == TTI::VectorInstrContext::None)
+    return getVectorInstrCostHelper(Opcode, Val, CostKind, Index, I, Scalar,
+                                    ScalarUserAndIdx);
+
+  // Get base cost from existing helper.
+  InstructionCost BaseCost = getVectorInstrCostHelper(
+      Opcode, Val, CostKind, Index, I, Scalar, ScalarUserAndIdx);
+
+  // If the cost is already zero or invalid (special cases handled by existing
+  // helper), don't apply context-based reduction.
+  if (BaseCost == 0 || !BaseCost.isValid())
+    return BaseCost;
+
+  // Apply context-aware cost reduction for integer types only.
+  // For floating point types, context doesn't help much.
+  if (Val->getScalarType()->isFloatingPointTy())
+    return BaseCost;
+
+  // For load/store contexts, use cost of 1:
+  // - Load context: Inserts are cheaper (data from load can be directly
+  // inserted)
+  // - Store context: Extracts are cheaper (data for store doesn't need full
+  // formatting)
+  if ((VIC == TTI::VectorInstrContext::Load &&
+       Opcode == Instruction::InsertElement) ||
+      (VIC == TTI::VectorInstrContext::Store &&
+       Opcode == Instruction::ExtractElement)) {
+    return 1;
+  }
+
+  return BaseCost;
+}
+
 InstructionCost AArch64TTIImpl::getVectorInstrCost(unsigned Opcode, Type *Val,
                                                    TTI::TargetCostKind CostKind,
                                                    unsigned Index,
@@ -4192,6 +4230,27 @@ InstructionCost AArch64TTIImpl::getVectorInstrCost(const Instruction &I,
   return getVectorInstrCostHelper(I.getOpcode(), Val, CostKind, Index, &I);
 }
 
+// VIC-aware overloads for context-aware costing.
+InstructionCost AArch64TTIImpl::getVectorInstrCost(
+    unsigned Opcode, Type *Val, TTI::TargetCostKind CostKind, unsigned Index,
+    const Value *Op0, const Value *Op1, TTI::VectorInstrContext VIC) const {
+  // Treat insert at lane 0 into a poison vector as having zero cost. This
+  // ensures vector broadcasts via an insert + shuffle (and will be lowered to a
+  // single dup) are treated as cheap.
+  if (Opcode == Instruction::InsertElement && Index == 0 && Op0 &&
+      isa<PoisonValue>(Op0))
+    return 0;
+  return getVectorInstrCostHelper(Opcode, Val, CostKind, Index, VIC);
+}
+
+InstructionCost AArch64TTIImpl::getVectorInstrCost(
+    unsigned Opcode, Type *Val, TTI::TargetCostKind CostKind, unsigned Index,
+    Value *Scalar, ArrayRef<std::tuple<Value *, User *, int>> ScalarUserAndIdx,
+    TTI::VectorInstrContext VIC) const {
+  return getVectorInstrCostHelper(Opcode, Val, CostKind, Index, VIC, nullptr,
+                                  Scalar, ScalarUserAndIdx);
+}
+
 InstructionCost
 AArch64TTIImpl::getIndexedVectorInstrCostFromEnd(unsigned Opcode, Type *Val,
                                                  TTI::TargetCostKind CostKind,
@@ -4214,13 +4273,49 @@ InstructionCost AArch64TTIImpl::getScalarizationOverhead(
     VectorType *Ty, const APInt &DemandedElts, bool Insert, bool Extract,
     TTI::TargetCostKind CostKind, bool ForPoisonSrc,
     ArrayRef<Value *> VL) const {
+  return getScalarizationOverhead(Ty, DemandedElts, Insert, Extract, CostKind,
+                                  TTI::VectorInstrContext::None, ForPoisonSrc,
+                                  VL);
+}
+
+InstructionCost AArch64TTIImpl::getScalarizationOverhead(
+    VectorType *Ty, const APInt &DemandedElts, bool Insert, bool Extract,
+    TTI::TargetCostKind CostKind, TTI::VectorInstrContext VIC,
+    bool ForPoisonSrc, ArrayRef<Value *> VL) const {
+
   if (isa<ScalableVectorType>(Ty))
     return InstructionCost::getInvalid();
-  if (Ty->getElementType()->isFloatingPointTy())
-    return BaseT::getScalarizationOverhead(Ty, DemandedElts, Insert, Extract,
-                                           CostKind);
+
+  // For floating-point types, iterate through elements to correctly account for
+  // index-0 inserts/extracts being free, while still applying VIC
+  // optimizations.
+  if (Ty->getElementType()->isFloatingPointTy()) {
+    auto *FVTy = cast<FixedVectorType>(Ty);
+    InstructionCost Cost = 0;
+    for (unsigned i = 0, e = FVTy->getNumElements(); i < e; ++i) {
+      if (!DemandedElts[i])
+        continue;
+      if (Insert) {
+        Value *InsertedVal = VL.empty() ? nullptr : VL[i];
+        Cost +=
+            getVectorInstrCost(Instruction::InsertElement, Ty, CostKind, i,
+                               static_cast<const Value *>(nullptr),
+                               static_cast<const Value *>(InsertedVal), VIC);
+      }
+      if (Extract)
+        Cost += getVectorInstrCost(Instruction::ExtractElement, Ty, CostKind, i,
+                                   static_cast<const Value *>(nullptr),
+                                   static_cast<const Value *>(nullptr), VIC);
+    }
+    return Cost;
+  }
+
+  // For integer types, use simplified formula with VIC optimization.
   unsigned VecInstCost =
       CostKind == TTI::TCK_CodeSize ? 1 : ST->getVectorInsertExtractBaseCost();
+  if ((VIC == TTI::VectorInstrContext::Store && Extract) ||
+      (VIC == TTI::VectorInstrContext::Load && !Extract))
+    VecInstCost = 1;
   return DemandedElts.popcount() * (Insert + Extract) * VecInstCost;
 }
 

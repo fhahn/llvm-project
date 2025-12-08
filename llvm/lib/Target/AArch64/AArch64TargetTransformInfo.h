@@ -83,6 +83,13 @@ class AArch64TTIImpl final : public BasicTTIImplBase<AArch64TTIImpl> {
       const Instruction *I = nullptr, Value *Scalar = nullptr,
       ArrayRef<std::tuple<Value *, User *, int>> ScalarUserAndIdx = {}) const;
 
+  // VIC-aware version of getVectorInstrCostHelper for context-aware costing.
+  InstructionCost getVectorInstrCostHelper(
+      unsigned Opcode, Type *Val, TTI::TargetCostKind CostKind, unsigned Index,
+      TTI::VectorInstrContext VIC, const Instruction *I = nullptr,
+      Value *Scalar = nullptr,
+      ArrayRef<std::tuple<Value *, User *, int>> ScalarUserAndIdx = {}) const;
+
 public:
   explicit AArch64TTIImpl(const AArch64TargetMachine *TM, const Function &F)
       : BaseT(TM, F.getDataLayout()), ST(TM->getSubtargetImpl(F)),
@@ -232,6 +239,19 @@ public:
   InstructionCost getVectorInstrCost(const Instruction &I, Type *Val,
                                      TTI::TargetCostKind CostKind,
                                      unsigned Index) const override;
+
+  // VIC-aware overloads for context-aware vector instruction costing.
+  InstructionCost getVectorInstrCost(unsigned Opcode, Type *Val,
+                                     TTI::TargetCostKind CostKind,
+                                     unsigned Index, const Value *Op0,
+                                     const Value *Op1,
+                                     TTI::VectorInstrContext VIC) const;
+
+  InstructionCost getVectorInstrCost(
+      unsigned Opcode, Type *Val, TTI::TargetCostKind CostKind, unsigned Index,
+      Value *Scalar,
+      ArrayRef<std::tuple<Value *, User *, int>> ScalarUserAndIdx,
+      TTI::VectorInstrContext VIC) const;
 
   InstructionCost
   getIndexedVectorInstrCostFromEnd(unsigned Opcode, Type *Val,
@@ -504,6 +524,11 @@ public:
       VectorType *Ty, const APInt &DemandedElts, bool Insert, bool Extract,
       TTI::TargetCostKind CostKind, bool ForPoisonSrc = true,
       ArrayRef<Value *> VL = {}) const override;
+
+  InstructionCost getScalarizationOverhead(
+      VectorType *Ty, const APInt &DemandedElts, bool Insert, bool Extract,
+      TTI::TargetCostKind CostKind, TTI::VectorInstrContext VIC,
+      bool ForPoisonSrc = true, ArrayRef<Value *> VL = {}) const override;
 
   /// Return the cost of the scaling factor used in the addressing
   /// mode represented by AM for this target, for a load/store

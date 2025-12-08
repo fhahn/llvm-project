@@ -665,7 +665,9 @@ define i32 @test_or_reduction_with_stride_2(i32 %scale, ptr %src) {
 ; CHECK-LABEL: define i32 @test_or_reduction_with_stride_2(
 ; CHECK-SAME: i32 [[SCALE:%.*]], ptr [[SRC:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    br i1 false, label %[[VEC_EPILOG_SCALAR_PH:.*]], label %[[VECTOR_MAIN_LOOP_ITER_CHECK:.*]]
+; CHECK:       [[VECTOR_MAIN_LOOP_ITER_CHECK]]:
+; CHECK-NEXT:    br i1 false, label %[[VEC_EPILOG_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <16 x i32> poison, i32 [[SCALE]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <16 x i32> [[BROADCAST_SPLATINSERT]], <16 x i32> poison, <16 x i32> zeroinitializer
@@ -746,8 +748,38 @@ define i32 @test_or_reduction_with_stride_2(i32 %scale, ptr %src) {
 ; CHECK-NEXT:    br i1 [[TMP67]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP22:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[TMP68:%.*]] = call i32 @llvm.vector.reduce.or.v16i32(<16 x i32> [[TMP66]])
-; CHECK-NEXT:    br label %[[SCALAR_PH:.*]]
-; CHECK:       [[SCALAR_PH]]:
+; CHECK-NEXT:    br i1 false, [[EXIT:label %.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]]
+; CHECK:       [[VEC_EPILOG_ITER_CHECK]]:
+; CHECK-NEXT:    br i1 false, label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF23:![0-9]+]]
+; CHECK:       [[VEC_EPILOG_PH]]:
+; CHECK-NEXT:    [[VEC_EPILOG_RESUME_VAL:%.*]] = phi i64 [ 48, %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
+; CHECK-NEXT:    [[BC_MERGE_RDX:%.*]] = phi i32 [ [[TMP68]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
+; CHECK-NEXT:    [[TMP70:%.*]] = insertelement <2 x i32> zeroinitializer, i32 [[BC_MERGE_RDX]], i32 0
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <2 x i32> poison, i32 [[SCALE]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT1]], <2 x i32> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    br label %[[VEC_EPILOG_VECTOR_BODY:.*]]
+; CHECK:       [[VEC_EPILOG_VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX3:%.*]] = phi i64 [ [[VEC_EPILOG_RESUME_VAL]], %[[VEC_EPILOG_PH]] ], [ [[INDEX_NEXT5:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_PHI4:%.*]] = phi <2 x i32> [ [[TMP70]], %[[VEC_EPILOG_PH]] ], [ [[TMP81:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
+; CHECK-NEXT:    [[OFFSET_IDX1:%.*]] = mul i64 [[INDEX3]], 2
+; CHECK-NEXT:    [[TMP71:%.*]] = add i64 [[OFFSET_IDX1]], 0
+; CHECK-NEXT:    [[TMP72:%.*]] = add i64 [[OFFSET_IDX1]], 2
+; CHECK-NEXT:    [[TMP73:%.*]] = getelementptr [32 x i8], ptr [[SRC]], i64 [[TMP71]]
+; CHECK-NEXT:    [[TMP74:%.*]] = getelementptr [32 x i8], ptr [[SRC]], i64 [[TMP72]]
+; CHECK-NEXT:    [[TMP75:%.*]] = load i8, ptr [[TMP73]], align 1
+; CHECK-NEXT:    [[TMP76:%.*]] = load i8, ptr [[TMP74]], align 1
+; CHECK-NEXT:    [[TMP77:%.*]] = insertelement <2 x i8> poison, i8 [[TMP75]], i32 0
+; CHECK-NEXT:    [[TMP78:%.*]] = insertelement <2 x i8> [[TMP77]], i8 [[TMP76]], i32 1
+; CHECK-NEXT:    [[TMP79:%.*]] = sext <2 x i8> [[TMP78]] to <2 x i32>
+; CHECK-NEXT:    [[TMP80:%.*]] = mul <2 x i32> [[BROADCAST_SPLAT2]], [[TMP79]]
+; CHECK-NEXT:    [[TMP81]] = or <2 x i32> [[TMP80]], [[VEC_PHI4]]
+; CHECK-NEXT:    [[INDEX_NEXT5]] = add nuw i64 [[INDEX3]], 2
+; CHECK-NEXT:    [[TMP82:%.*]] = icmp eq i64 [[INDEX_NEXT5]], 50
+; CHECK-NEXT:    br i1 [[TMP82]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP24:![0-9]+]]
+; CHECK:       [[VEC_EPILOG_MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[TMP83:%.*]] = call i32 @llvm.vector.reduce.or.v2i32(<2 x i32> [[TMP81]])
+; CHECK-NEXT:    br i1 true, [[EXIT]], label %[[VEC_EPILOG_SCALAR_PH]]
+; CHECK:       [[VEC_EPILOG_SCALAR_PH]]:
 ;
 entry:
   br label %loop
