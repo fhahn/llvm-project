@@ -459,13 +459,34 @@ public:
       VectorType *Ty, const APInt &DemandedElts, bool Insert, bool Extract,
       TTI::TargetCostKind CostKind, bool ForPoisonSrc = true,
       ArrayRef<Value *> VL = {}) const {
+    // Default implementation returns 0.
+    // BasicTTIImpl provides the actual implementation.
     return 0;
+  }
+
+  // Virtual 8-param overload with VectorInstrContext.
+  // Default implementation ignores VIC and delegates to the virtual 7-param
+  // version. Targets can override this to provide VIC-aware cost modeling.
+  virtual InstructionCost getScalarizationOverhead(
+      VectorType *Ty, const APInt &DemandedElts, bool Insert, bool Extract,
+      TTI::TargetCostKind CostKind, TTI::VectorInstrContext VIC,
+      bool ForPoisonSrc, ArrayRef<Value *> VL) const {
+    // Ignore VIC and call the virtual 7-param version.
+    return getScalarizationOverhead(Ty, DemandedElts, Insert, Extract, CostKind,
+                                    ForPoisonSrc, VL);
   }
 
   virtual InstructionCost
   getOperandsScalarizationOverhead(ArrayRef<Type *> Tys,
                                    TTI::TargetCostKind CostKind) const {
     return 0;
+  }
+
+  virtual InstructionCost
+  getOperandsScalarizationOverhead(ArrayRef<Type *> Tys,
+                                   TTI::TargetCostKind CostKind,
+                                   TTI::VectorInstrContext VIC) const {
+    return getOperandsScalarizationOverhead(Tys, CostKind);
   }
 
   virtual bool supportsEfficientVectorElementLoadStore() const { return false; }

@@ -95,6 +95,7 @@ private:
     InstructionCost Cost = 0;
     // Broadcast cost is equal to the cost of extracting the zero'th element
     // plus the cost of inserting it into every element of the result vector.
+    // For Stage 1 NFC: Call 6-param version (ignoring VIC).
     Cost += thisT()->getVectorInstrCost(Instruction::ExtractElement, VTy,
                                         CostKind, 0, nullptr, nullptr);
 
@@ -118,6 +119,7 @@ private:
     // index 0 of first vector, index 1 of second vector,index 2 of first
     // vector and finally index 3 of second vector and insert them at index
     // <0,1,2,3> of result vector.
+    // For Stage 1 NFC: Call 6-param version (ignoring VIC).
     for (int i = 0, e = VTy->getNumElements(); i < e; ++i) {
       Cost += thisT()->getVectorInstrCost(Instruction::InsertElement, VTy,
                                           CostKind, i, nullptr, nullptr);
@@ -145,6 +147,7 @@ private:
     // Subvector extraction cost is equal to the cost of extracting element from
     // the source type plus the cost of inserting them into the result vector
     // type.
+    // For Stage 1 NFC: Call 6-param version (ignoring VIC).
     for (int i = 0; i != NumSubElts; ++i) {
       Cost +=
           thisT()->getVectorInstrCost(Instruction::ExtractElement, VTy,
@@ -173,6 +176,7 @@ private:
     // Subvector insertion cost is equal to the cost of extracting element from
     // the source type plus the cost of inserting them into the result vector
     // type.
+    // For Stage 1 NFC: Call 6-param version (ignoring VIC).
     for (int i = 0; i != NumSubElts; ++i) {
       Cost += thisT()->getVectorInstrCost(Instruction::ExtractElement, SubVTy,
                                           CostKind, i, nullptr, nullptr);
@@ -380,6 +384,7 @@ protected:
   ~BasicTTIImplBase() override = default;
 
   using TargetTransformInfoImplBase::DL;
+  using TargetTransformInfoImplBase::getScalarizationOverhead;
 
 public:
   /// \name Scalar TTI Implementations
@@ -947,16 +952,18 @@ public:
   }
 
   /// Helper wrapper for the DemandedElts variant of getScalarizationOverhead.
-  InstructionCost getScalarizationOverhead(VectorType *InTy, bool Insert,
-                                           bool Extract,
-                                           TTI::TargetCostKind CostKind) const {
+  InstructionCost getScalarizationOverhead(
+      VectorType *InTy, bool Insert, bool Extract, TTI::TargetCostKind CostKind,
+      bool ForPoisonSrc = true, ArrayRef<Value *> VL = {},
+      TTI::VectorInstrContext VIC = TTI::VectorInstrContext::None) const {
     if (isa<ScalableVectorType>(InTy))
       return InstructionCost::getInvalid();
     auto *Ty = cast<FixedVectorType>(InTy);
 
     APInt DemandedElts = APInt::getAllOnes(Ty->getNumElements());
+    // Use CRTP to allow target overrides
     return thisT()->getScalarizationOverhead(Ty, DemandedElts, Insert, Extract,
-                                             CostKind);
+                                             CostKind, ForPoisonSrc, VL);
   }
 
   /// Estimate the overhead of scalarizing an instruction's
@@ -964,6 +971,15 @@ public:
   /// argument are passes via Tys.
   InstructionCost getOperandsScalarizationOverhead(
       ArrayRef<Type *> Tys, TTI::TargetCostKind CostKind) const override {
+    return getOperandsScalarizationOverhead(Tys, CostKind,
+                                            TTI::VectorInstrContext::None);
+  }
+
+  // Non-virtual overload with VectorInstrContext parameter.
+  InstructionCost
+  getOperandsScalarizationOverhead(ArrayRef<Type *> Tys,
+                                   TTI::TargetCostKind CostKind,
+                                   TTI::VectorInstrContext VIC) const override {
     InstructionCost Cost = 0;
     for (Type *Ty : Tys) {
       // Disregard things like metadata arguments.
@@ -973,7 +989,8 @@ public:
 
       if (auto *VecTy = dyn_cast<VectorType>(Ty))
         Cost += getScalarizationOverhead(VecTy, /*Insert*/ false,
-                                         /*Extract*/ true, CostKind);
+                                         /*Extract*/ true, CostKind,
+                                         /*ForPoisonSrc=*/true, {}, VIC);
     }
 
     return Cost;
@@ -1364,6 +1381,7 @@ public:
   getExtractWithExtendCost(unsigned Opcode, Type *Dst, VectorType *VecTy,
                            unsigned Index,
                            TTI::TargetCostKind CostKind) const override {
+    // For Stage 1 NFC: Call 6-param version (ignoring VIC).
     return thisT()->getVectorInstrCost(Instruction::ExtractElement, VecTy,
                                        CostKind, Index, nullptr, nullptr) +
            thisT()->getCastInstrCost(Opcode, Dst, VecTy->getElementType(),
@@ -1428,11 +1446,23 @@ public:
     return 1;
   }
 
+  // Virtual override without VIC - maintains original HEAD~1 behavior
   InstructionCost getVectorInstrCost(unsigned Opcode, Type *Val,
                                      TTI::TargetCostKind CostKind,
                                      unsigned Index, const Value *Op0,
                                      const Value *Op1) const override {
     return getRegUsageForType(Val->getScalarType());
+  }
+
+  // Non-virtual overload with VectorInstrContext parameter.
+  // Default implementation ignores VIC and delegates to the regular helper.
+  InstructionCost getVectorInstrCost(unsigned Opcode, Type *Val,
+                                     TTI::TargetCostKind CostKind,
+                                     unsigned Index, const Value *Op0,
+                                     const Value *Op1,
+                                     TTI::VectorInstrContext VIC) const {
+    // Default implementation ignores VIC and uses the 6-param version via CRTP
+    return thisT()->getVectorInstrCost(Opcode, Val, CostKind, Index, Op0, Op1);
   }
 
   /// \param ScalarUserAndIdx encodes the information about extracts from a
@@ -1444,8 +1474,21 @@ public:
                                      unsigned Index, Value *Scalar,
                                      ArrayRef<std::tuple<Value *, User *, int>>
                                          ScalarUserAndIdx) const override {
-    return thisT()->getVectorInstrCost(Opcode, Val, CostKind, Index, nullptr,
-                                       nullptr);
+    return getVectorInstrCost(Opcode, Val, CostKind, Index, nullptr, nullptr,
+                              TTI::VectorInstrContext::None);
+  }
+
+  // Non-virtual overload with VectorInstrContext parameter.
+  // Default implementation ignores VIC and delegates to the regular helper.
+  InstructionCost getVectorInstrCost(
+      unsigned Opcode, Type *Val, TTI::TargetCostKind CostKind, unsigned Index,
+      Value *Scalar,
+      ArrayRef<std::tuple<Value *, User *, int>> ScalarUserAndIdx,
+      TTI::VectorInstrContext VIC) const {
+    // Default implementation ignores VIC and uses the 7-param variant with
+    // nullptr Op0/Op1
+    return getVectorInstrCost(Opcode, Val, CostKind, Index, nullptr, nullptr,
+                              VIC);
   }
 
   InstructionCost getVectorInstrCost(const Instruction &I, Type *Val,
@@ -1457,6 +1500,11 @@ public:
       Op0 = IE->getOperand(0);
       Op1 = IE->getOperand(1);
     }
+    [[maybe_unused]] TTI::VectorInstrContext VIC =
+        TTI::getVectorInstrContextHint(&I);
+    // For Stage 1 NFC: Call the 6-param version through CRTP.
+    // VIC is extracted but not used yet - will be used in Stage 2 target
+    // overrides.
     return thisT()->getVectorInstrCost(I.getOpcode(), Val, CostKind, Index, Op0,
                                        Op1);
   }
@@ -1471,6 +1519,7 @@ public:
              "Unexpected index from end of vector");
       NewIndex = FVTy->getNumElements() - 1 - Index;
     }
+    // For Stage 1 NFC: Call the 6-param version
     return thisT()->getVectorInstrCost(Opcode, Val, CostKind, NewIndex, nullptr,
                                        nullptr);
   }
@@ -2494,6 +2543,7 @@ public:
 
       // Approximate the cost based on the expansion code in
       // SelectionDAGBuilder.
+      // For Stage 1 NFC: Call 6-param version (ignoring VIC).
       InstructionCost Cost = 0;
       Cost += thisT()->getVectorInstrCost(Instruction::ExtractElement, NeedleTy,
                                           CostKind, 1, nullptr, nullptr);
@@ -2527,6 +2577,7 @@ public:
 
       Align Alignment = thisT()->DL.getABITypeAlign(EltTy);
       InstructionCost Cost = 0;
+      // For Stage 1 NFC: Call 6-param version (ignoring VIC).
       Cost += thisT()->getVectorInstrCost(Instruction::ExtractElement, PtrsTy,
                                           CostKind, 1, nullptr, nullptr);
       Cost += thisT()->getMemoryOpCost(Instruction::Load, EltTy, Alignment, 0,
@@ -3223,6 +3274,7 @@ public:
                                                  Ty, {}, CostKind, 0, Ty);
     ArithCost +=
         NumReduxLevels * thisT()->getArithmeticInstrCost(Opcode, Ty, CostKind);
+    // For Stage 1 NFC: Call 6-param version (ignoring VIC).
     return ShuffleCost + ArithCost +
            thisT()->getVectorInstrCost(Instruction::ExtractElement, Ty,
                                        CostKind, 0, nullptr, nullptr);
@@ -3316,6 +3368,7 @@ public:
     MinMaxCost += NumReduxLevels * getIntrinsicInstrCost(Attrs, CostKind);
     // The last min/max should be in vector registers and we counted it above.
     // So just need a single extractelement.
+    // For Stage 1 NFC: Call 6-param version (ignoring VIC).
     return ShuffleCost + MinMaxCost +
            thisT()->getVectorInstrCost(Instruction::ExtractElement, Ty,
                                        CostKind, 0, nullptr, nullptr);

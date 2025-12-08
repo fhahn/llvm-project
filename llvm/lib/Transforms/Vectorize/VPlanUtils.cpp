@@ -15,6 +15,7 @@
 #include "llvm/Analysis/MemoryLocation.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/Analysis/ScalarEvolutionPatternMatch.h"
+#include "llvm/IR/Instructions.h"
 
 using namespace llvm;
 using namespace llvm::VPlanPatternMatch;
@@ -495,4 +496,38 @@ vputils::getMemoryLocation(const VPRecipeBase &R) {
   if (MDNode *AliasScopeMD = M->getMetadata(LLVMContext::MD_alias_scope))
     Loc.AATags.Scope = AliasScopeMD;
   return Loc;
+}
+
+TargetTransformInfo::VectorInstrContext
+vputils::getInstrContext(const VPRecipeBase *R) {
+  // Check for store operations
+  if (isa<VPWidenStoreRecipe>(R) || isa<VPWidenStoreEVLRecipe>(R)) {
+    return TargetTransformInfo::VectorInstrContext::Store;
+  }
+
+  // Check for load operations
+  if (isa<VPWidenLoadRecipe>(R) || isa<VPWidenLoadEVLRecipe>(R)) {
+    return TargetTransformInfo::VectorInstrContext::Load;
+  }
+
+  // Check for interleave recipes
+  if (auto *Interleave = dyn_cast<VPInterleaveBase>(R)) {
+    // If the interleave recipe has stored values, it's a store operation
+    if (!Interleave->getStoredValues().empty())
+      return TargetTransformInfo::VectorInstrContext::Store;
+    else
+      return TargetTransformInfo::VectorInstrContext::Load;
+  }
+
+  // Check the underlying instruction for VPReplicateRecipe
+  if (auto *Replicate = dyn_cast<VPReplicateRecipe>(R)) {
+    if (auto *I = Replicate->getUnderlyingInstr()) {
+      if (isa<LoadInst>(I))
+        return TargetTransformInfo::VectorInstrContext::Load;
+      if (isa<StoreInst>(I))
+        return TargetTransformInfo::VectorInstrContext::Store;
+    }
+  }
+
+  return TargetTransformInfo::VectorInstrContext::None;
 }

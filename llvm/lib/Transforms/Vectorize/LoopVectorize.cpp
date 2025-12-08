@@ -5626,11 +5626,16 @@ LoopVectorizationCostModel::getScalarizationOverhead(Instruction *I,
   if (!RetTy->isVoidTy() &&
       (!isa<LoadInst>(I) || !TTI.supportsEfficientVectorElementLoadStore())) {
 
+    TTI::VectorInstrContext VIC = TTI::VectorInstrContext::None;
+    if (isa<LoadInst>(I))
+      VIC = TTI::VectorInstrContext::Load;
+    else if (isa<StoreInst>(I))
+      VIC = TTI::VectorInstrContext::Store;
+
     for (Type *VectorTy : getContainedTypes(RetTy)) {
       Cost += TTI.getScalarizationOverhead(
           cast<VectorType>(VectorTy), APInt::getAllOnes(VF.getFixedValue()),
-          /*Insert=*/true,
-          /*Extract=*/false, CostKind);
+          /*Insert=*/true, /*Extract=*/false, CostKind, VIC);
     }
   }
 

@@ -635,6 +635,61 @@ bool TargetTransformInfo::isTargetIntrinsicWithStructReturnOverloadAtField(
   return TTIImpl->isTargetIntrinsicWithStructReturnOverloadAtField(ID, RetIdx);
 }
 
+TargetTransformInfo::VectorInstrContext
+TargetTransformInfo::getVectorInstrContextHint(const Instruction *I) {
+  if (!I)
+    return VectorInstrContext::None;
+
+  auto isLoad = [](const Value *V) {
+    const Instruction *I = dyn_cast<Instruction>(V);
+    if (!I)
+      return false;
+
+    if (I->getOpcode() == Instruction::Load)
+      return true;
+
+    if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(I)) {
+      return II->getIntrinsicID() == Intrinsic::masked_load ||
+             II->getIntrinsicID() == Intrinsic::masked_gather;
+    }
+
+    return false;
+  };
+
+  auto isStore = [](const Value *V) {
+    const Instruction *I = dyn_cast<Instruction>(V);
+    if (!I)
+      return false;
+
+    if (I->getOpcode() == Instruction::Store)
+      return true;
+
+    if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(I)) {
+      return II->getIntrinsicID() == Intrinsic::masked_store ||
+             II->getIntrinsicID() == Intrinsic::masked_scatter;
+    }
+
+    return false;
+  };
+
+  switch (I->getOpcode()) {
+  case Instruction::InsertElement:
+    // For inserts, check if the value being inserted comes from a load
+    if (isLoad(I->getOperand(1)))
+      return VectorInstrContext::Load;
+    break;
+  case Instruction::ExtractElement:
+    // For extracts, check if it has a single use that is a store
+    if (I->hasOneUse() && isStore(*I->user_begin()))
+      return VectorInstrContext::Store;
+    break;
+  default:
+    return VectorInstrContext::None;
+  }
+
+  return VectorInstrContext::None;
+}
+
 InstructionCost TargetTransformInfo::getScalarizationOverhead(
     VectorType *Ty, const APInt &DemandedElts, bool Insert, bool Extract,
     TTI::TargetCostKind CostKind, bool ForPoisonSrc,
@@ -643,9 +698,23 @@ InstructionCost TargetTransformInfo::getScalarizationOverhead(
                                            CostKind, ForPoisonSrc, VL);
 }
 
+InstructionCost TargetTransformInfo::getScalarizationOverhead(
+    VectorType *Ty, const APInt &DemandedElts, bool Insert, bool Extract,
+    TTI::TargetCostKind CostKind, TTI::VectorInstrContext VIC,
+    bool ForPoisonSrc, ArrayRef<Value *> VL) const {
+  return TTIImpl->getScalarizationOverhead(Ty, DemandedElts, Insert, Extract,
+                                           CostKind, VIC, ForPoisonSrc, VL);
+}
+
 InstructionCost TargetTransformInfo::getOperandsScalarizationOverhead(
     ArrayRef<Type *> Tys, TTI::TargetCostKind CostKind) const {
   return TTIImpl->getOperandsScalarizationOverhead(Tys, CostKind);
+}
+
+InstructionCost TargetTransformInfo::getOperandsScalarizationOverhead(
+    ArrayRef<Type *> Tys, TTI::TargetCostKind CostKind,
+    TTI::VectorInstrContext VIC) const {
+  return TTIImpl->getOperandsScalarizationOverhead(Tys, CostKind, VIC);
 }
 
 bool TargetTransformInfo::supportsEfficientVectorElementLoadStore() const {

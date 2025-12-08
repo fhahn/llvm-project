@@ -1029,6 +1029,25 @@ public:
   isTargetIntrinsicWithStructReturnOverloadAtField(Intrinsic::ID ID,
                                                    int RetIdx) const;
 
+  /// VectorInstrContext is an internal-only enum to express extra context
+  /// when insert/extract operations can be folded into loads/stores.
+  ///
+  /// See \c getVectorInstrContextHint to compute a VectorInstrContext from an
+  /// Instruction*. Callers can use it if they don't need to override the
+  /// context and just want it to be calculated from the instruction.
+  enum class VectorInstrContext : uint8_t {
+    None,  ///< The insert/extract is not used with a load/store.
+    Load,  ///< The value being inserted comes from a load (InsertElement only).
+    Store, ///< The extracted value is stored (ExtractElement only).
+  };
+
+  /// Calculates a VectorInstrContext from \p I.
+  /// This should be used by callers of getVectorInstrCost if they wish to
+  /// determine the context from some instruction.
+  /// \returns the VectorInstrContext for InsertElement/ExtractElement, None if
+  /// \p I is nullptr or if it's another type of instruction.
+  static VectorInstrContext getVectorInstrContextHint(const Instruction *I);
+
   /// Estimate the overhead of scalarizing an instruction. Insert and Extract
   /// are set if the demanded result elements need to be inserted and/or
   /// extracted from vectors.  The involved values may be passed in VL if
@@ -1038,10 +1057,22 @@ public:
       TTI::TargetCostKind CostKind, bool ForPoisonSrc = true,
       ArrayRef<Value *> VL = {}) const;
 
+  // Overload with VectorInstrContext for context-aware scalarization costing.
+  LLVM_ABI InstructionCost getScalarizationOverhead(
+      VectorType *Ty, const APInt &DemandedElts, bool Insert, bool Extract,
+      TTI::TargetCostKind CostKind, TTI::VectorInstrContext VIC,
+      bool ForPoisonSrc = true, ArrayRef<Value *> VL = {}) const;
+
   /// Estimate the overhead of scalarizing operands with the given types. The
   /// (potentially vector) types to use for each of argument are passes via Tys.
   LLVM_ABI InstructionCost getOperandsScalarizationOverhead(
       ArrayRef<Type *> Tys, TTI::TargetCostKind CostKind) const;
+
+  // Overload with VectorInstrContext for context-aware operand scalarization
+  // costing.
+  LLVM_ABI InstructionCost getOperandsScalarizationOverhead(
+      ArrayRef<Type *> Tys, TTI::TargetCostKind CostKind,
+      TTI::VectorInstrContext VIC) const;
 
   /// If target has efficient vector element load/store instructions, it can
   /// return true here so that insertion/extraction costs are not added to
