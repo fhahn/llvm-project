@@ -3990,6 +3990,17 @@ InstructionCost AArch64TTIImpl::getVectorInstrCostHelper(
     TTI::VectorInstrContext VIC) const {
   assert(Val->isVectorTy() && "This must be a vector type");
 
+  // For load/store contexts with <2 x T> where T is >= 32 bits, the
+  // insert/extract can be folded into the load/store.
+  auto *VTy = cast<VectorType>(Val);
+  if (VTy->getElementCount().getKnownMinValue() == 2 &&
+      DL.getTypeAllocSizeInBits(VTy->getElementType()) >= 32 &&
+      ((VIC == TTI::VectorInstrContext::Load &&
+        Opcode == Instruction::InsertElement) ||
+       (VIC == TTI::VectorInstrContext::Store &&
+        Opcode == Instruction::ExtractElement)))
+    return 0;
+
   if (Index != -1U) {
     // Legalize the type.
     std::pair<InstructionCost, MVT> LT = getTypeLegalizationCost(Val);
@@ -4210,12 +4221,25 @@ InstructionCost AArch64TTIImpl::getScalarizationOverhead(
     TTI::VectorInstrContext VIC) const {
   if (isa<ScalableVectorType>(Ty))
     return InstructionCost::getInvalid();
+
+  // For Load context, insertions are cheaper (loaded data directly inserted).
+  // For Store context, extractions are cheaper (extracted data directly
+  // stored).
+  if (Ty->getElementCount().getKnownMinValue() == 2 &&
+      DL.getTypeAllocSizeInBits(Ty->getElementType()) >= 32 &&
+      ((VIC == TTI::VectorInstrContext::Store && Extract) ||
+       (VIC == TTI::VectorInstrContext::Load && Insert))) {
+    return 0;
+  }
+
   if (Ty->getElementType()->isFloatingPointTy())
     return BaseT::getScalarizationOverhead(Ty, DemandedElts, Insert, Extract,
                                            CostKind);
-  unsigned VecInstCost =
-      CostKind == TTI::TCK_CodeSize ? 1 : ST->getVectorInsertExtractBaseCost();
-  return DemandedElts.popcount() * (Insert + Extract) * VecInstCost;
+
+   unsigned VecInstCost =
+       CostKind == TTI::TCK_CodeSize ? 1 : ST->getVectorInsertExtractBaseCost();
+
+   return DemandedElts.popcount() * (Insert + Extract) * VecInstCost;
 }
 
 std::optional<InstructionCost> AArch64TTIImpl::getFP16BF16PromoteCost(
