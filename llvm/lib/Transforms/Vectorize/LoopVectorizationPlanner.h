@@ -514,8 +514,12 @@ public:
   VectorizationFactor planInVPlanNativePath(ElementCount UserVF);
 
   /// Return the VPlan for \p VF. At the moment, there is always a single VPlan
-  /// for each VF.
-  VPlan &getPlanFor(ElementCount VF) const;
+  /// for each VF, unless epilogue vectorization is possible and both masked
+  /// and unmasked variants exist. When \p PreferUnmasked is std::nullopt
+  /// (default), asserts there's exactly one plan for the VF. When true, prefers
+  /// the unmasked plan; when false, prefers the masked plan.
+  VPlan &getPlanFor(ElementCount VF,
+                    std::optional<bool> PreferUnmasked = std::nullopt) const;
 
   /// Compute and return the most profitable vectorization factor. Also collect
   /// all profitable VFs in ProfitableVFs.

@@ -2973,9 +2973,15 @@ public:
   ~VPReplicateRecipe() override = default;
 
   VPReplicateRecipe *clone() override {
-    auto *Copy = new VPReplicateRecipe(
-        getUnderlyingInstr(), operands(), IsSingleScalar,
-        isPredicated() ? getMask() : nullptr, *this, *this, getDebugLoc());
+    // If predicated, the mask is the last operand. Don't include it in the
+    // operands passed to the constructor since it will add the mask separately.
+    SmallVector<VPValue *> Ops(operands());
+    VPValue *Mask = nullptr;
+    if (isPredicated()) {
+      Mask = Ops.pop_back_val();
+    }
+    auto *Copy = new VPReplicateRecipe(getUnderlyingInstr(), Ops, IsSingleScalar,
+                                       Mask, *this, *this, getDebugLoc());
     Copy->transferFlags(*this);
     return Copy;
   }
@@ -4492,6 +4498,11 @@ public:
 
   void addVF(ElementCount VF) { VFs.insert(VF); }
 
+  void removeVF(ElementCount VF) {
+    assert(hasVF(VF) && "Cannot remove VF not in plan");
+    VFs.remove(VF);
+  }
+
   void setVF(ElementCount VF) {
     assert(hasVF(VF) && "Cannot set VF not already in plan");
     VFs.clear();
@@ -4660,6 +4671,12 @@ public:
     return !(!getScalarPreheader()->hasPredecessors() ||
              getScalarPreheader()->getSinglePredecessor() == getEntry());
   }
+
+  /// Returns true if this plan does not have a header mask, indicating it was
+  /// either created as an unmasked plan or had its masks removed by unmasking.
+  /// This is detected structurally by checking for the absence of a header mask
+  /// recipe rather than stored as state.
+  bool isUnmasked() const;
 };
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)

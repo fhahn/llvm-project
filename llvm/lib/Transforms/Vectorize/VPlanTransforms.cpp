@@ -40,6 +40,7 @@
 #include "llvm/IR/Metadata.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/TypeSize.h"
+#include "llvm/Transforms/Utils/LoopUtils.h"
 #include "llvm/Transforms/Utils/ScalarEvolutionExpander.h"
 
 using namespace llvm;
@@ -2756,52 +2757,6 @@ static VPActiveLaneMaskPHIRecipe *addVPLaneMaskPhiAndUpdateExitBranch(
   return LaneMaskPhi;
 }
 
-/// Collect the header mask with the pattern:
-///   (ICMP_ULE, WideCanonicalIV, backedge-taken-count)
-/// TODO: Introduce explicit recipe for header-mask instead of searching
-/// for the header-mask pattern manually.
-static VPSingleDefRecipe *findHeaderMask(VPlan &Plan) {
-  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
-  SmallVector<VPValue *> WideCanonicalIVs;
-  auto *FoundWidenCanonicalIVUser = find_if(
-      LoopRegion->getCanonicalIV()->users(), IsaPred<VPWidenCanonicalIVRecipe>);
-  assert(count_if(LoopRegion->getCanonicalIV()->users(),
-                  IsaPred<VPWidenCanonicalIVRecipe>) <= 1 &&
-         "Must have at most one VPWideCanonicalIVRecipe");
-  if (FoundWidenCanonicalIVUser !=
-      LoopRegion->getCanonicalIV()->users().end()) {
-    auto *WideCanonicalIV =
-        cast<VPWidenCanonicalIVRecipe>(*FoundWidenCanonicalIVUser);
-    WideCanonicalIVs.push_back(WideCanonicalIV);
-  }
-
-  // Also include VPWidenIntOrFpInductionRecipes that represent a widened
-  // version of the canonical induction.
-  VPBasicBlock *HeaderVPBB = LoopRegion->getEntryBasicBlock();
-  for (VPRecipeBase &Phi : HeaderVPBB->phis()) {
-    auto *WidenOriginalIV = dyn_cast<VPWidenIntOrFpInductionRecipe>(&Phi);
-    if (WidenOriginalIV && WidenOriginalIV->isCanonical())
-      WideCanonicalIVs.push_back(WidenOriginalIV);
-  }
-
-  // Walk users of wide canonical IVs and find the single compare of the form
-  // (ICMP_ULE, WideCanonicalIV, backedge-taken-count).
-  VPSingleDefRecipe *HeaderMask = nullptr;
-  for (auto *Wide : WideCanonicalIVs) {
-    for (VPUser *U : SmallVector<VPUser *>(Wide->users())) {
-      auto *VPI = dyn_cast<VPInstruction>(U);
-      if (!VPI || !vputils::isHeaderMask(VPI, Plan))
-        continue;
-
-      assert(VPI->getOperand(0) == Wide &&
-             "WidenCanonicalIV must be the first operand of the compare");
-      assert(!HeaderMask && "Multiple header masks found?");
-      HeaderMask = VPI;
-    }
-  }
-  return HeaderMask;
-}
-
 void VPlanTransforms::addActiveLaneMask(
     VPlan &Plan, bool UseActiveLaneMaskForControlFlow,
     bool DataAndControlFlowWithoutRuntimeCheck) {
@@ -2815,7 +2770,8 @@ void VPlanTransforms::addActiveLaneMask(
       LoopRegion->getCanonicalIV()->users(), IsaPred<VPWidenCanonicalIVRecipe>);
   assert(FoundWidenCanonicalIVUser &&
          "Must have widened canonical IV when tail folding!");
-  VPSingleDefRecipe *HeaderMask = findHeaderMask(Plan);
+  VPSingleDefRecipe *HeaderMask =
+      cast_or_null<VPSingleDefRecipe>(vputils::findHeaderMask(Plan));
   auto *WideCanonicalIV =
       cast<VPWidenCanonicalIVRecipe>(*FoundWidenCanonicalIVUser);
   VPSingleDefRecipe *LaneMask;
@@ -3033,9 +2989,11 @@ static void transformRecipestoEVLRecipes(VPlan &Plan, VPValue &EVL) {
     }
   }
 
-  VPValue *HeaderMask = findHeaderMask(Plan);
-  if (!HeaderMask)
+  auto *HeaderMaskR =
+      dyn_cast_or_null<VPSingleDefRecipe>(vputils::findHeaderMask(Plan));
+  if (!HeaderMaskR)
     return;
+  VPValue *HeaderMask = HeaderMaskR;
 
   // Replace header masks with a mask equivalent to predicating by EVL:
   //
@@ -5243,4 +5201,247 @@ void VPlanTransforms::addExitUsersForFirstOrderRecurrences(VPlan &Plan,
       cast<VPInstruction>(&R)->replaceAllUsesWith(PenultimateElement);
     }
   }
+}
+
+bool VPlanTransforms::unmaskVPlan(VPlan &Plan) {
+  using namespace VPlanPatternMatch;
+
+  // First check if we can proceed.
+  if (!Plan.getVectorLoopRegion())
+    return false;
+
+  // Find the header mask (icmp ule instruction in the header block).
+  VPBasicBlock *Header = Plan.getVectorLoopRegion()->getEntryBasicBlock();
+  VPValue *HeaderMask = nullptr;
+  VPRecipeBase *HeaderMaskRecipe = nullptr;
+  VPWidenCanonicalIVRecipe *WidenIVRecipe = nullptr;
+
+  for (VPRecipeBase &R : *Header) {
+    if (auto *WidenIV = dyn_cast<VPWidenCanonicalIVRecipe>(&R)) {
+      WidenIVRecipe = WidenIV;
+    }
+    if (auto *SingleDef = dyn_cast<VPSingleDefRecipe>(&R)) {
+      if (vputils::isHeaderMask(SingleDef, Plan)) {
+        HeaderMask = SingleDef;
+        HeaderMaskRecipe = &R;
+        break;
+      }
+    }
+  }
+
+  if (!HeaderMask)
+    return false; // No header mask found, already unmasked
+
+  // For now, only handle simple header masks (ICmp), not active lane mask PHIs
+  // which have complex update patterns.
+  if (!isa<VPInstruction>(HeaderMaskRecipe))
+    return false;
+
+  VPTypeAnalysis TypeInfo(Plan);
+
+  // Collect all recipes that use the header mask. Check if we can handle all
+  // user types and bail out early if not.
+  SmallVector<VPInstruction *> ToSimplify;
+  SmallVector<VPReplicateRecipe *> ReplicatesToUpdate;
+  SmallVector<VPWidenMemoryRecipe *> MemoryRecipesToUpdate;
+  SmallVector<VPInterleaveRecipe *> InterleaveRecipesToUpdate;
+
+  for (VPUser *U : HeaderMask->users()) {
+    if (U == HeaderMaskRecipe)
+      continue;
+    if (auto *Rep = dyn_cast<VPReplicateRecipe>(U)) {
+      if (Rep->isPredicated() && Rep->getMask() == HeaderMask)
+        ReplicatesToUpdate.push_back(Rep);
+    } else if (auto *Mem = dyn_cast<VPWidenMemoryRecipe>(U)) {
+      if (Mem->isMasked() && Mem->getMask() == HeaderMask)
+        MemoryRecipesToUpdate.push_back(Mem);
+    } else if (auto *Interleave = dyn_cast<VPInterleaveRecipe>(U)) {
+      if (Interleave->getMask() == HeaderMask)
+        InterleaveRecipesToUpdate.push_back(Interleave);
+    } else if (auto *VPI = dyn_cast<VPInstruction>(U)) {
+      ToSimplify.push_back(VPI);
+    } else {
+      // Unknown user type - bail out.
+      return false;
+    }
+  }
+
+  // Simplify VPInstruction recipes that use the header mask.
+  for (VPInstruction *VPI : ToSimplify) {
+
+    // LastActiveLane(HeaderMask) -> VF - 1
+    if (match(VPI, m_LastActiveLane(m_Specific(HeaderMask)))) {
+      Type *Ty = TypeInfo.inferScalarType(VPI);
+      VPBuilder B(VPI);
+      // Cast VF to the target type if needed.
+      VPValue *VFCast =
+          B.createScalarCast(Instruction::ZExt, &Plan.getVF(), Ty,
+                             VPI->getDebugLoc());
+      VPValue *VFMinus1 = B.createNaryOp(
+          Instruction::Sub, {VFCast, Plan.getConstantInt(Ty, 1)},
+          VPI->getDebugLoc());
+      VPI->replaceAllUsesWith(VFMinus1);
+      VPI->eraseFromParent();
+      continue;
+    }
+
+    // Select(HeaderMask, a, b) -> a (for non-reductions)
+    // For reduction selects: select(mask, add_result, phi), transform by
+    // masking the per-iteration contribution instead of the accumulated result.
+    VPValue *TrueVal, *FalseVal;
+    if (match(VPI, m_Select(m_Specific(HeaderMask), m_VPValue(TrueVal),
+                            m_VPValue(FalseVal)))) {
+      auto *PhiR = dyn_cast<VPReductionPHIRecipe>(FalseVal);
+      if (!PhiR) {
+        // Non-reduction select, simplify by replacing with true value.
+        VPI->replaceAllUsesWith(TrueVal);
+        VPI->eraseFromParent();
+        continue;
+      }
+
+      // This is a reduction select. Transform to unconditional reduction by
+      // masking the per-iteration contribution instead.
+      // Find the reduction operation that produces TrueVal.
+      auto *DefRecipe = TrueVal->getDefiningRecipe();
+      auto *WidenR = dyn_cast<VPWidenRecipe>(DefRecipe);
+      if (!WidenR) {
+        // Not a simple widen recipe, skip for now.
+        continue;
+      }
+
+      // Find which operand is the phi and which is the contribution.
+      VPValue *Contrib = nullptr;
+      unsigned ContribIdx = 0;
+      for (unsigned I = 0, E = WidenR->getNumOperands(); I != E; ++I) {
+        if (WidenR->getOperand(I) != PhiR) {
+          Contrib = WidenR->getOperand(I);
+          ContribIdx = I;
+          break;
+        }
+      }
+      if (!Contrib) {
+        // Couldn't find contribution operand, skip.
+        continue;
+      }
+
+      // Get the identity for this reduction kind.
+      RecurKind Kind = PhiR->getRecurrenceKind();
+      Type *Ty = TypeInfo.inferScalarType(Contrib);
+      FastMathFlags FMF;
+      if (RecurrenceDescriptor::isFloatingPointRecurrenceKind(Kind))
+        if (auto *FMFRecipe = dyn_cast<VPRecipeWithIRFlags>(WidenR))
+          FMF = FMFRecipe->getFastMathFlags();
+      Value *Identity = getRecurrenceIdentity(Kind, Ty, FMF);
+      VPValue *IdentityVPV = Plan.getOrAddLiveIn(Identity);
+
+      // Create: masked_contrib = select(mask, contrib, identity)
+      VPBuilder B(WidenR);
+      VPValue *MaskedContrib =
+          B.createSelect(HeaderMask, Contrib, IdentityVPV, VPI->getDebugLoc());
+
+      // Update the reduction op to use masked_contrib.
+      WidenR->setOperand(ContribIdx, MaskedContrib);
+
+      // Update the phi's backedge from select to the reduction result.
+      PhiR->setOperand(1, TrueVal);
+
+      // Replace all uses of the select with the reduction result.
+      VPI->replaceAllUsesWith(TrueVal);
+      VPI->eraseFromParent();
+    }
+  }
+
+  // Replace predicated VPReplicateRecipe with unpredicated versions.
+  for (VPReplicateRecipe *Rep : ReplicatesToUpdate) {
+    SmallVector<VPValue *> Operands(Rep->operands().begin(),
+                                    Rep->operands().end() - 1);
+
+    auto *NewRep = new VPReplicateRecipe(
+        Rep->getUnderlyingInstr(), Operands, Rep->isSingleScalar(),
+        nullptr /* Mask */, *Rep, *Rep, Rep->getDebugLoc());
+    NewRep->transferFlags(*Rep);
+    NewRep->insertBefore(Rep);
+
+    if (Rep->getNumDefinedValues() > 0)
+      Rep->getVPSingleValue()->replaceAllUsesWith(NewRep->getVPSingleValue());
+
+    Rep->eraseFromParent();
+  }
+
+  // For VPWidenMemoryRecipe, replace with unmasked versions.
+  for (VPWidenMemoryRecipe *Mem : MemoryRecipesToUpdate) {
+    SmallVector<VPValue *> Operands(Mem->operands().begin(),
+                                    Mem->operands().end() - 1);
+
+    VPRecipeBase *NewRecipe = nullptr;
+    if (auto *Load = dyn_cast<VPWidenLoadRecipe>(Mem)) {
+      NewRecipe = new VPWidenLoadRecipe(
+          cast<LoadInst>(Load->getIngredient()), Operands[0], nullptr /* Mask */,
+          Load->isConsecutive(), Load->isReverse(), *Load, Load->getDebugLoc());
+    } else if (auto *Store = dyn_cast<VPWidenStoreRecipe>(Mem)) {
+      NewRecipe = new VPWidenStoreRecipe(
+          cast<StoreInst>(Store->getIngredient()), Operands[0], Operands[1],
+          nullptr /* Mask */, Store->isConsecutive(), Store->isReverse(),
+          *Store, Store->getDebugLoc());
+    }
+
+    if (NewRecipe) {
+      NewRecipe->insertBefore(Mem);
+      // VPWidenLoadRecipe IS a VPValue (inherits from VPValue directly).
+      // VPWidenStoreRecipe has no defined values.
+      if (auto *OldLoad = dyn_cast<VPWidenLoadRecipe>(Mem)) {
+        auto *NewLoad = cast<VPWidenLoadRecipe>(NewRecipe);
+        OldLoad->replaceAllUsesWith(NewLoad);
+      }
+      Mem->eraseFromParent();
+    }
+  }
+
+  // For VPInterleaveRecipe, replace with unmasked versions.
+  for (VPInterleaveRecipe *Interleave : InterleaveRecipesToUpdate) {
+    // Create a new VPInterleaveRecipe without the mask.
+    SmallVector<VPValue *> StoredValues(Interleave->getStoredValues());
+    auto *NewRecipe = new VPInterleaveRecipe(
+        Interleave->getInterleaveGroup(), Interleave->getAddr(), StoredValues,
+        nullptr /* Mask */, Interleave->needsMaskForGaps(), *Interleave,
+        Interleave->getDebugLoc());
+    NewRecipe->insertBefore(Interleave);
+
+    // Replace uses of the old load results with the new ones.
+    for (unsigned I = 0, E = Interleave->getNumDefinedValues(); I != E; ++I)
+      Interleave->getVPValue(I)->replaceAllUsesWith(NewRecipe->getVPValue(I));
+
+    Interleave->eraseFromParent();
+  }
+
+  // If the header mask still has users, we cannot fully unmask - bail out.
+  // This can happen with recipes we don't handle yet.
+  if (!HeaderMask->users().empty())
+    return false;
+
+  // Remove the header mask recipe.
+  HeaderMaskRecipe->eraseFromParent();
+
+  // Also remove the VPWidenCanonicalIVRecipe if it's only used by the mask.
+  if (WidenIVRecipe && WidenIVRecipe->getNumUsers() == 0)
+    WidenIVRecipe->eraseFromParent();
+
+  // Update the middle block's terminator. For tail-folded loops, the middle
+  // block has BranchOnCond(true) meaning "always skip scalar epilogue". After
+  // unmasking, we need to check if there are remaining iterations.
+  VPBasicBlock *MiddleVPBB = Plan.getMiddleBlock();
+  auto *MiddleTerm = dyn_cast<VPInstruction>(MiddleVPBB->getTerminator());
+  if (MiddleTerm && MiddleTerm->getOpcode() == VPInstruction::BranchOnCond &&
+      MiddleTerm->getOperand(0) == Plan.getTrue()) {
+    // Replace BranchOnCond(true) with BranchOnCond(TC == VectorTC).
+    // If TC == VectorTC, no remainder, go to exit.
+    // If TC != VectorTC, there's remainder, go to scalar epilogue.
+    VPBuilder Builder(MiddleTerm);
+    VPValue *Cmp = Builder.createICmp(CmpInst::ICMP_EQ, Plan.getTripCount(),
+                                      &Plan.getVectorTripCount(),
+                                      MiddleTerm->getDebugLoc(), "cmp.n");
+    MiddleTerm->setOperand(0, Cmp);
+  }
+
+  return true;
 }

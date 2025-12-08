@@ -397,6 +397,11 @@ struct VPlanTransforms {
   static DenseMap<VPBasicBlock *, VPValue *>
   introduceMasksAndLinearize(VPlan &Plan, bool FoldTail);
 
+  /// Unmask a tail-folded VPlan by removing the header mask and converting
+  /// masked recipes to unmasked versions. Returns true if the plan was
+  /// successfully unmasked.
+  static bool unmaskVPlan(VPlan &Plan);
+
   /// Add branch weight metadata, if the \p Plan's middle block is terminated by
   /// a BranchOnCond recipe.
   static void

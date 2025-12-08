@@ -57,6 +57,11 @@ bool isSingleScalar(const VPValue *VPV);
 /// Return true if \p V is a header mask in \p Plan.
 bool isHeaderMask(const VPValue *V, const VPlan &Plan);
 
+/// Find and return the header mask recipe in \p Plan, or nullptr if none
+/// exists. The header mask is the compare (ICMP_ULE, WideCanonicalIV,
+/// backedge-taken-count) or an active lane mask PHI.
+VPRecipeBase *findHeaderMask(VPlan &Plan);
+
 /// Checks if \p V is uniform across all VF lanes and UF parts. It is considered
 /// as such if it is either loop invariant (defined outside the vector region)
 /// or its operand is known to be uniform across all VFs and UFs (e.g.

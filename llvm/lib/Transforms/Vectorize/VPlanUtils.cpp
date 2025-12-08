@@ -81,6 +81,30 @@ bool vputils::isHeaderMask(const VPValue *V, const VPlan &Plan) {
          B == Plan.getBackedgeTakenCount();
 }
 
+VPRecipeBase *vputils::findHeaderMask(VPlan &Plan) {
+  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
+  if (!LoopRegion)
+    return nullptr;
+
+  // First check for VPActiveLaneMaskPHIRecipe in the header phis.
+  VPBasicBlock *HeaderVPBB = LoopRegion->getEntryBasicBlock();
+  for (VPRecipeBase &Phi : HeaderVPBB->phis()) {
+    if (isa<VPActiveLaneMaskPHIRecipe>(&Phi))
+      return &Phi;
+  }
+
+  // Search through VPInstructions in the header for a header mask pattern.
+  // Only check VPInstruction recipes since isHeaderMask uses pattern matchers
+  // that may assert on other recipe types.
+  for (VPRecipeBase &R : *HeaderVPBB) {
+    auto *VPI = dyn_cast<VPInstruction>(&R);
+    if (VPI && vputils::isHeaderMask(VPI, Plan))
+      return &R;
+  }
+
+  return nullptr;
+}
+
 const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
                                            PredicatedScalarEvolution &PSE,
                                            const Loop *L) {

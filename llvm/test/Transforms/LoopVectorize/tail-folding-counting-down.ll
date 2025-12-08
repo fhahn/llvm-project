@@ -1,4 +1,5 @@
 ; RUN: opt < %s -passes=loop-vectorize -prefer-predicate-over-epilogue=predicate-dont-vectorize -force-vector-width=4 -S | FileCheck %s
+; RUN: opt < %s -passes=loop-vectorize -prefer-predicate-over-epilogue=predicate-dont-vectorize -force-vector-width=4 -enable-unmask-tail-fold -S | FileCheck %s --check-prefix=UNMASK
 
 ; Check that a counting-down loop which has no primary induction variable
 ; is vectorized with preferred predication.
@@ -6,6 +7,15 @@
 ; CHECK-LABEL: vector.body:
 ; CHECK-LABEL: middle.block:
 ; CHECK-NEXT:    br label %while.end.loopexit
+
+; UNMASK-LABEL: vector.ph:
+; UNMASK:       %n.mod.vf = urem i32 %N, 4
+; UNMASK:       %n.vec = sub i32 %N, %n.mod.vf
+; UNMASK-LABEL: vector.body:
+; UNMASK-NOT: icmp ule
+; UNMASK-LABEL: middle.block:
+; UNMASK-NEXT:    %cmp.n = icmp eq i32 %N, %n.vec
+; UNMASK-NEXT:    br i1 %cmp.n, label %while.end.loopexit, label %scalar.ph
 
 target datalayout = "e-m:e-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64"
 
@@ -40,35 +50,4 @@ while.end:
   ret void
 }
 
-; Make sure a loop is successfully vectorized with fold-tail when the backedge
-; taken count is constant and used inside the loop. Issue revealed by D76992.
-;
-define void @reuse_const_btc(ptr %A) {
-; CHECK-LABEL: @reuse_const_btc
-; CHECK: {{%.*}} = icmp ule <4 x i32> {{%.*}}, splat (i32 13)
-; CHECK: {{%.*}} = select <4 x i1> {{%.*}}, <4 x i32> splat (i32 13), <4 x i32> splat (i32 12)
-;
-entry:
-  br label %loop
 
-loop:
-  %riv = phi i32 [ 13, %entry ], [ %rivMinus1, %merge ]
-  %sub = sub nuw nsw i32 20, %riv
-  %arrayidx = getelementptr inbounds i8, ptr %A, i32 %sub
-  %cond0 = icmp eq i32 %riv, 7
-  br i1 %cond0, label %then, label %else
-then:
-  br label %merge
-else:
-  br label %merge
-merge:
-  %blend = phi i32 [ 13, %then ], [ 12, %else ]
-  %trunc = trunc i32 %blend to i8
-  store i8 %trunc, ptr %arrayidx, align 1
-  %rivMinus1 = add nuw nsw i32 %riv, -1
-  %cond = icmp eq i32 %riv, 0
-  br i1 %cond, label %exit, label %loop
-
-exit:
-  ret void
-}

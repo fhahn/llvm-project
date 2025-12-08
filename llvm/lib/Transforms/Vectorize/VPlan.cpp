@@ -1022,6 +1022,53 @@ const VPRegionBlock *VPlan::getVectorLoopRegion() const {
   return nullptr;
 }
 
+bool VPlan::isUnmasked() const {
+  // A plan is considered "unmasked" if it was created by unmaskVPlan. This is
+  // detected by checking for the TC == VectorTC comparison pattern in the
+  // middle block, which is unique to plans created by unmaskVPlan.
+  //
+  // Regular non-tail-folded plans also don't have header masks, but they don't
+  // have this TC == VectorTC check either.
+  VPRegionBlock *LoopRegion =
+      const_cast<VPlan *>(this)->getVectorLoopRegion();
+  if (!LoopRegion || !LoopRegion->getSingleSuccessor())
+    return false;
+
+  VPBasicBlock *MiddleVPBB =
+      dyn_cast<VPBasicBlock>(LoopRegion->getSingleSuccessor());
+  if (!MiddleVPBB || MiddleVPBB->empty())
+    return false;
+
+  // Look for the pattern created by unmaskVPlan: BranchOnCond(ICmp EQ TC, VTC).
+  VPValue *TC = getTripCount();
+  VPValue *VTC = &const_cast<VPlan *>(this)->getVectorTripCount();
+
+  for (VPRecipeBase &R : reverse(*MiddleVPBB)) {
+    auto *VPI = dyn_cast<VPInstruction>(&R);
+    if (!VPI)
+      continue;
+
+    if (VPI->getOpcode() != VPInstruction::BranchOnCond)
+      continue;
+
+    VPValue *Cond = VPI->getOperand(0);
+    auto *CondRecipe =
+        dyn_cast_or_null<VPInstruction>(Cond->getDefiningRecipe());
+    if (!CondRecipe || CondRecipe->getOpcode() != Instruction::ICmp)
+      continue;
+
+    // Check if the ICmp compares TC and VTC.
+    VPValue *Op0 = CondRecipe->getOperand(0);
+    VPValue *Op1 = CondRecipe->getOperand(1);
+    if ((Op0 == TC && Op1 == VTC) || (Op0 == VTC && Op1 == TC))
+      return true;
+
+    break;
+  }
+
+  return false;
+}
+
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 void VPlan::printLiveIns(raw_ostream &O) const {
   VPSlotTracker SlotTracker(this);
@@ -1572,17 +1619,34 @@ void LoopVectorizationPlanner::buildVPlans(ElementCount MinVF,
   }
 }
 
-VPlan &LoopVectorizationPlanner::getPlanFor(ElementCount VF) const {
-  assert(count_if(VPlans,
-                  [VF](const VPlanPtr &Plan) { return Plan->hasVF(VF); }) ==
-             1 &&
-         "Multiple VPlans for VF.");
-
+VPlan &
+LoopVectorizationPlanner::getPlanFor(ElementCount VF,
+                                     std::optional<bool> PreferUnmasked) const {
+  SmallVector<VPlan *, 2> MatchingPlans;
   for (const VPlanPtr &Plan : VPlans) {
     if (Plan->hasVF(VF))
-      return *Plan.get();
+      MatchingPlans.push_back(Plan.get());
   }
-  llvm_unreachable("No plan found!");
+
+  assert(!MatchingPlans.empty() && "No plan found for VF!");
+
+  // If only one plan matches, return it.
+  if (MatchingPlans.size() == 1)
+    return *MatchingPlans[0];
+
+  // Multiple plans match - this can happen when epilogue vectorization is
+  // possible and both masked and unmasked variants exist.
+  assert(PreferUnmasked.has_value() &&
+         "Multiple plans for VF but no preference specified");
+
+  // Find the plan matching the preference.
+  auto It = llvm::find_if(MatchingPlans, [&](VPlan *Plan) {
+    return Plan->isUnmasked() == *PreferUnmasked;
+  });
+
+  // If no plan matches the preference exactly, return the first one.
+  // This can happen if only masked or only unmasked plans exist for a VF.
+  return (It != MatchingPlans.end()) ? **It : *MatchingPlans[0];
 }
 
 static void addRuntimeUnrollDisableMetaData(Loop *L) {

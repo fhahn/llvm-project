@@ -255,6 +255,11 @@ cl::opt<bool> llvm::EnableWideActiveLaneMask(
     cl::desc("Enable use of wide lane masks when used for control flow in "
              "tail-folded loops"));
 
+static cl::opt<bool> EnableUnmaskTailFold(
+    "enable-unmask-tail-fold", cl::init(false), cl::Hidden,
+    cl::desc("Enable unmasking of tail-folded VPlans, converting masked "
+             "recipes to unmasked versions."));
+
 static cl::opt<bool> MaximizeBandwidth(
     "vectorizer-maximize-bandwidth", cl::init(false), cl::Hidden,
     cl::desc("Maximize bandwidth when selecting vectorization factor which "
@@ -1299,6 +1304,12 @@ public:
   /// loop hint annotation.
   bool isScalarEpilogueAllowed() const {
     return ScalarEpilogueStatus == CM_ScalarEpilogueAllowed;
+  }
+
+  /// Returns true if tail-folding is preferred but scalar epilogue can be used
+  /// as fallback (predicate-else-scalar-epilogue mode).
+  bool canFallbackToScalarEpilogue() const {
+    return ScalarEpilogueStatus == CM_ScalarEpilogueNotNeededUsePredicate;
   }
 
   /// Returns true if tail-folding is preferred over a scalar epilogue.
@@ -4406,7 +4417,15 @@ VectorizationFactor LoopVectorizationPlanner::selectEpilogueVectorizationFactor(
     return Result;
   }
 
-  if (!CM.isScalarEpilogueAllowed()) {
+  // When EnableUnmaskTailFold is used with a predicate-else-scalar-epilogue
+  // mode, we can use unmasked plan for the main loop and masked plan for the
+  // epilogue. In this case, allow epilogue vectorization even if scalar
+  // epilogue is not normally allowed, as long as we have both plan variants.
+  bool AllowEpilogueWithUnmask =
+      EnableUnmaskTailFold && CM.canFallbackToScalarEpilogue() &&
+      any_of(VPlans, [](const VPlanPtr &P) { return P->isUnmasked(); }) &&
+      any_of(VPlans, [](const VPlanPtr &P) { return !P->isUnmasked(); });
+  if (!CM.isScalarEpilogueAllowed() && !AllowEpilogueWithUnmask) {
     LLVM_DEBUG(dbgs() << "LEV: Unable to vectorize epilogue because no "
                          "epilogue is allowed.\n");
     return Result;
@@ -4452,8 +4471,9 @@ VectorizationFactor LoopVectorizationPlanner::selectEpilogueVectorizationFactor(
   Type *TCType = Legal->getWidestInductionType();
   const SCEV *RemainingIterations = nullptr;
   unsigned MaxTripCount = 0;
+  // Prefer unmasked plan when both exist for main loop.
   const SCEV *TC = vputils::getSCEVExprForVPValue(
-      getPlanFor(MainLoopVF).getTripCount(), PSE);
+      getPlanFor(MainLoopVF, /*PreferUnmasked=*/true).getTripCount(), PSE);
   assert(!isa<SCEVCouldNotCompute>(TC) && "Trip count SCEV must be computable");
   const SCEV *KnownMinTC;
   bool ScalableTC = match(TC, m_scev_c_Mul(m_SCEV(KnownMinTC), m_SCEVVScale()));
@@ -7116,6 +7136,31 @@ static bool planContainsAdditionalSimplifications(VPlan &Plan,
                 RepR->getUnderlyingInstr(), VF))
           return true;
       }
+
+      // If unmaskVPlan transformed a reduction select by masking the
+      // contribution with identity, the plan contains a select that wasn't in
+      // the original loop. This affects cost comparison.
+      if (auto *VPI = dyn_cast<VPInstruction>(&R)) {
+        using namespace VPlanPatternMatch;
+        VPValue *Mask, *TrueVal, *FalseVal;
+        if (match(VPI, m_Select(m_VPValue(Mask), m_VPValue(TrueVal),
+                                m_VPValue(FalseVal)))) {
+          // Check if false value is a live-in constant (identity for reduction).
+          if (FalseVal->isDefinedOutsideLoopRegions() &&
+              FalseVal->getLiveInIRValue() &&
+              isa<Constant>(FalseVal->getLiveInIRValue())) {
+            // Check if the select is used by a binary op with a reduction phi.
+            if (any_of(VPI->users(), [](VPUser *U) {
+                  auto *WidenR = dyn_cast<VPWidenRecipe>(U);
+                  return WidenR && any_of(WidenR->operands(), [](VPValue *Op) {
+                           return isa<VPReductionPHIRecipe>(Op);
+                         });
+                }))
+              return true;
+          }
+        }
+      }
+
       if (Instruction *UI = GetInstructionForCost(&R)) {
         // If we adjusted the predicate of the recipe, the cost in the legacy
         // cost model may be different.
@@ -7150,10 +7195,67 @@ static bool planContainsAdditionalSimplifications(VPlan &Plan,
 VectorizationFactor LoopVectorizationPlanner::computeBestVF() {
   if (VPlans.empty())
     return VectorizationFactor::Disabled();
-  // If there is a single VPlan with a single VF, return it directly.
-  VPlan &FirstPlan = *VPlans[0];
-  if (VPlans.size() == 1 && size(FirstPlan.vectorFactors()) == 1)
-    return {*FirstPlan.vectorFactors().begin(), 0, 0};
+
+  // Helper to check if both masked and unmasked plan variants exist.
+  auto hasBothVariants = [this]() {
+    return any_of(VPlans, [](const VPlanPtr &P) { return P->isUnmasked(); }) &&
+           any_of(VPlans, [](const VPlanPtr &P) { return !P->isUnmasked(); });
+  };
+
+  // Check if all plans have the same single VF (e.g., user forced a specific
+  // VF). In this case, compare plans for that VF and return the best.
+  auto allPlansSingleSameVF = [this]() -> std::optional<ElementCount> {
+    ElementCount FirstVF = *VPlans[0]->vectorFactors().begin();
+    for (const auto &P : VPlans) {
+      if (size(P->vectorFactors()) != 1 ||
+          *P->vectorFactors().begin() != FirstVF)
+        return std::nullopt;
+    }
+    return FirstVF;
+  };
+
+  if (auto SingleVF = allPlansSingleSameVF()) {
+    // All plans have the same single VF. If there's only one plan, return it.
+    if (VPlans.size() == 1)
+      return {*SingleVF, 0, 0};
+
+    // Multiple plans with same single VF - find the best one by cost.
+    // Use <= so that when costs are equal, the later (unmasked) plan wins,
+    // as it is simpler with no header mask overhead.
+    VPlan *BestPlan = VPlans[0].get();
+    InstructionCost BestCost = cost(*BestPlan, *SingleVF);
+    for (size_t I = 1; I < VPlans.size(); ++I) {
+      InstructionCost PlanCost = cost(*VPlans[I], *SingleVF);
+      if (PlanCost <= BestCost) {
+        BestCost = PlanCost;
+        BestPlan = VPlans[I].get();
+      }
+    }
+
+    // Check if we should keep both masked and unmasked variants for epilogue
+    // vectorization. When EnableUnmaskTailFold is used with a
+    // predicate-else-scalar-epilogue mode, the main loop uses unmasked plan
+    // and the epilogue uses masked plan.
+    bool KeepBothForEpilogue = EnableUnmaskTailFold &&
+                               EnableEpilogueVectorization &&
+                               CM.canFallbackToScalarEpilogue() &&
+                               hasBothVariants();
+
+    if (KeepBothForEpilogue) {
+      // Keep both plans for epilogue vectorization.
+      LLVM_DEBUG(dbgs() << "LV: Keeping both masked and unmasked plans for "
+                        << "epilogue vectorization.\n");
+    } else {
+      // Remove non-winning plans.
+      llvm::erase_if(VPlans, [BestPlan](const VPlanPtr &P) {
+        return P.get() != BestPlan;
+      });
+    }
+    LLVM_DEBUG(dbgs() << "LV: Selected plan " << BestPlan->getName()
+                      << " for VF " << *SingleVF << " with cost " << BestCost
+                      << "\n");
+    return {*SingleVF, BestCost, 0};
+  }
 
   LLVM_DEBUG(dbgs() << "LV: Computing best VF using cost kind: "
                     << (CM.CostKind == TTI::TCK_RecipThroughput
@@ -7182,6 +7284,10 @@ VectorizationFactor LoopVectorizationPlanner::computeBestVF() {
     // evaluation.
     BestFactor.Cost = InstructionCost::getMax();
   }
+
+  // Track the best plan for each VF when multiple plans have the same VF.
+  // This happens when we generate both masked and unmasked variants.
+  DenseMap<ElementCount, std::pair<InstructionCost, VPlan *>> BestPlanForVF;
 
   for (auto &P : VPlans) {
     ArrayRef<ElementCount> VFs(P->vectorFactors().begin(),
@@ -7223,6 +7329,12 @@ VectorizationFactor LoopVectorizationPlanner::computeBestVF() {
         continue;
       }
 
+      // Track best plan for this VF (when comparing multiple plans with same
+      // VF).
+      auto It = BestPlanForVF.find(VF);
+      if (It == BestPlanForVF.end() || Cost < It->second.first)
+        BestPlanForVF[VF] = {Cost, P.get()};
+
       if (isMoreProfitable(CurrentFactor, BestFactor, P->hasScalarTail()))
         BestFactor = CurrentFactor;
 
@@ -7232,13 +7344,46 @@ VectorizationFactor LoopVectorizationPlanner::computeBestVF() {
     }
   }
 
+  // For VFs that appear in multiple plans, remove them from non-winning plans.
+  // This ensures getPlanFor() finds exactly one plan per VF.
+  // However, when epilogue vectorization is possible, keep both masked and
+  // unmasked variants available - the main loop will use unmasked and the
+  // epilogue will use masked/tail-folded.
+  // Also keep both variants when EnableUnmaskTailFold is used with
+  // predicate-else-scalar-epilogue mode, as we can use unmasked for main loop
+  // and masked for epilogue.
+  bool KeepBothVariants = CM.isScalarEpilogueAllowed() ||
+                          (EnableUnmaskTailFold && EnableEpilogueVectorization &&
+                           CM.canFallbackToScalarEpilogue() &&
+                           hasBothVariants());
+  for (auto &P : VPlans) {
+    SmallVector<ElementCount, 4> VFsToRemove;
+    for (ElementCount VF : P->vectorFactors()) {
+      auto It = BestPlanForVF.find(VF);
+      if (It != BestPlanForVF.end() && It->second.second != P.get()) {
+        // When keeping both variants for epilogue vectorization, only remove
+        // the VF if both plans have the same masked/unmasked status.
+        if (KeepBothVariants &&
+            P->isUnmasked() != It->second.second->isUnmasked())
+          continue;
+        VFsToRemove.push_back(VF);
+      }
+    }
+    for (ElementCount VF : VFsToRemove)
+      P->removeVF(VF);
+  }
+
+  // Remove plans that no longer have any VFs.
+  llvm::erase_if(VPlans,
+                 [](const VPlanPtr &P) { return P->vectorFactors().empty(); });
+
 #ifndef NDEBUG
   // Select the optimal vectorization factor according to the legacy cost-model.
   // This is now only used to verify the decisions by the new VPlan-based
   // cost-model and will be retired once the VPlan-based cost-model is
   // stabilized.
   VectorizationFactor LegacyVF = selectVectorizationFactor();
-  VPlan &BestPlan = getPlanFor(BestFactor.Width);
+  VPlan &BestPlan = getPlanFor(BestFactor.Width, /*PreferUnmasked=*/true);
 
   // Pre-compute the cost and use it to check if BestPlan contains any
   // simplifications not accounted for in the legacy cost model. If that's the
@@ -7252,6 +7397,8 @@ VectorizationFactor LoopVectorizationPlanner::computeBestVF() {
   // * VPlans with additional VPlan simplifications,
   // * EVL-based VPlans with gather/scatters (the VPlan-based cost model uses
   //   vp_scatter/vp_gather).
+  // * VPlans that were unmasked by unmaskVPlan (the transformation changes
+  //   plan structure in ways the legacy cost model doesn't account for).
   // The legacy cost model doesn't properly model costs for such loops.
   bool UsesEVLGatherScatter =
       any_of(VPBlockUtils::blocksOnly<VPBasicBlock>(vp_depth_first_shallow(
@@ -7262,14 +7409,20 @@ VectorizationFactor LoopVectorizationPlanner::computeBestVF() {
                         !cast<VPWidenMemoryRecipe>(&R)->isConsecutive();
                });
              });
-  assert(
-      (BestFactor.Width == LegacyVF.Width || BestPlan.hasEarlyExit() ||
-       !Legal->getLAI()->getSymbolicStrides().empty() || UsesEVLGatherScatter ||
-       planContainsAdditionalSimplifications(
-           getPlanFor(BestFactor.Width), CostCtx, OrigLoop, BestFactor.Width) ||
-       planContainsAdditionalSimplifications(
-           getPlanFor(LegacyVF.Width), CostCtx, OrigLoop, LegacyVF.Width)) &&
-      " VPlan cost model and legacy cost model disagreed");
+  // Check if unmaskVPlan might have modified the plan. This happens when
+  // tail folding by masking is enabled but the plan doesn't have a header mask
+  // (ICmp ULE pattern), indicating unmaskVPlan processed it.
+  bool MayBeUnmasked = EnableUnmaskTailFold && CM.foldTailByMasking();
+  assert((BestFactor.Width == LegacyVF.Width || BestPlan.hasEarlyExit() ||
+          !Legal->getLAI()->getSymbolicStrides().empty() ||
+          UsesEVLGatherScatter || MayBeUnmasked ||
+          planContainsAdditionalSimplifications(
+              getPlanFor(BestFactor.Width, /*PreferUnmasked=*/true), CostCtx,
+              OrigLoop, BestFactor.Width) ||
+          planContainsAdditionalSimplifications(
+              getPlanFor(LegacyVF.Width, /*PreferUnmasked=*/true), CostCtx,
+              OrigLoop, LegacyVF.Width)) &&
+         " VPlan cost model and legacy cost model disagreed");
   assert((BestFactor.Width.isScalar() || BestFactor.ScalarCost > 0) &&
          "when vectorizing, the scalar cost must be computed.");
 #endif
@@ -7405,14 +7558,20 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   VPlanTransforms::removeDeadRecipes(BestVPlan);
 
   VPlanTransforms::convertToConcreteRecipes(BestVPlan);
+  // Check if the plan is unmasked (no header mask) before dissolving regions.
+  bool PlanIsUnmasked = BestVPlan.isUnmasked();
   // Regions are dissolved after optimizing for VF and UF, which completely
   // removes unneeded loop regions first.
   VPlanTransforms::dissolveLoopRegions(BestVPlan);
   // Canonicalize EVL loops after regions are dissolved.
   VPlanTransforms::canonicalizeEVLLoops(BestVPlan);
   VPlanTransforms::materializeBackedgeTakenCount(BestVPlan, VectorPH);
+  // Use tail folding for trip count computation only if the plan has a header
+  // mask (i.e., is not unmasked). Unmasked plans have their masks removed
+  // and rely on a scalar epilogue to handle remaining iterations.
+  bool TailFoldByMasking = CM.foldTailByMasking() && !PlanIsUnmasked;
   VPlanTransforms::materializeVectorTripCount(
-      BestVPlan, VectorPH, CM.foldTailByMasking(),
+      BestVPlan, VectorPH, TailFoldByMasking,
       CM.requiresScalarEpilogue(BestVF.isVector()));
   VPlanTransforms::materializeVFAndVFxUF(BestVPlan, VectorPH, BestVF);
   VPlanTransforms::cse(BestVPlan);
@@ -8327,18 +8486,50 @@ void LoopVectorizationPlanner::buildVPlansWithVPRecipes(ElementCount MinVF,
     VFRange SubRange = {VF, MaxVFTimes2};
     if (auto Plan = tryToBuildVPlanWithVPRecipes(
             std::unique_ptr<VPlan>(VPlan0->duplicate()), SubRange, &LVer)) {
-      // Now optimize the initial VPlan.
-      VPlanTransforms::hoistPredicatedLoads(*Plan, PSE, OrigLoop);
-      VPlanTransforms::sinkPredicatedStores(*Plan, PSE, OrigLoop);
-      VPlanTransforms::runPass(VPlanTransforms::truncateToMinimalBitwidths,
-                               *Plan, CM.getMinimalBitwidths());
-      VPlanTransforms::runPass(VPlanTransforms::optimize, *Plan);
-      // TODO: try to put it close to addActiveLaneMask().
-      if (CM.foldTailWithEVL())
-        VPlanTransforms::runPass(VPlanTransforms::addExplicitVectorLength,
-                                 *Plan, CM.getMaxSafeElements());
-      assert(verifyVPlanIsValid(*Plan) && "VPlan is invalid");
-      VPlans.push_back(std::move(Plan));
+      // Collect plans to optimize and add. We may have both a masked and an
+      // unmasked version for tail-folded loops.
+      SmallVector<VPlanPtr, 2> PlansToAdd;
+
+      // Check if we should try to create an unmasked variant alongside the
+      // masked one for cost comparison. Don't try to unmask if using active
+      // lane masks (e.g., ARM MVE/SVE) since those require the masking.
+      // Also skip for scalar-only plans since unmasking doesn't apply.
+      bool HasVectorVF = any_of(Plan->vectorFactors(),
+                                [](ElementCount VF) { return !VF.isScalar(); });
+      bool TryUnmask = EnableUnmaskTailFold && CM.foldTailByMasking() &&
+                       !useActiveLaneMask(CM.getTailFoldingStyle()) &&
+                       !CM.foldTailWithEVL() && HasVectorVF;
+      if (TryUnmask) {
+        // Duplicate the plan before attempting to unmask.
+        auto UnmaskedPlan = std::unique_ptr<VPlan>(Plan->duplicate());
+        if (VPlanTransforms::unmaskVPlan(*UnmaskedPlan)) {
+          // Unmasking succeeded - keep both plans for cost comparison.
+          Plan->setName("Masked VPlan");
+          UnmaskedPlan->setName("Unmasked VPlan");
+          PlansToAdd.push_back(std::move(Plan));
+          PlansToAdd.push_back(std::move(UnmaskedPlan));
+        } else {
+          // Unmasking failed - just use the original plan.
+          PlansToAdd.push_back(std::move(Plan));
+        }
+      } else {
+        PlansToAdd.push_back(std::move(Plan));
+      }
+
+      // Optimize and add all plans.
+      for (auto &P : PlansToAdd) {
+        VPlanTransforms::hoistPredicatedLoads(*P, PSE, OrigLoop);
+        VPlanTransforms::sinkPredicatedStores(*P, PSE, OrigLoop);
+        VPlanTransforms::runPass(VPlanTransforms::truncateToMinimalBitwidths,
+                                 *P, CM.getMinimalBitwidths());
+        VPlanTransforms::runPass(VPlanTransforms::optimize, *P);
+        // TODO: try to put it close to addActiveLaneMask().
+        if (CM.foldTailWithEVL())
+          VPlanTransforms::runPass(VPlanTransforms::addExplicitVectorLength,
+                                   *P, CM.getMaxSafeElements());
+        assert(verifyVPlanIsValid(*P) && "VPlan is invalid");
+        VPlans.push_back(std::move(P));
+      }
     }
     VF = SubRange.End;
   }
@@ -9163,7 +9354,7 @@ static bool processLoopInVPlanNativePath(
   if (VPlanBuildStressTest || VectorizationFactor::Disabled() == VF)
     return false;
 
-  VPlan &BestPlan = LVP.getPlanFor(VF.Width);
+  VPlan &BestPlan = LVP.getPlanFor(VF.Width, /*PreferUnmasked=*/true);
 
   {
     GeneratedRTChecks Checks(PSE, DT, LI, TTI, CM.CostKind);
@@ -9510,6 +9701,7 @@ static SmallVector<Instruction *> preparePlanForEpilogueVectorLoop(
                 [](const VPUser *U) {
                   return isa<VPScalarIVStepsRecipe>(U) ||
                          isa<VPDerivedIVRecipe>(U) ||
+                         isa<VPWidenCanonicalIVRecipe>(U) ||
                          cast<VPRecipeBase>(U)->isScalarCast() ||
                          cast<VPInstruction>(U)->getOpcode() ==
                              Instruction::Add;
@@ -9691,12 +9883,33 @@ static void fixScalarResumeValuesFromBypass(BasicBlock *BypassBlock, Loop *L,
   // Fix induction resume values from the additional bypass block.
   IRBuilder<> BypassBuilder(BypassBlock, BypassBlock->getFirstInsertionPt());
   for (const auto &[IVPhi, II] : LVL.getInductionVars()) {
-    auto *Inc = cast<PHINode>(IVPhi->getIncomingValueForBlock(PH));
+    Value *IncomingVal = IVPhi->getIncomingValueForBlock(PH);
     Value *V = createInductionAdditionalBypassValues(
         IVPhi, II, BypassBuilder, ExpandedSCEVs, MainVectorTripCount,
         LVL.getPrimaryInduction());
-    // TODO: Directly add as extra operand to the VPResumePHI recipe.
-    Inc->setIncomingValueForBlock(BypassBlock, V);
+
+    // The incoming value should be a PHINode (the resume phi from
+    // vectorization). If it is, update its incoming value for the bypass block.
+    if (auto *Inc = dyn_cast<PHINode>(IncomingVal)) {
+      // TODO: Directly add as extra operand to the VPResumePHI recipe.
+      Inc->setIncomingValueForBlock(BypassBlock, V);
+      continue;
+    }
+
+    // No resume PHI exists (e.g., when using a masked plan for epilogue).
+    // Create a new resume PHI in the scalar preheader with incoming values:
+    // - From bypass block: use the computed resume value (MainVectorTripCount)
+    // - From other predecessors: use the original start value
+    IRBuilder<> PHBuilder(PH, PH->begin());
+    PHINode *ResumePhi =
+        PHBuilder.CreatePHI(IVPhi->getType(), pred_size(PH), "bc.resume.val");
+    for (BasicBlock *Pred : predecessors(PH)) {
+      if (Pred == BypassBlock)
+        ResumePhi->addIncoming(V, Pred);
+      else
+        ResumePhi->addIncoming(IncomingVal, Pred);
+    }
+    IVPhi->setIncomingValueForBlock(PH, ResumePhi);
   }
 }
 
@@ -9998,8 +10211,9 @@ bool LoopVectorizePass::processLoop(Loop *L) {
 
   GeneratedRTChecks Checks(PSE, DT, LI, TTI, CM.CostKind);
   if (LVP.hasPlanWithVF(VF.Width)) {
-    // Select the interleave count.
-    IC = LVP.selectInterleaveCount(LVP.getPlanFor(VF.Width), VF.Width, VF.Cost);
+    // Select the interleave count. Prefer unmasked plan when both exist.
+    IC = LVP.selectInterleaveCount(
+        LVP.getPlanFor(VF.Width, /*PreferUnmasked=*/true), VF.Width, VF.Cost);
 
     unsigned SelectedIC = std::max(IC, UserIC);
     //  Optimistically generate runtime checks if they are needed. Drop them if
@@ -10022,12 +10236,12 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     // Check if it is profitable to vectorize with runtime checks.
     bool ForceVectorization =
         Hints.getForce() == LoopVectorizeHints::FK_Enabled;
-    VPCostContext CostCtx(CM.TTI, *CM.TLI, LVP.getPlanFor(VF.Width), CM,
-                          CM.CostKind, CM.PSE, L);
+    VPlan &PlanForCost = LVP.getPlanFor(VF.Width, /*PreferUnmasked=*/true);
+    VPCostContext CostCtx(CM.TTI, *CM.TLI, PlanForCost, CM, CM.CostKind,
+                          CM.PSE, L);
     if (!ForceVectorization &&
-        !isOutsideLoopWorkProfitable(Checks, VF, L, PSE, CostCtx,
-                                     LVP.getPlanFor(VF.Width), SEL,
-                                     CM.getVScaleForTuning())) {
+        !isOutsideLoopWorkProfitable(Checks, VF, L, PSE, CostCtx, PlanForCost,
+                                     SEL, CM.getVScaleForTuning())) {
       ORE->emit([&]() {
         return OptimizationRemarkAnalysisAliasing(
                    DEBUG_TYPE, "CantReorderMemOps", L->getStartLoc(),
@@ -10164,17 +10378,24 @@ bool LoopVectorizePass::processLoop(Loop *L) {
   // If we decided that it is *legal* to interleave or vectorize the loop, then
   // do it.
 
-  VPlan &BestPlan = LVP.getPlanFor(VF.Width);
+  // When there are both masked and unmasked plans, prefer unmasked for the
+  // main loop since it's what we selected in computeBestVF.
+  VPlan &BestPlan = LVP.getPlanFor(VF.Width, /*PreferUnmasked=*/true);
   // Consider vectorizing the epilogue too if it's profitable.
   VectorizationFactor EpilogueVF =
       LVP.selectEpilogueVectorizationFactor(VF.Width, IC);
   if (EpilogueVF.Width.isVector()) {
-    std::unique_ptr<VPlan> BestMainPlan(BestPlan.duplicate());
+    // For epilogue vectorization, prefer unmasked plan for main loop (since
+    // epilogue handles remaining iterations) and masked plan for epilogue
+    // (to handle partial vectors with tail-folding).
+    VPlan &BestMainPlanRef = LVP.getPlanFor(VF.Width, /*PreferUnmasked=*/true);
+    std::unique_ptr<VPlan> BestMainPlan(BestMainPlanRef.duplicate());
 
     // The first pass vectorizes the main loop and creates a scalar epilogue
     // to be vectorized by executing the plan (potentially with a different
     // factor) again shortly afterwards.
-    VPlan &BestEpiPlan = LVP.getPlanFor(EpilogueVF.Width);
+    VPlan &BestEpiPlan =
+        LVP.getPlanFor(EpilogueVF.Width, /*PreferUnmasked=*/false);
     BestEpiPlan.getMiddleBlock()->setName("vec.epilog.middle.block");
     BestEpiPlan.getVectorPreheader()->setName("vec.epilog.ph");
     preparePlanForMainVectorLoop(*BestMainPlan, BestEpiPlan);
