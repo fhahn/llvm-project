@@ -60,6 +60,8 @@ struct BitstreamRemarkSerializerHelper {
   StringRef LastRemarkPass;
   StringRef LastRemarkFunction;
 
+  bool InRemarksBlock = false;
+
   BitstreamRemarkSerializerHelper(BitstreamRemarkContainerType ContainerType,
                                   raw_ostream &OS);
 

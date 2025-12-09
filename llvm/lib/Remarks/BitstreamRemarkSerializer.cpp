@@ -278,14 +278,20 @@ void BitstreamRemarkSerializerHelper::emitMetaBlock(
 
 void BitstreamRemarkSerializerHelper::enterRemarksBlock() {
   Bitstream.EnterSubblock(REMARKS_BLOCK_ID, 4);
+  InRemarksBlock = true;
 }
 
 void BitstreamRemarkSerializerHelper::exitRemarksBlock() {
   Bitstream.ExitBlock();
+  InRemarksBlock = false;
 }
 
 void BitstreamRemarkSerializerHelper::emitLateMetaBlock(
     const StringTable &StrTab) {
+  // Exit the remarks block if we're still in it
+  if (InRemarksBlock)
+    exitRemarksBlock();
+
   // Emit the late meta block (after all remarks are serialized)
   Bitstream.EnterSubblock(META_BLOCK_ID, 3);
   emitMetaStrTab(StrTab);
@@ -294,6 +300,10 @@ void BitstreamRemarkSerializerHelper::emitLateMetaBlock(
 
 void BitstreamRemarkSerializerHelper::emitRemark(const Remark &Remark,
                                                       StringTable &StrTab) {
+  // Enter the remarks block if we haven't already
+  if (!InRemarksBlock)
+    enterRemarksBlock();
+
   if ((Bitstream.GetCurrentBlockBitNo() / 8) > (1 << 24)) {
     exitRemarksBlock();
     //FIXME:
@@ -367,7 +377,7 @@ void BitstreamRemarkSerializerHelper::emitRemark(const Remark &Remark,
 
   for (const Argument &Arg : Remark.Args) {
     R.clear();
-    auto MaybeIntVal = Arg.getValAsInt();
+    auto MaybeIntVal = Arg.getValAsInt<int64_t>();
 
     unsigned Opc = RECORD_REMARK_ARG_KV;
     if (Arg.Key == "String") {
