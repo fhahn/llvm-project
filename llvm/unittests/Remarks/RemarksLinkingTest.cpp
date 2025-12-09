@@ -135,12 +135,13 @@ TEST(Remarks, LinkingGoodBitstream) {
         "<BLOCKINFO_BLOCK/>\n"
         "<Meta BlockID=8 NumWords=3 BlockCodeSize=3>\n"
         "  <Container info codeid=1 abbrevid=4 op0=1 op1=1/>\n"
-        "  <Remark version codeid=2 abbrevid=5 op0=0/>\n"
+        "  <Remark version codeid=2 abbrevid=5 op0=1/>\n"
         "</Meta>\n"
-        "<Remark BlockID=9 NumWords=4 BlockCodeSize=4>\n"
-        "  <Remark header codeid=5 abbrevid=4 op0=2 op1=1 op2=0 op3=2/>\n"
-        "  <Remark debug location codeid=6 abbrevid=5 op0=3 op1=3 op2=12/>\n"
-        "</Remark>\n"
+        "<Remarks BlockID=9 NumWords=2 BlockCodeSize=4>\n"
+        "  <Remark header codeid=6 abbrevid=5 op0=0 op1=2/>\n"
+        "  <Remark codeid=5 abbrevid=4 op0=2 op1=1/>\n"
+        "  <Remark debug location codeid=7 abbrevid=6 op0=3 op1=3 op2=12/>\n"
+        "</Remarks>\n"
         "<Meta BlockID=8 NumWords=10 BlockCodeSize=3>\n"
         "  <String table codeid=3 abbrevid=6/> blob data = "
         "'inline\\x00NoDefinition\\x00foo\\x00file.c\\x00'\n"
@@ -157,11 +158,12 @@ TEST(Remarks, LinkingGoodBitstream) {
         "<BLOCKINFO_BLOCK/>\n"
         "<Meta BlockID=8 NumWords=3 BlockCodeSize=3>\n"
         "  <Container info codeid=1 abbrevid=4 op0=1 op1=1/>\n"
-        "  <Remark version codeid=2 abbrevid=5 op0=0/>\n"
+        "  <Remark version codeid=2 abbrevid=5 op0=1/>\n"
         "</Meta>\n"
-        "<Remark BlockID=9 NumWords=1 BlockCodeSize=4>\n"
-        "  <Remark header codeid=5 abbrevid=4 op0=2 op1=1 op2=0 op3=2/>\n"
-        "</Remark>\n"
+        "<Remarks BlockID=9 NumWords=2 BlockCodeSize=4>\n"
+        "  <Remark header codeid=6 abbrevid=5 op0=0 op1=2/>\n"
+        "  <Remark codeid=5 abbrevid=4 op0=2 op1=1/>\n"
+        "</Remarks>\n"
         "<Meta BlockID=8 NumWords=8 BlockCodeSize=3>\n"
         "  <String table codeid=3 abbrevid=6/> blob data = "
         "'inline\\x00NoDefinition\\x00foo\\x00'\n"
@@ -185,12 +187,13 @@ TEST(Remarks, LinkingGoodBitstream) {
         "<BLOCKINFO_BLOCK/>\n"
         "<Meta BlockID=8 NumWords=3 BlockCodeSize=3>\n"
         "  <Container info codeid=1 abbrevid=4 op0=1 op1=1/>\n"
-        "  <Remark version codeid=2 abbrevid=5 op0=0/>\n"
+        "  <Remark version codeid=2 abbrevid=5 op0=1/>\n"
         "</Meta>\n"
-        "<Remark BlockID=9 NumWords=4 BlockCodeSize=4>\n"
-        "  <Remark header codeid=5 abbrevid=4 op0=2 op1=1 op2=0 op3=2/>\n"
-        "  <Remark debug location codeid=6 abbrevid=5 op0=3 op1=3 op2=12/>\n"
-        "</Remark>\n"
+        "<Remarks BlockID=9 NumWords=2 BlockCodeSize=4>\n"
+        "  <Remark header codeid=6 abbrevid=5 op0=0 op1=2/>\n"
+        "  <Remark codeid=5 abbrevid=4 op0=2 op1=1/>\n"
+        "  <Remark debug location codeid=7 abbrevid=6 op0=3 op1=3 op2=12/>\n"
+        "</Remarks>\n"
         "<Meta BlockID=8 NumWords=10 BlockCodeSize=3>\n"
         "  <String table codeid=3 abbrevid=6/> blob data = "
         "'inline\\x00NoDefinition\\x00foo\\x00file.c\\x00'\n"
@@ -217,16 +220,15 @@ TEST(Remarks, LinkingGoodStrTab) {
         "<BLOCKINFO_BLOCK/>\n"
         "<Meta BlockID=8 NumWords=3 BlockCodeSize=3>\n"
         "  <Container info codeid=1 abbrevid=4 op0=1 op1=1/>\n"
-        "  <Remark version codeid=2 abbrevid=5 op0=0/>\n"
+        "  <Remark version codeid=2 abbrevid=5 op0=1/>\n"
         "</Meta>\n"
-        "<Remark BlockID=9 NumWords=4 BlockCodeSize=4>\n"
-        "  <Remark header codeid=5 abbrevid=4 op0=1 op1=4 op2=0 op3=2/>\n"
-        "  <Remark debug location codeid=6 abbrevid=5 op0=3 op1=3 op2=12/>\n"
-        "</Remark>\n"
-        "<Remark BlockID=9 NumWords=4 BlockCodeSize=4>\n"
-        "  <Remark header codeid=5 abbrevid=4 op0=2 op1=1 op2=0 op3=2/>\n"
-        "  <Remark debug location codeid=6 abbrevid=5 op0=3 op1=3 op2=12/>\n"
-        "</Remark>\n"
+        "<Remarks BlockID=9 NumWords=3 BlockCodeSize=4>\n"
+        "  <Remark header codeid=6 abbrevid=5 op0=0 op1=2/>\n"
+        "  <Remark codeid=5 abbrevid=4 op0=1 op1=4/>\n"
+        "  <Remark debug location codeid=7 abbrevid=6 op0=3 op1=3 op2=12/>\n"
+        "  <Remark codeid=5 abbrevid=4 op0=2 op1=1/>\n"
+        "  <Remark debug location codeid=7 abbrevid=6 op0=3 op1=3 op2=12/>\n"
+        "</Remarks>\n"
         "<Meta BlockID=8 NumWords=11 BlockCodeSize=3>\n"
         "  <String table codeid=3 abbrevid=6/> blob data = "
         "'inline\\x00NoDefinition\\x00foo\\x00file.c\\x00Ok\\x00'\n"
@@ -248,15 +250,15 @@ TEST(Remarks, LinkingError) {
   }
 
   {
-    // Check that the prepend path is propagated and fails with the full path.
-    // Also ensures that the remark format is correctly auto-detected.
+    // Check that mismatching remark versions are detected.
+    // The input has version 0, but the current version is 1.
     RL.setExternalFilePrependPath("/baddir/");
     Error E = RL.link(StringRef(
         "REMARKS\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0badfile.opt.yaml", 40));
     EXPECT_TRUE(static_cast<bool>(E));
     std::string ErrorMessage = toString(std::move(E));
     EXPECT_EQ(StringRef(ErrorMessage).lower(),
-              StringRef("'/baddir/badfile.opt.yaml': No such file or directory")
+              StringRef("Mismatching remark version. Got 0, expected 1.")
                   .lower());
   }
 }

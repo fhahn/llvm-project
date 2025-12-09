@@ -162,7 +162,7 @@ Error BitstreamRemarkParserHelper::handleRecord() {
       break;
     }
     if (CurrScope == ScopeKind::Argument) {
-      Args.back().Loc = Loc;
+      Args.back().Loc = DLoc;
       break;
     }
     return unexpectedRecord(RemarkDebugLocName);

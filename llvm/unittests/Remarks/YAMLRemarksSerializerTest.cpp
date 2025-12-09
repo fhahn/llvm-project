@@ -94,7 +94,7 @@ TEST(YAMLRemarks, SerializerRemark) {
         "    DebugLoc:        { File: argpath, Line: 6, Column: 7 }\n"
         "...\n",
         StringRef("REMARKS\0"
-                  "\0\0\0\0\0\0\0\0"
+                  "\1\0\0\0\0\0\0\0"
                   "\0\0\0\0\0\0\0\0" EXTERNALFILETESTPATH "\0",
                   38));
 }

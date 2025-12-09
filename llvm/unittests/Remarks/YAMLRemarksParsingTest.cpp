@@ -565,8 +565,10 @@ TEST(YAMLRemarks, ParsingGoodMeta) {
                 "Function: foo\n");
 
   // No string table.
+  // Metadata format: REMARKS\0 + version (uint64_t LE) + strtab_size (uint64_t LE)
+  // Version = 1, StrTabSize = 0
   parseGoodMeta(StringRef("REMARKS\0"
-                          "\0\0\0\0\0\0\0\0"
+                          "\1\0\0\0\0\0\0\0"
                           "\0\0\0\0\0\0\0\0"
                           "--- !Missed\n"
                           "Pass: inline\n"
@@ -585,30 +587,33 @@ TEST(YAMLRemarks, ParsingBadMeta) {
   parseExpectErrorMeta(StringRef("REMARKS\0"
                                  "\x09\0\0\0\0\0\0\0",
                                  16),
-                       "Mismatching remark version. Got 9, expected 0.",
+                       "Mismatching remark version. Got 9, expected 1.",
                        CmpType::Equal);
 
+  // Version 0 is now invalid - should get version mismatch
   parseExpectErrorMeta(StringRef("REMARKS\0"
                                  "\0\0\0\0\0\0\0\0",
                                  16),
-                       "Expecting string table size.", CmpType::Equal);
+                       "Mismatching remark version. Got 0, expected 1.",
+                       CmpType::Equal);
 
+  // Version 0 with string table - should fail on version first
   parseExpectErrorMeta(StringRef("REMARKS\0"
                                  "\0\0\0\0\0\0\0\0"
                                  "\x01\0\0\0\0\0\0\0",
                                  24),
-                       "String table unsupported for YAML format.",
+                       "Mismatching remark version. Got 0, expected 1.",
                        CmpType::Equal);
 
   parseExpectErrorMeta(StringRef("REMARKS\0"
-                                 "\0\0\0\0\0\0\0\0"
+                                 "\1\0\0\0\0\0\0\0"
                                  "\0\0\0\0\0\0\0\0"
                                  "/path/",
                                  30),
                        "'/path/'", CmpType::Contains);
 
   parseExpectErrorMeta(StringRef("REMARKS\0"
-                                 "\0\0\0\0\0\0\0\0"
+                                 "\1\0\0\0\0\0\0\0"
                                  "\0\0\0\0\0\0\0\0"
                                  "/path/",
                                  30),
