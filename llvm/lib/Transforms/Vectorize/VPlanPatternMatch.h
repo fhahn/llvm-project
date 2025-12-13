@@ -260,6 +260,27 @@ inline bind_ty<VPValue> m_VPValue(VPValue *&V) { return V; }
 /// Match a VPInstruction, capturing if we match.
 inline bind_ty<VPInstruction> m_VPInstruction(VPInstruction *&V) { return V; }
 
+/// Match a VPWidenIntOrFpInductionRecipe, binding its start value.
+struct WidenIntOrFpInduction_match {
+  VPValue *&Start;
+
+  WidenIntOrFpInduction_match(VPValue *&Start) : Start(Start) {}
+
+  bool match(VPValue *V) {
+    auto *DefR =
+        dyn_cast_or_null<VPWidenIntOrFpInductionRecipe>(V->getDefiningRecipe());
+    if (!DefR)
+      return false;
+    Start = DefR->getStartValue();
+    return true;
+  }
+};
+
+inline WidenIntOrFpInduction_match
+m_WidenIntOrFpInduction(VPValue *&Start) {
+  return WidenIntOrFpInduction_match(Start);
+}
+
 template <typename Ops_t, unsigned Opcode, bool Commutative,
           typename... RecipeTys>
 struct Recipe_match {

@@ -2596,42 +2596,47 @@ void VPlanTransforms::removeBranchOnConst(VPlan &Plan) {
   }
 }
 
-/// Optimize FindIV reductions by removing unnecessary sentinel checks.
-/// The sentinel check can be skipped when start(FindIV) == sentinel.
-/// In this case, the result is the same whether iterations matched or not.
 void VPlanTransforms::optimizeFindIVSentinelChecks(VPlan &Plan) {
   VPBasicBlock *MiddleVPBB = Plan.getMiddleBlock();
   for (VPRecipeBase &R : make_early_inc_range(*MiddleVPBB)) {
     // Match ComputeFindIVResult with sentinel: {phi, start, sentinel, parts...}
-    VPValue *Start, *Sentinel;
+    VPValue *PhiV, *Start, *Sentinel;
     if (!match(&R, m_VPInstruction<VPInstruction::ComputeFindIVResult>(
-                       m_VPValue(), m_VPValue(Start), m_VPValue(Sentinel),
+                       m_VPValue(PhiV), m_VPValue(Start), m_VPValue(Sentinel),
                        m_VPValue())))
       continue;
 
-    // Check if start == sentinel (same VPValue or equal constant values).
-    const APInt *StartC, *SentinelC;
-    bool CanSkipSentinel =
-        Start == Sentinel ||
-        (match(Start, m_APInt(StartC)) && match(Sentinel, m_APInt(SentinelC)) &&
-         *StartC == *SentinelC);
+    auto *RedPhiR = cast<VPReductionPHIRecipe>(PhiV);
+    bool SentinelNeeded = true;
 
-    if (!CanSkipSentinel)
+    // Check 1: start(FindIV) == sentinel?
+    if (Start == Sentinel)
+      SentinelNeeded = false;
+
+    // Check 2: start(IV) == start(FindIV)?
+    // If so, we can change the reduction PHI init to start instead of sentinel.
+    VPValue *IVStart;
+    if (SentinelNeeded &&
+        match(RedPhiR->getBackedgeValue(),
+              m_Select(m_VPValue(), m_WidenIntOrFpInduction(IVStart),
+                       m_VPValue())) &&
+        IVStart == Start) {
+      RedPhiR->setOperand(0, Start);
+      SentinelNeeded = false;
+    }
+
+    if (SentinelNeeded)
       continue;
 
     // Create a new instruction without the sentinel operand.
-    // New operands: {phi, start, part0, part1, ...}
+    // New operands: {phi, start, part0}
     auto *FindIVResult = cast<VPInstruction>(&R);
-    SmallVector<VPValue *> NewOperands;
-    NewOperands.push_back(FindIVResult->getOperand(0)); // phi
-    NewOperands.push_back(Start);
-    for (unsigned I = 3; I < FindIVResult->getNumOperands(); ++I)
-      NewOperands.push_back(FindIVResult->getOperand(I)); // parts
-
+    assert(FindIVResult->getNumOperands() == 4 &&
+           "Expected 4 operands before unrolling");
     VPBuilder Builder(FindIVResult);
     auto *NewFindIVResult = Builder.createNaryOp(
-        VPInstruction::ComputeFindIVResult, NewOperands,
-        FindIVResult->getDebugLoc());
+        VPInstruction::ComputeFindIVResult,
+        {PhiV, Start, FindIVResult->getOperand(3)}, FindIVResult->getDebugLoc());
     FindIVResult->replaceAllUsesWith(NewFindIVResult);
     FindIVResult->eraseFromParent();
   }

@@ -296,8 +296,10 @@ struct VPlanTransforms {
   /// Perform instcombine-like simplifications on recipes in \p Plan.
   static void simplifyRecipes(VPlan &Plan);
 
-  /// Optimize FindIV reductions by removing unnecessary sentinel checks when
-  /// the start value equals the sentinel value.
+  /// Optimize FindIV reductions by removing unnecessary sentinel checks.
+  /// The sentinel check can be skipped when:
+  /// 1. start(FindIV) == sentinel, or
+  /// 2. start(IV) == start(FindIV) (and we change the reduction init to start)
   static void optimizeFindIVSentinelChecks(VPlan &Plan);
 
   /// Remove BranchOnCond recipes with true or false conditions together with
