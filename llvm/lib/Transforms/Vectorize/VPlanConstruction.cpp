@@ -460,31 +460,42 @@ static void addCanonicalIVRecipes(VPlan &Plan, VPBasicBlock *HeaderVPBB,
   Value *StartIdx = ConstantInt::get(IdxTy, 0);
   auto *StartV = Plan.getOrAddLiveIn(StartIdx);
 
-  // Add a VPCanonicalIVPHIRecipe starting at 0 to the header.
   auto *CanonicalIVPHI = new VPCanonicalIVPHIRecipe(StartV, DL);
   HeaderVPBB->insert(CanonicalIVPHI, HeaderVPBB->begin());
 
-  // We are about to replace the branch to exit the region. Remove the original
-  // BranchOnCond, if there is any.
+  VPInstruction *Term = LatchVPBB->empty()
+                            ? nullptr
+                            : dyn_cast<VPInstruction>(&LatchVPBB->back());
+  VPBuilder Builder(LatchVPBB);
   DebugLoc LatchDL = DL;
-  if (!LatchVPBB->empty() && match(&LatchVPBB->back(), m_BranchOnCond())) {
-    LatchDL = LatchVPBB->getTerminator()->getDebugLoc();
-    LatchVPBB->getTerminator()->eraseFromParent();
+
+  // Remove any existing BranchOnCond, to be replaced by BranchOnCount below.
+  if (Term && match(Term, m_BranchOnCond())) {
+    LatchDL = Term->getDebugLoc();
+    Term->eraseFromParent();
+    Term = nullptr;
   }
 
-  VPBuilder Builder(LatchVPBB);
-  // Add a VPInstruction to increment the scalar canonical IV by VF * UF.
-  // Initially the induction increment is guaranteed to not wrap, but that may
-  // change later, e.g. when tail-folding, when the flags need to be dropped.
-  auto *CanonicalIVIncrement = Builder.createOverflowingOp(
-      Instruction::Add, {CanonicalIVPHI, &Plan.getVFxUF()}, {true, false}, DL,
-      "index.next");
-  CanonicalIVPHI->addOperand(CanonicalIVIncrement);
+  // For BranchOnTwoConds, insert IV increment before the early exit condition.
+  bool IsTwoCondBranch = Term && match(Term, m_BranchOnTwoConds());
+  if (IsTwoCondBranch)
+    Builder.setInsertPoint(Term->getOperand(0)->getDefiningRecipe());
 
-  // Add the BranchOnCount VPInstruction to the latch.
-  Builder.createNaryOp(VPInstruction::BranchOnCount,
-                       {CanonicalIVIncrement, &Plan.getVectorTripCount()},
-                       LatchDL);
+  // Add a VPInstruction to increment the scalar canonical IV by VF * UF.
+  auto *Inc = Builder.createOverflowingOp(Instruction::Add,
+                                          {CanonicalIVPHI, &Plan.getVFxUF()},
+                                          {true, false}, DL, "index.next");
+  CanonicalIVPHI->addOperand(Inc);
+
+  // Create/update latch terminator.
+  if (IsTwoCondBranch) {
+    Builder.setInsertPoint(Term);
+    Term->setOperand(1, Builder.createICmp(CmpInst::ICMP_EQ, Inc,
+                                           &Plan.getVectorTripCount(), DL));
+  } else {
+    Builder.createNaryOp(VPInstruction::BranchOnCount,
+                         {Inc, &Plan.getVectorTripCount()}, LatchDL);
+  }
 }
 
 /// Creates extracts for values in \p Plan defined in a loop region and used
@@ -533,9 +544,16 @@ static void addInitialSkeleton(VPlan &Plan, Type *InductionTy, DebugLoc IVDL,
   } else {
     VPBlockUtils::connectBlocks(LatchVPBB, MiddleVPBB);
     LatchVPBB->swapSuccessors();
+    // The latch now has 2 successors but originally had an unconditional
+    // branch. Add a placeholder BranchOnCond that will be replaced by
+    // BranchOnCount in addCanonicalIVRecipes.
+    VPBuilder Builder(LatchVPBB);
+    Builder.createNaryOp(VPInstruction::BranchOnCond, {Plan.getTrue()},
+                         DebugLoc::getUnknown());
   }
 
-  addCanonicalIVRecipes(Plan, HeaderVPBB, LatchVPBB, InductionTy, IVDL);
+  // Note: Canonical IV is added later, after early exits are handled, via
+  // VPlanTransforms::addCanonicalIV.
 
   // Create SCEV and VPValue for the trip count.
   // We use the symbolic max backedge-taken-count, which works also when
@@ -562,14 +580,8 @@ static void addInitialSkeleton(VPlan &Plan, Type *InductionTy, DebugLoc IVDL,
 
   createExtractsForLiveOuts(Plan, MiddleVPBB);
 
-  VPBuilder ScalarPHBuilder(ScalarPH);
-  for (const auto &[PhiR, ScalarPhiR] : zip_equal(
-           drop_begin(HeaderVPBB->phis()), Plan.getScalarHeader()->phis())) {
-    auto *VectorPhiR = cast<VPPhi>(&PhiR);
-    auto *ResumePhiR = ScalarPHBuilder.createScalarPhi(
-        {VectorPhiR, VectorPhiR->getOperand(0)}, VectorPhiR->getDebugLoc());
-    cast<VPIRPhi>(&ScalarPhiR)->addOperand(ResumePhiR);
-  }
+  // Note: Resume phis are created in addCanonicalIV after the canonical IV
+  // is added to the header.
 }
 
 /// Check \p Plan's live-in and replace them with constants, if they can be
@@ -911,6 +923,27 @@ static bool isExitCountable(VPBasicBlock *ExitingVPBB,
 
   return (IsInvariant(LHSS) && HasComputableEvolution(RHSS)) ||
          (IsInvariant(RHSS) && HasComputableEvolution(LHSS));
+}
+
+void VPlanTransforms::addCanonicalIV(VPlan &Plan, Type *InductionTy,
+                                     DebugLoc IVDL) {
+  auto *MiddleVPBB = cast<VPBasicBlock>(
+      Plan.getScalarHeader()->getSinglePredecessor()->getPredecessors()[0]);
+  auto *LatchVPBB = cast<VPBasicBlock>(MiddleVPBB->getSinglePredecessor());
+  auto *HeaderVPBB = cast<VPBasicBlock>(LatchVPBB->getSuccessors().back());
+  addCanonicalIVRecipes(Plan, HeaderVPBB, LatchVPBB, InductionTy, IVDL);
+
+  // Create resume phis in the scalar preheader for all phis in the vector
+  // header (except the canonical IV which is first).
+  auto *ScalarPH = Plan.getScalarPreheader();
+  VPBuilder ScalarPHBuilder(ScalarPH);
+  for (const auto &[PhiR, ScalarPhiR] : zip_equal(
+           drop_begin(HeaderVPBB->phis()), Plan.getScalarHeader()->phis())) {
+    auto *VectorPhiR = cast<VPHeaderPHIRecipe>(&PhiR);
+    auto *ResumePhiR = ScalarPHBuilder.createScalarPhi(
+        {VectorPhiR, VectorPhiR->getStartValue()}, VectorPhiR->getDebugLoc());
+    cast<VPIRPhi>(&ScalarPhiR)->addOperand(ResumePhiR);
+  }
 }
 
 void VPlanTransforms::handleEarlyExits(VPlan &Plan,

@@ -141,6 +141,10 @@ struct VPlanTransforms {
                                                  PredicatedScalarEvolution &PSE,
                                                  Loop *OrigLoop);
 
+  /// Add canonical IV and loop exit recipes to \p Plan.
+  LLVM_ABI_FOR_TEST static void addCanonicalIV(VPlan &Plan, Type *InductionTy,
+                                               DebugLoc IVDL);
+
   /// If a check is needed to guard executing the scalar epilogue loop, it will
   /// be added to the middle block.
   LLVM_ABI_FOR_TEST static void addMiddleCheck(VPlan &Plan,

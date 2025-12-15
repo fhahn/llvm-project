@@ -4019,17 +4019,14 @@ void VPlanTransforms::handleUncountableEarlyExit(VPBasicBlock *EarlyExitingVPBB,
     }
   }
 
-  // Replace the conditional branch controlling the latch exit from the vector
-  // loop with a multi-conditional branch exiting to vector early exit if the
-  // early exit has been taken, exiting to middle block if the original
-  // condition of the vector latch is true, otherwise continuing back to header.
+  // Replace the latch's BranchOnCond with a BranchOnTwoConds that exits to
+  // vector early exit if the early exit was taken, or to the middle block/
+  // header based on the latch exit condition. The latch exit condition will be
+  // updated by addCanonicalIV to (IV == trip count).
   auto *LatchExitingBranch = cast<VPInstruction>(LatchVPBB->getTerminator());
-  assert(LatchExitingBranch->getOpcode() == VPInstruction::BranchOnCount &&
+  assert(match(LatchExitingBranch, m_BranchOnCond()) &&
          "Unexpected terminator");
-  auto *IsLatchExitTaken =
-      Builder.createICmp(CmpInst::ICMP_EQ, LatchExitingBranch->getOperand(0),
-                         LatchExitingBranch->getOperand(1));
-
+  VPValue *IsLatchExitTaken = LatchExitingBranch->getOperand(0);
   DebugLoc LatchDL = LatchExitingBranch->getDebugLoc();
   LatchExitingBranch->eraseFromParent();
 
