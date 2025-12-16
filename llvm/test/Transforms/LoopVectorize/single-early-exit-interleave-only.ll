@@ -19,12 +19,12 @@ define i8 @iv_used_in_exit_with_math(i8 noundef %g) {
 ; CHECK-NEXT:    [[TMP2:%.*]] = shl nuw i8 1, [[TMP0]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = and i8 [[TMP1]], [[G]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = and i8 [[TMP2]], [[G]]
-; CHECK-NEXT:    [[TMP7:%.*]] = icmp ne i8 [[TMP3]], 0
-; CHECK-NEXT:    [[TMP8:%.*]] = icmp ne i8 [[TMP4]], 0
+; CHECK-NEXT:    [[TMP5:%.*]] = icmp ne i8 [[TMP3]], 0
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp ne i8 [[TMP4]], 0
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
-; CHECK-NEXT:    [[TMP12:%.*]] = freeze i1 [[TMP7]]
-; CHECK-NEXT:    [[TMP13:%.*]] = freeze i1 [[TMP8]]
-; CHECK-NEXT:    [[TMP9:%.*]] = or i1 [[TMP12]], [[TMP13]]
+; CHECK-NEXT:    [[TMP7:%.*]] = freeze i1 [[TMP5]]
+; CHECK-NEXT:    [[TMP8:%.*]] = freeze i1 [[TMP6]]
+; CHECK-NEXT:    [[TMP9:%.*]] = or i1 [[TMP7]], [[TMP8]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = icmp eq i32 [[INDEX_NEXT]], 4
 ; CHECK-NEXT:    br i1 [[TMP9]], label %[[VECTOR_EARLY_EXIT:.*]], label %[[VECTOR_BODY_INTERIM]]
 ; CHECK:       [[VECTOR_BODY_INTERIM]]:
@@ -32,21 +32,21 @@ define i8 @iv_used_in_exit_with_math(i8 noundef %g) {
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    br label %[[RETURN:.*]]
 ; CHECK:       [[VECTOR_EARLY_EXIT]]:
-; CHECK-NEXT:    [[TMP32:%.*]] = icmp eq i1 [[TMP8]], false
-; CHECK-NEXT:    [[TMP33:%.*]] = zext i1 [[TMP32]] to i64
-; CHECK-NEXT:    [[TMP34:%.*]] = add i64 1, [[TMP33]]
-; CHECK-NEXT:    [[TMP35:%.*]] = icmp eq i1 [[TMP7]], false
-; CHECK-NEXT:    [[TMP14:%.*]] = zext i1 [[TMP35]] to i64
-; CHECK-NEXT:    [[TMP15:%.*]] = add i64 0, [[TMP14]]
-; CHECK-NEXT:    [[TMP16:%.*]] = icmp ne i64 [[TMP14]], 1
-; CHECK-NEXT:    [[TMP17:%.*]] = select i1 [[TMP16]], i64 [[TMP15]], i64 [[TMP34]]
-; CHECK-NEXT:    [[TMP18:%.*]] = trunc i64 [[TMP17]] to i32
-; CHECK-NEXT:    [[TMP19:%.*]] = add i32 [[INDEX]], [[TMP18]]
-; CHECK-NEXT:    [[TMP20:%.*]] = trunc i32 [[TMP19]] to i8
-; CHECK-NEXT:    [[TMP23:%.*]] = trunc i32 [[TMP19]] to i8
+; CHECK-NEXT:    [[TMP12:%.*]] = icmp eq i1 [[TMP6]], false
+; CHECK-NEXT:    [[TMP13:%.*]] = zext i1 [[TMP12]] to i64
+; CHECK-NEXT:    [[TMP14:%.*]] = add i64 1, [[TMP13]]
+; CHECK-NEXT:    [[TMP15:%.*]] = icmp eq i1 [[TMP5]], false
+; CHECK-NEXT:    [[TMP16:%.*]] = zext i1 [[TMP15]] to i64
+; CHECK-NEXT:    [[TMP17:%.*]] = add i64 0, [[TMP16]]
+; CHECK-NEXT:    [[TMP18:%.*]] = icmp ne i64 [[TMP16]], 1
+; CHECK-NEXT:    [[TMP19:%.*]] = select i1 [[TMP18]], i64 [[TMP17]], i64 [[TMP14]]
+; CHECK-NEXT:    [[TMP20:%.*]] = trunc i64 [[TMP19]] to i32
+; CHECK-NEXT:    [[TMP21:%.*]] = add i32 [[INDEX]], [[TMP20]]
+; CHECK-NEXT:    [[TMP22:%.*]] = trunc i32 [[TMP21]] to i8
+; CHECK-NEXT:    [[TMP23:%.*]] = trunc i32 [[TMP21]] to i8
 ; CHECK-NEXT:    br label %[[RETURN]]
 ; CHECK:       [[RETURN]]:
-; CHECK-NEXT:    [[RES_IV1:%.*]] = phi i8 [ 32, %[[MIDDLE_BLOCK]] ], [ [[TMP20]], %[[VECTOR_EARLY_EXIT]] ]
+; CHECK-NEXT:    [[RES_IV1:%.*]] = phi i8 [ 32, %[[MIDDLE_BLOCK]] ], [ [[TMP22]], %[[VECTOR_EARLY_EXIT]] ]
 ; CHECK-NEXT:    [[RES_IV2:%.*]] = phi i8 [ 0, %[[MIDDLE_BLOCK]] ], [ [[TMP23]], %[[VECTOR_EARLY_EXIT]] ]
 ; CHECK-NEXT:    [[RES:%.*]] = add i8 [[RES_IV1]], [[RES_IV2]]
 ; CHECK-NEXT:    ret i8 [[RES]]

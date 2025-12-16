@@ -734,8 +734,8 @@ private:
   /// the use of those function variants.
   bool VecCallVariantsFound = false;
 
-  /// Keep track of all the countable and uncountable exiting blocks if
-  /// the exact backedge taken count is not computable.
+  /// Keep track of all the countable exiting blocks if the exact backedge
+  /// taken count is not computable.
   SmallVector<BasicBlock *, 4> CountableExitingBlocks;
 
   /// True if the loop has uncountable early exits.

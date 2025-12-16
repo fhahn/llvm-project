@@ -314,11 +314,11 @@ return:
   ret ptr %retval
 }
 
-; The early exit (i.e. unknown exit-not-taken count) is the latch - we don't
-; support this yet.
+; The early exit (i.e. unknown exit-not-taken count) is in the latch block -
+; this is the "rotated" case which we support.
 define i64 @uncountable_exit_on_last_block() {
 ; CHECK-LABEL: LV: Checking a loop in 'uncountable_exit_on_last_block'
-; CHECK:       LV: Not vectorizing: Last early exiting block in the chain is not the latch predecessor.
+; CHECK:       LV: Found an early exit loop with symbolic max backedge taken count: 63
 entry:
   %p1 = alloca [1024 x i8]
   %p2 = alloca [1024 x i8]

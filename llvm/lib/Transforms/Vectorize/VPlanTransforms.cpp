@@ -3954,11 +3954,118 @@ void VPlanTransforms::convertToConcreteRecipes(VPlan &Plan) {
     R->eraseFromParent();
 }
 
-void VPlanTransforms::handleUncountableEarlyExit(VPBasicBlock *EarlyExitingVPBB,
-                                                 VPBasicBlock *EarlyExitVPBB,
-                                                 VPlan &Plan,
-                                                 VPBasicBlock *HeaderVPBB,
-                                                 VPBasicBlock *LatchVPBB) {
+VPBasicBlock *
+VPlanTransforms::handleUncountableEarlyExit(VPBasicBlock *EarlyExitingVPBB,
+                                            VPBasicBlock *EarlyExitVPBB,
+                                            VPlan &Plan,
+                                            VPBasicBlock *HeaderVPBB,
+                                            VPBasicBlock *LatchVPBB) {
+  // Handle rotated case where the latch is the early exiting block
+  if (EarlyExitingVPBB == LatchVPBB) {
+    // In the rotated case, the early exit condition is in the latch terminator.
+    // After addInitialSkeleton, latch has successors [Middle, Header] where
+    // Middle was inserted on the exit edge. The BranchOnCond condition controls
+    // whether we exit (via Middle) or continue (to Header).
+
+    VPBasicBlock *MiddleVPBB = cast<VPBasicBlock>(LatchVPBB->getSuccessors()[0]);
+    VPBasicBlock *VectorEarlyExitVPBB =
+        Plan.createVPBasicBlock("vector.early.exit");
+    VectorEarlyExitVPBB->setParent(LatchVPBB->getParent());
+
+    VPBlockUtils::connectBlocks(VectorEarlyExitVPBB, EarlyExitVPBB);
+
+    VPBuilder EarlyExitB(VectorEarlyExitVPBB);
+    VPBuilder MiddleBuilder(MiddleVPBB);
+
+    // Get the early exit condition from the latch terminator.
+    // The exit path is via successor[0] (Middle), so when condition is true,
+    // we take the exit. The condition should already be in the right sense.
+    assert(match(LatchVPBB->getTerminator(), m_BranchOnCond()) &&
+           "Terminator must be BranchOnCond in rotated case");
+    VPValue *EarlyExitCond = LatchVPBB->getTerminator()->getOperand(0);
+
+    VPBuilder Builder(LatchVPBB->getTerminator());
+    VPValue *IsEarlyExitTaken =
+        Builder.createNaryOp(VPInstruction::AnyOf, {EarlyExitCond});
+
+    // Get the predecessor index for MiddleVPBB in the exit block's predecessors.
+    // In the rotated case, the exit block has both Middle (via latch) and
+    // possibly other predecessors (e.g., from header's countable exit).
+    unsigned MiddlePredIdx = EarlyExitVPBB->getIndexForPredecessor(MiddleVPBB);
+
+    for (VPRecipeBase &R : EarlyExitVPBB->phis()) {
+      auto *ExitIRI = cast<VPIRPhi>(&R);
+
+      // For rotated early exit:
+      // - Header (countable exit) value goes to middle.block
+      // - Latch (uncountable exit) value goes to vector.early.exit
+      //
+      // Operands of the VPIRPhi correspond to VPlan predecessors of the exit
+      // block. MiddlePredIdx identifies the latch exit path (via middle block),
+      // and any other operand index corresponds to the countable exit path.
+
+      // Add operand for VectorEarlyExitVPBB (early exit uses latch value).
+      // The latch exit value is at MiddlePredIdx (the middle block predecessor).
+      ExitIRI->addOperand(ExitIRI->getOperand(MiddlePredIdx));
+
+      // Early exit operand is now at the last position.
+      unsigned EarlyExitIdx = ExitIRI->getNumOperands() - 1;
+
+      // For the countable exit (middle.block), get the value from the other
+      // predecessor (header). With 2 original predecessors, it's at index
+      // 1 - MiddlePredIdx.
+      VPValue *CountableExitVal = nullptr;
+      if (ExitIRI->getNumOperands() > 2)
+        CountableExitVal = ExitIRI->getOperand(1 - MiddlePredIdx);
+
+      // If the countable exit value needs lane extraction (not a live-in),
+      // extract its last lane for the middle.block path.
+      if (CountableExitVal && CountableExitVal->hasDefiningRecipe()) {
+        CountableExitVal = MiddleBuilder.createNaryOp(
+            VPInstruction::ExtractLastPart, CountableExitVal);
+        CountableExitVal = MiddleBuilder.createNaryOp(
+            VPInstruction::ExtractLastLane, CountableExitVal);
+      }
+
+      // Set the countable exit value at MiddlePredIdx (the middle.block path).
+      if (CountableExitVal)
+        ExitIRI->setOperand(MiddlePredIdx, CountableExitVal);
+
+      VPValue *IncomingFromEarlyExit = ExitIRI->getOperand(EarlyExitIdx);
+      if (IncomingFromEarlyExit->hasDefiningRecipe()) {
+        VPValue *FirstActiveLane = EarlyExitB.createNaryOp(
+            VPInstruction::FirstActiveLane, {EarlyExitCond},
+            DebugLoc::getUnknown(), "first.active.lane");
+        IncomingFromEarlyExit = EarlyExitB.createNaryOp(
+            VPInstruction::ExtractLane, {FirstActiveLane, IncomingFromEarlyExit},
+            DebugLoc::getUnknown(), "early.exit.value");
+        ExitIRI->setOperand(EarlyExitIdx, IncomingFromEarlyExit);
+      }
+    }
+
+    // Replace the latch BranchOnCond with BranchOnTwoConds.
+    // The second operand (latch exit condition: IV == trip count) will be set
+    // by addCanonicalIV. Use a placeholder value here since we don't have the
+    // canonical IV yet.
+    auto *LatchExitingBranch = cast<VPInstruction>(LatchVPBB->getTerminator());
+    DebugLoc LatchDL = LatchExitingBranch->getDebugLoc();
+    LatchExitingBranch->eraseFromParent();
+
+    VPBuilder NewBuilder(LatchVPBB);
+    NewBuilder.createNaryOp(
+        VPInstruction::BranchOnTwoConds,
+        {IsEarlyExitTaken, Plan.getFalse() /* placeholder, set by addCanonicalIV */},
+        LatchDL);
+
+    // Set successors in the order required by BranchOnTwoConds:
+    // [early-exit, middle, header]
+    LatchVPBB->clearSuccessors();
+    LatchVPBB->setSuccessors({VectorEarlyExitVPBB, MiddleVPBB, HeaderVPBB});
+    VectorEarlyExitVPBB->setPredecessors({LatchVPBB});
+    return VectorEarlyExitVPBB;
+  }
+
+  // Original non-rotated case
   auto *MiddleVPBB = cast<VPBasicBlock>(LatchVPBB->getSuccessors()[0]);
   if (!EarlyExitVPBB->getSinglePredecessor() &&
       EarlyExitVPBB->getPredecessors()[1] == MiddleVPBB) {
@@ -3975,7 +4082,7 @@ void VPlanTransforms::handleUncountableEarlyExit(VPBasicBlock *EarlyExitingVPBB,
   VPBuilder Builder(LatchVPBB->getTerminator());
   VPBlockBase *TrueSucc = EarlyExitingVPBB->getSuccessors()[0];
   assert(match(EarlyExitingVPBB->getTerminator(), m_BranchOnCond()) &&
-         "Terminator must be be BranchOnCond");
+         "Terminator must be BranchOnCond");
   VPValue *CondOfEarlyExitingVPBB =
       EarlyExitingVPBB->getTerminator()->getOperand(0);
   auto *CondToEarlyExit = TrueSucc == EarlyExitVPBB
@@ -4036,6 +4143,7 @@ void VPlanTransforms::handleUncountableEarlyExit(VPBasicBlock *EarlyExitingVPBB,
   LatchVPBB->clearSuccessors();
   LatchVPBB->setSuccessors({VectorEarlyExitVPBB, MiddleVPBB, HeaderVPBB});
   VectorEarlyExitVPBB->setPredecessors({LatchVPBB});
+  return VectorEarlyExitVPBB;
 }
 
 /// This function tries convert extended in-loop reductions to

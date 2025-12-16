@@ -626,6 +626,7 @@ bool LoopVectorizationLegality::isUniformMemOp(Instruction &I,
   // stores from being uniform.  The current lowering simply doesn't handle
   // it; in particular, the cost model distinguishes scatter/gather from
   // scalar w/predication, and we currently rely on the scalar path.
+
   return isUniform(Ptr, VF) && !blockNeedsPredication(I.getParent());
 }
 
@@ -1438,9 +1439,8 @@ bool LoopVectorizationLegality::blockNeedsPredication(
   // For a single early exit, it must be a direct predecessor of the latch.
   // For multiple early exits, they form a chain where each exiting block
   // dominates all subsequent blocks up to the latch.
-  BasicBlock *Latch = TheLoop->getLoopLatch();
   if (hasUncountableEarlyExit())
-    return BB == Latch;
+    return BB == TheLoop->getLoopLatch();
   return LoopAccessInfo::blockNeedsPredication(BB, TheLoop, DT);
 }
 
@@ -1717,7 +1717,7 @@ bool LoopVectorizationLegality::isVectorizableEarlyExitLoop() {
 
   // Keep a record of all the exiting blocks.
   SmallVector<const SCEVPredicate *, 4> Predicates;
-  SmallVector<BasicBlock *> UncountableExitingBlocks;
+  SmallVector<BasicBlock *, 4> UncountableExitingBlocks;
   for (BasicBlock *BB : ExitingBlocks) {
     const SCEV *EC =
         PSE.getSE()->getPredicatedExitCount(TheLoop, BB, &Predicates);
@@ -1764,8 +1764,16 @@ bool LoopVectorizationLegality::isVectorizableEarlyExitLoop() {
     }
   }
 
+  // Supported cases:
+  // 1. Non-rotated: last uncountable exit is the latch predecessor, latch has
+  //    countable exit
+  // 2. Rotated: latch itself is an uncountable exit, other block(s) have
+  //    countable exit(s)
   BasicBlock *LatchPredBB = LatchBB->getUniquePredecessor();
-  if (LatchPredBB != UncountableExitingBlocks.back()) {
+  bool LatchIsUncountableExit =
+      is_contained(UncountableExitingBlocks, LatchBB);
+
+  if (!LatchIsUncountableExit && LatchPredBB != UncountableExitingBlocks.back()) {
     reportVectorizationFailure(
         "Last early exiting block in the chain is not the latch predecessor",
         "Cannot vectorize early exit loop", "EarlyExitNotLatchPredecessor", ORE,
@@ -1773,17 +1781,41 @@ bool LoopVectorizationLegality::isVectorizableEarlyExitLoop() {
     return false;
   }
 
-  // The latch block must have a countable exit.
-  if (isa<SCEVCouldNotCompute>(
-          PSE.getSE()->getPredicatedExitCount(TheLoop, LatchBB, &Predicates))) {
-    reportVectorizationFailure(
-        "Cannot determine exact exit count for latch block",
-        "Cannot vectorize early exit loop",
-        "UnknownLatchExitCountEarlyExitLoop", ORE, TheLoop);
-    return false;
+  if (LatchIsUncountableExit) {
+    // Rotated case: latch is the uncountable exit.
+    // Need at least one countable exit to determine trip count.
+    if (CountableExitingBlocks.empty()) {
+      reportVectorizationFailure(
+          "Rotated early exit loop has no countable exits",
+          "Cannot vectorize early exit loop", "NoCountableExitsForEarlyExit",
+          ORE, TheLoop);
+      return false;
+    }
+
+    // When the latch is the early exit, all exits must go to the same block
+    // (unique exit block), or the latch must also have a countable exit.
+    // Otherwise, the non-latch countable exit creates an invalid VPlan.
+    if (!is_contained(CountableExitingBlocks, LatchBB) &&
+        !TheLoop->getUniqueExitBlock()) {
+      reportVectorizationFailure(
+          "Rotated early exit loop with non-unique exit blocks",
+          "Cannot vectorize early exit loop",
+          "NonUniqueExitBlocksEarlyExitLoop", ORE, TheLoop);
+      return false;
+    }
+  } else {
+    // Non-rotated case: latch must have a countable exit.
+    if (isa<SCEVCouldNotCompute>(PSE.getSE()->getPredicatedExitCount(
+            TheLoop, LatchBB, &Predicates))) {
+      reportVectorizationFailure(
+          "Cannot determine exact exit count for latch block",
+          "Cannot vectorize early exit loop",
+          "UnknownLatchExitCountEarlyExitLoop", ORE, TheLoop);
+      return false;
+    }
+    assert(llvm::is_contained(CountableExitingBlocks, LatchBB) &&
+           "Latch block not found in list of countable exits!");
   }
-  assert(llvm::is_contained(CountableExitingBlocks, LatchBB) &&
-         "Latch block not found in list of countable exits!");
 
   // Check to see if there are instructions that could potentially generate
   // exceptions or have side-effects.
@@ -1838,11 +1870,24 @@ bool LoopVectorizationLegality::isVectorizableEarlyExitLoop() {
           "NonReadOnlyEarlyExitLoop", ORE, TheLoop);
       return false;
     }
-  } else {
-    // Check all uncountable exiting blocks for movable loads.
+  } else if (!LatchIsUncountableExit) {
+    // Non-rotated case with side effects: check if the condition load can be
+    // moved before the side effects.
     for (BasicBlock *ExitingBB : UncountableExitingBlocks) {
       if (!canUncountableExitConditionLoadBeMoved(ExitingBB))
         return false;
+    }
+  } else {
+    // Rotated case (latch is early exit) with side effects: we need the loop
+    // to be read-only to safely speculate loads.
+    Predicates.clear();
+    if (!isReadOnlyLoop(TheLoop, PSE.getSE(), DT, AC, NonDerefLoads,
+                        &Predicates)) {
+      reportVectorizationFailure(
+          "Loop may fault",
+          "Cannot vectorize early exit loop with side effects",
+          "EarlyExitLoopWithSideEffects", ORE, TheLoop);
+      return false;
     }
   }
 

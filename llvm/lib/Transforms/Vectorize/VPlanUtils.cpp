@@ -329,8 +329,18 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
               return SE.getCouldNotCompute();
             return SE.getTruncateOrSignExtend(IV, Step->getType());
           })
+          .Case([&SE](const VPFirstOrderRecurrencePHIRecipe *R) {
+            // First-order recurrences may not have a simple closed-form SCEV
+            // expression. Get the SCEV for the underlying PHI which SCEV can
+            // analyze directly.
+            auto *Phi = R->getUnderlyingInstr();
+            if (!Phi || !SE.isSCEVable(Phi->getType()))
+              return SE.getCouldNotCompute();
+            return SE.getSCEV(const_cast<Instruction *>(Phi));
+          })
           .Default(
-              [&SE](const VPRecipeBase *) { return SE.getCouldNotCompute(); });
+              SE.getCouldNotCompute()
+                   );
 
   return PSE.getPredicatedSCEV(Expr);
 }

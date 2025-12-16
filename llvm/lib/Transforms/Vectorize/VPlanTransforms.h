@@ -314,11 +314,12 @@ struct VPlanTransforms {
   /// Update \p Plan to account for the uncountable early exit from \p
   /// EarlyExitingVPBB to \p EarlyExitVPBB by introducing a BranchOnTwoConds
   /// terminator in the latch that handles the early exit and the latch exit
-  /// condition.
-  static void handleUncountableEarlyExit(VPBasicBlock *EarlyExitingVPBB,
-                                         VPBasicBlock *EarlyExitVPBB,
-                                         VPlan &Plan, VPBasicBlock *HeaderVPBB,
-                                         VPBasicBlock *LatchVPBB);
+  /// condition. Returns the created vector.early.exit block.
+  static VPBasicBlock *handleUncountableEarlyExit(VPBasicBlock *EarlyExitingVPBB,
+                                                  VPBasicBlock *EarlyExitVPBB,
+                                                  VPlan &Plan,
+                                                  VPBasicBlock *HeaderVPBB,
+                                                  VPBasicBlock *LatchVPBB);
 
   /// Replace loop regions with explicit CFG.
   static void dissolveLoopRegions(VPlan &Plan);

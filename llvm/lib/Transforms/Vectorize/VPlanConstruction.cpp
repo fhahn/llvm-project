@@ -898,6 +898,11 @@ static bool isExitCountable(VPBasicBlock *ExitingVPBB,
 
   ScalarEvolution &SE = *PSE.getSE();
 
+  // Look through Not instruction (added by canonicalHeaderAndLatch).
+  VPValue *OrigCond = Cond;
+  if (match(Cond, m_Not(m_VPValue(OrigCond))))
+    Cond = OrigCond;
+
   // Check if the condition is a constant. Any constant condition makes the
   // exit countable: either always taken (exit count is 0) or never taken
   // (dead exit that doesn't affect loop trip count). In both cases, SCEV can
@@ -906,29 +911,51 @@ static bool isExitCountable(VPBasicBlock *ExitingVPBB,
   if (isa<SCEVConstant>(CondS))
     return true;
 
-  if (!match(Cond, m_ICmp(m_VPValue(LHS), m_VPValue(RHS))))
-    return false;
-
-  const SCEV *LHSS = vputils::getSCEVExprForVPValue(LHS, PSE, L);
-  const SCEV *RHSS = vputils::getSCEVExprForVPValue(RHS, PSE, L);
-
-  // Check if a SCEV is loop-invariant.
-  auto IsInvariant = [&](const SCEV *S) {
-    return !isa<SCEVCouldNotCompute>(S) && SE.isLoopInvariant(S, L);
+  // Check if a SCEV/VPValue pair is loop-invariant.
+  auto IsInvariant = [&](const SCEV *S, VPValue *V) {
+    return isa<SCEVCouldNotCompute>(S) ? V->isDefinedOutsideLoopRegions()
+                                       : SE.isLoopInvariant(S, L);
   };
   // Check if a SCEV has computable loop evolution.
   auto HasComputableEvolution = [&](const SCEV *S) {
     return !isa<SCEVCouldNotCompute>(S) && SE.hasComputableLoopEvolution(S, L);
   };
+  // Check if a single icmp operand pair forms a countable exit condition.
+  auto IsCountableICmp = [&](VPValue *LHS, VPValue *RHS) {
+    const SCEV *LHSS = vputils::getSCEVExprForVPValue(LHS, PSE, L);
+    const SCEV *RHSS = vputils::getSCEVExprForVPValue(RHS, PSE, L);
+    return (IsInvariant(LHSS, LHS) && HasComputableEvolution(RHSS)) ||
+           (IsInvariant(RHSS, RHS) && HasComputableEvolution(LHSS));
+  };
 
-  return (IsInvariant(LHSS) && HasComputableEvolution(RHSS)) ||
-         (IsInvariant(RHSS) && HasComputableEvolution(LHSS));
+  // Handle OR'd conditions recursively - if both operands are countable,
+  // the OR is also countable.
+  VPValue *Op0, *Op1;
+  if (match(Cond, m_BinaryOr(m_VPValue(Op0), m_VPValue(Op1)))) {
+    auto CheckOperand = [&](VPValue *Op) {
+      if (match(Op, m_ICmp(m_VPValue(LHS), m_VPValue(RHS))))
+        return IsCountableICmp(LHS, RHS);
+      return false;
+    };
+    return CheckOperand(Op0) && CheckOperand(Op1);
+  }
+
+  // Look through identity selects (select i1 %cond, true, false) which are
+  // equivalent to just %cond.
+  VPValue *SelCond;
+  if (match(Cond, m_Select(m_VPValue(SelCond), m_True(), m_False())))
+    Cond = SelCond;
+
+  if (!match(Cond, m_ICmp(m_VPValue(LHS), m_VPValue(RHS))))
+    return false;
+
+  return IsCountableICmp(LHS, RHS);
 }
 
 void VPlanTransforms::addCanonicalIV(VPlan &Plan, Type *InductionTy,
                                      DebugLoc IVDL) {
-  auto *MiddleVPBB = cast<VPBasicBlock>(
-      Plan.getScalarHeader()->getSinglePredecessor()->getPredecessors()[0]);
+  auto *ScalarPHBlock = Plan.getScalarHeader()->getSinglePredecessor();
+  auto *MiddleVPBB = cast<VPBasicBlock>(ScalarPHBlock->getPredecessors()[0]);
   auto *LatchVPBB = cast<VPBasicBlock>(MiddleVPBB->getSinglePredecessor());
   auto *HeaderVPBB = cast<VPBasicBlock>(LatchVPBB->getSuccessors().back());
   addCanonicalIVRecipes(Plan, HeaderVPBB, LatchVPBB, InductionTy, IVDL);
@@ -960,17 +987,47 @@ void VPlanTransforms::handleEarlyExits(VPlan &Plan,
   // is fused into the latch exit, and used to branch from middle block to the
   // early exit destination.
   [[maybe_unused]] bool HandledUncountableEarlyExit = false;
+
+  // Track vector.early.exit blocks created during uncountable exit handling
+  // to skip them when processing exit block predecessors.
+  SmallPtrSet<VPBasicBlock *, 2> CreatedEarlyExitBlocks;
+
+  // First check if the latch has an uncountable exit (rotated case).
+  // In the rotated case, the latch exits via middle block (after
+  // addInitialSkeleton), so we need to check the latch's terminator directly.
+  // Only check if the latch has a conditional terminator (BranchOnCond).
+  // We check directly to avoid assertions in getTerminator() for inconsistent
+  // states (2+ successors but no conditional branch).
+  bool LatchHasUncountableExit = false;
+  if (!LatchVPBB->empty()) {
+    using namespace VPlanPatternMatch;
+    if (match(&LatchVPBB->back(), m_BranchOnCond(m_VPValue())))
+      LatchHasUncountableExit = !isExitCountable(LatchVPBB, PSE, OrigLoop);
+  }
+
   for (VPIRBasicBlock *EB : Plan.getExitBlocks()) {
     for (VPBlockBase *Pred : to_vector(EB->getPredecessors())) {
       if (Pred == MiddleVPBB)
+        continue;
+      // Skip vector.early.exit blocks created during uncountable exit handling.
+      if (CreatedEarlyExitBlocks.contains(cast<VPBasicBlock>(Pred)))
         continue;
       auto *ExitingVPBB = cast<VPBasicBlock>(Pred);
       if (!isExitCountable(ExitingVPBB, PSE, OrigLoop)) {
         assert(!HandledUncountableEarlyExit &&
                "can handle exactly one uncountable early exit");
-        handleUncountableEarlyExit(ExitingVPBB, EB, Plan, HeaderVPBB, LatchVPBB);
+        CreatedEarlyExitBlocks.insert(handleUncountableEarlyExit(
+            ExitingVPBB, EB, Plan, HeaderVPBB, LatchVPBB));
         HandledUncountableEarlyExit = true;
       } else {
+        // Countable exit: if the latch has an uncountable exit (rotated case),
+        // handle it first before processing the countable exit.
+        if (LatchHasUncountableExit && !HandledUncountableEarlyExit) {
+          CreatedEarlyExitBlocks.insert(handleUncountableEarlyExit(
+              LatchVPBB, EB, Plan, HeaderVPBB, LatchVPBB));
+          HandledUncountableEarlyExit = true;
+        }
+        // Remove incoming values for the countable exit.
         for (VPRecipeBase &R : EB->phis())
           cast<VPIRPhi>(&R)->removeIncomingValueFor(Pred);
       }

@@ -4,8 +4,8 @@
 declare void @init_mem(ptr, i64);
 
 
-; The early exit (i.e. unknown exit-not-taken count) is the latch - we don't
-; support this yet.
+; The early exit (i.e. unknown exit-not-taken count) is the latch - this is
+; the "rotated" early exit case.
 define i64 @early_exit_on_last_block() {
 ; CHECK-LABEL: define i64 @early_exit_on_last_block() {
 ; CHECK-NEXT:  entry:
@@ -13,22 +13,34 @@ define i64 @early_exit_on_last_block() {
 ; CHECK-NEXT:    [[P2:%.*]] = alloca [1024 x i8], align 1
 ; CHECK-NEXT:    call void @init_mem(ptr [[P1]], i64 1024)
 ; CHECK-NEXT:    call void @init_mem(ptr [[P2]], i64 1024)
-; CHECK-NEXT:    br label [[LAND_RHS:%.*]]
-; CHECK:       loop:
-; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ [[INDEX_NEXT:%.*]], [[SEARCH:%.*]] ], [ 3, [[ENTRY:%.*]] ]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 1
-; CHECK-NEXT:    [[CMP1:%.*]] = icmp ne i64 [[INDEX_NEXT]], 67
-; CHECK-NEXT:    br i1 [[CMP1]], label [[SEARCH]], label [[FOR_END_LOOPEXIT:%.*]]
-; CHECK:       search:
-; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i8, ptr [[P1]], i64 [[INDEX]]
-; CHECK-NEXT:    [[TMP41:%.*]] = load i8, ptr [[ARRAYIDX]], align 1
-; CHECK-NEXT:    [[ARRAYIDX1:%.*]] = getelementptr inbounds i8, ptr [[P2]], i64 [[INDEX]]
-; CHECK-NEXT:    [[TMP42:%.*]] = load i8, ptr [[ARRAYIDX1]], align 1
-; CHECK-NEXT:    [[CMP3:%.*]] = icmp eq i8 [[TMP41]], [[TMP42]]
-; CHECK-NEXT:    br i1 [[CMP3]], label [[FOR_END_LOOPEXIT]], label [[LAND_RHS]]
+; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
+; CHECK:       vector.ph:
+; CHECK-NEXT:    br label [[VECTOR_BODY1:%.*]]
+; CHECK:       vector.body:
+; CHECK-NEXT:    [[INDEX1:%.*]] = phi i64 [ 0, [[VECTOR_BODY]] ], [ [[INDEX_NEXT3:%.*]], [[LOOP_END:%.*]] ]
+; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i64 3, [[INDEX1]]
+; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr i8, ptr [[P1]], i64 [[OFFSET_IDX]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i8>, ptr [[TMP0]], align 1
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[P2]], i64 [[OFFSET_IDX]]
+; CHECK-NEXT:    [[WIDE_LOAD2:%.*]] = load <4 x i8>, ptr [[TMP1]], align 1
+; CHECK-NEXT:    [[TMP2:%.*]] = icmp eq <4 x i8> [[WIDE_LOAD]], [[WIDE_LOAD2]]
+; CHECK-NEXT:    [[INDEX_NEXT3]] = add nuw i64 [[INDEX1]], 4
+; CHECK-NEXT:    [[TMP3:%.*]] = freeze <4 x i1> [[TMP2]]
+; CHECK-NEXT:    [[EXITCOND:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP3]])
+; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[INDEX_NEXT3]], 64
+; CHECK-NEXT:    br i1 [[EXITCOND]], label [[SEARCH:%.*]], label [[LOOP_END]]
+; CHECK:       vector.body.interim:
+; CHECK-NEXT:    br i1 [[TMP5]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY1]], !llvm.loop [[LOOP0:![0-9]+]]
+; CHECK:       middle.block:
+; CHECK-NEXT:    br label [[LOOP_END1:%.*]]
+; CHECK:       vector.early.exit:
+; CHECK-NEXT:    [[TMP6:%.*]] = call i64 @llvm.experimental.cttz.elts.i64.v4i1(<4 x i1> [[TMP2]], i1 false)
+; CHECK-NEXT:    [[TMP7:%.*]] = add i64 [[INDEX1]], [[TMP6]]
+; CHECK-NEXT:    [[TMP8:%.*]] = add i64 3, [[TMP7]]
+; CHECK-NEXT:    br label [[LOOP_END1]]
 ; CHECK:       loop.end:
-; CHECK-NEXT:    [[START_0_LCSSA:%.*]] = phi i64 [ 64, [[LAND_RHS]] ], [ [[INDEX]], [[SEARCH]] ]
-; CHECK-NEXT:    ret i64 [[START_0_LCSSA]]
+; CHECK-NEXT:    [[RETVAL:%.*]] = phi i64 [ [[TMP8]], [[SEARCH]] ], [ 64, [[MIDDLE_BLOCK]] ]
+; CHECK-NEXT:    ret i64 [[RETVAL]]
 ;
 entry:
   %p1 = alloca [1024 x i8]
@@ -179,7 +191,7 @@ define i64 @loop_contains_unsafe_call() {
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ [[INDEX_NEXT:%.*]], [[LOOP_INC:%.*]] ], [ 3, [[ENTRY:%.*]] ]
 ; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i32, ptr [[P1]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[LD1:%.*]] = load i32, ptr [[ARRAYIDX]], align 1
-; CHECK-NEXT:    [[BAD_CALL:%.*]] = call i32 @foo(i32 [[LD1]]) #[[ATTR1:[0-9]+]]
+; CHECK-NEXT:    [[BAD_CALL:%.*]] = call i32 @foo(i32 [[LD1]]) #[[ATTR2:[0-9]+]]
 ; CHECK-NEXT:    [[CMP:%.*]] = icmp eq i32 [[BAD_CALL]], 34
 ; CHECK-NEXT:    br i1 [[CMP]], label [[LOOP_INC]], label [[LOOP_END:%.*]]
 ; CHECK:       loop.inc:
@@ -714,3 +726,8 @@ declare i32 @foo(i32) readonly
 declare <vscale x 4 x i32> @foo_vec(<vscale x 4 x i32>)
 
 attributes #0 = { "vector-function-abi-variant"="_ZGVsNxv_foo(foo_vec)" }
+;.
+; CHECK: [[LOOP0]] = distinct !{[[LOOP0]], [[META1:![0-9]+]], [[META2:![0-9]+]]}
+; CHECK: [[META1]] = !{!"llvm.loop.isvectorized", i32 1}
+; CHECK: [[META2]] = !{!"llvm.loop.unroll.runtime.disable"}
+;.

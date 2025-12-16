@@ -3147,11 +3147,15 @@ void LoopVectorizationCostModel::collectLoopUniforms(ElementCount VF) {
   // Start with the conditional branches exiting the loop. If the branch
   // condition is an instruction contained in the loop that is only used by the
   // branch, it is uniform. Note conditions from uncountable early exits are not
-  // uniform.
+  // uniform - the early exit condition needs per-lane vectorization.
   SmallVector<BasicBlock *> Exiting;
   TheLoop->getExitingBlocks(Exiting);
   for (BasicBlock *E : Exiting) {
-    if (Legal->hasUncountableEarlyExit() && TheLoop->getLoopLatch() != E)
+    // Skip the uncountable early exiting blocks - their conditions are not
+    // uniform. A block is an uncountable exit if it's not in the countable
+    // exiting blocks.
+    if (Legal->hasUncountableEarlyExit() &&
+        !is_contained(Legal->getCountableExitingBlocks(), E))
       continue;
     auto *Cmp = dyn_cast<Instruction>(E->getTerminator()->getOperand(0));
     if (Cmp && TheLoop->contains(Cmp) && Cmp->hasOneUse())
@@ -3246,8 +3250,17 @@ void LoopVectorizationCostModel::collectLoopUniforms(ElementCount VF) {
 
       // If the pointer can be proven to be uniform, always add it to the
       // worklist.
-      if (isa<Instruction>(Ptr) && Legal->isUniform(Ptr, VF))
-        AddToWorklistIfAllowed(cast<Instruction>(Ptr));
+      // Exception: In early exit loops, don't mark pointers from the
+      // early exiting blocks as uniform, as they feed into non-uniform
+      // operations.
+      auto *PtrInst = dyn_cast<Instruction>(Ptr);
+      bool ShouldMarkUniform = PtrInst && Legal->isUniform(Ptr, VF);
+      if (ShouldMarkUniform && Legal->hasUncountableEarlyExit() &&
+          !is_contained(Legal->getCountableExitingBlocks(),
+                        PtrInst->getParent()))
+        ShouldMarkUniform = false;
+      if (ShouldMarkUniform)
+        AddToWorklistIfAllowed(PtrInst);
 
       if (IsUniformMemOpUse(&I))
         AddToWorklistIfAllowed(&I);
@@ -9572,9 +9585,16 @@ bool LoopVectorizePass::processLoop(Loop *L) {
 
   if (LVL.hasUncountableEarlyExit()) {
     BasicBlock *LoopLatch = L->getLoopLatch();
+    // Check if latch is an uncountable exit (rotated case).
+    bool LatchIsUncountableExit =
+        !is_contained(LVL.getCountableExitingBlocks(), LoopLatch);
+    // For non-rotated loops, only the latch can have a countable exit.
+    // For rotated loops (latch is uncountable), countable exits in other blocks
+    // are expected.
     if (IAI.requiresScalarEpilogue() ||
-        any_of(LVL.getCountableExitingBlocks(),
-               [LoopLatch](BasicBlock *BB) { return BB != LoopLatch; })) {
+        (!LatchIsUncountableExit &&
+         any_of(LVL.getCountableExitingBlocks(),
+                [LoopLatch](BasicBlock *BB) { return BB != LoopLatch; }))) {
       reportVectorizationFailure("Auto-vectorization of early exit loops "
                                  "requiring a scalar epilogue is unsupported",
                                  "UncountableEarlyExitUnsupported", ORE, L);
