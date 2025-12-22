@@ -283,13 +283,13 @@ compound=true
   N0 -> N2 [ label="F"]
   N1 [label =
     "scalar.ph:\l" +
-    "  EMIT-SCALAR vp\<%6\> = phi [ ir\<%iv\>, middle.block ], [ ir\<0\>, ir-bb\<entry\> ]\l" +
+    "  EMIT-SCALAR vp\<%10\> = phi [ ir\<%iv\>, middle.block ], [ ir\<0\>, ir-bb\<entry\> ]\l" +
     "Successor(s): ir-bb\<loop.header\>\l"
   ]
   N1 -> N3 [ label=""]
   N3 [label =
     "ir-bb\<loop.header\>:\l" +
-    "  IR   %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop.latch ] (extra operand: vp\<%6\> from scalar.ph)\l" +
+    "  IR   %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop.latch ] (extra operand: vp\<%10\> from scalar.ph)\l" +
     "  IR   %arr.idx = getelementptr inbounds i32, ptr %A, i64 %iv\l" +
     "  IR   %l1 = load i32, ptr %arr.idx, align 4\l" +
     "  IR   %c = icmp eq i32 %l1, 0\l" +
@@ -321,20 +321,39 @@ compound=true
       "  EMIT ir\<%exitcond\> = icmp ne ir\<%iv.next\>, ir\<%N\>\l" +
       "  EMIT vp\<%3\> = not ir\<%exitcond\>\l" +
       "  EMIT vp\<%index.next\> = add nuw vp\<%2\>, vp\<%0\>\l" +
-      "  EMIT branch-on-count vp\<%index.next\>, vp\<%1\>\l" +
+      "  EMIT vp\<%4\> = any-of ir\<%c\>\l" +
+      "  EMIT vp\<%5\> = icmp eq vp\<%index.next\>, vp\<%1\>\l" +
+      "  EMIT vp\<%6\> = or vp\<%4\>, vp\<%5\>\l" +
+      "  EMIT branch-on-cond vp\<%6\>\l" +
       "No successors\l"
     ]
   }
   N6 -> N7 [ label="" ltail=cluster_N5]
   N7 [label =
+    "middle.split:\l" +
+    "  EMIT branch-on-cond vp\<%4\>\l" +
+    "Successor(s): vector.early.exit, middle.block\l"
+  ]
+  N7 -> N8 [ label="T"]
+  N7 -> N9 [ label="F"]
+  N8 [label =
+    "vector.early.exit:\l" +
+    "Successor(s): ir-bb\<exit.1\>\l"
+  ]
+  N8 -> N10 [ label=""]
+  N10 [label =
+    "ir-bb\<exit.1\>:\l" +
+    "No successors\l"
+  ]
+  N9 [label =
     "middle.block:\l" +
     "  EMIT vp\<%cmp.n\> = icmp eq ir\<%N\>, vp\<%1\>\l" +
     "  EMIT branch-on-cond vp\<%cmp.n\>\l" +
     "Successor(s): ir-bb\<exit.2\>, scalar.ph\l"
   ]
-  N7 -> N8 [ label="T"]
-  N7 -> N1 [ label="F"]
-  N8 [label =
+  N9 -> N11 [ label="T"]
+  N9 -> N1 [ label="F"]
+  N11 [label =
     "ir-bb\<exit.2\>:\l" +
     "No successors\l"
   ]
