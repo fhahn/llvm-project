@@ -8154,7 +8154,7 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(
             return !CM.requiresScalarEpilogue(VF.isVector());
           },
           Range);
-  VPlanTransforms::handleEarlyExits(*Plan, Legal->hasUncountableEarlyExit());
+  VPlanTransforms::handleEarlyExits(*Plan, PSE, OrigLoop);
   VPlanTransforms::addMiddleCheck(*Plan, RequiresScalarEpilogueCheck,
                                   CM.foldTailByMasking());
 
@@ -8414,8 +8414,7 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VFRange &Range) {
       MapVector<PHINode *, RecurrenceDescriptor>(),
       SmallPtrSet<const PHINode *, 1>(), SmallPtrSet<PHINode *, 1>(),
       /*AllowReordering=*/false);
-  VPlanTransforms::handleEarlyExits(*Plan,
-                                    /*HasUncountableExit*/ false);
+  VPlanTransforms::handleEarlyExits(*Plan, PSE, OrigLoop);
   VPlanTransforms::addMiddleCheck(*Plan, /*RequiresScalarEpilogue*/ true,
                                   /*TailFolded*/ false);
 

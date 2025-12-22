@@ -134,9 +134,12 @@ struct VPlanTransforms {
       const DenseSet<BasicBlock *> &BlocksNeedingPredication,
       ElementCount MinVF);
 
-  /// Update \p Plan to account for all early exits.
+  /// Update \p Plan to account for all early exits. An exit is considered
+  /// countable if its condition compares an induction variable (or simple
+  /// computation based on an IV) against a loop-invariant value.
   LLVM_ABI_FOR_TEST static void handleEarlyExits(VPlan &Plan,
-                                                 bool HasUncountableExit);
+                                                 PredicatedScalarEvolution &PSE,
+                                                 Loop *OrigLoop);
 
   /// If a check is needed to guard executing the scalar epilogue loop, it will
   /// be added to the middle block.

@@ -874,12 +874,52 @@ void VPlanTransforms::createInLoopReductionRecipes(
     R->eraseFromParent();
 }
 
+/// Returns true if the exit from \p ExitingVPBB is countable, i.e., the exit
+/// condition is a constant, or compares a loop-invariant value against a value
+/// with computable loop evolution.
+static bool isExitCountable(VPBasicBlock *ExitingVPBB,
+                            PredicatedScalarEvolution &PSE, const Loop *L) {
+  using namespace VPlanPatternMatch;
+  VPValue *Cond, *LHS, *RHS;
+  if (!match(ExitingVPBB->getTerminator(), m_BranchOnCond(m_VPValue(Cond))))
+    return false;
+
+  ScalarEvolution &SE = *PSE.getSE();
+
+  // Check if the condition is a constant. Any constant condition makes the
+  // exit countable: either always taken (exit count is 0) or never taken
+  // (dead exit that doesn't affect loop trip count). In both cases, SCEV can
+  // reason about the exit and no special early-exit handling is needed.
+  const SCEV *CondS = vputils::getSCEVExprForVPValue(Cond, PSE, L);
+  if (isa<SCEVConstant>(CondS))
+    return true;
+
+  if (!match(Cond, m_ICmp(m_VPValue(LHS), m_VPValue(RHS))))
+    return false;
+
+  const SCEV *LHSS = vputils::getSCEVExprForVPValue(LHS, PSE, L);
+  const SCEV *RHSS = vputils::getSCEVExprForVPValue(RHS, PSE, L);
+
+  // Check if a SCEV is loop-invariant.
+  auto IsInvariant = [&](const SCEV *S) {
+    return !isa<SCEVCouldNotCompute>(S) && SE.isLoopInvariant(S, L);
+  };
+  // Check if a SCEV has computable loop evolution.
+  auto HasComputableEvolution = [&](const SCEV *S) {
+    return !isa<SCEVCouldNotCompute>(S) && SE.hasComputableLoopEvolution(S, L);
+  };
+
+  return (IsInvariant(LHSS) && HasComputableEvolution(RHSS)) ||
+         (IsInvariant(RHSS) && HasComputableEvolution(LHSS));
+}
+
 void VPlanTransforms::handleEarlyExits(VPlan &Plan,
-                                       bool HasUncountableEarlyExit) {
+                                       PredicatedScalarEvolution &PSE,
+                                       Loop *OrigLoop) {
   auto *MiddleVPBB = cast<VPBasicBlock>(
       Plan.getScalarHeader()->getSinglePredecessor()->getPredecessors()[0]);
   auto *LatchVPBB = cast<VPBasicBlock>(MiddleVPBB->getSinglePredecessor());
-  VPBlockBase *HeaderVPB = cast<VPBasicBlock>(LatchVPBB->getSuccessors()[1]);
+  auto *HeaderVPBB = cast<VPBasicBlock>(LatchVPBB->getSuccessors()[1]);
 
   // Disconnect all early exits from the loop leaving it with a single exit from
   // the latch. Early exits that are countable are left for a scalar epilog. The
@@ -891,23 +931,20 @@ void VPlanTransforms::handleEarlyExits(VPlan &Plan,
     for (VPBlockBase *Pred : to_vector(EB->getPredecessors())) {
       if (Pred == MiddleVPBB)
         continue;
-      if (HasUncountableEarlyExit) {
+      auto *ExitingVPBB = cast<VPBasicBlock>(Pred);
+      if (!isExitCountable(ExitingVPBB, PSE, OrigLoop)) {
         assert(!HandledUncountableEarlyExit &&
                "can handle exactly one uncountable early exit");
-        handleUncountableEarlyExit(cast<VPBasicBlock>(Pred), EB, Plan,
-                                   cast<VPBasicBlock>(HeaderVPB), LatchVPBB);
+        handleUncountableEarlyExit(ExitingVPBB, EB, Plan, HeaderVPBB, LatchVPBB);
         HandledUncountableEarlyExit = true;
       } else {
         for (VPRecipeBase &R : EB->phis())
           cast<VPIRPhi>(&R)->removeIncomingValueFor(Pred);
       }
-      cast<VPBasicBlock>(Pred)->getTerminator()->eraseFromParent();
-      VPBlockUtils::disconnectBlocks(Pred, EB);
+      ExitingVPBB->getTerminator()->eraseFromParent();
+      VPBlockUtils::disconnectBlocks(ExitingVPBB, EB);
     }
   }
-
-  assert((!HasUncountableEarlyExit || HandledUncountableEarlyExit) &&
-         "missed an uncountable exit that must be handled");
 }
 
 void VPlanTransforms::addMiddleCheck(VPlan &Plan,
