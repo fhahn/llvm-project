@@ -148,6 +148,14 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
     return SE.getCouldNotCompute();
   }
 
+  // Skip pattern matching for predicated VPReplicateRecipes, as they have an
+  // extra mask operand that confuses the pattern matchers (which expect a fixed
+  // operand count for binary ops, casts, etc.).
+  if (auto *Rep =
+          dyn_cast_if_present<VPReplicateRecipe>(V->getDefiningRecipe()))
+    if (Rep->isPredicated())
+      return SE.getCouldNotCompute();
+
   // Helper to create SCEVs for binary and unary operations.
   auto CreateSCEV =
       [&](ArrayRef<VPValue *> Ops,
