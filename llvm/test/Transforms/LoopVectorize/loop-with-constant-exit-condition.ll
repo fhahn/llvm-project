@@ -3,8 +3,56 @@
 
 target datalayout = "e-m:o-i64:64-f80:128-n8:16:32:64-S128"
 
-define i16 @multiple_exit_one_with_constant_condition(ptr %dst, i64 %x) {
-; CHECK-LABEL: @multiple_exit_one_with_constant_condition(
+; Test where constant condition (true) causes the exit to ALWAYS be taken.
+; Exit is on true branch, condition is true, so exit is always taken.
+define i16 @constant_true_exit_taken(ptr %dst, i64 %x) {
+; CHECK-LABEL: @constant_true_exit_taken(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    br label [[LOOP_HEADER:%.*]]
+; CHECK:       loop.header:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, [[ENTRY:%.*]] ], [ [[IV_NEXT:%.*]], [[LOOP_LATCH:%.*]] ]
+; CHECK-NEXT:    [[GEP:%.*]] = getelementptr inbounds i32, ptr [[DST:%.*]], i64 [[IV]]
+; CHECK-NEXT:    store i64 0, ptr [[GEP]], align 8
+; CHECK-NEXT:    br i1 true, label [[EXIT_2:%.*]], label [[LOOP_THEN:%.*]]
+; CHECK:       loop.then:
+; CHECK-NEXT:    [[CMP3:%.*]] = icmp ne i64 [[IV]], [[X:%.*]]
+; CHECK-NEXT:    br i1 [[CMP3]], label [[LOOP_LATCH]], label [[EXIT_1:%.*]]
+; CHECK:       loop.latch:
+; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 1
+; CHECK-NEXT:    br label [[LOOP_HEADER]]
+; CHECK:       exit.1:
+; CHECK-NEXT:    ret i16 0
+; CHECK:       exit.2:
+; CHECK-NEXT:    ret i16 1
+;
+entry:
+  br label %loop.header
+
+loop.header:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop.latch ]
+  %gep = getelementptr inbounds i32, ptr %dst, i64 %iv
+  store i64 0, ptr %gep
+  br i1 true, label %exit.2, label %loop.then
+
+loop.then:
+  %cmp3 = icmp ne i64 %iv, %x
+  br i1 %cmp3, label %loop.latch, label %exit.1
+
+loop.latch:
+  %iv.next = add i64 %iv, 1
+  br label %loop.header
+
+exit.1:
+  ret i16 0
+
+exit.2:
+  ret i16 1
+}
+
+; Test where constant condition (true) causes the exit to NOT be taken (dead exit).
+; Exit is on false branch, condition is true, so exit is never taken.
+define i16 @constant_true_exit_not_taken(ptr %dst, i64 %x) {
+; CHECK-LABEL: @constant_true_exit_not_taken(
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[X:%.*]], 1
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ule i64 [[TMP0]], 2
