@@ -125,6 +125,37 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
     return CreateSCEV({LHSVal, RHSVal}, [&](ArrayRef<const SCEV *> Ops) {
       return SE.getMinusSCEV(Ops[0], Ops[1], SCEV::FlagAnyWrap, 0);
     });
+  if (match(V, m_Mul(m_VPValue(LHSVal), m_VPValue(RHSVal))))
+    return CreateSCEV({LHSVal, RHSVal}, [&](ArrayRef<const SCEV *> Ops) {
+      return SE.getMulExpr(Ops[0], Ops[1], SCEV::FlagAnyWrap, 0);
+    });
+  if (match(V,
+            m_Binary<Instruction::UDiv>(m_VPValue(LHSVal), m_VPValue(RHSVal))))
+    return CreateSCEV({LHSVal, RHSVal}, [&](ArrayRef<const SCEV *> Ops) {
+      return SE.getUDivExpr(Ops[0], Ops[1]);
+    });
+  // Handle AND with constant: x & (2^n - 1) can be represented as x % 2^n.
+  // Also handle general AND that SCEV can represent.
+  if (match(V, m_c_BinaryAnd(m_VPValue(LHSVal), m_VPValue(RHSVal)))) {
+    const SCEV *LHSS = getSCEVExprForVPValue(LHSVal, PSE, L);
+    const SCEV *RHSS = getSCEVExprForVPValue(RHSVal, PSE, L);
+    if (!isa<SCEVCouldNotCompute>(LHSS) && !isa<SCEVCouldNotCompute>(RHSS)) {
+      // For x & c where c is a constant mask of the form 2^n - 1,
+      // represent as urem(x, 2^n).
+      if (auto *C = dyn_cast<SCEVConstant>(RHSS)) {
+        APInt Mask = C->getAPInt();
+        if ((Mask + 1).isPowerOf2())
+          return SE.getURemExpr(LHSS, SE.getConstant(Mask + 1));
+      }
+      if (auto *C = dyn_cast<SCEVConstant>(LHSS)) {
+        APInt Mask = C->getAPInt();
+        if ((Mask + 1).isPowerOf2())
+          return SE.getURemExpr(RHSS, SE.getConstant(Mask + 1));
+      }
+    }
+    // Fall through for non-constant ANDs
+  }
+
   if (match(V, m_Trunc(m_VPValue(LHSVal)))) {
     const VPlan *Plan = V->getDefiningRecipe()->getParent()->getPlan();
     Type *DestTy = VPTypeAnalysis(*Plan).inferScalarType(V);
