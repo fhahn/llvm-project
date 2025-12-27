@@ -4313,8 +4313,10 @@ InstructionCost AArch64TTIImpl::getScalarizationOverhead(
   // For integer types, use simplified formula with VIC optimization.
   unsigned VecInstCost =
       CostKind == TTI::TCK_CodeSize ? 1 : ST->getVectorInsertExtractBaseCost();
+  // For Load context, insertions are cheaper (loaded data directly inserted).
+  // For Store context, extractions are cheaper (extracted data directly stored).
   if ((VIC == TTI::VectorInstrContext::Store && Extract) ||
-      (VIC == TTI::VectorInstrContext::Load && !Extract))
+      (VIC == TTI::VectorInstrContext::Load && Insert))
     VecInstCost = 1;
   return DemandedElts.popcount() * (Insert + Extract) * VecInstCost;
 }

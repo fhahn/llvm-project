@@ -10,7 +10,6 @@
 #define LLVM_TRANSFORMS_VECTORIZE_VPLANUTILS_H
 
 #include "VPlan.h"
-#include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Support/Compiler.h"
 
 namespace llvm {
@@ -105,10 +104,6 @@ inline VPIRFlags getFlagsFromIndDesc(const InductionDescriptor &ID) {
   return VPIRFlags::WrapFlagsTy(false, false);
 }
 
-/// Extract VectorInstrContext for the given VPRecipeBase.
-/// For the infrastructure commit, this will always return None
-/// since no context hints are set yet.
-TargetTransformInfo::VectorInstrContext getInstrContext(const VPRecipeBase *R);
 } // namespace vputils
 
 //===----------------------------------------------------------------------===//

@@ -95,7 +95,6 @@ private:
     InstructionCost Cost = 0;
     // Broadcast cost is equal to the cost of extracting the zero'th element
     // plus the cost of inserting it into every element of the result vector.
-    // For Stage 1 NFC: Call 6-param version (ignoring VIC).
     Cost += thisT()->getVectorInstrCost(Instruction::ExtractElement, VTy,
                                         CostKind, 0, nullptr, nullptr);
 
@@ -119,7 +118,6 @@ private:
     // index 0 of first vector, index 1 of second vector,index 2 of first
     // vector and finally index 3 of second vector and insert them at index
     // <0,1,2,3> of result vector.
-    // For Stage 1 NFC: Call 6-param version (ignoring VIC).
     for (int i = 0, e = VTy->getNumElements(); i < e; ++i) {
       Cost += thisT()->getVectorInstrCost(Instruction::InsertElement, VTy,
                                           CostKind, i, nullptr, nullptr);
@@ -147,7 +145,6 @@ private:
     // Subvector extraction cost is equal to the cost of extracting element from
     // the source type plus the cost of inserting them into the result vector
     // type.
-    // For Stage 1 NFC: Call 6-param version (ignoring VIC).
     for (int i = 0; i != NumSubElts; ++i) {
       Cost +=
           thisT()->getVectorInstrCost(Instruction::ExtractElement, VTy,
@@ -176,7 +173,6 @@ private:
     // Subvector insertion cost is equal to the cost of extracting element from
     // the source type plus the cost of inserting them into the result vector
     // type.
-    // For Stage 1 NFC: Call 6-param version (ignoring VIC).
     for (int i = 0; i != NumSubElts; ++i) {
       Cost += thisT()->getVectorInstrCost(Instruction::ExtractElement, SubVTy,
                                           CostKind, i, nullptr, nullptr);
@@ -1381,7 +1377,6 @@ public:
   getExtractWithExtendCost(unsigned Opcode, Type *Dst, VectorType *VecTy,
                            unsigned Index,
                            TTI::TargetCostKind CostKind) const override {
-    // For Stage 1 NFC: Call 6-param version (ignoring VIC).
     return thisT()->getVectorInstrCost(Instruction::ExtractElement, VecTy,
                                        CostKind, Index, nullptr, nullptr) +
            thisT()->getCastInstrCost(Opcode, Dst, VecTy->getElementType(),
@@ -1500,13 +1495,9 @@ public:
       Op0 = IE->getOperand(0);
       Op1 = IE->getOperand(1);
     }
-    [[maybe_unused]] TTI::VectorInstrContext VIC =
-        TTI::getVectorInstrContextHint(&I);
-    // For Stage 1 NFC: Call the 6-param version through CRTP.
-    // VIC is extracted but not used yet - will be used in Stage 2 target
-    // overrides.
+    TTI::VectorInstrContext VIC = TTI::getVectorInstrContextHint(&I);
     return thisT()->getVectorInstrCost(I.getOpcode(), Val, CostKind, Index, Op0,
-                                       Op1);
+                                       Op1, VIC);
   }
 
   InstructionCost
@@ -1519,7 +1510,6 @@ public:
              "Unexpected index from end of vector");
       NewIndex = FVTy->getNumElements() - 1 - Index;
     }
-    // For Stage 1 NFC: Call the 6-param version
     return thisT()->getVectorInstrCost(Opcode, Val, CostKind, NewIndex, nullptr,
                                        nullptr);
   }
@@ -2543,7 +2533,6 @@ public:
 
       // Approximate the cost based on the expansion code in
       // SelectionDAGBuilder.
-      // For Stage 1 NFC: Call 6-param version (ignoring VIC).
       InstructionCost Cost = 0;
       Cost += thisT()->getVectorInstrCost(Instruction::ExtractElement, NeedleTy,
                                           CostKind, 1, nullptr, nullptr);
@@ -2577,7 +2566,6 @@ public:
 
       Align Alignment = thisT()->DL.getABITypeAlign(EltTy);
       InstructionCost Cost = 0;
-      // For Stage 1 NFC: Call 6-param version (ignoring VIC).
       Cost += thisT()->getVectorInstrCost(Instruction::ExtractElement, PtrsTy,
                                           CostKind, 1, nullptr, nullptr);
       Cost += thisT()->getMemoryOpCost(Instruction::Load, EltTy, Alignment, 0,
@@ -3274,7 +3262,6 @@ public:
                                                  Ty, {}, CostKind, 0, Ty);
     ArithCost +=
         NumReduxLevels * thisT()->getArithmeticInstrCost(Opcode, Ty, CostKind);
-    // For Stage 1 NFC: Call 6-param version (ignoring VIC).
     return ShuffleCost + ArithCost +
            thisT()->getVectorInstrCost(Instruction::ExtractElement, Ty,
                                        CostKind, 0, nullptr, nullptr);
@@ -3368,7 +3355,6 @@ public:
     MinMaxCost += NumReduxLevels * getIntrinsicInstrCost(Attrs, CostKind);
     // The last min/max should be in vector registers and we counted it above.
     // So just need a single extractelement.
-    // For Stage 1 NFC: Call 6-param version (ignoring VIC).
     return ShuffleCost + MinMaxCost +
            thisT()->getVectorInstrCost(Instruction::ExtractElement, Ty,
                                        CostKind, 0, nullptr, nullptr);
