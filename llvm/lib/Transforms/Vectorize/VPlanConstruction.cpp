@@ -893,18 +893,17 @@ static bool isExitCountable(VPBasicBlock *ExitingVPBB,
   const SCEV *LHSS = vputils::getSCEVExprForVPValue(LHS, PSE, L);
   const SCEV *RHSS = vputils::getSCEVExprForVPValue(RHS, PSE, L);
 
-  // Check if a SCEV/VPValue pair is loop-invariant.
-  auto IsInvariant = [&](const SCEV *S, VPValue *V) {
-    return isa<SCEVCouldNotCompute>(S) ? V->isDefinedOutsideLoopRegions()
-                                       : SE.isLoopInvariant(S, L);
+  // Check if a SCEV is loop-invariant.
+  auto IsInvariant = [&](const SCEV *S) {
+    return !isa<SCEVCouldNotCompute>(S) && SE.isLoopInvariant(S, L);
   };
   // Check if a SCEV has computable loop evolution.
   auto HasComputableEvolution = [&](const SCEV *S) {
     return !isa<SCEVCouldNotCompute>(S) && SE.hasComputableLoopEvolution(S, L);
   };
 
-  return (IsInvariant(LHSS, LHS) && HasComputableEvolution(RHSS)) ||
-         (IsInvariant(RHSS, RHS) && HasComputableEvolution(LHSS));
+  return (IsInvariant(LHSS) && HasComputableEvolution(RHSS)) ||
+         (IsInvariant(RHSS) && HasComputableEvolution(LHSS));
 }
 
 void VPlanTransforms::handleEarlyExits(VPlan &Plan,
