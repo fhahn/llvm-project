@@ -8919,7 +8919,7 @@ void VPDerivedIVRecipe::execute(VPTransformState &State) {
   Value *DerivedIV = emitTransformedIndex(
       State.Builder, Index, getStartValue()->getLiveInIRValue(), Step, Kind,
       cast_if_present<BinaryOperator>(FPBinOp));
-  DerivedIV->setName(Name);
+  DerivedIV->setName(getName());
   State.set(this, DerivedIV, VPLane(0));
 }
 

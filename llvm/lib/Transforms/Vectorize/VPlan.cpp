@@ -1427,8 +1427,8 @@ void VPUser::printOperands(raw_ostream &O, VPSlotTracker &SlotTracker) const {
 void VPSlotTracker::assignName(const VPValue *V) {
   assert(!VPValue2Name.contains(V) && "VPValue already has a name!");
   auto *UV = V->getUnderlyingValue();
-  auto *VPI = dyn_cast_or_null<VPInstruction>(V);
-  if (!UV && !(VPI && !VPI->getName().empty())) {
+  auto *DefR = dyn_cast_or_null<VPSingleDefRecipe>(V->getDefiningRecipe());
+  if (!UV && !(DefR && !DefR->getName().empty())) {
     VPValue2Name[V] = (Twine("vp<%") + Twine(NextSlot) + ">").str();
     NextSlot++;
     return;
@@ -1440,7 +1440,7 @@ void VPSlotTracker::assignName(const VPValue *V) {
   if (UV)
     Name = getName(UV);
   else
-    Name = VPI->getName();
+    Name = DefR->getName().str();
 
   assert(!Name.empty() && "Name cannot be empty.");
   StringRef Prefix = UV ? "ir<" : "vp<%";

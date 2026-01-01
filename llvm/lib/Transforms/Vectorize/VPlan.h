@@ -529,14 +529,18 @@ protected:
 /// more output IR that define a single result VPValue.
 /// Note that VPRecipeBase must be inherited from before VPValue.
 class VPSingleDefRecipe : public VPRecipeBase, public VPValue {
+  /// Name to use for the generated IR instruction for the defined VPValue.
+  StringRef Name;
+
 public:
   VPSingleDefRecipe(const unsigned char SC, ArrayRef<VPValue *> Operands,
-                    DebugLoc DL = DebugLoc::getUnknown())
-      : VPRecipeBase(SC, Operands, DL), VPValue(this) {}
+                    DebugLoc DL = DebugLoc::getUnknown(), StringRef Name = "")
+      : VPRecipeBase(SC, Operands, DL), VPValue(this), Name(Name) {}
 
   VPSingleDefRecipe(const unsigned char SC, ArrayRef<VPValue *> Operands,
-                    Value *UV, DebugLoc DL = DebugLoc::getUnknown())
-      : VPRecipeBase(SC, Operands, DL), VPValue(this, UV) {}
+                    Value *UV, DebugLoc DL = DebugLoc::getUnknown(),
+                    StringRef Name = "")
+      : VPRecipeBase(SC, Operands, DL), VPValue(this, UV), Name(Name) {}
 
   static inline bool classof(const VPRecipeBase *R) {
     switch (R->getVPDefID()) {
@@ -598,6 +602,12 @@ public:
   const Instruction *getUnderlyingInstr() const {
     return cast<Instruction>(getUnderlyingValue());
   }
+
+  /// Returns the name for the VPValue defined by the recipe.
+  StringRef getName() const { return Name; }
+
+  /// Set the name for the defined VPValue.
+  void setName(StringRef NewName) { Name = NewName; }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   /// Print this VPSingleDefRecipe to dbgs() (for debugging).
@@ -923,8 +933,8 @@ public:
 struct VPRecipeWithIRFlags : public VPSingleDefRecipe, public VPIRFlags {
   VPRecipeWithIRFlags(const unsigned char SC, ArrayRef<VPValue *> Operands,
                       const VPIRFlags &Flags,
-                      DebugLoc DL = DebugLoc::getUnknown())
-      : VPSingleDefRecipe(SC, Operands, DL), VPIRFlags(Flags) {}
+                      DebugLoc DL = DebugLoc::getUnknown(), StringRef Name = "")
+      : VPSingleDefRecipe(SC, Operands, DL, Name), VPIRFlags(Flags) {}
 
   static inline bool classof(const VPRecipeBase *R) {
     return R->getVPDefID() == VPRecipeBase::VPInstructionSC ||
@@ -1156,9 +1166,6 @@ private:
   typedef unsigned char OpcodeTy;
   OpcodeTy Opcode;
 
-  /// An optional name that can be used for the generated IR instruction.
-  StringRef Name;
-
   /// Returns true if we can generate a scalar for the first lane only if
   /// needed.
   bool canGenerateScalarForFirstLane() const;
@@ -1184,7 +1191,7 @@ public:
 
   VPInstruction *clone() override {
     auto *New = new VPInstruction(Opcode, operands(), *this, *this,
-                                  getDebugLoc(), Name);
+                                  getDebugLoc(), getName());
     if (getUnderlyingValue())
       New->setUnderlyingValue(getUnderlyingInstr());
     return New;
@@ -1245,12 +1252,6 @@ public:
   /// Returns true if this VPInstruction's operands are single scalars and the
   /// result is also a single scalar.
   bool isSingleScalar() const;
-
-  /// Returns the symbolic name assigned to the VPInstruction.
-  StringRef getName() const { return Name; }
-
-  /// Set the symbolic name for the VPInstruction.
-  void setName(StringRef NewName) { Name = NewName; }
 
 protected:
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
@@ -2339,22 +2340,19 @@ protected:
 /// the second from the exiting block of the region.
 class LLVM_ABI_FOR_TEST VPWidenPHIRecipe : public VPSingleDefRecipe,
                                            public VPPhiAccessors {
-  /// Name to use for the generated IR instruction for the widened phi.
-  StringRef Name;
-
 public:
   /// Create a new VPWidenPHIRecipe for \p Phi with start value \p Start and
   /// debug location \p DL.
   VPWidenPHIRecipe(PHINode *Phi, VPValue *Start = nullptr,
                    DebugLoc DL = DebugLoc::getUnknown(), StringRef Name = "")
-      : VPSingleDefRecipe(VPDef::VPWidenPHISC, {}, Phi, DL), Name(Name) {
+      : VPSingleDefRecipe(VPDef::VPWidenPHISC, {}, Phi, DL, Name) {
     if (Start)
       addOperand(Start);
   }
 
   VPWidenPHIRecipe *clone() override {
     auto *C = new VPWidenPHIRecipe(cast<PHINode>(getUnderlyingValue()),
-                                   getOperand(0), getDebugLoc(), Name);
+                                   getOperand(0), getDebugLoc(), getName());
     for (VPValue *Op : llvm::drop_begin(operands()))
       C->addOperand(Op);
     return C;
@@ -3744,9 +3742,6 @@ class VPDerivedIVRecipe : public VPSingleDefRecipe {
   /// for floating point inductions.
   const FPMathOperator *FPBinOp;
 
-  /// Name to use for the generated IR instruction for the derived IV.
-  StringRef Name;
-
 public:
   VPDerivedIVRecipe(const InductionDescriptor &IndDesc, VPValue *Start,
                     VPCanonicalIVPHIRecipe *CanonicalIV, VPValue *Step,
@@ -3759,14 +3754,15 @@ public:
   VPDerivedIVRecipe(InductionDescriptor::InductionKind Kind,
                     const FPMathOperator *FPBinOp, VPValue *Start, VPValue *IV,
                     VPValue *Step, StringRef Name = "")
-      : VPSingleDefRecipe(VPDef::VPDerivedIVSC, {Start, IV, Step}), Kind(Kind),
-        FPBinOp(FPBinOp), Name(Name) {}
+      : VPSingleDefRecipe(VPDef::VPDerivedIVSC, {Start, IV, Step},
+                          DebugLoc::getUnknown(), Name),
+        Kind(Kind), FPBinOp(FPBinOp) {}
 
   ~VPDerivedIVRecipe() override = default;
 
   VPDerivedIVRecipe *clone() override {
     return new VPDerivedIVRecipe(Kind, FPBinOp, getStartValue(), getOperand(1),
-                                 getStepValue());
+                                 getStepValue(), getName());
   }
 
   VP_CLASSOF_IMPL(VPDef::VPDerivedIVSC)

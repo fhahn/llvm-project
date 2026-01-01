@@ -409,8 +409,8 @@ template class VPUnrollPartAccessor<3>;
 VPInstruction::VPInstruction(unsigned Opcode, ArrayRef<VPValue *> Operands,
                              const VPIRFlags &Flags, const VPIRMetadata &MD,
                              DebugLoc DL, StringRef Name)
-    : VPRecipeWithIRFlags(VPDef::VPInstructionSC, Operands, Flags, DL),
-      VPIRMetadata(MD), Opcode(Opcode), Name(Name) {
+    : VPRecipeWithIRFlags(VPDef::VPInstructionSC, Operands, Flags, DL, Name),
+      VPIRMetadata(MD), Opcode(Opcode) {
   assert(flagsValidForOpcode(getOpcode()) &&
          "Set flags not supported for the provided opcode");
   assert((getNumOperandsForOpcode(Opcode) == -1u ||
@@ -523,7 +523,7 @@ Value *VPInstruction::generate(VPTransformState &State) {
     Value *A = State.get(getOperand(0), OnlyFirstLaneUsed);
     Value *B = State.get(getOperand(1), OnlyFirstLaneUsed);
     auto *Res =
-        Builder.CreateBinOp((Instruction::BinaryOps)getOpcode(), A, B, Name);
+        Builder.CreateBinOp((Instruction::BinaryOps)getOpcode(), A, B, getName());
     if (auto *I = dyn_cast<Instruction>(Res))
       applyFlags(*I);
     return Res;
@@ -533,7 +533,7 @@ Value *VPInstruction::generate(VPTransformState &State) {
   case VPInstruction::Not: {
     bool OnlyFirstLaneUsed = vputils::onlyFirstLaneUsed(this);
     Value *A = State.get(getOperand(0), OnlyFirstLaneUsed);
-    return Builder.CreateNot(A, Name);
+    return Builder.CreateNot(A, getName());
   }
   case Instruction::ExtractElement: {
     assert(State.VF.isVector() && "Only extract elements from vectors");
@@ -544,18 +544,18 @@ Value *VPInstruction::generate(VPTransformState &State) {
     }
     Value *Vec = State.get(getOperand(0));
     Value *Idx = State.get(getOperand(1), /*IsScalar=*/true);
-    return Builder.CreateExtractElement(Vec, Idx, Name);
+    return Builder.CreateExtractElement(Vec, Idx, getName());
   }
   case Instruction::Freeze: {
     Value *Op = State.get(getOperand(0), vputils::onlyFirstLaneUsed(this));
-    return Builder.CreateFreeze(Op, Name);
+    return Builder.CreateFreeze(Op, getName());
   }
   case Instruction::FCmp:
   case Instruction::ICmp: {
     bool OnlyFirstLaneUsed = vputils::onlyFirstLaneUsed(this);
     Value *A = State.get(getOperand(0), OnlyFirstLaneUsed);
     Value *B = State.get(getOperand(1), OnlyFirstLaneUsed);
-    return Builder.CreateCmp(getPredicate(), A, B, Name);
+    return Builder.CreateCmp(getPredicate(), A, B, getName());
   }
   case Instruction::PHI: {
     llvm_unreachable("should be handled by VPPhi::execute");
@@ -567,7 +567,7 @@ Value *VPInstruction::generate(VPTransformState &State) {
                   OnlyFirstLaneUsed || vputils::isSingleScalar(getOperand(0)));
     Value *Op1 = State.get(getOperand(1), OnlyFirstLaneUsed);
     Value *Op2 = State.get(getOperand(2), OnlyFirstLaneUsed);
-    return Builder.CreateSelect(Cond, Op1, Op2, Name);
+    return Builder.CreateSelect(Cond, Op1, Op2, getName());
   }
   case VPInstruction::ActiveLaneMask: {
     // Get first lane of vector induction variable.
@@ -579,14 +579,14 @@ Value *VPInstruction::generate(VPTransformState &State) {
     // to avoid unnecessary extracts.
     if (State.VF.isScalar())
       return Builder.CreateCmp(CmpInst::Predicate::ICMP_ULT, VIVElem0, ScalarTC,
-                               Name);
+                               getName());
 
     ElementCount EC = State.VF.multiplyCoefficientBy(
         cast<ConstantInt>(getOperand(2)->getLiveInIRValue())->getZExtValue());
     auto *PredTy = VectorType::get(Builder.getInt1Ty(), EC);
     return Builder.CreateIntrinsic(Intrinsic::get_active_lane_mask,
                                    {PredTy, ScalarTC->getType()},
-                                   {VIVElem0, ScalarTC}, nullptr, Name);
+                                   {VIVElem0, ScalarTC}, nullptr, getName());
   }
   case VPInstruction::FirstOrderRecurrenceSplice: {
     // Generate code to combine the previous and current values in vector v3.
@@ -605,7 +605,7 @@ Value *VPInstruction::generate(VPTransformState &State) {
     if (!V1->getType()->isVectorTy())
       return V1;
     Value *V2 = State.get(getOperand(1));
-    return Builder.CreateVectorSplice(V1, V2, -1, Name);
+    return Builder.CreateVectorSplice(V1, V2, -1, getName());
   }
   case VPInstruction::CalculateTripCountMinusVF: {
     unsigned UF = getParent()->getPlan()->getUF();
@@ -639,7 +639,7 @@ Value *VPInstruction::generate(VPTransformState &State) {
     // The canonical IV is incremented by the vectorization factor (num of
     // SIMD elements) times the unroll part.
     Value *Step = createStepForVF(Builder, IV->getType(), State.VF, Part);
-    return Builder.CreateAdd(IV, Step, Name, hasNoUnsignedWrap(),
+    return Builder.CreateAdd(IV, Step, getName(), hasNoUnsignedWrap(),
                              hasNoSignedWrap());
   }
   case VPInstruction::BranchOnCond: {
@@ -818,26 +818,26 @@ Value *VPInstruction::generate(VPTransformState &State) {
       Res = State.get(getOperand(0));
     }
     if (isa<ExtractElementInst>(Res))
-      Res->setName(Name);
+      Res->setName(getName());
     return Res;
   }
   case VPInstruction::LogicalAnd: {
     Value *A = State.get(getOperand(0));
     Value *B = State.get(getOperand(1));
-    return Builder.CreateLogicalAnd(A, B, Name);
+    return Builder.CreateLogicalAnd(A, B, getName());
   }
   case VPInstruction::PtrAdd: {
     assert(vputils::onlyFirstLaneUsed(this) &&
            "can only generate first lane for PtrAdd");
     Value *Ptr = State.get(getOperand(0), VPLane(0));
     Value *Addend = State.get(getOperand(1), VPLane(0));
-    return Builder.CreatePtrAdd(Ptr, Addend, Name, getGEPNoWrapFlags());
+    return Builder.CreatePtrAdd(Ptr, Addend, getName(), getGEPNoWrapFlags());
   }
   case VPInstruction::WidePtrAdd: {
     Value *Ptr =
         State.get(getOperand(0), vputils::isSingleScalar(getOperand(0)));
     Value *Addend = State.get(getOperand(1));
-    return Builder.CreatePtrAdd(Ptr, Addend, Name, getGEPNoWrapFlags());
+    return Builder.CreatePtrAdd(Ptr, Addend, getName(), getGEPNoWrapFlags());
   }
   case VPInstruction::AnyOf: {
     Value *Res = Builder.CreateFreeze(State.get(getOperand(0)));
@@ -874,7 +874,7 @@ Value *VPInstruction::generate(VPTransformState &State) {
     if (getNumOperands() == 1) {
       Value *Mask = State.get(getOperand(0));
       return Builder.CreateCountTrailingZeroElems(Builder.getInt64Ty(), Mask,
-                                                  /*ZeroIsPoison=*/false, Name);
+                                                  /*ZeroIsPoison=*/false, getName());
     }
     // If there are multiple operands, create a chain of selects to pick the
     // first operand with an active lane and add the number of lanes of the
@@ -891,7 +891,7 @@ Value *VPInstruction::generate(VPTransformState &State) {
                     Builder.getInt64Ty())
               : Builder.CreateCountTrailingZeroElems(
                     Builder.getInt64Ty(), State.get(getOperand(Idx)),
-                    /*ZeroIsPoison=*/false, Name);
+                    /*ZeroIsPoison=*/false, getName());
       Value *Current = Builder.CreateAdd(
           Builder.CreateMul(RuntimeVF, Builder.getInt64(Idx)), TrailingZeros);
       if (Res) {
@@ -4415,7 +4415,7 @@ void VPReductionPHIRecipe::printRecipe(raw_ostream &O, const Twine &Indent,
 void VPWidenPHIRecipe::execute(VPTransformState &State) {
   Value *Op0 = State.get(getOperand(0));
   Type *VecTy = Op0->getType();
-  Instruction *VecPhi = State.Builder.CreatePHI(VecTy, 2, Name);
+  Instruction *VecPhi = State.Builder.CreatePHI(VecTy, 2, getName());
   State.set(this, VecPhi);
 }
 
