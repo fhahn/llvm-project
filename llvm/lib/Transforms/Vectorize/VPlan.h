@@ -1157,7 +1157,7 @@ private:
   OpcodeTy Opcode;
 
   /// An optional name that can be used for the generated IR instruction.
-  std::string Name;
+  StringRef Name;
 
   /// Returns true if we can generate a scalar for the first lane only if
   /// needed.
@@ -1178,7 +1178,7 @@ private:
 public:
   VPInstruction(unsigned Opcode, ArrayRef<VPValue *> Operands,
                 const VPIRFlags &Flags = {}, const VPIRMetadata &MD = {},
-                DebugLoc DL = DebugLoc::getUnknown(), const Twine &Name = "");
+                DebugLoc DL = DebugLoc::getUnknown(), StringRef Name = "");
 
   VP_CLASSOF_IMPL(VPDef::VPInstructionSC)
 
@@ -1250,7 +1250,7 @@ public:
   StringRef getName() const { return Name; }
 
   /// Set the symbolic name for the VPInstruction.
-  void setName(StringRef NewName) { Name = NewName.str(); }
+  void setName(StringRef NewName) { Name = NewName; }
 
 protected:
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
@@ -1274,7 +1274,7 @@ public:
                         Type *ResultTy, const VPIRFlags &Flags = {},
                         const VPIRMetadata &Metadata = {},
                         DebugLoc DL = DebugLoc::getUnknown(),
-                        const Twine &Name = "")
+                        StringRef Name = "")
       : VPInstruction(Opcode, Operands, Flags, Metadata, DL, Name),
         ResultTy(ResultTy) {}
 
@@ -1386,7 +1386,7 @@ public:
 };
 
 struct LLVM_ABI_FOR_TEST VPPhi : public VPInstruction, public VPPhiAccessors {
-  VPPhi(ArrayRef<VPValue *> Operands, DebugLoc DL, const Twine &Name = "")
+  VPPhi(ArrayRef<VPValue *> Operands, DebugLoc DL, StringRef Name = "")
       : VPInstruction(Instruction::PHI, Operands, {}, {}, DL, Name) {}
 
   static inline bool classof(const VPUser *U) {
@@ -2340,14 +2340,14 @@ protected:
 class LLVM_ABI_FOR_TEST VPWidenPHIRecipe : public VPSingleDefRecipe,
                                            public VPPhiAccessors {
   /// Name to use for the generated IR instruction for the widened phi.
-  std::string Name;
+  StringRef Name;
 
 public:
   /// Create a new VPWidenPHIRecipe for \p Phi with start value \p Start and
   /// debug location \p DL.
   VPWidenPHIRecipe(PHINode *Phi, VPValue *Start = nullptr,
-                   DebugLoc DL = DebugLoc::getUnknown(), const Twine &Name = "")
-      : VPSingleDefRecipe(VPDef::VPWidenPHISC, {}, Phi, DL), Name(Name.str()) {
+                   DebugLoc DL = DebugLoc::getUnknown(), StringRef Name = "")
+      : VPSingleDefRecipe(VPDef::VPWidenPHISC, {}, Phi, DL), Name(Name) {
     if (Start)
       addOperand(Start);
   }
@@ -3745,12 +3745,12 @@ class VPDerivedIVRecipe : public VPSingleDefRecipe {
   const FPMathOperator *FPBinOp;
 
   /// Name to use for the generated IR instruction for the derived IV.
-  std::string Name;
+  StringRef Name;
 
 public:
   VPDerivedIVRecipe(const InductionDescriptor &IndDesc, VPValue *Start,
                     VPCanonicalIVPHIRecipe *CanonicalIV, VPValue *Step,
-                    const Twine &Name = "")
+                    StringRef Name = "")
       : VPDerivedIVRecipe(
             IndDesc.getKind(),
             dyn_cast_or_null<FPMathOperator>(IndDesc.getInductionBinOp()),
@@ -3758,9 +3758,9 @@ public:
 
   VPDerivedIVRecipe(InductionDescriptor::InductionKind Kind,
                     const FPMathOperator *FPBinOp, VPValue *Start, VPValue *IV,
-                    VPValue *Step, const Twine &Name = "")
+                    VPValue *Step, StringRef Name = "")
       : VPSingleDefRecipe(VPDef::VPDerivedIVSC, {Start, IV, Step}), Kind(Kind),
-        FPBinOp(FPBinOp), Name(Name.str()) {}
+        FPBinOp(FPBinOp), Name(Name) {}
 
   ~VPDerivedIVRecipe() override = default;
 

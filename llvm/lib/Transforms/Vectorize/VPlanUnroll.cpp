@@ -188,15 +188,12 @@ void UnrollState::unrollWidenInductionByUF(
   else
     AddOpc = Instruction::Add;
   for (unsigned Part = 1; Part != UF; ++Part) {
-    std::string Name =
-        Part > 1 ? "step.add." + std::to_string(Part) : "step.add";
-
     VPInstruction *Add = Builder.createNaryOp(AddOpc,
                                               {
                                                   Prev,
                                                   VectorStep,
                                               },
-                                              Flags, IV->getDebugLoc(), Name);
+                                              Flags, IV->getDebugLoc(), "step.add");
     ToSkip.insert(Add);
     addRecipeForPart(IV, Add, Part);
     Prev = Add;

@@ -65,7 +65,7 @@ class VPBuilder {
   VPInstruction *createInstruction(unsigned Opcode,
                                    ArrayRef<VPValue *> Operands,
                                    const VPIRMetadata &MD, DebugLoc DL,
-                                   const Twine &Name = "") {
+                                   StringRef Name = "") {
     return tryInsertInstruction(
         new VPInstruction(Opcode, Operands, {}, MD, DL, Name));
   }
@@ -155,20 +155,20 @@ public:
                               const VPIRFlags &Flags = {},
                               const VPIRMetadata &MD = {},
                               DebugLoc DL = DebugLoc::getUnknown(),
-                              const Twine &Name = "") {
+                              StringRef Name = "") {
     VPInstruction *NewVPInst = tryInsertInstruction(
         new VPInstruction(Opcode, Operands, Flags, MD, DL, Name));
     NewVPInst->setUnderlyingValue(Inst);
     return NewVPInst;
   }
   VPInstruction *createNaryOp(unsigned Opcode, ArrayRef<VPValue *> Operands,
-                              DebugLoc DL, const Twine &Name = "") {
+                              DebugLoc DL, StringRef Name = "") {
     return createInstruction(Opcode, Operands, {}, DL, Name);
   }
   VPInstruction *createNaryOp(unsigned Opcode, ArrayRef<VPValue *> Operands,
                               const VPIRFlags &Flags,
                               DebugLoc DL = DebugLoc::getUnknown(),
-                              const Twine &Name = "") {
+                              StringRef Name = "") {
     return tryInsertInstruction(
         new VPInstruction(Opcode, Operands, Flags, {}, DL, Name));
   }
@@ -176,7 +176,7 @@ public:
   VPInstruction *createNaryOp(unsigned Opcode, ArrayRef<VPValue *> Operands,
                               Type *ResultTy, const VPIRFlags &Flags = {},
                               DebugLoc DL = DebugLoc::getUnknown(),
-                              const Twine &Name = "") {
+                              StringRef Name = "") {
     return tryInsertInstruction(new VPInstructionWithType(
         Opcode, Operands, ResultTy, Flags, {}, DL, Name));
   }
@@ -184,27 +184,27 @@ public:
   VPInstruction *createOverflowingOp(
       unsigned Opcode, ArrayRef<VPValue *> Operands,
       VPRecipeWithIRFlags::WrapFlagsTy WrapFlags = {false, false},
-      DebugLoc DL = DebugLoc::getUnknown(), const Twine &Name = "") {
+      DebugLoc DL = DebugLoc::getUnknown(), StringRef Name = "") {
     return tryInsertInstruction(
         new VPInstruction(Opcode, Operands, WrapFlags, {}, DL, Name));
   }
 
   VPInstruction *createNot(VPValue *Operand,
                            DebugLoc DL = DebugLoc::getUnknown(),
-                           const Twine &Name = "") {
+                           StringRef Name = "") {
     return createInstruction(VPInstruction::Not, {Operand}, {}, DL, Name);
   }
 
   VPInstruction *createAnd(VPValue *LHS, VPValue *RHS,
                            DebugLoc DL = DebugLoc::getUnknown(),
-                           const Twine &Name = "") {
+                           StringRef Name = "") {
     return createInstruction(Instruction::BinaryOps::And, {LHS, RHS}, {}, DL,
                              Name);
   }
 
   VPInstruction *createOr(VPValue *LHS, VPValue *RHS,
                           DebugLoc DL = DebugLoc::getUnknown(),
-                          const Twine &Name = "") {
+                          StringRef Name = "") {
 
     return tryInsertInstruction(new VPInstruction(
         Instruction::BinaryOps::Or, {LHS, RHS},
@@ -213,13 +213,13 @@ public:
 
   VPInstruction *createLogicalAnd(VPValue *LHS, VPValue *RHS,
                                   DebugLoc DL = DebugLoc::getUnknown(),
-                                  const Twine &Name = "") {
+                                  StringRef Name = "") {
     return createNaryOp(VPInstruction::LogicalAnd, {LHS, RHS}, DL, Name);
   }
 
   VPInstruction *
   createSelect(VPValue *Cond, VPValue *TrueVal, VPValue *FalseVal,
-               DebugLoc DL = DebugLoc::getUnknown(), const Twine &Name = "",
+               DebugLoc DL = DebugLoc::getUnknown(), StringRef Name = "",
                std::optional<FastMathFlags> FMFs = std::nullopt) {
     if (!FMFs)
       return createNaryOp(Instruction::Select, {Cond, TrueVal, FalseVal}, DL,
@@ -232,7 +232,7 @@ public:
   /// and \p B.
   VPInstruction *createICmp(CmpInst::Predicate Pred, VPValue *A, VPValue *B,
                             DebugLoc DL = DebugLoc::getUnknown(),
-                            const Twine &Name = "") {
+                            StringRef Name = "") {
     assert(Pred >= CmpInst::FIRST_ICMP_PREDICATE &&
            Pred <= CmpInst::LAST_ICMP_PREDICATE && "invalid predicate");
     return tryInsertInstruction(
@@ -243,7 +243,7 @@ public:
   /// and \p B.
   VPInstruction *createFCmp(CmpInst::Predicate Pred, VPValue *A, VPValue *B,
                             DebugLoc DL = DebugLoc::getUnknown(),
-                            const Twine &Name = "") {
+                            StringRef Name = "") {
     assert(Pred >= CmpInst::FIRST_FCMP_PREDICATE &&
            Pred <= CmpInst::LAST_FCMP_PREDICATE && "invalid predicate");
     return tryInsertInstruction(
@@ -252,7 +252,7 @@ public:
 
   VPInstruction *createPtrAdd(VPValue *Ptr, VPValue *Offset,
                               DebugLoc DL = DebugLoc::getUnknown(),
-                              const Twine &Name = "") {
+                              StringRef Name = "") {
     return tryInsertInstruction(
         new VPInstruction(VPInstruction::PtrAdd, {Ptr, Offset},
                           GEPNoWrapFlags::none(), {}, DL, Name));
@@ -261,21 +261,21 @@ public:
   VPInstruction *createNoWrapPtrAdd(VPValue *Ptr, VPValue *Offset,
                                     GEPNoWrapFlags GEPFlags,
                                     DebugLoc DL = DebugLoc::getUnknown(),
-                                    const Twine &Name = "") {
+                                    StringRef Name = "") {
     return tryInsertInstruction(new VPInstruction(
         VPInstruction::PtrAdd, {Ptr, Offset}, GEPFlags, {}, DL, Name));
   }
 
   VPInstruction *createWidePtrAdd(VPValue *Ptr, VPValue *Offset,
                                   DebugLoc DL = DebugLoc::getUnknown(),
-                                  const Twine &Name = "") {
+                                  StringRef Name = "") {
     return tryInsertInstruction(
         new VPInstruction(VPInstruction::WidePtrAdd, {Ptr, Offset},
                           GEPNoWrapFlags::none(), {}, DL, Name));
   }
 
   VPPhi *createScalarPhi(ArrayRef<VPValue *> IncomingValues, DebugLoc DL,
-                         const Twine &Name = "") {
+                         StringRef Name = "") {
     return tryInsertInstruction(new VPPhi(IncomingValues, DL, Name));
   }
 
@@ -298,7 +298,7 @@ public:
   VPDerivedIVRecipe *createDerivedIV(InductionDescriptor::InductionKind Kind,
                                      FPMathOperator *FPBinOp, VPValue *Start,
                                      VPValue *Current, VPValue *Step,
-                                     const Twine &Name = "") {
+                                     StringRef Name = "") {
     return tryInsertInstruction(
         new VPDerivedIVRecipe(Kind, FPBinOp, Start, Current, Step, Name));
   }
