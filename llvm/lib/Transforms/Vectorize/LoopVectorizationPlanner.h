@@ -604,6 +604,18 @@ public:
                   [&](const VPlanPtr &Plan) { return Plan->hasVF(VF); });
   }
 
+  /// Look through the existing plans and return true if we have a tail-folded
+  /// plan (one without a scalar tail) with vectorization factor \p VF.
+  bool hasTailFoldedPlanWithVF(ElementCount VF) const {
+    return any_of(VPlans, [&](const VPlanPtr &Plan) {
+      return Plan->hasVF(VF) && !Plan->hasScalarTail();
+    });
+  }
+
+  /// Return a tail-folded VPlan for \p VF. Asserts that exactly one such plan
+  /// exists.
+  VPlan &getTailFoldedPlanFor(ElementCount VF) const;
+
   /// Test a \p Predicate on a \p Range of VF's. Return the value of applying
   /// \p Predicate on Range.Start, possibly decreasing Range.End such that the
   /// returned value holds for the entire \p Range.

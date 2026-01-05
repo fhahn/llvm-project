@@ -1641,16 +1641,40 @@ void LoopVectorizationPlanner::buildVPlans(ElementCount MinVF,
 }
 
 VPlan &LoopVectorizationPlanner::getPlanFor(ElementCount VF) const {
-  assert(count_if(VPlans,
-                  [VF](const VPlanPtr &Plan) { return Plan->hasVF(VF); }) ==
-             1 &&
-         "Multiple VPlans for VF.");
+  // There may be two plans with the same VF: one tail-folded and one with a
+  // scalar tail. In that case, prefer the plan with scalar tail for the main
+  // loop.
+  VPlan *PlanWithScalarTail = nullptr;
+  VPlan *AnyPlan = nullptr;
+  unsigned Count = 0;
+  for (const VPlanPtr &Plan : VPlans) {
+    if (Plan->hasVF(VF)) {
+      ++Count;
+      AnyPlan = Plan.get();
+      if (Plan->hasScalarTail())
+        PlanWithScalarTail = Plan.get();
+    }
+  }
+
+  if (Count == 1)
+    return *AnyPlan;
+  // Multiple plans with the same VF; prefer the one with a scalar tail.
+  assert(Count > 1 && PlanWithScalarTail &&
+         "expected multiple VPlans with a scalar-tail plan");
+  return *PlanWithScalarTail;
+}
+
+VPlan &LoopVectorizationPlanner::getTailFoldedPlanFor(ElementCount VF) const {
+  assert(count_if(VPlans, [VF](const VPlanPtr &Plan) {
+           return Plan->hasVF(VF) && !Plan->hasScalarTail();
+         }) == 1 &&
+         "Expected exactly one tail-folded VPlan for VF.");
 
   for (const VPlanPtr &Plan : VPlans) {
-    if (Plan->hasVF(VF))
+    if (Plan->hasVF(VF) && !Plan->hasScalarTail())
       return *Plan.get();
   }
-  llvm_unreachable("No plan found!");
+  llvm_unreachable("No tail-folded plan found!");
 }
 
 static void addRuntimeUnrollDisableMetaData(Loop *L) {

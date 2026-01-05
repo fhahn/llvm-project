@@ -264,6 +264,12 @@ static cl::opt<bool> EnableCostBasedTailFolding(
     cl::desc("Build VPlans with both tail-folding and scalar epilogue and let "
              "the cost model pick the best option."));
 
+static cl::opt<bool> FoldTailForEpilogueOnly(
+    "fold-tail-for-epilogue-only", cl::init(false), cl::Hidden,
+    cl::desc("When set, use a non-tail-folded main vector loop with a "
+             "tail-folded epilogue vector loop to eliminate the scalar "
+             "remainder. Requires -enable-cost-based-tail-folding."));
+
 static cl::opt<bool> MaximizeBandwidth(
     "vectorizer-maximize-bandwidth", cl::init(false), cl::Hidden,
     cl::desc("Maximize bandwidth when selecting vectorization factor which "
@@ -4639,9 +4645,26 @@ VectorizationFactor LoopVectorizationPlanner::selectEpilogueVectorizationFactor(
       Result = NextVF;
   }
 
-  if (Result != VectorizationFactor::Disabled())
+  // If we selected an epilogue VF, ensure getPlanFor()/getTailFoldedPlanFor()
+  // can find it by removing it from other plans. When FoldTailForEpilogueOnly
+  // is enabled, keep tail-folded plans for the epilogue and remove the VF from
+  // non-tail-folded plans. Otherwise, keep only the first plan with this VF.
+  if (Result != VectorizationFactor::Disabled()) {
     LLVM_DEBUG(dbgs() << "LEV: Vectorizing epilogue loop with VF = "
                       << Result.Width << "\n");
+
+    bool Kept = false;
+    for (auto &P : VPlans) {
+      if (!P->hasVF(Result.Width))
+        continue;
+      bool IsTailFolded = !P->hasScalarTail();
+      if (FoldTailForEpilogueOnly ? IsTailFolded : !Kept) {
+        Kept = true;
+        continue;
+      }
+      P->removeVF(Result.Width);
+    }
+  }
   return Result;
 }
 
@@ -7430,8 +7453,25 @@ LoopVectorizationPlanner::computeBestVF() {
       CurrentFactor.HasScalarTail = P->hasScalarTail();
 
       if (isMoreProfitable(CurrentFactor, BestFactor)) {
+<<<<<<< HEAD
         BestFactor = CurrentFactor;
         BestPlan = P.get();
+=======
+        // When FoldTailForEpilogueOnly is enabled, prefer non-tail-folded plans
+        // for the main loop (those with scalar tail). Skip tail-folded plans
+        // from main loop selection, but still record them as profitable so they
+        // can be used for the epilogue.
+        if (FoldTailForEpilogueOnly && !P->hasScalarTail() &&
+            !CurrentFactor.Width.isScalar()) {
+          LLVM_DEBUG(
+              dbgs() << "LV: Skipping tail-folded plan for VF " << VF
+                     << " for main loop (will be used for epilogue)\n");
+          if (isMoreProfitable(CurrentFactor, ScalarFactor))
+            ProfitableVFs.push_back(CurrentFactor);
+          continue;
+        }
+        BestFactor = CurrentFactor;
+>>>>>>> cce4aea32d63 (i Step)
       }
 
       // Track the best plan for each VF for deduplication.
@@ -7447,11 +7487,15 @@ LoopVectorizationPlanner::computeBestVF() {
   }
 
   // Deduplicate all VFs across plans so that getPlanFor() finds a unique
-  // plan per VF.
+  // plan per VF. When FoldTailForEpilogueOnly is enabled, keep tail-folded
+  // plans for use as epilogue plans.
   for (auto &[VF, Best] : BestPlanForVF) {
     for (auto &P : VPlans) {
-      if (P.get() != Best.first && P->hasVF(VF))
+      if (P.get() != Best.first && P->hasVF(VF)) {
+        if (FoldTailForEpilogueOnly && !P->hasScalarTail())
+          continue;
         P->removeVF(VF);
+      }
     }
   }
 
@@ -7588,8 +7632,14 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   // which may be needed for epilogue vectorization.
   VPlanTransforms::removeBranchOnConst(BestVPlan, /*OnlyLatches=*/true);
   VPlanTransforms::materializeBackedgeTakenCount(BestVPlan, VectorPH);
+  // Determine whether to use tail-folded trip count calculation. Use the cost
+  // model's decision by default. When FoldTailForEpilogueOnly is enabled, the
+  // main loop uses a non-tail-folded plan even if tail folding is preferred,
+  // so check the plan's hasScalarTail() property in that case.
+  bool UseTailFolding = FoldTailForEpilogueOnly ? !BestVPlan.hasScalarTail()
+                                                : CM.foldTailByMasking();
   VPlanTransforms::materializeVectorTripCount(
-      BestVPlan, VectorPH, IsTailFolded,
+      BestVPlan, VectorPH, UseTailFolding,
       CM.requiresScalarEpilogue(BestVF.isVector()), &BestVPlan.getVFxUF());
   VPlanTransforms::materializeFactors(BestVPlan, VectorPH, BestVF);
   VPlanTransforms::cse(BestVPlan);
@@ -9135,9 +9185,37 @@ LoopVectorizePass::LoopVectorizePass(LoopVectorizeOptions Opts)
                               !EnableLoopVectorization) {}
 
 /// Prepare \p MainPlan for vectorizing the main vector loop during epilogue
-/// vectorization.
+/// vectorization. Remove ResumePhis from \p MainPlan for inductions that
+/// don't have a corresponding wide induction in \p EpiPlan.
 static SmallVector<VPInstruction *>
 preparePlanForMainVectorLoop(VPlan &MainPlan, VPlan &EpiPlan) {
+  // Collect PHI nodes of widened phis in the VPlan for the epilogue. Those
+  // will need their resume-values computed in the main vector loop. Others
+  // can be removed from the main VPlan.
+  SmallPtrSet<PHINode *, 2> EpiWidenedPhis;
+  for (VPRecipeBase &R :
+       EpiPlan.getVectorLoopRegion()->getEntryBasicBlock()->phis()) {
+    if (isa<VPCanonicalIVPHIRecipe, VPActiveLaneMaskPHIRecipe,
+            VPCurrentIterationPHIRecipe>(&R))
+      continue;
+    EpiWidenedPhis.insert(
+        cast<PHINode>(R.getVPSingleValue()->getUnderlyingValue()));
+  }
+  for (VPRecipeBase &R :
+       make_early_inc_range(MainPlan.getScalarHeader()->phis())) {
+    auto *VPIRInst = cast<VPIRPhi>(&R);
+    if (EpiWidenedPhis.contains(&VPIRInst->getIRPhi()))
+      continue;
+    // There is no corresponding wide induction in the epilogue plan that would
+    // need a resume value. Remove the VPIRInst wrapping the scalar header phi
+    // together with the corresponding ResumePhi. The resume values for the
+    // scalar loop will be created during execution of EpiPlan.
+    VPRecipeBase *ResumePhi = VPIRInst->getOperand(0)->getDefiningRecipe();
+    VPIRInst->eraseFromParent();
+    ResumePhi->eraseFromParent();
+  }
+  RUN_VPLAN_PASS(VPlanTransforms::removeDeadRecipes, MainPlan);
+
   using namespace VPlanPatternMatch;
   // When vectorizing the epilogue, FindFirstIV & FindLastIV reductions can
   // introduce multiple uses of undef/poison. If the reduction start value may
@@ -9290,8 +9368,12 @@ static SmallVector<Instruction *> preparePlanForEpilogueVectorLoop(
   SmallVector<Instruction *> InstsToMove;
   // Ensure that the start values for all header phi recipes are updated before
   // vectorizing the epilogue loop. Skip the canonical IV, which has been
-  // handled above.
+  // handled above. Also skip active lane mask and EVL-based IV recipes as they
+  // are specific to tail-folded loops and don't need resume values.
   for (VPRecipeBase &R : drop_begin(Header->phis())) {
+    // Skip recipes that are specific to tail-folded loops.
+    if (isa<VPActiveLaneMaskPHIRecipe, VPCurrentIterationPHIRecipe>(&R))
+      continue;
     Value *ResumeV = nullptr;
     // TODO: Move setting of resume values to prepareToExecute.
     if (auto *ReductionPhi = dyn_cast<VPReductionPHIRecipe>(&R)) {
@@ -9419,6 +9501,12 @@ static SmallVector<Instruction *> preparePlanForEpilogueVectorLoop(
     ExpandR->eraseFromParent();
   }
 
+  // For tail-folded epilogue plans, skip the minimum iteration check since
+  // the tail-folded loop handles any number of remaining iterations with
+  // masking. No scalar remainder is needed.
+  if (!Plan.hasScalarTail())
+    return InstsToMove;
+
   auto VScale = CM.getVScaleForTuning();
   unsigned MainLoopStep =
       estimateElementCount(EPI.MainLoopVF * EPI.MainLoopUF, VScale);
@@ -9445,6 +9533,7 @@ fixScalarResumeValuesFromBypass(BasicBlock *BypassBlock, Loop *L,
       Phi.addIncoming(Phi.getIncomingValueForBlock(BypassBlock), Pred);
     }
   }
+
   auto *ScalarPH = cast<VPIRBasicBlock>(BestEpiPlan.getScalarPreheader());
   if (ScalarPH->hasPredecessors()) {
     // Fix resume values for inductions and reductions from the additional
@@ -9478,9 +9567,36 @@ static void connectEpilogueVectorLoop(VPlan &EpiPlan, Loop *L,
   BasicBlock *VecEpilogueIterationCountCheck =
       cast<VPIRBasicBlock>(EpiPlan.getEntry())->getIRBasicBlock();
 
-  BasicBlock *VecEpiloguePreHeader =
-      cast<CondBrInst>(VecEpilogueIterationCountCheck->getTerminator())
-          ->getSuccessor(1);
+  // Get the epilogue preheader. For tail-folded epilogue plans, the entry
+  // block may have an unconditional branch directly to the preheader.
+  // For non-tail-folded plans, there's a conditional iteration check.
+  auto *Term = VecEpilogueIterationCountCheck->getTerminator();
+  BasicBlock *VecEpiloguePreHeader;
+  bool IsTailFoldedEpilogue = false;
+  if (isa<UncondBrInst>(Term)) {
+      // Tail-folded epilogue: the unconditional branch might go to the scalar
+      // preheader. Get the correct epilogue vector preheader by name.
+      IsTailFoldedEpilogue = true;
+      Function *F = VecEpilogueIterationCountCheck->getParent();
+      VecEpiloguePreHeader = nullptr;
+      for (BasicBlock &BB : *F) {
+        if (BB.getName() == "vec.epilog.ph") {
+          VecEpiloguePreHeader = &BB;
+          break;
+        }
+      }
+      assert(VecEpiloguePreHeader &&
+             "Failed to find epilogue vector preheader");
+      LLVM_DEBUG(dbgs() << "LV: Tail-folded epilogue, redirecting to "
+                        << VecEpiloguePreHeader->getName() << "\n");
+      // Update the terminator to branch to the correct preheader.
+      cast<UncondBrInst>(Term)->setSuccessor(0, VecEpiloguePreHeader);
+  } else if (auto *BI = dyn_cast<CondBrInst>(Term)) {
+      // Non-tail-folded: conditional branch, preheader is the "true" successor
+      VecEpiloguePreHeader = BI->getSuccessor(1);
+  } else {
+    llvm_unreachable("Expected branch instruction as entry block terminator");
+  }
   // Adjust the control flow taking the state info from the main loop
   // vectorization into account.
   assert(EPI.MainLoopIterationCountCheck && EPI.EpilogueIterationCountCheck &&
@@ -9493,6 +9609,59 @@ static void connectEpilogueVectorLoop(VPlan &EpiPlan, Loop *L,
                      VecEpilogueIterationCountCheck},
                     {DominatorTree::Insert, EPI.MainLoopIterationCountCheck,
                      VecEpiloguePreHeader}});
+
+  // For tail-folded epilogues, there is no scalar remainder loop - the
+  // tail-folded epilogue handles all remaining iterations. Skip the bypass
+  // updates to the scalar preheader.
+  if (IsTailFoldedEpilogue) {
+    // For tail-folded epilogues, redirect the epilogue iteration count check
+    // to the epilogue preheader (the epilogue loop will handle all iterations).
+    EPI.EpilogueIterationCountCheck->getTerminator()->replaceUsesOfWith(
+        VecEpilogueIterationCountCheck, VecEpiloguePreHeader);
+    DTU.applyUpdates(
+        {{DominatorTree::Delete, EPI.EpilogueIterationCountCheck,
+          VecEpilogueIterationCountCheck},
+         {DominatorTree::Insert, EPI.EpilogueIterationCountCheck,
+          VecEpiloguePreHeader}});
+
+    // Adjust the terminators of runtime check blocks for tail-folded epilogue.
+    BasicBlock *SCEVCheckBlock = Checks.getSCEVChecks().second;
+    BasicBlock *MemCheckBlock = Checks.getMemRuntimeChecks().second;
+    if (SCEVCheckBlock) {
+      SCEVCheckBlock->getTerminator()->replaceUsesOfWith(
+          VecEpilogueIterationCountCheck, VecEpiloguePreHeader);
+      DTU.applyUpdates({{DominatorTree::Delete, SCEVCheckBlock,
+                         VecEpilogueIterationCountCheck},
+                        {DominatorTree::Insert, SCEVCheckBlock,
+                         VecEpiloguePreHeader}});
+    }
+    if (MemCheckBlock) {
+      MemCheckBlock->getTerminator()->replaceUsesOfWith(
+          VecEpilogueIterationCountCheck, VecEpiloguePreHeader);
+      DTU.applyUpdates({{DominatorTree::Delete, MemCheckBlock,
+                         VecEpilogueIterationCountCheck},
+                        {DominatorTree::Insert, MemCheckBlock,
+                         VecEpiloguePreHeader}});
+    }
+
+    // Move phis from the iteration count check block to the preheader.
+    SmallVector<PHINode *, 4> PhisInBlock(
+        llvm::make_pointer_range(VecEpilogueIterationCountCheck->phis()));
+    for (PHINode *Phi : PhisInBlock) {
+      Phi->moveBefore(VecEpiloguePreHeader->getFirstNonPHIIt());
+      Phi->replaceIncomingBlockWith(
+          VecEpilogueIterationCountCheck->getSinglePredecessor(),
+          VecEpilogueIterationCountCheck);
+    }
+
+    auto IP = VecEpiloguePreHeader->getFirstNonPHIIt();
+    for (auto *I : InstsToMove)
+      I->moveBefore(IP);
+
+    // For tail-folded epilogues, there is no scalar remainder loop, so we
+    // don't need to fix scalar resume values.
+    return;
+  }
 
   BasicBlock *ScalarPH =
       cast<VPIRBasicBlock>(EpiPlan.getScalarPreheader())->getIRBasicBlock();
@@ -9939,7 +10108,14 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     // The first pass vectorizes the main loop and creates a scalar epilogue
     // to be vectorized by executing the plan (potentially with a different
     // factor) again shortly afterwards.
-    VPlan &BestEpiPlan = LVP.getPlanFor(EpilogueVF.Width);
+    // When FoldTailForEpilogueOnly is enabled, use the tail-folded plan for
+    // the epilogue to avoid a scalar remainder after the epilogue vector loop.
+    bool UseTailFoldedEpilogue =
+        FoldTailForEpilogueOnly &&
+        LVP.hasTailFoldedPlanWithVF(EpilogueVF.Width);
+    VPlan &BestEpiPlan = UseTailFoldedEpilogue
+                             ? LVP.getTailFoldedPlanFor(EpilogueVF.Width)
+                             : LVP.getPlanFor(EpilogueVF.Width);
     BestEpiPlan.getMiddleBlock()->setName("vec.epilog.middle.block");
     BestEpiPlan.getVectorPreheader()->setName("vec.epilog.ph");
     SmallVector<VPInstruction *> ResumeValues =
