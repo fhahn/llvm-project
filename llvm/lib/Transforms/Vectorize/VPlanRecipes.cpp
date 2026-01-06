@@ -2832,14 +2832,14 @@ VPExpressionRecipe::VPExpressionRecipe(
       if (Def && ExpressionRecipesAsSetOfUsers.contains(Def))
         continue;
       addOperand(Op);
-      LiveInPlaceholders.push_back(new VPSymbolicValue());
+      Placeholders.push_back(new VPSymbolicValue());
     }
   }
 
   // Replace each external operand with the first one created for it in
-  // LiveInPlaceholders.
+  // Placeholders.
   for (auto *R : ExpressionRecipes)
-    for (auto const &[LiveIn, Tmp] : zip(operands(), LiveInPlaceholders))
+    for (auto const &[LiveIn, Tmp] : zip(operands(), Placeholders))
       R->replaceUsesOfWith(LiveIn, Tmp);
 }
 
@@ -2851,7 +2851,7 @@ void VPExpressionRecipe::decompose() {
       R->insertBefore(this);
 
   for (const auto &[Idx, Op] : enumerate(operands()))
-    LiveInPlaceholders[Idx]->replaceAllUsesWith(Op);
+    Placeholders[Idx]->replaceAllUsesWith(Op);
 
   replaceAllUsesWith(ExpressionRecipes.back());
   ExpressionRecipes.clear();

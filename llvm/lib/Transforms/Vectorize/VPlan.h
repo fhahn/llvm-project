@@ -3053,7 +3053,7 @@ class VPExpressionRecipe : public VPSingleDefRecipe {
 
   /// Temporary VPValues used for external operands of the expression, i.e.
   /// operands not defined by recipes in the expression.
-  SmallVector<VPValue *> LiveInPlaceholders;
+  SmallVector<VPValue *> Placeholders;
 
   enum class ExpressionTypes {
     /// Represents an inloop extended reduction operation, performing a
@@ -3115,7 +3115,7 @@ public:
       if (ExpressionRecipesSeen.insert(R).second)
         delete R;
     }
-    for (VPValue *T : LiveInPlaceholders)
+    for (VPValue *T : Placeholders)
       delete T;
   }
 
@@ -3131,8 +3131,7 @@ public:
         New->replaceUsesOfWith(Old, NewExpressiondRecipes[Idx]);
       // Update placeholder operands in the cloned recipe to use the external
       // operands, to be internalized when the cloned expression is constructed.
-      for (const auto &[Placeholder, OutsideOp] :
-           zip(LiveInPlaceholders, operands()))
+      for (const auto &[Placeholder, OutsideOp] : zip(Placeholders, operands()))
         New->replaceUsesOfWith(Placeholder, OutsideOp);
     }
     return new VPExpressionRecipe(ExpressionType, NewExpressiondRecipes);
