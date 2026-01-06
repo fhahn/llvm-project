@@ -2595,15 +2595,16 @@ protected:
     // TODO: extend the masked interleaved-group support to reversed access.
     assert((!Mask || !IG->isReverse()) &&
            "Reversed masked interleave-group not supported.");
-    for (unsigned I = 0; I < IG->getFactor(); ++I)
-      if (Instruction *Inst = IG->getMember(I)) {
-        if (Inst->getType()->isVoidTy())
-          continue;
-        new VPRecipeValue(this, Inst);
-      }
-
-    for (auto *SV : StoredValues)
-      addOperand(SV);
+    if (StoredValues.empty()) {
+      for (unsigned I = 0; I < IG->getFactor(); ++I)
+        if (Instruction *Inst = IG->getMember(I)) {
+          assert(!Inst->getType()->isVoidTy());
+          new VPRecipeValue(Inst, this);
+        }
+    } else {
+      for (auto *SV : StoredValues)
+        addOperand(SV);
+    }
     if (Mask) {
       HasMask = true;
       addOperand(Mask);
