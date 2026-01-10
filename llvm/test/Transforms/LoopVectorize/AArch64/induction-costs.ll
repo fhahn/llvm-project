@@ -487,6 +487,39 @@ exit:
   ret i32 %rdx.next
 }
 
+; Test that sext(sub nsw) used in address computation is handled correctly
+; in VPlan cost model (must match SCEV's handling).
+define ptr @sext_sub_nsw_for_address(ptr %base, i64 %n, ptr %src) #0 {
+; CHECK-LABEL: define ptr @sext_sub_nsw_for_address(
+; CHECK:       vector.body:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %count = phi i64 [ %n, %entry ], [ %count.next, %loop ]
+  %iv.i32 = phi i32 [ 0, %entry ], [ %iv.i32.next, %loop ]
+  %gep.1 = getelementptr double, ptr %src, i64 %iv
+  %gep.2 = getelementptr i8, ptr %gep.1, i64 -8
+  store double 0.000000e+00, ptr %gep.2, align 8
+  %neg = sub nsw i32 0, %iv.i32
+  %neg.ext = sext i32 %neg to i64
+  %gep.3 = getelementptr double, ptr %base, i64 %neg.ext
+  %l = load double, ptr %gep.3, align 8
+  store double %l, ptr %gep.1, align 8
+  %iv.i32.next = add i32 %iv.i32, 2
+  %iv.next = add i64 %iv, 2
+  %count.next = add i64 %count, -1
+  %ec = icmp sgt i64 %count, 0
+  br i1 %ec, label %loop, label %exit
+
+exit:
+  ret ptr null
+}
+
+attributes #0 = { "target-cpu"="neoverse-v2" }
+
 ;.
 ; CHECK: [[LOOP0]] = distinct !{[[LOOP0]], [[META1:![0-9]+]], [[META2:![0-9]+]]}
 ; CHECK: [[META1]] = !{!"llvm.loop.isvectorized", i32 1}

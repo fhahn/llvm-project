@@ -82,6 +82,71 @@ bool vputils::isHeaderMask(const VPValue *V, const VPlan &Plan) {
          B == Plan.getBackedgeTakenCount();
 }
 
+/// Returns true if \p R propagates poison from operand \p OpIdx to its result.
+static bool propagatesPoisonFromRecipeOp(const VPRecipeBase *R,
+                                         unsigned OpIdx) {
+  return TypeSwitch<const VPRecipeBase *, bool>(R)
+      .Case<VPWidenGEPRecipe, VPWidenCastRecipe>(
+          [](const VPRecipeBase *) { return true; })
+      .Case<VPInstruction>([OpIdx](const VPInstruction *VPI) {
+        // ExtractElement propagates poison from vector operand (operand 0).
+        return VPI->getOpcode() == Instruction::ExtractElement && OpIdx == 0;
+      })
+      .Case<VPReplicateRecipe>([](const VPReplicateRecipe *Rep) {
+        // GEP and casts propagate poison from all operands.
+        unsigned Opcode = Rep->getOpcode();
+        return Opcode == Instruction::GetElementPtr ||
+               Instruction::isCast(Opcode);
+      })
+      .Default([](const VPRecipeBase *) { return false; });
+}
+
+/// Returns true if \p V being poison is guaranteed to trigger UB because it
+/// propagates to a memory operation address or branch condition.
+static bool poisonGuaranteesUB(const VPValue *V) {
+  SmallPtrSet<const VPValue *, 8> Visited;
+  SmallVector<const VPValue *, 16> Worklist;
+
+  Visited.insert(V);
+  Worklist.push_back(V);
+
+  while (!Worklist.empty()) {
+    const VPValue *Current = Worklist.pop_back_val();
+
+    for (VPUser *U : Current->users()) {
+      auto *R = dyn_cast<VPRecipeBase>(U);
+      if (!R)
+        continue;
+
+      // Check if Current is used as an address operand for load/store (UB).
+      if (auto *MemR = dyn_cast<VPWidenMemoryRecipe>(R)) {
+        if (MemR->getAddr() == Current)
+          return true;
+        continue;
+      }
+
+      // Replicated load/store with poison address is UB.
+      if (auto *Rep = dyn_cast<VPReplicateRecipe>(R)) {
+        unsigned Opcode = Rep->getOpcode();
+        if ((Opcode == Instruction::Load && Rep->getOperand(0) == Current) ||
+            (Opcode == Instruction::Store && Rep->getOperand(1) == Current))
+          return true;
+      }
+
+      // Check if poison propagates through this recipe to any of its users.
+      for (auto [Idx, Op] : enumerate(R->operands())) {
+        if (Op == Current && propagatesPoisonFromRecipeOp(R, Idx)) {
+          if (Visited.insert(R->getVPSingleValue()).second)
+            Worklist.push_back(R->getVPSingleValue());
+          break;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
 const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
                                            PredicatedScalarEvolution &PSE,
                                            const Loop *L) {
@@ -140,6 +205,23 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
   if (match(V, m_SExt(m_VPValue(LHSVal)))) {
     const VPlan *Plan = V->getDefiningRecipe()->getParent()->getPlan();
     Type *DestTy = VPTypeAnalysis(*Plan).inferScalarType(V);
+
+    // Mirror SCEV's createSCEV handling for sext(sub nsw): push sign extension
+    // onto the operands before computing the subtraction. This preserves NSW
+    // and allows better AddRec optimizations. Only valid when poison from the
+    // sub leads to UB.
+    VPValue *SubLHS, *SubRHS;
+    auto *SubR =
+        dyn_cast_or_null<VPRecipeWithIRFlags>(LHSVal->getDefiningRecipe());
+    if (match(LHSVal, m_Sub(m_VPValue(SubLHS), m_VPValue(SubRHS))) && SubR &&
+        SubR->hasNoSignedWrap() && poisonGuaranteesUB(LHSVal)) {
+      const SCEV *V1 = getSCEVExprForVPValue(SubLHS, PSE, L);
+      const SCEV *V2 = getSCEVExprForVPValue(SubRHS, PSE, L);
+      if (!isa<SCEVCouldNotCompute>(V1) && !isa<SCEVCouldNotCompute>(V2))
+        return SE.getMinusSCEV(SE.getSignExtendExpr(V1, DestTy),
+                               SE.getSignExtendExpr(V2, DestTy), SCEV::FlagNSW);
+    }
+
     return CreateSCEV({LHSVal}, [&](ArrayRef<const SCEV *> Ops) {
       return SE.getSignExtendExpr(Ops[0], DestTy);
     });
