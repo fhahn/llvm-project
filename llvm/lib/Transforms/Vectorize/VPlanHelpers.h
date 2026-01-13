@@ -340,6 +340,14 @@ struct VPTransformState {
   VPDominatorTree VPDT;
 };
 
+/// Returns true if the VPlan-based cost model should be used for computing
+/// costs for replicating stores with \p VF and memory instruction \p MemI.
+inline bool useVPlanCostModelForReplicatingStore(ElementCount VF,
+                                                 Instruction *MemI) {
+  return isa<StoreInst>(MemI) && VF.getKnownMinValue() == 2 &&
+         getLoadStoreType(MemI)->isDoubleTy();
+}
+
 /// Struct to hold various analysis needed for cost computations.
 struct VPCostContext {
   const TargetTransformInfo &TTI;

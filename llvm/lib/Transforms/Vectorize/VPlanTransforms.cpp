@@ -3457,6 +3457,7 @@ canSinkStoreWithNoAliasCheck(ArrayRef<VPReplicateRecipe *> StoresToSink,
 void VPlanTransforms::sinkPredicatedStores(VPlan &Plan,
                                            PredicatedScalarEvolution &PSE,
                                            const Loop *L) {
+  return;
   auto Groups =
       collectComplementaryPredicatedMemOps<Instruction::Store>(Plan, PSE, L);
   if (Groups.empty())

@@ -3162,7 +3162,8 @@ InstructionCost VPReplicateRecipe::computeCost(ElementCount VF,
     // TODO: See getMemInstScalarizationCost for how to handle replicating and
     // predicated cases.
     const VPRegionBlock *ParentRegion = getParent()->getParent();
-    if (ParentRegion && ParentRegion->isReplicator())
+    if (ParentRegion && ParentRegion->isReplicator() &&
+        !useVPlanCostModelForReplicatingStore(VF, UI))
       break;
 
     bool IsLoad = UI->getOpcode() == Instruction::Load;
@@ -3209,6 +3210,18 @@ InstructionCost VPReplicateRecipe::computeCost(ElementCount VF,
 
     TTI::VectorInstrContext VIC =
         IsLoad ? TTI::VectorInstrContext::Load : TTI::VectorInstrContext::Store;
+    if (ParentRegion && ParentRegion->isReplicator() &&
+        useVPlanCostModelForReplicatingStore(VF, UI)) {
+
+      InstructionCost Cost = 0;
+      Cost += VF.getKnownMinValue() *
+              Ctx.TTI.getCFInstrCost(Instruction::Br, Ctx.CostKind);
+
+      return Cost + ((ScalarCost * VF.getFixedValue()) +
+                     Ctx.getScalarizationOverhead(ResultTy, OpsToScalarize, VF,
+                                                  VIC, true)) / 2;
+    }
+
     return (ScalarCost * VF.getFixedValue()) +
            Ctx.getScalarizationOverhead(ResultTy, OpsToScalarize, VF, VIC,
                                         true);
