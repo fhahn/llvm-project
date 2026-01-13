@@ -585,6 +585,9 @@ void VPlanTransforms::createAndOptimizeReplicateRegions(VPlan &Plan) {
   // Convert masked VPReplicateRecipes to if-then region blocks.
   addReplicateRegions(Plan);
 
+  // Sink stores with the same mask together to enable merging.
+  sinkSameMaskStores(Plan);
+
   bool ShouldSimplify = true;
   while (ShouldSimplify) {
     ShouldSimplify = sinkScalarOperands(Plan);
@@ -4722,6 +4725,201 @@ canSinkStoreWithNoAliasCheck(ArrayRef<VPReplicateRecipe *> StoresToSink,
   VPBasicBlock *LastBB = StoresToSink.back()->getParent();
   SinkStoreInfo SinkInfo(StoresToSinkSet, *StoresToSink[0], PSE, L, TypeInfo);
   return canHoistOrSinkWithNoAliasCheck(*StoreLoc, FirstBB, LastBB, SinkInfo);
+}
+
+/// Collect store replicate regions grouped by their mask (predicate).
+/// Returns a map from mask to list of {region, store recipe} pairs.
+static DenseMap<VPValue *, SmallVector<std::pair<VPRegionBlock *, VPRecipeBase *>>>
+collectStoreRegionsByMask(VPlan &Plan) {
+  DenseMap<VPValue *, SmallVector<std::pair<VPRegionBlock *, VPRecipeBase *>>>
+      RegionsByMask;
+
+  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
+  for (VPRegionBlock *Region : VPBlockUtils::blocksOnly<VPRegionBlock>(
+           vp_depth_first_shallow(LoopRegion->getEntry()))) {
+    if (!Region->isReplicator())
+      continue;
+
+    VPValue *Mask = getPredicatedMask(Region);
+    if (!Mask)
+      continue;
+
+    VPBasicBlock *ThenBB = getPredicatedThenBlock(Region);
+    if (!ThenBB)
+      continue;
+
+    // Find the store recipe in the then block.
+    VPRecipeBase *StoreRecipe = nullptr;
+    for (VPRecipeBase &R : *ThenBB) {
+      auto *RepR = dyn_cast<VPReplicateRecipe>(&R);
+      if (RepR && RepR->getOpcode() == Instruction::Store) {
+        StoreRecipe = &R;
+        break;
+      }
+    }
+
+    if (StoreRecipe)
+      RegionsByMask[Mask].push_back({Region, StoreRecipe});
+  }
+
+  return RegionsByMask;
+}
+
+/// Check if stores in the given regions can be sunk past intermediate blocks
+/// using noalias metadata. The regions must be in dominance order.
+static bool canSinkRegionStores(
+    ArrayRef<std::pair<VPRegionBlock *, VPRecipeBase *>> Regions) {
+  if (Regions.size() < 2)
+    return false;
+
+  // Get memory location from the first store to check aliasing.
+  auto *FirstStore = cast<VPReplicateRecipe>(Regions.front().second);
+  auto StoreLoc = vputils::getMemoryLocation(*FirstStore);
+  if (!StoreLoc || !StoreLoc->AATags.Scope)
+    return false;
+
+  const AAMDNodes &StoreAA = StoreLoc->AATags;
+
+  // Check all intermediate blocks between first and last region.
+  for (size_t I = 0; I < Regions.size() - 1; ++I) {
+    VPRegionBlock *Region = Regions[I].first;
+    VPBasicBlock *SuccBB =
+        dyn_cast_or_null<VPBasicBlock>(Region->getSingleSuccessor());
+    if (!SuccBB)
+      return false;
+
+    // Walk through blocks until we hit the next region.
+    VPRegionBlock *NextRegion = Regions[I + 1].first;
+    for (VPBlockBase *Block = SuccBB; Block && Block != NextRegion;
+         Block = Block->getSingleSuccessor()) {
+      auto *VPBB = dyn_cast<VPBasicBlock>(Block);
+      if (!VPBB)
+        return false;
+
+      for (VPRecipeBase &R : *VPBB) {
+        // Check if this recipe may read or write memory.
+        if (!R.mayReadFromMemory() && !R.mayWriteToMemory())
+          continue;
+
+        auto Loc = vputils::getMemoryLocation(R);
+        if (!Loc)
+          return false;
+
+        // For reads, check if they don't alias with our store using noalias
+        // metadata.
+        if (R.mayReadFromMemory() &&
+            ScopedNoAliasAAResult::mayAliasInScopes(Loc->AATags.Scope,
+                                                    StoreAA.NoAlias))
+          return false;
+
+        // For writes, check both directions.
+        if (R.mayWriteToMemory()) {
+          if (ScopedNoAliasAAResult::mayAliasInScopes(StoreAA.Scope,
+                                                      Loc->AATags.NoAlias))
+            return false;
+          if (ScopedNoAliasAAResult::mayAliasInScopes(Loc->AATags.Scope,
+                                                      StoreAA.NoAlias))
+            return false;
+        }
+      }
+    }
+  }
+
+  return true;
+}
+
+/// Remove empty replicate regions by bypassing them in the CFG.
+static void removeEmptyReplicateRegions(VPlan &Plan) {
+  SmallVector<VPRegionBlock *> ToRemove;
+  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
+  for (VPRegionBlock *Region : VPBlockUtils::blocksOnly<VPRegionBlock>(
+           vp_depth_first_shallow(LoopRegion->getEntry()))) {
+    if (!Region->isReplicator())
+      continue;
+
+    VPBasicBlock *ThenBB = getPredicatedThenBlock(Region);
+    if (!ThenBB || !ThenBB->empty())
+      continue;
+
+    // The then block is empty, remove this region.
+    ToRemove.push_back(Region);
+  }
+
+  for (VPRegionBlock *Region : ToRemove) {
+    // Remove recipes from the region's blocks before disconnecting.
+    for (VPRecipeBase &R :
+         make_early_inc_range(reverse(*Region->getEntryBasicBlock())))
+      R.eraseFromParent();
+
+    // Bypass the region: connect predecessors directly to successors.
+    for (VPBlockBase *Pred : make_early_inc_range(Region->getPredecessors())) {
+      VPBlockUtils::disconnectBlocks(Pred, Region);
+      for (VPBlockBase *Succ : Region->getSuccessors())
+        VPBlockUtils::connectBlocks(Pred, Succ);
+    }
+    for (VPBlockBase *Succ : make_early_inc_range(Region->getSuccessors()))
+      VPBlockUtils::disconnectBlocks(Region, Succ);
+  }
+}
+
+void VPlanTransforms::sinkSameMaskStores(VPlan &Plan) {
+  // Collect store regions grouped by their mask.
+  auto RegionsByMask = collectStoreRegionsByMask(Plan);
+
+  VPDominatorTree VPDT(Plan);
+  bool Changed = true;
+
+  while (Changed) {
+    Changed = false;
+
+    for (auto &[Mask, Regions] : RegionsByMask) {
+      if (Regions.size() < 2)
+        continue;
+
+      // Sort regions by dominance order.
+      sort(Regions, [&VPDT](const auto &A, const auto &B) {
+        return VPDT.properlyDominates(A.first, B.first);
+      });
+
+      // Check if we can sink stores past intermediate blocks.
+      if (!canSinkRegionStores(Regions))
+        continue;
+
+      for (unsigned I = 0; I+4 <= Regions.size(); I += 4) {
+        // Get the last region - we'll sink all stores into this one.
+        ArrayRef<std::pair<VPRegionBlock *, VPRecipeBase *>> Block(&Regions[I], 4);
+        VPRegionBlock *LastRegion = Block.back().first;
+        VPBasicBlock *LastThenBB = getPredicatedThenBlock(LastRegion);
+        if (!LastThenBB)
+          continue;
+
+        // Sink recipes from earlier regions into the last region.
+        for (size_t I = 0; I < Block.size() - 1; ++I) {
+          VPRegionBlock *Region = Block[I].first;
+          VPBasicBlock *ThenBB = getPredicatedThenBlock(Region);
+          if (!ThenBB)
+            continue;
+
+          // Move all recipes from ThenBB to LastThenBB.
+          for (VPRecipeBase &R : make_early_inc_range(*ThenBB))
+            R.moveBefore(*LastThenBB, LastThenBB->begin());
+
+          Changed = true;
+        }
+      }
+
+      // After sinking, we need to re-collect regions since the structure
+      // changed.
+      if (Changed)
+        break;
+    }
+
+    if (Changed)
+      RegionsByMask = collectStoreRegionsByMask(Plan);
+  }
+
+  // Remove empty replicate regions that were created by sinking.
+  removeEmptyReplicateRegions(Plan);
 }
 
 void VPlanTransforms::sinkPredicatedStores(VPlan &Plan,

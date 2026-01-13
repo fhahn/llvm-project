@@ -370,6 +370,10 @@ struct VPlanTransforms {
   static void sinkPredicatedStores(VPlan &Plan, PredicatedScalarEvolution &PSE,
                                    const Loop *L);
 
+  /// Sink predicated stores with the same mask together into a single replicate
+  /// region. This enables subsequent merging of replicate regions.
+  static void sinkSameMaskStores(VPlan &Plan);
+
   // Materialize vector trip counts for constants early if it can simply be
   // computed as (Original TC / VF * UF) * VF * UF.
   static void
