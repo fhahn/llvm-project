@@ -4275,6 +4275,10 @@ AArch64TTIImpl::getAddressComputationCost(Type *Ty, ScalarEvolution *SE,
   unsigned NumVectorInstToHideOverhead = NeonNonConstStrideOverhead;
   int MaxMergeDistance = 64;
 
+  if (SE && isa_and_nonnull<SCEVAddRecExpr>(Ptr) &&
+      isa<SCEVConstant>(cast<SCEVAddRecExpr>(Ptr)->getStepRecurrence(*SE)))
+    return 1;
+
   if (Ty->isVectorTy() && SE &&
       !BaseT::isConstantStridedAccessLessThan(SE, Ptr, MaxMergeDistance + 1))
     return NumVectorInstToHideOverhead;
