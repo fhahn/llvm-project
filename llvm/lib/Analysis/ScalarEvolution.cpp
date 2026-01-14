@@ -14968,7 +14968,7 @@ public:
         for (const auto *Pred : U->getPredicates())
           if (const auto *IPred = dyn_cast<SCEVComparePredicate>(Pred))
             if (IPred->getLHS() == Expr &&
-                IPred->getPredicate() == ICmpInst::ICMP_EQ)
+                IPred->getPredicate() == ICmpInst::ICMP_EQ && isa<SCEVConstant>(IPred->getRHS()))
               return IPred->getRHS();
       } else if (const auto *IPred = dyn_cast<SCEVComparePredicate>(Pred)) {
         if (IPred->getLHS() == Expr &&
