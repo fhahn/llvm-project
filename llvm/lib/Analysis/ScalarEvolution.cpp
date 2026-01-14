@@ -14980,35 +14980,19 @@ public:
   }
 
   const SCEV *visitZeroExtendExpr(const SCEVZeroExtendExpr *Expr) {
-    const SCEV *Operand = visit(Expr->getOperand());
-    const SCEVAddRecExpr *AR = dyn_cast<SCEVAddRecExpr>(Operand);
-    if (AR && AR->getLoop() == L && AR->isAffine()) {
-      // This couldn't be folded because the operand didn't have the nuw
-      // flag. Add the nusw flag as an assumption that we could make.
-      const SCEV *Step = AR->getStepRecurrence(SE);
-      Type *Ty = Expr->getType();
-      if (addOverflowAssumption(AR, SCEVWrapPredicate::IncrementNUSW))
-        return SE.getAddRecExpr(SE.getZeroExtendExpr(AR->getStart(), Ty),
-                                SE.getSignExtendExpr(Step, Ty), L,
-                                AR->getNoWrapFlags());
-    }
-    return SE.getZeroExtendExpr(Operand, Expr->getType());
+    const SCEV *Operand = Expr->getOperand();
+    const SCEV *Res = foldZExtIntoAddRec(Operand, Expr->getType());
+    if (isa<SCEVAddRecExpr>(Res))
+      return Res;
+    return foldZExtIntoAddRec(visit(Operand), Expr->getType());
   }
 
   const SCEV *visitSignExtendExpr(const SCEVSignExtendExpr *Expr) {
-    const SCEV *Operand = visit(Expr->getOperand());
-    const SCEVAddRecExpr *AR = dyn_cast<SCEVAddRecExpr>(Operand);
-    if (AR && AR->getLoop() == L && AR->isAffine()) {
-      // This couldn't be folded because the operand didn't have the nsw
-      // flag. Add the nssw flag as an assumption that we could make.
-      const SCEV *Step = AR->getStepRecurrence(SE);
-      Type *Ty = Expr->getType();
-      if (addOverflowAssumption(AR, SCEVWrapPredicate::IncrementNSSW))
-        return SE.getAddRecExpr(SE.getSignExtendExpr(AR->getStart(), Ty),
-                                SE.getSignExtendExpr(Step, Ty), L,
-                                AR->getNoWrapFlags());
-    }
-    return SE.getSignExtendExpr(Operand, Expr->getType());
+    const SCEV *Operand = Expr->getOperand();
+    const SCEV *Res = foldSExtIntoAddRec(Operand, Expr->getType());
+    if (isa<SCEVAddRecExpr>(Res))
+      return Res;
+    return foldSExtIntoAddRec(visit(Operand), Expr->getType());
   }
 
 private:
@@ -15058,6 +15042,36 @@ private:
     }
     return PredicatedRewrite->first;
   }
+
+  const SCEV *foldZExtIntoAddRec(const SCEV *Expr, Type *Ty) {
+    const SCEVAddRecExpr *AR = dyn_cast<SCEVAddRecExpr>(Expr);
+    if (AR && AR->getLoop() == L && AR->isAffine()) {
+      // This couldn't be folded because the operand didn't have the nuw
+      // flag. Add the nusw flag as an assumption that we could make.
+      const SCEV *Step = AR->getStepRecurrence(SE);
+      if (addOverflowAssumption(AR, SCEVWrapPredicate::IncrementNUSW))
+        return SE.getAddRecExpr(SE.getZeroExtendExpr(AR->getStart(), Ty),
+                                SE.getSignExtendExpr(Step, Ty), L,
+                                AR->getNoWrapFlags());
+    }
+    return SE.getZeroExtendExpr(Expr, Ty);
+  }
+
+
+  const SCEV *foldSExtIntoAddRec(const SCEV *Expr, Type *Ty) {
+    const SCEVAddRecExpr *AR = dyn_cast<SCEVAddRecExpr>(Expr);
+    if (AR && AR->getLoop() == L && AR->isAffine()) {
+      // This couldn't be folded because the operand didn't have the nsw
+      // flag. Add the nssw flag as an assumption that we could make.
+      const SCEV *Step = AR->getStepRecurrence(SE);
+      if (addOverflowAssumption(AR, SCEVWrapPredicate::IncrementNSSW))
+        return SE.getAddRecExpr(SE.getSignExtendExpr(AR->getStart(), Ty),
+                                SE.getSignExtendExpr(Step, Ty), L,
+                                AR->getNoWrapFlags());
+    }
+    return SE.getSignExtendExpr(Expr, Ty);
+  }
+
 
   SmallVectorImpl<const SCEVPredicate *> *NewPreds;
   const SCEVPredicate *Pred;
