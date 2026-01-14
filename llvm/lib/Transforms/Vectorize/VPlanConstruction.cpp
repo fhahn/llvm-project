@@ -609,7 +609,7 @@ createWidenInductionRecipe(PHINode *Phi, VPPhi *PhiR, VPIRValue *Start,
          "step must be loop invariant");
   assert((Plan.getLiveIn(IndDesc.getStartValue()) == Start ||
           (SE.isSCEVable(IndDesc.getStartValue()->getType()) &&
-           SE.getSCEV(IndDesc.getStartValue()) ==
+           PSE.getSCEV(IndDesc.getStartValue()) ==
                vputils::getSCEVExprForVPValue(Start, PSE))) &&
          "Start VPValue must match IndDesc's start value");
 

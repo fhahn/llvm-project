@@ -137,9 +137,24 @@ static bool poisonGuaranteesUB(const VPValue *V) {
   return false;
 }
 
+/// Builds a SCEV expression for \p V. Async predicates are applied once by
+/// getSCEVExprForVPValue, the public wrapper for this function.
+static const SCEV *getSCEVExprForVPValueImpl(const VPValue *V,
+                                             PredicatedScalarEvolution &PSE,
+                                             const Loop *L);
+
 const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
                                            PredicatedScalarEvolution &PSE,
                                            const Loop *L) {
+  const SCEV *Expr = getSCEVExprForVPValueImpl(V, PSE, L);
+  if (isa<SCEVCouldNotCompute>(Expr))
+    return Expr;
+  return PSE.getPredicatedSCEV(Expr);
+}
+
+static const SCEV *getSCEVExprForVPValueImpl(const VPValue *V,
+                                             PredicatedScalarEvolution &PSE,
+                                             const Loop *L) {
   ScalarEvolution &SE = *PSE.getSE();
   if (isa<VPIRValue, VPSymbolicValue>(V)) {
     Value *LiveIn = V->getUnderlyingValue();
@@ -155,7 +170,7 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
       -> const SCEV * {
     SmallVector<const SCEV *, 2> SCEVOps;
     for (VPValue *Op : Ops) {
-      const SCEV *S = getSCEVExprForVPValue(Op, PSE, L);
+      const SCEV *S = getSCEVExprForVPValueImpl(Op, PSE, L);
       if (isa<SCEVCouldNotCompute>(S))
         return SE.getCouldNotCompute();
       SCEVOps.push_back(S);
@@ -202,8 +217,8 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
     auto *SubR = dyn_cast<VPRecipeWithIRFlags>(LHSVal);
     if (match(LHSVal, m_Sub(m_VPValue(SubLHS), m_VPValue(SubRHS))) && SubR &&
         SubR->hasNoSignedWrap() && poisonGuaranteesUB(LHSVal)) {
-      const SCEV *V1 = getSCEVExprForVPValue(SubLHS, PSE, L);
-      const SCEV *V2 = getSCEVExprForVPValue(SubRHS, PSE, L);
+      const SCEV *V1 = getSCEVExprForVPValueImpl(SubLHS, PSE, L);
+      const SCEV *V2 = getSCEVExprForVPValueImpl(SubRHS, PSE, L);
       if (!isa<SCEVCouldNotCompute>(V1) && !isa<SCEVCouldNotCompute>(V2))
         return SE.getMinusSCEV(SE.getSignExtendExpr(V1, DestTy),
                                SE.getSignExtendExpr(V2, DestTy), SCEV::FlagNSW);
@@ -250,29 +265,30 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
     const SCEV *GEPExpr = CreateSCEV(Ops, [&](ArrayRef<const SCEV *> Ops) {
       return SE.getGEPExpr(Ops.front(), Ops.drop_front(), SourceElementType);
     });
-    return PSE.getPredicatedSCEV(GEPExpr);
+    return GEPExpr;
   }
 
   // TODO: Support constructing SCEVs for more recipes as needed.
   const VPRecipeBase *DefR = V->getDefiningRecipe();
-  const SCEV *Expr = TypeSwitch<const VPRecipeBase *, const SCEV *>(DefR)
+  return TypeSwitch<const VPRecipeBase *, const SCEV *>(DefR)
       .Case<VPExpandSCEVRecipe>(
           [](const VPExpandSCEVRecipe *R) { return R->getSCEV(); })
       .Case<VPCanonicalIVPHIRecipe>([&SE, &PSE,
                                      L](const VPCanonicalIVPHIRecipe *R) {
         if (!L)
           return SE.getCouldNotCompute();
-        const SCEV *Start = getSCEVExprForVPValue(R->getOperand(0), PSE, L);
+        const SCEV *Start = getSCEVExprForVPValueImpl(R->getOperand(0), PSE, L);
         return SE.getAddRecExpr(Start, SE.getOne(Start->getType()), L,
                                 SCEV::FlagAnyWrap);
       })
       .Case<VPWidenIntOrFpInductionRecipe>(
           [&SE, &PSE, L](const VPWidenIntOrFpInductionRecipe *R) {
-            const SCEV *Step = getSCEVExprForVPValue(R->getStepValue(), PSE, L);
+            const SCEV *Step =
+                getSCEVExprForVPValueImpl(R->getStepValue(), PSE, L);
             if (!L || isa<SCEVCouldNotCompute>(Step))
               return SE.getCouldNotCompute();
             const SCEV *Start =
-                getSCEVExprForVPValue(R->getStartValue(), PSE, L);
+                getSCEVExprForVPValueImpl(R->getStartValue(), PSE, L);
             const SCEV *AddRec =
                 SE.getAddRecExpr(Start, Step, L, SCEV::FlagAnyWrap);
             if (R->getTruncInst())
@@ -280,9 +296,9 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
             return AddRec;
           })
       .Case<VPDerivedIVRecipe>([&SE, &PSE, L](const VPDerivedIVRecipe *R) {
-        const SCEV *Start = getSCEVExprForVPValue(R->getOperand(0), PSE, L);
-        const SCEV *IV = getSCEVExprForVPValue(R->getOperand(1), PSE, L);
-        const SCEV *Scale = getSCEVExprForVPValue(R->getOperand(2), PSE, L);
+        const SCEV *Start = getSCEVExprForVPValueImpl(R->getOperand(0), PSE, L);
+        const SCEV *IV = getSCEVExprForVPValueImpl(R->getOperand(1), PSE, L);
+        const SCEV *Scale = getSCEVExprForVPValueImpl(R->getOperand(2), PSE, L);
         if (any_of(ArrayRef({Start, IV, Scale}), IsaPred<SCEVCouldNotCompute>))
           return SE.getCouldNotCompute();
 
@@ -292,16 +308,13 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
       })
       .Case<VPScalarIVStepsRecipe>([&SE, &PSE,
                                     L](const VPScalarIVStepsRecipe *R) {
-        const SCEV *IV = getSCEVExprForVPValue(R->getOperand(0), PSE, L);
-        const SCEV *Step = getSCEVExprForVPValue(R->getOperand(1), PSE, L);
+        const SCEV *IV = getSCEVExprForVPValueImpl(R->getOperand(0), PSE, L);
+        const SCEV *Step = getSCEVExprForVPValueImpl(R->getOperand(1), PSE, L);
         if (isa<SCEVCouldNotCompute>(IV) || !isa<SCEVConstant>(Step))
           return SE.getCouldNotCompute();
         return SE.getTruncateOrSignExtend(IV, Step->getType());
       })
-      .Default(
-          [&SE](const VPRecipeBase *) { return SE.getCouldNotCompute(); });
-
-  return PSE.getPredicatedSCEV(Expr);
+      .Default([&SE](const VPRecipeBase *) { return SE.getCouldNotCompute(); });
 }
 
 bool vputils::isAddressSCEVForCost(const SCEV *Addr, ScalarEvolution &SE,
