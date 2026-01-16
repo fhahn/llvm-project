@@ -7309,13 +7309,20 @@ static VPRecipeBase *findRecipe(VPValue *Start, PredT Pred) {
   return nullptr;
 }
 
-static Value *getStartValueFromReductionResult(VPInstruction *RdxResult) {
+/// Match FindIV result: select(icmp ne ReducedIV, Sentinel), ReducedIV, Start.
+static bool matchFindIVResult(VPInstruction *VPI, VPInstruction *&ReducedIV,
+                              VPValue *&Sentinel, VPValue *&Start) {
   using namespace VPlanPatternMatch;
-  assert(RdxResult->getOpcode() == VPInstruction::ComputeFindIVResult &&
-         "RdxResult must be ComputeFindIVResult");
-  VPValue *StartVPV = RdxResult->getOperand(0);
-  match(StartVPV, m_Freeze(m_VPValue(StartVPV)));
-  return StartVPV->getLiveInIRValue();
+  VPValue *CmpLHS;
+  if (!VPI ||
+      !match(VPI, m_Select(m_ICmp(m_VPValue(CmpLHS), m_VPValue(Sentinel)),
+                           m_Deferred(CmpLHS), m_VPValue(Start))))
+    return false;
+  ReducedIV = dyn_cast<VPInstruction>(CmpLHS);
+  return ReducedIV &&
+         ReducedIV->getOpcode() == VPInstruction::ComputeReductionResult &&
+         RecurrenceDescriptor::isMinMaxRecurrenceKind(
+             ReducedIV->getRecurKind());
 }
 
 // If \p EpiResumePhiR is resume VPPhi for a reduction when vectorizing the
@@ -7330,15 +7337,23 @@ static void fixReductionScalarResumeWhenVectorizingEpilog(
   match(Incoming, VPlanPatternMatch::m_ZExtOrSExt(
                       VPlanPatternMatch::m_VPValue(Incoming)));
   auto *EpiRedResult = dyn_cast<VPInstruction>(Incoming);
-  if (!EpiRedResult ||
-      (EpiRedResult->getOpcode() != VPInstruction::ComputeAnyOfResult &&
-       EpiRedResult->getOpcode() != VPInstruction::ComputeReductionResult &&
-       EpiRedResult->getOpcode() != VPInstruction::ComputeFindIVResult))
+  if (!EpiRedResult)
     return;
 
-  // Find the reduction phi by searching users of the backedge value.
+  // Match FindIV pattern and extract components.
+  VPInstruction *ReducedIV = nullptr;
+  VPValue *Sentinel = nullptr, *StartVPV = nullptr;
+  bool IsFindIV =
+      matchFindIVResult(EpiRedResult, ReducedIV, Sentinel, StartVPV);
+  if (!IsFindIV &&
+      EpiRedResult->getOpcode() != VPInstruction::ComputeAnyOfResult &&
+      EpiRedResult->getOpcode() != VPInstruction::ComputeReductionResult)
+    return;
+
+  // Find the reduction phi. For FindIV, use ReducedIV's operand as backedge.
   VPValue *BackedgeVal =
-      EpiRedResult->getOperand(EpiRedResult->getNumOperands() - 1);
+      IsFindIV ? ReducedIV->getOperand(0)
+               : EpiRedResult->getOperand(EpiRedResult->getNumOperands() - 1);
   auto *EpiRedHeaderPhi = cast_if_present<VPReductionPHIRecipe>(
       findRecipe(BackedgeVal, IsaPred<VPReductionPHIRecipe>));
   if (!EpiRedHeaderPhi) {
@@ -7369,20 +7384,10 @@ static void fixReductionScalarResumeWhenVectorizingEpilog(
            "AnyOf expected to start by comparing main resume value to original "
            "start value");
     MainResumeValue = Cmp->getOperand(0);
-  } else if (RecurrenceDescriptor::isFindIVRecurrenceKind(Kind)) {
-    Value *StartV = getStartValueFromReductionResult(EpiRedResult);
-    Value *SentinelV = EpiRedResult->getOperand(1)->getLiveInIRValue();
-    using namespace llvm::PatternMatch;
-    Value *Cmp, *OrigResumeV, *CmpOp;
-    [[maybe_unused]] bool IsExpectedPattern =
-        match(MainResumeValue,
-              m_Select(m_OneUse(m_Value(Cmp)), m_Specific(SentinelV),
-                       m_Value(OrigResumeV))) &&
-        (match(Cmp, m_SpecificICmp(ICmpInst::ICMP_EQ, m_Specific(OrigResumeV),
-                                   m_Value(CmpOp))) &&
-         ((CmpOp == StartV && isGuaranteedNotToBeUndefOrPoison(CmpOp))));
-    assert(IsExpectedPattern && "Unexpected reduction resume pattern");
-    MainResumeValue = OrigResumeV;
+  } else if (IsFindIV) {
+    // For FindIV, MainResumeValue may be wrapped in a select. Extract the PHI.
+    if (auto *Sel = dyn_cast<SelectInst>(MainResumeValue))
+      MainResumeValue = Sel->getFalseValue();
   }
   PHINode *MainResumePhi = cast<PHINode>(MainResumeValue);
 
@@ -8733,13 +8738,11 @@ void LoopVectorizationPlanner::addReductionResultComputation(
       NewExitingVPV =
           Builder.createSelect(Cond, OrigExitingVPV, PhiR, {}, "", FMFs);
       OrigExitingVPV->replaceUsesWithIf(NewExitingVPV, [](VPUser &U, unsigned) {
-        return isa<VPInstruction>(&U) &&
-               (cast<VPInstruction>(&U)->getOpcode() ==
-                    VPInstruction::ComputeAnyOfResult ||
-                cast<VPInstruction>(&U)->getOpcode() ==
-                    VPInstruction::ComputeReductionResult ||
-                cast<VPInstruction>(&U)->getOpcode() ==
-                    VPInstruction::ComputeFindIVResult);
+        using namespace VPlanPatternMatch;
+        return match(
+            &U, m_CombineOr(
+                    m_VPInstruction<VPInstruction::ComputeAnyOfResult>(),
+                    m_VPInstruction<VPInstruction::ComputeReductionResult>()));
       });
       if (CM.usePredicatedReductionSelect())
         PhiR->setOperand(1, NewExitingVPV);
@@ -8774,9 +8777,13 @@ void LoopVectorizationPlanner::addReductionResultComputation(
         MinMaxKind = IsSigned ? RecurKind::SMin : RecurKind::UMin;
       VPIRFlags Flags(MinMaxKind, /*IsOrdered=*/false, /*IsInLoop=*/false,
                       FastMathFlags());
-      FinalReductionResult =
-          Builder.createNaryOp(VPInstruction::ComputeFindIVResult,
-                               {Start, Sentinel, NewExitingVPV}, Flags, ExitDL);
+      auto *ReducedIV =
+          Builder.createNaryOp(VPInstruction::ComputeReductionResult,
+                               {NewExitingVPV}, Flags, ExitDL);
+      auto *Cmp =
+          Builder.createICmp(CmpInst::ICMP_NE, ReducedIV, Sentinel, ExitDL);
+      FinalReductionResult = cast<VPInstruction>(
+          Builder.createSelect(Cmp, ReducedIV, Start, ExitDL));
     } else if (RecurrenceDescriptor::isAnyOfRecurrenceKind(RecurrenceKind)) {
       VPValue *Start = PhiR->getStartValue();
       FinalReductionResult =
@@ -8830,6 +8837,12 @@ void LoopVectorizationPlanner::addReductionResultComputation(
     for (auto *U : to_vector(OrigExitingVPV->users())) {
       auto *Parent = cast<VPRecipeBase>(U)->getParent();
       if (FinalReductionResult == U || Parent->getParent())
+        continue;
+      // Skip FindIV reduction chain recipes (ComputeReductionResult, icmp).
+      if (RecurrenceDescriptor::isFindIVRecurrenceKind(RecurrenceKind) &&
+          match(U, m_CombineOr(
+                       m_VPInstruction<VPInstruction::ComputeReductionResult>(),
+                       m_VPInstruction<Instruction::ICmp>())))
         continue;
       U->replaceUsesOfWith(OrigExitingVPV, FinalReductionResult);
 
@@ -9321,14 +9334,18 @@ static void preparePlanForMainVectorLoop(VPlan &MainPlan, VPlan &EpiPlan) {
     VPBuilder Builder(Plan.getEntry());
     for (VPRecipeBase &R : *Plan.getMiddleBlock()) {
       auto *VPI = dyn_cast<VPInstruction>(&R);
-      if (!VPI || VPI->getOpcode() != VPInstruction::ComputeFindIVResult)
+      VPInstruction *ReducedIV;
+      VPValue *Sentinel, *OrigStart;
+      if (!matchFindIVResult(VPI, ReducedIV, Sentinel, OrigStart))
         continue;
-      VPValue *OrigStart = VPI->getOperand(0);
-      if (isGuaranteedNotToBeUndefOrPoison(OrigStart->getLiveInIRValue()))
+      // Only freeze if the start value is a live-in IR value that might be
+      // undef or poison.
+      if (!isa<VPIRValue>(OrigStart) ||
+          isGuaranteedNotToBeUndefOrPoison(OrigStart->getLiveInIRValue()))
         continue;
       VPInstruction *Freeze =
           Builder.createNaryOp(Instruction::Freeze, {OrigStart}, {}, "fr");
-      VPI->setOperand(0, Freeze);
+      VPI->setOperand(2, Freeze);
       if (UpdateResumePhis)
         OrigStart->replaceUsesWithIf(Freeze, [Freeze](VPUser &U, unsigned) {
           return Freeze != &U && isa<VPPhi>(&U);
@@ -9435,30 +9452,25 @@ static SmallVector<Instruction *> preparePlanForEpilogueVectorLoop(
     Value *ResumeV = nullptr;
     // TODO: Move setting of resume values to prepareToExecute.
     if (auto *ReductionPhi = dyn_cast<VPReductionPHIRecipe>(&R)) {
-      // Find the reduction result by searching users of the phi or its backedge
-      // value.
-      auto IsReductionResult = [](VPRecipeBase *R) {
+      RecurKind RK = ReductionPhi->getRecurrenceKind();
+      // Find the reduction result by searching users of the backedge value.
+      auto IsReductionResult = [RK](VPRecipeBase *R) {
         auto *VPI = dyn_cast<VPInstruction>(R);
-        return VPI &&
-               (VPI->getOpcode() == VPInstruction::ComputeAnyOfResult ||
-                VPI->getOpcode() == VPInstruction::ComputeReductionResult ||
-                VPI->getOpcode() == VPInstruction::ComputeFindIVResult);
+        if (!VPI)
+          return false;
+        if (RecurrenceDescriptor::isFindIVRecurrenceKind(RK))
+          return VPI->getOpcode() == VPInstruction::ComputeReductionResult &&
+                 RecurrenceDescriptor::isMinMaxRecurrenceKind(
+                     VPI->getRecurKind());
+        return VPI->getOpcode() == VPInstruction::ComputeAnyOfResult ||
+               VPI->getOpcode() == VPInstruction::ComputeReductionResult;
       };
       auto *RdxResult = cast<VPInstruction>(
           findRecipe(ReductionPhi->getBackedgeValue(), IsReductionResult));
-      assert(
-          (is_contained(RdxResult->operands(),
-                        ReductionPhi->getBackedgeValue()) ||
-           (isa<VPWidenCastRecipe>(ReductionPhi->getBackedgeValue()) &&
-            is_contained(RdxResult->operands(), ReductionPhi->getBackedgeValue()
-                                                    ->getDefiningRecipe()
-                                                    ->getOperand(0))) ||
-           RdxResult->getOpcode() == VPInstruction::ComputeFindIVResult) &&
-          "expected to find reduction result via backedge");
+      assert(RdxResult && "expected to find reduction result");
 
       ResumeV = cast<PHINode>(ReductionPhi->getUnderlyingInstr())
                     ->getIncomingValueForBlock(L->getLoopPreheader());
-      RecurKind RK = ReductionPhi->getRecurrenceKind();
       if (RecurrenceDescriptor::isAnyOfRecurrenceKind(RK)) {
         Value *StartV = RdxResult->getOperand(1)->getLiveInIRValue();
         // VPReductionPHIRecipes for AnyOf reductions expect a boolean as
@@ -9470,23 +9482,32 @@ static SmallVector<Instruction *> preparePlanForEpilogueVectorLoop(
         if (auto *I = dyn_cast<Instruction>(ResumeV))
           InstsToMove.push_back(I);
       } else if (RecurrenceDescriptor::isFindIVRecurrenceKind(RK)) {
-        Value *StartV = getStartValueFromReductionResult(RdxResult);
-        ToFrozen[StartV] = cast<PHINode>(ResumeV)->getIncomingValueForBlock(
-            EPI.MainLoopIterationCountCheck);
+        // Find the select using RdxResult and extract sentinel.
+        VPInstruction *ReducedIV = nullptr;
+        VPValue *SentinelVPV = nullptr, *StartVPV = nullptr;
+        for (VPUser *U : RdxResult->users())
+          if (auto *VPI = dyn_cast<VPInstruction>(U);
+              VPI && matchFindIVResult(VPI, ReducedIV, SentinelVPV, StartVPV))
+            break;
+        assert(SentinelVPV && "expected FindIV select using RdxResult");
 
-        // VPReductionPHIRecipe for FindFirstIV/FindLastIV reductions requires
-        // an adjustment to the resume value. The resume value is adjusted to
-        // the sentinel value when the final value from the main vector loop
-        // equals the start value. This ensures correctness when the start value
-        // might not be less than the minimum value of a monotonically
-        // increasing induction variable.
+        // Get the frozen start value from the main loop.
+        Value *FrozenStartV = cast<PHINode>(ResumeV)->getIncomingValueForBlock(
+            EPI.MainLoopIterationCountCheck);
+        Value *StartV = FrozenStartV;
+        if (auto *FreezeI = dyn_cast<FreezeInst>(FrozenStartV))
+          StartV = FreezeI->getOperand(0);
+        ToFrozen[StartV] = FrozenStartV;
+
+        // Adjust resume: select(icmp eq ResumeV, FrozenStartV), Sentinel,
+        // ResumeV
         BasicBlock *ResumeBB = cast<Instruction>(ResumeV)->getParent();
         IRBuilder<> Builder(ResumeBB, ResumeBB->getFirstNonPHIIt());
-        Value *Cmp = Builder.CreateICmpEQ(ResumeV, ToFrozen[StartV]);
+        Value *Cmp = Builder.CreateICmpEQ(ResumeV, FrozenStartV);
         if (auto *I = dyn_cast<Instruction>(Cmp))
           InstsToMove.push_back(I);
-        Value *Sentinel = RdxResult->getOperand(1)->getLiveInIRValue();
-        ResumeV = Builder.CreateSelect(Cmp, Sentinel, ResumeV);
+        ResumeV =
+            Builder.CreateSelect(Cmp, SentinelVPV->getLiveInIRValue(), ResumeV);
         if (auto *I = dyn_cast<Instruction>(ResumeV))
           InstsToMove.push_back(I);
       } else {
@@ -9518,12 +9539,18 @@ static SmallVector<Instruction *> preparePlanForEpilogueVectorLoop(
   // should be removed once induction resume value creation is done
   // directly in VPlan.
   for (auto &R : make_early_inc_range(*Plan.getEntry())) {
-    // Re-use frozen values from the main plan for Freeze VPInstructions in the
-    // epilogue plan. This ensures all users use the same frozen value.
+    // Re-use frozen values from the main plan for Freeze VPInstructions.
     auto *VPI = dyn_cast<VPInstruction>(&R);
     if (VPI && VPI->getOpcode() == Instruction::Freeze) {
-      VPI->replaceAllUsesWith(Plan.getOrAddLiveIn(
-          ToFrozen.lookup(VPI->getOperand(0)->getLiveInIRValue())));
+      VPValue *FreezeOp = VPI->getOperand(0);
+      if (auto *IRVal = dyn_cast<VPIRValue>(FreezeOp))
+        if (Value *FrozenV = ToFrozen.lookup(IRVal->getLiveInIRValue())) {
+          VPI->replaceAllUsesWith(Plan.getOrAddLiveIn(FrozenV));
+          VPI->eraseFromParent();
+          continue;
+        }
+      VPI->replaceAllUsesWith(FreezeOp);
+      VPI->eraseFromParent();
       continue;
     }
 
@@ -9539,6 +9566,17 @@ static SmallVector<Instruction *> preparePlanForEpilogueVectorLoop(
     if (Plan.getTripCount() == ExpandR)
       Plan.resetTripCount(ExpandedVal);
     ExpandR->eraseFromParent();
+  }
+
+  // For FindIV reductions, update the middle block select to use frozen start.
+  for (VPRecipeBase &R : *Plan.getMiddleBlock()) {
+    VPInstruction *ReducedIV;
+    VPValue *Sentinel, *StartVPV;
+    if (auto *VPI = dyn_cast<VPInstruction>(&R);
+        VPI && matchFindIVResult(VPI, ReducedIV, Sentinel, StartVPV))
+      if (auto *IRVal = dyn_cast<VPIRValue>(StartVPV))
+        if (Value *FrozenV = ToFrozen.lookup(IRVal->getLiveInIRValue()))
+          VPI->setOperand(2, Plan.getOrAddLiveIn(FrozenV));
   }
 
   auto VScale = CM.getVScaleForTuning();

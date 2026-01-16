@@ -1511,35 +1511,42 @@ bool VPlanTransforms::handleMultiUseReductions(VPlan &Plan) {
     //
     // For example, this transforms
     // vp<%min.result> = compute-reduction-result ir<%min.val.next>
-    // vp<%find.iv.result = compute-find-iv-result ir<0>, SENTINEL,
-    //                                             vp<%min.idx.next>
+    // vp<%iv.rdx> = compute-reduction-result (smax) vp<%min.idx.next>
+    // vp<%cmp> = icmp eq vp<%iv.rdx>, SENTINEL
+    // vp<%find.iv.result> = select vp<%cmp>, ir<0>, vp<%iv.rdx>
     //
     // into:
     //
     // vp<min.result> = compute-reduction-result ir<%min.val.next>
     // vp<%final.min.cmp> = icmp eq ir<%min.val.next>, vp<min.result>
-    // vp<%final.iv> = select vp<%final.min.cmp>, ir<%min.idx.next>, SENTINEL
-    // vp<%find.iv.result> = compute-find-iv-result ir<0>, SENTINEL,
-    //                                              vp<%final.iv>
-    VPInstruction *FindIVResult =
-        findUserOf<VPInstruction::ComputeFindIVResult>(
-            FindIVPhiR->getBackedgeValue());
-    assert(FindIVResult && "Backedge value feeding FindIVPhiR expected to also "
-                           "feed a ComputeFindIVResult");
-    assert(FindIVResult->getParent() == MinOrMaxResult->getParent() &&
+    // vp<%final.iv> = select vp<%final.min.cmp>, vp<%min.idx.next>, SENTINEL
+    // vp<%iv.rdx> = compute-reduction-result (smax) vp<%final.iv>
+    // vp<%cmp> = icmp eq vp<%iv.rdx>, SENTINEL
+    // vp<%find.iv.result> = select vp<%cmp>, ir<0>, vp<%iv.rdx>
+    //
+    // Find the ComputeReductionResult with minmax kind for FindIV.
+    auto *FindIVRdxResult = cast<VPInstruction>(findUserOf(
+        FindIVPhiR->getBackedgeValue(),
+        m_VPInstruction<VPInstruction::ComputeReductionResult>(m_VPValue())));
+    // Find the icmp -> select pattern wrapping the reduction result.
+    auto *FindIVCmp = findUserOf<Instruction::ICmp>(FindIVRdxResult);
+    auto *FindIVSelect = findUserOf<Instruction::Select>(FindIVCmp);
+    assert(FindIVSelect->getParent() == MinOrMaxResult->getParent() &&
            "both results must be computed in the same block");
-    MinOrMaxResult->moveBefore(*FindIVResult->getParent(),
-                               FindIVResult->getIterator());
+    MinOrMaxResult->moveBefore(*FindIVRdxResult->getParent(),
+                               FindIVRdxResult->getIterator());
 
-    VPBuilder B(FindIVResult);
+    VPBuilder B(FindIVRdxResult);
     VPValue *MinOrMaxExiting = MinOrMaxResult->getOperand(0);
     auto *FinalMinOrMaxCmp =
         B.createICmp(CmpInst::ICMP_EQ, MinOrMaxExiting, MinOrMaxResult);
-    VPValue *Sentinel = FindIVResult->getOperand(1);
-    VPValue *LastIVExiting = FindIVResult->getOperand(2);
+    // Sentinel is operand 1 of the icmp.
+    VPValue *Sentinel = FindIVCmp->getOperand(1);
+    // The exiting IV is operand 0 of the ComputeReductionResult.
+    VPValue *LastIVExiting = FindIVRdxResult->getOperand(0);
     auto *FinalIVSelect =
         B.createSelect(FinalMinOrMaxCmp, LastIVExiting, Sentinel);
-    FindIVResult->setOperand(2, FinalIVSelect);
+    FindIVRdxResult->setOperand(0, FinalIVSelect);
   }
   return true;
 }
