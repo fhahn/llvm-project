@@ -7086,6 +7086,9 @@ static bool planContainsAdditionalSimplifications(VPlan &Plan,
       if (auto *VPR = dyn_cast<VPReductionRecipe>(&R))
         if (VPR->isPartialReduction())
           return true;
+      if (auto *Expr = dyn_cast<VPExpressionRecipe>(&R))
+        if (Expr->getVFScaleFactor() > 1)
+          return true;
 
       // The VPlan-based cost model can analyze if recipes are scalar
       // recursively, but the legacy cost model cannot.
