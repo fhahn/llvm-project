@@ -233,6 +233,14 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
     return CreateSCEV({LHSVal, RHSVal}, [&](ArrayRef<const SCEV *> Ops) {
       return SE.getSMinExpr(Ops[0], Ops[1]);
     });
+  if (match(V, m_VPInstruction<VPInstruction::PtrAdd>(m_VPValue(LHSVal),
+                                                      m_VPValue(RHSVal)))) {
+    // PtrAdd is like a GEP with i8 element type (byte offset).
+    return CreateSCEV({LHSVal, RHSVal}, [&](ArrayRef<const SCEV *> Ops) {
+      return SE.getGEPExpr(Ops[0], {Ops[1]},
+                           Type::getInt8Ty(SE.getContext()));
+    });
+  }
 
   // Handle GEP operations (VPInstruction, VPReplicateRecipe, or
   // VPWidenGEPRecipe), including VPInstruction::PtrAdd.
