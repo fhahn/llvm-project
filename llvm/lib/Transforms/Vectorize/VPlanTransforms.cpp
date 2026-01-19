@@ -1469,10 +1469,24 @@ static void simplifyRecipe(VPSingleDefRecipe *Def, VPTypeAnalysis &TypeInfo) {
     return;
   }
 
+  // Simplify first-order recurrence PHIs where both incoming values are the
+  // same after simplifications.
   if (auto *Phi = dyn_cast<VPFirstOrderRecurrencePHIRecipe>(Def)) {
     if (Phi->getOperand(0) == Phi->getOperand(1))
       Phi->replaceAllUsesWith(Phi->getOperand(0));
     return;
+  }
+
+  // Simplify trivial header PHIs where the backedge value is the PHI itself,
+  // meaning no computation happens in the loop body.
+  if (auto *Phi = dyn_cast<VPHeaderPHIRecipe>(Def)) {
+    // VPWidenIntOrFpInductionRecipe doesn't have a backedge value in the same
+    // sense, so skip it.
+    if (!isa<VPWidenIntOrFpInductionRecipe>(Phi) && Phi->getNumOperands() == 2 &&
+        Phi->getBackedgeValue() == Phi) {
+      Phi->replaceAllUsesWith(Phi->getStartValue());
+      return;
+    }
   }
 
   // Look through ExtractLastLane.
