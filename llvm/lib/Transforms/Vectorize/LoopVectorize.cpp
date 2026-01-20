@@ -7394,6 +7394,8 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   VPlanTransforms::runPass(VPlanTransforms::unrollByUF, BestVPlan, BestUF);
   VPlanTransforms::runPass(VPlanTransforms::materializePacksAndUnpacks,
                            BestVPlan);
+  VPlanTransforms::runPass(VPlanTransforms::scalarizePredicateCompares,
+                           BestVPlan);
   VPlanTransforms::runPass(VPlanTransforms::materializeBroadcasts, BestVPlan);
   VPlanTransforms::runPass(VPlanTransforms::replicateByVF, BestVPlan, BestVF);
   bool HasBranchWeights =

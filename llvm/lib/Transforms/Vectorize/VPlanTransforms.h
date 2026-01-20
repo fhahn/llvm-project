@@ -393,6 +393,11 @@ struct VPlanTransforms {
   /// needed.
   static void materializePacksAndUnpacks(VPlan &Plan);
 
+  /// Scalarize widened compare conditions that are only used for branch masks.
+  /// This avoids widening and extracting scalars when only scalar values are
+  /// needed.
+  static void scalarizePredicateCompares(VPlan &Plan);
+
   /// Materialize VF and VFxUF to be computed explicitly using VPInstructions.
   static void materializeVFAndVFxUF(VPlan &Plan, VPBasicBlock *VectorPH,
                                     ElementCount VF);

@@ -2674,6 +2674,137 @@ void VPlanTransforms::removeBranchOnConst(VPlan &Plan) {
   }
 }
 
+/// Check if \p V is only used by VPBranchOnMaskRecipe, possibly through
+/// VPInstruction::Not.
+static bool isOnlyUsedForBranchMask(VPValue *V) {
+  for (VPUser *U : V->users()) {
+    if (isa<VPBranchOnMaskRecipe>(U))
+      continue;
+    auto *VPI = dyn_cast<VPInstruction>(U);
+    if (VPI && VPI->getOpcode() == VPInstruction::Not &&
+        isOnlyUsedForBranchMask(VPI))
+      continue;
+    return false;
+  }
+  return true;
+}
+
+/// Check if the operand chain from \p V through WIDEN recipes can be
+/// scalarized. Returns the VPReplicateRecipe at the root if yes, nullptr
+/// otherwise.
+static VPReplicateRecipe *canScalarizeChain(VPValue *V) {
+  // Check if operand is directly a VPReplicateRecipe (scalar that will be
+  // expanded per lane by replicateByVF).
+  if (auto *Rep = dyn_cast_or_null<VPReplicateRecipe>(V->getDefiningRecipe()))
+    return Rep;
+
+  // Check if it's a BuildVector with a single operand that's a
+  // VPReplicateRecipe.
+  auto *BV = dyn_cast_or_null<VPInstruction>(V->getDefiningRecipe());
+  if (BV && BV->getOpcode() == VPInstruction::BuildVector &&
+      BV->getNumOperands() == 1)
+    return dyn_cast<VPReplicateRecipe>(BV->getOperand(0));
+
+  return nullptr;
+}
+
+/// Scalarize widened compare conditions that are only used for branch masks.
+/// This avoids widening and extracting scalars when only scalar values are
+/// needed.
+void VPlanTransforms::scalarizePredicateCompares(VPlan &Plan) {
+  if (Plan.hasScalarVFOnly())
+    return;
+
+  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
+  if (!LoopRegion)
+    return;
+
+  // Collect NOT instructions used only by BRANCH-ON-MASK that we can eliminate
+  // by negating the icmp predicate.
+  SmallVector<VPInstruction *> ToProcess;
+
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_shallow(LoopRegion->getEntry()))) {
+    for (VPRecipeBase &R : *VPBB) {
+      auto *NotVPI = dyn_cast<VPInstruction>(&R);
+      if (!NotVPI || NotVPI->getOpcode() != VPInstruction::Not)
+        continue;
+
+      // Check if the NOT is only used by VPBranchOnMaskRecipe.
+      if (!all_of(NotVPI->users(),
+                  [](VPUser *U) { return isa<VPBranchOnMaskRecipe>(U); }))
+        continue;
+
+      // Check if the NOT's operand is a WIDEN icmp.
+      auto *WidenCmp = dyn_cast_or_null<VPWidenRecipe>(
+          NotVPI->getOperand(0)->getDefiningRecipe());
+      if (!WidenCmp || WidenCmp->getOpcode() != Instruction::ICmp)
+        continue;
+
+      ToProcess.push_back(NotVPI);
+    }
+  }
+
+  for (VPInstruction *NotVPI : ToProcess) {
+    auto *WidenCmp =
+        cast<VPWidenRecipe>(NotVPI->getOperand(0)->getDefiningRecipe());
+    VPValue *CmpLHS = WidenCmp->getOperand(0);
+    VPValue *CmpRHS = WidenCmp->getOperand(1);
+
+    // Check if LHS comes from a widened binary op with scalar input.
+    auto *WidenBinOp =
+        dyn_cast_or_null<VPWidenRecipe>(CmpLHS->getDefiningRecipe());
+    if (!WidenBinOp || !Instruction::isBinaryOp(WidenBinOp->getOpcode()))
+      continue;
+
+    VPValue *BinOpLHS = WidenBinOp->getOperand(0);
+    VPValue *BinOpRHS = WidenBinOp->getOperand(1);
+
+    // Check if either operand of the binary op comes from a scalar source.
+    VPReplicateRecipe *RootReplicate = canScalarizeChain(BinOpLHS);
+    if (!RootReplicate)
+      RootReplicate = canScalarizeChain(BinOpRHS);
+    if (!RootReplicate)
+      continue;
+
+    // Get underlying instructions.
+    Instruction *BinOpInstr =
+        dyn_cast_or_null<Instruction>(WidenBinOp->getUnderlyingValue());
+    auto *CmpInstr = dyn_cast_or_null<CmpInst>(WidenCmp->getUnderlyingValue());
+    if (!BinOpInstr || !CmpInstr)
+      continue;
+
+    // Create scalarized binary op.
+    auto *ScalarBinOp = new VPReplicateRecipe(
+        BinOpInstr, {BinOpLHS, BinOpRHS}, /*IsSingleScalar=*/false,
+        /*Mask=*/nullptr, *WidenBinOp, *WidenBinOp, WidenBinOp->getDebugLoc());
+    ScalarBinOp->insertBefore(WidenBinOp);
+
+    // Create scalarized icmp with NEGATED predicate (to eliminate the NOT).
+    // Clone the instruction and negate its predicate.
+    VPSingleDefRecipe *ScalarCmp = new VPReplicateRecipe(
+        CmpInstr, {ScalarBinOp, CmpRHS}, /*IsSingleScalar=*/false,
+        /*Mask=*/nullptr, VPIRFlags(CmpInst::getInversePredicate(CmpInstr->getPredicate())), *WidenCmp, WidenCmp->getDebugLoc());
+    ScalarCmp->insertBefore(WidenCmp);
+    auto *BV = new VPInstruction(
+        VPInstruction::BuildVector, {ScalarCmp});
+    BV->insertBefore(WidenCmp);
+
+
+    // BRANCH-ON-MASK will get the scalar icmp, which will be expanded per lane.
+    NotVPI->replaceAllUsesWith(BV);
+    NotVPI->eraseFromParent();
+
+    // Remove the original WIDEN icmp if it has no other users.
+    if (WidenCmp->getNumUsers() == 0)
+      WidenCmp->eraseFromParent();
+
+    // Remove the original WIDEN binary op if it has no other users.
+    if (WidenBinOp->getNumUsers() == 0)
+      WidenBinOp->eraseFromParent();
+  }
+}
+
 void VPlanTransforms::optimize(VPlan &Plan) {
   runPass(removeRedundantCanonicalIVs, Plan);
   runPass(removeRedundantInductionCasts, Plan);
