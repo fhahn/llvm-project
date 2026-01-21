@@ -2675,35 +2675,65 @@ void VPlanTransforms::removeBranchOnConst(VPlan &Plan) {
 }
 
 /// Check if \p V is only used by VPBranchOnMaskRecipe, possibly through
-/// VPInstruction::Not.
+/// VPInstruction::Not, or through extractelement + Not patterns.
 static bool isOnlyUsedForBranchMask(VPValue *V) {
   for (VPUser *U : V->users()) {
     if (isa<VPBranchOnMaskRecipe>(U))
       continue;
     auto *VPI = dyn_cast<VPInstruction>(U);
-    if (VPI && VPI->getOpcode() == VPInstruction::Not &&
+    if (!VPI)
+      return false;
+
+    // Handle NOT -> branch mask path.
+    if (VPI->getOpcode() == VPInstruction::Not &&
         isOnlyUsedForBranchMask(VPI))
       continue;
+
+    // Handle BuildVector -> branch mask path.
+    if (VPI->getOpcode() == VPInstruction::BuildVector &&
+        isOnlyUsedForBranchMask(VPI))
+      continue;
+
+    // Handle extractelement -> NOT -> BuildVector -> branch mask path.
+    // This pattern is created by earlier transforms.
+    if (VPI->getOpcode() == Instruction::ExtractElement) {
+      bool AllUsersOk = true;
+      for (VPUser *ExtractUser : VPI->users()) {
+        auto *NotVPI = dyn_cast<VPInstruction>(ExtractUser);
+        if (NotVPI && NotVPI->getOpcode() == VPInstruction::Not &&
+            isOnlyUsedForBranchMask(NotVPI))
+          continue;
+        AllUsersOk = false;
+        break;
+      }
+      if (AllUsersOk)
+        continue;
+    }
+
     return false;
   }
   return true;
 }
 
 /// Check if the operand chain from \p V through WIDEN recipes can be
-/// scalarized. Returns the VPReplicateRecipe at the root if yes, nullptr
-/// otherwise.
+/// scalarized. Returns the first VPReplicateRecipe in the chain if yes,
+/// nullptr otherwise.
 static VPReplicateRecipe *canScalarizeChain(VPValue *V) {
   // Check if operand is directly a VPReplicateRecipe (scalar that will be
   // expanded per lane by replicateByVF).
   if (auto *Rep = dyn_cast_or_null<VPReplicateRecipe>(V->getDefiningRecipe()))
     return Rep;
 
-  // Check if it's a BuildVector with a single operand that's a
-  // VPReplicateRecipe.
+  // Check if it's a BuildVector where all operands are VPReplicateRecipes.
   auto *BV = dyn_cast_or_null<VPInstruction>(V->getDefiningRecipe());
   if (BV && BV->getOpcode() == VPInstruction::BuildVector &&
-      BV->getNumOperands() == 1)
-    return dyn_cast<VPReplicateRecipe>(BV->getOperand(0));
+      BV->getNumOperands() > 0) {
+    for (VPValue *Op : BV->operands()) {
+      if (!isa_and_nonnull<VPReplicateRecipe>(Op->getDefiningRecipe()))
+        return nullptr;
+    }
+    return cast<VPReplicateRecipe>(BV->getOperand(0)->getDefiningRecipe());
+  }
 
   return nullptr;
 }
@@ -2719,35 +2749,26 @@ void VPlanTransforms::scalarizePredicateCompares(VPlan &Plan) {
   if (!LoopRegion)
     return;
 
-  // Collect NOT instructions used only by BRANCH-ON-MASK that we can eliminate
-  // by negating the icmp predicate.
-  SmallVector<VPInstruction *> ToProcess;
+  // Collect WIDEN icmp recipes that are only used for branch masks
+  // (directly or through NOT).
+  SmallVector<VPWidenRecipe *> ToProcess;
 
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
            vp_depth_first_shallow(LoopRegion->getEntry()))) {
     for (VPRecipeBase &R : *VPBB) {
-      auto *NotVPI = dyn_cast<VPInstruction>(&R);
-      if (!NotVPI || NotVPI->getOpcode() != VPInstruction::Not)
-        continue;
-
-      // Check if the NOT is only used by VPBranchOnMaskRecipe.
-      if (!all_of(NotVPI->users(),
-                  [](VPUser *U) { return isa<VPBranchOnMaskRecipe>(U); }))
-        continue;
-
-      // Check if the NOT's operand is a WIDEN icmp.
-      auto *WidenCmp = dyn_cast_or_null<VPWidenRecipe>(
-          NotVPI->getOperand(0)->getDefiningRecipe());
+      auto *WidenCmp = dyn_cast<VPWidenRecipe>(&R);
       if (!WidenCmp || WidenCmp->getOpcode() != Instruction::ICmp)
         continue;
 
-      ToProcess.push_back(NotVPI);
+      // Check if only used by VPBranchOnMaskRecipe (directly or through NOT).
+      if (!isOnlyUsedForBranchMask(WidenCmp))
+        continue;
+
+      ToProcess.push_back(WidenCmp);
     }
   }
 
-  for (VPInstruction *NotVPI : ToProcess) {
-    auto *WidenCmp =
-        cast<VPWidenRecipe>(NotVPI->getOperand(0)->getDefiningRecipe());
+  for (VPWidenRecipe *WidenCmp : ToProcess) {
     VPValue *CmpLHS = WidenCmp->getOperand(0);
     VPValue *CmpRHS = WidenCmp->getOperand(1);
 
@@ -2780,20 +2801,42 @@ void VPlanTransforms::scalarizePredicateCompares(VPlan &Plan) {
         /*Mask=*/nullptr, *WidenBinOp, *WidenBinOp, WidenBinOp->getDebugLoc());
     ScalarBinOp->insertBefore(WidenBinOp);
 
-    // Create scalarized icmp with NEGATED predicate (to eliminate the NOT).
-    // Clone the instruction and negate its predicate.
+    // Create scalarized icmp with SAME predicate.
     VPSingleDefRecipe *ScalarCmp = new VPReplicateRecipe(
         CmpInstr, {ScalarBinOp, CmpRHS}, /*IsSingleScalar=*/false,
-        /*Mask=*/nullptr, VPIRFlags(CmpInst::getInversePredicate(CmpInstr->getPredicate())), *WidenCmp, WidenCmp->getDebugLoc());
+        /*Mask=*/nullptr, VPIRFlags(CmpInstr->getPredicate()), *WidenCmp,
+        WidenCmp->getDebugLoc());
     ScalarCmp->insertBefore(WidenCmp);
-    auto *BV = new VPInstruction(
-        VPInstruction::BuildVector, {ScalarCmp});
+    auto *BV = new VPInstruction(VPInstruction::BuildVector, {ScalarCmp});
     BV->insertBefore(WidenCmp);
 
+    // Handle direct VPBranchOnMaskRecipe users.
+    for (VPUser *U : to_vector(WidenCmp->users())) {
+      if (isa<VPBranchOnMaskRecipe>(U))
+        U->setOperand(0, BV);
+    }
 
-    // BRANCH-ON-MASK will get the scalar icmp, which will be expanded per lane.
-    NotVPI->replaceAllUsesWith(BV);
-    NotVPI->eraseFromParent();
+    // Handle NOT users: wrap NOT in BuildVector so replicateByVF will
+    // clone NOT per lane.
+    for (VPUser *U : to_vector(WidenCmp->users())) {
+      auto *NotVPI = dyn_cast<VPInstruction>(U);
+      if (!NotVPI || NotVPI->getOpcode() != VPInstruction::Not)
+        continue;
+
+      // Replace NOT's operand with the scalar icmp BuildVector.
+      NotVPI->setOperand(0, BV);
+
+      // Wrap NOT in BuildVector for its users.
+      auto *BVNot =
+          new VPInstruction(VPInstruction::BuildVector, {NotVPI});
+      BVNot->insertAfter(NotVPI);
+
+      // Replace NOT's VPBranchOnMaskRecipe users with BVNot.
+      for (VPUser *NotUser : to_vector(NotVPI->users())) {
+        if (isa<VPBranchOnMaskRecipe>(NotUser))
+          NotUser->setOperand(0, BVNot);
+      }
+    }
 
     // Remove the original WIDEN icmp if it has no other users.
     if (WidenCmp->getNumUsers() == 0)

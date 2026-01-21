@@ -494,7 +494,9 @@ unsigned VPInstruction::getNumOperandsForOpcode(unsigned Opcode) {
 #endif
 
 bool VPInstruction::doesGeneratePerAllLanes() const {
-  return Opcode == VPInstruction::PtrAdd && !vputils::onlyFirstLaneUsed(this);
+  if (Opcode == VPInstruction::PtrAdd && !vputils::onlyFirstLaneUsed(this))
+    return true;
+  return false;
 }
 
 bool VPInstruction::canGenerateScalarForFirstLane() const {
