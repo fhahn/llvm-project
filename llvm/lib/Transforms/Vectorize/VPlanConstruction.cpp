@@ -1540,8 +1540,17 @@ static bool handleFirstArgMinOrMax(
 
   VPBuilder Builder(FindIVRdxResult);
   VPValue *MinOrMaxExiting = MinOrMaxResult->getOperand(0);
-  auto *FinalMinOrMaxCmp =
-      Builder.createICmp(CmpInst::ICMP_EQ, MinOrMaxExiting, MinOrMaxResult);
+  // For FP reductions, use fcmp; for integer reductions, use icmp.
+  RecurKind RdxKind = MinOrMaxPhiR->getRecurrenceKind();
+  bool IsFP = !RecurrenceDescriptor::isIntegerRecurrenceKind(RdxKind);
+  VPInstruction *FinalMinOrMaxCmp;
+  if (IsFP) {
+    FinalMinOrMaxCmp =
+        Builder.createFCmp(CmpInst::FCMP_OEQ, MinOrMaxExiting, MinOrMaxResult);
+  } else {
+    FinalMinOrMaxCmp =
+        Builder.createICmp(CmpInst::ICMP_EQ, MinOrMaxExiting, MinOrMaxResult);
+  }
   VPValue *LastIVExiting = FindIVRdxResult->getOperand(0);
   VPValue *MaxIV =
       Plan.getConstantInt(APInt::getMaxValue(Ty->getIntegerBitWidth()));
@@ -1566,9 +1575,15 @@ static bool handleFirstArgMinOrMax(
 
   // If the final min/max value matches its start value, the condition in the
   // loop was always false, i.e. no induction value has been selected. If that's
-  // the case, set the result of the IV reduction to its start value.
-  VPValue *AlwaysFalse = Builder.createICmp(CmpInst::ICMP_EQ, MinOrMaxResult,
-                                            MinOrMaxPhiR->getStartValue());
+  // the case, use the original start value.
+  VPValue *AlwaysFalse;
+  if (IsFP) {
+    AlwaysFalse = Builder.createFCmp(CmpInst::FCMP_OEQ, MinOrMaxResult,
+                                     MinOrMaxPhiR->getStartValue());
+  } else {
+    AlwaysFalse = Builder.createICmp(CmpInst::ICMP_EQ, MinOrMaxResult,
+                                     MinOrMaxPhiR->getStartValue());
+  }
   VPValue *FinalIV = Builder.createSelect(
       AlwaysFalse, FindIVSelect->getOperand(2), FinalCanIV);
   FindIVSelect->replaceAllUsesWith(FinalIV);
@@ -1600,7 +1615,7 @@ bool VPlanTransforms::handleMultiUseReductions(VPlan &Plan,
     // reduction cycle.
     RecurKind RdxKind = MinOrMaxPhiR->getRecurrenceKind();
     assert(
-        RecurrenceDescriptor::isIntMinMaxRecurrenceKind(RdxKind) &&
+        RecurrenceDescriptor::isMinMaxRecurrenceKind(RdxKind) &&
         "only min/max recurrences support users outside the reduction chain");
 
     auto *MinOrMaxOp =
@@ -1695,8 +1710,14 @@ bool VPlanTransforms::handleMultiUseReductions(VPlan &Plan,
         return Pred == CmpInst::ICMP_SLE || Pred == CmpInst::ICMP_SLT;
       case RecurKind::SMin:
         return Pred == CmpInst::ICMP_SGE || Pred == CmpInst::ICMP_SGT;
+      case RecurKind::FMax:
+      case RecurKind::FMaxNum:
+        return Pred == CmpInst::FCMP_OLE || Pred == CmpInst::FCMP_OLT;
+      case RecurKind::FMin:
+      case RecurKind::FMinNum:
+        return Pred == CmpInst::FCMP_OGE || Pred == CmpInst::FCMP_OGT;
       default:
-        llvm_unreachable("unhandled recurrence kind");
+        return false;
       }
     }();
     if (!IsValidKindPred) {
@@ -1711,6 +1732,21 @@ bool VPlanTransforms::handleMultiUseReductions(VPlan &Plan,
       return false;
     }
 
+    // For floating-point reductions, require fast-math flags (at least nnan).
+    if (RecurrenceDescriptor::isMinMaxRecurrenceKind(RdxKind) &&
+        !RecurrenceDescriptor::isIntegerRecurrenceKind(RdxKind)) {
+      if (!Cmp->hasFastMathFlags() || !Cmp->getFastMathFlags().noNaNs()) {
+        ORE->emit([&]() {
+          return OptimizationRemarkMissed(
+                     DEBUG_TYPE, "VectorizationFPMultiUseReductionNoFastMath",
+                     TheLoop->getStartLoc(), TheLoop->getHeader())
+                 << "Multi-use floating-point reduction requires 'nnan' "
+                    "fast-math flag";
+        });
+        return false;
+      }
+    }
+
     auto *FindIVSelect = findFindIVSelect(FindIVPhiR->getBackedgeValue());
     auto *FindIVCmp = FindIVSelect->getOperand(0)->getDefiningRecipe();
     auto *FindIVRdxResult = cast<VPInstruction>(FindIVCmp->getOperand(0));
@@ -1722,7 +1758,12 @@ bool VPlanTransforms::handleMultiUseReductions(VPlan &Plan,
     MinOrMaxResult->moveBefore(*FindIVRdxResult->getParent(),
                                FindIVRdxResult->getIterator());
 
-    bool IsStrictPredicate = ICmpInst::isLT(Pred) || ICmpInst::isGT(Pred);
+    // For strict predicates, use a UMin reduction to find the minimum index.
+    // Canonical IVs (0, 1, 2, ...) are guaranteed not to wrap in the vector
+    // loop, so UMin can always be used.
+    bool IsStrictPredicate =
+        ICmpInst::isLT(Pred) || ICmpInst::isGT(Pred) ||
+        Pred == CmpInst::FCMP_OLT || Pred == CmpInst::FCMP_OGT;
     if (IsStrictPredicate) {
       return handleFirstArgMinOrMax(Plan, MinOrMaxPhiR, FindIVPhiR,
                                     cast<VPWidenIntOrFpInductionRecipe>(IVOp),
@@ -1755,8 +1796,15 @@ bool VPlanTransforms::handleMultiUseReductions(VPlan &Plan,
     //
     VPBuilder B(FindIVRdxResult);
     VPValue *MinOrMaxExiting = MinOrMaxResult->getOperand(0);
-    auto *FinalMinOrMaxCmp =
-        B.createICmp(CmpInst::ICMP_EQ, MinOrMaxExiting, MinOrMaxResult);
+    // For FP reductions, use fcmp; for integer reductions, use icmp.
+    VPInstruction *FinalMinOrMaxCmp;
+    if (!RecurrenceDescriptor::isIntegerRecurrenceKind(RdxKind)) {
+      FinalMinOrMaxCmp =
+          B.createFCmp(CmpInst::FCMP_OEQ, MinOrMaxExiting, MinOrMaxResult);
+    } else {
+      FinalMinOrMaxCmp =
+          B.createICmp(CmpInst::ICMP_EQ, MinOrMaxExiting, MinOrMaxResult);
+    }
     VPValue *Sentinel = FindIVCmp->getOperand(1);
     VPValue *LastIVExiting = FindIVRdxResult->getOperand(0);
     auto *FinalIVSelect =

@@ -356,7 +356,9 @@ static RecurrenceDescriptor getMinMaxRecurrence(PHINode *Phi, Loop *TheLoop,
            GetMinMaxRK(U, A, B) == RecurKind::None;
   });
   if (PhiHasInvalidUses) {
-    if (!RecurrenceDescriptor::isIntMinMaxRecurrenceKind(RK) ||
+    if ((!RecurrenceDescriptor::isIntMinMaxRecurrenceKind(RK) &&
+         !RecurrenceDescriptor::isFPMinMaxNumRecurrenceKind(RK) &&
+         RK != RecurKind::FMin && RK != RecurKind::FMax) ||
         !BackedgeValue->hasOneUse())
       return {};
     return RecurrenceDescriptor(
