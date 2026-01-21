@@ -3952,11 +3952,12 @@ void VPlanTransforms::handleUncountableEarlyExits(VPlan &Plan,
   // becomes last). The vector is reversed afterwards to restore forward order
   // for the dispatch logic.
   SmallVector<VPBasicBlock *> VectorEarlyExitVPBBs;
-  for (const auto &[EarlyExitingVPBB, EarlyExitVPBB, CondToExit] :
-       reverse(Exits)) {
+  for (auto [I, Exit] : enumerate(reverse(Exits))) {
+    auto &[EarlyExitingVPBB, EarlyExitVPBB, CondToExit] = Exit;
+    unsigned Idx = Exits.size() - 1 - I;
+    Twine BlockSuffix = Exits.size() == 1 ? "" : Twine(".") + Twine(Idx);
     VPBasicBlock *VectorEarlyExitVPBB =
-        Plan.createVPBasicBlock("vector.early.exit");
-    VectorEarlyExitVPBB->setParent(EarlyExitVPBB->getParent());
+        Plan.createVPBasicBlock("vector.early.exit" + BlockSuffix);
     VectorEarlyExitVPBBs.push_back(VectorEarlyExitVPBB);
 
     for (VPRecipeBase &R : EarlyExitVPBB->phis()) {
@@ -3984,7 +3985,7 @@ void VPlanTransforms::handleUncountableEarlyExits(VPlan &Plan,
   VectorEarlyExitVPBBs = to_vector(llvm::reverse(VectorEarlyExitVPBBs));
 
   // For exit blocks that also have the middle block as predecessor (latch
-  // exit to the same block as an early exit), extract the last lane of the
+  // exits to the same block as an early exit), extract the last lane of the
   // first operand for the middle block's incoming value.
   VPBuilder MiddleBuilder(MiddleVPBB);
   for (VPRecipeBase &R :
@@ -3996,7 +3997,8 @@ void VPlanTransforms::handleUncountableEarlyExits(VPlan &Plan,
   }
 
   if (Exits.size() != 1) {
-    VPBasicBlock *DispatchBB = Plan.createVPBasicBlock("vector.early.exit");
+    VPBasicBlock *DispatchBB =
+        Plan.createVPBasicBlock("vector.early.exit.check");
     DispatchBB->setParent(VectorEarlyExitVPBBs[0]->getParent());
     // In the dispatch block, compute the first active lane across all
     // conditions and chain through exits.
@@ -4014,7 +4016,8 @@ void VPlanTransforms::handleUncountableEarlyExits(VPlan &Plan,
       bool IsLastDispatch = (I + 2 == Exits.size());
       VPBasicBlock *FalseBB =
           IsLastDispatch ? VectorEarlyExitVPBBs.back()
-                         : Plan.createVPBasicBlock("vector.early.exit.check");
+                         : Plan.createVPBasicBlock(
+                               Twine("vector.early.exit.check.") + Twine(I));
       if (!IsLastDispatch)
         FalseBB->setParent(LatchVPBB->getParent());
 
