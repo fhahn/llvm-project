@@ -29,6 +29,7 @@ class Instruction;
 class LoadInst;
 class Loop;
 class MemoryLocation;
+class SCEV;
 class ScalarEvolution;
 class SCEVPredicate;
 template <typename T> class SmallVectorImpl;
@@ -84,6 +85,18 @@ LLVM_ABI bool isSafeToLoadUnconditionally(
 /// address loaded from is analyzeable by SCEV.
 LLVM_ABI bool isDereferenceableAndAlignedInLoop(
     LoadInst *LI, Loop *L, ScalarEvolution &SE, DominatorTree &DT,
+    AssumptionCache *AC = nullptr,
+    SmallVectorImpl<const SCEVPredicate *> *Predicates = nullptr);
+
+/// Overload that takes SCEV and type information directly instead of a
+/// LoadInst. This enables checking dereferenceability without access to the
+/// underlying IR instruction, useful for VPlan-based analysis.
+/// \p PtrSCEV is the SCEV expression for the pointer.
+/// \p AccessSize is the size in bytes of the memory access.
+/// \p Alignment is the required alignment of the access.
+LLVM_ABI bool isDereferenceableAndAlignedInLoop(
+    const SCEV *PtrSCEV, Align Alignment, const APInt &AccessSize,
+    const DataLayout &DL, Loop *L, ScalarEvolution &SE, DominatorTree &DT,
     AssumptionCache *AC = nullptr,
     SmallVectorImpl<const SCEVPredicate *> *Predicates = nullptr);
 
