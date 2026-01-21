@@ -759,7 +759,7 @@ m_Intrinsic(const T0 &Op0, const T1 &Op1, const T2 &Op2, const T3 &Op3) {
 
 struct live_in_vpvalue {
   template <typename ITy> bool match(ITy *V) const {
-    return isa<VPIRValue, VPSymbolicValue>(V);
+    return isa<VPValue>(V) && cast<VPValue>(V)->isLiveIn();
   }
 };
 
@@ -787,7 +787,8 @@ private:
       return false;
 
     if constexpr (std::is_same_v<RecipeTy, VPWidenGEPRecipe>) {
-      SourceElementType = DefR->getSourceElementType();
+      SourceElementType = cast<GetElementPtrInst>(DefR->getUnderlyingInstr())
+                              ->getSourceElementType();
     } else if (DefR->getOpcode() == Instruction::GetElementPtr) {
       SourceElementType = cast<GetElementPtrInst>(DefR->getUnderlyingInstr())
                               ->getSourceElementType();
@@ -829,6 +830,7 @@ template <typename T> inline OneUse_match<T> m_OneUse(const T &SubPattern) {
   return SubPattern;
 }
 
-} // namespace llvm::VPlanPatternMatch
+} // namespace VPlanPatternMatch
+} // namespace llvm
 
 #endif
