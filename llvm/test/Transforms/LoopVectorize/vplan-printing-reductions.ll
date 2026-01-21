@@ -220,12 +220,15 @@ exit:
 define i64 @find_last_iv(ptr %a, i64 %n, i64 %start) {
 ; CHECK-LABEL: Checking a loop in 'find_last_iv'
 ; CHECK:       VPlan 'Initial VPlan for VF={4},UF>=1' {
-; CHECK:        <x1> vector loop: {
+; CHECK:        vector.ph:
+; CHECK-NEXT:   Successor(s): vector loop
+; CHECK-EMPTY:
+; CHECK-NEXT:   <x1> vector loop: {
 ; CHECK-NEXT:     vector.body:
 ; CHECK-NEXT:     EMIT vp<[[CAN_IV:%.+]]> = CANONICAL-INDUCTION ir<0>, vp<%index.next>
 ; CHECK-NEXT:     ir<%iv> = WIDEN-INDUCTION nuw nsw ir<0>, ir<1>, vp<{{.+}}>
 ; CHECK-NEXT:     WIDEN-REDUCTION-PHI ir<%rdx> = phi ir<-9223372036854775808>, ir<%cond>
-; CHECK-NEXT:     vp<[[SCALAR_STEPS:%.+]]> = SCALAR-STEPS vp<[[CAN_IV]]>, ir<1>
+; CHECK-NEXT:     vp<[[SCALAR_STEPS:%.+]]> = SCALAR-STEPS vp<[[CAN_IV]]>, ir<1>, vp<{{.+}}>
 ; CHECK-NEXT:     CLONE ir<%gep.a> = getelementptr inbounds ir<%a>, vp<[[SCALAR_STEPS]]>
 ; CHECK-NEXT:     vp<[[VEC_PTR:%.+]]> = vector-pointer inbounds ir<%gep.a>
 ; CHECK-NEXT:     WIDEN ir<%l.a> = load vp<[[VEC_PTR]]>

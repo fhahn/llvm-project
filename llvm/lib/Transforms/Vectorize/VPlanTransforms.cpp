@@ -5387,12 +5387,12 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
                      PhiR->getRecurrenceKind()))
       continue;
 
-    // Get the IV from the backedge value of the reduction phi.
+    // Get the IV and condition from the backedge value of the reduction phi.
     // The backedge value should be a select between the phi and the IV.
     VPValue *BackedgeVal = PhiR->getBackedgeValue();
-    VPValue *TrueVal, *FalseVal;
-    if (!match(BackedgeVal,
-               m_Select(m_VPValue(), m_VPValue(TrueVal), m_VPValue(FalseVal))))
+    VPValue *Cond, *TrueVal, *FalseVal;
+    if (!match(BackedgeVal, m_Select(m_VPValue(Cond), m_VPValue(TrueVal),
+                                     m_VPValue(FalseVal))))
       continue;
 
     // The non-phi operand of the select is the IV.
@@ -5405,48 +5405,96 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
 
     // Determine direction from SCEV step.
     // Positive step means FindLast (ascending), negative means FindFirst.
-    if (!SE.isKnownNonZero(Step))
+    auto *AR = dyn_cast<SCEVAddRecExpr>(IVSCEV);
+    if (!AR || !SE.isKnownNonZero(Step))
       continue;
 
     bool IsFindLast = SE.isKnownPositive(Step);
+
+    // Try sentinel-based approach first (signed, then unsigned).
     bool UseSigned = true;
     std::optional<APInt> SentinelVal = CheckSentinel(IVSCEV, IsFindLast, true);
     if (!SentinelVal) {
       SentinelVal = CheckSentinel(IVSCEV, IsFindLast, false);
-      if (!SentinelVal)
-        continue;
       UseSigned = false;
+    }
+
+    // Fall back to boolean tracking if IV doesn't wrap.
+    if (!SentinelVal) {
+      if (AR->hasNoSignedWrap()) {
+        UseSigned = true;
+      } else if (AR->hasNoUnsignedWrap()) {
+        UseSigned = false;
+      } else {
+        continue;
+      }
     }
 
     VPInstruction *RdxResult = cast<VPInstruction>(vputils::findRecipe(
         BackedgeVal,
         match_fn(m_VPInstruction<VPInstruction::ComputeReductionResult>())));
 
-    // Create the reduction result in the middle block using sentinel directly.
-    VPBuilder MiddleBuilder(RdxResult);
-    DebugLoc ExitDL = RdxResult->getDebugLoc();
-    VPValue *Start = PhiR->getStartValue();
     RecurKind NewRK = GetFindIVRecurKind(IsFindLast, UseSigned);
 
     RecurKind MinMaxKind = IsFindLast
                                ? (UseSigned ? RecurKind::SMax : RecurKind::UMax)
                                : (UseSigned ? RecurKind::SMin : RecurKind::UMin);
+
+    VPBuilder MiddleBuilder(RdxResult);
     VPIRFlags Flags(MinMaxKind, /*IsOrdered=*/false, /*IsInLoop=*/false,
                     FastMathFlags());
-
-    VPValue *Sentinel = Plan.getConstantInt(*SentinelVal);
+    DebugLoc ExitDL = RdxResult->getDebugLoc();
     VPValue *ReducedIV =
         MiddleBuilder.createNaryOp(VPInstruction::ComputeReductionResult,
                                    {RdxResult->getOperand(0)}, Flags, ExitDL);
-    auto *Cmp =
-        MiddleBuilder.createICmp(CmpInst::ICMP_NE, ReducedIV, Sentinel, ExitDL);
-    VPInstruction *NewRdxResult = cast<VPInstruction>(
-        MiddleBuilder.createSelect(Cmp, ReducedIV, Start, ExitDL));
+
+    VPInstruction *NewRdxResult;
+    VPValue *StartVPV = PhiR->getStartValue();
+    if (SentinelVal) {
+      // Sentinel-based approach: reduce IVs with min/max, compare against
+      // sentinel to detect if condition was ever true, select accordingly.
+      VPValue *Sentinel = Plan.getConstantInt(*SentinelVal);
+      auto *Cmp = MiddleBuilder.createICmp(CmpInst::ICMP_NE, ReducedIV,
+                                           Sentinel, ExitDL);
+      NewRdxResult = cast<VPInstruction>(
+          MiddleBuilder.createSelect(Cmp, ReducedIV, StartVPV, ExitDL));
+      StartVPV = Sentinel;
+    } else {
+      // Introduce a boolean AnyOf reduction to track if the condition was ever
+      // true in the loop. Use it to select the initial start value, if it was
+      // never true.
+      auto *AnyOfPhi = new VPReductionPHIRecipe(
+          nullptr, RecurKind::Or, *Plan.getFalse(), *Plan.getFalse(),
+          RdxUnordered{1}, /*HasUsesOutsideReductionChain=*/false);
+      AnyOfPhi->insertAfter(PhiR);
+
+      VPBuilder LoopBuilder(
+          cast<VPRecipeBase>(BackedgeVal->getDefiningRecipe()));
+      VPValue *AnyOfCond = Cond;
+      if (TrueVal == PhiR)
+        AnyOfCond = LoopBuilder.createNot(Cond);
+      VPValue *OrVal = LoopBuilder.createOr(AnyOfPhi, AnyOfCond);
+      AnyOfPhi->setOperand(1, OrVal);
+
+      NewRdxResult =
+          MiddleBuilder.createNaryOp(VPInstruction::ComputeAnyOfResult,
+                                     {StartVPV, ReducedIV, OrVal}, {}, ExitDL);
+
+      // Initialize the IV reduction phi with the neutral element, not the
+      // original start value, to ensure correct min/max reduction results.
+      unsigned BitWidth = IVSCEV->getType()->getScalarSizeInBits();
+      APInt NeutralVal = IsFindLast
+                             ? (UseSigned ? APInt::getSignedMinValue(BitWidth)
+                                          : APInt::getZero(BitWidth))
+                             : (UseSigned ? APInt::getSignedMaxValue(BitWidth)
+                                          : APInt::getAllOnes(BitWidth));
+      StartVPV = Plan.getConstantInt(NeutralVal);
+    }
     RdxResult->replaceAllUsesWith(NewRdxResult);
     RdxResult->eraseFromParent();
 
     auto *NewPhiR = new VPReductionPHIRecipe(
-        cast<PHINode>(PhiR->getUnderlyingInstr()), NewRK, *Sentinel,
+        cast<PHINode>(PhiR->getUnderlyingInstr()), NewRK, *StartVPV,
         *BackedgeVal, RdxUnordered{1}, PhiR->hasUsesOutsideReductionChain());
     NewPhiR->insertBefore(PhiR);
     PhiR->replaceAllUsesWith(NewPhiR);
