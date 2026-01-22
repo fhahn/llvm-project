@@ -1848,11 +1848,25 @@ bool LoopVectorizationLegality::isVectorizableEarlyExitLoop() {
 
   // Check non-dereferenceable loads if any.
   for (LoadInst *LI : NonDerefLoads) {
-    // Occurs after the early exit, so we can predicate it.
-    /*    if (UncountableExitingBlocks.size() == 1 &&
-     * DT->properlyDominates(*UncountableExitingBlocks.begin(),
-     * LI->getParent()))*/
-    continue;
+    // Check if this load can be predicated because it occurs after some early
+    // exit. If the load's block is properly dominated by any uncountable
+    // exiting block, the load will only execute for lanes that didn't take that
+    // exit, so we can safely predicate it.
+    BasicBlock *LoadBB = LI->getParent();
+    bool DominatedByExit = llvm::any_of(
+        UncountableExitingBlocks, [this, LoadBB](BasicBlock *ExitBB) {
+          return DT->properlyDominates(ExitBB, LoadBB);
+        });
+    if (DominatedByExit) {
+      LLVM_DEBUG(dbgs() << "LV: Load can be predicated (dominated by exit): "
+                        << *LI << "\n");
+      // Mark this load as needing predication/masking.
+      MaskedOp.insert(LI);
+      continue;
+    }
+
+    // The load is not dominated by any early exit, so it cannot be predicated.
+    // Check if we can use fault-only-first for it instead.
     // Only support unit-stride access for now.
     int Stride = isConsecutivePtr(LI->getType(), LI->getPointerOperand());
     if (Stride != 1) {

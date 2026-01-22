@@ -3997,19 +3997,34 @@ void VPlanTransforms::handleUncountableEarlyExits(VPlan &Plan,
     ExitIRI->extractLastLaneOfLastPartOfFirstOperand(MiddleBuilder);
   }
 
+  // Predicate instructions in blocks dominated by early exits. We compute a
+  // cumulative mask that tracks lanes which have exited at any earlier exit.
+  // Since exits form a dominance chain, we process them in order and
+  // accumulate the exit conditions.
+  VPValue *CumulativeExitCond = nullptr;
   for (auto &[EarlyExitingVPBB, _, CondToExit] : Exits) {
     VPBuilder Builder(EarlyExitingVPBB);
-    // Create a mask and predicate any "exited" lanes in successor blocks.
-    VPValue *FirstActiveLane =
-        Builder.createNaryOp(VPInstruction::FirstActiveLane, {CondToExit},
+
+    // Update cumulative exit condition (OR of all exit conditions seen so far).
+    if (CumulativeExitCond)
+      CumulativeExitCond = Builder.createOr(CumulativeExitCond, CondToExit);
+    else
+      CumulativeExitCond = CondToExit;
+
+    // Create a mask based on the cumulative condition. Lanes where any exit
+    // condition was true at or before their index should be masked.
+    VPValue *FirstExitLane =
+        Builder.createNaryOp(VPInstruction::FirstActiveLane, {CumulativeExitCond},
                              DebugLoc::getUnknown(), "first.active.lane");
     VPValue *SuccMask = Builder.createICmp(
         CmpInst::ICMP_ULT,
         Builder.createNaryOp(VPInstruction::StepVector, {},
                              Type::getInt64Ty(Plan.getContext())),
-        FirstActiveLane);
+        FirstExitLane);
 
-    // EarlyExitingBB->getSingleSuccessor()
+    // Apply mask to all VPInstructions in the in-loop successor block.
+    // After terminator erasure and exit block disconnection, each early exiting
+    // block has a single successor that continues the loop.
     for (VPRecipeBase &R :
          *cast<VPBasicBlock>(EarlyExitingVPBB->getSingleSuccessor())) {
       auto *VPI = dyn_cast<VPInstruction>(&R);
