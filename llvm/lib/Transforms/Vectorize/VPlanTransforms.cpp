@@ -3908,7 +3908,6 @@ void VPlanTransforms::handleUncountableEarlyExits(VPlan &Plan,
     VPValue *CondToExit;
   };
 
-  VPBuilder Builder(LatchVPBB->getTerminator());
   SmallVector<EarlyExitInfo> Exits;
   for (VPIRBasicBlock *EB : Plan.getExitBlocks()) {
     for (VPBlockBase *Pred : to_vector(EB->getPredecessors())) {
@@ -3921,6 +3920,7 @@ void VPlanTransforms::handleUncountableEarlyExits(VPlan &Plan,
              "Terminator must be BranchOnCond");
       VPValue *CondOfEarlyExitingVPBB =
           EarlyExitingVPBB->getTerminator()->getOperand(0);
+      VPBuilder Builder(EarlyExitingVPBB->getTerminator());
       auto *CondToEarlyExit = TrueSucc == EB
                                   ? CondOfEarlyExitingVPBB
                                   : Builder.createNot(CondOfEarlyExitingVPBB);
@@ -3931,6 +3931,7 @@ void VPlanTransforms::handleUncountableEarlyExits(VPlan &Plan,
       });
     }
   }
+  VPBuilder Builder(LatchVPBB->getTerminator());
 
   // Sort exits by dominance to get the correct program order.
   VPDominatorTree VPDT(Plan);
@@ -3994,6 +3995,28 @@ void VPlanTransforms::handleUncountableEarlyExits(VPlan &Plan,
     if (ExitIRI->getNumOperands() == 1)
       continue;
     ExitIRI->extractLastLaneOfLastPartOfFirstOperand(MiddleBuilder);
+  }
+
+  for (auto &[EarlyExitingVPBB, _, CondToExit] : Exits) {
+    VPBuilder Builder(EarlyExitingVPBB);
+    // Create a mask and predicate any "exited" lanes in successor blocks.
+    VPValue *FirstActiveLane =
+        Builder.createNaryOp(VPInstruction::FirstActiveLane, {CondToExit},
+                             DebugLoc::getUnknown(), "first.active.lane");
+    VPValue *SuccMask = Builder.createICmp(
+        CmpInst::ICMP_ULT,
+        Builder.createNaryOp(VPInstruction::StepVector, {},
+                             Type::getInt64Ty(Plan.getContext())),
+        FirstActiveLane);
+
+    // EarlyExitingBB->getSingleSuccessor()
+    for (VPRecipeBase &R :
+         *cast<VPBasicBlock>(EarlyExitingVPBB->getSingleSuccessor())) {
+      auto *VPI = dyn_cast<VPInstruction>(&R);
+      if (!VPI)
+        continue;
+      VPI->addMask(SuccMask);
+    }
   }
 
   if (Exits.size() != 1) {
