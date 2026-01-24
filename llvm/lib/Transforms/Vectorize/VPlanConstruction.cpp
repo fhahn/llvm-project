@@ -968,9 +968,7 @@ void VPlanTransforms::foldTailByMasking(VPlan &Plan) {
   VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
   VPBasicBlock *Header = LoopRegion->getEntryBasicBlock();
 
-  Header->splitAt(Header->getFirstNonPhi());
-
-  // Create the header mask and insert it in the header.
+  // Create the header mask and insert it in the header after any phis.
   auto *IV =
       new VPWidenCanonicalIVRecipe(Header->getParent()->getCanonicalIV());
   VPBuilder Builder(Header, Header->getFirstNonPhi());
@@ -978,9 +976,14 @@ void VPlanTransforms::foldTailByMasking(VPlan &Plan) {
   VPValue *BTC = Plan.getOrCreateBackedgeTakenCount();
   VPValue *HeaderMask = Builder.createICmp(CmpInst::ICMP_ULE, IV, BTC);
 
-  // Predicate everything after the header mask.
-  Builder.setInsertPoint(Header, Header->end());
-  Builder.createNaryOp(VPInstruction::PredicateSuccessors, HeaderMask);
+  // Add header mask to all VPInstructions in the loop region.
+  for (VPBlockBase *VPB : vp_depth_first_shallow(Header)) {
+    auto *VPBB = cast<VPBasicBlock>(VPB);
+    for (VPRecipeBase &R : *VPBB) {
+      if (auto *VPI = dyn_cast<VPInstruction>(&R))
+        VPI->addMask(HeaderMask);
+    }
+  }
 
   // Any extract of the last element must be updated to extract from the last
   // active lane of the header mask instead (i.e., the lane corresponding to the
