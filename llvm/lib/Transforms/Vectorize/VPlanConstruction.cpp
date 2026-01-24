@@ -22,6 +22,7 @@
 #include "llvm/Analysis/LoopIterator.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/Transforms/Utils/LoopUtils.h"
@@ -872,7 +873,10 @@ void VPlanTransforms::createInLoopReductionRecipes(
 }
 
 void VPlanTransforms::handleEarlyExits(VPlan &Plan,
-                                       bool HasUncountableEarlyExit) {
+                                       bool HasUncountableEarlyExit,
+                                       Loop *TheLoop,
+                                       PredicatedScalarEvolution &PSE,
+                                       DominatorTree &DT, AssumptionCache *AC) {
   auto *MiddleVPBB = cast<VPBasicBlock>(
       Plan.getScalarHeader()->getSinglePredecessor()->getPredecessors()[0]);
   auto *LatchVPBB = cast<VPBasicBlock>(MiddleVPBB->getSinglePredecessor());
@@ -892,7 +896,8 @@ void VPlanTransforms::handleEarlyExits(VPlan &Plan,
         assert(!HandledUncountableEarlyExit &&
                "can handle exactly one uncountable early exit");
         handleUncountableEarlyExit(cast<VPBasicBlock>(Pred), EB, Plan,
-                                   cast<VPBasicBlock>(HeaderVPB), LatchVPBB);
+                                   cast<VPBasicBlock>(HeaderVPB), LatchVPBB,
+                                   TheLoop, PSE, DT, AC);
         HandledUncountableEarlyExit = true;
       } else {
         for (VPRecipeBase &R : EB->phis())
@@ -967,6 +972,18 @@ void VPlanTransforms::createLoopRegions(VPlan &Plan) {
 // including memory overlap checks block and wrapping/unit-stride checks block.
 static constexpr uint32_t CheckBypassWeights[] = {1, 127};
 
+/// Update scalar preheader phis to account for a new predecessor. Replicates
+/// the incoming value from the previous last predecessor.
+static void updateScalarPHPhis(VPBasicBlock *ScalarPHBB) {
+  unsigned NumPreds = ScalarPHBB->getNumPredecessors();
+  for (VPRecipeBase &R : ScalarPHBB->phis()) {
+    auto *Phi = cast<VPPhi>(&R);
+    assert(Phi->getNumIncoming() == NumPreds - 1 &&
+           "must have incoming values for all predecessors");
+    Phi->addOperand(Phi->getOperand(NumPreds - 2));
+  }
+}
+
 void VPlanTransforms::attachCheckBlock(VPlan &Plan, Value *Cond,
                                        BasicBlock *CheckBlock,
                                        bool AddBranchWeights) {
@@ -974,27 +991,89 @@ void VPlanTransforms::attachCheckBlock(VPlan &Plan, Value *Cond,
   VPBasicBlock *CheckBlockVPBB = Plan.createVPIRBasicBlock(CheckBlock);
   VPBlockBase *VectorPH = Plan.getVectorPreheader();
   VPBlockBase *ScalarPH = Plan.getScalarPreheader();
-  VPBlockBase *PreVectorPH = VectorPH->getSinglePredecessor();
-  VPBlockUtils::insertOnEdge(PreVectorPH, VectorPH, CheckBlockVPBB);
+  VPBlockUtils::insertOnEdge(VectorPH->getSinglePredecessor(), VectorPH,
+                             CheckBlockVPBB);
   VPBlockUtils::connectBlocks(CheckBlockVPBB, ScalarPH);
   CheckBlockVPBB->swapSuccessors();
+  updateScalarPHPhis(cast<VPBasicBlock>(ScalarPH));
 
-  // We just connected a new block to the scalar preheader. Update all
-  // VPPhis by adding an incoming value for it, replicating the last value.
-  unsigned NumPredecessors = ScalarPH->getNumPredecessors();
-  for (VPRecipeBase &R : cast<VPBasicBlock>(ScalarPH)->phis()) {
-    assert(isa<VPPhi>(&R) && "Phi expected to be VPPhi");
-    assert(cast<VPPhi>(&R)->getNumIncoming() == NumPredecessors - 1 &&
-           "must have incoming values for all operands");
-    R.addOperand(R.getOperand(NumPredecessors - 2));
-  }
-
-  VPIRMetadata VPBranchWeights;
   auto *Term =
       VPBuilder(CheckBlockVPBB)
           .createNaryOp(
               VPInstruction::BranchOnCond, {CondVPV},
               Plan.getVectorLoopRegion()->getCanonicalIV()->getDebugLoc());
+  if (AddBranchWeights) {
+    MDBuilder MDB(Plan.getContext());
+    MDNode *BranchWeights =
+        MDB.createBranchWeights(CheckBypassWeights, /*IsExpected=*/false);
+    Term->setMetadata(LLVMContext::MD_prof, BranchWeights);
+  }
+}
+
+void VPlanTransforms::attachSpeculativeLoadChecks(
+    VPlan &Plan, ElementCount VF, PredicatedScalarEvolution &PSE, Loop *TheLoop,
+    bool AddBranchWeights) {
+  VPRegionBlock *VectorRegion = Plan.getVectorLoopRegion();
+  assert(VectorRegion && "Expected VPlan to have a vector loop region");
+
+  // Scan the plan for speculative load intrinsics and collect the base pointer
+  // and vector type for each.
+  SmallVector<std::pair<VPValue *, Type *>> SpeculativeLoads;
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_shallow(VectorRegion->getEntry()))) {
+    for (VPRecipeBase &R : *VPBB) {
+      VPValue *Ptr;
+      if (!match(&R, m_Intrinsic<Intrinsic::speculative_load>(m_VPValue(Ptr))))
+        continue;
+      auto *IntrinsicR = cast<VPWidenIntrinsicRecipe>(&R);
+
+      // Get the loop-invariant base pointer via SCEV.
+      const SCEV *PtrSCEV = vputils::getSCEVExprForVPValue(Ptr, PSE, TheLoop);
+      assert(!isa<SCEVCouldNotCompute>(PtrSCEV) &&
+             "speculative load has non-computable pointer SCEV");
+      const SCEV *BaseSCEV = PSE.getSE()->getPointerBase(PtrSCEV);
+      assert(!isa<SCEVCouldNotCompute>(BaseSCEV) &&
+             "speculative load has non-computable pointer base");
+      VPValue *BasePtr = vputils::getOrCreateVPValueForSCEVExpr(Plan, BaseSCEV);
+      SpeculativeLoads.push_back(
+          {BasePtr, VectorType::get(IntrinsicR->getResultType(), VF)});
+    }
+  }
+
+  if (SpeculativeLoads.empty())
+    return;
+
+  // Create a check block that verifies the speculative loads are safe
+  // using @llvm.can.load.speculatively intrinsic.
+  VPBasicBlock *CheckBlockVPBB = Plan.createVPBasicBlock("spec.load.check");
+  VPBlockBase *VectorPH = Plan.getVectorPreheader();
+  VPBlockBase *ScalarPH = Plan.getScalarPreheader();
+
+  VPBlockUtils::insertOnEdge(VectorPH->getSinglePredecessor(), VectorPH,
+                             CheckBlockVPBB);
+  VPBlockUtils::connectBlocks(CheckBlockVPBB, ScalarPH);
+  updateScalarPHPhis(cast<VPBasicBlock>(ScalarPH));
+
+  VPBuilder Builder(CheckBlockVPBB);
+  const DataLayout &DL = TheLoop->getHeader()->getDataLayout();
+  Type *I64Ty = Type::getInt64Ty(Plan.getContext());
+
+  // Build a combined check for all speculative loads.
+  VPValue *AllChecksPassed = nullptr;
+  for (const auto &[StartPtr, VecTy] : SpeculativeLoads) {
+    TypeSize SizeInBytes = DL.getTypeStoreSize(VecTy);
+    VPValue *SizeVal = Builder.createElementCount(
+        I64Ty, ElementCount::get(SizeInBytes.getKnownMinValue(),
+                                 SizeInBytes.isScalable()));
+    VPValue *IsSafe = Builder.createNaryOp(VPInstruction::CanLoadSpeculatively,
+                                           {StartPtr, SizeVal});
+    AllChecksPassed =
+        AllChecksPassed ? Builder.createAnd(AllChecksPassed, IsSafe) : IsSafe;
+  }
+
+  auto *Term =
+      Builder.createNaryOp(VPInstruction::BranchOnCond, {AllChecksPassed});
+
   if (AddBranchWeights) {
     MDBuilder MDB(Plan.getContext());
     MDNode *BranchWeights =
