@@ -5120,6 +5120,41 @@ void SelectionDAGBuilder::visitMaskedLoad(const CallInst &I, bool IsExpanding) {
   setValue(&I, Res);
 }
 
+void SelectionDAGBuilder::visitSpeculativeLoad(const CallInst &I) {
+  SDLoc sdl = getCurSDLoc();
+
+  // @llvm.speculative.load.*(ptr)
+  // Speculatively loads a value from memory. The load may access memory beyond
+  // the allocated object if the pointer has sufficient alignment to guarantee
+  // the access won't cross a page boundary.
+  Value *PtrOperand = I.getArgOperand(0);
+  SDValue Ptr = getValue(PtrOperand);
+
+  const TargetLowering &TLI = DAG.getTargetLoweringInfo();
+  EVT VT = TLI.getValueType(DAG.getDataLayout(), I.getType());
+  Align Alignment = I.getParamAlign(0).valueOrOne();
+  AAMDNodes AAInfo = I.getAAMetadata();
+  TypeSize StoreSize = VT.getStoreSize();
+
+  SDValue InChain = DAG.getRoot();
+
+  // Use MOLoad but NOT MODereferenceable - the memory may not be
+  // dereferenceable in the traditional sense, but alignment guarantees it won't
+  // fault.
+  MachineMemOperand::Flags MMOFlags = MachineMemOperand::MOLoad;
+
+  // For scalable vectors, we don't know the exact size at compile time.
+  LocationSize LocSize = StoreSize.isScalable()
+                             ? LocationSize::beforeOrAfterPointer()
+                             : LocationSize::precise(StoreSize);
+  MachineMemOperand *MMO = DAG.getMachineFunction().getMachineMemOperand(
+      MachinePointerInfo(PtrOperand), MMOFlags, LocSize, Alignment, AAInfo);
+
+  SDValue Load = DAG.getLoad(VT, sdl, InChain, Ptr, MMO);
+  PendingLoads.push_back(Load.getValue(1));
+  setValue(&I, Load);
+}
+
 void SelectionDAGBuilder::visitMaskedGather(const CallInst &I) {
   SDLoc sdl = getCurSDLoc();
 
@@ -6863,6 +6898,9 @@ void SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I,
     return;
   case Intrinsic::masked_compressstore:
     visitMaskedStore(I, true /* IsCompressing */);
+    return;
+  case Intrinsic::speculative_load:
+    visitSpeculativeLoad(I);
     return;
   case Intrinsic::powi:
     setValue(&I, ExpandPowI(sdl, getValue(I.getArgOperand(0)),

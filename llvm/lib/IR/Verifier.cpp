@@ -6749,6 +6749,26 @@ void Verifier::visitIntrinsicCall(Intrinsic::ID ID, CallBase &Call) {
           &Call);
     break;
   }
+  case Intrinsic::speculative_load: {
+    Type *LoadTy = Call.getType();
+    TypeSize Size = DL.getTypeStoreSize(LoadTy);
+    // For scalable vectors, check the known minimum size is a power of 2.
+    // The cost model will reject unsupported sizes (e.g., > 16 bytes on AArch64).
+    Check(Size.getKnownMinValue() > 0 && isPowerOf2_64(Size.getKnownMinValue()),
+          "llvm.speculative.load type must have a power-of-2 size", &Call);
+    break;
+  }
+  case Intrinsic::can_load_speculatively: {
+    // Size can be a runtime value (for scalable vectors), but if it's a
+    // constant, verify it's a positive power of 2.
+    if (auto *SizeCI = dyn_cast<ConstantInt>(Call.getArgOperand(1))) {
+      uint64_t Size = SizeCI->getZExtValue();
+      Check(Size > 0 && isPowerOf2_64(Size),
+            "llvm.can.load.speculatively size must be a positive power of 2",
+            &Call);
+    }
+    break;
+  }
   case Intrinsic::vector_insert: {
     Value *Vec = Call.getArgOperand(0);
     Value *SubVec = Call.getArgOperand(1);
