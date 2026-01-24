@@ -115,11 +115,9 @@ struct VPlanTransforms {
 
   /// Create VPReductionRecipes for in-loop reductions. This processes chains
   /// of operations contributing to in-loop reductions and creates appropriate
-  /// VPReductionRecipe instances. Block masks from \p BlockMaskCache are used
-  /// to add predication for blocks in \p BlocksNeedingPredication.
+  /// VPReductionRecipe instances.
   static void createInLoopReductionRecipes(
-      VPlan &Plan, const DenseMap<VPBasicBlock *, VPValue *> &BlockMaskCache,
-      const DenseSet<BasicBlock *> &BlocksNeedingPredication,
+      VPlan &Plan, const DenseSet<BasicBlock *> &BlocksNeedingPredication,
       ElementCount MinVF);
 
   /// Update \p Plan to account for all early exits.
@@ -419,17 +417,14 @@ struct VPlanTransforms {
   /// %wide.iv = widen-canonical-iv ...
   /// %header-mask = icmp ult %wide.iv, BTC
   ///
-  /// The header is then split at the header mask and successors are predicated
-  /// with VPInstruction::PredicateSuccessors. Any
-  /// VPInstruction::ExtractLastLanes are also updated to extract from the last
-  /// active lane of the header mask.
+  /// The header mask is then added to all VPInstructions in the loop region.
+  /// Any VPInstruction::ExtractLastLanes are also updated to extract from the
+  /// last active lane of the header mask.
   static void foldTailByMasking(VPlan &Plan);
 
   /// Predicate and linearize the control-flow in the only loop region of \p
-  /// Plan. Masks for blocks are added to a block-to-mask map which is returned
-  /// in order to be used later for wide recipe construction.
-  static DenseMap<VPBasicBlock *, VPValue *>
-  introduceMasksAndLinearize(VPlan &Plan);
+  /// Plan. Block masks are computed and added to VPInstructions via addMask().
+  static void introduceMasksAndLinearize(VPlan &Plan);
 
   /// Add branch weight metadata, if the \p Plan's middle block is terminated by
   /// a BranchOnCond recipe.

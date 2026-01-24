@@ -125,6 +125,11 @@ inline VPRecipeBase *findRecipe(VPValue *Start, PredT Pred) {
   return nullptr;
 }
 
+/// Collect the header mask with the pattern:
+/// ICMP_ULE, WideCanonicalIV, backedge-taken-count)
+/// TODO: Introduce explicit recipe for header-mask instead of searching
+/// the header-mask pattern manually.
+VPSingleDefRecipe *findHeaderMask(VPlan &Plan);
 } // namespace vputils
 
 //===----------------------------------------------------------------------===//
