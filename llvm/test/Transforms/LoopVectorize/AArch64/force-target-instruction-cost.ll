@@ -12,11 +12,9 @@ define double @test_reduction_costs() {
 ; COMMON:       [[VECTOR_PH]]:
 ; COMMON-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; COMMON:       [[VECTOR_BODY]]:
-; COMMON-NEXT:    [[VEC_PHI:%.*]] = phi double [ 0.000000e+00, %[[VECTOR_PH]] ], [ [[TMP0:%.*]], %[[VECTOR_BODY]] ]
-; COMMON-NEXT:    [[VEC_PHI1:%.*]] = phi double [ 0.000000e+00, %[[VECTOR_PH]] ], [ [[TMP1:%.*]], %[[VECTOR_BODY]] ]
-; COMMON-NEXT:    [[TMP0]] = call double @llvm.vector.reduce.fadd.v2f64(double [[VEC_PHI]], <2 x double> splat (double 3.000000e+00))
-; COMMON-NEXT:    [[TMP1]] = call double @llvm.vector.reduce.fadd.v2f64(double [[VEC_PHI1]], <2 x double> splat (double 9.000000e+00))
-; COMMON-NEXT:    br i1 true, label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
+; COMMON-NEXT:    [[TMP0:%.*]] = call double @llvm.vector.reduce.fadd.v2f64(double 0.000000e+00, <2 x double> splat (double 3.000000e+00))
+; COMMON-NEXT:    [[TMP1:%.*]] = call double @llvm.vector.reduce.fadd.v2f64(double 0.000000e+00, <2 x double> splat (double 9.000000e+00))
+; COMMON-NEXT:    br label %[[MIDDLE_BLOCK:.*]]
 ; COMMON:       [[MIDDLE_BLOCK]]:
 ; COMMON-NEXT:    br label %[[EXIT:.*]]
 ; COMMON:       [[EXIT]]:
@@ -67,7 +65,7 @@ define void @test_iv_cost(ptr %ptr.start, i8 %a, i64 %b) {
 ; COST1-NEXT:    store <16 x i8> zeroinitializer, ptr [[TMP0]], align 1
 ; COST1-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 32
 ; COST1-NEXT:    [[TMP1:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; COST1-NEXT:    br i1 [[TMP1]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
+; COST1-NEXT:    br i1 [[TMP1]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; COST1:       [[MIDDLE_BLOCK]]:
 ; COST1-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[START]], [[N_VEC]]
 ; COST1-NEXT:    br i1 [[CMP_N]], [[EXIT_LOOPEXIT:label %.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]]
@@ -75,7 +73,7 @@ define void @test_iv_cost(ptr %ptr.start, i8 %a, i64 %b) {
 ; COST1-NEXT:    [[IND_END:%.*]] = sub i64 [[START]], [[N_VEC]]
 ; COST1-NEXT:    [[IND_END9:%.*]] = getelementptr i8, ptr [[PTR_START]], i64 [[N_VEC]]
 ; COST1-NEXT:    [[MIN_EPILOG_ITERS_CHECK:%.*]] = icmp ult i64 [[N_MOD_VF]], 4
-; COST1-NEXT:    br i1 [[MIN_EPILOG_ITERS_CHECK]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF4:![0-9]+]]
+; COST1-NEXT:    br i1 [[MIN_EPILOG_ITERS_CHECK]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF3:![0-9]+]]
 ; COST1:       [[VEC_EPILOG_PH]]:
 ; COST1-NEXT:    [[VEC_EPILOG_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
 ; COST1-NEXT:    [[N_MOD_VF2:%.*]] = urem i64 [[START]], 4
@@ -89,7 +87,7 @@ define void @test_iv_cost(ptr %ptr.start, i8 %a, i64 %b) {
 ; COST1-NEXT:    store <4 x i8> zeroinitializer, ptr [[NEXT_GEP5]], align 1
 ; COST1-NEXT:    [[INDEX_NEXT6]] = add nuw i64 [[INDEX4]], 4
 ; COST1-NEXT:    [[TMP4:%.*]] = icmp eq i64 [[INDEX_NEXT6]], [[N_VEC3]]
-; COST1-NEXT:    br i1 [[TMP4]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
+; COST1-NEXT:    br i1 [[TMP4]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; COST1:       [[VEC_EPILOG_MIDDLE_BLOCK]]:
 ; COST1-NEXT:    [[CMP_N7:%.*]] = icmp eq i64 [[START]], [[N_VEC3]]
 ; COST1-NEXT:    br i1 [[CMP_N7]], [[EXIT_LOOPEXIT]], label %[[VEC_EPILOG_SCALAR_PH]]
@@ -118,7 +116,7 @@ define void @test_iv_cost(ptr %ptr.start, i8 %a, i64 %b) {
 ; COST10-NEXT:    store <16 x i8> zeroinitializer, ptr [[NEXT_GEP]], align 1
 ; COST10-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 16
 ; COST10-NEXT:    [[TMP0:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; COST10-NEXT:    br i1 [[TMP0]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
+; COST10-NEXT:    br i1 [[TMP0]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; COST10:       [[MIDDLE_BLOCK]]:
 ; COST10-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[START]], [[N_VEC]]
 ; COST10-NEXT:    br i1 [[CMP_N]], [[EXIT_LOOPEXIT:label %.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]]
@@ -126,7 +124,7 @@ define void @test_iv_cost(ptr %ptr.start, i8 %a, i64 %b) {
 ; COST10-NEXT:    [[IND_END:%.*]] = sub i64 [[START]], [[N_VEC]]
 ; COST10-NEXT:    [[IND_END9:%.*]] = getelementptr i8, ptr [[PTR_START]], i64 [[N_VEC]]
 ; COST10-NEXT:    [[MIN_EPILOG_ITERS_CHECK:%.*]] = icmp ult i64 [[N_MOD_VF]], 4
-; COST10-NEXT:    br i1 [[MIN_EPILOG_ITERS_CHECK]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF4:![0-9]+]]
+; COST10-NEXT:    br i1 [[MIN_EPILOG_ITERS_CHECK]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF3:![0-9]+]]
 ; COST10:       [[VEC_EPILOG_PH]]:
 ; COST10-NEXT:    [[VEC_EPILOG_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
 ; COST10-NEXT:    [[N_MOD_VF2:%.*]] = urem i64 [[START]], 4
@@ -140,7 +138,7 @@ define void @test_iv_cost(ptr %ptr.start, i8 %a, i64 %b) {
 ; COST10-NEXT:    store <4 x i8> zeroinitializer, ptr [[NEXT_GEP5]], align 1
 ; COST10-NEXT:    [[INDEX_NEXT6]] = add nuw i64 [[INDEX4]], 4
 ; COST10-NEXT:    [[TMP3:%.*]] = icmp eq i64 [[INDEX_NEXT6]], [[N_VEC3]]
-; COST10-NEXT:    br i1 [[TMP3]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
+; COST10-NEXT:    br i1 [[TMP3]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; COST10:       [[VEC_EPILOG_MIDDLE_BLOCK]]:
 ; COST10-NEXT:    [[CMP_N7:%.*]] = icmp eq i64 [[START]], [[N_VEC3]]
 ; COST10-NEXT:    br i1 [[CMP_N7]], [[EXIT_LOOPEXIT]], label %[[VEC_EPILOG_SCALAR_PH]]
@@ -241,20 +239,20 @@ define void @test_exit_branch_cost(ptr %dst, ptr noalias %x.ptr, ptr noalias %y.
 ; COMMON-NEXT:    [[TMP21:%.*]] = extractelement <2 x i1> [[TMP20]], i32 0
 ; COMMON-NEXT:    br i1 [[TMP21]], label %[[PRED_STORE_IF14:.*]], label %[[PRED_STORE_CONTINUE15:.*]]
 ; COMMON:       [[PRED_STORE_IF14]]:
-; COMMON-NEXT:    [[TMP22:%.*]] = load i64, ptr [[SRC]], align 8, !alias.scope [[META7:![0-9]+]]
-; COMMON-NEXT:    store i64 [[TMP22]], ptr [[DST]], align 8, !alias.scope [[META10:![0-9]+]], !noalias [[META7]]
+; COMMON-NEXT:    [[TMP22:%.*]] = load i64, ptr [[SRC]], align 8, !alias.scope [[META6:![0-9]+]]
+; COMMON-NEXT:    store i64 [[TMP22]], ptr [[DST]], align 8, !alias.scope [[META9:![0-9]+]], !noalias [[META6]]
 ; COMMON-NEXT:    br label %[[PRED_STORE_CONTINUE15]]
 ; COMMON:       [[PRED_STORE_CONTINUE15]]:
 ; COMMON-NEXT:    [[TMP23:%.*]] = extractelement <2 x i1> [[TMP20]], i32 1
 ; COMMON-NEXT:    br i1 [[TMP23]], label %[[PRED_STORE_IF16:.*]], label %[[PRED_STORE_CONTINUE17]]
 ; COMMON:       [[PRED_STORE_IF16]]:
-; COMMON-NEXT:    [[TMP24:%.*]] = load i64, ptr [[SRC]], align 8, !alias.scope [[META7]]
-; COMMON-NEXT:    store i64 [[TMP24]], ptr [[DST]], align 8, !alias.scope [[META10]], !noalias [[META7]]
+; COMMON-NEXT:    [[TMP24:%.*]] = load i64, ptr [[SRC]], align 8, !alias.scope [[META6]]
+; COMMON-NEXT:    store i64 [[TMP24]], ptr [[DST]], align 8, !alias.scope [[META9]], !noalias [[META6]]
 ; COMMON-NEXT:    br label %[[PRED_STORE_CONTINUE17]]
 ; COMMON:       [[PRED_STORE_CONTINUE17]]:
 ; COMMON-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; COMMON-NEXT:    [[TMP25:%.*]] = icmp eq i64 [[INDEX_NEXT]], 64
-; COMMON-NEXT:    br i1 [[TMP25]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP12:![0-9]+]]
+; COMMON-NEXT:    br i1 [[TMP25]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP11:![0-9]+]]
 ; COMMON:       [[MIDDLE_BLOCK]]:
 ; COMMON-NEXT:    br label %[[SCALAR_PH]]
 ; COMMON:       [[SCALAR_PH]]:
@@ -333,7 +331,7 @@ define void @invalid_legacy_cost(i64 %N, ptr %x) #0 {
 ; COST1-NEXT:    store <2 x ptr> [[BROADCAST_SPLAT]], ptr [[TMP3]], align 8
 ; COST1-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; COST1-NEXT:    [[TMP4:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; COST1-NEXT:    br i1 [[TMP4]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP14:![0-9]+]]
+; COST1-NEXT:    br i1 [[TMP4]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP13:![0-9]+]]
 ; COST1:       [[MIDDLE_BLOCK]]:
 ; COST1-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
 ; COST1-NEXT:    br i1 [[CMP_N]], [[FOR_END:label %.*]], label %[[SCALAR_PH]]
@@ -358,7 +356,7 @@ define void @invalid_legacy_cost(i64 %N, ptr %x) #0 {
 ; COST10-NEXT:    store <2 x ptr> [[BROADCAST_SPLAT]], ptr [[TMP2]], align 8
 ; COST10-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; COST10-NEXT:    [[TMP3:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; COST10-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP14:![0-9]+]]
+; COST10-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP13:![0-9]+]]
 ; COST10:       [[MIDDLE_BLOCK]]:
 ; COST10-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
 ; COST10-NEXT:    br i1 [[CMP_N]], [[FOR_END:label %.*]], label %[[SCALAR_PH]]
@@ -453,11 +451,11 @@ define void @interleave_group(ptr %dst) #1 {
 ; COST1-NEXT:    store <48 x i8> zeroinitializer, ptr [[TMP4]], align 1
 ; COST1-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 32
 ; COST1-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[INDEX_NEXT]], 96
-; COST1-NEXT:    br i1 [[TMP5]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP16:![0-9]+]]
+; COST1-NEXT:    br i1 [[TMP5]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP15:![0-9]+]]
 ; COST1:       [[MIDDLE_BLOCK]]:
 ; COST1-NEXT:    br i1 false, [[EXIT:label %.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]]
 ; COST1:       [[VEC_EPILOG_ITER_CHECK]]:
-; COST1-NEXT:    br i1 false, label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF4]]
+; COST1-NEXT:    br i1 false, label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF3]]
 ; COST1:       [[VEC_EPILOG_PH]]:
 ; COST1-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ 96, %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
 ; COST1-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[BC_RESUME_VAL]], i64 0
@@ -499,7 +497,7 @@ define void @interleave_group(ptr %dst) #1 {
 ; COST1-NEXT:    [[INDEX_NEXT2]] = add nuw i64 [[INDEX1]], 4
 ; COST1-NEXT:    [[VEC_IND_NEXT]] = add <4 x i64> [[VEC_IND]], splat (i64 4)
 ; COST1-NEXT:    [[TMP23:%.*]] = icmp eq i64 [[INDEX_NEXT2]], 100
-; COST1-NEXT:    br i1 [[TMP23]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP17:![0-9]+]]
+; COST1-NEXT:    br i1 [[TMP23]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP16:![0-9]+]]
 ; COST1:       [[VEC_EPILOG_MIDDLE_BLOCK]]:
 ; COST1-NEXT:    br i1 false, [[EXIT]], label %[[VEC_EPILOG_SCALAR_PH]]
 ; COST1:       [[VEC_EPILOG_SCALAR_PH]]:
@@ -519,11 +517,11 @@ define void @interleave_group(ptr %dst) #1 {
 ; COST10-NEXT:    store <48 x i8> zeroinitializer, ptr [[TMP1]], align 1
 ; COST10-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 16
 ; COST10-NEXT:    [[TMP2:%.*]] = icmp eq i64 [[INDEX_NEXT]], 96
-; COST10-NEXT:    br i1 [[TMP2]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP16:![0-9]+]]
+; COST10-NEXT:    br i1 [[TMP2]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP15:![0-9]+]]
 ; COST10:       [[MIDDLE_BLOCK]]:
 ; COST10-NEXT:    br i1 false, [[EXIT:label %.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]]
 ; COST10:       [[VEC_EPILOG_ITER_CHECK]]:
-; COST10-NEXT:    br i1 false, label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF4]]
+; COST10-NEXT:    br i1 false, label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF3]]
 ; COST10:       [[VEC_EPILOG_PH]]:
 ; COST10-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ 96, %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
 ; COST10-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[BC_RESUME_VAL]], i64 0
@@ -565,7 +563,7 @@ define void @interleave_group(ptr %dst) #1 {
 ; COST10-NEXT:    [[INDEX_NEXT2]] = add nuw i64 [[INDEX1]], 4
 ; COST10-NEXT:    [[VEC_IND_NEXT]] = add <4 x i64> [[VEC_IND]], splat (i64 4)
 ; COST10-NEXT:    [[TMP20:%.*]] = icmp eq i64 [[INDEX_NEXT2]], 100
-; COST10-NEXT:    br i1 [[TMP20]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP17:![0-9]+]]
+; COST10-NEXT:    br i1 [[TMP20]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP16:![0-9]+]]
 ; COST10:       [[VEC_EPILOG_MIDDLE_BLOCK]]:
 ; COST10-NEXT:    br i1 false, [[EXIT]], label %[[VEC_EPILOG_SCALAR_PH]]
 ; COST10:       [[VEC_EPILOG_SCALAR_PH]]:
