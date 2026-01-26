@@ -4904,14 +4904,12 @@ LoopVectorizationPlanner::selectInterleaveCount(VPlan &Plan, ElementCount VF,
     // do the final reduction after the loop.
     bool HasSelectCmpReductions =
         HasReductions &&
-        any_of(Plan.getVectorLoopRegion()->getEntryBasicBlock()->phis(),
-               [](VPRecipeBase &R) {
-                 auto *RedR = dyn_cast<VPReductionPHIRecipe>(&R);
-                 return RedR && (RecurrenceDescriptor::isAnyOfRecurrenceKind(
-                                     RedR->getRecurrenceKind()) ||
-                                 RecurrenceDescriptor::isFindIVRecurrenceKind(
-                                     RedR->getRecurrenceKind()));
-               });
+        any_of(*Plan.getMiddleBlock(), [](VPRecipeBase &R) {
+          using namespace VPlanPatternMatch;
+          return match(
+              &R, m_CombineOr(m_VPInstruction<VPInstruction::ComputeAnyOfResult>(),
+                              m_FindIVResult(m_VPValue(), m_VPValue())));
+        });
     if (HasSelectCmpReductions) {
       LLVM_DEBUG(dbgs() << "LV: Not interleaving select-cmp reductions.\n");
       return 1;
@@ -7323,7 +7321,7 @@ static void fixReductionScalarResumeWhenVectorizingEpilog(
   if (EpiRedResult->getOpcode() == VPInstruction::ComputeAnyOfResult ||
       EpiRedResult->getOpcode() == VPInstruction::ComputeReductionResult)
     BackedgeVal = EpiRedResult->getOperand(EpiRedResult->getNumOperands() - 1);
-  else if (matchFindIVResult(EpiRedResult, m_VPValue(BackedgeVal), m_VPValue()))
+  else if (match(EpiRedResult, m_FindIVResult(m_VPValue(BackedgeVal), m_VPValue())))
     IsFindIV = true;
   else
     return;
@@ -9300,7 +9298,7 @@ static void preparePlanForMainVectorLoop(VPlan &MainPlan, VPlan &EpiPlan) {
       if (!VPI)
         continue;
       VPValue *OrigStart;
-      if (!matchFindIVResult(VPI, m_VPValue(), m_VPValue(OrigStart)))
+      if (!match(VPI, m_FindIVResult(m_VPValue(), m_VPValue(OrigStart))))
         continue;
       if (isGuaranteedNotToBeUndefOrPoison(OrigStart->getLiveInIRValue()))
         continue;

@@ -1158,9 +1158,8 @@ static VPInstruction *findComputeReductionResult(VPReductionPHIRecipe *PhiR) {
 static VPInstruction *findFindIVSelect(VPValue *BackedgeVal) {
   return cast<VPInstruction>(
       vputils::findRecipe(BackedgeVal, [BackedgeVal](VPRecipeBase *R) {
-        auto *VPI = dyn_cast<VPInstruction>(R);
-        return VPI &&
-               matchFindIVResult(VPI, m_Specific(BackedgeVal), m_VPValue());
+        using namespace VPlanPatternMatch;
+        return match(R, m_FindIVResult(m_Specific(BackedgeVal), m_VPValue()));
       }));
 }
 
