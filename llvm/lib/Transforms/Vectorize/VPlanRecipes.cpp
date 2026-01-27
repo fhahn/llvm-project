@@ -3402,8 +3402,9 @@ InstructionCost VPReplicateRecipe::computeCost(ElementCount VF,
     // TODO: See getMemInstScalarizationCost for how to handle replicating and
     // predicated cases.
     const VPRegionBlock *ParentRegion = getRegion();
+    Type *DataTy = getLoadStoreType(UI);
     if (ParentRegion && ParentRegion->isReplicator() &&
-        VF.getKnownMinValue() != 2)
+        !(VF.getKnownMinValue() == 2 && DataTy->isDoubleTy()))
       break;
 
     bool IsLoad = UI->getOpcode() == Instruction::Load;
@@ -3452,7 +3453,7 @@ InstructionCost VPReplicateRecipe::computeCost(ElementCount VF,
     TTI::VectorInstrContext VIC =
         IsLoad ? TTI::VectorInstrContext::Load : TTI::VectorInstrContext::Store;
     if (ParentRegion && ParentRegion->isReplicator() &&
-        VF.getKnownMinValue() == 2) {
+        VF.getKnownMinValue() == 2 && DataTy->isDoubleTy()) {
 
       InstructionCost Cost = 0;
       Cost += VF.getKnownMinValue() *

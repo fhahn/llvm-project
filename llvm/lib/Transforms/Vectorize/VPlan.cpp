@@ -817,10 +817,15 @@ InstructionCost VPRegionBlock::cost(ElementCount VF, VPCostContext &Ctx) {
             if (!RepR)
               continue;
             auto *UI = dyn_cast_or_null<Instruction>(RepR->getUnderlyingValue());
-            if (UI && !Ctx.skipCostComputation(UI, VF.isVector())) {
-              Masks.insert(VPR->getEntryBasicBlock()->front().getOperand(0));
-              break;
-            }
+            if (!UI || Ctx.skipCostComputation(UI, VF.isVector()))
+              continue;
+            if (!isa<LoadInst, StoreInst>(UI))
+              continue;
+            Type *DataTy = getLoadStoreType(UI);
+            if (!DataTy->isDoubleTy())
+              continue;
+            Masks.insert(VPR->getEntryBasicBlock()->front().getOperand(0));
+            break;
           }
         }
       }
