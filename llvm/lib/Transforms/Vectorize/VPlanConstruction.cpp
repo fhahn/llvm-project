@@ -984,30 +984,47 @@ static void updateScalarPHPhis(VPBasicBlock *ScalarPHBB) {
   }
 }
 
-void VPlanTransforms::attachCheckBlock(VPlan &Plan, Value *Cond,
-                                       BasicBlock *CheckBlock,
-                                       bool AddBranchWeights) {
-  VPValue *CondVPV = Plan.getOrAddLiveIn(Cond);
-  VPBasicBlock *CheckBlockVPBB = Plan.createVPIRBasicBlock(CheckBlock);
+/// Insert \p CheckBlockVPBB on the edge leading to the vector preheader,
+/// connecting it to both vector and scalar preheaders. Updates scalar
+/// preheader phis to account for the new predecessor.
+/// If \p BypassOnTrue is true, swaps successors so that a true condition
+/// bypasses to scalar (successor order: [ScalarPH, VectorPH]).
+/// Otherwise, keeps successor order as [VectorPH, ScalarPH].
+static void insertCheckBlockBeforeVectorLoop(VPlan &Plan,
+                                             VPBasicBlock *CheckBlockVPBB,
+                                             bool BypassOnTrue = true) {
   VPBlockBase *VectorPH = Plan.getVectorPreheader();
   VPBlockBase *ScalarPH = Plan.getScalarPreheader();
   VPBlockUtils::insertOnEdge(VectorPH->getSinglePredecessor(), VectorPH,
                              CheckBlockVPBB);
   VPBlockUtils::connectBlocks(CheckBlockVPBB, ScalarPH);
-  CheckBlockVPBB->swapSuccessors();
+  if (BypassOnTrue)
+    CheckBlockVPBB->swapSuccessors();
   updateScalarPHPhis(cast<VPBasicBlock>(ScalarPH));
+}
 
-  auto *Term =
-      VPBuilder(CheckBlockVPBB)
-          .createNaryOp(
-              VPInstruction::BranchOnCond, {CondVPV},
-              Plan.getVectorLoopRegion()->getCanonicalIV()->getDebugLoc());
+/// Create a BranchOnCond terminator in \p CheckBlockVPBB.
+/// Optionally adds branch weights.
+static void addBypassBranch(VPlan &Plan, VPBasicBlock *CheckBlockVPBB,
+                            VPValue *Cond, bool AddBranchWeights) {
+  DebugLoc DL = Plan.getVectorLoopRegion()->getCanonicalIV()->getDebugLoc();
+  auto *Term = VPBuilder(CheckBlockVPBB)
+                   .createNaryOp(VPInstruction::BranchOnCond, {Cond}, DL);
   if (AddBranchWeights) {
     MDBuilder MDB(Plan.getContext());
     MDNode *BranchWeights =
         MDB.createBranchWeights(CheckBypassWeights, /*IsExpected=*/false);
     Term->setMetadata(LLVMContext::MD_prof, BranchWeights);
   }
+}
+
+void VPlanTransforms::attachCheckBlock(VPlan &Plan, Value *Cond,
+                                       BasicBlock *CheckBlock,
+                                       bool AddBranchWeights) {
+  VPValue *CondVPV = Plan.getOrAddLiveIn(Cond);
+  VPBasicBlock *CheckBlockVPBB = Plan.createVPIRBasicBlock(CheckBlock);
+  insertCheckBlockBeforeVectorLoop(Plan, CheckBlockVPBB, /*BypassOnTrue=*/true);
+  addBypassBranch(Plan, CheckBlockVPBB, CondVPV, AddBranchWeights);
 }
 
 void VPlanTransforms::attachSpeculativeLoadChecks(
@@ -1025,7 +1042,7 @@ void VPlanTransforms::attachSpeculativeLoadChecks(
       VPValue *Ptr;
       if (!match(&R, m_Intrinsic<Intrinsic::speculative_load>(m_VPValue(Ptr))))
         continue;
-      auto *IntrinsicR = cast<VPWidenIntrinsicRecipe>(&R);
+      Type *ResultTy = cast<VPWidenIntrinsicRecipe>(&R)->getResultType();
 
       // Get the loop-invariant base pointer via SCEV.
       const SCEV *PtrSCEV = vputils::getSCEVExprForVPValue(Ptr, PSE, TheLoop);
@@ -1035,8 +1052,7 @@ void VPlanTransforms::attachSpeculativeLoadChecks(
       assert(!isa<SCEVCouldNotCompute>(BaseSCEV) &&
              "speculative load has non-computable pointer base");
       VPValue *BasePtr = vputils::getOrCreateVPValueForSCEVExpr(Plan, BaseSCEV);
-      SpeculativeLoads.push_back(
-          {BasePtr, VectorType::get(IntrinsicR->getResultType(), VF)});
+      SpeculativeLoads.push_back({BasePtr, VectorType::get(ResultTy, VF)});
     }
   }
 
@@ -1044,15 +1060,11 @@ void VPlanTransforms::attachSpeculativeLoadChecks(
     return;
 
   // Create a check block that verifies the speculative loads are safe
-  // using @llvm.can.load.speculatively intrinsic.
+  // using @llvm.can.load.speculatively intrinsic. Insert the block into the
+  // plan first so VPBuilder can access the plan.
   VPBasicBlock *CheckBlockVPBB = Plan.createVPBasicBlock("spec.load.check");
-  VPBlockBase *VectorPH = Plan.getVectorPreheader();
-  VPBlockBase *ScalarPH = Plan.getScalarPreheader();
-
-  VPBlockUtils::insertOnEdge(VectorPH->getSinglePredecessor(), VectorPH,
-                             CheckBlockVPBB);
-  VPBlockUtils::connectBlocks(CheckBlockVPBB, ScalarPH);
-  updateScalarPHPhis(cast<VPBasicBlock>(ScalarPH));
+  // Use BypassOnTrue=false since AllChecksPassed=true means continue to vector.
+  insertCheckBlockBeforeVectorLoop(Plan, CheckBlockVPBB, /*BypassOnTrue=*/false);
 
   VPBuilder Builder(CheckBlockVPBB);
   const DataLayout &DL = TheLoop->getHeader()->getDataLayout();
@@ -1071,15 +1083,7 @@ void VPlanTransforms::attachSpeculativeLoadChecks(
         AllChecksPassed ? Builder.createAnd(AllChecksPassed, IsSafe) : IsSafe;
   }
 
-  auto *Term =
-      Builder.createNaryOp(VPInstruction::BranchOnCond, {AllChecksPassed});
-
-  if (AddBranchWeights) {
-    MDBuilder MDB(Plan.getContext());
-    MDNode *BranchWeights =
-        MDB.createBranchWeights(CheckBypassWeights, /*IsExpected=*/false);
-    Term->setMetadata(LLVMContext::MD_prof, BranchWeights);
-  }
+  addBypassBranch(Plan, CheckBlockVPBB, AllChecksPassed, AddBranchWeights);
 }
 
 void VPlanTransforms::addMinimumIterationCheck(

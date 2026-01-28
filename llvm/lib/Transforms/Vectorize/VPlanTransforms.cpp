@@ -4024,9 +4024,9 @@ void VPlanTransforms::handleUncountableEarlyExit(
   replaceUnsafeLoadsWithSpeculative(HeaderVPBB, MiddleVPBB, EarlyExitVPBB,
                                     TheLoop, PSE, DT, AC);
 
-  VPValue *CondToEarlyExit = TrueSucc == EarlyExitVPBB
-                                 ? CondOfEarlyExitingVPBB
-                                 : Builder.createNot(CondOfEarlyExitingVPBB);
+  auto *CondToEarlyExit = TrueSucc == EarlyExitVPBB
+                              ? CondOfEarlyExitingVPBB
+                              : Builder.createNot(CondOfEarlyExitingVPBB);
 
   // Create a BranchOnTwoConds in the latch that branches to:
   // [0] vector.early.exit, [1] middle block, [2] header (continue looping).
