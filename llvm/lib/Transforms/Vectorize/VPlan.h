@@ -1308,7 +1308,11 @@ public:
     /// backedge value). Has the wide induction recipe as operand.
     ExitingIVValue,
     MaskedCond,
-    OpsEnd = MaskedCond,
+    /// Checks if a speculative load from a pointer is safe. Takes a pointer
+    /// operand. The result type is used to determine the load size. Returns i1.
+    /// Maps to @llvm.can.load.speculatively intrinsic.
+    CanLoadSpeculatively,
+    OpsEnd = CanLoadSpeculatively,
   };
 
   /// Returns true if this VPInstruction generates scalar values for all lanes.
