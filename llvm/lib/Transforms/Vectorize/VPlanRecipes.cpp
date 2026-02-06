@@ -1597,6 +1597,14 @@ void VPInstructionWithType::execute(VPTransformState &State) {
     State.set(this, VScale, true);
     break;
   }
+  case Instruction::Load: {
+    // Create a scalar load from the address operand. Use align 1 to be
+    // conservative; the original load's alignment isn't tracked here.
+    Value *Addr = State.get(getOperand(0), VPLane(0));
+    Value *Load = State.Builder.CreateAlignedLoad(ResultTy, Addr, Align(1));
+    State.set(this, Load, VPLane(0));
+    break;
+  }
 
   default:
     llvm_unreachable("opcode not implemented yet");

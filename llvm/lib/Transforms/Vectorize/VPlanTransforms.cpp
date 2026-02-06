@@ -5712,23 +5712,53 @@ void VPlanTransforms::addExitUsersForFirstOrderRecurrences(VPlan &Plan,
   }
 }
 
-/// Check if \p V is a binary expression of a widened IV and a loop-invariant
-/// value. Returns the widened IV if found, nullptr otherwise.
-static VPWidenIntOrFpInductionRecipe *getExpressionIV(VPValue *V) {
-  auto *BinOp = dyn_cast<VPWidenRecipe>(V);
-  if (!BinOp || !Instruction::isBinaryOp(BinOp->getOpcode()) ||
-      Instruction::isIntDivRem(BinOp->getOpcode()))
-    return nullptr;
+namespace {
 
-  VPValue *WidenIVCandidate = BinOp->getOperand(0);
-  VPValue *InvariantCandidate = BinOp->getOperand(1);
-  if (!isa<VPWidenIntOrFpInductionRecipe>(WidenIVCandidate))
-    std::swap(WidenIVCandidate, InvariantCandidate);
+/// Describes a sinkable FindLastIV expression. For loads, all fields are
+/// populated; for binary operations, only WidenIV is set.
+struct SinkableExpression {
+  /// The widened induction variable underlying the expression.
+  VPWidenIntOrFpInductionRecipe *WidenIV = nullptr;
+  /// SCEV expression for the base pointer of the load address (loads only).
+  const SCEV *BasePtr = nullptr;
+  /// Size of the loaded element type in bytes (loads only).
+  uint64_t ElemBytes = 0;
+  /// The loaded element type (loads only).
+  Type *ElemTy = nullptr;
 
-  if (!InvariantCandidate->isDefinedOutsideLoopRegions())
-    return nullptr;
+  SinkableExpression() = default;
+  SinkableExpression(VPWidenIntOrFpInductionRecipe *WidenIV)
+      : WidenIV(WidenIV) {}
+  SinkableExpression(VPWidenIntOrFpInductionRecipe *WidenIV,
+                     const SCEV *BasePtr, uint64_t ElemBytes, Type *ElemTy)
+      : WidenIV(WidenIV), BasePtr(BasePtr), ElemBytes(ElemBytes),
+        ElemTy(ElemTy) {}
 
-  return dyn_cast<VPWidenIntOrFpInductionRecipe>(WidenIVCandidate);
+  /// Whether this describes a sinkable load.
+  bool isLoad() const { return ElemTy != nullptr; }
+};
+
+} // namespace
+
+/// Sink a load to the middle block by reloading from BasePtr[SafeIdx], where
+/// SafeIdx is 0 when the condition was never true (safe because the original
+/// loop unconditionally accesses base[0..n)).
+static VPValue *sinkLoadToMiddleBlock(VPValue *ReducedIV, VPValue *FoundCmp,
+                                      const SinkableExpression &SinkInfo,
+                                      VPlan &Plan, VPBuilder &Builder,
+                                      DebugLoc DL) {
+  VPValue *BasePtr =
+      vputils::getOrCreateVPValueForSCEVExpr(Plan, SinkInfo.BasePtr);
+
+  Type *IdxTy = Plan.getVectorLoopRegion()->getCanonicalIV()->getScalarType();
+  VPValue *Zero = Plan.getConstantInt(IdxTy, 0);
+  VPValue *SafeIdx = Builder.createSelect(FoundCmp, ReducedIV, Zero, DL);
+  VPValue *StepVal = Plan.getConstantInt(IdxTy, SinkInfo.ElemBytes);
+  VPValue *ByteOffset = Builder.createOverflowingOp(
+      Instruction::Mul, {SafeIdx, StepVal}, {false, false}, DL);
+  VPValue *Addr = Builder.createPtrAdd(BasePtr, ByteOffset, DL);
+  return Builder.createNaryOp(Instruction::Load, {Addr}, SinkInfo.ElemTy,
+                              VPIRFlags(), DL);
 }
 
 /// Create a scalar version of \p BinOp, with its \p WidenIV operand replaced
@@ -5746,6 +5776,97 @@ static VPValue *cloneBinOpForScalarIV(VPWidenRecipe *BinOp, VPValue *ScalarIV,
   }
   ClonedOp->insertAfter(ScalarIV->getDefiningRecipe());
   return ClonedOp;
+}
+
+/// Try to match \p V as a widened load from an IV-indexed address
+/// (base[iv]). Returns the widened IV and base/element info on success.
+/// The load must be consecutive, non-reverse, non-masked, and the loop must
+/// not write to memory (so the sunk load reads the same value).
+static std::optional<SinkableExpression>
+matchSinkableLoad(VPValue *V, VPlan &Plan, PredicatedScalarEvolution &PSE,
+                  const Loop &L) {
+  auto *LoadR = dyn_cast<VPWidenLoadRecipe>(V);
+  if (!LoadR || !LoadR->isConsecutive() || LoadR->isReverse() ||
+      LoadR->isMasked())
+    return std::nullopt;
+
+  // Check the address is an affine AddRec via SCEV.
+  ScalarEvolution &SE = *PSE.getSE();
+  const SCEV *AddrSCEV =
+      vputils::getSCEVExprForVPValue(LoadR->getAddr(), PSE, &L);
+  const SCEV *BaseSCEV, *AddrStep;
+  if (!match(AddrSCEV, m_scev_AffineAddRec(m_SCEV(BaseSCEV), m_SCEV(AddrStep))))
+    return std::nullopt;
+
+  // Find a widened IV whose SCEV, scaled by the element size and offset by
+  // the base, matches the address SCEV: Base + IV * ElemBytes == Addr.
+  VPTypeAnalysis TypeInfo(Plan);
+  Type *ElemTy = TypeInfo.inferScalarType(V);
+  uint64_t ElemBytes = SE.getDataLayout().getTypeAllocSize(ElemTy);
+  const SCEV *ElemBytesSCEV = SE.getConstant(AddrStep->getType(), ElemBytes);
+
+  VPWidenIntOrFpInductionRecipe *WidenIV = nullptr;
+  for (auto &R : Plan.getVectorLoopRegion()->getEntryBasicBlock()->phis()) {
+    auto *WIV = dyn_cast<VPWidenIntOrFpInductionRecipe>(&R);
+    if (!WIV)
+      continue;
+    const SCEV *IVSCEV = vputils::getSCEVExprForVPValue(WIV, PSE, &L);
+    if (SE.getAddExpr(BaseSCEV, SE.getMulExpr(IVSCEV, ElemBytesSCEV)) !=
+        AddrSCEV)
+      continue;
+    WidenIV = WIV;
+    break;
+  }
+  if (!WidenIV)
+    return std::nullopt;
+
+  // The SCEV equation Base + IV * ElemBytes == Addr can only hold when
+  // IVStart == 0 (otherwise the start values don't match). This guarantees
+  // that the fallback address BaseSCEV + 0 * ElemBytes == BaseSCEV is the
+  // first address the loop accesses, which is always dereferenceable.
+  assert(SE.isKnownPredicate(
+             CmpInst::ICMP_EQ,
+             vputils::getSCEVExprForVPValue(WidenIV->getStartValue(), PSE, &L),
+             SE.getZero(WidenIV->getScalarType())) &&
+         "SCEV matching requires IV to start at 0");
+
+  // TODO: Support loads with type different from the IV type.
+  if (ElemTy != WidenIV->getScalarType())
+    return std::nullopt;
+
+  // Check that load sinking is safe: bail out if the loop writes to memory,
+  // as the sunk load in the middle block could read a value overwritten by a
+  // later iteration.
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_shallow(Plan.getVectorLoopRegion()->getEntry()))) {
+    if (any_of(*VPBB, [](VPRecipeBase &R) { return R.mayWriteToMemory(); }))
+      return std::nullopt;
+  }
+  return SinkableExpression(WidenIV, BaseSCEV, ElemBytes, ElemTy);
+}
+
+/// Check if \p V is a binary expression of a widened IV and a loop-invariant
+/// value, or a widened load from an IV-indexed address. Returns the widened IV
+/// and optional load info on success.
+static SinkableExpression getExpressionIV(VPValue *V, VPlan &Plan,
+                                          PredicatedScalarEvolution &PSE,
+                                          const Loop &L) {
+  auto *BinOp = dyn_cast<VPWidenRecipe>(V);
+  if (BinOp && Instruction::isBinaryOp(BinOp->getOpcode()) &&
+      !Instruction::isIntDivRem(BinOp->getOpcode())) {
+    VPValue *WidenIVCandidate = BinOp->getOperand(0);
+    VPValue *InvariantCandidate = BinOp->getOperand(1);
+    if (!isa<VPWidenIntOrFpInductionRecipe>(WidenIVCandidate))
+      std::swap(WidenIVCandidate, InvariantCandidate);
+    if (InvariantCandidate->isDefinedOutsideLoopRegions())
+      if (auto *WIV = dyn_cast<VPWidenIntOrFpInductionRecipe>(WidenIVCandidate))
+        return SinkableExpression(WIV);
+  }
+
+  if (auto LoadInfo = matchSinkableLoad(V, Plan, PSE, L))
+    return *LoadInfo;
+
+  return SinkableExpression();
 }
 
 void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
@@ -5805,15 +5926,33 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
                         m_Specific(PhiR))))
       continue;
 
-    // Check if FindLastExpression is a simple expression of a widened IV. If
-    // so, we can track the underlying IV instead and sink the expression.
-    auto *IVOfExpressionToSink = getExpressionIV(FindLastExpression);
-    const SCEV *IVSCEV = vputils::getSCEVExprForVPValue(
-        IVOfExpressionToSink ? IVOfExpressionToSink : FindLastExpression, PSE,
-        &L);
+    // Check if FindLastExpression is a simple expression of a widened IV or a
+    // sinkable load. If so, we can track the underlying IV instead and sink
+    // the expression.
+    auto ExprInfo = getExpressionIV(FindLastExpression, Plan, PSE, L);
+    auto *IVOfExpressionToSink = ExprInfo.WidenIV;
+
+    // If the IV expression uses a wider type than the reduction and no users
+    // require the wide IV value, skip expression sinking to avoid introducing
+    // wider computations. This check does not apply to load sinking, where
+    // matchSinkableLoad already enforces ElemTy == WidenIV->getScalarType().
+    if (IVOfExpressionToSink && !ExprInfo.isLoad()) {
+      Type *IVTy = IVOfExpressionToSink->getScalarType();
+      Type *RdxTy = PhiR->getUnderlyingInstr()->getType();
+      if (IVTy->getScalarSizeInBits() > RdxTy->getScalarSizeInBits() &&
+          vputils::onlyScalarValuesUsed(IVOfExpressionToSink))
+        IVOfExpressionToSink = nullptr;
+    }
+
+    const SCEV *FindLastExpressionSCEV =
+        vputils::getSCEVExprForVPValue(FindLastExpression, PSE, &L);
+    const SCEV *IVSCEV =
+        IVOfExpressionToSink
+            ? vputils::getSCEVExprForVPValue(IVOfExpressionToSink, PSE, &L)
+            : FindLastExpressionSCEV;
     const SCEV *Step;
     if (!match(IVSCEV, m_scev_AffineAddRec(m_SCEV(), m_SCEV(Step)))) {
-      assert(!match(vputils::getSCEVExprForVPValue(FindLastExpression, PSE, &L),
+      assert(!match(FindLastExpressionSCEV,
                     m_scev_AffineAddRec(m_SCEV(), m_SCEV())) &&
              "IVOfExpressionToSink not being an AddRec must imply "
              "FindLastExpression not being an AddRec.");
@@ -5836,8 +5975,6 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
     // multiply or divide by large constant, respectively), which also makes
     // sinking undesirable.
     if (IVOfExpressionToSink) {
-      const SCEV *FindLastExpressionSCEV =
-          vputils::getSCEVExprForVPValue(FindLastExpression, PSE, &L);
       if (match(FindLastExpressionSCEV,
                 m_scev_AffineAddRec(m_SCEV(), m_SCEV(Step)))) {
         bool NewUseMax = SE.isKnownPositive(Step);
@@ -5858,6 +5995,10 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
     // if the condition was ever true. Requires the IV to not wrap, otherwise we
     // cannot use min/max.
     if (!SentinelVal) {
+      // Load sinking is unreachable here: the SCEV equation requires
+      // IVStart == 0, which guarantees a sentinel always exists.
+      assert(!ExprInfo.isLoad() &&
+             "load sinking should always have a sentinel");
       auto *AR = cast<SCEVAddRecExpr>(IVSCEV);
       if (AR->hasNoSignedWrap())
         UseSigned = true;
@@ -5900,19 +6041,28 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
     VPValue *ReducedIV = MiddleBuilder.createNaryOp(
         VPInstruction::ComputeReductionResult, FindLastSelect, Flags, ExitDL);
 
-    // If IVOfExpressionToSink is an expression to sink, sink it now.
+    // Sink the find-last expression to the middle block, if needed.
+    VPValue *Sentinel =
+        SentinelVal ? Plan.getConstantInt(*SentinelVal) : nullptr;
     VPValue *VectorRegionExitingVal = ReducedIV;
-    if (IVOfExpressionToSink)
-      VectorRegionExitingVal =
-          cloneBinOpForScalarIV(cast<VPWidenRecipe>(FindLastExpression),
-                                ReducedIV, IVOfExpressionToSink);
+    if (IVOfExpressionToSink) {
+      if (ExprInfo.isLoad()) {
+        auto *Cmp = MiddleBuilder.createICmp(CmpInst::ICMP_NE, ReducedIV,
+                                             Sentinel, ExitDL);
+        VectorRegionExitingVal = sinkLoadToMiddleBlock(
+            ReducedIV, Cmp, ExprInfo, Plan, MiddleBuilder, ExitDL);
+      } else {
+        VectorRegionExitingVal =
+            cloneBinOpForScalarIV(cast<VPWidenRecipe>(FindLastExpression),
+                                  ReducedIV, IVOfExpressionToSink);
+      }
+    }
 
     VPValue *NewRdxResult;
     VPValue *StartVPV = PhiR->getStartValue();
     if (SentinelVal) {
       // Sentinel-based approach: reduce IVs with min/max, compare against
       // sentinel to detect if condition was ever true, select accordingly.
-      VPValue *Sentinel = Plan.getConstantInt(*SentinelVal);
       auto *Cmp = MiddleBuilder.createICmp(CmpInst::ICMP_NE, ReducedIV,
                                            Sentinel, ExitDL);
       NewRdxResult = MiddleBuilder.createSelect(Cmp, VectorRegionExitingVal,

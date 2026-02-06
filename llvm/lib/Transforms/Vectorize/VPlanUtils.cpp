@@ -313,6 +313,9 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
               return SE.getCouldNotCompute();
             return SE.getTruncateOrSignExtend(IV, Step->getType());
           })
+          .Case([&PSE, L](const VPVectorPointerRecipe *R) {
+            return getSCEVExprForVPValue(R->getOperand(0), PSE, L);
+          })
           .Default(
               [&SE](const VPRecipeBase *) { return SE.getCouldNotCompute(); });
 
