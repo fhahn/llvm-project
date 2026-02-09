@@ -8173,6 +8173,10 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(
           },
           Range);
   VPlanTransforms::handleEarlyExits(*Plan, Legal->hasUncountableEarlyExit());
+
+  // Predicate and linearize the loop blocks before creating loop regions.
+  VPlanTransforms::introduceMasksAndLinearize(*Plan, CM.foldTailByMasking());
+
   VPlanTransforms::addMiddleCheck(*Plan, RequiresScalarEpilogueCheck,
                                   CM.foldTailByMasking());
 
@@ -8227,11 +8231,6 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(
       continue;
     InterleaveGroups.insert(IG);
   }
-
-  // ---------------------------------------------------------------------------
-  // Predicate and linearize the top-level loop region.
-  // ---------------------------------------------------------------------------
-  VPlanTransforms::introduceMasksAndLinearize(*Plan, CM.foldTailByMasking());
 
   // ---------------------------------------------------------------------------
   // Construct wide recipes and apply predication for original scalar

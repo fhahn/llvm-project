@@ -165,8 +165,9 @@ void VPPredicator::createHeaderMask(VPBasicBlock *HeaderVPBB, bool FoldTail) {
   // non-phi instructions.
 
   auto &Plan = *HeaderVPBB->getPlan();
-  auto *IV =
-      new VPWidenCanonicalIVRecipe(HeaderVPBB->getParent()->getCanonicalIV());
+  // Find the canonical IV as the first recipe in the header block.
+  auto *CanonicalIV = cast<VPCanonicalIVPHIRecipe>(&*HeaderVPBB->begin());
+  auto *IV = new VPWidenCanonicalIVRecipe(CanonicalIV);
   Builder.setInsertPoint(HeaderVPBB, HeaderVPBB->getFirstNonPhi());
   Builder.insert(IV);
 
@@ -266,16 +267,27 @@ void VPPredicator::convertPhisToBlends(VPBasicBlock *VPBB) {
 }
 
 void VPlanTransforms::introduceMasksAndLinearize(VPlan &Plan, bool FoldTail) {
-  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
+  auto *MiddleVPBB =
+      cast<VPBasicBlock>(Plan.getScalarPreheader()->getPredecessors()[0]);
+  auto *Latch = cast<VPBasicBlock>(MiddleVPBB->getSinglePredecessor());
+  auto *Header = cast<VPBasicBlock>(Latch->getSuccessors().back());
+
+  // Helper to check if a block is inside the loop body.
+  auto IsLoopBlock = [&](VPBasicBlock *VPBB) {
+    if (VPBB == MiddleVPBB || isa<VPIRBasicBlock>(VPBB))
+      return false;
+    return !all_of(VPBB->getSuccessors(), IsaPred<VPIRBasicBlock>);
+  };
+
   // Scan the body of the loop in a topological order to visit each basic block
   // after having visited its predecessor basic blocks.
-  VPBasicBlock *Header = LoopRegion->getEntryBasicBlock();
   ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>> RPOT(
       Header);
   VPPredicator Predicator;
-  for (VPBlockBase *VPB : RPOT) {
-    // Non-outer regions with VPBBs only are supported at the moment.
-    auto *VPBB = cast<VPBasicBlock>(VPB);
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(RPOT)) {
+    if (!IsLoopBlock(VPBB))
+      continue;
+
     // Introduce the mask for VPBB, which may introduce needed edge masks, and
     // convert all phi recipes of VPBB to blend recipes unless VPBB is the
     // header.
@@ -297,9 +309,12 @@ void VPlanTransforms::introduceMasksAndLinearize(VPlan &Plan, bool FoldTail) {
     }
   }
 
-  // Linearize the blocks of the loop into one serial chain.
+  // Linearize the loop's internal control flow, preserving the latch.
   VPBlockBase *PrevVPBB = nullptr;
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(RPOT)) {
+    if (VPBB == Latch || !IsLoopBlock(VPBB))
+      continue;
+
     auto Successors = to_vector(VPBB->getSuccessors());
     if (Successors.size() > 1)
       VPBB->getTerminator()->eraseFromParent();
@@ -314,6 +329,9 @@ void VPlanTransforms::introduceMasksAndLinearize(VPlan &Plan, bool FoldTail) {
     PrevVPBB = VPBB;
   }
 
+  if (PrevVPBB)
+    VPBlockUtils::connectBlocks(PrevVPBB, Latch);
+
   // If we folded the tail and introduced a header mask, any extract of the
   // last element must be updated to extract from the last active lane of the
   // header mask instead (i.e., the lane corresponding to the last active
@@ -321,12 +339,12 @@ void VPlanTransforms::introduceMasksAndLinearize(VPlan &Plan, bool FoldTail) {
   if (FoldTail) {
     assert(Plan.getExitBlocks().size() == 1 &&
            "only a single-exit block is supported currently");
-    assert(Plan.getExitBlocks().front()->getSinglePredecessor() ==
-               Plan.getMiddleBlock() &&
+    assert(Plan.getExitBlocks().front()->getSinglePredecessor() == MiddleVPBB &&
            "the exit block must have middle block as single predecessor");
 
-    VPBuilder B(Plan.getMiddleBlock()->getTerminator());
-    for (VPRecipeBase &R : *Plan.getMiddleBlock()) {
+    VPBuilder B(MiddleVPBB);
+
+    for (VPRecipeBase &R : make_early_inc_range(*MiddleVPBB)) {
       VPValue *Op;
       if (!match(&R, m_CombineOr(
                          m_ExitingIVValue(m_VPValue(), m_VPValue(Op)),
