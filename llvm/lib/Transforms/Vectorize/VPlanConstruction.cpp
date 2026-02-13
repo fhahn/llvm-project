@@ -897,14 +897,13 @@ void VPlanTransforms::createInLoopReductionRecipes(
 
 void VPlanTransforms::handleEarlyExits(VPlan &Plan,
                                        bool HasUncountableEarlyExit) {
-  auto *MiddleVPBB = cast<VPBasicBlock>(
-      Plan.getScalarHeader()->getSinglePredecessor()->getPredecessors()[0]);
+  auto *MiddleVPBB =
+      cast<VPBasicBlock>(Plan.getScalarPreheader()->getPredecessors()[0]);
   auto *LatchVPBB = cast<VPBasicBlock>(MiddleVPBB->getSinglePredecessor());
-  VPBlockBase *HeaderVPB = cast<VPBasicBlock>(LatchVPBB->getSuccessors()[1]);
+  auto *HeaderVPBB = cast<VPBasicBlock>(LatchVPBB->getSuccessors().back());
 
   if (HasUncountableEarlyExit) {
-    handleUncountableEarlyExits(Plan, cast<VPBasicBlock>(HeaderVPB), LatchVPBB,
-                                MiddleVPBB);
+    handleUncountableEarlyExits(Plan, HeaderVPBB, LatchVPBB, MiddleVPBB);
     return;
   }
 
@@ -919,7 +918,14 @@ void VPlanTransforms::handleEarlyExits(VPlan &Plan,
       for (VPRecipeBase &R : EB->phis())
         cast<VPIRPhi>(&R)->removeIncomingValueFor(Pred);
       auto *EarlyExitingVPBB = cast<VPBasicBlock>(Pred);
-      EarlyExitingVPBB->getTerminator()->eraseFromParent();
+      auto *Term = cast<VPInstruction>(EarlyExitingVPBB->getTerminator());
+
+      // For countable early exits, the exit is never taken (trip count computed
+      // to stop before). Replace ExitCond to make the continue path mask true.
+      bool ExitOnTrue = EarlyExitingVPBB->getSuccessors()[0] == EB;
+      Term->getOperand(0)->replaceAllUsesWith(ExitOnTrue ? Plan.getFalse()
+                                                         : Plan.getTrue());
+      Term->eraseFromParent();
       VPBlockUtils::disconnectBlocks(Pred, EB);
     }
   }
@@ -928,8 +934,8 @@ void VPlanTransforms::handleEarlyExits(VPlan &Plan,
 void VPlanTransforms::addMiddleCheck(VPlan &Plan,
                                      bool RequiresScalarEpilogueCheck,
                                      bool TailFolded) {
-  auto *MiddleVPBB = cast<VPBasicBlock>(
-      Plan.getScalarHeader()->getSinglePredecessor()->getPredecessors()[0]);
+  auto *MiddleVPBB =
+      cast<VPBasicBlock>(Plan.getScalarPreheader()->getPredecessors()[0]);
   // If MiddleVPBB has a single successor then the original loop does not exit
   // via the latch and the single successor must be the scalar preheader.
   // There's no need to add a runtime check to MiddleVPBB.

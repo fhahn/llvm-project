@@ -8172,10 +8172,11 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(
             return !CM.requiresScalarEpilogue(VF.isVector());
           },
           Range);
-  VPlanTransforms::handleEarlyExits(*Plan, Legal->hasUncountableEarlyExit());
 
   // Predicate and linearize the loop blocks before creating loop regions.
   VPlanTransforms::introduceMasksAndLinearize(*Plan, CM.foldTailByMasking());
+
+  VPlanTransforms::handleEarlyExits(*Plan, Legal->hasUncountableEarlyExit());
 
   VPlanTransforms::addMiddleCheck(*Plan, RequiresScalarEpilogueCheck,
                                   CM.foldTailByMasking());

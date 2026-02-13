@@ -272,11 +272,8 @@ void VPlanTransforms::introduceMasksAndLinearize(VPlan &Plan, bool FoldTail) {
   auto *Latch = cast<VPBasicBlock>(MiddleVPBB->getSinglePredecessor());
   auto *Header = cast<VPBasicBlock>(Latch->getSuccessors().back());
 
-  // Helper to check if a block is inside the loop body.
   auto IsLoopBlock = [&](VPBasicBlock *VPBB) {
-    if (VPBB == MiddleVPBB || isa<VPIRBasicBlock>(VPBB))
-      return false;
-    return !all_of(VPBB->getSuccessors(), IsaPred<VPIRBasicBlock>);
+    return VPBB != MiddleVPBB && !all_of(VPBB->getSuccessors(), IsaPred<VPIRBasicBlock>);
   };
 
   // Scan the body of the loop in a topological order to visit each basic block
@@ -309,28 +306,29 @@ void VPlanTransforms::introduceMasksAndLinearize(VPlan &Plan, bool FoldTail) {
     }
   }
 
-  // Linearize the loop's internal control flow, preserving the latch.
+  // Linearize the loop's internal control flow. Exiting blocks (with edges to
+  // exit blocks) keep their terminators for handleEarlyExits to process.
   VPBlockBase *PrevVPBB = nullptr;
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(RPOT)) {
-    if (VPBB == Latch || !IsLoopBlock(VPBB))
+    if (!IsLoopBlock(VPBB))
       continue;
 
-    auto Successors = to_vector(VPBB->getSuccessors());
-    if (Successors.size() > 1)
-      VPBB->getTerminator()->eraseFromParent();
+    bool IsExiting = any_of(VPBB->getSuccessors(), IsaPred<VPIRBasicBlock>) || VPBB == Latch;
+    if (!IsExiting) {
+      auto Successors = to_vector(VPBB->getSuccessors());
+      if (Successors.size() > 1)
+        VPBB->getTerminator()->eraseFromParent();
+      for (auto *Succ : Successors)
+        VPBlockUtils::disconnectBlocks(VPBB, Succ);
+    }
 
     // Flatten the CFG in the loop. To do so, first disconnect VPBB from its
     // successors. Then connect VPBB to the previously visited VPBB.
-    for (auto *Succ : Successors)
-      VPBlockUtils::disconnectBlocks(VPBB, Succ);
-    if (PrevVPBB)
+    if (PrevVPBB && !is_contained(PrevVPBB->getSuccessors(), VPBB))
       VPBlockUtils::connectBlocks(PrevVPBB, VPBB);
 
     PrevVPBB = VPBB;
   }
-
-  if (PrevVPBB)
-    VPBlockUtils::connectBlocks(PrevVPBB, Latch);
 
   // If we folded the tail and introduced a header mask, any extract of the
   // last element must be updated to extract from the last active lane of the
