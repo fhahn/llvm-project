@@ -4060,18 +4060,27 @@ void VPlanTransforms::handleUncountableEarlyExits(VPlan &Plan,
       // Collect condition for this early exit.
       auto *EarlyExitingVPBB = cast<VPBasicBlock>(Pred);
       VPBlockBase *TrueSucc = EarlyExitingVPBB->getSuccessors()[0];
-      auto *TermVPI = cast<VPInstruction>(EarlyExitingVPBB->getTerminator());
-      VPValue *CondOfEarlyExitingVPBB = TermVPI->getOperand(0);
+      VPValue *CondOfEarlyExitingVPBB;
+      // For predicated early exits, the exiting block may have >2 successors
+      // (in-loop + exit edges), so use the last recipe directly instead of
+      // getTerminator() which asserts on >2 successors.
+      auto *TermVPI = cast<VPInstruction>(&EarlyExitingVPBB->back());
+      [[maybe_unused]] bool Matched =
+          match(TermVPI, m_BranchOnCond(m_VPValue(CondOfEarlyExitingVPBB)));
+      assert(Matched && "Terminator must be BranchOnCond");
 
       auto *CondToEarlyExit = TrueSucc == ExitBlock
                                   ? CondOfEarlyExitingVPBB
                                   : Builder.createNot(CondOfEarlyExitingVPBB);
 
       // For predicated early exits, AND the condition with the block mask.
-      if (VPValue *BlockMask = TermVPI->getMask())
+      VPValue *BlockMask = TermVPI->getMask();
+      if (BlockMask)
         CondToEarlyExit = Builder.createLogicalAnd(BlockMask, CondToEarlyExit);
 
-      assert((isa<VPIRValue>(CondOfEarlyExitingVPBB) ||
+      // For predicated early exits, the block mask ensures the condition is
+      // only evaluated when the block is active, so dominance is not required.
+      assert((BlockMask || isa<VPIRValue>(CondOfEarlyExitingVPBB) ||
               VPDT.properlyDominates(
                   CondOfEarlyExitingVPBB->getDefiningRecipe()->getParent(),
                   LatchVPBB)) &&
@@ -4085,9 +4094,12 @@ void VPlanTransforms::handleUncountableEarlyExits(VPlan &Plan,
   }
 
   assert(!Exits.empty() && "must have at least one early exit");
-  // Sort exits by dominance to get the correct program order.
+  // Sort exits by DFS order to get a consistent program order. This handles
+  // both dominating exits and exits in parallel branches (diamond pattern).
+  VPDT.updateDFSNumbers();
   llvm::sort(Exits, [&VPDT](const EarlyExitInfo &A, const EarlyExitInfo &B) {
-    return VPDT.properlyDominates(A.EarlyExitingVPBB, B.EarlyExitingVPBB);
+    return VPDT.getNode(A.EarlyExitingVPBB)->getDFSNumIn() <
+           VPDT.getNode(B.EarlyExitingVPBB)->getDFSNumIn();
   });
 
   // Build the AnyOf condition for the latch terminator using logical OR
@@ -4174,7 +4186,17 @@ void VPlanTransforms::handleUncountableEarlyExits(VPlan &Plan,
       ExitIRI->addOperand(NewIncoming);
     }
 
-    EarlyExitingVPBB->getTerminator()->eraseFromParent();
+    // Exiting blocks retain their original in-loop successors during
+    // linearization. Remove all but the last, which is the linearized chain
+    // edge (connectBlocks appends to the successor list).
+    SmallVector<VPBlockBase *> InLoopSuccs;
+    for (VPBlockBase *Succ : EarlyExitingVPBB->getSuccessors())
+      if (!isa<VPIRBasicBlock>(Succ))
+        InLoopSuccs.push_back(Succ);
+    for (VPBlockBase *Succ : ArrayRef(InLoopSuccs).drop_back())
+      VPBlockUtils::disconnectBlocks(EarlyExitingVPBB, Succ);
+
+    EarlyExitingVPBB->back().eraseFromParent();
     VPBlockUtils::disconnectBlocks(EarlyExitingVPBB, EarlyExitVPBB);
     VPBlockUtils::connectBlocks(VectorEarlyExitVPBB, EarlyExitVPBB);
   }

@@ -1745,25 +1745,11 @@ bool LoopVectorizationLegality::isVectorizableEarlyExitLoop() {
     return false;
   }
 
-  // Sort exiting blocks by dominance order to establish a clear chain.
+  // Sort exiting blocks by DFS order to establish a consistent ordering.
   DT->updateDFSNumbers();
   llvm::sort(UncountableExitingBlocks, [this](BasicBlock *A, BasicBlock *B) {
     return DT->getNode(A)->getDFSNumIn() < DT->getNode(B)->getDFSNumIn();
   });
-
-  // Verify that exits form a strict dominance chain: each block must
-  // dominate the next. This ensures each exit is only dominated by its
-  // predecessors in the chain.
-  for (unsigned I = 0; I + 1 < UncountableExitingBlocks.size(); ++I) {
-    if (!DT->properlyDominates(UncountableExitingBlocks[I],
-                               UncountableExitingBlocks[I + 1])) {
-      reportVectorizationFailure(
-          "Uncountable early exits do not form a dominance chain",
-          "Cannot vectorize early exit loop with non-dominating exits",
-          "NonDominatingEarlyExits", ORE, TheLoop);
-      return false;
-    }
-  }
 
   BasicBlock *LatchPredBB = LatchBB->getUniquePredecessor();
   // For predicated early exits, the latch may have multiple predecessors.
