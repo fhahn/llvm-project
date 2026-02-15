@@ -1766,7 +1766,20 @@ bool LoopVectorizationLegality::isVectorizableEarlyExitLoop() {
   }
 
   BasicBlock *LatchPredBB = LatchBB->getUniquePredecessor();
-  if (LatchPredBB != UncountableExitingBlocks.back()) {
+  // For predicated early exits, the latch may have multiple predecessors.
+  // In this case, verify the last uncountable exit can reach the latch.
+  if (!LatchPredBB) {
+    BasicBlock *LastUncountableExit = UncountableExitingBlocks.back();
+    bool CanReachLatch = any_of(successors(LastUncountableExit),
+                                [&](BasicBlock *S) { return TheLoop->contains(S); });
+    if (!CanReachLatch) {
+      reportVectorizationFailure(
+          "Last early exiting block cannot reach the latch",
+          "Cannot vectorize early exit loop", "EarlyExitNotLatchPredecessor",
+          ORE, TheLoop);
+      return false;
+    }
+  } else if (LatchPredBB != UncountableExitingBlocks.back()) {
     reportVectorizationFailure(
         "Last early exiting block in the chain is not the latch predecessor",
         "Cannot vectorize early exit loop", "EarlyExitNotLatchPredecessor", ORE,

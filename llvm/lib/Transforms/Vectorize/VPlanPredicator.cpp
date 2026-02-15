@@ -276,6 +276,13 @@ void VPlanTransforms::introduceMasksAndLinearize(VPlan &Plan, bool FoldTail) {
     return VPBB != MiddleVPBB && !all_of(VPBB->getSuccessors(), IsaPred<VPIRBasicBlock>);
   };
 
+  // Check if header has any exit edge. When the header has an exit edge, the
+  // OR combination of exit conditions handles control flow correctly without
+  // needing block masks on BranchOnCond. Block masks are only needed for
+  // predicated early exits where the header does NOT exit.
+  bool HeaderHasExitEdge =
+      any_of(Header->getSuccessors(), IsaPred<VPIRBasicBlock>);
+
   // Scan the body of the loop in a topological order to visit each basic block
   // after having visited its predecessor basic blocks.
   ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>> RPOT(
@@ -299,10 +306,21 @@ void VPlanTransforms::introduceMasksAndLinearize(VPlan &Plan, bool FoldTail) {
     if (!BlockMask)
       continue;
 
-    // Mask all VPInstructions in the block.
+    // Check if this is a predicated early exit block: an exiting block where
+    // the header doesn't have an exit edge.
+    bool IsExiting = any_of(VPBB->getSuccessors(), IsaPred<VPIRBasicBlock>);
+    bool IsPredEarlyExit = IsExiting && VPBB != Header && !HeaderHasExitEdge;
+
+    // Mask all VPInstructions in the block. For predicated early exits, also
+    // add the mask to the BranchOnCond terminator.
     for (VPRecipeBase &R : *VPBB) {
-      if (auto *VPI = dyn_cast<VPInstruction>(&R))
-        VPI->addMask(BlockMask);
+      auto *VPI = dyn_cast<VPInstruction>(&R);
+      if (!VPI)
+        continue;
+      // Only add mask to BranchOnCond for predicated early exits.
+      if (VPI->getOpcode() == VPInstruction::BranchOnCond && !IsPredEarlyExit)
+        continue;
+      VPI->addMask(BlockMask);
     }
   }
 
