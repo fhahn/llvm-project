@@ -8127,12 +8127,12 @@ void LoopVectorizationPlanner::buildVPlansWithVPRecipes(ElementCount MinVF,
       getDebugLocFromInstOrOperands(Legal->getPrimaryInduction()), PSE, &LVer);
 
   // Create recipes for header phis.
-  VPlanTransforms::createHeaderPhiRecipes(
-      *VPlan0, PSE, *OrigLoop, Legal->getInductionVars(),
-      Legal->getReductionVars(), Legal->getFixedOrderRecurrences(),
-      CM.getInLoopReductions(), Hints.allowReordering());
+  RUN_VPLAN_PASS(VPlanTransforms::createHeaderPhiRecipes, *VPlan0, PSE,
+                 *OrigLoop, Legal->getInductionVars(),
+                 Legal->getReductionVars(), Legal->getFixedOrderRecurrences(),
+                 CM.getInLoopReductions(), Hints.allowReordering());
 
-  VPlanTransforms::simplifyRecipes(*VPlan0);
+  RUN_VPLAN_PASS(VPlanTransforms::simplifyRecipes, *VPlan0);
 
   auto MaxVFTimes2 = MaxVF * 2;
   for (ElementCount VF = MinVF; ElementCount::isKnownLT(VF, MaxVFTimes2);) {
@@ -8179,11 +8179,12 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(
             return !CM.requiresScalarEpilogue(VF.isVector());
           },
           Range);
-  VPlanTransforms::handleEarlyExits(*Plan, Legal->hasUncountableEarlyExit());
-  VPlanTransforms::addMiddleCheck(*Plan, RequiresScalarEpilogueCheck,
-                                  CM.foldTailByMasking());
+  RUN_VPLAN_PASS(VPlanTransforms::handleEarlyExits, *Plan,
+                 Legal->hasUncountableEarlyExit());
+  RUN_VPLAN_PASS(VPlanTransforms::addMiddleCheck, *Plan,
+                 RequiresScalarEpilogueCheck, CM.foldTailByMasking());
 
-  VPlanTransforms::createLoopRegions(*Plan);
+  RUN_VPLAN_PASS(VPlanTransforms::createLoopRegions, *Plan);
 
   // Don't use getDecisionAndClampRange here, because we don't know the UF
   // so this function is better to be conservative, rather than to split
@@ -8238,8 +8239,8 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(
   // ---------------------------------------------------------------------------
   // Predicate and linearize the top-level loop region.
   // ---------------------------------------------------------------------------
-  RUN_VPLAN_PASS_NO_VERIFY(VPlanTransforms::introduceMasksAndLinearize, *Plan,
-                           CM.foldTailByMasking());
+  RUN_VPLAN_PASS(VPlanTransforms::introduceMasksAndLinearize, *Plan,
+                 CM.foldTailByMasking());
 
   // ---------------------------------------------------------------------------
   // Construct wide recipes and apply predication for original scalar
@@ -8262,8 +8263,8 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(
     if (CM.blockNeedsPredicationForAnyReason(BB))
       BlocksNeedingPredication.insert(BB);
 
-  VPlanTransforms::createInLoopReductionRecipes(*Plan, BlocksNeedingPredication,
-                                                Range.Start);
+  RUN_VPLAN_PASS(VPlanTransforms::createInLoopReductionRecipes, *Plan,
+                 BlocksNeedingPredication, Range.Start);
 
   // Now process all other blocks and instructions.
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(RPOT)) {
@@ -8331,10 +8332,10 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(
 
   // TODO: We can't call runPass on these transforms yet, due to verifier
   // failures.
-  VPlanTransforms::addExitUsersForFirstOrderRecurrences(*Plan, Range);
+  RUN_VPLAN_PASS(VPlanTransforms::addExitUsersForFirstOrderRecurrences, *Plan,
+                 Range);
   DenseMap<VPValue *, VPValue *> IVEndValues;
-  VPlanTransforms::updateScalarResumePhis(*Plan, IVEndValues,
-                                          CM.foldTailByMasking());
+  RUN_VPLAN_PASS(VPlanTransforms::updateScalarResumePhis, *Plan, IVEndValues, CM.foldTailByMasking());
 
   // ---------------------------------------------------------------------------
   // Transform initial VPlan: Apply previously taken decisions, in order, to
