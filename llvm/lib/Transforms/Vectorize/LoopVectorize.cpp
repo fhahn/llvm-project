@@ -4362,8 +4362,6 @@ static bool hasUnsupportedHeaderPhiRecipe(VPlan &Plan) {
   return any_of(
       Plan.getVectorLoopRegion()->getEntryBasicBlock()->phis(),
       [](VPRecipeBase &R) {
-        if (auto *WidenInd = dyn_cast<VPWidenIntOrFpInductionRecipe>(&R))
-          return !WidenInd->getPHINode();
         auto *RedPhi = dyn_cast<VPReductionPHIRecipe>(&R);
         return RedPhi && (RecurrenceDescriptor::isFindLastRecurrenceKind(
                               RedPhi->getRecurrenceKind()) ||
@@ -4384,7 +4382,8 @@ bool LoopVectorizationPlanner::isCandidateForEpilogueVectorization(
       }))
     return false;
 
-  // FindLast reductions and inductions without underlying PHI require special
+  // FindLast reductions and reduction phis without an underlying PHI (e.g.,
+  // AnyOf reductions introduced by the FindIV fallback) require special
   // handling and are currently not supported for epilogue vectorization.
   if (hasUnsupportedHeaderPhiRecipe(getPlanFor(VF)))
     return false;
@@ -7340,7 +7339,6 @@ VectorizationFactor LoopVectorizationPlanner::computeBestVF() {
   return BestFactor;
 }
 
-
 DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
     ElementCount BestVF, unsigned BestUF, VPlan &BestVPlan,
     InnerLoopVectorizer &ILV, DominatorTree *DT, bool VectorizingEpilogue) {
@@ -8926,21 +8924,120 @@ LoopVectorizePass::LoopVectorizePass(LoopVectorizeOptions Opts)
 /// Prepare \p MainPlan for vectorizing the main vector loop during epilogue
 /// vectorization. Remove ResumePhis from \p MainPlan for inductions that
 /// don't have a corresponding wide induction in \p EpiPlan.
-static SmallVector<VPInstruction *>
+static std::pair<DenseMap<VPRecipeBase *, VPInstruction *>,
+                 SmallVector<VPInstruction *>>
 preparePlanForMainVectorLoop(VPlan &MainPlan, VPlan &EpiPlan) {
-  // Collect PHI nodes of widened phis in the VPlan for the epilogue. Those
-  // will need their resume-values computed in the main vector loop. Others
-  // can be removed from the main VPlan.
-  SmallPtrSet<PHINode *, 2> EpiWidenedPhis;
-  for (VPRecipeBase &R :
-       EpiPlan.getVectorLoopRegion()->getEntryBasicBlock()->phis()) {
-    if (isa<VPCanonicalIVPHIRecipe>(&R))
-      continue;
-    EpiWidenedPhis.insert(
-        cast<PHINode>(R.getVPSingleValue()->getUnderlyingValue()));
+  using namespace VPlanPatternMatch;
+
+  // Compare two VPValues that may be live-ins or VPExpandSCEVRecipes.
+  auto vpValuesMatch = [](VPValue *A, VPValue *B) -> bool {
+    if (A == B)
+      return true;
+    auto *ExpandA =
+        dyn_cast_or_null<VPExpandSCEVRecipe>(A->getDefiningRecipe());
+    auto *ExpandB =
+        dyn_cast_or_null<VPExpandSCEVRecipe>(B->getDefiningRecipe());
+    if (ExpandA && ExpandB)
+      return ExpandA->getSCEV() == ExpandB->getSCEV();
+    if (!A->getDefiningRecipe() && !B->getDefiningRecipe())
+      return A->getLiveInIRValue() == B->getLiveInIRValue();
+    return false;
+  };
+
+  // Peel off a possible trunc cast wrapping a resume phi's end value.
+  auto peelCast = [](VPValue *V) -> VPValue * {
+    if (auto *Cast =
+            dyn_cast_or_null<VPRecipeWithIRFlags>(V->getDefiningRecipe()))
+      if (Cast->isScalarCast())
+        return Cast->getOperand(0);
+    return V;
+  };
+
+  // Return true if \p V is an induction end value: either a VPDerivedIVRecipe
+  // (non-canonical induction) or a live-in with no defining recipe (canonical
+  // induction, i.e. VectorTC).
+  auto isInductionEndValue = [&peelCast](VPValue *V) -> bool {
+    V = peelCast(V);
+    return !V->getDefiningRecipe() ||
+           isa<VPDerivedIVRecipe>(V->getDefiningRecipe());
+  };
+
+  // Check if the induction end value \p V matches an epilogue wide induction
+  // \p WideIV by comparing start and step values.
+  auto inductionEndValueMatchesWideIV =
+      [&](VPValue *V, VPWidenInductionRecipe *WideIV) -> bool {
+    V = peelCast(V);
+
+    if (auto *DerivedIV =
+            dyn_cast_or_null<VPDerivedIVRecipe>(V->getDefiningRecipe()))
+      return vpValuesMatch(WideIV->getStartValue(),
+                           DerivedIV->getStartValue()) &&
+             vpValuesMatch(WideIV->getStepValue(), DerivedIV->getStepValue());
+
+    // Canonical induction: end value is VectorTC directly (a live-in with no
+    // defining recipe). Matches canonical or truncated wide inductions.
+    auto *IntOrFp = dyn_cast<VPWidenIntOrFpInductionRecipe>(WideIV);
+    if (!V->getDefiningRecipe() && IntOrFp) {
+      auto *StepC = dyn_cast<VPConstantInt>(IntOrFp->getStepValue());
+      auto *StartC = dyn_cast<VPConstantInt>(IntOrFp->getStartValue());
+      return StartC && StartC->isZero() && StepC && StepC->isOne() &&
+             (IntOrFp->getTruncInst() || IntOrFp->isCanonical());
+    }
+
+    return false;
+  };
+
+  // Build a mapping from epilogue header phis to their matching main plan
+  // resume phis. Inductions are matched by comparing start and step values of
+  // the end value; non-induction phis (reductions/FORs) are matched by relative
+  // order. Multiple epilogue induction phis may share the same resume phi (e.g.
+  // when an IV is used both widened and truncated).
+  MapVector<VPRecipeBase *, VPPhi *> EpiPhiToResumePhi;
+  SmallVector<VPPhi *> ResumePhis;
+  for (VPRecipeBase &R : MainPlan.getScalarHeader()->phis()) {
+    auto *VPIRInst = cast<VPIRPhi>(&R);
+    ResumePhis.push_back(
+        cast<VPPhi>(VPIRInst->getOperand(0)->getDefiningRecipe()));
   }
+  auto NonIndIt = ResumePhis.begin();
+  for (VPRecipeBase &EpiR : drop_begin(
+           EpiPlan.getVectorLoopRegion()->getEntryBasicBlock()->phis())) {
+    if (auto *WideIV = dyn_cast<VPWidenInductionRecipe>(&EpiR)) {
+      auto It = find_if(ResumePhis, [&](VPPhi *ResumePhi) {
+        return inductionEndValueMatchesWideIV(ResumePhi->getOperand(0), WideIV);
+      });
+      if (It != ResumePhis.end()) {
+        EpiPhiToResumePhi[&EpiR] = *It;
+      } else {
+        // Phi recipe has no underlying PHI and no scalar resume phi. Map to
+        // nullptr so the canonical IV's ResumeForEpilogue is used below.
+        [[maybe_unused]] auto *IntOrFp =
+            cast<VPWidenIntOrFpInductionRecipe>(WideIV);
+        assert(!IntOrFp->getPHINode() && IntOrFp->isCanonical() &&
+               "expected canonical induction without underlying phi");
+        EpiPhiToResumePhi[&EpiR] = nullptr;
+      }
+    } else {
+      // Skip non-induction phis without underlying value (e.g., AnyOf
+      // reductions introduced by the FindIV transform), which are not yet
+      // supported for epilogue vectorization.
+      if (!cast<VPReductionPHIRecipe>(&EpiR)->getUnderlyingValue())
+        continue;
+      // Advance past induction end values to find the next non-induction
+      // resume phi.
+      while (NonIndIt != ResumePhis.end() &&
+             isInductionEndValue((*NonIndIt)->getOperand(0)))
+        ++NonIndIt;
+      assert(NonIndIt != ResumePhis.end() &&
+             "expected resume phi for each epilogue header phi");
+      EpiPhiToResumePhi[&EpiR] = *NonIndIt;
+      ++NonIndIt;
+    }
+  }
+
   VPBasicBlock *MainScalarPH = MainPlan.getScalarPreheader();
 
+<<<<<<< HEAD
   // Remove scalar header phis and their resume phis for inductions without
   // a corresponding wide induction in the epilogue.
   for (VPRecipeBase &R :
@@ -8951,12 +9048,36 @@ preparePlanForMainVectorLoop(VPlan &MainPlan, VPlan &EpiPlan) {
     VPRecipeBase *ResumePhi = VPIRInst->getOperand(0)->getDefiningRecipe();
     if (!ResumePhi)
       continue;
+=======
+  // Remove resume phis in the main plan that don't correspond to any epilogue
+  // header phi.
+  SmallPtrSet<VPPhi *, 4> UsedResumePhis(from_range,
+                                         make_second_range(EpiPhiToResumePhi));
+  for (VPRecipeBase &R :
+       make_early_inc_range(MainPlan.getScalarHeader()->phis())) {
+    auto *VPIRInst = cast<VPIRPhi>(&R);
+    auto *ResumePhiR =
+        cast<VPPhi>(VPIRInst->getOperand(0)->getDefiningRecipe());
+    if (!isInductionEndValue(ResumePhiR->getOperand(0)) ||
+        UsedResumePhis.contains(ResumePhiR)) {
+      if (isInductionEndValue(ResumePhiR->getOperand(0)))
+        Resumes.push_back(nullptr);
+      else
+        Resumes.push_back(
+            Builder.createNaryOp(VPInstruction::ResumeForEpilogue, ResumePhiR));
+      continue;
+    }
+
+    // There is no corresponding wide induction in the plan. Remove the VPIRPhi
+    // wrapping the scalar header phi together with the corresponding
+    // ResumePhi.
+>>>>>>> 7fbb5cf40159 (Step)
     VPIRInst->eraseFromParent();
-    ResumePhi->eraseFromParent();
+    ResumePhiR->eraseFromParent();
+    Resumes.push_back(nullptr);
   }
   RUN_VPLAN_PASS(VPlanTransforms::removeDeadRecipes, MainPlan);
 
-  using namespace VPlanPatternMatch;
   // When vectorizing the epilogue, FindFirstIV & FindLastIV reductions can
   // introduce multiple uses of undef/poison. If the reduction start value may
   // be undef or poison it needs to be frozen and the frozen start has to be
@@ -8997,12 +9118,30 @@ preparePlanForMainVectorLoop(VPlan &MainPlan, VPlan &EpiPlan) {
   // If there is a suitable resume value for the canonical induction in the
   // scalar (which will become vector) epilogue loop, use it and move it to the
   // beginning of the scalar preheader. Otherwise create it below.
+  // Add a user to make sure the resume phi won't get removed.
+  VPSymbolicValue T;
+  auto *CanonicalResumeForEpi =
+      Builder.createNaryOp(VPInstruction::ResumeForEpilogue, &T);
+
+  // Create ResumeForEpilogue instructions for each epilogue header phi, using
+  // the mapping built earlier.
+  DenseMap<VPRecipeBase *, VPInstruction *> EpiPhiToResumeForEpi;
+  for (auto &[EpiPhi, MainResumePhi] : EpiPhiToResumePhi) {
+    if (MainResumePhi) {
+      EpiPhiToResumeForEpi[EpiPhi] =
+          Builder.createNaryOp(VPInstruction::ResumeForEpilogue, MainResumePhi);
+    } else {
+      EpiPhiToResumeForEpi[EpiPhi] = CanonicalResumeForEpi;
+    }
+  }
+
+  VPPhi *ResumePhi = nullptr;
   auto ResumePhiIter =
       find_if(MainScalarPH->phis(), [VectorTC](VPRecipeBase &R) {
         return match(&R, m_VPInstruction<Instruction::PHI>(m_Specific(VectorTC),
                                                            m_ZeroInt()));
       });
-  VPPhi *ResumePhi = nullptr;
+
   if (ResumePhiIter == MainScalarPH->phis().end()) {
     VPBuilder ScalarPHBuilder(MainScalarPH, MainScalarPH->begin());
     ResumePhi = ScalarPHBuilder.createScalarPhi(
@@ -9016,6 +9155,7 @@ preparePlanForMainVectorLoop(VPlan &MainPlan, VPlan &EpiPlan) {
     else if (&*MainScalarPH->begin() != ResumePhi)
       ResumePhi->moveBefore(*MainScalarPH, MainScalarPH->begin());
   }
+<<<<<<< HEAD
   // Collect resume values from the scalar preheader. Create
   // ResumeForEpilogue for all phis to keep them alive, and track reduction
   // resumes for epilogue bypass fixup.
@@ -9038,6 +9178,10 @@ preparePlanForMainVectorLoop(VPlan &MainPlan, VPlan &EpiPlan) {
   }
 
   return ReductionResumeValues;
+=======
+  CanonicalResumeForEpi->setOperand(0, ResumePhi);
+  return {EpiPhiToResumeForEpi, Resumes};
+>>>>>>> 7fbb5cf40159 (Step)
 }
 
 /// Prepare \p Plan for vectorizing the epilogue loop. That is, re-use expanded
@@ -9049,7 +9193,8 @@ preparePlanForMainVectorLoop(VPlan &MainPlan, VPlan &EpiPlan) {
 static SmallVector<Instruction *> preparePlanForEpilogueVectorLoop(
     VPlan &Plan, Loop *L, const SCEV2ValueTy &ExpandedSCEVs,
     EpilogueLoopVectorizationInfo &EPI, LoopVectorizationCostModel &CM,
-    ScalarEvolution &SE) {
+    ScalarEvolution &SE,
+    const DenseMap<VPRecipeBase *, VPInstruction *> &EpiPhiToResumeForEpi) {
   VPRegionBlock *VectorLoop = Plan.getVectorLoopRegion();
   VPBasicBlock *Header = VectorLoop->getEntryBasicBlock();
   Header->setName("vec.epilog.vector.body");
@@ -9121,8 +9266,8 @@ static SmallVector<Instruction *> preparePlanForEpilogueVectorLoop(
           vputils::findRecipe(ReductionPhi->getBackedgeValue(), IsReductionResult));
       assert(RdxResult && "expected to find reduction result");
 
-      ResumeV = cast<PHINode>(ReductionPhi->getUnderlyingInstr())
-                    ->getIncomingValueForBlock(L->getLoopPreheader());
+      ResumeV = cast<PHINode>(
+          EpiPhiToResumeForEpi.lookup(ReductionPhi)->getUnderlyingValue());
 
       // Check for FindIV pattern by looking for icmp user of RdxResult.
       // The pattern is: select(icmp ne RdxResult, Sentinel), RdxResult, Start
@@ -9166,15 +9311,15 @@ static SmallVector<Instruction *> preparePlanForEpilogueVectorLoop(
           InstsToMove.push_back(I);
       } else {
         VPValue *StartVal = Plan.getOrAddLiveIn(ResumeV);
-        auto *PhiR = dyn_cast<VPReductionPHIRecipe>(&R);
-        if (auto *VPI = dyn_cast<VPInstruction>(PhiR->getStartValue())) {
+        if (auto *VPI =
+                dyn_cast<VPInstruction>(ReductionPhi->getStartValue())) {
           assert(VPI->getOpcode() == VPInstruction::ReductionStartVector &&
                  "unexpected start value");
           // Partial sub-reductions always start at 0 and account for the
           // reduction start value in a final subtraction. Update it to use the
           // resume value from the main vector loop.
-          if (PhiR->getVFScaleFactor() > 1 &&
-              PhiR->getRecurrenceKind() == RecurKind::Sub) {
+          if (ReductionPhi->getVFScaleFactor() > 1 &&
+              ReductionPhi->getRecurrenceKind() == RecurKind::Sub) {
             auto *Sub = cast<VPInstruction>(RdxResult->getSingleUser());
             assert(Sub->getOpcode() == Instruction::Sub && "Unexpected opcode");
             assert(isa<VPIRValue>(Sub->getOperand(0)) &&
@@ -9192,11 +9337,9 @@ static SmallVector<Instruction *> preparePlanForEpilogueVectorLoop(
       }
     } else {
       // Retrieve the induction resume values for wide inductions from
-      // their original phi nodes in the scalar loop.
-      PHINode *IndPhi = cast<VPWidenInductionRecipe>(&R)->getPHINode();
-      // Hook up to the PHINode generated by a ResumePhi recipe of main
-      // loop VPlan, which feeds the scalar loop.
-      ResumeV = IndPhi->getIncomingValueForBlock(L->getLoopPreheader());
+      // the ResumeForEpilogue mapping.
+      ResumeV =
+          cast<PHINode>(EpiPhiToResumeForEpi.lookup(&R)->getUnderlyingValue());
     }
     assert(ResumeV && "Must have a resume value");
     VPValue *StartVal = Plan.getOrAddLiveIn(ResumeV);
@@ -9808,7 +9951,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     VPlan &BestEpiPlan = LVP.getPlanFor(EpilogueVF.Width);
     BestEpiPlan.getMiddleBlock()->setName("vec.epilog.middle.block");
     BestEpiPlan.getVectorPreheader()->setName("vec.epilog.ph");
-    auto ReductionResumeValues =
+    const auto &[EpiPhiToResumeForEpi, ReductionResumeValues ] =
         preparePlanForMainVectorLoop(*BestMainPlan, BestEpiPlan);
     EpilogueLoopVectorizationInfo EPI(VF.Width, IC, EpilogueVF.Width, 1,
                                       BestEpiPlan);
@@ -9822,8 +9965,9 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     // edges from the first pass.
     EpilogueVectorizerEpilogueLoop EpilogILV(L, PSE, LI, DT, TTI, AC, EPI, &CM,
                                              Checks, BestEpiPlan);
-    SmallVector<Instruction *> InstsToMove = preparePlanForEpilogueVectorLoop(
-        BestEpiPlan, L, ExpandedSCEVs, EPI, CM, *PSE.getSE());
+    SmallVector<Instruction *> InstsToMove =
+        preparePlanForEpilogueVectorLoop(BestEpiPlan, L, ExpandedSCEVs, EPI, CM,
+                                         *PSE.getSE(), EpiPhiToResumeForEpi);
     LVP.executePlan(EPI.EpilogueVF, EPI.EpilogueUF, BestEpiPlan, EpilogILV, DT,
                     true);
     connectEpilogueVectorLoop(BestEpiPlan, L, EPI, DT, LVL, ExpandedSCEVs,
