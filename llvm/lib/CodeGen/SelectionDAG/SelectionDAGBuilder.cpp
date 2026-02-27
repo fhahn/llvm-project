@@ -5137,6 +5137,8 @@ void SelectionDAGBuilder::visitMaskedLoad(const CallInst &I, bool IsExpanding) {
 void SelectionDAGBuilder::visitSpeculativeLoad(const CallInst &I) {
   SDLoc sdl = getCurSDLoc();
   Value *PtrOperand = I.getArgOperand(0);
+  // The second argument (num_guaranteed_non_poison_bytes) is IR-level
+  // semantics only; it is not needed at codegen.
   SDValue Ptr = getValue(PtrOperand);
 
   const TargetLowering &TLI = DAG.getTargetLoweringInfo();

@@ -27724,9 +27724,9 @@ This is an overloaded intrinsic.
 
 ::
 
-      declare <4 x float>  @llvm.speculative.load.v4f32.p0(ptr <ptr>)
-      declare <8 x i32>    @llvm.speculative.load.v8i32.p0(ptr <ptr>)
-      declare i64          @llvm.speculative.load.i64.p0(ptr <ptr>)
+      declare <4 x float>  @llvm.speculative.load.v4f32.p0(ptr <ptr>, i64 <num_non_poison_bytes>)
+      declare <8 x i32>    @llvm.speculative.load.v8i32.p0(ptr <ptr>, i64 <num_non_poison_bytes>)
+      declare i64          @llvm.speculative.load.i64.p0(ptr <ptr>, i64 <num_non_poison_bytes>)
 
 Overview:
 """""""""
@@ -27740,8 +27740,10 @@ access cannot fault.
 Arguments:
 """"""""""
 
-The argument is a pointer to the memory location to load from. The return type
-must have a power-of-2 size in bytes.
+The first argument is a pointer to the memory location to load from. The second
+argument is an ``i64`` specifying the number of bytes from the start of the
+loaded value that are guaranteed to be non-poison (i.e., backed by accessible
+memory). The return type must have a power-of-2 size in bytes.
 
 Semantics:
 """"""""""
@@ -27763,6 +27765,11 @@ For accessible bytes, the intrinsic returns the stored value. For inaccessible
 bytes, the intrinsic returns ``poison`` and the bytes are not considered accessed
 for the purpose of data races or ``noalias`` constraints. At least the first
 byte must be accessible; otherwise the behavior is undefined.
+
+The ``num_non_poison_bytes`` argument specifies how many bytes starting from
+``ptr`` are guaranteed to contain non-poison values. Bytes at offsets
+``>= num_non_poison_bytes`` may be poison. This allows the caller to
+communicate which portion of the loaded value is actually valid for use.
 
 The behavior is undefined if program execution depends on any byte in the
 result that may not be accessible.

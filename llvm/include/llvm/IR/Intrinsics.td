@@ -2604,10 +2604,11 @@ def int_experimental_vector_compress:
               [IntrNoMem]>;
 
 // Speculatively load a value from memory; lowers to a regular aligned load.
-// The loaded type must have a power-of-2 size.
+// The loaded type must have a power-of-2 size. The second argument specifies
+// the number of bytes that are guaranteed to be non-poison in the result.
 def int_speculative_load:
   DefaultAttrsIntrinsic<[llvm_any_ty],
-            [llvm_anyptr_ty],
+            [llvm_anyptr_ty, llvm_i64_ty],
             [IntrArgMemOnly, IntrWillReturn, NoCapture<ArgIndex<0>>]>;
 
 // Returns true if it's safe to speculatively load 'num_bytes' from 'ptr'.
