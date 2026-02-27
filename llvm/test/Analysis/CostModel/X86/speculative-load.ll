@@ -6,25 +6,25 @@
 
 define void @speculative_load_cost(ptr %p) {
 ; CHECK-LABEL: 'speculative_load_cost'
-; CHECK-NEXT:  Cost Model: Invalid cost for instruction: %1 = call i8 @llvm.speculative.load.i8.p0(ptr %p)
-; CHECK-NEXT:  Cost Model: Invalid cost for instruction: %2 = call i16 @llvm.speculative.load.i16.p0(ptr %p)
-; CHECK-NEXT:  Cost Model: Invalid cost for instruction: %3 = call i32 @llvm.speculative.load.i32.p0(ptr %p)
-; CHECK-NEXT:  Cost Model: Invalid cost for instruction: %4 = call i64 @llvm.speculative.load.i64.p0(ptr %p)
-; CHECK-NEXT:  Cost Model: Invalid cost for instruction: %5 = call <4 x i32> @llvm.speculative.load.v4i32.p0(ptr %p)
-; CHECK-NEXT:  Cost Model: Invalid cost for instruction: %6 = call <8 x i32> @llvm.speculative.load.v8i32.p0(ptr %p)
-; CHECK-NEXT:  Cost Model: Invalid cost for instruction: %7 = call <2 x i64> @llvm.speculative.load.v2i64.p0(ptr %p)
-; CHECK-NEXT:  Cost Model: Invalid cost for instruction: %8 = call <4 x float> @llvm.speculative.load.v4f32.p0(ptr %p)
-; CHECK-NEXT:  Cost Model: Invalid cost for instruction: %9 = call <2 x double> @llvm.speculative.load.v2f64.p0(ptr %p)
+; CHECK-NEXT:  Cost Model: Invalid cost for instruction: %1 = call i8 @llvm.speculative.load.i8.p0(ptr %p, i64 0)
+; CHECK-NEXT:  Cost Model: Invalid cost for instruction: %2 = call i16 @llvm.speculative.load.i16.p0(ptr %p, i64 0)
+; CHECK-NEXT:  Cost Model: Invalid cost for instruction: %3 = call i32 @llvm.speculative.load.i32.p0(ptr %p, i64 0)
+; CHECK-NEXT:  Cost Model: Invalid cost for instruction: %4 = call i64 @llvm.speculative.load.i64.p0(ptr %p, i64 0)
+; CHECK-NEXT:  Cost Model: Invalid cost for instruction: %5 = call <4 x i32> @llvm.speculative.load.v4i32.p0(ptr %p, i64 0)
+; CHECK-NEXT:  Cost Model: Invalid cost for instruction: %6 = call <8 x i32> @llvm.speculative.load.v8i32.p0(ptr %p, i64 0)
+; CHECK-NEXT:  Cost Model: Invalid cost for instruction: %7 = call <2 x i64> @llvm.speculative.load.v2i64.p0(ptr %p, i64 0)
+; CHECK-NEXT:  Cost Model: Invalid cost for instruction: %8 = call <4 x float> @llvm.speculative.load.v4f32.p0(ptr %p, i64 0)
+; CHECK-NEXT:  Cost Model: Invalid cost for instruction: %9 = call <2 x double> @llvm.speculative.load.v2f64.p0(ptr %p, i64 0)
 ; CHECK-NEXT:  Cost Model: Found an estimated cost of 0 for instruction: ret void
 ;
-  call i8 @llvm.speculative.load.i8.p0(ptr %p)
-  call i16 @llvm.speculative.load.i16.p0(ptr %p)
-  call i32 @llvm.speculative.load.i32.p0(ptr %p)
-  call i64 @llvm.speculative.load.i64.p0(ptr %p)
-  call <4 x i32> @llvm.speculative.load.v4i32.p0(ptr %p)
-  call <8 x i32> @llvm.speculative.load.v8i32.p0(ptr %p)
-  call <2 x i64> @llvm.speculative.load.v2i64.p0(ptr %p)
-  call <4 x float> @llvm.speculative.load.v4f32.p0(ptr %p)
-  call <2 x double> @llvm.speculative.load.v2f64.p0(ptr %p)
+  call i8 @llvm.speculative.load.i8.p0(ptr %p, i64 0)
+  call i16 @llvm.speculative.load.i16.p0(ptr %p, i64 0)
+  call i32 @llvm.speculative.load.i32.p0(ptr %p, i64 0)
+  call i64 @llvm.speculative.load.i64.p0(ptr %p, i64 0)
+  call <4 x i32> @llvm.speculative.load.v4i32.p0(ptr %p, i64 0)
+  call <8 x i32> @llvm.speculative.load.v8i32.p0(ptr %p, i64 0)
+  call <2 x i64> @llvm.speculative.load.v2i64.p0(ptr %p, i64 0)
+  call <4 x float> @llvm.speculative.load.v4f32.p0(ptr %p, i64 0)
+  call <2 x double> @llvm.speculative.load.v2f64.p0(ptr %p, i64 0)
   ret void
 }
