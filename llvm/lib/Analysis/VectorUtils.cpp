@@ -164,7 +164,7 @@ bool llvm::isVectorIntrinsicWithScalarOpAtArg(Intrinsic::ID ID,
   case Intrinsic::vector_extract:
     return (ScalarOpdIdx == 1);
   case Intrinsic::speculative_load:
-    return ScalarOpdIdx == 0;
+    return ScalarOpdIdx == 0 || ScalarOpdIdx == 1;
   case Intrinsic::smul_fix:
   case Intrinsic::smul_fix_sat:
   case Intrinsic::umul_fix:

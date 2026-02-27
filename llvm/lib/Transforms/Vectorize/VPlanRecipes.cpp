@@ -14,6 +14,7 @@
 #include "LoopVectorizationPlanner.h"
 #include "VPlan.h"
 #include "VPlanAnalysis.h"
+#include "VPlanCFG.h"
 #include "VPlanHelpers.h"
 #include "VPlanPatternMatch.h"
 #include "VPlanUtils.h"
@@ -1596,6 +1597,21 @@ void VPInstructionWithType::execute(VPTransformState &State) {
     State.set(this, VScale, true);
     break;
   }
+  case Instruction::Load: {
+    Value *Addr = State.get(getOperand(0), /*IsScalar=*/true);
+    Value *Loaded = State.Builder.CreateLoad(ResultTy, Addr);
+    State.set(this, Loaded, /*IsScalar=*/true);
+    break;
+  }
+  case Instruction::GetElementPtr: {
+    Value *Ptr = State.get(getOperand(0), /*IsScalar=*/true);
+    SmallVector<Value *, 2> Indices;
+    for (unsigned I = 1, E = getNumOperands(); I != E; ++I)
+      Indices.push_back(State.get(getOperand(I), /*IsScalar=*/true));
+    State.set(this, State.Builder.CreateGEP(ResultTy, Ptr, Indices),
+              /*IsScalar=*/true);
+    break;
+  }
 
   default:
     llvm_unreachable("opcode not implemented yet");
@@ -1622,6 +1638,10 @@ void VPInstructionWithType::printRecipe(raw_ostream &O, const Twine &Indent,
     break;
   case Instruction::Load:
     O << "load ";
+    printOperands(O, SlotTracker);
+    break;
+  case Instruction::GetElementPtr:
+    O << "gep ";
     printOperands(O, SlotTracker);
     break;
   default:
@@ -2951,6 +2971,151 @@ InstructionCost VPReductionRecipe::computeCost(ElementCount VF,
   return Ctx.TTI.getArithmeticReductionCost(Opcode, VectorTy, OptionalFMF,
                                             Ctx.CostKind);
 }
+
+VPOracleCallRecipe::VPOracleCallRecipe(std::unique_ptr<VPlan> OraclePlan,
+                                       ArrayRef<VPValue *> ExternalOperands)
+    : VPSingleDefRecipe(VPRecipeBase::VPOracleCallSC, ExternalOperands, {}),
+      OraclePlan(std::move(OraclePlan)) {}
+
+VPOracleCallRecipe *VPOracleCallRecipe::clone() {
+  SmallVector<VPValue *> Ops(operands());
+  return new VPOracleCallRecipe(
+      std::unique_ptr<VPlan>(OraclePlan->duplicate()), Ops);
+}
+
+/// Fix up the oracle function after executing the plan: add phi backedges for
+/// the oracle loop header and replace the unreachable terminator in \p ExitVPBB
+/// with a ret instruction returning the exit block's computed return value.
+static void fixupOracleFunction(VPlan &Plan, VPTransformState &State,
+                                IRBuilderBase &Builder,
+                                VPBasicBlock *ExitVPBB) {
+  VPBasicBlock *Header = vputils::getFirstLoopHeader(Plan, State.VPDT);
+  assert(Header && "oracle plan must have a loop header");
+  auto *LatchVPBB = cast<VPBasicBlock>(Header->getPredecessors()[1]);
+  BasicBlock *LatchBB = State.CFG.VPBB2IRBB[LatchVPBB];
+  for (VPRecipeBase &R : Header->phis()) {
+    assert(R.getNumOperands() == 2);
+    auto *HeaderPhi = cast<PHINode>(
+        State.get(cast<VPSingleDefRecipe>(&R), /*IsScalar=*/true));
+    HeaderPhi->addIncoming(
+        State.get(R.getOperand(1), /*IsScalar=*/true), LatchBB);
+  }
+
+  BasicBlock *ExitBB = State.CFG.VPBB2IRBB[ExitVPBB];
+  Value *RetVal = State.get(cast<VPSingleDefRecipe>(&ExitVPBB->back()),
+                            /*IsScalar=*/true);
+  Builder.SetInsertPoint(ExitBB->getTerminator());
+  Builder.CreateRet(RetVal);
+  ExitBB->getTerminator()->eraseFromParent();
+}
+
+/// Create the outlined oracle function with appropriate attributes.
+/// Signature: i64 (ParamTys...) — returns valid lane count.
+static Function *createOracleFunction(Module *M, ArrayRef<Type *> ParamTys) {
+  LLVMContext &Ctx = M->getContext();
+  Type *I64Ty = Type::getInt64Ty(Ctx);
+  FunctionType *OracleFTy = FunctionType::get(I64Ty, ParamTys, false);
+  Function *OracleFn = Function::Create(
+      OracleFTy, GlobalValue::InternalLinkage, "oracle.exit.cond", M);
+  OracleFn->addFnAttr(Attribute::NoInline);
+  OracleFn->addFnAttr(Attribute::OptimizeNone);
+  OracleFn->setOnlyReadsMemory();
+  OracleFn->setDoesNotThrow();
+  OracleFn->setWillReturn();
+  return OracleFn;
+}
+
+void VPOracleCallRecipe::execute(VPTransformState &State) {
+  IRBuilderBase &Builder = State.Builder;
+  Module *M = Builder.GetInsertBlock()->getModule();
+  LLVMContext &Ctx = M->getContext();
+  Type *I64Ty = Type::getInt64Ty(Ctx);
+
+  // Collect materialized external operand values.
+  SmallVector<Value *> ExternalVals;
+  SmallVector<Type *> ParamTys;
+  for (VPValue *Op : operands()) {
+    Value *V = State.get(Op, /*IsScalar=*/true);
+    ExternalVals.push_back(V);
+    ParamTys.push_back(V->getType());
+  }
+
+  Function *OracleFn = createOracleFunction(M, ParamTys);
+
+  // Remap oracle plan live-ins to function arguments and mark pointer
+  // arguments as nocapture. Collect first to avoid mutating the LiveIns map
+  // during iteration; ordering is deterministic because LiveIns is a
+  // SmallMapVector (insertion-ordered).
+  auto LiveInsToRemap = vputils::getRemappableLiveIns(*OraclePlan);
+  for (auto [ArgIdx, LiveIn] : enumerate(LiveInsToRemap)) {
+    OraclePlan->remapLiveIn(LiveIn, OracleFn->getArg(ArgIdx));
+    if (OracleFn->getArg(ArgIdx)->getType()->isPointerTy())
+      OracleFn->addParamAttr(
+          ArgIdx, Attribute::getWithCaptureInfo(Ctx, CaptureInfo::none()));
+  }
+
+  // Set the oracle plan's VF symbolic value to the actual VF.
+  OraclePlan->getVF().replaceAllUsesWith(OraclePlan->getConstantInt(64, State.VF.getKnownMinValue()));
+
+  // Replace VectorTripCount (repurposed as start IV during buildOraclePlan)
+  // with the canonical IV function argument (last operand).
+  auto *CanonIVLiveIn =
+      OraclePlan->getOrAddLiveIn(OracleFn->getArg(LiveInsToRemap.size()));
+  OraclePlan->getVectorTripCount().replaceAllUsesWith(CanonIVLiveIn);
+
+  // Create a seed entry block for the oracle function. VPBasicBlock::execute()
+  // needs PrevBB to determine the parent function when creating new blocks.
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", OracleFn);
+  IRBuilder<> OracleBuilder(Ctx);
+
+  LoopInfo OracleLI;
+  VPTransformState OracleState(/*TTI=*/nullptr, ElementCount::getFixed(1),
+                               &OracleLI, /*DT=*/nullptr, /*AC=*/nullptr,
+                               OracleBuilder, OraclePlan.get(),
+                               /*CurrentParentLoop=*/nullptr, I64Ty);
+  OracleState.CFG.PrevBB = EntryBB;
+
+  // Execute the oracle plan and find the exit block (the only leaf).
+  VPBasicBlock *ExitVPBB = nullptr;
+  ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>> RPOT(
+      OraclePlan->getEntry());
+  for (VPBlockBase *Block : RPOT) {
+    Block->execute(&OracleState);
+    if (Block->getNumSuccessors() == 0)
+      ExitVPBB = cast<VPBasicBlock>(Block);
+  }
+  assert(ExitVPBB && "oracle plan must have an exit block");
+
+  fixupOracleFunction(*OraclePlan, OracleState, OracleBuilder, ExitVPBB);
+
+  // Connect the entry block to the first block generated by the oracle plan.
+  BasicBlock *FirstBB =
+      OracleState.CFG.VPBB2IRBB[cast<VPBasicBlock>(OraclePlan->getEntry())];
+  BranchInst::Create(FirstBB, EntryBB);
+
+  // Emit call to oracle in the vector body.
+  Value *OracleResult = Builder.CreateCall(OracleFn, ExternalVals);
+  State.set(this, OracleResult, /*IsScalar=*/true);
+}
+
+InstructionCost
+VPOracleCallRecipe::computeCost(ElementCount VF, VPCostContext &Ctx) const {
+  // The oracle functions won't end up in the final code-gen.
+  return 0;
+}
+
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+void VPOracleCallRecipe::printRecipe(raw_ostream &O, const Twine &Indent,
+                                     VPSlotTracker &Tracker) const {
+  O << Indent << "ORACLE-CALL ";
+  printAsOperand(O, Tracker);
+  O << " = oracle.exit.cond(";
+  interleaveComma(operands(), O, [&O, &Tracker](VPValue *V) {
+    V->printAsOperand(O, Tracker);
+  });
+  O << ")";
+}
+#endif
 
 VPExpressionRecipe::VPExpressionRecipe(
     ExpressionTypes ExpressionType,

@@ -918,11 +918,14 @@ bool VPlanTransforms::handleEarlyExits(VPlan &Plan,
 
   if (HasUncountableEarlyExit) {
     auto *HeaderVPBB = cast<VPBasicBlock>(HeaderVPB);
+    // Clone the plan before flattening early exits. The clone retains the
+    // original early-exit structure and will be modified into an oracle.
+    std::unique_ptr<VPlan> OraclePlan(Plan.duplicate());
     auto *LastEarlyExitingVPBB = handleUncountableEarlyExits(
         Plan, HeaderVPBB, LatchVPBB, MiddleVPBB, TheLoop, PSE, DT, AC);
     return replaceUnsafeLoadsWithSpeculative(Plan, HeaderVPBB, MiddleVPBB,
                                              LastEarlyExitingVPBB, TheLoop, PSE,
-                                             DT, AC);
+                                             DT, AC, std::move(OraclePlan));
   }
 
   // Disconnect countable early exits from the loop, leaving it with a single
@@ -1150,7 +1153,8 @@ void VPlanTransforms::attachSpeculativeLoadChecks(
            vp_depth_first_shallow(VectorRegion->getEntry()))) {
     for (VPRecipeBase &R : *VPBB) {
       VPValue *Ptr;
-      if (!match(&R, m_Intrinsic<Intrinsic::speculative_load>(m_VPValue(Ptr))))
+      if (!match(&R, m_Intrinsic<Intrinsic::speculative_load>(m_VPValue(Ptr),
+                                                              m_VPValue())))
         continue;
       Type *ResultTy = cast<VPWidenIntrinsicRecipe>(&R)->getResultType();
 

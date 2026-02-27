@@ -19,10 +19,11 @@ define i64 @early_exit_with_without_dereferenceable(ptr %p1, ptr %p2) {
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY_INTERIM:.*]] ]
+; CHECK-NEXT:    [[TMP4:%.*]] = call i64 @oracle.exit.cond(ptr [[P1]], ptr [[P2]], i64 [[IV]])
 ; CHECK-NEXT:    [[GEP_P1:%.*]] = getelementptr inbounds i8, ptr [[P1]], i64 [[IV]]
-; CHECK-NEXT:    [[TMP5:%.*]] = call <16 x i8> @llvm.speculative.load.v16i8.p0(ptr [[GEP_P1]])
+; CHECK-NEXT:    [[TMP5:%.*]] = call <16 x i8> @llvm.speculative.load.v16i8.p0(ptr [[GEP_P1]], i64 [[TMP4]])
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i8, ptr [[P2]], i64 [[IV]]
-; CHECK-NEXT:    [[TMP7:%.*]] = call <16 x i8> @llvm.speculative.load.v16i8.p0(ptr [[TMP6]])
+; CHECK-NEXT:    [[TMP7:%.*]] = call <16 x i8> @llvm.speculative.load.v16i8.p0(ptr [[TMP6]], i64 [[TMP4]])
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp ne <16 x i8> [[TMP5]], [[TMP7]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[IV]], 16
 ; CHECK-NEXT:    [[TMP9:%.*]] = freeze <16 x i1> [[TMP8]]
@@ -70,10 +71,11 @@ define i64 @early_exit_with_without_dereferenceable(ptr %p1, ptr %p2) {
 ; MAX-BW-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; MAX-BW:       [[VECTOR_BODY]]:
 ; MAX-BW-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY_INTERIM:.*]] ]
+; MAX-BW-NEXT:    [[TMP4:%.*]] = call i64 @oracle.exit.cond(ptr [[P1]], ptr [[P2]], i64 [[IV]])
 ; MAX-BW-NEXT:    [[GEP_P1:%.*]] = getelementptr inbounds i8, ptr [[P1]], i64 [[IV]]
-; MAX-BW-NEXT:    [[TMP5:%.*]] = call <16 x i8> @llvm.speculative.load.v16i8.p0(ptr [[GEP_P1]])
+; MAX-BW-NEXT:    [[TMP5:%.*]] = call <16 x i8> @llvm.speculative.load.v16i8.p0(ptr [[GEP_P1]], i64 [[TMP4]])
 ; MAX-BW-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i8, ptr [[P2]], i64 [[IV]]
-; MAX-BW-NEXT:    [[TMP7:%.*]] = call <16 x i8> @llvm.speculative.load.v16i8.p0(ptr [[TMP6]])
+; MAX-BW-NEXT:    [[TMP7:%.*]] = call <16 x i8> @llvm.speculative.load.v16i8.p0(ptr [[TMP6]], i64 [[TMP4]])
 ; MAX-BW-NEXT:    [[TMP8:%.*]] = icmp ne <16 x i8> [[TMP5]], [[TMP7]]
 ; MAX-BW-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[IV]], 16
 ; MAX-BW-NEXT:    [[TMP9:%.*]] = freeze <16 x i1> [[TMP8]]
@@ -143,10 +145,12 @@ define i64 @early_exit_mixed_width_no_dereferencable(ptr %A, ptr %B) {
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY_INTERIM:.*]] ]
+; CHECK-NEXT:    [[TMP4:%.*]] = call i64 @oracle.exit.cond.1(ptr [[A]], ptr [[B]], i64 [[IV]])
+; CHECK-NEXT:    [[TMP15:%.*]] = shl i64 [[TMP4]], 2
 ; CHECK-NEXT:    [[GEP_A:%.*]] = getelementptr inbounds i8, ptr [[A]], i64 [[IV]]
-; CHECK-NEXT:    [[TMP5:%.*]] = call <4 x i8> @llvm.speculative.load.v4i8.p0(ptr [[GEP_A]])
+; CHECK-NEXT:    [[TMP5:%.*]] = call <4 x i8> @llvm.speculative.load.v4i8.p0(ptr [[GEP_A]], i64 [[TMP4]])
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[IV]]
-; CHECK-NEXT:    [[TMP7:%.*]] = call <4 x i32> @llvm.speculative.load.v4i32.p0(ptr [[TMP6]])
+; CHECK-NEXT:    [[TMP7:%.*]] = call <4 x i32> @llvm.speculative.load.v4i32.p0(ptr [[TMP6]], i64 [[TMP15]])
 ; CHECK-NEXT:    [[TMP8:%.*]] = trunc <4 x i32> [[TMP7]] to <4 x i8>
 ; CHECK-NEXT:    [[TMP9:%.*]] = icmp ne <4 x i8> [[TMP5]], [[TMP8]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[IV]], 4
@@ -195,10 +199,12 @@ define i64 @early_exit_mixed_width_no_dereferencable(ptr %A, ptr %B) {
 ; MAX-BW-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; MAX-BW:       [[VECTOR_BODY]]:
 ; MAX-BW-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY_INTERIM:.*]] ]
+; MAX-BW-NEXT:    [[TMP4:%.*]] = call i64 @oracle.exit.cond.1(ptr [[A]], ptr [[B]], i64 [[IV]])
+; MAX-BW-NEXT:    [[TMP15:%.*]] = shl i64 [[TMP4]], 2
 ; MAX-BW-NEXT:    [[GEP_A:%.*]] = getelementptr inbounds i8, ptr [[A]], i64 [[IV]]
-; MAX-BW-NEXT:    [[TMP5:%.*]] = call <4 x i8> @llvm.speculative.load.v4i8.p0(ptr [[GEP_A]])
+; MAX-BW-NEXT:    [[TMP5:%.*]] = call <4 x i8> @llvm.speculative.load.v4i8.p0(ptr [[GEP_A]], i64 [[TMP4]])
 ; MAX-BW-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[IV]]
-; MAX-BW-NEXT:    [[TMP7:%.*]] = call <4 x i32> @llvm.speculative.load.v4i32.p0(ptr [[TMP6]])
+; MAX-BW-NEXT:    [[TMP7:%.*]] = call <4 x i32> @llvm.speculative.load.v4i32.p0(ptr [[TMP6]], i64 [[TMP15]])
 ; MAX-BW-NEXT:    [[TMP8:%.*]] = trunc <4 x i32> [[TMP7]] to <4 x i8>
 ; MAX-BW-NEXT:    [[TMP9:%.*]] = icmp ne <4 x i8> [[TMP5]], [[TMP8]]
 ; MAX-BW-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[IV]], 4

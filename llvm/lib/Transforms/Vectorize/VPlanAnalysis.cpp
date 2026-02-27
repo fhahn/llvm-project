@@ -326,6 +326,9 @@ Type *VPTypeAnalysis::inferScalarType(const VPValue *V) {
           })
           .Case([this](const VPExpressionRecipe *R) {
             return inferScalarType(R->getOperandOfResultType());
+          })
+          .Case([this](const VPOracleCallRecipe *) -> Type * {
+            return Type::getInt64Ty(Ctx);
           });
 
   assert(ResultTy && "could not infer type for the given VPValue");

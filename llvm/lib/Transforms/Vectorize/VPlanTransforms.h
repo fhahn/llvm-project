@@ -341,11 +341,14 @@ struct VPlanTransforms {
   /// Replace loads that may not be dereferenceable with speculative load
   /// intrinsics. Returns false if any non-dereferenceable load is found in a
   /// block past all early exits (i.e. dominated by \p LastEarlyExitingVPBB),
-  /// since such loads cannot be safely speculated.
+  /// since such loads cannot be safely speculated. \p OraclePlan is a cloned
+  /// VPlan (with the original early-exit structure) that will be modified into
+  /// an oracle function.
   static bool replaceUnsafeLoadsWithSpeculative(
       VPlan &Plan, VPBasicBlock *HeaderVPBB, VPBasicBlock *MiddleVPBB,
       VPBasicBlock *LastEarlyExitingVPBB, Loop *TheLoop,
-      PredicatedScalarEvolution &PSE, DominatorTree &DT, AssumptionCache *AC);
+      PredicatedScalarEvolution &PSE, DominatorTree &DT, AssumptionCache *AC,
+      std::unique_ptr<VPlan> OraclePlan);
 
   /// Replaces the exit condition from
   ///   (branch-on-cond eq CanonicalIVInc, VectorTripCount)

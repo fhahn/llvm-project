@@ -64,6 +64,10 @@ bool isHeaderMask(const VPValue *V, const VPlan &Plan);
 /// VPDerivedIV or VPCanonicalIVPHI).
 bool isUniformAcrossVFsAndUFs(VPValue *V);
 
+/// Collect live-in VPIRValues that have users and are not constants.
+/// Ordering is deterministic because LiveIns is a SmallMapVector.
+SmallVector<VPIRValue *> getRemappableLiveIns(VPlan &Plan);
+
 /// Returns the header block of the first, top-level loop, or null if none
 /// exist.
 VPBasicBlock *getFirstLoopHeader(VPlan &Plan, VPDominatorTree &VPDT);

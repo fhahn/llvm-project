@@ -159,10 +159,11 @@ define i8 @header_load_live_out_unknown(ptr %A, ptr %B) {
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT1:%.*]], %[[VECTOR_BODY_INTERIM:.*]] ]
+; CHECK-NEXT:    [[TMP4:%.*]] = call i64 @oracle.exit.cond(ptr [[A]], ptr [[B]], i64 [[INDEX]])
 ; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i8, ptr [[A]], i64 [[INDEX]]
-; CHECK-NEXT:    [[TMP5:%.*]] = call <4 x i8> @llvm.speculative.load.v4i8.p0(ptr [[ARRAYIDX]])
+; CHECK-NEXT:    [[TMP5:%.*]] = call <4 x i8> @llvm.speculative.load.v4i8.p0(ptr [[ARRAYIDX]], i64 [[TMP4]])
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i8, ptr [[B]], i64 [[INDEX]]
-; CHECK-NEXT:    [[TMP7:%.*]] = call <4 x i8> @llvm.speculative.load.v4i8.p0(ptr [[TMP6]])
+; CHECK-NEXT:    [[TMP7:%.*]] = call <4 x i8> @llvm.speculative.load.v4i8.p0(ptr [[TMP6]], i64 [[TMP4]])
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp ne <4 x i8> [[TMP5]], [[TMP7]]
 ; CHECK-NEXT:    [[INDEX_NEXT1]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP9:%.*]] = freeze <4 x i1> [[TMP8]]

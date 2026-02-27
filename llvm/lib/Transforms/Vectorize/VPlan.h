@@ -412,6 +412,7 @@ public:
     VPInstructionSC,
     VPInterleaveEVLSC,
     VPInterleaveSC,
+    VPOracleCallSC,
     VPReductionEVLSC,
     VPReductionSC,
     VPReplicateSC,
@@ -602,6 +603,7 @@ public:
     case VPRecipeBase::VPExpandSCEVSC:
     case VPRecipeBase::VPExpressionSC:
     case VPRecipeBase::VPInstructionSC:
+    case VPRecipeBase::VPOracleCallSC:
     case VPRecipeBase::VPReductionEVLSC:
     case VPRecipeBase::VPReductionSC:
     case VPRecipeBase::VPReplicateSC:
@@ -3294,6 +3296,39 @@ public:
   }
 };
 
+/// Holds a cloned VPlan representing the oracle (a scalar loop that replays
+/// the original early-exit condition lane-by-lane). During execute(), emits an
+/// outlined scalar function from the oracle VPlan and calls it; the result is
+/// a single scalar i64 giving the number of valid lanes.
+class VPOracleCallRecipe : public VPSingleDefRecipe {
+  /// The cloned and modified VPlan used as the oracle. Owned by this recipe.
+  std::unique_ptr<VPlan> OraclePlan;
+
+public:
+  /// Construct from a modified oracle VPlan. The operands of this recipe are
+  /// the live-in values referenced by the oracle plan (base pointers,
+  /// loop-invariant comparands, etc.) and become function arguments.
+  VPOracleCallRecipe(std::unique_ptr<VPlan> OraclePlan,
+                     ArrayRef<VPValue *> ExternalOperands);
+
+  VP_CLASSOF_IMPL(VPRecipeBase::VPOracleCallSC)
+
+  VPOracleCallRecipe *clone() override;
+  void execute(VPTransformState &State) override;
+
+  InstructionCost computeCost(ElementCount VF,
+                              VPCostContext &Ctx) const override;
+
+  /// The oracle only uses the first lane of each operand.
+  bool usesFirstLaneOnly(const VPValue *Op) const override { return true; }
+
+protected:
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+  void printRecipe(raw_ostream &O, const Twine &Indent,
+                   VPSlotTracker &Tracker) const override;
+#endif
+};
+
 /// A recipe to combine multiple recipes into a single 'expression' recipe,
 /// which should be considered a single entity for cost-modeling and transforms.
 /// The recipe needs to be 'decomposed', i.e. replaced by its individual
@@ -4855,6 +4890,17 @@ public:
 
   /// Return the list of live-in VPValues available in the VPlan.
   auto getLiveIns() const { return LiveIns.values(); }
+
+  /// Remap the underlying IR value of the live-in \p LI to \p NewV. This
+  /// updates both the VPIRValue's underlying value and the LiveIns map key.
+  void remapLiveIn(VPIRValue *LI, Value *NewV) {
+    Value *OldV = LI->UnderlyingVal;
+    assert(OldV && "expected live-in to have an underlying value");
+    assert(LiveIns.lookup(OldV) == LI && "live-in not in map");
+    LiveIns.erase(OldV);
+    LI->UnderlyingVal = NewV;
+    LiveIns[NewV] = LI;
+  }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   /// Print the live-ins of this VPlan to \p O.

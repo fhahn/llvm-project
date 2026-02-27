@@ -4129,6 +4129,7 @@ static bool willGenerateVectors(VPlan &Plan, ElementCount VF,
       case VPRecipeBase::VPExpandSCEVSC:
       case VPRecipeBase::VPPredInstPHISC:
       case VPRecipeBase::VPBranchOnMaskSC:
+      case VPRecipeBase::VPOracleCallSC:
         continue;
       case VPRecipeBase::VPReductionSC:
       case VPRecipeBase::VPActiveLaneMaskPHISC:
@@ -8279,9 +8280,10 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(
     for (VPRecipeBase &R : make_early_inc_range(
              make_range(VPBB->getFirstNonPhi(), VPBB->end()))) {
       // Skip recipes that do not need transforming. VPWidenIntrinsicRecipe
-      // is added for speculative loads in early exit loops.
+      // is added for speculative loads in early exit loops. VPOracleCallRecipe
+      // computes the byte count for speculative loads.
       if (isa<VPWidenCanonicalIVRecipe, VPBlendRecipe, VPReductionRecipe,
-              VPWidenIntrinsicRecipe>(&R))
+              VPWidenIntrinsicRecipe, VPOracleCallRecipe>(&R))
         continue;
       auto *VPI = cast<VPInstruction>(&R);
       if (!VPI->getUnderlyingValue())

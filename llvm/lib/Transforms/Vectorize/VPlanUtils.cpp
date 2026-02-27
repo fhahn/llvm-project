@@ -458,6 +458,14 @@ bool vputils::isUniformAcrossVFsAndUFs(VPValue *V) {
       });
 }
 
+SmallVector<VPIRValue *> vputils::getRemappableLiveIns(VPlan &Plan) {
+  SmallVector<VPIRValue *> Result;
+  for (VPIRValue *LiveIn : Plan.getLiveIns())
+    if (LiveIn->getNumUsers() > 0 && !isa<Constant>(LiveIn->getValue()))
+      Result.push_back(LiveIn);
+  return Result;
+}
+
 VPBasicBlock *vputils::getFirstLoopHeader(VPlan &Plan, VPDominatorTree &VPDT) {
   auto DepthFirst = vp_depth_first_shallow(Plan.getEntry());
   auto I = find_if(DepthFirst, [&VPDT](VPBlockBase *VPB) {
@@ -572,7 +580,8 @@ vputils::getRecipesForUncountableExit(VPlan &Plan,
       Recipes.push_back(GEP->getDefiningRecipe());
       GEPs.push_back(GEP->getDefiningRecipe());
     } else if (match(V, m_Intrinsic<Intrinsic::speculative_load>(
-                            m_GetElementPtr(m_LiveIn(), m_VPValue())))) {
+                            m_GetElementPtr(m_LiveIn(), m_VPValue()),
+                            m_VPValue()))) {
       // Handle speculative loads created for early-exit vectorization.
       VPValue *GEP = V->getDefiningRecipe()->getOperand(0);
       Recipes.push_back(V->getDefiningRecipe());
