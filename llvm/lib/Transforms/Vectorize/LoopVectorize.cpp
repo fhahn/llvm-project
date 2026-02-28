@@ -365,7 +365,7 @@ cl::opt<bool>
 #ifdef EXPENSIVE_CHECKS
                           cl::init(true),
 #else
-                          cl::init(false),
+                          cl::init(true),
 #endif
                           cl::Hidden,
                           cl::desc("Verify VPlans after VPlan transforms."));
