@@ -378,6 +378,16 @@ bool VPlanVerifier::verifyBlock(const VPBlockBase *VPB) {
       return false;
     }
   }
+  // For plain CFG VPlans (no parent region), verify header/latch structure.
+  if (VPBB && !VPBB->getParent()) {
+    if (VPBlockUtils::isHeader(VPBB, VPDT)) {
+      if (!VPBlockUtils::isLatch(VPB->getPredecessors()[1], VPDT)) {
+        errs() << "Header's second predecessor must be the latch!\n";
+        return false;
+      }
+    }
+  }
+
   return !VPBB || verifyVPBasicBlock(VPBB);
 }
 
