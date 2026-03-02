@@ -80,6 +80,8 @@ public:
   void writeInteger(uint64_t Offset, const APInt &Int, const DataLayout &DL);
   void writeFloat(uint64_t Offset, const APFloat &Float, const DataLayout &DL);
   void writePointer(uint64_t Offset, const Pointer &Ptr, const DataLayout &DL);
+  AnyValue readInteger(uint64_t Offset, unsigned BitWidth,
+                       const DataLayout &DL) const;
 
   void markAsFreed();
 };

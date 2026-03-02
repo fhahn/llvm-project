@@ -203,6 +203,22 @@ void MemoryObject::writeFloat(uint64_t Offset, const APFloat &Float,
                               const DataLayout &DL) {
   writeInteger(Offset, Float.bitcastToAPInt(), DL);
 }
+AnyValue MemoryObject::readInteger(uint64_t Offset, unsigned BitWidth,
+                                   const DataLayout &DL) const {
+  uint64_t IntSize = divideCeil(BitWidth, 8);
+  assert(SaturatingAdd(Offset, IntSize) <= Size && "Read out of bounds");
+  APInt Result(BitWidth, 0);
+  for (uint64_t I = 0; I < IntSize; ++I) {
+    const Byte &B = Bytes[Offset + I];
+    if (B.Kind != ByteKind::Concrete)
+      return AnyValue::poison();
+    uint64_t ByteIndex = DL.isLittleEndian() ? I : (IntSize - 1 - I);
+    uint64_t Bits = std::min(uint64_t(BitWidth) - ByteIndex * 8, uint64_t(8));
+    Result.insertBits(APInt(Bits, B.Value), ByteIndex * 8);
+  }
+  return Result;
+}
+
 void MemoryObject::writePointer(uint64_t Offset, const Pointer &Ptr,
                                 const DataLayout &DL) {
   writeInteger(Offset, Ptr.address(), DL);

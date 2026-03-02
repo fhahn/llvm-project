@@ -17,6 +17,7 @@
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/Support/Allocator.h"
+#include "llvm/Support/MathExtras.h"
 
 namespace llvm::ubi {
 
@@ -918,6 +919,35 @@ public:
       return Pointer(V.asInteger().zextOrTrunc(
           DL.getPointerSizeInBits(I.getType()->getPointerAddressSpace())));
     });
+  }
+
+  AnyValue loadScalar(const Pointer &Ptr, Type *Ty) {
+    MemoryObject *MO = Ptr.getMemoryObject();
+    if (!MO) {
+      reportImmediateUB("Load from null or dangling pointer.");
+      return AnyValue::poison();
+    }
+    if (MO->getState() != MemoryObjectState::Alive) {
+      reportImmediateUB("Load from dead or freed memory object.");
+      return AnyValue::poison();
+    }
+    uint64_t Offset = Ptr.address().getZExtValue() - MO->getAddress();
+    unsigned BitWidth = Ty->getScalarSizeInBits();
+    uint64_t ByteSize = divideCeil(BitWidth, 8);
+    if (Offset + ByteSize > MO->getSize()) {
+      reportImmediateUB("Load out of bounds.");
+      return AnyValue::poison();
+    }
+    return MO->readInteger(Offset, BitWidth, DL);
+  }
+
+  void visitLoadInst(LoadInst &LI) {
+    auto &PtrVal = getValue(LI.getPointerOperand());
+    if (PtrVal.isPoison()) {
+      reportImmediateUB("Load from poison pointer.");
+      return;
+    }
+    setResult(LI, loadScalar(PtrVal.asPointer(), LI.getType()));
   }
 
   void visitInstruction(Instruction &I) {
