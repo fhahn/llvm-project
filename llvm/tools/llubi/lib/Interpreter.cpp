@@ -947,7 +947,26 @@ public:
       reportImmediateUB("Load from poison pointer.");
       return;
     }
-    setResult(LI, loadScalar(PtrVal.asPointer(), LI.getType()));
+    Type *Ty = LI.getType();
+    if (auto *VTy = dyn_cast<FixedVectorType>(Ty)) {
+      Type *EltTy = VTy->getElementType();
+      unsigned EltSize = DL.getTypeStoreSize(EltTy).getFixedValue();
+      const Pointer &BasePtr = PtrVal.asPointer();
+      std::vector<AnyValue> Elts;
+      unsigned NumElts = VTy->getNumElements();
+      Elts.reserve(NumElts);
+      for (unsigned I = 0; I < NumElts; ++I) {
+        APInt EltAddr = BasePtr.address() + APInt(BasePtr.address().getBitWidth(),
+                                                  I * EltSize);
+        Pointer EltPtr = BasePtr.getWithNewAddr(EltAddr);
+        Elts.push_back(loadScalar(EltPtr, EltTy));
+        if (!Status)
+          return;
+      }
+      setResult(LI, std::move(Elts));
+      return;
+    }
+    setResult(LI, loadScalar(PtrVal.asPointer(), Ty));
   }
 
   void visitInstruction(Instruction &I) {
