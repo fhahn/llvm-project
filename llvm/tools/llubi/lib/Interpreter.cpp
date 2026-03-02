@@ -1010,7 +1010,24 @@ public:
       return;
     }
     auto &Val = getValue(SI.getValueOperand());
-    storeScalar(PtrVal.asPointer(), Val, SI.getValueOperand()->getType());
+    Type *Ty = SI.getValueOperand()->getType();
+    if (auto *VTy = dyn_cast<FixedVectorType>(Ty)) {
+      Type *EltTy = VTy->getElementType();
+      unsigned EltSize = DL.getTypeStoreSize(EltTy).getFixedValue();
+      const Pointer &BasePtr = PtrVal.asPointer();
+      auto &Elts = Val.asAggregate();
+      for (unsigned I = 0, E = VTy->getNumElements(); I != E; ++I) {
+        APInt EltAddr = BasePtr.address() + APInt(BasePtr.address().getBitWidth(),
+                                                  I * EltSize);
+        Pointer EltPtr = BasePtr.getWithNewAddr(EltAddr);
+        storeScalar(EltPtr, Elts[I], EltTy);
+        if (!Status)
+          return;
+      }
+      setResult(SI, AnyValue());
+      return;
+    }
+    storeScalar(PtrVal.asPointer(), Val, Ty);
     setResult(SI, AnyValue());
   }
 
