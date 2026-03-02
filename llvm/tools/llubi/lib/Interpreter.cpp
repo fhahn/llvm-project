@@ -969,6 +969,51 @@ public:
     setResult(LI, loadScalar(PtrVal.asPointer(), Ty));
   }
 
+  void storeScalar(const Pointer &Ptr, const AnyValue &Val, Type *Ty) {
+    MemoryObject *MO = Ptr.getMemoryObject();
+    if (!MO) {
+      reportImmediateUB("Store to null or dangling pointer.");
+      return;
+    }
+    if (MO->getState() != MemoryObjectState::Alive) {
+      reportImmediateUB("Store to dead or freed memory object.");
+      return;
+    }
+    if (MO->isConstant()) {
+      reportImmediateUB("Store to constant memory object.");
+      return;
+    }
+    uint64_t Offset = Ptr.address().getZExtValue() - MO->getAddress();
+    unsigned BitWidth = Ty->getScalarSizeInBits();
+    uint64_t ByteSize = divideCeil(BitWidth, 8);
+    if (Offset + ByteSize > MO->getSize()) {
+      reportImmediateUB("Store out of bounds.");
+      return;
+    }
+    if (Val.isPoison()) {
+      // Write poison bytes.
+      for (uint64_t I = 0; I < ByteSize; ++I)
+        (*MO)[Offset + I] = Byte{0, ByteKind::Poison};
+    } else if (Val.isPointer()) {
+      MO->writePointer(Offset, Val.asPointer(), DL);
+    } else if (Val.isFloat()) {
+      MO->writeFloat(Offset, Val.asFloat(), DL);
+    } else {
+      MO->writeInteger(Offset, Val.asInteger(), DL);
+    }
+  }
+
+  void visitStoreInst(StoreInst &SI) {
+    auto &PtrVal = getValue(SI.getPointerOperand());
+    if (PtrVal.isPoison()) {
+      reportImmediateUB("Store to poison pointer.");
+      return;
+    }
+    auto &Val = getValue(SI.getValueOperand());
+    storeScalar(PtrVal.asPointer(), Val, SI.getValueOperand()->getType());
+    setResult(SI, AnyValue());
+  }
+
   void visitInstruction(Instruction &I) {
     Handler.onUnrecognizedInstruction(I);
     Status = false;
