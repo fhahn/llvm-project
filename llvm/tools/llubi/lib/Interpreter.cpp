@@ -439,6 +439,44 @@ public:
       }
       // TODO: handle llvm.assume with operand bundles
       return AnyValue();
+    case Intrinsic::speculative_load: {
+      auto &PtrVal = getValue(CB.getArgOperand(0));
+      auto &NumBytesVal = getValue(CB.getArgOperand(1));
+      if (PtrVal.isPoison() || NumBytesVal.isPoison())
+        return AnyValue::getPoisonValue(Ctx, CB.getType());
+      uint64_t NumNonPoisonBytes = NumBytesVal.asInteger().getZExtValue();
+      const Pointer &BasePtr = PtrVal.asPointer();
+      Type *ResTy = CB.getType();
+      if (auto *VTy = dyn_cast<FixedVectorType>(ResTy)) {
+        Type *EltTy = VTy->getElementType();
+        unsigned EltSize = DL.getTypeStoreSize(EltTy).getFixedValue();
+        unsigned NumElts = VTy->getNumElements();
+        std::vector<AnyValue> Elts;
+        Elts.reserve(NumElts);
+        for (unsigned I = 0; I < NumElts; ++I) {
+          uint64_t EltEnd = (uint64_t)(I + 1) * EltSize;
+          if (EltEnd <= NumNonPoisonBytes) {
+            APInt EltAddr =
+                BasePtr.address() +
+                APInt(BasePtr.address().getBitWidth(), I * EltSize);
+            Pointer EltPtr = BasePtr.getWithNewAddr(EltAddr);
+            Elts.push_back(loadScalar(EltPtr, EltTy));
+            if (!Status)
+              return AnyValue();
+          } else {
+            Elts.push_back(AnyValue::poison());
+          }
+        }
+        return std::move(Elts);
+      }
+      // Scalar case.
+      unsigned TypeSize = DL.getTypeStoreSize(ResTy).getFixedValue();
+      if (NumNonPoisonBytes >= TypeSize)
+        return loadScalar(BasePtr, ResTy);
+      return AnyValue::poison();
+    }
+    case Intrinsic::can_load_speculatively:
+      return AnyValue::boolean(true);
     default:
       Handler.onUnrecognizedInstruction(CB);
       Status = false;
