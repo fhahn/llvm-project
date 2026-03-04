@@ -262,6 +262,13 @@ bool VPlanVerifier::verifyVPBasicBlock(const VPBasicBlock *VPBB) {
         if (isa<VPPredInstPHIRecipe>(UI))
           continue;
 
+        // MaskedCond recipes may be used from blocks they don't dominate; they
+        // incorporate their block's mask and will be lowered to a LogicalAnd
+        // during linearization.
+        if (auto *VPI = dyn_cast<VPInstruction>(&R))
+          if (VPI->getOpcode() == VPInstruction::MaskedCond)
+            continue;
+
         // If the user is in the same block, check it comes after R in the
         // block.
         if (UI->getParent() == VPBB) {
@@ -305,17 +312,6 @@ bool VPlanVerifier::verifyVPBasicBlock(const VPBasicBlock *VPBB) {
   }
 
   return true;
-}
-
-/// Utility function that checks whether \p VPBlockVec has duplicate
-/// VPBlockBases.
-static bool hasDuplicates(const SmallVectorImpl<VPBlockBase *> &VPBlockVec) {
-  SmallDenseSet<const VPBlockBase *, 8> VPBlockSet;
-  for (const auto *Block : VPBlockVec) {
-    if (!VPBlockSet.insert(Block).second)
-      return true;
-  }
-  return false;
 }
 
 bool VPlanVerifier::verifyBlock(const VPBlockBase *VPB) {
@@ -367,13 +363,6 @@ bool VPlanVerifier::verifyBlock(const VPBlockBase *VPB) {
 
   // Check block's successors.
   const auto &Successors = VPB->getSuccessors();
-  // There must be only one instance of a successor in block's successor list.
-  // TODO: This won't work for switch statements.
-  if (hasDuplicates(Successors)) {
-    errs() << "Multiple instances of the same successor.\n";
-    return false;
-  }
-
   for (const VPBlockBase *Succ : Successors) {
     // There must be a bi-directional link between block and successor.
     const auto &SuccPreds = Succ->getPredecessors();
@@ -385,13 +374,6 @@ bool VPlanVerifier::verifyBlock(const VPBlockBase *VPB) {
 
   // Check block's predecessors.
   const auto &Predecessors = VPB->getPredecessors();
-  // There must be only one instance of a predecessor in block's predecessor
-  // list.
-  // TODO: This won't work for switch statements.
-  if (hasDuplicates(Predecessors)) {
-    errs() << "Multiple instances of the same predecessor.\n";
-    return false;
-  }
 
   for (const VPBlockBase *Pred : Predecessors) {
     // Block and predecessor must be inside the same region.
