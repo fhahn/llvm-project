@@ -209,6 +209,14 @@ bool VPlanVerifier::verifyVPBasicBlock(const VPBasicBlock *VPBB) {
   for (const VPRecipeBase &R : *VPBB)
     RecipeNumbering[&R] = Cnt++;
 
+  // Recipes in blocks with a MaskedCond may be used from blocks they don't
+  // dominate; the block will be linearized and its recipes will dominate their
+  // users after linearization.
+  bool BlockHasMaskedCond = any_of(*VPBB, [](const VPRecipeBase &R) {
+    auto *VPI = dyn_cast<VPInstruction>(&R);
+    return VPI && VPI->getOpcode() == VPInstruction::MaskedCond;
+  });
+
   for (const VPRecipeBase &R : *VPBB) {
     if (isa<VPIRInstruction>(&R) && !isa<VPIRBasicBlock>(VPBB)) {
       errs() << "VPIRInstructions ";
@@ -262,12 +270,8 @@ bool VPlanVerifier::verifyVPBasicBlock(const VPBasicBlock *VPBB) {
         if (isa<VPPredInstPHIRecipe>(UI))
           continue;
 
-        // MaskedCond recipes may be used from blocks they don't dominate; they
-        // incorporate their block's mask and will be lowered to a LogicalAnd
-        // during linearization.
-        if (auto *VPI = dyn_cast<VPInstruction>(&R))
-          if (VPI->getOpcode() == VPInstruction::MaskedCond)
-            continue;
+        if (BlockHasMaskedCond)
+          continue;
 
         // If the user is in the same block, check it comes after R in the
         // block.
