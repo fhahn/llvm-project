@@ -3070,7 +3070,6 @@ void VPlanTransforms::optimizeEVLMasks(VPlan &Plan) {
     return;
 
   VPTypeAnalysis TypeInfo(Plan);
-  SmallVector<VPRecipeBase *> OldRecipes;
   for (VPUser *U : collectUsersRecursively(HeaderMask)) {
     VPRecipeBase *R = cast<VPRecipeBase>(U);
     if (auto *NewR = optimizeMaskToEVL(HeaderMask, *R, TypeInfo, *EVL)) {
@@ -3078,15 +3077,11 @@ void VPlanTransforms::optimizeEVLMasks(VPlan &Plan) {
       for (auto [Old, New] :
            zip_equal(R->definedValues(), NewR->definedValues()))
         Old->replaceAllUsesWith(New);
-      OldRecipes.push_back(R);
+      SmallVector<VPValue *> PossiblyDead(R->operands());
+      R->eraseFromParent();
+      for (VPValue *Op : PossiblyDead)
+        recursivelyDeleteDeadRecipes(Op);
     }
-  }
-  // Erase old recipes at the end so we don't invalidate TypeInfo.
-  for (VPRecipeBase *R : reverse(OldRecipes)) {
-    SmallVector<VPValue *> PossiblyDead(R->operands());
-    R->eraseFromParent();
-    for (VPValue *Op : PossiblyDead)
-      recursivelyDeleteDeadRecipes(Op);
   }
 }
 
@@ -3886,13 +3881,12 @@ void VPlanTransforms::expandBranchOnTwoConds(VPlan &Plan) {
 
 void VPlanTransforms::convertToConcreteRecipes(VPlan &Plan) {
   VPTypeAnalysis TypeInfo(Plan);
-  SmallVector<VPRecipeBase *> ToRemove;
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
            vp_depth_first_deep(Plan.getEntry()))) {
     for (VPRecipeBase &R : make_early_inc_range(*VPBB)) {
       if (auto *WidenIVR = dyn_cast<VPWidenIntOrFpInductionRecipe>(&R)) {
         expandVPWidenIntOrFpInduction(WidenIVR, TypeInfo);
-        ToRemove.push_back(WidenIVR);
+        WidenIVR->eraseFromParent();
         continue;
       }
 
@@ -3904,11 +3898,11 @@ void VPlanTransforms::convertToConcreteRecipes(VPlan &Plan) {
           VPValue *PtrAdd =
               scalarizeVPWidenPointerInduction(WidenIVR, Plan, Builder);
           WidenIVR->replaceAllUsesWith(PtrAdd);
-          ToRemove.push_back(WidenIVR);
+          WidenIVR->eraseFromParent();
           continue;
         }
         expandVPWidenPointerInduction(WidenIVR, TypeInfo);
-        ToRemove.push_back(WidenIVR);
+        WidenIVR->eraseFromParent();
         continue;
       }
 
@@ -3921,7 +3915,8 @@ void VPlanTransforms::convertToConcreteRecipes(VPlan &Plan) {
                                         Blend->getIncomingValue(I), Select,
                                         R.getDebugLoc(), "predphi", *Blend);
         Blend->replaceAllUsesWith(Select);
-        ToRemove.push_back(Blend);
+        Blend->eraseFromParent();
+        continue;
       }
 
       if (auto *VEPR = dyn_cast<VPVectorEndPointerRecipe>(&R)) {
@@ -3934,7 +3929,8 @@ void VPlanTransforms::convertToConcreteRecipes(VPlan &Plan) {
 
       if (auto *Expr = dyn_cast<VPExpressionRecipe>(&R)) {
         Expr->decompose();
-        ToRemove.push_back(Expr);
+        Expr->eraseFromParent();
+        continue;
       }
 
       // Expand LastActiveLane into Not + FirstActiveLane + Sub.
@@ -3960,7 +3956,7 @@ void VPlanTransforms::convertToConcreteRecipes(VPlan &Plan) {
                               LastActiveL->getDebugLoc(), "last.active.lane");
 
         LastActiveL->replaceAllUsesWith(LastLane);
-        ToRemove.push_back(LastActiveL);
+        LastActiveL->eraseFromParent();
         continue;
       }
 
@@ -3971,7 +3967,7 @@ void VPlanTransforms::convertToConcreteRecipes(VPlan &Plan) {
                "Unmasked MaskedCond should be simplified earlier");
         VPI->replaceAllUsesWith(Builder.createNaryOp(
             VPInstruction::LogicalAnd, {VPI->getOperand(0), VPI->getMask()}));
-        ToRemove.push_back(VPI);
+        VPI->eraseFromParent();
         continue;
       }
 
@@ -3982,7 +3978,7 @@ void VPlanTransforms::convertToConcreteRecipes(VPlan &Plan) {
         DebugLoc DL = BranchOnCountInst->getDebugLoc();
         VPValue *Cond = Builder.createICmp(CmpInst::ICMP_EQ, IV, TC, DL);
         Builder.createNaryOp(VPInstruction::BranchOnCond, Cond, DL);
-        ToRemove.push_back(BranchOnCountInst);
+        BranchOnCountInst->eraseFromParent();
         continue;
       }
 
@@ -4022,12 +4018,9 @@ void VPlanTransforms::convertToConcreteRecipes(VPlan &Plan) {
           MulOpc, {VectorStep, ScalarStep}, Flags, R.getDebugLoc());
       VectorStep = Mul;
       VPI->replaceAllUsesWith(VectorStep);
-      ToRemove.push_back(VPI);
+      VPI->eraseFromParent();
     }
   }
-
-  for (VPRecipeBase *R : ToRemove)
-    R->eraseFromParent();
 }
 
 void VPlanTransforms::handleUncountableEarlyExits(VPlan &Plan,

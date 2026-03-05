@@ -8462,7 +8462,6 @@ void LoopVectorizationPlanner::addReductionResultComputation(
   VPTypeAnalysis TypeInfo(*Plan);
   VPRegionBlock *VectorLoopRegion = Plan->getVectorLoopRegion();
   VPBasicBlock *MiddleVPBB = Plan->getMiddleBlock();
-  SmallVector<VPRecipeBase *> ToDelete;
   VPBasicBlock *LatchVPBB = VectorLoopRegion->getExitingBasicBlock();
   Builder.setInsertPoint(&*std::prev(std::prev(LatchVPBB->end())));
   VPBasicBlock::iterator IP = MiddleVPBB->getFirstNonPhi();
@@ -8618,7 +8617,7 @@ void LoopVectorizationPlanner::addReductionResultComputation(
       VPValue *Or = Builder.createOr(PhiR, Cmp);
       AnyOfSelect->getVPSingleValue()->replaceAllUsesWith(Or);
       // Delete AnyOfSelect now that it has invalid types.
-      ToDelete.push_back(AnyOfSelect);
+      AnyOfSelect->eraseFromParent();
 
       // Convert the reduction phi to operate on bools.
       PhiR->setOperand(0, Plan->getFalse());
@@ -8640,8 +8639,6 @@ void LoopVectorizationPlanner::addReductionResultComputation(
       PhiR->setOperand(0, StartV);
     }
   }
-  for (VPRecipeBase *R : ToDelete)
-    R->eraseFromParent();
 
   RUN_VPLAN_PASS(VPlanTransforms::clearReductionWrapFlags, *Plan);
 }
