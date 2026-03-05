@@ -87,7 +87,7 @@ struct SCEVUse : PointerIntPair<const SCEV *, 2> {
   unsigned getFlags() const { return getInt(); }
 
   bool operator==(const SCEVUse &RHS) const {
-    return getRawPointer() == RHS.getRawPointer();
+    return getCanonical() == RHS.getCanonical();
   }
 
   bool operator==(const SCEV *RHS) const { return getRawPointer() == RHS; }
@@ -126,13 +126,23 @@ template <> struct DenseMapInfo<SCEVUse> {
   }
 
   static unsigned getHashValue(SCEVUse U) {
-    return hash_value(U.getRawPointer());
+    return hash_value(U.getCanonical());
   }
 
   static bool isEqual(const SCEVUse LHS, const SCEVUse RHS) {
-    return LHS.getRawPointer() == RHS.getRawPointer();
+    void *L = LHS.getRawPointer();
+    void *R = RHS.getRawPointer();
+    if (L == reinterpret_cast<void *>(-1) || L == reinterpret_cast<void *>(-2) ||
+        R == reinterpret_cast<void *>(-1) || R == reinterpret_cast<void *>(-2))
+      return L == R;
+    return LHS.getCanonical() == RHS.getCanonical();
   }
 };
+
+
+inline bool SCEVUse::isCanonical() const {
+  return getCanonical() == getPointer();
+}
 
 template <> struct simplify_type<SCEVUse> {
   using SimpleType = const SCEV *;
@@ -276,6 +286,11 @@ template <> struct FoldingSetTrait<SCEV> : DefaultFoldingSetTrait<SCEV> {
 
 inline raw_ostream &operator<<(raw_ostream &OS, const SCEV &S) {
   S.print(OS);
+  return OS;
+}
+
+inline raw_ostream &operator<<(raw_ostream &OS, SCEVUse U) {
+  U.print(OS);
   return OS;
 }
 
