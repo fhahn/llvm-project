@@ -46,7 +46,13 @@ VPValue *vputils::getOrCreateVPValueForSCEVExpr(VPlan &Plan, const SCEV *Expr) {
   if (U && !isa<Instruction>(U->getValue()))
     return Plan.getOrAddLiveIn(U->getValue());
   auto *Expanded = new VPExpandSCEVRecipe(Expr);
-  Plan.getEntry()->appendRecipe(Expanded);
+  // Insert after VPIRInstructions and existing VPExpandSCEVRecipes, but before
+  // other recipes, so expandSCEVs can find and process all SCEV recipes.
+  auto *Entry = Plan.getEntry();
+  Expanded->insertBefore(
+      *Entry, llvm::find_if_not(*Entry, [](VPRecipeBase &R) {
+        return isa<VPIRInstruction, VPIRPhi, VPExpandSCEVRecipe>(&R);
+      }));
   return Expanded;
 }
 
@@ -546,6 +552,7 @@ vputils::getRecipesForUncountableExit(VPlan &Plan,
       return std::nullopt;
 
     VPValue *Op1, *Op2;
+    VPValue *GEP = nullptr;
     // Walk back through recipes until we find at least one load from memory.
     if (match(V, m_ICmp(m_VPValue(Op1), m_VPValue(Op2)))) {
       Worklist.push_back(Op1);
@@ -557,15 +564,21 @@ vputils::getRecipesForUncountableExit(VPlan &Plan,
       if (Load->isMasked())
         return std::nullopt;
 
-      VPValue *GEP = Load->getAddr();
-      if (!match(GEP, m_GetElementPtr(m_LiveIn(), m_VPValue())))
-        return std::nullopt;
-
+      GEP = Load->getAddr();
       Recipes.push_back(Load);
-      Recipes.push_back(GEP->getDefiningRecipe());
-      GEPs.push_back(GEP->getDefiningRecipe());
+    } else if (match(V, m_Intrinsic<Intrinsic::speculative_load>(
+                            m_VPValue(GEP), m_VPValue()))) {
+      // Handle speculative loads created for early-exit vectorization.
+      Recipes.push_back(V->getDefiningRecipe());
     } else
       return std::nullopt;
+
+    if (GEP) {
+      if (!match(GEP, m_GetElementPtr(m_LiveIn(), m_VPValue())))
+        return std::nullopt;
+      Recipes.push_back(GEP->getDefiningRecipe());
+      GEPs.push_back(GEP->getDefiningRecipe());
+    }
   }
 
   return UncountableCondition;

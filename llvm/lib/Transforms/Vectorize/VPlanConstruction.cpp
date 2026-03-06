@@ -26,6 +26,7 @@
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/Transforms/Utils/LoopUtils.h"
@@ -953,8 +954,10 @@ bool VPlanTransforms::handleEarlyExits(VPlan &Plan,
 
   if (HasUncountableEarlyExit) {
     auto *HeaderVPBB = cast<VPBasicBlock>(HeaderVPB);
-    if (!areAllLoadsDereferenceable(HeaderVPBB, MiddleVPBB, TheLoop, PSE, DT,
-                                    AC))
+    // Replace non-dereferenceable loads with speculative loads before
+    // flattening early exits, so the oracle clone preserves the exit structure.
+    if (!replaceUnsafeLoadsWithSpeculative(Plan, HeaderVPBB, MiddleVPBB,
+                                           TheLoop, PSE, DT, AC))
       return false;
     handleUncountableEarlyExits(Plan, HeaderVPBB, LatchVPBB, MiddleVPBB);
     return true;
@@ -1170,6 +1173,56 @@ void VPlanTransforms::attachCheckBlock(VPlan &Plan, Value *Cond,
   VPBasicBlock *CheckBlockVPBB = Plan.createVPIRBasicBlock(CheckBlock);
   insertCheckBlockBeforeVectorLoop(Plan, CheckBlockVPBB);
   addBypassBranch(Plan, CheckBlockVPBB, CondVPV, AddBranchWeights);
+}
+
+void VPlanTransforms::attachSpeculativeLoadChecks(
+    VPlan &Plan, ElementCount VF, PredicatedScalarEvolution &PSE, Loop *TheLoop,
+    bool AddBranchWeights) {
+  VPRegionBlock *VectorRegion = Plan.getVectorLoopRegion();
+  assert(VectorRegion && "Expected VPlan to have a vector loop region");
+
+  const DataLayout &DL = TheLoop->getHeader()->getDataLayout();
+  Type *I64Ty = Type::getInt64Ty(Plan.getContext());
+  VPBasicBlock *CheckBlockVPBB = nullptr;
+  VPBuilder Builder;
+  VPValue *AllChecksPassed = nullptr;
+
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_shallow(VectorRegion->getEntry()))) {
+    for (VPRecipeBase &R : *VPBB) {
+      VPValue *Ptr;
+      if (!match(&R, m_Intrinsic<Intrinsic::speculative_load>(m_VPValue(Ptr),
+                                                              m_VPValue())))
+        continue;
+      if (!CheckBlockVPBB) {
+        CheckBlockVPBB = Plan.createVPBasicBlock("spec.load.check");
+        insertCheckBlockBeforeVectorLoop(Plan, CheckBlockVPBB);
+        Builder.setInsertPoint(CheckBlockVPBB);
+      }
+      const SCEV *PtrSCEV = vputils::getSCEVExprForVPValue(Ptr, PSE, TheLoop);
+      assert(!isa<SCEVCouldNotCompute>(PtrSCEV) &&
+             "speculative load has non-computable pointer SCEV");
+      const SCEV *BaseSCEV = PSE.getSE()->getPointerBase(PtrSCEV);
+      assert(!isa<SCEVCouldNotCompute>(BaseSCEV) &&
+             "speculative load has non-computable pointer base");
+      VPValue *BasePtr = vputils::getOrCreateVPValueForSCEVExpr(Plan, BaseSCEV);
+      Type *ScalarTy = cast<VPWidenIntrinsicRecipe>(&R)->getResultType();
+      TypeSize SizeInBytes = DL.getTypeStoreSize(VectorType::get(ScalarTy, VF));
+      VPValue *SizeVal = Builder.createElementCount(
+          I64Ty, ElementCount::get(SizeInBytes.getKnownMinValue(),
+                                   SizeInBytes.isScalable()));
+      VPValue *IsSafe = Builder.createNaryOp(VPInstruction::CanLoadSpeculatively,
+                                             {BasePtr, SizeVal});
+      AllChecksPassed =
+          AllChecksPassed ? Builder.createAnd(AllChecksPassed, IsSafe) : IsSafe;
+    }
+  }
+
+  if (!CheckBlockVPBB)
+    return;
+
+  VPValue *Cond = Builder.createNot(AllChecksPassed);
+  addBypassBranch(Plan, CheckBlockVPBB, Cond, AddBranchWeights);
 }
 
 void VPlanTransforms::addMinimumIterationCheck(

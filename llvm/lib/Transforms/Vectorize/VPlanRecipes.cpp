@@ -14,6 +14,7 @@
 #include "LoopVectorizationPlanner.h"
 #include "VPlan.h"
 #include "VPlanAnalysis.h"
+#include "VPlanCFG.h"
 #include "VPlanHelpers.h"
 #include "VPlanPatternMatch.h"
 #include "VPlanUtils.h"
@@ -471,6 +472,7 @@ unsigned VPInstruction::getNumOperandsForOpcode() const {
   case Instruction::Store:
   case VPInstruction::BranchOnCount:
   case VPInstruction::BranchOnTwoConds:
+  case VPInstruction::CanLoadSpeculatively:
   case VPInstruction::FirstOrderRecurrenceSplice:
   case VPInstruction::LogicalAnd:
   case VPInstruction::LogicalOr:
@@ -662,6 +664,12 @@ Value *VPInstruction::generate(VPTransformState &State) {
     // SIMD elements) times the unroll part.
     return Builder.CreateAdd(IV, VFxPart, Name, hasNoUnsignedWrap(),
                              hasNoSignedWrap());
+  }
+  case VPInstruction::CanLoadSpeculatively: {
+    Value *Ptr = State.get(getOperand(0), /*IsScalar=*/true);
+    Value *Size = State.get(getOperand(1), /*IsScalar=*/true);
+    return Builder.CreateIntrinsic(Intrinsic::can_load_speculatively,
+                                   {Ptr->getType()}, {Ptr, Size});
   }
   case VPInstruction::BranchOnCond: {
     Value *Cond = State.get(getOperand(0), VPLane(0));
@@ -1288,6 +1296,7 @@ bool VPInstruction::isSingleScalar() const {
   switch (getOpcode()) {
   case Instruction::Load:
   case Instruction::PHI:
+  case VPInstruction::CanLoadSpeculatively:
   case VPInstruction::ExplicitVectorLength:
   case VPInstruction::ResumeForEpilogue:
   case VPInstruction::VScale:
@@ -1365,6 +1374,7 @@ bool VPInstruction::opcodeMayReadOrWriteFromMemory() const {
   case VPInstruction::ReductionStartVector:
   case VPInstruction::Reverse:
   case VPInstruction::VScale:
+  case VPInstruction::CanLoadSpeculatively:
   case VPInstruction::Unpack:
     return false;
   default:
@@ -1392,6 +1402,7 @@ bool VPInstruction::usesFirstLaneOnly(const VPValue *Op) const {
   case VPInstruction::Not:
     // TODO: Cover additional opcodes.
     return vputils::onlyFirstLaneUsed(this);
+  case Instruction::GetElementPtr:
   case Instruction::Load:
   case VPInstruction::ActiveLaneMask:
   case VPInstruction::ExplicitVectorLength:
@@ -1561,6 +1572,9 @@ void VPInstruction::printRecipe(raw_ostream &O, const Twine &Indent,
   case VPInstruction::ExtractLastActive:
     O << "extract-last-active";
     break;
+  case VPInstruction::CanLoadSpeculatively:
+    O << "can-load-speculatively";
+    break;
   default:
     O << Instruction::getOpcodeName(getOpcode());
   }
@@ -1591,6 +1605,21 @@ void VPInstructionWithType::execute(VPTransformState &State) {
     State.set(this, VScale, true);
     break;
   }
+  case Instruction::Load: {
+    Value *Addr = State.get(getOperand(0), /*IsScalar=*/true);
+    State.set(this, State.Builder.CreateLoad(ResultTy, Addr),
+              /*IsScalar=*/true);
+    break;
+  }
+  case Instruction::GetElementPtr: {
+    Value *Ptr = State.get(getOperand(0), /*IsScalar=*/true);
+    SmallVector<Value *, 2> Indices;
+    for (unsigned I = 1, E = getNumOperands(); I != E; ++I)
+      Indices.push_back(State.get(getOperand(I), /*IsScalar=*/true));
+    State.set(this, State.Builder.CreateGEP(ResultTy, Ptr, Indices),
+              /*IsScalar=*/true);
+    break;
+  }
 
   default:
     llvm_unreachable("opcode not implemented yet");
@@ -1616,7 +1645,8 @@ void VPInstructionWithType::printRecipe(raw_ostream &O, const Twine &Indent,
     O << "vscale " << *ResultTy;
     break;
   case Instruction::Load:
-    O << "load ";
+  case Instruction::GetElementPtr:
+    O << Instruction::getOpcodeName(getOpcode()) << " ";
     printOperands(O, SlotTracker);
     break;
   default:
@@ -1956,10 +1986,11 @@ static InstructionCost getCostForIntrinsics(Intrinsic::ID ID,
   Type *ScalarRetTy = Ctx.Types.inferScalarType(&R);
   Type *RetTy = VF.isVector() ? toVectorizedTy(ScalarRetTy, VF) : ScalarRetTy;
   SmallVector<Type *> ParamTys;
-  for (const VPValue *Op : Operands) {
-    ParamTys.push_back(VF.isVector()
-                           ? toVectorTy(Ctx.Types.inferScalarType(Op), VF)
-                           : Ctx.Types.inferScalarType(Op));
+  for (const auto &[Idx, Op] : enumerate(Operands)) {
+    Type *ScalarTy = Ctx.Types.inferScalarType(Op);
+    bool Vectorize =
+        VF.isVector() && !isVectorIntrinsicWithScalarOpAtArg(ID, Idx, nullptr);
+    ParamTys.push_back(Vectorize ? toVectorTy(ScalarTy, VF) : ScalarTy);
   }
 
   // TODO: Rework TTI interface to avoid reliance on underlying IntrinsicInst.
@@ -2956,6 +2987,26 @@ InstructionCost VPReductionRecipe::computeCost(ElementCount VF,
   return Ctx.TTI.getArithmeticReductionCost(Opcode, VectorTy, OptionalFMF,
                                             Ctx.CostKind);
 }
+
+VPSpeculativeLoadOracleRecipe *VPSpeculativeLoadOracleRecipe::clone() {
+  return new VPSpeculativeLoadOracleRecipe(
+      std::unique_ptr<VPlan>(OraclePlan->duplicate()), to_vector(operands()));
+}
+
+void VPSpeculativeLoadOracleRecipe::execute(VPTransformState &State) {
+  llvm_unreachable("VPSpeculativeLoadOracleRecipe should be expanded by "
+                   "expandSpeculativeLoadOracleRecipes before execution");
+}
+
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+void VPSpeculativeLoadOracleRecipe::printRecipe(
+    raw_ostream &O, const Twine &Indent, VPSlotTracker &Tracker) const {
+  O << Indent << "SPECULATIVE-LOAD-ORACLE ";
+  printAsOperand(O, Tracker);
+  O << " = call ";
+  printOperands(O, Tracker);
+}
+#endif
 
 VPExpressionRecipe::VPExpressionRecipe(
     ExpressionTypes ExpressionType,

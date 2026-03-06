@@ -104,6 +104,8 @@ Type *VPTypeAnalysis::inferScalarTypeForRecipe(const VPInstruction *R) {
     assert(inferScalarType(R->getOperand(0)) ==
                inferScalarType(R->getOperand(1)) &&
            "different types inferred for different operands");
+    [[fallthrough]];
+  case VPInstruction::CanLoadSpeculatively:
     return IntegerType::get(Ctx, 1);
   case VPInstruction::ComputeAnyOfResult:
     return inferScalarType(R->getOperand(1));
@@ -324,6 +326,9 @@ Type *VPTypeAnalysis::inferScalarType(const VPValue *V) {
           })
           .Case([this](const VPExpressionRecipe *R) {
             return inferScalarType(R->getOperandOfResultType());
+          })
+          .Case([this](const VPSpeculativeLoadOracleRecipe *) -> Type * {
+            return Type::getInt64Ty(Ctx);
           });
 
   assert(ResultTy && "could not infer type for the given VPValue");

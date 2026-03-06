@@ -412,6 +412,7 @@ public:
     VPInstructionSC,
     VPInterleaveEVLSC,
     VPInterleaveSC,
+    VPSpeculativeLoadOracleSC,
     VPReductionEVLSC,
     VPReductionSC,
     VPReplicateSC,
@@ -602,6 +603,7 @@ public:
     case VPRecipeBase::VPExpandSCEVSC:
     case VPRecipeBase::VPExpressionSC:
     case VPRecipeBase::VPInstructionSC:
+    case VPRecipeBase::VPSpeculativeLoadOracleSC:
     case VPRecipeBase::VPReductionEVLSC:
     case VPRecipeBase::VPReductionSC:
     case VPRecipeBase::VPReplicateSC:
@@ -1310,7 +1312,9 @@ public:
     /// backedge value). Has the wide induction recipe as operand.
     ExitingIVValue,
     MaskedCond,
-    OpsEnd = MaskedCond,
+    /// Maps to @llvm.can.load.speculatively intrinsic. Returns i1.
+    CanLoadSpeculatively,
+    OpsEnd = CanLoadSpeculatively,
   };
 
   /// Returns true if this VPInstruction generates scalar values for all lanes.
@@ -3297,6 +3301,40 @@ public:
            "Op must be an operand of the recipe");
     return true;
   }
+};
+
+/// Holds a cloned VPlan for a speculative load oracle (a scalar loop replaying
+/// early-exit conditions lane-by-lane). Expanded by
+/// expandSpeculativeLoadOracleRecipes; returns i64 valid lane count.
+class VPSpeculativeLoadOracleRecipe : public VPSingleDefRecipe {
+  std::unique_ptr<VPlan> OraclePlan;
+
+public:
+  VPSpeculativeLoadOracleRecipe(std::unique_ptr<VPlan> OraclePlan,
+                                ArrayRef<VPValue *> ExternalOperands)
+      : VPSingleDefRecipe(VPRecipeBase::VPSpeculativeLoadOracleSC,
+                          ExternalOperands, {}),
+        OraclePlan(std::move(OraclePlan)) {}
+
+  VP_CLASSOF_IMPL(VPRecipeBase::VPSpeculativeLoadOracleSC)
+
+  VPSpeculativeLoadOracleRecipe *clone() override;
+  void execute(VPTransformState &State) override;
+
+  /// The oracle won't end up in the final code-gen.
+  InstructionCost computeCost(ElementCount, VPCostContext &) const override {
+    return 0;
+  }
+
+  bool usesFirstLaneOnly(const VPValue *Op) const override { return true; }
+
+  VPlan &getOraclePlan() { return *OraclePlan; }
+
+protected:
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+  void printRecipe(raw_ostream &O, const Twine &Indent,
+                   VPSlotTracker &Tracker) const override;
+#endif
 };
 
 /// A recipe to combine multiple recipes into a single 'expression' recipe,

@@ -187,6 +187,12 @@ struct VPlanTransforms {
   static void attachCheckBlock(VPlan &Plan, Value *Cond, BasicBlock *CheckBlock,
                                bool AddBranchWeights);
 
+  /// Attach runtime checks for speculative loads; bypasses to scalar loop if
+  /// checks fail.
+  static void attachSpeculativeLoadChecks(VPlan &Plan, ElementCount VF,
+                                          PredicatedScalarEvolution &PSE,
+                                          Loop *TheLoop, bool AddBranchWeights);
+
   /// Replaces the VPInstructions in \p Plan with corresponding
   /// widen recipes. Returns false if any VPInstructions could not be converted
   /// to a wide recipe if needed.
@@ -327,11 +333,12 @@ struct VPlanTransforms {
                                           VPBasicBlock *LatchVPBB,
                                           VPBasicBlock *MiddleVPBB);
 
-  /// Check if all loads in the loop are dereferenceable. Returns false if any
-  /// non-dereferenceable load is found.
-  static bool areAllLoadsDereferenceable(
-      VPBasicBlock *HeaderVPBB, VPBasicBlock *MiddleVPBB, Loop *TheLoop,
-      PredicatedScalarEvolution &PSE, DominatorTree &DT, AssumptionCache *AC);
+  /// Replace non-dereferenceable loads with speculative load intrinsics. Must
+  /// be called before handleUncountableEarlyExits.
+  static bool replaceUnsafeLoadsWithSpeculative(
+      VPlan &Plan, VPBasicBlock *HeaderVPBB, VPBasicBlock *MiddleVPBB,
+      Loop *TheLoop, PredicatedScalarEvolution &PSE, DominatorTree &DT,
+      AssumptionCache *AC);
 
   /// Replaces the exit condition from
   ///   (branch-on-cond eq CanonicalIVInc, VectorTripCount)
@@ -345,6 +352,10 @@ struct VPlanTransforms {
   /// Expand BranchOnTwoConds instructions into explicit CFG with
   /// BranchOnCond instructions. Should be called after dissolveLoopRegions.
   static void expandBranchOnTwoConds(VPlan &Plan);
+
+  /// Expand VPSpeculativeLoadOracleRecipes into the main plan. Must be called
+  /// after dissolveLoopRegions.
+  static void expandSpeculativeLoadOracleRecipes(VPlan &Plan, ElementCount VF);
 
   /// Transform loops with variable-length stepping after region
   /// dissolution.
