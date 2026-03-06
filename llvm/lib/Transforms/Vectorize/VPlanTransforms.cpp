@@ -30,8 +30,10 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Analysis/IVDescriptors.h"
 #include "llvm/Analysis/InstSimplifyFolder.h"
+#include "llvm/Analysis/Loads.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/MemoryLocation.h"
+#include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/Analysis/ScalarEvolutionPatternMatch.h"
 #include "llvm/Analysis/ScopedNoAliasAA.h"
 #include "llvm/Analysis/VectorUtils.h"
@@ -39,9 +41,12 @@
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/TypeSize.h"
 #include "llvm/Transforms/Utils/LoopUtils.h"
 #include "llvm/Transforms/Utils/ScalarEvolutionExpander.h"
+
+#define DEBUG_TYPE "loop-vectorize"
 
 using namespace llvm;
 using namespace VPlanPatternMatch;
@@ -4092,6 +4097,53 @@ void VPlanTransforms::convertToConcreteRecipes(VPlan &Plan) {
 
   for (VPRecipeBase *R : ToRemove)
     R->eraseFromParent();
+}
+
+/// Check if all loads in the loop are dereferenceable. Iterates over all blocks
+/// reachable from \p HeaderVPBB, skipping \p MiddleVPBB. Returns false if any
+/// non-dereferenceable load is found.
+bool VPlanTransforms::areAllLoadsDereferenceable(
+    VPBasicBlock *HeaderVPBB, VPBasicBlock *MiddleVPBB, Loop *TheLoop,
+    PredicatedScalarEvolution &PSE, DominatorTree &DT, AssumptionCache *AC) {
+  ScalarEvolution &SE = *PSE.getSE();
+  const DataLayout &DL = TheLoop->getHeader()->getDataLayout();
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_shallow(HeaderVPBB))) {
+    // Skip blocks outside the loop (exit blocks and their successors).
+    if (VPBB == MiddleVPBB)
+      continue;
+    for (VPRecipeBase &R : *VPBB) {
+      auto *VPI = dyn_cast<VPInstructionWithType>(&R);
+      if (!VPI || VPI->getOpcode() != Instruction::Load)
+        continue;
+
+      // Get the pointer SCEV for dereferenceability checking.
+      VPValue *Ptr = VPI->getOperand(0);
+      const SCEV *PtrSCEV = vputils::getSCEVExprForVPValue(Ptr, PSE, TheLoop);
+      if (isa<SCEVCouldNotCompute>(PtrSCEV)) {
+        LLVM_DEBUG(dbgs() << "LV: Not vectorizing: Found non-dereferenceable "
+                             "load with SCEVCouldNotCompute pointer\n");
+        return false;
+      }
+
+      // Check dereferenceability using the SCEV-based version.
+      Type *LoadTy = VPI->getResultType();
+      const SCEV *SizeSCEV =
+          SE.getStoreSizeOfExpr(DL.getIndexType(PtrSCEV->getType()), LoadTy);
+      auto *Load = cast<LoadInst>(VPI->getUnderlyingValue());
+      SmallVector<const SCEVPredicate *> Preds;
+      if (isDereferenceableAndAlignedInLoop(PtrSCEV, Load->getAlign(), SizeSCEV,
+                                            TheLoop, SE, DT, AC, &Preds))
+        continue;
+
+      LLVM_DEBUG(
+          dbgs()
+          << "LV: Not vectorizing: Found non-dereferenceable load: " << *Load
+          << "\n");
+      return false;
+    }
+  }
+  return true;
 }
 
 void VPlanTransforms::handleUncountableEarlyExits(VPlan &Plan,

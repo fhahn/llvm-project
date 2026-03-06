@@ -941,17 +941,23 @@ void VPlanTransforms::createInLoopReductionRecipes(
     R->eraseFromParent();
 }
 
-void VPlanTransforms::handleEarlyExits(VPlan &Plan,
-                                       bool HasUncountableEarlyExit) {
+bool VPlanTransforms::handleEarlyExits(VPlan &Plan,
+                                       bool HasUncountableEarlyExit,
+                                       Loop *TheLoop,
+                                       PredicatedScalarEvolution &PSE,
+                                       DominatorTree &DT, AssumptionCache *AC) {
   auto *MiddleVPBB = cast<VPBasicBlock>(
       Plan.getScalarHeader()->getSinglePredecessor()->getPredecessors()[0]);
   auto *LatchVPBB = cast<VPBasicBlock>(MiddleVPBB->getSinglePredecessor());
   VPBlockBase *HeaderVPB = cast<VPBasicBlock>(LatchVPBB->getSuccessors()[1]);
 
   if (HasUncountableEarlyExit) {
-    handleUncountableEarlyExits(Plan, cast<VPBasicBlock>(HeaderVPB), LatchVPBB,
-                                MiddleVPBB);
-    return;
+    auto *HeaderVPBB = cast<VPBasicBlock>(HeaderVPB);
+    if (!areAllLoadsDereferenceable(HeaderVPBB, MiddleVPBB, TheLoop, PSE, DT,
+                                    AC))
+      return false;
+    handleUncountableEarlyExits(Plan, HeaderVPBB, LatchVPBB, MiddleVPBB);
+    return true;
   }
 
   // Disconnect countable early exits from the loop, leaving it with a single
@@ -969,6 +975,7 @@ void VPlanTransforms::handleEarlyExits(VPlan &Plan,
       VPBlockUtils::disconnectBlocks(Pred, EB);
     }
   }
+  return true;
 }
 
 void VPlanTransforms::addMiddleCheck(VPlan &Plan,
