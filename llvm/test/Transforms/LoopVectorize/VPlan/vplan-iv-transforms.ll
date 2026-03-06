@@ -306,7 +306,6 @@ define i64 @early_exit_iv_via_latch_phi(ptr dereferenceable(1024) %a) {
 ; CHECK-NEXT:  vp<[[VP4:%[0-9]+]]> = CANONICAL-IV
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
-; CHECK-NEXT:      ir<%j> = WIDEN-INDUCTION ir<3>, ir<5>, vp<[[VP0]]>
 ; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = SCALAR-STEPS vp<[[VP4]]>, ir<1>, vp<[[VP0]]>
 ; CHECK-NEXT:      CLONE ir<%gep> = getelementptr ir<%a>, vp<[[VP5]]>
 ; CHECK-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer i8, ir<%gep>, ir<1>
@@ -327,13 +326,14 @@ define i64 @early_exit_iv_via_latch_phi(ptr dereferenceable(1024) %a) {
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.early.exit:
-; CHECK-NEXT:    WIDEN ir<%j.next> = add ir<%j>, ir<5>
-; CHECK-NEXT:    EMIT vp<%first.active.lane> = first-active-lane vp<[[VP7]]>
-; CHECK-NEXT:    EMIT vp<%early.exit.value> = extract-lane vp<%first.active.lane>, ir<%j.next>
+; CHECK-NEXT:    EMIT vp<[[VP12:%[0-9]+]]> = first-active-lane vp<[[VP7]]>
+; CHECK-NEXT:    EMIT vp<[[VP13:%[0-9]+]]> = add vp<[[VP4]]>, vp<[[VP12]]>
+; CHECK-NEXT:    EMIT vp<[[VP14:%[0-9]+]]> = add vp<[[VP13]]>, ir<1>
+; CHECK-NEXT:    vp<[[VP15:%[0-9]+]]> = DERIVED-IV ir<3> + vp<[[VP14]]> * ir<5>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<exit>:
-; CHECK-NEXT:    IR   %r = phi i64 [ %j.next, %loop ], [ %j.l, %latch ] (extra operands: vp<[[VP3]]> from middle.block, vp<%early.exit.value> from vector.early.exit)
+; CHECK-NEXT:    IR   %r = phi i64 [ %j.next, %loop ], [ %j.l, %latch ] (extra operands: vp<[[VP3]]> from middle.block, vp<[[VP15]]> from vector.early.exit)
 ; CHECK-NEXT:  No successors
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  scalar.ph:
