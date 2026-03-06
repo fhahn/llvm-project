@@ -4118,6 +4118,7 @@ static bool willGenerateVectors(VPlan &Plan, ElementCount VF,
       case VPRecipeBase::VPExpandSCEVSC:
       case VPRecipeBase::VPPredInstPHISC:
       case VPRecipeBase::VPBranchOnMaskSC:
+      case VPRecipeBase::VPSpeculativeLoadOracleSC:
         continue;
       case VPRecipeBase::VPReductionSC:
       case VPRecipeBase::VPActiveLaneMaskPHISC:
@@ -7447,6 +7448,10 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   // compactness.
   attachRuntimeChecks(BestVPlan, ILV.RTChecks, HasBranchWeights);
 
+  // Attach runtime checks for speculative loads in early exit loops.
+  VPlanTransforms::attachSpeculativeLoadChecks(BestVPlan, BestVF, PSE, OrigLoop,
+                                               HasBranchWeights);
+
   // Retrieving VectorPH now when it's easier while VPlan still has Regions.
   VPBasicBlock *VectorPH = cast<VPBasicBlock>(BestVPlan.getVectorPreheader());
 
@@ -8300,7 +8305,8 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(
     for (VPRecipeBase &R : make_early_inc_range(
              make_range(VPBB->getFirstNonPhi(), VPBB->end()))) {
       // Skip recipes that do not need transforming.
-      if (isa<VPWidenCanonicalIVRecipe, VPBlendRecipe, VPReductionRecipe>(&R))
+      if (isa<VPWidenCanonicalIVRecipe, VPBlendRecipe, VPReductionRecipe,
+              VPWidenIntrinsicRecipe, VPSpeculativeLoadOracleRecipe>(&R))
         continue;
       auto *VPI = cast<VPInstruction>(&R);
       if (!VPI->getUnderlyingValue())
