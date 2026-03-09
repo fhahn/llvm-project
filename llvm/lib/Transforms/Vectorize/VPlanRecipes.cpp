@@ -480,6 +480,7 @@ unsigned VPInstruction::getNumOperandsForOpcode() const {
   case VPInstruction::CalculateTripCountMinusVF:
     return 2;
   case Instruction::Select:
+  case Instruction::InsertElement:
   case VPInstruction::ActiveLaneMask:
   case VPInstruction::ReductionStartVector:
     return 3;
@@ -568,6 +569,12 @@ Value *VPInstruction::generate(VPTransformState &State) {
     Value *Vec = State.get(getOperand(0));
     Value *Idx = State.get(getOperand(1), /*IsScalar=*/true);
     return Builder.CreateExtractElement(Vec, Idx, Name);
+  }
+  case Instruction::InsertElement: {
+    Value *Vec = State.get(getOperand(0));
+    Value *Elt = State.get(getOperand(1), /*IsScalar=*/true);
+    Value *Idx = State.get(getOperand(2), /*IsScalar=*/true);
+    return Builder.CreateInsertElement(Vec, Elt, Idx, Name);
   }
   case Instruction::Freeze: {
     Value *Op = State.get(getOperand(0), vputils::onlyFirstLaneUsed(this));
@@ -1329,6 +1336,7 @@ bool VPInstruction::opcodeMayReadOrWriteFromMemory() const {
   switch (getOpcode()) {
   case Instruction::GetElementPtr:
   case Instruction::ExtractElement:
+  case Instruction::InsertElement:
   case Instruction::Freeze:
   case Instruction::FCmp:
   case Instruction::ICmp:
@@ -1382,6 +1390,8 @@ bool VPInstruction::usesFirstLaneOnly(const VPValue *Op) const {
     return false;
   case Instruction::ExtractElement:
     return Op == getOperand(1);
+  case Instruction::InsertElement:
+    return Op != getOperand(0);
   case Instruction::PHI:
     return true;
   case Instruction::FCmp:

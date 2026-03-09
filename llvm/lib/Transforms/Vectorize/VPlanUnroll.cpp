@@ -775,8 +775,6 @@ static void convertRecipesInRegionBlocksToSingleScalar(
                              BranchOnMask->getDebugLoc());
         BranchOnMask->eraseFromParent();
       } else if (auto *PredPhi = dyn_cast<VPPredInstPHIRecipe>(&NewR)) {
-        assert(VF.isScalar() &&
-               "VPPredInstPHIRecipe only supported for scalar VFs currently");
         VPValue *PredOp = PredPhi->getOperand(0);
         VPValue *PoisonVal = Plan.getOrAddLiveIn(
             PoisonValue::get(TypeAnalysis.inferScalarType(PredOp)));
@@ -841,12 +839,6 @@ void VPlanTransforms::unrollReplicateRegions(VPlan &Plan, ElementCount VF) {
 
     VPBlockBase *Exiting = Region->getExiting();
 
-    // Skip regions with VPPredInstPHIRecipes for vector VF as packing them
-    // requires additional work.
-    if (!VF.isScalar() &&
-        any_of(*cast<VPBasicBlock>(Exiting), IsaPred<VPPredInstPHIRecipe>))
-      continue;
-
     // Disconnect and dissolve the region.
     VPBlockBase *Pred = Region->getSinglePredecessor();
     assert(Pred && "Replicate region must have a single predecessor");
@@ -894,5 +886,66 @@ void VPlanTransforms::unrollReplicateRegions(VPlan &Plan, ElementCount VF) {
                                   LaneClones[Lane].first);
     for (VPBlockBase *Succ : Successors)
       VPBlockUtils::connectBlocks(LaneClones.back().second, Succ);
+
+    // For vector VF, collect per-lane predicated scalar phis and create
+    // BuildVector/BuildStructVector to pack them into a vector result.
+    if (VF.isScalar())
+      continue;
+
+    // Collect phis from each lane's exit block. Phis are in the same order
+    // across all cloned exit blocks, so we can match them by position.
+    SmallVector<SmallVector<VPValue *, 4>> PhisByLane;
+    for (auto &[_, Exit] : LaneClones) {
+      auto &Phis = PhisByLane.emplace_back();
+      for (auto &Phi : cast<VPBasicBlock>(Exit)->phis())
+        Phis.push_back(Phi.getVPSingleValue());
+    }
+
+    auto *LastExit = cast<VPBasicBlock>(LaneClones.back().second);
+    VPBuilder Builder(LastExit, LastExit->end());
+    for (unsigned I = 0; I < PhisByLane[0].size(); ++I) {
+      SmallVector<VPValue *> LaneValues;
+      for (auto &LanePhis : PhisByLane)
+        LaneValues.push_back(LanePhis[I]);
+
+      Type *ScalarTy = TypeAnalysis.inferScalarType(LaneValues[0]);
+
+      // Struct types need BuildStructVector as InsertElement doesn't apply.
+      if (isa<StructType>(ScalarTy)) {
+        auto *BV =
+            Builder.createNaryOp(VPInstruction::BuildStructVector, LaneValues);
+        LaneValues[0]->replaceUsesWithIf(
+            BV, [BV](VPUser &U, unsigned) { return &U != BV; });
+        continue;
+      }
+
+      // All phis are predicated (from VPPredInstPHIRecipe dissolution). Lower
+      // directly to InsertElement + VPWidenPHIRecipe chains for shorter live
+      // ranges.
+      VPValue *RunningVec = Plan.getOrAddLiveIn(PoisonValue::get(ScalarTy));
+      for (auto [Lane, LaneVal] : enumerate(LaneValues)) {
+        auto *LanePhi = cast<VPPhi>(LaneVal);
+        assert(LanePhi->getNumOperands() == 2 &&
+               match(LanePhi->getOperand(0), m_Poison()) &&
+               "expected predicated phi");
+        auto *MergeBB = LanePhi->getParent();
+        VPValue *PredVal = LanePhi->getOperand(1);
+        auto *ThenBB = PredVal->getDefiningRecipe()->getParent();
+
+        VPBuilder ThenBuilder(
+            ThenBB, std::next(PredVal->getDefiningRecipe()->getIterator()));
+        VPValue *Idx = Plan.getConstantInt(IdxTy, Lane);
+        auto *Insert = ThenBuilder.createNaryOp(Instruction::InsertElement,
+                                                {RunningVec, PredVal, Idx},
+                                                LanePhi->getDebugLoc());
+
+        auto *VecPhi =
+            new VPWidenPHIRecipe(nullptr, RunningVec, LanePhi->getDebugLoc());
+        VecPhi->addOperand(Insert);
+        VecPhi->insertBefore(*MergeBB, MergeBB->getFirstNonPhi());
+        RunningVec = VecPhi;
+      }
+      LaneValues[0]->replaceAllUsesWith(RunningVec);
+    }
   }
 }
