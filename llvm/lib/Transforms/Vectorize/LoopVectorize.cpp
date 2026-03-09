@@ -7340,72 +7340,6 @@ VectorizationFactor LoopVectorizationPlanner::computeBestVF() {
   return BestFactor;
 }
 
-// If \p EpiResumePhiR is resume VPPhi for a reduction when vectorizing the
-// epilog loop, fix the reduction's scalar PHI node by adding the incoming value
-// from the main vector loop.
-static void fixReductionScalarResumeWhenVectorizingEpilog(
-    VPPhi *EpiResumePhiR, PHINode &EpiResumePhi, BasicBlock *BypassBlock) {
-  using namespace VPlanPatternMatch;
-  // Get the VPInstruction computing the reduction result in the middle block.
-  // The first operand may not be from the middle block if it is not connected
-  // to the scalar preheader. In that case, there's nothing to fix.
-  VPValue *Incoming = EpiResumePhiR->getOperand(0);
-  match(Incoming, VPlanPatternMatch::m_ZExtOrSExt(
-                      VPlanPatternMatch::m_VPValue(Incoming)));
-  auto *EpiRedResult = dyn_cast<VPInstruction>(Incoming);
-  if (!EpiRedResult)
-    return;
-
-  VPValue *BackedgeVal;
-  bool IsFindIV = false;
-  if (EpiRedResult->getOpcode() == VPInstruction::ComputeAnyOfResult ||
-      EpiRedResult->getOpcode() == VPInstruction::ComputeReductionResult)
-    BackedgeVal = EpiRedResult->getOperand(EpiRedResult->getNumOperands() - 1);
-  else if (matchFindIVResult(EpiRedResult, m_VPValue(BackedgeVal), m_VPValue()))
-    IsFindIV = true;
-  else
-    return;
-
-  auto *EpiRedHeaderPhi = cast_if_present<VPReductionPHIRecipe>(
-      vputils::findRecipe(BackedgeVal, IsaPred<VPReductionPHIRecipe>));
-  if (!EpiRedHeaderPhi) {
-    match(BackedgeVal,
-          VPlanPatternMatch::m_Select(VPlanPatternMatch::m_VPValue(),
-                                      VPlanPatternMatch::m_VPValue(BackedgeVal),
-                                      VPlanPatternMatch::m_VPValue()));
-    EpiRedHeaderPhi = cast<VPReductionPHIRecipe>(
-        vputils::findRecipe(BackedgeVal, IsaPred<VPReductionPHIRecipe>));
-  }
-
-  Value *MainResumeValue;
-  if (auto *VPI = dyn_cast<VPInstruction>(EpiRedHeaderPhi->getStartValue())) {
-    assert((VPI->getOpcode() == VPInstruction::Broadcast ||
-            VPI->getOpcode() == VPInstruction::ReductionStartVector) &&
-           "unexpected start recipe");
-    MainResumeValue = VPI->getOperand(0)->getUnderlyingValue();
-  } else
-    MainResumeValue = EpiRedHeaderPhi->getStartValue()->getUnderlyingValue();
-  if (EpiRedResult->getOpcode() == VPInstruction::ComputeAnyOfResult) {
-    [[maybe_unused]] Value *StartV =
-        EpiRedResult->getOperand(0)->getLiveInIRValue();
-    auto *Cmp = cast<ICmpInst>(MainResumeValue);
-    assert(Cmp->getPredicate() == CmpInst::ICMP_NE &&
-           "AnyOf expected to start with ICMP_NE");
-    assert(Cmp->getOperand(1) == StartV &&
-           "AnyOf expected to start by comparing main resume value to original "
-           "start value");
-    MainResumeValue = Cmp->getOperand(0);
-  } else if (IsFindIV) {
-    MainResumeValue = cast<SelectInst>(MainResumeValue)->getFalseValue();
-  }
-  PHINode *MainResumePhi = cast<PHINode>(MainResumeValue);
-
-  // When fixing reductions in the epilogue loop we should already have
-  // created a bc.merge.rdx Phi after the main vector body. Ensure that we carry
-  // over the incoming values correctly.
-  EpiResumePhi.setIncomingValueForBlock(
-      BypassBlock, MainResumePhi->getIncomingValueForBlock(BypassBlock));
-}
 
 DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
     ElementCount BestVF, unsigned BestUF, VPlan &BestVPlan,
@@ -8992,7 +8926,8 @@ LoopVectorizePass::LoopVectorizePass(LoopVectorizeOptions Opts)
 /// Prepare \p MainPlan for vectorizing the main vector loop during epilogue
 /// vectorization. Remove ResumePhis from \p MainPlan for inductions that
 /// don't have a corresponding wide induction in \p EpiPlan.
-static void preparePlanForMainVectorLoop(VPlan &MainPlan, VPlan &EpiPlan) {
+static SmallVector<VPInstruction *>
+preparePlanForMainVectorLoop(VPlan &MainPlan, VPlan &EpiPlan) {
   // Collect PHI nodes of widened phis in the VPlan for the epilogue. Those
   // will need their resume-values computed in the main vector loop. Others
   // can be removed from the main VPlan.
@@ -9004,16 +8939,44 @@ static void preparePlanForMainVectorLoop(VPlan &MainPlan, VPlan &EpiPlan) {
     EpiWidenedPhis.insert(
         cast<PHINode>(R.getVPSingleValue()->getUnderlyingValue()));
   }
+  VPBasicBlock *MainScalarPH = MainPlan.getScalarPreheader();
+  VPBuilder Builder(MainScalarPH);
+  SmallVector<VPInstruction *> ReductionResumeValues;
+
   for (VPRecipeBase &R :
        make_early_inc_range(MainPlan.getScalarHeader()->phis())) {
     auto *VPIRInst = cast<VPIRPhi>(&R);
+    VPValue *ResumeOp = VPIRInst->getOperand(0);
+    auto *ResumeDef = ResumeOp->getDefiningRecipe();
+
+    // Check if this resume value needs to be forwarded to the epilogue.
+    // Induction resumes have their end values computed in the vector
+    // preheader; reduction resumes come from the middle block or are
+    // live-ins.
+    bool NeedsForwarding = !ResumeDef;
+    if (!NeedsForwarding) {
+      if (auto *VPI = dyn_cast<VPInstruction>(ResumeDef)) {
+        auto *Inner = dyn_cast<VPInstruction>(VPI->getOperand(0));
+        NeedsForwarding =
+            Inner &&
+            Inner->getParent() != MainPlan.getVectorPreheader();
+      }
+    }
+
+    if (NeedsForwarding) {
+      ReductionResumeValues.push_back(Builder.createNaryOp(
+          VPInstruction::ResumeForEpilogue, ResumeOp));
+      continue;
+    }
+    ReductionResumeValues.push_back(nullptr);
+
     if (EpiWidenedPhis.contains(&VPIRInst->getIRPhi()))
       continue;
     // There is no corresponding wide induction in the epilogue plan that would
     // need a resume value. Remove the VPIRInst wrapping the scalar header phi
     // together with the corresponding ResumePhi. The resume values for the
     // scalar loop will be created during execution of EpiPlan.
-    VPRecipeBase *ResumePhi = VPIRInst->getOperand(0)->getDefiningRecipe();
+    VPRecipeBase *ResumePhi = ResumeOp->getDefiningRecipe();
     VPIRInst->eraseFromParent();
     ResumePhi->eraseFromParent();
   }
@@ -9060,7 +9023,6 @@ static void preparePlanForMainVectorLoop(VPlan &MainPlan, VPlan &EpiPlan) {
   // If there is a suitable resume value for the canonical induction in the
   // scalar (which will become vector) epilogue loop, use it and move it to the
   // beginning of the scalar preheader. Otherwise create it below.
-  VPBasicBlock *MainScalarPH = MainPlan.getScalarPreheader();
   auto ResumePhiIter =
       find_if(MainScalarPH->phis(), [VectorTC](VPRecipeBase &R) {
         return match(&R, m_VPInstruction<Instruction::PHI>(m_Specific(VectorTC),
@@ -9080,9 +9042,11 @@ static void preparePlanForMainVectorLoop(VPlan &MainPlan, VPlan &EpiPlan) {
     else if (&*MainScalarPH->begin() != ResumePhi)
       ResumePhi->moveBefore(*MainScalarPH, MainScalarPH->begin());
   }
-  // Add a user to to make sure the resume phi won't get removed.
+  // Add a user to make sure the resume phi won't get removed.
   VPBuilder(MainScalarPH)
       .createNaryOp(VPInstruction::ResumeForEpilogue, ResumePhi);
+
+  return ReductionResumeValues;
 }
 
 /// Prepare \p Plan for vectorizing the epilogue loop. That is, re-use expanded
@@ -9317,11 +9281,11 @@ static Value *createInductionAdditionalBypassValues(
   return EndValueFromAdditionalBypass;
 }
 
-static void fixScalarResumeValuesFromBypass(BasicBlock *BypassBlock, Loop *L,
-                                            VPlan &BestEpiPlan,
-                                            LoopVectorizationLegality &LVL,
-                                            const SCEV2ValueTy &ExpandedSCEVs,
-                                            Value *MainVectorTripCount) {
+static void fixScalarResumeValuesFromBypass(
+    BasicBlock *BypassBlock, Loop *L, VPlan &BestEpiPlan,
+    LoopVectorizationLegality &LVL, const SCEV2ValueTy &ExpandedSCEVs,
+    Value *MainVectorTripCount,
+    ArrayRef<VPInstruction *> ReductionResumeValues) {
   // Fix reduction resume values from the additional bypass block.
   BasicBlock *PH = L->getLoopPreheader();
   for (auto *Pred : predecessors(PH)) {
@@ -9333,12 +9297,43 @@ static void fixScalarResumeValuesFromBypass(BasicBlock *BypassBlock, Loop *L,
   }
   auto *ScalarPH = cast<VPIRBasicBlock>(BestEpiPlan.getScalarPreheader());
   if (ScalarPH->hasPredecessors()) {
+    // Build a deduplicated list of reduction resume values from the main loop,
+    // preserving order but removing duplicates by operand identity.
+    SmallPtrSet<VPValue *, 4> Seen;
+    SmallVector<VPValue *> UniqueResumes;
+    for (VPInstruction *VPI : ReductionResumeValues) {
+      if (!VPI)
+        continue;
+      if (Seen.insert(VPI->getOperand(0)).second)
+        UniqueResumes.push_back(VPI);
+    }
+
+    // Get the epilogue's vector preheader. Induction resume values in the
+    // scalar preheader have their operand(0) defined here.
+    VPBlockBase *VectorPH =
+        ScalarPH->getPredecessors().back()->getSuccessors()[1];
     // If ScalarPH has predecessors, we may need to update its reduction
     // resume values.
+    auto ResumeIter = UniqueResumes.begin();
     for (const auto &[R, IRPhi] :
-         zip(ScalarPH->phis(), ScalarPH->getIRBasicBlock()->phis())) {
-      fixReductionScalarResumeWhenVectorizingEpilog(cast<VPPhi>(&R), IRPhi,
-                                                    BypassBlock);
+         zip_equal(*ScalarPH, ScalarPH->getIRBasicBlock()->phis())) {
+      // Skip induction resume values; only fix reduction resumes.
+      if (isa<VPIRValue>(R.getOperand(0)) ||
+          isa<VPDerivedIVRecipe>(R.getOperand(0)) ||
+          cast<VPInstruction>(R.getOperand(0))->getParent() == VectorPH)
+        continue;
+      assert(ResumeIter != UniqueResumes.end() &&
+             "expected a reduction resume value");
+      // Look up the bc.merge.rdx PHI from the main loop via the mapping.
+      auto *MainResumePhi =
+          cast<PHINode>((*ResumeIter)->getUnderlyingValue());
+      ++ResumeIter;
+
+      // When fixing reductions in the epilogue loop we should already have
+      // created a bc.merge.rdx Phi after the main vector body. Ensure that we
+      // carry over the incoming values correctly.
+      IRPhi.setIncomingValueForBlock(
+          BypassBlock, MainResumePhi->getIncomingValueForBlock(BypassBlock));
     }
   }
 
@@ -9363,7 +9358,8 @@ static void connectEpilogueVectorLoop(
     VPlan &EpiPlan, Loop *L, EpilogueLoopVectorizationInfo &EPI,
     DominatorTree *DT, LoopVectorizationLegality &LVL,
     DenseMap<const SCEV *, Value *> &ExpandedSCEVs, GeneratedRTChecks &Checks,
-    ArrayRef<Instruction *> InstsToMove) {
+    ArrayRef<Instruction *> InstsToMove,
+    ArrayRef<VPInstruction *> ReductionResumeValues) {
   BasicBlock *VecEpilogueIterationCountCheck =
       cast<VPIRBasicBlock>(EpiPlan.getEntry())->getIRBasicBlock();
 
@@ -9446,7 +9442,8 @@ static void connectEpilogueVectorLoop(
   // after executing the main loop. We need to update the resume values of
   // inductions and reductions during epilogue vectorization.
   fixScalarResumeValuesFromBypass(VecEpilogueIterationCountCheck, L, EpiPlan,
-                                  LVL, ExpandedSCEVs, EPI.VectorTripCount);
+                                  LVL, ExpandedSCEVs, EPI.VectorTripCount,
+                                  ReductionResumeValues);
 }
 
 bool LoopVectorizePass::processLoop(Loop *L) {
@@ -9833,7 +9830,8 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     VPlan &BestEpiPlan = LVP.getPlanFor(EpilogueVF.Width);
     BestEpiPlan.getMiddleBlock()->setName("vec.epilog.middle.block");
     BestEpiPlan.getVectorPreheader()->setName("vec.epilog.ph");
-    preparePlanForMainVectorLoop(*BestMainPlan, BestEpiPlan);
+    auto ReductionResumeValues =
+        preparePlanForMainVectorLoop(*BestMainPlan, BestEpiPlan);
     EpilogueLoopVectorizationInfo EPI(VF.Width, IC, EpilogueVF.Width, 1,
                                       BestEpiPlan);
     EpilogueVectorizerMainLoop MainILV(L, PSE, LI, DT, TTI, AC, EPI, &CM,
@@ -9851,7 +9849,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     LVP.executePlan(EPI.EpilogueVF, EPI.EpilogueUF, BestEpiPlan, EpilogILV, DT,
                     true);
     connectEpilogueVectorLoop(BestEpiPlan, L, EPI, DT, LVL, ExpandedSCEVs,
-                              Checks, InstsToMove);
+                              Checks, InstsToMove, ReductionResumeValues);
     ++LoopsEpilogueVectorized;
   } else {
     InnerLoopVectorizer LB(L, PSE, LI, DT, TTI, AC, VF.Width, IC, &CM, Checks,
