@@ -8940,43 +8940,17 @@ preparePlanForMainVectorLoop(VPlan &MainPlan, VPlan &EpiPlan) {
         cast<PHINode>(R.getVPSingleValue()->getUnderlyingValue()));
   }
   VPBasicBlock *MainScalarPH = MainPlan.getScalarPreheader();
-  VPBuilder Builder(MainScalarPH);
-  SmallVector<VPInstruction *> ReductionResumeValues;
 
+  // Remove scalar header phis and their resume phis for inductions without
+  // a corresponding wide induction in the epilogue.
   for (VPRecipeBase &R :
        make_early_inc_range(MainPlan.getScalarHeader()->phis())) {
     auto *VPIRInst = cast<VPIRPhi>(&R);
-    VPValue *ResumeOp = VPIRInst->getOperand(0);
-    auto *ResumeDef = ResumeOp->getDefiningRecipe();
-
-    // Check if this resume value needs to be forwarded to the epilogue.
-    // Induction resumes have their end values computed in the vector
-    // preheader; reduction resumes come from the middle block or are
-    // live-ins.
-    bool NeedsForwarding = !ResumeDef;
-    if (!NeedsForwarding) {
-      if (auto *VPI = dyn_cast<VPInstruction>(ResumeDef)) {
-        auto *Inner = dyn_cast<VPInstruction>(VPI->getOperand(0));
-        NeedsForwarding =
-            Inner &&
-            Inner->getParent() != MainPlan.getVectorPreheader();
-      }
-    }
-
-    if (NeedsForwarding) {
-      ReductionResumeValues.push_back(Builder.createNaryOp(
-          VPInstruction::ResumeForEpilogue, ResumeOp));
-      continue;
-    }
-    ReductionResumeValues.push_back(nullptr);
-
     if (EpiWidenedPhis.contains(&VPIRInst->getIRPhi()))
       continue;
-    // There is no corresponding wide induction in the epilogue plan that would
-    // need a resume value. Remove the VPIRInst wrapping the scalar header phi
-    // together with the corresponding ResumePhi. The resume values for the
-    // scalar loop will be created during execution of EpiPlan.
-    VPRecipeBase *ResumePhi = ResumeOp->getDefiningRecipe();
+    VPRecipeBase *ResumePhi = VPIRInst->getOperand(0)->getDefiningRecipe();
+    if (!ResumePhi)
+      continue;
     VPIRInst->eraseFromParent();
     ResumePhi->eraseFromParent();
   }
@@ -9042,9 +9016,26 @@ preparePlanForMainVectorLoop(VPlan &MainPlan, VPlan &EpiPlan) {
     else if (&*MainScalarPH->begin() != ResumePhi)
       ResumePhi->moveBefore(*MainScalarPH, MainScalarPH->begin());
   }
-  // Add a user to make sure the resume phi won't get removed.
-  VPBuilder(MainScalarPH)
-      .createNaryOp(VPInstruction::ResumeForEpilogue, ResumePhi);
+  // Collect resume values from the scalar preheader. Create
+  // ResumeForEpilogue for all phis to keep them alive, and track reduction
+  // resumes for epilogue bypass fixup.
+  SmallVector<VPInstruction *> ReductionResumeValues;
+  VPBuilder ResumeBuilder(MainScalarPH);
+  VPBasicBlock *VecPreheader = MainPlan.getVectorPreheader();
+  for (VPRecipeBase &R : MainScalarPH->phis()) {
+    auto *Resume = ResumeBuilder.createNaryOp(
+        VPInstruction::ResumeForEpilogue, R.getVPSingleValue());
+    // Skip the canonical IV resume and induction resumes; only track
+    // reduction resumes for epilogue bypass fixup.
+    if (&R == ResumePhi)
+      continue;
+    auto *Op = R.getOperand(0);
+    if (auto *Def = Op->getDefiningRecipe();
+        Def && (Def->getParent() == VecPreheader ||
+                isa<VPDerivedIVRecipe>(Def)))
+      continue;
+    ReductionResumeValues.push_back(Resume);
+  }
 
   return ReductionResumeValues;
 }
@@ -9297,24 +9288,11 @@ static void fixScalarResumeValuesFromBypass(
   }
   auto *ScalarPH = cast<VPIRBasicBlock>(BestEpiPlan.getScalarPreheader());
   if (ScalarPH->hasPredecessors()) {
-    // Build a deduplicated list of reduction resume values from the main loop,
-    // preserving order but removing duplicates by operand identity.
-    SmallPtrSet<VPValue *, 4> Seen;
-    SmallVector<VPValue *> UniqueResumes;
-    for (VPInstruction *VPI : ReductionResumeValues) {
-      if (!VPI)
-        continue;
-      if (Seen.insert(VPI->getOperand(0)).second)
-        UniqueResumes.push_back(VPI);
-    }
-
-    // Get the epilogue's vector preheader. Induction resume values in the
-    // scalar preheader have their operand(0) defined here.
     VPBlockBase *VectorPH =
         ScalarPH->getPredecessors().back()->getSuccessors()[1];
     // If ScalarPH has predecessors, we may need to update its reduction
     // resume values.
-    auto ResumeIter = UniqueResumes.begin();
+    auto ResumeIter = ReductionResumeValues.begin();
     for (const auto &[R, IRPhi] :
          zip_equal(*ScalarPH, ScalarPH->getIRBasicBlock()->phis())) {
       // Skip induction resume values; only fix reduction resumes.
@@ -9322,7 +9300,7 @@ static void fixScalarResumeValuesFromBypass(
           isa<VPDerivedIVRecipe>(R.getOperand(0)) ||
           cast<VPInstruction>(R.getOperand(0))->getParent() == VectorPH)
         continue;
-      assert(ResumeIter != UniqueResumes.end() &&
+      assert(ResumeIter != ReductionResumeValues.end() &&
              "expected a reduction resume value");
       // Look up the bc.merge.rdx PHI from the main loop via the mapping.
       auto *MainResumePhi =
