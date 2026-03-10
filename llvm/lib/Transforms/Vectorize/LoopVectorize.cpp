@@ -540,9 +540,6 @@ public:
   /// Fix the vectorized code, taking care of header phi's, and more.
   void fixVectorizedLoop(VPTransformState &State);
 
-  /// Fix the non-induction PHIs in \p Plan.
-  void fixNonInductionPHIs(VPTransformState &State);
-
   /// Returns the original loop trip count.
   Value *getTripCount() const { return TripCount; }
 
@@ -2591,9 +2588,6 @@ LoopVectorizationCostModel::getVectorIntrinsicCost(CallInst *CI,
 }
 
 void InnerLoopVectorizer::fixVectorizedLoop(VPTransformState &State) {
-  // Fix widened non-induction PHIs by setting up the PHI operands.
-  fixNonInductionPHIs(State);
-
   // Don't apply optimizations below when no (vector) loop remains, as they all
   // require one at the moment.
   VPBasicBlock *HeaderVPBB =
@@ -2605,22 +2599,6 @@ void InnerLoopVectorizer::fixVectorizedLoop(VPTransformState &State) {
 
   // Remove redundant induction instructions.
   legacyCSE(HeaderBB);
-}
-
-void InnerLoopVectorizer::fixNonInductionPHIs(VPTransformState &State) {
-  auto Iter = vp_depth_first_shallow(Plan.getEntry());
-  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(Iter)) {
-    for (VPRecipeBase &P : VPBB->phis()) {
-      VPWidenPHIRecipe *VPPhi = dyn_cast<VPWidenPHIRecipe>(&P);
-      if (!VPPhi)
-        continue;
-      PHINode *NewPhi = cast<PHINode>(State.get(VPPhi));
-      // Make sure the builder has a valid insert point.
-      Builder.SetInsertPoint(NewPhi);
-      for (const auto &[Inc, VPBB] : VPPhi->incoming_values_and_blocks())
-        NewPhi->addIncoming(State.get(Inc), State.CFG.VPBB2IRBB[VPBB]);
-    }
-  }
 }
 
 void LoopVectorizationCostModel::collectLoopScalars(ElementCount VF) {
