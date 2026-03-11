@@ -501,20 +501,20 @@ define void @testCmpZero(ptr %src, ptr %dst, i32 %srcidx, i32 %dstidx, i32 %len)
 ; X64-LABEL: testCmpZero:
 ; X64:       # %bb.0: # %entry
 ; X64-NEXT:    movslq %edx, %rdx
-; X64-NEXT:    addq %rdx, %rdi
-; X64-NEXT:    movslq %ecx, %rax
-; X64-NEXT:    addq %rsi, %rax
-; X64-NEXT:    addl %edx, %r8d
-; X64-NEXT:    movslq %r8d, %rcx
-; X64-NEXT:    subq %rdx, %rcx
-; X64-NEXT:    xorl %edx, %edx
+; X64-NEXT:    leaq (%rdi,%rdx), %rax
+; X64-NEXT:    movslq %ecx, %rcx
+; X64-NEXT:    addq %rsi, %rcx
+; X64-NEXT:    addl %r8d, %edx
+; X64-NEXT:    movslq %edx, %rdx
+; X64-NEXT:    addq %rdi, %rdx
 ; X64-NEXT:    .p2align 4
 ; X64-NEXT:  .LBB5_1: # %for.body82.us
 ; X64-NEXT:    # =>This Inner Loop Header: Depth=1
-; X64-NEXT:    movzbl (%rax,%rdx,4), %esi
-; X64-NEXT:    movb %sil, (%rdi,%rdx)
-; X64-NEXT:    incq %rdx
-; X64-NEXT:    cmpq %rdx, %rcx
+; X64-NEXT:    movzbl (%rcx), %esi
+; X64-NEXT:    addq $4, %rcx
+; X64-NEXT:    movb %sil, (%rax)
+; X64-NEXT:    incq %rax
+; X64-NEXT:    cmpq %rdx, %rax
 ; X64-NEXT:    jne .LBB5_1
 ; X64-NEXT:  # %bb.2: # %return
 ; X64-NEXT:    retq
@@ -525,17 +525,19 @@ define void @testCmpZero(ptr %src, ptr %dst, i32 %srcidx, i32 %dstidx, i32 %len)
 ; X32-NEXT:    pushl %esi
 ; X32-NEXT:    movl {{[0-9]+}}(%esp), %eax
 ; X32-NEXT:    movl {{[0-9]+}}(%esp), %ecx
+; X32-NEXT:    movl {{[0-9]+}}(%esp), %esi
+; X32-NEXT:    addl {{[0-9]+}}(%esp), %eax
+; X32-NEXT:    leal (%esi,%ecx), %edx
 ; X32-NEXT:    addl {{[0-9]+}}(%esp), %ecx
-; X32-NEXT:    movl {{[0-9]+}}(%esp), %edx
-; X32-NEXT:    addl {{[0-9]+}}(%esp), %edx
-; X32-NEXT:    xorl %esi, %esi
+; X32-NEXT:    addl %esi, %ecx
 ; X32-NEXT:    .p2align 4
 ; X32-NEXT:  .LBB5_1: # %for.body82.us
 ; X32-NEXT:    # =>This Inner Loop Header: Depth=1
-; X32-NEXT:    movzbl (%edx,%esi,4), %ebx
-; X32-NEXT:    movb %bl, (%ecx,%esi)
-; X32-NEXT:    incl %esi
-; X32-NEXT:    cmpl %esi, %eax
+; X32-NEXT:    movzbl (%eax), %ebx
+; X32-NEXT:    addl $4, %eax
+; X32-NEXT:    movb %bl, (%edx)
+; X32-NEXT:    incl %edx
+; X32-NEXT:    cmpl %ecx, %edx
 ; X32-NEXT:    jne .LBB5_1
 ; X32-NEXT:  # %bb.2: # %return
 ; X32-NEXT:    popl %esi

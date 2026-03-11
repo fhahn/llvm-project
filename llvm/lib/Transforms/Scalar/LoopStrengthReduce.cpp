@@ -7034,6 +7034,66 @@ static llvm::PHINode *GetInductionVariable(const Loop &L, ScalarEvolution &SE,
   return nullptr;
 }
 
+/// Insert llvm.ssa.copy intrinsics in the loop preheader for pointer-typed
+/// PHI start values that are not simple (arguments, constants, allocas).
+/// This makes SCEV treat these start values as opaque, preventing
+/// unnecessary wrap flag loss during LSR.
+static SmallVector<WeakTrackingVH, 4>
+localizePointerStartValues(Loop *L, ScalarEvolution &SE, LoopInfo &LI) {
+  SmallVector<WeakTrackingVH, 4> Copies;
+  BasicBlock *PH = L->getLoopPreheader();
+  BasicBlock *Latch = L->getLoopLatch();
+  if (!PH || !Latch)
+    return Copies;
+
+  for (PHINode &PN : L->getHeader()->phis()) {
+    if (!PN.getType()->isPointerTy())
+      continue;
+    // Get preheader incoming value.
+    Value *Start = PN.getIncomingValueForBlock(PH);
+    // Skip if already a simple value (argument, constant, alloca) or derived
+    // from an alloca (e.g., GEP chain from a stack allocation). SCEV can reason
+    // precisely about alloca-based addresses without needing localization.
+    if (isa<Argument>(Start) || isa<Constant>(Start))
+      continue;
+    if (isa<AllocaInst>(getUnderlyingObject(Start)))
+      continue;
+    // Skip if the start value is defined inside a loop (e.g., an exit value
+    // from a sibling loop). Localizing such values can indirectly cause
+    // flag loss on the sibling loop's IV.
+    if (auto *StartI = dyn_cast<Instruction>(Start))
+      if (LI.getLoopFor(StartI->getParent()))
+        continue;
+    // Insert ssa.copy in preheader before the terminator.
+    LLVM_DEBUG(dbgs() << "LSR: Localizing pointer start value " << *Start
+                      << " for PHI " << PN << "\n");
+    Function *CopyFn = Intrinsic::getOrInsertDeclaration(
+        PH->getModule(), Intrinsic::ssa_copy, {Start->getType()});
+    CallInst *Copy = CallInst::Create(CopyFn, {Start}, "",
+                                      PH->getTerminator()->getIterator());
+    PN.setIncomingValueForBlock(PH, Copy);
+    SE.forgetValue(&PN);
+    Copies.push_back(WeakTrackingVH(Copy));
+  }
+  return Copies;
+}
+
+/// Remove ssa.copy intrinsics inserted by localizePointerStartValues,
+/// replacing their uses with the original values.
+static void removeLocalizedCopies(SmallVectorImpl<WeakTrackingVH> &Copies,
+                                  ScalarEvolution &SE) {
+  for (WeakTrackingVH &VH : Copies) {
+    if (!VH)
+      continue; // Already erased by LSR.
+    auto *Copy = cast<CallInst>(VH);
+    Value *Orig = Copy->getArgOperand(0);
+    SE.forgetValue(Copy);
+    Copy->replaceAllUsesWith(Orig);
+    Copy->eraseFromParent();
+  }
+  Copies.clear();
+}
+
 static bool ReduceLoopStrength(Loop *L, IVUsers &IU, ScalarEvolution &SE,
                                DominatorTree &DT, LoopInfo &LI,
                                const TargetTransformInfo &TTI,
@@ -7044,6 +7104,10 @@ static bool ReduceLoopStrength(Loop *L, IVUsers &IU, ScalarEvolution &SE,
   // meet the salvageable criteria and store their DIExpression and SCEVs.
   SmallVector<std::unique_ptr<DVIRecoveryRec>, 2> SalvageableDVIRecords;
   DbgGatherSalvagableDVI(L, SE, SalvageableDVIRecords);
+
+  // Localize pointer start values so SCEV treats them as opaque,
+  // preventing unnecessary wrap flag loss during LSR.
+  auto Copies = localizePointerStartValues(L, SE, LI);
 
   bool Changed = false;
   std::unique_ptr<MemorySSAUpdater> MSSAU;
@@ -7090,6 +7154,9 @@ static bool ReduceLoopStrength(Loop *L, IVUsers &IU, ScalarEvolution &SE,
       DeleteDeadPHIs(L->getHeader(), &TLI, MSSAU.get());
     }
   }
+
+  // Remove ssa.copy intrinsics now that LSR is done.
+  removeLocalizedCopies(Copies, SE);
 
   if (SalvageableDVIRecords.empty())
     return Changed;

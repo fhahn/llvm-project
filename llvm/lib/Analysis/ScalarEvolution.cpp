@@ -7149,9 +7149,15 @@ const ConstantRange &ScalarEvolution::getRangeRef(
     if (U->getType()->isPointerTy() && SignHint == HINT_RANGE_UNSIGNED) {
       // Strengthen the range if the underlying IR value is a
       // global/alloca/heap allocation using the size of the object.
+      // Look through ssa.copy to the original pointer for property queries,
+      // since ssa.copy is semantically transparent (identity function).
+      Value *PtrV = V;
+      if (auto *II = dyn_cast<IntrinsicInst>(V))
+        if (II->getIntrinsicID() == Intrinsic::ssa_copy)
+          PtrV = II->getArgOperand(0);
       bool CanBeNull, CanBeFreed;
       uint64_t DerefBytes =
-          V->getPointerDereferenceableBytes(DL, CanBeNull, CanBeFreed);
+          PtrV->getPointerDereferenceableBytes(DL, CanBeNull, CanBeFreed);
       if (DerefBytes > 1 && isUIntN(BitWidth, DerefBytes)) {
         // The highest address the object can start is DerefBytes bytes before
         // the end (unsigned max value). If this value is not a multiple of the
@@ -7161,11 +7167,11 @@ const ConstantRange &ScalarEvolution::getRangeRef(
         // object.
         APInt MaxVal =
             APInt::getMaxValue(BitWidth) - APInt(BitWidth, DerefBytes);
-        uint64_t Align = U->getValue()->getPointerAlignment(DL).value();
+        uint64_t Align = PtrV->getPointerAlignment(DL).value();
         uint64_t Rem = MaxVal.urem(Align);
         MaxVal -= APInt(BitWidth, Rem);
         APInt MinVal = APInt::getZero(BitWidth);
-        if (llvm::isKnownNonZero(V, DL))
+        if (llvm::isKnownNonZero(PtrV, DL))
           MinVal = Align;
         ConservativeResult = ConservativeResult.intersectWith(
             ConstantRange::getNonEmpty(MinVal, MaxVal + 1), RangeType);
@@ -7900,6 +7906,11 @@ ScalarEvolution::getOperandsToCreate(Value *V, SmallVectorImpl<Value *> &Ops) {
   }
   case Instruction::Call:
   case Instruction::Invoke:
+    // Don't look through ssa.copy -- it is used to create opaque copies.
+    if (auto *II = dyn_cast<IntrinsicInst>(U))
+      if (II->getIntrinsicID() == Intrinsic::ssa_copy)
+        return getUnknown(U);
+
     if (Value *RV = cast<CallBase>(U)->getReturnedArgOperand()) {
       Ops.push_back(RV);
       return nullptr;
@@ -8361,6 +8372,11 @@ const SCEV *ScalarEvolution::createSCEV(Value *V) {
 
   case Instruction::Call:
   case Instruction::Invoke:
+    // Don't look through ssa.copy -- it is used to create opaque copies.
+    if (auto *II = dyn_cast<IntrinsicInst>(U))
+      if (II->getIntrinsicID() == Intrinsic::ssa_copy)
+        return getUnknown(U);
+
     if (Value *RV = cast<CallBase>(U)->getReturnedArgOperand())
       return getSCEV(RV);
 
