@@ -4135,9 +4135,12 @@ buildOraclePlan(std::unique_ptr<VPlan> OraclePlan,
   CanonicalIVPHI->eraseFromParent();
 
   // Replace VPWidenIntOrFpInductionRecipes with scalar equivalents.
-  // Bail out on pointer inductions and reductions.
+  // Bail out on pointer inductions.
   for (VPRecipeBase &R : make_early_inc_range(HeaderVPBB->phis())) {
-    if (isa<VPWidenPointerInductionRecipe, VPReductionPHIRecipe>(&R))
+    assert(!isa<VPReductionPHIRecipe, VPFirstOrderRecurrencePHIRecipe>(&R) &&
+           "reductions and first-order recurrences not supported in "
+           "early-exit loops");
+    if (isa<VPWidenPointerInductionRecipe>(&R))
       return nullptr;
     auto *WideIV = dyn_cast<VPWidenIntOrFpInductionRecipe>(&R);
     if (!WideIV)

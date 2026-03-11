@@ -213,6 +213,9 @@ LLVM_ABI extern char &UnreachableMachineBlockElimID;
 /// DeadMachineInstructionElim - This pass removes dead machine instructions.
 LLVM_ABI extern char &DeadMachineInstructionElimID;
 
+/// DeadMachineLoopElim - This pass removes dead machine loops.
+LLVM_ABI extern char &DeadMachineLoopElimID;
+
 /// This pass adds dead/undef flags after analyzing subregister lanes.
 LLVM_ABI extern char &DetectDeadLanesID;
 
