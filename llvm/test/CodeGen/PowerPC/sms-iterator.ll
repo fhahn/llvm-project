@@ -3,6 +3,8 @@
 ; RUN:       -mcpu=pwr9 --ppc-enable-pipeliner -debug-only=pipeliner -disable-cgp-delete-phis 2>&1 \
 ; RUN:       >/dev/null | FileCheck %s
 
+@g = external global i32
+
 %0 = type { i32, [16 x double] }
 
 ; CHECK: MII = 3 MAX_II = 13 (rec=3, res=2)
@@ -11,6 +13,7 @@ define dso_local fastcc double @_ZN3povL9polysolveEiPdS0_() unnamed_addr #0 {
   br label %1
 
 1:                                                ; preds = %1, %0
+  store i32 0, ptr @g
   br i1 undef, label %2, label %1
 
 2:                                                ; preds = %1
@@ -27,6 +30,7 @@ define dso_local fastcc double @_ZN3povL9polysolveEiPdS0_() unnamed_addr #0 {
   %11 = fadd fast double %10, %8
   %12 = add i64 %6, -1
   %13 = icmp eq i64 %12, 0
+  store i32 0, ptr @g
   br i1 %13, label %14, label %3
 
 14:                                               ; preds = %3, %2

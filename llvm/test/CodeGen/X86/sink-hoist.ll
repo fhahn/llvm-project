@@ -13,6 +13,8 @@
 ; CHECK-NEXT: ret
 ; CHECK:      divsd
 
+@g = external global i32
+
 define double @foo(double %x, double %y, i1 %c) nounwind {
   %a = fdiv double %x, 3.2
   %b = fdiv double %y, 3.3
@@ -165,6 +167,7 @@ bb2:                                              ; preds = %bb2, %entry
   %tmp11 = load i32, ptr @cl_options_count, align 4   ; <i32> [#uses=1]
   %tmp12 = zext i32 %tmp11 to i64                 ; <i64> [#uses=1]
   %tmp13 = icmp ugt i64 %tmp12, %tmp25            ; <i1> [#uses=1]
+  store i32 0, ptr @g
   br i1 %tmp13, label %bb2, label %bb6
 
 bb6:                                              ; preds = %bb2, %entry

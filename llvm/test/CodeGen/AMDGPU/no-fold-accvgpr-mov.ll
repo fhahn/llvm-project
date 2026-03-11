@@ -2,6 +2,8 @@
 ; RUN: llc -mtriple=amdgcn--amdhsa -mcpu=gfx942 %s -o - | FileCheck %s --check-prefixes=GFX942
 ; RUN: llc -mtriple=amdgcn--amdhsa -mcpu=gfx908 %s -o - | FileCheck %s --check-prefixes=GFX908
 
+@g = external addrspace(1) global i32
+
 define amdgpu_kernel void @matmul_kernel(i32 %a0, i32 %a1) {
 ; GFX942-LABEL: matmul_kernel:
 ; GFX942:       ; %bb.0: ; %entry
@@ -18,16 +20,21 @@ define amdgpu_kernel void @matmul_kernel(i32 %a0, i32 %a1) {
 ; GFX942-NEXT:    s_branch .LBB0_2
 ; GFX942-NEXT:  .LBB0_1: ; %bb2
 ; GFX942-NEXT:    ; in Loop: Header=BB0_2 Depth=1
+; GFX942-NEXT:    s_or_b32 s3, s6, 1
+; GFX942-NEXT:    s_ashr_i32 s4, s6, 31
+; GFX942-NEXT:    s_and_b32 s6, s4, s3
 ; GFX942-NEXT:    s_mov_b32 s3, s2
-; GFX942-NEXT:    s_nop 0
 ; GFX942-NEXT:    v_mov_b64_e32 v[4:5], s[2:3]
+; GFX942-NEXT:    s_getpc_b64 s[4:5]
+; GFX942-NEXT:    s_add_u32 s4, s4, g@gotpcrel32@lo+4
+; GFX942-NEXT:    s_addc_u32 s5, s5, g@gotpcrel32@hi+12
+; GFX942-NEXT:    s_load_dwordx2 s[4:5], s[4:5], 0x0
 ; GFX942-NEXT:    v_mov_b32_e32 v2, v1
 ; GFX942-NEXT:    v_mov_b32_e32 v3, v1
-; GFX942-NEXT:    s_or_b32 s4, s6, 1
-; GFX942-NEXT:    s_ashr_i32 s3, s6, 31
+; GFX942-NEXT:    s_waitcnt lgkmcnt(0)
+; GFX942-NEXT:    global_store_dword v1, v1, s[4:5]
 ; GFX942-NEXT:    v_mfma_f32_16x16x16_f16 v[2:5], v[4:5], v[4:5], v[0:3]
-; GFX942-NEXT:    s_and_b32 s6, s3, s4
-; GFX942-NEXT:    s_nop 5
+; GFX942-NEXT:    s_nop 6
 ; GFX942-NEXT:    v_mov_b32_e32 v0, v2
 ; GFX942-NEXT:    s_cbranch_execz .LBB0_4
 ; GFX942-NEXT:  .LBB0_2: ; %bb
@@ -42,40 +49,46 @@ define amdgpu_kernel void @matmul_kernel(i32 %a0, i32 %a1) {
 ; GFX908-LABEL: matmul_kernel:
 ; GFX908:       ; %bb.0: ; %entry
 ; GFX908-NEXT:    s_load_dwordx2 s[0:1], s[8:9], 0x0
-; GFX908-NEXT:    v_accvgpr_write_b32 a2, 0
+; GFX908-NEXT:    v_mov_b32_e32 v0, 0
 ; GFX908-NEXT:    v_accvgpr_write_b32 a1, 0
 ; GFX908-NEXT:    s_mov_b32 s2, 0
-; GFX908-NEXT:    s_mov_b32 s3, 0
+; GFX908-NEXT:    v_accvgpr_write_b32 a2, v0
 ; GFX908-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX908-NEXT:    s_cmp_lg_u32 s0, 0
 ; GFX908-NEXT:    s_cselect_b64 s[0:1], -1, 0
-; GFX908-NEXT:    v_cndmask_b32_e64 v0, 0, 1, s[0:1]
-; GFX908-NEXT:    v_cmp_ne_u32_e64 s[0:1], 1, v0
+; GFX908-NEXT:    v_cndmask_b32_e64 v1, 0, 1, s[0:1]
+; GFX908-NEXT:    v_cmp_ne_u32_e64 s[0:1], 1, v1
+; GFX908-NEXT:    s_mov_b32 s6, 0
 ; GFX908-NEXT:    s_branch .LBB0_2
 ; GFX908-NEXT:  .LBB0_1: ; %bb2
 ; GFX908-NEXT:    ; in Loop: Header=BB0_2 Depth=1
-; GFX908-NEXT:    s_nop 6
-; GFX908-NEXT:    v_accvgpr_read_b32 v3, a2
-; GFX908-NEXT:    s_or_b32 s4, s3, 1
-; GFX908-NEXT:    s_ashr_i32 s5, s3, 31
+; GFX908-NEXT:    s_nop 4
+; GFX908-NEXT:    v_accvgpr_read_b32 v4, a2
+; GFX908-NEXT:    s_or_b32 s3, s6, 1
+; GFX908-NEXT:    s_ashr_i32 s4, s6, 31
+; GFX908-NEXT:    s_and_b32 s6, s4, s3
 ; GFX908-NEXT:    s_mov_b32 s3, s2
-; GFX908-NEXT:    v_mov_b32_e32 v1, s2
-; GFX908-NEXT:    v_mov_b32_e32 v2, s3
-; GFX908-NEXT:    v_accvgpr_write_b32 a0, v3
+; GFX908-NEXT:    v_mov_b32_e32 v2, s2
+; GFX908-NEXT:    v_mov_b32_e32 v3, s3
+; GFX908-NEXT:    v_accvgpr_write_b32 a0, v4
+; GFX908-NEXT:    v_accvgpr_read_b32 v5, a1
 ; GFX908-NEXT:    v_accvgpr_read_b32 v4, a1
-; GFX908-NEXT:    v_accvgpr_read_b32 v3, a1
-; GFX908-NEXT:    s_and_b32 s3, s5, s4
-; GFX908-NEXT:    v_accvgpr_write_b32 a2, v4
-; GFX908-NEXT:    v_accvgpr_write_b32 a3, v3
-; GFX908-NEXT:    s_nop 0
-; GFX908-NEXT:    v_mfma_f32_16x16x16f16 a[2:5], v[1:2], v[1:2], a[0:3]
+; GFX908-NEXT:    s_getpc_b64 s[4:5]
+; GFX908-NEXT:    s_add_u32 s4, s4, g@gotpcrel32@lo+4
+; GFX908-NEXT:    s_addc_u32 s5, s5, g@gotpcrel32@hi+12
+; GFX908-NEXT:    v_accvgpr_write_b32 a2, v5
+; GFX908-NEXT:    v_accvgpr_write_b32 a3, v4
+; GFX908-NEXT:    s_load_dwordx2 s[4:5], s[4:5], 0x0
+; GFX908-NEXT:    v_mfma_f32_16x16x16f16 a[2:5], v[2:3], v[2:3], a[0:3]
+; GFX908-NEXT:    s_waitcnt lgkmcnt(0)
+; GFX908-NEXT:    global_store_dword v0, v0, s[4:5]
 ; GFX908-NEXT:    s_cbranch_execz .LBB0_4
 ; GFX908-NEXT:  .LBB0_2: ; %bb
 ; GFX908-NEXT:    ; =>This Inner Loop Header: Depth=1
 ; GFX908-NEXT:    s_and_b64 vcc, exec, s[0:1]
 ; GFX908-NEXT:    s_cbranch_vccz .LBB0_1
 ; GFX908-NEXT:  ; %bb.3:
-; GFX908-NEXT:    ; implicit-def: $sgpr3
+; GFX908-NEXT:    ; implicit-def: $sgpr6
 ; GFX908-NEXT:    ; implicit-def: $agpr2
 ; GFX908-NEXT:  .LBB0_4: ; %common.ret
 ; GFX908-NEXT:    s_endpgm
@@ -97,6 +110,7 @@ bb2:
   %i8 = call <4 x float> @llvm.amdgcn.mfma.f32.16x16x16f16(<4 x half> zeroinitializer, <4 x half> zeroinitializer, <4 x float> %i7, i32 0, i32 0, i32 0)
   %i9 = extractelement <4 x float> %i8, i32 0
   %i10 = insertvalue { float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float } zeroinitializer, float %i9, 123
+  store i32 0, ptr addrspace(1) @g
   br label %bb
 
 bb11:

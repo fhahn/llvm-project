@@ -2,6 +2,8 @@
 ; RUN: llc -mtriple=aarch64-none-linux-gnu < %s -o - | FileCheck %s --check-prefixes=CHECK,CHECK-SD
 ; RUN: llc -mtriple=aarch64-none-linux-gnu -global-isel < %s -o - | FileCheck %s --check-prefixes=CHECK,CHECK-GI
 
+@g = external global i32
+
 define i64 @umull(i64 %x0, i64 %x1) {
 ; CHECK-LABEL: umull:
 ; CHECK:       // %bb.0: // %entry
@@ -1481,19 +1483,25 @@ define i64 @umaddl_and_and(i64 %x, i64 %y, i64 %a) {
 define i32 @f(i32 %0) {
 ; CHECK-SD-LABEL: f:
 ; CHECK-SD:       // %bb.0: // %entry
+; CHECK-SD-NEXT:    adrp x8, :got:g
 ; CHECK-SD-NEXT:    // kill: def $w0 killed $w0 def $x0
-; CHECK-SD-NEXT:    neg w8, w0
+; CHECK-SD-NEXT:    neg w9, w0
+; CHECK-SD-NEXT:    ldr x8, [x8, :got_lo12:g]
 ; CHECK-SD-NEXT:  .LBB93_1: // %B
 ; CHECK-SD-NEXT:    // =>This Inner Loop Header: Depth=1
-; CHECK-SD-NEXT:    cbnz x8, .LBB93_1
+; CHECK-SD-NEXT:    str wzr, [x8]
+; CHECK-SD-NEXT:    cbnz x9, .LBB93_1
 ; CHECK-SD-NEXT:    b .LBB93_1
 ;
 ; CHECK-GI-LABEL: f:
 ; CHECK-GI:       // %bb.0: // %entry
-; CHECK-GI-NEXT:    neg w8, w0
+; CHECK-GI-NEXT:    adrp x8, :got:g
+; CHECK-GI-NEXT:    neg w9, w0
+; CHECK-GI-NEXT:    ldr x8, [x8, :got_lo12:g]
 ; CHECK-GI-NEXT:  .LBB93_1: // %B
 ; CHECK-GI-NEXT:    // =>This Inner Loop Header: Depth=1
-; CHECK-GI-NEXT:    cbnz x8, .LBB93_1
+; CHECK-GI-NEXT:    str wzr, [x8]
+; CHECK-GI-NEXT:    cbnz x9, .LBB93_1
 ; CHECK-GI-NEXT:    b .LBB93_1
 entry:
   %1 = sext i32 %0 to i64
@@ -1507,6 +1515,7 @@ A:
   br label %B
 
 B:
+  store i32 0, ptr @g
   %t = icmp eq i64 0, %3
   br i1 %t, label %A, label %B
 }

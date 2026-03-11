@@ -4,6 +4,8 @@
 ; This is a case where we would incorrectly conclude that LBB0_1 could only
 ; be reached via fall through and would therefore omit the label.
 
+@side_effect = external global i32
+
 @g = dso_local global i32 0
 
 define dso_local void @xyz() {
@@ -14,13 +16,16 @@ define dso_local void @xyz() {
 ; CHECK-NEXT:    xorpd %xmm1, %xmm1
 ; CHECK-NEXT:    ucomisd %xmm1, %xmm0
 ; CHECK-NEXT:    jne .LBB0_1
-; CHECK-NEXT:    jnp .LBB0_2
+; CHECK-NEXT:    jnp .LBB0_3
+; CHECK-NEXT:  .LBB0_1: # %foo.preheader
+; CHECK-NEXT:    movq side_effect@GOTPCREL(%rip), %rax
 ; CHECK-NEXT:    .p2align 4
-; CHECK-NEXT:  .LBB0_1: # %foo
+; CHECK-NEXT:  .LBB0_2: # %foo
 ; CHECK-NEXT:    # =>This Inner Loop Header: Depth=1
 ; CHECK-NEXT:    ucomisd %xmm1, %xmm0
-; CHECK-NEXT:    ja .LBB0_1
-; CHECK-NEXT:  .LBB0_2: # %bar
+; CHECK-NEXT:    movl $0, (%rax)
+; CHECK-NEXT:    ja .LBB0_2
+; CHECK-NEXT:  .LBB0_3: # %bar
 ; CHECK-NEXT:    retq
 entry:
   %cmp1 = fcmp oeq double bitcast (i64 ptrtoint (ptr @g to i64) to double), 0.000000e+00
@@ -28,6 +33,7 @@ entry:
 
 foo:
   %cmp2 = fcmp ogt double bitcast (i64 ptrtoint (ptr @g to i64) to double), 0.000000e+00
+  store i32 0, ptr @side_effect
   br i1 %cmp2, label %foo, label %bar
 
 bar:

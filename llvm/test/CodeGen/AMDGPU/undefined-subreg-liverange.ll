@@ -5,6 +5,8 @@
 ; We may have subregister live ranges that are undefined on some paths. The
 ; verifier should not complain about this.
 
+@g = external addrspace(1) global i32
+
 define amdgpu_kernel void @func() #0 {
 ; CHECK-LABEL: func:
 ; CHECK:       ; %bb.0: ; %B0
@@ -46,22 +48,31 @@ B30.2:
 define amdgpu_ps float @valley_partially_undef_copy() #0 {
 ; CHECK-LABEL: valley_partially_undef_copy:
 ; CHECK:       ; %bb.0: ; %bb
-; CHECK-NEXT:    s_mov_b32 s3, 0xf000
-; CHECK-NEXT:    s_mov_b32 s2, -1
-; CHECK-NEXT:    buffer_load_dword v1, off, s[0:3], 0 glc
+; CHECK-NEXT:    s_mov_b32 s7, 0xf000
+; CHECK-NEXT:    s_mov_b32 s6, -1
+; CHECK-NEXT:    buffer_load_dword v1, off, s[4:7], 0 glc
 ; CHECK-NEXT:    s_waitcnt vmcnt(0)
-; CHECK-NEXT:    buffer_load_dword v0, off, s[0:3], 0 glc
+; CHECK-NEXT:    buffer_load_dword v0, off, s[4:7], 0 glc
 ; CHECK-NEXT:    s_waitcnt vmcnt(0)
-; CHECK-NEXT:    v_mov_b32_e32 v2, 0x7fc00000
-; CHECK-NEXT:    buffer_store_dwordx4 v[0:3], off, s[0:3], 0
-; CHECK-NEXT:    buffer_store_dword v2, off, s[0:3], 0
+; CHECK-NEXT:    v_mov_b32_e32 v3, 0x7fc00000
+; CHECK-NEXT:    v_mov_b32_e32 v2, 0
+; CHECK-NEXT:    buffer_store_dwordx4 v[0:3], off, s[4:7], 0
+; CHECK-NEXT:    buffer_store_dword v3, off, s[4:7], 0
 ; CHECK-NEXT:    v_cmp_ne_u32_e32 vcc, 0, v1
 ; CHECK-NEXT:    s_waitcnt expcnt(1)
 ; CHECK-NEXT:    v_cndmask_b32_e64 v1, 0, 1, vcc
 ; CHECK-NEXT:    v_cmp_ne_u32_e64 s[0:1], 1, v1
+; CHECK-NEXT:    s_getpc_b64 s[2:3]
+; CHECK-NEXT:    s_add_u32 s2, s2, g@gotpcrel32@lo+4
+; CHECK-NEXT:    s_addc_u32 s3, s3, g@gotpcrel32@hi+12
 ; CHECK-NEXT:  .LBB1_1: ; %bb9
 ; CHECK-NEXT:    ; =>This Inner Loop Header: Depth=1
+; CHECK-NEXT:    s_load_dwordx2 s[4:5], s[2:3], 0x0
 ; CHECK-NEXT:    s_and_b64 vcc, exec, s[0:1]
+; CHECK-NEXT:    s_waitcnt lgkmcnt(0)
+; CHECK-NEXT:    buffer_store_dword v2, off, s[4:7], 0
+; CHECK-NEXT:    s_waitcnt vmcnt(0)
+; CHECK-NEXT:    s_mov_b64 vcc, vcc
 ; CHECK-NEXT:    s_cbranch_vccnz .LBB1_1
 ; CHECK-NEXT:  ; %bb.2: ; %bb11
 ; CHECK-NEXT:    s_mov_b32 s3, 0xf000
@@ -85,6 +96,7 @@ bb:
 
 bb9:                                              ; preds = %bb9, %bb
   %tmp10 = icmp eq i32 %tmp, 0
+  store volatile i32 0, ptr addrspace(1) @g
   br i1 %tmp10, label %bb9, label %bb11
 
 bb11:                                             ; preds = %bb9

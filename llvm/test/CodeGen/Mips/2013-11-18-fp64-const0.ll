@@ -2,6 +2,8 @@
 ; RUN: llc < %s -mtriple=mips-- -mattr=-fp64 | FileCheck %s -check-prefix=CHECK-FP32
 ; RUN: llc < %s -mtriple=mips-- -mcpu=mips32r2 -mattr=+fp64 | FileCheck %s -check-prefix=CHECK-FP64
 
+@g = external global i32
+
 ; This test case is a simplified version of an llvm-stress generated test with
 ; seed=3718491962.
 ; It originally failed on MIPS32 with FP64 with the following error:
@@ -14,6 +16,7 @@ define void @autogen_SD3718491962(double %a0) {
 ; CHECK-FP32-LABEL: autogen_SD3718491962:
 ; CHECK-FP32:       # %bb.0: # %BB
 ; CHECK-FP32-NEXT:    lui $1, %hi($CPI0_0)
+; CHECK-FP32-NEXT:    lui $2, %hi(g)
 ; CHECK-FP32-NEXT:    ldc1 $f0, %lo($CPI0_0)($1)
 ; CHECK-FP32-NEXT:    mtc1 $zero, $f2
 ; CHECK-FP32-NEXT:    mtc1 $zero, $f3
@@ -23,11 +26,11 @@ define void @autogen_SD3718491962(double %a0) {
 ; CHECK-FP32-NEXT:    addiu $1, $zero, 1
 ; CHECK-FP32-NEXT:    movf $1, $zero, $fcc0
 ; CHECK-FP32-NEXT:    c.olt.d $f12, $f2
-; CHECK-FP32-NEXT:    addiu $2, $zero, 1
-; CHECK-FP32-NEXT:    movt $2, $zero, $fcc0
-; CHECK-FP32-NEXT:    and $1, $2, $1
+; CHECK-FP32-NEXT:    addiu $3, $zero, 1
+; CHECK-FP32-NEXT:    movt $3, $zero, $fcc0
+; CHECK-FP32-NEXT:    and $1, $3, $1
 ; CHECK-FP32-NEXT:    bnez $1, $BB0_1
-; CHECK-FP32-NEXT:    nop
+; CHECK-FP32-NEXT:    sw $zero, %lo(g)($2)
 ; CHECK-FP32-NEXT:  # %bb.2: # %CF85
 ; CHECK-FP32-NEXT:    jr $ra
 ; CHECK-FP32-NEXT:    nop
@@ -35,6 +38,7 @@ define void @autogen_SD3718491962(double %a0) {
 ; CHECK-FP64-LABEL: autogen_SD3718491962:
 ; CHECK-FP64:       # %bb.0: # %BB
 ; CHECK-FP64-NEXT:    lui $1, %hi($CPI0_0)
+; CHECK-FP64-NEXT:    lui $2, %hi(g)
 ; CHECK-FP64-NEXT:    ldc1 $f0, %lo($CPI0_0)($1)
 ; CHECK-FP64-NEXT:    mtc1 $zero, $f1
 ; CHECK-FP64-NEXT:    mthc1 $zero, $f1
@@ -44,11 +48,11 @@ define void @autogen_SD3718491962(double %a0) {
 ; CHECK-FP64-NEXT:    addiu $1, $zero, 1
 ; CHECK-FP64-NEXT:    movf $1, $zero, $fcc0
 ; CHECK-FP64-NEXT:    c.olt.d $f12, $f1
-; CHECK-FP64-NEXT:    addiu $2, $zero, 1
-; CHECK-FP64-NEXT:    movt $2, $zero, $fcc0
-; CHECK-FP64-NEXT:    and $1, $2, $1
+; CHECK-FP64-NEXT:    addiu $3, $zero, 1
+; CHECK-FP64-NEXT:    movt $3, $zero, $fcc0
+; CHECK-FP64-NEXT:    and $1, $3, $1
 ; CHECK-FP64-NEXT:    bnez $1, $BB0_1
-; CHECK-FP64-NEXT:    nop
+; CHECK-FP64-NEXT:    sw $zero, %lo(g)($2)
 ; CHECK-FP64-NEXT:  # %bb.2: # %CF85
 ; CHECK-FP64-NEXT:    jr $ra
 ; CHECK-FP64-NEXT:    nop
@@ -58,6 +62,7 @@ BB:
   br label %CF88
 
 CF88:                                             ; preds = %CF86
+  store i32 0, ptr @g
   %Sl18 = select i1 %Cmp, i1 %Cmp11, i1 %Cmp
   br i1 %Sl18, label %CF88, label %CF85
 

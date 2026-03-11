@@ -3,6 +3,8 @@
 ; PR1103
 
 target datalayout = "e-p:64:64"
+@g = external global i32
+
 @i6000 = dso_local global [128 x i64] zeroinitializer, align 16
 
 
@@ -14,47 +16,52 @@ define dso_local void @foo(ptr %a0, ptr %a1, ptr %a2, ptr %a3, ptr %a4, ptr %a5)
 ; CHECK-NEXT:    .cfi_offset %rbp, -16
 ; CHECK-NEXT:    movq %rsp, %rbp
 ; CHECK-NEXT:    .cfi_def_cfa_register %rbp
-; CHECK-NEXT:    movslq (%rdi), %r8
+; CHECK-NEXT:    movslq (%rdi), %r10
 ; CHECK-NEXT:    movslq (%rsi), %rax
-; CHECK-NEXT:    movslq (%rdx), %rsi
-; CHECK-NEXT:    movl (%rcx), %edi
-; CHECK-NEXT:    movq %rsp, %rcx
-; CHECK-NEXT:    subl %r8d, %eax
-; CHECK-NEXT:    movslq %eax, %rdx
+; CHECK-NEXT:    movslq (%rdx), %rdi
+; CHECK-NEXT:    movl (%rcx), %r8d
+; CHECK-NEXT:    movslq (%r9), %rcx
+; CHECK-NEXT:    movq %rsp, %rdx
+; CHECK-NEXT:    subl %r10d, %eax
+; CHECK-NEXT:    movslq %eax, %rsi
 ; CHECK-NEXT:    js .LBB0_1
 ; CHECK-NEXT:  # %bb.11: # %b63
-; CHECK-NEXT:    testq %rdx, %rdx
+; CHECK-NEXT:    testq %rsi, %rsi
 ; CHECK-NEXT:    js .LBB0_14
 ; CHECK-NEXT:  # %bb.12:
-; CHECK-NEXT:    xorl %r8d, %r8d
+; CHECK-NEXT:    movq g@GOTPCREL(%rip), %r9
+; CHECK-NEXT:    xorl %r10d, %r10d
 ; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  .LBB0_13: # %a25b
 ; CHECK-NEXT:    # =>This Inner Loop Header: Depth=1
-; CHECK-NEXT:    testb %r8b, %r8b
+; CHECK-NEXT:    movl $0, (%r9)
+; CHECK-NEXT:    testb %r10b, %r10b
 ; CHECK-NEXT:    je .LBB0_13
 ; CHECK-NEXT:  .LBB0_14: # %b85
-; CHECK-NEXT:    movb $1, %r8b
-; CHECK-NEXT:    testb %r8b, %r8b
+; CHECK-NEXT:    movb $1, %r9b
+; CHECK-NEXT:    testb %r9b, %r9b
 ; CHECK-NEXT:    jne .LBB0_1
 ; CHECK-NEXT:  # %bb.15:
-; CHECK-NEXT:    xorl %r8d, %r8d
+; CHECK-NEXT:    movq g@GOTPCREL(%rip), %r9
+; CHECK-NEXT:    xorl %r10d, %r10d
 ; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  .LBB0_16: # %a25b140
 ; CHECK-NEXT:    # =>This Inner Loop Header: Depth=1
-; CHECK-NEXT:    testb %r8b, %r8b
+; CHECK-NEXT:    movl $0, (%r9)
+; CHECK-NEXT:    testb %r10b, %r10b
 ; CHECK-NEXT:    je .LBB0_16
 ; CHECK-NEXT:  .LBB0_1: # %a29b
-; CHECK-NEXT:    cmpl %esi, %edi
+; CHECK-NEXT:    cmpl %edi, %r8d
 ; CHECK-NEXT:    js .LBB0_10
 ; CHECK-NEXT:  # %bb.2: # %b158
-; CHECK-NEXT:    movslq (%r9), %rsi
-; CHECK-NEXT:    movl %esi, %edi
+; CHECK-NEXT:    movl %ecx, %edi
 ; CHECK-NEXT:    orl %eax, %edi
 ; CHECK-NEXT:    movl %edi, %r8d
 ; CHECK-NEXT:    shrl $31, %r8d
 ; CHECK-NEXT:    xorl %r9d, %r9d
 ; CHECK-NEXT:    xorps %xmm0, %xmm0
-; CHECK-NEXT:    movb $1, %r10b
+; CHECK-NEXT:    movq g@GOTPCREL(%rip), %r10
+; CHECK-NEXT:    movb $1, %r11b
 ; CHECK-NEXT:    jmp .LBB0_3
 ; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  .LBB0_9: # %b1606
@@ -81,22 +88,24 @@ define dso_local void @foo(ptr %a0, ptr %a1, ptr %a2, ptr %a3, ptr %a4, ptr %a5)
 ; CHECK-NEXT:    js .LBB0_4
 ; CHECK-NEXT:  # %bb.17: # %b179
 ; CHECK-NEXT:    # in Loop: Header=BB0_3 Depth=1
-; CHECK-NEXT:    testq %rdx, %rdx
+; CHECK-NEXT:    testq %rsi, %rsi
 ; CHECK-NEXT:    js .LBB0_18
 ; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  .LBB0_36: # %a30b
 ; CHECK-NEXT:    # Parent Loop BB0_3 Depth=1
 ; CHECK-NEXT:    # => This Inner Loop Header: Depth=2
+; CHECK-NEXT:    movl $0, (%r10)
 ; CHECK-NEXT:    testb %r9b, %r9b
 ; CHECK-NEXT:    je .LBB0_36
 ; CHECK-NEXT:  .LBB0_18: # %b188
 ; CHECK-NEXT:    # in Loop: Header=BB0_3 Depth=1
-; CHECK-NEXT:    testb %r10b, %r10b
+; CHECK-NEXT:    testb %r11b, %r11b
 ; CHECK-NEXT:    jne .LBB0_4
 ; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  .LBB0_19: # %a30b294
 ; CHECK-NEXT:    # Parent Loop BB0_3 Depth=1
 ; CHECK-NEXT:    # => This Inner Loop Header: Depth=2
+; CHECK-NEXT:    movl $0, (%r10)
 ; CHECK-NEXT:    testb %r9b, %r9b
 ; CHECK-NEXT:    je .LBB0_19
 ; CHECK-NEXT:  .LBB0_4: # %a33b
@@ -119,6 +128,7 @@ define dso_local void @foo(ptr %a0, ptr %a1, ptr %a2, ptr %a3, ptr %a4, ptr %a5)
 ; CHECK-NEXT:  .LBB0_33: # %a74b
 ; CHECK-NEXT:    # Parent Loop BB0_3 Depth=1
 ; CHECK-NEXT:    # => This Inner Loop Header: Depth=2
+; CHECK-NEXT:    movl $0, (%r10)
 ; CHECK-NEXT:    testb %r9b, %r9b
 ; CHECK-NEXT:    jne .LBB0_33
 ; CHECK-NEXT:  # %bb.34: # %b1582
@@ -151,76 +161,81 @@ define dso_local void @foo(ptr %a0, ptr %a1, ptr %a2, ptr %a3, ptr %a4, ptr %a5)
 ; CHECK-NEXT:    # Parent Loop BB0_3 Depth=1
 ; CHECK-NEXT:    # => This Loop Header: Depth=2
 ; CHECK-NEXT:    # Child Loop BB0_37 Depth 3
-; CHECK-NEXT:    testq %rsi, %rsi
+; CHECK-NEXT:    testq %rcx, %rcx
 ; CHECK-NEXT:    js .LBB0_21
 ; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  .LBB0_37: # %a35b
 ; CHECK-NEXT:    # Parent Loop BB0_3 Depth=1
 ; CHECK-NEXT:    # Parent Loop BB0_20 Depth=2
 ; CHECK-NEXT:    # => This Inner Loop Header: Depth=3
+; CHECK-NEXT:    movl $0, (%r10)
 ; CHECK-NEXT:    testb %r9b, %r9b
 ; CHECK-NEXT:    je .LBB0_37
 ; CHECK-NEXT:    jmp .LBB0_21
 ; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  .LBB0_27: # %b1016
 ; CHECK-NEXT:    # in Loop: Header=BB0_25 Depth=2
-; CHECK-NEXT:    testq %rsi, %rsi
+; CHECK-NEXT:    testq %rcx, %rcx
 ; CHECK-NEXT:    jle .LBB0_6
 ; CHECK-NEXT:  .LBB0_25: # %b858
 ; CHECK-NEXT:    # Parent Loop BB0_3 Depth=1
 ; CHECK-NEXT:    # => This Loop Header: Depth=2
 ; CHECK-NEXT:    # Child Loop BB0_38 Depth 3
 ; CHECK-NEXT:    # Child Loop BB0_28 Depth 3
-; CHECK-NEXT:    testq %rdx, %rdx
+; CHECK-NEXT:    testq %rsi, %rsi
 ; CHECK-NEXT:    js .LBB0_26
 ; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  .LBB0_38: # %a53b
 ; CHECK-NEXT:    # Parent Loop BB0_3 Depth=1
 ; CHECK-NEXT:    # Parent Loop BB0_25 Depth=2
 ; CHECK-NEXT:    # => This Inner Loop Header: Depth=3
+; CHECK-NEXT:    movl $0, (%r10)
 ; CHECK-NEXT:    testb %r9b, %r9b
 ; CHECK-NEXT:    je .LBB0_38
 ; CHECK-NEXT:  .LBB0_26: # %b879
 ; CHECK-NEXT:    # in Loop: Header=BB0_25 Depth=2
-; CHECK-NEXT:    testb %r10b, %r10b
+; CHECK-NEXT:    testb %r11b, %r11b
 ; CHECK-NEXT:    jne .LBB0_27
 ; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  .LBB0_28: # %a53b1019
 ; CHECK-NEXT:    # Parent Loop BB0_3 Depth=1
 ; CHECK-NEXT:    # Parent Loop BB0_25 Depth=2
 ; CHECK-NEXT:    # => This Inner Loop Header: Depth=3
-; CHECK-NEXT:    testq %rdx, %rdx
+; CHECK-NEXT:    movl $0, (%r10)
+; CHECK-NEXT:    testq %rsi, %rsi
 ; CHECK-NEXT:    jle .LBB0_28
 ; CHECK-NEXT:    jmp .LBB0_27
 ; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  .LBB0_31: # %b1263
 ; CHECK-NEXT:    # in Loop: Header=BB0_29 Depth=2
-; CHECK-NEXT:    testq %rdx, %rdx
+; CHECK-NEXT:    testq %rsi, %rsi
 ; CHECK-NEXT:    jle .LBB0_7
 ; CHECK-NEXT:  .LBB0_29: # %b1117
 ; CHECK-NEXT:    # Parent Loop BB0_3 Depth=1
 ; CHECK-NEXT:    # => This Loop Header: Depth=2
 ; CHECK-NEXT:    # Child Loop BB0_39 Depth 3
 ; CHECK-NEXT:    # Child Loop BB0_32 Depth 3
-; CHECK-NEXT:    testq %rsi, %rsi
+; CHECK-NEXT:    testq %rcx, %rcx
 ; CHECK-NEXT:    js .LBB0_30
 ; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  .LBB0_39: # %a63b
 ; CHECK-NEXT:    # Parent Loop BB0_3 Depth=1
 ; CHECK-NEXT:    # Parent Loop BB0_29 Depth=2
 ; CHECK-NEXT:    # => This Inner Loop Header: Depth=3
-; CHECK-NEXT:    testq %rsi, %rsi
+; CHECK-NEXT:    movl $0, (%r10)
+; CHECK-NEXT:    testq %rcx, %rcx
 ; CHECK-NEXT:    jle .LBB0_39
 ; CHECK-NEXT:  .LBB0_30: # %b1139
 ; CHECK-NEXT:    # in Loop: Header=BB0_29 Depth=2
-; CHECK-NEXT:    testq %rsi, %rsi
+; CHECK-NEXT:    testq %rcx, %rcx
 ; CHECK-NEXT:    jle .LBB0_31
 ; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  .LBB0_32: # %a63b1266
 ; CHECK-NEXT:    # Parent Loop BB0_3 Depth=1
 ; CHECK-NEXT:    # Parent Loop BB0_29 Depth=2
 ; CHECK-NEXT:    # => This Inner Loop Header: Depth=3
-; CHECK-NEXT:    testq %rsi, %rsi
+; CHECK-NEXT:    movl $0, (%r10)
+; CHECK-NEXT:    testq %rcx, %rcx
 ; CHECK-NEXT:    jle .LBB0_32
 ; CHECK-NEXT:    jmp .LBB0_31
 ; CHECK-NEXT:    .p2align 4
@@ -232,13 +247,14 @@ define dso_local void @foo(ptr %a0, ptr %a1, ptr %a2, ptr %a3, ptr %a4, ptr %a5)
 ; CHECK-NEXT:    # Parent Loop BB0_3 Depth=1
 ; CHECK-NEXT:    # => This Loop Header: Depth=2
 ; CHECK-NEXT:    # Child Loop BB0_23 Depth 3
-; CHECK-NEXT:    testq %rdx, %rdx
+; CHECK-NEXT:    testq %rsi, %rsi
 ; CHECK-NEXT:    js .LBB0_24
 ; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  .LBB0_23: # %a45b
 ; CHECK-NEXT:    # Parent Loop BB0_3 Depth=1
 ; CHECK-NEXT:    # Parent Loop BB0_22 Depth=2
 ; CHECK-NEXT:    # => This Inner Loop Header: Depth=3
+; CHECK-NEXT:    movl $0, (%r10)
 ; CHECK-NEXT:    testb %r9b, %r9b
 ; CHECK-NEXT:    je .LBB0_23
 ; CHECK-NEXT:    jmp .LBB0_24
@@ -307,6 +323,7 @@ a25b140q:
 	br label %a25b140
 a25b:
 	%w1989 = phi i64 [ 0, %b63 ], [ %v1990, %a25b ]
+	store i32 0, ptr @g
 	%e642 = shl i64 %w1989, 0
 	%r129 = add i64 %e642, 0
 	%r132 = add i64 %e642, 0
@@ -315,6 +332,7 @@ a25b:
 	br i1 %r134, label %b85, label %a25b
 a25b140:
 	%w1982 = phi i64 [ 0, %a25b140q ], [ %v1983, %a25b140 ]
+	store i32 0, ptr @g
 	%r145 = add i64 %r82, 0
 	%v1983 = add i64 %w1982, 0
 	%u1987 = icmp slt i64 %v1983, 0
@@ -350,6 +368,7 @@ a30b294q:
 	br label %a30b294
 a30b:
 	%w = phi i64 [ 0, %b179 ], [ %v, %a30b ]
+	store i32 0, ptr @g
 	%b2 = shl i64 %w, 0
 	%r283 = add i64 %b2, 0
 	%r286 = add i64 %b2, 0
@@ -358,6 +377,7 @@ a30b:
 	br i1 %r288, label %b188, label %a30b
 a30b294:
 	%w1847 = phi i64 [ 0, %a30b294q ], [ %v1848, %a30b294 ]
+	store i32 0, ptr @g
 	%v1848 = add i64 %w1847, 0
 	%u = icmp slt i64 %v1848, 0
 	br i1 %u, label %a33b, label %a30b294
@@ -390,6 +410,7 @@ b377:
 	br i1 %r462, label %a35b465, label %b463
 a35b:
 	%w1865 = phi i64 [ 0, %b341 ], [ %v1866, %a35b ]
+	store i32 0, ptr @g
 	%e785 = shl i64 %w1865, 0
 	%b1877 = mul i64 %w1865, 0
 	%s795 = add i64 %b1877, 0
@@ -434,6 +455,7 @@ b565:
 	br i1 %r711, label %a45b714, label %b712
 a45b:
 	%w1852 = phi i64 [ 0, %b535 ], [ %v1853, %a45b ]
+	store i32 0, ptr @g
 	%e945 = shl i64 %w1852, 0
 	%r609 = add i64 %r562, 0
 	%r703 = add i64 %e945, 0
@@ -523,6 +545,7 @@ a53b1019q:
 	br label %a53b1019
 a53b:
 	%w1881 = phi i64 [ 0, %b858 ], [ %v1882, %a53b ]
+	store i32 0, ptr @g
 	%e1205 = shl i64 %w1881, 0
 	%r1007 = add i64 %e1205, 0
 	%r1010 = add i64 %e1205, 0
@@ -537,6 +560,7 @@ b1016:
 	br i1 %r1073, label %b858, label %a57b
 a53b1019:
 	%w1885 = phi i64 [ 0, %a53b1019q ], [ %v1886, %a53b1019 ]
+	store i32 0, ptr @g
 	%r1022 = add i64 %r876, 0
 	%r1025 = add i64 %r1022, 0
 	%r1026 = getelementptr float, ptr %c2, i64 %r1025
@@ -596,6 +620,7 @@ a63b1266q:
 a63b:
 	%w1904 = phi i64 [ 0, %b1117 ], [ %v1905, %a63b ]
 	%s1375 = phi i64 [ 0, %b1117 ], [ %r1251, %a63b ]
+	store i32 0, ptr @g
 	%b1906 = add i64 %r1089, 0
 	%b1907 = mul i64 %r1101, 0
 	%b1929 = mul i64 %w1904, 0
@@ -622,6 +647,7 @@ b1263:
 a63b1266:
 	%w1944 = phi i64 [ 0, %a63b1266q ], [ %v1945, %a63b1266 ]
 	%s1377 = phi i64 [ %s1374, %a63b1266q ], [ %r1297, %a63b1266 ]
+	store i32 0, ptr @g
 	%r1282 = fadd float %r1136, 0.000000e+00
 	%r1297 = add i64 %s1377, 0
 	%v1945 = add i64 %w1944, 0
@@ -650,6 +676,7 @@ b1342:
 	br label %a74b
 a74b:
 	%w1958 = phi i64 [ 0, %b1342 ], [ %v1959, %a74b ]
+	store i32 0, ptr @g
 	%r1379 = add i64 %s1543, 0
 	%r1403 = add i64 %r1355, 0
 	%r1422 = add i64 %r1348, 0

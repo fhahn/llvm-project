@@ -7,11 +7,14 @@
 ; CHECK: cmpb.gtu([[REG0:r[0-9]+]]
 ; CHECK: [[REG0]] = add([[REG0]],
 
+@g = external global i32
+
 define void @f0() #0 {
 b0:
   br label %b1
 
 b1:                                               ; preds = %b1, %b0
+  store i32 0, ptr @g
   br i1 undef, label %b1, label %b2
 
 b2:                                               ; preds = %b2, %b1
@@ -19,6 +22,7 @@ b2:                                               ; preds = %b2, %b1
   %v1 = trunc i32 %v0 to i8
   %v2 = icmp ugt i8 %v1, 44
   %v3 = add i32 %v0, -30
+  store i32 0, ptr @g
   br i1 %v2, label %b2, label %b3
 
 b3:                                               ; preds = %b2

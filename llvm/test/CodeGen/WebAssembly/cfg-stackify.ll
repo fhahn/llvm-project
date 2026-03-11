@@ -552,8 +552,7 @@ u1:
 ; CHECK-LABEL: test8:
 ; CHECK:       .LBB{{[0-9]+}}_1:
 ; CHECK-NEXT:  loop i32{{$}}
-; CHECK-NEXT:  i32.const $push{{[^,]+}}, 0{{$}}
-; CHECK-NEXT:  br_if    0, {{[^,]+}}{{$}}
+; CHECK:       i32.store g($pop{{.*}}), $pop{{.*}}{{$}}
 ; CHECK-NEXT:  br       0{{$}}
 ; CHECK-NEXT:  .LBB{{[0-9]+}}_2:
 ; CHECK-NEXT:  end_loop{{$}}
@@ -562,6 +561,7 @@ bb:
   br label %bb1
 
 bb1:
+  store i32 0, ptr @g
   br i1 undef, label %bb2, label %bb3
 
 bb2:
@@ -794,6 +794,7 @@ bb1:
   ]
 
 bb4:
+  store i32 0, ptr @g
   %tmp5 = add i32 %tmp, 1
   br label %bb1
 
@@ -844,13 +845,15 @@ bb5:
 ; CHECK-LABEL: test14:
 ; CHECK:      .LBB{{[0-9]+}}_1:{{$}}
 ; CHECK-NEXT:     loop    {{$}}
-; CHECK-NEXT:     i32.const   $push0=, 0{{$}}
-; CHECK-NEXT:     br_if       0, $pop0{{$}}
+; CHECK:          i32.store   g($pop{{.*}}), $pop{{.*}}{{$}}
+; CHECK-NEXT:     i32.const   $push{{[^,]+}}=, 0{{$}}
+; CHECK-NEXT:     br_if       0, $pop{{.*}}{{$}}
 ; CHECK-NEXT:     end_loop{{$}}
 ; CHECK-NEXT: .LBB{{[0-9]+}}_3:{{$}}
 ; CHECK-NEXT:     loop    {{$}}
-; CHECK-NEXT:     i32.const   $push1=, 0{{$}}
-; CHECK-NEXT:     br_if       0, $pop1{{$}}
+; CHECK:          i32.store   g($pop{{.*}}), $pop{{.*}}{{$}}
+; CHECK-NEXT:     i32.const   $push{{[^,]+}}=, 0{{$}}
+; CHECK-NEXT:     br_if       0, $pop{{.*}}{{$}}
 ; CHECK-NEXT:     end_loop{{$}}
 ; CHECK-NEXT:     return{{$}}
 define void @test14() {
@@ -858,6 +861,7 @@ bb:
   br label %bb1
 
 bb1:
+  store i32 0, ptr @g
   %tmp = bitcast i1 undef to i1
   br i1 %tmp, label %bb3, label %bb1
 
@@ -892,6 +896,7 @@ bb38:
   br i1 undef, label %bb48, label %bb48
 
 bb48:
+  store i32 0, ptr @g
   %tmp49 = bitcast i1 undef to i1
   br i1 %tmp49, label %bb3, label %bb50
 
@@ -925,6 +930,7 @@ bb50:
 ; CHECK-NEXT:   end_block{{$}}
 ; CHECK-NEXT:   return{{$}}
 %0 = type { i8, i32 }
+@g = external global i32
 declare void @test15_callee0()
 declare void @test15_callee1()
 define void @test15() {

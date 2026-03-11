@@ -5,11 +5,14 @@
 
 target triple = "hexagon"
 
+@g = external global i32
+
 define void @fred() #0 {
 b0:
   br label %b1
 
 b1:                                               ; preds = %b1, %b0
+  store i32 0, ptr @g
   %v2 = load i32, ptr undef, align 4
   %v3 = select i1 undef, i32 %v2, i32 0
   %v4 = and i32 %v3, 7

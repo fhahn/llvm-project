@@ -4,6 +4,8 @@
 
 declare i32 @llvm.amdgcn.workitem.id.x()
 
+@g = external addrspace(1) global i32
+
 define <2 x i64> @f1() #0 {
 ; GFX11-LABEL: f1:
 ; GFX11:       ; %bb.0:
@@ -53,25 +55,25 @@ define amdgpu_kernel void @f2(i32 %arg, i32 %arg1, i32 %arg2, i1 %arg3, i32 %arg
 ; GFX11-LABEL: f2:
 ; GFX11:       ; %bb.0: ; %bb
 ; GFX11-NEXT:    s_mov_b64 s[16:17], s[4:5]
-; GFX11-NEXT:    v_mov_b32_e32 v31, v0
-; GFX11-NEXT:    s_load_b32 s19, s[16:17], 0x24
-; GFX11-NEXT:    s_mov_b32 s12, s13
 ; GFX11-NEXT:    s_mov_b64 s[10:11], s[6:7]
 ; GFX11-NEXT:    s_mov_b64 s[6:7], s[2:3]
-; GFX11-NEXT:    v_and_b32_e32 v0, 0x3ff, v31
+; GFX11-NEXT:    s_load_b32 s3, s[16:17], 0x24
+; GFX11-NEXT:    v_mov_b32_e32 v31, v0
+; GFX11-NEXT:    s_mov_b32 s12, s13
 ; GFX11-NEXT:    s_mov_b64 s[4:5], s[0:1]
 ; GFX11-NEXT:    s_mov_b32 s20, 0
 ; GFX11-NEXT:    s_mov_b32 s0, -1
-; GFX11-NEXT:    s_mov_b32 s3, exec_lo
+; GFX11-NEXT:    v_and_b32_e32 v0, 0x3ff, v31
+; GFX11-NEXT:    s_mov_b32 s18, exec_lo
 ; GFX11-NEXT:    s_mov_b32 s32, 0
 ; GFX11-NEXT:    s_waitcnt lgkmcnt(0)
-; GFX11-NEXT:    v_mul_lo_u32 v0, s19, v0
-; GFX11-NEXT:    s_delay_alu instid0(VALU_DEP_1)
+; GFX11-NEXT:    s_delay_alu instid0(VALU_DEP_1) | instskip(NEXT) | instid1(VALU_DEP_1)
+; GFX11-NEXT:    v_mul_lo_u32 v0, s3, v0
 ; GFX11-NEXT:    v_cmpx_eq_u32_e32 0, v0
 ; GFX11-NEXT:    s_cbranch_execz .LBB2_13
 ; GFX11-NEXT:  ; %bb.1: ; %bb14
 ; GFX11-NEXT:    s_load_b128 s[20:23], s[16:17], 0x2c
-; GFX11-NEXT:    s_mov_b32 s18, 0
+; GFX11-NEXT:    s_mov_b32 s19, 0
 ; GFX11-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX11-NEXT:    s_bitcmp1_b32 s21, 0
 ; GFX11-NEXT:    s_cselect_b32 s24, -1, 0
@@ -90,27 +92,28 @@ define amdgpu_kernel void @f2(i32 %arg, i32 %arg1, i32 %arg2, i1 %arg3, i32 %arg
 ; GFX11-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX11-NEXT:    s_swappc_b64 s[30:31], s[0:1]
 ; GFX11-NEXT:    s_mov_b32 s14, s21
-; GFX11-NEXT:    s_mov_b32 s2, -1
+; GFX11-NEXT:    s_mov_b32 s8, -1
 ; GFX11-NEXT:    s_cbranch_execz .LBB2_4
 ; GFX11-NEXT:    s_branch .LBB2_12
 ; GFX11-NEXT:  .LBB2_3:
-; GFX11-NEXT:    s_mov_b32 s2, 0
+; GFX11-NEXT:    s_mov_b32 s8, 0
 ; GFX11-NEXT:    s_and_not1_b32 vcc_lo, exec_lo, s0
 ; GFX11-NEXT:    s_cbranch_vccnz .LBB2_12
 ; GFX11-NEXT:  .LBB2_4: ; %bb16
 ; GFX11-NEXT:    s_load_b32 s0, s[16:17], 0x54
 ; GFX11-NEXT:    s_bitcmp1_b32 s23, 0
-; GFX11-NEXT:    s_cselect_b32 s9, -1, 0
+; GFX11-NEXT:    s_cselect_b32 s13, -1, 0
 ; GFX11-NEXT:    s_and_b32 s1, s23, 1
 ; GFX11-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX11-NEXT:    s_bitcmp1_b32 s0, 0
 ; GFX11-NEXT:    s_mov_b32 s0, -1
-; GFX11-NEXT:    s_cselect_b32 s8, -1, 0
+; GFX11-NEXT:    s_cselect_b32 s9, -1, 0
 ; GFX11-NEXT:    s_cmp_eq_u32 s1, 0
 ; GFX11-NEXT:    s_cbranch_scc0 .LBB2_8
 ; GFX11-NEXT:  ; %bb.5: ; %bb18.preheader
 ; GFX11-NEXT:    s_load_b128 s[28:31], s[16:17], 0x44
 ; GFX11-NEXT:    v_mov_b32_e32 v0, 0
+; GFX11-NEXT:    v_cndmask_b32_e64 v1, 0, 1, s24
 ; GFX11-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX11-NEXT:    s_mul_hi_u32 s1, s29, s28
 ; GFX11-NEXT:    s_mul_i32 s0, s29, s28
@@ -123,62 +126,78 @@ define amdgpu_kernel void @f2(i32 %arg, i32 %arg1, i32 %arg2, i1 %arg3, i32 %arg
 ; GFX11-NEXT:    s_mul_i32 s0, s0, s22
 ; GFX11-NEXT:    s_mul_i32 s0, s0, s20
 ; GFX11-NEXT:    s_delay_alu instid0(SALU_CYCLE_1) | instskip(NEXT) | instid1(SALU_CYCLE_1)
-; GFX11-NEXT:    s_or_b32 s0, s19, s0
-; GFX11-NEXT:    s_lshl_b64 s[20:21], s[0:1], 1
+; GFX11-NEXT:    s_or_b32 s0, s3, s0
+; GFX11-NEXT:    s_lshl_b64 s[2:3], s[0:1], 1
 ; GFX11-NEXT:    s_mov_b32 s0, s1
-; GFX11-NEXT:    global_load_u16 v1, v0, s[20:21]
-; GFX11-NEXT:    v_cndmask_b32_e64 v0, 0, 1, s24
-; GFX11-NEXT:    s_waitcnt vmcnt(0)
-; GFX11-NEXT:    v_cmp_eq_u32_e32 vcc_lo, 0, v1
-; GFX11-NEXT:    v_cndmask_b32_e64 v1, 0, 1, vcc_lo
-; GFX11-NEXT:    s_mov_b32 vcc_lo, 0
+; GFX11-NEXT:    s_set_inst_prefetch_distance 0x1
 ; GFX11-NEXT:    .p2align 6
 ; GFX11-NEXT:  .LBB2_6: ; %bb18
 ; GFX11-NEXT:    ; =>This Inner Loop Header: Depth=1
+; GFX11-NEXT:    s_getpc_b64 s[20:21]
+; GFX11-NEXT:    s_add_u32 s20, s20, g@gotpcrel32@lo+4
+; GFX11-NEXT:    s_addc_u32 s21, s21, g@gotpcrel32@hi+12
 ; GFX11-NEXT:    s_and_b32 s1, 0xffff, s1
-; GFX11-NEXT:    s_cselect_b32 s13, -1, 0
-; GFX11-NEXT:    v_readfirstlane_b32 s1, v0
-; GFX11-NEXT:    v_cndmask_b32_e64 v2, 0, 1, s13
-; GFX11-NEXT:    s_and_b32 s13, s8, s13
-; GFX11-NEXT:    s_delay_alu instid0(SALU_CYCLE_1) | instskip(NEXT) | instid1(VALU_DEP_1)
-; GFX11-NEXT:    s_and_b32 s13, s13, exec_lo
-; GFX11-NEXT:    v_readfirstlane_b32 s19, v2
-; GFX11-NEXT:    s_cselect_b32 s1, s19, s1
-; GFX11-NEXT:    s_delay_alu instid0(SALU_CYCLE_1)
+; GFX11-NEXT:    s_load_b64 s[20:21], s[20:21], 0x0
+; GFX11-NEXT:    s_cselect_b32 s1, -1, 0
+; GFX11-NEXT:    s_delay_alu instid0(SALU_CYCLE_1) | instskip(SKIP_1) | instid1(SALU_CYCLE_1)
+; GFX11-NEXT:    v_cndmask_b32_e64 v3, 0, 1, s1
+; GFX11-NEXT:    s_and_b32 s1, s9, s1
+; GFX11-NEXT:    s_and_b32 s1, s1, exec_lo
+; GFX11-NEXT:    s_delay_alu instid0(VALU_DEP_1)
+; GFX11-NEXT:    v_readfirstlane_b32 s1, v3
+; GFX11-NEXT:    s_waitcnt lgkmcnt(0)
+; GFX11-NEXT:    global_store_b32 v0, v0, s[20:21] dlc
+; GFX11-NEXT:    s_waitcnt_vscnt null, 0x0
+; GFX11-NEXT:    global_load_u16 v2, v0, s[2:3]
+; GFX11-NEXT:    v_readfirstlane_b32 s20, v1
+; GFX11-NEXT:    s_cselect_b32 s1, s1, s20
+; GFX11-NEXT:    s_delay_alu instid0(SALU_CYCLE_1) | instskip(SKIP_4) | instid1(VALU_DEP_1)
 ; GFX11-NEXT:    s_and_b32 s1, s1, 1
-; GFX11-NEXT:    s_and_b32 s13, 0xffff, s0
-; GFX11-NEXT:    s_cselect_b32 s13, -1, 0
-; GFX11-NEXT:    s_and_b32 s20, s9, exec_lo
-; GFX11-NEXT:    v_cndmask_b32_e64 v2, 0, 1, s13
-; GFX11-NEXT:    v_readfirstlane_b32 s13, v1
-; GFX11-NEXT:    s_delay_alu instid0(VALU_DEP_2) | instskip(SKIP_1) | instid1(SALU_CYCLE_1)
-; GFX11-NEXT:    v_readfirstlane_b32 s19, v2
-; GFX11-NEXT:    s_cselect_b32 s13, s19, s13
-; GFX11-NEXT:    s_bitcmp1_b32 s13, 0
-; GFX11-NEXT:    s_cselect_b32 s13, 0x100, 0
+; GFX11-NEXT:    s_and_b32 s20, 0xffff, s0
+; GFX11-NEXT:    s_cselect_b32 s20, -1, 0
+; GFX11-NEXT:    s_and_b32 s22, s13, exec_lo
+; GFX11-NEXT:    v_cndmask_b32_e64 v3, 0, 1, s20
+; GFX11-NEXT:    v_readfirstlane_b32 s20, v3
+; GFX11-NEXT:    s_waitcnt vmcnt(0)
+; GFX11-NEXT:    v_cmp_eq_u32_e32 vcc_lo, 0, v2
+; GFX11-NEXT:    v_cndmask_b32_e64 v2, 0, 1, vcc_lo
+; GFX11-NEXT:    s_mov_b32 vcc_lo, 0
+; GFX11-NEXT:    s_delay_alu instid0(VALU_DEP_1) | instskip(SKIP_1) | instid1(SALU_CYCLE_1)
+; GFX11-NEXT:    v_readfirstlane_b32 s21, v2
+; GFX11-NEXT:    s_cselect_b32 s20, s20, s21
+; GFX11-NEXT:    s_bitcmp1_b32 s20, 0
+; GFX11-NEXT:    s_cselect_b32 s20, 0x100, 0
 ; GFX11-NEXT:    s_delay_alu instid0(SALU_CYCLE_1)
-; GFX11-NEXT:    s_or_b32 s0, s13, s0
+; GFX11-NEXT:    s_or_b32 s0, s20, s0
 ; GFX11-NEXT:    s_cbranch_vccz .LBB2_6
 ; GFX11-NEXT:  ; %bb.7: ; %Flow
+; GFX11-NEXT:    s_set_inst_prefetch_distance 0x2
 ; GFX11-NEXT:    s_mov_b32 s0, 0
 ; GFX11-NEXT:  .LBB2_8: ; %Flow12
 ; GFX11-NEXT:    s_delay_alu instid0(SALU_CYCLE_1)
 ; GFX11-NEXT:    s_and_b32 vcc_lo, exec_lo, s0
 ; GFX11-NEXT:    s_cbranch_vccz .LBB2_12
 ; GFX11-NEXT:  ; %bb.9:
-; GFX11-NEXT:    s_xor_b32 s0, s8, -1
+; GFX11-NEXT:    v_mov_b32_e32 v0, 0
+; GFX11-NEXT:    s_xor_b32 s0, s9, -1
 ; GFX11-NEXT:  .LBB2_10: ; %bb17
 ; GFX11-NEXT:    ; =>This Inner Loop Header: Depth=1
-; GFX11-NEXT:    s_delay_alu instid0(SALU_CYCLE_1)
+; GFX11-NEXT:    s_getpc_b64 s[2:3]
+; GFX11-NEXT:    s_add_u32 s2, s2, g@gotpcrel32@lo+4
+; GFX11-NEXT:    s_addc_u32 s3, s3, g@gotpcrel32@hi+12
 ; GFX11-NEXT:    s_and_b32 vcc_lo, exec_lo, s0
+; GFX11-NEXT:    s_load_b64 s[2:3], s[2:3], 0x0
+; GFX11-NEXT:    s_waitcnt lgkmcnt(0)
+; GFX11-NEXT:    global_store_b32 v0, v0, s[2:3] dlc
+; GFX11-NEXT:    s_waitcnt_vscnt null, 0x0
 ; GFX11-NEXT:    s_cbranch_vccz .LBB2_10
 ; GFX11-NEXT:  ; %bb.11: ; %Flow6
-; GFX11-NEXT:    s_mov_b32 s18, -1
+; GFX11-NEXT:    s_mov_b32 s19, -1
 ; GFX11-NEXT:  .LBB2_12: ; %Flow11
-; GFX11-NEXT:    s_and_b32 s20, s2, exec_lo
-; GFX11-NEXT:    s_or_not1_b32 s0, s18, exec_lo
+; GFX11-NEXT:    s_and_b32 s20, s8, exec_lo
+; GFX11-NEXT:    s_or_not1_b32 s0, s19, exec_lo
 ; GFX11-NEXT:  .LBB2_13: ; %Flow9
-; GFX11-NEXT:    s_or_b32 exec_lo, exec_lo, s3
+; GFX11-NEXT:    s_or_b32 exec_lo, exec_lo, s18
 ; GFX11-NEXT:    s_and_saveexec_b32 s3, s0
 ; GFX11-NEXT:    s_cbranch_execz .LBB2_15
 ; GFX11-NEXT:  ; %bb.14: ; %bb43
@@ -217,11 +236,13 @@ bb16:
   br i1 %arg5, label %bb17, label %bb18
 
 bb17:
+  store volatile i32 0, ptr addrspace(1) @g
   br i1 %arg11, label %bb17, label %bb43
 
 bb18:
   %i19 = phi i16 [ %i38, %bb18 ], [ 0, %bb16 ]
   %i20 = phi i16 [ %i42, %bb18 ], [ 0, %bb16 ]
+  store volatile i32 0, ptr addrspace(1) @g
   %i21 = zext i32 %arg7 to i64
   %i22 = zext i32 %arg8 to i64
   %i23 = mul i64 %i22, %i21

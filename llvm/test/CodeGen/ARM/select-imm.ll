@@ -5,6 +5,8 @@
 ; RUN: llc < %s -mtriple=thumb-eabi -mcpu=arm1156t2-s -mattr=+thumb2 | FileCheck %s --check-prefix=THUMB2
 ; RUN: llc < %s -mtriple=thumbv8m.base-eabi | FileCheck %s --check-prefix=V8MBASE
 
+@g = external global i32
+
 define i32 @t1(i32 %c) nounwind readnone {
 ; ARM-LABEL: t1:
 ; ARM:       @ %bb.0: @ %entry
@@ -427,22 +429,29 @@ define void @t9(ptr %a, i8 %b) {
 ; ARM-NEXT:    ldrsb r4, [r0]
 ; ARM-NEXT:    mov r0, #1
 ; ARM-NEXT:    bl f
-; ARM-NEXT:    and r0, r4, #255
-; ARM-NEXT:    cmp r0, r0
+; ARM-NEXT:    and r2, r4, #255
+; ARM-NEXT:    cmp r2, r2
 ; ARM-NEXT:    bne .LBB8_3
 ; ARM-NEXT:  @ %bb.1: @ %while.body.preheader
+; ARM-NEXT:    ldr r12, .LCPI8_0
 ; ARM-NEXT:    add r1, r4, #1
-; ARM-NEXT:    mov r2, r0
+; ARM-NEXT:    mov r3, #0
+; ARM-NEXT:    mov r0, r2
 ; ARM-NEXT:  .LBB8_2: @ %while.body
 ; ARM-NEXT:    @ =>This Inner Loop Header: Depth=1
-; ARM-NEXT:    add r2, r2, #1
+; ARM-NEXT:    add r0, r0, #1
 ; ARM-NEXT:    add r1, r1, #1
-; ARM-NEXT:    and r3, r2, #255
-; ARM-NEXT:    cmp r3, r0
+; ARM-NEXT:    and r4, r0, #255
+; ARM-NEXT:    str r3, [r12]
+; ARM-NEXT:    cmp r4, r2
 ; ARM-NEXT:    blt .LBB8_2
 ; ARM-NEXT:  .LBB8_3: @ %while.end
 ; ARM-NEXT:    pop {r4, lr}
 ; ARM-NEXT:    mov pc, lr
+; ARM-NEXT:    .p2align 2
+; ARM-NEXT:  @ %bb.4:
+; ARM-NEXT:  .LCPI8_0:
+; ARM-NEXT:    .long g
 ;
 ; ARMT2-LABEL: t9:
 ; ARMT2:       @ %bb.0: @ %entry
@@ -451,45 +460,55 @@ define void @t9(ptr %a, i8 %b) {
 ; ARMT2-NEXT:    ldrsb r4, [r0]
 ; ARMT2-NEXT:    mov r0, #1
 ; ARMT2-NEXT:    bl f
-; ARMT2-NEXT:    uxtb r0, r4
-; ARMT2-NEXT:    cmp r0, r0
+; ARMT2-NEXT:    uxtb r2, r4
+; ARMT2-NEXT:    cmp r2, r2
 ; ARMT2-NEXT:    popne {r4, pc}
 ; ARMT2-NEXT:  .LBB8_1: @ %while.body.preheader
+; ARMT2-NEXT:    movw r12, :lower16:g
 ; ARMT2-NEXT:    add r1, r4, #1
-; ARMT2-NEXT:    mov r2, r0
+; ARMT2-NEXT:    movt r12, :upper16:g
+; ARMT2-NEXT:    mov r3, #0
+; ARMT2-NEXT:    mov r0, r2
 ; ARMT2-NEXT:  .LBB8_2: @ %while.body
 ; ARMT2-NEXT:    @ =>This Inner Loop Header: Depth=1
-; ARMT2-NEXT:    add r2, r2, #1
+; ARMT2-NEXT:    add r0, r0, #1
 ; ARMT2-NEXT:    add r1, r1, #1
-; ARMT2-NEXT:    uxtb r3, r2
-; ARMT2-NEXT:    cmp r3, r0
+; ARMT2-NEXT:    uxtb r4, r0
+; ARMT2-NEXT:    cmp r4, r2
+; ARMT2-NEXT:    str r3, [r12]
 ; ARMT2-NEXT:    blt .LBB8_2
 ; ARMT2-NEXT:  @ %bb.3: @ %while.end
 ; ARMT2-NEXT:    pop {r4, pc}
 ;
 ; THUMB1-LABEL: t9:
 ; THUMB1:       @ %bb.0: @ %entry
-; THUMB1-NEXT:    .save {r4, lr}
-; THUMB1-NEXT:    push {r4, lr}
-; THUMB1-NEXT:    movs r1, #0
-; THUMB1-NEXT:    ldrsb r4, [r0, r1]
+; THUMB1-NEXT:    .save {r4, r5, r7, lr}
+; THUMB1-NEXT:    push {r4, r5, r7, lr}
+; THUMB1-NEXT:    movs r4, #0
+; THUMB1-NEXT:    ldrsb r5, [r0, r4]
 ; THUMB1-NEXT:    movs r0, #1
 ; THUMB1-NEXT:    bl f
-; THUMB1-NEXT:    uxtb r0, r4
+; THUMB1-NEXT:    uxtb r0, r5
 ; THUMB1-NEXT:    cmp r0, r0
 ; THUMB1-NEXT:    bne .LBB8_3
 ; THUMB1-NEXT:  @ %bb.1: @ %while.body.preheader
-; THUMB1-NEXT:    adds r1, r4, #1
-; THUMB1-NEXT:    mov r2, r0
+; THUMB1-NEXT:    adds r1, r5, #1
+; THUMB1-NEXT:    ldr r2, .LCPI8_0
+; THUMB1-NEXT:    mov r3, r0
 ; THUMB1-NEXT:  .LBB8_2: @ %while.body
 ; THUMB1-NEXT:    @ =>This Inner Loop Header: Depth=1
+; THUMB1-NEXT:    str r4, [r2]
 ; THUMB1-NEXT:    adds r1, r1, #1
-; THUMB1-NEXT:    adds r2, r2, #1
-; THUMB1-NEXT:    uxtb r3, r2
-; THUMB1-NEXT:    cmp r3, r0
+; THUMB1-NEXT:    adds r3, r3, #1
+; THUMB1-NEXT:    uxtb r5, r3
+; THUMB1-NEXT:    cmp r5, r0
 ; THUMB1-NEXT:    blt .LBB8_2
 ; THUMB1-NEXT:  .LBB8_3: @ %while.end
-; THUMB1-NEXT:    pop {r4, pc}
+; THUMB1-NEXT:    pop {r4, r5, r7, pc}
+; THUMB1-NEXT:    .p2align 2
+; THUMB1-NEXT:  @ %bb.4:
+; THUMB1-NEXT:  .LCPI8_0:
+; THUMB1-NEXT:    .long g
 ;
 ; THUMB2-LABEL: t9:
 ; THUMB2:       @ %bb.0: @ %entry
@@ -498,46 +517,53 @@ define void @t9(ptr %a, i8 %b) {
 ; THUMB2-NEXT:    ldrsb.w r4, [r0]
 ; THUMB2-NEXT:    movs r0, #1
 ; THUMB2-NEXT:    bl f
-; THUMB2-NEXT:    uxtb r0, r4
-; THUMB2-NEXT:    cmp r0, r0
+; THUMB2-NEXT:    uxtb r2, r4
+; THUMB2-NEXT:    cmp r2, r2
 ; THUMB2-NEXT:    it ne
 ; THUMB2-NEXT:    popne {r4, pc}
 ; THUMB2-NEXT:  .LBB8_1: @ %while.body.preheader
+; THUMB2-NEXT:    movw r12, :lower16:g
 ; THUMB2-NEXT:    adds r1, r4, #1
-; THUMB2-NEXT:    mov r2, r0
+; THUMB2-NEXT:    movt r12, :upper16:g
+; THUMB2-NEXT:    movs r3, #0
+; THUMB2-NEXT:    mov r0, r2
 ; THUMB2-NEXT:  .LBB8_2: @ %while.body
 ; THUMB2-NEXT:    @ =>This Inner Loop Header: Depth=1
-; THUMB2-NEXT:    adds r2, #1
+; THUMB2-NEXT:    adds r0, #1
 ; THUMB2-NEXT:    adds r1, #1
-; THUMB2-NEXT:    uxtb r3, r2
-; THUMB2-NEXT:    cmp r3, r0
+; THUMB2-NEXT:    uxtb r4, r0
+; THUMB2-NEXT:    cmp r4, r2
+; THUMB2-NEXT:    str.w r3, [r12]
 ; THUMB2-NEXT:    blt .LBB8_2
 ; THUMB2-NEXT:  @ %bb.3: @ %while.end
 ; THUMB2-NEXT:    pop {r4, pc}
 ;
 ; V8MBASE-LABEL: t9:
 ; V8MBASE:       @ %bb.0: @ %entry
-; V8MBASE-NEXT:    .save {r4, lr}
-; V8MBASE-NEXT:    push {r4, lr}
-; V8MBASE-NEXT:    movs r1, #0
-; V8MBASE-NEXT:    ldrsb r4, [r0, r1]
+; V8MBASE-NEXT:    .save {r4, r5, r7, lr}
+; V8MBASE-NEXT:    push {r4, r5, r7, lr}
+; V8MBASE-NEXT:    movs r4, #0
+; V8MBASE-NEXT:    ldrsb r5, [r0, r4]
 ; V8MBASE-NEXT:    movs r0, #1
 ; V8MBASE-NEXT:    bl f
-; V8MBASE-NEXT:    uxtb r0, r4
+; V8MBASE-NEXT:    uxtb r0, r5
 ; V8MBASE-NEXT:    cmp r0, r0
 ; V8MBASE-NEXT:    bne .LBB8_3
 ; V8MBASE-NEXT:  @ %bb.1: @ %while.body.preheader
-; V8MBASE-NEXT:    adds r1, r4, #1
-; V8MBASE-NEXT:    mov r2, r0
+; V8MBASE-NEXT:    adds r1, r5, #1
+; V8MBASE-NEXT:    movw r2, :lower16:g
+; V8MBASE-NEXT:    movt r2, :upper16:g
+; V8MBASE-NEXT:    mov r3, r0
 ; V8MBASE-NEXT:  .LBB8_2: @ %while.body
 ; V8MBASE-NEXT:    @ =>This Inner Loop Header: Depth=1
+; V8MBASE-NEXT:    str r4, [r2]
 ; V8MBASE-NEXT:    adds r1, r1, #1
-; V8MBASE-NEXT:    adds r2, r2, #1
-; V8MBASE-NEXT:    uxtb r3, r2
-; V8MBASE-NEXT:    cmp r3, r0
+; V8MBASE-NEXT:    adds r3, r3, #1
+; V8MBASE-NEXT:    uxtb r5, r3
+; V8MBASE-NEXT:    cmp r5, r0
 ; V8MBASE-NEXT:    blt .LBB8_2
 ; V8MBASE-NEXT:  .LBB8_3: @ %while.end
-; V8MBASE-NEXT:    pop {r4, pc}
+; V8MBASE-NEXT:    pop {r4, r5, r7, pc}
 entry:
   %0 = load i8, ptr %a
   %conv = sext i8 %0 to i32
@@ -555,6 +581,7 @@ while.body:                                       ; preds = %entry, %while.body
   %conv1 = zext i8 %inc9 to i32
   %cmp = icmp slt i32 %conv1, %conv119
   %conv5 = and i32 %inc, 255
+  store i32 0, ptr @g
   br i1 %cmp, label %while.body, label %while.end
 
 while.end:

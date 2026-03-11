@@ -2,6 +2,8 @@
 ; RUN: llc -mtriple=aarch64-apple-darwin            -verify-machineinstrs < %s | FileCheck %s --check-prefixes=CHECK,CHECK-ISEL
 ; RUN: llc -mtriple=aarch64-apple-darwin -fast-isel -verify-machineinstrs < %s | FileCheck %s --check-prefixes=CHECK,CHECK-FAST
 
+@g = external global i32
+
 ; Test that we use the correct register class.
 define i32 @mul_add_imm(i32 %a, i32 %b) {
 ; CHECK-LABEL: mul_add_imm:
@@ -29,23 +31,32 @@ define i32 @mul_sub_imm1(i32 %a, i32 %b) {
 define void @mul_add_imm2() {
 ; CHECK-ISEL-LABEL: mul_add_imm2:
 ; CHECK-ISEL:       ; %bb.0: ; %entry
-; CHECK-ISEL-NEXT:    mov w8, #1 ; =0x1
+; CHECK-ISEL-NEXT:  Lloh0:
+; CHECK-ISEL-NEXT:    adrp x8, _g@GOTPAGE
+; CHECK-ISEL-NEXT:    mov w9, #1 ; =0x1
+; CHECK-ISEL-NEXT:  Lloh1:
+; CHECK-ISEL-NEXT:    ldr x8, [x8, _g@GOTPAGEOFF]
 ; CHECK-ISEL-NEXT:  LBB2_1: ; %for.body8
 ; CHECK-ISEL-NEXT:    ; =>This Inner Loop Header: Depth=1
-; CHECK-ISEL-NEXT:    cbnz w8, LBB2_1
+; CHECK-ISEL-NEXT:    str wzr, [x8]
+; CHECK-ISEL-NEXT:    cbnz w9, LBB2_1
 ; CHECK-ISEL-NEXT:  ; %bb.2: ; %for.end20
 ; CHECK-ISEL-NEXT:    ret
+; CHECK-ISEL-NEXT:    .loh AdrpLdrGot Lloh0, Lloh1
 ;
 ; CHECK-FAST-LABEL: mul_add_imm2:
 ; CHECK-FAST:       ; %bb.0: ; %entry
 ; CHECK-FAST-NEXT:    mov x8, #-3 ; =0xfffffffffffffffd
-; CHECK-FAST-NEXT:    mov x9, #45968 ; =0xb390
+; CHECK-FAST-NEXT:    mov x10, #45968 ; =0xb390
+; CHECK-FAST-NEXT:    adrp x9, _g@GOTPAGE
 ; CHECK-FAST-NEXT:    madd x8, x8, x8, x8
-; CHECK-FAST-NEXT:    movk x9, #48484, lsl #16
-; CHECK-FAST-NEXT:    movk x9, #323, lsl #32
+; CHECK-FAST-NEXT:    movk x10, #48484, lsl #16
+; CHECK-FAST-NEXT:    movk x10, #323, lsl #32
 ; CHECK-FAST-NEXT:  LBB2_1: ; %for.body8
 ; CHECK-FAST-NEXT:    ; =>This Inner Loop Header: Depth=1
-; CHECK-FAST-NEXT:    cmp x8, x9
+; CHECK-FAST-NEXT:    ldr x11, [x9, _g@GOTPAGEOFF]
+; CHECK-FAST-NEXT:    cmp x8, x10
+; CHECK-FAST-NEXT:    str wzr, [x11]
 ; CHECK-FAST-NEXT:    b.lt LBB2_1
 ; CHECK-FAST-NEXT:  ; %bb.2: ; %for.end20
 ; CHECK-FAST-NEXT:    ret
@@ -57,6 +68,7 @@ for.body8:
   %0 = mul i64 undef, -3
   %mul1971 = add i64 %0, -3
   %cmp7 = icmp slt i64 %mul1971, 1390451930000
+  store i32 0, ptr @g
   br i1 %cmp7, label %for.body8, label %for.end20
 for.end20:
   ret void

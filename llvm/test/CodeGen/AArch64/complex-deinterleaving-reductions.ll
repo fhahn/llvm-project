@@ -3,6 +3,8 @@
 
 target triple = "aarch64"
 
+@g = external global i32
+
 %"struct.std::complex" = type { { double, double } }
 
 ; Zero initialized reduction
@@ -240,8 +242,11 @@ middle.block:                                     ; preds = %vector.body
 define void @incorrect_reduction_pattern(i1 %exitcond.not) {
 ; CHECK-LABEL: incorrect_reduction_pattern:
 ; CHECK:       // %bb.0: // %entry
+; CHECK-NEXT:    adrp x8, :got:g
+; CHECK-NEXT:    ldr x8, [x8, :got_lo12:g]
 ; CHECK-NEXT:  .LBB3_1: // %for.body
 ; CHECK-NEXT:    // =>This Inner Loop Header: Depth=1
+; CHECK-NEXT:    str wzr, [x8]
 ; CHECK-NEXT:    tbz w0, #0, .LBB3_1
 ; CHECK-NEXT:  // %bb.2: // %for.end.loopexit
 ; CHECK-NEXT:    ret
@@ -254,6 +259,7 @@ for.body:                                         ; preds = %for.body, %entry
   %add = fadd <4 x float> %vec_r, %vec_i
   %lane_r = shufflevector <4 x float> <float 1.000000e+00, float undef, float undef, float undef>, <4 x float> zeroinitializer, <4 x i32> zeroinitializer
   %lane_i = shufflevector <4 x float> <float 1.000000e+00, float undef, float undef, float undef>, <4 x float> zeroinitializer, <4 x i32> zeroinitializer
+  store i32 0, ptr @g
   br i1 %exitcond.not, label %for.end.loopexit, label %for.body
 
 for.end.loopexit:                                 ; preds = %for.body

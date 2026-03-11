@@ -57,6 +57,8 @@
 ; DISABLE-NEXT: blr
 ;
 
+@g = external global i32
+
 define i32 @foo(i32 %a, i32 %b) {
   %tmp = alloca i32, align 4
   %tmp2 = icmp slt i32 %a, %b
@@ -466,6 +468,7 @@ for.body:                                         ; preds = %entry, %for.body
   tail call void asm "addi 31, 14, 1", "~{r31}"()
   %inc = add nuw nsw i32 %i.03, 1
   %exitcond = icmp eq i32 %inc, 10
+  store i32 0, ptr @g
   br i1 %exitcond, label %for.exit, label %for.body
 
 for.exit:

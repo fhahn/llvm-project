@@ -5,6 +5,8 @@
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 
+@g = external global i32
+
 @a = external global ptr, align 8
 @b = external global i32, align 4
 
@@ -19,6 +21,7 @@ entry:
 
 for.body.i:                                       ; preds = %for.body.i, %entry
   %exitcond5.i = icmp eq i32 undef, undef
+  store i32 0, ptr @g
   br i1 %exitcond5.i, label %for.body3.lr.ph.i, label %for.body.i
 
 for.body3.lr.ph.i:                                ; preds = %for.body.i

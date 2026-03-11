@@ -4,6 +4,8 @@
 ; This testcase produces a situation with unused value numbers in subregister
 ; liveranges that get distributed by ConnectedVNInfoEqClasses.
 
+@g = external addrspace(1) global i32
+
 define amdgpu_kernel void @hoge(i1 %c0, i1 %c1, i1 %c2, i1 %c3, i1 %c4) {
 ; CHECK-LABEL: hoge:
 ; CHECK:       ; %bb.0: ; %bb
@@ -18,11 +20,22 @@ define amdgpu_kernel void @hoge(i1 %c0, i1 %c1, i1 %c2, i1 %c3, i1 %c4) {
 ; CHECK-NEXT:    s_bitcmp1_b32 s2, 24
 ; CHECK-NEXT:    s_cselect_b64 s[0:1], -1, 0
 ; CHECK-NEXT:    s_xor_b64 s[0:1], s[0:1], -1
-; CHECK-NEXT:    v_cndmask_b32_e64 v0, 0, 1, s[0:1]
-; CHECK-NEXT:    v_cmp_ne_u32_e64 s[0:1], 1, v0
+; CHECK-NEXT:    v_cndmask_b32_e64 v1, 0, 1, s[0:1]
+; CHECK-NEXT:    s_mov_b32 s7, 0xf000
+; CHECK-NEXT:    s_mov_b32 s6, -1
+; CHECK-NEXT:    v_mov_b32_e32 v0, 0
+; CHECK-NEXT:    v_cmp_ne_u32_e64 s[0:1], 1, v1
+; CHECK-NEXT:    s_getpc_b64 s[2:3]
+; CHECK-NEXT:    s_add_u32 s2, s2, g@gotpcrel32@lo+4
+; CHECK-NEXT:    s_addc_u32 s3, s3, g@gotpcrel32@hi+12
 ; CHECK-NEXT:  .LBB0_1: ; %bb25
 ; CHECK-NEXT:    ; =>This Inner Loop Header: Depth=1
+; CHECK-NEXT:    s_load_dwordx2 s[4:5], s[2:3], 0x0
 ; CHECK-NEXT:    s_and_b64 vcc, exec, s[0:1]
+; CHECK-NEXT:    s_waitcnt lgkmcnt(0)
+; CHECK-NEXT:    buffer_store_dword v0, off, s[4:7], 0
+; CHECK-NEXT:    s_waitcnt vmcnt(0)
+; CHECK-NEXT:    s_mov_b64 vcc, vcc
 ; CHECK-NEXT:    s_cbranch_vccnz .LBB0_1
 ; CHECK-NEXT:  ; %bb.2: ; %bb30
 ; CHECK-NEXT:    s_endpgm
@@ -59,6 +72,7 @@ bb23:
 
 bb25:
   %tmp26 = phi i32 [ %tmp24, %bb23 ], [ poison, %bb25 ]
+  store volatile i32 0, ptr addrspace(1) @g
   br i1 %c3, label %bb25, label %bb30
 
 bb30:

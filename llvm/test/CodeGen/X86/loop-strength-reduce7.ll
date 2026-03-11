@@ -4,44 +4,52 @@
 target triple = "i386-apple-darwin9.6"
 	%struct.III_psy_xmin = type { [22 x double], [13 x [3 x double]] }
 	%struct.III_scalefac_t = type { [22 x i32], [13 x [3 x i32]] }
+
+@g = external global i32
 	%struct.gr_info = type { i32, i32, i32, i32, i32, i32, i32, i32, [3 x i32], [3 x i32], i32, i32, i32, i32, i32, i32, i32, i32, i32, ptr, [4 x i32] }
 	%struct.lame_global_flags = type { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, ptr, ptr, i32, i32, float, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, float, i32, i32, i32, float, float, float, float, i32, i32, i32, i32, i32, i32, i32, i32 }
 
 define fastcc void @outer_loop(ptr nocapture %gfp, ptr nocapture %xr, i32 %targ_bits, ptr nocapture %best_noise, ptr nocapture %l3_xmin, ptr nocapture %l3_enc, ptr nocapture %scalefac, ptr nocapture %cod_info, i32 %ch) nounwind {
 ; CHECK-LABEL: outer_loop:
 ; CHECK:       ## %bb.0: ## %entry
+; CHECK-NEXT:    pushl %edi
 ; CHECK-NEXT:    pushl %esi
-; CHECK-NEXT:    movl $88, %eax
-; CHECK-NEXT:    movl $168, %ecx
+; CHECK-NEXT:    movl L_g$non_lazy_ptr, %eax
+; CHECK-NEXT:    movl $0, (%eax)
+; CHECK-NEXT:    movl $88, %ecx
+; CHECK-NEXT:    movl $168, %edx
 ; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  LBB0_2: ## %bb28.i37
 ; CHECK-NEXT:    ## =>This Loop Header: Depth=1
 ; CHECK-NEXT:    ## Child Loop BB0_3 Depth 2
-; CHECK-NEXT:    xorl %edx, %edx
-; CHECK-NEXT:    movl %eax, %esi
+; CHECK-NEXT:    xorl %esi, %esi
+; CHECK-NEXT:    movl %ecx, %edi
 ; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  LBB0_3: ## %bb29.i38
 ; CHECK-NEXT:    ## Parent Loop BB0_2 Depth=1
 ; CHECK-NEXT:    ## => This Inner Loop Header: Depth=2
-; CHECK-NEXT:    incl %edx
-; CHECK-NEXT:    addl $12, %esi
-; CHECK-NEXT:    cmpl $11, %edx
+; CHECK-NEXT:    incl %esi
+; CHECK-NEXT:    movl $0, (%eax)
+; CHECK-NEXT:    addl $12, %edi
+; CHECK-NEXT:    cmpl $11, %esi
 ; CHECK-NEXT:    jbe LBB0_3
 ; CHECK-NEXT:  ## %bb.1: ## %bb28.i37.loopexit
 ; CHECK-NEXT:    ## in Loop: Header=BB0_2 Depth=1
-; CHECK-NEXT:    addl $4, %eax
-; CHECK-NEXT:    addl $168, %ecx
+; CHECK-NEXT:    addl $4, %ecx
+; CHECK-NEXT:    addl $168, %edx
 ; CHECK-NEXT:    jmp LBB0_2
 entry:
 	br label %bb4
 
 bb4:		; preds = %bb4, %entry
+	store i32 0, ptr @g
 	br i1 true, label %bb5, label %bb4
 
 bb5:		; preds = %bb4
 	br i1 true, label %bb28.i37, label %bb.i4
 
 bb.i4:		; preds = %bb.i4, %bb5
+	store i32 0, ptr @g
 	br label %bb.i4
 
 bb28.i37:		; preds = %bb33.i47, %bb5
@@ -65,5 +73,6 @@ bb33.i47:		; preds = %bb30.i41, %bb29.i38
 	%4 = add i32 %sfb.314.i, 1		; <i32> [#uses=1]
 	%phitmp.i46 = icmp ugt i32 %4, 11		; <i1> [#uses=1]
 	%indvar.next33.i = add i32 %indvar32.i, 1		; <i32> [#uses=1]
+	store i32 0, ptr @g
 	br i1 %phitmp.i46, label %bb28.i37, label %bb29.i38
 }

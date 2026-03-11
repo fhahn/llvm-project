@@ -5,18 +5,23 @@
 ; Ensure that the %ptrue from the preheader is sunk into the loop such that the ptest is removed.
 ;
 
+@g = external global i32
+
 define void @test_sink_ptrue_into_ptest(i32 %n) {
 ; CHECK-LABEL: test_sink_ptrue_into_ptest:
 ; CHECK:       // %bb.0: // %entry
 ; CHECK-NEXT:    whilelt p0.s, wzr, w0
 ; CHECK-NEXT:    b.pl .LBB0_3
 ; CHECK-NEXT:  // %bb.1: // %for.body.preheader
-; CHECK-NEXT:    mov w9, wzr
-; CHECK-NEXT:    cntw x8
+; CHECK-NEXT:    adrp x9, :got:g
+; CHECK-NEXT:    mov w8, wzr
+; CHECK-NEXT:    cntw x10
+; CHECK-NEXT:    ldr x9, [x9, :got_lo12:g]
 ; CHECK-NEXT:  .LBB0_2: // %for.body
 ; CHECK-NEXT:    // =>This Inner Loop Header: Depth=1
-; CHECK-NEXT:    whilelt p0.s, w9, w0
-; CHECK-NEXT:    add w9, w9, w8
+; CHECK-NEXT:    whilelt p0.s, w8, w0
+; CHECK-NEXT:    add w8, w8, w10
+; CHECK-NEXT:    str wzr, [x9]
 ; CHECK-NEXT:    b.mi .LBB0_2
 ; CHECK-NEXT:  .LBB0_3: // %exit
 ; CHECK-NEXT:    ret
@@ -33,6 +38,7 @@ for.body:
   %i.next = add i32 %i, %step
   %while = call <vscale x 4 x i1> @llvm.aarch64.sve.whilelt.nxv4i1.i32(i32 %i, i32 %n)
   %ptest = call i1 @llvm.aarch64.sve.ptest.first.nxv4i1(<vscale x 4 x i1> %ptrue.ph, <vscale x 4 x i1> %while)
+  store i32 0, ptr @g
   br i1 %ptest, label %for.body, label %exit
 
 exit:

@@ -195,6 +195,7 @@
 ; SPIRV-Opt-NEXT:      Remove dead machine instructions
 ; SPIRV-Opt-NEXT:      MachineDominator Tree Construction
 ; SPIRV-Opt-NEXT:      Machine Natural Loop Construction
+; SPIRV-Opt-NEXT:      Delete dead machine loops
 ; SPIRV-Opt-NEXT:      Machine Block Frequency Analysis
 ; SPIRV-Opt-NEXT:      Early Machine Loop Invariant Code Motion
 ; SPIRV-Opt-NEXT:      MachineDominator Tree Construction

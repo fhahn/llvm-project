@@ -1,5 +1,7 @@
 ; RUN: llc -mtriple=powerpc64-unknown-linux-gnu -mcpu=pwr8 -verify-machineinstrs < %s | FileCheck %s
 
+@g = external global i32
+
 define i32 @relax_bcc(i1 %b) {
 ; CHECK-LABEL: relax_bcc:
 ; CHECK:       # %bb.0:
@@ -13,12 +15,12 @@ define i32 @relax_bcc(i1 %b) {
 ; CHECK-NEXT:    bc 12, 1, .+8
 ; CHECK-NEXT:    b .LBB0_4
 ; CHECK-NEXT:  # %bb.1:
-; CHECK-NEXT:    li 3, 101
-; CHECK-NEXT:    mtctr 3
-; CHECK-NEXT:    .p2align        4
+; CHECK:         li 3, 101
+; CHECK:         mtctr 3
+; CHECK:         .p2align        4
 ; CHECK-NEXT:  .LBB0_2:
 ; CHECK-NEXT:    # =>This Inner Loop Header: Depth=1
-; CHECK-NEXT:    bdnz .LBB0_2
+; CHECK:         bdnz .LBB0_2
 ; CHECK-NEXT:  # %bb.3:
 ; CHECK-NEXT:    #APP
 ; CHECK-NEXT:    .space 32748
@@ -34,6 +36,7 @@ for.body:                                         ; preds = %for.body, %entry
    %0 = phi i32 [0, %entry], [%1, %for.body]
    %1 = add i32 %0, 1
    %2 = icmp sgt i32 %1, 100
+   store volatile i32 0, ptr @g
    br i1 %2, label %exit, label %for.body
 
 exit:

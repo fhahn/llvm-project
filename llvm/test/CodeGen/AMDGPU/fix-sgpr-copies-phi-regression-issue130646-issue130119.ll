@@ -5,37 +5,44 @@
 ; process a copy which has already been erased (which was already
 ; inserted by the pass).
 
+@g = external addrspace(1) global i32
+
 define double @issue130646(i64 %arg) {
 ; CHECK-LABEL: issue130646:
 ; CHECK:       ; %bb.0: ; %entry
 ; CHECK-NEXT:    s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)
 ; CHECK-NEXT:    v_mov_b32_e32 v2, 0
+; CHECK-NEXT:    s_mov_b64 s[6:7], 0
 ; CHECK-NEXT:    v_mov_b32_e32 v3, 0
-; CHECK-NEXT:    s_mov_b64 s[4:5], 0
+; CHECK-NEXT:    s_mov_b32 s5, g@abs32@hi
+; CHECK-NEXT:    s_mov_b32 s4, g@abs32@lo
+; CHECK-NEXT:    v_mov_b32_e32 v4, 0
 ; CHECK-NEXT:    s_branch .LBB0_2
 ; CHECK-NEXT:  .LBB0_1: ; %for.body.5
 ; CHECK-NEXT:    ; in Loop: Header=BB0_2 Depth=1
-; CHECK-NEXT:    s_lshr_b64 s[6:7], s[4:5], 1
-; CHECK-NEXT:    v_or_b32_e32 v3, s7, v3
-; CHECK-NEXT:    v_or_b32_e32 v2, s6, v2
-; CHECK-NEXT:    s_lshr_b64 s[6:7], s[4:5], 5
-; CHECK-NEXT:    s_or_b32 s6, s6, 1
-; CHECK-NEXT:    v_or3_b32 v3, v3, v1, s7
-; CHECK-NEXT:    v_or3_b32 v2, v2, v0, s6
-; CHECK-NEXT:    s_lshr_b64 s[4:5], s[4:5], 8
+; CHECK-NEXT:    s_lshr_b64 s[8:9], s[6:7], 1
+; CHECK-NEXT:    v_or_b32_e32 v3, s9, v3
+; CHECK-NEXT:    v_or_b32_e32 v2, s8, v2
+; CHECK-NEXT:    s_lshr_b64 s[8:9], s[6:7], 5
+; CHECK-NEXT:    s_or_b32 s8, s8, 1
+; CHECK-NEXT:    v_or3_b32 v3, v3, v1, s9
+; CHECK-NEXT:    v_or3_b32 v2, v2, v0, s8
+; CHECK-NEXT:    s_lshr_b64 s[6:7], s[6:7], 8
+; CHECK-NEXT:    global_store_dword v4, v4, s[4:5]
 ; CHECK-NEXT:    s_cbranch_execz .LBB0_4
 ; CHECK-NEXT:  .LBB0_2: ; %for.body
 ; CHECK-NEXT:    ; =>This Inner Loop Header: Depth=1
-; CHECK-NEXT:    s_cmp_eq_u64 s[4:5], 0
-; CHECK-NEXT:    v_readfirstlane_b32 s8, v0
-; CHECK-NEXT:    v_readfirstlane_b32 s9, v1
+; CHECK-NEXT:    s_cmp_eq_u64 s[6:7], 0
+; CHECK-NEXT:    v_readfirstlane_b32 s10, v0
+; CHECK-NEXT:    v_readfirstlane_b32 s11, v1
 ; CHECK-NEXT:    s_cbranch_scc0 .LBB0_1
 ; CHECK-NEXT:  ; %bb.3:
 ; CHECK-NEXT:    ; implicit-def: $vgpr2_vgpr3
-; CHECK-NEXT:    s_mov_b64 s[4:5], s[8:9]
+; CHECK-NEXT:    s_mov_b64 s[6:7], s[10:11]
 ; CHECK-NEXT:  .LBB0_4: ; %for.cond.cleanup
 ; CHECK-NEXT:    v_mov_b32_e32 v0, 0
 ; CHECK-NEXT:    v_mov_b32_e32 v1, 0
+; CHECK-NEXT:    s_waitcnt vmcnt(0)
 ; CHECK-NEXT:    s_setpc_b64 s[30:31]
 entry:
   br label %for.body
@@ -61,6 +68,7 @@ for.body.5:                                       ; preds = %for.body
   %i6 = or i64 %shr.3.4, 1
   %shl28.3.7 = or i64 %i6, %i3
   %shr.3.7 = lshr i64 %current_bit.01093, 8
+  store i32 0, ptr addrspace(1) @g
   br label %for.body
 
 cleanup:                                          ; preds = %if.end26.i.i, %for.cond.cleanup
@@ -72,8 +80,12 @@ define amdgpu_cs void @issue130119(i1 %arg) {
 ; CHECK:       ; %bb.0: ; %bb
 ; CHECK-NEXT:    v_and_b32_e32 v0, 1, v0
 ; CHECK-NEXT:    v_cmp_eq_u32_e64 s[0:1], 1, v0
+; CHECK-NEXT:    s_mov_b32 s3, g@abs32@hi
+; CHECK-NEXT:    s_mov_b32 s2, g@abs32@lo
+; CHECK-NEXT:    v_mov_b32_e32 v0, 0
 ; CHECK-NEXT:    s_mov_b32 s16, 0
 ; CHECK-NEXT:    s_mov_b64 s[4:5], 0
+; CHECK-NEXT:    global_store_dword v0, v0, s[2:3]
 ; CHECK-NEXT:    s_branch .LBB1_2
 ; CHECK-NEXT:  .LBB1_1: ; %Flow2
 ; CHECK-NEXT:    ; in Loop: Header=BB1_2 Depth=1
@@ -151,6 +163,7 @@ bb3:                                              ; preds = %bb8, %bb1
   %i4 = phi i32 [ %i2, %bb1 ], [ %i9, %bb8 ]
   %i5 = and i32 %i, 1
   %i6 = icmp eq i32 %i5, 0
+  store i32 0, ptr addrspace(1) @g
   br i1 %i6, label %bb8, label %bb7
 
 bb7:                                              ; preds = %bb3

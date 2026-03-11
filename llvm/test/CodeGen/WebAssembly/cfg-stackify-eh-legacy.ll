@@ -9,6 +9,7 @@ target triple = "wasm32-unknown-unknown"
 
 @_ZTIi = external constant ptr
 @_ZTId = external constant ptr
+@g = external global i32
 
 %class.Object = type { i8 }
 %class.MyClass = type { i32 }
@@ -1219,6 +1220,7 @@ invoke.cont:                                      ; preds = %if.then
   ret i32 %call
 
 for.inc:                                          ; preds = %for.body
+  store i32 0, ptr @g
   %inc = add nsw i32 %i.0, 1
   br label %for.cond
 

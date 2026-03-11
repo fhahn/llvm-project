@@ -8,26 +8,34 @@
 %"struct.Outer::Inner" = type { i32, i32, i8, i8 }
 
 @oStruct = external global %struct.Outer, align 4
+@g = external global i32
 
 define void @main(i8 %val8) nounwind "frame-pointer"="none" {
 ; CHECK-LABEL: main:
 ; CHECK:       @ %bb.0: @ %for.body.lr.ph
 ; CHECK-NEXT:    movw r0, :lower16:(L_oStruct$non_lazy_ptr-(LPC0_0+4))
+; CHECK-NEXT:    mov.w r9, #0
 ; CHECK-NEXT:    movt r0, :upper16:(L_oStruct$non_lazy_ptr-(LPC0_0+4))
+; CHECK-NEXT:    movw r1, :lower16:(L_g$non_lazy_ptr-(LPC0_1+4))
 ; CHECK-NEXT:  LPC0_0:
 ; CHECK-NEXT:    add r0, pc
+; CHECK-NEXT:    movt r1, :upper16:(L_g$non_lazy_ptr-(LPC0_1+4))
+; CHECK-NEXT:  LPC0_1:
+; CHECK-NEXT:    add r1, pc
 ; CHECK-NEXT:    ldr r0, [r0]
+; CHECK-NEXT:    ldr r1, [r1]
 ; CHECK-NEXT:    adds r0, #25
 ; CHECK-NEXT:  LBB0_1: @ %for.body
 ; CHECK-NEXT:    @ =>This Inner Loop Header: Depth=1
-; CHECK-NEXT:    ldr r1, [r0, #-21]
+; CHECK-NEXT:    ldr r3, [r0, #-21]
 ; CHECK-NEXT:    ldr r2, [r0, #-17]
-; CHECK-NEXT:    muls r1, r2, r1
-; CHECK-NEXT:    cmp r1, #0
+; CHECK-NEXT:    muls r2, r3, r2
+; CHECK-NEXT:    cmp r2, #0
 ; CHECK-NEXT:    it ne
 ; CHECK-NEXT:    bxne lr
 ; CHECK-NEXT:  LBB0_2: @ %_Z14printIsNotZeroi.exit17.for.body_crit_edge
 ; CHECK-NEXT:    @ in Loop: Header=BB0_1 Depth=1
+; CHECK-NEXT:    str.w r9, [r1]
 ; CHECK-NEXT:    adds r0, #12
 ; CHECK-NEXT:    b LBB0_1
 for.body.lr.ph:
@@ -55,6 +63,7 @@ _Z14printIsNotZeroi.exit17.for.body_crit_edge:    ; preds = %_Z14printIsNotZeroi
   %b.phi.trans.insert = getelementptr %struct.Outer, ptr @oStruct, i32 0, i32 1, i32 %inc, i32 3
   %tmp3.pre = load i8, ptr %b.phi.trans.insert, align 1
   %phitmp27 = icmp eq i8 %val8, 0
+  store i32 0, ptr @g
   br label %for.body
 
 for.end:                                          ; preds = %_Z14printIsNotZeroi.exit17

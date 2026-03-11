@@ -3,6 +3,8 @@
 
 %"struct.__llvm_libc::rpc::Buffer" = type { [8 x i64] }
 
+@g = external addrspace(1) global i32
+
 define void @issue63986(i64 %0, i64 %idxprom, ptr inreg %ptr) {
 ; CHECK-LABEL: issue63986:
 ; CHECK:       ; %bb.0: ; %entry
@@ -72,11 +74,17 @@ define void @issue63986(i64 %0, i64 %idxprom, ptr inreg %ptr) {
 ; CHECK-NEXT:  .LBB0_9: ; %Flow14
 ; CHECK-NEXT:    ; in Loop: Header=BB0_11 Depth=1
 ; CHECK-NEXT:    s_or_b64 exec, exec, s[10:11]
+; CHECK-NEXT:    s_getpc_b64 s[8:9]
+; CHECK-NEXT:    s_add_u32 s8, s8, g@gotpcrel32@lo+4
+; CHECK-NEXT:    s_addc_u32 s9, s9, g@gotpcrel32@hi+12
+; CHECK-NEXT:    s_load_dwordx2 s[8:9], s[8:9], 0x0
+; CHECK-NEXT:    s_waitcnt lgkmcnt(0)
+; CHECK-NEXT:    global_store_dword v3, v3, s[8:9]
 ; CHECK-NEXT:    s_mov_b64 s[8:9], 0
 ; CHECK-NEXT:  .LBB0_10: ; %Flow16
 ; CHECK-NEXT:    ; in Loop: Header=BB0_11 Depth=1
-; CHECK-NEXT:    s_andn2_b64 vcc, exec, s[8:9]
-; CHECK-NEXT:    s_cbranch_vccz .LBB0_18
+; CHECK-NEXT:    s_and_b64 vcc, exec, s[8:9]
+; CHECK-NEXT:    s_cbranch_vccnz .LBB0_18
 ; CHECK-NEXT:  .LBB0_11: ; %while.cond
 ; CHECK-NEXT:    ; =>This Loop Header: Depth=1
 ; CHECK-NEXT:    ; Child Loop BB0_13 Depth 2
@@ -145,6 +153,7 @@ entry:
 
 while.cond:                         ; preds = %while.cond
   tail call void @llvm.memcpy.p0.p0.i64(ptr %arrayidx, ptr null, i64 %0, i1 false)
+  store i32 0, ptr addrspace(1) @g
   br label %while.cond
 }
 
@@ -159,36 +168,50 @@ define void @issue63986_reduced_expanded(i64 %idxprom) {
 ; CHECK-NEXT:    s_mov_b32 s5, 0
 ; CHECK-NEXT:    s_cbranch_scc0 .LBB1_4
 ; CHECK-NEXT:  ; %bb.3:
-; CHECK-NEXT:    ; implicit-def: $vgpr0_vgpr1
+; CHECK-NEXT:    ; implicit-def: $vgpr4_vgpr5
 ; CHECK-NEXT:    s_branch .LBB1_5
 ; CHECK-NEXT:  .LBB1_4: ; %loop-memcpy-residual-header.post-loop-memcpy-expansion_crit_edge
-; CHECK-NEXT:    v_lshlrev_b64 v[0:1], 1, v[0:1]
+; CHECK-NEXT:    v_lshlrev_b64 v[4:5], 1, v[0:1]
 ; CHECK-NEXT:    s_cbranch_execnz .LBB1_8
 ; CHECK-NEXT:  .LBB1_5: ; %loop-memcpy-residual.preheader
 ; CHECK-NEXT:    v_mov_b32_e32 v0, s4
 ; CHECK-NEXT:    s_mov_b64 s[8:9], 0
 ; CHECK-NEXT:    s_mov_b32 s7, 0
 ; CHECK-NEXT:    v_mov_b32_e32 v1, s5
+; CHECK-NEXT:    v_mov_b32_e32 v2, 0
 ; CHECK-NEXT:  .LBB1_6: ; %loop-memcpy-residual
 ; CHECK-NEXT:    s_add_i32 s6, s8, 1
+; CHECK-NEXT:    s_getpc_b64 s[4:5]
+; CHECK-NEXT:    s_add_u32 s4, s4, g@gotpcrel32@lo+4
+; CHECK-NEXT:    s_addc_u32 s5, s5, g@gotpcrel32@hi+12
+; CHECK-NEXT:    s_load_dwordx2 s[4:5], s[4:5], 0x0
 ; CHECK-NEXT:    v_cmp_lt_u64_e32 vcc, s[6:7], v[0:1]
 ; CHECK-NEXT:    s_mov_b64 s[8:9], 1
+; CHECK-NEXT:    s_waitcnt lgkmcnt(0)
+; CHECK-NEXT:    global_store_dword v2, v2, s[4:5]
+; CHECK-NEXT:    s_waitcnt vmcnt(0)
 ; CHECK-NEXT:    s_cbranch_vccnz .LBB1_6
 ; CHECK-NEXT:  ; %bb.7: ; %Flow
-; CHECK-NEXT:    v_mov_b32_e32 v0, 0
-; CHECK-NEXT:    v_mov_b32_e32 v1, 0
+; CHECK-NEXT:    v_mov_b32_e32 v4, 0
+; CHECK-NEXT:    v_mov_b32_e32 v5, 0
 ; CHECK-NEXT:  .LBB1_8: ; %post-loop-memcpy-expansion
-; CHECK-NEXT:    v_mov_b32_e32 v2, 0
-; CHECK-NEXT:    v_mov_b32_e32 v3, v2
-; CHECK-NEXT:    v_mov_b32_e32 v4, v2
-; CHECK-NEXT:    v_mov_b32_e32 v5, v2
+; CHECK-NEXT:    v_mov_b32_e32 v0, 0
+; CHECK-NEXT:    v_mov_b32_e32 v1, v0
+; CHECK-NEXT:    v_mov_b32_e32 v2, v0
+; CHECK-NEXT:    v_mov_b32_e32 v3, v0
 ; CHECK-NEXT:    s_and_b64 vcc, exec, 0
-; CHECK-NEXT:    flat_store_dwordx4 v[0:1], v[2:5]
 ; CHECK-NEXT:  .LBB1_9: ; %loop-memcpy-expansion2
+; CHECK-NEXT:    s_getpc_b64 s[4:5]
+; CHECK-NEXT:    s_add_u32 s4, s4, g@gotpcrel32@lo+4
+; CHECK-NEXT:    s_addc_u32 s5, s5, g@gotpcrel32@hi+12
+; CHECK-NEXT:    s_load_dwordx2 s[4:5], s[4:5], 0x0
+; CHECK-NEXT:    flat_store_dwordx4 v[4:5], v[0:3]
+; CHECK-NEXT:    s_waitcnt lgkmcnt(0)
+; CHECK-NEXT:    global_store_dword v0, v0, s[4:5]
+; CHECK-NEXT:    s_waitcnt vmcnt(0)
 ; CHECK-NEXT:    s_mov_b64 vcc, vcc
 ; CHECK-NEXT:    s_cbranch_vccz .LBB1_9
 ; CHECK-NEXT:  ; %bb.10: ; %DummyReturnBlock
-; CHECK-NEXT:    s_waitcnt vmcnt(0) lgkmcnt(0)
 ; CHECK-NEXT:    s_setpc_b64 s[30:31]
 entry:
   %spec.select = tail call i64 @llvm.umin.i64(i64 sub (i64 ptrtoint (ptr addrspacecast (ptr addrspace(4) inttoptr (i64 32 to ptr addrspace(4)) to ptr) to i64), i64 ptrtoint (ptr addrspacecast (ptr addrspace(4) null to ptr) to i64)), i64 56)
@@ -206,6 +229,7 @@ loop-memcpy-residual:                             ; preds = %loop-memcpy-residua
   %residual-loop-index1 = phi i64 [ 1, %loop-memcpy-residual ], [ 0, %loop-memcpy-residual.preheader ]
   %i5 = add i64 %residual-loop-index1, 1
   %i6 = icmp ult i64 %i5, %i3
+  store volatile i32 0, ptr addrspace(1) @g
   br i1 %i6, label %loop-memcpy-residual, label %post-loop-memcpy-expansion
 
 post-loop-memcpy-expansion:                       ; preds = %loop-memcpy-residual-header.post-loop-memcpy-expansion_crit_edge, %loop-memcpy-residual
@@ -215,6 +239,7 @@ post-loop-memcpy-expansion:                       ; preds = %loop-memcpy-residua
 loop-memcpy-expansion2:                           ; preds = %loop-memcpy-expansion2, %post-loop-memcpy-expansion
   %scevgep7 = getelementptr i8, ptr null, i64 %.pre-phi
   store <4 x i32> zeroinitializer, ptr %scevgep7, align 1
+  store volatile i32 0, ptr addrspace(1) @g
   br label %loop-memcpy-expansion2
 
 loop-memcpy-residual-header:                      ; preds = %entry

@@ -4,6 +4,8 @@
 ; This testing case is reduced from 254.gap SyFgets function.
 ; We make sure a spill is hoisted to a cold BB inside the hotter outer loop.
 
+@g = external global i32
+
 %struct.TMP.1 = type { ptr, ptr, [1024 x i8] }
 %struct.TMP.2 = type { ptr, i32, i32, i16, i16, %struct.TMP.3, i32, ptr, ptr, ptr, ptr, ptr, %struct.TMP.3, ptr, i32, [3 x i8], [1 x i8], %struct.TMP.3, i32, i64 }
 %struct.TMP.4 = type opaque
@@ -79,7 +81,7 @@ define ptr @SyFgets(ptr %line, i64 %length, i64 %fid) {
 ; CHECK-NEXT:    movq _syBuf@GOTPCREL(%rip), %rcx
 ; CHECK-NEXT:    leaq 8(%rcx,%rax), %rdx
 ; CHECK-NEXT:    movq _syCTRO@GOTPCREL(%rip), %rax
-; CHECK-NEXT:    movl $1, %r13d
+; CHECK-NEXT:    movl $1, %r15d
 ; CHECK-NEXT:    movb $1, %cl
 ; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  LBB0_9: ## %do.body
@@ -94,23 +96,24 @@ define ptr @SyFgets(ptr %line, i64 %length, i64 %fid) {
 ; CHECK-NEXT:    testb %al, %al
 ; CHECK-NEXT:    jne LBB0_11
 ; CHECK-NEXT:  ## %bb.12: ## %while.body200.preheader
-; CHECK-NEXT:    xorl %r12d, %r12d
+; CHECK-NEXT:    xorl %r14d, %r14d
 ; CHECK-NEXT:    leaq LJTI0_0(%rip), %rdx
-; CHECK-NEXT:    leaq LJTI0_1(%rip), %r14
-; CHECK-NEXT:    movb $1, %sil
+; CHECK-NEXT:    leaq LJTI0_1(%rip), %rsi
+; CHECK-NEXT:    movq _g@GOTPCREL(%rip), %r13
+; CHECK-NEXT:    movb $1, %dil
 ; CHECK-NEXT:    movl $0, {{[-0-9]+}}(%r{{[sb]}}p) ## 4-byte Folded Spill
-; CHECK-NEXT:    xorl %r15d, %r15d
+; CHECK-NEXT:    xorl %r12d, %r12d
 ; CHECK-NEXT:    jmp LBB0_13
 ; CHECK-NEXT:  LBB0_43: ## %while.cond1037.preheader
 ; CHECK-NEXT:    ## in Loop: Header=BB0_13 Depth=1
-; CHECK-NEXT:    testb %r12b, %r12b
+; CHECK-NEXT:    testb %r14b, %r14b
 ; CHECK-NEXT:    je LBB0_54
 ; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  LBB0_20: ## %while.cond197.backedge
 ; CHECK-NEXT:    ## in Loop: Header=BB0_13 Depth=1
-; CHECK-NEXT:    decl %r13d
-; CHECK-NEXT:    testl %r13d, %r13d
-; CHECK-NEXT:    movl %ebp, %r15d
+; CHECK-NEXT:    decl %r15d
+; CHECK-NEXT:    testl %r15d, %r15d
+; CHECK-NEXT:    movl %ebp, %r12d
 ; CHECK-NEXT:    jle LBB0_21
 ; CHECK-NEXT:  LBB0_13: ## %while.body200
 ; CHECK-NEXT:    ## =>This Loop Header: Depth=1
@@ -121,17 +124,17 @@ define ptr @SyFgets(ptr %line, i64 %length, i64 %fid) {
 ; CHECK-NEXT:    ja LBB0_14
 ; CHECK-NEXT:  ## %bb.55: ## %while.body200
 ; CHECK-NEXT:    ## in Loop: Header=BB0_13 Depth=1
-; CHECK-NEXT:    movslq (%r14,%rax,4), %rax
-; CHECK-NEXT:    addq %r14, %rax
+; CHECK-NEXT:    movslq (%rsi,%rax,4), %rax
+; CHECK-NEXT:    addq %rsi, %rax
 ; CHECK-NEXT:    jmpq *%rax
 ; CHECK-NEXT:  LBB0_25: ## %sw.bb474
 ; CHECK-NEXT:    ## in Loop: Header=BB0_13 Depth=1
-; CHECK-NEXT:    testb %r12b, %r12b
+; CHECK-NEXT:    testb %r14b, %r14b
 ; CHECK-NEXT:    ## implicit-def: $rbx
 ; CHECK-NEXT:    jne LBB0_33
 ; CHECK-NEXT:  ## %bb.26: ## %do.body479.preheader
 ; CHECK-NEXT:    ## in Loop: Header=BB0_13 Depth=1
-; CHECK-NEXT:    testb %r12b, %r12b
+; CHECK-NEXT:    testb %r14b, %r14b
 ; CHECK-NEXT:    ## implicit-def: $rbx
 ; CHECK-NEXT:    jne LBB0_33
 ; CHECK-NEXT:  ## %bb.27: ## %land.rhs485.preheader
@@ -142,12 +145,12 @@ define ptr @SyFgets(ptr %line, i64 %length, i64 %fid) {
 ; CHECK-NEXT:  LBB0_31: ## %do.body479.backedge
 ; CHECK-NEXT:    ## in Loop: Header=BB0_28 Depth=2
 ; CHECK-NEXT:    leaq 1(%rbx), %rax
-; CHECK-NEXT:    testb %r12b, %r12b
+; CHECK-NEXT:    testb %r14b, %r14b
 ; CHECK-NEXT:    je LBB0_32
 ; CHECK-NEXT:  LBB0_28: ## %land.rhs485
 ; CHECK-NEXT:    ## Parent Loop BB0_13 Depth=1
 ; CHECK-NEXT:    ## => This Inner Loop Header: Depth=2
-; CHECK-NEXT:    testb %sil, %sil
+; CHECK-NEXT:    testb %dil, %dil
 ; CHECK-NEXT:    jne LBB0_54
 ; CHECK-NEXT:  ## %bb.29: ## %cond.true.i.i2780
 ; CHECK-NEXT:    ## in Loop: Header=BB0_28 Depth=2
@@ -158,7 +161,7 @@ define ptr @SyFgets(ptr %line, i64 %length, i64 %fid) {
 ; CHECK-NEXT:    ## in Loop: Header=BB0_28 Depth=2
 ; CHECK-NEXT:    movl $256, %esi ## imm = 0x100
 ; CHECK-NEXT:    callq ___maskrune
-; CHECK-NEXT:    movb $1, %sil
+; CHECK-NEXT:    movb $1, %dil
 ; CHECK-NEXT:    testb %al, %al
 ; CHECK-NEXT:    jne LBB0_31
 ; CHECK-NEXT:    jmp LBB0_33
@@ -200,7 +203,7 @@ define ptr @SyFgets(ptr %line, i64 %length, i64 %fid) {
 ; CHECK-NEXT:    incq %rbx
 ; CHECK-NEXT:  LBB0_33: ## %if.end517
 ; CHECK-NEXT:    ## in Loop: Header=BB0_13 Depth=1
-; CHECK-NEXT:    leal -324(%r15), %eax
+; CHECK-NEXT:    leal -324(%r12), %eax
 ; CHECK-NEXT:    cmpl $59, %eax
 ; CHECK-NEXT:    ja LBB0_34
 ; CHECK-NEXT:  ## %bb.56: ## %if.end517
@@ -210,11 +213,11 @@ define ptr @SyFgets(ptr %line, i64 %length, i64 %fid) {
 ; CHECK-NEXT:    jb LBB0_37
 ; CHECK-NEXT:  LBB0_34: ## %if.end517
 ; CHECK-NEXT:    ## in Loop: Header=BB0_13 Depth=1
-; CHECK-NEXT:    cmpl $11, %r15d
+; CHECK-NEXT:    cmpl $11, %r12d
 ; CHECK-NEXT:    je LBB0_37
 ; CHECK-NEXT:  ## %bb.35: ## %if.end517
 ; CHECK-NEXT:    ## in Loop: Header=BB0_13 Depth=1
-; CHECK-NEXT:    cmpl $24, %r15d
+; CHECK-NEXT:    cmpl $24, %r12d
 ; CHECK-NEXT:    je LBB0_37
 ; CHECK-NEXT:  ## %bb.36: ## %if.then532
 ; CHECK-NEXT:    ## in Loop: Header=BB0_13 Depth=1
@@ -224,25 +227,30 @@ define ptr @SyFgets(ptr %line, i64 %length, i64 %fid) {
 ; CHECK-NEXT:  LBB0_37: ## %for.cond534
 ; CHECK-NEXT:    ## Parent Loop BB0_13 Depth=1
 ; CHECK-NEXT:    ## => This Inner Loop Header: Depth=2
-; CHECK-NEXT:    testb %r12b, %r12b
+; CHECK-NEXT:    movl $0, (%r13)
+; CHECK-NEXT:    testb %r14b, %r14b
 ; CHECK-NEXT:    jne LBB0_37
 ; CHECK-NEXT:  ## %bb.38: ## %for.cond542.preheader
 ; CHECK-NEXT:    ## in Loop: Header=BB0_13 Depth=1
 ; CHECK-NEXT:    testb %al, %al
 ; CHECK-NEXT:    movb $0, (%rbx)
 ; CHECK-NEXT:    leaq LJTI0_0(%rip), %rdx
+; CHECK-NEXT:    leaq LJTI0_1(%rip), %rsi
 ; CHECK-NEXT:    jmp LBB0_20
 ; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  LBB0_41: ## %while.cond864
 ; CHECK-NEXT:    ## =>This Inner Loop Header: Depth=1
+; CHECK-NEXT:    movl $0, (%r13)
 ; CHECK-NEXT:    jmp LBB0_41
 ; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  LBB0_42: ## %while.cond962
 ; CHECK-NEXT:    ## =>This Inner Loop Header: Depth=1
+; CHECK-NEXT:    movl $0, (%r13)
 ; CHECK-NEXT:    jmp LBB0_42
 ; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  LBB0_24: ## %for.cond357
 ; CHECK-NEXT:    ## =>This Inner Loop Header: Depth=1
+; CHECK-NEXT:    movl $0, (%r13)
 ; CHECK-NEXT:    jmp LBB0_24
 ; CHECK-NEXT:  LBB0_11:
 ; CHECK-NEXT:    movl $0, {{[-0-9]+}}(%r{{[sb]}}p) ## 4-byte Folded Spill
@@ -263,9 +271,11 @@ define ptr @SyFgets(ptr %line, i64 %length, i64 %fid) {
 ; CHECK-NEXT:    subq %rbx, %r14
 ; CHECK-NEXT:    movq _syHistory@GOTPCREL(%rip), %rax
 ; CHECK-NEXT:    leaq 8189(%r14,%rax), %rax
+; CHECK-NEXT:    movq _g@GOTPCREL(%rip), %rcx
 ; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  LBB0_48: ## %for.body1723
 ; CHECK-NEXT:    ## =>This Inner Loop Header: Depth=1
+; CHECK-NEXT:    movl $0, (%rcx)
 ; CHECK-NEXT:    decq %rax
 ; CHECK-NEXT:    jmp LBB0_48
 ; CHECK-NEXT:  LBB0_46: ## %if.then1477.loopexit
@@ -278,10 +288,12 @@ define ptr @SyFgets(ptr %line, i64 %length, i64 %fid) {
 ; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  LBB0_17: ## %for.body643.us
 ; CHECK-NEXT:    ## =>This Inner Loop Header: Depth=1
+; CHECK-NEXT:    movl $0, (%r13)
 ; CHECK-NEXT:    jmp LBB0_17
 ; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  LBB0_40: ## %while.cond661
 ; CHECK-NEXT:    ## =>This Inner Loop Header: Depth=1
+; CHECK-NEXT:    movl $0, (%r13)
 ; CHECK-NEXT:    jmp LBB0_40
 ; CHECK-NEXT:  LBB0_49: ## %for.cond1480.preheader
 ; CHECK-NEXT:    xorl %eax, %eax
@@ -442,6 +454,7 @@ while.cond635.preheader:
   br i1 poison, label %for.body643.us, label %while.cond661
 
 for.body643.us:
+  store i32 0, ptr @g
   br label %for.body643.us
 
 while.cond201.preheader:
@@ -466,6 +479,7 @@ while.cond197.backedge:
   br i1 %cmp198, label %while.body200, label %while.end1465
 
 for.cond357:
+  store i32 0, ptr @g
   br label %for.cond357
 
 sw.bb474:
@@ -522,6 +536,7 @@ if.then532:
   br label %for.cond534
 
 for.cond534:
+  store i32 0, ptr @g
   %cmp536 = icmp eq i8 undef, 0
   br i1 %cmp536, label %for.cond542.preheader, label %for.cond534
 
@@ -543,9 +558,11 @@ sw.bb566:
   br label %while.cond197.backedge
 
 while.cond661:
+  store i32 0, ptr @g
   br label %while.cond661
 
 while.cond864:
+  store i32 0, ptr @g
   br label %while.cond864
 
 sw.bb956:
@@ -555,6 +572,7 @@ if.then959:
   br label %while.cond962
 
 while.cond962:
+  store i32 0, ptr @g
   br label %while.cond962
 
 sw.bb979:
@@ -654,6 +672,7 @@ for.body1723:
   %add.ptr1728 = getelementptr i8, ptr %q.303203, i64 %idx.neg1727
   %4 = load i8, ptr %add.ptr1728, align 1, !tbaa !5
   %incdec.ptr1730 = getelementptr i8, ptr %q.303203, i64 -1
+  store i32 0, ptr @g
   br label %for.body1723
 
 cleanup:

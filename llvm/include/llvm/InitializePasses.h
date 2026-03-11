@@ -211,6 +211,7 @@ LLVM_ABI void initializeMachineFunctionPrinterPassPass(PassRegistry &);
 LLVM_ABI void initializeMachineFunctionSplitterPass(PassRegistry &);
 LLVM_ABI void initializeMachineLateInstrsCleanupLegacyPass(PassRegistry &);
 LLVM_ABI void initializeMachineLICMPass(PassRegistry &);
+LLVM_ABI void initializeMachineLoopDeletionPass(PassRegistry &);
 LLVM_ABI void initializeMachineLoopInfoWrapperPassPass(PassRegistry &);
 LLVM_ABI void initializeMachineModuleInfoWrapperPassPass(PassRegistry &);
 LLVM_ABI void

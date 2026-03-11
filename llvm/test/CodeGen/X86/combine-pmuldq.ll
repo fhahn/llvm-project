@@ -5,6 +5,8 @@
 ; RUN: llc < %s -mtriple=x86_64-unknown-unknown -mattr=+avx512vl | FileCheck %s --check-prefixes=AVX,AVX512VL
 ; RUN: llc < %s -mtriple=x86_64-unknown-unknown -mattr=+avx512vl,+avx512dq | FileCheck %s --check-prefixes=AVX,AVX512DQVL
 
+@g = external global i32
+
 define <2 x i64> @combine_shuffle_sext_pmuldq(<4 x i32> %a0, <4 x i32> %a1) {
 ; SSE-LABEL: combine_shuffle_sext_pmuldq:
 ; SSE:       # %bb.0:
@@ -208,20 +210,24 @@ define <8 x i64> @combine_zext_pmuludq_256(<8 x i32> %a) {
 define void @PR39398(i32 %a0) {
 ; SSE-LABEL: PR39398:
 ; SSE:       # %bb.0: # %bb
+; SSE-NEXT:    movq g@GOTPCREL(%rip), %rax
 ; SSE-NEXT:    .p2align 4
 ; SSE-NEXT:  .LBB5_1: # %bb10
 ; SSE-NEXT:    # =>This Inner Loop Header: Depth=1
 ; SSE-NEXT:    cmpl $232, %edi
+; SSE-NEXT:    movl $0, (%rax)
 ; SSE-NEXT:    jne .LBB5_1
 ; SSE-NEXT:  # %bb.2: # %bb34
 ; SSE-NEXT:    retq
 ;
 ; AVX-LABEL: PR39398:
 ; AVX:       # %bb.0: # %bb
+; AVX-NEXT:    movq g@GOTPCREL(%rip), %rax
 ; AVX-NEXT:    .p2align 4
 ; AVX-NEXT:  .LBB5_1: # %bb10
 ; AVX-NEXT:    # =>This Inner Loop Header: Depth=1
 ; AVX-NEXT:    cmpl $232, %edi
+; AVX-NEXT:    movl $0, (%rax)
 ; AVX-NEXT:    jne .LBB5_1
 ; AVX-NEXT:  # %bb.2: # %bb34
 ; AVX-NEXT:    retq
@@ -243,6 +249,7 @@ bb10:                                             ; preds = %bb10, %bb
   %tmp28 = add <4 x i64> zeroinitializer, %tmp26
   %tmp29 = add <4 x i64> zeroinitializer, %tmp27
   %tmp33 = icmp eq i32 %a0, 232
+  store i32 0, ptr @g
   br i1 %tmp33, label %bb34, label %bb10
 
 bb34:                                             ; preds = %bb10

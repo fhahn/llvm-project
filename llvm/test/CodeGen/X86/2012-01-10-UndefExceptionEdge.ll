@@ -14,6 +14,8 @@ target triple = "i386-apple-macosx10.7"
 ;
 ; <rdar://problem/10664933>
 
+@g = external global i32
+
 @Exception = external unnamed_addr constant { ptr, ptr }
 
 declare void @llvm.memset.p0.i32(ptr nocapture, i8, i32, i1) nounwind
@@ -34,10 +36,10 @@ define void @f(ptr nocapture %arg, ptr nocapture %arg1, ptr nocapture %arg2, ptr
 ; CHECK-NEXT:    .cfi_offset %edi, -16
 ; CHECK-NEXT:    .cfi_offset %ebx, -12
 ; CHECK-NEXT:    xorl %eax, %eax
-; CHECK-NEXT:    xorl %edi, %edi
+; CHECK-NEXT:    movl $0, {{[-0-9]+}}(%e{{[sb]}}p) ## 4-byte Folded Spill
 ; CHECK-NEXT:    testb %al, %al
 ; CHECK-NEXT:  Ltmp0: ## EH_LABEL
-; CHECK-NEXT:    ## implicit-def: $ebx
+; CHECK-NEXT:    ## implicit-def: $edi
 ; CHECK-NEXT:    calll __Znam
 ; CHECK-NEXT:  Ltmp1: ## EH_LABEL
 ; CHECK-NEXT:  ## %bb.1: ## %bb11
@@ -46,6 +48,7 @@ define void @f(ptr nocapture %arg, ptr nocapture %arg1, ptr nocapture %arg2, ptr
 ; CHECK-NEXT:    testb %al, %al
 ; CHECK-NEXT:    jne LBB0_2
 ; CHECK-NEXT:  ## %bb.7: ## %bb31
+; CHECK-NEXT:    movl L_g$non_lazy_ptr, %edi
 ; CHECK-NEXT:    ## implicit-def: $eax
 ; CHECK-NEXT:    ## kill: killed $eax
 ; CHECK-NEXT:  LBB0_8: ## %bb38
@@ -88,11 +91,12 @@ define void @f(ptr nocapture %arg, ptr nocapture %arg1, ptr nocapture %arg2, ptr
 ; CHECK-NEXT:    ## in Loop: Header=BB0_13 Depth=2
 ; CHECK-NEXT:    xorl %ecx, %ecx
 ; CHECK-NEXT:    movl %esi, %edx
-; CHECK-NEXT:    movl %edi, %ebx
+; CHECK-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %ebx ## 4-byte Reload
 ; CHECK-NEXT:  LBB0_16: ## %bb49
 ; CHECK-NEXT:    ## Parent Loop BB0_8 Depth=1
 ; CHECK-NEXT:    ## Parent Loop BB0_13 Depth=2
 ; CHECK-NEXT:    ## => This Inner Loop Header: Depth=3
+; CHECK-NEXT:    movl $0, (%edi)
 ; CHECK-NEXT:    incl %ecx
 ; CHECK-NEXT:    addl $4, %edx
 ; CHECK-NEXT:    decl %ebx
@@ -113,7 +117,7 @@ define void @f(ptr nocapture %arg, ptr nocapture %arg1, ptr nocapture %arg2, ptr
 ; CHECK-NEXT:  ## %bb.20: ## %bb61.preheader
 ; CHECK-NEXT:    ## in Loop: Header=BB0_8 Depth=1
 ; CHECK-NEXT:    movl %esi, %eax
-; CHECK-NEXT:    movl %edi, %ecx
+; CHECK-NEXT:    movl {{[-0-9]+}}(%e{{[sb]}}p), %ecx ## 4-byte Reload
 ; CHECK-NEXT:  LBB0_21: ## %bb61
 ; CHECK-NEXT:    ## Parent Loop BB0_8 Depth=1
 ; CHECK-NEXT:    ## => This Inner Loop Header: Depth=2
@@ -127,13 +131,13 @@ define void @f(ptr nocapture %arg, ptr nocapture %arg1, ptr nocapture %arg2, ptr
 ; CHECK-NEXT:    jmp LBB0_8
 ; CHECK-NEXT:  LBB0_18: ## %bb43
 ; CHECK-NEXT:  Ltmp5: ## EH_LABEL
-; CHECK-NEXT:    movl %esi, %ebx
+; CHECK-NEXT:    movl %esi, %edi
 ; CHECK-NEXT:    calll _OnOverFlow
 ; CHECK-NEXT:  Ltmp6: ## EH_LABEL
 ; CHECK-NEXT:    jmp LBB0_3
 ; CHECK-NEXT:  LBB0_2: ## %bb29
 ; CHECK-NEXT:  Ltmp7: ## EH_LABEL
-; CHECK-NEXT:    movl %esi, %ebx
+; CHECK-NEXT:    movl %esi, %edi
 ; CHECK-NEXT:    calll _OnOverFlow
 ; CHECK-NEXT:  Ltmp8: ## EH_LABEL
 ; CHECK-NEXT:  LBB0_3: ## %bb30
@@ -141,9 +145,9 @@ define void @f(ptr nocapture %arg, ptr nocapture %arg1, ptr nocapture %arg2, ptr
 ; CHECK-NEXT:  LBB0_4: ## %bb20.loopexit
 ; CHECK-NEXT:  Ltmp4: ## EH_LABEL
 ; CHECK-NEXT:  LBB0_9:
-; CHECK-NEXT:    movl %esi, %ebx
+; CHECK-NEXT:    movl %esi, %edi
 ; CHECK-NEXT:  LBB0_6: ## %bb23
-; CHECK-NEXT:    testl %ebx, %ebx
+; CHECK-NEXT:    testl %edi, %edi
 ; CHECK-NEXT:    addl $28, %esp
 ; CHECK-NEXT:    popl %esi
 ; CHECK-NEXT:    popl %edi
@@ -241,6 +245,7 @@ bb48:                                             ; preds = %bb45
 
 bb49:                                             ; preds = %bb49, %bb48
   %tmp50 = phi i32 [ %tmp55, %bb49 ], [ 0, %bb48 ]
+  store i32 0, ptr @g
   %tmp51 = add i32 %tmp50, undef
   %tmp52 = add i32 %tmp50, undef
   %tmp53 = getelementptr i32, ptr %tmp10, i32 %tmp52

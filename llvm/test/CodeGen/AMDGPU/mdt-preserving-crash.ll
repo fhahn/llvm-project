@@ -2,6 +2,7 @@
 ; RUN: llc -mtriple=amdgcn-amd-amdhsa -mcpu=gfx900 < %s | FileCheck %s
 
 @_RSENC_gDcd_______________________________ = external protected addrspace(1) externally_initialized global [4096 x i8], align 16
+@g = external addrspace(1) global i32
 
 define protected amdgpu_kernel void @_RSENC_PRInit__________________________________(i1 %c0) local_unnamed_addr #0 {
 ; CHECK-LABEL: _RSENC_PRInit__________________________________:
@@ -25,9 +26,17 @@ define protected amdgpu_kernel void @_RSENC_PRInit______________________________
 ; CHECK-NEXT:    s_and_b64 vcc, exec, s[4:5]
 ; CHECK-NEXT:    s_cbranch_vccnz .LBB0_13
 ; CHECK-NEXT:  ; %bb.2: ; %lor.lhs.false17
-; CHECK-NEXT:    s_cmp_eq_u32 s4, 0
+; CHECK-NEXT:    v_mov_b32_e32 v0, 0
 ; CHECK-NEXT:  .LBB0_3: ; %while.cond.i
 ; CHECK-NEXT:    ; =>This Inner Loop Header: Depth=1
+; CHECK-NEXT:    s_getpc_b64 s[4:5]
+; CHECK-NEXT:    s_add_u32 s4, s4, g@gotpcrel32@lo+4
+; CHECK-NEXT:    s_addc_u32 s5, s5, g@gotpcrel32@hi+12
+; CHECK-NEXT:    s_load_dwordx2 s[4:5], s[4:5], 0x0
+; CHECK-NEXT:    s_waitcnt lgkmcnt(0)
+; CHECK-NEXT:    s_cmp_eq_u32 s4, 0
+; CHECK-NEXT:    global_store_dword v0, v0, s[4:5]
+; CHECK-NEXT:    s_waitcnt vmcnt(0)
 ; CHECK-NEXT:    s_cbranch_scc1 .LBB0_3
 ; CHECK-NEXT:  ; %bb.4: ; %if.end60
 ; CHECK-NEXT:    s_cbranch_execz .LBB0_12
@@ -56,10 +65,18 @@ define protected amdgpu_kernel void @_RSENC_PRInit______________________________
 ; CHECK-NEXT:    s_cbranch_execz .LBB0_12
 ; CHECK-NEXT:  ; %bb.10: ; %if.then404
 ; CHECK-NEXT:    s_movk_i32 s4, 0x1000
+; CHECK-NEXT:    v_mov_b32_e32 v0, 0
 ; CHECK-NEXT:  .LBB0_11: ; %for.body564
 ; CHECK-NEXT:    ; =>This Inner Loop Header: Depth=1
+; CHECK-NEXT:    s_getpc_b64 s[6:7]
+; CHECK-NEXT:    s_add_u32 s6, s6, g@gotpcrel32@lo+4
+; CHECK-NEXT:    s_addc_u32 s7, s7, g@gotpcrel32@hi+12
+; CHECK-NEXT:    s_load_dwordx2 s[6:7], s[6:7], 0x0
 ; CHECK-NEXT:    s_sub_i32 s4, s4, 32
 ; CHECK-NEXT:    s_cmp_lg_u32 s4, 0
+; CHECK-NEXT:    s_waitcnt lgkmcnt(0)
+; CHECK-NEXT:    global_store_dword v0, v0, s[6:7]
+; CHECK-NEXT:    s_waitcnt vmcnt(0)
 ; CHECK-NEXT:    s_cbranch_scc1 .LBB0_11
 ; CHECK-NEXT:  .LBB0_12: ; %UnifiedUnreachableBlock
 ; CHECK-NEXT:    ; divergent unreachable
@@ -85,6 +102,7 @@ lor.lhs.false17:                                  ; preds = %if.end15
 
 while.cond.i:                                     ; preds = %while.cond.i, %lor.lhs.false17
   %undef0 = freeze i32 poison
+  store volatile i32 0, ptr addrspace(1) @g
   switch i32 %undef0, label %if.end60 [
     i32 0, label %while.cond.i
     i32 3, label %if.end60.loopexit857
@@ -203,6 +221,7 @@ for.body564:                                      ; preds = %for.body564, %if.th
   %i560.0801 = phi i32 [ 0, %if.then404 ], [ %inc568.31, %for.body564 ]
   %inc568.31 = add nuw nsw i32 %i560.0801, 32
   %exitcond839.not.31 = icmp eq i32 %inc568.31, 4096
+  store volatile i32 0, ptr addrspace(1) @g
   br i1 %exitcond839.not.31, label %if.end570, label %for.body564
 
 if.end570:                                        ; preds = %for.body564, %if.else407

@@ -8,8 +8,10 @@ target triple = "x86_64-apple-darwin9"
 ; CHECK-LABEL: foo:
 ; CHECK: align
 ; CHECK: incl  %eax
-; CHECK-NEXT: decl  %ecx
+; CHECK: decl  %ecx
 ; CHECK-NEXT: jne
+
+@g = external global i32
 
 define void @foo() nounwind {
 entry:
@@ -22,6 +24,7 @@ loop:
 	%tmp623.us1538 = select i1 %tmp611.us1535, i32 6, i32 0		; <i32> [#uses=0]
 	%tmp628.us1540 = shl i32 %i.2.0.us1534, 1		; <i32> [#uses=1]
 	%tmp645646647.us1547 = sext i32 %tmp628.us1540 to i64		; <i64> [#uses=0]
+	store i32 0, ptr @g
 	br i1 %tmp611.us1535, label %exit, label %loop
 
 exit:

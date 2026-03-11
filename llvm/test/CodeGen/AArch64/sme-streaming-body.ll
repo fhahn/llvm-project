@@ -3,6 +3,8 @@
 
 declare void @normal_callee();
 declare void @streaming_callee() "aarch64_pstate_sm_enabled";
+
+@g = external global i32
 declare void @streaming_compatible_callee() "aarch64_pstate_sm_compatible";
 
 define void @locally_streaming_caller_streaming_callee() "aarch64_pstate_sm_body" nounwind {
@@ -247,9 +249,12 @@ define float @test_arg_survives_loop(float %arg, i32 %N) nounwind "aarch64_pstat
 ; CHECK-NEXT:    stp d9, d8, [sp, #64] // 16-byte Folded Spill
 ; CHECK-NEXT:    str s0, [sp, #12] // 4-byte Spill
 ; CHECK-NEXT:    smstart sm
+; CHECK-NEXT:    adrp x8, :got:g
+; CHECK-NEXT:    ldr x8, [x8, :got_lo12:g]
 ; CHECK-NEXT:  .LBB9_1: // %for.body
 ; CHECK-NEXT:    // =>This Inner Loop Header: Depth=1
 ; CHECK-NEXT:    subs w0, w0, #1
+; CHECK-NEXT:    str wzr, [x8]
 ; CHECK-NEXT:    b.ne .LBB9_1
 ; CHECK-NEXT:  // %bb.2: // %for.cond.cleanup
 ; CHECK-NEXT:    fmov s0, #1.00000000
@@ -271,6 +276,7 @@ for.body:
   %i.02 = phi i32 [ 0, %entry ], [ %inc, %for.body ]
   %inc = add nuw nsw i32 %i.02, 1
   %exitcond.not = icmp eq i32 %inc, %N
+  store i32 0, ptr @g
   br i1 %exitcond.not, label %for.cond.cleanup, label %for.body
 
 for.cond.cleanup:

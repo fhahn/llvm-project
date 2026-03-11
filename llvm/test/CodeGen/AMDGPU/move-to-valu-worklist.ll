@@ -4,6 +4,8 @@
 ; the use chain will be visited. We do not want the same node to be
 ; pushed to the visit worklist more than once.
 
+@g = external addrspace(1) global i32
+
 ; GCN-LABEL: {{^}}in_worklist_once:
 ; GCN: buffer_load_dword
 ; GCN: BB0_1:
@@ -23,6 +25,7 @@ bb1:                                              ; preds = %bb1, %bb
 	%tmp13 = xor i64 %tmp11, %tmp2
 	%tmp15 = and i64 %tmp3, %tmp13
 	%tmp16 = xor i64 %tmp15, %tmp3
+	store volatile i32 0, ptr addrspace(1) @g
 br label %bb1
 }
 

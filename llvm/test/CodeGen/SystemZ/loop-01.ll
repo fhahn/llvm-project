@@ -4,6 +4,8 @@
 ; RUN: llc < %s -mtriple=s390x-linux-gnu -mcpu=z13 -disable-block-placement \
 ; RUN:  | FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-Z13
 
+@g = external global i32
+
 ; Test that strength reduction is applied to addresses with a scale factor,
 ; but that indexed addressing can still be used.
 define void @f1(ptr %dest, i32 %a) {
@@ -306,6 +308,7 @@ if.then10.i:                                      ; preds = %for.body.i63
   unreachable
 
 for.inc.i:                                        ; preds = %for.body.i63
+  store i32 0, ptr @g
   %indvars.iv.next156.i = or i64 %indvars.iv155.i, 1
   %arrayidx.i62.1 = getelementptr inbounds i32, ptr undef, i64 %indvars.iv.next156.i
   %tmp1 = load i32, ptr %arrayidx.i62.1, align 4

@@ -5,6 +5,8 @@
 ;CHECK:       %latch
 ;CHECK:       %header
 ;CHECK:       %false
+@g = external global i32
+
 define i32 @test1(ptr %p) {
 entry:
   br label %header
@@ -227,6 +229,7 @@ header:
   %2 = inttoptr i64 %1 to ptr
   %data = load i32, ptr %2
   %3 = icmp eq i32 %data, 0
+  store i32 0, ptr @g
   br i1 %3, label %latch, label %header
 
 latch:
@@ -236,4 +239,3 @@ latch:
 exit:
   ret void
 }
-

@@ -4,11 +4,14 @@
 ; RUN: llc -mtriple=amdgcn--amdhsa -mcpu=gfx1030 < %s | FileCheck -check-prefixes=GFX1030 %s
 ; RUN: llc -mtriple=amdgcn--amdhsa -mcpu=gfx1100 < %s | FileCheck -check-prefixes=GFX1100 %s
 
+@g = external addrspace(1) global i32
+
 define amdgpu_kernel void @test_insert_extract(i32 %p, i32 %q) {
 ; GFX90A-LABEL: test_insert_extract:
 ; GFX90A:       ; %bb.0: ; %entry
 ; GFX90A-NEXT:    s_load_dwordx2 s[0:1], s[8:9], 0x0
 ; GFX90A-NEXT:    s_mov_b32 s2, 0
+; GFX90A-NEXT:    v_mov_b32_e32 v0, 0
 ; GFX90A-NEXT:    s_and_b64 vcc, exec, -1
 ; GFX90A-NEXT:    s_mov_b32 s3, 0
 ; GFX90A-NEXT:    s_mov_b32 s4, 0
@@ -48,6 +51,13 @@ define amdgpu_kernel void @test_insert_extract(i32 %p, i32 %q) {
 ; GFX90A-NEXT:    s_or_b64 s[8:9], s[10:11], s[8:9]
 ; GFX90A-NEXT:    s_and_b64 s[8:9], s[8:9], exec
 ; GFX90A-NEXT:    s_cselect_b32 s6, 0, s6
+; GFX90A-NEXT:    s_getpc_b64 s[8:9]
+; GFX90A-NEXT:    s_add_u32 s8, s8, g@gotpcrel32@lo+4
+; GFX90A-NEXT:    s_addc_u32 s9, s9, g@gotpcrel32@hi+12
+; GFX90A-NEXT:    s_load_dwordx2 s[8:9], s[8:9], 0x0
+; GFX90A-NEXT:    s_waitcnt lgkmcnt(0)
+; GFX90A-NEXT:    global_store_dword v0, v0, s[8:9]
+; GFX90A-NEXT:    s_waitcnt vmcnt(0)
 ; GFX90A-NEXT:    s_mov_b64 vcc, vcc
 ; GFX90A-NEXT:    s_cbranch_vccnz .LBB0_1
 ; GFX90A-NEXT:  ; %bb.2: ; %DummyReturnBlock
@@ -57,6 +67,7 @@ define amdgpu_kernel void @test_insert_extract(i32 %p, i32 %q) {
 ; GFX942:       ; %bb.0: ; %entry
 ; GFX942-NEXT:    s_load_dwordx2 s[0:1], s[4:5], 0x0
 ; GFX942-NEXT:    s_mov_b32 s2, 0
+; GFX942-NEXT:    v_mov_b32_e32 v0, 0
 ; GFX942-NEXT:    s_and_b64 vcc, exec, -1
 ; GFX942-NEXT:    s_mov_b32 s3, 0
 ; GFX942-NEXT:    s_mov_b32 s4, 0
@@ -96,6 +107,13 @@ define amdgpu_kernel void @test_insert_extract(i32 %p, i32 %q) {
 ; GFX942-NEXT:    s_or_b64 s[8:9], s[10:11], s[8:9]
 ; GFX942-NEXT:    s_and_b64 s[8:9], s[8:9], exec
 ; GFX942-NEXT:    s_cselect_b32 s6, 0, s6
+; GFX942-NEXT:    s_getpc_b64 s[8:9]
+; GFX942-NEXT:    s_add_u32 s8, s8, g@gotpcrel32@lo+4
+; GFX942-NEXT:    s_addc_u32 s9, s9, g@gotpcrel32@hi+12
+; GFX942-NEXT:    s_load_dwordx2 s[8:9], s[8:9], 0x0
+; GFX942-NEXT:    s_waitcnt lgkmcnt(0)
+; GFX942-NEXT:    global_store_dword v0, v0, s[8:9] sc0 sc1
+; GFX942-NEXT:    s_waitcnt vmcnt(0)
 ; GFX942-NEXT:    s_mov_b64 vcc, vcc
 ; GFX942-NEXT:    s_cbranch_vccnz .LBB0_1
 ; GFX942-NEXT:  ; %bb.2: ; %DummyReturnBlock
@@ -104,12 +122,14 @@ define amdgpu_kernel void @test_insert_extract(i32 %p, i32 %q) {
 ; GFX1030-LABEL: test_insert_extract:
 ; GFX1030:       ; %bb.0: ; %entry
 ; GFX1030-NEXT:    s_load_dwordx2 s[0:1], s[8:9], 0x0
+; GFX1030-NEXT:    v_mov_b32_e32 v0, 0
 ; GFX1030-NEXT:    s_mov_b32 s2, 0
 ; GFX1030-NEXT:    s_mov_b32 s3, 0
 ; GFX1030-NEXT:    s_mov_b32 s4, 0
 ; GFX1030-NEXT:    s_mov_b32 s5, 0
 ; GFX1030-NEXT:    s_mov_b32 s6, 0
 ; GFX1030-NEXT:    s_mov_b32 vcc_lo, exec_lo
+; GFX1030-NEXT:    s_inst_prefetch 0x1
 ; GFX1030-NEXT:    .p2align 6
 ; GFX1030-NEXT:  .LBB0_1: ; %for.body
 ; GFX1030-NEXT:    ; =>This Inner Loop Header: Depth=1
@@ -145,19 +165,29 @@ define amdgpu_kernel void @test_insert_extract(i32 %p, i32 %q) {
 ; GFX1030-NEXT:    s_or_b32 s7, s9, s7
 ; GFX1030-NEXT:    s_and_b32 s7, s7, exec_lo
 ; GFX1030-NEXT:    s_cselect_b32 s6, 0, s6
+; GFX1030-NEXT:    s_getpc_b64 s[8:9]
+; GFX1030-NEXT:    s_add_u32 s8, s8, g@gotpcrel32@lo+4
+; GFX1030-NEXT:    s_addc_u32 s9, s9, g@gotpcrel32@hi+12
+; GFX1030-NEXT:    s_load_dwordx2 s[8:9], s[8:9], 0x0
+; GFX1030-NEXT:    s_waitcnt lgkmcnt(0)
+; GFX1030-NEXT:    global_store_dword v0, v0, s[8:9]
+; GFX1030-NEXT:    s_waitcnt_vscnt null, 0x0
 ; GFX1030-NEXT:    s_cbranch_vccnz .LBB0_1
 ; GFX1030-NEXT:  ; %bb.2: ; %DummyReturnBlock
+; GFX1030-NEXT:    s_inst_prefetch 0x2
 ; GFX1030-NEXT:    s_endpgm
 ;
 ; GFX1100-LABEL: test_insert_extract:
 ; GFX1100:       ; %bb.0: ; %entry
 ; GFX1100-NEXT:    s_load_b64 s[0:1], s[4:5], 0x0
+; GFX1100-NEXT:    v_mov_b32_e32 v0, 0
 ; GFX1100-NEXT:    s_mov_b32 s2, 0
 ; GFX1100-NEXT:    s_mov_b32 s3, 0
 ; GFX1100-NEXT:    s_mov_b32 s4, 0
 ; GFX1100-NEXT:    s_mov_b32 s5, 0
 ; GFX1100-NEXT:    s_mov_b32 s6, 0
 ; GFX1100-NEXT:    s_mov_b32 vcc_lo, exec_lo
+; GFX1100-NEXT:    s_set_inst_prefetch_distance 0x1
 ; GFX1100-NEXT:    .p2align 6
 ; GFX1100-NEXT:  .LBB0_1: ; %for.body
 ; GFX1100-NEXT:    ; =>This Inner Loop Header: Depth=1
@@ -198,8 +228,16 @@ define amdgpu_kernel void @test_insert_extract(i32 %p, i32 %q) {
 ; GFX1100-NEXT:    s_delay_alu instid0(SALU_CYCLE_1)
 ; GFX1100-NEXT:    s_and_b32 s7, s7, exec_lo
 ; GFX1100-NEXT:    s_cselect_b32 s6, 0, s6
+; GFX1100-NEXT:    s_getpc_b64 s[8:9]
+; GFX1100-NEXT:    s_add_u32 s8, s8, g@gotpcrel32@lo+4
+; GFX1100-NEXT:    s_addc_u32 s9, s9, g@gotpcrel32@hi+12
+; GFX1100-NEXT:    s_load_b64 s[8:9], s[8:9], 0x0
+; GFX1100-NEXT:    s_waitcnt lgkmcnt(0)
+; GFX1100-NEXT:    global_store_b32 v0, v0, s[8:9] dlc
+; GFX1100-NEXT:    s_waitcnt_vscnt null, 0x0
 ; GFX1100-NEXT:    s_cbranch_vccnz .LBB0_1
 ; GFX1100-NEXT:  ; %bb.2: ; %DummyReturnBlock
+; GFX1100-NEXT:    s_set_inst_prefetch_distance 0x2
 ; GFX1100-NEXT:    s_endpgm
 entry:
   %init = insertelement <4 x i32> zeroinitializer, i32 0, i64 0
@@ -214,6 +252,7 @@ for.body:                                     ; preds = %for.body, %entry
   %i2 = insertelement <4 x i32> %x2, i32 %add, i64 %idxprom
   %e3 = extractelement <4 x i32> %x1, i64 %idxprom
   %i4 = insertelement <4 x i32> %x1, i32 %e3, i64 0
+  store volatile i32 0, ptr addrspace(1) @g
   br label %for.body
 }
 

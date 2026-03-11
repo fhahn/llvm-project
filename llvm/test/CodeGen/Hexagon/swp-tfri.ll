@@ -5,6 +5,8 @@
 
 ; STATS: 1 pipeliner        - Number of loops software pipelined
 
+@g = external global i32
+
 ; Function Attrs: nounwind
 define fastcc void @f0() #0 {
 b0:
@@ -39,6 +41,7 @@ b5:                                               ; preds = %b5, %b2
   %v13 = or i16 0, %v12
   %v14 = or i16 %v10, %v13
   %v15 = add nsw i32 %v8, -32
+  store i32 0, ptr @g
   %v16 = icmp sgt i32 %v15, 31
   br i1 %v16, label %b5, label %b3
 

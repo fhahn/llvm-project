@@ -4,6 +4,8 @@
 ; RUN: llc -mtriple=sparc64-unknown-linux %s -o - | FileCheck %s -check-prefix=SPARC64
 ; RUN: llc -mtriple=sparc64-unknown-linux -mattr=vis3 %s -o - | FileCheck %s -check-prefix=SPARC64-VIS3
 
+@g = external global i32
+
 define i32 @test_addx(i64 %a, i64 %b, i64 %c) nounwind {
 ; V8-LABEL: test_addx:
 ; V8:       ! %bb.0: ! %entry
@@ -450,12 +452,14 @@ define i32 @test_float_cc(double %a, double %b, i32 %c, i32 %d) nounwind {
 ; V8-NEXT:    mov 1, %o0
 ; V8-NEXT:    retl
 ; V8-NEXT:    add %sp, 112, %sp
-; V8-NEXT:  .LBB7_3: ! %loop
+; V8-NEXT:  .LBB7_3: ! %loop.preheader
+; V8-NEXT:    sethi %hi(g), %o0
+; V8-NEXT:  .LBB7_4: ! %loop
 ; V8-NEXT:    ! =>This Inner Loop Header: Depth=1
 ; V8-NEXT:    cmp %o4, 10
-; V8-NEXT:    be .LBB7_3
-; V8-NEXT:    nop
-; V8-NEXT:  ! %bb.4: ! %exit.0
+; V8-NEXT:    be .LBB7_4
+; V8-NEXT:    st %g0, [%o0+%lo(g)]
+; V8-NEXT:  ! %bb.5: ! %exit.0
 ; V8-NEXT:    mov %g0, %o0
 ; V8-NEXT:    retl
 ; V8-NEXT:    add %sp, 112, %sp
@@ -484,12 +488,14 @@ define i32 @test_float_cc(double %a, double %b, i32 %c, i32 %d) nounwind {
 ; V9-NEXT:    mov 1, %o0
 ; V9-NEXT:    retl
 ; V9-NEXT:    add %sp, 112, %sp
-; V9-NEXT:  .LBB7_3: ! %loop
+; V9-NEXT:  .LBB7_3: ! %loop.preheader
+; V9-NEXT:    sethi %hi(g), %o0
+; V9-NEXT:  .LBB7_4: ! %loop
 ; V9-NEXT:    ! =>This Inner Loop Header: Depth=1
 ; V9-NEXT:    cmp %o4, 10
-; V9-NEXT:    be %icc, .LBB7_3
-; V9-NEXT:    nop
-; V9-NEXT:  ! %bb.4: ! %exit.0
+; V9-NEXT:    be %icc, .LBB7_4
+; V9-NEXT:    st %g0, [%o0+%lo(g)]
+; V9-NEXT:  ! %bb.5: ! %exit.0
 ; V9-NEXT:    mov %g0, %o0
 ; V9-NEXT:    retl
 ; V9-NEXT:    add %sp, 112, %sp
@@ -510,12 +516,16 @@ define i32 @test_float_cc(double %a, double %b, i32 %c, i32 %d) nounwind {
 ; SPARC64-NEXT:  ! %bb.2: ! %exit.1
 ; SPARC64-NEXT:    retl
 ; SPARC64-NEXT:    mov 1, %o0
-; SPARC64-NEXT:  .LBB7_3: ! %loop
+; SPARC64-NEXT:  .LBB7_3: ! %loop.preheader
+; SPARC64-NEXT:    sethi %h44(g), %o0
+; SPARC64-NEXT:    add %o0, %m44(g), %o0
+; SPARC64-NEXT:    sllx %o0, 12, %o0
+; SPARC64-NEXT:  .LBB7_4: ! %loop
 ; SPARC64-NEXT:    ! =>This Inner Loop Header: Depth=1
 ; SPARC64-NEXT:    cmp %o2, 10
-; SPARC64-NEXT:    be %icc, .LBB7_3
-; SPARC64-NEXT:    nop
-; SPARC64-NEXT:  ! %bb.4: ! %exit.0
+; SPARC64-NEXT:    be %icc, .LBB7_4
+; SPARC64-NEXT:    st %g0, [%o0+%l44(g)]
+; SPARC64-NEXT:  ! %bb.5: ! %exit.0
 ; SPARC64-NEXT:    retl
 ; SPARC64-NEXT:    mov %g0, %o0
 ;
@@ -535,12 +545,16 @@ define i32 @test_float_cc(double %a, double %b, i32 %c, i32 %d) nounwind {
 ; SPARC64-VIS3-NEXT:  ! %bb.2: ! %exit.1
 ; SPARC64-VIS3-NEXT:    retl
 ; SPARC64-VIS3-NEXT:    mov 1, %o0
-; SPARC64-VIS3-NEXT:  .LBB7_3: ! %loop
+; SPARC64-VIS3-NEXT:  .LBB7_3: ! %loop.preheader
+; SPARC64-VIS3-NEXT:    sethi %h44(g), %o0
+; SPARC64-VIS3-NEXT:    add %o0, %m44(g), %o0
+; SPARC64-VIS3-NEXT:    sllx %o0, 12, %o0
+; SPARC64-VIS3-NEXT:  .LBB7_4: ! %loop
 ; SPARC64-VIS3-NEXT:    ! =>This Inner Loop Header: Depth=1
 ; SPARC64-VIS3-NEXT:    cmp %o2, 10
-; SPARC64-VIS3-NEXT:    be %icc, .LBB7_3
-; SPARC64-VIS3-NEXT:    nop
-; SPARC64-VIS3-NEXT:  ! %bb.4: ! %exit.0
+; SPARC64-VIS3-NEXT:    be %icc, .LBB7_4
+; SPARC64-VIS3-NEXT:    st %g0, [%o0+%l44(g)]
+; SPARC64-VIS3-NEXT:  ! %bb.5: ! %exit.0
 ; SPARC64-VIS3-NEXT:    retl
 ; SPARC64-VIS3-NEXT:    mov %g0, %o0
 entry:
@@ -548,6 +562,7 @@ entry:
    br i1 %0, label %loop, label %loop.2
 
 loop:
+   store i32 0, ptr @g
    %1 = icmp eq i32 %c, 10
    br i1 %1, label %loop, label %exit.0
 

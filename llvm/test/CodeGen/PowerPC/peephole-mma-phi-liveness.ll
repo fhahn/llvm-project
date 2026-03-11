@@ -5,6 +5,8 @@
 
 target datalayout = "E-m:a-Fi64-i64:64-n32:64-S128-v256:256:256-v512:512:512"
 
+@g = external global i32
+
 define void @baz(i64 %arg) local_unnamed_addr #0 {
 ; CHECK-LABEL: baz:
 ; CHECK:       # %bb.0: # %bb
@@ -28,17 +30,15 @@ define void @baz(i64 %arg) local_unnamed_addr #0 {
 ; CHECK-NEXT:  # %bb.1: # %bb10
 ; CHECK-NEXT:    xvf64gerpp 0, 34, 0
 ; CHECK-NEXT:  L..BB0_2: # %bb12
-; CHECK-NEXT:    cmpdi 3, 0
-; CHECK-NEXT:  L..BB0_3: # %bb13
-; CHECK-NEXT:    #
-; CHECK-NEXT:    bc 4, 2, L..BB0_3
-; CHECK-NEXT:  # %bb.4: # %bb14
 ; CHECK-NEXT:    xxmfacc 0
+; CHECK-NEXT:    ld 3, L..C0(2) # @g
+; CHECK-NEXT:    li 4, 0
 ; CHECK-NEXT:    xxlxor 0, 0, 0
 ; CHECK-NEXT:    xxlxor 2, 2, 2
 ; CHECK-NEXT:    xvsubdp 1, 0, 1
 ; CHECK-NEXT:    xvmaddadp 2, 1, 2
 ; CHECK-NEXT:    xvadddp 0, 2, 0
+; CHECK-NEXT:    stw 4, 0(3)
 ; CHECK-NEXT:    xxswapd 0, 0
 ; CHECK-NEXT:    stxv 0, 0(3)
 ; CHECK-NEXT:    blr
@@ -66,16 +66,13 @@ define void @baz(i64 %arg) local_unnamed_addr #0 {
 ; CHECK-WACC-NEXT:  # %bb.1: # %bb10
 ; CHECK-WACC-NEXT:    xvf64gerpp 0, 34, 0
 ; CHECK-WACC-NEXT:  L..BB0_2: # %bb12
-; CHECK-WACC-NEXT:    cmpdi 3, 0
-; CHECK-WACC-NEXT:    .align 4
-; CHECK-WACC-NEXT:  L..BB0_3: # %bb13
-; CHECK-WACC-NEXT:    #
-; CHECK-WACC-NEXT:    bc 4, 2, L..BB0_3
-; CHECK-WACC-NEXT:  # %bb.4: # %bb14
-; CHECK-WACC-NEXT:    dmxxextfdmr512 34, 36, 0, 0
+; CHECK-WACC-NEXT:    ld 3, L..C0(2) # @g
+; CHECK-WACC-NEXT:    li 4, 0
 ; CHECK-WACC-NEXT:    xxlxor 0, 0, 0
-; CHECK-WACC-NEXT:    xvsubdp 1, 0, 35
 ; CHECK-WACC-NEXT:    xxlxor 2, 2, 2
+; CHECK-WACC-NEXT:    stw 4, 0(3)
+; CHECK-WACC-NEXT:    dmxxextfdmr512 34, 36, 0, 0
+; CHECK-WACC-NEXT:    xvsubdp 1, 0, 35
 ; CHECK-WACC-NEXT:    xvmaddadp 2, 1, 2
 ; CHECK-WACC-NEXT:    xvadddp 0, 2, 0
 ; CHECK-WACC-NEXT:    xxswapd 0, 0
@@ -112,6 +109,7 @@ bb12:                                             ; preds = %bb10, %bb
 
 bb13:                                             ; preds = %bb13, %bb12
   %icmp = icmp eq i64 0, %arg
+  store i32 0, ptr @g
   br i1 %icmp, label %bb14, label %bb13
 
 bb14:                                             ; preds = %bb13

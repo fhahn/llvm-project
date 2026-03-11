@@ -13,6 +13,8 @@
 ; RUN: llc -verify-machineinstrs -mcpu=pwr9 -disable-ppc-innermost-loop-align32 -mtriple powerpc64-unknown-linux-gnu < %s | FileCheck %s -check-prefixes=CHECK,PWR-DISABLE-PPC-INNERMOST-LOOP-ALIGN32
 
 
+@g = external global i32
+
 %struct.parm = type { ptr, i32, i32 }
 
 ; Test the loop alignment when the innermost hot loop has more than 8 instructions.
@@ -131,6 +133,7 @@ do.body1:                                         ; preds = %do.body1, %do.body
   %n.0 = phi i64 [ %m.addr.0, %do.body ], [ %0, %do.body1 ]
   %0 = tail call i64 asm "subi     $0,$0,1", "=r,0"(i64 %n.0)
   %tobool = icmp eq i64 %0, 0
+  store i32 0, ptr @g
   br i1 %tobool, label %do.end, label %do.body1
 
 do.end:                                           ; preds = %do.body1

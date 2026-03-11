@@ -2,6 +2,8 @@
 ; RUN: llc -mtriple=amdgcn -mcpu=verde -amdgpu-early-ifcvt=0 -machine-sink-split-probability-threshold=0 -structurizecfg-skip-uniform-regions < %s | FileCheck -enable-var-scope -check-prefix=GCN -check-prefix=SI %s
 ; RUN: llc -mtriple=amdgcn -mcpu=tonga -mattr=-flat-for-global -amdgpu-early-ifcvt=0 -machine-sink-split-probability-threshold=0 -structurizecfg-skip-uniform-regions < %s | FileCheck -enable-var-scope -check-prefix=GCN -check-prefix=VI %s
 
+@g = external addrspace(1) global i32
+
 define amdgpu_kernel void @uniform_if_scc(i32 %cond, ptr addrspace(1) %out) {
 ; SI-LABEL: uniform_if_scc:
 ; SI:       ; %bb.0: ; %entry
@@ -562,24 +564,42 @@ bb9:                                              ; preds = %bb8, %bb4
 define amdgpu_kernel void @uniform_loop(ptr addrspace(1) %out, i32 %a) {
 ; SI-LABEL: uniform_loop:
 ; SI:       ; %bb.0: ; %entry
-; SI-NEXT:    s_load_dword s0, s[4:5], 0xb
+; SI-NEXT:    s_load_dword s4, s[4:5], 0xb
+; SI-NEXT:    s_mov_b32 s3, 0xf000
+; SI-NEXT:    s_mov_b32 s2, -1
+; SI-NEXT:    v_mov_b32_e32 v0, 0
 ; SI-NEXT:  .LBB10_1: ; %loop
 ; SI-NEXT:    ; =>This Inner Loop Header: Depth=1
+; SI-NEXT:    s_getpc_b64 s[0:1]
+; SI-NEXT:    s_add_u32 s0, s0, g@gotpcrel32@lo+4
+; SI-NEXT:    s_addc_u32 s1, s1, g@gotpcrel32@hi+12
+; SI-NEXT:    s_load_dwordx2 s[0:1], s[0:1], 0x0
 ; SI-NEXT:    s_waitcnt lgkmcnt(0)
-; SI-NEXT:    s_add_i32 s0, s0, -1
-; SI-NEXT:    s_cmp_lg_u32 s0, 0
+; SI-NEXT:    s_add_i32 s4, s4, -1
+; SI-NEXT:    s_cmp_lg_u32 s4, 0
+; SI-NEXT:    buffer_store_dword v0, off, s[0:3], 0
+; SI-NEXT:    s_waitcnt vmcnt(0)
 ; SI-NEXT:    s_cbranch_scc1 .LBB10_1
 ; SI-NEXT:  ; %bb.2: ; %done
 ; SI-NEXT:    s_endpgm
 ;
 ; VI-LABEL: uniform_loop:
 ; VI:       ; %bb.0: ; %entry
-; VI-NEXT:    s_load_dword s0, s[4:5], 0x2c
+; VI-NEXT:    s_load_dword s4, s[4:5], 0x2c
+; VI-NEXT:    s_mov_b32 s3, 0xf000
+; VI-NEXT:    s_mov_b32 s2, -1
+; VI-NEXT:    v_mov_b32_e32 v0, 0
 ; VI-NEXT:  .LBB10_1: ; %loop
 ; VI-NEXT:    ; =>This Inner Loop Header: Depth=1
+; VI-NEXT:    s_getpc_b64 s[0:1]
+; VI-NEXT:    s_add_u32 s0, s0, g@gotpcrel32@lo+4
+; VI-NEXT:    s_addc_u32 s1, s1, g@gotpcrel32@hi+12
+; VI-NEXT:    s_load_dwordx2 s[0:1], s[0:1], 0x0
 ; VI-NEXT:    s_waitcnt lgkmcnt(0)
-; VI-NEXT:    s_add_i32 s0, s0, -1
-; VI-NEXT:    s_cmp_lg_u32 s0, 0
+; VI-NEXT:    s_add_i32 s4, s4, -1
+; VI-NEXT:    s_cmp_lg_u32 s4, 0
+; VI-NEXT:    buffer_store_dword v0, off, s[0:3], 0
+; VI-NEXT:    s_waitcnt vmcnt(0)
 ; VI-NEXT:    s_cbranch_scc1 .LBB10_1
 ; VI-NEXT:  ; %bb.2: ; %done
 ; VI-NEXT:    s_endpgm
@@ -590,6 +610,7 @@ loop:
   %i = phi i32 [0, %entry], [%i.i, %loop]
   %i.i = add i32 %i, 1
   %cmp = icmp eq i32 %a, %i.i
+  store volatile i32 0, ptr addrspace(1) @g
   br i1 %cmp, label %done, label %loop
 
 done:
@@ -1143,10 +1164,20 @@ define void @move_to_valu_vgpr_operand_phi(ptr addrspace(3) %out) {
 ; SI-NEXT:    v_add_i32_e32 v0, vcc, 28, v0
 ; SI-NEXT:    v_mov_b32_e32 v1, 1
 ; SI-NEXT:    s_and_b64 vcc, exec, 0
+; SI-NEXT:    s_mov_b32 s7, 0xf000
+; SI-NEXT:    s_mov_b32 s6, -1
+; SI-NEXT:    v_mov_b32_e32 v2, 0
 ; SI-NEXT:    s_mov_b32 m0, -1
 ; SI-NEXT:    s_branch .LBB20_2
 ; SI-NEXT:  .LBB20_1: ; %bb3
 ; SI-NEXT:    ; in Loop: Header=BB20_2 Depth=1
+; SI-NEXT:    s_getpc_b64 s[4:5]
+; SI-NEXT:    s_add_u32 s4, s4, g@gotpcrel32@lo+4
+; SI-NEXT:    s_addc_u32 s5, s5, g@gotpcrel32@hi+12
+; SI-NEXT:    s_load_dwordx2 s[4:5], s[4:5], 0x0
+; SI-NEXT:    s_waitcnt lgkmcnt(0)
+; SI-NEXT:    buffer_store_dword v2, off, s[4:7], 0
+; SI-NEXT:    s_waitcnt vmcnt(0)
 ; SI-NEXT:    v_add_i32_e64 v0, s[4:5], 8, v0
 ; SI-NEXT:  .LBB20_2: ; %bb1
 ; SI-NEXT:    ; =>This Inner Loop Header: Depth=1
@@ -1161,7 +1192,7 @@ define void @move_to_valu_vgpr_operand_phi(ptr addrspace(3) %out) {
 ; SI-NEXT:    s_mov_b64 vcc, vcc
 ; SI-NEXT:    s_cbranch_vccz .LBB20_1
 ; SI-NEXT:  ; %bb.4: ; %DummyReturnBlock
-; SI-NEXT:    s_waitcnt lgkmcnt(0)
+; SI-NEXT:    s_waitcnt expcnt(0) lgkmcnt(0)
 ; SI-NEXT:    s_setpc_b64 s[30:31]
 ;
 ; VI-LABEL: move_to_valu_vgpr_operand_phi:
@@ -1170,10 +1201,20 @@ define void @move_to_valu_vgpr_operand_phi(ptr addrspace(3) %out) {
 ; VI-NEXT:    v_add_u32_e32 v0, vcc, 28, v0
 ; VI-NEXT:    v_mov_b32_e32 v1, 1
 ; VI-NEXT:    s_and_b64 vcc, exec, 0
+; VI-NEXT:    s_mov_b32 s7, 0xf000
+; VI-NEXT:    s_mov_b32 s6, -1
+; VI-NEXT:    v_mov_b32_e32 v2, 0
 ; VI-NEXT:    s_mov_b32 m0, -1
 ; VI-NEXT:    s_branch .LBB20_2
 ; VI-NEXT:  .LBB20_1: ; %bb3
 ; VI-NEXT:    ; in Loop: Header=BB20_2 Depth=1
+; VI-NEXT:    s_getpc_b64 s[4:5]
+; VI-NEXT:    s_add_u32 s4, s4, g@gotpcrel32@lo+4
+; VI-NEXT:    s_addc_u32 s5, s5, g@gotpcrel32@hi+12
+; VI-NEXT:    s_load_dwordx2 s[4:5], s[4:5], 0x0
+; VI-NEXT:    s_waitcnt lgkmcnt(0)
+; VI-NEXT:    buffer_store_dword v2, off, s[4:7], 0
+; VI-NEXT:    s_waitcnt vmcnt(0)
 ; VI-NEXT:    v_add_u32_e64 v0, s[4:5], 8, v0
 ; VI-NEXT:  .LBB20_2: ; %bb1
 ; VI-NEXT:    ; =>This Inner Loop Header: Depth=1
@@ -1207,6 +1248,7 @@ bb2:                                              ; preds = %bb1
 
 bb3:                                              ; preds = %bb2, %bb1
   %tmp4 = add nsw i32 %tmp0, 2
+  store volatile i32 0, ptr addrspace(1) @g
   br label %bb1
 }
 

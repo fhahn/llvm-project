@@ -3,6 +3,8 @@
 
 ; Correctly tracking COPY instructions in peephole should not crash compiler.
 
+@g = external global i32
+
 declare void @llvm.lifetime.start.p0(i64 immarg, ptr nocapture)
 
 define void @foo(ptr %p1, ptr %p2, ptr %p3, ptr %p4) {
@@ -17,11 +19,13 @@ define void @foo(ptr %p1, ptr %p2, ptr %p3, ptr %p4) {
 ; CHECK-NEXT:    movl (%rax), %eax
 ; CHECK-NEXT:    shll %cl, %eax
 ; CHECK-NEXT:    movl %r8d, (%rdx)
+; CHECK-NEXT:    movq g@GOTPCREL(%rip), %rdi
 ; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  .LBB0_1: # %loop2.header
 ; CHECK-NEXT:    # =>This Inner Loop Header: Depth=1
-; CHECK-NEXT:    movl $5, %edi
-; CHECK-NEXT:    orl %eax, %edi
+; CHECK-NEXT:    movl $0, (%rdi)
+; CHECK-NEXT:    movl $5, %r9d
+; CHECK-NEXT:    orl %eax, %r9d
 ; CHECK-NEXT:    je .LBB0_1
 ; CHECK-NEXT:  # %bb.2: # %exit
 ; CHECK-NEXT:    movl %r8d, (%rdx)
@@ -53,6 +57,7 @@ loop2.preheader:
   br label %loop2.header
 
 loop2.header:
+  store i32 0, ptr @g
   %cond1 = icmp eq i32 %vq3, 0
   br i1 %cond1, label %loop2.body, label %exit
 

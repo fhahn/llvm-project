@@ -2,6 +2,8 @@
 ; RUN: llc < %s -mtriple=i686-unknown-unknown -mattr=+avx | FileCheck %s --check-prefixes=CHECK,X86
 ; RUN: llc < %s -mtriple=x86_64-unknown-unknown -mattr=+avx | FileCheck %s --check-prefixes=CHECK,X64
 
+@g = external global i32
+
 define void @knownbits_zext_in_reg(ptr) nounwind {
 ; X86-LABEL: knownbits_zext_in_reg:
 ; X86:       # %bb.0: # %BB
@@ -24,6 +26,7 @@ define void @knownbits_zext_in_reg(ptr) nounwind {
 ; X86-NEXT:  .LBB0_2: # %CF237
 ; X86-NEXT:    # Parent Loop BB0_1 Depth=1
 ; X86-NEXT:    # => This Inner Loop Header: Depth=2
+; X86-NEXT:    movl $0, g
 ; X86-NEXT:    testb %bl, %bl
 ; X86-NEXT:    jne .LBB0_2
 ; X86-NEXT:    jmp .LBB0_1
@@ -36,7 +39,8 @@ define void @knownbits_zext_in_reg(ptr) nounwind {
 ; X64-NEXT:    imull $177, %eax, %edx
 ; X64-NEXT:    shrl $14, %edx
 ; X64-NEXT:    movzbl %cl, %ecx
-; X64-NEXT:    xorl %esi, %esi
+; X64-NEXT:    movq g@GOTPCREL(%rip), %rsi
+; X64-NEXT:    xorl %edi, %edi
 ; X64-NEXT:    .p2align 4
 ; X64-NEXT:  .LBB0_1: # %CF
 ; X64-NEXT:    # =>This Loop Header: Depth=1
@@ -47,7 +51,8 @@ define void @knownbits_zext_in_reg(ptr) nounwind {
 ; X64-NEXT:  .LBB0_2: # %CF237
 ; X64-NEXT:    # Parent Loop BB0_1 Depth=1
 ; X64-NEXT:    # => This Inner Loop Header: Depth=2
-; X64-NEXT:    testb %sil, %sil
+; X64-NEXT:    movl $0, (%rsi)
+; X64-NEXT:    testb %dil, %dil
 ; X64-NEXT:    jne .LBB0_2
 ; X64-NEXT:    jmp .LBB0_1
 BB:
@@ -64,6 +69,7 @@ CF:                                               ; preds = %CF246, %BB
   br label %CF237
 
 CF237:                                            ; preds = %CF237, %CF
+  store i32 0, ptr @g
   %Cmp73 = icmp ne i1 undef, undef
   br i1 %Cmp73, label %CF237, label %CF246
 

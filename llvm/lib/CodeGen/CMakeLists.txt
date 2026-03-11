@@ -133,6 +133,7 @@ add_llvm_component_library(LLVMCodeGen
   MachineInstr.cpp
   MachineLateInstrsCleanup.cpp
   MachineLICM.cpp
+  MachineLoopDeletion.cpp
   MachineLoopInfo.cpp
   MachineLoopUtils.cpp
   MachineModuleInfo.cpp

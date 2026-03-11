@@ -2,6 +2,8 @@
 target datalayout = "E-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v128:128:128-n32:64"
 target triple = "powerpc64-unknown-freebsd10.0"
 
+@g = external global i32
+
 @a = common global i32 0, align 4
 
 define void @test1(i32 %c) nounwind {
@@ -86,6 +88,7 @@ for.body:                                         ; preds = %for.body, %entry
   %val = add i32 %load, %phi
   %dec = add i32 %phi, -1
   %cmp = icmp sgt i32 %phi, 1
+  store volatile i32 0, ptr @g
   br i1 %cmp, label %for.body, label %return
 
 return:                                           ; preds = %for.body

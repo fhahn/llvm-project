@@ -3,10 +3,11 @@
 
 declare fastcc void @bar()
 
+@g = external addrspace(1) global i32
+
 define fastcc i32 @foo() {
   ; CHECK-LABEL: name: foo
   ; CHECK: bb.0 (%ir-block.0):
-  ; CHECK-NEXT:   successors: %bb.1(0x80000000)
   ; CHECK-NEXT:   liveins: $sgpr12, $sgpr13, $sgpr14, $sgpr15, $sgpr30, $sgpr31, $vgpr31, $sgpr4_sgpr5, $sgpr6_sgpr7, $sgpr8_sgpr9, $sgpr10_sgpr11
   ; CHECK-NEXT: {{  $}}
   ; CHECK-NEXT:   S_WAITCNT 0
@@ -30,18 +31,18 @@ define fastcc i32 @foo() {
   ; CHECK-NEXT:   $vgpr40 = V_WRITELANE_B32 killed $sgpr31, 1, $vgpr40
   ; CHECK-NEXT:   S_WAITCNT 49279
   ; CHECK-NEXT:   dead $sgpr30_sgpr31 = SI_CALL killed renamable $sgpr16_sgpr17, @bar, csr_amdgpu, implicit killed $sgpr4_sgpr5, implicit killed $sgpr6_sgpr7, implicit killed $sgpr8_sgpr9, implicit killed $sgpr10_sgpr11, implicit killed $sgpr12, implicit killed $sgpr13, implicit killed $sgpr14, implicit killed $sgpr15, implicit killed $vgpr31, implicit $sgpr0_sgpr1_sgpr2_sgpr3
-  ; CHECK-NEXT:   $vcc_lo = S_MOV_B32 $exec_lo
-  ; CHECK-NEXT: {{  $}}
-  ; CHECK-NEXT: bb.1 (%ir-block.1):
-  ; CHECK-NEXT:   successors: %bb.2(0x04000000), %bb.1(0x7c000000)
-  ; CHECK-NEXT:   liveins: $vcc_lo
-  ; CHECK-NEXT: {{  $}}
-  ; CHECK-NEXT:   S_CBRANCH_VCCNZ %bb.1, implicit $vcc_lo
-  ; CHECK-NEXT: {{  $}}
-  ; CHECK-NEXT: bb.2.DummyReturnBlock:
+  ; CHECK-NEXT:   BUNDLE implicit-def $sgpr4_sgpr5, implicit-def $sgpr4, implicit-def $scc, implicit-def $sgpr5 {
+  ; CHECK-NEXT:     $sgpr4_sgpr5 = S_GETPC_B64
+  ; CHECK-NEXT:     $sgpr4 = S_ADD_U32 internal $sgpr4, target-flags(amdgpu-gotprel32-lo) @g + 4, implicit-def $scc
+  ; CHECK-NEXT:     $sgpr5 = S_ADDC_U32 internal $sgpr5, target-flags(amdgpu-gotprel32-hi) @g + 12, implicit-def $scc, implicit internal $scc
+  ; CHECK-NEXT:   }
+  ; CHECK-NEXT:   renamable $vgpr0 = V_MOV_B32_e32 0, implicit $exec
+  ; CHECK-NEXT:   renamable $sgpr4_sgpr5 = S_LOAD_DWORDX2_IMM killed renamable $sgpr4_sgpr5, 0, 0 :: (dereferenceable invariant load (s64) from got, addrspace 4)
   ; CHECK-NEXT:   $sgpr31 = V_READLANE_B32 $vgpr40, 1
   ; CHECK-NEXT:   $sgpr30 = V_READLANE_B32 $vgpr40, 0
   ; CHECK-NEXT:   $sgpr32 = S_MOV_B32 $sgpr33
+  ; CHECK-NEXT:   S_WAITCNT 49279
+  ; CHECK-NEXT:   GLOBAL_STORE_DWORD_SADDR killed renamable $vgpr0, renamable $vgpr0, killed renamable $sgpr4_sgpr5, 0, 0, implicit $exec :: (store (s32) into @g, addrspace 1)
   ; CHECK-NEXT:   $sgpr4 = V_READLANE_B32 $vgpr40, 2
   ; CHECK-NEXT:   $sgpr5 = S_OR_SAVEEXEC_B32 -1, implicit-def $exec, implicit-def dead $scc, implicit $exec
   ; CHECK-NEXT:   $vgpr40 = BUFFER_LOAD_DWORD_OFFSET $sgpr0_sgpr1_sgpr2_sgpr3, $sgpr33, 0, 0, 0, implicit $exec :: ("amdgpu-thread-private" load (s32) from %stack.2, addrspace 5)
@@ -54,5 +55,6 @@ define fastcc i32 @foo() {
   br label %1
 
 1:
+  store i32 0, ptr addrspace(1) @g
   br label %1
 }

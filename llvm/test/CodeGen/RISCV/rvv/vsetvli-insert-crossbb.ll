@@ -35,6 +35,7 @@ if.end:                                           ; preds = %if.else, %if.then
 }
 
 @scratch = global i8 0, align 16
+@g = external global i32
 
 define <vscale x 1 x double> @test2(i64 %avl, i8 zeroext %cond, <vscale x 1 x double> %a, <vscale x 1 x double> %b) nounwind {
 ; CHECK-LABEL: test2:
@@ -1089,10 +1090,12 @@ define <vscale x 4 x i32> @clobbered_forwarded_avl(i64 %n, <vscale x 4 x i32> %v
 ; CHECK-LABEL: clobbered_forwarded_avl:
 ; CHECK:       # %bb.0: # %entry
 ; CHECK-NEXT:    vsetvli zero, a0, e32, m2, ta, ma
+; CHECK-NEXT:    lui a2, %hi(g)
 ; CHECK-NEXT:    andi a1, a1, 1
 ; CHECK-NEXT:  .LBB27_1: # %for.body
 ; CHECK-NEXT:    # =>This Inner Loop Header: Depth=1
 ; CHECK-NEXT:    addi a0, a0, 1
+; CHECK-NEXT:    sw zero, %lo(g)(a2)
 ; CHECK-NEXT:    bnez a1, .LBB27_1
 ; CHECK-NEXT:  # %bb.2: # %for.cond.cleanup
 ; CHECK-NEXT:    vadd.vv v10, v8, v8
@@ -1107,6 +1110,7 @@ for.body:
   %1 = phi i64 [ %3, %for.body ], [ %n, %entry ]
   %2 = tail call i64 @llvm.riscv.vsetvli.i64(i64 %1, i64 0, i64 0)
   %3 = add i64 %1, 1
+  store i32 0, ptr @g
   br i1 %cmp, label %for.body, label %for.cond.cleanup
 
 for.cond.cleanup:

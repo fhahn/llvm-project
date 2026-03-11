@@ -14,6 +14,8 @@ target triple = "x86_64-apple-macosx"
 
 
 ; Initial motivating example: Simple diamond with a call just on one side.
+@g = external global i32
+
 define i32 @foo(i32 %a, i32 %b) {
 ; ENABLE-LABEL: foo:
 ; ENABLE:       ## %bb.0:
@@ -461,12 +463,14 @@ define i32 @inlineAsm(i32 %cond, i32 %N) {
 ; ENABLE-NEXT:    nop
 ; ENABLE-NEXT:    ## InlineAsm End
 ; ENABLE-NEXT:    movl $10, %eax
+; ENABLE-NEXT:    movq _g@GOTPCREL(%rip), %rcx
 ; ENABLE-NEXT:    .p2align 4
 ; ENABLE-NEXT:  LBB6_2: ## %for.body
 ; ENABLE-NEXT:    ## =>This Inner Loop Header: Depth=1
 ; ENABLE-NEXT:    ## InlineAsm Start
 ; ENABLE-NEXT:    addl $1, %ebx
 ; ENABLE-NEXT:    ## InlineAsm End
+; ENABLE-NEXT:    movl $0, (%rcx)
 ; ENABLE-NEXT:    decl %eax
 ; ENABLE-NEXT:    jne LBB6_2
 ; ENABLE-NEXT:  ## %bb.3: ## %for.exit
@@ -493,12 +497,14 @@ define i32 @inlineAsm(i32 %cond, i32 %N) {
 ; DISABLE-NEXT:    nop
 ; DISABLE-NEXT:    ## InlineAsm End
 ; DISABLE-NEXT:    movl $10, %eax
+; DISABLE-NEXT:    movq _g@GOTPCREL(%rip), %rcx
 ; DISABLE-NEXT:    .p2align 4
 ; DISABLE-NEXT:  LBB6_2: ## %for.body
 ; DISABLE-NEXT:    ## =>This Inner Loop Header: Depth=1
 ; DISABLE-NEXT:    ## InlineAsm Start
 ; DISABLE-NEXT:    addl $1, %ebx
 ; DISABLE-NEXT:    ## InlineAsm End
+; DISABLE-NEXT:    movl $0, (%rcx)
 ; DISABLE-NEXT:    decl %eax
 ; DISABLE-NEXT:    jne LBB6_2
 ; DISABLE-NEXT:  ## %bb.3: ## %for.exit
@@ -526,6 +532,7 @@ for.body:                                         ; preds = %entry, %for.body
   tail call void asm "addl $$1, %ebx", "~{ebx}"()
   %inc = add nuw nsw i32 %i.03, 1
   %exitcond = icmp eq i32 %inc, 10
+  store i32 0, ptr @g
   br i1 %exitcond, label %for.exit, label %for.body
 
 for.exit:

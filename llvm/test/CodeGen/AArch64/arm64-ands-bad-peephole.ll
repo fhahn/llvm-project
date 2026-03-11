@@ -5,6 +5,8 @@
 target datalayout = "e-m:o-i64:64-i128:128-n32:64-S128"
 target triple = "arm64-apple-ios"
 
+@g = external global i32
+
 ; CHECK-LABEL: tst1:
 ; CHECK: add [[REG:w[0-9]+]], w{{[0-9]+}}, #1
 ; CHECK: tst [[REG]], #0x1
@@ -20,6 +22,7 @@ for.body:                                         ; preds = %for.body, %entry
   %add2.result.0 = select i1 %cmp1, i32 %true, i32 %result.09
   %inc = add nsw i32 %i.08, 1
   %cmp = icmp slt i32 %i.08, %true
+  store i32 0, ptr @g
   br i1 %cmp, label %for.body, label %for.cond.for.end_crit_edge
 
 for.cond.for.end_crit_edge:                       ; preds = %for.body

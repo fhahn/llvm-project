@@ -4,13 +4,16 @@
 ; Check that DAGCombiner does not crash after producing an illegal
 ; BUILD_VECTOR node.
 
+@g = external global i32
 
 define void @pr32422(double %a0) {
 ; CHECK-LABEL: pr32422:
 ; CHECK:       # %bb.0: # %BB
+; CHECK-NEXT:    lgrl %r1, g@GOT
 ; CHECK-NEXT:  .LBB0_1: # %CF
 ; CHECK-NEXT:    # =>This Inner Loop Header: Depth=1
 ; CHECK-NEXT:    cdbr %f0, %f0
+; CHECK-NEXT:    mvhi 0(%r1), 0
 ; CHECK-NEXT:    jo .LBB0_1
 ; CHECK-NEXT:  # %bb.2: # %CF353
 ; CHECK-NEXT:    br %r14
@@ -23,6 +26,7 @@ BB:
   br label %CF
 
 CF:                                               ; preds = %CF, %BB
+  store i32 0, ptr @g
   %Cmp40 = fcmp uno double 0xC663C682E9619F00, %a0
   br i1 %Cmp40, label %CF, label %CF353
 

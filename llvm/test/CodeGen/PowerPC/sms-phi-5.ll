@@ -2,6 +2,8 @@
 ; RUN: llc < %s -mtriple=powerpc64le-unknown-linux-gnu -verify-machineinstrs\
 ; RUN:       -mcpu=pwr9 --ppc-enable-pipeliner 2>&1 | FileCheck %s
 
+@g = external global i32
+
 define void @phi5() unnamed_addr {
 ; CHECK-LABEL: phi5:
 ; CHECK:       # %bb.0:
@@ -12,12 +14,12 @@ define void @phi5() unnamed_addr {
 ; CHECK-NEXT:    andi. 3, 3, 6336
 ; CHECK-NEXT:    beqlr 0
 ; CHECK-NEXT:  # %bb.2:
-; CHECK-NEXT:    lhz 3, 0(3)
-; CHECK-NEXT:    slwi 3, 3, 15
-; CHECK-NEXT:    clrlwi 3, 3, 31
-; CHECK-NEXT:    rlwinm 4, 3, 31, 17, 31
-; CHECK-NEXT:    or 3, 3, 4
-; CHECK-NEXT:    rlwimi 3, 3, 15, 0, 16
+; CHECK-NEXT:    addis 3, 2, .LC0@toc@ha
+; CHECK-NEXT:    li 4, 0
+; CHECK-NEXT:    ld 3, .LC0@toc@l(3)
+; CHECK-NEXT:    stw 4, 0(3)
+; CHECK-NEXT:    li 3, 1
+; CHECK-NEXT:    mtctr 3
 ; CHECK-NEXT:  # %bb.3:
 ; CHECK-NEXT:    blr
   switch i12 undef, label %21 [
@@ -49,6 +51,7 @@ define void @phi5() unnamed_addr {
   %18 = or i16 %17, %16
   %19 = add i32 %8, -1
   %20 = icmp eq i32 %19, 0
+  store i32 0, ptr @g
   br i1 %20, label %21, label %3
 
 21:                                               ; preds = %3, %0

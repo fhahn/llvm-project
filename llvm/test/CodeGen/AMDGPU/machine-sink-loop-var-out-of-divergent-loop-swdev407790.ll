@@ -4,6 +4,8 @@
 ; A VGPR loop variable was incorrectly sunk into a flow block, past
 ; the si_end_cf reconvergence point.
 
+@g = external addrspace(1) global i32
+
 define void @machinesink_loop_variable_out_of_divergent_loop(i32 %arg, i1 %cmp49280.not, i32 %arg1, i1 %cmp108) {
 ; CHECK-LABEL: machinesink_loop_variable_out_of_divergent_loop:
 ; CHECK:       ; %bb.0: ; %entry
@@ -71,12 +73,19 @@ define void @machinesink_loop_variable_out_of_divergent_loop(i32 %arg, i1 %cmp49
 ; CHECK-NEXT:  .LBB0_8: ; %for.body159.preheader
 ; CHECK-NEXT:    s_inst_prefetch 0x2
 ; CHECK-NEXT:    s_or_b32 exec_lo, exec_lo, s6
+; CHECK-NEXT:    v_mov_b32_e32 v0, 0
 ; CHECK-NEXT:    s_mov_b32 vcc_lo, exec_lo
 ; CHECK-NEXT:  .LBB0_9: ; %for.body159
 ; CHECK-NEXT:    ; =>This Inner Loop Header: Depth=1
+; CHECK-NEXT:    s_getpc_b64 s[4:5]
+; CHECK-NEXT:    s_add_u32 s4, s4, g@gotpcrel32@lo+4
+; CHECK-NEXT:    s_addc_u32 s5, s5, g@gotpcrel32@hi+12
+; CHECK-NEXT:    s_load_dwordx2 s[4:5], s[4:5], 0x0
+; CHECK-NEXT:    s_waitcnt lgkmcnt(0)
+; CHECK-NEXT:    global_store_dword v0, v0, s[4:5]
+; CHECK-NEXT:    s_waitcnt_vscnt null, 0x0
 ; CHECK-NEXT:    s_cbranch_vccnz .LBB0_9
 ; CHECK-NEXT:  ; %bb.10: ; %DummyReturnBlock
-; CHECK-NEXT:    s_waitcnt lgkmcnt(0)
 ; CHECK-NEXT:    s_setpc_b64 s[30:31]
 entry:
   br label %for.body33
@@ -110,5 +119,6 @@ for.end121:                                       ; preds = %if.end118, %for.bod
   br i1 %cmp31, label %for.body33, label %for.body159
 
 for.body159:                                      ; preds = %for.body159, %for.end121
+  store volatile i32 0, ptr addrspace(1) @g
   br label %for.body159
 }

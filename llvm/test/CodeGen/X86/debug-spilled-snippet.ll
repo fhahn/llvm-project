@@ -6,6 +6,8 @@
 
 ; CHECK-COUNT-4: DBG_VALUE $ebp, 0, !6, !DIExpression(DW_OP_constu, 16, DW_OP_minus), debug-location !10
 
+@g = external global i32
+
 define void @main(i32 %call, i32 %xor.i, i1 %tobool4.not, i32 %.pre) #0 !dbg !4 {
 entry:
   %tobool1.not = icmp ne i32 %call, 0
@@ -26,6 +28,7 @@ for.body5:                                        ; preds = %for.body5, %entry
   %xor.i.i = xor i32 %shr18.i, %xor.i
   %arrayidx.i.i = getelementptr [0 x i32], ptr null, i32 0, i32 %xor.i.i
   %xor1.i40.i = xor i32 %xor.i.i, %call
+  store i32 0, ptr @g
   br i1 %tobool4.not, label %for.cond.loopexit.loopexit, label %for.body5
 
 if.then.i54:                                      ; preds = %for.cond.loopexit.loopexit

@@ -5,45 +5,50 @@
 ; same loop, the other successor is outside the loop. We should be able to sink
 ; MOV32ri outside the loop.
 ; rdar://11980766
+@g = external global i32
+
 define i32 @sink_succ(i32 %argc, ptr nocapture %argv) nounwind uwtable ssp {
 ; CHECK-LABEL: sink_succ:
 ; CHECK:       ## %bb.0: ## %entry
-; CHECK-NEXT:    xorl %eax, %eax
+; CHECK-NEXT:    xorl %ecx, %ecx
+; CHECK-NEXT:    movq _g@GOTPCREL(%rip), %rax
 ; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  LBB0_1: ## %preheader
 ; CHECK-NEXT:    ## =>This Loop Header: Depth=1
 ; CHECK-NEXT:    ## Child Loop BB0_2 Depth 2
 ; CHECK-NEXT:    ## Child Loop BB0_3 Depth 3
-; CHECK-NEXT:    movl $1, %ecx
+; CHECK-NEXT:    movl $1, %edx
 ; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  LBB0_2: ## %for.body1.lr
 ; CHECK-NEXT:    ## Parent Loop BB0_1 Depth=1
 ; CHECK-NEXT:    ## => This Loop Header: Depth=2
 ; CHECK-NEXT:    ## Child Loop BB0_3 Depth 3
-; CHECK-NEXT:    movl %ecx, %edx
+; CHECK-NEXT:    movl %edx, %esi
 ; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  LBB0_3: ## %for.body1
 ; CHECK-NEXT:    ## Parent Loop BB0_1 Depth=1
 ; CHECK-NEXT:    ## Parent Loop BB0_2 Depth=2
 ; CHECK-NEXT:    ## => This Inner Loop Header: Depth=3
-; CHECK-NEXT:    decl %edx
+; CHECK-NEXT:    movl $0, (%rax)
+; CHECK-NEXT:    decl %esi
 ; CHECK-NEXT:    jne LBB0_3
 ; CHECK-NEXT:  ## %bb.4: ## %for.inc40.i
 ; CHECK-NEXT:    ## in Loop: Header=BB0_2 Depth=2
-; CHECK-NEXT:    incl %ecx
-; CHECK-NEXT:    cmpl $32, %ecx
+; CHECK-NEXT:    incl %edx
+; CHECK-NEXT:    cmpl $32, %edx
 ; CHECK-NEXT:    jne LBB0_2
 ; CHECK-NEXT:  ## %bb.5: ## %exit
 ; CHECK-NEXT:    ## in Loop: Header=BB0_1 Depth=1
-; CHECK-NEXT:    incl %eax
-; CHECK-NEXT:    cmpl $10, %eax
+; CHECK-NEXT:    incl %ecx
+; CHECK-NEXT:    cmpl $10, %ecx
 ; CHECK-NEXT:    jne LBB0_1
 ; CHECK-NEXT:  ## %bb.6: ## %for.body2.preheader
-; CHECK-NEXT:    movl $2048, %eax ## imm = 0x800
+; CHECK-NEXT:    movl $2048, %ecx ## imm = 0x800
 ; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  LBB0_7: ## %for.body2
 ; CHECK-NEXT:    ## =>This Inner Loop Header: Depth=1
-; CHECK-NEXT:    decl %eax
+; CHECK-NEXT:    movl $0, (%rax)
+; CHECK-NEXT:    decl %ecx
 ; CHECK-NEXT:    jne LBB0_7
 ; CHECK-NEXT:  ## %bb.8: ## %for.end20
 ; CHECK-NEXT:    xorl %eax, %eax
@@ -64,6 +69,7 @@ for.body1:
   %iv.next.i = add i64 %iv.i, 1
   %lftr.wideiv32 = trunc i64 %iv.next.i to i32
   %exitcond33 = icmp eq i32 %lftr.wideiv32, %iv30
+  store i32 0, ptr @g
   br i1 %exitcond33, label %for.inc40.i, label %for.body1
 
 for.inc40.i:
@@ -81,6 +87,7 @@ for.body2:
   %iv.next = add i64 %iv, 1
   %lftr.wideiv = trunc i64 %iv.next to i32
   %exitcond = icmp eq i32 %lftr.wideiv, 2048
+  store i32 0, ptr @g
   br i1 %exitcond, label %for.end20, label %for.body2
 
 for.end20:

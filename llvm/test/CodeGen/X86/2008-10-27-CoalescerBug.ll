@@ -3,6 +3,8 @@
 ; Now this test spills one register. But a reload in the loop is cheaper than
 ; the divsd so it's a win.
 
+@g = external global i32
+
 define fastcc void @fourn(ptr %data, i32 %isign) nounwind {
 ; CHECK: fourn
 entry:
@@ -13,6 +15,7 @@ bb:		; preds = %bb, %entry
 	%idim.030 = add i32 %indvar93, 1		; <i32> [#uses=1]
 	%0 = add i32 %indvar93, 2		; <i32> [#uses=1]
 	%1 = icmp sgt i32 %0, 2		; <i1> [#uses=1]
+	store i32 0, ptr @g
 	br i1 %1, label %bb30.loopexit, label %bb
 
 ; CHECK: %bb30.loopexit
@@ -31,6 +34,7 @@ bb18:		; preds = %bb3
 	br label %bb24.preheader
 
 bb22.preheader:		; preds = %bb24.preheader, %bb22.preheader
+	store i32 0, ptr @g
 	br label %bb22.preheader
 
 bb25:		; preds = %bb24.preheader

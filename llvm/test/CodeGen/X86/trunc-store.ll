@@ -26,13 +26,17 @@
 ;   }
 ; }
 
+@g = external global i32
+
 define void @fn1(i64 %a0) {
 ; CHECK-LABEL: fn1:
 ; CHECK:       # %bb.0: # %for.cond
+; CHECK-NEXT:    movq g@GOTPCREL(%rip), %rax
 ; CHECK-NEXT:    .p2align 4
 ; CHECK-NEXT:  .LBB0_1: # %vector.body
 ; CHECK-NEXT:    # =>This Inner Loop Header: Depth=1
 ; CHECK-NEXT:    cmpq $8, %rdi
+; CHECK-NEXT:    movl $0, (%rax)
 ; CHECK-NEXT:    jne .LBB0_1
 ; CHECK-NEXT:  # %bb.2: # %middle.block
 ; CHECK-NEXT:    retq
@@ -48,6 +52,7 @@ vector.body:                                      ; preds = %vector.body, %for.c
   %x74 = select i1 %x73, i32 %x44, i32 undef
   %x84 = select i1 undef, i32 undef, i32 %x74
   %x88 = icmp eq i64 %a0, 8
+  store i32 0, ptr @g
   br i1 %x88, label %middle.block, label %vector.body
 
 middle.block:                                     ; preds = %vector.body

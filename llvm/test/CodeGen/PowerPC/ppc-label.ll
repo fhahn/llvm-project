@@ -22,6 +22,8 @@
 ;   return 25;
 ; }
 
+@g = external global i32
+
 define i32 @foo() local_unnamed_addr {
 entry:
   ret i32 0
@@ -32,6 +34,7 @@ entry:
   br label %L
 
 L:                                                ; preds = %L, %entry
+  store i32 0, ptr @g
   indirectbr ptr inttoptr (i32 add (i32 ptrtoint (ptr blockaddress(@main, %L) to i32), i32 sub (i32 ptrtoint (ptr blockaddress(@main, %return) to i32), i32 ptrtoint (ptr blockaddress(@main, %L) to i32))) to ptr), [label %return, label %L]
 
 return:                                           ; preds = %L
@@ -39,6 +42,6 @@ return:                                           ; preds = %L
 }
 
 
-; CHECK:     lwz 3, .LC0-.LTOC(30)
+; CHECK:     lwz {{[0-9]+}}, .LC0-.LTOC(30)
 ; CHECK-NOT: li 3, .Ltmp1-.L1$pb@l
 ; CHECK-NOT: addis 4, 30, .Ltmp1-.L1$pb@ha

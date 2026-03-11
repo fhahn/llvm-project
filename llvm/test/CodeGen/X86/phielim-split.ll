@@ -7,9 +7,11 @@ target triple = "x86_64-apple-macosx10.8.0"
 ; <rdar://problem/11561842>
 ;
 ; CHECK: split_loop_exit
-; CHECK: %for.cond
-; CHECK-NOT: mov
+; CHECK: %for.cond{{$}}
+; CHECK-NOT: mov{{.*}}, %
 ; CHECK: je
+
+@g = external global i32
 
 define i32 @split_loop_exit(i32 %a, i32 %b, ptr nocapture %p) nounwind uwtable readonly ssp {
 entry:
@@ -21,6 +23,7 @@ for.cond:                                         ; preds = %entry, %for.cond
   %incdec.ptr = getelementptr inbounds i8, ptr %p.addr.0, i64 1
   %0 = load i8, ptr %p.addr.0, align 1
   %tobool = icmp eq i8 %0, 0
+  store volatile i32 0, ptr @g
   br i1 %tobool, label %for.cond, label %if.end2
 
 if.end2:                                          ; preds = %for.cond, %entry

@@ -123,7 +123,8 @@
 ; CHECK-NEXT:       Remove dead machine instructions
 ; CHECK-NEXT:       MachineDominator Tree Construction
 ; CHECK-NEXT:       Machine Natural Loop Construction
-; CHECK-NEXT:       Machine Trace Metrics 
+; CHECK-NEXT:       Delete dead machine loops
+; CHECK-NEXT:       Machine Trace Metrics
 ; CHECK-NEXT:       Lazy Machine Block Frequency Analysis 
 ; CHECK-NEXT:       Machine InstCombiner 
 ; CHECK-NEXT:       Machine Block Frequency Analysis

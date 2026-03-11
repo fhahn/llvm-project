@@ -377,6 +377,9 @@ LLVM_ABI extern char &MachineLICMID;
 /// This variant works before register allocation. \see MachineLICMID.
 LLVM_ABI extern char &EarlyMachineLICMID;
 
+/// MachineLoopDeletion - This pass deletes dead machine loops.
+LLVM_ABI extern char &MachineLoopDeletionID;
+
 /// MachineSinking - This pass performs sinking on machine instructions.
 LLVM_ABI extern char &MachineSinkingLegacyID;
 

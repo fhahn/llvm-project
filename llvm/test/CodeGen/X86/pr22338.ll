@@ -2,6 +2,8 @@
 ; RUN: llc < %s -mtriple=i686-unknown-linux-gnu | FileCheck %s --check-prefix=X86
 ; RUN: llc < %s -mtriple=x86_64-unknown-linux-gnu | FileCheck %s --check-prefix=X64
 
+@g = external global i32
+
 define i32 @fn(i32 %a0, i32 %a1) {
 ; X86-LABEL: fn:
 ; X86:       # %bb.0: # %entry
@@ -25,6 +27,7 @@ define i32 @fn(i32 %a0, i32 %a1) {
 ; X86-NEXT:  .LBB0_1: # %bb1
 ; X86-NEXT:    # =>This Inner Loop Header: Depth=1
 ; X86-NEXT:    testl %ebx, %ebx
+; X86-NEXT:    movl $0, g
 ; X86-NEXT:    je .LBB0_1
 ; X86-NEXT:  # %bb.2: # %bb2
 ; X86-NEXT:    popl %ebx
@@ -46,10 +49,12 @@ define i32 @fn(i32 %a0, i32 %a1) {
 ; X64-NEXT:    addb %dl, %dl
 ; X64-NEXT:    movl %edx, %ecx
 ; X64-NEXT:    shll %cl, %eax
+; X64-NEXT:    movq g@GOTPCREL(%rip), %rcx
 ; X64-NEXT:    .p2align 4
 ; X64-NEXT:  .LBB0_1: # %bb1
 ; X64-NEXT:    # =>This Inner Loop Header: Depth=1
 ; X64-NEXT:    testl %esi, %esi
+; X64-NEXT:    movl $0, (%rcx)
 ; X64-NEXT:    je .LBB0_1
 ; X64-NEXT:  # %bb.2: # %bb2
 ; X64-NEXT:    retq
@@ -65,6 +70,7 @@ entry:
   br label %bb1
 
 bb1:                                              ; preds = %bb1, %entry
+  store i32 0, ptr @g
   br i1 %tobool, label %bb1, label %bb2
 
 bb2:                                              ; preds = %bb1

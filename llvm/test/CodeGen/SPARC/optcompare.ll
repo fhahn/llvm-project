@@ -2,6 +2,8 @@
 ; RUN: llc < %s -mtriple=sparc | FileCheck %s
 ; RUN: llc < %s -mtriple=sparcv9 | FileCheck %s -check-prefix=CHECK64
 
+@g = external global i32
+
 define i32 @test(i32 %a) nounwind {
 ; CHECK-LABEL: test:
 ; CHECK:       ! %bb.0: ! %entry
@@ -106,11 +108,12 @@ define i32 @not_same_block(i32 %a) nounwind {
 ; CHECK-LABEL: not_same_block:
 ; CHECK:       ! %bb.0: ! %entry
 ; CHECK-NEXT:    and %o0, 1, %o0
+; CHECK-NEXT:    sethi %hi(g), %o1
 ; CHECK-NEXT:  .LBB3_1: ! %if.then
 ; CHECK-NEXT:    ! =>This Inner Loop Header: Depth=1
 ; CHECK-NEXT:    cmp %o0, 0
 ; CHECK-NEXT:    bne .LBB3_1
-; CHECK-NEXT:    nop
+; CHECK-NEXT:    st %g0, [%o1+%lo(g)]
 ; CHECK-NEXT:  ! %bb.2: ! %if.end
 ; CHECK-NEXT:    retl
 ; CHECK-NEXT:    mov 2, %o0
@@ -118,11 +121,14 @@ define i32 @not_same_block(i32 %a) nounwind {
 ; CHECK64-LABEL: not_same_block:
 ; CHECK64:       ! %bb.0: ! %entry
 ; CHECK64-NEXT:    and %o0, 1, %o0
+; CHECK64-NEXT:    sethi %h44(g), %o1
+; CHECK64-NEXT:    add %o1, %m44(g), %o1
+; CHECK64-NEXT:    sllx %o1, 12, %o1
 ; CHECK64-NEXT:  .LBB3_1: ! %if.then
 ; CHECK64-NEXT:    ! =>This Inner Loop Header: Depth=1
 ; CHECK64-NEXT:    cmp %o0, 0
 ; CHECK64-NEXT:    bne %icc, .LBB3_1
-; CHECK64-NEXT:    nop
+; CHECK64-NEXT:    st %g0, [%o1+%l44(g)]
 ; CHECK64-NEXT:  ! %bb.2: ! %if.end
 ; CHECK64-NEXT:    retl
 ; CHECK64-NEXT:    mov 2, %o0
@@ -131,6 +137,7 @@ entry:
   br label %if.then
 
 if.then:
+  store i32 0, ptr @g
   %tobool = icmp eq i32 %and, 0
   br i1 %tobool, label %if.end, label %if.then
   ret i32 1

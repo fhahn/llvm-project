@@ -1,6 +1,8 @@
 ; RUN: llc -mtriple=i686-linux -pre-RA-sched=source < %s | FileCheck %s
 ; RUN: opt -disable-output -passes=debugify < %s
 
+@side_effect = external global i32
+
 declare void @error(i32 %i, i32 %a, i32 %b)
 
 define i32 @test_ifchains(i32 %i, ptr %a, i32 %b) {
@@ -345,6 +347,7 @@ loop.body4:
 
 loop.body5:
   %ptr2 = load ptr, ptr undef, align 4
+  store i32 0, ptr @side_effect
   br label %loop.body3
 }
 
@@ -357,10 +360,10 @@ define void @unnatural_cfg2(ptr %p0, i32 %a0, i1 %arg) {
 ; CHECK: %loop.header
 ; CHECK: %loop.body1
 ; CHECK: %loop.body2
-; CHECK: %loop.body4
-; CHECK: %loop.inner2.begin
 ; CHECK: %loop.body3
 ; CHECK: %loop.inner1.begin
+; CHECK: %loop.body4
+; CHECK: %loop.inner2.begin
 ; CHECK: %bail
 
 entry:
@@ -393,6 +396,7 @@ loop.inner1.end:
   %ptr2 = getelementptr inbounds i32, ptr %valphi, i32 0
   %castptr2 = bitcast ptr %ptr2 to ptr
   %val2 = load ptr, ptr %castptr2, align 4
+  store i32 0, ptr @side_effect
   br label %loop.inner1.begin
 
 loop.body4.dead:
@@ -407,6 +411,7 @@ loop.inner2.begin:
 
 loop.inner2.end:
   %comp3 = icmp eq i32 %a0, 1769472
+  store i32 0, ptr @side_effect
   br i1 %comp3, label %loop.end, label %loop.inner2.begin
 
 loop.end:
@@ -657,6 +662,7 @@ entry:
 
 loop:
   %cond = icmp eq i8 undef, 42
+  store i32 0, ptr @side_effect
   br i1 %cond, label %exit, label %loop
 
 exit:

@@ -3,6 +3,8 @@
 target datalayout = "e-m:w-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-pc-windows-msvc"
 
+@side_effect = external global i32
+
 %eh.ThrowInfo = type { i32, i32, i32, i32 }
 %rtti.TypeDescriptor2 = type { ptr, ptr, [3 x i8] }
 
@@ -24,6 +26,7 @@ catch:
   br label %catch.loop
 
 catch.loop:
+  store i32 0, ptr @side_effect
   br i1 %B, label %catchret, label %catch.loop
 
 catchret:

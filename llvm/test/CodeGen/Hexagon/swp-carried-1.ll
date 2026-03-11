@@ -13,12 +13,14 @@
 ; CHECK: endloop0
 
 @g0 = external global [256 x i32], align 8
+@g = external global i32
 
 define void @f0() #0 {
 b0:
   br label %b1
 
 b1:                                               ; preds = %b1, %b0
+  store i32 0, ptr @g
   br i1 undef, label %b2, label %b1
 
 b2:                                               ; preds = %b1
@@ -27,6 +29,7 @@ b2:                                               ; preds = %b1
 b3:                                               ; preds = %b3, %b2
   %v0 = phi ptr [ @g0, %b2 ], [ %v1, %b3 ]
   %v1 = getelementptr i32, ptr %v0, i32 6
+  store i32 0, ptr @g
   br i1 undef, label %b4, label %b3
 
 b4:                                               ; preds = %b3
@@ -51,6 +54,7 @@ b5:                                               ; preds = %b5, %b4
   %v17 = add i64 %v16, %v13
   %v18 = add i64 %v17, 0
   %v19 = add i64 %v18, %v15
+  store i32 0, ptr @g
   %v20 = icmp eq i32 %v9, 128
   br i1 %v20, label %b6, label %b5
 

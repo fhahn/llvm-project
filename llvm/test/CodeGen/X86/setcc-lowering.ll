@@ -7,6 +7,8 @@
 ; Verify that we don't crash during codegen due to a wrong lowering
 ; of a setcc node with illegal operand types and return type.
 
+@g = external global i32
+
 define <8 x i16> @pr25080(<8 x i32> %a) nounwind {
 ; AVX1-LABEL: pr25080:
 ; AVX1:       # %bb.0: # %entry
@@ -53,35 +55,41 @@ entry:
 define void @pr26232(i64 %a, <16 x i1> %b) nounwind {
 ; AVX1-LABEL: pr26232:
 ; AVX1:       # %bb.0: # %allocas
+; AVX1-NEXT:    movq g@GOTPCREL(%rip), %rax
+; AVX1-NEXT:    movl $0, (%rax)
 ; AVX1-NEXT:    vpxor %xmm1, %xmm1, %xmm1
 ; AVX1-NEXT:    .p2align 4
 ; AVX1-NEXT:  .LBB1_1: # %for_loop599
 ; AVX1-NEXT:    # =>This Inner Loop Header: Depth=1
 ; AVX1-NEXT:    cmpq $65536, %rdi # imm = 0x10000
-; AVX1-NEXT:    setl %al
-; AVX1-NEXT:    vmovd %eax, %xmm2
+; AVX1-NEXT:    setl %cl
+; AVX1-NEXT:    vmovd %ecx, %xmm2
 ; AVX1-NEXT:    vpshufb %xmm1, %xmm2, %xmm2
 ; AVX1-NEXT:    vpand %xmm0, %xmm2, %xmm2
 ; AVX1-NEXT:    vpsllw $7, %xmm2, %xmm2
-; AVX1-NEXT:    vpmovmskb %xmm2, %eax
-; AVX1-NEXT:    testl %eax, %eax
+; AVX1-NEXT:    vpmovmskb %xmm2, %ecx
+; AVX1-NEXT:    testl %ecx, %ecx
+; AVX1-NEXT:    movl $0, (%rax)
 ; AVX1-NEXT:    jne .LBB1_1
 ; AVX1-NEXT:  # %bb.2: # %for_exit600
 ; AVX1-NEXT:    retq
 ;
 ; AVX2-LABEL: pr26232:
 ; AVX2:       # %bb.0: # %allocas
+; AVX2-NEXT:    movq g@GOTPCREL(%rip), %rax
+; AVX2-NEXT:    movl $0, (%rax)
 ; AVX2-NEXT:    .p2align 4
 ; AVX2-NEXT:  .LBB1_1: # %for_loop599
 ; AVX2-NEXT:    # =>This Inner Loop Header: Depth=1
 ; AVX2-NEXT:    cmpq $65536, %rdi # imm = 0x10000
-; AVX2-NEXT:    setl %al
-; AVX2-NEXT:    vmovd %eax, %xmm1
+; AVX2-NEXT:    setl %cl
+; AVX2-NEXT:    vmovd %ecx, %xmm1
 ; AVX2-NEXT:    vpbroadcastb %xmm1, %xmm1
 ; AVX2-NEXT:    vpand %xmm0, %xmm1, %xmm1
 ; AVX2-NEXT:    vpsllw $7, %xmm1, %xmm1
-; AVX2-NEXT:    vpmovmskb %xmm1, %eax
-; AVX2-NEXT:    testl %eax, %eax
+; AVX2-NEXT:    vpmovmskb %xmm1, %ecx
+; AVX2-NEXT:    testl %ecx, %ecx
+; AVX2-NEXT:    movl $0, (%rax)
 ; AVX2-NEXT:    jne .LBB1_1
 ; AVX2-NEXT:  # %bb.2: # %for_exit600
 ; AVX2-NEXT:    retq
@@ -93,6 +101,7 @@ define void @pr26232(i64 %a, <16 x i1> %b) nounwind {
 ; KNL-32-NEXT:    vptestmd %zmm0, %zmm0, %k0
 ; KNL-32-NEXT:    movl {{[0-9]+}}(%esp), %eax
 ; KNL-32-NEXT:    movl {{[0-9]+}}(%esp), %ecx
+; KNL-32-NEXT:    movl $0, g
 ; KNL-32-NEXT:    .p2align 4
 ; KNL-32-NEXT:  .LBB1_1: # %for_loop599
 ; KNL-32-NEXT:    # =>This Inner Loop Header: Depth=1
@@ -105,6 +114,7 @@ define void @pr26232(i64 %a, <16 x i1> %b) nounwind {
 ; KNL-32-NEXT:    kmovw %edx, %k1
 ; KNL-32-NEXT:    kandw %k0, %k1, %k1
 ; KNL-32-NEXT:    kortestw %k1, %k1
+; KNL-32-NEXT:    movl $0, g
 ; KNL-32-NEXT:    jne .LBB1_1
 ; KNL-32-NEXT:  # %bb.2: # %for_exit600
 ; KNL-32-NEXT:    retl
@@ -112,6 +122,7 @@ allocas:
   br label %for_test11.preheader
 
 for_test11.preheader:                             ; preds = %for_test11.preheader, %allocas
+  store i32 0, ptr @g
   br i1 undef, label %for_loop599, label %for_test11.preheader
 
 for_loop599:                                      ; preds = %for_loop599, %for_test11.preheader
@@ -121,6 +132,7 @@ for_loop599:                                      ; preds = %for_loop599, %for_t
   %"oldMask&test607" = and <16 x i1> %less_i_load605__broadcast, %b
   %intmask.i894 = bitcast <16 x i1> %"oldMask&test607" to i16
   %res.i895 = icmp eq i16 %intmask.i894, 0
+  store i32 0, ptr @g
   br i1 %res.i895, label %for_exit600, label %for_loop599
 
 for_exit600:                                      ; preds = %for_loop599

@@ -2,6 +2,8 @@
 ;RUN: llc < %s -mtriple=i686-- -mattr=-slow-incdec | FileCheck %s -check-prefixes=CHECK,SLOW
 ;RUN: llc < %s -mtriple=i686-- -mattr=+slow-incdec | FileCheck %s -check-prefixes=CHECK,FAST
 
+@g = external global i32
+
 define void @foo(i32 inreg %dns) minsize {
 ; CHECK-LABEL: foo:
 ; CHECK:       # %bb.0: # %entry
@@ -9,6 +11,7 @@ define void @foo(i32 inreg %dns) minsize {
 ; CHECK-NEXT:    decl %ecx
 ; CHECK-NEXT:  .LBB0_1: # %for.body
 ; CHECK-NEXT:    # =>This Inner Loop Header: Depth=1
+; CHECK-NEXT:    andl $0, g
 ; CHECK-NEXT:    movzwl %cx, %edx
 ; CHECK-NEXT:    decl %ecx
 ; CHECK-NEXT:    cmpl %eax, %edx
@@ -20,6 +23,7 @@ entry:
 
 for.body:
   %i.05 = phi i16 [ %dec, %for.body ], [ 0, %entry ]
+  store i32 0, ptr @g
   %dec = add i16 %i.05, -1
   %conv = zext i16 %dec to i32
   %cmp = icmp slt i32 %conv, %dns
@@ -36,6 +40,7 @@ define void @bar(i32 inreg %dns) minsize {
 ; CHECK-NEXT:    incl %ecx
 ; CHECK-NEXT:  .LBB1_1: # %for.body
 ; CHECK-NEXT:    # =>This Inner Loop Header: Depth=1
+; CHECK-NEXT:    andl $0, g
 ; CHECK-NEXT:    movzwl %cx, %edx
 ; CHECK-NEXT:    incl %ecx
 ; CHECK-NEXT:    cmpl %eax, %edx
@@ -47,6 +52,7 @@ entry:
 
 for.body:
   %i.05 = phi i16 [ %inc, %for.body ], [ 0, %entry ]
+  store i32 0, ptr @g
   %inc = add i16 %i.05, 1
   %conv = zext i16 %inc to i32
   %cmp = icmp slt i32 %conv, %dns
@@ -62,6 +68,7 @@ define void @foo_optsize(i32 inreg %dns) optsize {
 ; CHECK-NEXT:    decl %ecx
 ; CHECK-NEXT:  .LBB2_1: # %for.body
 ; CHECK-NEXT:    # =>This Inner Loop Header: Depth=1
+; CHECK-NEXT:    movl $0, g
 ; CHECK-NEXT:    movzwl %cx, %edx
 ; CHECK-NEXT:    decl %ecx
 ; CHECK-NEXT:    cmpl %eax, %edx
@@ -73,6 +80,7 @@ entry:
 
 for.body:
   %i.05 = phi i16 [ %dec, %for.body ], [ 0, %entry ]
+  store i32 0, ptr @g
   %dec = add i16 %i.05, -1
   %conv = zext i16 %dec to i32
   %cmp = icmp slt i32 %conv, %dns
@@ -89,6 +97,7 @@ define void @bar_optsize(i32 inreg %dns) optsize {
 ; CHECK-NEXT:    incl %ecx
 ; CHECK-NEXT:  .LBB3_1: # %for.body
 ; CHECK-NEXT:    # =>This Inner Loop Header: Depth=1
+; CHECK-NEXT:    movl $0, g
 ; CHECK-NEXT:    movzwl %cx, %edx
 ; CHECK-NEXT:    incl %ecx
 ; CHECK-NEXT:    cmpl %eax, %edx
@@ -100,6 +109,7 @@ entry:
 
 for.body:
   %i.05 = phi i16 [ %inc, %for.body ], [ 0, %entry ]
+  store i32 0, ptr @g
   %inc = add i16 %i.05, 1
   %conv = zext i16 %inc to i32
   %cmp = icmp slt i32 %conv, %dns
@@ -115,6 +125,7 @@ define void @foo_pgso(i32 inreg %dns) !prof !14 {
 ; CHECK-NEXT:    decl %ecx
 ; CHECK-NEXT:  .LBB4_1: # %for.body
 ; CHECK-NEXT:    # =>This Inner Loop Header: Depth=1
+; CHECK-NEXT:    movl $0, g
 ; CHECK-NEXT:    movzwl %cx, %edx
 ; CHECK-NEXT:    decl %ecx
 ; CHECK-NEXT:    cmpl %eax, %edx
@@ -126,6 +137,7 @@ entry:
 
 for.body:
   %i.05 = phi i16 [ %dec, %for.body ], [ 0, %entry ]
+  store i32 0, ptr @g
   %dec = add i16 %i.05, -1
   %conv = zext i16 %dec to i32
   %cmp = icmp slt i32 %conv, %dns
@@ -142,6 +154,7 @@ define void @bar_pgso(i32 inreg %dns) !prof !14 {
 ; CHECK-NEXT:    incl %ecx
 ; CHECK-NEXT:  .LBB5_1: # %for.body
 ; CHECK-NEXT:    # =>This Inner Loop Header: Depth=1
+; CHECK-NEXT:    movl $0, g
 ; CHECK-NEXT:    movzwl %cx, %edx
 ; CHECK-NEXT:    incl %ecx
 ; CHECK-NEXT:    cmpl %eax, %edx
@@ -153,6 +166,7 @@ entry:
 
 for.body:
   %i.05 = phi i16 [ %inc, %for.body ], [ 0, %entry ]
+  store i32 0, ptr @g
   %inc = add i16 %i.05, 1
   %conv = zext i16 %inc to i32
   %cmp = icmp slt i32 %conv, %dns
@@ -168,6 +182,7 @@ define void @foo_nosize(i32 inreg %dns) {
 ; SLOW-NEXT:    .p2align 4
 ; SLOW-NEXT:  .LBB6_1: # %for.body
 ; SLOW-NEXT:    # =>This Inner Loop Header: Depth=1
+; SLOW-NEXT:    movl $0, g
 ; SLOW-NEXT:    movzwl %cx, %edx
 ; SLOW-NEXT:    decl %ecx
 ; SLOW-NEXT:    cmpl %eax, %edx
@@ -181,6 +196,7 @@ define void @foo_nosize(i32 inreg %dns) {
 ; FAST-NEXT:    .p2align 4
 ; FAST-NEXT:  .LBB6_1: # %for.body
 ; FAST-NEXT:    # =>This Inner Loop Header: Depth=1
+; FAST-NEXT:    movl $0, g
 ; FAST-NEXT:    movzwl %cx, %edx
 ; FAST-NEXT:    addl $-1, %ecx
 ; FAST-NEXT:    cmpl %eax, %edx
@@ -192,6 +208,7 @@ entry:
 
 for.body:
   %i.05 = phi i16 [ %dec, %for.body ], [ 0, %entry ]
+  store i32 0, ptr @g
   %dec = add i16 %i.05, -1
   %conv = zext i16 %dec to i32
   %cmp = icmp slt i32 %conv, %dns
@@ -208,6 +225,7 @@ define void @bar_nosize(i32 inreg %dns) {
 ; SLOW-NEXT:    .p2align 4
 ; SLOW-NEXT:  .LBB7_1: # %for.body
 ; SLOW-NEXT:    # =>This Inner Loop Header: Depth=1
+; SLOW-NEXT:    movl $0, g
 ; SLOW-NEXT:    movzwl %cx, %edx
 ; SLOW-NEXT:    incl %ecx
 ; SLOW-NEXT:    cmpl %eax, %edx
@@ -221,6 +239,7 @@ define void @bar_nosize(i32 inreg %dns) {
 ; FAST-NEXT:    .p2align 4
 ; FAST-NEXT:  .LBB7_1: # %for.body
 ; FAST-NEXT:    # =>This Inner Loop Header: Depth=1
+; FAST-NEXT:    movl $0, g
 ; FAST-NEXT:    movzwl %cx, %edx
 ; FAST-NEXT:    addl $1, %ecx
 ; FAST-NEXT:    cmpl %eax, %edx
@@ -232,6 +251,7 @@ entry:
 
 for.body:
   %i.05 = phi i16 [ %inc, %for.body ], [ 0, %entry ]
+  store i32 0, ptr @g
   %inc = add i16 %i.05, 1
   %conv = zext i16 %inc to i32
   %cmp = icmp slt i32 %conv, %dns
