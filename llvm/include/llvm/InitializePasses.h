@@ -94,6 +94,7 @@ LLVM_ABI void initializeDXILResourceBindingWrapperPassPass(PassRegistry &);
 LLVM_ABI void initializeDXILResourceTypeWrapperPassPass(PassRegistry &);
 LLVM_ABI void initializeDXILResourceWrapperPassPass(PassRegistry &);
 LLVM_ABI void initializeDeadMachineInstructionElimPass(PassRegistry &);
+LLVM_ABI void initializeDeadMachineLoopElimPass(PassRegistry &);
 LLVM_ABI void initializeDebugifyMachineModulePass(PassRegistry &);
 LLVM_ABI void initializeDependenceAnalysisWrapperPassPass(PassRegistry &);
 LLVM_ABI void initializeDetectDeadLanesLegacyPass(PassRegistry &);

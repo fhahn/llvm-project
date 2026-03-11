@@ -1348,6 +1348,10 @@ void TargetPassConfig::addMachineSSAOptimization() {
   // arguments directly (see t11 in test/CodeGen/X86/sibcall.ll).
   addPass(&DeadMachineInstructionElimID);
 
+  // Remove dead machine loops whose outputs are unused (e.g. oracle loops
+  // from early-exit vectorization after speculative load lowering).
+  addPass(&DeadMachineLoopElimID);
+
   // Allow targets to insert passes that improve instruction level parallelism,
   // like if-conversion. Such passes will typically need dominator trees and
   // loop info, just like LICM and CSE below.
