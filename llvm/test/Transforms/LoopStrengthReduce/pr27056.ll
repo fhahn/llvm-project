@@ -16,20 +16,17 @@ define void @b_copy_ctor() personality ptr @__CxxFrameHandler3 {
 ; CHECK-NEXT:    [[TMP0:%.*]] = load ptr, ptr @GV1, align 8
 ; CHECK-NEXT:    br label [[FOR_COND:%.*]]
 ; CHECK:       for.cond:
-; CHECK-NEXT:    [[LSR_IV:%.*]] = phi i64 [ [[LSR_IV_NEXT:%.*]], [[CALL_I_NOEXC:%.*]] ], [ 0, [[ENTRY:%.*]] ]
-; CHECK-NEXT:    [[LSR_IV2:%.*]] = inttoptr i64 [[LSR_IV]] to ptr
+; CHECK-NEXT:    [[UGLYGEP:%.*]] = phi ptr [ [[TMP0]], [[ENTRY:%.*]] ], [ [[INCDEC_PTR:%.*]], [[CALL_I_NOEXC:%.*]] ]
 ; CHECK-NEXT:    invoke void @a_copy_ctor()
-; CHECK-NEXT:    to label [[CALL_I_NOEXC]] unwind label [[CATCH_DISPATCH:%.*]]
+; CHECK-NEXT:            to label [[CALL_I_NOEXC]] unwind label [[CATCH_DISPATCH:%.*]]
 ; CHECK:       call.i.noexc:
-; CHECK-NEXT:    [[LSR_IV_NEXT]] = add i64 [[LSR_IV]], -16
+; CHECK-NEXT:    [[INCDEC_PTR]] = getelementptr inbounds [[STRUCT_L:%.*]], ptr [[UGLYGEP]], i64 1
 ; CHECK-NEXT:    br label [[FOR_COND]]
 ; CHECK:       catch.dispatch:
-; CHECK-NEXT:    [[TMP2:%.*]] = catchswitch within none [label %catch] unwind to caller
+; CHECK-NEXT:    [[TMP2:%.*]] = catchswitch within none [label [[CATCH:%.*]]] unwind to caller
 ; CHECK:       catch:
 ; CHECK-NEXT:    [[TMP3:%.*]] = catchpad within [[TMP2]] [ptr null, i32 64, ptr null]
-; CHECK-NEXT:    [[CMP16:%.*]] = icmp eq ptr [[LSR_IV2]], null
-; CHECK-NEXT:    [[TMP4:%.*]] = mul i64 [[LSR_IV]], -1
-; CHECK-NEXT:    [[UGLYGEP:%.*]] = getelementptr i8, ptr [[TMP0]], i64 [[TMP4]]
+; CHECK-NEXT:    [[CMP16:%.*]] = icmp eq ptr [[UGLYGEP]], [[TMP0]]
 ; CHECK-NEXT:    br i1 [[CMP16]], label [[FOR_END:%.*]], label [[FOR_BODY_PREHEADER:%.*]]
 ; CHECK:       for.body.preheader:
 ; CHECK-NEXT:    br label [[FOR_BODY:%.*]]
