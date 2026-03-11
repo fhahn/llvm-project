@@ -1066,6 +1066,13 @@ SCEVExpander::getAddRecExprPHILiterally(const SCEVAddRecExpr *Normalized,
       // Those values were not actually inserted but re-used.
       ReusedValues.insert(AddRecPhiMatch);
       ReusedValues.insert(IncV);
+      // Propagate NUW to a reused GEP increment if the AddRec or the
+      // use-specific flags prove it.
+      if (auto *GEP = dyn_cast<GetElementPtrInst>(IncV))
+        if (Normalized->hasNoUnsignedWrap() ||
+            (UseSpecificFlags & SCEV::FlagNUW))
+          GEP->setNoWrapFlags(GEP->getNoWrapFlags() |
+                              GEPNoWrapFlags::noUnsignedWrap());
       return AddRecPhiMatch;
     }
   }
@@ -1142,6 +1149,11 @@ SCEVExpander::getAddRecExprPHILiterally(const SCEVAddRecExpr *Normalized,
       if (IncrementIsNSW)
         cast<BinaryOperator>(IncV)->setHasNoSignedWrap();
     }
+    if (auto *GEP = dyn_cast<GetElementPtrInst>(IncV)) {
+      if (Normalized->hasNoUnsignedWrap() ||
+          (UseSpecificFlags & SCEV::FlagNUW))
+        GEP->setNoWrapFlags(GEP->getNoWrapFlags() | GEPNoWrapFlags::noUnsignedWrap());
+    }
     PN->addIncoming(IncV, Pred);
   }
 
@@ -1200,6 +1212,10 @@ Value *SCEVExpander::expandAddRecExprLiterally(const SCEVAddRecExpr *S) {
         I->setHasNoUnsignedWrap(false);
       if (!S->hasNoSignedWrap())
         I->setHasNoSignedWrap(false);
+    }
+    if (auto *GEP = dyn_cast<GetElementPtrInst>(Result)) {
+      if (!S->hasNoUnsignedWrap())
+        GEP->setNoWrapFlags(GEP->getNoWrapFlags().withoutNoUnsignedWrap());
     }
 
     // For an expansion to use the postinc form, the client must call
@@ -1560,6 +1576,39 @@ Value *SCEVExpander::expandCodeFor(const SCEV *SH, Type *Ty) {
     V = InsertNoopCastOfTo(V, Ty);
   }
   return V;
+}
+
+Value *SCEVExpander::expandCodeFor(SCEVUse SU, Type *Ty) {
+  const SCEV *S = SU;
+  SCEV::NoWrapFlags UseFlags =
+      static_cast<SCEV::NoWrapFlags>(SU.getInt() << 1);
+
+  if ((UseFlags & SCEV::FlagNUW) && S->getType()->isPointerTy()) {
+    // If the SCEVUse carries NUW and the expression is a pointer add, expand
+    // the pointer base first, then add the offset with a NUW GEP.
+    if (const auto *Add = dyn_cast<SCEVAddExpr>(S)) {
+      if (!(Add->getNoWrapFlags() & SCEV::FlagNUW)) {
+        Value *Base = expand(SE.getPointerBase(Add));
+        const SCEV *Offset = SE.removePointerBase(Add);
+        Value *V = expandAddToGEP(Offset, Base, SCEV::FlagNUW);
+        if (Ty && Ty != V->getType())
+          V = InsertNoopCastOfTo(V, Ty);
+        return V;
+      }
+    }
+
+    // For pointer AddRecs where the canonical SCEV doesn't carry NUW but the
+    // SCEVUse does, thread the use-specific NUW through to
+    // getAddRecExprPHILiterally so that GEP increments get the nuw flag.
+    if (isa<SCEVAddRecExpr>(S) &&
+        !(cast<SCEVAddRecExpr>(S)->getNoWrapFlags() & SCEV::FlagNUW)) {
+      UseSpecificFlags = UseFlags;
+      Value *V = expandCodeFor(S, Ty);
+      UseSpecificFlags = SCEV::FlagAnyWrap;
+      return V;
+    }
+  }
+  return expandCodeFor(S, Ty);
 }
 
 Value *SCEVExpander::FindValueInExprValueMap(

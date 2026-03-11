@@ -7,8 +7,8 @@ define void @test(ptr %p.base, i8 %x) {
 ; CHECK-LABEL: @test(
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    switch i8 [[X:%.*]], label [[WHILE_END:%.*]] [
-; CHECK-NEXT:    i8 10, label [[WHILE_BODY_PREHEADER:%.*]]
-; CHECK-NEXT:    i8 20, label [[WHILE_BODY_PREHEADER]]
+; CHECK-NEXT:      i8 10, label [[WHILE_BODY_PREHEADER:%.*]]
+; CHECK-NEXT:      i8 20, label [[WHILE_BODY_PREHEADER]]
 ; CHECK-NEXT:    ]
 ; CHECK:       while.body.preheader:
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[P_BASE:%.*]], i64 1
@@ -17,11 +17,11 @@ define void @test(ptr %p.base, i8 %x) {
 ; CHECK-NEXT:    [[LSR_IV:%.*]] = phi ptr [ [[SCEVGEP1:%.*]], [[WHILE_BODY_BACKEDGE:%.*]] ], [ [[SCEVGEP]], [[WHILE_BODY_PREHEADER]] ]
 ; CHECK-NEXT:    [[Y:%.*]] = load i8, ptr [[LSR_IV]], align 1
 ; CHECK-NEXT:    switch i8 [[Y]], label [[WHILE_END_LOOPEXIT:%.*]] [
-; CHECK-NEXT:    i8 10, label [[WHILE_BODY_BACKEDGE]]
-; CHECK-NEXT:    i8 20, label [[WHILE_BODY_BACKEDGE]]
+; CHECK-NEXT:      i8 10, label [[WHILE_BODY_BACKEDGE]]
+; CHECK-NEXT:      i8 20, label [[WHILE_BODY_BACKEDGE]]
 ; CHECK-NEXT:    ]
 ; CHECK:       while.body.backedge:
-; CHECK-NEXT:    [[SCEVGEP1]] = getelementptr i8, ptr [[LSR_IV]], i64 1
+; CHECK-NEXT:    [[SCEVGEP1]] = getelementptr nuw i8, ptr [[LSR_IV]], i64 1
 ; CHECK-NEXT:    br label [[WHILE_BODY]]
 ; CHECK:       while.end.loopexit:
 ; CHECK-NEXT:    br label [[WHILE_END]]

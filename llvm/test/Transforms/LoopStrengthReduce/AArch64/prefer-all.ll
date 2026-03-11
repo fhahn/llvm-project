@@ -13,7 +13,7 @@ define i32 @postindex_loop(ptr %p, i64 %n) {
 ; CHECK-NEXT:    [[VAL:%.*]] = load i32, ptr [[LSR_IV1]], align 4
 ; CHECK-NEXT:    [[ADD]] = add i32 [[RET]], [[VAL]]
 ; CHECK-NEXT:    [[LSR_IV_NEXT]] = add i64 [[LSR_IV]], -1
-; CHECK-NEXT:    [[SCEVGEP]] = getelementptr i8, ptr [[LSR_IV1]], i64 4
+; CHECK-NEXT:    [[SCEVGEP]] = getelementptr nuw i8, ptr [[LSR_IV1]], i64 4
 ; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp eq i64 [[LSR_IV_NEXT]], 0
 ; CHECK-NEXT:    br i1 [[EXITCOND]], label %[[EXIT:.*]], label %[[FOR_BODY]]
 ; CHECK:       [[EXIT]]:
@@ -51,7 +51,7 @@ define i32 @preindex_loop(ptr %p, i64 %n) {
 ; CHECK-NEXT:    [[VAL:%.*]] = load i32, ptr [[LSR_IV1]], align 4
 ; CHECK-NEXT:    [[ADD]] = add i32 [[RET]], [[VAL]]
 ; CHECK-NEXT:    [[LSR_IV_NEXT]] = add i64 [[LSR_IV]], -1
-; CHECK-NEXT:    [[SCEVGEP2]] = getelementptr i8, ptr [[LSR_IV1]], i64 4
+; CHECK-NEXT:    [[SCEVGEP2]] = getelementptr nuw i8, ptr [[LSR_IV1]], i64 4
 ; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp eq i64 [[LSR_IV_NEXT]], 0
 ; CHECK-NEXT:    br i1 [[EXITCOND]], label %[[EXIT:.*]], label %[[FOR_BODY]]
 ; CHECK:       [[EXIT]]:
@@ -91,7 +91,7 @@ define i64 @offset_loop(ptr %p, i64 %n) {
 ; CHECK-NEXT:    [[VAL2:%.*]] = load i64, ptr [[ARRAYIDX2]], align 4
 ; CHECK-NEXT:    [[ADD]] = add i64 [[VAL2]], [[RET]]
 ; CHECK-NEXT:    [[IDX_NEXT]] = add nuw nsw i64 [[IDX]], 1
-; CHECK-NEXT:    [[SCEVGEP]] = getelementptr i8, ptr [[LSR_IV]], i64 8
+; CHECK-NEXT:    [[SCEVGEP]] = getelementptr nuw i8, ptr [[LSR_IV]], i64 8
 ; CHECK-NEXT:    [[CMP:%.*]] = icmp eq i64 [[IDX_NEXT]], [[VAL1]]
 ; CHECK-NEXT:    br i1 [[CMP]], label %[[FOR_END:.*]], label %[[FOR_BODY]]
 ; CHECK:       [[FOR_END]]:
@@ -125,12 +125,12 @@ define i32 @conditional_load(ptr %p, ptr %q, ptr %n) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    br label %[[FOR_BODY:.*]]
 ; CHECK:       [[FOR_BODY]]:
-; CHECK-NEXT:    [[LSR_IV1:%.*]] = phi ptr [ [[SCEVGEP2:%.*]], %[[FOR_INC:.*]] ], [ [[P]], %[[ENTRY]] ]
+; CHECK-NEXT:    [[LSR_IV1:%.*]] = phi ptr [ [[SCEVGEP1:%.*]], %[[FOR_INC:.*]] ], [ [[P]], %[[ENTRY]] ]
 ; CHECK-NEXT:    [[IDX:%.*]] = phi i64 [ [[IDX_NEXT:%.*]], %[[FOR_INC]] ], [ 0, %[[ENTRY]] ]
 ; CHECK-NEXT:    [[RET:%.*]] = phi i32 [ [[RET_NEXT:%.*]], %[[FOR_INC]] ], [ 0, %[[ENTRY]] ]
 ; CHECK-NEXT:    [[PVAL:%.*]] = load i32, ptr [[LSR_IV1]], align 4
 ; CHECK-NEXT:    [[TOBOOL_NOT:%.*]] = icmp eq i32 [[PVAL]], 0
-; CHECK-NEXT:    [[SCEVGEP2]] = getelementptr i8, ptr [[LSR_IV1]], i64 4
+; CHECK-NEXT:    [[SCEVGEP1]] = getelementptr nuw i8, ptr [[LSR_IV1]], i64 4
 ; CHECK-NEXT:    br i1 [[TOBOOL_NOT]], label %[[FOR_INC]], label %[[IF_THEN:.*]]
 ; CHECK:       [[IF_THEN]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[IDX]], 2
@@ -189,7 +189,7 @@ define i32 @early_exit_load(ptr %p, ptr %q, ptr %n) {
 ; CHECK-NEXT:    [[IDX:%.*]] = phi i64 [ [[IDX_NEXT:%.*]], %[[FOR_INC]] ], [ 0, %[[ENTRY]] ]
 ; CHECK-NEXT:    [[PVAL:%.*]] = load i32, ptr [[LSR_IV1]], align 4
 ; CHECK-NEXT:    [[CMP1:%.*]] = icmp eq i32 [[PVAL]], 0
-; CHECK-NEXT:    [[SCEVGEP2]] = getelementptr i8, ptr [[LSR_IV1]], i64 4
+; CHECK-NEXT:    [[SCEVGEP2]] = getelementptr nuw i8, ptr [[LSR_IV1]], i64 4
 ; CHECK-NEXT:    br i1 [[CMP1]], label %[[FOR_INC]], label %[[EXIT:.*]]
 ; CHECK:       [[FOR_INC]]:
 ; CHECK-NEXT:    [[QVAL:%.*]] = load i32, ptr [[LSR_IV]], align 4
@@ -241,7 +241,7 @@ define void @middle_block_load(ptr %p, ptr %q, i64 %n) {
 ; CHECK-NEXT:    [[LSR_IV:%.*]] = phi i64 [ [[LSR_IV_NEXT:%.*]], %[[FOR_INC]] ], [ [[N]], %[[ENTRY]] ]
 ; CHECK-NEXT:    [[PVAL:%.*]] = load i32, ptr [[LSR_IV2]], align 4
 ; CHECK-NEXT:    [[CMP1:%.*]] = icmp sgt i32 [[PVAL]], 0
-; CHECK-NEXT:    [[SCEVGEP3]] = getelementptr i8, ptr [[LSR_IV2]], i64 4
+; CHECK-NEXT:    [[SCEVGEP3]] = getelementptr nuw i8, ptr [[LSR_IV2]], i64 4
 ; CHECK-NEXT:    br i1 [[CMP1]], label %[[IF_THEN1:.*]], label %[[IF_ELSE1:.*]]
 ; CHECK:       [[IF_THEN1]]:
 ; CHECK-NEXT:    tail call void @otherfn1()

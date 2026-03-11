@@ -12,7 +12,7 @@ define i32 @test(i32 %c, ptr %a, ptr %b) {
 ; CHECK-NEXT:    [[WIDE_TRIP_COUNT:%.*]] = zext i32 [[C]] to i64
 ; CHECK-NEXT:    br label [[FOR_BODY:%.*]]
 ; CHECK:       for.cond:
-; CHECK-NEXT:    [[UGLYGEP:%.*]] = getelementptr i8, ptr [[LSR_IV:%.*]], i64 4
+; CHECK-NEXT:    [[UGLYGEP:%.*]] = getelementptr nuw i8, ptr [[LSR_IV:%.*]], i64 4
 ; CHECK-NEXT:    [[LSR_IV_NEXT:%.*]] = add nsw i64 [[LSR_IV1:%.*]], -1
 ; CHECK-NEXT:    [[EXITCOND_NOT:%.*]] = icmp eq i64 [[LSR_IV_NEXT]], 0
 ; CHECK-NEXT:    br i1 [[EXITCOND_NOT]], label [[RETURN_LOOPEXIT:%.*]], label [[FOR_BODY]]

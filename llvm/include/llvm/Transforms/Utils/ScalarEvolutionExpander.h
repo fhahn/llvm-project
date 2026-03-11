@@ -132,6 +132,12 @@ class SCEVExpander : public SCEVVisitor<SCEVExpander, Value *> {
   /// freeze it first.
   bool SafeUDivMode = false;
 
+  /// Use-specific no-wrap flags for the current top-level expansion via
+  /// expandCodeFor(SCEVUse). These flags are threaded through to
+  /// getAddRecExprPHILiterally to propagate NUW to GEP increments even when
+  /// the canonical SCEV expression does not carry the flag.
+  SCEV::NoWrapFlags UseSpecificFlags = SCEV::FlagAnyWrap;
+
   typedef IRBuilder<InstSimplifyFolder, IRBuilderCallbackInserter> BuilderType;
   BuilderType Builder;
 
@@ -318,6 +324,18 @@ public:
   Value *expandCodeFor(const SCEV *SH, Type *Ty, Instruction *I) {
     return expandCodeFor(SH, Ty, I->getIterator());
   }
+
+  /// Expand a SCEVUse, propagating use-specific flags (e.g. NUW) to the
+  /// generated code. For pointer add expressions where the SCEVUse carries
+  /// NUW, the flag is applied to the emitted GEP.
+  Value *expandCodeFor(SCEVUse SU, Type *Ty, BasicBlock::iterator I) {
+    setInsertPoint(I);
+    return expandCodeFor(SU, Ty);
+  }
+  Value *expandCodeFor(SCEVUse SU, Type *Ty, Instruction *I) {
+    return expandCodeFor(SU, Ty, I->getIterator());
+  }
+  LLVM_ABI Value *expandCodeFor(SCEVUse SU, Type *Ty = nullptr);
 
   /// Insert code to directly compute the specified SCEV expression into the
   /// program.  The code is inserted into the SCEVExpander's current
