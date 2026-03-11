@@ -98,8 +98,10 @@
 ; LAXX-NEXT:       Remove dead machine instructions
 ; LAXX-NEXT:       MachineDominator Tree Construction
 ; LAXX-NEXT:       Machine Natural Loop Construction
+; LAXX-NEXT:       Remove dead machine loops
 ; LAXX-NEXT:       Machine Cycle Info Analysis
 ; LAXX-NEXT:       Machine Block Frequency Analysis
+; LAXX-NEXT:       MachineDominator Tree Construction
 ; LAXX-NEXT:       Machine Register Class Info Analysis
 ; LAXX-NEXT:       Early Machine Loop Invariant Code Motion
 ; LAXX-NEXT:       MachineDominator Tree Construction
