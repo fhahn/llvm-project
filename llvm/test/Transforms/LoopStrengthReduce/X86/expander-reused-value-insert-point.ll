@@ -19,7 +19,7 @@ define void @test(ptr %ioptr, i32 %X, ptr %start, ptr %end) {
 ; CHECK-NEXT:    br label [[FOR_BODY37:%.*]]
 ; CHECK:       for.body37:
 ; CHECK-NEXT:    [[P0R_0335:%.*]] = phi ptr [ [[ADD_PTR94:%.*]], [[FOR_BODY37]] ], [ [[START:%.*]], [[FOR_BODY15]] ]
-; CHECK-NEXT:    [[ADD_PTR94]] = getelementptr inbounds double, ptr [[P0R_0335]], i64 1
+; CHECK-NEXT:    [[ADD_PTR94]] = getelementptr inbounds nuw double, ptr [[P0R_0335]], i64 1
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[P0R_0335]], i64 [[TMP1]]
 ; CHECK-NEXT:    [[F1I_0:%.*]] = load double, ptr [[SCEVGEP]], align 8
 ; CHECK-NEXT:    call void @use(double [[F1I_0]])

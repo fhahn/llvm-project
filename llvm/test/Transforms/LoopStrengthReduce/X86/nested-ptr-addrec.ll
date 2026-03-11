@@ -20,14 +20,14 @@ define void @test() {
 ; CHECK-NEXT:    br label [[LOOP2_HEADER:%.*]]
 ; CHECK:       loop2.header:
 ; CHECK-NEXT:    [[LSR_IV1:%.*]] = phi ptr [ [[SCEVGEP2:%.*]], [[LOOP2_HEADER]] ], [ [[LSR_IV]], [[LOOP2_PREHEADER]] ]
-; CHECK-NEXT:    [[SCEVGEP2]] = getelementptr i8, ptr [[LSR_IV1]], i64 8
+; CHECK-NEXT:    [[SCEVGEP2]] = getelementptr nuw i8, ptr [[LSR_IV1]], i64 8
 ; CHECK-NEXT:    br i1 false, label [[LOOP2_HEADER]], label [[LOOP2_CONT:%.*]]
 ; CHECK:       loop2.cont:
 ; CHECK-NEXT:    [[V:%.*]] = load i8, ptr [[SCEVGEP2]], align 1
 ; CHECK-NEXT:    [[C:%.*]] = icmp ne i8 [[V]], 0
 ; CHECK-NEXT:    br i1 [[C]], label [[LOOP_EXIT]], label [[LOOP_LATCH]]
 ; CHECK:       loop.latch:
-; CHECK-NEXT:    [[SCEVGEP]] = getelementptr i8, ptr [[LSR_IV]], i64 8
+; CHECK-NEXT:    [[SCEVGEP]] = getelementptr nuw i8, ptr [[LSR_IV]], i64 8
 ; CHECK-NEXT:    br label [[LOOP_HEADER]]
 ;
 entry:

@@ -105,11 +105,26 @@ const SCEV *llvm::normalizeForPostIncUse(const SCEV *S,
   };
   const SCEV *Normalized =
       NormalizeDenormalizeRewriter(Normalize, Pred, SE).visit(S);
-  const SCEV *Denormalized = denormalizeForPostIncUse(Normalized, Loops, SE);
+  const SCEV *Denormalized =
+      denormalizeForPostIncUse(Normalized, Loops, SE);
   // If the normalized expression isn't invertible.
   if (CheckInvertible && Denormalized != S)
     return nullptr;
   return Normalized;
+}
+
+SCEVUse llvm::normalizeForPostIncUse(SCEVUse S,
+                                     const PostIncLoopSet &Loops,
+                                     ScalarEvolution &SE,
+                                     bool CheckInvertible) {
+  const SCEV *Result =
+      normalizeForPostIncUse(S.getPointer(), Loops, SE, CheckInvertible);
+  if (!Result)
+    return SCEVUse();
+  // Preserve use-specific flags only if the expression was not transformed.
+  if (Result == S.getPointer())
+    return SCEVUse(Result, S.getFlags());
+  return Result;
 }
 
 const SCEV *llvm::normalizeForPostIncUseIf(const SCEV *S, NormalizePredTy Pred,
@@ -126,4 +141,14 @@ const SCEV *llvm::denormalizeForPostIncUse(const SCEV *S,
     return Loops.count(AR->getLoop());
   };
   return NormalizeDenormalizeRewriter(Denormalize, Pred, SE).visit(S);
+}
+
+SCEVUse llvm::denormalizeForPostIncUse(SCEVUse S,
+                                       const PostIncLoopSet &Loops,
+                                       ScalarEvolution &SE) {
+  const SCEV *Result = denormalizeForPostIncUse(S.getPointer(), Loops, SE);
+  // Preserve use-specific flags only if the expression was not transformed.
+  if (Result == S.getPointer())
+    return SCEVUse(Result, S.getFlags());
+  return Result;
 }

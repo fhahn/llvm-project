@@ -151,7 +151,7 @@ define void @NonSCEVableIV(float %init, ptr %A, i32 %N) {
 ; CHECK-NEXT:    [[LFTR_WIDEIV:%.*]] = trunc i64 [[LSR_IV]] to i32
 ; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp eq i32 [[LFTR_WIDEIV]], [[N]]
 ; CHECK-NEXT:    [[LSR_IV_NEXT]] = add nuw nsw i64 [[LSR_IV]], 1
-; CHECK-NEXT:    [[SCEVGEP]] = getelementptr i8, ptr [[LSR_IV1]], i64 4
+; CHECK-NEXT:    [[SCEVGEP]] = getelementptr nuw i8, ptr [[LSR_IV1]], i64 4
 ; CHECK-NEXT:    br i1 [[EXITCOND]], label [[FOR_END:%.*]], label [[FOR_BODY]]
 ; CHECK:       for.end:
 ; CHECK-NEXT:    ret void

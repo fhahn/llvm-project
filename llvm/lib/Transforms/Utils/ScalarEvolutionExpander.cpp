@@ -1066,6 +1066,11 @@ SCEVExpander::getAddRecExprPHILiterally(const SCEVAddRecExpr *Normalized,
       // Those values were not actually inserted but re-used.
       ReusedValues.insert(AddRecPhiMatch);
       ReusedValues.insert(IncV);
+      // Propagate NUW to a reused GEP increment if the AddRec proves it.
+      if (auto *GEP = dyn_cast<GetElementPtrInst>(IncV))
+        if (Normalized->hasNoUnsignedWrap())
+          GEP->setNoWrapFlags(GEP->getNoWrapFlags() |
+                              GEPNoWrapFlags::noUnsignedWrap());
       return AddRecPhiMatch;
     }
   }
@@ -1084,10 +1089,13 @@ SCEVExpander::getAddRecExprPHILiterally(const SCEVAddRecExpr *Normalized,
   PostIncLoops.clear();
 
   // Expand code for the start value into the loop preheader.
+  // Thread the current SCEVUse flags to the start expansion so that e.g.
+  // a pointer add start value gets NUW when the SCEVUse carries it.
   assert(L->getLoopPreheader() &&
          "Can't expand add recurrences without a loop preheader!");
   Value *StartV =
-      expand(Normalized->getStart(), L->getLoopPreheader()->getTerminator());
+      expand(SCEVUse(Normalized->getStart(), CurrentSCEVUse.getFlags()),
+             L->getLoopPreheader()->getTerminator());
 
   // StartV must have been be inserted into L's preheader to dominate the new
   // phi.
@@ -1141,6 +1149,11 @@ SCEVExpander::getAddRecExprPHILiterally(const SCEVAddRecExpr *Normalized,
         cast<BinaryOperator>(IncV)->setHasNoUnsignedWrap();
       if (IncrementIsNSW)
         cast<BinaryOperator>(IncV)->setHasNoSignedWrap();
+    }
+    if (auto *GEP = dyn_cast<GetElementPtrInst>(IncV)) {
+      if (Normalized->hasNoUnsignedWrap())
+        GEP->setNoWrapFlags(GEP->getNoWrapFlags() |
+                            GEPNoWrapFlags::noUnsignedWrap());
     }
     PN->addIncoming(IncV, Pred);
   }
@@ -1200,6 +1213,10 @@ Value *SCEVExpander::expandAddRecExprLiterally(const SCEVAddRecExpr *S) {
         I->setHasNoUnsignedWrap(false);
       if (!S->hasNoSignedWrap())
         I->setHasNoSignedWrap(false);
+    }
+    if (auto *GEP = dyn_cast<GetElementPtrInst>(Result)) {
+      if (!S->hasNoUnsignedWrap())
+        GEP->setNoWrapFlags(GEP->getNoWrapFlags().withoutNoUnsignedWrap());
     }
 
     // For an expansion to use the postinc form, the client must call
@@ -1562,6 +1579,18 @@ Value *SCEVExpander::expandCodeFor(const SCEV *SH, Type *Ty) {
   return V;
 }
 
+Value *SCEVExpander::expandCodeFor(SCEVUse SU, Type *Ty) {
+  // Expand the code for this SCEV, threading SCEVUse flags through expand().
+  Value *V = expand(SU);
+
+  if (Ty && Ty != V->getType()) {
+    assert(SE.getTypeSizeInBits(Ty) == SE.getTypeSizeInBits(SU->getType()) &&
+           "non-trivial casts should be done with the SCEVs directly!");
+    V = InsertNoopCastOfTo(V, Ty);
+  }
+  return V;
+}
+
 Value *SCEVExpander::FindValueInExprValueMap(
     const SCEV *S, const Instruction *InsertPt,
     SmallVectorImpl<Instruction *> &DropPoisonGeneratingInsts) {
@@ -1602,7 +1631,9 @@ Value *SCEVExpander::FindValueInExprValueMap(
 // literally, to prevent LSR's transformed SCEV from being reverted. Otherwise,
 // the expansion will try to reuse Value from ExprValueMap, and only when it
 // fails, expand the SCEV literally.
-Value *SCEVExpander::expand(const SCEV *S) {
+Value *SCEVExpander::expand(SCEVUse SU) {
+  const SCEV *S = SU;
+  unsigned UseFlags = SU.getFlags();
   // Compute an insertion point for this SCEV object. Hoist the instructions
   // as far out in the loop nest as possible.
   BasicBlock::iterator InsertPt = Builder.GetInsertPoint();
@@ -1654,7 +1685,8 @@ Value *SCEVExpander::expand(const SCEV *S) {
   }
 
   // Check to see if we already expanded this here.
-  auto I = InsertedExpressions.find(std::make_pair(S, &*InsertPt));
+  auto I =
+      InsertedExpressions.find(std::make_tuple(S, UseFlags, &*InsertPt));
   if (I != InsertedExpressions.end())
     return I->second;
 
@@ -1665,8 +1697,25 @@ Value *SCEVExpander::expand(const SCEV *S) {
   SmallVector<Instruction *> DropPoisonGeneratingInsts;
   Value *V = FindValueInExprValueMap(S, &*InsertPt, DropPoisonGeneratingInsts);
   if (!V) {
-    V = visit(S);
-    V = fixupLCSSAFormFor(V);
+    SCEV::NoWrapFlags NWFlags =
+        static_cast<SCEV::NoWrapFlags>(UseFlags);
+    // If the SCEVUse carries NUW and the expression is a pointer add, expand
+    // with NUW on the GEP.
+    if ((NWFlags & SCEV::FlagNUW) && S->getType()->isPointerTy()) {
+      if (const auto *Add = dyn_cast<SCEVAddExpr>(S)) {
+        if (!(Add->getNoWrapFlags() & SCEV::FlagNUW)) {
+          Value *Base = expand(SE.getPointerBase(Add));
+          const SCEV *Offset = SE.removePointerBase(Add);
+          V = expandAddToGEP(Offset, Base, SCEV::FlagNUW);
+        }
+      }
+    }
+    if (!V) {
+      // Use the SCEVUse-aware visit() overload so that use-specific flags
+      // (e.g. NUW) are available to visit methods via CurrentSCEVUse.
+      V = visit(SU);
+      V = fixupLCSSAFormFor(V);
+    }
   } else {
     for (Instruction *I : DropPoisonGeneratingInsts) {
       rememberFlags(I);
@@ -1696,7 +1745,7 @@ Value *SCEVExpander::expand(const SCEV *S) {
   // the expression at this insertion point. If the mapped value happened to be
   // a postinc expansion, it could be reused by a non-postinc user, but only if
   // its insertion point was already at the head of the loop.
-  InsertedExpressions[std::make_pair(S, &*InsertPt)] = V;
+  InsertedExpressions[std::make_tuple(S, UseFlags, &*InsertPt)] = V;
   return V;
 }
 

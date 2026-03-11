@@ -105,7 +105,7 @@ define void @negativeFourCase(ptr %ptr1, ptr %ptr2) nounwind {
 ; CHECK-NEXT:    [[LSR_IV:%.*]] = phi i32 [ [[LSR_IV_NEXT:%.*]], [[FOR_INC_US_I_I:%.*]] ], [ 0, [[FOR_COND6_PREHEADER_US_I_I]] ]
 ; CHECK-NEXT:    [[ADDR_198_US_I_I:%.*]] = phi ptr [ [[ADDR_0108_US_I_I]], [[FOR_COND6_PREHEADER_US_I_I]] ], [ [[INCDEC_PTR_US_I_I:%.*]], [[FOR_INC_US_I_I]] ]
 ; CHECK-NEXT:    [[INC_196_US_I_I:%.*]] = phi i32 [ 0, [[FOR_COND6_PREHEADER_US_I_I]] ], [ [[INC_2_US_I_I:%.*]], [[FOR_INC_US_I_I]] ]
-; CHECK-NEXT:    [[INCDEC_PTR_US_I_I]] = getelementptr inbounds i8, ptr [[ADDR_198_US_I_I]], i32 1
+; CHECK-NEXT:    [[INCDEC_PTR_US_I_I]] = getelementptr inbounds nuw i8, ptr [[ADDR_198_US_I_I]], i32 1
 ; CHECK-NEXT:    [[TMP0:%.*]] = load i8, ptr [[ADDR_198_US_I_I]], align 1
 ; CHECK-NEXT:    [[CMP9_US_I_I:%.*]] = icmp eq i8 [[TMP0]], -1
 ; CHECK-NEXT:    br i1 [[CMP9_US_I_I]], label [[IF_END37_US_I_I:%.*]], label [[IF_ELSE_US_I_I:%.*]]

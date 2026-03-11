@@ -74,7 +74,11 @@ class SCEVExpander : public SCEVVisitor<SCEVExpander, Value *> {
   bool PreserveLCSSA;
 
   // InsertedExpressions caches Values for reuse, so must track RAUW.
-  DenseMap<std::pair<const SCEV *, Instruction *>, TrackingVH<Value>>
+  // The key includes the SCEV pointer, the use-specific flags from SCEVUse,
+  // and the insertion point. This ensures that expansions with different
+  // SCEVUse flags (e.g. NUW) are not incorrectly reused.
+  DenseMap<std::tuple<const SCEV *, unsigned, Instruction *>,
+           TrackingVH<Value>>
       InsertedExpressions;
 
   // InsertedValues only flags inserted instructions so needs no RAUW.
@@ -319,6 +323,18 @@ public:
     return expandCodeFor(SH, Ty, I->getIterator());
   }
 
+  /// Expand a SCEVUse, propagating use-specific flags (e.g. NUW) to the
+  /// generated code. For pointer add expressions where the SCEVUse carries
+  /// NUW, the flag is applied to the emitted GEP.
+  Value *expandCodeFor(SCEVUse SU, Type *Ty, BasicBlock::iterator I) {
+    setInsertPoint(I);
+    return expandCodeFor(SU, Ty);
+  }
+  Value *expandCodeFor(SCEVUse SU, Type *Ty, Instruction *I) {
+    return expandCodeFor(SU, Ty, I->getIterator());
+  }
+  LLVM_ABI Value *expandCodeFor(SCEVUse SU, Type *Ty = nullptr);
+
   /// Insert code to directly compute the specified SCEV expression into the
   /// program.  The code is inserted into the SCEVExpander's current
   /// insertion point. If a type is specified, the result will be expanded to
@@ -478,13 +494,13 @@ private:
       const SCEV *S, const Instruction *InsertPt,
       SmallVectorImpl<Instruction *> &DropPoisonGeneratingInsts);
 
-  LLVM_ABI Value *expand(const SCEV *S);
-  Value *expand(const SCEV *S, BasicBlock::iterator I) {
+  LLVM_ABI Value *expand(SCEVUse S);
+  Value *expand(SCEVUse S, BasicBlock::iterator I) {
     setInsertPoint(I);
     return expand(S);
   }
-  Value *expand(const SCEV *S, Instruction *I) {
-    setInsertPoint(I);
+  Value *expand(SCEVUse S, Instruction *I) {
+    setInsertPoint(I->getIterator());
     return expand(S);
   }
 

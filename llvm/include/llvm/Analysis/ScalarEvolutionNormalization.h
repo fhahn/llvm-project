@@ -45,6 +45,7 @@ class Loop;
 class ScalarEvolution;
 class SCEV;
 class SCEVAddRecExpr;
+struct SCEVUse;
 
 typedef SmallPtrSet<const Loop *, 2> PostIncLoopSet;
 
@@ -58,6 +59,15 @@ LLVM_ABI const SCEV *normalizeForPostIncUse(const SCEV *S,
                                             ScalarEvolution &SE,
                                             bool CheckInvertible = true);
 
+/// Normalize \p S to be post-increment for all loops present in \p
+/// Loops, preserving SCEVUse flags when the expression is unchanged.
+/// Returns a null SCEVUse if the result is not invertible and \p
+/// CheckInvertible is true.
+LLVM_ABI SCEVUse normalizeForPostIncUse(SCEVUse S,
+                                        const PostIncLoopSet &Loops,
+                                        ScalarEvolution &SE,
+                                        bool CheckInvertible = true);
+
 /// Normalize \p S for all add recurrence sub-expressions for which \p
 /// Pred returns true.
 LLVM_ABI const SCEV *normalizeForPostIncUseIf(const SCEV *S,
@@ -69,6 +79,12 @@ LLVM_ABI const SCEV *normalizeForPostIncUseIf(const SCEV *S,
 LLVM_ABI const SCEV *denormalizeForPostIncUse(const SCEV *S,
                                               const PostIncLoopSet &Loops,
                                               ScalarEvolution &SE);
+
+/// Denormalize \p S to be post-increment for all loops present in \p
+/// Loops, preserving SCEVUse flags when the expression is unchanged.
+LLVM_ABI SCEVUse denormalizeForPostIncUse(SCEVUse S,
+                                          const PostIncLoopSet &Loops,
+                                          ScalarEvolution &SE);
 } // namespace llvm
 
 #endif

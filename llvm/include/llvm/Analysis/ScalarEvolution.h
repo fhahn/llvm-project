@@ -753,7 +753,8 @@ public:
   LLVM_ABI SCEVUse getGEPExpr(SCEVUse BaseExpr, ArrayRef<SCEVUse> IndexExprs,
                               Type *SrcElementTy,
                               GEPNoWrapFlags NW = GEPNoWrapFlags::none(),
-                              bool UseCtx = false, bool IsInBounds = false);
+                              bool UseCtx = false,
+                              GEPNoWrapFlags OrigNW = GEPNoWrapFlags::none());
   LLVM_ABI const SCEV *getAbsExpr(const SCEV *Op, bool IsNSW);
   LLVM_ABI const SCEV *getMinMaxExpr(SCEVTypes Kind,
                                      SmallVectorImpl<SCEVUse> &Operands);

@@ -4,19 +4,18 @@
 target datalayout = "e-p:64:64:64-n32:64"
 
 ; Pointer IV with a complex start value (GEP chain).
-; The SCEVUse mechanism should help preserve nuw on the GEP increment.
+; The SCEVUse mechanism should help preserve nuw on the start GEP.
 define void @ptr_iv_complex_start(ptr %base, i64 %off, i64 %len) {
 ; CHECK-LABEL: @ptr_iv_complex_start(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[GEP1:%.*]] = getelementptr i8, ptr [[BASE:%.*]], i64 [[OFF:%.*]]
-; CHECK-NEXT:    [[GEP2:%.*]] = getelementptr i8, ptr [[GEP1]], i64 16
-; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr nuw i8, ptr [[GEP2]], i64 4
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[OFF:%.*]], 20
+; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr nuw i8, ptr [[BASE:%.*]], i64 [[TMP0]]
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
 ; CHECK-NEXT:    [[LSR_IV2:%.*]] = phi i64 [ [[LSR_IV_NEXT:%.*]], [[LOOP]] ], [ [[LEN:%.*]], [[ENTRY:%.*]] ]
 ; CHECK-NEXT:    [[LSR_IV:%.*]] = phi ptr [ [[SCEVGEP1:%.*]], [[LOOP]] ], [ [[SCEVGEP]], [[ENTRY]] ]
-; CHECK-NEXT:    [[TMP0:%.*]] = load volatile i32, ptr [[LSR_IV]], align 4
-; CHECK-NEXT:    [[SCEVGEP1]] = getelementptr i8, ptr [[LSR_IV]], i64 4
+; CHECK-NEXT:    [[TMP1:%.*]] = load volatile i32, ptr [[LSR_IV]], align 4
+; CHECK-NEXT:    [[SCEVGEP1]] = getelementptr nuw i8, ptr [[LSR_IV]], i64 4
 ; CHECK-NEXT:    [[LSR_IV_NEXT]] = add i64 [[LSR_IV2]], -1
 ; CHECK-NEXT:    [[C:%.*]] = icmp ne i64 [[LSR_IV_NEXT]], 0
 ; CHECK-NEXT:    br i1 [[C]], label [[LOOP]], label [[EXIT:%.*]]
@@ -51,7 +50,7 @@ define void @ptr_iv_simple_start(ptr %p.start, i64 %len) {
 ; CHECK-NEXT:    [[LSR_IV2:%.*]] = phi i64 [ [[LSR_IV_NEXT:%.*]], [[LOOP]] ], [ [[LEN:%.*]], [[ENTRY:%.*]] ]
 ; CHECK-NEXT:    [[LSR_IV:%.*]] = phi ptr [ [[SCEVGEP1:%.*]], [[LOOP]] ], [ [[SCEVGEP]], [[ENTRY]] ]
 ; CHECK-NEXT:    [[TMP0:%.*]] = load volatile i32, ptr [[LSR_IV]], align 4
-; CHECK-NEXT:    [[SCEVGEP1]] = getelementptr i8, ptr [[LSR_IV]], i64 4
+; CHECK-NEXT:    [[SCEVGEP1]] = getelementptr nuw i8, ptr [[LSR_IV]], i64 4
 ; CHECK-NEXT:    [[LSR_IV_NEXT]] = add i64 [[LSR_IV2]], -1
 ; CHECK-NEXT:    [[C:%.*]] = icmp ne i64 [[LSR_IV_NEXT]], 0
 ; CHECK-NEXT:    br i1 [[C]], label [[LOOP]], label [[EXIT:%.*]]

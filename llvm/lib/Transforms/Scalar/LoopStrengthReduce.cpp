@@ -499,11 +499,11 @@ struct Formula {
   /// This invariant can be temporarily broken while building a formula.
   /// However, every formula inserted into the LSRInstance must be in canonical
   /// form.
-  SmallVector<const SCEV *, 4> BaseRegs;
+  SmallVector<SCEVUse, 4> BaseRegs;
 
   /// The 'scaled' register for this use. This should be non-null when Scale is
   /// not zero.
-  const SCEV *ScaledReg = nullptr;
+  SCEVUse ScaledReg;
 
   /// An additional constant offset which added near the use. This requires a
   /// temporary register, but the offset itself can live in an add immediate
@@ -512,7 +512,7 @@ struct Formula {
 
   Formula() = default;
 
-  void initialMatch(const SCEV *S, Loop *L, ScalarEvolution &SE);
+  void initialMatch(SCEVUse S, Loop *L, ScalarEvolution &SE);
 
   bool isCanonical(const Loop &L) const;
 
@@ -527,7 +527,7 @@ struct Formula {
   size_t getNumRegs() const;
   Type *getType() const;
 
-  void deleteBaseReg(const SCEV *&S);
+  void deleteBaseReg(SCEVUse &S);
 
   bool referencesReg(const SCEV *S) const;
   bool hasRegsUsedByUsesOtherThan(size_t LUIdx,
@@ -540,7 +540,7 @@ struct Formula {
 } // end anonymous namespace
 
 /// Recursion helper for initialMatch.
-static void DoInitialMatch(const SCEV *S, Loop *L,
+static void DoInitialMatch(SCEVUse S, Loop *L,
                            SmallVectorImpl<SCEVUse> &Good,
                            SmallVectorImpl<SCEVUse> &Bad, ScalarEvolution &SE) {
   // Collect expressions which properly dominate the loop header.
@@ -595,18 +595,18 @@ static void DoInitialMatch(const SCEV *S, Loop *L,
 
 /// Incorporate loop-variant parts of S into this Formula, attempting to keep
 /// all loop-invariant and loop-computable values in a single base register.
-void Formula::initialMatch(const SCEV *S, Loop *L, ScalarEvolution &SE) {
+void Formula::initialMatch(SCEVUse S, Loop *L, ScalarEvolution &SE) {
   SmallVector<SCEVUse, 4> Good;
   SmallVector<SCEVUse, 4> Bad;
   DoInitialMatch(S, L, Good, Bad, SE);
   if (!Good.empty()) {
-    const SCEV *Sum = SE.getAddExpr(Good);
+    SCEVUse Sum = Good.size() == 1 ? Good[0] : SCEVUse(SE.getAddExpr(Good));
     if (!Sum->isZero())
       BaseRegs.push_back(Sum);
     HasBaseReg = true;
   }
   if (!Bad.empty()) {
-    const SCEV *Sum = SE.getAddExpr(Bad);
+    SCEVUse Sum = Bad.size() == 1 ? Bad[0] : SCEVUse(SE.getAddExpr(Bad));
     if (!Sum->isZero())
       BaseRegs.push_back(Sum);
     HasBaseReg = true;
@@ -677,7 +677,7 @@ void Formula::canonicalize(const Loop &L) {
   // BaseRegs containing the recurrent expr related with Loop L. Swap the
   // reg with ScaledReg.
   if (!containsAddRecDependentOnLoop(ScaledReg, L)) {
-    auto I = find_if(BaseRegs, [&L](const SCEV *S) {
+    auto I = find_if(BaseRegs, [&L](SCEVUse S) {
       return containsAddRecDependentOnLoop(S, L);
     });
     if (I != BaseRegs.end())
@@ -733,7 +733,7 @@ Type *Formula::getType() const {
 }
 
 /// Delete the given base reg from the BaseRegs list.
-void Formula::deleteBaseReg(const SCEV *&S) {
+void Formula::deleteBaseReg(SCEVUse &S) {
   if (&S != &BaseRegs.back())
     std::swap(S, BaseRegs.back());
   BaseRegs.pop_back();
@@ -936,17 +936,20 @@ static Immediate ExtractImmediate(SCEVUse &S, ScalarEvolution &SE) {
     }
   } else if (const SCEVAddExpr *Add = dyn_cast<SCEVAddExpr>(S)) {
     SmallVector<SCEVUse, 8> NewOps(Add->operands());
+    unsigned OrigFlags = S.getFlags();
     Immediate Result = ExtractImmediate(NewOps.front(), SE);
     if (Result.isNonZero())
-      S = SE.getAddExpr(NewOps);
+      S = SCEVUse(SE.getAddExpr(NewOps), OrigFlags);
     return Result;
   } else if (const SCEVAddRecExpr *AR = dyn_cast<SCEVAddRecExpr>(S)) {
     SmallVector<SCEVUse, 8> NewOps(AR->operands());
+    unsigned OrigFlags = S.getFlags();
     Immediate Result = ExtractImmediate(NewOps.front(), SE);
     if (Result.isNonZero())
-      S = SE.getAddRecExpr(NewOps, AR->getLoop(),
+      S = SCEVUse(SE.getAddRecExpr(NewOps, AR->getLoop(),
                            // FIXME: AR->getNoWrapFlags(SCEV::FlagNW)
-                           SCEV::FlagAnyWrap);
+                           SCEV::FlagAnyWrap),
+                  OrigFlags);
     return Result;
   } else if (EnableVScaleImmediates &&
              match(S, m_scev_Mul(m_scev_APInt(C), m_SCEVVScale()))) {
@@ -1679,7 +1682,7 @@ LLVM_DUMP_METHOD void LSRFixup::dump() const {
 /// Test whether this use as a formula which has the same registers as the given
 /// formula.
 bool LSRUse::HasFormulaWithSameRegs(const Formula &F) const {
-  SmallVector<const SCEV *, 4> Key = F.BaseRegs;
+  SmallVector<const SCEV *, 4> Key(F.BaseRegs.begin(), F.BaseRegs.end());
   if (F.ScaledReg) Key.push_back(F.ScaledReg);
   // Unstable sort by host order ok, because this is only used for uniquifying.
   llvm::sort(Key);
@@ -1703,7 +1706,7 @@ bool LSRUse::InsertFormula(const Formula &F, const Loop &L) {
   if (!Formulae.empty() && RigidFormula)
     return false;
 
-  SmallVector<const SCEV *, 4> Key = F.BaseRegs;
+  SmallVector<const SCEV *, 4> Key(F.BaseRegs.begin(), F.BaseRegs.end());
   if (F.ScaledReg) Key.push_back(F.ScaledReg);
   // Unstable sort by host order ok, because this is only used for uniquifying.
   llvm::sort(Key);
@@ -2204,14 +2207,14 @@ class LSRInstance {
   bool reconcileNewOffset(LSRUse &LU, Immediate NewOffset, bool HasBaseReg,
                           LSRUse::KindType Kind, MemAccessTy AccessTy);
 
-  std::pair<size_t, Immediate> getUse(const SCEV *&Expr, LSRUse::KindType Kind,
+  std::pair<size_t, Immediate> getUse(SCEVUse &Expr, LSRUse::KindType Kind,
                                       MemAccessTy AccessTy);
 
   void DeleteUse(LSRUse &LU, size_t LUIdx);
 
   LSRUse *FindUseWithSimilarFormula(const Formula &F, const LSRUse &OrigLU);
 
-  void InsertInitialFormula(const SCEV *S, LSRUse &LU, size_t LUIdx);
+  void InsertInitialFormula(SCEVUse S, LSRUse &LU, size_t LUIdx);
   void InsertSupplementalFormula(const SCEV *S, LSRUse &LU, size_t LUIdx);
   void CountRegisters(const Formula &F, size_t LUIdx);
   bool InsertFormula(LSRUse &LU, unsigned LUIdx, const Formula &F);
@@ -2804,13 +2807,11 @@ bool LSRInstance::reconcileNewOffset(LSRUse &LU, Immediate NewOffset,
 /// Return an LSRUse index and an offset value for a fixup which needs the given
 /// expression, with the given kind and optional access type.  Either reuse an
 /// existing use or create a new one, as needed.
-std::pair<size_t, Immediate> LSRInstance::getUse(const SCEV *&Expr,
+std::pair<size_t, Immediate> LSRInstance::getUse(SCEVUse &Expr,
                                                  LSRUse::KindType Kind,
                                                  MemAccessTy AccessTy) {
-  const SCEV *Copy = Expr;
-  SCEVUse ExprUse = Expr;
-  Immediate Offset = ExtractImmediate(ExprUse, SE);
-  Expr = ExprUse;
+  SCEVUse Copy = Expr;
+  Immediate Offset = ExtractImmediate(Expr, SE);
 
   // Basic uses can't accept any offset, for example.
   if (!isAlwaysFoldable(TTI, Kind, AccessTy, /*BaseGV=*/ nullptr,
@@ -3539,10 +3540,24 @@ void LSRInstance::CollectFixupsAndInitialFormulae() {
       AccessTy = getAccessType(TTI, UserInst, U.getOperandValToReplace());
     }
 
-    const SCEV *S = IU.getExpr(U);
+    SCEVUse S = IU.getExpr(U);
     if (!S)
       continue;
     PostIncLoopSet TmpPostIncLoops = U.getPostIncLoops();
+
+    // For pointer operands, get use-specific flags via getSCEV with
+    // UseCtx=true (e.g., NUW from inbounds/nuw GEPs) and normalize the
+    // resulting SCEVUse. The SCEVUse overload of normalizeForPostIncUse
+    // will properly preserve flags when the expression is unchanged.
+    if (U.getOperandValToReplace()->getType()->isPointerTy() &&
+        SE.isSCEVable(U.getOperandValToReplace()->getType())) {
+      SCEVUse UseSCEV =
+          SE.getSCEV(U.getOperandValToReplace(), /*UseCtx=*/true);
+      SCEVUse Normalized =
+          normalizeForPostIncUse(UseSCEV, U.getPostIncLoops(), SE);
+      if (Normalized)
+        S = Normalized;
+    }
 
     // Equality (== and !=) ICmps are special. We can rewrite (i == N) as
     // (N - i == 0), and this allows (N - i) to be the expression that we work
@@ -3642,7 +3657,7 @@ void LSRInstance::CollectFixupsAndInitialFormulae() {
 
 /// Insert a formula for the given expression into the given use, separating out
 /// loop-variant portions from loop-invariant and loop-computable portions.
-void LSRInstance::InsertInitialFormula(const SCEV *S, LSRUse &LU,
+void LSRInstance::InsertInitialFormula(SCEVUse S, LSRUse &LU,
                                        size_t LUIdx) {
   // Mark uses whose expressions cannot be expanded.
   if (!Rewriter.isSafeToExpand(S))
@@ -3712,7 +3727,7 @@ LSRInstance::CollectLoopInvariantFixupsAndFormulae() {
     return;
 
   while (!Worklist.empty()) {
-    const SCEV *S = Worklist.pop_back_val();
+    SCEVUse S = Worklist.pop_back_val();
 
     // Don't process the same SCEV twice
     if (!Visited.insert(S).second)
@@ -4442,7 +4457,7 @@ void LSRInstance::GenerateTruncates(LSRUse &LU, unsigned LUIdx, Formula Base) {
         F.ScaledReg = NewScaledReg;
       }
       bool HasZeroBaseReg = false;
-      for (const SCEV *&BaseReg : F.BaseRegs) {
+      for (SCEVUse &BaseReg : F.BaseRegs) {
         const SCEV *NewBaseReg =
             getAnyExtendConsideringPostIncUses(Loops, BaseReg, SrcTy, SE);
         if (!NewBaseReg || NewBaseReg->isZero()) {
@@ -4875,8 +4890,7 @@ void LSRInstance::NarrowSearchSpaceByDetectingSupersets() {
         // Look for a formula with a constant or GV in a register. If the use
         // also has a formula with that same value in an immediate field,
         // delete the one that uses a register.
-        for (SmallVectorImpl<const SCEV *>::const_iterator
-             I = F.BaseRegs.begin(), E = F.BaseRegs.end(); I != E; ++I) {
+        for (auto I = F.BaseRegs.begin(), E = F.BaseRegs.end(); I != E; ++I) {
           if (const SCEVConstant *C = dyn_cast<SCEVConstant>(*I)) {
             Formula NewF = F;
             //FIXME: Formulas should store bitwidth to do wrapping properly.
@@ -5711,11 +5725,12 @@ Value *LSRInstance::Expand(const LSRUse &LU, const LSRFixup &LF,
   SmallVector<SCEVUse, 8> Ops;
 
   // Expand the BaseRegs portion.
-  for (const SCEV *Reg : F.BaseRegs) {
+  for (SCEVUse Reg : F.BaseRegs) {
     assert(!Reg->isZero() && "Zero allocated in a base register!");
 
     // If we're expanding for a post-inc user, make the post-inc adjustment.
     Reg = denormalizeForPostIncUse(Reg, LF.PostIncLoops, SE);
+
     Ops.push_back(SE.getUnknown(Rewriter.expandCodeFor(Reg, nullptr)));
   }
 
@@ -7023,66 +7038,6 @@ static llvm::PHINode *GetInductionVariable(const Loop &L, ScalarEvolution &SE,
   return nullptr;
 }
 
-/// Insert llvm.ssa.copy intrinsics in the loop preheader for pointer-typed
-/// PHI start values that are not simple (arguments, constants, allocas).
-/// This makes SCEV treat these start values as opaque, preventing
-/// unnecessary wrap flag loss during LSR.
-static SmallVector<WeakTrackingVH, 4>
-localizePointerStartValues(Loop *L, ScalarEvolution &SE, LoopInfo &LI) {
-  SmallVector<WeakTrackingVH, 4> Copies;
-  BasicBlock *PH = L->getLoopPreheader();
-  BasicBlock *Latch = L->getLoopLatch();
-  if (!PH || !Latch)
-    return Copies;
-
-  for (PHINode &PN : L->getHeader()->phis()) {
-    if (!PN.getType()->isPointerTy())
-      continue;
-    // Get preheader incoming value.
-    Value *Start = PN.getIncomingValueForBlock(PH);
-    // Skip if already a simple value (argument, constant, alloca) or derived
-    // from an alloca (e.g., GEP chain from a stack allocation). SCEV can reason
-    // precisely about alloca-based addresses without needing localization.
-    if (isa<Argument>(Start) || isa<Constant>(Start))
-      continue;
-    if (isa<AllocaInst>(getUnderlyingObject(Start)))
-      continue;
-    // Skip if the start value is defined inside a loop (e.g., an exit value
-    // from a sibling loop). Localizing such values can indirectly cause
-    // flag loss on the sibling loop's IV.
-    if (auto *StartI = dyn_cast<Instruction>(Start))
-      if (LI.getLoopFor(StartI->getParent()))
-        continue;
-    // Insert ssa.copy in preheader before the terminator.
-    LLVM_DEBUG(dbgs() << "LSR: Localizing pointer start value " << *Start
-                      << " for PHI " << PN << "\n");
-    Function *CopyFn = Intrinsic::getOrInsertDeclaration(
-        PH->getModule(), Intrinsic::ssa_copy, {Start->getType()});
-    CallInst *Copy = CallInst::Create(CopyFn, {Start}, "",
-                                      PH->getTerminator()->getIterator());
-    PN.setIncomingValueForBlock(PH, Copy);
-    SE.forgetValue(&PN);
-    Copies.push_back(WeakTrackingVH(Copy));
-  }
-  return Copies;
-}
-
-/// Remove ssa.copy intrinsics inserted by localizePointerStartValues,
-/// replacing their uses with the original values.
-static void removeLocalizedCopies(SmallVectorImpl<WeakTrackingVH> &Copies,
-                                  ScalarEvolution &SE) {
-  for (WeakTrackingVH &VH : Copies) {
-    if (!VH)
-      continue; // Already erased by LSR.
-    auto *Copy = cast<CallInst>(VH);
-    Value *Orig = Copy->getArgOperand(0);
-    SE.forgetValue(Copy);
-    Copy->replaceAllUsesWith(Orig);
-    Copy->eraseFromParent();
-  }
-  Copies.clear();
-}
-
 static bool ReduceLoopStrength(Loop *L, IVUsers &IU, ScalarEvolution &SE,
                                DominatorTree &DT, LoopInfo &LI,
                                const TargetTransformInfo &TTI,
@@ -7093,10 +7048,6 @@ static bool ReduceLoopStrength(Loop *L, IVUsers &IU, ScalarEvolution &SE,
   // meet the salvageable criteria and store their DIExpression and SCEVs.
   SmallVector<std::unique_ptr<DVIRecoveryRec>, 2> SalvageableDVIRecords;
   DbgGatherSalvagableDVI(L, SE, SalvageableDVIRecords);
-
-  // Localize pointer start values so SCEV treats them as opaque,
-  // preventing unnecessary wrap flag loss during LSR.
-  auto Copies = localizePointerStartValues(L, SE, LI);
 
   bool Changed = false;
   std::unique_ptr<MemorySSAUpdater> MSSAU;
@@ -7125,6 +7076,7 @@ static bool ReduceLoopStrength(Loop *L, IVUsers &IU, ScalarEvolution &SE,
       DeleteDeadPHIs(L->getHeader(), &TLI, MSSAU.get());
     }
   }
+
   // LSR may at times remove all uses of an induction variable from a loop.
   // The only remaining use is the PHI in the exit block.
   // When this is the case, if the exit value of the IV can be calculated using
@@ -7143,9 +7095,6 @@ static bool ReduceLoopStrength(Loop *L, IVUsers &IU, ScalarEvolution &SE,
       DeleteDeadPHIs(L->getHeader(), &TLI, MSSAU.get());
     }
   }
-
-  // Remove ssa.copy intrinsics now that LSR is done.
-  removeLocalizedCopies(Copies, SE);
 
   if (SalvageableDVIRecords.empty())
     return Changed;

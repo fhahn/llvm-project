@@ -624,6 +624,11 @@ public:
 /// This class defines a simple visitor class that may be used for
 /// various SCEV analysis purposes.
 template <typename SC, typename RetVal = void> struct SCEVVisitor {
+  /// The SCEVUse currently being visited. Updated by visit(SCEVUse) to carry
+  /// use-specific flags (e.g. NUW) through the visitor dispatch so that
+  /// individual visit methods can access them.
+  SCEVUse CurrentSCEVUse;
+
   RetVal visit(const SCEV *S) {
     switch (S->getSCEVType()) {
     case scConstant:
@@ -665,6 +670,17 @@ template <typename SC, typename RetVal = void> struct SCEVVisitor {
       return ((SC *)this)->visitCouldNotCompute((const SCEVCouldNotCompute *)S);
     }
     llvm_unreachable("Unknown SCEV kind!");
+  }
+
+  /// Visit a SCEVUse, making use-specific flags available to visit methods
+  /// via CurrentSCEVUse. Saves and restores CurrentSCEVUse around the
+  /// dispatch so that recursive visits (through expand()) nest correctly.
+  RetVal visit(SCEVUse SU) {
+    SCEVUse SavedUse = CurrentSCEVUse;
+    CurrentSCEVUse = SU;
+    RetVal R = visit((const SCEV *)SU);
+    CurrentSCEVUse = SavedUse;
+    return R;
   }
 
   RetVal visitCouldNotCompute(const SCEVCouldNotCompute *S) {
