@@ -44,13 +44,14 @@ define void @cross_iter_raw_outer(ptr %A, ptr noalias %B, i64 %N, i64 %M) {
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 1, i64 2, i64 3, i64 4>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[OUTER_LATCH8]] ]
 ; CHECK-NEXT:    [[TMP2:%.*]] = sub nuw nsw <4 x i64> [[VEC_IND]], splat (i64 1)
 ; CHECK-NEXT:    [[WIDE_GEP:%.*]] = getelementptr inbounds float, ptr [[A]], <4 x i64> [[TMP2]]
-; CHECK-NEXT:    [[WIDE_MASKED_GATHER:%.*]] = call <4 x float> @llvm.masked.gather.v4f32.v4p0(<4 x ptr> align 4 [[WIDE_GEP]], <4 x i1> splat (i1 true), <4 x float> poison)
+; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <4 x ptr> [[WIDE_GEP]], i64 0
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x float>, ptr [[TMP6]], align 4
 ; CHECK-NEXT:    br i1 [[CMP_INNER]], label %[[INNER_PH1:.*]], label %[[OUTER_LATCH8]]
 ; CHECK:       [[INNER_PH1]]:
 ; CHECK-NEXT:    br label %[[INNER_BODY2:.*]]
 ; CHECK:       [[INNER_BODY2]]:
 ; CHECK-NEXT:    [[J3:%.*]] = phi <4 x i64> [ zeroinitializer, %[[INNER_PH1]] ], [ [[TMP4:%.*]], %[[INNER_BODY2]] ]
-; CHECK-NEXT:    [[SUM4:%.*]] = phi <4 x float> [ [[WIDE_MASKED_GATHER]], %[[INNER_PH1]] ], [ [[TMP3:%.*]], %[[INNER_BODY2]] ]
+; CHECK-NEXT:    [[SUM4:%.*]] = phi <4 x float> [ [[WIDE_LOAD]], %[[INNER_PH1]] ], [ [[TMP3:%.*]], %[[INNER_BODY2]] ]
 ; CHECK-NEXT:    [[WIDE_GEP5:%.*]] = getelementptr inbounds float, ptr [[B]], <4 x i64> [[J3]]
 ; CHECK-NEXT:    [[WIDE_MASKED_GATHER6:%.*]] = call <4 x float> @llvm.masked.gather.v4f32.v4p0(<4 x ptr> align 4 [[WIDE_GEP5]], <4 x i1> splat (i1 true), <4 x float> poison)
 ; CHECK-NEXT:    [[TMP3]] = fadd <4 x float> [[SUM4]], [[WIDE_MASKED_GATHER6]]
@@ -60,7 +61,8 @@ define void @cross_iter_raw_outer(ptr %A, ptr noalias %B, i64 %N, i64 %M) {
 ; CHECK-NEXT:    br i1 [[TMP7]], label %[[INNER_EXIT6:.*]], label %[[INNER_BODY2]]
 ; CHECK:       [[INNER_EXIT6]]:
 ; CHECK-NEXT:    [[WIDE_GEP8:%.*]] = getelementptr inbounds float, ptr [[A]], <4 x i64> [[VEC_IND]]
-; CHECK-NEXT:    call void @llvm.masked.scatter.v4f32.v4p0(<4 x float> [[TMP3]], <4 x ptr> align 4 [[WIDE_GEP8]], <4 x i1> splat (i1 true))
+; CHECK-NEXT:    [[TMP9:%.*]] = extractelement <4 x ptr> [[WIDE_GEP8]], i64 0
+; CHECK-NEXT:    store <4 x float> [[TMP3]], ptr [[TMP9]], align 4
 ; CHECK-NEXT:    br label %[[OUTER_LATCH8]]
 ; CHECK:       [[OUTER_LATCH8]]:
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
@@ -148,10 +150,12 @@ define void @cross_iter_waw_outer(ptr %A, ptr noalias %B, i64 %N, i64 %M) {
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[OUTER_LATCH6:.*]] ]
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[OUTER_LATCH6]] ]
 ; CHECK-NEXT:    [[WIDE_GEP:%.*]] = getelementptr inbounds float, ptr [[A]], <4 x i64> [[VEC_IND]]
-; CHECK-NEXT:    call void @llvm.masked.scatter.v4f32.v4p0(<4 x float> zeroinitializer, <4 x ptr> align 4 [[WIDE_GEP]], <4 x i1> splat (i1 true))
+; CHECK-NEXT:    [[TMP3:%.*]] = extractelement <4 x ptr> [[WIDE_GEP]], i64 0
+; CHECK-NEXT:    store <4 x float> zeroinitializer, ptr [[TMP3]], align 4
 ; CHECK-NEXT:    [[TMP0:%.*]] = add nuw nsw <4 x i64> [[VEC_IND]], splat (i64 1)
 ; CHECK-NEXT:    [[WIDE_GEP1:%.*]] = getelementptr inbounds float, ptr [[A]], <4 x i64> [[TMP0]]
-; CHECK-NEXT:    call void @llvm.masked.scatter.v4f32.v4p0(<4 x float> splat (float 1.000000e+00), <4 x ptr> align 4 [[WIDE_GEP1]], <4 x i1> splat (i1 true))
+; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <4 x ptr> [[WIDE_GEP1]], i64 0
+; CHECK-NEXT:    store <4 x float> splat (float 1.000000e+00), ptr [[TMP6]], align 4
 ; CHECK-NEXT:    br i1 [[CMP_INNER]], label %[[INNER_PH2:.*]], label %[[OUTER_LATCH6]]
 ; CHECK:       [[INNER_PH2]]:
 ; CHECK-NEXT:    br label %[[INNER_BODY3:.*]]
@@ -518,13 +522,14 @@ define void @same_addr_safe(ptr %A, ptr noalias %B, i64 %N, i64 %M) {
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[OUTER_LATCH7:.*]] ]
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[OUTER_LATCH7]] ]
 ; CHECK-NEXT:    [[WIDE_GEP:%.*]] = getelementptr inbounds float, ptr [[A]], <4 x i64> [[VEC_IND]]
-; CHECK-NEXT:    [[WIDE_MASKED_GATHER1:%.*]] = call <4 x float> @llvm.masked.gather.v4f32.v4p0(<4 x ptr> align 4 [[WIDE_GEP]], <4 x i1> splat (i1 true), <4 x float> poison)
+; CHECK-NEXT:    [[TMP0:%.*]] = extractelement <4 x ptr> [[WIDE_GEP]], i64 0
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x float>, ptr [[TMP0]], align 4
 ; CHECK-NEXT:    br i1 [[CMP_INNER]], label %[[INNER_PH1:.*]], label %[[OUTER_LATCH7]]
 ; CHECK:       [[INNER_PH1]]:
 ; CHECK-NEXT:    br label %[[INNER_BODY2:.*]]
 ; CHECK:       [[INNER_BODY2]]:
 ; CHECK-NEXT:    [[J3:%.*]] = phi <4 x i64> [ zeroinitializer, %[[INNER_PH1]] ], [ [[TMP2:%.*]], %[[INNER_BODY2]] ]
-; CHECK-NEXT:    [[SUM4:%.*]] = phi <4 x float> [ [[WIDE_MASKED_GATHER1]], %[[INNER_PH1]] ], [ [[TMP1:%.*]], %[[INNER_BODY2]] ]
+; CHECK-NEXT:    [[SUM4:%.*]] = phi <4 x float> [ [[WIDE_LOAD]], %[[INNER_PH1]] ], [ [[TMP1:%.*]], %[[INNER_BODY2]] ]
 ; CHECK-NEXT:    [[WIDE_GEP5:%.*]] = getelementptr inbounds float, ptr [[B]], <4 x i64> [[J3]]
 ; CHECK-NEXT:    [[WIDE_MASKED_GATHER:%.*]] = call <4 x float> @llvm.masked.gather.v4f32.v4p0(<4 x ptr> align 4 [[WIDE_GEP5]], <4 x i1> splat (i1 true), <4 x float> poison)
 ; CHECK-NEXT:    [[TMP1]] = fadd <4 x float> [[SUM4]], [[WIDE_MASKED_GATHER]]
@@ -533,7 +538,8 @@ define void @same_addr_safe(ptr %A, ptr noalias %B, i64 %N, i64 %M) {
 ; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <4 x i1> [[TMP3]], i64 0
 ; CHECK-NEXT:    br i1 [[TMP4]], label %[[INNER_EXIT6:.*]], label %[[INNER_BODY2]]
 ; CHECK:       [[INNER_EXIT6]]:
-; CHECK-NEXT:    call void @llvm.masked.scatter.v4f32.v4p0(<4 x float> [[TMP1]], <4 x ptr> align 4 [[WIDE_GEP]], <4 x i1> splat (i1 true))
+; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <4 x ptr> [[WIDE_GEP]], i64 0
+; CHECK-NEXT:    store <4 x float> [[TMP1]], ptr [[TMP5]], align 4
 ; CHECK-NEXT:    br label %[[OUTER_LATCH7]]
 ; CHECK:       [[OUTER_LATCH7]]:
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4

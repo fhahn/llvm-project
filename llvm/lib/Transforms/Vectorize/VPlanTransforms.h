@@ -227,10 +227,12 @@ struct VPlanTransforms {
 
   /// Replaces the VPInstructions in \p Plan with corresponding
   /// widen recipes. Returns false if any VPInstructions could not be converted
-  /// to a wide recipe if needed.
-  LLVM_ABI_FOR_TEST static bool
-  tryToConvertVPInstructionsToVPRecipes(VPlan &Plan,
-                                        const TargetLibraryInfo &TLI);
+  /// to a wide recipe if needed. When \p PSE and \p OuterLoop are provided,
+  /// uses SCEV to detect contiguous memory accesses w.r.t. the outer loop
+  /// induction variable.
+  LLVM_ABI_FOR_TEST static bool tryToConvertVPInstructionsToVPRecipes(
+      VPlan &Plan, const TargetLibraryInfo &TLI,
+      PredicatedScalarEvolution *PSE = nullptr, Loop *OuterLoop = nullptr);
 
   /// Try to legalize reductions with multiple in-loop uses. Currently only
   /// strict and non-strict min/max reductions used by FindLastIV reductions are

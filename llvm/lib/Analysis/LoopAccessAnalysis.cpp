@@ -967,6 +967,8 @@ private:
 
 } // end anonymous namespace
 
+/// Try to compute a constant stride for \p AR. Used by getPtrStride and
+/// isNoWrap.
 std::optional<int64_t>
 llvm::getStrideFromAddRec(const SCEVAddRecExpr *AR, const Loop *Lp,
                           Type *AccessTy, Value *Ptr,
