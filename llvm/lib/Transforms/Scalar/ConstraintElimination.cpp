@@ -1238,11 +1238,16 @@ void State::addInfoFor(BasicBlock &BB) {
     // Add facts from unsigned division and remainder.
     //   urem x, n: result < n  and  result <= x
     //   udiv x, n: result <= x
+    // Add facts from signed division and remainder.
+    //   srem x, n: result <= x (when x >= 0) and result >= x (when x <= 0)
+    //   sdiv x, n: result <= x (when x >= 0 and n >= 1)
     // Add facts from bitwise AND.
     //   and x, y: result <= x  and  result <= y (unsigned)
     if (auto *BO = dyn_cast<BinaryOperator>(&I)) {
       if ((BO->getOpcode() == Instruction::URem ||
            BO->getOpcode() == Instruction::UDiv ||
+           BO->getOpcode() == Instruction::SRem ||
+           BO->getOpcode() == Instruction::SDiv ||
            BO->getOpcode() == Instruction::And) &&
           isGuaranteedNotToBePoison(BO))
         WorkList.push_back(FactOrCheck::getInstFact(DT.getNode(&BB), BO));
@@ -2076,6 +2081,19 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
         continue;
       }
 
+      // Helper to check if a value is known non-negative, using both static
+      // analysis and the constraint system.
+      auto IsKnownNonNegative = [&](Value *V) {
+        auto &DL = F.getDataLayout();
+        if (isKnownNonNegative(V, DL))
+          return true;
+        auto *Zero = ConstantInt::get(V->getType(), 0);
+        auto R = Info.getConstraintForSolving(CmpInst::ICMP_SGE, V, Zero);
+        if (R.size() < 2 || !R.isValid(Info))
+          return false;
+        return Info.getCS(R.IsSigned).isConditionImplied(R.Coefficients);
+      };
+
       if (auto *BO = dyn_cast<BinaryOperator>(CB.Inst)) {
         if (BO->getOpcode() == Instruction::URem) {
           // urem x, n: result < n (remainder is always less than divisor)
@@ -2093,6 +2111,39 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
           // and x, y: result <= x and result <= y (unsigned)
           AddFact(CmpInst::ICMP_ULE, BO, BO->getOperand(0));
           AddFact(CmpInst::ICMP_ULE, BO, BO->getOperand(1));
+          continue;
+        }
+        if (BO->getOpcode() == Instruction::SRem) {
+          Value *X = BO->getOperand(0);
+          Value *N = BO->getOperand(1);
+          auto *Zero = ConstantInt::get(BO->getType(), 0);
+          // srem x, n when x >= 0: result >= 0 and result <= x.
+          if (IsKnownNonNegative(X)) {
+            AddFact(CmpInst::ICMP_SGE, BO, Zero);
+            AddFact(CmpInst::ICMP_SLE, BO, X);
+          }
+          // srem x, n: |result| < |n|. When n is a constant,
+          // -|n| < result < |n|.
+          if (auto *CN = dyn_cast<ConstantInt>(N)) {
+            APInt AbsN = CN->getValue().abs();
+            if (AbsN.isStrictlyPositive()) {
+              AddFact(CmpInst::ICMP_SLT, BO,
+                      ConstantInt::get(BO->getType(), AbsN));
+              AddFact(CmpInst::ICMP_SGT, BO,
+                      ConstantInt::get(BO->getType(), -AbsN));
+            }
+          }
+          continue;
+        }
+        if (BO->getOpcode() == Instruction::SDiv) {
+          Value *X = BO->getOperand(0);
+          Value *N = BO->getOperand(1);
+          auto *Zero = ConstantInt::get(BO->getType(), 0);
+          // sdiv x, n when x >= 0 and n >= 0: result >= 0 and result <= x.
+          if (IsKnownNonNegative(X) && IsKnownNonNegative(N)) {
+            AddFact(CmpInst::ICMP_SGE, BO, Zero);
+            AddFact(CmpInst::ICMP_SLE, BO, X);
+          }
           continue;
         }
       }
