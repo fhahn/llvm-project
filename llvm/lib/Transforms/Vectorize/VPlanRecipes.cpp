@@ -317,7 +317,13 @@ bool VPRecipeBase::isScalarCast() const {
 }
 
 void VPIRFlags::intersectFlags(const VPIRFlags &Other) {
-  assert(OpType == Other.OpType && "OpType must match");
+  // If the operation types don't match, drop all flags conservatively.
+  if (OpType != Other.OpType) {
+    OpType = OperationType::Other;
+    AllFlags[0] = 0;
+    AllFlags[1] = 0;
+    return;
+  }
   switch (OpType) {
   case OperationType::OverflowingBinOp:
     WrapFlags.HasNUW &= Other.WrapFlags.HasNUW;

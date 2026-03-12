@@ -17,6 +17,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Transforms/Vectorize/SLPVectorizer.h"
+#include "VPlan.h"
+#include "VPlanHelpers.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/PriorityQueue.h"
@@ -217,6 +219,10 @@ static cl::opt<bool> VectorizeCopyableElements(
     "slp-copyable-elements", cl::init(true), cl::Hidden,
     cl::desc("Try to replace values with the idempotent instructions for "
              "better vectorization."));
+
+static cl::opt<bool> SLPUseVPlanCodegen(
+    "slp-use-vplan-codegen", cl::init(false), cl::Hidden,
+    cl::desc("Use VPlan-based codegen in SLP vectorizer"));
 
 // Limit the number of alias checks. The limit is chosen so that
 // it has no negative effect on the llvm benchmarks.
@@ -2027,6 +2033,15 @@ public:
                 Instruction *ReductionRoot = nullptr,
                 ArrayRef<std::tuple<WeakTrackingVH, unsigned, bool, bool>>
                     VectorValuesAndScales = {});
+
+  /// Returns true if the current SLP tree is eligible for VPlan-based codegen.
+  bool isVPlanEligible() const;
+
+  /// Build a VPlan from the current SLP tree.
+  std::unique_ptr<VPlan> buildVPlanForTree();
+
+  /// Execute the VPlan, generating vector IR for the SLP tree.
+  void executeVPlanForTree(VPlan &Plan, unsigned VF);
 
   /// \returns the cost incurred by unwanted spills and fills, caused by
   /// holding live values over call sites.
@@ -21622,6 +21637,197 @@ Value *BoUpSLP::vectorizeTree(TreeEntry *E) {
   return nullptr;
 }
 
+bool BoUpSLP::isVPlanEligible() const {
+  // No external uses — avoids needing VectorizedValue for extract generation.
+  if (!ExternalUses.empty())
+    return false;
+
+  BasicBlock *RootBB =
+      cast<Instruction>(VectorizableTree[0]->Scalars.front())->getParent();
+
+  // Check all tree entries for eligibility.
+  for (const std::unique_ptr<TreeEntry> &TE : VectorizableTree) {
+    if (DeletedNodes.contains(TE.get()))
+      continue;
+
+    // No MinBWs entries.
+    if (MinBWs.contains(TE.get()))
+      return false;
+
+    // All non-gather entries must be in the same basic block, since
+    // buildVPlanForTree sorts them by comesBefore which requires same-BB.
+    if (!TE->isGather() && TE->hasState() &&
+        TE->getMainOp()->getParent() != RootBB)
+      return false;
+
+    if (TE->isGather())
+      return false;
+
+    // Only handle Vectorize state.
+    if (TE->State != TreeEntry::Vectorize)
+      return false;
+
+    // No reordering or reuse shuffles.
+    if (!TE->ReorderIndices.empty() || !TE->ReuseShuffleIndices.empty())
+      return false;
+
+    // No alt-shuffle.
+    if (TE->isAltShuffle())
+      return false;
+
+    if (!TE->hasState())
+      return false;
+
+    // No vector-typed scalars (revec). VPlan recipes assume scalar element
+    // types and would create invalid vector-of-vector types.
+    if (TE->Scalars.front()->getType()->isVectorTy())
+      return false;
+
+    unsigned Opcode = TE->getOpcode();
+    // Only binary ops, loads, and stores.
+    if (!Instruction::isBinaryOp(Opcode) && Opcode != Instruction::Load &&
+        Opcode != Instruction::Store && Opcode != Instruction::FNeg)
+      return false;
+
+    // Verify all operand entries exist in the tree mapping and are not deleted.
+    for (unsigned I = 0, NumOps = TE->getNumOperands(); I < NumOps; ++I) {
+      auto It = OperandsToTreeEntry.find({TE.get(), I});
+      if (It == OperandsToTreeEntry.end())
+        return false;
+      if (DeletedNodes.contains(It->second))
+        return false;
+    }
+  }
+  return true;
+}
+
+std::unique_ptr<VPlan> BoUpSLP::buildVPlanForTree() {
+  // Local map from TreeEntry to VPValue, used to wire operands during building.
+  DenseMap<const TreeEntry *, VPValue *> EntryToVPValue;
+  // Use the BB containing the first scalar of the root entry as the scalar
+  // header.
+  BasicBlock *ScalarHeaderBB =
+      cast<Instruction>(VectorizableTree[0]->Scalars.front())->getParent();
+  auto Plan = std::make_unique<VPlan>(ScalarHeaderBB);
+
+  // Set a dummy trip count to satisfy VPTypeAnalysis requirements.
+  // SLP doesn't operate on loops, but VPTransformState needs a valid plan.
+  auto *DummyTC = Plan->getOrAddLiveIn(
+      ConstantInt::get(IntegerType::get(F->getContext(), 32), 0));
+  Plan->setTripCount(DummyTC);
+
+  VPBasicBlock *VPBB = Plan->createVPBasicBlock("slp.body");
+
+  // Connect the recipe VPBB after the entry (preheader).
+  VPBlockUtils::insertBlockAfter(VPBB, Plan->getEntry());
+
+  // Collect non-deleted, non-gather entries and sort by MainOp position in the
+  // BB to match original program order (which also satisfies def-before-use).
+  SmallVector<TreeEntry *> Entries;
+  for (const std::unique_ptr<TreeEntry> &TEPtr : VectorizableTree) {
+    TreeEntry *E = TEPtr.get();
+    if (DeletedNodes.contains(E) || E->isGather())
+      continue;
+    Entries.push_back(E);
+  }
+  // Sort entries topologically: process operands before their users.
+  // Use a stable topological sort based on operand dependencies between entries,
+  // falling back to comesBefore for entries without dependencies.
+  {
+    DenseSet<TreeEntry *> EntrySet(Entries.begin(), Entries.end());
+    DenseSet<TreeEntry *> Visited;
+    SmallVector<TreeEntry *> Sorted;
+    std::function<void(TreeEntry *)> Visit = [&](TreeEntry *E) {
+      if (!Visited.insert(E).second)
+        return;
+      // Visit operand entries first.
+      for (unsigned I = 0, NumOps = E->getNumOperands(); I < NumOps; ++I) {
+        TreeEntry *OpE = getOperandEntry(E, I);
+        if (EntrySet.contains(OpE))
+          Visit(OpE);
+      }
+      Sorted.push_back(E);
+    };
+    // Process in comesBefore order for stability.
+    sort(Entries, [](const TreeEntry *A, const TreeEntry *B) {
+      return A->getMainOp()->comesBefore(B->getMainOp());
+    });
+    for (TreeEntry *E : Entries)
+      Visit(E);
+    Entries = std::move(Sorted);
+  }
+
+  for (TreeEntry *E : Entries) {
+
+    unsigned Opcode = E->getOpcode();
+    Instruction *MainOp = E->getMainOp();
+
+    if (Instruction::isBinaryOp(Opcode)) {
+      VPValue *LHS = EntryToVPValue.lookup(getOperandEntry(E, 0));
+      VPValue *RHS = EntryToVPValue.lookup(getOperandEntry(E, 1));
+      assert(LHS && RHS && "Operand entries not yet processed");
+      // Intersect flags across all scalars in the bundle.
+      VPIRFlags Flags(*MainOp);
+      for (Value *V : E->Scalars)
+        if (auto *I = dyn_cast<Instruction>(V))
+          Flags.intersectFlags(VPIRFlags(*I));
+      auto *R = new VPWidenRecipe(*MainOp, {LHS, RHS}, Flags,
+                                  VPIRMetadata(*MainOp),
+                                  MainOp->getDebugLoc());
+      VPBB->appendRecipe(R);
+      EntryToVPValue[E] = R;
+    } else if (Opcode == Instruction::FNeg) {
+      VPValue *Op = EntryToVPValue.lookup(getOperandEntry(E, 0));
+      assert(Op && "Operand entry not yet processed");
+      VPIRFlags Flags(*MainOp);
+      for (Value *V : E->Scalars)
+        if (auto *I = dyn_cast<Instruction>(V))
+          Flags.intersectFlags(VPIRFlags(*I));
+      auto *R = new VPWidenRecipe(*MainOp, {Op}, Flags,
+                                  VPIRMetadata(*MainOp),
+                                  MainOp->getDebugLoc());
+      VPBB->appendRecipe(R);
+      EntryToVPValue[E] = R;
+    } else if (Opcode == Instruction::Load) {
+      auto *LI = cast<LoadInst>(MainOp);
+      VPValue *Addr = Plan->getOrAddLiveIn(LI->getPointerOperand());
+      auto *R = new VPWidenLoadRecipe(*LI, Addr, /*Mask=*/nullptr,
+                                      /*Consecutive=*/true, /*Reverse=*/false,
+                                      VPIRMetadata(*LI), LI->getDebugLoc());
+      VPBB->appendRecipe(R);
+      EntryToVPValue[E] = R;
+    } else if (Opcode == Instruction::Store) {
+      auto *SI = cast<StoreInst>(MainOp);
+      VPValue *Addr = Plan->getOrAddLiveIn(SI->getPointerOperand());
+      VPValue *StoredVal = EntryToVPValue.lookup(getOperandEntry(E, 0));
+      assert(StoredVal && "Stored value entry not yet processed");
+      auto *R =
+          new VPWidenStoreRecipe(*SI, Addr, StoredVal, /*Mask=*/nullptr,
+                                 /*Consecutive=*/true, /*Reverse=*/false,
+                                 VPIRMetadata(*SI), SI->getDebugLoc());
+      VPBB->appendRecipe(R);
+    } else {
+      llvm_unreachable("Unsupported opcode in VPlan-based SLP codegen");
+    }
+  }
+
+  return Plan;
+}
+
+void BoUpSLP::executeVPlanForTree(VPlan &Plan, unsigned VF) {
+  VPTransformState State(TTI, ElementCount::getFixed(VF), LI, DT, AC, Builder,
+                         &Plan, /*CurrentParentLoop=*/nullptr,
+                         Builder.getInt32Ty());
+
+  // Find the VPBB containing recipes (connected after the entry).
+  VPBasicBlock *VPBB =
+      cast<VPBasicBlock>(Plan.getEntry()->getSingleSuccessor());
+
+  // Execute each recipe in order.
+  for (VPRecipeBase &R : *VPBB)
+    R.execute(State);
+}
+
 Value *BoUpSLP::vectorizeTree() {
   ExtraValueToDebugLocsMap ExternallyUsedValues;
   return vectorizeTree(ExternallyUsedValues);
@@ -21661,6 +21867,17 @@ Value *BoUpSLP::vectorizeTree(
   else
     Builder.SetInsertPoint(&F->getEntryBlock(), F->getEntryBlock().begin());
 
+  // Try VPlan-based codegen if enabled and the tree is eligible.
+  // Do not use VPlan codegen when called from a reduction context
+  // (ReductionRoot is set), as the caller needs VectorizedValue on the root
+  // entry to emit the reduction.
+  if (SLPUseVPlanCodegen && !ReductionRoot && isVPlanEligible()) {
+    // Set insert point after the last instruction in the root bundle.
+    setInsertPointAfterBundle(VectorizableTree[0].get());
+    unsigned VF = VectorizableTree[0]->Scalars.size();
+    auto Plan = buildVPlanForTree();
+    executeVPlanForTree(*Plan, VF);
+  } else {
   // Vectorize gather operands of the nodes with the external uses only.
   SmallVector<std::pair<TreeEntry *, Instruction *>> GatherEntries;
   for (const std::unique_ptr<TreeEntry> &TE : VectorizableTree) {
@@ -21802,6 +22019,7 @@ Value *BoUpSLP::vectorizeTree(
     }
     eraseInstruction(PrevVec);
   }
+  } // end of else (non-VPlan codegen path)
 
   LLVM_DEBUG(dbgs() << "SLP: Extracting " << ExternalUses.size()
                     << " values .\n");
@@ -22230,7 +22448,8 @@ Value *BoUpSLP::vectorizeTree(
       continue;
     }
 
-    assert(Entry->VectorizedValue && "Can't find vectorizable value");
+    assert((Entry->VectorizedValue || SLPUseVPlanCodegen) &&
+           "Can't find vectorizable value");
 
     // For each lane:
     for (int Lane = 0, LE = Entry->Scalars.size(); Lane != LE; ++Lane) {
@@ -22267,7 +22486,8 @@ Value *BoUpSLP::vectorizeTree(
 
   // Merge the DIAssignIDs from the about-to-be-deleted instructions into the
   // new vector instruction.
-  if (auto *V = dyn_cast<Instruction>(VectorizableTree[0]->VectorizedValue))
+  if (auto *V =
+          dyn_cast_or_null<Instruction>(VectorizableTree[0]->VectorizedValue))
     V->mergeDIAssignID(RemovedInsts);
 
   // Clear up reduction references, if any.
