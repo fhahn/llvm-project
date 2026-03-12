@@ -79,12 +79,12 @@ define void @epilogue_main_loop_dead(ptr %dst, i32 %width, ptr %src) {
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF1:%.*]] = and i64 [[TMP2]], 31
 ; CHECK-NEXT:    [[N_VEC1:%.*]] = sub i64 [[TMP2]], [[N_MOD_VF1]]
+; CHECK-NEXT:    [[TMP6:%.*]] = load i8, ptr [[SRC]], align 1, !alias.scope [[META3:![0-9]+]]
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <16 x i8> poison, i8 [[TMP6]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <16 x i8> [[BROADCAST_SPLATINSERT]], <16 x i8> poison, <16 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr i8, ptr [[DST]], i64 [[N_VEC1]]
 ; CHECK-NEXT:    [[TMP14:%.*]] = trunc i64 [[N_VEC1]] to i32
 ; CHECK-NEXT:    [[TMP15:%.*]] = sub i32 [[WIDTH]], [[TMP14]]
-; CHECK-NEXT:    [[TMP12:%.*]] = load i8, ptr [[SRC]], align 1, !alias.scope [[META3:![0-9]+]]
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <16 x i8> poison, i8 [[TMP12]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <16 x i8> [[BROADCAST_SPLATINSERT]], <16 x i8> poison, <16 x i32> zeroinitializer
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX1:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT1:%.*]], %[[VECTOR_BODY]] ]
@@ -105,12 +105,12 @@ define void @epilogue_main_loop_dead(ptr %dst, i32 %width, ptr %src) {
 ; CHECK-NEXT:    [[VEC_EPILOG_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC1]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VEC_EPILOG_PH1]] ]
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP2]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP2]], [[N_MOD_VF]]
+; CHECK-NEXT:    [[TMP12:%.*]] = load i8, ptr [[SRC]], align 1, !alias.scope [[META3]]
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT8:%.*]] = insertelement <4 x i8> poison, i8 [[TMP12]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT9:%.*]] = shufflevector <4 x i8> [[BROADCAST_SPLATINSERT8]], <4 x i8> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr [[DST]], i64 [[N_VEC]]
 ; CHECK-NEXT:    [[DOTCAST:%.*]] = trunc i64 [[N_VEC]] to i32
 ; CHECK-NEXT:    [[TMP8:%.*]] = sub i32 [[WIDTH]], [[DOTCAST]]
-; CHECK-NEXT:    [[TMP16:%.*]] = load i8, ptr [[SRC]], align 1, !alias.scope [[META3]]
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT8:%.*]] = insertelement <4 x i8> poison, i8 [[TMP16]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT9:%.*]] = shufflevector <4 x i8> [[BROADCAST_SPLATINSERT8]], <4 x i8> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ [[VEC_EPILOG_RESUME_VAL]], %[[VEC_EPILOG_PH]] ], [ [[INDEX_NEXT:%.*]], %[[LOOP]] ]

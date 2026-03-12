@@ -1122,6 +1122,9 @@ VPlanTransforms::expandSCEVs(VPlan &Plan, ScalarEvolution &SE) {
     if (!ExpSCEV)
       continue;
     const SCEV *Expr = ExpSCEV->getSCEV();
+    assert(!SCEVExprContains(
+               Expr, [](const SCEV *S) { return isa<SCEVLoopInvariantLoad>(S); }) &&
+           "SCEVLoopInvariantLoad must have been expanded in VPlan");
     Value *Res =
         Expander.expandCodeFor(Expr, Expr->getType(), EntryBB->getTerminator());
     ExpandedSCEVs[Expr] = Res;

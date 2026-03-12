@@ -63,6 +63,8 @@ public:
 
   LLVM_ABI void visitVScale(const SCEVVScale *Numerator);
 
+  LLVM_ABI void visitLoopInvariantLoad(const SCEVLoopInvariantLoad *Numerator);
+
   LLVM_ABI void visitAddRecExpr(const SCEVAddRecExpr *Numerator);
 
   LLVM_ABI void visitAddExpr(const SCEVAddExpr *Numerator);

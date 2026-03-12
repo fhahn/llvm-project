@@ -1906,7 +1906,6 @@ void VPInstructionWithType::execute(VPTransformState &State) {
     State.set(this, Call, true);
     break;
   }
-
   default:
     llvm_unreachable("opcode not implemented yet");
   }
@@ -4924,6 +4923,13 @@ void VPExpandSCEVRecipe::printRecipe(raw_ostream &O, const Twine &Indent,
   O << Indent << "EMIT ";
   printAsOperand(O, SlotTracker);
   O << " = EXPAND SCEV " << *Expr;
+  if (getNumOperands() > 0) {
+    O << " using ";
+    interleaveComma(operands(), O,
+                    [&O, &SlotTracker](VPValue *Op) {
+                      Op->printAsOperand(O, SlotTracker);
+                    });
+  }
 }
 #endif
 

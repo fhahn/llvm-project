@@ -17,6 +17,7 @@ class DominatorTree;
 class MemoryLocation;
 class ScalarEvolution;
 class SCEV;
+class SCEVLoopInvariantLoad;
 class PredicatedScalarEvolution;
 class VPBuilder;
 } // namespace llvm
@@ -179,6 +180,13 @@ bool isUsedByLoadStoreAddress(const VPValue *V);
 /// Find the ComputeReductionResult recipe for \p PhiR, looking through selects
 /// inserted for predicated reductions or tail folding.
 VPInstruction *findComputeReductionResult(VPReductionPHIRecipe *PhiR);
+
+/// Returns the load recipe in \p Plan's entry block that
+/// VPlanTransforms::hoistInvariantLoads hoisted for \p InvLoad, or nullptr if
+/// there is none. VPSCEVExpander reuses it to expand \p InvLoad.
+VPReplicateRecipe *findHoistedInvariantLoad(VPlan &Plan,
+                                           const SCEVLoopInvariantLoad *InvLoad,
+                                           ScalarEvolution &SE);
 
 /// Finds the incoming alias-mask within the vector preheader.
 VPValue *findIncomingAliasMask(const VPlan &Plan);

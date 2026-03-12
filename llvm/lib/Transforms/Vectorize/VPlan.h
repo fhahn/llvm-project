@@ -4031,7 +4031,12 @@ public:
 
   ~VPExpandSCEVRecipe() override = default;
 
-  VPExpandSCEVRecipe *clone() override { return new VPExpandSCEVRecipe(Expr); }
+  VPExpandSCEVRecipe *clone() override {
+    auto *R = new VPExpandSCEVRecipe(Expr);
+    for (VPValue *Op : operands())
+      R->addExpansionDependency(Op);
+    return R;
+  }
 
   VP_CLASSOF_IMPL(VPRecipeBase::VPExpandSCEVSC)
 
@@ -4047,6 +4052,17 @@ public:
   }
 
   const SCEV *getSCEV() const { return Expr; }
+
+  /// Add \p V as an operand, to record that expanding the recipe's SCEV uses
+  /// \p V. This keeps \p V alive until the recipe is expanded.
+  void addExpansionDependency(VPValue *V) { addOperand(V); }
+
+  /// SCEV expansion only uses scalar values.
+  bool usesFirstLaneOnly(const VPValue *Op) const override {
+    assert(is_contained(operands(), Op) &&
+           "Op must be an operand of the recipe");
+    return true;
+  }
 
 protected:
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)

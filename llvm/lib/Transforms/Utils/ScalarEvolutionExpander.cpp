@@ -455,6 +455,7 @@ const Loop *SCEVExpander::getRelevantLoop(const SCEV *S) {
   switch (S->getSCEVType()) {
   case scConstant:
   case scVScale:
+  case scLoopInvariantLoad:
     return nullptr; // A constant has no relevant loops.
   case scTruncate:
   case scZeroExtend:
@@ -1614,6 +1615,12 @@ Value *SCEVExpander::visitVScale(SCEVUseT<const SCEVVScale *> S) {
   return Builder.CreateVScale(S->getType());
 }
 
+Value *SCEVExpander::visitLoopInvariantLoad(
+    SCEVUseT<const SCEVLoopInvariantLoad *> S) {
+  llvm_unreachable("SCEVLoopInvariantLoad must be replaced with "
+                   "SCEVUnknown(loaded_value) before expansion");
+}
+
 Value *SCEVExpander::expandCodeFor(SCEVUse SH, Type *Ty,
                                    BasicBlock::iterator IP) {
   setInsertPoint(IP);
@@ -2085,6 +2092,7 @@ template<typename T> static InstructionCost costAndCollectOperands(
   case scUnknown:
   case scConstant:
   case scVScale:
+  case scLoopInvariantLoad:
     return 0;
   case scPtrToAddr:
     Cost = CastCost(Instruction::PtrToAddr);
@@ -2210,6 +2218,7 @@ bool SCEVExpander::isHighCostExpansionHelper(
     llvm_unreachable("Attempt to use a SCEVCouldNotCompute object!");
   case scUnknown:
   case scVScale:
+  case scLoopInvariantLoad:
     // Assume to be zero-cost.
     return false;
   case scConstant: {
@@ -2535,6 +2544,10 @@ struct SCEVFindUnsafe {
       : SE(SE), CanonicalMode(CanonicalMode) {}
 
   bool follow(const SCEV *S) {
+    if (isa<SCEVLoopInvariantLoad>(S)) {
+      IsUnsafe = true;
+      return false;
+    }
     if (const SCEVUDivExpr *D = dyn_cast<SCEVUDivExpr>(S)) {
       if (!SE.isKnownNonZero(D->getRHS()) ||
           !SE.isGuaranteedNotToBePoison(D->getRHS())) {

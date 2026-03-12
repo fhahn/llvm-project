@@ -16,7 +16,7 @@ define void @runtime_checks_with_symbolic_max_btc_neg_1(ptr %P, ptr %S, i32 %x, 
 ; CHECK-NEXT:        ptr %S
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: ((4 * %y) + %P) High: inttoptr (i32 -1 to ptr))
+; CHECK-NEXT:          (Low: ((4 * %y) + %P) High: ((4 * (invariant.load(%S, i32) smax (1 + %y)<nsw>)) + %P))
 ; CHECK-NEXT:            Member: {((4 * %y) + %P),+,4}<%loop>
 ; CHECK-NEXT:        Group GRP1:
 ; CHECK-NEXT:          (Low: %S High: (4 + %S))
@@ -195,7 +195,7 @@ define void @symbolic_max_btc_may_wrap_negative_step(ptr %P, ptr %S) {
 ; CHECK-NEXT:        ptr %S
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: (-4 + inttoptr (i32 -1 to ptr))<nsw> High: (4 + %P))
+; CHECK-NEXT:          (Low: (4 + (-4 * (1 smax invariant.load(%S, i32))) + %P) High: (4 + %P))
 ; CHECK-NEXT:            Member: {%P,+,-4}<nw><%loop>
 ; CHECK-NEXT:        Group GRP1:
 ; CHECK-NEXT:          (Low: %S High: (4 + %S))
@@ -239,7 +239,7 @@ define void @symbolic_max_btc_may_wrap_non_constant_negative_step(ptr %P, ptr %S
 ; CHECK-NEXT:        ptr %S
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: ((-4 + inttoptr (i32 -1 to ptr))<nsw> umin %P) High: (4 + ((-4 + inttoptr (i32 -1 to ptr))<nsw> umax %P))<nsw>)
+; CHECK-NEXT:          (Low: ((((-1 + (-1 * (zext i16 (trunc i32 %step to i16) to i32))<nsw>)<nsw> * (-1 + (1 smax invariant.load(%S, i32)))<nsw>) + %P) umin %P) High: (4 + ((((-1 + (-1 * (zext i16 (trunc i32 %step to i16) to i32))<nsw>)<nsw> * (-1 + (1 smax invariant.load(%S, i32)))<nsw>) + %P) umax %P)))
 ; CHECK-NEXT:            Member: {%P,+,(-1 + (-1 * (zext i16 (trunc i32 %step to i16) to i32))<nsw>)<nsw>}<nw><%loop>
 ; CHECK-NEXT:        Group GRP1:
 ; CHECK-NEXT:          (Low: %S High: (4 + %S))
@@ -286,7 +286,7 @@ define void @symbolic_max_btc_may_wrap_non_constant_non_negative_step(ptr %P, pt
 ; CHECK-NEXT:        ptr %S
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: ((-4 + inttoptr (i32 -1 to ptr))<nsw> umin %P) High: (4 + ((-4 + inttoptr (i32 -1 to ptr))<nsw> umax %P))<nsw>)
+; CHECK-NEXT:          (Low: ((((zext i16 (trunc i32 %step to i16) to i32) * (-1 + (1 smax invariant.load(%S, i32)))<nsw>) + %P) umin %P) High: (4 + ((((zext i16 (trunc i32 %step to i16) to i32) * (-1 + (1 smax invariant.load(%S, i32)))<nsw>) + %P) umax %P)))
 ; CHECK-NEXT:            Member: {%P,+,(zext i16 (trunc i32 %step to i16) to i32)}<nuw><%loop>
 ; CHECK-NEXT:        Group GRP1:
 ; CHECK-NEXT:          (Low: %S High: (4 + %S))
@@ -331,7 +331,7 @@ define void @symbolic_max_btc_may_wrap_unknown_step_direction(ptr %P, ptr %S, i3
 ; CHECK-NEXT:        ptr %S
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: ((-4 + inttoptr (i32 -1 to ptr))<nsw> umin %P) High: (4 + ((-4 + inttoptr (i32 -1 to ptr))<nsw> umax %P))<nsw>)
+; CHECK-NEXT:          (Low: ((((-1 + (1 smax invariant.load(%S, i32)))<nsw> * (%step.a + %step.b)) + %P) umin %P) High: (4 + ((((-1 + (1 smax invariant.load(%S, i32)))<nsw> * (%step.a + %step.b)) + %P) umax %P)))
 ; CHECK-NEXT:            Member: {%P,+,(%step.a + %step.b)}<nw><%loop>
 ; CHECK-NEXT:        Group GRP1:
 ; CHECK-NEXT:          (Low: %S High: (4 + %S))

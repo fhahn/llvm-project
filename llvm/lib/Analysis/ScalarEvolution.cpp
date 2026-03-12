@@ -257,6 +257,7 @@ void SCEV::computeAndSetCanonical(ScalarEvolution &SE) {
   switch (getSCEVType()) {
   case scConstant:
   case scVScale:
+  case scLoopInvariantLoad:
   case scUnknown:
     CanonicalSCEV = this;
     return;
@@ -302,6 +303,12 @@ void SCEV::print(raw_ostream &OS) const {
   case scVScale:
     OS << "vscale";
     return;
+  case scLoopInvariantLoad: {
+    const SCEVLoopInvariantLoad *LI = cast<SCEVLoopInvariantLoad>(this);
+    OS << "invariant.load(" << *LI->getPointerSCEV() << ", " << *LI->getType()
+       << ")";
+    return;
+  }
   case scPtrToAddr: {
     const SCEVCastExpr *PtrCast = cast<SCEVCastExpr>(this);
     SCEVUse Op = PtrCast->getOperand();
@@ -407,6 +414,10 @@ ArrayRef<SCEVUse> SCEV::operands() const {
   switch (getSCEVType()) {
   case scConstant:
   case scVScale:
+  // SCEVLoopInvariantLoad's pointer operand is not exposed here because it
+  // is always loop-invariant and should not participate in SCEV traversals
+  // or rewrites that target loop-varying sub-expressions.
+  case scLoopInvariantLoad:
   case scUnknown:
     return {};
   case scPtrToAddr:
@@ -496,6 +507,24 @@ const SCEV *ScalarEvolution::getVScale(Type *Ty) {
   if (const SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP))
     return S;
   SCEV *S = new (SCEVAllocator) SCEVVScale(ID.Intern(SCEVAllocator), Ty);
+  UniqueSCEVs.InsertNode(S, IP);
+  S->computeAndSetCanonical(*this);
+  return S;
+}
+
+const SCEV *ScalarEvolution::getLoopInvariantLoad(const SCEV *Ptr,
+                                                  Type *LoadTy,
+                                                  const Loop *L) {
+  FoldingSetNodeID ID;
+  ID.AddInteger(scLoopInvariantLoad);
+  ID.AddPointer(Ptr);
+  ID.AddPointer(LoadTy);
+  ID.AddPointer(L);
+  void *IP = nullptr;
+  if (const SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP))
+    return S;
+  SCEV *S = new (SCEVAllocator)
+      SCEVLoopInvariantLoad(ID.Intern(SCEVAllocator), Ptr, LoadTy, L);
   UniqueSCEVs.InsertNode(S, IP);
   S->computeAndSetCanonical(*this);
   return S;
@@ -699,6 +728,20 @@ CompareSCEVComplexity(const LoopInfo *const LI, const SCEV *LHS,
     const auto *LTy = cast<IntegerType>(cast<SCEVVScale>(LHS)->getType());
     const auto *RTy = cast<IntegerType>(cast<SCEVVScale>(RHS)->getType());
     return LTy->getBitWidth() - RTy->getBitWidth();
+  }
+
+  case scLoopInvariantLoad: {
+    const auto *LLoad = cast<SCEVLoopInvariantLoad>(LHS);
+    const auto *RLoad = cast<SCEVLoopInvariantLoad>(RHS);
+    auto PtrCmp = CompareSCEVComplexity(LI, LLoad->getPointerSCEV(),
+                                        RLoad->getPointerSCEV(), DT, Depth + 1);
+    if (PtrCmp && *PtrCmp != 0)
+      return PtrCmp;
+    unsigned LBitWidth = LLoad->getType()->getIntegerBitWidth();
+    unsigned RBitWidth = RLoad->getType()->getIntegerBitWidth();
+    if (LBitWidth != RBitWidth)
+      return (int)LBitWidth - (int)RBitWidth;
+    return PtrCmp;
   }
 
   case scAddRecExpr: {
@@ -4055,6 +4098,10 @@ public:
 
   RetVal visitVScale(const SCEVVScale *VScale) { return VScale; }
 
+  RetVal visitLoopInvariantLoad(const SCEVLoopInvariantLoad *Load) {
+    return Load;
+  }
+
   RetVal visitPtrToAddrExpr(const SCEVPtrToAddrExpr *Expr) { return Expr; }
 
   RetVal visitTruncateExpr(const SCEVTruncateExpr *Expr) { return Expr; }
@@ -4102,6 +4149,7 @@ static bool scevUnconditionallyPropagatesPoisonFromOperands(SCEVTypes Kind) {
   switch (Kind) {
   case scConstant:
   case scVScale:
+  case scLoopInvariantLoad:
   case scTruncate:
   case scZeroExtend:
   case scSignExtend:
@@ -6320,6 +6368,7 @@ APInt ScalarEvolution::getConstantMultipleImpl(const SCEV *S,
     return getConstantMultiple(cast<SCEVCastExpr>(S)->getOperand());
   case scUDivExpr:
   case scVScale:
+  case scLoopInvariantLoad:
     return APInt(BitWidth, 1);
   case scTruncate: {
     // Only multiples that are a power of 2 will hold after truncation.
@@ -6617,6 +6666,7 @@ ScalarEvolution::getRangeRefIter(const SCEV *S,
       [[fallthrough]];
     case scConstant:
     case scVScale:
+    case scLoopInvariantLoad:
     case scTruncate:
     case scZeroExtend:
     case scSignExtend:
@@ -6728,6 +6778,8 @@ const ConstantRange &ScalarEvolution::getRangeRef(
     llvm_unreachable("Already handled above.");
   case scVScale:
     return setRange(S, SignHint, getVScaleRange(&F, BitWidth));
+  case scLoopInvariantLoad:
+    return setRange(S, SignHint, ConstantRange::getFull(BitWidth));
   case scTruncate: {
     const SCEVTruncateExpr *Trunc = cast<SCEVTruncateExpr>(S);
     ConstantRange X = getRangeRef(Trunc->getOperand(), SignHint, Depth + 1);
@@ -10067,6 +10119,7 @@ static Constant *BuildConstantFromSCEV(const SCEV *V) {
   case scCouldNotCompute:
   case scAddRecExpr:
   case scVScale:
+  case scLoopInvariantLoad:
     return nullptr;
   case scConstant:
     return cast<SCEVConstant>(V)->getValue();
@@ -10149,6 +10202,7 @@ const SCEV *ScalarEvolution::getWithOperands(const SCEV *S,
     return getSequentialMinMaxExpr(S->getSCEVType(), NewOps);
   case scConstant:
   case scVScale:
+  case scLoopInvariantLoad:
   case scUnknown:
     return S;
   case scCouldNotCompute:
@@ -10161,6 +10215,7 @@ const SCEV *ScalarEvolution::computeSCEVAtScope(const SCEV *V, const Loop *L) {
   switch (V->getSCEVType()) {
   case scConstant:
   case scVScale:
+  case scLoopInvariantLoad:
     return V;
   case scAddRecExpr: {
     // If this is a loop recurrence for a loop that does not contain L, then we
@@ -13493,6 +13548,23 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
       return RHS;
   }
 
+  // Check if RHS is a load from a loop-invariant address. If so, we can
+  // replace RHS with a SCEVLoopInvariantLoad to assume the load is
+  // loop-invariant (no aliasing stores) under a predicate. The existing
+  // loop-invariant RHS handling below computes the backedge-taken count.
+  if (!isLoopInvariant(RHS, L) && AllowPredicates) {
+    auto *U = dyn_cast<SCEVUnknown>(RHS);
+    auto *Load = U ? dyn_cast<LoadInst>(U->getValue()) : nullptr;
+    if (Load && Load->isSimple() && L->contains(Load) &&
+        L->getLoopPreheader()) {
+      const SCEV *PtrSCEV = getSCEV(Load->getPointerOperand());
+      if (isLoopInvariant(PtrSCEV, L)) {
+        RHS = getLoopInvariantLoad(PtrSCEV, Load->getType(), L);
+        OrigRHS = RHS;
+      }
+    }
+  }
+
   const SCEV *End = nullptr, *BECount = nullptr,
              *BECountIfBackedgeTaken = nullptr;
   if (!isLoopInvariant(RHS, L)) {
@@ -14405,6 +14477,13 @@ ScalarEvolution::computeLoopDisposition(const SCEV *S, const Loop *L) {
   case scConstant:
   case scVScale:
     return LoopInvariant;
+  case scLoopInvariantLoad: {
+    // The loaded value is available in the preheader of the loop it is assumed
+    // to be invariant in.
+    auto *LI = cast<SCEVLoopInvariantLoad>(S);
+    return L->contains(LI->getLoop()->getLoopPreheader()) ? LoopVariant
+                                                          : LoopInvariant;
+  }
   case scAddRecExpr: {
     const SCEVAddRecExpr *AR = cast<SCEVAddRecExpr>(S);
 
@@ -14519,6 +14598,15 @@ ScalarEvolution::computeBlockDisposition(const SCEV *S, const BasicBlock *BB) {
   case scConstant:
   case scVScale:
     return ProperlyDominatesBlock;
+  case scLoopInvariantLoad: {
+    auto *LI = cast<SCEVLoopInvariantLoad>(S);
+    const BasicBlock *PH = LI->getLoop()->getLoopPreheader();
+    if (DT.properlyDominates(PH, BB))
+      return ProperlyDominatesBlock;
+    if (DT.dominates(PH, BB))
+      return DominatesBlock;
+    return DoesNotDominateBlock;
+  }
   case scAddRecExpr: {
     // This uses a "dominates" query instead of "properly dominates" query
     // to test for proper dominance too, because the instruction which

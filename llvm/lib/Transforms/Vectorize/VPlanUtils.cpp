@@ -60,6 +60,20 @@ VPValue *vputils::getOrCreateVPValueForSCEVExpr(VPlan &Plan, const SCEV *Expr) {
   return Expanded;
 }
 
+VPReplicateRecipe *
+vputils::findHoistedInvariantLoad(VPlan &Plan,
+                                  const SCEVLoopInvariantLoad *InvLoad,
+                                  ScalarEvolution &SE) {
+  for (VPRecipeBase &R : *Plan.getEntry()) {
+    auto *RepR = dyn_cast<VPReplicateRecipe>(&R);
+    auto *Load = RepR ? dyn_cast<LoadInst>(RepR->getUnderlyingInstr()) : nullptr;
+    if (Load && Load->getType() == InvLoad->getType() &&
+        SE.getSCEV(Load->getPointerOperand()) == InvLoad->getPointerSCEV())
+      return RepR;
+  }
+  return nullptr;
+}
+
 /// Returns true if \p V being poison is guaranteed to trigger UB because it
 /// propagates to the address of a memory recipe.
 static bool poisonGuaranteesUB(const VPValue *V) {
@@ -1067,6 +1081,16 @@ VPValue *VPSCEVExpander::expand(const SCEV *S) {
         return ExpSCEV;
     }
     return vputils::getOrCreateVPValueForSCEVExpr(Plan, S);
+  }
+  case scLoopInvariantLoad: {
+    // Loop-invariant loads cannot be expanded; reuse the load
+    // VPlanTransforms::hoistInvariantTripCountLoads moved to the plan's entry
+    // block. Loading the location again would drop the original load's
+    // alignment, volatility and metadata.
+    VPValue *Hoisted = vputils::findHoistedInvariantLoad(
+        Builder.getPlan(), cast<SCEVLoopInvariantLoad>(S), SE);
+    assert(Hoisted && "invariant load must have been hoisted to the entry block");
+    return Hoisted;
   }
   case scCouldNotCompute:
     llvm_unreachable("Attempt to expand a SCEVCouldNotCompute");

@@ -23,8 +23,8 @@ define void @test1_select_invariant(ptr %src.1, ptr %src.2, ptr %dst, i1 %c, i8 
 ; CHECK:       vector.ph:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[TMP2]], 1
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i32 [[TMP2]], [[N_MOD_VF]]
-; CHECK-NEXT:    [[TMP6:%.*]] = trunc i32 [[N_VEC]] to i8
 ; CHECK-NEXT:    [[TMP13:%.*]] = load i8, ptr [[PTR_SEL]], align 8, !alias.scope [[META0:![0-9]+]]
+; CHECK-NEXT:    [[TMP6:%.*]] = trunc i32 [[N_VEC]] to i8
 ; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK:       vector.body:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]

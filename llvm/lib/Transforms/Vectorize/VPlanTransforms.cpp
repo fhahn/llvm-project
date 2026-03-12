@@ -30,6 +30,8 @@
 #include "llvm/Analysis/Loads.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/MemoryLocation.h"
+#include "llvm/Analysis/ScalarEvolution.h"
+#include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/Analysis/ScalarEvolutionPatternMatch.h"
 #include "llvm/Analysis/ScopedNoAliasAA.h"
 #include "llvm/Analysis/VectorUtils.h"
@@ -3674,6 +3676,116 @@ void VPlanTransforms::convertToAbstractRecipes(VPlan &Plan, VPCostContext &Ctx,
         tryToCreateAbstractReductionRecipe(Red, Ctx, Range);
     }
   }
+}
+
+/// Returns true if \p S depends on the value loaded by \p LoadR.
+static bool usesInvariantLoad(const SCEV *S, VPReplicateRecipe &LoadR,
+                              ScalarEvolution &SE) {
+  auto *Load = cast<LoadInst>(LoadR.getUnderlyingInstr());
+  const SCEV *PtrSCEV = SE.getSCEV(Load->getPointerOperand());
+  return SCEVExprContains(S, [&](const SCEV *E) {
+    auto *InvLoad = dyn_cast<SCEVLoopInvariantLoad>(E);
+    return InvLoad && InvLoad->getType() == Load->getType() &&
+           InvLoad->getPointerSCEV() == PtrSCEV;
+  });
+}
+
+/// Returns true if \p S depends on a loop-invariant load that has not been
+/// hoisted into \p Plan's entry block.
+static bool hasUnhoistedInvariantLoad(const SCEV *S, VPlan &Plan,
+                                      ScalarEvolution &SE) {
+  return SCEVExprContains(S, [&](const SCEV *E) {
+    auto *InvLoad = dyn_cast<SCEVLoopInvariantLoad>(E);
+    return InvLoad && !vputils::findHoistedInvariantLoad(Plan, InvLoad, SE);
+  });
+}
+
+bool VPlanTransforms::hoistInvariantLoads(VPlan &Plan, ScalarEvolution &SE) {
+  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
+
+  // Collect candidate loads with invariant addresses and noalias scopes
+  // metadata and memory-writing recipes with noalias metadata.
+  SmallVector<std::pair<VPReplicateRecipe *, MemoryLocation>> CandidateLoads;
+  SmallVector<MemoryLocation> Stores;
+  bool HasUnanalyzableWrite = false;
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_shallow(LoopRegion->getEntry()))) {
+    for (VPRecipeBase &R : *VPBB) {
+      // Only handle single-scalar replicated loads with invariant addresses.
+      if (auto *RepR = dyn_cast<VPReplicateRecipe>(&R)) {
+        if (RepR->isPredicated() || !RepR->isSingleScalar() ||
+            RepR->getOpcode() != Instruction::Load)
+          continue;
+
+        VPValue *Addr = RepR->getOperand(0);
+        if (Addr->isDefinedOutsideLoopRegions()) {
+          MemoryLocation Loc = *vputils::getMemoryLocation(*RepR);
+          if (!Loc.AATags.Scope)
+            continue;
+          CandidateLoads.push_back({RepR, Loc});
+        }
+      }
+      if (R.mayWriteToMemory()) {
+        auto Loc = vputils::getMemoryLocation(R);
+        if (!Loc || !Loc->AATags.Scope || !Loc->AATags.NoAlias)
+          HasUnanalyzableWrite = true;
+        else
+          Stores.push_back(*Loc);
+      }
+    }
+  }
+
+  // SCEVs expanded in \p Plan's entry block may depend on loop-invariant loads.
+  // Their expansion reuses the hoisted load, so those loads have to be hoisted
+  // into the entry block, in front of the recipes expanding them.
+  VPBasicBlock *Entry = Plan.getEntry();
+  auto EntryInsertPt = find_if(*Entry, IsaPred<VPExpandSCEVRecipe>);
+  SmallVector<VPExpandSCEVRecipe *> ExpandSCEVs;
+  if (EntryInsertPt != Entry->end())
+    for (VPRecipeBase &R : *Entry)
+      if (auto *ExpSCEV = dyn_cast<VPExpandSCEVRecipe>(&R))
+        if (SCEVExprContains(ExpSCEV->getSCEV(), IsaPred<SCEVLoopInvariantLoad>))
+          ExpandSCEVs.push_back(ExpSCEV);
+
+  for (auto &[LoadR, LoadLoc] : CandidateLoads) {
+    // Hoist the load if it doesn't alias with any stores according to the
+    // noalias metadata. Other loads should have been hoisted by other passes.
+    if (HasUnanalyzableWrite ||
+        any_of(Stores, [&LoadLoc = LoadLoc](const MemoryLocation &StoreLoc) {
+          return ScopedNoAliasAAResult::mayAliasInScopes(
+              LoadLoc.AATags.Scope, StoreLoc.AATags.NoAlias);
+        }))
+      continue;
+
+    SmallVector<VPExpandSCEVRecipe *> Users;
+    copy_if(ExpandSCEVs, std::back_inserter(Users),
+            [&, &LoadR = LoadR](VPExpandSCEVRecipe *ExpSCEV) {
+              return usesInvariantLoad(ExpSCEV->getSCEV(), *LoadR, SE);
+            });
+    if (Users.empty()) {
+      LoadR->moveBefore(*Plan.getVectorPreheader(),
+                        Plan.getVectorPreheader()->getFirstNonPhi());
+      continue;
+    }
+
+    // Hoisting into the entry block also speculates the load past the runtime
+    // checks guarding the vector loop, so restrict this to loads executed on
+    // every iteration of the original loop.
+    if (LoadR->getParent() != LoopRegion->getEntryBasicBlock())
+      continue;
+
+    // Record the load as an operand of the recipes expanding a SCEV using it,
+    // which keeps it alive until they are expanded.
+    LoadR->moveBefore(*Entry, EntryInsertPt);
+    for (VPExpandSCEVRecipe *ExpSCEV : Users)
+      ExpSCEV->addExpansionDependency(LoadR);
+  }
+
+  // Discard the plan if a SCEV expanded in the entry block still depends on a
+  // load that could not be hoisted, as it cannot be expanded.
+  return none_of(ExpandSCEVs, [&](VPExpandSCEVRecipe *ExpSCEV) {
+    return hasUnhoistedInvariantLoad(ExpSCEV->getSCEV(), Plan, SE);
+  });
 }
 
 // Collect common metadata from a group of replicate recipes by intersecting

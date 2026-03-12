@@ -40,6 +40,7 @@ enum SCEVTypes : unsigned short {
   // folders simpler.
   scConstant,
   scVScale,
+  scLoopInvariantLoad,
   scTruncate,
   scZeroExtend,
   scSignExtend,
@@ -85,6 +86,35 @@ class SCEVVScale : public SCEV {
 public:
   /// Methods for support type inquiry through isa, cast, and dyn_cast:
   static bool classof(const SCEV *S) { return S->getSCEVType() == scVScale; }
+};
+
+/// This class represents a load from a loop-invariant pointer address. Under
+/// a NoAliasLoad predicate, the loaded value is assumed to be loop-invariant
+/// (no stores in the loop alias with the load address). This SCEV is
+/// loop-invariant by construction since its only operand, the pointer, is
+/// loop-invariant.
+class SCEVLoopInvariantLoad : public SCEV {
+  friend class ScalarEvolution;
+
+  const SCEV *Ptr;
+  const Loop *L;
+
+  SCEVLoopInvariantLoad(const FoldingSetNodeIDRef ID, const SCEV *Ptr,
+                        Type *LoadTy, const Loop *L)
+      : SCEV(ID, scLoopInvariantLoad, 0, LoadTy), Ptr(Ptr), L(L) {}
+
+public:
+  /// Returns the pointer SCEV of the load.
+  const SCEV *getPointerSCEV() const { return Ptr; }
+
+  /// Returns the loop the loaded value is assumed to be invariant in. The value
+  /// is available in the loop's preheader.
+  const Loop *getLoop() const { return L; }
+
+  /// Methods for support type inquiry through isa, cast, and dyn_cast:
+  static bool classof(const SCEV *S) {
+    return S->getSCEVType() == scLoopInvariantLoad;
+  }
 };
 
 inline unsigned short computeExpressionSize(ArrayRef<SCEVUse> Args) {
@@ -595,6 +625,9 @@ template <typename SC, typename RetVal = void> struct SCEVVisitor {
       return ((SC *)this)->visitConstant((const SCEVConstant *)S);
     case scVScale:
       return ((SC *)this)->visitVScale((const SCEVVScale *)S);
+    case scLoopInvariantLoad:
+      return ((SC *)this)
+          ->visitLoopInvariantLoad((const SCEVLoopInvariantLoad *)S);
     case scPtrToAddr:
       return ((SC *)this)->visitPtrToAddrExpr((const SCEVPtrToAddrExpr *)S);
     case scTruncate:
@@ -644,6 +677,10 @@ template <typename SC, typename RetVal = void> struct SCEVUseVisitor {
           ->visitConstant(cast<SCEVUseT<const SCEVConstant *>>(S));
     case scVScale:
       return ((SC *)this)->visitVScale(cast<SCEVUseT<const SCEVVScale *>>(S));
+    case scLoopInvariantLoad:
+      return ((SC *)this)
+          ->visitLoopInvariantLoad(
+              cast<SCEVUseT<const SCEVLoopInvariantLoad *>>(S));
     case scPtrToAddr:
       return ((SC *)this)
           ->visitPtrToAddrExpr(cast<SCEVUseT<const SCEVPtrToAddrExpr *>>(S));
@@ -725,6 +762,7 @@ public:
       switch (S->getSCEVType()) {
       case scConstant:
       case scVScale:
+      case scLoopInvariantLoad:
       case scUnknown:
         continue;
       case scPtrToAddr:
@@ -815,6 +853,10 @@ public:
   const SCEV *visitConstant(const SCEVConstant *Constant) { return Constant; }
 
   const SCEV *visitVScale(const SCEVVScale *VScale) { return VScale; }
+
+  const SCEV *visitLoopInvariantLoad(const SCEVLoopInvariantLoad *Load) {
+    return Load;
+  }
 
   const SCEV *visitPtrToAddrExpr(const SCEVPtrToAddrExpr *Expr) {
     const SCEV *Operand = ((SC *)this)->visit(Expr->getOperand());

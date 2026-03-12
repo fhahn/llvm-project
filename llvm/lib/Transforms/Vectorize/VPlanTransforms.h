@@ -445,6 +445,14 @@ struct VPlanTransforms {
   /// Add explicit broadcasts for live-ins and VPValues defined in \p Plan's entry block if they are used as vectors.
   static void materializeBroadcasts(VPlan &Plan);
 
+  /// Hoist single-scalar loads with invariant addresses out of the vector loop
+  /// region, if the noalias metadata proves they are not written in the loop.
+  /// Loads a SCEV expanded in \p Plan's entry block depends on are hoisted into
+  /// the entry block, so their expansion can reuse them; all other candidates
+  /// are hoisted to the vector preheader. Returns false if such a load could not
+  /// be hoisted, in which case \p Plan must be discarded.
+  static bool hoistInvariantLoads(VPlan &Plan, ScalarEvolution &SE);
+
   /// Hoist predicated loads from the same address to the loop entry block, if
   /// they are guaranteed to execute on both paths (i.e., in replicate regions
   /// with complementary masks P and NOT P).

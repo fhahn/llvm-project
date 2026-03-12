@@ -171,10 +171,10 @@ define i64 @cse_two_guards(ptr %base, i64 %n, ptr %cmp) {
 ; CHECK:       [[VECTOR_PH19]]:
 ; CHECK-NEXT:    [[N_VEC21:%.*]] = and i64 [[TMP28]], 1152921504606846974
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT22:%.*]] = insertelement <2 x double> poison, double [[TMP9]], i64 0
+; CHECK-NEXT:    [[TMP29:%.*]] = load i64, ptr [[CMP]], align 8, !alias.scope [[META3:![0-9]+]]
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT24:%.*]] = insertelement <2 x i64> poison, i64 [[TMP29]], i64 0
 ; CHECK-NEXT:    [[TMP10:%.*]] = mul i64 [[N_VEC21]], 48
 ; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr i8, ptr [[BASE]], i64 [[TMP10]]
-; CHECK-NEXT:    [[TMP12:%.*]] = load i64, ptr [[CMP]], align 8, !alias.scope [[META3:![0-9]+]]
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT24:%.*]] = insertelement <2 x i64> poison, i64 [[TMP12]], i64 0
 ; CHECK-NEXT:    [[TMP13:%.*]] = uitofp <2 x i64> [[BROADCAST_SPLATINSERT24]] to <2 x double>
 ; CHECK-NEXT:    [[TMP14:%.*]] = fmul nnan <2 x double> [[BROADCAST_SPLATINSERT22]], [[TMP13]]
 ; CHECK-NEXT:    [[TMP15:%.*]] = fcmp ugt <2 x double> [[TMP14]], zeroinitializer
@@ -330,7 +330,7 @@ define i1 @lambda(ptr %lam, ptr %cmp) {
 
 define ptr @gep_base_cancel(ptr %p, ptr %end, ptr noalias %a) {
 ; CHECK-LABEL: define noundef ptr @gep_base_cancel(
-; CHECK-SAME: ptr nofree readonly captures(address) [[P:%.*]], ptr nofree readnone captures(address) [[END:%.*]], ptr noalias nofree captures(address, ret: address, provenance) [[A:%.*]]) local_unnamed_addr #[[ATTR4:[0-9]+]] {
+; CHECK-SAME: ptr nofree readonly captures(address) [[P:%.*]], ptr nofree readnone captures(address) [[END:%.*]], ptr noalias nofree captures(address, ret: address, provenance) [[A:%.*]]) local_unnamed_addr #[[ATTR5:[0-9]+]] {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[IN_BOUNDS6:%.*]] = icmp ult ptr [[P]], [[END]]
 ; CHECK-NEXT:    br i1 [[IN_BOUNDS6]], label %[[BODY_PREHEADER:.*]], label %[[COMMON_RET:.*]]

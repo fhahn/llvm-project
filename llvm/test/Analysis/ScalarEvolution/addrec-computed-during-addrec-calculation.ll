@@ -29,6 +29,10 @@ define void @test(ptr %p) {
 ; CHECK-NEXT:  Loop %loop2: Unpredictable backedge-taken count.
 ; CHECK-NEXT:  Loop %loop2: constant max backedge-taken count is i32 -1
 ; CHECK-NEXT:  Loop %loop2: symbolic max backedge-taken count is i32 -1
+; CHECK-NEXT:  Loop %loop2: Predicated backedge-taken count is ((-1 * %iv) + (invariant.load(%p, i32) smax %iv))
+; CHECK-NEXT:   Predicates:
+; CHECK-NEXT:  Loop %loop2: Predicated symbolic max backedge-taken count is ((-1 * %iv) + (invariant.load(%p, i32) smax %iv))
+; CHECK-NEXT:   Predicates:
 ; CHECK-NEXT:  Loop %loop3: backedge-taken count is i1 false
 ; CHECK-NEXT:  Loop %loop3: constant max backedge-taken count is i1 false
 ; CHECK-NEXT:  Loop %loop3: symbolic max backedge-taken count is i1 false

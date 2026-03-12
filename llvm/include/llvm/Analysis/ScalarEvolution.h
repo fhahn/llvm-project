@@ -747,6 +747,8 @@ public:
   LLVM_ABI const SCEV *getTruncateExpr(SCEVUse Op, Type *Ty,
                                        unsigned Depth = 0);
   LLVM_ABI const SCEV *getVScale(Type *Ty);
+  LLVM_ABI const SCEV *getLoopInvariantLoad(const SCEV *Ptr, Type *LoadTy,
+                                            const Loop *L);
   LLVM_ABI const SCEV *
   getElementCount(Type *Ty, ElementCount EC,
                   SCEV::NoWrapFlags Flags = SCEV::FlagAnyWrap);
