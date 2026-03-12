@@ -1176,6 +1176,16 @@ void State::addInfoFor(BasicBlock &BB) {
         AddFactFromMemoryAccess(SI->getPointerOperand(), SI->getAccessType());
     }
 
+    // Enqueue selects with icmp conditions for simplification.
+    if (auto *Sel = dyn_cast<SelectInst>(&I)) {
+      if (isa<ICmpInst>(Sel->getCondition())) {
+        auto *DTN = DT.getNode(&BB);
+        if (DTN)
+          WorkList.push_back(
+              FactOrCheck(FactOrCheck::EntryTy::InstCheck, DTN, &I));
+      }
+    }
+
     auto *II = dyn_cast<IntrinsicInst>(&I);
     Intrinsic::ID ID = II ? II->getIntrinsicID() : Intrinsic::not_intrinsic;
     switch (ID) {
@@ -1615,6 +1625,32 @@ static bool checkAndReplaceCmp(CmpIntrinsic *I, ConstraintInfo &Info,
   return false;
 }
 
+static bool checkAndReplaceSelect(SelectInst *Sel, ConstraintInfo &Info,
+                                  SmallVectorImpl<Instruction *> &ToRemove) {
+  // If the condition is already a constant (e.g. simplified by a prior
+  // UseCheck), fold the select directly.
+  if (auto *CI = dyn_cast<ConstantInt>(Sel->getCondition())) {
+    Sel->replaceAllUsesWith(CI->isOne() ? Sel->getTrueValue()
+                                        : Sel->getFalseValue());
+    ToRemove.push_back(Sel);
+    return true;
+  }
+
+  auto *Cmp = dyn_cast<ICmpInst>(Sel->getCondition());
+  if (!Cmp)
+    return false;
+
+  if (auto ImpliedCondition =
+          checkCondition(Cmp->getPredicate(), Cmp->getOperand(0),
+                         Cmp->getOperand(1), Sel, Info)) {
+    Sel->replaceAllUsesWith(*ImpliedCondition ? Sel->getTrueValue()
+                                              : Sel->getFalseValue());
+    ToRemove.push_back(Sel);
+    return true;
+  }
+  return false;
+}
+
 static void
 removeEntryFromStack(const StackEntry &E, ConstraintInfo &Info,
                      Module *ReproducerModule,
@@ -1963,6 +1999,8 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
         Changed |= checkAndReplaceMinMax(MinMax, Info, ToRemove);
       } else if (auto *CmpIntr = dyn_cast<CmpIntrinsic>(Inst)) {
         Changed |= checkAndReplaceCmp(CmpIntr, Info, ToRemove);
+      } else if (auto *Sel = dyn_cast<SelectInst>(Inst)) {
+        Changed |= checkAndReplaceSelect(Sel, Info, ToRemove);
       }
       continue;
     }
