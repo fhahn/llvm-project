@@ -21684,11 +21684,11 @@ bool BoUpSLP::isVPlanEligible() const {
       return false;
 
     unsigned Opcode = TE->getOpcode();
-    // Only binary ops, compares, casts, loads, and stores.
+    // Only binary ops, compares, selects, casts, loads, and stores.
     if (!Instruction::isBinaryOp(Opcode) && !Instruction::isCast(Opcode) &&
         Opcode != Instruction::Load && Opcode != Instruction::Store &&
         Opcode != Instruction::FNeg && Opcode != Instruction::ICmp &&
-        Opcode != Instruction::FCmp)
+        Opcode != Instruction::FCmp && Opcode != Instruction::Select)
       return false;
 
     // Verify all operand entries exist in the tree mapping and are not deleted.
@@ -21800,6 +21800,21 @@ std::unique_ptr<VPlan> BoUpSLP::buildVPlanForTree() {
           Flags.intersectFlags(VPIRFlags(*I));
       auto *R = new VPWidenRecipe(*MainOp, {LHS, RHS}, Flags,
                                   VPIRMetadata(*MainOp), MainOp->getDebugLoc());
+      VPBB->appendRecipe(R);
+      EntryToVPValue[E] = R;
+    } else if (Opcode == Instruction::Select) {
+      VPValue *Cond = EntryToVPValue.lookup(getOperandEntry(E, 0));
+      VPValue *TrueVal = EntryToVPValue.lookup(getOperandEntry(E, 1));
+      VPValue *FalseVal = EntryToVPValue.lookup(getOperandEntry(E, 2));
+      assert(Cond && TrueVal && FalseVal &&
+             "Operand entries not yet processed");
+      VPIRFlags Flags(*MainOp);
+      for (Value *V : E->Scalars)
+        if (auto *I = dyn_cast<Instruction>(V))
+          Flags.intersectFlags(VPIRFlags(*I));
+      auto *R = new VPWidenRecipe(*MainOp, {Cond, TrueVal, FalseVal}, Flags,
+                                  VPIRMetadata(*MainOp),
+                                  MainOp->getDebugLoc());
       VPBB->appendRecipe(R);
       EntryToVPValue[E] = R;
     } else if (Instruction::isCast(Opcode)) {
