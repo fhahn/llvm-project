@@ -1110,6 +1110,7 @@ static bool isHighCostExpansion(const SCEV *S,
   case scUnknown:
   case scConstant:
   case scVScale:
+  case scLoopInvariantLoad:
     return false;
   case scTruncate:
     return isHighCostExpansion(cast<SCEVTruncateExpr>(S)->getOperand(),
@@ -3000,6 +3001,7 @@ static const SCEV *getExprBase(const SCEV *S) {
     return S;
   case scConstant:
   case scVScale:
+  case scLoopInvariantLoad:
     return nullptr;
   case scTruncate:
     return getExprBase(cast<SCEVTruncateExpr>(S)->getOperand());

@@ -16,7 +16,7 @@ define void @runtime_checks_with_symbolic_max_btc_neg_1(ptr %P, ptr %S, i32 %x, 
 ; CHECK-NEXT:        ptr %S
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: ((4 * %y) + %P) High: inttoptr (i32 -1 to ptr))
+; CHECK-NEXT:          (Low: ((4 * %y) + %P) High: ((4 * (invariant.load(%S, i32) smax (1 + %y)<nsw>)) + %P))
 ; CHECK-NEXT:            Member: {((4 * %y) + %P),+,4}<%loop>
 ; CHECK-NEXT:        Group GRP1:
 ; CHECK-NEXT:          (Low: %S High: (4 + %S))

@@ -1242,6 +1242,13 @@ VPValue *expandSCEVExpr(const SCEV *S, Type *ResultTy, VPBuilder &Builder,
         Result = Plan.getOrAddLiveIn(U->getValue());
     } else if (isa<SCEVVScale>(S)) {
       Result = Builder.createNaryOp(VPInstruction::VScale, {}, S->getType());
+    } else if (auto *LILoad = dyn_cast<SCEVLoopInvariantLoad>(S)) {
+      VPValue *PtrVPV =
+          expandSCEVExpr(LILoad->getPointerSCEV(),
+                         LILoad->getPointerSCEV()->getType(), Builder, Plan, DL,
+                         SCEV2VPV);
+      Result = Builder.createNaryOp(Instruction::Load, {PtrVPV},
+                                    LILoad->getType(), {}, DL);
     } else if (isa<SCEVCastExpr>(S) || isa<SCEVUMaxExpr>(S) ||
                isa<SCEVSMaxExpr>(S) || isa<SCEVUMinExpr>(S) ||
                isa<SCEVSMinExpr>(S)) {

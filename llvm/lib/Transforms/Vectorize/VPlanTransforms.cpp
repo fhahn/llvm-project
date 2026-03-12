@@ -32,6 +32,8 @@
 #include "llvm/Analysis/InstSimplifyFolder.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/MemoryLocation.h"
+#include "llvm/Analysis/ScalarEvolution.h"
+#include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/Analysis/ScalarEvolutionPatternMatch.h"
 #include "llvm/Analysis/ScopedNoAliasAA.h"
 #include "llvm/Analysis/VectorUtils.h"
@@ -4778,6 +4780,45 @@ void VPlanTransforms::hoistInvariantLoads(VPlan &Plan) {
   }
 }
 
+bool VPlanTransforms::verifyInvariantLoadTripCountNoAlias(
+    VPlan &Plan, PredicatedScalarEvolution &PSE, const Loop *L) {
+  // Collect pointer SCEVs from SCEVLoopInvariantLoad nodes in the predicated
+  // BTC.
+  const SCEV *BTC = PSE.getBackedgeTakenCount();
+  if (isa<SCEVCouldNotCompute>(BTC))
+    return true;
+
+  SmallPtrSet<const SCEV *, 4> InvariantLoadPtrs;
+  SCEVExprContains(BTC, [&](const SCEV *S) {
+    if (auto *LI = dyn_cast<SCEVLoopInvariantLoad>(S))
+      InvariantLoadPtrs.insert(LI->getPointerSCEV());
+    return false;
+  });
+
+  if (InvariantLoadPtrs.empty())
+    return true;
+
+  // Verify that no loads remaining in the loop region have pointer SCEVs
+  // matching the SCEVLoopInvariantLoad pointers in the BTC. If all such loads
+  // were hoisted to the preheader by hoistInvariantLoads, the assumption is
+  // verified.
+  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_shallow(LoopRegion->getEntry()))) {
+    for (VPRecipeBase &R : *VPBB) {
+      auto *RepR = dyn_cast<VPReplicateRecipe>(&R);
+      if (!RepR || RepR->getOpcode() != Instruction::Load)
+        continue;
+      const SCEV *PtrSCEV =
+          vputils::getSCEVExprForVPValue(RepR->getOperand(0), PSE, L);
+      if (InvariantLoadPtrs.contains(PtrSCEV))
+        return false;
+    }
+  }
+
+  return true;
+}
+
 // Collect common metadata from a group of replicate recipes by intersecting
 // metadata from all recipes in the group.
 static VPIRMetadata getCommonMetadata(ArrayRef<VPReplicateRecipe *> Recipes) {
@@ -5251,12 +5292,62 @@ void VPlanTransforms::expandSCEVExpressions(VPlan &Plan, ScalarEvolution *SE,
   }
 }
 
+namespace {
+/// SCEV rewriter that replaces SCEVLoopInvariantLoad nodes with
+/// SCEVUnknown wrapping an already-executed load value.
+class SCEVLoopInvariantLoadRewriter
+    : public SCEVRewriteVisitor<SCEVLoopInvariantLoadRewriter> {
+  DenseMap<const SCEVLoopInvariantLoad *, Value *> &LoadReplacements;
+
+public:
+  SCEVLoopInvariantLoadRewriter(
+      ScalarEvolution &SE,
+      DenseMap<const SCEVLoopInvariantLoad *, Value *> &LoadReplacements)
+      : SCEVRewriteVisitor(SE), LoadReplacements(LoadReplacements) {}
+
+  const SCEV *visitLoopInvariantLoad(const SCEVLoopInvariantLoad *S) {
+    auto It = LoadReplacements.find(S);
+    if (It != LoadReplacements.end())
+      return SE.getUnknown(It->second);
+    return S;
+  }
+};
+} // namespace
+
 DenseMap<const SCEV *, Value *>
 VPlanTransforms::expandSCEVs(VPlan &Plan, ScalarEvolution &SE) {
   SCEVExpander Expander(SE, "induction", /*PreserveLCSSA=*/false);
 
   auto *Entry = cast<VPIRBasicBlock>(Plan.getEntry());
   BasicBlock *EntryBB = Entry->getIRBasicBlock();
+
+  // Collect all SCEVLoopInvariantLoad nodes from VPExpandSCEVRecipes that
+  // remain (e.g., inside casts or min/max fallbacks), expand their pointers,
+  // and create IR loads in the entry block so we can rewrite the SCEV to
+  // SCEVUnknown. The pointer SCEVs do not contain SCEVLoopInvariantLoad, so
+  // SCEVExpander can handle them.
+  DenseMap<const SCEVLoopInvariantLoad *, Value *> LoadReplacements;
+  for (VPRecipeBase &R : *Entry) {
+    auto *ExpSCEV = dyn_cast<VPExpandSCEVRecipe>(&R);
+    if (!ExpSCEV)
+      continue;
+    SCEVExprContains(ExpSCEV->getSCEV(), [&](const SCEV *S) {
+      auto *InvLoad = dyn_cast<SCEVLoopInvariantLoad>(S);
+      if (!InvLoad || LoadReplacements.count(InvLoad))
+        return false;
+      Value *PtrVal = Expander.expandCodeFor(
+          InvLoad->getPointerSCEV(), InvLoad->getPointerSCEV()->getType(),
+          EntryBB->getTerminator());
+      LoadReplacements[InvLoad] =
+          new LoadInst(InvLoad->getType(), PtrVal, "",
+                       EntryBB->getTerminator()->getIterator());
+      return false;
+    });
+  }
+
+  // Rewrite SCEV expressions to replace SCEVLoopInvariantLoad nodes.
+  SCEVLoopInvariantLoadRewriter Rewriter(SE, LoadReplacements);
+
 
   DenseMap<const SCEV *, Value *> ExpandedSCEVs;
 
@@ -5267,8 +5358,14 @@ VPlanTransforms::expandSCEVs(VPlan &Plan, ScalarEvolution &SE) {
     if (!ExpSCEV)
       continue;
     const SCEV *Expr = ExpSCEV->getSCEV();
-    Value *Res =
-        Expander.expandCodeFor(Expr, Expr->getType(), EntryBB->getTerminator());
+    if (!LoadReplacements.empty())
+      Expr = Rewriter.visit(Expr);
+    assert(!SCEVExprContains(Expr, [](const SCEV *S) {
+             return isa<SCEVLoopInvariantLoad>(S);
+           }) &&
+           "SCEVLoopInvariantLoad should have been rewritten");
+    Value *Res = Expander.expandCodeFor(Expr, Expr->getType(),
+                                        EntryBB->getTerminator());
     ExpandedSCEVs[ExpSCEV->getSCEV()] = Res;
     replaceExpandSCEVRecipe(Plan, ExpSCEV, Plan.getOrAddLiveIn(Res));
   }

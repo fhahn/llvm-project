@@ -414,6 +414,13 @@ struct VPlanTransforms {
   /// plan using noalias metadata.
   static void hoistInvariantLoads(VPlan &Plan);
 
+  /// Verify that all loads whose pointer SCEVs match SCEVLoopInvariantLoad
+  /// pointers in the predicated BTC have been hoisted out of the loop region.
+  /// Returns false if the BTC depends on invariant loads but some matching
+  /// loads remain in the loop (i.e., hoisting failed).
+  static bool verifyInvariantLoadTripCountNoAlias(
+      VPlan &Plan, PredicatedScalarEvolution &PSE, const Loop *L);
+
   /// Hoist predicated loads from the same address to the loop entry block, if
   /// they are guaranteed to execute on both paths (i.e., in replicate regions
   /// with complementary masks P and NOT P).

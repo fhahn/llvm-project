@@ -1582,6 +1582,12 @@ void VPInstructionWithType::execute(VPTransformState &State) {
     State.set(this, VScale, true);
     break;
   }
+  case Instruction::Load: {
+    Value *Ptr = State.get(getOperand(0), VPLane(0));
+    Value *LdI = State.Builder.CreateLoad(ResultTy, Ptr, "scev.load");
+    State.set(this, LdI, true);
+    break;
+  }
 
   default:
     llvm_unreachable("opcode not implemented yet");

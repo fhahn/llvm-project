@@ -1777,6 +1777,25 @@ public:
 } // end namespace llvm
 
 namespace {
+
+/// Returns true if any runtime pointer check bound SCEV contains a
+/// SCEVLoopInvariantLoad node, which cannot be expanded by SCEVExpander.
+static bool hasInvariantLoadBound(const RuntimePointerChecking &RtPtrChecking) {
+  auto ContainsInvLoad = [](const SCEV *S) {
+    return SCEVExprContains(
+        S, [](const SCEV *E) { return isa<SCEVLoopInvariantLoad>(E); });
+  };
+  return any_of(
+      RtPtrChecking.getChecks(),
+      [&](const std::pair<const RuntimeCheckingPtrGroup *,
+                          const RuntimeCheckingPtrGroup *> &Check) {
+        return ContainsInvLoad(Check.first->High) ||
+               ContainsInvLoad(Check.first->Low) ||
+               ContainsInvLoad(Check.second->High) ||
+               ContainsInvLoad(Check.second->Low);
+      });
+}
+
 /// Helper struct to manage generating runtime checks for vectorization.
 ///
 /// The runtime checks are created up-front in temporary blocks to allow better
@@ -1875,29 +1894,38 @@ public:
 
     const auto &RtPtrChecking = *LAI.getRuntimePointerChecking();
     if (RtPtrChecking.Need) {
-      auto *Pred = SCEVCheckBlock ? SCEVCheckBlock : Preheader;
-      MemCheckBlock = SplitBlock(Pred, Pred->getTerminator(), DT, LI, nullptr,
-                                 "vector.memcheck");
-
       auto DiffChecks = RtPtrChecking.getDiffChecks();
-      if (DiffChecks) {
-        Value *RuntimeVF = nullptr;
-        MemRuntimeCheckCond = addDiffRuntimeChecks(
-            MemCheckBlock->getTerminator(), *DiffChecks, MemCheckExp,
-            [VF, &RuntimeVF](IRBuilderBase &B, unsigned Bits) {
-              if (!RuntimeVF)
-                RuntimeVF = getRuntimeVF(B, B.getIntNTy(Bits), VF);
-              return RuntimeVF;
-            },
-            IC);
-      } else {
-        MemRuntimeCheckCond = addRuntimeChecks(
-            MemCheckBlock->getTerminator(), L, RtPtrChecking.getChecks(),
-            MemCheckExp, VectorizerParams::HoistRuntimeChecks);
+
+      // Check if any bound SCEV contains SCEVLoopInvariantLoad, which cannot
+      // be expanded by SCEVExpander. Non-diff checks with such bounds are
+      // deferred to VPlan-based expansion in attachRuntimeChecks.
+      bool HasInvariantLoadBound =
+          !DiffChecks && hasInvariantLoadBound(RtPtrChecking);
+
+      if (!HasInvariantLoadBound) {
+        auto *Pred = SCEVCheckBlock ? SCEVCheckBlock : Preheader;
+        MemCheckBlock = SplitBlock(Pred, Pred->getTerminator(), DT, LI,
+                                   nullptr, "vector.memcheck");
+
+        if (DiffChecks) {
+          Value *RuntimeVF = nullptr;
+          MemRuntimeCheckCond = addDiffRuntimeChecks(
+              MemCheckBlock->getTerminator(), *DiffChecks, MemCheckExp,
+              [VF, &RuntimeVF](IRBuilderBase &B, unsigned Bits) {
+                if (!RuntimeVF)
+                  RuntimeVF = getRuntimeVF(B, B.getIntNTy(Bits), VF);
+                return RuntimeVF;
+              },
+              IC);
+        } else {
+          MemRuntimeCheckCond = addRuntimeChecks(
+              MemCheckBlock->getTerminator(), L, RtPtrChecking.getChecks(),
+              MemCheckExp, VectorizerParams::HoistRuntimeChecks);
+        }
+        assert(MemRuntimeCheckCond &&
+               "no RT checks generated although RtPtrChecking "
+               "claimed checks are required");
       }
-      assert(MemRuntimeCheckCond &&
-             "no RT checks generated although RtPtrChecking "
-             "claimed checks are required");
     }
 
     SCEVExp.eraseDeadInstructions(SCEVCheckCond);
@@ -8047,6 +8075,16 @@ void LoopVectorizationPlanner::buildVPlansWithVPRecipes(ElementCount MinVF,
       RUN_VPLAN_PASS(VPlanTransforms::truncateToMinimalBitwidths, *Plan,
                      CM.getMinimalBitwidths());
       RUN_VPLAN_PASS(VPlanTransforms::optimize, *Plan);
+
+      // Verify the invariant load trip count assumption (if any) after
+      // optimization, which includes hoistInvariantLoads. Check that all
+      // loads matching SCEVLoopInvariantLoad pointers in the BTC have been
+      // hoisted out of the loop region.
+      if (!VPlanTransforms::verifyInvariantLoadTripCountNoAlias(*Plan, PSE,
+                                                               OrigLoop)) {
+        VF = SubRange.End;
+        continue;
+      }
       // TODO: try to put addExplicitVectorLength close to addActiveLaneMask
       if (CM.foldTailWithEVL()) {
         RUN_VPLAN_PASS(VPlanTransforms::addExplicitVectorLength, *Plan,
@@ -8554,6 +8592,17 @@ void LoopVectorizationPlanner::attachRuntimeChecks(
     VPlanTransforms::attachCheckBlock(Plan, SCEVCheckCond, SCEVCheckBlock,
                                       HasBranchWeights);
   }
+  // Use VPlan recipes for non-diff-check memory checks when LAI is
+  // available. This also handles the case where no IR MemCheckBlock was
+  // generated because bound SCEVs contain SCEVLoopInvariantLoad.
+  const auto *RtPtrChecking =
+      LAI ? LAI->getRuntimePointerChecking() : nullptr;
+  if (RtPtrChecking && RtPtrChecking->Need && !RtPtrChecking->getDiffChecks()) {
+    RTChecks.dropMemRuntimeChecks();
+    VPlanTransforms::addMemoryRuntimeChecks(
+        Plan, OrigLoop, *RtPtrChecking, *PSE.getSE(), HasBranchWeights);
+    return;
+  }
   const auto &[MemCheckCond, MemCheckBlock] = RTChecks.getMemRuntimeChecks();
   if (MemCheckBlock && MemCheckBlock->hasNPredecessors(0)) {
     // VPlan-native path does not do any analysis for runtime checks
@@ -8577,17 +8626,6 @@ void LoopVectorizationPlanner::attachRuntimeChecks(
       });
     }
 
-    // Use VPlan recipes for non-diff-check memory checks when LAI is
-    // available. Drop the pre-built IR block and use VPExpandSCEVRecipe
-    // instances for SCEV expansions, which will be expanded by expandSCEVs().
-    const auto *RtPtrChecking =
-        LAI ? LAI->getRuntimePointerChecking() : nullptr;
-    if (RtPtrChecking && !RtPtrChecking->getDiffChecks()) {
-      RTChecks.dropMemRuntimeChecks();
-      VPlanTransforms::addMemoryRuntimeChecks(
-          Plan, OrigLoop, *RtPtrChecking, *PSE.getSE(), HasBranchWeights);
-      return;
-    }
     VPlanTransforms::attachCheckBlock(Plan, MemCheckCond, MemCheckBlock,
                                       HasBranchWeights);
   }
@@ -9718,6 +9756,19 @@ bool LoopVectorizePass::processLoop(Loop *L) {
       LVP.selectBestEpiloguePlan(BestPlan, VF.Width, IC);
   bool HasBranchWeights =
       hasBranchWeightMD(*L->getLoopLatch()->getTerminator());
+  // Skip epilogue vectorization if memory runtime checks involve
+  // SCEVLoopInvariantLoad bounds, which require VPlan-based expansion that is
+  // not yet supported for the epilogue vectorization path.
+  if (EpiPlan) {
+    const auto &RtPtrChecking = *LVL.getLAI()->getRuntimePointerChecking();
+    if (RtPtrChecking.Need && hasInvariantLoadBound(RtPtrChecking)) {
+      EpiPlan = nullptr;
+      LLVM_DEBUG(
+          dbgs() << "LEV: Epilogue vectorization disabled due to "
+                    "SCEVLoopInvariantLoad in runtime check bounds.\n");
+    }
+  }
+
   if (EpiPlan) {
     VPlan &BestEpiPlan = *EpiPlan;
     VPlan &BestMainPlan = BestPlan;

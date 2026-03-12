@@ -324,6 +324,9 @@ private:
   SCEVMonotonicity visitVScale(const SCEVVScale *) {
     return SCEVMonotonicity(SCEVMonotonicityType::Invariant);
   }
+  SCEVMonotonicity visitLoopInvariantLoad(const SCEVLoopInvariantLoad *) {
+    return SCEVMonotonicity(SCEVMonotonicityType::Invariant);
+  }
 
   // TODO: Handle more cases.
   SCEVMonotonicity visitZeroExtendExpr(const SCEVZeroExtendExpr *Expr) {

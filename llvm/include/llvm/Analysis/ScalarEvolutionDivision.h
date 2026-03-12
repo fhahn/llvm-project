@@ -64,6 +64,8 @@ public:
 
   void visitVScale(const SCEVVScale *Numerator);
 
+  void visitLoopInvariantLoad(const SCEVLoopInvariantLoad *Numerator);
+
   void visitAddRecExpr(const SCEVAddRecExpr *Numerator);
 
   void visitAddExpr(const SCEVAddExpr *Numerator);

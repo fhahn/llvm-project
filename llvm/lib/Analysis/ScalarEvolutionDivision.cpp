@@ -130,6 +130,11 @@ void SCEVDivision::visitVScale(const SCEVVScale *Numerator) {
   return cannotDivide(Numerator);
 }
 
+void SCEVDivision::visitLoopInvariantLoad(
+    const SCEVLoopInvariantLoad *Numerator) {
+  return cannotDivide(Numerator);
+}
+
 void SCEVDivision::visitAddRecExpr(const SCEVAddRecExpr *Numerator) {
   const SCEV *StartQ, *StartR, *StepQ, *StepR;
   if (!Numerator->isAffine())
