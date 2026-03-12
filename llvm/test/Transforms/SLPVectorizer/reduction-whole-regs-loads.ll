@@ -2,6 +2,9 @@
 ; RUN: opt < %s -passes=slp-vectorizer -S -mtriple=riscv64-unknown-linux -mattr=+v -slp-threshold=-100 | FileCheck %s --check-prefix=RISCV
 ; RUN: opt < %s -passes=slp-vectorizer -S -mtriple=x86_64-unknown-linux -slp-threshold=-100 | FileCheck %s
 ; RUN: opt < %s -passes=slp-vectorizer -S -mtriple=aarch64-unknown-linux -slp-threshold=-100 | FileCheck %s
+; RUN: opt < %s -passes=slp-vectorizer -slp-use-vplan-codegen -S -mtriple=riscv64-unknown-linux -mattr=+v -slp-threshold=-100 | FileCheck %s --check-prefix=RISCV
+; RUN: opt < %s -passes=slp-vectorizer -slp-use-vplan-codegen -S -mtriple=x86_64-unknown-linux -slp-threshold=-100 | FileCheck %s
+; RUN: opt < %s -passes=slp-vectorizer -slp-use-vplan-codegen -S -mtriple=aarch64-unknown-linux -slp-threshold=-100 | FileCheck %s
 ; REQUIRES: aarch64-registered-target, x86-registered-target, riscv-registered-target
 
 define i64 @test(ptr %p) {

@@ -3,6 +3,10 @@
 ; RUN: opt -passes=slp-vectorizer -S -slp-max-vf=8 < %s | FileCheck -check-prefix=MAX256 %s
 ; RUN: opt -passes=slp-vectorizer -S -slp-max-vf=32 < %s | FileCheck -check-prefix=MAX1024 %s
 ; RUN: opt -passes=slp-vectorizer -S < %s | FileCheck -check-prefix=MAX1024 %s
+; RUN: opt -passes=slp-vectorizer -slp-use-vplan-codegen -S -slp-max-vf=1 < %s | FileCheck -check-prefix=VPLAN-MAX32 %s
+; RUN: opt -passes=slp-vectorizer -slp-use-vplan-codegen -S -slp-max-vf=8 < %s | FileCheck -check-prefix=VPLAN-MAX256 %s
+; RUN: opt -passes=slp-vectorizer -slp-use-vplan-codegen -S -slp-max-vf=32 < %s | FileCheck -check-prefix=VPLAN-MAX1024 %s
+; RUN: opt -passes=slp-vectorizer -slp-use-vplan-codegen -S < %s | FileCheck -check-prefix=VPLAN-MAX1024 %s
 
 ; Make sure we do not vectorize to create PHI wider than requested.
 ; On AMDGPU target wider vectorization will result in a higher register pressure,
@@ -82,9 +86,9 @@ define void @phi_float32(half %hval, float %fval) {
 ; MAX32-NEXT:    [[I66:%.*]] = fmul float [[I9]], [[FVAL]]
 ; MAX32-NEXT:    [[I67:%.*]] = fadd float 0.000000e+00, [[I66]]
 ; MAX32-NEXT:    switch i32 undef, label [[BB5:%.*]] [
-; MAX32-NEXT:    i32 0, label [[BB2:%.*]]
-; MAX32-NEXT:    i32 1, label [[BB3:%.*]]
-; MAX32-NEXT:    i32 2, label [[BB4:%.*]]
+; MAX32-NEXT:      i32 0, label [[BB2:%.*]]
+; MAX32-NEXT:      i32 1, label [[BB3:%.*]]
+; MAX32-NEXT:      i32 2, label [[BB4:%.*]]
 ; MAX32-NEXT:    ]
 ; MAX32:       bb3:
 ; MAX32-NEXT:    br label [[BB2]]
@@ -155,9 +159,9 @@ define void @phi_float32(half %hval, float %fval) {
 ; MAX256-NEXT:    [[TMP16:%.*]] = fmul <8 x float> [[TMP15]], [[TMP3]]
 ; MAX256-NEXT:    [[TMP17:%.*]] = fadd <8 x float> zeroinitializer, [[TMP16]]
 ; MAX256-NEXT:    switch i32 undef, label [[BB5:%.*]] [
-; MAX256-NEXT:    i32 0, label [[BB2:%.*]]
-; MAX256-NEXT:    i32 1, label [[BB3:%.*]]
-; MAX256-NEXT:    i32 2, label [[BB4:%.*]]
+; MAX256-NEXT:      i32 0, label [[BB2:%.*]]
+; MAX256-NEXT:      i32 1, label [[BB3:%.*]]
+; MAX256-NEXT:      i32 2, label [[BB4:%.*]]
 ; MAX256-NEXT:    ]
 ; MAX256:       bb3:
 ; MAX256-NEXT:    br label [[BB2]]
@@ -201,9 +205,9 @@ define void @phi_float32(half %hval, float %fval) {
 ; MAX1024-NEXT:    [[TMP16:%.*]] = fmul <8 x float> [[TMP15]], [[TMP3]]
 ; MAX1024-NEXT:    [[TMP17:%.*]] = fadd <8 x float> zeroinitializer, [[TMP16]]
 ; MAX1024-NEXT:    switch i32 undef, label [[BB5:%.*]] [
-; MAX1024-NEXT:    i32 0, label [[BB2:%.*]]
-; MAX1024-NEXT:    i32 1, label [[BB3:%.*]]
-; MAX1024-NEXT:    i32 2, label [[BB4:%.*]]
+; MAX1024-NEXT:      i32 0, label [[BB2:%.*]]
+; MAX1024-NEXT:      i32 1, label [[BB3:%.*]]
+; MAX1024-NEXT:      i32 2, label [[BB4:%.*]]
 ; MAX1024-NEXT:    ]
 ; MAX1024:       bb3:
 ; MAX1024-NEXT:    br label [[BB2]]
@@ -219,6 +223,225 @@ define void @phi_float32(half %hval, float %fval) {
 ; MAX1024-NEXT:    [[TMP22:%.*]] = extractelement <8 x float> [[TMP20]], i32 7
 ; MAX1024-NEXT:    store float [[TMP22]], ptr undef, align 4
 ; MAX1024-NEXT:    ret void
+;
+; VPLAN-MAX32-LABEL: @phi_float32(
+; VPLAN-MAX32-NEXT:  bb:
+; VPLAN-MAX32-NEXT:    br label [[BB1:%.*]]
+; VPLAN-MAX32:       bb1:
+; VPLAN-MAX32-NEXT:    [[I:%.*]] = fpext half [[HVAL:%.*]] to float
+; VPLAN-MAX32-NEXT:    [[I1:%.*]] = fmul float [[I]], [[FVAL:%.*]]
+; VPLAN-MAX32-NEXT:    [[I2:%.*]] = fadd float 0.000000e+00, [[I1]]
+; VPLAN-MAX32-NEXT:    [[I3:%.*]] = fpext half [[HVAL]] to float
+; VPLAN-MAX32-NEXT:    [[I4:%.*]] = fmul float [[I3]], [[FVAL]]
+; VPLAN-MAX32-NEXT:    [[I5:%.*]] = fadd float 0.000000e+00, [[I4]]
+; VPLAN-MAX32-NEXT:    [[I6:%.*]] = fpext half [[HVAL]] to float
+; VPLAN-MAX32-NEXT:    [[I7:%.*]] = fmul float [[I6]], [[FVAL]]
+; VPLAN-MAX32-NEXT:    [[I8:%.*]] = fadd float 0.000000e+00, [[I7]]
+; VPLAN-MAX32-NEXT:    [[I9:%.*]] = fpext half [[HVAL]] to float
+; VPLAN-MAX32-NEXT:    [[I10:%.*]] = fmul float [[I9]], [[FVAL]]
+; VPLAN-MAX32-NEXT:    [[I11:%.*]] = fadd float 0.000000e+00, [[I10]]
+; VPLAN-MAX32-NEXT:    [[I12:%.*]] = fmul float [[I]], [[FVAL]]
+; VPLAN-MAX32-NEXT:    [[I13:%.*]] = fadd float 0.000000e+00, [[I12]]
+; VPLAN-MAX32-NEXT:    [[I14:%.*]] = fmul float [[I3]], [[FVAL]]
+; VPLAN-MAX32-NEXT:    [[I15:%.*]] = fadd float 0.000000e+00, [[I14]]
+; VPLAN-MAX32-NEXT:    [[I16:%.*]] = fmul float [[I6]], [[FVAL]]
+; VPLAN-MAX32-NEXT:    [[I17:%.*]] = fadd float 0.000000e+00, [[I16]]
+; VPLAN-MAX32-NEXT:    [[I18:%.*]] = fmul float [[I9]], [[FVAL]]
+; VPLAN-MAX32-NEXT:    [[I19:%.*]] = fadd float 0.000000e+00, [[I18]]
+; VPLAN-MAX32-NEXT:    [[I20:%.*]] = fmul float [[I]], [[FVAL]]
+; VPLAN-MAX32-NEXT:    [[I21:%.*]] = fadd float 0.000000e+00, [[I20]]
+; VPLAN-MAX32-NEXT:    [[I22:%.*]] = fmul float [[I3]], [[FVAL]]
+; VPLAN-MAX32-NEXT:    [[I23:%.*]] = fadd float 0.000000e+00, [[I22]]
+; VPLAN-MAX32-NEXT:    [[I24:%.*]] = fmul float [[I6]], [[FVAL]]
+; VPLAN-MAX32-NEXT:    [[I25:%.*]] = fadd float 0.000000e+00, [[I24]]
+; VPLAN-MAX32-NEXT:    [[I26:%.*]] = fmul float [[I9]], [[FVAL]]
+; VPLAN-MAX32-NEXT:    [[I27:%.*]] = fadd float 0.000000e+00, [[I26]]
+; VPLAN-MAX32-NEXT:    [[I28:%.*]] = fmul float [[I]], [[FVAL]]
+; VPLAN-MAX32-NEXT:    [[I29:%.*]] = fadd float 0.000000e+00, [[I28]]
+; VPLAN-MAX32-NEXT:    [[I30:%.*]] = fmul float [[I3]], [[FVAL]]
+; VPLAN-MAX32-NEXT:    [[I31:%.*]] = fadd float 0.000000e+00, [[I30]]
+; VPLAN-MAX32-NEXT:    [[I32:%.*]] = fmul float [[I6]], [[FVAL]]
+; VPLAN-MAX32-NEXT:    [[I33:%.*]] = fadd float 0.000000e+00, [[I32]]
+; VPLAN-MAX32-NEXT:    [[I34:%.*]] = fmul float [[I9]], [[FVAL]]
+; VPLAN-MAX32-NEXT:    [[I35:%.*]] = fadd float 0.000000e+00, [[I34]]
+; VPLAN-MAX32-NEXT:    [[I36:%.*]] = fmul float [[I]], [[FVAL]]
+; VPLAN-MAX32-NEXT:    [[I37:%.*]] = fadd float 0.000000e+00, [[I36]]
+; VPLAN-MAX32-NEXT:    [[I38:%.*]] = fmul float [[I3]], [[FVAL]]
+; VPLAN-MAX32-NEXT:    [[I39:%.*]] = fadd float 0.000000e+00, [[I38]]
+; VPLAN-MAX32-NEXT:    [[I40:%.*]] = fmul float [[I6]], [[FVAL]]
+; VPLAN-MAX32-NEXT:    [[I41:%.*]] = fadd float 0.000000e+00, [[I40]]
+; VPLAN-MAX32-NEXT:    [[I42:%.*]] = fmul float [[I9]], [[FVAL]]
+; VPLAN-MAX32-NEXT:    [[I43:%.*]] = fadd float 0.000000e+00, [[I42]]
+; VPLAN-MAX32-NEXT:    [[I44:%.*]] = fmul float [[I]], [[FVAL]]
+; VPLAN-MAX32-NEXT:    [[I45:%.*]] = fadd float 0.000000e+00, [[I44]]
+; VPLAN-MAX32-NEXT:    [[I46:%.*]] = fmul float [[I3]], [[FVAL]]
+; VPLAN-MAX32-NEXT:    [[I47:%.*]] = fadd float 0.000000e+00, [[I46]]
+; VPLAN-MAX32-NEXT:    [[I48:%.*]] = fmul float [[I6]], [[FVAL]]
+; VPLAN-MAX32-NEXT:    [[I49:%.*]] = fadd float 0.000000e+00, [[I48]]
+; VPLAN-MAX32-NEXT:    [[I50:%.*]] = fmul float [[I9]], [[FVAL]]
+; VPLAN-MAX32-NEXT:    [[I51:%.*]] = fadd float 0.000000e+00, [[I50]]
+; VPLAN-MAX32-NEXT:    [[I52:%.*]] = fmul float [[I]], [[FVAL]]
+; VPLAN-MAX32-NEXT:    [[I53:%.*]] = fadd float 0.000000e+00, [[I52]]
+; VPLAN-MAX32-NEXT:    [[I54:%.*]] = fmul float [[I3]], [[FVAL]]
+; VPLAN-MAX32-NEXT:    [[I55:%.*]] = fadd float 0.000000e+00, [[I54]]
+; VPLAN-MAX32-NEXT:    [[I56:%.*]] = fmul float [[I6]], [[FVAL]]
+; VPLAN-MAX32-NEXT:    [[I57:%.*]] = fadd float 0.000000e+00, [[I56]]
+; VPLAN-MAX32-NEXT:    [[I58:%.*]] = fmul float [[I9]], [[FVAL]]
+; VPLAN-MAX32-NEXT:    [[I59:%.*]] = fadd float 0.000000e+00, [[I58]]
+; VPLAN-MAX32-NEXT:    [[I60:%.*]] = fmul float [[I]], [[FVAL]]
+; VPLAN-MAX32-NEXT:    [[I61:%.*]] = fadd float 0.000000e+00, [[I60]]
+; VPLAN-MAX32-NEXT:    [[I62:%.*]] = fmul float [[I3]], [[FVAL]]
+; VPLAN-MAX32-NEXT:    [[I63:%.*]] = fadd float 0.000000e+00, [[I62]]
+; VPLAN-MAX32-NEXT:    [[I64:%.*]] = fmul float [[I6]], [[FVAL]]
+; VPLAN-MAX32-NEXT:    [[I65:%.*]] = fadd float 0.000000e+00, [[I64]]
+; VPLAN-MAX32-NEXT:    [[I66:%.*]] = fmul float [[I9]], [[FVAL]]
+; VPLAN-MAX32-NEXT:    [[I67:%.*]] = fadd float 0.000000e+00, [[I66]]
+; VPLAN-MAX32-NEXT:    switch i32 undef, label [[BB5:%.*]] [
+; VPLAN-MAX32-NEXT:      i32 0, label [[BB2:%.*]]
+; VPLAN-MAX32-NEXT:      i32 1, label [[BB3:%.*]]
+; VPLAN-MAX32-NEXT:      i32 2, label [[BB4:%.*]]
+; VPLAN-MAX32-NEXT:    ]
+; VPLAN-MAX32:       bb3:
+; VPLAN-MAX32-NEXT:    br label [[BB2]]
+; VPLAN-MAX32:       bb4:
+; VPLAN-MAX32-NEXT:    br label [[BB2]]
+; VPLAN-MAX32:       bb5:
+; VPLAN-MAX32-NEXT:    br label [[BB2]]
+; VPLAN-MAX32:       bb2:
+; VPLAN-MAX32-NEXT:    [[PHI1:%.*]] = phi float [ [[I19]], [[BB3]] ], [ [[I19]], [[BB4]] ], [ [[FVAL]], [[BB5]] ], [ [[I19]], [[BB1]] ]
+; VPLAN-MAX32-NEXT:    [[PHI2:%.*]] = phi float [ [[I17]], [[BB3]] ], [ [[FVAL]], [[BB4]] ], [ [[I17]], [[BB5]] ], [ [[I17]], [[BB1]] ]
+; VPLAN-MAX32-NEXT:    [[PHI3:%.*]] = phi float [ [[I15]], [[BB3]] ], [ [[FVAL]], [[BB4]] ], [ [[FVAL]], [[BB5]] ], [ [[FVAL]], [[BB1]] ]
+; VPLAN-MAX32-NEXT:    [[PHI4:%.*]] = phi float [ [[I13]], [[BB3]] ], [ [[I13]], [[BB4]] ], [ [[I13]], [[BB5]] ], [ [[FVAL]], [[BB1]] ]
+; VPLAN-MAX32-NEXT:    [[PHI5:%.*]] = phi float [ [[I11]], [[BB3]] ], [ [[I11]], [[BB4]] ], [ [[FVAL]], [[BB5]] ], [ [[I11]], [[BB1]] ]
+; VPLAN-MAX32-NEXT:    [[PHI6:%.*]] = phi float [ [[I8]], [[BB3]] ], [ [[FVAL]], [[BB4]] ], [ [[I8]], [[BB5]] ], [ [[I8]], [[BB1]] ]
+; VPLAN-MAX32-NEXT:    [[PHI7:%.*]] = phi float [ [[I5]], [[BB3]] ], [ [[FVAL]], [[BB4]] ], [ [[FVAL]], [[BB5]] ], [ [[FVAL]], [[BB1]] ]
+; VPLAN-MAX32-NEXT:    [[PHI8:%.*]] = phi float [ [[I2]], [[BB3]] ], [ [[I2]], [[BB4]] ], [ [[I2]], [[BB5]] ], [ [[FVAL]], [[BB1]] ]
+; VPLAN-MAX32-NEXT:    [[PHI9:%.*]] = phi float [ [[I21]], [[BB3]] ], [ [[I21]], [[BB4]] ], [ [[I21]], [[BB5]] ], [ [[FVAL]], [[BB1]] ]
+; VPLAN-MAX32-NEXT:    [[PHI10:%.*]] = phi float [ [[I23]], [[BB3]] ], [ [[FVAL]], [[BB4]] ], [ [[FVAL]], [[BB5]] ], [ [[FVAL]], [[BB1]] ]
+; VPLAN-MAX32-NEXT:    [[PHI11:%.*]] = phi float [ [[I25]], [[BB3]] ], [ [[FVAL]], [[BB4]] ], [ [[I25]], [[BB5]] ], [ [[I25]], [[BB1]] ]
+; VPLAN-MAX32-NEXT:    [[PHI12:%.*]] = phi float [ [[I27]], [[BB3]] ], [ [[I27]], [[BB4]] ], [ [[FVAL]], [[BB5]] ], [ [[I27]], [[BB1]] ]
+; VPLAN-MAX32-NEXT:    [[PHI13:%.*]] = phi float [ [[I29]], [[BB3]] ], [ [[I29]], [[BB4]] ], [ [[I29]], [[BB5]] ], [ [[FVAL]], [[BB1]] ]
+; VPLAN-MAX32-NEXT:    [[PHI14:%.*]] = phi float [ [[I31]], [[BB3]] ], [ [[FVAL]], [[BB4]] ], [ [[FVAL]], [[BB5]] ], [ [[FVAL]], [[BB1]] ]
+; VPLAN-MAX32-NEXT:    [[PHI15:%.*]] = phi float [ [[I33]], [[BB3]] ], [ [[FVAL]], [[BB4]] ], [ [[I33]], [[BB5]] ], [ [[I33]], [[BB1]] ]
+; VPLAN-MAX32-NEXT:    [[PHI16:%.*]] = phi float [ [[I35]], [[BB3]] ], [ [[I35]], [[BB4]] ], [ [[FVAL]], [[BB5]] ], [ [[I35]], [[BB1]] ]
+; VPLAN-MAX32-NEXT:    [[PHI17:%.*]] = phi float [ [[I37]], [[BB3]] ], [ [[I37]], [[BB4]] ], [ [[I37]], [[BB5]] ], [ [[FVAL]], [[BB1]] ]
+; VPLAN-MAX32-NEXT:    [[PHI18:%.*]] = phi float [ [[I39]], [[BB3]] ], [ [[FVAL]], [[BB4]] ], [ [[FVAL]], [[BB5]] ], [ [[FVAL]], [[BB1]] ]
+; VPLAN-MAX32-NEXT:    [[PHI19:%.*]] = phi float [ [[I41]], [[BB3]] ], [ [[FVAL]], [[BB4]] ], [ [[I41]], [[BB5]] ], [ [[I41]], [[BB1]] ]
+; VPLAN-MAX32-NEXT:    [[PHI20:%.*]] = phi float [ [[I43]], [[BB3]] ], [ [[I43]], [[BB4]] ], [ [[FVAL]], [[BB5]] ], [ [[I43]], [[BB1]] ]
+; VPLAN-MAX32-NEXT:    [[PHI21:%.*]] = phi float [ [[I45]], [[BB3]] ], [ [[I45]], [[BB4]] ], [ [[I45]], [[BB5]] ], [ [[FVAL]], [[BB1]] ]
+; VPLAN-MAX32-NEXT:    [[PHI22:%.*]] = phi float [ [[I47]], [[BB3]] ], [ [[FVAL]], [[BB4]] ], [ [[FVAL]], [[BB5]] ], [ [[FVAL]], [[BB1]] ]
+; VPLAN-MAX32-NEXT:    [[PHI23:%.*]] = phi float [ [[I49]], [[BB3]] ], [ [[FVAL]], [[BB4]] ], [ [[I49]], [[BB5]] ], [ [[I49]], [[BB1]] ]
+; VPLAN-MAX32-NEXT:    [[PHI24:%.*]] = phi float [ [[I51]], [[BB3]] ], [ [[I51]], [[BB4]] ], [ [[FVAL]], [[BB5]] ], [ [[I51]], [[BB1]] ]
+; VPLAN-MAX32-NEXT:    [[PHI25:%.*]] = phi float [ [[I53]], [[BB3]] ], [ [[I53]], [[BB4]] ], [ [[I53]], [[BB5]] ], [ [[FVAL]], [[BB1]] ]
+; VPLAN-MAX32-NEXT:    [[PHI26:%.*]] = phi float [ [[I55]], [[BB3]] ], [ [[FVAL]], [[BB4]] ], [ [[FVAL]], [[BB5]] ], [ [[FVAL]], [[BB1]] ]
+; VPLAN-MAX32-NEXT:    [[PHI27:%.*]] = phi float [ [[I57]], [[BB3]] ], [ [[FVAL]], [[BB4]] ], [ [[I57]], [[BB5]] ], [ [[I57]], [[BB1]] ]
+; VPLAN-MAX32-NEXT:    [[PHI28:%.*]] = phi float [ [[I59]], [[BB3]] ], [ [[I59]], [[BB4]] ], [ [[FVAL]], [[BB5]] ], [ [[I59]], [[BB1]] ]
+; VPLAN-MAX32-NEXT:    [[PHI29:%.*]] = phi float [ [[I61]], [[BB3]] ], [ [[I61]], [[BB4]] ], [ [[I61]], [[BB5]] ], [ [[FVAL]], [[BB1]] ]
+; VPLAN-MAX32-NEXT:    [[PHI30:%.*]] = phi float [ [[I63]], [[BB3]] ], [ [[FVAL]], [[BB4]] ], [ [[FVAL]], [[BB5]] ], [ [[FVAL]], [[BB1]] ]
+; VPLAN-MAX32-NEXT:    [[PHI31:%.*]] = phi float [ [[I65]], [[BB3]] ], [ [[FVAL]], [[BB4]] ], [ [[I65]], [[BB5]] ], [ [[I65]], [[BB1]] ]
+; VPLAN-MAX32-NEXT:    [[PHI32:%.*]] = phi float [ [[I67]], [[BB3]] ], [ [[I67]], [[BB4]] ], [ [[FVAL]], [[BB5]] ], [ [[I67]], [[BB1]] ]
+; VPLAN-MAX32-NEXT:    store float [[PHI31]], ptr undef, align 4
+; VPLAN-MAX32-NEXT:    ret void
+;
+; VPLAN-MAX256-LABEL: @phi_float32(
+; VPLAN-MAX256-NEXT:  bb:
+; VPLAN-MAX256-NEXT:    br label [[BB1:%.*]]
+; VPLAN-MAX256:       bb1:
+; VPLAN-MAX256-NEXT:    [[I:%.*]] = fpext half [[HVAL:%.*]] to float
+; VPLAN-MAX256-NEXT:    [[I3:%.*]] = fpext half [[HVAL]] to float
+; VPLAN-MAX256-NEXT:    [[I6:%.*]] = fpext half [[HVAL]] to float
+; VPLAN-MAX256-NEXT:    [[I9:%.*]] = fpext half [[HVAL]] to float
+; VPLAN-MAX256-NEXT:    [[TMP0:%.*]] = insertelement <8 x float> poison, float [[I]], i32 0
+; VPLAN-MAX256-NEXT:    [[TMP1:%.*]] = shufflevector <8 x float> [[TMP0]], <8 x float> poison, <8 x i32> zeroinitializer
+; VPLAN-MAX256-NEXT:    [[TMP2:%.*]] = insertelement <8 x float> poison, float [[FVAL:%.*]], i32 0
+; VPLAN-MAX256-NEXT:    [[TMP3:%.*]] = shufflevector <8 x float> [[TMP2]], <8 x float> poison, <8 x i32> zeroinitializer
+; VPLAN-MAX256-NEXT:    [[TMP4:%.*]] = fmul <8 x float> [[TMP1]], [[TMP3]]
+; VPLAN-MAX256-NEXT:    [[TMP5:%.*]] = fadd <8 x float> zeroinitializer, [[TMP4]]
+; VPLAN-MAX256-NEXT:    [[TMP6:%.*]] = insertelement <8 x float> poison, float [[I3]], i32 0
+; VPLAN-MAX256-NEXT:    [[TMP7:%.*]] = shufflevector <8 x float> [[TMP6]], <8 x float> poison, <8 x i32> zeroinitializer
+; VPLAN-MAX256-NEXT:    [[TMP8:%.*]] = fmul <8 x float> [[TMP7]], [[TMP3]]
+; VPLAN-MAX256-NEXT:    [[TMP9:%.*]] = fadd <8 x float> zeroinitializer, [[TMP8]]
+; VPLAN-MAX256-NEXT:    [[TMP10:%.*]] = insertelement <8 x float> poison, float [[I6]], i32 0
+; VPLAN-MAX256-NEXT:    [[TMP11:%.*]] = shufflevector <8 x float> [[TMP10]], <8 x float> poison, <8 x i32> zeroinitializer
+; VPLAN-MAX256-NEXT:    [[TMP12:%.*]] = fmul <8 x float> [[TMP11]], [[TMP3]]
+; VPLAN-MAX256-NEXT:    [[TMP13:%.*]] = fadd <8 x float> zeroinitializer, [[TMP12]]
+; VPLAN-MAX256-NEXT:    [[TMP14:%.*]] = insertelement <8 x float> poison, float [[I9]], i32 0
+; VPLAN-MAX256-NEXT:    [[TMP15:%.*]] = shufflevector <8 x float> [[TMP14]], <8 x float> poison, <8 x i32> zeroinitializer
+; VPLAN-MAX256-NEXT:    [[TMP16:%.*]] = fmul <8 x float> [[TMP15]], [[TMP3]]
+; VPLAN-MAX256-NEXT:    [[TMP17:%.*]] = fadd <8 x float> zeroinitializer, [[TMP16]]
+; VPLAN-MAX256-NEXT:    switch i32 undef, label [[BB5:%.*]] [
+; VPLAN-MAX256-NEXT:      i32 0, label [[BB2:%.*]]
+; VPLAN-MAX256-NEXT:      i32 1, label [[BB3:%.*]]
+; VPLAN-MAX256-NEXT:      i32 2, label [[BB4:%.*]]
+; VPLAN-MAX256-NEXT:    ]
+; VPLAN-MAX256:       bb3:
+; VPLAN-MAX256-NEXT:    br label [[BB2]]
+; VPLAN-MAX256:       bb4:
+; VPLAN-MAX256-NEXT:    [[TMP18:%.*]] = insertelement <8 x float> poison, float [[FVAL]], i32 0
+; VPLAN-MAX256-NEXT:    [[TMP19:%.*]] = shufflevector <8 x float> [[TMP18]], <8 x float> poison, <8 x i32> zeroinitializer
+; VPLAN-MAX256-NEXT:    br label [[BB2]]
+; VPLAN-MAX256:       bb5:
+; VPLAN-MAX256-NEXT:    [[TMP20:%.*]] = insertelement <8 x float> poison, float [[FVAL]], i32 0
+; VPLAN-MAX256-NEXT:    [[TMP21:%.*]] = shufflevector <8 x float> [[TMP20]], <8 x float> poison, <8 x i32> zeroinitializer
+; VPLAN-MAX256-NEXT:    br label [[BB2]]
+; VPLAN-MAX256:       bb2:
+; VPLAN-MAX256-NEXT:    [[TMP22:%.*]] = phi <8 x float> [ [[TMP9]], [[BB3]] ], [ [[TMP19]], [[BB4]] ], [ [[TMP21]], [[BB5]] ], [ [[TMP3]], [[BB1]] ]
+; VPLAN-MAX256-NEXT:    [[TMP23:%.*]] = phi <8 x float> [ [[TMP5]], [[BB3]] ], [ [[TMP5]], [[BB4]] ], [ [[TMP5]], [[BB5]] ], [ [[TMP3]], [[BB1]] ]
+; VPLAN-MAX256-NEXT:    [[TMP24:%.*]] = phi <8 x float> [ [[TMP17]], [[BB3]] ], [ [[TMP17]], [[BB4]] ], [ [[TMP3]], [[BB5]] ], [ [[TMP17]], [[BB1]] ]
+; VPLAN-MAX256-NEXT:    [[TMP25:%.*]] = phi <8 x float> [ [[TMP13]], [[BB3]] ], [ [[TMP3]], [[BB4]] ], [ [[TMP13]], [[BB5]] ], [ [[TMP13]], [[BB1]] ]
+; VPLAN-MAX256-NEXT:    [[TMP26:%.*]] = extractelement <8 x float> [[TMP25]], i32 7
+; VPLAN-MAX256-NEXT:    store float [[TMP26]], ptr undef, align 4
+; VPLAN-MAX256-NEXT:    ret void
+;
+; VPLAN-MAX1024-LABEL: @phi_float32(
+; VPLAN-MAX1024-NEXT:  bb:
+; VPLAN-MAX1024-NEXT:    br label [[BB1:%.*]]
+; VPLAN-MAX1024:       bb1:
+; VPLAN-MAX1024-NEXT:    [[I:%.*]] = fpext half [[HVAL:%.*]] to float
+; VPLAN-MAX1024-NEXT:    [[I3:%.*]] = fpext half [[HVAL]] to float
+; VPLAN-MAX1024-NEXT:    [[I6:%.*]] = fpext half [[HVAL]] to float
+; VPLAN-MAX1024-NEXT:    [[I9:%.*]] = fpext half [[HVAL]] to float
+; VPLAN-MAX1024-NEXT:    [[TMP0:%.*]] = insertelement <8 x float> poison, float [[I]], i32 0
+; VPLAN-MAX1024-NEXT:    [[TMP1:%.*]] = shufflevector <8 x float> [[TMP0]], <8 x float> poison, <8 x i32> zeroinitializer
+; VPLAN-MAX1024-NEXT:    [[TMP2:%.*]] = insertelement <8 x float> poison, float [[FVAL:%.*]], i32 0
+; VPLAN-MAX1024-NEXT:    [[TMP3:%.*]] = shufflevector <8 x float> [[TMP2]], <8 x float> poison, <8 x i32> zeroinitializer
+; VPLAN-MAX1024-NEXT:    [[TMP4:%.*]] = fmul <8 x float> [[TMP1]], [[TMP3]]
+; VPLAN-MAX1024-NEXT:    [[TMP5:%.*]] = fadd <8 x float> zeroinitializer, [[TMP4]]
+; VPLAN-MAX1024-NEXT:    [[TMP6:%.*]] = insertelement <8 x float> poison, float [[I3]], i32 0
+; VPLAN-MAX1024-NEXT:    [[TMP7:%.*]] = shufflevector <8 x float> [[TMP6]], <8 x float> poison, <8 x i32> zeroinitializer
+; VPLAN-MAX1024-NEXT:    [[TMP8:%.*]] = fmul <8 x float> [[TMP7]], [[TMP3]]
+; VPLAN-MAX1024-NEXT:    [[TMP9:%.*]] = fadd <8 x float> zeroinitializer, [[TMP8]]
+; VPLAN-MAX1024-NEXT:    [[TMP10:%.*]] = insertelement <8 x float> poison, float [[I6]], i32 0
+; VPLAN-MAX1024-NEXT:    [[TMP11:%.*]] = shufflevector <8 x float> [[TMP10]], <8 x float> poison, <8 x i32> zeroinitializer
+; VPLAN-MAX1024-NEXT:    [[TMP12:%.*]] = fmul <8 x float> [[TMP11]], [[TMP3]]
+; VPLAN-MAX1024-NEXT:    [[TMP13:%.*]] = fadd <8 x float> zeroinitializer, [[TMP12]]
+; VPLAN-MAX1024-NEXT:    [[TMP14:%.*]] = insertelement <8 x float> poison, float [[I9]], i32 0
+; VPLAN-MAX1024-NEXT:    [[TMP15:%.*]] = shufflevector <8 x float> [[TMP14]], <8 x float> poison, <8 x i32> zeroinitializer
+; VPLAN-MAX1024-NEXT:    [[TMP16:%.*]] = fmul <8 x float> [[TMP15]], [[TMP3]]
+; VPLAN-MAX1024-NEXT:    [[TMP17:%.*]] = fadd <8 x float> zeroinitializer, [[TMP16]]
+; VPLAN-MAX1024-NEXT:    switch i32 undef, label [[BB5:%.*]] [
+; VPLAN-MAX1024-NEXT:      i32 0, label [[BB2:%.*]]
+; VPLAN-MAX1024-NEXT:      i32 1, label [[BB3:%.*]]
+; VPLAN-MAX1024-NEXT:      i32 2, label [[BB4:%.*]]
+; VPLAN-MAX1024-NEXT:    ]
+; VPLAN-MAX1024:       bb3:
+; VPLAN-MAX1024-NEXT:    br label [[BB2]]
+; VPLAN-MAX1024:       bb4:
+; VPLAN-MAX1024-NEXT:    [[TMP18:%.*]] = insertelement <8 x float> poison, float [[FVAL]], i32 0
+; VPLAN-MAX1024-NEXT:    [[TMP19:%.*]] = shufflevector <8 x float> [[TMP18]], <8 x float> poison, <8 x i32> zeroinitializer
+; VPLAN-MAX1024-NEXT:    br label [[BB2]]
+; VPLAN-MAX1024:       bb5:
+; VPLAN-MAX1024-NEXT:    [[TMP20:%.*]] = insertelement <8 x float> poison, float [[FVAL]], i32 0
+; VPLAN-MAX1024-NEXT:    [[TMP21:%.*]] = shufflevector <8 x float> [[TMP20]], <8 x float> poison, <8 x i32> zeroinitializer
+; VPLAN-MAX1024-NEXT:    br label [[BB2]]
+; VPLAN-MAX1024:       bb2:
+; VPLAN-MAX1024-NEXT:    [[TMP22:%.*]] = phi <8 x float> [ [[TMP9]], [[BB3]] ], [ [[TMP19]], [[BB4]] ], [ [[TMP21]], [[BB5]] ], [ [[TMP3]], [[BB1]] ]
+; VPLAN-MAX1024-NEXT:    [[TMP23:%.*]] = phi <8 x float> [ [[TMP5]], [[BB3]] ], [ [[TMP5]], [[BB4]] ], [ [[TMP5]], [[BB5]] ], [ [[TMP3]], [[BB1]] ]
+; VPLAN-MAX1024-NEXT:    [[TMP24:%.*]] = phi <8 x float> [ [[TMP17]], [[BB3]] ], [ [[TMP17]], [[BB4]] ], [ [[TMP3]], [[BB5]] ], [ [[TMP17]], [[BB1]] ]
+; VPLAN-MAX1024-NEXT:    [[TMP25:%.*]] = phi <8 x float> [ [[TMP13]], [[BB3]] ], [ [[TMP3]], [[BB4]] ], [ [[TMP13]], [[BB5]] ], [ [[TMP13]], [[BB1]] ]
+; VPLAN-MAX1024-NEXT:    [[TMP26:%.*]] = extractelement <8 x float> [[TMP25]], i32 7
+; VPLAN-MAX1024-NEXT:    store float [[TMP26]], ptr undef, align 4
+; VPLAN-MAX1024-NEXT:    ret void
 ;
 bb:
   br label %bb1

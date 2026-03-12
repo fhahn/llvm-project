@@ -1,6 +1,8 @@
 ; REQUIRES: asserts
 ; RUN: opt -mtriple=systemz-unknown -mcpu=z13 -passes=slp-vectorizer -debug-only=SLP \
 ; RUN:   -S -disable-output < %s 2>&1 | FileCheck %s
+; RUN: opt -mtriple=systemz-unknown -mcpu=z13 -passes=slp-vectorizer -slp-use-vplan-codegen -debug-only=SLP \
+; RUN:   -S -disable-output < %s 2>&1 | FileCheck %s
 ;
 ; Check that SLP vectorizer gets the right cost difference for a compare
 ; node.

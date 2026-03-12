@@ -245,8 +245,16 @@ VPTransformState::VPTransformState(const TargetTransformInfo *TTI,
       CurrentParentLoop(CurrentParentLoop), TypeAnalysis(*Plan), VPDT(*Plan) {}
 
 Value *VPTransformState::get(const VPValue *Def, const VPLane &Lane) {
-  if (isa<VPIRValue, VPSymbolicValue>(Def))
-    return Def->getUnderlyingValue();
+  if (isa<VPIRValue, VPSymbolicValue>(Def)) {
+    Value *V = Def->getUnderlyingValue();
+    // For vector-typed live-ins, extract the requested lane rather than
+    // returning the whole vector.
+    if (V->getType()->isVectorTy()) {
+      Value *LaneV = Lane.getAsRuntimeExpr(Builder, VF);
+      return Builder.CreateExtractElement(V, LaneV);
+    }
+    return V;
+  }
 
   if (hasScalarValue(Def, Lane))
     return Data.VPV2Scalars[Def][Lane.mapToCacheIndex(VF)];
@@ -301,6 +309,11 @@ Value *VPTransformState::get(const VPValue *Def, bool NeedsScalar) {
 
   if (!hasScalarValue(Def, {0})) {
     Value *IRV = Def->getLiveInIRValue();
+    // Vector-typed live-ins are used as-is, not broadcast.
+    if (IRV->getType()->isVectorTy()) {
+      set(Def, IRV);
+      return IRV;
+    }
     Value *B = GetBroadcastInstrs(IRV);
     set(Def, B);
     return B;

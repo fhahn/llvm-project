@@ -1,5 +1,7 @@
 ; RUN: opt < %s -passes=slp-vectorizer -mtriple=ve-linux -S | FileCheck %s -check-prefix=VE 
 ; RUN: opt < %s -passes=slp-vectorizer -mtriple=x86_64-pc_linux -mcpu=core-avx2 -S | FileCheck %s -check-prefix=SSE
+; RUN: opt < %s -passes=slp-vectorizer -slp-use-vplan-codegen -mtriple=ve-linux -S | FileCheck %s -check-prefix=VE 
+; RUN: opt < %s -passes=slp-vectorizer -slp-use-vplan-codegen -mtriple=x86_64-pc_linux -mcpu=core-avx2 -S | FileCheck %s -check-prefix=SSE
 
 ; Make sure SLP does not trigger for VE on an appealing set of combinable loads
 ; and stores that vectorizes for x86 SSE.

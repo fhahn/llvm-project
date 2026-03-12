@@ -17,6 +17,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Transforms/Vectorize/SLPVectorizer.h"
+#include "VPlan.h"
+#include "VPlanAnalysis.h"
+#include "VPlanHelpers.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/PriorityQueue.h"
@@ -112,6 +115,10 @@ using namespace std::placeholders;
 #define DEBUG_TYPE "SLP"
 
 STATISTIC(NumVectorInstructions, "Number of vector instructions generated");
+STATISTIC(NumVPlanCodegen,
+          "Number of SLP trees using VPlan-based codegen");
+STATISTIC(NumLegacyCodegen,
+          "Number of SLP trees using legacy codegen");
 
 DEBUG_COUNTER(VectorizedGraphs, "slp-vectorized",
               "Controls which SLP graphs should be vectorized.");
@@ -222,6 +229,10 @@ static cl::opt<unsigned> LoopAwareTripCount(
     "slp-cost-loop-trip-count", cl::init(2), cl::Hidden,
     cl::desc("Loop trip count, considered by the cost model during "
              "modeling (0=loops are ignored and considered flat code)"));
+
+static cl::opt<bool> SLPUseVPlanCodegen(
+    "slp-use-vplan-codegen", cl::init(true), cl::Hidden,
+    cl::desc("Use VPlan-based codegen in SLP vectorizer"));
 
 // Limit the number of alias checks. The limit is chosen so that
 // it has no negative effect on the llvm benchmarks.
@@ -2032,6 +2043,13 @@ public:
                 Instruction *ReductionRoot = nullptr,
                 ArrayRef<std::tuple<WeakTrackingVH, unsigned, bool, bool>>
                     VectorValuesAndScales = {});
+
+  /// Build a VPlan from the current SLP tree. Returns nullptr if the tree
+  /// contains constructs not yet supported by VPlan-based codegen.
+  std::unique_ptr<VPlan> buildVPlanForTree(VPValue *&RootVPV);
+
+  /// Execute the VPlan, generating vector IR for the SLP tree.
+  void executeVPlanForTree(VPlan &Plan, VPValue *RootVPV);
 
   /// \returns the cost incurred by unwanted spills and fills, caused by
   /// holding live values over call sites.
@@ -22398,6 +22416,940 @@ Value *BoUpSLP::vectorizeTree(TreeEntry *E) {
   return nullptr;
 }
 
+/// Returns true if operand \p J of an entry with opcode \p Opcode is a
+/// live-in (not tracked via OperandsToTreeEntry).
+static bool isLiveInOperand(unsigned Opcode, unsigned J) {
+  return (Opcode == Instruction::Load && J == 0) ||
+         (Opcode == Instruction::Store && J == 1) ||
+         (Opcode == Instruction::InsertElement && J == 0);
+}
+
+/// Simplify BuildVector recipes in \p Plan by replacing them with more
+/// efficient ShuffleVector or InsertElement+ShuffleVector sequences.
+static void simplifyBuildVectors(VPlan &Plan) {
+  VPBasicBlock *VPBB =
+      cast<VPBasicBlock>(Plan.getEntry()->getSingleSuccessor());
+  VPTypeAnalysis TypeInfo(Plan);
+  auto *I32Ty = Type::getInt32Ty(Plan.getContext());
+
+  // Helper to check if a VPValue is a live-in undef.
+  auto IsUndef = [](VPValue *Op) -> bool {
+    auto *IRVal = dyn_cast<VPIRValue>(Op);
+    return IRVal && isa<UndefValue>(IRVal->getValue());
+  };
+
+  for (VPRecipeBase &R : make_early_inc_range(*VPBB)) {
+    auto *BV = dyn_cast<VPInstruction>(&R);
+    if (!BV || BV->getOpcode() != VPInstruction::BuildVector)
+      continue;
+
+    unsigned NumElts = BV->getNumOperands();
+
+    // Skip BuildVectors with non-undef constants.
+    if (any_of(BV->operands(), [](VPValue *Op) {
+          auto *IRVal = dyn_cast<VPIRValue>(Op);
+          return IRVal && isa<Constant>(IRVal->getValue()) &&
+                 !isa<UndefValue>(IRVal->getValue());
+        }))
+      continue;
+
+    // Try splat pattern: all non-undef operands are the same VPValue.
+    VPValue *SplatVal = nullptr;
+    bool IsSplat = true;
+    bool HasPoisonLane = false;
+    for (VPValue *Op : BV->operands()) {
+      if (IsUndef(Op)) {
+        HasPoisonLane = true;
+        continue;
+      }
+      if (!SplatVal)
+        SplatVal = Op;
+      else if (SplatVal != Op) {
+        IsSplat = false;
+        break;
+      }
+    }
+
+    if (IsSplat && SplatVal) {
+      Type *ScalarTy = TypeInfo.inferScalarType(BV->getOperand(0));
+      auto *VecTy = FixedVectorType::get(ScalarTy, NumElts);
+      VPValue *PoisonVec = Plan.getOrAddLiveIn(PoisonValue::get(VecTy));
+      auto *IE = new VPInstruction(Instruction::InsertElement,
+                                   {PoisonVec, SplatVal,
+                                    Plan.getConstantInt(I32Ty, 0)});
+      IE->insertBefore(BV);
+
+      SmallVector<VPValue *> ShufOps;
+      ShufOps.push_back(IE);
+      for (VPValue *Op : BV->operands()) {
+        if (IsUndef(Op))
+          ShufOps.push_back(
+              Plan.getConstantInt(I32Ty, PoisonMaskElem, /*IsSigned=*/true));
+        else
+          ShufOps.push_back(Plan.getConstantInt(I32Ty, 0));
+      }
+      auto *Shuf = new VPInstruction(Instruction::ShuffleVector, ShufOps);
+      Shuf->insertBefore(BV);
+      VPValue *Result = Shuf;
+      if (HasPoisonLane) {
+        Result = new VPInstruction(Instruction::Freeze, {Shuf});
+        cast<VPInstruction>(Result)->insertBefore(BV);
+      }
+      BV->replaceAllUsesWith(Result);
+      BV->eraseFromParent();
+      continue;
+    }
+
+    // Try extract-from-vector pattern: all non-undef operands are
+    // ExtractElementInst from at most 2 source vectors.
+    SmallVector<Value *, 2> SrcVecs;
+    auto IsValidExtractOp = [&](VPValue *Op) -> bool {
+      auto *IRVal = dyn_cast<VPIRValue>(Op);
+      if (!IRVal)
+        return false;
+      if (isa<UndefValue>(IRVal->getValue()))
+        return true;
+      auto *EE = dyn_cast<ExtractElementInst>(IRVal->getValue());
+      if (!EE || !isa<ConstantInt>(EE->getIndexOperand()))
+        return false;
+      Value *Src = EE->getVectorOperand();
+      if (!is_contained(SrcVecs, Src))
+        SrcVecs.push_back(Src);
+      if (SrcVecs.size() == 2 &&
+          SrcVecs[0]->getType() != SrcVecs[1]->getType())
+        return false;
+      return SrcVecs.size() <= 2;
+    };
+
+    if (all_of(BV->operands(), IsValidExtractOp) && !SrcVecs.empty()) {
+      unsigned SrcNumElts =
+          cast<FixedVectorType>(SrcVecs[0]->getType())->getNumElements();
+      SmallVector<VPValue *> ShufOps;
+      ShufOps.push_back(Plan.getOrAddLiveIn(SrcVecs[0]));
+      if (SrcVecs.size() == 2)
+        ShufOps.push_back(Plan.getOrAddLiveIn(SrcVecs[1]));
+      for (VPValue *Op : BV->operands()) {
+        auto *IRVal = cast<VPIRValue>(Op);
+        if (isa<UndefValue>(IRVal->getValue())) {
+          ShufOps.push_back(
+              Plan.getConstantInt(I32Ty, PoisonMaskElem, /*IsSigned=*/true));
+          continue;
+        }
+        auto *EE = cast<ExtractElementInst>(IRVal->getValue());
+        unsigned ExtIdx =
+            cast<ConstantInt>(EE->getIndexOperand())->getZExtValue();
+        unsigned VecOffset =
+            (EE->getVectorOperand() == SrcVecs[0]) ? 0 : SrcNumElts;
+        ShufOps.push_back(Plan.getConstantInt(I32Ty, ExtIdx + VecOffset));
+      }
+      auto *Shuf = new VPInstruction(Instruction::ShuffleVector, ShufOps);
+      Shuf->insertBefore(BV);
+      BV->replaceAllUsesWith(Shuf);
+      BV->eraseFromParent();
+      continue;
+    }
+  }
+}
+
+std::unique_ptr<VPlan>
+BoUpSLP::buildVPlanForTree(VPValue *&RootVPV) {
+  if (!isa<Instruction>(VectorizableTree[0]->Scalars.front()))
+    return nullptr;
+
+  DenseMap<TreeEntry *, VPValue *> EntryToVPValue;
+  auto *ScalarHeaderBB =
+      cast<Instruction>(VectorizableTree[0]->Scalars.front())->getParent();
+  auto Plan = std::make_unique<VPlan>(ScalarHeaderBB);
+  auto *I32Ty = IntegerType::get(F->getContext(), 32);
+  Plan->setTripCount(Plan->getConstantInt(I32Ty, 0));
+  VPBasicBlock *VPBB = Plan->createVPBasicBlock("slp.body");
+  VPBlockUtils::insertBlockAfter(VPBB, Plan->getEntry());
+
+  // Validate eligibility and create gather recipes. Gathers become live-ins
+  // (constant splats) or deferred BuildVector recipes.
+  DenseMap<TreeEntry *, VPInstruction *> PendingBuildVectors;
+  auto CleanupPendingBVs = scope_exit([&]() {
+    for (auto &[E, BV] : PendingBuildVectors)
+      delete BV;
+  });
+  bool HasNonExtractEntry = false;
+  SmallVector<TreeEntry *> SortedEntries;
+  for (const std::unique_ptr<TreeEntry> &TEPtr : VectorizableTree) {
+    TreeEntry *E = TEPtr.get();
+    if (DeletedNodes.contains(E))
+      continue;
+    if (MinBWs.contains(E))
+      return nullptr;
+    if (E->isGather()) {
+      // Constant splats can be represented as live-ins directly.
+      if (E->Scalars.size() > 1 && isa<Constant>(E->Scalars.front()) &&
+          all_of(E->Scalars,
+                 [&](Value *V) { return V == E->Scalars.front(); })) {
+        EntryToVPValue[E] = Plan->getOrAddLiveIn(E->Scalars.front());
+        continue;
+      }
+      // Gathers where all scalars are live-in values become BuildVectors.
+      // Reject gathers containing extractelement instructions whose source
+      // vectors are tree scalars (simplifyBuildVectors would create shuffles
+      // referencing soon-to-be-erased instructions).
+      if (!all_of(E->Scalars, [&](Value *V) {
+            if (isa<Constant>(V))
+              return true;
+            auto *I = dyn_cast<Instruction>(V);
+            if (!I)
+              return true;
+            if (ScalarToTreeEntries.contains(V))
+              return false;
+            if (auto *EE = dyn_cast<ExtractElementInst>(I))
+              if (ScalarToTreeEntries.contains(EE->getVectorOperand()))
+                return false;
+            return true;
+          }))
+        return nullptr;
+      SmallVector<VPValue *> Ops;
+      for (Value *V : E->Scalars)
+        Ops.push_back(Plan->getOrAddLiveIn(V));
+      auto *BV = new VPInstruction(VPInstruction::BuildVector, Ops);
+      EntryToVPValue[E] = BV;
+      PendingBuildVectors[E] = BV;
+      continue;
+    }
+
+    if (!E->hasState() || E->State != TreeEntry::Vectorize ||
+        !E->ReorderIndices.empty() || !E->ReuseShuffleIndices.empty() ||
+        !DT->isReachableFromEntry(E->getMainOp()->getParent()))
+      return nullptr;
+    if (getValueType(E->Scalars.front())->isVectorTy())
+      return nullptr;
+    // Bail out for non-trivially-vectorizable calls.
+    if (E->getOpcode() == Instruction::Call) {
+      auto *CI = cast<CallInst>(E->getMainOp());
+      Intrinsic::ID ID = getVectorIntrinsicIDForCall(CI, TLI);
+      if (!isTriviallyVectorizable(ID))
+        return nullptr;
+    }
+
+    SortedEntries.push_back(E);
+    if (E->getOpcode() != Instruction::ExtractElement)
+      HasNonExtractEntry = true;
+  }
+  if (!HasNonExtractEntry)
+    return nullptr;
+
+  DenseMap<std::pair<const TreeEntry *, unsigned>, VPValue *> ExtractVPValues;
+
+  auto CreateExtract = [&](VPValue *Vec, unsigned Lane) -> VPValue * {
+    auto *Ext = new VPInstruction(
+        Instruction::ExtractElement,
+        {Vec, Plan->getConstantInt(I32Ty, Lane)});
+    VPBB->appendRecipe(Ext);
+    return Ext;
+  };
+
+  // Helper to create a shufflevector VPInstruction.
+  auto CreateShuffleRecipe = [&](VPValue *V0, ArrayRef<int> Mask,
+                                 VPValue *V1 = nullptr) -> VPValue * {
+    SmallVector<VPValue *> Ops;
+    Ops.push_back(V0);
+    if (V1)
+      Ops.push_back(V1);
+    for (int M : Mask)
+      Ops.push_back(Plan->getConstantInt(I32Ty, M, /*IsSigned=*/true));
+    auto *Shuf = new VPInstruction(Instruction::ShuffleVector, Ops);
+    VPBB->appendRecipe(Shuf);
+    return Shuf;
+  };
+
+  // Compute intersected VPIRFlags for a list of scalar values.
+  auto ComputeFlags = [](Instruction *SeedOp,
+                         ArrayRef<Value *> Scalars) -> VPIRFlags {
+    if (auto *CmpI = dyn_cast<CmpInst>(SeedOp)) {
+      VPIRFlags Flags(CmpI->getPredicate());
+      if (auto *FCI = dyn_cast<FCmpInst>(SeedOp)) {
+        FastMathFlags FMF = FCI->getFastMathFlags();
+        for (Value *V : Scalars)
+          if (auto *FI = dyn_cast<FPMathOperator>(V))
+            FMF &= FI->getFastMathFlags();
+        Flags = VPIRFlags(CmpI->getPredicate(), FMF);
+      }
+      return Flags;
+    }
+    VPIRFlags Flags(*SeedOp);
+    for (Value *V : Scalars) {
+      auto *I = dyn_cast<Instruction>(V);
+      if (!I || !VPIRFlags(*I).hasSameOpType(Flags))
+        return VPIRFlags();
+      Flags.intersectFlags(VPIRFlags(*I));
+    }
+    return Flags;
+  };
+
+  // Resolve a pointer to its VPValue, extracting from a vectorized tree
+  // entry if the pointer is a scalar in one.
+  auto getOrCreateAddrVPV = [&](Value *Ptr) -> VPValue * {
+    if (auto *PtrI = dyn_cast<Instruction>(Ptr)) {
+      ArrayRef<TreeEntry *> PtrEntries = getTreeEntries(PtrI);
+      if (!PtrEntries.empty()) {
+        TreeEntry *PtrEntry = PtrEntries.front();
+        if (VPValue *PtrVPV = EntryToVPValue.lookup(PtrEntry)) {
+          unsigned Lane = PtrEntry->findLaneForValue(Ptr);
+          auto ExtKey = std::make_pair(PtrEntry, Lane);
+          if (!ExtractVPValues.contains(ExtKey))
+            ExtractVPValues[ExtKey] = CreateExtract(PtrVPV, Lane);
+          return ExtractVPValues[ExtKey];
+        }
+      }
+    }
+    return Plan->getOrAddLiveIn(Ptr);
+  };
+
+  auto CreateEntryRecipe = [&](TreeEntry *E) -> VPValue * {
+    unsigned Opcode = E->getOpcode();
+    Instruction *MainOp = E->getMainOp();
+
+    if (Instruction::isBinaryOp(Opcode) || Opcode == Instruction::FNeg ||
+        Opcode == Instruction::Select ||
+        Opcode == Instruction::ICmp || Opcode == Instruction::FCmp ||
+        Opcode == Instruction::GetElementPtr) {
+      SmallVector<VPValue *, 3> Ops;
+      for (unsigned J = 0, NumOps = MainOp->getNumOperands(); J < NumOps; ++J) {
+        VPValue *Op = EntryToVPValue.lookup(getOperandEntry(E, J));
+        assert(Op && "Operand entry not yet processed");
+        Ops.push_back(Op);
+      }
+      if (E->isAltShuffle()) {
+        Instruction *AltOp = E->getAltOp();
+        ValueList OpScalars, AltScalars;
+        SmallVector<int> Mask;
+        E->buildAltOpShuffleMask(
+            [E, this](Instruction *I) {
+              return isAlternateInstruction(I, E->getMainOp(), E->getAltOp(),
+                                            *TLI);
+            },
+            Mask, &OpScalars, &AltScalars);
+        auto *V0 = new VPWidenRecipe(*MainOp, Ops, ComputeFlags(MainOp, OpScalars),
+                                     VPIRMetadata(*MainOp), MainOp->getDebugLoc());
+        VPBB->appendRecipe(V0);
+        auto *V1 = new VPWidenRecipe(*AltOp, Ops, ComputeFlags(AltOp, AltScalars),
+                                     VPIRMetadata(*AltOp), AltOp->getDebugLoc());
+        VPBB->appendRecipe(V1);
+        return CreateShuffleRecipe(V0, Mask, V1);
+      }
+
+      VPIRFlags Flags;
+      if (Opcode == Instruction::GetElementPtr)
+        Flags = VPIRFlags(GEPNoWrapFlags::none());
+      else
+        Flags = ComputeFlags(MainOp, E->Scalars);
+      auto *R = new VPWidenRecipe(*MainOp, Ops, Flags, VPIRMetadata(*MainOp),
+                                  MainOp->getDebugLoc());
+      VPBB->appendRecipe(R);
+      return R;
+    }
+    if (Instruction::isCast(Opcode)) {
+      VPValue *Op = EntryToVPValue.lookup(getOperandEntry(E, 0));
+      assert(Op && "Operand entry not yet processed");
+      auto *CI = cast<CastInst>(MainOp);
+      if (E->isAltShuffle()) {
+        auto *AltOp = cast<CastInst>(E->getAltOp());
+        ValueList OpScalars, AltScalars;
+        SmallVector<int> Mask;
+        E->buildAltOpShuffleMask(
+            [E, this](Instruction *I) {
+              return isAlternateInstruction(I, E->getMainOp(), E->getAltOp(),
+                                            *TLI);
+            },
+            Mask, &OpScalars, &AltScalars);
+        auto *V0 = new VPWidenCastRecipe(
+            CI->getOpcode(), Op, CI->getType(), CI,
+            VPIRFlags::getDefaultFlags(CI->getOpcode()), VPIRMetadata(*CI),
+            CI->getDebugLoc());
+        VPBB->appendRecipe(V0);
+        auto *V1 = new VPWidenCastRecipe(
+            AltOp->getOpcode(), Op, AltOp->getType(), AltOp,
+            VPIRFlags::getDefaultFlags(AltOp->getOpcode()),
+            VPIRMetadata(*AltOp), AltOp->getDebugLoc());
+        VPBB->appendRecipe(V1);
+        return CreateShuffleRecipe(V0, Mask, V1);
+      }
+      auto *R = new VPWidenCastRecipe(
+          CI->getOpcode(), Op, CI->getType(), CI,
+          VPIRFlags::getDefaultFlags(CI->getOpcode()), VPIRMetadata(*CI),
+          CI->getDebugLoc());
+      VPBB->appendRecipe(R);
+      return R;
+    }
+    if (Opcode == Instruction::Freeze) {
+      VPValue *Op = EntryToVPValue.lookup(getOperandEntry(E, 0));
+      assert(Op && "Operand entry not yet processed");
+      auto *R = new VPInstruction(Instruction::Freeze, {Op}, {}, {},
+                                  MainOp->getDebugLoc());
+      VPBB->appendRecipe(R);
+      return R;
+    }
+    if (Opcode == Instruction::Call) {
+      auto *CI = cast<CallInst>(MainOp);
+      Intrinsic::ID ID = getVectorIntrinsicIDForCall(CI, TLI);
+      assert(isTriviallyVectorizable(ID) &&
+             "Only trivially vectorizable intrinsics expected");
+
+      // Check if a vector library function is available and cheaper than the
+      // intrinsic, matching the logic in the legacy vectorizeTree path.
+      auto *VecTy =
+          getWidenedType(CI->getType(), E->Scalars.size());
+      SmallVector<Type *> ArgTys =
+          buildIntrinsicArgTypes(CI, ID, VecTy->getNumElements(), 0, TTI);
+      auto VecCallCosts = getVectorCallCosts(CI, VecTy, TTI, TLI, ArgTys);
+      bool UseIntrinsic = ID != Intrinsic::not_intrinsic &&
+                          VecCallCosts.first <= VecCallCosts.second;
+
+      SmallVector<VPValue *> Args;
+      unsigned TreeOpIdx = 0;
+      for (unsigned J = 0, NumArgs = CI->arg_size(); J < NumArgs; ++J) {
+        if (UseIntrinsic && isVectorIntrinsicWithScalarOpAtArg(ID, J, TTI)) {
+          Args.push_back(Plan->getOrAddLiveIn(CI->getArgOperand(J)));
+          continue;
+        }
+        VPValue *Op = EntryToVPValue.lookup(getOperandEntry(E, TreeOpIdx));
+        assert(Op && "Operand entry not yet processed");
+        Args.push_back(Op);
+        ++TreeOpIdx;
+      }
+      // Intersect fast-math flags for floating-point results.
+      VPIRFlags Flags;
+      if (isa<FPMathOperator>(CI)) {
+        FastMathFlags FMFs;
+        FMFs.set();
+        for (Value *V : E->Scalars)
+          if (auto *FPOp = dyn_cast<FPMathOperator>(V))
+            FMFs &= FPOp->getFastMathFlags();
+          else
+            FMFs = FastMathFlags();
+        Flags = VPIRFlags(FMFs);
+      }
+
+      if (!UseIntrinsic) {
+        VFShape Shape =
+            VFShape::get(CI->getFunctionType(),
+                         ElementCount::getFixed(VecTy->getNumElements()),
+                         false /*HasGlobalPred*/);
+        Function *VecFunc = VFDatabase(*CI).getVectorizedFunction(Shape);
+        assert(VecFunc && "Vector function not found");
+        Args.push_back(Plan->getOrAddLiveIn(VecFunc));
+        auto *R = new VPWidenCallRecipe(CI, VecFunc, Args, Flags,
+                                        VPIRMetadata(*CI), CI->getDebugLoc());
+        VPBB->appendRecipe(R);
+        return R;
+      }
+
+      auto *R = new VPWidenIntrinsicRecipe(*CI, ID, Args, CI->getType(),
+                                            Flags, VPIRMetadata(*CI),
+                                            CI->getDebugLoc());
+      VPBB->appendRecipe(R);
+      return R;
+    }
+    if (Opcode == Instruction::InsertElement) {
+      VPValue *Op = EntryToVPValue.lookup(getOperandEntry(E, 1));
+      assert(Op && "Operand entry not yet processed");
+
+      // Find the first insert in the chain.
+      auto *FirstInsert =
+          cast<Instruction>(*find_if(E->Scalars, [E](Value *V) {
+            return !is_contained(E->Scalars,
+                                 cast<Instruction>(V)->getOperand(0));
+          }));
+      const unsigned NumElts =
+          cast<FixedVectorType>(FirstInsert->getType())->getNumElements();
+      const unsigned NumScalars = E->Scalars.size();
+
+      unsigned Offset = *getElementIndex(MainOp);
+      assert(Offset < NumElts && "Failed to find vector index offset");
+
+      // Build Mask mapping offset-relative positions to operand lanes.
+      SmallVector<int> Mask(NumElts, PoisonMaskElem);
+      bool IsIdentity = true;
+      for (unsigned I = 0; I < NumScalars; ++I) {
+        unsigned InsertIdx = *getElementIndex(E->Scalars[I]);
+        IsIdentity &= InsertIdx - Offset == I;
+        Mask[InsertIdx - Offset] = I;
+      }
+      // Step 1: Resize/reorder if needed.
+      if (!IsIdentity || NumElts != NumScalars) {
+        SmallVector<int> InsertMask(Mask);
+        if (NumElts != NumScalars && Offset == 0) {
+          // Follow insert chain to fill positions used by later inserts.
+          InsertElementInst *Ins = cast<InsertElementInst>(MainOp);
+          do {
+            std::optional<unsigned> InsertIdx = getElementIndex(Ins);
+            if (!InsertIdx)
+              break;
+            if (InsertMask[*InsertIdx] == PoisonMaskElem)
+              InsertMask[*InsertIdx] = *InsertIdx;
+            if (!Ins->hasOneUse())
+              break;
+            Ins = dyn_cast_or_null<InsertElementInst>(
+                Ins->getUniqueUndroppableUser());
+          } while (Ins);
+          SmallBitVector UseMask1 =
+              buildUseMask(NumElts, InsertMask, UseMask::UndefsAsMask);
+          SmallBitVector IsFirstPoison =
+              isUndefVector<true>(FirstInsert->getOperand(0), UseMask1);
+          SmallBitVector IsFirstUndef =
+              isUndefVector(FirstInsert->getOperand(0), UseMask1);
+          if (!IsFirstPoison.all()) {
+            for (unsigned I = 0; I < NumElts; I++) {
+              if (InsertMask[I] == PoisonMaskElem && !IsFirstPoison.test(I) &&
+                  IsFirstUndef.test(I)) {
+                InsertMask[I] = I < NumScalars ? I : 0;
+              } else if (InsertMask[I] != PoisonMaskElem &&
+                         Mask[I] == PoisonMaskElem) {
+                InsertMask[I] = PoisonMaskElem;
+              }
+            }
+          } else {
+            InsertMask = Mask;
+          }
+        }
+        Op = CreateShuffleRecipe(Op, InsertMask);
+      }
+      // Step 2: Place at offset position and merge with base if needed.
+      if (NumElts != NumScalars) {
+        SmallVector<int> InsertMask(NumElts, PoisonMaskElem);
+        for (unsigned I = 0; I < NumElts; I++) {
+          if (Mask[I] != PoisonMaskElem)
+            InsertMask[Offset + I] = I;
+        }
+        SmallBitVector UseMask2 =
+            buildUseMask(NumElts, InsertMask, UseMask::UndefsAsMask);
+        SmallBitVector IsFirstUndef =
+            isUndefVector(FirstInsert->getOperand(0), UseMask2);
+        if (!IsIdentity || Offset != 0 || !IsFirstUndef.all()) {
+          if (IsFirstUndef.all()) {
+            SmallBitVector IsFirstPoison =
+                isUndefVector<true>(FirstInsert->getOperand(0), UseMask2);
+            if (!IsFirstPoison.all()) {
+              for (unsigned I = 0; I < NumElts; I++) {
+                if (InsertMask[I] == PoisonMaskElem && !IsFirstPoison.test(I))
+                  InsertMask[I] = I + NumElts;
+              }
+            }
+            VPValue *V2 = IsFirstPoison.all()
+                              ? Plan->getOrAddLiveIn(PoisonValue::get(
+                                    getWidenedType(MainOp->getType()
+                                                       ->getScalarType(),
+                                                   NumElts)))
+                              : Plan->getOrAddLiveIn(
+                                    FirstInsert->getOperand(0));
+            Op = CreateShuffleRecipe(Op, InsertMask, V2);
+          } else {
+            SmallBitVector IsFirstPoison =
+                isUndefVector<true>(FirstInsert->getOperand(0), UseMask2);
+            for (unsigned I = 0; I < NumElts; I++) {
+              if (InsertMask[I] == PoisonMaskElem)
+                InsertMask[I] = IsFirstPoison.test(I) ? PoisonMaskElem : I;
+              else
+                InsertMask[I] += NumElts;
+            }
+            VPValue *Base =
+                Plan->getOrAddLiveIn(FirstInsert->getOperand(0));
+            Op = CreateShuffleRecipe(Base, InsertMask, Op);
+          }
+        }
+      }
+      return Op;
+    }
+    if (Opcode == Instruction::PHI) {
+      auto *PH = cast<PHINode>(MainOp);
+      SmallVector<VPValue *> Ops;
+      for (unsigned I = 0, NumOps = PH->getNumIncomingValues(); I < NumOps;
+           ++I) {
+        VPValue *Op = EntryToVPValue.lookup(getOperandEntry(E, I));
+        assert(Op && "Operand entry not yet processed");
+        Ops.push_back(Op);
+      }
+      auto *R = new VPWidenPHIRecipe(PH, Ops.front(), PH->getDebugLoc());
+      for (VPValue *Op : ArrayRef(Ops).drop_front())
+        R->addOperand(Op);
+      VPBB->appendRecipe(R);
+      return R;
+    }
+    if (Opcode == Instruction::ExtractElement) {
+      // Find the source vector from the first non-undef scalar.
+      Value *SrcVec = nullptr;
+      for (Value *V : E->Scalars) {
+        if (!isa<UndefValue>(V)) {
+          SrcVec = cast<ExtractElementInst>(V)->getVectorOperand();
+          break;
+        }
+      }
+      assert(SrcVec && "ExtractElement entry with all undefs");
+      VPValue *SrcVPV = Plan->getOrAddLiveIn(SrcVec);
+
+      // Build shuffle mask and check for identity.
+      SmallVector<int> Mask;
+      bool IsIdentity = true;
+      for (auto [I, V] : enumerate(E->Scalars)) {
+        if (isa<UndefValue>(V)) {
+          Mask.push_back(PoisonMaskElem);
+          continue;
+        }
+        int Idx = cast<ConstantInt>(
+                      cast<ExtractElementInst>(V)->getIndexOperand())
+                      ->getSExtValue();
+        IsIdentity &= (unsigned)Idx == I;
+        Mask.push_back(Idx);
+      }
+      if (IsIdentity)
+        return SrcVPV;
+      return CreateShuffleRecipe(SrcVPV, Mask);
+    }
+    if (Opcode == Instruction::Load) {
+      auto *LI = cast<LoadInst>(MainOp);
+      VPValue *Addr = getOrCreateAddrVPV(LI->getPointerOperand());
+      auto *R = new VPWidenLoadRecipe(*LI, Addr, /*Mask=*/nullptr,
+                                      /*Consecutive=*/true,
+                                      VPIRMetadata(*LI), LI->getDebugLoc());
+      VPBB->appendRecipe(R);
+      return R;
+    }
+    if (Opcode == Instruction::Store) {
+      auto *SI = cast<StoreInst>(MainOp);
+      VPValue *Addr = getOrCreateAddrVPV(SI->getPointerOperand());
+      VPValue *StoredVal = EntryToVPValue.lookup(getOperandEntry(E, 0));
+      assert(StoredVal && "Stored value entry not yet processed");
+      auto *R =
+          new VPWidenStoreRecipe(*SI, Addr, StoredVal, /*Mask=*/nullptr,
+                                 /*Consecutive=*/true,
+                                 VPIRMetadata(*SI), SI->getDebugLoc());
+      VPBB->appendRecipe(R);
+      return nullptr; // Stores don't define a VPValue.
+    }
+    llvm_unreachable("Unsupported opcode in VPlan-based SLP codegen");
+  };
+
+  struct PendingExtract {
+    const TreeEntry *E;
+    VPValue *EntryVPV;
+    Value *Scalar;
+    unsigned Lane;
+    Instruction *MarkerInst;
+    PHINode *PHI = nullptr;
+    unsigned PHIOperandIdx = 0;
+    Instruction *UserInst = nullptr;
+  };
+  SmallVector<PendingExtract> PendingExtracts;
+
+  MapVector<Instruction *, SmallDenseMap<unsigned, VPValue *>>
+      UserReplacements;
+
+  auto AddUserReplacement = [&](Instruction *UserInst, Value *Scalar,
+                                VPValue *ExtVPV) {
+    for (unsigned I = 0, N = UserInst->getNumOperands(); I < N; ++I) {
+      if (UserInst->getOperand(I) == Scalar)
+        UserReplacements[UserInst][I] = ExtVPV;
+    }
+  };
+
+  auto AddAllUserReplacements = [&](Value *Scalar, VPValue *ExtVPV) {
+    for (User *U : Scalar->users()) {
+      auto *UserInst = dyn_cast<Instruction>(U);
+      if (!UserInst || !getTreeEntries(UserInst).empty())
+        continue;
+      AddUserReplacement(UserInst, Scalar, ExtVPV);
+    }
+  };
+
+  bool Failed = false;
+  auto CreateExtractRecipes = [&](TreeEntry *E, VPValue *EntryVPV,
+                                  bool DeferIfAfterEntry = false) {
+    if (Failed)
+      return;
+    Instruction *LastInst = nullptr;
+    if (DeferIfAfterEntry)
+      LastInst = &getLastInstructionInBundle(E);
+
+    for (const ExternalUser &EU : ExternalUses) {
+      if (&EU.E != E)
+        continue;
+      if (EU.User) {
+        auto *UserInst = dyn_cast<Instruction>(EU.User);
+        if (UserInst && !getTreeEntries(UserInst).empty())
+          continue;
+      }
+      // InsertElement external uses replace non-tree users with the vector.
+      if (E->getOpcode() == Instruction::InsertElement) {
+        assert(EntryVPV && "External use of entry that defines no value");
+        AddAllUserReplacements(EU.Scalar, EntryVPV);
+        continue;
+      }
+      // PHI users need extracts placed at incoming block terminators.
+      if (EU.User && isa<PHINode>(EU.User)) {
+        auto *PHI = cast<PHINode>(EU.User);
+        for (unsigned I = 0, N = PHI->getNumIncomingValues(); I < N; ++I) {
+          if (PHI->getIncomingValue(I) != EU.Scalar)
+            continue;
+          Instruction *Term = PHI->getIncomingBlock(I)->getTerminator();
+          if (isa<CatchSwitchInst>(Term)) {
+            Failed = true;
+            return;
+          }
+          PendingExtracts.push_back(
+              {E, EntryVPV, EU.Scalar, EU.Lane, Term, PHI, I});
+        }
+        continue;
+      }
+      // Defer extracts for non-null Users after the entry's last instruction.
+      if (DeferIfAfterEntry && EU.User) {
+        auto *UserInst = cast<Instruction>(EU.User);
+        bool IsFirstInBB = (UserInst == &UserInst->getParent()->front());
+        if (!IsFirstInBB &&
+            (UserInst->getParent() != LastInst->getParent() ||
+             LastInst->comesBefore(UserInst))) {
+          Instruction *PredInst = &*std::prev(UserInst->getIterator());
+          if (getTreeEntries(PredInst).empty()) {
+            PendingExtracts.push_back(
+                {E, EntryVPV, EU.Scalar, EU.Lane, PredInst,
+                 /*PHI=*/nullptr, /*PHIOperandIdx=*/0, UserInst});
+            continue;
+          }
+        }
+      }
+      auto ExtKey = std::make_pair(&EU.E, EU.Lane);
+      if (!ExtractVPValues.contains(ExtKey)) {
+        assert(EntryVPV && "External use of entry that defines no value");
+        ExtractVPValues[ExtKey] = CreateExtract(EntryVPV, EU.Lane);
+      }
+      if (EU.User)
+        AddUserReplacement(cast<Instruction>(EU.User), EU.Scalar,
+                           ExtractVPValues[ExtKey]);
+      else
+        AddAllUserReplacements(EU.Scalar, ExtractVPValues[ExtKey]);
+    }
+  };
+
+  auto InstOrder = [this](Instruction *AI, Instruction *BI) {
+    if (AI->getParent() != BI->getParent()) {
+      auto *NodeA = DT->getNode(AI->getParent());
+      auto *NodeB = DT->getNode(BI->getParent());
+      assert(NodeA && NodeB && "Should only process reachable instructions");
+      return NodeA->getDFSNumIn() < NodeB->getDFSNumIn();
+    }
+    return AI->comesBefore(BI);
+  };
+
+  // Sort non-gather entries by program order.
+  llvm::sort(SortedEntries, [&](TreeEntry *A, TreeEntry *B) {
+    return InstOrder(A->getMainOp(), B->getMainOp());
+  });
+
+  // Process entries, ensuring each entry's operand entries are processed first.
+  DenseSet<TreeEntry *> Processed;
+  std::function<void(TreeEntry *)> ProcessEntry =
+      [&](TreeEntry *E) {
+    if (Failed || !Processed.insert(E).second)
+      return;
+
+    // Recursively process operand entries first.
+    unsigned Opcode = E->getOpcode();
+    if (Opcode != Instruction::ExtractElement) {
+      for (unsigned J = 0, NumOps = E->getNumOperands(); J < NumOps; ++J) {
+        if (isLiveInOperand(Opcode, J))
+          continue;
+        auto It = OperandsToTreeEntry.find({E, J});
+        if (It == OperandsToTreeEntry.end() ||
+            DeletedNodes.contains(It->second) ||
+            It->second->Scalars.size() != E->Scalars.size()) {
+          Failed = true;
+          return;
+        }
+        if (It->second->isGather()) {
+          if (Opcode == Instruction::InsertElement) {
+            Failed = true;
+            return;
+          }
+        } else {
+          ProcessEntry(It->second);
+        }
+        if (Failed)
+          return;
+      }
+    }
+
+    // For PHI entries, place BuildVector recipes for gather operands in the
+    // corresponding incoming blocks.
+    if (Opcode == Instruction::PHI) {
+      auto *PH = cast<PHINode>(E->getMainOp());
+      for (unsigned J = 0, NumOps = PH->getNumIncomingValues(); J < NumOps;
+           ++J) {
+        TreeEntry *OpE = getOperandEntry(E, J);
+        auto BVIt = PendingBuildVectors.find(OpE);
+        if (BVIt == PendingBuildVectors.end())
+          continue;
+        BasicBlock *InBB = PH->getIncomingBlock(J);
+        if (isa<CatchSwitchInst>(InBB->getTerminator()) ||
+            !InBB->getTerminator()->getPrevNode()) {
+          Failed = true;
+          return;
+        }
+        Instruction *Marker = InBB->getTerminator()->getPrevNode();
+        VPBB->appendRecipe(VPIRInstruction::create(*Marker));
+        VPBB->appendRecipe(BVIt->second);
+        PendingBuildVectors.erase(BVIt);
+      }
+    }
+
+    VPBB->appendRecipe(VPIRInstruction::create(getLastInstructionInBundle(E)));
+
+    // Append any pending BuildVector recipes for this entry's operands.
+    if (Opcode != Instruction::ExtractElement &&
+        Opcode != Instruction::PHI) {
+      for (unsigned J = 0, NumOps = E->getNumOperands(); J < NumOps; ++J) {
+        if (isLiveInOperand(Opcode, J))
+          continue;
+        TreeEntry *OpE = getOperandEntry(E, J);
+        auto BVIt = PendingBuildVectors.find(OpE);
+        if (BVIt != PendingBuildVectors.end()) {
+          VPBB->appendRecipe(BVIt->second);
+          PendingBuildVectors.erase(BVIt);
+        }
+      }
+    }
+
+    VPValue *EntryVPV = CreateEntryRecipe(E);
+    if (EntryVPV)
+      EntryToVPValue[E] = EntryVPV;
+
+    // PHI entries defer extract recipes to after the PHI zone.
+    if (Opcode == Instruction::PHI)
+      return;
+
+    // Create extract recipes for any external uses of this entry.
+    CreateExtractRecipes(E, EntryVPV, /*DeferIfAfterEntry=*/true);
+  };
+
+  for (TreeEntry *E : SortedEntries)
+    ProcessEntry(E);
+
+  if (Failed)
+    return nullptr;
+
+  // Create extract recipes for PHI external uses, deferred to avoid placing
+  // non-PHI instructions in the PHI zone.
+  SmallPtrSet<BasicBlock *, 4> PHIBlockMarkerEmitted;
+  for (TreeEntry *E : SortedEntries) {
+    if (E->getOpcode() != Instruction::PHI)
+      continue;
+    VPValue *EntryVPV = EntryToVPValue.lookup(E);
+    BasicBlock *BB = E->getMainOp()->getParent();
+    if (PHIBlockMarkerEmitted.insert(BB).second) {
+      Instruction &FirstNonPHI = *BB->getFirstNonPHIIt();
+      VPBB->appendRecipe(VPIRInstruction::createBefore(FirstNonPHI));
+    }
+    CreateExtractRecipes(E, EntryVPV);
+  }
+  if (Failed)
+    return nullptr;
+
+  // Sort pending extracts (deferred + PHI) by marker position.
+  llvm::sort(PendingExtracts,
+             [&](const PendingExtract &A, const PendingExtract &B) {
+               return InstOrder(A.MarkerInst, B.MarkerInst);
+             });
+
+  // Emit markers and extract recipes for pending extracts.
+  DenseMap<std::tuple<const TreeEntry *, unsigned, Instruction *>, VPValue *>
+      PHIExtractVPValues;
+  // Deferred non-PHI extracts keyed by (entry, lane, block) to avoid
+  // dominance issues when a scalar has uses in sibling blocks.
+  DenseMap<std::tuple<const TreeEntry *, unsigned, BasicBlock *>, VPValue *>
+      DeferredExtractVPValues;
+  Instruction *LastMarkerInst = nullptr;
+  for (auto &PE : PendingExtracts) {
+    if (PE.MarkerInst != LastMarkerInst) {
+      if (PE.MarkerInst->isTerminator())
+        VPBB->appendRecipe(VPIRInstruction::createBefore(*PE.MarkerInst));
+      else
+        VPBB->appendRecipe(VPIRInstruction::create(*PE.MarkerInst));
+      LastMarkerInst = PE.MarkerInst;
+    }
+    if (PE.PHI) {
+      auto Key = std::make_tuple(PE.E, PE.Lane, PE.MarkerInst);
+      if (!PHIExtractVPValues.contains(Key)) {
+        assert(PE.EntryVPV && "External use of entry that defines no value");
+        PHIExtractVPValues[Key] = CreateExtract(PE.EntryVPV, PE.Lane);
+      }
+      // Only replace the specific PHI operand index, not all matching ones.
+      // A PHI may use the same scalar from multiple incoming blocks, each
+      // needing a different extract placed at that block's terminator.
+      UserReplacements[PE.PHI][PE.PHIOperandIdx] = PHIExtractVPValues[Key];
+    } else {
+      // Use (entry, lane, block) as key so extracts in different blocks
+      // each get their own extractelement, avoiding dominance issues when
+      // a scalar has uses in sibling blocks.
+      auto ExtKey = std::make_tuple(PE.E, PE.Lane,
+                                    PE.MarkerInst->getParent());
+      if (!DeferredExtractVPValues.contains(ExtKey))
+        DeferredExtractVPValues[ExtKey] = CreateExtract(PE.EntryVPV, PE.Lane);
+      if (PE.UserInst)
+        AddUserReplacement(PE.UserInst, PE.Scalar,
+                           DeferredExtractVPValues[ExtKey]);
+      else
+        AddAllUserReplacements(PE.Scalar, DeferredExtractVPValues[ExtKey]);
+    }
+  }
+
+  // Append any remaining BuildVector recipes.
+  for (auto &[E, BV] : PendingBuildVectors)
+    VPBB->appendRecipe(BV);
+  PendingBuildVectors.clear();
+
+  // Create VPIRInstructions wrapping external user instructions.
+  for (auto &[UserInst, Repls] : UserReplacements) {
+    auto *IRInst = isa<PHINode>(UserInst)
+                       ? VPIRInstruction::createNonPhi(*UserInst)
+                       : VPIRInstruction::create(*UserInst);
+    for (unsigned I = 0, N = UserInst->getNumOperands(); I < N; ++I) {
+      auto It = Repls.find(I);
+      if (It != Repls.end())
+        IRInst->addOperand(It->second);
+      else
+        IRInst->addOperand(Plan->getOrAddLiveIn(UserInst->getOperand(I)));
+    }
+    VPBB->appendRecipe(IRInst);
+  }
+
+  simplifyBuildVectors(*Plan);
+  RootVPV = EntryToVPValue.lookup(VectorizableTree[0].get());
+  return Plan;
+}
+
+void BoUpSLP::executeVPlanForTree(VPlan &Plan, VPValue *RootVPV) {
+  unsigned VF = VectorizableTree[0]->Scalars.size();
+  VPTransformState State(TTI, ElementCount::getFixed(VF), LI, DT, AC, Builder,
+                         &Plan, /*CurrentParentLoop=*/nullptr,
+                         Builder.getInt32Ty());
+
+  VPBasicBlock *VPBB =
+      cast<VPBasicBlock>(Plan.getEntry()->getSingleSuccessor());
+  for (VPRecipeBase &R : *VPBB)
+    R.execute(State);
+
+  // Fixup PHI incoming values.
+  for (VPRecipeBase &R : *VPBB) {
+    auto *PhiR = dyn_cast<VPWidenPHIRecipe>(&R);
+    if (!PhiR)
+      continue;
+    auto *OrigPHI = cast<PHINode>(PhiR->getUnderlyingInstr());
+    auto *NewPhi = cast<PHINode>(State.get(PhiR));
+    for (unsigned I = 0, NumOps = PhiR->getNumOperands(); I < NumOps; ++I)
+      NewPhi->addIncoming(State.get(PhiR->getOperand(I)),
+                          OrigPHI->getIncomingBlock(I));
+  }
+
+  if (RootVPV)
+    VectorizableTree[0]->VectorizedValue = State.get(RootVPV);
+}
+
 Value *BoUpSLP::vectorizeTree() {
   ExtraValueToDebugLocsMap ExternallyUsedValues;
   return vectorizeTree(ExternallyUsedValues);
@@ -22437,6 +23389,20 @@ Value *BoUpSLP::vectorizeTree(
   else
     Builder.SetInsertPoint(&F->getEntryBlock(), F->getEntryBlock().begin());
 
+  // Try VPlan-based codegen if enabled (not for reductions).
+  bool UsedVPlan = false;
+  if (SLPUseVPlanCodegen && !ReductionRoot) {
+    VPValue *RootVPV = nullptr;
+    if (auto Plan = buildVPlanForTree(RootVPV)) {
+      executeVPlanForTree(*Plan, RootVPV);
+      UsedVPlan = true;
+      ++NumVPlanCodegen;
+    }
+  }
+  if (!UsedVPlan) {
+    if (SLPUseVPlanCodegen && ReductionRoot)
+      LLVM_DEBUG(dbgs() << "SLP: VPlan ineligible: reduction root\n");
+    ++NumLegacyCodegen;
   // Vectorize gather operands of the nodes with the external uses only.
   SmallVector<std::pair<TreeEntry *, Instruction *>> GatherEntries;
   for (const std::unique_ptr<TreeEntry> &TE : VectorizableTree) {
@@ -22578,7 +23544,12 @@ Value *BoUpSLP::vectorizeTree(
     }
     eraseInstruction(PrevVec);
   }
+  } // end of else (non-VPlan codegen path)
 
+  // When VPlan codegen was used, external uses are handled as part of the
+  // VPlan. Skip the legacy external-use extraction loop.
+  SmallDenseSet<ExtractElementInst *, 4> IgnoredExtracts;
+  if (!UsedVPlan) {
   LLVM_DEBUG(dbgs() << "SLP: Extracting " << ExternalUses.size()
                     << " values .\n");
 
@@ -22592,7 +23563,6 @@ Value *BoUpSLP::vectorizeTree(
   SmallDenseSet<Value *, 4> UsedInserts;
   DenseMap<std::pair<Value *, Type *>, Value *> VectorCasts;
   SmallDenseSet<Value *, 4> ScalarsWithNullptrUser;
-  SmallDenseSet<ExtractElementInst *, 4> IgnoredExtracts;
   // Extract all of the elements with the external uses.
   for (const auto &ExternalUse : ExternalUses) {
     Value *Scalar = ExternalUse.Scalar;
@@ -22973,6 +23943,7 @@ Value *BoUpSLP::vectorizeTree(
     }
     CSEBlocks.insert(LastInsert->getParent());
   }
+  } // end of if (!UsedVPlan)
 
   SmallVector<Instruction *> RemovedInsts;
   // For each vectorized value:
@@ -23006,7 +23977,8 @@ Value *BoUpSLP::vectorizeTree(
       continue;
     }
 
-    assert(Entry->VectorizedValue && "Can't find vectorizable value");
+    assert((Entry->VectorizedValue || SLPUseVPlanCodegen) &&
+           "Can't find vectorizable value");
 
     // For each lane:
     for (int Lane = 0, LE = Entry->Scalars.size(); Lane != LE; ++Lane) {
@@ -23027,7 +23999,7 @@ Value *BoUpSLP::vectorizeTree(
           LLVM_DEBUG(dbgs() << "SLP: \tvalidating user:" << *U << ".\n");
 
           // It is legal to delete users in the ignorelist.
-          assert((isVectorized(U) ||
+          assert((isVectorized(U) || UsedVPlan ||
                   (UserIgnoreList && UserIgnoreList->contains(U)) ||
                   (isa_and_nonnull<Instruction>(U) &&
                    isDeleted(cast<Instruction>(U)))) &&
@@ -23043,7 +24015,8 @@ Value *BoUpSLP::vectorizeTree(
 
   // Merge the DIAssignIDs from the about-to-be-deleted instructions into the
   // new vector instruction.
-  if (auto *V = dyn_cast<Instruction>(VectorizableTree[0]->VectorizedValue))
+  if (auto *V =
+          dyn_cast_or_null<Instruction>(VectorizableTree[0]->VectorizedValue))
     V->mergeDIAssignID(RemovedInsts);
 
   // Clear up reduction references, if any.

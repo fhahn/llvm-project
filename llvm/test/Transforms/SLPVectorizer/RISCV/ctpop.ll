@@ -3,6 +3,10 @@
 ; RUN: opt < %s -passes=slp-vectorizer -S -mtriple=riscv64 -mattr=+m,+v | FileCheck %s
 ; RUN: opt < %s -passes=slp-vectorizer -S -mtriple=riscv32 -mattr=+v,+zvbb | FileCheck %s
 ; RUN: opt < %s -passes=slp-vectorizer -S -mtriple=riscv64 -mattr=+v,+zvbb | FileCheck %s
+; RUN: opt < %s -passes=slp-vectorizer -slp-use-vplan-codegen -S -mtriple=riscv32 -mattr=+m,+v | FileCheck %s
+; RUN: opt < %s -passes=slp-vectorizer -slp-use-vplan-codegen -S -mtriple=riscv64 -mattr=+m,+v | FileCheck %s
+; RUN: opt < %s -passes=slp-vectorizer -slp-use-vplan-codegen -S -mtriple=riscv32 -mattr=+v,+zvbb | FileCheck %s
+; RUN: opt < %s -passes=slp-vectorizer -slp-use-vplan-codegen -S -mtriple=riscv64 -mattr=+v,+zvbb | FileCheck %s
 
 define <4 x i8> @ctpop_v4i8(ptr %a) {
 ; CHECK-LABEL: define <4 x i8> @ctpop_v4i8

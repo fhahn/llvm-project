@@ -2,6 +2,9 @@
 ; RUN: opt < %s -passes=slp-vectorizer -mtriple=riscv64 -mattr=+v \
 ; RUN: -riscv-v-vector-bits-min=-1 -riscv-v-slp-max-vf=0 -S | FileCheck %s --check-prefixes=CHECK
 ; RUN: opt < %s -passes=slp-vectorizer -mtriple=riscv64 -mattr=+v -S | FileCheck %s --check-prefixes=DEFAULT
+; RUN: opt < %s -passes=slp-vectorizer -slp-use-vplan-codegen -mtriple=riscv64 -mattr=+v \
+; RUN: -riscv-v-vector-bits-min=-1 -riscv-v-slp-max-vf=0 -S | FileCheck %s --check-prefixes=CHECK
+; RUN: opt < %s -passes=slp-vectorizer -slp-use-vplan-codegen -mtriple=riscv64 -mattr=+v -S | FileCheck %s --check-prefixes=DEFAULT
 
 
 define void @simple_copy(ptr %dest, ptr %p) {

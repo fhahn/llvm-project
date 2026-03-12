@@ -4,6 +4,11 @@
 ; RUN:     | FileCheck %s
 ; RUN: opt < %s -passes=slp-vectorizer -S -mtriple=riscv64 -mattr=+v,+f \
 ; RUN:     | FileCheck %s --check-prefix=DEFAULT
+; RUN: opt < %s -passes=slp-vectorizer -slp-use-vplan-codegen -S -mtriple=riscv64 -mattr=+v,+f \
+; RUN:     -riscv-v-vector-bits-min=-1 -riscv-v-slp-max-vf=0 \
+; RUN:     | FileCheck %s
+; RUN: opt < %s -passes=slp-vectorizer -slp-use-vplan-codegen -S -mtriple=riscv64 -mattr=+v,+f \
+; RUN:     | FileCheck %s --check-prefix=DEFAULT
 
 declare float @fabsf(float) readonly nounwind willreturn
 

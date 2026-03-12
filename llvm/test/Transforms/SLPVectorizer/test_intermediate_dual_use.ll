@@ -4,6 +4,7 @@
 ; and is then used in a safe way and an unsafe way.
 
 ; RUN: opt -S --passes=slp-vectorizer < %s | FileCheck %s
+; RUN: opt -S --passes=slp-vectorizer -slp-use-vplan-codegen < %s | FileCheck %s
 
 define i1 @test_intermediate_dual_use(<4 x i32> %x) {
 ; CHECK-LABEL: define i1 @test_intermediate_dual_use(

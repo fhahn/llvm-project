@@ -11,10 +11,10 @@ define void @test(double %i) {
 ; CHECK-NEXT:    [[TMP3:%.*]] = fsub <2 x double> zeroinitializer, [[TMP2]]
 ; CHECK-NEXT:    [[I75:%.*]] = fsub double 0.000000e+00, [[I]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = fsub <2 x double> [[TMP0]], zeroinitializer
-; CHECK-NEXT:    [[TMP7:%.*]] = shufflevector <2 x double> [[TMP1]], <2 x double> [[TMP5]], <4 x i32> <i32 poison, i32 0, i32 2, i32 poison>
+; CHECK-NEXT:    [[TMP28:%.*]] = shufflevector <2 x double> [[TMP1]], <2 x double> [[TMP5]], <4 x i32> <i32 poison, i32 0, i32 2, i32 poison>
 ; CHECK-NEXT:    [[TMP6:%.*]] = shufflevector <2 x double> [[TMP5]], <2 x double> poison, <4 x i32> <i32 0, i32 1, i32 poison, i32 poison>
-; CHECK-NEXT:    [[TMP28:%.*]] = shufflevector <4 x double> [[TMP6]], <4 x double> [[TMP7]], <8 x i32> <i32 poison, i32 poison, i32 0, i32 poison, i32 poison, i32 5, i32 6, i32 poison>
-; CHECK-NEXT:    [[TMP8:%.*]] = shufflevector <8 x double> [[TMP28]], <8 x double> <double 0.000000e+00, double 0.000000e+00, double poison, double poison, double 0.000000e+00, double poison, double poison, double poison>, <8 x i32> <i32 8, i32 9, i32 2, i32 poison, i32 12, i32 5, i32 6, i32 poison>
+; CHECK-NEXT:    [[TMP7:%.*]] = shufflevector <4 x double> [[TMP6]], <4 x double> [[TMP28]], <8 x i32> <i32 poison, i32 poison, i32 0, i32 poison, i32 poison, i32 5, i32 6, i32 poison>
+; CHECK-NEXT:    [[TMP8:%.*]] = shufflevector <8 x double> [[TMP7]], <8 x double> <double 0.000000e+00, double 0.000000e+00, double poison, double poison, double 0.000000e+00, double poison, double poison, double poison>, <8 x i32> <i32 8, i32 9, i32 2, i32 poison, i32 12, i32 5, i32 6, i32 poison>
 ; CHECK-NEXT:    [[TMP9:%.*]] = insertelement <8 x double> [[TMP8]], double [[I75]], i32 3
 ; CHECK-NEXT:    [[TMP10:%.*]] = shufflevector <8 x double> [[TMP9]], <8 x double> poison, <8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 3>
 ; CHECK-NEXT:    [[TMP11:%.*]] = fmul <8 x double> zeroinitializer, [[TMP10]]

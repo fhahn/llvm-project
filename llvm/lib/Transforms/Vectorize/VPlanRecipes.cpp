@@ -319,7 +319,12 @@ bool VPRecipeBase::isScalarCast() const {
 }
 
 void VPIRFlags::intersectFlags(const VPIRFlags &Other) {
-  assert(OpType == Other.OpType && "OpType must match");
+  // If the operation types don't match, do nothing. This matches the behavior
+  // of Instruction::andIRFlags, which is a no-op for mismatched flag
+  // categories (e.g., intersecting an OverflowingBinOp with a NonNegOp
+  // preserves the wrap flags since NonNegOp doesn't affect them).
+  if (OpType != Other.OpType)
+    return;
   switch (OpType) {
   case OperationType::OverflowingBinOp:
     WrapFlags.HasNUW &= Other.WrapFlags.HasNUW;
@@ -343,8 +348,7 @@ void VPIRFlags::intersectFlags(const VPIRFlags &Other) {
     assert((OpType != OperationType::FCmp ||
             FCmpFlags.CmpPredStorage == Other.FCmpFlags.CmpPredStorage) &&
            "Cannot drop CmpPredicate");
-    getFMFsRef().NoNaNs &= Other.getFMFsRef().NoNaNs;
-    getFMFsRef().NoInfs &= Other.getFMFsRef().NoInfs;
+    getFMFsRef().intersect(Other.getFMFsRef());
     break;
   case OperationType::NonNegOp:
     NonNegFlags.NonNeg &= Other.NonNegFlags.NonNeg;
@@ -360,8 +364,7 @@ void VPIRFlags::intersectFlags(const VPIRFlags &Other) {
            "Cannot change IsOrdered");
     assert(ReductionFlags.IsInLoop == Other.ReductionFlags.IsInLoop &&
            "Cannot change IsInLoop");
-    getFMFsRef().NoNaNs &= Other.getFMFsRef().NoNaNs;
-    getFMFsRef().NoInfs &= Other.getFMFsRef().NoInfs;
+    getFMFsRef().intersect(Other.getFMFsRef());
     break;
   case OperationType::Other:
     break;
@@ -482,6 +485,7 @@ unsigned VPInstruction::getNumOperandsForOpcode() const {
   case VPInstruction::CalculateTripCountMinusVF:
     return 2;
   case Instruction::Select:
+  case Instruction::InsertElement:
   case VPInstruction::ActiveLaneMask:
   case VPInstruction::ReductionStartVector:
     return 3;
@@ -495,6 +499,7 @@ unsigned VPInstruction::getNumOperandsForOpcode() const {
   }
   case Instruction::GetElementPtr:
   case Instruction::PHI:
+  case Instruction::ShuffleVector:
   case Instruction::Switch:
   case VPInstruction::AnyOf:
   case VPInstruction::BuildStructVector:
@@ -570,6 +575,12 @@ Value *VPInstruction::generate(VPTransformState &State) {
     Value *Vec = State.get(getOperand(0));
     Value *Idx = State.get(getOperand(1), /*IsScalar=*/true);
     return Builder.CreateExtractElement(Vec, Idx, Name);
+  }
+  case Instruction::InsertElement: {
+    Value *Vec = State.get(getOperand(0));
+    Value *Elt = State.get(getOperand(1), /*IsScalar=*/true);
+    Value *Idx = State.get(getOperand(2), /*IsScalar=*/true);
+    return Builder.CreateInsertElement(Vec, Elt, Idx, Name);
   }
   case Instruction::Freeze: {
     Value *Op = State.get(getOperand(0), vputils::onlyFirstLaneUsed(this));
@@ -707,11 +718,41 @@ Value *VPInstruction::generate(VPTransformState &State) {
   }
   case VPInstruction::BuildVector: {
     auto *ScalarTy = State.TypeAnalysis.inferScalarType(getOperand(0));
-    auto NumOfElements = ElementCount::getFixed(getNumOperands());
-    Value *Res = PoisonValue::get(toVectorizedTy(ScalarTy, NumOfElements));
-    for (const auto &[Idx, Op] : enumerate(operands()))
-      Res = Builder.CreateInsertElement(Res, State.get(Op, true),
+    unsigned NumElts = getNumOperands();
+    auto *VecTy = toVectorizedTy(ScalarTy, ElementCount::getFixed(NumElts));
+
+    // Collect resolved scalar values. Fold non-undef/non-poison constants into
+    // the initial vector to match legacy codegen (which pre-fills constant
+    // lanes). Undef/poison lanes stay as poison so they don't block splat
+    // optimizations in later passes.
+    SmallVector<Value *> Scalars(NumElts);
+    SmallVector<Constant *> InitElts(NumElts, PoisonValue::get(ScalarTy));
+    bool HasFoldedConst = false;
+    for (const auto &[Idx, Op] : enumerate(operands())) {
+      Value *V = State.get(Op, true);
+      Scalars[Idx] = V;
+      if (auto *C = dyn_cast<Constant>(V);
+          C && !isa<UndefValue>(C)) {
+        InitElts[Idx] = C;
+        HasFoldedConst = true;
+      }
+    }
+
+    Value *Res = HasFoldedConst
+                     ? static_cast<Value *>(ConstantVector::get(InitElts))
+                     : PoisonValue::get(VecTy);
+
+    for (unsigned Idx = 0; Idx < NumElts; ++Idx) {
+      // Skip non-undef constants already in the initial vector.
+      if (auto *C = dyn_cast<Constant>(Scalars[Idx]);
+          C && !isa<UndefValue>(C))
+        continue;
+      // Skip undef/poison that are represented as poison in the initial vector.
+      if (isa<PoisonValue>(Scalars[Idx]))
+        continue;
+      Res = Builder.CreateInsertElement(Res, Scalars[Idx],
                                         Builder.getInt32(Idx));
+    }
     return Res;
   }
   case VPInstruction::ReductionStartVector: {
@@ -908,6 +949,23 @@ Value *VPInstruction::generate(VPTransformState &State) {
     return State.get(getOperand(0), true);
   case VPInstruction::Reverse:
     return Builder.CreateVectorReverse(State.get(getOperand(0)), "reverse");
+  case Instruction::ShuffleVector: {
+    Value *V0 = State.get(getOperand(0));
+    unsigned MaskStart = 1;
+    Value *V1 = nullptr;
+    // Two-input shuffle: second operand is a vector, not a mask element.
+    if (getNumOperands() > 1 && !isa<VPConstantInt>(getOperand(1))) {
+      V1 = State.get(getOperand(1));
+      MaskStart = 2;
+    }
+    SmallVector<int> Mask;
+    for (unsigned I = MaskStart; I < getNumOperands(); ++I)
+      Mask.push_back(
+          cast<VPConstantInt>(getOperand(I))->getAPInt().getSExtValue());
+    if (V1)
+      return Builder.CreateShuffleVector(V0, V1, Mask, Name);
+    return Builder.CreateShuffleVector(V0, Mask, Name);
+  }
   case VPInstruction::ExtractLastActive: {
     Value *Result = State.get(getOperand(0), /*IsScalar=*/true);
     for (unsigned Idx = 1; Idx < getNumOperands(); Idx += 2) {
@@ -1343,10 +1401,12 @@ bool VPInstruction::opcodeMayReadOrWriteFromMemory() const {
   switch (getOpcode()) {
   case Instruction::GetElementPtr:
   case Instruction::ExtractElement:
+  case Instruction::InsertElement:
   case Instruction::Freeze:
   case Instruction::FCmp:
   case Instruction::ICmp:
   case Instruction::Select:
+  case Instruction::ShuffleVector:
   case Instruction::PHI:
   case VPInstruction::AnyOf:
   case VPInstruction::BranchOnCond:
@@ -1396,6 +1456,8 @@ bool VPInstruction::usesFirstLaneOnly(const VPValue *Op) const {
     return false;
   case Instruction::ExtractElement:
     return Op == getOperand(1);
+  case Instruction::InsertElement:
+    return Op == getOperand(1) || Op == getOperand(2);
   case Instruction::PHI:
     return true;
   case Instruction::FCmp:
@@ -1680,11 +1742,24 @@ VPIRInstruction *VPIRInstruction ::create(Instruction &I) {
 }
 
 void VPIRInstruction::execute(VPTransformState &State) {
-  assert(!isa<VPIRPhi>(this) && getNumOperands() == 0 &&
-         "PHINodes must be handled by VPIRPhi");
+  assert((!isa<PHINode>(&I) || getNumOperands() > 0 || InsertBefore) &&
+         "PHINode VPIRInstructions without operands should use VPIRPhi");
+  // If the VPIRInstruction has operands, update the wrapped IR instruction's
+  // operands with the corresponding VPlan-produced values. This is used e.g.
+  // by SLP to replace scalar operands with values extracted from vectors.
+  for (const auto &[Idx, Op] : enumerate(operands())) {
+    // Use scalar mode for scalar-typed operands; for vector-typed operands
+    // (e.g. the vector input of insertelement), retrieve the full vector.
+    bool IsScalar = !I.getOperand(Idx)->getType()->isVectorTy();
+    Value *V = State.get(Op, IsScalar);
+    I.setOperand(Idx, V);
+  }
   // Advance the insert point after the wrapped IR instruction. This allows
   // interleaving VPIRInstructions and other recipes.
-  State.Builder.SetInsertPoint(I.getParent(), std::next(I.getIterator()));
+  if (InsertBefore)
+    State.Builder.SetInsertPoint(I.getParent(), I.getIterator());
+  else
+    State.Builder.SetInsertPoint(I.getParent(), std::next(I.getIterator()));
 }
 
 InstructionCost VPIRInstruction::computeCost(ElementCount VF,
@@ -2328,8 +2403,19 @@ void VPWidenRecipe::execute(VPTransformState &State) {
   case Instruction::UncondBr:
   case Instruction::CondBr:
   case Instruction::PHI:
-  case Instruction::GetElementPtr:
     llvm_unreachable("This instruction is handled by a different recipe.");
+  case Instruction::GetElementPtr: {
+    SmallVector<Value *, 4> Ops;
+    for (VPValue *VPOp : operands())
+      Ops.push_back(State.get(VPOp));
+    auto *GEP = cast<GetElementPtrInst>(getUnderlyingValue());
+    Value *V = Builder.CreateGEP(GEP->getSourceElementType(), Ops[0],
+                                  ArrayRef(Ops).drop_front());
+    if (auto *NewGEP = dyn_cast<GetElementPtrInst>(V))
+      applyFlags(*NewGEP);
+    State.set(this, V);
+    return;
+  }
   case Instruction::UDiv:
   case Instruction::SDiv:
   case Instruction::SRem:

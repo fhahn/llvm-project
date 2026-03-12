@@ -2,6 +2,9 @@
 ; RUN: opt < %s -mtriple=x86_64-apple-macosx10.11.0 -passes=slp-vectorizer -S -mattr=+sse2 | FileCheck %s --check-prefix=SSE
 ; RUN: opt < %s -mtriple=x86_64-apple-macosx10.11.0 -passes=slp-vectorizer -S -mattr=+avx  | FileCheck %s --check-prefix=AVX
 ; RUN: opt < %s -mtriple=x86_64-apple-macosx10.11.0 -passes=slp-vectorizer -S -mattr=+avx2 | FileCheck %s --check-prefix=AVX
+; RUN: opt < %s -mtriple=x86_64-apple-macosx10.11.0 -passes=slp-vectorizer -slp-use-vplan-codegen -S -mattr=+sse2 | FileCheck %s --check-prefix=VPLAN-SSE
+; RUN: opt < %s -mtriple=x86_64-apple-macosx10.11.0 -passes=slp-vectorizer -slp-use-vplan-codegen -S -mattr=+avx  | FileCheck %s --check-prefix=VPLAN-AVX
+; RUN: opt < %s -mtriple=x86_64-apple-macosx10.11.0 -passes=slp-vectorizer -slp-use-vplan-codegen -S -mattr=+avx2 | FileCheck %s --check-prefix=VPLAN-AVX2
 
 ; Verify that the SLP vectorizer is able to figure out that commutativity
 ; offers the possibility to splat/broadcast %c and thus make it profitable
@@ -35,6 +38,45 @@ define void @splat(i8 %a, i8 %b, i8 %c) {
 ; AVX-NEXT:    store <16 x i8> [[TMP6]], ptr @cle, align 16
 ; AVX-NEXT:    ret void
 ;
+; VPLAN-SSE-LABEL: @splat(
+; VPLAN-SSE-NEXT:    [[TMP1:%.*]] = insertelement <16 x i8> poison, i8 [[A:%.*]], i32 0
+; VPLAN-SSE-NEXT:    [[TMP2:%.*]] = insertelement <16 x i8> [[TMP1]], i8 [[B:%.*]], i32 1
+; VPLAN-SSE-NEXT:    [[TMP3:%.*]] = shufflevector <16 x i8> [[TMP2]], <16 x i8> poison, <16 x i32> <i32 0, i32 0, i32 0, i32 0, i32 0, i32 1, i32 0, i32 1, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0>
+; VPLAN-SSE-NEXT:    [[TMP4:%.*]] = insertelement <16 x i8> poison, i8 [[C:%.*]], i32 0
+; VPLAN-SSE-NEXT:    [[TMP5:%.*]] = shufflevector <16 x i8> [[TMP4]], <16 x i8> poison, <16 x i32> zeroinitializer
+; VPLAN-SSE-NEXT:    [[TMP6:%.*]] = xor <16 x i8> [[TMP3]], [[TMP5]]
+; VPLAN-SSE-NEXT:    store <16 x i8> [[TMP6]], ptr @cle, align 16
+; VPLAN-SSE-NEXT:    ret void
+;
+; VPLAN-AVX-LABEL: @splat(
+; VPLAN-AVX-NEXT:    [[TMP1:%.*]] = insertelement <16 x i8> poison, i8 [[A:%.*]], i32 0
+; VPLAN-AVX-NEXT:    [[TMP2:%.*]] = insertelement <16 x i8> [[TMP1]], i8 [[B:%.*]], i32 1
+; VPLAN-AVX-NEXT:    [[TMP3:%.*]] = shufflevector <16 x i8> [[TMP2]], <16 x i8> poison, <16 x i32> <i32 0, i32 0, i32 0, i32 0, i32 0, i32 1, i32 0, i32 1, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0>
+; VPLAN-AVX-NEXT:    [[TMP4:%.*]] = insertelement <16 x i8> poison, i8 [[C:%.*]], i32 0
+; VPLAN-AVX-NEXT:    [[TMP5:%.*]] = shufflevector <16 x i8> [[TMP4]], <16 x i8> poison, <16 x i32> zeroinitializer
+; VPLAN-AVX-NEXT:    [[TMP6:%.*]] = xor <16 x i8> [[TMP3]], [[TMP5]]
+; VPLAN-AVX-NEXT:    store <16 x i8> [[TMP6]], ptr @cle, align 16
+; VPLAN-AVX-NEXT:    ret void
+;
+; VPLAN-AVX2-LABEL: @splat(
+; VPLAN-AVX2-NEXT:    [[TMP1:%.*]] = insertelement <16 x i8> poison, i8 [[A:%.*]], i32 0
+; VPLAN-AVX2-NEXT:    [[TMP2:%.*]] = insertelement <16 x i8> [[TMP1]], i8 [[B:%.*]], i32 1
+; VPLAN-AVX2-NEXT:    [[TMP3:%.*]] = shufflevector <16 x i8> [[TMP2]], <16 x i8> poison, <16 x i32> <i32 0, i32 0, i32 0, i32 0, i32 0, i32 1, i32 0, i32 1, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0>
+; VPLAN-AVX2-NEXT:    [[TMP4:%.*]] = insertelement <16 x i8> poison, i8 [[C:%.*]], i32 0
+; VPLAN-AVX2-NEXT:    [[TMP5:%.*]] = shufflevector <16 x i8> [[TMP4]], <16 x i8> poison, <16 x i32> zeroinitializer
+; VPLAN-AVX2-NEXT:    [[TMP6:%.*]] = xor <16 x i8> [[TMP3]], [[TMP5]]
+; VPLAN-AVX2-NEXT:    store <16 x i8> [[TMP6]], ptr @cle, align 16
+; VPLAN-AVX2-NEXT:    ret void
+;
+; VPLAN-LABEL: @splat(
+; VPLAN-NEXT:    [[TMP1:%.*]] = insertelement <16 x i8> poison, i8 [[A:%.*]], i32 0
+; VPLAN-NEXT:    [[TMP2:%.*]] = insertelement <16 x i8> [[TMP1]], i8 [[B:%.*]], i32 1
+; VPLAN-NEXT:    [[TMP3:%.*]] = shufflevector <16 x i8> [[TMP2]], <16 x i8> poison, <16 x i32> <i32 0, i32 0, i32 0, i32 0, i32 0, i32 1, i32 0, i32 1, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0>
+; VPLAN-NEXT:    [[TMP4:%.*]] = insertelement <16 x i8> poison, i8 [[C:%.*]], i32 0
+; VPLAN-NEXT:    [[TMP5:%.*]] = shufflevector <16 x i8> [[TMP4]], <16 x i8> poison, <16 x i32> zeroinitializer
+; VPLAN-NEXT:    [[TMP6:%.*]] = xor <16 x i8> [[TMP3]], [[TMP5]]
+; VPLAN-NEXT:    store <16 x i8> [[TMP6]], ptr @cle, align 16
+; VPLAN-NEXT:    ret void
   %1 = xor i8 %c, %a
   store i8 %1, ptr @cle, align 16
   %2 = xor i8 %a, %c
@@ -100,6 +142,49 @@ define void @same_opcode_on_one_side(i32 %a, i32 %b, i32 %c) {
 ; AVX-NEXT:    [[TMP8:%.*]] = xor <4 x i32> [[TMP5]], [[TMP7]]
 ; AVX-NEXT:    store <4 x i32> [[TMP8]], ptr @cle32, align 16
 ; AVX-NEXT:    ret void
+;
+; VPLAN-SSE-LABEL: @same_opcode_on_one_side(
+; VPLAN-SSE-NEXT:    [[ADD1:%.*]] = add i32 [[C:%.*]], [[A:%.*]]
+; VPLAN-SSE-NEXT:    [[ADD2:%.*]] = add i32 [[C]], [[A]]
+; VPLAN-SSE-NEXT:    [[ADD3:%.*]] = add i32 [[A]], [[C]]
+; VPLAN-SSE-NEXT:    [[ADD4:%.*]] = add i32 [[C]], [[A]]
+; VPLAN-SSE-NEXT:    [[TMP1:%.*]] = xor i32 [[ADD1]], [[A]]
+; VPLAN-SSE-NEXT:    store i32 [[TMP1]], ptr @cle32, align 16
+; VPLAN-SSE-NEXT:    [[TMP2:%.*]] = xor i32 [[B:%.*]], [[ADD2]]
+; VPLAN-SSE-NEXT:    store i32 [[TMP2]], ptr getelementptr inbounds ([32 x i32], ptr @cle32, i64 0, i64 1), align 4
+; VPLAN-SSE-NEXT:    [[TMP3:%.*]] = xor i32 [[C]], [[ADD3]]
+; VPLAN-SSE-NEXT:    store i32 [[TMP3]], ptr getelementptr inbounds ([32 x i32], ptr @cle32, i64 0, i64 2), align 4
+; VPLAN-SSE-NEXT:    [[TMP4:%.*]] = xor i32 [[A]], [[ADD4]]
+; VPLAN-SSE-NEXT:    store i32 [[TMP4]], ptr getelementptr inbounds ([32 x i32], ptr @cle32, i64 0, i64 3), align 4
+; VPLAN-SSE-NEXT:    ret void
+;
+; VPLAN-AVX-LABEL: @same_opcode_on_one_side(
+; VPLAN-AVX-NEXT:    [[TMP1:%.*]] = insertelement <4 x i32> poison, i32 [[C:%.*]], i32 0
+; VPLAN-AVX-NEXT:    [[TMP2:%.*]] = shufflevector <4 x i32> [[TMP1]], <4 x i32> poison, <4 x i32> zeroinitializer
+; VPLAN-AVX-NEXT:    [[TMP3:%.*]] = insertelement <4 x i32> poison, i32 [[A:%.*]], i32 0
+; VPLAN-AVX-NEXT:    [[TMP4:%.*]] = shufflevector <4 x i32> [[TMP3]], <4 x i32> poison, <4 x i32> zeroinitializer
+; VPLAN-AVX-NEXT:    [[TMP5:%.*]] = add <4 x i32> [[TMP2]], [[TMP4]]
+; VPLAN-AVX-NEXT:    [[TMP6:%.*]] = insertelement <4 x i32> poison, i32 [[A]], i32 0
+; VPLAN-AVX-NEXT:    [[TMP7:%.*]] = insertelement <4 x i32> [[TMP6]], i32 [[B:%.*]], i32 1
+; VPLAN-AVX-NEXT:    [[TMP8:%.*]] = insertelement <4 x i32> [[TMP7]], i32 [[C]], i32 2
+; VPLAN-AVX-NEXT:    [[TMP9:%.*]] = insertelement <4 x i32> [[TMP8]], i32 [[A]], i32 3
+; VPLAN-AVX-NEXT:    [[TMP10:%.*]] = xor <4 x i32> [[TMP5]], [[TMP9]]
+; VPLAN-AVX-NEXT:    store <4 x i32> [[TMP10]], ptr @cle32, align 16
+; VPLAN-AVX-NEXT:    ret void
+;
+; VPLAN-AVX2-LABEL: @same_opcode_on_one_side(
+; VPLAN-AVX2-NEXT:    [[TMP1:%.*]] = insertelement <4 x i32> poison, i32 [[C:%.*]], i32 0
+; VPLAN-AVX2-NEXT:    [[TMP2:%.*]] = shufflevector <4 x i32> [[TMP1]], <4 x i32> poison, <4 x i32> zeroinitializer
+; VPLAN-AVX2-NEXT:    [[TMP3:%.*]] = insertelement <4 x i32> poison, i32 [[A:%.*]], i32 0
+; VPLAN-AVX2-NEXT:    [[TMP4:%.*]] = shufflevector <4 x i32> [[TMP3]], <4 x i32> poison, <4 x i32> zeroinitializer
+; VPLAN-AVX2-NEXT:    [[TMP5:%.*]] = add <4 x i32> [[TMP2]], [[TMP4]]
+; VPLAN-AVX2-NEXT:    [[TMP6:%.*]] = insertelement <4 x i32> poison, i32 [[A]], i32 0
+; VPLAN-AVX2-NEXT:    [[TMP7:%.*]] = insertelement <4 x i32> [[TMP6]], i32 [[B:%.*]], i32 1
+; VPLAN-AVX2-NEXT:    [[TMP8:%.*]] = insertelement <4 x i32> [[TMP7]], i32 [[C]], i32 2
+; VPLAN-AVX2-NEXT:    [[TMP9:%.*]] = insertelement <4 x i32> [[TMP8]], i32 [[A]], i32 3
+; VPLAN-AVX2-NEXT:    [[TMP10:%.*]] = xor <4 x i32> [[TMP5]], [[TMP9]]
+; VPLAN-AVX2-NEXT:    store <4 x i32> [[TMP10]], ptr @cle32, align 16
+; VPLAN-AVX2-NEXT:    ret void
 ;
   %add1 = add i32 %c, %a
   %add2 = add i32 %c, %a

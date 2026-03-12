@@ -3,6 +3,10 @@
 ; RUN:     -riscv-v-slp-max-vf=0 | FileCheck %s
 ; RUN: opt -passes=slp-vectorizer -S < %s -mtriple=riscv64 -mattr=+v \
 ; RUN:     -riscv-v-slp-max-vf=0 | FileCheck %s
+; RUN: opt -passes=slp-vectorizer -slp-use-vplan-codegen -S < %s -mtriple=riscv32 -mattr=+v \
+; RUN:     -riscv-v-slp-max-vf=0 | FileCheck %s
+; RUN: opt -passes=slp-vectorizer -slp-use-vplan-codegen -S < %s -mtriple=riscv64 -mattr=+v \
+; RUN:     -riscv-v-slp-max-vf=0 | FileCheck %s
 
 ; These shouldn't be vectorized as the cost of materializing the constants as
 ; vectors should outweigh the scalar cost

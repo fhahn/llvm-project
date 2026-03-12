@@ -2,6 +2,9 @@
 ; RUN: opt -S -mtriple=amdgcn-amd-amdhsa -mcpu=hawaii -passes=slp-vectorizer %s | FileCheck -check-prefixes=GCN,GFX7 %s
 ; RUN: opt -S -mtriple=amdgcn-amd-amdhsa -mcpu=fiji -passes=slp-vectorizer %s | FileCheck -check-prefixes=GCN,GFX8 %s
 ; RUN: opt -S -mtriple=amdgcn-amd-amdhsa -mcpu=gfx900 -passes=slp-vectorizer %s | FileCheck -check-prefixes=GCN,GFX8 %s
+; RUN: opt -S -mtriple=amdgcn-amd-amdhsa -mcpu=hawaii -passes=slp-vectorizer -slp-use-vplan-codegen %s | FileCheck -check-prefixes=GCN,GFX7 %s
+; RUN: opt -S -mtriple=amdgcn-amd-amdhsa -mcpu=fiji -passes=slp-vectorizer -slp-use-vplan-codegen %s | FileCheck -check-prefixes=GCN,GFX8 %s
+; RUN: opt -S -mtriple=amdgcn-amd-amdhsa -mcpu=gfx900 -passes=slp-vectorizer -slp-use-vplan-codegen %s | FileCheck -check-prefixes=GCN,GFX8 %s
 
 define <2 x half> @round_v2f16(<2 x half> %arg) {
 ; GFX7-LABEL: @round_v2f16(

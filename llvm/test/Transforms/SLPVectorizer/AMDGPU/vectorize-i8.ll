@@ -2,6 +2,9 @@
 ; RUN: opt -S -mtriple=amdgcn-amd-amdhsa -mcpu=hawaii -passes=slp-vectorizer %s | FileCheck -check-prefix=GFX7 %s
 ; RUN: opt -S -mtriple=amdgcn-amd-amdhsa -mcpu=fiji -passes=slp-vectorizer %s | FileCheck -check-prefix=GFX8 %s
 ; RUN: opt -S -mtriple=amdgcn-amd-amdhsa -mcpu=gfx900 -passes=slp-vectorizer %s | FileCheck -check-prefix=GFX9 %s
+; RUN: opt -S -mtriple=amdgcn-amd-amdhsa -mcpu=hawaii -passes=slp-vectorizer -slp-use-vplan-codegen %s | FileCheck -check-prefix=GFX7 %s
+; RUN: opt -S -mtriple=amdgcn-amd-amdhsa -mcpu=fiji -passes=slp-vectorizer -slp-use-vplan-codegen %s | FileCheck -check-prefix=GFX8 %s
+; RUN: opt -S -mtriple=amdgcn-amd-amdhsa -mcpu=gfx900 -passes=slp-vectorizer -slp-use-vplan-codegen %s | FileCheck -check-prefix=GFX9 %s
 
 define protected amdgpu_kernel void @arith_2(<16 x i8> %invec, ptr %out, i32 %flag) {
 ; GFX7-LABEL: define protected amdgpu_kernel void @arith_2(
@@ -397,44 +400,6 @@ define protected amdgpu_kernel void @phi_2(ptr addrspace(3) %inptr0, ptr addrspa
 ; GFX7-NEXT:    store <16 x i8> [[TMP3]], ptr [[OUT1]], align 16
 ; GFX7-NEXT:    ret void
 ;
-; GFX8-LABEL: define protected amdgpu_kernel void @phi_2(
-; GFX8-SAME: ptr addrspace(3) [[INPTR0:%.*]], ptr addrspace(3) [[INPTR1:%.*]], ptr [[OUT:%.*]], ptr [[OUT1:%.*]], i32 [[FLAG:%.*]]) #[[ATTR0]] {
-; GFX8-NEXT:  [[ENTRY:.*]]:
-; GFX8-NEXT:    [[GEP0:%.*]] = getelementptr i8, ptr addrspace(3) [[INPTR0]], i32 0
-; GFX8-NEXT:    [[TMP0:%.*]] = load <2 x i8>, ptr addrspace(3) [[GEP0]], align 8
-; GFX8-NEXT:    br label %[[DO_BODY:.*]]
-; GFX8:       [[DO_BODY]]:
-; GFX8-NEXT:    [[TMP1:%.*]] = phi <2 x i8> [ [[TMP0]], %[[ENTRY]] ], [ [[TMP2:%.*]], %[[DO_BODY]] ]
-; GFX8-NEXT:    [[TMP2]] = load <2 x i8>, ptr addrspace(3) [[GEP0]], align 8
-; GFX8-NEXT:    [[TMP3:%.*]] = shufflevector <2 x i8> [[TMP2]], <2 x i8> poison, <16 x i32> <i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 0, i32 1, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison>
-; GFX8-NEXT:    [[VEC111:%.*]] = shufflevector <2 x i8> [[TMP1]], <2 x i8> poison, <16 x i32> <i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 0, i32 1, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison>
-; GFX8-NEXT:    store <16 x i8> [[VEC111]], ptr addrspace(3) [[INPTR1]], align 2
-; GFX8-NEXT:    [[CMP:%.*]] = icmp eq i32 [[FLAG]], 0
-; GFX8-NEXT:    br i1 [[CMP]], label %[[EXIT:.*]], label %[[DO_BODY]]
-; GFX8:       [[EXIT]]:
-; GFX8-NEXT:    store <16 x i8> [[VEC111]], ptr [[OUT]], align 16
-; GFX8-NEXT:    store <16 x i8> [[TMP3]], ptr [[OUT1]], align 16
-; GFX8-NEXT:    ret void
-;
-; GFX9-LABEL: define protected amdgpu_kernel void @phi_2(
-; GFX9-SAME: ptr addrspace(3) [[INPTR0:%.*]], ptr addrspace(3) [[INPTR1:%.*]], ptr [[OUT:%.*]], ptr [[OUT1:%.*]], i32 [[FLAG:%.*]]) #[[ATTR0]] {
-; GFX9-NEXT:  [[ENTRY:.*]]:
-; GFX9-NEXT:    [[GEP0:%.*]] = getelementptr i8, ptr addrspace(3) [[INPTR0]], i32 0
-; GFX9-NEXT:    [[TMP0:%.*]] = load <2 x i8>, ptr addrspace(3) [[GEP0]], align 8
-; GFX9-NEXT:    br label %[[DO_BODY:.*]]
-; GFX9:       [[DO_BODY]]:
-; GFX9-NEXT:    [[TMP1:%.*]] = phi <2 x i8> [ [[TMP0]], %[[ENTRY]] ], [ [[TMP2:%.*]], %[[DO_BODY]] ]
-; GFX9-NEXT:    [[TMP2]] = load <2 x i8>, ptr addrspace(3) [[GEP0]], align 8
-; GFX9-NEXT:    [[TMP3:%.*]] = shufflevector <2 x i8> [[TMP2]], <2 x i8> poison, <16 x i32> <i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 0, i32 1, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison>
-; GFX9-NEXT:    [[VEC111:%.*]] = shufflevector <2 x i8> [[TMP1]], <2 x i8> poison, <16 x i32> <i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 0, i32 1, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison>
-; GFX9-NEXT:    store <16 x i8> [[VEC111]], ptr addrspace(3) [[INPTR1]], align 2
-; GFX9-NEXT:    [[CMP:%.*]] = icmp eq i32 [[FLAG]], 0
-; GFX9-NEXT:    br i1 [[CMP]], label %[[EXIT:.*]], label %[[DO_BODY]]
-; GFX9:       [[EXIT]]:
-; GFX9-NEXT:    store <16 x i8> [[VEC111]], ptr [[OUT]], align 16
-; GFX9-NEXT:    store <16 x i8> [[TMP3]], ptr [[OUT1]], align 16
-; GFX9-NEXT:    ret void
-;
 entry:
   %gep0 = getelementptr i8, ptr addrspace(3) %inptr0, i32 0
   %ele0 = load i8, ptr addrspace(3) %gep0, align 8
@@ -492,56 +457,6 @@ define protected amdgpu_kernel void @phi_3(ptr addrspace(3) %inptr0, ptr addrspa
 ; GFX7-NEXT:    store <16 x i8> [[VEC12]], ptr [[OUT]], align 16
 ; GFX7-NEXT:    store <16 x i8> [[VEC02]], ptr [[OUT1]], align 16
 ; GFX7-NEXT:    ret void
-;
-; GFX8-LABEL: define protected amdgpu_kernel void @phi_3(
-; GFX8-SAME: ptr addrspace(3) [[INPTR0:%.*]], ptr addrspace(3) [[INPTR1:%.*]], ptr [[OUT:%.*]], ptr [[OUT1:%.*]], i32 [[FLAG:%.*]]) #[[ATTR0]] {
-; GFX8-NEXT:  [[ENTRY:.*]]:
-; GFX8-NEXT:    [[GEP0:%.*]] = getelementptr i8, ptr addrspace(3) [[INPTR0]], i32 0
-; GFX8-NEXT:    [[TMP0:%.*]] = load <2 x i8>, ptr addrspace(3) [[GEP0]], align 8
-; GFX8-NEXT:    [[GEP2:%.*]] = getelementptr i8, ptr addrspace(3) [[INPTR0]], i32 2
-; GFX8-NEXT:    [[ELE2:%.*]] = load i8, ptr addrspace(3) [[GEP2]], align 2
-; GFX8-NEXT:    br label %[[DO_BODY:.*]]
-; GFX8:       [[DO_BODY]]:
-; GFX8-NEXT:    [[PHI1:%.*]] = phi i8 [ [[ELE2]], %[[ENTRY]] ], [ [[OTHERELE2:%.*]], %[[DO_BODY]] ]
-; GFX8-NEXT:    [[TMP1:%.*]] = phi <2 x i8> [ [[TMP0]], %[[ENTRY]] ], [ [[TMP2:%.*]], %[[DO_BODY]] ]
-; GFX8-NEXT:    [[TMP2]] = load <2 x i8>, ptr addrspace(3) [[GEP0]], align 8
-; GFX8-NEXT:    [[OTHERELE2]] = load i8, ptr addrspace(3) [[GEP2]], align 2
-; GFX8-NEXT:    [[TMP3:%.*]] = shufflevector <2 x i8> [[TMP2]], <2 x i8> poison, <16 x i32> <i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 0, i32 1, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison>
-; GFX8-NEXT:    [[VEC02:%.*]] = insertelement <16 x i8> [[TMP3]], i8 [[OTHERELE2]], i64 10
-; GFX8-NEXT:    [[VEC111:%.*]] = shufflevector <2 x i8> [[TMP1]], <2 x i8> poison, <16 x i32> <i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 0, i32 1, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison>
-; GFX8-NEXT:    [[VEC12:%.*]] = insertelement <16 x i8> [[VEC111]], i8 [[PHI1]], i64 10
-; GFX8-NEXT:    store <16 x i8> [[VEC12]], ptr addrspace(3) [[INPTR1]], align 2
-; GFX8-NEXT:    [[CMP:%.*]] = icmp eq i32 [[FLAG]], 0
-; GFX8-NEXT:    br i1 [[CMP]], label %[[EXIT:.*]], label %[[DO_BODY]]
-; GFX8:       [[EXIT]]:
-; GFX8-NEXT:    store <16 x i8> [[VEC12]], ptr [[OUT]], align 16
-; GFX8-NEXT:    store <16 x i8> [[VEC02]], ptr [[OUT1]], align 16
-; GFX8-NEXT:    ret void
-;
-; GFX9-LABEL: define protected amdgpu_kernel void @phi_3(
-; GFX9-SAME: ptr addrspace(3) [[INPTR0:%.*]], ptr addrspace(3) [[INPTR1:%.*]], ptr [[OUT:%.*]], ptr [[OUT1:%.*]], i32 [[FLAG:%.*]]) #[[ATTR0]] {
-; GFX9-NEXT:  [[ENTRY:.*]]:
-; GFX9-NEXT:    [[GEP0:%.*]] = getelementptr i8, ptr addrspace(3) [[INPTR0]], i32 0
-; GFX9-NEXT:    [[TMP0:%.*]] = load <2 x i8>, ptr addrspace(3) [[GEP0]], align 8
-; GFX9-NEXT:    [[GEP2:%.*]] = getelementptr i8, ptr addrspace(3) [[INPTR0]], i32 2
-; GFX9-NEXT:    [[ELE2:%.*]] = load i8, ptr addrspace(3) [[GEP2]], align 2
-; GFX9-NEXT:    br label %[[DO_BODY:.*]]
-; GFX9:       [[DO_BODY]]:
-; GFX9-NEXT:    [[PHI1:%.*]] = phi i8 [ [[ELE2]], %[[ENTRY]] ], [ [[OTHERELE2:%.*]], %[[DO_BODY]] ]
-; GFX9-NEXT:    [[TMP1:%.*]] = phi <2 x i8> [ [[TMP0]], %[[ENTRY]] ], [ [[TMP2:%.*]], %[[DO_BODY]] ]
-; GFX9-NEXT:    [[TMP2]] = load <2 x i8>, ptr addrspace(3) [[GEP0]], align 8
-; GFX9-NEXT:    [[OTHERELE2]] = load i8, ptr addrspace(3) [[GEP2]], align 2
-; GFX9-NEXT:    [[TMP3:%.*]] = shufflevector <2 x i8> [[TMP2]], <2 x i8> poison, <16 x i32> <i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 0, i32 1, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison>
-; GFX9-NEXT:    [[VEC02:%.*]] = insertelement <16 x i8> [[TMP3]], i8 [[OTHERELE2]], i64 10
-; GFX9-NEXT:    [[VEC111:%.*]] = shufflevector <2 x i8> [[TMP1]], <2 x i8> poison, <16 x i32> <i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 0, i32 1, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison>
-; GFX9-NEXT:    [[VEC12:%.*]] = insertelement <16 x i8> [[VEC111]], i8 [[PHI1]], i64 10
-; GFX9-NEXT:    store <16 x i8> [[VEC12]], ptr addrspace(3) [[INPTR1]], align 2
-; GFX9-NEXT:    [[CMP:%.*]] = icmp eq i32 [[FLAG]], 0
-; GFX9-NEXT:    br i1 [[CMP]], label %[[EXIT:.*]], label %[[DO_BODY]]
-; GFX9:       [[EXIT]]:
-; GFX9-NEXT:    store <16 x i8> [[VEC12]], ptr [[OUT]], align 16
-; GFX9-NEXT:    store <16 x i8> [[VEC02]], ptr [[OUT1]], align 16
-; GFX9-NEXT:    ret void
 ;
 entry:
   %gep0 = getelementptr i8, ptr addrspace(3) %inptr0, i32 0
@@ -613,44 +528,6 @@ define protected amdgpu_kernel void @phi_4(ptr addrspace(3) %inptr0, ptr addrspa
 ; GFX7-NEXT:    store <16 x i8> [[TMP3]], ptr [[OUT1]], align 16
 ; GFX7-NEXT:    ret void
 ;
-; GFX8-LABEL: define protected amdgpu_kernel void @phi_4(
-; GFX8-SAME: ptr addrspace(3) [[INPTR0:%.*]], ptr addrspace(3) [[INPTR1:%.*]], ptr [[OUT:%.*]], ptr [[OUT1:%.*]], i32 [[FLAG:%.*]]) #[[ATTR0]] {
-; GFX8-NEXT:  [[ENTRY:.*]]:
-; GFX8-NEXT:    [[GEP0:%.*]] = getelementptr i8, ptr addrspace(3) [[INPTR0]], i32 0
-; GFX8-NEXT:    [[TMP0:%.*]] = load <4 x i8>, ptr addrspace(3) [[GEP0]], align 8
-; GFX8-NEXT:    br label %[[DO_BODY:.*]]
-; GFX8:       [[DO_BODY]]:
-; GFX8-NEXT:    [[TMP1:%.*]] = phi <4 x i8> [ [[TMP0]], %[[ENTRY]] ], [ [[TMP2:%.*]], %[[DO_BODY]] ]
-; GFX8-NEXT:    [[TMP2]] = load <4 x i8>, ptr addrspace(3) [[GEP0]], align 8
-; GFX8-NEXT:    [[TMP3:%.*]] = shufflevector <4 x i8> [[TMP2]], <4 x i8> poison, <16 x i32> <i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 0, i32 1, i32 2, i32 3, i32 poison, i32 poison, i32 poison, i32 poison>
-; GFX8-NEXT:    [[VEC131:%.*]] = shufflevector <4 x i8> [[TMP1]], <4 x i8> poison, <16 x i32> <i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 0, i32 1, i32 2, i32 3, i32 poison, i32 poison, i32 poison, i32 poison>
-; GFX8-NEXT:    store <16 x i8> [[VEC131]], ptr addrspace(3) [[INPTR1]], align 2
-; GFX8-NEXT:    [[CMP:%.*]] = icmp eq i32 [[FLAG]], 0
-; GFX8-NEXT:    br i1 [[CMP]], label %[[EXIT:.*]], label %[[DO_BODY]]
-; GFX8:       [[EXIT]]:
-; GFX8-NEXT:    store <16 x i8> [[VEC131]], ptr [[OUT]], align 16
-; GFX8-NEXT:    store <16 x i8> [[TMP3]], ptr [[OUT1]], align 16
-; GFX8-NEXT:    ret void
-;
-; GFX9-LABEL: define protected amdgpu_kernel void @phi_4(
-; GFX9-SAME: ptr addrspace(3) [[INPTR0:%.*]], ptr addrspace(3) [[INPTR1:%.*]], ptr [[OUT:%.*]], ptr [[OUT1:%.*]], i32 [[FLAG:%.*]]) #[[ATTR0]] {
-; GFX9-NEXT:  [[ENTRY:.*]]:
-; GFX9-NEXT:    [[GEP0:%.*]] = getelementptr i8, ptr addrspace(3) [[INPTR0]], i32 0
-; GFX9-NEXT:    [[TMP0:%.*]] = load <4 x i8>, ptr addrspace(3) [[GEP0]], align 8
-; GFX9-NEXT:    br label %[[DO_BODY:.*]]
-; GFX9:       [[DO_BODY]]:
-; GFX9-NEXT:    [[TMP1:%.*]] = phi <4 x i8> [ [[TMP0]], %[[ENTRY]] ], [ [[TMP2:%.*]], %[[DO_BODY]] ]
-; GFX9-NEXT:    [[TMP2]] = load <4 x i8>, ptr addrspace(3) [[GEP0]], align 8
-; GFX9-NEXT:    [[TMP3:%.*]] = shufflevector <4 x i8> [[TMP2]], <4 x i8> poison, <16 x i32> <i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 0, i32 1, i32 2, i32 3, i32 poison, i32 poison, i32 poison, i32 poison>
-; GFX9-NEXT:    [[VEC131:%.*]] = shufflevector <4 x i8> [[TMP1]], <4 x i8> poison, <16 x i32> <i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 0, i32 1, i32 2, i32 3, i32 poison, i32 poison, i32 poison, i32 poison>
-; GFX9-NEXT:    store <16 x i8> [[VEC131]], ptr addrspace(3) [[INPTR1]], align 2
-; GFX9-NEXT:    [[CMP:%.*]] = icmp eq i32 [[FLAG]], 0
-; GFX9-NEXT:    br i1 [[CMP]], label %[[EXIT:.*]], label %[[DO_BODY]]
-; GFX9:       [[EXIT]]:
-; GFX9-NEXT:    store <16 x i8> [[VEC131]], ptr [[OUT]], align 16
-; GFX9-NEXT:    store <16 x i8> [[TMP3]], ptr [[OUT1]], align 16
-; GFX9-NEXT:    ret void
-;
 entry:
   %gep0 = getelementptr i8, ptr addrspace(3) %inptr0, i32 0
   %ele0 = load i8, ptr addrspace(3) %gep0, align 8
@@ -690,63 +567,6 @@ exit:
 }
 
 define protected amdgpu_kernel void @phi_4_with_stores(ptr addrspace(3) %inptr0, ptr addrspace(3) %inptr1, ptr %out, ptr %out1, i32 %flag) {
-; GFX7-LABEL: define protected amdgpu_kernel void @phi_4_with_stores(
-; GFX7-SAME: ptr addrspace(3) [[INPTR0:%.*]], ptr addrspace(3) [[INPTR1:%.*]], ptr [[OUT:%.*]], ptr [[OUT1:%.*]], i32 [[FLAG:%.*]]) #[[ATTR0]] {
-; GFX7-NEXT:  [[ENTRY:.*]]:
-; GFX7-NEXT:    [[GEP0:%.*]] = getelementptr i8, ptr addrspace(3) [[INPTR0]], i32 0
-; GFX7-NEXT:    [[TMP0:%.*]] = load <4 x i8>, ptr addrspace(3) [[GEP0]], align 8
-; GFX7-NEXT:    br label %[[DO_BODY:.*]]
-; GFX7:       [[DO_BODY]]:
-; GFX7-NEXT:    [[TMP1:%.*]] = phi <4 x i8> [ [[TMP0]], %[[ENTRY]] ], [ [[TMP2:%.*]], %[[DO_BODY]] ]
-; GFX7-NEXT:    [[TMP2]] = load <4 x i8>, ptr addrspace(3) [[GEP0]], align 8
-; GFX7-NEXT:    store <4 x i8> [[TMP1]], ptr addrspace(3) [[GEP0]], align 2
-; GFX7-NEXT:    [[TMP3:%.*]] = shufflevector <4 x i8> [[TMP1]], <4 x i8> poison, <16 x i32> <i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 0, i32 1, i32 2, i32 3, i32 poison, i32 poison, i32 poison, i32 poison>
-; GFX7-NEXT:    store <16 x i8> [[TMP3]], ptr addrspace(3) [[INPTR1]], align 2
-; GFX7-NEXT:    [[CMP:%.*]] = icmp eq i32 [[FLAG]], 0
-; GFX7-NEXT:    br i1 [[CMP]], label %[[EXIT:.*]], label %[[DO_BODY]]
-; GFX7:       [[EXIT]]:
-; GFX7-NEXT:    store <16 x i8> [[TMP3]], ptr [[OUT]], align 16
-; GFX7-NEXT:    store <16 x i8> [[TMP3]], ptr [[OUT1]], align 16
-; GFX7-NEXT:    ret void
-;
-; GFX8-LABEL: define protected amdgpu_kernel void @phi_4_with_stores(
-; GFX8-SAME: ptr addrspace(3) [[INPTR0:%.*]], ptr addrspace(3) [[INPTR1:%.*]], ptr [[OUT:%.*]], ptr [[OUT1:%.*]], i32 [[FLAG:%.*]]) #[[ATTR0]] {
-; GFX8-NEXT:  [[ENTRY:.*]]:
-; GFX8-NEXT:    [[GEP0:%.*]] = getelementptr i8, ptr addrspace(3) [[INPTR0]], i32 0
-; GFX8-NEXT:    [[TMP0:%.*]] = load <4 x i8>, ptr addrspace(3) [[GEP0]], align 8
-; GFX8-NEXT:    br label %[[DO_BODY:.*]]
-; GFX8:       [[DO_BODY]]:
-; GFX8-NEXT:    [[TMP1:%.*]] = phi <4 x i8> [ [[TMP0]], %[[ENTRY]] ], [ [[TMP2:%.*]], %[[DO_BODY]] ]
-; GFX8-NEXT:    [[TMP2]] = load <4 x i8>, ptr addrspace(3) [[GEP0]], align 8
-; GFX8-NEXT:    store <4 x i8> [[TMP1]], ptr addrspace(3) [[GEP0]], align 2
-; GFX8-NEXT:    [[TMP3:%.*]] = shufflevector <4 x i8> [[TMP1]], <4 x i8> poison, <16 x i32> <i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 0, i32 1, i32 2, i32 3, i32 poison, i32 poison, i32 poison, i32 poison>
-; GFX8-NEXT:    store <16 x i8> [[TMP3]], ptr addrspace(3) [[INPTR1]], align 2
-; GFX8-NEXT:    [[CMP:%.*]] = icmp eq i32 [[FLAG]], 0
-; GFX8-NEXT:    br i1 [[CMP]], label %[[EXIT:.*]], label %[[DO_BODY]]
-; GFX8:       [[EXIT]]:
-; GFX8-NEXT:    store <16 x i8> [[TMP3]], ptr [[OUT]], align 16
-; GFX8-NEXT:    store <16 x i8> [[TMP3]], ptr [[OUT1]], align 16
-; GFX8-NEXT:    ret void
-;
-; GFX9-LABEL: define protected amdgpu_kernel void @phi_4_with_stores(
-; GFX9-SAME: ptr addrspace(3) [[INPTR0:%.*]], ptr addrspace(3) [[INPTR1:%.*]], ptr [[OUT:%.*]], ptr [[OUT1:%.*]], i32 [[FLAG:%.*]]) #[[ATTR0]] {
-; GFX9-NEXT:  [[ENTRY:.*]]:
-; GFX9-NEXT:    [[GEP0:%.*]] = getelementptr i8, ptr addrspace(3) [[INPTR0]], i32 0
-; GFX9-NEXT:    [[TMP0:%.*]] = load <4 x i8>, ptr addrspace(3) [[GEP0]], align 8
-; GFX9-NEXT:    br label %[[DO_BODY:.*]]
-; GFX9:       [[DO_BODY]]:
-; GFX9-NEXT:    [[TMP1:%.*]] = phi <4 x i8> [ [[TMP0]], %[[ENTRY]] ], [ [[TMP2:%.*]], %[[DO_BODY]] ]
-; GFX9-NEXT:    [[TMP2]] = load <4 x i8>, ptr addrspace(3) [[GEP0]], align 8
-; GFX9-NEXT:    store <4 x i8> [[TMP1]], ptr addrspace(3) [[GEP0]], align 2
-; GFX9-NEXT:    [[TMP3:%.*]] = shufflevector <4 x i8> [[TMP1]], <4 x i8> poison, <16 x i32> <i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 0, i32 1, i32 2, i32 3, i32 poison, i32 poison, i32 poison, i32 poison>
-; GFX9-NEXT:    store <16 x i8> [[TMP3]], ptr addrspace(3) [[INPTR1]], align 2
-; GFX9-NEXT:    [[CMP:%.*]] = icmp eq i32 [[FLAG]], 0
-; GFX9-NEXT:    br i1 [[CMP]], label %[[EXIT:.*]], label %[[DO_BODY]]
-; GFX9:       [[EXIT]]:
-; GFX9-NEXT:    store <16 x i8> [[TMP3]], ptr [[OUT]], align 16
-; GFX9-NEXT:    store <16 x i8> [[TMP3]], ptr [[OUT1]], align 16
-; GFX9-NEXT:    ret void
-;
 entry:
   %gep0 = getelementptr i8, ptr addrspace(3) %inptr0, i32 0
   %ele0 = load i8, ptr addrspace(3) %gep0, align 8

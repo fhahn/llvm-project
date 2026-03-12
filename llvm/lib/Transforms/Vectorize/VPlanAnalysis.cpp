@@ -76,6 +76,7 @@ Type *VPTypeAnalysis::inferScalarTypeForRecipe(const VPInstruction *R) {
 
   switch (Opcode) {
   case Instruction::ExtractElement:
+  case Instruction::InsertElement:
   case Instruction::Freeze:
   case Instruction::PHI:
   case VPInstruction::Broadcast:
@@ -150,6 +151,7 @@ Type *VPTypeAnalysis::inferScalarTypeForRecipe(const VPInstruction *R) {
         ->getReturnType();
   }
   case Instruction::GetElementPtr:
+  case Instruction::ShuffleVector:
     return inferScalarType(R->getOperand(0));
   case Instruction::ExtractValue:
     return cast<ExtractValueInst>(R->getUnderlyingValue())->getType();
@@ -179,6 +181,8 @@ Type *VPTypeAnalysis::inferScalarTypeForRecipe(const VPWidenRecipe *R) {
   case Instruction::ICmp:
   case Instruction::FCmp:
     return IntegerType::get(Ctx, 1);
+  case Instruction::GetElementPtr:
+    return R->getUnderlyingInstr()->getType();
   case Instruction::FNeg:
   case Instruction::Freeze:
     return inferScalarType(R->getOperand(0));
@@ -279,8 +283,15 @@ Type *VPTypeAnalysis::inferScalarType(const VPValue *V) {
   if (Type *CachedTy = CachedTypes.lookup(V))
     return CachedTy;
 
-  if (auto *IRV = dyn_cast<VPIRValue>(V))
-    return IRV->getType();
+  if (auto *IRV = dyn_cast<VPIRValue>(V)) {
+    Type *Ty = IRV->getType();
+    // For vector-typed live-ins (e.g. source vectors of extractelement entries
+    // in SLP), return the element type since VPlan recipes operate on scalar
+    // types.
+    if (auto *VTy = dyn_cast<VectorType>(Ty))
+      return VTy->getElementType();
+    return Ty;
+  }
 
   if (isa<VPSymbolicValue>(V)) {
     // All VPValues without any underlying IR value (like the vector trip count

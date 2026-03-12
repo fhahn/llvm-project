@@ -2,6 +2,8 @@
 ; RUN: opt < %s -mtriple=s390x-unknown-linux -mcpu=z16 -S -passes=slp-vectorizer \
 ; RUN:   -pass-remarks-output=%t | FileCheck %s
 ; RUN: cat %t | FileCheck -check-prefix=REMARK %s
+; RUN: opt < %s -mtriple=s390x-unknown-linux -mcpu=z16 -S -passes=slp-vectorizer -slp-use-vplan-codegen \
+; RUN:   -pass-remarks-output=%t | FileCheck %s
 ;
 ; Test functions that (at least currently) only gets vectorized if the
 ; insertion cost for an element load is counted as free.

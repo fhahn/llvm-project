@@ -2,6 +2,9 @@
 ; RUN: opt -passes=inject-tli-mappings,slp-vectorizer -vector-library=Accelerate -S %s | FileCheck %s
 ; RUN: opt -passes=inject-tli-mappings,slp-vectorizer -vector-library=ArmPL -S %s | FileCheck %s --check-prefix=CHECK-ARMPL
 ; RUN: opt -passes=inject-tli-mappings,slp-vectorizer -S %s | FileCheck --check-prefix NOACCELERATE %s
+; RUN: opt -passes=inject-tli-mappings,slp-vectorizer -slp-use-vplan-codegen -vector-library=Accelerate -S %s | FileCheck %s --check-prefix=VPLAN
+; RUN: opt -passes=inject-tli-mappings,slp-vectorizer -slp-use-vplan-codegen -vector-library=ArmPL -S %s | FileCheck %s --check-prefix=VPLAN-ARMPL
+; RUN: opt -passes=inject-tli-mappings,slp-vectorizer -slp-use-vplan-codegen -S %s | FileCheck --check-prefix VPLAN-NOACCELERATE %s
 
 target datalayout = "e-m:o-i64:64-i128:128-n32:64-S128"
 target triple = "arm64-apple-ios14.0.0"
@@ -38,6 +41,35 @@ define <4 x float> @int_sin_4x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @llvm.sin.f32(float [[VECEXT_3]])
 ; NOACCELERATE-NEXT:    [[VECINS_31:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
 ; NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_31]]
+;
+; VPLAN-LABEL: @int_sin_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @vsinf(<4 x float> [[TMP0]])
+; VPLAN-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-ARMPL-LABEL: @int_sin_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = call fast aarch64_vector_pcs <4 x float> @armpl_vsinq_f32(<4 x float> [[TMP0]])
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @int_sin_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT:%.*]] = extractelement <4 x float> [[TMP0]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = tail call fast float @llvm.sin.f32(float [[VECEXT]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS:%.*]] = insertelement <4 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_1:%.*]] = extractelement <4 x float> [[TMP0]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[TMP2:%.*]] = tail call fast float @llvm.sin.f32(float [[VECEXT_1]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_1:%.*]] = insertelement <4 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_2:%.*]] = extractelement <4 x float> [[TMP0]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[TMP3:%.*]] = tail call fast float @llvm.sin.f32(float [[VECEXT_2]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_2:%.*]] = insertelement <4 x float> [[VECINS_1]], float [[TMP3]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_3:%.*]] = extractelement <4 x float> [[TMP0]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @llvm.sin.f32(float [[VECEXT_3]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
 ;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
@@ -77,6 +109,24 @@ define <4 x float> @ceil_4x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @llvm.ceil.v4f32(<4 x float> [[TMP0]])
 ; NOACCELERATE-NEXT:    ret <4 x float> [[TMP1]]
 ;
+; VPLAN-LABEL: @ceil_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @llvm.ceil.v4f32(<4 x float> [[TMP0]])
+; VPLAN-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-ARMPL-LABEL: @ceil_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @llvm.ceil.v4f32(<4 x float> [[TMP0]])
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @ceil_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @llvm.ceil.v4f32(<4 x float> [[TMP0]])
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[TMP1]]
+;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
   %vecext = extractelement <4 x float> %0, i32 0
@@ -115,6 +165,24 @@ define <4 x float> @fabs_4x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @llvm.fabs.v4f32(<4 x float> [[TMP0]])
 ; NOACCELERATE-NEXT:    ret <4 x float> [[TMP1]]
 ;
+; VPLAN-LABEL: @fabs_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @llvm.fabs.v4f32(<4 x float> [[TMP0]])
+; VPLAN-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-ARMPL-LABEL: @fabs_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @llvm.fabs.v4f32(<4 x float> [[TMP0]])
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @fabs_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @llvm.fabs.v4f32(<4 x float> [[TMP0]])
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[TMP1]]
+;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
   %vecext = extractelement <4 x float> %0, i32 0
@@ -150,6 +218,24 @@ define <4 x float> @int_fabs_4x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
 ; NOACCELERATE-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @llvm.fabs.v4f32(<4 x float> [[TMP0]])
 ; NOACCELERATE-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-LABEL: @int_fabs_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @llvm.fabs.v4f32(<4 x float> [[TMP0]])
+; VPLAN-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-ARMPL-LABEL: @int_fabs_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @llvm.fabs.v4f32(<4 x float> [[TMP0]])
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @int_fabs_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @llvm.fabs.v4f32(<4 x float> [[TMP0]])
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[TMP1]]
 ;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
@@ -187,6 +273,24 @@ define <4 x float> @floor_4x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @llvm.floor.v4f32(<4 x float> [[TMP0]])
 ; NOACCELERATE-NEXT:    ret <4 x float> [[TMP1]]
 ;
+; VPLAN-LABEL: @floor_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @llvm.floor.v4f32(<4 x float> [[TMP0]])
+; VPLAN-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-ARMPL-LABEL: @floor_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @llvm.floor.v4f32(<4 x float> [[TMP0]])
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @floor_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @llvm.floor.v4f32(<4 x float> [[TMP0]])
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[TMP1]]
+;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
   %vecext = extractelement <4 x float> %0, i32 0
@@ -222,6 +326,24 @@ define <4 x float> @sqrt_4x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
 ; NOACCELERATE-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @llvm.sqrt.v4f32(<4 x float> [[TMP0]])
 ; NOACCELERATE-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-LABEL: @sqrt_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @llvm.sqrt.v4f32(<4 x float> [[TMP0]])
+; VPLAN-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-ARMPL-LABEL: @sqrt_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @llvm.sqrt.v4f32(<4 x float> [[TMP0]])
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @sqrt_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @llvm.sqrt.v4f32(<4 x float> [[TMP0]])
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[TMP1]]
 ;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
@@ -270,6 +392,35 @@ define <4 x float> @exp_4x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[VECINS_31:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
 ; NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_31]]
 ;
+; VPLAN-LABEL: @exp_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @vexpf(<4 x float> [[TMP0]])
+; VPLAN-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-ARMPL-LABEL: @exp_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = call fast aarch64_vector_pcs <4 x float> @armpl_vexpq_f32(<4 x float> [[TMP0]])
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @exp_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT:%.*]] = extractelement <4 x float> [[TMP0]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = tail call fast float @expf(float [[VECEXT]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS:%.*]] = insertelement <4 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_1:%.*]] = extractelement <4 x float> [[TMP0]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[TMP2:%.*]] = tail call fast float @expf(float [[VECEXT_1]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_1:%.*]] = insertelement <4 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_2:%.*]] = extractelement <4 x float> [[TMP0]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[TMP3:%.*]] = tail call fast float @expf(float [[VECEXT_2]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_2:%.*]] = insertelement <4 x float> [[VECINS_1]], float [[TMP3]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_3:%.*]] = extractelement <4 x float> [[TMP0]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @expf(float [[VECEXT_3]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
+;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
   %vecext = extractelement <4 x float> %0, i32 0
@@ -316,6 +467,35 @@ define <4 x float> @expm1_4x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @expm1f(float [[VECEXT_3]])
 ; NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
 ; NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
+;
+; VPLAN-LABEL: @expm1_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @vexpm1f(<4 x float> [[TMP0]])
+; VPLAN-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-ARMPL-LABEL: @expm1_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = call fast aarch64_vector_pcs <4 x float> @armpl_vexpm1q_f32(<4 x float> [[TMP0]])
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @expm1_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT:%.*]] = extractelement <4 x float> [[TMP0]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = tail call fast float @expm1f(float [[VECEXT]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS:%.*]] = insertelement <4 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_1:%.*]] = extractelement <4 x float> [[TMP0]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[TMP2:%.*]] = tail call fast float @expm1f(float [[VECEXT_1]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_1:%.*]] = insertelement <4 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_2:%.*]] = extractelement <4 x float> [[TMP0]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[TMP3:%.*]] = tail call fast float @expm1f(float [[VECEXT_2]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_2:%.*]] = insertelement <4 x float> [[VECINS_1]], float [[TMP3]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_3:%.*]] = extractelement <4 x float> [[TMP0]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @expm1f(float [[VECEXT_3]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
 ;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
@@ -364,6 +544,35 @@ define <4 x float> @log_4x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[VECINS_31:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
 ; NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_31]]
 ;
+; VPLAN-LABEL: @log_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @vlogf(<4 x float> [[TMP0]])
+; VPLAN-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-ARMPL-LABEL: @log_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = call fast aarch64_vector_pcs <4 x float> @armpl_vlogq_f32(<4 x float> [[TMP0]])
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @log_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT:%.*]] = extractelement <4 x float> [[TMP0]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = tail call fast float @logf(float [[VECEXT]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS:%.*]] = insertelement <4 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_1:%.*]] = extractelement <4 x float> [[TMP0]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[TMP2:%.*]] = tail call fast float @logf(float [[VECEXT_1]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_1:%.*]] = insertelement <4 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_2:%.*]] = extractelement <4 x float> [[TMP0]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[TMP3:%.*]] = tail call fast float @logf(float [[VECEXT_2]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_2:%.*]] = insertelement <4 x float> [[VECINS_1]], float [[TMP3]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_3:%.*]] = extractelement <4 x float> [[TMP0]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @logf(float [[VECEXT_3]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
+;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
   %vecext = extractelement <4 x float> %0, i32 0
@@ -410,6 +619,35 @@ define <4 x float> @log1p_4x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @log1pf(float [[VECEXT_3]])
 ; NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
 ; NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
+;
+; VPLAN-LABEL: @log1p_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @vlog1pf(<4 x float> [[TMP0]])
+; VPLAN-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-ARMPL-LABEL: @log1p_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = call fast aarch64_vector_pcs <4 x float> @armpl_vlog1pq_f32(<4 x float> [[TMP0]])
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @log1p_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT:%.*]] = extractelement <4 x float> [[TMP0]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = tail call fast float @log1pf(float [[VECEXT]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS:%.*]] = insertelement <4 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_1:%.*]] = extractelement <4 x float> [[TMP0]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[TMP2:%.*]] = tail call fast float @log1pf(float [[VECEXT_1]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_1:%.*]] = insertelement <4 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_2:%.*]] = extractelement <4 x float> [[TMP0]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[TMP3:%.*]] = tail call fast float @log1pf(float [[VECEXT_2]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_2:%.*]] = insertelement <4 x float> [[VECINS_1]], float [[TMP3]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_3:%.*]] = extractelement <4 x float> [[TMP0]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @log1pf(float [[VECEXT_3]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
 ;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
@@ -480,6 +718,57 @@ define <4 x float> @log10p_4x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
 ; NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
 ;
+; VPLAN-LABEL: @log10p_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[VECEXT:%.*]] = extractelement <4 x float> [[TMP0]], i32 0
+; VPLAN-NEXT:    [[TMP1:%.*]] = tail call fast float @log10pf(float [[VECEXT]])
+; VPLAN-NEXT:    [[VECINS:%.*]] = insertelement <4 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NEXT:    [[VECEXT_1:%.*]] = extractelement <4 x float> [[TMP0]], i32 1
+; VPLAN-NEXT:    [[TMP2:%.*]] = tail call fast float @log10pf(float [[VECEXT_1]])
+; VPLAN-NEXT:    [[VECINS_1:%.*]] = insertelement <4 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NEXT:    [[VECEXT_2:%.*]] = extractelement <4 x float> [[TMP0]], i32 2
+; VPLAN-NEXT:    [[TMP3:%.*]] = tail call fast float @log10pf(float [[VECEXT_2]])
+; VPLAN-NEXT:    [[VECINS_2:%.*]] = insertelement <4 x float> [[VECINS_1]], float [[TMP3]], i32 2
+; VPLAN-NEXT:    [[VECEXT_3:%.*]] = extractelement <4 x float> [[TMP0]], i32 3
+; VPLAN-NEXT:    [[TMP4:%.*]] = tail call fast float @log10pf(float [[VECEXT_3]])
+; VPLAN-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
+; VPLAN-NEXT:    ret <4 x float> [[VECINS_3]]
+;
+; VPLAN-ARMPL-LABEL: @log10p_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[VECEXT:%.*]] = extractelement <4 x float> [[TMP0]], i32 0
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = tail call fast float @log10pf(float [[VECEXT]])
+; VPLAN-ARMPL-NEXT:    [[VECINS:%.*]] = insertelement <4 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-ARMPL-NEXT:    [[VECEXT_1:%.*]] = extractelement <4 x float> [[TMP0]], i32 1
+; VPLAN-ARMPL-NEXT:    [[TMP2:%.*]] = tail call fast float @log10pf(float [[VECEXT_1]])
+; VPLAN-ARMPL-NEXT:    [[VECINS_1:%.*]] = insertelement <4 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-ARMPL-NEXT:    [[VECEXT_2:%.*]] = extractelement <4 x float> [[TMP0]], i32 2
+; VPLAN-ARMPL-NEXT:    [[TMP3:%.*]] = tail call fast float @log10pf(float [[VECEXT_2]])
+; VPLAN-ARMPL-NEXT:    [[VECINS_2:%.*]] = insertelement <4 x float> [[VECINS_1]], float [[TMP3]], i32 2
+; VPLAN-ARMPL-NEXT:    [[VECEXT_3:%.*]] = extractelement <4 x float> [[TMP0]], i32 3
+; VPLAN-ARMPL-NEXT:    [[TMP4:%.*]] = tail call fast float @log10pf(float [[VECEXT_3]])
+; VPLAN-ARMPL-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[VECINS_3]]
+;
+; VPLAN-NOACCELERATE-LABEL: @log10p_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT:%.*]] = extractelement <4 x float> [[TMP0]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = tail call fast float @log10pf(float [[VECEXT]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS:%.*]] = insertelement <4 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_1:%.*]] = extractelement <4 x float> [[TMP0]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[TMP2:%.*]] = tail call fast float @log10pf(float [[VECEXT_1]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_1:%.*]] = insertelement <4 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_2:%.*]] = extractelement <4 x float> [[TMP0]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[TMP3:%.*]] = tail call fast float @log10pf(float [[VECEXT_2]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_2:%.*]] = insertelement <4 x float> [[VECINS_1]], float [[TMP3]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_3:%.*]] = extractelement <4 x float> [[TMP0]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @log10pf(float [[VECEXT_3]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
+;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
   %vecext = extractelement <4 x float> %0, i32 0
@@ -538,6 +827,46 @@ define <4 x float> @logb_4x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
 ; NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
 ;
+; VPLAN-LABEL: @logb_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @vlogbf(<4 x float> [[TMP0]])
+; VPLAN-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-ARMPL-LABEL: @logb_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[VECEXT:%.*]] = extractelement <4 x float> [[TMP0]], i32 0
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = tail call fast float @logbf(float [[VECEXT]])
+; VPLAN-ARMPL-NEXT:    [[VECINS:%.*]] = insertelement <4 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-ARMPL-NEXT:    [[VECEXT_1:%.*]] = extractelement <4 x float> [[TMP0]], i32 1
+; VPLAN-ARMPL-NEXT:    [[TMP2:%.*]] = tail call fast float @logbf(float [[VECEXT_1]])
+; VPLAN-ARMPL-NEXT:    [[VECINS_1:%.*]] = insertelement <4 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-ARMPL-NEXT:    [[VECEXT_2:%.*]] = extractelement <4 x float> [[TMP0]], i32 2
+; VPLAN-ARMPL-NEXT:    [[TMP3:%.*]] = tail call fast float @logbf(float [[VECEXT_2]])
+; VPLAN-ARMPL-NEXT:    [[VECINS_2:%.*]] = insertelement <4 x float> [[VECINS_1]], float [[TMP3]], i32 2
+; VPLAN-ARMPL-NEXT:    [[VECEXT_3:%.*]] = extractelement <4 x float> [[TMP0]], i32 3
+; VPLAN-ARMPL-NEXT:    [[TMP4:%.*]] = tail call fast float @logbf(float [[VECEXT_3]])
+; VPLAN-ARMPL-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[VECINS_3]]
+;
+; VPLAN-NOACCELERATE-LABEL: @logb_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT:%.*]] = extractelement <4 x float> [[TMP0]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = tail call fast float @logbf(float [[VECEXT]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS:%.*]] = insertelement <4 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_1:%.*]] = extractelement <4 x float> [[TMP0]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[TMP2:%.*]] = tail call fast float @logbf(float [[VECEXT_1]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_1:%.*]] = insertelement <4 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_2:%.*]] = extractelement <4 x float> [[TMP0]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[TMP3:%.*]] = tail call fast float @logbf(float [[VECEXT_2]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_2:%.*]] = insertelement <4 x float> [[VECINS_1]], float [[TMP3]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_3:%.*]] = extractelement <4 x float> [[TMP0]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @logbf(float [[VECEXT_3]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
+;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
   %vecext = extractelement <4 x float> %0, i32 0
@@ -584,6 +913,35 @@ define <4 x float> @sin_4x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @sinf(float [[VECEXT_3]])
 ; NOACCELERATE-NEXT:    [[VECINS_31:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
 ; NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_31]]
+;
+; VPLAN-LABEL: @sin_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @vsinf(<4 x float> [[TMP0]])
+; VPLAN-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-ARMPL-LABEL: @sin_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = call fast aarch64_vector_pcs <4 x float> @armpl_vsinq_f32(<4 x float> [[TMP0]])
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @sin_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT:%.*]] = extractelement <4 x float> [[TMP0]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = tail call fast float @sinf(float [[VECEXT]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS:%.*]] = insertelement <4 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_1:%.*]] = extractelement <4 x float> [[TMP0]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[TMP2:%.*]] = tail call fast float @sinf(float [[VECEXT_1]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_1:%.*]] = insertelement <4 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_2:%.*]] = extractelement <4 x float> [[TMP0]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[TMP3:%.*]] = tail call fast float @sinf(float [[VECEXT_2]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_2:%.*]] = insertelement <4 x float> [[VECINS_1]], float [[TMP3]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_3:%.*]] = extractelement <4 x float> [[TMP0]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @sinf(float [[VECEXT_3]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
 ;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
@@ -632,6 +990,35 @@ define <4 x float> @cos_4x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[VECINS_31:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
 ; NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_31]]
 ;
+; VPLAN-LABEL: @cos_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @vcosf(<4 x float> [[TMP0]])
+; VPLAN-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-ARMPL-LABEL: @cos_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = call fast aarch64_vector_pcs <4 x float> @armpl_vcosq_f32(<4 x float> [[TMP0]])
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @cos_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT:%.*]] = extractelement <4 x float> [[TMP0]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = tail call fast float @cosf(float [[VECEXT]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS:%.*]] = insertelement <4 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_1:%.*]] = extractelement <4 x float> [[TMP0]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[TMP2:%.*]] = tail call fast float @cosf(float [[VECEXT_1]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_1:%.*]] = insertelement <4 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_2:%.*]] = extractelement <4 x float> [[TMP0]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[TMP3:%.*]] = tail call fast float @cosf(float [[VECEXT_2]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_2:%.*]] = insertelement <4 x float> [[VECINS_1]], float [[TMP3]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_3:%.*]] = extractelement <4 x float> [[TMP0]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @cosf(float [[VECEXT_3]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
+;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
   %vecext = extractelement <4 x float> %0, i32 0
@@ -678,6 +1065,35 @@ define <4 x float> @tan_4x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @tanf(float [[VECEXT_3]])
 ; NOACCELERATE-NEXT:    [[VECINS_31:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
 ; NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_31]]
+;
+; VPLAN-LABEL: @tan_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @vtanf(<4 x float> [[TMP0]])
+; VPLAN-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-ARMPL-LABEL: @tan_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = call fast aarch64_vector_pcs <4 x float> @armpl_vtanq_f32(<4 x float> [[TMP0]])
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @tan_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT:%.*]] = extractelement <4 x float> [[TMP0]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = tail call fast float @tanf(float [[VECEXT]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS:%.*]] = insertelement <4 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_1:%.*]] = extractelement <4 x float> [[TMP0]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[TMP2:%.*]] = tail call fast float @tanf(float [[VECEXT_1]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_1:%.*]] = insertelement <4 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_2:%.*]] = extractelement <4 x float> [[TMP0]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[TMP3:%.*]] = tail call fast float @tanf(float [[VECEXT_2]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_2:%.*]] = insertelement <4 x float> [[VECINS_1]], float [[TMP3]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_3:%.*]] = extractelement <4 x float> [[TMP0]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @tanf(float [[VECEXT_3]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
 ;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
@@ -726,6 +1142,35 @@ define <4 x float> @asin_4x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[VECINS_31:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
 ; NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_31]]
 ;
+; VPLAN-LABEL: @asin_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @vasinf(<4 x float> [[TMP0]])
+; VPLAN-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-ARMPL-LABEL: @asin_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = call fast aarch64_vector_pcs <4 x float> @armpl_vasinq_f32(<4 x float> [[TMP0]])
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @asin_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT:%.*]] = extractelement <4 x float> [[TMP0]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = tail call fast float @asinf(float [[VECEXT]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS:%.*]] = insertelement <4 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_1:%.*]] = extractelement <4 x float> [[TMP0]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[TMP2:%.*]] = tail call fast float @asinf(float [[VECEXT_1]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_1:%.*]] = insertelement <4 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_2:%.*]] = extractelement <4 x float> [[TMP0]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[TMP3:%.*]] = tail call fast float @asinf(float [[VECEXT_2]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_2:%.*]] = insertelement <4 x float> [[VECINS_1]], float [[TMP3]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_3:%.*]] = extractelement <4 x float> [[TMP0]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @asinf(float [[VECEXT_3]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
+;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
   %vecext = extractelement <4 x float> %0, i32 0
@@ -771,6 +1216,35 @@ define <4 x float> @int_asin_4x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @llvm.asin.f32(float [[VECEXT_3]])
 ; NOACCELERATE-NEXT:    [[VECINS_31:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
 ; NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_31]]
+;
+; VPLAN-LABEL: @int_asin_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @vasinf(<4 x float> [[TMP0]])
+; VPLAN-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-ARMPL-LABEL: @int_asin_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = call fast aarch64_vector_pcs <4 x float> @armpl_vasinq_f32(<4 x float> [[TMP0]])
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @int_asin_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT:%.*]] = extractelement <4 x float> [[TMP0]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = tail call fast float @llvm.asin.f32(float [[VECEXT]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS:%.*]] = insertelement <4 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_1:%.*]] = extractelement <4 x float> [[TMP0]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[TMP2:%.*]] = tail call fast float @llvm.asin.f32(float [[VECEXT_1]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_1:%.*]] = insertelement <4 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_2:%.*]] = extractelement <4 x float> [[TMP0]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[TMP3:%.*]] = tail call fast float @llvm.asin.f32(float [[VECEXT_2]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_2:%.*]] = insertelement <4 x float> [[VECINS_1]], float [[TMP3]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_3:%.*]] = extractelement <4 x float> [[TMP0]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @llvm.asin.f32(float [[VECEXT_3]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
 ;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
@@ -819,6 +1293,35 @@ define <4 x float> @acos_4x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[VECINS_31:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
 ; NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_31]]
 ;
+; VPLAN-LABEL: @acos_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @vacosf(<4 x float> [[TMP0]])
+; VPLAN-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-ARMPL-LABEL: @acos_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = call fast aarch64_vector_pcs <4 x float> @armpl_vacosq_f32(<4 x float> [[TMP0]])
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @acos_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT:%.*]] = extractelement <4 x float> [[TMP0]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = tail call fast float @acosf(float [[VECEXT]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS:%.*]] = insertelement <4 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_1:%.*]] = extractelement <4 x float> [[TMP0]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[TMP2:%.*]] = tail call fast float @acosf(float [[VECEXT_1]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_1:%.*]] = insertelement <4 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_2:%.*]] = extractelement <4 x float> [[TMP0]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[TMP3:%.*]] = tail call fast float @acosf(float [[VECEXT_2]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_2:%.*]] = insertelement <4 x float> [[VECINS_1]], float [[TMP3]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_3:%.*]] = extractelement <4 x float> [[TMP0]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @acosf(float [[VECEXT_3]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
+;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
   %vecext = extractelement <4 x float> %0, i32 0
@@ -864,6 +1367,35 @@ define <4 x float> @int_acos_4x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @llvm.acos.f32(float [[VECEXT_3]])
 ; NOACCELERATE-NEXT:    [[VECINS_31:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
 ; NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_31]]
+;
+; VPLAN-LABEL: @int_acos_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @vacosf(<4 x float> [[TMP0]])
+; VPLAN-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-ARMPL-LABEL: @int_acos_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = call fast aarch64_vector_pcs <4 x float> @armpl_vacosq_f32(<4 x float> [[TMP0]])
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @int_acos_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT:%.*]] = extractelement <4 x float> [[TMP0]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = tail call fast float @llvm.acos.f32(float [[VECEXT]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS:%.*]] = insertelement <4 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_1:%.*]] = extractelement <4 x float> [[TMP0]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[TMP2:%.*]] = tail call fast float @llvm.acos.f32(float [[VECEXT_1]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_1:%.*]] = insertelement <4 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_2:%.*]] = extractelement <4 x float> [[TMP0]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[TMP3:%.*]] = tail call fast float @llvm.acos.f32(float [[VECEXT_2]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_2:%.*]] = insertelement <4 x float> [[VECINS_1]], float [[TMP3]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_3:%.*]] = extractelement <4 x float> [[TMP0]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @llvm.acos.f32(float [[VECEXT_3]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
 ;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
@@ -912,6 +1444,35 @@ define <4 x float> @atan_4x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[VECINS_31:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
 ; NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_31]]
 ;
+; VPLAN-LABEL: @atan_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @vatanf(<4 x float> [[TMP0]])
+; VPLAN-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-ARMPL-LABEL: @atan_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = call fast aarch64_vector_pcs <4 x float> @armpl_vatanq_f32(<4 x float> [[TMP0]])
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @atan_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT:%.*]] = extractelement <4 x float> [[TMP0]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = tail call fast float @atanf(float [[VECEXT]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS:%.*]] = insertelement <4 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_1:%.*]] = extractelement <4 x float> [[TMP0]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[TMP2:%.*]] = tail call fast float @atanf(float [[VECEXT_1]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_1:%.*]] = insertelement <4 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_2:%.*]] = extractelement <4 x float> [[TMP0]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[TMP3:%.*]] = tail call fast float @atanf(float [[VECEXT_2]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_2:%.*]] = insertelement <4 x float> [[VECINS_1]], float [[TMP3]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_3:%.*]] = extractelement <4 x float> [[TMP0]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @atanf(float [[VECEXT_3]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
+;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
   %vecext = extractelement <4 x float> %0, i32 0
@@ -957,6 +1518,35 @@ define <4 x float> @int_atan_4x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @llvm.atan.f32(float [[VECEXT_3]])
 ; NOACCELERATE-NEXT:    [[VECINS_31:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
 ; NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_31]]
+;
+; VPLAN-LABEL: @int_atan_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @vatanf(<4 x float> [[TMP0]])
+; VPLAN-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-ARMPL-LABEL: @int_atan_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = call fast aarch64_vector_pcs <4 x float> @armpl_vatanq_f32(<4 x float> [[TMP0]])
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @int_atan_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT:%.*]] = extractelement <4 x float> [[TMP0]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = tail call fast float @llvm.atan.f32(float [[VECEXT]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS:%.*]] = insertelement <4 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_1:%.*]] = extractelement <4 x float> [[TMP0]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[TMP2:%.*]] = tail call fast float @llvm.atan.f32(float [[VECEXT_1]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_1:%.*]] = insertelement <4 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_2:%.*]] = extractelement <4 x float> [[TMP0]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[TMP3:%.*]] = tail call fast float @llvm.atan.f32(float [[VECEXT_2]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_2:%.*]] = insertelement <4 x float> [[VECINS_1]], float [[TMP3]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_3:%.*]] = extractelement <4 x float> [[TMP0]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @llvm.atan.f32(float [[VECEXT_3]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
 ;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
@@ -1011,6 +1601,42 @@ define <4 x float> @atan2_4x(ptr %a, ptr %b) {
 ; NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @atan2f(float [[VECEXT_3]], float [[VECEXTB_3]])
 ; NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
 ; NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
+;
+; VPLAN-LABEL: @atan2_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[BB:%.*]] = load <4 x float>, ptr [[B:%.*]], align 16
+; VPLAN-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @vatan2f(<4 x float> [[TMP0]], <4 x float> [[BB]])
+; VPLAN-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-ARMPL-LABEL: @atan2_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[BB:%.*]] = load <4 x float>, ptr [[B:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = call fast aarch64_vector_pcs <4 x float> @armpl_vatan2q_f32(<4 x float> [[TMP0]], <4 x float> [[BB]])
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @atan2_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[BB:%.*]] = load <4 x float>, ptr [[B:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT:%.*]] = extractelement <4 x float> [[TMP0]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXTB:%.*]] = extractelement <4 x float> [[BB]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = tail call fast float @atan2f(float [[VECEXT]], float [[VECEXTB]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS:%.*]] = insertelement <4 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_1:%.*]] = extractelement <4 x float> [[TMP0]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXTB_1:%.*]] = extractelement <4 x float> [[BB]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[TMP2:%.*]] = tail call fast float @atan2f(float [[VECEXT_1]], float [[VECEXTB_1]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_1:%.*]] = insertelement <4 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_2:%.*]] = extractelement <4 x float> [[TMP0]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXTB_2:%.*]] = extractelement <4 x float> [[BB]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[TMP3:%.*]] = tail call fast float @atan2f(float [[VECEXT_2]], float [[VECEXTB_2]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_2:%.*]] = insertelement <4 x float> [[VECINS_1]], float [[TMP3]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_3:%.*]] = extractelement <4 x float> [[TMP0]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXTB_3:%.*]] = extractelement <4 x float> [[BB]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @atan2f(float [[VECEXT_3]], float [[VECEXTB_3]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
 ;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
@@ -1070,6 +1696,42 @@ define <4 x float> @int_atan2_4x(ptr %a, ptr %b) {
 ; NOACCELERATE-NEXT:    [[VECINS_31:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
 ; NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_31]]
 ;
+; VPLAN-LABEL: @int_atan2_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[BB:%.*]] = load <4 x float>, ptr [[B:%.*]], align 16
+; VPLAN-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @vatan2f(<4 x float> [[TMP0]], <4 x float> [[BB]])
+; VPLAN-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-ARMPL-LABEL: @int_atan2_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[BB:%.*]] = load <4 x float>, ptr [[B:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = call fast aarch64_vector_pcs <4 x float> @armpl_vatan2q_f32(<4 x float> [[TMP0]], <4 x float> [[BB]])
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @int_atan2_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[BB:%.*]] = load <4 x float>, ptr [[B:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT:%.*]] = extractelement <4 x float> [[TMP0]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXTB:%.*]] = extractelement <4 x float> [[BB]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = tail call fast float @llvm.atan2.f32(float [[VECEXT]], float [[VECEXTB]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS:%.*]] = insertelement <4 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_1:%.*]] = extractelement <4 x float> [[TMP0]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXTB_1:%.*]] = extractelement <4 x float> [[BB]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[TMP2:%.*]] = tail call fast float @llvm.atan2.f32(float [[VECEXT_1]], float [[VECEXTB_1]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_1:%.*]] = insertelement <4 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_2:%.*]] = extractelement <4 x float> [[TMP0]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXTB_2:%.*]] = extractelement <4 x float> [[BB]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[TMP3:%.*]] = tail call fast float @llvm.atan2.f32(float [[VECEXT_2]], float [[VECEXTB_2]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_2:%.*]] = insertelement <4 x float> [[VECINS_1]], float [[TMP3]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_3:%.*]] = extractelement <4 x float> [[TMP0]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXTB_3:%.*]] = extractelement <4 x float> [[BB]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @llvm.atan2.f32(float [[VECEXT_3]], float [[VECEXTB_3]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
+;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
   %bb = load <4 x float>, ptr %b, align 16
@@ -1122,6 +1784,35 @@ define <4 x float> @sinh_4x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[VECINS_31:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
 ; NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_31]]
 ;
+; VPLAN-LABEL: @sinh_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @vsinhf(<4 x float> [[TMP0]])
+; VPLAN-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-ARMPL-LABEL: @sinh_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = call fast aarch64_vector_pcs <4 x float> @armpl_vsinhq_f32(<4 x float> [[TMP0]])
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @sinh_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT:%.*]] = extractelement <4 x float> [[TMP0]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = tail call fast float @sinhf(float [[VECEXT]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS:%.*]] = insertelement <4 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_1:%.*]] = extractelement <4 x float> [[TMP0]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[TMP2:%.*]] = tail call fast float @sinhf(float [[VECEXT_1]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_1:%.*]] = insertelement <4 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_2:%.*]] = extractelement <4 x float> [[TMP0]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[TMP3:%.*]] = tail call fast float @sinhf(float [[VECEXT_2]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_2:%.*]] = insertelement <4 x float> [[VECINS_1]], float [[TMP3]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_3:%.*]] = extractelement <4 x float> [[TMP0]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @sinhf(float [[VECEXT_3]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
+;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
   %vecext = extractelement <4 x float> %0, i32 0
@@ -1167,6 +1858,35 @@ define <4 x float> @int_sinh_4x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @llvm.sinh.f32(float [[VECEXT_3]])
 ; NOACCELERATE-NEXT:    [[VECINS_31:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
 ; NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_31]]
+;
+; VPLAN-LABEL: @int_sinh_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @vsinhf(<4 x float> [[TMP0]])
+; VPLAN-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-ARMPL-LABEL: @int_sinh_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = call fast aarch64_vector_pcs <4 x float> @armpl_vsinhq_f32(<4 x float> [[TMP0]])
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @int_sinh_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT:%.*]] = extractelement <4 x float> [[TMP0]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = tail call fast float @llvm.sinh.f32(float [[VECEXT]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS:%.*]] = insertelement <4 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_1:%.*]] = extractelement <4 x float> [[TMP0]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[TMP2:%.*]] = tail call fast float @llvm.sinh.f32(float [[VECEXT_1]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_1:%.*]] = insertelement <4 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_2:%.*]] = extractelement <4 x float> [[TMP0]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[TMP3:%.*]] = tail call fast float @llvm.sinh.f32(float [[VECEXT_2]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_2:%.*]] = insertelement <4 x float> [[VECINS_1]], float [[TMP3]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_3:%.*]] = extractelement <4 x float> [[TMP0]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @llvm.sinh.f32(float [[VECEXT_3]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
 ;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
@@ -1215,6 +1935,35 @@ define <4 x float> @cosh_4x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[VECINS_31:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
 ; NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_31]]
 ;
+; VPLAN-LABEL: @cosh_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @vcoshf(<4 x float> [[TMP0]])
+; VPLAN-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-ARMPL-LABEL: @cosh_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = call fast aarch64_vector_pcs <4 x float> @armpl_vcoshq_f32(<4 x float> [[TMP0]])
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @cosh_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT:%.*]] = extractelement <4 x float> [[TMP0]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = tail call fast float @coshf(float [[VECEXT]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS:%.*]] = insertelement <4 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_1:%.*]] = extractelement <4 x float> [[TMP0]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[TMP2:%.*]] = tail call fast float @coshf(float [[VECEXT_1]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_1:%.*]] = insertelement <4 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_2:%.*]] = extractelement <4 x float> [[TMP0]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[TMP3:%.*]] = tail call fast float @coshf(float [[VECEXT_2]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_2:%.*]] = insertelement <4 x float> [[VECINS_1]], float [[TMP3]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_3:%.*]] = extractelement <4 x float> [[TMP0]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @coshf(float [[VECEXT_3]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
+;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
   %vecext = extractelement <4 x float> %0, i32 0
@@ -1260,6 +2009,35 @@ define <4 x float> @int_cosh_4x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @llvm.cosh.f32(float [[VECEXT_3]])
 ; NOACCELERATE-NEXT:    [[VECINS_31:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
 ; NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_31]]
+;
+; VPLAN-LABEL: @int_cosh_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @vcoshf(<4 x float> [[TMP0]])
+; VPLAN-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-ARMPL-LABEL: @int_cosh_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = call fast aarch64_vector_pcs <4 x float> @armpl_vcoshq_f32(<4 x float> [[TMP0]])
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @int_cosh_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT:%.*]] = extractelement <4 x float> [[TMP0]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = tail call fast float @llvm.cosh.f32(float [[VECEXT]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS:%.*]] = insertelement <4 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_1:%.*]] = extractelement <4 x float> [[TMP0]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[TMP2:%.*]] = tail call fast float @llvm.cosh.f32(float [[VECEXT_1]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_1:%.*]] = insertelement <4 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_2:%.*]] = extractelement <4 x float> [[TMP0]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[TMP3:%.*]] = tail call fast float @llvm.cosh.f32(float [[VECEXT_2]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_2:%.*]] = insertelement <4 x float> [[VECINS_1]], float [[TMP3]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_3:%.*]] = extractelement <4 x float> [[TMP0]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @llvm.cosh.f32(float [[VECEXT_3]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
 ;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
@@ -1308,6 +2086,35 @@ define <4 x float> @tanh_4x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[VECINS_31:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
 ; NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_31]]
 ;
+; VPLAN-LABEL: @tanh_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @vtanhf(<4 x float> [[TMP0]])
+; VPLAN-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-ARMPL-LABEL: @tanh_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = call fast aarch64_vector_pcs <4 x float> @armpl_vtanhq_f32(<4 x float> [[TMP0]])
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @tanh_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT:%.*]] = extractelement <4 x float> [[TMP0]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = tail call fast float @tanhf(float [[VECEXT]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS:%.*]] = insertelement <4 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_1:%.*]] = extractelement <4 x float> [[TMP0]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[TMP2:%.*]] = tail call fast float @tanhf(float [[VECEXT_1]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_1:%.*]] = insertelement <4 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_2:%.*]] = extractelement <4 x float> [[TMP0]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[TMP3:%.*]] = tail call fast float @tanhf(float [[VECEXT_2]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_2:%.*]] = insertelement <4 x float> [[VECINS_1]], float [[TMP3]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_3:%.*]] = extractelement <4 x float> [[TMP0]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @tanhf(float [[VECEXT_3]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
+;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
   %vecext = extractelement <4 x float> %0, i32 0
@@ -1353,6 +2160,35 @@ define <4 x float> @int_tanh_4x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @llvm.tanh.f32(float [[VECEXT_3]])
 ; NOACCELERATE-NEXT:    [[VECINS_31:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
 ; NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_31]]
+;
+; VPLAN-LABEL: @int_tanh_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @vtanhf(<4 x float> [[TMP0]])
+; VPLAN-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-ARMPL-LABEL: @int_tanh_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = call fast aarch64_vector_pcs <4 x float> @armpl_vtanhq_f32(<4 x float> [[TMP0]])
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @int_tanh_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT:%.*]] = extractelement <4 x float> [[TMP0]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = tail call fast float @llvm.tanh.f32(float [[VECEXT]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS:%.*]] = insertelement <4 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_1:%.*]] = extractelement <4 x float> [[TMP0]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[TMP2:%.*]] = tail call fast float @llvm.tanh.f32(float [[VECEXT_1]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_1:%.*]] = insertelement <4 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_2:%.*]] = extractelement <4 x float> [[TMP0]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[TMP3:%.*]] = tail call fast float @llvm.tanh.f32(float [[VECEXT_2]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_2:%.*]] = insertelement <4 x float> [[VECINS_1]], float [[TMP3]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_3:%.*]] = extractelement <4 x float> [[TMP0]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @llvm.tanh.f32(float [[VECEXT_3]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
 ;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
@@ -1401,6 +2237,35 @@ define <4 x float> @asinh_4x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
 ; NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
 ;
+; VPLAN-LABEL: @asinh_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @vasinhf(<4 x float> [[TMP0]])
+; VPLAN-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-ARMPL-LABEL: @asinh_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = call fast aarch64_vector_pcs <4 x float> @armpl_vasinhq_f32(<4 x float> [[TMP0]])
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @asinh_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT:%.*]] = extractelement <4 x float> [[TMP0]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = tail call fast float @asinhf(float [[VECEXT]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS:%.*]] = insertelement <4 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_1:%.*]] = extractelement <4 x float> [[TMP0]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[TMP2:%.*]] = tail call fast float @asinhf(float [[VECEXT_1]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_1:%.*]] = insertelement <4 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_2:%.*]] = extractelement <4 x float> [[TMP0]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[TMP3:%.*]] = tail call fast float @asinhf(float [[VECEXT_2]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_2:%.*]] = insertelement <4 x float> [[VECINS_1]], float [[TMP3]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_3:%.*]] = extractelement <4 x float> [[TMP0]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @asinhf(float [[VECEXT_3]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
+;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
   %vecext = extractelement <4 x float> %0, i32 0
@@ -1448,6 +2313,35 @@ define <4 x float> @acosh_4x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
 ; NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
 ;
+; VPLAN-LABEL: @acosh_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @vacoshf(<4 x float> [[TMP0]])
+; VPLAN-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-ARMPL-LABEL: @acosh_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = call fast aarch64_vector_pcs <4 x float> @armpl_vacoshq_f32(<4 x float> [[TMP0]])
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @acosh_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT:%.*]] = extractelement <4 x float> [[TMP0]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = tail call fast float @acoshf(float [[VECEXT]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS:%.*]] = insertelement <4 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_1:%.*]] = extractelement <4 x float> [[TMP0]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[TMP2:%.*]] = tail call fast float @acoshf(float [[VECEXT_1]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_1:%.*]] = insertelement <4 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_2:%.*]] = extractelement <4 x float> [[TMP0]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[TMP3:%.*]] = tail call fast float @acoshf(float [[VECEXT_2]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_2:%.*]] = insertelement <4 x float> [[VECINS_1]], float [[TMP3]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_3:%.*]] = extractelement <4 x float> [[TMP0]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @acoshf(float [[VECEXT_3]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
+;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
   %vecext = extractelement <4 x float> %0, i32 0
@@ -1494,6 +2388,35 @@ define <4 x float> @atanh_4x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @atanhf(float [[VECEXT_3]])
 ; NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
 ; NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
+;
+; VPLAN-LABEL: @atanh_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @vatanhf(<4 x float> [[TMP0]])
+; VPLAN-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-ARMPL-LABEL: @atanh_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = call fast aarch64_vector_pcs <4 x float> @armpl_vatanhq_f32(<4 x float> [[TMP0]])
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @atanh_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT:%.*]] = extractelement <4 x float> [[TMP0]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = tail call fast float @atanhf(float [[VECEXT]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS:%.*]] = insertelement <4 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_1:%.*]] = extractelement <4 x float> [[TMP0]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[TMP2:%.*]] = tail call fast float @atanhf(float [[VECEXT_1]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_1:%.*]] = insertelement <4 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_2:%.*]] = extractelement <4 x float> [[TMP0]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[TMP3:%.*]] = tail call fast float @atanhf(float [[VECEXT_2]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_2:%.*]] = insertelement <4 x float> [[VECINS_1]], float [[TMP3]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_3:%.*]] = extractelement <4 x float> [[TMP0]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @atanhf(float [[VECEXT_3]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
 ;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
@@ -1547,6 +2470,39 @@ define <2 x float> @sin_2x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[VECINS_1:%.*]] = insertelement <2 x float> [[VECINS]], float [[TMP2]], i32 1
 ; NOACCELERATE-NEXT:    ret <2 x float> [[VECINS_1]]
 ;
+; VPLAN-LABEL: @sin_2x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <2 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[VECEXT:%.*]] = extractelement <2 x float> [[TMP0]], i32 0
+; VPLAN-NEXT:    [[TMP1:%.*]] = tail call fast float @llvm.sin.f32(float [[VECEXT]]) #[[ATTR3:[0-9]+]]
+; VPLAN-NEXT:    [[VECINS:%.*]] = insertelement <2 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NEXT:    [[VECEXT_1:%.*]] = extractelement <2 x float> [[TMP0]], i32 1
+; VPLAN-NEXT:    [[TMP2:%.*]] = tail call fast float @llvm.sin.f32(float [[VECEXT_1]]) #[[ATTR3]]
+; VPLAN-NEXT:    [[VECINS_1:%.*]] = insertelement <2 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NEXT:    ret <2 x float> [[VECINS_1]]
+;
+; VPLAN-ARMPL-LABEL: @sin_2x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <2 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[VECEXT:%.*]] = extractelement <2 x float> [[TMP0]], i32 0
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = tail call fast float @llvm.sin.f32(float [[VECEXT]]) #[[ATTR3:[0-9]+]]
+; VPLAN-ARMPL-NEXT:    [[VECINS:%.*]] = insertelement <2 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-ARMPL-NEXT:    [[VECEXT_1:%.*]] = extractelement <2 x float> [[TMP0]], i32 1
+; VPLAN-ARMPL-NEXT:    [[TMP2:%.*]] = tail call fast float @llvm.sin.f32(float [[VECEXT_1]]) #[[ATTR3]]
+; VPLAN-ARMPL-NEXT:    [[VECINS_1:%.*]] = insertelement <2 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-ARMPL-NEXT:    ret <2 x float> [[VECINS_1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @sin_2x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <2 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT:%.*]] = extractelement <2 x float> [[TMP0]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = tail call fast float @llvm.sin.f32(float [[VECEXT]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS:%.*]] = insertelement <2 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_1:%.*]] = extractelement <2 x float> [[TMP0]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[TMP2:%.*]] = tail call fast float @llvm.sin.f32(float [[VECEXT_1]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_1:%.*]] = insertelement <2 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    ret <2 x float> [[VECINS_1]]
+;
 entry:
   %0 = load <2 x float>, ptr %a, align 16
   %vecext = extractelement <2 x float> %0, i32 0
@@ -1591,6 +2547,35 @@ define <4 x float> @int_cos_4x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @llvm.cos.f32(float [[VECEXT_3]])
 ; NOACCELERATE-NEXT:    [[VECINS_31:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
 ; NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_31]]
+;
+; VPLAN-LABEL: @int_cos_4x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[TMP1:%.*]] = call fast <4 x float> @vcosf(<4 x float> [[TMP0]])
+; VPLAN-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-ARMPL-LABEL: @int_cos_4x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = call fast aarch64_vector_pcs <4 x float> @armpl_vcosq_f32(<4 x float> [[TMP0]])
+; VPLAN-ARMPL-NEXT:    ret <4 x float> [[TMP1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @int_cos_4x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <4 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT:%.*]] = extractelement <4 x float> [[TMP0]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = tail call fast float @llvm.cos.f32(float [[VECEXT]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS:%.*]] = insertelement <4 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_1:%.*]] = extractelement <4 x float> [[TMP0]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[TMP2:%.*]] = tail call fast float @llvm.cos.f32(float [[VECEXT_1]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_1:%.*]] = insertelement <4 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_2:%.*]] = extractelement <4 x float> [[TMP0]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[TMP3:%.*]] = tail call fast float @llvm.cos.f32(float [[VECEXT_2]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_2:%.*]] = insertelement <4 x float> [[VECINS_1]], float [[TMP3]], i32 2
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_3:%.*]] = extractelement <4 x float> [[TMP0]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    [[TMP4:%.*]] = tail call fast float @llvm.cos.f32(float [[VECEXT_3]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_3:%.*]] = insertelement <4 x float> [[VECINS_2]], float [[TMP4]], i32 3
+; VPLAN-NOACCELERATE-NEXT:    ret <4 x float> [[VECINS_3]]
 ;
 entry:
   %0 = load <4 x float>, ptr %a, align 16
@@ -1643,6 +2628,39 @@ define <2 x float> @cos_2x(ptr %a) {
 ; NOACCELERATE-NEXT:    [[TMP2:%.*]] = tail call fast float @llvm.cos.f32(float [[VECEXT_1]])
 ; NOACCELERATE-NEXT:    [[VECINS_1:%.*]] = insertelement <2 x float> [[VECINS]], float [[TMP2]], i32 1
 ; NOACCELERATE-NEXT:    ret <2 x float> [[VECINS_1]]
+;
+; VPLAN-LABEL: @cos_2x(
+; VPLAN-NEXT:  entry:
+; VPLAN-NEXT:    [[TMP0:%.*]] = load <2 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NEXT:    [[VECEXT:%.*]] = extractelement <2 x float> [[TMP0]], i32 0
+; VPLAN-NEXT:    [[TMP1:%.*]] = tail call fast float @llvm.cos.f32(float [[VECEXT]]) #[[ATTR4:[0-9]+]]
+; VPLAN-NEXT:    [[VECINS:%.*]] = insertelement <2 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NEXT:    [[VECEXT_1:%.*]] = extractelement <2 x float> [[TMP0]], i32 1
+; VPLAN-NEXT:    [[TMP2:%.*]] = tail call fast float @llvm.cos.f32(float [[VECEXT_1]]) #[[ATTR4]]
+; VPLAN-NEXT:    [[VECINS_1:%.*]] = insertelement <2 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NEXT:    ret <2 x float> [[VECINS_1]]
+;
+; VPLAN-ARMPL-LABEL: @cos_2x(
+; VPLAN-ARMPL-NEXT:  entry:
+; VPLAN-ARMPL-NEXT:    [[TMP0:%.*]] = load <2 x float>, ptr [[A:%.*]], align 16
+; VPLAN-ARMPL-NEXT:    [[VECEXT:%.*]] = extractelement <2 x float> [[TMP0]], i32 0
+; VPLAN-ARMPL-NEXT:    [[TMP1:%.*]] = tail call fast float @llvm.cos.f32(float [[VECEXT]]) #[[ATTR4:[0-9]+]]
+; VPLAN-ARMPL-NEXT:    [[VECINS:%.*]] = insertelement <2 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-ARMPL-NEXT:    [[VECEXT_1:%.*]] = extractelement <2 x float> [[TMP0]], i32 1
+; VPLAN-ARMPL-NEXT:    [[TMP2:%.*]] = tail call fast float @llvm.cos.f32(float [[VECEXT_1]]) #[[ATTR4]]
+; VPLAN-ARMPL-NEXT:    [[VECINS_1:%.*]] = insertelement <2 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-ARMPL-NEXT:    ret <2 x float> [[VECINS_1]]
+;
+; VPLAN-NOACCELERATE-LABEL: @cos_2x(
+; VPLAN-NOACCELERATE-NEXT:  entry:
+; VPLAN-NOACCELERATE-NEXT:    [[TMP0:%.*]] = load <2 x float>, ptr [[A:%.*]], align 16
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT:%.*]] = extractelement <2 x float> [[TMP0]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[TMP1:%.*]] = tail call fast float @llvm.cos.f32(float [[VECEXT]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS:%.*]] = insertelement <2 x float> zeroinitializer, float [[TMP1]], i32 0
+; VPLAN-NOACCELERATE-NEXT:    [[VECEXT_1:%.*]] = extractelement <2 x float> [[TMP0]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    [[TMP2:%.*]] = tail call fast float @llvm.cos.f32(float [[VECEXT_1]])
+; VPLAN-NOACCELERATE-NEXT:    [[VECINS_1:%.*]] = insertelement <2 x float> [[VECINS]], float [[TMP2]], i32 1
+; VPLAN-NOACCELERATE-NEXT:    ret <2 x float> [[VECINS_1]]
 ;
 entry:
   %0 = load <2 x float>, ptr %a, align 16

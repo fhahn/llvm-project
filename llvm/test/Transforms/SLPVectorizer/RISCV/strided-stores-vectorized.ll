@@ -3,6 +3,10 @@
 ; RUN:   | FileCheck -check-prefix=RV64 %s
 ; RUN: opt -passes=slp-vectorizer -S < %s -mtriple=riscv32-unknown-linux -mattr=+v \
 ; RUN:   | FileCheck -check-prefix=RV32 %s
+; RUN: opt -passes=slp-vectorizer -slp-use-vplan-codegen -S < %s -mtriple=riscv64-unknown-linux -mattr=+v \
+; RUN:   | FileCheck -check-prefix=RV64 %s
+; RUN: opt -passes=slp-vectorizer -slp-use-vplan-codegen -S < %s -mtriple=riscv32-unknown-linux -mattr=+v \
+; RUN:   | FileCheck -check-prefix=RV32 %s
 
 define void @store_reverse(ptr %p3) {
 ; RV64-LABEL: define void @store_reverse(

@@ -742,6 +742,16 @@ private:
     char ApproxFunc : 1;
 
     LLVM_ABI_FOR_TEST FastMathFlagsTy(const FastMathFlags &FMF);
+
+    void intersect(const FastMathFlagsTy &Other) {
+      AllowReassoc &= Other.AllowReassoc;
+      NoNaNs &= Other.NoNaNs;
+      NoInfs &= Other.NoInfs;
+      NoSignedZeros &= Other.NoSignedZeros;
+      AllowReciprocal &= Other.AllowReciprocal;
+      AllowContract &= Other.AllowContract;
+      ApproxFunc &= Other.ApproxFunc;
+    }
   };
   /// Holds both the predicate and fast-math flags for floating-point
   /// comparisons.
@@ -882,6 +892,11 @@ public:
   /// Only keep flags also present in \p Other. \p Other must have the same
   /// OpType as the current object.
   void intersectFlags(const VPIRFlags &Other);
+
+  /// Check if \p Other has the same operation type for flag intersection.
+  bool hasSameOpType(const VPIRFlags &Other) const {
+    return OpType == Other.OpType;
+  }
 
   /// Drop all poison-generating flags.
   void dropPoisonGeneratingFlags() {
@@ -1682,11 +1697,16 @@ protected:
   const VPRecipeBase *getAsRecipe() const override { return this; }
 };
 
-/// A recipe to wrap on original IR instruction not to be modified during
+/// A recipe to wrap an original IR instruction not to be modified during
 /// execution, except for PHIs. PHIs are modeled via the VPIRPhi subclass.
-/// Expect PHIs, VPIRInstructions cannot have any operands.
+/// When operands are present, execute() updates the wrapped instruction's
+/// operands with VPlan-produced values (used by SLP to replace scalar operands
+/// with extracted vector lanes).
 class VPIRInstruction : public VPRecipeBase {
   Instruction &I;
+
+  /// If true, execute() sets the insert point before \p I rather than after.
+  bool InsertBefore = false;
 
 protected:
   /// VPIRInstruction::create() should be used to create VPIRInstructions, as
@@ -1700,6 +1720,20 @@ public:
   /// Create a new VPIRPhi for \p \I, if it is a PHINode, otherwise create a
   /// VPIRInstruction.
   LLVM_ABI_FOR_TEST static VPIRInstruction *create(Instruction &I);
+
+  /// Always create a VPIRInstruction, even for PHINodes (bypassing VPIRPhi).
+  /// Used by SLP when wrapping PHI user instructions whose operands should be
+  /// updated directly without VPIRPhi's incoming-block semantics.
+  static VPIRInstruction *createNonPhi(Instruction &I) {
+    return new VPIRInstruction(I);
+  }
+
+  /// Create a VPIRInstruction that sets the insert point before \p I.
+  static VPIRInstruction *createBefore(Instruction &I) {
+    auto *R = new VPIRInstruction(I);
+    R->InsertBefore = true;
+    return R;
+  }
 
   VP_CLASSOF_IMPL(VPRecipeBase::VPIRInstructionSC)
 

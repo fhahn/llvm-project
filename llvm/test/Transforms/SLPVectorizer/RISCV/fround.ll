@@ -3,6 +3,10 @@
 ; RUN: opt < %s -passes=slp-vectorizer -S -mtriple=riscv64 -mattr=+m,+v | FileCheck %s
 ; RUN: opt < %s -passes=slp-vectorizer -S -mtriple=riscv32 -mattr=+v,+zvbb | FileCheck %s
 ; RUN: opt < %s -passes=slp-vectorizer -S -mtriple=riscv64 -mattr=+v,+zvbb | FileCheck %s
+; RUN: opt < %s -passes=slp-vectorizer -slp-use-vplan-codegen -S -mtriple=riscv32 -mattr=+m,+v | FileCheck %s
+; RUN: opt < %s -passes=slp-vectorizer -slp-use-vplan-codegen -S -mtriple=riscv64 -mattr=+m,+v | FileCheck %s
+; RUN: opt < %s -passes=slp-vectorizer -slp-use-vplan-codegen -S -mtriple=riscv32 -mattr=+v,+zvbb | FileCheck %s
+; RUN: opt < %s -passes=slp-vectorizer -slp-use-vplan-codegen -S -mtriple=riscv64 -mattr=+v,+zvbb | FileCheck %s
 
 define <4 x float> @rint_v4f32(ptr %a) {
 ; CHECK-LABEL: define <4 x float> @rint_v4f32(
