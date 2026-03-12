@@ -21660,8 +21660,15 @@ bool BoUpSLP::isVPlanEligible() const {
         TE->getMainOp()->getParent() != RootBB)
       return false;
 
-    if (TE->isGather())
+    if (TE->isGather()) {
+      // Allow constant-splat gathers (e.g., GEP constant indices). They will
+      // be represented as live-ins in the VPlan.
+      if (TE->Scalars.size() > 1 && isa<Constant>(TE->Scalars.front()) &&
+          all_of(TE->Scalars,
+                 [&](Value *V) { return V == TE->Scalars.front(); }))
+        continue;
       return false;
+    }
 
     // Only handle Vectorize state.
     if (TE->State != TreeEntry::Vectorize)
@@ -21684,11 +21691,12 @@ bool BoUpSLP::isVPlanEligible() const {
       return false;
 
     unsigned Opcode = TE->getOpcode();
-    // Only binary ops, compares, selects, casts, loads, and stores.
+    // Only binary ops, compares, selects, casts, GEPs, loads, and stores.
     if (!Instruction::isBinaryOp(Opcode) && !Instruction::isCast(Opcode) &&
         Opcode != Instruction::Load && Opcode != Instruction::Store &&
         Opcode != Instruction::FNeg && Opcode != Instruction::ICmp &&
-        Opcode != Instruction::FCmp && Opcode != Instruction::Select)
+        Opcode != Instruction::FCmp && Opcode != Instruction::Select &&
+        Opcode != Instruction::GetElementPtr)
       return false;
 
     // Verify all operand entries exist in the tree mapping and are not deleted.
@@ -21728,8 +21736,14 @@ std::unique_ptr<VPlan> BoUpSLP::buildVPlanForTree() {
   SmallVector<TreeEntry *> Entries;
   for (const std::unique_ptr<TreeEntry> &TEPtr : VectorizableTree) {
     TreeEntry *E = TEPtr.get();
-    if (DeletedNodes.contains(E) || E->isGather())
+    if (DeletedNodes.contains(E))
       continue;
+    // Map constant-splat gather entries to live-ins. These are used e.g. for
+    // GEP constant indices.
+    if (E->isGather()) {
+      EntryToVPValue[E] = Plan->getOrAddLiveIn(E->Scalars.front());
+      continue;
+    }
     Entries.push_back(E);
   }
   // Sort entries topologically: process operands before their users.
@@ -21828,6 +21842,20 @@ std::unique_ptr<VPlan> BoUpSLP::buildVPlanForTree() {
       auto *R =
           new VPWidenCastRecipe(CI->getOpcode(), Op, CI->getType(), CI, Flags,
                                 VPIRMetadata(*CI), CI->getDebugLoc());
+      VPBB->appendRecipe(R);
+      EntryToVPValue[E] = R;
+    } else if (Opcode == Instruction::GetElementPtr) {
+      auto *GEP = cast<GetElementPtrInst>(MainOp);
+      SmallVector<VPValue *> Ops;
+      for (unsigned J = 0, N = GEP->getNumOperands(); J < N; ++J) {
+        VPValue *Op = EntryToVPValue.lookup(getOperandEntry(E, J));
+        assert(Op && "Operand entry not yet processed");
+        Ops.push_back(Op);
+      }
+      // Drop GEP flags to match legacy SLP codegen behavior.
+      auto *R = new VPWidenGEPRecipe(GEP, Ops,
+                                     VPIRFlags(GEPNoWrapFlags::none()),
+                                     GEP->getDebugLoc());
       VPBB->appendRecipe(R);
       EntryToVPValue[E] = R;
     } else if (Opcode == Instruction::Load) {
