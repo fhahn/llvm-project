@@ -1205,7 +1205,7 @@ void State::addInfoFor(BasicBlock &BB) {
       }
       break;
     }
-    // Enqueue ssub_with_overflow for simplification.
+    // Enqueue overflow intrinsics for simplification.
     case Intrinsic::ssub_with_overflow:
     case Intrinsic::usub_with_overflow:
     case Intrinsic::sadd_with_overflow:
@@ -1235,20 +1235,22 @@ void State::addInfoFor(BasicBlock &BB) {
       break;
     }
 
-    // Add facts from unsigned division and remainder.
-    //   urem x, n: result < n  and  result <= x
-    //   udiv x, n: result <= x
-    // Add facts from signed division and remainder.
-    //   srem x, n: result <= x (when x >= 0) and result >= x (when x <= 0)
-    //   sdiv x, n: result <= x (when x >= 0 and n >= 1)
-    // Add facts from bitwise AND.
-    //   and x, y: result <= x  and  result <= y (unsigned)
+    // Add facts from binary operators whose results have known bounds:
+    //   urem x, n:  result < n  and  result <= x
+    //   udiv x, n:  result <= x
+    //   srem x, n:  result <= x (when x >= 0)
+    //   sdiv x, n:  result <= x (when x >= 0 and n >= 0)
+    //   and  x, y:  result <= x  and  result <= y (unsigned)
+    //   lshr x, y:  result <= x (unsigned)
+    //   ashr x, y:  result <= x (when x >= 0)
     if (auto *BO = dyn_cast<BinaryOperator>(&I)) {
       if ((BO->getOpcode() == Instruction::URem ||
            BO->getOpcode() == Instruction::UDiv ||
            BO->getOpcode() == Instruction::SRem ||
            BO->getOpcode() == Instruction::SDiv ||
-           BO->getOpcode() == Instruction::And) &&
+           BO->getOpcode() == Instruction::And ||
+           BO->getOpcode() == Instruction::LShr ||
+           BO->getOpcode() == Instruction::AShr) &&
           isGuaranteedNotToBePoison(BO))
         WorkList.push_back(FactOrCheck::getInstFact(DT.getNode(&BB), BO));
     }
@@ -1860,39 +1862,32 @@ tryToSimplifyOverflowMath(IntrinsicInst *II, ConstraintInfo &Info,
     return CSToUse.isConditionImplied(R.Coefficients);
   };
 
+  Value *A = II->getArgOperand(0);
+  Value *B = II->getArgOperand(1);
+  auto *Zero = ConstantInt::get(A->getType(), 0);
+
   bool Changed = false;
   if (II->getIntrinsicID() == Intrinsic::ssub_with_overflow) {
     // If A s>= B && B s>= 0, ssub.with.overflow(a, b) should not overflow and
     // can be simplified to a regular sub.
-    Value *A = II->getArgOperand(0);
-    Value *B = II->getArgOperand(1);
     if (!DoesConditionHold(CmpInst::ICMP_SGE, A, B, Info) ||
-        !DoesConditionHold(CmpInst::ICMP_SGE, B,
-                           ConstantInt::get(A->getType(), 0), Info))
+        !DoesConditionHold(CmpInst::ICMP_SGE, B, Zero, Info))
       return false;
     Changed = replaceOverflowUses(II, Instruction::Sub, A, B, ToRemove);
   } else if (II->getIntrinsicID() == Intrinsic::usub_with_overflow) {
     // If A u>= B, usub.with.overflow(a, b) should not overflow and can be
     // simplified to a regular sub.
-    Value *A = II->getArgOperand(0);
-    Value *B = II->getArgOperand(1);
     if (!DoesConditionHold(CmpInst::ICMP_UGE, A, B, Info))
       return false;
     Changed = replaceOverflowUses(II, Instruction::Sub, A, B, ToRemove);
   } else if (II->getIntrinsicID() == Intrinsic::sadd_with_overflow) {
     // If A and B have different signs, sadd.with.overflow(a, b) cannot
     // overflow. Check if (A s>= 0 && B s<= 0) || (A s<= 0 && B s>= 0).
-    Value *A = II->getArgOperand(0);
-    Value *B = II->getArgOperand(1);
     bool NeverOverflows =
-        (DoesConditionHold(CmpInst::ICMP_SGE, A,
-                           ConstantInt::get(A->getType(), 0), Info) &&
-         DoesConditionHold(CmpInst::ICMP_SLE, B,
-                           ConstantInt::get(B->getType(), 0), Info)) ||
-        (DoesConditionHold(CmpInst::ICMP_SLE, A,
-                           ConstantInt::get(A->getType(), 0), Info) &&
-         DoesConditionHold(CmpInst::ICMP_SGE, B,
-                           ConstantInt::get(B->getType(), 0), Info));
+        (DoesConditionHold(CmpInst::ICMP_SGE, A, Zero, Info) &&
+         DoesConditionHold(CmpInst::ICMP_SLE, B, Zero, Info)) ||
+        (DoesConditionHold(CmpInst::ICMP_SLE, A, Zero, Info) &&
+         DoesConditionHold(CmpInst::ICMP_SGE, B, Zero, Info));
     if (!NeverOverflows)
       return false;
     Changed = replaceOverflowUses(II, Instruction::Add, A, B, ToRemove);
@@ -2095,25 +2090,23 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
       };
 
       if (auto *BO = dyn_cast<BinaryOperator>(CB.Inst)) {
-        if (BO->getOpcode() == Instruction::URem) {
+        switch (BO->getOpcode()) {
+        case Instruction::URem:
           // urem x, n: result < n (remainder is always less than divisor)
           AddFact(CmpInst::ICMP_ULT, BO, BO->getOperand(1));
           // urem x, n: result <= x (remainder is at most the dividend)
           AddFact(CmpInst::ICMP_ULE, BO, BO->getOperand(0));
           continue;
-        }
-        if (BO->getOpcode() == Instruction::UDiv) {
+        case Instruction::UDiv:
           // udiv x, n: result <= x (quotient is at most the dividend)
           AddFact(CmpInst::ICMP_ULE, BO, BO->getOperand(0));
           continue;
-        }
-        if (BO->getOpcode() == Instruction::And) {
+        case Instruction::And:
           // and x, y: result <= x and result <= y (unsigned)
           AddFact(CmpInst::ICMP_ULE, BO, BO->getOperand(0));
           AddFact(CmpInst::ICMP_ULE, BO, BO->getOperand(1));
           continue;
-        }
-        if (BO->getOpcode() == Instruction::SRem) {
+        case Instruction::SRem: {
           Value *X = BO->getOperand(0);
           Value *N = BO->getOperand(1);
           auto *Zero = ConstantInt::get(BO->getType(), 0);
@@ -2135,7 +2128,7 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
           }
           continue;
         }
-        if (BO->getOpcode() == Instruction::SDiv) {
+        case Instruction::SDiv: {
           Value *X = BO->getOperand(0);
           Value *N = BO->getOperand(1);
           auto *Zero = ConstantInt::get(BO->getType(), 0);
@@ -2145,6 +2138,35 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
             AddFact(CmpInst::ICMP_SLE, BO, X);
           }
           continue;
+        }
+        case Instruction::LShr:
+          // lshr x, y: result <= x (unsigned), since logical right shift
+          // can only decrease or maintain the value.
+          AddFact(CmpInst::ICMP_ULE, BO, BO->getOperand(0));
+          // lshr x, C: result <= (UINT_MAX >> C) for constant shift amounts,
+          // giving a tighter upper bound.
+          if (auto *CI = dyn_cast<ConstantInt>(BO->getOperand(1))) {
+            uint64_t Shift = CI->getZExtValue();
+            unsigned BitWidth = BO->getType()->getIntegerBitWidth();
+            if (Shift > 0 && Shift < BitWidth) {
+              APInt MaxVal = APInt::getMaxValue(BitWidth).lshr(Shift);
+              AddFact(CmpInst::ICMP_ULE, BO,
+                      ConstantInt::get(BO->getType(), MaxVal));
+            }
+          }
+          continue;
+        case Instruction::AShr: {
+          // ashr x, y when x >= 0: result >= 0 and result <= x.
+          Value *X = BO->getOperand(0);
+          if (IsKnownNonNegative(X)) {
+            AddFact(CmpInst::ICMP_ULE, BO, X);
+            AddFact(CmpInst::ICMP_SGE, BO,
+                    ConstantInt::get(BO->getType(), 0));
+          }
+          continue;
+        }
+        default:
+          break;
         }
       }
 
