@@ -1228,9 +1228,12 @@ void State::addInfoFor(BasicBlock &BB) {
     // Add facts from unsigned division and remainder.
     //   urem x, n: result < n  and  result <= x
     //   udiv x, n: result <= x
+    // Add facts from bitwise AND.
+    //   and x, y: result <= x  and  result <= y (unsigned)
     if (auto *BO = dyn_cast<BinaryOperator>(&I)) {
       if ((BO->getOpcode() == Instruction::URem ||
-           BO->getOpcode() == Instruction::UDiv) &&
+           BO->getOpcode() == Instruction::UDiv ||
+           BO->getOpcode() == Instruction::And) &&
           isGuaranteedNotToBePoison(BO))
         WorkList.push_back(FactOrCheck::getInstFact(DT.getNode(&BB), BO));
     }
@@ -2046,6 +2049,12 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
         if (BO->getOpcode() == Instruction::UDiv) {
           // udiv x, n: result <= x (quotient is at most the dividend)
           AddFact(CmpInst::ICMP_ULE, BO, BO->getOperand(0));
+          continue;
+        }
+        if (BO->getOpcode() == Instruction::And) {
+          // and x, y: result <= x and result <= y (unsigned)
+          AddFact(CmpInst::ICMP_ULE, BO, BO->getOperand(0));
+          AddFact(CmpInst::ICMP_ULE, BO, BO->getOperand(1));
           continue;
         }
       }
