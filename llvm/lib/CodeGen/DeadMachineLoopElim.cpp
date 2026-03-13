@@ -16,6 +16,7 @@
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineLoopInfo.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
+#include "llvm/CodeGen/TargetInstrInfo.h"
 #include "llvm/CodeGen/TargetSubtargetInfo.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Pass.h"
@@ -66,6 +67,12 @@ static bool isLoopDead(MachineLoop *L, const MachineRegisterInfo &MRI,
     for (MachineInstr &MI : *MBB) {
       if (MI.mayStore() || MI.isCall() || MI.hasUnmodeledSideEffects())
         return false;
+      if (MI.mayLoad() &&
+          llvm::any_of(MI.memoperands(),
+                       [](const MachineMemOperand *MMO) {
+                         return !MMO->isUnordered();
+                       }))
+        return false;
 
       for (const MachineOperand &MO : MI.all_defs()) {
         Register Reg = MO.getReg();
@@ -112,8 +119,35 @@ bool DeadMachineLoopElim::runOnMachineFunction(MachineFunction &MF) {
     // Update PHI nodes in the exit block: remove entries from loop blocks
     // and add an entry for the preheader. Since the loop is dead, any values
     // from loop blocks that feed into exit block PHIs must be defined outside
-    // the loop (isLoopDead ensures no loop-defined registers escape). Use the
-    // value from the first loop-block entry for the preheader.
+    // the loop (isLoopDead ensures no loop-defined registers escape).
+    // All loop-block entries in a given PHI must carry the same value; if they
+    // differ we cannot determine which value the preheader should use.
+    bool BadPHI = false;
+    for (MachineInstr &PHI : ExitBlock->phis()) {
+      Register PreheaderVal;
+      bool FoundLoopEntry = false;
+      for (unsigned I = PHI.getNumOperands() - 1; I >= 2; I -= 2) {
+        if (L->contains(PHI.getOperand(I).getMBB())) {
+          Register Val = PHI.getOperand(I - 1).getReg();
+          if (!FoundLoopEntry) {
+            PreheaderVal = Val;
+            FoundLoopEntry = true;
+          } else if (Val != PreheaderVal) {
+            BadPHI = true;
+            break;
+          }
+        }
+      }
+      if (BadPHI)
+        break;
+    }
+
+    if (BadPHI) {
+      LLVM_DEBUG(dbgs() << "  Skipping: exit block PHI has conflicting "
+                           "values from different loop exits\n");
+      continue;
+    }
+
     for (MachineInstr &PHI : ExitBlock->phis()) {
       Register PreheaderVal;
       bool FoundLoopEntry = false;
@@ -144,6 +178,17 @@ bool DeadMachineLoopElim::runOnMachineFunction(MachineFunction &MF) {
       while (!MBB->succ_empty())
         MBB->removeSuccessor(MBB->succ_begin());
       MBB->eraseFromParent();
+    }
+
+    // If the preheader originally fell through to the loop header (no explicit
+    // branch), the erasure of loop blocks may leave the preheader falling
+    // through to the wrong block. Add an explicit branch if needed.
+    if (!Preheader->isLayoutSuccessor(ExitBlock)) {
+      MachineBasicBlock::iterator Term = Preheader->getFirstTerminator();
+      if (Term == Preheader->end()) {
+        const TargetInstrInfo *TII = MF.getSubtarget().getInstrInfo();
+        TII->insertBranch(*Preheader, ExitBlock, nullptr, {}, DebugLoc());
+      }
     }
     Changed = true;
     ++NumDeleted;
