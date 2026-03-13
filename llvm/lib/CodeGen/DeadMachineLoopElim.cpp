@@ -109,6 +109,28 @@ bool DeadMachineLoopElim::runOnMachineFunction(MachineFunction &MF) {
 
     LLVM_DEBUG(dbgs() << "Deleting dead machine loop: " << *L);
 
+    // Update PHI nodes in the exit block: remove entries from loop blocks
+    // and add an entry for the preheader. Since the loop is dead, any values
+    // from loop blocks that feed into exit block PHIs must be defined outside
+    // the loop (isLoopDead ensures no loop-defined registers escape). Use the
+    // value from the first loop-block entry for the preheader.
+    for (MachineInstr &PHI : ExitBlock->phis()) {
+      Register PreheaderVal;
+      bool FoundLoopEntry = false;
+      for (unsigned I = PHI.getNumOperands() - 1; I >= 2; I -= 2) {
+        if (L->contains(PHI.getOperand(I).getMBB())) {
+          if (!FoundLoopEntry) {
+            PreheaderVal = PHI.getOperand(I - 1).getReg();
+            FoundLoopEntry = true;
+          }
+          PHI.removeOperand(I);
+          PHI.removeOperand(I - 1);
+        }
+      }
+      PHI.addOperand(MachineOperand::CreateReg(PreheaderVal, false));
+      PHI.addOperand(MachineOperand::CreateMBB(Preheader));
+    }
+
     Preheader->ReplaceUsesOfBlockWith(L->getHeader(), ExitBlock);
 
     SmallVector<MachineBasicBlock *, 4> Blocks(L->blocks());
@@ -118,6 +140,7 @@ bool DeadMachineLoopElim::runOnMachineFunction(MachineFunction &MF) {
       MLI.removeLoop(llvm::find(MLI, L));
 
     for (MachineBasicBlock *MBB : Blocks) {
+      MLI.removeBlock(MBB);
       while (!MBB->succ_empty())
         MBB->removeSuccessor(MBB->succ_begin());
       MBB->eraseFromParent();

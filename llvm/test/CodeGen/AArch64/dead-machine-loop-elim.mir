@@ -38,6 +38,14 @@
   define i32 @nested_live_inner_loop(ptr %p, ptr %q) {
     ret i32 0
   }
+
+  define i32 @dead_loop_exit_phi(ptr %p) {
+    ret i32 0
+  }
+
+  define i32 @dead_loop_exit_phi_multiple_preds(ptr %p) {
+    ret i32 0
+  }
 ...
 ---
 name:            dead_inner_loop
@@ -669,6 +677,153 @@ body:             |
 
   bb.5:
     $w0 = COPY %2.sub_32
+    RET_ReallyLR
+
+...
+---
+# Test that a dead loop with PHI nodes in the exit block is removed
+# correctly, with exit block PHIs updated to reference the preheader.
+
+name:            dead_loop_exit_phi
+tracksRegLiveness: true
+registers:
+  - { id: 0, class: gpr64common }
+  - { id: 1, class: gpr64common }
+  - { id: 2, class: gpr32 }
+  - { id: 3, class: gpr32 }
+  - { id: 4, class: gpr64sp }
+  - { id: 5, class: gpr32 }
+body:             |
+  ; CHECK-LABEL: name: dead_loop_exit_phi
+  ; CHECK: bb.0:
+  ; CHECK-NEXT:   successors: %bb.3(0x80000000)
+  ; CHECK-NEXT:   liveins: $x0
+  ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT:   [[COPY:%[0-9]+]]:gpr64common = COPY $x0
+  ; CHECK-NEXT:   [[COPY1:%[0-9]+]]:gpr64common = COPY $xzr
+  ; CHECK-NEXT:   [[COPY2:%[0-9]+]]:gpr32 = COPY $wzr
+  ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT: bb.3:
+  ; CHECK-NEXT:   [[PHI:%[0-9]+]]:gpr32 = PHI [[COPY2]], %bb.0
+  ; CHECK-NEXT:   $w0 = COPY [[PHI]]
+  ; CHECK-NEXT:   RET_ReallyLR
+  bb.0:
+    successors: %bb.1(0x80000000)
+    liveins: $x0
+
+    %0:gpr64common = COPY $x0
+    %1:gpr64common = COPY $xzr
+    %5:gpr32 = COPY $wzr
+
+  bb.1:
+    successors: %bb.3(0x10000000), %bb.2(0x70000000)
+
+    %1:gpr64common = PHI %1, %bb.0, %4, %bb.2
+    %2:gpr32 = LDRBBroX %0, %1, 0, 0
+    CBNZW %2, %bb.3
+    B %bb.2
+
+  bb.2:
+    successors: %bb.3(0x10000000), %bb.1(0x70000000)
+
+    %4:gpr64sp = ADDXri %1, 1, 0
+    dead $xzr = SUBSXri %1, 3, 0, implicit-def $nzcv
+    Bcc 1, %bb.1, implicit $nzcv
+    B %bb.3
+
+  bb.3:
+    %3:gpr32 = PHI %5, %bb.1, %5, %bb.2
+    $w0 = COPY %3
+    RET_ReallyLR
+
+...
+---
+# Test that a dead loop with PHI nodes in the exit block is removed
+# correctly when the exit block also has predecessors from outside the loop.
+
+name:            dead_loop_exit_phi_multiple_preds
+tracksRegLiveness: true
+registers:
+  - { id: 0, class: gpr64common }
+  - { id: 1, class: gpr64common }
+  - { id: 2, class: gpr32 }
+  - { id: 3, class: gpr32 }
+  - { id: 4, class: gpr64sp }
+  - { id: 5, class: gpr32 }
+  - { id: 6, class: gpr32 }
+body:             |
+  ; CHECK-LABEL: name: dead_loop_exit_phi_multiple_preds
+  ; CHECK: bb.0:
+  ; CHECK-NEXT:   successors: %bb.1(0x40000000), %bb.4(0x40000000)
+  ; CHECK-NEXT:   liveins: $x0, $w1
+  ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT:   [[COPY:%[0-9]+]]:gpr64common = COPY $x0
+  ; CHECK-NEXT:   [[COPY1:%[0-9]+]]:gpr64common = COPY $xzr
+  ; CHECK-NEXT:   [[COPY2:%[0-9]+]]:gpr32 = COPY $wzr
+  ; CHECK-NEXT:   [[COPY3:%[0-9]+]]:gpr32 = COPY $w1
+  ; CHECK-NEXT:   CBNZW [[COPY3]], %bb.4
+  ; CHECK-NEXT:   B %bb.1
+  ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT: bb.1:
+  ; CHECK-NEXT:   successors: %bb.3(0x10000000), %bb.2(0x70000000)
+  ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT:   [[COPY1:%[0-9]+]]:gpr64common = PHI [[COPY1]], %bb.0, %4, %bb.2
+  ; CHECK-NEXT:   [[LDRBBroX:%[0-9]+]]:gpr32 = LDRBBroX [[COPY]], [[COPY1]], 0, 0
+  ; CHECK-NEXT:   CBNZW [[LDRBBroX]], %bb.3
+  ; CHECK-NEXT:   B %bb.2
+  ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT: bb.2:
+  ; CHECK-NEXT:   successors: %bb.3(0x10000000), %bb.1(0x70000000)
+  ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT:   [[ADDXri:%[0-9]+]]:gpr64sp = ADDXri [[COPY1]], 1, 0
+  ; CHECK-NEXT:   dead $xzr = SUBSXri [[COPY1]], 3, 0, implicit-def $nzcv
+  ; CHECK-NEXT:   Bcc 1, %bb.1, implicit $nzcv
+  ; CHECK-NEXT:   B %bb.3
+  ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT: bb.3:
+  ; CHECK-NEXT:   successors: %bb.4(0x80000000)
+  ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT:   [[PHI:%[0-9]+]]:gpr32 = PHI [[COPY2]], %bb.1, [[COPY2]], %bb.2
+  ; CHECK-NEXT:   B %bb.4
+  ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT: bb.4:
+  ; CHECK-NEXT:   $w0 = COPY [[COPY2]]
+  ; CHECK-NEXT:   RET_ReallyLR
+  bb.0:
+    successors: %bb.1(0x40000000), %bb.4(0x40000000)
+    liveins: $x0, $w1
+
+    %0:gpr64common = COPY $x0
+    %1:gpr64common = COPY $xzr
+    %5:gpr32 = COPY $wzr
+    %6:gpr32 = COPY $w1
+    CBNZW %6, %bb.4
+    B %bb.1
+
+  bb.1:
+    successors: %bb.3(0x10000000), %bb.2(0x70000000)
+
+    %1:gpr64common = PHI %1, %bb.0, %4, %bb.2
+    %2:gpr32 = LDRBBroX %0, %1, 0, 0
+    CBNZW %2, %bb.3
+    B %bb.2
+
+  bb.2:
+    successors: %bb.3(0x10000000), %bb.1(0x70000000)
+
+    %4:gpr64sp = ADDXri %1, 1, 0
+    dead $xzr = SUBSXri %1, 3, 0, implicit-def $nzcv
+    Bcc 1, %bb.1, implicit $nzcv
+    B %bb.3
+
+  bb.3:
+    successors: %bb.4(0x80000000)
+
+    %3:gpr32 = PHI %5, %bb.1, %5, %bb.2
+    B %bb.4
+
+  bb.4:
+    $w0 = COPY %5
     RET_ReallyLR
 
 ...
