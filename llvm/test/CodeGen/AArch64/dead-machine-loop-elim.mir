@@ -39,11 +39,19 @@
     ret i32 0
   }
 
+  define void @volatile_load_loop(ptr %p) {
+    ret void
+  }
+
   define i32 @dead_loop_exit_phi(ptr %p) {
     ret i32 0
   }
 
   define i32 @dead_loop_exit_phi_multiple_preds(ptr %p) {
+    ret i32 0
+  }
+
+  define i32 @dead_loop_conflicting_exit_phi(ptr %p) {
     ret i32 0
   }
 ...
@@ -681,6 +689,49 @@ body:             |
 
 ...
 ---
+# Negative test: loop with a volatile load must not be removed.
+# The volatile load is an observable side effect.
+
+name:            volatile_load_loop
+tracksRegLiveness: true
+registers:
+  - { id: 0, class: gpr64common }
+  - { id: 1, class: gpr32 }
+body:             |
+  ; CHECK-LABEL: name: volatile_load_loop
+  ; CHECK: bb.0:
+  ; CHECK-NEXT:   successors: %bb.1(0x80000000)
+  ; CHECK-NEXT:   liveins: $x0
+  ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT:   [[COPY:%[0-9]+]]:gpr64common = COPY $x0
+  ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT: bb.1:
+  ; CHECK-NEXT:   successors: %bb.2(0x10000000), %bb.1(0x70000000)
+  ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT:   [[LDRWui:%[0-9]+]]:gpr32 = LDRWui [[COPY]], 0 :: (volatile load (s32))
+  ; CHECK-NEXT:   CBNZW [[LDRWui]], %bb.1
+  ; CHECK-NEXT:   B %bb.2
+  ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT: bb.2:
+  ; CHECK-NEXT:   RET_ReallyLR
+  bb.0:
+    successors: %bb.1(0x80000000)
+    liveins: $x0
+
+    %0:gpr64common = COPY $x0
+
+  bb.1:
+    successors: %bb.2(0x10000000), %bb.1(0x70000000)
+
+    %1:gpr32 = LDRWui %0, 0 :: (volatile load (s32))
+    CBNZW %1, %bb.1
+    B %bb.2
+
+  bb.2:
+    RET_ReallyLR
+
+...
+---
 # Test that a dead loop with PHI nodes in the exit block is removed
 # correctly, with exit block PHIs updated to reference the preheader.
 
@@ -824,6 +875,82 @@ body:             |
 
   bb.4:
     $w0 = COPY %5
+    RET_ReallyLR
+
+...
+---
+# Negative test: dead loop where the exit block PHI has conflicting values
+# from different loop exits. The pass cannot determine which value to use
+# for the preheader, so the loop must not be deleted.
+# bb.1 exits to bb.3 with %10 (value A) and bb.2 exits to bb.3 with %11 (value B).
+
+name:            dead_loop_conflicting_exit_phi
+tracksRegLiveness: true
+registers:
+  - { id: 0, class: gpr64common }
+  - { id: 1, class: gpr64common }
+  - { id: 2, class: gpr64 }
+  - { id: 3, class: gpr64sp }
+  - { id: 10, class: gpr64common }
+  - { id: 11, class: gpr64common }
+body:             |
+  ; CHECK-LABEL: name: dead_loop_conflicting_exit_phi
+  ; CHECK: bb.0:
+  ; CHECK-NEXT:   successors: %bb.1(0x80000000)
+  ; CHECK-NEXT:   liveins: $x0, $x1
+  ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT:   [[COPY:%[0-9]+]]:gpr64common = COPY $x0
+  ; CHECK-NEXT:   [[COPY1:%[0-9]+]]:gpr64common = COPY $x1
+  ; CHECK-NEXT:   [[COPY2:%[0-9]+]]:gpr64common = COPY $xzr
+  ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT: bb.1:
+  ; CHECK-NEXT:   successors: %bb.3(0x04000000), %bb.2(0x7c000000)
+  ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT:   [[COPY2:%[0-9]+]]:gpr64common = PHI [[COPY2]], %bb.0, %3, %bb.2
+  ; CHECK-NEXT:   [[LDRXui:%[0-9]+]]:gpr64 = LDRXui [[COPY2]], 0 :: (load (s64))
+  ; CHECK-NEXT:   CBZX [[LDRXui]], %bb.3
+  ; CHECK-NEXT:   B %bb.2
+  ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT: bb.2:
+  ; CHECK-NEXT:   successors: %bb.3(0x04000000), %bb.1(0x7c000000)
+  ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT:   [[ADDXri:%[0-9]+]]:gpr64sp = ADDXri [[COPY2]], 1, 0
+  ; CHECK-NEXT:   dead $xzr = SUBSXri [[ADDXri]], 10, 0, implicit-def $nzcv
+  ; CHECK-NEXT:   Bcc 1, %bb.1, implicit $nzcv
+  ; CHECK-NEXT:   B %bb.3
+  ; CHECK-NEXT: {{  $}}
+  ; CHECK-NEXT: bb.3:
+  ; CHECK-NEXT:   [[PHI:%[0-9]+]]:gpr64common = PHI [[COPY]], %bb.1, [[COPY1]], %bb.2
+  ; CHECK-NEXT:   $x0 = COPY [[PHI]]
+  ; CHECK-NEXT:   RET_ReallyLR
+  bb.0:
+    successors: %bb.1(0x80000000)
+    liveins: $x0, $x1
+
+    %10:gpr64common = COPY $x0
+    %11:gpr64common = COPY $x1
+    %0:gpr64common = COPY $xzr
+
+  bb.1:
+    successors: %bb.3(0x04000000), %bb.2(0x7c000000)
+
+    %0:gpr64common = PHI %0, %bb.0, %3, %bb.2
+    %2:gpr64 = LDRXui %0, 0 :: (load (s64))
+    CBZX %2, %bb.3
+    B %bb.2
+
+  bb.2:
+    successors: %bb.3(0x04000000), %bb.1(0x7c000000)
+
+    %3:gpr64sp = ADDXri %0, 1, 0
+    dead $xzr = SUBSXri %3, 10, 0, implicit-def $nzcv
+    Bcc 1, %bb.1, implicit $nzcv
+    B %bb.3
+
+  bb.3:
+    ; PHI with DIFFERENT values from bb.1 (%10) vs bb.2 (%11).
+    %1:gpr64common = PHI %10, %bb.1, %11, %bb.2
+    $x0 = COPY %1
     RET_ReallyLR
 
 ...
