@@ -21667,6 +21667,19 @@ bool BoUpSLP::isVPlanEligible() const {
           all_of(TE->Scalars,
                  [&](Value *V) { return V == TE->Scalars.front(); }))
         continue;
+      // Allow gathers where all scalars are live-in values (constants or
+      // instructions not part of the tree). These will be represented as
+      // BuildVector VPInstructions.
+      if (all_of(TE->Scalars, [&](Value *V) {
+            if (isa<Constant>(V))
+              return true;
+            auto *I = dyn_cast<Instruction>(V);
+            if (!I)
+              return true;
+            // The value is a live-in if it's not in the SLP tree.
+            return !ScalarToTreeEntries.contains(V);
+          }))
+        continue;
       return false;
     }
 
@@ -21731,8 +21744,9 @@ std::unique_ptr<VPlan> BoUpSLP::buildVPlanForTree() {
   // Connect the recipe VPBB after the entry (preheader).
   VPBlockUtils::insertBlockAfter(VPBB, Plan->getEntry());
 
-  // Collect non-deleted, non-gather entries and sort by MainOp position in the
-  // BB to match original program order (which also satisfies def-before-use).
+  // Handle gather entries first (map to live-ins or BuildVector), then collect
+  // non-gather entries and sort by MainOp position in the BB to match original
+  // program order (which also satisfies def-before-use).
   SmallVector<TreeEntry *> Entries;
   for (const std::unique_ptr<TreeEntry> &TEPtr : VectorizableTree) {
     TreeEntry *E = TEPtr.get();
@@ -21741,7 +21755,21 @@ std::unique_ptr<VPlan> BoUpSLP::buildVPlanForTree() {
     // Map constant-splat gather entries to live-ins. These are used e.g. for
     // GEP constant indices.
     if (E->isGather()) {
-      EntryToVPValue[E] = Plan->getOrAddLiveIn(E->Scalars.front());
+      // Splat gather: all scalars are the same value. Map to a scalar live-in
+      // which VPlan recipes will broadcast automatically.
+      if (E->Scalars.size() > 1 &&
+          all_of(E->Scalars,
+                 [&](Value *V) { return V == E->Scalars.front(); })) {
+        EntryToVPValue[E] = Plan->getOrAddLiveIn(E->Scalars.front());
+      } else {
+        // General gather of live-in scalars: emit a BuildVector.
+        SmallVector<VPValue *> Ops;
+        for (Value *V : E->Scalars)
+          Ops.push_back(Plan->getOrAddLiveIn(V));
+        auto *BV = new VPInstruction(VPInstruction::BuildVector, Ops);
+        VPBB->appendRecipe(BV);
+        EntryToVPValue[E] = BV;
+      }
       continue;
     }
     Entries.push_back(E);

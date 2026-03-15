@@ -3,6 +3,7 @@
 ; RUN: opt -slp-use-vplan-codegen < %s -mtriple=x86_64-- -passes=slp-vectorizer -S -mattr=+avx2 | FileCheck %s --check-prefix=CHECK
 ; RUN: opt < %s -mtriple=x86_64-- -passes=slp-vectorizer -S -mattr=+avx2 -mattr=+f16c | FileCheck %s --check-prefix=CHECK-F16C
 ; RUN: opt < %s -mtriple=x86_64-- -passes=slp-vectorizer -S -mattr=+avx512f | FileCheck %s --check-prefix=CHECK-AVX512
+; RUN: opt -slp-use-vplan-codegen < %s -mtriple=x86_64-- -passes=slp-vectorizer -S -mattr=+avx512f | FileCheck %s --check-prefix=CHECK-AVX512
 
 define void @fpext_v4xf16_v4xf32(ptr %s0, ptr %d0) {
 ; CHECK-LABEL: define void @fpext_v4xf16_v4xf32(

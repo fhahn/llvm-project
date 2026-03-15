@@ -5,6 +5,7 @@
 ; shouldn't be calling isFAbsFree() on the legalized type.
 
 ; RUN: opt -passes=slp-vectorizer -slp-threshold=-10 -S %s | FileCheck %s
+; RUN: opt -slp-use-vplan-codegen -passes=slp-vectorizer -slp-threshold=-10 -S %s | FileCheck %s
 
 target triple = "i686-unknown-linux-gnu"
 
