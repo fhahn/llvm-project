@@ -1670,8 +1670,14 @@ VPIRInstruction *VPIRInstruction ::create(Instruction &I) {
 }
 
 void VPIRInstruction::execute(VPTransformState &State) {
-  assert(!isa<VPIRPhi>(this) && getNumOperands() == 0 &&
-         "PHINodes must be handled by VPIRPhi");
+  assert(!isa<VPIRPhi>(this) && "PHINodes must be handled by VPIRPhi");
+  // If the VPIRInstruction has operands, update the wrapped IR instruction's
+  // operands with the corresponding VPlan-produced values. This is used e.g.
+  // by SLP to replace scalar operands with values extracted from vectors.
+  for (const auto &[Idx, Op] : enumerate(operands())) {
+    Value *V = State.get(Op, /*IsScalar=*/true);
+    I.setOperand(Idx, V);
+  }
   // Advance the insert point after the wrapped IR instruction. This allows
   // interleaving VPIRInstructions and other recipes.
   State.Builder.SetInsertPoint(I.getParent(), std::next(I.getIterator()));

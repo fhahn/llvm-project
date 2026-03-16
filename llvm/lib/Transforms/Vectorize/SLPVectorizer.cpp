@@ -21642,12 +21642,25 @@ Value *BoUpSLP::vectorizeTree(TreeEntry *E) {
 }
 
 bool BoUpSLP::isVPlanEligible() const {
-  // No external uses — avoids needing VectorizedValue for extract generation.
-  if (!ExternalUses.empty())
-    return false;
-
+  // Check external uses for eligibility. Only support cases where the user
+  // is a non-PHI instruction in the same block as the tree root, so extracts
+  // can be placed correctly.
   BasicBlock *RootBB =
       cast<Instruction>(VectorizableTree[0]->Scalars.front())->getParent();
+  for (const ExternalUser &EU : ExternalUses) {
+    // User == nullptr means the scalar needs RAUW. Not yet supported.
+    if (!EU.User)
+      return false;
+    auto *UserInst = dyn_cast<Instruction>(EU.User);
+    if (!UserInst)
+      return false;
+    // PHI users need special insert-point handling. Not yet supported.
+    if (isa<PHINode>(UserInst))
+      return false;
+    // Cross-block external uses need special extract placement.
+    if (UserInst->getParent() != RootBB)
+      return false;
+  }
 
   // Check all tree entries for eligibility.
   for (const std::unique_ptr<TreeEntry> &TE : VectorizableTree) {
@@ -21729,8 +21742,7 @@ bool BoUpSLP::isVPlanEligible() const {
 }
 
 std::unique_ptr<VPlan> BoUpSLP::buildVPlanForTree() {
-  // Local map from TreeEntry to VPValue, used to wire operands during building.
-  DenseMap<const TreeEntry *, VPValue *> EntryToVPValue;
+  DenseMap<TreeEntry *, VPValue *> EntryToVPValue;
   // Use the BB containing the first scalar of the root entry as the scalar
   // header.
   BasicBlock *ScalarHeaderBB =
@@ -21814,7 +21826,7 @@ std::unique_ptr<VPlan> BoUpSLP::buildVPlanForTree() {
       VPValue *LHS = EntryToVPValue.lookup(getOperandEntry(E, 0));
       VPValue *RHS = EntryToVPValue.lookup(getOperandEntry(E, 1));
       assert(LHS && RHS && "Operand entries not yet processed");
-      // Intersect flags across all scalars in the bundle.
+      // Intersect flags across all instruction scalars in the bundle.
       VPIRFlags Flags(*MainOp);
       for (Value *V : E->Scalars)
         if (auto *I = dyn_cast<Instruction>(V))
@@ -21913,6 +21925,27 @@ std::unique_ptr<VPlan> BoUpSLP::buildVPlanForTree() {
     }
   }
 
+  // Model external uses: create extract element recipes in the VPlan.
+  // After execution, executeVPlanForTree handles RAUW and placement.
+  DenseMap<std::pair<TreeEntry *, unsigned>, VPInstruction *> ExtractCache;
+  for (const ExternalUser &EU : ExternalUses) {
+    TreeEntry *TE = const_cast<TreeEntry *>(&EU.E);
+    VPValue *VecVPV = EntryToVPValue.lookup(TE);
+    if (!VecVPV)
+      continue;
+
+    auto Key = std::make_pair(TE, EU.Lane);
+    if (ExtractCache.count(Key))
+      continue;
+
+    VPValue *LaneIdx = Plan->getOrAddLiveIn(
+        ConstantInt::get(IntegerType::get(F->getContext(), 32), EU.Lane));
+    auto *Extract =
+        new VPInstruction(Instruction::ExtractElement, {VecVPV, LaneIdx});
+    VPBB->appendRecipe(Extract);
+    ExtractCache[Key] = Extract;
+  }
+
   return Plan;
 }
 
@@ -21925,9 +21958,96 @@ void BoUpSLP::executeVPlanForTree(VPlan &Plan, unsigned VF) {
   VPBasicBlock *VPBB =
       cast<VPBasicBlock>(Plan.getEntry()->getSingleSuccessor());
 
+  // Remember the insert point so we can scan new instructions afterwards.
+  BasicBlock *InsertBB = Builder.GetInsertBlock();
+
   // Execute each recipe in order.
   for (VPRecipeBase &R : *VPBB)
     R.execute(State);
+
+  // VPlan execution may produce IR with VPlan-specific naming (e.g.
+  // "wide.load", "broadcast.splatinsert") and i64 indices for broadcasts.
+  // Normalize these to match the legacy SLP codegen output: strip names and
+  // change broadcast insertelement indices from i64 to i32.
+  for (Instruction &I : *InsertBB) {
+    if (auto *LdI = dyn_cast<LoadInst>(&I)) {
+      if (LdI->getName().starts_with("wide.load"))
+        LdI->setName("");
+    } else if (auto *IE = dyn_cast<InsertElementInst>(&I)) {
+      if (IE->getName().starts_with("broadcast.splatinsert")) {
+        IE->setName("");
+        // Change i64 index to i32 to match legacy SLP output.
+        if (auto *CI = dyn_cast<ConstantInt>(IE->getOperand(2));
+            CI && CI->getType()->isIntegerTy(64))
+          IE->setOperand(
+              2, ConstantInt::get(IntegerType::get(F->getContext(), 32),
+                                  CI->getZExtValue()));
+      }
+    } else if (auto *SV = dyn_cast<ShuffleVectorInst>(&I)) {
+      if (SV->getName().starts_with("broadcast.splat"))
+        SV->setName("");
+    }
+  }
+
+  // Handle external uses. The VPlan contains extract recipes for each
+  // {entry, lane} pair. Match them to ExternalUses and RAUW the original
+  // scalars, placing each extract before its user for dominance.
+  DenseMap<std::pair<Value *, unsigned>, Value *> VecLaneToExtract;
+  for (VPRecipeBase &R : *VPBB) {
+    auto *VPI = dyn_cast<VPInstruction>(&R);
+    if (!VPI || VPI->getOpcode() != Instruction::ExtractElement)
+      continue;
+    Value *ExtractIR = State.get(VPI, /*NeedsScalar=*/true);
+    Value *VecIR = State.get(VPI->getOperand(0), /*NeedsScalar=*/false);
+    auto *LaneCI =
+        dyn_cast<ConstantInt>(State.get(VPI->getOperand(1), VPLane(0)));
+    if (!LaneCI)
+      continue;
+    VecLaneToExtract[{VecIR, LaneCI->getZExtValue()}] = ExtractIR;
+  }
+
+  // Build a map from main instruction to its generated vector value.
+  DenseMap<Instruction *, Value *> MainOpToVec;
+  for (VPRecipeBase &R : *VPBB) {
+    for (VPValue *VPV : R.definedValues()) {
+      if (!VPV->getUnderlyingValue())
+        continue;
+      if (State.hasVectorValue(VPV)) {
+        MainOpToVec[cast<Instruction>(VPV->getUnderlyingValue())] =
+            State.get(VPV, /*NeedsScalar=*/false);
+      }
+    }
+  }
+
+  for (const ExternalUser &EU : ExternalUses) {
+    if (!EU.User)
+      continue;
+    auto *UserInst = dyn_cast<Instruction>(EU.User);
+    if (!UserInst)
+      continue;
+
+    auto VecIt = MainOpToVec.find(EU.E.getMainOp());
+    if (VecIt == MainOpToVec.end())
+      continue;
+
+    auto ExtIt = VecLaneToExtract.find({VecIt->second, EU.Lane});
+    if (ExtIt == VecLaneToExtract.end())
+      continue;
+
+    Value *ExtractVal = ExtIt->second;
+    if (auto *ExtractInst = dyn_cast<Instruction>(ExtractVal)) {
+      if (!DT->dominates(ExtractInst, UserInst)) {
+        // Place the extract after the vector value it extracts from, to ensure
+        // the extract dominates the user without breaking the def-use chain.
+        auto *VecInst = dyn_cast<Instruction>(VecIt->second);
+        if (VecInst && VecInst->comesBefore(UserInst))
+          ExtractInst->moveAfter(VecInst);
+        else
+          ExtractInst->moveBefore(UserInst->getIterator());
+      }
+    }
+    UserInst->replaceUsesOfWith(EU.Scalar, ExtractVal);
+  }
 }
 
 Value *BoUpSLP::vectorizeTree() {
@@ -22127,6 +22247,10 @@ Value *BoUpSLP::vectorizeTree(
   }
   } // end of else (non-VPlan codegen path)
 
+  // When VPlan codegen was used, external uses are handled as part of the
+  // VPlan. Skip the legacy external-use extraction loop.
+  SmallDenseSet<ExtractElementInst *, 4> IgnoredExtracts;
+  if (!UsedVPlan) {
   LLVM_DEBUG(dbgs() << "SLP: Extracting " << ExternalUses.size()
                     << " values .\n");
 
@@ -22140,7 +22264,6 @@ Value *BoUpSLP::vectorizeTree(
   SmallDenseSet<Value *, 4> UsedInserts;
   DenseMap<std::pair<Value *, Type *>, Value *> VectorCasts;
   SmallDenseSet<Value *, 4> ScalarsWithNullptrUser;
-  SmallDenseSet<ExtractElementInst *, 4> IgnoredExtracts;
   // Extract all of the elements with the external uses.
   for (const auto &ExternalUse : ExternalUses) {
     Value *Scalar = ExternalUse.Scalar;
@@ -22521,6 +22644,7 @@ Value *BoUpSLP::vectorizeTree(
     }
     CSEBlocks.insert(LastInsert->getParent());
   }
+  } // end of if (!UsedVPlan)
 
   SmallVector<Instruction *> RemovedInsts;
   // For each vectorized value:
@@ -22576,7 +22700,7 @@ Value *BoUpSLP::vectorizeTree(
           LLVM_DEBUG(dbgs() << "SLP: \tvalidating user:" << *U << ".\n");
 
           // It is legal to delete users in the ignorelist.
-          assert((isVectorized(U) ||
+          assert((isVectorized(U) || UsedVPlan ||
                   (UserIgnoreList && UserIgnoreList->contains(U)) ||
                   (isa_and_nonnull<Instruction>(U) &&
                    isDeleted(cast<Instruction>(U)))) &&
