@@ -114,6 +114,10 @@ using namespace std::placeholders;
 #define DEBUG_TYPE "SLP"
 
 STATISTIC(NumVectorInstructions, "Number of vector instructions generated");
+STATISTIC(NumVPlanCodegen,
+          "Number of SLP trees using VPlan-based codegen");
+STATISTIC(NumLegacyCodegen,
+          "Number of SLP trees using legacy codegen");
 
 DEBUG_COUNTER(VectorizedGraphs, "slp-vectorized",
               "Controls which SLP graphs should be vectorized.");
@@ -21969,13 +21973,17 @@ Value *BoUpSLP::vectorizeTree(
   // Do not use VPlan codegen when called from a reduction context
   // (ReductionRoot is set), as the caller needs VectorizedValue on the root
   // entry to emit the reduction.
+  bool UsedVPlan = false;
   if (SLPUseVPlanCodegen && !ReductionRoot && isVPlanEligible()) {
     // Set insert point after the last instruction in the root bundle.
     setInsertPointAfterBundle(VectorizableTree[0].get());
     unsigned VF = VectorizableTree[0]->Scalars.size();
     auto Plan = buildVPlanForTree();
     executeVPlanForTree(*Plan, VF);
+    UsedVPlan = true;
+    ++NumVPlanCodegen;
   } else {
+    ++NumLegacyCodegen;
   // Vectorize gather operands of the nodes with the external uses only.
   SmallVector<std::pair<TreeEntry *, Instruction *>> GatherEntries;
   for (const std::unique_ptr<TreeEntry> &TE : VectorizableTree) {
