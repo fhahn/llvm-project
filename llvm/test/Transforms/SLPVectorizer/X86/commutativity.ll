@@ -2,6 +2,9 @@
 ; RUN: opt < %s -mtriple=x86_64-apple-macosx10.11.0 -passes=slp-vectorizer -S -mattr=+sse2 | FileCheck %s --check-prefix=SSE
 ; RUN: opt < %s -mtriple=x86_64-apple-macosx10.11.0 -passes=slp-vectorizer -S -mattr=+avx  | FileCheck %s --check-prefix=AVX
 ; RUN: opt < %s -mtriple=x86_64-apple-macosx10.11.0 -passes=slp-vectorizer -S -mattr=+avx2 | FileCheck %s --check-prefix=AVX
+; RUN: opt < %s -mtriple=x86_64-apple-macosx10.11.0 -passes=slp-vectorizer -slp-use-vplan-codegen -S -mattr=+sse2 | FileCheck %s --check-prefix=SSE
+; RUN: opt < %s -mtriple=x86_64-apple-macosx10.11.0 -passes=slp-vectorizer -slp-use-vplan-codegen -S -mattr=+avx  | FileCheck %s --check-prefix=AVX
+; RUN: opt < %s -mtriple=x86_64-apple-macosx10.11.0 -passes=slp-vectorizer -slp-use-vplan-codegen -S -mattr=+avx2 | FileCheck %s --check-prefix=AVX
 
 ; Verify that the SLP vectorizer is able to figure out that commutativity
 ; offers the possibility to splat/broadcast %c and thus make it profitable

@@ -3,6 +3,10 @@
 ; RUN: -passes=slp-vectorizer \
 ; RUN: -slp-disable-tree-reorder=true -slp-force-strided-loads=true \
 ; RUN: -S < %s | FileCheck %s
+; RUN: opt -mtriple=riscv64 -mattr=+m,+v \
+; RUN: -passes=slp-vectorizer -slp-use-vplan-codegen \
+; RUN: -slp-disable-tree-reorder=true -slp-force-strided-loads=true \
+; RUN: -S < %s | FileCheck %s
 
 define void @const_stride_reversed(ptr %pl, ptr %ps) {
 ; CHECK-LABEL: define void @const_stride_reversed(

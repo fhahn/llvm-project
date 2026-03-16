@@ -2,6 +2,9 @@
 ; RUN: opt -S -mtriple=amdgcn-amd-amdhsa -mcpu=hawaii -passes=slp-vectorizer %s | FileCheck -check-prefix=GFX7 %s
 ; RUN: opt -S -mtriple=amdgcn-amd-amdhsa -mcpu=fiji -passes=slp-vectorizer %s | FileCheck -check-prefix=GFX8 %s
 ; RUN: opt -S -mtriple=amdgcn-amd-amdhsa -mcpu=gfx900 -passes=slp-vectorizer %s | FileCheck -check-prefix=GFX9 %s
+; RUN: opt -S -mtriple=amdgcn-amd-amdhsa -mcpu=hawaii -passes=slp-vectorizer -slp-use-vplan-codegen %s | FileCheck -check-prefix=GFX7 %s
+; RUN: opt -S -mtriple=amdgcn-amd-amdhsa -mcpu=fiji -passes=slp-vectorizer -slp-use-vplan-codegen %s | FileCheck -check-prefix=GFX8 %s
+; RUN: opt -S -mtriple=amdgcn-amd-amdhsa -mcpu=gfx900 -passes=slp-vectorizer -slp-use-vplan-codegen %s | FileCheck -check-prefix=GFX9 %s
 
 define protected amdgpu_kernel void @arith_2(<16 x i8> %invec, ptr %out, i32 %flag) {
 ; GFX7-LABEL: define protected amdgpu_kernel void @arith_2(

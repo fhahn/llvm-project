@@ -5,6 +5,12 @@
 ; RUN: -riscv-v-vector-bits-min=256 -riscv-v-slp-max-vf=0 -S | FileCheck %s --check-prefixes=CHECK,CHECK-256
 ; RUN: opt < %s -passes=slp-vectorizer -mtriple=riscv64 -mattr=+v \
 ; RUN: -riscv-v-vector-bits-min=512 -riscv-v-slp-max-vf=0 -S | FileCheck %s --check-prefixes=CHECK,CHECK-512
+; RUN: opt < %s -passes=slp-vectorizer -slp-use-vplan-codegen -mtriple=riscv64 -mattr=+v \
+; RUN: -riscv-v-vector-bits-min=128 -riscv-v-slp-max-vf=0 -S | FileCheck %s --check-prefixes=CHECK,CHECK-128
+; RUN: opt < %s -passes=slp-vectorizer -slp-use-vplan-codegen -mtriple=riscv64 -mattr=+v \
+; RUN: -riscv-v-vector-bits-min=256 -riscv-v-slp-max-vf=0 -S | FileCheck %s --check-prefixes=CHECK,CHECK-256
+; RUN: opt < %s -passes=slp-vectorizer -slp-use-vplan-codegen -mtriple=riscv64 -mattr=+v \
+; RUN: -riscv-v-vector-bits-min=512 -riscv-v-slp-max-vf=0 -S | FileCheck %s --check-prefixes=CHECK,CHECK-512
 
 target datalayout = "e-m:e-p:64:64-i64:64-i128:128-n64-S128"
 target triple = "riscv64"

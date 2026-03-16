@@ -2,6 +2,9 @@
 ; RUN: opt < %s -passes=slp-vectorizer -mtriple=riscv64 -mattr=+m,+v \
 ; RUN: -riscv-v-vector-bits-min=-1 -riscv-v-slp-max-vf=0 -S | FileCheck %s --check-prefixes=CHECK
 ; RUN: opt < %s -passes=slp-vectorizer -mtriple=riscv64 -mattr=+m,+v -S | FileCheck %s --check-prefixes=DEFAULT
+; RUN: opt < %s -passes=slp-vectorizer -slp-use-vplan-codegen -mtriple=riscv64 -mattr=+m,+v \
+; RUN: -riscv-v-vector-bits-min=-1 -riscv-v-slp-max-vf=0 -S | FileCheck %s --check-prefixes=CHECK
+; RUN: opt < %s -passes=slp-vectorizer -slp-use-vplan-codegen -mtriple=riscv64 -mattr=+m,+v -S | FileCheck %s --check-prefixes=DEFAULT
 
 define void @vec_add(ptr %dest, ptr %p) {
 ; CHECK-LABEL: @vec_add(

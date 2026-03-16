@@ -5,6 +5,12 @@
 ; RUN: opt < %s -mtriple=x86_64-unknown -mcpu=core-avx2 -passes=slp-vectorizer -S | FileCheck %s --check-prefixes=CHECK,AVX
 ; RUN: opt < %s -mtriple=x86_64-unknown -mcpu=knl -passes=slp-vectorizer -S | FileCheck %s --check-prefixes=CHECK,AVX
 ; RUN: opt < %s -mtriple=x86_64-unknown -mcpu=skx -passes=slp-vectorizer -S | FileCheck %s --check-prefixes=CHECK,AVX
+; RUN: opt < %s -mtriple=x86_64-unknown -passes=slp-vectorizer -slp-use-vplan-codegen -S | FileCheck %s --check-prefixes=CHECK,SSE
+; RUN: opt < %s -mtriple=x86_64-unknown -mcpu=slm -passes=slp-vectorizer -slp-use-vplan-codegen -S | FileCheck %s --check-prefixes=CHECK,SLM
+; RUN: opt < %s -mtriple=x86_64-unknown -mcpu=corei7-avx -passes=slp-vectorizer -slp-use-vplan-codegen -S | FileCheck %s --check-prefixes=CHECK,AVX
+; RUN: opt < %s -mtriple=x86_64-unknown -mcpu=core-avx2 -passes=slp-vectorizer -slp-use-vplan-codegen -S | FileCheck %s --check-prefixes=CHECK,AVX
+; RUN: opt < %s -mtriple=x86_64-unknown -mcpu=knl -passes=slp-vectorizer -slp-use-vplan-codegen -S | FileCheck %s --check-prefixes=CHECK,AVX
+; RUN: opt < %s -mtriple=x86_64-unknown -mcpu=skx -passes=slp-vectorizer -slp-use-vplan-codegen -S | FileCheck %s --check-prefixes=CHECK,AVX
 
 ;
 ; 128-bit vectors

@@ -3,6 +3,10 @@
 ; RUN: opt < %s -passes=slp-vectorizer -S -mtriple=nvptx64-nvidia-cuda -mcpu=sm_80 | FileCheck %s -check-prefix=VECTOR
 ; RUN: opt < %s -passes=slp-vectorizer -S -mtriple=nvptx64-nvidia-cuda -mcpu=sm_70 | FileCheck %s -check-prefix=VECTOR
 ; RUN: opt < %s -passes=slp-vectorizer -S -mtriple=nvptx64-nvidia-cuda -mcpu=sm_50 | FileCheck %s -check-prefix=NOVECTOR
+; RUN: opt < %s -passes=slp-vectorizer -slp-use-vplan-codegen -S -mtriple=nvptx64-nvidia-cuda -mcpu=sm_90 | FileCheck %s -check-prefix=VECTOR
+; RUN: opt < %s -passes=slp-vectorizer -slp-use-vplan-codegen -S -mtriple=nvptx64-nvidia-cuda -mcpu=sm_80 | FileCheck %s -check-prefix=VECTOR
+; RUN: opt < %s -passes=slp-vectorizer -slp-use-vplan-codegen -S -mtriple=nvptx64-nvidia-cuda -mcpu=sm_70 | FileCheck %s -check-prefix=VECTOR
+; RUN: opt < %s -passes=slp-vectorizer -slp-use-vplan-codegen -S -mtriple=nvptx64-nvidia-cuda -mcpu=sm_50 | FileCheck %s -check-prefix=NOVECTOR
 
 define void @fusion(ptr noalias nocapture align 256 dereferenceable(19267584) %arg, ptr noalias nocapture readonly align 256 dereferenceable(19267584) %arg1, i32 %arg2, i32 %arg3) local_unnamed_addr #0 {
 ; VECTOR-LABEL: @fusion(

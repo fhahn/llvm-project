@@ -3,6 +3,10 @@
 ; RUN: opt -S -mtriple=amdgcn-amd-amdhsa -mcpu=gfx908 -passes=slp-vectorizer < %s | FileCheck -check-prefixes=GCN,GFX9 %s
 ; RUN: opt -S -mtriple=amdgcn-amd-amdhsa -mcpu=gfx90a -passes=slp-vectorizer < %s | FileCheck -check-prefixes=GCN,GFX9 %s
 ; RUN: opt -S -mtriple=amdgcn-amd-amdhsa -mcpu=gfx1030 -passes=slp-vectorizer < %s | FileCheck -check-prefixes=GCN,GFX9 %s
+; RUN: opt -S -mtriple=amdgcn-amd-amdhsa -mcpu=gfx803 -passes=slp-vectorizer -slp-use-vplan-codegen < %s | FileCheck -check-prefixes=GCN,GFX8 %s
+; RUN: opt -S -mtriple=amdgcn-amd-amdhsa -mcpu=gfx908 -passes=slp-vectorizer -slp-use-vplan-codegen < %s | FileCheck -check-prefixes=GCN,GFX9 %s
+; RUN: opt -S -mtriple=amdgcn-amd-amdhsa -mcpu=gfx90a -passes=slp-vectorizer -slp-use-vplan-codegen < %s | FileCheck -check-prefixes=GCN,GFX9 %s
+; RUN: opt -S -mtriple=amdgcn-amd-amdhsa -mcpu=gfx1030 -passes=slp-vectorizer -slp-use-vplan-codegen < %s | FileCheck -check-prefixes=GCN,GFX9 %s
 
 ; FIXME: Should not vectorize on gfx8
 

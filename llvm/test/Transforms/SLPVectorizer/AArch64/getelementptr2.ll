@@ -4,6 +4,8 @@
 ; RUN: cat %t | FileCheck -check-prefix=YAML %s
 ; RUN: opt -S -mtriple=aarch64--linux-gnu -passes=slp-vectorizer -slp-threshold=-5 -pass-remarks-output=%t < %s | FileCheck %s
 ; RUN: cat %t | FileCheck -check-prefix=YAML %s
+; RUN: opt -S -mtriple=aarch64--linux-gnu -passes=slp-vectorizer -slp-use-vplan-codegen -slp-threshold=-5 -pass-remarks-output=%t < %s | FileCheck %s
+; RUN: opt -S -mtriple=aarch64--linux-gnu -passes=slp-vectorizer -slp-use-vplan-codegen -slp-threshold=-5 -pass-remarks-output=%t < %s | FileCheck %s
 
 
 @global = internal global { ptr } zeroinitializer, align 8

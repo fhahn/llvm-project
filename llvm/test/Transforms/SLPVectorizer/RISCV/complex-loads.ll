@@ -2,6 +2,9 @@
 ; RUN: opt -S -mtriple riscv64-unknown-linux-gnu < %s --passes=slp-vectorizer -mattr=+v | FileCheck %s
 ; RUN: opt -S -mtriple riscv64-unknown-linux-gnu < %s --passes=slp-vectorizer -mattr=+v -slp-threshold=-15 | FileCheck %s --check-prefix=THR15
 ; RUN: opt -S -mtriple riscv64-unknown-linux-gnu < %s --passes=slp-vectorizer -mattr=+v,+unaligned-vector-mem | FileCheck %s --check-prefix=UNALIGNED_VEC_MEM
+; RUN: opt -S -mtriple riscv64-unknown-linux-gnu < %s --passes=slp-vectorizer -slp-use-vplan-codegen -mattr=+v | FileCheck %s
+; RUN: opt -S -mtriple riscv64-unknown-linux-gnu < %s --passes=slp-vectorizer -slp-use-vplan-codegen -mattr=+v -slp-threshold=-15 | FileCheck %s --check-prefix=THR15
+; RUN: opt -S -mtriple riscv64-unknown-linux-gnu < %s --passes=slp-vectorizer -slp-use-vplan-codegen -mattr=+v,+unaligned-vector-mem | FileCheck %s --check-prefix=UNALIGNED_VEC_MEM
 
 define i32 @test(ptr %pix1, ptr %pix2, i64 %idx.ext, i64 %idx.ext63, ptr %add.ptr, ptr %add.ptr64) {
 ; CHECK-LABEL: define i32 @test(

@@ -3,6 +3,10 @@
 ; RUN: opt -passes=slp-vectorizer -S -slp-max-vf=8 < %s | FileCheck -check-prefix=MAX256 %s
 ; RUN: opt -passes=slp-vectorizer -S -slp-max-vf=32 < %s | FileCheck -check-prefix=MAX1024 %s
 ; RUN: opt -passes=slp-vectorizer -S < %s | FileCheck -check-prefix=MAX1024 %s
+; RUN: opt -passes=slp-vectorizer -slp-use-vplan-codegen -S -slp-max-vf=1 < %s | FileCheck -check-prefix=MAX32 %s
+; RUN: opt -passes=slp-vectorizer -slp-use-vplan-codegen -S -slp-max-vf=8 < %s | FileCheck -check-prefix=MAX256 %s
+; RUN: opt -passes=slp-vectorizer -slp-use-vplan-codegen -S -slp-max-vf=32 < %s | FileCheck -check-prefix=MAX1024 %s
+; RUN: opt -passes=slp-vectorizer -slp-use-vplan-codegen -S < %s | FileCheck -check-prefix=MAX1024 %s
 
 ; Make sure we do not vectorize to create PHI wider than requested.
 ; On AMDGPU target wider vectorization will result in a higher register pressure,

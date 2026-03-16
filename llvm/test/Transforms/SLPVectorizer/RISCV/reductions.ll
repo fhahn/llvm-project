@@ -11,6 +11,18 @@
 ; RUN: opt < %s -passes=slp-vectorizer -mtriple=riscv64 \
 ; RUN: -mattr=+v,+zvl512b,+zvfh,+zvfbfmin -riscv-v-slp-max-vf=0 -S \
 ; RUN: | FileCheck %s --check-prefixes=CHECK,ZVFH
+; RUN: opt < %s -passes=slp-vectorizer -slp-use-vplan-codegen -mtriple=riscv64 \
+; RUN: -mattr=+v,+zvfhmin,+zvfbfmin -riscv-v-slp-max-vf=0 -S \
+; RUN: | FileCheck %s --check-prefixes=CHECK,ZVFHMIN
+; RUN: opt < %s -passes=slp-vectorizer -slp-use-vplan-codegen -mtriple=riscv64 \
+; RUN: -mattr=+v,+zvfh,+zvfbfmin -riscv-v-slp-max-vf=0 -S \
+; RUN: | FileCheck %s --check-prefixes=CHECK,ZVFH
+; RUN: opt < %s -passes=slp-vectorizer -slp-use-vplan-codegen -mtriple=riscv64 \
+; RUN: -mattr=+v,+zvl256b,+zvfh,+zvfbfmin -riscv-v-slp-max-vf=0 -S \
+; RUN: | FileCheck %s --check-prefixes=CHECK,ZVFH
+; RUN: opt < %s -passes=slp-vectorizer -slp-use-vplan-codegen -mtriple=riscv64 \
+; RUN: -mattr=+v,+zvl512b,+zvfh,+zvfbfmin -riscv-v-slp-max-vf=0 -S \
+; RUN: | FileCheck %s --check-prefixes=CHECK,ZVFH
 
 target datalayout = "e-m:e-p:64:64-i64:64-i128:128-n64-S128"
 target triple = "riscv64"

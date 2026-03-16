@@ -2,6 +2,9 @@
 ; RUN: opt -passes=inject-tli-mappings,slp-vectorizer -vector-library=Accelerate -S %s | FileCheck %s
 ; RUN: opt -passes=inject-tli-mappings,slp-vectorizer -vector-library=ArmPL -S %s | FileCheck %s --check-prefix=CHECK-ARMPL
 ; RUN: opt -passes=inject-tli-mappings,slp-vectorizer -S %s | FileCheck --check-prefix NOACCELERATE %s
+; RUN: opt -passes=inject-tli-mappings,slp-vectorizer -slp-use-vplan-codegen -vector-library=Accelerate -S %s | FileCheck %s
+; RUN: opt -passes=inject-tli-mappings,slp-vectorizer -slp-use-vplan-codegen -vector-library=ArmPL -S %s | FileCheck %s --check-prefix=CHECK-ARMPL
+; RUN: opt -passes=inject-tli-mappings,slp-vectorizer -slp-use-vplan-codegen -S %s | FileCheck --check-prefix NOACCELERATE %s
 
 target datalayout = "e-m:o-i64:64-i128:128-n32:64-S128"
 target triple = "arm64-apple-ios14.0.0"

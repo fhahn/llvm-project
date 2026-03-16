@@ -3,6 +3,8 @@
 ; RUN: cat %t | FileCheck -check-prefix=REMARK %s
 ; RUN: opt < %s -S -aa-pipeline=basic-aa -passes=slp-vectorizer -pass-remarks-output=%t | FileCheck %s
 ; RUN: cat %t | FileCheck -check-prefix=REMARK %s
+; RUN: opt < %s -S -passes=slp-vectorizer -slp-use-vplan-codegen -pass-remarks-output=%t | FileCheck %s
+; RUN: opt < %s -S -aa-pipeline=basic-aa -passes=slp-vectorizer -slp-use-vplan-codegen -pass-remarks-output=%t | FileCheck %s
 
 target datalayout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128"
 target triple = "aarch64--linux-gnu"
