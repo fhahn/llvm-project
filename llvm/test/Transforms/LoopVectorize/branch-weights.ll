@@ -12,14 +12,14 @@ define void @f0(i8 %n, i32 %len, ptr %p) !prof !0 {
 ; MAINVF4IC1_EPI4:    br i1 [[CMP_ENTRY]], label %[[ITER_CHECK:.*]], label %[[EXIT:.*]], !prof [[PROF1:![0-9]+]]
 ; MAINVF4IC1_EPI4:  [[ITER_CHECK]]:
 ; MAINVF4IC1_EPI4:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[TMP0:%.*]], 4
-; MAINVF4IC1_EPI4:    br i1 [[MIN_ITERS_CHECK]], label %[[VEC_EPILOG_SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]], !prof [[PROF2:![0-9]+]]
-; MAINVF4IC1_EPI4:  [[VECTOR_SCEVCHECK]]:
-; MAINVF4IC1_EPI4:    [[TMP2:%.*]] = icmp slt i8 [[TMP1:%.*]], 0
-; MAINVF4IC1_EPI4:    [[TMP3:%.*]] = icmp ugt i32 [[LEN]], 255
-; MAINVF4IC1_EPI4:    br i1 [[TMP4:%.*]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VECTOR_MAIN_LOOP_ITER_CHECK:.*]], !prof [[PROF2]]
-; MAINVF4IC1_EPI4:  [[VECTOR_MAIN_LOOP_ITER_CHECK]]:
+; MAINVF4IC1_EPI4:    br i1 [[MIN_ITERS_CHECK]], label %[[VEC_EPILOG_SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK1:.*]], !prof [[PROF2:![0-9]+]]
+; MAINVF4IC1_EPI4:  [[VECTOR_SCEVCHECK:.*]]:
 ; MAINVF4IC1_EPI4:    [[MIN_ITERS_CHECK1:%.*]] = icmp ult i32 [[TMP0]], 4
 ; MAINVF4IC1_EPI4:    br i1 [[MIN_ITERS_CHECK1]], label %[[VEC_EPILOG_PH:.*]], label %[[VECTOR_PH:.*]], !prof [[PROF2]]
+; MAINVF4IC1_EPI4:  [[VECTOR_SCEVCHECK1]]:
+; MAINVF4IC1_EPI4:    [[TMP2:%.*]] = icmp slt i8 [[TMP1:%.*]], 0
+; MAINVF4IC1_EPI4:    [[TMP3:%.*]] = icmp ugt i32 [[LEN]], 255
+; MAINVF4IC1_EPI4:    br i1 [[TMP4:%.*]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VECTOR_SCEVCHECK]], !prof [[PROF2]]
 ; MAINVF4IC1_EPI4:  [[VECTOR_PH]]:
 ; MAINVF4IC1_EPI4:    br label %[[VECTOR_BODY:.*]]
 ; MAINVF4IC1_EPI4:  [[VECTOR_BODY]]:
@@ -55,14 +55,14 @@ define void @f0(i8 %n, i32 %len, ptr %p) !prof !0 {
 ; MAINVF4IC2_EPI4:    br i1 [[CMP_ENTRY]], label %[[ITER_CHECK:.*]], label %[[EXIT:.*]], !prof [[PROF1:![0-9]+]]
 ; MAINVF4IC2_EPI4:  [[ITER_CHECK]]:
 ; MAINVF4IC2_EPI4:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[TMP0:%.*]], 4
-; MAINVF4IC2_EPI4:    br i1 [[MIN_ITERS_CHECK]], label %[[VEC_EPILOG_SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]], !prof [[PROF2:![0-9]+]]
-; MAINVF4IC2_EPI4:  [[VECTOR_SCEVCHECK]]:
-; MAINVF4IC2_EPI4:    [[TMP2:%.*]] = icmp slt i8 [[TMP1:%.*]], 0
-; MAINVF4IC2_EPI4:    [[TMP3:%.*]] = icmp ugt i32 [[LEN]], 255
-; MAINVF4IC2_EPI4:    br i1 [[TMP4:%.*]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VECTOR_MAIN_LOOP_ITER_CHECK:.*]], !prof [[PROF2]]
-; MAINVF4IC2_EPI4:  [[VECTOR_MAIN_LOOP_ITER_CHECK]]:
+; MAINVF4IC2_EPI4:    br i1 [[MIN_ITERS_CHECK]], label %[[VEC_EPILOG_SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK1:.*]], !prof [[PROF2:![0-9]+]]
+; MAINVF4IC2_EPI4:  [[VECTOR_SCEVCHECK:.*]]:
 ; MAINVF4IC2_EPI4:    [[MIN_ITERS_CHECK1:%.*]] = icmp ult i32 [[TMP0]], 8
 ; MAINVF4IC2_EPI4:    br i1 [[MIN_ITERS_CHECK1]], label %[[VEC_EPILOG_PH:.*]], label %[[VECTOR_PH:.*]], !prof [[PROF2]]
+; MAINVF4IC2_EPI4:  [[VECTOR_SCEVCHECK1]]:
+; MAINVF4IC2_EPI4:    [[TMP2:%.*]] = icmp slt i8 [[TMP1:%.*]], 0
+; MAINVF4IC2_EPI4:    [[TMP3:%.*]] = icmp ugt i32 [[LEN]], 255
+; MAINVF4IC2_EPI4:    br i1 [[TMP4:%.*]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VECTOR_SCEVCHECK]], !prof [[PROF2]]
 ; MAINVF4IC2_EPI4:  [[VECTOR_PH]]:
 ; MAINVF4IC2_EPI4:    br label %[[VECTOR_BODY:.*]]
 ; MAINVF4IC2_EPI4:  [[VECTOR_BODY]]:

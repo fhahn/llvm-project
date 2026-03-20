@@ -615,10 +615,10 @@ public:
   /// Emit remarks for recipes with invalid costs in the available VPlans.
   void emitInvalidCostRemarks(OptimizationRemarkEmitter *ORE);
 
-  /// Create a check to \p Plan to see if the vector loop should be executed
-  /// based on its trip count.
+  /// Add a minimum iteration count check to \p Plan.
   void addMinimumIterationCheck(VPlan &Plan, ElementCount VF, unsigned UF,
-                                ElementCount MinProfitableTripCount) const;
+                                ElementCount MinProfitableTripCount,
+                                bool ForceEmitCheck = false) const;
 
   /// Update loop metadata and profile info for both the scalar remainder loop
   /// and \p VectorLoop, if it exists. Keeps all loop hints from the original

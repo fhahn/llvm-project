@@ -1216,60 +1216,68 @@ void VPlanTransforms::attachCheckBlock(VPlan &Plan, Value *Cond,
   addBypassBranch(Plan, CheckBlockVPBB, CondVPV, AddBranchWeights);
 }
 
+/// Return an insert point in \p EntryVPBB after existing VPIRPhi,
+/// VPIRInstruction and VPExpandSCEVRecipe recipes, where new ExpandSCEV
+/// recipes can be placed so expandSCEVs processes them.
+static VPBasicBlock::iterator
+getExpandSCEVInsertPt(VPBasicBlock *EntryVPBB) {
+  auto InsertPt = EntryVPBB->begin();
+  while (InsertPt != EntryVPBB->end() &&
+         isa<VPExpandSCEVRecipe, VPIRPhi, VPIRInstruction>(&*InsertPt))
+    ++InsertPt;
+  return InsertPt;
+}
+
 void VPlanTransforms::addMinimumIterationCheck(
     VPlan &Plan, ElementCount VF, unsigned UF,
     ElementCount MinProfitableTripCount, bool RequiresScalarEpilogue,
     bool TailFolded, Loop *OrigLoop, const uint32_t *MinItersBypassWeights,
-    DebugLoc DL, PredicatedScalarEvolution &PSE) {
-  // Generate code to check if the loop's trip count is less than VF * UF, or
-  // equal to it in case a scalar epilogue is required; this implies that the
-  // vector trip count is zero. This check also covers the case where adding one
-  // to the backedge-taken count overflowed leading to an incorrect trip count
-  // of zero. In this case we will also jump to the scalar loop.
+    DebugLoc DL, PredicatedScalarEvolution &PSE, bool ForceEmitCheck,
+    VPBasicBlock *OutputBlock) {
+  // Check if TC < max(MinProfitableTripCount, VF * UF) (or <= if a scalar
+  // epilogue is required). If so, bypass the vector loop.
   CmpInst::Predicate CmpPred =
       RequiresScalarEpilogue ? ICmpInst::ICMP_ULE : ICmpInst::ICMP_ULT;
-  // If tail is to be folded, vector loop takes care of all iterations.
   VPValue *TripCountVPV = Plan.getTripCount();
   const SCEV *TripCount = vputils::getSCEVExprForVPValue(TripCountVPV, PSE);
   Type *TripCountTy = TripCount->getType();
   ScalarEvolution &SE = *PSE.getSE();
   auto GetMinTripCount = [&]() -> const SCEV * {
-    // Compute max(MinProfitableTripCount, UF * VF) and return it.
+    // Return max(MinProfitableTripCount, VF * UF).
     const SCEV *VFxUF =
         SE.getElementCount(TripCountTy, (VF * UF), SCEV::FlagNUW);
     if (UF * VF.getKnownMinValue() >=
-        MinProfitableTripCount.getKnownMinValue()) {
-      // TODO: SCEV should be able to simplify test.
+        MinProfitableTripCount.getKnownMinValue())
       return VFxUF;
-    }
     const SCEV *MinProfitableTripCountSCEV =
         SE.getElementCount(TripCountTy, MinProfitableTripCount, SCEV::FlagNUW);
     return SE.getUMaxExpr(MinProfitableTripCountSCEV, VFxUF);
   };
 
   VPBasicBlock *EntryVPBB = Plan.getEntry();
-  VPBuilder Builder(EntryVPBB);
+  // ICmp and BranchOnCond go in OutputBlock if given, otherwise in Entry.
+  VPBasicBlock *CheckVPBB = OutputBlock ? OutputBlock : EntryVPBB;
+  VPBuilder Builder(CheckVPBB);
   VPValue *TripCountCheck = Plan.getFalse();
   const SCEV *Step = GetMinTripCount();
-  // TripCountCheck = false, folding tail implies positive vector trip
-  // count.
+  // Tail folding implies positive vector trip count; keep check as false.
   if (!TailFolded) {
-    // TODO: Emit unconditional branch to vector preheader instead of
-    // conditional branch with known condition.
     TripCount = SE.applyLoopGuards(TripCount, OrigLoop);
-    // Check if the trip count is < the step.
-    if (SE.isKnownPredicate(CmpPred, TripCount, Step)) {
-      // TODO: Ensure step is at most the trip count when determining max VF and
-      // UF, w/o tail folding.
+    if (!ForceEmitCheck && SE.isKnownPredicate(CmpPred, TripCount, Step)) {
+      // TODO: Ensure step <= trip count when determining max VF/UF w/o tail
+      // folding.
       TripCountCheck = Plan.getTrue();
-    } else if (!SE.isKnownPredicate(CmpInst::getInversePredicate(CmpPred),
+    } else if (ForceEmitCheck ||
+               !SE.isKnownPredicate(CmpInst::getInversePredicate(CmpPred),
                                     TripCount, Step)) {
-      // Generate the minimum iteration check only if we cannot prove the
-      // check is known to be true, or known to be false.
-      VPValue *MinTripCountVPV = Builder.createExpandSCEV(Step);
+      // Emit the check. ForceEmitCheck prevents removeBranchOnConst from
+      // folding the branch, needed for epilogue vectorization.
+      // ExpandSCEV goes in Entry so expandSCEVs processes it.
+      VPBuilder SCEVBuilder(EntryVPBB, getExpandSCEVInsertPt(EntryVPBB));
+      VPValue *MinTripCountVPV = SCEVBuilder.createExpandSCEV(Step);
       TripCountCheck = Builder.createICmp(
           CmpPred, TripCountVPV, MinTripCountVPV, DL, "min.iters.check");
-    } // else step known to be < trip count, use TripCountCheck preset to false.
+    }
   }
   VPInstruction *Term =
       Builder.createNaryOp(VPInstruction::BranchOnCond, {TripCountCheck}, DL);
@@ -1279,6 +1287,19 @@ void VPlanTransforms::addMinimumIterationCheck(
         ArrayRef(MinItersBypassWeights, 2), /*IsExpected=*/false);
     Term->setMetadata(LLVMContext::MD_prof, BranchWeights);
   }
+}
+
+void VPlanTransforms::addIterationCountCheckBlock(
+    VPlan &Plan, ElementCount VF, unsigned UF, bool RequiresScalarEpilogue,
+    Loop *OrigLoop, const uint32_t *MinItersBypassWeights, DebugLoc DL,
+    PredicatedScalarEvolution &PSE) {
+  auto *CheckBlock =
+      Plan.createVPBasicBlock("vector.main.loop.iter.check");
+  insertCheckBlockBeforeVectorLoop(Plan, CheckBlock);
+  addMinimumIterationCheck(Plan, VF, UF, ElementCount::getFixed(0),
+                           RequiresScalarEpilogue, /*TailFolded=*/false,
+                           OrigLoop, MinItersBypassWeights, DL, PSE,
+                           /*ForceEmitCheck=*/true, CheckBlock);
 }
 
 void VPlanTransforms::addMinimumVectorEpilogueIterationCheck(

@@ -10,12 +10,12 @@ define void @test_store_initially_interleave(i32 %n, ptr noalias %src) #0 {
 ; I64-NEXT:    [[TMP4:%.*]] = add i32 [[N]], 1
 ; I64-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ule i32 [[TMP4]], 4
 ; I64-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[VEC_EPILOG_SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
-; I64:       [[VECTOR_SCEVCHECK]]:
-; I64-NEXT:    [[TMP1:%.*]] = icmp slt i32 [[N]], 0
-; I64-NEXT:    br i1 [[TMP1]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VECTOR_MAIN_LOOP_ITER_CHECK:.*]]
-; I64:       [[VECTOR_MAIN_LOOP_ITER_CHECK]]:
+; I64:       [[VECTOR_MAIN_LOOP_ITER_CHECK:.*]]:
 ; I64-NEXT:    [[MIN_ITERS_CHECK1:%.*]] = icmp ule i32 [[TMP4]], 16
 ; I64-NEXT:    br i1 [[MIN_ITERS_CHECK1]], label %[[VEC_EPILOG_PH:.*]], label %[[VECTOR_PH:.*]]
+; I64:       [[VECTOR_SCEVCHECK]]:
+; I64-NEXT:    [[TMP1:%.*]] = icmp slt i32 [[N]], 0
+; I64-NEXT:    br i1 [[TMP1]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VECTOR_MAIN_LOOP_ITER_CHECK]]
 ; I64:       [[VECTOR_PH]]:
 ; I64-NEXT:    [[N_MOD_VF:%.*]] = urem i32 [[TMP4]], 16
 ; I64-NEXT:    [[TMP2:%.*]] = icmp eq i32 [[N_MOD_VF]], 0
