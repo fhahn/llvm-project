@@ -131,23 +131,19 @@ define void @derived_pointer_ivs(ptr noalias %a, ptr noalias %b, ptr %end) {
 ; VF2-LABEL: define void @derived_pointer_ivs(
 ; VF2-SAME: ptr noalias [[A:%.*]], ptr noalias [[B:%.*]], ptr [[END:%.*]]) {
 ; VF2-NEXT:  [[ENTRY:.*:]]
-; VF2-NEXT:    [[A5:%.*]] = ptrtoint ptr [[A]] to i64
-; VF2-NEXT:    [[END4:%.*]] = ptrtoint ptr [[END]] to i64
 ; VF2-NEXT:    [[A2:%.*]] = ptrtoint ptr [[A]] to i64
 ; VF2-NEXT:    [[END1:%.*]] = ptrtoint ptr [[END]] to i64
-; VF2-NEXT:    [[TMP0:%.*]] = sub i64 0, [[A5]]
-; VF2-NEXT:    [[TMP13:%.*]] = add i64 [[END4]], [[TMP0]]
-; VF2-NEXT:    [[TMP1:%.*]] = add i64 [[TMP13]], -16
 ; VF2-NEXT:    [[TMP2:%.*]] = lshr i64 [[TMP1]], 4
 ; VF2-NEXT:    [[TMP3:%.*]] = add nuw nsw i64 [[TMP2]], 1
 ; VF2-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP3]], 2
 ; VF2-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; VF2:       [[VECTOR_MEMCHECK]]:
-; VF2-NEXT:    [[TMP4:%.*]] = add i64 [[END1]], -16
-; VF2-NEXT:    [[TMP5:%.*]] = sub i64 [[TMP4]], [[A2]]
+; VF2-NEXT:    [[TMP4:%.*]] = sub i64 0, [[A2]]
+; VF2-NEXT:    [[TMP13:%.*]] = add i64 -16, [[TMP4]]
+; VF2-NEXT:    [[TMP5:%.*]] = add i64 [[TMP13]], [[END1]]
 ; VF2-NEXT:    [[TMP6:%.*]] = lshr i64 [[TMP5]], 4
 ; VF2-NEXT:    [[TMP7:%.*]] = shl nuw i64 [[TMP6]], 4
-; VF2-NEXT:    [[TMP8:%.*]] = add i64 [[TMP7]], 16
+; VF2-NEXT:    [[TMP8:%.*]] = add i64 16, [[TMP7]]
 ; VF2-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP8]]
 ; VF2-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP8]]
 ; VF2-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[B]], [[SCEVGEP3]]
@@ -181,23 +177,19 @@ define void @derived_pointer_ivs(ptr noalias %a, ptr noalias %b, ptr %end) {
 ; VF2IC2-LABEL: define void @derived_pointer_ivs(
 ; VF2IC2-SAME: ptr noalias [[A:%.*]], ptr noalias [[B:%.*]], ptr [[END:%.*]]) {
 ; VF2IC2-NEXT:  [[ENTRY:.*:]]
-; VF2IC2-NEXT:    [[A5:%.*]] = ptrtoint ptr [[A]] to i64
-; VF2IC2-NEXT:    [[END4:%.*]] = ptrtoint ptr [[END]] to i64
 ; VF2IC2-NEXT:    [[A2:%.*]] = ptrtoint ptr [[A]] to i64
 ; VF2IC2-NEXT:    [[END1:%.*]] = ptrtoint ptr [[END]] to i64
-; VF2IC2-NEXT:    [[TMP0:%.*]] = sub i64 0, [[A5]]
-; VF2IC2-NEXT:    [[TMP16:%.*]] = add i64 [[END4]], [[TMP0]]
-; VF2IC2-NEXT:    [[TMP1:%.*]] = add i64 [[TMP16]], -16
 ; VF2IC2-NEXT:    [[TMP2:%.*]] = lshr i64 [[TMP1]], 4
 ; VF2IC2-NEXT:    [[TMP3:%.*]] = add nuw nsw i64 [[TMP2]], 1
 ; VF2IC2-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP3]], 4
 ; VF2IC2-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; VF2IC2:       [[VECTOR_MEMCHECK]]:
-; VF2IC2-NEXT:    [[TMP4:%.*]] = add i64 [[END1]], -16
-; VF2IC2-NEXT:    [[TMP5:%.*]] = sub i64 [[TMP4]], [[A2]]
+; VF2IC2-NEXT:    [[TMP4:%.*]] = sub i64 0, [[A2]]
+; VF2IC2-NEXT:    [[TMP16:%.*]] = add i64 -16, [[TMP4]]
+; VF2IC2-NEXT:    [[TMP5:%.*]] = add i64 [[TMP16]], [[END1]]
 ; VF2IC2-NEXT:    [[TMP6:%.*]] = lshr i64 [[TMP5]], 4
 ; VF2IC2-NEXT:    [[TMP7:%.*]] = shl nuw i64 [[TMP6]], 4
-; VF2IC2-NEXT:    [[TMP8:%.*]] = add i64 [[TMP7]], 16
+; VF2IC2-NEXT:    [[TMP8:%.*]] = add i64 16, [[TMP7]]
 ; VF2IC2-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP8]]
 ; VF2IC2-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP8]]
 ; VF2IC2-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[B]], [[SCEVGEP3]]
@@ -237,23 +229,19 @@ define void @derived_pointer_ivs(ptr noalias %a, ptr noalias %b, ptr %end) {
 ; VF4-LABEL: define void @derived_pointer_ivs(
 ; VF4-SAME: ptr noalias [[A:%.*]], ptr noalias [[B:%.*]], ptr [[END:%.*]]) {
 ; VF4-NEXT:  [[ENTRY:.*:]]
-; VF4-NEXT:    [[A5:%.*]] = ptrtoint ptr [[A]] to i64
-; VF4-NEXT:    [[END4:%.*]] = ptrtoint ptr [[END]] to i64
 ; VF4-NEXT:    [[A2:%.*]] = ptrtoint ptr [[A]] to i64
 ; VF4-NEXT:    [[END1:%.*]] = ptrtoint ptr [[END]] to i64
-; VF4-NEXT:    [[TMP0:%.*]] = sub i64 0, [[A5]]
-; VF4-NEXT:    [[TMP15:%.*]] = add i64 [[END4]], [[TMP0]]
-; VF4-NEXT:    [[TMP1:%.*]] = add i64 [[TMP15]], -16
 ; VF4-NEXT:    [[TMP2:%.*]] = lshr i64 [[TMP1]], 4
 ; VF4-NEXT:    [[TMP3:%.*]] = add nuw nsw i64 [[TMP2]], 1
 ; VF4-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP3]], 4
 ; VF4-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; VF4:       [[VECTOR_MEMCHECK]]:
-; VF4-NEXT:    [[TMP4:%.*]] = add i64 [[END1]], -16
-; VF4-NEXT:    [[TMP5:%.*]] = sub i64 [[TMP4]], [[A2]]
+; VF4-NEXT:    [[TMP4:%.*]] = sub i64 0, [[A2]]
+; VF4-NEXT:    [[TMP15:%.*]] = add i64 -16, [[TMP4]]
+; VF4-NEXT:    [[TMP5:%.*]] = add i64 [[TMP15]], [[END1]]
 ; VF4-NEXT:    [[TMP6:%.*]] = lshr i64 [[TMP5]], 4
 ; VF4-NEXT:    [[TMP7:%.*]] = shl nuw i64 [[TMP6]], 4
-; VF4-NEXT:    [[TMP8:%.*]] = add i64 [[TMP7]], 16
+; VF4-NEXT:    [[TMP8:%.*]] = add i64 16, [[TMP7]]
 ; VF4-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP8]]
 ; VF4-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP8]]
 ; VF4-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[B]], [[SCEVGEP3]]

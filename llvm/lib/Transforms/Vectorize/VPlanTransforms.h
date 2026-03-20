@@ -29,6 +29,7 @@ class Loop;
 class LoopVersioning;
 class OptimizationRemarkEmitter;
 class PHINode;
+class RuntimePointerChecking;
 class ScalarEvolution;
 class PredicatedScalarEvolution;
 class TargetLibraryInfo;
@@ -194,6 +195,15 @@ struct VPlanTransforms {
   /// condition.
   static void attachCheckBlock(VPlan &Plan, Value *Cond, BasicBlock *CheckBlock,
                                bool AddBranchWeights);
+
+  /// Generate VPlan recipes for memory runtime overlap checks for \p
+  /// RtPtrChecking and add the corresponding check block to \p Plan. SCEV
+  /// expressions are represented as VPExpandSCEVRecipe instances in the entry
+  /// block, which will be expanded by expandSCEVs().
+  static void addMemoryRuntimeChecks(VPlan &Plan, Loop *OrigLoop,
+                                     const RuntimePointerChecking &RtPtrChecking,
+                                     ScalarEvolution &SE,
+                                     bool AddBranchWeights);
 
   /// Replaces the VPInstructions in \p Plan with corresponding
   /// widen recipes. Returns false if any VPInstructions could not be converted

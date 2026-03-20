@@ -45,6 +45,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Local.h"
+#include "llvm/Transforms/Utils/RuntimeCheckExpansion.h"
 #include "llvm/Transforms/Utils/ScalarEvolutionExpander.h"
 
 using namespace llvm;
@@ -2005,27 +2006,11 @@ Loop *llvm::cloneLoop(Loop *L, Loop *PL, ValueToValueMapTy &VM,
   return &New;
 }
 
-/// IR Values for the lower and upper bounds of a pointer evolution.  We
-/// need to use value-handles because SCEV expansion can invalidate previously
-/// expanded values.  Thus expansion of a pointer can invalidate the bounds for
-/// a previous one.
-struct PointerBounds {
-  TrackingVH<Value> Start;
-  TrackingVH<Value> End;
-  Value *StrideToCheck;
-};
-
-/// Expand code for the lower and upper bound of the pointer group \p CG
-/// in \p TheLoop.  \return the values for the bounds.
-static PointerBounds expandBounds(const RuntimeCheckingPtrGroup *CG,
-                                  Loop *TheLoop, Instruction *Loc,
-                                  SCEVExpander &Exp, bool HoistRuntimeChecks) {
-  LLVMContext &Ctx = Loc->getContext();
-  Type *PtrArithTy = PointerType::get(Ctx, CG->AddressSpace);
-
-  Value *Start = nullptr, *End = nullptr;
-  LLVM_DEBUG(dbgs() << "LAA: Adding RT check for range:\n");
-  const SCEV *Low = CG->Low, *High = CG->High, *Stride = nullptr;
+AdjustedBounds llvm::adjustBoundsForHoisting(const RuntimeCheckingPtrGroup *CG,
+                                             Loop *TheLoop,
+                                             ScalarEvolution &SE,
+                                             bool HoistRuntimeChecks) {
+  const SCEV *Low = CG->Low, *High = CG->High, *StrideSCEV = nullptr;
 
   // If the Low and High values are themselves loop-variant, then we may want
   // to expand the range to include those covered by the outer loop as well.
@@ -2042,7 +2027,6 @@ static PointerBounds expandBounds(const RuntimeCheckingPtrGroup *CG,
     auto *HighAR = cast<SCEVAddRecExpr>(High);
     auto *LowAR = cast<SCEVAddRecExpr>(Low);
     const Loop *OuterLoop = TheLoop->getParentLoop();
-    ScalarEvolution &SE = *Exp.getSE();
     const SCEV *Recur = LowAR->getStepRecurrence(SE);
     if (Recur == HighAR->getStepRecurrence(SE) &&
         HighAR->getLoop() == OuterLoop && LowAR->getLoop() == OuterLoop) {
@@ -2061,49 +2045,48 @@ static PointerBounds expandBounds(const RuntimeCheckingPtrGroup *CG,
           // to generate extra checks to ensure the stride is positive.
           if (!SE.isKnownNonNegative(
                   SE.applyLoopGuards(Recur, HighAR->getLoop()))) {
-            Stride = Recur;
+            StrideSCEV = Recur;
             LLVM_DEBUG(dbgs() << "LAA: ... but need to check stride is "
                                  "positive: "
-                              << *Stride << '\n');
+                              << *StrideSCEV << '\n');
           }
         }
       }
     }
   }
 
-  Start = Exp.expandCodeFor(Low, PtrArithTy, Loc);
-  End = Exp.expandCodeFor(High, PtrArithTy, Loc);
-  if (CG->NeedsFreeze) {
-    IRBuilder<> Builder(Loc);
-    Start = Builder.CreateFreeze(Start, Start->getName() + ".fr");
-    End = Builder.CreateFreeze(End, End->getName() + ".fr");
+  return {Low, High, StrideSCEV};
+}
+
+namespace {
+/// Adapter letting generateRuntimeChecks emit real IR via IRBuilder.
+/// The DebugLoc parameters are accepted to match the template interface but
+/// ignored because IRBuilder carries its own debug location.
+struct IRCheckBuilder {
+  using VT = Value *;
+  SCEVExpander &Exp;
+  IRBuilder<InstSimplifyFolder> &B;
+  Instruction *Loc;
+
+  VT expandSCEV(const SCEV *S, Type *Ty) {
+    return Exp.expandCodeFor(S, Ty, Loc);
   }
-  Value *StrideVal =
-      Stride ? Exp.expandCodeFor(Stride, Stride->getType(), Loc) : nullptr;
-  LLVM_DEBUG(dbgs() << "Start: " << *Low << " End: " << *High << "\n");
-  return {Start, End, StrideVal};
-}
-
-/// Turns a collection of checks into a collection of expanded upper and
-/// lower bounds for both pointers in the check.
-static SmallVector<std::pair<PointerBounds, PointerBounds>, 4>
-expandBounds(const SmallVectorImpl<RuntimePointerCheck> &PointerChecks, Loop *L,
-             Instruction *Loc, SCEVExpander &Exp, bool HoistRuntimeChecks) {
-  SmallVector<std::pair<PointerBounds, PointerBounds>, 4> ChecksWithBounds;
-
-  // Here we're relying on the SCEV Expander's cache to only emit code for the
-  // same bounds once.
-  transform(PointerChecks, std::back_inserter(ChecksWithBounds),
-            [&](const RuntimePointerCheck &Check) {
-              PointerBounds First = expandBounds(Check.first, L, Loc, Exp,
-                                                 HoistRuntimeChecks),
-                            Second = expandBounds(Check.second, L, Loc, Exp,
-                                                  HoistRuntimeChecks);
-              return std::make_pair(First, Second);
-            });
-
-  return ChecksWithBounds;
-}
+  VT createFreeze(VT V, DebugLoc) {
+    return B.CreateFreeze(V, V->getName() + ".fr");
+  }
+  VT createICmp(CmpInst::Predicate P, VT A, VT RHS, DebugLoc,
+                const Twine &N) {
+    return B.CreateICmp(P, A, RHS, N);
+  }
+  VT createAnd(VT A, VT RHS, DebugLoc, const Twine &N) {
+    return B.CreateAnd(A, RHS, N);
+  }
+  VT createOr(VT A, VT RHS, DebugLoc, const Twine &N) {
+    return B.CreateOr(A, RHS, N);
+  }
+  VT getZero(VT V) { return ConstantInt::get(V->getType(), 0); }
+};
+} // namespace
 
 Value *llvm::addRuntimeChecks(
     Instruction *Loc, Loop *TheLoop,
@@ -2111,54 +2094,13 @@ Value *llvm::addRuntimeChecks(
     SCEVExpander &Exp, bool HoistRuntimeChecks) {
   // TODO: Move noalias annotation code from LoopVersioning here and share with LV if possible.
   // TODO: Pass  RtPtrChecking instead of PointerChecks and SE separately, if possible
-  auto ExpandedChecks =
-      expandBounds(PointerChecks, TheLoop, Loc, Exp, HoistRuntimeChecks);
-
-  LLVMContext &Ctx = Loc->getContext();
-  IRBuilder ChkBuilder(Ctx, InstSimplifyFolder(Loc->getDataLayout()));
+  IRBuilder ChkBuilder(Loc->getContext(),
+                       InstSimplifyFolder(Loc->getDataLayout()));
   ChkBuilder.SetInsertPoint(Loc);
-  // Our instructions might fold to a constant.
-  Value *MemoryRuntimeCheck = nullptr;
-
-  for (const auto &[A, B] : ExpandedChecks) {
-    // Check if two pointers (A and B) conflict where conflict is computed as:
-    // start(A) <= end(B) && start(B) <= end(A)
-
-    assert((A.Start->getType()->getPointerAddressSpace() ==
-            B.End->getType()->getPointerAddressSpace()) &&
-           (B.Start->getType()->getPointerAddressSpace() ==
-            A.End->getType()->getPointerAddressSpace()) &&
-           "Trying to bounds check pointers with different address spaces");
-
-    // [A|B].Start points to the first accessed byte under base [A|B].
-    // [A|B].End points to the last accessed byte, plus one.
-    // There is no conflict when the intervals are disjoint:
-    // NoConflict = (B.Start >= A.End) || (A.Start >= B.End)
-    //
-    // bound0 = (B.Start < A.End)
-    // bound1 = (A.Start < B.End)
-    //  IsConflict = bound0 & bound1
-    Value *Cmp0 = ChkBuilder.CreateICmpULT(A.Start, B.End, "bound0");
-    Value *Cmp1 = ChkBuilder.CreateICmpULT(B.Start, A.End, "bound1");
-    Value *IsConflict = ChkBuilder.CreateAnd(Cmp0, Cmp1, "found.conflict");
-    if (A.StrideToCheck) {
-      Value *IsNegativeStride = ChkBuilder.CreateICmpSLT(
-          A.StrideToCheck, ConstantInt::get(A.StrideToCheck->getType(), 0),
-          "stride.check");
-      IsConflict = ChkBuilder.CreateOr(IsConflict, IsNegativeStride);
-    }
-    if (B.StrideToCheck) {
-      Value *IsNegativeStride = ChkBuilder.CreateICmpSLT(
-          B.StrideToCheck, ConstantInt::get(B.StrideToCheck->getType(), 0),
-          "stride.check");
-      IsConflict = ChkBuilder.CreateOr(IsConflict, IsNegativeStride);
-    }
-    if (MemoryRuntimeCheck) {
-      IsConflict =
-          ChkBuilder.CreateOr(MemoryRuntimeCheck, IsConflict, "conflict.rdx");
-    }
-    MemoryRuntimeCheck = IsConflict;
-  }
+  IRCheckBuilder Builder{Exp, ChkBuilder, Loc};
+  Value *MemoryRuntimeCheck = generateRuntimeChecks(
+      Builder, DebugLoc(), PointerChecks, TheLoop, *Exp.getSE(),
+      HoistRuntimeChecks);
 
   Exp.eraseDeadInstructions(MemoryRuntimeCheck);
   return MemoryRuntimeCheck;

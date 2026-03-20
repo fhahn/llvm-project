@@ -190,6 +190,12 @@ public:
         new VPInstruction(Opcode, Operands, WrapFlags, {}, DL, Name));
   }
 
+  VPInstruction *createFreeze(VPValue *V,
+                              DebugLoc DL = DebugLoc::getUnknown(),
+                              const Twine &Name = "") {
+    return createInstruction(Instruction::Freeze, {V}, {}, DL, Name);
+  }
+
   VPInstruction *createNot(VPValue *Operand,
                            DebugLoc DL = DebugLoc::getUnknown(),
                            const Twine &Name = "") {
@@ -626,9 +632,12 @@ public:
   void addMinimumIterationCheck(VPlan &Plan, ElementCount VF, unsigned UF,
                                 ElementCount MinProfitableTripCount) const;
 
-  /// Attach the runtime checks of \p RTChecks to \p Plan.
+  /// Attach the runtime checks of \p RTChecks to \p Plan. If \p LAI is
+  /// provided and the checks are non-diff-checks, the memory checks are
+  /// modelled as VPlan recipes instead of wrapping the pre-built IR block.
   void attachRuntimeChecks(VPlan &Plan, GeneratedRTChecks &RTChecks,
-                           bool HasBranchWeights) const;
+                           bool HasBranchWeights,
+                           const LoopAccessInfo *LAI = nullptr) const;
 
   /// Update loop metadata and profile info for both the scalar remainder loop
   /// and \p VectorLoop, if it exists. Keeps all loop hints from the original

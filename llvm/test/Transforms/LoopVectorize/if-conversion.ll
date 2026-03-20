@@ -34,12 +34,9 @@ define void @function0(ptr nocapture %a, ptr nocapture %b, i32 %start, i32 %end)
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[TMP5:%.*]] = shl nsw i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP5]]
-; CHECK-NEXT:    [[TMP6:%.*]] = xor i32 [[START]], -1
-; CHECK-NEXT:    [[TMP7:%.*]] = add i32 [[END]], [[TMP6]]
-; CHECK-NEXT:    [[TMP8:%.*]] = zext i32 [[TMP7]] to i64
-; CHECK-NEXT:    [[TMP9:%.*]] = add nsw i64 [[TMP0]], [[TMP8]]
-; CHECK-NEXT:    [[TMP10:%.*]] = shl nsw i64 [[TMP9]], 2
-; CHECK-NEXT:    [[TMP11:%.*]] = add nsw i64 [[TMP10]], 4
+; CHECK-NEXT:    [[TMP7:%.*]] = shl nuw nsw i64 [[TMP3]], 2
+; CHECK-NEXT:    [[TMP8:%.*]] = add nuw nsw i64 [[TMP7]], 4
+; CHECK-NEXT:    [[TMP11:%.*]] = add nsw i64 [[TMP8]], [[TMP5]]
 ; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP11]]
 ; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP5]]
 ; CHECK-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP11]]

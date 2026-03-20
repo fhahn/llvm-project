@@ -35,32 +35,32 @@ define void @diff_checks(ptr nocapture noundef writeonly %dst, ptr nocapture nou
 ; CHECK-SAME: (ptr noundef writeonly captures(none) [[DST:%.*]], ptr noundef readonly captures(none) [[SRC:%.*]], i32 noundef [[M:%.*]], i32 noundef [[N:%.*]]) #[[ATTR0:[0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[ADD5:%.*]] = add nsw i32 [[N]], 1
-; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[M]], -1
-; CHECK-NEXT:    [[TMP1:%.*]] = shl i32 [[N]], 2
-; CHECK-NEXT:    [[TMP2:%.*]] = add i32 [[TMP1]], 4
-; CHECK-NEXT:    [[TMP3:%.*]] = mul i32 [[TMP0]], [[TMP2]]
-; CHECK-NEXT:    [[TMP4:%.*]] = add i32 [[TMP3]], [[TMP1]]
-; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DST]], i32 [[TMP4]]
-; CHECK-NEXT:    [[TMP5:%.*]] = mul i32 [[N]], [[M]]
-; CHECK-NEXT:    [[TMP6:%.*]] = shl i32 [[TMP5]], 2
-; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[SRC]], i32 [[TMP6]]
 ; CHECK-NEXT:    br label [[OUTER_LOOP:%.*]]
 ; CHECK:       outer.loop:
 ; CHECK-NEXT:    [[I_023_US:%.*]] = phi i32 [ [[INC10_US:%.*]], [[INNER_LOOP_EXIT:%.*]] ], [ 0, [[ENTRY:%.*]] ]
 ; CHECK-NEXT:    [[MUL_US:%.*]] = mul nsw i32 [[I_023_US]], [[N]]
-; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr i32, ptr [[SRC]], i32 [[MUL_US]]
+; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr i32, ptr [[SRC]], i32 [[MUL_US]]
 ; CHECK-NEXT:    [[MUL6_US:%.*]] = mul nsw i32 [[I_023_US]], [[ADD5]]
-; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr i32, ptr [[DST]], i32 [[MUL6_US]]
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i32, ptr [[DST]], i32 [[MUL6_US]]
 ; CHECK-NEXT:    br label [[VECTOR_MEMCHECK:%.*]]
 ; CHECK:       vector.memcheck:
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DST]], [[SCEVGEP1]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SRC]], [[SCEVGEP]]
+; CHECK-NEXT:    [[TMP2:%.*]] = shl i32 [[N]], 2
+; CHECK-NEXT:    [[TMP3:%.*]] = add i32 4, [[TMP2]]
+; CHECK-NEXT:    [[TMP4:%.*]] = add i32 -1, [[M]]
+; CHECK-NEXT:    [[TMP5:%.*]] = mul i32 [[TMP3]], [[TMP4]]
+; CHECK-NEXT:    [[TMP6:%.*]] = add i32 [[TMP2]], [[TMP5]]
+; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr [[DST]], i32 [[TMP6]]
+; CHECK-NEXT:    [[TMP8:%.*]] = shl i32 [[M]], 2
+; CHECK-NEXT:    [[TMP9:%.*]] = mul i32 [[TMP8]], [[N]]
+; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr i8, ptr [[SRC]], i32 [[TMP9]]
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DST]], [[TMP10]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SRC]], [[TMP7]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
-; CHECK-NEXT:    [[STRIDE_CHECK:%.*]] = icmp slt i32 [[TMP2]], 0
-; CHECK-NEXT:    [[TMP9:%.*]] = or i1 [[FOUND_CONFLICT]], [[STRIDE_CHECK]]
-; CHECK-NEXT:    [[STRIDE_CHECK2:%.*]] = icmp slt i32 [[TMP1]], 0
-; CHECK-NEXT:    [[TMP10:%.*]] = or i1 [[TMP9]], [[STRIDE_CHECK2]]
-; CHECK-NEXT:    br i1 [[TMP10]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
+; CHECK-NEXT:    [[STRIDE_CHECK:%.*]] = icmp slt i32 [[TMP3]], 0
+; CHECK-NEXT:    [[TMP11:%.*]] = or i1 [[FOUND_CONFLICT]], [[STRIDE_CHECK]]
+; CHECK-NEXT:    [[STRIDE_CHECK3:%.*]] = icmp slt i32 [[TMP2]], 0
+; CHECK-NEXT:    [[TMP12:%.*]] = or i1 [[TMP11]], [[STRIDE_CHECK3]]
+; CHECK-NEXT:    br i1 [[TMP12]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
 ; CHECK-NEXT:    [[N_RND_UP:%.*]] = add i32 [[N]], 3
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i32 [[N_RND_UP]], 4
@@ -69,23 +69,23 @@ define void @diff_checks(ptr nocapture noundef writeonly %dst, ptr nocapture nou
 ; CHECK:       vector.body:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[ACTIVE_LANE_MASK:%.*]] = call <4 x i1> @llvm.get.active.lane.mask.v4i1.i32(i32 [[INDEX]], i32 [[N]])
-; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr i32, ptr [[TMP7]], i32 [[INDEX]]
-; CHECK-NEXT:    [[WIDE_MASKED_LOAD:%.*]] = call <4 x i32> @llvm.masked.load.v4i32.p0(ptr align 4 [[TMP11]], <4 x i1> [[ACTIVE_LANE_MASK]], <4 x i32> poison), !alias.scope [[META0:![0-9]+]]
-; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr i32, ptr [[TMP8]], i32 [[INDEX]]
-; CHECK-NEXT:    call void @llvm.masked.store.v4i32.p0(<4 x i32> [[WIDE_MASKED_LOAD]], ptr align 4 [[TMP12]], <4 x i1> [[ACTIVE_LANE_MASK]]), !alias.scope [[META3:![0-9]+]], !noalias [[META0]]
+; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr i32, ptr [[TMP0]], i32 [[INDEX]]
+; CHECK-NEXT:    [[WIDE_MASKED_LOAD:%.*]] = call <4 x i32> @llvm.masked.load.v4i32.p0(ptr align 4 [[TMP13]], <4 x i1> [[ACTIVE_LANE_MASK]], <4 x i32> poison), !alias.scope [[META0:![0-9]+]]
+; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr i32, ptr [[TMP1]], i32 [[INDEX]]
+; CHECK-NEXT:    call void @llvm.masked.store.v4i32.p0(<4 x i32> [[WIDE_MASKED_LOAD]], ptr align 4 [[TMP14]], <4 x i1> [[ACTIVE_LANE_MASK]]), !alias.scope [[META3:![0-9]+]], !noalias [[META0]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add i32 [[INDEX]], 4
-; CHECK-NEXT:    [[TMP13:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP13]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
+; CHECK-NEXT:    [[TMP15:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP15]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
 ; CHECK:       middle.block:
 ; CHECK-NEXT:    br label [[INNER_LOOP_EXIT]]
 ; CHECK:       scalar.ph:
 ; CHECK-NEXT:    br label [[INNER_LOOP:%.*]]
 ; CHECK:       inner.loop:
 ; CHECK-NEXT:    [[J_021_US:%.*]] = phi i32 [ 0, [[SCALAR_PH]] ], [ [[INC_US:%.*]], [[INNER_LOOP]] ]
-; CHECK-NEXT:    [[ARRAYIDX_US:%.*]] = getelementptr i32, ptr [[TMP7]], i32 [[J_021_US]]
-; CHECK-NEXT:    [[TMP14:%.*]] = load i32, ptr [[ARRAYIDX_US]], align 4
-; CHECK-NEXT:    [[ARRAYIDX8_US:%.*]] = getelementptr i32, ptr [[TMP8]], i32 [[J_021_US]]
-; CHECK-NEXT:    store i32 [[TMP14]], ptr [[ARRAYIDX8_US]], align 4
+; CHECK-NEXT:    [[ARRAYIDX_US:%.*]] = getelementptr i32, ptr [[TMP0]], i32 [[J_021_US]]
+; CHECK-NEXT:    [[TMP16:%.*]] = load i32, ptr [[ARRAYIDX_US]], align 4
+; CHECK-NEXT:    [[ARRAYIDX8_US:%.*]] = getelementptr i32, ptr [[TMP1]], i32 [[J_021_US]]
+; CHECK-NEXT:    store i32 [[TMP16]], ptr [[ARRAYIDX8_US]], align 4
 ; CHECK-NEXT:    [[INC_US]] = add nuw nsw i32 [[J_021_US]], 1
 ; CHECK-NEXT:    [[EXITCOND_NOT:%.*]] = icmp eq i32 [[INC_US]], [[N]]
 ; CHECK-NEXT:    br i1 [[EXITCOND_NOT]], label [[INNER_LOOP_EXIT]], label [[INNER_LOOP]], !llvm.loop [[LOOP8:![0-9]+]]

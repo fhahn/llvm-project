@@ -897,7 +897,7 @@ attributes #1 = { "target-cpu"="skylake-avx512" "target-features"="-avx512f" }
 ; CHECK: [[META9]] = !{[[META10:![0-9]+]]}
 ; CHECK: [[META10]] = distinct !{[[META10]], [[META8]]}
 ; CHECK: [[LOOP11]] = distinct !{[[LOOP11]], [[META1]], [[META2]]}
-; CHECK: [[LOOP12]] = distinct !{[[LOOP12]], [[META1]]}
+; CHECK: [[LOOP12]] = distinct !{[[LOOP12]], [[META2]], [[META1]]}
 ; CHECK: [[LOOP13]] = distinct !{[[LOOP13]], [[META1]], [[META2]]}
 ; CHECK: [[LOOP14]] = distinct !{[[LOOP14]], [[META2]], [[META1]]}
 ; CHECK: [[META15]] = !{[[META16:![0-9]+]]}
@@ -906,7 +906,7 @@ attributes #1 = { "target-cpu"="skylake-avx512" "target-features"="-avx512f" }
 ; CHECK: [[META18]] = !{[[META19:![0-9]+]]}
 ; CHECK: [[META19]] = distinct !{[[META19]], [[META17]]}
 ; CHECK: [[LOOP20]] = distinct !{[[LOOP20]], [[META1]], [[META2]]}
-; CHECK: [[LOOP21]] = distinct !{[[LOOP21]], [[META1]]}
+; CHECK: [[LOOP21]] = distinct !{[[LOOP21]], [[META2]], [[META1]]}
 ; CHECK: [[LOOP22]] = distinct !{[[LOOP22]], [[META1]], [[META2]]}
 ; CHECK: [[LOOP23]] = distinct !{[[LOOP23]], [[META2]], [[META1]]}
 ; CHECK: [[LOOP24]] = distinct !{[[LOOP24]], [[META1]], [[META2]]}

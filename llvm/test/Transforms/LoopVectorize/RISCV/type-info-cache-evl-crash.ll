@@ -13,7 +13,7 @@ define void @type_info_cache_clobber(ptr %dstv, ptr %src, i64 %wide.trip.count) 
 ; CHECK-NEXT:    br label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DSTV]], i64 1
-; CHECK-NEXT:    [[TMP5:%.*]] = add i64 [[WIDE_TRIP_COUNT]], 1
+; CHECK-NEXT:    [[TMP5:%.*]] = add i64 1, [[WIDE_TRIP_COUNT]]
 ; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[SRC]], i64 [[TMP5]]
 ; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DSTV]], [[SCEVGEP1]]
 ; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SRC]], [[SCEVGEP]]
@@ -98,5 +98,5 @@ exit:
 ; CHECK: [[LOOP5]] = distinct !{[[LOOP5]], [[META6:![0-9]+]], [[META7:![0-9]+]]}
 ; CHECK: [[META6]] = !{!"llvm.loop.isvectorized", i32 1}
 ; CHECK: [[META7]] = !{!"llvm.loop.unroll.runtime.disable"}
-; CHECK: [[LOOP8]] = distinct !{[[LOOP8]], [[META6]]}
+; CHECK: [[LOOP8]] = distinct !{[[LOOP8]], [[META7]], [[META6]]}
 ;.

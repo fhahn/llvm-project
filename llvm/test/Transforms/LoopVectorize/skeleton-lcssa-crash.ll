@@ -30,7 +30,7 @@ define i16 @test(ptr %arg, i64 %N) {
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[L_2]], i64 2
 ; CHECK-NEXT:    [[SCEVGEP5:%.*]] = getelementptr i8, ptr [[L_1]], i64 2
 ; CHECK-NEXT:    [[TMP1:%.*]] = shl i64 [[N]], 1
-; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[TMP1]], 4
+; CHECK-NEXT:    [[TMP2:%.*]] = add i64 4, [[TMP1]]
 ; CHECK-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[L_1]], i64 [[TMP2]]
 ; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[L_2]], [[SCEVGEP3]]
 ; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SCEVGEP5]], [[SCEVGEP]]

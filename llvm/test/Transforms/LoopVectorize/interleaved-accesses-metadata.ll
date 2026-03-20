@@ -76,23 +76,19 @@ define void @ir_tbaa_different(ptr %base, ptr %end, ptr %src) {
 ; CHECK-LABEL: define void @ir_tbaa_different(
 ; CHECK-SAME: ptr [[BASE:%.*]], ptr [[END:%.*]], ptr [[SRC:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    [[BASE2:%.*]] = ptrtoint ptr [[BASE]] to i64
-; CHECK-NEXT:    [[END1:%.*]] = ptrtoint ptr [[END]] to i64
 ; CHECK-NEXT:    [[BASE3:%.*]] = ptrtoint ptr [[BASE]] to i64
 ; CHECK-NEXT:    [[END2:%.*]] = ptrtoint ptr [[END]] to i64
-; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 0, [[BASE2]]
-; CHECK-NEXT:    [[TMP16:%.*]] = add i64 [[END1]], [[TMP0]]
-; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[TMP16]], -8
 ; CHECK-NEXT:    [[TMP2:%.*]] = lshr i64 [[TMP1]], 3
 ; CHECK-NEXT:    [[TMP3:%.*]] = add nuw nsw i64 [[TMP2]], 1
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP3]], 2
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP10:%.*]] = add i64 [[END2]], -8
-; CHECK-NEXT:    [[TMP12:%.*]] = sub i64 [[TMP10]], [[BASE3]]
+; CHECK-NEXT:    [[TMP10:%.*]] = sub i64 0, [[BASE3]]
+; CHECK-NEXT:    [[TMP16:%.*]] = add i64 -8, [[TMP10]]
+; CHECK-NEXT:    [[TMP12:%.*]] = add i64 [[TMP16]], [[END2]]
 ; CHECK-NEXT:    [[TMP13:%.*]] = lshr i64 [[TMP12]], 3
 ; CHECK-NEXT:    [[TMP14:%.*]] = shl nuw i64 [[TMP13]], 3
-; CHECK-NEXT:    [[TMP15:%.*]] = add i64 [[TMP14]], 8
+; CHECK-NEXT:    [[TMP15:%.*]] = add i64 8, [[TMP14]]
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[BASE]], i64 [[TMP15]]
 ; CHECK-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[SRC]], i64 4
 ; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[BASE]], [[SCEVGEP3]]
@@ -271,7 +267,7 @@ exit:
 ; CHECK: [[TBAA16]] = !{[[META17:![0-9]+]], [[META2]], i64 0}
 ; CHECK: [[META17]] = !{!"Vec2r", [[META2]], i64 0, [[META2]], i64 8}
 ; CHECK: [[TBAA18]] = !{[[META17]], [[META2]], i64 8}
-; CHECK: [[LOOP19]] = distinct !{[[LOOP19]], [[META8]]}
+; CHECK: [[LOOP19]] = distinct !{[[LOOP19]], [[META9]], [[META8]]}
 ; CHECK: [[LOOP20]] = distinct !{[[LOOP20]], [[META8]], [[META9]]}
 ; CHECK: [[LOOP21]] = distinct !{[[LOOP21]], [[META9]], [[META8]]}
 ;.

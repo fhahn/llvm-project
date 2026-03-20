@@ -95,10 +95,10 @@ define void @geps_feeding_interleave_groups_with_reuse(ptr %arg, i64 %arg1, ptr 
 ; CHECK-NEXT:    br i1 [[TMP4]], label %[[SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[TMP20:%.*]] = shl i64 [[ARG1]], 4
-; CHECK-NEXT:    [[TMP21:%.*]] = add i64 [[TMP20]], 16
+; CHECK-NEXT:    [[TMP21:%.*]] = add i64 16, [[TMP20]]
 ; CHECK-NEXT:    [[SCEVGEP12:%.*]] = getelementptr i8, ptr [[ARG2]], i64 [[TMP21]]
 ; CHECK-NEXT:    [[TMP22:%.*]] = shl i64 [[ARG1]], 5
-; CHECK-NEXT:    [[TMP23:%.*]] = add i64 [[TMP22]], 32
+; CHECK-NEXT:    [[TMP23:%.*]] = add i64 32, [[TMP22]]
 ; CHECK-NEXT:    [[SCEVGEP13:%.*]] = getelementptr i8, ptr [[ARG]], i64 [[TMP23]]
 ; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[ARG2]], [[SCEVGEP13]]
 ; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[ARG]], [[SCEVGEP12]]
@@ -369,19 +369,18 @@ define void @geps_feeding_interleave_groups_with_reuse2(ptr %A, ptr %B, i64 %N) 
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[TMP42:%.*]] = lshr i64 [[N]], 3
 ; CHECK-NEXT:    [[TMP43:%.*]] = shl i64 [[TMP42]], 5
-; CHECK-NEXT:    [[TMP45:%.*]] = add nuw nsw i64 [[TMP43]], 4
+; CHECK-NEXT:    [[TMP45:%.*]] = add i64 4, [[TMP43]]
 ; CHECK-NEXT:    [[SCEVGEP29:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP45]]
-; CHECK-NEXT:    [[TMP53:%.*]] = add i64 [[TMP43]], 32
+; CHECK-NEXT:    [[TMP53:%.*]] = add i64 32, [[TMP43]]
 ; CHECK-NEXT:    [[SCEVGEP28:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP53]]
 ; CHECK-NEXT:    [[TMP46:%.*]] = shl i64 [[TMP42]], 4
-; CHECK-NEXT:    [[TMP47:%.*]] = add nuw nsw i64 [[TMP46]], 8
+; CHECK-NEXT:    [[TMP47:%.*]] = add i64 8, [[TMP46]]
 ; CHECK-NEXT:    [[SCEVGEP30:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP47]]
 ; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[B]], [[SCEVGEP28]]
 ; CHECK-NEXT:    [[BOUND2:%.*]] = icmp ult ptr [[A]], [[SCEVGEP29]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND1]], [[BOUND2]]
-; CHECK-NEXT:    [[BOUND132:%.*]] = icmp ult ptr [[B]], [[SCEVGEP28]]
 ; CHECK-NEXT:    [[BOUND133:%.*]] = icmp ult ptr [[A]], [[SCEVGEP30]]
-; CHECK-NEXT:    [[FOUND_CONFLICT33:%.*]] = and i1 [[BOUND132]], [[BOUND133]]
+; CHECK-NEXT:    [[FOUND_CONFLICT33:%.*]] = and i1 [[BOUND1]], [[BOUND133]]
 ; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT33]]
 ; CHECK-NEXT:    br i1 [[CONFLICT_RDX]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:

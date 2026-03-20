@@ -2024,32 +2024,18 @@ public:
   /// unused.
   ~GeneratedRTChecks() {
     SCEVExpanderCleaner SCEVCleaner(SCEVExp);
-    SCEVExpanderCleaner MemCheckCleaner(MemCheckExp);
     bool SCEVChecksUsed = !SCEVCheckBlock || !pred_empty(SCEVCheckBlock);
     bool MemChecksUsed = !MemCheckBlock || !pred_empty(MemCheckBlock);
     if (SCEVChecksUsed)
       SCEVCleaner.markResultUsed();
 
-    if (MemChecksUsed) {
-      MemCheckCleaner.markResultUsed();
-    } else {
-      auto &SE = *MemCheckExp.getSE();
-      // Memory runtime check generation creates compares that use expanded
-      // values. Remove them before running the SCEVExpanderCleaners.
-      for (auto &I : make_early_inc_range(reverse(*MemCheckBlock))) {
-        if (MemCheckExp.isInsertedInstruction(&I))
-          continue;
-        SE.forgetValue(&I);
-        I.eraseFromParent();
-      }
-    }
-    MemCheckCleaner.cleanup();
+    if (!MemChecksUsed)
+      cleanupMemChecks();
+
     SCEVCleaner.cleanup();
 
     if (!SCEVChecksUsed)
       SCEVCheckBlock->eraseFromParent();
-    if (!MemChecksUsed)
-      MemCheckBlock->eraseFromParent();
   }
 
   /// Retrieves the SCEVCheckCond and SCEVCheckBlock that were generated as IR
@@ -2074,6 +2060,37 @@ public:
   /// Return true if any runtime checks have been added
   bool hasChecks() const {
     return getSCEVChecks().first || getMemRuntimeChecks().first;
+  }
+
+  /// Drop the pre-built memory runtime check block, cleaning up all
+  /// instructions and SCEV expansions. After this call, the destructor will
+  /// skip cleanup for memory checks.
+  void dropMemRuntimeChecks() {
+    if (!MemCheckBlock)
+      return;
+    assert(pred_empty(MemCheckBlock) &&
+           "cannot drop memory checks that are already connected");
+    cleanupMemChecks();
+    MemCheckBlock = nullptr;
+    MemRuntimeCheckCond = nullptr;
+  }
+
+private:
+  /// Clean up the memory check block: remove non-SCEV-expanded instructions,
+  /// run the SCEVExpanderCleaner, and erase the block.
+  void cleanupMemChecks() {
+    auto &SE = *MemCheckExp.getSE();
+    // Memory runtime check generation creates compares that use expanded
+    // values. Remove them before running the SCEVExpanderCleaner.
+    for (auto &I : make_early_inc_range(reverse(*MemCheckBlock))) {
+      if (MemCheckExp.isInsertedInstruction(&I))
+        continue;
+      SE.forgetValue(&I);
+      I.eraseFromParent();
+    }
+    SCEVExpanderCleaner Cleaner(MemCheckExp);
+    Cleaner.cleanup();
+    MemCheckBlock->eraseFromParent();
   }
 };
 } // namespace
@@ -7414,6 +7431,8 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   VPlanTransforms::cse(BestVPlan);
   VPlanTransforms::simplifyRecipes(BestVPlan);
   VPlanTransforms::simplifyKnownEVL(BestVPlan, BestVF, PSE);
+  if (EpilogueVecKind == EpilogueVectorizationKind::None)
+    VPlanTransforms::expandSCEVExpressions(BestVPlan);
 
   // 0. Generate SCEV-dependent code in the entry, including TripCount, before
   // making any changes to the CFG.
@@ -8525,7 +8544,8 @@ void LoopVectorizationPlanner::addReductionResultComputation(
 }
 
 void LoopVectorizationPlanner::attachRuntimeChecks(
-    VPlan &Plan, GeneratedRTChecks &RTChecks, bool HasBranchWeights) const {
+    VPlan &Plan, GeneratedRTChecks &RTChecks, bool HasBranchWeights,
+    const LoopAccessInfo *LAI) const {
   const auto &[SCEVCheckCond, SCEVCheckBlock] = RTChecks.getSCEVChecks();
   if (SCEVCheckBlock && SCEVCheckBlock->hasNPredecessors(0)) {
     assert((!CM.OptForSize ||
@@ -8555,6 +8575,18 @@ void LoopVectorizationPlanner::attachRuntimeChecks(
                   "eliminating the need for runtime checks "
                   "(e.g., adding 'restrict').";
       });
+    }
+
+    // Use VPlan recipes for non-diff-check memory checks when LAI is
+    // available. Drop the pre-built IR block and use VPExpandSCEVRecipe
+    // instances for SCEV expansions, which will be expanded by expandSCEVs().
+    const auto *RtPtrChecking =
+        LAI ? LAI->getRuntimePointerChecking() : nullptr;
+    if (RtPtrChecking && !RtPtrChecking->getDiffChecks()) {
+      RTChecks.dropMemRuntimeChecks();
+      VPlanTransforms::addMemoryRuntimeChecks(
+          Plan, OrigLoop, *RtPtrChecking, *PSE.getSE(), HasBranchWeights);
+      return;
     }
     VPlanTransforms::attachCheckBlock(Plan, MemCheckCond, MemCheckBlock,
                                       HasBranchWeights);
@@ -9758,7 +9790,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
                    BestPlan, VF.Width, IC, PSE);
     LVP.addMinimumIterationCheck(BestPlan, VF.Width, IC,
                                  VF.MinProfitableTripCount);
-    LVP.attachRuntimeChecks(BestPlan, Checks, HasBranchWeights);
+    LVP.attachRuntimeChecks(BestPlan, Checks, HasBranchWeights, LVL.getLAI());
 
     LVP.executePlan(VF.Width, IC, BestPlan, LB, DT);
     ++LoopsVectorized;

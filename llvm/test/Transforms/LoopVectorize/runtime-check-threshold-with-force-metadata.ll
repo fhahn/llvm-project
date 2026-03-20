@@ -94,5 +94,5 @@ exit:
 ; LIMIT1: [[LOOP5]] = distinct !{[[LOOP5]], [[META6:![0-9]+]], [[META7:![0-9]+]]}
 ; LIMIT1: [[META6]] = !{!"llvm.loop.isvectorized", i32 1}
 ; LIMIT1: [[META7]] = !{!"llvm.loop.unroll.runtime.disable"}
-; LIMIT1: [[LOOP8]] = distinct !{[[LOOP8]], [[META6]]}
+; LIMIT1: [[LOOP8]] = distinct !{[[LOOP8]], [[META7]], [[META6]]}
 ;.

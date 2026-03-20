@@ -26,25 +26,25 @@ define void @skip_free_iv_truncate(i16 %x, ptr %A) #0 {
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[TMP31:%.*]] = shl nsw i64 [[X_I64]], 1
 ; CHECK-NEXT:    [[SCEVGEP9:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP31]]
-; CHECK-NEXT:    [[SMAX10:%.*]] = call i64 @llvm.smax.i64(i64 [[X_I64]], i64 99)
-; CHECK-NEXT:    [[TMP32:%.*]] = sub i64 [[SMAX10]], [[X_I64]]
-; CHECK-NEXT:    [[UMIN11:%.*]] = call i64 @llvm.umin.i64(i64 [[TMP32]], i64 1)
-; CHECK-NEXT:    [[TMP33:%.*]] = sub i64 [[SMAX10]], [[UMIN11]]
-; CHECK-NEXT:    [[TMP34:%.*]] = sub i64 [[TMP33]], [[X_I64]]
+; CHECK-NEXT:    [[TMP8:%.*]] = sub nsw i64 0, [[X_I64]]
+; CHECK-NEXT:    [[TMP9:%.*]] = sub nsw i64 0, [[UMIN21]]
+; CHECK-NEXT:    [[TMP10:%.*]] = add i64 [[TMP8]], [[TMP9]]
+; CHECK-NEXT:    [[TMP34:%.*]] = add i64 [[TMP10]], [[SMAX20]]
 ; CHECK-NEXT:    [[TMP35:%.*]] = udiv i64 [[TMP34]], 3
-; CHECK-NEXT:    [[TMP36:%.*]] = add i64 [[UMIN11]], [[TMP35]]
-; CHECK-NEXT:    [[TMP37:%.*]] = mul i64 [[TMP36]], 6
-; CHECK-NEXT:    [[TMP38:%.*]] = add i64 [[TMP37]], [[TMP31]]
-; CHECK-NEXT:    [[TMP39:%.*]] = add i64 [[TMP38]], 2
+; CHECK-NEXT:    [[TMP13:%.*]] = add i64 [[TMP35]], [[UMIN21]]
+; CHECK-NEXT:    [[TMP14:%.*]] = mul i64 6, [[TMP13]]
+; CHECK-NEXT:    [[TMP15:%.*]] = add i64 2, [[TMP31]]
+; CHECK-NEXT:    [[TMP39:%.*]] = add i64 [[TMP15]], [[TMP14]]
 ; CHECK-NEXT:    [[SCEVGEP12:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP39]]
 ; CHECK-NEXT:    [[TMP40:%.*]] = shl nsw i64 [[X_I64]], 3
 ; CHECK-NEXT:    [[SCEVGEP13:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP40]]
-; CHECK-NEXT:    [[TMP41:%.*]] = mul i64 [[TMP36]], 24
-; CHECK-NEXT:    [[TMP42:%.*]] = add i64 [[TMP41]], [[TMP40]]
-; CHECK-NEXT:    [[TMP43:%.*]] = add i64 [[TMP42]], 8
+; CHECK-NEXT:    [[TMP20:%.*]] = mul i64 24, [[TMP13]]
+; CHECK-NEXT:    [[TMP21:%.*]] = add i64 8, [[TMP40]]
+; CHECK-NEXT:    [[TMP43:%.*]] = add i64 [[TMP21]], [[TMP20]]
 ; CHECK-NEXT:    [[SCEVGEP14:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP43]]
-; CHECK-NEXT:    [[TMP44:%.*]] = add nsw i64 [[TMP40]], -8
+; CHECK-NEXT:    [[TMP44:%.*]] = add i64 -8, [[TMP40]]
 ; CHECK-NEXT:    [[SCEVGEP15:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP44]]
+; CHECK-NEXT:    [[TMP42:%.*]] = add i64 [[TMP40]], [[TMP20]]
 ; CHECK-NEXT:    [[SCEVGEP16:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP42]]
 ; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[SCEVGEP9]], [[SCEVGEP14]]
 ; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SCEVGEP13]], [[SCEVGEP12]]
@@ -258,7 +258,7 @@ attributes #1 = { "target-cpu"="sifive-p670" }
 ; CHECK: [[LOOP6]] = distinct !{[[LOOP6]], [[META7:![0-9]+]], [[META8:![0-9]+]]}
 ; CHECK: [[META7]] = !{!"llvm.loop.isvectorized", i32 1}
 ; CHECK: [[META8]] = !{!"llvm.loop.unroll.runtime.disable"}
-; CHECK: [[LOOP9]] = distinct !{[[LOOP9]], [[META7]]}
+; CHECK: [[LOOP9]] = distinct !{[[LOOP9]], [[META8]], [[META7]]}
 ; CHECK: [[LOOP10]] = distinct !{[[LOOP10]], [[META7]], [[META8]]}
 ; CHECK: [[LOOP11]] = distinct !{[[LOOP11]], [[META7]], [[META8]]}
 ;.

@@ -346,20 +346,20 @@ define void @recurrence_3(ptr nocapture readonly %a, ptr nocapture %b, i32 %n, f
 ; CHECK-VF4UF1:       [[FOR_PREHEADER]]:
 ; CHECK-VF4UF1-NEXT:    [[TMP1:%.*]] = add i32 [[N]], -1
 ; CHECK-VF4UF1-NEXT:    [[TMP2:%.*]] = zext i32 [[TMP1]] to i64
+; CHECK-VF4UF1-NEXT:    [[TMP5:%.*]] = add i32 [[N]], -2
+; CHECK-VF4UF1-NEXT:    [[TMP6:%.*]] = zext i32 [[TMP5]] to i64
 ; CHECK-VF4UF1-NEXT:    [[TMP3:%.*]] = call i64 @llvm.vscale.i64()
 ; CHECK-VF4UF1-NEXT:    [[TMP4:%.*]] = shl nuw i64 [[TMP3]], 2
 ; CHECK-VF4UF1-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP2]], [[TMP4]]
 ; CHECK-VF4UF1-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK-VF4UF1:       [[VECTOR_MEMCHECK]]:
 ; CHECK-VF4UF1-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[B]], i64 8
-; CHECK-VF4UF1-NEXT:    [[TMP5:%.*]] = add i32 [[N]], -2
-; CHECK-VF4UF1-NEXT:    [[TMP6:%.*]] = zext i32 [[TMP5]] to i64
 ; CHECK-VF4UF1-NEXT:    [[TMP7:%.*]] = shl nuw nsw i64 [[TMP6]], 3
-; CHECK-VF4UF1-NEXT:    [[TMP8:%.*]] = add nuw nsw i64 [[TMP7]], 16
+; CHECK-VF4UF1-NEXT:    [[TMP8:%.*]] = add i64 16, [[TMP7]]
 ; CHECK-VF4UF1-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP8]]
 ; CHECK-VF4UF1-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[A]], i64 2
 ; CHECK-VF4UF1-NEXT:    [[TMP9:%.*]] = shl nuw nsw i64 [[TMP6]], 1
-; CHECK-VF4UF1-NEXT:    [[TMP10:%.*]] = add nuw nsw i64 [[TMP9]], 4
+; CHECK-VF4UF1-NEXT:    [[TMP10:%.*]] = add i64 4, [[TMP9]]
 ; CHECK-VF4UF1-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP10]]
 ; CHECK-VF4UF1-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[SCEVGEP]], [[SCEVGEP3]]
 ; CHECK-VF4UF1-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SCEVGEP2]], [[SCEVGEP1]]
@@ -421,20 +421,20 @@ define void @recurrence_3(ptr nocapture readonly %a, ptr nocapture %b, i32 %n, f
 ; CHECK-VF4UF2:       [[FOR_PREHEADER]]:
 ; CHECK-VF4UF2-NEXT:    [[TMP1:%.*]] = add i32 [[N]], -1
 ; CHECK-VF4UF2-NEXT:    [[TMP2:%.*]] = zext i32 [[TMP1]] to i64
+; CHECK-VF4UF2-NEXT:    [[TMP5:%.*]] = add i32 [[N]], -2
+; CHECK-VF4UF2-NEXT:    [[TMP6:%.*]] = zext i32 [[TMP5]] to i64
 ; CHECK-VF4UF2-NEXT:    [[TMP3:%.*]] = call i64 @llvm.vscale.i64()
 ; CHECK-VF4UF2-NEXT:    [[TMP4:%.*]] = shl nuw i64 [[TMP3]], 3
 ; CHECK-VF4UF2-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP2]], [[TMP4]]
 ; CHECK-VF4UF2-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK-VF4UF2:       [[VECTOR_MEMCHECK]]:
 ; CHECK-VF4UF2-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[B]], i64 8
-; CHECK-VF4UF2-NEXT:    [[TMP5:%.*]] = add i32 [[N]], -2
-; CHECK-VF4UF2-NEXT:    [[TMP6:%.*]] = zext i32 [[TMP5]] to i64
 ; CHECK-VF4UF2-NEXT:    [[TMP7:%.*]] = shl nuw nsw i64 [[TMP6]], 3
-; CHECK-VF4UF2-NEXT:    [[TMP8:%.*]] = add nuw nsw i64 [[TMP7]], 16
+; CHECK-VF4UF2-NEXT:    [[TMP8:%.*]] = add i64 16, [[TMP7]]
 ; CHECK-VF4UF2-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP8]]
 ; CHECK-VF4UF2-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[A]], i64 2
 ; CHECK-VF4UF2-NEXT:    [[TMP9:%.*]] = shl nuw nsw i64 [[TMP6]], 1
-; CHECK-VF4UF2-NEXT:    [[TMP10:%.*]] = add nuw nsw i64 [[TMP9]], 4
+; CHECK-VF4UF2-NEXT:    [[TMP10:%.*]] = add i64 4, [[TMP9]]
 ; CHECK-VF4UF2-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP10]]
 ; CHECK-VF4UF2-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[SCEVGEP]], [[SCEVGEP3]]
 ; CHECK-VF4UF2-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SCEVGEP2]], [[SCEVGEP1]]
@@ -723,7 +723,7 @@ define void @sink_after(ptr %a, ptr %b, i64 %n) {
 ; CHECK-VF4UF1-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP2]]
 ; CHECK-VF4UF1-NEXT:    [[SCEVGEP1:%.*]] = getelementptr nuw i8, ptr [[A]], i64 2
 ; CHECK-VF4UF1-NEXT:    [[TMP3:%.*]] = shl i64 [[N]], 1
-; CHECK-VF4UF1-NEXT:    [[TMP4:%.*]] = add i64 [[TMP3]], 2
+; CHECK-VF4UF1-NEXT:    [[TMP4:%.*]] = add i64 2, [[TMP3]]
 ; CHECK-VF4UF1-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP4]]
 ; CHECK-VF4UF1-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[B]], [[SCEVGEP2]]
 ; CHECK-VF4UF1-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SCEVGEP1]], [[SCEVGEP]]
@@ -779,7 +779,7 @@ define void @sink_after(ptr %a, ptr %b, i64 %n) {
 ; CHECK-VF4UF2-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP2]]
 ; CHECK-VF4UF2-NEXT:    [[SCEVGEP1:%.*]] = getelementptr nuw i8, ptr [[A]], i64 2
 ; CHECK-VF4UF2-NEXT:    [[TMP3:%.*]] = shl i64 [[N]], 1
-; CHECK-VF4UF2-NEXT:    [[TMP4:%.*]] = add i64 [[TMP3]], 2
+; CHECK-VF4UF2-NEXT:    [[TMP4:%.*]] = add i64 2, [[TMP3]]
 ; CHECK-VF4UF2-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP4]]
 ; CHECK-VF4UF2-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[B]], [[SCEVGEP2]]
 ; CHECK-VF4UF2-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SCEVGEP1]], [[SCEVGEP]]

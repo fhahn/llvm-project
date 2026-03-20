@@ -25,7 +25,7 @@ define i32 @inv_val_store_to_inv_address_with_reduction(ptr %a, i64 %n, ptr %b) 
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_MEMCHECK:%.*]]
 ; CHECK:       vector.memcheck:
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[A:%.*]], i64 4
-; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[N]], 2
+; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[SMAX2]], 2
 ; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[B:%.*]], i64 [[TMP0]]
 ; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[A]], [[SCEVGEP1]]
 ; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[B]], [[SCEVGEP]]
@@ -99,7 +99,7 @@ define void @inv_val_store_to_inv_address(ptr %a, i64 %n, ptr %b) {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_MEMCHECK:%.*]]
 ; CHECK:       vector.memcheck:
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[A:%.*]], i64 4
-; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[N]], 2
+; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[SMAX2]], 2
 ; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[B:%.*]], i64 [[TMP0]]
 ; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[A]], [[SCEVGEP1]]
 ; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[B]], [[SCEVGEP]]
@@ -173,7 +173,7 @@ define void @inv_val_store_to_inv_address_conditional(ptr %a, i64 %n, ptr %b, i3
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp slt i64 [[N]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_MEMCHECK:%.*]]
 ; CHECK:       vector.memcheck:
-; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[N]], 2
+; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[SMAX2]], 2
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[B:%.*]], i64 [[TMP0]]
 ; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[A:%.*]], i64 4
 ; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[B]], [[SCEVGEP1]]
@@ -201,22 +201,22 @@ define void @inv_val_store_to_inv_address_conditional(ptr %a, i64 %n, ptr %b, i3
 ; CHECK:       pred.store.continue:
 ; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <4 x i1> [[TMP2]], i64 1
 ; CHECK-NEXT:    br i1 [[TMP4]], label [[PRED_STORE_IF5:%.*]], label [[PRED_STORE_CONTINUE6:%.*]]
-; CHECK:       pred.store.if5:
+; CHECK:       pred.store.if4:
 ; CHECK-NEXT:    store i32 [[NTRUNC]], ptr [[A]], align 4, !alias.scope [[META19]]
 ; CHECK-NEXT:    br label [[PRED_STORE_CONTINUE6]]
-; CHECK:       pred.store.continue6:
+; CHECK:       pred.store.continue5:
 ; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <4 x i1> [[TMP2]], i64 2
 ; CHECK-NEXT:    br i1 [[TMP5]], label [[PRED_STORE_IF7:%.*]], label [[PRED_STORE_CONTINUE8:%.*]]
-; CHECK:       pred.store.if7:
+; CHECK:       pred.store.if6:
 ; CHECK-NEXT:    store i32 [[NTRUNC]], ptr [[A]], align 4, !alias.scope [[META19]]
 ; CHECK-NEXT:    br label [[PRED_STORE_CONTINUE8]]
-; CHECK:       pred.store.continue8:
+; CHECK:       pred.store.continue7:
 ; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <4 x i1> [[TMP2]], i64 3
 ; CHECK-NEXT:    br i1 [[TMP6]], label [[PRED_STORE_IF9:%.*]], label [[PRED_STORE_CONTINUE10]]
-; CHECK:       pred.store.if9:
+; CHECK:       pred.store.if8:
 ; CHECK-NEXT:    store i32 [[NTRUNC]], ptr [[A]], align 4, !alias.scope [[META19]]
 ; CHECK-NEXT:    br label [[PRED_STORE_CONTINUE10]]
-; CHECK:       pred.store.continue10:
+; CHECK:       pred.store.continue9:
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP7]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP21:![0-9]+]]
@@ -348,7 +348,6 @@ define void @multiple_uniform_stores(ptr nocapture %var1, ptr nocapture readonly
 ; CHECK-NEXT:    [[TMP2:%.*]] = shl nuw nsw i64 [[TMP1]], 2
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr [[VAR1:%.*]], i64 [[TMP2]]
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[TMP3]], i64 4
-; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[VAR2:%.*]], i64 4
 ; CHECK-NEXT:    br label [[FOR_COND1_PREHEADER:%.*]]
 ; CHECK:       for.cond1.preheader:
 ; CHECK-NEXT:    [[INDVARS_IV23:%.*]] = phi i64 [ [[INDVARS_IV_NEXT24:%.*]], [[FOR_INC8:%.*]] ], [ 0, [[FOR_COND1_PREHEADER_PREHEADER]] ]
@@ -359,21 +358,18 @@ define void @multiple_uniform_stores(ptr nocapture %var1, ptr nocapture readonly
 ; CHECK-NEXT:    [[ARRAYIDX5:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[VAR1]], i64 [[INDVARS_IV23]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = zext i32 [[J_022]] to i64
 ; CHECK-NEXT:    [[ARRAYIDX5_PROMOTED:%.*]] = load i32, ptr [[ARRAYIDX5]], align 4
-; CHECK-NEXT:    [[TMP5:%.*]] = xor i32 [[J_022]], -1
-; CHECK-NEXT:    [[TMP6:%.*]] = add i32 [[ITR]], [[TMP5]]
+; CHECK-NEXT:    [[TMP6:%.*]] = sub i32 [[TMP0]], [[J_022]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = zext i32 [[TMP6]] to i64
 ; CHECK-NEXT:    [[TMP8:%.*]] = add nuw nsw i64 [[TMP7]], 1
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[TMP6]], 3
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_MEMCHECK:%.*]]
 ; CHECK:       vector.memcheck:
 ; CHECK-NEXT:    [[TMP9:%.*]] = shl nuw nsw i64 [[TMP4]], 2
-; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[VAR2]], i64 [[TMP9]]
-; CHECK-NEXT:    [[TMP10:%.*]] = xor i32 [[J_022]], -1
-; CHECK-NEXT:    [[TMP11:%.*]] = add i32 [[ITR]], [[TMP10]]
-; CHECK-NEXT:    [[TMP12:%.*]] = zext i32 [[TMP11]] to i64
-; CHECK-NEXT:    [[TMP13:%.*]] = add nuw nsw i64 [[TMP4]], [[TMP12]]
-; CHECK-NEXT:    [[TMP14:%.*]] = shl nuw nsw i64 [[TMP13]], 2
-; CHECK-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[SCEVGEP2]], i64 [[TMP14]]
+; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[VAR2:%.*]], i64 [[TMP9]]
+; CHECK-NEXT:    [[TMP11:%.*]] = shl nuw nsw i64 [[TMP7]], 2
+; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr i8, ptr [[VAR2]], i64 [[TMP11]]
+; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr i8, ptr [[TMP12]], i64 4
+; CHECK-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[TMP13]], i64 [[TMP9]]
 ; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[VAR1]], [[SCEVGEP3]]
 ; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SCEVGEP1]], [[SCEVGEP]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]

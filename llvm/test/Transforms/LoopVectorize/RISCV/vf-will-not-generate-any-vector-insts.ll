@@ -68,5 +68,5 @@ exit:
 ; CHECK: [[LOOP5]] = distinct !{[[LOOP5]], [[META6:![0-9]+]], [[META7:![0-9]+]]}
 ; CHECK: [[META6]] = !{!"llvm.loop.isvectorized", i32 1}
 ; CHECK: [[META7]] = !{!"llvm.loop.unroll.runtime.disable"}
-; CHECK: [[LOOP8]] = distinct !{[[LOOP8]], [[META6]]}
+; CHECK: [[LOOP8]] = distinct !{[[LOOP8]], [[META7]], [[META6]]}
 ;.

@@ -244,7 +244,7 @@ for.end:
 ; IF-EVL-OUTLOOP: [[META5]] = !{!"llvm.loop.unroll.runtime.disable"}
 ; IF-EVL-OUTLOOP: [[META6]] = !{[[META7:![0-9]+]]}
 ; IF-EVL-OUTLOOP: [[META7]] = distinct !{[[META7]], [[META2]]}
-; IF-EVL-OUTLOOP: [[LOOP8]] = distinct !{[[LOOP8]], [[META4]]}
+; IF-EVL-OUTLOOP: [[LOOP8]] = distinct !{[[LOOP8]], [[META5]], [[META4]]}
 ;.
 ; IF-EVL-INLOOP: [[META0]] = !{[[META1:![0-9]+]]}
 ; IF-EVL-INLOOP: [[META1]] = distinct !{[[META1]], [[META2:![0-9]+]]}
@@ -254,7 +254,7 @@ for.end:
 ; IF-EVL-INLOOP: [[META5]] = !{!"llvm.loop.unroll.runtime.disable"}
 ; IF-EVL-INLOOP: [[META6]] = !{[[META7:![0-9]+]]}
 ; IF-EVL-INLOOP: [[META7]] = distinct !{[[META7]], [[META2]]}
-; IF-EVL-INLOOP: [[LOOP8]] = distinct !{[[LOOP8]], [[META4]]}
+; IF-EVL-INLOOP: [[LOOP8]] = distinct !{[[LOOP8]], [[META5]], [[META4]]}
 ;.
 ; NO-VP-OUTLOOP: [[META0]] = !{[[META1:![0-9]+]]}
 ; NO-VP-OUTLOOP: [[META1]] = distinct !{[[META1]], [[META2:![0-9]+]]}
@@ -264,7 +264,7 @@ for.end:
 ; NO-VP-OUTLOOP: [[META5]] = !{!"llvm.loop.unroll.runtime.disable"}
 ; NO-VP-OUTLOOP: [[META6]] = !{[[META7:![0-9]+]]}
 ; NO-VP-OUTLOOP: [[META7]] = distinct !{[[META7]], [[META2]]}
-; NO-VP-OUTLOOP: [[LOOP8]] = distinct !{[[LOOP8]], [[META4]]}
+; NO-VP-OUTLOOP: [[LOOP8]] = distinct !{[[LOOP8]], [[META5]], [[META4]]}
 ;.
 ; NO-VP-INLOOP: [[META0]] = !{[[META1:![0-9]+]]}
 ; NO-VP-INLOOP: [[META1]] = distinct !{[[META1]], [[META2:![0-9]+]]}
@@ -274,5 +274,5 @@ for.end:
 ; NO-VP-INLOOP: [[META5]] = !{!"llvm.loop.unroll.runtime.disable"}
 ; NO-VP-INLOOP: [[META6]] = !{[[META7:![0-9]+]]}
 ; NO-VP-INLOOP: [[META7]] = distinct !{[[META7]], [[META2]]}
-; NO-VP-INLOOP: [[LOOP8]] = distinct !{[[LOOP8]], [[META4]]}
+; NO-VP-INLOOP: [[LOOP8]] = distinct !{[[LOOP8]], [[META5]], [[META4]]}
 ;.

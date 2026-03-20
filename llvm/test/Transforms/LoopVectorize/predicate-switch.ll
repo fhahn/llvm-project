@@ -681,7 +681,7 @@ exit:
 ; IC1: [[META7]] = distinct !{[[META7]], [[META8:![0-9]+]]}
 ; IC1: [[META8]] = distinct !{[[META8]], !"LVerDomain"}
 ; IC1: [[LOOP9]] = distinct !{[[LOOP9]], [[META1]], [[META2]]}
-; IC1: [[LOOP10]] = distinct !{[[LOOP10]], [[META1]]}
+; IC1: [[LOOP10]] = distinct !{[[LOOP10]], [[META2]], [[META1]]}
 ;.
 ; IC2: [[LOOP0]] = distinct !{[[LOOP0]], [[META1:![0-9]+]], [[META2:![0-9]+]]}
 ; IC2: [[META1]] = !{!"llvm.loop.isvectorized", i32 1}
@@ -693,5 +693,5 @@ exit:
 ; IC2: [[META7]] = distinct !{[[META7]], [[META8:![0-9]+]]}
 ; IC2: [[META8]] = distinct !{[[META8]], !"LVerDomain"}
 ; IC2: [[LOOP9]] = distinct !{[[LOOP9]], [[META1]], [[META2]]}
-; IC2: [[LOOP10]] = distinct !{[[LOOP10]], [[META1]]}
+; IC2: [[LOOP10]] = distinct !{[[LOOP10]], [[META2]], [[META1]]}
 ;.

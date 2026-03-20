@@ -1662,7 +1662,7 @@ exit:
 ; CHECK-VF4-IC1: [[META9]] = !{[[META10:![0-9]+]]}
 ; CHECK-VF4-IC1: [[META10]] = distinct !{[[META10]], [[META8]]}
 ; CHECK-VF4-IC1: [[LOOP11]] = distinct !{[[LOOP11]], [[META1]], [[META2]]}
-; CHECK-VF4-IC1: [[LOOP12]] = distinct !{[[LOOP12]], [[META1]]}
+; CHECK-VF4-IC1: [[LOOP12]] = distinct !{[[LOOP12]], [[META2]], [[META1]]}
 ; CHECK-VF4-IC1: [[LOOP13]] = distinct !{[[LOOP13]], [[META1]], [[META2]]}
 ; CHECK-VF4-IC1: [[LOOP14]] = distinct !{[[LOOP14]], [[META2]], [[META1]]}
 ;.
@@ -1678,7 +1678,7 @@ exit:
 ; CHECK-VF4-IC2: [[META9]] = !{[[META10:![0-9]+]]}
 ; CHECK-VF4-IC2: [[META10]] = distinct !{[[META10]], [[META8]]}
 ; CHECK-VF4-IC2: [[LOOP11]] = distinct !{[[LOOP11]], [[META1]], [[META2]]}
-; CHECK-VF4-IC2: [[LOOP12]] = distinct !{[[LOOP12]], [[META1]]}
+; CHECK-VF4-IC2: [[LOOP12]] = distinct !{[[LOOP12]], [[META2]], [[META1]]}
 ; CHECK-VF4-IC2: [[LOOP13]] = distinct !{[[LOOP13]], [[META1]], [[META2]]}
 ; CHECK-VF4-IC2: [[LOOP14]] = distinct !{[[LOOP14]], [[META2]], [[META1]]}
 ;.

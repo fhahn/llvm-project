@@ -1280,10 +1280,9 @@ define i32 @pointer_iv_mixed(ptr %a, ptr %b, i64 %n) {
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[SMAX2]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[SMAX:%.*]] = call i64 @llvm.smax.i64(i64 [[N]], i64 1)
-; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[SMAX]], 3
+; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[SMAX2]], 3
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP0]]
-; CHECK-NEXT:    [[TMP1:%.*]] = shl i64 [[SMAX]], 2
+; CHECK-NEXT:    [[TMP1:%.*]] = shl i64 [[SMAX2]], 2
 ; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP1]]
 ; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[B]], [[SCEVGEP1]]
 ; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[A]], [[SCEVGEP]]
@@ -1318,14 +1317,14 @@ define i32 @pointer_iv_mixed(ptr %a, ptr %b, i64 %n) {
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[FOR_END:.*]], label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:
 ; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ], [ 0, %[[VECTOR_MEMCHECK]] ]
-; CHECK-NEXT:    [[BC_RESUME_VAL3:%.*]] = phi ptr [ [[TMP3]], %[[MIDDLE_BLOCK]] ], [ [[A]], %[[ENTRY]] ], [ [[A]], %[[VECTOR_MEMCHECK]] ]
-; CHECK-NEXT:    [[BC_RESUME_VAL4:%.*]] = phi ptr [ [[TMP5]], %[[MIDDLE_BLOCK]] ], [ [[B]], %[[ENTRY]] ], [ [[B]], %[[VECTOR_MEMCHECK]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL2:%.*]] = phi ptr [ [[TMP3]], %[[MIDDLE_BLOCK]] ], [ [[A]], %[[ENTRY]] ], [ [[A]], %[[VECTOR_MEMCHECK]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL3:%.*]] = phi ptr [ [[TMP5]], %[[MIDDLE_BLOCK]] ], [ [[B]], %[[ENTRY]] ], [ [[B]], %[[VECTOR_MEMCHECK]] ]
 ; CHECK-NEXT:    [[BC_MERGE_RDX:%.*]] = phi i32 [ [[TMP9]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ], [ 0, %[[VECTOR_MEMCHECK]] ]
 ; CHECK-NEXT:    br label %[[FOR_BODY:.*]]
 ; CHECK:       [[FOR_BODY]]:
 ; CHECK-NEXT:    [[I:%.*]] = phi i64 [ [[I_NEXT:%.*]], %[[FOR_BODY]] ], [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ]
-; CHECK-NEXT:    [[P:%.*]] = phi ptr [ [[UNNAMEDTMP3:%.*]], %[[FOR_BODY]] ], [ [[BC_RESUME_VAL3]], %[[SCALAR_PH]] ]
-; CHECK-NEXT:    [[Q:%.*]] = phi ptr [ [[UNNAMEDTMP4:%.*]], %[[FOR_BODY]] ], [ [[BC_RESUME_VAL4]], %[[SCALAR_PH]] ]
+; CHECK-NEXT:    [[P:%.*]] = phi ptr [ [[UNNAMEDTMP3:%.*]], %[[FOR_BODY]] ], [ [[BC_RESUME_VAL2]], %[[SCALAR_PH]] ]
+; CHECK-NEXT:    [[Q:%.*]] = phi ptr [ [[UNNAMEDTMP4:%.*]], %[[FOR_BODY]] ], [ [[BC_RESUME_VAL3]], %[[SCALAR_PH]] ]
 ; CHECK-NEXT:    [[UNNAMEDTMP0:%.*]] = phi i32 [ [[UNNAMEDTMP2:%.*]], %[[FOR_BODY]] ], [ [[BC_MERGE_RDX]], %[[SCALAR_PH]] ]
 ; CHECK-NEXT:    [[UNNAMEDTMP1:%.*]] = load i32, ptr [[P]], align 8
 ; CHECK-NEXT:    [[UNNAMEDTMP2]] = add i32 [[UNNAMEDTMP1]], [[UNNAMEDTMP0]]
@@ -1346,10 +1345,9 @@ define i32 @pointer_iv_mixed(ptr %a, ptr %b, i64 %n) {
 ; INTER-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[SMAX2]], 4
 ; INTER-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; INTER:       [[VECTOR_MEMCHECK]]:
-; INTER-NEXT:    [[SMAX:%.*]] = call i64 @llvm.smax.i64(i64 [[N]], i64 1)
-; INTER-NEXT:    [[TMP0:%.*]] = shl i64 [[SMAX]], 3
+; INTER-NEXT:    [[TMP0:%.*]] = shl i64 [[SMAX2]], 3
 ; INTER-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP0]]
-; INTER-NEXT:    [[TMP1:%.*]] = shl i64 [[SMAX]], 2
+; INTER-NEXT:    [[TMP1:%.*]] = shl i64 [[SMAX2]], 2
 ; INTER-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP1]]
 ; INTER-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[B]], [[SCEVGEP1]]
 ; INTER-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[A]], [[SCEVGEP]]
@@ -1384,14 +1382,14 @@ define i32 @pointer_iv_mixed(ptr %a, ptr %b, i64 %n) {
 ; INTER-NEXT:    br i1 [[CMP_N]], label %[[FOR_END:.*]], label %[[SCALAR_PH]]
 ; INTER:       [[SCALAR_PH]]:
 ; INTER-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ], [ 0, %[[VECTOR_MEMCHECK]] ]
-; INTER-NEXT:    [[BC_RESUME_VAL3:%.*]] = phi ptr [ [[TMP3]], %[[MIDDLE_BLOCK]] ], [ [[A]], %[[ENTRY]] ], [ [[A]], %[[VECTOR_MEMCHECK]] ]
-; INTER-NEXT:    [[BC_RESUME_VAL4:%.*]] = phi ptr [ [[TMP5]], %[[MIDDLE_BLOCK]] ], [ [[B]], %[[ENTRY]] ], [ [[B]], %[[VECTOR_MEMCHECK]] ]
+; INTER-NEXT:    [[BC_RESUME_VAL2:%.*]] = phi ptr [ [[TMP3]], %[[MIDDLE_BLOCK]] ], [ [[A]], %[[ENTRY]] ], [ [[A]], %[[VECTOR_MEMCHECK]] ]
+; INTER-NEXT:    [[BC_RESUME_VAL3:%.*]] = phi ptr [ [[TMP5]], %[[MIDDLE_BLOCK]] ], [ [[B]], %[[ENTRY]] ], [ [[B]], %[[VECTOR_MEMCHECK]] ]
 ; INTER-NEXT:    [[BC_MERGE_RDX:%.*]] = phi i32 [ [[TMP9]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ], [ 0, %[[VECTOR_MEMCHECK]] ]
 ; INTER-NEXT:    br label %[[FOR_BODY:.*]]
 ; INTER:       [[FOR_BODY]]:
 ; INTER-NEXT:    [[I:%.*]] = phi i64 [ [[I_NEXT:%.*]], %[[FOR_BODY]] ], [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ]
-; INTER-NEXT:    [[P:%.*]] = phi ptr [ [[UNNAMEDTMP3:%.*]], %[[FOR_BODY]] ], [ [[BC_RESUME_VAL3]], %[[SCALAR_PH]] ]
-; INTER-NEXT:    [[Q:%.*]] = phi ptr [ [[UNNAMEDTMP4:%.*]], %[[FOR_BODY]] ], [ [[BC_RESUME_VAL4]], %[[SCALAR_PH]] ]
+; INTER-NEXT:    [[P:%.*]] = phi ptr [ [[UNNAMEDTMP3:%.*]], %[[FOR_BODY]] ], [ [[BC_RESUME_VAL2]], %[[SCALAR_PH]] ]
+; INTER-NEXT:    [[Q:%.*]] = phi ptr [ [[UNNAMEDTMP4:%.*]], %[[FOR_BODY]] ], [ [[BC_RESUME_VAL3]], %[[SCALAR_PH]] ]
 ; INTER-NEXT:    [[UNNAMEDTMP0:%.*]] = phi i32 [ [[UNNAMEDTMP2:%.*]], %[[FOR_BODY]] ], [ [[BC_MERGE_RDX]], %[[SCALAR_PH]] ]
 ; INTER-NEXT:    [[UNNAMEDTMP1:%.*]] = load i32, ptr [[P]], align 8
 ; INTER-NEXT:    [[UNNAMEDTMP2]] = add i32 [[UNNAMEDTMP1]], [[UNNAMEDTMP0]]
@@ -1440,10 +1438,9 @@ define void @pointer_operand_geps_with_different_indexed_types(ptr %A, ptr %B, i
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[SMAX2]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[SMAX:%.*]] = call i64 @llvm.smax.i64(i64 [[N]], i64 1)
-; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[B]], i64 [[SMAX]]
-; CHECK-NEXT:    [[TMP6:%.*]] = shl i64 [[SMAX]], 3
-; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[TMP6]], -4
+; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[B]], i64 [[SMAX2]]
+; CHECK-NEXT:    [[TMP6:%.*]] = shl i64 [[SMAX2]], 3
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 -4, [[TMP6]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP0]]
 ; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[B]], [[TMP1]]
 ; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[A]], [[SCEVGEP]]
@@ -1516,10 +1513,9 @@ define void @pointer_operand_geps_with_different_indexed_types(ptr %A, ptr %B, i
 ; INTER-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ule i64 [[SMAX2]], 4
 ; INTER-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; INTER:       [[VECTOR_MEMCHECK]]:
-; INTER-NEXT:    [[SMAX:%.*]] = call i64 @llvm.smax.i64(i64 [[N]], i64 1)
-; INTER-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[B]], i64 [[SMAX]]
-; INTER-NEXT:    [[TMP8:%.*]] = shl i64 [[SMAX]], 3
-; INTER-NEXT:    [[TMP0:%.*]] = add i64 [[TMP8]], -4
+; INTER-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[B]], i64 [[SMAX2]]
+; INTER-NEXT:    [[TMP8:%.*]] = shl i64 [[SMAX2]], 3
+; INTER-NEXT:    [[TMP0:%.*]] = add i64 -4, [[TMP8]]
 ; INTER-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP0]]
 ; INTER-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[B]], [[TMP1]]
 ; INTER-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[A]], [[SCEVGEP]]

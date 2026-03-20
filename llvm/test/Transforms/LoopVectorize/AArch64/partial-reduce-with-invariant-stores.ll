@@ -10,9 +10,10 @@ define i32 @zext_add_reduc_i8_i32_store_invariant(ptr %a, ptr %dst) {
 ; CHECK-NEXT:    [[GEP_DST:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 42
 ; CHECK-NEXT:    br label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr nuw i8, ptr [[DST]], i64 168
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DST]], i64 172
 ; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[A]], i64 1024
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[GEP_DST]], [[SCEVGEP1]]
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP5]], [[SCEVGEP1]]
 ; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[A]], [[SCEVGEP]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]

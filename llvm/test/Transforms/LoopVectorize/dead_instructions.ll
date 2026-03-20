@@ -192,5 +192,5 @@ loop:
 ; CHECK: [[META8]] = !{[[META9:![0-9]+]]}
 ; CHECK: [[META9]] = distinct !{[[META9]], [[META7]]}
 ; CHECK: [[LOOP10]] = distinct !{[[LOOP10]], [[META1]], [[META2]]}
-; CHECK: [[LOOP11]] = distinct !{[[LOOP11]], [[META1]]}
+; CHECK: [[LOOP11]] = distinct !{[[LOOP11]], [[META2]], [[META1]]}
 ;.

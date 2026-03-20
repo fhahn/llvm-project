@@ -64,23 +64,18 @@ define i1 @scalarize_ptr_induction(ptr %start, ptr %end, ptr noalias %dst, i1 %c
 ; CHECK-LABEL: define i1 @scalarize_ptr_induction(
 ; CHECK-SAME: ptr [[START:%.*]], ptr [[END:%.*]], ptr noalias [[DST:%.*]], i1 [[C:%.*]]) #[[ATTR1:[0-9]+]] {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[START5:%.*]] = ptrtoint ptr [[START]] to i64
-; CHECK-NEXT:    [[END4:%.*]] = ptrtoint ptr [[END]] to i64
 ; CHECK-NEXT:    [[START2:%.*]] = ptrtoint ptr [[START]] to i64
 ; CHECK-NEXT:    [[END1:%.*]] = ptrtoint ptr [[END]] to i64
-; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 0, [[START5]]
-; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[END4]], [[TMP0]]
-; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[TMP4]], -12
-; CHECK-NEXT:    [[TMP2:%.*]] = udiv i64 [[TMP1]], 12
 ; CHECK-NEXT:    [[TMP3:%.*]] = add nuw nsw i64 [[TMP2]], 1
 ; CHECK-NEXT:    br label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DST]], i64 8
-; CHECK-NEXT:    [[TMP6:%.*]] = add i64 [[END1]], -12
-; CHECK-NEXT:    [[TMP7:%.*]] = sub i64 [[TMP6]], [[START2]]
+; CHECK-NEXT:    [[TMP5:%.*]] = sub i64 0, [[START2]]
+; CHECK-NEXT:    [[TMP6:%.*]] = add i64 -12, [[TMP5]]
+; CHECK-NEXT:    [[TMP7:%.*]] = add i64 [[TMP6]], [[END1]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = udiv i64 [[TMP7]], 12
-; CHECK-NEXT:    [[TMP9:%.*]] = mul nuw i64 [[TMP8]], 12
-; CHECK-NEXT:    [[TMP10:%.*]] = add i64 [[TMP9]], 8
+; CHECK-NEXT:    [[TMP9:%.*]] = mul nuw i64 12, [[TMP8]]
+; CHECK-NEXT:    [[TMP10:%.*]] = add i64 8, [[TMP9]]
 ; CHECK-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[START]], i64 [[TMP10]]
 ; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DST]], [[SCEVGEP3]]
 ; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[START]], [[SCEVGEP]]

@@ -150,18 +150,14 @@ define i32 @cost_of_exit_branch_and_cond_insts(ptr %a, ptr %b, i1 %c, i16 %x) #0
 ; CHECK-NEXT:    [[UMAX3:%.*]] = call i32 @llvm.umax.i32(i32 [[TMP0]], i32 111)
 ; CHECK-NEXT:    [[TMP1:%.*]] = sub i32 770, [[UMAX3]]
 ; CHECK-NEXT:    [[SMAX4:%.*]] = call i32 @llvm.smax.i32(i32 [[TMP1]], i32 0)
+; CHECK-NEXT:    [[TMP5:%.*]] = zext nneg i32 [[SMAX4]] to i64
 ; CHECK-NEXT:    [[TMP2:%.*]] = add nuw nsw i32 [[SMAX4]], 1
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ule i32 [[TMP2]], 19
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[A]], i64 1
-; CHECK-NEXT:    [[TMP3:%.*]] = zext i16 [[X]] to i32
-; CHECK-NEXT:    [[UMAX1:%.*]] = call i32 @llvm.umax.i32(i32 [[TMP3]], i32 111)
-; CHECK-NEXT:    [[TMP4:%.*]] = sub i32 770, [[UMAX1]]
-; CHECK-NEXT:    [[SMAX:%.*]] = call i32 @llvm.smax.i32(i32 [[TMP4]], i32 0)
-; CHECK-NEXT:    [[TMP5:%.*]] = zext nneg i32 [[SMAX]] to i64
 ; CHECK-NEXT:    [[TMP6:%.*]] = shl nuw nsw i64 [[TMP5]], 2
-; CHECK-NEXT:    [[TMP7:%.*]] = add nuw nsw i64 [[TMP6]], 4
+; CHECK-NEXT:    [[TMP7:%.*]] = add i64 4, [[TMP6]]
 ; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP7]]
 ; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[A]], [[SCEVGEP2]]
 ; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[B]], [[SCEVGEP]]
@@ -411,14 +407,14 @@ attributes #0 = { "target-features"="+64bit,+v" }
 ; CHECK: [[META6]] = !{[[META7:![0-9]+]]}
 ; CHECK: [[META7]] = distinct !{[[META7]], [[META5]]}
 ; CHECK: [[LOOP8]] = distinct !{[[LOOP8]], [[META1]], [[META2]]}
-; CHECK: [[LOOP9]] = distinct !{[[LOOP9]], [[META1]]}
+; CHECK: [[LOOP9]] = distinct !{[[LOOP9]], [[META2]], [[META1]]}
 ; CHECK: [[META10]] = !{[[META11:![0-9]+]]}
 ; CHECK: [[META11]] = distinct !{[[META11]], [[META12:![0-9]+]]}
 ; CHECK: [[META12]] = distinct !{[[META12]], !"LVerDomain"}
 ; CHECK: [[META13]] = !{[[META14:![0-9]+]]}
 ; CHECK: [[META14]] = distinct !{[[META14]], [[META12]]}
 ; CHECK: [[LOOP15]] = distinct !{[[LOOP15]], [[META1]], [[META2]]}
-; CHECK: [[LOOP16]] = distinct !{[[LOOP16]], [[META1]]}
+; CHECK: [[LOOP16]] = distinct !{[[LOOP16]], [[META2]], [[META1]]}
 ; CHECK: [[LOOP17]] = distinct !{[[LOOP17]], [[META1]], [[META2]]}
 ; CHECK: [[LOOP18]] = distinct !{[[LOOP18]], [[META1]], [[META2]]}
 ;.

@@ -21,6 +21,7 @@
 #include "VPlanTransforms.h"
 #include "VPlanUtils.h"
 #include "llvm/Analysis/Loads.h"
+#include "llvm/Analysis/LoopAccessAnalysis.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/LoopIterator.h"
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
@@ -32,6 +33,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Transforms/Utils/LoopUtils.h"
 #include "llvm/Transforms/Utils/LoopVersioning.h"
+#include "llvm/Transforms/Utils/RuntimeCheckExpansion.h"
 
 #define DEBUG_TYPE "vplan"
 
@@ -1215,6 +1217,166 @@ void VPlanTransforms::attachCheckBlock(VPlan &Plan, Value *Cond,
   insertCheckBlockBeforeVectorLoop(Plan, CheckBlockVPBB);
   addBypassBranch(Plan, CheckBlockVPBB, CondVPV, AddBranchWeights);
 }
+
+namespace {
+
+/// Expand \p S directly into VPlan recipes using \p Builder. Caches results in
+/// \p SCEV2VPV to avoid duplicates. Falls back to VPExpandSCEVRecipe for casts,
+/// min/max and other unsupported expressions.
+VPValue *expandSCEVExpr(const SCEV *S, Type *ResultTy, VPBuilder &Builder,
+                        VPlan &Plan, DebugLoc DL,
+                        DenseMap<const SCEV *, VPValue *> &SCEV2VPV) {
+  // The cache stores native-type results (before any cast to ResultTy), so
+  // lookups with different ResultTy values for the same SCEV are correct.
+  VPValue *Result = SCEV2VPV.lookup(S);
+
+  if (!Result) {
+    if (auto *C = dyn_cast<SCEVConstant>(S)) {
+      Result = Plan.getOrAddLiveIn(C->getValue());
+    } else if (auto *U = dyn_cast<SCEVUnknown>(S)) {
+      // Fall back to VPExpandSCEVRecipe for Instructions to let SCEVExpander
+      // preserve LCSSA form.
+      if (isa<Instruction>(U->getValue()))
+        Result = Builder.createExpandSCEV(S);
+      else
+        Result = Plan.getOrAddLiveIn(U->getValue());
+    } else if (isa<SCEVVScale>(S)) {
+      Result = Builder.createNaryOp(VPInstruction::VScale, {}, S->getType());
+    } else if (isa<SCEVCastExpr>(S) || isa<SCEVUMaxExpr>(S) ||
+               isa<SCEVSMaxExpr>(S) || isa<SCEVUMinExpr>(S) ||
+               isa<SCEVSMinExpr>(S)) {
+      // Fall back to VPExpandSCEVRecipe for casts and min/max so
+      // SCEVExpander in expandSCEVs can reuse existing IR values.
+      Result = Builder.createExpandSCEV(S);
+    } else if (auto *NAry = dyn_cast<SCEVNAryExpr>(S)) {
+      VPIRFlags::WrapFlagsTy WrapFlags(NAry->hasNoUnsignedWrap(),
+                                       NAry->hasNoSignedWrap());
+      if (isa<SCEVAddExpr>(S)) {
+        // Separate pointer and integer operands in a single pass.
+        VPValue *PtrOp = nullptr;
+        SmallVector<VPValue *, 4> IntOps;
+        for (const SCEVUse &Op : NAry->operands()) {
+          VPValue *Expanded =
+              expandSCEVExpr(Op, Op->getType(), Builder, Plan, DL, SCEV2VPV);
+          if (Op->getType()->isPointerTy()) {
+            assert(!PtrOp && "multiple pointer operands in SCEVAddExpr");
+            PtrOp = Expanded;
+          } else {
+            IntOps.push_back(Expanded);
+          }
+        }
+
+        // Chain the integer operands with Add.
+        assert(!IntOps.empty() &&
+               "SCEVAddExpr must have at least one integer operand");
+        VPValue *IntSum = IntOps[0];
+        for (unsigned I = 1; I < IntOps.size(); ++I)
+          IntSum = Builder.createAdd(IntSum, IntOps[I], DL, "", WrapFlags);
+
+        if (PtrOp) {
+          GEPNoWrapFlags GEPFlags = WrapFlags.HasNUW
+                                        ? GEPNoWrapFlags::noUnsignedWrap()
+                                        : GEPNoWrapFlags::none();
+          Result = Builder.createNoWrapPtrAdd(PtrOp, IntSum, GEPFlags, DL);
+        } else {
+          Result = IntSum;
+        }
+      } else if (isa<SCEVMulExpr>(S)) {
+        SmallVector<VPValue *, 4> Ops;
+        for (const SCEVUse &Op : NAry->operands())
+          Ops.push_back(
+              expandSCEVExpr(Op, Op->getType(), Builder, Plan, DL, SCEV2VPV));
+        Result = Ops[0];
+        for (unsigned I = 1; I < Ops.size(); ++I)
+          Result = Builder.createOverflowingOp(Instruction::Mul,
+                                               {Result, Ops[I]}, WrapFlags,
+                                               DL);
+      } else {
+        // Fall back to VPExpandSCEVRecipe for AddRecExpr and other n-ary
+        // expressions.
+        Result = Builder.createExpandSCEV(S);
+      }
+    } else if (auto *UDiv = dyn_cast<SCEVUDivExpr>(S)) {
+      VPValue *LHS =
+          expandSCEVExpr(UDiv->getLHS(), UDiv->getLHS()->getType(), Builder,
+                         Plan, DL, SCEV2VPV);
+      VPValue *RHS =
+          expandSCEVExpr(UDiv->getRHS(), UDiv->getRHS()->getType(), Builder,
+                         Plan, DL, SCEV2VPV);
+      Result = Builder.createNaryOp(
+          Instruction::UDiv, {LHS, RHS},
+          VPIRFlags::getDefaultFlags(Instruction::UDiv), DL);
+    } else {
+      // Unsupported SCEV kind; fall back to VPExpandSCEVRecipe.
+      Result = Builder.createExpandSCEV(S);
+    }
+
+    SCEV2VPV[S] = Result;
+  }
+
+  // Cast to the requested result type if needed.
+  Type *SrcTy = S->getType();
+  if (ResultTy != SrcTy) {
+    if (ResultTy->isPointerTy() && SrcTy->isIntegerTy()) {
+      Result =
+          Builder.createScalarCast(Instruction::IntToPtr, Result, ResultTy, DL);
+    } else if (ResultTy->isIntegerTy() && SrcTy->isPointerTy()) {
+      Result =
+          Builder.createScalarCast(Instruction::PtrToInt, Result, ResultTy, DL);
+    } else if (ResultTy->isIntegerTy() && SrcTy->isIntegerTy())
+      Result = Builder.createScalarZExtOrTrunc(Result, ResultTy, SrcTy, DL);
+  }
+
+  return Result;
+}
+
+/// Adapter letting generateRuntimeChecks emit VPlan recipes. Inherits
+/// VPBuilder for createICmp, createAnd, createOr, createFreeze; only
+/// expandSCEV and getZero need custom implementations.
+struct VPlanCheckBuilder : VPBuilder {
+  using VT = VPValue *;
+  VPlan &Plan;
+  DebugLoc DL;
+  VPTypeAnalysis TypeInfo;
+  DenseMap<const SCEV *, VPValue *> SCEV2VPV;
+
+  VPlanCheckBuilder(VPBasicBlock *BB, VPlan &Plan, DebugLoc DL)
+      : VPBuilder(BB), Plan(Plan), DL(DL), TypeInfo(Plan) {}
+
+  VT expandSCEV(const SCEV *S, Type *Ty) {
+    return expandSCEVExpr(S, Ty, *this, Plan, DL, SCEV2VPV);
+  }
+  VT getZero(VT V) { return Plan.getZero(TypeInfo.inferScalarType(V)); }
+};
+} // namespace
+
+void VPlanTransforms::addMemoryRuntimeChecks(
+    VPlan &Plan, Loop *OrigLoop,
+    const RuntimePointerChecking &RtPtrChecking, ScalarEvolution &SE,
+    bool AddBranchWeights) {
+  if (!RtPtrChecking.Need)
+    return;
+
+  auto *MemCheckVPBB = Plan.createVPBasicBlock("vector.memcheck");
+  VPlanCheckBuilder Builder(MemCheckVPBB, Plan, OrigLoop->getStartLoc());
+
+  VPValue *Cond = generateRuntimeChecks(
+      Builder, OrigLoop->getStartLoc(), RtPtrChecking.getChecks(), OrigLoop,
+      SE, VectorizerParams::HoistRuntimeChecks);
+  assert(Cond && "no RT checks generated although RtPtrChecking "
+                 "claimed checks are required");
+
+  // Move VPExpandSCEVRecipes to the entry block where expandSCEVs() expects
+  // them; all other recipes (mul, ptradd, etc.) stay in the memcheck block.
+  auto *Entry = Plan.getEntry();
+  for (VPRecipeBase &R : make_early_inc_range(*MemCheckVPBB))
+    if (isa<VPExpandSCEVRecipe>(&R))
+      R.moveBefore(*Entry, Entry->getTerminator()->getIterator());
+
+  insertCheckBlockBeforeVectorLoop(Plan, MemCheckVPBB);
+  addBypassBranch(Plan, MemCheckVPBB, Cond, AddBranchWeights);
+}
+
 
 void VPlanTransforms::addMinimumIterationCheck(
     VPlan &Plan, VPBasicBlock *CheckBlock, ElementCount VF, unsigned UF,

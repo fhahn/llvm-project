@@ -349,7 +349,7 @@ define void @test3_pr58811(ptr %dst) {
 ; VF2-NEXT:    [[TMP3:%.*]] = add i32 [[TMP4]], -1
 ; VF2-NEXT:    br label %[[VECTOR_PH:.*]]
 ; VF2:       [[VECTOR_PH]]:
-; VF2-NEXT:    [[TMP15:%.*]] = mul i32 198, [[TMP3]]
+; VF2-NEXT:    [[TMP4:%.*]] = mul i32 198, [[TMP3]]
 ; VF2-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i32> poison, i32 [[TMP3]], i64 0
 ; VF2-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT]], <2 x i32> poison, <2 x i32> zeroinitializer
 ; VF2-NEXT:    [[TMP5:%.*]] = mul <2 x i32> <i32 0, i32 1>, [[BROADCAST_SPLAT]]
@@ -373,7 +373,7 @@ define void @test3_pr58811(ptr %dst) {
 ; VF2-NEXT:    br label %[[LOOP_3:.*]]
 ; VF2:       [[LOOP_3]]:
 ; VF2-NEXT:    [[IV_3:%.*]] = phi i16 [ [[INC_1:%.*]], %[[LOOP_3]] ], [ 198, %[[SCALAR_PH]] ]
-; VF2-NEXT:    [[IV_4:%.*]] = phi i32 [ [[SUB93_1:%.*]], %[[LOOP_3]] ], [ [[TMP15]], %[[SCALAR_PH]] ]
+; VF2-NEXT:    [[IV_4:%.*]] = phi i32 [ [[SUB93_1:%.*]], %[[LOOP_3]] ], [ [[TMP4]], %[[SCALAR_PH]] ]
 ; VF2-NEXT:    [[GEP_DST:%.*]] = getelementptr inbounds i32, ptr [[DST]], i16 [[IV_3]]
 ; VF2-NEXT:    store i32 [[IV_4]], ptr [[GEP_DST]], align 4
 ; VF2-NEXT:    [[SUB93_1]] = sub i32 [[IV_4]], [[ADD101_LCSSA]]
@@ -411,7 +411,7 @@ define void @test3_pr58811(ptr %dst) {
 ; CHECK-NEXT:    [[TMP3:%.*]] = add i32 [[TMP8]], -1
 ; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
-; CHECK-NEXT:    [[IND_END:%.*]] = mul i32 196, [[TMP3]]
+; CHECK-NEXT:    [[TMP8:%.*]] = mul i32 196, [[TMP3]]
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[TMP3]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP5:%.*]] = mul <4 x i32> <i32 0, i32 1, i32 2, i32 3>, [[BROADCAST_SPLAT]]
@@ -435,7 +435,7 @@ define void @test3_pr58811(ptr %dst) {
 ; CHECK-NEXT:    br label %[[LOOP_3:.*]]
 ; CHECK:       [[LOOP_3]]:
 ; CHECK-NEXT:    [[IV_3:%.*]] = phi i16 [ [[INC_1:%.*]], %[[LOOP_3]] ], [ 196, %[[SCALAR_PH]] ]
-; CHECK-NEXT:    [[IV_4:%.*]] = phi i32 [ [[SUB93_1:%.*]], %[[LOOP_3]] ], [ [[IND_END]], %[[SCALAR_PH]] ]
+; CHECK-NEXT:    [[IV_4:%.*]] = phi i32 [ [[SUB93_1:%.*]], %[[LOOP_3]] ], [ [[TMP8]], %[[SCALAR_PH]] ]
 ; CHECK-NEXT:    [[GEP_DST:%.*]] = getelementptr inbounds i32, ptr [[DST]], i16 [[IV_3]]
 ; CHECK-NEXT:    store i32 [[IV_4]], ptr [[GEP_DST]], align 4
 ; CHECK-NEXT:    [[SUB93_1]] = sub i32 [[IV_4]], [[ADD101_LCSSA]]

@@ -100,6 +100,7 @@ define void @replicate_sext(i32 %N, ptr %dst, ptr %src) #0 {
 ; CHECK-LABEL: define void @replicate_sext(
 ; CHECK-SAME: i32 [[N:%.*]], ptr [[DST:%.*]], ptr [[SRC:%.*]]) #[[ATTR0:[0-9]+]] {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[TMP13:%.*]] = zext i32 [[N]] to i64
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[N]], 1
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ule i32 [[TMP0]], 40
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
@@ -128,12 +129,11 @@ define void @replicate_sext(i32 %N, ptr %dst, ptr %src) #0 {
 ; CHECK-NEXT:    [[TMP12:%.*]] = or i1 [[TMP11]], [[TMP10]]
 ; CHECK-NEXT:    br i1 [[TMP12]], label %[[SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP13:%.*]] = zext i32 [[N]] to i64
-; CHECK-NEXT:    [[TMP14:%.*]] = mul nuw nsw i64 [[TMP13]], 12
-; CHECK-NEXT:    [[TMP15:%.*]] = add nuw nsw i64 [[TMP14]], 4
+; CHECK-NEXT:    [[TMP14:%.*]] = mul nuw nsw i64 12, [[TMP13]]
+; CHECK-NEXT:    [[TMP15:%.*]] = add i64 4, [[TMP14]]
 ; CHECK-NEXT:    [[SCEVGEP7:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP15]]
 ; CHECK-NEXT:    [[TMP16:%.*]] = shl nuw nsw i64 [[TMP13]], 4
-; CHECK-NEXT:    [[TMP17:%.*]] = add nuw nsw i64 [[TMP16]], 8
+; CHECK-NEXT:    [[TMP17:%.*]] = add i64 8, [[TMP16]]
 ; CHECK-NEXT:    [[SCEVGEP8:%.*]] = getelementptr i8, ptr [[SRC]], i64 [[TMP17]]
 ; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DST]], [[SCEVGEP8]]
 ; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SRC]], [[SCEVGEP7]]

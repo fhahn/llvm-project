@@ -710,9 +710,20 @@ define void @double_stride_int_scaled(ptr %p, ptr %p2, i64 %stride) {
 ;
 ; STRIDED-LABEL: @double_stride_int_scaled(
 ; STRIDED-NEXT:  entry:
+; STRIDED-NEXT:    [[TMP0:%.*]] = mul i64 [[STRIDE:%.*]], 4092
+; STRIDED-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[P2:%.*]], i64 [[TMP0]]
+; STRIDED-NEXT:    [[TMP1:%.*]] = icmp ult ptr [[P2]], [[SCEVGEP]]
+; STRIDED-NEXT:    [[UMIN:%.*]] = select i1 [[TMP1]], ptr [[P2]], ptr [[SCEVGEP]]
+; STRIDED-NEXT:    [[TMP2:%.*]] = icmp ugt ptr [[P2]], [[SCEVGEP]]
+; STRIDED-NEXT:    [[UMAX:%.*]] = select i1 [[TMP2]], ptr [[P2]], ptr [[SCEVGEP]]
+; STRIDED-NEXT:    [[SCEVGEP9:%.*]] = getelementptr i8, ptr [[P:%.*]], i64 [[TMP0]]
+; STRIDED-NEXT:    [[TMP3:%.*]] = icmp ult ptr [[P]], [[SCEVGEP9]]
+; STRIDED-NEXT:    [[UMIN3:%.*]] = select i1 [[TMP3]], ptr [[P]], ptr [[SCEVGEP9]]
+; STRIDED-NEXT:    [[TMP4:%.*]] = icmp ugt ptr [[P]], [[SCEVGEP9]]
+; STRIDED-NEXT:    [[UMAX4:%.*]] = select i1 [[TMP4]], ptr [[P]], ptr [[SCEVGEP9]]
 ; STRIDED-NEXT:    br label [[VECTOR_SCEVCHECK:%.*]]
 ; STRIDED:       vector.scevcheck:
-; STRIDED-NEXT:    [[TMP24:%.*]] = shl i64 [[STRIDE:%.*]], 2
+; STRIDED-NEXT:    [[TMP24:%.*]] = shl i64 [[STRIDE]], 2
 ; STRIDED-NEXT:    [[TMP25:%.*]] = mul i64 [[STRIDE]], -4
 ; STRIDED-NEXT:    [[TMP26:%.*]] = icmp slt i64 [[TMP24]], 0
 ; STRIDED-NEXT:    [[TMP27:%.*]] = select i1 [[TMP26]], i64 [[TMP25]], i64 [[TMP24]]
@@ -720,7 +731,7 @@ define void @double_stride_int_scaled(ptr %p, ptr %p2, i64 %stride) {
 ; STRIDED-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i64, i1 } [[MUL]], 0
 ; STRIDED-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i64, i1 } [[MUL]], 1
 ; STRIDED-NEXT:    [[TMP28:%.*]] = sub i64 0, [[MUL_RESULT]]
-; STRIDED-NEXT:    [[TMP29:%.*]] = getelementptr i8, ptr [[P2:%.*]], i64 [[MUL_RESULT]]
+; STRIDED-NEXT:    [[TMP29:%.*]] = getelementptr i8, ptr [[P2]], i64 [[MUL_RESULT]]
 ; STRIDED-NEXT:    [[TMP30:%.*]] = getelementptr i8, ptr [[P2]], i64 [[TMP28]]
 ; STRIDED-NEXT:    [[TMP31:%.*]] = icmp ult ptr [[TMP29]], [[P2]]
 ; STRIDED-NEXT:    [[TMP32:%.*]] = icmp ugt ptr [[TMP30]], [[P2]]
@@ -732,7 +743,7 @@ define void @double_stride_int_scaled(ptr %p, ptr %p2, i64 %stride) {
 ; STRIDED-NEXT:    [[MUL_RESULT2:%.*]] = extractvalue { i64, i1 } [[MUL1]], 0
 ; STRIDED-NEXT:    [[MUL_OVERFLOW3:%.*]] = extractvalue { i64, i1 } [[MUL1]], 1
 ; STRIDED-NEXT:    [[TMP16:%.*]] = sub i64 0, [[MUL_RESULT2]]
-; STRIDED-NEXT:    [[TMP35:%.*]] = getelementptr i8, ptr [[P:%.*]], i64 [[MUL_RESULT2]]
+; STRIDED-NEXT:    [[TMP35:%.*]] = getelementptr i8, ptr [[P]], i64 [[MUL_RESULT2]]
 ; STRIDED-NEXT:    [[TMP36:%.*]] = getelementptr i8, ptr [[P]], i64 [[TMP16]]
 ; STRIDED-NEXT:    [[TMP37:%.*]] = icmp ult ptr [[TMP35]], [[P]]
 ; STRIDED-NEXT:    [[TMP38:%.*]] = icmp ugt ptr [[TMP36]], [[P]]
@@ -741,18 +752,7 @@ define void @double_stride_int_scaled(ptr %p, ptr %p2, i64 %stride) {
 ; STRIDED-NEXT:    [[TMP23:%.*]] = or i1 [[TMP13]], [[TMP40]]
 ; STRIDED-NEXT:    br i1 [[TMP23]], label [[SCALAR_PH:%.*]], label [[VECTOR_MEMCHECK1:%.*]]
 ; STRIDED:       vector.memcheck:
-; STRIDED-NEXT:    [[TMP3:%.*]] = mul i64 [[STRIDE]], 4092
-; STRIDED-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[P2]], i64 [[TMP3]]
-; STRIDED-NEXT:    [[TMP4:%.*]] = icmp ult ptr [[P2]], [[SCEVGEP]]
-; STRIDED-NEXT:    [[UMIN:%.*]] = select i1 [[TMP4]], ptr [[P2]], ptr [[SCEVGEP]]
-; STRIDED-NEXT:    [[TMP5:%.*]] = icmp ugt ptr [[P2]], [[SCEVGEP]]
-; STRIDED-NEXT:    [[UMAX:%.*]] = select i1 [[TMP5]], ptr [[P2]], ptr [[SCEVGEP]]
 ; STRIDED-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[UMAX]], i64 4
-; STRIDED-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[P]], i64 [[TMP3]]
-; STRIDED-NEXT:    [[TMP6:%.*]] = icmp ult ptr [[P]], [[SCEVGEP2]]
-; STRIDED-NEXT:    [[UMIN3:%.*]] = select i1 [[TMP6]], ptr [[P]], ptr [[SCEVGEP2]]
-; STRIDED-NEXT:    [[TMP7:%.*]] = icmp ugt ptr [[P]], [[SCEVGEP2]]
-; STRIDED-NEXT:    [[UMAX4:%.*]] = select i1 [[TMP7]], ptr [[P]], ptr [[SCEVGEP2]]
 ; STRIDED-NEXT:    [[SCEVGEP5:%.*]] = getelementptr i8, ptr [[UMAX4]], i64 4
 ; STRIDED-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[UMIN]], [[SCEVGEP5]]
 ; STRIDED-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[UMIN3]], [[SCEVGEP1]]
@@ -804,10 +804,21 @@ define void @double_stride_int_scaled(ptr %p, ptr %p2, i64 %stride) {
 ; STRIDED-UF2-NEXT:    [[TMP0:%.*]] = call i64 @llvm.vscale.i64()
 ; STRIDED-UF2-NEXT:    [[TMP1:%.*]] = shl nuw i64 [[TMP0]], 3
 ; STRIDED-UF2-NEXT:    [[UMAX9:%.*]] = call i64 @llvm.umax.i64(i64 [[TMP1]], i64 79)
+; STRIDED-UF2-NEXT:    [[TMP23:%.*]] = mul i64 [[STRIDE:%.*]], 4092
+; STRIDED-UF2-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[P2:%.*]], i64 [[TMP23]]
+; STRIDED-UF2-NEXT:    [[TMP24:%.*]] = icmp ult ptr [[P2]], [[SCEVGEP]]
+; STRIDED-UF2-NEXT:    [[UMIN:%.*]] = select i1 [[TMP24]], ptr [[P2]], ptr [[SCEVGEP]]
+; STRIDED-UF2-NEXT:    [[TMP25:%.*]] = icmp ugt ptr [[P2]], [[SCEVGEP]]
+; STRIDED-UF2-NEXT:    [[UMAX:%.*]] = select i1 [[TMP25]], ptr [[P2]], ptr [[SCEVGEP]]
+; STRIDED-UF2-NEXT:    [[SCEVGEP10:%.*]] = getelementptr i8, ptr [[P:%.*]], i64 [[TMP23]]
+; STRIDED-UF2-NEXT:    [[TMP26:%.*]] = icmp ult ptr [[P]], [[SCEVGEP10]]
+; STRIDED-UF2-NEXT:    [[UMIN6:%.*]] = select i1 [[TMP26]], ptr [[P]], ptr [[SCEVGEP10]]
+; STRIDED-UF2-NEXT:    [[TMP27:%.*]] = icmp ugt ptr [[P]], [[SCEVGEP10]]
+; STRIDED-UF2-NEXT:    [[UMAX7:%.*]] = select i1 [[TMP27]], ptr [[P]], ptr [[SCEVGEP10]]
 ; STRIDED-UF2-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 1024, [[UMAX9]]
 ; STRIDED-UF2-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_SCEVCHECK:%.*]]
 ; STRIDED-UF2:       vector.scevcheck:
-; STRIDED-UF2-NEXT:    [[TMP2:%.*]] = shl i64 [[STRIDE:%.*]], 2
+; STRIDED-UF2-NEXT:    [[TMP2:%.*]] = shl i64 [[STRIDE]], 2
 ; STRIDED-UF2-NEXT:    [[TMP3:%.*]] = mul i64 [[STRIDE]], -4
 ; STRIDED-UF2-NEXT:    [[TMP4:%.*]] = icmp slt i64 [[TMP2]], 0
 ; STRIDED-UF2-NEXT:    [[TMP5:%.*]] = select i1 [[TMP4]], i64 [[TMP3]], i64 [[TMP2]]
@@ -815,7 +826,7 @@ define void @double_stride_int_scaled(ptr %p, ptr %p2, i64 %stride) {
 ; STRIDED-UF2-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i64, i1 } [[MUL]], 0
 ; STRIDED-UF2-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i64, i1 } [[MUL]], 1
 ; STRIDED-UF2-NEXT:    [[TMP6:%.*]] = sub i64 0, [[MUL_RESULT]]
-; STRIDED-UF2-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr [[P2:%.*]], i64 [[MUL_RESULT]]
+; STRIDED-UF2-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr [[P2]], i64 [[MUL_RESULT]]
 ; STRIDED-UF2-NEXT:    [[TMP8:%.*]] = getelementptr i8, ptr [[P2]], i64 [[TMP6]]
 ; STRIDED-UF2-NEXT:    [[TMP9:%.*]] = icmp ult ptr [[TMP7]], [[P2]]
 ; STRIDED-UF2-NEXT:    [[TMP10:%.*]] = icmp ugt ptr [[TMP8]], [[P2]]
@@ -827,7 +838,7 @@ define void @double_stride_int_scaled(ptr %p, ptr %p2, i64 %stride) {
 ; STRIDED-UF2-NEXT:    [[MUL_RESULT2:%.*]] = extractvalue { i64, i1 } [[MUL1]], 0
 ; STRIDED-UF2-NEXT:    [[MUL_OVERFLOW3:%.*]] = extractvalue { i64, i1 } [[MUL1]], 1
 ; STRIDED-UF2-NEXT:    [[TMP15:%.*]] = sub i64 0, [[MUL_RESULT2]]
-; STRIDED-UF2-NEXT:    [[TMP16:%.*]] = getelementptr i8, ptr [[P:%.*]], i64 [[MUL_RESULT2]]
+; STRIDED-UF2-NEXT:    [[TMP16:%.*]] = getelementptr i8, ptr [[P]], i64 [[MUL_RESULT2]]
 ; STRIDED-UF2-NEXT:    [[TMP17:%.*]] = getelementptr i8, ptr [[P]], i64 [[TMP15]]
 ; STRIDED-UF2-NEXT:    [[TMP18:%.*]] = icmp ult ptr [[TMP16]], [[P]]
 ; STRIDED-UF2-NEXT:    [[TMP19:%.*]] = icmp ugt ptr [[TMP17]], [[P]]
@@ -836,18 +847,7 @@ define void @double_stride_int_scaled(ptr %p, ptr %p2, i64 %stride) {
 ; STRIDED-UF2-NEXT:    [[TMP22:%.*]] = or i1 [[TMP12]], [[TMP21]]
 ; STRIDED-UF2-NEXT:    br i1 [[TMP22]], label [[SCALAR_PH]], label [[VECTOR_MEMCHECK:%.*]]
 ; STRIDED-UF2:       vector.memcheck:
-; STRIDED-UF2-NEXT:    [[TMP23:%.*]] = mul i64 [[STRIDE]], 4092
-; STRIDED-UF2-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[P2]], i64 [[TMP23]]
-; STRIDED-UF2-NEXT:    [[TMP24:%.*]] = icmp ult ptr [[P2]], [[SCEVGEP]]
-; STRIDED-UF2-NEXT:    [[UMIN:%.*]] = select i1 [[TMP24]], ptr [[P2]], ptr [[SCEVGEP]]
-; STRIDED-UF2-NEXT:    [[TMP25:%.*]] = icmp ugt ptr [[P2]], [[SCEVGEP]]
-; STRIDED-UF2-NEXT:    [[UMAX:%.*]] = select i1 [[TMP25]], ptr [[P2]], ptr [[SCEVGEP]]
 ; STRIDED-UF2-NEXT:    [[SCEVGEP4:%.*]] = getelementptr i8, ptr [[UMAX]], i64 4
-; STRIDED-UF2-NEXT:    [[SCEVGEP5:%.*]] = getelementptr i8, ptr [[P]], i64 [[TMP23]]
-; STRIDED-UF2-NEXT:    [[TMP26:%.*]] = icmp ult ptr [[P]], [[SCEVGEP5]]
-; STRIDED-UF2-NEXT:    [[UMIN6:%.*]] = select i1 [[TMP26]], ptr [[P]], ptr [[SCEVGEP5]]
-; STRIDED-UF2-NEXT:    [[TMP27:%.*]] = icmp ugt ptr [[P]], [[SCEVGEP5]]
-; STRIDED-UF2-NEXT:    [[UMAX7:%.*]] = select i1 [[TMP27]], ptr [[P]], ptr [[SCEVGEP5]]
 ; STRIDED-UF2-NEXT:    [[SCEVGEP8:%.*]] = getelementptr i8, ptr [[UMAX7]], i64 4
 ; STRIDED-UF2-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[UMIN]], [[SCEVGEP8]]
 ; STRIDED-UF2-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[UMIN6]], [[SCEVGEP4]]
@@ -1091,20 +1091,20 @@ define void @double_stride_ptr_iv(ptr %p, ptr %p2, i64 %stride) {
 ;
 ; STRIDED-LABEL: @double_stride_ptr_iv(
 ; STRIDED-NEXT:  entry:
-; STRIDED-NEXT:    br label [[VECTOR_MEMCHECK:%.*]]
-; STRIDED:       vector.memcheck:
 ; STRIDED-NEXT:    [[TMP3:%.*]] = mul i64 [[STRIDE:%.*]], 1023
 ; STRIDED-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[P2:%.*]], i64 [[TMP3]]
 ; STRIDED-NEXT:    [[TMP4:%.*]] = icmp ult ptr [[P2]], [[SCEVGEP]]
 ; STRIDED-NEXT:    [[UMIN:%.*]] = select i1 [[TMP4]], ptr [[P2]], ptr [[SCEVGEP]]
 ; STRIDED-NEXT:    [[TMP5:%.*]] = icmp ugt ptr [[P2]], [[SCEVGEP]]
 ; STRIDED-NEXT:    [[UMAX:%.*]] = select i1 [[TMP5]], ptr [[P2]], ptr [[SCEVGEP]]
-; STRIDED-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[UMAX]], i64 4
 ; STRIDED-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[P:%.*]], i64 [[TMP3]]
 ; STRIDED-NEXT:    [[TMP6:%.*]] = icmp ult ptr [[P]], [[SCEVGEP2]]
 ; STRIDED-NEXT:    [[UMIN3:%.*]] = select i1 [[TMP6]], ptr [[P]], ptr [[SCEVGEP2]]
 ; STRIDED-NEXT:    [[TMP7:%.*]] = icmp ugt ptr [[P]], [[SCEVGEP2]]
 ; STRIDED-NEXT:    [[UMAX4:%.*]] = select i1 [[TMP7]], ptr [[P]], ptr [[SCEVGEP2]]
+; STRIDED-NEXT:    br label [[VECTOR_MEMCHECK:%.*]]
+; STRIDED:       vector.memcheck:
+; STRIDED-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[UMAX]], i64 4
 ; STRIDED-NEXT:    [[SCEVGEP5:%.*]] = getelementptr i8, ptr [[UMAX4]], i64 4
 ; STRIDED-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[UMIN]], [[SCEVGEP5]]
 ; STRIDED-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[UMIN3]], [[SCEVGEP1]]
@@ -1157,21 +1157,21 @@ define void @double_stride_ptr_iv(ptr %p, ptr %p2, i64 %stride) {
 ; STRIDED-UF2-NEXT:    [[TMP0:%.*]] = call i64 @llvm.vscale.i64()
 ; STRIDED-UF2-NEXT:    [[TMP1:%.*]] = shl nuw i64 [[TMP0]], 3
 ; STRIDED-UF2-NEXT:    [[UMAX6:%.*]] = call i64 @llvm.umax.i64(i64 [[TMP1]], i64 28)
-; STRIDED-UF2-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 1024, [[UMAX6]]
-; STRIDED-UF2-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_MEMCHECK:%.*]]
-; STRIDED-UF2:       vector.memcheck:
 ; STRIDED-UF2-NEXT:    [[TMP2:%.*]] = mul i64 [[STRIDE:%.*]], 1023
 ; STRIDED-UF2-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[P2:%.*]], i64 [[TMP2]]
 ; STRIDED-UF2-NEXT:    [[TMP3:%.*]] = icmp ult ptr [[P2]], [[SCEVGEP]]
 ; STRIDED-UF2-NEXT:    [[UMIN:%.*]] = select i1 [[TMP3]], ptr [[P2]], ptr [[SCEVGEP]]
 ; STRIDED-UF2-NEXT:    [[TMP4:%.*]] = icmp ugt ptr [[P2]], [[SCEVGEP]]
 ; STRIDED-UF2-NEXT:    [[UMAX:%.*]] = select i1 [[TMP4]], ptr [[P2]], ptr [[SCEVGEP]]
-; STRIDED-UF2-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[UMAX]], i64 4
 ; STRIDED-UF2-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[P:%.*]], i64 [[TMP2]]
 ; STRIDED-UF2-NEXT:    [[TMP5:%.*]] = icmp ult ptr [[P]], [[SCEVGEP2]]
 ; STRIDED-UF2-NEXT:    [[UMIN3:%.*]] = select i1 [[TMP5]], ptr [[P]], ptr [[SCEVGEP2]]
 ; STRIDED-UF2-NEXT:    [[TMP6:%.*]] = icmp ugt ptr [[P]], [[SCEVGEP2]]
 ; STRIDED-UF2-NEXT:    [[UMAX4:%.*]] = select i1 [[TMP6]], ptr [[P]], ptr [[SCEVGEP2]]
+; STRIDED-UF2-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 1024, [[UMAX6]]
+; STRIDED-UF2-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_MEMCHECK:%.*]]
+; STRIDED-UF2:       vector.memcheck:
+; STRIDED-UF2-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[UMAX]], i64 4
 ; STRIDED-UF2-NEXT:    [[SCEVGEP5:%.*]] = getelementptr i8, ptr [[UMAX4]], i64 4
 ; STRIDED-UF2-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[UMIN]], [[SCEVGEP5]]
 ; STRIDED-UF2-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[UMIN3]], [[SCEVGEP1]]

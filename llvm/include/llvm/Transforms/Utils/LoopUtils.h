@@ -622,6 +622,18 @@ LLVM_ABI void appendLoopsToWorklist(LoopInfo &,
 LLVM_ABI Loop *cloneLoop(Loop *L, Loop *PL, ValueToValueMapTy &VM, LoopInfo *LI,
                          LPPassManager *LPM);
 
+/// Adjusted SCEV bounds after optional hoisting for outer loops.
+struct AdjustedBounds {
+  const SCEV *Low, *High;
+  const SCEV *Stride; ///< nullptr if no stride check needed
+};
+
+/// Compute adjusted bounds for a pointer group, potentially hoisting to the
+/// outer loop for runtime check efficiency.
+LLVM_ABI AdjustedBounds
+adjustBoundsForHoisting(const RuntimeCheckingPtrGroup *CG, Loop *TheLoop,
+                        ScalarEvolution &SE, bool HoistRuntimeChecks);
+
 /// Add code that checks at runtime if the accessed arrays in \p PointerChecks
 /// overlap. Returns the final comparator value or NULL if no check is needed.
 LLVM_ABI Value *

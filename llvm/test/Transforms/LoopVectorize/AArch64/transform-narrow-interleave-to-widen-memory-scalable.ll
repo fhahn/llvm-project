@@ -326,16 +326,16 @@ define void @test_masked_interleave_group(i32 %N, ptr %mask, ptr %src, ptr %dst)
 ; CHECK-NEXT:    [[CMP_N24:%.*]] = icmp eq i64 [[TMP1]], [[INDEX]]
 ; CHECK-NEXT:    br i1 [[CMP_N24]], label %[[EXIT]], label %[[VEC_EPILOG_SCALAR_PH]]
 ; CHECK:       [[VEC_EPILOG_SCALAR_PH]]:
-; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i32 [ [[TMP24]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[TMP10]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MEMCHECK]] ], [ 0, %[[ITER_CHECK]] ]
-; CHECK-NEXT:    [[BC_RESUME_VAL25:%.*]] = phi ptr [ [[NEXT_GEP]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[TMP12]], %[[VEC_EPILOG_ITER_CHECK]] ], [ [[DST]], %[[VECTOR_MEMCHECK]] ], [ [[DST]], %[[ITER_CHECK]] ]
-; CHECK-NEXT:    [[BC_RESUME_VAL26:%.*]] = phi ptr [ [[NEXT_GEP7]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[TMP14]], %[[VEC_EPILOG_ITER_CHECK]] ], [ [[SRC]], %[[VECTOR_MEMCHECK]] ], [ [[SRC]], %[[ITER_CHECK]] ]
-; CHECK-NEXT:    [[BC_RESUME_VAL27:%.*]] = phi ptr [ [[NEXT_GEP8]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[TMP15]], %[[VEC_EPILOG_ITER_CHECK]] ], [ [[MASK]], %[[VECTOR_MEMCHECK]] ], [ [[MASK]], %[[ITER_CHECK]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL28:%.*]] = phi i32 [ [[TMP24]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[TMP10]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MEMCHECK]] ], [ 0, %[[ITER_CHECK]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL29:%.*]] = phi ptr [ [[NEXT_GEP]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[TMP12]], %[[VEC_EPILOG_ITER_CHECK]] ], [ [[DST]], %[[VECTOR_MEMCHECK]] ], [ [[DST]], %[[ITER_CHECK]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL30:%.*]] = phi ptr [ [[NEXT_GEP7]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[TMP14]], %[[VEC_EPILOG_ITER_CHECK]] ], [ [[SRC]], %[[VECTOR_MEMCHECK]] ], [ [[SRC]], %[[ITER_CHECK]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL31:%.*]] = phi ptr [ [[NEXT_GEP8]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[TMP15]], %[[VEC_EPILOG_ITER_CHECK]] ], [ [[MASK]], %[[VECTOR_MEMCHECK]] ], [ [[MASK]], %[[ITER_CHECK]] ]
 ; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
 ; CHECK:       [[LOOP_HEADER]]:
-; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ [[BC_RESUME_VAL]], %[[VEC_EPILOG_SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
-; CHECK-NEXT:    [[DST_IV:%.*]] = phi ptr [ [[BC_RESUME_VAL25]], %[[VEC_EPILOG_SCALAR_PH]] ], [ [[DST_IV_NEXT:%.*]], %[[LOOP_LATCH]] ]
-; CHECK-NEXT:    [[SRC_IV:%.*]] = phi ptr [ [[BC_RESUME_VAL26]], %[[VEC_EPILOG_SCALAR_PH]] ], [ [[SRC_IV_NEXT:%.*]], %[[LOOP_LATCH]] ]
-; CHECK-NEXT:    [[MASK_IV:%.*]] = phi ptr [ [[BC_RESUME_VAL27]], %[[VEC_EPILOG_SCALAR_PH]] ], [ [[MASK_IV_NEXT:%.*]], %[[LOOP_LATCH]] ]
+; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ [[BC_RESUME_VAL28]], %[[VEC_EPILOG_SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
+; CHECK-NEXT:    [[DST_IV:%.*]] = phi ptr [ [[BC_RESUME_VAL29]], %[[VEC_EPILOG_SCALAR_PH]] ], [ [[DST_IV_NEXT:%.*]], %[[LOOP_LATCH]] ]
+; CHECK-NEXT:    [[SRC_IV:%.*]] = phi ptr [ [[BC_RESUME_VAL30]], %[[VEC_EPILOG_SCALAR_PH]] ], [ [[SRC_IV_NEXT:%.*]], %[[LOOP_LATCH]] ]
+; CHECK-NEXT:    [[MASK_IV:%.*]] = phi ptr [ [[BC_RESUME_VAL31]], %[[VEC_EPILOG_SCALAR_PH]] ], [ [[MASK_IV_NEXT:%.*]], %[[LOOP_LATCH]] ]
 ; CHECK-NEXT:    [[MASK_IV_NEXT]] = getelementptr i8, ptr [[MASK_IV]], i64 1
 ; CHECK-NEXT:    [[MASK_VAL:%.*]] = load i8, ptr [[MASK_IV]], align 1
 ; CHECK-NEXT:    [[SHOULD_COPY:%.*]] = icmp eq i8 [[MASK_VAL]], 0

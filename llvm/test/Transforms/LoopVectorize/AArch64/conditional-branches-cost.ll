@@ -389,7 +389,7 @@ define i32 @header_mask_and_invariant_compare(ptr %A, ptr %B, ptr %C, ptr %D, pt
 ; DEFAULT:       [[VECTOR_MEMCHECK]]:
 ; DEFAULT-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[E]], i64 4
 ; DEFAULT-NEXT:    [[TMP1:%.*]] = shl i64 [[N]], 2
-; DEFAULT-NEXT:    [[TMP2:%.*]] = add i64 [[TMP1]], 4
+; DEFAULT-NEXT:    [[TMP2:%.*]] = add i64 4, [[TMP1]]
 ; DEFAULT-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[D]], i64 [[TMP2]]
 ; DEFAULT-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[A]], i64 4
 ; DEFAULT-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[B]], i64 4
@@ -473,7 +473,7 @@ define i32 @header_mask_and_invariant_compare(ptr %A, ptr %B, ptr %C, ptr %D, pt
 ; PRED:       [[VECTOR_MEMCHECK]]:
 ; PRED-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[E]], i64 4
 ; PRED-NEXT:    [[TMP1:%.*]] = shl i64 [[N]], 2
-; PRED-NEXT:    [[TMP2:%.*]] = add i64 [[TMP1]], 4
+; PRED-NEXT:    [[TMP2:%.*]] = add i64 4, [[TMP1]]
 ; PRED-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[D]], i64 [[TMP2]]
 ; PRED-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[A]], i64 4
 ; PRED-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[B]], i64 4

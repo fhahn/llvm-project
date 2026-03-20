@@ -5,13 +5,13 @@ define void @hoist_invariant_load_noalias_due_to_memchecks(ptr %dst, ptr %invari
 ; CHECK-LABEL: define void @hoist_invariant_load_noalias_due_to_memchecks(
 ; CHECK-SAME: ptr [[DST:%.*]], ptr [[INVARIANT_PTR:%.*]], i32 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
+; CHECK-NEXT:    [[TMP1:%.*]] = zext i32 [[TMP0]] to i64
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[N]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
-; CHECK-NEXT:    [[TMP1:%.*]] = zext i32 [[TMP0]] to i64
 ; CHECK-NEXT:    [[TMP2:%.*]] = shl nuw nsw i64 [[TMP1]], 2
-; CHECK-NEXT:    [[TMP3:%.*]] = add nuw nsw i64 [[TMP2]], 4
+; CHECK-NEXT:    [[TMP3:%.*]] = add i64 4, [[TMP2]]
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP3]]
 ; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[INVARIANT_PTR]], i64 4
 ; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DST]], [[SCEVGEP1]]
@@ -130,14 +130,14 @@ exit:
 define void @dont_hoist_predicated_load(ptr %dst, ptr %invariant_ptr, ptr %cond_ptr, i32 %n) {
 ; CHECK-LABEL: define void @dont_hoist_predicated_load(
 ; CHECK-SAME: ptr [[DST:%.*]], ptr [[INVARIANT_PTR:%.*]], ptr [[COND_PTR:%.*]], i32 [[N:%.*]]) {
-; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[N]], 4
-; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]]
-; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:  [[VECTOR_MEMCHECK:.*]]:
 ; CHECK-NEXT:    [[TMP5:%.*]] = add i32 [[N]], -1
 ; CHECK-NEXT:    [[TMP20:%.*]] = zext i32 [[TMP5]] to i64
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[N]], 4
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK1:.*]]
+; CHECK:       [[VECTOR_MEMCHECK1]]:
 ; CHECK-NEXT:    [[TMP22:%.*]] = shl nuw nsw i64 [[TMP20]], 2
-; CHECK-NEXT:    [[TMP3:%.*]] = add nuw nsw i64 [[TMP22]], 4
+; CHECK-NEXT:    [[TMP3:%.*]] = add i64 4, [[TMP22]]
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP3]]
 ; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[COND_PTR]], i64 [[TMP3]]
 ; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[INVARIANT_PTR]], i64 4
@@ -169,28 +169,28 @@ define void @dont_hoist_predicated_load(ptr %dst, ptr %invariant_ptr, ptr %cond_
 ; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <4 x i1> [[TMP1]], i32 1
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[PRED_STORE_IF6:.*]], label %[[PRED_STORE_CONTINUE7:.*]]
 ; CHECK:       [[PRED_STORE_IF6]]:
-; CHECK-NEXT:    [[TMP11:%.*]] = load i32, ptr [[INVARIANT_PTR]], align 4, !alias.scope [[META14]]
+; CHECK-NEXT:    [[TMP15:%.*]] = load i32, ptr [[INVARIANT_PTR]], align 4, !alias.scope [[META14]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = add i32 [[INDEX]], 1
 ; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[TMP8]]
-; CHECK-NEXT:    store i32 [[TMP11]], ptr [[TMP13]], align 4, !alias.scope [[META16]], !noalias [[META18]]
+; CHECK-NEXT:    store i32 [[TMP15]], ptr [[TMP13]], align 4, !alias.scope [[META16]], !noalias [[META18]]
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE7]]
 ; CHECK:       [[PRED_STORE_CONTINUE7]]:
 ; CHECK-NEXT:    [[TMP10:%.*]] = extractelement <4 x i1> [[TMP1]], i32 2
 ; CHECK-NEXT:    br i1 [[TMP10]], label %[[PRED_STORE_IF8:.*]], label %[[PRED_STORE_CONTINUE9:.*]]
 ; CHECK:       [[PRED_STORE_IF8]]:
-; CHECK-NEXT:    [[TMP15:%.*]] = load i32, ptr [[INVARIANT_PTR]], align 4, !alias.scope [[META14]]
+; CHECK-NEXT:    [[TMP19:%.*]] = load i32, ptr [[INVARIANT_PTR]], align 4, !alias.scope [[META14]]
 ; CHECK-NEXT:    [[TMP12:%.*]] = add i32 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[TMP12]]
-; CHECK-NEXT:    store i32 [[TMP15]], ptr [[TMP17]], align 4, !alias.scope [[META16]], !noalias [[META18]]
+; CHECK-NEXT:    store i32 [[TMP19]], ptr [[TMP17]], align 4, !alias.scope [[META16]], !noalias [[META18]]
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE9]]
 ; CHECK:       [[PRED_STORE_CONTINUE9]]:
 ; CHECK-NEXT:    [[TMP14:%.*]] = extractelement <4 x i1> [[TMP1]], i32 3
 ; CHECK-NEXT:    br i1 [[TMP14]], label %[[PRED_STORE_IF10:.*]], label %[[PRED_STORE_CONTINUE11]]
 ; CHECK:       [[PRED_STORE_IF10]]:
-; CHECK-NEXT:    [[TMP19:%.*]] = load i32, ptr [[INVARIANT_PTR]], align 4, !alias.scope [[META14]]
+; CHECK-NEXT:    [[TMP23:%.*]] = load i32, ptr [[INVARIANT_PTR]], align 4, !alias.scope [[META14]]
 ; CHECK-NEXT:    [[TMP16:%.*]] = add i32 [[INDEX]], 3
 ; CHECK-NEXT:    [[TMP21:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[TMP16]]
-; CHECK-NEXT:    store i32 [[TMP19]], ptr [[TMP21]], align 4, !alias.scope [[META16]], !noalias [[META18]]
+; CHECK-NEXT:    store i32 [[TMP23]], ptr [[TMP21]], align 4, !alias.scope [[META16]], !noalias [[META18]]
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE11]]
 ; CHECK:       [[PRED_STORE_CONTINUE11]]:
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
@@ -200,7 +200,7 @@ define void @dont_hoist_predicated_load(ptr %dst, ptr %invariant_ptr, ptr %cond_
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i32 [[N]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:
-; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i32 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ], [ 0, %[[VECTOR_MEMCHECK]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i32 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[VECTOR_MEMCHECK]] ], [ 0, %[[VECTOR_MEMCHECK1]] ]
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]

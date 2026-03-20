@@ -13,7 +13,9 @@ define void @test_predicated_load_cast_hint(ptr %dst.1, ptr %dst.2, ptr %src, i8
 ; CHECK-NEXT:    [[N_SUB:%.*]] = add i32 [[N_EXT]], -15
 ; CHECK-NEXT:    [[SMAX16:%.*]] = call i32 @llvm.smax.i32(i32 [[N_SUB]], i32 4)
 ; CHECK-NEXT:    [[TMP0:%.*]] = add nsw i32 [[SMAX16]], -1
-; CHECK-NEXT:    [[TMP1:%.*]] = lshr i32 [[TMP0]], 2
+; CHECK-NEXT:    [[TMP20:%.*]] = zext nneg i32 [[TMP0]] to i64
+; CHECK-NEXT:    [[TMP13:%.*]] = add nsw i32 [[SMAX16]], -1
+; CHECK-NEXT:    [[TMP1:%.*]] = lshr i32 [[TMP13]], 2
 ; CHECK-NEXT:    [[TMP2:%.*]] = add nuw nsw i32 [[TMP1]], 1
 ; CHECK-NEXT:    br label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
@@ -45,13 +47,10 @@ define void @test_predicated_load_cast_hint(ptr %dst.1, ptr %dst.2, ptr %src, i8
 ; CHECK-NEXT:    [[SCEVGEP5:%.*]] = getelementptr i8, ptr [[SRC]], i64 1
 ; CHECK-NEXT:    [[TMP18:%.*]] = shl i64 [[OFF]], 3
 ; CHECK-NEXT:    [[SCEVGEP6:%.*]] = getelementptr i8, ptr [[DST_1]], i64 [[TMP18]]
-; CHECK-NEXT:    [[SMAX7:%.*]] = call i32 @llvm.smax.i32(i32 [[N_SUB]], i32 4)
-; CHECK-NEXT:    [[TMP19:%.*]] = add nsw i32 [[SMAX7]], -1
-; CHECK-NEXT:    [[TMP20:%.*]] = zext nneg i32 [[TMP19]] to i64
 ; CHECK-NEXT:    [[TMP21:%.*]] = lshr i64 [[TMP20]], 2
 ; CHECK-NEXT:    [[TMP22:%.*]] = shl nuw nsw i64 [[TMP21]], 9
-; CHECK-NEXT:    [[TMP23:%.*]] = add i64 [[TMP22]], [[TMP18]]
-; CHECK-NEXT:    [[TMP24:%.*]] = add i64 [[TMP23]], 8
+; CHECK-NEXT:    [[TMP29:%.*]] = add i64 8, [[TMP18]]
+; CHECK-NEXT:    [[TMP24:%.*]] = add i64 [[TMP29]], [[TMP22]]
 ; CHECK-NEXT:    [[SCEVGEP8:%.*]] = getelementptr i8, ptr [[DST_1]], i64 [[TMP24]]
 ; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DST_2]], [[SCEVGEP5]]
 ; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SRC]], [[SCEVGEP4]]

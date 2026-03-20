@@ -36,6 +36,14 @@ define void @foo(ptr %p, ptr %p.strided, i64 %n, i64 %stride) {
 ; NO-UNIT-STRIDE-MV-NEXT:    [[MUL:%.*]] = mul nuw nsw i64 [[ADD]], [[ADD]]
 ; NO-UNIT-STRIDE-MV-NEXT:    [[OUT_OFFSET:%.*]] = add i64 [[MUL]], 16
 ; NO-UNIT-STRIDE-MV-NEXT:    [[OUT:%.*]] = getelementptr i64, ptr [[P]], i64 [[OUT_OFFSET]]
+; NO-UNIT-STRIDE-MV-NEXT:    [[TMP0:%.*]] = mul i64 [[STRIDE]], 504
+; NO-UNIT-STRIDE-MV-NEXT:    [[SCEVGEP12:%.*]] = getelementptr i8, ptr [[P_STRIDED]], i64 [[TMP0]]
+; NO-UNIT-STRIDE-MV-NEXT:    [[TMP1:%.*]] = shl i64 [[STRIDE]], 3
+; NO-UNIT-STRIDE-MV-NEXT:    [[SCEVGEP13:%.*]] = getelementptr i8, ptr [[P_STRIDED]], i64 [[TMP1]]
+; NO-UNIT-STRIDE-MV-NEXT:    [[TMP16:%.*]] = icmp ult ptr [[SCEVGEP12]], [[SCEVGEP13]]
+; NO-UNIT-STRIDE-MV-NEXT:    [[UMIN:%.*]] = select i1 [[TMP16]], ptr [[SCEVGEP12]], ptr [[SCEVGEP13]]
+; NO-UNIT-STRIDE-MV-NEXT:    [[TMP19:%.*]] = icmp ugt ptr [[SCEVGEP12]], [[SCEVGEP13]]
+; NO-UNIT-STRIDE-MV-NEXT:    [[UMAX:%.*]] = select i1 [[TMP19]], ptr [[SCEVGEP12]], ptr [[SCEVGEP13]]
 ; NO-UNIT-STRIDE-MV-NEXT:    br label %[[VECTOR_SCEVCHECK:.*]]
 ; NO-UNIT-STRIDE-MV:       [[VECTOR_SCEVCHECK]]:
 ; NO-UNIT-STRIDE-MV-NEXT:    [[TMP2:%.*]] = shl i64 [[STRIDE]], 3
@@ -55,22 +63,15 @@ define void @foo(ptr %p, ptr %p.strided, i64 %n, i64 %stride) {
 ; NO-UNIT-STRIDE-MV-NEXT:    [[TMP12:%.*]] = or i1 [[TMP11]], [[MUL_OVERFLOW]]
 ; NO-UNIT-STRIDE-MV-NEXT:    br i1 [[TMP12]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; NO-UNIT-STRIDE-MV:       [[VECTOR_MEMCHECK]]:
-; NO-UNIT-STRIDE-MV-NEXT:    [[TMP13:%.*]] = mul i64 [[ADD]], [[ADD]]
+; NO-UNIT-STRIDE-MV-NEXT:    [[TMP13:%.*]] = add nuw nsw i64 2, [[STRIDE]]
 ; NO-UNIT-STRIDE-MV-NEXT:    [[TMP14:%.*]] = shl i64 [[TMP13]], 3
-; NO-UNIT-STRIDE-MV-NEXT:    [[TMP15:%.*]] = add i64 [[TMP14]], 136
+; NO-UNIT-STRIDE-MV-NEXT:    [[TMP17:%.*]] = mul i64 [[TMP14]], [[TMP13]]
+; NO-UNIT-STRIDE-MV-NEXT:    [[TMP15:%.*]] = add i64 136, [[TMP17]]
 ; NO-UNIT-STRIDE-MV-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[P]], i64 [[TMP15]]
-; NO-UNIT-STRIDE-MV-NEXT:    [[TMP18:%.*]] = add i64 [[TMP14]], 640
+; NO-UNIT-STRIDE-MV-NEXT:    [[TMP18:%.*]] = add i64 640, [[TMP17]]
 ; NO-UNIT-STRIDE-MV-NEXT:    [[SCEVGEP4:%.*]] = getelementptr i8, ptr [[P]], i64 [[TMP18]]
 ; NO-UNIT-STRIDE-MV-NEXT:    [[SCEVGEP5:%.*]] = getelementptr i8, ptr [[P]], i64 8
 ; NO-UNIT-STRIDE-MV-NEXT:    [[SCEVGEP6:%.*]] = getelementptr i8, ptr [[P]], i64 512
-; NO-UNIT-STRIDE-MV-NEXT:    [[TMP20:%.*]] = mul i64 [[STRIDE]], 504
-; NO-UNIT-STRIDE-MV-NEXT:    [[SCEVGEP7:%.*]] = getelementptr i8, ptr [[P_STRIDED]], i64 [[TMP20]]
-; NO-UNIT-STRIDE-MV-NEXT:    [[TMP21:%.*]] = shl i64 [[STRIDE]], 3
-; NO-UNIT-STRIDE-MV-NEXT:    [[SCEVGEP8:%.*]] = getelementptr i8, ptr [[P_STRIDED]], i64 [[TMP21]]
-; NO-UNIT-STRIDE-MV-NEXT:    [[TMP22:%.*]] = icmp ult ptr [[SCEVGEP7]], [[SCEVGEP8]]
-; NO-UNIT-STRIDE-MV-NEXT:    [[UMIN:%.*]] = select i1 [[TMP22]], ptr [[SCEVGEP7]], ptr [[SCEVGEP8]]
-; NO-UNIT-STRIDE-MV-NEXT:    [[TMP23:%.*]] = icmp ugt ptr [[SCEVGEP7]], [[SCEVGEP8]]
-; NO-UNIT-STRIDE-MV-NEXT:    [[UMAX:%.*]] = select i1 [[TMP23]], ptr [[SCEVGEP7]], ptr [[SCEVGEP8]]
 ; NO-UNIT-STRIDE-MV-NEXT:    [[SCEVGEP9:%.*]] = getelementptr i8, ptr [[UMAX]], i64 8
 ; NO-UNIT-STRIDE-MV-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[SCEVGEP2]], [[SCEVGEP6]]
 ; NO-UNIT-STRIDE-MV-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SCEVGEP5]], [[SCEVGEP4]]

@@ -15,7 +15,7 @@ define void @fn(i32 noundef %n, ptr %in, ptr %out) #0 {
 ; CHECK:       [[FOR_BODY_PREHEADER]]:
 ; CHECK-NEXT:    br label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = mul i32 [[N]], 3
+; CHECK-NEXT:    [[TMP0:%.*]] = mul i32 3, [[N]]
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[OUT]], i32 [[TMP0]]
 ; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[IN]], i32 [[TMP0]]
 ; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[OUT]], [[SCEVGEP1]]
