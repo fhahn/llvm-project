@@ -569,7 +569,7 @@ const VPRegionBlock *VPBasicBlock::getEnclosingLoopRegion() const {
   return getEnclosingLoopRegionForRegion(getParent());
 }
 
-static bool hasConditionalTerminator(const VPBasicBlock *VPBB) {
+static bool hasTerminator(const VPBasicBlock *VPBB) {
   if (VPBB->empty()) {
     assert(
         VPBB->getNumSuccessors() < 2 &&
@@ -578,6 +578,11 @@ static bool hasConditionalTerminator(const VPBasicBlock *VPBB) {
   }
 
   const VPRecipeBase *R = &VPBB->back();
+  if (match(R, m_VPInstruction<Instruction::Ret>())) {
+    assert(!VPBB->getParent() && VPBB->getNumSuccessors() == 0 &&
+           "return must exit the plan");
+    return true;
+  }
   [[maybe_unused]] bool IsSwitch =
       isa<VPInstruction>(R) &&
       cast<VPInstruction>(R)->getOpcode() == Instruction::Switch;
@@ -608,13 +613,13 @@ static bool hasConditionalTerminator(const VPBasicBlock *VPBB) {
 }
 
 VPRecipeBase *VPBasicBlock::getTerminator() {
-  if (hasConditionalTerminator(this))
+  if (hasTerminator(this))
     return &back();
   return nullptr;
 }
 
 const VPRecipeBase *VPBasicBlock::getTerminator() const {
-  if (hasConditionalTerminator(this))
+  if (hasTerminator(this))
     return &back();
   return nullptr;
 }
@@ -624,9 +629,21 @@ bool VPBasicBlock::isExiting() const {
 }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+/// Print the oracle plans defined in the blocks reachable from \p Entry, named
+/// by the enclosing plan's \p SlotTracker.
+static void printOraclePlans(raw_ostream &O, const VPBlockBase *Entry,
+                             VPSlotTracker &SlotTracker) {
+  for (const VPBasicBlock *VPBB :
+       VPBlockUtils::blocksOnly<const VPBasicBlock>(vp_depth_first_deep(Entry)))
+    for (const VPRecipeBase &R : *VPBB)
+      if (auto *Oracle = dyn_cast<VPSpeculativeLoadOracleRecipe>(&R))
+        Oracle->printOraclePlan(O, SlotTracker);
+}
+
 void VPBlockBase::print(raw_ostream &O) const {
   VPSlotTracker SlotTracker(getPlan());
   print(O, "", SlotTracker);
+  printOraclePlans(O, this, SlotTracker);
 }
 
 void VPBlockBase::printSuccessors(raw_ostream &O, const Twine &Indent) const {
@@ -1101,11 +1118,10 @@ void VPlan::printLiveIns(raw_ostream &O) const {
   }
 }
 
-LLVM_DUMP_METHOD
-void VPlan::print(raw_ostream &O) const {
+void VPlan::print(raw_ostream &O, const Twine &Title) const {
   VPSlotTracker SlotTracker(this);
 
-  O << "VPlan '" << getName() << "' {";
+  O << Title << " {";
 
   printLiveIns(O);
 
@@ -1117,6 +1133,13 @@ void VPlan::print(raw_ostream &O) const {
   }
 
   O << "}\n";
+
+  printOraclePlans(O, getEntry(), SlotTracker);
+}
+
+LLVM_DUMP_METHOD
+void VPlan::print(raw_ostream &O) const {
+  print(O, "VPlan '" + getName() + "'");
 }
 
 std::string VPlan::getName() const {

@@ -436,6 +436,7 @@ public:
     VPReductionSC,
     VPReplicateSC,
     VPScalarIVStepsSC,
+    VPSpeculativeLoadOracleSC,
     VPVectorPointerSC,
     VPVectorEndPointerSC,
     VPWidenCallSC,
@@ -640,6 +641,7 @@ public:
     case VPRecipeBase::VPReductionSC:
     case VPRecipeBase::VPReplicateSC:
     case VPRecipeBase::VPScalarIVStepsSC:
+    case VPRecipeBase::VPSpeculativeLoadOracleSC:
     case VPRecipeBase::VPVectorPointerSC:
     case VPRecipeBase::VPVectorEndPointerSC:
     case VPRecipeBase::VPWidenCallSC:
@@ -1301,6 +1303,8 @@ public:
 /// the VPInstruction is also a single def-use vertex. Most VPInstruction
 /// opcodes can take an optional mask. Masks may be assigned during
 /// predication.
+/// Instruction::Ret returns its operand's first lane and terminates a top-level
+/// block without successors.
 class LLVM_ABI_FOR_TEST VPInstruction : public VPRecipeWithIRFlags,
                                         public VPIRMetadata {
 public:
@@ -3545,6 +3549,42 @@ public:
   }
 };
 
+/// Holds a cloned VPlan replaying the early-exit conditions lane-by-lane and
+/// defines a pointer to the function generated from it, returning the number of
+/// accessible bytes. Operands are its arguments: canonical IV, then live-ins.
+class VPSpeculativeLoadOracleRecipe : public VPSingleDefRecipe {
+  std::unique_ptr<VPlan> OraclePlan;
+
+public:
+  VPSpeculativeLoadOracleRecipe(std::unique_ptr<VPlan> OraclePlan,
+                                ArrayRef<VPValue *> Args, LLVMContext &Ctx)
+      : VPSingleDefRecipe(VPRecipeBase::VPSpeculativeLoadOracleSC, Args,
+                          PointerType::getUnqual(Ctx)),
+        OraclePlan(std::move(OraclePlan)) {}
+
+  VP_CLASSOF_IMPL(VPRecipeBase::VPSpeculativeLoadOracleSC)
+
+  VPSpeculativeLoadOracleRecipe *clone() override;
+  void execute(VPTransformState &State) override;
+
+  InstructionCost computeCost(ElementCount VF, VPCostContext &) const override {
+    return VF.isScalable() ? InstructionCost::getInvalid() : InstructionCost(0);
+  }
+
+  bool usesFirstLaneOnly(const VPValue *Op) const override { return true; }
+
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+  /// Print the oracle plan to \p O, named as \p Tracker names this recipe.
+  void printOraclePlan(raw_ostream &O, VPSlotTracker &Tracker) const;
+#endif
+
+protected:
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+  void printRecipe(raw_ostream &O, const Twine &Indent,
+                   VPSlotTracker &Tracker) const override;
+#endif
+};
+
 /// A recipe to combine multiple recipes into a single 'expression' recipe,
 /// which should be considered a single entity for cost-modeling and transforms.
 /// The recipe needs to be 'decomposed', i.e. replaced by its individual
@@ -4526,8 +4566,7 @@ public:
   using VPBlockBase::print; // Get the print(raw_stream &O) version.
 #endif
 
-  /// If the block has multiple successors, return the branch recipe terminating
-  /// the block. If there are no or only a single successor, return nullptr;
+  /// Return the branch or return recipe terminating the block, if any.
   VPRecipeBase *getTerminator();
   const VPRecipeBase *getTerminator() const;
 
@@ -5174,6 +5213,9 @@ public:
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   /// Print the live-ins of this VPlan to \p O.
   void printLiveIns(raw_ostream &O) const;
+
+  /// Print this VPlan to \p O, headed by \p Title.
+  void print(raw_ostream &O, const Twine &Title) const;
 
   /// Print this VPlan to \p O.
   LLVM_ABI_FOR_TEST void print(raw_ostream &O) const;
