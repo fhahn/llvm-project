@@ -212,8 +212,8 @@ loop.end:
 
 define i64 @same_exit_block_pre_inc_use1_too_small_allocas() !dbg !4 {
 ; CHECK-DEBUG-LABEL: LV: Checking a loop in 'same_exit_block_pre_inc_use1_too_small_allocas'
-; CHECK-DEBUG:       LV: Not vectorizing: Auto-vectorization of early exit loops with potentially faulting loads is not supported.
-; CHECK-REMARK:      foo.c:5:3: loop not vectorized: Auto-vectorization of early exit loops with potentially faulting loads is not supported
+; CHECK-DEBUG:       LV: We can vectorize this loop!
+; CHECK-DEBUG-NOT:   LV: Not vectorizing:
 entry:
   %p1 = alloca [42 x i8]
   %p2 = alloca [42 x i8]
@@ -243,8 +243,8 @@ loop.end:
 
 define i64 @same_exit_block_pre_inc_use1_too_small_deref_ptrs(ptr dereferenceable(42) %p1, ptr dereferenceable(42) %p2) !dbg !41 {
 ; CHECK-DEBUG-LABEL: LV: Checking a loop in 'same_exit_block_pre_inc_use1_too_small_deref_ptrs'
-; CHECK-DEBUG:       LV: Not vectorizing: Auto-vectorization of early exit loops with potentially faulting loads is not supported.
-; CHECK-REMARK:      foo.c:70:3: loop not vectorized: Auto-vectorization of early exit loops with potentially faulting loads is not supported
+; CHECK-DEBUG:       LV: We can vectorize this loop!
+; CHECK-DEBUG-NOT:   LV: Not vectorizing:
 entry:
   br label %loop, !dbg !42
 
@@ -270,8 +270,8 @@ loop.end:
 
 define i64 @same_exit_block_pre_inc_use1_unknown_ptrs(ptr %p1, ptr %p2) !dbg !43 {
 ; CHECK-DEBUG-LABEL: LV: Checking a loop in 'same_exit_block_pre_inc_use1_unknown_ptrs'
-; CHECK-DEBUG:       LV: Not vectorizing: Auto-vectorization of early exit loops with potentially faulting loads is not supported.
-; CHECK-REMARK:      foo.c:80:3: loop not vectorized: Auto-vectorization of early exit loops with potentially faulting loads is not supported
+; CHECK-DEBUG:       LV: We can vectorize this loop!
+; CHECK-DEBUG-NOT:   LV: Not vectorizing:
 entry:
   br label %loop, !dbg !44
 

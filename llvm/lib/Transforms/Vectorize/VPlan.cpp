@@ -578,7 +578,7 @@ const VPRegionBlock *VPBasicBlock::getEnclosingLoopRegion() const {
   return getEnclosingLoopRegionForRegion(getParent());
 }
 
-static bool hasConditionalTerminator(const VPBasicBlock *VPBB) {
+static bool hasTerminator(const VPBasicBlock *VPBB) {
   if (VPBB->empty()) {
     assert(
         VPBB->getNumSuccessors() < 2 &&
@@ -587,6 +587,8 @@ static bool hasConditionalTerminator(const VPBasicBlock *VPBB) {
   }
 
   const VPRecipeBase *R = &VPBB->back();
+  if (match(R, m_VPInstruction<Instruction::Ret>()))
+    return true;
   [[maybe_unused]] bool IsSwitch =
       isa<VPInstruction>(R) &&
       cast<VPInstruction>(R)->getOpcode() == Instruction::Switch;
@@ -617,13 +619,13 @@ static bool hasConditionalTerminator(const VPBasicBlock *VPBB) {
 }
 
 VPRecipeBase *VPBasicBlock::getTerminator() {
-  if (hasConditionalTerminator(this))
+  if (hasTerminator(this))
     return &back();
   return nullptr;
 }
 
 const VPRecipeBase *VPBasicBlock::getTerminator() const {
-  if (hasConditionalTerminator(this))
+  if (hasTerminator(this))
     return &back();
   return nullptr;
 }
@@ -1115,11 +1117,10 @@ void VPlan::printLiveIns(raw_ostream &O) const {
   }
 }
 
-LLVM_DUMP_METHOD
-void VPlan::print(raw_ostream &O) const {
+void VPlan::print(raw_ostream &O, const Twine &Title) const {
   VPSlotTracker SlotTracker(this);
 
-  O << "VPlan '" << getName() << "' {";
+  O << Title << " {";
 
   printLiveIns(O);
 
@@ -1131,6 +1132,20 @@ void VPlan::print(raw_ostream &O) const {
   }
 
   O << "}\n";
+
+  for (const VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<const VPBasicBlock>(
+           vp_depth_first_deep(getEntry())))
+    for (const auto &Oracle :
+         make_isa_range<const VPSpeculativeLoadOracleRecipe>(*VPBB)) {
+      O << '\n';
+      Oracle.getOraclePlan().print(O, "VPlan for speculative-load oracle " +
+                                          SlotTracker.getOrCreateName(&Oracle));
+    }
+}
+
+LLVM_DUMP_METHOD
+void VPlan::print(raw_ostream &O) const {
+  print(O, "VPlan '" + getName() + "'");
 }
 
 std::string VPlan::getName() const {

@@ -3312,6 +3312,7 @@ static bool willGenerateVectors(VPlan &Plan, ElementCount VF,
       case VPRecipeBase::VPExpandSCEVSC:
       case VPRecipeBase::VPPredInstPHISC:
       case VPRecipeBase::VPBranchOnMaskSC:
+      case VPRecipeBase::VPSpeculativeLoadOracleSC:
         continue;
       case VPRecipeBase::VPReductionSC:
       case VPRecipeBase::VPActiveLaneMaskPHISC:
@@ -5653,7 +5654,7 @@ LoopVectorizationPlanner::computeBestVF() {
     return {VectorizationFactor(FirstPlan.getSingleVF(), 0, 0), &FirstPlan};
   }
 
-  if (hasPlanWithVF(UserVF) && hasForcedEpilogueVF() && VPlans.size() == 2) {
+  if (FirstPlan.hasVF(UserVF) && hasForcedEpilogueVF() && VPlans.size() == 2) {
     assert(VPlans[0]->getSingleVF() == UserVF &&
            "expected second plan to be for the forced UserVF");
     assert(VPlans[1]->getSingleVF() == EpilogueVectorizationForceVF &&
@@ -5789,11 +5790,13 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   // TODO: Move to VPlan transform stage once the transition to the VPlan-based
   // cost model is complete for better cost estimates.
   RUN_VPLAN_PASS(VPlanTransforms::unrollByUF, BestVPlan, BestUF);
+  bool HasBranchWeights =
+      hasBranchWeightMD(*OrigLoop->getLoopLatch()->getTerminator());
+  RUN_VPLAN_PASS(VPlanTransforms::attachSpeculativeLoadChecks, BestVPlan,
+                 BestVF, PSE, OrigLoop, HasBranchWeights);
   RUN_VPLAN_PASS(VPlanTransforms::materializePacksAndUnpacks, BestVPlan);
   RUN_VPLAN_PASS(VPlanTransforms::materializeBroadcasts, BestVPlan);
   RUN_VPLAN_PASS(VPlanTransforms::replicateByVF, BestVPlan, BestVF);
-  bool HasBranchWeights =
-      hasBranchWeightMD(*OrigLoop->getLoopLatch()->getTerminator());
   if (HasBranchWeights) {
     std::optional<unsigned> VScale = Config.getVScaleForTuning();
     RUN_VPLAN_PASS(VPlanTransforms::addBranchWeightToMiddleTerminator,
@@ -6686,7 +6689,8 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan,
                     VPReplicateRecipe, VPWidenLoadRecipe, VPWidenStoreRecipe,
                     VPWidenCallRecipe, VPWidenIntrinsicRecipe,
                     VPVectorPointerRecipe, VPVectorEndPointerRecipe,
-                    VPHistogramRecipe, VPInstruction>) &&
+                    VPHistogramRecipe, VPSpeculativeLoadOracleRecipe,
+                    VPInstruction>) &&
         "Unexpected recipe");
     for (VPInstruction &VPI :
          make_early_inc_range(make_isa_range<VPInstruction>(*VPBB))) {
@@ -8044,6 +8048,15 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     LLVM_DEBUG(dbgs() << "LV: Not interleaving due to EE with side effects.\n");
     IntDiagMsg = {"EEWithSideEffectsPreventsInterleaving",
                   "Unable to interleave due to early exit with side effects."};
+    InterleaveLoop = false;
+    IC = 1;
+  }
+
+  // FIXME: Enable interleaving for plans with speculative loads.
+  if (InterleaveLoop && vputils::findSpeculativeLoadOracle(*BestPlanPtr)) {
+    LLVM_DEBUG(dbgs() << "LV: Not interleaving loop with speculative loads.\n");
+    IntDiagMsg = {"SpeculativeLoadPreventsInterleaving",
+                  "Unable to interleave loop using speculative loads."};
     InterleaveLoop = false;
     IC = 1;
   }
