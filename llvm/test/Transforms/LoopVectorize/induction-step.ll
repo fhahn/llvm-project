@@ -48,8 +48,8 @@ define void @induction_with_global(i32 %init, ptr noalias nocapture %A, i32 %N) 
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <8 x i32> [ [[INDUCTION]], %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[TMP8]]
 ; CHECK-NEXT:    store <8 x i32> [[VEC_IND]], ptr [[TMP9]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP8]], 8
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nsw <8 x i32> [[VEC_IND]], [[DOTSPLAT6]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP8]], 8
 ; CHECK-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP12]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -137,8 +137,8 @@ define i32 @induction_with_loop_inv(i32 %init, ptr noalias nocapture %A, i32 %N,
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <8 x i32> [ [[INDUCTION]], %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[TMP6]]
 ; CHECK-NEXT:    store <8 x i32> [[VEC_IND]], ptr [[TMP7]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP6]], 8
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nsw <8 x i32> [[VEC_IND]], [[DOTSPLAT6]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP6]], 8
 ; CHECK-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP10]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -229,8 +229,8 @@ define void @non_primary_iv_loop_inv_trunc(ptr %a, i64 %n, i64 %step) {
 ; CHECK-NEXT:    [[VEC_IND10:%.*]] = phi <8 x i32> [ [[TMP2]], %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[TMP6]]
 ; CHECK-NEXT:    store <8 x i32> [[VEC_IND10]], ptr [[TMP7]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP6]], 8
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <8 x i32> [[VEC_IND10]], [[DOTSPLAT9]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP6]], 8
 ; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP9]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -284,8 +284,8 @@ define void @iv_no_binary_op_in_descriptor(i1 %c, ptr %dst) {
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <8 x i64> [ <i64 0, i64 1, i64 2, i64 3, i64 4, i64 5, i64 6, i64 7>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i64, ptr [[DST]], i64 [[TMP0]]
 ; CHECK-NEXT:    store <8 x i64> [[VEC_IND]], ptr [[TMP1]], align 8
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP0]], 8
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <8 x i64> [[VEC_IND]], splat (i64 8)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP0]], 8
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1000
 ; CHECK-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -337,8 +337,8 @@ define void @wide_add_induction_step_live_in(ptr %dst, i64 %N, i16 %off) {
 ; CHECK-NEXT:    [[TMP4:%.*]] = add <8 x i16> [[VEC_IND]], [[DOTSPLAT1]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i16, ptr [[DST]], i64 [[TMP3]]
 ; CHECK-NEXT:    store <8 x i16> [[TMP4]], ptr [[TMP5]], align 2
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP3]], 8
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <8 x i16> [[VEC_IND]], [[BROADCAST_SPLAT]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP3]], 8
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP7]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP9:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -406,8 +406,8 @@ define void @wide_sub_induction_step_live_in(ptr %dst, i64 %N, i16 %off) {
 ; CHECK-NEXT:    [[TMP5:%.*]] = sub <8 x i16> [[VEC_IND]], [[DOTSPLAT]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i16, ptr [[DST]], i64 [[TMP4]]
 ; CHECK-NEXT:    store <8 x i16> [[TMP5]], ptr [[TMP6]], align 2
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP4]], 8
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <8 x i16> [[VEC_IND]], [[BROADCAST_SPLAT]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP4]], 8
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP8]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP11:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

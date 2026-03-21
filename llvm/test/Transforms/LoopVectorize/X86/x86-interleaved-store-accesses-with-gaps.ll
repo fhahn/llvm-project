@@ -65,8 +65,8 @@ define void @test1(ptr noalias nocapture %points, ptr noalias nocapture readonly
 ; DISABLED_MASKED_STRIDED-NEXT:    store i16 [[TMP16]], ptr [[TMP25]], align 2
 ; DISABLED_MASKED_STRIDED-NEXT:    store i16 [[TMP17]], ptr [[TMP26]], align 2
 ; DISABLED_MASKED_STRIDED-NEXT:    store i16 [[TMP18]], ptr [[TMP27]], align 2
-; DISABLED_MASKED_STRIDED-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; DISABLED_MASKED_STRIDED-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[VEC_IND]], splat (i64 4)
+; DISABLED_MASKED_STRIDED-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; DISABLED_MASKED_STRIDED-NEXT:    [[TMP28:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1024
 ; DISABLED_MASKED_STRIDED-NEXT:    br i1 [[TMP28]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; DISABLED_MASKED_STRIDED:       [[MIDDLE_BLOCK]]:
@@ -224,8 +224,8 @@ define void @test2(ptr noalias nocapture %points, i32 %numPoints, ptr noalias no
 ; DISABLED_MASKED_STRIDED-NEXT:    store i16 [[TMP32]], ptr [[TMP31]], align 2
 ; DISABLED_MASKED_STRIDED-NEXT:    br label %[[PRED_STORE_CONTINUE15]]
 ; DISABLED_MASKED_STRIDED:       [[PRED_STORE_CONTINUE15]]:
-; DISABLED_MASKED_STRIDED-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; DISABLED_MASKED_STRIDED-NEXT:    [[VEC_IND_NEXT]] = add <4 x i64> [[VEC_IND]], splat (i64 4)
+; DISABLED_MASKED_STRIDED-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; DISABLED_MASKED_STRIDED-NEXT:    [[TMP33:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; DISABLED_MASKED_STRIDED-NEXT:    br i1 [[TMP33]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
 ; DISABLED_MASKED_STRIDED:       [[MIDDLE_BLOCK]]:
@@ -264,8 +264,8 @@ define void @test2(ptr noalias nocapture %points, i32 %numPoints, ptr noalias no
 ; ENABLED_MASKED_STRIDED-NEXT:    [[INTERLEAVED_MASK:%.*]] = shufflevector <4 x i1> [[TMP0]], <4 x i1> poison, <16 x i32> <i32 0, i32 0, i32 0, i32 0, i32 1, i32 1, i32 1, i32 1, i32 2, i32 2, i32 2, i32 2, i32 3, i32 3, i32 3, i32 3>
 ; ENABLED_MASKED_STRIDED-NEXT:    [[TMP4:%.*]] = and <16 x i1> [[INTERLEAVED_MASK]], <i1 true, i1 true, i1 false, i1 false, i1 true, i1 true, i1 false, i1 false, i1 true, i1 true, i1 false, i1 false, i1 true, i1 true, i1 false, i1 false>
 ; ENABLED_MASKED_STRIDED-NEXT:    call void @llvm.masked.store.v16i16.p0(<16 x i16> [[INTERLEAVED_VEC]], ptr align 2 [[TMP2]], <16 x i1> [[TMP4]])
-; ENABLED_MASKED_STRIDED-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; ENABLED_MASKED_STRIDED-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i64> [[VEC_IND]], splat (i64 4)
+; ENABLED_MASKED_STRIDED-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; ENABLED_MASKED_STRIDED-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; ENABLED_MASKED_STRIDED-NEXT:    br i1 [[TMP5]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
 ; ENABLED_MASKED_STRIDED:       [[MIDDLE_BLOCK]]:
@@ -366,8 +366,8 @@ define void @test(ptr noalias nocapture %points, ptr noalias nocapture readonly 
 ; DISABLED_MASKED_STRIDED-NEXT:    store i16 [[TMP18]], ptr [[TMP17]], align 2
 ; DISABLED_MASKED_STRIDED-NEXT:    br label %[[PRED_STORE_CONTINUE6]]
 ; DISABLED_MASKED_STRIDED:       [[PRED_STORE_CONTINUE6]]:
-; DISABLED_MASKED_STRIDED-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; DISABLED_MASKED_STRIDED-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[VEC_IND]], splat (i64 4)
+; DISABLED_MASKED_STRIDED-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; DISABLED_MASKED_STRIDED-NEXT:    [[TMP19:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1024
 ; DISABLED_MASKED_STRIDED-NEXT:    br i1 [[TMP19]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; DISABLED_MASKED_STRIDED:       [[MIDDLE_BLOCK]]:
@@ -424,8 +424,8 @@ define void @test(ptr noalias nocapture %points, ptr noalias nocapture readonly 
 ; ENABLED_MASKED_STRIDED-NEXT:    store i16 [[TMP18]], ptr [[TMP17]], align 2
 ; ENABLED_MASKED_STRIDED-NEXT:    br label %[[PRED_STORE_CONTINUE6]]
 ; ENABLED_MASKED_STRIDED:       [[PRED_STORE_CONTINUE6]]:
-; ENABLED_MASKED_STRIDED-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; ENABLED_MASKED_STRIDED-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[VEC_IND]], splat (i64 4)
+; ENABLED_MASKED_STRIDED-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; ENABLED_MASKED_STRIDED-NEXT:    [[TMP19:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1024
 ; ENABLED_MASKED_STRIDED-NEXT:    br i1 [[TMP19]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; ENABLED_MASKED_STRIDED:       [[MIDDLE_BLOCK]]:

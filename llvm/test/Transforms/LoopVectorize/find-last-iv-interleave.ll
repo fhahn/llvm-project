@@ -25,8 +25,8 @@ define i64 @findlast_iv_interleave(ptr %a, i64 %n) {
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq <4 x i64> [[WIDE_LOAD2]], splat (i64 42)
 ; CHECK-NEXT:    [[TMP4]] = select <4 x i1> [[TMP2]], <4 x i64> [[VEC_IND]], <4 x i64> [[VEC_PHI]]
 ; CHECK-NEXT:    [[TMP5]] = select <4 x i1> [[TMP3]], <4 x i64> [[STEP_ADD]], <4 x i64> [[VEC_PHI1]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[STEP_ADD]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -100,8 +100,8 @@ define i64 @findlast_iv_start5_interleave(ptr %a, i64 %n) {
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq <4 x i64> [[WIDE_LOAD2]], splat (i64 42)
 ; CHECK-NEXT:    [[TMP6]] = select <4 x i1> [[TMP4]], <4 x i64> [[VEC_IND]], <4 x i64> [[VEC_PHI]]
 ; CHECK-NEXT:    [[TMP7]] = select <4 x i1> [[TMP5]], <4 x i64> [[STEP_ADD]], <4 x i64> [[VEC_PHI1]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[STEP_ADD]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP8]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -204,8 +204,8 @@ define i64 @findlast_iv_step2_interleave(ptr %a, i64 %n) {
 ; CHECK-NEXT:    [[TMP37:%.*]] = icmp eq <4 x i64> [[TMP35]], splat (i64 42)
 ; CHECK-NEXT:    [[TMP38]] = select <4 x i1> [[TMP36]], <4 x i64> [[VEC_IND]], <4 x i64> [[VEC_PHI]]
 ; CHECK-NEXT:    [[TMP39]] = select <4 x i1> [[TMP37]], <4 x i64> [[STEP_ADD]], <4 x i64> [[VEC_PHI1]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[STEP_ADD]], splat (i64 8)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[TMP40:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP40]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -276,8 +276,8 @@ define i32 @findlast_iv_i32_interleave(ptr %a, i32 %n) {
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq <4 x i32> [[WIDE_LOAD2]], splat (i32 42)
 ; CHECK-NEXT:    [[TMP4]] = select <4 x i1> [[TMP2]], <4 x i32> [[VEC_IND]], <4 x i32> [[VEC_PHI]]
 ; CHECK-NEXT:    [[TMP5]] = select <4 x i1> [[TMP3]], <4 x i32> [[STEP_ADD]], <4 x i32> [[VEC_PHI1]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 8
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i32> [[STEP_ADD]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 8
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

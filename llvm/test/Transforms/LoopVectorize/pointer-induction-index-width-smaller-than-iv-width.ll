@@ -23,8 +23,8 @@ define void @wide_ptr_induction_index_width_smaller_than_iv_width(ptr noalias %s
 ; CHECK-NEXT:    store <4 x i64> [[WIDE_LOAD]], ptr [[TMP10]], align 8
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds ptr, ptr [[DST_1]], i64 [[TMP4]]
 ; CHECK-NEXT:    store <4 x ptr> [[VECTOR_GEP]], ptr [[TMP3]], align 8
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP4]], 4
 ; CHECK-NEXT:    [[PTR_IND]] = getelementptr i8, ptr [[POINTER_PHI]], i32 32
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP4]], 4
 ; CHECK-NEXT:    [[TMP15:%.*]] = icmp eq i64 [[INDEX_NEXT]], 100
 ; CHECK-NEXT:    br i1 [[TMP15]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

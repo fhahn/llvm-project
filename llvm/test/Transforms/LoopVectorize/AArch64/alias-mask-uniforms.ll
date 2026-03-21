@@ -82,8 +82,8 @@ define void @vf_dependent_uniform(ptr noalias %p, ptr %p.out, ptr %p.in, i64 %n)
 ; CHECK-NEXT:    [[TMP36:%.*]] = add <4 x i64> [[TMP34]], [[WIDE_MASKED_LOAD]]
 ; CHECK-NEXT:    [[TMP37:%.*]] = getelementptr i64, ptr [[P_OUT]], i64 [[INDEX]]
 ; CHECK-NEXT:    call void @llvm.masked.store.v4i64.p0(<4 x i64> [[TMP36]], ptr align 8 [[TMP37]], <4 x i1> [[MASK]])
-; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], [[NUM_ACTIVE_LANES]]
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i64> [[VEC_IND]], [[BROADCAST_SPLAT]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], [[NUM_ACTIVE_LANES]]
 ; CHECK-NEXT:    [[TMP38:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP38]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -151,8 +151,8 @@ define void @uniform_load(ptr noalias %p, ptr %p.out, ptr %p.in, i64 %n) {
 ; CHECK-NEXT:    [[TMP19:%.*]] = add <4 x i64> [[TMP17]], [[WIDE_MASKED_LOAD]]
 ; CHECK-NEXT:    [[TMP20:%.*]] = getelementptr i64, ptr [[P_OUT]], i64 [[INDEX]]
 ; CHECK-NEXT:    call void @llvm.masked.store.v4i64.p0(<4 x i64> [[TMP19]], ptr align 8 [[TMP20]], <4 x i1> [[MASK]])
-; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], [[NUM_ACTIVE_LANES]]
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i64> [[VEC_IV]], [[BROADCAST_SPLAT1]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], [[NUM_ACTIVE_LANES]]
 ; CHECK-NEXT:    [[TMP21:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP21]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -243,8 +243,8 @@ define void @uniform_store(ptr noalias %p, ptr %p.out, ptr %p.in, i64 %n) {
 ; CHECK:       [[PRED_STORE_CONTINUE10]]:
 ; CHECK-NEXT:    [[TMP20:%.*]] = getelementptr i64, ptr [[P_OUT]], i64 [[INDEX]]
 ; CHECK-NEXT:    call void @llvm.masked.store.v4i64.p0(<4 x i64> [[TMP11]], ptr align 8 [[TMP20]], <4 x i1> [[MASK]])
-; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], [[NUM_ACTIVE_LANES]]
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i64> [[VEC_IV]], [[BROADCAST_SPLAT1]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], [[NUM_ACTIVE_LANES]]
 ; CHECK-NEXT:    [[TMP21:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP21]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

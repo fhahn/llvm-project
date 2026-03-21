@@ -10,7 +10,6 @@ define void @sink_replicate_region_1(i32 %x, ptr %ptr, ptr noalias %dst) optsize
 ; CHECK-LABEL: VPlan for loop in 'sink_replicate_region_1'
 ; CHECK:  VPlan 'Initial VPlan for VF={2},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in vp<[[VP3:%[0-9]+]]> = backedge-taken count
 ; CHECK-EMPTY:
@@ -69,8 +68,7 @@ define void @sink_replicate_region_1(i32 %x, ptr %ptr, ptr noalias %dst) optsize
 ; CHECK-NEXT:    Successor(s): loop.2
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    loop.2:
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP4]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -124,7 +122,6 @@ define void @sink_replicate_region_2(i32 %x, i8 %y, ptr %ptr, i32 %z) optsize {
 ; CHECK-LABEL: VPlan for loop in 'sink_replicate_region_2'
 ; CHECK:  VPlan 'Initial VPlan for VF={2},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in vp<[[VP3:%[0-9]+]]> = backedge-taken count
 ; CHECK-EMPTY:
@@ -167,8 +164,7 @@ define void @sink_replicate_region_2(i32 %x, i8 %y, ptr %ptr, i32 %z) optsize {
 ; CHECK-NEXT:    Successor(s): if.1
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    if.1:
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP4]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -219,7 +215,6 @@ exit:
 define i32 @sink_replicate_region_3_reduction(i32 %x, i8 %y, ptr %ptr) optsize {
 ; CHECK-LABEL: VPlan for loop in 'sink_replicate_region_3_reduction'
 ; CHECK:  VPlan 'Initial VPlan for VF={2},UF>=1' {
-; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = backedge-taken count
 ; CHECK-EMPTY:
@@ -260,8 +255,7 @@ define i32 @sink_replicate_region_3_reduction(i32 %x, i8 %y, ptr %ptr) optsize {
 ; CHECK-NEXT:    loop.0:
 ; CHECK-NEXT:      WIDEN ir<%add> = add vp<[[VP8]]>, ir<%recur.next>
 ; CHECK-NEXT:      WIDEN ir<%and.red.next> = and ir<%and.red>, ir<%add>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP0]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP4]]>, vp<{{[^>]+}}>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -317,7 +311,6 @@ define void @sink_replicate_region_4_requires_split_at_end_of_block(i32 %x, ptr 
 ; CHECK-LABEL: VPlan for loop in 'sink_replicate_region_4_requires_split_at_end_of_block'
 ; CHECK:  VPlan 'Initial VPlan for VF={2},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in vp<[[VP3:%[0-9]+]]> = backedge-taken count
 ; CHECK-EMPTY:
@@ -397,8 +390,7 @@ define void @sink_replicate_region_4_requires_split_at_end_of_block(i32 %x, ptr 
 ; CHECK-NEXT:    Successor(s): loop.3
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    loop.3:
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP4]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -459,7 +451,6 @@ define void @sink_replicate_region_after_replicate_region(ptr %ptr, ptr noalias 
 ; CHECK-LABEL: VPlan for loop in 'sink_replicate_region_after_replicate_region'
 ; CHECK:  VPlan 'Initial VPlan for VF={2},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in vp<[[VP3:%[0-9]+]]> = backedge-taken count
 ; CHECK-EMPTY:
@@ -502,8 +493,7 @@ define void @sink_replicate_region_after_replicate_region(ptr %ptr, ptr noalias 
 ; CHECK-NEXT:    Successor(s): loop.3
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    loop.3:
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP5]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP5]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -557,7 +547,6 @@ define void @need_new_block_after_sinking_pr56146(i32 %x, ptr %src, ptr noalias 
 ; CHECK-LABEL: VPlan for loop in 'need_new_block_after_sinking_pr56146'
 ; CHECK:  VPlan 'Initial VPlan for VF={2},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in vp<[[VP3:%[0-9]+]]> = backedge-taken count
 ; CHECK-EMPTY:
@@ -597,8 +586,7 @@ define void @need_new_block_after_sinking_pr56146(i32 %x, ptr %src, ptr noalias 
 ; CHECK-NEXT:    Successor(s): loop.1
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    loop.1:
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP4]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block

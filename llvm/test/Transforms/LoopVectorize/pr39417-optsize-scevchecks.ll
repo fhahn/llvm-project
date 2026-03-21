@@ -76,8 +76,8 @@ define void @scev4stride1(ptr noalias nocapture %a, ptr noalias nocapture readon
 ; CHECK-NEXT:    [[TMP20:%.*]] = insertelement <4 x i32> [[TMP19]], i32 [[TMP16]], i32 3
 ; CHECK-NEXT:    [[TMP21:%.*]] = getelementptr inbounds i32, ptr [[A]], i32 [[INDEX]]
 ; CHECK-NEXT:    store <4 x i32> [[TMP20]], ptr [[TMP21]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i32> [[VEC_IND]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP24:%.*]] = icmp eq i32 [[INDEX_NEXT]], 1024
 ; CHECK-NEXT:    br i1 [[TMP24]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

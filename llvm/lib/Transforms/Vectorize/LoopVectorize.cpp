@@ -3509,16 +3509,17 @@ std::unique_ptr<VPlan> LoopVectorizationPlanner::selectBestEpiloguePlan(
     return nullptr;
   }
 
-  // Check if a plan's vector loop processes fewer iterations than VF (e.g. when
-  // interleave groups have been narrowed) narrowInterleaveGroups)  and return
-  // the adjusted, effective VF.
-  using namespace VPlanPatternMatch;
+  // Check if a plan's vector loop processes fewer iterations than VF (e.g.
+  // when interleave groups have been narrowed by narrowInterleaveGroups) and
+  // return the adjusted, effective VF. Only the fixed-VF narrowing reduces the
+  // effective VF to a single element; the scalable narrowing still processes
+  // VScale elements per iteration, so its effective VF is unchanged.
   auto GetEffectiveVF = [](VPlan &Plan, ElementCount VF) -> ElementCount {
-    auto *Exiting = Plan.getVectorLoopRegion()->getExitingBasicBlock();
-    if (match(&Exiting->back(),
-              m_BranchOnCount(m_Add(m_CanonicalIV(), m_Specific(&Plan.getUF())),
-                              m_VPValue())))
-      return ElementCount::get(1, VF.isScalable());
+    if (auto *Region = Plan.getVectorLoopRegion()) {
+      if (Region->getStripFactorKind() ==
+          VPCanonicalIVInfo::StripFactorKind::NarrowFixed)
+        return ElementCount::get(1, VF.isScalable());
+    }
     return VF;
   };
 
@@ -6661,13 +6662,10 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan,
   VPRegionBlock *LoopRegion = Plan->getVectorLoopRegion();
   bool HasNUW = !IVUpdateMayOverflow || Style == TailFoldingStyle::None;
   if (!HasNUW) {
-    auto *IVInc =
-        LoopRegion->getExitingBasicBlock()->getTerminator()->getOperand(0);
-    assert(match(IVInc,
-                 m_VPInstruction<Instruction::Add>(
-                     m_Specific(LoopRegion->getCanonicalIV()), m_VPValue())) &&
-           "Did not find the canonical IV increment");
-    LoopRegion->clearCanonicalIVNUW(cast<VPInstruction>(IVInc));
+    assert(LoopRegion->getExitingBasicBlock()->getTerminator()->getOperand(0) ==
+               LoopRegion->getCanonicalIV() &&
+           "expected canonical IV as BranchOnCount operand");
+    LoopRegion->clearCanonicalIVNUW();
   }
 
   // ---------------------------------------------------------------------------
@@ -6859,7 +6857,7 @@ void LoopVectorizationPlanner::addReductionResultComputation(
   VPRegionBlock *VectorLoopRegion = Plan->getVectorLoopRegion();
   VPBasicBlock *MiddleVPBB = Plan->getMiddleBlock();
   VPBasicBlock *LatchVPBB = VectorLoopRegion->getExitingBasicBlock();
-  Builder.setInsertPoint(&*std::prev(std::prev(LatchVPBB->end())));
+  Builder.setInsertPoint(LatchVPBB, LatchVPBB->getTerminator()->getIterator());
   VPBasicBlock::iterator IP = MiddleVPBB->getFirstNonPhi();
   VPValue *HeaderMask = vputils::findHeaderMask(*Plan);
   for (VPRecipeBase &R :
@@ -7434,7 +7432,7 @@ preparePlanForMainVectorLoop(VPlan &MainPlan, VPlan &EpiPlan) {
   auto *Term =
       MainPlan.getVectorLoopRegion()->getExitingBasicBlock()->getTerminator();
   [[maybe_unused]] bool MatchedTC =
-      match(Term, m_BranchOnCount(m_VPValue(), m_VPValue(VectorTC)));
+      match(Term, m_BranchOnCount(m_VPValue(), m_VPValue(), m_VPValue(VectorTC)));
   assert(MatchedTC && "must match vector trip count");
 
   // If there is a suitable resume value for the canonical induction in the
@@ -7523,26 +7521,24 @@ static SmallVector<Instruction *> preparePlanForEpilogueVectorLoop(
   VPValue *VPV = Plan.getOrAddLiveIn(EPResumeVal);
   assert(all_of(IV->users(),
                 [](const VPUser *U) {
-                  if (isa<VPScalarIVStepsRecipe, VPDerivedIVRecipe>(U))
+                  if (isa<VPScalarIVStepsRecipe, VPDerivedIVRecipe,
+                          VPWidenCanonicalIVRecipe>(U))
                     return true;
                   unsigned Opc = cast<VPInstruction>(U)->getOpcode();
-                  return Instruction::isCast(Opc) || Opc == Instruction::Add;
+                  return Instruction::isCast(Opc) ||
+                         Opc == Instruction::Add ||
+                         Opc == VPInstruction::BranchOnCount ||
+                         Opc == VPInstruction::BranchOnCondOrCount;
                 }) &&
-         "the canonical IV should only be used by its increment or "
-         "ScalarIVSteps when resetting the start value");
+         "the canonical IV should only be used by its increment, "
+         "BranchOnCount, or ScalarIVSteps when resetting the start value");
   VPBuilder Builder(Header, Header->getFirstNonPhi());
   VPInstruction *Add = Builder.createAdd(IV, VPV);
-  // Replace all users of the canonical IV and its increment with the offset
-  // version, except for the Add itself and the canonical IV increment.
-  auto *Increment = vputils::findCanonicalIVIncrement(Plan);
-  assert(Increment && "Must have a canonical IV increment at this point");
-  IV->replaceUsesWithIf(Add, [Add, Increment](VPUser &U, unsigned) {
-    return &U != Add && &U != Increment;
-  });
-  VPInstruction *OffsetIVInc =
-      VPBuilder::getToInsertAfter(Increment).createAdd(Increment, VPV);
-  Increment->replaceAllUsesWith(OffsetIVInc);
-  OffsetIVInc->setOperand(0, Increment);
+  // Replace all users of the canonical IV with the offset version, except for
+  // the Add itself. Dissolution detects the offset Add and folds it into the
+  // scalar phi's start value, so no separate increment update is needed.
+  IV->replaceUsesWithIf(
+      Add, [Add](VPUser &U, unsigned) { return &U != Add; });
 
   DenseMap<Value *, Value *> ToFrozen;
   SmallVector<Instruction *> InstsToMove;

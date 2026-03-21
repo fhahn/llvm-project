@@ -34,9 +34,9 @@ define void @test(ptr %base_a, ptr %base_b, i32 %ntypes) {
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [4 x i8], ptr [[BASE_A]], <4 x i64> [[VEC_IND1]]
 ; CHECK-NEXT:    [[TMP23:%.*]] = getelementptr inbounds [8 x i8], ptr [[BASE_B]], i64 [[TMP20]]
 ; CHECK-NEXT:    call void @llvm.masked.store.v4p0.p0(<4 x ptr> [[TMP3]], ptr align 8 [[TMP23]], <4 x i1> [[TMP0]])
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP20]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[VEC_IND1]], [[BROADCAST_SPLAT4]]
 ; CHECK-NEXT:    [[VEC_IND_NEXT6]] = add nuw <4 x i64> [[VEC_IND]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP20]], 4
 ; CHECK-NEXT:    [[TMP25:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP25]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

@@ -208,8 +208,8 @@ define void @wide_truncated_iv(ptr %dst) {
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr [[TMP2]], i64 8
 ; CHECK-NEXT:    store <8 x i8> [[VEC_IND]], ptr [[TMP2]], align 1
 ; CHECK-NEXT:    store <8 x i8> [[STEP_ADD]], ptr [[TMP5]], align 1
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 16
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <8 x i8> [[STEP_ADD]], splat (i8 8)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 16
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], 192
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -228,8 +228,8 @@ define void @wide_truncated_iv(ptr %dst) {
 ; CHECK-NEXT:    [[VEC_IND4:%.*]] = phi <8 x i8> [ [[INDUCTION]], %[[VEC_EPILOG_PH]] ], [ [[VEC_IND_NEXT6:%.*]], %[[LOOP]] ]
 ; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr i8, ptr [[DST]], i64 [[INDEX3]]
 ; CHECK-NEXT:    store <8 x i8> [[VEC_IND4]], ptr [[TMP9]], align 1
-; CHECK-NEXT:    [[INDEX_NEXT7]] = add nuw i64 [[INDEX3]], 8
 ; CHECK-NEXT:    [[VEC_IND_NEXT6]] = add <8 x i8> [[VEC_IND4]], splat (i8 8)
+; CHECK-NEXT:    [[INDEX_NEXT7]] = add nuw i64 [[INDEX3]], 8
 ; CHECK-NEXT:    [[TMP11:%.*]] = icmp eq i64 [[INDEX_NEXT7]], 200
 ; CHECK-NEXT:    br i1 [[TMP11]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[LOOP]], !llvm.loop [[LOOP9:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_MIDDLE_BLOCK]]:
@@ -288,8 +288,8 @@ define i64 @test_ptr_ivs_and_widened_ivs(ptr %src, i32 %N) {
 ; CHECK-NEXT:    [[NEXT_GEP:%.*]] = getelementptr i8, ptr [[SRC]], i64 [[OFFSET_IDX]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr i32, ptr [[NEXT_GEP]], i64 4
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP6]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[STEP_ADD]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[TMP11:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP11]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP11:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -655,8 +655,8 @@ define void@sext_sub_nsw_for_address(ptr %base, i64 %n, ptr %src) #0 {
 ; CHECK-NEXT:    [[TMP82:%.*]] = shufflevector <2 x double> zeroinitializer, <2 x double> [[TMP78]], <4 x i32> <i32 0, i32 1, i32 2, i32 3>
 ; CHECK-NEXT:    [[INTERLEAVED_VEC19:%.*]] = shufflevector <4 x double> [[TMP82]], <4 x double> poison, <4 x i32> <i32 0, i32 2, i32 1, i32 3>
 ; CHECK-NEXT:    store <4 x double> [[INTERLEAVED_VEC19]], ptr [[TMP38]], align 8, !alias.scope [[META20]], !noalias [[META17]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <2 x i32> [[STEP_ADD_3]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[TMP83:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP83]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP22:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -697,8 +697,8 @@ define void@sext_sub_nsw_for_address(ptr %base, i64 %n, ptr %src) #0 {
 ; CHECK-NEXT:    [[TMP99:%.*]] = shufflevector <2 x double> zeroinitializer, <2 x double> [[TMP98]], <4 x i32> <i32 0, i32 1, i32 2, i32 3>
 ; CHECK-NEXT:    [[INTERLEAVED_VEC25:%.*]] = shufflevector <4 x double> [[TMP99]], <4 x double> poison, <4 x i32> <i32 0, i32 2, i32 1, i32 3>
 ; CHECK-NEXT:    store <4 x double> [[INTERLEAVED_VEC25]], ptr [[TMP88]], align 8, !alias.scope [[META20]], !noalias [[META17]]
-; CHECK-NEXT:    [[INDEX_NEXT26]] = add nuw i64 [[INDEX23]], 2
 ; CHECK-NEXT:    [[VEC_IND_NEXT27]] = add <2 x i32> [[VEC_IND24]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT26]] = add nuw i64 [[INDEX23]], 2
 ; CHECK-NEXT:    [[TMP100:%.*]] = icmp eq i64 [[INDEX_NEXT26]], [[N_VEC21]]
 ; CHECK-NEXT:    br i1 [[TMP100]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP24:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_MIDDLE_BLOCK]]:

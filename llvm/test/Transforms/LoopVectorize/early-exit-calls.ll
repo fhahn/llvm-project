@@ -17,9 +17,9 @@ define i32 @early_exit_with_extractvalue(ptr dereferenceable(1024) align 8 %src,
 ; CHECK-NEXT:    [[TMP2:%.*]] = extractvalue { <4 x i32>, <4 x i1> } [[TMP1]], 1
 ; CHECK-NEXT:    [[TMP3:%.*]] = freeze <4 x i1> [[TMP2]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP3]])
+; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i32> [[VEC_IND]], splat (i32 4)
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i32 [[IV_NEXT]], 60
-; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i32> [[VEC_IND]], splat (i32 4)
 ; CHECK-NEXT:    br i1 [[TMP4]], label %[[VECTOR_EARLY_EXIT:.*]], label %[[EARLY_EXIT]]
 ; CHECK:       [[EARLY_EXIT]]:
 ; CHECK-NEXT:    br i1 [[TMP5]], label %[[MIDDLE_BLOCK:.*]], label %[[LATCH]], !llvm.loop [[LOOP0:![0-9]+]]

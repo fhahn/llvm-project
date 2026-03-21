@@ -16,8 +16,8 @@ define i64 @reduction(i64 %arg) #0 {
 ; CHECK-NEXT:    [[STEP_ADD:%.*]] = add nuw <4 x i64> [[VEC_IND]], splat (i64 4)
 ; CHECK-NEXT:    [[TMP5]] = or <4 x i32> [[VEC_PHI]], splat (i32 1)
 ; CHECK-NEXT:    [[TMP1]] = or <4 x i32> [[VEC_PHI2]], splat (i32 1)
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nsw <4 x i64> [[STEP_ADD]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], 96
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

@@ -123,8 +123,8 @@ define void @ld_lshr1_step1_start0_ind1(ptr noalias %A, ptr noalias %B) {
 ; VF4-NEXT:    [[TMP17:%.*]] = add nsw <4 x i64> [[TMP16]], splat (i64 42)
 ; VF4-NEXT:    [[TMP18:%.*]] = getelementptr inbounds i64, ptr [[B]], i64 [[INDEX]]
 ; VF4-NEXT:    store <4 x i64> [[TMP17]], ptr [[TMP18]], align 8
-; VF4-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; VF4-NEXT:    [[VEC_IND_NEXT]] = add nsw <4 x i64> [[VEC_IND]], splat (i64 4)
+; VF4-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; VF4-NEXT:    [[TMP19:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1000
 ; VF4-NEXT:    br i1 [[TMP19]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
 ; VF4:       middle.block:
@@ -246,8 +246,8 @@ define void @ld_lshr0_step2_start0_ind1(ptr noalias %A, ptr noalias %B) {
 ; VF2-NEXT:    [[TMP15:%.*]] = getelementptr inbounds i64, ptr [[B]], i64 [[TMP1]]
 ; VF2-NEXT:    store i64 [[TMP12]], ptr [[TMP14]], align 8
 ; VF2-NEXT:    store i64 [[TMP13]], ptr [[TMP15]], align 8
-; VF2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; VF2-NEXT:    [[VEC_IND_NEXT]] = add nsw <2 x i64> [[VEC_IND]], splat (i64 4)
+; VF2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; VF2-NEXT:    [[TMP16:%.*]] = icmp eq i64 [[INDEX_NEXT]], 500
 ; VF2-NEXT:    br i1 [[TMP16]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
 ; VF2:       middle.block:
@@ -298,8 +298,8 @@ define void @ld_lshr0_step2_start0_ind1(ptr noalias %A, ptr noalias %B) {
 ; VF4-NEXT:    store i64 [[TMP23]], ptr [[TMP27]], align 8
 ; VF4-NEXT:    store i64 [[TMP24]], ptr [[TMP28]], align 8
 ; VF4-NEXT:    store i64 [[TMP25]], ptr [[TMP29]], align 8
-; VF4-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; VF4-NEXT:    [[VEC_IND_NEXT]] = add nsw <4 x i64> [[VEC_IND]], splat (i64 8)
+; VF4-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; VF4-NEXT:    [[TMP30:%.*]] = icmp eq i64 [[INDEX_NEXT]], 500
 ; VF4-NEXT:    br i1 [[TMP30]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
 ; VF4:       middle.block:
@@ -436,8 +436,8 @@ define void @ld_lshr0_step3_start0_ind1(ptr noalias %A, ptr noalias %B) {
 ; VF2-NEXT:    [[TMP15:%.*]] = getelementptr inbounds i64, ptr [[B]], i64 [[TMP1]]
 ; VF2-NEXT:    store i64 [[TMP12]], ptr [[TMP14]], align 8
 ; VF2-NEXT:    store i64 [[TMP13]], ptr [[TMP15]], align 8
-; VF2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; VF2-NEXT:    [[VEC_IND_NEXT]] = add nsw <2 x i64> [[VEC_IND]], splat (i64 6)
+; VF2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; VF2-NEXT:    [[TMP16:%.*]] = icmp eq i64 [[INDEX_NEXT]], 332
 ; VF2-NEXT:    br i1 [[TMP16]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
 ; VF2:       middle.block:
@@ -487,8 +487,8 @@ define void @ld_lshr0_step3_start0_ind1(ptr noalias %A, ptr noalias %B) {
 ; VF4-NEXT:    store i64 [[TMP23]], ptr [[TMP27]], align 8
 ; VF4-NEXT:    store i64 [[TMP24]], ptr [[TMP28]], align 8
 ; VF4-NEXT:    store i64 [[TMP25]], ptr [[TMP29]], align 8
-; VF4-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; VF4-NEXT:    [[VEC_IND_NEXT]] = add nsw <4 x i64> [[VEC_IND]], splat (i64 12)
+; VF4-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; VF4-NEXT:    [[TMP30:%.*]] = icmp eq i64 [[INDEX_NEXT]], 332
 ; VF4-NEXT:    br i1 [[TMP30]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
 ; VF4:       middle.block:
@@ -541,8 +541,8 @@ define void @ld_lshr1_step3_start0_ind1(ptr noalias %A, ptr noalias %B) {
 ; VF2-NEXT:    [[TMP15:%.*]] = getelementptr inbounds i64, ptr [[B]], i64 [[TMP1]]
 ; VF2-NEXT:    store i64 [[TMP12]], ptr [[TMP14]], align 8
 ; VF2-NEXT:    store i64 [[TMP13]], ptr [[TMP15]], align 8
-; VF2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; VF2-NEXT:    [[VEC_IND_NEXT]] = add nsw <2 x i64> [[VEC_IND]], splat (i64 6)
+; VF2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; VF2-NEXT:    [[TMP16:%.*]] = icmp eq i64 [[INDEX_NEXT]], 332
 ; VF2-NEXT:    br i1 [[TMP16]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP9:![0-9]+]]
 ; VF2:       middle.block:
@@ -592,8 +592,8 @@ define void @ld_lshr1_step3_start0_ind1(ptr noalias %A, ptr noalias %B) {
 ; VF4-NEXT:    store i64 [[TMP23]], ptr [[TMP27]], align 8
 ; VF4-NEXT:    store i64 [[TMP24]], ptr [[TMP28]], align 8
 ; VF4-NEXT:    store i64 [[TMP25]], ptr [[TMP29]], align 8
-; VF4-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; VF4-NEXT:    [[VEC_IND_NEXT]] = add nsw <4 x i64> [[VEC_IND]], splat (i64 12)
+; VF4-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; VF4-NEXT:    [[TMP30:%.*]] = icmp eq i64 [[INDEX_NEXT]], 332
 ; VF4-NEXT:    br i1 [[TMP30]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP9:![0-9]+]]
 ; VF4:       middle.block:
@@ -642,8 +642,8 @@ define void @ld_lshr1_step1_start1_ind1(ptr noalias %A, ptr noalias %B) {
 ; VF2-NEXT:    [[TMP10:%.*]] = add nsw <2 x i64> [[TMP9]], splat (i64 42)
 ; VF2-NEXT:    [[TMP11:%.*]] = getelementptr inbounds i64, ptr [[B]], i64 [[TMP0]]
 ; VF2-NEXT:    store <2 x i64> [[TMP10]], ptr [[TMP11]], align 8
-; VF2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; VF2-NEXT:    [[VEC_IND_NEXT]] = add nsw <2 x i64> [[VEC_IND]], splat (i64 2)
+; VF2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; VF2-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[INDEX_NEXT]], 998
 ; VF2-NEXT:    br i1 [[TMP12]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP11:![0-9]+]]
 ; VF2:       middle.block:
@@ -680,8 +680,8 @@ define void @ld_lshr1_step1_start1_ind1(ptr noalias %A, ptr noalias %B) {
 ; VF4-NEXT:    [[TMP18:%.*]] = add nsw <4 x i64> [[TMP17]], splat (i64 42)
 ; VF4-NEXT:    [[TMP19:%.*]] = getelementptr inbounds i64, ptr [[B]], i64 [[TMP0]]
 ; VF4-NEXT:    store <4 x i64> [[TMP18]], ptr [[TMP19]], align 8
-; VF4-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; VF4-NEXT:    [[VEC_IND_NEXT]] = add nsw <4 x i64> [[VEC_IND]], splat (i64 4)
+; VF4-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; VF4-NEXT:    [[TMP20:%.*]] = icmp eq i64 [[INDEX_NEXT]], 996
 ; VF4-NEXT:    br i1 [[TMP20]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP11:![0-9]+]]
 ; VF4:       middle.block:
@@ -818,8 +818,8 @@ define void @ld_lshr1_step3_start1_ind1(ptr noalias %A, ptr noalias %B) {
 ; VF2-NEXT:    [[TMP16:%.*]] = getelementptr inbounds i64, ptr [[B]], i64 [[TMP2]]
 ; VF2-NEXT:    store i64 [[TMP13]], ptr [[TMP15]], align 8
 ; VF2-NEXT:    store i64 [[TMP14]], ptr [[TMP16]], align 8
-; VF2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; VF2-NEXT:    [[VEC_IND_NEXT]] = add nsw <2 x i64> [[VEC_IND]], splat (i64 6)
+; VF2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; VF2-NEXT:    [[TMP17:%.*]] = icmp eq i64 [[INDEX_NEXT]], 332
 ; VF2-NEXT:    br i1 [[TMP17]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP15:![0-9]+]]
 ; VF2:       middle.block:
@@ -870,8 +870,8 @@ define void @ld_lshr1_step3_start1_ind1(ptr noalias %A, ptr noalias %B) {
 ; VF4-NEXT:    store i64 [[TMP24]], ptr [[TMP28]], align 8
 ; VF4-NEXT:    store i64 [[TMP25]], ptr [[TMP29]], align 8
 ; VF4-NEXT:    store i64 [[TMP26]], ptr [[TMP30]], align 8
-; VF4-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; VF4-NEXT:    [[VEC_IND_NEXT]] = add nsw <4 x i64> [[VEC_IND]], splat (i64 12)
+; VF4-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; VF4-NEXT:    [[TMP31:%.*]] = icmp eq i64 [[INDEX_NEXT]], 332
 ; VF4-NEXT:    br i1 [[TMP31]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP15:![0-9]+]]
 ; VF4:       middle.block:
@@ -925,8 +925,8 @@ define void @ld_lshr2_step3_start1_ind1(ptr noalias %A, ptr noalias %B) {
 ; VF2-NEXT:    [[TMP16:%.*]] = getelementptr inbounds i64, ptr [[B]], i64 [[TMP2]]
 ; VF2-NEXT:    store i64 [[TMP13]], ptr [[TMP15]], align 8
 ; VF2-NEXT:    store i64 [[TMP14]], ptr [[TMP16]], align 8
-; VF2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; VF2-NEXT:    [[VEC_IND_NEXT]] = add nsw <2 x i64> [[VEC_IND]], splat (i64 6)
+; VF2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; VF2-NEXT:    [[TMP17:%.*]] = icmp eq i64 [[INDEX_NEXT]], 332
 ; VF2-NEXT:    br i1 [[TMP17]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP17:![0-9]+]]
 ; VF2:       middle.block:
@@ -977,8 +977,8 @@ define void @ld_lshr2_step3_start1_ind1(ptr noalias %A, ptr noalias %B) {
 ; VF4-NEXT:    store i64 [[TMP24]], ptr [[TMP28]], align 8
 ; VF4-NEXT:    store i64 [[TMP25]], ptr [[TMP29]], align 8
 ; VF4-NEXT:    store i64 [[TMP26]], ptr [[TMP30]], align 8
-; VF4-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; VF4-NEXT:    [[VEC_IND_NEXT]] = add nsw <4 x i64> [[VEC_IND]], splat (i64 12)
+; VF4-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; VF4-NEXT:    [[TMP31:%.*]] = icmp eq i64 [[INDEX_NEXT]], 332
 ; VF4-NEXT:    br i1 [[TMP31]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP17:![0-9]+]]
 ; VF4:       middle.block:

@@ -45,8 +45,8 @@ define void @test_pr59459(i64 %iv.start, ptr %arr) {
 ; CHECK-NEXT:    [[TMP16:%.*]] = zext i32 [[TMP12]] to i64
 ; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr i16, ptr [[ARR:%.*]], i64 [[TMP16]]
 ; CHECK-NEXT:    store <16 x i16> [[TMP15]], ptr [[TMP17]], align 2
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 16
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <16 x i32> [[VEC_IND]], splat (i32 16)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 16
 ; CHECK-NEXT:    [[TMP19:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP19]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       middle.block:
@@ -78,8 +78,8 @@ define void @test_pr59459(i64 %iv.start, ptr %arr) {
 ; CHECK-NEXT:    [[TMP27:%.*]] = zext i32 [[TMP23]] to i64
 ; CHECK-NEXT:    [[TMP28:%.*]] = getelementptr i16, ptr [[ARR]], i64 [[TMP27]]
 ; CHECK-NEXT:    store <4 x i16> [[TMP26]], ptr [[TMP28]], align 2
-; CHECK-NEXT:    [[INDEX_NEXT15]] = add nuw i64 [[INDEX8]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT13]] = add <4 x i32> [[VEC_IND12]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT15]] = add nuw i64 [[INDEX8]], 4
 ; CHECK-NEXT:    [[TMP30:%.*]] = icmp eq i64 [[INDEX_NEXT15]], [[N_VEC4]]
 ; CHECK-NEXT:    br i1 [[TMP30]], label [[VEC_EPILOG_MIDDLE_BLOCK:%.*]], label [[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       vec.epilog.middle.block:
@@ -166,8 +166,8 @@ define void @test_induction_step_needs_expansion(ptr noalias %j, ptr %k, i64 %l,
 ; CHECK-NEXT:    store <16 x i16> [[TMP5]], ptr [[TMP10]], align 2
 ; CHECK-NEXT:    store <16 x i16> [[TMP6]], ptr [[TMP21]], align 2
 ; CHECK-NEXT:    store <16 x i16> [[TMP7]], ptr [[TMP12]], align 2
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 64
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <16 x i16> [[STEP_ADD_3]], [[TMP1]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 64
 ; CHECK-NEXT:    [[TMP13:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP13]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       middle.block:
@@ -201,8 +201,8 @@ define void @test_induction_step_needs_expansion(ptr noalias %j, ptr %k, i64 %l,
 ; CHECK-NEXT:    [[TMP17:%.*]] = sub <8 x i16> [[VEC_IND20]], [[DOTSPLAT14]]
 ; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr inbounds i16, ptr [[K]], i64 [[INDEX12]]
 ; CHECK-NEXT:    store <8 x i16> [[TMP17]], ptr [[TMP18]], align 2
-; CHECK-NEXT:    [[INDEX_NEXT24]] = add nuw i64 [[INDEX12]], 8
 ; CHECK-NEXT:    [[VEC_IND_NEXT21]] = add <8 x i16> [[VEC_IND20]], [[BROADCAST_SPLAT23]]
+; CHECK-NEXT:    [[INDEX_NEXT24]] = add nuw i64 [[INDEX12]], 8
 ; CHECK-NEXT:    [[TMP20:%.*]] = icmp eq i64 [[INDEX_NEXT24]], [[N_VEC5]]
 ; CHECK-NEXT:    br i1 [[TMP20]], label [[VEC_EPILOG_MIDDLE_BLOCK:%.*]], label [[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; CHECK:       vec.epilog.middle.block:

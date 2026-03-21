@@ -5,8 +5,7 @@ define i32 @find_last_with_select(ptr noalias %a, ptr noalias %b) {
 ; CHECK-LABEL: VPlan for loop in 'find_last_with_select'
 ; CHECK:  VPlan ' for UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
-; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
+; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<500> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
@@ -16,23 +15,22 @@ define i32 @find_last_with_select(ptr noalias %a, ptr noalias %b) {
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {
-; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
+; CHECK-NEXT:  vp<[[VP2:%[0-9]+]]> = CANONICAL-IV vp<[[VP3:%[0-9]+]]> (VF * UF)
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION nuw nsw ir<0>, ir<1>, vp<[[VP0]]>
 ; CHECK-NEXT:      WIDEN-REDUCTION-PHI ir<%rdx> = phi (find-last) ir<1>, ir<%sel>
 ; CHECK-NEXT:      CLONE ir<%gep.a> = getelementptr inbounds ir<%a>, ir<%iv>
-; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = vector-pointer inbounds ir<%gep.a>
+; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = vector-pointer inbounds ir<%gep.a>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%load.a> = load vp<[[VP4]]>
 ; CHECK-NEXT:      CLONE ir<%gep.b> = getelementptr inbounds ir<%b>, ir<%iv>
-; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds ir<%gep.b>
+; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds ir<%gep.b>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%load.b> = load vp<[[VP5]]>
 ; CHECK-NEXT:      WIDEN ir<%cmp> = icmp slt ir<%load.a>, ir<%load.b>
 ; CHECK-NEXT:      WIDEN ir<%sel> = select ir<%cmp>, ir<%rdx>, ir<%load.a>
 ; CHECK-NEXT:      CLONE ir<%iv.next> = add nuw nsw ir<%iv>, ir<1>
 ; CHECK-NEXT:      CLONE ir<%exitcond> = icmp eq ir<%iv.next>, ir<500>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP2]]>, vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -44,7 +42,7 @@ define i32 @find_last_with_select(ptr noalias %a, ptr noalias %b) {
 ; CHECK-NEXT:    EMIT vp<[[VP10:%[0-9]+]]> = extract-last-lane vp<[[VP9]]>
 ; CHECK-NEXT:    EMIT vp<[[VP11:%[0-9]+]]> = extract-last-part vp<[[VP7]]>
 ; CHECK-NEXT:    EMIT vp<[[VP12:%[0-9]+]]> = extract-last-lane vp<[[VP11]]>
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<500>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<500>, vp<[[VP1]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:

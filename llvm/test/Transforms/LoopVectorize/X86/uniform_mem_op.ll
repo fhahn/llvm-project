@@ -386,8 +386,8 @@ define i32 @test_count_bits(ptr %test_base) {
 ; CHECK-NEXT:    [[TMP37]] = add <4 x i32> [[VEC_PHI4]], [[TMP33]]
 ; CHECK-NEXT:    [[TMP38]] = add <4 x i32> [[VEC_PHI5]], [[TMP34]]
 ; CHECK-NEXT:    [[TMP39]] = add <4 x i32> [[VEC_PHI6]], [[TMP35]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 16
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i64> [[STEP_ADD_3]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 16
 ; CHECK-NEXT:    [[TMP40:%.*]] = icmp eq i64 [[INDEX_NEXT]], 4096
 ; CHECK-NEXT:    br i1 [[TMP40]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP19:![0-9]+]]
 ; CHECK:       middle.block:

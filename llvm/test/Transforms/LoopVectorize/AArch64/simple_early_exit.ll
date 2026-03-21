@@ -113,9 +113,9 @@ define i64 @same_exit_block_pre_inc_use4() {
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp uge <2 x i64> [[VEC_IND]], [[WIDE_LOAD]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = freeze <2 x i1> [[TMP4]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = call i1 @llvm.vector.reduce.or.v2i1(<2 x i1> [[TMP2]])
+; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <2 x i64> [[VEC_IND]], splat (i64 2)
 ; CHECK-NEXT:    [[INDEX_NEXT2]] = add nuw i64 [[INDEX1]], 2
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT2]], 64
-; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <2 x i64> [[VEC_IND]], splat (i64 2)
 ; CHECK-NEXT:    br i1 [[TMP5]], label [[VECTOR_EARLY_EXIT:%.*]], label [[VECTOR_BODY_INTERIM]]
 ; CHECK:       vector.body.interim:
 ; CHECK-NEXT:    br i1 [[TMP6]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]

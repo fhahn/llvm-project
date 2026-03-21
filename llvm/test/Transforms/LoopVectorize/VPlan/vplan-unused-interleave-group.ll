@@ -8,7 +8,6 @@
 define void @test_unused_interleave(ptr %src, i32 %length) {
 ; CHECK-LABEL: 'test_unused_interleave'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
-; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<%length> = original trip-count
 ; CHECK-EMPTY:
@@ -22,8 +21,7 @@ define void @test_unused_interleave(ptr %src, i32 %length) {
 ; CHECK-NEXT:  vp<[[VP2:%[0-9]+]]> = CANONICAL-IV
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP2]]>, vp<[[VP0]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP2]]>, vp<{{[^>]+}}>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block

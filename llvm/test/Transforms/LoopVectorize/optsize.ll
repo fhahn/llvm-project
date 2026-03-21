@@ -268,8 +268,8 @@ define void @pr43371(i16 %val) optsize {
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr [2592 x i16], ptr @cm_array, i32 0, i32 [[TMP3]]
 ; CHECK-NEXT:    store i16 0, ptr [[TMP5]], align 1
 ; CHECK-NEXT:    store i16 0, ptr [[TMP7]], align 1
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <2 x i16> [[VEC_IND]], splat (i16 2)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i32 [[INDEX_NEXT]], 756
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP15:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -296,8 +296,8 @@ define void @pr43371(i16 %val) optsize {
 ; PGSO-NEXT:    [[TMP7:%.*]] = getelementptr [2592 x i16], ptr @cm_array, i32 0, i32 [[TMP3]]
 ; PGSO-NEXT:    store i16 0, ptr [[TMP5]], align 1
 ; PGSO-NEXT:    store i16 0, ptr [[TMP7]], align 1
-; PGSO-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; PGSO-NEXT:    [[VEC_IND_NEXT]] = add <2 x i16> [[VEC_IND]], splat (i16 2)
+; PGSO-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; PGSO-NEXT:    [[TMP6:%.*]] = icmp eq i32 [[INDEX_NEXT]], 756
 ; PGSO-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP15:![0-9]+]]
 ; PGSO:       [[MIDDLE_BLOCK]]:
@@ -324,8 +324,8 @@ define void @pr43371(i16 %val) optsize {
 ; NPGSO-NEXT:    [[TMP7:%.*]] = getelementptr [2592 x i16], ptr @cm_array, i32 0, i32 [[TMP3]]
 ; NPGSO-NEXT:    store i16 0, ptr [[TMP5]], align 1
 ; NPGSO-NEXT:    store i16 0, ptr [[TMP7]], align 1
-; NPGSO-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; NPGSO-NEXT:    [[VEC_IND_NEXT]] = add <2 x i16> [[VEC_IND]], splat (i16 2)
+; NPGSO-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; NPGSO-NEXT:    [[TMP6:%.*]] = icmp eq i32 [[INDEX_NEXT]], 756
 ; NPGSO-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP19:![0-9]+]]
 ; NPGSO:       [[MIDDLE_BLOCK]]:
@@ -375,8 +375,8 @@ define void @pr43371_pgso(i16 %val) !prof !14 {
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr [2592 x i16], ptr @cm_array, i32 0, i32 [[TMP3]]
 ; CHECK-NEXT:    store i16 0, ptr [[TMP5]], align 1
 ; CHECK-NEXT:    store i16 0, ptr [[TMP7]], align 1
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <2 x i16> [[VEC_IND]], splat (i16 2)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i32 [[INDEX_NEXT]], 756
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP18:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -403,8 +403,8 @@ define void @pr43371_pgso(i16 %val) !prof !14 {
 ; PGSO-NEXT:    [[TMP7:%.*]] = getelementptr [2592 x i16], ptr @cm_array, i32 0, i32 [[TMP3]]
 ; PGSO-NEXT:    store i16 0, ptr [[TMP5]], align 1
 ; PGSO-NEXT:    store i16 0, ptr [[TMP7]], align 1
-; PGSO-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; PGSO-NEXT:    [[VEC_IND_NEXT]] = add <2 x i16> [[VEC_IND]], splat (i16 2)
+; PGSO-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; PGSO-NEXT:    [[TMP6:%.*]] = icmp eq i32 [[INDEX_NEXT]], 756
 ; PGSO-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP18:![0-9]+]]
 ; PGSO:       [[MIDDLE_BLOCK]]:
@@ -484,8 +484,8 @@ define i32 @pr45526() optsize {
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i32> [ <i32 0, i32 1, i32 2, i32 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VECTOR_RECUR:%.*]] = phi <4 x i32> [ <i32 poison, i32 poison, i32 poison, i32 5>, %[[VECTOR_PH]] ], [ [[TMP1:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP1]] = add nuw nsw <4 x i32> [[VEC_IND]], splat (i32 1)
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq i32 [[INDEX_NEXT]], 512
 ; CHECK-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP19:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -509,8 +509,8 @@ define i32 @pr45526() optsize {
 ; PGSO-NEXT:    [[VEC_IND:%.*]] = phi <4 x i32> [ <i32 0, i32 1, i32 2, i32 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; PGSO-NEXT:    [[VECTOR_RECUR:%.*]] = phi <4 x i32> [ <i32 poison, i32 poison, i32 poison, i32 5>, %[[VECTOR_PH]] ], [ [[TMP1:%.*]], %[[VECTOR_BODY]] ]
 ; PGSO-NEXT:    [[TMP1]] = add nuw nsw <4 x i32> [[VEC_IND]], splat (i32 1)
-; PGSO-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; PGSO-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
+; PGSO-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; PGSO-NEXT:    [[TMP3:%.*]] = icmp eq i32 [[INDEX_NEXT]], 512
 ; PGSO-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP19:![0-9]+]]
 ; PGSO:       [[MIDDLE_BLOCK]]:
@@ -534,8 +534,8 @@ define i32 @pr45526() optsize {
 ; NPGSO-NEXT:    [[VEC_IND:%.*]] = phi <4 x i32> [ <i32 0, i32 1, i32 2, i32 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; NPGSO-NEXT:    [[VECTOR_RECUR:%.*]] = phi <4 x i32> [ <i32 poison, i32 poison, i32 poison, i32 5>, %[[VECTOR_PH]] ], [ [[TMP1:%.*]], %[[VECTOR_BODY]] ]
 ; NPGSO-NEXT:    [[TMP1]] = add nuw nsw <4 x i32> [[VEC_IND]], splat (i32 1)
-; NPGSO-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; NPGSO-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
+; NPGSO-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; NPGSO-NEXT:    [[TMP3:%.*]] = icmp eq i32 [[INDEX_NEXT]], 512
 ; NPGSO-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP22:![0-9]+]]
 ; NPGSO:       [[MIDDLE_BLOCK]]:
@@ -575,8 +575,8 @@ define i32 @pr45526_pgso() !prof !14 {
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i32> [ <i32 0, i32 1, i32 2, i32 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VECTOR_RECUR:%.*]] = phi <4 x i32> [ <i32 poison, i32 poison, i32 poison, i32 5>, %[[VECTOR_PH]] ], [ [[TMP1:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP1]] = add nuw nsw <4 x i32> [[VEC_IND]], splat (i32 1)
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq i32 [[INDEX_NEXT]], 512
 ; CHECK-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP20:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -600,8 +600,8 @@ define i32 @pr45526_pgso() !prof !14 {
 ; PGSO-NEXT:    [[VEC_IND:%.*]] = phi <4 x i32> [ <i32 0, i32 1, i32 2, i32 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; PGSO-NEXT:    [[VECTOR_RECUR:%.*]] = phi <4 x i32> [ <i32 poison, i32 poison, i32 poison, i32 5>, %[[VECTOR_PH]] ], [ [[TMP1:%.*]], %[[VECTOR_BODY]] ]
 ; PGSO-NEXT:    [[TMP1]] = add nuw nsw <4 x i32> [[VEC_IND]], splat (i32 1)
-; PGSO-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; PGSO-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
+; PGSO-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; PGSO-NEXT:    [[TMP3:%.*]] = icmp eq i32 [[INDEX_NEXT]], 512
 ; PGSO-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP20:![0-9]+]]
 ; PGSO:       [[MIDDLE_BLOCK]]:
@@ -687,8 +687,8 @@ define void @stride1(ptr noalias %B, i32 %BStride) optsize {
 ; CHECK-NEXT:    store i16 42, ptr [[TMP7]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE2]]
 ; CHECK:       [[PRED_STORE_CONTINUE2]]:
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <2 x i32> [[VEC_IND]], splat (i32 2)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp eq i32 [[INDEX_NEXT]], 1026
 ; CHECK-NEXT:    br i1 [[TMP8]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP21:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -725,8 +725,8 @@ define void @stride1(ptr noalias %B, i32 %BStride) optsize {
 ; PGSO-NEXT:    store i16 42, ptr [[TMP7]], align 4
 ; PGSO-NEXT:    br label %[[PRED_STORE_CONTINUE2]]
 ; PGSO:       [[PRED_STORE_CONTINUE2]]:
-; PGSO-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; PGSO-NEXT:    [[VEC_IND_NEXT]] = add <2 x i32> [[VEC_IND]], splat (i32 2)
+; PGSO-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; PGSO-NEXT:    [[TMP8:%.*]] = icmp eq i32 [[INDEX_NEXT]], 1026
 ; PGSO-NEXT:    br i1 [[TMP8]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP21:![0-9]+]]
 ; PGSO:       [[MIDDLE_BLOCK]]:
@@ -763,8 +763,8 @@ define void @stride1(ptr noalias %B, i32 %BStride) optsize {
 ; NPGSO-NEXT:    store i16 42, ptr [[TMP7]], align 4
 ; NPGSO-NEXT:    br label %[[PRED_STORE_CONTINUE2]]
 ; NPGSO:       [[PRED_STORE_CONTINUE2]]:
-; NPGSO-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; NPGSO-NEXT:    [[VEC_IND_NEXT]] = add <2 x i32> [[VEC_IND]], splat (i32 2)
+; NPGSO-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; NPGSO-NEXT:    [[TMP8:%.*]] = icmp eq i32 [[INDEX_NEXT]], 1026
 ; NPGSO-NEXT:    br i1 [[TMP8]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP25:![0-9]+]]
 ; NPGSO:       [[MIDDLE_BLOCK]]:
@@ -810,8 +810,8 @@ define void @stride1_pgso(ptr noalias %B, i32 %BStride) !prof !14 {
 ; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds i16, ptr [[B]], i32 [[TMP2]]
 ; CHECK-NEXT:    store i16 42, ptr [[TMP1]], align 4
 ; CHECK-NEXT:    store i16 42, ptr [[TMP4]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <2 x i32> [[VEC_IND]], splat (i32 2)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq i32 [[INDEX_NEXT]], 1024
 ; CHECK-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP22:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -847,8 +847,8 @@ define void @stride1_pgso(ptr noalias %B, i32 %BStride) !prof !14 {
 ; PGSO-NEXT:    [[TMP4:%.*]] = getelementptr inbounds i16, ptr [[B]], i32 [[TMP2]]
 ; PGSO-NEXT:    store i16 42, ptr [[TMP1]], align 4
 ; PGSO-NEXT:    store i16 42, ptr [[TMP4]], align 4
-; PGSO-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; PGSO-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <2 x i32> [[VEC_IND]], splat (i32 2)
+; PGSO-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; PGSO-NEXT:    [[TMP3:%.*]] = icmp eq i32 [[INDEX_NEXT]], 1024
 ; PGSO-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP22:![0-9]+]]
 ; PGSO:       [[MIDDLE_BLOCK]]:

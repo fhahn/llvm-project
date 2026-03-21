@@ -5,8 +5,7 @@ define void @iv_no_binary_op_in_descriptor(i1 %c, ptr %dst) {
 ; CHECK-LABEL: VPlan for loop in 'iv_no_binary_op_in_descriptor'
 ; CHECK:  VPlan 'Initial VPlan for VF={8},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
-; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
+; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<1000> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
@@ -16,22 +15,21 @@ define void @iv_no_binary_op_in_descriptor(i1 %c, ptr %dst) {
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {
-; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
+; CHECK-NEXT:  vp<[[VP2:%[0-9]+]]> = CANONICAL-IV vp<[[VP3:%[0-9]+]]> (VF * UF)
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION ir<0>, ir<1>, vp<[[VP0]]>
-; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = SCALAR-STEPS vp<[[VP3]]>, ir<1>, vp<[[VP0]]>
+; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = SCALAR-STEPS vp<[[VP2]]>, ir<1>, vp<[[VP0]]>
 ; CHECK-NEXT:      CLONE ir<%gep> = getelementptr inbounds ir<%dst>, vp<[[VP4]]>
-; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds ir<%gep>
+; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds ir<%gep>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP5]]>, ir<%iv>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP2]]>, vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<1000>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<1000>, vp<[[VP1]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
@@ -39,7 +37,7 @@ define void @iv_no_binary_op_in_descriptor(i1 %c, ptr %dst) {
 ; CHECK-NEXT:  No successors
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  scalar.ph:
-; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP2]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
+; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP1]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
 ; CHECK-NEXT:  Successor(s): ir-bb<loop.header>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<loop.header>:
@@ -75,8 +73,7 @@ define void @iv_expand(ptr %p, i64 %n) {
 ; CHECK-LABEL: VPlan for loop in 'iv_expand'
 ; CHECK:  VPlan 'Initial VPlan for VF={8},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
-; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
+; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
@@ -86,25 +83,24 @@ define void @iv_expand(ptr %p, i64 %n) {
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {
-; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
+; CHECK-NEXT:  vp<[[VP2:%[0-9]+]]> = CANONICAL-IV vp<[[VP3:%[0-9]+]]> (VF * UF)
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION ir<0>, ir<1>, vp<[[VP0]]>
-; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = SCALAR-STEPS vp<[[VP3]]>, ir<1>, vp<[[VP0]]>
+; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = SCALAR-STEPS vp<[[VP2]]>, ir<1>, vp<[[VP0]]>
 ; CHECK-NEXT:      CLONE ir<%q> = getelementptr ir<%p>, vp<[[VP4]]>
-; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer ir<%q>
+; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer ir<%q>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%x> = load vp<[[VP5]]>
 ; CHECK-NEXT:      WIDEN ir<%y> = add ir<%x>, ir<%iv>
-; CHECK-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer ir<%q>
+; CHECK-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer ir<%q>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP6]]>, ir<%y>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP2]]>, vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP1]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
@@ -112,7 +108,7 @@ define void @iv_expand(ptr %p, i64 %n) {
 ; CHECK-NEXT:  No successors
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  scalar.ph:
-; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP2]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
+; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP1]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
 ; CHECK-NEXT:  Successor(s): ir-bb<loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<loop>:
@@ -149,8 +145,7 @@ define void @iv_truncated_wrap_flags(ptr %dst, i64 %n) {
 ; CHECK-LABEL: VPlan for loop in 'iv_truncated_wrap_flags'
 ; CHECK:  VPlan 'Initial VPlan for VF={8},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
-; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
+; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
@@ -160,22 +155,21 @@ define void @iv_truncated_wrap_flags(ptr %dst, i64 %n) {
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {
-; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
+; CHECK-NEXT:  vp<[[VP2:%[0-9]+]]> = CANONICAL-IV vp<[[VP3:%[0-9]+]]> (VF * UF)
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION ir<0>, ir<1>, vp<[[VP0]]> (truncated to i16)
-; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = SCALAR-STEPS vp<[[VP3]]>, ir<1>, vp<[[VP0]]>
+; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = SCALAR-STEPS vp<[[VP2]]>, ir<1>, vp<[[VP0]]>
 ; CHECK-NEXT:      CLONE ir<%ptr> = getelementptr inbounds ir<%dst>, vp<[[VP4]]>
-; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds ir<%ptr>
+; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds ir<%ptr>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP5]]>, ir<%iv>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP2]]>, vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP1]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
@@ -183,7 +177,7 @@ define void @iv_truncated_wrap_flags(ptr %dst, i64 %n) {
 ; CHECK-NEXT:  No successors
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  scalar.ph:
-; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP2]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
+; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP1]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
 ; CHECK-NEXT:  Successor(s): ir-bb<loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<loop>:

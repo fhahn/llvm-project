@@ -25,8 +25,8 @@ define void @diamond_phi2(ptr %a, i1 %c1, i1 %c2) {
 ; CHECK-NEXT:    [[PREDPHI:%.*]] = select <4 x i1> [[TMP5]], <4 x i64> [[TMP3]], <4 x i64> [[TMP2]]
 ; CHECK-NEXT:    [[TMP21:%.*]] = getelementptr i64, ptr [[A]], i64 [[TMP20]]
 ; CHECK-NEXT:    call void @llvm.masked.store.v4i64.p0(<4 x i64> [[PREDPHI]], ptr align 4 [[TMP21]], <4 x i1> [[TMP6]])
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP20]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[VEC_IND]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP20]], 4
 ; CHECK-NEXT:    [[TMP23:%.*]] = icmp eq i64 [[INDEX_NEXT]], 128
 ; CHECK-NEXT:    br i1 [[TMP23]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

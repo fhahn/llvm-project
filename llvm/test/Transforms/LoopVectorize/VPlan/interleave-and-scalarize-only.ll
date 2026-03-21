@@ -4,7 +4,6 @@
 ; DBG-LABEL: 'test_scalarize_call'
 ; DBG:      VPlan 'Initial VPlan for VF={1},UF>=1' {
 ; DBG-NEXT: Live-in vp<[[VF:%.+]]> = VF
-; DBG-NEXT: Live-in vp<[[VFxUF:%.+]]> = VF * UF
 ; DBG-NEXT: Live-in vp<[[VEC_TC:%.+]]> = vector-trip-count
 ; DBG-NEXT: vp<[[TC:%.+]]> = original trip-count
 ; DBG-EMPTY:
@@ -25,8 +24,7 @@
 ; DBG-NEXT:     CLONE ir<%min> = call @llvm.smin.i32(vp<[[IV_STEPS]]>, ir<65535>)
 ; DBG-NEXT:     CLONE ir<%arrayidx> = getelementptr inbounds ir<%dst>, vp<[[IV_STEPS]]>
 ; DBG-NEXT:     CLONE store ir<%min>, ir<%arrayidx>
-; DBG-NEXT:     EMIT vp<[[INC:%.+]]> = add nuw vp<[[CAN_IV]]>, vp<[[VFxUF]]>
-; DBG-NEXT:     EMIT branch-on-count vp<[[INC]]>, vp<[[VEC_TC]]>
+; DBG-NEXT:     EMIT branch-on-count vp<[[CAN_IV]]>, vp<{{[^>]+}}>, vp<[[VEC_TC]]>
 ; DBG-NEXT:   No successors
 ; DBG-NEXT: }
 ;
@@ -67,8 +65,7 @@ exit:
 
 ; DBG-LABEL: 'test_scalarize_with_branch_cond'
 
-; DBG:       Live-in vp<[[VFxUF:%.+]]> = VF * UF
-; DBG-NEXT:  Live-in vp<[[VEC_TC:%.+]]> = vector-trip-count
+; DBG:       Live-in vp<[[VEC_TC:%.+]]> = vector-trip-count
 ; DBG-NEXT:  Live-in ir<1000> = original trip-count
 ; DBG-EMPTY:
 ; DBG-NEXT: ir-bb<entry>:
@@ -105,8 +102,7 @@ exit:
 ; DBG-NEXT:   Successor(s): cond.false.1
 ; DBG-EMPTY:
 ; DBG-NEXT:   cond.false.1:
-; DBG-NEXT:     EMIT vp<[[CAN_IV_INC:%.+]]> = add nuw vp<[[CAN_IV]]>, vp<[[VFxUF]]>
-; DBG-NEXT:     EMIT branch-on-count vp<[[CAN_IV_INC]]>, vp<[[VEC_TC]]>
+; DBG-NEXT:     EMIT branch-on-count vp<[[CAN_IV]]>, vp<{{[^>]+}}>, vp<[[VEC_TC]]>
 ; DBG-NEXT:   No successors
 ; DBG-NEXT: }
 ; DBG-NEXT: Successor(s): middle.block
@@ -190,7 +186,6 @@ exit:
 ; DBG-LABEL: 'first_order_recurrence_using_induction'
 ; DBG:      VPlan 'Initial VPlan for VF={1},UF>=1' {
 ; DBG-NEXT: Live-in vp<[[VF:%.+]]> = VF
-; DBG-NEXT: Live-in vp<[[VFxUF:%.+]]> = VF * UF
 ; DBG-NEXT: Live-in vp<[[VTC:%.+]]> = vector-trip-count
 ; DBG-NEXT: vp<[[TC:%.+]]> = original trip-count
 ; DBG-EMPTY:
@@ -210,8 +205,7 @@ exit:
 ; DBG-NEXT:     vp<[[SCALAR_STEPS]]> = SCALAR-STEPS vp<[[TRUNC_IV]]>, ir<1>, vp<[[VF]]
 ; DBG-NEXT:     EMIT vp<[[SPLICE:%.+]]> = first-order splice ir<%for>, vp<[[SCALAR_STEPS]]>
 ; DBG-NEXT:     CLONE store vp<[[SPLICE]]>, ir<%dst>
-; DBG-NEXT:     EMIT vp<[[IV_INC:%.+]]> = add nuw vp<[[CAN_IV]]>, vp<[[VFxUF]]>
-; DBG-NEXT:     EMIT branch-on-count vp<[[IV_INC]]>, vp<[[VTC]]>
+; DBG-NEXT:     EMIT branch-on-count vp<[[CAN_IV]]>, vp<{{[^>]+}}>, vp<[[VTC]]>
 ; DBG-NEXT:   No successors
 ; DBG-NEXT: }
 ; DBG-NEXT: Successor(s): middle.block

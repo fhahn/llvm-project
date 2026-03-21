@@ -214,8 +214,8 @@ define i1 @any_of_reduction_i1_epilog(i64 %N, i32 %a) {
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <8 x i32> [ <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7>, [[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP2:%.*]] = icmp ne <8 x i32> [[VEC_IND]], [[BROADCAST_SPLAT]]
 ; CHECK-NEXT:    [[TMP3]] = or <8 x i1> [[VEC_PHI]], [[TMP2]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <8 x i32> [[VEC_IND]], splat (i32 8)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP4]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP9:![0-9]+]]
 ; CHECK:       middle.block:
@@ -248,8 +248,8 @@ define i1 @any_of_reduction_i1_epilog(i64 %N, i32 %a) {
 ; CHECK-NEXT:    [[VEC_IND11:%.*]] = phi <4 x i32> [ [[INDUCTION]], [[VEC_EPILOG_PH]] ], [ [[VEC_IND_NEXT12:%.*]], [[VEC_EPILOG_VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP9:%.*]] = icmp ne <4 x i32> [[VEC_IND11]], [[BROADCAST_SPLAT14]]
 ; CHECK-NEXT:    [[TMP10]] = or <4 x i1> [[VEC_PHI10]], [[TMP9]]
-; CHECK-NEXT:    [[INDEX_NEXT15]] = add nuw i64 [[INDEX9]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT12]] = add <4 x i32> [[VEC_IND11]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT15]] = add nuw i64 [[INDEX9]], 4
 ; CHECK-NEXT:    [[TMP11:%.*]] = icmp eq i64 [[INDEX_NEXT15]], [[N_VEC3]]
 ; CHECK-NEXT:    br i1 [[TMP11]], label [[VEC_EPILOG_MIDDLE_BLOCK:%.*]], label [[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP10:![0-9]+]]
 ; CHECK:       vec.epilog.middle.block:

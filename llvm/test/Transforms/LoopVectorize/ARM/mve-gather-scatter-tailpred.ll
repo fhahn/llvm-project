@@ -191,8 +191,8 @@ define void @test_stride3_4i32(ptr readonly %data, ptr noalias nocapture %dst, i
 ; CHECK-NEXT:    [[TMP4:%.*]] = add nsw <4 x i32> splat (i32 5), [[WIDE_MASKED_GATHER]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i32, ptr [[DST:%.*]], i32 [[INDEX]]
 ; CHECK-NEXT:    call void @llvm.masked.store.v4i32.p0(<4 x i32> [[TMP4]], ptr align 4 [[TMP5]], <4 x i1> [[ACTIVE_LANE_MASK]])
-; CHECK-NEXT:    [[INDEX_NEXT]] = add i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i32> [[VEC_IND]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP7]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
 ; CHECK:       middle.block:
@@ -238,8 +238,8 @@ define void @test_stride4_4i32(ptr readonly %data, ptr noalias nocapture %dst, i
 ; CHECK-NEXT:    [[TMP4:%.*]] = add nsw <4 x i32> splat (i32 5), [[WIDE_MASKED_GATHER]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i32, ptr [[DST:%.*]], i32 [[INDEX]]
 ; CHECK-NEXT:    call void @llvm.masked.store.v4i32.p0(<4 x i32> [[TMP4]], ptr align 4 [[TMP5]], <4 x i1> [[ACTIVE_LANE_MASK]])
-; CHECK-NEXT:    [[INDEX_NEXT]] = add i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i32> [[VEC_IND]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP7]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; CHECK:       middle.block:
@@ -348,9 +348,9 @@ define void @test_stride_noninvar_4i32(ptr readonly %data, ptr noalias nocapture
 ; CHECK-NEXT:    [[TMP5:%.*]] = add nsw <4 x i32> splat (i32 5), [[WIDE_MASKED_GATHER]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i32, ptr [[DST:%.*]], i32 [[INDEX]]
 ; CHECK-NEXT:    store <4 x i32> [[TMP5]], ptr [[TMP6]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i32> [[VEC_IND]], splat (i32 4)
 ; CHECK-NEXT:    [[VEC_IND_NEXT3]] = add nuw nsw <4 x i32> [[VEC_IND2]], splat (i32 32)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP8]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP11:![0-9]+]]
 ; CHECK:       middle.block:
@@ -467,9 +467,9 @@ define void @test_stride_noninvar3_4i32(ptr readonly %data, ptr noalias nocaptur
 ; CHECK-NEXT:    [[TMP7:%.*]] = add nsw <4 x i32> splat (i32 5), [[WIDE_MASKED_GATHER]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds i32, ptr [[DST:%.*]], i32 [[INDEX]]
 ; CHECK-NEXT:    store <4 x i32> [[TMP7]], ptr [[TMP8]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i32> [[VEC_IND]], splat (i32 4)
 ; CHECK-NEXT:    [[VEC_IND_NEXT5]] = add nuw nsw <4 x i32> [[VEC_IND4]], [[DOTSPLAT3]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP10:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP10]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP13:![0-9]+]]
 ; CHECK:       middle.block:

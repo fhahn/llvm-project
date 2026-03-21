@@ -1456,6 +1456,7 @@ public:
     case Instruction::AtomicRMW:
     case VPInstruction::BranchOnCond:
     case VPInstruction::BranchOnTwoConds:
+    case VPInstruction::BranchOnCondOrCount:
     case VPInstruction::BranchOnCount:
       return false;
     default:
@@ -4595,21 +4596,48 @@ public:
 };
 
 /// Track information about the canonical IV value of a region.
-/// TODO: Have it also track the canonical IV increment, subject of NUW flag.
 class VPCanonicalIVInfo {
+public:
+  /// Describes how the strip-mine factor (the per-vector-iteration step of the
+  /// canonical IV) should be lowered to a concrete VPValue.
+  enum class StripFactorKind {
+    /// Default: VF * UF (lowered to whatever VFxUF materializes to).
+    Default,
+    /// Narrowed for fixed VF: just UF (one original-iteration per
+    /// vector-iteration of the narrowed plan).
+    NarrowFixed,
+    /// Narrowed for scalable VF: VScale * UF.
+    NarrowScalable,
+  };
+
+private:
   /// VPRegionValue for the canonical IV, whose allocation is managed by
   /// VPCanonicalIVInfo.
   std::unique_ptr<VPRegionValue> CanIV;
+
+  /// Stable VPRegionValue used as the strip-mine factor operand of recipes
+  /// that step the canonical IV (e.g. BranchOnCount). Lowered to a concrete
+  /// VPValue by lowerStripFactor() based on \ref Kind.
+  std::unique_ptr<VPRegionValue> StripFactor;
+
+  /// Encodes how StripFactor should be lowered.
+  StripFactorKind Kind = StripFactorKind::Default;
 
   /// Whether the increment of the canonical IV may unsigned wrap or not.
   bool HasNUW = true;
 
 public:
   VPCanonicalIVInfo(Type *Ty, DebugLoc DL, VPRegionBlock *Region)
-      : CanIV(std::make_unique<VPRegionValue>(Ty, DL, Region)) {}
+      : CanIV(std::make_unique<VPRegionValue>(Ty, DL, Region)),
+        StripFactor(std::make_unique<VPRegionValue>(Ty, DL, Region)) {}
 
   VPRegionValue *getRegionValue() { return CanIV.get(); }
   const VPRegionValue *getRegionValue() const { return CanIV.get(); }
+
+  VPRegionValue *getStripMineFactor() const { return StripFactor.get(); }
+
+  StripFactorKind getStripFactorKind() const { return Kind; }
+  void setStripFactorKind(StripFactorKind K) { Kind = K; }
 
   bool hasNUW() const { return HasNUW; }
 
@@ -4729,11 +4757,6 @@ public:
   /// its entry, and its exiting block to its successor.
   void dissolveToCFGLoop();
 
-  /// Get the canonical IV increment instruction if it exists. Otherwise, create
-  /// a new increment before the terminator and return it. The canonical IV
-  /// increment is subject to DCE if unused, unlike the canonical IV itself.
-  VPInstruction *getOrCreateCanonicalIVIncrement();
-
   /// Return the canonical induction variable of the region, null for
   /// replicating regions.
   VPRegionValue *getCanonicalIV() {
@@ -4751,11 +4774,27 @@ public:
   /// Indicates if NUW is set for the canonical IV increment, for loop regions.
   bool hasCanonicalIVNUW() const { return CanIVInfo->hasNUW(); }
 
-  /// Unsets NUW for the canonical IV increment \p Increment, for loop regions.
-  void clearCanonicalIVNUW(VPInstruction *Increment) {
-    assert(Increment && "Must provide increment to clear");
-    Increment->dropPoisonGeneratingFlags();
-    CanIVInfo->clearNUW();
+  /// Unsets NUW for the canonical IV increment, for loop regions.
+  void clearCanonicalIVNUW() { CanIVInfo->clearNUW(); }
+
+  /// Return the strip-mine factor VPRegionValue for the loop region. The
+  /// returned VPRegionValue is a stable handle used as an operand by recipes
+  /// that need the strip-mine factor (e.g. BranchOnCount). It is lowered to
+  /// the appropriate concrete VPValue by lowerStripFactor() based on the
+  /// strip-factor kind.
+  VPRegionValue *getStripMineFactor() const {
+    return CanIVInfo->getStripMineFactor();
+  }
+
+  /// Return the kind of strip-mine factor for the loop region.
+  VPCanonicalIVInfo::StripFactorKind getStripFactorKind() const {
+    return CanIVInfo->getStripFactorKind();
+  }
+
+  /// Set the kind of strip-mine factor for the loop region. The actual
+  /// concrete VPValue is computed at lowering time.
+  void setStripFactorKind(VPCanonicalIVInfo::StripFactorKind K) {
+    CanIVInfo->setStripFactorKind(K);
   }
 };
 

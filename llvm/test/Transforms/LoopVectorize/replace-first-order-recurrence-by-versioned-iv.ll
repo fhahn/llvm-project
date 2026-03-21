@@ -114,8 +114,8 @@ define void @do_not_replace_first_order_recurrence_with_versioned_iv_for_pointer
 ; CHECK-NEXT:    [[TMP16:%.*]] = getelementptr inbounds double, ptr [[Y]], i64 [[TMP15]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x double>, ptr [[TMP14]], align 8
 ; CHECK-NEXT:    store <4 x double> [[WIDE_LOAD]], ptr [[TMP16]], align 8
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP17:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP17]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -191,8 +191,8 @@ define i64 @do_not_replace_first_order_recurrence_with_versioned_iv_for_wide_poi
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i64>, ptr [[TMP7]], align 8
 ; CHECK-NEXT:    [[TMP10:%.*]] = add <4 x i64> [[WIDE_LOAD]], [[TMP5]]
 ; CHECK-NEXT:    store <4 x i64> [[TMP10]], ptr [[TMP11]], align 8
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP12]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -282,8 +282,8 @@ define void @replace_first_order_recurrence_with_versioned_iv_for_uniform_non_po
 ; CHECK-NEXT:    [[TMP26:%.*]] = getelementptr inbounds double, ptr [[Y]], i32 [[TMP20]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x double>, ptr [[TMP25]], align 8
 ; CHECK-NEXT:    store <4 x double> [[WIDE_LOAD]], ptr [[TMP26]], align 8
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[TMP20]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[TMP20]], 4
 ; CHECK-NEXT:    [[TMP22:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP22]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -359,8 +359,8 @@ define void @replace_for_removes_predicate(ptr %y, ptr %x, i64 %n) {
 ; CHECK-NEXT:    [[TMP7:%.*]] = sitofp <4 x i64> [[TMP4]] to <4 x double>
 ; CHECK-NEXT:    [[TMP8:%.*]] = fadd <4 x double> [[WIDE_LOAD]], [[TMP7]]
 ; CHECK-NEXT:    store <4 x double> [[TMP8]], ptr [[TMP6]], align 8
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP9]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP10:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -441,9 +441,9 @@ define void @for_iv_kept_predicate_needed(ptr %dst, i64 %n) {
 ; CHECK-NEXT:    [[INDEX:%.*]] = extractelement <4 x i64> [[TMP5]], i64 0
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i64, ptr [[DST]], i64 [[INDEX]]
 ; CHECK-NEXT:    store <4 x i64> [[VEC_IND]], ptr [[TMP3]], align 8
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX1]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[VEC_IND]], splat (i64 4)
 ; CHECK-NEXT:    [[VEC_IND_NEXT3]] = add <4 x i16> [[VEC_IND2]], splat (i16 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX1]], 4
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP4]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP12:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -510,8 +510,8 @@ define void @for_iv_dropped_predicate_removed(ptr %dst, i64 %n) {
 ; CHECK-NEXT:    [[TMP4:%.*]] = sitofp <4 x i64> [[TMP3]] to <4 x double>
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds double, ptr [[DST]], i64 [[INDEX]]
 ; CHECK-NEXT:    store <4 x double> [[TMP4]], ptr [[TMP5]], align 8
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i16> [[VEC_IND]], splat (i16 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP14:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -580,10 +580,10 @@ define void @induction_with_predicate_replaceable_by_for(ptr %dst, i32 %len) {
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i32> [ <i32 0, i32 1, i32 2, i32 3>, %[[VECTOR_PH1]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[INDEX]]
 ; CHECK-NEXT:    store <4 x i32> [[VEC_IND]], ptr [[TMP3]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP4]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP4]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP16:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i32 [[UMAX1]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
@@ -601,7 +601,7 @@ define void @induction_with_predicate_replaceable_by_for(ptr %dst, i32 %len) {
 ; CHECK-NEXT:    [[EXT]] = zext i8 [[INC]] to i32
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i32 [[IV]], 1
 ; CHECK-NEXT:    [[C:%.*]] = icmp ult i32 [[IV_NEXT]], [[LEN]]
-; CHECK-NEXT:    br i1 [[C]], label %[[LOOP]], label %[[EXIT]], !llvm.loop [[LOOP3:![0-9]+]]
+; CHECK-NEXT:    br i1 [[C]], label %[[LOOP]], label %[[EXIT]], !llvm.loop [[LOOP17:![0-9]+]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void
 ;

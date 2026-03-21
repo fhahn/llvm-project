@@ -7,8 +7,7 @@ define void @predicated_load(i1 %c, ptr %ptr, ptr %dst) {
 ; SCALAR-LABEL: VPlan for loop in 'predicated_load'
 ; SCALAR:  VPlan 'Initial VPlan for VF={1},UF={2}' {
 ; SCALAR-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; SCALAR-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
-; SCALAR-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
+; SCALAR-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = vector-trip-count
 ; SCALAR-NEXT:  Live-in ir<1024> = original trip-count
 ; SCALAR-EMPTY:
 ; SCALAR-NEXT:  ir-bb<entry>:
@@ -25,11 +24,11 @@ define void @predicated_load(i1 %c, ptr %ptr, ptr %dst) {
 ; SCALAR-NEXT:  Successor(s): vector loop
 ; SCALAR-EMPTY:
 ; SCALAR-NEXT:  <x1> vector loop: {
-; SCALAR-NEXT:  vp<[[VP5:%[0-9]+]]> = CANONICAL-IV
+; SCALAR-NEXT:  vp<[[VP4:%[0-9]+]]> = CANONICAL-IV vp<[[VP5:%[0-9]+]]> (VF * UF)
 ; SCALAR-EMPTY:
 ; SCALAR-NEXT:    vector.body:
-; SCALAR-NEXT:      vp<[[VP6:%[0-9]+]]> = SCALAR-STEPS vp<[[VP5]]>, ir<1>, vp<[[VP0]]>
-; SCALAR-NEXT:      vp<[[VP7:%[0-9]+]]> = SCALAR-STEPS vp<[[VP5]]>, ir<1>, vp<[[VP0]]>, vp<[[VP0]]>
+; SCALAR-NEXT:      vp<[[VP6:%[0-9]+]]> = SCALAR-STEPS vp<[[VP4]]>, ir<1>, vp<[[VP0]]>
+; SCALAR-NEXT:      vp<[[VP7:%[0-9]+]]> = SCALAR-STEPS vp<[[VP4]]>, ir<1>, vp<[[VP0]]>, vp<[[VP0]]>
 ; SCALAR-NEXT:      EMIT branch-on-cond ir<%c>
 ; SCALAR-NEXT:    Successor(s): pred.load.if, pred.load.continue
 ; SCALAR-EMPTY:
@@ -56,14 +55,13 @@ define void @predicated_load(i1 %c, ptr %ptr, ptr %dst) {
 ; SCALAR-NEXT:      CLONE ir<%gep.dst>.1 = getelementptr ir<%dst>, vp<[[VP7]]>
 ; SCALAR-NEXT:      CLONE store ir<%pred.val>, ir<%gep.dst>
 ; SCALAR-NEXT:      CLONE store ir<%pred.val>.1, ir<%gep.dst>.1
-; SCALAR-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP5]]>, vp<[[VP1]]>
-; SCALAR-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; SCALAR-NEXT:      EMIT branch-on-count vp<[[VP4]]>, vp<[[VP5]]>, vp<[[VP1]]>
 ; SCALAR-NEXT:    No successors
 ; SCALAR-NEXT:  }
 ; SCALAR-NEXT:  Successor(s): middle.block
 ; SCALAR-EMPTY:
 ; SCALAR-NEXT:  middle.block:
-; SCALAR-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<1024>, vp<[[VP2]]>
+; SCALAR-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<1024>, vp<[[VP1]]>
 ; SCALAR-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; SCALAR-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; SCALAR-EMPTY:
@@ -71,7 +69,7 @@ define void @predicated_load(i1 %c, ptr %ptr, ptr %dst) {
 ; SCALAR-NEXT:  No successors
 ; SCALAR-EMPTY:
 ; SCALAR-NEXT:  scalar.ph:
-; SCALAR-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP2]]>, middle.block ], [ ir<0>, ir-bb<entry> ], [ ir<0>, ir-bb<vector.memcheck> ]
+; SCALAR-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP1]]>, middle.block ], [ ir<0>, ir-bb<entry> ], [ ir<0>, ir-bb<vector.memcheck> ]
 ; SCALAR-NEXT:  Successor(s): ir-bb<loop.header>
 ; SCALAR-EMPTY:
 ; SCALAR-NEXT:  ir-bb<loop.header>:
@@ -83,8 +81,7 @@ define void @predicated_load(i1 %c, ptr %ptr, ptr %dst) {
 ; VECTOR-LABEL: VPlan for loop in 'predicated_load'
 ; VECTOR:  VPlan 'Initial VPlan for VF={2},UF={2}' {
 ; VECTOR-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; VECTOR-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
-; VECTOR-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
+; VECTOR-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = vector-trip-count
 ; VECTOR-NEXT:  Live-in ir<1024> = original trip-count
 ; VECTOR-EMPTY:
 ; VECTOR-NEXT:  ir-bb<entry>:
@@ -98,20 +95,20 @@ define void @predicated_load(i1 %c, ptr %ptr, ptr %dst) {
 ; VECTOR-NEXT:  Successor(s): scalar.ph, vector.ph
 ; VECTOR-EMPTY:
 ; VECTOR-NEXT:  vector.ph:
-; VECTOR-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = broadcast ir<%c>
+; VECTOR-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = broadcast ir<%c>
 ; VECTOR-NEXT:  Successor(s): vector loop
 ; VECTOR-EMPTY:
 ; VECTOR-NEXT:  <x1> vector loop: {
-; VECTOR-NEXT:  vp<[[VP6:%[0-9]+]]> = CANONICAL-IV
+; VECTOR-NEXT:  vp<[[VP5:%[0-9]+]]> = CANONICAL-IV vp<[[VP6:%[0-9]+]]> (VF * UF)
 ; VECTOR-EMPTY:
 ; VECTOR-NEXT:    vector.body:
-; VECTOR-NEXT:      vp<[[VP7:%[0-9]+]]> = SCALAR-STEPS vp<[[VP6]]>, ir<1>, vp<[[VP0]]>
-; VECTOR-NEXT:      vp<[[VP8:%[0-9]+]]> = SCALAR-STEPS vp<[[VP6]]>, ir<1>, vp<[[VP0]]>, ir<1>
+; VECTOR-NEXT:      vp<[[VP7:%[0-9]+]]> = SCALAR-STEPS vp<[[VP5]]>, ir<1>, vp<[[VP0]]>
+; VECTOR-NEXT:      vp<[[VP8:%[0-9]+]]> = SCALAR-STEPS vp<[[VP5]]>, ir<1>, vp<[[VP0]]>, ir<1>
 ; VECTOR-NEXT:      EMIT branch-on-cond ir<%c>
 ; VECTOR-NEXT:    Successor(s): pred.load.if, pred.load.continue
 ; VECTOR-EMPTY:
 ; VECTOR-NEXT:    pred.load.if:
-; VECTOR-NEXT:      vp<[[VP10:%[0-9]+]]> = SCALAR-STEPS vp<[[VP6]]>, ir<1>, vp<[[VP0]]>
+; VECTOR-NEXT:      vp<[[VP10:%[0-9]+]]> = SCALAR-STEPS vp<[[VP5]]>, ir<1>, vp<[[VP0]]>
 ; VECTOR-NEXT:      CLONE ir<%gep> = getelementptr ir<%ptr>, vp<[[VP10]]>
 ; VECTOR-NEXT:      CLONE ir<%lv> = load ir<%gep>
 ; VECTOR-NEXT:      EMIT vp<[[VP11:%[0-9]+]]> = insertelement ir<poison>, ir<%lv>, ir<0>
@@ -123,7 +120,7 @@ define void @predicated_load(i1 %c, ptr %ptr, ptr %dst) {
 ; VECTOR-NEXT:    Successor(s): pred.load.if, pred.load.continue
 ; VECTOR-EMPTY:
 ; VECTOR-NEXT:    pred.load.if:
-; VECTOR-NEXT:      vp<[[VP14:%[0-9]+]]> = SCALAR-STEPS vp<[[VP6]]>, ir<1>, vp<[[VP0]]>, ir<1>
+; VECTOR-NEXT:      vp<[[VP14:%[0-9]+]]> = SCALAR-STEPS vp<[[VP5]]>, ir<1>, vp<[[VP0]]>, ir<1>
 ; VECTOR-NEXT:      CLONE ir<%gep>.1 = getelementptr ir<%ptr>, vp<[[VP14]]>
 ; VECTOR-NEXT:      CLONE ir<%lv>.1 = load ir<%gep>.1
 ; VECTOR-NEXT:      EMIT vp<[[VP15:%[0-9]+]]> = insertelement vp<[[VP12]]>, ir<%lv>.1, ir<1>
@@ -135,7 +132,7 @@ define void @predicated_load(i1 %c, ptr %ptr, ptr %dst) {
 ; VECTOR-NEXT:    Successor(s): pred.load.if, pred.load.continue
 ; VECTOR-EMPTY:
 ; VECTOR-NEXT:    pred.load.if:
-; VECTOR-NEXT:      vp<[[VP18:%[0-9]+]]> = SCALAR-STEPS vp<[[VP6]]>, ir<1>, vp<[[VP0]]>, vp<[[VP0]]>
+; VECTOR-NEXT:      vp<[[VP18:%[0-9]+]]> = SCALAR-STEPS vp<[[VP5]]>, ir<1>, vp<[[VP0]]>, vp<[[VP0]]>
 ; VECTOR-NEXT:      CLONE ir<%gep>.2 = getelementptr ir<%ptr>, vp<[[VP18]]>
 ; VECTOR-NEXT:      CLONE ir<%lv>.2 = load ir<%gep>.2
 ; VECTOR-NEXT:      EMIT vp<[[VP19:%[0-9]+]]> = insertelement ir<poison>, ir<%lv>.2, ir<0>
@@ -148,7 +145,7 @@ define void @predicated_load(i1 %c, ptr %ptr, ptr %dst) {
 ; VECTOR-EMPTY:
 ; VECTOR-NEXT:    pred.load.if:
 ; VECTOR-NEXT:      EMIT vp<[[VP22:%[0-9]+]]> = add vp<[[VP0]]>, ir<1>
-; VECTOR-NEXT:      vp<[[VP23:%[0-9]+]]> = SCALAR-STEPS vp<[[VP6]]>, ir<1>, vp<[[VP0]]>, vp<[[VP22]]>
+; VECTOR-NEXT:      vp<[[VP23:%[0-9]+]]> = SCALAR-STEPS vp<[[VP5]]>, ir<1>, vp<[[VP0]]>, vp<[[VP22]]>
 ; VECTOR-NEXT:      CLONE ir<%gep>.3 = getelementptr ir<%ptr>, vp<[[VP23]]>
 ; VECTOR-NEXT:      CLONE ir<%lv>.3 = load ir<%gep>.3
 ; VECTOR-NEXT:      EMIT vp<[[VP24:%[0-9]+]]> = insertelement vp<[[VP20]]>, ir<%lv>.3, ir<1>
@@ -156,22 +153,21 @@ define void @predicated_load(i1 %c, ptr %ptr, ptr %dst) {
 ; VECTOR-EMPTY:
 ; VECTOR-NEXT:    pred.load.continue:
 ; VECTOR-NEXT:      WIDEN-PHI vp<[[VP25:%[0-9]+]]> = phi [ vp<[[VP20]]>, pred.load.continue ], [ vp<[[VP24]]>, pred.load.if ]
-; VECTOR-NEXT:      BLEND ir<%pred.val> = ir<0> vp<%16>/vp<[[VP5]]>
-; VECTOR-NEXT:      BLEND ir<%pred.val>.1 = ir<0> vp<%25>/vp<[[VP5]]>
+; VECTOR-NEXT:      BLEND ir<%pred.val> = ir<0> vp<%16>/vp<[[VP4]]>
+; VECTOR-NEXT:      BLEND ir<%pred.val>.1 = ir<0> vp<%25>/vp<[[VP4]]>
 ; VECTOR-NEXT:      CLONE ir<%gep.dst> = getelementptr ir<%dst>, vp<[[VP7]]>
 ; VECTOR-NEXT:      EMIT vp<[[VP26:%[0-9]+]]> = mul nuw nsw vp<[[VP0]]>, ir<1>
 ; VECTOR-NEXT:      vp<[[VP27:%[0-9]+]]> = vector-pointer ir<%gep.dst>, ir<1>
 ; VECTOR-NEXT:      vp<[[VP28:%[0-9]+]]> = vector-pointer ir<%gep.dst>, ir<1>, vp<[[VP26]]>
 ; VECTOR-NEXT:      WIDEN store vp<[[VP27]]>, ir<%pred.val>
 ; VECTOR-NEXT:      WIDEN store vp<[[VP28]]>, ir<%pred.val>.1
-; VECTOR-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP6]]>, vp<[[VP1]]>
-; VECTOR-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; VECTOR-NEXT:      EMIT branch-on-count vp<[[VP5]]>, vp<[[VP6]]>, vp<[[VP1]]>
 ; VECTOR-NEXT:    No successors
 ; VECTOR-NEXT:  }
 ; VECTOR-NEXT:  Successor(s): middle.block
 ; VECTOR-EMPTY:
 ; VECTOR-NEXT:  middle.block:
-; VECTOR-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<1024>, vp<[[VP2]]>
+; VECTOR-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<1024>, vp<[[VP1]]>
 ; VECTOR-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; VECTOR-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; VECTOR-EMPTY:
@@ -179,7 +175,7 @@ define void @predicated_load(i1 %c, ptr %ptr, ptr %dst) {
 ; VECTOR-NEXT:  No successors
 ; VECTOR-EMPTY:
 ; VECTOR-NEXT:  scalar.ph:
-; VECTOR-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP2]]>, middle.block ], [ ir<0>, ir-bb<entry> ], [ ir<0>, ir-bb<vector.memcheck> ]
+; VECTOR-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP1]]>, middle.block ], [ ir<0>, ir-bb<entry> ], [ ir<0>, ir-bb<vector.memcheck> ]
 ; VECTOR-NEXT:  Successor(s): ir-bb<loop.header>
 ; VECTOR-EMPTY:
 ; VECTOR-NEXT:  ir-bb<loop.header>:

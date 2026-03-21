@@ -111,8 +111,8 @@ define void @test_store_initially_interleave(i32 %n, ptr noalias %src) #0 {
 ; I64-NEXT:    store double [[TMP36]], ptr [[TMP68]], align 4
 ; I64-NEXT:    store double [[TMP37]], ptr [[TMP69]], align 4
 ; I64-NEXT:    store double [[TMP38]], ptr [[TMP70]], align 4
-; I64-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 16
 ; I64-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[STEP_ADD_3]], splat (i32 4)
+; I64-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 16
 ; I64-NEXT:    [[TMP71:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; I64-NEXT:    br i1 [[TMP71]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; I64:       [[MIDDLE_BLOCK]]:
@@ -153,8 +153,8 @@ define void @test_store_initially_interleave(i32 %n, ptr noalias %src) #0 {
 ; I64-NEXT:    store double [[TMP79]], ptr [[TMP87]], align 4
 ; I64-NEXT:    store double [[TMP80]], ptr [[TMP88]], align 4
 ; I64-NEXT:    store double [[TMP81]], ptr [[TMP89]], align 4
-; I64-NEXT:    [[INDEX_NEXT6]] = add nuw i32 [[INDEX4]], 4
 ; I64-NEXT:    [[VEC_IND_NEXT7]] = add <4 x i32> [[VEC_IND5]], splat (i32 4)
+; I64-NEXT:    [[INDEX_NEXT6]] = add nuw i32 [[INDEX4]], 4
 ; I64-NEXT:    [[TMP90:%.*]] = icmp eq i32 [[INDEX_NEXT6]], [[N_VEC3]]
 ; I64-NEXT:    br i1 [[TMP90]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; I64:       [[VEC_EPILOG_MIDDLE_BLOCK]]:
@@ -265,8 +265,8 @@ define void @test_store_initially_interleave(i32 %n, ptr noalias %src) #0 {
 ; I32-NEXT:    store double [[TMP35]], ptr [[TMP67]], align 4
 ; I32-NEXT:    store double [[TMP36]], ptr [[TMP68]], align 4
 ; I32-NEXT:    store double [[TMP37]], ptr [[TMP69]], align 4
-; I32-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 16
 ; I32-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[STEP_ADD_3]], splat (i32 4)
+; I32-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 16
 ; I32-NEXT:    [[TMP70:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; I32-NEXT:    br i1 [[TMP70]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; I32:       [[MIDDLE_BLOCK]]:
@@ -307,8 +307,8 @@ define void @test_store_initially_interleave(i32 %n, ptr noalias %src) #0 {
 ; I32-NEXT:    store double [[TMP78]], ptr [[TMP86]], align 4
 ; I32-NEXT:    store double [[TMP79]], ptr [[TMP87]], align 4
 ; I32-NEXT:    store double [[TMP80]], ptr [[TMP88]], align 4
-; I32-NEXT:    [[INDEX_NEXT6]] = add nuw i32 [[INDEX4]], 4
 ; I32-NEXT:    [[VEC_IND_NEXT7]] = add <4 x i32> [[VEC_IND5]], splat (i32 4)
+; I32-NEXT:    [[INDEX_NEXT6]] = add nuw i32 [[INDEX4]], 4
 ; I32-NEXT:    [[TMP89:%.*]] = icmp eq i32 [[INDEX_NEXT6]], [[N_VEC3]]
 ; I32-NEXT:    br i1 [[TMP89]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; I32:       [[VEC_EPILOG_MIDDLE_BLOCK]]:

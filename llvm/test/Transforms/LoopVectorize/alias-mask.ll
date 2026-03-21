@@ -46,8 +46,8 @@ define void @alias_mask(ptr noalias %a, ptr %b, ptr %c, i64 %n) {
 ; CHECK-NEXT:    [[TMP13:%.*]] = call <4 x i8> @llvm.masked.sdiv.v4i8(<4 x i8> [[WIDE_MASKED_LOAD5]], <4 x i8> [[WIDE_MASKED_LOAD]], <4 x i1> [[TMP9]])
 ; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr inbounds i8, ptr [[C]], i64 [[INDEX]]
 ; CHECK-NEXT:    call void @llvm.masked.store.v4i8.p0(<4 x i8> [[TMP13]], ptr align 1 [[TMP14]], <4 x i1> [[TMP9]])
-; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], [[NUM_ACTIVE_LANES]]
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i64> [[VEC_IV]], [[BROADCAST_SPLAT1]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], [[NUM_ACTIVE_LANES]]
 ; CHECK-NEXT:    [[TMP15:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP15]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -117,8 +117,8 @@ define void @alias_mask_multiple(ptr %a, ptr %b, ptr %c, i64 %n) {
 ; CHECK-NEXT:    [[TMP16:%.*]] = add <4 x i8> [[WIDE_MASKED_LOAD6]], [[WIDE_MASKED_LOAD]]
 ; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr inbounds i8, ptr [[C]], i64 [[INDEX]]
 ; CHECK-NEXT:    call void @llvm.masked.store.v4i8.p0(<4 x i8> [[TMP16]], ptr align 1 [[TMP17]], <4 x i1> [[TMP13]])
-; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], [[NUM_ACTIVE_LANES]]
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i64> [[VEC_IV]], [[BROADCAST_SPLAT1]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], [[NUM_ACTIVE_LANES]]
 ; CHECK-NEXT:    [[TMP18:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP18]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -184,8 +184,8 @@ define void @alias_mask_non_default_address_space(ptr addrspace(1) noalias %a, p
 ; CHECK-NEXT:    [[TMP13:%.*]] = call <4 x i8> @llvm.masked.sdiv.v4i8(<4 x i8> [[WIDE_MASKED_LOAD5]], <4 x i8> [[WIDE_MASKED_LOAD]], <4 x i1> [[TMP9]])
 ; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr inbounds i8, ptr addrspace(1) [[C]], i64 [[INDEX]]
 ; CHECK-NEXT:    call void @llvm.masked.store.v4i8.p1(<4 x i8> [[TMP13]], ptr addrspace(1) align 1 [[TMP14]], <4 x i1> [[TMP9]])
-; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], [[NUM_ACTIVE_LANES]]
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i64> [[VEC_IV]], [[BROADCAST_SPLAT1]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], [[NUM_ACTIVE_LANES]]
 ; CHECK-NEXT:    [[TMP15:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP15]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -249,8 +249,8 @@ define void @alias_mask_known_trip_count(ptr noalias %a, ptr %b, ptr %c) {
 ; CHECK-NEXT:    [[TMP11:%.*]] = add <4 x i8> [[WIDE_MASKED_LOAD3]], [[WIDE_MASKED_LOAD]]
 ; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds nuw i8, ptr [[C]], i64 [[INDEX]]
 ; CHECK-NEXT:    call void @llvm.masked.store.v4i8.p0(<4 x i8> [[TMP11]], ptr align 1 [[TMP12]], <4 x i1> [[TMP8]])
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[NUM_ACTIVE_LANES]]
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i8> [[VEC_IND]], [[BROADCAST_SPLAT]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[NUM_ACTIVE_LANES]]
 ; CHECK-NEXT:    [[TMP13:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP13]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -322,9 +322,9 @@ define void @alias_mask_truncated_wide_induction(ptr %a, ptr %b, i64 %n) {
 ; CHECK-NEXT:    [[TMP12:%.*]] = sext <4 x i8> [[TMP11]] to <4 x i16>
 ; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr inbounds nuw [2 x i8], ptr [[B]], i64 [[INDEX]]
 ; CHECK-NEXT:    call void @llvm.masked.store.v4i16.p0(<4 x i16> [[TMP12]], ptr align 2 [[TMP13]], <4 x i1> [[TMP8]])
-; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], [[NUM_ACTIVE_LANES]]
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i8> [[VEC_IND]], [[BROADCAST_SPLAT4]]
 ; CHECK-NEXT:    [[VEC_IND_NEXT8]] = add nuw <4 x i64> [[VEC_IND7]], [[BROADCAST_SPLAT6]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], [[NUM_ACTIVE_LANES]]
 ; CHECK-NEXT:    [[TMP14:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP14]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP10:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -391,8 +391,8 @@ define i8 @add_reduction(ptr %a, ptr %b, i64 %n) {
 ; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds i8, ptr [[B]], i64 [[INDEX]]
 ; CHECK-NEXT:    call void @llvm.masked.store.v4i8.p0(<4 x i8> [[WIDE_MASKED_LOAD]], ptr align 1 [[TMP4]], <4 x i1> [[CLAMPED_HEADER_MASK]])
 ; CHECK-NEXT:    [[TMP13]] = select <4 x i1> [[CLAMPED_HEADER_MASK]], <4 x i8> [[TMP3]], <4 x i8> [[VEC_PHI]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], [[NUM_ACTIVE_LANES]]
 ; CHECK-NEXT:    [[VEC_IND_NEXT8]] = add nuw <4 x i64> [[VEC_IND3]], [[BROADCAST_SPLAT6]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], [[NUM_ACTIVE_LANES]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP5]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP12:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -466,8 +466,8 @@ define i32 @find_last_reduction(ptr %a, ptr noalias %b, ptr %c, i64 %n) {
 ; CHECK-NEXT:    [[TMP16:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP15]])
 ; CHECK-NEXT:    [[TMP17]] = select i1 [[TMP16]], <4 x i1> [[TMP14]], <4 x i1> [[TMP6]]
 ; CHECK-NEXT:    [[TMP18]] = select i1 [[TMP16]], <4 x i32> [[WIDE_MASKED_LOAD]], <4 x i32> [[VEC_PHI]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], [[NUM_ACTIVE_LANES]]
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i64> [[VEC_IND]], [[BROADCAST_SPLAT4]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], [[NUM_ACTIVE_LANES]]
 ; CHECK-NEXT:    [[TMP19:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP19]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP14:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -538,8 +538,8 @@ define i64 @find_iv_reduction(ptr %a, ptr %b, i64 %n) {
 ; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr inbounds i64, ptr [[B]], i64 [[INDEX]]
 ; CHECK-NEXT:    call void @llvm.masked.store.v4i64.p0(<4 x i64> [[WIDE_MASKED_LOAD]], ptr align 8 [[TMP11]], <4 x i1> [[CLAMPED_HEADER_MASK]])
 ; CHECK-NEXT:    [[TMP12]] = select <4 x i1> [[CLAMPED_HEADER_MASK]], <4 x i64> [[TMP10]], <4 x i64> [[VEC_PHI]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], [[NUM_ACTIVE_LANES]]
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i64> [[VEC_IND]], [[BROADCAST_SPLAT4]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], [[NUM_ACTIVE_LANES]]
 ; CHECK-NEXT:    [[TMP13:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP13]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP16:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -616,8 +616,8 @@ define i64 @any_of_reduction(i64 %a, ptr %src, ptr %dst, i32 %n) {
 ; CHECK-NEXT:    call void @llvm.masked.store.v4i32.p0(<4 x i32> [[WIDE_MASKED_LOAD]], ptr align 4 [[TMP15]], <4 x i1> [[CLAMPED_HEADER_MASK]])
 ; CHECK-NEXT:    [[TMP16:%.*]] = select <4 x i1> [[CLAMPED_HEADER_MASK]], <4 x i1> [[TMP14]], <4 x i1> zeroinitializer
 ; CHECK-NEXT:    [[TMP17]] = or <4 x i1> [[VEC_PHI]], [[TMP16]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add i32 [[INDEX]], [[TMP6]]
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i32> [[VEC_IND]], [[BROADCAST_SPLAT4]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add i32 [[INDEX]], [[TMP6]]
 ; CHECK-NEXT:    [[TMP18:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP18]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP18:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

@@ -19,10 +19,10 @@ define float @fmaxnum_reduction(ptr %src, i64 %n) {
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds float, ptr [[SRC]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <8 x float>, ptr [[TMP0]], align 4
 ; CHECK-NEXT:    [[TMP1]] = call <8 x float> @llvm.maxnum.v8f32(<8 x float> [[VEC_PHI]], <8 x float> [[WIDE_LOAD]])
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[TMP2:%.*]] = fcmp uno <8 x float> [[WIDE_LOAD]], [[WIDE_LOAD]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = freeze <8 x i1> [[TMP2]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = call i1 @llvm.vector.reduce.or.v8i1(<8 x i1> [[TMP3]])
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = or i1 [[TMP4]], [[TMP5]]
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
@@ -84,10 +84,10 @@ define float @fminnum_reduction(ptr %src, i64 %n) {
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds float, ptr [[SRC]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <8 x float>, ptr [[TMP0]], align 4
 ; CHECK-NEXT:    [[TMP1]] = call <8 x float> @llvm.minnum.v8f32(<8 x float> [[VEC_PHI]], <8 x float> [[WIDE_LOAD]])
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[TMP2:%.*]] = fcmp uno <8 x float> [[WIDE_LOAD]], [[WIDE_LOAD]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = freeze <8 x i1> [[TMP2]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = call i1 @llvm.vector.reduce.or.v8i1(<8 x i1> [[TMP3]])
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = or i1 [[TMP4]], [[TMP5]]
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
@@ -149,10 +149,10 @@ define i64 @dead_fmaxnum_reduction(ptr %src, i64 %n) {
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds float, ptr [[SRC]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <8 x float>, ptr [[TMP0]], align 4
 ; CHECK-NEXT:    [[TMP1]] = call <8 x float> @llvm.maxnum.v8f32(<8 x float> [[VEC_PHI]], <8 x float> [[WIDE_LOAD]])
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[TMP2:%.*]] = fcmp uno <8 x float> [[WIDE_LOAD]], [[WIDE_LOAD]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = freeze <8 x i1> [[TMP2]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = call i1 @llvm.vector.reduce.or.v8i1(<8 x i1> [[TMP3]])
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = or i1 [[TMP4]], [[TMP5]]
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]

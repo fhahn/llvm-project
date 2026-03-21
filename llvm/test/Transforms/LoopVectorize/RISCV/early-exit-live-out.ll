@@ -256,9 +256,9 @@ define i64 @strided_search(ptr align 8 dereferenceable(14784) %p) {
 ; RV32-NEXT:    [[TMP10:%.*]] = icmp eq <vscale x 2 x i64> [[WIDE_MASKED_GATHER]], zeroinitializer
 ; RV32-NEXT:    [[TMP11:%.*]] = freeze <vscale x 2 x i1> [[TMP10]]
 ; RV32-NEXT:    [[TMP12:%.*]] = call i1 @llvm.vector.reduce.or.nxv2i1(<vscale x 2 x i1> [[TMP11]])
+; RV32-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <vscale x 2 x i64> [[VEC_IND]], [[BROADCAST_SPLAT]]
 ; RV32-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP3]]
 ; RV32-NEXT:    [[TMP13:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; RV32-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <vscale x 2 x i64> [[VEC_IND]], [[BROADCAST_SPLAT]]
 ; RV32-NEXT:    br i1 [[TMP12]], label %[[VECTOR_EARLY_EXIT:.*]], label %[[VECTOR_BODY_INTERIM]]
 ; RV32:       [[VECTOR_BODY_INTERIM]]:
 ; RV32-NEXT:    br i1 [[TMP13]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]

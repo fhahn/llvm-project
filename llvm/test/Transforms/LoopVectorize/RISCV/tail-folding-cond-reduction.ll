@@ -461,8 +461,8 @@ define i32 @step_cond_add(ptr %a, i64 %n, i32 %start) {
 ; NO-VP-OUTLOOP-NEXT:    [[TMP27:%.*]] = icmp sgt <vscale x 4 x i32> [[WIDE_MASKED_LOAD]], [[VEC_IND]]
 ; NO-VP-OUTLOOP-NEXT:    [[TMP22:%.*]] = select <vscale x 4 x i1> [[TMP27]], <vscale x 4 x i32> [[WIDE_MASKED_LOAD]], <vscale x 4 x i32> zeroinitializer
 ; NO-VP-OUTLOOP-NEXT:    [[TMP23]] = add <vscale x 4 x i32> [[TMP22]], [[VEC_PHI]]
-; NO-VP-OUTLOOP-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP7]]
 ; NO-VP-OUTLOOP-NEXT:    [[VEC_IND_NEXT]] = add <vscale x 4 x i32> [[VEC_IND]], [[DOTSPLAT]]
+; NO-VP-OUTLOOP-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP7]]
 ; NO-VP-OUTLOOP-NEXT:    [[TMP25:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; NO-VP-OUTLOOP-NEXT:    br i1 [[TMP25]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; NO-VP-OUTLOOP:       middle.block:
@@ -515,8 +515,8 @@ define i32 @step_cond_add(ptr %a, i64 %n, i32 %start) {
 ; NO-VP-INLOOP-NEXT:    [[TMP16:%.*]] = select <vscale x 4 x i1> [[TMP15]], <vscale x 4 x i32> [[WIDE_LOAD]], <vscale x 4 x i32> zeroinitializer
 ; NO-VP-INLOOP-NEXT:    [[TMP17:%.*]] = call i32 @llvm.vector.reduce.add.nxv4i32(<vscale x 4 x i32> [[TMP16]])
 ; NO-VP-INLOOP-NEXT:    [[TMP18]] = add i32 [[VEC_PHI]], [[TMP17]]
-; NO-VP-INLOOP-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP3]]
 ; NO-VP-INLOOP-NEXT:    [[VEC_IND_NEXT]] = add <vscale x 4 x i32> [[VEC_IND]], [[DOTSPLAT]]
+; NO-VP-INLOOP-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP3]]
 ; NO-VP-INLOOP-NEXT:    [[TMP19:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; NO-VP-INLOOP-NEXT:    br i1 [[TMP19]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; NO-VP-INLOOP:       middle.block:
@@ -654,8 +654,8 @@ define i32 @step_cond_add_pred(ptr %a, i64 %n, i32 %start) {
 ; NO-VP-OUTLOOP-NEXT:    [[TMP28:%.*]] = icmp sgt <vscale x 4 x i32> [[WIDE_MASKED_LOAD]], [[VEC_IND]]
 ; NO-VP-OUTLOOP-NEXT:    [[TMP22:%.*]] = add <vscale x 4 x i32> [[VEC_PHI]], [[WIDE_MASKED_LOAD]]
 ; NO-VP-OUTLOOP-NEXT:    [[PREDPHI]] = select <vscale x 4 x i1> [[TMP28]], <vscale x 4 x i32> [[TMP22]], <vscale x 4 x i32> [[VEC_PHI]]
-; NO-VP-OUTLOOP-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP7]]
 ; NO-VP-OUTLOOP-NEXT:    [[VEC_IND_NEXT]] = add <vscale x 4 x i32> [[VEC_IND]], [[DOTSPLAT]]
+; NO-VP-OUTLOOP-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP7]]
 ; NO-VP-OUTLOOP-NEXT:    [[TMP26:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; NO-VP-OUTLOOP-NEXT:    br i1 [[TMP26]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; NO-VP-OUTLOOP:       middle.block:
@@ -712,8 +712,8 @@ define i32 @step_cond_add_pred(ptr %a, i64 %n, i32 %start) {
 ; NO-VP-INLOOP-NEXT:    [[TMP16:%.*]] = select <vscale x 4 x i1> [[TMP15]], <vscale x 4 x i32> [[WIDE_LOAD]], <vscale x 4 x i32> zeroinitializer
 ; NO-VP-INLOOP-NEXT:    [[TMP17:%.*]] = call i32 @llvm.vector.reduce.add.nxv4i32(<vscale x 4 x i32> [[TMP16]])
 ; NO-VP-INLOOP-NEXT:    [[TMP18]] = add i32 [[VEC_PHI]], [[TMP17]]
-; NO-VP-INLOOP-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP3]]
 ; NO-VP-INLOOP-NEXT:    [[VEC_IND_NEXT]] = add <vscale x 4 x i32> [[VEC_IND]], [[DOTSPLAT]]
+; NO-VP-INLOOP-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP3]]
 ; NO-VP-INLOOP-NEXT:    [[TMP19:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; NO-VP-INLOOP-NEXT:    br i1 [[TMP19]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; NO-VP-INLOOP:       middle.block:

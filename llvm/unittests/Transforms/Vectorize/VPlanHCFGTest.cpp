@@ -50,7 +50,7 @@ TEST_F(VPlanHCFGTest, testBuildHCFGInnerLoop) {
   // Check that the region following the preheader consists of a block for the
   // original header and a separate latch.
   VPBasicBlock *VecBB = Plan->getVectorLoopRegion()->getEntryBasicBlock();
-  EXPECT_EQ(10u, VecBB->size());
+  EXPECT_EQ(9u, VecBB->size());
   EXPECT_EQ(0u, VecBB->getNumPredecessors());
   EXPECT_EQ(0u, VecBB->getNumSuccessors());
   EXPECT_EQ(VecBB->getParent()->getEntryBasicBlock(), VecBB);
@@ -101,7 +101,7 @@ TEST_F(VPlanHCFGTest, testBuildHCFGInnerLoop) {
   raw_string_ostream OS(FullDump);
   Plan->printDOT(OS);
   const char *ExpectedStr = R"(digraph VPlan {
-graph [labelloc=t, fontsize=30; label="Vectorization Plan\n for UF\>=1\nLive-in vp\<%0\> = VF * UF\nLive-in vp\<%1\> = vector-trip-count\nLive-in ir\<%N\> = original trip-count\n"]
+graph [labelloc=t, fontsize=30; label="Vectorization Plan\n for UF\>=1\nLive-in vp\<%0\> = vector-trip-count\nLive-in ir\<%N\> = original trip-count\n"]
 node [shape=rect, fontname=Courier, fontsize=30]
 edge [fontname=Courier, fontsize=30]
 compound=true
@@ -136,7 +136,7 @@ compound=true
   subgraph cluster_N5 {
     fontname=Courier
     label="\<x1\> vector loop"
-    "vp\<%2\> = CANONICAL-IV"
+    "vp\<%1\> = CANONICAL-IV"
     N4 [label =
       "vector.body:\l" +
       "  EMIT-SCALAR ir\<%indvars.iv\> = phi [ ir\<0\>, vector.ph ], [ ir\<%indvars.iv.next\>, vector.body ]\l" +
@@ -147,8 +147,7 @@ compound=true
       "  EMIT ir\<%indvars.iv.next\> = add ir\<%indvars.iv\>, ir\<1\>\l" +
       "  EMIT ir\<%exitcond\> = icmp ne ir\<%indvars.iv.next\>, ir\<%N\>\l" +
       "  EMIT vp\<%3\> = not ir\<%exitcond\>\l" +
-      "  EMIT vp\<%index.next\> = add nuw vp\<%2\>, vp\<%0\>\l" +
-      "  EMIT branch-on-count vp\<%index.next\>, vp\<%1\>\l" +
+      "  EMIT branch-on-count vp\<%1\>, vp\<%2\>, vp\<%0\>\l" +
       "No successors\l"
     ]
   }
@@ -157,7 +156,7 @@ compound=true
     "middle.block:\l" +
     "  EMIT vp\<%5\> = extract-last-part ir\<%indvars.iv.next\>\l" +
     "  EMIT vp\<%6\> = extract-last-lane vp\<%5\>\l" +
-    "  EMIT vp\<%cmp.n\> = icmp eq ir\<%N\>, vp\<%1\>\l" +
+    "  EMIT vp\<%cmp.n\> = icmp eq ir\<%N\>, vp\<%0\>\l" +
     "  EMIT branch-on-cond vp\<%cmp.n\>\l" +
     "Successor(s): ir-bb\<for.end\>, scalar.ph\l"
   ]
@@ -214,7 +213,7 @@ TEST_F(VPlanHCFGTest, testVPInstructionToVPRecipesInner) {
   // Check that the region following the preheader consists of a block for the
   // original header and a separate latch.
   VPBasicBlock *VecBB = Plan->getVectorLoopRegion()->getEntryBasicBlock();
-  EXPECT_EQ(11u, VecBB->size());
+  EXPECT_EQ(10u, VecBB->size());
   EXPECT_EQ(0u, VecBB->getNumPredecessors());
   EXPECT_EQ(0u, VecBB->getNumSuccessors());
   EXPECT_EQ(VecBB->getParent()->getEntryBasicBlock(), VecBB);
@@ -227,7 +226,6 @@ TEST_F(VPlanHCFGTest, testVPInstructionToVPRecipesInner) {
   EXPECT_NE(nullptr, dyn_cast<VPWidenMemoryRecipe>(&*Iter++));
   EXPECT_NE(nullptr, dyn_cast<VPWidenRecipe>(&*Iter++));
   EXPECT_NE(nullptr, dyn_cast<VPWidenRecipe>(&*Iter++));
-  EXPECT_NE(nullptr, dyn_cast<VPInstruction>(&*Iter++));
   EXPECT_NE(nullptr, dyn_cast<VPInstruction>(&*Iter++));
   EXPECT_NE(nullptr, dyn_cast<VPInstruction>(&*Iter++));
   EXPECT_NE(nullptr, dyn_cast<VPInstruction>(&*Iter++));
@@ -271,7 +269,7 @@ TEST_F(VPlanHCFGTest, testBuildHCFGInnerLoopMultiExit) {
   raw_string_ostream OS(FullDump);
   Plan->printDOT(OS);
   const char *ExpectedStr = R"(digraph VPlan {
-graph [labelloc=t, fontsize=30; label="Vectorization Plan\n for UF\>=1\nLive-in vp\<%0\> = VF * UF\nLive-in vp\<%1\> = vector-trip-count\nLive-in ir\<%N\> = original trip-count\n"]
+graph [labelloc=t, fontsize=30; label="Vectorization Plan\n for UF\>=1\nLive-in vp\<%0\> = vector-trip-count\nLive-in ir\<%N\> = original trip-count\n"]
 node [shape=rect, fontname=Courier, fontsize=30]
 edge [fontname=Courier, fontsize=30]
 compound=true
@@ -303,7 +301,7 @@ compound=true
   subgraph cluster_N5 {
     fontname=Courier
     label="\<x1\> vector loop"
-    "vp\<%2\> = CANONICAL-IV"
+    "vp\<%1\> = CANONICAL-IV"
     N4 [label =
       "vector.body:\l" +
       "  EMIT-SCALAR ir\<%iv\> = phi [ ir\<0\>, vector.ph ], [ ir\<%iv.next\>, loop.latch ]\l" +
@@ -320,8 +318,7 @@ compound=true
       "  EMIT ir\<%iv.next\> = add ir\<%iv\>, ir\<1\>\l" +
       "  EMIT ir\<%exitcond\> = icmp ne ir\<%iv.next\>, ir\<%N\>\l" +
       "  EMIT vp\<%3\> = not ir\<%exitcond\>\l" +
-      "  EMIT vp\<%index.next\> = add nuw vp\<%2\>, vp\<%0\>\l" +
-      "  EMIT branch-on-count vp\<%index.next\>, vp\<%1\>\l" +
+      "  EMIT branch-on-count vp\<%1\>, vp\<%2\>, vp\<%0\>\l" +
       "No successors\l"
     ]
   }
@@ -330,7 +327,7 @@ compound=true
     "middle.block:\l" +
     "  EMIT vp\<%5\> = extract-last-part ir\<%iv.next\>\l" +
     "  EMIT vp\<%6\> = extract-last-lane vp\<%5\>\l" +
-    "  EMIT vp\<%cmp.n\> = icmp eq ir\<%N\>, vp\<%1\>\l" +
+    "  EMIT vp\<%cmp.n\> = icmp eq ir\<%N\>, vp\<%0\>\l" +
     "  EMIT branch-on-cond vp\<%cmp.n\>\l" +
     "Successor(s): ir-bb\<exit.2\>, scalar.ph\l"
   ]

@@ -5,26 +5,24 @@ define i32 @test(i32 %limit, i1 %guard, i32 %divisor) {
 ; CHECK-LABEL: VPlan for loop in 'test'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
-; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
-; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = original trip-count
+; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = vector-trip-count
+; CHECK-NEXT:  vp<[[VP2:%[0-9]+]]> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:    EMIT vp<[[VP3]]> = EXPAND SCEV (1 + (0 smax %limit))<nuw>
+; CHECK-NEXT:    EMIT vp<[[VP2]]> = EXPAND SCEV (1 + (0 smax %limit))<nuw>
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
-; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = reduction-start-vector ir<0>, ir<0>, ir<1>
+; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = reduction-start-vector ir<0>, ir<0>, ir<1>
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {
-; CHECK-NEXT:  vp<[[VP5:%[0-9]+]]> = CANONICAL-IV
+; CHECK-NEXT:  vp<[[VP4:%[0-9]+]]> = CANONICAL-IV vp<[[VP5:%[0-9]+]]> (VF * UF)
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION nuw nsw ir<0>, ir<1>, vp<[[VP0]]>
-; CHECK-NEXT:      WIDEN-REDUCTION-PHI ir<%sum> = phi (add) vp<[[VP4]]>, ir<%sum>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP5]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      WIDEN-REDUCTION-PHI ir<%sum> = phi (add) vp<[[VP3]]>, ir<%sum>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP4]]>, vp<[[VP5]]>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -34,7 +32,7 @@ define i32 @test(i32 %limit, i1 %guard, i32 %divisor) {
 ; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = compute-reduction-result (add) ir<%sum>
 ; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = extract-last-part ir<%prev.iv>
 ; CHECK-NEXT:    EMIT vp<%vector.recur.extract> = extract-last-lane vp<[[VP8]]>
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq vp<[[VP3]]>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq vp<[[VP2]]>, vp<[[VP1]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
@@ -43,7 +41,7 @@ define i32 @test(i32 %limit, i1 %guard, i32 %divisor) {
 ; CHECK-NEXT:  No successors
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  scalar.ph:
-; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP2]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
+; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP1]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
 ; CHECK-NEXT:    EMIT-SCALAR vp<%scalar.recur.init> = phi [ vp<%vector.recur.extract>, middle.block ], [ ir<0>, ir-bb<entry> ]
 ; CHECK-NEXT:    EMIT-SCALAR vp<%bc.merge.rdx> = phi [ vp<[[VP7]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
 ; CHECK-NEXT:  Successor(s): ir-bb<loop.header>

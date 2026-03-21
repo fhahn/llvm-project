@@ -6,9 +6,8 @@ define void @alias_mask(ptr noalias %a, ptr %b, ptr %c, i64 %n) {
 ; INITIAL-LABEL: VPlan for loop in 'alias_mask'
 ; INITIAL:  VPlan 'Initial VPlan for VF={4},UF>=1' {
 ; INITIAL-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; INITIAL-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
-; INITIAL-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
-; INITIAL-NEXT:  Live-in vp<[[VP3:%[0-9]+]]> = backedge-taken count
+; INITIAL-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = vector-trip-count
+; INITIAL-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = backedge-taken count
 ; INITIAL-NEXT:  Live-in ir<%n> = original trip-count
 ; INITIAL-EMPTY:
 ; INITIAL-NEXT:  ir-bb<entry>:
@@ -19,12 +18,12 @@ define void @alias_mask(ptr noalias %a, ptr %b, ptr %c, i64 %n) {
 ; INITIAL-NEXT:  Successor(s): vector loop
 ; INITIAL-EMPTY:
 ; INITIAL-NEXT:  <x1> vector loop: {
-; INITIAL-NEXT:  vp<[[VP4:%[0-9]+]]> = CANONICAL-IV
+; INITIAL-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV vp<[[VP4:%[0-9]+]]> (VF * UF)
 ; INITIAL-EMPTY:
 ; INITIAL-NEXT:    vector.body:
 ; INITIAL-NEXT:      ir<%iv> = WIDEN-INDUCTION nuw nsw ir<0>, ir<1>, vp<[[VP0]]>
-; INITIAL-NEXT:      EMIT vp<[[VP5:%[0-9]+]]> = WIDEN-CANONICAL-INDUCTION nuw vp<[[VP4]]>
-; INITIAL-NEXT:      EMIT vp<[[VP6:%[0-9]+]]> = icmp ule vp<[[VP5]]>, vp<[[VP3]]>
+; INITIAL-NEXT:      EMIT vp<[[VP5:%[0-9]+]]> = WIDEN-CANONICAL-INDUCTION nuw vp<[[VP3]]>
+; INITIAL-NEXT:      EMIT vp<[[VP6:%[0-9]+]]> = icmp ule vp<[[VP5]]>, vp<[[VP2]]>
 ; INITIAL-NEXT:      EMIT vp<[[VP7:%[0-9]+]]> = and vp<[[VP6]]>, vp<%incoming.alias.mask>
 ; INITIAL-NEXT:    Successor(s): vector.body.split
 ; INITIAL-EMPTY:
@@ -44,8 +43,7 @@ define void @alias_mask(ptr noalias %a, ptr %b, ptr %c, i64 %n) {
 ; INITIAL-NEXT:    Successor(s): vector.latch
 ; INITIAL-EMPTY:
 ; INITIAL-NEXT:    vector.latch:
-; INITIAL-NEXT:      EMIT vp<%index.next> = add vp<[[VP4]]>, vp<[[VP1]]>
-; INITIAL-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; INITIAL-NEXT:      EMIT branch-on-count vp<[[VP3]]>, vp<[[VP4]]>, vp<[[VP1]]>
 ; INITIAL-NEXT:    No successors
 ; INITIAL-NEXT:  }
 ; INITIAL-NEXT:  Successor(s): middle.block
@@ -94,8 +92,8 @@ define void @alias_mask(ptr noalias %a, ptr %b, ptr %c, i64 %n) {
 ; FINAL-NEXT:    WIDEN ir<%add> = add ir<%ld.b>, ir<%ld.a>
 ; FINAL-NEXT:    CLONE ir<%ptr.c> = getelementptr inbounds ir<%c>, vp<%index>
 ; FINAL-NEXT:    WIDEN store ir<%ptr.c>, ir<%add>, vp<[[VP12]]>
-; FINAL-NEXT:    EMIT vp<%index.next> = add vp<%index>, vp<%num.active.lanes>
 ; FINAL-NEXT:    EMIT vp<%vec.ind.next> = add nuw vp<[[VP10]]>, vp<[[VP9]]>
+; FINAL-NEXT:    EMIT vp<%index.next> = add vp<%index>, vp<%num.active.lanes>
 ; FINAL-NEXT:    EMIT vp<[[VP13:%[0-9]+]]> = icmp eq vp<%index.next>, vp<%n.vec>
 ; FINAL-NEXT:    EMIT branch-on-cond vp<[[VP13]]>
 ; FINAL-NEXT:  Successor(s): middle.block, vector.body

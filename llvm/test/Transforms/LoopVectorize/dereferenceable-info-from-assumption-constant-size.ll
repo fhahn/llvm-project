@@ -39,8 +39,8 @@ define void @deref_assumption_in_header_constant_trip_count(ptr noalias noundef 
 ; CHECK-NEXT:    [[PREDPHI:%.*]] = select <2 x i1> [[TMP10]], <2 x i32> [[TMP14]], <2 x i32> [[WIDE_LOAD]]
 ; CHECK-NEXT:    [[TMP30:%.*]] = getelementptr inbounds i32, ptr [[C]], i64 [[TMP0]]
 ; CHECK-NEXT:    store <2 x i32> [[PREDPHI]], ptr [[TMP30]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <2 x i64> [[VEC_IND]], splat (i64 2)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[TMP32:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1000
 ; CHECK-NEXT:    br i1 [[TMP32]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -168,8 +168,8 @@ define void @deref_assumption_too_small_in_header_constant_trip_count(ptr noalia
 ; CHECK-NEXT:    [[PREDPHI:%.*]] = select <2 x i1> [[TMP10]], <2 x i32> [[TMP14]], <2 x i32> [[WIDE_LOAD]]
 ; CHECK-NEXT:    [[TMP30:%.*]] = getelementptr inbounds i32, ptr [[C]], i64 [[TMP0]]
 ; CHECK-NEXT:    store <2 x i32> [[PREDPHI]], ptr [[TMP30]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <2 x i64> [[VEC_IND]], splat (i64 2)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[TMP32:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1000
 ; CHECK-NEXT:    br i1 [[TMP32]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -242,8 +242,8 @@ define void @deref_assumption_in_header_constant_trip_count_align_1(ptr noalias 
 ; CHECK-NEXT:    [[PREDPHI:%.*]] = select <2 x i1> [[TMP7]], <2 x i32> [[TMP17]], <2 x i32> [[WIDE_LOAD]]
 ; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr inbounds i32, ptr [[C]], i64 [[TMP0]]
 ; CHECK-NEXT:    store <2 x i32> [[PREDPHI]], ptr [[TMP18]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <2 x i64> [[VEC_IND]], splat (i64 2)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[TMP20:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1000
 ; CHECK-NEXT:    br i1 [[TMP20]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -316,8 +316,8 @@ define void @deref_assumption_in_header_constant_trip_count_align_via_arg_attrib
 ; CHECK-NEXT:    [[PREDPHI:%.*]] = select <2 x i1> [[TMP7]], <2 x i32> [[TMP17]], <2 x i32> [[WIDE_LOAD]]
 ; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr inbounds i32, ptr [[C]], i64 [[TMP0]]
 ; CHECK-NEXT:    store <2 x i32> [[PREDPHI]], ptr [[TMP18]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <2 x i64> [[VEC_IND]], splat (i64 2)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[TMP20:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1000
 ; CHECK-NEXT:    br i1 [[TMP20]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -390,8 +390,8 @@ define void @deref_assumption_in_header_constant_trip_count_align_not_known(ptr 
 ; CHECK-NEXT:    [[PREDPHI:%.*]] = select <2 x i1> [[TMP7]], <2 x i32> [[TMP17]], <2 x i32> [[WIDE_LOAD]]
 ; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr inbounds i32, ptr [[C]], i64 [[TMP0]]
 ; CHECK-NEXT:    store <2 x i32> [[PREDPHI]], ptr [[TMP18]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <2 x i64> [[VEC_IND]], splat (i64 2)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[TMP20:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1000
 ; CHECK-NEXT:    br i1 [[TMP20]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -462,8 +462,8 @@ define void @deref_assumption_in_then_constant_trip_count(ptr noalias noundef %a
 ; CHECK-NEXT:    [[PREDPHI:%.*]] = select <2 x i1> [[TMP4]], <2 x i32> [[TMP12]], <2 x i32> [[WIDE_LOAD]]
 ; CHECK-NEXT:    [[TMP26:%.*]] = getelementptr inbounds i32, ptr [[C]], i64 [[TMP0]]
 ; CHECK-NEXT:    store <2 x i32> [[PREDPHI]], ptr [[TMP26]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <2 x i64> [[VEC_IND]], splat (i64 2)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[TMP28:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1000
 ; CHECK-NEXT:    br i1 [[TMP28]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -536,8 +536,8 @@ define void @deref_assumption_in_latch_constant_trip_count(ptr noalias noundef %
 ; CHECK-NEXT:    call void @llvm.assume(i1 true) [ "align"(ptr [[TMP4]], i64 4), "dereferenceable"(ptr [[TMP4]], i64 4) ]
 ; CHECK-NEXT:    [[TMP30:%.*]] = getelementptr inbounds i32, ptr [[C]], i64 [[TMP0]]
 ; CHECK-NEXT:    store <2 x i32> [[PREDPHI]], ptr [[TMP30]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <2 x i64> [[VEC_IND]], splat (i64 2)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[TMP32:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1000
 ; CHECK-NEXT:    br i1 [[TMP32]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP9:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -613,8 +613,8 @@ define void @deref_assumption_in_header_variable_trip_count(ptr noalias noundef 
 ; CHECK-NEXT:    [[PREDPHI:%.*]] = select <2 x i1> [[TMP10]], <2 x i32> [[TMP14]], <2 x i32> [[WIDE_LOAD]]
 ; CHECK-NEXT:    [[TMP30:%.*]] = getelementptr inbounds i32, ptr [[C]], i64 [[TMP0]]
 ; CHECK-NEXT:    store <2 x i32> [[PREDPHI]], ptr [[TMP30]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <2 x i64> [[VEC_IND]], splat (i64 2)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[TMP32:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP32]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP10:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

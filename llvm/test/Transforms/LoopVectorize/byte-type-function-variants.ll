@@ -153,8 +153,8 @@ define void @byte_type_linear(ptr noalias %dst, ptr readonly %src, i64 %n) {
 ; CHECK-NEXT:    [[TMP9:%.*]] = insertelement <2 x b64> [[TMP8]], b64 [[TMP7]], i32 1
 ; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds b64, ptr [[DST]], i64 [[INDEX]]
 ; CHECK-NEXT:    store <2 x b64> [[TMP9]], ptr [[TMP10]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <2 x i64> [[VEC_IND]], splat (i64 2)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP11:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP11]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

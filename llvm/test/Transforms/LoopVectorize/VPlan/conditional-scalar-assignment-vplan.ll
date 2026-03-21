@@ -19,7 +19,6 @@ define i32 @simple_csa_int_select(i64 %N, ptr %data, i32 %a) {
 ; CHECK-LABEL: VPlan for loop in 'simple_csa_int_select'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<%N> = original trip-count
 ; CHECK-EMPTY:
@@ -43,8 +42,7 @@ define i32 @simple_csa_int_select(i64 %N, ptr %data, i32 %a) {
 ; CHECK-NEXT:      EMIT vp<[[VP7:%[0-9]+]]> = any-of ir<%select.cmp>
 ; CHECK-NEXT:      EMIT vp<[[VP8]]> = select vp<[[VP7]]>, ir<%select.cmp>, vp<[[VP4]]>
 ; CHECK-NEXT:      EMIT vp<[[VP9]]> = select vp<[[VP7]]>, ir<%ld>, ir<%data.phi>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP3]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -79,7 +77,6 @@ define i32 @simple_csa_int_select(i64 %N, ptr %data, i32 %a) {
 ; CHECK-TF-LABEL: VPlan for loop in 'simple_csa_int_select'
 ; CHECK-TF:  VPlan 'Initial VPlan for VF={4},UF>=1' {
 ; CHECK-TF-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-TF-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-TF-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-TF-NEXT:  Live-in vp<[[VP3:%[0-9]+]]> = backedge-taken count
 ; CHECK-TF-EMPTY:
@@ -106,8 +103,7 @@ define i32 @simple_csa_int_select(i64 %N, ptr %data, i32 %a) {
 ; CHECK-TF-NEXT:      EMIT vp<[[VP11:%[0-9]+]]> = any-of vp<[[VP10]]>
 ; CHECK-TF-NEXT:      EMIT vp<[[VP12]]> = select vp<[[VP11]]>, vp<[[VP10]]>, vp<[[VP5]]>
 ; CHECK-TF-NEXT:      EMIT vp<[[VP13]]> = select vp<[[VP11]]>, ir<%ld>, ir<%data.phi>
-; CHECK-TF-NEXT:      EMIT vp<%index.next> = add vp<[[VP4]]>, vp<[[VP1]]>
-; CHECK-TF-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-TF-NEXT:      EMIT branch-on-count vp<[[VP4]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-TF-NEXT:    No successors
 ; CHECK-TF-NEXT:  }
 ; CHECK-TF-NEXT:  Successor(s): middle.block
@@ -165,7 +161,6 @@ define i32 @simple_csa_int_load(ptr noalias %a, ptr noalias %b, i32 %default_val
 ; CHECK-LABEL: VPlan for loop in 'simple_csa_int_load'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<%N> = original trip-count
 ; CHECK-EMPTY:
@@ -209,8 +204,7 @@ define i32 @simple_csa_int_load(ptr noalias %a, ptr noalias %b, i32 %default_val
 ; CHECK-NEXT:      EMIT vp<[[VP9:%[0-9]+]]> = any-of ir<%if.cond>
 ; CHECK-NEXT:      EMIT vp<[[VP10]]> = select vp<[[VP9]]>, ir<%if.cond>, vp<[[VP4]]>
 ; CHECK-NEXT:      EMIT vp<[[VP11]]> = select vp<[[VP9]]>, vp<[[VP8]]>, ir<%data.phi>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP3]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -242,7 +236,6 @@ define i32 @simple_csa_int_load(ptr noalias %a, ptr noalias %b, i32 %default_val
 ; CHECK-TF-LABEL: VPlan for loop in 'simple_csa_int_load'
 ; CHECK-TF:  VPlan 'Initial VPlan for VF={4},UF>=1' {
 ; CHECK-TF-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-TF-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-TF-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-TF-NEXT:  Live-in vp<[[VP3:%[0-9]+]]> = backedge-taken count
 ; CHECK-TF-EMPTY:
@@ -272,8 +265,7 @@ define i32 @simple_csa_int_load(ptr noalias %a, ptr noalias %b, i32 %default_val
 ; CHECK-TF-NEXT:      EMIT vp<[[VP12:%[0-9]+]]> = any-of vp<[[VP10]]>
 ; CHECK-TF-NEXT:      EMIT vp<[[VP13]]> = select vp<[[VP12]]>, vp<[[VP10]]>, vp<[[VP5]]>
 ; CHECK-TF-NEXT:      EMIT vp<[[VP14]]> = select vp<[[VP12]]>, ir<%ld.b>, ir<%data.phi>
-; CHECK-TF-NEXT:      EMIT vp<%index.next> = add vp<[[VP4]]>, vp<[[VP1]]>
-; CHECK-TF-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-TF-NEXT:      EMIT branch-on-count vp<[[VP4]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-TF-NEXT:    No successors
 ; CHECK-TF-NEXT:  }
 ; CHECK-TF-NEXT:  Successor(s): middle.block

@@ -46,8 +46,8 @@ define i8 @widget(ptr %arr, i8 %t9) {
 ; CHECK-NEXT:    [[TMP14:%.*]] = icmp slt <4 x i8> [[TMP11]], [[BROADCAST_SPLAT]]
 ; CHECK-NEXT:    [[TMP15:%.*]] = zext <4 x i1> [[TMP14]] to <4 x i8>
 ; CHECK-NEXT:    store <4 x i8> [[TMP15]], ptr [[TMP13]], align 1
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i8> [[VEC_IND]], splat (i8 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP17:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP17]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       middle.block:

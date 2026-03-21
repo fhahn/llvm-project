@@ -42,8 +42,8 @@ define i32 @test_scalar_predicated_cost(i64 %x, i64 %y, ptr %A) #0 {
 ; CHECK-NEXT:    call void @llvm.masked.store.v8i32.p0(<8 x i32> [[TMP10]], ptr align 4 [[TMP13]], <8 x i1> [[TMP1]])
 ; CHECK-NEXT:    call void @llvm.masked.store.v8i32.p0(<8 x i32> [[TMP11]], ptr align 4 [[TMP14]], <8 x i1> [[TMP2]])
 ; CHECK-NEXT:    call void @llvm.masked.store.v8i32.p0(<8 x i32> [[TMP12]], ptr align 4 [[TMP15]], <8 x i1> [[TMP3]])
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 32
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <8 x i64> [[STEP_ADD_3]], splat (i64 8)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 32
 ; CHECK-NEXT:    [[TMP16:%.*]] = icmp eq i64 [[INDEX_NEXT]], 96
 ; CHECK-NEXT:    br i1 [[TMP16]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -68,8 +68,8 @@ define i32 @test_scalar_predicated_cost(i64 %x, i64 %y, ptr %A) #0 {
 ; CHECK-NEXT:    [[TMP19:%.*]] = getelementptr i32, ptr [[A]], i64 [[INDEX9]]
 ; CHECK-NEXT:    [[TMP20:%.*]] = trunc <4 x i64> [[TMP18]] to <4 x i32>
 ; CHECK-NEXT:    call void @llvm.masked.store.v4i32.p0(<4 x i32> [[TMP20]], ptr align 4 [[TMP19]], <4 x i1> [[TMP17]])
-; CHECK-NEXT:    [[INDEX_NEXT11]] = add nuw i64 [[INDEX9]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT12]] = add <4 x i64> [[VEC_IND10]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT11]] = add nuw i64 [[INDEX9]], 4
 ; CHECK-NEXT:    [[TMP21:%.*]] = icmp eq i64 [[INDEX_NEXT11]], 100
 ; CHECK-NEXT:    br i1 [[TMP21]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_MIDDLE_BLOCK]]:

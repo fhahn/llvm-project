@@ -40,8 +40,8 @@ define i32 @first_order_recurrence(ptr nocapture readonly %a, ptr nocapture %b, 
 ; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = add <4 x i32> [[WIDE_MASKED_LOAD]], [[TMP8]]
 ; CHECK-NEXT:    call void @llvm.masked.store.v4i32.p0(<4 x i32> [[TMP10]], ptr align 4 [[TMP9]], <4 x i1> [[TMP5]])
-; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i64> [[VEC_IV]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP11:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP11]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -106,8 +106,8 @@ define void @uses_bounds_checks(ptr noalias %a, ptr %b, ptr %c, i64 %n) {
 ; CHECK-NEXT:    [[TMP5:%.*]] = add <4 x i8> [[TMP4]], [[WIDE_MASKED_LOAD]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds nuw i8, ptr [[C]], i64 [[INDEX]]
 ; CHECK-NEXT:    call void @llvm.masked.store.v4i8.p0(<4 x i8> [[TMP5]], ptr align 1 [[TMP6]], <4 x i1> [[TMP1]]), !alias.scope [[META7:![0-9]+]], !noalias [[META4]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i64> [[VEC_IV]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP7]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP9:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

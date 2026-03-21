@@ -147,8 +147,8 @@ define void @pointer_induction_used_as_vector(ptr noalias %start.1, ptr noalias 
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i8>, ptr [[TMP4]], align 1
 ; CHECK-NEXT:    [[TMP6:%.*]] = add <4 x i8> [[WIDE_LOAD]], splat (i8 1)
 ; CHECK-NEXT:    store <4 x i8> [[TMP6]], ptr [[TMP4]], align 1
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[PTR_IND]] = getelementptr i8, ptr [[POINTER_PHI]], i64 4
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP7]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       middle.block:
@@ -234,9 +234,9 @@ define void @non_constant_vector_expansion(i32 %0, ptr %call) {
 ; STRIDED-NEXT:    [[OFFSET_IDX:%.*]] = trunc i64 [[INDEX]] to i32
 ; STRIDED-NEXT:    [[TMP6:%.*]] = getelementptr ptr, ptr [[CALL:%.*]], i32 [[OFFSET_IDX]]
 ; STRIDED-NEXT:    store <4 x ptr> [[VECTOR_GEP]], ptr [[TMP6]], align 4
-; STRIDED-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; STRIDED-NEXT:    [[TMP3:%.*]] = shl i64 [[TMP1]], 2
 ; STRIDED-NEXT:    [[PTR_IND]] = getelementptr i8, ptr [[POINTER_PHI]], i64 [[TMP3]]
+; STRIDED-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; STRIDED-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[INDEX_NEXT]], 100
 ; STRIDED-NEXT:    br i1 [[TMP8]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; STRIDED:       middle.block:
@@ -305,9 +305,9 @@ define void @outside_lattice(ptr noalias %p, ptr noalias %q, i32 %n) {
 ; DEFAULT-NEXT:    store <4 x ptr> [[VECTOR_GEP]], ptr [[TMP5]], align 8
 ; DEFAULT-NEXT:    [[TMP7:%.*]] = getelementptr inbounds i32, ptr [[Q:%.*]], i32 [[OFFSET_IDX]]
 ; DEFAULT-NEXT:    store <4 x i32> [[VEC_IND]], ptr [[TMP7]], align 4
-; DEFAULT-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; DEFAULT-NEXT:    [[PTR_IND]] = getelementptr i8, ptr [[POINTER_PHI]], i64 16
 ; DEFAULT-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
+; DEFAULT-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; DEFAULT-NEXT:    [[TMP9:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; DEFAULT-NEXT:    br i1 [[TMP9]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; DEFAULT:       middle.block:
@@ -359,9 +359,9 @@ define void @outside_lattice(ptr noalias %p, ptr noalias %q, i32 %n) {
 ; STRIDED-NEXT:    store <4 x ptr> [[VECTOR_GEP]], ptr [[TMP5]], align 8
 ; STRIDED-NEXT:    [[TMP7:%.*]] = getelementptr inbounds i32, ptr [[Q:%.*]], i32 [[OFFSET_IDX]]
 ; STRIDED-NEXT:    store <4 x i32> [[VEC_IND]], ptr [[TMP7]], align 4
-; STRIDED-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; STRIDED-NEXT:    [[PTR_IND]] = getelementptr i8, ptr [[POINTER_PHI]], i64 16
 ; STRIDED-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
+; STRIDED-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; STRIDED-NEXT:    [[TMP9:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; STRIDED-NEXT:    br i1 [[TMP9]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; STRIDED:       middle.block:

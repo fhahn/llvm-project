@@ -380,8 +380,8 @@ define void @hoist_previous_value_and_operand(ptr %dst, i64 %mask) {
 ; CHECK-NEXT:    [[TMP6]] = or <4 x i32> [[TMP5]], splat (i32 3)
 ; CHECK-NEXT:    [[TMP7:%.*]] = shufflevector <4 x i32> [[VECTOR_RECUR1]], <4 x i32> [[TMP6]], <4 x i32> <i32 3, i32 4, i32 5, i32 6>
 ; CHECK-NEXT:    store <4 x i32> [[TMP7]], ptr [[TMP1]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i64> [[VEC_IND]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[INDEX_NEXT]], 336
 ; CHECK-NEXT:    br i1 [[TMP8]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
 ; CHECK:       middle.block:

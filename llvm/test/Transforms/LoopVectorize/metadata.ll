@@ -406,9 +406,9 @@ define void @unknown_metadata(ptr nocapture %a, ptr noalias %b, i64 %size) {
 ; CHECK-NEXT:    [[TMP1:%.*]] = extractelement <2 x ptr> [[TMP2]], i64 0
 ; CHECK-NEXT:    store <2 x i32> [[TMP3]], ptr [[TMP1]], align 4
 ; CHECK-NEXT:    store <2 x ptr> [[TMP2]], ptr [[TMP6]], align 8
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <2 x i64> [[VEC_IND]], splat (i64 2)
 ; CHECK-NEXT:    [[VEC_IND_NEXT2]] = add <2 x i32> [[TMP3]], splat (i32 2)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP5]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP12:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -455,9 +455,9 @@ define void @unknown_metadata(ptr nocapture %a, ptr noalias %b, i64 %size) {
 ; INTERLEAVE-NEXT:    [[TMP7:%.*]] = getelementptr inbounds ptr, ptr [[TMP0]], i64 2
 ; INTERLEAVE-NEXT:    store <2 x ptr> [[TMP1]], ptr [[TMP0]], align 8
 ; INTERLEAVE-NEXT:    store <2 x ptr> [[TMP2]], ptr [[TMP7]], align 8
-; INTERLEAVE-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; INTERLEAVE-NEXT:    [[VEC_IND_NEXT]] = add <2 x i64> [[STEP_ADD]], splat (i64 2)
 ; INTERLEAVE-NEXT:    [[VEC_IND_NEXT2]] = add <2 x i32> [[STEP_ADD3]], splat (i32 2)
+; INTERLEAVE-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; INTERLEAVE-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; INTERLEAVE-NEXT:    br i1 [[TMP8]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP12:![0-9]+]]
 ; INTERLEAVE:       [[MIDDLE_BLOCK]]:

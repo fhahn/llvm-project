@@ -12,8 +12,7 @@ define void @reverse_unmasked_load_feeds_address(ptr noalias %src, i64 %n) {
 ; CHECK-LABEL: VPlan for loop in 'reverse_unmasked_load_feeds_address'
 ; CHECK:  VPlan ' for UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
-; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
+; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
@@ -24,7 +23,7 @@ define void @reverse_unmasked_load_feeds_address(ptr noalias %src, i64 %n) {
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {
-; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
+; CHECK-NEXT:  vp<[[VP2:%[0-9]+]]> = CANONICAL-IV vp<[[VP3:%[0-9]+]]> (VF * UF)
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION ir<%n.minus.1>, ir<-1>, vp<[[VP0]]>
@@ -34,8 +33,7 @@ define void @reverse_unmasked_load_feeds_address(ptr noalias %src, i64 %n) {
 ; CHECK-NEXT:      EMIT ir<%ptr.sel> = select ir<%cmp>, ir<@tbl.a>, ir<@tbl.b>
 ; CHECK-NEXT:      REPLICATE store ir<1.000000e+00>, ir<%ptr.sel>
 ; CHECK-NEXT:      EMIT ir<%ec> = icmp eq ir<%iv>, ir<0>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP2]]>, vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -67,8 +65,7 @@ define void @mixed_address_and_vector_uses(ptr noalias %src, ptr noalias %dst, i
 ; CHECK-LABEL: VPlan for loop in 'mixed_address_and_vector_uses'
 ; CHECK:  VPlan ' for UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
-; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
+; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
@@ -78,7 +75,7 @@ define void @mixed_address_and_vector_uses(ptr noalias %src, ptr noalias %dst, i
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {
-; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
+; CHECK-NEXT:  vp<[[VP2:%[0-9]+]]> = CANONICAL-IV vp<[[VP3:%[0-9]+]]> (VF * UF)
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION ir<0>, ir<1>, vp<[[VP0]]>
@@ -93,8 +90,7 @@ define void @mixed_address_and_vector_uses(ptr noalias %src, ptr noalias %dst, i
 ; CHECK-NEXT:      WIDEN store vp<[[VP4]]>, ir<%doubled>
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add ir<%iv>, ir<1>
 ; CHECK-NEXT:      EMIT ir<%ec> = icmp eq ir<%iv.next>, ir<%n>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP2]]>, vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -128,8 +124,7 @@ define void @interleave_member_feeds_address(ptr noalias %arr, i64 %n) {
 ; CHECK-LABEL: VPlan for loop in 'interleave_member_feeds_address'
 ; CHECK:  VPlan ' for UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
-; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
+; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
@@ -139,7 +134,7 @@ define void @interleave_member_feeds_address(ptr noalias %arr, i64 %n) {
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {
-; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
+; CHECK-NEXT:  vp<[[VP2:%[0-9]+]]> = CANONICAL-IV vp<[[VP3:%[0-9]+]]> (VF * UF)
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION ir<0>, ir<1>, vp<[[VP0]]>
@@ -150,8 +145,7 @@ define void @interleave_member_feeds_address(ptr noalias %arr, i64 %n) {
 ; CHECK-NEXT:      REPLICATE store ir<%v>, ir<%p>
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add ir<%iv>, ir<1>
 ; CHECK-NEXT:      EMIT ir<%ec> = icmp eq ir<%iv.next>, ir<%n>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP2]]>, vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -181,8 +175,7 @@ define void @symbolic_stride_versioned_to_one(ptr noalias %src, ptr noalias %dst
 ; CHECK-LABEL: VPlan for loop in 'symbolic_stride_versioned_to_one'
 ; CHECK:  VPlan ' for UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
-; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
+; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
@@ -192,7 +185,7 @@ define void @symbolic_stride_versioned_to_one(ptr noalias %src, ptr noalias %dst
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {
-; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
+; CHECK-NEXT:  vp<[[VP2:%[0-9]+]]> = CANONICAL-IV vp<[[VP3:%[0-9]+]]> (VF * UF)
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION ir<0>, ir<1>, vp<[[VP0]]>
@@ -205,8 +198,7 @@ define void @symbolic_stride_versioned_to_one(ptr noalias %src, ptr noalias %dst
 ; CHECK-NEXT:      WIDEN store vp<[[VP5]]>, ir<%doubled>
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add ir<%iv>, ir<1>
 ; CHECK-NEXT:      EMIT ir<%ec> = icmp eq ir<%iv.next>, ir<%n>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP2]]>, vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block

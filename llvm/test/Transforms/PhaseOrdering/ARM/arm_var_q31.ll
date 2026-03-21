@@ -67,8 +67,8 @@ define void @arm_var_q31(ptr noundef %pSrc, i32 noundef %blockSize, ptr noundef 
 ; CHECK-NEXT:    [[TMP31:%.*]] = add i64 [[TMP29]], [[TMP30]]
 ; CHECK-NEXT:    [[TMP32:%.*]] = tail call i64 @llvm.vector.reduce.add.v4i64(<4 x i64> [[TMP22]])
 ; CHECK-NEXT:    [[TMP33]] = add i64 [[TMP31]], [[TMP32]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[PTR_IND]] = getelementptr i8, ptr [[POINTER_PHI]], i32 64
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP34:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP34]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; CHECK:       middle.block:

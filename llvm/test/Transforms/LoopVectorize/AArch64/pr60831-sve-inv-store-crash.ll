@@ -27,8 +27,8 @@ define void @test_invar_gep(ptr %dst) #0 {
 ; CHECK-NEXT:    [[TMP7:%.*]] = sub i32 [[TMP4]], 1
 ; CHECK-NEXT:    [[TMP18:%.*]] = extractelement <vscale x 4 x i64> [[TMP9]], i32 [[TMP7]]
 ; CHECK-NEXT:    store i64 [[TMP18]], ptr [[TMP14:%.*]], align 1
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP3]]
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nsw <vscale x 4 x i64> [[TMP9]], [[DOTSPLAT]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP3]]
 ; CHECK-NEXT:    [[TMP19:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP19]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       middle.block:
@@ -70,8 +70,8 @@ define void @test_invar_gep(ptr %dst) #0 {
 ; IC2-NEXT:    [[TMP8:%.*]] = sub i32 [[TMP7]], 1
 ; IC2-NEXT:    [[TMP9:%.*]] = extractelement <vscale x 4 x i64> [[TMP22]], i32 [[TMP8]]
 ; IC2-NEXT:    store i64 [[TMP9]], ptr [[DST:%.*]], align 1
-; IC2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP3]]
 ; IC2-NEXT:    [[VEC_IND_NEXT]] = add nsw <vscale x 4 x i64> [[TMP22]], [[TMP21]]
+; IC2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP3]]
 ; IC2-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; IC2-NEXT:    br i1 [[TMP10]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; IC2:       middle.block:
@@ -133,8 +133,8 @@ define void @test_invar_gep_var_start(i64 %start, ptr %dst) #0 {
 ; CHECK-NEXT:    [[TMP9:%.*]] = sub i32 [[TMP8]], 1
 ; CHECK-NEXT:    [[TMP11:%.*]] = extractelement <vscale x 4 x i64> [[TMP7]], i32 [[TMP9]]
 ; CHECK-NEXT:    store i64 [[TMP11]], ptr [[DST:%.*]], align 1
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP4]]
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nsw <vscale x 4 x i64> [[TMP7]], [[BROADCAST_SPLAT2]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP4]]
 ; CHECK-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP12]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
 ; CHECK:       middle.block:
@@ -182,8 +182,8 @@ define void @test_invar_gep_var_start(i64 %start, ptr %dst) #0 {
 ; IC2-NEXT:    [[TMP12:%.*]] = sub i32 [[TMP11]], 1
 ; IC2-NEXT:    [[TMP15:%.*]] = extractelement <vscale x 4 x i64> [[TMP10]], i32 [[TMP12]]
 ; IC2-NEXT:    store i64 [[TMP15]], ptr [[DST:%.*]], align 1
-; IC2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP5]]
 ; IC2-NEXT:    [[VEC_IND_NEXT]] = add nsw <vscale x 4 x i64> [[TMP10]], [[TMP9]]
+; IC2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP5]]
 ; IC2-NEXT:    [[TMP16:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; IC2-NEXT:    br i1 [[TMP16]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
 ; IC2:       middle.block:
@@ -250,8 +250,8 @@ define void @test_invar_gep_var_start_step_2(i64 %start, ptr %dst) #0 {
 ; CHECK-NEXT:    [[TMP14:%.*]] = sub i32 [[TMP13]], 1
 ; CHECK-NEXT:    [[TMP16:%.*]] = extractelement <vscale x 4 x i64> [[TMP12]], i32 [[TMP14]]
 ; CHECK-NEXT:    store i64 [[TMP16]], ptr [[DST:%.*]], align 1
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP6]]
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nsw <vscale x 4 x i64> [[TMP12]], [[BROADCAST_SPLAT2]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP6]]
 ; CHECK-NEXT:    [[TMP17:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP17]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
 ; CHECK:       middle.block:
@@ -304,8 +304,8 @@ define void @test_invar_gep_var_start_step_2(i64 %start, ptr %dst) #0 {
 ; IC2-NEXT:    [[TMP15:%.*]] = sub i32 [[TMP17]], 1
 ; IC2-NEXT:    [[TMP20:%.*]] = extractelement <vscale x 4 x i64> [[TMP14]], i32 [[TMP15]]
 ; IC2-NEXT:    store i64 [[TMP20]], ptr [[DST:%.*]], align 1
-; IC2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP7]]
 ; IC2-NEXT:    [[VEC_IND_NEXT]] = add nsw <vscale x 4 x i64> [[TMP14]], [[TMP13]]
+; IC2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP7]]
 ; IC2-NEXT:    [[TMP21:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; IC2-NEXT:    br i1 [[TMP21]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
 ; IC2:       middle.block:

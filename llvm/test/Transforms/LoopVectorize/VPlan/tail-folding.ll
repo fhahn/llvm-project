@@ -5,7 +5,6 @@ define i32 @live_out(ptr noalias %p, i32 %n) {
 ; CHECK-LABEL: VPlan for loop in 'live_out'
 ; CHECK:  VPlan ' for UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in vp<[[VP3:%[0-9]+]]> = backedge-taken count
 ; CHECK-NEXT:  Live-in ir<%n> = original trip-count
@@ -37,8 +36,7 @@ define i32 @live_out(ptr noalias %p, i32 %n) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.latch:
 ; CHECK-NEXT:      EMIT-SCALAR vp<[[VP8:%[0-9]+]]> = phi [ ir<%y>, vector.body.split ], [ ir<poison>, vector.body ]
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP4]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -92,7 +90,6 @@ define i32 @conditional_live_out(ptr noalias %p, i32 %n, i1 %c) {
 ; CHECK-LABEL: VPlan for loop in 'conditional_live_out'
 ; CHECK:  VPlan ' for UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in vp<[[VP3:%[0-9]+]]> = backedge-taken count
 ; CHECK-NEXT:  Live-in ir<%n> = original trip-count
@@ -132,8 +129,7 @@ define i32 @conditional_live_out(ptr noalias %p, i32 %n, i1 %c) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.latch:
 ; CHECK-NEXT:      EMIT-SCALAR vp<[[VP8:%[0-9]+]]> = phi [ ir<%phi>, latch ], [ ir<poison>, vector.body ]
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP4]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -188,7 +184,6 @@ define void @header_unconditional_branch(ptr noalias %p, i32 %n) {
 ; CHECK-LABEL: VPlan for loop in 'header_unconditional_branch'
 ; CHECK:  VPlan ' for UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in vp<[[VP3:%[0-9]+]]> = backedge-taken count
 ; CHECK-NEXT:  Live-in ir<%n> = original trip-count
@@ -218,8 +213,7 @@ define void @header_unconditional_branch(ptr noalias %p, i32 %n) {
 ; CHECK-NEXT:    Successor(s): vector.latch
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.latch:
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP4]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -261,7 +255,6 @@ define i32 @reduction(ptr noalias %p, i32 %n) {
 ; CHECK-LABEL: VPlan for loop in 'reduction'
 ; CHECK:  VPlan ' for UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in vp<[[VP3:%[0-9]+]]> = backedge-taken count
 ; CHECK-NEXT:  Live-in ir<%n> = original trip-count
@@ -293,8 +286,7 @@ define i32 @reduction(ptr noalias %p, i32 %n) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.latch:
 ; CHECK-NEXT:      EMIT-SCALAR vp<[[VP8]]> = phi [ ir<%rdx.next>, vector.body.split ], [ ir<%rdx>, vector.body ]
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP4]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block

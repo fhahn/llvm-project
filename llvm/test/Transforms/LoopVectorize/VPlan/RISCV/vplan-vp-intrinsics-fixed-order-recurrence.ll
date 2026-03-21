@@ -8,7 +8,6 @@ define void @first_order_recurrence(ptr noalias %A, ptr noalias %B, i64 %TC) {
 ;
 ; IF-EVL: VPlan 'Initial VPlan for VF={vscale x 1,vscale x 2,vscale x 4},UF={1}' {
 ; IF-EVL-NEXT: Live-in vp<[[VF:%[0-9]+]]> = VF
-; IF-EVL-NEXT: Live-in vp<[[VFUF:%[0-9]+]]> = VF * UF
 ; IF-EVL-NEXT: Live-in vp<[[VTC:%[0-9]+]]> = vector-trip-count
 ; IF-EVL-NEXT: Live-in ir<%TC> = original trip-count
 ; IF-EVL-EMPTY:
@@ -38,11 +37,10 @@ define void @first_order_recurrence(ptr noalias %A, ptr noalias %B, i64 %TC) {
 ; IF-EVL-NEXT:     CLONE ir<[[GEP2:%.+]]> = getelementptr inbounds nuw ir<%B>, vp<[[ST]]>
 ; IF-EVL-NEXT:     vp<[[PTR2:%[0-9]+]]> = vector-pointer inbounds nuw ir<[[GEP2]]>
 ; IF-EVL-NEXT:     WIDEN vp.store vp<[[PTR2]]>, ir<[[ADD]]>, vp<[[EVL]]>
-; IF-EVL-NEXT:     EMIT-SCALAR vp<[[CAST2:%[0-9]+]]> = zext vp<[[EVL]]> to i64
-; IF-EVL-NEXT:     EMIT vp<[[IV_NEXT]]> = add vp<[[CAST2]]>, vp<[[EVL_PHI]]>
-; IF-EVL-NEXT:     EMIT vp<[[AVL_NEXT]]> = sub nuw vp<[[AVL]]>, vp<[[CAST2]]>
-; IF-EVL-NEXT:     EMIT vp<[[IV_NEXT_EXIT:%.+]]> = add vp<[[IV]]>, vp<[[VFUF]]>
-; IF-EVL-NEXT:     EMIT branch-on-count  vp<[[IV_NEXT_EXIT]]>, vp<[[VTC]]>
+; IF-EVL-NEXT:     EMIT-SCALAR vp<[[CAST:%[0-9]+]]> = zext vp<[[EVL]]> to i64
+; IF-EVL-NEXT:     EMIT vp<[[IV_NEXT]]> = add vp<[[CAST]]>, vp<[[EVL_PHI]]>
+; IF-EVL-NEXT:     EMIT vp<[[AVL_NEXT]]> = sub nuw vp<[[AVL]]>, vp<[[CAST]]>
+; IF-EVL-NEXT:     EMIT branch-on-count  vp<[[EVL_PHI]]>, vp<{{[^>]+}}>, vp<[[VTC]]>
 ; IF-EVL-NEXT:   No successors
 ; IF-EVL-NEXT: }
 ; IF-EVL-NEXT: Successor(s): middle.block

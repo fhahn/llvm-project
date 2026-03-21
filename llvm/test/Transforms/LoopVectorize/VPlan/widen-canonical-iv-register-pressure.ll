@@ -39,8 +39,8 @@ define i32 @two_reductions(i64 %N, ptr %a, ptr %b) {
 ; UF1-NEXT:    WIDEN ir<%lb> = load ir<%gb>, vp<[[VP7]]>
 ; UF1-NEXT:    WIDEN ir<%sum.a.next> = add ir<%sum.a>, ir<%la>
 ; UF1-NEXT:    WIDEN ir<%sum.b.next> = add ir<%sum.b>, ir<%lb>
-; UF1-NEXT:    EMIT vp<%index.next> = add vp<%index>, ir<4>
 ; UF1-NEXT:    EMIT vp<%vec.ind.next> = add nuw vp<[[VP6]]>, vp<[[VP5]]>
+; UF1-NEXT:    EMIT vp<%index.next> = add vp<%index>, ir<4>
 ; UF1-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = icmp eq vp<%index.next>, vp<%n.vec>
 ; UF1-NEXT:    EMIT branch-on-cond vp<[[VP8]]>
 ; UF1-NEXT:  Successor(s): middle.block, vector.body

@@ -28,6 +28,7 @@
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/Support/Debug.h"
@@ -473,26 +474,37 @@ static void createLoopRegion(VPlan &Plan, VPBlockBase *HeaderVPB, DebugLoc DL) {
   if (!IsOutermost)
     return;
 
+  // The IV increment is deferred to region dissolution; the region's strip-mine
+  // factor VPRegionValue is the single source of truth for the step and is
+  // lowered to a concrete VPValue at dissolution. The latch terminator carries
+  // the canonical IV, the strip-mine factor, and the vector trip count, so the
+  // count condition can be materialized later.
   auto *LatchTerm = LatchVPBB->getTerminator();
   VPBuilder Builder(LatchTerm);
-  // Add a VPInstruction to increment the scalar canonical IV by VF * UF.
-  // Initially the induction increment is guaranteed to not wrap, but that may
-  // change later, e.g. when tail-folding, when the flags need to be dropped.
-  auto *CanonicalIVIncrement = Builder.createAdd(
-      R->getCanonicalIV(), &Plan.getVFxUF(), DL, "index.next", {true, false});
+  VPValue *CanIV = R->getCanonicalIV();
 
   if (match(LatchTerm, m_BranchOnTwoConds())) {
-    auto *IsLatchExitTaken = Builder.createICmp(
-        CmpInst::ICMP_EQ, CanonicalIVIncrement, &Plan.getVectorTripCount());
-    LatchTerm->setOperand(1, IsLatchExitTaken);
+    // An early exit has already replaced the latch terminator with a
+    // branch-on-two-conds, whose first condition tests whether any early exit
+    // is taken. Replace it with a branch-on-cond-or-count that combines the
+    // early-exit condition with the canonical count check.
+    VPValue *IsAnyExitTaken = LatchTerm->getOperand(0);
+    DebugLoc LatchDL = LatchTerm->getDebugLoc();
+    Builder.createNaryOp(VPInstruction::BranchOnCondOrCount,
+                         {IsAnyExitTaken, CanIV, R->getStripMineFactor(),
+                          &Plan.getVectorTripCount()},
+                         LatchDL);
+    LatchTerm->eraseFromParent();
   } else {
     // We are replacing the branch to exit the region. Remove the original
-    // BranchOnCond.
+    // BranchOnCond. BranchOnCount takes the canonical IV, the strip-mine factor
+    // (the region's stable strip-mine factor VPRegionValue), and the vector
+    // trip count. The IV increment is materialized when the region is dissolved.
     assert(match(LatchTerm, m_BranchOnCond()) && "Unexpected terminator");
     DebugLoc LatchDL = LatchTerm->getDebugLoc();
-    Builder.createNaryOp(VPInstruction::BranchOnCount,
-                         {CanonicalIVIncrement, &Plan.getVectorTripCount()},
-                         LatchDL);
+    Builder.createNaryOp(
+        VPInstruction::BranchOnCount,
+        {CanIV, R->getStripMineFactor(), &Plan.getVectorTripCount()}, LatchDL);
     LatchTerm->eraseFromParent();
   }
 }
@@ -1373,21 +1385,17 @@ void VPlanTransforms::foldTailByMasking(VPlan &Plan) {
   Builder.createNaryOp(VPInstruction::BranchOnCond, HeaderMask);
 
   VPBasicBlock *OrigLatch = LoopRegion->getExitingBasicBlock();
-  VPValue *IVInc;
   [[maybe_unused]] bool TermBranchOnCount =
       match(OrigLatch->getTerminator(),
-            m_BranchOnCount(m_VPValue(IVInc),
+            m_BranchOnCount(m_Specific(LoopRegion->getCanonicalIV()),
+                            m_VPValue(),
                             m_Specific(&Plan.getVectorTripCount())));
-  assert(TermBranchOnCount &&
-         match(IVInc, m_Add(m_Specific(LoopRegion->getCanonicalIV()),
-                            m_Specific(&Plan.getVFxUF()))) &&
-         std::next(IVInc->getDefiningRecipe()->getIterator()) ==
-             OrigLatch->getTerminator()->getIterator() &&
-         "Unexpected canonical iv increment");
+  assert(TermBranchOnCount && "Unexpected latch terminator");
 
-  // Split the latch at the IV update, and branch to it from the header mask.
+  // Split the latch at the BranchOnCount, and branch to it from the header
+  // mask.
   VPBasicBlock *Latch =
-      OrigLatch->splitAt(IVInc->getDefiningRecipe()->getIterator());
+      OrigLatch->splitAt(OrigLatch->getTerminator()->getIterator());
   Latch->setName("vector.latch");
   VPBlockUtils::connectBlocks(Header, Latch);
 
@@ -1702,7 +1710,15 @@ bool VPlanTransforms::handleMaxMinNumReductions(VPlan &Plan) {
   }
 
   VPBasicBlock *LatchVPBB = LoopRegion->getExitingBasicBlock();
+  auto *LatchExitingBranch = LatchVPBB->getTerminator();
+  assert(match(LatchExitingBranch, m_BranchOnCount()) &&
+         "Unexpected terminator");
+  auto *CanIV = LatchExitingBranch->getOperand(0);
+  auto *StripMineFactor = LatchExitingBranch->getOperand(1);
+  auto *TC = LatchExitingBranch->getOperand(2);
+
   VPBuilder LatchBuilder(LatchVPBB->getTerminator());
+
   VPValue *AllNaNLanes = nullptr;
   SmallPtrSet<VPValue *, 2> RdxResults;
   for (const auto &[_, MinOrMaxOp] : MinOrMaxNumReductionsToHandle) {
@@ -1733,14 +1749,8 @@ bool VPlanTransforms::handleMaxMinNumReductions(VPlan &Plan) {
     RdxResults.insert(RdxResult);
   }
 
-  auto *LatchExitingBranch = LatchVPBB->getTerminator();
-  assert(match(LatchExitingBranch, m_BranchOnCount(m_VPValue(), m_VPValue())) &&
-         "Unexpected terminator");
-  auto *IsLatchExitTaken = LatchBuilder.createICmp(
-      CmpInst::ICMP_EQ, LatchExitingBranch->getOperand(0),
-      LatchExitingBranch->getOperand(1));
-  auto *AnyExitTaken = LatchBuilder.createOr(AnyNaNLane, IsLatchExitTaken);
-  LatchBuilder.createNaryOp(VPInstruction::BranchOnCond, AnyExitTaken);
+  LatchBuilder.createNaryOp(VPInstruction::BranchOnCondOrCount,
+                            {AnyNaNLane, CanIV, StripMineFactor, TC});
   LatchExitingBranch->eraseFromParent();
 
   // Update resume phis for inductions in the scalar preheader. If AnyNaNLane is

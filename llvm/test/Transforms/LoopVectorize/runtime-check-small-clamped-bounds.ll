@@ -517,8 +517,8 @@ define void @wider_nusw_does_not_imply_narrower(ptr %dst, i64 %n) {
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i8>, ptr [[TMP12]], align 1
 ; CHECK-NEXT:    [[TMP14:%.*]] = xor <4 x i8> [[WIDE_LOAD]], splat (i8 11)
 ; CHECK-NEXT:    store <4 x i8> [[TMP14]], ptr [[TMP12]], align 1
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[OFFSET_IDX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[OFFSET_IDX]], 4
 ; CHECK-NEXT:    [[TMP15:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP15]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP12:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -901,8 +901,8 @@ define i32 @scale_mismatch_rejected(ptr %A, i32 %N) {
 ; CHECK-NEXT:    [[TMP18:%.*]] = insertelement <4 x i32> [[TMP17]], i32 [[TMP14]], i32 2
 ; CHECK-NEXT:    [[TMP19:%.*]] = insertelement <4 x i32> [[TMP18]], i32 [[TMP15]], i32 3
 ; CHECK-NEXT:    [[TMP20]] = add <4 x i32> [[VEC_PHI]], [[TMP19]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i32> [[VEC_IND]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP21:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP21]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP22:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

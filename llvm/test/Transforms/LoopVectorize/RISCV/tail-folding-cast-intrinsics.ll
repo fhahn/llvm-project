@@ -1231,8 +1231,8 @@ define void @vp_ptrtoint(ptr %a, ptr %b, i64 %N) {
 ; NO-VP-NEXT:    [[TMP10:%.*]] = ptrtoint <vscale x 2 x ptr> [[TMP9]] to <vscale x 2 x i64>
 ; NO-VP-NEXT:    [[TMP11:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[INDEX]]
 ; NO-VP-NEXT:    store <vscale x 2 x i64> [[TMP10]], ptr [[TMP11]], align 8
-; NO-VP-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP3]]
 ; NO-VP-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <vscale x 2 x i64> [[VEC_IND]], [[BROADCAST_SPLAT]]
+; NO-VP-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP3]]
 ; NO-VP-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; NO-VP-NEXT:    br i1 [[TMP12]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP47:![0-9]+]]
 ; NO-VP:       [[MIDDLE_BLOCK]]:

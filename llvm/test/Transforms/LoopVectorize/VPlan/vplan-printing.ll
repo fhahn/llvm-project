@@ -10,7 +10,6 @@ define void @print_call_and_memory(i64 %n, ptr noalias %y, ptr noalias %x) {
 ; CHECK-LABEL: VPlan for loop in 'print_call_and_memory'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
@@ -32,8 +31,7 @@ define void @print_call_and_memory(i64 %n, ptr noalias %y, ptr noalias %x) {
 ; CHECK-NEXT:      CLONE ir<%arrayidx2> = getelementptr inbounds ir<%x>, vp<[[VP4]]>
 ; CHECK-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer inbounds ir<%arrayidx2>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP6]]>, ir<%call>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP3]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -85,7 +83,6 @@ define void @print_widen_gep_and_select(i64 %n, ptr noalias %y, ptr noalias %x, 
 ; CHECK-LABEL: VPlan for loop in 'print_widen_gep_and_select'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
@@ -110,8 +107,7 @@ define void @print_widen_gep_and_select(i64 %n, ptr noalias %y, ptr noalias %x, 
 ; CHECK-NEXT:      CLONE ir<%arrayidx2> = getelementptr inbounds ir<%x>, vp<[[VP4]]>
 ; CHECK-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer inbounds ir<%arrayidx2>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP6]]>, ir<%add>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP3]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -167,7 +163,6 @@ define void @print_replicate_predicated_phi(i64 %n, ptr %x) {
 ; CHECK-LABEL: VPlan for loop in 'print_replicate_predicated_phi'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = original trip-count
 ; CHECK-EMPTY:
@@ -208,8 +203,7 @@ define void @print_replicate_predicated_phi(i64 %n, ptr %x) {
 ; CHECK-NEXT:      CLONE ir<%idx> = getelementptr ir<%x>, vp<[[VP5]]>
 ; CHECK-NEXT:      vp<[[VP8:%[0-9]+]]> = vector-pointer ir<%idx>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP8]]>, ir<%d>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP4]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -263,7 +257,6 @@ define void @print_interleave_groups(i32 %C, i32 %D) {
 ; CHECK-LABEL: VPlan for loop in 'print_interleave_groups'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<256> = original trip-count
 ; CHECK-EMPTY:
@@ -292,8 +285,7 @@ define void @print_interleave_groups(i32 %C, i32 %D) {
 ; CHECK-NEXT:        store ir<1> to index 1
 ; CHECK-NEXT:        store ir<2> to index 2
 ; CHECK-NEXT:        store ir<%AB.3> to index 3
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP4]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -370,7 +362,6 @@ define void @recipe_debug_loc_location(ptr nocapture %src) !dbg !5 {
 ; CHECK-LABEL: VPlan for loop in 'recipe_debug_loc_location'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<128> = original trip-count
 ; CHECK-EMPTY:
@@ -415,8 +406,7 @@ define void @recipe_debug_loc_location(ptr nocapture %src) !dbg !5 {
 ; CHECK-NEXT:      BLEND ir<%ysd.0> = ir<%psd> vp<%9>/vp<[[VP8]]>, !dbg /tmp/s.c:14:3
 ; CHECK-NEXT:      vp<[[VP10:%[0-9]+]]> = vector-pointer inbounds ir<%isd>, ir<1>, !dbg /tmp/s.c:15:3
 ; CHECK-NEXT:      WIDEN store vp<[[VP10]]>, ir<%ysd.0>, !dbg /tmp/s.c:15:3
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP3]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -477,7 +467,6 @@ define void @print_expand_scev(i64 %y, ptr %ptr) {
 ; CHECK-LABEL: VPlan for loop in 'print_expand_scev'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = original trip-count
 ; CHECK-EMPTY:
@@ -502,8 +491,7 @@ define void @print_expand_scev(i64 %y, ptr %ptr) {
 ; CHECK-NEXT:      WIDEN ir<%v3> = add nuw ir<%iv>, ir<1>
 ; CHECK-NEXT:      REPLICATE ir<%gep> = getelementptr inbounds ir<%ptr>, vp<[[VP8]]>
 ; CHECK-NEXT:      REPLICATE store ir<%v3>, ir<%gep>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP6]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP6]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -555,7 +543,6 @@ define i32 @print_exit_value(ptr %ptr, i32 %off) {
 ; CHECK-LABEL: VPlan for loop in 'print_exit_value'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<1000> = original trip-count
 ; CHECK-EMPTY:
@@ -574,8 +561,7 @@ define i32 @print_exit_value(ptr %ptr, i32 %off) {
 ; CHECK-NEXT:      CLONE ir<%gep> = getelementptr inbounds ir<%ptr>, vp<[[VP4]]>
 ; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds ir<%gep>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP5]]>, ir<0>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP3]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -627,7 +613,6 @@ define void @print_fast_math_flags(i64 %n, ptr noalias %y, ptr noalias %x, ptr %
 ; CHECK-LABEL: VPlan for loop in 'print_fast_math_flags'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
@@ -651,8 +636,7 @@ define void @print_fast_math_flags(i64 %n, ptr noalias %y, ptr noalias %x, ptr %
 ; CHECK-NEXT:      CLONE ir<%gep.x> = getelementptr inbounds ir<%x>, vp<[[VP4]]>
 ; CHECK-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer inbounds ir<%gep.x>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP6]]>, ir<%div>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP3]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -707,7 +691,6 @@ define void @print_exact_flags(i64 %n, ptr noalias %x) {
 ; CHECK-LABEL: VPlan for loop in 'print_exact_flags'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
@@ -730,8 +713,7 @@ define void @print_exact_flags(i64 %n, ptr noalias %x) {
 ; CHECK-NEXT:      WIDEN ir<%add> = add nuw nsw ir<%div.1>, ir<%div.2>
 ; CHECK-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer inbounds ir<%gep.x>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP6]]>, ir<%add>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP3]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -784,7 +766,6 @@ define void @print_call_flags(ptr readonly %src, ptr noalias %dest, i64 %n) {
 ; CHECK-LABEL: VPlan for loop in 'print_call_flags'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
@@ -828,8 +809,7 @@ define void @print_call_flags(ptr readonly %src, ptr noalias %dest, i64 %n) {
 ; CHECK-NEXT:      CLONE ir<%st.addr> = getelementptr inbounds ir<%dest>, vp<[[VP4]]>
 ; CHECK-NEXT:      vp<[[VP8:%[0-9]+]]> = vector-pointer inbounds ir<%st.addr>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP8]]>, ir<%st.value>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP3]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -887,7 +867,6 @@ define void @print_disjoint_flags(i64 %n, ptr noalias %x) {
 ; CHECK-LABEL: VPlan for loop in 'print_disjoint_flags'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
@@ -910,8 +889,7 @@ define void @print_disjoint_flags(i64 %n, ptr noalias %x) {
 ; CHECK-NEXT:      WIDEN ir<%add> = add nuw nsw ir<%or.1>, ir<%or.2>
 ; CHECK-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer inbounds ir<%gep.x>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP6]]>, ir<%add>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP3]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -964,7 +942,6 @@ define void @zext_nneg(ptr noalias %p, ptr noalias %p1) {
 ; CHECK-LABEL: VPlan for loop in 'zext_nneg'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<1000> = original trip-count
 ; CHECK-EMPTY:
@@ -986,8 +963,7 @@ define void @zext_nneg(ptr noalias %p, ptr noalias %p1) {
 ; CHECK-NEXT:      EMIT vp<[[VP6:%[0-9]+]]> = extract-last-part ir<%zext>
 ; CHECK-NEXT:      EMIT vp<[[VP7:%[0-9]+]]> = extract-last-lane vp<[[VP6]]>
 ; CHECK-NEXT:      CLONE store vp<[[VP7]]>, ir<%p1>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP3]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -1036,7 +1012,6 @@ define i16 @print_first_order_recurrence_and_result(ptr %ptr) {
 ; CHECK-LABEL: VPlan for loop in 'print_first_order_recurrence_and_result'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<1000> = original trip-count
 ; CHECK-EMPTY:
@@ -1059,8 +1034,7 @@ define i16 @print_first_order_recurrence_and_result(ptr %ptr) {
 ; CHECK-NEXT:      WIDEN ir<%add> = add vp<[[VP6]]>, ir<1>
 ; CHECK-NEXT:      vp<[[VP7:%[0-9]+]]> = vector-pointer inbounds ir<%gep.ptr>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP7]]>, ir<%add>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP3]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -1116,7 +1090,6 @@ define void @print_select_with_fastmath_flags(ptr noalias %a, ptr noalias %b, pt
 ; CHECK-LABEL: VPlan for loop in 'print_select_with_fastmath_flags'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<%N> = original trip-count
 ; CHECK-EMPTY:
@@ -1143,8 +1116,7 @@ define void @print_select_with_fastmath_flags(ptr noalias %a, ptr noalias %b, pt
 ; CHECK-NEXT:      CLONE ir<%gep11> = getelementptr inbounds nuw ir<%a>, vp<[[VP4]]>
 ; CHECK-NEXT:      vp<[[VP7:%[0-9]+]]> = vector-pointer inbounds nuw ir<%gep11>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP7]]>, ir<%cond>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP3]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block

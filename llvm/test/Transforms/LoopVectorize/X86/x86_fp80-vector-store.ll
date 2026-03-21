@@ -38,8 +38,8 @@ define void @example() {
 ; FORCED-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [1024 x x86_fp80], ptr @x, i64 0, i64 [[TMP1]]
 ; FORCED-NEXT:    store x86_fp80 [[TMP5]], ptr [[TMP3]], align 16
 ; FORCED-NEXT:    store x86_fp80 [[TMP6]], ptr [[TMP4]], align 16
-; FORCED-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; FORCED-NEXT:    [[VEC_IND_NEXT]] = add <2 x i64> [[VEC_IND]], splat (i64 2)
+; FORCED-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; FORCED-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1024
 ; FORCED-NEXT:    br i1 [[TMP7]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; FORCED:       [[MIDDLE_BLOCK]]:
@@ -105,8 +105,8 @@ define void @test_replicating_store_x86_fp80_cost(i32 %n, ptr %dst) #0 {
 ; FORCED-NEXT:    [[TMP8:%.*]] = getelementptr x86_fp80, ptr [[DST]], i64 [[TMP7]]
 ; FORCED-NEXT:    store x86_fp80 0.000000e+00, ptr [[TMP6]], align 16
 ; FORCED-NEXT:    store x86_fp80 0.000000e+00, ptr [[TMP8]], align 16
-; FORCED-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; FORCED-NEXT:    [[VEC_IND_NEXT]] = add <2 x i32> [[VEC_IND]], splat (i32 2)
+; FORCED-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; FORCED-NEXT:    [[TMP9:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; FORCED-NEXT:    br i1 [[TMP9]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
 ; FORCED:       [[MIDDLE_BLOCK]]:

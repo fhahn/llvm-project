@@ -44,8 +44,8 @@ define void @constant_fold_commutative_and(ptr %ptr.n, ptr noalias %p, i1 %cond)
 ; CHECK-NEXT:    store i1 [[TMP21]], ptr [[TMP20]], align 1
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE5]]
 ; CHECK:       [[PRED_STORE_CONTINUE5]]:
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <2 x i8> [[VEC_IND]], splat (i8 2)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP15:%.*]] = icmp eq i64 [[INDEX_NEXT]], 18
 ; CHECK-NEXT:    br i1 [[TMP15]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

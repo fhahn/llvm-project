@@ -24,8 +24,8 @@ define i64 @for_liveout_blocked_by_ind_predicate(ptr %dst, i64 %n) {
 ; CHECK-NEXT:    [[TMP4:%.*]] = sitofp <4 x i64> [[TMP3]] to <4 x double>
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds double, ptr [[DST]], i64 [[INDEX]]
 ; CHECK-NEXT:    store <4 x double> [[TMP4]], ptr [[TMP5]], align 8
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i16> [[VEC_IND]], splat (i16 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[LOOP1]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -74,8 +74,8 @@ define i64 @for_liveout_blocked_by_ind_predicate(ptr %dst, i64 %n) {
 ; THRESHOLD-NEXT:    [[TMP4:%.*]] = sitofp <4 x i64> [[TMP3]] to <4 x double>
 ; THRESHOLD-NEXT:    [[TMP5:%.*]] = getelementptr inbounds double, ptr [[DST]], i64 [[INDEX]]
 ; THRESHOLD-NEXT:    store <4 x double> [[TMP4]], ptr [[TMP5]], align 8
-; THRESHOLD-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; THRESHOLD-NEXT:    [[VEC_IND_NEXT]] = add <4 x i16> [[VEC_IND]], splat (i16 4)
+; THRESHOLD-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; THRESHOLD-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; THRESHOLD-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[LOOP1]], !llvm.loop [[LOOP0:![0-9]+]]
 ; THRESHOLD:       [[MIDDLE_BLOCK]]:
@@ -145,8 +145,8 @@ define void @for_inflates_scev_threshold(ptr %dst, i64 %n) {
 ; CHECK-NEXT:    [[TMP4:%.*]] = sitofp <4 x i64> [[TMP3]] to <4 x double>
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds double, ptr [[DST]], i64 [[INDEX]]
 ; CHECK-NEXT:    store <4 x double> [[TMP4]], ptr [[TMP5]], align 8
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i16> [[VEC_IND]], splat (i16 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -194,8 +194,8 @@ define void @for_inflates_scev_threshold(ptr %dst, i64 %n) {
 ; THRESHOLD-NEXT:    [[TMP4:%.*]] = sitofp <4 x i64> [[TMP3]] to <4 x double>
 ; THRESHOLD-NEXT:    [[TMP5:%.*]] = getelementptr inbounds double, ptr [[DST]], i64 [[INDEX]]
 ; THRESHOLD-NEXT:    store <4 x double> [[TMP4]], ptr [[TMP5]], align 8
-; THRESHOLD-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; THRESHOLD-NEXT:    [[VEC_IND_NEXT]] = add <4 x i16> [[VEC_IND]], splat (i16 4)
+; THRESHOLD-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; THRESHOLD-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; THRESHOLD-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[LOOP]], !llvm.loop [[LOOP4:![0-9]+]]
 ; THRESHOLD:       [[MIDDLE_BLOCK]]:
@@ -301,9 +301,9 @@ define void @for_blocks_vectorization_optsize(ptr %dst, i64 %n) optsize {
 ; CHECK-NEXT:    store double [[TMP19]], ptr [[TMP18]], align 8
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE7]]
 ; CHECK:       [[PRED_STORE_CONTINUE7]]:
-; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i16> [[VEC_IND]], splat (i16 4)
 ; CHECK-NEXT:    [[VEC_IND_NEXT8]] = add nuw <4 x i64> [[VEC_IND1]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP20:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP20]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -369,9 +369,9 @@ define void @for_blocks_vectorization_optsize(ptr %dst, i64 %n) optsize {
 ; THRESHOLD-NEXT:    store double [[TMP19]], ptr [[TMP18]], align 8
 ; THRESHOLD-NEXT:    br label %[[PRED_STORE_CONTINUE7]]
 ; THRESHOLD:       [[PRED_STORE_CONTINUE7]]:
-; THRESHOLD-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 4
 ; THRESHOLD-NEXT:    [[VEC_IND_NEXT]] = add <4 x i16> [[VEC_IND]], splat (i16 4)
 ; THRESHOLD-NEXT:    [[VEC_IND_NEXT8]] = add nuw <4 x i64> [[VEC_IND1]], splat (i64 4)
+; THRESHOLD-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 4
 ; THRESHOLD-NEXT:    [[TMP20:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; THRESHOLD-NEXT:    br i1 [[TMP20]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; THRESHOLD:       [[MIDDLE_BLOCK]]:
@@ -427,9 +427,9 @@ define i64 @for_and_ind_liveout_gep(ptr %dst, i64 %n) {
 ; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <4 x i64> [[TMP5]], i64 0
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds i64, ptr [[DST]], i64 [[TMP6]]
 ; CHECK-NEXT:    store <4 x i64> [[VEC_IND]], ptr [[TMP7]], align 8
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[VEC_IND]], splat (i64 4)
 ; CHECK-NEXT:    [[VEC_IND_NEXT3]] = add <4 x i16> [[VEC_IND2]], splat (i16 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP8]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

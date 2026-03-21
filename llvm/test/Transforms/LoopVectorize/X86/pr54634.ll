@@ -56,8 +56,8 @@ define ptr addrspace(10) @japi1_vect_42283(ptr nocapture readonly %0, i32 %1) #0
 ; CHECK-NEXT:    call void @llvm.masked.scatter.v4i64.v4p13(<4 x i64> [[BROADCAST_SPLAT8]], <4 x ptr addrspace(13)> align 8 [[TMP23]], <4 x i1> splat (i1 true)), !tbaa [[JTBAA_ARRAYBUF_TBAA10]]
 ; CHECK-NEXT:    call void @llvm.masked.scatter.v4i64.v4p13(<4 x i64> [[BROADCAST_SPLAT8]], <4 x ptr addrspace(13)> align 8 [[TMP24]], <4 x i1> splat (i1 true)), !tbaa [[JTBAA_ARRAYBUF_TBAA10]]
 ; CHECK-NEXT:    call void @llvm.masked.scatter.v4i64.v4p13(<4 x i64> [[BROADCAST_SPLAT8]], <4 x ptr addrspace(13)> align 8 [[TMP25]], <4 x i1> splat (i1 true)), !tbaa [[JTBAA_ARRAYBUF_TBAA10]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 16
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i64> [[STEP_ADD5]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 16
 ; CHECK-NEXT:    [[TMP26:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP26]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP12:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -79,24 +79,24 @@ define ptr addrspace(10) @japi1_vect_42283(ptr nocapture readonly %0, i32 %1) #0
 ; CHECK-NEXT:    [[INDUCTION:%.*]] = add <4 x i64> [[DOTSPLAT]], <i64 0, i64 1, i64 2, i64 3>
 ; CHECK-NEXT:    br label %[[VEC_EPILOG_VECTOR_BODY:.*]]
 ; CHECK:       [[VEC_EPILOG_VECTOR_BODY]]:
-; CHECK-NEXT:    [[INDEX7:%.*]] = phi i64 [ [[VEC_EPILOG_RESUME_VAL]], %[[VEC_EPILOG_PH]] ], [ [[INDEX_NEXT14:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
+; CHECK-NEXT:    [[INDEX12:%.*]] = phi i64 [ [[VEC_EPILOG_RESUME_VAL]], %[[VEC_EPILOG_PH]] ], [ [[INDEX_NEXT14:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_IND8:%.*]] = phi <4 x i64> [ [[INDUCTION]], %[[VEC_EPILOG_PH]] ], [ [[VEC_IND_NEXT9:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP28:%.*]] = getelementptr inbounds { ptr addrspace(10), i64 }, ptr addrspace(13) [[TMP7]], <4 x i64> [[VEC_IND8]], i32 0
 ; CHECK-NEXT:    call void @llvm.masked.scatter.v4p10.v4p13(<4 x ptr addrspace(10)> [[BROADCAST_SPLAT11]], <4 x ptr addrspace(13)> align 8 [[TMP28]], <4 x i1> splat (i1 true)), !tbaa [[JTBAA_ARRAYBUF_TBAA10]]
 ; CHECK-NEXT:    [[TMP29:%.*]] = getelementptr inbounds { ptr addrspace(10), i64 }, ptr addrspace(13) [[TMP7]], <4 x i64> [[VEC_IND8]], i32 1
 ; CHECK-NEXT:    call void @llvm.masked.scatter.v4i64.v4p13(<4 x i64> [[BROADCAST_SPLAT13]], <4 x ptr addrspace(13)> align 8 [[TMP29]], <4 x i1> splat (i1 true)), !tbaa [[JTBAA_ARRAYBUF_TBAA10]]
-; CHECK-NEXT:    [[INDEX_NEXT14]] = add nuw i64 [[INDEX7]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT9]] = add <4 x i64> [[VEC_IND8]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT14]] = add nuw i64 [[INDEX12]], 4
 ; CHECK-NEXT:    [[TMP30:%.*]] = icmp eq i64 [[INDEX_NEXT14]], [[N_VEC5]]
 ; CHECK-NEXT:    br i1 [[TMP30]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP16:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[CMP_N15:%.*]] = icmp eq i64 [[TMP8]], [[N_VEC5]]
 ; CHECK-NEXT:    br i1 [[CMP_N15]], label %[[L44]], label %[[VEC_EPILOG_SCALAR_PH]]
 ; CHECK:       [[VEC_EPILOG_SCALAR_PH]]:
-; CHECK-NEXT:    [[BC_RESUME_VAL17:%.*]] = phi i64 [ [[N_VEC5]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[N_VEC]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[ITER_CHECK]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC5]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[N_VEC]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[ITER_CHECK]] ]
 ; CHECK-NEXT:    br label %[[L26:.*]]
 ; CHECK:       [[L26]]:
-; CHECK-NEXT:    [[VALUE_PHI5:%.*]] = phi i64 [ [[BC_RESUME_VAL17]], %[[VEC_EPILOG_SCALAR_PH]] ], [ [[TMP27:%.*]], %[[L26]] ]
+; CHECK-NEXT:    [[VALUE_PHI5:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[VEC_EPILOG_SCALAR_PH]] ], [ [[TMP27:%.*]], %[[L26]] ]
 ; CHECK-NEXT:    [[DOTREPACK:%.*]] = getelementptr inbounds { ptr addrspace(10), i64 }, ptr addrspace(13) [[TMP7]], i64 [[VALUE_PHI5]], i32 0
 ; CHECK-NEXT:    store ptr addrspace(10) [[DOTUNPACK]], ptr addrspace(13) [[DOTREPACK]], align 8, !tbaa [[JTBAA_ARRAYBUF_TBAA10]]
 ; CHECK-NEXT:    [[DOTREPACK4:%.*]] = getelementptr inbounds { ptr addrspace(10), i64 }, ptr addrspace(13) [[TMP7]], i64 [[VALUE_PHI5]], i32 1

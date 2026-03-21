@@ -575,8 +575,8 @@ define void @first_order_recurrence_indvar(ptr noalias %A, i64 %TC) {
 ; NO-VP-NEXT:    [[TMP13:%.*]] = call <vscale x 2 x i64> @llvm.vector.splice.right.nxv2i64(<vscale x 2 x i64> [[VECTOR_RECUR]], <vscale x 2 x i64> [[TMP12]], i32 1)
 ; NO-VP-NEXT:    [[TMP11:%.*]] = getelementptr inbounds nuw i64, ptr [[A]], i64 [[INDEX]]
 ; NO-VP-NEXT:    store <vscale x 2 x i64> [[TMP13]], ptr [[TMP11]], align 8
-; NO-VP-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP3]]
 ; NO-VP-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <vscale x 2 x i64> [[VEC_IND]], [[BROADCAST_SPLAT]]
+; NO-VP-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP3]]
 ; NO-VP-NEXT:    [[TMP23:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; NO-VP-NEXT:    br i1 [[TMP23]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP10:![0-9]+]]
 ; NO-VP:       [[MIDDLE_BLOCK]]:

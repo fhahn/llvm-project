@@ -52,8 +52,8 @@ define void @loop_invariant_store(ptr %p, i64 %a, i8 %b) {
 ; CHECK-NEXT:    store i8 [[TMP9]], ptr [[P]], align 1
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE8]]
 ; CHECK:       [[PRED_STORE_CONTINUE8]]:
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP10:%.*]] = icmp eq i32 [[INDEX_NEXT]], 12
 ; CHECK-NEXT:    br i1 [[TMP10]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -146,9 +146,9 @@ define void @loop_invariant_srem(ptr %p, i64 %a, i8 %b) {
 ; CHECK-NEXT:    store i32 4, ptr [[TMP23]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE10]]
 ; CHECK:       [[PRED_STORE_CONTINUE10]]:
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i8> [[VEC_IND1]], splat (i8 4)
 ; CHECK-NEXT:    [[VEC_IND_NEXT10]] = add nuw <4 x i8> [[VEC_IND3]], splat (i8 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP26:%.*]] = icmp eq i32 [[INDEX_NEXT]], 12
 ; CHECK-NEXT:    br i1 [[TMP26]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

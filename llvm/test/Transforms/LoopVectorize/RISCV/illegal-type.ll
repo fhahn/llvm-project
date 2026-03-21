@@ -120,8 +120,8 @@ define void @uniform_store_i1(ptr noalias %dst, ptr noalias %start, i64 %N) {
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq <32 x ptr> [[TMP5]], [[BROADCAST_SPLAT]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <32 x i1> [[TMP7]], i64 31
 ; CHECK-NEXT:    store i1 [[TMP8]], ptr [[DST:%.*]], align 1
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 32
 ; CHECK-NEXT:    [[PTR_IND]] = getelementptr i8, ptr [[POINTER_PHI]], i64 256
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 32
 ; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP9]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP2:![0-9]+]]
 ; CHECK:       middle.block:

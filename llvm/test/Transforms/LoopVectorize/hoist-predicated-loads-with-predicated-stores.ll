@@ -990,8 +990,8 @@ define void @sink_multiple_store_groups_noalias_via_scev_urem(ptr %dst, ptr %src
 ; CHECK-NEXT:    store double 1.000000e+01, ptr [[TMP33]], align 8, !alias.scope [[META95]]
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE3]]
 ; CHECK:       [[PRED_STORE_CONTINUE3]]:
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <2 x i64> [[VEC_IND]], splat (i64 32)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP28:%.*]] = icmp eq i64 [[INDEX_NEXT]], 100
 ; CHECK-NEXT:    br i1 [[TMP28]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP97:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

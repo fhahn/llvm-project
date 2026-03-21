@@ -73,8 +73,8 @@ define i32 @many_reductions(ptr %a, ptr %b, ptr %c, ptr %d, ptr %e, ptr %f, i64 
 ; UF2-NEXT:    [[TMP23]] = add <8 x i32> [[VEC_PHI9]], [[WIDE_MASKED_LOAD25]]
 ; UF2-NEXT:    [[TMP24]] = add <8 x i32> [[VEC_PHI10]], [[WIDE_MASKED_LOAD26]]
 ; UF2-NEXT:    [[TMP25]] = add <8 x i32> [[VEC_PHI11]], [[WIDE_MASKED_LOAD27]]
-; UF2-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 16
 ; UF2-NEXT:    [[VEC_IND_NEXT]] = add nuw <8 x i64> [[VEC_IV16]], splat (i64 8)
+; UF2-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 16
 ; UF2-NEXT:    [[TMP26:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; UF2-NEXT:    br i1 [[TMP26]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; UF2:       [[MIDDLE_BLOCK]]:

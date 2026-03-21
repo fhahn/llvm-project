@@ -551,8 +551,8 @@ define void @switch_unconditional_duplicate_target(ptr %start, ptr %dest) {
 ; IC1-NEXT:    [[TMP2:%.*]] = extractelement <2 x ptr> [[PREDPHI2]], i64 1
 ; IC1-NEXT:    store i32 0, ptr [[TMP1]], align 4
 ; IC1-NEXT:    store i32 0, ptr [[TMP2]], align 4
-; IC1-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; IC1-NEXT:    [[VEC_IND_NEXT]] = add <2 x i64> [[VEC_IND]], splat (i64 2)
+; IC1-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; IC1-NEXT:    [[TMP3:%.*]] = icmp eq i64 [[INDEX_NEXT]], 100
 ; IC1-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP9:![0-9]+]]
 ; IC1:       [[MIDDLE_BLOCK]]:
@@ -617,8 +617,8 @@ define void @switch_unconditional_duplicate_target(ptr %start, ptr %dest) {
 ; IC2-NEXT:    store i32 0, ptr [[TMP3]], align 4
 ; IC2-NEXT:    store i32 0, ptr [[TMP4]], align 4
 ; IC2-NEXT:    store i32 0, ptr [[TMP5]], align 4
-; IC2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; IC2-NEXT:    [[VEC_IND_NEXT]] = add <2 x i64> [[STEP_ADD]], splat (i64 2)
+; IC2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; IC2-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], 100
 ; IC2-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP9:![0-9]+]]
 ; IC2:       [[MIDDLE_BLOCK]]:

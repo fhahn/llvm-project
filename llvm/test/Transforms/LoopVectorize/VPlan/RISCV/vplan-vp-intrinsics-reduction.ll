@@ -22,7 +22,6 @@ define i32 @reduction(ptr %a, i64 %n, i32 %start) {
 ; IF-EVL-NOT: CURRENT-ITERATION-PHI
 
 ; IF-EVL-OUTLOOP: VPlan 'Initial VPlan for VF={vscale x 1,vscale x 2,vscale x 4},UF={1}' {
-; IF-EVL-OUTLOOP-NEXT: Live-in vp<[[VFUF:%[0-9]+]]> = VF * UF
 ; IF-EVL-OUTLOOP-NEXT: Live-in vp<[[VTC:%[0-9]+]]> = vector-trip-count
 ; IF-EVL-OUTLOOP-NEXT: Live-in ir<%n> = original trip-count
 ; IF-EVL-OUTLOOP-EMPTY:
@@ -48,11 +47,10 @@ define i32 @reduction(ptr %a, i64 %n, i32 %start) {
 ; IF-EVL-OUTLOOP-NEXT:    WIDEN ir<[[LD1:%.+]]> = vp.load vp<[[PTR1]]>, vp<[[EVL]]>
 ; IF-EVL-OUTLOOP-NEXT:    WIDEN ir<[[ADD:%.+]]> = add ir<[[LD1]]>, ir<[[RDX_PHI]]>
 ; IF-EVL-OUTLOOP-NEXT:    WIDEN-INTRINSIC vp<[[RDX_SELECT]]> = call llvm.vp.merge(ir<true>, ir<[[ADD]]>, ir<[[RDX_PHI]]>, vp<[[EVL]]>)
-; IF-EVL-OUTLOOP-NEXT:    EMIT-SCALAR vp<[[CAST2:%[0-9]+]]> = zext vp<[[EVL]]> to i64
-; IF-EVL-OUTLOOP-NEXT:    EMIT vp<[[IV_NEXT]]> = add vp<[[CAST2]]>, vp<[[EVL_PHI]]>
-; IF-EVL-OUTLOOP-NEXT:    EMIT vp<[[AVL_NEXT]]> = sub nuw vp<[[AVL]]>, vp<[[CAST2]]>
-; IF-EVL-OUTLOOP-NEXT:    EMIT vp<[[IV_NEXT_EXIT:%.+]]> = add vp<[[IV]]>, vp<[[VFUF]]>
-; IF-EVL-OUTLOOP-NEXT:    EMIT branch-on-count  vp<[[IV_NEXT_EXIT]]>, vp<[[VTC]]>
+; IF-EVL-OUTLOOP-NEXT:    EMIT-SCALAR vp<[[CAST:%[0-9]+]]> = zext vp<[[EVL]]> to i64
+; IF-EVL-OUTLOOP-NEXT:    EMIT vp<[[IV_NEXT]]> = add vp<[[CAST]]>, vp<[[EVL_PHI]]>
+; IF-EVL-OUTLOOP-NEXT:    EMIT vp<[[AVL_NEXT]]> = sub nuw vp<[[AVL]]>, vp<[[CAST]]>
+; IF-EVL-OUTLOOP-NEXT:    EMIT branch-on-count vp<[[EVL_PHI]]>, vp<{{[^>]+}}>, vp<[[VTC]]>
 ; IF-EVL-OUTLOOP-NEXT:  No successors
 ; IF-EVL-OUTLOOP-NEXT: }
 ; IF-EVL-OUTLOOP-NEXT: Successor(s): middle.block
@@ -67,7 +65,6 @@ define i32 @reduction(ptr %a, i64 %n, i32 %start) {
 ;
 
 ; IF-EVL-INLOOP: VPlan 'Initial VPlan for VF={vscale x 1,vscale x 2,vscale x 4},UF={1}' {
-; IF-EVL-INLOOP-NEXT: Live-in vp<[[VFUF:%[0-9]+]]> = VF * UF
 ; IF-EVL-INLOOP-NEXT: Live-in vp<[[VTC:%[0-9]+]]> = vector-trip-count
 ; IF-EVL-INLOOP-NEXT: Live-in ir<%n> = original trip-count
 ; IF-EVL-INLOOP-EMPTY:
@@ -89,11 +86,10 @@ define i32 @reduction(ptr %a, i64 %n, i32 %start) {
 ; IF-EVL-INLOOP-NEXT:    vp<[[PTR1:%[0-9]+]]> = vector-pointer inbounds ir<[[GEP1]]>
 ; IF-EVL-INLOOP-NEXT:    WIDEN ir<[[LD1:%.+]]> = vp.load vp<[[PTR1]]>, vp<[[EVL]]>
 ; IF-EVL-INLOOP-NEXT:    REDUCE ir<[[ADD:%.+]]> = ir<[[RDX_PHI]]> + vp.reduce.add (ir<[[LD1]]>, vp<[[EVL]]>)
-; IF-EVL-INLOOP-NEXT:    EMIT-SCALAR vp<[[CAST2:%[0-9]+]]> = zext vp<[[EVL]]> to i64
-; IF-EVL-INLOOP-NEXT:    EMIT vp<[[IV_NEXT]]> = add vp<[[CAST2]]>, vp<[[EVL_PHI]]>
-; IF-EVL-INLOOP-NEXT:    EMIT vp<[[AVL_NEXT]]> = sub nuw vp<[[AVL]]>, vp<[[CAST2]]>
-; IF-EVL-INLOOP-NEXT:    EMIT vp<[[IV_NEXT_EXIT:%.+]]> = add vp<[[IV]]>, vp<[[VFUF]]>
-; IF-EVL-INLOOP-NEXT:    EMIT branch-on-count  vp<[[IV_NEXT_EXIT]]>, vp<[[VTC]]>
+; IF-EVL-INLOOP-NEXT:    EMIT-SCALAR vp<[[CAST:%[0-9]+]]> = zext vp<[[EVL]]> to i64
+; IF-EVL-INLOOP-NEXT:    EMIT vp<[[IV_NEXT]]> = add vp<[[CAST]]>, vp<[[EVL_PHI]]>
+; IF-EVL-INLOOP-NEXT:    EMIT vp<[[AVL_NEXT]]> = sub nuw vp<[[AVL]]>, vp<[[CAST]]>
+; IF-EVL-INLOOP-NEXT:    EMIT branch-on-count vp<[[EVL_PHI]]>, vp<{{[^>]+}}>, vp<[[VTC]]>
 ; IF-EVL-INLOOP-NEXT:  No successors
 ; IF-EVL-INLOOP-NEXT: }
 ; IF-EVL-INLOOP-NEXT: Successor(s): middle.block
@@ -109,7 +105,6 @@ define i32 @reduction(ptr %a, i64 %n, i32 %start) {
 
 ; NO-VP-OUTLOOP: VPlan 'Initial VPlan for VF={vscale x 1,vscale x 2,vscale x 4},UF>=1' {
 ; NO-VP-OUTLOOP-NEXT: Live-in vp<[[VF:%[0-9]+]]> = VF
-; NO-VP-OUTLOOP-NEXT: Live-in vp<[[VFUF:%[0-9]+]]> = VF * UF
 ; NO-VP-OUTLOOP-NEXT: Live-in vp<[[VTC:%[0-9]+]]> = vector-trip-count
 ; NO-VP-OUTLOOP-NEXT: Live-in ir<%n> = original trip-count
 ; NO-VP-OUTLOOP-EMPTY:
@@ -127,8 +122,7 @@ define i32 @reduction(ptr %a, i64 %n, i32 %start) {
 ; NO-VP-OUTLOOP-NEXT:    vp<[[PTR1:%[0-9]+]]> = vector-pointer inbounds ir<[[GEP1]]>
 ; NO-VP-OUTLOOP-NEXT:    WIDEN ir<[[LD1:%.+]]> = load vp<[[PTR1]]>
 ; NO-VP-OUTLOOP-NEXT:    WIDEN ir<[[ADD:%.+]]> = add ir<[[LD1]]>, ir<[[RDX_PHI]]>
-; NO-VP-OUTLOOP-NEXT:    EMIT vp<[[IV_NEXT_EXIT:%.+]]> = add nuw vp<[[IV]]>, vp<[[VFUF]]>
-; NO-VP-OUTLOOP-NEXT:    EMIT branch-on-count  vp<[[IV_NEXT_EXIT]]>, vp<[[VTC]]>
+; NO-VP-OUTLOOP-NEXT:    EMIT branch-on-count vp<[[IV]]>, vp<{{[^>]+}}>, vp<[[VTC]]>
 ; NO-VP-OUTLOOP-NEXT:  No successors
 ; NO-VP-OUTLOOP-NEXT: }
 ; NO-VP-OUTLOOP-NEXT: Successor(s): middle.block
@@ -158,7 +152,6 @@ define i32 @reduction(ptr %a, i64 %n, i32 %start) {
 
 ; NO-VP-INLOOP: VPlan 'Initial VPlan for VF={vscale x 1,vscale x 2,vscale x 4},UF>=1' {
 ; NO-VP-INLOOP-NEXT: Live-in vp<[[VF:%[0-9]+]]> = VF
-; NO-VP-INLOOP-NEXT: Live-in vp<[[VFUF:%[0-9]+]]> = VF * UF
 ; NO-VP-INLOOP-NEXT: Live-in vp<[[VTC:%[0-9]+]]> = vector-trip-count
 ; NO-VP-INLOOP-NEXT: Live-in ir<%n> = original trip-count
 ; NO-VP-INLOOP-EMPTY:
@@ -176,8 +169,7 @@ define i32 @reduction(ptr %a, i64 %n, i32 %start) {
 ; NO-VP-INLOOP-NEXT:    vp<[[PTR1:%[0-9]+]]> = vector-pointer inbounds ir<[[GEP1]]>
 ; NO-VP-INLOOP-NEXT:    WIDEN ir<[[LD1:%.+]]> = load vp<[[PTR1]]>
 ; NO-VP-INLOOP-NEXT:    REDUCE ir<[[ADD:%.+]]> = ir<[[RDX_PHI]]> + reduce.add (ir<[[LD1]]>)
-; NO-VP-INLOOP-NEXT:    EMIT vp<[[IV_NEXT_EXIT:%.+]]> = add nuw vp<[[IV]]>, vp<[[VFUF]]>
-; NO-VP-INLOOP-NEXT:    EMIT branch-on-count  vp<[[IV_NEXT_EXIT]]>, vp<[[VTC]]>
+; NO-VP-INLOOP-NEXT:    EMIT branch-on-count vp<[[IV]]>, vp<{{[^>]+}}>, vp<[[VTC]]>
 ; NO-VP-INLOOP-NEXT:  No successors
 ; NO-VP-INLOOP-NEXT: }
 ; NO-VP-INLOOP-NEXT: Successor(s): middle.block

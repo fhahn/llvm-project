@@ -45,8 +45,8 @@ define void @foo() {
 ; CHECK-NEXT:    br i1 [[TMP15]], label %[[OUTER_LOOP_LATCH4]], label %[[INNER_LOOP1]]
 ; CHECK:       [[OUTER_LOOP_LATCH4]]:
 ; CHECK-NEXT:    call void @llvm.masked.scatter.nxv4f32.nxv4p0(<vscale x 4 x float> [[TMP12]], <vscale x 4 x ptr> align 4 [[TMP10]], <vscale x 4 x i1> splat (i1 true))
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP3]]
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <vscale x 4 x i64> [[VEC_IND]], [[DOTSPLAT]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP3]]
 ; CHECK-NEXT:    [[TMP20:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP20]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -74,7 +74,7 @@ define void @foo() {
 ; CHECK-NEXT:    store float [[X_NEXT_LCSSA]], ptr [[ARRAYIDX1]], align 4
 ; CHECK-NEXT:    [[I_NEXT]] = add nuw nsw i64 [[I]], 1
 ; CHECK-NEXT:    [[OUTER_EXITCOND:%.*]] = icmp eq i64 [[I_NEXT]], 1024
-; CHECK-NEXT:    br i1 [[OUTER_EXITCOND]], label %[[EXIT]], label %[[OUTER_LOOP]], !llvm.loop [[LOOP3:![0-9]+]]
+; CHECK-NEXT:    br i1 [[OUTER_EXITCOND]], label %[[EXIT]], label %[[OUTER_LOOP]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void
 ;

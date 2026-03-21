@@ -42,8 +42,8 @@ define void @pointer_induction_used_as_vector(ptr noalias %start.1, ptr noalias 
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <vscale x 2 x i8>, ptr [[TMP10]], align 1
 ; CHECK-NEXT:    [[TMP12:%.*]] = add <vscale x 2 x i8> [[WIDE_LOAD]], splat (i8 1)
 ; CHECK-NEXT:    store <vscale x 2 x i8> [[TMP12]], ptr [[TMP10]], align 1
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP3]]
 ; CHECK-NEXT:    [[PTR_IND]] = getelementptr i8, ptr [[POINTER_PHI]], i64 [[TMP3]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP3]]
 ; CHECK-NEXT:    [[TMP21:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP21]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       middle.block:

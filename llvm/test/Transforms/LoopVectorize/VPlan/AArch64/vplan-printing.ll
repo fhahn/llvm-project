@@ -8,7 +8,6 @@ target triple = "aarch64-none-unknown-elf"
 define i32 @print_partial_reduction(ptr %a, ptr %b) "target-features"="+neon,+dotprod" {
 ; CHECK:      VPlan 'Initial VPlan for VF={8,16},UF>=1' {
 ; CHECK-NEXT: Live-in vp<[[VF:%.]]> = VF
-; CHECK-NEXT: Live-in vp<[[VFxUF:%.]]> = VF * UF
 ; CHECK-NEXT: Live-in vp<[[VEC_TC:%.+]]> = vector-trip-count
 ; CHECK-NEXT: Live-in ir<1024> = original trip-count
 ; CHECK-EMPTY:
@@ -32,8 +31,7 @@ define i32 @print_partial_reduction(ptr %a, ptr %b) "target-features"="+neon,+do
 ; CHECK-NEXT:   vp<[[PTR_B:%.+]]> = vector-pointer ir<%gep.b>
 ; CHECK-NEXT:   WIDEN ir<%load.b> = load vp<[[PTR_B]]>
 ; CHECK-NEXT:   EXPRESSION vp<[[REDUCE]]> = ir<[[ACC]]> + partial.reduce.add (mul (ir<%load.b> zext to i32), (ir<%load.a> zext to i32))
-; CHECK-NEXT:   EMIT vp<[[CAN_IV_NEXT:%.+]]> = add nuw vp<[[CAN_IV]]>, vp<[[VFxUF]]>
-; CHECK-NEXT:   EMIT branch-on-count vp<[[CAN_IV_NEXT]]>, vp<[[VEC_TC]]>
+; CHECK-NEXT:   EMIT branch-on-count vp<[[CAN_IV]]>, vp<{{[^>]+}}>, vp<[[VEC_TC]]>
 ; CHECK-NEXT: No successors
 ; CHECK-NEXT: }
 ; CHECK-NEXT: Successor(s): middle.block
@@ -128,7 +126,6 @@ exit:
 define i32 @print_partial_reduction_predication(ptr %a, ptr %b, i64 %N) "target-features"="+sve" {
 ; CHECK: VPlan 'Initial VPlan for VF={8,16},UF>=1' {
 ; CHECK-NEXT: Live-in vp<[[VF:%[0-9]+]]> = VF
-; CHECK-NEXT: Live-in vp<[[VFxUF:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT: Live-in ir<%N> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT: ir-bb<entry>:
@@ -154,7 +151,7 @@ define i32 @print_partial_reduction_predication(ptr %a, ptr %b, i64 %N) "target-
 ; CHECK-NEXT:     vp<[[PTR_B:%[0-9]+]]> = vector-pointer ir<%gep.b>
 ; CHECK-NEXT:     WIDEN ir<%load.b> = load vp<[[PTR_B]]>, vp<[[MASK]]>
 ; CHECK-NEXT:     EXPRESSION vp<[[REDUCE]]> = vp<[[MASK]]> + partial.reduce.add (mul (ir<%load.b> zext to i32), (ir<%load.a> zext to i32), <badref>)
-; CHECK-NEXT:     EMIT vp<%index.next> = add vp<[[CAN_IV]]>, vp<[[VFxUF]]>
+; CHECK-NEXT:     EMIT vp<%index.next> = add vp<[[CAN_IV]]>, vp<{{%[0-9]+}}>
 ; CHECK-NEXT:     EMIT vp<[[PART_IDX:%[0-9]+]]> = VF * Part + vp<%index.next>, vp<[[VF]]>
 ; CHECK-NEXT:     EMIT vp<%active.lane.mask.next> = active lane mask vp<[[PART_IDX]]>, ir<%N>, ir<1>
 ; CHECK-NEXT:     EMIT vp<[[NOT_MASK:%[0-9]+]]> = not vp<%active.lane.mask.next>
@@ -195,7 +192,6 @@ exit:
 define i32 @print_partial_reduction_ext_mul(ptr %a, ptr %b) "target-features"="+neon,+dotprod" {
 ; CHECK:      VPlan 'Initial VPlan for VF={8,16},UF>=1' {
 ; CHECK-NEXT: Live-in vp<[[VF:%.]]> = VF
-; CHECK-NEXT: Live-in vp<[[VFxUF:%.]]> = VF * UF
 ; CHECK-NEXT: Live-in vp<[[VEC_TC:%.+]]> = vector-trip-count
 ; CHECK-NEXT: Live-in ir<1024> = original trip-count
 ; CHECK-EMPTY:
@@ -219,8 +215,7 @@ define i32 @print_partial_reduction_ext_mul(ptr %a, ptr %b) "target-features"="+
 ; CHECK-NEXT:   vp<[[PTR_B:%.+]]> = vector-pointer ir<%gep.b>
 ; CHECK-NEXT:   WIDEN ir<%load.b> = load vp<[[PTR_B]]>
 ; CHECK-NEXT:   EXPRESSION vp<[[REDUCE]]> = ir<[[ACC]]> + partial.reduce.add (mul (ir<%load.b> zext to i32), (ir<%load.a> zext to i32))
-; CHECK-NEXT:   EMIT vp<[[CAN_IV_NEXT:%.+]]> = add nuw vp<[[CAN_IV]]>, vp<[[VFxUF]]>
-; CHECK-NEXT:   EMIT branch-on-count vp<[[CAN_IV_NEXT]]>, vp<[[VEC_TC]]>
+; CHECK-NEXT:   EMIT branch-on-count vp<[[CAN_IV]]>, vp<{{[^>]+}}>, vp<[[VEC_TC]]>
 ; CHECK-NEXT: No successors
 ; CHECK-NEXT: }
 ; CHECK-NEXT: Successor(s): middle.block

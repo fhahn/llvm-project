@@ -8,7 +8,6 @@
 ; RUN:   -vectorize-scev-check-threshold=1 %s | FileCheck --check-prefixes=COMMON,THRESHOLD1 %s
 
 define i64 @predicated_iv_with_liveout(ptr %dst, i64 %n) {
-;
 ; CHECK-LABEL: define i64 @predicated_iv_with_liveout(
 ; CHECK-SAME: ptr [[DST:%.*]], i64 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
@@ -36,9 +35,9 @@ define i64 @predicated_iv_with_liveout(ptr %dst, i64 %n) {
 ; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <4 x i64> [[TMP5]], i64 0
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds i64, ptr [[DST]], i64 [[TMP6]]
 ; CHECK-NEXT:    store <4 x i64> [[VEC_IND]], ptr [[TMP7]], align 8
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[VEC_IND]], splat (i64 4)
 ; CHECK-NEXT:    [[VEC_IND_NEXT3]] = add <4 x i16> [[VEC_IND2]], splat (i16 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP8]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -111,9 +110,9 @@ define i64 @predicated_iv_with_liveout(ptr %dst, i64 %n) {
 ; THRESHOLD1-NEXT:    [[TMP6:%.*]] = extractelement <4 x i64> [[TMP5]], i64 0
 ; THRESHOLD1-NEXT:    [[TMP7:%.*]] = getelementptr inbounds i64, ptr [[DST]], i64 [[TMP6]]
 ; THRESHOLD1-NEXT:    store <4 x i64> [[VEC_IND]], ptr [[TMP7]], align 8
-; THRESHOLD1-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; THRESHOLD1-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[VEC_IND]], splat (i64 4)
 ; THRESHOLD1-NEXT:    [[VEC_IND_NEXT3]] = add <4 x i16> [[VEC_IND2]], splat (i16 4)
+; THRESHOLD1-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; THRESHOLD1-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; THRESHOLD1-NEXT:    br i1 [[TMP8]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; THRESHOLD1:       [[MIDDLE_BLOCK]]:
@@ -179,8 +178,8 @@ define void @dead_predicated_iv1(ptr %dst, i64 %n) {
 ; CHECK-NEXT:    [[TMP2:%.*]] = zext <4 x i16> [[TMP1]] to <4 x i64>
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i64, ptr [[DST]], i64 [[INDEX]]
 ; CHECK-NEXT:    store <4 x i64> [[TMP2]], ptr [[TMP3]], align 8
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i16> [[VEC_IND]], splat (i16 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP4]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -221,8 +220,8 @@ define void @dead_predicated_iv1(ptr %dst, i64 %n) {
 ; THRESHOLD0-NEXT:    [[TMP2:%.*]] = zext <4 x i16> [[TMP1]] to <4 x i64>
 ; THRESHOLD0-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i64, ptr [[DST]], i64 [[INDEX]]
 ; THRESHOLD0-NEXT:    store <4 x i64> [[TMP2]], ptr [[TMP3]], align 8
-; THRESHOLD0-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; THRESHOLD0-NEXT:    [[VEC_IND_NEXT]] = add <4 x i16> [[VEC_IND]], splat (i16 4)
+; THRESHOLD0-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; THRESHOLD0-NEXT:    [[TMP4:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; THRESHOLD0-NEXT:    br i1 [[TMP4]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; THRESHOLD0:       [[MIDDLE_BLOCK]]:
@@ -263,8 +262,8 @@ define void @dead_predicated_iv1(ptr %dst, i64 %n) {
 ; THRESHOLD1-NEXT:    [[TMP2:%.*]] = zext <4 x i16> [[TMP1]] to <4 x i64>
 ; THRESHOLD1-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i64, ptr [[DST]], i64 [[INDEX]]
 ; THRESHOLD1-NEXT:    store <4 x i64> [[TMP2]], ptr [[TMP3]], align 8
-; THRESHOLD1-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; THRESHOLD1-NEXT:    [[VEC_IND_NEXT]] = add <4 x i16> [[VEC_IND]], splat (i16 4)
+; THRESHOLD1-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; THRESHOLD1-NEXT:    [[TMP4:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; THRESHOLD1-NEXT:    br i1 [[TMP4]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; THRESHOLD1:       [[MIDDLE_BLOCK]]:
@@ -332,8 +331,8 @@ define void @dead_predicated_iv2(ptr %dst, i64 %n) {
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i64, ptr [[DST]], i64 [[INDEX]]
 ; CHECK-NEXT:    store <4 x i64> [[VEC_IND]], ptr [[TMP5]], align 8
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[VEC_IND]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -399,8 +398,8 @@ define void @dead_predicated_iv2(ptr %dst, i64 %n) {
 ; THRESHOLD1-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; THRESHOLD1-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i64, ptr [[DST]], i64 [[INDEX]]
 ; THRESHOLD1-NEXT:    store <4 x i64> [[VEC_IND]], ptr [[TMP5]], align 8
-; THRESHOLD1-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; THRESHOLD1-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[VEC_IND]], splat (i64 4)
+; THRESHOLD1-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; THRESHOLD1-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; THRESHOLD1-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; THRESHOLD1:       [[MIDDLE_BLOCK]]:
@@ -909,9 +908,9 @@ define void @two_used_predicated_ivs(ptr %dst1, ptr %dst2, i64 %n) {
 ; CHECK-NEXT:    store <4 x i32> [[TMP11]], ptr [[TMP13]], align 4
 ; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr inbounds i32, ptr [[DST2]], i64 [[INDEX]]
 ; CHECK-NEXT:    store <4 x i32> [[TMP12]], ptr [[TMP14]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i32> [[VEC_IND]], splat (i32 36)
 ; CHECK-NEXT:    [[VEC_IND_NEXT9]] = add nuw nsw <4 x i32> [[VEC_IND8]], splat (i32 20)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP15:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP15]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP14:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

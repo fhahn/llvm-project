@@ -7,7 +7,6 @@
 define void @foo(ptr noalias %a, ptr noalias %b, ptr noalias %c, i64 %N) {
 ; CHECK-LABEL: VPlan 'Initial VPlan for VF={2,4},UF>=1' {
 ; CHECK-NEXT: Live-in vp<[[VF:%.+]]> = VF
-; CHECK-NEXT: Live-in vp<[[VFxUF:%.+]]> = VF * UF
 ; CHECK-NEXT: Live-in vp<[[VTC:%.+]]> = vector-trip-count
 ; CHECK-NEXT: Live-in vp<[[BTC:%.+]]> = backedge-taken count
 ; CHECK-EMPTY:
@@ -47,8 +46,7 @@ define void @foo(ptr noalias %a, ptr noalias %b, ptr noalias %c, i64 %N) {
 ; CHECK-NEXT:  Successor(s): for.body.2
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  for.body.2:
-; CHECK-NEXT:     EMIT vp<[[CAN_INC:%.+]]> = add vp<[[CAN_IV]]>, vp<[[VFxUF]]>
-; CHECK-NEXT:     EMIT branch-on-count vp<[[CAN_INC]]>, vp<[[VTC]]>
+; CHECK-NEXT:     EMIT branch-on-count vp<[[CAN_IV]]>, vp<{{[^>]+}}>, vp<[[VTC]]>
 ; CHECK-NEXT:   No successors
 ; CHECK-NEXT: }
 ;
@@ -75,7 +73,6 @@ for.cond.cleanup:
 define void @safe_dep(ptr %p) {
 ; CHECK-LABEL: VPlan 'Initial VPlan for VF={2},UF>=1' {
 ; CHECK-NEXT: Live-in vp<[[VF:%.+]]> = VF
-; CHECK-NEXT: Live-in vp<[[VFxUF:%.+]]> = VF * UF
 ; CHECK-NEXT: Live-in vp<[[VTC:%.+]]> = vector-trip-count
 ; CHECK-NEXT: Live-in ir<512> = original trip-count
 ; CHECK-EMPTY:
@@ -97,8 +94,7 @@ define void @safe_dep(ptr %p) {
 ; CHECK-NEXT:     CLONE ir<%a2> = getelementptr ir<%p>, ir<%offset>
 ; CHECK-NEXT:     vp<[[VPTR2:%.+]]> = vector-pointer ir<%a2>
 ; CHECK-NEXT:     WIDEN store vp<[[VPTR2]]>, ir<%v>
-; CHECK-NEXT:     EMIT vp<[[CAN_INC:%.+]]> = add nuw vp<[[CAN_IV]]>, vp<[[VFxUF]]>
-; CHECK-NEXT:     EMIT branch-on-count vp<[[CAN_INC]]>, vp<[[VTC]]>
+; CHECK-NEXT:     EMIT branch-on-count vp<[[CAN_IV]]>, vp<{{[^>]+}}>, vp<[[VTC]]>
 ; CHECK-NEXT:   No successors
 ; CHECK-NEXT: }
 ;

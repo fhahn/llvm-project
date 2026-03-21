@@ -5,7 +5,6 @@ define void @struct_return_f32_widen(ptr noalias %in, ptr noalias writeonly %out
 ; CHECK-LABEL: 'struct_return_f32_widen'
 ; CHECK:  VPlan 'Initial VPlan for VF={2},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<1024> = original trip-count
 ; CHECK-EMPTY:
@@ -32,8 +31,7 @@ define void @struct_return_f32_widen(ptr noalias %in, ptr noalias writeonly %out
 ; CHECK-NEXT:      CLONE ir<%arrayidx4> = getelementptr inbounds ir<%out_b>, vp<[[VP4]]>
 ; CHECK-NEXT:      vp<[[VP7:%[0-9]+]]> = vector-pointer inbounds ir<%arrayidx4>
 ; CHECK-NEXT:      WIDEN store vp<[[VP7]]>, ir<%extract_b>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP3]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -92,7 +90,6 @@ define void @struct_return_f32_replicate(ptr noalias %in, ptr noalias writeonly 
 ; CHECK-LABEL: 'struct_return_f32_replicate'
 ; CHECK:  VPlan 'Initial VPlan for VF={2},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<1024> = original trip-count
 ; CHECK-EMPTY:
@@ -119,8 +116,7 @@ define void @struct_return_f32_replicate(ptr noalias %in, ptr noalias writeonly 
 ; CHECK-NEXT:      CLONE ir<%arrayidx4> = getelementptr inbounds ir<%out_b>, vp<[[VP4]]>
 ; CHECK-NEXT:      vp<[[VP7:%[0-9]+]]> = vector-pointer inbounds ir<%arrayidx4>
 ; CHECK-NEXT:      WIDEN store vp<[[VP7]]>, ir<%extract_b>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP3]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block

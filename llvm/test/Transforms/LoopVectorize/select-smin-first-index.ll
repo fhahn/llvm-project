@@ -23,8 +23,8 @@ define i64 @test_vectorize_select_smin_first_idx(ptr %src, i64 %n) {
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp sgt <4 x i64> [[VEC_PHI1]], [[WIDE_LOAD]]
 ; CHECK-NEXT:    [[TMP2]] = call <4 x i64> @llvm.smin.v4i64(<4 x i64> [[VEC_PHI1]], <4 x i64> [[WIDE_LOAD]])
 ; CHECK-NEXT:    [[TMP3]] = select <4 x i1> [[TMP1]], <4 x i64> [[VEC_IND]], <4 x i64> [[VEC_PHI]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[IV1]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[VEC_IND]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[IV1]], 4
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP4]], label %[[MIDDLE_BLOCK:.*]], label %[[LOOP]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -97,8 +97,8 @@ define i64 @test_vectorize_select_smin_first_idx_signed_sentinel_possible(ptr %s
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp sgt <4 x i64> [[VEC_PHI1]], [[WIDE_LOAD]]
 ; CHECK-NEXT:    [[TMP2]] = call <4 x i64> @llvm.smin.v4i64(<4 x i64> [[VEC_PHI1]], <4 x i64> [[WIDE_LOAD]])
 ; CHECK-NEXT:    [[TMP3]] = select <4 x i1> [[TMP1]], <4 x i64> [[VEC_IND]], <4 x i64> [[VEC_PHI]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[VEC_IND]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq i64 [[INDEX_NEXT]], 100
 ; CHECK-NEXT:    br i1 [[TMP4]], label %[[EXIT:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[EXIT]]:
@@ -155,8 +155,8 @@ define i64 @test_vectorize_select_smin_first_idx_cond_flipped(ptr %src, i64 %n) 
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp slt <4 x i64> [[WIDE_LOAD]], [[VEC_PHI1]]
 ; CHECK-NEXT:    [[TMP2]] = call <4 x i64> @llvm.smin.v4i64(<4 x i64> [[VEC_PHI1]], <4 x i64> [[WIDE_LOAD]])
 ; CHECK-NEXT:    [[TMP3]] = select <4 x i1> [[TMP1]], <4 x i64> [[VEC_IND]], <4 x i64> [[VEC_PHI]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[IV]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[VEC_IND]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[IV]], 4
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP4]], label %[[MIDDLE_BLOCK:.*]], label %[[LOOP]], !llvm.loop [[LOOP5:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -318,8 +318,8 @@ define i64 @test_vectorize_select_smin_idx_iv_start_different(ptr %src, i64 %n) 
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp sgt <4 x i64> [[VEC_PHI1]], [[WIDE_LOAD]]
 ; CHECK-NEXT:    [[TMP2]] = call <4 x i64> @llvm.smin.v4i64(<4 x i64> [[VEC_PHI1]], <4 x i64> [[WIDE_LOAD]])
 ; CHECK-NEXT:    [[TMP3]] = select <4 x i1> [[TMP1]], <4 x i64> [[VEC_IND]], <4 x i64> [[VEC_PHI]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i64> [[VEC_IND]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq i64 [[INDEX_NEXT]], 980
 ; CHECK-NEXT:    br i1 [[TMP4]], label %[[EXIT:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
 ; CHECK:       [[EXIT]]:
@@ -422,8 +422,8 @@ define i64 @test_vectorize_select_smin_first_idx_non_canonical_wide_iv(ptr %src)
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp slt <4 x i64> [[WIDE_LOAD]], [[VEC_PHI1]]
 ; CHECK-NEXT:    [[TMP2]] = call <4 x i64> @llvm.smin.v4i64(<4 x i64> [[VEC_PHI1]], <4 x i64> [[WIDE_LOAD]])
 ; CHECK-NEXT:    [[TMP3]] = select <4 x i1> [[TMP1]], <4 x i64> [[VEC_IND]], <4 x i64> [[VEC_PHI]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i64> [[VEC_IND]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq i64 [[INDEX_NEXT]], 100
 ; CHECK-NEXT:    br i1 [[TMP4]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

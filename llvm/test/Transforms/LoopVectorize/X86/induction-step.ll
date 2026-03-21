@@ -30,8 +30,8 @@ define i16 @wide_add_induction_step_live_in(ptr %dst, i64 %N, i16 %off) {
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds i16, ptr [[TMP6]], i64 4
 ; CHECK-NEXT:    store <4 x i16> [[VEC_IND_NEXT]], ptr [[TMP6]], align 2
 ; CHECK-NEXT:    store <4 x i16> [[TMP5]], ptr [[TMP7]], align 2
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX1]], 8
 ; CHECK-NEXT:    [[VEC_IND_NEXT1]] = add <4 x i16> [[TMP13]], [[BROADCAST_SPLAT5]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX1]], 8
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP8]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -102,8 +102,8 @@ define i16 @wide_sub_induction_step_live_in(ptr %dst, i64 %N, i16 %off) {
 ; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds i16, ptr [[TMP6]], i64 4
 ; CHECK-NEXT:    store <4 x i16> [[TMP10]], ptr [[TMP6]], align 2
 ; CHECK-NEXT:    store <4 x i16> [[TMP7]], ptr [[TMP8]], align 2
-; CHECK-NEXT:    [[INDEX_NEXT16]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i16> [[STEP_ADD]], [[TMP2]]
+; CHECK-NEXT:    [[INDEX_NEXT16]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[TMP16:%.*]] = icmp eq i64 [[INDEX_NEXT16]], [[N_VEC5]]
 ; CHECK-NEXT:    br i1 [[TMP16]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

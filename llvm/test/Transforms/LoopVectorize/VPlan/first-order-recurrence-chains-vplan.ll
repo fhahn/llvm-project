@@ -6,7 +6,6 @@ define void @test_chained_first_order_recurrences_1(ptr %ptr) {
 ; CHECK-LABEL: VPlan for loop in 'test_chained_first_order_recurrences_1'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<1000> = original trip-count
 ; CHECK-EMPTY:
@@ -31,8 +30,7 @@ define void @test_chained_first_order_recurrences_1(ptr %ptr) {
 ; CHECK-NEXT:      WIDEN ir<%add> = add vp<[[VP6]]>, vp<[[VP7]]>
 ; CHECK-NEXT:      vp<[[VP8:%[0-9]+]]> = vector-pointer inbounds ir<%gep.ptr>
 ; CHECK-NEXT:      WIDEN store vp<[[VP8]]>, ir<%add>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP3]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -91,7 +89,6 @@ define void @test_chained_first_order_recurrences_3(ptr %ptr) {
 ; CHECK-LABEL: VPlan for loop in 'test_chained_first_order_recurrences_3'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<1000> = original trip-count
 ; CHECK-EMPTY:
@@ -119,8 +116,7 @@ define void @test_chained_first_order_recurrences_3(ptr %ptr) {
 ; CHECK-NEXT:      WIDEN ir<%add.2> = add ir<%add.1>, vp<[[VP8]]>
 ; CHECK-NEXT:      vp<[[VP9:%[0-9]+]]> = vector-pointer inbounds ir<%gep.ptr>
 ; CHECK-NEXT:      WIDEN store vp<[[VP9]]>, ir<%add.2>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP3]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -190,7 +186,6 @@ define i32 @test_chained_first_order_recurrences_4(ptr %base, i64 %x) {
 ; CHECK-LABEL: VPlan for loop in 'test_chained_first_order_recurrences_4'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<4098> = original trip-count
 ; CHECK-EMPTY:
@@ -215,8 +210,7 @@ define i32 @test_chained_first_order_recurrences_4(ptr %base, i64 %x) {
 ; CHECK-NEXT:      WIDEN-CAST ir<%for.y.i64> = sext vp<[[VP7]]> to i64
 ; CHECK-NEXT:      vp<[[VP8:%[0-9]+]]> = vector-pointer ir<%gep>
 ; CHECK-NEXT:      WIDEN store vp<[[VP8]]>, ir<%for.y.i64>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP4]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -277,7 +271,6 @@ define i32 @test_chained_first_order_recurrences_5_hoist_to_load(ptr %base) {
 ; CHECK-LABEL: VPlan for loop in 'test_chained_first_order_recurrences_5_hoist_to_load'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<4098> = original trip-count
 ; CHECK-EMPTY:
@@ -304,8 +297,7 @@ define i32 @test_chained_first_order_recurrences_5_hoist_to_load(ptr %base) {
 ; CHECK-NEXT:      WIDEN-CAST ir<%for.y.i64> = sext vp<[[VP8]]> to i64
 ; CHECK-NEXT:      vp<[[VP9:%[0-9]+]]> = vector-pointer ir<%gep>
 ; CHECK-NEXT:      WIDEN store vp<[[VP9]]>, ir<%for.y.i64>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP3]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block

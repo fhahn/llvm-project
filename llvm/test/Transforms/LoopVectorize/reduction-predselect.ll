@@ -17,8 +17,8 @@ define i32 @reduction_sum_single(ptr noalias nocapture %A) {
 ; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds [4 x i8], ptr [[A:%.*]], i32 [[TMP3]]
 ; CHECK-NEXT:    [[TMP24:%.*]] = call <4 x i32> @llvm.masked.load.v4i32.p0(ptr align 4 [[TMP1]], <4 x i1> [[TMP0]], <4 x i32> zeroinitializer)
 ; CHECK-NEXT:    [[TMP25]] = add <4 x i32> [[VEC_PHI]], [[TMP24]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[TMP3]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i16> [[VEC_IND]], splat (i16 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[TMP3]], 4
 ; CHECK-NEXT:    [[TMP26:%.*]] = icmp eq i32 [[INDEX_NEXT]], 260
 ; CHECK-NEXT:    br i1 [[TMP26]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       middle.block:
@@ -64,8 +64,8 @@ define i32 @reduction_sum(ptr noalias nocapture %A, ptr noalias nocapture %B) {
 ; CHECK-NEXT:    [[TMP41:%.*]] = add <4 x i32> [[TMP40]], [[TMP38]]
 ; CHECK-NEXT:    [[TMP42:%.*]] = add <4 x i32> [[TMP41]], [[TMP39]]
 ; CHECK-NEXT:    [[TMP43]] = select <4 x i1> [[TMP0]], <4 x i32> [[TMP42]], <4 x i32> [[VEC_PHI]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[TMP31]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[TMP31]], 4
 ; CHECK-NEXT:    [[TMP44:%.*]] = icmp eq i32 [[INDEX_NEXT]], 260
 ; CHECK-NEXT:    br i1 [[TMP44]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
 ; CHECK:       middle.block:
@@ -114,8 +114,8 @@ define i32 @reduction_prod(ptr noalias nocapture %A, ptr noalias nocapture %B) {
 ; CHECK-NEXT:    [[TMP40:%.*]] = mul <4 x i32> [[VEC_PHI]], [[TMP38]]
 ; CHECK-NEXT:    [[TMP41:%.*]] = mul <4 x i32> [[TMP40]], [[TMP39]]
 ; CHECK-NEXT:    [[TMP42]] = select <4 x i1> [[TMP0]], <4 x i32> [[TMP41]], <4 x i32> [[VEC_PHI]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[TMP6]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i16> [[VEC_IND]], splat (i16 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[TMP6]], 4
 ; CHECK-NEXT:    [[TMP43:%.*]] = icmp eq i32 [[INDEX_NEXT]], 260
 ; CHECK-NEXT:    br i1 [[TMP43]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       middle.block:
@@ -163,8 +163,8 @@ define i32 @reduction_and(ptr nocapture %A, ptr nocapture %B) {
 ; CHECK-NEXT:    [[TMP40:%.*]] = and <4 x i32> [[TMP38]], [[TMP39]]
 ; CHECK-NEXT:    [[TMP41:%.*]] = select <4 x i1> [[TMP0]], <4 x i32> [[TMP40]], <4 x i32> splat (i32 -1)
 ; CHECK-NEXT:    [[TMP42]] = and <4 x i32> [[VEC_PHI]], [[TMP41]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[TMP6]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i16> [[VEC_IND]], splat (i16 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[TMP6]], 4
 ; CHECK-NEXT:    [[TMP43:%.*]] = icmp eq i32 [[INDEX_NEXT]], 260
 ; CHECK-NEXT:    br i1 [[TMP43]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
 ; CHECK:       middle.block:
@@ -212,8 +212,8 @@ define i32 @reduction_or(ptr nocapture %A, ptr nocapture %B) {
 ; CHECK-NEXT:    [[TMP40:%.*]] = add nsw <4 x i32> [[TMP39]], [[TMP38]]
 ; CHECK-NEXT:    [[TMP41:%.*]] = select <4 x i1> [[TMP0]], <4 x i32> [[TMP40]], <4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP42]] = or <4 x i32> [[VEC_PHI]], [[TMP41]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[TMP6]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i16> [[VEC_IND]], splat (i16 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[TMP6]], 4
 ; CHECK-NEXT:    [[TMP43:%.*]] = icmp eq i32 [[INDEX_NEXT]], 260
 ; CHECK-NEXT:    br i1 [[TMP43]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       middle.block:
@@ -261,8 +261,8 @@ define i32 @reduction_xor(ptr nocapture %A, ptr nocapture %B) {
 ; CHECK-NEXT:    [[TMP40:%.*]] = add nsw <4 x i32> [[TMP39]], [[TMP38]]
 ; CHECK-NEXT:    [[TMP41:%.*]] = select <4 x i1> [[TMP0]], <4 x i32> [[TMP40]], <4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP42]] = xor <4 x i32> [[VEC_PHI]], [[TMP41]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[TMP6]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i16> [[VEC_IND]], splat (i16 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[TMP6]], 4
 ; CHECK-NEXT:    [[TMP43:%.*]] = icmp eq i32 [[INDEX_NEXT]], 260
 ; CHECK-NEXT:    br i1 [[TMP43]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
 ; CHECK:       middle.block:
@@ -310,8 +310,8 @@ define float @reduction_fadd(ptr nocapture %A, ptr nocapture %B) {
 ; CHECK-NEXT:    [[TMP40:%.*]] = fadd fast <4 x float> [[VEC_PHI]], [[TMP38]]
 ; CHECK-NEXT:    [[TMP41:%.*]] = fadd fast <4 x float> [[TMP40]], [[TMP39]]
 ; CHECK-NEXT:    [[TMP42]] = select fast <4 x i1> [[TMP0]], <4 x float> [[TMP41]], <4 x float> [[VEC_PHI]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[TMP31]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i16> [[VEC_IND]], splat (i16 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[TMP31]], 4
 ; CHECK-NEXT:    [[TMP43:%.*]] = icmp eq i32 [[INDEX_NEXT]], 260
 ; CHECK-NEXT:    br i1 [[TMP43]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; CHECK:       middle.block:
@@ -359,8 +359,8 @@ define float @reduction_fmul(ptr nocapture %A, ptr nocapture %B) {
 ; CHECK-NEXT:    [[TMP40:%.*]] = fmul fast <4 x float> [[VEC_PHI]], [[TMP38]]
 ; CHECK-NEXT:    [[TMP41:%.*]] = fmul fast <4 x float> [[TMP40]], [[TMP39]]
 ; CHECK-NEXT:    [[TMP42]] = select fast <4 x i1> [[TMP0]], <4 x float> [[TMP41]], <4 x float> [[VEC_PHI]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[TMP31]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i16> [[VEC_IND]], splat (i16 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[TMP31]], 4
 ; CHECK-NEXT:    [[TMP43:%.*]] = icmp eq i32 [[INDEX_NEXT]], 260
 ; CHECK-NEXT:    br i1 [[TMP43]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP9:![0-9]+]]
 ; CHECK:       middle.block:
@@ -405,8 +405,8 @@ define i32 @reduction_min(ptr nocapture %A, ptr nocapture %B) {
 ; CHECK-NEXT:    [[TMP23:%.*]] = call <4 x i32> @llvm.masked.load.v4i32.p0(ptr align 4 [[TMP1]], <4 x i1> [[TMP0]], <4 x i32> poison)
 ; CHECK-NEXT:    [[TMP24:%.*]] = call <4 x i32> @llvm.smin.v4i32(<4 x i32> [[VEC_PHI]], <4 x i32> [[TMP23]])
 ; CHECK-NEXT:    [[TMP25]] = select <4 x i1> [[TMP0]], <4 x i32> [[TMP24]], <4 x i32> [[VEC_PHI]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[TMP3]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i16> [[VEC_IND]], splat (i16 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[TMP3]], 4
 ; CHECK-NEXT:    [[TMP26:%.*]] = icmp eq i32 [[INDEX_NEXT]], 260
 ; CHECK-NEXT:    br i1 [[TMP26]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP10:![0-9]+]]
 ; CHECK:       middle.block:
@@ -449,8 +449,8 @@ define i32 @reduction_max(ptr nocapture %A, ptr nocapture %B) {
 ; CHECK-NEXT:    [[TMP23:%.*]] = call <4 x i32> @llvm.masked.load.v4i32.p0(ptr align 4 [[TMP1]], <4 x i1> [[TMP0]], <4 x i32> poison)
 ; CHECK-NEXT:    [[TMP24:%.*]] = call <4 x i32> @llvm.umax.v4i32(<4 x i32> [[VEC_PHI]], <4 x i32> [[TMP23]])
 ; CHECK-NEXT:    [[TMP25]] = select <4 x i1> [[TMP0]], <4 x i32> [[TMP24]], <4 x i32> [[VEC_PHI]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[TMP3]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i16> [[VEC_IND]], splat (i16 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[TMP3]], 4
 ; CHECK-NEXT:    [[TMP26:%.*]] = icmp eq i32 [[INDEX_NEXT]], 260
 ; CHECK-NEXT:    br i1 [[TMP26]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP11:![0-9]+]]
 ; CHECK:       middle.block:

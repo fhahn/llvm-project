@@ -4,7 +4,7 @@
 define void @diamond_phi(ptr %a) {
 ; CHECK-LABEL: VPlan for loop in 'diamond_phi'
 ; CHECK-NEXT:  <x1> vector loop: {
-; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
+; CHECK-NEXT:  vp<[[VP2:%[0-9]+]]> = CANONICAL-IV vp<[[VP3:%[0-9]+]]> (VF * UF)
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION nuw nsw ir<0>, ir<1>, vp<[[VP0:%[0-9]+]]>
@@ -26,8 +26,7 @@ define void @diamond_phi(ptr %a) {
 ; CHECK-NEXT:      EMIT store ir<%phi4>, ir<%gep>
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add nuw nsw ir<%iv>, ir<1>
 ; CHECK-NEXT:      EMIT ir<%ec> = icmp eq ir<%iv.next>, ir<128>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2:%[0-9]+]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP2]]>, vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -69,7 +68,7 @@ exit:
 define void @mask_reuse(ptr %a) {
 ; CHECK-LABEL: VPlan for loop in 'mask_reuse'
 ; CHECK-NEXT:  <x1> vector loop: {
-; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
+; CHECK-NEXT:  vp<[[VP2:%[0-9]+]]> = CANONICAL-IV vp<[[VP3:%[0-9]+]]> (VF * UF)
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION nuw nsw ir<0>, ir<1>, vp<[[VP0:%[0-9]+]]>
@@ -100,8 +99,7 @@ define void @mask_reuse(ptr %a) {
 ; CHECK-NEXT:      EMIT store ir<%phi4>, ir<%gep>
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add nuw nsw ir<%iv>, ir<1>
 ; CHECK-NEXT:      EMIT ir<%ec> = icmp eq ir<%iv.next>, ir<128>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2:%[0-9]+]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP2]]>, vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -154,7 +152,7 @@ exit:
 define void @optimized_mask(ptr %a) {
 ; CHECK-LABEL: VPlan for loop in 'optimized_mask'
 ; CHECK-NEXT:  <x1> vector loop: {
-; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
+; CHECK-NEXT:  vp<[[VP2:%[0-9]+]]> = CANONICAL-IV vp<[[VP3:%[0-9]+]]> (VF * UF)
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION nuw nsw ir<0>, ir<1>, vp<[[VP0:%[0-9]+]]>
@@ -208,8 +206,7 @@ define void @optimized_mask(ptr %a) {
 ; CHECK-NEXT:      EMIT store ir<%phi7>, ir<%gep>
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add nuw nsw ir<%iv>, ir<1>
 ; CHECK-NEXT:      EMIT ir<%ec> = icmp eq ir<%iv.next>, ir<128>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2:%[0-9]+]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP2]]>, vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -279,7 +276,7 @@ exit:
 define void @switch(ptr %a) {
 ; CHECK-LABEL: VPlan for loop in 'switch'
 ; CHECK-NEXT:  <x1> vector loop: {
-; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
+; CHECK-NEXT:  vp<[[VP2:%[0-9]+]]> = CANONICAL-IV vp<[[VP3:%[0-9]+]]> (VF * UF)
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION nuw nsw ir<0>, ir<1>, vp<[[VP0:%[0-9]+]]>
@@ -324,8 +321,7 @@ define void @switch(ptr %a) {
 ; CHECK-NEXT:      EMIT store ir<%phi5>, ir<%gep>
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add nuw nsw ir<%iv>, ir<1>
 ; CHECK-NEXT:      EMIT ir<%ec> = icmp eq ir<%iv.next>, ir<128>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2:%[0-9]+]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP2]]>, vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -396,7 +392,7 @@ exit:
 define void @diamond_phi2(ptr %a, i1 %c1, i1 %c2) {
 ; CHECK-LABEL: VPlan for loop in 'diamond_phi2'
 ; CHECK-NEXT:  <x1> vector loop: {
-; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
+; CHECK-NEXT:  vp<[[VP2:%[0-9]+]]> = CANONICAL-IV vp<[[VP3:%[0-9]+]]> (VF * UF)
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION nuw nsw ir<0>, ir<1>, vp<[[VP0:%[0-9]+]]>
@@ -424,8 +420,7 @@ define void @diamond_phi2(ptr %a, i1 %c1, i1 %c2) {
 ; CHECK-NEXT:    bb5:
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add nuw nsw ir<%iv>, ir<1>
 ; CHECK-NEXT:      EMIT ir<%ec> = icmp eq ir<%iv.next>, ir<128>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2:%[0-9]+]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP2]]>, vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -479,7 +474,7 @@ exit:
 define void @blend_masks(ptr noalias %p, i1 %c0, i1 %c1, i1 %c2, i1 %c3, i1 %c4) {
 ; CHECK-LABEL: VPlan for loop in 'blend_masks'
 ; CHECK-NEXT:  <x1> vector loop: {
-; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
+; CHECK-NEXT:  vp<[[VP2:%[0-9]+]]> = CANONICAL-IV vp<[[VP3:%[0-9]+]]> (VF * UF)
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION ir<0>, ir<1>, vp<[[VP0:%[0-9]+]]>
@@ -525,8 +520,7 @@ define void @blend_masks(ptr noalias %p, i1 %c0, i1 %c1, i1 %c2, i1 %c3, i1 %c4)
 ; CHECK-NEXT:    bb8:
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add ir<%iv>, ir<1>
 ; CHECK-NEXT:      EMIT ir<%ec> = icmp eq ir<%iv.next>, ir<128>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2:%[0-9]+]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP2]]>, vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -585,7 +579,7 @@ exit:
 define void @blend_masks_triangle_phi(ptr noalias %p, i1 %c0, i1 %c1) {
 ; CHECK-LABEL: VPlan for loop in 'blend_masks_triangle_phi'
 ; CHECK-NEXT:  <x1> vector loop: {
-; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
+; CHECK-NEXT:  vp<[[VP2:%[0-9]+]]> = CANONICAL-IV vp<[[VP3:%[0-9]+]]> (VF * UF)
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION ir<0>, ir<1>, vp<[[VP0:%[0-9]+]]>
@@ -608,8 +602,7 @@ define void @blend_masks_triangle_phi(ptr noalias %p, i1 %c0, i1 %c1) {
 ; CHECK-NEXT:      EMIT store ir<%phi>, ir<%gep>
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add ir<%iv>, ir<1>
 ; CHECK-NEXT:      EMIT ir<%ec> = icmp eq ir<%iv.next>, ir<128>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2:%[0-9]+]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP2]]>, vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block

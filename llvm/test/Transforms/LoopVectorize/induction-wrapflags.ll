@@ -38,9 +38,9 @@ define void @induction_with_multiple_instructions_in_chain(ptr %p, ptr noalias %
 ; CHECK-NEXT:    store i8 0, ptr [[TMP15]], align 1
 ; CHECK-NEXT:    store i8 0, ptr [[TMP16]], align 1
 ; CHECK-NEXT:    store i8 0, ptr [[TMP17]], align 1
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 12)
 ; CHECK-NEXT:    [[VEC_IND_NEXT2]] = add <4 x i32> [[VEC_IND1]], splat (i32 12)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP18:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1024
 ; CHECK-NEXT:    br i1 [[TMP18]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -84,8 +84,8 @@ define i32 @induction_trunc_wrapflags(ptr %p) {
 ; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr [[TMP0]], i64 -3
 ; CHECK-NEXT:    [[REVERSE:%.*]] = shufflevector <4 x i8> [[VEC_IND]], <4 x i8> poison, <4 x i32> <i32 3, i32 2, i32 1, i32 0>
 ; CHECK-NEXT:    store <4 x i8> [[REVERSE]], ptr [[TMP2]], align 1
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i8> [[VEC_IND]], splat (i8 16)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq i64 [[INDEX_NEXT]], 324
 ; CHECK-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

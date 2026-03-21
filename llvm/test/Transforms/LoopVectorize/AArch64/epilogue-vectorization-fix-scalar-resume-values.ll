@@ -200,8 +200,8 @@ define i64 @find_last_and_any_of(ptr %Dst, ptr %Src) {
 ; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr inbounds i32, ptr [[TMP13]], i64 8
 ; CHECK-NEXT:    store <8 x i32> [[TMP11]], ptr [[TMP13]], align 4
 ; CHECK-NEXT:    store <8 x i32> [[TMP12]], ptr [[TMP14]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 16
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <8 x i32> [[STEP_ADD]], splat (i32 8)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 16
 ; CHECK-NEXT:    [[TMP15:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1008
 ; CHECK-NEXT:    br i1 [[TMP15]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP12:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -245,8 +245,8 @@ define i64 @find_last_and_any_of(ptr %Dst, ptr %Src) {
 ; CHECK-NEXT:    [[TMP30:%.*]] = add nsw <4 x i32> [[WIDE_LOAD16]], splat (i32 7)
 ; CHECK-NEXT:    [[TMP31:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[INDEX12]]
 ; CHECK-NEXT:    store <4 x i32> [[TMP30]], ptr [[TMP31]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT17]] = add nuw i64 [[INDEX12]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT18]] = add <4 x i32> [[VEC_IND15]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT17]] = add nuw i64 [[INDEX12]], 4
 ; CHECK-NEXT:    [[TMP32:%.*]] = icmp eq i64 [[INDEX_NEXT17]], 1020
 ; CHECK-NEXT:    br i1 [[TMP32]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP14:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_MIDDLE_BLOCK]]:

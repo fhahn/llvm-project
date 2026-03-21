@@ -128,8 +128,8 @@ define hidden void @pointer_phi_v4i32_add3(ptr noalias nocapture readonly %A, pt
 ; CHECK-NEXT:    [[WIDE_MASKED_GATHER:%.*]] = call <4 x i32> @llvm.masked.gather.v4i32.v4p0(<4 x ptr> align 4 [[VECTOR_GEP]], <4 x i1> splat (i1 true), <4 x i32> poison)
 ; CHECK-NEXT:    [[TMP2:%.*]] = add nsw <4 x i32> [[WIDE_MASKED_GATHER]], [[BROADCAST_SPLAT]]
 ; CHECK-NEXT:    store <4 x i32> [[TMP2]], ptr [[NEXT_GEP]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[PTR_IND]] = getelementptr i8, ptr [[POINTER_PHI]], i32 48
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq i32 [[INDEX_NEXT]], 996
 ; CHECK-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -606,8 +606,8 @@ define hidden void @pointer_phi_v4f32_add3(ptr noalias nocapture readonly %A, pt
 ; CHECK-NEXT:    [[WIDE_MASKED_GATHER:%.*]] = call <4 x float> @llvm.masked.gather.v4f32.v4p0(<4 x ptr> align 4 [[VECTOR_GEP]], <4 x i1> splat (i1 true), <4 x float> poison)
 ; CHECK-NEXT:    [[TMP2:%.*]] = fadd fast <4 x float> [[WIDE_MASKED_GATHER]], [[BROADCAST_SPLAT]]
 ; CHECK-NEXT:    store <4 x float> [[TMP2]], ptr [[NEXT_GEP]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[PTR_IND]] = getelementptr i8, ptr [[POINTER_PHI]], i32 48
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq i32 [[INDEX_NEXT]], 996
 ; CHECK-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP17:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -840,8 +840,8 @@ define hidden void @pointer_phi_v4i32_uf2(ptr noalias nocapture readonly %A, ptr
 ; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr [[NEXT_GEP]], i32 16
 ; CHECK-NEXT:    store <4 x i32> [[TMP2]], ptr [[NEXT_GEP]], align 4
 ; CHECK-NEXT:    store <4 x i32> [[TMP3]], ptr [[TMP4]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 8
 ; CHECK-NEXT:    [[PTR_IND]] = getelementptr i8, ptr [[POINTER_PHI]], i32 192
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 8
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i32 [[INDEX_NEXT]], 9992
 ; CHECK-NEXT:    br i1 [[TMP5]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP24:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -921,8 +921,8 @@ define hidden void @pointer_phi_v4i32_uf4(ptr noalias nocapture readonly %A, ptr
 ; CHECK-NEXT:    store <4 x i32> [[TMP3]], ptr [[TMP6]], align 4
 ; CHECK-NEXT:    store <4 x i32> [[TMP4]], ptr [[TMP7]], align 4
 ; CHECK-NEXT:    store <4 x i32> [[TMP5]], ptr [[TMP8]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 16
 ; CHECK-NEXT:    [[PTR_IND]] = getelementptr i8, ptr [[POINTER_PHI]], i32 384
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 16
 ; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq i32 [[INDEX_NEXT]], 9984
 ; CHECK-NEXT:    br i1 [[TMP9]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP26:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -997,9 +997,9 @@ define hidden void @mult_ptr_iv(ptr noalias nocapture readonly %x, ptr noalias n
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i8, <4 x ptr> [[VECTOR_GEP]], i32 2
 ; CHECK-NEXT:    call void @llvm.masked.scatter.v4i8.v4p0(<4 x i8> [[TMP3]], <4 x ptr> align 1 [[TMP5]], <4 x i1> splat (i1 true)), !alias.scope [[META31]], !noalias [[META28]]
 ; CHECK-NEXT:    call void @llvm.masked.scatter.v4i8.v4p0(<4 x i8> [[TMP4]], <4 x ptr> align 1 [[TMP6]], <4 x i1> splat (i1 true)), !alias.scope [[META31]], !noalias [[META28]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[PTR_IND]] = getelementptr i8, ptr [[POINTER_PHI]], i32 12
 ; CHECK-NEXT:    [[PTR_IND6]] = getelementptr i8, ptr [[POINTER_PHI2]], i32 12
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i32 [[INDEX_NEXT]], 1000
 ; CHECK-NEXT:    br i1 [[TMP7]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP33:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

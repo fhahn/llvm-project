@@ -123,8 +123,8 @@ define i1 @select_exit_cond(ptr %start, ptr %end, i64 %N) {
 ; CHECK-NEXT:    [[TMP65]] = or <2 x i64> [[TMP81]], [[VEC_PHI19]]
 ; CHECK-NEXT:    [[TMP66]] = or <2 x i64> [[TMP82]], [[VEC_PHI20]]
 ; CHECK-NEXT:    [[TMP67]] = or <2 x i64> [[TMP83]], [[VEC_PHI21]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 24
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <2 x i64> [[STEP_ADD_11]], splat (i64 2)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 24
 ; CHECK-NEXT:    [[TMP51:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP51]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -166,8 +166,8 @@ define i1 @select_exit_cond(ptr %start, ptr %end, i64 %N) {
 ; CHECK-NEXT:    [[TMP62:%.*]] = shl <2 x i64> [[VEC_IND27]], splat (i64 1)
 ; CHECK-NEXT:    [[TMP63:%.*]] = shl <2 x i64> [[TMP61]], [[TMP62]]
 ; CHECK-NEXT:    [[TMP58]] = or <2 x i64> [[TMP63]], [[VEC_PHI29]]
-; CHECK-NEXT:    [[INDEX_NEXT32]] = add nuw i64 [[INDEX38]], 2
 ; CHECK-NEXT:    [[VEC_IND_NEXT28]] = add <2 x i64> [[VEC_IND27]], splat (i64 2)
+; CHECK-NEXT:    [[INDEX_NEXT32]] = add nuw i64 [[INDEX38]], 2
 ; CHECK-NEXT:    [[TMP54:%.*]] = icmp eq i64 [[INDEX_NEXT32]], [[N_VEC25]]
 ; CHECK-NEXT:    br i1 [[TMP54]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_MIDDLE_BLOCK]]:

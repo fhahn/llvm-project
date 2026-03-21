@@ -17,8 +17,8 @@ define void @main(i1 %cond, ptr %arr) {
 ; CHECK-NEXT:    [[PREDPHI:%.*]] = select i1 [[COND]], <4 x i32> splat (i32 7), <4 x i32> [[TMP5]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i32, ptr [[ARR]], i32 [[INDEX]]
 ; CHECK-NEXT:    store <4 x i32> [[PREDPHI]], ptr [[TMP1]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP2:%.*]] = icmp eq i32 [[INDEX_NEXT]], 32
 ; CHECK-NEXT:    br i1 [[TMP2]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

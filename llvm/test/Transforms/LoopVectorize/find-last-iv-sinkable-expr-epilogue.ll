@@ -22,8 +22,8 @@ define i64 @findlast_mul_expr_epilogue(ptr %a, i64 %n) {
 ; CHECK-NEXT:    [[WIDE_LOAD9:%.*]] = load <4 x i64>, ptr [[TMP10]], align 8
 ; CHECK-NEXT:    [[TMP11:%.*]] = icmp eq <4 x i64> [[WIDE_LOAD9]], splat (i64 42)
 ; CHECK-NEXT:    [[TMP12]] = select <4 x i1> [[TMP11]], <4 x i64> [[VEC_IND7]], <4 x i64> [[VEC_PHI]]
-; CHECK-NEXT:    [[INDEX_NEXT10]] = add nuw i64 [[INDEX6]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT11]] = add nuw nsw <4 x i64> [[VEC_IND7]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT10]] = add nuw i64 [[INDEX6]], 4
 ; CHECK-NEXT:    [[TMP13:%.*]] = icmp eq i64 [[INDEX_NEXT10]], [[N_VEC3]]
 ; CHECK-NEXT:    br i1 [[TMP13]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -89,8 +89,8 @@ define i64 @findlast_shl_expr_epilogue(ptr %a, i64 %n) {
 ; CHECK-NEXT:    [[WIDE_LOAD9:%.*]] = load <4 x i64>, ptr [[TMP10]], align 8
 ; CHECK-NEXT:    [[TMP11:%.*]] = icmp eq <4 x i64> [[WIDE_LOAD9]], splat (i64 42)
 ; CHECK-NEXT:    [[TMP12]] = select <4 x i1> [[TMP11]], <4 x i64> [[VEC_IND7]], <4 x i64> [[VEC_PHI]]
-; CHECK-NEXT:    [[INDEX_NEXT10]] = add nuw i64 [[INDEX6]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT11]] = add nuw nsw <4 x i64> [[VEC_IND7]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT10]] = add nuw i64 [[INDEX6]], 4
 ; CHECK-NEXT:    [[TMP13:%.*]] = icmp eq i64 [[INDEX_NEXT10]], [[N_VEC3]]
 ; CHECK-NEXT:    br i1 [[TMP13]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -156,8 +156,8 @@ define i64 @findlast_or_expr_epilogue(ptr %a, i64 %n) {
 ; CHECK-NEXT:    [[WIDE_LOAD9:%.*]] = load <4 x i64>, ptr [[TMP10]], align 8
 ; CHECK-NEXT:    [[TMP11:%.*]] = icmp eq <4 x i64> [[WIDE_LOAD9]], splat (i64 42)
 ; CHECK-NEXT:    [[TMP12]] = select <4 x i1> [[TMP11]], <4 x i64> [[VEC_IND7]], <4 x i64> [[VEC_PHI]]
-; CHECK-NEXT:    [[INDEX_NEXT10]] = add nuw i64 [[INDEX6]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT11]] = add nuw nsw <4 x i64> [[VEC_IND7]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT10]] = add nuw i64 [[INDEX6]], 4
 ; CHECK-NEXT:    [[TMP13:%.*]] = icmp eq i64 [[INDEX_NEXT10]], [[N_VEC3]]
 ; CHECK-NEXT:    br i1 [[TMP13]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

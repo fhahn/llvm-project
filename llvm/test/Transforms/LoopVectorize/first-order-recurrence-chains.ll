@@ -811,8 +811,8 @@ define i64 @test_first_order_recurrences_and_induction(ptr %ptr, i64 %n) {
 ; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds i64, ptr [[PTR]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = add <4 x i64> [[TMP1]], splat (i64 10)
 ; CHECK-NEXT:    store <4 x i64> [[TMP4]], ptr [[TMP2]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[VEC_IND]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP5]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP20:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -875,8 +875,8 @@ define i64 @test_first_order_recurrences_and_induction2(ptr %ptr, i64 %n) {
 ; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds i64, ptr [[PTR]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = add <4 x i64> [[TMP1]], splat (i64 10)
 ; CHECK-NEXT:    store <4 x i64> [[TMP4]], ptr [[TMP2]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[VEC_IND]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP5]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP22:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -939,8 +939,8 @@ define ptr @test_first_order_recurrences_and_pointer_induction1(ptr %ptr, i64 %n
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds ptr, ptr [[PTR]], i64 [[INDEX]]
 ; CHECK-NEXT:    store <4 x ptr> [[TMP0]], ptr [[TMP3]], align 8
 ; CHECK-NEXT:    store <4 x ptr> [[TMP1]], ptr [[TMP3]], align 8
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[PTR_IND]] = getelementptr i8, ptr [[POINTER_PHI]], i64 16
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP5]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP24:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -1010,8 +1010,8 @@ define ptr @test_first_order_recurrences_and_pointer_induction2(ptr %ptr, i64 %n
 ; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds ptr, ptr [[PTR]], i64 [[INDEX1]]
 ; CHECK-NEXT:    store <4 x ptr> [[VECTOR_GEP]], ptr [[TMP2]], align 8
 ; CHECK-NEXT:    store <4 x ptr> [[TMP1]], ptr [[TMP2]], align 8
-; CHECK-NEXT:    [[INDEX_NEXT1]] = add nuw i64 [[INDEX1]], 4
 ; CHECK-NEXT:    [[PTR_IND]] = getelementptr i8, ptr [[POINTER_PHI]], i64 16
+; CHECK-NEXT:    [[INDEX_NEXT1]] = add nuw i64 [[INDEX1]], 4
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[INDEX_NEXT1]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP5]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP26:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

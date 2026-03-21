@@ -32,8 +32,8 @@ define void @foo(ptr nocapture %A) {
 ; CHECK-NEXT:    store i32 4, ptr [[TMP7]], align 4
 ; CHECK-NEXT:    store i32 4, ptr [[TMP9]], align 4
 ; CHECK-NEXT:    store i32 4, ptr [[TMP12]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <2 x i64> [[VEC_IND]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[INDEX_NEXT]], 10000
 ; CHECK-NEXT:    br i1 [[TMP10]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       middle.block:

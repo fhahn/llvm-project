@@ -29,13 +29,13 @@ define void @fminnum_with_any_of_cost(ptr %p) #0 {
 ; CHECK-NEXT:    [[TMP5]] = call <16 x float> @llvm.minnum.v16f32(<16 x float> [[VEC_PHI1]], <16 x float> [[WIDE_LOAD4]])
 ; CHECK-NEXT:    [[TMP6]] = call <16 x float> @llvm.minnum.v16f32(<16 x float> [[VEC_PHI2]], <16 x float> [[WIDE_LOAD5]])
 ; CHECK-NEXT:    [[TMP7]] = call <16 x float> @llvm.minnum.v16f32(<16 x float> [[VEC_PHI3]], <16 x float> [[WIDE_LOAD6]])
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 64
 ; CHECK-NEXT:    [[TMP8:%.*]] = fcmp uno <16 x float> [[WIDE_LOAD]], [[WIDE_LOAD4]]
 ; CHECK-NEXT:    [[TMP9:%.*]] = fcmp uno <16 x float> [[WIDE_LOAD5]], [[WIDE_LOAD6]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = freeze <16 x i1> [[TMP8]]
 ; CHECK-NEXT:    [[TMP11:%.*]] = freeze <16 x i1> [[TMP9]]
 ; CHECK-NEXT:    [[TMP12:%.*]] = or <16 x i1> [[TMP10]], [[TMP11]]
 ; CHECK-NEXT:    [[TMP13:%.*]] = call i1 @llvm.vector.reduce.or.v16i1(<16 x i1> [[TMP12]])
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 64
 ; CHECK-NEXT:    [[TMP14:%.*]] = icmp eq i64 [[INDEX_NEXT]], 128
 ; CHECK-NEXT:    [[TMP15:%.*]] = or i1 [[TMP13]], [[TMP14]]
 ; CHECK-NEXT:    br i1 [[TMP15]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]

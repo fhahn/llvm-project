@@ -25,8 +25,8 @@ define void @licm_replicate_call(double %x, ptr %dst) {
 ; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds double, ptr [[TMP8]], i64 2
 ; CHECK-NEXT:    store <2 x double> [[TMP6]], ptr [[TMP8]], align 8
 ; CHECK-NEXT:    store <2 x double> [[TMP7]], ptr [[TMP10]], align 8
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <2 x i32> [[STEP_ADD]], splat (i32 2)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP11:%.*]] = icmp eq i64 [[INDEX_NEXT]], 128
 ; CHECK-NEXT:    br i1 [[TMP11]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

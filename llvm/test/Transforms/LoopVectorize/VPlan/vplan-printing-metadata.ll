@@ -6,7 +6,6 @@ define void @test_widen_metadata(ptr noalias %A, ptr noalias %B, i32 %n) {
 ; CHECK-LABEL: VPlan for loop in 'test_widen_metadata'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
@@ -30,8 +29,7 @@ define void @test_widen_metadata(ptr noalias %A, ptr noalias %B, i32 %n) {
 ; CHECK-NEXT:      CLONE ir<%gep.B> = getelementptr inbounds ir<%B>, vp<[[VP4]]>
 ; CHECK-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer inbounds ir<%gep.B>
 ; CHECK-NEXT:      WIDEN store vp<[[VP6]]>, ir<%conv.back> (!tbaa !0)
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP3]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -87,7 +85,6 @@ define void @test_intrinsic_with_metadata(ptr noalias %A, ptr noalias %B, i32 %n
 ; CHECK-LABEL: VPlan for loop in 'test_intrinsic_with_metadata'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
@@ -109,8 +106,7 @@ define void @test_intrinsic_with_metadata(ptr noalias %A, ptr noalias %B, i32 %n
 ; CHECK-NEXT:      CLONE ir<%gep.B> = getelementptr inbounds ir<%B>, vp<[[VP4]]>
 ; CHECK-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer inbounds ir<%gep.B>
 ; CHECK-NEXT:      WIDEN store vp<[[VP6]]>, ir<%sqrt> (!tbaa !0)
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP3]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -161,7 +157,6 @@ define void @test_widen_with_multiple_metadata(ptr noalias %A, ptr noalias %B, i
 ; CHECK-LABEL: VPlan for loop in 'test_widen_with_multiple_metadata'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
@@ -185,8 +180,7 @@ define void @test_widen_with_multiple_metadata(ptr noalias %A, ptr noalias %B, i
 ; CHECK-NEXT:      CLONE ir<%gep.B> = getelementptr inbounds ir<%B>, vp<[[VP4]]>
 ; CHECK-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer inbounds ir<%gep.B>
 ; CHECK-NEXT:      WIDEN store vp<[[VP6]]>, ir<%conv.back> (!tbaa !0)
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP3]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block

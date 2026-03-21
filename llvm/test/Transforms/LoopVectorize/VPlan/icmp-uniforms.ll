@@ -13,7 +13,6 @@ target datalayout = "e-m:e-i64:64-i128:128-n32:64-S128"
 define i32 @more_than_one_use(ptr %a, i64 %n) {
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = original trip-count
 ; CHECK-EMPTY:
@@ -37,8 +36,7 @@ define i32 @more_than_one_use(ptr %a, i64 %n) {
 ; CHECK-NEXT:      REPLICATE ir<%tmp1> = getelementptr inbounds ir<%a>, ir<%tmp0>
 ; CHECK-NEXT:      REPLICATE ir<%tmp2> = load ir<%tmp1>
 ; CHECK-NEXT:      WIDEN ir<%tmp3> = add ir<%r>, ir<%tmp2>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP5]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP5]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -98,7 +96,6 @@ define void @test(ptr %ptr) {
 ; CHECK-LABEL: 'test'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in vp<[[VP3:%[0-9]+]]> = backedge-taken count
 ; CHECK-EMPTY:
@@ -136,8 +133,7 @@ define void @test(ptr %ptr) {
 ; CHECK-NEXT:    Successor(s): loop.0
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    loop.0:
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP4]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block

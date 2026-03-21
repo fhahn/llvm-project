@@ -97,9 +97,9 @@ TEST_F(VPVerifierTest, VPInstructionUseBeforeDefDifferentBB) {
 #if GTEST_HAS_STREAM_REDIRECTION
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   EXPECT_STREQ("Use before def!\n"
-               "  EMIT vp<%1> = sub vp<%3>, ir<0>\n"
+               "  EMIT vp<%1> = sub vp<%4>, ir<0>\n"
                "  before\n"
-               "  EMIT vp<%3> = add ir<0>, ir<0>\n",
+               "  EMIT vp<%4> = add ir<0>, ir<0>\n",
                ::testing::internal::GetCapturedStderr().c_str());
 #else
   EXPECT_STREQ("Use before def!\n",
@@ -146,9 +146,9 @@ TEST_F(VPVerifierTest, VPBlendUseBeforeDefDifferentBB) {
 #if GTEST_HAS_STREAM_REDIRECTION
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   EXPECT_STREQ("Use before def!\n"
-               "  BLEND ir<<badref>> = vp<%2>\n"
+               "  BLEND ir<<badref>> = vp<%3>\n"
                "  before\n"
-               "  EMIT vp<%2> = add ir<0>, ir<0>\n",
+               "  EMIT vp<%3> = add ir<0>, ir<0>\n",
                ::testing::internal::GetCapturedStderr().c_str());
 #else
   EXPECT_STREQ("Use before def!\n",

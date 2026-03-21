@@ -198,8 +198,8 @@ define void @uniform_gep_for_replicating_gep(ptr %dst) {
 ; CHECK-NEXT:    store i8 [[TMP12]], ptr [[TMP19]], align 1
 ; CHECK-NEXT:    store i8 [[TMP25]], ptr [[TMP21]], align 1
 ; CHECK-NEXT:    store i8 [[TMP26]], ptr [[TMP28]], align 1
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 8
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <2 x i32> [[STEP_ADD_3]], splat (i32 2)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 8
 ; CHECK-NEXT:    [[TMP24:%.*]] = icmp eq i32 [[INDEX_NEXT]], 128
 ; CHECK-NEXT:    br i1 [[TMP24]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

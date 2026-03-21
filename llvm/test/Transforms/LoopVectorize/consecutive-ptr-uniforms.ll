@@ -1309,8 +1309,8 @@ define i32 @pointer_iv_mixed(ptr %a, ptr %b, i64 %n) {
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP6]], align 8, !alias.scope [[META20:![0-9]+]]
 ; CHECK-NEXT:    [[TMP7]] = add <4 x i32> [[WIDE_LOAD]], [[VEC_PHI]]
 ; CHECK-NEXT:    store <4 x ptr> [[VECTOR_GEP]], ptr [[NEXT_GEP]], align 8, !alias.scope [[META23:![0-9]+]], !noalias [[META20]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[PTR_IND]] = getelementptr i8, ptr [[POINTER_PHI]], i64 16
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP8]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP25:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -1375,8 +1375,8 @@ define i32 @pointer_iv_mixed(ptr %a, ptr %b, i64 %n) {
 ; INTER-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP6]], align 8, !alias.scope [[META20:![0-9]+]]
 ; INTER-NEXT:    [[TMP7]] = add <4 x i32> [[WIDE_LOAD]], [[VEC_PHI]]
 ; INTER-NEXT:    store <4 x ptr> [[VECTOR_GEP]], ptr [[NEXT_GEP]], align 8, !alias.scope [[META23:![0-9]+]], !noalias [[META20]]
-; INTER-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; INTER-NEXT:    [[PTR_IND]] = getelementptr i8, ptr [[POINTER_PHI]], i64 16
+; INTER-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; INTER-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; INTER-NEXT:    br i1 [[TMP8]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP25:![0-9]+]]
 ; INTER:       [[MIDDLE_BLOCK]]:
@@ -1597,8 +1597,8 @@ define void @pr61396_pointer_used_as_both_stored_value_and_pointer_operand_by_st
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds ptr, ptr [[ARY]], <4 x i64> [[VEC_IND]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = extractelement <4 x ptr> [[TMP0]], i64 0
 ; CHECK-NEXT:    store <4 x ptr> [[TMP0]], ptr [[TMP1]], align 8
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[VEC_IND]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP2:%.*]] = icmp eq i64 [[INDEX_NEXT]], 10240
 ; CHECK-NEXT:    br i1 [[TMP2]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP34:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -1627,8 +1627,8 @@ define void @pr61396_pointer_used_as_both_stored_value_and_pointer_operand_by_st
 ; INTER-NEXT:    [[TMP0:%.*]] = getelementptr inbounds ptr, ptr [[ARY]], <4 x i64> [[VEC_IND]]
 ; INTER-NEXT:    [[TMP1:%.*]] = extractelement <4 x ptr> [[TMP0]], i64 0
 ; INTER-NEXT:    store <4 x ptr> [[TMP0]], ptr [[TMP1]], align 8
-; INTER-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; INTER-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[VEC_IND]], splat (i64 4)
+; INTER-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; INTER-NEXT:    [[TMP2:%.*]] = icmp eq i64 [[INDEX_NEXT]], 10240
 ; INTER-NEXT:    br i1 [[TMP2]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP34:![0-9]+]]
 ; INTER:       [[MIDDLE_BLOCK]]:

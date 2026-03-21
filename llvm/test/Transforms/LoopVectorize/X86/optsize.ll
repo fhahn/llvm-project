@@ -25,8 +25,8 @@ define i32 @foo_optsize() #0 {
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq <64 x i8> [[WIDE_MASKED_LOAD]], zeroinitializer
 ; CHECK-NEXT:    [[TMP5:%.*]] = select <64 x i1> [[TMP4]], <64 x i8> splat (i8 2), <64 x i8> splat (i8 1)
 ; CHECK-NEXT:    call void @llvm.masked.store.v64i8.p0(<64 x i8> [[TMP5]], ptr align 1 [[TMP2]], <64 x i1> [[TMP1]])
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 64
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <64 x i8> [[VEC_IND]], splat (i8 64)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 64
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i32 [[INDEX_NEXT]], 256
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -49,8 +49,8 @@ define i32 @foo_optsize() #0 {
 ; AUTOVF-NEXT:    [[TMP4:%.*]] = icmp eq <32 x i8> [[WIDE_MASKED_LOAD]], zeroinitializer
 ; AUTOVF-NEXT:    [[TMP5:%.*]] = select <32 x i1> [[TMP4]], <32 x i8> splat (i8 2), <32 x i8> splat (i8 1)
 ; AUTOVF-NEXT:    call void @llvm.masked.store.v32i8.p0(<32 x i8> [[TMP5]], ptr align 1 [[TMP2]], <32 x i1> [[TMP1]])
-; AUTOVF-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 32
 ; AUTOVF-NEXT:    [[VEC_IND_NEXT]] = add nuw <32 x i8> [[VEC_IND]], splat (i8 32)
+; AUTOVF-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 32
 ; AUTOVF-NEXT:    [[TMP6:%.*]] = icmp eq i32 [[INDEX_NEXT]], 224
 ; AUTOVF-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; AUTOVF:       [[MIDDLE_BLOCK]]:
@@ -95,8 +95,8 @@ define i32 @foo_minsize() #1 {
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq <64 x i8> [[WIDE_MASKED_LOAD]], zeroinitializer
 ; CHECK-NEXT:    [[TMP5:%.*]] = select <64 x i1> [[TMP4]], <64 x i8> splat (i8 2), <64 x i8> splat (i8 1)
 ; CHECK-NEXT:    call void @llvm.masked.store.v64i8.p0(<64 x i8> [[TMP5]], ptr align 1 [[TMP2]], <64 x i1> [[TMP1]])
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 64
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <64 x i8> [[VEC_IND]], splat (i8 64)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 64
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i32 [[INDEX_NEXT]], 256
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -119,8 +119,8 @@ define i32 @foo_minsize() #1 {
 ; AUTOVF-NEXT:    [[TMP5:%.*]] = icmp eq <16 x i8> [[WIDE_MASKED_LOAD]], zeroinitializer
 ; AUTOVF-NEXT:    [[TMP3:%.*]] = select <16 x i1> [[TMP5]], <16 x i8> splat (i8 2), <16 x i8> splat (i8 1)
 ; AUTOVF-NEXT:    call void @llvm.masked.store.v16i8.p0(<16 x i8> [[TMP3]], ptr align 1 [[TMP2]], <16 x i1> [[TMP0]])
-; AUTOVF-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 16
 ; AUTOVF-NEXT:    [[VEC_IND_NEXT]] = add nuw <16 x i8> [[VEC_IND]], splat (i8 16)
+; AUTOVF-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 16
 ; AUTOVF-NEXT:    [[TMP4:%.*]] = icmp eq i32 [[INDEX_NEXT]], 208
 ; AUTOVF-NEXT:    br i1 [[TMP4]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
 ; AUTOVF:       [[MIDDLE_BLOCK]]:
@@ -168,8 +168,8 @@ define void @scev4stride1(ptr noalias nocapture %a, ptr noalias nocapture readon
 ; CHECK-NEXT:    [[WIDE_MASKED_GATHER:%.*]] = call <64 x i32> @llvm.masked.gather.v64i32.v64p0(<64 x ptr> align 4 [[TMP2]], <64 x i1> splat (i1 true), <64 x i32> poison)
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i32, ptr [[A]], i32 [[INDEX]]
 ; CHECK-NEXT:    store <64 x i32> [[WIDE_MASKED_GATHER]], ptr [[TMP3]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 64
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <64 x i32> [[VEC_IND]], splat (i32 64)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 64
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i32 [[INDEX_NEXT]], 256
 ; CHECK-NEXT:    br i1 [[TMP5]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -193,8 +193,8 @@ define void @scev4stride1(ptr noalias nocapture %a, ptr noalias nocapture readon
 ; AUTOVF-NEXT:    [[WIDE_MASKED_GATHER:%.*]] = call <8 x i32> @llvm.masked.gather.v8i32.v8p0(<8 x ptr> align 4 [[TMP2]], <8 x i1> splat (i1 true), <8 x i32> poison)
 ; AUTOVF-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i32, ptr [[A]], i32 [[INDEX]]
 ; AUTOVF-NEXT:    store <8 x i32> [[WIDE_MASKED_GATHER]], ptr [[TMP3]], align 4
-; AUTOVF-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 8
 ; AUTOVF-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <8 x i32> [[VEC_IND]], splat (i32 8)
+; AUTOVF-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 8
 ; AUTOVF-NEXT:    [[TMP5:%.*]] = icmp eq i32 [[INDEX_NEXT]], 256
 ; AUTOVF-NEXT:    br i1 [[TMP5]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; AUTOVF:       [[MIDDLE_BLOCK]]:
@@ -347,9 +347,9 @@ define void @tail_folded_store_avx512(ptr %start, ptr %end) #3 {
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr [[POINTER_PHI]], <64 x i32> <i32 0, i32 -72, i32 -144, i32 -216, i32 -288, i32 -360, i32 -432, i32 -504, i32 -576, i32 -648, i32 -720, i32 -792, i32 -864, i32 -936, i32 -1008, i32 -1080, i32 -1152, i32 -1224, i32 -1296, i32 -1368, i32 -1440, i32 -1512, i32 -1584, i32 -1656, i32 -1728, i32 -1800, i32 -1872, i32 -1944, i32 -2016, i32 -2088, i32 -2160, i32 -2232, i32 -2304, i32 -2376, i32 -2448, i32 -2520, i32 -2592, i32 -2664, i32 -2736, i32 -2808, i32 -2880, i32 -2952, i32 -3024, i32 -3096, i32 -3168, i32 -3240, i32 -3312, i32 -3384, i32 -3456, i32 -3528, i32 -3600, i32 -3672, i32 -3744, i32 -3816, i32 -3888, i32 -3960, i32 -4032, i32 -4104, i32 -4176, i32 -4248, i32 -4320, i32 -4392, i32 -4464, i32 -4536>
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp ule <64 x i32> [[VEC_IV]], [[BROADCAST_SPLAT4]]
 ; CHECK-NEXT:    call void @llvm.masked.scatter.v64p0.v64p0(<64 x ptr> splat (ptr null), <64 x ptr> align 8 [[TMP5]], <64 x i1> [[TMP6]])
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 64
 ; CHECK-NEXT:    [[PTR_IND]] = getelementptr i8, ptr [[POINTER_PHI]], i32 -4608
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <64 x i32> [[VEC_IV]], splat (i32 64)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 64
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP7]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -382,9 +382,9 @@ define void @tail_folded_store_avx512(ptr %start, ptr %end) #3 {
 ; AUTOVF-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr [[POINTER_PHI]], <8 x i32> <i32 0, i32 -72, i32 -144, i32 -216, i32 -288, i32 -360, i32 -432, i32 -504>
 ; AUTOVF-NEXT:    [[TMP6:%.*]] = icmp ule <8 x i32> [[VEC_IV]], [[BROADCAST_SPLAT4]]
 ; AUTOVF-NEXT:    call void @llvm.masked.scatter.v8p0.v8p0(<8 x ptr> splat (ptr null), <8 x ptr> align 8 [[TMP5]], <8 x i1> [[TMP6]])
-; AUTOVF-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 8
 ; AUTOVF-NEXT:    [[PTR_IND]] = getelementptr i8, ptr [[POINTER_PHI]], i32 -576
 ; AUTOVF-NEXT:    [[VEC_IND_NEXT]] = add nuw <8 x i32> [[VEC_IV]], splat (i32 8)
+; AUTOVF-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 8
 ; AUTOVF-NEXT:    [[TMP7:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; AUTOVF-NEXT:    br i1 [[TMP7]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
 ; AUTOVF:       [[MIDDLE_BLOCK]]:

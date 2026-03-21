@@ -9,8 +9,7 @@ define void @pick_wide_call(ptr noalias %in.ptr, ptr noalias %out.ptr) {
 ; CHECK-LABEL: VPlan for loop in 'pick_wide_call'
 ; CHECK:  VPlan ' for UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
-; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
+; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<1000> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
@@ -20,21 +19,20 @@ define void @pick_wide_call(ptr noalias %in.ptr, ptr noalias %out.ptr) {
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {
-; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
+; CHECK-NEXT:  vp<[[VP2:%[0-9]+]]> = CANONICAL-IV vp<[[VP3:%[0-9]+]]> (VF * UF)
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION nuw nsw ir<0>, ir<1>, vp<[[VP0]]>
 ; CHECK-NEXT:      CLONE ir<%in.gep> = getelementptr inbounds ir<%in.ptr>, ir<%iv>
-; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = vector-pointer inbounds ir<%in.gep>
+; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = vector-pointer inbounds ir<%in.gep>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%in> = load vp<[[VP4]]>
 ; CHECK-NEXT:      WIDEN-CALL ir<%call> = call  @acos(ir<%in>) (using library function: _ZGVnN2v_acos)
 ; CHECK-NEXT:      CLONE ir<%out.gep> = getelementptr inbounds ir<%out.ptr>, ir<%iv>
-; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds ir<%out.gep>
+; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds ir<%out.gep>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP5]]>, ir<%call>
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add nuw nsw ir<%iv>, ir<1>
 ; CHECK-NEXT:      CLONE ir<%exitcond> = icmp eq ir<%iv.next>, ir<1000>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP2]]>, vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -63,8 +61,7 @@ define void @pick_intrinsic_call(ptr noalias %in.ptr, ptr noalias %out.ptr) {
 ; CHECK-LABEL: VPlan for loop in 'pick_intrinsic_call'
 ; CHECK:  VPlan ' for UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
-; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
+; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<1000> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
@@ -74,21 +71,20 @@ define void @pick_intrinsic_call(ptr noalias %in.ptr, ptr noalias %out.ptr) {
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {
-; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
+; CHECK-NEXT:  vp<[[VP2:%[0-9]+]]> = CANONICAL-IV vp<[[VP3:%[0-9]+]]> (VF * UF)
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION nuw nsw ir<0>, ir<1>, vp<[[VP0]]>
 ; CHECK-NEXT:      CLONE ir<%in.gep> = getelementptr inbounds ir<%in.ptr>, ir<%iv>
-; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = vector-pointer inbounds ir<%in.gep>
+; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = vector-pointer inbounds ir<%in.gep>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%in> = load vp<[[VP4]]>
 ; CHECK-NEXT:      WIDEN-INTRINSIC ir<%call> = call llvm.umin(ir<100>, ir<%in>)
 ; CHECK-NEXT:      CLONE ir<%out.gep> = getelementptr inbounds ir<%out.ptr>, ir<%iv>
-; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds ir<%out.gep>
+; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds ir<%out.gep>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP5]]>, ir<%call>
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add nuw nsw ir<%iv>, ir<1>
 ; CHECK-NEXT:      CLONE ir<%exitcond> = icmp eq ir<%iv.next>, ir<1000>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP2]]>, vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block

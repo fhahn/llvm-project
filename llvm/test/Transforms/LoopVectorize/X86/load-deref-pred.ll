@@ -54,8 +54,8 @@ define i32 @test_explicit_pred(i64 %len) {
 ; CHECK-NEXT:    [[TMP17]] = add <4 x i32> [[VEC_PHI4]], [[PREDPHI10]]
 ; CHECK-NEXT:    [[TMP18]] = add <4 x i32> [[VEC_PHI5]], [[PREDPHI11]]
 ; CHECK-NEXT:    [[TMP19]] = add <4 x i32> [[VEC_PHI6]], [[PREDPHI12]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 16
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i64> [[STEP_ADD2]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 16
 ; CHECK-NEXT:    [[TMP20:%.*]] = icmp eq i64 [[INDEX_NEXT]], 4096
 ; CHECK-NEXT:    br i1 [[TMP20]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       middle.block:

@@ -31,8 +31,8 @@ define void @widen_call_instruction(ptr noalias nocapture readonly %a.in, ptr no
 ; CHECK:       [[VECTOR_LATCH]]:
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds double, ptr [[C_OUT]], <4 x i64> [[VEC_IND]]
 ; CHECK-NEXT:    call void @llvm.masked.scatter.v4f64.v4p0(<4 x double> [[TMP3]], <4 x ptr> align 8 [[TMP7]], <4 x i1> splat (i1 true))
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[VEC_IND]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1000
 ; CHECK-NEXT:    br i1 [[TMP8]], label %[[FOR1_HEADER:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[FOR1_HEADER]]:

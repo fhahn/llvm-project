@@ -425,8 +425,8 @@ define double @test_multiple_iv_live_outs(ptr %dst, i64 %N, i64 %i, i64 %start) 
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x double> [ <double 0.000000e+00, double 2.500000e+00, double 5.000000e+00, double 7.500000e+00>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr double, ptr [[DST]], i64 [[INDEX]]
 ; CHECK-NEXT:    store <4 x double> [[VEC_IND]], ptr [[TMP4]], align 8
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = fadd fast <4 x double> [[VEC_IND]], splat (double 1.000000e+01)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP5]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP15:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -456,8 +456,8 @@ define double @test_multiple_iv_live_outs(ptr %dst, i64 %N, i64 %i, i64 %start) 
 ; CHECK-NEXT:    [[VEC_IND7:%.*]] = phi <2 x double> [ [[INDUCTION]], %[[VEC_EPILOG_PH]] ], [ [[VEC_IND_NEXT9:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr double, ptr [[DST]], i64 [[INDEX6]]
 ; CHECK-NEXT:    store <2 x double> [[VEC_IND7]], ptr [[TMP11]], align 8
-; CHECK-NEXT:    [[INDEX_NEXT8]] = add nuw i64 [[INDEX6]], 2
 ; CHECK-NEXT:    [[VEC_IND_NEXT9]] = fadd fast <2 x double> [[VEC_IND7]], splat (double 5.000000e+00)
+; CHECK-NEXT:    [[INDEX_NEXT8]] = add nuw i64 [[INDEX6]], 2
 ; CHECK-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[INDEX_NEXT8]], [[N_VEC4]]
 ; CHECK-NEXT:    br i1 [[TMP12]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP16:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_MIDDLE_BLOCK]]:

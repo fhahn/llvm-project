@@ -87,8 +87,8 @@ define void @gep_use_outside_loop(ptr noalias %dst, ptr %src) {
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i16>, ptr [[TMP2]], align 2
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp ne <4 x i16> [[WIDE_LOAD]], splat (i16 10)
 ; CHECK-NEXT:    call void @llvm.masked.store.v4i16.p0(<4 x i16> zeroinitializer, ptr align 2 [[TMP6]], <4 x i1> [[TMP5]])
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP0]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i64> [[VEC_IND]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP0]], 4
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[INDEX_NEXT]], 96
 ; CHECK-NEXT:    br i1 [[TMP8]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

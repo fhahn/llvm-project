@@ -10,7 +10,6 @@
 
 define void @vector_reverse_i64(ptr nocapture noundef writeonly %A, ptr nocapture noundef readonly %B, i32 noundef signext %n) {
 ; CHECK: VPlan 'Initial VPlan for VF={vscale x 1,vscale x 2,vscale x 4},UF={1}' {
-; CHECK-NEXT: Live-in vp<[[VFxUF:%.+]]> = VF * UF
 ; CHECK-NEXT: Live-in vp<[[VTC:%.+]]> = vector-trip-count
 ; CHECK-NEXT: vp<[[OTC:%.+]]> = original trip-count
 ; CHECK-EMPTY:
@@ -43,8 +42,7 @@ define void @vector_reverse_i64(ptr nocapture noundef writeonly %A, ptr nocaptur
 ; CHECK-NEXT:     WIDEN vp.store vp<[[VEC_END_PTR_A]]>, vp<[[STORE_VAL]]>, vp<[[EVL]]>
 ; CHECK-NEXT:     EMIT vp<[[IV_NEXT]]> = add vp<[[EVL]]>, vp<[[EVL_PHI]]>
 ; CHECK-NEXT:     EMIT vp<[[AVL_NEXT]]> = sub nuw vp<[[AVL]]>, vp<[[EVL]]>
-; CHECK-NEXT:     EMIT vp<[[INDEX_NEXT:%.+]]> = add vp<[[INDUCTION]]>, vp<[[VFxUF]]>
-; CHECK-NEXT:     EMIT branch-on-count vp<[[INDEX_NEXT]]>, vp<[[VTC]]>
+; CHECK-NEXT:     EMIT branch-on-count vp<[[EVL_PHI]]>, vp<{{[^>]+}}>, vp<[[VTC]]>
 ; CHECK-NEXT:   No successors
 ; CHECK-NEXT: }
 ; CHECK-NEXT: Successor(s): middle.block

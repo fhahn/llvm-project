@@ -433,8 +433,8 @@ define void @drop_zext_nneg(ptr noalias %p, ptr noalias %p1) #0 {
 ; CHECK-NEXT:    [[PREDPHI:%.*]] = select <4 x i1> [[TMP0]], <4 x double> [[WIDE_MASKED_LOAD]], <4 x double> zeroinitializer
 ; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <4 x double> [[PREDPHI]], i64 3
 ; CHECK-NEXT:    store double [[TMP5]], ptr [[P1]], align 8
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1024
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP1:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

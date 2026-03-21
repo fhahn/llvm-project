@@ -36,8 +36,8 @@ define void @test_assume(ptr %arr, i64 %n) {
 ; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <2 x i1> [[TMP5]], i64 0
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[VECTOR_LATCH]], label %[[INNER1]]
 ; CHECK:       [[VECTOR_LATCH]]:
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <2 x i64> [[VEC_IND]], splat (i64 2)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP7]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -130,8 +130,8 @@ define void @test_assume_non_canonical_iv(ptr %arr, i64 %n) {
 ; CHECK-NEXT:    [[TMP12:%.*]] = extractelement <2 x i1> [[TMP11]], i64 0
 ; CHECK-NEXT:    br i1 [[TMP12]], label %[[VECTOR_LATCH]], label %[[INNER1]]
 ; CHECK:       [[VECTOR_LATCH]]:
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <2 x i64> [[VEC_IND]], splat (i64 6)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP13:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP13]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -139,11 +139,11 @@ define void @test_assume_non_canonical_iv(ptr %arr, i64 %n) {
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:
 ; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ]
-; CHECK-NEXT:    [[BC_RESUME_VAL2:%.*]] = phi i64 [ [[TMP1]], %[[MIDDLE_BLOCK]] ], [ 10, %[[ENTRY]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL3:%.*]] = phi i64 [ [[TMP1]], %[[MIDDLE_BLOCK]] ], [ 10, %[[ENTRY]] ]
 ; CHECK-NEXT:    br label %[[OUTER_HEADER:.*]]
 ; CHECK:       [[OUTER_HEADER]]:
 ; CHECK-NEXT:    [[J:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[J_NEXT:%.*]], %[[OUTER_LATCH:.*]] ]
-; CHECK-NEXT:    [[M:%.*]] = phi i64 [ [[BC_RESUME_VAL2]], %[[SCALAR_PH]] ], [ [[M_NEXT:%.*]], %[[OUTER_LATCH]] ]
+; CHECK-NEXT:    [[M:%.*]] = phi i64 [ [[BC_RESUME_VAL3]], %[[SCALAR_PH]] ], [ [[M_NEXT:%.*]], %[[OUTER_LATCH]] ]
 ; CHECK-NEXT:    [[M_NEXT]] = add i64 [[M]], 3
 ; CHECK-NEXT:    [[CMP:%.*]] = icmp sge i64 [[M]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[CMP]])
@@ -227,8 +227,8 @@ define void @test_lifetime(ptr %arr, i64 %n) {
 ; CHECK-NEXT:    br i1 [[TMP5]], label %[[VECTOR_LATCH]], label %[[INNER1]]
 ; CHECK:       [[VECTOR_LATCH]]:
 ; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[A]])
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <2 x i64> [[VEC_IND]], splat (i64 2)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -312,8 +312,8 @@ define void @test_sideeffect(ptr %arr, i64 %n) {
 ; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <2 x i1> [[TMP4]], i64 0
 ; CHECK-NEXT:    br i1 [[TMP5]], label %[[VECTOR_LATCH]], label %[[INNER1]]
 ; CHECK:       [[VECTOR_LATCH]]:
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <2 x i64> [[VEC_IND]], splat (i64 2)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP9:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -396,8 +396,8 @@ define void @test_pseudoprobe(ptr %arr, i64 %n) {
 ; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <2 x i1> [[TMP4]], i64 0
 ; CHECK-NEXT:    br i1 [[TMP5]], label %[[VECTOR_LATCH]], label %[[INNER1]]
 ; CHECK:       [[VECTOR_LATCH]]:
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <2 x i64> [[VEC_IND]], splat (i64 2)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP11:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

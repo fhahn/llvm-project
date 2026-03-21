@@ -85,8 +85,8 @@ define void @expand(ptr %src, ptr %dst, i64 %0) {
 ; CHECK-NEXT:    store double 0.000000e+00, ptr [[TMP35]], align 8, !alias.scope [[META3]]
 ; CHECK-NEXT:    store double 0.000000e+00, ptr [[TMP42]], align 8, !alias.scope [[META3]]
 ; CHECK-NEXT:    store double 0.000000e+00, ptr [[TMP37]], align 8, !alias.scope [[META3]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i64> [[VEC_IND]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP38:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP38]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

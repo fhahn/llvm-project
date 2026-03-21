@@ -85,9 +85,9 @@ define i64 @second_lshr_operand_zero_via_scev() {
 ; CHECK-NEXT:    [[TMP9:%.*]] = select <2 x i1> [[TMP1]], <2 x i64> [[TMP3]], <2 x i64> [[TMP7]]
 ; CHECK-NEXT:    [[TMP10]] = or <2 x i64> [[TMP8]], [[VEC_PHI]]
 ; CHECK-NEXT:    [[TMP11]] = or <2 x i64> [[TMP9]], [[VEC_PHI1]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <2 x i64> [[STEP_ADD]], splat (i64 2)
 ; CHECK-NEXT:    [[VEC_IND_NEXT3]] = add <2 x i32> [[STEP_ADD4]], splat (i32 2)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1000
 ; CHECK-NEXT:    br i1 [[TMP12]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

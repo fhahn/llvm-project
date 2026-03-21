@@ -38,8 +38,8 @@ define void @test1_pr58811(ptr %dst) {
 ; VF2-NEXT:    [[OFFSET_IDX:%.*]] = trunc i32 [[INDEX]] to i16
 ; VF2-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i32, ptr [[DST]], i16 [[OFFSET_IDX]]
 ; VF2-NEXT:    store <2 x i32> [[VEC_IND]], ptr [[TMP5]], align 4
-; VF2-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; VF2-NEXT:    [[VEC_IND_NEXT]] = add <2 x i32> [[VEC_IND]], [[BROADCAST_SPLAT2]]
+; VF2-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; VF2-NEXT:    [[TMP6:%.*]] = icmp eq i32 [[INDEX_NEXT]], 198
 ; VF2-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; VF2:       [[MIDDLE_BLOCK]]:
@@ -100,8 +100,8 @@ define void @test1_pr58811(ptr %dst) {
 ; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = trunc i32 [[INDEX]] to i16
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i32, ptr [[DST]], i16 [[OFFSET_IDX]]
 ; CHECK-NEXT:    store <4 x i32> [[VEC_IND]], ptr [[TMP5]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], [[BROADCAST_SPLAT2]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP2:%.*]] = icmp eq i32 [[INDEX_NEXT]], 196
 ; CHECK-NEXT:    br i1 [[TMP2]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -208,8 +208,8 @@ define void @test2_pr58811(ptr %dst) {
 ; VF2-NEXT:    [[OFFSET_IDX:%.*]] = trunc i32 [[INDEX]] to i16
 ; VF2-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i32, ptr [[DST]], i16 [[OFFSET_IDX]]
 ; VF2-NEXT:    store <2 x i32> [[VEC_IND]], ptr [[TMP5]], align 4
-; VF2-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; VF2-NEXT:    [[VEC_IND_NEXT]] = add <2 x i32> [[VEC_IND]], [[BROADCAST_SPLAT2]]
+; VF2-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; VF2-NEXT:    [[TMP6:%.*]] = icmp eq i32 [[INDEX_NEXT]], 198
 ; VF2-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; VF2:       [[MIDDLE_BLOCK]]:
@@ -272,8 +272,8 @@ define void @test2_pr58811(ptr %dst) {
 ; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = trunc i32 [[INDEX]] to i16
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i32, ptr [[DST]], i16 [[OFFSET_IDX]]
 ; CHECK-NEXT:    store <4 x i32> [[VEC_IND]], ptr [[TMP5]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], [[BROADCAST_SPLAT2]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP2:%.*]] = icmp eq i32 [[INDEX_NEXT]], 196
 ; CHECK-NEXT:    br i1 [[TMP2]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -362,8 +362,8 @@ define void @test3_pr58811(ptr %dst) {
 ; VF2-NEXT:    [[OFFSET_IDX:%.*]] = trunc i32 [[INDEX]] to i16
 ; VF2-NEXT:    [[TMP7:%.*]] = getelementptr inbounds i32, ptr [[DST]], i16 [[OFFSET_IDX]]
 ; VF2-NEXT:    store <2 x i32> [[VEC_IND]], ptr [[TMP7]], align 4
-; VF2-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; VF2-NEXT:    [[VEC_IND_NEXT]] = add <2 x i32> [[VEC_IND]], [[BROADCAST_SPLAT2]]
+; VF2-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; VF2-NEXT:    [[TMP22:%.*]] = icmp eq i32 [[INDEX_NEXT]], 198
 ; VF2-NEXT:    br i1 [[TMP22]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; VF2:       [[MIDDLE_BLOCK]]:
@@ -423,8 +423,8 @@ define void @test3_pr58811(ptr %dst) {
 ; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = trunc i32 [[INDEX]] to i16
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds i32, ptr [[DST]], i16 [[OFFSET_IDX]]
 ; CHECK-NEXT:    store <4 x i32> [[VEC_IND]], ptr [[TMP7]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], [[BROADCAST_SPLAT2]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq i32 [[INDEX_NEXT]], 196
 ; CHECK-NEXT:    br i1 [[TMP4]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

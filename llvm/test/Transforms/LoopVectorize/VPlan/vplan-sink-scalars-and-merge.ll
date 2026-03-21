@@ -12,7 +12,6 @@ define void @sink1(i32 %k, i32 %x) {
 ; CHECK-LABEL: VPlan for loop in 'sink1'
 ; CHECK:  VPlan 'Initial VPlan for VF={2},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in vp<[[VP3:%[0-9]+]]> = backedge-taken count
 ; CHECK-EMPTY:
@@ -72,8 +71,7 @@ define void @sink1(i32 %k, i32 %x) {
 ; CHECK-NEXT:    Successor(s): if.1
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    if.1:
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP5]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP5]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -125,7 +123,6 @@ define void @sink2(i32 %k) {
 ; CHECK-LABEL: VPlan for loop in 'sink2'
 ; CHECK:  VPlan 'Initial VPlan for VF={2},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in vp<[[VP3:%[0-9]+]]> = backedge-taken count
 ; CHECK-EMPTY:
@@ -183,8 +180,7 @@ define void @sink2(i32 %k) {
 ; CHECK-NEXT:    Successor(s): loop.1
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    loop.1:
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP5]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP5]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -238,7 +234,6 @@ define void @sink3(i32 %k) {
 ; CHECK-LABEL: VPlan for loop in 'sink3'
 ; CHECK:  VPlan 'Initial VPlan for VF={2},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in vp<[[VP3:%[0-9]+]]> = backedge-taken count
 ; CHECK-EMPTY:
@@ -296,8 +291,7 @@ define void @sink3(i32 %k) {
 ; CHECK-NEXT:    Successor(s): loop.1
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    loop.1:
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP5]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP5]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -352,7 +346,6 @@ define void @uniform_gep(i64 %k, ptr noalias %A, ptr noalias %B) {
 ; CHECK-LABEL: VPlan for loop in 'uniform_gep'
 ; CHECK:  VPlan 'Initial VPlan for VF={2},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in vp<[[VP3:%[0-9]+]]> = backedge-taken count
 ; CHECK-EMPTY:
@@ -392,8 +385,7 @@ define void @uniform_gep(i64 %k, ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    Successor(s): loop.then.0
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    loop.then.0:
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP4]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -444,7 +436,6 @@ define void @pred_cfg1(i32 %k, i32 %j) {
 ; CHECK-LABEL: VPlan for loop in 'pred_cfg1'
 ; CHECK:  VPlan 'Initial VPlan for VF={2},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in vp<[[VP3:%[0-9]+]]> = backedge-taken count
 ; CHECK-EMPTY:
@@ -504,8 +495,7 @@ define void @pred_cfg1(i32 %k, i32 %j) {
 ; CHECK-NEXT:    Successor(s): next.0.1
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    next.0.1:
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP5]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP5]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -562,7 +552,6 @@ define void @pred_cfg2(i32 %k, i32 %j) {
 ; CHECK-LABEL: VPlan for loop in 'pred_cfg2'
 ; CHECK:  VPlan 'Initial VPlan for VF={2},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in vp<[[VP3:%[0-9]+]]> = backedge-taken count
 ; CHECK-EMPTY:
@@ -624,8 +613,7 @@ define void @pred_cfg2(i32 %k, i32 %j) {
 ; CHECK-NEXT:    Successor(s): then.1.1
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    then.1.1:
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP5]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP5]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -690,7 +678,6 @@ define void @pred_cfg3(i32 %k, i32 %j) {
 ; CHECK-LABEL: VPlan for loop in 'pred_cfg3'
 ; CHECK:  VPlan 'Initial VPlan for VF={2},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in vp<[[VP3:%[0-9]+]]> = backedge-taken count
 ; CHECK-EMPTY:
@@ -753,8 +740,7 @@ define void @pred_cfg3(i32 %k, i32 %j) {
 ; CHECK-NEXT:    Successor(s): then.1.2
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    then.1.2:
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP5]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP5]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -818,7 +804,6 @@ define void @merge_3_replicate_region(i32 %k, i32 %j) {
 ; CHECK-LABEL: VPlan for loop in 'merge_3_replicate_region'
 ; CHECK:  VPlan 'Initial VPlan for VF={2},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in vp<[[VP3:%[0-9]+]]> = backedge-taken count
 ; CHECK-EMPTY:
@@ -883,8 +868,7 @@ define void @merge_3_replicate_region(i32 %k, i32 %j) {
 ; CHECK-NEXT:    Successor(s): then.0.4
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    then.0.4:
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP5]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP5]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -948,7 +932,6 @@ define void @update_2_uses_in_same_recipe_in_merged_block(i32 %k) {
 ; CHECK-LABEL: VPlan for loop in 'update_2_uses_in_same_recipe_in_merged_block'
 ; CHECK:  VPlan 'Initial VPlan for VF={2},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in vp<[[VP3:%[0-9]+]]> = backedge-taken count
 ; CHECK-EMPTY:
@@ -986,8 +969,7 @@ define void @update_2_uses_in_same_recipe_in_merged_block(i32 %k) {
 ; CHECK-NEXT:    Successor(s): loop.2
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    loop.2:
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP5]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP5]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -1037,7 +1019,6 @@ define void @recipe_in_merge_candidate_used_by_first_order_recurrence(i32 %k) {
 ; CHECK-LABEL: VPlan for loop in 'recipe_in_merge_candidate_used_by_first_order_recurrence'
 ; CHECK:  VPlan 'Initial VPlan for VF={2},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in vp<[[VP3:%[0-9]+]]> = backedge-taken count
 ; CHECK-EMPTY:
@@ -1094,8 +1075,7 @@ define void @recipe_in_merge_candidate_used_by_first_order_recurrence(i32 %k) {
 ; CHECK-NEXT:    Successor(s): loop.2
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    loop.2:
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP5]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP5]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -1146,7 +1126,6 @@ exit:
 define void @update_multiple_users(ptr noalias %src, ptr noalias %dst, i1 %c) {
 ; CHECK-LABEL: VPlan for loop in 'update_multiple_users'
 ; CHECK:  VPlan 'Initial VPlan for VF={2},UF>=1' {
-; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<999> = original trip-count
 ; CHECK-EMPTY:
@@ -1181,8 +1160,7 @@ define void @update_multiple_users(ptr noalias %src, ptr noalias %dst, i1 %c) {
 ; CHECK-NEXT:    Successor(s): loop.then.1
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    loop.then.1:
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP2]]>, vp<[[VP0]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP2]]>, vp<{{[^>]+}}>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -1233,7 +1211,6 @@ define void @sinking_requires_duplication(ptr %addr) {
 ; CHECK-LABEL: VPlan for loop in 'sinking_requires_duplication'
 ; CHECK:  VPlan 'Initial VPlan for VF={2},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
@@ -1270,8 +1247,7 @@ define void @sinking_requires_duplication(ptr %addr) {
 ; CHECK-NEXT:    Successor(s): then.0
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    then.0:
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP3]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -1322,7 +1298,6 @@ define void @merge_with_dead_gep_between_regions(i32 %n, i32 %k, ptr noalias %sr
 ; CHECK-LABEL: VPlan for loop in 'merge_with_dead_gep_between_regions'
 ; CHECK:  VPlan 'Initial VPlan for VF={2},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
@@ -1361,8 +1336,7 @@ define void @merge_with_dead_gep_between_regions(i32 %n, i32 %k, ptr noalias %sr
 ; CHECK-NEXT:    Successor(s): loop.then.1
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    loop.then.1:
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP4]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
@@ -1415,7 +1389,6 @@ define void @ptr_induction_remove_dead_recipe(ptr %start, ptr %end) {
 ; CHECK-LABEL: VPlan for loop in 'ptr_induction_remove_dead_recipe'
 ; CHECK:  VPlan 'Initial VPlan for VF={2},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = original trip-count
 ; CHECK-EMPTY:
@@ -1457,8 +1430,7 @@ define void @ptr_induction_remove_dead_recipe(ptr %start, ptr %end) {
 ; CHECK-NEXT:    Successor(s): if.then.0
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    if.then.0:
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP5]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP5]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block

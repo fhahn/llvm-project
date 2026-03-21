@@ -125,8 +125,8 @@ define void @addrspacecast_in_ptr_chain(ptr addrspace(1) %src, ptr noalias %dst)
 ; CHECK-NEXT:    [[TMP29:%.*]] = getelementptr inbounds double, ptr [[TMP28]], i64 4
 ; CHECK-NEXT:    store <4 x double> [[TMP19]], ptr [[TMP28]], align 8
 ; CHECK-NEXT:    store <4 x double> [[TMP27]], ptr [[TMP29]], align 8
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i64> [[STEP_ADD]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[TMP30:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1000
 ; CHECK-NEXT:    br i1 [[TMP30]], label %[[SCALAR_PH:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[SCALAR_PH]]:

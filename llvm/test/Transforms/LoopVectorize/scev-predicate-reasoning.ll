@@ -40,8 +40,8 @@ define void @step_direction_unknown(i32 %arg, ptr %dst) {
 ; CHECK-NEXT:    store double 0.000000e+00, ptr [[TMP15]], align 8
 ; CHECK-NEXT:    store double 0.000000e+00, ptr [[TMP16]], align 8
 ; CHECK-NEXT:    store double 0.000000e+00, ptr [[TMP17]], align 8
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP18:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1024
 ; CHECK-NEXT:    br i1 [[TMP18]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -89,9 +89,9 @@ define void @integer_induction_wraps_scev_predicate_known(i32 %x, ptr %call, ptr
 ; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i32 30, [[DOTCAST]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr ptr, ptr [[CALL]], i32 [[OFFSET_IDX]]
 ; CHECK-NEXT:    store <4 x ptr> [[VECTOR_GEP]], ptr [[TMP4]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP5:%.*]] = shl i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[PTR_IND]] = getelementptr i8, ptr [[POINTER_PHI]], i64 [[TMP5]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], 992
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

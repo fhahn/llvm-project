@@ -104,8 +104,8 @@ define float @_Z4testmm(i64 %size, i64 %offset) {
 ; CHECK-NEXT:    [[TMP68:%.*]] = fmul fast <4 x float> [[WIDE_LOAD4]], [[TMP67]]
 ; CHECK-NEXT:    [[TMP69:%.*]] = fmul fast <4 x float> [[WIDE_LOAD5]], [[TMP68]]
 ; CHECK-NEXT:    [[TMP70]] = fadd fast <4 x float> [[VEC_PHI2]], [[TMP69]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i64> [[VEC_IND]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP71:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP71]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

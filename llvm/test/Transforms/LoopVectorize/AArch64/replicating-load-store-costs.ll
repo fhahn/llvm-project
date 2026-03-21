@@ -168,8 +168,8 @@ define void @uniform_gep_for_replicating_gep(ptr %dst) {
 ; CHECK-NEXT:    [[TMP12:%.*]] = extractelement <2 x i8> [[TMP6]], i64 1
 ; CHECK-NEXT:    store i8 [[TMP22]], ptr [[TMP18]], align 1
 ; CHECK-NEXT:    store i8 [[TMP12]], ptr [[TMP19]], align 1
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <2 x i32> [[STEP_ADD]], splat (i32 2)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP24:%.*]] = icmp eq i32 [[INDEX_NEXT]], 128
 ; CHECK-NEXT:    br i1 [[TMP24]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -236,8 +236,8 @@ define void @test_load_gep_widen_induction(ptr noalias %dst, ptr noalias %dst2) 
 ; CHECK-NEXT:    store <2 x ptr> [[TMP1]], ptr [[TMP13]], align 8
 ; CHECK-NEXT:    store <2 x ptr> [[TMP2]], ptr [[TMP14]], align 8
 ; CHECK-NEXT:    store <2 x ptr> [[TMP3]], ptr [[TMP15]], align 8
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[OFFSET_IDX]], 8
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <2 x i64> [[STEP_ADD_3]], splat (i64 2)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[OFFSET_IDX]], 8
 ; CHECK-NEXT:    [[TMP16:%.*]] = icmp eq i64 [[INDEX_NEXT]], 96
 ; CHECK-NEXT:    br i1 [[TMP16]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

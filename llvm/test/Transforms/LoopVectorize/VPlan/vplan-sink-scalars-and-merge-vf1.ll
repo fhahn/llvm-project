@@ -9,7 +9,6 @@ define void @sink_with_sideeffects(i1 %c, ptr %ptr) {
 ; CHECK-LABEL: VPlan for loop in 'sink_with_sideeffects'
 ; CHECK:  VPlan 'Initial VPlan for VF={1},UF>=1' {
 ; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<1024> = original trip-count
 ; CHECK-EMPTY:
@@ -45,8 +44,7 @@ define void @sink_with_sideeffects(i1 %c, ptr %ptr) {
 ; CHECK-NEXT:    Successor(s): if.then.0
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    if.then.0:
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<[[VP4]]>, vp<{{[^>]+}}>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block

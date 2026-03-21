@@ -256,8 +256,8 @@ define void @pr52024(ptr %dst, i16 %N) {
 ; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr i32, ptr [[TMP12]], i64 2
 ; CHECK-NEXT:    store <2 x i32> [[TMP10]], ptr [[TMP12]], align 4
 ; CHECK-NEXT:    store <2 x i32> [[TMP11]], ptr [[TMP13]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <2 x i16> [[STEP_ADD]], [[TMP6]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP14:%.*]] = icmp eq i32 [[INDEX_NEXT]], 24
 ; CHECK-NEXT:    br i1 [[TMP14]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

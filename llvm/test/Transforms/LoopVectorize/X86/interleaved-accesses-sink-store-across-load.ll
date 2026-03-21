@@ -34,9 +34,9 @@ define void @avoid_sinking_store_across_load(ptr %arr) {
 ; CHECK-NEXT:    [[STRIDED_VEC6:%.*]] = shufflevector <12 x i32> [[WIDE_VEC4]], <12 x i32> poison, <4 x i32> <i32 1, i32 4, i32 7, i32 10>
 ; CHECK-NEXT:    [[TMP9:%.*]] = add <4 x i32> [[STRIDED_VEC6]], [[STRIDED_VEC5]]
 ; CHECK-NEXT:    call void @llvm.masked.scatter.v4i32.v4p0(<4 x i32> [[TMP9]], <4 x ptr> align 4 [[TMP4]], <4 x i1> splat (i1 true))
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[VEC_IND]], splat (i64 12)
 ; CHECK-NEXT:    [[VEC_IND_NEXT3]] = add nuw nsw <4 x i64> [[VEC_IND2]], splat (i64 12)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[INDEX_NEXT]], 16
 ; CHECK-NEXT:    br i1 [[TMP10]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       middle.block:

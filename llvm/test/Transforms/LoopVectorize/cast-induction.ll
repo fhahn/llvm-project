@@ -19,8 +19,8 @@ define void @example12() {
 ; VF4-NEXT:    [[VEC_IND:%.*]] = phi <4 x i32> [ <i32 0, i32 1, i32 2, i32 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; VF4-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [2048 x i32], ptr @a, i64 0, i64 [[INDEX]]
 ; VF4-NEXT:    store <4 x i32> [[VEC_IND]], ptr [[TMP0]], align 4
-; VF4-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; VF4-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
+; VF4-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; VF4-NEXT:    [[TMP1:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1024
 ; VF4-NEXT:    br i1 [[TMP1]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; VF4:       [[MIDDLE_BLOCK]]:
@@ -80,8 +80,8 @@ define void @redundant_iv_cast(ptr %dst) {
 ; VF4-NEXT:    [[OFFSET_IDX:%.*]] = trunc i32 [[INDEX]] to i16
 ; VF4-NEXT:    [[TMP0:%.*]] = getelementptr inbounds i16, ptr [[DST]], i16 [[OFFSET_IDX]]
 ; VF4-NEXT:    store <4 x i16> [[VEC_IND]], ptr [[TMP0]], align 2
-; VF4-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; VF4-NEXT:    [[VEC_IND_NEXT]] = add <4 x i16> [[VEC_IND]], splat (i16 4)
+; VF4-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; VF4-NEXT:    [[TMP1:%.*]] = icmp eq i32 [[INDEX_NEXT]], 10000
 ; VF4-NEXT:    br i1 [[TMP1]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
 ; VF4:       [[MIDDLE_BLOCK]]:
@@ -172,8 +172,8 @@ define void @cast_variable_step(i64 %step) {
 ; VF4-NEXT:    [[VEC_IND:%.*]] = phi <4 x i32> [ [[INDUCTION]], %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; VF4-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [2048 x i32], ptr @a, i64 0, i64 [[INDEX]]
 ; VF4-NEXT:    store <4 x i32> [[VEC_IND]], ptr [[TMP3]], align 4
-; VF4-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; VF4-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], [[BROADCAST_SPLAT2]]
+; VF4-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; VF4-NEXT:    [[TMP4:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1024
 ; VF4-NEXT:    br i1 [[TMP4]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
 ; VF4:       [[MIDDLE_BLOCK]]:
@@ -459,8 +459,8 @@ define i64 @induction_cast_chain_cleared_by_dce(i64 %n, i64 %mask.init) {
 ; VF4-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ [[INDUCTION]], %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; VF4-NEXT:    [[VEC_PHI:%.*]] = phi <4 x i64> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[TMP18:%.*]], %[[VECTOR_BODY]] ]
 ; VF4-NEXT:    [[TMP18]] = add <4 x i64> [[VEC_PHI]], [[VEC_IND]]
-; VF4-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; VF4-NEXT:    [[VEC_IND_NEXT]] = add <4 x i64> [[VEC_IND]], [[BROADCAST_SPLAT3]]
+; VF4-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; VF4-NEXT:    [[TMP19:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; VF4-NEXT:    br i1 [[TMP19]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; VF4:       [[MIDDLE_BLOCK]]:

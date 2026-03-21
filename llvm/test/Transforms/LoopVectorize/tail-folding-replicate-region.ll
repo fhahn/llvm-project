@@ -82,8 +82,8 @@ define void @f(ptr %p, i64 %n) {
 ; CHECK-NEXT:    store i32 [[TMP36]], ptr [[TMP7]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE12]]
 ; CHECK:       [[PRED_STORE_CONTINUE12]]:
-; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i64> [[VEC_IND]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP37:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP37]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

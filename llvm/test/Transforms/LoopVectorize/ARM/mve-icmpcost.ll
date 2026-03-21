@@ -31,8 +31,7 @@ target triple = "thumbv8.1m.main-arm-none-eabi"
 ; CHECK: Cost of 0 for VF 2: CLONE ir<%arrayidx7> = getelementptr ir<%d>, vp<{{.+}}>
 ; CHECK: Cost of 0 for VF 2: vp<{{.+}}> = vector-pointer ir<%arrayidx7>
 ; CHECK: Cost of 16 for VF 2: WIDEN store vp<{{.+}}>, ir<%conv6>, ir<%cmp2>
-; CHECK: Cost of 0 for VF 2: EMIT vp<%index.next> = add nuw vp<{{.+}}>, vp<{{.+}}>
-; CHECK: Cost of 1 for VF 2: EMIT branch-on-count vp<%index.next>, vp<{{.+}}>
+; CHECK: Cost of 1 for VF 2: EMIT branch-on-count vp<{{.+}}>, vp<{{.+}}>
 ; CHECK: Cost for VF 2: 86 (Estimated cost per lane: 43.
 ; CHECK: Cost of 1 for VF 4: induction instruction   %inc = add nuw nsw i32 %i.016, 1
 ; CHECK: Cost of 0 for VF 4: induction instruction   %i.016 = phi i32 [ 0, %for.body.lr.ph ], [ %inc, %for.inc ]
@@ -46,8 +45,7 @@ target triple = "thumbv8.1m.main-arm-none-eabi"
 ; CHECK: Cost of 0 for VF 4: CLONE ir<%arrayidx7> = getelementptr ir<%d>, vp<{{.+}}>
 ; CHECK: Cost of 0 for VF 4: vp<{{.+}}> = vector-pointer ir<%arrayidx7>
 ; CHECK: Cost of 2 for VF 4: WIDEN store vp<{{.+}}>, ir<%conv6>, ir<%cmp2>
-; CHECK: Cost of 0 for VF 4: EMIT vp<%index.next> = add nuw vp<{{.+}}>, vp<{{.+}}>
-; CHECK: Cost of 1 for VF 4: EMIT branch-on-count vp<%index.next>, vp<{{.+}}>
+; CHECK: Cost of 1 for VF 4: EMIT branch-on-count vp<{{.+}}>, vp<{{.+}}>
 ; CHECK: Cost for VF 4: 10 (Estimated cost per lane: 2.
 ; CHECK: Cost of 1 for VF 8: induction instruction   %inc = add nuw nsw i32 %i.016, 1
 ; CHECK: Cost of 0 for VF 8: induction instruction   %i.016 = phi i32 [ 0, %for.body.lr.ph ], [ %inc, %for.inc ]
@@ -61,8 +59,7 @@ target triple = "thumbv8.1m.main-arm-none-eabi"
 ; CHECK: Cost of 0 for VF 8: CLONE ir<%arrayidx7> = getelementptr ir<%d>, vp<{{.+}}>
 ; CHECK: Cost of 0 for VF 8: vp<{{.+}}> = vector-pointer ir<%arrayidx7>
 ; CHECK: Cost of 2 for VF 8: WIDEN store vp<{{.+}}>, ir<%conv6>, ir<%cmp2>
-; CHECK: Cost of 0 for VF 8: EMIT vp<%index.next> = add nuw vp<{{.+}}>, vp<{{.+}}>
-; CHECK: Cost of 1 for VF 8: EMIT branch-on-count vp<%index.next>, vp<{{.+}}>
+; CHECK: Cost of 1 for VF 8: EMIT branch-on-count vp<{{.+}}>, vp<{{.+}}>
 ; CHECK: Cost for VF 8: 46 (Estimated cost per lane: 5.
 ; CHECK: LV: Selecting VF: 4.
 define void @expensive_icmp(ptr noalias nocapture %d, ptr nocapture readonly %s, i32 %n, i16 zeroext %m) #0 {
@@ -147,8 +144,7 @@ for.inc:
 ; CHECK: Cost of 0 for VF 2: WIDEN-CAST ir<%conv4> = trunc ir<%spec.select.i> to i8
 ; CHECK: Cost of 0 for VF 2: vp<[[VEC_PTR3:%.+]]> = vector-pointer vp<%next.gep>.1
 ; CHECK: Cost of 18 for VF 2: WIDEN store vp<[[VEC_PTR3]]>, ir<%conv4>
-; CHECK: Cost of 0 for VF 2: EMIT vp<%index.next> = add nuw vp<[[CAN_IV]]>, vp<{{.+}}>
-; CHECK: Cost of 1 for VF 2: EMIT branch-on-count vp<%index.next>, vp<{{.+}}>
+; CHECK: Cost of 1 for VF 2: EMIT branch-on-count vp<{{.+}}>, vp<{{.+}}>
 ; CHECK: Cost for VF 2: 130 (Estimated cost per lane: 65.
 ; CHECK: Cost of 1 for VF 4: induction instruction   %dec = add i32 %blkCnt.012, -1
 ; CHECK: Cost of 0 for VF 4: induction instruction   %blkCnt.012 = phi i32 [ %dec, %while.body ], [ %blockSize, %while.body.preheader ]
@@ -177,8 +173,7 @@ for.inc:
 ; CHECK: Cost of 0 for VF 4: WIDEN-CAST ir<%conv4> = trunc ir<%spec.select.i> to i8
 ; CHECK: Cost of 0 for VF 4: vp<[[VEC_PTR2:%.+]]> = vector-pointer vp<%next.gep>.1
 ; CHECK: Cost of 2 for VF 4: WIDEN store vp<[[VEC_PTR2]]>, ir<%conv4>
-; CHECK: Cost of 0 for VF 4: EMIT vp<%index.next> = add nuw vp<[[CAN_IV]]>, vp<{{.+}}>
-; CHECK: Cost of 1 for VF 4: EMIT branch-on-count vp<%index.next>, vp<{{.+}}>
+; CHECK: Cost of 1 for VF 4: EMIT branch-on-count vp<{{.+}}>, vp<{{.+}}>
 ; CHECK: Cost for VF 4: 14 (Estimated cost per lane: 3.
 ; CHECK: Cost of 1 for VF 8: induction instruction   %dec = add i32 %blkCnt.012, -1
 ; CHECK: Cost of 0 for VF 8: induction instruction   %blkCnt.012 = phi i32 [ %dec, %while.body ], [ %blockSize, %while.body.preheader ]
@@ -207,8 +202,7 @@ for.inc:
 ; CHECK: Cost of 2 for VF 8: WIDEN-CAST ir<%conv4> = trunc ir<%spec.select.i> to i8
 ; CHECK: Cost of 0 for VF 8: vp<[[VEC_PTR3:%.+]]> = vector-pointer vp<%next.gep>.1
 ; CHECK: Cost of 2 for VF 8: WIDEN store vp<[[VEC_PTR3]]>, ir<%conv4>
-; CHECK: Cost of 0 for VF 8: EMIT vp<%index.next> = add nuw vp<[[CAN_IV]]>, vp<{{.+}}
-; CHECK: Cost of 1 for VF 8: EMIT branch-on-count vp<%index.next>, vp<{{.+}}>
+; CHECK: Cost of 1 for VF 8: EMIT branch-on-count vp<{{.+}}>, vp<{{.+}}>
 ; CHECK: Cost for VF 8: 26 (Estimated cost per lane: 3.
 ; CHECK: Cost of 1 for VF 16: induction instruction   %dec = add i32 %blkCnt.012, -1
 ; CHECK: Cost of 0 for VF 16: induction instruction   %blkCnt.012 = phi i32 [ %dec, %while.body ], [ %blockSize, %while.body.preheader ]
@@ -237,8 +231,7 @@ for.inc:
 ; CHECK: Cost of 6 for VF 16: WIDEN-CAST ir<%conv4> = trunc ir<%spec.select.i> to i8
 ; CHECK: Cost of 0 for VF 16: vp<[[VEC_PTR2:%.+]]> = vector-pointer vp<%next.gep>.1
 ; CHECK: Cost of 2 for VF 16: WIDEN store vp<[[VEC_PTR2]]>, ir<%conv4>
-; CHECK: Cost of 0 for VF 16: EMIT vp<%index.next> = add nuw vp<[[CAN_IV]]>, vp<{{.+}}>
-; CHECK: Cost of 1 for VF 16: EMIT branch-on-count vp<%index.next>, vp<{{.+}}>
+; CHECK: Cost of 1 for VF 16: EMIT branch-on-count vp<{{.+}}>, vp<{{.+}}>
 ; CHECK: Cost for VF 16: 50
 ; CHECK: LV: Selecting VF: 16.
 define void @cheap_icmp(ptr nocapture readonly %pSrcA, ptr nocapture readonly %pSrcB, ptr nocapture %pDst, i32 %blockSize) #0 {

@@ -326,8 +326,8 @@ define i64 @findlast_load_scaled_iv(ptr noalias %a, ptr noalias %b, i64 %n) {
 ; CHECK-NEXT:    [[TMP21:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP20]])
 ; CHECK-NEXT:    [[TMP22]] = select i1 [[TMP21]], <4 x i1> [[TMP2]], <4 x i1> [[TMP0]]
 ; CHECK-NEXT:    [[TMP23]] = select i1 [[TMP21]], <4 x i64> [[TMP19]], <4 x i64> [[VEC_PHI]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[VEC_IND]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP24:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP24]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP10:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

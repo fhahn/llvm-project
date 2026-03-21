@@ -10,7 +10,6 @@ target triple = "aarch64-unknown-linux-gnu"
 ; VPLANS-LABEL: Checking a loop in 'simple_memset'
 ; VPLANS:      VPlan 'Initial VPlan for VF={vscale x 1,vscale x 2,vscale x 4},UF>=1' {
 ; VPLANS-NEXT: Live-in vp<[[VF:%.+]]> = VF
-; VPLANS-NEXT: Live-in vp<[[VFxUF:%.+]]> = VF * UF
 ; VPLANS:      vp<[[TC:%[0-9]+]]> = original trip-count
 ; VPLANS-EMPTY:
 ; VPLANS-NEXT: ir-bb<entry>:
@@ -31,7 +30,7 @@ target triple = "aarch64-unknown-linux-gnu"
 ; VPLANS-NEXT:     CLONE ir<%gep> = getelementptr ir<%ptr>, vp<[[STEP]]>
 ; VPLANS-NEXT:     vp<[[VEC_PTR:%[0-9]+]]> = vector-pointer ir<%gep>
 ; VPLANS-NEXT:     WIDEN store vp<[[VEC_PTR]]>, ir<%val>, vp<[[LANEMASK_PHI]]>
-; VPLANS-NEXT:     EMIT vp<[[INDV_UPDATE:%.+]]> = add vp<[[INDV]]>, vp<[[VFxUF]]>
+; VPLANS-NEXT:     EMIT vp<[[INDV_UPDATE:%.+]]> = add vp<[[INDV]]>, vp<{{%[0-9]+}}>
 ; VPLANS-NEXT:     EMIT vp<[[INC:%[0-9]+]]> = VF * Part + vp<[[INDV_UPDATE]]>, vp<[[VF]]>
 ; VPLANS-NEXT:     EMIT vp<[[LANEMASK_LOOP]]> = active lane mask vp<[[INC]]>, vp<[[TC]]>
 ; VPLANS-NEXT:     EMIT vp<[[NOT:%[0-9]+]]> = not vp<[[LANEMASK_LOOP]]>

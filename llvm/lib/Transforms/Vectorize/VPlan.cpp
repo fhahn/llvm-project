@@ -610,13 +610,14 @@ static bool hasConditionalTerminator(const VPBasicBlock *VPBB) {
   [[maybe_unused]] bool IsSwitch =
       isa<VPInstruction>(R) &&
       cast<VPInstruction>(R)->getOpcode() == Instruction::Switch;
-  [[maybe_unused]] bool IsBranchOnTwoConds = match(R, m_BranchOnTwoConds());
+  [[maybe_unused]] bool IsMultiCondBranch =
+      match(R, m_CombineOr(m_BranchOnTwoConds(), m_BranchOnCondOrCount()));
   [[maybe_unused]] bool IsCondBranch =
       isa<VPBranchOnMaskRecipe>(R) ||
       match(R, m_CombineOr(m_BranchOnCond(), m_BranchOnCount()));
   if (VPBB->getNumSuccessors() == 2 ||
       (VPBB->isExiting() && !VPBB->getParent()->isReplicator())) {
-    assert((IsCondBranch || IsSwitch || IsBranchOnTwoConds) &&
+    assert((IsCondBranch || IsSwitch || IsMultiCondBranch) &&
            "block with multiple successors not terminated by "
            "conditional branch nor switch recipe");
 
@@ -624,14 +625,14 @@ static bool hasConditionalTerminator(const VPBasicBlock *VPBB) {
   }
 
   if (VPBB->getNumSuccessors() > 2) {
-    assert((IsSwitch || IsBranchOnTwoConds) &&
-           "block with more than 2 successors not terminated by a switch or "
-           "branch-on-two-conds recipe");
+    assert((IsSwitch || IsMultiCondBranch) &&
+           "block with more than 2 successors not terminated by a switch, "
+           "branch-on-two-conds, or branch-on-cond-or-count recipe");
     return true;
   }
 
   assert(
-      !IsCondBranch && !IsBranchOnTwoConds &&
+      !IsCondBranch && !IsMultiCondBranch &&
       "block with 0 or 1 successors terminated by conditional branch recipe");
   return false;
 }
@@ -743,6 +744,8 @@ VPRegionBlock *VPRegionBlock::clone() {
       CanIV ? Plan.createLoopRegion(CanIV->getType(), CanIV->getDebugLoc(),
                                     getName(), NewEntry, NewExiting)
             : Plan.createReplicateRegion(NewEntry, NewExiting, getName());
+  if (CanIV)
+    NewRegion->setStripFactorKind(getStripFactorKind());
 
   for (VPBlockBase *Block : vp_depth_first_shallow(NewEntry))
     Block->setParent(NewRegion);
@@ -816,7 +819,21 @@ void VPRegionBlock::print(raw_ostream &O, const Twine &Indent,
   if (auto *CanIV = getCanonicalIV()) {
     O << '\n';
     CanIV->print(O, SlotTracker);
-    O << " = CANONICAL-IV\n";
+    O << " = CANONICAL-IV ";
+    getStripMineFactor()->printAsOperand(O, SlotTracker);
+    O << " (";
+    switch (getStripFactorKind()) {
+    case VPCanonicalIVInfo::StripFactorKind::Default:
+      O << "VF * UF";
+      break;
+    case VPCanonicalIVInfo::StripFactorKind::NarrowFixed:
+      O << "narrow: UF";
+      break;
+    case VPCanonicalIVInfo::StripFactorKind::NarrowScalable:
+      O << "narrow: VScale * UF";
+      break;
+    }
+    O << ")\n";
   }
   for (auto *BlockBase : vp_depth_first_shallow(Entry)) {
     O << '\n';
@@ -829,14 +846,122 @@ void VPRegionBlock::print(raw_ostream &O, const Twine &Indent,
 #endif
 
 void VPRegionBlock::dissolveToCFGLoop() {
+  VPlan &Plan = *getPlan();
   auto *Header = cast<VPBasicBlock>(getEntry());
   auto *ExitingLatch = cast<VPBasicBlock>(getExiting());
   auto *CanIV = getCanonicalIV();
+  auto *Term = ExitingLatch->getTerminator();
+
+  // Materialize the canonical IV increment. This is the single place an
+  // increment is created when dissolving a loop region. The step is the
+  // region's strip-mine factor VPRegionValue, lowered to a concrete VPValue
+  // below.
+  //
+  // The latch terminator determines what is created here:
+  //   - BranchOnCount(IV, Step, TC) and BranchOnCondOrCount(Cond, IV, Step, TC)
+  //     still carry the count check. Create the increment plus the count
+  //     condition (Inc == TC) and the final branch:
+  //       * BranchOnCount                       -> BranchOnCond(Inc == TC)
+  //       * BranchOnCondOrCount, 2 successors    -> BranchOnTwoConds(Cond, CC)
+  //       * BranchOnCondOrCount, 1 successor     -> BranchOnCond(Cond | CC)
+  //   - Any other terminator (e.g. active-lane-mask or EVL based) has already
+  //     created the increment from the strip-mine factor; reuse it for the
+  //     scalar phi's backedge value.
+  VPValue *CanIVInc = nullptr;
+  VPValue *IV, *Step, *TC;
+  VPValue *ExtraCond = nullptr;
+  if (Term && match(Term, m_CombineOr(
+                              m_BranchOnCount(m_VPValue(IV), m_VPValue(Step),
+                                              m_VPValue(TC)),
+                              m_BranchOnCondOrCount(m_VPValue(ExtraCond),
+                                                    m_VPValue(IV),
+                                                    m_VPValue(Step),
+                                                    m_VPValue(TC))))) {
+    VPBuilder Builder(Term);
+    DebugLoc DL = Term->getDebugLoc();
+    // The increment inherits the canonical IV's DebugLoc (the original scalar
+    // IV's location); the count check and branch use the latch branch's
+    // DebugLoc carried on the terminator. The increment steps the branch's IV
+    // operand, which is the canonical IV, or an offset of it (CanIV +
+    // EPResumeVal) when vectorizing an epilogue; simplifyRecipes later folds
+    // such an offset into the scalar phi's start value.
+    CanIVInc = Builder.createOverflowingOp(
+        Instruction::Add, {IV, Step}, {hasCanonicalIVNUW(), /*HasNSW=*/false},
+        CanIV->getDebugLoc(), "index.next");
+    VPValue *CountCond = Builder.createICmp(CmpInst::ICMP_EQ, CanIVInc, TC, DL);
+    if (!ExtraCond)
+      Builder.createNaryOp(VPInstruction::BranchOnCond, CountCond, DL);
+    else if (getNumSuccessors() == 2)
+      Builder.createNaryOp(VPInstruction::BranchOnTwoConds,
+                           {ExtraCond, CountCond}, DL);
+    else
+      Builder.createNaryOp(VPInstruction::BranchOnCond,
+                           Builder.createOr(ExtraCond, CountCond, DL), DL);
+    Term->eraseFromParent();
+  } else if (CanIV->getType()) {
+    // The increment was already created from the strip-mine factor by an
+    // earlier transform (e.g. active-lane-mask or EVL based stepping). Its step
+    // may since have been lowered to a concrete value, so match the canonical
+    // IV's add increment by its step rather than by the strip-mine factor.
+    // Restrict the match to VPInstructions, as the canonical IV may also be
+    // used by replicated scalar adds (e.g. cloned in-loop address
+    // computations). If the count check was folded away (e.g. a
+    // single-iteration loop), no increment exists yet; create one from the
+    // strip-mine factor for the scalar phi's backedge value.
+    auto IsCanIVInc = [&](VPUser *U) {
+      return isa<VPInstruction>(U) &&
+             match(U, m_c_Add(m_Specific(CanIV), m_VPValue()));
+    };
+    assert(count_if(CanIV->users(), IsCanIVInc) <= 1 &&
+           "canonical IV must have at most one VPInstruction add increment");
+    auto It = find_if(CanIV->users(), IsCanIVInc);
+    if (It != CanIV->user_end())
+      CanIVInc = cast<VPInstruction>(*It)->getVPSingleValue();
+    else {
+      auto InsertPt = Term ? Term->getIterator() : ExitingLatch->end();
+      CanIVInc = VPBuilder(ExitingLatch, InsertPt)
+                     .createOverflowingOp(
+                         Instruction::Add, {CanIV, getStripMineFactor()},
+                         {hasCanonicalIVNUW(), /*HasNSW=*/false},
+                         CanIV->getDebugLoc(), "index.next");
+    }
+  }
+
+  // Lower the strip-mine factor RV based on its kind. Replaces all uses of
+  // the RV (CanIVInc above, if any) with a concrete VPValue.
+  if (auto *RV = getStripMineFactor(); RV->getNumUsers() > 0) {
+    Type *TCTy = getCanonicalIVType();
+    VPBasicBlock *VectorPH = Plan.getVectorPreheader();
+    VPBuilder PHBuilder(VectorPH, VectorPH->begin());
+    unsigned UF = Plan.getConcreteUF();
+
+    VPValue *Replacement;
+    switch (getStripFactorKind()) {
+    case VPCanonicalIVInfo::StripFactorKind::Default:
+      // Lower to VFxUF (still a symbol at this point); materializeFactors
+      // will materialize it later, propagating to our uses.
+      Replacement = &Plan.getVFxUF();
+      break;
+    case VPCanonicalIVInfo::StripFactorKind::NarrowFixed:
+      Replacement = Plan.getConstantInt(TCTy, UF);
+      break;
+    case VPCanonicalIVInfo::StripFactorKind::NarrowScalable: {
+      VPValue *VScale =
+          PHBuilder.createElementCount(TCTy, ElementCount::getScalable(1));
+      Replacement = UF == 1 ? VScale
+                            : PHBuilder.createOverflowingOp(
+                                  Instruction::Mul,
+                                  {VScale, Plan.getConstantInt(TCTy, UF)},
+                                  {true, false});
+      break;
+    }
+    }
+    RV->replaceAllUsesWith(Replacement);
+  }
+
   if (CanIV->getNumUsers() > 0) {
-    VPlan &Plan = *getPlan();
     auto *Zero = Plan.getZero(CanIV->getType());
     DebugLoc DL = CanIV->getDebugLoc();
-    VPInstruction *CanIVInc = getOrCreateCanonicalIVIncrement();
     VPBuilder HeaderBuilder(Header, Header->begin());
     auto *ScalarR =
         HeaderBuilder.createScalarPhi({Zero, CanIVInc}, DL, "index");
@@ -854,23 +979,6 @@ void VPRegionBlock::dissolveToCFGLoop() {
   VPBlockUtils::connectBlocks(ExitingLatch, Header);
 }
 
-VPInstruction *VPRegionBlock::getOrCreateCanonicalIVIncrement() {
-  // TODO: Represent the increment as VPRegionValue as well.
-  VPRegionValue *CanIV = getCanonicalIV();
-  assert(CanIV && "Expected a canonical IV");
-
-  if (auto *Inc = vputils::findCanonicalIVIncrement(*getPlan()))
-    return Inc;
-
-  assert(!getPlan()->getVFxUF().isMaterialized() &&
-         "VFxUF can be used only before it is materialized.");
-  auto *ExitingLatch = cast<VPBasicBlock>(getExiting());
-  return VPBuilder(ExitingLatch->getTerminator())
-      .createOverflowingOp(Instruction::Add, {CanIV, &getPlan()->getVFxUF()},
-                           {hasCanonicalIVNUW(), /* HasNSW */ false},
-                           CanIV->getDebugLoc(), "index.next");
-}
-
 VPlan::VPlan(Loop *L, Type *IdxTy)
     : VectorTripCount(IdxTy), VF(IdxTy), UF(IdxTy), VFxUF(IdxTy) {
   setEntry(createVPIRBasicBlock(L->getLoopPreheader()));
@@ -885,12 +993,22 @@ VPlan::VPlan(Loop *L, Type *IdxTy)
 VPlan::~VPlan() {
   VPSymbolicValue DummyValue(nullptr);
 
-  // Redirect all recipe operands to DummyValue before deleting blocks.
-  for (VPBasicBlock *VPBB :
-       VPBlockUtils::blocksOnly<VPBasicBlock>(CreatedBlocks))
-    for (VPRecipeBase &R : *VPBB)
-      for (unsigned I = 0, E = R.getNumOperands(); I != E; I++)
-        R.setOperand(I, &DummyValue);
+  // Redirect all recipe operands to DummyValue before deleting blocks. Loop
+  // regions also hold a canonical IV (which may still have users) and a
+  // strip-mine factor operand (held on VPCanonicalIVInfo, not in any block);
+  // detach both so the blocks and the operands they reference can be deleted in
+  // any order.
+  for (VPBlockBase *VPB : CreatedBlocks) {
+    if (auto *VPBB = dyn_cast<VPBasicBlock>(VPB)) {
+      for (VPRecipeBase &R : *VPBB)
+        for (unsigned I = 0, E = R.getNumOperands(); I != E; I++)
+          R.setOperand(I, &DummyValue);
+    } else if (auto *Region = cast<VPRegionBlock>(VPB);
+               !Region->isReplicator()) {
+      Region->getCanonicalIV()->replaceAllUsesWith(&DummyValue);
+      Region->getStripMineFactor()->replaceAllUsesWith(&DummyValue);
+    }
+  }
 
   for (auto *VPB : CreatedBlocks)
     delete VPB;
@@ -1213,11 +1331,12 @@ static void remapOperands(VPBlockBase *Entry, VPBlockBase *NewEntry,
   // Update all operands to use cloned VPValues.
   for (VPBasicBlock *NewBB :
        VPBlockUtils::blocksOnly<VPBasicBlock>(NewDeepRPOT)) {
-    for (VPRecipeBase &NewR : *NewBB)
+    for (VPRecipeBase &NewR : *NewBB) {
       for (unsigned I = 0, E = NewR.getNumOperands(); I != E; ++I) {
         VPValue *NewOp = Old2NewVPValues.lookup(NewR.getOperand(I));
         NewR.setOperand(I, NewOp);
       }
+    }
   }
 }
 
@@ -1255,6 +1374,10 @@ VPlan *VPlan::duplicate() {
     assert(OldCanIV && NewCanIV &&
            "Loop regions of both plans must have canonical IVs.");
     Old2NewVPValues[OldCanIV] = NewCanIV;
+    Old2NewVPValues[LoopRegion->getStripMineFactor()] =
+        NewPlan->getVectorLoopRegion()->getStripMineFactor();
+    NewPlan->getVectorLoopRegion()->setStripFactorKind(
+        LoopRegion->getStripFactorKind());
   }
 
   assert(none_of(Old2NewVPValues.keys(), IsaPred<VPSymbolicValue>) &&
@@ -1587,8 +1710,11 @@ void VPSlotTracker::assignNames(const VPlan &Plan) {
   for (const VPBlockBase *VPB : RPOT) {
     if (auto *VPBB = dyn_cast<VPBasicBlock>(VPB))
       assignNames(VPBB);
-    else if (auto *CanIV = cast<VPRegionBlock>(VPB)->getCanonicalIV())
-      assignName(CanIV);
+    else if (auto *Region = dyn_cast<VPRegionBlock>(VPB);
+             Region && !Region->isReplicator()) {
+      assignName(Region->getCanonicalIV());
+      assignName(Region->getStripMineFactor());
+    }
   }
 }
 

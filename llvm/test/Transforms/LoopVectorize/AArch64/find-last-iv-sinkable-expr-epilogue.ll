@@ -46,8 +46,8 @@ define i32 @findlast_add_expr(ptr %a, i32 %n) {
 ; CHECK-NEXT:    [[TMP13]] = select <4 x i1> [[TMP5]], <4 x i32> [[TMP9]], <4 x i32> [[VEC_PHI2]]
 ; CHECK-NEXT:    [[TMP14]] = select <4 x i1> [[TMP6]], <4 x i32> [[TMP10]], <4 x i32> [[VEC_PHI3]]
 ; CHECK-NEXT:    [[TMP15]] = select <4 x i1> [[TMP7]], <4 x i32> [[TMP11]], <4 x i32> [[VEC_PHI4]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 16
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i32> [[STEP_ADD_3]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 16
 ; CHECK-NEXT:    [[TMP16:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP16]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -84,8 +84,8 @@ define i32 @findlast_add_expr(ptr %a, i32 %n) {
 ; CHECK-NEXT:    [[TMP23:%.*]] = icmp eq <4 x i32> [[WIDE_LOAD17]], splat (i32 42)
 ; CHECK-NEXT:    [[TMP30:%.*]] = add <4 x i32> [[TMP24]], splat (i32 100)
 ; CHECK-NEXT:    [[TMP25]] = select <4 x i1> [[TMP23]], <4 x i32> [[TMP30]], <4 x i32> [[VEC_PHI16]]
-; CHECK-NEXT:    [[INDEX_NEXT18]] = add nuw i32 [[INDEX14]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT19]] = add nuw nsw <4 x i32> [[TMP24]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT18]] = add nuw i32 [[INDEX14]], 4
 ; CHECK-NEXT:    [[TMP26:%.*]] = icmp eq i32 [[INDEX_NEXT18]], [[N_VEC11]]
 ; CHECK-NEXT:    br i1 [[TMP26]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_MIDDLE_BLOCK]]:
@@ -168,8 +168,8 @@ define i32 @findlast_mul_expr(ptr %a, i32 %n) {
 ; CHECK-NEXT:    [[TMP9]] = select <4 x i1> [[TMP5]], <4 x i32> [[STEP_ADD]], <4 x i32> [[VEC_PHI2]]
 ; CHECK-NEXT:    [[TMP10]] = select <4 x i1> [[TMP6]], <4 x i32> [[STEP_ADD_2]], <4 x i32> [[VEC_PHI3]]
 ; CHECK-NEXT:    [[TMP11]] = select <4 x i1> [[TMP7]], <4 x i32> [[STEP_ADD_3]], <4 x i32> [[VEC_PHI4]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[IV1]], 16
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i32> [[STEP_ADD_3]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[IV1]], 16
 ; CHECK-NEXT:    [[TMP12:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP12]], label %[[MIDDLE_BLOCK:.*]], label %[[LOOP]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

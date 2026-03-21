@@ -228,8 +228,8 @@ define i32 @loop_inv_select_condition_issue_182152(i32 %iv.start, i32 %a, i32 %b
 ; CHECK-NEXT:    [[TMP6:%.*]] = phi <4 x i1> [ zeroinitializer, [[VECTOR_PH]] ], [ [[TMP7:%.*]], [[LOOP]] ]
 ; CHECK-NEXT:    [[TMP7]] = select i1 [[TMP5]], <4 x i1> [[TMP3]], <4 x i1> [[TMP6]]
 ; CHECK-NEXT:    [[TMP8]] = select i1 [[TMP5]], <4 x i32> [[VEC_IND]], <4 x i32> [[VEC_PHI]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP9]], label [[MIDDLE_BLOCK:%.*]], label [[LOOP]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       middle.block:

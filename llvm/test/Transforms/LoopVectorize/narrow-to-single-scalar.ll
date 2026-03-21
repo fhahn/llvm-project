@@ -98,8 +98,8 @@ define void @narrow_to_single_scalar_store_address_not_uniform_across_all_parts(
 ; VF4IC1-NEXT:    store i32 [[TMP1]], ptr [[TMP8]], align 4
 ; VF4IC1-NEXT:    store i32 [[TMP2]], ptr [[TMP10]], align 4
 ; VF4IC1-NEXT:    store i32 [[TMP3]], ptr [[TMP12]], align 4
-; VF4IC1-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; VF4IC1-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
+; VF4IC1-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; VF4IC1-NEXT:    [[TMP13:%.*]] = icmp eq i32 [[INDEX_NEXT]], 100
 ; VF4IC1-NEXT:    br i1 [[TMP13]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
 ; VF4IC1:       [[MIDDLE_BLOCK]]:
@@ -327,8 +327,8 @@ define void @narrow_scatter_with_uniform_addr_to_scalar_unroll(ptr noalias %src,
 ; VF4IC1-NEXT:    store i8 [[TMP13]], ptr [[TMP6]], align 4
 ; VF4IC1-NEXT:    store i8 [[TMP14]], ptr [[TMP7]], align 4
 ; VF4IC1-NEXT:    store i8 [[TMP11]], ptr [[TMP8]], align 4
-; VF4IC1-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; VF4IC1-NEXT:    [[VEC_IND_NEXT]] = add <4 x i64> [[VEC_IND]], splat (i64 4)
+; VF4IC1-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; VF4IC1-NEXT:    [[TMP15:%.*]] = icmp eq i64 [[INDEX_NEXT]], 256
 ; VF4IC1-NEXT:    br i1 [[TMP15]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; VF4IC1:       [[MIDDLE_BLOCK]]:

@@ -28,8 +28,8 @@ define void @conversion_cost1(i32 %n, ptr nocapture %A, ptr nocapture %B) {
 ; CHECK-NEXT:    [[TMP5:%.*]] = add i64 3, [[INDEX]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i8, ptr [[A]], i64 [[TMP5]]
 ; CHECK-NEXT:    store <32 x i8> [[VEC_IND]], ptr [[TMP6]], align 1
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 32
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <32 x i8> [[VEC_IND]], splat (i8 32)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 32
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP7]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -55,8 +55,8 @@ define void @conversion_cost1(i32 %n, ptr nocapture %A, ptr nocapture %B) {
 ; CHECK-NEXT:    [[TMP10:%.*]] = add i64 3, [[INDEX4]]
 ; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr inbounds i8, ptr [[A]], i64 [[TMP10]]
 ; CHECK-NEXT:    store <8 x i8> [[VEC_IND5]], ptr [[TMP11]], align 1
-; CHECK-NEXT:    [[INDEX_NEXT6]] = add nuw i64 [[INDEX4]], 8
 ; CHECK-NEXT:    [[VEC_IND_NEXT7]] = add <8 x i8> [[VEC_IND5]], splat (i8 8)
+; CHECK-NEXT:    [[INDEX_NEXT6]] = add nuw i64 [[INDEX4]], 8
 ; CHECK-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[INDEX_NEXT6]], [[N_VEC3]]
 ; CHECK-NEXT:    br i1 [[TMP12]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_MIDDLE_BLOCK]]:
@@ -119,8 +119,8 @@ define void @conversion_cost2(i32 %n, ptr nocapture %A, ptr nocapture %B) {
 ; CHECK-NEXT:    [[TMP7:%.*]] = sitofp <8 x i64> [[TMP6]] to <8 x float>
 ; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds float, ptr [[B]], i64 [[TMP5]]
 ; CHECK-NEXT:    store <8 x float> [[TMP7]], ptr [[TMP8]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <8 x i64> [[VEC_IND]], splat (i64 8)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP9]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

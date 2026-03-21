@@ -286,8 +286,8 @@ define i64 @non_unit_step_iv_live_out(ptr %dst, i64 %N) {
 ; CHECK-NEXT:    store <4 x i32> [[STEP_ADD]], ptr [[TMP3]], align 4
 ; CHECK-NEXT:    store <4 x i32> [[STEP_ADD_2]], ptr [[TMP4]], align 4
 ; CHECK-NEXT:    store <4 x i32> [[STEP_ADD_3]], ptr [[TMP5]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 16
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[STEP_ADD_3]], splat (i32 12)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 16
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP12:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -314,8 +314,8 @@ define i64 @non_unit_step_iv_live_out(ptr %dst, i64 %N) {
 ; CHECK-NEXT:    [[VEC_IND5:%.*]] = phi <4 x i32> [ [[INDUCTION]], %[[VEC_EPILOG_PH]] ], [ [[VEC_IND_NEXT7:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr i32, ptr [[DST]], i64 [[INDEX4]]
 ; CHECK-NEXT:    store <4 x i32> [[VEC_IND5]], ptr [[TMP10]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT6]] = add nuw i64 [[INDEX4]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT7]] = add <4 x i32> [[VEC_IND5]], splat (i32 12)
+; CHECK-NEXT:    [[INDEX_NEXT6]] = add nuw i64 [[INDEX4]], 4
 ; CHECK-NEXT:    [[TMP11:%.*]] = icmp eq i64 [[INDEX_NEXT6]], [[N_VEC3]]
 ; CHECK-NEXT:    br i1 [[TMP11]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP13:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_MIDDLE_BLOCK]]:

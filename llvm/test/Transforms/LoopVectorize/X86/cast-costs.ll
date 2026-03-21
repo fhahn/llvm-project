@@ -160,8 +160,8 @@ define void @replicate_sext(i32 %N, ptr %dst, ptr %src) #0 {
 ; CHECK-NEXT:    [[TMP27:%.*]] = getelementptr i32, ptr [[DST]], <4 x i64> [[TMP25]]
 ; CHECK-NEXT:    call void @llvm.masked.scatter.v4i32.v4p0(<4 x i32> [[STRIDED_VEC]], <4 x ptr> align 4 [[TMP27]], <4 x i1> splat (i1 true)), !alias.scope [[META7:![0-9]+]], !noalias [[META4]]
 ; CHECK-NEXT:    call void @llvm.masked.scatter.v4i32.v4p0(<4 x i32> [[STRIDED_VEC9]], <4 x ptr> align 4 [[TMP27]], <4 x i1> splat (i1 true)), !alias.scope [[META7]], !noalias [[META4]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 12)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP26:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP26]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP9:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

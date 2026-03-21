@@ -19,8 +19,8 @@ define void @tc_17_without_runtime_check(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[TMP2:%.*]] = add <4 x i32> [[VEC_IND]], splat (i32 17)
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr i32, ptr [[B]], i32 [[INDEX]]
 ; CHECK-NEXT:    call void @llvm.masked.store.v4i32.p0(<4 x i32> [[TMP2]], ptr align 4 [[TMP3]], <4 x i1> [[TMP0]])
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq i32 [[INDEX_NEXT]], 20
 ; CHECK-NEXT:    br i1 [[TMP4]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -68,8 +68,8 @@ define void @tc_17_with_runtime_check(ptr %A, ptr %B) {
 ; CHECK-NEXT:    [[TMP3:%.*]] = add <4 x i32> [[VEC_IND]], splat (i32 17)
 ; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr i32, ptr [[B]], i32 [[INDEX]]
 ; CHECK-NEXT:    call void @llvm.masked.store.v4i32.p0(<4 x i32> [[TMP3]], ptr align 4 [[TMP4]], <4 x i1> [[TMP1]])
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i32 [[INDEX_NEXT]], 20
 ; CHECK-NEXT:    br i1 [[TMP5]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -122,8 +122,8 @@ define void @tc_20_without_runtime_checks(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[TMP1:%.*]] = add <4 x i32> [[VEC_IND]], splat (i32 17)
 ; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr i32, ptr [[B]], i32 [[INDEX]]
 ; CHECK-NEXT:    store <4 x i32> [[TMP1]], ptr [[TMP2]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq i32 [[INDEX_NEXT]], 20
 ; CHECK-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -170,8 +170,8 @@ define void @tc_20_with_runtime_checks(ptr %A, ptr %B) {
 ; CHECK-NEXT:    [[TMP2:%.*]] = add <4 x i32> [[VEC_IND]], splat (i32 17)
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr i32, ptr [[B]], i32 [[INDEX]]
 ; CHECK-NEXT:    store <4 x i32> [[TMP2]], ptr [[TMP3]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq i32 [[INDEX_NEXT]], 20
 ; CHECK-NEXT:    br i1 [[TMP4]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -225,8 +225,8 @@ define void @tc_23_without_runtime_checks(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[TMP2:%.*]] = add <4 x i32> [[VEC_IND]], splat (i32 17)
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr i32, ptr [[B]], i32 [[INDEX]]
 ; CHECK-NEXT:    call void @llvm.masked.store.v4i32.p0(<4 x i32> [[TMP2]], ptr align 4 [[TMP3]], <4 x i1> [[TMP0]])
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq i32 [[INDEX_NEXT]], 24
 ; CHECK-NEXT:    br i1 [[TMP4]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -274,8 +274,8 @@ define void @tc_23_with_runtime_checks(ptr %A, ptr %B) {
 ; CHECK-NEXT:    [[TMP3:%.*]] = add <4 x i32> [[VEC_IND]], splat (i32 17)
 ; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr i32, ptr [[B]], i32 [[INDEX]]
 ; CHECK-NEXT:    call void @llvm.masked.store.v4i32.p0(<4 x i32> [[TMP3]], ptr align 4 [[TMP4]], <4 x i1> [[TMP1]])
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i32 [[INDEX_NEXT]], 24
 ; CHECK-NEXT:    br i1 [[TMP5]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP9:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

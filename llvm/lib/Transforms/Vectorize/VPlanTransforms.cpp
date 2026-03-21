@@ -1773,29 +1773,28 @@ static void simplifyRecipe(VPSingleDefRecipe *Def) {
     return;
   }
 
-  // Look for cycles where Def is of the form:
-  //  X = phi(0, IVInc)  ; used only by IVInc, or by IVInc and Inc = X + Y
-  //  IVInc = X + Step   ; used by X and Def
-  //  Def = IVInc + Y
-  // Fold the increment Y into the phi's start value, replace Def with IVInc,
-  // and if Inc exists, replace it with X.
-  if (match(Def, m_Add(m_Add(m_VPValue(X), m_VPValue()), m_VPValue(Y))) &&
-      isa<VPIRValue>(Y) &&
-      match(X, m_VPPhi(m_ZeroInt(), m_Specific(Def->getOperand(0))))) {
-    auto *Phi = cast<VPPhi>(X);
-    auto *IVInc = Def->getOperand(0);
-    if (IVInc->getNumUsers() == 2) {
-      // If Phi has a second user (besides IVInc's defining recipe), it must
-      // be Inc = Phi + Y for the fold to apply.
-      auto *Inc = dyn_cast_or_null<VPSingleDefRecipe>(
-          findUserOf(Phi, m_Add(m_Specific(Phi), m_Specific(Y))));
-      if (Phi->getNumUsers() == 1 || (Phi->getNumUsers() == 2 && Inc)) {
-        Def->replaceAllUsesWith(IVInc);
-        if (Inc)
-          Inc->replaceAllUsesWith(Phi);
-        Phi->setOperand(0, Y);
-        return;
-      }
+  // Fold a loop-invariant offset into the start value of a canonical-shaped
+  // phi. After dissolution an epilogue loop's canonical IV has the shape:
+  //   Phi   = phi(0, IVInc)          ; Phi's only user is Def
+  //   Def   = Phi + Y                ; Y is a loop-invariant live-in (offset)
+  //   IVInc = Def + Step             ; Phi's backedge increment
+  // Fold Y into the phi's start and replace Def with Phi, turning IVInc into
+  // the canonical Phi + Step:
+  //   Phi   = phi(Y, IVInc)
+  //   IVInc = Phi + Step
+  if (match(Def, m_Add(m_VPValue(), m_VPValue()))) {
+    auto *Phi = dyn_cast<VPPhi>(Def->getOperand(0));
+    VPValue *Y = Def->getOperand(1);
+    if (!Phi) {
+      Phi = dyn_cast<VPPhi>(Def->getOperand(1));
+      Y = Def->getOperand(0);
+    }
+    if (Phi && isa<VPIRValue>(Y) && Phi->getNumUsers() == 1 &&
+        match(Phi, m_VPPhi(m_ZeroInt(), m_VPValue())) &&
+        match(Phi->getOperand(1), m_c_Add(m_Specific(Def), m_VPValue()))) {
+      Phi->setOperand(0, Y);
+      Def->replaceAllUsesWith(Phi);
+      return;
     }
   }
 
@@ -2151,40 +2150,6 @@ static bool optimizeVectorInductionWidthForTCAndVFUF(VPlan &Plan,
   return MadeChange;
 }
 
-/// Return true if \p Cond is known to be true for given \p BestVF and \p
-/// BestUF.
-static bool isConditionTrueViaVFAndUF(VPValue *Cond, VPlan &Plan,
-                                      ElementCount BestVF, unsigned BestUF,
-                                      PredicatedScalarEvolution &PSE) {
-  if (match(Cond, m_BinaryOr(m_VPValue(), m_VPValue())))
-    return any_of(Cond->getDefiningRecipe()->operands(), [&Plan, BestVF, BestUF,
-                                                          &PSE](VPValue *C) {
-      return isConditionTrueViaVFAndUF(C, Plan, BestVF, BestUF, PSE);
-    });
-
-  auto *CanIV = Plan.getVectorLoopRegion()->getCanonicalIV();
-  if (!match(Cond, m_SpecificICmp(
-                       CmpInst::ICMP_EQ,
-                       m_c_Add(m_Specific(CanIV), m_Specific(&Plan.getVFxUF())),
-                       m_Specific(&Plan.getVectorTripCount()))))
-    return false;
-
-  // The compare checks CanIV + VFxUF == vector trip count. The vector trip
-  // count is not conveniently available as SCEV so far, so we compare directly
-  // against the original trip count. This is stricter than necessary, as we
-  // will only return true if the trip count == vector trip count.
-  const SCEV *VectorTripCount =
-      vputils::getSCEVExprForVPValue(&Plan.getVectorTripCount(), PSE);
-  if (isa<SCEVCouldNotCompute>(VectorTripCount))
-    VectorTripCount = vputils::getSCEVExprForVPValue(Plan.getTripCount(), PSE);
-  assert(!isa<SCEVCouldNotCompute>(VectorTripCount) &&
-         "Trip count SCEV must be computable");
-  ScalarEvolution &SE = *PSE.getSE();
-  ElementCount NumElements = BestVF.multiplyCoefficientBy(BestUF);
-  const SCEV *C = SE.getElementCount(VectorTripCount->getType(), NumElements);
-  return SE.isKnownPredicate(CmpInst::ICMP_EQ, VectorTripCount, C);
-}
-
 /// Try to replace multiple active lane masks used for control flow with
 /// a single, wide active lane mask instruction followed by multiple
 /// extract subvector intrinsics. This applies to the active lane mask
@@ -2292,45 +2257,55 @@ static bool simplifyBranchConditionForVFAndUF(VPlan &Plan, ElementCount BestVF,
   VPRegionBlock *VectorRegion = Plan.getVectorLoopRegion();
   VPBasicBlock *ExitingVPBB = VectorRegion->getExitingBasicBlock();
   auto *Term = &ExitingVPBB->back();
-  VPValue *Cond;
-  auto m_CanIVInc = m_Add(m_VPValue(), m_Specific(&Plan.getVFxUF()));
-  // Check if the branch condition compares the canonical IV increment (for main
-  // loop), or the canonical IV increment plus an offset (for epilog loop).
-  if (match(Term, m_BranchOnCount(
-                      m_CombineOr(m_CanIVInc, m_c_Add(m_CanIVInc, m_LiveIn())),
-                      m_VPValue())) ||
-      match(Term,
-            m_BranchOnCondOrCount(m_VPValue(), m_VPValue(), m_VPValue())) ||
-      match(Term, m_BranchOnCond(m_Not(m_ActiveLaneMask(
-                      m_VPValue(), m_VPValue(), m_VPValue()))))) {
-    // Try to simplify the branch condition if VectorTC <= VF * UF when the
-    // latch terminator is BranchOnCount or BranchOnCond(Not(ActiveLaneMask)).
-    const SCEV *VectorTripCount =
-        vputils::getSCEVExprForVPValue(&Plan.getVectorTripCount(), PSE);
-    if (isa<SCEVCouldNotCompute>(VectorTripCount))
-      VectorTripCount =
-          vputils::getSCEVExprForVPValue(Plan.getTripCount(), PSE);
-    assert(!isa<SCEVCouldNotCompute>(VectorTripCount) &&
-           "Trip count SCEV must be computable");
-    ScalarEvolution &SE = *PSE.getSE();
-    ElementCount NumElements = BestVF.multiplyCoefficientBy(BestUF);
-    const SCEV *C = SE.getElementCount(VectorTripCount->getType(), NumElements);
-    if (!SE.isKnownPredicate(CmpInst::ICMP_ULE, VectorTripCount, C))
-      return false;
-  } else if (match(Term, m_BranchOnCond(m_VPValue(Cond))) ||
-             match(Term, m_BranchOnTwoConds(m_VPValue(), m_VPValue(Cond)))) {
-    // For BranchOnCond, check if we can prove the condition to be true using VF
-    // and UF.
-    if (!isConditionTrueViaVFAndUF(Cond, Plan, BestVF, BestUF, PSE))
-      return false;
-  } else {
+  VPValue *ExtraCond = nullptr;
+  if (!match(Term,
+             m_CombineOr(m_BranchOnCount(m_VPValue(), m_VPValue(), m_VPValue()),
+                         m_CombineOr(m_BranchOnCondOrCount(m_VPValue(ExtraCond),
+                                                           m_VPValue(),
+                                                           m_VPValue(),
+                                                           m_VPValue()),
+                                     m_BranchOnCond(m_Not(m_ActiveLaneMask(
+                                         m_VPValue(), m_VPValue(),
+                                         m_VPValue())))))))
     return false;
-  }
 
-  // The vector loop region only executes once. Convert terminator of the
-  // exiting block to exit in the first iteration.
-  if (match(Term, m_BranchOnTwoConds())) {
-    Term->setOperand(1, Plan.getTrue());
+  // Try to simplify the branch condition if VectorTC <= StripMineFactor.
+  const SCEV *VectorTripCount =
+      vputils::getSCEVExprForVPValue(&Plan.getVectorTripCount(), PSE);
+  if (isa<SCEVCouldNotCompute>(VectorTripCount))
+    VectorTripCount = vputils::getSCEVExprForVPValue(Plan.getTripCount(), PSE);
+  assert(!isa<SCEVCouldNotCompute>(VectorTripCount) &&
+         "Trip count SCEV must be computable");
+  ScalarEvolution &SE = *PSE.getSE();
+  // Compute the strip-mine factor SCEV based on the region's kind.
+  Type *TCTy = VectorTripCount->getType();
+  const SCEV *StripMineFactor;
+  switch (VectorRegion->getStripFactorKind()) {
+  case VPCanonicalIVInfo::StripFactorKind::Default:
+    StripMineFactor =
+        SE.getElementCount(TCTy, BestVF.multiplyCoefficientBy(BestUF));
+    break;
+  case VPCanonicalIVInfo::StripFactorKind::NarrowFixed:
+    StripMineFactor = SE.getConstant(TCTy, BestUF);
+    break;
+  case VPCanonicalIVInfo::StripFactorKind::NarrowScalable:
+    StripMineFactor =
+        SE.getMulExpr(SE.getVScale(TCTy), SE.getConstant(TCTy, BestUF));
+    break;
+  }
+  if (isa<SCEVCouldNotCompute>(StripMineFactor))
+    return false;
+  if (!SE.isKnownPredicate(CmpInst::ICMP_ULE, VectorTripCount, StripMineFactor))
+    return false;
+
+  // For BranchOnCondOrCount, the count component is always true (the loop
+  // runs once); replace with BranchOnTwoConds(ExtraCond, true) to preserve
+  // the 3 successors (Dispatch, Middle, Header) with Header becoming dead.
+  if (ExtraCond) {
+    VPBuilder(Term).createNaryOp(VPInstruction::BranchOnTwoConds,
+                                 {ExtraCond, Plan.getTrue()},
+                                 Term->getDebugLoc());
+    Term->eraseFromParent();
     return true;
   }
 
@@ -2841,10 +2816,10 @@ addVPLaneMaskPhiAndUpdateExitBranch(VPlan &Plan) {
   VPRegionBlock *TopRegion = Plan.getVectorLoopRegion();
   VPBasicBlock *EB = TopRegion->getExitingBasicBlock();
   VPValue *StartV = Plan.getZero(TopRegion->getCanonicalIVType());
-  auto *CanonicalIVIncrement = TopRegion->getOrCreateCanonicalIVIncrement();
-  // TODO: Check if dropping the flags is needed.
-  TopRegion->clearCanonicalIVNUW(CanonicalIVIncrement);
-  DebugLoc DL = CanonicalIVIncrement->getDebugLoc();
+  // Clear NUW on the canonical IV, as the increment may overflow when used
+  // with active lane masks. The increment will be created during dissolution.
+  TopRegion->clearCanonicalIVNUW();
+  DebugLoc DL = TopRegion->getCanonicalIV()->getDebugLoc();
   // We can't use StartV directly in the ActiveLaneMask VPInstruction, since
   // we have to take unrolling into account. Each part needs to start at
   //   Part * VF
@@ -2877,6 +2852,10 @@ addVPLaneMaskPhiAndUpdateExitBranch(VPlan &Plan) {
   // original terminator.
   VPRecipeBase *OriginalTerminator = EB->getTerminator();
   Builder.setInsertPoint(OriginalTerminator);
+  auto *CanonicalIVIncrement = Builder.createOverflowingOp(
+      Instruction::Add,
+      {TopRegion->getCanonicalIV(), TopRegion->getStripMineFactor()},
+      {TopRegion->hasCanonicalIVNUW(), /*HasNSW=*/false}, DL, "index.next");
   auto *InLoopIncrement = Builder.createOverflowingOp(
       VPInstruction::CanonicalIVIncrementForPart,
       {CanonicalIVIncrement, &Plan.getVF()}, {false, false}, DL);
@@ -3174,17 +3153,14 @@ static void fixupVFUsersForEVL(VPlan &Plan, VPValue &EVL) {
   });
 
   assert(all_of(Plan.getVFxUF().users(),
-                match_fn(m_CombineOr(
-                    m_c_Add(m_Specific(LoopRegion->getCanonicalIV()),
-                            m_Specific(&Plan.getVFxUF())),
-                    m_Isa<VPWidenPointerInductionRecipe>()))) &&
-         "Only users of VFxUF should be VPWidenPointerInductionRecipe and the "
-         "increment of the canonical induction.");
-  Plan.getVFxUF().replaceUsesWithIf(EVLAsIdx, [](VPUser &U, unsigned Idx) {
-    // Only replace uses in VPWidenPointerInductionRecipe; The increment of the
-    // canonical induction must not be updated.
-    return isa<VPWidenPointerInductionRecipe>(U);
-  });
+                IsaPred<VPWidenPointerInductionRecipe>) &&
+         "Only users of VFxUF should be VPWidenPointerInductionRecipe.");
+  // Replace VFxUF uses with EVL via replaceUsesWithIf (with an always-true
+  // predicate) so VFxUF is not marked materialized; later passes (e.g.
+  // materializeVectorTripCount) may add new uses of VFxUF before
+  // materializeFactors materializes it.
+  Plan.getVFxUF().replaceUsesWithIf(
+      EVLAsIdx, [](VPUser &, unsigned) { return true; });
 
   // Create a scalar phi to track the previous EVL if fixed-order recurrence is
   // contained.
@@ -3315,7 +3291,6 @@ void VPlanTransforms::addExplicitVectorLength(
   auto *CanonicalIV = LoopRegion->getCanonicalIV();
   auto *CanIVTy = LoopRegion->getCanonicalIVType();
   VPValue *StartV = Plan.getZero(CanIVTy);
-  auto *CanonicalIVIncrement = LoopRegion->getOrCreateCanonicalIVIncrement();
 
   // Create the CurrentIteration recipe in the vector loop.
   auto *CurrentIteration =
@@ -3338,16 +3313,20 @@ void VPlanTransforms::addExplicitVectorLength(
   auto *VPEVL = Builder.createNaryOp(VPInstruction::ExplicitVectorLength, AVL,
                                      DebugLoc::getUnknown(), "evl");
 
-  Builder.setInsertPoint(CanonicalIVIncrement);
+  // Insert before the latch terminator (BranchOnCount).
+  auto *LatchVPBB = cast<VPBasicBlock>(LoopRegion->getExiting());
+  auto *LatchTerm = LatchVPBB->getTerminator();
+  Builder.setInsertPoint(LatchTerm);
   VPValue *OpVPEVL = VPEVL;
 
   auto *I32Ty = Type::getInt32Ty(Plan.getContext());
-  OpVPEVL = Builder.createScalarZExtOrTrunc(
-      OpVPEVL, CanIVTy, I32Ty, CanonicalIVIncrement->getDebugLoc());
+  OpVPEVL = Builder.createScalarZExtOrTrunc(OpVPEVL, CanIVTy, I32Ty,
+                                            LatchTerm->getDebugLoc());
 
-  auto *NextIter = Builder.createAdd(
-      OpVPEVL, CurrentIteration, CanonicalIVIncrement->getDebugLoc(),
-      "current.iteration.next", CanonicalIVIncrement->getNoWrapFlags());
+  bool HasNUW = LoopRegion->hasCanonicalIVNUW();
+  auto *NextIter =
+      Builder.createAdd(OpVPEVL, CurrentIteration, LatchTerm->getDebugLoc(),
+                        "current.iteration.next", {HasNUW, false});
   CurrentIteration->addBackedgeValue(NextIter);
 
   VPValue *NextAVL =
@@ -3358,10 +3337,9 @@ void VPlanTransforms::addExplicitVectorLength(
   fixupVFUsersForEVL(Plan, *VPEVL);
   removeDeadRecipes(Plan);
 
-  // Replace all uses of the canonical IV with VPCurrentIterationPHIRecipe
-  // except for the canonical IV increment.
+  // Replace all uses of the canonical IV with VPCurrentIterationPHIRecipe.
   CanonicalIV->replaceAllUsesWith(CurrentIteration);
-  CanonicalIVIncrement->setOperand(0, CanonicalIV);
+
   // TODO: support unroll factor > 1.
   Plan.setUF(1);
 }
@@ -3442,21 +3420,20 @@ void VPlanTransforms::convertEVLExitCond(VPlan &Plan) {
   if (match(LatchBr, m_BranchOnCond(m_True())))
     return;
 
-  VPValue *CanIVInc;
-  [[maybe_unused]] bool FoundIncrement = match(
-      LatchBr,
-      m_BranchOnCond(m_SpecificCmp(CmpInst::ICMP_EQ, m_VPValue(CanIVInc),
-                                   m_Specific(&Plan.getVectorTripCount()))));
-  assert(FoundIncrement &&
-         match(CanIVInc, m_Add(m_Specific(LoopRegion->getCanonicalIV()),
-                               m_Specific(&Plan.getVFxUF()))) &&
-         "Expected BranchOnCond with ICmp comparing CanIV + VFxUF with vector "
-         "trip count");
+  // The latch terminator may be a BranchOnCount (new model, not yet dissolved)
+  // or a BranchOnCond with an ICmp (old model after convertToConcreteRecipes).
+  // Either way, replace it with AVL-based exit: BranchOnCond(AVLNext == 0).
+  assert(match(LatchBr,
+               m_CombineOr(m_BranchOnCount(), m_BranchOnCond(m_VPValue()))) &&
+         "Expected BranchOnCount or BranchOnCond as latch terminator");
 
   Type *AVLTy = AVLNext->getScalarType();
   VPBuilder Builder(LatchBr);
-  LatchBr->setOperand(
-      0, Builder.createICmp(CmpInst::ICMP_EQ, AVLNext, Plan.getZero(AVLTy)));
+  VPValue *Cond =
+      Builder.createICmp(CmpInst::ICMP_EQ, AVLNext, Plan.getZero(AVLTy));
+  Builder.createNaryOp(VPInstruction::BranchOnCond, Cond,
+                       LatchBr->getDebugLoc());
+  LatchBr->eraseFromParent();
 }
 
 void VPlanTransforms::replaceSymbolicStrides(
@@ -4149,17 +4126,6 @@ void VPlanTransforms::convertToConcreteRecipes(VPlan &Plan) {
         continue;
       }
 
-      // Lower BranchOnCount to ICmp + BranchOnCond.
-      VPValue *IV, *TC;
-      if (match(&R, m_BranchOnCount(m_VPValue(IV), m_VPValue(TC)))) {
-        auto *BranchOnCountInst = cast<VPInstruction>(&R);
-        DebugLoc DL = BranchOnCountInst->getDebugLoc();
-        VPValue *Cond = Builder.createICmp(CmpInst::ICMP_EQ, IV, TC, DL);
-        Builder.createNaryOp(VPInstruction::BranchOnCond, Cond, DL);
-        BranchOnCountInst->eraseFromParent();
-        continue;
-      }
-
       VPValue *VectorStep;
       VPValue *ScalarStep;
       if (!match(&R, m_VPInstruction<VPInstruction::WideIVStep>(
@@ -4438,10 +4404,12 @@ bool VPlanTransforms::handleUncountableEarlyExits(
   VPValue *IsAnyExitTaken =
       LatchBuilder.createNaryOp(VPInstruction::AnyOf, {Combined});
 
-  // Create a comparison for the latch exit condition and replace the
-  // BranchOnCond with a BranchOnTwoConds. The original BranchOnCond's condition
-  // is used as the latch-exit condition; canonical IV recipes have not been
-  // introduced yet, so there is no BranchOnCount to derive the condition from.
+  // Replace the latch's BranchOnCond with a BranchOnTwoConds. The original
+  // BranchOnCond's condition is used as the latch-exit condition; canonical IV
+  // recipes have not been introduced yet, so there is no BranchOnCount to
+  // derive the count condition from. When the loop region is created, the
+  // BranchOnTwoConds is turned into a BranchOnCondOrCount that combines the
+  // any-exit condition with the canonical count check.
   auto *LatchExitingBranch = cast<VPInstruction>(LatchVPBB->getTerminator());
   assert(LatchExitingBranch->getOpcode() == VPInstruction::BranchOnCond &&
          "Unexpected terminator");
@@ -5297,21 +5265,15 @@ void VPlanTransforms::materializeVectorTripCount(
 
 void VPlanTransforms::materializeFactors(VPlan &Plan, VPBasicBlock *VectorPH,
                                          ElementCount VFEC) {
-  // If VF and VFxUF have already been materialized (no remaining users),
-  // there's nothing more to do.
-  if (Plan.getVF().isMaterialized()) {
-    assert(Plan.getVFxUF().isMaterialized() &&
-           "VF and VFxUF must be materialized together");
-    return;
-  }
-
   VPBuilder Builder(VectorPH, VectorPH->begin());
   Type *TCTy = Plan.getTripCount()->getScalarType();
-  VPValue &VF = Plan.getVF();
-  VPValue &VFxUF = Plan.getVFxUF();
+  VPSymbolicValue &VF = Plan.getVF();
+  VPSymbolicValue &VFxUF = Plan.getVFxUF();
   // If there are no users of the runtime VF, compute VFxUF by constant folding
   // the multiplication of VF and UF.
-  if (VF.getNumUsers() == 0) {
+  if (VF.isMaterialized() || VF.getNumUsers() == 0) {
+    if (VFxUF.isMaterialized() || VFxUF.getNumUsers() == 0)
+      return;
     VPValue *RuntimeVFxUF =
         Builder.createElementCount(TCTy, VFEC * Plan.getConcreteUF());
     VFxUF.replaceAllUsesWith(RuntimeVFxUF);
@@ -5328,6 +5290,8 @@ void VPlanTransforms::materializeFactors(VPlan &Plan, VPBasicBlock *VectorPH,
   }
   VF.replaceAllUsesWith(RuntimeVF);
 
+  if (VFxUF.isMaterialized() || VFxUF.getNumUsers() == 0)
+    return;
   VPValue *MulByUF = Builder.createOverflowingOp(
       Instruction::Mul,
       {RuntimeVF, Plan.getConstantInt(TCTy, Plan.getConcreteUF())},
@@ -5448,7 +5412,18 @@ void VPlanTransforms::materializeAliasMaskCheckBlock(
   assert(Plan.getConcreteUF() == 1 &&
          "Clamped VF not supported with interleaving");
   Plan.getVF().replaceAllUsesWith(ClampedVF);
-  Plan.getVFxUF().replaceAllUsesWith(ClampedVF);
+
+  // The loop steps by the clamped VF. Lower the region's strip-mine factor to
+  // ClampedVF directly, replacing its use as the step operand of the latch's
+  // BranchOnCount, instead of the kind-based VFxUF (which is materialized just
+  // below).
+  Plan.getVectorLoopRegion()->getStripMineFactor()->replaceAllUsesWith(
+      ClampedVF);
+
+  // Update any remaining VFxUF users (e.g. the just-materialized trip count).
+  // Guard the RAUW so VFxUF is only marked materialized if it still has users.
+  if (Plan.getVFxUF().getNumUsers() > 0)
+    Plan.getVFxUF().replaceAllUsesWith(ClampedVF);
 }
 
 void VPlanTransforms::expandSCEVsToVPInstructions(VPlan &Plan,
@@ -5701,13 +5676,11 @@ VPlanTransforms::narrowInterleaveGroups(VPlan &Plan,
 
   // Skip plans when we may not be able to properly narrow.
   VPBasicBlock *Exiting = VectorLoop->getExitingBasicBlock();
-  if (!match(&Exiting->back(), m_BranchOnCount()))
+  if (!match(&Exiting->back(),
+             m_BranchOnCount(m_Specific(VectorLoop->getCanonicalIV()),
+                             m_VPValue(),
+                             m_Specific(&Plan.getVectorTripCount()))))
     return nullptr;
-
-  assert(match(&Exiting->back(),
-               m_BranchOnCount(m_Add(m_VPValue(), m_Specific(&Plan.getVFxUF())),
-                               m_Specific(&Plan.getVectorTripCount()))) &&
-         "unexpected branch-on-count");
 
   SmallVector<VPInterleaveRecipe *> StoreGroups;
   std::optional<ElementCount> VFToOptimize;
@@ -5829,7 +5802,6 @@ VPlanTransforms::narrowInterleaveGroups(VPlan &Plan,
 
   // Adjust induction to reflect that the transformed plan only processes one
   // original iteration.
-  VPInstruction *CanIVInc = vputils::findCanonicalIVIncrement(Plan);
   Type *CanIVTy = VectorLoop->getCanonicalIVType();
   VPBasicBlock *VectorPH = Plan.getVectorPreheader();
   VPBuilder PHBuilder(VectorPH, VectorPH->begin());
@@ -5842,16 +5814,24 @@ VPlanTransforms::narrowInterleaveGroups(VPlan &Plan,
     Step = PHBuilder.createOverflowingOp(Instruction::Mul, {VScale, UF},
                                          {true, false});
     Plan.getVF().replaceAllUsesWith(VScale);
+    VectorLoop->setStripFactorKind(
+        VPCanonicalIVInfo::StripFactorKind::NarrowScalable);
   } else {
     Step = UF;
     Plan.getVF().replaceAllUsesWith(Plan.getConstantInt(CanIVTy, 1));
+    VectorLoop->setStripFactorKind(
+        VPCanonicalIVInfo::StripFactorKind::NarrowFixed);
   }
   // Materialize vector trip count with the narrowed step.
   materializeVectorTripCount(Plan, VectorPH, /*TailByMasking=*/false,
                              RequiresScalarEpilogue, Step);
 
-  CanIVInc->setOperand(1, Step);
-  Plan.getVFxUF().replaceAllUsesWith(Step);
+  // Update remaining VFxUF users (e.g. VPWidenPointerInductionRecipe) to step
+  // by the narrowed Step. The region's strip-mine factor RV is independent
+  // and is lowered separately by lowerStripFactor based on the kind set
+  // above.
+  if (Plan.getVFxUF().getNumUsers() > 0)
+    Plan.getVFxUF().replaceAllUsesWith(Step);
 
   removeDeadRecipes(Plan);
   assert(none_of(*VectorLoop->getEntryBasicBlock(),

@@ -114,8 +114,8 @@ define void @example2(i32 %n, i32 %x) optsize {
 ; CHECK-NEXT:    store i32 [[X]], ptr [[TMP14]], align 4
 ; CHECK-NEXT:    br label [[PRED_STORE_CONTINUE6]]
 ; CHECK:       pred.store.continue6:
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i64> [[VEC_IND]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP15:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP15]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
 ; CHECK:       middle.block:
@@ -194,8 +194,8 @@ define void @example2(i32 %n, i32 %x) optsize {
 ; CHECK-NEXT:    store i32 [[TMP49]], ptr [[TMP48]], align 4
 ; CHECK-NEXT:    br label [[PRED_STORE_CONTINUE26]]
 ; CHECK:       pred.store.continue24:
-; CHECK-NEXT:    [[INDEX_NEXT29]] = add nuw i64 [[INDEX16]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT26]] = add nuw <4 x i64> [[VEC_IV]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT29]] = add nuw i64 [[INDEX16]], 4
 ; CHECK-NEXT:    [[TMP50:%.*]] = icmp eq i64 [[INDEX_NEXT29]], [[N_VEC12]]
 ; CHECK-NEXT:    br i1 [[TMP50]], label [[MIDDLE_BLOCK27:%.*]], label [[VECTOR_BODY13]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       middle.block27:
@@ -308,8 +308,8 @@ define void @example3(i32 %n, ptr noalias nocapture %p, ptr noalias nocapture %q
 ; CHECK-NEXT:    store i32 [[TMP19]], ptr [[NEXT_GEP5]], align 16
 ; CHECK-NEXT:    br label [[PRED_STORE_CONTINUE16]]
 ; CHECK:       pred.store.continue13:
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i64> [[VEC_IV]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP18:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP18]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
 ; CHECK:       middle.block:
@@ -487,8 +487,8 @@ define void @example23c(ptr noalias nocapture %src, ptr noalias nocapture %dst) 
 ; CHECK-NEXT:    store i32 [[TMP23]], ptr [[NEXT_GEP9]], align 4
 ; CHECK-NEXT:    br label [[PRED_STORE_CONTINUE15]]
 ; CHECK:       pred.store.continue13:
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i16> [[VEC_IND]], splat (i16 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP24:%.*]] = icmp eq i64 [[INDEX_NEXT]], 260
 ; CHECK-NEXT:    br i1 [[TMP24]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
 ; CHECK:       middle.block:
@@ -579,8 +579,8 @@ define i64 @example23d(ptr noalias nocapture %src, ptr noalias nocapture %dst) o
 ; CHECK-NEXT:    store i32 [[TMP23]], ptr [[NEXT_GEP8]], align 4
 ; CHECK-NEXT:    br label [[PRED_STORE_CONTINUE14]]
 ; CHECK:       pred.store.continue13:
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i16> [[VEC_IND]], splat (i16 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP24:%.*]] = icmp eq i64 [[INDEX_NEXT]], 260
 ; CHECK-NEXT:    br i1 [[TMP24]], label [[MIDDLE_BLOCK:%.*]], label [[TMP1]], !llvm.loop [[LOOP8:![0-9]+]]
 ; CHECK:       middle.block:

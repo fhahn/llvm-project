@@ -323,8 +323,8 @@ define void @latch_branch_cost(ptr %dst) {
 ; PRED-NEXT:    store i8 0, ptr [[TMP24]], align 1
 ; PRED-NEXT:    br label %[[PRED_STORE_CONTINUE6]]
 ; PRED:       [[PRED_STORE_CONTINUE6]]:
-; PRED-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; PRED-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i8> [[VEC_IND]], splat (i8 4)
+; PRED-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; PRED-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[INDEX_NEXT]], 100
 ; PRED-NEXT:    br i1 [[TMP12]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; PRED:       [[MIDDLE_BLOCK]]:
@@ -809,8 +809,8 @@ define void @test_conditional_interleave_group (ptr noalias %src.1, ptr noalias 
 ; DEFAULT-NEXT:    store float 0.000000e+00, ptr [[TMP74]], align 4
 ; DEFAULT-NEXT:    br label %[[PRED_STORE_CONTINUE27]]
 ; DEFAULT:       [[PRED_STORE_CONTINUE27]]:
-; DEFAULT-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; DEFAULT-NEXT:    [[VEC_IND_NEXT]] = add <8 x i64> [[VEC_IND]], splat (i64 8)
+; DEFAULT-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; DEFAULT-NEXT:    [[TMP80:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; DEFAULT-NEXT:    br i1 [[TMP80]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP25:![0-9]+]]
 ; DEFAULT:       [[MIDDLE_BLOCK]]:
@@ -1028,8 +1028,8 @@ define void @redundant_branch_and_tail_folding(ptr %dst, i1 %c) {
 ; DEFAULT-NEXT:    [[TMP1:%.*]] = trunc nuw nsw <4 x i64> [[TMP0]] to <4 x i32>
 ; DEFAULT-NEXT:    [[TMP2:%.*]] = extractelement <4 x i32> [[TMP1]], i64 3
 ; DEFAULT-NEXT:    store i32 [[TMP2]], ptr [[DST]], align 4
-; DEFAULT-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; DEFAULT-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[STEP_ADD]], splat (i64 4)
+; DEFAULT-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; DEFAULT-NEXT:    [[TMP3:%.*]] = icmp eq i64 [[INDEX_NEXT]], 16
 ; DEFAULT-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP27:![0-9]+]]
 ; DEFAULT:       [[MIDDLE_BLOCK]]:

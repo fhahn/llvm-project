@@ -34,8 +34,8 @@ define void @icmp_predicate_and_branch_cost(i32 %size, ptr %dst, i64 %conv5.i) #
 ; CHECK-NEXT:    [[PREDPHI3:%.*]] = select <16 x i1> [[TMP6]], <16 x i8> [[PREDPHI]], <16 x i8> splat (i8 1)
 ; CHECK-NEXT:    [[TMP11:%.*]] = extractelement <16 x i8> [[PREDPHI3]], i64 15
 ; CHECK-NEXT:    store i8 [[TMP11]], ptr [[DST:%.*]], align 1
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 16
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <16 x i32> [[VEC_IND]], splat (i32 128)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 16
 ; CHECK-NEXT:    [[TMP12:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP12]], label [[MIDDLE_BLOCK:%.*]], label [[LOOP_HEADER]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       middle.block:

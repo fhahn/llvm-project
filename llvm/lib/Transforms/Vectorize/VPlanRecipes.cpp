@@ -465,6 +465,7 @@ Type *llvm::computeScalarTypeForInstruction(unsigned Opcode,
   switch (Opcode) {
   case VPInstruction::BranchOnCond:
   case VPInstruction::BranchOnTwoConds:
+  case VPInstruction::BranchOnCondOrCount:
   case VPInstruction::BranchOnCount:
   case Instruction::Store:
   case Instruction::Switch:
@@ -595,7 +596,6 @@ unsigned VPInstruction::getNumOperandsForOpcode() const {
   case Instruction::FCmp:
   case Instruction::ExtractElement:
   case Instruction::Store:
-  case VPInstruction::BranchOnCount:
   case VPInstruction::BranchOnTwoConds:
   case VPInstruction::FirstOrderRecurrenceSplice:
   case VPInstruction::LogicalAnd:
@@ -608,9 +608,11 @@ unsigned VPInstruction::getNumOperandsForOpcode() const {
   case Instruction::InsertElement:
   case Instruction::Select:
   case VPInstruction::ActiveLaneMask:
-  case VPInstruction::BranchOnCondOrCount:
+  case VPInstruction::BranchOnCount:
   case VPInstruction::ReductionStartVector:
     return 3;
+  case VPInstruction::BranchOnCondOrCount:
+    return 4;
   case Instruction::Call:
     return getCalledFnOperandIndex(ArrayRef<VPValue *>(op_begin(), op_end())) +
            1;
@@ -1404,7 +1406,8 @@ InstructionCost VPInstruction::computeCost(ElementCount VF,
     return Ctx.TTI.getArithmeticInstrCost(Instruction::Xor, ValTy,
                                           Ctx.CostKind);
   }
-  case VPInstruction::BranchOnCount: {
+  case VPInstruction::BranchOnCount:
+  case VPInstruction::BranchOnCondOrCount: {
     // If TC <= VF then this is just a branch.
     // FIXME: Removing the branch happens in simplifyBranchConditionForVFAndUF
     // where it checks TC <= VF * UF, but we don't know UF yet. This means in
@@ -1417,8 +1420,13 @@ InstructionCost VPInstruction::computeCost(ElementCount VF,
     ConstantInt *TCConst = dyn_cast_if_present<ConstantInt>(TC);
     if (TCConst && TCConst->getValue().ule(VF.getKnownMinValue()))
       return 0;
-    // Otherwise BranchOnCount generates ICmpEQ followed by a branch.
-    Type *ValTy = getOperand(0)->getScalarType();
+    // Otherwise BranchOnCount / BranchOnCondOrCount materialize the canonical
+    // IV increment's count check as an ICmpEQ followed by a branch. The
+    // canonical IV operand is the first for BranchOnCount and the second for
+    // BranchOnCondOrCount.
+    unsigned IVOpIdx =
+        getOpcode() == VPInstruction::BranchOnCondOrCount ? 1 : 0;
+    Type *ValTy = getOperand(IVOpIdx)->getScalarType();
     return Ctx.TTI.getCmpSelInstrCost(Instruction::ICmp, ValTy,
                                       CmpInst::makeCmpResultType(ValTy),
                                       CmpInst::ICMP_EQ, Ctx.CostKind);

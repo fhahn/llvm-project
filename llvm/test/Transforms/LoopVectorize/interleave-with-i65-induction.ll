@@ -25,8 +25,8 @@ define void @i65_induction_with_negative_step(ptr %dst) {
 ; CHECK-NEXT:    [[REVERSE1:%.*]] = shufflevector <4 x i64> [[TMP3]], <4 x i64> poison, <4 x i32> <i32 3, i32 2, i32 1, i32 0>
 ; CHECK-NEXT:    store <4 x i64> [[REVERSE]], ptr [[TMP6]], align 8
 ; CHECK-NEXT:    store <4 x i64> [[REVERSE1]], ptr [[TMP8]], align 8
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i65 [[INDEX]], 8
 ; CHECK-NEXT:    [[TMP7]] = sub <4 x i64> [[STEP_ADD]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i65 [[INDEX]], 8
 ; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq i65 [[INDEX_NEXT]], 1000
 ; CHECK-NEXT:    br i1 [[TMP9]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
