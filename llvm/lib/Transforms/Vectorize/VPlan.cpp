@@ -950,6 +950,13 @@ bool VPlan::isExitBlock(VPBlockBase *VPBB) {
   return is_contained(ExitBlocks, VPBB);
 }
 
+VPSpeculativeLoadOracleRecipe *VPlan::getSpeculativeLoadOracle() {
+  VPBasicBlock &Header = *getVectorLoopRegion()->getEntryBasicBlock();
+  auto It = find_if(Header, IsaPred<VPSpeculativeLoadOracleRecipe>);
+  return It == Header.end() ? nullptr
+                            : cast<VPSpeculativeLoadOracleRecipe>(&*It);
+}
+
 /// To make RUN_VPLAN_PASS print final VPlan.
 static void printFinalVPlan(VPlan &) {}
 

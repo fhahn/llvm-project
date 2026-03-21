@@ -13,9 +13,11 @@
 
 #include "LoopVectorizationPlanner.h"
 #include "VPlan.h"
+#include "VPlanCFG.h"
 #include "VPlanHelpers.h"
 #include "VPlanPatternMatch.h"
 #include "VPlanUtils.h"
+#include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SmallVectorExtras.h"
@@ -25,6 +27,7 @@
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Dominators.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
@@ -3619,6 +3622,102 @@ InstructionCost VPReductionRecipe::computeCost(ElementCount VF,
   return Ctx.TTI.getArithmeticReductionCost(Opcode, VectorTy, OptionalFMF,
                                             Ctx.CostKind);
 }
+
+VPSpeculativeLoadOracleRecipe *VPSpeculativeLoadOracleRecipe::clone() {
+  return new VPSpeculativeLoadOracleRecipe(
+      std::unique_ptr<VPlan>(OraclePlan->duplicate()), operands(),
+      OraclePlan->getContext());
+}
+
+void VPSpeculativeLoadOracleRecipe::execute(VPTransformState &State) {
+  VPlan &Plan = *OraclePlan;
+  LLVMContext &Ctx = State.Builder.getContext();
+  Type *I64Ty = Type::getInt64Ty(Ctx);
+
+  // The oracle function's parameters mirror this recipe's operands: the lane-0
+  // canonical IV, followed by the oracle plan's external live-ins.
+  auto ParamTypes = map_to_vector(
+      operands(), [](VPValue *Op) { return Op->getScalarType(); });
+
+  Module *M = State.Builder.GetInsertBlock()->getModule();
+  Function *OracleFn = Function::Create(
+      FunctionType::get(I64Ty, ParamTypes, /*isVarArg=*/false),
+      GlobalValue::InternalLinkage, "speculativeLoadOracle", M);
+  OracleFn->setMemoryEffects(MemoryEffects::argMemOnly(ModRefInfo::Ref));
+  OracleFn->addFnAttr(Attribute::NoInline);
+  OracleFn->addFnAttr(Attribute::OptimizeNone);
+  // The replay loop runs exactly VF iterations, so it always terminates.
+  OracleFn->addFnAttr(Attribute::MustProgress);
+
+  // Remap the oracle plan's placeholders to the function's arguments: its
+  // vector-trip-count symbol, standing in for the outer canonical IV, to the
+  // first, its live-ins to the remaining ones.
+  Argument *CanonIVArg = OracleFn->getArg(0);
+  CanonIVArg->setName("canonIV");
+  Plan.getVectorTripCount().replaceAllUsesWith(Plan.getOrAddLiveIn(CanonIVArg));
+  for (auto [Arg, Op] :
+       zip_equal(drop_begin(OracleFn->args()), drop_begin(operands()))) {
+    Value *V = cast<VPIRValue>(Op)->getValue();
+    Arg.setName(V->getName());
+    Plan.getOrAddLiveIn(V)->replaceAllUsesWith(Plan.getOrAddLiveIn(&Arg));
+  }
+
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "oracle.entry", OracleFn);
+  IRBuilder<> OracleBuilder(EntryBB);
+
+  // Replace the VF placeholder with the runtime lane count, matching the IV
+  // type so the BranchOnCount types agree.
+  Value *RuntimeVF =
+      getRuntimeVF(OracleBuilder, CanonIVArg->getType(), State.VF);
+  Plan.getVF().replaceAllUsesWith(Plan.getOrAddLiveIn(RuntimeVF));
+  OracleBuilder.CreateUnreachable();
+
+  // Set up a VPTransformState for scalar (VF=1) execution into the oracle
+  // function. Create a LoopInfo so VPBasicBlock::execute can register the loop.
+  DominatorTree OracleDT(*OracleFn);
+  LoopInfo OracleLI(OracleDT);
+  VPTransformState OracleState(State.TTI, ElementCount::getFixed(1), &OracleLI,
+                               /*DT=*/nullptr, /*AC=*/nullptr, OracleBuilder,
+                               &Plan, /*CurrentParentLoop=*/nullptr);
+  OracleState.CFG.PrevBB = EntryBB;
+  OracleState.CFG.VPBB2IRBB[Plan.getEntry()] = EntryBB;
+
+  // Generate the oracle plan's blocks directly, bypassing VPlan::execute which
+  // does main-plan-specific setup and cleanup. The entry is already mapped to
+  // EntryBB and comes first in RPO, so skip it; the single exit block has no
+  // successors, hence comes last.
+  ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>> RPOT(
+      Plan.getEntry());
+  VPBasicBlock *ExitVPBB = nullptr;
+  for (VPBlockBase *Block : drop_begin(RPOT)) {
+    Block->execute(&OracleState);
+    ExitVPBB = cast<VPBasicBlock>(Block);
+  }
+  OracleState.fixupHeaderPhis();
+  assert(ExitVPBB->getNumSuccessors() == 0 && "exit block must be last in RPO");
+
+  // Return the byte count computed by the last recipe of the exit block.
+  BasicBlock *ExitBB = OracleState.CFG.VPBB2IRBB[ExitVPBB];
+  cast<UnreachableInst>(ExitBB->getTerminator())->eraseFromParent();
+  Value *RetVal =
+      OracleState.get(ExitVPBB->back().getVPSingleValue(), /*IsScalar=*/true);
+  assert(RetVal->getType() == I64Ty && "Oracle exit value must be i64");
+  OracleBuilder.SetInsertPoint(ExitBB);
+  OracleBuilder.CreateRet(RetVal);
+
+  State.set(this, OracleFn, /*IsScalar=*/true);
+}
+
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+void VPSpeculativeLoadOracleRecipe::printRecipe(raw_ostream &O,
+                                                const Twine &Indent,
+                                                VPSlotTracker &Tracker) const {
+  O << Indent << "SPECULATIVE-LOAD-ORACLE ";
+  printAsOperand(O, Tracker);
+  O << " = call ";
+  printOperands(O, Tracker);
+}
+#endif
 
 VPExpressionRecipe::VPExpressionRecipe(
     ExpressionTypes ExpressionType,

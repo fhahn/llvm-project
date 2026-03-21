@@ -437,6 +437,7 @@ public:
     VPReductionSC,
     VPReplicateSC,
     VPScalarIVStepsSC,
+    VPSpeculativeLoadOracleSC,
     VPVectorPointerSC,
     VPVectorEndPointerSC,
     VPWidenCallSC,
@@ -641,6 +642,7 @@ public:
     case VPRecipeBase::VPReductionSC:
     case VPRecipeBase::VPReplicateSC:
     case VPRecipeBase::VPScalarIVStepsSC:
+    case VPRecipeBase::VPSpeculativeLoadOracleSC:
     case VPRecipeBase::VPVectorPointerSC:
     case VPRecipeBase::VPVectorEndPointerSC:
     case VPRecipeBase::VPWidenCallSC:
@@ -3542,6 +3544,39 @@ public:
   }
 };
 
+/// Holds a cloned VPlan for a speculative load oracle: a scalar loop replaying
+/// the early-exit conditions lane-by-lane. Defines the pointer to the oracle
+/// function generated from that plan, which returns the number of accessible
+/// bytes as i64. Its operands are the arguments passed to that function: the
+/// lane-0 canonical IV, followed by the oracle plan's live-ins.
+class VPSpeculativeLoadOracleRecipe : public VPSingleDefRecipe {
+  std::unique_ptr<VPlan> OraclePlan;
+
+public:
+  VPSpeculativeLoadOracleRecipe(std::unique_ptr<VPlan> OraclePlan,
+                                ArrayRef<VPValue *> Args, LLVMContext &Ctx)
+      : VPSingleDefRecipe(VPRecipeBase::VPSpeculativeLoadOracleSC, Args,
+                          PointerType::getUnqual(Ctx)),
+        OraclePlan(std::move(OraclePlan)) {}
+
+  VP_CLASSOF_IMPL(VPRecipeBase::VPSpeculativeLoadOracleSC)
+
+  VPSpeculativeLoadOracleRecipe *clone() override;
+  void execute(VPTransformState &State) override;
+
+  InstructionCost computeCost(ElementCount, VPCostContext &) const override {
+    return 0;
+  }
+
+  bool usesFirstLaneOnly(const VPValue *Op) const override { return true; }
+
+protected:
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+  void printRecipe(raw_ostream &O, const Twine &Indent,
+                   VPSlotTracker &Tracker) const override;
+#endif
+};
+
 /// A recipe to combine multiple recipes into a single 'expression' recipe,
 /// which should be considered a single entity for cost-modeling and transforms.
 /// The recipe needs to be 'decomposed', i.e. replaced by its individual
@@ -5255,6 +5290,10 @@ public:
     // block and the early exiting edge).
     return NumExitPredecessors > 1;
   }
+
+  /// Returns the speculative-load oracle recipe in the vector loop header, or
+  /// nullptr if the plan does not use one. Requires loop regions to be created.
+  VPSpeculativeLoadOracleRecipe *getSpeculativeLoadOracle();
 
   /// Returns true if the scalar tail may execute after the vector loop, i.e.
   /// if the middle block is a predecessor of the scalar preheader. Note that

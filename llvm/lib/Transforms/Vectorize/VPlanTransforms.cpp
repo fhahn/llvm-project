@@ -3308,11 +3308,12 @@ bool VPlanTransforms::handleUncountableEarlyExits(
   auto *MiddleVPBB = VPBlockUtils::getPlainCFGMiddleBlock(Plan);
   auto [HeaderVPBB, LatchVPBB] = VPBlockUtils::getPlainCFGHeaderAndLatch(Plan);
 
-  // Dereferenceability is checked separately for uncountable exit loops with
+  // Dereferenceability is only handled for uncountable exit loops without
   // stores, as only the loads contributing to the exit condition need to
-  // be checked.
+  // be checked. Non-dereferenceable loads are replaced with speculative
+  // loads, before the early exits below flatten the loop's CFG.
   if (Style == UncountableExitStyle::ReadOnly &&
-      !areAllLoadsDereferenceable(HeaderVPBB, TheLoop, PSE, DT, AC))
+      !replaceUnsafeLoadsWithSpeculative(Plan, TheLoop, PSE, DT, AC))
     return false;
 
   VPBuilder LatchBuilder(LatchVPBB->getTerminator());

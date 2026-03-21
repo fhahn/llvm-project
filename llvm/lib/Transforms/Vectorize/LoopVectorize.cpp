@@ -3273,6 +3273,7 @@ static bool willGenerateVectors(VPlan &Plan, ElementCount VF,
       case VPRecipeBase::VPExpandSCEVSC:
       case VPRecipeBase::VPPredInstPHISC:
       case VPRecipeBase::VPBranchOnMaskSC:
+      case VPRecipeBase::VPSpeculativeLoadOracleSC:
         continue;
       case VPRecipeBase::VPReductionSC:
       case VPRecipeBase::VPActiveLaneMaskPHISC:
@@ -5630,7 +5631,10 @@ LoopVectorizationPlanner::computeBestVF() {
     return {VectorizationFactor(FirstPlan.getSingleVF(), 0, 0), &FirstPlan};
   }
 
-  if (hasPlanWithVF(UserVF) && hasForcedEpilogueVF() && VPlans.size() == 2) {
+  // Check the first plan directly: UserVF may have been rejected due to
+  // invalid costs, in which case the plans were built by the cost-based path
+  // below and just happen to include one with UserVF.
+  if (FirstPlan.hasVF(UserVF) && hasForcedEpilogueVF() && VPlans.size() == 2) {
     assert(VPlans[0]->getSingleVF() == UserVF &&
            "expected second plan to be for the forced UserVF");
     assert(VPlans[1]->getSingleVF() == EpilogueVectorizationForceVF &&
@@ -5773,6 +5777,9 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
                    HasBranchWeights);
     ++LoopsPartialAliasVectorized;
   }
+
+  RUN_VPLAN_PASS(VPlanTransforms::attachSpeculativeLoadChecks, BestVPlan,
+                 BestVF, PSE, OrigLoop, HasBranchWeights);
 
   // Retrieving VectorPH now when it's easier while VPlan still has Regions.
   VPBasicBlock *VectorPH = cast<VPBasicBlock>(BestVPlan.getVectorPreheader());
@@ -6502,6 +6509,8 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
 
   RUN_VPLAN_PASS(VPlanTransforms::createLoopRegions, *VPlan0,
                  getDebugLocFromInstOrOperands(Legal->getPrimaryInduction()));
+  RUN_VPLAN_PASS(VPlanTransforms::materializeSpeculativeLoadOracleCanonicalIV,
+                 *VPlan0);
   if (CM->foldTailByMasking())
     RUN_VPLAN_PASS(VPlanTransforms::foldTailByMasking, *VPlan0);
 
@@ -6680,7 +6689,8 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan,
       if (isa<VPWidenCanonicalIVRecipe, VPBlendRecipe, VPReductionRecipe,
               VPReplicateRecipe, VPWidenLoadRecipe, VPWidenStoreRecipe,
               VPWidenCallRecipe, VPWidenIntrinsicRecipe, VPVectorPointerRecipe,
-              VPVectorEndPointerRecipe, VPHistogramRecipe>(&R) ||
+              VPVectorEndPointerRecipe, VPHistogramRecipe,
+              VPSpeculativeLoadOracleRecipe>(&R) ||
           (Instruction::isCast(cast<VPInstruction>(R).getOpcode()) &&
            vputils::onlyFirstLaneUsed(R.getVPSingleValue())))
         continue;
@@ -8084,6 +8094,16 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     LLVM_DEBUG(dbgs() << "LV: Not interleaving due to EE with side effects.\n");
     IntDiagMsg = {"EEWithSideEffectsPreventsInterleaving",
                   "Unable to interleave due to early exit with side effects."};
+    InterleaveLoop = false;
+    IC = 1;
+  }
+
+  // The oracle's canonical-IV operand is not offset per unrolled part, so parts
+  // >= 1 would replay the wrong lane window.
+  if (InterleaveLoop && BestPlanPtr->getSpeculativeLoadOracle()) {
+    LLVM_DEBUG(dbgs() << "LV: Not interleaving loop with speculative loads.\n");
+    IntDiagMsg = {"SpeculativeLoadPreventsInterleaving",
+                  "Unable to interleave loop using speculative loads."};
     InterleaveLoop = false;
     IC = 1;
   }
