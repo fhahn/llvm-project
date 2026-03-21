@@ -515,10 +515,12 @@ void VPBasicBlock::execute(VPTransformState *State) {
   };
   // 1. Create an IR basic block.
   if ((Replica && this == getParent()->getEntry()) ||
-      IsReplicateRegion(getSingleHierarchicalPredecessor())) {
+      IsReplicateRegion(getSingleHierarchicalPredecessor()) ||
+      !getNumPredecessors()) {
     // Reuse the previous basic block if the current VPBB is either
-    //  * the entry to a replicate region, or
-    //  * the exit of a replicate region.
+    //  * the entry to a replicate region,
+    //  * the exit of a replicate region, or
+    //  * has no predecessors (plan entry, e.g. for oracle plans).
     State->CFG.VPBB2IRBB[this] = NewBB;
   } else {
     NewBB = createEmptyBasicBlock(*State);
@@ -934,30 +936,36 @@ void VPlan::execute(VPTransformState *State) {
   // constructed.
   State->VPDT.recalculate(*this);
 
-  // Disconnect VectorPreHeader from ExitBB in both the CFG and DT.
   BasicBlock *VectorPreHeader = State->CFG.PrevBB;
-  cast<UncondBrInst>(VectorPreHeader->getTerminator())->setSuccessor(nullptr);
-  State->CFG.DTU.applyUpdates(
-      {{DominatorTree::Delete, VectorPreHeader, State->CFG.ExitBB}});
-
-  LLVM_DEBUG(dbgs() << "Executing best plan with VF=" << State->VF
-                    << ", UF=" << getConcreteUF() << '\n');
-  setName("Final VPlan");
-  // TODO: RUN_VPLAN_PASS/VPlanTransforms::runPass should automatically dump
-  // VPlans after some specific stages when "-debug" is specified, but that
-  // hasn't been implemented yet. For now, just do both:
-  LLVM_DEBUG(dump());
-  RUN_VPLAN_PASS(printFinalVPlan, *this);
-
-  BasicBlock *ScalarPh = State->CFG.ExitBB;
-  VPBasicBlock *ScalarPhVPBB = getScalarPreheader();
-  if (ScalarPhVPBB->hasPredecessors()) {
-    // Disconnect scalar preheader and scalar header, as the dominator tree edge
-    // will be updated as part of VPlan execution. This allows keeping the DTU
-    // logic generic during VPlan execution.
+  if (State->CFG.ExitBB) {
+    // Disconnect VectorPreHeader from ExitBB in both the CFG and DT.
+    cast<UncondBrInst>(VectorPreHeader->getTerminator())
+        ->setSuccessor(nullptr);
     State->CFG.DTU.applyUpdates(
-        {{DominatorTree::Delete, ScalarPh, ScalarPh->getSingleSuccessor()}});
+        {{DominatorTree::Delete, VectorPreHeader, State->CFG.ExitBB}});
   }
+
+  if (State->CFG.ExitBB) {
+    LLVM_DEBUG(dbgs() << "Executing best plan with VF=" << State->VF
+                      << ", UF=" << getConcreteUF() << '\n');
+    setName("Final VPlan");
+    // TODO: RUN_VPLAN_PASS/VPlanTransforms::runPass should automatically dump
+    // VPlans after some specific stages when "-debug" is specified, but that
+    // hasn't been implemented yet. For now, just do both:
+    LLVM_DEBUG(dump());
+    RUN_VPLAN_PASS(printFinalVPlan, *this);
+
+    BasicBlock *ScalarPh = State->CFG.ExitBB;
+    VPBasicBlock *ScalarPhVPBB = getScalarPreheader();
+    if (ScalarPhVPBB->hasPredecessors()) {
+      // Disconnect scalar preheader and scalar header, as the dominator tree
+      // edge will be updated as part of VPlan execution. This allows keeping
+      // the DTU logic generic during VPlan execution.
+      State->CFG.DTU.applyUpdates(
+          {{DominatorTree::Delete, ScalarPh, ScalarPh->getSingleSuccessor()}});
+    }
+  }
+
   ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>> RPOT(
       Entry);
   // Generate code for the VPlan, in parts of the vector skeleton, loop body and
@@ -991,29 +999,32 @@ void VPlan::execute(VPTransformState *State) {
     }
   }
 
-  // If the original loop is unreachable, delete it and all its blocks.
-  if (!ScalarPhVPBB->hasPredecessors()) {
-    // DeleteDeadBlocks will remove single-entry phis. Remove them from the exit
-    // VPIRBBs in VPlan as well, otherwise we would retain references to deleted
-    // IR instructions.
-    for (VPIRBasicBlock *EB : getExitBlocks()) {
-      for (VPRecipeBase &R : make_early_inc_range(EB->phis())) {
-        if (R.getNumOperands() == 1)
-          R.eraseFromParent();
+  if (State->CFG.ExitBB) {
+    VPBasicBlock *ScalarPhVPBB = getScalarPreheader();
+    // If the original loop is unreachable, delete it and all its blocks.
+    if (!ScalarPhVPBB->hasPredecessors()) {
+      // DeleteDeadBlocks will remove single-entry phis. Remove them from the
+      // exit VPIRBBs in VPlan as well, otherwise we would retain references to
+      // deleted IR instructions.
+      for (VPIRBasicBlock *EB : getExitBlocks()) {
+        for (VPRecipeBase &R : make_early_inc_range(EB->phis())) {
+          if (R.getNumOperands() == 1)
+            R.eraseFromParent();
+        }
       }
+
+      Loop *OrigLoop =
+          State->LI->getLoopFor(getScalarHeader()->getIRBasicBlock());
+      auto Blocks = OrigLoop->getBlocksVector();
+      Blocks.push_back(cast<VPIRBasicBlock>(ScalarPhVPBB)->getIRBasicBlock());
+      for (auto *BB : Blocks)
+        State->LI->removeBlock(BB);
+      DeleteDeadBlocks(Blocks, &State->CFG.DTU);
+      State->LI->erase(OrigLoop);
     }
 
-    Loop *OrigLoop =
-        State->LI->getLoopFor(getScalarHeader()->getIRBasicBlock());
-    auto Blocks = OrigLoop->getBlocksVector();
-    Blocks.push_back(cast<VPIRBasicBlock>(ScalarPhVPBB)->getIRBasicBlock());
-    for (auto *BB : Blocks)
-      State->LI->removeBlock(BB);
-    DeleteDeadBlocks(Blocks, &State->CFG.DTU);
-    State->LI->erase(OrigLoop);
+    State->CFG.DTU.flush();
   }
-
-  State->CFG.DTU.flush();
 
   // Fix the latch value of canonical, reduction and first-order recurrences
   // phis in all loop headers.

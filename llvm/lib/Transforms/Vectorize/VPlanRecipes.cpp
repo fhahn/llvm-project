@@ -3046,8 +3046,6 @@ void VPSpeculativeLoadOracleRecipe::execute(VPTransformState &State) {
   Type *I64Ty = Type::getInt64Ty(Ctx);
 
   auto *OracleEntry = cast<VPBasicBlock>(OraclePlan.getEntry());
-  auto *OracleHeader = cast<VPBasicBlock>(OracleEntry->getSingleSuccessor());
-  auto *ScalarIVPHIR = &OracleHeader->front();
 
   // Replace the oracle plan's VF placeholder with the actual VF, matching the
   // canonical IV type so the BranchOnCount comparison types agree.
@@ -3070,44 +3068,24 @@ void VPSpeculativeLoadOracleRecipe::execute(VPTransformState &State) {
   OracleFn->addFnAttr(Attribute::NoInline);
   OracleFn->addFnAttr(Attribute::OptimizeNone);
 
-  // Name the canonical IV argument.
+  // Name the canonical IV argument and materialize the placeholder live-in
+  // (backed by UndefValue) so the adjusted IV instruction uses the function
+  // argument.
   Argument *CanonIVArg = OracleFn->getArg(0);
   CanonIVArg->setName("canonIV");
+  OraclePlan.getOrAddLiveIn(UndefValue::get(IVTy))
+      ->replaceAllUsesWith(OraclePlan.getOrAddLiveIn(CanonIVArg));
 
-  // Collect external VPIRValues in the oracle plan and remap them to function
-  // arguments. The recipe operands (index 1..N) correspond to the external
-  // values in the order they were collected by buildOraclePlan.
-  MapVector<Value *, Value *> IRValueToArg;
-  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
-           vp_depth_first_shallow(OracleEntry)))
-    for (VPRecipeBase &R : *VPBB)
-      for (VPValue *Op : R.operands())
-        if (auto *IRV = dyn_cast<VPIRValue>(Op))
-          if (!isa<VPConstantInt>(IRV) && !isa<Constant>(IRV->getValue()))
-            IRValueToArg.try_emplace(IRV->getValue(), nullptr);
-
-  // Map each external value to its corresponding function argument.
-  unsigned ArgI = 1;
-  for (auto &[OrigVal, FnArg] : IRValueToArg) {
-    Argument *Arg = OracleFn->getArg(ArgI++);
+  // Remap external live-ins to function arguments. Each recipe operand
+  // (index 1..N) corresponds to an external value whose VPIRValue live-in
+  // in the oracle plan we replace with a function argument live-in.
+  for (unsigned I = 1, E = getNumOperands(); I != E; ++I) {
+    Value *OrigVal = State.get(getOperand(I), /*IsScalar=*/true);
+    Argument *Arg = OracleFn->getArg(I);
     Arg->setName(OrigVal->getName());
-    FnArg = Arg;
+    OraclePlan.getOrAddLiveIn(OrigVal)
+        ->replaceAllUsesWith(OraclePlan.getOrAddLiveIn(Arg));
   }
-
-  // Remap VPIRValue operands in the oracle plan to point to function arguments.
-  DenseMap<Value *, VPIRValue *> ArgLiveIns;
-  for (auto &[OrigVal, FnArg] : IRValueToArg)
-    ArgLiveIns[OrigVal] = OraclePlan.getOrAddLiveIn(FnArg);
-  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
-           vp_depth_first_shallow(OracleEntry)))
-    for (VPRecipeBase &R : *VPBB)
-      for (unsigned I = 0, E = R.getNumOperands(); I != E; ++I)
-        if (auto *IRV = dyn_cast<VPIRValue>(R.getOperand(I)))
-          if (!isa<VPConstantInt>(IRV)) {
-            auto It = ArgLiveIns.find(IRV->getValue());
-            if (It != ArgLiveIns.end())
-              R.setOperand(I, It->second);
-          }
 
   // Create entry IR basic block in the oracle function with an unreachable
   // terminator that connectToPredecessors will replace with a branch.
@@ -3126,85 +3104,32 @@ void VPSpeculativeLoadOracleRecipe::execute(VPTransformState &State) {
                                &OracleLI, /*DT=*/nullptr, /*AC=*/nullptr,
                                OracleBuilder, &OraclePlan,
                                /*CurrentParentLoop=*/nullptr, I64Ty);
-
-  // Initialize CFG state so VPBasicBlock::execute creates BBs in the oracle
-  // function (using PrevBB->getParent()) and inserts them at the end
-  // (ExitBB=nullptr).
   OracleState.CFG.PrevBB = EntryBB;
-  OracleState.CFG.ExitBB = nullptr;
-  OracleState.CFG.VPBB2IRBB[OracleEntry] = EntryBB;
-  OracleState.VPDT.recalculate(OraclePlan);
 
-  // Execute all blocks except entry (pre-mapped) using VPBasicBlock::execute,
-  // which handles BB creation, CFG wiring, and recipe execution.
-  ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>> RPOT(
-      OracleEntry);
-  for (VPBlockBase *Block : RPOT) {
-    if (Block == OracleEntry)
-      continue;
-    Block->execute(&OracleState);
-  }
+  // Execute the oracle plan. VPlan::execute handles RPOT traversal, BB
+  // creation, CFG wiring, and header PHI backedge fixup. The entry
+  // VPBasicBlock (no predecessors) reuses EntryBB; subsequent blocks are
+  // created in the oracle function. ExitBB is nullptr (EntryBB has no
+  // successor), so main-plan-specific cleanup (scalar header, dead block
+  // deletion) is skipped.
+  OraclePlan.execute(&OracleState);
 
-  // Fix up header PHI backedge incoming values, following the same pattern as
-  // VPlan::execute.
-  for (VPBlockBase *VPB : vp_depth_first_shallow(OracleEntry)) {
-    if (!VPBlockUtils::isHeader(VPB, OracleState.VPDT))
-      continue;
-    auto *Header = cast<VPBasicBlock>(VPB);
-    auto *LatchVPBB = cast<VPBasicBlock>(Header->getPredecessors()[1]);
-    BasicBlock *LatchBB = OracleState.CFG.VPBB2IRBB[LatchVPBB];
-    for (VPRecipeBase &R : Header->phis()) {
-      auto *PhiR = cast<VPSingleDefRecipe>(&R);
-      Value *Phi = OracleState.get(PhiR, /*IsScalar=*/true);
-      Value *BackedgeVal =
-          OracleState.get(PhiR->getOperand(1), /*IsScalar=*/true);
-      cast<PHINode>(Phi)->addIncoming(BackedgeVal, LatchBB);
-    }
-  }
-
-  // Add adjusted IV: inside the oracle function, the scalar IV PHI counts
-  // 0..VF. Add canonIV to get the actual lane index for memory addressing.
-  auto *ScalarIVPHI = cast<VPInstruction>(ScalarIVPHIR);
-  Value *IVPHIVal = OracleState.get(ScalarIVPHI, /*IsScalar=*/true);
-  BasicBlock *HeaderBB = OracleState.CFG.VPBB2IRBB[OracleHeader];
-  OracleBuilder.SetInsertPoint(HeaderBB, HeaderBB->getFirstNonPHIIt());
-  Value *AdjustedIV = OracleBuilder.CreateAdd(IVPHIVal, CanonIVArg,
-                                              "adjusted.iv");
-
-  // Replace uses of the IV PHI with AdjustedIV, except in the IV increment
-  // and exit block (which use the local 0..VF counter).
-  auto *IVIncR = cast<VPInstruction>(ScalarIVPHI->getOperand(1));
-  Value *IVIncVal = OracleState.get(IVIncR, /*IsScalar=*/true);
-
-  // Find the oracle exit block (block with no successors, other than entry).
-  VPBasicBlock *OracleExitVPBB = nullptr;
-  for (VPBasicBlock *VPBB :
-           VPBlockUtils::blocksOnly<VPBasicBlock>(RPOT))
-    if (VPBB != OracleEntry && VPBB->getNumSuccessors() == 0)
-      OracleExitVPBB = VPBB;
-  assert(OracleExitVPBB && "oracle plan must have an exit block");
+  // Add a return instruction in the oracle exit block (the latch's successor
+  // that isn't the loop header).
+  auto *HeaderVPBB = cast<VPBasicBlock>(OracleEntry->getSingleSuccessor());
+  auto *LatchVPBB = cast<VPBasicBlock>(HeaderVPBB->getPredecessors()[1]);
+  auto *OracleExitVPBB = cast<VPBasicBlock>(
+      LatchVPBB->getSuccessors()[0] == HeaderVPBB
+          ? LatchVPBB->getSuccessors()[1]
+          : LatchVPBB->getSuccessors()[0]);
 
   BasicBlock *ExitBB = OracleState.CFG.VPBB2IRBB[OracleExitVPBB];
-  SmallVector<Use *> UsesToReplace;
-  for (Use &U : IVPHIVal->uses()) {
-    auto *UserI = cast<Instruction>(U.getUser());
-    if (UserI == IVIncVal || UserI == AdjustedIV ||
-        UserI->getParent() == ExitBB)
-      continue;
-    UsesToReplace.push_back(&U);
-  }
-  for (Use *U : UsesToReplace)
-    U->set(AdjustedIV);
-
-  // Add return instruction in the exit block.
   OracleBuilder.SetInsertPoint(ExitBB, ExitBB->end());
-  // Remove the unreachable if still present.
   if (auto *UI = dyn_cast_or_null<UnreachableInst>(ExitBB->getTerminator()))
     UI->eraseFromParent();
   // The exit block's last non-terminator value is the lane count (i64).
   Value *RetVal = &*std::prev(ExitBB->end());
-  assert(RetVal->getType() == Type::getInt64Ty(Ctx) &&
-         "Oracle exit value must be i64");
+  assert(RetVal->getType() == I64Ty && "Oracle exit value must be i64");
   OracleBuilder.CreateRet(RetVal);
 
   // Store the oracle function pointer as the result.

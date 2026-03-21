@@ -1004,6 +1004,21 @@ buildOraclePlan(std::unique_ptr<VPlan> OraclePlan,
   // Change trip count from VectorTripCount to VF.
   LatchTerm->setOperand(1, &OraclePlan->getVF());
 
+  // Add adjusted IV: ScalarIVPHI counts 0..VF locally. Add a placeholder
+  // live-in for the outer canonical IV to get the actual lane index
+  // for memory addressing. The placeholder is materialized in execute().
+  VPIRValue *CanonIVParam =
+      OraclePlan->getOrAddLiveIn(UndefValue::get(IVTy));
+  auto *AdjustedIV = new VPInstruction(
+      Instruction::Add, {ScalarIVPHI, CanonIVParam},
+      VPIRFlags::getDefaultFlags(Instruction::Add), {},
+      DebugLoc::getUnknown(), "adjusted.iv");
+  AdjustedIV->insertBefore(*HeaderVPBB, HeaderVPBB->getFirstNonPhi());
+  ScalarIVPHI->replaceUsesWithIf(
+      AdjustedIV, [AdjustedIV, IVIncR](VPUser &U, unsigned) {
+        return &U != AdjustedIV && &U != IVIncR;
+      });
+
   // Replace GEP VPInstructions with typed versions for scalar execution.
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
            vp_depth_first_shallow(OraclePlan->getEntry()))) {
