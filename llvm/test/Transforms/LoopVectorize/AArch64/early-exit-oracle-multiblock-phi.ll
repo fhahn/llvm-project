@@ -42,12 +42,42 @@ early.exit:
 }
 ; CHECK-LABEL: define ptr @oracle_multiblock_phi(
 ; CHECK-SAME: i64 [[N:%.*]]) {
-; CHECK-NEXT:  [[SCALAR_PH:.*]]:
+; CHECK-NEXT:  [[SCALAR_PH1:.*]]:
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[SPEC_LOAD_CHECK:.*]]
+; CHECK:       [[SPEC_LOAD_CHECK]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = call i1 @llvm.can.load.speculatively.p0(ptr null, i64 16)
+; CHECK-NEXT:    [[TMP1:%.*]] = xor i1 [[TMP0]], true
+; CHECK-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[N]], 3
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[N_MOD_VF]]
+; CHECK-NEXT:    br label %[[HEADER1:.*]]
+; CHECK:       [[HEADER1]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[LATCH_EXIT1:.*]] ]
+; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr [4 x i8], ptr null, i64 [[INDEX]]
+; CHECK-NEXT:    [[TMP8:%.*]] = call <4 x i32> (ptr, i1, ...) @llvm.speculative.load.v4i32.p0(ptr [[TMP2]], i1 false, ptr @speculativeLoadOracle, i64 [[INDEX]])
+; CHECK-NEXT:    [[TMP3:%.*]] = freeze <4 x i32> [[TMP8]]
+; CHECK-NEXT:    [[TMP4:%.*]] = icmp ne <4 x i32> [[TMP3]], zeroinitializer
+; CHECK-NEXT:    [[TMP5:%.*]] = freeze <4 x i1> [[TMP4]]
+; CHECK-NEXT:    [[TMP6:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP5]])
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP6]], label %[[VECTOR_EARLY_EXIT:.*]], label %[[LATCH_EXIT1]]
+; CHECK:       [[LATCH_EXIT1]]:
+; CHECK-NEXT:    br i1 [[TMP7]], label %[[MIDDLE_BLOCK:.*]], label %[[HEADER1]], !llvm.loop [[LOOP0:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[CMP_N]], label %[[LATCH_EXIT:.*]], label %[[SCALAR_PH]]
+; CHECK:       [[VECTOR_EARLY_EXIT]]:
+; CHECK-NEXT:    br label %[[EARLY_EXIT:.*]]
+; CHECK:       [[SCALAR_PH]]:
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[SCALAR_PH1]] ], [ 0, %[[SPEC_LOAD_CHECK]] ]
 ; CHECK-NEXT:    br label %[[HEADER:.*]]
-; CHECK:       [[LATCH_EXIT:.*]]:
+; CHECK:       [[LATCH_EXIT]]:
 ; CHECK-NEXT:    ret ptr null
 ; CHECK:       [[HEADER]]:
-; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[IV_NEXT:%.*]], %[[LATCH:.*]] ], [ 0, %[[SCALAR_PH]] ]
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[IV_NEXT:%.*]], %[[LATCH:.*]] ], [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ]
 ; CHECK-NEXT:    br i1 false, label %[[IF_TRUE:.*]], label %[[IF_FALSE:.*]]
 ; CHECK:       [[IF_TRUE]]:
 ; CHECK-NEXT:    [[GEP_I16:%.*]] = getelementptr [2 x i8], ptr null, i64 [[IV]]
@@ -60,11 +90,54 @@ early.exit:
 ; CHECK:       [[MERGE]]:
 ; CHECK-NEXT:    [[VAL:%.*]] = phi i32 [ [[LD_I32]], %[[IF_FALSE]] ], [ 1, %[[IF_TRUE]] ]
 ; CHECK-NEXT:    [[CMP:%.*]] = icmp eq i32 [[VAL]], 0
-; CHECK-NEXT:    br i1 [[CMP]], label %[[LATCH]], label %[[EARLY_EXIT:.*]]
+; CHECK-NEXT:    br i1 [[CMP]], label %[[LATCH]], label %[[EARLY_EXIT]]
 ; CHECK:       [[LATCH]]:
 ; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 1
 ; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
-; CHECK-NEXT:    br i1 [[EC]], label %[[LATCH_EXIT]], label %[[HEADER]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[LATCH_EXIT]], label %[[HEADER]], !llvm.loop [[LOOP3:![0-9]+]]
 ; CHECK:       [[EARLY_EXIT]]:
 ; CHECK-NEXT:    ret ptr null
 ;
+;
+; CHECK-LABEL: define internal i64 @speculativeLoadOracle(
+; CHECK-SAME: i64 [[CANONIV:%.*]]) #[[ATTR1:[0-9]+]] {
+; CHECK-NEXT:  [[ORACLE_ENTRY:.*]]:
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[ORACLE_ENTRY]] ], [ [[INDEX_NEXT:%.*]], %[[LATCH:.*]] ]
+; CHECK-NEXT:    [[ADJUSTED_IV:%.*]] = add i64 [[INDEX]], [[CANONIV]]
+; CHECK-NEXT:    [[TMP0:%.*]] = mul i64 [[ADJUSTED_IV]], 1
+; CHECK-NEXT:    [[TMP1:%.*]] = add i64 0, [[TMP0]]
+; CHECK-NEXT:    br i1 false, label %[[IF_TRUE:.*]], label %[[IF_FALSE:.*]]
+; CHECK:       [[IF_FALSE]]:
+; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr [4 x i8], ptr null, i64 [[TMP1]]
+; CHECK-NEXT:    [[TMP3:%.*]] = load i32, ptr [[TMP2]], align 4
+; CHECK-NEXT:    br label %[[MERGE:.*]]
+; CHECK:       [[IF_TRUE]]:
+; CHECK-NEXT:    br label %[[MERGE]]
+; CHECK:       [[MERGE]]:
+; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi i32 [ [[TMP3]], %[[IF_FALSE]] ], [ 1, %[[IF_TRUE]] ]
+; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq i32 [[VEC_PHI]], 0
+; CHECK-NEXT:    br i1 [[TMP4]], label %[[LATCH]], label %[[ORACLE_EXIT:.*]]
+; CHECK:       [[LATCH]]:
+; CHECK-NEXT:    [[TMP5:%.*]] = add i64 [[TMP1]], 1
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[TMP5]], 0
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[INDEX_NEXT]], 4
+; CHECK-NEXT:    br i1 [[TMP7]], label %[[ORACLE_EXIT]], label %[[VECTOR_BODY]]
+; CHECK:       [[ORACLE_EXIT]]:
+; CHECK-NEXT:    [[TMP8:%.*]] = add i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP9:%.*]] = mul i64 [[TMP8]], 4
+; CHECK-NEXT:    ret i64 [[TMP9]]
+;
+;.
+; CHECK: attributes #[[ATTR0:[0-9]+]] = { nocallback nofree nosync nounwind speculatable willreturn memory(none) }
+; CHECK: attributes #[[ATTR1]] = { mustprogress noinline optnone memory(argmem: read) }
+; CHECK: attributes #[[ATTR2:[0-9]+]] = { nocallback nofree nosync nounwind willreturn memory(argmem: read) }
+; CHECK: attributes #[[ATTR3:[0-9]+]] = { nocallback nocreateundeforpoison nofree nosync nounwind speculatable willreturn memory(none) }
+;.
+; CHECK: [[LOOP0]] = distinct !{[[LOOP0]], [[META1:![0-9]+]], [[META2:![0-9]+]]}
+; CHECK: [[META1]] = !{!"llvm.loop.isvectorized", i32 1}
+; CHECK: [[META2]] = !{!"llvm.loop.unroll.runtime.disable"}
+; CHECK: [[LOOP3]] = distinct !{[[LOOP3]], [[META2]], [[META1]]}
+;.

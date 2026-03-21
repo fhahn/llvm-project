@@ -432,6 +432,7 @@ public:
     VPInstructionSC,
     VPInterleaveEVLSC,
     VPInterleaveSC,
+    VPSpeculativeLoadOracleSC,
     VPReductionEVLSC,
     VPReductionSC,
     VPReplicateSC,
@@ -636,6 +637,7 @@ public:
     case VPRecipeBase::VPExpandSCEVSC:
     case VPRecipeBase::VPExpressionSC:
     case VPRecipeBase::VPInstructionSC:
+    case VPRecipeBase::VPSpeculativeLoadOracleSC:
     case VPRecipeBase::VPReductionEVLSC:
     case VPRecipeBase::VPReductionSC:
     case VPRecipeBase::VPReplicateSC:
@@ -1348,6 +1350,8 @@ public:
     /// backedge value). Has the wide induction recipe as operand.
     ExitingIVValue,
     MaskedCond,
+    /// Maps to @llvm.can.load.speculatively intrinsic. Returns i1.
+    CanLoadSpeculatively,
 
     // The opcodes below are used for VPInstructionWithType.
     // NOTE: VPInstructionWithType classes are also used for:
@@ -3536,6 +3540,45 @@ public:
            "Op must be an operand of the recipe");
     return true;
   }
+};
+
+/// Holds a cloned VPlan for a speculative load oracle (a scalar loop replaying
+/// early-exit conditions lane-by-lane). Defines the pointer to the oracle
+/// function generated from that plan, which returns the number of accessible
+/// bytes as i64.
+class VPSpeculativeLoadOracleRecipe : public VPSingleDefRecipe {
+  std::unique_ptr<VPlan> OraclePlan;
+  /// Key used to look up the canonical IV placeholder live-in in OraclePlan.
+  /// This is a PoisonValue that gets replaced with the oracle function's first
+  /// argument during execution.
+  Value *CanonIVPlaceholder;
+
+public:
+  VPSpeculativeLoadOracleRecipe(std::unique_ptr<VPlan> OraclePlan,
+                                Value *CanonIVPlaceholder,
+                                ArrayRef<VPValue *> ExternalOperands)
+      : VPSingleDefRecipe(VPRecipeBase::VPSpeculativeLoadOracleSC,
+                          ExternalOperands,
+                          PointerType::get(CanonIVPlaceholder->getContext(), 0)),
+        OraclePlan(std::move(OraclePlan)),
+        CanonIVPlaceholder(CanonIVPlaceholder) {}
+
+  VP_CLASSOF_IMPL(VPRecipeBase::VPSpeculativeLoadOracleSC)
+
+  VPSpeculativeLoadOracleRecipe *clone() override;
+  void execute(VPTransformState &State) override;
+
+  InstructionCost computeCost(ElementCount, VPCostContext &) const override {
+    return 0;
+  }
+
+  bool usesFirstLaneOnly(const VPValue *Op) const override { return true; }
+
+protected:
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+  void printRecipe(raw_ostream &O, const Twine &Indent,
+                   VPSlotTracker &Tracker) const override;
+#endif
 };
 
 /// A recipe to combine multiple recipes into a single 'expression' recipe,

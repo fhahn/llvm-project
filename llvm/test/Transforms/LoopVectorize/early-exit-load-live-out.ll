@@ -148,21 +148,21 @@ define i8 @header_load_live_out_unknown(ptr %A, ptr %B) {
 ; CHECK-LABEL: define i8 @header_load_live_out_unknown(
 ; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]]) {
 ; CHECK-NEXT:  [[SCALAR_PH:.*]]:
-; CHECK-NEXT:    br label %[[LOOP:.*]]
-; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[SCALAR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[LOOP_INC:.*]] ]
-; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i8, ptr [[A]], i64 [[INDEX]]
-; CHECK-NEXT:    [[LD1:%.*]] = load i8, ptr [[ARRAYIDX]], align 1
-; CHECK-NEXT:    [[ARRAYIDX1:%.*]] = getelementptr inbounds i8, ptr [[B]], i64 [[INDEX]]
-; CHECK-NEXT:    [[LD2:%.*]] = load i8, ptr [[ARRAYIDX1]], align 1
+; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
+; CHECK:       [[LOOP_HEADER]]:
+; CHECK-NEXT:    [[IV1:%.*]] = phi i64 [ 0, %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
+; CHECK-NEXT:    [[GEP_A1:%.*]] = getelementptr inbounds i8, ptr [[A]], i64 [[IV1]]
+; CHECK-NEXT:    [[LD1:%.*]] = load i8, ptr [[GEP_A1]], align 1
+; CHECK-NEXT:    [[GEP_B:%.*]] = getelementptr inbounds i8, ptr [[B]], i64 [[IV1]]
+; CHECK-NEXT:    [[LD2:%.*]] = load i8, ptr [[GEP_B]], align 1
 ; CHECK-NEXT:    [[CMP3:%.*]] = icmp eq i8 [[LD1]], [[LD2]]
-; CHECK-NEXT:    br i1 [[CMP3]], label %[[LOOP_INC]], label %[[LOOP_END:.*]]
-; CHECK:       [[LOOP_INC]]:
-; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 1
-; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp ne i64 [[INDEX_NEXT]], 67
-; CHECK-NEXT:    br i1 [[EXITCOND]], label %[[LOOP]], label %[[LOOP_END]]
+; CHECK-NEXT:    br i1 [[CMP3]], label %[[LOOP_LATCH]], label %[[LOOP_END:.*]]
+; CHECK:       [[LOOP_LATCH]]:
+; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV1]], 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp ne i64 [[IV_NEXT]], 67
+; CHECK-NEXT:    br i1 [[EC]], label %[[LOOP_HEADER]], label %[[LOOP_END]]
 ; CHECK:       [[LOOP_END]]:
-; CHECK-NEXT:    [[RETVAL:%.*]] = phi i8 [ [[LD1]], %[[LOOP]] ], [ 0, %[[LOOP_INC]] ]
+; CHECK-NEXT:    [[RETVAL:%.*]] = phi i8 [ [[LD1]], %[[LOOP_HEADER]] ], [ 0, %[[LOOP_LATCH]] ]
 ; CHECK-NEXT:    ret i8 [[RETVAL]]
 ;
 entry:
@@ -191,24 +191,24 @@ loop.end:
 define i8 @latch_load_live_out_unknown(ptr %A, ptr %B) {
 ; CHECK-LABEL: define i8 @latch_load_live_out_unknown(
 ; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]]) {
-; CHECK-NEXT:  [[SCALAR_PH:.*]]:
-; CHECK-NEXT:    br label %[[LOOP:.*]]
-; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[SCALAR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[LOOP_INC:.*]] ]
-; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i8, ptr [[A]], i64 [[INDEX]]
-; CHECK-NEXT:    [[LD1:%.*]] = load i8, ptr [[ARRAYIDX]], align 1
-; CHECK-NEXT:    [[ARRAYIDX1:%.*]] = getelementptr inbounds i8, ptr [[B]], i64 [[INDEX]]
+; CHECK-NEXT:  [[SCALAR_PH1:.*]]:
+; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
+; CHECK:       [[LOOP_HEADER]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[SCALAR_PH1]] ], [ [[INDEX_NEXT:%.*]], %[[LOOP_INC:.*]] ]
+; CHECK-NEXT:    [[GEP_A:%.*]] = getelementptr inbounds i8, ptr [[A]], i64 [[IV]]
+; CHECK-NEXT:    [[LD1:%.*]] = load i8, ptr [[GEP_A]], align 1
+; CHECK-NEXT:    [[ARRAYIDX1:%.*]] = getelementptr inbounds i8, ptr [[B]], i64 [[IV]]
 ; CHECK-NEXT:    [[LD2:%.*]] = load i8, ptr [[ARRAYIDX1]], align 1
 ; CHECK-NEXT:    [[CMP3:%.*]] = icmp eq i8 [[LD1]], [[LD2]]
 ; CHECK-NEXT:    br i1 [[CMP3]], label %[[LOOP_INC]], label %[[LOOP_END:.*]]
 ; CHECK:       [[LOOP_INC]]:
-; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 1
+; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[IV]], 1
 ; CHECK-NEXT:    [[ARRAYIDX2:%.*]] = getelementptr inbounds i8, ptr [[A]], i64 [[INDEX_NEXT]]
 ; CHECK-NEXT:    [[LD3:%.*]] = load i8, ptr [[ARRAYIDX2]], align 1
 ; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp ne i64 [[INDEX_NEXT]], 100
-; CHECK-NEXT:    br i1 [[EXITCOND]], label %[[LOOP]], label %[[LOOP_END]]
+; CHECK-NEXT:    br i1 [[EXITCOND]], label %[[LOOP_HEADER]], label %[[LOOP_END]]
 ; CHECK:       [[LOOP_END]]:
-; CHECK-NEXT:    [[RETVAL:%.*]] = phi i8 [ [[LD1]], %[[LOOP]] ], [ [[LD3]], %[[LOOP_INC]] ]
+; CHECK-NEXT:    [[RETVAL:%.*]] = phi i8 [ [[LD1]], %[[LOOP_HEADER]] ], [ [[LD3]], %[[LOOP_INC]] ]
 ; CHECK-NEXT:    ret i8 [[RETVAL]]
 ;
 entry:

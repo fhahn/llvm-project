@@ -85,6 +85,12 @@ IntrinsicCostAttributes::IntrinsicCostAttributes(
     Arguments.insert(Arguments.begin(), CI.arg_begin(), CI.arg_end());
   FunctionType *FTy = CI.getCalledFunction()->getFunctionType();
   ParamTys.insert(ParamTys.begin(), FTy->param_begin(), FTy->param_end());
+  // FunctionType::param_* only enumerates the fixed parameters; for varargs
+  // calls also append the types of the trailing call arguments so that
+  // downstream cost code can rely on ParamTys covering all operands.
+  if (FTy->isVarArg())
+    for (unsigned I = FTy->getNumParams(), E = CI.arg_size(); I != E; ++I)
+      ParamTys.push_back(CI.getArgOperand(I)->getType());
 }
 
 IntrinsicCostAttributes::IntrinsicCostAttributes(Intrinsic::ID Id, Type *RTy,

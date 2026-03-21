@@ -13,9 +13,11 @@
 
 #include "LoopVectorizationPlanner.h"
 #include "VPlan.h"
+#include "VPlanCFG.h"
 #include "VPlanHelpers.h"
 #include "VPlanPatternMatch.h"
 #include "VPlanUtils.h"
+#include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SmallVectorExtras.h"
@@ -25,6 +27,7 @@
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Dominators.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
@@ -525,6 +528,8 @@ Type *llvm::computeScalarTypeForInstruction(unsigned Opcode,
   case VPInstruction::ExplicitVectorLength:
     assert(Op0Ty->isIntegerTy() && "expected integer operand");
     return IntegerType::get(Ctx, 32);
+  case VPInstruction::CanLoadSpeculatively:
+    return IntegerType::get(Ctx, 1);
   case Instruction::Select: {
     assert((!Op0Ty || Op0Ty->isIntegerTy(1)) &&
            "select condition must be bool");
@@ -660,6 +665,7 @@ unsigned VPInstruction::getNumOperandsForOpcode() const {
   case VPInstruction::ActiveLaneMask:
   case VPInstruction::BranchOnCount:
   case VPInstruction::BranchOnTwoConds:
+  case VPInstruction::CanLoadSpeculatively:
   case VPInstruction::FirstOrderRecurrenceSplice:
   case VPInstruction::LogicalAnd:
   case VPInstruction::LogicalOr:
@@ -876,6 +882,12 @@ Value *VPInstruction::generate(VPTransformState &State) {
         Builder.getInt32Ty(), Intrinsic::experimental_get_vector_length,
         {AVL, VFArg, Builder.getTrue()});
     return EVL;
+  }
+  case VPInstruction::CanLoadSpeculatively: {
+    Value *Ptr = State.get(getOperand(0), /*IsScalar=*/true);
+    Value *Size = State.get(getOperand(1), /*IsScalar=*/true);
+    return Builder.CreateIntrinsic(Intrinsic::can_load_speculatively,
+                                   {Ptr->getType()}, {Ptr, Size});
   }
   case VPInstruction::BranchOnCond: {
     Value *Cond = State.get(getOperand(0), VPLane(0));
@@ -1542,6 +1554,7 @@ bool VPInstruction::isSingleScalar() const {
   switch (getOpcode()) {
   case Instruction::Load:
   case Instruction::PHI:
+  case VPInstruction::CanLoadSpeculatively:
   case VPInstruction::ExplicitVectorLength:
   case VPInstruction::ResumeForEpilogue:
   case VPInstruction::Intrinsic:
@@ -1673,6 +1686,7 @@ bool VPInstruction::opcodeMayReadOrWriteFromMemory() const {
   case VPInstruction::StepVector:
   case VPInstruction::ReductionStartVector:
   case VPInstruction::Reverse:
+  case VPInstruction::CanLoadSpeculatively:
   case VPInstruction::Unpack:
     return false;
   case VPInstruction::Intrinsic: {
@@ -1713,6 +1727,7 @@ bool VPInstruction::usesFirstLaneOnly(const VPValue *Op) const {
   case Instruction::Load:
   case VPInstruction::ActiveLaneMask:
   case VPInstruction::WideActiveLaneMask:
+  case VPInstruction::CanLoadSpeculatively:
   case VPInstruction::ExplicitVectorLength:
   case VPInstruction::CalculateTripCountMinusVF:
   case VPInstruction::CanonicalIVIncrementForPart:
@@ -1883,6 +1898,9 @@ void VPInstruction::printRecipe(raw_ostream &O, const Twine &Indent,
     break;
   case VPInstruction::NumActiveLanes:
     O << "num-active-lanes";
+    break;
+  case VPInstruction::CanLoadSpeculatively:
+    O << "can-load-speculatively";
     break;
   default:
     O << Instruction::getOpcodeName(getOpcode());
@@ -2354,10 +2372,13 @@ InstructionCost VPWidenIntrinsicRecipe::computeCallCost(
   }
 
   Type *RetTy = VF.isVector() ? toVectorizedTy(ScalarRetTy, VF) : ScalarRetTy;
-  SmallVector<Type *> ParamTys =
-      map_to_vector(Operands, [&](const VPValue *Op) {
-        return toVectorTy(Op->getScalarType(), VF);
-      });
+  SmallVector<Type *> ParamTys;
+  for (const auto &[Idx, Op] : enumerate(Operands)) {
+    Type *ScalarTy = Op->getScalarType();
+    bool Vectorize =
+        VF.isVector() && !isVectorIntrinsicWithScalarOpAtArg(ID, Idx, nullptr);
+    ParamTys.push_back(Vectorize ? toVectorTy(ScalarTy, VF) : ScalarTy);
+  }
 
   VectorInstrContext VIC = VectorInstrContext::None;
   for (const VPValue *Op : Operands)
@@ -3503,6 +3524,116 @@ InstructionCost VPReductionRecipe::computeCost(ElementCount VF,
   return Ctx.TTI.getArithmeticReductionCost(Opcode, VectorTy, OptionalFMF,
                                             Ctx.CostKind);
 }
+
+VPSpeculativeLoadOracleRecipe *VPSpeculativeLoadOracleRecipe::clone() {
+  return new VPSpeculativeLoadOracleRecipe(
+      std::unique_ptr<VPlan>(OraclePlan->duplicate()), CanonIVPlaceholder,
+      operands());
+}
+
+void VPSpeculativeLoadOracleRecipe::execute(VPTransformState &State) {
+  VPlan &Plan = *OraclePlan;
+  LLVMContext &Ctx = State.Builder.getContext();
+  Type *I64Ty = Type::getInt64Ty(Ctx);
+
+  auto *OracleEntry = cast<VPBasicBlock>(Plan.getEntry());
+
+  // Replace the oracle plan's VF placeholder with the actual VF, matching the
+  // canonical IV type so the BranchOnCount comparison types agree.
+  Type *IVTy = CanonIVPlaceholder->getType();
+  Plan.getVF().replaceAllUsesWith(Plan.getConstantInt(
+      IVTy->getIntegerBitWidth(), State.VF.getKnownMinValue()));
+
+  // Build function signature: first operand is the canonical IV, rest are
+  // external live-in values collected during buildOraclePlan.
+  auto ParamTypes = map_to_vector(operands(), [&](VPValue *Op) {
+    return State.get(Op, /*IsScalar=*/true)->getType();
+  });
+
+  FunctionType *FnTy = FunctionType::get(I64Ty, ParamTypes, false);
+  Module *M = State.Builder.GetInsertBlock()->getModule();
+  Function *OracleFn = Function::Create(
+      FnTy, GlobalValue::InternalLinkage, "speculativeLoadOracle", M);
+  OracleFn->setMemoryEffects(MemoryEffects::argMemOnly(ModRefInfo::Ref));
+  OracleFn->addFnAttr(Attribute::NoInline);
+  OracleFn->addFnAttr(Attribute::OptimizeNone);
+  // The replay loop runs exactly VF iterations, so it always terminates.
+  OracleFn->addFnAttr(Attribute::MustProgress);
+
+  // Remap the oracle plan's live-ins to the function arguments. Operand 0 is
+  // the canonical IV, whose oracle-plan live-in is keyed by the poison
+  // placeholder; the remaining operands are external live-ins keyed by their
+  // underlying IR value.
+  for (auto [I, Op] : enumerate(operands())) {
+    Value *Key = I == 0 ? CanonIVPlaceholder : State.get(Op, /*IsScalar=*/true);
+    Argument *Arg = OracleFn->getArg(I);
+    Arg->setName(I == 0 ? "canonIV" : Key->getName());
+    Plan.getOrAddLiveIn(Key)->replaceAllUsesWith(Plan.getOrAddLiveIn(Arg));
+  }
+
+  // Create entry IR basic block in the oracle function.
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "oracle.entry", OracleFn);
+  IRBuilder<> OracleBuilder(EntryBB);
+  OracleBuilder.CreateUnreachable();
+
+  // Set up a VPTransformState for scalar (VF=1) execution into the oracle
+  // function. Create a LoopInfo so VPBasicBlock::execute can register the loop.
+  DominatorTree OracleDT(*OracleFn);
+  LoopInfo OracleLI(OracleDT);
+  VPTransformState OracleState(State.TTI, ElementCount::getFixed(1),
+                               &OracleLI, /*DT=*/nullptr, /*AC=*/nullptr,
+                               OracleBuilder, &Plan,
+                               /*CurrentParentLoop=*/nullptr);
+  OracleState.CFG.PrevBB = EntryBB;
+
+  // Execute the oracle plan blocks directly via RPOT traversal, bypassing
+  // VPlan::execute which does main-plan-specific setup/cleanup. Map the
+  // entry to EntryBB and skip it during traversal.
+  OracleState.CFG.VPBB2IRBB[OracleEntry] = EntryBB;
+  OracleState.VPDT.recalculate(Plan);
+
+  ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>> RPOT(
+      OracleEntry);
+  for (VPBlockBase *Block : RPOT) {
+    if (Block == OracleEntry)
+      continue;
+    Block->execute(&OracleState);
+  }
+
+  // Fix header PHI backedge values, reusing the shared fixup which relies on
+  // the VPDT recalculated above.
+  OracleState.fixupHeaderPhis();
+
+  // Add a return instruction in the oracle exit block, the unique loop-body
+  // block with no successors. The return value is the byte count computed by
+  // the last recipe in the exit block.
+  auto *OracleExitVPBB = cast<VPBasicBlock>(
+      *find_if(vp_depth_first_shallow(Plan.getEntry()), [](VPBlockBase *VPB) {
+        return isa<VPBasicBlock>(VPB) && !isa<VPIRBasicBlock>(VPB) &&
+               VPB->getNumSuccessors() == 0;
+      }));
+
+  BasicBlock *ExitBB = OracleState.CFG.VPBB2IRBB[OracleExitVPBB];
+  cast<UnreachableInst>(ExitBB->getTerminator())->eraseFromParent();
+  auto *RetRecipe = cast<VPSingleDefRecipe>(&OracleExitVPBB->back());
+  Value *RetVal = OracleState.get(RetRecipe, /*IsScalar=*/true);
+  assert(RetVal->getType() == I64Ty && "Oracle exit value must be i64");
+  OracleBuilder.SetInsertPoint(ExitBB);
+  OracleBuilder.CreateRet(RetVal);
+
+  // Store the oracle function pointer as the result.
+  State.set(this, OracleFn, /*IsScalar=*/true);
+}
+
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+void VPSpeculativeLoadOracleRecipe::printRecipe(
+    raw_ostream &O, const Twine &Indent, VPSlotTracker &Tracker) const {
+  O << Indent << "SPECULATIVE-LOAD-ORACLE ";
+  printAsOperand(O, Tracker);
+  O << " = call ";
+  printOperands(O, Tracker);
+}
+#endif
 
 VPExpressionRecipe::VPExpressionRecipe(
     ExpressionTypes ExpressionType,
