@@ -374,6 +374,18 @@ m_BranchOnTwoConds(const Op0_t &Op0, const Op1_t &Op1) {
   return m_VPInstruction<VPInstruction::BranchOnTwoConds>(Op0, Op1);
 }
 
+inline VPInstruction_match<VPInstruction::BranchOnCondOrCount>
+m_BranchOnCondOrCount() {
+  return m_VPInstruction<VPInstruction::BranchOnCondOrCount>();
+}
+
+template <typename Op0_t, typename Op1_t, typename Op2_t>
+inline VPInstruction_match<VPInstruction::BranchOnCondOrCount, Op0_t, Op1_t,
+                           Op2_t>
+m_BranchOnCondOrCount(const Op0_t &Op0, const Op1_t &Op1, const Op2_t &Op2) {
+  return m_VPInstruction<VPInstruction::BranchOnCondOrCount>(Op0, Op1, Op2);
+}
+
 template <typename Op0_t>
 inline VPInstruction_match<VPInstruction::Broadcast, Op0_t>
 m_Broadcast(const Op0_t &Op0) {

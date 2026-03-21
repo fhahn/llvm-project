@@ -1253,6 +1253,11 @@ public:
     // middle.split or successor 2, and (2) middle.split branching to successor
     // 0 or successor 1 based on condition 0.
     BranchOnTwoConds,
+    // Combine an extra boolean condition with the count-based latch exit.
+    // Takes 3 operands: (ExtraCond, CanonicalIV, TripCount). Dissolved to:
+    //  - 3 successors (early exits): Inc + ICmp + BranchOnTwoConds
+    //  - 2 successors (NaN reductions): Inc + ICmp + Or + BranchOnCond
+    BranchOnCondOrCount,
     Broadcast,
     /// Given operands of (the same) struct type, creates a struct of fixed-
     /// width vectors each containing a struct field of all operands. The

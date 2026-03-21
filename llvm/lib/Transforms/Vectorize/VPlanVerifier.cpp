@@ -592,16 +592,20 @@ bool VPlanVerifier::verify(const VPlan &Plan) {
 
   if (Exiting->empty()) {
     errs() << "VPlan vector loop exiting block must end with BranchOnCount, "
-              "BranchOnCond, or BranchOnTwoConds VPInstruction but is empty\n";
+              "BranchOnCond, BranchOnTwoConds, or BranchOnCondOrCount "
+              "VPInstruction but is empty\n";
     return false;
   }
 
   auto *LastInst = dyn_cast<VPInstruction>(std::prev(Exiting->end()));
-  if (!match(LastInst, m_CombineOr(m_BranchOnCond(),
-                                   m_CombineOr(m_BranchOnCount(),
-                                               m_BranchOnTwoConds())))) {
+  if (!match(LastInst,
+             m_CombineOr(m_BranchOnCond(),
+                         m_CombineOr(m_BranchOnCount(),
+                                     m_CombineOr(m_BranchOnTwoConds(),
+                                                  m_BranchOnCondOrCount()))))) {
     errs() << "VPlan vector loop exit must end with BranchOnCount, "
-              "BranchOnCond, or BranchOnTwoConds VPInstruction\n";
+              "BranchOnCond, BranchOnTwoConds, or BranchOnCondOrCount "
+              "VPInstruction\n";
     return false;
   }
 

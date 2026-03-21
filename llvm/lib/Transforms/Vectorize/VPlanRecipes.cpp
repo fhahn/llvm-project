@@ -178,7 +178,8 @@ bool VPRecipeBase::mayHaveSideEffects() const {
     return mayWriteToMemory() ||
            VPI->getOpcode() == VPInstruction::BranchOnCount ||
            VPI->getOpcode() == VPInstruction::BranchOnCond ||
-           VPI->getOpcode() == VPInstruction::BranchOnTwoConds;
+           VPI->getOpcode() == VPInstruction::BranchOnTwoConds ||
+           VPI->getOpcode() == VPInstruction::BranchOnCondOrCount;
   }
   case VPWidenCallSC: {
     Function *Fn = cast<VPWidenCallRecipe>(this)->getCalledScalarFunction();
@@ -607,6 +608,7 @@ unsigned VPInstruction::getNumOperandsForOpcode() const {
   case Instruction::InsertElement:
   case Instruction::Select:
   case VPInstruction::ActiveLaneMask:
+  case VPInstruction::BranchOnCondOrCount:
   case VPInstruction::ReductionStartVector:
     return 3;
   case Instruction::Call:
@@ -646,6 +648,7 @@ bool VPInstruction::canGenerateScalarForFirstLane() const {
   case Instruction::Select:
   case VPInstruction::BranchOnCond:
   case VPInstruction::BranchOnTwoConds:
+  case VPInstruction::BranchOnCondOrCount:
   case VPInstruction::BranchOnCount:
   case VPInstruction::CalculateTripCountMinusVF:
   case VPInstruction::CanonicalIVIncrementForPart:
@@ -1554,6 +1557,7 @@ bool VPInstruction::opcodeMayReadOrWriteFromMemory() const {
   case VPInstruction::AnyOf:
   case VPInstruction::BranchOnCond:
   case VPInstruction::BranchOnTwoConds:
+  case VPInstruction::BranchOnCondOrCount:
   case VPInstruction::BranchOnCount:
   case VPInstruction::Broadcast:
   case VPInstruction::BuildStructVector:
@@ -1623,6 +1627,7 @@ bool VPInstruction::usesFirstLaneOnly(const VPValue *Op) const {
   case VPInstruction::BranchOnCount:
   case VPInstruction::BranchOnCond:
   case VPInstruction::BranchOnTwoConds:
+  case VPInstruction::BranchOnCondOrCount:
   case VPInstruction::Broadcast:
   case VPInstruction::ReductionStartVector:
     return true;
@@ -1659,6 +1664,7 @@ bool VPInstruction::usesFirstPartOnly(const VPValue *Op) const {
   case VPInstruction::BranchOnCount:
   case VPInstruction::BranchOnCond:
   case VPInstruction::BranchOnTwoConds:
+  case VPInstruction::BranchOnCondOrCount:
   case VPInstruction::CanonicalIVIncrementForPart:
     return true;
   };
@@ -1710,6 +1716,9 @@ void VPInstruction::printRecipe(raw_ostream &O, const Twine &Indent,
     break;
   case VPInstruction::BranchOnCount:
     O << "branch-on-count";
+    break;
+  case VPInstruction::BranchOnCondOrCount:
+    O << "branch-on-cond-or-count";
     break;
   case VPInstruction::Broadcast:
     O << "broadcast";

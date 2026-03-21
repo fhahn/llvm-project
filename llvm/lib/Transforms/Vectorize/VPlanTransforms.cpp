@@ -2299,6 +2299,8 @@ static bool simplifyBranchConditionForVFAndUF(VPlan &Plan, ElementCount BestVF,
   if (match(Term, m_BranchOnCount(
                       m_CombineOr(m_CanIVInc, m_c_Add(m_CanIVInc, m_LiveIn())),
                       m_VPValue())) ||
+      match(Term,
+            m_BranchOnCondOrCount(m_VPValue(), m_VPValue(), m_VPValue())) ||
       match(Term, m_BranchOnCond(m_Not(m_ActiveLaneMask(
                       m_VPValue(), m_VPValue(), m_VPValue()))))) {
     // Try to simplify the branch condition if VectorTC <= VF * UF when the
