@@ -7570,11 +7570,9 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   if (BestVPlan.hasEarlyExit())
     ++LoopsEarlyExitVectorized;
 
-  // Cache isTailFolded before unrollByUF, which transforms
-  // VPWidenIntOrFpInductionRecipe to VPWidenPHIRecipe, making findHeaderMask
-  // unable to find the header mask. Also needed before optimizeForVFAndUF and
-  // dissolveLoopRegions, which may remove the vector loop region.
-  bool IsTailFolded = BestVPlan.isTailFolded();
+  // Cache isTailFolded before unrollByUF and other transforms that may
+  // remove the vector loop region, after which isTailFolded() cannot be called.
+  bool UseTailFolding = BestVPlan.isTailFolded();
 
   // TODO: Move to VPlan transform stage once the transition to the VPlan-based
   // cost model is complete for better cost estimates.
@@ -7632,12 +7630,6 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   // which may be needed for epilogue vectorization.
   VPlanTransforms::removeBranchOnConst(BestVPlan, /*OnlyLatches=*/true);
   VPlanTransforms::materializeBackedgeTakenCount(BestVPlan, VectorPH);
-  // Determine whether to use tail-folded trip count calculation. Use the cost
-  // model's decision by default. When FoldTailForEpilogueOnly is enabled, the
-  // main loop uses a non-tail-folded plan even if tail folding is preferred,
-  // so check the plan's hasScalarTail() property in that case.
-  bool UseTailFolding = FoldTailForEpilogueOnly ? !BestVPlan.hasScalarTail()
-                                                : CM.foldTailByMasking();
   VPlanTransforms::materializeVectorTripCount(
       BestVPlan, VectorPH, UseTailFolding,
       CM.requiresScalarEpilogue(BestVF.isVector()), &BestVPlan.getVFxUF());
@@ -9191,30 +9183,35 @@ static SmallVector<VPInstruction *>
 preparePlanForMainVectorLoop(VPlan &MainPlan, VPlan &EpiPlan) {
   // Collect PHI nodes of widened phis in the VPlan for the epilogue. Those
   // will need their resume-values computed in the main vector loop. Others
-  // can be removed from the main VPlan.
-  SmallPtrSet<PHINode *, 2> EpiWidenedPhis;
-  for (VPRecipeBase &R :
-       EpiPlan.getVectorLoopRegion()->getEntryBasicBlock()->phis()) {
-    if (isa<VPCanonicalIVPHIRecipe, VPActiveLaneMaskPHIRecipe,
-            VPCurrentIterationPHIRecipe>(&R))
-      continue;
-    EpiWidenedPhis.insert(
-        cast<PHINode>(R.getVPSingleValue()->getUnderlyingValue()));
+  // When FoldTailForEpilogueOnly is enabled, the epilogue plan may use a
+  // tail-folded loop with different widened inductions than the main plan.
+  // Remove resume phis from the main plan for inductions not widened in the
+  // epilogue, as those resume values will be created during EpiPlan execution.
+  if (FoldTailForEpilogueOnly) {
+    SmallPtrSet<PHINode *, 2> EpiWidenedPhis;
+    for (VPRecipeBase &R :
+         EpiPlan.getVectorLoopRegion()->getEntryBasicBlock()->phis()) {
+      if (isa<VPCanonicalIVPHIRecipe, VPActiveLaneMaskPHIRecipe,
+              VPCurrentIterationPHIRecipe>(&R))
+        continue;
+      EpiWidenedPhis.insert(
+          cast<PHINode>(R.getVPSingleValue()->getUnderlyingValue()));
+    }
+    for (VPRecipeBase &R :
+         make_early_inc_range(MainPlan.getScalarHeader()->phis())) {
+      auto *VPIRInst = cast<VPIRPhi>(&R);
+      if (EpiWidenedPhis.contains(&VPIRInst->getIRPhi()))
+        continue;
+      // There is no corresponding wide induction in the epilogue plan that
+      // would need a resume value. Remove the VPIRInst wrapping the scalar
+      // header phi together with the corresponding ResumePhi. The resume
+      // values for the scalar loop will be created during execution of EpiPlan.
+      VPRecipeBase *ResumePhi = VPIRInst->getOperand(0)->getDefiningRecipe();
+      VPIRInst->eraseFromParent();
+      ResumePhi->eraseFromParent();
+    }
+    RUN_VPLAN_PASS(VPlanTransforms::removeDeadRecipes, MainPlan);
   }
-  for (VPRecipeBase &R :
-       make_early_inc_range(MainPlan.getScalarHeader()->phis())) {
-    auto *VPIRInst = cast<VPIRPhi>(&R);
-    if (EpiWidenedPhis.contains(&VPIRInst->getIRPhi()))
-      continue;
-    // There is no corresponding wide induction in the epilogue plan that would
-    // need a resume value. Remove the VPIRInst wrapping the scalar header phi
-    // together with the corresponding ResumePhi. The resume values for the
-    // scalar loop will be created during execution of EpiPlan.
-    VPRecipeBase *ResumePhi = VPIRInst->getOperand(0)->getDefiningRecipe();
-    VPIRInst->eraseFromParent();
-    ResumePhi->eraseFromParent();
-  }
-  RUN_VPLAN_PASS(VPlanTransforms::removeDeadRecipes, MainPlan);
 
   using namespace VPlanPatternMatch;
   // When vectorizing the epilogue, FindFirstIV & FindLastIV reductions can
