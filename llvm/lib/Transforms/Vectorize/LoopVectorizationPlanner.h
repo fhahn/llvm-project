@@ -620,6 +620,11 @@ public:
                                 ElementCount MinProfitableTripCount,
                                 bool ForceEmitCheck = false) const;
 
+  /// Add a new check block before the vector preheader to \p Plan to check
+  /// if the main vector loop should be executed (TC >= VF * UF).
+  void addIterationCountCheckBlock(VPlan &Plan, ElementCount VF,
+                                   unsigned UF) const;
+
   /// Update loop metadata and profile info for both the scalar remainder loop
   /// and \p VectorLoop, if it exists. Keeps all loop hints from the original
   /// loop on the vector loop and replaces vectorizer-specific metadata. The

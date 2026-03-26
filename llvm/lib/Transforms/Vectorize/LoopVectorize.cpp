@@ -8534,6 +8534,18 @@ void LoopVectorizationPlanner::addMinimumIterationCheck(
       ForceEmitCheck);
 }
 
+void LoopVectorizationPlanner::addIterationCountCheckBlock(
+    VPlan &Plan, ElementCount VF, unsigned UF) const {
+  const uint32_t *BranchWeights =
+      hasBranchWeightMD(*OrigLoop->getLoopLatch()->getTerminator())
+          ? &MinItersBypassWeights[0]
+          : nullptr;
+  VPlanTransforms::addIterationCountCheckBlock(
+      Plan, VF, UF, CM.requiresScalarEpilogue(VF.isVector()), OrigLoop,
+      BranchWeights,
+      OrigLoop->getLoopPredecessor()->getTerminator()->getDebugLoc(), PSE);
+}
+
 // Determine how to lower the scalar epilogue, which depends on 1) optimising
 // for minimum code-size, 2) predicate compiler options, 3) loop hints forcing
 // predication, and 4) a TTI hook that analyses whether the loop is suitable
@@ -9646,17 +9658,8 @@ bool LoopVectorizePass::processLoop(Loop *L) {
                                  EPI.EpilogueUF,
                                  ElementCount::getFixed(0),
                                  /*ForceEmitCheck=*/true);
-    {
-      const uint32_t *BranchWeights =
-          hasBranchWeightMD(*L->getLoopLatch()->getTerminator())
-              ? &MinItersBypassWeights[0]
-              : nullptr;
-      VPlanTransforms::addIterationCountCheckBlock(
-          *BestMainPlan, EPI.MainLoopVF, EPI.MainLoopUF,
-          CM.requiresScalarEpilogue(EPI.MainLoopVF.isVector()), L,
-          BranchWeights,
-          L->getLoopPreheader()->getTerminator()->getDebugLoc(), PSE);
-    }
+    LVP.addIterationCountCheckBlock(*BestMainPlan, EPI.MainLoopVF,
+                                    EPI.MainLoopUF);
 
     EpilogueVectorizerMainLoop MainILV(L, PSE, LI, DT, TTI, AC, EPI, &CM,
                                        Checks, *BestMainPlan);
@@ -9690,7 +9693,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
       BasicBlock *FirstRT = SCEVBlock ? SCEVBlock : MemBlock;
       BasicBlock *LastRT = MemBlock ? MemBlock : SCEVBlock;
       BasicBlock *VecPH =
-          cast<BranchInst>(LastRT->getTerminator())->getSuccessor(1);
+          cast<CondBrInst>(LastRT->getTerminator())->getSuccessor(1);
 
       EntryBB->getTerminator()->replaceUsesOfWith(MainCheck, FirstRT);
       MainCheck->getTerminator()->replaceUsesOfWith(FirstRT, VecPH);
