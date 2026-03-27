@@ -1226,8 +1226,10 @@ void VPlanTransforms::addMinimumIterationCheck(
   // vector trip count is zero. This check also covers the case where adding one
   // to the backedge-taken count overflowed leading to an incorrect trip count
   // of zero. In this case we will also jump to the scalar loop.
+  assert((Plan.getMiddleBlock()->getSingleSuccessor() == Plan.getScalarPreheader()) == RequiresScalarEpilogue);
+  assert(!Plan.hasScalarTail() == TailFolded);
   CmpInst::Predicate CmpPred =
-      RequiresScalarEpilogue ? ICmpInst::ICMP_ULE : ICmpInst::ICMP_ULT;
+       Plan.getMiddleBlock()->getSingleSuccessor() == Plan.getScalarPreheader()? ICmpInst::ICMP_ULE : ICmpInst::ICMP_ULT;
   // If tail is to be folded, vector loop takes care of all iterations.
   VPValue *TripCountVPV = Plan.getTripCount();
   const SCEV *TripCount = vputils::getSCEVExprForVPValue(TripCountVPV, PSE);
