@@ -9147,8 +9147,9 @@ static SmallVector<Instruction *> preparePlanForEpilogueVectorLoop(
   VPInstruction *OffsetIVInc =
       VPBuilder::getToInsertAfter(Increment).createAdd(Increment, VPV);
   Increment->replaceUsesWithIf(OffsetIVInc,
-                               [IV](VPUser &U, unsigned) { return &U != IV; });
-  OffsetIVInc->setOperand(0, Increment);
+                               [IV, OffsetIVInc](VPUser &U, unsigned) {
+                                 return &U != IV && &U != OffsetIVInc;
+                               });
 
   DenseMap<Value *, Value *> ToFrozen;
   SmallVector<Instruction *> InstsToMove;

@@ -2492,10 +2492,7 @@ bool VPlanTransforms::adjustFixedOrderRecurrences(VPlan &Plan,
         LoopBuilder.createNaryOp(VPInstruction::FirstOrderRecurrenceSplice,
                                  {FOR, FOR->getBackedgeValue()});
 
-    FOR->replaceAllUsesWith(RecurSplice);
-    // Set the first operand of RecurSplice to FOR again, after replacing
-    // all users.
-    RecurSplice->setOperand(0, FOR);
+    FOR->replaceAllUsesExcept(RecurSplice, *RecurSplice);
 
     // Check for users extracting at the penultimate active lane of the FOR.
     // If only a single lane is active in the current iteration, we need to
@@ -2804,8 +2801,7 @@ void VPlanTransforms::truncateToMinimalBitwidths(
             Instruction::ZExt, ResultVPV, OldResTy, nullptr,
             VPIRFlags::getDefaultFlags(Instruction::ZExt));
         Ext->insertAfter(&R);
-        ResultVPV->replaceAllUsesWith(Ext);
-        Ext->setOperand(0, ResultVPV);
+        ResultVPV->replaceAllUsesExcept(Ext, *Ext);
         assert(OldResSizeInBits > NewResSizeInBits && "Nothing to shrink?");
       } else {
         assert(match(&R, m_ICmp(m_VPValue(), m_VPValue())) &&
@@ -3396,8 +3392,7 @@ void VPlanTransforms::addExplicitVectorLength(
 
   // Replace all uses of VPCanonicalIVPHIRecipe by
   // VPCurrentIterationPHIRecipe except for the canonical IV increment.
-  CanonicalIVPHI->replaceAllUsesWith(CurrentIteration);
-  CanonicalIVIncrement->setOperand(0, CanonicalIVPHI);
+  CanonicalIVPHI->replaceAllUsesExcept(CurrentIteration, *CanonicalIVIncrement);
   // TODO: support unroll factor > 1.
   Plan.setUF(1);
 }
@@ -6045,9 +6040,7 @@ static void transformToPartialReduction(const VPPartialReductionChain &Chain,
   VPInstruction *NewResult = Builder.createNaryOp(
       SubOpc, {OldStartValue, RdxResult}, VPIRFlags::getDefaultFlags(SubOpc),
       RdxPhi->getDebugLoc());
-  RdxResult->replaceUsesWithIf(
-      NewResult,
-      [&NewResult](VPUser &U, unsigned Idx) { return &U != NewResult; });
+  RdxResult->replaceAllUsesExcept(NewResult, *NewResult);
 }
 
 /// Check if a partial reduction chain is is supported by the target (i.e. does

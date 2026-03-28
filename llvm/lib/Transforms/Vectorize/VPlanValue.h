@@ -174,6 +174,14 @@ public:
 
   void replaceAllUsesWith(VPValue *New);
 
+  /// Replace all uses of this VPValue with \p New, except for uses in \p
+  /// ExceptedUser.
+  void replaceAllUsesExcept(VPValue *New, VPUser &ExceptedUser) {
+    replaceUsesWithIf(New, [&ExceptedUser](VPUser &U, unsigned) {
+      return &U != &ExceptedUser;
+    });
+  }
+
   /// Go through the uses list for this VPValue and make each use point to \p
   /// New if the callback ShouldReplace returns true for the given use specified
   /// by a pair of (VPUser, the use index).
