@@ -22,9 +22,8 @@ define void @widen_ptr_phi_unrolled(ptr noalias nocapture %a, ptr noalias nocapt
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N:%.*]], [[TMP1]]
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
-; CHECK-NEXT:    [[TMP4:%.*]] = call i64 @llvm.vscale.i64()
-; CHECK-NEXT:    [[TMP3:%.*]] = shl nuw nsw i64 [[TMP4]], 2
-; CHECK-NEXT:    [[TMP5:%.*]] = shl nuw nsw i64 [[TMP4]], 3
+; CHECK-NEXT:    [[TMP3:%.*]] = shl nuw nsw i64 [[TMP0]], 2
+; CHECK-NEXT:    [[TMP5:%.*]] = shl nuw nsw i64 [[TMP0]], 3
 ; CHECK-NEXT:    [[DOTNOT:%.*]] = sub nsw i64 0, [[TMP5]]
 ; CHECK-NEXT:    [[N_VEC:%.*]] = and i64 [[N]], [[DOTNOT]]
 ; CHECK-NEXT:    [[TMP26:%.*]] = shl i64 [[N_VEC]], 3
@@ -33,7 +32,7 @@ define void @widen_ptr_phi_unrolled(ptr noalias nocapture %a, ptr noalias nocapt
 ; CHECK:       vector.body:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = shl i64 [[INDEX]], 3
-; CHECK-NEXT:    [[TMP7:%.*]] = shl nuw nsw i64 [[TMP4]], 5
+; CHECK-NEXT:    [[TMP7:%.*]] = shl nuw nsw i64 [[TMP0]], 5
 ; CHECK-NEXT:    [[NEXT_GEP:%.*]] = getelementptr i8, ptr [[C]], i64 [[OFFSET_IDX]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr i8, ptr [[C]], i64 [[OFFSET_IDX]]
 ; CHECK-NEXT:    [[NEXT_GEP2:%.*]] = getelementptr i8, ptr [[TMP8]], i64 [[TMP7]]
@@ -130,9 +129,8 @@ define void @widen_2ptrs_phi_unrolled(ptr noalias nocapture %dst, ptr noalias no
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N:%.*]], [[TMP1]]
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
-; CHECK-NEXT:    [[TMP5:%.*]] = call i64 @llvm.vscale.i64()
-; CHECK-NEXT:    [[TMP7:%.*]] = shl nuw nsw i64 [[TMP5]], 2
-; CHECK-NEXT:    [[TMP6:%.*]] = shl nuw nsw i64 [[TMP5]], 3
+; CHECK-NEXT:    [[TMP7:%.*]] = shl nuw nsw i64 [[TMP0]], 2
+; CHECK-NEXT:    [[TMP6:%.*]] = shl nuw nsw i64 [[TMP0]], 3
 ; CHECK-NEXT:    [[DOTNOT:%.*]] = sub nsw i64 0, [[TMP6]]
 ; CHECK-NEXT:    [[N_VEC:%.*]] = and i64 [[N]], [[DOTNOT]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = shl i64 [[N_VEC]], 2
@@ -217,8 +215,7 @@ define i32 @pointer_iv_mixed(ptr noalias %a, ptr noalias %b, i64 %n) #0 {
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp samesign ult i64 [[SMAX]], [[TMP1]]
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
-; CHECK-NEXT:    [[TMP5:%.*]] = call i64 @llvm.vscale.i64()
-; CHECK-NEXT:    [[TMP6:%.*]] = shl nuw nsw i64 [[TMP5]], 1
+; CHECK-NEXT:    [[TMP6:%.*]] = shl nuw nsw i64 [[TMP0]], 1
 ; CHECK-NEXT:    [[DOTNOT:%.*]] = sub nsw i64 0, [[TMP6]]
 ; CHECK-NEXT:    [[N_VEC:%.*]] = and i64 [[SMAX]], [[DOTNOT]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = shl i64 [[N_VEC]], 2
@@ -240,7 +237,7 @@ define i32 @pointer_iv_mixed(ptr noalias %a, ptr noalias %b, i64 %n) #0 {
 ; CHECK-NEXT:    [[TMP12]] = add <vscale x 2 x i32> [[WIDE_LOAD]], [[VEC_PHI]]
 ; CHECK-NEXT:    store <vscale x 2 x ptr> [[VECTOR_GEP]], ptr [[NEXT_GEP]], align 8
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP6]]
-; CHECK-NEXT:    [[TMP15:%.*]] = shl nuw nsw i64 [[TMP5]], 3
+; CHECK-NEXT:    [[TMP15:%.*]] = shl nuw nsw i64 [[TMP0]], 3
 ; CHECK-NEXT:    [[PTR_IND]] = getelementptr i8, ptr [[POINTER_PHI]], i64 [[TMP15]]
 ; CHECK-NEXT:    [[TMP13:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP13]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]

@@ -501,8 +501,7 @@ define void @even_load_dynamic_tc(ptr noalias nocapture readonly %A, ptr noalias
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK_NOT_NOT]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
 ; CHECK-NEXT:    [[TMP4:%.*]] = add nuw i64 [[TMP1]], 1
-; CHECK-NEXT:    [[TMP5:%.*]] = call i64 @llvm.vscale.i64()
-; CHECK-NEXT:    [[TMP6:%.*]] = shl nuw nsw i64 [[TMP5]], 2
+; CHECK-NEXT:    [[TMP6:%.*]] = shl nuw nsw i64 [[TMP2]], 2
 ; CHECK-NEXT:    [[TMP7:%.*]] = add nsw i64 [[TMP6]], -1
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP4]], [[TMP7]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[N_MOD_VF]], 0
@@ -793,8 +792,7 @@ define void @PR27626_0(ptr %p, i32 %z, i64 %n) #1 {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK_NOT]], label [[VECTOR_PH:%.*]], label [[SCALAR_PH:%.*]]
 ; CHECK:       vector.ph:
 ; CHECK-NEXT:    [[SMAX:%.*]] = call i64 @llvm.smax.i64(i64 [[N]], i64 1)
-; CHECK-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
-; CHECK-NEXT:    [[TMP3:%.*]] = shl nuw nsw i64 [[TMP2]], 2
+; CHECK-NEXT:    [[TMP3:%.*]] = shl nuw nsw i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[TMP4:%.*]] = add nsw i64 [[TMP3]], -1
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[SMAX]], [[TMP4]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[N_MOD_VF]], 0
@@ -864,8 +862,7 @@ define i32 @PR27626_1(ptr %p, i64 %n) #1 {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK_NOT]], label [[VECTOR_PH:%.*]], label [[SCALAR_PH:%.*]]
 ; CHECK:       vector.ph:
 ; CHECK-NEXT:    [[SMAX:%.*]] = call i64 @llvm.smax.i64(i64 [[N]], i64 1)
-; CHECK-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
-; CHECK-NEXT:    [[TMP3:%.*]] = shl nuw nsw i64 [[TMP2]], 2
+; CHECK-NEXT:    [[TMP3:%.*]] = shl nuw nsw i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[TMP4:%.*]] = add nsw i64 [[TMP3]], -1
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[SMAX]], [[TMP4]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[N_MOD_VF]], 0
@@ -940,8 +937,7 @@ define void @PR27626_2(ptr %p, i64 %n, i32 %z) #1 {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK_NOT]], label [[VECTOR_PH:%.*]], label [[SCALAR_PH:%.*]]
 ; CHECK:       vector.ph:
 ; CHECK-NEXT:    [[SMAX:%.*]] = call i64 @llvm.smax.i64(i64 [[N]], i64 1)
-; CHECK-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
-; CHECK-NEXT:    [[TMP3:%.*]] = shl nuw nsw i64 [[TMP2]], 2
+; CHECK-NEXT:    [[TMP3:%.*]] = shl nuw nsw i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[TMP4:%.*]] = add nsw i64 [[TMP3]], -1
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[SMAX]], [[TMP4]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[N_MOD_VF]], 0
@@ -1012,8 +1008,7 @@ define i32 @PR27626_3(ptr %p, i64 %n, i32 %z) #1 {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK_NOT]], label [[VECTOR_PH:%.*]], label [[SCALAR_PH:%.*]]
 ; CHECK:       vector.ph:
 ; CHECK-NEXT:    [[SMAX:%.*]] = call i64 @llvm.smax.i64(i64 [[N]], i64 1)
-; CHECK-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
-; CHECK-NEXT:    [[TMP3:%.*]] = shl nuw nsw i64 [[TMP2]], 2
+; CHECK-NEXT:    [[TMP3:%.*]] = shl nuw nsw i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[TMP4:%.*]] = add nsw i64 [[TMP3]], -1
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[SMAX]], [[TMP4]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[N_MOD_VF]], 0
@@ -1097,8 +1092,7 @@ define void @PR27626_4(ptr %a, i32 %x, i32 %y, i32 %z, i64 %n) #1 {
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp samesign ult i64 [[TMP2]], [[TMP4]]
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
-; CHECK-NEXT:    [[TMP6:%.*]] = call i64 @llvm.vscale.i64()
-; CHECK-NEXT:    [[TMP7:%.*]] = shl nuw nsw i64 [[TMP6]], 2
+; CHECK-NEXT:    [[TMP7:%.*]] = shl nuw nsw i64 [[TMP3]], 2
 ; CHECK-NEXT:    [[DOTNOT:%.*]] = sub nsw i64 0, [[TMP7]]
 ; CHECK-NEXT:    [[N_VEC:%.*]] = and i64 [[TMP2]], [[DOTNOT]]
 ; CHECK-NEXT:    [[IND_END:%.*]] = shl nuw i64 [[N_VEC]], 1
@@ -1110,7 +1104,7 @@ define void @PR27626_4(ptr %a, i32 %x, i32 %y, i32 %z, i64 %n) #1 {
 ; CHECK-NEXT:    [[BROADCAST_SPLAT4:%.*]] = shufflevector <vscale x 4 x i32> [[BROADCAST_SPLATINSERT3]], <vscale x 4 x i32> poison, <vscale x 4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP10:%.*]] = call <vscale x 4 x i64> @llvm.stepvector.nxv4i64()
 ; CHECK-NEXT:    [[TMP9:%.*]] = shl nuw nsw <vscale x 4 x i64> [[TMP10]], splat (i64 1)
-; CHECK-NEXT:    [[TMP11:%.*]] = shl nuw nsw i64 [[TMP6]], 3
+; CHECK-NEXT:    [[TMP11:%.*]] = shl nuw nsw i64 [[TMP3]], 3
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT5:%.*]] = insertelement <vscale x 4 x i64> poison, i64 [[TMP11]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT6:%.*]] = shufflevector <vscale x 4 x i64> [[BROADCAST_SPLATINSERT5]], <vscale x 4 x i64> poison, <vscale x 4 x i32> zeroinitializer
 ; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
@@ -1173,8 +1167,7 @@ define void @PR27626_5(ptr %a, i32 %x, i32 %y, i32 %z, i64 %n) #1 {
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp samesign ult i64 [[TMP2]], [[TMP4]]
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
-; CHECK-NEXT:    [[TMP7:%.*]] = call i64 @llvm.vscale.i64()
-; CHECK-NEXT:    [[TMP8:%.*]] = shl nuw nsw i64 [[TMP7]], 2
+; CHECK-NEXT:    [[TMP8:%.*]] = shl nuw nsw i64 [[TMP3]], 2
 ; CHECK-NEXT:    [[DOTNOT:%.*]] = sub nsw i64 0, [[TMP8]]
 ; CHECK-NEXT:    [[N_VEC:%.*]] = and i64 [[TMP2]], [[DOTNOT]]
 ; CHECK-NEXT:    [[TMP11:%.*]] = shl nuw i64 [[N_VEC]], 1
@@ -1188,7 +1181,7 @@ define void @PR27626_5(ptr %a, i32 %x, i32 %y, i32 %z, i64 %n) #1 {
 ; CHECK-NEXT:    [[TMP10:%.*]] = call <vscale x 4 x i64> @llvm.stepvector.nxv4i64()
 ; CHECK-NEXT:    [[TMP19:%.*]] = shl nuw nsw <vscale x 4 x i64> [[TMP10]], splat (i64 1)
 ; CHECK-NEXT:    [[INDUCTION:%.*]] = add nuw nsw <vscale x 4 x i64> [[TMP19]], splat (i64 3)
-; CHECK-NEXT:    [[TMP12:%.*]] = shl nuw nsw i64 [[TMP7]], 3
+; CHECK-NEXT:    [[TMP12:%.*]] = shl nuw nsw i64 [[TMP3]], 3
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT5:%.*]] = insertelement <vscale x 4 x i64> poison, i64 [[TMP12]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT6:%.*]] = shufflevector <vscale x 4 x i64> [[BROADCAST_SPLATINSERT5]], <vscale x 4 x i64> poison, <vscale x 4 x i32> zeroinitializer
 ; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
@@ -1265,14 +1258,13 @@ define void @PR34743(ptr %a, ptr %b, i64 %n) #1 {
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
-; CHECK-NEXT:    [[TMP9:%.*]] = call i64 @llvm.vscale.i64()
-; CHECK-NEXT:    [[TMP10:%.*]] = shl nuw nsw i64 [[TMP9]], 2
+; CHECK-NEXT:    [[TMP10:%.*]] = shl nuw nsw i64 [[TMP2]], 2
 ; CHECK-NEXT:    [[DOTNOT:%.*]] = sub nsw i64 0, [[TMP10]]
 ; CHECK-NEXT:    [[N_VEC:%.*]] = and i64 [[TMP1]], [[DOTNOT]]
 ; CHECK-NEXT:    [[IND_END:%.*]] = shl i64 [[N_VEC]], 1
 ; CHECK-NEXT:    [[TMP14:%.*]] = call <vscale x 4 x i64> @llvm.stepvector.nxv4i64()
 ; CHECK-NEXT:    [[TMP15:%.*]] = shl nuw nsw <vscale x 4 x i64> [[TMP14]], splat (i64 1)
-; CHECK-NEXT:    [[TMP13:%.*]] = shl nuw nsw i64 [[TMP9]], 3
+; CHECK-NEXT:    [[TMP13:%.*]] = shl nuw nsw i64 [[TMP2]], 3
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 4 x i64> poison, i64 [[TMP13]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 4 x i64> [[BROADCAST_SPLATINSERT]], <vscale x 4 x i64> poison, <vscale x 4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP33:%.*]] = call i32 @llvm.vscale.i32()
@@ -1359,8 +1351,7 @@ define void @interleave_deinterleave_factor3(ptr writeonly noalias %dst, ptr rea
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ugt i64 [[TMP0]], 256
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
-; CHECK-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
-; CHECK-NEXT:    [[TMP3:%.*]] = shl nuw i64 [[TMP2]], 2
+; CHECK-NEXT:    [[TMP3:%.*]] = shl nuw nsw i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i64 1024, [[TMP3]]
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub nuw nsw i64 1024, [[N_MOD_VF]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = call <vscale x 4 x i64> @llvm.stepvector.nxv4i64()
@@ -1451,8 +1442,7 @@ define void @interleave_deinterleave(ptr writeonly noalias %dst, ptr readonly %a
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ugt i64 [[TMP0]], 256
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
-; CHECK-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
-; CHECK-NEXT:    [[TMP3:%.*]] = shl nuw i64 [[TMP2]], 2
+; CHECK-NEXT:    [[TMP3:%.*]] = shl nuw nsw i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i64 1024, [[TMP3]]
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub nuw nsw i64 1024, [[N_MOD_VF]]
 ; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]

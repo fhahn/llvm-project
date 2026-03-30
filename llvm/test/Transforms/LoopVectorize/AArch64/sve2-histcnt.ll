@@ -36,8 +36,7 @@ define void @simple_histogram(ptr noalias %buckets, ptr readonly %indices, i64 %
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], [[TMP1]]
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
-; CHECK-NEXT:    [[TMP4:%.*]] = call i64 @llvm.vscale.i64()
-; CHECK-NEXT:    [[TMP5:%.*]] = shl nuw nsw i64 [[TMP4]], 2
+; CHECK-NEXT:    [[TMP5:%.*]] = shl nuw nsw i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[DOTNOT:%.*]] = sub nsw i64 0, [[TMP5]]
 ; CHECK-NEXT:    [[N_VEC:%.*]] = and i64 [[N]], [[DOTNOT]]
 ; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
@@ -85,8 +84,7 @@ define void @simple_histogram_inc_param(ptr noalias %buckets, ptr readonly %indi
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], [[TMP1]]
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
-; CHECK-NEXT:    [[TMP4:%.*]] = call i64 @llvm.vscale.i64()
-; CHECK-NEXT:    [[TMP5:%.*]] = shl nuw nsw i64 [[TMP4]], 2
+; CHECK-NEXT:    [[TMP5:%.*]] = shl nuw nsw i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[DOTNOT:%.*]] = sub nsw i64 0, [[TMP5]]
 ; CHECK-NEXT:    [[N_VEC:%.*]] = and i64 [[N]], [[DOTNOT]]
 ; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
@@ -134,8 +132,7 @@ define void @simple_histogram_sub(ptr noalias %buckets, ptr readonly %indices, i
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], [[TMP1]]
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
-; CHECK-NEXT:    [[TMP4:%.*]] = call i64 @llvm.vscale.i64()
-; CHECK-NEXT:    [[TMP5:%.*]] = shl nuw nsw i64 [[TMP4]], 2
+; CHECK-NEXT:    [[TMP5:%.*]] = shl nuw nsw i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[DOTNOT:%.*]] = sub nsw i64 0, [[TMP5]]
 ; CHECK-NEXT:    [[N_VEC:%.*]] = and i64 [[N]], [[DOTNOT]]
 ; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
@@ -183,8 +180,7 @@ define void @conditional_histogram(ptr noalias %buckets, ptr readonly %indices, 
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], [[TMP3]]
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
-; CHECK-NEXT:    [[TMP4:%.*]] = call i64 @llvm.vscale.i64()
-; CHECK-NEXT:    [[TMP5:%.*]] = shl nuw nsw i64 [[TMP4]], 2
+; CHECK-NEXT:    [[TMP5:%.*]] = shl nuw nsw i64 [[TMP6]], 2
 ; CHECK-NEXT:    [[DOTNOT:%.*]] = sub nsw i64 0, [[TMP5]]
 ; CHECK-NEXT:    [[N_VEC:%.*]] = and i64 [[N]], [[DOTNOT]]
 ; CHECK-NEXT:    br label [[FOR_BODY:%.*]]
@@ -250,8 +246,7 @@ define void @histogram_8bit(ptr noalias %buckets, ptr readonly %indices, i64 %N)
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK1:%.*]] = icmp ult i64 [[N]], [[TMP6]]
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK1]], label [[VEC_EPILOG_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
-; CHECK-NEXT:    [[TMP3:%.*]] = call i64 @llvm.vscale.i64()
-; CHECK-NEXT:    [[TMP4:%.*]] = shl nuw nsw i64 [[TMP3]], 4
+; CHECK-NEXT:    [[TMP4:%.*]] = shl nuw nsw i64 [[TMP5]], 4
 ; CHECK-NEXT:    [[DOTNOT:%.*]] = add nsw i64 [[TMP4]], -1
 ; CHECK-NEXT:    [[N_VEC:%.*]] = and i64 [[N]], [[DOTNOT]]
 ; CHECK-NEXT:    [[N_VEC1:%.*]] = sub i64 [[N]], [[N_VEC]]
@@ -426,15 +421,14 @@ define void @simple_histogram_user_interleave(ptr noalias %buckets, ptr readonly
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], [[TMP1]]
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
-; CHECK-NEXT:    [[TMP4:%.*]] = call i64 @llvm.vscale.i64()
-; CHECK-NEXT:    [[TMP5:%.*]] = shl nuw nsw i64 [[TMP4]], 3
+; CHECK-NEXT:    [[TMP5:%.*]] = shl nuw nsw i64 [[TMP0]], 3
 ; CHECK-NEXT:    [[DOTNOT:%.*]] = sub nsw i64 0, [[TMP5]]
 ; CHECK-NEXT:    [[N_VEC:%.*]] = and i64 [[N]], [[DOTNOT]]
 ; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK:       vector.body:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [4 x i8], ptr [[INDICES]], i64 [[INDEX]]
-; CHECK-NEXT:    [[DOTIDX:%.*]] = shl nuw nsw i64 [[TMP4]], 4
+; CHECK-NEXT:    [[DOTIDX:%.*]] = shl nuw nsw i64 [[TMP0]], 4
 ; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP8]], i64 [[DOTIDX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <vscale x 4 x i32>, ptr [[TMP8]], align 4
 ; CHECK-NEXT:    [[WIDE_LOAD1:%.*]] = load <vscale x 4 x i32>, ptr [[TMP17]], align 4
@@ -485,8 +479,7 @@ define void @histogram_array_3op_gep(i64 noundef %N) #0 {
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], [[TMP1]]
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
-; CHECK-NEXT:    [[TMP3:%.*]] = call i64 @llvm.vscale.i64()
-; CHECK-NEXT:    [[TMP4:%.*]] = shl nuw nsw i64 [[TMP3]], 2
+; CHECK-NEXT:    [[TMP4:%.*]] = shl nuw nsw i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[DOTNOT:%.*]] = sub nsw i64 0, [[TMP4]]
 ; CHECK-NEXT:    [[N_VEC:%.*]] = and i64 [[N]], [[DOTNOT]]
 ; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
@@ -538,8 +531,7 @@ define void @histogram_array_4op_gep_nonzero_const_idx(i64 noundef %N, ptr reado
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], [[TMP1]]
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[ENTRY:%.*]]
 ; CHECK:       vector.ph:
-; CHECK-NEXT:    [[TMP3:%.*]] = call i64 @llvm.vscale.i64()
-; CHECK-NEXT:    [[TMP4:%.*]] = shl nuw nsw i64 [[TMP3]], 2
+; CHECK-NEXT:    [[TMP4:%.*]] = shl nuw nsw i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[DOTNOT:%.*]] = sub nsw i64 0, [[TMP4]]
 ; CHECK-NEXT:    [[N_VEC:%.*]] = and i64 [[N]], [[DOTNOT]]
 ; CHECK-NEXT:    br label [[FOR_BODY:%.*]]
@@ -749,8 +741,7 @@ define void @simple_histogram_64b(ptr noalias %buckets, ptr readonly %indices, i
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], [[TMP1]]
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
-; CHECK-NEXT:    [[TMP3:%.*]] = call i64 @llvm.vscale.i64()
-; CHECK-NEXT:    [[TMP4:%.*]] = shl nuw nsw i64 [[TMP3]], 1
+; CHECK-NEXT:    [[TMP4:%.*]] = shl nuw nsw i64 [[TMP0]], 1
 ; CHECK-NEXT:    [[DOTNOT:%.*]] = sub nsw i64 0, [[TMP4]]
 ; CHECK-NEXT:    [[N_VEC:%.*]] = and i64 [[N]], [[DOTNOT]]
 ; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]

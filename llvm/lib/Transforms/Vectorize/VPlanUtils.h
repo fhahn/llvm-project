@@ -151,6 +151,11 @@ VPInstruction *findComputeReductionResult(VPReductionPHIRecipe *PhiR);
 /// the header-mask pattern manually.
 VPSingleDefRecipe *findHeaderMask(VPlan &Plan);
 
+/// Expand \p S directly into VPInstructions using \p Builder. Falls back to
+/// VPExpandSCEVRecipe for SCEVExpressions not supported yet.
+VPValue *expandSCEVExpr(const SCEV *S, VPBuilder &Builder, VPlan &Plan,
+                        DebugLoc DL);
+
 } // namespace vputils
 
 //===----------------------------------------------------------------------===//

@@ -8562,7 +8562,7 @@ void LoopVectorizationPlanner::addMinimumIterationCheck(
           ? &MinItersBypassWeights[0]
           : nullptr;
   VPlanTransforms::addMinimumIterationCheck(
-      Plan, VF, UF, MinProfitableTripCount,
+      Plan, Plan.getEntry(), VF, UF, MinProfitableTripCount,
       CM.requiresScalarEpilogue(VF.isVector()), CM.foldTailByMasking(),
       OrigLoop, BranchWeights,
       OrigLoop->getLoopPredecessor()->getTerminator()->getDebugLoc(), PSE);

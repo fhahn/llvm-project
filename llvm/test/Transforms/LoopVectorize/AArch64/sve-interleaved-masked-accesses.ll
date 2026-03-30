@@ -30,8 +30,7 @@ define void @masked_strided1(ptr noalias nocapture readonly %p, ptr noalias noca
 ; SCALAR_TAIL_FOLDING-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ugt i32 [[TMP0]], 64
 ; SCALAR_TAIL_FOLDING-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; SCALAR_TAIL_FOLDING:       vector.ph:
-; SCALAR_TAIL_FOLDING-NEXT:    [[TMP1:%.*]] = call i32 @llvm.vscale.i32()
-; SCALAR_TAIL_FOLDING-NEXT:    [[TMP2:%.*]] = shl nuw i32 [[TMP1]], 4
+; SCALAR_TAIL_FOLDING-NEXT:    [[TMP2:%.*]] = shl nuw nsw i32 [[TMP0]], 4
 ; SCALAR_TAIL_FOLDING-NEXT:    [[N_MOD_VF:%.*]] = urem i32 1024, [[TMP2]]
 ; SCALAR_TAIL_FOLDING-NEXT:    [[N_VEC:%.*]] = sub nuw nsw i32 1024, [[N_MOD_VF]]
 ; SCALAR_TAIL_FOLDING-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 16 x i32> poison, i32 [[CONV]], i64 0
@@ -170,8 +169,7 @@ define void @masked_strided2(ptr noalias nocapture readnone %p, ptr noalias noca
 ; SCALAR_TAIL_FOLDING-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ugt i32 [[TMP0]], 64
 ; SCALAR_TAIL_FOLDING-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; SCALAR_TAIL_FOLDING:       vector.ph:
-; SCALAR_TAIL_FOLDING-NEXT:    [[TMP1:%.*]] = call i32 @llvm.vscale.i32()
-; SCALAR_TAIL_FOLDING-NEXT:    [[TMP2:%.*]] = shl nuw i32 [[TMP1]], 4
+; SCALAR_TAIL_FOLDING-NEXT:    [[TMP2:%.*]] = shl nuw nsw i32 [[TMP0]], 4
 ; SCALAR_TAIL_FOLDING-NEXT:    [[N_MOD_VF:%.*]] = urem i32 1024, [[TMP2]]
 ; SCALAR_TAIL_FOLDING-NEXT:    [[N_VEC:%.*]] = sub nuw nsw i32 1024, [[N_MOD_VF]]
 ; SCALAR_TAIL_FOLDING-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 16 x i32> poison, i32 [[CONV]], i64 0
@@ -292,8 +290,7 @@ define void @masked_strided3(ptr noalias nocapture readnone %p, ptr noalias noca
 ; SCALAR_TAIL_FOLDING-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ugt i32 [[TMP0]], 64
 ; SCALAR_TAIL_FOLDING-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; SCALAR_TAIL_FOLDING:       vector.ph:
-; SCALAR_TAIL_FOLDING-NEXT:    [[TMP1:%.*]] = call i32 @llvm.vscale.i32()
-; SCALAR_TAIL_FOLDING-NEXT:    [[TMP2:%.*]] = shl nuw i32 [[TMP1]], 4
+; SCALAR_TAIL_FOLDING-NEXT:    [[TMP2:%.*]] = shl nuw nsw i32 [[TMP0]], 4
 ; SCALAR_TAIL_FOLDING-NEXT:    [[N_MOD_VF:%.*]] = urem i32 1024, [[TMP2]]
 ; SCALAR_TAIL_FOLDING-NEXT:    [[N_VEC:%.*]] = sub nuw nsw i32 1024, [[N_MOD_VF]]
 ; SCALAR_TAIL_FOLDING-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 16 x i32> poison, i32 [[CONV]], i64 0
@@ -434,8 +431,7 @@ define void @masked_strided_factor4(ptr noalias nocapture readonly %p, ptr noali
 ; SCALAR_TAIL_FOLDING-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ugt i32 [[TMP0]], 64
 ; SCALAR_TAIL_FOLDING-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; SCALAR_TAIL_FOLDING:       vector.ph:
-; SCALAR_TAIL_FOLDING-NEXT:    [[TMP1:%.*]] = call i32 @llvm.vscale.i32()
-; SCALAR_TAIL_FOLDING-NEXT:    [[TMP2:%.*]] = shl nuw i32 [[TMP1]], 4
+; SCALAR_TAIL_FOLDING-NEXT:    [[TMP2:%.*]] = shl nuw nsw i32 [[TMP0]], 4
 ; SCALAR_TAIL_FOLDING-NEXT:    [[N_MOD_VF:%.*]] = urem i32 1024, [[TMP2]]
 ; SCALAR_TAIL_FOLDING-NEXT:    [[N_VEC:%.*]] = sub nuw nsw i32 1024, [[N_MOD_VF]]
 ; SCALAR_TAIL_FOLDING-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 16 x i32> poison, i32 [[CONV]], i64 0

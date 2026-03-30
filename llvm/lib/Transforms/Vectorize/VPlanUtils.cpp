@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "VPlanUtils.h"
+#include "LoopVectorizationPlanner.h"
 #include "VPlanAnalysis.h"
 #include "VPlanCFG.h"
 #include "VPlanDominatorTree.h"
@@ -698,4 +699,27 @@ VPInstruction *vputils::findComputeReductionResult(VPReductionPHIRecipe *PhiR) {
     return nullptr;
   return vputils::findUserOf<VPInstruction::ComputeReductionResult>(
       cast<VPSingleDefRecipe>(SelR));
+}
+
+VPValue *vputils::expandSCEVExpr(const SCEV *S, VPBuilder &Builder,
+                                 VPlan &Plan, DebugLoc DL) {
+  if (auto *C = dyn_cast<SCEVConstant>(S))
+    return Plan.getOrAddLiveIn(C->getValue());
+  if (auto *U = dyn_cast<SCEVUnknown>(S))
+    return Plan.getOrAddLiveIn(U->getValue());
+  if (isa<SCEVVScale>(S))
+    return Builder.createNaryOp(VPInstruction::VScale, {}, S->getType());
+  if (auto *Mul = dyn_cast<SCEVMulExpr>(S)) {
+    VPIRFlags::WrapFlagsTy WrapFlags(Mul->hasNoUnsignedWrap(),
+                                     Mul->hasNoSignedWrap());
+    // Chain the operands with Mul.
+    VPValue *Result = expandSCEVExpr(Mul->getOperand(0), Builder, Plan, DL);
+    for (const SCEVUse &Op : drop_begin(Mul->operands()))
+      Result = Builder.createOverflowingOp(
+          Instruction::Mul, {Result, expandSCEVExpr(Op, Builder, Plan, DL)},
+          WrapFlags, DL);
+    return Result;
+  }
+  // Unsupported SCEV kind; fall back to VPExpandSCEVRecipe.
+  return Builder.createExpandSCEV(S);
 }

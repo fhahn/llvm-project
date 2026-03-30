@@ -55,8 +55,7 @@ define i32 @chained_recurrences(i32 %x, i64 %y, ptr %src.1, i32 %z, ptr %src.2) 
 ; VSCALEFORTUNING2-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP0]], [[TMP2]]
 ; VSCALEFORTUNING2-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; VSCALEFORTUNING2:       [[VECTOR_PH]]:
-; VSCALEFORTUNING2-NEXT:    [[TMP3:%.*]] = call i64 @llvm.vscale.i64()
-; VSCALEFORTUNING2-NEXT:    [[TMP4:%.*]] = shl nuw i64 [[TMP3]], 3
+; VSCALEFORTUNING2-NEXT:    [[TMP4:%.*]] = shl nuw i64 [[TMP1]], 3
 ; VSCALEFORTUNING2-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[TMP0]], [[TMP4]]
 ; VSCALEFORTUNING2-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[N_MOD_VF]]
 ; VSCALEFORTUNING2-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 4 x i32> poison, i32 [[X]], i64 0
@@ -288,8 +287,7 @@ define i16 @reduce_udiv(ptr %src, i16 %x, i64 %N) #0 {
 ; DEFAULT-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP0]], [[TMP2]]
 ; DEFAULT-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; DEFAULT:       [[VECTOR_PH]]:
-; DEFAULT-NEXT:    [[TMP3:%.*]] = call i64 @llvm.vscale.i64()
-; DEFAULT-NEXT:    [[TMP5:%.*]] = shl nuw i64 [[TMP3]], 2
+; DEFAULT-NEXT:    [[TMP5:%.*]] = shl nuw i64 [[TMP1]], 2
 ; DEFAULT-NEXT:    [[TMP4:%.*]] = shl nuw i64 [[TMP5]], 1
 ; DEFAULT-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[TMP0]], [[TMP4]]
 ; DEFAULT-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[N_MOD_VF]]
@@ -340,17 +338,16 @@ define i16 @reduce_udiv(ptr %src, i16 %x, i64 %N) #0 {
 ; VSCALEFORTUNING2-NEXT:    [[TMP0:%.*]] = add i64 [[N]], 1
 ; VSCALEFORTUNING2-NEXT:    [[TMP1:%.*]] = call i64 @llvm.vscale.i64()
 ; VSCALEFORTUNING2-NEXT:    [[TMP5:%.*]] = shl nuw i64 [[TMP1]], 1
-; VSCALEFORTUNING2-NEXT:    [[TMP2:%.*]] = shl nuw i64 [[TMP1]], 3
 ; VSCALEFORTUNING2-NEXT:    [[MIN_ITERS_CHECK1:%.*]] = icmp ult i64 [[TMP0]], [[TMP5]]
 ; VSCALEFORTUNING2-NEXT:    [[TMP6:%.*]] = call i64 @llvm.vscale.i64()
 ; VSCALEFORTUNING2-NEXT:    [[TMP9:%.*]] = shl nuw i64 [[TMP6]], 1
 ; VSCALEFORTUNING2-NEXT:    br i1 [[MIN_ITERS_CHECK1]], label %[[VEC_EPILOG_SCALAR_PH:.*]], label %[[VECTOR_MAIN_LOOP_ITER_CHECK:.*]]
 ; VSCALEFORTUNING2:       [[VECTOR_MAIN_LOOP_ITER_CHECK]]:
+; VSCALEFORTUNING2-NEXT:    [[TMP2:%.*]] = shl nuw i64 [[TMP1]], 3
 ; VSCALEFORTUNING2-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP0]], [[TMP2]]
 ; VSCALEFORTUNING2-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[VEC_EPILOG_PH:.*]], label %[[VECTOR_PH:.*]]
 ; VSCALEFORTUNING2:       [[VECTOR_PH]]:
-; VSCALEFORTUNING2-NEXT:    [[TMP3:%.*]] = call i64 @llvm.vscale.i64()
-; VSCALEFORTUNING2-NEXT:    [[TMP7:%.*]] = shl nuw i64 [[TMP3]], 2
+; VSCALEFORTUNING2-NEXT:    [[TMP7:%.*]] = shl nuw i64 [[TMP1]], 2
 ; VSCALEFORTUNING2-NEXT:    [[TMP4:%.*]] = shl nuw i64 [[TMP7]], 1
 ; VSCALEFORTUNING2-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[TMP0]], [[TMP4]]
 ; VSCALEFORTUNING2-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[N_MOD_VF]]

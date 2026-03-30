@@ -40,8 +40,7 @@ define void @single_constant_stride_int_scaled(ptr %p) {
 ; CHECK-UF2-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ule i64 1024, [[TMP1]]
 ; CHECK-UF2-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; CHECK-UF2:       vector.ph:
-; CHECK-UF2-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
-; CHECK-UF2-NEXT:    [[TMP3:%.*]] = shl nuw i64 [[TMP2]], 2
+; CHECK-UF2-NEXT:    [[TMP3:%.*]] = shl nuw i64 [[TMP0]], 2
 ; CHECK-UF2-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 4 x i64> poison, i64 [[TMP3]], i64 0
 ; CHECK-UF2-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 4 x i64> [[BROADCAST_SPLATINSERT]], <vscale x 4 x i64> poison, <vscale x 4 x i32> zeroinitializer
 ; CHECK-UF2-NEXT:    [[TMP4:%.*]] = shl nuw i64 [[TMP3]], 1
@@ -141,8 +140,7 @@ define void @single_constant_stride_int_iv(ptr %p) {
 ; CHECK-UF2-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 1024, [[TMP1]]
 ; CHECK-UF2-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; CHECK-UF2:       vector.ph:
-; CHECK-UF2-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
-; CHECK-UF2-NEXT:    [[TMP3:%.*]] = shl nuw i64 [[TMP2]], 2
+; CHECK-UF2-NEXT:    [[TMP3:%.*]] = shl nuw i64 [[TMP0]], 2
 ; CHECK-UF2-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 4 x i64> poison, i64 [[TMP3]], i64 0
 ; CHECK-UF2-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 4 x i64> [[BROADCAST_SPLATINSERT]], <vscale x 4 x i64> poison, <vscale x 4 x i32> zeroinitializer
 ; CHECK-UF2-NEXT:    [[TMP4:%.*]] = shl nuw i64 [[TMP3]], 1
@@ -244,8 +242,7 @@ define void @single_constant_stride_ptr_iv(ptr %p) {
 ; CHECK-UF2-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ule i64 1024, [[TMP1]]
 ; CHECK-UF2-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; CHECK-UF2:       vector.ph:
-; CHECK-UF2-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
-; CHECK-UF2-NEXT:    [[TMP3:%.*]] = shl nuw i64 [[TMP2]], 2
+; CHECK-UF2-NEXT:    [[TMP3:%.*]] = shl nuw i64 [[TMP0]], 2
 ; CHECK-UF2-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 4 x i64> poison, i64 [[TMP3]], i64 0
 ; CHECK-UF2-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 4 x i64> [[BROADCAST_SPLATINSERT]], <vscale x 4 x i64> poison, <vscale x 4 x i32> zeroinitializer
 ; CHECK-UF2-NEXT:    [[TMP4:%.*]] = shl nuw i64 [[TMP3]], 1
@@ -368,8 +365,7 @@ define void @single_stride_int_scaled(ptr %p, i64 %stride) {
 ; NOSTRIDED-UF2-NEXT:    [[IDENT_CHECK:%.*]] = icmp ne i64 [[STRIDE:%.*]], 1
 ; NOSTRIDED-UF2-NEXT:    br i1 [[IDENT_CHECK]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
 ; NOSTRIDED-UF2:       vector.ph:
-; NOSTRIDED-UF2-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
-; NOSTRIDED-UF2-NEXT:    [[TMP5:%.*]] = shl nuw i64 [[TMP2]], 2
+; NOSTRIDED-UF2-NEXT:    [[TMP5:%.*]] = shl nuw i64 [[TMP0]], 2
 ; NOSTRIDED-UF2-NEXT:    [[TMP3:%.*]] = shl nuw i64 [[TMP5]], 1
 ; NOSTRIDED-UF2-NEXT:    [[N_MOD_VF:%.*]] = urem i64 1024, [[TMP3]]
 ; NOSTRIDED-UF2-NEXT:    [[N_VEC:%.*]] = sub i64 1024, [[N_MOD_VF]]
@@ -490,8 +486,7 @@ define void @single_stride_int_iv(ptr %p, i64 %stride) {
 ; NOSTRIDED-UF2-NEXT:    [[IDENT_CHECK:%.*]] = icmp ne i64 [[STRIDE:%.*]], 1
 ; NOSTRIDED-UF2-NEXT:    br i1 [[IDENT_CHECK]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
 ; NOSTRIDED-UF2:       vector.ph:
-; NOSTRIDED-UF2-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
-; NOSTRIDED-UF2-NEXT:    [[TMP5:%.*]] = shl nuw i64 [[TMP2]], 2
+; NOSTRIDED-UF2-NEXT:    [[TMP5:%.*]] = shl nuw i64 [[TMP0]], 2
 ; NOSTRIDED-UF2-NEXT:    [[TMP3:%.*]] = shl nuw i64 [[TMP5]], 1
 ; NOSTRIDED-UF2-NEXT:    [[N_MOD_VF:%.*]] = urem i64 1024, [[TMP3]]
 ; NOSTRIDED-UF2-NEXT:    [[N_VEC:%.*]] = sub i64 1024, [[N_MOD_VF]]
@@ -980,8 +975,7 @@ define void @double_stride_int_iv(ptr %p, ptr %p2, i64 %stride) {
 ; NOSTRIDED-UF2-NEXT:    [[IDENT_CHECK:%.*]] = icmp ne i64 [[STRIDE:%.*]], 1
 ; NOSTRIDED-UF2-NEXT:    br i1 [[IDENT_CHECK]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
 ; NOSTRIDED-UF2:       vector.ph:
-; NOSTRIDED-UF2-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
-; NOSTRIDED-UF2-NEXT:    [[TMP5:%.*]] = shl nuw i64 [[TMP2]], 2
+; NOSTRIDED-UF2-NEXT:    [[TMP5:%.*]] = shl nuw i64 [[TMP0]], 2
 ; NOSTRIDED-UF2-NEXT:    [[TMP3:%.*]] = shl nuw i64 [[TMP5]], 1
 ; NOSTRIDED-UF2-NEXT:    [[N_MOD_VF:%.*]] = urem i64 1024, [[TMP3]]
 ; NOSTRIDED-UF2-NEXT:    [[N_VEC:%.*]] = sub i64 1024, [[N_MOD_VF]]
@@ -1313,8 +1307,7 @@ define void @constant_stride_reinterpret(ptr noalias %in, ptr noalias %out) {
 ; NOSTRIDED-UF2-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 1024, [[TMP1]]
 ; NOSTRIDED-UF2-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; NOSTRIDED-UF2:       vector.ph:
-; NOSTRIDED-UF2-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
-; NOSTRIDED-UF2-NEXT:    [[TMP3:%.*]] = shl nuw i64 [[TMP2]], 1
+; NOSTRIDED-UF2-NEXT:    [[TMP3:%.*]] = shl nuw i64 [[TMP0]], 1
 ; NOSTRIDED-UF2-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 2 x i64> poison, i64 [[TMP3]], i64 0
 ; NOSTRIDED-UF2-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 2 x i64> [[BROADCAST_SPLATINSERT]], <vscale x 2 x i64> poison, <vscale x 2 x i32> zeroinitializer
 ; NOSTRIDED-UF2-NEXT:    [[TMP4:%.*]] = shl nuw i64 [[TMP3]], 1
@@ -1391,8 +1384,7 @@ define void @constant_stride_reinterpret(ptr noalias %in, ptr noalias %out) {
 ; STRIDED-UF2-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 1024, [[TMP1]]
 ; STRIDED-UF2-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; STRIDED-UF2:       vector.ph:
-; STRIDED-UF2-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
-; STRIDED-UF2-NEXT:    [[TMP3:%.*]] = shl nuw i64 [[TMP2]], 1
+; STRIDED-UF2-NEXT:    [[TMP3:%.*]] = shl nuw i64 [[TMP0]], 1
 ; STRIDED-UF2-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 2 x i64> poison, i64 [[TMP3]], i64 0
 ; STRIDED-UF2-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 2 x i64> [[BROADCAST_SPLATINSERT]], <vscale x 2 x i64> poison, <vscale x 2 x i32> zeroinitializer
 ; STRIDED-UF2-NEXT:    [[TMP4:%.*]] = shl nuw i64 [[TMP3]], 1
