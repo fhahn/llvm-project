@@ -4279,6 +4279,12 @@ VectorizationFactor LoopVectorizationPlanner::selectVectorizationFactor() {
   }
 
   for (auto &P : VPlans) {
+    // When cost-based tail folding is disabled, skip plans that don't match
+    // the default tail folding decision.
+    if (!EnableCostBasedTailFolding &&
+        P->isTailFolded() != CM.foldTailByMasking())
+      continue;
+
     ArrayRef<ElementCount> VFs(P->vectorFactors().begin(),
                                P->vectorFactors().end());
 
@@ -6966,7 +6972,7 @@ void LoopVectorizationPlanner::plan(ElementCount UserVF, unsigned UserIC) {
   // the need to save/restore MaskedOp state.
   // Use a separate cost model instance to avoid mutating the primary CM's
   // state, which would cause extra debug output and cached decision changes.
-  if (EnableCostBasedTailFolding && CanBuildTailFoldedPlans) {
+  if (CanBuildTailFoldedPlans) {
     LoopVectorizationCostModel TFCM(CM.ScalarEpilogueStatus, CM.TheLoop,
                                     CM.PSE, CM.LI, CM.Legal, CM.TTI, CM.TLI,
                                     CM.DB, CM.AC, CM.ORE, CM.GetBFI,
@@ -6981,7 +6987,16 @@ void LoopVectorizationPlanner::plan(ElementCount UserVF, unsigned UserIC) {
     }
   }
 
-  LLVM_DEBUG(printPlans(dbgs()));
+  LLVM_DEBUG({
+    for (auto &P : VPlans) {
+      // When cost-based tail folding is disabled, don't print plans that
+      // don't match the default tail folding decision.
+      if (!EnableCostBasedTailFolding &&
+          P->isTailFolded() != CM.foldTailByMasking())
+        continue;
+      P->print(dbgs());
+    }
+  });
 }
 
 InstructionCost VPCostContext::getLegacyCost(Instruction *UI,
@@ -7373,6 +7388,12 @@ LoopVectorizationPlanner::computeBestVF() {
   DenseMap<ElementCount, std::pair<VPlan *, VectorizationFactor>> BestPlanForVF;
 
   for (auto &P : VPlans) {
+    // When cost-based tail folding is disabled, skip plans that don't match
+    // the default tail folding decision.
+    if (!EnableCostBasedTailFolding &&
+        P->isTailFolded() != CM.foldTailByMasking())
+      continue;
+
     ArrayRef<ElementCount> VFs(P->vectorFactors().begin(),
                                P->vectorFactors().end());
 
@@ -7433,6 +7454,14 @@ LoopVectorizationPlanner::computeBestVF() {
         P->removeVF(VF);
     }
   }
+
+  // When cost-based tail folding is disabled, remove plans that don't match
+  // the default tail folding decision, as they are only built for VPlan
+  // building coverage.
+  if (!EnableCostBasedTailFolding)
+    erase_if(VPlans, [&](std::unique_ptr<VPlan> &P) {
+      return P->isTailFolded() != CM.foldTailByMasking();
+    });
 
 #ifndef NDEBUG
   // Select the optimal vectorization factor according to the legacy cost-model.
