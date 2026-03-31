@@ -5616,14 +5616,15 @@ void LoopVectorizationPlanner::plan(ElementCount UserVF, unsigned UserIC) {
   // cost model.
   BuildVPlansForVFs(*VPlan1, ElementCount::getFixed(1), CM);
 
-  // With cost-based tail folding, additionally build tail-folded plans to
-  // compare against the default scalar-epilogue plans. Skipped if tail folding
-  // is already the default, is not legal, or would require destructively
-  // invalidating interleave groups. Tail-folded plans are built after the
-  // default plans, as prepareToFoldTailByMasking only adds to the set of masked
-  // operations, avoiding the need to save and restore it.
-  if (EnableCostBasedTailFolding && !CM.foldTailByMasking() &&
-      CM.isEpilogueAllowed() && Legal->canFoldTailByMasking() &&
+  // Additionally build tail-folded plans, to compare against the default
+  // scalar-epilogue plans with cost-based tail folding, and for VPlan building
+  // coverage otherwise. Skipped if tail folding is already the default, is not
+  // legal, or would require destructively invalidating interleave groups.
+  // Tail-folded plans are built after the default plans, as
+  // prepareToFoldTailByMasking only adds to the set of masked operations,
+  // avoiding the need to save and restore it.
+  if (!CM.foldTailByMasking() && CM.isEpilogueAllowed() &&
+      Legal->canFoldTailByMasking() &&
       (useMaskedInterleavedAccesses(TTI) || !CM.InterleaveInfo.hasGroups())) {
     // Use a separate cost model instance to avoid mutating the primary cost
     // model's cached decisions. It is only used to build the plans; costing in
@@ -5659,7 +5660,16 @@ void LoopVectorizationPlanner::plan(ElementCount UserVF, unsigned UserIC) {
     }
   }
 
-  LLVM_DEBUG(printPlans(dbgs()));
+  LLVM_DEBUG({
+    for (auto &P : VPlans) {
+      // When cost-based tail folding is disabled, don't print plans that
+      // don't match the default tail folding decision.
+      if (!EnableCostBasedTailFolding &&
+          P->hasTailFolded() != CM.foldTailByMasking())
+        continue;
+      P->print(dbgs());
+    }
+  });
 }
 
 VPCostContext::VPCostContext(const TargetLibraryInfo &TLI, const VPlan &Plan,
@@ -5936,6 +5946,12 @@ LoopVectorizationPlanner::computeBestVF() {
   VPlan *PlanForBestVF = &FirstPlan;
 
   for (auto &P : VPlans) {
+    // When cost-based tail folding is disabled, skip plans that don't match
+    // the default tail folding decision.
+    if (!EnableCostBasedTailFolding &&
+        P->hasTailFolded() != CM.foldTailByMasking())
+      continue;
+
     ArrayRef<ElementCount> VFs(P->vectorFactors().begin(),
                                P->vectorFactors().end());
 
@@ -5983,6 +5999,15 @@ LoopVectorizationPlanner::computeBestVF() {
   }
 
   VPlan &BestPlan = *PlanForBestVF;
+
+  // When cost-based tail folding is disabled, remove plans that don't match
+  // the default tail folding decision, as they are only built for VPlan
+  // building coverage.
+  if (!EnableCostBasedTailFolding)
+    erase_if(VPlans, [&](std::unique_ptr<VPlan> &P) {
+      return P->hasTailFolded() != CM.foldTailByMasking();
+    });
+
 
   assert((BestFactor.Width.isScalar() || BestFactor.ScalarCost > 0) &&
          "when vectorizing, the scalar cost must be computed.");
