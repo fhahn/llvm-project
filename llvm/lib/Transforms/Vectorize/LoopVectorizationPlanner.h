@@ -432,6 +432,10 @@ struct VectorizationFactor {
   /// to runtime checks.
   ElementCount MinProfitableTripCount;
 
+  /// Whether the plan for this VF has a scalar tail (i.e., does not fold the
+  /// tail by masking).
+  bool HasScalarTail = true;
+
   VectorizationFactor(ElementCount Width, InstructionCost Cost,
                       InstructionCost ScalarCost)
       : Width(Width), Cost(Cost), ScalarCost(ScalarCost) {}
@@ -657,12 +661,14 @@ private:
   /// built. Each VPlan is built starting from a copy of \p InitialPlan, which
   /// is a plain CFG VPlan wrapping the original scalar loop.
   VPlanPtr tryToBuildVPlanWithVPRecipes(VPlanPtr InitialPlan, VFRange &Range,
-                                        LoopVersioning *LVer);
+                                        LoopVersioning *LVer,
+                                        LoopVectorizationCostModel &TheCM);
 
   /// Build VPlans for power-of-2 VF's between \p MinVF and \p MaxVF inclusive,
   /// according to the information gathered by Legal when it checked if it is
   /// legal to vectorize the loop. This method creates VPlans using VPRecipes.
-  void buildVPlansWithVPRecipes(ElementCount MinVF, ElementCount MaxVF);
+  void buildVPlansWithVPRecipes(ElementCount MinVF, ElementCount MaxVF,
+                                LoopVectorizationCostModel &TheCM);
 
   /// Add recipes to compute the final reduction result (ComputeAnyOfResult,
   /// ComputeReductionResult depending on the reduction) in
@@ -670,7 +676,8 @@ private:
   /// and users outside the vector region when folding the tail.
   void addReductionResultComputation(VPlanPtr &Plan,
                                      VPRecipeBuilder &RecipeBuilder,
-                                     ElementCount MinVF);
+                                     ElementCount MinVF,
+                                     LoopVectorizationCostModel &TheCM);
 
   /// Attach the runtime checks of \p RTChecks to \p Plan.
   void attachRuntimeChecks(VPlan &Plan, GeneratedRTChecks &RTChecks,
@@ -688,14 +695,14 @@ private:
   /// Returns true if the per-lane cost of VectorizationFactor A is lower than
   /// that of B.
   bool isMoreProfitable(const VectorizationFactor &A,
-                        const VectorizationFactor &B, bool HasTail,
+                        const VectorizationFactor &B,
                         bool IsEpilogue = false) const;
 
   /// Returns true if the per-lane cost of VectorizationFactor A is lower than
   /// that of B in the context of vectorizing a loop with known \p MaxTripCount.
   bool isMoreProfitable(const VectorizationFactor &A,
                         const VectorizationFactor &B,
-                        const unsigned MaxTripCount, bool HasTail,
+                        const unsigned MaxTripCount,
                         bool IsEpilogue = false) const;
 
   /// Determines if we have the infrastructure to vectorize the loop and its

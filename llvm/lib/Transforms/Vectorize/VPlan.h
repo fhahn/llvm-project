@@ -4770,16 +4770,16 @@ public:
 
   void addVF(ElementCount VF) { VFs.insert(VF); }
 
-  void setVF(ElementCount VF) {
-    assert(hasVF(VF) && "Cannot set VF not already in plan");
-    VFs.clear();
-    VFs.insert(VF);
-  }
-
   /// Remove \p VF from the plan.
   void removeVF(ElementCount VF) {
     assert(hasVF(VF) && "tried to remove VF not present in plan");
     VFs.remove(VF);
+  }
+
+  void setVF(ElementCount VF) {
+    assert(hasVF(VF) && "Cannot set VF not already in plan");
+    VFs.clear();
+    VFs.insert(VF);
   }
 
   bool hasVF(ElementCount VF) const { return VFs.count(VF); }
@@ -4953,13 +4953,18 @@ public:
            (ExitBlocks.size() == 1 && ExitBlocks[0]->getNumPredecessors() > 1);
   }
 
-  /// Returns true if the scalar tail may execute after the vector loop. Note
-  /// that this relies on unneeded branches to the scalar tail loop being
-  /// removed.
+  /// Returns true if the scalar tail may execute after the vector loop, i.e.,
+  /// the middle block is a predecessor of the scalar preheader. Cannot be
+  /// called after dissolveLoopRegions removes the vector loop region.
   bool hasScalarTail() const {
-    return !(!getScalarPreheader()->hasPredecessors() ||
-             getScalarPreheader()->getSinglePredecessor() == getEntry());
+    return llvm::is_contained(getScalarPreheader()->getPredecessors(),
+                              getMiddleBlock());
   }
+
+  /// Returns true if this plan folds the tail by masking, i.e., has a header
+  /// mask. Cannot be called after dissolveLoopRegions removes the vector loop
+  /// region.
+  bool isTailFolded();
 };
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)

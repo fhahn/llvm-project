@@ -585,7 +585,12 @@ VPSingleDefRecipe *vputils::findHeaderMask(VPlan &Plan) {
   // Also include VPWidenIntOrFpInductionRecipes that represent a widened
   // version of the canonical induction.
   VPBasicBlock *HeaderVPBB = LoopRegion->getEntryBasicBlock();
+
+  // Check for active lane mask PHI in the header, which indicates tail folding
+  // via active lane masks.
   for (VPRecipeBase &Phi : HeaderVPBB->phis()) {
+    if (auto *ALM = dyn_cast<VPActiveLaneMaskPHIRecipe>(&Phi))
+      return ALM;
     auto *WidenOriginalIV = dyn_cast<VPWidenIntOrFpInductionRecipe>(&Phi);
     if (WidenOriginalIV && WidenOriginalIV->isCanonical())
       WideCanonicalIVs.push_back(WidenOriginalIV);

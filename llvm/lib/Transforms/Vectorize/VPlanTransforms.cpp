@@ -3112,7 +3112,7 @@ static VPRecipeBase *optimizeMaskToEVL(VPValue *HeaderMask,
       return new VPReductionEVLRecipe(*Rdx, EVL, Mask);
 
   if (auto *Interleave = dyn_cast<VPInterleaveRecipe>(&CurRecipe))
-    if (Interleave->getMask() &&
+    if (!Interleave->needsMaskForGaps() && Interleave->getMask() &&
         match(Interleave->getMask(), m_RemoveMask(HeaderMask, Mask)))
       return new VPInterleaveEVLRecipe(*Interleave, EVL, Mask);
 

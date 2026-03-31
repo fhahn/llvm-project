@@ -259,6 +259,11 @@ cl::opt<bool> llvm::EnableWideActiveLaneMask(
     cl::desc("Enable use of wide lane masks when used for control flow in "
              "tail-folded loops"));
 
+static cl::opt<bool> EnableCostBasedTailFolding(
+    "enable-cost-based-tail-folding", cl::init(false), cl::Hidden,
+    cl::desc("Build VPlans with both tail-folding and scalar epilogue and let "
+             "the cost model pick the best option."));
+
 static cl::opt<bool> MaximizeBandwidth(
     "vectorizer-maximize-bandwidth", cl::init(false), cl::Hidden,
     cl::desc("Maximize bandwidth when selecting vectorization factor which "
@@ -1489,6 +1494,22 @@ public:
     CallWideningDecisions.clear();
     Uniforms.clear();
     Scalars.clear();
+    ForcedScalars.clear();
+    InstsToScalarize.clear();
+    PredicatedBBsAfterVectorization.clear();
+    NumPredStores = 0;
+  }
+
+  /// Force tail folding to be enabled with the TTI-preferred style.
+  /// Falls back to DataWithoutLaneMask if TTI has no preference, since
+  /// we need a concrete masking style when tail folding is requested.
+  void forceTailFoldingWithPreferredStyle() {
+    ChosenTailFoldingStyle = TTI.getPreferredTailFoldingStyle();
+    if (ChosenTailFoldingStyle == TailFoldingStyle::None)
+      ChosenTailFoldingStyle = TailFoldingStyle::DataWithoutLaneMask;
+    // Allow command line override.
+    if (ForceTailFoldingStyle.getNumOccurrences())
+      ChosenTailFoldingStyle = ForceTailFoldingStyle.getValue();
   }
 
   /// Returns the expected execution cost. The unit of the cost does
@@ -3935,7 +3956,6 @@ ElementCount LoopVectorizationCostModel::getMaximizedVFForTarget(
 bool LoopVectorizationPlanner::isMoreProfitable(const VectorizationFactor &A,
                                                 const VectorizationFactor &B,
                                                 const unsigned MaxTripCount,
-                                                bool HasTail,
                                                 bool IsEpilogue) const {
   InstructionCost CostA = A.Cost;
   InstructionCost CostB = B.Cost;
@@ -3976,9 +3996,9 @@ bool LoopVectorizationPlanner::isMoreProfitable(const VectorizationFactor &A,
   if (!MaxTripCount)
     return LowerCostWithoutTC;
 
-  auto GetCostForTC = [MaxTripCount, HasTail](unsigned VF,
-                                              InstructionCost VectorCost,
-                                              InstructionCost ScalarCost) {
+  auto GetCostForTC = [MaxTripCount](unsigned VF, InstructionCost VectorCost,
+                                     InstructionCost ScalarCost,
+                                     bool HasScalarTail) {
     // If the trip count is a known (possibly small) constant, the trip count
     // will be rounded up to an integer number of iterations under
     // FoldTailByMasking. The total cost in that case will be
@@ -3987,14 +4007,16 @@ bool LoopVectorizationPlanner::isMoreProfitable(const VectorizationFactor &A,
     // some extra overheads, but for the purpose of comparing the costs of
     // different VFs we can use this to compare the total loop-body cost
     // expected after vectorization.
-    if (HasTail)
+    if (HasScalarTail)
       return VectorCost * (MaxTripCount / VF) +
              ScalarCost * (MaxTripCount % VF);
     return VectorCost * divideCeil(MaxTripCount, VF);
   };
 
-  auto RTCostA = GetCostForTC(EstimatedWidthA, CostA, A.ScalarCost);
-  auto RTCostB = GetCostForTC(EstimatedWidthB, CostB, B.ScalarCost);
+  auto RTCostA =
+      GetCostForTC(EstimatedWidthA, CostA, A.ScalarCost, A.HasScalarTail);
+  auto RTCostB =
+      GetCostForTC(EstimatedWidthB, CostB, B.ScalarCost, B.HasScalarTail);
   bool LowerCostWithTC = CmpFn(RTCostA, RTCostB);
   LLVM_DEBUG(if (LowerCostWithTC != LowerCostWithoutTC) {
     dbgs() << "LV: VF " << (LowerCostWithTC ? A.Width : B.Width)
@@ -4009,10 +4031,9 @@ bool LoopVectorizationPlanner::isMoreProfitable(const VectorizationFactor &A,
 
 bool LoopVectorizationPlanner::isMoreProfitable(const VectorizationFactor &A,
                                                 const VectorizationFactor &B,
-                                                bool HasTail,
                                                 bool IsEpilogue) const {
   const unsigned MaxTripCount = PSE.getSmallConstantMaxTripCount();
-  return LoopVectorizationPlanner::isMoreProfitable(A, B, MaxTripCount, HasTail,
+  return LoopVectorizationPlanner::isMoreProfitable(A, B, MaxTripCount,
                                                     IsEpilogue);
 }
 
@@ -4328,6 +4349,7 @@ VectorizationFactor LoopVectorizationPlanner::selectVectorizationFactor() {
         C += RUs[I].spillCost(CostCtx, ForceTargetNumVectorRegs);
 
       VectorizationFactor Candidate(VF, C, ScalarCost.ScalarCost);
+      Candidate.HasScalarTail = P->hasScalarTail();
       unsigned Width =
           estimateElementCount(Candidate.Width, CM.getVScaleForTuning());
       LLVM_DEBUG(dbgs() << "LV: Vector loop of width " << VF
@@ -4354,7 +4376,7 @@ VectorizationFactor LoopVectorizationPlanner::selectVectorizationFactor() {
         continue;
       }
 
-      if (isMoreProfitable(Candidate, ChosenFactor, P->hasScalarTail()))
+      if (isMoreProfitable(Candidate, ChosenFactor))
         ChosenFactor = Candidate;
     }
   }
@@ -4368,8 +4390,7 @@ VectorizationFactor LoopVectorizationPlanner::selectVectorizationFactor() {
   }
 
   LLVM_DEBUG(if (ForceVectorization && !ChosenFactor.Width.isScalar() &&
-                 !isMoreProfitable(ChosenFactor, ScalarCost,
-                                   !CM.foldTailByMasking())) dbgs()
+                 !isMoreProfitable(ChosenFactor, ScalarCost)) dbgs()
              << "LV: Vectorization seems to be not beneficial, "
              << "but was forced by a user.\n");
   return ChosenFactor;
@@ -4609,7 +4630,7 @@ VectorizationFactor LoopVectorizationPlanner::selectEpilogueVectorizationFactor(
     }
 
     if (Result.Width.isScalar() ||
-        isMoreProfitable(NextVF, Result, MaxTripCount, !CM.foldTailByMasking(),
+        isMoreProfitable(NextVF, Result, MaxTripCount,
                          /*IsEpilogue*/ true))
       Result = NextVF;
   }
@@ -6878,6 +6899,16 @@ void LoopVectorizationPlanner::plan(ElementCount UserVF, unsigned UserIC) {
   if (CM.foldTailByMasking())
     Legal->prepareToFoldTailByMasking();
 
+  // Check if we can additionally build tail-folded plans. Only when the default
+  // is non-tail-folding and tail-folding is possible. Tail-folded plans are
+  // built after default plans since prepareToFoldTailByMasking is additive,
+  // avoiding the need to save/restore MaskedOp state. Skip when it would
+  // require destructively invalidating interleave groups.
+  bool CanBuildTailFoldedPlans =
+      !CM.foldTailByMasking() && CM.isScalarEpilogueAllowed() &&
+      CM.Legal->canFoldTailByMasking() &&
+      (useMaskedInterleavedAccesses(TTI) || !CM.InterleaveInfo.hasGroups());
+
   ElementCount MaxUserVF =
       UserVF.isScalable() ? MaxFactors.ScalableVF : MaxFactors.FixedVF;
   if (UserVF) {
@@ -6893,7 +6924,7 @@ void LoopVectorizationPlanner::plan(ElementCount UserVF, unsigned UserIC) {
       CM.collectInLoopReductions();
       if (CM.selectUserVectorizationFactor(UserVF)) {
         LLVM_DEBUG(dbgs() << "LV: Using user VF " << UserVF << ".\n");
-        buildVPlansWithVPRecipes(UserVF, UserVF);
+        buildVPlansWithVPRecipes(UserVF, UserVF, CM);
         LLVM_DEBUG(printPlans(dbgs()));
         return;
       }
@@ -6902,23 +6933,55 @@ void LoopVectorizationPlanner::plan(ElementCount UserVF, unsigned UserIC) {
     }
   }
 
-  // Collect the Vectorization Factor Candidates.
-  SmallVector<ElementCount> VFCandidates;
-  for (auto VF = ElementCount::getFixed(1);
-       ElementCount::isKnownLE(VF, MaxFactors.FixedVF); VF *= 2)
-    VFCandidates.push_back(VF);
-  for (auto VF = ElementCount::getScalable(1);
-       ElementCount::isKnownLE(VF, MaxFactors.ScalableVF); VF *= 2)
-    VFCandidates.push_back(VF);
+  // Helper lambda to build VPlans for a given maximum fixed VF. When
+  // SkipScalarVF is true, skip VF=1 (used when building non-default plans,
+  // since the scalar plan is independent of tail-folding strategy).
+  auto BuildVPlansForVFs = [&](ElementCount MaxFixedVF,
+                               LoopVectorizationCostModel &TheCM,
+                               bool SkipScalarVF = false) {
+    ElementCount MinFixedVF =
+        SkipScalarVF ? ElementCount::getFixed(2) : ElementCount::getFixed(1);
+    // Collect the Vectorization Factor Candidates.
+    SmallVector<ElementCount> VFCandidates;
+    for (auto VF = MinFixedVF; ElementCount::isKnownLE(VF, MaxFixedVF);
+         VF *= 2)
+      VFCandidates.push_back(VF);
+    for (auto VF = ElementCount::getScalable(1);
+         ElementCount::isKnownLE(VF, MaxFactors.ScalableVF); VF *= 2)
+      VFCandidates.push_back(VF);
 
-  CM.collectInLoopReductions();
-  for (const auto &VF : VFCandidates) {
-    // Collect Uniform and Scalar instructions after vectorization with VF.
-    CM.collectNonVectorizedAndSetWideningDecisions(VF);
+    TheCM.collectInLoopReductions();
+    for (const auto &VF : VFCandidates)
+      TheCM.collectNonVectorizedAndSetWideningDecisions(VF);
+
+    buildVPlansWithVPRecipes(MinFixedVF, MaxFixedVF, TheCM);
+    buildVPlansWithVPRecipes(ElementCount::getScalable(1),
+                             MaxFactors.ScalableVF, TheCM);
+  };
+
+  // Build default plans.
+  BuildVPlansForVFs(MaxFactors.FixedVF, CM);
+
+  // Additionally build tail-folded plans for cost-based tail folding selection.
+  // Since prepareToFoldTailByMasking is additive (only adds entries to
+  // MaskedOp), building tail-folded plans after non-tail-folded plans avoids
+  // the need to save/restore MaskedOp state.
+  // Use a separate cost model instance to avoid mutating the primary CM's
+  // state, which would cause extra debug output and cached decision changes.
+  if (EnableCostBasedTailFolding && CanBuildTailFoldedPlans) {
+    LoopVectorizationCostModel TFCM(CM.ScalarEpilogueStatus, CM.TheLoop,
+                                    CM.PSE, CM.LI, CM.Legal, CM.TTI, CM.TLI,
+                                    CM.DB, CM.AC, CM.ORE, CM.GetBFI,
+                                    CM.TheFunction, CM.Hints,
+                                    CM.InterleaveInfo, CM.OptForSize);
+    TFCM.collectValuesToIgnore();
+    TFCM.collectElementTypesForWidening();
+    TFCM.forceTailFoldingWithPreferredStyle();
+    if (TFCM.foldTailByMasking()) {
+      Legal->prepareToFoldTailByMasking();
+      BuildVPlansForVFs(MaxFactors.FixedVF, TFCM, /*SkipScalarVF=*/true);
+    }
   }
-
-  buildVPlansWithVPRecipes(ElementCount::getFixed(1), MaxFactors.FixedVF);
-  buildVPlansWithVPRecipes(ElementCount::getScalable(1), MaxFactors.ScalableVF);
 
   LLVM_DEBUG(printPlans(dbgs()));
 }
@@ -7304,6 +7367,11 @@ VectorizationFactor LoopVectorizationPlanner::computeBestVF() {
     BestFactor.Cost = InstructionCost::getMax();
   }
 
+  // Track the best plan per VF to deduplicate when multiple plans exist for the
+  // same VF, e.g. tail-folded and non-tail-folded, or narrowed interleave
+  // group alternatives.
+  DenseMap<ElementCount, std::pair<VPlan *, VectorizationFactor>> BestPlanForVF;
+
   for (auto &P : VPlans) {
     ArrayRef<ElementCount> VFs(P->vectorFactors().begin(),
                                P->vectorFactors().end());
@@ -7338,13 +7406,29 @@ VectorizationFactor LoopVectorizationPlanner::computeBestVF() {
       InstructionCost Cost =
           cost(*P, VF, ConsiderRegPressure ? &RUs[I] : nullptr);
       VectorizationFactor CurrentFactor(VF, Cost, ScalarCost);
+      CurrentFactor.HasScalarTail = P->hasScalarTail();
 
-      if (isMoreProfitable(CurrentFactor, BestFactor, P->hasScalarTail()))
+      if (isMoreProfitable(CurrentFactor, BestFactor))
         BestFactor = CurrentFactor;
 
+      // Track the best plan for each VF for deduplication.
+      auto [It, Inserted] =
+          BestPlanForVF.try_emplace(VF, P.get(), CurrentFactor);
+      if (!Inserted && isMoreProfitable(CurrentFactor, It->second.second))
+        It->second = {P.get(), CurrentFactor};
+
       // If profitable add it to ProfitableVF list.
-      if (isMoreProfitable(CurrentFactor, ScalarFactor, P->hasScalarTail()))
+      if (isMoreProfitable(CurrentFactor, ScalarFactor))
         ProfitableVFs.push_back(CurrentFactor);
+    }
+  }
+
+  // Deduplicate all VFs across plans so that getPlanFor() finds a unique
+  // plan per VF.
+  for (auto &[VF, Best] : BestPlanForVF) {
+    for (auto &P : VPlans) {
+      if (P.get() != Best.first && P->hasVF(VF))
+        P->removeVF(VF);
     }
   }
 
@@ -7403,6 +7487,13 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
          "Trying to execute plan with unsupported UF");
   if (BestVPlan.hasEarlyExit())
     ++LoopsEarlyExitVectorized;
+
+  // Cache isTailFolded before unrollByUF, which transforms
+  // VPWidenIntOrFpInductionRecipe to VPWidenPHIRecipe, making findHeaderMask
+  // unable to find the header mask. Also needed before optimizeForVFAndUF and
+  // dissolveLoopRegions, which may remove the vector loop region.
+  bool IsTailFolded = BestVPlan.isTailFolded();
+
   // TODO: Move to VPlan transform stage once the transition to the VPlan-based
   // cost model is complete for better cost estimates.
   RUN_VPLAN_PASS(VPlanTransforms::unrollByUF, BestVPlan, BestUF);
@@ -7460,7 +7551,7 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   VPlanTransforms::removeBranchOnConst(BestVPlan, /*OnlyLatches=*/true);
   VPlanTransforms::materializeBackedgeTakenCount(BestVPlan, VectorPH);
   VPlanTransforms::materializeVectorTripCount(
-      BestVPlan, VectorPH, CM.foldTailByMasking(),
+      BestVPlan, VectorPH, IsTailFolded,
       CM.requiresScalarEpilogue(BestVF.isVector()), &BestVPlan.getVFxUF());
   VPlanTransforms::materializeFactors(BestVPlan, VectorPH, BestVF);
   VPlanTransforms::cse(BestVPlan);
@@ -8098,8 +8189,9 @@ VPRecipeBuilder::tryToCreateWidenNonPhiRecipe(VPSingleDefRecipe *R,
   return tryToWiden(VPI);
 }
 
-void LoopVectorizationPlanner::buildVPlansWithVPRecipes(ElementCount MinVF,
-                                                        ElementCount MaxVF) {
+void LoopVectorizationPlanner::buildVPlansWithVPRecipes(
+    ElementCount MinVF, ElementCount MaxVF,
+    LoopVectorizationCostModel &TheCM) {
   if (ElementCount::isKnownGT(MinVF, MaxVF))
     return;
 
@@ -8142,9 +8234,9 @@ void LoopVectorizationPlanner::buildVPlansWithVPRecipes(ElementCount MinVF,
   if (!VPlanTransforms::handleEarlyExits(*VPlan0, EEStyle, OrigLoop, PSE, *DT,
                                          Legal->getAssumptionCache()))
     return;
-  VPlanTransforms::addMiddleCheck(*VPlan0, CM.foldTailByMasking());
+  VPlanTransforms::addMiddleCheck(*VPlan0, TheCM.foldTailByMasking());
   RUN_VPLAN_PASS_NO_VERIFY(VPlanTransforms::createLoopRegions, *VPlan0);
-  if (CM.foldTailByMasking())
+  if (TheCM.foldTailByMasking())
     RUN_VPLAN_PASS_NO_VERIFY(VPlanTransforms::foldTailByMasking, *VPlan0);
   RUN_VPLAN_PASS_NO_VERIFY(VPlanTransforms::introduceMasksAndLinearize,
                            *VPlan0);
@@ -8153,17 +8245,18 @@ void LoopVectorizationPlanner::buildVPlansWithVPRecipes(ElementCount MinVF,
   for (ElementCount VF = MinVF; ElementCount::isKnownLT(VF, MaxVFTimes2);) {
     VFRange SubRange = {VF, MaxVFTimes2};
     if (auto Plan = tryToBuildVPlanWithVPRecipes(
-            std::unique_ptr<VPlan>(VPlan0->duplicate()), SubRange, &LVer)) {
+            std::unique_ptr<VPlan>(VPlan0->duplicate()), SubRange, &LVer,
+            TheCM)) {
       // Now optimize the initial VPlan.
       VPlanTransforms::hoistPredicatedLoads(*Plan, PSE, OrigLoop);
       VPlanTransforms::sinkPredicatedStores(*Plan, PSE, OrigLoop);
       RUN_VPLAN_PASS(VPlanTransforms::truncateToMinimalBitwidths, *Plan,
-                     CM.getMinimalBitwidths());
+                     TheCM.getMinimalBitwidths());
       RUN_VPLAN_PASS(VPlanTransforms::optimize, *Plan);
       // TODO: try to put addExplicitVectorLength close to addActiveLaneMask
-      if (CM.foldTailWithEVL()) {
+      if (TheCM.foldTailWithEVL()) {
         RUN_VPLAN_PASS(VPlanTransforms::addExplicitVectorLength, *Plan,
-                       CM.getMaxSafeElements());
+                       TheCM.getMaxSafeElements());
         RUN_VPLAN_PASS(VPlanTransforms::optimizeEVLMasks, *Plan);
       }
 
@@ -8178,7 +8271,8 @@ void LoopVectorizationPlanner::buildVPlansWithVPRecipes(ElementCount MinVF,
 }
 
 VPlanPtr LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(
-    VPlanPtr Plan, VFRange &Range, LoopVersioning *LVer) {
+    VPlanPtr Plan, VFRange &Range, LoopVersioning *LVer,
+    LoopVectorizationCostModel &TheCM) {
 
   using namespace llvm::VPlanPatternMatch;
   SmallPtrSet<const InterleaveGroup<Instruction> *, 1> InterleaveGroups;
@@ -8190,8 +8284,8 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(
 
   bool RequiresScalarEpilogueCheck =
       LoopVectorizationPlanner::getDecisionAndClampRange(
-          [this](ElementCount VF) {
-            return !CM.requiresScalarEpilogue(VF.isVector());
+          [&TheCM](ElementCount VF) {
+            return !TheCM.requiresScalarEpilogue(VF.isVector());
           },
           Range);
   // Update the branch in the middle block if a scalar epilogue is required.
@@ -8209,9 +8303,9 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(
   // TODO: Consider using getDecisionAndClampRange here to split up VPlans.
   bool IVUpdateMayOverflow = false;
   for (ElementCount VF : Range)
-    IVUpdateMayOverflow |= !isIndvarOverflowCheckKnownFalse(&CM, VF);
+    IVUpdateMayOverflow |= !isIndvarOverflowCheckKnownFalse(&TheCM, VF);
 
-  TailFoldingStyle Style = CM.getTailFoldingStyle();
+  TailFoldingStyle Style = TheCM.getTailFoldingStyle();
   // Use NUW for the induction increment if we proved that it won't overflow in
   // the vector loop or when not folding the tail. In the later case, we know
   // that the canonical induction increment will not overflow as the vector trip
@@ -8238,9 +8332,9 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(
   // placeholders for its members' Recipes which we'll be replacing with a
   // single VPInterleaveRecipe.
   for (InterleaveGroup<Instruction> *IG : IAI.getInterleaveGroups()) {
-    auto ApplyIG = [IG, this](ElementCount VF) -> bool {
+    auto ApplyIG = [IG, &TheCM](ElementCount VF) -> bool {
       bool Result = (VF.isVector() && // Query is illegal for VF == 1
-                     CM.getWideningDecision(IG->getInsertPos(), VF) ==
+                     TheCM.getWideningDecision(IG->getInsertPos(), VF) ==
                          LoopVectorizationCostModel::CM_Interleave);
       // For scalable vectors, the interleave factors must be <= 8 since we
       // require the (de)interleaveN intrinsics instead of shufflevectors.
@@ -8257,7 +8351,7 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(
   // Construct wide recipes and apply predication for original scalar
   // VPInstructions in the loop.
   // ---------------------------------------------------------------------------
-  VPRecipeBuilder RecipeBuilder(*Plan, TLI, Legal, CM, Builder);
+  VPRecipeBuilder RecipeBuilder(*Plan, TLI, Legal, TheCM, Builder);
 
   // Scan the body of the loop in a topological order to visit each basic block
   // after having visited its predecessor basic blocks.
@@ -8270,7 +8364,7 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(
   // Collect blocks that need predication for in-loop reduction recipes.
   DenseSet<BasicBlock *> BlocksNeedingPredication;
   for (BasicBlock *BB : OrigLoop->blocks())
-    if (CM.blockNeedsPredicationForAnyReason(BB))
+    if (TheCM.blockNeedsPredicationForAnyReason(BB))
       BlocksNeedingPredication.insert(BB);
 
   VPlanTransforms::createInLoopReductionRecipes(*Plan, BlocksNeedingPredication,
@@ -8349,13 +8443,13 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(
   // bring the VPlan to its final state.
   // ---------------------------------------------------------------------------
 
-  addReductionResultComputation(Plan, RecipeBuilder, Range.Start);
+  addReductionResultComputation(Plan, RecipeBuilder, Range.Start, TheCM);
 
   // Optimize FindIV reductions to use sentinel-based approach when possible.
   RUN_VPLAN_PASS(VPlanTransforms::optimizeFindIVReductions, *Plan, PSE,
                  *OrigLoop);
   VPlanTransforms::optimizeInductionLiveOutUsers(*Plan, PSE,
-                                                 CM.foldTailByMasking());
+                                                 TheCM.foldTailByMasking());
 
   // Apply mandatory transformation to handle reductions with multiple in-loop
   // uses if possible, bail out otherwise.
@@ -8376,9 +8470,9 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(
   // range for better cost estimation.
   // TODO: Enable following transform when the EVL-version of extended-reduction
   // and mulacc-reduction are implemented.
-  if (!CM.foldTailWithEVL()) {
-    VPCostContext CostCtx(CM.TTI, *CM.TLI, *Plan, CM, CM.CostKind, CM.PSE,
-                          OrigLoop);
+  if (!TheCM.foldTailWithEVL()) {
+    VPCostContext CostCtx(TheCM.TTI, *TheCM.TLI, *Plan, TheCM, TheCM.CostKind,
+                          TheCM.PSE, OrigLoop);
     RUN_VPLAN_PASS(VPlanTransforms::createPartialReductions, *Plan, CostCtx,
                    Range);
     RUN_VPLAN_PASS(VPlanTransforms::convertToAbstractRecipes, *Plan, CostCtx,
@@ -8393,7 +8487,7 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(
   // for this VPlan, replace the Recipes widening its memory instructions with a
   // single VPInterleaveRecipe at its insertion point.
   RUN_VPLAN_PASS(VPlanTransforms::createInterleaveGroups, *Plan,
-                 InterleaveGroups, RecipeBuilder, CM.isScalarEpilogueAllowed());
+                 InterleaveGroups, RecipeBuilder, TheCM.isScalarEpilogueAllowed());
 
   // Replace VPValues for known constant strides.
   RUN_VPLAN_PASS(VPlanTransforms::replaceSymbolicStrides, *Plan, PSE,
@@ -8463,7 +8557,8 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VFRange &Range) {
 }
 
 void LoopVectorizationPlanner::addReductionResultComputation(
-    VPlanPtr &Plan, VPRecipeBuilder &RecipeBuilder, ElementCount MinVF) {
+    VPlanPtr &Plan, VPRecipeBuilder &RecipeBuilder, ElementCount MinVF,
+    LoopVectorizationCostModel &TheCM) {
   using namespace VPlanPatternMatch;
   VPTypeAnalysis TypeInfo(*Plan);
   VPRegionBlock *VectorLoopRegion = Plan->getVectorLoopRegion();
@@ -8493,7 +8588,7 @@ void LoopVectorizationPlanner::addReductionResultComputation(
     // with fewer lanes than the VF. So the operands of the select would have
     // different numbers of lanes. Partial reductions mask the input instead.
     auto *RR = dyn_cast<VPReductionRecipe>(OrigExitingVPV->getDefiningRecipe());
-    if (!PhiR->isInLoop() && CM.foldTailByMasking() &&
+    if (!PhiR->isInLoop() && TheCM.foldTailByMasking() &&
         (!RR || !RR->isPartialReduction())) {
       VPValue *Cond = vputils::findHeaderMask(*Plan);
       NewExitingVPV =
@@ -8506,7 +8601,7 @@ void LoopVectorizationPlanner::addReductionResultComputation(
                     m_VPInstruction<VPInstruction::ComputeReductionResult>()));
       });
 
-      if (CM.usePredicatedReductionSelect(RecurrenceKind))
+      if (TheCM.usePredicatedReductionSelect(RecurrenceKind))
         PhiR->setOperand(1, NewExitingVPV);
     }
 
@@ -8698,7 +8793,7 @@ void LoopVectorizationPlanner::addMinimumIterationCheck(
           : nullptr;
   VPlanTransforms::addMinimumIterationCheck(
       Plan, VF, UF, MinProfitableTripCount,
-      CM.requiresScalarEpilogue(VF.isVector()), CM.foldTailByMasking(),
+      CM.requiresScalarEpilogue(VF.isVector()), Plan.isTailFolded(),
       OrigLoop, BranchWeights,
       OrigLoop->getLoopPredecessor()->getTerminator()->getDebugLoc(), PSE);
 }

@@ -1070,6 +1070,17 @@ const VPRegionBlock *VPlan::getVectorLoopRegion() const {
   return nullptr;
 }
 
+bool VPlan::isTailFolded() {
+  // The plan is tail-folded if either:
+  // 1. The middle block is NOT a predecessor of the scalar preheader (i.e.,
+  //    removeBranchOnConst removed the dead edge because addMiddleCheck set
+  //    BranchOnCond(true) for tail-folded plans), or
+  // 2. There IS a header mask (covers the case where an early exit, e.g. for
+  //    NaN handling, replaced the BranchOnCond(true) with a runtime condition,
+  //    keeping the middle->scalarPH edge alive despite tail folding).
+  return !hasScalarTail() || vputils::findHeaderMask(*this) != nullptr;
+}
+
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 void VPlan::printLiveIns(raw_ostream &O) const {
   VPSlotTracker SlotTracker(this);
