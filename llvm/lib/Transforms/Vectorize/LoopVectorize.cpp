@@ -260,7 +260,7 @@ cl::opt<bool> llvm::EnableWideActiveLaneMask(
              "tail-folded loops"));
 
 static cl::opt<bool> EnableCostBasedTailFolding(
-    "enable-cost-based-tail-folding", cl::init(false), cl::Hidden,
+    "enable-cost-based-tail-folding", cl::init(true), cl::Hidden,
     cl::desc("Build VPlans with both tail-folding and scalar epilogue and let "
              "the cost model pick the best option."));
 
@@ -1494,18 +1494,17 @@ public:
     CallWideningDecisions.clear();
     Uniforms.clear();
     Scalars.clear();
-    ForcedScalars.clear();
-    InstsToScalarize.clear();
-    PredicatedBBsAfterVectorization.clear();
-    NumPredStores = 0;
   }
 
   /// Force tail folding to be enabled with the TTI-preferred style.
   /// Falls back to DataWithoutLaneMask if TTI has no preference, since
   /// we need a concrete masking style when tail folding is requested.
+  /// Never selects EVL-based tail folding, as cost-based tail folding
+  /// only compares masking vs. scalar epilogue strategies.
   void forceTailFoldingWithPreferredStyle() {
     ChosenTailFoldingStyle = TTI.getPreferredTailFoldingStyle();
-    if (ChosenTailFoldingStyle == TailFoldingStyle::None)
+    if (ChosenTailFoldingStyle == TailFoldingStyle::None ||
+        ChosenTailFoldingStyle == TailFoldingStyle::DataWithEVL)
       ChosenTailFoldingStyle = TailFoldingStyle::DataWithoutLaneMask;
     // Allow command line override.
     if (ForceTailFoldingStyle.getNumOccurrences())
@@ -4425,7 +4424,7 @@ static bool hasUnsupportedHeaderPhiRecipe(VPlan &Plan) {
 }
 
 bool LoopVectorizationPlanner::isCandidateForEpilogueVectorization(
-    ElementCount VF) const {
+    VPlan &MainPlan, ElementCount VF) const {
   // Cross iteration phis such as fixed-order recurrences and FMaxNum/FMinNum
   // reductions need special handling and are currently unsupported.
   if (any_of(OrigLoop->getHeader()->phis(), [&](PHINode &Phi) {
@@ -4439,7 +4438,7 @@ bool LoopVectorizationPlanner::isCandidateForEpilogueVectorization(
 
   // FindLast reductions and inductions without underlying PHI require special
   // handling and are currently not supported for epilogue vectorization.
-  if (hasUnsupportedHeaderPhiRecipe(getPlanFor(VF)))
+  if (hasUnsupportedHeaderPhiRecipe(MainPlan))
     return false;
 
   // Phis with uses outside of the loop require special handling and are
@@ -4485,7 +4484,7 @@ bool LoopVectorizationCostModel::isEpilogueVectorizationProfitable(
 }
 
 VectorizationFactor LoopVectorizationPlanner::selectEpilogueVectorizationFactor(
-    ElementCount MainLoopVF, unsigned IC) {
+    VPlan &MainPlan, ElementCount MainLoopVF, unsigned IC) {
   VectorizationFactor Result = VectorizationFactor::Disabled();
   if (!EnableEpilogueVectorization) {
     LLVM_DEBUG(dbgs() << "LEV: Epilogue vectorization is disabled.\n");
@@ -4500,7 +4499,7 @@ VectorizationFactor LoopVectorizationPlanner::selectEpilogueVectorizationFactor(
 
   // Not really a cost consideration, but check for unsupported cases here to
   // simplify the logic.
-  if (!isCandidateForEpilogueVectorization(MainLoopVF)) {
+  if (!isCandidateForEpilogueVectorization(MainPlan, MainLoopVF)) {
     LLVM_DEBUG(dbgs() << "LEV: Unable to vectorize epilogue because the loop "
                          "is not a supported candidate.\n");
     return Result;
@@ -4545,7 +4544,6 @@ VectorizationFactor LoopVectorizationPlanner::selectEpilogueVectorizationFactor(
   // Check if the main loop processes fewer than MainLoopVF elements per
   // iteration (e.g. due to narrowing interleave groups). Adjust MainLoopVF
   // as needed.
-  VPlan &MainPlan = getPlanFor(MainLoopVF);
   MainLoopVF = GetEffectiveVF(MainPlan, MainLoopVF);
 
   // If MainLoopVF = vscale x 2, and vscale is expected to be 4, then we know
@@ -7331,13 +7329,14 @@ static bool planContainsAdditionalSimplifications(VPlan &Plan,
 }
 #endif
 
-VectorizationFactor LoopVectorizationPlanner::computeBestVF() {
+std::pair<VectorizationFactor, VPlan *>
+LoopVectorizationPlanner::computeBestVF() {
   if (VPlans.empty())
-    return VectorizationFactor::Disabled();
+    return {VectorizationFactor::Disabled(), nullptr};
   // If there is a single VPlan with a single VF, return it directly.
   VPlan &FirstPlan = *VPlans[0];
   if (VPlans.size() == 1 && size(FirstPlan.vectorFactors()) == 1)
-    return {*FirstPlan.vectorFactors().begin(), 0, 0};
+    return {{*FirstPlan.vectorFactors().begin(), 0, 0}, &FirstPlan};
 
   LLVM_DEBUG(dbgs() << "LV: Computing best VF using cost kind: "
                     << (CM.CostKind == TTI::TCK_RecipThroughput
@@ -7358,6 +7357,7 @@ VectorizationFactor LoopVectorizationPlanner::computeBestVF() {
   LLVM_DEBUG(dbgs() << "LV: Scalar loop costs: " << ScalarCost << ".\n");
   VectorizationFactor ScalarFactor(ScalarVF, ScalarCost, ScalarCost);
   VectorizationFactor BestFactor = ScalarFactor;
+  VPlan *BestPlan = &getPlanFor(ScalarVF);
 
   bool ForceVectorization = Hints.getForce() == LoopVectorizeHints::FK_Enabled;
   if (ForceVectorization) {
@@ -7408,8 +7408,10 @@ VectorizationFactor LoopVectorizationPlanner::computeBestVF() {
       VectorizationFactor CurrentFactor(VF, Cost, ScalarCost);
       CurrentFactor.HasScalarTail = P->hasScalarTail();
 
-      if (isMoreProfitable(CurrentFactor, BestFactor))
+      if (isMoreProfitable(CurrentFactor, BestFactor)) {
         BestFactor = CurrentFactor;
+        BestPlan = P.get();
+      }
 
       // Track the best plan for each VF for deduplication.
       auto [It, Inserted] =
@@ -7438,24 +7440,27 @@ VectorizationFactor LoopVectorizationPlanner::computeBestVF() {
   // cost-model and will be retired once the VPlan-based cost-model is
   // stabilized.
   VectorizationFactor LegacyVF = selectVectorizationFactor();
-  VPlan &BestPlan = getPlanFor(BestFactor.Width);
 
   // Pre-compute the cost and use it to check if BestPlan contains any
   // simplifications not accounted for in the legacy cost model. If that's the
   // case, don't trigger the assertion, as the extra simplifications may cause a
   // different VF to be picked by the VPlan-based cost model.
-  VPCostContext CostCtx(CM.TTI, *CM.TLI, BestPlan, CM, CM.CostKind, CM.PSE,
+  VPCostContext CostCtx(CM.TTI, *CM.TLI, *BestPlan, CM, CM.CostKind, CM.PSE,
                         OrigLoop);
-  precomputeCosts(BestPlan, BestFactor.Width, CostCtx);
+  precomputeCosts(*BestPlan, BestFactor.Width, CostCtx);
   // Verify that the VPlan-based and legacy cost models agree, except for
   // * VPlans with early exits,
   // * VPlans with additional VPlan simplifications,
   // * EVL-based VPlans with gather/scatters (the VPlan-based cost model uses
   //   vp_scatter/vp_gather).
+  // * VPlans where cost-based tail-folding selected a tail-folded plan (the
+  //   legacy cost model doesn't account for tail-folding overhead and VF
+  //   deduplication across tail-folded/non-tail-folded plans may change
+  //   available VFs).
   // The legacy cost model doesn't properly model costs for such loops.
   bool UsesEVLGatherScatter =
       any_of(VPBlockUtils::blocksOnly<VPBasicBlock>(vp_depth_first_shallow(
-                 BestPlan.getVectorLoopRegion()->getEntry())),
+                 BestPlan->getVectorLoopRegion()->getEntry())),
              [](VPBasicBlock *VPBB) {
                return any_of(*VPBB, [](VPRecipeBase &R) {
                  return isa<VPWidenLoadEVLRecipe, VPWidenStoreEVLRecipe>(&R) &&
@@ -7463,10 +7468,14 @@ VectorizationFactor LoopVectorizationPlanner::computeBestVF() {
                });
              });
   assert(
-      (BestFactor.Width == LegacyVF.Width || BestPlan.hasEarlyExit() ||
+      (BestFactor.Width == LegacyVF.Width || BestPlan->hasEarlyExit() ||
+       (EnableCostBasedTailFolding &&
+        any_of(VPlans, [](const std::unique_ptr<VPlan> &P) {
+          return P->isTailFolded();
+        })) ||
        !Legal->getLAI()->getSymbolicStrides().empty() || UsesEVLGatherScatter ||
        planContainsAdditionalSimplifications(
-           getPlanFor(BestFactor.Width), CostCtx, OrigLoop, BestFactor.Width) ||
+           *BestPlan, CostCtx, OrigLoop, BestFactor.Width) ||
        planContainsAdditionalSimplifications(
            getPlanFor(LegacyVF.Width), CostCtx, OrigLoop, LegacyVF.Width)) &&
       " VPlan cost model and legacy cost model disagreed");
@@ -7475,7 +7484,7 @@ VectorizationFactor LoopVectorizationPlanner::computeBestVF() {
 #endif
 
   LLVM_DEBUG(dbgs() << "LV: Selecting VF: " << BestFactor.Width << ".\n");
-  return BestFactor;
+  return {BestFactor, BestPlan};
 }
 
 DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
@@ -9718,7 +9727,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
 
   // Plan how to best vectorize.
   LVP.plan(UserVF, UserIC);
-  VectorizationFactor VF = LVP.computeBestVF();
+  auto [VF, BestPlan] = LVP.computeBestVF();
   unsigned IC = 1;
 
   if (ORE->allowExtraAnalysis(LV_NAME))
@@ -9727,7 +9736,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
   GeneratedRTChecks Checks(PSE, DT, LI, TTI, CM.CostKind);
   if (LVP.hasPlanWithVF(VF.Width)) {
     // Select the interleave count.
-    IC = LVP.selectInterleaveCount(LVP.getPlanFor(VF.Width), VF.Width, VF.Cost);
+    IC = LVP.selectInterleaveCount(*BestPlan, VF.Width, VF.Cost);
 
     unsigned SelectedIC = std::max(IC, UserIC);
     //  Optimistically generate runtime checks if they are needed. Drop them if
@@ -9750,11 +9759,11 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     // Check if it is profitable to vectorize with runtime checks.
     bool ForceVectorization =
         Hints.getForce() == LoopVectorizeHints::FK_Enabled;
-    VPCostContext CostCtx(CM.TTI, *CM.TLI, LVP.getPlanFor(VF.Width), CM,
+    VPCostContext CostCtx(CM.TTI, *CM.TLI, *BestPlan, CM,
                           CM.CostKind, CM.PSE, L);
     if (!ForceVectorization &&
         !isOutsideLoopWorkProfitable(Checks, VF, L, PSE, CostCtx,
-                                     LVP.getPlanFor(VF.Width), SEL,
+                                     *BestPlan, SEL,
                                      CM.getVScaleForTuning())) {
       ORE->emit([&]() {
         return OptimizationRemarkAnalysisAliasing(
@@ -9892,12 +9901,11 @@ bool LoopVectorizePass::processLoop(Loop *L) {
   // If we decided that it is *legal* to interleave or vectorize the loop, then
   // do it.
 
-  VPlan &BestPlan = LVP.getPlanFor(VF.Width);
   // Consider vectorizing the epilogue too if it's profitable.
   VectorizationFactor EpilogueVF =
-      LVP.selectEpilogueVectorizationFactor(VF.Width, IC);
+      LVP.selectEpilogueVectorizationFactor(*BestPlan, VF.Width, IC);
   if (EpilogueVF.Width.isVector()) {
-    std::unique_ptr<VPlan> BestMainPlan(BestPlan.duplicate());
+    std::unique_ptr<VPlan> BestMainPlan(BestPlan->duplicate());
 
     // The first pass vectorizes the main loop and creates a scalar epilogue
     // to be vectorized by executing the plan (potentially with a different
@@ -9928,15 +9936,15 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     ++LoopsEpilogueVectorized;
   } else {
     InnerLoopVectorizer LB(L, PSE, LI, DT, TTI, AC, VF.Width, IC, &CM, Checks,
-                           BestPlan);
+                           *BestPlan);
     // TODO: Move to general VPlan pipeline once epilogue loops are also
     // supported.
     RUN_VPLAN_PASS(VPlanTransforms::materializeConstantVectorTripCount,
-                   BestPlan, VF.Width, IC, PSE);
-    LVP.addMinimumIterationCheck(BestPlan, VF.Width, IC,
+                   *BestPlan, VF.Width, IC, PSE);
+    LVP.addMinimumIterationCheck(*BestPlan, VF.Width, IC,
                                  VF.MinProfitableTripCount);
 
-    LVP.executePlan(VF.Width, IC, BestPlan, LB, DT, false);
+    LVP.executePlan(VF.Width, IC, *BestPlan, LB, DT, false);
     ++LoopsVectorized;
   }
 
