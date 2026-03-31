@@ -366,7 +366,7 @@ struct VPCostContext {
 
   /// \returns how much the cost of a predicated block should be divided by.
   /// Forwards to LoopVectorizationCostModel::getPredBlockCostDivisor.
-  uint64_t getPredBlockCostDivisor(BasicBlock *BB) const;
+  uint64_t getPredBlockCostDivisor(const BasicBlock *BB) const;
 
   /// Returns the OperandInfo for \p V, if it is a live-in.
   TargetTransformInfo::OperandValueInfo getOperandInfo(VPValue *V) const;
@@ -375,6 +375,12 @@ struct VPCostContext {
   /// legacy cost model for \p VF. Only used to check for additional VPlan
   /// simplifications.
   bool isLegacyUniformAfterVectorization(Instruction *I, ElementCount VF) const;
+
+  /// Return true if the safe-divisor strategy should be used for the given
+  /// predicated div/rem \p RepR at vectorization factor \p VF. Computes
+  /// scalarization vs safe-divisor costs using TTI directly.
+  bool shouldWidenDivRemViaSafeDivisor(const VPReplicateRecipe *RepR,
+                                       ElementCount VF);
 
   /// Estimate the overhead of scalarizing a recipe with result type \p ResultTy
   /// and \p Operands with \p VF. This is a convenience wrapper for the

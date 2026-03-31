@@ -661,15 +661,15 @@ define void @sdiv_with_uniform_ops(i16 %0, i1 %c, ptr %dst) {
 ;
 ; VEC-LABEL: @sdiv_with_uniform_ops(
 ; VEC-NEXT:  entry:
+; VEC-NEXT:    [[TMP2:%.*]] = select i1 [[C:%.*]], i16 [[TMP0:%.*]], i16 1
+; VEC-NEXT:    [[TMP1:%.*]] = sdiv i16 10, [[TMP2]]
 ; VEC-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; VEC:       vector.body:
 ; VEC-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, [[ENTRY:%.*]] ], [ [[INDEX_NEXT:%.*]], [[PRED_STORE_CONTINUE2:%.*]] ]
-; VEC-NEXT:    br i1 [[C:%.*]], label [[PRED_STORE_IF:%.*]], label [[PRED_STORE_CONTINUE2]]
+; VEC-NEXT:    br i1 [[C]], label [[PRED_STORE_IF:%.*]], label [[PRED_STORE_CONTINUE2]]
 ; VEC:       pred.store.if:
-; VEC-NEXT:    [[TMP1:%.*]] = sdiv i16 10, [[TMP0:%.*]]
 ; VEC-NEXT:    store i16 [[TMP1]], ptr [[DST:%.*]], align 1
-; VEC-NEXT:    [[TMP2:%.*]] = sdiv i16 10, [[TMP0]]
-; VEC-NEXT:    store i16 [[TMP2]], ptr [[DST]], align 1
+; VEC-NEXT:    store i16 [[TMP1]], ptr [[DST]], align 1
 ; VEC-NEXT:    br label [[PRED_STORE_CONTINUE2]]
 ; VEC:       pred.store.continue2:
 ; VEC-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2

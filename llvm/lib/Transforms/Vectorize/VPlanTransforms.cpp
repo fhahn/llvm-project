@@ -4661,6 +4661,63 @@ void VPlanTransforms::convertToAbstractRecipes(VPlan &Plan, VPCostContext &Ctx,
   }
 }
 
+void VPlanTransforms::convertReplicateToSafeDivisor(VPlan &Plan,
+                                                    VPCostContext &Ctx,
+                                                    VFRange &Range) {
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_deep(Plan.getVectorLoopRegion()))) {
+    for (VPRecipeBase &R : make_early_inc_range(*VPBB)) {
+      auto *RepR = dyn_cast<VPReplicateRecipe>(&R);
+      if (!RepR || !RepR->isPredicated())
+        continue;
+
+      unsigned Opcode = RepR->getOpcode();
+      if (Opcode != Instruction::UDiv && Opcode != Instruction::SDiv &&
+          Opcode != Instruction::URem && Opcode != Instruction::SRem)
+        continue;
+
+      // Skip if any operand is defined by a non-single-scalar
+      // VPReplicateRecipe, as those produce per-lane scalars that cannot
+      // directly provide vector values needed for widening.
+      if (any_of(RepR->operands(), [](VPValue *Op) {
+            auto *DefR =
+                dyn_cast_or_null<VPReplicateRecipe>(Op->getDefiningRecipe());
+            return DefR && !DefR->isSingleScalar();
+          }))
+        continue;
+
+      Instruction *I = RepR->getUnderlyingInstr();
+
+      // Check if safe-divisor is profitable for all VFs in the range. This also
+      // checks that the recipe is not single-scalar (uniform). The cost based
+      // decision will always select safe-divisor for scalable vectors as
+      // scalarization isn't legal.
+      auto ShouldWiden = [&Ctx, RepR](ElementCount VF) -> bool {
+        return Ctx.shouldWidenDivRemViaSafeDivisor(RepR, VF);
+      };
+      if (!LoopVectorizationPlanner::getDecisionAndClampRange(ShouldWiden,
+                                                              Range))
+        continue;
+
+      // Convert to safe-divisor form: select(mask, divisor, 1) + widened
+      // div/rem.
+      VPValue *Mask = RepR->getMask();
+      VPValue *One = Plan.getConstantInt(I->getType(), 1u);
+      auto *SafeRHS = new VPInstruction(Instruction::Select,
+                                        {Mask, RepR->getOperand(1), One}, {},
+                                        {}, RepR->getDebugLoc());
+      SafeRHS->insertBefore(RepR);
+
+      auto *WidenR = new VPWidenRecipe(
+          *I, {RepR->getOperand(0), SafeRHS}, *RepR, *RepR,
+          RepR->getDebugLoc());
+      WidenR->insertBefore(RepR);
+      RepR->replaceAllUsesWith(WidenR);
+      RepR->eraseFromParent();
+    }
+  }
+}
+
 void VPlanTransforms::materializeBroadcasts(VPlan &Plan) {
   if (Plan.hasScalarVFOnly())
     return;

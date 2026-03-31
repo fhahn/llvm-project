@@ -1151,6 +1151,13 @@ struct VPRecipeWithIRFlags : public VPSingleDefRecipe, public VPIRFlags {
   /// Compute the cost for this recipe for \p VF, using \p Opcode and \p Ctx.
   InstructionCost getCostForRecipeWithOpcode(unsigned Opcode, ElementCount VF,
                                              VPCostContext &Ctx) const;
+
+  /// Compute the cost for \p Opcode with \p Operands for \p VF, using \p Ctx.
+  /// If \p R is provided, it is used for additional context (underlying
+  /// instruction, predicate, pattern matching).
+  static InstructionCost getCostForRecipeWithOpcode(
+      unsigned Opcode, ArrayRef<VPValue *> Operands, ElementCount VF,
+      VPCostContext &Ctx, const VPRecipeWithIRFlags *R = nullptr);
 };
 
 /// Helper to access the operand that contains the unroll part for this recipe
@@ -1817,6 +1824,11 @@ public:
   /// Return the cost of this VPWidenRecipe.
   InstructionCost computeCost(ElementCount VF,
                               VPCostContext &Ctx) const override;
+
+  /// Return the cost for a widened instruction with \p Opcode and \p Operands.
+  static InstructionCost computeCost(unsigned Opcode,
+                                     ArrayRef<VPValue *> Operands,
+                                     ElementCount VF, VPCostContext &Ctx);
 
   unsigned getOpcode() const { return Opcode; }
 
@@ -3254,6 +3266,12 @@ public:
   /// Return the cost of this VPReplicateRecipe.
   InstructionCost computeCost(ElementCount VF,
                               VPCostContext &Ctx) const override;
+
+  /// Return the cost for \p R with \p VF assuming it will be predicated if
+  /// \p IsPredicated is true.
+  static InstructionCost computeCost(const VPReplicateRecipe *R,
+                                     ElementCount VF, VPCostContext &Ctx,
+                                     bool IsPredicated);
 
   bool isSingleScalar() const { return IsSingleScalar; }
 

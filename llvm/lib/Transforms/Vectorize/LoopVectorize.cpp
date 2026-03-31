@@ -6942,8 +6942,48 @@ bool VPCostContext::skipCostComputation(Instruction *UI, bool IsVector) const {
          SkipCostComputation.contains(UI);
 }
 
-uint64_t VPCostContext::getPredBlockCostDivisor(BasicBlock *BB) const {
+uint64_t VPCostContext::getPredBlockCostDivisor(const BasicBlock *BB) const {
   return CM.getPredBlockCostDivisor(CostKind, BB);
+}
+
+bool VPCostContext::shouldWidenDivRemViaSafeDivisor(
+    const VPReplicateRecipe *RepR, ElementCount VF) {
+  unsigned Opcode = RepR->getOpcode();
+  assert(Opcode == Instruction::UDiv || Opcode == Instruction::SDiv ||
+         Opcode == Instruction::SRem || Opcode == Instruction::URem);
+
+  // Handle the force option override.
+  switch (ForceSafeDivisor) {
+  case cl::BOU_TRUE:
+    return true;
+  case cl::BOU_FALSE:
+    return false;
+  case cl::BOU_UNSET:
+    break;
+  }
+
+  // Don't widen single-scalar (uniform) recipes.
+  if (RepR->isSingleScalar())
+    return false;
+
+  // Scalarization isn't legal for scalable vectors; always use safe-divisor.
+  if (VF.isScalable())
+    return true;
+
+  // Compute scalarization cost, reusing the VPReplicateRecipe cost model.
+  InstructionCost ScalarizationCost =
+      VPReplicateRecipe::computeCost(RepR, VF, *this, /*IsPredicated=*/true);
+
+  // Compute safe-divisor cost: select guard + widened div/rem.
+  VPValue *Mask = RepR->getOperand(RepR->getNumOperands() - 1);
+  VPValue *Divisor = RepR->getOperand(1);
+  VPValue *Dividend = RepR->getOperand(0);
+  InstructionCost SafeDivisorCost = VPWidenRecipe::computeCost(
+      Instruction::Select, {Mask, Divisor, Divisor}, VF, *this);
+  SafeDivisorCost += VPWidenRecipe::computeCost(
+      Opcode, {Dividend, Divisor}, VF, *this);
+
+  return !(ScalarizationCost < SafeDivisorCost);
 }
 
 InstructionCost
@@ -7918,20 +7958,13 @@ VPWidenRecipe *VPRecipeBuilder::tryToWiden(VPInstruction *VPI) {
   case Instruction::SDiv:
   case Instruction::UDiv:
   case Instruction::SRem:
-  case Instruction::URem: {
-    // If not provably safe, use a select to form a safe divisor before widening the
-    // div/rem operation itself.  Otherwise fall through to general handling below.
-    if (CM.isPredicatedInst(I)) {
-      SmallVector<VPValue *> Ops(VPI->operandsWithoutMask());
-      VPValue *Mask = VPI->getMask();
-      VPValue *One = Plan.getConstantInt(I->getType(), 1u);
-      auto *SafeRHS =
-          Builder.createSelect(Mask, Ops[1], One, VPI->getDebugLoc());
-      Ops[1] = SafeRHS;
-      return new VPWidenRecipe(*I, Ops, *VPI, *VPI, VPI->getDebugLoc());
-    }
+  case Instruction::URem:
+    // If not provably safe, handle predicated div/rem via handleReplication;
+    // VPlanTransforms::convertReplicateToSafeDivisor will convert to
+    // safe-divisor widened form when profitable.
+    if (CM.isPredicatedInst(I))
+      return nullptr;
     [[fallthrough]];
-  }
   case Instruction::Add:
   case Instruction::And:
   case Instruction::AShr:
@@ -8383,6 +8416,13 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(
                    Range);
     RUN_VPLAN_PASS(VPlanTransforms::convertToAbstractRecipes, *Plan, CostCtx,
                    Range);
+  }
+
+  {
+    VPCostContext CostCtx(CM.TTI, *CM.TLI, *Plan, CM, CM.CostKind, CM.PSE,
+                          OrigLoop);
+    RUN_VPLAN_PASS(VPlanTransforms::convertReplicateToSafeDivisor, *Plan,
+                   CostCtx, Range);
   }
 
   for (ElementCount VF : Range)

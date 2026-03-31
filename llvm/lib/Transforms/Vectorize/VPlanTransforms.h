@@ -369,6 +369,11 @@ struct VPlanTransforms {
   static void convertToAbstractRecipes(VPlan &Plan, VPCostContext &Ctx,
                                        VFRange &Range);
 
+  /// For predicated VPReplicateRecipes of div/rem, convert to safe-divisor
+  /// widened form (select(mask, divisor, 1) + VPWidenRecipe) when profitable.
+  static void convertReplicateToSafeDivisor(VPlan &Plan, VPCostContext &Ctx,
+                                            VFRange &Range);
+
   /// Perform instcombine-like simplifications on recipes in \p Plan.
   static void simplifyRecipes(VPlan &Plan);
 
