@@ -631,7 +631,8 @@ static VPHeaderPHIRecipe *
 createWidenInductionRecipe(PHINode *Phi, VPPhi *PhiR, VPIRValue *Start,
                            const InductionDescriptor &IndDesc, VPlan &Plan,
                            PredicatedScalarEvolution &PSE, Loop &OrigLoop,
-                           DebugLoc DL) {
+                           DebugLoc DL,
+                           ArrayRef<const SCEVPredicate *> Predicates) {
   [[maybe_unused]] ScalarEvolution &SE = *PSE.getSE();
   assert(SE.isLoopInvariant(IndDesc.getStep(), &OrigLoop) &&
          "step must be loop invariant");
@@ -671,7 +672,7 @@ createWidenInductionRecipe(PHINode *Phi, VPPhi *PhiR, VPIRValue *Start,
 
   if (IndDesc.getKind() == InductionDescriptor::IK_PtrInduction) {
     auto *WideIV = new VPWidenPointerInductionRecipe(
-        Phi, Start, Step, &Plan.getVFxUF(), IndDesc, DL);
+        Phi, Start, Step, &Plan.getVFxUF(), IndDesc, DL, Predicates);
     ReplaceExtractsWithExitingIVValue(WideIV);
     return WideIV;
   }
@@ -692,7 +693,7 @@ createWidenInductionRecipe(PHINode *Phi, VPPhi *PhiR, VPIRValue *Start,
   VPIRFlags Flags = vputils::getFlagsFromIndDesc(IndDesc);
 
   auto *WideIV = new VPWidenIntOrFpInductionRecipe(
-      Phi, Start, Step, &Plan.getVF(), IndDesc, Flags, DL);
+      Phi, Start, Step, &Plan.getVF(), IndDesc, Flags, DL, Predicates);
 
   ReplaceExtractsWithExitingIVValue(WideIV);
   return WideIV;
@@ -703,7 +704,9 @@ void VPlanTransforms::createHeaderPhiRecipes(
     const MapVector<PHINode *, InductionDescriptor> &Inductions,
     const MapVector<PHINode *, RecurrenceDescriptor> &Reductions,
     const SmallPtrSetImpl<const PHINode *> &FixedOrderRecurrences,
-    const SmallPtrSetImpl<PHINode *> &InLoopReductions, bool AllowReordering) {
+    const SmallPtrSetImpl<PHINode *> &InLoopReductions, bool AllowReordering,
+    const DenseMap<PHINode *, SmallVector<const SCEVPredicate *, 2>>
+        &InductionPredicateMap) {
   // Retrieve the header manually from the intial plain-CFG VPlan.
   VPBasicBlock *HeaderVPBB = cast<VPBasicBlock>(
       Plan.getEntry()->getSuccessors()[1]->getSingleSuccessor());
@@ -727,14 +730,36 @@ void VPlanTransforms::createHeaderPhiRecipes(
       // first-order recurrences. If there are no users of the intermediate
       // recurrences in the chain, the fixed order recurrence should be
       // modeled directly, enabling more efficient codegen.
-      return new VPFirstOrderRecurrencePHIRecipe(Phi, *Start, *BackedgeValue);
+      auto *FOR =
+          new VPFirstOrderRecurrencePHIRecipe(Phi, *Start, *BackedgeValue);
+      // If the phi is also an induction, create a wide induction recipe and
+      // attach it as operand 2 of the FOR. adjustFixedOrderRecurrences will
+      // decide whether to replace the FOR with the induction (for GEP users)
+      // or keep the FOR and erase the induction.
+      auto InductionIt = Inductions.find(Phi);
+      if (InductionIt != Inductions.end()) {
+        auto PredIt = InductionPredicateMap.find(Phi);
+        ArrayRef<const SCEVPredicate *> Preds;
+        if (PredIt != InductionPredicateMap.end())
+          Preds = PredIt->second;
+        auto *WideIV = createWidenInductionRecipe(
+            Phi, PhiR, Start, InductionIt->second, Plan, PSE, OrigLoop,
+            PhiR->getDebugLoc(), Preds);
+        FOR->addOperand(WideIV);
+      }
+      return FOR;
     }
 
     auto InductionIt = Inductions.find(Phi);
-    if (InductionIt != Inductions.end())
+    if (InductionIt != Inductions.end()) {
+      auto PredIt = InductionPredicateMap.find(Phi);
+      ArrayRef<const SCEVPredicate *> Preds;
+      if (PredIt != InductionPredicateMap.end())
+        Preds = PredIt->second;
       return createWidenInductionRecipe(Phi, PhiR, Start, InductionIt->second,
                                         Plan, PSE, OrigLoop,
-                                        PhiR->getDebugLoc());
+                                        PhiR->getDebugLoc(), Preds);
+    }
 
     assert(Reductions.contains(Phi) && "only reductions are expected now");
     const RecurrenceDescriptor &RdxDesc = Reductions.lookup(Phi);
@@ -755,12 +780,17 @@ void VPlanTransforms::createHeaderPhiRecipes(
 
   assert(isa<VPCanonicalIVPHIRecipe>(HeaderVPBB->front()) &&
          "first recipe must be canonical IV phi");
+  SmallVector<VPFirstOrderRecurrencePHIRecipe *> FORsWithInductions;
   for (VPRecipeBase &R : make_early_inc_range(drop_begin(HeaderVPBB->phis()))) {
     auto *PhiR = cast<VPPhi>(&R);
     VPHeaderPHIRecipe *HeaderPhiR = CreateHeaderPhiRecipe(PhiR);
     HeaderPhiR->insertBefore(PhiR);
     PhiR->replaceAllUsesWith(HeaderPhiR);
     PhiR->eraseFromParent();
+    // Track FORs with attached induction recipes for deferred insertion.
+    if (auto *FOR = dyn_cast<VPFirstOrderRecurrencePHIRecipe>(HeaderPhiR))
+      if (FOR->getNumOperands() == 3)
+        FORsWithInductions.push_back(FOR);
   }
 
   for (const auto &[HeaderPhiR, ScalarPhiR] :
@@ -776,6 +806,11 @@ void VPlanTransforms::createHeaderPhiRecipes(
                             ? "bc.resume.val"
                             : "bc.merge.rdx");
   }
+
+  // Insert induction recipes attached to FORs after the scalar preheader phi
+  // matching, since the extra header phi has no corresponding scalar phi.
+  for (auto *FOR : FORsWithInductions)
+    FOR->getOperand(2)->getDefiningRecipe()->insertBefore(FOR);
 }
 
 void VPlanTransforms::createInLoopReductionRecipes(

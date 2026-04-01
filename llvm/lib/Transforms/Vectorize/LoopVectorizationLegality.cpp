@@ -744,7 +744,8 @@ void LoopVectorizationLegality::addInductionPhi(
   // on predicates that only hold within the loop, since allowing the exit
   // currently means re-using this SCEV outside the loop (see PR33706 for more
   // details).
-  if (PSE.getPredicate().isAlwaysTrue()) {
+  if (PSE.getPredicate().isAlwaysTrue() &&
+      IndPSE.getPredicate().isAlwaysTrue()) {
     AllowedExit.insert(Phi);
     AllowedExit.insert(Phi->getIncomingValueForBlock(TheLoop->getLoopLatch()));
   }
@@ -922,26 +923,43 @@ bool LoopVectorizationLegality::canVectorizeInstr(Instruction &I) {
     // By recording these, we can then reason about ways to vectorize each
     // of these NotAllowedExit.
     InductionDescriptor ID;
-    if (InductionDescriptor::isInductionPHI(Phi, TheLoop, PSE, ID) &&
+    auto &IndPred = cast<SCEVUnionPredicate>(IndPSE.getPredicate());
+    unsigned PredsBefore = IndPred.getPredicates().size();
+    if (InductionDescriptor::isInductionPHI(Phi, TheLoop, IndPSE, ID) &&
         !IsDisallowedStridedPointerInduction(ID)) {
+      auto NewPreds = cast<SCEVUnionPredicate>(IndPSE.getPredicate())
+                          .getPredicates()
+                          .slice(PredsBefore);
+      if (!NewPreds.empty())
+        InductionPredicateMap[Phi].append(NewPreds.begin(), NewPreds.end());
       addInductionPhi(Phi, ID, AllowedExit);
       Requirements->addExactFPMathInst(ID.getExactFPMathInst());
       return true;
     }
 
+    bool IsSupported = false;
     if (RecurrenceDescriptor::isFixedOrderRecurrence(Phi, TheLoop, DT)) {
       AllowedExit.insert(Phi);
       FixedOrderRecurrences.insert(Phi);
-      return true;
+      IsSupported = true;
     }
 
     // As a last resort, coerce the PHI to a AddRec expression
     // and re-try classifying it a an induction PHI.
-    if (InductionDescriptor::isInductionPHI(Phi, TheLoop, PSE, ID, true) &&
+    auto &IndPred2 = cast<SCEVUnionPredicate>(IndPSE.getPredicate());
+    unsigned PredsBefore2 = IndPred2.getPredicates().size();
+    if (InductionDescriptor::isInductionPHI(Phi, TheLoop, IndPSE, ID, true) &&
         !IsDisallowedStridedPointerInduction(ID)) {
+      auto NewPreds = cast<SCEVUnionPredicate>(IndPSE.getPredicate())
+                          .getPredicates()
+                          .slice(PredsBefore2);
+      if (!NewPreds.empty())
+        InductionPredicateMap[Phi].append(NewPreds.begin(), NewPreds.end());
       addInductionPhi(Phi, ID, AllowedExit);
-      return true;
+      IsSupported = true;
     }
+    if (IsSupported)
+      return true;
 
     reportVectorizationFailure("Found an unidentified PHI",
                                "value that could not be identified as "
@@ -1089,7 +1107,8 @@ bool LoopVectorizationLegality::canVectorizeInstr(Instruction &I) {
     // used outside the loop only if the SCEV predicates within the loop is
     // same as outside the loop. Allowing the exit means reusing the SCEV
     // outside the loop.
-    if (PSE.getPredicate().isAlwaysTrue()) {
+    if (PSE.getPredicate().isAlwaysTrue() &&
+        IndPSE.getPredicate().isAlwaysTrue()) {
       AllowedExit.insert(&I);
       return true;
     }
@@ -2038,7 +2057,8 @@ bool LoopVectorizationLegality::canVectorize(bool UseVPlanNativePath) {
   if (Hints->getForce() == LoopVectorizeHints::FK_Enabled)
     SCEVThreshold = PragmaVectorizeSCEVCheckThreshold;
 
-  if (PSE.getPredicate().getComplexity() > SCEVThreshold) {
+  if ((PSE.getPredicate().getComplexity() +
+       IndPSE.getPredicate().getComplexity()) > SCEVThreshold) {
     LLVM_DEBUG(dbgs() << "LV: Vectorization not profitable "
                          "due to SCEVThreshold");
     reportVectorizationFailure("Too many SCEV checks needed",

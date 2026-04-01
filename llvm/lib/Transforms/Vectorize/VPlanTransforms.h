@@ -28,6 +28,7 @@ class Instruction;
 class Loop;
 class LoopVersioning;
 class OptimizationRemarkEmitter;
+class SCEVPredicate;
 class PHINode;
 class ScalarEvolution;
 class PredicatedScalarEvolution;
@@ -140,7 +141,9 @@ struct VPlanTransforms {
       const MapVector<PHINode *, InductionDescriptor> &Inductions,
       const MapVector<PHINode *, RecurrenceDescriptor> &Reductions,
       const SmallPtrSetImpl<const PHINode *> &FixedOrderRecurrences,
-      const SmallPtrSetImpl<PHINode *> &InLoopReductions, bool AllowReordering);
+      const SmallPtrSetImpl<PHINode *> &InLoopReductions, bool AllowReordering,
+      const DenseMap<PHINode *, SmallVector<const SCEVPredicate *, 2>>
+          &InductionPredicateMap);
 
   /// Create VPReductionRecipes for in-loop reductions. This processes chains
   /// of operations contributing to in-loop reductions and creates appropriate

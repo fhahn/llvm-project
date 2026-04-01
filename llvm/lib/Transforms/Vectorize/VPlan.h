@@ -57,6 +57,7 @@ struct VPTransformState;
 class raw_ostream;
 class RecurrenceDescriptor;
 class SCEV;
+class SCEVPredicate;
 class Type;
 class VPBasicBlock;
 class VPBuilder;
@@ -2371,12 +2372,15 @@ protected:
 /// retrieving the step value, induction descriptor and original phi node.
 class VPWidenInductionRecipe : public VPHeaderPHIRecipe {
   const InductionDescriptor &IndDesc;
+  SmallVector<const SCEVPredicate *, 2> Predicates;
 
 public:
   VPWidenInductionRecipe(unsigned char Kind, PHINode *IV, VPValue *Start,
                          VPValue *Step, const InductionDescriptor &IndDesc,
+                         ArrayRef<const SCEVPredicate *> Predicates,
                          DebugLoc DL)
-      : VPHeaderPHIRecipe(Kind, IV, Start, DL), IndDesc(IndDesc) {
+      : VPHeaderPHIRecipe(Kind, IV, Start, DL), IndDesc(IndDesc),
+        Predicates(Predicates) {
     addOperand(Step);
   }
 
@@ -2422,6 +2426,9 @@ public:
   /// Returns the induction descriptor for the recipe.
   const InductionDescriptor &getInductionDescriptor() const { return IndDesc; }
 
+  /// Returns the SCEV predicates associated with this induction.
+  ArrayRef<const SCEVPredicate *> getPredicates() const { return Predicates; }
+
   VPValue *getBackedgeValue() override {
     // TODO: All operands of base recipe must exist and be at same index in
     // derived recipe.
@@ -2460,9 +2467,10 @@ class VPWidenIntOrFpInductionRecipe : public VPWidenInductionRecipe,
 public:
   VPWidenIntOrFpInductionRecipe(PHINode *IV, VPIRValue *Start, VPValue *Step,
                                 VPValue *VF, const InductionDescriptor &IndDesc,
-                                const VPIRFlags &Flags, DebugLoc DL)
+                                const VPIRFlags &Flags, DebugLoc DL,
+                                ArrayRef<const SCEVPredicate *> Predicates = {})
       : VPWidenInductionRecipe(VPRecipeBase::VPWidenIntOrFpInductionSC, IV,
-                               Start, Step, IndDesc, DL),
+                               Start, Step, IndDesc, Predicates, DL),
         VPIRFlags(Flags), Trunc(nullptr) {
     addOperand(VF);
   }
@@ -2470,9 +2478,10 @@ public:
   VPWidenIntOrFpInductionRecipe(PHINode *IV, VPIRValue *Start, VPValue *Step,
                                 VPValue *VF, const InductionDescriptor &IndDesc,
                                 TruncInst *Trunc, const VPIRFlags &Flags,
-                                DebugLoc DL)
+                                DebugLoc DL,
+                                ArrayRef<const SCEVPredicate *> Predicates = {})
       : VPWidenInductionRecipe(VPRecipeBase::VPWidenIntOrFpInductionSC, IV,
-                               Start, Step, IndDesc, DL),
+                               Start, Step, IndDesc, Predicates, DL),
         VPIRFlags(Flags), Trunc(Trunc) {
     addOperand(VF);
     SmallVector<std::pair<unsigned, MDNode *>> Metadata;
@@ -2487,7 +2496,8 @@ public:
   VPWidenIntOrFpInductionRecipe *clone() override {
     return new VPWidenIntOrFpInductionRecipe(
         getPHINode(), getStartValue(), getStepValue(), getVFValue(),
-        getInductionDescriptor(), Trunc, *this, getDebugLoc());
+        getInductionDescriptor(), Trunc, *this, getDebugLoc(),
+        getPredicates());
   }
 
   VP_CLASSOF_IMPL(VPRecipeBase::VPWidenIntOrFpInductionSC)
@@ -2548,9 +2558,10 @@ public:
   /// VF*UF.
   VPWidenPointerInductionRecipe(PHINode *Phi, VPValue *Start, VPValue *Step,
                                 VPValue *NumUnrolledElems,
-                                const InductionDescriptor &IndDesc, DebugLoc DL)
+                                const InductionDescriptor &IndDesc, DebugLoc DL,
+                                ArrayRef<const SCEVPredicate *> Predicates = {})
       : VPWidenInductionRecipe(VPRecipeBase::VPWidenPointerInductionSC, Phi,
-                               Start, Step, IndDesc, DL) {
+                               Start, Step, IndDesc, Predicates, DL) {
     addOperand(NumUnrolledElems);
   }
 
@@ -2559,7 +2570,8 @@ public:
   VPWidenPointerInductionRecipe *clone() override {
     return new VPWidenPointerInductionRecipe(
         cast<PHINode>(getUnderlyingInstr()), getOperand(0), getOperand(1),
-        getOperand(2), getInductionDescriptor(), getDebugLoc());
+        getOperand(2), getInductionDescriptor(), getDebugLoc(),
+        getPredicates());
   }
 
   VP_CLASSOF_IMPL(VPRecipeBase::VPWidenPointerInductionSC)
@@ -2646,8 +2658,11 @@ struct VPFirstOrderRecurrencePHIRecipe : public VPHeaderPHIRecipe {
   VP_CLASSOF_IMPL(VPRecipeBase::VPFirstOrderRecurrencePHISC)
 
   VPFirstOrderRecurrencePHIRecipe *clone() override {
-    return new VPFirstOrderRecurrencePHIRecipe(
+    auto *R = new VPFirstOrderRecurrencePHIRecipe(
         cast<PHINode>(getUnderlyingInstr()), *getOperand(0), *getOperand(1));
+    if (getNumOperands() == 3)
+      R->addOperand(getOperand(2));
+    return R;
   }
 
   void execute(VPTransformState &State) override;

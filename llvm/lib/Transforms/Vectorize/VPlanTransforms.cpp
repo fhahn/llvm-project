@@ -2470,6 +2470,7 @@ static bool hoistPreviousBeforeFORUsers(VPFirstOrderRecurrencePHIRecipe *FOR,
   return true;
 }
 
+using namespace llvm::VPlanPatternMatch;
 bool VPlanTransforms::adjustFixedOrderRecurrences(VPlan &Plan,
                                                   VPBuilder &LoopBuilder) {
   VPDominatorTree VPDT(Plan);
@@ -2482,6 +2483,19 @@ bool VPlanTransforms::adjustFixedOrderRecurrences(VPlan &Plan,
       RecurrencePhis.push_back(FOR);
 
   for (VPFirstOrderRecurrencePHIRecipe *FOR : RecurrencePhis) {
+    if (FOR->getNumOperands() == 3) {
+      if (any_of(FOR->users(), [](VPUser *U) {
+            return isa<VPRecipeBase>(U) &&
+                   match(cast<VPRecipeBase>(U),
+                         m_Binary<Instruction::GetElementPtr>(m_VPValue(),
+                                                              m_VPValue()));
+          })) {
+        FOR->replaceAllUsesWith(FOR->getOperand(2));
+        FOR->eraseFromParent();
+        continue;
+      }
+    }
+
     SmallPtrSet<VPFirstOrderRecurrencePHIRecipe *, 4> SeenPhis;
     VPRecipeBase *Previous = FOR->getBackedgeValue()->getDefiningRecipe();
     // Fixed-order recurrences do not contain cycles, so this loop is guaranteed
@@ -2494,8 +2508,27 @@ bool VPlanTransforms::adjustFixedOrderRecurrences(VPlan &Plan,
     }
 
     if (!sinkRecurrenceUsersAfterPrevious(FOR, Previous, VPDT) &&
-        !hoistPreviousBeforeFORUsers(FOR, Previous, VPDT))
+        !hoistPreviousBeforeFORUsers(FOR, Previous, VPDT)) {
+      if (FOR->getNumOperands() == 3) {
+        FOR->replaceAllUsesWith(FOR->getOperand(2));
+        FOR->eraseFromParent();
+        continue;
+      }
       return false;
+    }
+
+    if (FOR->getNumOperands() == 3) {
+      auto *IV = cast<VPWidenIntOrFpInductionRecipe>(
+          FOR->getOperand(2)->getDefiningRecipe());
+      auto *NewFOR = new VPFirstOrderRecurrencePHIRecipe(
+          cast<PHINode>(FOR->getUnderlyingInstr()), *FOR->getOperand(0),
+          *FOR->getOperand(1));
+      NewFOR->insertBefore(FOR);
+      FOR->replaceAllUsesWith(NewFOR);
+      FOR->eraseFromParent();
+      FOR = NewFOR;
+      IV->eraseFromParent();
+    }
 
     // Introduce a recipe to combine the incoming and previous values of a
     // fixed-order recurrence.

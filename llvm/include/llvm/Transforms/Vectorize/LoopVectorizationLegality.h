@@ -28,6 +28,7 @@
 
 #include "llvm/ADT/MapVector.h"
 #include "llvm/Analysis/LoopAccessAnalysis.h"
+#include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Support/TypeSize.h"
 #include "llvm/Transforms/Utils/LoopUtils.h"
 
@@ -273,9 +274,10 @@ public:
       LoopAccessInfoManager &LAIs, LoopInfo *LI, OptimizationRemarkEmitter *ORE,
       LoopVectorizationRequirements *R, LoopVectorizeHints *H, DemandedBits *DB,
       AssumptionCache *AC, bool AllowRuntimeSCEVChecks, AAResults *AA)
-      : TheLoop(L), LI(LI), PSE(PSE), TTI(TTI), TLI(TLI), DT(DT), LAIs(LAIs),
-        ORE(ORE), Requirements(R), Hints(H), DB(DB), AC(AC),
-        AllowRuntimeSCEVChecks(AllowRuntimeSCEVChecks), AA(AA) {}
+      : TheLoop(L), LI(LI), PSE(PSE), IndPSE(*PSE.getSE(), *L), TTI(TTI),
+        TLI(TLI), DT(DT), LAIs(LAIs), ORE(ORE), Requirements(R), Hints(H),
+        DB(DB), AC(AC), AllowRuntimeSCEVChecks(AllowRuntimeSCEVChecks),
+        AA(AA) {}
 
   /// ReductionList contains the reduction descriptors for all
   /// of the reductions that were found in the loop.
@@ -480,6 +482,13 @@ public:
     return &PSE;
   }
 
+  PredicatedScalarEvolution &getIndPSE() { return IndPSE; }
+
+  const DenseMap<PHINode *, SmallVector<const SCEVPredicate *, 2>> &
+  getInductionPredicateMap() const {
+    return InductionPredicateMap;
+  }
+
   Loop *getLoop() const { return TheLoop; }
 
   LoopInfo *getLoopInfo() const { return LI; }
@@ -659,6 +668,12 @@ private:
   /// of new predicates if this is required to enable vectorization and
   /// unrolling.
   PredicatedScalarEvolution &PSE;
+
+  PredicatedScalarEvolution IndPSE;
+
+  /// Per-induction SCEV predicates (overflow checks) captured during legality.
+  DenseMap<PHINode *, SmallVector<const SCEVPredicate *, 2>>
+      InductionPredicateMap;
 
   /// Target Transform Info.
   TargetTransformInfo *TTI;

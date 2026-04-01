@@ -3363,7 +3363,8 @@ bool LoopVectorizationCostModel::runtimeChecksRequired() {
     return true;
   }
 
-  if (!PSE.getPredicate().isAlwaysTrue()) {
+  if (!PSE.getPredicate().isAlwaysTrue() ||
+      !Legal->getIndPSE().getPredicate().isAlwaysTrue()) {
     reportVectorizationFailure("Runtime SCEV check is required with -Os/-Oz",
         "runtime SCEV checks needed. Enable vectorization of this "
         "loop with '#pragma clang loop vectorize(enable)' when "
@@ -8123,7 +8124,8 @@ void LoopVectorizationPlanner::buildVPlansWithVPRecipes(ElementCount MinVF,
   VPlanTransforms::createHeaderPhiRecipes(
       *VPlan0, PSE, *OrigLoop, Legal->getInductionVars(),
       Legal->getReductionVars(), Legal->getFixedOrderRecurrences(),
-      CM.getInLoopReductions(), Hints.allowReordering());
+      CM.getInLoopReductions(), Hints.allowReordering(),
+      Legal->getInductionPredicateMap());
 
   VPlanTransforms::simplifyRecipes(*VPlan0);
   // If we're vectorizing a loop with an uncountable exit, make sure that the
@@ -8409,6 +8411,20 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlanWithVPRecipes(
                       Builder))
     return nullptr;
 
+  // Add SCEV predicates from surviving induction recipes to the main PSE.
+  // This must happen after adjustFixedOrderRecurrences (which may erase
+  // inductions replaced by FORs) and before later transforms that may remove
+  // induction recipes (e.g. dead recipe elimination after canonical induction
+  // replacement).
+  {
+    VPBasicBlock *HeaderVPBB =
+        Plan->getVectorLoopRegion()->getEntry()->getEntryBasicBlock();
+    for (auto &R : HeaderVPBB->phis())
+      if (auto *WideIV = dyn_cast<VPWidenInductionRecipe>(&R))
+        for (const auto *P : WideIV->getPredicates())
+          PSE.addPredicate(*P);
+  }
+
   if (useActiveLaneMask(Style)) {
     // TODO: Move checks to VPlanTransforms::addActiveLaneMask once
     // TailFoldingStyle is visible there.
@@ -8436,7 +8452,8 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VFRange &Range) {
       *Plan, PSE, *OrigLoop, Legal->getInductionVars(),
       MapVector<PHINode *, RecurrenceDescriptor>(),
       SmallPtrSet<const PHINode *, 1>(), SmallPtrSet<PHINode *, 1>(),
-      /*AllowReordering=*/false);
+      /*AllowReordering=*/false,
+      Legal->getInductionPredicateMap());
   [[maybe_unused]] bool CanHandleExits = VPlanTransforms::handleEarlyExits(
       *Plan, UncountableExitStyle::NoUncountableExit, OrigLoop, PSE, *DT,
       Legal->getAssumptionCache());
@@ -9636,8 +9653,8 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     //  Optimistically generate runtime checks if they are needed. Drop them if
     //  they turn out to not be profitable.
     if (VF.Width.isVector() || SelectedIC > 1) {
-      Checks.create(L, *LVL.getLAI(), PSE.getPredicate(), VF.Width, SelectedIC,
-                    *ORE);
+      Checks.create(L, *LVL.getLAI(), PSE.getPredicate(), VF.Width,
+                    SelectedIC, *ORE);
 
       // Bail out early if either the SCEV or memory runtime checks are known to
       // fail. In that case, the vector loop would never execute.
