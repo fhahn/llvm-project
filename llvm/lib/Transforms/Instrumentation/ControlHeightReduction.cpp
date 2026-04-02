@@ -1593,13 +1593,24 @@ static void insertTrivialPHIs(CHRScope *Scope,
         }
       }
       if (Users.size() > 0) {
-        // Insert a trivial phi for I (phi [&I, P0], [&I, P1], ...) at
-        // ExitBlock. Replace I with the new phi in UI unless UI is another
-        // phi at ExitBlock.
+        // Insert a trivial phi for I at ExitBlock that uses &I for in-scope
+        // predecessors and the phi itself for non-scope predecessors. Replace
+        // I with the new phi in UI unless UI is another phi at ExitBlock.
         PHINode *PN = PHINode::Create(I.getType(), pred_size(ExitBlock), "");
         PN->insertBefore(ExitBlock->begin());
         for (BasicBlock *Pred : predecessors(ExitBlock)) {
-          PN->addIncoming(&I, Pred);
+          // For predecessors outside the scope, &I cannot be used directly:
+          // after cloning splits the scope into chr/nonchr paths, &I no
+          // longer dominates such predecessors (e.g. when ExitBlock is a
+          // loop header reached via a backedge). Self-referencing PN is
+          // safe because any path from such a predecessor to a use of &I
+          // must have transited the scope previously, and &I is only
+          // defined inside the scope, so PN already holds the correct
+          // value from the prior scope traversal.
+          if (BlocksInScope.contains(Pred))
+            PN->addIncoming(&I, Pred);
+          else
+            PN->addIncoming(PN, Pred);
         }
         TrivialPHIs.insert(PN);
         CHR_DEBUG(dbgs() << "Insert phi " << *PN << "\n");
