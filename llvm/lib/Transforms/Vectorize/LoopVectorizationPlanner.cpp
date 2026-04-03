@@ -691,7 +691,6 @@ void VFSelectionContext::collectInLoopReductions() {
 bool LoopVectorizationPlanner::isMoreProfitable(const VectorizationFactor &A,
                                                 const VectorizationFactor &B,
                                                 const unsigned MaxTripCount,
-                                                bool HasTail,
                                                 bool IsEpilogue) const {
   InstructionCost CostA = A.Cost;
   InstructionCost CostB = B.Cost;
@@ -738,9 +737,9 @@ bool LoopVectorizationPlanner::isMoreProfitable(const VectorizationFactor &A,
   if (!MaxTripCount)
     return LowerCostWithoutTC;
 
-  auto GetCostForTC = [MaxTripCount, HasTail](unsigned VF,
-                                              InstructionCost VectorCost,
-                                              InstructionCost ScalarCost) {
+  auto GetCostForTC = [MaxTripCount](unsigned EstimatedWidth,
+                                     const VectorizationFactor &F,
+                                     InstructionCost VectorCost) {
     // If the trip count is a known (possibly small) constant, the trip count
     // will be rounded up to an integer number of iterations under
     // FoldTailByMasking. The total cost in that case will be
@@ -749,14 +748,14 @@ bool LoopVectorizationPlanner::isMoreProfitable(const VectorizationFactor &A,
     // some extra overheads, but for the purpose of comparing the costs of
     // different VFs we can use this to compare the total loop-body cost
     // expected after vectorization.
-    if (HasTail)
-      return VectorCost * (MaxTripCount / VF) +
-             ScalarCost * (MaxTripCount % VF);
-    return VectorCost * divideCeil(MaxTripCount, VF);
+    if (F.HasScalarTail)
+      return VectorCost * (MaxTripCount / EstimatedWidth) +
+             F.ScalarCost * (MaxTripCount % EstimatedWidth);
+    return VectorCost * divideCeil(MaxTripCount, EstimatedWidth);
   };
 
-  auto RTCostA = GetCostForTC(EstimatedWidthA, CostA, A.ScalarCost);
-  auto RTCostB = GetCostForTC(EstimatedWidthB, CostB, B.ScalarCost);
+  auto RTCostA = GetCostForTC(EstimatedWidthA, A, CostA);
+  auto RTCostB = GetCostForTC(EstimatedWidthB, B, CostB);
   bool LowerCostWithTC = CmpFn(RTCostA, RTCostB);
   LLVM_DEBUG(if (LowerCostWithTC != LowerCostWithoutTC) {
     dbgs() << "LV: VF " << (LowerCostWithTC ? A.Width : B.Width)
@@ -771,10 +770,9 @@ bool LoopVectorizationPlanner::isMoreProfitable(const VectorizationFactor &A,
 
 bool LoopVectorizationPlanner::isMoreProfitable(const VectorizationFactor &A,
                                                 const VectorizationFactor &B,
-                                                bool HasTail,
                                                 bool IsEpilogue) const {
   const unsigned MaxTripCount = PSE.getSmallConstantMaxTripCount();
-  return LoopVectorizationPlanner::isMoreProfitable(A, B, MaxTripCount, HasTail,
+  return LoopVectorizationPlanner::isMoreProfitable(A, B, MaxTripCount,
                                                     IsEpilogue);
 }
 

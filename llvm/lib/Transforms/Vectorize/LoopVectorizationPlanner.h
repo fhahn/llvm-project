@@ -598,6 +598,10 @@ struct VectorizationFactor {
   /// to runtime checks.
   ElementCount MinProfitableTripCount;
 
+  /// Whether the plan for this VF has a scalar tail (i.e., does not fold the
+  /// tail by masking).
+  bool HasScalarTail = true;
+
   VectorizationFactor(ElementCount Width, InstructionCost Cost,
                       InstructionCost ScalarCost)
       : Width(Width), Cost(Cost), ScalarCost(ScalarCost) {}
@@ -1019,9 +1023,10 @@ public:
 
 private:
   /// Build an initial VPlan, with HCFG wrapping the original scalar loop and
-  /// scalar transformations applied. Returns null if an initial VPlan cannot
-  /// be built.
-  VPlanPtr tryToBuildVPlan1();
+  /// scalar transformations applied. The tail-folding decision is taken from
+  /// \p TheCM, so different cost models produce different base plans. Returns
+  /// null if an initial VPlan cannot be built.
+  VPlanPtr tryToBuildVPlan1(LoopVectorizationCostModel &TheCM);
 
   /// Build a VPlan using VPRecipes according to the information gathered by
   /// Legal and VPlan-based analysis. For outer loops, performs basic recipe
@@ -1031,12 +1036,14 @@ private:
   /// maximum VF for which no plan could be built. Each VPlan is built starting
   /// from a copy of \p InitialPlan, which is a plain CFG VPlan wrapping the
   /// original scalar loop.
-  VPlanPtr tryToBuildVPlan(VPlanPtr InitialPlan, VFRange &Range);
+  VPlanPtr tryToBuildVPlan(VPlanPtr InitialPlan, VFRange &Range,
+                           LoopVectorizationCostModel &TheCM);
 
   /// Build VPlans for power-of-2 VF's between \p MinVF and \p MaxVF inclusive,
   /// based on \p VPlan1 and according to the information gathered by Legal
   /// when it checked if it is legal to vectorize the loop.
-  void buildVPlans(VPlan &VPlan1, ElementCount MinVF, ElementCount MaxVF);
+  void buildVPlans(VPlan &VPlan1, ElementCount MinVF, ElementCount MaxVF,
+                   LoopVectorizationCostModel &TheCM);
 
   /// Add ComputeReductionResult recipes to the middle block to compute the
   /// final reduction results. Add Select recipes to the latch block when
@@ -1044,19 +1051,20 @@ private:
   /// iteration values according to the header mask.
   void addReductionResultComputation(VPlanPtr &Plan,
                                      VPRecipeBuilder &RecipeBuilder,
-                                     ElementCount MinVF);
+                                     ElementCount MinVF,
+                                     LoopVectorizationCostModel &TheCM);
 
   /// Returns true if the per-lane cost of VectorizationFactor A is lower than
   /// that of B.
   bool isMoreProfitable(const VectorizationFactor &A,
-                        const VectorizationFactor &B, bool HasTail,
+                        const VectorizationFactor &B,
                         bool IsEpilogue = false) const;
 
   /// Returns true if the per-lane cost of VectorizationFactor A is lower than
   /// that of B in the context of vectorizing a loop with known \p MaxTripCount.
   bool isMoreProfitable(const VectorizationFactor &A,
                         const VectorizationFactor &B,
-                        const unsigned MaxTripCount, bool HasTail,
+                        const unsigned MaxTripCount,
                         bool IsEpilogue = false) const;
 
   /// Determines if we have the infrastructure to vectorize the loop and its
