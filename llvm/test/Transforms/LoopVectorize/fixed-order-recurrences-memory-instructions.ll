@@ -86,15 +86,22 @@ define void @sink_store_that_uses_for_past_instructions(ptr noalias %A, ptr noal
 ; CHECK-LABEL: @sink_store_that_uses_for_past_instructions(
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
-; CHECK:       loop:
-; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ 0, [[ENTRY:%.*]] ], [ [[IV_NEXT:%.*]], [[LOOP]] ]
-; CHECK-NEXT:    [[FOR:%.*]] = phi i32 [ 0, [[ENTRY]] ], [ [[FOR_NEXT:%.*]], [[LOOP]] ]
+; CHECK:       vector.ph:
+; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
+; CHECK:       vector.body:
+; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ 0, [[LOOP]] ], [ [[IV_NEXT:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i32> [ <i32 0, i32 1, i32 2, i32 3>, [[LOOP]] ], [ [[VEC_IND_NEXT:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VECTOR_RECUR:%.*]] = phi <4 x i32> [ <i32 poison, i32 poison, i32 poison, i32 0>, [[LOOP]] ], [ [[TMP1:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[GEP_A:%.*]] = getelementptr inbounds i32, ptr [[A:%.*]], i32 [[IV]]
-; CHECK-NEXT:    store i32 [[FOR]], ptr [[GEP_A]], align 4
-; CHECK-NEXT:    [[FOR_NEXT]] = add i32 [[IV]], 2
-; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i32 [[IV]], 1
+; CHECK-NEXT:    [[TMP1]] = add <4 x i32> [[VEC_IND]], splat (i32 2)
+; CHECK-NEXT:    [[TMP2:%.*]] = shufflevector <4 x i32> [[VECTOR_RECUR]], <4 x i32> [[TMP1]], <4 x i32> <i32 3, i32 4, i32 5, i32 6>
+; CHECK-NEXT:    store <4 x i32> [[TMP2]], ptr [[GEP_A]], align 4
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw i32 [[IV]], 4
+; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i32> [[VEC_IND]], splat (i32 4)
 ; CHECK-NEXT:    [[EC:%.*]] = icmp eq i32 [[IV_NEXT]], 1000
-; CHECK-NEXT:    br i1 [[EC]], label [[EXIT:%.*]], label [[LOOP]]
+; CHECK-NEXT:    br i1 [[EC]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
+; CHECK:       middle.block:
+; CHECK-NEXT:    br label [[EXIT:%.*]]
 ; CHECK:       exit:
 ; CHECK-NEXT:    ret void
 ;
@@ -188,10 +195,10 @@ exit:
 define void @sink_store_past_non_aliasing_store(ptr noalias %A, ptr noalias %B) {
 ; CHECK-LABEL: @sink_store_past_non_aliasing_store(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    br label [[LOOP:%.*]]
+; CHECK-NEXT:    br label [[VECTOR_BODY1:%.*]]
 ; CHECK:       loop:
-; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ 0, [[ENTRY:%.*]] ], [ [[IV_NEXT:%.*]], [[LOOP]] ]
-; CHECK-NEXT:    [[FOR:%.*]] = phi i32 [ 0, [[ENTRY]] ], [ [[FOR_NEXT:%.*]], [[LOOP]] ]
+; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ 0, [[VECTOR_BODY:%.*]] ], [ [[IV_NEXT:%.*]], [[VECTOR_BODY1]] ]
+; CHECK-NEXT:    [[FOR:%.*]] = phi i32 [ 0, [[VECTOR_BODY]] ], [ [[FOR_NEXT:%.*]], [[VECTOR_BODY1]] ]
 ; CHECK-NEXT:    [[GEP_A:%.*]] = getelementptr inbounds i32, ptr [[A:%.*]], i32 [[IV]]
 ; CHECK-NEXT:    store i32 [[FOR]], ptr [[GEP_A]], align 4
 ; CHECK-NEXT:    [[GEP_B:%.*]] = getelementptr inbounds i32, ptr [[B:%.*]], i32 [[IV]]
@@ -199,7 +206,7 @@ define void @sink_store_past_non_aliasing_store(ptr noalias %A, ptr noalias %B) 
 ; CHECK-NEXT:    [[FOR_NEXT]] = add i32 [[IV]], 2
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i32 [[IV]], 1
 ; CHECK-NEXT:    [[EC:%.*]] = icmp eq i32 [[IV_NEXT]], 1000
-; CHECK-NEXT:    br i1 [[EC]], label [[EXIT:%.*]], label [[LOOP]]
+; CHECK-NEXT:    br i1 [[EC]], label [[EXIT:%.*]], label [[VECTOR_BODY1]]
 ; CHECK:       exit:
 ; CHECK-NEXT:    ret void
 ;
@@ -227,8 +234,8 @@ define void @sink_store_past_aliasing_store(ptr %A, ptr %B) {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
-; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ 0, [[ENTRY:%.*]] ], [ [[IV_NEXT:%.*]], [[LOOP]] ]
-; CHECK-NEXT:    [[FOR:%.*]] = phi i32 [ 0, [[ENTRY]] ], [ [[FOR_NEXT:%.*]], [[LOOP]] ]
+; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ 0, [[SCALAR_PH:%.*]] ], [ [[IV_NEXT:%.*]], [[LOOP]] ]
+; CHECK-NEXT:    [[FOR:%.*]] = phi i32 [ 0, [[SCALAR_PH]] ], [ [[FOR_NEXT:%.*]], [[LOOP]] ]
 ; CHECK-NEXT:    [[GEP_A:%.*]] = getelementptr inbounds i32, ptr [[A:%.*]], i32 [[IV]]
 ; CHECK-NEXT:    store i32 [[FOR]], ptr [[GEP_A]], align 4
 ; CHECK-NEXT:    [[GEP_B:%.*]] = getelementptr inbounds i32, ptr [[B:%.*]], i32 [[IV]]

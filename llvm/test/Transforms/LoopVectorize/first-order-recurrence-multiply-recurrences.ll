@@ -96,13 +96,13 @@ exit:
 define void @test_pr54223_sink_after_insertion_order(ptr noalias %a, ptr noalias %b, ptr noalias %dst) {
 ; CHECK-LABEL: @test_pr54223_sink_after_insertion_order(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    br label [[VECTOR_PH:%.*]]
-; CHECK:       vector.ph:
 ; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
+; CHECK:       vector.ph:
+; CHECK-NEXT:    br label [[VECTOR_BODY1:%.*]]
 ; CHECK:       vector.body:
-; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[VECTOR_RECUR:%.*]] = phi <4 x float> [ <float poison, float poison, float poison, float 0.000000e+00>, [[VECTOR_PH]] ], [ [[BROADCAST_SPLAT:%.*]], [[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[VECTOR_RECUR1:%.*]] = phi <4 x float> [ <float poison, float poison, float poison, float 0.000000e+00>, [[VECTOR_PH]] ], [ [[BROADCAST_SPLAT3:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_BODY]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY1]] ]
+; CHECK-NEXT:    [[VECTOR_RECUR:%.*]] = phi <4 x float> [ <float poison, float poison, float poison, float 0.000000e+00>, [[VECTOR_BODY]] ], [ [[BROADCAST_SPLAT:%.*]], [[VECTOR_BODY1]] ]
+; CHECK-NEXT:    [[VECTOR_RECUR1:%.*]] = phi <4 x float> [ <float poison, float poison, float poison, float 0.000000e+00>, [[VECTOR_BODY]] ], [ [[BROADCAST_SPLAT3:%.*]], [[VECTOR_BODY1]] ]
 ; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds float, ptr [[DST:%.*]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = load float, ptr [[A:%.*]], align 4
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x float> poison, float [[TMP2]], i64 0
@@ -111,15 +111,15 @@ define void @test_pr54223_sink_after_insertion_order(ptr noalias %a, ptr noalias
 ; CHECK-NEXT:    [[TMP4:%.*]] = load float, ptr [[B:%.*]], align 4
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT2:%.*]] = insertelement <4 x float> poison, float [[TMP4]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT3]] = shufflevector <4 x float> [[BROADCAST_SPLATINSERT2]], <4 x float> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP5:%.*]] = shufflevector <4 x float> [[VECTOR_RECUR1]], <4 x float> [[BROADCAST_SPLAT3]], <4 x i32> <i32 3, i32 4, i32 5, i32 6>
-; CHECK-NEXT:    [[TMP6:%.*]] = fneg <4 x float> [[TMP5]]
-; CHECK-NEXT:    [[TMP7:%.*]] = call <4 x float> @llvm.fmuladd.v4f32(<4 x float> [[TMP3]], <4 x float> [[TMP6]], <4 x float> zeroinitializer)
-; CHECK-NEXT:    store <4 x float> [[TMP7]], ptr [[TMP1]], align 4
+; CHECK-NEXT:    [[TMP7:%.*]] = shufflevector <4 x float> [[VECTOR_RECUR1]], <4 x float> [[BROADCAST_SPLAT3]], <4 x i32> <i32 3, i32 4, i32 5, i32 6>
+; CHECK-NEXT:    [[TMP5:%.*]] = fneg <4 x float> [[TMP7]]
+; CHECK-NEXT:    [[TMP6:%.*]] = call <4 x float> @llvm.fmuladd.v4f32(<4 x float> [[TMP3]], <4 x float> [[TMP5]], <4 x float> zeroinitializer)
+; CHECK-NEXT:    store <4 x float> [[TMP6]], ptr [[TMP1]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq i64 [[INDEX_NEXT]], 10000
-; CHECK-NEXT:    br i1 [[TMP9]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP9]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY1]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       middle.block:
-; CHECK-NEXT:    br label [[LOOP:%.*]]
+; CHECK-NEXT:    br label [[EXIT:%.*]]
 ; CHECK:       exit:
 ; CHECK-NEXT:    ret void
 ;
@@ -465,19 +465,60 @@ exit:
 define void @hoist_previous_value_and_operand_assume(ptr %dst) {
 ; CHECK-LABEL: @hoist_previous_value_and_operand_assume(
 ; CHECK-NEXT:  entry:
+; CHECK-NEXT:    br label [[LOOP1:%.*]]
+; CHECK:       vector.ph:
+; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
+; CHECK:       vector.body:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[LOOP1]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VECTOR_RECUR:%.*]] = phi <4 x i1> [ <i1 poison, i1 poison, i1 poison, i1 true>, [[LOOP1]] ], [ [[VEC_IND:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VECTOR_RECUR1:%.*]] = phi <4 x i1> [ <i1 poison, i1 poison, i1 poison, i1 false>, [[LOOP1]] ], [ splat (i1 true), [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_IND]] = phi <4 x i1> [ <i1 true, i1 false, i1 true, i1 false>, [[LOOP1]] ], [ [[VEC_IND]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i64 1, [[INDEX]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[OFFSET_IDX]], 1
+; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[OFFSET_IDX]], 2
+; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[OFFSET_IDX]], 3
+; CHECK-NEXT:    [[TMP7:%.*]] = shufflevector <4 x i1> [[VECTOR_RECUR]], <4 x i1> [[VEC_IND]], <4 x i32> <i32 3, i32 4, i32 5, i32 6>
+; CHECK-NEXT:    [[TMP8:%.*]] = shufflevector <4 x i1> [[VECTOR_RECUR1]], <4 x i1> splat (i1 true), <4 x i32> <i32 3, i32 4, i32 5, i32 6>
+; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i32, ptr [[DST:%.*]], i64 [[OFFSET_IDX]]
+; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[TMP0]]
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[TMP1]]
+; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[TMP2]]
+; CHECK-NEXT:    [[TMP9:%.*]] = extractelement <4 x i1> [[TMP8]], i64 0
+; CHECK-NEXT:    store i1 [[TMP9]], ptr [[TMP3]], align 1
+; CHECK-NEXT:    [[TMP10:%.*]] = extractelement <4 x i1> [[TMP8]], i64 1
+; CHECK-NEXT:    store i1 [[TMP10]], ptr [[TMP4]], align 1
+; CHECK-NEXT:    [[TMP11:%.*]] = extractelement <4 x i1> [[TMP8]], i64 2
+; CHECK-NEXT:    store i1 [[TMP11]], ptr [[TMP5]], align 1
+; CHECK-NEXT:    [[TMP12:%.*]] = extractelement <4 x i1> [[TMP8]], i64 3
+; CHECK-NEXT:    store i1 [[TMP12]], ptr [[TMP6]], align 1
+; CHECK-NEXT:    [[TMP13:%.*]] = extractelement <4 x i1> [[TMP7]], i64 0
+; CHECK-NEXT:    call void @llvm.assume(i1 [[TMP13]])
+; CHECK-NEXT:    [[TMP14:%.*]] = extractelement <4 x i1> [[TMP7]], i64 1
+; CHECK-NEXT:    call void @llvm.assume(i1 [[TMP14]])
+; CHECK-NEXT:    [[TMP15:%.*]] = extractelement <4 x i1> [[TMP7]], i64 2
+; CHECK-NEXT:    call void @llvm.assume(i1 [[TMP15]])
+; CHECK-NEXT:    [[TMP16:%.*]] = extractelement <4 x i1> [[TMP7]], i64 3
+; CHECK-NEXT:    call void @llvm.assume(i1 [[TMP16]])
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; CHECK-NEXT:    [[TMP17:%.*]] = icmp eq i64 [[INDEX_NEXT]], 336
+; CHECK-NEXT:    br i1 [[TMP17]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
+; CHECK:       middle.block:
+; CHECK-NEXT:    [[VECTOR_RECUR_EXTRACT:%.*]] = extractelement <4 x i1> [[VEC_IND]], i64 3
+; CHECK-NEXT:    br label [[SCALAR_PH:%.*]]
+; CHECK:       scalar.ph:
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
-; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 1, [[ENTRY:%.*]] ], [ [[ADD:%.*]], [[LOOP]] ]
-; CHECK-NEXT:    [[FOR_1:%.*]] = phi i1 [ true, [[ENTRY]] ], [ [[TRUNC:%.*]], [[LOOP]] ]
-; CHECK-NEXT:    [[FOR_2:%.*]] = phi i1 [ false, [[ENTRY]] ], [ [[OR:%.*]], [[LOOP]] ]
-; CHECK-NEXT:    [[OR]] = or i1 [[FOR_1]], true
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 337, [[SCALAR_PH]] ], [ [[ADD:%.*]], [[LOOP]] ]
+; CHECK-NEXT:    [[FOR_2:%.*]] = phi i1 [ [[VECTOR_RECUR_EXTRACT]], [[SCALAR_PH]] ], [ [[OR:%.*]], [[LOOP]] ]
+; CHECK-NEXT:    [[FOR_3:%.*]] = phi i1 [ true, [[SCALAR_PH]] ], [ [[OR1:%.*]], [[LOOP]] ]
+; CHECK-NEXT:    [[OR1]] = or i1 [[FOR_2]], true
 ; CHECK-NEXT:    [[ADD]] = add i64 [[IV]], 1
-; CHECK-NEXT:    [[GEP:%.*]] = getelementptr inbounds i32, ptr [[DST:%.*]], i64 [[IV]]
-; CHECK-NEXT:    store i1 [[FOR_2]], ptr [[GEP]], align 1
+; CHECK-NEXT:    [[GEP:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[IV]]
+; CHECK-NEXT:    store i1 [[FOR_3]], ptr [[GEP]], align 1
 ; CHECK-NEXT:    [[ICMP:%.*]] = icmp ult i64 [[IV]], 337
-; CHECK-NEXT:    call void @llvm.assume(i1 [[FOR_1]])
-; CHECK-NEXT:    [[TRUNC]] = trunc i64 [[IV]] to i1
-; CHECK-NEXT:    br i1 [[ICMP]], label [[LOOP]], label [[EXIT:%.*]]
+; CHECK-NEXT:    call void @llvm.assume(i1 [[FOR_2]])
+; CHECK-NEXT:    [[OR]] = trunc i64 [[IV]] to i1
+; CHECK-NEXT:    br i1 [[ICMP]], label [[LOOP]], label [[EXIT:%.*]], !llvm.loop [[LOOP8:![0-9]+]]
 ; CHECK:       exit:
 ; CHECK-NEXT:    ret void
 ;

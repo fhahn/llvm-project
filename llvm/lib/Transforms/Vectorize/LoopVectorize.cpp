@@ -5028,6 +5028,7 @@ LoopVectorizationCostModel::getInstructionCost(Instruction *I,
   case Instruction::PHI: {
     auto *Phi = cast<PHINode>(I);
 
+    VectorTy = toVectorTy(RetTy, VF);
     // First-order recurrences are replaced by vector shuffles inside the loop.
     // When a phi is also classified as an induction, it may be treated as
     // scalar by the uniformity analysis, in which case VectorTy is not a

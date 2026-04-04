@@ -875,6 +875,23 @@ static bool tryToSinkOrHoistRecurrenceUsers(VPBasicBlock *HeaderVPBB,
     }
 
     assert(Previous && "Previous must be a recipe");
+
+    // Reject the FOR if any user with side effects sits between the FOR phi
+    // and Previous with an intervening recipe that may access memory.
+    for (VPUser *U : FOR->users()) {
+      auto *UserR = dyn_cast<VPRecipeBase>(U);
+      if (!UserR || UserR == Previous ||
+          UserR->getParent() != FOR->getParent() ||
+          VPDT.properlyDominates(Previous, UserR) ||
+          !UserR->mayHaveSideEffects())
+        continue;
+      for (VPRecipeBase &R : make_range(std::next(UserR->getIterator()),
+                                        Previous->getIterator())) {
+        if (R.mayReadOrWriteMemory())
+          return false;
+      }
+    }
+
     // Sink FOR users after Previous or hoist Previous before FOR users.
     if (!sinkRecurrenceUsersAfterPrevious(FOR, Previous, VPDT) &&
         !hoistPreviousBeforeFORUsers(FOR, Previous, VPDT))

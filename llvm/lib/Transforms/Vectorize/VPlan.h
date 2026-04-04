@@ -2430,6 +2430,10 @@ public:
   static inline bool classof(const VPSingleDefRecipe *R) {
     return isa<VPHeaderPHIRecipe>(static_cast<const VPRecipeBase *>(R));
   }
+  static inline bool classof(const VPUser *U) {
+    auto *R = dyn_cast<VPRecipeBase>(U);
+    return R && classof(R);
+  }
 
   /// Generate the phi nodes.
   void execute(VPTransformState &State) override = 0;

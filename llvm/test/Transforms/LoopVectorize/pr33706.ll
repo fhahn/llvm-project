@@ -20,12 +20,61 @@ define void @PR33706(ptr nocapture readonly %arg, ptr nocapture %arg1, i32 %arg2
 ; CHECK-NEXT:    br label [[BB27:%.*]]
 ; CHECK:       bb9:
 ; CHECK-NEXT:    [[VAR_TMP10:%.*]] = udiv i32 65536, [[ARG2]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add nsw i32 [[VAR_TMP10]], -1
+; CHECK-NEXT:    [[TMP1:%.*]] = zext i32 [[TMP0]] to i64
+; CHECK-NEXT:    [[TMP2:%.*]] = add nuw nsw i64 [[TMP1]], 1
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP2]], 2
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
+; CHECK:       vector.ph:
+; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[TMP2]], 2
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP2]], [[N_MOD_VF]]
+; CHECK-NEXT:    [[TMP3:%.*]] = shl i64 [[N_VEC]], 2
+; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr [[VAR_TMP4]], i64 [[TMP3]]
+; CHECK-NEXT:    [[TMP5:%.*]] = trunc i64 [[N_VEC]] to i32
+; CHECK-NEXT:    [[TMP6:%.*]] = sub i32 [[VAR_TMP10]], [[TMP5]]
+; CHECK-NEXT:    [[TMP7:%.*]] = mul i32 [[TMP5]], [[ARG2]]
+; CHECK-NEXT:    [[TMP8:%.*]] = add i32 [[TMP]], [[TMP7]]
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i32> poison, i32 [[ARG2]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT]], <2 x i32> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <2 x i32> poison, i32 [[TMP]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT1]], <2 x i32> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP9:%.*]] = mul <2 x i32> <i32 0, i32 1>, [[BROADCAST_SPLAT]]
+; CHECK-NEXT:    [[INDUCTION:%.*]] = add <2 x i32> [[BROADCAST_SPLAT2]], [[TMP9]]
+; CHECK-NEXT:    [[TMP10:%.*]] = shl i32 [[ARG2]], 1
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT3:%.*]] = insertelement <2 x i32> poison, i32 [[TMP10]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT4:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT3]], <2 x i32> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    [[VECTOR_RECUR_INIT:%.*]] = insertelement <2 x i32> poison, i32 [[VAR_TMP5]], i32 1
+; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
+; CHECK:       vector.body:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VECTOR_RECUR:%.*]] = phi <2 x i32> [ [[VECTOR_RECUR_INIT]], [[VECTOR_PH]] ], [ [[TMP13:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <2 x i32> [ [[INDUCTION]], [[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP11:%.*]] = shl i64 [[INDEX]], 2
+; CHECK-NEXT:    [[NEXT_GEP:%.*]] = getelementptr i8, ptr [[VAR_TMP4]], i64 [[TMP11]]
+; CHECK-NEXT:    [[TMP12:%.*]] = add <2 x i32> [[VEC_IND]], [[BROADCAST_SPLAT]]
+; CHECK-NEXT:    [[TMP13]] = and <2 x i32> [[TMP12]], splat (i32 65535)
+; CHECK-NEXT:    [[TMP14:%.*]] = shufflevector <2 x i32> [[VECTOR_RECUR]], <2 x i32> [[TMP13]], <2 x i32> <i32 1, i32 2>
+; CHECK-NEXT:    [[TMP15:%.*]] = sitofp <2 x i32> [[TMP14]] to <2 x float>
+; CHECK-NEXT:    store <2 x float> [[TMP15]], ptr [[NEXT_GEP]], align 4
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
+; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <2 x i32> [[VEC_IND]], [[BROADCAST_SPLAT4]]
+; CHECK-NEXT:    [[TMP16:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP16]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
+; CHECK:       middle.block:
+; CHECK-NEXT:    [[VECTOR_RECUR_EXTRACT:%.*]] = extractelement <2 x i32> [[TMP13]], i64 1
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP2]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[CMP_N]], label [[BB22:%.*]], label [[SCALAR_PH]]
+; CHECK:       scalar.ph:
+; CHECK-NEXT:    [[SCALAR_RECUR_INIT:%.*]] = phi i32 [ [[VECTOR_RECUR_EXTRACT]], [[MIDDLE_BLOCK]] ], [ [[VAR_TMP5]], [[BB9]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi ptr [ [[TMP4]], [[MIDDLE_BLOCK]] ], [ [[VAR_TMP4]], [[BB9]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL5:%.*]] = phi i32 [ [[TMP6]], [[MIDDLE_BLOCK]] ], [ [[VAR_TMP10]], [[BB9]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL6:%.*]] = phi i32 [ [[TMP8]], [[MIDDLE_BLOCK]] ], [ [[TMP]], [[BB9]] ]
 ; CHECK-NEXT:    br label [[BB11:%.*]]
 ; CHECK:       bb11:
-; CHECK-NEXT:    [[VAR_TMP12:%.*]] = phi i32 [ [[VAR_TMP20:%.*]], [[BB11]] ], [ [[VAR_TMP5]], [[BB9]] ]
-; CHECK-NEXT:    [[VAR_TMP13:%.*]] = phi ptr [ [[VAR_TMP18:%.*]], [[BB11]] ], [ [[VAR_TMP4]], [[BB9]] ]
-; CHECK-NEXT:    [[VAR_TMP14:%.*]] = phi i32 [ [[VAR_TMP16:%.*]], [[BB11]] ], [ [[VAR_TMP10]], [[BB9]] ]
-; CHECK-NEXT:    [[VAR_TMP15:%.*]] = phi i32 [ [[VAR_TMP19:%.*]], [[BB11]] ], [ [[TMP]], [[BB9]] ]
+; CHECK-NEXT:    [[VAR_TMP12:%.*]] = phi i32 [ [[VAR_TMP20:%.*]], [[BB11]] ], [ [[SCALAR_RECUR_INIT]], [[SCALAR_PH]] ]
+; CHECK-NEXT:    [[VAR_TMP13:%.*]] = phi ptr [ [[VAR_TMP18:%.*]], [[BB11]] ], [ [[BC_RESUME_VAL]], [[SCALAR_PH]] ]
+; CHECK-NEXT:    [[VAR_TMP14:%.*]] = phi i32 [ [[VAR_TMP16:%.*]], [[BB11]] ], [ [[BC_RESUME_VAL5]], [[SCALAR_PH]] ]
+; CHECK-NEXT:    [[VAR_TMP15:%.*]] = phi i32 [ [[VAR_TMP19:%.*]], [[BB11]] ], [ [[BC_RESUME_VAL6]], [[SCALAR_PH]] ]
 ; CHECK-NEXT:    [[VAR_TMP16]] = add nsw i32 [[VAR_TMP14]], -1
 ; CHECK-NEXT:    [[VAR_TMP17:%.*]] = sitofp i32 [[VAR_TMP12]] to float
 ; CHECK-NEXT:    store float [[VAR_TMP17]], ptr [[VAR_TMP13]], align 4
@@ -33,11 +82,11 @@ define void @PR33706(ptr nocapture readonly %arg, ptr nocapture %arg1, i32 %arg2
 ; CHECK-NEXT:    [[VAR_TMP19]] = add i32 [[VAR_TMP15]], [[ARG2]]
 ; CHECK-NEXT:    [[VAR_TMP20]] = and i32 [[VAR_TMP19]], 65535
 ; CHECK-NEXT:    [[VAR_TMP21:%.*]] = icmp eq i32 [[VAR_TMP16]], 0
-; CHECK-NEXT:    br i1 [[VAR_TMP21]], label [[BB22:%.*]], label [[BB11]]
+; CHECK-NEXT:    br i1 [[VAR_TMP21]], label [[BB22]], label [[BB11]], !llvm.loop [[LOOP3:![0-9]+]]
 ; CHECK:       bb22:
-; CHECK-NEXT:    [[VAR_TMP23:%.*]] = phi ptr [ [[VAR_TMP18]], [[BB11]] ]
-; CHECK-NEXT:    [[VAR_TMP24:%.*]] = phi i32 [ [[VAR_TMP19]], [[BB11]] ]
-; CHECK-NEXT:    [[VAR_TMP25:%.*]] = phi i32 [ [[VAR_TMP20]], [[BB11]] ]
+; CHECK-NEXT:    [[VAR_TMP23:%.*]] = phi ptr [ [[VAR_TMP18]], [[BB11]] ], [ [[TMP4]], [[MIDDLE_BLOCK]] ]
+; CHECK-NEXT:    [[VAR_TMP24:%.*]] = phi i32 [ [[VAR_TMP19]], [[BB11]] ], [ [[TMP8]], [[MIDDLE_BLOCK]] ]
+; CHECK-NEXT:    [[VAR_TMP25:%.*]] = phi i32 [ [[VAR_TMP20]], [[BB11]] ], [ [[VECTOR_RECUR_EXTRACT]], [[MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    [[VAR_TMP26:%.*]] = ashr i32 [[VAR_TMP24]], 16
 ; CHECK-NEXT:    store i32 [[VAR_TMP26]], ptr @global, align 4
 ; CHECK-NEXT:    br label [[BB27]]
