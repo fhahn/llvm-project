@@ -2338,6 +2338,11 @@ void LoopVectorizationCostModel::collectLoopScalars(ElementCount VF) {
   // variable and induction variable update remain scalar.
   for (const auto &Induction : Legal->getInductionVars()) {
     auto *Ind = Induction.first;
+    // Skip Ind if it can be treated as both a fixed order recurrence or
+    // induction.
+    if (Legal->isFixedOrderRecurrence(Ind))
+      continue;
+
     auto *IndUpdate = cast<Instruction>(Ind->getIncomingValueForBlock(Latch));
 
     // If tail-folding is applied, the primary induction variable will be used
@@ -5024,7 +5029,12 @@ LoopVectorizationCostModel::getInstructionCost(Instruction *I,
     auto *Phi = cast<PHINode>(I);
 
     // First-order recurrences are replaced by vector shuffles inside the loop.
-    if (VF.isVector() && Legal->isFixedOrderRecurrence(Phi)) {
+    // When a phi is also classified as an induction, it may be treated as
+    // scalar by the uniformity analysis, in which case VectorTy is not a
+    // vector type. In that case, skip the FOR shuffle cost (the VPlan will
+    // decide the final recipe, and the induction cost dominates).
+    if (VF.isVector() && Legal->isFixedOrderRecurrence(Phi) &&
+        isa<VectorType>(VectorTy)) {
       return TTI.getShuffleCost(
           TargetTransformInfo::SK_Splice, cast<VectorType>(VectorTy),
           cast<VectorType>(VectorTy), {}, Config.CostKind, -1);
