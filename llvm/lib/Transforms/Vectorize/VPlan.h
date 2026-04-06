@@ -4459,9 +4459,13 @@ public:
 
   /// Return the position of the first non-phi node recipe in the block.
   iterator getFirstNonPhi();
+  const_iterator getFirstNonPhi() const;
 
   /// Returns an iterator range over the PHI-like recipes in the block.
   iterator_range<iterator> phis() {
+    return make_range(begin(), getFirstNonPhi());
+  }
+  iterator_range<const_iterator> phis() const {
     return make_range(begin(), getFirstNonPhi());
   }
 

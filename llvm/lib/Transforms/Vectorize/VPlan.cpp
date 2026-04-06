@@ -270,6 +270,13 @@ VPBasicBlock::iterator VPBasicBlock::getFirstNonPhi() {
   return It;
 }
 
+VPBasicBlock::const_iterator VPBasicBlock::getFirstNonPhi() const {
+  const_iterator It = begin();
+  while (It != end() && It->isPhi())
+    It++;
+  return It;
+}
+
 VPTransformState::VPTransformState(const TargetTransformInfo *TTI,
                                    ElementCount VF, LoopInfo *LI,
                                    DominatorTree *DT, AssumptionCache *AC,

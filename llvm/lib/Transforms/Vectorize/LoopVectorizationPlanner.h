@@ -1075,7 +1075,7 @@ private:
 
   /// Determines if we have the infrastructure to vectorize the loop and its
   /// epilogue, assuming the main loop is vectorized by \p MainPlan.
-  bool isCandidateForEpilogueVectorization(VPlan &MainPlan) const;
+  bool isCandidateForEpilogueVectorization(const VPlan &MainPlan) const;
 };
 
 /// A helper function that returns true if the given type is irregular. The

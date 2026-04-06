@@ -3389,10 +3389,10 @@ static bool hasFindLastReductionPhi(VPlan &Plan) {
 
 /// Returns true if the VPlan contains header phi recipes that are not currently
 /// supported for epilogue vectorization.
-static bool hasUnsupportedHeaderPhiRecipe(VPlan &Plan) {
+static bool hasUnsupportedHeaderPhiRecipe(const VPlan &Plan) {
   return any_of(
       Plan.getVectorLoopRegion()->getEntryBasicBlock()->phis(),
-      [](VPRecipeBase &R) {
+      [](const VPRecipeBase &R) {
         switch (R.getVPRecipeID()) {
         case VPRecipeBase::VPFirstOrderRecurrencePHISC:
           // TODO: Add support for fixed-order recurrences.
@@ -3414,7 +3414,8 @@ static bool hasUnsupportedHeaderPhiRecipe(VPlan &Plan) {
           // expression is identified by a non-VPInstruction user of
           // ComputeReductionResult.
           if (RecurrenceDescriptor::isFindIVRecurrenceKind(Kind)) {
-            auto *RdxResult = vputils::findComputeReductionResult(RedPhi);
+            auto *RdxResult = vputils::findComputeReductionResult(
+                const_cast<VPReductionPHIRecipe *>(RedPhi));
             assert(RdxResult &&
                    "FindIV reduction must have ComputeReductionResult");
             return any_of(RdxResult->users(),
@@ -3429,7 +3430,7 @@ static bool hasUnsupportedHeaderPhiRecipe(VPlan &Plan) {
 }
 
 bool LoopVectorizationPlanner::isCandidateForEpilogueVectorization(
-    VPlan &MainPlan) const {
+    const VPlan &MainPlan) const {
   assert(MainPlan.hasScalarTail() &&
          "Epilogue vectorization requires a scalar tail in the main plan.");
 
