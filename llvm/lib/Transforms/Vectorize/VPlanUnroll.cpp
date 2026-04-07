@@ -390,8 +390,8 @@ void UnrollState::unrollRecipeByUF(VPRecipeBase &R) {
               m_VPInstruction<VPInstruction::CanonicalIVIncrementForPart>())) {
       VPBuilder Builder(Copy);
       VPValue *ScaledByPart = Builder.createOverflowingOp(
-          Instruction::Mul, {Copy->getOperand(1), getConstantInt(Part)});
-      Copy->setOperand(1, ScaledByPart);
+          Instruction::Mul, {Copy->getOperand(2), getConstantInt(Part)});
+      Copy->setOperand(2, ScaledByPart);
     }
   }
   if (auto *VEPR = dyn_cast<VPVectorEndPointerRecipe>(&R)) {
@@ -505,8 +505,12 @@ void VPlanTransforms::unrollByUF(VPlan &Plan, unsigned UF) {
         auto *VPI = dyn_cast<VPInstruction>(&R);
         if (VPI &&
             VPI->getOpcode() == VPInstruction::CanonicalIVIncrementForPart &&
-            VPI->getOperand(1) == &Plan.getVF()) {
-          VPI->replaceAllUsesWith(VPI->getOperand(0));
+            VPI->getOperand(2) == &Plan.getVF()) {
+          // (Base, Step, VF) with unscaled VF simplifies to Base + Step.
+          VPValue *Replacement = VPBuilder(VPI).createOverflowingOp(
+              Instruction::Add, {VPI->getOperand(0), VPI->getOperand(1)},
+              VPI->getNoWrapFlags(), VPI->getDebugLoc());
+          VPI->replaceAllUsesWith(Replacement);
           VPI->eraseFromParent();
         }
       }

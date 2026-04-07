@@ -2151,7 +2151,8 @@ static bool tryToReplaceALMWithWideALM(VPlan &Plan, ElementCount VF,
     uint64_t Part;
     if (match(Index,
               m_VPInstruction<VPInstruction::CanonicalIVIncrementForPart>(
-                  m_VPValue(), m_Mul(m_VPValue(), m_ConstantInt(Part)))))
+                  m_VPValue(), m_VPValue(),
+                  m_Mul(m_VPValue(), m_ConstantInt(Part)))))
       Phis[Part] = Phi;
     else {
       // Anything other than a CanonicalIVIncrementForPart is part 0
@@ -2974,8 +2975,9 @@ addVPLaneMaskPhiAndUpdateExitBranch(VPlan &Plan) {
   VPValue *VF = &Plan.getVF();
 
   auto *EntryIncrement = Builder.createOverflowingOp(
-      VPInstruction::CanonicalIVIncrementForPart, {StartV, VF}, {false, false},
-      DL, "index.part.next");
+      VPInstruction::CanonicalIVIncrementForPart,
+      {StartV, Plan.getConstantInt(TopRegion->getCanonicalIVType(), 0), VF},
+      {false, false}, DL, "index.part.next");
 
   // Create the active lane mask instruction in the VPlan preheader.
   VPValue *ALMMultiplier =
@@ -2996,7 +2998,7 @@ addVPLaneMaskPhiAndUpdateExitBranch(VPlan &Plan) {
   Builder.setInsertPoint(OriginalTerminator);
   auto *InLoopIncrement = Builder.createOverflowingOp(
       VPInstruction::CanonicalIVIncrementForPart,
-      {CanonicalIVIncrement, &Plan.getVF()}, {false, false}, DL);
+      {CanonicalIVPHI, &Plan.getVFxUF(), VF}, {false, false}, DL);
   auto *ALM = Builder.createNaryOp(VPInstruction::ActiveLaneMask,
                                    {InLoopIncrement, TC, ALMMultiplier}, DL,
                                    "active.lane.mask.next");
@@ -4116,8 +4118,12 @@ void VPlanTransforms::convertToConcreteRecipes(VPlan &Plan) {
               &R,
               m_VPInstruction<VPInstruction::CanonicalIVIncrementForPart>())) {
         auto *VPI = cast<VPInstruction>(&R);
+        VPValue *BaseIV = Builder.createOverflowingOp(
+            Instruction::Add, {VPI->getOperand(0), VPI->getOperand(1)},
+            VPI->getNoWrapFlags(), VPI->getDebugLoc());
         VPValue *Add = Builder.createOverflowingOp(
-            Instruction::Add, VPI->operands(), VPI->getNoWrapFlags(),
+            Instruction::Add, {BaseIV, VPI->getOperand(2)},
+            VPI->getNoWrapFlags(),
             VPI->getDebugLoc());
         VPI->replaceAllUsesWith(Add);
         ToRemove.push_back(VPI);

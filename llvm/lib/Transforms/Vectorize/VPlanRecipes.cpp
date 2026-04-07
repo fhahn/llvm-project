@@ -505,6 +505,7 @@ unsigned VPInstruction::getNumOperandsForOpcode() const {
     return 2;
   case Instruction::Select:
   case VPInstruction::ActiveLaneMask:
+  case VPInstruction::CanonicalIVIncrementForPart:
   case VPInstruction::ReductionStartVector:
     return 3;
   case Instruction::Call:
@@ -515,7 +516,6 @@ unsigned VPInstruction::getNumOperandsForOpcode() const {
   case VPInstruction::AnyOf:
   case VPInstruction::BuildStructVector:
   case VPInstruction::BuildVector:
-  case VPInstruction::CanonicalIVIncrementForPart:
   case VPInstruction::ComputeAnyOfResult:
   case VPInstruction::ComputeReductionResult:
   case VPInstruction::FirstActiveLane:
