@@ -391,7 +391,7 @@ bool vputils::isSingleScalar(const VPValue *VPV) {
           VPVectorEndPointerRecipe>(VPV))
     return true;
   if (auto *Expr = dyn_cast<VPExpressionRecipe>(VPV))
-    return Expr->isSingleScalar();
+    return Expr->isSingleScalar();t rebas
 
   // VPExpandSCEVRecipes must be placed in the entry and are always uniform.
   return isa<VPExpandSCEVRecipe>(VPV);
@@ -713,11 +713,24 @@ static bool canExpandNAry(const SCEVNAryExpr *NAry) {
   });
 }
 
+<<<<<<< HEAD
 
+=======
+<<<<<<< HEAD
+>>>>>>> 140f3d3f4b63 (Add ResultTy parameter to vputils::expandSCEVExpr)
 VPValue *vputils::expandSCEVExpr(const SCEV *S, VPBuilder &Builder,
                                  VPlan &Plan, DebugLoc DL,
+<<<<<<< HEAD
                                  ScalarEvolution *SE, Loop *OrigLoop,
                                  DominatorTree *DT) {
+=======
+=======
+VPValue *vputils::expandSCEVExpr(const SCEV *S, Type *ResultTy,
+                                 VPBuilder &Builder, VPlan &Plan, DebugLoc DL,
+                                 DenseMap<const SCEV *, VPValue *> &SCEV2VPV,
+>>>>>>> cc66a58f8f07 (Add ResultTy parameter to vputils::expandSCEVExpr)
+                                 ScalarEvolution *SE, Loop *OrigLoop) {
+>>>>>>> 473c2d95daa9 (Add ResultTy parameter to vputils::expandSCEVExpr)
   // Check if there's an existing loop-invariant IR value for this SCEV
   // that we can reuse as a live-in, avoiding redundant expansion.
   // Skip SCEVConstant/SCEVUnknown — they're already handled as direct
@@ -777,6 +790,7 @@ VPValue *vputils::expandSCEVExpr(const SCEV *S, VPBuilder &Builder,
     // constants first) to match SCEVExpander's operand order and enable
     // CSE.
     auto RevOps = reverse(NAry->operands());
+<<<<<<< HEAD
     VPValue *Result = expandSCEVExpr(*RevOps.begin(), Builder, Plan, DL,
                                      SE, OrigLoop);
     for (const auto &Op : drop_begin(RevOps))
@@ -793,9 +807,45 @@ VPValue *vputils::expandSCEVExpr(const SCEV *S, VPBuilder &Builder,
     VPValue *RHS = expandSCEVExpr(UDiv->getRHS(), Builder, Plan, DL,
                                   SE, OrigLoop);
     return Builder.createNaryOp(
+=======
+    Result = expandSCEVExpr(*RevOps.begin(), (*RevOps.begin())->getType(),
+                            Builder, Plan, DL, SCEV2VPV, SE, OrigLoop);
+    for (const auto &Op : drop_begin(RevOps))
+      Result = Builder.createOverflowingOp(
+          Opcode,
+          {Result, expandSCEVExpr(Op, Op->getType(), Builder, Plan, DL,
+                                  SCEV2VPV, SE, OrigLoop)},
+          WrapFlags, DL);
+  } else if (auto *UDiv = dyn_cast<SCEVUDivExpr>(S)) {
+    VPValue *LHS = expandSCEVExpr(UDiv->getLHS(), UDiv->getLHS()->getType(),
+                                   Builder, Plan, DL, SCEV2VPV, SE, OrigLoop);
+    VPValue *RHS = expandSCEVExpr(UDiv->getRHS(), UDiv->getRHS()->getType(),
+                                   Builder, Plan, DL, SCEV2VPV, SE, OrigLoop);
+    Result = Builder.createNaryOp(
+>>>>>>> cc66a58f8f07 (Add ResultTy parameter to vputils::expandSCEVExpr)
         Instruction::UDiv, {LHS, RHS},
         VPIRFlags::getDefaultFlags(Instruction::UDiv), DL);
   }
+<<<<<<< HEAD
   // Unsupported SCEV kind; fall back to VPExpandSCEVRecipe.
   return Builder.createExpandSCEV(S);
+=======
+
+  SCEV2VPV[S] = Result;
+
+  // Cast to the requested result type if needed.
+  Type *SrcTy = S->getType();
+  if (ResultTy != SrcTy) {
+    if (ResultTy->isPointerTy() && SrcTy->isIntegerTy()) {
+      Result =
+          Builder.createScalarCast(Instruction::IntToPtr, Result, ResultTy, DL);
+    } else if (ResultTy->isIntegerTy() && SrcTy->isPointerTy()) {
+      Result =
+          Builder.createScalarCast(Instruction::PtrToInt, Result, ResultTy, DL);
+    } else if (ResultTy->isIntegerTy() && SrcTy->isIntegerTy())
+      Result = Builder.createScalarZExtOrTrunc(Result, ResultTy, SrcTy, DL);
+  }
+
+  return Result;
+>>>>>>> cc66a58f8f07 (Add ResultTy parameter to vputils::expandSCEVExpr)
 }

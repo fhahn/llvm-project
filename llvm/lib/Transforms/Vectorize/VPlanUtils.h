@@ -152,6 +152,7 @@ VPInstruction *findComputeReductionResult(VPReductionPHIRecipe *PhiR);
 /// the header-mask pattern manually.
 VPSingleDefRecipe *findHeaderMask(VPlan &Plan);
 
+<<<<<<< HEAD
 /// Expand \p S directly into VPlan recipes using \p Builder. Falls back to
 /// VPExpandSCEVRecipe for casts, min/max and other unsupported expressions. If
 /// \p SE and \p OrigLoop are provided, existing loop-invariant IR values
@@ -162,6 +163,27 @@ VPValue *expandSCEVExpr(const SCEV *S, VPBuilder &Builder, VPlan &Plan,
                         Loop *OrigLoop = nullptr,
                         DominatorTree *DT = nullptr);
 
+=======
+/// Expand \p S directly into VPlan recipes using \p Builder. Caches results in
+/// \p SCEV2VPV to avoid duplicates. Falls back to VPExpandSCEVRecipe for casts,
+/// min/max and other unsupported expressions. If \p ResultTy differs from
+/// S->getType(), a cast is inserted. If \p SE and \p OrigLoop are provided,
+/// existing loop-invariant IR values computing the same SCEV are reused as
+/// live-ins instead of creating new recipes.
+VPValue *expandSCEVExpr(const SCEV *S, Type *ResultTy, VPBuilder &Builder,
+                        VPlan &Plan, DebugLoc DL,
+                        DenseMap<const SCEV *, VPValue *> &SCEV2VPV,
+                        ScalarEvolution *SE = nullptr,
+                        Loop *OrigLoop = nullptr);
+
+/// Convenience overload that expands \p S without inter-expansion caching.
+inline VPValue *expandSCEVExpr(const SCEV *S, VPBuilder &Builder, VPlan &Plan,
+                               DebugLoc DL) {
+  DenseMap<const SCEV *, VPValue *> SCEV2VPV;
+  return expandSCEVExpr(S, S->getType(), Builder, Plan, DL, SCEV2VPV);
+}
+
+>>>>>>> cc66a58f8f07 (Add ResultTy parameter to vputils::expandSCEVExpr)
 } // namespace vputils
 
 //===----------------------------------------------------------------------===//

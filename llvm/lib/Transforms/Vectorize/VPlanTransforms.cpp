@@ -5284,8 +5284,17 @@ void VPlanTransforms::expandSCEVExpressions(VPlan &Plan, ScalarEvolution *SE,
       continue;
     const SCEV *S = ExpSCEV->getSCEV();
     VPBuilder Builder(Entry, ExpSCEV->getIterator());
+<<<<<<< HEAD
     VPValue *Expanded =
+<<<<<<< HEAD
         vputils::expandSCEVExpr(S, Builder, Plan, DebugLoc(), SE, OrigLoop, DT);
+=======
+        vputils::expandSCEVExpr(S, Builder, Plan, DebugLoc(), SE, OrigLoop);
+=======
+    VPValue *Expanded = vputils::expandSCEVExpr(
+        S, S->getType(), Builder, Plan, DebugLoc(), SCEV2VPV, SE, OrigLoop);
+>>>>>>> cc66a58f8f07 (Add ResultTy parameter to vputils::expandSCEVExpr)
+>>>>>>> 473c2d95daa9 (Add ResultTy parameter to vputils::expandSCEVExpr)
     if (Expanded == ExpSCEV)
       continue;
     replaceExpandSCEVRecipe(Plan, ExpSCEV, Expanded);
