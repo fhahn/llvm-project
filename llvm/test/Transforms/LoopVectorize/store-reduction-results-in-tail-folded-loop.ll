@@ -13,7 +13,8 @@ define void @pr75298_store_reduction_value_in_folded_loop(i64 %iv.start) optsize
 ; CHECK-NEXT:    [[CMP3:%.*]] = icmp slt i64 [[IV_START]], 7
 ; CHECK-NEXT:    br i1 [[CMP3]], label [[PH:%.*]], label [[EXIT:%.*]]
 ; CHECK:       ph:
-; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 7, [[IV_START]]
+; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 0, [[IV_START]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[TMP1]], 7
 ; CHECK-NEXT:    br label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
 ; CHECK-NEXT:    [[N_RND_UP:%.*]] = add i64 [[TMP0]], 3

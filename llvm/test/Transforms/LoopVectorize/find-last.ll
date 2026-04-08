@@ -204,8 +204,9 @@ define i32 @loop_inv_select_condition_issue_182152(i32 %iv.start, i32 %a, i32 %b
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[INV_COND:%.*]] = icmp eq i32 [[A:%.*]], [[B:%.*]]
 ; CHECK-NEXT:    [[SMAX:%.*]] = call i32 @llvm.smax.i32(i32 [[IV_START:%.*]], i32 1)
-; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[SMAX]], 1
-; CHECK-NEXT:    [[TMP1:%.*]] = sub i32 [[TMP0]], [[IV_START]]
+; CHECK-NEXT:    [[TMP0:%.*]] = sub i32 0, [[IV_START]]
+; CHECK-NEXT:    [[TMP11:%.*]] = add i32 [[SMAX]], [[TMP0]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i32 [[TMP11]], 1
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[TMP1]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:

@@ -170,8 +170,9 @@ define i32 @PR35734(i32 %x, i32 %y) {
 ; CHECK-LABEL: @PR35734(
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[SMAX:%.*]] = call i32 @llvm.smax.i32(i32 [[X:%.*]], i32 78)
-; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[SMAX]], 1
-; CHECK-NEXT:    [[TMP1:%.*]] = sub i32 [[TMP0]], [[X]]
+; CHECK-NEXT:    [[TMP0:%.*]] = sub i32 0, [[X]]
+; CHECK-NEXT:    [[TMP8:%.*]] = add i32 [[SMAX]], [[TMP0]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i32 [[TMP8]], 1
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[TMP1]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:

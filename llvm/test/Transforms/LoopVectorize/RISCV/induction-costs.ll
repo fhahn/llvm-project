@@ -15,8 +15,10 @@ define void @skip_free_iv_truncate(i16 %x, ptr %A) #0 {
 ; CHECK-NEXT:    [[SMAX20:%.*]] = call i64 @llvm.smax.i64(i64 [[X_I64]], i64 99)
 ; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 [[SMAX20]], [[X_I64]]
 ; CHECK-NEXT:    [[UMIN21:%.*]] = call i64 @llvm.umin.i64(i64 [[TMP0]], i64 1)
-; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[SMAX20]], [[UMIN21]]
-; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[TMP1]], [[X_I64]]
+; CHECK-NEXT:    [[TMP1:%.*]] = sub nsw i64 0, [[UMIN21]]
+; CHECK-NEXT:    [[TMP6:%.*]] = add i64 [[SMAX20]], [[TMP1]]
+; CHECK-NEXT:    [[TMP7:%.*]] = sub nsw i64 0, [[X_I64]]
+; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[TMP6]], [[TMP7]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = udiv i64 [[TMP2]], 3
 ; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[UMIN21]], [[TMP3]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = add i64 [[TMP4]], 1

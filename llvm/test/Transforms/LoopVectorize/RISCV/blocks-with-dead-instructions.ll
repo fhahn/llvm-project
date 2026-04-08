@@ -479,7 +479,8 @@ define void @dead_load_in_block(ptr %dst, ptr %src, i8 %N, i64 %x) #0 {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    [[N_EXT:%.*]] = zext i8 [[N]] to i64
 ; CHECK-NEXT:    [[UMIN7:%.*]] = call i64 @llvm.umin.i64(i64 [[N_EXT]], i64 1)
-; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 [[N_EXT]], [[UMIN7]]
+; CHECK-NEXT:    [[TMP4:%.*]] = sub nsw i64 0, [[UMIN7]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[TMP4]], [[N_EXT]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = udiv i64 [[TMP0]], 3
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[UMIN7]], [[TMP1]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = add i64 [[TMP2]], 1

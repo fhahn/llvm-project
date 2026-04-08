@@ -12,8 +12,9 @@ define ptr @foo(ptr %p, ptr %p.last) #0 {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[P3:%.*]] = ptrtoint ptr [[P:%.*]] to i64
 ; CHECK-NEXT:    [[P_LAST1:%.*]] = ptrtoint ptr [[P_LAST:%.*]] to i64
-; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[P_LAST1]], -1024
-; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], [[P3]]
+; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 0, [[P3]]
+; CHECK-NEXT:    [[TMP6:%.*]] = add i64 [[P_LAST1]], [[TMP0]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[TMP6]], -1024
 ; CHECK-NEXT:    [[TMP2:%.*]] = lshr i64 [[TMP1]], 10
 ; CHECK-NEXT:    [[TMP3:%.*]] = add nuw nsw i64 [[TMP2]], 1
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP3]], 16
@@ -72,8 +73,9 @@ define ptr @bar(ptr %p, ptr %p.last) #0 {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[P3:%.*]] = ptrtoint ptr [[P:%.*]] to i64
 ; CHECK-NEXT:    [[P_LAST1:%.*]] = ptrtoint ptr [[P_LAST:%.*]] to i64
-; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[P_LAST1]], -1024
-; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], [[P3]]
+; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 0, [[P3]]
+; CHECK-NEXT:    [[TMP6:%.*]] = add i64 [[P_LAST1]], [[TMP0]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[TMP6]], -1024
 ; CHECK-NEXT:    [[TMP2:%.*]] = lshr i64 [[TMP1]], 10
 ; CHECK-NEXT:    [[TMP3:%.*]] = add nuw nsw i64 [[TMP2]], 1
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP3]], 16

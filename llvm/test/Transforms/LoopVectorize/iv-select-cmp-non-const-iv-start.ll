@@ -10,7 +10,8 @@ define i64 @select_non_const_iv_start_signed_guard(ptr %a, i64 %rdx_start, i64 %
 ; CHECK-VF4IC1-NEXT:    [[GUARD:%.*]] = icmp slt i64 [[IV_START]], [[N]]
 ; CHECK-VF4IC1-NEXT:    br i1 [[GUARD]], label %[[FOR_BODY_PREHEADER:.*]], label %[[EXIT:.*]]
 ; CHECK-VF4IC1:       [[FOR_BODY_PREHEADER]]:
-; CHECK-VF4IC1-NEXT:    [[TMP0:%.*]] = sub i64 [[N]], [[IV_START]]
+; CHECK-VF4IC1-NEXT:    [[TMP6:%.*]] = sub i64 0, [[IV_START]]
+; CHECK-VF4IC1-NEXT:    [[TMP0:%.*]] = add i64 [[N]], [[TMP6]]
 ; CHECK-VF4IC1-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP0]], 4
 ; CHECK-VF4IC1-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK-VF4IC1:       [[VECTOR_PH]]:
@@ -70,7 +71,8 @@ define i64 @select_non_const_iv_start_signed_guard(ptr %a, i64 %rdx_start, i64 %
 ; CHECK-VF4IC4-NEXT:    [[GUARD:%.*]] = icmp slt i64 [[IV_START]], [[N]]
 ; CHECK-VF4IC4-NEXT:    br i1 [[GUARD]], label %[[FOR_BODY_PREHEADER:.*]], label %[[EXIT:.*]]
 ; CHECK-VF4IC4:       [[FOR_BODY_PREHEADER]]:
-; CHECK-VF4IC4-NEXT:    [[TMP0:%.*]] = sub i64 [[N]], [[IV_START]]
+; CHECK-VF4IC4-NEXT:    [[TMP23:%.*]] = sub i64 0, [[IV_START]]
+; CHECK-VF4IC4-NEXT:    [[TMP0:%.*]] = add i64 [[N]], [[TMP23]]
 ; CHECK-VF4IC4-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP0]], 16
 ; CHECK-VF4IC4-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK-VF4IC4:       [[VECTOR_PH]]:
@@ -160,7 +162,8 @@ define i64 @select_non_const_iv_start_signed_guard(ptr %a, i64 %rdx_start, i64 %
 ; CHECK-VF1IC4-NEXT:    [[GUARD:%.*]] = icmp slt i64 [[IV_START]], [[N]]
 ; CHECK-VF1IC4-NEXT:    br i1 [[GUARD]], label %[[FOR_BODY_PREHEADER:.*]], label %[[EXIT:.*]]
 ; CHECK-VF1IC4:       [[FOR_BODY_PREHEADER]]:
-; CHECK-VF1IC4-NEXT:    [[TMP5:%.*]] = sub i64 [[N]], [[IV_START]]
+; CHECK-VF1IC4-NEXT:    [[TMP9:%.*]] = sub i64 0, [[IV_START]]
+; CHECK-VF1IC4-NEXT:    [[TMP5:%.*]] = add i64 [[N]], [[TMP9]]
 ; CHECK-VF1IC4-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP5]], 4
 ; CHECK-VF1IC4-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK-VF1IC4:       [[VECTOR_PH]]:
@@ -266,7 +269,8 @@ define i32 @select_trunc_non_const_iv_start_signed_guard(ptr %a, i32 %rdx_start,
 ; CHECK-VF4IC1:       [[FOR_BODY_PREHEADER]]:
 ; CHECK-VF4IC1-NEXT:    [[TMP0:%.*]] = sext i32 [[IV_START]] to i64
 ; CHECK-VF4IC1-NEXT:    [[WIDE_TRIP_COUNT:%.*]] = sext i32 [[N]] to i64
-; CHECK-VF4IC1-NEXT:    [[TMP1:%.*]] = sub i64 [[WIDE_TRIP_COUNT]], [[TMP0]]
+; CHECK-VF4IC1-NEXT:    [[TMP14:%.*]] = sub nsw i64 0, [[TMP0]]
+; CHECK-VF4IC1-NEXT:    [[TMP1:%.*]] = add i64 [[TMP14]], [[WIDE_TRIP_COUNT]]
 ; CHECK-VF4IC1-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP1]], 4
 ; CHECK-VF4IC1-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK-VF4IC1:       [[VECTOR_PH]]:
@@ -331,7 +335,8 @@ define i32 @select_trunc_non_const_iv_start_signed_guard(ptr %a, i32 %rdx_start,
 ; CHECK-VF4IC4:       [[FOR_BODY_PREHEADER]]:
 ; CHECK-VF4IC4-NEXT:    [[TMP0:%.*]] = sext i32 [[IV_START]] to i64
 ; CHECK-VF4IC4-NEXT:    [[WIDE_TRIP_COUNT:%.*]] = sext i32 [[N]] to i64
-; CHECK-VF4IC4-NEXT:    [[TMP1:%.*]] = sub i64 [[WIDE_TRIP_COUNT]], [[TMP0]]
+; CHECK-VF4IC4-NEXT:    [[TMP38:%.*]] = sub nsw i64 0, [[TMP0]]
+; CHECK-VF4IC4-NEXT:    [[TMP1:%.*]] = add i64 [[TMP38]], [[WIDE_TRIP_COUNT]]
 ; CHECK-VF4IC4-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP1]], 16
 ; CHECK-VF4IC4-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK-VF4IC4:       [[VECTOR_PH]]:
@@ -429,7 +434,8 @@ define i32 @select_trunc_non_const_iv_start_signed_guard(ptr %a, i32 %rdx_start,
 ; CHECK-VF1IC4:       [[FOR_BODY_PREHEADER]]:
 ; CHECK-VF1IC4-NEXT:    [[TMP0:%.*]] = sext i32 [[IV_START]] to i64
 ; CHECK-VF1IC4-NEXT:    [[WIDE_TRIP_COUNT:%.*]] = sext i32 [[N]] to i64
-; CHECK-VF1IC4-NEXT:    [[TMP15:%.*]] = sub i64 [[WIDE_TRIP_COUNT]], [[TMP0]]
+; CHECK-VF1IC4-NEXT:    [[TMP19:%.*]] = sub nsw i64 0, [[TMP0]]
+; CHECK-VF1IC4-NEXT:    [[TMP15:%.*]] = add i64 [[TMP19]], [[WIDE_TRIP_COUNT]]
 ; CHECK-VF1IC4-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP15]], 4
 ; CHECK-VF1IC4-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK-VF1IC4:       [[VECTOR_PH]]:

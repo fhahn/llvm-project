@@ -8,7 +8,8 @@ define void @switch4_default_common_dest_with_case(ptr %start, ptr %end) {
 ; IC1-NEXT:  [[ENTRY:.*]]:
 ; IC1-NEXT:    [[START2:%.*]] = ptrtoint ptr [[START]] to i64
 ; IC1-NEXT:    [[END1:%.*]] = ptrtoint ptr [[END]] to i64
-; IC1-NEXT:    [[TMP0:%.*]] = sub i64 [[END1]], [[START2]]
+; IC1-NEXT:    [[TMP1:%.*]] = sub i64 0, [[START2]]
+; IC1-NEXT:    [[TMP0:%.*]] = add i64 [[END1]], [[TMP1]]
 ; IC1-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP0]], 2
 ; IC1-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; IC1:       [[VECTOR_PH]]:
@@ -100,7 +101,8 @@ define void @switch4_default_common_dest_with_case(ptr %start, ptr %end) {
 ; IC2-NEXT:  [[ENTRY:.*]]:
 ; IC2-NEXT:    [[START2:%.*]] = ptrtoint ptr [[START]] to i64
 ; IC2-NEXT:    [[END1:%.*]] = ptrtoint ptr [[END]] to i64
-; IC2-NEXT:    [[TMP0:%.*]] = sub i64 [[END1]], [[START2]]
+; IC2-NEXT:    [[TMP1:%.*]] = sub i64 0, [[START2]]
+; IC2-NEXT:    [[TMP0:%.*]] = add i64 [[END1]], [[TMP1]]
 ; IC2-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP0]], 4
 ; IC2-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; IC2:       [[VECTOR_PH]]:

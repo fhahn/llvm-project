@@ -390,7 +390,8 @@ define float @fmaxnum_induction_starts_at_value(ptr %src, i64 %start, i64 %n) {
 ; CHECK-LABEL: define float @fmaxnum_induction_starts_at_value(
 ; CHECK-SAME: ptr [[SRC:%.*]], i64 [[START:%.*]], i64 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 [[N]], [[START]]
+; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 0, [[START]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[N]], [[TMP1]]
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP0]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:

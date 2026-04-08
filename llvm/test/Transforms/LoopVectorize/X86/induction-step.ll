@@ -75,7 +75,8 @@ define i16 @wide_sub_induction_step_live_in(ptr %dst, i64 %N, i16 %off) {
 ; CHECK-LABEL: @wide_sub_induction_step_live_in(
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[O_1:%.*]] = add i16 [[OFF:%.*]], 2
-; CHECK-NEXT:    [[TMP0:%.*]] = sub i16 -2, [[OFF]]
+; CHECK-NEXT:    [[TMP4:%.*]] = sub i16 0, [[OFF]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i16 [[TMP4]], -2
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N:%.*]], 8
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:

@@ -83,7 +83,11 @@ define void @pr49900(i32 %x, ptr %ptr) {
 ; CHECK-NEXT:    [[TMP1:%.*]] = add i32 [[SMAX2]], -12
 ; CHECK-NEXT:    [[TMP2:%.*]] = sub i32 [[TMP1]], [[IV_1]]
 ; CHECK-NEXT:    [[UMIN3:%.*]] = call i32 @llvm.umin.i32(i32 [[TMP2]], i32 1)
-; CHECK-NEXT:    [[TMP4:%.*]] = sub i32 [[TMP2]], [[UMIN3]]
+; CHECK-NEXT:    [[TMP3:%.*]] = sub i32 0, [[IV_1]]
+; CHECK-NEXT:    [[TMP23:%.*]] = add i32 [[SMAX2]], [[TMP3]]
+; CHECK-NEXT:    [[TMP33:%.*]] = sub nsw i32 0, [[UMIN3]]
+; CHECK-NEXT:    [[TMP34:%.*]] = add i32 [[TMP23]], [[TMP33]]
+; CHECK-NEXT:    [[TMP4:%.*]] = add i32 [[TMP34]], -12
 ; CHECK-NEXT:    [[TMP5:%.*]] = udiv i32 [[TMP4]], 13
 ; CHECK-NEXT:    [[TMP22:%.*]] = add i32 [[UMIN3]], [[TMP5]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = add i32 [[TMP22]], 1
@@ -132,10 +136,21 @@ define void @pr49900(i32 %x, ptr %ptr) {
 ; CHECK-NEXT:    [[TMP20:%.*]] = sub i32 [[TMP19]], [[IV_1]]
 ; CHECK-NEXT:    [[TMP21:%.*]] = sub i32 [[TMP20]], [[TMP17]]
 ; CHECK-NEXT:    [[UMIN1:%.*]] = call i32 @llvm.umin.i32(i32 [[TMP21]], i32 1)
-; CHECK-NEXT:    [[TMP23:%.*]] = sub i32 [[TMP20]], [[UMIN1]]
-; CHECK-NEXT:    [[TMP24:%.*]] = sub i32 [[TMP23]], [[TMP17]]
+; CHECK-NEXT:    [[TMP40:%.*]] = sub i32 0, [[IV_1]]
+; CHECK-NEXT:    [[TMP41:%.*]] = add i32 [[UMAX]], [[TMP40]]
+; CHECK-NEXT:    [[TMP42:%.*]] = sub nsw i32 0, [[UMIN1]]
+; CHECK-NEXT:    [[TMP43:%.*]] = add i32 [[TMP41]], [[TMP42]]
+; CHECK-NEXT:    [[TMP44:%.*]] = add i32 [[SMAX]], [[TMP40]]
+; CHECK-NEXT:    [[TMP31:%.*]] = sub nsw i32 0, [[UMIN]]
+; CHECK-NEXT:    [[TMP32:%.*]] = add i32 [[TMP44]], [[TMP31]]
+; CHECK-NEXT:    [[TMP24:%.*]] = add i32 [[TMP32]], -12
 ; CHECK-NEXT:    [[TMP25:%.*]] = udiv i32 [[TMP24]], 13
-; CHECK-NEXT:    [[TMP30:%.*]] = add i32 [[UMIN1]], [[TMP25]]
+; CHECK-NEXT:    [[TMP35:%.*]] = add i32 [[UMIN]], [[TMP25]]
+; CHECK-NEXT:    [[TMP36:%.*]] = mul i32 [[TMP35]], -13
+; CHECK-NEXT:    [[TMP37:%.*]] = add i32 [[TMP43]], [[TMP36]]
+; CHECK-NEXT:    [[TMP38:%.*]] = add i32 [[TMP37]], -26
+; CHECK-NEXT:    [[TMP39:%.*]] = udiv i32 [[TMP38]], 13
+; CHECK-NEXT:    [[TMP30:%.*]] = add i32 [[UMIN1]], [[TMP39]]
 ; CHECK-NEXT:    [[TMP26:%.*]] = add i32 [[TMP30]], 1
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[TMP26]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]

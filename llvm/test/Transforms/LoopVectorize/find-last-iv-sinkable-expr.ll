@@ -1112,9 +1112,10 @@ define i64 @findlast_expr_flipped_select_anyof(ptr %a, ptr %b, i64 %rdx.start, i
 ; NO-TF-LABEL: define i64 @findlast_expr_flipped_select_anyof(
 ; NO-TF-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[RDX_START:%.*]], i64 [[N:%.*]]) {
 ; NO-TF-NEXT:  [[ENTRY:.*]]:
-; NO-TF-NEXT:    [[TMP0:%.*]] = add i64 [[N]], 1
 ; NO-TF-NEXT:    [[UMIN:%.*]] = call i64 @llvm.umin.i64(i64 [[N]], i64 1)
-; NO-TF-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], [[UMIN]]
+; NO-TF-NEXT:    [[TMP0:%.*]] = sub nsw i64 0, [[UMIN]]
+; NO-TF-NEXT:    [[TMP16:%.*]] = add i64 [[N]], [[TMP0]]
+; NO-TF-NEXT:    [[TMP1:%.*]] = add i64 [[TMP16]], 1
 ; NO-TF-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP1]], 4
 ; NO-TF-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; NO-TF:       [[VECTOR_PH]]:
@@ -1178,9 +1179,10 @@ define i64 @findlast_expr_flipped_select_anyof(ptr %a, ptr %b, i64 %rdx.start, i
 ; TF-LABEL: define i64 @findlast_expr_flipped_select_anyof(
 ; TF-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[RDX_START:%.*]], i64 [[N:%.*]]) {
 ; TF-NEXT:  [[ENTRY:.*:]]
-; TF-NEXT:    [[TMP0:%.*]] = add i64 [[N]], 1
 ; TF-NEXT:    [[UMIN:%.*]] = call i64 @llvm.umin.i64(i64 [[N]], i64 1)
-; TF-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], [[UMIN]]
+; TF-NEXT:    [[TMP0:%.*]] = sub nsw i64 0, [[UMIN]]
+; TF-NEXT:    [[TMP16:%.*]] = add i64 [[N]], [[TMP0]]
+; TF-NEXT:    [[TMP1:%.*]] = add i64 [[TMP16]], 1
 ; TF-NEXT:    br label %[[VECTOR_PH:.*]]
 ; TF:       [[VECTOR_PH]]:
 ; TF-NEXT:    [[N_RND_UP:%.*]] = add i64 [[TMP1]], 3

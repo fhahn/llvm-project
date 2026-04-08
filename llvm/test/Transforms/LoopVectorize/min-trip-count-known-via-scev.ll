@@ -143,7 +143,8 @@ define void @loop_never_executes_precondition_order_1(i64 %start, ptr %dst) {
 ; CHECK-NEXT:    [[PRE_1:%.*]] = icmp slt i64 [[MUL]], [[START]]
 ; CHECK-NEXT:    br i1 [[PRE_1]], label %[[LOOP_PREHEADER:.*]], label %[[EXIT]]
 ; CHECK:       [[LOOP_PREHEADER]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 1, [[START]]
+; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 0, [[START]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[TMP3]], 1
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP0]], 2
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
@@ -216,7 +217,8 @@ define void @loop_never_executes_precondition_order_1_predicates_flipped(i64 %st
 ; CHECK-NEXT:    [[PRE_1:%.*]] = icmp slt i64 [[MUL]], [[START]]
 ; CHECK-NEXT:    br i1 [[PRE_1]], label %[[LOOP_PREHEADER:.*]], label %[[EXIT]]
 ; CHECK:       [[LOOP_PREHEADER]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 1, [[START]]
+; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 0, [[START]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[TMP3]], 1
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP0]], 2
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:

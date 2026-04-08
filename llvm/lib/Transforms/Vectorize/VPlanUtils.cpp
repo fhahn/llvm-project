@@ -709,7 +709,7 @@ static bool canExpandNAry(const SCEVNAryExpr *NAry) {
   if (!isa<SCEVAddExpr, SCEVMulExpr>(NAry))
     return false;
   return llvm::none_of(NAry->operands(), [](const SCEVUse &Op) {
-    return Op->getType()->isPointerTy() || Op->isNonConstantNegative();
+    return Op->getType()->isPointerTy();
   });
 }
 

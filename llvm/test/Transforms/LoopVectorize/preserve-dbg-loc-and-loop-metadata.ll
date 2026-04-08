@@ -73,8 +73,9 @@ define void @widen_ptr_induction_dbg(ptr %start, ptr %end) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[START2:%.*]] = ptrtoint ptr [[START]] to i64
 ; CHECK-NEXT:    [[END1:%.*]] = ptrtoint ptr [[END]] to i64
-; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[END1]], -8
-; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], [[START2]]
+; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 0, [[START2]]
+; CHECK-NEXT:    [[TMP8:%.*]] = add i64 [[END1]], [[TMP0]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[TMP8]], -8
 ; CHECK-NEXT:    [[TMP2:%.*]] = lshr i64 [[TMP1]], 3
 ; CHECK-NEXT:    [[TMP3:%.*]] = add nuw nsw i64 [[TMP2]], 1
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP3]], 4
@@ -115,8 +116,9 @@ define void @widen_ptr_induction_dbg(ptr %start, ptr %end) {
 ; DEBUGLOC-NEXT:  [[ENTRY:.*]]:
 ; DEBUGLOC-NEXT:    [[START2:%.*]] = ptrtoint ptr [[START]] to i64, !dbg [[DBG34:![0-9]+]]
 ; DEBUGLOC-NEXT:    [[END1:%.*]] = ptrtoint ptr [[END]] to i64, !dbg [[DBG34]]
-; DEBUGLOC-NEXT:    [[TMP0:%.*]] = add i64 [[END1]], -8, !dbg [[DBG34]]
-; DEBUGLOC-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], [[START2]], !dbg [[DBG34]]
+; DEBUGLOC-NEXT:    [[TMP0:%.*]] = sub i64 0, [[START2]]
+; DEBUGLOC-NEXT:    [[TMP7:%.*]] = add i64 [[END1]], [[TMP0]]
+; DEBUGLOC-NEXT:    [[TMP1:%.*]] = add i64 [[TMP7]], -8
 ; DEBUGLOC-NEXT:    [[TMP2:%.*]] = lshr i64 [[TMP1]], 3
 ; DEBUGLOC-NEXT:    [[TMP3:%.*]] = add nuw nsw i64 [[TMP2]], 1
 ; DEBUGLOC-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP3]], 4, !dbg [[DBG34]]
@@ -135,8 +137,8 @@ define void @widen_ptr_induction_dbg(ptr %start, ptr %end) {
 ; DEBUGLOC-NEXT:    store <4 x ptr> [[VECTOR_GEP]], ptr [[TMP6]], align 1, !dbg [[DBG36:![0-9]+]]
 ; DEBUGLOC-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; DEBUGLOC-NEXT:    [[PTR_IND]] = getelementptr i8, ptr [[POINTER_PHI]], i64 32, !dbg [[DBG35]]
-; DEBUGLOC-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]], !dbg [[DBG37:![0-9]+]]
-; DEBUGLOC-NEXT:    br i1 [[TMP7]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !dbg [[DBG37]], !llvm.loop [[LOOP38:![0-9]+]]
+; DEBUGLOC-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]], !dbg [[DBG37:![0-9]+]]
+; DEBUGLOC-NEXT:    br i1 [[TMP8]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !dbg [[DBG37]], !llvm.loop [[LOOP38:![0-9]+]]
 ; DEBUGLOC:       [[MIDDLE_BLOCK]]:
 ; DEBUGLOC-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP3]], [[N_VEC]], !dbg [[DBG37]]
 ; DEBUGLOC-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !dbg [[DBG37]]

@@ -321,7 +321,6 @@ define void @test_start_zext(i32 %start, ptr %dst) {
 ; VF4-SAME: i32 [[START:%.*]], ptr [[DST:%.*]]) {
 ; VF4-NEXT:  [[ENTRY:.*:]]
 ; VF4-NEXT:    [[START_EXT:%.*]] = zext i32 [[START]] to i64
-; VF4-NEXT:    [[TMP0:%.*]] = sub i64 100, [[START_EXT]]
 ; VF4-NEXT:    br label %[[VECTOR_SCEVCHECK:.*]]
 ; VF4:       [[VECTOR_SCEVCHECK]]:
 ; VF4-NEXT:    [[IDENT_CHECK:%.*]] = icmp ne i32 [[START]], 1
@@ -357,7 +356,8 @@ define void @test_start_zext(i32 %start, ptr %dst) {
 ; IC2-SAME: i32 [[START:%.*]], ptr [[DST:%.*]]) {
 ; IC2-NEXT:  [[ENTRY:.*]]:
 ; IC2-NEXT:    [[START_EXT:%.*]] = zext i32 [[START]] to i64
-; IC2-NEXT:    [[TMP0:%.*]] = sub i64 100, [[START_EXT]]
+; IC2-NEXT:    [[TMP8:%.*]] = sub nsw i64 0, [[START_EXT]]
+; IC2-NEXT:    [[TMP0:%.*]] = add nsw i64 [[TMP8]], 100
 ; IC2-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP0]], 2
 ; IC2-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; IC2:       [[VECTOR_PH]]:

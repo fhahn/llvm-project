@@ -577,7 +577,8 @@ define void @phi_of_ptrtoint_diff_check(ptr %base, ptr %end, i64 %n, i1 %cond) {
 ; CHECK-NEXT:    br i1 [[CMP]], label %[[LOOP_PREHEADER:.*]], [[EXIT:label %.*]]
 ; CHECK:       [[LOOP_PREHEADER]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[N]], [[END_INT]]
-; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], [[DST_INT]]
+; CHECK-NEXT:    [[TMP4:%.*]] = sub i64 0, [[DST_INT]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], [[TMP4]]
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP1]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:

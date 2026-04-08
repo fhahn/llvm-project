@@ -186,7 +186,8 @@ define void @safe_load_store_distance_not_pow_of_2(i64 %N) {
 ; CHECK-LABEL: @safe_load_store_distance_not_pow_of_2(
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[UMIN:%.*]] = call i64 @llvm.umin.i64(i64 [[N:%.*]], i64 1)
-; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 [[N]], [[UMIN]]
+; CHECK-NEXT:    [[TMP10:%.*]] = sub nsw i64 0, [[UMIN]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[N]], [[TMP10]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = udiv i64 [[TMP0]], 3
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[UMIN]], [[TMP1]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = add i64 [[TMP2]], 1

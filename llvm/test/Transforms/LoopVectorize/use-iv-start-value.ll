@@ -9,7 +9,8 @@ define i64 @foo(ptr %p1, ptr %p2, i64 %start, i64 %end) {
 ; CHECK-SAME: ptr [[P1:%.*]], ptr [[P2:%.*]], i64 [[START:%.*]], i64 [[END:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[START2:%.*]] = and i64 [[START]], 12345
-; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 [[END]], [[START2]]
+; CHECK-NEXT:    [[TMP1:%.*]] = sub nsw i64 0, [[START2]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[END]], [[TMP1]]
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP0]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:

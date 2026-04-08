@@ -505,7 +505,8 @@ define void @noalias_metadata(ptr align 8 %dst, ptr align 8 %src) {
 ; CHECK-NEXT:    [[DST3:%.*]] = ptrtoint ptr [[DST]] to i64
 ; CHECK-NEXT:    [[SRC2:%.*]] = ptrtoint ptr [[SRC]] to i64
 ; CHECK-NEXT:    [[DST1:%.*]] = ptrtoint ptr [[DST]] to i64
-; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[DST3]], [[SRC4]]
+; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 0, [[SRC4]]
+; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[DST3]], [[TMP0]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = lshr i64 [[TMP2]], 3
 ; CHECK-NEXT:    [[TMP4:%.*]] = add nuw nsw i64 [[TMP3]], 1
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP4]], 2
@@ -558,7 +559,8 @@ define void @noalias_metadata(ptr align 8 %dst, ptr align 8 %src) {
 ; INTERLEAVE-NEXT:    [[DST3:%.*]] = ptrtoint ptr [[DST]] to i64
 ; INTERLEAVE-NEXT:    [[SRC2:%.*]] = ptrtoint ptr [[SRC]] to i64
 ; INTERLEAVE-NEXT:    [[DST1:%.*]] = ptrtoint ptr [[DST]] to i64
-; INTERLEAVE-NEXT:    [[TMP2:%.*]] = sub i64 [[DST3]], [[SRC4]]
+; INTERLEAVE-NEXT:    [[TMP0:%.*]] = sub i64 0, [[SRC4]]
+; INTERLEAVE-NEXT:    [[TMP2:%.*]] = add i64 [[DST3]], [[TMP0]]
 ; INTERLEAVE-NEXT:    [[TMP3:%.*]] = lshr i64 [[TMP2]], 3
 ; INTERLEAVE-NEXT:    [[TMP4:%.*]] = add nuw nsw i64 [[TMP3]], 1
 ; INTERLEAVE-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP4]], 4

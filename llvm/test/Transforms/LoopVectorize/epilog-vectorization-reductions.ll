@@ -676,8 +676,9 @@ define i64 @reduction_with_ptr_iv_inttoptr_exit_cond(ptr %base, ptr %src) {
 ; CHECK-NEXT:    [[ADD:%.*]] = add i64 [[PTRTOINT]], 120
 ; CHECK-NEXT:    [[END:%.*]] = inttoptr i64 [[ADD]] to ptr
 ; CHECK-NEXT:    [[START:%.*]] = getelementptr i8, ptr [[BASE]], i64 24
-; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[ADD]], -48
-; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], [[PTRTOINT]]
+; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 0, [[PTRTOINT]]
+; CHECK-NEXT:    [[TMP14:%.*]] = add i64 [[ADD]], [[TMP0]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[TMP14]], -48
 ; CHECK-NEXT:    [[TMP2:%.*]] = mul i64 [[TMP1]], 768614336404564651
 ; CHECK-NEXT:    [[TMP3:%.*]] = lshr i64 [[TMP2]], 3
 ; CHECK-NEXT:    [[TMP4:%.*]] = add nuw nsw i64 [[TMP3]], 1

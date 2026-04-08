@@ -21,7 +21,8 @@ define i32 @test1()  {
 ; CHECK-NEXT:    [[B_PROMOTED:%.*]] = load i32, ptr @b, align 4
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[B_PROMOTED]], 1
 ; CHECK-NEXT:    [[SMAX:%.*]] = call i32 @llvm.smax.i32(i32 [[TMP0]], i32 4)
-; CHECK-NEXT:    [[TMP1:%.*]] = sub i32 [[SMAX]], [[B_PROMOTED]]
+; CHECK-NEXT:    [[TMP3:%.*]] = sub i32 0, [[B_PROMOTED]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i32 [[SMAX]], [[TMP3]]
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[TMP1]], 2
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[_LR_PH_I:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
@@ -94,7 +95,8 @@ define i32 @test2()  {
 ; CHECK-NEXT:    [[B_PROMOTED:%.*]] = load i32, ptr @b, align 4
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[B_PROMOTED]], 1
 ; CHECK-NEXT:    [[SMAX:%.*]] = call i32 @llvm.smax.i32(i32 [[TMP0]], i32 4)
-; CHECK-NEXT:    [[TMP1:%.*]] = sub i32 [[SMAX]], [[B_PROMOTED]]
+; CHECK-NEXT:    [[TMP3:%.*]] = sub i32 0, [[B_PROMOTED]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i32 [[SMAX]], [[TMP3]]
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[TMP1]], 2
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[_LR_PH_I:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
@@ -167,7 +169,8 @@ define i32 @test3(i32 %N)  {
 ; CHECK-NEXT:    [[B_PROMOTED:%.*]] = load i32, ptr @b, align 4
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[B_PROMOTED]], 1
 ; CHECK-NEXT:    [[SMAX:%.*]] = call i32 @llvm.smax.i32(i32 [[TMP0]], i32 4)
-; CHECK-NEXT:    [[TMP1:%.*]] = sub i32 [[SMAX]], [[B_PROMOTED]]
+; CHECK-NEXT:    [[TMP7:%.*]] = sub i32 0, [[B_PROMOTED]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i32 [[SMAX]], [[TMP7]]
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[TMP1]], 2
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[_LR_PH_I1:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
@@ -255,7 +258,8 @@ define i32 @test4(i32 %N)  {
 ; CHECK:       [[_LR_PH_I_PREHEADER:.*:]]
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[B_PROMOTED]], 1
 ; CHECK-NEXT:    [[SMAX:%.*]] = call i32 @llvm.smax.i32(i32 [[TMP0]], i32 4)
-; CHECK-NEXT:    [[TMP1:%.*]] = sub i32 [[SMAX]], [[B_PROMOTED]]
+; CHECK-NEXT:    [[TMP3:%.*]] = sub i32 0, [[B_PROMOTED]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i32 [[SMAX]], [[TMP3]]
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[TMP1]], 2
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[_LR_PH_I:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
@@ -517,7 +521,8 @@ define i8 @outside_user_non_phi()  {
 ; CHECK-NEXT:    [[B_PROMOTED:%.*]] = load i32, ptr @b, align 4
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[B_PROMOTED]], 1
 ; CHECK-NEXT:    [[SMAX:%.*]] = call i32 @llvm.smax.i32(i32 [[TMP0]], i32 4)
-; CHECK-NEXT:    [[TMP1:%.*]] = sub i32 [[SMAX]], [[B_PROMOTED]]
+; CHECK-NEXT:    [[TMP3:%.*]] = sub i32 0, [[B_PROMOTED]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i32 [[SMAX]], [[TMP3]]
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[TMP1]], 2
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[_LR_PH_I:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
@@ -648,7 +653,8 @@ define i32 @sum_arrays_outside_use(ptr %B, ptr %A, ptr %C, i32 %N)  {
 ; CHECK-NEXT:    [[B_PROMOTED:%.*]] = load i32, ptr @b, align 4
 ; CHECK-NEXT:    [[TMP0:%.*]] = add nsw i32 [[B_PROMOTED]], 1
 ; CHECK-NEXT:    [[SMAX:%.*]] = call i32 @llvm.smax.i32(i32 [[N]], i32 [[TMP0]])
-; CHECK-NEXT:    [[TMP1:%.*]] = sub i32 [[SMAX]], [[B_PROMOTED]]
+; CHECK-NEXT:    [[TMP5:%.*]] = sub i32 0, [[B_PROMOTED]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i32 [[SMAX]], [[TMP5]]
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[TMP1]], 2
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[_LR_PH_I:.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:

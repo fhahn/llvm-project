@@ -82,7 +82,8 @@ define void @diff_memcheck_known_false_for_vf_4(ptr %B, ptr %A, ptr %end) {
 ; CHECK-NEXT:    [[B_CAST:%.*]] = ptrtoint ptr [[B]] to i64
 ; CHECK-NEXT:    [[PTR_SUB:%.*]] = sub i64 [[A_INT]], [[B_CAST]]
 ; CHECK-NEXT:    [[ADD_PTR11:%.*]] = getelementptr i8, ptr [[B]], i64 [[PTR_SUB]]
-; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 [[A_INT]], [[END1]]
+; CHECK-NEXT:    [[TMP7:%.*]] = sub i64 0, [[END1]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[A_INT]], [[TMP7]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = lshr i64 [[TMP0]], 3
 ; CHECK-NEXT:    [[TMP2:%.*]] = add nuw nsw i64 [[TMP1]], 1
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP2]], 4

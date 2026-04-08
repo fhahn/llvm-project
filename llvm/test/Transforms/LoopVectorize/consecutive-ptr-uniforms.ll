@@ -117,7 +117,8 @@ define i32 @consecutive_ptr_reverse(ptr %a, i64 %n) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = add nsw i64 [[N]], -1
 ; CHECK-NEXT:    [[SMIN:%.*]] = call i64 @llvm.smin.i64(i64 [[TMP0]], i64 0)
-; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[N]], [[SMIN]]
+; CHECK-NEXT:    [[TMP8:%.*]] = sub i64 0, [[SMIN]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[N]], [[TMP8]]
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP1]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
@@ -163,7 +164,8 @@ define i32 @consecutive_ptr_reverse(ptr %a, i64 %n) {
 ; INTER-NEXT:  [[ENTRY:.*]]:
 ; INTER-NEXT:    [[TMP0:%.*]] = add nsw i64 [[N]], -1
 ; INTER-NEXT:    [[SMIN:%.*]] = call i64 @llvm.smin.i64(i64 [[TMP0]], i64 0)
-; INTER-NEXT:    [[TMP1:%.*]] = sub i64 [[N]], [[SMIN]]
+; INTER-NEXT:    [[TMP8:%.*]] = sub i64 0, [[SMIN]]
+; INTER-NEXT:    [[TMP1:%.*]] = add i64 [[N]], [[TMP8]]
 ; INTER-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP1]], 4
 ; INTER-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; INTER:       [[VECTOR_PH]]:
@@ -375,7 +377,8 @@ define i32 @interleaved_access_reverse(ptr %p, i64 %n) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = add nsw i64 [[N]], -1
 ; CHECK-NEXT:    [[SMIN:%.*]] = call i64 @llvm.smin.i64(i64 [[TMP0]], i64 0)
-; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[N]], [[SMIN]]
+; CHECK-NEXT:    [[TMP18:%.*]] = sub i64 0, [[SMIN]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[N]], [[TMP18]]
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP1]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
@@ -448,7 +451,8 @@ define i32 @interleaved_access_reverse(ptr %p, i64 %n) {
 ; INTER-NEXT:  [[ENTRY:.*]]:
 ; INTER-NEXT:    [[TMP0:%.*]] = add nsw i64 [[N]], -1
 ; INTER-NEXT:    [[SMIN:%.*]] = call i64 @llvm.smin.i64(i64 [[TMP0]], i64 0)
-; INTER-NEXT:    [[TMP1:%.*]] = sub i64 [[N]], [[SMIN]]
+; INTER-NEXT:    [[TMP5:%.*]] = sub i64 0, [[SMIN]]
+; INTER-NEXT:    [[TMP1:%.*]] = add i64 [[N]], [[TMP5]]
 ; INTER-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP1]], 4
 ; INTER-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; INTER:       [[VECTOR_PH]]:
