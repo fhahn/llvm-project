@@ -713,6 +713,7 @@ static bool canExpandNAry(const SCEVNAryExpr *NAry) {
   });
 }
 
+
 VPValue *vputils::expandSCEVExpr(const SCEV *S, VPBuilder &Builder,
                                  VPlan &Plan, DebugLoc DL,
                                  ScalarEvolution *SE, Loop *OrigLoop,
@@ -785,6 +786,15 @@ VPValue *vputils::expandSCEVExpr(const SCEV *S, VPBuilder &Builder,
            expandSCEVExpr(Op, Builder, Plan, DL, SE, OrigLoop, DT)},
           WrapFlags, DL);
     return Result;
+  }
+  if (auto *UDiv = dyn_cast<SCEVUDivExpr>(S)) {
+    VPValue *LHS = expandSCEVExpr(UDiv->getLHS(), Builder, Plan, DL,
+                                  SE, OrigLoop);
+    VPValue *RHS = expandSCEVExpr(UDiv->getRHS(), Builder, Plan, DL,
+                                  SE, OrigLoop);
+    return Builder.createNaryOp(
+        Instruction::UDiv, {LHS, RHS},
+        VPIRFlags::getDefaultFlags(Instruction::UDiv), DL);
   }
   // Unsupported SCEV kind; fall back to VPExpandSCEVRecipe.
   return Builder.createExpandSCEV(S);
