@@ -14,6 +14,7 @@
 #include "llvm/Support/Compiler.h"
 
 namespace llvm {
+class DominatorTree;
 class MemoryLocation;
 class ScalarEvolution;
 class SCEV;
@@ -151,10 +152,15 @@ VPInstruction *findComputeReductionResult(VPReductionPHIRecipe *PhiR);
 /// the header-mask pattern manually.
 VPSingleDefRecipe *findHeaderMask(VPlan &Plan);
 
-/// Expand \p S directly into VPInstructions using \p Builder. Falls back to
-/// VPExpandSCEVRecipe for SCEVExpressions not supported yet.
+/// Expand \p S directly into VPlan recipes using \p Builder. Falls back to
+/// VPExpandSCEVRecipe for casts, min/max and other unsupported expressions. If
+/// \p SE and \p OrigLoop are provided, existing loop-invariant IR values
+/// computing the same SCEV are reused as live-ins instead of creating new
+/// recipes.
 VPValue *expandSCEVExpr(const SCEV *S, VPBuilder &Builder, VPlan &Plan,
-                        DebugLoc DL);
+                        DebugLoc DL, ScalarEvolution *SE = nullptr,
+                        Loop *OrigLoop = nullptr,
+                        DominatorTree *DT = nullptr);
 
 } // namespace vputils
 

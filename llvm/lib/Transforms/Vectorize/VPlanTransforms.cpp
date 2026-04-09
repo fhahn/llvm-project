@@ -734,11 +734,23 @@ static bool isDeadRecipe(VPRecipeBase &R) {
 }
 
 void VPlanTransforms::removeDeadRecipes(VPlan &Plan) {
+  // Collect VPValues used as trip count or vector trip count — these must not
+  // be removed even if they appear to have no recipe users.
+  SmallPtrSet<VPValue *, 4> PlanLiveValues;
+  PlanLiveValues.insert(Plan.getTripCount());
+  if (Plan.getVectorTripCount().getUnderlyingValue() ||
+      Plan.getVectorTripCount().getNumUsers() > 0)
+    PlanLiveValues.insert(&Plan.getVectorTripCount());
+
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
            vp_post_order_deep(Plan.getEntry()))) {
     // The recipes in the block are processed in reverse order, to catch chains
     // of dead recipes.
     for (VPRecipeBase &R : make_early_inc_range(reverse(*VPBB))) {
+      // Don't remove recipes that define plan-level values like the trip count.
+      if (auto *Def = dyn_cast<VPSingleDefRecipe>(&R))
+        if (PlanLiveValues.contains(Def))
+          continue;
       if (isDeadRecipe(R)) {
         R.eraseFromParent();
         continue;
@@ -5208,32 +5220,60 @@ void VPlanTransforms::materializeFactors(VPlan &Plan, VPBasicBlock *VectorPH,
   VFxUF.replaceAllUsesWith(MulByUF);
 }
 
+/// Replace \p ExpSCEV with \p Replacement, updating the plan's trip count if
+/// needed, and erase \p ExpSCEV.
+static void replaceExpandSCEVRecipe(VPlan &Plan, VPExpandSCEVRecipe *ExpSCEV,
+                                    VPValue *Replacement) {
+  ExpSCEV->replaceAllUsesWith(Replacement);
+  if (Plan.getTripCount() == ExpSCEV)
+    Plan.resetTripCount(Replacement);
+  ExpSCEV->eraseFromParent();
+}
+
+void VPlanTransforms::expandSCEVExpressions(VPlan &Plan, ScalarEvolution *SE,
+                                            Loop *OrigLoop,
+                                            DominatorTree *DT) {
+  auto *Entry = cast<VPIRBasicBlock>(Plan.getEntry());
+
+  // Expand VPExpandSCEVRecipes to VPInstructions where possible. Remaining
+  // recipes (casts, min/max fallbacks) are kept for later IR-level expansion.
+  for (VPRecipeBase &R : make_early_inc_range(*Entry)) {
+    auto *ExpSCEV = dyn_cast<VPExpandSCEVRecipe>(&R);
+    if (!ExpSCEV)
+      continue;
+    const SCEV *S = ExpSCEV->getSCEV();
+    VPBuilder Builder(Entry, ExpSCEV->getIterator());
+    VPValue *Expanded =
+        vputils::expandSCEVExpr(S, Builder, Plan, DebugLoc(), SE, OrigLoop, DT);
+    if (Expanded == ExpSCEV)
+      continue;
+    replaceExpandSCEVRecipe(Plan, ExpSCEV, Expanded);
+  }
+}
+
 DenseMap<const SCEV *, Value *>
 VPlanTransforms::expandSCEVs(VPlan &Plan, ScalarEvolution &SE) {
   SCEVExpander Expander(SE, "induction", /*PreserveLCSSA=*/false);
 
   auto *Entry = cast<VPIRBasicBlock>(Plan.getEntry());
   BasicBlock *EntryBB = Entry->getIRBasicBlock();
+
   DenseMap<const SCEV *, Value *> ExpandedSCEVs;
+
+  // Expand remaining VPExpandSCEVRecipes (fallbacks for casts, min/max, etc.)
+  // using SCEVExpander.
   for (VPRecipeBase &R : make_early_inc_range(*Entry)) {
-    if (isa<VPIRInstruction, VPIRPhi>(&R))
-      continue;
     auto *ExpSCEV = dyn_cast<VPExpandSCEVRecipe>(&R);
     if (!ExpSCEV)
-      break;
+      continue;
     const SCEV *Expr = ExpSCEV->getSCEV();
     Value *Res =
         Expander.expandCodeFor(Expr, Expr->getType(), EntryBB->getTerminator());
     ExpandedSCEVs[ExpSCEV->getSCEV()] = Res;
-    VPValue *Exp = Plan.getOrAddLiveIn(Res);
-    ExpSCEV->replaceAllUsesWith(Exp);
-    if (Plan.getTripCount() == ExpSCEV)
-      Plan.resetTripCount(Exp);
-    ExpSCEV->eraseFromParent();
+    replaceExpandSCEVRecipe(Plan, ExpSCEV, Plan.getOrAddLiveIn(Res));
   }
   assert(none_of(*Entry, IsaPred<VPExpandSCEVRecipe>) &&
-         "VPExpandSCEVRecipes must be at the beginning of the entry block, "
-         "before any VPIRInstructions");
+         "all VPExpandSCEVRecipes must have been expanded");
   // Add IR instructions in the entry basic block but not in the VPIRBasicBlock
   // to the VPIRBasicBlock.
   auto EI = Entry->begin();

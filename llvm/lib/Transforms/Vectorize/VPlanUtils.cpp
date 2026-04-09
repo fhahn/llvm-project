@@ -13,6 +13,8 @@
 #include "VPlanDominatorTree.h"
 #include "VPlanPatternMatch.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/IR/Dominators.h"
+#include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/MemoryLocation.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/Analysis/ScalarEvolutionPatternMatch.h"
@@ -701,22 +703,80 @@ VPInstruction *vputils::findComputeReductionResult(VPReductionPHIRecipe *PhiR) {
       cast<VPSingleDefRecipe>(SelR));
 }
 
+/// Return true if \p NAry (an Add or Mul) can be expanded to VPInstructions
+/// without falling back to VPExpandSCEVRecipe.
+static bool canExpandNAry(const SCEVNAryExpr *NAry) {
+  if (!isa<SCEVAddExpr, SCEVMulExpr>(NAry))
+    return false;
+  return llvm::none_of(NAry->operands(), [](const SCEVUse &Op) {
+    return Op->getType()->isPointerTy() || Op->isNonConstantNegative();
+  });
+}
+
 VPValue *vputils::expandSCEVExpr(const SCEV *S, VPBuilder &Builder,
-                                 VPlan &Plan, DebugLoc DL) {
+                                 VPlan &Plan, DebugLoc DL,
+                                 ScalarEvolution *SE, Loop *OrigLoop,
+                                 DominatorTree *DT) {
+  // Check if there's an existing loop-invariant IR value for this SCEV
+  // that we can reuse as a live-in, avoiding redundant expansion.
+  // Skip SCEVConstant/SCEVUnknown — they're already handled as direct
+  // live-ins below. Non-instructions (Arguments, Constants) are always
+  // safe to reuse. For instructions, verify they dominate the loop
+  // preheader by checking they are in the VPlan's entry block (which
+  // corresponds to the loop preheader) or a block that dominates it.
+  BasicBlock *PH = OrigLoop ? OrigLoop->getLoopPreheader() : nullptr;
+  if (SE && !isa<SCEVConstant, SCEVUnknown>(S)) {
+    for (Value *V : SE->getSCEVValues(S)) {
+      if (V->getType() != S->getType())
+        continue;
+      auto *I = dyn_cast<Instruction>(V);
+      if (I && OrigLoop->contains(I->getParent()))
+        continue;
+      // Only reuse instructions that dominate the loop preheader.
+      // Instructions in sibling branches (e.g., another loop's preheader)
+      // are outside the loop but may not dominate this loop's preheader.
+      if (I && PH) {
+        if (DT) {
+          if (!DT->dominates(I->getParent(), PH))
+            continue;
+        } else if (I->getParent() != PH) {
+          continue;
+        }
+      }
+      // Match SCEVExpander's FindValueInExprValueMap: reuse existing
+      // instructions but drop poison-generating flags that the SCEV doesn't
+      // guarantee, to avoid introducing NUW/NSW that SCEVExpander wouldn't.
+      if (auto *OBO = dyn_cast_or_null<OverflowingBinaryOperator>(I)) {
+        auto *NAry = dyn_cast<SCEVNAryExpr>(S);
+        if (NAry) {
+          auto *BO = cast<BinaryOperator>(I);
+          if (OBO->hasNoUnsignedWrap() && !NAry->hasNoUnsignedWrap())
+            BO->setHasNoUnsignedWrap(false);
+          if (OBO->hasNoSignedWrap() && !NAry->hasNoSignedWrap())
+            BO->setHasNoSignedWrap(false);
+        }
+      }
+      return Plan.getOrAddLiveIn(V);
+    }
+  }
+
   if (auto *C = dyn_cast<SCEVConstant>(S))
     return Plan.getOrAddLiveIn(C->getValue());
   if (auto *U = dyn_cast<SCEVUnknown>(S))
     return Plan.getOrAddLiveIn(U->getValue());
   if (isa<SCEVVScale>(S))
     return Builder.createNaryOp(VPInstruction::VScale, {}, S->getType());
-  if (auto *Mul = dyn_cast<SCEVMulExpr>(S)) {
+  if (auto *Mul= dyn_cast<SCEVMulExpr>(S); Mul&& canExpandNAry(Mul)) {
     VPIRFlags::WrapFlagsTy WrapFlags(Mul->hasNoUnsignedWrap(),
                                      Mul->hasNoSignedWrap());
     // Chain the operands with Mul.
-    VPValue *Result = expandSCEVExpr(Mul->getOperand(0), Builder, Plan, DL);
+    VPValue *Result = expandSCEVExpr(Mul->getOperand(0), Builder, Plan, DL,
+                                     SE, OrigLoop);
     for (const SCEVUse &Op : drop_begin(Mul->operands()))
       Result = Builder.createOverflowingOp(
-          Instruction::Mul, {Result, expandSCEVExpr(Op, Builder, Plan, DL)},
+          Instruction::Mul,
+          {Result,
+           expandSCEVExpr(Op, Builder, Plan, DL, SE, OrigLoop, DT)},
           WrapFlags, DL);
     return Result;
   }

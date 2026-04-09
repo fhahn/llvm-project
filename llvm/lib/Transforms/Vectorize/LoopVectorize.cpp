@@ -7404,6 +7404,13 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
       BestVPlan, VectorPH, CM.foldTailByMasking(),
       CM.requiresScalarEpilogue(BestVF.isVector()), &BestVPlan.getVFxUF());
   VPlanTransforms::materializeFactors(BestVPlan, VectorPH, BestVF);
+  // Expand VPExpandSCEVRecipes to VPInstructions before CSE, so duplicates
+  // with other SCEV expansions (e.g., from addMinimumIterationCheck) are
+  // eliminated. Skip for epilogue vectorization which needs the
+  // VPExpandSCEVRecipes to be expanded via SCEVExpander for IR value reuse.
+  if (EpilogueVecKind == EpilogueVectorizationKind::None)
+    VPlanTransforms::expandSCEVExpressions(BestVPlan, PSE.getSE(), OrigLoop,
+                                            DT);
   VPlanTransforms::cse(BestVPlan);
   VPlanTransforms::simplifyRecipes(BestVPlan);
   VPlanTransforms::simplifyKnownEVL(BestVPlan, BestVF, PSE);

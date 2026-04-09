@@ -1618,6 +1618,9 @@ public:
     }
   };
 
+  /// Return the Value set from which the SCEV expr is generated.
+  LLVM_ABI ArrayRef<Value *> getSCEVValues(const SCEV *S);
+
 private:
   /// A CallbackVH to arrange for ScalarEvolution to be notified whenever a
   /// Value is deleted.
@@ -1703,9 +1706,6 @@ private:
 
   /// Memoized values for the getConstantMultiple
   DenseMap<const SCEV *, APInt> ConstantMultipleCache;
-
-  /// Return the Value set from which the SCEV expr is generated.
-  ArrayRef<Value *> getSCEVValues(const SCEV *S);
 
   /// Private helper method for the getConstantMultiple method. If \p CtxI is
   /// not nullptr, return a constant multiple valid at \p CtxI.

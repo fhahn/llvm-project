@@ -49,8 +49,8 @@ define void @reduced(ptr %0, ptr %1, i64 %iv, ptr %2, i64 %iv76, i64 %iv93) {
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], label [[SCALAR_PH5]], label [[VECTOR_PH6:%.*]]
 ; CHECK:       vector.ph5:
-; CHECK-NEXT:    [[N_MOD_VF8:%.*]] = urem i64 [[TMP3]], 4
-; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP3]], [[N_MOD_VF8]]
+; CHECK-NEXT:    [[N_MOD_VF6:%.*]] = urem i64 [[TMP3]], 4
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP3]], [[N_MOD_VF6]]
 ; CHECK-NEXT:    br label [[VECTOR_BODY10:%.*]]
 ; CHECK:       vector.body8:
 ; CHECK-NEXT:    [[INDEX12:%.*]] = phi i64 [ 0, [[VECTOR_PH6]] ], [ [[INDEX_NEXT13:%.*]], [[VECTOR_BODY10]] ]
@@ -79,8 +79,8 @@ define void @reduced(ptr %0, ptr %1, i64 %iv, ptr %2, i64 %iv76, i64 %iv93) {
 ; CHECK-NEXT:    [[FOUND_CONFLICT19:%.*]] = and i1 [[BOUND017]], [[BOUND118]]
 ; CHECK-NEXT:    br i1 [[FOUND_CONFLICT19]], label [[SCALAR_PH21]], label [[VECTOR_PH24:%.*]]
 ; CHECK:       vector.ph22:
-; CHECK-NEXT:    [[N_MOD_VF24:%.*]] = urem i64 [[TMP3]], 4
-; CHECK-NEXT:    [[N_VEC25:%.*]] = sub i64 [[TMP3]], [[N_MOD_VF24]]
+; CHECK-NEXT:    [[N_MOD_VF23:%.*]] = urem i64 [[TMP3]], 4
+; CHECK-NEXT:    [[N_VEC25:%.*]] = sub i64 [[TMP3]], [[N_MOD_VF23]]
 ; CHECK-NEXT:    br label [[VECTOR_BODY27:%.*]]
 ; CHECK:       vector.body25:
 ; CHECK-NEXT:    [[INDEX29:%.*]] = phi i64 [ 0, [[VECTOR_PH24]] ], [ [[INDEX_NEXT29:%.*]], [[VECTOR_BODY27]] ]

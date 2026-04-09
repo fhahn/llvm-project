@@ -41,7 +41,11 @@ VPTypeAnalysis::VPTypeAnalysis(const VPlan &Plan)
     CanonicalIVTy = TCIRV->getType();
     return;
   }
-  CanonicalIVTy = cast<VPExpandSCEVRecipe>(TC)->getSCEV()->getType();
+  if (auto *ExpandR = dyn_cast<VPExpandSCEVRecipe>(TC)) {
+    CanonicalIVTy = ExpandR->getSCEV()->getType();
+    return;
+  }
+  CanonicalIVTy = inferScalarType(TC);
 }
 
 Type *VPTypeAnalysis::inferScalarTypeForRecipe(const VPBlendRecipe *R) {

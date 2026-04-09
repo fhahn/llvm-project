@@ -447,10 +447,19 @@ struct VPlanTransforms {
   static void materializeFactors(VPlan &Plan, VPBasicBlock *VectorPH,
                                  ElementCount VF);
 
-  /// Expand VPExpandSCEVRecipes in \p Plan's entry block. Each
-  /// VPExpandSCEVRecipe is replaced with a live-in wrapping the expanded IR
-  /// value. A mapping from SCEV expressions to their expanded IR value is
-  /// returned.
+  /// Try to expand VPExpandSCEVRecipes in \p Plan's entry block to
+  /// VPInstructions. Recipes that cannot be expanded (casts, min/max) are kept
+  /// for later IR-level expansion by expandSCEVs. Should run before CSE so
+  /// that duplicate expansions are eliminated. If \p SE and \p OrigLoop are
+  /// provided, existing loop-invariant IR values are reused as live-ins.
+  static void expandSCEVExpressions(VPlan &Plan, ScalarEvolution *SE = nullptr,
+                                    Loop *OrigLoop = nullptr,
+                                    DominatorTree *DT = nullptr);
+
+  /// Expand remaining VPExpandSCEVRecipes in \p Plan's entry block using
+  /// SCEVExpander. Each VPExpandSCEVRecipe is replaced with a live-in wrapping
+  /// the expanded IR value. A mapping from SCEV expressions to their expanded
+  /// IR value is returned.
   static DenseMap<const SCEV *, Value *> expandSCEVs(VPlan &Plan,
                                                      ScalarEvolution &SE);
 
