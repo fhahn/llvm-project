@@ -212,11 +212,9 @@ define void @expand_diff_scev_unknown(ptr %dst, i1 %invar.c, i32 %step) mustprog
 ; CHECK-NEXT:    [[TMP4:%.*]] = add i32 [[TMP3]], [[TMP2]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = add i32 [[SMAX]], [[TMP4]]
 ; CHECK-NEXT:    [[UMIN:%.*]] = call i32 @llvm.umin.i32(i32 [[TMP5]], i32 1)
-; CHECK-NEXT:    [[TMP6:%.*]] = add i32 [[UMIN]], 1
 ; CHECK-NEXT:    [[TMP7:%.*]] = sub i32 [[TMP5]], [[UMIN]]
 ; CHECK-NEXT:    [[UMAX:%.*]] = call i32 @llvm.umax.i32(i32 [[STEP]], i32 1)
 ; CHECK-NEXT:    [[TMP9:%.*]] = udiv i32 [[TMP7]], [[UMAX]]
-; CHECK-NEXT:    [[TMP8:%.*]] = add i32 [[TMP6]], [[TMP9]]
 ; CHECK-NEXT:    [[TMP16:%.*]] = sub i32 2, [[STEP]]
 ; CHECK-NEXT:    [[TMP12:%.*]] = add i32 [[IV_1_LCSSA]], [[TMP16]]
 ; CHECK-NEXT:    [[SMAX1:%.*]] = call i32 @llvm.smax.i32(i32 [[TMP12]], i32 0)

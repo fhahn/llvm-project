@@ -13,7 +13,7 @@ define void @a(ptr readnone %b) {
 ; CHECK-NEXT:    br i1 [[CMP_NOT4]], label [[FOR_COND_CLEANUP:%.*]], label [[FOR_BODY_PREHEADER:%.*]]
 ; CHECK:       for.body.preheader:
 ; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 0, [[B1]]
-; CHECK-NEXT:    [[TMP2:%.*]] = mul i64 -1, [[B1]]
+; CHECK-NEXT:    [[TMP2:%.*]] = mul i64 [[B1]], -1
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP0]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:

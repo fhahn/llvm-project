@@ -6,11 +6,11 @@
 define void @scev_add_expanded(ptr %dst, i64 %n) {
 ; CHECK-LABEL: VPlan for loop in 'scev_add_expanded'
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<%0> = original trip-count
+; CHECK-NEXT:  vp<[[VP2:%[0-9]+]]> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<loop.preheader>:
-; CHECK-NEXT:    IR   %0 = add i64 %n, 2
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult ir<%0>, ir<4>
+; CHECK-NEXT:    EMIT vp<[[VP2]]> = add ir<%n>, ir<2>
+; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP2]]>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ;
@@ -33,13 +33,13 @@ exit:
 define void @scev_add_lshr_expanded(ptr %dst, i64 %n) {
 ; CHECK-LABEL: VPlan for loop in 'scev_add_lshr_expanded'
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<%2> = original trip-count
+; CHECK-NEXT:  vp<[[VP2:%[0-9]+]]> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<loop.preheader>:
 ; CHECK-NEXT:    IR   %0 = add i64 %n, -1
 ; CHECK-NEXT:    IR   %1 = lshr i64 %0, 1
-; CHECK-NEXT:    IR   %2 = add nuw i64 %1, 1
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult ir<%2>, ir<4>
+; CHECK-NEXT:    EMIT vp<[[VP2]]> = add nuw ir<%1>, ir<1>
+; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP2]]>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ;
@@ -62,13 +62,13 @@ exit:
 define void @scev_add_udiv3_expanded(ptr %dst, i64 %n) {
 ; CHECK-LABEL: VPlan for loop in 'scev_add_udiv3_expanded'
 ; CHECK:  VPlan 'Final VPlan for VF={4},UF={1}' {
-; CHECK-NEXT:  Live-in ir<%2> = original trip-count
+; CHECK-NEXT:  vp<[[VP2:%[0-9]+]]> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<loop.preheader>:
 ; CHECK-NEXT:    IR   %0 = add i64 %n, -1
 ; CHECK-NEXT:    IR   %1 = udiv i64 %0, 3
-; CHECK-NEXT:    IR   %2 = add nuw nsw i64 %1, 1
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult ir<%2>, ir<4>
+; CHECK-NEXT:    EMIT vp<[[VP2]]> = add nuw nsw ir<%1>, ir<1>
+; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP2]]>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ;

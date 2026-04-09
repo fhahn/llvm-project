@@ -11,10 +11,10 @@ define void @test_pr55100(i32 %N) {
 ; CHECK-NEXT:    [[TMP1:%.*]] = mul nuw nsw i32 [[IV_1]], -1
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i32 [[TMP0]], [[TMP1]]
 ; CHECK-NEXT:    [[UMIN:%.*]] = call i32 @llvm.umin.i32(i32 [[TMP2]], i32 18)
-; CHECK-NEXT:    [[TMP3:%.*]] = add nuw nsw i32 [[UMIN]], 1
 ; CHECK-NEXT:    [[C_2:%.*]] = icmp ugt i32 [[IV_1]], 10
 ; CHECK-NEXT:    br i1 [[C_2]], label [[LOOP_2_HEADER_PREHEADER:%.*]], label [[EXIT_LOOPEXIT1:%.*]]
 ; CHECK:       loop.2.header.preheader:
+; CHECK-NEXT:    [[TMP3:%.*]] = add nuw nsw i32 [[UMIN]], 1
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ule i32 [[TMP3]], 2
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:

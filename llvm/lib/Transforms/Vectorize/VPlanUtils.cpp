@@ -766,15 +766,21 @@ VPValue *vputils::expandSCEVExpr(const SCEV *S, VPBuilder &Builder,
     return Plan.getOrAddLiveIn(U->getValue());
   if (isa<SCEVVScale>(S))
     return Builder.createNaryOp(VPInstruction::VScale, {}, S->getType());
-  if (auto *Mul= dyn_cast<SCEVMulExpr>(S); Mul&& canExpandNAry(Mul)) {
-    VPIRFlags::WrapFlagsTy WrapFlags(Mul->hasNoUnsignedWrap(),
-                                     Mul->hasNoSignedWrap());
-    // Chain the operands with Mul.
-    VPValue *Result = expandSCEVExpr(Mul->getOperand(0), Builder, Plan, DL,
+  if (auto *NAry = dyn_cast<SCEVNAryExpr>(S); NAry && canExpandNAry(NAry)) {
+    unsigned Opcode =
+        isa<SCEVAddExpr>(NAry) ? Instruction::Add : Instruction::Mul;
+    VPIRFlags::WrapFlagsTy WrapFlags(NAry->hasNoUnsignedWrap(),
+                                     NAry->hasNoSignedWrap());
+    // Expand operands and chain them with the binary op. Start from the
+    // most complex operand (last, since SCEV sorts by complexity with
+    // constants first) to match SCEVExpander's operand order and enable
+    // CSE.
+    auto RevOps = reverse(NAry->operands());
+    VPValue *Result = expandSCEVExpr(*RevOps.begin(), Builder, Plan, DL,
                                      SE, OrigLoop);
-    for (const SCEVUse &Op : drop_begin(Mul->operands()))
+    for (const auto &Op : drop_begin(RevOps))
       Result = Builder.createOverflowingOp(
-          Instruction::Mul,
+          Opcode,
           {Result,
            expandSCEVExpr(Op, Builder, Plan, DL, SE, OrigLoop, DT)},
           WrapFlags, DL);
