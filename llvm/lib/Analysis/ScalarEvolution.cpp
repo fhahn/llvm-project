@@ -2624,9 +2624,10 @@ bool ScalarEvolution::isAvailableAtLoopEntry(const SCEV *S, const Loop *L) {
 }
 
 /// Get a canonical add expression, or something simpler if possible.
-const SCEV *ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
-                                        SCEV::NoWrapFlags OrigFlags,
-                                        unsigned Depth) {
+SCEVUse ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
+                                    SCEV::NoWrapFlags OrigFlags,
+                                    unsigned Depth,
+                                    SCEV::NoWrapFlags UseFlags) {
   assert(!(OrigFlags & ~(SCEV::FlagNUW | SCEV::FlagNSW)) &&
          "only nuw or nsw allowed");
   assert(!Ops.empty() && "Cannot get empty add!");
@@ -2658,14 +2659,14 @@ const SCEV *ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
 
   // Limit recursion calls depth.
   if (Depth > MaxArithDepth || hasHugeExpression(Ops))
-    return getOrCreateAddExpr(Ops, ComputeFlags(Ops));
+    return SCEVUse(getOrCreateAddExpr(Ops, ComputeFlags(Ops)), UseFlags);
 
   if (SCEV *S = findExistingSCEVInCache(scAddExpr, Ops)) {
     // Don't strengthen flags if we have no new information.
     SCEVAddExpr *Add = static_cast<SCEVAddExpr *>(S);
     if (Add->getNoWrapFlags(OrigFlags) != OrigFlags)
       Add->setNoWrapFlags(ComputeFlags(Ops));
-    return S;
+    return SCEVUse(S, UseFlags);
   }
 
   // Okay, check to see if the same value occurs in the operand list more than
@@ -2829,6 +2830,9 @@ const SCEV *ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
     // common NUW flag for expression after inlining. Other flags cannot be
     // preserved, because they may depend on the original order of operations.
     SCEV::NoWrapFlags CommonFlags = maskFlags(OrigFlags, SCEV::FlagNUW);
+    SCEV::NoWrapFlags CommonUseFlags = maskFlags(UseFlags, SCEV::FlagNUW);
+    // Track whether all inlined adds have NUW for use-specific flag
+    // preservation.
     while (const SCEVAddExpr *Add = dyn_cast<SCEVAddExpr>(Ops[Idx])) {
       if (Ops.size() > AddOpsInlineThreshold ||
           Add->getNumOperands() > AddOpsInlineThreshold)
@@ -2839,13 +2843,14 @@ const SCEV *ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
       append_range(Ops, Add->operands());
       DeletedAdd = true;
       CommonFlags = maskFlags(CommonFlags, Add->getNoWrapFlags());
+      CommonUseFlags = maskFlags(CommonUseFlags, Add->getNoWrapFlags());
     }
 
     // If we deleted at least one add, we added operands to the end of the list,
     // and they are not necessarily sorted.  Recurse to resort and resimplify
     // any operands we just acquired.
     if (DeletedAdd)
-      return getAddExpr(Ops, CommonFlags, Depth + 1);
+      return getAddExpr(Ops, CommonFlags, Depth + 1, CommonUseFlags);
   }
 
   // Skip over the add expression until we get to a multiply.
@@ -3029,7 +3034,7 @@ const SCEV *ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
       const SCEV *NewRec = getAddRecExpr(AddRecOps, AddRecLoop, Flags);
 
       // If all of the other operands were loop invariant, we are done.
-      if (Ops.size() == 1) return NewRec;
+      if (Ops.size() == 1) return SCEVUse(NewRec, UseFlags);
 
       // Otherwise, add the folded AddRec by the non-invariant parts.
       for (unsigned i = 0;; ++i)
@@ -3084,7 +3089,7 @@ const SCEV *ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
 
   // Okay, it looks like we really DO need an add expr.  Check to see if we
   // already have one, otherwise create a new one.
-  return getOrCreateAddExpr(Ops, ComputeFlags(Ops));
+  return SCEVUse(getOrCreateAddExpr(Ops, ComputeFlags(Ops)), UseFlags);
 }
 
 const SCEV *ScalarEvolution::getOrCreateAddExpr(ArrayRef<SCEVUse> Ops,
@@ -3966,33 +3971,17 @@ SCEVUse ScalarEvolution::getGEPExpr(SCEVUse BaseExpr,
   bool NUW = NW.hasNoUnsignedWrap() ||
              (NW.hasNoUnsignedSignedWrap() && isKnownNonNegative(Offset));
   SCEV::NoWrapFlags BaseWrap = NUW ? SCEV::FlagNUW : SCEV::FlagAnyWrap;
-  auto *GEPExpr = getAddExpr(BaseExpr, Offset, BaseWrap);
-  assert(BaseExpr->getType() == GEPExpr->getType() &&
-         "GEP should not change type mid-flight.");
+  SCEV::NoWrapFlags UseFlags = SCEV::FlagAnyWrap;
   if (!NUW) {
     if (UseSpecificNW.hasNoUnsignedWrap() ||
-        (UseSpecificNW.hasNoUnsignedSignedWrap() && isKnownNonNegative(Offset))) {
-      // Check if it is safe to annotate the expression with use-specific NUW.
-      // Don't apply it if Base or Offset contain potentially wrapping
-      // sub-expressions that could be flattened into a larger Add expression.
-      auto IsSafeForUseNUW = [](SCEVUse S) {
-        if (any(S.getUseNoWrapFlags() & SCEV::FlagNUW))
-          return true;
-        // Add and AddRec expressions could be flattened into a wider
-        // add, so they need NUW to be safe.
-        if (isa<SCEVAddExpr, SCEVAddRecExpr>(S))
-          return S.hasNoUnsignedWrap();
-        // Conservatively allow a small set of expression forms that are
-        // known safe: they won't be flattened into a wider add.
-        const SCEVUnknown *U;
-        return match(
-            S, m_CombineOr(m_scev_ZExt(m_SCEVUnknown(U)),
-                           m_CombineOr(m_SCEVUnknown(U), m_SCEVConstant())));
-      };
-      if (IsSafeForUseNUW(BaseExpr) && IsSafeForUseNUW(Offset))
-        return SCEVUse(&*GEPExpr, SCEV::FlagNUW);
-    }
+        (UseSpecificNW.hasNoUnsignedSignedWrap() &&
+         isKnownNonNegative(Offset)))
+      UseFlags = SCEV::FlagNUW;
   }
+  SmallVector<SCEVUse, 2> AddOps = {BaseExpr, Offset};
+  auto GEPExpr = getAddExpr(AddOps, BaseWrap, /*Depth=*/0, UseFlags);
+  assert(BaseExpr->getType() == GEPExpr->getType() &&
+         "GEP should not change type mid-flight.");
   return GEPExpr;
 }
 
@@ -13612,7 +13601,7 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
         //
         // FIXME: Should isLoopEntryGuardedByCond do this for us?
         auto CondGT = IsSigned ? ICmpInst::ICMP_SGT : ICmpInst::ICMP_UGT;
-        auto *StartMinusOne =
+        auto StartMinusOne =
             getAddExpr(OrigStart, getMinusOne(OrigStart->getType()));
         return isLoopEntryGuardedByCond(L, CondGT, OrigRHS, StartMinusOne);
       };

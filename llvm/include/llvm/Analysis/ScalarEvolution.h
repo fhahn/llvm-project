@@ -765,9 +765,10 @@ public:
   LLVM_ABI const SCEV *getCastExpr(SCEVTypes Kind, const SCEV *Op, Type *Ty);
   LLVM_ABI const SCEV *getAnyExtendExpr(const SCEV *Op, Type *Ty);
 
-  LLVM_ABI const SCEV *getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
-                                  SCEV::NoWrapFlags Flags = SCEV::FlagAnyWrap,
-                                  unsigned Depth = 0);
+  LLVM_ABI SCEVUse getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
+                              SCEV::NoWrapFlags Flags = SCEV::FlagAnyWrap,
+                              unsigned Depth = 0,
+                              SCEV::NoWrapFlags UseFlags = SCEV::FlagAnyWrap);
   const SCEV *getAddExpr(SCEVUse LHS, SCEVUse RHS,
                          SCEV::NoWrapFlags Flags = SCEV::FlagAnyWrap,
                          unsigned Depth = 0) {
