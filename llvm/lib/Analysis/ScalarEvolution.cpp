@@ -3888,8 +3888,8 @@ const SCEV *ScalarEvolution::getAddRecExpr(SmallVectorImpl<SCEVUse> &Operands,
 }
 
 SCEVUse ScalarEvolution::getGEPExpr(GEPOperator *GEP,
-                                    ArrayRef<SCEVUse> IndexExprs, bool UseCtx) {
-  SCEVUse BaseExpr = getSCEV(GEP->getPointerOperand(), UseCtx);
+                                    ArrayRef<SCEVUse> IndexExprs) {
+  SCEVUse BaseExpr = getSCEV(GEP->getPointerOperand());
   // getSCEV(Base)->getType() has the same address space as Base->getType()
   // because SCEV::getType() preserves the address space.
   GEPNoWrapFlags NW = GEP->getNoWrapFlags();
@@ -3905,8 +3905,7 @@ SCEVUse ScalarEvolution::getGEPExpr(GEPOperator *GEP,
   }
 
   return getGEPExpr(BaseExpr, IndexExprs, GEP->getSourceElementType(), NW,
-                    /*UseSpecificNW=*/
-                    UseCtx ? GEP->getNoWrapFlags() : GEPNoWrapFlags::none());
+                    /*UseSpecificNW=*/GEP->getNoWrapFlags());
 }
 
 SCEVUse ScalarEvolution::getGEPExpr(SCEVUse BaseExpr,
@@ -3972,7 +3971,7 @@ SCEVUse ScalarEvolution::getGEPExpr(SCEVUse BaseExpr,
          "GEP should not change type mid-flight.");
   if (!NUW) {
     if (UseSpecificNW.hasNoUnsignedWrap() ||
-        (UseSpecificNW.isInBounds() && isKnownNonNegative(Offset))) {
+        (UseSpecificNW.hasNoUnsignedSignedWrap() && isKnownNonNegative(Offset))) {
       // Check if it is safe to annotate the expression with use-specific NUW.
       // Don't apply it if Base or Offset contain potentially wrapping
       // sub-expressions that could be flattened into a larger Add expression.
@@ -3987,8 +3986,8 @@ SCEVUse ScalarEvolution::getGEPExpr(SCEVUse BaseExpr,
         // known safe: they won't be flattened into a wider add.
         const SCEVUnknown *U;
         return match(
-            S, m_CombineOr(m_scev_ZExt(m_SCEVUnknown(U)), m_SCEVUnknown(U)));
-        match(S, m_SCEVConstant());
+            S, m_CombineOr(m_scev_ZExt(m_SCEVUnknown(U)),
+                           m_CombineOr(m_SCEVUnknown(U), m_SCEVConstant())));
       };
       if (IsSafeForUseNUW(BaseExpr) && IsSafeForUseNUW(Offset))
         return SCEVUse(&*GEPExpr, SCEV::FlagNUW);
@@ -4748,15 +4747,15 @@ void ScalarEvolution::insertValueToMap(Value *V, SCEVUse S) {
 SCEVUse ScalarEvolution::getSCEV(Value *V, bool UseCtx) {
   assert(isSCEVable(V->getType()) && "Value is not SCEVable!");
 
-  if (SCEVUse S = getExistingSCEV(V)) {
-    // When not using context-specific flags, return the canonical SCEV
-    // without any use-specific flags.
-    if (!UseCtx)
-      return S.getPointer();
-    return S;
-  }
-  // TODO: Should we always create use-specific SCEVs?
-  return createSCEVIter(V, UseCtx);
+  SCEVUse S = getExistingSCEV(V);
+  if (!S)
+    S = createSCEVIter(V);
+
+  // When not using context-specific flags, return the canonical SCEV
+  // without any use-specific flags.
+  if (!UseCtx)
+    return S.getPointer();
+  return S;
 }
 
 SCEVUse ScalarEvolution::getExistingSCEV(Value *V) {
@@ -6491,14 +6490,14 @@ const SCEV *ScalarEvolution::createNodeForSelectOrPHI(Value *V, Value *Cond,
 
 /// Expand GEP instructions into add and multiply operations. This allows them
 /// to be analyzed by regular SCEV code.
-SCEVUse ScalarEvolution::createNodeForGEP(GEPOperator *GEP, bool UseCtx) {
+SCEVUse ScalarEvolution::createNodeForGEP(GEPOperator *GEP) {
   assert(GEP->getSourceElementType()->isSized() &&
          "GEP source element type must be sized");
 
   SmallVector<SCEVUse, 4> IndexExprs;
   for (Value *Index : GEP->indices())
     IndexExprs.push_back(getSCEV(Index));
-  return getGEPExpr(GEP, IndexExprs, UseCtx);
+  return getGEPExpr(GEP, IndexExprs);
 }
 
 APInt ScalarEvolution::getConstantMultipleImpl(const SCEV *S,
@@ -7722,7 +7721,7 @@ bool ScalarEvolution::loopIsFiniteByAssumption(const Loop *L) {
   return isFinite(L) || (isMustProgress(L) && loopHasNoSideEffects(L));
 }
 
-SCEVUse ScalarEvolution::createSCEVIter(Value *V, bool UseCtx) {
+SCEVUse ScalarEvolution::createSCEVIter(Value *V) {
   // Worklist item with a Value and a bool indicating whether all operands have
   // been visited already.
   using PointerTy = PointerIntPair<Value *, 1, bool>;
@@ -7741,7 +7740,7 @@ SCEVUse ScalarEvolution::createSCEVIter(Value *V, bool UseCtx) {
     SCEVUse CreatedSCEV;
     // If all operands have been visited already, create the SCEV.
     if (E.getInt()) {
-      CreatedSCEV = createSCEV(CurV, UseCtx);
+      CreatedSCEV = createSCEV(CurV);
     } else {
       // Otherwise get the operands we need to create SCEV's for before creating
       // the SCEV for CurV. If the SCEV for CurV can be constructed trivially,
@@ -7997,7 +7996,7 @@ ScalarEvolution::getOperandsToCreate(Value *V, SmallVectorImpl<Value *> &Ops) {
   return nullptr;
 }
 
-SCEVUse ScalarEvolution::createSCEV(Value *V, bool UseCtx) {
+SCEVUse ScalarEvolution::createSCEV(Value *V) {
   if (!isSCEVable(V->getType()))
     return getUnknown(V);
 
@@ -8414,7 +8413,7 @@ SCEVUse ScalarEvolution::createSCEV(Value *V, bool UseCtx) {
     break;
 
   case Instruction::GetElementPtr:
-    return createNodeForGEP(cast<GEPOperator>(U), UseCtx);
+    return createNodeForGEP(cast<GEPOperator>(U));
 
   case Instruction::PHI:
     return createNodeForPHI(cast<PHINode>(U));

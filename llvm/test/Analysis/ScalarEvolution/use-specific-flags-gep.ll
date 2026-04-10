@@ -83,7 +83,7 @@ define ptr @chained_inbounds_geps(ptr %base, i32 %n, i32 %m) {
 ; CHECK-NEXT:    %ext.m = zext i32 %m to i64
 ; CHECK-NEXT:    --> (zext i32 %m to i64) U: [0,4294967296) S: [0,4294967296)
 ; CHECK-NEXT:    %gep2 = getelementptr inbounds i8, ptr %gep1, i64 %ext.m
-; CHECK-NEXT:    --> ((zext i32 %n to i64) + (zext i32 %m to i64) + %base)(u nuw) U: full-set S: full-set
+; CHECK-NEXT:    --> ((zext i32 %n to i64) + (zext i32 %m to i64) + %base) U: full-set S: full-set
 ; CHECK-NEXT:  Determining loop execution counts for: @chained_inbounds_geps
 ;
   %ext.n = zext i32 %n to i64
@@ -459,9 +459,9 @@ define void @nested_loop_inbounds_addrecs(ptr %base, i64 %n, i64 %m) {
 ; CHECK-NEXT:    %gep.inbounds = getelementptr inbounds i8, ptr %gep.outer, i64 %iv.inner
 ; CHECK-NEXT:    --> {{\{\{}}%base,+,1}<nw><%outer>,+,1}<nw><%inner> U: full-set S: full-set Exits: {(-1 + %m + %base),+,1}<nw><%outer> LoopDispositions: { %inner: Computable, %outer: Variant }
 ; CHECK-NEXT:    %gep.inner.nuw = getelementptr nuw i8, ptr %gep.outer.nuw, i64 %iv.inner
-; CHECK-NEXT:    --> {{\{\{}}%base,+,1}<nw><%outer>,+,1}<nw><%inner>(u nuw) U: full-set S: full-set Exits: {(-1 + %m + %base),+,1}<nw><%outer> LoopDispositions: { %inner: Computable, %outer: Variant }
+; CHECK-NEXT:    --> {{\{\{}}%base,+,1}<nw><%outer>,+,1}<nw><%inner> U: full-set S: full-set Exits: {(-1 + %m + %base),+,1}<nw><%outer> LoopDispositions: { %inner: Computable, %outer: Variant }
 ; CHECK-NEXT:    %gep.inner.nusw = getelementptr inbounds nuw i8, ptr %gep.outer.nuw, i64 %iv.inner
-; CHECK-NEXT:    --> {{\{\{}}%base,+,1}<nw><%outer>,+,1}<nw><%inner>(u nuw) U: full-set S: full-set Exits: {(-1 + %m + %base),+,1}<nw><%outer> LoopDispositions: { %inner: Computable, %outer: Variant }
+; CHECK-NEXT:    --> {{\{\{}}%base,+,1}<nw><%outer>,+,1}<nw><%inner> U: full-set S: full-set Exits: {(-1 + %m + %base),+,1}<nw><%outer> LoopDispositions: { %inner: Computable, %outer: Variant }
 ; CHECK-NEXT:    %gep.inner.plain = getelementptr i8, ptr %gep.outer, i64 %iv.inner
 ; CHECK-NEXT:    --> {{\{\{}}%base,+,1}<nw><%outer>,+,1}<nw><%inner> U: full-set S: full-set Exits: {(-1 + %m + %base),+,1}<nw><%outer> LoopDispositions: { %inner: Computable, %outer: Variant }
 ; CHECK-NEXT:    %iv.inner.next = add nuw i64 %iv.inner, 1

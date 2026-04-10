@@ -821,8 +821,7 @@ public:
   /// \p GEP The GEP. The indices contained in the GEP itself are ignored,
   /// instead we use IndexExprs.
   /// \p IndexExprs The expressions for the indices.
-  LLVM_ABI SCEVUse getGEPExpr(GEPOperator *GEP, ArrayRef<SCEVUse> IndexExprs,
-                              bool UseCtx = false);
+  LLVM_ABI SCEVUse getGEPExpr(GEPOperator *GEP, ArrayRef<SCEVUse> IndexExprs);
   LLVM_ABI SCEVUse
   getGEPExpr(SCEVUse BaseExpr, ArrayRef<SCEVUse> IndexExprs, Type *SrcElementTy,
              GEPNoWrapFlags NW = GEPNoWrapFlags::none(),
@@ -1992,14 +1991,12 @@ private:
   ConstantRange getRangeForUnknownRecurrence(const SCEVUnknown *U);
 
   /// We know that there is no SCEV for the specified value.  Analyze the
-  /// expression recursively. If \p UseCtx is true, create a SCEV with
-  /// use-specific flags valid only for existing uses of \p V.
-  SCEVUse createSCEV(Value *V, bool UseCtx = false);
+  /// expression recursively.
+  SCEVUse createSCEV(Value *V);
 
   /// We know that there is no SCEV for the specified value. Create a new SCEV
-  /// for \p V iteratively. If \p UseCtx is true, create a SCEV with
-  /// use-specific flags valid only for existing uses of \p V.
-  SCEVUse createSCEVIter(Value *V, bool UseCtx = false);
+  /// for \p V iteratively.
+  SCEVUse createSCEVIter(Value *V);
   /// Collect operands of \p V for which SCEV expressions should be constructed
   /// first. Returns a SCEV directly if it can be constructed trivially for \p
   /// V.
@@ -2043,7 +2040,7 @@ private:
                                        Value *FalseVal);
 
   /// Provide the special handling we need to analyze GEP SCEVs.
-  SCEVUse createNodeForGEP(GEPOperator *GEP, bool UseCtx = false);
+  SCEVUse createNodeForGEP(GEPOperator *GEP);
 
   /// Implementation code for getSCEVAtScope; called at most once for each
   /// SCEV+Loop pair.
