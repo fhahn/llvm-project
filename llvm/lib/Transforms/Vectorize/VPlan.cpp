@@ -121,17 +121,32 @@ void VPRecipeBase::dump() const {
 #endif
 
 #if !defined(NDEBUG)
-bool VPRecipeValue::isDefinedBy(const VPDef *D) const { return Def == D; }
+bool VPRecipeValue::isDefinedBy(const VPDef *D) const {
+  return getDefiningRecipe() == D;
+}
 #endif
 
 VPRecipeBase *VPValue::getDefiningRecipe() {
   auto *DefValue = dyn_cast<VPRecipeValue>(this);
-  return DefValue ? DefValue->Def : nullptr;
+  if (!DefValue)
+    return nullptr;
+  if (auto *SV = dyn_cast<VPStandaloneRecipeValue>(DefValue))
+    return SV->getDef();
+  // Embedded in VPSingleDefRecipe: compute via static_cast. This is
+  // well-defined because VPSingleDefRecipe inherits from both VPRecipeBase and
+  // VPRecipeValue, and this VPRecipeValue is a base subobject of that
+  // VPSingleDefRecipe.
+  return static_cast<VPSingleDefRecipe *>(DefValue);
 }
 
 const VPRecipeBase *VPValue::getDefiningRecipe() const {
   auto *DefValue = dyn_cast<VPRecipeValue>(this);
-  return DefValue ? DefValue->Def : nullptr;
+  if (!DefValue)
+    return nullptr;
+  if (auto *SV = dyn_cast<VPStandaloneRecipeValue>(DefValue))
+    return SV->getDef();
+  // Embedded in VPSingleDefRecipe: compute via static_cast.
+  return static_cast<const VPSingleDefRecipe *>(DefValue);
 }
 
 Value *VPValue::getLiveInIRValue() const {
@@ -141,7 +156,7 @@ Value *VPValue::getLiveInIRValue() const {
 Type *VPIRValue::getType() const { return getUnderlyingValue()->getType(); }
 
 VPRecipeValue::VPRecipeValue(VPRecipeBase *Def, Value *UV)
-    : VPValue(VPVRecipeValueSC, UV), Def(Def) {
+    : VPValue(VPVEmbeddedRecipeValueSC, UV) {
   assert(Def && "VPRecipeValue requires a defining recipe");
   Def->addDefinedValue(this);
 }
@@ -149,7 +164,13 @@ VPRecipeValue::VPRecipeValue(VPRecipeBase *Def, Value *UV)
 VPRecipeValue::~VPRecipeValue() {
   assert(Users.empty() &&
          "trying to delete a VPRecipeValue with remaining users");
-  Def->removeDefinedValue(this);
+  getDefiningRecipe()->removeDefinedValue(this);
+}
+
+VPStandaloneRecipeValue::VPStandaloneRecipeValue(VPRecipeBase *Def, Value *UV)
+    : VPRecipeValue(VPVRecipeValueSC, UV), Def(Def) {
+  assert(Def && "VPStandaloneRecipeValue requires a defining recipe");
+  Def->addDefinedValue(this);
 }
 
 // Get the top-most entry block of \p Start. This is the entry block of the

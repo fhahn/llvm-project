@@ -79,11 +79,12 @@ public:
   /// An enumeration for keeping track of the concrete subclass of VPValue that
   /// are actually instantiated.
   enum {
-    VPVIRValueSC,     /// A live-in VPValue wrapping an IR Value.
-    VPVSymbolicSC,    /// A symbolic live-in VPValue without IR backing.
-    VPVRecipeValueSC, /// A VPValue defined by a recipe.
-    VPRegionValueSC,  /// A VPValue sub-class that is defined by a region, like
-                      /// the canonical IV of a loop region.
+    VPVIRValueSC,             /// A live-in VPValue wrapping an IR Value.
+    VPVSymbolicSC,            /// A symbolic live-in VPValue without IR backing.
+    VPVRecipeValueSC,         /// A standalone VPValue defined by a recipe.
+    VPVEmbeddedRecipeValueSC, /// A VPValue embedded in a VPSingleDefRecipe.
+    VPRegionValueSC,          /// A VPValue sub-class that is defined by a
+                              /// region, like the canonical IV of a loop region.
   };
 
   VPValue(const VPValue &) = delete;
@@ -304,9 +305,6 @@ class VPRecipeValue : public VPValue {
   friend class VPValue;
   friend class VPDef;
 
-  /// Pointer to the VPRecipeBase that defines this VPValue.
-  VPRecipeBase *Def;
-
 #if !defined(NDEBUG)
   /// Returns true if this VPRecipeValue is defined by \p D.
   /// NOTE: Only used by VPDef to assert that VPRecipeValues added/removed from
@@ -314,10 +312,37 @@ class VPRecipeValue : public VPValue {
   bool isDefinedBy(const VPDef *D) const;
 #endif
 
+protected:
+  VPRecipeValue(unsigned char SC, Value *UV = nullptr)
+      : VPValue(SC, UV) {}
+
 public:
   LLVM_ABI_FOR_TEST VPRecipeValue(VPRecipeBase *Def, Value *UV = nullptr);
 
   LLVM_ABI_FOR_TEST virtual ~VPRecipeValue();
+
+  static bool classof(const VPValue *V) {
+    return V->getVPValueID() == VPVRecipeValueSC ||
+           V->getVPValueID() == VPVEmbeddedRecipeValueSC;
+  }
+};
+
+/// A standalone VPRecipeValue used by multi-def recipes (e.g. VPInterleaveBase)
+/// and embedded load recipes (VPWidenLoad*). Stores a pointer to the defining
+/// recipe, unlike embedded single-def recipe values where the defining recipe is
+/// computed via static_cast.
+class VPStandaloneRecipeValue : public VPRecipeValue {
+  friend class VPDef;
+
+  /// Pointer to the VPRecipeBase that defines this VPValue.
+  VPRecipeBase *Def;
+
+public:
+  LLVM_ABI_FOR_TEST VPStandaloneRecipeValue(VPRecipeBase *Def,
+                                            Value *UV = nullptr);
+
+  VPRecipeBase *getDef() const { return Def; }
+  void clearDef() { Def = nullptr; }
 
   static bool classof(const VPValue *V) {
     return V->getVPValueID() == VPVRecipeValueSC;
@@ -431,14 +456,13 @@ public:
 /// from VPDef before VPValue.
 class VPDef {
   friend class VPRecipeValue;
+  friend class VPStandaloneRecipeValue;
 
   /// The VPValues defined by this VPDef.
   TinyPtrVector<VPRecipeValue *> DefinedValues;
 
   /// Add \p V as a defined value by this VPDef.
   void addDefinedValue(VPRecipeValue *V) {
-    assert(V->isDefinedBy(this) &&
-           "can only add VPValue already linked with this VPDef");
     DefinedValues.push_back(V);
   }
 
@@ -450,7 +474,8 @@ class VPDef {
     assert(is_contained(DefinedValues, V) &&
            "VPValue to remove must be in DefinedValues");
     llvm::erase(DefinedValues, V);
-    V->Def = nullptr;
+    if (auto *SV = dyn_cast<VPStandaloneRecipeValue>(V))
+      SV->clearDef();
   }
 
 public:
