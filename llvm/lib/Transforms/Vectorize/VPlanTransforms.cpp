@@ -2207,12 +2207,14 @@ static bool simplifyBranchConditionForVFAndUF(VPlan &Plan, ElementCount BestVF,
   VPBasicBlock *ExitingVPBB = VectorRegion->getExitingBasicBlock();
   auto *Term = &ExitingVPBB->back();
   VPValue *Cond;
+  VPValue *Offset = nullptr;
   auto m_CanIVInc = m_Add(m_VPValue(), m_Specific(&Plan.getVFxUF()));
   // Check if the branch condition compares the canonical IV increment (for main
   // loop), or the canonical IV increment plus an offset (for epilog loop).
-  if (match(Term, m_BranchOnCount(
-                      m_CombineOr(m_CanIVInc, m_c_Add(m_CanIVInc, m_LiveIn())),
-                      m_VPValue())) ||
+  if (match(Term, m_BranchOnCount(m_CanIVInc, m_VPValue())) ||
+      match(Term,
+            m_BranchOnCount(m_c_Add(m_CanIVInc, m_VPValue(Offset)),
+                            m_VPValue())) ||
       match(Term, m_BranchOnCond(m_Not(m_ActiveLaneMask(
                       m_VPValue(), m_VPValue(), m_VPValue()))))) {
     // Try to simplify the branch condition if VectorTC <= VF * UF when the
@@ -2225,6 +2227,15 @@ static bool simplifyBranchConditionForVFAndUF(VPlan &Plan, ElementCount BestVF,
     assert(!isa<SCEVCouldNotCompute>(VectorTripCount) &&
            "Trip count SCEV must be computable");
     ScalarEvolution &SE = *PSE.getSE();
+    // For the epilog loop, the effective trip count is VectorTC - Offset where
+    // Offset is the main loop's vector trip count. Subtract the offset to get
+    // the number of iterations the epilog vector loop executes.
+    if (Offset) {
+      const SCEV *OffsetSCEV = vputils::getSCEVExprForVPValue(Offset, PSE);
+      if (isa<SCEVCouldNotCompute>(OffsetSCEV))
+        return false;
+      VectorTripCount = SE.getMinusSCEV(VectorTripCount, OffsetSCEV);
+    }
     ElementCount NumElements = BestVF.multiplyCoefficientBy(BestUF);
     const SCEV *C = SE.getElementCount(VectorTripCount->getType(), NumElements);
     if (!SE.isKnownPredicate(CmpInst::ICMP_ULE, VectorTripCount, C))

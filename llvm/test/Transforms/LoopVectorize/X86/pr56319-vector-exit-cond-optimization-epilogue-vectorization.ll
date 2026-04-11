@@ -28,20 +28,21 @@ define void @pr56319(ptr noalias %src, ptr noalias %dst) {
 ; CHECK:       middle.block:
 ; CHECK-NEXT:    br label [[VEC_EPILOG_ITER_CHECK:%.*]]
 ; CHECK:       vec.epilog.iter.check:
-; CHECK-NEXT:    br i1 false, label [[VEC_EPILOG_SCALAR_PH]], label [[VEC_EPILOG_PH]]
+; CHECK-NEXT:    br i1 false, label [[VEC_EPILOG_SCALAR_PH]], label [[VEC_EPILOG_PH]], !prof [[PROF3:![0-9]+]]
 ; CHECK:       vec.epilog.ph:
-; CHECK-NEXT:    [[VEC_EPILOG_RESUME_VAL:%.*]] = phi i64 [ 32, [[VEC_EPILOG_ITER_CHECK]] ], [ 0, [[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
 ; CHECK-NEXT:    br label [[VEC_EPILOG_VECTOR_BODY:%.*]]
 ; CHECK:       vec.epilog.vector.body:
-; CHECK-NEXT:    [[INDEX1:%.*]] = phi i64 [ [[VEC_EPILOG_RESUME_VAL]], [[VEC_EPILOG_PH]] ], [ [[INDEX_NEXT4:%.*]], [[VEC_EPILOG_VECTOR_BODY]] ]
+; CHECK-NEXT:    [[INDEX2:%.*]] = phi i64 [ 0, [[VEC_EPILOG_PH]] ], [ [[INDEX_NEXT5:%.*]], [[VEC_EPILOG_VECTOR_BODY]] ]
+; CHECK-NEXT:    [[INDEX1:%.*]] = add i64 [[INDEX2]], 32
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [3 x i8], ptr [[SRC]], i64 [[INDEX1]], i64 0
 ; CHECK-NEXT:    [[WIDE_VEC2:%.*]] = load <6 x i8>, ptr [[TMP7]], align 1
 ; CHECK-NEXT:    [[STRIDED_VEC3:%.*]] = shufflevector <6 x i8> [[WIDE_VEC2]], <6 x i8> poison, <2 x i32> <i32 0, i32 3>
 ; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds i8, ptr [[DST]], i64 [[INDEX1]]
 ; CHECK-NEXT:    store <2 x i8> [[STRIDED_VEC3]], ptr [[TMP9]], align 1
-; CHECK-NEXT:    [[INDEX_NEXT4]] = add nuw i64 [[INDEX1]], 2
+; CHECK-NEXT:    [[INDEX_NEXT5]] = add nuw i64 [[INDEX2]], 2
+; CHECK-NEXT:    [[INDEX_NEXT4:%.*]] = add i64 [[INDEX_NEXT5]], 32
 ; CHECK-NEXT:    [[TMP11:%.*]] = icmp eq i64 [[INDEX_NEXT4]], 36
-; CHECK-NEXT:    br i1 [[TMP11]], label [[VEC_EPILOG_MIDDLE_BLOCK:%.*]], label [[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP11]], label [[VEC_EPILOG_MIDDLE_BLOCK:%.*]], label [[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       vec.epilog.middle.block:
 ; CHECK-NEXT:    br label [[VEC_EPILOG_SCALAR_PH]]
 ; CHECK:       vec.epilog.scalar.ph:
@@ -55,7 +56,7 @@ define void @pr56319(ptr noalias %src, ptr noalias %dst) {
 ; CHECK-NEXT:    store i8 [[L]], ptr [[GEP_DST]], align 1
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
 ; CHECK-NEXT:    [[CMP:%.*]] = icmp eq i64 [[IV_NEXT]], 37
-; CHECK-NEXT:    br i1 [[CMP]], label [[EXIT:%.*]], label [[LOOP]], !llvm.loop [[LOOP4:![0-9]+]]
+; CHECK-NEXT:    br i1 [[CMP]], label [[EXIT:%.*]], label [[LOOP]], !llvm.loop [[LOOP5:![0-9]+]]
 ; CHECK:       exit:
 ; CHECK-NEXT:    ret void
 ;

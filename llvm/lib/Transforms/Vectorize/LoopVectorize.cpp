@@ -8999,6 +8999,14 @@ static SmallVector<Instruction *> preparePlanForEpilogueVectorLoop(
     EPI.VectorTripCount = EPResumeVal->getOperand(0);
   }
   VPValue *VPV = Plan.getOrAddLiveIn(EPResumeVal);
+  // If the main loop's vector trip count is a non-zero constant, use it
+  // directly as the offset instead of the resume PHI. A non-zero vector trip
+  // count means the main loop always executes (TC >= MainVFxUF), so the bypass
+  // paths that set the resume value to 0 are dead. This enables further
+  // simplifications as SCEV can reason about constant offsets.
+  if (auto *CI = dyn_cast<ConstantInt>(EPI.VectorTripCount);
+      CI && !CI->isZero())
+    VPV = Plan.getOrAddLiveIn(CI);
   assert(all_of(IV->users(),
                 [](const VPUser *U) {
                   return isa<VPScalarIVStepsRecipe>(U) ||
