@@ -120,7 +120,7 @@ define void @arm_var_q31(ptr noundef %pSrc, i32 noundef %blockSize, ptr noundef 
 ; CHECK-NEXT:    [[ADD27_LCSSA:%.*]] = phi i64 [ [[TMP25]], [[MIDDLE_BLOCK]] ], [ [[ADD27]], [[WHILE_BODY]] ]
 ; CHECK-NEXT:    [[ADD29_LCSSA:%.*]] = phi i64 [ [[TMP33]], [[MIDDLE_BLOCK]] ], [ [[ADD29]], [[WHILE_BODY]] ]
 ; CHECK-NEXT:    [[TMP39:%.*]] = shl i32 [[SHR]], 4
-; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[PSRC]], i32 [[TMP39]]
+; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr nuw i8, ptr [[PSRC]], i32 [[TMP39]]
 ; CHECK-NEXT:    br label [[WHILE_END]]
 ; CHECK:       while.end:
 ; CHECK-NEXT:    [[SUM_0_LCSSA:%.*]] = phi i64 [ 0, [[IF_END]] ], [ [[ADD29_LCSSA]], [[WHILE_END_LOOPEXIT]] ]

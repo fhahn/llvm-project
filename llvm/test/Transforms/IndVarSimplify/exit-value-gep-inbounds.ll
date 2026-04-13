@@ -11,7 +11,7 @@ define ptr @pointer_advance_inbounds(ptr %p, i64 %n) {
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    br i1 true, label %[[EXIT:.*]], label %[[LOOP]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[P]], i64 [[N]]
+; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr nuw i8, ptr [[P]], i64 [[N]]
 ; CHECK-NEXT:    ret ptr [[SCEVGEP]]
 ;
 entry:
@@ -147,7 +147,7 @@ define ptr @nonconstant_nonneg_step_inbounds(ptr %p, i64 %n, i32 %s) {
 ; CHECK-NEXT:    br i1 true, label %[[EXIT:.*]], label %[[LOOP]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = mul i64 [[N]], [[STEP]]
-; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[P]], i64 [[TMP0]]
+; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr nuw i8, ptr [[P]], i64 [[TMP0]]
 ; CHECK-NEXT:    ret ptr [[SCEVGEP]]
 ;
 entry:

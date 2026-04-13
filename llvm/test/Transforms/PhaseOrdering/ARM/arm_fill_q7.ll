@@ -17,7 +17,7 @@ define dso_local void @arm_fill_q7(i8 signext %value, ptr %pDst, i32 %blockSize)
 ; OLDPM:       while.body.preheader:
 ; OLDPM-NEXT:    [[TMP0:%.*]] = and i32 [[BLOCKSIZE]], -4
 ; OLDPM-NEXT:    call void @llvm.memset.p0.i32(ptr align 1 [[PDST:%.*]], i8 [[VALUE:%.*]], i32 [[TMP0]], i1 false)
-; OLDPM-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[PDST]], i32 [[TMP0]]
+; OLDPM-NEXT:    [[SCEVGEP:%.*]] = getelementptr nuw i8, ptr [[PDST]], i32 [[TMP0]]
 ; OLDPM-NEXT:    br label [[WHILE_END]]
 ; OLDPM:       while.end:
 ; OLDPM-NEXT:    [[PDST_ADDR_0_LCSSA:%.*]] = phi ptr [ [[PDST]], [[ENTRY:%.*]] ], [ [[SCEVGEP]], [[WHILE_BODY_PREHEADER]] ]
@@ -37,7 +37,7 @@ define dso_local void @arm_fill_q7(i8 signext %value, ptr %pDst, i32 %blockSize)
 ; NEWPM:       while.body.preheader:
 ; NEWPM-NEXT:    [[TMP0:%.*]] = and i32 [[BLOCKSIZE]], -4
 ; NEWPM-NEXT:    call void @llvm.memset.p0.i32(ptr align 1 [[PDST:%.*]], i8 [[VALUE:%.*]], i32 [[TMP0]], i1 false)
-; NEWPM-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[PDST]], i32 [[TMP0]]
+; NEWPM-NEXT:    [[SCEVGEP:%.*]] = getelementptr nuw i8, ptr [[PDST]], i32 [[TMP0]]
 ; NEWPM-NEXT:    br label [[WHILE_END]]
 ; NEWPM:       while.end:
 ; NEWPM-NEXT:    [[PDST_ADDR_0_LCSSA:%.*]] = phi ptr [ [[PDST]], [[ENTRY:%.*]] ], [ [[SCEVGEP]], [[WHILE_BODY_PREHEADER]] ]

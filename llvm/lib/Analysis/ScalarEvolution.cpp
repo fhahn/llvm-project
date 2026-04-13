@@ -1077,6 +1077,23 @@ const SCEV *SCEVAddRecExpr::evaluateAtIteration(const SCEV *It,
   return evaluateAtIteration(operands(), It, SE);
 }
 
+SCEVUse SCEVAddRecExpr::evaluateAtIteration(SCEVUse ARU, const SCEV *It,
+                                            ScalarEvolution &SE) {
+  auto *AR = cast<SCEVAddRecExpr>(ARU);
+  const SCEV *Result = evaluateAtIteration(AR->operands(), It, SE);
+
+  // Preserve use-specific flags from AR when the step is non-negative: each
+  // intermediate value at iteration i in [0,N] satisfies the same inbounds/nuw
+  // properties (proven per-iteration), so the final value Base + Step*N also
+  // does.
+  auto UseFlags = ARU.getUseNoWrapFlags();
+  if (UseFlags != SCEVNoWrapFlags::FlagAnyWrap && AR->getNumOperands() == 2 &&
+      isa<SCEVAddExpr>(Result) &&
+      SE.isKnownNonNegative(AR->getOperand(1)))
+    return SCEVUse(Result, UseFlags);
+  return Result;
+}
+
 const SCEV *SCEVAddRecExpr::evaluateAtIteration(ArrayRef<SCEVUse> Operands,
                                                 const SCEV *It,
                                                 ScalarEvolution &SE) {
@@ -10332,8 +10349,10 @@ SCEVUse ScalarEvolution::computeSCEVAtScope(SCEVUse V, const Loop *L) {
       if (BackedgeTakenCount == getCouldNotCompute())
         return AddRec;
 
-      // Then, evaluate the AddRec.
-      return AddRec->evaluateAtIteration(BackedgeTakenCount, *this);
+      // Then, evaluate the AddRec. Use the (possibly folded) AddRec but
+      // preserve the use-specific flags from the original V.
+      return SCEVAddRecExpr::evaluateAtIteration(
+          SCEVUse(AddRec, V.getUseNoWrapFlags()), BackedgeTakenCount, *this);
     }
 
     return AddRec;
