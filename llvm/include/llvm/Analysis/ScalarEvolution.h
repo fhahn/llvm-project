@@ -145,10 +145,6 @@ struct SCEVUseT : private PointerIntPair<SCEVPtrT, 2> {
   SCEVNoWrapFlags
   getNoWrapFlags(SCEVNoWrapFlags Mask = SCEVNoWrapFlags::NoWrapMask) const;
 
-  bool hasNoUnsignedWrap() const {
-    return any(getNoWrapFlags() & SCEVNoWrapFlags::FlagNUW);
-  }
-
   /// Return only the use-specific no-wrap flags (NUW/NSW) without the
   /// underlying SCEV's flags.
   SCEVNoWrapFlags getUseNoWrapFlags() const {
@@ -197,8 +193,9 @@ template <> struct PointerLikeTypeTraits<SCEVUse> {
     return U;
   }
 
-  /// The Low bits are used by the PointerIntPair.
-  static constexpr int NumLowBitsAvailable = 0;
+  /// PointerIntPair<const SCEV *, 2> uses 2 of the 3 low bits from SCEV's
+  /// 8-byte alignment, leaving 1 bit available.
+  static constexpr int NumLowBitsAvailable = 1;
 };
 
 template <> struct DenseMapInfo<SCEVUse> {
@@ -257,7 +254,7 @@ struct CastInfo<SCEVUseT<ToSCEVPtrT>, const SCEVUse,
 /// This class represents an analyzed expression in the program.  These are
 /// opaque objects that the client is not allowed to do much with directly.
 ///
-class SCEV : public FoldingSetNode {
+class alignas(8) SCEV : public FoldingSetNode {
   friend struct FoldingSetTrait<SCEV>;
 
   /// A reference to an Interned FoldingSetNodeID for this node.  The
@@ -723,8 +720,7 @@ public:
   getStrengthenedNoWrapFlagsFromBinOp(const OverflowingBinaryOperator *OBO);
 
   /// Notify this ScalarEvolution that \p User directly uses SCEVs in \p Ops.
-  LLVM_ABI void registerUser(const SCEV *User, ArrayRef<const SCEV *> Ops);
-  LLVM_ABI void registerUser(const SCEV *User, ArrayRef<SCEVUse> Ops);
+  LLVM_ABI void registerUser(SCEVUse User, ArrayRef<SCEVUse> Ops);
 
   /// Return true if the SCEV expression contains an undef value.
   LLVM_ABI bool containsUndefs(const SCEV *S) const;
@@ -967,7 +963,7 @@ public:
   ///
   /// In the case that a relevant loop exit value cannot be computed, the
   /// original value V is returned.
-  LLVM_ABI const SCEV *getSCEVAtScope(const SCEV *S, const Loop *L);
+  LLVM_ABI SCEVUse getSCEVAtScope(SCEVUse S, const Loop *L);
 
   /// This is a convenience function which does getSCEVAtScope(getSCEV(V), L).
   LLVM_ABI const SCEV *getSCEVAtScope(Value *V, const Loop *L);
@@ -1667,14 +1663,14 @@ private:
   std::unique_ptr<SCEVCouldNotCompute> CouldNotCompute;
 
   /// The type for HasRecMap.
-  using HasRecMapType = DenseMap<const SCEV *, bool>;
+  using HasRecMapType = DenseMap<SCEVUse, bool>;
 
   /// This is a cache to record whether a SCEV contains any scAddRecExpr.
   HasRecMapType HasRecMap;
 
   /// The type for ExprValueMap.
   using ValueSetVector = SmallSetVector<Value *, 4>;
-  using ExprValueMapType = DenseMap<const SCEV *, ValueSetVector>;
+  using ExprValueMapType = DenseMap<SCEVUse, ValueSetVector>;
 
   /// ExprValueMap -- This map records the original values from which
   /// the SCEV expr is generated from.
@@ -1690,7 +1686,7 @@ private:
   /// This is a cache for expressions that got folded to a different existing
   /// SCEV.
   DenseMap<FoldID, const SCEV *> FoldCache;
-  DenseMap<const SCEV *, SmallVector<FoldID, 2>> FoldCacheUser;
+  DenseMap<SCEVUse, SmallVector<FoldID, 2>> FoldCacheUser;
 
   /// Mark predicate values currently being processed by isImpliedCond.
   SmallPtrSet<const Value *, 6> PendingLoopPredicates;
@@ -1707,10 +1703,10 @@ private:
   bool ProvingSplitPredicate = false;
 
   /// Memoized values for the getConstantMultiple
-  DenseMap<const SCEV *, APInt> ConstantMultipleCache;
+  DenseMap<SCEVUse, APInt> ConstantMultipleCache;
 
   /// Return the Value set from which the SCEV expr is generated.
-  ArrayRef<Value *> getSCEVValues(const SCEV *S);
+  ArrayRef<Value *> getSCEVValues(SCEVUse S);
 
   /// Private helper method for the getConstantMultiple method. If \p CtxI is
   /// not nullptr, return a constant multiple valid at \p CtxI.
@@ -1875,7 +1871,7 @@ private:
   DenseMap<const Loop *, BackedgeTakenInfo> PredicatedBackedgeTakenCounts;
 
   /// Loops whose backedge taken counts directly use this non-constant SCEV.
-  DenseMap<const SCEV *, SmallPtrSet<PointerIntPair<const Loop *, 1, bool>, 4>>
+  DenseMap<SCEVUse, SmallPtrSet<PointerIntPair<const Loop *, 1, bool>, 4>>
       BECountUsers;
 
   /// This map contains entries for all of the PHI instructions that we
@@ -1887,16 +1883,16 @@ private:
   /// This map contains entries for all the expressions that we attempt to
   /// compute getSCEVAtScope information for, which can be expensive in
   /// extreme cases.
-  DenseMap<const SCEV *, SmallVector<std::pair<const Loop *, const SCEV *>, 2>>
+  DenseMap<SCEVUse, SmallVector<std::pair<const Loop *, SCEVUse>, 2>>
       ValuesAtScopes;
 
   /// Reverse map for invalidation purposes: Stores of which SCEV and which
   /// loop this is the value-at-scope of.
-  DenseMap<const SCEV *, SmallVector<std::pair<const Loop *, const SCEV *>, 2>>
+  DenseMap<SCEVUse, SmallVector<std::pair<const Loop *, SCEVUse>, 2>>
       ValuesAtScopesUsers;
 
   /// Memoized computeLoopDisposition results.
-  DenseMap<const SCEV *,
+  DenseMap<SCEVUse,
            SmallVector<PointerIntPair<const Loop *, 2, LoopDisposition>, 2>>
       LoopDispositions;
 
@@ -1928,7 +1924,7 @@ private:
 
   /// Memoized computeBlockDisposition results.
   DenseMap<
-      const SCEV *,
+      SCEVUse,
       SmallVector<PointerIntPair<const BasicBlock *, 2, BlockDisposition>, 2>>
       BlockDispositions;
 
@@ -1936,13 +1932,13 @@ private:
   BlockDisposition computeBlockDisposition(const SCEV *S, const BasicBlock *BB);
 
   /// Stores all SCEV that use a given SCEV as its direct operand.
-  DenseMap<const SCEV *, SmallPtrSet<const SCEV *, 8> > SCEVUsers;
+  DenseMap<SCEVUse, SmallPtrSet<SCEVUse, 8>> SCEVUsers;
 
   /// Memoized results from getRange
-  DenseMap<const SCEV *, ConstantRange> UnsignedRanges;
+  DenseMap<SCEVUse, ConstantRange> UnsignedRanges;
 
   /// Memoized results from getRange
-  DenseMap<const SCEV *, ConstantRange> SignedRanges;
+  DenseMap<SCEVUse, ConstantRange> SignedRanges;
 
   /// Used to parameterize getRange
   enum RangeSignHint { HINT_RANGE_UNSIGNED, HINT_RANGE_SIGNED };
@@ -1950,7 +1946,7 @@ private:
   /// Set the memoized range for the given SCEV.
   const ConstantRange &setRange(const SCEV *S, RangeSignHint Hint,
                                 ConstantRange CR) {
-    DenseMap<const SCEV *, ConstantRange> &Cache =
+    DenseMap<SCEVUse, ConstantRange> &Cache =
         Hint == HINT_RANGE_UNSIGNED ? UnsignedRanges : SignedRanges;
 
     auto Pair = Cache.insert_or_assign(S, std::move(CR));
@@ -2045,7 +2041,7 @@ private:
 
   /// Implementation code for getSCEVAtScope; called at most once for each
   /// SCEV+Loop pair.
-  const SCEV *computeSCEVAtScope(const SCEV *S, const Loop *L);
+  SCEVUse computeSCEVAtScope(SCEVUse S, const Loop *L);
 
   /// Return the BackedgeTakenInfo for the given loop, lazily computing new
   /// values if the loop hasn't been analyzed yet. The returned result is
@@ -2342,7 +2338,7 @@ private:
   void forgetMemoizedResults(ArrayRef<SCEVUse> SCEVs);
 
   /// Helper for forgetMemoizedResults.
-  void forgetMemoizedResultsImpl(const SCEV *S);
+  void forgetMemoizedResultsImpl(SCEVUse S);
 
   /// Iterate over instructions in \p Worklist and their users. Erase entries
   /// from ValueExprMap and collect SCEV expressions in \p ToForget
@@ -2477,16 +2473,17 @@ private:
   bool canIVOverflowOnGT(const SCEV *RHS, const SCEV *Stride, bool IsSigned);
 
   /// Get add expr already created or create a new one.
-  const SCEV *getOrCreateAddExpr(ArrayRef<SCEVUse> Ops,
-                                 SCEV::NoWrapFlags Flags);
+  SCEVUse getOrCreateAddExpr(ArrayRef<SCEVUse> Ops, SCEV::NoWrapFlags Flags,
+                             SCEV::NoWrapFlags UseFlags = SCEV::FlagAnyWrap);
 
   /// Get mul expr already created or create a new one.
-  const SCEV *getOrCreateMulExpr(ArrayRef<SCEVUse> Ops,
-                                 SCEV::NoWrapFlags Flags);
+  SCEVUse getOrCreateMulExpr(ArrayRef<SCEVUse> Ops, SCEV::NoWrapFlags Flags,
+                             SCEV::NoWrapFlags UseFlags = SCEV::FlagAnyWrap);
 
   // Get addrec expr already created or create a new one.
-  const SCEV *getOrCreateAddRecExpr(ArrayRef<SCEVUse> Ops, const Loop *L,
-                                    SCEV::NoWrapFlags Flags);
+  SCEVUse getOrCreateAddRecExpr(ArrayRef<SCEVUse> Ops, const Loop *L,
+                                SCEV::NoWrapFlags Flags,
+                                SCEV::NoWrapFlags UseFlags = SCEV::FlagAnyWrap);
 
   /// Return x if \p Val is f(x) where f is a 1-1 function.
   const SCEV *stripInjectiveFunctions(const SCEV *Val) const;
