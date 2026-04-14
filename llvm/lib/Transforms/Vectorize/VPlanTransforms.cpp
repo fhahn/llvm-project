@@ -2561,6 +2561,38 @@ void VPlanTransforms::clearReductionWrapFlags(VPlan &Plan) {
   }
 }
 
+void VPlanTransforms::adjustAnyOfReductions(VPlan &Plan) {
+  using namespace VPlanPatternMatch;
+  for (VPRecipeBase &R :
+       Plan.getVectorLoopRegion()->getEntryBasicBlock()->phis()) {
+    auto *PhiR = dyn_cast<VPReductionPHIRecipe>(&R);
+    if (!PhiR || !RecurrenceDescriptor::isAnyOfRecurrenceKind(
+                     PhiR->getRecurrenceKind()))
+      continue;
+
+    // Find the select among PhiR's users.
+    auto *AnyOfSelect = vputils::findUserOf(
+        PhiR, m_Select(m_VPValue(), m_VPValue(), m_VPValue()));
+    VPValue *Cmp = AnyOfSelect->getOperand(0);
+    // If the compare is checking the reduction PHI node, adjust it to check
+    // the start value.
+    if (VPRecipeBase *CmpR = Cmp->getDefiningRecipe())
+      CmpR->replaceUsesOfWith(PhiR, PhiR->getStartValue());
+    VPBuilder Builder(AnyOfSelect);
+
+    // If the true value of the select is the reduction phi, the new value is
+    // selected if the negated condition is true in any iteration.
+    if (AnyOfSelect->getOperand(1) == PhiR)
+      Cmp = Builder.createNot(Cmp);
+    VPValue *Or = Builder.createOr(PhiR, Cmp);
+    AnyOfSelect->getVPSingleValue()->replaceAllUsesWith(Or);
+    AnyOfSelect->eraseFromParent();
+
+    // Convert the reduction phi to operate on bools.
+    PhiR->setOperand(0, Plan.getFalse());
+  }
+}
+
 namespace {
 struct VPCSEDenseMapInfo : public DenseMapInfo<VPSingleDefRecipe *> {
   static bool isSentinel(const VPSingleDefRecipe *Def) {
@@ -6569,7 +6601,9 @@ void VPlanTransforms::makeMemOpWideningDecisions(
   }
 
   VPBasicBlock *MiddleVPBB = Plan.getMiddleBlock();
-  VPBuilder FinalRedStoresBuilder(MiddleVPBB, MiddleVPBB->getFirstNonPhi());
+  // Insert invariant stores after reduction results, before the terminator.
+  VPBuilder FinalRedStoresBuilder(MiddleVPBB,
+                                  MiddleVPBB->getTerminator()->getIterator());
 
   for (VPInstruction *VPI : MemOps) {
     auto ReplaceWith = [&](VPRecipeBase *New) {

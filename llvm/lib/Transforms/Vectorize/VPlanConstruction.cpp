@@ -698,6 +698,61 @@ createWidenInductionRecipe(PHINode *Phi, VPPhi *PhiR, VPIRValue *Start,
   return WideIV;
 }
 
+/// Create a ComputeReductionResult or ComputeAnyOfResult recipe in the middle
+/// block for \p PhiR, replacing the ExtractLastPart/ExtractLastLane chain
+/// created by buildVPlan0.
+static void createReductionResultRecipe(VPReductionPHIRecipe *PhiR,
+                                        VPBasicBlock *MiddleVPBB,
+                                        DebugLoc ExitDL) {
+  using namespace VPlanPatternMatch;
+  RecurKind RK = PhiR->getRecurrenceKind();
+  VPValue *ExitingVPV = PhiR->getBackedgeValue();
+
+  // Create the reduction result recipe in the middle block.
+  VPInstruction *RedResult;
+  VPBuilder MiddleBuilder(MiddleVPBB, MiddleVPBB->getFirstNonPhi());
+  if (RecurrenceDescriptor::isAnyOfRecurrenceKind(RK)) {
+    auto *AnyOfSelect = vputils::findUserOf(
+        PhiR, m_Select(m_VPValue(), m_VPValue(), m_VPValue()));
+    VPValue *NewVal = AnyOfSelect->getOperand(1) == PhiR
+                          ? AnyOfSelect->getOperand(2)
+                          : AnyOfSelect->getOperand(1);
+    VPIRFlags OrFlags(RecurKind::Or, /*IsOrdered=*/false,
+                      /*IsInLoop=*/false, FastMathFlags());
+    auto *OrReduce =
+        MiddleBuilder.createNaryOp(VPInstruction::ComputeReductionResult,
+                                   {ExitingVPV}, OrFlags, ExitDL);
+    RedResult = MiddleBuilder.createNaryOp(
+        VPInstruction::ComputeAnyOfResult,
+        {PhiR->getStartValue(), NewVal, OrReduce}, ExitDL);
+  } else {
+    VPIRFlags Flags(RK, PhiR->isOrdered(), PhiR->isInLoop(),
+                    PhiR->getFastMathFlags());
+    RedResult = MiddleBuilder.createNaryOp(
+        VPInstruction::ComputeReductionResult, {ExitingVPV}, Flags, ExitDL);
+  }
+
+  // Replace ExtractLastPart -> ExtractLastLane chains for this reduction's
+  // backedge value with the reduction result, then erase the dead chain.
+  for (auto *U : to_vector(ExitingVPV->users())) {
+    if (!match(U, m_ExtractLastPart(m_VPValue())))
+      continue;
+    auto *ExtPart = cast<VPInstruction>(U);
+    if (ExtPart->getParent() != MiddleVPBB)
+      continue;
+    for (auto *EU : to_vector(ExtPart->users())) {
+      if (!match(EU, m_CombineOr(m_ExtractLane(m_VPValue(), m_VPValue()),
+                                 m_ExtractLastLane(m_VPValue()))))
+        continue;
+      cast<VPInstruction>(EU)->replaceAllUsesWith(RedResult);
+      cast<VPInstruction>(EU)->eraseFromParent();
+    }
+    assert(ExtPart->getNumUsers() == 0 &&
+           "ExtractLastPart should have no remaining users");
+    ExtPart->eraseFromParent();
+  }
+}
+
 void VPlanTransforms::createHeaderPhiRecipes(
     VPlan &Plan, PredicatedScalarEvolution &PSE, Loop &OrigLoop,
     const MapVector<PHINode *, InductionDescriptor> &Inductions,
@@ -753,6 +808,14 @@ void VPlanTransforms::createHeaderPhiRecipes(
         RdxDesc.hasUsesOutsideReductionChain());
   };
 
+  auto *PreheaderVPBB =
+      cast<VPBasicBlock>(Plan.getEntry()->getSuccessors()[1]);
+  auto *LatchVPBB = cast<VPBasicBlock>(HeaderVPBB->getPredecessors()[1]);
+  auto *MiddleVPBB = cast<VPBasicBlock>(LatchVPBB->getSuccessors()[0]);
+  // Use the latch terminator's DebugLoc for middle-block recipes so debugger
+  // stepping stays after the loop's backedge test.
+  DebugLoc ExitDL = LatchVPBB->getTerminator()->getDebugLoc();
+  VPTypeAnalysis TypeInfo(Plan);
   assert(isa<VPCanonicalIVPHIRecipe>(HeaderVPBB->front()) &&
          "first recipe must be canonical IV phi");
   for (VPRecipeBase &R : make_early_inc_range(drop_begin(HeaderVPBB->phis()))) {
@@ -761,6 +824,34 @@ void VPlanTransforms::createHeaderPhiRecipes(
     HeaderPhiR->insertBefore(PhiR);
     PhiR->replaceAllUsesWith(HeaderPhiR);
     PhiR->eraseFromParent();
+
+    auto *RedPhiR = dyn_cast<VPReductionPHIRecipe>(HeaderPhiR);
+    if (!RedPhiR)
+      continue;
+    if (isa<VPIRValue>(RedPhiR->getOperand(1)))
+      continue;
+
+    // Create ComputeReductionResult / ComputeAnyOfResult in the middle block,
+    // replacing the ExtractLastPart/ExtractLastLane chain from buildVPlan0.
+    createReductionResultRecipe(RedPhiR, MiddleVPBB, ExitDL);
+
+    // For standard reductions (not AnyOf/FindIV/MinMax/FindLast), create the
+    // ReductionStartVector in the preheader.
+    RecurKind RK = RedPhiR->getRecurrenceKind();
+    if (RecurrenceDescriptor::isAnyOfRecurrenceKind(RK) ||
+        RecurrenceDescriptor::isFindIVRecurrenceKind(RK) ||
+        RecurrenceDescriptor::isMinMaxRecurrenceKind(RK) ||
+        RecurrenceDescriptor::isFindLastRecurrenceKind(RK))
+      continue;
+    Type *PhiTy = TypeInfo.inferScalarType(RedPhiR);
+    VPBuilder PHBuilder(PreheaderVPBB);
+    VPValue *Iden = Plan.getOrAddLiveIn(
+        getRecurrenceIdentity(RK, PhiTy, RedPhiR->getFastMathFlags()));
+    auto *ScaleFactorVPV = Plan.getConstantInt(/*BitWidth=*/32, /*Value=*/1);
+    VPValue *StartV = PHBuilder.createNaryOp(
+        VPInstruction::ReductionStartVector,
+        {RedPhiR->getStartValue(), Iden, ScaleFactorVPV}, *RedPhiR);
+    RedPhiR->setOperand(0, StartV);
   }
 
   for (const auto &[HeaderPhiR, ScalarPhiR] :

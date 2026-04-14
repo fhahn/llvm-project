@@ -677,13 +677,9 @@ private:
   /// legal to vectorize the loop. This method creates VPlans using VPRecipes.
   void buildVPlansWithVPRecipes(ElementCount MinVF, ElementCount MaxVF);
 
-  /// Add recipes to compute the final reduction result (ComputeAnyOfResult,
-  /// ComputeReductionResult depending on the reduction) in
-  /// the middle block. Selects are introduced for reductions between the phi
-  /// and users outside the vector region when folding the tail.
-  void addReductionResultComputation(VPlanPtr &Plan,
-                                     VPRecipeBuilder &RecipeBuilder,
-                                     ElementCount MinVF);
+  /// Introduce tail-fold selects for reductions and adjust reduction results
+  /// for smaller types in the middle block.
+  void adjustReductionExitValues(VPlanPtr &Plan, ElementCount MinVF);
 
   /// Returns true if the per-lane cost of VectorizationFactor A is lower than
   /// that of B.

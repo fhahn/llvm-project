@@ -40,12 +40,12 @@ define i32 @multi_user_cmp(ptr readonly %a, i64 noundef %n) {
 ; CHECK-VF4-IC1-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-VF4-IC1-NEXT:    br i1 [[TMP7]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK-VF4-IC1:       middle.block:
-; CHECK-VF4-IC1-NEXT:    [[TMP8:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP6]])
-; CHECK-VF4-IC1-NEXT:    [[TMP9:%.*]] = freeze i1 [[TMP8]]
-; CHECK-VF4-IC1-NEXT:    [[RDX_SELECT:%.*]] = select i1 [[TMP9]], i1 false, i1 true
 ; CHECK-VF4-IC1-NEXT:    [[TMP10:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP4]])
 ; CHECK-VF4-IC1-NEXT:    [[TMP11:%.*]] = freeze i1 [[TMP10]]
 ; CHECK-VF4-IC1-NEXT:    [[RDX_SELECT2:%.*]] = select i1 [[TMP11]], i1 true, i1 false
+; CHECK-VF4-IC1-NEXT:    [[TMP8:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP6]])
+; CHECK-VF4-IC1-NEXT:    [[TMP9:%.*]] = freeze i1 [[TMP8]]
+; CHECK-VF4-IC1-NEXT:    [[RDX_SELECT:%.*]] = select i1 [[TMP9]], i1 false, i1 true
 ; CHECK-VF4-IC1-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; CHECK-VF4-IC1-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH]]
 ; CHECK-VF4-IC1:       scalar.ph:
@@ -103,14 +103,14 @@ define i32 @multi_user_cmp(ptr readonly %a, i64 noundef %n) {
 ; CHECK-VF4-IC2-NEXT:    [[TMP14:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-VF4-IC2-NEXT:    br i1 [[TMP14]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK-VF4-IC2:       middle.block:
-; CHECK-VF4-IC2-NEXT:    [[BIN_RDX:%.*]] = or <4 x i1> [[TMP13]], [[TMP12]]
-; CHECK-VF4-IC2-NEXT:    [[TMP15:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[BIN_RDX]])
-; CHECK-VF4-IC2-NEXT:    [[TMP16:%.*]] = freeze i1 [[TMP15]]
-; CHECK-VF4-IC2-NEXT:    [[RDX_SELECT:%.*]] = select i1 [[TMP16]], i1 false, i1 true
 ; CHECK-VF4-IC2-NEXT:    [[BIN_RDX5:%.*]] = or <4 x i1> [[TMP9]], [[TMP8]]
 ; CHECK-VF4-IC2-NEXT:    [[TMP17:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[BIN_RDX5]])
 ; CHECK-VF4-IC2-NEXT:    [[TMP18:%.*]] = freeze i1 [[TMP17]]
 ; CHECK-VF4-IC2-NEXT:    [[RDX_SELECT6:%.*]] = select i1 [[TMP18]], i1 true, i1 false
+; CHECK-VF4-IC2-NEXT:    [[BIN_RDX:%.*]] = or <4 x i1> [[TMP13]], [[TMP12]]
+; CHECK-VF4-IC2-NEXT:    [[TMP15:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[BIN_RDX]])
+; CHECK-VF4-IC2-NEXT:    [[TMP16:%.*]] = freeze i1 [[TMP15]]
+; CHECK-VF4-IC2-NEXT:    [[RDX_SELECT:%.*]] = select i1 [[TMP16]], i1 false, i1 true
 ; CHECK-VF4-IC2-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; CHECK-VF4-IC2-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH]]
 ; CHECK-VF4-IC2:       scalar.ph:
@@ -169,12 +169,12 @@ define i32 @multi_user_cmp(ptr readonly %a, i64 noundef %n) {
 ; CHECK-VF1-IC2-NEXT:    [[TMP14:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-VF1-IC2-NEXT:    br i1 [[TMP14]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK-VF1-IC2:       middle.block:
-; CHECK-VF1-IC2-NEXT:    [[BIN_RDX:%.*]] = or i1 [[TMP13]], [[TMP12]]
-; CHECK-VF1-IC2-NEXT:    [[TMP15:%.*]] = freeze i1 [[BIN_RDX]]
-; CHECK-VF1-IC2-NEXT:    [[RDX_SELECT:%.*]] = select i1 [[TMP15]], i1 false, i1 true
 ; CHECK-VF1-IC2-NEXT:    [[BIN_RDX4:%.*]] = or i1 [[TMP9]], [[TMP8]]
 ; CHECK-VF1-IC2-NEXT:    [[TMP16:%.*]] = freeze i1 [[BIN_RDX4]]
 ; CHECK-VF1-IC2-NEXT:    [[RDX_SELECT5:%.*]] = select i1 [[TMP16]], i1 true, i1 false
+; CHECK-VF1-IC2-NEXT:    [[BIN_RDX:%.*]] = or i1 [[TMP13]], [[TMP12]]
+; CHECK-VF1-IC2-NEXT:    [[TMP15:%.*]] = freeze i1 [[BIN_RDX]]
+; CHECK-VF1-IC2-NEXT:    [[RDX_SELECT:%.*]] = select i1 [[TMP15]], i1 false, i1 true
 ; CHECK-VF1-IC2-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; CHECK-VF1-IC2-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH]]
 ; CHECK-VF1-IC2:       scalar.ph:
@@ -259,12 +259,12 @@ define i32 @multi_user_cmp_int(ptr readonly %a, i64 noundef %n) {
 ; CHECK-VF4-IC1-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-VF4-IC1-NEXT:    br i1 [[TMP7]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK-VF4-IC1:       middle.block:
-; CHECK-VF4-IC1-NEXT:    [[TMP8:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP6]])
-; CHECK-VF4-IC1-NEXT:    [[TMP9:%.*]] = freeze i1 [[TMP8]]
-; CHECK-VF4-IC1-NEXT:    [[RDX_SELECT:%.*]] = select i1 [[TMP9]], i1 false, i1 true
 ; CHECK-VF4-IC1-NEXT:    [[TMP10:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP4]])
 ; CHECK-VF4-IC1-NEXT:    [[TMP11:%.*]] = freeze i1 [[TMP10]]
 ; CHECK-VF4-IC1-NEXT:    [[RDX_SELECT2:%.*]] = select i1 [[TMP11]], i1 true, i1 false
+; CHECK-VF4-IC1-NEXT:    [[TMP8:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP6]])
+; CHECK-VF4-IC1-NEXT:    [[TMP9:%.*]] = freeze i1 [[TMP8]]
+; CHECK-VF4-IC1-NEXT:    [[RDX_SELECT:%.*]] = select i1 [[TMP9]], i1 false, i1 true
 ; CHECK-VF4-IC1-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; CHECK-VF4-IC1-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH]]
 ; CHECK-VF4-IC1:       scalar.ph:
@@ -322,14 +322,14 @@ define i32 @multi_user_cmp_int(ptr readonly %a, i64 noundef %n) {
 ; CHECK-VF4-IC2-NEXT:    [[TMP14:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-VF4-IC2-NEXT:    br i1 [[TMP14]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK-VF4-IC2:       middle.block:
-; CHECK-VF4-IC2-NEXT:    [[BIN_RDX:%.*]] = or <4 x i1> [[TMP13]], [[TMP12]]
-; CHECK-VF4-IC2-NEXT:    [[TMP15:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[BIN_RDX]])
-; CHECK-VF4-IC2-NEXT:    [[TMP16:%.*]] = freeze i1 [[TMP15]]
-; CHECK-VF4-IC2-NEXT:    [[RDX_SELECT:%.*]] = select i1 [[TMP16]], i1 false, i1 true
 ; CHECK-VF4-IC2-NEXT:    [[BIN_RDX5:%.*]] = or <4 x i1> [[TMP9]], [[TMP8]]
 ; CHECK-VF4-IC2-NEXT:    [[TMP17:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[BIN_RDX5]])
 ; CHECK-VF4-IC2-NEXT:    [[TMP18:%.*]] = freeze i1 [[TMP17]]
 ; CHECK-VF4-IC2-NEXT:    [[RDX_SELECT6:%.*]] = select i1 [[TMP18]], i1 true, i1 false
+; CHECK-VF4-IC2-NEXT:    [[BIN_RDX:%.*]] = or <4 x i1> [[TMP13]], [[TMP12]]
+; CHECK-VF4-IC2-NEXT:    [[TMP15:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[BIN_RDX]])
+; CHECK-VF4-IC2-NEXT:    [[TMP16:%.*]] = freeze i1 [[TMP15]]
+; CHECK-VF4-IC2-NEXT:    [[RDX_SELECT:%.*]] = select i1 [[TMP16]], i1 false, i1 true
 ; CHECK-VF4-IC2-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; CHECK-VF4-IC2-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH]]
 ; CHECK-VF4-IC2:       scalar.ph:
@@ -388,12 +388,12 @@ define i32 @multi_user_cmp_int(ptr readonly %a, i64 noundef %n) {
 ; CHECK-VF1-IC2-NEXT:    [[TMP14:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-VF1-IC2-NEXT:    br i1 [[TMP14]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK-VF1-IC2:       middle.block:
-; CHECK-VF1-IC2-NEXT:    [[BIN_RDX:%.*]] = or i1 [[TMP13]], [[TMP12]]
-; CHECK-VF1-IC2-NEXT:    [[TMP15:%.*]] = freeze i1 [[BIN_RDX]]
-; CHECK-VF1-IC2-NEXT:    [[RDX_SELECT:%.*]] = select i1 [[TMP15]], i1 false, i1 true
 ; CHECK-VF1-IC2-NEXT:    [[BIN_RDX4:%.*]] = or i1 [[TMP9]], [[TMP8]]
 ; CHECK-VF1-IC2-NEXT:    [[TMP16:%.*]] = freeze i1 [[BIN_RDX4]]
 ; CHECK-VF1-IC2-NEXT:    [[RDX_SELECT5:%.*]] = select i1 [[TMP16]], i1 true, i1 false
+; CHECK-VF1-IC2-NEXT:    [[BIN_RDX:%.*]] = or i1 [[TMP13]], [[TMP12]]
+; CHECK-VF1-IC2-NEXT:    [[TMP15:%.*]] = freeze i1 [[BIN_RDX]]
+; CHECK-VF1-IC2-NEXT:    [[RDX_SELECT:%.*]] = select i1 [[TMP15]], i1 false, i1 true
 ; CHECK-VF1-IC2-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; CHECK-VF1-IC2-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH]]
 ; CHECK-VF1-IC2:       scalar.ph:
@@ -528,12 +528,12 @@ define i32 @multi_user_cmp_branch_use(ptr readonly %a, ptr %b, i64 noundef %n) {
 ; CHECK-VF4-IC1-NEXT:    [[TMP31:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-VF4-IC1-NEXT:    br i1 [[TMP31]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP11:![0-9]+]]
 ; CHECK-VF4-IC1:       middle.block:
-; CHECK-VF4-IC1-NEXT:    [[TMP32:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP7]])
-; CHECK-VF4-IC1-NEXT:    [[TMP33:%.*]] = freeze i1 [[TMP32]]
-; CHECK-VF4-IC1-NEXT:    [[RDX_SELECT:%.*]] = select i1 [[TMP33]], i1 false, i1 true
 ; CHECK-VF4-IC1-NEXT:    [[TMP34:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP5]])
 ; CHECK-VF4-IC1-NEXT:    [[TMP35:%.*]] = freeze i1 [[TMP34]]
 ; CHECK-VF4-IC1-NEXT:    [[RDX_SELECT9:%.*]] = select i1 [[TMP35]], i1 true, i1 false
+; CHECK-VF4-IC1-NEXT:    [[TMP32:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP7]])
+; CHECK-VF4-IC1-NEXT:    [[TMP33:%.*]] = freeze i1 [[TMP32]]
+; CHECK-VF4-IC1-NEXT:    [[RDX_SELECT:%.*]] = select i1 [[TMP33]], i1 false, i1 true
 ; CHECK-VF4-IC1-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; CHECK-VF4-IC1-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH]]
 ; CHECK-VF4-IC1:       scalar.ph:
@@ -686,14 +686,14 @@ define i32 @multi_user_cmp_branch_use(ptr readonly %a, ptr %b, i64 noundef %n) {
 ; CHECK-VF4-IC2-NEXT:    [[TMP61:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-VF4-IC2-NEXT:    br i1 [[TMP61]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP11:![0-9]+]]
 ; CHECK-VF4-IC2:       middle.block:
-; CHECK-VF4-IC2-NEXT:    [[BIN_RDX:%.*]] = or <4 x i1> [[TMP14]], [[TMP13]]
-; CHECK-VF4-IC2-NEXT:    [[TMP62:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[BIN_RDX]])
-; CHECK-VF4-IC2-NEXT:    [[TMP63:%.*]] = freeze i1 [[TMP62]]
-; CHECK-VF4-IC2-NEXT:    [[RDX_SELECT:%.*]] = select i1 [[TMP63]], i1 false, i1 true
 ; CHECK-VF4-IC2-NEXT:    [[BIN_RDX20:%.*]] = or <4 x i1> [[TMP10]], [[TMP9]]
 ; CHECK-VF4-IC2-NEXT:    [[TMP64:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[BIN_RDX20]])
 ; CHECK-VF4-IC2-NEXT:    [[TMP65:%.*]] = freeze i1 [[TMP64]]
 ; CHECK-VF4-IC2-NEXT:    [[RDX_SELECT21:%.*]] = select i1 [[TMP65]], i1 true, i1 false
+; CHECK-VF4-IC2-NEXT:    [[BIN_RDX:%.*]] = or <4 x i1> [[TMP14]], [[TMP13]]
+; CHECK-VF4-IC2-NEXT:    [[TMP62:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[BIN_RDX]])
+; CHECK-VF4-IC2-NEXT:    [[TMP63:%.*]] = freeze i1 [[TMP62]]
+; CHECK-VF4-IC2-NEXT:    [[RDX_SELECT:%.*]] = select i1 [[TMP63]], i1 false, i1 true
 ; CHECK-VF4-IC2-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; CHECK-VF4-IC2-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH]]
 ; CHECK-VF4-IC2:       scalar.ph:
@@ -784,12 +784,12 @@ define i32 @multi_user_cmp_branch_use(ptr readonly %a, ptr %b, i64 noundef %n) {
 ; CHECK-VF1-IC2-NEXT:    [[TMP23:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-VF1-IC2-NEXT:    br i1 [[TMP23]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP11:![0-9]+]]
 ; CHECK-VF1-IC2:       middle.block:
-; CHECK-VF1-IC2-NEXT:    [[BIN_RDX:%.*]] = or i1 [[TMP14]], [[TMP13]]
-; CHECK-VF1-IC2-NEXT:    [[TMP24:%.*]] = freeze i1 [[BIN_RDX]]
-; CHECK-VF1-IC2-NEXT:    [[RDX_SELECT:%.*]] = select i1 [[TMP24]], i1 false, i1 true
 ; CHECK-VF1-IC2-NEXT:    [[BIN_RDX7:%.*]] = or i1 [[TMP10]], [[TMP9]]
 ; CHECK-VF1-IC2-NEXT:    [[TMP25:%.*]] = freeze i1 [[BIN_RDX7]]
 ; CHECK-VF1-IC2-NEXT:    [[RDX_SELECT8:%.*]] = select i1 [[TMP25]], i1 true, i1 false
+; CHECK-VF1-IC2-NEXT:    [[BIN_RDX:%.*]] = or i1 [[TMP14]], [[TMP13]]
+; CHECK-VF1-IC2-NEXT:    [[TMP24:%.*]] = freeze i1 [[BIN_RDX]]
+; CHECK-VF1-IC2-NEXT:    [[RDX_SELECT:%.*]] = select i1 [[TMP24]], i1 false, i1 true
 ; CHECK-VF1-IC2-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; CHECK-VF1-IC2-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH]]
 ; CHECK-VF1-IC2:       scalar.ph:
@@ -894,12 +894,12 @@ define i32 @multi_user_cmp_branch_use_and_outside_bb_use(ptr readonly %a, i64 no
 ; CHECK-VF4-IC1-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-VF4-IC1-NEXT:    br i1 [[TMP7]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP13:![0-9]+]]
 ; CHECK-VF4-IC1:       middle.block:
-; CHECK-VF4-IC1-NEXT:    [[TMP9:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP6]])
-; CHECK-VF4-IC1-NEXT:    [[TMP10:%.*]] = freeze i1 [[TMP9]]
-; CHECK-VF4-IC1-NEXT:    [[RDX_SELECT:%.*]] = select i1 [[TMP10]], i1 false, i1 true
 ; CHECK-VF4-IC1-NEXT:    [[TMP11:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP4]])
 ; CHECK-VF4-IC1-NEXT:    [[TMP12:%.*]] = freeze i1 [[TMP11]]
 ; CHECK-VF4-IC1-NEXT:    [[RDX_SELECT2:%.*]] = select i1 [[TMP12]], i1 true, i1 false
+; CHECK-VF4-IC1-NEXT:    [[TMP9:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP6]])
+; CHECK-VF4-IC1-NEXT:    [[TMP10:%.*]] = freeze i1 [[TMP9]]
+; CHECK-VF4-IC1-NEXT:    [[RDX_SELECT:%.*]] = select i1 [[TMP10]], i1 false, i1 true
 ; CHECK-VF4-IC1-NEXT:    [[TMP8:%.*]] = extractelement <4 x i1> [[TMP3]], i32 3
 ; CHECK-VF4-IC1-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; CHECK-VF4-IC1-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH]]
@@ -960,14 +960,14 @@ define i32 @multi_user_cmp_branch_use_and_outside_bb_use(ptr readonly %a, i64 no
 ; CHECK-VF4-IC2-NEXT:    [[TMP14:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-VF4-IC2-NEXT:    br i1 [[TMP14]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP13:![0-9]+]]
 ; CHECK-VF4-IC2:       middle.block:
-; CHECK-VF4-IC2-NEXT:    [[BIN_RDX:%.*]] = or <4 x i1> [[TMP13]], [[TMP12]]
-; CHECK-VF4-IC2-NEXT:    [[TMP16:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[BIN_RDX]])
-; CHECK-VF4-IC2-NEXT:    [[TMP17:%.*]] = freeze i1 [[TMP16]]
-; CHECK-VF4-IC2-NEXT:    [[RDX_SELECT:%.*]] = select i1 [[TMP17]], i1 false, i1 true
 ; CHECK-VF4-IC2-NEXT:    [[BIN_RDX5:%.*]] = or <4 x i1> [[TMP9]], [[TMP8]]
 ; CHECK-VF4-IC2-NEXT:    [[TMP18:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[BIN_RDX5]])
 ; CHECK-VF4-IC2-NEXT:    [[TMP19:%.*]] = freeze i1 [[TMP18]]
 ; CHECK-VF4-IC2-NEXT:    [[RDX_SELECT6:%.*]] = select i1 [[TMP19]], i1 true, i1 false
+; CHECK-VF4-IC2-NEXT:    [[BIN_RDX:%.*]] = or <4 x i1> [[TMP13]], [[TMP12]]
+; CHECK-VF4-IC2-NEXT:    [[TMP16:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[BIN_RDX]])
+; CHECK-VF4-IC2-NEXT:    [[TMP17:%.*]] = freeze i1 [[TMP16]]
+; CHECK-VF4-IC2-NEXT:    [[RDX_SELECT:%.*]] = select i1 [[TMP17]], i1 false, i1 true
 ; CHECK-VF4-IC2-NEXT:    [[TMP15:%.*]] = extractelement <4 x i1> [[TMP7]], i32 3
 ; CHECK-VF4-IC2-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; CHECK-VF4-IC2-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH]]
@@ -1029,12 +1029,12 @@ define i32 @multi_user_cmp_branch_use_and_outside_bb_use(ptr readonly %a, i64 no
 ; CHECK-VF1-IC2-NEXT:    [[TMP14:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-VF1-IC2-NEXT:    br i1 [[TMP14]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP13:![0-9]+]]
 ; CHECK-VF1-IC2:       middle.block:
-; CHECK-VF1-IC2-NEXT:    [[BIN_RDX:%.*]] = or i1 [[TMP13]], [[TMP12]]
-; CHECK-VF1-IC2-NEXT:    [[TMP15:%.*]] = freeze i1 [[BIN_RDX]]
-; CHECK-VF1-IC2-NEXT:    [[RDX_SELECT:%.*]] = select i1 [[TMP15]], i1 false, i1 true
 ; CHECK-VF1-IC2-NEXT:    [[BIN_RDX4:%.*]] = or i1 [[TMP9]], [[TMP8]]
 ; CHECK-VF1-IC2-NEXT:    [[TMP16:%.*]] = freeze i1 [[BIN_RDX4]]
 ; CHECK-VF1-IC2-NEXT:    [[RDX_SELECT5:%.*]] = select i1 [[TMP16]], i1 true, i1 false
+; CHECK-VF1-IC2-NEXT:    [[BIN_RDX:%.*]] = or i1 [[TMP13]], [[TMP12]]
+; CHECK-VF1-IC2-NEXT:    [[TMP15:%.*]] = freeze i1 [[BIN_RDX]]
+; CHECK-VF1-IC2-NEXT:    [[RDX_SELECT:%.*]] = select i1 [[TMP15]], i1 false, i1 true
 ; CHECK-VF1-IC2-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; CHECK-VF1-IC2-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH]]
 ; CHECK-VF1-IC2:       scalar.ph:

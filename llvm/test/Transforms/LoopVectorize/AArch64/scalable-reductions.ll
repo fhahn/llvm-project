@@ -330,7 +330,7 @@ define void @invariant_store(ptr %dst, ptr readonly %src) {
 ; CHECK: middle.block:
 ; CHECK: %[[ADD:.*]] = add <vscale x 4 x i32> %[[ADD2]], %[[ADD1]]
 ; CHECK-NEXT: %[[SUM:.*]] = call i32 @llvm.vector.reduce.add.nxv4i32(<vscale x 4 x i32> %[[ADD]])
-; CHECK-NEXT: store i32 %[[SUM]], ptr %gep.dst, align 4
+; CHECK: store i32 %[[SUM]], ptr %gep.dst, align 4
 entry:
   %gep.dst = getelementptr inbounds i32, ptr %dst, i64 42
   store i32 0, ptr %gep.dst, align 4

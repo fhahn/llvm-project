@@ -238,6 +238,12 @@ struct VPlanTransforms {
   /// Clear NSW/NUW flags from reduction instructions if necessary.
   static void clearReductionWrapFlags(VPlan &Plan);
 
+  /// Adjust AnyOf reductions: replace the reduction phi for the selected value
+  /// with a boolean reduction phi node to check if the condition is true in any
+  /// iteration. The final value is selected by the final
+  /// ComputeReductionResult.
+  static void adjustAnyOfReductions(VPlan &Plan);
+
   /// Explicitly unroll \p Plan by \p UF.
   static void unrollByUF(VPlan &Plan, unsigned UF);
 

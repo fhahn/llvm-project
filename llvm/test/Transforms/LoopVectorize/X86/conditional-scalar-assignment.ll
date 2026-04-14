@@ -438,10 +438,10 @@ define i32 @multi_use_cmp_for_csa_int_select(i64 %N, ptr %data, i32 %a) {
 ; AVX512-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; AVX512-NEXT:    br i1 [[TMP8]], label %[[MIDDLE_BLOCK:.*]], label %[[LOOP]], !llvm.loop [[LOOP8:![0-9]+]]
 ; AVX512:       [[MIDDLE_BLOCK]]:
-; AVX512-NEXT:    [[TMP9:%.*]] = call i32 @llvm.experimental.vector.extract.last.active.v8i32(<8 x i32> [[TMP6]], <8 x i1> [[TMP5]], i32 -1)
 ; AVX512-NEXT:    [[TMP10:%.*]] = call i64 @llvm.vector.reduce.smax.v8i64(<8 x i64> [[TMP7]])
 ; AVX512-NEXT:    [[TMP11:%.*]] = icmp ne i64 [[TMP10]], -9223372036854775808
 ; AVX512-NEXT:    [[TMP12:%.*]] = select i1 [[TMP11]], i64 [[TMP10]], i64 -1
+; AVX512-NEXT:    [[TMP9:%.*]] = call i32 @llvm.experimental.vector.extract.last.active.v8i32(<8 x i32> [[TMP6]], <8 x i1> [[TMP5]], i32 -1)
 ; AVX512-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; AVX512-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; AVX512:       [[SCALAR_PH]]:

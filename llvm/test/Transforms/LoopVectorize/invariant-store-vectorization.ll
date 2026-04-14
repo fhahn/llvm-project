@@ -397,8 +397,8 @@ define void @multiple_uniform_stores(ptr nocapture %var1, ptr nocapture readonly
 ; CHECK:       middle.block:
 ; CHECK-NEXT:    [[DOTLCSSA:%.*]] = phi <4 x i32> [ [[TMP17]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP19:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[DOTLCSSA]])
-; CHECK-NEXT:    store i32 [[TMP19]], ptr [[ARRAYIDX5]], align 4, !alias.scope [[META27:![0-9]+]], !noalias [[META23]]
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP8]], [[N_VEC]]
+; CHECK-NEXT:    store i32 [[TMP19]], ptr [[ARRAYIDX5]], align 4, !alias.scope [[META27:![0-9]+]], !noalias [[META23]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label [[FOR_INC8_LOOPEXIT:%.*]], label [[SCALAR_PH]]
 ; CHECK:       scalar.ph:
 ; CHECK-NEXT:    [[BC_MERGE_RDX:%.*]] = phi i32 [ [[TMP19]], [[MIDDLE_BLOCK]] ], [ [[ARRAYIDX5_PROMOTED]], [[FOR_BODY3_LR_PH]] ], [ [[ARRAYIDX5_PROMOTED]], [[VECTOR_MEMCHECK]] ]

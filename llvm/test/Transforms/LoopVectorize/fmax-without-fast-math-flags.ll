@@ -707,8 +707,8 @@ define float @test_fmax_and_fmax(ptr %src.0, ptr %src.1, i64 %n) {
 ; CHECK-NEXT:    [[TMP13:%.*]] = select i1 [[TMP9]], <4 x float> [[VEC_PHI]], <4 x float> [[TMP3]]
 ; CHECK-NEXT:    [[TMP14:%.*]] = select i1 [[TMP9]], <4 x float> [[VEC_PHI1]], <4 x float> [[TMP2]]
 ; CHECK-NEXT:    [[TMP15:%.*]] = select i1 [[TMP9]], i64 [[IV]], i64 [[N_VEC]]
-; CHECK-NEXT:    [[TMP16:%.*]] = call float @llvm.vector.reduce.fmin.v4f32(<4 x float> [[TMP13]])
 ; CHECK-NEXT:    [[TMP17:%.*]] = call float @llvm.vector.reduce.fmax.v4f32(<4 x float> [[TMP14]])
+; CHECK-NEXT:    [[TMP16:%.*]] = call float @llvm.vector.reduce.fmin.v4f32(<4 x float> [[TMP13]])
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; CHECK-NEXT:    [[TMP18:%.*]] = xor i1 [[TMP9]], true
 ; CHECK-NEXT:    [[TMP19:%.*]] = and i1 [[CMP_N]], [[TMP18]]

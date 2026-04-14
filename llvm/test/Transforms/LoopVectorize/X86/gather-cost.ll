@@ -188,12 +188,12 @@ define float @_Z4testmm(i64 %size, i64 %offset) {
 ; CHECK-NEXT:    [[TMP150:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP150]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       middle.block:
-; CHECK-NEXT:    [[BIN_RDX:%.*]] = fadd fast <4 x float> [[TMP65]], [[TMP64]]
-; CHECK-NEXT:    [[TMP151:%.*]] = call fast float @llvm.vector.reduce.fadd.v4f32(float 0.000000e+00, <4 x float> [[BIN_RDX]])
-; CHECK-NEXT:    [[BIN_RDX13:%.*]] = fadd fast <4 x float> [[TMP107]], [[TMP106]]
-; CHECK-NEXT:    [[TMP152:%.*]] = call fast float @llvm.vector.reduce.fadd.v4f32(float 0.000000e+00, <4 x float> [[BIN_RDX13]])
 ; CHECK-NEXT:    [[BIN_RDX14:%.*]] = fadd fast <4 x float> [[TMP149]], [[TMP148]]
 ; CHECK-NEXT:    [[TMP153:%.*]] = call fast float @llvm.vector.reduce.fadd.v4f32(float 0.000000e+00, <4 x float> [[BIN_RDX14]])
+; CHECK-NEXT:    [[BIN_RDX13:%.*]] = fadd fast <4 x float> [[TMP107]], [[TMP106]]
+; CHECK-NEXT:    [[TMP152:%.*]] = call fast float @llvm.vector.reduce.fadd.v4f32(float 0.000000e+00, <4 x float> [[BIN_RDX13]])
+; CHECK-NEXT:    [[BIN_RDX:%.*]] = fadd fast <4 x float> [[TMP65]], [[TMP64]]
+; CHECK-NEXT:    [[TMP151:%.*]] = call fast float @llvm.vector.reduce.fadd.v4f32(float 0.000000e+00, <4 x float> [[BIN_RDX]])
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[SIZE]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH]]
 ; CHECK:       scalar.ph:

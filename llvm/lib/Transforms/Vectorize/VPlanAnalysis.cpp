@@ -35,13 +35,10 @@ VPTypeAnalysis::VPTypeAnalysis(const VPlan &Plan)
   }
 
   // If there's no canonical IV, retrieve the type from the trip count
-  // expression.
-  auto *TC = Plan.getTripCount();
-  if (auto *TCIRV = dyn_cast<VPIRValue>(TC)) {
-    CanonicalIVTy = TCIRV->getType();
-    return;
-  }
-  CanonicalIVTy = cast<VPExpandSCEVRecipe>(TC)->getSCEV()->getType();
+  // expression. Use inferScalarType, as the trip count is always a VPIRValue
+  // or VPExpandSCEVRecipe, both of which can be inferred without
+  // CanonicalIVTy.
+  CanonicalIVTy = inferScalarType(Plan.getTripCount());
 }
 
 Type *VPTypeAnalysis::inferScalarTypeForRecipe(const VPBlendRecipe *R) {

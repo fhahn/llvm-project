@@ -52,10 +52,10 @@ define void @partial_reduce_extends_shared_with_reduction(ptr %ptr, i64 %n) #0 {
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP8]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[BIN_RDX:%.*]] = add <8 x i64> [[TMP14]], [[TMP7]]
-; CHECK-NEXT:    [[TMP16:%.*]] = call i64 @llvm.vector.reduce.add.v8i64(<8 x i64> [[BIN_RDX]])
 ; CHECK-NEXT:    [[BIN_RDX6:%.*]] = add <8 x i64> [[TMP10]], [[TMP5]]
 ; CHECK-NEXT:    [[TMP17:%.*]] = call i64 @llvm.vector.reduce.add.v8i64(<8 x i64> [[BIN_RDX6]])
+; CHECK-NEXT:    [[BIN_RDX:%.*]] = add <8 x i64> [[TMP14]], [[TMP7]]
+; CHECK-NEXT:    [[TMP16:%.*]] = call i64 @llvm.vector.reduce.add.v8i64(<8 x i64> [[BIN_RDX]])
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], [[EXIT:label %.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]]
 ; CHECK:       [[VEC_EPILOG_ITER_CHECK]]:

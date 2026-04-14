@@ -427,10 +427,10 @@ define i32 @multi_use_cmp_for_csa_int_select(i64 %N, ptr %data, i32 %a) {
 ; SVE-NEXT:    [[TMP13:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; SVE-NEXT:    br i1 [[TMP13]], label %[[MIDDLE_BLOCK:.*]], label %[[LOOP]], !llvm.loop [[LOOP8:![0-9]+]]
 ; SVE:       [[MIDDLE_BLOCK]]:
-; SVE-NEXT:    [[TMP14:%.*]] = call i32 @llvm.experimental.vector.extract.last.active.nxv4i32(<vscale x 4 x i32> [[TMP11]], <vscale x 4 x i1> [[TMP10]], i32 -1)
 ; SVE-NEXT:    [[TMP15:%.*]] = call i64 @llvm.vector.reduce.smax.nxv4i64(<vscale x 4 x i64> [[TMP12]])
 ; SVE-NEXT:    [[TMP16:%.*]] = icmp ne i64 [[TMP15]], -9223372036854775808
 ; SVE-NEXT:    [[TMP17:%.*]] = select i1 [[TMP16]], i64 [[TMP15]], i64 -1
+; SVE-NEXT:    [[TMP14:%.*]] = call i32 @llvm.experimental.vector.extract.last.active.nxv4i32(<vscale x 4 x i32> [[TMP11]], <vscale x 4 x i1> [[TMP10]], i32 -1)
 ; SVE-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; SVE-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; SVE:       [[SCALAR_PH]]:
@@ -1972,8 +1972,8 @@ define i32 @csa_multiple_find_last_phi_reductions(ptr noalias %mask, ptr noalias
 ; SVE-NEXT:    [[TMP18:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; SVE-NEXT:    br i1 [[TMP18]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP24:![0-9]+]]
 ; SVE:       [[MIDDLE_BLOCK]]:
-; SVE-NEXT:    [[TMP19:%.*]] = call i32 @llvm.experimental.vector.extract.last.active.nxv16i32(<vscale x 16 x i32> [[TMP15]], <vscale x 16 x i1> [[TMP14]], i32 0)
 ; SVE-NEXT:    [[TMP20:%.*]] = call i32 @llvm.experimental.vector.extract.last.active.nxv16i32(<vscale x 16 x i32> [[TMP17]], <vscale x 16 x i1> [[TMP16]], i32 0)
+; SVE-NEXT:    [[TMP19:%.*]] = call i32 @llvm.experimental.vector.extract.last.active.nxv16i32(<vscale x 16 x i32> [[TMP15]], <vscale x 16 x i1> [[TMP14]], i32 0)
 ; SVE-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; SVE-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; SVE:       [[SCALAR_PH]]:
