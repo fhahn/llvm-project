@@ -720,7 +720,7 @@ public:
   getStrengthenedNoWrapFlagsFromBinOp(const OverflowingBinaryOperator *OBO);
 
   /// Notify this ScalarEvolution that \p User directly uses SCEVs in \p Ops.
-  LLVM_ABI void registerUser(SCEVUse User, ArrayRef<SCEVUse> Ops);
+  LLVM_ABI void registerUser(const SCEV *User, ArrayRef<SCEVUse> Ops);
 
   /// Return true if the SCEV expression contains an undef value.
   LLVM_ABI bool containsUndefs(const SCEV *S) const;
@@ -1663,14 +1663,14 @@ private:
   std::unique_ptr<SCEVCouldNotCompute> CouldNotCompute;
 
   /// The type for HasRecMap.
-  using HasRecMapType = DenseMap<SCEVUse, bool>;
+  using HasRecMapType = DenseMap<const SCEV *, bool>;
 
   /// This is a cache to record whether a SCEV contains any scAddRecExpr.
   HasRecMapType HasRecMap;
 
   /// The type for ExprValueMap.
   using ValueSetVector = SmallSetVector<Value *, 4>;
-  using ExprValueMapType = DenseMap<SCEVUse, ValueSetVector>;
+  using ExprValueMapType = DenseMap<const SCEV *, ValueSetVector>;
 
   /// ExprValueMap -- This map records the original values from which
   /// the SCEV expr is generated from.
@@ -1686,7 +1686,7 @@ private:
   /// This is a cache for expressions that got folded to a different existing
   /// SCEV.
   DenseMap<FoldID, const SCEV *> FoldCache;
-  DenseMap<SCEVUse, SmallVector<FoldID, 2>> FoldCacheUser;
+  DenseMap<const SCEV *, SmallVector<FoldID, 2>> FoldCacheUser;
 
   /// Mark predicate values currently being processed by isImpliedCond.
   SmallPtrSet<const Value *, 6> PendingLoopPredicates;
@@ -1703,10 +1703,10 @@ private:
   bool ProvingSplitPredicate = false;
 
   /// Memoized values for the getConstantMultiple
-  DenseMap<SCEVUse, APInt> ConstantMultipleCache;
+  DenseMap<const SCEV *, APInt> ConstantMultipleCache;
 
   /// Return the Value set from which the SCEV expr is generated.
-  ArrayRef<Value *> getSCEVValues(SCEVUse S);
+  ArrayRef<Value *> getSCEVValues(const SCEV *S);
 
   /// Private helper method for the getConstantMultiple method. If \p CtxI is
   /// not nullptr, return a constant multiple valid at \p CtxI.
@@ -1871,7 +1871,7 @@ private:
   DenseMap<const Loop *, BackedgeTakenInfo> PredicatedBackedgeTakenCounts;
 
   /// Loops whose backedge taken counts directly use this non-constant SCEV.
-  DenseMap<SCEVUse, SmallPtrSet<PointerIntPair<const Loop *, 1, bool>, 4>>
+  DenseMap<const SCEV *, SmallPtrSet<PointerIntPair<const Loop *, 1, bool>, 4>>
       BECountUsers;
 
   /// This map contains entries for all of the PHI instructions that we
@@ -1892,7 +1892,7 @@ private:
       ValuesAtScopesUsers;
 
   /// Memoized computeLoopDisposition results.
-  DenseMap<SCEVUse,
+  DenseMap<const SCEV *,
            SmallVector<PointerIntPair<const Loop *, 2, LoopDisposition>, 2>>
       LoopDispositions;
 
@@ -1924,7 +1924,7 @@ private:
 
   /// Memoized computeBlockDisposition results.
   DenseMap<
-      SCEVUse,
+      const SCEV *,
       SmallVector<PointerIntPair<const BasicBlock *, 2, BlockDisposition>, 2>>
       BlockDispositions;
 
@@ -1932,13 +1932,13 @@ private:
   BlockDisposition computeBlockDisposition(const SCEV *S, const BasicBlock *BB);
 
   /// Stores all SCEV that use a given SCEV as its direct operand.
-  DenseMap<SCEVUse, SmallPtrSet<SCEVUse, 8>> SCEVUsers;
+  DenseMap<const SCEV *, SmallPtrSet<const SCEV *, 8>> SCEVUsers;
 
   /// Memoized results from getRange
-  DenseMap<SCEVUse, ConstantRange> UnsignedRanges;
+  DenseMap<const SCEV *, ConstantRange> UnsignedRanges;
 
   /// Memoized results from getRange
-  DenseMap<SCEVUse, ConstantRange> SignedRanges;
+  DenseMap<const SCEV *, ConstantRange> SignedRanges;
 
   /// Used to parameterize getRange
   enum RangeSignHint { HINT_RANGE_UNSIGNED, HINT_RANGE_SIGNED };
@@ -1946,7 +1946,7 @@ private:
   /// Set the memoized range for the given SCEV.
   const ConstantRange &setRange(const SCEV *S, RangeSignHint Hint,
                                 ConstantRange CR) {
-    DenseMap<SCEVUse, ConstantRange> &Cache =
+    DenseMap<const SCEV *, ConstantRange> &Cache =
         Hint == HINT_RANGE_UNSIGNED ? UnsignedRanges : SignedRanges;
 
     auto Pair = Cache.insert_or_assign(S, std::move(CR));

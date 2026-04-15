@@ -1648,7 +1648,7 @@ static APInt extractConstantWithoutWrapping(ScalarEvolution &SE,
 static void insertFoldCacheEntry(
     const ScalarEvolution::FoldID &ID, const SCEV *S,
     DenseMap<ScalarEvolution::FoldID, const SCEV *> &FoldCache,
-    DenseMap<SCEVUse, SmallVector<ScalarEvolution::FoldID, 2>>
+    DenseMap<const SCEV *, SmallVector<ScalarEvolution::FoldID, 2>>
         &FoldCacheUser) {
   auto I = FoldCache.insert({ID, S});
   if (!I.second) {
@@ -3110,8 +3110,8 @@ SCEVUse ScalarEvolution::getOrCreateAddExpr(ArrayRef<SCEVUse> Ops,
         SCEVAddExpr(ID.Intern(SCEVAllocator), O, Ops.size());
     UniqueSCEVs.InsertNode(S, IP);
     S->computeAndSetCanonical(*this);
+    registerUser(S, Ops);
     Result = SCEVUse(S, UseFlags);
-    registerUser(Result, Ops);
   } else {
     Result = SCEVUse(S, UseFlags);
   }
@@ -3140,8 +3140,8 @@ SCEVUse ScalarEvolution::getOrCreateAddRecExpr(ArrayRef<SCEVUse> Ops,
     UniqueSCEVs.InsertNode(S, IP);
     S->computeAndSetCanonical(*this);
     LoopUsers[L].push_back(S);
+    registerUser(S, Ops);
     Result = SCEVUse(S, UseFlags);
-    registerUser(Result, Ops);
   } else {
     Result = SCEVUse(S, UseFlags);
   }
@@ -3167,8 +3167,8 @@ SCEVUse ScalarEvolution::getOrCreateMulExpr(ArrayRef<SCEVUse> Ops,
                                         O, Ops.size());
     UniqueSCEVs.InsertNode(S, IP);
     S->computeAndSetCanonical(*this);
+    registerUser(S, Ops);
     Result = SCEVUse(S, UseFlags);
-    registerUser(Result, Ops);
   } else {
     Result = SCEVUse(S, UseFlags);
   }
@@ -4714,8 +4714,8 @@ bool ScalarEvolution::containsAddRecurrence(const SCEV *S) {
 
 /// Return the ValueOffsetPair set for \p S. \p S can be represented
 /// by the value and offset from any ValueOffsetPair in the set.
-ArrayRef<Value *> ScalarEvolution::getSCEVValues(SCEVUse S) {
-  ExprValueMapType::iterator SI = ExprValueMap.find(S);
+ArrayRef<Value *> ScalarEvolution::getSCEVValues(const SCEV *S) {
+  ExprValueMapType::iterator SI = ExprValueMap.find_as(S);
   if (SI == ExprValueMap.end())
     return {};
   return SI->second.getArrayRef();
@@ -4727,17 +4727,10 @@ ArrayRef<Value *> ScalarEvolution::getSCEVValues(SCEVUse S) {
 void ScalarEvolution::eraseValueFromMap(Value *V) {
   ValueExprMapType::iterator I = ValueExprMap.find_as(V);
   if (I != ValueExprMap.end()) {
-    SCEVUse S = I->second;
-    auto EVIt = ExprValueMap.find(S);
+    auto EVIt = ExprValueMap.find(I->second);
     bool Removed = EVIt->second.remove(V);
     (void) Removed;
     assert(Removed && "Value not in ExprValueMap?");
-    SCEVUse Canonical = S.getCanonical();
-    if (Canonical != S) {
-      auto CanonIt = ExprValueMap.find(Canonical);
-      if (CanonIt != ExprValueMap.end())
-        CanonIt->second.remove(V);
-    }
     ValueExprMap.erase(I);
   }
 }
@@ -4750,9 +4743,6 @@ void ScalarEvolution::insertValueToMap(Value *V, SCEVUse S) {
   if (It == ValueExprMap.end()) {
     ValueExprMap.insert({SCEVCallbackVH(V, this), S});
     ExprValueMap[S].insert(V);
-    SCEVUse Canonical = S.getCanonical();
-    if (Canonical != S)
-      ExprValueMap[Canonical].insert(V);
   }
 }
 
@@ -6814,7 +6804,7 @@ static bool RangeRefPHIAllowedOperands(DominatorTree &DT, PHINode *PHI) {
 const ConstantRange &
 ScalarEvolution::getRangeRefIter(const SCEV *S,
                                  ScalarEvolution::RangeSignHint SignHint) {
-  DenseMap<SCEVUse, ConstantRange> &Cache =
+  DenseMap<const SCEV *, ConstantRange> &Cache =
       SignHint == ScalarEvolution::HINT_RANGE_UNSIGNED ? UnsignedRanges
                                                        : SignedRanges;
   SmallVector<SCEVUse> WorkList;
@@ -6892,7 +6882,7 @@ ScalarEvolution::getRangeRefIter(const SCEV *S,
 /// with a "cleaner" unsigned (resp. signed) representation.
 const ConstantRange &ScalarEvolution::getRangeRef(
     const SCEV *S, ScalarEvolution::RangeSignHint SignHint, unsigned Depth) {
-  DenseMap<SCEVUse, ConstantRange> &Cache =
+  DenseMap<const SCEV *, ConstantRange> &Cache =
       SignHint == ScalarEvolution::HINT_RANGE_UNSIGNED ? UnsignedRanges
                                                        : SignedRanges;
   ConstantRange::PreferredRangeType RangeType =
@@ -6900,7 +6890,7 @@ const ConstantRange &ScalarEvolution::getRangeRef(
                                                        : ConstantRange::Signed;
 
   // See if we've computed this range already.
-  auto I = Cache.find(S);
+  DenseMap<const SCEV *, ConstantRange>::iterator I = Cache.find(S);
   if (I != Cache.end())
     return I->second;
 
@@ -8801,9 +8791,8 @@ void ScalarEvolution::visitAndClearUsers(
     ValueExprMapType::iterator It =
         ValueExprMap.find_as(static_cast<Value *>(I));
     if (It != ValueExprMap.end()) {
-      SCEVUse S = It->second;
       eraseValueFromMap(It->first);
-      ToForget.push_back(S);
+      ToForget.push_back(It->second);
       if (PHINode *PN = dyn_cast<PHINode>(I))
         ConstantEvolutionLoopExitValue.erase(PN);
     }
@@ -8941,7 +8930,7 @@ void ScalarEvolution::forgetBlockAndLoopDispositions(Value *V) {
       continue;
     auto Users = SCEVUsers.find(Curr);
     if (Users != SCEVUsers.end())
-      for (SCEVUse User : Users->second)
+      for (const auto *User : Users->second)
         if (Seen.insert(User).second)
           Worklist.push_back(User);
   }
@@ -14590,22 +14579,19 @@ void ScalarEvolution::forgetBackedgeTakenCounts(const Loop *L,
 }
 
 void ScalarEvolution::forgetMemoizedResults(ArrayRef<SCEVUse> SCEVs) {
-  SmallPtrSet<SCEVUse, 8> ToForget;
-  SmallVector<SCEVUse, 8> Worklist;
-  for (SCEVUse S : SCEVs)
-    if (ToForget.insert(S).second)
-      Worklist.push_back(S);
+  SmallPtrSet<const SCEV *, 8> ToForget(llvm::from_range, SCEVs);
+  SmallVector<SCEVUse, 8> Worklist(ToForget.begin(), ToForget.end());
 
   while (!Worklist.empty()) {
-    SCEVUse Curr = Worklist.pop_back_val();
+    const SCEV *Curr = Worklist.pop_back_val();
     auto Users = SCEVUsers.find(Curr);
     if (Users != SCEVUsers.end())
-      for (SCEVUse User : Users->second)
+      for (const auto *User : Users->second)
         if (ToForget.insert(User).second)
           Worklist.push_back(User);
   }
 
-  for (SCEVUse S : ToForget)
+  for (const auto *S : ToForget)
     forgetMemoizedResultsImpl(S);
 
   for (auto I = PredicatedSCEVRewrites.begin();
@@ -15515,8 +15501,8 @@ PredicatedScalarEvolution::PredicatedScalarEvolution(ScalarEvolution &SE,
   Preds = std::make_unique<SCEVUnionPredicate>(Empty, SE);
 }
 
-void ScalarEvolution::registerUser(SCEVUse User, ArrayRef<SCEVUse> Ops) {
-  for (SCEVUse Op : Ops)
+void ScalarEvolution::registerUser(const SCEV *User, ArrayRef<SCEVUse> Ops) {
+  for (const SCEV *Op : Ops)
     if (!isa<SCEVConstant>(Op))
       SCEVUsers[Op].insert(User);
 }
