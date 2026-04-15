@@ -6874,11 +6874,13 @@ const ConstantRange &ScalarEvolution::getRangeRef(
   // as well.
   if (SignHint == ScalarEvolution::HINT_RANGE_UNSIGNED) {
     APInt Multiple = getNonZeroConstantMultiple(S);
-    APInt Remainder = APInt::getMaxValue(BitWidth).urem(Multiple);
-    if (!Remainder.isZero())
-      ConservativeResult =
-          ConstantRange(APInt::getMinValue(BitWidth),
-                        APInt::getMaxValue(BitWidth) - Remainder + 1);
+    if (Multiple != 1) {
+      APInt Remainder = APInt::getMaxValue(BitWidth).urem(Multiple);
+      if (!Remainder.isZero())
+        ConservativeResult =
+            ConstantRange(APInt::getMinValue(BitWidth),
+                          APInt::getMaxValue(BitWidth) - Remainder + 1);
+    }
   }
   else {
     uint32_t TZ = getMinTrailingZeros(S);
