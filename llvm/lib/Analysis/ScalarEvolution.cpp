@@ -14559,7 +14559,7 @@ void ScalarEvolution::forgetMemoizedResults(ArrayRef<SCEVUse> SCEVs) {
   }
 
   for (const auto *S : ToForget)
-    forgetMemoizedResultsImpl(S);
+    forgetMemoizedResultsImpl(S, ToForget);
 
   for (auto I = PredicatedSCEVRewrites.begin();
        I != PredicatedSCEVRewrites.end();) {
@@ -14571,7 +14571,8 @@ void ScalarEvolution::forgetMemoizedResults(ArrayRef<SCEVUse> SCEVs) {
   }
 }
 
-void ScalarEvolution::forgetMemoizedResultsImpl(const SCEV *S) {
+void ScalarEvolution::forgetMemoizedResultsImpl(
+    const SCEV *S, const SmallPtrSetImpl<const SCEV *> &ToForget) {
   LoopDispositions.erase(S);
   BlockDispositions.erase(S);
   UnsignedRanges.erase(S);
@@ -14597,7 +14598,8 @@ void ScalarEvolution::forgetMemoizedResultsImpl(const SCEV *S) {
   auto ScopeIt = ValuesAtScopes.find(S);
   if (ScopeIt != ValuesAtScopes.end()) {
     for (const auto &Pair : ScopeIt->second)
-      if (!isa_and_nonnull<SCEVConstant>(Pair.second))
+      if (!isa_and_nonnull<SCEVConstant>(Pair.second) &&
+          !ToForget.count(Pair.second))
         llvm::erase(ValuesAtScopesUsers[Pair.second],
                     std::make_pair(Pair.first, S));
     ValuesAtScopes.erase(ScopeIt);
@@ -14606,7 +14608,9 @@ void ScalarEvolution::forgetMemoizedResultsImpl(const SCEV *S) {
   auto ScopeUserIt = ValuesAtScopesUsers.find(S);
   if (ScopeUserIt != ValuesAtScopesUsers.end()) {
     for (const auto &Pair : ScopeUserIt->second)
-      llvm::erase(ValuesAtScopes[Pair.second], std::make_pair(Pair.first, S));
+      if (!ToForget.count(Pair.second))
+        llvm::erase(ValuesAtScopes[Pair.second],
+                    std::make_pair(Pair.first, S));
     ValuesAtScopesUsers.erase(ScopeUserIt);
   }
 

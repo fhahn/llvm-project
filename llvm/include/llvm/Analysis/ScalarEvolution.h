@@ -2336,8 +2336,11 @@ private:
   /// Drop memoized information for all \p SCEVs.
   void forgetMemoizedResults(ArrayRef<SCEVUse> SCEVs);
 
-  /// Helper for forgetMemoizedResults.
-  void forgetMemoizedResultsImpl(const SCEV *S);
+  /// Helper for forgetMemoizedResults. \p ToForget is the full set of SCEVs
+  /// being forgotten in this batch, used to skip reverse-map cleanup for
+  /// entries that will be erased anyway.
+  void forgetMemoizedResultsImpl(const SCEV *S,
+                                 const SmallPtrSetImpl<const SCEV *> &ToForget);
 
   /// Iterate over instructions in \p Worklist and their users. Erase entries
   /// from ValueExprMap and collect SCEV expressions in \p ToForget
