@@ -8773,23 +8773,17 @@ void ScalarEvolution::forgetLoop(const Loop *L) {
   SmallPtrSet<Instruction *, 16> Visited;
   SmallVector<SCEVUse, 16> ToForget;
 
+  // Collect all loops to forget first, then process in a single pass.
+  SmallPtrSet<const Loop *, 16> LoopsToForget;
+
   // Iterate over all the loops and sub-loops to drop SCEV information.
   while (!LoopWorklist.empty()) {
     auto *CurrL = LoopWorklist.pop_back_val();
+    LoopsToForget.insert(CurrL);
 
     // Drop any stored trip count value.
     forgetBackedgeTakenCounts(CurrL, /* Predicated */ false);
     forgetBackedgeTakenCounts(CurrL, /* Predicated */ true);
-
-    // Drop information about predicated SCEV rewrites for this loop.
-    for (auto I = PredicatedSCEVRewrites.begin();
-         I != PredicatedSCEVRewrites.end();) {
-      std::pair<const SCEV *, const Loop *> Entry = I->first;
-      if (Entry.second == CurrL)
-        PredicatedSCEVRewrites.erase(I++);
-      else
-        ++I;
-    }
 
     auto LoopUsersItr = LoopUsers.find(CurrL);
     if (LoopUsersItr != LoopUsers.end())
@@ -8804,6 +8798,17 @@ void ScalarEvolution::forgetLoop(const Loop *L) {
     // ValuesAtScopes map.
     LoopWorklist.append(CurrL->begin(), CurrL->end());
   }
+
+  // Drop information about predicated SCEV rewrites for all forgotten loops
+  // in a single pass over PredicatedSCEVRewrites, instead of one pass per loop.
+  for (auto I = PredicatedSCEVRewrites.begin();
+       I != PredicatedSCEVRewrites.end();) {
+    if (LoopsToForget.count(I->first.second))
+      PredicatedSCEVRewrites.erase(I++);
+    else
+      ++I;
+  }
+
   forgetMemoizedResults(ToForget);
 }
 
