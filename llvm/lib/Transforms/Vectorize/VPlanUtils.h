@@ -74,7 +74,7 @@ VPBasicBlock *getFirstLoopHeader(VPlan &Plan, VPDominatorTree &VPDT);
 
 /// Get the VF scaling factor applied to the recipe's output, if the recipe has
 /// one.
-unsigned getVFScaleFactor(VPRecipeBase *R);
+unsigned getVFScaleFactor(const VPRecipeBase *R);
 
 /// Return true if we do not know how to (mechanically) hoist or sink \p R.
 /// When sinking, passing \p Sinking = true ensures that assumes aren't sunk.

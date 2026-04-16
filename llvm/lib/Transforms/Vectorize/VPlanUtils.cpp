@@ -526,7 +526,7 @@ VPBasicBlock *vputils::getFirstLoopHeader(VPlan &Plan, VPDominatorTree &VPDT) {
   return I == DepthFirst.end() ? nullptr : cast<VPBasicBlock>(*I);
 }
 
-unsigned vputils::getVFScaleFactor(VPRecipeBase *R) {
+unsigned vputils::getVFScaleFactor(const VPRecipeBase *R) {
   if (!R)
     return 1;
   if (auto *RR = dyn_cast<VPReductionPHIRecipe>(R))

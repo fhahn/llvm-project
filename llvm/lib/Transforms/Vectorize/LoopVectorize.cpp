@@ -3377,9 +3377,9 @@ static bool hasReplicatorRegion(VPlan &Plan) {
 
 /// Returns true if the VPlan contains a VPReductionPHIRecipe with
 /// FindLast recurrence kind.
-static bool hasFindLastReductionPhi(VPlan &Plan) {
+static bool hasFindLastReductionPhi(const VPlan &Plan) {
   return any_of(Plan.getVectorLoopRegion()->getEntryBasicBlock()->phis(),
-                [](VPRecipeBase &R) {
+                [](const VPRecipeBase &R) {
                   auto *RedPhi = dyn_cast<VPReductionPHIRecipe>(&R);
                   return RedPhi &&
                          RecurrenceDescriptor::isFindLastRecurrenceKind(
