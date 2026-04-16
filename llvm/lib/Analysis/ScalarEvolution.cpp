@@ -14604,18 +14604,22 @@ void ScalarEvolution::forgetMemoizedResultsImpl(
   if (ScopeIt != ValuesAtScopes.end()) {
     for (const auto &Pair : ScopeIt->second)
       if (!isa_and_nonnull<SCEVConstant>(Pair.second) &&
-          !ToForget.count(Pair.second))
-        llvm::erase(ValuesAtScopesUsers[Pair.second],
-                    std::make_pair(Pair.first, S));
+          !ToForget.count(Pair.second)) {
+        auto UserIt = ValuesAtScopesUsers.find(Pair.second);
+        if (UserIt != ValuesAtScopesUsers.end())
+          llvm::erase(UserIt->second, std::make_pair(Pair.first, S));
+      }
     ValuesAtScopes.erase(ScopeIt);
   }
 
   auto ScopeUserIt = ValuesAtScopesUsers.find(S);
   if (ScopeUserIt != ValuesAtScopesUsers.end()) {
     for (const auto &Pair : ScopeUserIt->second)
-      if (!ToForget.count(Pair.second))
-        llvm::erase(ValuesAtScopes[Pair.second],
-                    std::make_pair(Pair.first, S));
+      if (!ToForget.count(Pair.second)) {
+        auto ScopeIt2 = ValuesAtScopes.find(Pair.second);
+        if (ScopeIt2 != ValuesAtScopes.end())
+          llvm::erase(ScopeIt2->second, std::make_pair(Pair.first, S));
+      }
     ValuesAtScopesUsers.erase(ScopeUserIt);
   }
 
