@@ -16,7 +16,7 @@ target triple = "x86_64-unknown-linux-gnu"
 define void @fn1() {
 ; CHECK-LABEL: define void @fn1(
 ; CHECK-SAME: ) local_unnamed_addr #[[ATTR0:[0-9]+]] {
-; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = load i32, ptr @b, align 4
 ; CHECK-NEXT:    [[IDXPROM1:%.*]] = sext i32 [[TMP0]] to i64
 ; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds [3 x i8], ptr @f, i64 [[IDXPROM1]]
@@ -102,7 +102,7 @@ for.end10:                                        ; preds = %for.cond
 ; Function Attrs: nounwind uwtable
 define i32 @main() {
 ; CHECK-LABEL: define noundef i32 @main(
-; CHECK-SAME: ) local_unnamed_addr #[[ATTR0]] {
+; CHECK-SAME: ) local_unnamed_addr #[[ATTR1:[0-9]+]] {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    [[TMP0:%.*]] = load i32, ptr @b, align 4
 ; CHECK-NEXT:    [[IDXPROM1_I:%.*]] = sext i32 [[TMP0]] to i64
