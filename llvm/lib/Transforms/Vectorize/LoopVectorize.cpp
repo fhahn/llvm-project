@@ -8379,7 +8379,28 @@ LoopVectorizeResult LoopVectorizePass::runImpl(Function &F) {
     // transform.
     Changed |= formLCSSARecursively(*L, *DT, LI, SE);
 
-    Changed |= CFGChanged |= processLoop(L);
+    // Record whether the loop being processed -- or any enclosing loop --
+    // was deferred by the early full unroller, before LV potentially
+    // rewrites it away. The marker may sit on an ancestor of the loop LV
+    // actually vectorizes if pre-LV canonicalization (rotation, interchange)
+    // moved it out of innermost position. Either case counts as "LV
+    // processed a deferred loop": the post-LV cleanup chain needs to run.
+    bool WasDeferred = false;
+    for (const Loop *Cur = L; Cur; Cur = Cur->getParentLoop()) {
+      if (getBooleanLoopAttribute(Cur,
+                                  "llvm.loop.unroll.deferred_for_vectorization")) {
+        WasDeferred = true;
+        break;
+      }
+    }
+    Function *ContainingF = L->getHeader()->getParent();
+
+    bool LoopChanged = processLoop(L);
+    Changed |= LoopChanged;
+    CFGChanged |= LoopChanged;
+
+    if (LoopChanged && WasDeferred)
+      ContainingF->addFnAttr("late-unroll-performed");
 
     if (Changed) {
       LAIs->clear();

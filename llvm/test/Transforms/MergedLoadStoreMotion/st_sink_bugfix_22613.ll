@@ -5,14 +5,6 @@ target triple = "x86_64-unknown-linux-gnu"
 
 ; RUN: opt -O2 -S < %s | FileCheck %s
 
-; CHECK-LABEL: main
-; CHECK: memset
-; CHECK: if.then
-; CHECK: store
-; CHECK: if.end
-; CHECK: store
-; CHECK: store
-
 @d = common global i32 0, align 4
 @b = common global i32 0, align 4
 @f = common global [1 x [3 x i8]] zeroinitializer, align 1

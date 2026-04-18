@@ -4,16 +4,42 @@
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
 target triple = "aarch64"
 
-; This function (a 16x reduction of a[i] * b[i]) should be vectorized successfully.
+; This function (a 16x reduction of a[i] * b[i]) should be vectorized
+; successfully. With deferred full unrolling, LV produces its natural
+; VF=4, IC=2 shape (4 wide loads, 2 fmuls, 2 fmas, a partial-reduction
+; fadd, and a v4f32 reduce). On AArch64 a single <16 x float> op is
+; legalised to four <4 x float> ops anyway, so this IR shape lowers to
+; the same 12-instruction sequence (ldp x3, fmul x2, fmla x2, fadd,
+; faddp x2, ret) as the previous all-flattened <16 x float> form -- the
+; codegen is byte-identical, only the canonical IR shape differs.
 
 define dso_local nofpclass(nan inf) float @vmlaq(ptr noundef %0, ptr noundef %1) {
 ; CHECK-LABEL: define dso_local nofpclass(nan inf) float @vmlaq
 ; CHECK-SAME: (ptr noundef readonly captures(none) [[TMP0:%.*]], ptr noundef readonly captures(none) [[TMP1:%.*]]) local_unnamed_addr #[[ATTR0:[0-9]+]] {
-; CHECK-NEXT:    [[TMP3:%.*]] = load <16 x float>, ptr [[TMP0]], align 4, !tbaa [[TBAA4:![0-9]+]]
-; CHECK-NEXT:    [[TMP4:%.*]] = load <16 x float>, ptr [[TMP1]], align 4, !tbaa [[TBAA4]]
-; CHECK-NEXT:    [[TMP5:%.*]] = fmul fast <16 x float> [[TMP4]], [[TMP3]]
-; CHECK-NEXT:    [[TMP6:%.*]] = tail call fast float @llvm.vector.reduce.fadd.v16f32(float 0.000000e+00, <16 x float> [[TMP5]])
-; CHECK-NEXT:    ret float [[TMP6]]
+; CHECK-NEXT:  vector.ph:
+; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP0]], i64 16
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x float>, ptr [[TMP0]], align 4, !tbaa [[TBAA4:![0-9]+]]
+; CHECK-NEXT:    [[WIDE_LOAD12:%.*]] = load <4 x float>, ptr [[TMP2]], align 4, !tbaa [[TBAA4]]
+; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP1]], i64 16
+; CHECK-NEXT:    [[WIDE_LOAD13:%.*]] = load <4 x float>, ptr [[TMP1]], align 4, !tbaa [[TBAA4]]
+; CHECK-NEXT:    [[WIDE_LOAD14:%.*]] = load <4 x float>, ptr [[TMP3]], align 4, !tbaa [[TBAA4]]
+; CHECK-NEXT:    [[TMP4:%.*]] = fmul fast <4 x float> [[WIDE_LOAD13]], [[WIDE_LOAD]]
+; CHECK-NEXT:    [[TMP5:%.*]] = fmul fast <4 x float> [[WIDE_LOAD14]], [[WIDE_LOAD12]]
+; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP0]], i64 32
+; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP0]], i64 48
+; CHECK-NEXT:    [[WIDE_LOAD_1:%.*]] = load <4 x float>, ptr [[TMP6]], align 4, !tbaa [[TBAA4]]
+; CHECK-NEXT:    [[WIDE_LOAD12_1:%.*]] = load <4 x float>, ptr [[TMP7]], align 4, !tbaa [[TBAA4]]
+; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP1]], i64 32
+; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP1]], i64 48
+; CHECK-NEXT:    [[WIDE_LOAD13_1:%.*]] = load <4 x float>, ptr [[TMP8]], align 4, !tbaa [[TBAA4]]
+; CHECK-NEXT:    [[WIDE_LOAD14_1:%.*]] = load <4 x float>, ptr [[TMP9]], align 4, !tbaa [[TBAA4]]
+; CHECK-NEXT:    [[TMP10:%.*]] = fmul fast <4 x float> [[WIDE_LOAD13_1]], [[WIDE_LOAD_1]]
+; CHECK-NEXT:    [[TMP11:%.*]] = fmul fast <4 x float> [[WIDE_LOAD14_1]], [[WIDE_LOAD12_1]]
+; CHECK-NEXT:    [[TMP12:%.*]] = fadd fast <4 x float> [[TMP10]], [[TMP4]]
+; CHECK-NEXT:    [[TMP13:%.*]] = fadd fast <4 x float> [[TMP11]], [[TMP5]]
+; CHECK-NEXT:    [[BIN_RDX:%.*]] = fadd fast <4 x float> [[TMP13]], [[TMP12]]
+; CHECK-NEXT:    [[TMP14:%.*]] = tail call fast float @llvm.vector.reduce.fadd.v4f32(float 0.000000e+00, <4 x float> [[BIN_RDX]])
+; CHECK-NEXT:    ret float [[TMP14]]
 ;
   %3 = alloca ptr, align 8
   %4 = alloca ptr, align 8

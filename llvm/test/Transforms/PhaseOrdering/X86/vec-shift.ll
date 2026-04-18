@@ -33,6 +33,7 @@ define noundef i64 @foo(i64 noundef %0) {
 
 define void @bar(ptr noundef %0) {
 ; SSE-LABEL: @bar(
+; SSE-NEXT:  vector.ph:
 ; SSE-NEXT:    [[TMP2:%.*]] = load <2 x i64>, ptr [[TMP0:%.*]], align 8
 ; SSE-NEXT:    [[TMP3:%.*]] = xor <2 x i64> [[TMP2]], splat (i64 -1)
 ; SSE-NEXT:    [[TMP4:%.*]] = shl <2 x i64> [[TMP3]], splat (i64 44)
@@ -55,6 +56,7 @@ define void @bar(ptr noundef %0) {
 ; SSE-NEXT:    ret void
 ;
 ; AVX-LABEL: @bar(
+; AVX-NEXT:  vector.ph:
 ; AVX-NEXT:    [[TMP2:%.*]] = load <4 x i64>, ptr [[TMP0:%.*]], align 8
 ; AVX-NEXT:    [[TMP3:%.*]] = xor <4 x i64> [[TMP2]], splat (i64 -1)
 ; AVX-NEXT:    [[TMP4:%.*]] = shl <4 x i64> [[TMP3]], splat (i64 44)

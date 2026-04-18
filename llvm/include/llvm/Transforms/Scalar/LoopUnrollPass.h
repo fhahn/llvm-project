@@ -12,6 +12,7 @@
 #include "llvm/Analysis/LoopAnalysisManager.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Transforms/Utils/ExtraPassManager.h"
 #include <optional>
 
 namespace llvm {
@@ -21,6 +22,40 @@ extern LLVM_ABI cl::opt<bool> ForgetSCEVInLoopUnroll;
 class Function;
 class Loop;
 class LPMUpdater;
+
+/// Marker analysis set on functions whose loops were deferred by the early
+/// LoopFullUnrollPass. Gates the late on-demand unroll-after-vectorize block.
+struct ShouldRunExtraUnrollAfterVectorize
+    : public ShouldRunExtraPasses<ShouldRunExtraUnrollAfterVectorize>,
+      public AnalysisInfoMixin<ShouldRunExtraUnrollAfterVectorize> {
+  LLVM_ABI static AnalysisKey Key;
+};
+
+/// Marker analysis set when the late on-demand LoopFullUnrollPass actually
+/// unrolled a deferred loop. Gates the post-unroll cleanup chain so it is
+/// skipped when no late unrolling took place.
+struct ShouldRunLateUnrollCleanup
+    : public ShouldRunExtraPasses<ShouldRunLateUnrollCleanup>,
+      public AnalysisInfoMixin<ShouldRunLateUnrollCleanup> {
+  LLVM_ABI static AnalysisKey Key;
+};
+
+/// Sets \c ShouldRunExtraUnrollAfterVectorize on functions that contain a
+/// loop carrying the deferred-for-vectorization marker.
+class MarkLoopsDeferredForVectorizationPass
+    : public PassInfoMixin<MarkLoopsDeferredForVectorizationPass> {
+public:
+  LLVM_ABI PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
+};
+
+/// Sets \c ShouldRunLateUnrollCleanup on functions where the late on-demand
+/// LoopFullUnrollPass actually unrolled a deferred loop, then consumes the
+/// per-function attribute so the cleanup chain runs at most once.
+class MarkLateUnrollCleanupPass
+    : public PassInfoMixin<MarkLateUnrollCleanupPass> {
+public:
+  LLVM_ABI PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
+};
 
 /// Loop unroll pass that only does full loop unrolling and peeling.
 class LoopFullUnrollPass : public OptionalPassInfoMixin<LoopFullUnrollPass> {
@@ -36,11 +71,24 @@ class LoopFullUnrollPass : public OptionalPassInfoMixin<LoopFullUnrollPass> {
   /// the internal SCEV records. For large loops, the former is faster.
   const bool ForgetSCEV;
 
+  /// If true, skip full unrolling for innermost loops that look likely to be
+  /// vectorized; the late on-demand pass below will fully unroll any that the
+  /// vectorizer leaves behind.
+  const bool SkipVectorizableLoops;
+
+  /// If true, only act on loops tagged with the deferral metadata written by
+  /// an earlier \c LoopFullUnrollPass run with \c SkipVectorizableLoops.
+  const bool OnlyDeferredLoops;
+
 public:
   explicit LoopFullUnrollPass(int OptLevel = 2, bool OnlyWhenForced = false,
-                              bool ForgetSCEV = false)
+                              bool ForgetSCEV = false,
+                              bool SkipVectorizableLoops = false,
+                              bool OnlyDeferredLoops = false)
       : OptLevel(OptLevel), OnlyWhenForced(OnlyWhenForced),
-        ForgetSCEV(ForgetSCEV) {}
+        ForgetSCEV(ForgetSCEV),
+        SkipVectorizableLoops(SkipVectorizableLoops),
+        OnlyDeferredLoops(OnlyDeferredLoops) {}
 
   LLVM_ABI PreservedAnalyses run(Loop &L, LoopAnalysisManager &AM,
                                  LoopStandardAnalysisResults &AR,

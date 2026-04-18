@@ -94,112 +94,68 @@ exit:
 define ptr @find_if_arr(i8 %c) {
 ; CHECK-LABEL: @find_if_arr(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[V1:%.*]] = load i8, ptr @arr, align 1
-; CHECK-NEXT:    [[DOTNOT:%.*]] = icmp eq i8 [[V1]], [[C:%.*]]
-; CHECK-NEXT:    br i1 [[DOTNOT]], label [[VECTOR_BODY_INTERIM:%.*]], label [[VECTOR_EARLY_EXIT:%.*]]
-; CHECK:       loop.latch:
-; CHECK-NEXT:    [[V_24:%.*]] = load i8, ptr getelementptr inbounds nuw (i8, ptr @arr, i64 1), align 1
-; CHECK-NEXT:    [[IS_MATCH_24:%.*]] = icmp eq i8 [[V_24]], [[C]]
-; CHECK-NEXT:    br i1 [[IS_MATCH_24]], label [[VECTOR_BODY_INTERIM]], label [[LOOP_LATCH_1:%.*]]
-; CHECK:       loop.latch.1:
-; CHECK-NEXT:    [[V_2:%.*]] = load i8, ptr getelementptr inbounds nuw (i8, ptr @arr, i64 2), align 1
-; CHECK-NEXT:    [[IS_MATCH_2:%.*]] = icmp eq i8 [[V_2]], [[C]]
-; CHECK-NEXT:    br i1 [[IS_MATCH_2]], label [[VECTOR_BODY_INTERIM]], label [[LOOP_LATCH_2:%.*]]
-; CHECK:       loop.latch.2:
-; CHECK-NEXT:    [[V_3:%.*]] = load i8, ptr getelementptr inbounds nuw (i8, ptr @arr, i64 3), align 1
-; CHECK-NEXT:    [[IS_MATCH_3:%.*]] = icmp eq i8 [[V_3]], [[C]]
-; CHECK-NEXT:    br i1 [[IS_MATCH_3]], label [[VECTOR_BODY_INTERIM]], label [[LOOP_LATCH_3:%.*]]
-; CHECK:       loop.latch.3:
-; CHECK-NEXT:    [[V_4:%.*]] = load i8, ptr getelementptr inbounds nuw (i8, ptr @arr, i64 4), align 1
-; CHECK-NEXT:    [[IS_MATCH_4:%.*]] = icmp eq i8 [[V_4]], [[C]]
-; CHECK-NEXT:    br i1 [[IS_MATCH_4]], label [[VECTOR_BODY_INTERIM]], label [[LOOP_LATCH_4:%.*]]
-; CHECK:       loop.latch.4:
-; CHECK-NEXT:    [[V_5:%.*]] = load i8, ptr getelementptr inbounds nuw (i8, ptr @arr, i64 5), align 1
-; CHECK-NEXT:    [[IS_MATCH_5:%.*]] = icmp eq i8 [[V_5]], [[C]]
-; CHECK-NEXT:    br i1 [[IS_MATCH_5]], label [[VECTOR_BODY_INTERIM]], label [[LOOP_LATCH_5:%.*]]
-; CHECK:       loop.latch.5:
-; CHECK-NEXT:    [[V_6:%.*]] = load i8, ptr getelementptr inbounds nuw (i8, ptr @arr, i64 6), align 1
-; CHECK-NEXT:    [[IS_MATCH_6:%.*]] = icmp eq i8 [[V_6]], [[C]]
-; CHECK-NEXT:    br i1 [[IS_MATCH_6]], label [[VECTOR_BODY_INTERIM]], label [[LOOP_LATCH_6:%.*]]
-; CHECK:       loop.latch.6:
-; CHECK-NEXT:    [[V_7:%.*]] = load i8, ptr getelementptr inbounds nuw (i8, ptr @arr, i64 7), align 1
-; CHECK-NEXT:    [[IS_MATCH_7:%.*]] = icmp eq i8 [[V_7]], [[C]]
-; CHECK-NEXT:    br i1 [[IS_MATCH_7]], label [[VECTOR_BODY_INTERIM]], label [[LOOP_LATCH_7:%.*]]
-; CHECK:       loop.latch.7:
-; CHECK-NEXT:    [[V_8:%.*]] = load i8, ptr getelementptr inbounds nuw (i8, ptr @arr, i64 8), align 1
-; CHECK-NEXT:    [[IS_MATCH_8:%.*]] = icmp eq i8 [[V_8]], [[C]]
-; CHECK-NEXT:    br i1 [[IS_MATCH_8]], label [[VECTOR_BODY_INTERIM]], label [[LOOP_LATCH_8:%.*]]
-; CHECK:       loop.latch.8:
-; CHECK-NEXT:    [[V_9:%.*]] = load i8, ptr getelementptr inbounds nuw (i8, ptr @arr, i64 9), align 1
-; CHECK-NEXT:    [[IS_MATCH_9:%.*]] = icmp eq i8 [[V_9]], [[C]]
-; CHECK-NEXT:    br i1 [[IS_MATCH_9]], label [[VECTOR_BODY_INTERIM]], label [[LOOP_LATCH_9:%.*]]
-; CHECK:       loop.latch.9:
-; CHECK-NEXT:    [[V_10:%.*]] = load i8, ptr getelementptr inbounds nuw (i8, ptr @arr, i64 10), align 1
-; CHECK-NEXT:    [[IS_MATCH_10:%.*]] = icmp eq i8 [[V_10]], [[C]]
-; CHECK-NEXT:    br i1 [[IS_MATCH_10]], label [[VECTOR_BODY_INTERIM]], label [[LOOP_LATCH_10:%.*]]
-; CHECK:       loop.latch.10:
-; CHECK-NEXT:    [[V_11:%.*]] = load i8, ptr getelementptr inbounds nuw (i8, ptr @arr, i64 11), align 1
-; CHECK-NEXT:    [[IS_MATCH_11:%.*]] = icmp eq i8 [[V_11]], [[C]]
-; CHECK-NEXT:    br i1 [[IS_MATCH_11]], label [[VECTOR_BODY_INTERIM]], label [[LOOP_LATCH_11:%.*]]
-; CHECK:       loop.latch.11:
-; CHECK-NEXT:    [[V_12:%.*]] = load i8, ptr getelementptr inbounds nuw (i8, ptr @arr, i64 12), align 1
-; CHECK-NEXT:    [[IS_MATCH_12:%.*]] = icmp eq i8 [[V_12]], [[C]]
-; CHECK-NEXT:    br i1 [[IS_MATCH_12]], label [[VECTOR_BODY_INTERIM]], label [[LOOP_LATCH_12:%.*]]
-; CHECK:       loop.latch.12:
-; CHECK-NEXT:    [[V_13:%.*]] = load i8, ptr getelementptr inbounds nuw (i8, ptr @arr, i64 13), align 1
-; CHECK-NEXT:    [[IS_MATCH_13:%.*]] = icmp eq i8 [[V_13]], [[C]]
-; CHECK-NEXT:    br i1 [[IS_MATCH_13]], label [[VECTOR_BODY_INTERIM]], label [[LOOP_LATCH_13:%.*]]
-; CHECK:       loop.latch.13:
-; CHECK-NEXT:    [[V_14:%.*]] = load i8, ptr getelementptr inbounds nuw (i8, ptr @arr, i64 14), align 1
-; CHECK-NEXT:    [[IS_MATCH_14:%.*]] = icmp eq i8 [[V_14]], [[C]]
-; CHECK-NEXT:    br i1 [[IS_MATCH_14]], label [[VECTOR_BODY_INTERIM]], label [[LOOP_LATCH_14:%.*]]
-; CHECK:       loop.latch.14:
-; CHECK-NEXT:    [[V_15:%.*]] = load i8, ptr getelementptr inbounds nuw (i8, ptr @arr, i64 15), align 1
-; CHECK-NEXT:    [[IS_MATCH_15:%.*]] = icmp eq i8 [[V_15]], [[C]]
-; CHECK-NEXT:    br i1 [[IS_MATCH_15]], label [[VECTOR_BODY_INTERIM]], label [[LOOP_LATCH_15:%.*]]
-; CHECK:       loop.latch.15:
-; CHECK-NEXT:    [[V_16:%.*]] = load i8, ptr getelementptr inbounds nuw (i8, ptr @arr, i64 16), align 1
-; CHECK-NEXT:    [[IS_MATCH_16:%.*]] = icmp eq i8 [[V_16]], [[C]]
-; CHECK-NEXT:    br i1 [[IS_MATCH_16]], label [[VECTOR_BODY_INTERIM]], label [[LOOP_LATCH_16:%.*]]
-; CHECK:       loop.latch.16:
-; CHECK-NEXT:    [[V_17:%.*]] = load i8, ptr getelementptr inbounds nuw (i8, ptr @arr, i64 17), align 1
-; CHECK-NEXT:    [[IS_MATCH_17:%.*]] = icmp eq i8 [[V_17]], [[C]]
-; CHECK-NEXT:    br i1 [[IS_MATCH_17]], label [[VECTOR_BODY_INTERIM]], label [[LOOP_LATCH_17:%.*]]
-; CHECK:       loop.latch.17:
-; CHECK-NEXT:    [[V_18:%.*]] = load i8, ptr getelementptr inbounds nuw (i8, ptr @arr, i64 18), align 1
-; CHECK-NEXT:    [[IS_MATCH_18:%.*]] = icmp eq i8 [[V_18]], [[C]]
-; CHECK-NEXT:    br i1 [[IS_MATCH_18]], label [[VECTOR_BODY_INTERIM]], label [[LOOP_LATCH_18:%.*]]
-; CHECK:       loop.latch.18:
-; CHECK-NEXT:    [[V_19:%.*]] = load i8, ptr getelementptr inbounds nuw (i8, ptr @arr, i64 19), align 1
-; CHECK-NEXT:    [[IS_MATCH_19:%.*]] = icmp eq i8 [[V_19]], [[C]]
-; CHECK-NEXT:    br i1 [[IS_MATCH_19]], label [[VECTOR_BODY_INTERIM]], label [[LOOP_LATCH_19:%.*]]
-; CHECK:       loop.latch.19:
-; CHECK-NEXT:    [[V_20:%.*]] = load i8, ptr getelementptr inbounds nuw (i8, ptr @arr, i64 20), align 1
-; CHECK-NEXT:    [[IS_MATCH_20:%.*]] = icmp eq i8 [[V_20]], [[C]]
-; CHECK-NEXT:    br i1 [[IS_MATCH_20]], label [[VECTOR_BODY_INTERIM]], label [[LOOP_LATCH_20:%.*]]
-; CHECK:       loop.latch.20:
-; CHECK-NEXT:    [[V_21:%.*]] = load i8, ptr getelementptr inbounds nuw (i8, ptr @arr, i64 21), align 1
-; CHECK-NEXT:    [[IS_MATCH_21:%.*]] = icmp eq i8 [[V_21]], [[C]]
-; CHECK-NEXT:    br i1 [[IS_MATCH_21]], label [[VECTOR_BODY_INTERIM]], label [[LOOP_LATCH_21:%.*]]
-; CHECK:       loop.latch.21:
-; CHECK-NEXT:    [[V_22:%.*]] = load i8, ptr getelementptr inbounds nuw (i8, ptr @arr, i64 22), align 1
-; CHECK-NEXT:    [[IS_MATCH_22:%.*]] = icmp eq i8 [[V_22]], [[C]]
-; CHECK-NEXT:    br i1 [[IS_MATCH_22]], label [[VECTOR_BODY_INTERIM]], label [[LOOP_LATCH_22:%.*]]
-; CHECK:       loop.latch.22:
-; CHECK-NEXT:    [[V_23:%.*]] = load i8, ptr getelementptr inbounds nuw (i8, ptr @arr, i64 23), align 1
-; CHECK-NEXT:    [[IS_MATCH_23:%.*]] = icmp eq i8 [[V_23]], [[C]]
-; CHECK-NEXT:    br i1 [[IS_MATCH_23]], label [[VECTOR_BODY_INTERIM]], label [[LOOP_LATCH_23:%.*]]
-; CHECK:       loop.latch.23:
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <8 x i8> poison, i8 [[C:%.*]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <8 x i8> [[BROADCAST_SPLATINSERT]], <8 x i8> poison, <8 x i32> zeroinitializer
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <8 x i8>, ptr @arr, align 1
+; CHECK-NEXT:    [[TMP0:%.*]] = icmp eq <8 x i8> [[WIDE_LOAD]], [[BROADCAST_SPLAT]]
+; CHECK-NEXT:    [[TMP1:%.*]] = freeze <8 x i1> [[TMP0]]
+; CHECK-NEXT:    [[TMP2:%.*]] = bitcast <8 x i1> [[TMP1]] to i8
+; CHECK-NEXT:    [[IS_MATCH_21:%.*]] = icmp eq i8 [[TMP2]], 0
+; CHECK-NEXT:    br i1 [[IS_MATCH_21]], label [[VECTOR_BODY_INTERIM:%.*]], label [[LOOP_LATCH_21:%.*]]
+; CHECK:       vector.body.interim:
+; CHECK-NEXT:    [[WIDE_LOAD_1:%.*]] = load <8 x i8>, ptr getelementptr inbounds nuw (i8, ptr @arr, i64 8), align 1
+; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq <8 x i8> [[WIDE_LOAD_1]], [[BROADCAST_SPLAT]]
+; CHECK-NEXT:    [[TMP4:%.*]] = freeze <8 x i1> [[TMP3]]
+; CHECK-NEXT:    [[TMP5:%.*]] = bitcast <8 x i1> [[TMP4]] to i8
+; CHECK-NEXT:    [[DOTNOT_1:%.*]] = icmp eq i8 [[TMP5]], 0
+; CHECK-NEXT:    br i1 [[DOTNOT_1]], label [[VECTOR_BODY_INTERIM_1:%.*]], label [[LOOP_LATCH_21]]
+; CHECK:       vector.body.interim.1:
+; CHECK-NEXT:    [[WIDE_LOAD_2:%.*]] = load <8 x i8>, ptr getelementptr inbounds nuw (i8, ptr @arr, i64 16), align 1
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq <8 x i8> [[WIDE_LOAD_2]], [[BROADCAST_SPLAT]]
+; CHECK-NEXT:    [[TMP7:%.*]] = freeze <8 x i1> [[TMP6]]
+; CHECK-NEXT:    [[TMP8:%.*]] = bitcast <8 x i1> [[TMP7]] to i8
+; CHECK-NEXT:    [[DOTNOT_2:%.*]] = icmp eq i8 [[TMP8]], 0
+; CHECK-NEXT:    br i1 [[DOTNOT_2]], label [[LOOP:%.*]], label [[LOOP_LATCH_21]]
+; CHECK:       vector.early.exit:
+; CHECK-NEXT:    [[INDEX_LCSSA:%.*]] = phi i64 [ 0, [[ENTRY:%.*]] ], [ 8, [[VECTOR_BODY_INTERIM]] ], [ 16, [[VECTOR_BODY_INTERIM_1]] ]
+; CHECK-NEXT:    [[DOTLCSSA6:%.*]] = phi ptr [ @arr, [[ENTRY]] ], [ getelementptr inbounds nuw (i8, ptr @arr, i64 8), [[VECTOR_BODY_INTERIM]] ], [ getelementptr inbounds nuw (i8, ptr @arr, i64 16), [[VECTOR_BODY_INTERIM_1]] ]
+; CHECK-NEXT:    [[DOTLCSSA:%.*]] = phi <8 x i1> [ [[TMP1]], [[ENTRY]] ], [ [[TMP4]], [[VECTOR_BODY_INTERIM]] ], [ [[TMP7]], [[VECTOR_BODY_INTERIM_1]] ]
+; CHECK-NEXT:    [[TMP9:%.*]] = insertelement <8 x ptr> poison, ptr [[DOTLCSSA6]], i64 0
+; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds nuw i8, ptr @arr, i64 [[INDEX_LCSSA]]
+; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP10]], i64 1
+; CHECK-NEXT:    [[TMP12:%.*]] = insertelement <8 x ptr> [[TMP9]], ptr [[TMP11]], i64 1
+; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr inbounds nuw i8, ptr @arr, i64 [[INDEX_LCSSA]]
+; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP13]], i64 2
+; CHECK-NEXT:    [[TMP15:%.*]] = insertelement <8 x ptr> [[TMP12]], ptr [[TMP14]], i64 2
+; CHECK-NEXT:    [[TMP16:%.*]] = getelementptr inbounds nuw i8, ptr @arr, i64 [[INDEX_LCSSA]]
+; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP16]], i64 3
+; CHECK-NEXT:    [[TMP18:%.*]] = insertelement <8 x ptr> [[TMP15]], ptr [[TMP17]], i64 3
+; CHECK-NEXT:    [[TMP19:%.*]] = getelementptr inbounds nuw i8, ptr @arr, i64 [[INDEX_LCSSA]]
+; CHECK-NEXT:    [[TMP20:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP19]], i64 4
+; CHECK-NEXT:    [[TMP21:%.*]] = insertelement <8 x ptr> [[TMP18]], ptr [[TMP20]], i64 4
+; CHECK-NEXT:    [[TMP22:%.*]] = getelementptr inbounds nuw i8, ptr @arr, i64 [[INDEX_LCSSA]]
+; CHECK-NEXT:    [[TMP23:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP22]], i64 5
+; CHECK-NEXT:    [[TMP24:%.*]] = insertelement <8 x ptr> [[TMP21]], ptr [[TMP23]], i64 5
+; CHECK-NEXT:    [[TMP25:%.*]] = getelementptr inbounds nuw i8, ptr @arr, i64 [[INDEX_LCSSA]]
+; CHECK-NEXT:    [[TMP26:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP25]], i64 6
+; CHECK-NEXT:    [[TMP27:%.*]] = insertelement <8 x ptr> [[TMP24]], ptr [[TMP26]], i64 6
+; CHECK-NEXT:    [[TMP28:%.*]] = getelementptr inbounds nuw i8, ptr @arr, i64 [[INDEX_LCSSA]]
+; CHECK-NEXT:    [[TMP29:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP28]], i64 7
+; CHECK-NEXT:    [[TMP30:%.*]] = insertelement <8 x ptr> [[TMP27]], ptr [[TMP29]], i64 7
+; CHECK-NEXT:    [[FIRST_ACTIVE_LANE:%.*]] = tail call i64 @llvm.experimental.cttz.elts.i64.v8i1(<8 x i1> [[DOTLCSSA]], i1 false)
+; CHECK-NEXT:    [[TMP31:%.*]] = extractelement <8 x ptr> [[TMP30]], i64 [[FIRST_ACTIVE_LANE]]
+; CHECK-NEXT:    br label [[EXIT:%.*]]
+; CHECK:       loop:
 ; CHECK-NEXT:    [[V:%.*]] = load i8, ptr getelementptr inbounds nuw (i8, ptr @arr, i64 24), align 1
 ; CHECK-NEXT:    [[IS_MATCH:%.*]] = icmp eq i8 [[V]], [[C]]
-; CHECK-NEXT:    br i1 [[IS_MATCH]], label [[VECTOR_BODY_INTERIM]], label [[LOOP_LATCH_24:%.*]]
-; CHECK:       loop.latch.24:
+; CHECK-NEXT:    br i1 [[IS_MATCH]], label [[EXIT]], label [[LOOP_LATCH:%.*]]
+; CHECK:       loop.latch:
 ; CHECK-NEXT:    [[V_1:%.*]] = load i8, ptr getelementptr inbounds nuw (i8, ptr @arr, i64 25), align 1
 ; CHECK-NEXT:    [[IS_MATCH_1:%.*]] = icmp eq i8 [[V_1]], [[C]]
 ; CHECK-NEXT:    [[SPEC_SELECT:%.*]] = select i1 [[IS_MATCH_1]], ptr getelementptr inbounds nuw (i8, ptr @arr, i64 25), ptr getelementptr inbounds nuw (i8, ptr @arr, i64 26)
-; CHECK-NEXT:    br label [[VECTOR_BODY_INTERIM]]
+; CHECK-NEXT:    br label [[EXIT]]
 ; CHECK:       exit:
-; CHECK-NEXT:    [[RES:%.*]] = phi ptr [ @arr, [[ENTRY:%.*]] ], [ getelementptr inbounds nuw (i8, ptr @arr, i64 13), [[LOOP_LATCH_12]] ], [ getelementptr inbounds nuw (i8, ptr @arr, i64 1), [[VECTOR_EARLY_EXIT]] ], [ [[SPEC_SELECT]], [[LOOP_LATCH_24]] ], [ getelementptr inbounds nuw (i8, ptr @arr, i64 2), [[LOOP_LATCH_1]] ], [ getelementptr inbounds nuw (i8, ptr @arr, i64 19), [[LOOP_LATCH_18]] ], [ getelementptr inbounds nuw (i8, ptr @arr, i64 3), [[LOOP_LATCH_2]] ], [ getelementptr inbounds nuw (i8, ptr @arr, i64 24), [[LOOP_LATCH_23]] ], [ getelementptr inbounds nuw (i8, ptr @arr, i64 4), [[LOOP_LATCH_3]] ], [ getelementptr inbounds nuw (i8, ptr @arr, i64 14), [[LOOP_LATCH_13]] ], [ getelementptr inbounds nuw (i8, ptr @arr, i64 5), [[LOOP_LATCH_4]] ], [ getelementptr inbounds nuw (i8, ptr @arr, i64 23), [[LOOP_LATCH_22]] ], [ getelementptr inbounds nuw (i8, ptr @arr, i64 6), [[LOOP_LATCH_5]] ], [ getelementptr inbounds nuw (i8, ptr @arr, i64 17), [[LOOP_LATCH_16]] ], [ getelementptr inbounds nuw (i8, ptr @arr, i64 7), [[LOOP_LATCH_6]] ], [ getelementptr inbounds nuw (i8, ptr @arr, i64 22), [[LOOP_LATCH_21]] ], [ getelementptr inbounds nuw (i8, ptr @arr, i64 8), [[LOOP_LATCH_7]] ], [ getelementptr inbounds nuw (i8, ptr @arr, i64 15), [[LOOP_LATCH_14]] ], [ getelementptr inbounds nuw (i8, ptr @arr, i64 9), [[LOOP_LATCH_8]] ], [ getelementptr inbounds nuw (i8, ptr @arr, i64 21), [[LOOP_LATCH_20]] ], [ getelementptr inbounds nuw (i8, ptr @arr, i64 10), [[LOOP_LATCH_9]] ], [ getelementptr inbounds nuw (i8, ptr @arr, i64 18), [[LOOP_LATCH_17]] ], [ getelementptr inbounds nuw (i8, ptr @arr, i64 11), [[LOOP_LATCH_10]] ], [ getelementptr inbounds nuw (i8, ptr @arr, i64 20), [[LOOP_LATCH_19]] ], [ getelementptr inbounds nuw (i8, ptr @arr, i64 12), [[LOOP_LATCH_11]] ], [ getelementptr inbounds nuw (i8, ptr @arr, i64 16), [[LOOP_LATCH_15]] ]
+; CHECK-NEXT:    [[RES:%.*]] = phi ptr [ [[TMP31]], [[LOOP_LATCH_21]] ], [ [[SPEC_SELECT]], [[LOOP_LATCH]] ], [ getelementptr inbounds nuw (i8, ptr @arr, i64 24), [[LOOP]] ]
 ; CHECK-NEXT:    ret ptr [[RES]]
 ;
 entry:
@@ -233,9 +189,55 @@ exit:
 define void @rt_check_needed(ptr %dst, ptr %a) {
 ; CHECK-LABEL: @rt_check_needed(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[VA:%.*]] = load i32, ptr [[A:%.*]], align 4
+; CHECK-NEXT:    [[DST1:%.*]] = ptrtoaddr ptr [[DST:%.*]] to i64
+; CHECK-NEXT:    [[A2:%.*]] = ptrtoaddr ptr [[A:%.*]] to i64
+; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 [[DST1]], [[A2]]
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP0]], 32
+; CHECK-NEXT:    br i1 [[DIFF_CHECK]], label [[LOOP:%.*]], label [[VECTOR_BODY:%.*]]
+; CHECK:       vector.body:
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds nuw i8, ptr [[A]], i64 16
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[A]], align 4
+; CHECK-NEXT:    [[WIDE_LOAD3:%.*]] = load <4 x i32>, ptr [[TMP1]], align 4
+; CHECK-NEXT:    [[TMP2:%.*]] = add nsw <4 x i32> [[WIDE_LOAD]], splat (i32 1)
+; CHECK-NEXT:    [[TMP3:%.*]] = add nsw <4 x i32> [[WIDE_LOAD3]], splat (i32 1)
+; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 16
+; CHECK-NEXT:    store <4 x i32> [[TMP2]], ptr [[DST]], align 4
+; CHECK-NEXT:    store <4 x i32> [[TMP3]], ptr [[TMP4]], align 4
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds nuw i8, ptr [[A]], i64 32
+; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds nuw i8, ptr [[A]], i64 48
+; CHECK-NEXT:    [[WIDE_LOAD_1:%.*]] = load <4 x i32>, ptr [[TMP5]], align 4
+; CHECK-NEXT:    [[WIDE_LOAD3_1:%.*]] = load <4 x i32>, ptr [[TMP6]], align 4
+; CHECK-NEXT:    [[TMP7:%.*]] = add nsw <4 x i32> [[WIDE_LOAD_1]], splat (i32 1)
+; CHECK-NEXT:    [[TMP8:%.*]] = add nsw <4 x i32> [[WIDE_LOAD3_1]], splat (i32 1)
+; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 32
+; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 48
+; CHECK-NEXT:    store <4 x i32> [[TMP7]], ptr [[TMP9]], align 4
+; CHECK-NEXT:    store <4 x i32> [[TMP8]], ptr [[TMP10]], align 4
+; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr inbounds nuw i8, ptr [[A]], i64 64
+; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds nuw i8, ptr [[A]], i64 80
+; CHECK-NEXT:    [[WIDE_LOAD_2:%.*]] = load <4 x i32>, ptr [[TMP11]], align 4
+; CHECK-NEXT:    [[WIDE_LOAD3_2:%.*]] = load <4 x i32>, ptr [[TMP12]], align 4
+; CHECK-NEXT:    [[TMP13:%.*]] = add nsw <4 x i32> [[WIDE_LOAD_2]], splat (i32 1)
+; CHECK-NEXT:    [[TMP14:%.*]] = add nsw <4 x i32> [[WIDE_LOAD3_2]], splat (i32 1)
+; CHECK-NEXT:    [[TMP15:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 64
+; CHECK-NEXT:    [[TMP16:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 80
+; CHECK-NEXT:    store <4 x i32> [[TMP13]], ptr [[TMP15]], align 4
+; CHECK-NEXT:    store <4 x i32> [[TMP14]], ptr [[TMP16]], align 4
+; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr inbounds nuw i8, ptr [[A]], i64 96
+; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr inbounds nuw i8, ptr [[A]], i64 112
+; CHECK-NEXT:    [[WIDE_LOAD_3:%.*]] = load <4 x i32>, ptr [[TMP17]], align 4
+; CHECK-NEXT:    [[WIDE_LOAD3_3:%.*]] = load <4 x i32>, ptr [[TMP18]], align 4
+; CHECK-NEXT:    [[TMP19:%.*]] = add nsw <4 x i32> [[WIDE_LOAD_3]], splat (i32 1)
+; CHECK-NEXT:    [[TMP20:%.*]] = add nsw <4 x i32> [[WIDE_LOAD3_3]], splat (i32 1)
+; CHECK-NEXT:    [[TMP21:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 96
+; CHECK-NEXT:    [[TMP22:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 112
+; CHECK-NEXT:    store <4 x i32> [[TMP19]], ptr [[TMP21]], align 4
+; CHECK-NEXT:    store <4 x i32> [[TMP20]], ptr [[TMP22]], align 4
+; CHECK-NEXT:    br label [[EXIT:%.*]]
+; CHECK:       loop:
+; CHECK-NEXT:    [[VA:%.*]] = load i32, ptr [[A]], align 4
 ; CHECK-NEXT:    [[ADD:%.*]] = add nsw i32 [[VA]], 1
-; CHECK-NEXT:    store i32 [[ADD]], ptr [[DST:%.*]], align 4
+; CHECK-NEXT:    store i32 [[ADD]], ptr [[DST]], align 4
 ; CHECK-NEXT:    [[GEP_A_1:%.*]] = getelementptr inbounds nuw i8, ptr [[A]], i64 4
 ; CHECK-NEXT:    [[VA_1:%.*]] = load i32, ptr [[GEP_A_1]], align 4
 ; CHECK-NEXT:    [[ADD_1:%.*]] = add nsw i32 [[VA_1]], 1
@@ -391,6 +393,8 @@ define void @rt_check_needed(ptr %dst, ptr %a) {
 ; CHECK-NEXT:    [[ADD_31:%.*]] = add nsw i32 [[VA_31]], 1
 ; CHECK-NEXT:    [[GEP_DST_31:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 124
 ; CHECK-NEXT:    store i32 [[ADD_31]], ptr [[GEP_DST_31]], align 4
+; CHECK-NEXT:    br label [[EXIT]]
+; CHECK:       exit:
 ; CHECK-NEXT:    ret void
 ;
 entry:

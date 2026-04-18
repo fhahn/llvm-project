@@ -17,8 +17,11 @@ target triple = "x86_64-apple-macosx"
 ; The late unroll cleanup runs:
 ; CHECK:      Running pass: LoopFullUnrollPass on loop {{.*}} in function has_deferred_loop
 ; CHECK:      Running pass: SROAPass on has_deferred_loop
-; CHECK-NEXT: Running pass: InstCombinePass on has_deferred_loop
 ; CHECK:      Invalidating analysis: ShouldRunExtraUnrollAfterVectorize on has_deferred_loop
+; CHECK:      Running pass: MarkLateUnrollCleanupPass on has_deferred_loop
+; CHECK-NEXT: Running analysis: ShouldRunLateUnrollCleanup on has_deferred_loop
+; CHECK:      Running pass: InstCombinePass on has_deferred_loop
+; CHECK:      Invalidating analysis: ShouldRunLateUnrollCleanup on has_deferred_loop
 
 define void @has_deferred_loop(ptr noalias %dst, ptr noalias %a, ptr noalias %b) {
 entry:
@@ -51,7 +54,7 @@ exit:
 ; CHECK-NOT:  Running analysis: ShouldRunExtraUnrollAfterVectorize on no_deferred_loop
 ; CHECK:      Running pass: LoopVectorizePass on no_deferred_loop
 ; CHECK-NOT:  Running pass: LoopFullUnrollPass on loop {{.*}} in function no_deferred_loop
-; CHECK-NOT:  Invalidating analysis: ShouldRunExtraUnrollAfterVectorize on no_deferred_loop
+; CHECK-NOT:  Running analysis: ShouldRunLateUnrollCleanup on no_deferred_loop
 ;
 ; Sentinel to terminate the negative checks above:
 ; CHECK:      Running pass: SLPVectorizerPass on no_deferred_loop
