@@ -12,6 +12,7 @@
 #include "llvm/Analysis/LoopAnalysisManager.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Transforms/Utils/ExtraPassManager.h"
 #include <optional>
 
 namespace llvm {
@@ -21,6 +22,26 @@ extern cl::opt<bool> ForgetSCEVInLoopUnroll;
 class Function;
 class Loop;
 class LPMUpdater;
+
+/// A marker analysis set when LoopFullUnrollPass defers a likely-vectorizable
+/// loop. It is used by the late on-demand unroll + cleanup pipeline so that
+/// it only runs on functions that actually had a deferred loop.
+struct ShouldRunExtraUnrollAfterVectorize
+    : public ShouldRunExtraPasses<ShouldRunExtraUnrollAfterVectorize>,
+      public AnalysisInfoMixin<ShouldRunExtraUnrollAfterVectorize> {
+  LLVM_ABI static AnalysisKey Key;
+};
+
+/// Function pass that triggers \c ShouldRunExtraUnrollAfterVectorize on
+/// functions where LoopFullUnrollPass previously deferred at least one loop
+/// (recorded via a function attribute). Running this pass close to the
+/// late on-demand cleanup pipeline ensures the marker analysis is cached
+/// right before it is queried.
+class MarkLoopsDeferredForVectorizationPass
+    : public PassInfoMixin<MarkLoopsDeferredForVectorizationPass> {
+public:
+  LLVM_ABI PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
+};
 
 /// Loop unroll pass that only does full loop unrolling and peeling.
 class LoopFullUnrollPass : public OptionalPassInfoMixin<LoopFullUnrollPass> {
@@ -36,11 +57,26 @@ class LoopFullUnrollPass : public OptionalPassInfoMixin<LoopFullUnrollPass> {
   /// the internal SCEV records. For large loops, the former is faster.
   const bool ForgetSCEV;
 
+  /// If true, skip unrolling innermost loops that are likely vectorizable
+  /// (i.e., vectorization has not been explicitly disabled). Those loops will
+  /// be fully unrolled later, after the vectorizer has had a chance to act.
+  const bool SkipVectorizableLoops;
+
+  /// If true, only process loops tagged with the deferral metadata written by
+  /// the early LoopFullUnrollPass; all other loops are left untouched. Used
+  /// by the late on-demand unroll pass that runs after the loop vectorizer
+  /// to finish the job on loops that were deferred but not vectorized.
+  const bool OnlyDeferredLoops;
+
 public:
   explicit LoopFullUnrollPass(int OptLevel = 2, bool OnlyWhenForced = false,
-                              bool ForgetSCEV = false)
+                              bool ForgetSCEV = false,
+                              bool SkipVectorizableLoops = false,
+                              bool OnlyDeferredLoops = false)
       : OptLevel(OptLevel), OnlyWhenForced(OnlyWhenForced),
-        ForgetSCEV(ForgetSCEV) {}
+        ForgetSCEV(ForgetSCEV),
+        SkipVectorizableLoops(SkipVectorizableLoops),
+        OnlyDeferredLoops(OnlyDeferredLoops) {}
 
   PreservedAnalyses run(Loop &L, LoopAnalysisManager &AM,
                         LoopStandardAnalysisResults &AR, LPMUpdater &U);

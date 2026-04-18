@@ -62,14 +62,14 @@ define void @test(i16 %g) {
 ; CHECK-GVN-NEXT:    ret void
 ;
 ; CHECK-GVN-O1-LABEL: @test(
-; CHECK-GVN-O1-NEXT:  entry:
+; CHECK-GVN-O1-NEXT:  while.end.2:
 ; CHECK-GVN-O1-NEXT:    tail call void @verify(i16 7)
 ; CHECK-GVN-O1-NEXT:    tail call void @verify(i16 42)
 ; CHECK-GVN-O1-NEXT:    tail call void @verify(i16 42)
 ; CHECK-GVN-O1-NEXT:    ret void
 ;
 ; CHECK-O1-LABEL: @test(
-; CHECK-O1-NEXT:  entry:
+; CHECK-O1-NEXT:  while.end.2:
 ; CHECK-O1-NEXT:    tail call void @verify(i16 7)
 ; CHECK-O1-NEXT:    tail call void @verify(i16 42)
 ; CHECK-O1-NEXT:    tail call void @verify(i16 42)

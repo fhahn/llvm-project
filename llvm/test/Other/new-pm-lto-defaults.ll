@@ -122,6 +122,7 @@
 ; CHECK-O23-NEXT: Running pass: LoopFullUnrollPass on loop
 ; CHECK-O23-NEXT: Running pass: LoopDistributePass on foo
 ; CHECK-O23-NEXT: Running analysis: LoopAccessAnalysis on foo
+; CHECK-O23-NEXT: Running pass: MarkLoopsDeferredForVectorizationPass on foo
 ; CHECK-O23-NEXT: Running pass: LoopVectorizePass on foo
 ; CHECK-O23-NEXT: Running analysis: DemandedBitsAnalysis on foo
 ; CHECK-O23-NEXT: Running pass: DropUnnecessaryAssumesPass on foo

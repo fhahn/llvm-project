@@ -5,14 +5,6 @@ target triple = "x86_64-unknown-linux-gnu"
 
 ; RUN: opt -O2 -S < %s | FileCheck %s
 
-; CHECK-LABEL: main
-; CHECK: memset
-; CHECK: if.then
-; CHECK: store
-; CHECK: if.end
-; CHECK: store
-; CHECK: store
-
 @d = common global i32 0, align 4
 @b = common global i32 0, align 4
 @f = common global [1 x [3 x i8]] zeroinitializer, align 1
@@ -32,15 +24,15 @@ define void @fn1() {
 ; CHECK-NEXT:    [[TOBOOL_NOT:%.*]] = icmp eq i32 [[TMP1]], 0
 ; CHECK-NEXT:    [[A_PROMOTED6:%.*]] = load i32, ptr @a, align 4
 ; CHECK-NEXT:    store i8 0, ptr [[ARRAYIDX]], align 1
-; CHECK-NEXT:    [[ARRAYIDX2_123:%.*]] = getelementptr inbounds nuw i8, ptr [[ARRAYIDX]], i64 1
-; CHECK-NEXT:    store i8 0, ptr [[ARRAYIDX2_123]], align 1
+; CHECK-NEXT:    [[ARRAYIDX2_128:%.*]] = getelementptr inbounds nuw i8, ptr [[ARRAYIDX]], i64 1
+; CHECK-NEXT:    store i8 0, ptr [[ARRAYIDX2_128]], align 1
 ; CHECK-NEXT:    tail call void @llvm.memset.p0.i64(ptr noundef nonnull align 1 dereferenceable(3) @f, i8 1, i64 3, i1 false)
-; CHECK-NEXT:    br i1 [[TOBOOL_NOT]], label %[[IF_END_2_1:.*]], label %[[IF_THEN_2_1:.*]]
-; CHECK:       [[IF_THEN_2_1]]:
-; CHECK-NEXT:    [[DEC_2_1:%.*]] = add nsw i32 [[A_PROMOTED6]], -6
-; CHECK-NEXT:    store i32 [[DEC_2_1]], ptr @a, align 4
-; CHECK-NEXT:    br label %[[IF_END_2_1]]
-; CHECK:       [[IF_END_2_1]]:
+; CHECK-NEXT:    br i1 [[TOBOOL_NOT]], label %[[IF_END_1_2:.*]], label %[[IF_THEN_1_2:.*]]
+; CHECK:       [[IF_THEN_1_2]]:
+; CHECK-NEXT:    [[DEC_1_2:%.*]] = add i32 [[A_PROMOTED6]], -6
+; CHECK-NEXT:    store i32 [[DEC_1_2]], ptr @a, align 4
+; CHECK-NEXT:    br label %[[IF_END_1_2]]
+; CHECK:       [[IF_END_1_2]]:
 ; CHECK-NEXT:    store i32 2, ptr @d, align 4
 ; CHECK-NEXT:    store i32 3, ptr @e, align 4
 ; CHECK-NEXT:    ret void
@@ -119,15 +111,15 @@ define i32 @main() {
 ; CHECK-NEXT:    [[TOBOOL_NOT_I:%.*]] = icmp eq i32 [[TMP1]], 0
 ; CHECK-NEXT:    [[A_PROMOTED6_I:%.*]] = load i32, ptr @a, align 4
 ; CHECK-NEXT:    store i8 0, ptr [[ARRAYIDX_I]], align 1
-; CHECK-NEXT:    [[ARRAYIDX2_123_I:%.*]] = getelementptr inbounds nuw i8, ptr [[ARRAYIDX_I]], i64 1
-; CHECK-NEXT:    store i8 0, ptr [[ARRAYIDX2_123_I]], align 1
+; CHECK-NEXT:    [[ARRAYIDX2_1_I4:%.*]] = getelementptr inbounds nuw i8, ptr [[ARRAYIDX_I]], i64 1
+; CHECK-NEXT:    store i8 0, ptr [[ARRAYIDX2_1_I4]], align 1
 ; CHECK-NEXT:    tail call void @llvm.memset.p0.i64(ptr noundef nonnull align 1 dereferenceable(3) @f, i8 1, i64 3, i1 false)
-; CHECK-NEXT:    br i1 [[TOBOOL_NOT_I]], label %[[IF_END:.*]], label %[[IF_THEN_2_1_I:.*]]
-; CHECK:       [[IF_THEN_2_1_I]]:
-; CHECK-NEXT:    [[DEC_2_1_I:%.*]] = add nsw i32 [[A_PROMOTED6_I]], -6
-; CHECK-NEXT:    store i32 [[DEC_2_1_I]], ptr @a, align 4
-; CHECK-NEXT:    br label %[[IF_END]]
-; CHECK:       [[IF_END]]:
+; CHECK-NEXT:    br i1 [[TOBOOL_NOT_I]], label %[[IF_END_1_I_2:.*]], label %[[IF_THEN_1_I_2:.*]]
+; CHECK:       [[IF_THEN_1_I_2]]:
+; CHECK-NEXT:    [[DEC_1_I_2:%.*]] = add i32 [[A_PROMOTED6_I]], -6
+; CHECK-NEXT:    store i32 [[DEC_1_I_2]], ptr @a, align 4
+; CHECK-NEXT:    br label %[[IF_END_1_I_2]]
+; CHECK:       [[IF_END_1_I_2]]:
 ; CHECK-NEXT:    store i32 2, ptr @d, align 4
 ; CHECK-NEXT:    store i32 3, ptr @e, align 4
 ; CHECK-NEXT:    ret i32 0

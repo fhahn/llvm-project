@@ -216,6 +216,7 @@ attributes #2 = { argmemonly nocallback nofree nosync nounwind willreturn }
 ; CHECK: [[META4]] = !{!"int", [[META5:![0-9]+]], i64 0}
 ; CHECK: [[META5]] = !{!"omnipotent char", [[META6:![0-9]+]], i64 0}
 ; CHECK: [[META6]] = !{!"Simple C/C++ TBAA"}
-; CHECK: [[LOOP7]] = distinct !{[[LOOP7]], [[META8:![0-9]+]]}
+; CHECK: [[LOOP7]] = distinct !{[[LOOP7]], [[META8:![0-9]+]], [[META9:![0-9]+]]}
 ; CHECK: [[META8]] = !{!"llvm.loop.mustprogress"}
+; CHECK: [[META9]] = !{!"llvm.loop.unroll.deferred_for_vectorization", i32 1}
 ;.

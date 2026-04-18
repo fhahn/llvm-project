@@ -12,7 +12,7 @@ target triple = "x86_64-pc-linux-gnu"
 
 define void @wibble(ptr %arg) personality ptr null {
 ; CHECK-LABEL: @wibble(
-; CHECK-NEXT:  bb:
+; CHECK-NEXT:  vector.body:
 ; CHECK-NEXT:    [[I10_3_I_PRE:%.*]] = load i8, ptr [[ARG:%.*]], align 1
 ; CHECK-NEXT:    [[TMP0:%.*]] = or i8 [[I10_3_I_PRE]], 1
 ; CHECK-NEXT:    [[I1_SROA_0_0_VEC_EXTRACT:%.*]] = zext i8 [[TMP0]] to i32

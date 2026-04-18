@@ -559,7 +559,8 @@ PassBuilder::buildO1FunctionSimplificationPipeline(OptimizationLevel Level,
       PGOOpt->Action != PGOOptions::SampleUse)
     LPM2.addPass(LoopFullUnrollPass(Level.getSpeedupLevel(),
                                     /* OnlyWhenForced= */ !PTO.LoopUnrolling,
-                                    PTO.ForgetAllSCEVInLoopUnroll));
+                                    PTO.ForgetAllSCEVInLoopUnroll,
+                                    /* SkipVectorizableLoops= */ true));
 
   invokeLoopOptimizerEndEPCallbacks(LPM2, Level);
 
@@ -741,7 +742,8 @@ PassBuilder::buildFunctionSimplificationPipeline(OptimizationLevel Level,
       PGOOpt->Action != PGOOptions::SampleUse)
     LPM2.addPass(LoopFullUnrollPass(Level.getSpeedupLevel(),
                                     /* OnlyWhenForced= */ !PTO.LoopUnrolling,
-                                    PTO.ForgetAllSCEVInLoopUnroll));
+                                    PTO.ForgetAllSCEVInLoopUnroll,
+                                    /* SkipVectorizableLoops= */ true));
 
   invokeLoopOptimizerEndEPCallbacks(LPM2, Level);
 
@@ -1334,6 +1336,12 @@ PassBuilder::buildModuleSimplificationPipeline(OptimizationLevel Level,
 void PassBuilder::addVectorPasses(OptimizationLevel Level,
                                   FunctionPassManager &FPM,
                                   ThinOrFullLTOPhase LTOPhase) {
+  const bool IsFullLTO = LTOPhase == ThinOrFullLTOPhase::FullLTOPostLink;
+
+  // Mark functions where the early LoopFullUnrollPass deferred a loop, so the
+  // late unroll + cleanup pipeline can be gated per-function.
+  FPM.addPass(MarkLoopsDeferredForVectorizationPass());
+
   FPM.addPass(LoopVectorizePass(
       LoopVectorizeOptions(!PTO.LoopInterleaving, !PTO.LoopVectorization)));
 
@@ -1355,6 +1363,22 @@ void PassBuilder::addVectorPasses(OptimizationLevel Level,
     if (EnableUnrollAndJam && PTO.LoopUnrolling)
       FPM.addPass(createFunctionToLoopPassAdaptor(
           LoopUnrollAndJamPass(Level.getSpeedupLevel())));
+    // Run full unrolling for loops that were deferred in the early pipeline
+    // because they looked vectorizable. Now that the vectorizer has run, fully
+    // unroll the marked loops that remain. Guarded by a marker so this only
+    // runs on functions that actually had a deferred loop.
+    {
+      ExtraFunctionPassManager<ShouldRunExtraUnrollAfterVectorize> ExtraPasses;
+      ExtraPasses.addPass(createFunctionToLoopPassAdaptor(
+          LoopFullUnrollPass(Level.getSpeedupLevel(),
+                             /*OnlyWhenForced=*/!PTO.LoopUnrolling,
+                             PTO.ForgetAllSCEVInLoopUnroll,
+                             /*SkipVectorizableLoops=*/false,
+                             /*OnlyDeferredLoops=*/true),
+          /*UseMemorySSA=*/false));
+      ExtraPasses.addPass(SROAPass(SROAOptions::PreserveCFG));
+      FPM.addPass(std::move(ExtraPasses));
+    }
     FPM.addPass(LoopUnrollPass(LoopUnrollOptions(
         Level.getSpeedupLevel(), /*OnlyWhenForced=*/!PTO.LoopUnrolling,
         PTO.ForgetAllSCEVInLoopUnroll)));
@@ -1422,6 +1446,44 @@ void PassBuilder::addVectorPasses(OptimizationLevel Level,
     FPM.addPass(SCCPPass());
     FPM.addPass(InstCombinePass());
     FPM.addPass(BDCEPass());
+  }
+
+  if (!IsFullLTO) {
+    // Run full unrolling for loops that were deferred in the early pipeline
+    // because they looked vectorizable. Now that the vectorizer has run, fully
+    // unroll the marked loops that remain before SLP, so the unrolled
+    // straight-line code can be SLP-vectorized. Guarded by a marker so this
+    // only runs on functions that actually had a deferred loop.
+    ExtraFunctionPassManager<ShouldRunExtraUnrollAfterVectorize> ExtraPasses;
+    ExtraPasses.addPass(createFunctionToLoopPassAdaptor(
+        LoopFullUnrollPass(Level.getSpeedupLevel(),
+                           /*OnlyWhenForced=*/!PTO.LoopUnrolling,
+                           PTO.ForgetAllSCEVInLoopUnroll,
+                           /*SkipVectorizableLoops=*/false,
+                           /*OnlyDeferredLoops=*/true),
+        /*UseMemorySSA=*/false));
+    ExtraPasses.addPass(SROAPass(SROAOptions::PreserveCFG));
+    // Recover code quality on the deferred loops after vectorization + late
+    // full unroll. The late transformations (either LoopVectorize turning
+    // the loop into a vector body, or LoopFullUnroll turning it into
+    // straight-line code) can leave behind redundant memsets/stores,
+    // chains of identical-condition branches, and duplicated conditional
+    // stores. A small cleanup sequence recovers that: InstCombine restores
+    // the if/else structure, JumpThreading collapses the repeated
+    // equal-condition branches, DSE drops the now-redundant stores
+    // (including LV-generated memsets shadowed by a subsequent full-width
+    // store), and SimplifyCFG with hoist/sink moves common straight-line
+    // code to the merge point.
+    ExtraPasses.addPass(InstCombinePass());
+    ExtraPasses.addPass(JumpThreadingPass());
+    ExtraPasses.addPass(InstCombinePass());
+    ExtraPasses.addPass(DSEPass());
+    ExtraPasses.addPass(MergedLoadStoreMotionPass());
+    ExtraPasses.addPass(SimplifyCFGPass(SimplifyCFGOptions()
+                                            .convertSwitchRangeToICmp(true)
+                                            .hoistCommonInsts(true)
+                                            .sinkCommonInsts(true)));
+    FPM.addPass(std::move(ExtraPasses));
   }
 
   // Optimize parallel scalar instruction chains into SIMD instructions.
@@ -2242,7 +2304,8 @@ PassBuilder::buildLTODefaultPipeline(OptimizationLevel Level,
   // Unroll small loops and perform peeling.
   LPM.addPass(LoopFullUnrollPass(Level.getSpeedupLevel(),
                                  /* OnlyWhenForced= */ !PTO.LoopUnrolling,
-                                 PTO.ForgetAllSCEVInLoopUnroll));
+                                 PTO.ForgetAllSCEVInLoopUnroll,
+                                 /* SkipVectorizableLoops= */ true));
   // The loop passes in LPM (LoopFullUnrollPass) do not preserve MemorySSA.
   // *All* loop passes must preserve it, in order to be able to use it.
   MainFPM.addPass(

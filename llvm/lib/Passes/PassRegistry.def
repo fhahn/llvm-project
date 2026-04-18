@@ -386,6 +386,8 @@ FUNCTION_ANALYSIS("should-not-run-function-passes",
                   ShouldNotRunFunctionPassesAnalysis())
 FUNCTION_ANALYSIS("should-run-extra-vector-passes",
                   ShouldRunExtraVectorPasses())
+FUNCTION_ANALYSIS("should-run-extra-unroll-after-vectorize",
+                  ShouldRunExtraUnrollAfterVectorize())
 FUNCTION_ANALYSIS("ssp-layout", SSPLayoutAnalysis())
 FUNCTION_ANALYSIS("stack-safety-local", StackSafetyAnalysis())
 FUNCTION_ANALYSIS("target-ir",
@@ -446,6 +448,8 @@ FUNCTION_PASS("expand-memcmp", ExpandMemCmpPass())
 FUNCTION_PASS("expand-reductions", ExpandReductionsPass())
 FUNCTION_PASS("extra-vector-passes",
               ExtraFunctionPassManager<ShouldRunExtraVectorPasses>())
+FUNCTION_PASS("extra-unroll-after-vectorize-passes",
+              ExtraFunctionPassManager<ShouldRunExtraUnrollAfterVectorize>())
 FUNCTION_PASS("fix-irreducible", FixIrreduciblePass())
 FUNCTION_PASS("flatten-cfg", FlattenCFGPass())
 FUNCTION_PASS("float2int", Float2IntPass())
@@ -490,6 +494,8 @@ FUNCTION_PASS("lower-invoke", LowerInvokePass())
 FUNCTION_PASS("lower-switch", LowerSwitchPass())
 FUNCTION_PASS("lower-widenable-condition", LowerWidenableConditionPass())
 FUNCTION_PASS("make-guards-explicit", MakeGuardsExplicitPass())
+FUNCTION_PASS("mark-loops-deferred-for-vectorization",
+              MarkLoopsDeferredForVectorizationPass())
 FUNCTION_PASS("mem2reg", PromotePass())
 FUNCTION_PASS("memcpyopt", MemCpyOptPass())
 FUNCTION_PASS("memprof", MemProfilerPass())

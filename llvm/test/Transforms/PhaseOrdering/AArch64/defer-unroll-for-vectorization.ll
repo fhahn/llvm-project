@@ -11,7 +11,7 @@ target triple = "arm64-apple-macosx"
 ; vectorized with VF=4 and unrolled 2x, producing 2 vector iterations.
 define void @add_arrays(ptr noalias %dst, ptr noalias %a, ptr noalias %b) {
 ; CHECK-LABEL: @add_arrays(
-; CHECK-NEXT:  entry:
+; CHECK-NEXT:  vector.body:
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[A:%.*]], align 4
 ; CHECK-NEXT:    [[WIDE_LOAD1:%.*]] = load <4 x i32>, ptr [[B:%.*]], align 4
 ; CHECK-NEXT:    [[TMP0:%.*]] = add nsw <4 x i32> [[WIDE_LOAD1]], [[WIDE_LOAD]]
@@ -87,7 +87,7 @@ exit:
 ; cannot handle. Verify it still gets fully unrolled after the vectorizer.
 define i32 @recurrence_loop(ptr %arr) {
 ; CHECK-LABEL: @recurrence_loop(
-; CHECK-NEXT:  entry:
+; CHECK-NEXT:  loop:
 ; CHECK-NEXT:    [[VAL:%.*]] = load i32, ptr [[ARR:%.*]], align 4
 ; CHECK-NEXT:    [[GEP_1:%.*]] = getelementptr inbounds nuw i8, ptr [[ARR]], i64 4
 ; CHECK-NEXT:    [[VAL_1:%.*]] = load i32, ptr [[GEP_1]], align 4

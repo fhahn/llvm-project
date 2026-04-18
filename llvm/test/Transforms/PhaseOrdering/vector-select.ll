@@ -73,9 +73,9 @@ define <4 x i8> @allSignBits_vec(<4 x i8> %cond, <4 x i8> %tval, <4 x i8> %fval)
 
 define <4 x i32> @PR42100(<4 x i32> noundef %x, <4 x i32> noundef %min) {
 ; CHECK-LABEL: @PR42100(
-; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[TMP0:%.*]] = tail call <4 x i32> @llvm.smin.v4i32(<4 x i32> [[X:%.*]], <4 x i32> [[MIN:%.*]])
-; CHECK-NEXT:    ret <4 x i32> [[TMP0]]
+; CHECK-NEXT:  for.body:
+; CHECK-NEXT:    [[SEL5:%.*]] = tail call <4 x i32> @llvm.smin.v4i32(<4 x i32> [[X:%.*]], <4 x i32> [[MIN_ADDR_1_2:%.*]])
+; CHECK-NEXT:    ret <4 x i32> [[SEL5]]
 ;
 entry:
   br label %for.cond

@@ -16,7 +16,7 @@ define void @copy(ptr noalias %to, ptr noalias %from) {
 ; noalias within one iteration, but may alias across iterations.
 define void @pr39282(ptr %addr1, ptr %addr2) {
 ; CHECK-LABEL: @pr39282(
-; CHECK-NEXT:  start:
+; CHECK-NEXT:  body:
 ; CHECK-NEXT:    tail call void @llvm.experimental.noalias.scope.decl(metadata [[META0:![0-9]+]])
 ; CHECK-NEXT:    tail call void @llvm.experimental.noalias.scope.decl(metadata [[META3:![0-9]+]])
 ; CHECK-NEXT:    [[X_I:%.*]] = load i32, ptr [[ADDR1:%.*]], align 4, !alias.scope [[META3]], !noalias [[META0]]
@@ -31,10 +31,12 @@ define void @pr39282(ptr %addr1, ptr %addr2) {
 ; CHECK-NEXT:    tail call void @llvm.experimental.noalias.scope.decl(metadata [[META11:![0-9]+]])
 ; CHECK-NEXT:    [[X_I_2:%.*]] = load i32, ptr [[ADDR1]], align 4, !alias.scope [[META11]], !noalias [[META9]]
 ; CHECK-NEXT:    store i32 [[X_I_2]], ptr [[ADDR2]], align 4, !alias.scope [[META9]], !noalias [[META11]]
+; CHECK-NEXT:    [[ADDR1I_3:%.*]] = getelementptr inbounds nuw i8, ptr [[ADDR1]], i64 4
+; CHECK-NEXT:    [[ADDR2I_3:%.*]] = getelementptr inbounds nuw i8, ptr [[ADDR2]], i64 4
 ; CHECK-NEXT:    tail call void @llvm.experimental.noalias.scope.decl(metadata [[META13:![0-9]+]])
 ; CHECK-NEXT:    tail call void @llvm.experimental.noalias.scope.decl(metadata [[META15:![0-9]+]])
-; CHECK-NEXT:    [[X_I_3:%.*]] = load i32, ptr [[ADDR1I_1]], align 4, !alias.scope [[META15]], !noalias [[META13]]
-; CHECK-NEXT:    store i32 [[X_I_3]], ptr [[ADDR2I_1]], align 4, !alias.scope [[META13]], !noalias [[META15]]
+; CHECK-NEXT:    [[X_I_3:%.*]] = load i32, ptr [[ADDR1I_3]], align 4, !alias.scope [[META15]], !noalias [[META13]]
+; CHECK-NEXT:    store i32 [[X_I_3]], ptr [[ADDR2I_3]], align 4, !alias.scope [[META13]], !noalias [[META15]]
 ; CHECK-NEXT:    ret void
 ;
 start:

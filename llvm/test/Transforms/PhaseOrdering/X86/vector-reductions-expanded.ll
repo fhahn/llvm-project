@@ -239,14 +239,15 @@ for.end:
 define float @fadd_v4i32(ptr %p) {
 ; CHECK-LABEL: @fadd_v4i32(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[TMP1:%.*]] = load <4 x float>, ptr [[P:%.*]], align 4, !tbaa [[TBAA7:![0-9]+]]
-; CHECK-NEXT:    [[RDX_SHUF:%.*]] = shufflevector <4 x float> [[TMP1]], <4 x float> poison, <4 x i32> <i32 2, i32 3, i32 poison, i32 poison>
-; CHECK-NEXT:    [[BIN_RDX:%.*]] = fadd fast <4 x float> [[TMP1]], [[RDX_SHUF]]
-; CHECK-NEXT:    [[RDX_SHUF3:%.*]] = shufflevector <4 x float> [[BIN_RDX]], <4 x float> poison, <4 x i32> <i32 1, i32 poison, i32 poison, i32 poison>
-; CHECK-NEXT:    [[BIN_RDX4:%.*]] = fadd fast <4 x float> [[BIN_RDX]], [[RDX_SHUF3]]
-; CHECK-NEXT:    [[TMP2:%.*]] = extractelement <4 x float> [[BIN_RDX4]], i32 0
-; CHECK-NEXT:    [[BIN_RDX5:%.*]] = fadd fast float 4.200000e+01, [[TMP2]]
-; CHECK-NEXT:    ret float [[BIN_RDX5]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x float>, ptr [[P:%.*]], align 4, !tbaa [[TBAA7:![0-9]+]]
+; CHECK-NEXT:    [[TMP0:%.*]] = fadd fast <4 x float> [[WIDE_LOAD]], <float 4.200000e+01, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00>
+; CHECK-NEXT:    [[RDX_SHUF:%.*]] = shufflevector <4 x float> [[TMP0]], <4 x float> poison, <4 x i32> <i32 2, i32 3, i32 poison, i32 poison>
+; CHECK-NEXT:    [[BIN_RDX:%.*]] = fadd fast <4 x float> [[TMP0]], [[RDX_SHUF]]
+; CHECK-NEXT:    [[RDX_SHUF4:%.*]] = shufflevector <4 x float> [[BIN_RDX]], <4 x float> poison, <4 x i32> <i32 1, i32 poison, i32 poison, i32 poison>
+; CHECK-NEXT:    [[BIN_RDX5:%.*]] = fadd fast <4 x float> [[BIN_RDX]], [[RDX_SHUF4]]
+; CHECK-NEXT:    [[TMP1:%.*]] = extractelement <4 x float> [[BIN_RDX5]], i32 0
+; CHECK-NEXT:    [[BIN_RDX6:%.*]] = fadd fast float 0.000000e+00, [[TMP1]]
+; CHECK-NEXT:    ret float [[BIN_RDX6]]
 ;
 entry:
   br label %for.cond
@@ -278,15 +279,15 @@ for.end:
 define float @fmul_v4i32(ptr %p) {
 ; CHECK-LABEL: @fmul_v4i32(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[TMP1:%.*]] = load <4 x float>, ptr [[P:%.*]], align 4, !tbaa [[TBAA7]]
-; CHECK-NEXT:    [[RDX_SHUF:%.*]] = shufflevector <4 x float> [[TMP1]], <4 x float> poison, <4 x i32> <i32 2, i32 3, i32 poison, i32 poison>
-; CHECK-NEXT:    [[BIN_RDX:%.*]] = fmul fast <4 x float> [[TMP1]], [[RDX_SHUF]]
-; CHECK-NEXT:    [[RDX_SHUF3:%.*]] = shufflevector <4 x float> [[BIN_RDX]], <4 x float> poison, <4 x i32> <i32 1, i32 poison, i32 poison, i32 poison>
-; CHECK-NEXT:    [[BIN_RDX4:%.*]] = fmul fast <4 x float> [[BIN_RDX]], [[RDX_SHUF3]]
-; CHECK-NEXT:    [[TMP2:%.*]] = extractelement <4 x float> [[BIN_RDX4]], i32 0
-; CHECK-NEXT:    [[BIN_RDX5:%.*]] = fmul fast float 1.000000e+00, [[TMP2]]
-; CHECK-NEXT:    [[OP_EXTRA:%.*]] = fmul fast float [[BIN_RDX5]], 4.200000e+01
-; CHECK-NEXT:    ret float [[OP_EXTRA]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x float>, ptr [[P:%.*]], align 4, !tbaa [[TBAA7]]
+; CHECK-NEXT:    [[TMP0:%.*]] = fmul fast <4 x float> [[WIDE_LOAD]], <float 4.200000e+01, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>
+; CHECK-NEXT:    [[RDX_SHUF:%.*]] = shufflevector <4 x float> [[TMP0]], <4 x float> poison, <4 x i32> <i32 2, i32 3, i32 poison, i32 poison>
+; CHECK-NEXT:    [[BIN_RDX:%.*]] = fmul fast <4 x float> [[TMP0]], [[RDX_SHUF]]
+; CHECK-NEXT:    [[RDX_SHUF4:%.*]] = shufflevector <4 x float> [[BIN_RDX]], <4 x float> poison, <4 x i32> <i32 1, i32 poison, i32 poison, i32 poison>
+; CHECK-NEXT:    [[BIN_RDX5:%.*]] = fmul fast <4 x float> [[BIN_RDX]], [[RDX_SHUF4]]
+; CHECK-NEXT:    [[TMP1:%.*]] = extractelement <4 x float> [[BIN_RDX5]], i32 0
+; CHECK-NEXT:    [[BIN_RDX6:%.*]] = fmul fast float 1.000000e+00, [[TMP1]]
+; CHECK-NEXT:    ret float [[BIN_RDX6]]
 ;
 entry:
   br label %for.cond
@@ -318,15 +319,15 @@ for.end:
 define float @fmin_v4f32(ptr %p) {
 ; CHECK-LABEL: @fmin_v4f32(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[TMP1:%.*]] = load <4 x float>, ptr [[P:%.*]], align 4, !tbaa [[TBAA7]]
-; CHECK-NEXT:    [[RDX_SHUF:%.*]] = shufflevector <4 x float> [[TMP1]], <4 x float> poison, <4 x i32> <i32 2, i32 3, i32 poison, i32 poison>
-; CHECK-NEXT:    [[RDX_MINMAX_CMP:%.*]] = fcmp fast olt <4 x float> [[TMP1]], [[RDX_SHUF]]
-; CHECK-NEXT:    [[RDX_MINMAX_SELECT:%.*]] = select fast <4 x i1> [[RDX_MINMAX_CMP]], <4 x float> [[TMP1]], <4 x float> [[RDX_SHUF]]
-; CHECK-NEXT:    [[RDX_SHUF3:%.*]] = shufflevector <4 x float> [[RDX_MINMAX_SELECT]], <4 x float> poison, <4 x i32> <i32 1, i32 poison, i32 poison, i32 poison>
-; CHECK-NEXT:    [[RDX_MINMAX_CMP4:%.*]] = fcmp fast olt <4 x float> [[RDX_MINMAX_SELECT]], [[RDX_SHUF3]]
-; CHECK-NEXT:    [[RDX_MINMAX_SELECT5:%.*]] = select fast <4 x i1> [[RDX_MINMAX_CMP4]], <4 x float> [[RDX_MINMAX_SELECT]], <4 x float> [[RDX_SHUF3]]
-; CHECK-NEXT:    [[TMP2:%.*]] = extractelement <4 x float> [[RDX_MINMAX_SELECT5]], i32 0
-; CHECK-NEXT:    ret float [[TMP2]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x float>, ptr [[P:%.*]], align 4, !tbaa [[TBAA7]]
+; CHECK-NEXT:    [[RDX_SHUF:%.*]] = shufflevector <4 x float> [[WIDE_LOAD]], <4 x float> poison, <4 x i32> <i32 2, i32 3, i32 poison, i32 poison>
+; CHECK-NEXT:    [[RDX_MINMAX_CMP:%.*]] = fcmp fast olt <4 x float> [[WIDE_LOAD]], [[RDX_SHUF]]
+; CHECK-NEXT:    [[RDX_MINMAX_SELECT:%.*]] = select fast <4 x i1> [[RDX_MINMAX_CMP]], <4 x float> [[WIDE_LOAD]], <4 x float> [[RDX_SHUF]]
+; CHECK-NEXT:    [[RDX_SHUF4:%.*]] = shufflevector <4 x float> [[RDX_MINMAX_SELECT]], <4 x float> poison, <4 x i32> <i32 1, i32 poison, i32 poison, i32 poison>
+; CHECK-NEXT:    [[RDX_MINMAX_CMP5:%.*]] = fcmp fast olt <4 x float> [[RDX_MINMAX_SELECT]], [[RDX_SHUF4]]
+; CHECK-NEXT:    [[RDX_MINMAX_SELECT6:%.*]] = select fast <4 x i1> [[RDX_MINMAX_CMP5]], <4 x float> [[RDX_MINMAX_SELECT]], <4 x float> [[RDX_SHUF4]]
+; CHECK-NEXT:    [[TMP0:%.*]] = extractelement <4 x float> [[RDX_MINMAX_SELECT6]], i32 0
+; CHECK-NEXT:    ret float [[TMP0]]
 ;
 entry:
   br label %for.cond
