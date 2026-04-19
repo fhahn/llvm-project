@@ -3295,7 +3295,6 @@ void LoopVectorizationPlanner::emitInvalidCostRemarks(
 static bool willGenerateVectors(VPlan &Plan, ElementCount VF,
                                 const TargetTransformInfo &TTI) {
   assert(VF.isVector() && "Checking a scalar VF?");
-  VPTypeAnalysis TypeInfo(Plan);
   DenseSet<VPRecipeBase *> EphemeralRecipes;
   collectEphemeralRecipesForVPlan(Plan, EphemeralRecipes);
   // Set of already visited types.
@@ -3374,7 +3373,7 @@ static bool willGenerateVectors(VPlan &Plan, ElementCount VF,
       // operand.
       VPValue *ToCheck =
           R.getNumDefinedValues() >= 1 ? R.getVPValue(0) : R.getOperand(1);
-      Type *ScalarTy = TypeInfo.inferScalarType(ToCheck);
+      Type *ScalarTy = ToCheck->getScalarType();
       if (!Visited.insert({ScalarTy}).second)
         continue;
       Type *WideTy = toVectorizedTy(ScalarTy, VF);
@@ -6178,8 +6177,7 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
 
   // Perform the actual loop transformation.
   VPTransformState State(&TTI, BestVF, LI, DT, ILV.AC, ILV.Builder, &BestVPlan,
-                         OrigLoop->getParentLoop(),
-                         Legal->getWidestInductionType());
+                         OrigLoop->getParentLoop());
 
 #ifdef EXPENSIVE_CHECKS
   assert(DT->verify(DominatorTree::VerificationLevel::Fast));
@@ -7082,7 +7080,6 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan,
 void LoopVectorizationPlanner::addReductionResultComputation(
     VPlanPtr &Plan, VPRecipeBuilder &RecipeBuilder, ElementCount MinVF) {
   using namespace VPlanPatternMatch;
-  VPTypeAnalysis TypeInfo(*Plan);
   VPRegionBlock *VectorLoopRegion = Plan->getVectorLoopRegion();
   VPBasicBlock *MiddleVPBB = Plan->getMiddleBlock();
   SmallVector<VPRecipeBase *> ToDelete;
@@ -7098,7 +7095,7 @@ void LoopVectorizationPlanner::addReductionResultComputation(
     RecurKind RecurrenceKind = PhiR->getRecurrenceKind();
     const RecurrenceDescriptor &RdxDesc = Legal->getRecurrenceDescriptor(
         cast<PHINode>(PhiR->getUnderlyingInstr()));
-    Type *PhiTy = TypeInfo.inferScalarType(PhiR);
+    Type *PhiTy = PhiR->getScalarType();
     // If tail is folded by masking, introduce selects between the phi
     // and the users outside the vector region of each reduction, at the
     // beginning of the dedicated latch block.
@@ -7626,7 +7623,9 @@ preparePlanForMainVectorLoop(VPlan &MainPlan, VPlan &EpiPlan) {
       });
   VPPhi *ResumePhi = nullptr;
   if (ResumePhiIter == MainScalarPH->phis().end()) {
-    Type *Ty = VPTypeAnalysis(MainPlan).inferScalarType(VectorTC);
+    assert(MainPlan.getVectorLoopRegion()->getCanonicalIV() &&
+           "canonical IV must exist");
+    Type *Ty = VectorTC->getScalarType();
     VPBuilder ScalarPHBuilder(MainScalarPH, MainScalarPH->begin());
     ResumePhi = ScalarPHBuilder.createScalarPhi(
         {VectorTC, MainPlan.getZero(Ty)}, {}, "vec.epilog.resume.val");

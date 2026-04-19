@@ -603,11 +603,6 @@ protected:
     return R->getVPRecipeID() == VPRecipeID;                                   \
   }
 
-/// Return the scalar type of \p V. If \p V's scalar type has not been set
-/// (e.g. the defining recipe has not yet been migrated), fall back to
-/// VPTypeAnalysis using the plan of the defining recipe.
-LLVM_ABI Type *getScalarTypeOrInfer(VPValue *V);
-
 /// Compute the scalar result type for an IR \p Opcode given \p Operands.
 LLVM_ABI Type *computeScalarTypeForInstruction(unsigned Opcode,
                                                ArrayRef<VPValue *> Operands);
@@ -2127,7 +2122,7 @@ public:
                    const VPIRFlags &Flags = {},
                    DebugLoc DL = DebugLoc::getUnknown())
       : VPRecipeWithIRFlags(VPRecipeBase::VPWidenGEPSC, Operands,
-                            getScalarTypeOrInfer(Operands[0]), Flags, DL),
+                            Operands[0]->getScalarType(), Flags, DL),
         SourceElementTy(GEP->getSourceElementType()) {
     setUnderlyingValue(GEP);
     SmallVector<std::pair<unsigned, MDNode *>> Metadata;
@@ -2187,7 +2182,7 @@ public:
   VPVectorEndPointerRecipe(VPValue *Ptr, VPValue *VF, Type *SourceElementTy,
                            int64_t Stride, GEPNoWrapFlags GEPFlags, DebugLoc DL)
       : VPRecipeWithIRFlags(VPRecipeBase::VPVectorEndPointerSC, {Ptr, VF},
-                            getScalarTypeOrInfer(Ptr), GEPFlags, DL),
+                            Ptr->getScalarType(), GEPFlags, DL),
         SourceElementTy(SourceElementTy), Stride(Stride) {
     assert(Stride < 0 && "Stride must be negative");
   }
@@ -2256,7 +2251,7 @@ public:
   VPVectorPointerRecipe(VPValue *Ptr, Type *SourceElementTy,
                         GEPNoWrapFlags GEPFlags, DebugLoc DL)
       : VPRecipeWithIRFlags(VPRecipeBase::VPVectorPointerSC, Ptr,
-                            getScalarTypeOrInfer(Ptr), GEPFlags, DL),
+                            Ptr->getScalarType(), GEPFlags, DL),
         SourceElementTy(SourceElementTy) {}
 
   VP_CLASSOF_IMPL(VPRecipeBase::VPVectorPointerSC)
@@ -2331,7 +2326,7 @@ protected:
   VPHeaderPHIRecipe(unsigned char VPRecipeID, Instruction *UnderlyingInstr,
                     VPValue *Start, DebugLoc DL = DebugLoc::getUnknown())
       : VPHeaderPHIRecipe(VPRecipeID, UnderlyingInstr, Start,
-                          getScalarTypeOrInfer(Start), DL) {}
+                          Start->getScalarType(), DL) {}
 
   VPHeaderPHIRecipe(unsigned char VPRecipeID, Instruction *UnderlyingInstr,
                     VPValue *Start, Type *ResultTy, DebugLoc DL)
@@ -2405,7 +2400,7 @@ public:
                          VPValue *Step, const InductionDescriptor &IndDesc,
                          DebugLoc DL)
       : VPWidenInductionRecipe(Kind, IV, Start, Step, IndDesc,
-                               getScalarTypeOrInfer(Start), DL) {}
+                               Start->getScalarType(), DL) {}
 
   VPWidenInductionRecipe(unsigned char Kind, PHINode *IV, VPValue *Start,
                          VPValue *Step, const InductionDescriptor &IndDesc,
@@ -2634,7 +2629,7 @@ public:
   VPWidenPHIRecipe(ArrayRef<VPValue *> IncomingValues,
                    DebugLoc DL = DebugLoc::getUnknown(), const Twine &Name = "")
       : VPSingleDefRecipe(VPRecipeBase::VPWidenPHISC, IncomingValues,
-                          getScalarTypeOrInfer(IncomingValues[0]),
+                          IncomingValues[0]->getScalarType(),
                           /*UV=*/nullptr, DL),
         Name(Name.str()) {}
 
@@ -3518,7 +3513,7 @@ public:
   /// nodes after merging back from a Branch-on-Mask.
   VPPredInstPHIRecipe(VPValue *PredV, DebugLoc DL)
       : VPSingleDefRecipe(VPRecipeBase::VPPredInstPHISC, PredV,
-                          getScalarTypeOrInfer(PredV), nullptr, DL) {}
+                          PredV->getScalarType(), nullptr, DL) {}
   ~VPPredInstPHIRecipe() override = default;
 
   VPPredInstPHIRecipe *clone() override {
@@ -4038,7 +4033,7 @@ public:
                         Instruction::BinaryOps Opcode, FastMathFlags FMFs,
                         DebugLoc DL)
       : VPRecipeWithIRFlags(VPRecipeBase::VPScalarIVStepsSC, {IV, Step, VF},
-                            getScalarTypeOrInfer(IV), FMFs, DL),
+                            IV->getScalarType(), FMFs, DL),
         InductionOpcode(Opcode) {}
 
   VPScalarIVStepsRecipe(const InductionDescriptor &IndDesc, VPValue *IV,

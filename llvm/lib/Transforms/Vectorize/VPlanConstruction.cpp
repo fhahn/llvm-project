@@ -999,7 +999,6 @@ bool VPlanTransforms::createHeaderPhiRecipes(
 
 void VPlanTransforms::createInLoopReductionRecipes(VPlan &Plan,
                                                    ElementCount MinVF) {
-  VPTypeAnalysis TypeInfo(Plan);
   VPBasicBlock *Header = Plan.getVectorLoopRegion()->getEntryBasicBlock();
   SmallVector<VPRecipeBase *> ToDelete;
 
@@ -1094,7 +1093,7 @@ void VPlanTransforms::createInLoopReductionRecipes(VPlan &Plan,
         VecOp = FMulRecipe;
       } else if (Kind == RecurKind::AddChainWithSubs &&
                  match(CurrentLink, m_Sub(m_VPValue(), m_VPValue()))) {
-        Type *PhiTy = TypeInfo.inferScalarType(PhiR);
+        Type *PhiTy = PhiR->getScalarType();
         auto *Zero = Plan.getConstantInt(PhiTy, 0);
         VPBuilder Builder(LinkVPBB, CurrentLink->getIterator());
         auto *Sub = Builder.createSub(Zero, CurrentLink->getOperand(1),
@@ -1364,15 +1363,13 @@ void VPlanTransforms::foldTailByMasking(VPlan &Plan) {
 
   // Insert phis with a poison incoming value for past the end of the tail.
   Builder.setInsertPoint(Latch, Latch->begin());
-  VPTypeAnalysis TypeInfo(Plan);
   for (const auto &[V, Users] : NeedsPhi) {
     if (isa<VPIRValue>(V))
       continue;
     // TODO: For reduction phis, use phi value instead of poison so we can
     // remove the special casing for tail folding in
     // LoopVectorizationPlanner::addReductionResultComputation
-    VPValue *Poison =
-        Plan.getOrAddLiveIn(PoisonValue::get(TypeInfo.inferScalarType(V)));
+    VPValue *Poison = Plan.getOrAddLiveIn(PoisonValue::get(V->getScalarType()));
     VPInstruction *Phi = Builder.createScalarPhi({V, Poison});
     for (VPUser *U : Users)
       U->replaceUsesOfWith(V, Phi);
@@ -1896,7 +1893,7 @@ static bool handleFirstArgMinOrMax(
   Type *Ty = Plan.getVectorLoopRegion()->getCanonicalIVType();
   // TODO: Support non (i.e., narrower than) canonical IV types.
   // TODO: Emit remarks for failed transformations.
-  if (Ty != VPTypeAnalysis(Plan).inferScalarType(WideIV))
+  if (Ty != WideIV->getScalarType())
     return false;
 
   auto *FindIVSelectR = cast<VPSingleDefRecipe>(
