@@ -7202,42 +7202,45 @@ void LoopVectorizationPlanner::addReductionResultComputation(
       FinalReductionResult =
           Builder.createAnyOfReduction(NewExitingVPV, NewVal, Start, ExitDL);
     } else {
+      // If the vector reduction can be performed in a smaller type, truncate
+      // the exiting value first so the ComputeReductionResult is constructed
+      // with the already-truncated operand (its scalar type is cached at
+      // construction time). The result is then extended back to PhiTy to
+      // enable InstCombine to evaluate the entire expression in the smaller
+      // type.
+      VPValue *ReductionOp = NewExitingVPV;
+      Instruction::CastOps ExtendOpc = Instruction::CastOpsEnd;
+      if (MinVF.isVector() && PhiTy != RdxDesc.getRecurrenceType()) {
+        assert(!PhiR->isInLoop() && "Unexpected truncated inloop reduction!");
+        assert(!RecurrenceDescriptor::isMinMaxRecurrenceKind(RecurrenceKind) &&
+               "Unexpected truncated min-max recurrence!");
+        Type *RdxTy = RdxDesc.getRecurrenceType();
+        ExtendOpc =
+            RdxDesc.isSigned() ? Instruction::SExt : Instruction::ZExt;
+        VPWidenCastRecipe *Trunc;
+        VPWidenCastRecipe *Extnd;
+        {
+          VPBuilder::InsertPointGuard TruncGuard(Builder);
+          Builder.setInsertPoint(
+              NewExitingVPV->getDefiningRecipe()->getParent(),
+              std::next(NewExitingVPV->getDefiningRecipe()->getIterator()));
+          Trunc =
+              Builder.createWidenCast(Instruction::Trunc, NewExitingVPV, RdxTy);
+          Extnd = Builder.createWidenCast(ExtendOpc, Trunc, PhiTy);
+        }
+        if (PhiR->getOperand(1) == NewExitingVPV)
+          PhiR->setOperand(1, Extnd->getVPSingleValue());
+        ReductionOp = Trunc;
+      }
+
       VPIRFlags Flags(RecurrenceKind, PhiR->isOrdered(), PhiR->isInLoop(),
                       PhiR->getFastMathFlags());
       FinalReductionResult =
           Builder.createNaryOp(VPInstruction::ComputeReductionResult,
-                               {NewExitingVPV}, Flags, ExitDL);
-    }
-    // If the vector reduction can be performed in a smaller type, we truncate
-    // then extend the loop exit value to enable InstCombine to evaluate the
-    // entire expression in the smaller type.
-    if (MinVF.isVector() && PhiTy != RdxDesc.getRecurrenceType() &&
-        !RecurrenceDescriptor::isAnyOfRecurrenceKind(RecurrenceKind)) {
-      assert(!PhiR->isInLoop() && "Unexpected truncated inloop reduction!");
-      assert(!RecurrenceDescriptor::isMinMaxRecurrenceKind(RecurrenceKind) &&
-             "Unexpected truncated min-max recurrence!");
-      Type *RdxTy = RdxDesc.getRecurrenceType();
-      VPWidenCastRecipe *Trunc;
-      Instruction::CastOps ExtendOpc =
-          RdxDesc.isSigned() ? Instruction::SExt : Instruction::ZExt;
-      VPWidenCastRecipe *Extnd;
-      {
-        VPBuilder::InsertPointGuard Guard(Builder);
-        Builder.setInsertPoint(
-            NewExitingVPV->getDefiningRecipe()->getParent(),
-            std::next(NewExitingVPV->getDefiningRecipe()->getIterator()));
-        Trunc =
-            Builder.createWidenCast(Instruction::Trunc, NewExitingVPV, RdxTy);
-        Extnd = Builder.createWidenCast(ExtendOpc, Trunc, PhiTy);
-      }
-      if (PhiR->getOperand(1) == NewExitingVPV)
-        PhiR->setOperand(1, Extnd->getVPSingleValue());
-
-      // Update ComputeReductionResult with the truncated exiting value and
-      // extend its result. Operand 0 provides the values to be reduced.
-      FinalReductionResult->setOperand(0, Trunc);
-      FinalReductionResult =
-          Builder.createScalarCast(ExtendOpc, FinalReductionResult, PhiTy, {});
+                               {ReductionOp}, Flags, ExitDL);
+      if (ExtendOpc != Instruction::CastOpsEnd)
+        FinalReductionResult = Builder.createScalarCast(
+            ExtendOpc, FinalReductionResult, PhiTy, {});
     }
 
     // Update all users outside the vector region. Also replace redundant

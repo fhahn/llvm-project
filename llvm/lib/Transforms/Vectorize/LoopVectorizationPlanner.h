@@ -204,15 +204,19 @@ public:
   VPInstruction *createFirstActiveLane(ArrayRef<VPValue *> Masks,
                                        DebugLoc DL = DebugLoc::getUnknown(),
                                        const Twine &Name = "") {
+    VPlan *Plan = BB->getPlan();
+    Type *IndexTy = Plan->getDataLayout().getIndexType(Plan->getContext(), 0);
     return tryInsertInstruction(new VPInstruction(
-        VPInstruction::FirstActiveLane, Masks, {}, {}, DL, Name));
+        VPInstruction::FirstActiveLane, Masks, {}, {}, DL, Name, IndexTy));
   }
 
   VPInstruction *createLastActiveLane(ArrayRef<VPValue *> Masks,
                                       DebugLoc DL = DebugLoc::getUnknown(),
                                       const Twine &Name = "") {
-    return tryInsertInstruction(new VPInstruction(VPInstruction::LastActiveLane,
-                                                  Masks, {}, {}, DL, Name));
+    VPlan *Plan = BB->getPlan();
+    Type *IndexTy = Plan->getDataLayout().getIndexType(Plan->getContext(), 0);
+    return tryInsertInstruction(new VPInstruction(
+        VPInstruction::LastActiveLane, Masks, {}, {}, DL, Name, IndexTy));
   }
 
   VPInstruction *createOverflowingOp(
@@ -337,8 +341,10 @@ public:
 
   VPPhi *createScalarPhi(ArrayRef<VPValue *> IncomingValues,
                          DebugLoc DL = DebugLoc::getUnknown(),
-                         const Twine &Name = "", const VPIRFlags &Flags = {}) {
-    return tryInsertInstruction(new VPPhi(IncomingValues, Flags, DL, Name));
+                         const Twine &Name = "", const VPIRFlags &Flags = {},
+                         Type *ResultTy = nullptr) {
+    return tryInsertInstruction(
+        new VPPhi(IncomingValues, Flags, DL, Name, ResultTy));
   }
 
   VPWidenPHIRecipe *createWidenPhi(ArrayRef<VPValue *> IncomingValues,

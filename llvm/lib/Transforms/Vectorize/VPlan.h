@@ -608,6 +608,10 @@ protected:
 /// VPTypeAnalysis using the plan of the defining recipe.
 LLVM_ABI Type *getScalarTypeOrInfer(VPValue *V);
 
+/// Compute the scalar result type for an IR \p Opcode given \p Operands.
+LLVM_ABI Type *computeScalarTypeForInstruction(unsigned Opcode,
+                                               ArrayRef<VPValue *> Operands);
+
 /// VPSingleDef is a base class for recipes for modeling a sequence of one or
 /// more output IR that define a single result VPValue.
 class VPSingleDefRecipe : public VPRecipeBase, public VPSingleDefValue {
@@ -1403,15 +1407,19 @@ private:
 public:
   VPInstruction(unsigned Opcode, ArrayRef<VPValue *> Operands,
                 const VPIRFlags &Flags = {}, const VPIRMetadata &MD = {},
-                DebugLoc DL = DebugLoc::getUnknown(), const Twine &Name = "");
+                DebugLoc DL = DebugLoc::getUnknown(), const Twine &Name = "",
+                Type *ResultTy = nullptr);
 
   VP_CLASSOF_IMPL(VPRecipeBase::VPInstructionSC)
 
-  VPInstruction *clone() override { return cloneWithOperands(operands()); }
+  VPInstruction *clone() override {
+    return cloneWithOperands(operands(), getScalarType());
+  }
 
-  VPInstruction *cloneWithOperands(ArrayRef<VPValue *> NewOperands) {
+  VPInstruction *cloneWithOperands(ArrayRef<VPValue *> NewOperands,
+                                   Type *ResultTy = nullptr) {
     auto *New = new VPInstruction(Opcode, NewOperands, *this, *this,
-                                  getDebugLoc(), Name);
+                                  getDebugLoc(), Name, ResultTy);
     if (getUnderlyingValue())
       New->setUnderlyingValue(getUnderlyingInstr());
     return New;
@@ -1531,18 +1539,15 @@ protected:
 /// directly determine the result type. Note that there is no separate recipe ID
 /// for VPInstructionWithType; it shares the same ID as VPInstruction and is
 /// distinguished purely by the opcode.
+/// TODO: Merge with VPInstruction, now that VPRecipeValue provides the type.
 class VPInstructionWithType : public VPInstruction {
-  /// Scalar result type produced by the recipe.
-  Type *ResultTy;
-
 public:
   VPInstructionWithType(unsigned Opcode, ArrayRef<VPValue *> Operands,
                         Type *ResultTy, const VPIRFlags &Flags = {},
                         const VPIRMetadata &Metadata = {},
                         DebugLoc DL = DebugLoc::getUnknown(),
                         const Twine &Name = "")
-      : VPInstruction(Opcode, Operands, Flags, Metadata, DL, Name),
-        ResultTy(ResultTy) {}
+      : VPInstruction(Opcode, Operands, Flags, Metadata, DL, Name, ResultTy) {}
 
   static inline bool classof(const VPRecipeBase *R) {
     // VPInstructionWithType are VPInstructions with specific opcodes requiring
@@ -1584,7 +1589,7 @@ public:
     return 0;
   }
 
-  Type *getResultType() const { return ResultTy; }
+  Type *getResultType() const { return getScalarType(); }
 
 protected:
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
@@ -1661,8 +1666,9 @@ public:
 
 struct LLVM_ABI_FOR_TEST VPPhi : public VPInstruction, public VPPhiAccessors {
   VPPhi(ArrayRef<VPValue *> Operands, const VPIRFlags &Flags, DebugLoc DL,
-        const Twine &Name = "")
-      : VPInstruction(Instruction::PHI, Operands, Flags, {}, DL, Name) {}
+        const Twine &Name = "", Type *ResultTy = nullptr)
+      : VPInstruction(Instruction::PHI, Operands, Flags, {}, DL, Name,
+                      ResultTy) {}
 
   static inline bool classof(const VPUser *U) {
     auto *VPI = dyn_cast<VPInstruction>(U);
