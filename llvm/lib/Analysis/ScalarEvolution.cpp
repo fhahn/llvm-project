@@ -1912,9 +1912,15 @@ const SCEV *ScalarEvolution::getZeroExtendExprImpl(const SCEV *Op, Type *Ty,
 
     const SCEVConstant *C;
     const SCEV *A;
-    // zext (C + A)<nsw> -> (sext(C) + sext(A))<nsw> if zext (C + A)<nsw> >=s 0.
-    if (SA->hasNoSignedWrap() && isKnownNonNegative(SA) &&
-        match(SA, m_scev_Add(m_SCEVConstant(C), m_SCEV(A)))) {
+    const APInt *C2;
+    // zext (C + A)<nsw> -> (sext(C) + sext(A))<nsw> if C < 0 and
+    // A >= |C| (so C + A >= 0 with nsw, making zext = sext;
+    if (SA->hasNoSignedWrap() &&
+        match(SA, m_scev_Add(m_SCEVConstant(C), m_SCEV(A))) &&
+        C->getAPInt().isNegative() && !C->getAPInt().isMinSignedValue() &&
+        match(A, m_scev_SMax(m_scev_APInt(C2), m_SCEV())) &&
+        C2->sge(C->getAPInt().abs())) {
+      assert(isKnownNonNegative(SA) && "incorrectly determined non-negative");
       return getAddExpr(getSignExtendExpr(C, Ty, Depth + 1),
                         getSignExtendExpr(A, Ty, Depth + 1), SCEV::FlagNSW,
                         Depth + 1);
