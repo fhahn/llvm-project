@@ -2027,7 +2027,7 @@ static bool optimizeVectorInductionWidthForTCAndVFUF(VPlan &Plan,
   bool MadeChange = false;
 
   VPBasicBlock *HeaderVPBB = Plan.getVectorLoopRegion()->getEntryBasicBlock();
-  for (VPRecipeBase &Phi : HeaderVPBB->phis()) {
+  for (VPRecipeBase &Phi : make_early_inc_range(HeaderVPBB->phis())) {
     auto *WideIV = dyn_cast<VPWidenIntOrFpInductionRecipe>(&Phi);
 
     // Currently only handle canonical IVs as it is trivial to replace the start
@@ -2052,14 +2052,14 @@ static bool optimizeVectorInductionWidthForTCAndVFUF(VPlan &Plan,
                                                 Plan.getConstantInt(NewIVTy, 1),
                                                 WideIV->getVFValue());
     NewWideIV->insertBefore(WideIV);
-    WideIV->replaceAllUsesWith(NewWideIV);
 
     auto *NewBTC = new VPWidenCastRecipe(
         Instruction::Trunc, Plan.getOrCreateBackedgeTakenCount(), NewIVTy,
         nullptr, VPIRFlags::getDefaultFlags(Instruction::Trunc));
     Plan.getVectorPreheader()->appendRecipe(NewBTC);
-    auto *Cmp = cast<VPInstruction>(NewWideIV->getSingleUser());
-    Cmp->setOperand(1, NewBTC);
+    auto *Cmp = cast<VPInstruction>(WideIV->getSingleUser());
+    Cmp->replaceAllUsesWith(
+        VPBuilder(Cmp).createICmp(Cmp->getPredicate(), NewWideIV, NewBTC));
 
     MadeChange = true;
   }
@@ -3654,7 +3654,7 @@ expandVPWidenIntOrFpInduction(VPWidenIntOrFpInductionRecipe *WidenIVR,
 
   // The value from the original loop to which we are mapping the new induction
   // variable.
-  Type *Ty = TypeInfo.inferScalarType(WidenIVR);
+  Type *Ty = WidenIVR->getScalarType();
 
   const InductionDescriptor &ID = WidenIVR->getInductionDescriptor();
   Instruction::BinaryOps AddOp;
@@ -3670,7 +3670,7 @@ expandVPWidenIntOrFpInduction(VPWidenIntOrFpInductionRecipe *WidenIVR,
 
   // If the phi is truncated, truncate the start and step values.
   VPBuilder Builder(Plan->getVectorPreheader());
-  Type *StepTy = TypeInfo.inferScalarType(Step);
+  Type *StepTy = Step->getScalarType();
   if (Ty->getScalarSizeInBits() < StepTy->getScalarSizeInBits()) {
     assert(StepTy->isIntegerTy() && "Truncation requires an integer type");
     Step = Builder.createScalarCast(Instruction::Trunc, Step, Ty, DL);

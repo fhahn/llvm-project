@@ -7162,25 +7162,40 @@ void LoopVectorizationPlanner::addReductionResultComputation(
       // is selected if the negated condition is true in any iteration.
       if (TrueValIsPhi)
         Cmp = Builder.createNot(Cmp);
-      VPValue *Or = Builder.createOr(PhiR, Cmp);
-      // Only replace uses inside the vector region with Or. External uses
-      // (e.g. scalar preheader resume phis) must be replaced by the user
-      // update loop below with FinalReductionResult.
-      AnyOfSelect->replaceUsesWithIf(Or, [](VPUser &U, unsigned) {
-        return cast<VPRecipeBase>(&U)->getRegion();
-      });
-      ToDelete.push_back(AnyOfSelect);
 
-      // Convert the reduction phi to operate on bools.
+      // Build a fresh i1 chain (phi, or, and i1 versions of any blend/select
+      // the exiting value flows through).
       auto *NewPhiR =
-          PhiR->cloneWithOperands(Plan->getFalse(), PhiR->getBackedgeValue());
+          PhiR->cloneWithOperands(Plan->getFalse(), Plan->getFalse());
       NewPhiR->insertBefore(PhiR);
-      PhiR->replaceAllUsesWith(NewPhiR);
-      PhiR = NewPhiR;
+      VPValue *NewExiting = Builder.createOr(NewPhiR, Cmp);
 
-      // Update NewExitingVPV if it was pointing to the now-replaced select.
-      if (NewExitingVPV == AnyOfSelect)
-        NewExitingVPV = Or;
+      if (OrigExitingVPV != AnyOfSelect) {
+        auto *B = cast<VPBlendRecipe>(OrigExitingVPV->getDefiningRecipe());
+        SmallVector<VPValue *> NewOps;
+        for (VPValue *Op : B->operands())
+          NewOps.push_back(Op == AnyOfSelect ? NewExiting
+                           : Op == PhiR      ? NewPhiR
+                                             : Op);
+        auto *NewB =
+            new VPBlendRecipe(cast_or_null<PHINode>(B->getUnderlyingValue()),
+                              NewOps, *B, B->getDebugLoc());
+        NewB->insertBefore(B);
+        NewExiting = NewB->getVPSingleValue();
+      }
+
+      if (NewExitingVPV != OrigExitingVPV) {
+        auto *S = cast<VPInstruction>(NewExitingVPV->getDefiningRecipe());
+        auto *NewS =
+            S->cloneWithOperands({S->getOperand(0), NewExiting, NewPhiR});
+        NewS->insertBefore(S);
+        NewExiting = NewS;
+      }
+
+      NewPhiR->setOperand(1, NewExiting);
+      PhiR->replaceAllUsesWith(Start);
+      PhiR = NewPhiR;
+      NewExitingVPV = NewExiting;
 
       Builder.setInsertPoint(MiddleVPBB, IP);
 
