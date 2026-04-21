@@ -143,6 +143,8 @@ STATISTIC(NumExitCountsNotComputed,
           "Number of loop exits without predictable exit counts");
 STATISTIC(NumBruteForceTripCountsComputed,
           "Number of loops with trip counts computed by force");
+STATISTIC(NumZExtAddNSWFolded,
+          "Number of zext(C+A)<nsw> folded via cheap non-neg check");
 
 #ifdef EXPENSIVE_CHECKS
 bool llvm::VerifySCEV = true;
@@ -1686,6 +1688,57 @@ ScalarEvolution::getZeroExtendExpr(const SCEV *Op, Type *Ty, unsigned Depth) {
   return S;
 }
 
+/// Compute a cheap lower bound on the signed minimum of \p S without
+/// triggering full range analysis. Returns std::nullopt if no cheap bound
+/// can be determined. Only does structural/constant checks.
+static std::optional<APInt> getCheapSignedMin(const SCEV *S) {
+  if (const auto *C = dyn_cast<SCEVConstant>(S))
+    return C->getAPInt();
+
+  if (isa<SCEVZeroExtendExpr>(S))
+    return APInt::getZero(S->getType()->getScalarSizeInBits());
+
+  if (const auto *SM = dyn_cast<SCEVSMaxExpr>(S)) {
+    // smax(C, X) >= C for any X.
+    if (const auto *C = dyn_cast<SCEVConstant>(SM->getOperand(0)))
+      return C->getAPInt();
+  }
+
+  if (const auto *UM = dyn_cast<SCEVUMaxExpr>(S)) {
+    // umax(a, b, ...) picks the largest unsigned value. For a signed lower
+    // bound, all operands must be non-negative — otherwise the unsigned-largest
+    // value could be negative signed.
+    APInt BestMin = APInt::getZero(S->getType()->getScalarSizeInBits());
+    for (SCEVUse Op : UM->operands()) {
+      auto OpMin = getCheapSignedMin(Op);
+      if (!OpMin || OpMin->isNegative())
+        return std::nullopt;
+      if (OpMin->sgt(BestMin))
+        BestMin = *OpMin;
+    }
+    return BestMin;
+  }
+
+  if (const auto *Mul = dyn_cast<SCEVMulExpr>(S)) {
+    if (Mul->getNumOperands() == 2) {
+      if (const auto *K = dyn_cast<SCEVConstant>(Mul->getOperand(0))) {
+        if (K->getAPInt().isStrictlyPositive()) {
+          if (auto MinOp = getCheapSignedMin(Mul->getOperand(1))) {
+            if (!MinOp->isNegative()) {
+              bool Overflow;
+              APInt Prod = K->getAPInt().smul_ov(*MinOp, Overflow);
+              if (!Overflow)
+                return Prod;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return std::nullopt;
+}
+
 const SCEV *ScalarEvolution::getZeroExtendExprImpl(const SCEV *Op, Type *Ty,
                                                    unsigned Depth) {
   assert(getTypeSizeInBits(Op->getType()) < getTypeSizeInBits(Ty) &&
@@ -1910,20 +1963,23 @@ const SCEV *ScalarEvolution::getZeroExtendExprImpl(const SCEV *Op, Type *Ty,
       return getAddExpr(Ops, SCEV::FlagNUW, Depth + 1);
     }
 
-    const SCEVConstant *C;
-    const SCEV *A;
-    const APInt *C2;
-    // zext (C + A)<nsw> -> (sext(C) + sext(A))<nsw> if C < 0 and
-    // A >= |C| (so C + A >= 0 with nsw, making zext = sext;
-    if (SA->hasNoSignedWrap() &&
-        match(SA, m_scev_Add(m_SCEVConstant(C), m_SCEV(A))) &&
-        C->getAPInt().isNegative() && !C->getAPInt().isMinSignedValue() &&
-        match(A, m_scev_SMax(m_scev_APInt(C2), m_SCEV())) &&
-        C2->sge(C->getAPInt().abs())) {
-      assert(isKnownNonNegative(SA) && "incorrectly determined non-negative");
-      return getAddExpr(getSignExtendExpr(C, Ty, Depth + 1),
-                        getSignExtendExpr(A, Ty, Depth + 1), SCEV::FlagNSW,
-                        Depth + 1);
+    // zext (C + A)<nsw> -> (sext(C) + sext(A))<nsw> if zext (C + A)<nsw> >=s 0.
+    // Use a cheap structural check for non-negativity to avoid expensive range
+    // analysis via isKnownNonNegative.
+    if (SA->hasNoSignedWrap() && SA->getNumOperands() == 2 &&
+        isa<SCEVConstant>(SA->getOperand(0))) {
+      const APInt &CV = cast<SCEVConstant>(SA->getOperand(0))->getAPInt();
+      if (auto MinOp1 = getCheapSignedMin(SA->getOperand(1))) {
+        bool Overflow;
+        APInt Sum = CV.sadd_ov(*MinOp1, Overflow);
+        if (!Overflow && !Sum.isNegative()) {
+          ++NumZExtAddNSWFolded;
+          return getAddExpr(
+              getSignExtendExpr(SA->getOperand(0), Ty, Depth + 1),
+              getSignExtendExpr(SA->getOperand(1), Ty, Depth + 1),
+              SCEV::FlagNSW, Depth + 1);
+        }
+      }
     }
 
     // zext(C + x + y + ...) --> (zext(D) + zext((C - D) + x + y + ...))
