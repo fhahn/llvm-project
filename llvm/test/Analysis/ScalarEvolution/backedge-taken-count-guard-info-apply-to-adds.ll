@@ -33,9 +33,9 @@ declare void @clobber()
 define void @test_add_sub_1_guard(ptr %src, i32 %n) {
 ; CHECK-LABEL: 'test_add_sub_1_guard'
 ; CHECK-NEXT:  Determining loop execution counts for: @test_add_sub_1_guard
-; CHECK-NEXT:  Loop %loop: backedge-taken count is (zext i32 (-1 + (%n /u 2))<nsw> to i64)
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 4294967295
-; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (zext i32 (-1 + (%n /u 2))<nsw> to i64)
+; CHECK-NEXT:  Loop %loop: backedge-taken count is i64 0
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 0
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i64 0
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
 entry:
@@ -90,3 +90,62 @@ loop:
 exit:
   ret i32 0
 }
+
+; Guard is on a whole SCEVMulExpr (%n * 4). With the guard %n * 4 == 16, the
+; BTC that uses %n * 4 should be simplified to the mapped RHS (16), yielding a
+; constant trip count.
+define void @test_mul_whole_expr_guard(i32 %n, ptr %dst) {
+; CHECK-LABEL: 'test_mul_whole_expr_guard'
+; CHECK-NEXT:  Determining loop execution counts for: @test_mul_whole_expr_guard
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + (4 * %n)<nuw>)
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 15
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + (4 * %n)<nuw>)
+; CHECK-NEXT:  Loop %loop: Trip multiple is 16
+;
+entry:
+  %mul = mul nuw i32 %n, 4
+  %pre = icmp eq i32 %mul, 16
+  call void @llvm.assume(i1 %pre)
+  br label %loop
+
+loop:
+  %iv = phi i32 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep = getelementptr i32, ptr %dst, i32 %iv
+  store i32 0, ptr %gep
+  %iv.next = add nuw i32 %iv, 1
+  %ec = icmp eq i32 %iv.next, %mul
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; Guard is on a whole SCEVUMaxExpr (umax(%n, 8)). The BTC references
+; umax(%n, 8), which should be simplified to the mapped constant (16).
+define void @test_umax_whole_expr_guard(i32 %n, ptr %dst) {
+; CHECK-LABEL: 'test_umax_whole_expr_guard'
+; CHECK-NEXT:  Determining loop execution counts for: @test_umax_whole_expr_guard
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + (8 umax %n))
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 15
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + (8 umax %n))
+; CHECK-NEXT:  Loop %loop: Trip multiple is 16
+;
+entry:
+  %umax = call i32 @llvm.umax.i32(i32 %n, i32 8)
+  %pre = icmp eq i32 %umax, 16
+  call void @llvm.assume(i1 %pre)
+  br label %loop
+
+loop:
+  %iv = phi i32 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep = getelementptr i32, ptr %dst, i32 %iv
+  store i32 0, ptr %gep
+  %iv.next = add nuw i32 %iv, 1
+  %ec = icmp eq i32 %iv.next, %umax
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+declare i32 @llvm.umax.i32(i32, i32)

@@ -16204,17 +16204,45 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
         FlagMask = ScalarEvolution::setFlags(FlagMask, SCEV::FlagNSW);
     }
 
-    const SCEV *visitAddRecExpr(const SCEVAddRecExpr *Expr) { return Expr; }
-
-    const SCEV *visitUnknown(const SCEVUnknown *Expr) {
-      return Map.lookup_or(Expr, Expr);
+    /// Look up a whole-expression rewrite in the guards Map before dispatching
+    /// to a type-specific visitor. This catches cases where a guard directly
+    /// maps a compound SCEV (e.g. Add, Mul, UMax). Only SCEV kinds that can
+    /// appear as a guard key are looked up; leaf/uncommon kinds (Constant,
+    /// VScale, PtrToInt, UDiv, AddRec) bypass the map lookup entirely to avoid
+    /// per-node overhead when visiting large SCEV trees.
+    ///
+    /// If \p S is an Add expression (the common BTC form of (C + X)), also try
+    /// looking up (S + 1). If found, return (mapped - 1). BTCs of the form
+    /// (N - 1) often depend on guards expressed on N. We limit this fallback
+    /// to Add expressions because constructing (S + 1) via getAddExpr interns
+    /// a fresh SCEV, and the fallback can only produce a different map key
+    /// than \p S when \p S already contains a constant operand.
+    const SCEV *visit(const SCEV *S) {
+      switch (S->getSCEVType()) {
+      case scConstant:
+      case scVScale:
+      case scPtrToInt:
+      case scUDivExpr:
+      case scAddRecExpr:
+      case scCouldNotCompute:
+        break;
+      default:
+        if (const SCEV *Rewritten = Map.lookup(S))
+          return Rewritten;
+        if (isa<SCEVAddExpr>(S)) {
+          const SCEV *One = SE.getOne(S->getType());
+          if (const SCEV *Rewritten = Map.lookup(SE.getAddExpr(S, One)))
+            return SE.getMinusSCEV(Rewritten, One);
+        }
+        break;
+      }
+      return SCEVRewriteVisitor<SCEVLoopGuardRewriter>::visit(S);
     }
 
-    const SCEV *visitZeroExtendExpr(const SCEVZeroExtendExpr *Expr) {
-      if (const SCEV *S = Map.lookup(Expr))
-        return S;
+    const SCEV *visitAddRecExpr(const SCEVAddRecExpr *Expr) { return Expr; }
 
-      // If we didn't find the extact ZExt expr in the map, check if there's
+    const SCEV *visitZeroExtendExpr(const SCEVZeroExtendExpr *Expr) {
+      // If we didn't find the exact ZExt expr in the map, check if there's
       // an entry for a smaller ZExt we can use instead.
       Type *Ty = Expr->getType();
       const SCEV *Op = Expr->getOperand(0);
@@ -16230,25 +16258,6 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
 
       return SCEVRewriteVisitor<SCEVLoopGuardRewriter>::visitZeroExtendExpr(
           Expr);
-    }
-
-    const SCEV *visitSignExtendExpr(const SCEVSignExtendExpr *Expr) {
-      if (const SCEV *S = Map.lookup(Expr))
-        return S;
-      return SCEVRewriteVisitor<SCEVLoopGuardRewriter>::visitSignExtendExpr(
-          Expr);
-    }
-
-    const SCEV *visitUMinExpr(const SCEVUMinExpr *Expr) {
-      if (const SCEV *S = Map.lookup(Expr))
-        return S;
-      return SCEVRewriteVisitor<SCEVLoopGuardRewriter>::visitUMinExpr(Expr);
-    }
-
-    const SCEV *visitSMinExpr(const SCEVSMinExpr *Expr) {
-      if (const SCEV *S = Map.lookup(Expr))
-        return S;
-      return SCEVRewriteVisitor<SCEVLoopGuardRewriter>::visitSMinExpr(Expr);
     }
 
     const SCEV *visitAddExpr(const SCEVAddExpr *Expr) {
@@ -16290,8 +16299,7 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
       SmallVector<SCEVUse, 2> Operands;
       bool Changed = false;
       for (SCEVUse Op : Expr->operands()) {
-        Operands.push_back(
-            SCEVRewriteVisitor<SCEVLoopGuardRewriter>::visit(Op));
+        Operands.push_back(visit(Op));
         Changed |= Op != Operands.back();
       }
       // We are only replacing operands with equivalent values, so transfer the
@@ -16306,8 +16314,7 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
       SmallVector<SCEVUse, 2> Operands;
       bool Changed = false;
       for (SCEVUse Op : Expr->operands()) {
-        Operands.push_back(
-            SCEVRewriteVisitor<SCEVLoopGuardRewriter>::visit(Op));
+        Operands.push_back(visit(Op));
         Changed |= Op != Operands.back();
       }
       // We are only replacing operands with equivalent values, so transfer the
