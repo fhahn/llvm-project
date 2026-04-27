@@ -2834,7 +2834,8 @@ public:
   /// all other incoming values are merged into it.
   VPBlendRecipe(PHINode *Phi, ArrayRef<VPValue *> Operands,
                 const VPIRFlags &Flags, DebugLoc DL)
-      : VPRecipeWithIRFlags(VPRecipeBase::VPBlendSC, Operands, Flags, DL) {
+      : VPRecipeWithIRFlags(VPRecipeBase::VPBlendSC, Operands,
+                            Operands[0]->getScalarType(), Flags, DL) {
     assert(Operands.size() >= 2 && "Expected at least two operands!");
     setUnderlyingValue(Phi);
   }
@@ -3100,8 +3101,9 @@ protected:
                     FastMathFlags FMFs, Instruction *I,
                     ArrayRef<VPValue *> Operands, VPValue *CondOp,
                     ReductionStyle Style, DebugLoc DL)
-      : VPRecipeWithIRFlags(SC, Operands, FMFs, DL), RdxKind(RdxKind),
-        Style(Style) {
+      : VPRecipeWithIRFlags(SC, Operands, Operands[0]->getScalarType(), FMFs,
+                            DL),
+        RdxKind(RdxKind), Style(Style) {
     if (CondOp) {
       IsConditional = true;
       addOperand(CondOp);

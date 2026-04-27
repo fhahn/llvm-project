@@ -3077,7 +3077,10 @@ InstructionCost VPReductionRecipe::computeCost(ElementCount VF,
 VPExpressionRecipe::VPExpressionRecipe(
     ExpressionTypes ExpressionType,
     ArrayRef<VPSingleDefRecipe *> ExpressionRecipes)
-    : VPSingleDefRecipe(VPRecipeBase::VPExpressionSC, {}),
+    : VPSingleDefRecipe(
+          VPRecipeBase::VPExpressionSC, {},
+          getScalarTypeOrInfer(
+              cast<VPReductionRecipe>(ExpressionRecipes.back())->getChainOp())),
       ExpressionRecipes(ExpressionRecipes), ExpressionType(ExpressionType) {
   assert(!ExpressionRecipes.empty() && "Nothing to combine?");
   assert(
@@ -3121,8 +3124,7 @@ VPExpressionRecipe::VPExpressionRecipe(
       if (Def && ExpressionRecipesAsSetOfUsers.contains(Def))
         continue;
       addOperand(Op);
-      LiveInPlaceholders.push_back(
-          new VPSymbolicValue(getScalarTypeOrInfer(Op)));
+      LiveInPlaceholders.push_back(new VPSymbolicValue(Op->getScalarType()));
     }
   }
 
