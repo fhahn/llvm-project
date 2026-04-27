@@ -3250,7 +3250,13 @@ public:
                     bool IsSingleScalar, VPValue *Mask = nullptr,
                     const VPIRFlags &Flags = {}, VPIRMetadata Metadata = {},
                     DebugLoc DL = DebugLoc::getUnknown())
-      : VPRecipeWithIRFlags(VPRecipeBase::VPReplicateSC, Operands, Flags, DL),
+      : VPRecipeWithIRFlags(
+            VPRecipeBase::VPReplicateSC, Operands,
+            Instruction::isCast(I->getOpcode()) ||
+                    isa<CallBase, LoadInst, AllocaInst, ExtractValueInst>(I)
+                ? I->getType()
+                : computeScalarTypeForInstruction(I->getOpcode(), Operands),
+            Flags, DL),
         VPIRMetadata(Metadata), IsSingleScalar(IsSingleScalar),
         IsPredicated(Mask) {
     setUnderlyingValue(I);
