@@ -19,36 +19,36 @@ define void @fill_dst(ptr noalias sret([256 x i8]) align 16 %dst, float %v) noin
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x float> poison, float [[V:%.*]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x float> [[BROADCAST_SPLATINSERT]], <4 x float> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw i8, ptr [[DST:%.*]], i64 16
-; CHECK-NEXT:    store <4 x float> [[BROADCAST_SPLAT]], ptr [[DST]], align 16
+; CHECK-NEXT:    store <4 x float> [[BROADCAST_SPLAT]], ptr [[DST:%.*]], align 16
+; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 16
 ; CHECK-NEXT:    store <4 x float> [[BROADCAST_SPLAT]], ptr [[TMP0]], align 16
 ; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 32
-; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 48
 ; CHECK-NEXT:    store <4 x float> [[BROADCAST_SPLAT]], ptr [[TMP1]], align 16
+; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 48
 ; CHECK-NEXT:    store <4 x float> [[BROADCAST_SPLAT]], ptr [[TMP2]], align 16
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 64
-; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 80
 ; CHECK-NEXT:    store <4 x float> [[BROADCAST_SPLAT]], ptr [[TMP3]], align 16
+; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 80
 ; CHECK-NEXT:    store <4 x float> [[BROADCAST_SPLAT]], ptr [[TMP4]], align 16
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 96
-; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 112
 ; CHECK-NEXT:    store <4 x float> [[BROADCAST_SPLAT]], ptr [[TMP5]], align 16
+; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 112
 ; CHECK-NEXT:    store <4 x float> [[BROADCAST_SPLAT]], ptr [[TMP6]], align 16
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 128
-; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 144
 ; CHECK-NEXT:    store <4 x float> [[BROADCAST_SPLAT]], ptr [[TMP7]], align 16
+; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 144
 ; CHECK-NEXT:    store <4 x float> [[BROADCAST_SPLAT]], ptr [[TMP8]], align 16
 ; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 160
-; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 176
 ; CHECK-NEXT:    store <4 x float> [[BROADCAST_SPLAT]], ptr [[TMP9]], align 16
+; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 176
 ; CHECK-NEXT:    store <4 x float> [[BROADCAST_SPLAT]], ptr [[TMP10]], align 16
 ; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 192
-; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 208
 ; CHECK-NEXT:    store <4 x float> [[BROADCAST_SPLAT]], ptr [[TMP11]], align 16
+; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 208
 ; CHECK-NEXT:    store <4 x float> [[BROADCAST_SPLAT]], ptr [[TMP12]], align 16
 ; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 224
-; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 240
 ; CHECK-NEXT:    store <4 x float> [[BROADCAST_SPLAT]], ptr [[TMP13]], align 16
+; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 240
 ; CHECK-NEXT:    store <4 x float> [[BROADCAST_SPLAT]], ptr [[TMP14]], align 16
 ; CHECK-NEXT:    ret void
 ;
