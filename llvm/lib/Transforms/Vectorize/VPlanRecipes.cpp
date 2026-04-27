@@ -511,7 +511,12 @@ Type *llvm::computeScalarTypeForInstruction(unsigned Opcode,
       AssertOperandType(Idx, Op1Ty);
     return Op1Ty;
   }
-  case Instruction::ExtractValue:
+  case Instruction::ExtractValue: {
+    assert(Operands.size() == 2 && "expected single level extractvalue");
+    auto *StructTy = cast<StructType>(Op0Ty);
+    return StructTy->getTypeAtIndex(
+        cast<VPConstantInt>(Operands[1])->getZExtValue());
+  }
   case VPInstruction::FirstActiveLane:
   case VPInstruction::LastActiveLane:
   case Instruction::Load:

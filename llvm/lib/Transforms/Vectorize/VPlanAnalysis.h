@@ -22,7 +22,6 @@ namespace llvm {
 class LLVMContext;
 class VPValue;
 class VPBlendRecipe;
-class VPWidenRecipe;
 class VPRecipeBase;
 class VPlan;
 class Value;
@@ -45,7 +44,6 @@ class VPTypeAnalysis {
   LLVMContext &Ctx;
 
   Type *inferScalarTypeForRecipe(const VPBlendRecipe *R);
-  Type *inferScalarTypeForRecipe(const VPWidenRecipe *R);
 
 public:
   VPTypeAnalysis(const VPlan &Plan) : Ctx(Plan.getContext()) {}
