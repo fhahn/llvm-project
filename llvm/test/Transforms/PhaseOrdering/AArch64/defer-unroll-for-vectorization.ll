@@ -11,7 +11,7 @@ target triple = "arm64-apple-macosx"
 ; vectorized with VF=4 and unrolled 2x, producing 2 vector iterations.
 define void @add_arrays(ptr noalias %dst, ptr noalias %a, ptr noalias %b) {
 ; CHECK-LABEL: @add_arrays(
-; CHECK-NEXT:  vector.body:
+; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[A:%.*]], align 4
 ; CHECK-NEXT:    [[WIDE_LOAD1:%.*]] = load <4 x i32>, ptr [[B:%.*]], align 4
 ; CHECK-NEXT:    [[TMP0:%.*]] = add nsw <4 x i32> [[WIDE_LOAD1]], [[WIDE_LOAD]]
@@ -127,7 +127,8 @@ exit:
 define void @unroll_enables_dse(ptr noalias %dst) {
 ; CHECK-LABEL: @unroll_enables_dse(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    store <4 x i32> <i32 1, i32 2, i32 3, i32 4>, ptr [[DST:%.*]], align 4
+; CHECK-NEXT:    tail call void @llvm.memset.p0.i64(ptr noundef nonnull align 4 dereferenceable(16) [[DST:%.*]], i8 0, i64 16, i1 false)
+; CHECK-NEXT:    store <4 x i32> <i32 1, i32 2, i32 3, i32 4>, ptr [[DST]], align 4
 ; CHECK-NEXT:    ret void
 ;
 entry:

@@ -11,7 +11,7 @@ target triple = "x86_64-apple-macosx"
 ; Test case for #42332, showing excessive unrolling of vector loop.
 define void @test_known_trip_count() {
 ; CHECK-LABEL: @test_known_trip_count(
-; CHECK-NEXT:  for.body:
+; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x double>, ptr @b, align 16
 ; CHECK-NEXT:    [[WIDE_LOAD3:%.*]] = load <2 x double>, ptr getelementptr inbounds nuw (i8, ptr @b, i64 16), align 16
 ; CHECK-NEXT:    [[WIDE_LOAD4:%.*]] = load <2 x double>, ptr @c, align 16
@@ -124,10 +124,14 @@ define void @test_known_trip_count() {
 ; CHECK-NEXT:    [[TMP27:%.*]] = fadd <2 x double> [[WIDE_LOAD3_13]], [[WIDE_LOAD5_13]]
 ; CHECK-NEXT:    store <2 x double> [[TMP26]], ptr getelementptr inbounds nuw (i8, ptr @a, i64 416), align 16
 ; CHECK-NEXT:    store <2 x double> [[TMP27]], ptr getelementptr inbounds nuw (i8, ptr @a, i64 432), align 16
-; CHECK-NEXT:    [[TMP28:%.*]] = load <2 x double>, ptr getelementptr inbounds nuw (i8, ptr @b, i64 448), align 16
-; CHECK-NEXT:    [[TMP29:%.*]] = load <2 x double>, ptr getelementptr inbounds nuw (i8, ptr @c, i64 448), align 16
-; CHECK-NEXT:    [[TMP30:%.*]] = fadd <2 x double> [[TMP28]], [[TMP29]]
-; CHECK-NEXT:    store <2 x double> [[TMP30]], ptr getelementptr inbounds nuw (i8, ptr @a, i64 448), align 16
+; CHECK-NEXT:    [[TMP28:%.*]] = load double, ptr getelementptr inbounds nuw (i8, ptr @b, i64 448), align 16
+; CHECK-NEXT:    [[TMP29:%.*]] = load double, ptr getelementptr inbounds nuw (i8, ptr @c, i64 448), align 16
+; CHECK-NEXT:    [[ADD:%.*]] = fadd double [[TMP28]], [[TMP29]]
+; CHECK-NEXT:    store double [[ADD]], ptr getelementptr inbounds nuw (i8, ptr @a, i64 448), align 16
+; CHECK-NEXT:    [[TMP30:%.*]] = load double, ptr getelementptr inbounds nuw (i8, ptr @b, i64 456), align 8
+; CHECK-NEXT:    [[TMP31:%.*]] = load double, ptr getelementptr inbounds nuw (i8, ptr @c, i64 456), align 8
+; CHECK-NEXT:    [[ADD_1:%.*]] = fadd double [[TMP30]], [[TMP31]]
+; CHECK-NEXT:    store double [[ADD_1]], ptr getelementptr inbounds nuw (i8, ptr @a, i64 456), align 8
 ; CHECK-NEXT:    ret void
 ;
 entry:

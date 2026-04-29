@@ -32,6 +32,17 @@ struct ShouldRunExtraUnrollAfterVectorize
   LLVM_ABI static AnalysisKey Key;
 };
 
+/// A marker analysis set only when the late on-demand LoopFullUnrollPass
+/// actually unrolled a deferred loop. Gates the post-unroll cleanup chain
+/// so it does not run when no late unrolling took place (e.g. because the
+/// vectorizer handled all deferred loops or the unroll cost model rejected
+/// them).
+struct ShouldRunLateUnrollCleanup
+    : public ShouldRunExtraPasses<ShouldRunLateUnrollCleanup>,
+      public AnalysisInfoMixin<ShouldRunLateUnrollCleanup> {
+  LLVM_ABI static AnalysisKey Key;
+};
+
 /// Function pass that triggers \c ShouldRunExtraUnrollAfterVectorize on
 /// functions where LoopFullUnrollPass previously deferred at least one loop
 /// (recorded via a function attribute). Running this pass close to the
@@ -39,6 +50,16 @@ struct ShouldRunExtraUnrollAfterVectorize
 /// right before it is queried.
 class MarkLoopsDeferredForVectorizationPass
     : public PassInfoMixin<MarkLoopsDeferredForVectorizationPass> {
+public:
+  LLVM_ABI PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
+};
+
+/// Function pass that triggers \c ShouldRunLateUnrollCleanup on functions
+/// where the late on-demand LoopFullUnrollPass actually unrolled a deferred
+/// loop (recorded via a function attribute). If no unrolling took place the
+/// attribute is absent and the cleanup pipeline is skipped.
+class MarkLateUnrollCleanupPass
+    : public PassInfoMixin<MarkLateUnrollCleanupPass> {
 public:
   LLVM_ABI PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
 };

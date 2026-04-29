@@ -1366,7 +1366,11 @@ void PassBuilder::addVectorPasses(OptimizationLevel Level,
     // Run full unrolling for loops that were deferred in the early pipeline
     // because they looked vectorizable. Now that the vectorizer has run, fully
     // unroll the marked loops that remain. Guarded by a marker so this only
-    // runs on functions that actually had a deferred loop.
+    // runs on functions that actually had a deferred loop. The post-unroll
+    // cleanup chain below is gated separately on whether an unroll actually
+    // happened, so that functions where every deferred loop was handled by
+    // the vectorizer (or rejected by the cost model) do not pay the cleanup
+    // cost.
     {
       ExtraFunctionPassManager<ShouldRunExtraUnrollAfterVectorize> ExtraPasses;
       ExtraPasses.addPass(createFunctionToLoopPassAdaptor(
@@ -1379,6 +1383,7 @@ void PassBuilder::addVectorPasses(OptimizationLevel Level,
       ExtraPasses.addPass(SROAPass(SROAOptions::PreserveCFG));
       FPM.addPass(std::move(ExtraPasses));
     }
+    FPM.addPass(MarkLateUnrollCleanupPass());
     FPM.addPass(LoopUnrollPass(LoopUnrollOptions(
         Level.getSpeedupLevel(), /*OnlyWhenForced=*/!PTO.LoopUnrolling,
         PTO.ForgetAllSCEVInLoopUnroll)));
@@ -1454,15 +1459,23 @@ void PassBuilder::addVectorPasses(OptimizationLevel Level,
     // unroll the marked loops that remain before SLP, so the unrolled
     // straight-line code can be SLP-vectorized. Guarded by a marker so this
     // only runs on functions that actually had a deferred loop.
-    ExtraFunctionPassManager<ShouldRunExtraUnrollAfterVectorize> ExtraPasses;
-    ExtraPasses.addPass(createFunctionToLoopPassAdaptor(
-        LoopFullUnrollPass(Level.getSpeedupLevel(),
-                           /*OnlyWhenForced=*/!PTO.LoopUnrolling,
-                           PTO.ForgetAllSCEVInLoopUnroll,
-                           /*SkipVectorizableLoops=*/false,
-                           /*OnlyDeferredLoops=*/true),
-        /*UseMemorySSA=*/false));
-    ExtraPasses.addPass(SROAPass(SROAOptions::PreserveCFG));
+    {
+      ExtraFunctionPassManager<ShouldRunExtraUnrollAfterVectorize> ExtraPasses;
+      ExtraPasses.addPass(createFunctionToLoopPassAdaptor(
+          LoopFullUnrollPass(Level.getSpeedupLevel(),
+                             /*OnlyWhenForced=*/!PTO.LoopUnrolling,
+                             PTO.ForgetAllSCEVInLoopUnroll,
+                             /*SkipVectorizableLoops=*/false,
+                             /*OnlyDeferredLoops=*/true),
+          /*UseMemorySSA=*/false));
+      ExtraPasses.addPass(SROAPass(SROAOptions::PreserveCFG));
+      FPM.addPass(std::move(ExtraPasses));
+    }
+    // Latch the cleanup-chain gate only if the late unroller above actually
+    // unrolled a deferred loop. When the vectorizer handled every deferred
+    // loop (or the unroll cost model rejected them), the attribute is not
+    // set and the cleanup chain below is skipped.
+    FPM.addPass(MarkLateUnrollCleanupPass());
     // Recover code quality on the deferred loops after vectorization + late
     // full unroll. The late transformations (either LoopVectorize turning
     // the loop into a vector body, or LoopFullUnroll turning it into
@@ -1474,16 +1487,19 @@ void PassBuilder::addVectorPasses(OptimizationLevel Level,
     // (including LV-generated memsets shadowed by a subsequent full-width
     // store), and SimplifyCFG with hoist/sink moves common straight-line
     // code to the merge point.
-    ExtraPasses.addPass(InstCombinePass());
-    ExtraPasses.addPass(JumpThreadingPass());
-    ExtraPasses.addPass(InstCombinePass());
-    ExtraPasses.addPass(DSEPass());
-    ExtraPasses.addPass(MergedLoadStoreMotionPass());
-    ExtraPasses.addPass(SimplifyCFGPass(SimplifyCFGOptions()
-                                            .convertSwitchRangeToICmp(true)
-                                            .hoistCommonInsts(true)
-                                            .sinkCommonInsts(true)));
-    FPM.addPass(std::move(ExtraPasses));
+    {
+      ExtraFunctionPassManager<ShouldRunLateUnrollCleanup> ExtraPasses;
+      ExtraPasses.addPass(InstCombinePass());
+      ExtraPasses.addPass(JumpThreadingPass());
+      ExtraPasses.addPass(InstCombinePass());
+      ExtraPasses.addPass(DSEPass());
+      ExtraPasses.addPass(MergedLoadStoreMotionPass());
+      ExtraPasses.addPass(SimplifyCFGPass(SimplifyCFGOptions()
+                                              .convertSwitchRangeToICmp(true)
+                                              .hoistCommonInsts(true)
+                                              .sinkCommonInsts(true)));
+      FPM.addPass(std::move(ExtraPasses));
+    }
   }
 
   // Optimize parallel scalar instruction chains into SIMD instructions.

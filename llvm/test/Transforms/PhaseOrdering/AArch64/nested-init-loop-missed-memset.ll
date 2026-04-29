@@ -28,46 +28,166 @@ define void @init() local_unnamed_addr {
 ; CHECK-LABEL: define void @init(
 ; CHECK-SAME: ) local_unnamed_addr #[[ATTR0:[0-9]+]] {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr @screen, align 16
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 24), align 8
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 48), align 16
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 72), align 8
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 96), align 16
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 120), align 8
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 144), align 16
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 168), align 8
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 192), align 16
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 216), align 8
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 240), align 16
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 264), align 8
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 288), align 16
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 312), align 8
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 336), align 16
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 360), align 8
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 384), align 16
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 408), align 8
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 432), align 16
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 456), align 8
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 480), align 16
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 504), align 8
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 528), align 16
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 552), align 8
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 576), align 16
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 600), align 8
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 624), align 16
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 648), align 8
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 672), align 16
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 696), align 8
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 720), align 16
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 744), align 8
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 768), align 16
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 792), align 8
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 816), align 16
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 840), align 8
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 864), align 16
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 888), align 8
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 912), align 16
-; CHECK-NEXT:    store <4 x i8> splat (i8 32), ptr getelementptr inbounds nuw (i8, ptr @screen, i64 936), align 8
+; CHECK-NEXT:    store i8 32, ptr @screen, align 16
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 24), align 8
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 48), align 16
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 72), align 8
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 96), align 16
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 120), align 8
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 144), align 16
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 168), align 8
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 192), align 16
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 216), align 8
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 240), align 16
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 264), align 8
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 288), align 16
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 312), align 8
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 336), align 16
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 360), align 8
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 384), align 16
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 408), align 8
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 432), align 16
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 456), align 8
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 480), align 16
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 504), align 8
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 528), align 16
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 552), align 8
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 576), align 16
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 600), align 8
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 624), align 16
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 648), align 8
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 672), align 16
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 696), align 8
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 720), align 16
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 744), align 8
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 768), align 16
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 792), align 8
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 816), align 16
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 840), align 8
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 864), align 16
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 888), align 8
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 912), align 16
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 936), align 8
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 1), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 25), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 49), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 73), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 97), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 121), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 145), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 169), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 193), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 217), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 241), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 265), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 289), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 313), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 337), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 361), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 385), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 409), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 433), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 457), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 481), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 505), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 529), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 553), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 577), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 601), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 625), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 649), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 673), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 697), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 721), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 745), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 769), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 793), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 817), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 841), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 865), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 889), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 913), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 937), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 2), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 26), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 50), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 74), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 98), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 122), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 146), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 170), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 194), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 218), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 242), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 266), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 290), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 314), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 338), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 362), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 386), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 410), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 434), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 458), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 482), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 506), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 530), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 554), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 578), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 602), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 626), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 650), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 674), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 698), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 722), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 746), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 770), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 794), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 818), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 842), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 866), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 890), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 914), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 938), align 2
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 3), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 27), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 51), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 75), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 99), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 123), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 147), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 171), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 195), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 219), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 243), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 267), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 291), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 315), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 339), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 363), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 387), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 411), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 435), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 459), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 483), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 507), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 531), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 555), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 579), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 603), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 627), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 651), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 675), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 699), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 723), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 747), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 771), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 795), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 819), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 843), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 867), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 891), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 915), align 1
+; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 939), align 1
 ; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 4), align 4
 ; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 28), align 4
 ; CHECK-NEXT:    store i8 32, ptr getelementptr inbounds nuw (i8, ptr @screen, i64 52), align 4

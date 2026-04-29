@@ -17,7 +17,7 @@ target triple = "x86_64-unknown-linux-gnu"
 
 define i32 @enabled(ptr noalias nocapture %a, ptr noalias nocapture readonly %b, i32 %N) {
 ; O1-LABEL: @enabled(
-; O1-NEXT:  vector.body:
+; O1-NEXT:  entry:
 ; O1-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[N:%.*]], i64 0
 ; O1-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
 ; O1-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw i8, ptr [[B:%.*]], i64 16
@@ -102,7 +102,7 @@ define i32 @enabled(ptr noalias nocapture %a, ptr noalias nocapture readonly %b,
 ; O1-NEXT:    ret i32 [[TMP46]]
 ;
 ; O2-LABEL: @enabled(
-; O2-NEXT:  vector.body:
+; O2-NEXT:  entry:
 ; O2-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[N:%.*]], i64 0
 ; O2-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
 ; O2-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw i8, ptr [[B:%.*]], i64 16
@@ -187,7 +187,7 @@ define i32 @enabled(ptr noalias nocapture %a, ptr noalias nocapture readonly %b,
 ; O2-NEXT:    ret i32 [[TMP46]]
 ;
 ; O3-LABEL: @enabled(
-; O3-NEXT:  vector.body:
+; O3-NEXT:  entry:
 ; O3-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[N:%.*]], i64 0
 ; O3-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
 ; O3-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw i8, ptr [[B:%.*]], i64 16
@@ -272,7 +272,7 @@ define i32 @enabled(ptr noalias nocapture %a, ptr noalias nocapture readonly %b,
 ; O3-NEXT:    ret i32 [[TMP46]]
 ;
 ; O3DEFAULT-LABEL: @enabled(
-; O3DEFAULT-NEXT:  vector.body:
+; O3DEFAULT-NEXT:  entry:
 ; O3DEFAULT-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[N:%.*]], i64 0
 ; O3DEFAULT-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
 ; O3DEFAULT-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw i8, ptr [[B:%.*]], i64 16
@@ -395,7 +395,7 @@ define i32 @enabled(ptr noalias nocapture %a, ptr noalias nocapture readonly %b,
 ; Oz-NEXT:    ret i32 [[TMP46]]
 ;
 ; O1VEC2-LABEL: @enabled(
-; O1VEC2-NEXT:  vector.body:
+; O1VEC2-NEXT:  entry:
 ; O1VEC2-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[N:%.*]], i64 0
 ; O1VEC2-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
 ; O1VEC2-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw i8, ptr [[B:%.*]], i64 16
@@ -480,7 +480,7 @@ define i32 @enabled(ptr noalias nocapture %a, ptr noalias nocapture readonly %b,
 ; O1VEC2-NEXT:    ret i32 [[TMP46]]
 ;
 ; O3DIS-LABEL: @enabled(
-; O3DIS-NEXT:  vector.body:
+; O3DIS-NEXT:  entry:
 ; O3DIS-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[N:%.*]], i64 0
 ; O3DIS-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
 ; O3DIS-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw i8, ptr [[B:%.*]], i64 16
@@ -596,13 +596,13 @@ define i32 @nopragma(ptr noalias nocapture %a, ptr noalias nocapture readonly %b
 ; O1-NEXT:    store i32 [[ADD]], ptr [[ARRAYIDX2]], align 4
 ; O1-NEXT:    [[INDVARS_IV_NEXT]] = add nuw nsw i64 [[INDVARS_IV]], 1
 ; O1-NEXT:    [[EXITCOND:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT]], 64
-; O1-NEXT:    br i1 [[EXITCOND]], label [[FOR_END:%.*]], label [[FOR_BODY]]
+; O1-NEXT:    br i1 [[EXITCOND]], label [[FOR_END:%.*]], label [[FOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; O1:       for.end:
 ; O1-NEXT:    [[TMP1:%.*]] = load i32, ptr [[A]], align 4
 ; O1-NEXT:    ret i32 [[TMP1]]
 ;
 ; O2-LABEL: @nopragma(
-; O2-NEXT:  vector.body:
+; O2-NEXT:  entry:
 ; O2-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[N:%.*]], i64 0
 ; O2-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
 ; O2-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw i8, ptr [[B:%.*]], i64 16
@@ -687,7 +687,7 @@ define i32 @nopragma(ptr noalias nocapture %a, ptr noalias nocapture readonly %b
 ; O2-NEXT:    ret i32 [[TMP46]]
 ;
 ; O3-LABEL: @nopragma(
-; O3-NEXT:  vector.body:
+; O3-NEXT:  entry:
 ; O3-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[N:%.*]], i64 0
 ; O3-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
 ; O3-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw i8, ptr [[B:%.*]], i64 16
@@ -772,7 +772,7 @@ define i32 @nopragma(ptr noalias nocapture %a, ptr noalias nocapture readonly %b
 ; O3-NEXT:    ret i32 [[TMP46]]
 ;
 ; O3DEFAULT-LABEL: @nopragma(
-; O3DEFAULT-NEXT:  vector.body:
+; O3DEFAULT-NEXT:  entry:
 ; O3DEFAULT-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[N:%.*]], i64 0
 ; O3DEFAULT-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
 ; O3DEFAULT-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw i8, ptr [[B:%.*]], i64 16
@@ -870,7 +870,7 @@ define i32 @nopragma(ptr noalias nocapture %a, ptr noalias nocapture readonly %b
 ; Os-NEXT:    store <4 x i32> [[TMP43]], ptr [[TMP45]], align 4
 ; Os-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; Os-NEXT:    [[TMP3:%.*]] = icmp eq i64 [[INDEX_NEXT]], 64
-; Os-NEXT:    br i1 [[TMP3]], label [[FOR_END:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
+; Os-NEXT:    br i1 [[TMP3]], label [[FOR_END:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; Os:       for.end:
 ; Os-NEXT:    [[TMP46:%.*]] = load i32, ptr [[A]], align 4
 ; Os-NEXT:    ret i32 [[TMP46]]
@@ -889,7 +889,7 @@ define i32 @nopragma(ptr noalias nocapture %a, ptr noalias nocapture readonly %b
 ; Oz-NEXT:    store <4 x i32> [[TMP2]], ptr [[ARRAYIDX2]], align 4
 ; Oz-NEXT:    [[INDVARS_IV_NEXT]] = add nuw i64 [[INDVARS_IV]], 4
 ; Oz-NEXT:    [[EXITCOND:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT]], 64
-; Oz-NEXT:    br i1 [[EXITCOND]], label [[FOR_END:%.*]], label [[FOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
+; Oz-NEXT:    br i1 [[EXITCOND]], label [[FOR_END:%.*]], label [[FOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; Oz:       for.end:
 ; Oz-NEXT:    [[TMP1:%.*]] = load i32, ptr [[A]], align 4
 ; Oz-NEXT:    ret i32 [[TMP1]]
@@ -934,7 +934,7 @@ define i32 @nopragma(ptr noalias nocapture %a, ptr noalias nocapture readonly %b
 ; O3DIS-NEXT:    store i32 [[ADD]], ptr [[ARRAYIDX2]], align 4
 ; O3DIS-NEXT:    [[INDVARS_IV_NEXT]] = add nuw nsw i64 [[INDVARS_IV]], 1
 ; O3DIS-NEXT:    [[EXITCOND:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT]], 64
-; O3DIS-NEXT:    br i1 [[EXITCOND]], label [[FOR_END:%.*]], label [[FOR_BODY]]
+; O3DIS-NEXT:    br i1 [[EXITCOND]], label [[FOR_END:%.*]], label [[FOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; O3DIS:       for.end:
 ; O3DIS-NEXT:    [[TMP1:%.*]] = load i32, ptr [[A]], align 4
 ; O3DIS-NEXT:    ret i32 [[TMP1]]
@@ -971,7 +971,7 @@ define i32 @disabled(ptr noalias nocapture %a, ptr noalias nocapture readonly %b
 ; O1-NEXT:    store i32 [[ADD]], ptr [[ARRAYIDX2]], align 4
 ; O1-NEXT:    [[INDVARS_IV_NEXT]] = add nuw nsw i64 [[INDVARS_IV]], 1
 ; O1-NEXT:    [[EXITCOND:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT]], 48
-; O1-NEXT:    br i1 [[EXITCOND]], label [[FOR_END:%.*]], label [[FOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
+; O1-NEXT:    br i1 [[EXITCOND]], label [[FOR_END:%.*]], label [[FOR_BODY]], !llvm.loop [[LOOP2:![0-9]+]]
 ; O1:       for.end:
 ; O1-NEXT:    [[TMP1:%.*]] = load i32, ptr [[A]], align 4
 ; O1-NEXT:    ret i32 [[TMP1]]
@@ -1087,7 +1087,7 @@ define i32 @disabled(ptr noalias nocapture %a, ptr noalias nocapture readonly %b
 ; Os-NEXT:    store i32 [[ADD]], ptr [[ARRAYIDX2]], align 4
 ; Os-NEXT:    [[INDVARS_IV_NEXT]] = add nuw nsw i64 [[INDVARS_IV]], 1
 ; Os-NEXT:    [[EXITCOND:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT]], 48
-; Os-NEXT:    br i1 [[EXITCOND]], label [[FOR_END:%.*]], label [[FOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
+; Os-NEXT:    br i1 [[EXITCOND]], label [[FOR_END:%.*]], label [[FOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
 ; Os:       for.end:
 ; Os-NEXT:    [[TMP1:%.*]] = load i32, ptr [[A]], align 4
 ; Os-NEXT:    ret i32 [[TMP1]]
@@ -1104,7 +1104,7 @@ define i32 @disabled(ptr noalias nocapture %a, ptr noalias nocapture readonly %b
 ; Oz-NEXT:    store i32 [[ADD]], ptr [[ARRAYIDX2]], align 4
 ; Oz-NEXT:    [[INDVARS_IV_NEXT]] = add nuw nsw i64 [[INDVARS_IV]], 1
 ; Oz-NEXT:    [[EXITCOND:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT]], 48
-; Oz-NEXT:    br i1 [[EXITCOND]], label [[FOR_END:%.*]], label [[FOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
+; Oz-NEXT:    br i1 [[EXITCOND]], label [[FOR_END:%.*]], label [[FOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
 ; Oz:       for.end:
 ; Oz-NEXT:    [[TMP1:%.*]] = load i32, ptr [[A]], align 4
 ; Oz-NEXT:    ret i32 [[TMP1]]
@@ -1121,7 +1121,7 @@ define i32 @disabled(ptr noalias nocapture %a, ptr noalias nocapture readonly %b
 ; O1VEC2-NEXT:    store i32 [[ADD]], ptr [[ARRAYIDX2]], align 4
 ; O1VEC2-NEXT:    [[INDVARS_IV_NEXT]] = add nuw nsw i64 [[INDVARS_IV]], 1
 ; O1VEC2-NEXT:    [[EXITCOND:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT]], 48
-; O1VEC2-NEXT:    br i1 [[EXITCOND]], label [[FOR_END:%.*]], label [[FOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
+; O1VEC2-NEXT:    br i1 [[EXITCOND]], label [[FOR_END:%.*]], label [[FOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; O1VEC2:       for.end:
 ; O1VEC2-NEXT:    [[TMP1:%.*]] = load i32, ptr [[A]], align 4
 ; O1VEC2-NEXT:    ret i32 [[TMP1]]
@@ -1138,7 +1138,7 @@ define i32 @disabled(ptr noalias nocapture %a, ptr noalias nocapture readonly %b
 ; O3DIS-NEXT:    store i32 [[ADD]], ptr [[ARRAYIDX2]], align 4
 ; O3DIS-NEXT:    [[INDVARS_IV_NEXT]] = add nuw nsw i64 [[INDVARS_IV]], 1
 ; O3DIS-NEXT:    [[EXITCOND:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT]], 48
-; O3DIS-NEXT:    br i1 [[EXITCOND]], label [[FOR_END:%.*]], label [[FOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
+; O3DIS-NEXT:    br i1 [[EXITCOND]], label [[FOR_END:%.*]], label [[FOR_BODY]], !llvm.loop [[LOOP2:![0-9]+]]
 ; O3DIS:       for.end:
 ; O3DIS-NEXT:    [[TMP1:%.*]] = load i32, ptr [[A]], align 4
 ; O3DIS-NEXT:    ret i32 [[TMP1]]

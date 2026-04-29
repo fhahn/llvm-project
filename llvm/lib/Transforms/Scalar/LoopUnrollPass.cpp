@@ -81,6 +81,7 @@ cl::opt<bool> llvm::ForgetSCEVInLoopUnroll(
              " compile time."));
 
 AnalysisKey ShouldRunExtraUnrollAfterVectorize::Key;
+AnalysisKey ShouldRunLateUnrollCleanup::Key;
 
 static cl::opt<unsigned>
     UnrollThreshold("unroll-threshold", cl::Hidden,
@@ -1726,9 +1727,15 @@ PreservedAnalyses LoopFullUnrollPass::run(Loop &L, LoopAnalysisManager &AM,
   OptimizationRemarkEmitter ORE(L.getHeader()->getParent());
 
   // The late on-demand pass only targets loops the early unroller previously
-  // deferred (identified by the metadata written there); everything else is
-  // left untouched.
-  if (OnlyDeferredLoops && !getBooleanLoopAttribute(&L, DeferredLoopMDName))
+  // deferred (identified by the metadata written there) and that were not
+  // ultimately vectorized; everything else is left untouched. Loops marked
+  // with llvm.loop.isvectorized have already been handled by LoopVectorize
+  // (the vector body and its scalar epilogue both inherit the deferred
+  // marker), so fully unrolling them here would just re-introduce the very
+  // blow-up the deferral was intended to avoid.
+  if (OnlyDeferredLoops &&
+      (!getBooleanLoopAttribute(&L, DeferredLoopMDName) ||
+       getBooleanLoopAttribute(&L, "llvm.loop.isvectorized")))
     return PreservedAnalyses::all();
 
   // Skip full unrolling for innermost loops that are likely vectorizable, so
@@ -1758,6 +1765,9 @@ PreservedAnalyses LoopFullUnrollPass::run(Loop &L, LoopAnalysisManager &AM,
     OldLoops.insert_range(AR.LI);
 
   std::string LoopName = std::string(L.getName());
+  // Capture the containing function up-front: after full unrolling the loop
+  // and its header may be gone, so dereferencing L below would be unsafe.
+  Function *ContainingF = L.getHeader()->getParent();
 
   bool Changed =
       tryToUnrollLoop(&L, AR.DT, &AR.LI, AR.SE, AR.TTI, AR.AC, ORE,
@@ -1774,6 +1784,14 @@ PreservedAnalyses LoopFullUnrollPass::run(Loop &L, LoopAnalysisManager &AM,
       LoopUnrollResult::Unmodified;
   if (!Changed)
     return PreservedAnalyses::all();
+
+  // Record on the containing function that the late on-demand full unroller
+  // actually performed an unroll on a deferred loop. The post-unroll cleanup
+  // chain is gated on this attribute, so that when the vectorizer handled
+  // every deferred loop (or the unroll cost model rejected all of them) the
+  // cleanup chain is skipped entirely.
+  if (OnlyDeferredLoops && !PeelOnly)
+    ContainingF->addFnAttr("late-unroll-performed");
 
   // The parent must not be damaged by unrolling!
 #ifndef NDEBUG
@@ -1848,6 +1866,20 @@ MarkLoopsDeferredForVectorizationPass::run(Function &F,
     AM.getResult<ShouldRunExtraUnrollAfterVectorize>(F);
     PA.preserve<ShouldRunExtraUnrollAfterVectorize>();
   }
+  return PA;
+}
+
+PreservedAnalyses
+MarkLateUnrollCleanupPass::run(Function &F, FunctionAnalysisManager &AM) {
+  if (!F.hasFnAttribute("late-unroll-performed"))
+    return PreservedAnalyses::all();
+
+  // Consume the marker: the cleanup chain runs once per function.
+  F.removeFnAttr("late-unroll-performed");
+
+  AM.getResult<ShouldRunLateUnrollCleanup>(F);
+  auto PA = PreservedAnalyses::all();
+  PA.preserve<ShouldRunLateUnrollCleanup>();
   return PA;
 }
 
