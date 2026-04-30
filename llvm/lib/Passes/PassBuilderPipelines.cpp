@@ -1486,7 +1486,14 @@ void PassBuilder::addVectorPasses(OptimizationLevel Level,
     // equal-condition branches, DSE drops the now-redundant stores
     // (including LV-generated memsets shadowed by a subsequent full-width
     // store), and SimplifyCFG with hoist/sink moves common straight-line
-    // code to the merge point.
+    // code to the merge point. A standard LoopUnrollPass follows to fully
+    // unroll any leftover LV-produced vector.body loops inside an outer
+    // loop that we kept (because its inner was deferred), turning them
+    // into straight-line stores; LoopIdiomRecognize then re-runs on the
+    // outer loop to fold the resulting nested init pattern into a memset
+    // (e.g. the doubly-nested screen-init idiom). Without these two steps
+    // those nested init patterns bottom out as a wide chain of scalar
+    // stores.
     {
       ExtraFunctionPassManager<ShouldRunLateUnrollCleanup> ExtraPasses;
       ExtraPasses.addPass(InstCombinePass());
@@ -1498,6 +1505,14 @@ void PassBuilder::addVectorPasses(OptimizationLevel Level,
                                               .convertSwitchRangeToICmp(true)
                                               .hoistCommonInsts(true)
                                               .sinkCommonInsts(true)));
+      ExtraPasses.addPass(LoopUnrollPass(LoopUnrollOptions(
+          Level.getSpeedupLevel(), /*OnlyWhenForced=*/!PTO.LoopUnrolling,
+          PTO.ForgetAllSCEVInLoopUnroll)));
+      LoopPassManager LIRPM;
+      LIRPM.addPass(LoopIdiomRecognizePass());
+      ExtraPasses.addPass(createFunctionToLoopPassAdaptor(std::move(LIRPM),
+                                                         /*UseMemorySSA=*/true));
+      ExtraPasses.addPass(MemCpyOptPass());
       FPM.addPass(std::move(ExtraPasses));
     }
   }

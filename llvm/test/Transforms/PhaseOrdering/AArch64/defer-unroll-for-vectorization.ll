@@ -127,8 +127,7 @@ exit:
 define void @unroll_enables_dse(ptr noalias %dst) {
 ; CHECK-LABEL: @unroll_enables_dse(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    tail call void @llvm.memset.p0.i64(ptr noundef nonnull align 4 dereferenceable(16) [[DST:%.*]], i8 0, i64 16, i1 false)
-; CHECK-NEXT:    store <4 x i32> <i32 1, i32 2, i32 3, i32 4>, ptr [[DST]], align 4
+; CHECK-NEXT:    store <4 x i32> <i32 1, i32 2, i32 3, i32 4>, ptr [[DST:%.*]], align 4
 ; CHECK-NEXT:    ret void
 ;
 entry:

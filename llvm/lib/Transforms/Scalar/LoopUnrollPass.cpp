@@ -1727,16 +1727,49 @@ PreservedAnalyses LoopFullUnrollPass::run(Loop &L, LoopAnalysisManager &AM,
   OptimizationRemarkEmitter ORE(L.getHeader()->getParent());
 
   // The late on-demand pass only targets loops the early unroller previously
-  // deferred (identified by the metadata written there) and that were not
-  // ultimately vectorized; everything else is left untouched. Loops marked
-  // with llvm.loop.isvectorized have already been handled by LoopVectorize
-  // (the vector body and its scalar epilogue both inherit the deferred
-  // marker), so fully unrolling them here would just re-introduce the very
-  // blow-up the deferral was intended to avoid.
-  if (OnlyDeferredLoops &&
-      (!getBooleanLoopAttribute(&L, DeferredLoopMDName) ||
-       getBooleanLoopAttribute(&L, "llvm.loop.isvectorized")))
+  // deferred (identified by the metadata written there); everything else is
+  // left untouched.
+  if (OnlyDeferredLoops && !getBooleanLoopAttribute(&L, DeferredLoopMDName))
     return PreservedAnalyses::all();
+
+  // A deferred loop that has been handled by LoopVectorize (vector body and
+  // its scalar epilogue both inherit the deferred marker) should not be
+  // fully unrolled here: doing so would just re-introduce the very blow-up
+  // the deferral was intended to avoid. However, LoopVectorize can leave
+  // patterns that still need the post-unroll cleanup chain (e.g. an
+  // LV-generated memset shadowed by a subsequent full-width store that DSE
+  // must remove), so signal the cleanup gate before bailing out.
+  if (OnlyDeferredLoops &&
+      getBooleanLoopAttribute(&L, "llvm.loop.isvectorized")) {
+    L.getHeader()->getParent()->addFnAttr("late-unroll-performed");
+    return PreservedAnalyses::all();
+  }
+
+  // Do not fully unroll outer loops whose inner loops have been deferred for
+  // vectorization. Replicating the deferred inner loop across outer unroll
+  // iterations destroys the nested structure that LoopIdiomRecognize relies
+  // on (e.g. a doubly-nested init loop collapsing to a single memset after
+  // the inner is unrolled and the outer's body is recognised) and forces
+  // LoopVectorize to process each copy in isolation, which tends to pick a
+  // poor VF for what was a perfect nest.
+  if (!OnlyDeferredLoops) {
+    bool HasDeferredDescendant = false;
+    for (Loop *Sub : depth_first(&L)) {
+      if (Sub == &L)
+        continue;
+      if (getBooleanLoopAttribute(Sub, DeferredLoopMDName)) {
+        HasDeferredDescendant = true;
+        break;
+      }
+    }
+    if (HasDeferredDescendant) {
+      LLVM_DEBUG(dbgs()
+                 << "LoopFullUnrollPass: skipping full unroll of outer loop "
+                 << L.getHeader()->getName()
+                 << " because an inner loop is deferred\n");
+      return PreservedAnalyses::all();
+    }
+  }
 
   // Skip full unrolling for innermost loops that are likely vectorizable, so
   // the vectorizer gets a chance to process them first. Peeling is still
