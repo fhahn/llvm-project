@@ -326,7 +326,7 @@ cl::opt<bool>
 #ifdef EXPENSIVE_CHECKS
                           cl::init(true),
 #else
-                          cl::init(false),
+                          cl::init(true),
 #endif
                           cl::Hidden,
                           cl::desc("Verify VPlans after VPlan transforms."));
@@ -7172,7 +7172,11 @@ void LoopVectorizationPlanner::addReductionResultComputation(
       ToDelete.push_back(AnyOfSelect);
 
       // Convert the reduction phi to operate on bools.
-      PhiR->setOperand(0, Plan->getFalse());
+      auto *NewPhiR =
+          PhiR->cloneWithOperands(Plan->getFalse(), PhiR->getBackedgeValue());
+      NewPhiR->insertBefore(PhiR);
+      PhiR->replaceAllUsesWith(NewPhiR);
+      PhiR = NewPhiR;
 
       // Update NewExitingVPV if it was pointing to the now-replaced select.
       if (NewExitingVPV == AnyOfSelect)

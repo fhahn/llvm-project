@@ -194,6 +194,10 @@ public:
   VPRecipeBase *getDefiningRecipe();
   const VPRecipeBase *getDefiningRecipe() const;
 
+  /// Returns the scalar type of this VPValue, dispatching based on the
+  /// concrete subclass.
+  Type *getScalarType() const;
+
   /// Returns true if this VPValue is defined by a recipe.
   bool hasDefiningRecipe() const { return getDefiningRecipe(); }
 
@@ -313,6 +317,9 @@ class VPRecipeValue : public VPValue {
   friend class VPValue;
   friend class VPDef;
 
+  /// The scalar type of the value produced by this recipe.
+  Type *Ty = nullptr;
+
 #if !defined(NDEBUG)
   /// Returns true if this VPRecipeValue is defined by \p D.
   /// NOTE: Only used by VPDef to assert that VPRecipeValues added/removed from
@@ -321,10 +328,14 @@ class VPRecipeValue : public VPValue {
 #endif
 
 protected:
-  VPRecipeValue(unsigned char SC, Value *UV = nullptr) : VPValue(SC, UV) {}
+  VPRecipeValue(unsigned char SC, Value *UV = nullptr, Type *Ty = nullptr)
+      : VPValue(SC, UV), Ty(Ty) {}
 
 public:
   LLVM_ABI_FOR_TEST virtual ~VPRecipeValue() = 0;
+
+  /// Returns the scalar type of this VPRecipeValue.
+  Type *getScalarType() const { return Ty; }
 
   static bool classof(const VPValue *V) {
     return V->getVPValueID() == VPVStandaloneRecipeValueSC ||
@@ -340,7 +351,7 @@ class VPSingleDefValue : public VPRecipeValue {
 protected:
   /// Construct a VPSingleDefValue. Must only be used by VPSingleDefRecipe.
   LLVM_ABI_FOR_TEST VPSingleDefValue(VPSingleDefRecipe *Def,
-                                     Value *UV = nullptr);
+                                     Value *UV = nullptr, Type *Ty = nullptr);
 
 public:
   static bool classof(const VPValue *V) {
@@ -357,7 +368,8 @@ class VPStandaloneRecipeValue : public VPRecipeValue {
 
 public:
   LLVM_ABI_FOR_TEST VPStandaloneRecipeValue(VPRecipeBase *Def,
-                                            Value *UV = nullptr);
+                                            Value *UV = nullptr,
+                                            Type *Ty = nullptr);
 
   ~VPStandaloneRecipeValue() override;
 

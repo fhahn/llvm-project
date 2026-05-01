@@ -2048,16 +2048,17 @@ static bool optimizeVectorInductionWidthForTCAndVFUF(VPlan &Plan,
       continue;
 
     // Update IV operands and comparison bound to use new narrower type.
-    auto *NewStart = Plan.getZero(NewIVTy);
-    WideIV->setStartValue(NewStart);
-    auto *NewStep = Plan.getConstantInt(NewIVTy, 1);
-    WideIV->setStepValue(NewStep);
+    auto *NewWideIV = WideIV->cloneWithOperands(Plan.getZero(NewIVTy),
+                                                Plan.getConstantInt(NewIVTy, 1),
+                                                WideIV->getVFValue());
+    NewWideIV->insertBefore(WideIV);
+    WideIV->replaceAllUsesWith(NewWideIV);
 
     auto *NewBTC = new VPWidenCastRecipe(
         Instruction::Trunc, Plan.getOrCreateBackedgeTakenCount(), NewIVTy,
         nullptr, VPIRFlags::getDefaultFlags(Instruction::Trunc));
     Plan.getVectorPreheader()->appendRecipe(NewBTC);
-    auto *Cmp = cast<VPInstruction>(WideIV->getSingleUser());
+    auto *Cmp = cast<VPInstruction>(NewWideIV->getSingleUser());
     Cmp->setOperand(1, NewBTC);
 
     MadeChange = true;

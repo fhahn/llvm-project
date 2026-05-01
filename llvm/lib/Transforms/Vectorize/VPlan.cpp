@@ -146,16 +146,32 @@ Value *VPValue::getLiveInIRValue() const {
 
 Type *VPIRValue::getType() const { return getUnderlyingValue()->getType(); }
 
-VPSingleDefValue::VPSingleDefValue(VPSingleDefRecipe *Def, Value *UV)
-    : VPRecipeValue(VPVSingleDefValueSC, UV) {
+Type *VPValue::getScalarType() const {
+  switch (getVPValueID()) {
+  case VPVIRValueSC:
+    return getUnderlyingValue()->getType();
+  case VPVSymbolicSC:
+    return cast<VPSymbolicValue>(this)->getType();
+  case VPRegionValueSC:
+    return cast<VPRegionValue>(this)->getType();
+  case VPVStandaloneRecipeValueSC:
+  case VPVSingleDefValueSC:
+    return cast<VPRecipeValue>(this)->getScalarType();
+  }
+  llvm_unreachable("Unhandled VPValue subclass");
+}
+
+VPSingleDefValue::VPSingleDefValue(VPSingleDefRecipe *Def, Value *UV, Type *Ty)
+    : VPRecipeValue(VPVSingleDefValueSC, UV, Ty) {
   assert(Def && "VPSingleDefValue requires a defining recipe");
   Def->addDefinedValue(this);
 }
 
 VPRecipeValue::~VPRecipeValue() = default;
 
-VPStandaloneRecipeValue::VPStandaloneRecipeValue(VPRecipeBase *Def, Value *UV)
-    : VPRecipeValue(VPVStandaloneRecipeValueSC, UV), Def(Def) {
+VPStandaloneRecipeValue::VPStandaloneRecipeValue(VPRecipeBase *Def, Value *UV,
+                                                 Type *Ty)
+    : VPRecipeValue(VPVStandaloneRecipeValueSC, UV, Ty), Def(Def) {
   assert(Def && "VPStandaloneRecipeValue requires a defining recipe");
   Def->addDefinedValue(this);
 }

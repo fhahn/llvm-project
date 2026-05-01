@@ -330,6 +330,44 @@ TEST_F(VPVerifierTest, NonHeaderPHIInHeader) {
   delete PHINode;
 }
 
+TEST_F(VPVerifierTest, VPScalarIVStepsMismatchedStepType) {
+  VPlan &Plan = getPlan();
+  VPIRValue *IV = Plan.getConstantInt(32, 0);
+  // Step has a different scalar type than the IV; the verifier must reject.
+  VPIRValue *Step = Plan.getConstantInt(64, 1);
+  VPIRValue *VF = Plan.getConstantInt(32, 4);
+
+  auto *Steps = new VPScalarIVStepsRecipe(IV, Step, VF, Instruction::Add,
+                                          FastMathFlags(), DebugLoc());
+  VPInstruction *BranchOnCond =
+      new VPInstruction(VPInstruction::BranchOnCond, {IV});
+
+  VPBasicBlock *VPBB1 = Plan.getEntry();
+  VPBasicBlock *VPBB2 = Plan.createVPBasicBlock("");
+  VPBB2->appendRecipe(Steps);
+  VPBB2->appendRecipe(BranchOnCond);
+
+  VPRegionBlock *R1 = Plan.createLoopRegion(Type::getInt32Ty(C), DebugLoc(),
+                                            "R1", VPBB2, VPBB2);
+  VPBlockUtils::connectBlocks(VPBB1, R1);
+  VPBlockUtils::connectBlocks(R1, Plan.getScalarHeader());
+
+#if GTEST_HAS_STREAM_REDIRECTION
+  ::testing::internal::CaptureStderr();
+#endif
+  EXPECT_FALSE(verifyVPlanIsValid(Plan));
+#if GTEST_HAS_STREAM_REDIRECTION
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+  EXPECT_STREQ("Recipe result type does not match type derived from operands: "
+               "vp<%2> = SCALAR-STEPS ir<0>, ir<1>, ir<4>\n\n",
+               ::testing::internal::GetCapturedStderr().c_str());
+#else
+  EXPECT_STREQ("Recipe result type does not match type derived from operands\n",
+               ::testing::internal::GetCapturedStderr().c_str());
+#endif
+#endif
+}
+
 TEST_F(VPVerifierTest, testRUN_VPLAN_PASS) {
   VPlan &Plan = getPlan();
   VPIRValue *Zero = Plan.getConstantInt(32, 0);
