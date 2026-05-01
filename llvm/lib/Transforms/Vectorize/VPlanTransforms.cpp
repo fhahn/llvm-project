@@ -6421,8 +6421,10 @@ void VPlanTransforms::createPartialReductions(VPlan &Plan,
       transformToPartialReduction(Chain, CostCtx.Types, Plan, Phi);
 }
 
-void VPlanTransforms::makeMemOpWideningDecisions(
-    VPlan &Plan, VFRange &Range, VPRecipeBuilder &RecipeBuilder) {
+void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
+                                                 VPRecipeBuilder &RecipeBuilder,
+                                                 PredicatedScalarEvolution &PSE,
+                                                 const Loop *L) {
   // Collect all loads/stores first. We will start with ones having simpler
   // decisions followed by more complex ones that are potentially
   // guided/dependent on the simpler ones.
@@ -6465,6 +6467,29 @@ void VPlanTransforms::makeMemOpWideningDecisions(
       continue;
     }
 
+    Instruction *I = VPI->getUnderlyingInstr();
+    bool IsLoad = VPI->getOpcode() == Instruction::Load;
+    VPValue *Ptr = VPI->getOperand(!IsLoad);
+    if (!RecipeBuilder.isMaskRequired(I)) {
+      // Scalarize loads used as addresses. Mark the load single-scalar only
+      // when the pointer is provably loop-invariant per SCEV; otherwise
+      // replicate per-lane so each iteration re-reads the (possibly varying)
+      // value, matching the legacy CM's conservative behavior for loaded
+      // pointers.
+      if (IsLoad && !RecipeBuilder.prefersVectorizedAddressing() &&
+          vputils::isUsedByLoadStoreAddress(VPI)) {
+        const SCEV *PtrSCEV = vputils::getSCEVExprForVPValue(Ptr, PSE, L);
+        bool IsSingleScalarLoad = !isa<SCEVCouldNotCompute>(PtrSCEV) &&
+                                  PSE.getSE()->isLoopInvariant(PtrSCEV, L);
+        ReplaceWith(new VPReplicateRecipe(
+            I, {Ptr}, /*IsSingleScalar=*/IsSingleScalarLoad,
+            /*Mask=*/nullptr, {}, *VPI, VPI->getDebugLoc()));
+        continue;
+      }
+    }
+
+    // Try VPlan-based widening for unmasked unit-stride accesses. The stride
+    // and mask checks are VF-independent, so no range clamping is needed.
     VPRecipeBase *Recipe = RecipeBuilder.tryToWidenMemory(VPI, Range);
     if (!Recipe)
       Recipe = RecipeBuilder.handleReplication(VPI, Range);

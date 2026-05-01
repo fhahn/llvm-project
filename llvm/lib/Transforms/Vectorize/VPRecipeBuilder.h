@@ -63,6 +63,12 @@ public:
                   LoopVectorizationCostModel &CM, VPBuilder &Builder)
       : Plan(Plan), TLI(TLI), Legal(Legal), CM(CM), Builder(Builder) {}
 
+  /// Returns true if a mask is required for \p I in the loop being vectorized.
+  bool isMaskRequired(Instruction *I) const;
+
+  /// Returns true if the target prefers vectorized addressing.
+  bool prefersVectorizedAddressing() const;
+
   /// Create and return a widened recipe for a non-phi recipe \p R if one can be
   /// created within the given VF \p Range.
   VPRecipeBase *tryToCreateWidenNonPhiRecipe(VPSingleDefRecipe *R,

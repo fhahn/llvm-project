@@ -812,6 +812,16 @@ bool vputils::isUsedByLoadStoreAddress(const VPValue *V) {
             RepR->getOperand(1) == Cur)
           return true;
       }
+      // Untransformed VPInstructions for loads/stores use the same operand
+      // layout as VPReplicateRecipe; match them so this helper is usable
+      // during early VPlan construction, before memory recipes have been
+      // created.
+      if (auto *VPI = dyn_cast<VPInstruction>(U)) {
+        if (VPI->getOpcode() == Instruction::Load && VPI->getOperand(0) == Cur)
+          return true;
+        if (VPI->getOpcode() == Instruction::Store && VPI->getOperand(1) == Cur)
+          return true;
+      }
       if (auto *MemR = dyn_cast<VPWidenMemoryRecipe>(U)) {
         if (MemR->getAddr() == Cur && MemR->isConsecutive())
           return true;
