@@ -1814,11 +1814,13 @@ public:
 
   ~VPWidenRecipe() override = default;
 
-  VPWidenRecipe *clone() override {
+  VPWidenRecipe *clone() override { return cloneWithOperands(operands()); }
+
+  VPWidenRecipe *cloneWithOperands(ArrayRef<VPValue *> NewOperands) {
     if (auto *UV = getUnderlyingValue())
-      return new VPWidenRecipe(*cast<Instruction>(UV), operands(), *this, *this,
-                               getDebugLoc());
-    return new VPWidenRecipe(Opcode, operands(), *this, *this, getDebugLoc());
+      return new VPWidenRecipe(*cast<Instruction>(UV), NewOperands, *this,
+                               *this, getDebugLoc());
+    return new VPWidenRecipe(Opcode, NewOperands, *this, *this, getDebugLoc());
   }
 
   VP_CLASSOF_IMPL(VPRecipeBase::VPWidenSC)
