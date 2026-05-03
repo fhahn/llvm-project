@@ -14,7 +14,6 @@
 #include "clang/StaticAnalyzer/Core/PathSensitive/SymbolManager.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Expr.h"
-#include "clang/AST/StmtObjC.h"
 #include "clang/Analysis/Analyses/LiveVariables.h"
 #include "clang/Analysis/AnalysisDeclContext.h"
 #include "clang/Basic/LLVM.h"
@@ -22,9 +21,6 @@
 #include "clang/StaticAnalyzer/Core/PathSensitive/SVals.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/Store.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/SymExpr.h"
-#include "llvm/ADT/FoldingSet.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
@@ -118,6 +114,8 @@ const Stmt *SymbolConjured::getStmt() const {
   case CFGElement::TemporaryDtor:
     return Elem->castAs<CFGTemporaryDtor>().getBindTemporaryExpr();
   case CFGElement::CleanupFunction:
+    return nullptr;
+  case CFGElement::FullExprCleanup:
     return nullptr;
   }
   return nullptr;

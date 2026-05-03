@@ -7,16 +7,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "Fuchsia.h"
-#include "CommonArgs.h"
 #include "clang/Config/config.h"
+#include "clang/Driver/CommonArgs.h"
 #include "clang/Driver/Compilation.h"
 #include "clang/Driver/Driver.h"
-#include "clang/Driver/DriverDiagnostic.h"
 #include "clang/Driver/MultilibBuilder.h"
-#include "clang/Driver/Options.h"
 #include "clang/Driver/SanitizerArgs.h"
+#include "clang/Options/Options.h"
 #include "llvm/Option/ArgList.h"
-#include "llvm/ProfileData/InstrProf.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/VirtualFileSystem.h"
@@ -93,7 +91,9 @@ void fuchsia::Linker::ConstructJob(Compilation &C, const JobAction &JA,
     CmdArgs.push_back("--execute-only");
 
     std::string CPU = getCPUName(D, Args, Triple);
-    if (CPU.empty() || CPU == "generic" || CPU == "cortex-a53")
+    if (Args.hasFlag(options::OPT_mfix_cortex_a53_843419,
+                     options::OPT_mno_fix_cortex_a53_843419, true) &&
+        (CPU.empty() || CPU == "generic" || CPU == "cortex-a53"))
       CmdArgs.push_back("--fix-cortex-a53-843419");
   }
 
@@ -344,7 +344,7 @@ Tool *Fuchsia::buildStaticLibTool() const {
 
 ToolChain::RuntimeLibType
 Fuchsia::GetRuntimeLibType(const ArgList &Args) const {
-  if (Arg *A = Args.getLastArg(clang::driver::options::OPT_rtlib_EQ)) {
+  if (Arg *A = Args.getLastArg(options::OPT_rtlib_EQ)) {
     StringRef Value = A->getValue();
     if (Value != "compiler-rt")
       getDriver().Diag(clang::diag::err_drv_invalid_rtlib_name)
@@ -416,7 +416,7 @@ void Fuchsia::AddClangCXXStdlibIncludeArgs(const ArgList &DriverArgs,
     return;
 
   const Driver &D = getDriver();
-  std::string Target = getTripleString();
+  StringRef Target = getTripleString();
 
   auto AddCXXIncludePath = [&](StringRef Path) {
     std::string Version = detectLibcxxVersion(Path);
@@ -481,9 +481,12 @@ SanitizerMask Fuchsia::getSupportedSanitizers() const {
   Res |= SanitizerKind::Fuzzer;
   Res |= SanitizerKind::FuzzerNoLink;
   Res |= SanitizerKind::Leak;
-  Res |= SanitizerKind::SafeStack;
   Res |= SanitizerKind::Scudo;
   Res |= SanitizerKind::Thread;
+  if (getTriple().getArch() == llvm::Triple::x86_64 ||
+      getTriple().getArch() == llvm::Triple::x86) {
+    Res |= SanitizerKind::SafeStack;
+  }
   return Res;
 }
 
@@ -494,6 +497,7 @@ SanitizerMask Fuchsia::getDefaultSanitizers() const {
   case llvm::Triple::riscv64:
     Res |= SanitizerKind::ShadowCallStack;
     break;
+  case llvm::Triple::x86:
   case llvm::Triple::x86_64:
     Res |= SanitizerKind::SafeStack;
     break;

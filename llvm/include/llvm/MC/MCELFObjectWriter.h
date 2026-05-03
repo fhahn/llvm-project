@@ -62,7 +62,7 @@ protected:
                           bool HasRelocationAddend_, uint8_t ABIVersion_ = 0);
 
 public:
-  virtual ~MCELFObjectTargetWriter() = default;
+  ~MCELFObjectTargetWriter() override = default;
 
   Triple::ObjectFormatType getFormat() const override { return Triple::ELF; }
   static bool classof(const MCObjectTargetWriter *W) {
@@ -149,6 +149,8 @@ public:
 
   DenseMap<const MCSectionELF *, std::vector<ELFRelocationEntry>> Relocations;
   DenseMap<const MCSymbolELF *, const MCSymbolELF *> Renames;
+  // .weakref aliases
+  SmallVector<const MCSymbolELF *, 0> Weakrefs;
   bool IsLittleEndian = false;
   bool SeenGnuAbi = false;
   std::optional<uint8_t> OverrideABIVersion;
@@ -179,7 +181,7 @@ public:
   uint64_t writeObject() override;
 
   bool hasRelocationAddend() const;
-  bool usesRela(const MCTargetOptions *TO, const MCSectionELF &Sec) const;
+  bool usesRela(const MCTargetOptions &TO, const MCSectionELF &Sec) const;
 
   bool useSectionSymbol(const MCValue &Val, const MCSymbolELF *Sym, uint64_t C,
                         unsigned Type) const;

@@ -29,7 +29,7 @@ protected:
   MCWinCOFFObjectTargetWriter(unsigned Machine_);
 
 public:
-  virtual ~MCWinCOFFObjectTargetWriter() = default;
+  ~MCWinCOFFObjectTargetWriter() override = default;
 
   Triple::ObjectFormatType getFormat() const override { return Triple::COFF; }
   static bool classof(const MCObjectTargetWriter *W) {
@@ -60,6 +60,7 @@ public:
 
   // MCObjectWriter interface implementation.
   void reset() override;
+  void setAssembler(MCAssembler *Asm) override;
   void setIncrementalLinkerCompatible(bool Value) {
     IncrementalLinkerCompatible = Value;
   }

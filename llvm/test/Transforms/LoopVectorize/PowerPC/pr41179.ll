@@ -43,14 +43,14 @@ define void @foo(ptr %start, ptr %end) {
 ; CHECK-NEXT:    [[G:%.*]] = getelementptr i8, ptr [[END]], i32 [[ADD]]
 ; CHECK-NEXT:    store i8 0, ptr [[G]], align 1
 ; CHECK-NEXT:    [[CMP:%.*]] = icmp ult ptr [[START]], [[G]]
-; CHECK-NEXT:    br i1 [[CMP]], label [[WHILE_BODY]], label [[WHILE_END_LOOPEXIT]], !llvm.loop [[LOOP2:![0-9]+]]
+; CHECK-NEXT:    br i1 [[CMP]], label [[WHILE_BODY]], label [[WHILE_END_LOOPEXIT]], !llvm.loop [[LOOP3:![0-9]+]]
 ; CHECK:       while.end.loopexit:
 ; CHECK-NEXT:    ret void
 ;
 entry:
   br label %while.body
 
-while.body:                                       ; preds = %while.body, %entry
+while.body:
   %count.09 = phi i32 [ %add, %while.body ], [ 0, %entry ]
   %add = add nsw i32 -1, %count.09
   %G = getelementptr i8, ptr %end, i32 %add
@@ -58,6 +58,6 @@ while.body:                                       ; preds = %while.body, %entry
   %cmp = icmp ult ptr %start, %G
   br i1 %cmp, label %while.body, label %while.end.loopexit
 
-while.end.loopexit:                               ; preds = %while.body
+while.end.loopexit:
   ret void
 }
