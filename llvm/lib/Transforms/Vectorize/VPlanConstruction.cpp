@@ -1193,7 +1193,7 @@ static bool areAllLoadsDereferenceable(VPBasicBlock *HeaderVPBB,
       }
 
       // Check dereferenceability using the SCEV-based version.
-      Type *LoadTy = VPI->getResultType();
+      Type *LoadTy = VPI->getScalarType();
       const SCEV *SizeSCEV =
           SE.getStoreSizeOfExpr(DL.getIndexType(PtrSCEV->getType()), LoadTy);
       auto *Load = cast<LoadInst>(VPI->getUnderlyingValue());

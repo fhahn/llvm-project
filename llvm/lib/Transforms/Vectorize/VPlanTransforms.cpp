@@ -4448,14 +4448,14 @@ tryToMatchAndCreateMulAccumulateReduction(VPReductionRecipe *Red,
         IsMulAccValidAndClampRange(Mul, Ext0, Ext1, Ext) && Mul->hasOneUse()) {
       auto *NewExt0 = new VPWidenRecipe(
           Instruction::CastOps(Ext0->getOpcode()), Ext0->getOperand(0),
-          Ext->getResultType(), nullptr, *Ext0, *Ext0, Ext0->getDebugLoc());
+          Ext->getScalarType(), nullptr, *Ext0, *Ext0, Ext0->getDebugLoc());
       NewExt0->insertBefore(Ext0);
 
       VPWidenRecipe *NewExt1 = NewExt0;
       if (Ext0 != Ext1) {
         NewExt1 = new VPWidenRecipe(Instruction::CastOps(Ext1->getOpcode()),
                                     Ext1->getOperand(0),
-                                        Ext->getResultType(), nullptr, *Ext1,
+                                        Ext->getScalarType(), nullptr, *Ext1,
                                         *Ext1, Ext1->getDebugLoc());
         NewExt1->insertBefore(Ext1);
       }
@@ -5915,12 +5915,12 @@ optimizeExtendsForPartialReduction(VPSingleDefRecipe *Op) {
     VPBuilder Builder(Mul);
     auto *NewLHS = Builder.createWidenCast(
         Instruction::CastOps(MulLHS->getOpcode()), MulLHS->getOperand(0),
-        Ext->getResultType());
+        Ext->getScalarType());
     auto *NewRHS = MulLHS == MulRHS
                        ? NewLHS
                        : Builder.createWidenCast(
                              Instruction::CastOps(MulRHS->getOpcode()),
-                             MulRHS->getOperand(0), Ext->getResultType());
+                             MulRHS->getOperand(0), Ext->getScalarType());
     auto *NewMul = Mul->cloneWithOperands({NewLHS, NewRHS});
     Builder.insert(NewMul);
     Op->replaceAllUsesWith(NewMul);

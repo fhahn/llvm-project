@@ -1522,9 +1522,6 @@ public:
   /// Set the symbolic name for the VPInstruction.
   void setName(StringRef NewName) { Name = NewName.str(); }
 
-  /// Return the result type of this VPInstruction. Alias for getScalarType().
-  Type *getResultType() const { return getScalarType(); }
-
 protected:
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   /// Print the VPInstruction to \p O.
@@ -1799,9 +1796,6 @@ public:
 
   unsigned getOpcode() const { return Opcode; }
 
-  /// Returns the result type of the recipe (alias for getScalarType()).
-  Type *getResultType() const { return getScalarType(); }
-
 protected:
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   /// Print the recipe.
@@ -1870,10 +1864,10 @@ public:
   VPWidenIntrinsicRecipe *clone() override {
     if (Value *CI = getUnderlyingValue())
       return new VPWidenIntrinsicRecipe(*cast<CallInst>(CI), VectorIntrinsicID,
-                                        operands(), getResultType(), *this,
+                                        operands(), getScalarType(), *this,
                                         *this, getDebugLoc());
     return new VPWidenIntrinsicRecipe(VectorIntrinsicID, operands(),
-                                      getResultType(), *this, *this,
+                                      getScalarType(), *this, *this,
                                       getDebugLoc());
   }
 
@@ -1888,9 +1882,6 @@ public:
 
   /// Return the ID of the intrinsic.
   Intrinsic::ID getVectorIntrinsicID() const { return VectorIntrinsicID; }
-
-  /// Return the scalar return type of the intrinsic.
-  Type *getResultType() const { return getScalarType(); }
 
   /// Return to name of the intrinsic as string.
   StringRef getIntrinsicName() const;
