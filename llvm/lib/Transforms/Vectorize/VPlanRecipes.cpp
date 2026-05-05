@@ -87,7 +87,6 @@ bool VPRecipeBase::mayWriteToMemory() const {
   case VPReductionSC:
   case VPVectorPointerSC:
   case VPWidenCanonicalIVSC:
-  case VPWidenCastSC:
   case VPWidenGEPSC:
   case VPWidenIntOrFpInductionSC:
   case VPWidenLoadEVLSC:
@@ -140,7 +139,6 @@ bool VPRecipeBase::mayReadFromMemory() const {
   case VPReductionSC:
   case VPVectorPointerSC:
   case VPWidenCanonicalIVSC:
-  case VPWidenCastSC:
   case VPWidenGEPSC:
   case VPWidenIntOrFpInductionSC:
   case VPWidenPHISC:
@@ -190,7 +188,6 @@ bool VPRecipeBase::mayHaveSideEffects() const {
   case VPScalarIVStepsSC:
   case VPVectorPointerSC:
   case VPWidenCanonicalIVSC:
-  case VPWidenCastSC:
   case VPWidenGEPSC:
   case VPWidenIntOrFpInductionSC:
   case VPWidenPHISC:
@@ -337,6 +334,11 @@ bool VPRecipeBase::isPhi() const {
 bool VPRecipeBase::isScalarCast() const {
   auto *VPI = dyn_cast<VPInstruction>(this);
   return VPI && Instruction::isCast(VPI->getOpcode());
+}
+
+bool VPRecipeBase::isWidenCast() const {
+  auto *R = dyn_cast<VPWidenRecipe>(this);
+  return R && Instruction::isCast(R->getOpcode());
 }
 
 void VPIRFlags::intersectFlags(const VPIRFlags &Other) {
@@ -2401,6 +2403,18 @@ void VPIRFlags::printFlags(raw_ostream &O) const {
 
 void VPWidenRecipe::execute(VPTransformState &State) {
   auto &Builder = State.Builder;
+  if (Instruction::isCast(Opcode)) {
+    assert(State.VF.isVector() && "Not vectorizing?");
+    Type *DestTy = VectorType::get(getResultType(), State.VF);
+    Value *A = State.get(getOperand(0));
+    Value *Cast = Builder.CreateCast(Instruction::CastOps(Opcode), A, DestTy);
+    State.set(this, Cast);
+    if (auto *CastOp = dyn_cast<Instruction>(Cast)) {
+      applyFlags(*CastOp);
+      applyMetadata(*CastOp);
+    }
+    return;
+  }
   switch (Opcode) {
   case Instruction::Call:
   case Instruction::UncondBr:
@@ -2508,6 +2522,14 @@ void VPWidenRecipe::execute(VPTransformState &State) {
 
 InstructionCost VPWidenRecipe::computeCost(ElementCount VF,
                                            VPCostContext &Ctx) const {
+  if (Instruction::isCast(Opcode)) {
+    // TODO: In some cases, widened casts are created but not considered in
+    // the legacy cost model, including truncates/extends when evaluating a
+    // reduction in a smaller type.
+    if (!getUnderlyingValue())
+      return 0;
+    return getCostForRecipeWithOpcode(getOpcode(), VF, Ctx);
+  }
   switch (Opcode) {
   case Instruction::UDiv:
   case Instruction::SDiv:
@@ -2546,48 +2568,13 @@ InstructionCost VPWidenRecipe::computeCost(ElementCount VF,
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 void VPWidenRecipe::printRecipe(raw_ostream &O, const Twine &Indent,
                                 VPSlotTracker &SlotTracker) const {
-  O << Indent << "WIDEN ";
+  O << Indent << (Instruction::isCast(Opcode) ? "WIDEN-CAST " : "WIDEN ");
   printAsOperand(O, SlotTracker);
   O << " = " << Instruction::getOpcodeName(Opcode);
   printFlags(O);
   printOperands(O, SlotTracker);
-}
-#endif
-
-void VPWidenCastRecipe::execute(VPTransformState &State) {
-  auto &Builder = State.Builder;
-  /// Vectorize casts.
-  assert(State.VF.isVector() && "Not vectorizing?");
-  Type *DestTy = VectorType::get(getResultType(), State.VF);
-  VPValue *Op = getOperand(0);
-  Value *A = State.get(Op);
-  Value *Cast = Builder.CreateCast(Instruction::CastOps(Opcode), A, DestTy);
-  State.set(this, Cast);
-  if (auto *CastOp = dyn_cast<Instruction>(Cast)) {
-    applyFlags(*CastOp);
-    applyMetadata(*CastOp);
-  }
-}
-
-InstructionCost VPWidenCastRecipe::computeCost(ElementCount VF,
-                                               VPCostContext &Ctx) const {
-  // TODO: In some cases, VPWidenCastRecipes are created but not considered in
-  // the legacy cost model, including truncates/extends when evaluating a
-  // reduction in a smaller type.
-  if (!getUnderlyingValue())
-    return 0;
-  return getCostForRecipeWithOpcode(getOpcode(), VF, Ctx);
-}
-
-#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
-void VPWidenCastRecipe::printRecipe(raw_ostream &O, const Twine &Indent,
-                                    VPSlotTracker &SlotTracker) const {
-  O << Indent << "WIDEN-CAST ";
-  printAsOperand(O, SlotTracker);
-  O << " = " << Instruction::getOpcodeName(Opcode);
-  printFlags(O);
-  printOperands(O, SlotTracker);
-  O << " to " << *getResultType();
+  if (Instruction::isCast(Opcode))
+    O << " to " << *getResultType();
 }
 #endif
 
@@ -3109,13 +3096,14 @@ InstructionCost VPExpressionRecipe::computeCost(ElementCount VF,
   case ExpressionTypes::ExtendedReduction: {
     unsigned Opcode = RecurrenceDescriptor::getOpcode(
         cast<VPReductionRecipe>(ExpressionRecipes[1])->getRecurrenceKind());
-    auto *ExtR = cast<VPWidenCastRecipe>(ExpressionRecipes[0]);
+    auto *ExtR = cast<VPWidenRecipe>(ExpressionRecipes[0]);
     auto *RedR = cast<VPReductionRecipe>(ExpressionRecipes.back());
 
     if (RedR->isPartialReduction())
       return Ctx.TTI.getPartialReductionCost(
           Opcode, getOperand(0)->getScalarType(), nullptr, RedTy, VF,
-          TargetTransformInfo::getPartialReductionExtendKind(ExtR->getOpcode()),
+          TargetTransformInfo::getPartialReductionExtendKind(
+              Instruction::CastOps(ExtR->getOpcode())),
           TargetTransformInfo::PR_None, std::nullopt, Ctx.CostKind,
           RedTy->isFloatingPointTy() ? std::optional{RedR->getFastMathFlags()}
                                      : std::nullopt);
@@ -3138,22 +3126,22 @@ InstructionCost VPExpressionRecipe::computeCost(ElementCount VF,
   case ExpressionTypes::ExtMulAccReduction: {
     auto *RedR = cast<VPReductionRecipe>(ExpressionRecipes.back());
     if (RedR->isPartialReduction()) {
-      auto *Ext0R = cast<VPWidenCastRecipe>(ExpressionRecipes[0]);
-      auto *Ext1R = cast<VPWidenCastRecipe>(ExpressionRecipes[1]);
+      auto *Ext0R = cast<VPWidenRecipe>(ExpressionRecipes[0]);
+      auto *Ext1R = cast<VPWidenRecipe>(ExpressionRecipes[1]);
       auto *Mul = cast<VPWidenRecipe>(ExpressionRecipes[2]);
       return Ctx.TTI.getPartialReductionCost(
           Opcode, getOperand(0)->getScalarType(),
           getOperand(1)->getScalarType(), RedTy, VF,
           TargetTransformInfo::getPartialReductionExtendKind(
-              Ext0R->getOpcode()),
+              Instruction::CastOps(Ext0R->getOpcode())),
           TargetTransformInfo::getPartialReductionExtendKind(
-              Ext1R->getOpcode()),
+              Instruction::CastOps(Ext1R->getOpcode())),
           Mul->getOpcode(), Ctx.CostKind,
           RedTy->isFloatingPointTy() ? std::optional{RedR->getFastMathFlags()}
                                      : std::nullopt);
     }
     return Ctx.TTI.getMulAccReductionCost(
-        cast<VPWidenCastRecipe>(ExpressionRecipes.front())->getOpcode() ==
+        cast<VPWidenRecipe>(ExpressionRecipes.front())->getOpcode() ==
             Instruction::ZExt,
         Opcode, RedTy, SrcVecTy, Ctx.CostKind);
   }
@@ -3200,7 +3188,7 @@ void VPExpressionRecipe::printRecipe(raw_ostream &O, const Twine &Indent,
     getOperand(0)->printAsOperand(O, SlotTracker);
     Red->printFlags(O);
 
-    auto *Ext0 = cast<VPWidenCastRecipe>(ExpressionRecipes[0]);
+    auto *Ext0 = cast<VPWidenRecipe>(ExpressionRecipes[0]);
     O << Instruction::getOpcodeName(Ext0->getOpcode()) << " to "
       << *Ext0->getResultType();
     if (Red->isConditional()) {
@@ -3220,11 +3208,11 @@ void VPExpressionRecipe::printRecipe(raw_ostream &O, const Twine &Indent,
     Mul->printFlags(O);
     O << "(";
     getOperand(0)->printAsOperand(O, SlotTracker);
-    auto *Ext0 = cast<VPWidenCastRecipe>(ExpressionRecipes[0]);
+    auto *Ext0 = cast<VPWidenRecipe>(ExpressionRecipes[0]);
     O << " " << Instruction::getOpcodeName(Ext0->getOpcode()) << " to "
       << *Ext0->getResultType() << "), (";
     getOperand(1)->printAsOperand(O, SlotTracker);
-    auto *Ext1 = cast<VPWidenCastRecipe>(ExpressionRecipes[1]);
+    auto *Ext1 = cast<VPWidenRecipe>(ExpressionRecipes[1]);
     O << " " << Instruction::getOpcodeName(Ext1->getOpcode()) << " to "
       << *Ext1->getResultType() << ")";
     if (Red->isConditional()) {
@@ -3250,7 +3238,7 @@ void VPExpressionRecipe::printRecipe(raw_ostream &O, const Twine &Indent,
       O << "(";
     getOperand(0)->printAsOperand(O, SlotTracker);
     if (IsExtended) {
-      auto *Ext0 = cast<VPWidenCastRecipe>(ExpressionRecipes[0]);
+      auto *Ext0 = cast<VPWidenRecipe>(ExpressionRecipes[0]);
       O << " " << Instruction::getOpcodeName(Ext0->getOpcode()) << " to "
         << *Ext0->getResultType() << "), (";
     } else {
@@ -3258,7 +3246,7 @@ void VPExpressionRecipe::printRecipe(raw_ostream &O, const Twine &Indent,
     }
     getOperand(1)->printAsOperand(O, SlotTracker);
     if (IsExtended) {
-      auto *Ext1 = cast<VPWidenCastRecipe>(ExpressionRecipes[1]);
+      auto *Ext1 = cast<VPWidenRecipe>(ExpressionRecipes[1]);
       O << " " << Instruction::getOpcodeName(Ext1->getOpcode()) << " to "
         << *Ext1->getResultType() << ")";
     }

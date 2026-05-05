@@ -437,7 +437,6 @@ public:
     VPVectorEndPointerSC,
     VPWidenCallSC,
     VPWidenCanonicalIVSC,
-    VPWidenCastSC,
     VPWidenGEPSC,
     VPWidenIntrinsicSC,
     VPWidenLoadEVLSC,
@@ -559,6 +558,10 @@ public:
   /// Return true if the recipe is a scalar cast.
   bool isScalarCast() const;
 
+  /// Return true if the recipe is a widened cast (VPWidenRecipe with a cast
+  /// opcode).
+  bool isWidenCast() const;
+
   /// Set the recipe's debug location to \p NewDL.
   void setDebugLoc(DebugLoc NewDL) { DL = NewDL; }
 
@@ -640,7 +643,6 @@ public:
     case VPRecipeBase::VPVectorEndPointerSC:
     case VPRecipeBase::VPWidenCallSC:
     case VPRecipeBase::VPWidenCanonicalIVSC:
-    case VPRecipeBase::VPWidenCastSC:
     case VPRecipeBase::VPWidenGEPSC:
     case VPRecipeBase::VPWidenIntrinsicSC:
     case VPRecipeBase::VPWidenSC:
@@ -1138,7 +1140,6 @@ struct VPRecipeWithIRFlags : public VPSingleDefRecipe, public VPIRFlags {
            R->getVPRecipeID() == VPRecipeBase::VPWidenSC ||
            R->getVPRecipeID() == VPRecipeBase::VPWidenGEPSC ||
            R->getVPRecipeID() == VPRecipeBase::VPWidenCallSC ||
-           R->getVPRecipeID() == VPRecipeBase::VPWidenCastSC ||
            R->getVPRecipeID() == VPRecipeBase::VPWidenIntrinsicSC ||
            R->getVPRecipeID() == VPRecipeBase::VPReductionSC ||
            R->getVPRecipeID() == VPRecipeBase::VPReductionEVLSC ||
@@ -1754,11 +1755,32 @@ public:
                             Flags, DL),
         VPIRMetadata(Metadata), Opcode(Opcode) {}
 
+  /// Construct a widen cast recipe with an explicit destination type.
+  VPWidenRecipe(Instruction::CastOps Opcode, VPValue *Op, Type *ResultTy,
+                CastInst *CI = nullptr, const VPIRFlags &Flags = {},
+                const VPIRMetadata &Metadata = {},
+                DebugLoc DL = DebugLoc::getUnknown())
+      : VPRecipeWithIRFlags(VPRecipeBase::VPWidenSC,
+                            ArrayRef<VPValue *>{Op}, ResultTy, Flags, DL),
+        VPIRMetadata(Metadata), Opcode(Opcode) {
+    assert(flagsValidForOpcode(Opcode) &&
+           "Set flags not supported for the provided opcode");
+    assert(hasRequiredFlagsForOpcode(Opcode) &&
+           "Opcode requires specific flags to be set");
+    if (CI)
+      setUnderlyingValue(CI);
+  }
+
   ~VPWidenRecipe() override = default;
 
   VPWidenRecipe *clone() override { return cloneWithOperands(operands()); }
 
   VPWidenRecipe *cloneWithOperands(ArrayRef<VPValue *> NewOperands) {
+    if (Instruction::isCast(Opcode))
+      return new VPWidenRecipe(Instruction::CastOps(Opcode), NewOperands[0],
+                               getScalarType(),
+                               cast_or_null<CastInst>(getUnderlyingValue()),
+                               *this, *this, getDebugLoc());
     if (auto *UV = getUnderlyingValue())
       return new VPWidenRecipe(*cast<Instruction>(UV), NewOperands, *this,
                                *this, getDebugLoc());
@@ -1777,6 +1799,9 @@ public:
 
   unsigned getOpcode() const { return Opcode; }
 
+  /// Returns the result type of the recipe (alias for getScalarType()).
+  Type *getResultType() const { return getScalarType(); }
+
 protected:
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   /// Print the recipe.
@@ -1791,58 +1816,6 @@ protected:
     return Opcode == Instruction::Select && Op == getOperand(0) &&
            Op->isDefinedOutsideLoopRegions();
   }
-};
-
-/// VPWidenCastRecipe is a recipe to create vector cast instructions.
-/// TODO: Merge with VPWidenRecipe now that type is associated to every
-/// VPRecipeValue.
-class VPWidenCastRecipe : public VPRecipeWithIRFlags, public VPIRMetadata {
-  /// Cast instruction opcode.
-  Instruction::CastOps Opcode;
-
-public:
-  VPWidenCastRecipe(Instruction::CastOps Opcode, VPValue *Op, Type *ResultTy,
-                    CastInst *CI = nullptr, const VPIRFlags &Flags = {},
-                    const VPIRMetadata &Metadata = {},
-                    DebugLoc DL = DebugLoc::getUnknown())
-      : VPRecipeWithIRFlags(VPRecipeBase::VPWidenCastSC, Op, ResultTy, Flags,
-                            DL),
-        VPIRMetadata(Metadata), Opcode(Opcode) {
-    assert(flagsValidForOpcode(Opcode) &&
-           "Set flags not supported for the provided opcode");
-    assert(hasRequiredFlagsForOpcode(Opcode) &&
-           "Opcode requires specific flags to be set");
-    setUnderlyingValue(CI);
-  }
-
-  ~VPWidenCastRecipe() override = default;
-
-  VPWidenCastRecipe *clone() override {
-    return new VPWidenCastRecipe(Opcode, getOperand(0), getScalarType(),
-                                 cast_or_null<CastInst>(getUnderlyingValue()),
-                                 *this, *this, getDebugLoc());
-  }
-
-  VP_CLASSOF_IMPL(VPRecipeBase::VPWidenCastSC)
-
-  /// Produce widened copies of the cast.
-  LLVM_ABI_FOR_TEST void execute(VPTransformState &State) override;
-
-  /// Return the cost of this VPWidenCastRecipe.
-  LLVM_ABI_FOR_TEST InstructionCost
-  computeCost(ElementCount VF, VPCostContext &Ctx) const override;
-
-  Instruction::CastOps getOpcode() const { return Opcode; }
-
-  /// Returns the result type of the cast.
-  Type *getResultType() const { return getScalarType(); }
-
-protected:
-#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
-  /// Print the recipe.
-  LLVM_ABI_FOR_TEST void printRecipe(raw_ostream &O, const Twine &Indent,
-                                     VPSlotTracker &SlotTracker) const override;
-#endif
 };
 
 /// A recipe for widening vector intrinsics.
@@ -3344,15 +3317,16 @@ class VPExpressionRecipe : public VPSingleDefRecipe {
                      ArrayRef<VPSingleDefRecipe *> ExpressionRecipes);
 
 public:
-  VPExpressionRecipe(VPWidenCastRecipe *Ext, VPReductionRecipe *Red)
-      : VPExpressionRecipe(ExpressionTypes::ExtendedReduction, {Ext, Red}) {}
-  VPExpressionRecipe(VPWidenRecipe *Mul, VPReductionRecipe *Red)
-      : VPExpressionRecipe(ExpressionTypes::MulAccReduction, {Mul, Red}) {}
-  VPExpressionRecipe(VPWidenCastRecipe *Ext0, VPWidenCastRecipe *Ext1,
+  VPExpressionRecipe(VPWidenRecipe *MulOrExt, VPReductionRecipe *Red)
+      : VPExpressionRecipe(Instruction::isCast(MulOrExt->getOpcode())
+                               ? ExpressionTypes::ExtendedReduction
+                               : ExpressionTypes::MulAccReduction,
+                           {MulOrExt, Red}) {}
+  VPExpressionRecipe(VPWidenRecipe *Ext0, VPWidenRecipe *Ext1,
                      VPWidenRecipe *Mul, VPReductionRecipe *Red)
       : VPExpressionRecipe(ExpressionTypes::ExtMulAccReduction,
                            {Ext0, Ext1, Mul, Red}) {}
-  VPExpressionRecipe(VPWidenCastRecipe *Ext0, VPWidenCastRecipe *Ext1,
+  VPExpressionRecipe(VPWidenRecipe *Ext0, VPWidenRecipe *Ext1,
                      VPWidenRecipe *Mul, VPWidenRecipe *Sub,
                      VPReductionRecipe *Red)
       : VPExpressionRecipe(ExpressionTypes::ExtNegatedMulAccReduction,
@@ -4091,7 +4065,7 @@ struct CastInfo<VPIRMetadata, VPRecipeBase *>
   /// Used by isa.
   static inline bool isPossible(VPRecipeBase *R) {
     // NOTE: Each recipe inheriting from VPIRMetadata must be listed here.
-    return isa<VPInstruction, VPWidenRecipe, VPWidenCastRecipe,
+    return isa<VPInstruction, VPWidenRecipe,
                VPWidenIntrinsicRecipe, VPWidenCallRecipe, VPReplicateRecipe,
                VPInterleaveRecipe, VPInterleaveEVLRecipe, VPWidenLoadRecipe,
                VPWidenLoadEVLRecipe, VPWidenStoreRecipe, VPWidenStoreEVLRecipe>(
@@ -4105,8 +4079,6 @@ struct CastInfo<VPIRMetadata, VPRecipeBase *>
       return cast<VPInstruction>(R);
     case VPRecipeBase::VPWidenSC:
       return cast<VPWidenRecipe>(R);
-    case VPRecipeBase::VPWidenCastSC:
-      return cast<VPWidenCastRecipe>(R);
     case VPRecipeBase::VPWidenIntrinsicSC:
       return cast<VPWidenIntrinsicRecipe>(R);
     case VPRecipeBase::VPWidenCallSC:

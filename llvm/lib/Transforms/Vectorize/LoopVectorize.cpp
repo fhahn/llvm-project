@@ -3241,8 +3241,7 @@ void LoopVectorizationPlanner::emitInvalidCostRemarks(
             .Case([](const VPWidenLoadRecipe *R) { return Instruction::Load; })
             .Case<VPWidenCallRecipe, VPWidenIntrinsicRecipe>(
                 [](const auto *R) { return Instruction::Call; })
-            .Case<VPInstruction, VPWidenRecipe, VPReplicateRecipe,
-                  VPWidenCastRecipe>(
+            .Case<VPInstruction, VPWidenRecipe, VPReplicateRecipe>(
                 [](const auto *R) { return R->getOpcode(); })
             .Case([](const VPInterleaveRecipe *R) {
               return R->getStoredValues().empty() ? Instruction::Load
@@ -3324,7 +3323,6 @@ static bool willGenerateVectors(VPlan &Plan, ElementCount VF,
       case VPRecipeBase::VPActiveLaneMaskPHISC:
       case VPRecipeBase::VPWidenCallSC:
       case VPRecipeBase::VPWidenCanonicalIVSC:
-      case VPRecipeBase::VPWidenCastSC:
       case VPRecipeBase::VPWidenGEPSC:
       case VPRecipeBase::VPWidenIntrinsicSC:
       case VPRecipeBase::VPWidenSC:
@@ -6732,9 +6730,9 @@ VPRecipeBuilder::tryToCreateWidenNonPhiRecipe(VPSingleDefRecipe *R,
 
   if (Instruction::isCast(VPI->getOpcode())) {
     auto *CI = cast<CastInst>(Instr);
-    return new VPWidenCastRecipe(CI->getOpcode(), VPI->getOperand(0),
-                                 VPI->getScalarType(), CI, *VPI, *VPI,
-                                 VPI->getDebugLoc());
+    return new VPWidenRecipe(CI->getOpcode(), VPI->getOperand(0),
+                             VPI->getScalarType(), CI, *VPI, *VPI,
+                             VPI->getDebugLoc());
   }
 
   return tryToWiden(VPI);
@@ -7213,8 +7211,8 @@ void LoopVectorizationPlanner::addReductionResultComputation(
         Type *RdxTy = RdxDesc.getRecurrenceType();
         ExtendOpc =
             RdxDesc.isSigned() ? Instruction::SExt : Instruction::ZExt;
-        VPWidenCastRecipe *Trunc;
-        VPWidenCastRecipe *Extnd;
+        VPWidenRecipe *Trunc;
+        VPWidenRecipe *Extnd;
         {
           VPBuilder::InsertPointGuard TruncGuard(Builder);
           Builder.setInsertPoint(

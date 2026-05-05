@@ -289,9 +289,13 @@ bool VPlanVerifier::verifyRecipeTypes(const VPRecipeBase &R) const {
         computeScalarTypeForInstruction(RepR->getOpcode(), Ops));
   }
   case VPRecipeBase::VPWidenSC: {
+    auto *WR = cast<VPWidenRecipe>(&R);
+    // Casts carry an explicit destination type.
+    if (Instruction::isCast(WR->getOpcode()))
+      return true;
     SmallVector<VPValue *, 4> Ops(R.operands());
-    return CheckScalarType(computeScalarTypeForInstruction(
-        cast<VPWidenRecipe>(&R)->getOpcode(), Ops));
+    return CheckScalarType(
+        computeScalarTypeForInstruction(WR->getOpcode(), Ops));
   }
   case VPRecipeBase::VPExpressionSC:
     return CheckScalarType(

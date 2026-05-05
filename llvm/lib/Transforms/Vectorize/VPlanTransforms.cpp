@@ -125,7 +125,7 @@ bool VPlanTransforms::tryToConvertVPInstructionsToVPRecipes(
                 VPIRFlags(*CI), *VPI, CI->getDebugLoc());
           }
         } else if (auto *CI = dyn_cast<CastInst>(Inst)) {
-          NewRecipe = new VPWidenCastRecipe(
+          NewRecipe = new VPWidenRecipe(
               CI->getOpcode(), Ingredient.getOperand(0), CI->getType(), CI,
               VPIRFlags(*CI), VPIRMetadata(*CI));
         } else {
@@ -882,6 +882,7 @@ static void legalizeAndOptimizeInductions(VPlan &Plan) {
       // Skip recipes that shouldn't be narrowed.
       if (!Def || !isa<VPReplicateRecipe, VPWidenRecipe>(Def) ||
           Def->getNumUsers() == 0 || !Def->getUnderlyingValue() ||
+          Def->isWidenCast() ||
           (RepR && (RepR->isSingleScalar() || RepR->isPredicated())))
         continue;
 
@@ -1230,7 +1231,7 @@ static std::optional<std::pair<bool, unsigned>>
 getOpcodeOrIntrinsicID(const VPSingleDefRecipe *R) {
   return TypeSwitch<const VPSingleDefRecipe *,
                     std::optional<std::pair<bool, unsigned>>>(R)
-      .Case<VPInstruction, VPWidenRecipe, VPWidenCastRecipe, VPWidenGEPRecipe,
+      .Case<VPInstruction, VPWidenRecipe, VPWidenRecipe, VPWidenGEPRecipe,
             VPReplicateRecipe>(
           [](auto *I) { return std::make_pair(false, I->getOpcode()); })
       .Case([](const VPWidenIntrinsicRecipe *I) {
@@ -1358,7 +1359,7 @@ static void simplifyRecipe(VPSingleDefRecipe *Def) {
       Def->replaceAllUsesWith(A);
     } else {
       // Don't replace a non-widened cast recipe with a widened cast.
-      if (!isa<VPWidenCastRecipe>(Def))
+      if (!isa<VPWidenRecipe>(Def))
         return;
       if (ATy->getScalarSizeInBits() < TruncTy->getScalarSizeInBits()) {
 
@@ -2027,7 +2028,7 @@ static bool optimizeVectorInductionWidthForTCAndVFUF(VPlan &Plan,
                                                 WideIV->getVFValue());
     NewWideIV->insertBefore(WideIV);
 
-    auto *NewBTC = new VPWidenCastRecipe(
+    auto *NewBTC = new VPWidenRecipe(
         Instruction::Trunc, Plan.getOrCreateBackedgeTakenCount(), NewIVTy,
         nullptr, VPIRFlags::getDefaultFlags(Instruction::Trunc));
     Plan.getVectorPreheader()->appendRecipe(NewBTC);
@@ -2513,13 +2514,13 @@ void VPlanTransforms::truncateToMinimalBitwidths(
   // cannot use RAUW after creating a new truncate, as this would could make
   // other uses have different types for their operands, making them invalidly
   // typed.
-  DenseMap<VPValue *, VPWidenCastRecipe *> ProcessedTruncs;
+  DenseMap<VPValue *, VPWidenRecipe *> ProcessedTruncs;
   VPBasicBlock *PH = Plan.getVectorPreheader();
   SmallVector<VPRecipeBase *> ToErase;
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
            vp_depth_first_deep(Plan.getVectorLoopRegion()))) {
     for (VPRecipeBase &R : make_early_inc_range(*VPBB)) {
-      if (!isa<VPWidenRecipe, VPWidenCastRecipe, VPReplicateRecipe,
+      if (!isa<VPWidenRecipe, VPReplicateRecipe,
                VPWidenLoadRecipe, VPWidenIntrinsicRecipe>(&R))
         continue;
 
@@ -2533,7 +2534,7 @@ void VPlanTransforms::truncateToMinimalBitwidths(
       // type. Skip those here, after incrementing NumProcessedRecipes. Also
       // skip casts which do not need to be handled explicitly here, as
       // redundant casts will be removed during recipe simplification.
-      if (isa<VPReplicateRecipe, VPWidenCastRecipe>(&R))
+      if (isa<VPReplicateRecipe>(&R) || R.isWidenCast())
         continue;
 
       Type *OldResTy = ResultVPV->getScalarType();
@@ -2557,9 +2558,9 @@ void VPlanTransforms::truncateToMinimalBitwidths(
       // Insert a ZExt of \p Source's result back to OldResTy after \p After,
       // so wide users keep seeing the original wide type.
       auto InsertExtAfter = [&](VPValue *Source,
-                                VPRecipeBase *After) -> VPWidenCastRecipe * {
+                                VPRecipeBase *After) -> VPWidenRecipe * {
         assert(OldResSizeInBits > NewResSizeInBits && "Nothing to shrink?");
-        auto *Ext = new VPWidenCastRecipe(
+        auto *Ext = new VPWidenRecipe(
             Instruction::ZExt, Source, OldResTy, nullptr,
             VPIRFlags::getDefaultFlags(Instruction::ZExt));
         Ext->insertAfter(After);
@@ -4267,7 +4268,7 @@ tryToMatchAndCreateExtendedReduction(VPReductionRecipe *Red, VPCostContext &Ctx,
 
           InstructionCost ExtRedCost = InstructionCost::getInvalid();
           InstructionCost ExtCost =
-              cast<VPWidenCastRecipe>(VecOp)->computeCost(VF, Ctx);
+              cast<VPWidenRecipe>(VecOp)->computeCost(VF, Ctx);
           InstructionCost RedCost = Red->computeCost(VF, Ctx);
 
           assert(!RedTy->isFloatingPointTy() &&
@@ -4282,11 +4283,12 @@ tryToMatchAndCreateExtendedReduction(VPReductionRecipe *Red, VPCostContext &Ctx,
 
   VPValue *A;
   // Match reduce(ext)).
-  if (match(VecOp, m_Isa<VPWidenCastRecipe>(m_ZExtOrSExt(m_VPValue(A)))) &&
+  if (match(VecOp, m_Isa<VPWidenRecipe>(m_ZExtOrSExt(m_VPValue(A)))) &&
       IsExtendedRedValidAndClampRange(
           RecurrenceDescriptor::getOpcode(Red->getRecurrenceKind()),
-          cast<VPWidenCastRecipe>(VecOp)->getOpcode(), A->getScalarType()))
-    return new VPExpressionRecipe(cast<VPWidenCastRecipe>(VecOp), Red);
+          Instruction::CastOps(cast<VPWidenRecipe>(VecOp)->getOpcode()),
+          A->getScalarType()))
+    return new VPExpressionRecipe(cast<VPWidenRecipe>(VecOp), Red);
 
   return nullptr;
 }
@@ -4314,8 +4316,8 @@ tryToMatchAndCreateMulAccumulateReduction(VPReductionRecipe *Red,
 
   // Clamp the range if using multiply-accumulate-reduction is profitable.
   auto IsMulAccValidAndClampRange =
-      [&](VPWidenRecipe *Mul, VPWidenCastRecipe *Ext0, VPWidenCastRecipe *Ext1,
-          VPWidenCastRecipe *OuterExt) -> bool {
+      [&](VPWidenRecipe *Mul, VPWidenRecipe *Ext0, VPWidenRecipe *Ext1,
+          VPWidenRecipe *OuterExt) -> bool {
     return LoopVectorizationPlanner::getDecisionAndClampRange(
         [&](ElementCount VF) {
           TTI::TargetCostKind CostKind = TTI::TCK_RecipThroughput;
@@ -4370,13 +4372,14 @@ tryToMatchAndCreateMulAccumulateReduction(VPReductionRecipe *Red,
   // creates two uniform extends that can more easily be matched by the rest of
   // the bundling code. The ExtB reference, ValB and operand 1 of Mul are all
   // replaced with the new extend of the constant.
-  auto ExtendAndReplaceConstantOp = [](VPWidenCastRecipe *ExtA,
-                                       VPWidenCastRecipe *&ExtB, VPValue *&ValB,
+  auto ExtendAndReplaceConstantOp = [](VPWidenRecipe *ExtA,
+                                       VPWidenRecipe *&ExtB, VPValue *&ValB,
                                        VPWidenRecipe *Mul) {
-    if (!ExtA || ExtB || !isa<VPIRValue>(ValB))
+    if (!ExtA || !Instruction::isCast(ExtA->getOpcode()) || ExtB ||
+        !isa<VPIRValue>(ValB))
       return;
     Type *NarrowTy = ExtA->getOperand(0)->getScalarType();
-    Instruction::CastOps ExtOpc = ExtA->getOpcode();
+    Instruction::CastOps ExtOpc = Instruction::CastOps(ExtA->getOpcode());
     const APInt *Const;
     if (!match(ValB, m_APInt(Const)) ||
         !llvm::canConstantBeExtended(
@@ -4397,8 +4400,8 @@ tryToMatchAndCreateMulAccumulateReduction(VPReductionRecipe *Red,
 
   // Try to match reduce.add(mul(...)).
   if (match(VecOp, m_Mul(m_VPValue(A), m_VPValue(B)))) {
-    auto *RecipeA = dyn_cast<VPWidenCastRecipe>(A);
-    auto *RecipeB = dyn_cast<VPWidenCastRecipe>(B);
+    auto *RecipeA = dyn_cast<VPWidenRecipe>(A);
+    auto *RecipeB = dyn_cast<VPWidenRecipe>(B);
     auto *Mul = cast<VPWidenRecipe>(VecOp);
 
     // Convert reduce.add(mul(ext, const)) to reduce.add(mul(ext, ext(const)))
@@ -4424,10 +4427,10 @@ tryToMatchAndCreateMulAccumulateReduction(VPReductionRecipe *Red,
 
   // Match reduce.add(ext(mul(A, B))).
   if (match(VecOp, m_ZExtOrSExt(m_Mul(m_VPValue(A), m_VPValue(B))))) {
-    auto *Ext = cast<VPWidenCastRecipe>(VecOp);
+    auto *Ext = cast<VPWidenRecipe>(VecOp);
     auto *Mul = cast<VPWidenRecipe>(Ext->getOperand(0));
-    auto *Ext0 = dyn_cast<VPWidenCastRecipe>(A);
-    auto *Ext1 = dyn_cast<VPWidenCastRecipe>(B);
+    auto *Ext0 = dyn_cast<VPWidenRecipe>(A);
+    auto *Ext1 = dyn_cast<VPWidenRecipe>(B);
 
     // reduce.add(ext(mul(ext, const)))
     // -> reduce.add(ext(mul(ext, ext(const))))
@@ -4443,14 +4446,15 @@ tryToMatchAndCreateMulAccumulateReduction(VPReductionRecipe *Red,
         (Ext->getOpcode() == Ext0->getOpcode() || Ext0 == Ext1) &&
         Ext0->getOpcode() == Ext1->getOpcode() &&
         IsMulAccValidAndClampRange(Mul, Ext0, Ext1, Ext) && Mul->hasOneUse()) {
-      auto *NewExt0 = new VPWidenCastRecipe(
-          Ext0->getOpcode(), Ext0->getOperand(0), Ext->getResultType(), nullptr,
-          *Ext0, *Ext0, Ext0->getDebugLoc());
+      auto *NewExt0 = new VPWidenRecipe(
+          Instruction::CastOps(Ext0->getOpcode()), Ext0->getOperand(0),
+          Ext->getResultType(), nullptr, *Ext0, *Ext0, Ext0->getDebugLoc());
       NewExt0->insertBefore(Ext0);
 
-      VPWidenCastRecipe *NewExt1 = NewExt0;
+      VPWidenRecipe *NewExt1 = NewExt0;
       if (Ext0 != Ext1) {
-        NewExt1 = new VPWidenCastRecipe(Ext1->getOpcode(), Ext1->getOperand(0),
+        NewExt1 = new VPWidenRecipe(Instruction::CastOps(Ext1->getOpcode()),
+                                    Ext1->getOperand(0),
                                         Ext->getResultType(), nullptr, *Ext1,
                                         *Ext1, Ext1->getDebugLoc());
         NewExt1->insertBefore(Ext1);
@@ -5110,7 +5114,7 @@ static bool canNarrowOps(ArrayRef<VPValue *> Ops, bool IsScalable) {
   if (!WideMember0)
     return false;
   for (VPValue *V : Ops) {
-    if (!isa<VPWidenRecipe, VPWidenCastRecipe>(V))
+    if (!isa<VPWidenRecipe>(V))
       return false;
     auto *R = cast<VPSingleDefRecipe>(V);
     if (getOpcodeOrIntrinsicID(R) != getOpcodeOrIntrinsicID(WideMember0))
@@ -5201,7 +5205,7 @@ narrowInterleaveGroupOp(VPValue *V, SmallPtrSetImpl<VPValue *> &NarrowedOps) {
   if (isAlreadyNarrow(V))
     return V;
 
-  if (isa<VPWidenRecipe, VPWidenCastRecipe>(R)) {
+  if (isa<VPWidenRecipe>(R)) {
     auto *WideMember0 = cast<VPSingleDefRecipe>(R);
     for (unsigned Idx = 0, E = WideMember0->getNumOperands(); Idx != E; ++Idx)
       WideMember0->setOperand(
@@ -5852,8 +5856,8 @@ optimizeExtendsForPartialReduction(VPSingleDefRecipe *Op) {
   // -> reduce.add(mul(ext(A), ext(trunc(C))))
   const APInt *Const;
   if (match(Op, m_Mul(m_ZExtOrSExt(m_VPValue()), m_APInt(Const)))) {
-    auto *ExtA = cast<VPWidenCastRecipe>(Op->getOperand(0));
-    Instruction::CastOps ExtOpc = ExtA->getOpcode();
+    auto *ExtA = cast<VPWidenRecipe>(Op->getOperand(0));
+    Instruction::CastOps ExtOpc = Instruction::CastOps(ExtA->getOpcode());
     Type *NarrowTy = ExtA->getOperand(0)->getScalarType();
     if (!Op->hasOneUse() ||
         !llvm::canConstantBeExtended(
@@ -5874,9 +5878,9 @@ optimizeExtendsForPartialReduction(VPSingleDefRecipe *Op) {
   if (match(Op, m_WidenIntrinsic<Intrinsic::abs>(m_Sub(
                     m_ZExtOrSExt(m_VPValue(X)), m_ZExtOrSExt(m_VPValue(Y)))))) {
     auto *Sub = Op->getOperand(0)->getDefiningRecipe();
-    auto *Ext = cast<VPWidenCastRecipe>(Sub->getOperand(0));
+    auto *Ext = cast<VPWidenRecipe>(Sub->getOperand(0));
     assert(Ext->getOpcode() ==
-               cast<VPWidenCastRecipe>(Sub->getOperand(1))->getOpcode() &&
+               cast<VPWidenRecipe>(Sub->getOperand(1))->getOpcode() &&
            "Expected both the LHS and RHS extends to be the same");
     bool IsSigned = Ext->getOpcode() == Instruction::SExt;
     VPBuilder Builder(Op);
@@ -5900,22 +5904,23 @@ optimizeExtendsForPartialReduction(VPSingleDefRecipe *Op) {
   // TODO: Support this optimization for float types.
   if (match(Op, m_ZExtOrSExt(m_Mul(m_ZExtOrSExt(m_VPValue()),
                                    m_ZExtOrSExt(m_VPValue()))))) {
-    auto *Ext = cast<VPWidenCastRecipe>(Op);
+    auto *Ext = cast<VPWidenRecipe>(Op);
     auto *Mul = cast<VPWidenRecipe>(Ext->getOperand(0));
-    auto *MulLHS = cast<VPWidenCastRecipe>(Mul->getOperand(0));
-    auto *MulRHS = cast<VPWidenCastRecipe>(Mul->getOperand(1));
+    auto *MulLHS = cast<VPWidenRecipe>(Mul->getOperand(0));
+    auto *MulRHS = cast<VPWidenRecipe>(Mul->getOperand(1));
     if (!Mul->hasOneUse() ||
         (Ext->getOpcode() != MulLHS->getOpcode() && MulLHS != MulRHS) ||
         MulLHS->getOpcode() != MulRHS->getOpcode())
       return Op;
     VPBuilder Builder(Mul);
     auto *NewLHS = Builder.createWidenCast(
-        MulLHS->getOpcode(), MulLHS->getOperand(0), Ext->getResultType());
+        Instruction::CastOps(MulLHS->getOpcode()), MulLHS->getOperand(0),
+        Ext->getResultType());
     auto *NewRHS = MulLHS == MulRHS
                        ? NewLHS
-                       : Builder.createWidenCast(MulRHS->getOpcode(),
-                                                 MulRHS->getOperand(0),
-                                                 Ext->getResultType());
+                       : Builder.createWidenCast(
+                             Instruction::CastOps(MulRHS->getOpcode()),
+                             MulRHS->getOperand(0), Ext->getResultType());
     auto *NewMul = Mul->cloneWithOperands({NewLHS, NewRHS});
     Builder.insert(NewMul);
     Op->replaceAllUsesWith(NewMul);
@@ -5934,7 +5939,7 @@ createPartialReductionExpression(VPReductionRecipe *Red) {
   // reduce.[f]add(ext(op))
   //  -> VPExpressionRecipe(op, red)
   if (match(VecOp, m_WidenAnyExtend(m_VPValue())))
-    return new VPExpressionRecipe(cast<VPWidenCastRecipe>(VecOp), Red);
+    return new VPExpressionRecipe(cast<VPWidenRecipe>(VecOp), Red);
 
   // reduce.[f]add([f]mul(ext(a), ext(b)))
   //  -> VPExpressionRecipe(a, b, mul, red)
@@ -5942,8 +5947,8 @@ createPartialReductionExpression(VPReductionRecipe *Red) {
       match(VecOp,
             m_Mul(m_ZExtOrSExt(m_VPValue()), m_ZExtOrSExt(m_VPValue())))) {
     auto *Mul = cast<VPWidenRecipe>(VecOp);
-    auto *ExtA = cast<VPWidenCastRecipe>(Mul->getOperand(0));
-    auto *ExtB = cast<VPWidenCastRecipe>(Mul->getOperand(1));
+    auto *ExtA = cast<VPWidenRecipe>(Mul->getOperand(0));
+    auto *ExtB = cast<VPWidenRecipe>(Mul->getOperand(1));
     return new VPExpressionRecipe(ExtA, ExtB, Mul, Red);
   }
 
@@ -5953,8 +5958,8 @@ createPartialReductionExpression(VPReductionRecipe *Red) {
                                             m_ZExtOrSExt(m_VPValue()))))) {
     auto *Sub = cast<VPWidenRecipe>(VecOp);
     auto *Mul = cast<VPWidenRecipe>(Sub->getOperand(1));
-    auto *ExtA = cast<VPWidenCastRecipe>(Mul->getOperand(0));
-    auto *ExtB = cast<VPWidenCastRecipe>(Mul->getOperand(1));
+    auto *ExtA = cast<VPWidenRecipe>(Mul->getOperand(0));
+    auto *ExtB = cast<VPWidenRecipe>(Mul->getOperand(1));
     return new VPExpressionRecipe(ExtA, ExtB, Mul, Sub, Red);
   }
 
@@ -6095,8 +6100,9 @@ getPartialReductionLinkCost(VPCostContext &CostCtx,
       CostCtx.CostKind, Flags);
 }
 
-static ExtendKind getPartialReductionExtendKind(VPWidenCastRecipe *Cast) {
-  return TTI::getPartialReductionExtendKind(Cast->getOpcode());
+static ExtendKind getPartialReductionExtendKind(VPWidenRecipe *Cast) {
+  return TTI::getPartialReductionExtendKind(
+      Instruction::CastOps(Cast->getOpcode()));
 }
 
 /// Checks if \p Op (which is an operand of \p UpdateR) is an extended reduction
@@ -6131,8 +6137,8 @@ matchExtendedReductionOperand(VPWidenRecipe *UpdateR, VPValue *Op) {
                                    m_WidenAnyExtend(m_VPValue(Y))))))) {
     auto *Abs = cast<VPWidenIntrinsicRecipe>(Op);
     auto *Sub = cast<VPWidenRecipe>(Abs->getOperand(0));
-    auto *LHSExt = cast<VPWidenCastRecipe>(Sub->getOperand(0));
-    auto *RHSExt = cast<VPWidenCastRecipe>(Sub->getOperand(1));
+    auto *LHSExt = cast<VPWidenRecipe>(Sub->getOperand(0));
+    auto *RHSExt = cast<VPWidenRecipe>(Sub->getOperand(1));
     Type *LHSInputType = X->getScalarType();
     Type *RHSInputType = Y->getScalarType();
     if (LHSInputType != RHSInputType ||
@@ -6148,7 +6154,7 @@ matchExtendedReductionOperand(VPWidenRecipe *UpdateR, VPValue *Op) {
 
   std::optional<TTI::PartialReductionExtendKind> OuterExtKind;
   if (match(Op, m_WidenAnyExtend(m_VPValue()))) {
-    auto *CastRecipe = cast<VPWidenCastRecipe>(Op);
+    auto *CastRecipe = cast<VPWidenRecipe>(Op);
     VPValue *CastSource = CastRecipe->getOperand(0);
     OuterExtKind = getPartialReductionExtendKind(CastRecipe);
     if (match(CastSource, m_Mul(m_VPValue(), m_VPValue())) ||
@@ -6192,21 +6198,21 @@ matchExtendedReductionOperand(VPWidenRecipe *UpdateR, VPValue *Op) {
   if (!match(LHS, m_WidenAnyExtend(m_VPValue())))
     return std::nullopt;
 
-  auto *LHSCast = cast<VPWidenCastRecipe>(LHS);
+  auto *LHSCast = cast<VPWidenRecipe>(LHS);
   Type *LHSInputType = LHSCast->getOperand(0)->getScalarType();
   ExtendKind LHSExtendKind = getPartialReductionExtendKind(LHSCast);
 
   // The RHS of the operation can be an extend or a constant integer.
   const APInt *RHSConst = nullptr;
-  VPWidenCastRecipe *RHSCast = nullptr;
+  VPWidenRecipe *RHSCast = nullptr;
   if (match(RHS, m_WidenAnyExtend(m_VPValue())))
-    RHSCast = cast<VPWidenCastRecipe>(RHS);
+    RHSCast = cast<VPWidenRecipe>(RHS);
   else if (!match(RHS, m_APInt(RHSConst)) ||
            !canConstantBeExtended(RHSConst, LHSInputType, LHSExtendKind))
     return std::nullopt;
 
   // The outer extend kind must match the inner extends for folding.
-  for (VPWidenCastRecipe *Cast : {LHSCast, RHSCast})
+  for (VPWidenRecipe *Cast : {LHSCast, RHSCast})
     if (Cast && OuterExtKind &&
         getPartialReductionExtendKind(Cast) != OuterExtKind)
       return std::nullopt;
@@ -6322,9 +6328,11 @@ void VPlanTransforms::createPartialReductions(VPlan &Plan,
   // something that isn't another partial reduction. This is because the
   // extends are intended to be lowered along with the reduction itself.
   auto ExtendUsersValid = [&](VPValue *Ext) {
-    return !isa<VPWidenCastRecipe>(Ext) || all_of(Ext->users(), [&](VPUser *U) {
-      return PartialReductionOps.contains(cast<VPRecipeBase>(U));
-    });
+    auto *WR = dyn_cast<VPWidenRecipe>(Ext);
+    return !WR || !Instruction::isCast(WR->getOpcode()) ||
+           all_of(Ext->users(), [&](VPUser *U) {
+             return PartialReductionOps.contains(cast<VPRecipeBase>(U));
+           });
   };
 
   auto IsProfitablePartialReductionChainForVF =
@@ -6346,8 +6354,9 @@ void VPlanTransforms::createPartialReductions(VPlan &Plan,
       if (ExtendedOp.ExtendB.Kind != ExtendKind::PR_None)
         RegularCost += ExtendedOp.ExtendsUser->computeCost(VF, CostCtx);
       for (VPValue *Op : ExtendedOp.ExtendsUser->operands())
-        if (auto *Extend = dyn_cast<VPWidenCastRecipe>(Op))
-          RegularCost += Extend->computeCost(VF, CostCtx);
+        if (auto *Extend = dyn_cast<VPWidenRecipe>(Op))
+          if (Instruction::isCast(Extend->getOpcode()))
+            RegularCost += Extend->computeCost(VF, CostCtx);
     }
     return PartialCost.isValid() && PartialCost < RegularCost;
   };

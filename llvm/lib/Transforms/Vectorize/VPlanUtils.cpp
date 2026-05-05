@@ -87,8 +87,11 @@ bool vputils::isHeaderMask(const VPValue *V, const VPlan &Plan) {
 /// Returns true if \p R propagates poison from any operand to its result.
 static bool propagatesPoisonFromRecipeOp(const VPRecipeBase *R) {
   return TypeSwitch<const VPRecipeBase *, bool>(R)
-      .Case<VPWidenGEPRecipe, VPWidenCastRecipe>(
+      .Case<VPWidenGEPRecipe>(
           [](const VPRecipeBase *) { return true; })
+      .Case([](const VPWidenRecipe *R) {
+        return Instruction::isCast(R->getOpcode());
+      })
       .Case([](const VPReplicateRecipe *Rep) {
         // GEP and casts propagate poison from all operands.
         unsigned Opcode = Rep->getOpcode();
@@ -394,7 +397,10 @@ bool vputils::isSingleScalar(const VPValue *VPV) {
   if (isa<VPWidenGEPRecipe, VPBlendRecipe>(VPV))
     return all_of(VPV->getDefiningRecipe()->operands(), isSingleScalar);
   if (auto *WidenR = dyn_cast<VPWidenRecipe>(VPV)) {
-    return preservesUniformity(WidenR->getOpcode()) &&
+    // Widened casts produce a vector result, even if the input is a single
+    // scalar.
+    return !Instruction::isCast(WidenR->getOpcode()) &&
+           preservesUniformity(WidenR->getOpcode()) &&
            all_of(WidenR->operands(), isSingleScalar);
   }
   if (auto *VPI = dyn_cast<VPInstruction>(VPV))
@@ -448,10 +454,6 @@ bool vputils::isUniformAcrossVFsAndUFs(const VPValue *V) {
       .Case([](const VPInstruction *VPI) {
         return preservesUniformity(VPI->getOpcode()) &&
                all_of(VPI->operands(), isUniformAcrossVFsAndUFs);
-      })
-      .Case([](const VPWidenCastRecipe *R) {
-        // A cast is uniform according to its operand.
-        return isUniformAcrossVFsAndUFs(R->getOperand(0));
       })
       .Default([](const VPRecipeBase *) { // A value is considered non-uniform
                                           // unless proven otherwise.
