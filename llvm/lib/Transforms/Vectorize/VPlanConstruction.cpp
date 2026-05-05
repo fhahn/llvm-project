@@ -1177,7 +1177,7 @@ static bool areAllLoadsDereferenceable(VPBasicBlock *HeaderVPBB,
     if (VPBB == MiddleVPBB || isa<VPIRBasicBlock>(VPBB))
       continue;
     for (VPRecipeBase &R : *VPBB) {
-      auto *VPI = dyn_cast<VPInstructionWithType>(&R);
+      auto *VPI = dyn_cast<VPInstruction>(&R);
       if (!VPI || VPI->getOpcode() != Instruction::Load) {
         assert(!R.mayReadFromMemory() && "unexpected recipe reading memory");
         continue;

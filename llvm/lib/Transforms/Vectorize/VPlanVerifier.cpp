@@ -257,11 +257,14 @@ bool VPlanVerifier::verifyRecipeTypes(const VPRecipeBase &R) const {
            CheckScalarType(R.getOperand(0)->getScalarType());
   case VPRecipeBase::VPInstructionSC: {
     auto *VPI = cast<VPInstruction>(&R);
-    if (isa<VPInstructionWithType>(VPI) ||
+    if (Instruction::isCast(VPI->getOpcode()) ||
         is_contained(ArrayRef<unsigned>{Instruction::ExtractValue,
                                         VPInstruction::FirstActiveLane,
                                         VPInstruction::LastActiveLane,
                                         VPInstruction::ComputeReductionResult,
+                                        VPInstruction::StepVector,
+                                        VPInstruction::VScale,
+                                        VPInstruction::WideIVStep,
                                         Instruction::Load, Instruction::Alloca,
                                         Instruction::Call},
                      VPI->getOpcode()))

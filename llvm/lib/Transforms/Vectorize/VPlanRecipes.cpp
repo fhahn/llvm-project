@@ -683,7 +683,18 @@ Value *VPInstruction::generate(VPTransformState &State) {
     return Res;
   }
 
+  if (Instruction::isCast(getOpcode())) {
+    Value *Op = State.get(getOperand(0), VPLane(0));
+    return Builder.CreateCast(Instruction::CastOps(getOpcode()), Op,
+                              getScalarType());
+  }
+
   switch (getOpcode()) {
+  case VPInstruction::StepVector:
+    return Builder.CreateStepVector(
+        VectorType::get(getScalarType(), State.VF));
+  case VPInstruction::VScale:
+    return Builder.CreateVScale(getScalarType());
   case VPInstruction::Not: {
     bool OnlyFirstLaneUsed = vputils::onlyFirstLaneUsed(this);
     Value *A = State.get(getOperand(0), OnlyFirstLaneUsed);
@@ -1691,72 +1702,23 @@ void VPInstruction::printRecipe(raw_ostream &O, const Twine &Indent,
   case VPInstruction::ExtractLastActive:
     O << "extract-last-active";
     break;
+  case VPInstruction::WideIVStep:
+    O << "wide-iv-step";
+    break;
+  case VPInstruction::StepVector:
+    O << "step-vector " << *getScalarType();
+    break;
+  case VPInstruction::VScale:
+    O << "vscale " << *getScalarType();
+    break;
   default:
     O << Instruction::getOpcodeName(getOpcode());
   }
 
   printFlags(O);
   printOperands(O, SlotTracker);
-}
-#endif
-
-void VPInstructionWithType::execute(VPTransformState &State) {
-  State.setDebugLocFrom(getDebugLoc());
-  Type *ResultTy = getResultType();
-  if (isScalarCast()) {
-    Value *Op = State.get(getOperand(0), VPLane(0));
-    Value *Cast = State.Builder.CreateCast(Instruction::CastOps(getOpcode()),
-                                           Op, ResultTy);
-    State.set(this, Cast, VPLane(0));
-    return;
-  }
-  switch (getOpcode()) {
-  case VPInstruction::StepVector: {
-    Value *StepVector =
-        State.Builder.CreateStepVector(VectorType::get(ResultTy, State.VF));
-    State.set(this, StepVector);
-    break;
-  }
-  case VPInstruction::VScale: {
-    Value *VScale = State.Builder.CreateVScale(ResultTy);
-    State.set(this, VScale, true);
-    break;
-  }
-
-  default:
-    llvm_unreachable("opcode not implemented yet");
-  }
-}
-
-#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
-void VPInstructionWithType::printRecipe(raw_ostream &O, const Twine &Indent,
-                                        VPSlotTracker &SlotTracker) const {
-  O << Indent << "EMIT" << (isSingleScalar() ? "-SCALAR" : "") << " ";
-  printAsOperand(O, SlotTracker);
-  O << " = ";
-
-  Type *ResultTy = getResultType();
-  switch (getOpcode()) {
-  case VPInstruction::WideIVStep:
-    O << "wide-iv-step ";
-    printOperands(O, SlotTracker);
-    break;
-  case VPInstruction::StepVector:
-    O << "step-vector " << *ResultTy;
-    break;
-  case VPInstruction::VScale:
-    O << "vscale " << *ResultTy;
-    break;
-  case Instruction::Load:
-    O << "load ";
-    printOperands(O, SlotTracker);
-    break;
-  default:
-    assert(Instruction::isCast(getOpcode()) && "unhandled opcode");
-    O << Instruction::getOpcodeName(getOpcode()) << " ";
-    printOperands(O, SlotTracker);
-    O << " to " << *ResultTy;
-  }
+  if (Instruction::isCast(getOpcode()))
+    O << " to " << *getScalarType();
 }
 #endif
 
