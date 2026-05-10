@@ -6421,6 +6421,19 @@ void VPlanTransforms::createPartialReductions(VPlan &Plan,
       transformToPartialReduction(Chain, CostCtx.Types, Plan, Phi);
 }
 
+/// Returns true if \p Ptr is a unit-stride AddRec pointer in \p L (stride equal
+/// to the access's type alloc size), ignoring types with padding.
+static bool isUnitStridePtr(VPValue *Ptr, Type *AccessTy,
+                            PredicatedScalarEvolution &PSE, const Loop *L) {
+  const DataLayout &DL = L->getHeader()->getDataLayout();
+  if (DL.getTypeAllocSizeInBits(AccessTy) != DL.getTypeSizeInBits(AccessTy))
+    return false;
+  uint64_t Size = DL.getTypeAllocSize(AccessTy).getFixedValue();
+  return match(vputils::getSCEVExprForVPValue(Ptr, PSE, L),
+               m_scev_AffineAddRec(m_SCEV(), m_scev_SpecificInt(Size),
+                                   m_SpecificLoop(L)));
+}
+
 void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
                                                  VPRecipeBuilder &RecipeBuilder,
                                                  PredicatedScalarEvolution &PSE,
@@ -6467,6 +6480,8 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
       continue;
     }
 
+    // Try VPlan-based widening for unmasked unit-stride accesses. The stride
+    // and mask checks are VF-independent, so no range clamping is needed.
     Instruction *I = VPI->getUnderlyingInstr();
     bool IsLoad = VPI->getOpcode() == Instruction::Load;
     VPValue *Ptr = VPI->getOperand(!IsLoad);
@@ -6486,10 +6501,25 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
             /*Mask=*/nullptr, {}, *VPI, VPI->getDebugLoc()));
         continue;
       }
+
+      Type *ScalarTy = getLoadStoreType(I);
+      if (isUnitStridePtr(Ptr, ScalarTy, PSE, L)) {
+        auto *VectorPtr = new VPVectorPointerRecipe(
+            Ptr, ScalarTy, vputils::getGEPFlagsForPtr(Ptr), VPI->getDebugLoc());
+        VectorPtr->insertBefore(VPI);
+        if (IsLoad)
+          ReplaceWith(new VPWidenLoadRecipe(*cast<LoadInst>(I), VectorPtr,
+                                            /*Mask=*/nullptr,
+                                            /*Consecutive=*/true, *VPI,
+                                            I->getDebugLoc()));
+        else
+          ReplaceWith(new VPWidenStoreRecipe(
+              *cast<StoreInst>(I), VectorPtr, VPI->getOperand(0),
+              /*Mask=*/nullptr, /*Consecutive=*/true, *VPI, I->getDebugLoc()));
+        continue;
+      }
     }
 
-    // Try VPlan-based widening for unmasked unit-stride accesses. The stride
-    // and mask checks are VF-independent, so no range clamping is needed.
     VPRecipeBase *Recipe = RecipeBuilder.tryToWidenMemory(VPI, Range);
     if (!Recipe)
       Recipe = RecipeBuilder.handleReplication(VPI, Range);
