@@ -350,6 +350,11 @@ cl::opt<bool> llvm::EnableVPlanNativePath(
     cl::desc("Enable VPlan-native vectorization path with "
              "support for outer loop vectorization."));
 
+static cl::opt<bool> EnableOuterLoopAutoVectorization(
+    "enable-outer-loop-auto-vectorization", cl::Hidden, cl::init(false),
+    cl::desc("Automatically vectorize outer loops without requiring a "
+             "pragma."));
+
 static cl::opt<bool> DisableOuterLoopMemorySafetyCheck(
     "disable-outer-loop-memory-safety-check", cl::Hidden, cl::init(false),
     cl::desc("Skip the VPlan-native outer-loop memory-safety check. "
@@ -1906,15 +1911,63 @@ static bool isExplicitVecOuterLoop(Loop *OuterLp,
   return true;
 }
 
+/// Check if \p OuterLp is a candidate for automatic outer loop vectorization
+/// (without an explicit pragma). Checks for basic structural properties that
+/// make outer loop vectorization likely to succeed and be profitable.
+/// Note: irreducible CFG is checked by the caller (collectSupportedLoops).
+static bool isAutoVecOuterLoopCandidate(Loop *OuterLp, ScalarEvolution &SE) {
+  assert(!OuterLp->isInnermost() && "This is not an outer loop");
+
+  // Must have a computable trip count.
+  if (isa<SCEVCouldNotCompute>(SE.getBackedgeTakenCount(OuterLp)))
+    return false;
+
+  // Profitability: reject loops with tiny constant trip counts, where a
+  // vectorized body would be fully replaced by a scalar epilogue.
+  // TODO: Replace with a proper outer-loop cost model.
+  if (unsigned MaxTC = SE.getSmallConstantMaxTripCount(OuterLp);
+      MaxTC != 0 && MaxTC < 4)
+    return false;
+
+  // Only support single-level nesting with an innermost inner loop.
+  ArrayRef<Loop *> SubLoops = OuterLp->getSubLoops();
+  if (SubLoops.size() != 1 || !SubLoops.front()->isInnermost())
+    return false;
+
+  // Reject calls whose widening is not modeled by the vectorizer
+  // (non-vectorizable intrinsics, unknown calls). Memory-accessing intrinsics
+  // (e.g. llvm.masked.load/store, llvm.vp.*) are also rejected because their
+  // pointer operands aren't covered by the load/store-only dependency scan in
+  // verifyOuterLoopMemorySafety. Other unsupported instructions (atomics, EH)
+  // are rejected later by verifyOuterLoopMemorySafety and by
+  // canVectorizeOuterLoop.
+  for (BasicBlock *BB : OuterLp->blocks()) {
+    for (Instruction &I : *BB) {
+      if (auto *CI = dyn_cast<CallInst>(&I)) {
+        Intrinsic::ID ID = CI->getIntrinsicID();
+        if (ID == Intrinsic::not_intrinsic || !isTriviallyVectorizable(ID) ||
+            !CI->doesNotAccessMemory())
+          return false;
+      }
+    }
+  }
+
+  return true;
+}
+
 static void collectSupportedLoops(Loop &L, LoopInfo *LI,
                                   OptimizationRemarkEmitter *ORE,
+                                  ScalarEvolution *SE,
                                   SmallVectorImpl<Loop *> &V) {
   // Collect inner loops and outer loops without irreducible control flow. For
-  // now, only collect outer loops that have explicit vectorization hints. If we
+  // now, only collect outer loops that have explicit vectorization hints or
+  // that are auto-vectorization candidates (when the flag is enabled). If we
   // are stress testing the VPlan H-CFG construction, we collect the outermost
   // loop of every loop nest.
   if (L.isInnermost() || VPlanBuildOuterloopStressTest ||
-      (EnableVPlanNativePath && isExplicitVecOuterLoop(&L, ORE))) {
+      (EnableVPlanNativePath && isExplicitVecOuterLoop(&L, ORE)) ||
+      (EnableOuterLoopAutoVectorization && SE &&
+       isAutoVecOuterLoopCandidate(&L, *SE))) {
     LoopBlocksRPO RPOT(&L);
     RPOT.perform(LI);
     if (!containsIrreducibleCFG<const BasicBlock *>(RPOT, *LI)) {
@@ -1928,7 +1981,7 @@ static void collectSupportedLoops(Loop &L, LoopInfo *LI,
     }
   }
   for (Loop *InnerL : L)
-    collectSupportedLoops(*InnerL, LI, ORE, V);
+    collectSupportedLoops(*InnerL, LI, ORE, SE, V);
 }
 
 //===----------------------------------------------------------------------===//
@@ -7950,8 +8003,10 @@ static void connectEpilogueVectorLoop(VPlan &EpiPlan, Loop *L,
 }
 
 bool LoopVectorizePass::processLoop(Loop *L) {
-  assert((EnableVPlanNativePath || L->isInnermost()) &&
-         "VPlan-native path is not enabled. Only process inner loops.");
+  assert((EnableVPlanNativePath || EnableOuterLoopAutoVectorization ||
+          L->isInnermost()) &&
+         "Outer loop processing requires -enable-vplan-native-path or "
+         "-enable-outer-loop-auto-vectorization.");
 
   LLVM_DEBUG(dbgs() << "\nLV: Checking a loop in '"
                     << L->getHeader()->getParent()->getName() << "' from "
@@ -8000,7 +8055,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
   LoopVectorizationLegality LVL(L, PSE, DT, TTI, TLI, F, *LAIs, LI, ORE,
                                 &Requirements, &Hints, DB, AC,
                                 /*AllowRuntimeSCEVChecks=*/!OptForSize, AA);
-  if (!LVL.canVectorize(EnableVPlanNativePath)) {
+  if (!LVL.canVectorize(!L->isInnermost())) {
     LLVM_DEBUG(dbgs() << "LV: Not vectorizing: Cannot prove legality.\n");
     Hints.emitRemarkWithHints();
     return false;
@@ -8484,7 +8539,7 @@ LoopVectorizeResult LoopVectorizePass::runImpl(Function &F) {
   SmallVector<Loop *, 8> Worklist;
 
   for (Loop *L : *LI)
-    collectSupportedLoops(*L, LI, ORE, Worklist);
+    collectSupportedLoops(*L, LI, ORE, SE, Worklist);
 
   LoopsAnalyzed += Worklist.size();
 

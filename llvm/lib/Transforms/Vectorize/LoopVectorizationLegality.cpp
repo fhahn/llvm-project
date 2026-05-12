@@ -1879,7 +1879,7 @@ bool LoopVectorizationLegality::canVectorize(bool UseVPlanNativePath) {
   // Specific checks for outer loops. We skip the remaining legal checks at this
   // point because they don't support outer loops.
   if (!TheLoop->isInnermost()) {
-    assert(UseVPlanNativePath && "VPlan-native path is not enabled.");
+    assert(UseVPlanNativePath && "outer loop requires UseVPlanNativePath");
 
     if (!canVectorizeOuterLoop()) {
       reportVectorizationFailure("Unsupported outer loop",
