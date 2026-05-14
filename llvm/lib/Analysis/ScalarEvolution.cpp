@@ -7071,6 +7071,50 @@ const ConstantRange &ScalarEvolution::getRangeRef(
               ConservativeResult.intersectWith(RangeFromAffineNew, RangeType);
         }
       }
+    } else {
+      // For non-affine AddRecs with a known trip count, use endpoint
+      // evaluation when the recurrence is monotonic in unbounded
+      // integers and does not wrap in the target type. The AddRec is
+      // monotonic non-decreasing if all operands after the start are
+      // known non-negative (by induction: the inner AddRec's values
+      // are >=0 at every iteration, so each step of the outer AddRec
+      // is >=0). The symmetric argument gives monotonic non-increasing
+      // when all such operands are known non-positive. Together with
+      // the matching no-wrap flag, every value of the sequence lies in
+      // the interval bounded by the start and the exit values.
+      bool AllNonNeg = true;
+      bool AllNonPos = true;
+      for (unsigned i = 1, e = AddRec->getNumOperands(); i != e; ++i) {
+        if (!isKnownNonNegative(AddRec->getOperand(i)))
+          AllNonNeg = false;
+        if (!isKnownNonPositive(AddRec->getOperand(i)))
+          AllNonPos = false;
+      }
+      bool MonotonicInc = AllNonNeg && AddRec->hasNoUnsignedWrap();
+      bool MonotonicDec = AllNonPos && AddRec->hasNoSignedWrap();
+      if (MonotonicInc || MonotonicDec) {
+        const SCEV *MaxBEScev =
+            getConstantMaxBackedgeTakenCount(AddRec->getLoop());
+        if (!isa<SCEVCouldNotCompute>(MaxBEScev)) {
+          APInt MaxBECount = cast<SCEVConstant>(MaxBEScev)->getAPInt();
+          if (MaxBECount.getBitWidth() > BitWidth &&
+              MaxBECount.getActiveBits() <= BitWidth)
+            MaxBECount = MaxBECount.trunc(BitWidth);
+          else if (MaxBECount.getBitWidth() < BitWidth)
+            MaxBECount = MaxBECount.zext(BitWidth);
+          if (MaxBECount.getBitWidth() == BitWidth) {
+            const SCEV *ExitValue =
+                AddRec->evaluateAtIteration(getConstant(MaxBECount), *this);
+            const SCEV *Start = AddRec->getStart();
+            ConstantRange StartRange =
+                getRangeRef(Start, SignHint, Depth + 1);
+            ConstantRange ExitRange =
+                getRangeRef(ExitValue, SignHint, Depth + 1);
+            ConservativeResult = ConservativeResult.intersectWith(
+                StartRange.unionWith(ExitRange), RangeType);
+          }
+        }
+      }
     }
 
     return setRange(AddRec, SignHint, std::move(ConservativeResult));
