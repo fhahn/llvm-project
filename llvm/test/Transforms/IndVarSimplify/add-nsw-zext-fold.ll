@@ -99,3 +99,106 @@ loop:                                     ; preds = %loop, %ph
 exit:
   ret void
 }
+
+; Regression: with the tighter fold, IndVarSimplify expands the start value
+; of the i32 IV in %loop2 (SCEV `zext(X - 2)<nsw>`) as a fresh i32 add plus
+; a zext instead of reusing %N (= zext of X) and emitting a single i64 add.
+; %N is kept live because the preceding loop uses it as trip count.
+define void @iv_start_no_reuse_for_pre_existing_zext(ptr %p, i32 range(i32 2, -2147483648) %X) {
+; CHECK-LABEL: define void @iv_start_no_reuse_for_pre_existing_zext(
+; CHECK-SAME: ptr [[P:%.*]], i32 range(i32 2, -2147483648) [[X:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[N:%.*]] = zext nneg i32 [[X]] to i64
+; CHECK-NEXT:    br label %[[LOOP1:.*]]
+; CHECK:       [[LOOP1]]:
+; CHECK-NEXT:    [[IV1:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV1_NEXT:%.*]], %[[LOOP1]] ]
+; CHECK-NEXT:    [[GEP1:%.*]] = getelementptr i8, ptr [[P]], i64 [[IV1]]
+; CHECK-NEXT:    store i8 0, ptr [[GEP1]], align 1
+; CHECK-NEXT:    [[IV1_NEXT]] = add nuw nsw i64 [[IV1]], 1
+; CHECK-NEXT:    [[DONE1:%.*]] = icmp eq i64 [[IV1_NEXT]], [[N]]
+; CHECK-NEXT:    br i1 [[DONE1]], label %[[LOOP2_PH:.*]], label %[[LOOP1]]
+; CHECK:       [[LOOP2_PH]]:
+; CHECK-NEXT:    [[SUB:%.*]] = add nsw i32 [[X]], -2
+; CHECK-NEXT:    [[TMP0:%.*]] = zext nneg i32 [[SUB]] to i64
+; CHECK-NEXT:    br label %[[LOOP2:.*]]
+; CHECK:       [[LOOP2]]:
+; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ [[INDVARS_IV_NEXT:%.*]], %[[LOOP2]] ], [ [[TMP0]], %[[LOOP2_PH]] ]
+; CHECK-NEXT:    [[GEP2:%.*]] = getelementptr i8, ptr [[P]], i64 [[INDVARS_IV]]
+; CHECK-NEXT:    store i8 0, ptr [[GEP2]], align 1
+; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add nsw i64 [[INDVARS_IV]], -1
+; CHECK-NEXT:    [[CMP2:%.*]] = icmp sgt i64 [[INDVARS_IV]], 0
+; CHECK-NEXT:    br i1 [[CMP2]], label %[[LOOP2]], label %[[EXIT:.*]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  %N = zext nneg i32 %X to i64
+  br label %loop1
+
+loop1:
+  %iv1 = phi i64 [ 0, %entry ], [ %iv1.next, %loop1 ]
+  %gep1 = getelementptr i8, ptr %p, i64 %iv1
+  store i8 0, ptr %gep1, align 1
+  %iv1.next = add nuw nsw i64 %iv1, 1
+  %done1 = icmp eq i64 %iv1.next, %N
+  br i1 %done1, label %loop2.ph, label %loop1
+
+loop2.ph:
+  %sub = add nsw i32 %X, -2
+  br label %loop2
+
+loop2:
+  %iv2 = phi i32 [ %sub, %loop2.ph ], [ %iv2.next, %loop2 ]
+  %idx2 = zext nneg i32 %iv2 to i64
+  %gep2 = getelementptr i8, ptr %p, i64 %idx2
+  store i8 0, ptr %gep2, align 1
+  %iv2.next = add nsw i32 %iv2, -1
+  %cmp2 = icmp sgt i32 %iv2, 0
+  br i1 %cmp2, label %loop2, label %exit
+
+exit:
+  ret void
+}
+
+; Regression: with the tighter fold, the SCEV of `zext(iv - 1)<nsw>` no
+; longer matches the step of the widened i64 IV, so IV widening keeps a
+; trunc/zext cycle around the narrow IV instead of dropping it. The trunc
+; of %dec to i16 is the second use that forces the narrow IV to survive.
+define void @widen_leaves_trunc_zext_cycle(ptr %p, ptr %p16, i32 range(i32 1, -2147483648) %n) {
+; CHECK-LABEL: define void @widen_leaves_trunc_zext_cycle(
+; CHECK-SAME: ptr [[P:%.*]], ptr [[P16:%.*]], i32 range(i32 1, -2147483648) [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = zext nneg i32 [[N]] to i64
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ [[INDVARS_IV_NEXT:%.*]], %[[LOOP]] ], [ [[TMP0]], %[[ENTRY]] ]
+; CHECK-NEXT:    [[TMP1:%.*]] = trunc nuw i64 [[INDVARS_IV]] to i32
+; CHECK-NEXT:    [[DEC:%.*]] = add nsw i32 [[TMP1]], -1
+; CHECK-NEXT:    [[IDX:%.*]] = zext i32 [[DEC]] to i64
+; CHECK-NEXT:    [[GEP:%.*]] = getelementptr i8, ptr [[P]], i64 [[IDX]]
+; CHECK-NEXT:    store i8 0, ptr [[GEP]], align 1
+; CHECK-NEXT:    [[CONV:%.*]] = trunc i32 [[DEC]] to i16
+; CHECK-NEXT:    store i16 [[CONV]], ptr [[P16]], align 2
+; CHECK-NEXT:    [[DONE:%.*]] = icmp eq i32 [[DEC]], 0
+; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add nsw i64 [[INDVARS_IV]], -1
+; CHECK-NEXT:    br i1 [[DONE]], label %[[EXIT:.*]], label %[[LOOP]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i32 [ %n, %entry ], [ %dec, %loop ]
+  %dec = add i32 %iv, -1
+  %idx = zext i32 %dec to i64
+  %gep = getelementptr i8, ptr %p, i64 %idx
+  store i8 0, ptr %gep, align 1
+  %conv = trunc i32 %dec to i16
+  store i16 %conv, ptr %p16, align 2
+  %done = icmp eq i32 %dec, 0
+  br i1 %done, label %exit, label %loop
+
+exit:
+  ret void
+}
