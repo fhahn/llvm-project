@@ -56,7 +56,7 @@ define i32 @ashr_nonneg_nonaddrec(i32 %x) {
 ; CHECK-LABEL: 'ashr_nonneg_nonaddrec'
 ; CHECK-NEXT:  Classifying expressions for: @ashr_nonneg_nonaddrec
 ; CHECK-NEXT:    %s = ashr i32 %x, 1
-; CHECK-NEXT:    --> %s U: [0,1073741824) S: [0,1073741824)
+; CHECK-NEXT:    --> (%x /u 2) U: [0,1073741824) S: [0,1073741824)
 ; CHECK-NEXT:  Determining loop execution counts for: @ashr_nonneg_nonaddrec
 ;
   %c = icmp sge i32 %x, 0

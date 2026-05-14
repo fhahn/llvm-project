@@ -315,9 +315,8 @@ define void @test_monotonic_ptr_iv_step_sign_positive_through_assume_multi_exit(
 ; CHECK-NEXT:    [[C_1:%.*]] = call i1 @cond()
 ; CHECK-NEXT:    br i1 [[C_1]], label [[THEN:%.*]], label [[EXIT]]
 ; CHECK:       then:
-; CHECK-NEXT:    [[C_2:%.*]] = icmp uge ptr [[PTR_IV]], [[START]]
 ; CHECK-NEXT:    [[C_3:%.*]] = icmp ult ptr [[PTR_IV]], [[UPPER]]
-; CHECK-NEXT:    [[AND:%.*]] = and i1 [[C_2]], [[C_3]]
+; CHECK-NEXT:    [[AND:%.*]] = and i1 true, [[C_3]]
 ; CHECK-NEXT:    br i1 [[AND]], label [[LOOP_LATCH]], label [[EXIT]]
 ; CHECK:       loop.latch:
 ; CHECK-NEXT:    call void @use(ptr [[PTR_IV]])

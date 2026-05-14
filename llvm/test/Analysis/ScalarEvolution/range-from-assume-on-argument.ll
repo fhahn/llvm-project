@@ -2,17 +2,15 @@
 ; RUN: opt -passes='print<scalar-evolution>' -disable-output %s 2>&1 | FileCheck %s
 
 ; ScalarEvolution::getRangeRef uses ValueTracking's computeKnownBits to tighten
-; the range of a SCEVUnknown. It passes a null context instruction; inside
-; ValueTracking, safeCxtI falls back to using the value itself as the context
-; when the value is an Instruction, but returns null when the value is a
-; function Argument. Consequently @llvm.assume intrinsics on an argument are
-; ignored by getRangeRef, while the same assume on an instruction (e.g. a load)
-; is consulted.
+; the range of a SCEVUnknown. For Arguments, it passes the entry block's
+; terminator as the context instruction so that @llvm.assume intrinsics in
+; the entry block are consulted. Without this, safeCxtI would return a null
+; context for an Argument and assumes would be ignored.
 ;
-; The asymmetry is visible below: @range_arg and @range_load are identical
-; apart from where %n comes from, yet only @range_load produces a tight range
-; for %n and the derived multiply, and only @range_load infers <nuw><nsw> on
-; (2 * %n).
+; The tests below check that an @llvm.assume on an argument tightens the
+; range of the argument SCEVUnknown the same way as an assume on an
+; instruction (e.g. a load): @range_arg matches @range_load, and
+; @iv_range_arg matches @iv_range_load.
 
 declare void @llvm.assume(i1)
 
@@ -20,7 +18,7 @@ define i32 @range_arg(i32 %n) {
 ; CHECK-LABEL: 'range_arg'
 ; CHECK-NEXT:  Classifying expressions for: @range_arg
 ; CHECK-NEXT:    %mul = mul i32 %n, 2
-; CHECK-NEXT:    --> (2 * %n) U: [0,-1) S: [-2147483648,2147483647)
+; CHECK-NEXT:    --> (2 * %n)<nuw><nsw> U: [0,31) S: [0,31)
 ; CHECK-NEXT:  Determining loop execution counts for: @range_arg
 ;
   %c = icmp ult i32 %n, 16
@@ -45,23 +43,22 @@ define i32 @range_load(ptr %np) {
   ret i32 %mul
 }
 
-; The same asymmetry shows up on an IV range. With %n as an argument, the IV
-; range is the full positive signed half (matching the latch comparison) rather
-; than [0, 16).
+; The same tightening should apply to an IV range: with the assume on %n,
+; SCEV derives the IV range [0, 16) whether %n is an argument or a load.
 
 define void @iv_range_arg(i32 %n, ptr %p) {
 ; CHECK-LABEL: 'iv_range_arg'
 ; CHECK-NEXT:  Classifying expressions for: @iv_range_arg
 ; CHECK-NEXT:    %iv = phi i32 [ 0, %entry ], [ %iv.next, %loop ]
-; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,-2147483648) S: [0,-2147483648) Exits: (-1 + (1 umax %n)) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,15) S: [0,15) Exits: (-1 + (1 umax %n))<nsw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %gep = getelementptr i32, ptr %p, i32 %iv
-; CHECK-NEXT:    --> {%p,+,4}<nw><%loop> U: full-set S: full-set Exits: ((4 * (zext i32 (-1 + (1 umax %n)) to i64))<nuw><nsw> + %p) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {%p,+,4}<nw><%loop> U: full-set S: full-set Exits: ((zext i32 (-4 + (4 * (1 umax %n))<nuw><nsw>)<nsw> to i64) + %p) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = add nuw nsw i32 %iv, 1
-; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,-2147483648) S: [1,-2147483648) Exits: (1 umax %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,16) S: [1,16) Exits: (1 umax %n) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @iv_range_arg
-; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + (1 umax %n))
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 -2
-; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + (1 umax %n))
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + (1 umax %n))<nsw>
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 14
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + (1 umax %n))<nsw>
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
 entry:
@@ -114,4 +111,28 @@ loop:
 
 exit:
   ret void
+}
+
+; Negative test: the assume is in a block other than the entry block. The
+; entry-block-terminator context does not see this assume, so the range of
+; %n stays full-set and the multiply does not gain wrap flags.
+
+define i32 @range_arg_assume_in_then(i32 %n, i1 %c1) {
+; CHECK-LABEL: 'range_arg_assume_in_then'
+; CHECK-NEXT:  Classifying expressions for: @range_arg_assume_in_then
+; CHECK-NEXT:    %mul = mul i32 %n, 2
+; CHECK-NEXT:    --> (2 * %n) U: [0,-1) S: [-2147483648,2147483647)
+; CHECK-NEXT:  Determining loop execution counts for: @range_arg_assume_in_then
+;
+entry:
+  br i1 %c1, label %then, label %else
+
+then:
+  %c = icmp ult i32 %n, 16
+  call void @llvm.assume(i1 %c)
+  %mul = mul i32 %n, 2
+  ret i32 %mul
+
+else:
+  ret i32 0
 }

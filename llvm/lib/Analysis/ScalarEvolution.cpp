@@ -7194,14 +7194,23 @@ const ConstantRange &ScalarEvolution::getRangeRef(
     ConservativeResult = ConservativeResult.intersectWith(CR);
 
     // See if ValueTracking can give us a useful range.
+    // ValueTracking's safeCxtI returns nullptr for Arguments, which causes
+    // @llvm.assume intrinsics on arguments to be ignored. Use the entry
+    // block's terminator as the context for Arguments: an assume in the
+    // entry block dominates the terminator, so its fact is consulted. (Note
+    // that using the first instruction of the entry block would not work,
+    // because an assume later in the block would not dominate it.)
+    const Instruction *CtxI = nullptr;
+    if (isa<Argument>(V))
+      CtxI = F.getEntryBlock().getTerminator();
     const DataLayout &DL = getDataLayout();
-    KnownBits Known = computeKnownBits(V, DL, &AC, nullptr, &DT);
+    KnownBits Known = computeKnownBits(V, DL, &AC, CtxI, &DT);
     if (Known.getBitWidth() != BitWidth)
       Known = Known.zextOrTrunc(BitWidth);
 
     // ValueTracking may be able to compute a tighter result for the number of
     // sign bits than for the value of those sign bits.
-    unsigned NS = ComputeNumSignBits(V, DL, &AC, nullptr, &DT);
+    unsigned NS = ComputeNumSignBits(V, DL, &AC, CtxI, &DT);
     if (U->getType()->isPointerTy()) {
       // If the pointer size is larger than the index size type, this can cause
       // NS to be larger than BitWidth. So compensate for this.
