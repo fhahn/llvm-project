@@ -5467,6 +5467,13 @@ static std::optional<BinaryOp> MatchBinaryOp(Value *V, const DataLayout &DL,
       BinOp.Op = Op;
       return BinOp;
     }
+    // If the operands have no common bits set, the or is equivalent to an
+    // add that cannot wrap, so model it as add nuw nsw.
+    if (haveNoCommonBitsSet(Op->getOperand(0), Op->getOperand(1),
+                            SimplifyQuery(DL, &DT, &AC,
+                                          dyn_cast<Instruction>(Op))))
+      return BinaryOp(Instruction::Add, Op->getOperand(0), Op->getOperand(1),
+                      /*IsNSW=*/true, /*IsNUW=*/true);
     return BinaryOp(Op);
   }
 

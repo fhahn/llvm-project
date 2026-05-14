@@ -16,7 +16,7 @@ define i32 @quadratic_setlt() {
 ; CHECK:       loop:
 ; CHECK-NEXT:    [[I:%.*]] = phi i32 [ 7, [[ENTRY:%.*]] ], [ [[I_NEXT:%.*]], [[LOOP]] ]
 ; CHECK-NEXT:    [[I_NEXT]] = add nuw nsw i32 [[I]], 1
-; CHECK-NEXT:    store i32 [[I]], ptr @A
+; CHECK-NEXT:    store i32 [[I]], ptr @A, align 4
 ; CHECK-NEXT:    [[I2:%.*]] = mul i32 [[I]], [[I]]
 ; CHECK-NEXT:    [[C:%.*]] = icmp slt i32 [[I2]], 1000
 ; CHECK-NEXT:    br i1 [[C]], label [[LOOP]], label [[LOOPEXIT:%.*]]
