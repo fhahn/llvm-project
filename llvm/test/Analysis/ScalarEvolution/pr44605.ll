@@ -9,22 +9,12 @@ define i32 @test() {
 ; CHECK-NEXT:    br label [[OUTER:%.*]]
 ; CHECK:       outer:
 ; CHECK-NEXT:    [[LOCAL_6_6:%.*]] = phi i32 [ 10, [[ENTRY:%.*]] ], [ [[TMP5:%.*]], [[LATCH:%.*]] ]
-; CHECK-NEXT:    [[LOCAL_4_5:%.*]] = phi i32 [ 56587, [[ENTRY]] ], [ 0, [[LATCH]] ]
 ; CHECK-NEXT:    [[LOCAL_3_4:%.*]] = phi i32 [ 2, [[ENTRY]] ], [ [[TMP5]], [[LATCH]] ]
-; CHECK-NEXT:    [[DOTUDIV:%.*]] = udiv i32 [[LOCAL_6_6]], 8361
 ; CHECK-NEXT:    br label [[INNER:%.*]]
 ; CHECK:       inner:
-; CHECK-NEXT:    [[LOCAL_7_3:%.*]] = phi i32 [ 2, [[OUTER]] ], [ [[TMP3:%.*]], [[INNER]] ]
-; CHECK-NEXT:    [[LOCAL_4_5_PN:%.*]] = phi i32 [ [[LOCAL_4_5]], [[OUTER]] ], [ [[TMP2:%.*]], [[INNER]] ]
-; CHECK-NEXT:    [[LOCAL_3_31:%.*]] = mul i32 [[LOCAL_4_5_PN]], [[DOTUDIV]]
-; CHECK-NEXT:    [[TMP0:%.*]] = mul nuw nsw i32 [[LOCAL_7_3]], [[DOTUDIV]]
-; CHECK-NEXT:    [[TMP1:%.*]] = sub i32 [[TMP0]], [[LOCAL_3_4]]
-; CHECK-NEXT:    [[TMP2]] = add i32 [[TMP1]], [[LOCAL_3_31]]
-; CHECK-NEXT:    [[TMP3]] = add nuw nsw i32 [[LOCAL_7_3]], 1
-; CHECK-NEXT:    [[TMP4:%.*]] = icmp samesign ugt i32 [[LOCAL_7_3]], 4
-; CHECK-NEXT:    br i1 [[TMP4]], label [[LATCH]], label [[INNER]]
+; CHECK-NEXT:    br i1 true, label [[LATCH]], label [[INNER]]
 ; CHECK:       latch:
-; CHECK-NEXT:    [[DOTLCSSA:%.*]] = phi i32 [ [[TMP2]], [[INNER]] ]
+; CHECK-NEXT:    [[DOTLCSSA:%.*]] = mul i32 [[LOCAL_3_4]], -1
 ; CHECK-NEXT:    [[TMP5]] = add nuw nsw i32 [[LOCAL_6_6]], 1
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp samesign ugt i32 [[LOCAL_6_6]], 276
 ; CHECK-NEXT:    br i1 [[TMP6]], label [[RETURN:%.*]], label [[OUTER]]

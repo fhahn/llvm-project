@@ -3585,6 +3585,10 @@ const SCEV *ScalarEvolution::getUDivExpr(SCEVUse LHS, SCEVUse RHS) {
     // try to analyze it, because the resolution chosen here may differ from
     // the resolution chosen in other parts of the compiler.
     if (!RHSC->getValue()->isZero()) {
+      // X udiv C --> 0 if the unsigned range of X proves X < C.
+      if (getUnsignedRangeMax(LHS).ult(RHSC->getAPInt()))
+        return getZero(LHS->getType());
+
       // Determine if the division can be folded into the operands of
       // its operands.
       // TODO: Generalize this to non-constants by using known-bits information.
