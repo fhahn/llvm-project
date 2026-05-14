@@ -8285,6 +8285,13 @@ const SCEV *ScalarEvolution::createSCEV(Value *V) {
       uint64_t AShrAmt = CI->getZExtValue();
       Type *TruncTy = IntegerType::get(getContext(), BitWidth - AShrAmt);
 
+      // If LHS is known non-negative, ashr is equivalent to lshr, which SCEV
+      // handles as unsigned division by a power of two.
+      const SCEV *LHS = getSCEV(BO->LHS);
+      if (isKnownNonNegative(LHS))
+        return getUDivExpr(
+            LHS, getConstant(APInt::getOneBitSet(BitWidth, AShrAmt)));
+
       Operator *L = dyn_cast<Operator>(BO->LHS);
       const SCEV *AddTruncateExpr = nullptr;
       ConstantInt *ShlAmtCI = nullptr;

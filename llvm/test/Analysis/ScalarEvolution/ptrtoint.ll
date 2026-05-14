@@ -573,9 +573,9 @@ define void @pr46786_c26_int(ptr %arg, ptr %arg1, ptr %arg2) {
 ; X32-NEXT:    %i10 = sub i64 %i9, %i4
 ; X32-NEXT:    --> {0,+,4}<nuw><%bb6> U: [0,4294967293) S: [0,4294967293) Exits: (4 * ((zext i32 (-4 + (-1 * (ptrtoint ptr %arg to i32)) + (ptrtoint ptr %arg1 to i32)) to i64) /u 4))<nuw><nsw> LoopDispositions: { %bb6: Computable }
 ; X32-NEXT:    %i11 = ashr exact i64 %i10, 2
-; X32-NEXT:    --> %i11 U: [-2147483648,2147483648) S: [-2147483648,2147483648) Exits: <<Unknown>> LoopDispositions: { %bb6: Variant }
+; X32-NEXT:    --> {0,+,1}<nuw><%bb6> U: [0,1073741824) S: [0,1073741824) Exits: ((zext i32 (-4 + (-1 * (ptrtoint ptr %arg to i32)) + (ptrtoint ptr %arg1 to i32)) to i64) /u 4) LoopDispositions: { %bb6: Computable }
 ; X32-NEXT:    %i12 = getelementptr inbounds i32, ptr %arg2, i64 %i11
-; X32-NEXT:    --> ((4 * (trunc i64 %i11 to i32))<nsw> + %arg2) U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %bb6: Variant }
+; X32-NEXT:    --> {%arg2,+,4}<%bb6> U: full-set S: full-set Exits: ((4 * ((-4 + (-1 * (ptrtoint ptr %arg to i32)) + (ptrtoint ptr %arg1 to i32)) /u 4))<nuw> + %arg2) LoopDispositions: { %bb6: Computable }
 ; X32-NEXT:    %i13 = load i32, ptr %i12, align 4
 ; X32-NEXT:    --> %i13 U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %bb6: Variant }
 ; X32-NEXT:    %i14 = add nsw i32 %i13, %i8

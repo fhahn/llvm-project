@@ -53,7 +53,7 @@ define void @test_ashr_zeros(i1 %arg) {
 ; CHECK-NEXT:    %iv.ashr = phi i64 [ 1023, %entry ], [ %iv.ashr.next, %loop ]
 ; CHECK-NEXT:    --> %iv.ashr U: [0,1024) S: [0,1024) Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:    %iv.ashr.next = ashr i64 %iv.ashr, 1
-; CHECK-NEXT:    --> %iv.ashr.next U: [0,512) S: [0,512) Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
+; CHECK-NEXT:    --> (%iv.ashr /u 2) U: [0,512) S: [0,512) Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:  Determining loop execution counts for: @test_ashr_zeros
 ; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
 ; CHECK-NEXT:  Loop %loop: Unpredictable constant max backedge-taken count.
@@ -500,7 +500,7 @@ define void @test_ashr_tc_positive() {
 ; CHECK-NEXT:    %iv.next = add i64 %iv, 1
 ; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,6) S: [1,6) Exits: 5 LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.ashr.next = ashr i64 %iv.ashr, 1
-; CHECK-NEXT:    --> %iv.ashr.next U: [0,512) S: [0,512) Exits: 31 LoopDispositions: { %loop: Variant }
+; CHECK-NEXT:    --> (%iv.ashr /u 2) U: [31,512) S: [31,512) Exits: 31 LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:  Determining loop execution counts for: @test_ashr_tc_positive
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is i64 4
 ; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 4

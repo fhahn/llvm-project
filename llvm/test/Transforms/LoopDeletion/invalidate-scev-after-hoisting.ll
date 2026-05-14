@@ -12,22 +12,21 @@ define void @test_pr57837() {
 ; CHECK:       outer.header:
 ; CHECK-NEXT:    br i1 true, label [[INNER_PH:%.*]], label [[OUTER_LATCH:%.*]]
 ; CHECK:       inner.ph:
-; CHECK-NEXT:    [[INVAR:%.*]] = ashr i32 0, 3
 ; CHECK-NEXT:    br label [[INNER:%.*]]
 ; CHECK:       inner:
-; CHECK-NEXT:    [[P:%.*]] = phi i32 [ poison, [[INNER_PH]] ], [ [[INVAR]], [[INNER]] ]
+; CHECK-NEXT:    [[P:%.*]] = phi i32 [ poison, [[INNER_PH]] ], [ [[INVAR:%.*]], [[INNER]] ]
 ; CHECK-NEXT:    [[INNER_IV:%.*]] = phi i32 [ 1, [[INNER_PH]] ], [ [[INNER_IV_NEXT:%.*]], [[INNER]] ]
 ; CHECK-NEXT:    [[ADD_1:%.*]] = add i32 [[P]], 30586
 ; CHECK-NEXT:    call void @use(i32 [[ADD_1]])
+; CHECK-NEXT:    [[INVAR]] = ashr i32 0, 3
 ; CHECK-NEXT:    [[INNER_IV_NEXT]] = add nuw nsw i32 [[INNER_IV]], 1
 ; CHECK-NEXT:    [[INVAR_ADD:%.*]] = add i32 [[INVAR]], 407
 ; CHECK-NEXT:    [[INNER_CMP:%.*]] = icmp samesign ult i32 [[INNER_IV_NEXT]], [[INVAR_ADD]]
 ; CHECK-NEXT:    br i1 [[INNER_CMP]], label [[INNER]], label [[INNER_EXIT:%.*]]
 ; CHECK:       inner.exit:
-; CHECK-NEXT:    [[INVAR_LCSSA:%.*]] = phi i32 [ [[INVAR]], [[INNER]] ]
 ; CHECK-NEXT:    br label [[OUTER_LATCH]]
 ; CHECK:       outer.latch:
-; CHECK-NEXT:    [[MERGE:%.*]] = phi i32 [ 0, [[OUTER_HEADER]] ], [ [[INVAR_LCSSA]], [[INNER_EXIT]] ]
+; CHECK-NEXT:    [[MERGE:%.*]] = phi i32 [ 0, [[OUTER_HEADER]] ], [ 0, [[INNER_EXIT]] ]
 ; CHECK-NEXT:    call void @use(i32 [[MERGE]])
 ; CHECK-NEXT:    br label [[EXIT:%.*]]
 ; CHECK:       exit:
