@@ -26347,29 +26347,31 @@ This is an overloaded intrinsic.
 
 ```
 ; Direct form: number of accessible bytes given as i64
-declare <4 x float>  @llvm.speculative.load.v4f32.p0(ptr <ptr>, i1 <from_end>, i64 <num_accessible_bytes>)
-declare <8 x i32>    @llvm.speculative.load.v8i32.p0(ptr <ptr>, i1 <from_end>, i64 <num_accessible_bytes>)
+declare b128       @llvm.speculative.load.b128.p0(ptr <ptr>, i1 <from_end>, i64 <num_accessible_bytes>)
+declare <4 x i32>  @llvm.speculative.load.v4i32.p0(ptr <ptr>, i1 <from_end>, i64 <num_accessible_bytes>)
+declare <vscale x 4 x i32>
+                   @llvm.speculative.load.nxv4i32.p0(ptr <ptr>, i1 <from_end>, i64 <num_accessible_bytes>)
 
 ; Oracle form: accessible bytes computed by calling oracle_fn(args...)
-declare <4 x float>  @llvm.speculative.load.v4f32.p0(ptr <ptr>, i1 <from_end>, ptr <oracle_fn>, ...)
+declare b128       @llvm.speculative.load.b128.p0(ptr <ptr>, i1 <from_end>, ptr <oracle_fn>, ...)
 ```
 
 ##### Overview:
 
 The '`llvm.speculative.load`' intrinsic loads a value from memory. Unlike a
 regular load, the memory access may extend beyond the bounds of the allocated
-object, provided the memory safely accessed on the underlying hardware.
+object, provided the memory can be safely accessed on the underlying hardware.
 {ref}`llvm.can.load.speculatively <int_can_load_speculatively>` can be used to
-check if the access is.
+check if the access is safe.
 
 ##### Arguments:
 
 The first argument is a pointer to the memory location to load from. The return
-type must be a vector type with a power-of-2 size in bytes. The second argument
-is an `i1` constant flag `from_end` that specifies whether the `N`
-accessible bytes are counted from the start or the end of the loaded values (see
-Semantics). The remaining arguments determine the *number of accessible bytes*,
-denoted `N` below.
+type must be a byte type or a vector type, and its size in bytes must be a
+positive power of 2. The second argument is an `i1` constant flag `from_end`
+selecting whether the `N` accessible bytes are counted from the start or end
+of the loaded value (see Semantics). The remaining arguments determine the
+*number of accessible bytes*, denoted `N` below.
 
 In the **direct form**, the third argument is an `i64` specifying `N`
 directly. In the **oracle form**, the third argument must be a direct
@@ -26379,8 +26381,7 @@ arguments are forwarded to it, and its return value is `N`.
 
 ##### Semantics:
 
-Let `S` denote the size of the return type in bytes. The intrinsic performs
-a load of `S` bytes starting from `ptr`.
+Let `S` denote the size of the return type in bytes.
 
 When `from_end` is `false`, the first `N` bytes (offsets `[0, N)`)
 are the stored values read from memory. Bytes at offsets `[N, S)` are
@@ -26394,6 +26395,11 @@ In both cases, the `N` accessible bytes must lie within the bounds of an
 allocated object that `ptr` is {ref}`based <pointeraliasing>` on, and
 poison bytes are not considered accessed for the purposes of data races or
 `noalias` constraints. The behavior is undefined if `N` exceeds `S`.
+
+The behavior is undefined if any byte the underlying load actually reads is
+not safe to speculatively access.
+{ref}`llvm.can.load.speculatively <int_can_load_speculatively>` can be used
+to check safety.
 
 (int_can_load_speculatively)=
 
@@ -26417,8 +26423,8 @@ even if the memory may be beyond the bounds of an allocated object.
 
 The first argument is a pointer to the memory location.
 
-The second argument is an i64 specifying the size in bytes of the load.
-The size must be a positive power of 2.  If the size is not a power-of-2, the
+The second argument is an i64 specifying the number of accessed bytes,
+and must be a positive power of 2. If the size is not a power-of-2, the
 result is `poison`.
 
 ##### Semantics:
@@ -26442,7 +26448,7 @@ br i1 %can_load, label %speculative_path, label %safe_path
 
 speculative_path:
   ; Safe to speculatively load from %ptr
-  %vec = call <4 x i32> @llvm.speculative.load.v4i32.p0(ptr %ptr, i64 16)
+  %vec = call <4 x i32> @llvm.speculative.load.v4i32.p0(ptr %ptr, i1 false, i64 16)
   ...
 
 safe_path:
