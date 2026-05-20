@@ -23,7 +23,7 @@ target triple = "i686-apple-darwin8"
 
 define i32 @main() {
 ; CHECK-LABEL: @main(
-; CHECK-NEXT:  bb84:
+; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    store volatile i32 2147027116, ptr @var, align 4
 ; CHECK-NEXT:    store volatile i32 -1610612736, ptr @var, align 4
 ; CHECK-NEXT:    store volatile i32 2147027116, ptr @var, align 4

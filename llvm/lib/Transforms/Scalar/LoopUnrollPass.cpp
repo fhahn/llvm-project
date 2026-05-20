@@ -199,12 +199,80 @@ static constexpr const char *DeferredLoopMDName =
     "llvm.loop.unroll.deferred_for_vectorization";
 
 /// Predicate used by LoopFullUnrollPass to decide which innermost loops to
-/// defer until after the loop vectorizer. Matches innermost loops without an
-/// explicit unroll pragma where vectorization is not disabled and that have
-/// a known constant trip count. Tiny inner loops in a nested context are
-/// excluded because fully unrolling them is typically what enables the
-/// parent loop to be vectorized as a perfect nest; deferring them forces the
-/// vectorizer to pick a poor VF for the parent.
+/// defer until after the loop vectorizer.
+///
+/// Deferral lets LoopVectorize see the loop instead of the straight-line
+/// code that the early full unroller would otherwise produce. That helps
+/// for medium-to-large constant-trip-count innermost loops where
+/// LoopVectorize generates a clean vector body and the late on-demand
+/// LoopFullUnrollPass can finish off any leftover scalar epilogue.
+///
+/// It hurts in three patterns the post-vectorize cleanup chain cannot
+/// recover from. This predicate excludes them up front:
+///
+///   (1) Loops with a small constant trip count (<= 8). At this size the
+///       LoopVectorize-produced body amounts to a single vector iteration
+///       plus the loop's own control flow, and on top of that LV may add
+///       a vector trip count check and a scalar epilogue. The
+///       fully-unrolled scalar form (at most 8 copies of the body) is at
+///       least as good on any out-of-order target, and avoids the
+///       second-order cost-model interaction described in (2). This
+///       reasoning does not rely on SLP being able to fold the unrolled
+///       scalars into wide vectors -- even when the body has shapes SLP
+///       cannot handle (early exits inside, calls, dependences that
+///       require runtime alias checks), the unrolled form is at worst
+///       equivalent to the LV-vectorized form.
+///
+///   (2) Innermost loops whose enclosing loop has a small constant trip
+///       count (<= 16). The deferred-then-LV-vectorized inner leaves a
+///       vector body whose unroll cost (summed across the outer's trip
+///       count) exceeds the late LoopUnrollPass threshold.
+///
+///       Concretely, on a 16x16 SAD example (udotabd / aom_sad-style):
+///         * SLP runs on the early-unrolled scalar form and packs the 16
+///           per-iteration absolute-difference chains into a single flat
+///           <16 x i16> sub-nsw + llvm.abs followed by
+///           vector.reduce.add.v16i32 (TTI size-latency cost ~5 for the
+///           reduction; per-iteration body ~15).
+///         * LV instead expresses the inner as a counted-loop in-loop
+///           reduction: a vector accumulator phi, an `insertelement` of
+///           the scalar accumulator each iteration, an umax/umin/sub
+///           triple for unsigned absolute difference at native width,
+///           freezes on each speculatively-vectorized load, then
+///           llvm.vector.partial.reduce.add.v4i32.v16i32 bridging the VF
+///           vs the natural reduction width, and finally
+///           vector.reduce.add.v4i32 to live-out. The partial-reduce
+///           alone scores ~64 in TTI size-latency on AArch64 (a
+///           scalarised-fallback estimate; the actual codegen is much
+///           cheaper, but that's a separate cost-model issue), pushing
+///           the per-iteration body from ~15 to ~79.
+///
+///       The cleanup chain has no pass that re-canonicalises the LV
+///       shape (no SLP/VectorCombine pass runs *after* the late
+///       LoopUnrollPass), so the inflated per-iteration cost is
+///       permanent and the outer stays as a loop -- losing the
+///       full-unroll the small TC asked for. We walk every ancestor
+///       (not just the immediate parent) because after inlining the
+///       deferred inner can sit several loop levels below the
+///       small-TC outer.
+///
+///   (3) (Already handled by case (1) above, but called out separately
+///       because the original deferral heuristic had it.) Tiny innermost
+///       loops in a nested context: full-unrolling them is what turns the
+///       nest into something LoopVectorize can attack as a perfect nest.
+///
+/// Notes on shapes that don't need a special case:
+///   * Loops with early exits / break: getSmallConstantTripCount returns
+///     0, so the TripCount <= 1 guard already excludes them. LoopVectorize
+///     also rejects the early-exit counted form, so deferring is a no-op
+///     in either direction.
+///   * Loops requiring runtime alias checks: these still go through LV
+///     when the outer is genuinely large/runtime. Ancestors with unknown
+///     trip counts are deliberately NOT treated as "small" in (2): a
+///     genuinely large/runtime ancestor is a fine context for deferral
+///     (LV has the room to amortize its overhead), and the stale-marker
+///     re-evaluation in run() recovers the post-inlining case where SCEV
+///     later proves a small constant ancestor bound.
 static bool isDeferredVectorizableLoop(Loop &L, ScalarEvolution &SE) {
   if (!L.isInnermost())
     return false;
@@ -216,8 +284,29 @@ static bool isDeferredVectorizableLoop(Loop &L, ScalarEvolution &SE) {
   unsigned TripCount = SE.getSmallConstantTripCount(&L);
   if (TripCount <= 1)
     return false;
-  if (L.getParentLoop() && TripCount <= 8)
+
+  // (1) Small constant trip count: the LV-vectorized form would be a
+  // single vector iteration plus loop / check / epilogue overhead, which
+  // is not better than the fully-unrolled scalar form at this size and
+  // sets up the case-(2) regression for any small-TC enclosing loop.
+  if (TripCount <= 8)
     return false;
+
+  // (2) An ancestor with a small constant trip count would be the natural
+  // full-unroll target after the inner is resolved. Deferring this loop
+  // leaves an LV-vectorized body that pushes the ancestor past the late
+  // unroll cost threshold, so the ancestor stays as a loop. Ancestors
+  // with unknown trip counts are deliberately not treated as small: a
+  // genuinely large/runtime ancestor is a fine context for deferral, and
+  // the stale-marker re-evaluation in run() recovers the post-inlining
+  // case where SCEV later proves a small constant bound.
+  for (Loop *Parent = L.getParentLoop(); Parent;
+       Parent = Parent->getParentLoop()) {
+    unsigned ParentTC = SE.getSmallConstantTripCount(Parent);
+    if (ParentTC > 0 && ParentTC <= 16)
+      return false;
+  }
+
   return true;
 }
 
@@ -1757,10 +1846,17 @@ PreservedAnalyses LoopFullUnrollPass::run(Loop &L, LoopAnalysisManager &AM,
     for (Loop *Sub : depth_first(&L)) {
       if (Sub == &L)
         continue;
-      if (getBooleanLoopAttribute(Sub, DeferredLoopMDName)) {
-        HasDeferredDescendant = true;
-        break;
-      }
+      if (!getBooleanLoopAttribute(Sub, DeferredLoopMDName))
+        continue;
+      // The marker may be stale: the descendant may have been deferred when
+      // its original containing function was processed in isolation, then
+      // inlined into the surrounding nest. Re-evaluate the predicate; if it
+      // no longer holds, the marker should not gate the outer loop.
+      if (SkipVectorizableLoops &&
+          !isDeferredVectorizableLoop(*Sub, AR.SE))
+        continue;
+      HasDeferredDescendant = true;
+      break;
     }
     if (HasDeferredDescendant) {
       LLVM_DEBUG(dbgs()
@@ -1786,6 +1882,22 @@ PreservedAnalyses LoopFullUnrollPass::run(Loop &L, LoopAnalysisManager &AM,
     // canonicalization has moved on.
     if (!getBooleanLoopAttribute(&L, DeferredLoopMDName))
       addStringMetadataToLoop(&L, DeferredLoopMDName, 1);
+  } else if (SkipVectorizableLoops &&
+             getBooleanLoopAttribute(&L, DeferredLoopMDName)) {
+    // The loop carries a deferred-for-vectorization marker from an earlier
+    // run (e.g. it was deferred when its containing function was processed
+    // in isolation, then inlined into a new context where the surrounding
+    // nest now wants to be fully unrolled). Re-evaluating the predicate
+    // showed deferral is no longer profitable, so clear the marker before
+    // proceeding: leaving it would cause the early outer-loop gate above
+    // to skip the surrounding loop, and the late on-demand unroller to keep
+    // treating this loop as deferred.
+    LLVM_DEBUG(dbgs()
+               << "LoopFullUnrollPass: clearing stale deferred marker on "
+               << L.getHeader()->getName() << "\n");
+    L.setLoopID(makePostTransformationMetadata(L.getHeader()->getContext(),
+                                               L.getLoopID(),
+                                               {DeferredLoopMDName}, {}));
   }
 
   // Keep track of the previous loop structure so we can identify new loops

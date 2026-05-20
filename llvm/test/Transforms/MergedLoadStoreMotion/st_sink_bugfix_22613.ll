@@ -29,7 +29,7 @@ define void @fn1() {
 ; CHECK-NEXT:    tail call void @llvm.memset.p0.i64(ptr noundef nonnull align 1 dereferenceable(3) @f, i8 1, i64 3, i1 false)
 ; CHECK-NEXT:    br i1 [[TOBOOL_NOT]], label %[[IF_END_1_2:.*]], label %[[IF_THEN_1_2:.*]]
 ; CHECK:       [[IF_THEN_1_2]]:
-; CHECK-NEXT:    [[DEC_1_2:%.*]] = add i32 [[A_PROMOTED6]], -6
+; CHECK-NEXT:    [[DEC_1_2:%.*]] = add nsw i32 [[A_PROMOTED6]], -6
 ; CHECK-NEXT:    store i32 [[DEC_1_2]], ptr @a, align 4
 ; CHECK-NEXT:    br label %[[IF_END_1_2]]
 ; CHECK:       [[IF_END_1_2]]:
@@ -116,7 +116,7 @@ define i32 @main() {
 ; CHECK-NEXT:    tail call void @llvm.memset.p0.i64(ptr noundef nonnull align 1 dereferenceable(3) @f, i8 1, i64 3, i1 false)
 ; CHECK-NEXT:    br i1 [[TOBOOL_NOT_I]], label %[[IF_END_1_I_2:.*]], label %[[IF_THEN_1_I_2:.*]]
 ; CHECK:       [[IF_THEN_1_I_2]]:
-; CHECK-NEXT:    [[DEC_1_I_2:%.*]] = add i32 [[A_PROMOTED6_I]], -6
+; CHECK-NEXT:    [[DEC_1_I_2:%.*]] = add nsw i32 [[A_PROMOTED6_I]], -6
 ; CHECK-NEXT:    store i32 [[DEC_1_I_2]], ptr @a, align 4
 ; CHECK-NEXT:    br label %[[IF_END_1_I_2]]
 ; CHECK:       [[IF_END_1_I_2]]:
