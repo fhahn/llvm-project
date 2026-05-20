@@ -207,72 +207,57 @@ static constexpr const char *DeferredLoopMDName =
 /// LoopVectorize generates a clean vector body and the late on-demand
 /// LoopFullUnrollPass can finish off any leftover scalar epilogue.
 ///
-/// It hurts in three patterns the post-vectorize cleanup chain cannot
+/// It hurts in two patterns the post-vectorize cleanup chain cannot
 /// recover from. This predicate excludes them up front:
 ///
-///   (1) Loops with a small constant trip count (<= 8). At this size the
-///       LoopVectorize-produced body amounts to a single vector iteration
-///       plus the loop's own control flow, and on top of that LV may add
-///       a vector trip count check and a scalar epilogue. The
-///       fully-unrolled scalar form (at most 8 copies of the body) is at
-///       least as good on any out-of-order target, and avoids the
-///       second-order cost-model interaction described in (2). This
-///       reasoning does not rely on SLP being able to fold the unrolled
-///       scalars into wide vectors -- even when the body has shapes SLP
-///       cannot handle (early exits inside, calls, dependences that
-///       require runtime alias checks), the unrolled form is at worst
-///       equivalent to the LV-vectorized form.
+///   (1) Loops with a small constant trip count (<= 8). The deferral
+///       happens in the per-function simplification pipeline, which sits
+///       *inside* the CGSCC pass manager. The CGSCC pipeline runs in
+///       this order:
+///         a. Inliner.
+///         b. PostOrderFunctionAttrsPass (infers `writeonly`,
+///            `initializes((lo,hi))`, `readnone` on arguments, etc.).
+///         c. Function-simplification (LICM, LoopRotate, the early
+///            LoopFullUnrollPass that this predicate gates, ...).
+///       PostOrderFunctionAttrs runs *before* the early full unroller.
+///       So if the early unroller defers a small-TC loop, the function
+///       attribute pass sees a loop body that writes through an
+///       induction-variable-indexed GEP into an sret arg and cannot
+///       prove `writeonly` / `initializes((0, N))` on the arg.
+///       The function attributes are sticky for the rest of the
+///       pipeline -- the inliner has already used them, and there is no
+///       second function-attr run after the late on-demand unroller
+///       eventually unrolls the deferred loops. Concretely, on a small
+///       helper such as `clip_color` (a 3-iter loop over color channels
+///       inlined into `hue`), deferral causes the inlined `hue` to lose
+///       `writeonly`/`initializes` on its sret arg, which then flips the
+///       inliner's cost decision for `hue_swap` and grows that 5-line
+///       tail-call wrapper into a 147-line body-inlined function.
+///       Excluding TC <= 8 here eliminates the chain at its root: the
+///       small-TC loops fully unroll before PostOrderFunctionAttrs ever
+///       runs, function-attr inference sees straight-line stores at
+///       constant offsets, and the inliner gets the same `writeonly` /
+///       `initializes` summary it had pre-deferral.
 ///
-///   (2) Innermost loops whose enclosing loop has a small constant trip
-///       count (<= 16). The deferred-then-LV-vectorized inner leaves a
-///       vector body whose unroll cost (summed across the outer's trip
-///       count) exceeds the late LoopUnrollPass threshold.
-///
-///       Concretely, on a 16x16 SAD example (udotabd / aom_sad-style):
-///         * SLP runs on the early-unrolled scalar form and packs the 16
-///           per-iteration absolute-difference chains into a single flat
-///           <16 x i16> sub-nsw + llvm.abs followed by
-///           vector.reduce.add.v16i32 (TTI size-latency cost ~5 for the
-///           reduction; per-iteration body ~15).
-///         * LV instead expresses the inner as a counted-loop in-loop
-///           reduction: a vector accumulator phi, an `insertelement` of
-///           the scalar accumulator each iteration, an umax/umin/sub
-///           triple for unsigned absolute difference at native width,
-///           freezes on each speculatively-vectorized load, then
-///           llvm.vector.partial.reduce.add.v4i32.v16i32 bridging the VF
-///           vs the natural reduction width, and finally
-///           vector.reduce.add.v4i32 to live-out. The partial-reduce
-///           alone scores ~64 in TTI size-latency on AArch64 (a
-///           scalarised-fallback estimate; the actual codegen is much
-///           cheaper, but that's a separate cost-model issue), pushing
-///           the per-iteration body from ~15 to ~79.
-///
-///       The cleanup chain has no pass that re-canonicalises the LV
-///       shape (no SLP/VectorCombine pass runs *after* the late
-///       LoopUnrollPass), so the inflated per-iteration cost is
-///       permanent and the outer stays as a loop -- losing the
-///       full-unroll the small TC asked for. We walk every ancestor
-///       (not just the immediate parent) because after inlining the
-///       deferred inner can sit several loop levels below the
-///       small-TC outer.
-///
-///   (3) (Already handled by case (1) above, but called out separately
-///       because the original deferral heuristic had it.) Tiny innermost
-///       loops in a nested context: full-unrolling them is what turns the
-///       nest into something LoopVectorize can attack as a perfect nest.
-///
-/// Notes on shapes that don't need a special case:
-///   * Loops with early exits / break: getSmallConstantTripCount returns
-///     0, so the TripCount <= 1 guard already excludes them. LoopVectorize
-///     also rejects the early-exit counted form, so deferring is a no-op
-///     in either direction.
-///   * Loops requiring runtime alias checks: these still go through LV
-///     when the outer is genuinely large/runtime. Ancestors with unknown
-///     trip counts are deliberately NOT treated as "small" in (2): a
-///     genuinely large/runtime ancestor is a fine context for deferral
-///     (LV has the room to amortize its overhead), and the stale-marker
-///     re-evaluation in run() recovers the post-inlining case where SCEV
-///     later proves a small constant ancestor bound.
+///   (2) FIXME -- workaround for an AArch64 TTI cost-model hole.
+///       Innermost loops whose enclosing loop has a small constant trip
+///       count (<= 16). On a 16x16 SAD example the unroll-then-SLP path
+///       and the defer-then-LV path lower to identical
+///       `uabd + udot + addv` AArch64 asm; there is *no* codegen
+///       difference. The regression is purely in the unroll cost
+///       model: `Intrinsic::vector_partial_reduce_add` has no case in
+///       the TTI intrinsic-cost dispatch, so it falls through to a
+///       scalarised-fallback estimate of ~64 size-latency units. With
+///       the outer's trip count summed in, the late LoopUnrollPass
+///       refuses to fully unroll an outer it would otherwise have
+///       happily unrolled. Drop this case once
+///       `AArch64TTIImpl::getIntrinsicInstrCost` (or the generic
+///       dispatch in BasicTTIImpl) returns a UDOT-aware cost for
+///       `vector_partial_reduce_add`. Until then, this case keeps the
+///       early unroll-then-SLP path for the udotabd / aom_sad-style
+///       shapes. We walk every ancestor (not just the immediate parent)
+///       because after inlining the deferred inner can sit several loop
+///       levels below the small-TC outer.
 static bool isDeferredVectorizableLoop(Loop &L, ScalarEvolution &SE) {
   if (!L.isInnermost())
     return false;
