@@ -2484,3 +2484,339 @@ llvm::hasPartialIVCondition(const Loop &L, unsigned MSSAThreshold,
 
   return {};
 }
+
+//===----------------------------------------------------------------------===//
+// getConstantLoopAccessByteRange
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// Strip a single zext/sext/trunc cast and return the underlying value, or
+/// the value itself if it isn't one of those casts.
+const Value *stripIntCast(const Value *V) {
+  if (auto *Ext = dyn_cast<ZExtInst>(V))
+    return Ext->getOperand(0);
+  if (auto *Ext = dyn_cast<SExtInst>(V))
+    return Ext->getOperand(0);
+  if (auto *T = dyn_cast<TruncInst>(V))
+    return T->getOperand(0);
+  return V;
+}
+
+/// Match a counted-from-constant induction PHI in \p Header. The IV must
+/// have exactly two incoming values: a `ConstantInt` from \p Preheader and
+/// `add iv, ConstantStep` from \p Latch with a positive step. On success,
+/// fills in \p IVOut, \p InitOut, \p StepOut.
+bool matchSimpleConstantIV(const BasicBlock *Header,
+                           const BasicBlock *Preheader,
+                           const BasicBlock *Latch, const PHINode *&IVOut,
+                           int64_t &InitOut, int64_t &StepOut) {
+  for (const PHINode &PN : Header->phis()) {
+    if (PN.getNumIncomingValues() != 2)
+      continue;
+    auto *Init = dyn_cast<ConstantInt>(PN.getIncomingValueForBlock(Preheader));
+    if (!Init)
+      continue;
+    auto *Add = dyn_cast<BinaryOperator>(PN.getIncomingValueForBlock(Latch));
+    if (!Add || Add->getOpcode() != Instruction::Add)
+      continue;
+    ConstantInt *Step = nullptr;
+    if (Add->getOperand(0) == &PN)
+      Step = dyn_cast<ConstantInt>(Add->getOperand(1));
+    else if (Add->getOperand(1) == &PN)
+      Step = dyn_cast<ConstantInt>(Add->getOperand(0));
+    if (!Step || Step->getSExtValue() <= 0)
+      continue;
+    IVOut = &PN;
+    InitOut = Init->getSExtValue();
+    StepOut = Step->getSExtValue();
+    return true;
+  }
+  return false;
+}
+
+/// Extract a constant trip count from a header `icmp ult/ule/ne` against a
+/// constant bound where one operand is the IV. Returns 0 if the shape isn't
+/// recognised. Init/Step are the IV's start and step values from
+/// matchSimpleConstantIV.
+/// Extract a constant trip count from a `icmp ult/ule/ne` against a constant
+/// bound where one operand is the IV phi or the IV's increment. We accept
+/// both head-tested forms (cmp in the header, body in the true successor)
+/// and latch-tested forms (cmp at the latch, true successor branching back
+/// to the header). The two forms differ in whether the comparison value
+/// has been incremented or not for the about-to-run iteration; the helper
+/// folds that into one TC formula. Returns 0 if the shape isn't recognised.
+uint64_t matchConstantTripCount(const BasicBlock *Header,
+                                const BasicBlock *Latch, const PHINode *IV,
+                                int64_t Init, int64_t Step) {
+  auto FindCondBr = [](const BasicBlock *BB) -> const BranchInst * {
+    auto *BR = dyn_cast<BranchInst>(BB->getTerminator());
+    if (!BR || !BR->isConditional())
+      return nullptr;
+    return BR;
+  };
+  // Most loops at this point in the pipeline have the conditional branch in
+  // the header (head-test) or the latch (latch-test). Try both.
+  const BranchInst *BR = FindCondBr(Header);
+  bool BrInHeader = BR != nullptr;
+  if (!BR && Latch != Header)
+    BR = FindCondBr(Latch);
+  if (!BR)
+    return 0;
+  auto *Cmp = dyn_cast<ICmpInst>(BR->getCondition());
+  if (!Cmp)
+    return 0;
+
+  // Identify the IV-side operand: the phi itself, or the post-increment
+  // `add iv, Step`.
+  const Value *Op0 = Cmp->getOperand(0);
+  const Value *Op1 = Cmp->getOperand(1);
+  enum class IVKind { Phi, Inc };
+  auto ClassifyIVOperand =
+      [&](const Value *V) -> std::optional<IVKind> {
+    if (V == IV)
+      return IVKind::Phi;
+    if (auto *Add = dyn_cast<BinaryOperator>(V))
+      if (Add->getOpcode() == Instruction::Add &&
+          (Add->getOperand(0) == IV || Add->getOperand(1) == IV))
+        return IVKind::Inc;
+    return std::nullopt;
+  };
+
+  const ConstantInt *Bound = nullptr;
+  bool IVOnLeft = false;
+  std::optional<IVKind> Kind;
+  if (auto K = ClassifyIVOperand(Op0)) {
+    Kind = K;
+    Bound = dyn_cast<ConstantInt>(Op1);
+    IVOnLeft = true;
+  } else if (auto K = ClassifyIVOperand(Op1)) {
+    Kind = K;
+    Bound = dyn_cast<ConstantInt>(Op0);
+  }
+  if (!Bound || !Kind)
+    return 0;
+
+  int64_t B = Bound->getSExtValue();
+  CmpInst::Predicate P =
+      IVOnLeft ? Cmp->getPredicate() : Cmp->getSwappedPredicate();
+  if (Init >= B || Step <= 0)
+    return 0;
+
+  // True if the "continue" successor of the conditional branch is the
+  // header, meaning the cmp is evaluated *after* the body has executed
+  // for the current IV (latch-test). In that case a cmp on the phi
+  // (current-IV) holds one iteration longer than the head-test form.
+  // If the true edge goes to the header, the predicate is "continue if
+  // true". Otherwise the true edge goes to the exit block, and the
+  // predicate is effectively inverted ("exit if true").
+  bool TrueGoesToHeader = BR->getSuccessor(0) == Header;
+  bool FalseGoesToHeader = BR->getSuccessor(1) == Header;
+  if (!TrueGoesToHeader && !FalseGoesToHeader)
+    return 0;
+  bool IsLatchTest = (Header == Latch) || TrueGoesToHeader || FalseGoesToHeader;
+  // Normalise to "continue if predicate true". If the false edge is the
+  // header, the predicate is for exit, so invert it.
+  if (FalseGoesToHeader)
+    P = CmpInst::getInversePredicate(P);
+
+  uint64_t Span = (uint64_t)(B - Init);
+  uint64_t Iters;
+  switch (P) {
+  case CmpInst::ICMP_ULT:
+  case CmpInst::ICMP_SLT:
+    // The number of iterations for which "iv < B" holds (with iv stepped):
+    //   ceil(Span / Step).
+    Iters = (Span + Step - 1) / Step;
+    break;
+  case CmpInst::ICMP_ULE:
+  case CmpInst::ICMP_SLE:
+    Iters = Span / Step + 1;
+    break;
+  case CmpInst::ICMP_NE:
+    if (Span % Step != 0)
+      return 0;
+    Iters = Span / Step;
+    break;
+  default:
+    return 0;
+  }
+
+  // Latch-test on the phi means the body has already executed for the
+  // value that fails the predicate -- one extra iteration.
+  if (IsLatchTest && *Kind == IVKind::Phi)
+    Iters += 1;
+
+  return Iters;
+}
+
+/// Walk the GEP chain backward from \p Ptr until reaching \p Base. Each
+/// link must accumulate either a fully constant offset, or a single
+/// non-constant index that's the loop's IV (possibly cast). On success,
+/// returns the constant base offset and the IV-scaled byte stride.
+std::optional<std::pair<int64_t, int64_t>>
+walkGEPChain(const Value *Ptr, const Value *Base, const PHINode *IV,
+             const DataLayout &DL) {
+  int64_t ConstOff = 0;
+  int64_t IVScale = 0;
+  bool SawIV = false;
+  while (Ptr != Base) {
+    auto *GEP = dyn_cast<GEPOperator>(Ptr);
+    if (!GEP)
+      return std::nullopt;
+    APInt Off(DL.getIndexSizeInBits(GEP->getPointerAddressSpace()), 0);
+    if (GEP->accumulateConstantOffset(DL, Off)) {
+      ConstOff += Off.getSExtValue();
+      Ptr = GEP->getPointerOperand();
+      continue;
+    }
+    // GEP has at least one non-constant index. Walk the indices manually:
+    // accumulate constant indices, and require exactly one non-constant
+    // index that is the IV (possibly through a single int cast).
+    if (SawIV)
+      return std::nullopt; // Already saw the IV in another GEP -- bail.
+    Type *Ty = GEP->getSourceElementType();
+    int64_t LocalConst = 0;
+    int64_t LocalScale = 0;
+    bool HasVarIdx = false;
+    Type *CurTy = GEP->getSourceElementType();
+    auto Indices = drop_begin(GEP->indices(), 1);
+    // First index is over the source element type itself.
+    {
+      const Value *I0 = GEP->getOperand(1);
+      uint64_t Stride = DL.getTypeAllocSize(Ty).getFixedValue();
+      if (auto *C = dyn_cast<ConstantInt>(I0)) {
+        LocalConst += (int64_t)Stride * C->getSExtValue();
+      } else if (stripIntCast(I0) == IV) {
+        LocalScale = (int64_t)Stride;
+        HasVarIdx = true;
+      } else {
+        return std::nullopt;
+      }
+    }
+    for (const Value *Idx : Indices) {
+      if (auto *ST = dyn_cast<StructType>(CurTy)) {
+        auto *C = dyn_cast<ConstantInt>(Idx);
+        if (!C)
+          return std::nullopt;
+        unsigned FieldNo = C->getZExtValue();
+        const StructLayout *SL = DL.getStructLayout(ST);
+        LocalConst += SL->getElementOffset(FieldNo);
+        CurTy = ST->getElementType(FieldNo);
+        continue;
+      }
+      // Array / vector / sequential type.
+      Type *ElemTy = GetElementPtrInst::getTypeAtIndex(CurTy, (uint64_t)0);
+      if (!ElemTy)
+        return std::nullopt;
+      uint64_t Stride = DL.getTypeAllocSize(ElemTy).getFixedValue();
+      if (auto *C = dyn_cast<ConstantInt>(Idx)) {
+        LocalConst += (int64_t)Stride * C->getSExtValue();
+      } else if (!HasVarIdx && stripIntCast(Idx) == IV) {
+        LocalScale = (int64_t)Stride;
+        HasVarIdx = true;
+      } else {
+        return std::nullopt;
+      }
+      CurTy = ElemTy;
+    }
+    ConstOff += LocalConst;
+    if (HasVarIdx) {
+      IVScale = LocalScale;
+      SawIV = true;
+    }
+    Ptr = GEP->getPointerOperand();
+  }
+  if (!SawIV)
+    return std::nullopt;
+  return std::make_pair(ConstOff, IVScale);
+}
+
+} // namespace
+
+std::optional<std::pair<int64_t, int64_t>>
+llvm::getConstantLoopAccessByteRange(const Instruction *I, const Value *Base,
+                                     const Loop *L, const DataLayout &DL) {
+  if (!L->isInnermost())
+    return std::nullopt;
+  // Only handle a simple two-block-or-fewer canonical loop with a preheader
+  // and a latch that branches back to the header. The header carries the
+  // IV phi; the exit comparison may live in the header or in the latch.
+  const BasicBlock *Header = L->getHeader();
+  const BasicBlock *Preheader = L->getLoopPreheader();
+  const BasicBlock *Latch = L->getLoopLatch();
+  if (!Preheader || !Latch)
+    return std::nullopt;
+  if (L->getNumBlocks() > 2)
+    return std::nullopt;
+
+  // Identify the IV.
+  const PHINode *IV = nullptr;
+  int64_t Init = 0, Step = 0;
+  if (!matchSimpleConstantIV(Header, Preheader, Latch, IV, Init, Step))
+    return std::nullopt;
+
+  // Extract the constant trip count from the latch comparison.
+  uint64_t TC = matchConstantTripCount(Header, Latch, IV, Init, Step);
+  if (TC == 0)
+    return std::nullopt;
+
+  // Determine pointer and access size for I.
+  const Value *Ptr = nullptr;
+  uint64_t AccessSize = 0;
+  if (auto *S = dyn_cast<StoreInst>(I)) {
+    if (!S->isSimple())
+      return std::nullopt;
+    Ptr = S->getPointerOperand();
+    AccessSize = DL.getTypeStoreSize(S->getValueOperand()->getType())
+                     .getFixedValue();
+  } else if (auto *Ld = dyn_cast<LoadInst>(I)) {
+    if (!Ld->isSimple())
+      return std::nullopt;
+    Ptr = Ld->getPointerOperand();
+    AccessSize = DL.getTypeStoreSize(Ld->getType()).getFixedValue();
+  } else {
+    return std::nullopt;
+  }
+
+  // Walk back to Base, collecting constant offset and IV-scaled byte stride.
+  auto Walked = walkGEPChain(Ptr, Base, IV, DL);
+  if (!Walked)
+    return std::nullopt;
+  int64_t ConstOff = Walked->first;
+  int64_t IVScale = Walked->second;
+  if (IVScale == 0)
+    return std::nullopt;
+  // We don't accept holes: stride must cover at least the access size, and
+  // the per-iteration step in bytes must equal IVScale*Step exactly.
+  int64_t IterStrideBytes;
+  if (__builtin_mul_overflow(IVScale, Step, &IterStrideBytes))
+    return std::nullopt;
+  if ((uint64_t)std::abs(IterStrideBytes) < AccessSize)
+    return std::nullopt;
+
+  // Compute the [low, high) byte range across all iterations.
+  // low = ConstOff + Init * IVScale
+  // high = ConstOff + (Init + (TC-1)*Step) * IVScale + AccessSize
+  int64_t LastIVValTimesScale;
+  int64_t IVBase;
+  if (__builtin_mul_overflow(Init, IVScale, &IVBase))
+    return std::nullopt;
+  int64_t LastIVVal;
+  if (__builtin_mul_overflow((int64_t)(TC - 1), Step, &LastIVVal))
+    return std::nullopt;
+  if (__builtin_add_overflow(LastIVVal, Init, &LastIVVal))
+    return std::nullopt;
+  if (__builtin_mul_overflow(LastIVVal, IVScale, &LastIVValTimesScale))
+    return std::nullopt;
+  int64_t Low, High;
+  if (__builtin_add_overflow(ConstOff, IVBase, &Low))
+    return std::nullopt;
+  if (__builtin_add_overflow(ConstOff, LastIVValTimesScale, &High))
+    return std::nullopt;
+  if (__builtin_add_overflow(High, (int64_t)AccessSize, &High))
+    return std::nullopt;
+  if (Low > High)
+    std::swap(Low, High);
+  return std::make_pair(Low, High);
+}

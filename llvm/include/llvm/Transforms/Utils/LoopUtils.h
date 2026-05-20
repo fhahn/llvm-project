@@ -695,6 +695,32 @@ LLVM_ABI std::optional<IVConditionInfo>
 hasPartialIVCondition(const Loop &L, unsigned MSSAThreshold,
                       const MemorySSA &MSSA, AAResults &AA);
 
+/// Compute the constant byte-range relative to \p Base that load/store
+/// \p I accesses across all iterations of \p L, *without* relying on
+/// ScalarEvolution. Returns a pair `[Low, High)` of signed byte offsets,
+/// or std::nullopt if \p I doesn't match the canonical shape this helper
+/// recognises:
+///
+///   * \p L has a single header that is also the only block branching back
+///     to itself, or a {header, body} pair where the header holds the IV
+///     phi and exit comparison.
+///   * The IV is a 2-incoming PHI in the header with a constant init from
+///     the preheader and \p iv.next = add iv, ConstantStep on the back-edge.
+///   * Loop exit is governed by an `icmp ult` (or `ule`/`ne`) against a
+///     constant bound, giving a non-zero constant trip count.
+///   * \p I 's pointer reaches \p Base via a chain of GEPOperators where
+///     all but one index across the chain is a constant; the single
+///     non-constant index is the loop's IV (possibly through a single
+///     `zext`/`sext`/`trunc` cast) and contributes a constant byte stride.
+///   * The accessed bytes do not overlap across iterations in a way that
+///     would create holes (stride >= access size).
+///
+/// Anything outside this shape returns std::nullopt; callers should treat
+/// that as "I don't know" and fall back to the conservative path.
+LLVM_ABI std::optional<std::pair<int64_t, int64_t>>
+getConstantLoopAccessByteRange(const Instruction *I, const Value *Base,
+                               const Loop *L, const DataLayout &DL);
+
 } // end namespace llvm
 
 #endif // LLVM_TRANSFORMS_UTILS_LOOPUTILS_H
