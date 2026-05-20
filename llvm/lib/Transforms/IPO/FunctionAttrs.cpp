@@ -30,6 +30,7 @@
 #include "llvm/Analysis/CallGraphSCCPass.h"
 #include "llvm/Analysis/CaptureTracking.h"
 #include "llvm/Analysis/LazyCallGraph.h"
+#include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/MemoryLocation.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/Argument.h"
@@ -61,6 +62,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/Utils/Local.h"
+#include "llvm/Transforms/Utils/LoopUtils.h"
 #include <cassert>
 #include <iterator>
 #include <map>
@@ -652,7 +654,9 @@ struct ArgumentUsesSummary {
 
 ArgumentAccessInfo getArgumentAccessInfo(const Instruction *I,
                                          const ArgumentUse &ArgUse,
-                                         const DataLayout &DL) {
+                                         const Argument *Arg,
+                                         const DataLayout &DL,
+                                         const LoopInfo *LI) {
   auto GetTypeAccessRange =
       [&DL](Type *Ty,
             std::optional<int64_t> Offset) -> std::optional<ConstantRange> {
@@ -668,6 +672,23 @@ ArgumentAccessInfo getArgumentAccessInfo(const Instruction *I,
       return ConstantRange(Low, High);
     }
     return std::nullopt;
+  };
+  // Recover access ranges for loop-form load/store accesses where the
+  // GEP offset depends on a counted-loop induction variable. This lets the
+  // caller establish initializes/writeonly attributes when the writes are
+  // hidden behind a small loop that hasn't been unrolled yet.
+  auto GetLoopAccessRange =
+      [&](const Instruction *I) -> std::optional<ConstantRange> {
+    if (!LI || !Arg)
+      return std::nullopt;
+    const Loop *L = LI->getLoopFor(I->getParent());
+    if (!L)
+      return std::nullopt;
+    auto Range = getConstantLoopAccessByteRange(I, Arg, L, DL);
+    if (!Range)
+      return std::nullopt;
+    return ConstantRange(APInt(64, Range->first, true),
+                         APInt(64, Range->second, true));
   };
   auto GetConstantIntRange =
       [](Value *Length,
@@ -700,6 +721,8 @@ ArgumentAccessInfo getArgumentAccessInfo(const Instruction *I,
       if (auto TypeAccessRange =
               GetTypeAccessRange(SI->getAccessType(), ArgUse.Offset))
         AccessRanges.insert(*TypeAccessRange);
+      else if (auto LoopAccessRange = GetLoopAccessRange(SI))
+        AccessRanges.insert(*LoopAccessRange);
       return {ArgumentAccessInfo::AccessType::Write, std::move(AccessRanges)};
     }
   } else if (auto *LI = dyn_cast<LoadInst>(I)) {
@@ -711,6 +734,8 @@ ArgumentAccessInfo getArgumentAccessInfo(const Instruction *I,
       if (auto TypeAccessRange =
               GetTypeAccessRange(LI->getAccessType(), ArgUse.Offset))
         return {ArgumentAccessInfo::AccessType::Read, {*TypeAccessRange}};
+      if (auto LoopAccessRange = GetLoopAccessRange(LI))
+        return {ArgumentAccessInfo::AccessType::Read, {*LoopAccessRange}};
     }
   } else if (auto *MemSet = dyn_cast<MemSetInst>(I)) {
     if (!MemSet->isVolatile()) {
@@ -760,7 +785,8 @@ ArgumentAccessInfo getArgumentAccessInfo(const Instruction *I,
 }
 
 // Collect the uses of argument "A" in "F".
-ArgumentUsesSummary collectArgumentUsesPerBlock(Argument &A, Function &F) {
+ArgumentUsesSummary collectArgumentUsesPerBlock(Argument &A, Function &F,
+                                                const LoopInfo *LI) {
   auto &DL = F.getParent()->getDataLayout();
   unsigned PointerSize =
       DL.getIndexSizeInBits(A.getType()->getPointerAddressSpace());
@@ -819,7 +845,7 @@ ArgumentUsesSummary collectArgumentUsesPerBlock(Argument &A, Function &F) {
     }
 
     auto *I = cast<Instruction>(U);
-    bool HasWrite = UpdateUseInfo(I, getArgumentAccessInfo(I, ArgUse, DL));
+    bool HasWrite = UpdateUseInfo(I, getArgumentAccessInfo(I, ArgUse, &A, DL, LI));
 
     Result.HasAnyWrite |= HasWrite;
 
@@ -1128,8 +1154,8 @@ static bool addAccessAttr(Argument *A, Attribute::AttrKind R) {
   return true;
 }
 
-static bool inferInitializes(Argument &A, Function &F) {
-  auto ArgumentUses = collectArgumentUsesPerBlock(A, F);
+static bool inferInitializes(Argument &A, Function &F, const LoopInfo *LI) {
+  auto ArgumentUses = collectArgumentUsesPerBlock(A, F, LI);
   // No write anywhere in the function, bail.
   if (!ArgumentUses.HasAnyWrite)
     return false;
@@ -1250,7 +1276,8 @@ static bool inferInitializes(Argument &A, Function &F) {
 /// Deduce nocapture attributes for the SCC.
 static void addArgumentAttrs(const SCCNodeSet &SCCNodes,
                              SmallPtrSet<Function *, 8> &Changed,
-                             bool SkipInitializes) {
+                             bool SkipInitializes,
+                             function_ref<LoopInfo *(Function &)> GetLI = {}) {
   ArgumentGraph AG;
 
   auto DetermineAccessAttrsForSingleton = [](Argument *A) {
@@ -1328,7 +1355,8 @@ static void addArgumentAttrs(const SCCNodeSet &SCCNodes,
           Changed.insert(F);
       }
       if (!SkipInitializes && !A.onlyReadsMemory()) {
-        if (inferInitializes(A, *F))
+        LoopInfo *LI = GetLI ? GetLI(*F) : nullptr;
+        if (inferInitializes(A, *F, LI))
           Changed.insert(F);
       }
     }
@@ -2238,7 +2266,8 @@ static SCCNodesResult createSCCNodeSet(ArrayRef<Function *> Functions) {
 template <typename AARGetterT>
 static SmallPtrSet<Function *, 8>
 deriveAttrsInPostOrder(ArrayRef<Function *> Functions, AARGetterT &&AARGetter,
-                       bool ArgAttrsOnly) {
+                       bool ArgAttrsOnly,
+                       function_ref<LoopInfo *(Function &)> GetLI = {}) {
   SCCNodesResult Nodes = createSCCNodeSet(Functions);
 
   // Bail if the SCC only contains optnone functions.
@@ -2256,7 +2285,7 @@ deriveAttrsInPostOrder(ArrayRef<Function *> Functions, AARGetterT &&AARGetter,
 
   addArgumentReturnedAttrs(Nodes.SCCNodes, Changed);
   addMemoryAttrs(Nodes.SCCNodes, AARGetter, Changed);
-  addArgumentAttrs(Nodes.SCCNodes, Changed, /*SkipInitializes=*/false);
+  addArgumentAttrs(Nodes.SCCNodes, Changed, /*SkipInitializes=*/false, GetLI);
   inferConvergent(Nodes.SCCNodes, Changed);
   addNoReturnAttrs(Nodes.SCCNodes, Changed);
   addColdAttrs(Nodes.SCCNodes, Changed);
@@ -2301,6 +2330,9 @@ PreservedAnalyses PostOrderFunctionAttrsPass::run(LazyCallGraph::SCC &C,
   auto AARGetter = [&](Function &F) -> AAResults & {
     return FAM.getResult<AAManager>(F);
   };
+  auto LIGetter = [&](Function &F) -> LoopInfo * {
+    return &FAM.getResult<LoopAnalysis>(F);
+  };
 
   SmallVector<Function *, 8> Functions;
   for (LazyCallGraph::Node &N : C) {
@@ -2308,7 +2340,7 @@ PreservedAnalyses PostOrderFunctionAttrsPass::run(LazyCallGraph::SCC &C,
   }
 
   auto ChangedFunctions =
-      deriveAttrsInPostOrder(Functions, AARGetter, ArgAttrsOnly);
+      deriveAttrsInPostOrder(Functions, AARGetter, ArgAttrsOnly, LIGetter);
   if (ChangedFunctions.empty())
     return PreservedAnalyses::all();
 

@@ -2484,3 +2484,627 @@ llvm::hasPartialIVCondition(const Loop &L, unsigned MSSAThreshold,
 
   return {};
 }
+
+//===----------------------------------------------------------------------===//
+// getConstantLoopAccessByteRange
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// Signedness of how the IV is interpreted by its consumer (the GEP index
+/// path and the loop exit comparison). Once chosen, all IV-related
+/// arithmetic (Init, Bound, trip count, range endpoints) is performed in
+/// the IV's own bitwidth using APInt with the matching sign convention.
+enum class IVSign { Signed, Unsigned };
+
+/// Information about a counted-from-constant induction PHI.
+struct SimpleIV {
+  const PHINode *PN = nullptr;
+  /// Initial value of the IV from the preheader, in the IV's own bitwidth.
+  APInt Init;
+  /// Per-iteration step (must be strictly positive), in the IV's bitwidth.
+  APInt Step;
+  /// True if the IV's `iv.next = add iv, Step` is marked nsw.
+  bool HasNSW = false;
+  /// True if the IV's `iv.next = add iv, Step` is marked nuw.
+  bool HasNUW = false;
+};
+
+/// Match a counted-from-constant induction PHI in \p Header. The IV must
+/// have exactly two incoming values: a `ConstantInt` from \p Preheader and
+/// `add iv, ConstantStep` from \p Latch. The step must be non-zero and,
+/// when interpreted using either signed or unsigned semantics, must be
+/// strictly positive in some sign domain (we reject signed-negative steps
+/// for simplicity). Reports the wrap flags on the add so that the caller
+/// can decide whether the chosen IV interpretation is sound.
+std::optional<SimpleIV> matchSimpleConstantIV(const BasicBlock *Header,
+                                              const BasicBlock *Preheader,
+                                              const BasicBlock *Latch) {
+  for (const PHINode &PN : Header->phis()) {
+    if (PN.getNumIncomingValues() != 2)
+      continue;
+    auto *Init = dyn_cast<ConstantInt>(PN.getIncomingValueForBlock(Preheader));
+    if (!Init)
+      continue;
+    auto *Add = dyn_cast<BinaryOperator>(PN.getIncomingValueForBlock(Latch));
+    if (!Add || Add->getOpcode() != Instruction::Add)
+      continue;
+    ConstantInt *Step = nullptr;
+    if (Add->getOperand(0) == &PN)
+      Step = dyn_cast<ConstantInt>(Add->getOperand(1));
+    else if (Add->getOperand(1) == &PN)
+      Step = dyn_cast<ConstantInt>(Add->getOperand(0));
+    if (!Step)
+      continue;
+    const APInt &StepVal = Step->getValue();
+    // Require a positive step under both signed and unsigned reads (i.e.
+    // step is in [1, 2^(bw-1) - 1]).  This means the same numeric value
+    // works in both sign domains and we don't have to second-guess later.
+    if (StepVal.isZero() || StepVal.isNegative())
+      continue;
+    SimpleIV Out;
+    Out.PN = &PN;
+    Out.Init = Init->getValue();
+    Out.Step = StepVal;
+    Out.HasNSW = Add->hasNoSignedWrap();
+    Out.HasNUW = Add->hasNoUnsignedWrap();
+    return Out;
+  }
+  return std::nullopt;
+}
+
+/// Extract a constant trip count from a `icmp` against a constant bound
+/// where one operand is the IV phi or the IV's increment. We accept both
+/// head-tested forms and latch-tested forms. All arithmetic is performed
+/// in the IV's bitwidth using APInt; \p Sign selects whether the bound
+/// and predicate are interpreted as signed or unsigned.
+std::optional<APInt> matchConstantTripCount(const BasicBlock *Header,
+                                            const BasicBlock *Latch,
+                                            const SimpleIV &IV, IVSign Sign) {
+  auto FindCondBr = [](const BasicBlock *BB) -> const BranchInst * {
+    auto *BR = dyn_cast<BranchInst>(BB->getTerminator());
+    if (!BR || !BR->isConditional())
+      return nullptr;
+    return BR;
+  };
+  // Most loops at this point in the pipeline have the conditional branch in
+  // the header (head-test) or the latch (latch-test). Try the latch first;
+  // the header conditional branch is the head-test form.
+  const BranchInst *BR = nullptr;
+  if (Latch != Header)
+    BR = FindCondBr(Latch);
+  if (!BR)
+    BR = FindCondBr(Header);
+  if (!BR)
+    return std::nullopt;
+  auto *Cmp = dyn_cast<ICmpInst>(BR->getCondition());
+  if (!Cmp)
+    return std::nullopt;
+
+  // Identify the IV-side operand: the phi itself, or the post-increment
+  // `add iv, Step`.
+  const Value *Op0 = Cmp->getOperand(0);
+  const Value *Op1 = Cmp->getOperand(1);
+  enum class IVKind { Phi, Inc };
+  auto ClassifyIVOperand =
+      [&](const Value *V) -> std::optional<IVKind> {
+    if (V == IV.PN)
+      return IVKind::Phi;
+    if (auto *Add = dyn_cast<BinaryOperator>(V))
+      if (Add->getOpcode() == Instruction::Add &&
+          (Add->getOperand(0) == IV.PN || Add->getOperand(1) == IV.PN))
+        return IVKind::Inc;
+    return std::nullopt;
+  };
+
+  const ConstantInt *BoundC = nullptr;
+  bool IVOnLeft = false;
+  std::optional<IVKind> Kind;
+  if (auto K = ClassifyIVOperand(Op0)) {
+    Kind = K;
+    BoundC = dyn_cast<ConstantInt>(Op1);
+    IVOnLeft = true;
+  } else if (auto K = ClassifyIVOperand(Op1)) {
+    Kind = K;
+    BoundC = dyn_cast<ConstantInt>(Op0);
+  }
+  if (!BoundC || !Kind)
+    return std::nullopt;
+
+  // The bound's bitwidth must match the IV (the cmp is between same-typed
+  // values in valid IR, but be defensive).
+  if (BoundC->getBitWidth() != IV.Init.getBitWidth())
+    return std::nullopt;
+  const APInt &Bound = BoundC->getValue();
+
+  CmpInst::Predicate P =
+      IVOnLeft ? Cmp->getPredicate() : Cmp->getSwappedPredicate();
+
+  // Verify the predicate's signedness matches the requested IV
+  // interpretation. Equality predicates are sign-agnostic and accepted
+  // for either.
+  bool IsSignedPred;
+  switch (P) {
+  case CmpInst::ICMP_SLT:
+  case CmpInst::ICMP_SLE:
+    IsSignedPred = true;
+    break;
+  case CmpInst::ICMP_ULT:
+  case CmpInst::ICMP_ULE:
+    IsSignedPred = false;
+    break;
+  case CmpInst::ICMP_NE:
+  case CmpInst::ICMP_EQ:
+    IsSignedPred = (Sign == IVSign::Signed);
+    break;
+  default:
+    return std::nullopt;
+  }
+  if (Sign == IVSign::Signed && !IsSignedPred)
+    return std::nullopt;
+  if (Sign == IVSign::Unsigned && IsSignedPred)
+    return std::nullopt;
+
+  // Determine which successor of the conditional branch continues the
+  // loop. If the true edge goes to the header we have "continue if true";
+  // if the false edge goes to the header, invert the predicate to
+  // normalise.
+  bool TrueGoesToHeader = BR->getSuccessor(0) == Header;
+  bool FalseGoesToHeader = BR->getSuccessor(1) == Header;
+  if (TrueGoesToHeader == FalseGoesToHeader)
+    return std::nullopt;
+  if (FalseGoesToHeader)
+    P = CmpInst::getInversePredicate(P);
+
+  // Init < Bound under the chosen sign domain. (For NE / EQ we still
+  // require this so the iteration count is well-defined.)
+  bool InitLtBound = Sign == IVSign::Signed ? IV.Init.slt(Bound)
+                                            : IV.Init.ult(Bound);
+  if (!InitLtBound)
+    return std::nullopt;
+
+  // Compute Span = Bound - Init in the IV's bitwidth, checking that no
+  // wrap occurs. With the InitLtBound check above this should not
+  // overflow, but be defensive.
+  bool Ov = false;
+  APInt Span = Sign == IVSign::Signed ? Bound.ssub_ov(IV.Init, Ov)
+                                      : Bound.usub_ov(IV.Init, Ov);
+  if (Ov)
+    return std::nullopt;
+
+  // Compute the iteration count in IV bitwidth. We deliberately compute
+  // here using unsigned APInt arithmetic on Span and Step, since both
+  // are non-negative and we only care about non-negative iteration
+  // counts. udiv/urem handle the magnitudes correctly.
+  APInt Iters;
+  switch (P) {
+  case CmpInst::ICMP_ULT:
+  case CmpInst::ICMP_SLT:
+    // ceil(Span / Step) iterations satisfy "iv < Bound" with iv stepped.
+    Iters = (Span + IV.Step - 1).udiv(IV.Step);
+    break;
+  case CmpInst::ICMP_ULE:
+  case CmpInst::ICMP_SLE:
+    Iters = Span.udiv(IV.Step) + 1;
+    break;
+  case CmpInst::ICMP_NE:
+    if (!Span.urem(IV.Step).isZero())
+      return std::nullopt;
+    Iters = Span.udiv(IV.Step);
+    break;
+  default:
+    return std::nullopt;
+  }
+
+  // Latch-test on the phi means the body has already executed for the
+  // value that fails the predicate -- one extra iteration. Head-tested
+  // form is when the conditional branch is in the header itself.
+  bool IsLatchTest = BR->getParent() != Header;
+  if (IsLatchTest && *Kind == IVKind::Phi)
+    Iters += 1;
+
+  return Iters;
+}
+
+/// Classification of an index value relative to \p IV.  \c std::nullopt
+/// means "this isn't the IV (possibly cast)".  An empty optional sign
+/// (i.e. \c IVUseClass with no Sign) means "the IV is used directly with
+/// the GEP index width — either sign convention is acceptable, the caller
+/// should pick based on the loop exit cmp".
+struct IVUseClass {
+  /// If set, the IV was reached through an explicit zext (Unsigned) or
+  /// sext (Signed). If unset, the IV is used directly and either sign
+  /// works.
+  std::optional<IVSign> Sign;
+};
+
+/// If \p V is the IV (or the IV through a single zext/sext that widens
+/// to \p IndexWidth), classify the use. Otherwise return std::nullopt.
+std::optional<IVUseClass> classifyIVUseInIndex(const Value *V,
+                                               const PHINode *IV,
+                                               unsigned IndexWidth) {
+  if (V == IV) {
+    if (IV->getType()->getIntegerBitWidth() != IndexWidth)
+      return std::nullopt;
+    return IVUseClass{};
+  }
+  if (auto *Z = dyn_cast<ZExtInst>(V)) {
+    if (Z->getOperand(0) == IV &&
+        Z->getType()->getIntegerBitWidth() == IndexWidth)
+      return IVUseClass{IVSign::Unsigned};
+    return std::nullopt;
+  }
+  if (auto *S = dyn_cast<SExtInst>(V)) {
+    if (S->getOperand(0) == IV &&
+        S->getType()->getIntegerBitWidth() == IndexWidth)
+      return IVUseClass{IVSign::Signed};
+    return std::nullopt;
+  }
+  // Trunc (and any other cast) is rejected: it discards bits and would
+  // require reasoning the helper isn't equipped for.
+  return std::nullopt;
+}
+
+/// Walk the GEP chain backward from \p Ptr until reaching \p Base. Each
+/// link must accumulate either a fully constant offset, or a single
+/// non-constant index that is the loop's IV (possibly via zext or sext).
+/// On success returns the constant base byte offset, the IV-scaled byte
+/// stride (as an APInt with the IV's bitwidth, treated according to the
+/// inferred sign), and the inferred sign of the IV use.
+struct WalkedGEP {
+  /// Constant byte offset accumulated along the chain.
+  int64_t ConstOff;
+  /// Scale (in bytes) applied to the IV value at the GEP index.
+  uint64_t IVScale;
+  /// Signedness with which the IV value is consumed by the GEP. If
+  /// std::nullopt, the IV is used directly (no zext/sext) at the index
+  /// position and either sign works -- the caller picks.
+  std::optional<IVSign> Sign;
+};
+
+std::optional<WalkedGEP> walkGEPChain(const Value *Ptr, const Value *Base,
+                                      const PHINode *IV,
+                                      const DataLayout &DL) {
+  // We require all GEPs in the chain to live in address space 0 (whose
+  // index width is at least 64 bits on every supported target). This
+  // sidesteps M4 entirely: address-space-modular offsets in narrower
+  // index spaces require sign convention we can't infer here.
+  int64_t ConstOff = 0;
+  uint64_t IVScale = 0;
+  bool SawIV = false;
+  // Sign of the IV use: nullopt means "either sign acceptable" (direct
+  // IV use with matching width), or "no IV use seen yet". A concrete
+  // value is set once we see an explicit zext/sext on the IV.
+  std::optional<IVSign> Sign;
+  bool SignFixed = false;
+
+  while (Ptr != Base) {
+    auto *GEP = dyn_cast<GEPOperator>(Ptr);
+    if (!GEP)
+      return std::nullopt;
+    if (GEP->getPointerAddressSpace() != 0)
+      return std::nullopt;
+    unsigned IdxWidth = DL.getIndexSizeInBits(0);
+    APInt Off(IdxWidth, 0);
+    if (GEP->accumulateConstantOffset(DL, Off)) {
+      // Sign-extend (or truncate) the AS-modular offset into i64. For
+      // AS=0 the index width is >= 64 on all targets we care about, but
+      // be defensive and bail if the sign-extended value doesn't fit
+      // in i64.
+      if (!Off.isSignedIntN(64))
+        return std::nullopt;
+      bool Ov = false;
+      int64_t OffI64 = Off.sextOrTrunc(64).getSExtValue();
+      int64_t NewConst =
+          APInt(64, ConstOff, true).sadd_ov(APInt(64, OffI64, true), Ov)
+              .getSExtValue();
+      if (Ov)
+        return std::nullopt;
+      ConstOff = NewConst;
+      Ptr = GEP->getPointerOperand();
+      continue;
+    }
+    // GEP has at least one non-constant index. Walk the indices manually:
+    // accumulate constant indices, and require exactly one non-constant
+    // index that is the IV (possibly through a single zext/sext cast).
+    if (SawIV)
+      return std::nullopt; // Already saw the IV in another GEP -- bail.
+    Type *SrcTy = GEP->getSourceElementType();
+
+    // Helper: multiply Stride * ConstIndex (signed, in i64) with overflow
+    // checking, then add into LocalConst. The constant index APInt may be
+    // wider than 64 bits; bail if so.
+    auto AddStridedConst = [&](uint64_t Stride, const APInt &Idx,
+                               int64_t &LocalConst) -> bool {
+      if (!Idx.isSignedIntN(64))
+        return false;
+      if (Stride > (uint64_t)std::numeric_limits<int64_t>::max())
+        return false;
+      APInt StrideAP(64, Stride, true);
+      APInt IdxAP(64, Idx.getSExtValue(), true);
+      bool Ov = false;
+      APInt Prod = StrideAP.smul_ov(IdxAP, Ov);
+      if (Ov)
+        return false;
+      APInt NewLC =
+          APInt(64, LocalConst, true).sadd_ov(Prod, Ov);
+      if (Ov)
+        return false;
+      LocalConst = NewLC.getSExtValue();
+      return true;
+    };
+
+    int64_t LocalConst = 0;
+    uint64_t LocalScale = 0;
+    bool HasVarIdx = false;
+    Type *CurTy = SrcTy;
+    auto Indices = drop_begin(GEP->indices(), 1);
+    // First index is over the source element type itself.
+    {
+      const Value *I0 = GEP->getOperand(1);
+      TypeSize Ts = DL.getTypeAllocSize(SrcTy);
+      if (Ts.isScalable())
+        return std::nullopt;
+      uint64_t Stride = Ts.getFixedValue();
+      if (auto *C = dyn_cast<ConstantInt>(I0)) {
+        if (!AddStridedConst(Stride, C->getValue(), LocalConst))
+          return std::nullopt;
+      } else if (auto Use = classifyIVUseInIndex(I0, IV, IdxWidth)) {
+        if (Stride > (uint64_t)std::numeric_limits<int64_t>::max())
+          return std::nullopt;
+        LocalScale = Stride;
+        HasVarIdx = true;
+        if (Use->Sign) {
+          Sign = Use->Sign;
+          SignFixed = true;
+        }
+      } else {
+        return std::nullopt;
+      }
+    }
+    for (const Value *Idx : Indices) {
+      if (auto *ST = dyn_cast<StructType>(CurTy)) {
+        auto *C = dyn_cast<ConstantInt>(Idx);
+        if (!C)
+          return std::nullopt;
+        // Field index is unsigned; bail if it does not fit in 32 bits.
+        if (!C->getValue().isIntN(32))
+          return std::nullopt;
+        unsigned FieldNo = C->getZExtValue();
+        const StructLayout *SL = DL.getStructLayout(ST);
+        uint64_t FieldOff = SL->getElementOffset(FieldNo);
+        if (FieldOff > (uint64_t)std::numeric_limits<int64_t>::max())
+          return std::nullopt;
+        bool Ov = false;
+        APInt NewLC =
+            APInt(64, LocalConst, true)
+                .sadd_ov(APInt(64, (int64_t)FieldOff, true), Ov);
+        if (Ov)
+          return std::nullopt;
+        LocalConst = NewLC.getSExtValue();
+        CurTy = ST->getElementType(FieldNo);
+        continue;
+      }
+      // Array / vector / sequential type.
+      Type *ElemTy = GetElementPtrInst::getTypeAtIndex(CurTy, (uint64_t)0);
+      if (!ElemTy)
+        return std::nullopt;
+      TypeSize Ts = DL.getTypeAllocSize(ElemTy);
+      if (Ts.isScalable())
+        return std::nullopt;
+      uint64_t Stride = Ts.getFixedValue();
+      if (auto *C = dyn_cast<ConstantInt>(Idx)) {
+        if (!AddStridedConst(Stride, C->getValue(), LocalConst))
+          return std::nullopt;
+      } else if (!HasVarIdx) {
+        if (auto Use = classifyIVUseInIndex(Idx, IV, IdxWidth)) {
+          if (Stride > (uint64_t)std::numeric_limits<int64_t>::max())
+            return std::nullopt;
+          LocalScale = Stride;
+          HasVarIdx = true;
+          if (Use->Sign) {
+            Sign = Use->Sign;
+            SignFixed = true;
+          }
+        } else {
+          return std::nullopt;
+        }
+      } else {
+        return std::nullopt;
+      }
+      CurTy = ElemTy;
+    }
+    bool Ov = false;
+    APInt NewConst = APInt(64, ConstOff, true)
+                         .sadd_ov(APInt(64, LocalConst, true), Ov);
+    if (Ov)
+      return std::nullopt;
+    ConstOff = NewConst.getSExtValue();
+    if (HasVarIdx) {
+      IVScale = LocalScale;
+      SawIV = true;
+    }
+    Ptr = GEP->getPointerOperand();
+  }
+  if (!SawIV)
+    return std::nullopt;
+  WalkedGEP Out;
+  Out.ConstOff = ConstOff;
+  Out.IVScale = IVScale;
+  Out.Sign = SignFixed ? Sign : std::nullopt;
+  return Out;
+}
+
+} // namespace
+
+std::optional<std::pair<int64_t, int64_t>>
+llvm::getConstantLoopAccessByteRange(const Instruction *I, const Value *Base,
+                                     const Loop *L, const DataLayout &DL) {
+  if (!L->isInnermost())
+    return std::nullopt;
+  // Only handle a simple two-block-or-fewer canonical loop with a preheader
+  // and a latch that branches back to the header. The header carries the
+  // IV phi; the exit comparison may live in the header or in the latch.
+  const BasicBlock *Header = L->getHeader();
+  const BasicBlock *Preheader = L->getLoopPreheader();
+  const BasicBlock *Latch = L->getLoopLatch();
+  if (!Preheader || !Latch)
+    return std::nullopt;
+  if (L->getNumBlocks() > 2)
+    return std::nullopt;
+
+  // Identify the IV.
+  std::optional<SimpleIV> IV = matchSimpleConstantIV(Header, Preheader, Latch);
+  if (!IV)
+    return std::nullopt;
+
+  // Determine pointer and access size for I.
+  const Value *Ptr = nullptr;
+  uint64_t AccessSize = 0;
+  if (auto *S = dyn_cast<StoreInst>(I)) {
+    if (!S->isSimple())
+      return std::nullopt;
+    Ptr = S->getPointerOperand();
+    TypeSize Ts = DL.getTypeStoreSize(S->getValueOperand()->getType());
+    if (Ts.isScalable())
+      return std::nullopt;
+    AccessSize = Ts.getFixedValue();
+  } else if (auto *Ld = dyn_cast<LoadInst>(I)) {
+    if (!Ld->isSimple())
+      return std::nullopt;
+    Ptr = Ld->getPointerOperand();
+    TypeSize Ts = DL.getTypeStoreSize(Ld->getType());
+    if (Ts.isScalable())
+      return std::nullopt;
+    AccessSize = Ts.getFixedValue();
+  } else {
+    return std::nullopt;
+  }
+  if (AccessSize == 0 ||
+      AccessSize > (uint64_t)std::numeric_limits<int64_t>::max())
+    return std::nullopt;
+
+  // Walk back to Base, collecting constant offset, IV-scaled byte stride
+  // and the signedness with which the GEP uses the IV.
+  auto Walked = walkGEPChain(Ptr, Base, IV->PN, DL);
+  if (!Walked)
+    return std::nullopt;
+  int64_t ConstOff = Walked->ConstOff;
+  uint64_t IVScale = Walked->IVScale;
+  if (IVScale == 0)
+    return std::nullopt;
+  IVSign Sign;
+  APInt Iters(64, 0);
+
+  auto TryWithSign = [&](IVSign S) -> bool {
+    // Wrap-flag requirement.
+    if (S == IVSign::Signed && !IV->HasNSW)
+      return false;
+    if (S == IVSign::Unsigned && !IV->HasNUW)
+      return false;
+    auto MaybeIters = matchConstantTripCount(Header, Latch, *IV, S);
+    if (!MaybeIters || MaybeIters->isZero())
+      return false;
+    Iters = *MaybeIters;
+    Sign = S;
+    return true;
+  };
+
+  if (Walked->Sign) {
+    if (!TryWithSign(*Walked->Sign))
+      return std::nullopt;
+  } else {
+    // Direct IV use with matching index width: either sign is OK as long
+    // as the wrap flag and exit cmp agree. Try unsigned first so that a
+    // canonical loop with `add nuw nsw` and `icmp ult` ends up in the
+    // unsigned domain (matches a typical zext-to-pointer-index lowering).
+    if (!TryWithSign(IVSign::Unsigned) && !TryWithSign(IVSign::Signed))
+      return std::nullopt;
+  }
+
+  // We need to be able to express Iters and Iters - 1 in i64. Bail
+  // otherwise.
+  if (!Iters.isIntN(64))
+    return std::nullopt;
+  uint64_t TC = Iters.getZExtValue();
+  if (TC == 0)
+    return std::nullopt;
+
+  // Convert Init and Step to int64 according to the chosen sign. Bail if
+  // they don't fit in i64 with the chosen sign convention. (Step is
+  // already known positive.)
+  if (Sign == IVSign::Signed && !IV->Init.isSignedIntN(64))
+    return std::nullopt;
+  if (Sign == IVSign::Unsigned && !IV->Init.isIntN(64))
+    return std::nullopt;
+  // Step is positive in both sign domains, so isIntN(64) suffices for both.
+  if (!IV->Step.isIntN(64))
+    return std::nullopt;
+  int64_t InitI64 = Sign == IVSign::Signed ? IV->Init.getSExtValue()
+                                           : (int64_t)IV->Init.getZExtValue();
+  // For unsigned-domain Init, isIntN(64) means the value fits in u64 but
+  // could be > INT64_MAX; in that case (int64_t)getZExtValue is negative
+  // when reinterpreted, which would corrupt the signed range arithmetic.
+  // Reject that case: the byte range model below uses int64_t.
+  if (Sign == IVSign::Unsigned && InitI64 < 0)
+    return std::nullopt;
+  int64_t StepI64 = (int64_t)IV->Step.getZExtValue();
+  if (StepI64 < 0)
+    return std::nullopt;
+  if (IVScale > (uint64_t)std::numeric_limits<int64_t>::max())
+    return std::nullopt;
+  int64_t IVScaleI64 = (int64_t)IVScale;
+
+  // Per-iteration stride in bytes = IVScale * Step, signed. (IVScale is
+  // non-negative as a byte size and Step is positive, so this is in
+  // [0, INT64_MAX] when no overflow is signalled.)
+  bool Ov = false;
+  APInt IterStride = APInt(64, IVScaleI64, true)
+                         .smul_ov(APInt(64, StepI64, true), Ov);
+  if (Ov)
+    return std::nullopt;
+  // No-holes check: stride must cover at least the access size. Use APInt
+  // abs() to avoid the std::abs(INT64_MIN) UB.
+  uint64_t AbsStride = IterStride.abs().getZExtValue();
+  if (AbsStride < AccessSize)
+    return std::nullopt;
+
+  // Compute the [low, high) byte range across all iterations.
+  // low  = ConstOff + Init      * IVScale
+  // high = ConstOff + LastIVVal * IVScale + AccessSize
+  // where LastIVVal = Init + (TC - 1) * Step.
+  APInt InitAP(64, InitI64, true);
+  APInt StepAP(64, StepI64, true);
+  APInt ScaleAP(64, IVScaleI64, true);
+  APInt ConstAP(64, ConstOff, true);
+  APInt AccessAP(64, (int64_t)AccessSize, true);
+
+  Ov = false;
+  APInt IVBase = InitAP.smul_ov(ScaleAP, Ov);
+  if (Ov)
+    return std::nullopt;
+  APInt TCMinus1(64, TC - 1, true);
+  APInt LastDelta = TCMinus1.smul_ov(StepAP, Ov);
+  if (Ov)
+    return std::nullopt;
+  APInt LastIVVal = InitAP.sadd_ov(LastDelta, Ov);
+  if (Ov)
+    return std::nullopt;
+  APInt LastTimesScale = LastIVVal.smul_ov(ScaleAP, Ov);
+  if (Ov)
+    return std::nullopt;
+  APInt Low = ConstAP.sadd_ov(IVBase, Ov);
+  if (Ov)
+    return std::nullopt;
+  APInt High = ConstAP.sadd_ov(LastTimesScale, Ov);
+  if (Ov)
+    return std::nullopt;
+  High = High.sadd_ov(AccessAP, Ov);
+  if (Ov)
+    return std::nullopt;
+  int64_t LowI = Low.getSExtValue();
+  int64_t HighI = High.getSExtValue();
+  if (LowI > HighI)
+    std::swap(LowI, HighI);
+  return std::make_pair(LowI, HighI);
+}
