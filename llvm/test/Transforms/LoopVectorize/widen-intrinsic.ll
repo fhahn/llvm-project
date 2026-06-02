@@ -60,7 +60,7 @@ define void @minnum_nofpclass_arg_and_ret(ptr %p, ptr %q) {
 ; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr float, ptr [[Q]], i32 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x float>, ptr [[TMP0]], align 4, !alias.scope [[META3:![0-9]+]], !noalias [[META6:![0-9]+]]
 ; CHECK-NEXT:    [[WIDE_LOAD2:%.*]] = load <4 x float>, ptr [[TMP1]], align 4, !alias.scope [[META6]]
-; CHECK-NEXT:    [[TMP2:%.*]] = call <4 x float> @llvm.minnum.v4f32(<4 x float> [[WIDE_LOAD]], <4 x float> [[WIDE_LOAD2]])
+; CHECK-NEXT:    [[TMP2:%.*]] = call nofpclass(nan) <4 x float> @llvm.minnum.v4f32(<4 x float> nofpclass(nan) [[WIDE_LOAD]], <4 x float> nofpclass(nan) [[WIDE_LOAD2]])
 ; CHECK-NEXT:    store <4 x float> [[TMP2]], ptr [[TMP0]], align 4, !alias.scope [[META3]], !noalias [[META6]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq i32 [[INDEX_NEXT]], 1024
@@ -114,7 +114,7 @@ define void @ctlz_range(ptr %p) {
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr i32, ptr [[P]], i32 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP0]], align 4
-; CHECK-NEXT:    [[TMP1:%.*]] = call <4 x i32> @llvm.ctlz.v4i32(<4 x i32> [[WIDE_LOAD]], i1 false)
+; CHECK-NEXT:    [[TMP1:%.*]] = call <4 x i32> @llvm.ctlz.v4i32(<4 x i32> range(i32 1, 0) [[WIDE_LOAD]], i1 false)
 ; CHECK-NEXT:    store <4 x i32> [[TMP1]], ptr [[TMP0]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP2:%.*]] = icmp eq i32 [[INDEX_NEXT]], 1024

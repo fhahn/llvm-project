@@ -152,7 +152,9 @@ exit:
   ret void
 }
 
-; Three calls with identical operands but differing string per-arg attributes.
+; Three calls with identical operands that differ only in non-propagatable
+; string per-arg attributes. Those attributes are never applied to the widened
+; call, so all three widened intrinsics are identical and CSE into one.
 define void @cse_differing_param_string_attrs(ptr %p, ptr %q, ptr noalias %r1, ptr noalias %r2, ptr noalias %r3) {
 ; CHECK-LABEL: define void @cse_differing_param_string_attrs(
 ; CHECK-SAME: ptr [[P:%.*]], ptr [[Q:%.*]], ptr noalias [[R1:%.*]], ptr noalias [[R2:%.*]], ptr noalias [[R3:%.*]]) {
@@ -166,13 +168,13 @@ define void @cse_differing_param_string_attrs(ptr %p, ptr %q, ptr noalias %r1, p
 ; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr float, ptr [[Q]], i32 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x float>, ptr [[TMP0]], align 4
 ; CHECK-NEXT:    [[WIDE_LOAD1:%.*]] = load <4 x float>, ptr [[TMP1]], align 4
-; CHECK-NEXT:    [[TMP3:%.*]] = call <4 x float> @llvm.minnum.v4f32(<4 x float> [[WIDE_LOAD]], <4 x float> [[WIDE_LOAD1]])
+; CHECK-NEXT:    [[TMP8:%.*]] = call <4 x float> @llvm.minnum.v4f32(<4 x float> [[WIDE_LOAD]], <4 x float> [[WIDE_LOAD1]])
 ; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr float, ptr [[R1]], i32 [[INDEX]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr float, ptr [[R2]], i32 [[INDEX]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr float, ptr [[R3]], i32 [[INDEX]]
-; CHECK-NEXT:    store <4 x float> [[TMP3]], ptr [[TMP4]], align 4
-; CHECK-NEXT:    store <4 x float> [[TMP3]], ptr [[TMP5]], align 4
-; CHECK-NEXT:    store <4 x float> [[TMP3]], ptr [[TMP6]], align 4
+; CHECK-NEXT:    store <4 x float> [[TMP8]], ptr [[TMP4]], align 4
+; CHECK-NEXT:    store <4 x float> [[TMP8]], ptr [[TMP5]], align 4
+; CHECK-NEXT:    store <4 x float> [[TMP8]], ptr [[TMP6]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i32 [[INDEX_NEXT]], 1024
 ; CHECK-NEXT:    br i1 [[TMP7]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]

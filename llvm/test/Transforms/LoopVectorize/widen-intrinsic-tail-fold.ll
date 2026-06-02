@@ -18,7 +18,7 @@ define void @tf_ctlz_range(ptr %p, i32 %n) {
 ; CHECK-NEXT:    [[ACTIVE_LANE_MASK:%.*]] = phi <4 x i1> [ [[ACTIVE_LANE_MASK_ENTRY]], %[[VECTOR_PH]] ], [ [[ACTIVE_LANE_MASK_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr i32, ptr [[P]], i32 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_MASKED_LOAD:%.*]] = call <4 x i32> @llvm.masked.load.v4i32.p0(ptr align 4 [[TMP2]], <4 x i1> [[ACTIVE_LANE_MASK]], <4 x i32> poison)
-; CHECK-NEXT:    [[TMP3:%.*]] = call <4 x i32> @llvm.ctlz.v4i32(<4 x i32> [[WIDE_MASKED_LOAD]], i1 false)
+; CHECK-NEXT:    [[TMP3:%.*]] = call <4 x i32> @llvm.ctlz.v4i32(<4 x i32> range(i32 1, 0) [[WIDE_MASKED_LOAD]], i1 false)
 ; CHECK-NEXT:    call void @llvm.masked.store.v4i32.p0(<4 x i32> [[TMP3]], ptr align 4 [[TMP2]], <4 x i1> [[ACTIVE_LANE_MASK]])
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[ACTIVE_LANE_MASK_NEXT]] = call <4 x i1> @llvm.get.active.lane.mask.v4i1.i32(i32 [[INDEX_NEXT]], i32 [[N]])

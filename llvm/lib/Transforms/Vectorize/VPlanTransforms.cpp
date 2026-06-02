@@ -2614,11 +2614,18 @@ void VPlanTransforms::cse(VPlan &Plan) {
         // V must dominate Def for a valid replacement.
         if (!VPDT.dominates(V->getParent(), VPBB))
           continue;
-        // Only keep flags present on both V and Def.
-        if (auto *RFlags = dyn_cast<VPRecipeWithIRFlags>(V))
-          RFlags->intersectFlags(*cast<VPRecipeWithIRFlags>(Def));
-        Def->replaceAllUsesWith(V);
-        continue;
+        // For widened intrinsics, intersect the parameter/return attributes. If
+        // they are incompatible, fall through to register Def in the map so
+        // later hash-equal recipes can CSE against it instead of against V.
+        if (auto *VIntr = dyn_cast<VPWidenIntrinsicRecipe>(V);
+            !VIntr ||
+            VIntr->intersectAttrs(*cast<VPWidenIntrinsicRecipe>(Def))) {
+          // Only keep flags present on both V and Def.
+          if (auto *RFlags = dyn_cast<VPRecipeWithIRFlags>(V))
+            RFlags->intersectFlags(*cast<VPRecipeWithIRFlags>(Def));
+          Def->replaceAllUsesWith(V);
+          continue;
+        }
       }
       CSEMap[Def] = Def;
     }
@@ -3156,7 +3163,7 @@ static VPRecipeBase *optimizeMaskToEVL(VPValue *HeaderMask,
                             m_TruncOrSelf(m_Specific(&Plan->getVF()))))) {
     if (!Mask)
       Mask = Plan->getTrue();
-    auto *NewLoad = cast<VPWidenMemIntrinsicRecipe>(&CurRecipe)->clone();
+    auto *NewLoad = cast<VPWidenIntrinsicRecipe>(&CurRecipe)->clone();
     NewLoad->setOperand(2, Mask);
     NewLoad->setOperand(3, &EVL);
     return NewLoad;
@@ -3351,10 +3358,16 @@ static void fixupVFUsersForEVL(VPlan &Plan, VPValue &EVL) {
 
   assert(all_of(Plan.getVF().users(),
                 [&Plan](VPUser *U) {
-                  auto IsAllowedUser =
-                      IsaPred<VPVectorEndPointerRecipe, VPScalarIVStepsRecipe,
-                              VPWidenIntOrFpInductionRecipe,
-                              VPWidenMemIntrinsicRecipe>;
+                  // Only the strided-load widened intrinsic recipe consumes VF
+                  // here.
+                  auto IsAllowedUser = [](VPUser *U) {
+                    if (isa<VPVectorEndPointerRecipe, VPScalarIVStepsRecipe,
+                            VPWidenIntOrFpInductionRecipe>(U))
+                      return true;
+                    auto *I = dyn_cast<VPWidenIntrinsicRecipe>(U);
+                    return I && I->getVectorIntrinsicID() ==
+                                    Intrinsic::experimental_vp_strided_load;
+                  };
                   if (match(U, m_Trunc(m_Specific(&Plan.getVF()))))
                     return all_of(cast<VPSingleDefRecipe>(U)->users(),
                                   IsAllowedUser);
@@ -7727,7 +7740,7 @@ void VPlanTransforms::convertToStridedAccesses(VPlan &Plan,
           return false;
         const InstructionCost CurrentCost = LoadR->computeCost(VF, Ctx);
         const InstructionCost StridedLoadStoreCost =
-            VPWidenMemIntrinsicRecipe::computeMemIntrinsicCost(
+            VPWidenIntrinsicRecipe::computeMemIntrinsicCost(
                 Intrinsic::experimental_vp_strided_load, DataTy,
                 LoadR->isMasked(), Alignment, Ctx);
         return StridedLoadStoreCost < CurrentCost;

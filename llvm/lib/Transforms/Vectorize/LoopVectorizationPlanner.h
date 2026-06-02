@@ -529,11 +529,14 @@ public:
                                                     Type *SourceElementTy,
                                                     bool Reverse, DebugLoc DL);
 
-  VPWidenMemIntrinsicRecipe *createWidenMemIntrinsic(
+  VPWidenIntrinsicRecipe *createWidenMemIntrinsic(
       Intrinsic::ID VectorIntrinsicID, ArrayRef<VPValue *> CallArguments,
       Type *Ty, Align Alignment, const VPIRMetadata &MD, DebugLoc DL) {
-    return tryInsertInstruction(new VPWidenMemIntrinsicRecipe(
-        VectorIntrinsicID, CallArguments, Ty, Alignment, MD, DL));
+    auto *R = new VPWidenIntrinsicRecipe(VectorIntrinsicID, CallArguments, Ty,
+                                         {}, MD, DL);
+    R->addParamAttr(
+        0, Attribute::getWithAlignment(Ty->getContext(), Alignment));
+    return tryInsertInstruction(R);
   }
 
   //===--------------------------------------------------------------------===//

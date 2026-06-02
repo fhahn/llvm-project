@@ -44,6 +44,7 @@
 #include <cassert>
 #include <cstddef>
 #include <functional>
+#include <optional>
 #include <string>
 #include <utility>
 #include <variant>
@@ -432,7 +433,6 @@ public:
     VPWidenCastSC,
     VPWidenGEPSC,
     VPWidenIntrinsicSC,
-    VPWidenMemIntrinsicSC,
     VPWidenLoadEVLSC,
     VPWidenLoadSC,
     VPWidenStoreEVLSC,
@@ -633,7 +633,6 @@ public:
     case VPRecipeBase::VPWidenCastSC:
     case VPRecipeBase::VPWidenGEPSC:
     case VPRecipeBase::VPWidenIntrinsicSC:
-    case VPRecipeBase::VPWidenMemIntrinsicSC:
     case VPRecipeBase::VPWidenSC:
     case VPRecipeBase::VPBlendSC:
     case VPRecipeBase::VPPredInstPHISC:
@@ -1126,7 +1125,6 @@ struct VPRecipeWithIRFlags : public VPSingleDefRecipe, public VPIRFlags {
            R->getVPRecipeID() == VPRecipeBase::VPWidenCallSC ||
            R->getVPRecipeID() == VPRecipeBase::VPWidenCastSC ||
            R->getVPRecipeID() == VPRecipeBase::VPWidenIntrinsicSC ||
-           R->getVPRecipeID() == VPRecipeBase::VPWidenMemIntrinsicSC ||
            R->getVPRecipeID() == VPRecipeBase::VPReductionSC ||
            R->getVPRecipeID() == VPRecipeBase::VPReductionEVLSC ||
            R->getVPRecipeID() == VPRecipeBase::VPReplicateSC ||
@@ -1216,6 +1214,10 @@ class VPIRAttributes {
 public:
   VPIRAttributes() = default;
 
+  /// Store the per-arg/return attributes from \p CI that are valid to propagate
+  /// to a widened intrinsic call, filtered using \p CI's scalar operand types.
+  explicit VPIRAttributes(CallInst &CI);
+
   /// Stores the per-arg/return attributes from \p CI that are valid to
   /// propagate to a widened call to \p Variant.
   VPIRAttributes(CallInst &CI, const Function &Variant);
@@ -1225,6 +1227,31 @@ public:
 
   /// Apply the stored per-arg/return attributes to widened call \p V.
   void applyAttrs(CallInst &V) const;
+
+  /// Return the stored return-value attributes.
+  AttributeSet getRetAttrs() const { return CallAttrs.getRetAttrs(); }
+
+  /// Return the stored attributes for the parameter at \p ArgIdx.
+  AttributeSet getParamAttrs(unsigned ArgIdx) const {
+    return CallAttrs.getParamAttrs(ArgIdx);
+  }
+
+  /// Add \p Attr to the stored attributes for the parameter at \p ArgIdx.
+  void addParamAttr(LLVMContext &Ctx, unsigned ArgIdx, Attribute Attr) {
+    CallAttrs = CallAttrs.addParamAttribute(Ctx, ArgIdx, Attr);
+  }
+
+  /// Intersect the stored attributes with \p Other, keeping only those common
+  /// to both. Returns false, leaving the stored attributes unchanged, if the
+  /// two lists are inherently incompatible.
+  bool intersectAttrs(LLVMContext &Ctx, const VPIRAttributes &Other) {
+    std::optional<AttributeList> Intersected =
+        CallAttrs.intersectWith(Ctx, Other.CallAttrs);
+    if (!Intersected)
+      return false;
+    CallAttrs = *Intersected;
+    return true;
+  }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   /// Print return-value attributes carried with this object.
@@ -1941,7 +1968,9 @@ protected:
 };
 
 /// A recipe for widening vector intrinsics.
-class VPWidenIntrinsicRecipe : public VPRecipeWithIRFlags, public VPIRMetadata {
+class VPWidenIntrinsicRecipe : public VPRecipeWithIRFlags,
+                               public VPIRMetadata,
+                               public VPIRAttributes {
   /// ID of the vector intrinsic to widen.
   Intrinsic::ID VectorIntrinsicID;
 
@@ -1960,17 +1989,18 @@ protected:
                          ArrayRef<VPValue *> CallArguments, Type *Ty,
                          const VPIRFlags &Flags = {},
                          const VPIRMetadata &MD = {},
+                         const VPIRAttributes &Attrs = {},
                          DebugLoc DL = DebugLoc::getUnknown())
       : VPRecipeWithIRFlags(SC, CallArguments, Ty, Flags, DL), VPIRMetadata(MD),
-        VectorIntrinsicID(VectorIntrinsicID) {
+        VPIRAttributes(Attrs), VectorIntrinsicID(VectorIntrinsicID) {
     LLVMContext &Ctx = Ty->getContext();
-    AttributeSet Attrs = Intrinsic::getFnAttributes(Ctx, VectorIntrinsicID);
-    MemoryEffects ME = Attrs.getMemoryEffects();
+    AttributeSet IntrAttrs = Intrinsic::getFnAttributes(Ctx, VectorIntrinsicID);
+    MemoryEffects ME = IntrAttrs.getMemoryEffects();
     MayReadFromMemory = !ME.onlyWritesMemory();
     MayWriteToMemory = !ME.onlyReadsMemory();
     MayHaveSideEffects = MayWriteToMemory ||
-                         !Attrs.hasAttribute(Attribute::NoUnwind) ||
-                         !Attrs.hasAttribute(Attribute::WillReturn);
+                         !IntrAttrs.hasAttribute(Attribute::NoUnwind) ||
+                         !IntrAttrs.hasAttribute(Attribute::WillReturn);
   }
 
   /// Helper function to produce the widened intrinsic call.
@@ -1982,13 +2012,16 @@ public:
                          const VPIRFlags &Flags = {},
                          const VPIRMetadata &MD = {},
                          DebugLoc DL = DebugLoc::getUnknown())
-      : VPRecipeWithIRFlags(VPRecipeBase::VPWidenIntrinsicSC, CallArguments, Ty,
-                            Flags, DL),
-        VPIRMetadata(MD), VectorIntrinsicID(VectorIntrinsicID),
-        MayReadFromMemory(CI.mayReadFromMemory()),
-        MayWriteToMemory(CI.mayWriteToMemory()),
-        MayHaveSideEffects(CI.mayHaveSideEffects()) {
+      : VPWidenIntrinsicRecipe(VPRecipeBase::VPWidenIntrinsicSC,
+                               VectorIntrinsicID, CallArguments, Ty, Flags, MD,
+                               VPIRAttributes(CI), DL) {
     setUnderlyingValue(&CI);
+    // The widened call keeps the scalar call's operand bundles, which can imply
+    // effects beyond the intrinsic ID's defaults (e.g. a "deopt" bundle), so
+    // preserve the scalar call's effects to avoid unsound hoisting/sinking.
+    MayReadFromMemory = CI.mayReadFromMemory();
+    MayWriteToMemory = CI.mayWriteToMemory();
+    MayHaveSideEffects = CI.mayHaveSideEffects();
   }
 
   VPWidenIntrinsicRecipe(Intrinsic::ID VectorIntrinsicID,
@@ -1998,23 +2031,27 @@ public:
                          DebugLoc DL = DebugLoc::getUnknown())
       : VPWidenIntrinsicRecipe(VPRecipeBase::VPWidenIntrinsicSC,
                                VectorIntrinsicID, CallArguments, Ty, Flags,
-                               Metadata, DL) {}
+                               Metadata, VPIRAttributes(), DL) {}
 
   ~VPWidenIntrinsicRecipe() override = default;
 
   VPWidenIntrinsicRecipe *clone() override {
-    if (Value *CI = getUnderlyingValue())
-      return new VPWidenIntrinsicRecipe(*cast<CallInst>(CI), VectorIntrinsicID,
+    Value *CI = getUnderlyingValue();
+    auto *C =
+        CI ? new VPWidenIntrinsicRecipe(*cast<CallInst>(CI), VectorIntrinsicID,
                                         operands(), getScalarType(), *this,
-                                        *this, getDebugLoc());
-    return new VPWidenIntrinsicRecipe(VectorIntrinsicID, operands(),
-                                      getScalarType(), *this, *this,
-                                      getDebugLoc());
+                                        *this, getDebugLoc())
+           : new VPWidenIntrinsicRecipe(VectorIntrinsicID, operands(),
+                                        getScalarType(), *this, *this,
+                                        getDebugLoc());
+    // The constructors recompute or default the attributes, so copy over this
+    // recipe's current (possibly CSE-intersected) attributes.
+    static_cast<VPIRAttributes &>(*C) = *this;
+    return C;
   }
 
   static inline bool classof(const VPRecipeBase *R) {
-    return R->getVPRecipeID() == VPRecipeBase::VPWidenIntrinsicSC ||
-           R->getVPRecipeID() == VPRecipeBase::VPWidenMemIntrinsicSC;
+    return R->getVPRecipeID() == VPRecipeBase::VPWidenIntrinsicSC;
   }
 
   static inline bool classof(const VPUser *U) {
@@ -2040,12 +2077,28 @@ public:
                                          const VPRecipeWithIRFlags &R,
                                          ElementCount VF, VPCostContext &Ctx);
 
+  /// Compute the cost of a vector memory intrinsic call.
+  static InstructionCost computeMemIntrinsicCost(Intrinsic::ID IID, Type *Ty,
+                                                 bool IsMasked, Align Alignment,
+                                                 VPCostContext &Ctx);
+
   /// Return the cost of this vector intrinsic.
   LLVM_ABI_FOR_TEST InstructionCost
   computeCost(ElementCount VF, VPCostContext &Ctx) const override;
 
   /// Return the ID of the intrinsic.
   Intrinsic::ID getVectorIntrinsicID() const { return VectorIntrinsicID; }
+
+  /// Add \p Attr to the parameter at \p ArgIdx.
+  void addParamAttr(unsigned ArgIdx, Attribute Attr) {
+    VPIRAttributes::addParamAttr(getScalarType()->getContext(), ArgIdx, Attr);
+  }
+
+  /// Intersect this recipe's attributes with \p Other's; see
+  /// VPIRAttributes::intersectAttrs.
+  bool intersectAttrs(const VPWidenIntrinsicRecipe &Other) {
+    return VPIRAttributes::intersectAttrs(getScalarType()->getContext(), Other);
+  }
 
   /// Return to name of the intrinsic as string.
   StringRef getIntrinsicName() const;
@@ -2067,48 +2120,6 @@ protected:
   LLVM_ABI_FOR_TEST void printRecipe(raw_ostream &O, const Twine &Indent,
                                      VPSlotTracker &SlotTracker) const override;
 #endif
-};
-
-/// A recipe for widening vector memory intrinsics.
-class VPWidenMemIntrinsicRecipe final : public VPWidenIntrinsicRecipe {
-  /// Alignment information for this memory access.
-  Align Alignment;
-
-public:
-  // TODO: support StoreInst for strided store
-  VPWidenMemIntrinsicRecipe(Intrinsic::ID VectorIntrinsicID,
-                            ArrayRef<VPValue *> CallArguments, Type *Ty,
-                            Align Alignment, const VPIRMetadata &MD = {},
-                            DebugLoc DL = DebugLoc::getUnknown())
-      : VPWidenIntrinsicRecipe(VPRecipeBase::VPWidenMemIntrinsicSC,
-                               VectorIntrinsicID, CallArguments, Ty, {}, MD,
-                               DL),
-        Alignment(Alignment) {
-    assert(VectorIntrinsicID == Intrinsic::experimental_vp_strided_load &&
-           "Unexpected intrinsic");
-  }
-
-  ~VPWidenMemIntrinsicRecipe() override = default;
-
-  VPWidenMemIntrinsicRecipe *clone() override {
-    return new VPWidenMemIntrinsicRecipe(getVectorIntrinsicID(), operands(),
-                                         getScalarType(), Alignment, *this,
-                                         getDebugLoc());
-  }
-
-  VP_CLASSOF_IMPL(VPRecipeBase::VPWidenMemIntrinsicSC)
-
-  /// Produce a widened version of the vector memory intrinsic.
-  void execute(VPTransformState &State) override;
-
-  /// Helper function for computing the cost of vector memory intrinsic.
-  static InstructionCost computeMemIntrinsicCost(Intrinsic::ID IID, Type *Ty,
-                                                 bool IsMasked, Align Alignment,
-                                                 VPCostContext &Ctx);
-
-  /// Return the cost of this vector memory intrinsic.
-  InstructionCost computeCost(ElementCount VF,
-                              VPCostContext &Ctx) const override;
 };
 
 /// A recipe for widening Call instructions using library calls.

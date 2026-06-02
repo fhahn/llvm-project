@@ -163,7 +163,7 @@ define void @test_intrinsic_with_arg_and_ret_attrs(ptr noalias %A, ptr noalias %
 ; CHECK-NEXT:      WIDEN ir<%a> = load vp<[[VP4]]>
 ; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds ir<%gep.B>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%b> = load vp<[[VP5]]>
-; CHECK-NEXT:      WIDEN-INTRINSIC ir<%m> = call llvm.minnum(ir<%a>, ir<%b>)
+; CHECK-NEXT:      WIDEN-INTRINSIC ir<%m> = call nofpclass(nan) llvm.minnum(nofpclass(nan) ir<%a>, nofpclass(nan) ir<%b>)
 ; CHECK-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer inbounds ir<%gep.A>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP6]]>, ir<%m>
 ; CHECK-NEXT:      EMIT ir<%i.next> = add ir<%i>, ir<1>
@@ -198,6 +198,72 @@ loop:
   store float %m, ptr %gep.A
   %i.next = add i32 %i, 1
   %cond = icmp eq i32 %i.next, %n
+  br i1 %cond, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; Only the allowlisted, propagatable attributes (here range) are stored and
+; printed for a widened intrinsic; non-propagatable ones (noundef) are dropped,
+; so the printed VPlan matches what applyAttrs emits on the widened call.
+define void @test_intrinsic_drops_non_propagatable_attrs(ptr noalias %A, ptr noalias %B, i64 %n) {
+; CHECK-LABEL: VPlan for loop in 'test_intrinsic_drops_non_propagatable_attrs'
+; CHECK:  VPlan ' for UF>=1' {
+; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
+; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
+; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
+; CHECK-NEXT:  Live-in ir<%n> = original trip-count
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<entry>:
+; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
+; CHECK-EMPTY:
+; CHECK-NEXT:  vector.ph:
+; CHECK-NEXT:  Successor(s): vector loop
+; CHECK-EMPTY:
+; CHECK-NEXT:  <x1> vector loop: {
+; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
+; CHECK-EMPTY:
+; CHECK-NEXT:    vector.body:
+; CHECK-NEXT:      ir<%i> = WIDEN-INDUCTION ir<0>, ir<1>, vp<[[VP0]]>
+; CHECK-NEXT:      CLONE ir<%gep.A> = getelementptr inbounds ir<%A>, ir<%i>
+; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = vector-pointer inbounds ir<%gep.A>, ir<1>
+; CHECK-NEXT:      WIDEN ir<%a> = load vp<[[VP4]]>
+; CHECK-NEXT:      WIDEN-INTRINSIC ir<%c> = call range(i32 0, 33) llvm.ctlz(range(i32 0, 100) ir<%a>, ir<true>)
+; CHECK-NEXT:      CLONE ir<%gep.B> = getelementptr inbounds ir<%B>, ir<%i>
+; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds ir<%gep.B>, ir<1>
+; CHECK-NEXT:      WIDEN store vp<[[VP5]]>, ir<%c>
+; CHECK-NEXT:      EMIT ir<%i.next> = add ir<%i>, ir<1>
+; CHECK-NEXT:      CLONE ir<%cond> = icmp eq ir<%i.next>, ir<%n>
+; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:    No successors
+; CHECK-NEXT:  }
+; CHECK-NEXT:  Successor(s): middle.block
+; CHECK-EMPTY:
+; CHECK-NEXT:  middle.block:
+; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = exiting-iv-value ir<%i>
+; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
+; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<exit>:
+; CHECK-NEXT:  No successors
+; CHECK-EMPTY:
+; CHECK-NEXT:  scalar.ph:
+;
+entry:
+  br label %loop
+
+loop:
+  %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
+  %gep.A = getelementptr inbounds i32, ptr %A, i64 %i
+  %a = load i32, ptr %gep.A
+  %c = call noundef range(i32 0, 33) i32 @llvm.ctlz.i32(i32 noundef range(i32 0, 100) %a, i1 true)
+  %gep.B = getelementptr inbounds i32, ptr %B, i64 %i
+  store i32 %c, ptr %gep.B
+  %i.next = add i64 %i, 1
+  %cond = icmp eq i64 %i.next, %n
   br i1 %cond, label %exit, label %loop
 
 exit:

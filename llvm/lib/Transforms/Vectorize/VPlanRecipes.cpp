@@ -82,7 +82,6 @@ bool VPRecipeBase::mayWriteToMemory() const {
     return !cast<VPWidenCallRecipe>(this)
                 ->getCalledScalarFunction()
                 ->onlyReadsMemory();
-  case VPWidenMemIntrinsicSC:
   case VPWidenIntrinsicSC:
     return cast<VPWidenIntrinsicRecipe>(this)->mayWriteToMemory();
   case VPActiveLaneMaskPHISC:
@@ -135,7 +134,6 @@ bool VPRecipeBase::mayReadFromMemory() const {
     return !cast<VPWidenCallRecipe>(this)
                 ->getCalledScalarFunction()
                 ->onlyWritesMemory();
-  case VPWidenMemIntrinsicSC:
   case VPWidenIntrinsicSC:
     return cast<VPWidenIntrinsicRecipe>(this)->mayReadFromMemory();
   case VPBranchOnMaskSC:
@@ -195,7 +193,6 @@ bool VPRecipeBase::mayHaveSideEffects() const {
     Function *Fn = cast<VPWidenCallRecipe>(this)->getCalledScalarFunction();
     return mayWriteToMemory() || !Fn->doesNotThrow() || !Fn->willReturn();
   }
-  case VPWidenMemIntrinsicSC:
   case VPWidenIntrinsicSC:
     return cast<VPWidenIntrinsicRecipe>(this)->mayHaveSideEffects();
   case VPBlendSC:
@@ -2142,15 +2139,54 @@ void VPIRMetadata::print(raw_ostream &O, VPSlotTracker &SlotTracker) const {
 }
 #endif
 
+// Value-property attributes (poison-on-violation) that lift element-wise to
+// vectors and so are safe to propagate to a widened call.
+static constexpr Attribute::AttrKind AllowedCallAttrs[] = {
+    Attribute::Alignment, Attribute::NonNull, Attribute::NoFPClass,
+    Attribute::Range};
+
+// Return the allowlisted attributes in \p AS that are compatible with \p Ty
+// (e.g. `align` on a non-pointer or `range` on a non-int operand is dropped).
+static AttributeSet filterCallAttrsForType(LLVMContext &Ctx, Type *Ty,
+                                           AttributeSet AS) {
+  if (!AS.hasAttributes())
+    return AttributeSet();
+  AttributeMask Incompatible =
+      AttributeFuncs::typeIncompatible(Ty, AS, AttributeFuncs::ASK_ALL);
+  AttrBuilder AB(Ctx);
+  for (Attribute::AttrKind K : AllowedCallAttrs) {
+    if (AS.hasAttribute(K) && !Incompatible.contains(K))
+      AB.addAttribute(AS.getAttribute(K));
+  }
+  return AttributeSet::get(Ctx, AB);
+}
+
+VPIRAttributes::VPIRAttributes(CallInst &CI) {
+  LLVMContext &Ctx = CI.getContext();
+  AttributeList ScalarAttrs = CI.getAttributes();
+
+  // Keep only the allowlisted attributes compatible with the scalar operand
+  // types; this filtered set is what the printer shows and what CSE compares.
+  // applyAttrs re-filters against the widened types, so the emitted set may be
+  // a subset (e.g. `nonnull` is valid on `ptr` but not on `<N x ptr>`).
+  AttributeSet RetAttrs;
+  if (!CI.getType()->isVoidTy())
+    RetAttrs =
+        filterCallAttrsForType(Ctx, CI.getType(), ScalarAttrs.getRetAttrs());
+
+  SmallVector<AttributeSet, 4> ArgAttrs(CI.arg_size());
+  for (const auto &[I, Arg] : enumerate(CI.args()))
+    ArgAttrs[I] = filterCallAttrsForType(Ctx, Arg->getType(),
+                                         ScalarAttrs.getParamAttrs(I));
+
+  CallAttrs = AttributeList::get(Ctx, AttributeSet(), RetAttrs, ArgAttrs);
+}
+
 VPIRAttributes::VPIRAttributes(CallInst &CI, const Function &Variant) {
   LLVMContext &Ctx = CI.getContext();
   AttributeList ScalarAttrs = CI.getAttributes();
   AttributeList VariantAttrs = Variant.getAttributes();
   FunctionType *VariantTy = Variant.getFunctionType();
-
-  static constexpr Attribute::AttrKind Allowed[] = {
-      Attribute::Alignment, Attribute::NonNull, Attribute::NoFPClass,
-      Attribute::Range};
 
   // Combine attributes from the Variant declaration and the call site, picking the stricter one.
   auto CombineAttrs = [&](Attribute CallAttr, Attribute VariantAttr) -> Attribute {
@@ -2175,16 +2211,13 @@ VPIRAttributes::VPIRAttributes(CallInst &CI, const Function &Variant) {
   };
 
   // Only keep allowed attributes (which do not trigger UB) and ones that are
-  // compatible with the widened type of Variant.
+  // compatible with the widened type of Variant, combining each with the
+  // matching Variant attribute.
   auto Filter = [&](Type *Ty, AttributeSet CallAS, AttributeSet VariantAS) {
-    AttributeMask Incompatible =
-        AttributeFuncs::typeIncompatible(Ty, CallAS, AttributeFuncs::ASK_ALL);
     AttrBuilder AB(Ctx);
-    for (Attribute::AttrKind K : Allowed) {
-      if (CallAS.hasAttribute(K) && !Incompatible.contains(K))
-        AB.addAttribute(
-            CombineAttrs(CallAS.getAttribute(K), VariantAS.getAttribute(K)));
-    }
+    for (Attribute A : filterCallAttrsForType(Ctx, Ty, CallAS))
+      AB.addAttribute(
+          CombineAttrs(A, VariantAS.getAttribute(A.getKindAsEnum())));
     return AttributeSet::get(Ctx, AB);
   };
 
@@ -2193,7 +2226,7 @@ VPIRAttributes::VPIRAttributes(CallInst &CI, const Function &Variant) {
     RetAttrs = Filter(Variant.getReturnType(), ScalarAttrs.getRetAttrs(),
                       VariantAttrs.getRetAttrs());
 
-  SmallVector<AttributeSet> ArgAttrs(VariantTy->getNumParams());
+  SmallVector<AttributeSet, 4> ArgAttrs(VariantTy->getNumParams());
   for (unsigned I = 0, E = std::min<unsigned>(CI.arg_size(),
                                               VariantTy->getNumParams());
        I != E; ++I) {
@@ -2210,12 +2243,17 @@ VPIRAttributes::VPIRAttributes(CallInst &CI, const Function &Variant) {
 void VPIRAttributes::applyAttrs(CallInst &V) const {
   LLVMContext &Ctx = V.getContext();
 
-  AttributeSet RetAttrs = CallAttrs.getRetAttrs();
+  // CallAttrs was filtered against the scalar operand types at construction;
+  // re-filter against the widened types to drop attributes whose compatibility
+  // changes under widening (e.g. `nonnull` on a widened vector of pointers).
+  AttributeSet RetAttrs =
+      filterCallAttrsForType(Ctx, V.getType(), CallAttrs.getRetAttrs());
   if (RetAttrs.hasAttributes())
     V.addRetAttrs(AttrBuilder(Ctx, RetAttrs));
 
-  for (unsigned I = 0, E = V.arg_size(); I != E; ++I) {
-    AttributeSet PA = CallAttrs.getParamAttrs(I);
+  for (const auto &[I, Arg] : enumerate(V.args())) {
+    AttributeSet PA =
+        filterCallAttrsForType(Ctx, Arg->getType(), CallAttrs.getParamAttrs(I));
     if (PA.hasAttributes())
       V.addParamAttrs(I, AttrBuilder(Ctx, PA));
   }
@@ -2376,6 +2414,8 @@ CallInst *VPWidenIntrinsicRecipe::createVectorCall(VPTransformState &State) {
   applyFlags(*V);
   applyMetadata(*V);
 
+  applyAttrs(*V);
+
   return V;
 }
 
@@ -2430,6 +2470,17 @@ InstructionCost VPWidenIntrinsicRecipe::computeCallCost(
 
 InstructionCost VPWidenIntrinsicRecipe::computeCost(ElementCount VF,
                                                     VPCostContext &Ctx) const {
+  // Strided loads are costed via the memory-intrinsic cost hook. The alignment
+  // is stored as an `align` attribute on the pointer operand (operand 0); an
+  // all-true mask (operand 2) means the access is unmasked.
+  if (VectorIntrinsicID == Intrinsic::experimental_vp_strided_load) {
+    Type *Ty = toVectorTy(getScalarType(), VF);
+    Align Alignment = getParamAttrs(0).getAlignment().valueOrOne();
+    return computeMemIntrinsicCost(VectorIntrinsicID, Ty,
+                                   !match(getOperand(2), m_True()), Alignment,
+                                   Ctx);
+  }
+
   return computeCallCost(VectorIntrinsicID, operands(), *this, VF, Ctx);
 }
 
@@ -2459,34 +2510,27 @@ void VPWidenIntrinsicRecipe::printRecipe(raw_ostream &O, const Twine &Indent,
 
   O << "call";
   printFlags(O);
+  // Print the return attributes with a trailing space (rather than via
+  // printRetAttrs, which prepends one) as the intrinsic name follows directly.
+  if (AttributeSet RA = getRetAttrs(); RA.hasAttributes())
+    O << RA.getAsString(/*InAttrGrp=*/false) << " ";
   O << getIntrinsicName() << "(";
-  printOperands(O, SlotTracker);
+
+  interleaveComma(enumerate(operands()), O, [&](const auto &IndexedOp) {
+    auto [Idx, Op] = IndexedOp;
+    printParamAttrs(O, Idx);
+    Op->printAsOperand(O, SlotTracker);
+  });
   O << ")";
 }
 #endif
 
-void VPWidenMemIntrinsicRecipe::execute(VPTransformState &State) {
-  CallInst *MemI = createVectorCall(State);
-  MemI->addParamAttr(
-      0, Attribute::getWithAlignment(MemI->getContext(), Alignment));
-  State.set(this, MemI);
-}
-
-InstructionCost VPWidenMemIntrinsicRecipe::computeMemIntrinsicCost(
+InstructionCost VPWidenIntrinsicRecipe::computeMemIntrinsicCost(
     Intrinsic::ID IID, Type *Ty, bool IsMasked, Align Alignment,
     VPCostContext &Ctx) {
   return Ctx.TTI.getMemIntrinsicInstrCost(
       MemIntrinsicCostAttributes(IID, Ty, /*Ptr=*/nullptr, IsMasked, Alignment),
       Ctx.CostKind);
-}
-
-InstructionCost
-VPWidenMemIntrinsicRecipe::computeCost(ElementCount VF,
-                                       VPCostContext &Ctx) const {
-  Type *Ty = toVectorTy(getScalarType(), VF);
-  return computeMemIntrinsicCost(getVectorIntrinsicID(), Ty,
-                                 !match(getOperand(2), m_True()), Alignment,
-                                 Ctx);
 }
 
 void VPHistogramRecipe::execute(VPTransformState &State) {
