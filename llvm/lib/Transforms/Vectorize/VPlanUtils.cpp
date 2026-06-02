@@ -771,18 +771,19 @@ vputils::getMemoryLocation(const VPRecipeBase &R) {
   return Loc;
 }
 
-VPInstruction *vputils::findCanonicalIVIncrement(VPlan &Plan) {
-  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
-  VPRegionValue *CanIV = LoopRegion->getCanonicalIV();
+VPInstruction *vputils::findCanonicalIVIncrement(VPRegionBlock &Region) {
+  VPRegionValue *CanIV = Region.getCanonicalIV();
   assert(CanIV && "Expected loop region to have a canonical IV");
+  VPlan &Plan = *Region.getPlan();
 
   VPSymbolicValue &VFxUF = Plan.getVFxUF();
 
   // Check if \p Step matches the expected increment step, accounting for
-  // materialization of VFxUF and UF.
+  // materialization of VFxUF and UF, or for transforms that rewrite the step
+  // to VF (e.g. the realign-loop transform's snapshot region).
   auto IsIncrementStep = [&](VPValue *Step) -> bool {
     if (!VFxUF.isMaterialized())
-      return Step == &VFxUF;
+      return Step == &VFxUF || Step == &Plan.getVF();
 
     VPSymbolicValue &UF = Plan.getUF();
     if (!UF.isMaterialized())
@@ -827,7 +828,7 @@ VPInstruction *vputils::findCanonicalIVIncrement(VPlan &Plan) {
   assert((!VFxUF.isMaterialized() || Increment) &&
          "After materializing VFxUF, an increment must exist");
   assert((!Increment ||
-          LoopRegion->hasCanonicalIVNUW() == Increment->hasNoUnsignedWrap()) &&
+          Region.hasCanonicalIVNUW() == Increment->hasNoUnsignedWrap()) &&
          "NUW flag in region and increment must match");
   return Increment;
 }

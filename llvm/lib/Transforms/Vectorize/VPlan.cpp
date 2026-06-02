@@ -859,7 +859,7 @@ VPInstruction *VPRegionBlock::getOrCreateCanonicalIVIncrement() {
   VPRegionValue *CanIV = getCanonicalIV();
   assert(CanIV && "Expected a canonical IV");
 
-  if (auto *Inc = vputils::findCanonicalIVIncrement(*getPlan()))
+  if (auto *Inc = vputils::findCanonicalIVIncrement(*this))
     return Inc;
 
   assert(!getPlan()->getVFxUF().isMaterialized() &&
@@ -1019,31 +1019,34 @@ void VPlan::execute(VPTransformState *State) {
 
   State->CFG.DTU.flush();
 
-  VPBasicBlock *Header = vputils::getFirstLoopHeader(*this, State->VPDT);
-  if (!Header)
-    return;
-
-  auto *LatchVPBB = cast<VPBasicBlock>(Header->getPredecessors()[1]);
-  BasicBlock *VectorLatchBB = State->CFG.VPBB2IRBB[LatchVPBB];
-
-  // Fix the latch value of canonical, reduction and first-order recurrences
-  // phis in the vector loop.
-  for (VPRecipeBase &R : Header->phis()) {
-    // Skip phi-like recipes that generate their backedege values themselves.
-    if (isa<VPWidenPHIRecipe>(&R))
+  // Fix the latch value of header phis (canonical IV, reductions, first-order
+  // recurrences) for every loop header in the plan. Most plans have a single
+  // header, but transforms like applyRealignSnapshot may introduce additional
+  // header VPBBs.
+  for (auto *Header : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_shallow(getEntry()))) {
+    if (!VPBlockUtils::isHeader(Header, State->VPDT))
       continue;
+    auto *LatchVPBB = cast<VPBasicBlock>(Header->getPredecessors()[1]);
+    BasicBlock *VectorLatchBB = State->CFG.VPBB2IRBB[LatchVPBB];
 
-    auto *PhiR = cast<VPSingleDefRecipe>(&R);
-    // VPInstructions currently model scalar Phis only.
-    bool NeedsScalar = isa<VPInstruction>(PhiR) ||
-                       (isa<VPReductionPHIRecipe>(PhiR) &&
-                        cast<VPReductionPHIRecipe>(PhiR)->isInLoop());
+    for (VPRecipeBase &R : Header->phis()) {
+      // Skip phi-like recipes that generate their backedge values themselves.
+      if (isa<VPWidenPHIRecipe>(&R))
+        continue;
 
-    Value *Phi = State->get(PhiR, NeedsScalar);
-    // VPHeaderPHIRecipe supports getBackedgeValue() but VPInstruction does
-    // not.
-    Value *Val = State->get(PhiR->getOperand(1), NeedsScalar);
-    cast<PHINode>(Phi)->addIncoming(Val, VectorLatchBB);
+      auto *PhiR = cast<VPSingleDefRecipe>(&R);
+      // VPInstructions currently model scalar Phis only.
+      bool NeedsScalar = isa<VPInstruction>(PhiR) ||
+                         (isa<VPReductionPHIRecipe>(PhiR) &&
+                          cast<VPReductionPHIRecipe>(PhiR)->isInLoop());
+
+      Value *Phi = State->get(PhiR, NeedsScalar);
+      // VPHeaderPHIRecipe supports getBackedgeValue() but VPInstruction does
+      // not.
+      Value *Val = State->get(PhiR->getOperand(1), NeedsScalar);
+      cast<PHINode>(Phi)->addIncoming(Val, VectorLatchBB);
+    }
   }
 }
 
@@ -1802,7 +1805,10 @@ void LoopVectorizationPlanner::updateLoopMetadataAndProfileInfo(
   // use the value of vscale used for tuning.
   unsigned AverageVectorTripCount = 0;
   unsigned RemainderAverageTripCount = 0;
-  auto EC = VectorLoop->getLoopPreheader()->getParent()->getEntryCount();
+  BasicBlock *VectorPH = VectorLoop->getLoopPreheader();
+  if (!VectorPH)
+    return;
+  auto EC = VectorPH->getParent()->getEntryCount();
   auto IsProfiled = EC && EC->getCount();
   if (!OrigAverageTripCount) {
     if (!IsProfiled)

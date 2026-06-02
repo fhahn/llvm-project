@@ -27,6 +27,7 @@
 #include "llvm/ADT/SetOperations.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Analysis/IVDescriptors.h"
 #include "llvm/Analysis/InstSimplifyFolder.h"
@@ -35,6 +36,7 @@
 #include "llvm/Analysis/MemoryLocation.h"
 #include "llvm/Analysis/ScalarEvolutionPatternMatch.h"
 #include "llvm/Analysis/ScopedNoAliasAA.h"
+#include "llvm/Analysis/ValueTracking.h"
 #include "llvm/Analysis/VectorUtils.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/MDBuilder.h"
@@ -47,6 +49,10 @@
 using namespace llvm;
 using namespace VPlanPatternMatch;
 using namespace SCEVPatternMatch;
+
+#define DEBUG_TYPE "vplan-realign-stats"
+
+STATISTIC(NumRealignApplied, "Number of plans where realign body was applied");
 
 bool VPlanTransforms::tryToConvertVPInstructionsToVPRecipes(
     VPlan &Plan, const TargetLibraryInfo &TLI) {
@@ -5827,7 +5833,7 @@ VPlanTransforms::narrowInterleaveGroups(VPlan &Plan,
 
   // Adjust induction to reflect that the transformed plan only processes one
   // original iteration.
-  VPInstruction *CanIVInc = vputils::findCanonicalIVIncrement(Plan);
+  VPInstruction *CanIVInc = vputils::findCanonicalIVIncrement(*VectorLoop);
   Type *CanIVTy = VectorLoop->getCanonicalIVType();
   VPBasicBlock *VectorPH = Plan.getVectorPreheader();
   VPBuilder PHBuilder(VectorPH, VectorPH->begin());
@@ -7242,4 +7248,387 @@ void VPlanTransforms::convertToStridedAccesses(VPlan &Plan,
       LoadR->replaceAllUsesWith(StridedLoad);
     }
   }
+}
+
+static cl::opt<bool> EnableTryToRealignLoop(
+    "vplan-try-to-realign-loop", cl::init(false), cl::Hidden,
+    cl::desc("Enable experimental loop-tail-realignment transform that "
+             "vectorizes the scalar tail by re-executing the vector body "
+             "once with a shifted base pointer."));
+
+// Walk back from \p Addr through simple replicate-GEP, widen-GEP and
+// vector-pointer chains until a live-in IR pointer is found, then collect
+// its underlying objects into \p Objects via getUnderlyingObjects. Returns
+// false if the chain reaches a recipe shape we don't support, in which case
+// \p Objects must not be inspected.
+static bool collectUnderlyingObjectsForAddr(
+    VPValue *Addr, SmallVectorImpl<const Value *> &Objects) {
+  VPValue *Cur = Addr;
+  while (Cur) {
+    if (Value *V = Cur->getUnderlyingValue()) {
+      getUnderlyingObjects(V, Objects);
+      return true;
+    }
+    auto *DefR = Cur->getDefiningRecipe();
+    if (!DefR)
+      return false;
+    if (auto *Rep = dyn_cast<VPReplicateRecipe>(DefR)) {
+      if (!isa<GetElementPtrInst>(Rep->getUnderlyingInstr()))
+        return false;
+      Cur = Rep->getOperand(0);
+      continue;
+    }
+    if (isa<VPWidenGEPRecipe, VPVectorPointerRecipe>(DefR)) {
+      Cur = DefR->getOperand(0);
+      continue;
+    }
+    return false;
+  }
+  return false;
+}
+
+// Return true if \p Header's body is safe to re-execute on the realign
+// overlap lanes: every non-loop-control recipe must be a recognised pure
+// widen/replicate/intrinsic/memory recipe with no self-aliasing across
+// loads and stores. \p IsLoopControl identifies the latch terminator (and,
+// post-dissolution, the canonical IV phi) so they're not validated as body
+// recipes. Used by both the pre-dissolution snapshot path and the
+// post-dissolution in-place epilogue rewrite, which differ only in how
+// the loop-control recipes are identified.
+static bool
+isRealignSafeBody(VPBasicBlock *Header,
+                  function_ref<bool(VPRecipeBase &)> IsLoopControl) {
+  // Tracks underlying memory objects of loads / stores; if the same object
+  // appears in both sets the body is self-aliasing across iterations and
+  // re-executing in the realign loop would observe its own writes.
+  SmallPtrSet<const Value *, 4> LoadBases, StoreBases;
+  bool SeenStore = false;
+  for (VPRecipeBase &R : *Header) {
+    if (IsLoopControl(R))
+      continue;
+    if (isa<VPWidenRecipe, VPWidenCastRecipe, VPWidenGEPRecipe,
+            VPVectorPointerRecipe, VPVectorEndPointerRecipe,
+            VPScalarIVStepsRecipe>(&R))
+      continue;
+    // Pure, side-effect-free widened intrinsics (e.g. llvm.fmuladd, llvm.abs,
+    // min/max). These compute one vector result per VF lanes, like a plain
+    // widen recipe, and are safe to re-execute idempotently on the overlap
+    // lanes. Reject anything that may read/write memory or have side effects
+    // (e.g. masked gather/scatter intrinsics, lifetime markers).
+    if (auto *WI = dyn_cast<VPWidenIntrinsicRecipe>(&R)) {
+      if (WI->mayReadFromMemory() || WI->mayWriteToMemory() ||
+          WI->mayHaveSideEffects())
+        return false;
+      continue;
+    }
+    if (auto *Mem = dyn_cast<VPWidenMemoryRecipe>(&R)) {
+      if (!Mem->isConsecutive())
+        return false;
+      bool IsLoad = isa<VPWidenLoadRecipe, VPWidenLoadEVLRecipe>(&R);
+      // Loads after a store within an iteration would observe their own
+      // writes from a previous iteration; reject.
+      if (IsLoad && SeenStore)
+        return false;
+      SeenStore |= !IsLoad;
+      SmallVector<const Value *, 4> Objects;
+      if (!collectUnderlyingObjectsForAddr(Mem->getAddr(), Objects))
+        return false;
+      auto &Bases = IsLoad ? LoadBases : StoreBases;
+      for (const Value *Obj : Objects)
+        Bases.insert(Obj);
+      continue;
+    }
+    if (auto *Rep = dyn_cast<VPReplicateRecipe>(&R)) {
+      if (!Rep->isSingleScalar() || Rep->mayReadFromMemory() ||
+          Rep->mayWriteToMemory() || Rep->mayHaveSideEffects())
+        return false;
+      continue;
+    }
+    if (auto *VPI = dyn_cast<VPInstruction>(&R)) {
+      if (VPI->mayHaveSideEffects() || VPI->mayReadFromMemory() ||
+          VPI->mayWriteToMemory())
+        return false;
+      continue;
+    }
+    // Anything else (e.g., interleave groups, predicated calls, intrinsics,
+    // gather/scatter, reductions) is rejected.
+    return false;
+  }
+  // Self-aliasing safety: same underlying object on both sides means the
+  // realign loop would re-read writes from the main loop.
+  for (const Value *V : LoadBases)
+    if (StoreBases.contains(V))
+      return false;
+  return true;
+}
+
+// Predicate identifying the latch BranchOn* terminator inside a realign-
+// candidate header. Used as the loop-control filter for isRealignSafeBody:
+// pre-dissolution the latch is the only recipe that needs to be skipped
+// (the canonical IV-increment is a generic Add VPInstruction and falls
+// through the side-effect check); post-dissolution callers compose this
+// with an extra check for the canonical IV phi.
+static bool isLatchBranchOn(VPRecipeBase &R) {
+  return match(&R, m_CombineOr(m_CombineOr(m_BranchOnCond(), m_BranchOnCount()),
+                               m_BranchOnTwoConds()));
+}
+
+// Walk the recipes inside \p Region (in deep RPO) and remap operands to the
+// cloned defs collected from \p OrigEntry. Operands that don't have a clone
+// (live-ins, defs outside the region) are left untouched. Used after
+// VPRegionBlock::clone(), which itself does not remap recipe operands.
+static void remapClonedRegionOperands(VPRegionBlock *OrigRegion,
+                                      VPRegionBlock *NewRegion) {
+  DenseMap<VPValue *, VPValue *> Old2New;
+  // Map the canonical IV of the original region to the cloned region's
+  // canonical IV, so that body recipes referring to the IV pick up the
+  // right def in the clone.
+  if (auto *OldCanIV = OrigRegion->getCanonicalIV()) {
+    if (auto *NewCanIV = NewRegion->getCanonicalIV())
+      Old2New[OldCanIV] = NewCanIV;
+  }
+
+  ReversePostOrderTraversal<VPBlockDeepTraversalWrapper<VPBlockBase *>>
+      OldRPOT(OrigRegion->getEntry());
+  ReversePostOrderTraversal<VPBlockDeepTraversalWrapper<VPBlockBase *>>
+      NewRPOT(NewRegion->getEntry());
+
+  // Collect mappings from old defined VPValues to their cloned counterparts.
+  for (const auto &[OldBB, NewBB] :
+       zip(VPBlockUtils::blocksOnly<VPBasicBlock>(OldRPOT),
+           VPBlockUtils::blocksOnly<VPBasicBlock>(NewRPOT))) {
+    assert(OldBB->getRecipeList().size() == NewBB->getRecipeList().size() &&
+           "blocks must have the same number of recipes");
+    for (const auto &[OldR, NewR] : zip(*OldBB, *NewBB)) {
+      assert(OldR.getNumDefinedValues() == NewR.getNumDefinedValues() &&
+             "recipes must define the same number of values");
+      for (const auto &[OldV, NewV] :
+           zip(OldR.definedValues(), NewR.definedValues()))
+        Old2New[OldV] = NewV;
+    }
+  }
+
+  // Now rewrite operands in the cloned recipes.
+  for (VPBasicBlock *NewBB :
+       VPBlockUtils::blocksOnly<VPBasicBlock>(NewRPOT)) {
+    for (VPRecipeBase &NewR : *NewBB) {
+      for (unsigned I = 0, E = NewR.getNumOperands(); I != E; ++I) {
+        VPValue *Op = NewR.getOperand(I);
+        auto It = Old2New.find(Op);
+        if (It != Old2New.end())
+          NewR.setOperand(I, It->second);
+      }
+    }
+  }
+}
+
+VPRegionBlock *VPlanTransforms::prepareRealignSnapshot(
+    VPlan &Plan, Loop *OrigLoop, ElementCount BestVF, unsigned BestUF,
+    PredicatedScalarEvolution &PSE) {
+  if (!EnableTryToRealignLoop)
+    return nullptr;
+
+  // Restrict to fixed VF and outermost loops.
+  if (!BestVF.isFixed() || OrigLoop->getParentLoop() || Plan.hasEarlyExit())
+    return nullptr;
+
+  // Only fire for compile-time-known trip counts: with a constant TC we can
+  // statically check the profitability gate (Tail >= 2) and emit the
+  // realigned epilogue without runtime checks. Runtime-TC support is added
+  // by a follow-up patch.
+  const SCEV *TCSCEV = vputils::getSCEVExprForVPValue(Plan.getTripCount(), PSE);
+  auto *TCConst = dyn_cast<SCEVConstant>(TCSCEV);
+  // Cap constant TC at 32 bits so RestartIdx * EltSize fits comfortably in
+  // uint64_t when computing the alignment downgrade.
+  if (!TCConst || TCConst->getAPInt().getActiveBits() > 32)
+    return nullptr;
+  uint64_t VFLanes = BestVF.getFixedValue();
+  uint64_t Stride = VFLanes * BestUF;
+  uint64_t TCVal = TCConst->getAPInt().getZExtValue();
+  // Profitability gate: the realign body re-executes the body once at offset
+  // RestartIdx, producing (Stride - Tail) redundant lane writes that overlap
+  // with the main vector loop. Require Tail >= 2 so the redundancy stays
+  // bounded; Tail == 1 has been observed to regress because a single scalar
+  // iteration is cheaper than re-running the realign body.
+  uint64_t Tail = TCVal % Stride;
+  if (Tail < 2 || TCVal < Stride)
+    return nullptr;
+
+  VPRegionBlock *MainRegion = Plan.getVectorLoopRegion();
+  if (!MainRegion || MainRegion->isReplicator())
+    return nullptr;
+  // Only handle a single-block loop body for now.
+  auto *Header = cast<VPBasicBlock>(MainRegion->getEntry());
+  if (Header != MainRegion->getExiting())
+    return nullptr;
+
+  // Reject loops with header phis other than the canonical IV. Reductions,
+  // first-order recurrences, and widen-IV recipes need special handling that
+  // the realigned loop currently does not provide. Pre-unroll, the canonical
+  // IV is represented as a VPRegionValue (not a VPPhi), so any phi recipe
+  // here is unsupported.
+  if (!Header->phis().empty())
+    return nullptr;
+
+  // Scan the loop body and reject anything we can't safely re-execute on
+  // the tail. Pre-unroll, the body has a single "part", so the validation
+  // is simpler than the post-dissolve path. Pre-dissolution the only
+  // loop-control recipe is the latch BranchOn*; the canonical IV-increment
+  // is a generic Add VPInstruction and falls through the side-effect check.
+  if (!isRealignSafeBody(Header, isLatchBranchOn))
+    return nullptr;
+
+  // Clone the region. VPRegionBlock::clone() copies blocks and recipes but
+  // does not remap operands; remap them so the clone is self-contained.
+  VPRegionBlock *Snapshot = MainRegion->clone();
+  remapClonedRegionOperands(MainRegion, Snapshot);
+  Snapshot->setName("vector.realign.region");
+
+  // The cloned IV-increment recipe steps by VFxUF; rewrite it to step by VF
+  // so that after materialization the realigned loop covers VF lanes per
+  // iteration. The increment lives in the cloned region's exiting (== entry)
+  // block as the recipe matching add(CanIV, VFxUF).
+  auto *CloneHeader = cast<VPBasicBlock>(Snapshot->getEntry());
+  VPRegionValue *CloneCanIV = Snapshot->getCanonicalIV();
+  auto It = find_if(*CloneHeader, [&](VPRecipeBase &R) {
+    return match(&R,
+                 m_Add(m_Specific(CloneCanIV), m_Specific(&Plan.getVFxUF())));
+  });
+  if (It == CloneHeader->end()) {
+    // Could not find the canonical IV-increment in the expected shape.
+    return nullptr;
+  }
+  cast<VPInstruction>(&*It)->setOperand(1, &Plan.getVF());
+
+  // Downgrade alignment on the cloned memory recipes. The main loop accesses
+  // at index k*VF (so its recipes may claim up to VF*EltSize, or more for an
+  // over-aligned base). The realign loop starts at n.vec - overlap with
+  // overlap in [0, VF-1] -- a runtime, generally non-VF-aligned index -- so
+  // only the element's natural alignment is sound for every possible start.
+  // Without this, an over-claimed alignment (e.g. align 32 on a load that is
+  // actually only element-aligned) is a miscompile.
+  for (VPRecipeBase &R : *CloneHeader) {
+    auto *MemR = dyn_cast<VPWidenMemoryRecipe>(&R);
+    if (!MemR)
+      continue;
+    Instruction &I = MemR->getIngredient();
+    Type *EltTy = getLoadStoreType(&I);
+    uint64_t EltBytes = I.getDataLayout().getTypeStoreSize(EltTy);
+    MemR->setAlignment(commonAlignment(MemR->getAlign(), EltBytes));
+  }
+
+  return Snapshot;
+}
+
+void VPlanTransforms::applyRealignSnapshot(VPlan &Plan,
+                                           VPRegionBlock *Snapshot,
+                                           ElementCount BestVF) {
+  if (!Snapshot)
+    return;
+
+  // Insert the snapshot region as a sibling of the main vector loop region
+  // and let dissolveLoopRegions (run later) flatten both regions uniformly.
+  // The IV of the snapshot iterates [0, TC - RealignStart) stepping by VF;
+  // a per-region offset added inside the header shifts effective indices to
+  // [RealignStart, TC).
+  //
+  //   middle.block -- cmp.n (tail==0) ----------------------------> exit
+  //                -- else --> realign.check
+  //   realign.check -- (tail < 2) -----------------------> scalar.ph
+  //                 -- else ---> realign.ph -- realign.region --> exit
+  //
+  // tail==1 is a small loss for the realign loop (1 vector iter + 1 overlap
+  // lane vs a single scalar iter), so route tail < 2 to the scalar tail.
+
+  VPBasicBlock *ScalarPH = Plan.getScalarPreheader();
+  if (!ScalarPH)
+    return;
+  VPBasicBlock *MiddleBB = Plan.getMiddleBlock();
+  if (!is_contained(MiddleBB->getSuccessors(), ScalarPH))
+    return;
+  if (Plan.getExitBlocks().size() != 1)
+    return;
+  VPIRBasicBlock *ExitBB = Plan.getExitBlocks()[0];
+  // Conservatively bail on live-out phis -- the snapshot region's exit edge
+  // becomes a new predecessor of ExitBB and we don't update phi incomings.
+  if (!ExitBB->phis().empty() || !ExitBB->getIRBasicBlock()->phis().empty())
+    return;
+
+  uint64_t VFLanes = BestVF.getFixedValue();
+  if (!isPowerOf2_64(VFLanes))
+    return;
+
+  // Compute realign.start = VTC - ((VTC - TC) & (VF - 1)) in a new realign.ph.
+  // The inner expression equals 0 when remainder is a multiple of VF, and
+  // (VF - remainder%VF) otherwise; in either case the realign loop covers
+  // exactly the lanes [RealignStart, TC).
+  VPValue *TC = Plan.getTripCount();
+  Type *TCTy = TC->getScalarType();
+  VPSymbolicValue *VTC = &Plan.getVectorTripCount();
+  assert(!VTC->isMaterialized() &&
+         "applyRealignSnapshot must run before VTC materialization");
+  VPBasicBlock *RealignPH = Plan.createVPBasicBlock("vector.realign.ph");
+  VPBuilder PHB(RealignPH, RealignPH->end());
+  VPValue *VFm1 = Plan.getConstantInt(TCTy, VFLanes - 1);
+  VPValue *NegRem = PHB.createSub(VTC, TC);
+  VPValue *Shift = PHB.createAnd(NegRem, VFm1);
+  VPValue *RealignStart = PHB.createSub(VTC, Shift);
+
+  // Wire up the new CFG before touching recipes inside the snapshot, so
+  // getPlan() works on the snapshot region. Layout:
+  //   middle.block --cmp.n--> exit
+  //                --else--> realign.check --tail<2--> scalar.ph
+  //                                       --else---> realign.ph -> Region -> exit
+  // insertOnEdge preserves scalar.ph's phi-operand indexing for middle.
+  VPBasicBlock *RealignCheck = Plan.createVPBasicBlock("realign.check");
+  VPBlockUtils::insertOnEdge(MiddleBB, ScalarPH, RealignCheck);
+  VPBlockUtils::connectBlocks(RealignCheck, RealignPH);
+  VPBlockUtils::connectBlocks(RealignPH, Snapshot);
+  VPBlockUtils::connectBlocks(Snapshot, ExitBB);
+
+  // Inside the snapshot header, replace uses of the canonical IV with
+  // (IV + RealignStart) and uses of its increment with (IVInc + RealignStart)
+  // -- same pattern as preparePlanForEpilogueVectorLoop. The IV phi keeps
+  // its zero start (created by dissolveToCFGLoop later); the existing
+  // simplifyRecipes fold then collapses the post-dissolution
+  //   phi(0, IVInc); IVInc = phi + Step; OffsetIV = phi + Y; Def = IVInc + Y
+  // shape into phi(Y, IVInc) so the realign loop's IV starts at RealignStart
+  // directly and the latch exits at TC.
+  auto *Header = cast<VPBasicBlock>(Snapshot->getEntry());
+  assert(Header == cast<VPBasicBlock>(Snapshot->getExiting()) &&
+         "snapshot region must be a single block");
+  VPRegionValue *CanIV = Snapshot->getCanonicalIV();
+  VPInstruction *CanIVInc = vputils::findCanonicalIVIncrement(*Snapshot);
+  if (!CanIVInc)
+    return;
+  VPBuilder HB(Header, Header->getFirstNonPhi());
+  auto *OffsetIV = HB.createAdd(CanIV, RealignStart);
+  CanIV->replaceUsesWithIf(OffsetIV, [&](VPUser &U, unsigned) {
+    return &U != OffsetIV && &U != CanIVInc;
+  });
+  VPInstruction *OffsetIVInc =
+      VPBuilder::getToInsertAfter(CanIVInc).createAdd(CanIVInc, RealignStart);
+  CanIVInc->replaceAllUsesWith(OffsetIVInc);
+  OffsetIVInc->setOperand(0, CanIVInc);
+
+  // The latch's BranchOnCount now compares the offset increment against TC
+  // directly; it was BranchOnCount(IVInc, ?) before the rewrite above.
+  VPRecipeBase *LatchTerm = &Header->back();
+  assert(
+      match(LatchTerm, m_BranchOnCount(m_Specific(OffsetIVInc), m_VPValue())) &&
+      "expected snapshot latch to be BranchOnCount(OffsetIVInc, ?)");
+  LatchTerm->setOperand(1, TC);
+
+  // Build the realign.check terminator. After insertOnEdge,
+  // RealignCheck->successors = [ScalarPH (idx 0), RealignPH (idx 1)].
+  // BranchOnCond(NotProfit) routes:
+  //   true  (tail<2) -> succ[0] = scalar.ph
+  //   false          -> succ[1] = realign.ph
+  VPBuilder CheckB(RealignCheck, RealignCheck->end());
+  VPValue *Tail = CheckB.createSub(TC, VTC);
+  VPValue *NotProfit =
+      CheckB.createICmp(CmpInst::ICMP_ULT, Tail, Plan.getConstantInt(TCTy, 2));
+  CheckB.createNaryOp(VPInstruction::BranchOnCond, {NotProfit});
+
+  ++NumRealignApplied;
 }

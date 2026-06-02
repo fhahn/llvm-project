@@ -154,9 +154,8 @@ inline VPRecipeBase *findRecipe(VPValue *Start, PredT Pred) {
   return nullptr;
 }
 
-/// Find the canonical IV increment of \p Plan's vector loop region. Returns
-/// nullptr if not found.
-VPInstruction *findCanonicalIVIncrement(VPlan &Plan);
+/// Find the canonical IV increment of \p Region. Returns nullptr if not found.
+VPInstruction *findCanonicalIVIncrement(VPRegionBlock &Region);
 
 /// Returns the GEP nowrap flags for \p Ptr, looking through pointer casts
 /// mirroring Value::stripPointerCasts.

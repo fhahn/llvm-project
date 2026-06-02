@@ -5905,6 +5905,17 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   VPlanTransforms::replaceWideCanonicalIVWithWideIV(
       BestVPlan, *PSE.getSE(), CM.TTI, Config.CostKind, BestVF, BestUF,
       CM.ValuesToIgnore);
+
+  // For the non-epi case, snapshot the vector loop region BEFORE unrolling so
+  // we can later re-use it as a VF-only realigned epilogue. The snapshot is
+  // held outside the CFG so it's not affected by unrollByUF, then inserted
+  // and dissolved by applyRealignSnapshot once the rest of the plan has
+  // been materialized.
+  VPRegionBlock *RealignSnapshot = nullptr;
+  if (EpilogueVecKind == EpilogueVectorizationKind::None)
+    RealignSnapshot = VPlanTransforms::prepareRealignSnapshot(
+        BestVPlan, OrigLoop, BestVF, BestUF, PSE);
+
   // TODO: Move to VPlan transform stage once the transition to the VPlan-based
   // cost model is complete for better cost estimates.
   RUN_VPLAN_PASS(VPlanTransforms::unrollByUF, BestVPlan, BestUF);
@@ -5952,6 +5963,13 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   }
 
   RUN_VPLAN_PASS(VPlanTransforms::removeDeadRecipes, BestVPlan);
+
+  // Insert the pre-unroll snapshot of the vector loop region as a sibling
+  // VF-only realigned vector epilogue. Runs before convertToConcreteRecipes
+  // and dissolveLoopRegions so the snapshot's BranchOnCount is lowered and
+  // its region dissolved by the same passes that handle the main loop region.
+  if (EpilogueVecKind == EpilogueVectorizationKind::None)
+    VPlanTransforms::applyRealignSnapshot(BestVPlan, RealignSnapshot, BestVF);
 
   RUN_VPLAN_PASS(VPlanTransforms::convertToConcreteRecipes, BestVPlan);
   // Convert the exit condition to AVLNext == 0 for EVL tail folded loops.
@@ -7532,7 +7550,7 @@ static SmallVector<Instruction *> preparePlanForEpilogueVectorLoop(
   VPInstruction *Add = Builder.createAdd(IV, VPV);
   // Replace all users of the canonical IV and its increment with the offset
   // version, except for the Add itself and the canonical IV increment.
-  auto *Increment = vputils::findCanonicalIVIncrement(Plan);
+  auto *Increment = vputils::findCanonicalIVIncrement(*VectorLoop);
   assert(Increment && "Must have a canonical IV increment at this point");
   IV->replaceUsesWithIf(Add, [Add, Increment](VPUser &U, unsigned) {
     return &U != Add && &U != Increment;
