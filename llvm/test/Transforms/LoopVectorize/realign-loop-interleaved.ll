@@ -26,6 +26,8 @@ define void @realign_interleaved(ptr noalias %dst, ptr noalias %src) {
 ; UF2-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1024
 ; UF2-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; UF2:       [[MIDDLE_BLOCK]]:
+; UF2-NEXT:    br label %[[REALIGN_CHECK:.*]]
+; UF2:       [[REALIGN_CHECK]]:
 ; UF2-NEXT:    br label %[[VECTOR_REALIGN_PH:.*]]
 ; UF2:       [[VECTOR_REALIGN_PH]]:
 ; UF2-NEXT:    br label %[[VECTOR_BODY2:.*]]
@@ -74,6 +76,8 @@ define void @realign_interleaved(ptr noalias %dst, ptr noalias %src) {
 ; UF4-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1024
 ; UF4-NEXT:    br i1 [[TMP12]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; UF4:       [[MIDDLE_BLOCK]]:
+; UF4-NEXT:    br label %[[REALIGN_CHECK:.*]]
+; UF4:       [[REALIGN_CHECK]]:
 ; UF4-NEXT:    br label %[[VECTOR_REALIGN_PH:.*]]
 ; UF4:       [[VECTOR_REALIGN_PH]]:
 ; UF4-NEXT:    br label %[[VECTOR_BODY4:.*]]
@@ -133,6 +137,8 @@ define void @realign_overaligned_interleaved(ptr noalias %dst, ptr noalias %src)
 ; UF2-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], 40
 ; UF2-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
 ; UF2:       [[MIDDLE_BLOCK]]:
+; UF2-NEXT:    br label %[[REALIGN_CHECK:.*]]
+; UF2:       [[REALIGN_CHECK]]:
 ; UF2-NEXT:    br label %[[VECTOR_REALIGN_PH:.*]]
 ; UF2:       [[VECTOR_REALIGN_PH]]:
 ; UF2-NEXT:    br label %[[VECTOR_BODY2:.*]]
@@ -181,6 +187,8 @@ define void @realign_overaligned_interleaved(ptr noalias %dst, ptr noalias %src)
 ; UF4-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[INDEX_NEXT]], 32
 ; UF4-NEXT:    br i1 [[TMP12]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
 ; UF4:       [[MIDDLE_BLOCK]]:
+; UF4-NEXT:    br label %[[REALIGN_CHECK:.*]]
+; UF4:       [[REALIGN_CHECK]]:
 ; UF4-NEXT:    br label %[[VECTOR_REALIGN_PH:.*]]
 ; UF4:       [[VECTOR_REALIGN_PH]]:
 ; UF4-NEXT:    br label %[[VECTOR_BODY4:.*]]

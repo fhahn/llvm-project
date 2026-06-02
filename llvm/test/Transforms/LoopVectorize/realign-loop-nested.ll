@@ -26,6 +26,8 @@ define void @realign_nested_const_tc(ptr noalias %dst, ptr noalias %src, i64 %ro
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[INDEX_NEXT]], 32
 ; CHECK-NEXT:    br i1 [[TMP5]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    br label %[[REALIGN_CHECK:.*]]
+; CHECK:       [[REALIGN_CHECK]]:
 ; CHECK-NEXT:    br label %[[VECTOR_REALIGN_PH:.*]]
 ; CHECK:       [[VECTOR_REALIGN_PH]]:
 ; CHECK-NEXT:    br label %[[VECTOR_BODY1:.*]]
@@ -104,9 +106,27 @@ define void @realign_nested(ptr noalias %dst, ptr noalias %src, i64 %n, i64 %rou
 ; CHECK-NEXT:    br i1 [[TMP5]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[CMP_N]], label %[[OUTER_LATCH]], label %[[SCALAR_PH]]
+; CHECK-NEXT:    br i1 [[CMP_N]], label %[[OUTER_LATCH]], label %[[REALIGN_CHECK:.*]]
+; CHECK:       [[REALIGN_CHECK]]:
+; CHECK-NEXT:    [[TMP6:%.*]] = sub i64 [[N]], [[N_VEC]]
+; CHECK-NEXT:    [[TMP7:%.*]] = icmp ult i64 [[TMP6]], 2
+; CHECK-NEXT:    br i1 [[TMP7]], label %[[SCALAR_PH]], label %[[VECTOR_REALIGN_PH:.*]]
+; CHECK:       [[VECTOR_REALIGN_PH]]:
+; CHECK-NEXT:    [[TMP8:%.*]] = sub i64 [[N]], 4
+; CHECK-NEXT:    br label %[[VECTOR_BODY1:.*]]
+; CHECK:       [[VECTOR_BODY1]]:
+; CHECK-NEXT:    [[INDEX2:%.*]] = phi i64 [ [[TMP8]], %[[VECTOR_REALIGN_PH]] ], [ [[INDEX_NEXT4:%.*]], %[[VECTOR_BODY1]] ]
+; CHECK-NEXT:    [[TMP9:%.*]] = add i64 [[TMP0]], [[INDEX2]]
+; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[TMP9]]
+; CHECK-NEXT:    [[WIDE_LOAD3:%.*]] = load <4 x i32>, ptr [[TMP10]], align 4
+; CHECK-NEXT:    [[TMP11:%.*]] = add <4 x i32> [[WIDE_LOAD3]], splat (i32 1)
+; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[TMP9]]
+; CHECK-NEXT:    store <4 x i32> [[TMP11]], ptr [[TMP12]], align 4
+; CHECK-NEXT:    [[INDEX_NEXT4]] = add nuw i64 [[INDEX2]], 4
+; CHECK-NEXT:    [[TMP13:%.*]] = icmp eq i64 [[INDEX_NEXT4]], [[N]]
+; CHECK-NEXT:    br i1 [[TMP13]], label %[[OUTER_LATCH]], label %[[VECTOR_BODY1]]
 ; CHECK:       [[SCALAR_PH]]:
-; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[OUTER]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[REALIGN_CHECK]] ], [ 0, %[[OUTER]] ]
 ; CHECK-NEXT:    br label %[[INNER:.*]]
 ; CHECK:       [[INNER]]:
 ; CHECK-NEXT:    [[J:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[J_NEXT:%.*]], %[[INNER]] ]

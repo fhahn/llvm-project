@@ -1270,7 +1270,7 @@ static bool simplifyLogicalRecipe(VPSingleDefRecipe *Def, VPBuilder &Builder,
 }
 
 /// Try to simplify VPSingleDefRecipe \p Def.
-static void simplifyRecipe(VPSingleDefRecipe *Def) {
+static void simplifyRecipe(VPSingleDefRecipe *Def, const VPDominatorTree &VPDT) {
   VPlan *Plan = Def->getParent()->getPlan();
 
   // Simplification of live-in IR values for SingleDef recipes using
@@ -1621,13 +1621,21 @@ static void simplifyRecipe(VPSingleDefRecipe *Def) {
   //  IVInc = X + Step   ; used by X and Def
   //  Def = IVInc + Y
   // Fold the increment Y into the phi's start value, replace Def with IVInc,
-  // and if Inc exists, replace it with X.
+  // and if Inc exists, replace it with X. Y must be loop-invariant w.r.t. Phi's
+  // loop: a live-in (no defining recipe), or defined in a block that dominates
+  // Phi's block (so it is computed once before the loop, not recomputed per
+  // iteration). A plain "different block" test is insufficient
+  // post-dissolution, where a loop-variant value defined in the latch also
+  // lives in a different block than the header Phi.
   VPValue *IVInc;
   if (match(Def, m_Add(m_VPValue(IVInc, m_Add(m_VPValue(X), m_VPValue())),
                        m_VPValue(Y))) &&
-      isa<VPIRValue>(Y) && match(X, m_VPPhi(m_ZeroInt(), m_Specific(IVInc)))) {
+      match(X, m_VPPhi(m_ZeroInt(), m_Specific(IVInc)))) {
     auto *Phi = cast<VPPhi>(X);
-    if (IVInc->getNumUsers() == 2) {
+    VPRecipeBase *YDef = Y->getDefiningRecipe();
+    if ((!YDef ||
+         VPDT.properlyDominates(YDef->getParent(), Phi->getParent())) &&
+        IVInc->getNumUsers() == 2) {
       // If Phi has a second user (besides IVInc's defining recipe), it must
       // be Inc = Phi + Y for the fold to apply.
       auto *Inc = dyn_cast_or_null<VPSingleDefRecipe>(
@@ -1672,12 +1680,13 @@ static void simplifyRecipe(VPSingleDefRecipe *Def) {
 }
 
 void VPlanTransforms::simplifyRecipes(VPlan &Plan) {
+  VPDominatorTree VPDT(Plan);
   ReversePostOrderTraversal<VPBlockDeepTraversalWrapper<VPBlockBase *>> RPOT(
       Plan.getEntry());
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(RPOT)) {
     for (VPRecipeBase &R : make_early_inc_range(*VPBB))
       if (auto *Def = dyn_cast<VPSingleDefRecipe>(&R))
-        simplifyRecipe(Def);
+        simplifyRecipe(Def, VPDT);
   }
 }
 
@@ -5972,17 +5981,22 @@ VPRegionBlock *VPlanTransforms::prepareRealignSnapshot(
   if (HasRuntimeDiffChecks)
     return nullptr;
 
-  // Only fire for a literal ConstantInt trip count, so the profitability gate
-  // is decided statically; runtime-TC support follows separately. Cap at 32
-  // bits so TCVal % Stride and TC - K*VF cannot overflow uint64_t.
+  // For a compile-time-known trip count, decide the profitability gate
+  // (Tail >= 2) statically here. For a runtime trip count the snapshot is
+  // still produced: applyRealignSnapshot emits the same gate as a runtime
+  // check (tail < 2) and routes unprofitable tails to the scalar tail.
   uint64_t TCVal;
-  if (!match(Plan.getTripCount(), m_ConstantInt(TCVal)) || !isUIntN(32, TCVal))
-    return nullptr;
-  // Require Tail >= 2 (a 1-element tail is cheaper as a scalar iteration) and
-  // TCVal >= VF*UF (the main loop runs, so the realign start cannot underflow).
-  uint64_t Stride = BestVF.getFixedValue() * BestUF;
-  if (TCVal % Stride < 2 || TCVal < Stride)
-    return nullptr;
+  if (match(Plan.getTripCount(), m_ConstantInt(TCVal))) {
+    // Cap at 32 bits so TCVal % Stride and TC - K*VF cannot overflow uint64_t.
+    if (!isUIntN(32, TCVal))
+      return nullptr;
+    // Require Tail >= 2 (a 1-element tail is cheaper as a scalar iteration)
+    // and TCVal >= VF*UF (the main loop runs, so the realign start cannot
+    // underflow).
+    uint64_t Stride = BestVF.getFixedValue() * BestUF;
+    if (TCVal % Stride < 2 || TCVal < Stride)
+      return nullptr;
+  }
 
   VPRegionBlock *MainRegion = Plan.getVectorLoopRegion();
   if (!MainRegion)
@@ -6037,10 +6051,61 @@ VPRegionBlock *VPlanTransforms::prepareRealignSnapshot(
   return Snapshot;
 }
 
+/// Build the start index of the realign loop in \p PHB. The realign loop steps
+/// by VF (\p VFLanes lanes) and runs \p K iterations, the last ending exactly
+/// at \p TC, so its start is
+///   RealignStart = TC - K * VF
+/// a single subtract of a compile-time constant. This applies whenever K is
+/// known at compile time: always for UF == 1 (the profitability gate forces
+/// K == 1), and for any UF when the trip count is a compile-time constant
+/// (then K = ceil(Tail / VF)). Folding K*VF also lets later passes prove the
+/// realign loop's trip count and, for K == 1, collapse it to a straight-line
+/// vector iteration.
+///
+/// (Algebraically TC - K*VF == VTC - ((VTC - TC) & (VF - 1)); the latter
+/// symbolic form is what createRuntimeRealignStart builds when K is unknown.)
+static VPValue *createConstantRealignStart(VPBuilder &PHB, VPlan &Plan,
+                                           VPValue *TC, uint64_t VFLanes,
+                                           uint64_t K) {
+  return PHB.createSub(TC,
+                       Plan.getConstantInt(TC->getScalarType(), K * VFLanes));
+}
+
+/// Build the start index of the realign loop when the trip count is not a
+/// compile-time constant. The realign loop steps by VF (\p VFLanes lanes) and
+/// its last iteration must end at \p TC, covering the trailing
+/// Tail = TC - VTC lanes. Since Tail is unknown here, compute the start
+/// symbolically as
+///   RealignStart = VTC - ((VTC - TC) & (VF - 1))
+/// The and-expression is 0 when the remainder is a multiple of VF and
+/// (VF - remainder%VF) otherwise, so the realign loop covers [RealignStart, TC)
+/// in between 1 and UF iterations. This matches the constant-TC TC - K*VF form
+/// (see createConstantRealignStart) but does not depend on a known Tail.
+static VPValue *createRuntimeRealignStart(VPBuilder &PHB, VPlan &Plan,
+                                          VPValue *TC, VPSymbolicValue *VTC,
+                                          uint64_t VFLanes) {
+  Type *TCTy = TC->getScalarType();
+  VPValue *VFm1 = Plan.getConstantInt(TCTy, VFLanes - 1);
+  VPValue *NegRem = PHB.createSub(VTC, TC);
+  VPValue *Shift = PHB.createAnd(NegRem, VFm1);
+  return PHB.createSub(VTC, Shift);
+}
+
 void VPlanTransforms::applyRealignSnapshot(VPlan &Plan, VPRegionBlock *Snapshot,
                                            ElementCount BestVF,
                                            unsigned BestUF) {
   assert(Snapshot && "applyRealignSnapshot requires a snapshot region");
+
+  // Splice the snapshot in as a sibling of the main vector loop (dissolved
+  // together later). Its IV is offset so effective indices are [RealignStart,
+  // TC); a realign.check gates on the runtime tail. tail==1 is a small loss for
+  // the realign loop (1 vector iter + 1 overlap lane vs a single scalar iter),
+  // so route tail < 2 to the scalar tail:
+  //
+  //   middle.block -- cmp.n (tail==0) ------------------> exit
+  //                -- else --> realign.check
+  //   realign.check -- (tail < 2) ----------------------> scalar.ph
+  //                 -- else --> realign.ph -- region --> exit
 
   // Only unrollByUF runs between prepare and apply, which disturbs neither the
   // skeleton nor the trip count; re-assert rather than re-check.
@@ -6051,32 +6116,38 @@ void VPlanTransforms::applyRealignSnapshot(VPlan &Plan, VPRegionBlock *Snapshot,
   assert(!Plan.getVectorTripCount().isMaterialized() &&
          "applyRealignSnapshot must run before VTC materialization");
 
-  // The realign loop covers the Tail = TC % (VF*UF) remaining lanes VF at a
-  // time, so it runs K = ceil(Tail / VF) iterations starting at TC - K*VF.
-  VPValue *TC = Plan.getTripCount();
   uint64_t VFLanes = BestVF.getFixedValue();
-  uint64_t TCVal = cast<VPConstantInt>(TC)->getZExtValue();
-  uint64_t RealignK = divideCeil(TCVal % (VFLanes * BestUF), VFLanes);
+  assert(isPowerOf2_64(VFLanes) && "realign requires a power-of-2 VF");
+
+  // Compute realign.start in a new realign.ph so the VF-stepping loop covers
+  // exactly [RealignStart, TC). The realign loop runs K = ceil(Tail / VF)
+  // iterations, which is known at compile time when the trip count is constant
+  // (K = ceil(TC % (VF*UF) / VF)) and, for any trip count, when UF == 1 (the
+  // tail is then below VF, so the loop runs a single VF-wide iteration). In
+  // those cases the start folds to TC - K*VF, a single subtract; otherwise
+  // (runtime TC, UF > 1) K is unknown and the start is built symbolically.
+  VPValue *TC = Plan.getTripCount();
+  Type *TCTy = TC->getScalarType();
+  VPSymbolicValue *VTC = &Plan.getVectorTripCount();
+  uint64_t TCVal;
+  uint64_t RealignK =
+      match(TC, m_ConstantInt(TCVal))
+          ? divideCeil(TCVal % (VFLanes * BestUF), VFLanes)
+          : (BestUF == 1 ? 1 : 0);
 
   VPBasicBlock *RealignPH = Plan.createVPBasicBlock("vector.realign.ph");
+  VPBuilder PHB(RealignPH, RealignPH->end());
   VPValue *RealignStart =
-      VPBuilder(RealignPH, RealignPH->end())
-          .createSub(
-              TC, Plan.getConstantInt(TC->getScalarType(), RealignK * VFLanes));
+      RealignK ? createConstantRealignStart(PHB, Plan, TC, VFLanes, RealignK)
+               : createRuntimeRealignStart(PHB, Plan, TC, VTC, VFLanes);
 
-  // Splice the snapshot in as a sibling of the main vector loop by redirecting
-  // middle.block's scalar.ph (cmp.n-false) edge to realign.ph; the scalar tail
-  // loses its entry and dies. Tail >= 2 is decided statically, so no runtime
-  // check is needed:
-  //
-  //   middle.block -- cmp.n (tail==0) --> exit
-  //                -- else --> realign.ph --> region --> exit
-  //
-  // Wire the CFG before touching recipes so getPlan() works on the snapshot.
-  for (VPRecipeBase &R : ScalarPH->phis())
-    cast<VPPhiAccessors>(&R)->removeIncomingValueFor(MiddleBB);
-  VPBlockUtils::disconnectBlocks(MiddleBB, ScalarPH);
-  VPBlockUtils::connectBlocks(MiddleBB, RealignPH);
+  // Insert realign.check on middle.block's scalar.ph (cmp.n-false) edge and
+  // route it on to realign.ph. Wire the CFG before touching recipes so
+  // getPlan() works on the snapshot; insertOnEdge preserves scalar.ph's
+  // phi-operand indexing for middle.block.
+  VPBasicBlock *RealignCheck = Plan.createVPBasicBlock("realign.check");
+  VPBlockUtils::insertOnEdge(MiddleBB, ScalarPH, RealignCheck);
+  VPBlockUtils::connectBlocks(RealignCheck, RealignPH);
   VPBlockUtils::connectBlocks(RealignPH, Snapshot);
   VPBlockUtils::connectBlocks(Snapshot, Plan.getExitBlocks()[0]);
 
@@ -6095,6 +6166,17 @@ void VPlanTransforms::applyRealignSnapshot(VPlan &Plan, VPRegionBlock *Snapshot,
       match(LatchTerm, m_BranchOnCount(m_Specific(OffsetIVInc), m_VPValue())) &&
       "expected snapshot latch to be BranchOnCount(OffsetIVInc, ?)");
   LatchTerm->setOperand(1, TC);
+
+  // Build the realign.check terminator. After insertOnEdge,
+  // RealignCheck->successors = [ScalarPH (idx 0), RealignPH (idx 1)].
+  // BranchOnCond(NotProfit) routes:
+  //   true  (tail<2) -> succ[0] = scalar.ph
+  //   false          -> succ[1] = realign.ph
+  VPBuilder CheckB(RealignCheck, RealignCheck->end());
+  VPValue *Tail = CheckB.createSub(TC, VTC);
+  VPValue *NotProfit =
+      CheckB.createICmp(CmpInst::ICMP_ULT, Tail, Plan.getConstantInt(TCTy, 2));
+  CheckB.createNaryOp(VPInstruction::BranchOnCond, {NotProfit});
 
   ++NumRealignApplied;
 }

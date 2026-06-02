@@ -27,9 +27,26 @@ define void @realign_runtime_tc(ptr noalias %dst, ptr noalias %src, i64 %n) {
 ; CHECK-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
+; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[REALIGN_CHECK:.*]]
+; CHECK:       [[REALIGN_CHECK]]:
+; CHECK-NEXT:    [[TMP4:%.*]] = sub i64 [[N]], [[N_VEC]]
+; CHECK-NEXT:    [[TMP5:%.*]] = icmp ult i64 [[TMP4]], 2
+; CHECK-NEXT:    br i1 [[TMP5]], label %[[SCALAR_PH]], label %[[VECTOR_REALIGN_PH:.*]]
+; CHECK:       [[VECTOR_REALIGN_PH]]:
+; CHECK-NEXT:    [[TMP6:%.*]] = sub i64 [[N]], 4
+; CHECK-NEXT:    br label %[[VECTOR_BODY1:.*]]
+; CHECK:       [[VECTOR_BODY1]]:
+; CHECK-NEXT:    [[INDEX2:%.*]] = phi i64 [ [[TMP6]], %[[VECTOR_REALIGN_PH]] ], [ [[INDEX_NEXT4:%.*]], %[[VECTOR_BODY1]] ]
+; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[INDEX2]]
+; CHECK-NEXT:    [[WIDE_LOAD3:%.*]] = load <4 x i32>, ptr [[TMP7]], align 4
+; CHECK-NEXT:    [[TMP8:%.*]] = add <4 x i32> [[WIDE_LOAD3]], splat (i32 1)
+; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[INDEX2]]
+; CHECK-NEXT:    store <4 x i32> [[TMP8]], ptr [[TMP9]], align 4
+; CHECK-NEXT:    [[INDEX_NEXT4]] = add nuw i64 [[INDEX2]], 4
+; CHECK-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[INDEX_NEXT4]], [[N]]
+; CHECK-NEXT:    br i1 [[TMP10]], label %[[EXIT]], label %[[VECTOR_BODY1]]
 ; CHECK:       [[SCALAR_PH]]:
-; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[REALIGN_CHECK]] ], [ 0, %[[ENTRY]] ]
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
@@ -336,6 +353,8 @@ define void @realign_constant_tc_tail_two(ptr noalias %dst, ptr noalias %src) {
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq i64 [[INDEX_NEXT]], 32
 ; CHECK-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP10:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    br label %[[REALIGN_CHECK:.*]]
+; CHECK:       [[REALIGN_CHECK]]:
 ; CHECK-NEXT:    br label %[[VECTOR_REALIGN_PH:.*]]
 ; CHECK:       [[VECTOR_REALIGN_PH]]:
 ; CHECK-NEXT:    br label %[[VECTOR_BODY1:.*]]

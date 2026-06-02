@@ -132,6 +132,8 @@ define void @realign_distinct_underlying_via_chain(ptr noalias %dst, ptr noalias
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq i64 [[INDEX_NEXT]], 32
 ; CHECK-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    br label %[[REALIGN_CHECK:.*]]
+; CHECK:       [[REALIGN_CHECK]]:
 ; CHECK-NEXT:    br label %[[VECTOR_REALIGN_PH:.*]]
 ; CHECK:       [[VECTOR_REALIGN_PH]]:
 ; CHECK-NEXT:    br label %[[VECTOR_BODY1:.*]]
