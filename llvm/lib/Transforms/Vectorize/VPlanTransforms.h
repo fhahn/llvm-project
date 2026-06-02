@@ -600,6 +600,14 @@ struct VPlanTransforms {
   /// regions uniformly.
   static void applyRealignSnapshot(VPlan &Plan, VPRegionBlock *Snapshot,
                                    ElementCount BestVF, unsigned BestUF);
+
+  /// Modify the epilogue VPlan in-place so the existing epi vector loop
+  /// covers the [TC - VF_epi, TC) lanes when the main loop ran (selecting
+  /// a shifted start from the preheader). The main-skipped path keeps the
+  /// standard start (0) and exit (n.vec_epi). No new blocks are inserted;
+  /// only select chains in the existing vec.epilog.ph.
+  static void tryToRealignEpilogueVPlan(VPlan &Plan, VPBasicBlock *VectorPH,
+                                        Loop *OrigLoop, ElementCount BestVF);
 };
 
 } // namespace llvm

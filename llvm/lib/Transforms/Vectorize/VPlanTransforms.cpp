@@ -7652,3 +7652,104 @@ void VPlanTransforms::applyRealignSnapshot(VPlan &Plan,
 
   ++NumRealignApplied;
 }
+
+void VPlanTransforms::tryToRealignEpilogueVPlan(VPlan &Plan,
+                                                VPBasicBlock *VectorPH,
+                                                Loop *OrigLoop,
+                                                ElementCount BestVF) {
+  if (!EnableTryToRealignLoop)
+    return;
+
+  if (!BestVF.isFixed() || (OrigLoop && OrigLoop->getParentLoop()) ||
+      Plan.hasEarlyExit())
+    return;
+  uint64_t VFLanes = BestVF.getFixedValue();
+  if (!isPowerOf2_64(VFLanes))
+    return;
+
+  // After dissolveLoopRegions the epilogue vector loop is laid out as
+  //   VectorPH -> Header -> {Header (back-edge), Middle}
+  // The plan's vector preheader holds the materialised vec.epilog.ph.
+  if (!VectorPH)
+    return;
+  auto *Header =
+      dyn_cast_if_present<VPBasicBlock>(VectorPH->getSingleSuccessor());
+  if (!Header || Header->getNumPredecessors() != 2 ||
+      Header->getPredecessors()[1] != Header)
+    return;
+
+  // The canonical IV is materialized as a single VPPhi at the start of
+  // the header, with operands [start, IVInc]. Reductions/FORs/widen-IV
+  // recipes would add more phi-like recipes here; reject those.
+  auto HeaderPhis = Header->phis();
+  if (!hasSingleElement(HeaderPhis))
+    return;
+  auto *CanIVPhi = dyn_cast<VPPhi>(&*HeaderPhis.begin());
+  if (!CanIVPhi || CanIVPhi->getNumOperands() != 2)
+    return;
+
+  // Match the latch terminator: BranchOnCond(ICmp EQ %IVInc, %VTC).
+  auto *LatchTerm = cast<VPInstruction>(Header->getTerminator());
+  VPValue *IVInc;
+  VPValue *VTC;
+  if (!match(LatchTerm,
+             m_BranchOnCond(m_SpecificCmp(
+                 CmpInst::ICMP_EQ, m_VPValue(IVInc), m_VPValue(VTC)))))
+    return;
+  auto *LatchCmp = cast<VPInstruction>(LatchTerm->getOperand(0));
+  auto *IVIncRec = IVInc->getDefiningRecipe();
+
+  // Body-shape allowlist (post-dissolve): same shape as in
+  // prepareRealignSnapshot, but with the loop-control recipes identified by
+  // identity rather than by opcode -- the IV is now a VPPhi and the latch
+  // branches via an explicit ICmp recipe.
+  if (!isRealignSafeBody(Header, [&](VPRecipeBase &R) {
+        return &R == CanIVPhi || &R == IVIncRec || &R == LatchCmp ||
+               &R == LatchTerm;
+      }))
+    return;
+
+  // Modify the existing epi loop's start and exit so the last iteration
+  // ends at TC when the main loop ran. The main-skipped path keeps the
+  // standard start (0) and exit (n.vec_epi); a realigned start would
+  // underflow when resume_val = 0 and Tail % VF_epi != 0. Both behaviors
+  // share the same loop body via select-based parameters in the preheader.
+  Type *TCTy = Plan.getTripCount()->getScalarType();
+
+  // CanIVPhi has 2 operands: [preheader_val, iv_inc] in some order.
+  unsigned PreheaderIdx = CanIVPhi->getOperand(0) == IVInc ? 1 : 0;
+  VPValue *OldStart = CanIVPhi->getOperand(PreheaderIdx);
+
+  // Insert select-based new_start and new_exit at end of preheader, before
+  // its terminator.
+  VPBuilder Builder(VectorPH, VectorPH->getTerminator()
+                                  ? VectorPH->getTerminator()->getIterator()
+                                  : VectorPH->end());
+  VPValue *TC = Plan.getTripCount();
+  VPValue *Zero = Plan.getZero(TCTy);
+  VPValue *VFm1 = Plan.getConstantInt(TCTy, VFLanes - 1);
+
+  // Shift = (-Tail) & (VF-1) where Tail = TC - OldStart. Folded to a
+  // single subtract (OldStart - TC == -Tail) to avoid the redundant negate.
+  VPValue *NegTail = Builder.createSub(OldStart, TC);
+  VPValue *Shift = Builder.createAnd(NegTail, VFm1);
+  // IsMainRan = OldStart != 0 (= we came via vec.epilog.iter.check, not
+  // vec.main.iter.check, so the main loop ran and OldStart = VTC_main).
+  VPValue *IsMainRan = Builder.createICmp(CmpInst::ICMP_NE, OldStart, Zero);
+  VPValue *EffShift = Builder.createSelect(IsMainRan, Shift, Zero);
+  VPValue *NewStart = Builder.createSub(OldStart, EffShift);
+  // NewExit = IsMainRan ? TC : VTC. VTC is the standard n_vec_epi value
+  // already materialised in the preheader, so reuse it instead of
+  // recomputing TC - (TC & VFm1).
+  VPInstruction *NewExit = Builder.createSelect(IsMainRan, TC, VTC);
+
+  // Plumb new_start into the IV phi's preheader operand.
+  CanIVPhi->setOperand(PreheaderIdx, NewStart);
+  // Plumb new_exit into all uses of VTC (latch ICmp + cmp.n_epi), but
+  // skip the new select itself which reuses VTC as its false operand.
+  VTC->replaceUsesWithIf(NewExit, [NewExit](VPUser &U, unsigned) {
+    return &U != NewExit;
+  });
+
+  ++NumRealignApplied;
+}

@@ -5906,11 +5906,13 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
       BestVPlan, *PSE.getSE(), CM.TTI, Config.CostKind, BestVF, BestUF,
       CM.ValuesToIgnore);
 
-  // For the non-epi case, snapshot the vector loop region BEFORE unrolling so
-  // we can later re-use it as a VF-only realigned epilogue. The snapshot is
-  // held outside the CFG so it's not affected by unrollByUF, then inserted
-  // and dissolved by applyRealignSnapshot once the rest of the plan has
-  // been materialized.
+  // Snapshot the vector loop region BEFORE unrolling so it can later be
+  // re-used as a VF-only realigned epilogue. The snapshot is held outside
+  // the CFG so it's not affected by unrollByUF, then inserted and
+  // dissolved by applyRealignSnapshot once the rest of the plan has been
+  // materialized. Only fires for standalone vector loops -- the epilogue
+  // VPlan during epi-vec uses an in-place rewrite (see below) and the
+  // main VPlan during epi-vec leaves the tail to the EPI VPlan.
   VPRegionBlock *RealignSnapshot = nullptr;
   if (EpilogueVecKind == EpilogueVectorizationKind::None)
     RealignSnapshot = VPlanTransforms::prepareRealignSnapshot(
@@ -6004,6 +6006,15 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   VPlanTransforms::cse(BestVPlan);
   VPlanTransforms::simplifyRecipes(BestVPlan);
   VPlanTransforms::simplifyKnownEVL(BestVPlan, BestVF, PSE);
+  // For the epilogue VPlan during epi-vec, modify the existing epi loop
+  // in-place: start/exit are rewritten via selects in the preheader so the
+  // last iteration ends at TC when the main loop ran. The main-skipped path
+  // keeps the standard start/exit since a realigned start would underflow.
+  // Runs after dissolveLoopRegions and per-part offset folding so the body
+  // scan sees a clean VPReplicate(GEP) / VPVectorPointerRecipe chain.
+  if (EpilogueVecKind == EpilogueVectorizationKind::Epilogue)
+    VPlanTransforms::tryToRealignEpilogueVPlan(BestVPlan, VectorPH, OrigLoop,
+                                               BestVF);
 
   // 0. Generate SCEV-dependent code in the entry, including TripCount, before
   // making any changes to the CFG.
@@ -7838,6 +7849,181 @@ static void connectEpilogueVectorLoop(VPlan &EpiPlan, Loop *L,
       Phi.eraseFromParent();
 }
 
+/// Remove the realign-on-epi setup cost from the main-skipped path.
+///
+/// The realign-on-epi transform (\c tryToRealignEpilogueVPlan) rewrites the
+/// epilogue loop's start and exit via a select chain placed in the shared
+/// epilogue preheader (vec.epilog.ph):
+///   IsMainRan = (resume_val != 0)
+///   NewStart  = resume_val - select(IsMainRan, (resume_val - TC) & (VF-1), 0)
+///   NewExit   = select(IsMainRan, TC, VTC_epi)
+/// Because the preheader has two predecessors -- the main-ran path
+/// (vec.epilog.iter.check, resume_val = VTC_main) and the main-skipped path
+/// (vector.main.loop.iter.check, resume_val = 0) -- this chain executes on
+/// *both*. On the main-skipped path it always evaluates to the plain baseline
+/// values (NewStart = 0, NewExit = VTC_epi), so the extra ALU is pure overhead
+/// there. For tiny trip counts that skip the main loop the epilogue runs only
+/// a couple of iterations, and that overhead dominates -- observed as a
+/// regression versus the un-realigned epilogue.
+///
+/// Sink the realigned values into the main-ran predecessor and replace the two
+/// selects with phis, so the main-skipped edge contributes only the baseline
+/// values at zero extra cost. The realign ALU then lives solely on the main-ran
+/// path, where the main loop has already run and the few extra ops are
+/// negligible. This also makes the fix independent of the epilogue
+/// min-iter-check shape (the previous threshold-doubling approach only matched
+/// an `ult VF` check and never reached the main-skip bypass edge at all).
+///
+/// Returns true if the realign select chain was found and rewritten.
+static bool sinkRealignedEpilogueSetup(BasicBlock *VecEpiloguePH) {
+  if (!VecEpiloguePH || VecEpiloguePH->getNumUses() == 0)
+    return false;
+
+  auto IsZero = [](Value *V) {
+    auto *C = dyn_cast<ConstantInt>(V);
+    return C && C->isZero();
+  };
+
+  // The IV start (NewStart) feeds the IV phi of the single successor loop body.
+  BasicBlock *Body = VecEpiloguePH->getSingleSuccessor();
+  if (!Body)
+    return false;
+  auto *IVPhi = dyn_cast<PHINode>(&Body->front());
+  if (!IVPhi || IVPhi->getNumIncomingValues() != 2)
+    return false;
+  auto *NewStartSub =
+      dyn_cast<Instruction>(IVPhi->getIncomingValueForBlock(VecEpiloguePH));
+  if (!NewStartSub || NewStartSub->getOpcode() != Instruction::Sub ||
+      NewStartSub->getParent() != VecEpiloguePH)
+    return false;
+
+  // NewStart = OldStart - select(IsMainRan, Shift, 0).
+  Value *OldStart = NewStartSub->getOperand(0);
+  auto *EffShift = dyn_cast<SelectInst>(NewStartSub->getOperand(1));
+  if (!EffShift || !IsZero(EffShift->getFalseValue()))
+    return false;
+  auto *IsMainRan = dyn_cast<ICmpInst>(EffShift->getCondition());
+  if (!IsMainRan || IsMainRan->getPredicate() != ICmpInst::ICMP_NE ||
+      IsMainRan->getOperand(0) != OldStart || !IsZero(IsMainRan->getOperand(1)))
+    return false;
+
+  // OldStart is the resume-value phi at the top of the preheader, with one
+  // incoming per predecessor; the main-skipped predecessor contributes 0.
+  auto *ResumePhi = dyn_cast<PHINode>(OldStart);
+  if (!ResumePhi || ResumePhi->getParent() != VecEpiloguePH ||
+      ResumePhi->getNumIncomingValues() != 2)
+    return false;
+  int SkipIdx = -1;
+  for (unsigned I = 0, E = ResumePhi->getNumIncomingValues(); I != E; ++I) {
+    if (IsZero(ResumePhi->getIncomingValue(I))) {
+      if (SkipIdx != -1)
+        return false; // Ambiguous: both incomings zero.
+      SkipIdx = I;
+    }
+  }
+  if (SkipIdx == -1)
+    return false;
+  BasicBlock *MainSkipPred = ResumePhi->getIncomingBlock(SkipIdx);
+  BasicBlock *MainRanPred = ResumePhi->getIncomingBlock(1 - SkipIdx);
+  Value *ResumeOnMainRan = ResumePhi->getIncomingValue(1 - SkipIdx);
+  Value *ResumeOnMainSkip = ResumePhi->getIncomingValue(SkipIdx);
+
+  // NewExit = select(IsMainRan, TC, VTC_epi) -- the other select gated on the
+  // same IsMainRan condition.
+  SelectInst *NewExit = nullptr;
+  for (User *U : IsMainRan->users()) {
+    auto *Sel = dyn_cast<SelectInst>(U);
+    if (Sel && Sel != EffShift && Sel->getCondition() == IsMainRan) {
+      if (NewExit)
+        return false; // More than one candidate; bail conservatively.
+      NewExit = Sel;
+    }
+  }
+  if (!NewExit || NewExit->getParent() != VecEpiloguePH)
+    return false;
+  Value *TC = NewExit->getTrueValue();
+  Value *VTCEpi = NewExit->getFalseValue();
+  Value *Shift = EffShift->getTrueValue();
+
+  // Recompute the realigned start in the main-ran predecessor, where the
+  // resume value (VTC_main) and TC are both available. Mirror the original
+  // expression: Shift = (resume - TC) & (VF-1); NewStart = resume - Shift.
+  auto *ShiftInst = dyn_cast<Instruction>(Shift);
+  if (!ShiftInst || ShiftInst->getOpcode() != Instruction::And)
+    return false;
+  auto *NegTail = dyn_cast<Instruction>(ShiftInst->getOperand(0));
+  Value *VFm1 = ShiftInst->getOperand(1);
+  if (!NegTail || NegTail->getOpcode() != Instruction::Sub ||
+      NegTail->getOperand(0) != OldStart || NegTail->getOperand(1) != TC)
+    return false;
+
+  // Defensive: the recompute below places Sub(ResumeOnMainRan, TC) and
+  // And(.., VFm1) in MainRanPred, so TC and VFm1 must dominate it. In the
+  // current pipeline TC is a function argument or a SCEV expansion in the
+  // entry iter-check (which dominates the whole vector region) and VFm1 is a
+  // constant, so this always holds; guard against a future pipeline that
+  // materializes either inside the epilogue preheader (which would not
+  // dominate MainRanPred) by bailing to a no-op.
+  auto DefinedInPreheader = [&](Value *V) {
+    auto *I = dyn_cast<Instruction>(V);
+    return I && I->getParent() == VecEpiloguePH;
+  };
+  if (DefinedInPreheader(TC) || DefinedInPreheader(VFm1))
+    return false;
+
+  IRBuilder<> RanB(MainRanPred->getTerminator());
+  Value *RanNegTail = RanB.CreateSub(ResumeOnMainRan, TC);
+  Value *RanShift = RanB.CreateAnd(RanNegTail, VFm1);
+  Value *StartOnMainRan = RanB.CreateSub(ResumeOnMainRan, RanShift);
+
+  // The exit value on the main-skipped edge is the standard epilogue vector
+  // trip count (VTC_epi). It is computed inside the preheader, so it does not
+  // dominate the main-skipped predecessor's edge into the phi. Rematerialize
+  // its (short) defining chain there. VTC_epi = n - (n urem VF_epi): all leaf
+  // operands (the trip count and constants) dominate every predecessor, so a
+  // shallow clone is always legal.
+  IRBuilder<> SkipB(MainSkipPred->getTerminator());
+  std::function<Value *(Value *)> rematInSkip = [&](Value *V) -> Value * {
+    auto *I = dyn_cast<Instruction>(V);
+    if (!I || I->getParent() != VecEpiloguePH)
+      return V; // Dominates already (arg/constant/earlier block).
+    if (isa<PHINode>(I))
+      return nullptr; // Don't clone phis; bail.
+    Instruction *Clone = I->clone();
+    for (unsigned Op = 0, E = Clone->getNumOperands(); Op != E; ++Op) {
+      Value *NewOp = rematInSkip(I->getOperand(Op));
+      if (!NewOp)
+        return nullptr;
+      Clone->setOperand(Op, NewOp);
+    }
+    SkipB.Insert(Clone);
+    return Clone;
+  };
+  Value *VTCEpiOnSkip = rematInSkip(VTCEpi);
+  if (!VTCEpiOnSkip)
+    return false;
+
+  // Build the two phis at the top of the preheader. On the main-skipped edge
+  // the values are the plain baseline ones (start = resume(=0), exit = VTC_epi)
+  // computed without any select chain.
+  IRBuilder<> PHB(&*VecEpiloguePH->getFirstInsertionPt());
+  auto *StartPhi = PHB.CreatePHI(NewStartSub->getType(), 2);
+  StartPhi->addIncoming(StartOnMainRan, MainRanPred);
+  StartPhi->addIncoming(ResumeOnMainSkip, MainSkipPred);
+  auto *ExitPhi = PHB.CreatePHI(NewExit->getType(), 2);
+  ExitPhi->addIncoming(TC, MainRanPred);
+  ExitPhi->addIncoming(VTCEpiOnSkip, MainSkipPred);
+
+  NewStartSub->replaceAllUsesWith(StartPhi);
+  NewExit->replaceAllUsesWith(ExitPhi);
+
+  // The original select chain is now dead; later DCE removes it, but erase the
+  // obvious leaves eagerly so the win is visible even without cleanup passes.
+  RecursivelyDeleteTriviallyDeadInstructions(NewStartSub);
+  RecursivelyDeleteTriviallyDeadInstructions(NewExit);
+  return true;
+}
+
 bool LoopVectorizePass::processLoop(Loop *L) {
   assert((EnableVPlanNativePath || L->isInnermost()) &&
          "VPlan-native path is not enabled. Only process inner loops.");
@@ -8320,6 +8506,18 @@ bool LoopVectorizePass::processLoop(Loop *L) {
         LoopVectorizationPlanner::EpilogueVectorizationKind::Epilogue);
     connectEpilogueVectorLoop(BestEpiPlan, L, EPI, DT, Checks, InstsToMove,
                               ResumeValues);
+    // If the realign-on-epi transform fired, sink its setup off the main-
+    // skipped path so tiny trip counts that skip the main loop don't pay for
+    // the realign select chain. The epilogue preheader (vec.epilog.ph) is a
+    // successor of the main-loop iteration-count check; sinkRealignedEpilogue-
+    // Setup pattern-matches the realign chain and is a no-op on any other
+    // block, so it is safe to offer both successors as candidates.
+    if (BasicBlock *MainCheck = EPI.MainLoopIterationCountCheck) {
+      if (auto *BI = dyn_cast<CondBrInst>(MainCheck->getTerminator()))
+        for (BasicBlock *Succ : successors(BI))
+          if (sinkRealignedEpilogueSetup(Succ))
+            break;
+    }
     ++LoopsEpilogueVectorized;
   } else {
     InnerLoopVectorizer LB(L, PSE, LI, DT, TTI, AC, VF.Width, IC, &CM, Checks,
