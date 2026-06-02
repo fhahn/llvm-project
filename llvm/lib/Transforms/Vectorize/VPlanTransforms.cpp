@@ -1782,23 +1782,28 @@ static void simplifyRecipe(VPSingleDefRecipe *Def) {
   //  IVInc = X + Step   ; used by X and Def
   //  Def = IVInc + Y
   // Fold the increment Y into the phi's start value, replace Def with IVInc,
-  // and if Inc exists, replace it with X.
+  // and if Inc exists, replace it with X. Y must be loop-invariant w.r.t.
+  // Phi's loop -- a live-in (no defining recipe), or defined outside the
+  // single-block loop body that contains Phi.
   if (match(Def, m_Add(m_Add(m_VPValue(X), m_VPValue()), m_VPValue(Y))) &&
-      isa<VPIRValue>(Y) &&
       match(X, m_VPPhi(m_ZeroInt(), m_Specific(Def->getOperand(0))))) {
     auto *Phi = cast<VPPhi>(X);
-    auto *IVInc = Def->getOperand(0);
-    if (IVInc->getNumUsers() == 2) {
-      // If Phi has a second user (besides IVInc's defining recipe), it must
-      // be Inc = Phi + Y for the fold to apply.
-      auto *Inc = dyn_cast_or_null<VPSingleDefRecipe>(
-          findUserOf(Phi, m_Add(m_Specific(Phi), m_Specific(Y))));
-      if (Phi->getNumUsers() == 1 || (Phi->getNumUsers() == 2 && Inc)) {
-        Def->replaceAllUsesWith(IVInc);
-        if (Inc)
-          Inc->replaceAllUsesWith(Phi);
-        Phi->setOperand(0, Y);
-        return;
+    VPRecipeBase *YDef = Y->getDefiningRecipe();
+    bool YInvariant = !YDef || YDef->getParent() != Phi->getParent();
+    if (YInvariant) {
+      auto *IVInc = Def->getOperand(0);
+      if (IVInc->getNumUsers() == 2) {
+        // If Phi has a second user (besides IVInc's defining recipe), it must
+        // be Inc = Phi + Y for the fold to apply.
+        auto *Inc = dyn_cast_or_null<VPSingleDefRecipe>(
+            findUserOf(Phi, m_Add(m_Specific(Phi), m_Specific(Y))));
+        if (Phi->getNumUsers() == 1 || (Phi->getNumUsers() == 2 && Inc)) {
+          Def->replaceAllUsesWith(IVInc);
+          if (Inc)
+            Inc->replaceAllUsesWith(Phi);
+          Phi->setOperand(0, Y);
+          return;
+        }
       }
     }
   }
@@ -7432,27 +7437,27 @@ VPRegionBlock *VPlanTransforms::prepareRealignSnapshot(
   if (!BestVF.isFixed() || OrigLoop->getParentLoop() || Plan.hasEarlyExit())
     return nullptr;
 
-  // Only fire for compile-time-known trip counts: with a constant TC we can
-  // statically check the profitability gate (Tail >= 2) and emit the
-  // realigned epilogue without runtime checks. Runtime-TC support is added
-  // by a follow-up patch.
+  // For compile-time-known trip counts, statically check the profitability
+  // gate (Tail >= 2) and bail before cloning the region. For runtime trip
+  // counts, applyRealignSnapshot emits the same gate as a runtime check
+  // (`tail < 2`) and routes unprofitable tails to the preserved scalar tail.
   const SCEV *TCSCEV = vputils::getSCEVExprForVPValue(Plan.getTripCount(), PSE);
-  auto *TCConst = dyn_cast<SCEVConstant>(TCSCEV);
-  // Cap constant TC at 32 bits so RestartIdx * EltSize fits comfortably in
-  // uint64_t when computing the alignment downgrade.
-  if (!TCConst || TCConst->getAPInt().getActiveBits() > 32)
-    return nullptr;
-  uint64_t VFLanes = BestVF.getFixedValue();
-  uint64_t Stride = VFLanes * BestUF;
-  uint64_t TCVal = TCConst->getAPInt().getZExtValue();
-  // Profitability gate: the realign body re-executes the body once at offset
-  // RestartIdx, producing (Stride - Tail) redundant lane writes that overlap
-  // with the main vector loop. Require Tail >= 2 so the redundancy stays
-  // bounded; Tail == 1 has been observed to regress because a single scalar
-  // iteration is cheaper than re-running the realign body.
-  uint64_t Tail = TCVal % Stride;
-  if (Tail < 2 || TCVal < Stride)
-    return nullptr;
+  if (auto *TCConst = dyn_cast<SCEVConstant>(TCSCEV)) {
+    // Cap constant TC at 32 bits so RestartIdx * EltSize fits comfortably in
+    // uint64_t when computing the alignment downgrade.
+    if (TCConst->getAPInt().getActiveBits() > 32)
+      return nullptr;
+    uint64_t TCVal = TCConst->getAPInt().getZExtValue();
+    uint64_t Stride = BestVF.getFixedValue() * BestUF;
+    // Profitability gate: the realign body re-executes the body once at offset
+    // RestartIdx, producing (Stride - Tail) redundant lane writes that overlap
+    // with the main vector loop. Require Tail >= 2 so the redundancy stays
+    // bounded; Tail == 1 has been observed to regress because a single scalar
+    // iteration is cheaper than re-running the realign body.
+    uint64_t Tail = TCVal % Stride;
+    if (Tail < 2 || TCVal < Stride)
+      return nullptr;
+  }
 
   VPRegionBlock *MainRegion = Plan.getVectorLoopRegion();
   if (!MainRegion || MainRegion->isReplicator())
@@ -7522,7 +7527,7 @@ VPRegionBlock *VPlanTransforms::prepareRealignSnapshot(
 
 void VPlanTransforms::applyRealignSnapshot(VPlan &Plan,
                                            VPRegionBlock *Snapshot,
-                                           ElementCount BestVF) {
+                                           ElementCount BestVF, unsigned BestUF) {
   if (!Snapshot)
     return;
 
@@ -7558,9 +7563,7 @@ void VPlanTransforms::applyRealignSnapshot(VPlan &Plan,
   if (!isPowerOf2_64(VFLanes))
     return;
 
-  // Compute realign.start = VTC - ((VTC - TC) & (VF - 1)) in a new realign.ph.
-  // The inner expression equals 0 when remainder is a multiple of VF, and
-  // (VF - remainder%VF) otherwise; in either case the realign loop covers
+  // Compute realign.start in a new realign.ph so the realign loop covers
   // exactly the lanes [RealignStart, TC).
   VPValue *TC = Plan.getTripCount();
   Type *TCTy = TC->getScalarType();
@@ -7569,10 +7572,27 @@ void VPlanTransforms::applyRealignSnapshot(VPlan &Plan,
          "applyRealignSnapshot must run before VTC materialization");
   VPBasicBlock *RealignPH = Plan.createVPBasicBlock("vector.realign.ph");
   VPBuilder PHB(RealignPH, RealignPH->end());
-  VPValue *VFm1 = Plan.getConstantInt(TCTy, VFLanes - 1);
-  VPValue *NegRem = PHB.createSub(VTC, TC);
-  VPValue *Shift = PHB.createAnd(NegRem, VFm1);
-  VPValue *RealignStart = PHB.createSub(VTC, Shift);
+  VPValue *RealignStart;
+  if (BestUF == 1) {
+    // With UF == 1 the realign loop steps by VF, and the profitability gate
+    // (Tail = TC - VTC in [2, VF)) guarantees it runs exactly one iteration.
+    // That single iteration must cover [TC - VF, TC), so RealignStart is just
+    // TC - VF -- a single subtract that is independent of VTC. This both
+    // saves two ALU ops over the general form below and lets later passes
+    // prove the realign loop's trip count is 1 and collapse it to a straight-
+    // line vector iteration. (Algebraically TC - VF == VTC - ((VTC - TC) &
+    // (VF - 1)) whenever 0 < Tail < VF, which the gate ensures.)
+    RealignStart = PHB.createSub(TC, Plan.getConstantInt(TCTy, VFLanes));
+  } else {
+    // General UF > 1 form: realign.start = VTC - ((VTC - TC) & (VF - 1)). The
+    // and-expression equals 0 when the remainder is a multiple of VF, and
+    // (VF - remainder%VF) otherwise; the realign loop then runs between 1 and
+    // UF iterations covering [RealignStart, TC).
+    VPValue *VFm1 = Plan.getConstantInt(TCTy, VFLanes - 1);
+    VPValue *NegRem = PHB.createSub(VTC, TC);
+    VPValue *Shift = PHB.createAnd(NegRem, VFm1);
+    RealignStart = PHB.createSub(VTC, Shift);
+  }
 
   // Wire up the new CFG before touching recipes inside the snapshot, so
   // getPlan() works on the snapshot region. Layout:

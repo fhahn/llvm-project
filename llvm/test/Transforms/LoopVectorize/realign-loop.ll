@@ -28,20 +28,37 @@ define void @realign_runtime_tc(ptr noalias %dst, ptr noalias %src, i64 %n) {
 ; CHECK-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[CMP_N]], label %[[LOOP1:.*]], label %[[SCALAR_PH]]
-; CHECK:       [[SCALAR_PH]]:
-; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ]
+; CHECK-NEXT:    br i1 [[CMP_N]], label %[[LOOP1:.*]], label %[[REALIGN_CHECK:.*]]
+; CHECK:       [[REALIGN_CHECK]]:
+; CHECK-NEXT:    [[TMP4:%.*]] = sub i64 [[N]], [[N_VEC]]
+; CHECK-NEXT:    [[TMP5:%.*]] = icmp ult i64 [[TMP4]], 2
+; CHECK-NEXT:    br i1 [[TMP5]], label %[[SCALAR_PH]], label %[[VECTOR_REALIGN_PH:.*]]
+; CHECK:       [[VECTOR_REALIGN_PH]]:
+; CHECK-NEXT:    [[TMP6:%.*]] = sub i64 [[N]], 4
 ; CHECK-NEXT:    br label %[[LOOP2:.*]]
 ; CHECK:       [[LOOP2]]:
-; CHECK-NEXT:    [[IV1:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP2]] ]
+; CHECK-NEXT:    [[IV1:%.*]] = phi i64 [ [[TMP6]], %[[VECTOR_REALIGN_PH]] ], [ [[INDEX_NEXT3:%.*]], %[[LOOP2]] ]
 ; CHECK-NEXT:    [[GEP_SRC1:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[IV1]]
-; CHECK-NEXT:    [[V:%.*]] = load i32, ptr [[GEP_SRC1]], align 4
+; CHECK-NEXT:    [[WIDE_LOAD2:%.*]] = load <4 x i32>, ptr [[GEP_SRC1]], align 4
+; CHECK-NEXT:    [[TMP10:%.*]] = add <4 x i32> [[WIDE_LOAD2]], splat (i32 1)
+; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[IV1]]
+; CHECK-NEXT:    store <4 x i32> [[TMP10]], ptr [[TMP11]], align 4
+; CHECK-NEXT:    [[INDEX_NEXT3]] = add nuw i64 [[IV1]], 4
+; CHECK-NEXT:    [[REALIGN_CMP:%.*]] = icmp eq i64 [[INDEX_NEXT3]], [[N]]
+; CHECK-NEXT:    br i1 [[REALIGN_CMP]], label %[[LOOP1]], label %[[LOOP2]]
+; CHECK:       [[SCALAR_PH]]:
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[REALIGN_CHECK]] ], [ 0, %[[ENTRY]] ]
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[GEP_SRC:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[IV]]
+; CHECK-NEXT:    [[V:%.*]] = load i32, ptr [[GEP_SRC]], align 4
 ; CHECK-NEXT:    [[INC:%.*]] = add i32 [[V]], 1
-; CHECK-NEXT:    [[GEP_DST:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[IV1]]
+; CHECK-NEXT:    [[GEP_DST:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[IV]]
 ; CHECK-NEXT:    store i32 [[INC]], ptr [[GEP_DST]], align 4
-; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV1]], 1
+; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 1
 ; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
-; CHECK-NEXT:    br i1 [[EC]], label %[[LOOP1]], label %[[LOOP2]], !llvm.loop [[LOOP3:![0-9]+]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[LOOP1]], label %[[LOOP]], !llvm.loop [[LOOP3:![0-9]+]]
 ; CHECK:       [[LOOP1]]:
 ; CHECK-NEXT:    ret void
 ;
@@ -557,26 +574,49 @@ define void @realign_heavy_body(ptr noalias %dst, ptr noalias %a, ptr noalias %b
 ; CHECK-NEXT:    br i1 [[TMP8]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP16:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
-; CHECK:       [[SCALAR_PH]]:
-; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ]
+; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[REALIGN_CHECK:.*]]
+; CHECK:       [[REALIGN_CHECK]]:
+; CHECK-NEXT:    [[TMP9:%.*]] = sub i64 [[N]], [[N_VEC]]
+; CHECK-NEXT:    [[TMP10:%.*]] = icmp ult i64 [[TMP9]], 2
+; CHECK-NEXT:    br i1 [[TMP10]], label %[[SCALAR_PH]], label %[[VECTOR_REALIGN_PH:.*]]
+; CHECK:       [[VECTOR_REALIGN_PH]]:
+; CHECK-NEXT:    [[TMP11:%.*]] = sub i64 [[N]], 4
 ; CHECK-NEXT:    br label %[[LOOP1:.*]]
 ; CHECK:       [[LOOP1]]:
-; CHECK-NEXT:    [[IV1:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP1]] ]
+; CHECK-NEXT:    [[IV1:%.*]] = phi i64 [ [[TMP11]], %[[VECTOR_REALIGN_PH]] ], [ [[INDEX_NEXT5:%.*]], %[[LOOP1]] ]
 ; CHECK-NEXT:    [[GA1:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[IV1]]
-; CHECK-NEXT:    [[VA:%.*]] = load i32, ptr [[GA1]], align 4
-; CHECK-NEXT:    [[GB:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[IV1]]
+; CHECK-NEXT:    [[WIDE_LOAD3:%.*]] = load <4 x i32>, ptr [[GA1]], align 4
+; CHECK-NEXT:    [[TMP15:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[IV1]]
+; CHECK-NEXT:    [[WIDE_LOAD4:%.*]] = load <4 x i32>, ptr [[TMP15]], align 4
+; CHECK-NEXT:    [[TMP16:%.*]] = add <4 x i32> [[WIDE_LOAD3]], [[WIDE_LOAD4]]
+; CHECK-NEXT:    [[TMP17:%.*]] = shl <4 x i32> [[TMP16]], splat (i32 1)
+; CHECK-NEXT:    [[TMP18:%.*]] = mul <4 x i32> [[WIDE_LOAD4]], splat (i32 3)
+; CHECK-NEXT:    [[TMP19:%.*]] = sub <4 x i32> [[TMP17]], [[TMP18]]
+; CHECK-NEXT:    [[TMP20:%.*]] = add <4 x i32> [[TMP19]], [[WIDE_LOAD3]]
+; CHECK-NEXT:    [[TMP21:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[IV1]]
+; CHECK-NEXT:    store <4 x i32> [[TMP20]], ptr [[TMP21]], align 4
+; CHECK-NEXT:    [[INDEX_NEXT5]] = add nuw i64 [[IV1]], 4
+; CHECK-NEXT:    [[REALIGN_CMP:%.*]] = icmp eq i64 [[INDEX_NEXT5]], [[N]]
+; CHECK-NEXT:    br i1 [[REALIGN_CMP]], label %[[EXIT]], label %[[LOOP1]]
+; CHECK:       [[SCALAR_PH]]:
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[REALIGN_CHECK]] ], [ 0, %[[ENTRY]] ]
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[GA:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[IV]]
+; CHECK-NEXT:    [[VA:%.*]] = load i32, ptr [[GA]], align 4
+; CHECK-NEXT:    [[GB:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[IV]]
 ; CHECK-NEXT:    [[VB:%.*]] = load i32, ptr [[GB]], align 4
 ; CHECK-NEXT:    [[S:%.*]] = add i32 [[VA]], [[VB]]
 ; CHECK-NEXT:    [[M:%.*]] = mul i32 [[S]], 2
 ; CHECK-NEXT:    [[X:%.*]] = mul i32 [[VB]], 3
 ; CHECK-NEXT:    [[Y:%.*]] = sub i32 [[M]], [[X]]
 ; CHECK-NEXT:    [[Z:%.*]] = add i32 [[Y]], [[VA]]
-; CHECK-NEXT:    [[GD:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[IV1]]
+; CHECK-NEXT:    [[GD:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[IV]]
 ; CHECK-NEXT:    store i32 [[Z]], ptr [[GD]], align 4
-; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV1]], 1
+; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 1
 ; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
-; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP1]], !llvm.loop [[LOOP17:![0-9]+]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP17:![0-9]+]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void
 ;
@@ -976,20 +1016,37 @@ define void @realign_widened_intrinsic(ptr noalias %dst, ptr noalias %src, i64 %
 ; CHECK-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP26:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
-; CHECK:       [[SCALAR_PH]]:
-; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ]
+; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[REALIGN_CHECK:.*]]
+; CHECK:       [[REALIGN_CHECK]]:
+; CHECK-NEXT:    [[TMP4:%.*]] = sub i64 [[N]], [[N_VEC]]
+; CHECK-NEXT:    [[TMP5:%.*]] = icmp ult i64 [[TMP4]], 2
+; CHECK-NEXT:    br i1 [[TMP5]], label %[[SCALAR_PH]], label %[[VECTOR_REALIGN_PH:.*]]
+; CHECK:       [[VECTOR_REALIGN_PH]]:
+; CHECK-NEXT:    [[TMP6:%.*]] = sub i64 [[N]], 4
 ; CHECK-NEXT:    br label %[[LOOP1:.*]]
 ; CHECK:       [[LOOP1]]:
-; CHECK-NEXT:    [[IV1:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP1]] ]
+; CHECK-NEXT:    [[IV1:%.*]] = phi i64 [ [[TMP6]], %[[VECTOR_REALIGN_PH]] ], [ [[INDEX_NEXT3:%.*]], %[[LOOP1]] ]
 ; CHECK-NEXT:    [[SGEP1:%.*]] = getelementptr inbounds float, ptr [[SRC]], i64 [[IV1]]
-; CHECK-NEXT:    [[V:%.*]] = load float, ptr [[SGEP1]], align 4
+; CHECK-NEXT:    [[WIDE_LOAD2:%.*]] = load <4 x float>, ptr [[SGEP1]], align 4
+; CHECK-NEXT:    [[TMP10:%.*]] = call <4 x float> @llvm.sqrt.v4f32(<4 x float> [[WIDE_LOAD2]])
+; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr inbounds float, ptr [[DST]], i64 [[IV1]]
+; CHECK-NEXT:    store <4 x float> [[TMP10]], ptr [[TMP11]], align 4
+; CHECK-NEXT:    [[INDEX_NEXT3]] = add nuw i64 [[IV1]], 4
+; CHECK-NEXT:    [[REALIGN_CMP:%.*]] = icmp eq i64 [[INDEX_NEXT3]], [[N]]
+; CHECK-NEXT:    br i1 [[REALIGN_CMP]], label %[[EXIT]], label %[[LOOP1]]
+; CHECK:       [[SCALAR_PH]]:
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[REALIGN_CHECK]] ], [ 0, %[[ENTRY]] ]
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[SGEP:%.*]] = getelementptr inbounds float, ptr [[SRC]], i64 [[IV]]
+; CHECK-NEXT:    [[V:%.*]] = load float, ptr [[SGEP]], align 4
 ; CHECK-NEXT:    [[R:%.*]] = call float @llvm.sqrt.f32(float [[V]])
-; CHECK-NEXT:    [[DGEP:%.*]] = getelementptr inbounds float, ptr [[DST]], i64 [[IV1]]
+; CHECK-NEXT:    [[DGEP:%.*]] = getelementptr inbounds float, ptr [[DST]], i64 [[IV]]
 ; CHECK-NEXT:    store float [[R]], ptr [[DGEP]], align 4
-; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV1]], 1
+; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 1
 ; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
-; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP1]], !llvm.loop [[LOOP27:![0-9]+]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP27:![0-9]+]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void
 ;
@@ -1036,20 +1093,37 @@ define void @realign_fmuladd(ptr noalias %dst, ptr noalias %src, i64 %n) {
 ; CHECK-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP28:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
-; CHECK:       [[SCALAR_PH]]:
-; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ]
+; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[REALIGN_CHECK:.*]]
+; CHECK:       [[REALIGN_CHECK]]:
+; CHECK-NEXT:    [[TMP4:%.*]] = sub i64 [[N]], [[N_VEC]]
+; CHECK-NEXT:    [[TMP5:%.*]] = icmp ult i64 [[TMP4]], 2
+; CHECK-NEXT:    br i1 [[TMP5]], label %[[SCALAR_PH]], label %[[VECTOR_REALIGN_PH:.*]]
+; CHECK:       [[VECTOR_REALIGN_PH]]:
+; CHECK-NEXT:    [[TMP6:%.*]] = sub i64 [[N]], 4
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[TMP6]], %[[VECTOR_REALIGN_PH]] ], [ [[INDEX_NEXT3:%.*]], %[[LOOP]] ]
 ; CHECK-NEXT:    [[SGEP:%.*]] = getelementptr inbounds float, ptr [[SRC]], i64 [[IV]]
-; CHECK-NEXT:    [[V:%.*]] = load float, ptr [[SGEP]], align 4
+; CHECK-NEXT:    [[WIDE_LOAD2:%.*]] = load <4 x float>, ptr [[SGEP]], align 4
+; CHECK-NEXT:    [[TMP10:%.*]] = call <4 x float> @llvm.fmuladd.v4f32(<4 x float> [[WIDE_LOAD2]], <4 x float> splat (float 2.000000e+00), <4 x float> [[WIDE_LOAD2]])
+; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr inbounds float, ptr [[DST]], i64 [[IV]]
+; CHECK-NEXT:    store <4 x float> [[TMP10]], ptr [[TMP11]], align 4
+; CHECK-NEXT:    [[INDEX_NEXT3]] = add nuw i64 [[IV]], 4
+; CHECK-NEXT:    [[REALIGN_CMP:%.*]] = icmp eq i64 [[INDEX_NEXT3]], [[N]]
+; CHECK-NEXT:    br i1 [[REALIGN_CMP]], label %[[EXIT]], label %[[LOOP]]
+; CHECK:       [[SCALAR_PH]]:
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[REALIGN_CHECK]] ], [ 0, %[[ENTRY]] ]
+; CHECK-NEXT:    br label %[[LOOP1:.*]]
+; CHECK:       [[LOOP1]]:
+; CHECK-NEXT:    [[IV1:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP1]] ]
+; CHECK-NEXT:    [[SGEP1:%.*]] = getelementptr inbounds float, ptr [[SRC]], i64 [[IV1]]
+; CHECK-NEXT:    [[V:%.*]] = load float, ptr [[SGEP1]], align 4
 ; CHECK-NEXT:    [[R:%.*]] = call float @llvm.fmuladd.f32(float [[V]], float 2.000000e+00, float [[V]])
-; CHECK-NEXT:    [[DGEP:%.*]] = getelementptr inbounds float, ptr [[DST]], i64 [[IV]]
+; CHECK-NEXT:    [[DGEP:%.*]] = getelementptr inbounds float, ptr [[DST]], i64 [[IV1]]
 ; CHECK-NEXT:    store float [[R]], ptr [[DGEP]], align 4
-; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 1
+; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV1]], 1
 ; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
-; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP29:![0-9]+]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP1]], !llvm.loop [[LOOP29:![0-9]+]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void
 ;

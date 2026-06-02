@@ -599,7 +599,7 @@ struct VPlanTransforms {
   /// Must be called before \c dissolveLoopRegions, which then dissolves both
   /// regions uniformly.
   static void applyRealignSnapshot(VPlan &Plan, VPRegionBlock *Snapshot,
-                                   ElementCount BestVF);
+                                   ElementCount BestVF, unsigned BestUF);
 };
 
 } // namespace llvm

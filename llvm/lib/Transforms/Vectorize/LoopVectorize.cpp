@@ -5969,7 +5969,8 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   // and dissolveLoopRegions so the snapshot's BranchOnCount is lowered and
   // its region dissolved by the same passes that handle the main loop region.
   if (EpilogueVecKind == EpilogueVectorizationKind::None)
-    VPlanTransforms::applyRealignSnapshot(BestVPlan, RealignSnapshot, BestVF);
+    VPlanTransforms::applyRealignSnapshot(BestVPlan, RealignSnapshot, BestVF,
+                                          BestUF);
 
   RUN_VPLAN_PASS(VPlanTransforms::convertToConcreteRecipes, BestVPlan);
   // Convert the exit condition to AVLNext == 0 for EVL tail folded loops.
