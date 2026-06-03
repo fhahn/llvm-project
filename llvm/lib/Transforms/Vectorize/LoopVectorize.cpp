@@ -2114,20 +2114,27 @@ static unsigned estimateElementCount(ElementCount VF,
 /// Returns the vector library variant function of \p CI usable at \p VF,
 /// respecting \p MaskRequired, or nullptr if none is found: a mapping with
 /// matching VF, masked if required, whose vector function is declared in the
-/// module.
+/// module with a signature matching the variant's shape. Malformed variants
+/// (e.g. a masked variant whose declaration omits the trailing mask parameter)
+/// are rejected here, consistent with the VPlan-side variant selection, so they
+/// are scalarized instead.
 static Function *getVectorLibraryVariantFor(const CallInst &CI, ElementCount VF,
                                             bool MaskRequired,
                                             const TargetLibraryInfo *TLI) {
   if (!TLI || CI.isNoBuiltin())
     return nullptr;
+  const Module *M = CI.getModule();
   for (const VFInfo &Info : VFDatabase::getMappings(CI))
     if (Info.Shape.VF == VF && (!MaskRequired || Info.isMasked()))
-      if (Function *F = CI.getModule()->getFunction(Info.VectorName))
+      if (Function *F =
+              VFABI::getMatchingVectorVariant(*M, Info, CI.getFunctionType()))
         return F;
   return nullptr;
 }
 
-/// Returns true iff \p CI has a library vector variant usable at \p VF.
+/// Returns true iff \p CI has a library vector variant usable at \p VF. Such
+/// variants are priced by VPWidenCallRecipe::computeCost rather than by
+/// scalarization.
 static bool hasVectorLibraryVariantFor(const CallInst &CI, ElementCount VF,
                                        bool MaskRequired,
                                        const TargetLibraryInfo *TLI) {

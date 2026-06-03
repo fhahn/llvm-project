@@ -5602,13 +5602,22 @@ static Function *findVectorVariant(CallInst *CI, ArrayRef<VPValue *> Args,
   if (CI->isNoBuiltin())
     return nullptr;
   auto Mappings = VFDatabase::getMappings(*CI);
-  const auto *It = find_if(Mappings, [&](const VFInfo &Info) {
-    return Info.Shape.VF == VF && (!MaskRequired || Info.isMasked()) &&
-           areVFParamsOk(Info, Args, PSE, L);
-  });
-  if (It == Mappings.end())
-    return nullptr;
-  return CI->getModule()->getFunction(It->VectorName);
+  const Module *M = CI->getModule();
+  Function *Variant = nullptr;
+  for (const VFInfo &Info : Mappings) {
+    if (Info.Shape.VF != VF || (MaskRequired && !Info.isMasked()) ||
+        !areVFParamsOk(Info, Args, PSE, L))
+      continue;
+    // Reject malformed variants whose declared signature does not match the
+    // shape: in particular, a variant claimed to be masked must have a
+    // trailing mask parameter, and parameter widths/element types must match
+    // the shape.
+    Variant =
+        VFABI::getMatchingVectorVariant(*M, Info, CI->getFunctionType());
+    if (Variant)
+      break;
+  }
+  return Variant;
 }
 
 namespace {
