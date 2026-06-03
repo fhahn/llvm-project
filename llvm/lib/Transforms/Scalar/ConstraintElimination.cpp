@@ -65,6 +65,11 @@ static cl::opt<bool> DumpReproducers(
     "constraint-elimination-dump-reproducers", cl::init(false), cl::Hidden,
     cl::desc("Dump IR to reproduce successful transformations."));
 
+static cl::opt<unsigned> MaxDecomposeDepth(
+    "constraint-elimination-max-decompose-depth", cl::init(256), cl::Hidden,
+    cl::desc("Maximum recursion depth when decomposing expressions. Deeper "
+             "expressions are treated opaquely to avoid stack overflow."));
+
 static int64_t MaxConstraintValue = std::numeric_limits<int64_t>::max();
 static int64_t MinSignedConstraintValue = std::numeric_limits<int64_t>::min();
 
@@ -467,7 +472,8 @@ static OffsetResult collectOffsets(GEPOperator &GEP, const DataLayout &DL) {
 }
 
 static Decomposition decompose(Value *V, const ConstraintInfo &Info,
-                               bool IsSigned, const DataLayout &DL);
+                               bool IsSigned, const DataLayout &DL,
+                               unsigned Depth = 0);
 
 static bool canUseSExt(ConstantInt *CI) {
   const APInt &Val = CI->getValue();
@@ -482,7 +488,8 @@ static bool preconditionHolds(const ConstraintInfo &Info,
 }
 
 static Decomposition decomposeGEP(GEPOperator &GEP, const ConstraintInfo &Info,
-                                  bool IsSigned, const DataLayout &DL) {
+                                  bool IsSigned, const DataLayout &DL,
+                                  unsigned Depth) {
   // Do not reason about pointers where the index size is larger than 64 bits,
   // as the coefficients used to encode constraints are 64 bit integers.
   if (DL.getIndexTypeSizeInBits(GEP.getPointerOperand()->getType()) > 64)
@@ -513,7 +520,7 @@ static Decomposition decomposeGEP(GEPOperator &GEP, const ConstraintInfo &Info,
         return &GEP;
     }
 
-    auto IdxResult = decompose(Index, Info, IsSigned, DL);
+    auto IdxResult = decompose(Index, Info, IsSigned, DL, Depth + 1);
     if (IdxResult.mul(Scale.getSExtValue()))
       return &GEP;
     if (Result.add(IdxResult))
@@ -529,12 +536,19 @@ static Decomposition decomposeGEP(GEPOperator &GEP, const ConstraintInfo &Info,
 // Looking through certain expressions is only valid if a pre-condition holds.
 // Pre-conditions are checked against \p Info as needed.
 static Decomposition decompose(Value *V, const ConstraintInfo &Info,
-                               bool IsSigned, const DataLayout &DL) {
-  auto MergeResults = [&Info, IsSigned,
-                       &DL](Value *A, Value *B,
-                            bool IsSignedB) -> std::optional<Decomposition> {
-    auto ResA = decompose(A, Info, IsSigned, DL);
-    auto ResB = decompose(B, Info, IsSignedB, DL);
+                               bool IsSigned, const DataLayout &DL,
+                               unsigned Depth) {
+  // Stop recursing once we hit the maximum decomposition depth and treat the
+  // value opaquely. This loses no soundness (the value is simply not broken
+  // down further) and bounds the stack usage for very long operand chains.
+  if (Depth >= MaxDecomposeDepth)
+    return V;
+
+  auto MergeResults = [&Info, IsSigned, &DL,
+                       Depth](Value *A, Value *B,
+                              bool IsSignedB) -> std::optional<Decomposition> {
+    auto ResA = decompose(A, Info, IsSigned, DL, Depth + 1);
+    auto ResB = decompose(B, Info, IsSignedB, DL, Depth + 1);
     if (ResA.add(ResB))
       return std::nullopt;
     return ResA;
@@ -543,7 +557,7 @@ static Decomposition decompose(Value *V, const ConstraintInfo &Info,
   Type *Ty = V->getType()->getScalarType();
   if (Ty->isPointerTy() && !IsSigned) {
     if (auto *GEP = dyn_cast<GEPOperator>(V))
-      return decomposeGEP(*GEP, Info, IsSigned, DL);
+      return decomposeGEP(*GEP, Info, IsSigned, DL, Depth);
     if (isa<ConstantPointerNull>(V))
       return int64_t(0);
 
@@ -589,8 +603,8 @@ static Decomposition decompose(Value *V, const ConstraintInfo &Info,
     }
 
     if (match(V, m_NSWSub(m_Value(Op0), m_Value(Op1)))) {
-      auto ResA = decompose(Op0, Info, IsSigned, DL);
-      auto ResB = decompose(Op1, Info, IsSigned, DL);
+      auto ResA = decompose(Op0, Info, IsSigned, DL, Depth + 1);
+      auto ResB = decompose(Op1, Info, IsSigned, DL, Depth + 1);
       if (!ResA.sub(ResB))
         return ResA;
       return V;
@@ -598,7 +612,7 @@ static Decomposition decompose(Value *V, const ConstraintInfo &Info,
 
     ConstantInt *CI;
     if (match(V, m_NSWMul(m_Value(Op0), m_ConstantInt(CI))) && canUseSExt(CI)) {
-      auto Result = decompose(Op0, Info, IsSigned, DL);
+      auto Result = decompose(Op0, Info, IsSigned, DL, Depth + 1);
       if (!Result.mul(CI->getSExtValue()))
         return Result;
       return V;
@@ -610,7 +624,7 @@ static Decomposition decompose(Value *V, const ConstraintInfo &Info,
       uint64_t Shift = CI->getValue().getLimitedValue();
       if (Shift < Ty->getIntegerBitWidth() - 1) {
         assert(Shift < 64 && "Would overflow");
-        auto Result = decompose(Op0, Info, IsSigned, DL);
+        auto Result = decompose(Op0, Info, IsSigned, DL, Depth + 1);
         if (!Result.mul(int64_t(1) << Shift))
           return Result;
         return V;
@@ -692,7 +706,7 @@ static Decomposition decompose(Value *V, const ConstraintInfo &Info,
     // shift of 63, for which int64_t{1} << 63 is INT64_MIN.
     if (CI->getSExtValue() < 0 || CI->getSExtValue() >= 63)
       return V;
-    auto Result = decompose(Op1, Info, IsSigned, DL);
+    auto Result = decompose(Op1, Info, IsSigned, DL, Depth + 1);
     if (!Result.mul(int64_t{1} << CI->getSExtValue()))
       return Result;
     return V;
@@ -700,7 +714,7 @@ static Decomposition decompose(Value *V, const ConstraintInfo &Info,
 
   if (match(V, m_NUWMul(m_Value(Op1), m_ConstantInt(CI))) && canUseSExt(CI) &&
       (!CI->isNegative())) {
-    auto Result = decompose(Op1, Info, IsSigned, DL);
+    auto Result = decompose(Op1, Info, IsSigned, DL, Depth + 1);
     if (!Result.mul(CI->getSExtValue()))
       return Result;
     return V;
@@ -712,8 +726,8 @@ static Decomposition decompose(Value *V, const ConstraintInfo &Info,
     if (!cast<OverflowingBinaryOperator>(V)->hasNoUnsignedWrap() &&
         !Info.doesHold(CmpInst::ICMP_ULE, Op1, Op0))
       return V;
-    auto ResA = decompose(Op0, Info, IsSigned, DL);
-    auto ResB = decompose(Op1, Info, IsSigned, DL);
+    auto ResA = decompose(Op0, Info, IsSigned, DL, Depth + 1);
+    auto ResB = decompose(Op1, Info, IsSigned, DL, Depth + 1);
     if (!ResA.sub(ResB))
       return ResA;
     return V;
