@@ -5835,12 +5835,19 @@ LoopVectorizationPlanner::computeBestVF() {
     return {VectorizationFactor(FirstPlan.getSingleVF(), 0, 0), &FirstPlan};
   }
 
-  if (hasPlanWithVF(UserVF) && hasForcedEpilogueVF()) {
-    assert(VPlans.size() == 2 && "Must have exactly 2 VPlans built");
-    assert(VPlans[0]->getSingleVF() == EpilogueVectorizationForceVF &&
-           "expected first plan to be for the forced epilogue VF");
-    assert(VPlans[1]->getSingleVF() == UserVF &&
-           "expected second plan to be for the forced UserVF");
+  // The forced-epilogue planning builds exactly two plans: one for the forced
+  // epilogue VF and one for the (vector) UserVF. It only keeps them if the
+  // UserVF plan has a valid cost; otherwise the plans are cleared and the
+  // generic candidate plans are built instead. Only take the fast path when the
+  // expected 2-plan state is actually present, so that an unrelated generic
+  // plan happening to cover UserVF does not trigger it.
+  auto IsPlanForSingleVF = [](const VPlan &Plan, ElementCount VF) {
+    auto VFs = Plan.vectorFactors();
+    return std::distance(VFs.begin(), VFs.end()) == 1 && Plan.hasVF(VF);
+  };
+  if (hasForcedEpilogueVF() && VPlans.size() == 2 &&
+      IsPlanForSingleVF(*VPlans[0], EpilogueVectorizationForceVF) &&
+      IsPlanForSingleVF(*VPlans[1], UserVF)) {
     return {VectorizationFactor(UserVF, 0, 0), VPlans[1].get()};
   }
 
