@@ -2075,10 +2075,15 @@ static void legacyCSE(BasicBlock *BB) {
 /// vscale value.
 static unsigned estimateElementCount(ElementCount VF,
                                      std::optional<unsigned> VScale) {
-  unsigned EstimatedVF = VF.getKnownMinValue();
+  // For scalable VFs the runtime element count is the known minimum value
+  // scaled by the (estimated) vscale. Compute the product in 64 bits and
+  // saturate to UINT_MAX to avoid overflowing the 32-bit result for very
+  // large vscale estimates.
+  uint64_t EstimatedVF = VF.getKnownMinValue();
   if (VF.isScalable())
     if (VScale)
       EstimatedVF *= *VScale;
+  EstimatedVF = std::min<uint64_t>(EstimatedVF, UINT_MAX);
   assert(EstimatedVF >= 1 && "Estimated VF shouldn't be less than 1");
   return EstimatedVF;
 }
