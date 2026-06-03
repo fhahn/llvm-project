@@ -1022,6 +1022,11 @@ llvm::getStrideFromAddRec(const SCEVAddRecExpr *AR, const Loop *Lp,
   TypeSize AllocSize = DL.getTypeAllocSize(AccessTy);
   int64_t Size = AllocSize.getFixedValue();
 
+  // A zero-sized access type (e.g. an empty struct or [0 x i8]) has no stride
+  // in elements; bail out to avoid dividing by zero below.
+  if (Size == 0)
+    return std::nullopt;
+
   // Huge step value - give up.
   std::optional<int64_t> StepVal = APStepVal->trySExtValue();
   if (!StepVal)
