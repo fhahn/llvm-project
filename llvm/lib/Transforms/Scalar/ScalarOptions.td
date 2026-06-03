@@ -36,6 +36,8 @@ defm : BoolField<"consthoist-with-block-frequency", "true",
 // ConstraintElimination.cpp
 defm : BoolField<"constraint-elimination-dump-reproducers", "false",
   "Dump IR to reproduce successful transformations">;
+defm : ValueField<"constraint-elimination-max-decompose-depth", "unsigned", "256",
+  "Maximum recursion depth when decomposing expressions. Deeper expressions are treated opaquely to avoid stack overflow">;
 defm : ValueField<"constraint-elimination-max-rows", "unsigned", "500",
   "Maximum number of rows to keep in constraint system">;
 

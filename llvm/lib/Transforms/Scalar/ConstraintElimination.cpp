@@ -360,6 +360,9 @@ class ConstraintInfo {
 
   const DataLayout &DL;
 
+  /// Maximum recursion depth when decomposing expressions.
+  unsigned MaxDecomposeDepth;
+
   /// Decompositions computed against the current state of the systems. Must be
   /// cleared when the system changes.
   DenseMap<PointerIntPair<Value *, 1, bool>, Decomposition> DecomposeCache;
@@ -370,14 +373,18 @@ public:
     return DecomposeCache;
   }
 
-  ConstraintInfo(const DataLayout &DL, ArrayRef<Value *> FunctionArgs)
-      : UnsignedCS(FunctionArgs), SignedCS(FunctionArgs), DL(DL) {
+  ConstraintInfo(const DataLayout &DL, ArrayRef<Value *> FunctionArgs,
+                 unsigned MaxDecomposeDepth)
+      : UnsignedCS(FunctionArgs), SignedCS(FunctionArgs), DL(DL),
+        MaxDecomposeDepth(MaxDecomposeDepth) {
     auto &Value2Index = getValue2Index(false);
     // Add Arg > -1 constraints to unsigned system for all function arguments.
     for (Value *Arg : FunctionArgs)
       UnsignedCS.addRow({Entry(0, 0), Entry(-1, Value2Index.at(Arg))},
                         Value2Index.size());
   }
+
+  unsigned getMaxDecomposeDepth() const { return MaxDecomposeDepth; }
 
   DenseMap<Value *, unsigned> &getValue2Index(bool Signed) {
     return Signed ? SignedCS.getValue2Index() : UnsignedCS.getValue2Index();
@@ -511,7 +518,7 @@ static OffsetResult collectOffsets(GEPOperator &GEP, const DataLayout &DL) {
 }
 
 static Decomposition decompose(Value *V, ConstraintInfo &Info, bool IsSigned,
-                               const DataLayout &DL);
+                               const DataLayout &DL, unsigned Depth = 0);
 
 static bool canUseSExt(ConstantInt *CI) {
   const APInt &Val = CI->getValue();
@@ -619,7 +626,8 @@ static bool isKnownNoWrap(Value *V, ConstraintInfo &Info, bool Signed) {
 }
 
 static Decomposition decomposeGEP(GEPOperator &GEP, ConstraintInfo &Info,
-                                  bool IsSigned, const DataLayout &DL) {
+                                  bool IsSigned, const DataLayout &DL,
+                                  unsigned Depth) {
   // Do not reason about pointers where the index size is larger than 64 bits,
   // as the coefficients used to encode constraints are 64 bit integers.
   if (DL.getIndexTypeSizeInBits(GEP.getPointerOperand()->getType()) > 64)
@@ -658,7 +666,7 @@ static Decomposition decomposeGEP(GEPOperator &GEP, ConstraintInfo &Info,
         return &GEP;
     }
 
-    auto IdxResult = decompose(Index, Info, IsSigned, DL);
+    auto IdxResult = decompose(Index, Info, IsSigned, DL, Depth + 1);
     if (IdxResult.mul(Scale.getSExtValue()))
       return &GEP;
     if (Result.add(IdxResult))
@@ -674,7 +682,8 @@ static Decomposition decomposeGEP(GEPOperator &GEP, ConstraintInfo &Info,
 // Looking through certain expressions is only valid if a pre-condition holds.
 // Pre-conditions are checked against \p Info as needed.
 static Decomposition decomposeImpl(Value *V, ConstraintInfo &Info,
-                                   bool IsSigned, const DataLayout &DL);
+                                   bool IsSigned, const DataLayout &DL,
+                                   unsigned Depth);
 
 /// Returns true if \p V is an operation decomposeImpl can look through.
 static bool mayLookThrough(Value *V) {
@@ -701,9 +710,15 @@ static bool mayLookThrough(Value *V) {
 }
 
 static Decomposition decompose(Value *V, ConstraintInfo &Info, bool IsSigned,
-                               const DataLayout &DL) {
+                               const DataLayout &DL, unsigned Depth) {
+  // Stop recursing once we hit the maximum decomposition depth and treat the
+  // value opaquely. This loses no soundness (the value is simply not broken
+  // down further) and bounds the stack usage for very long operand chains.
+  if (Depth >= Info.getMaxDecomposeDepth())
+    return V;
+
   if (!mayLookThrough(V))
-    return decomposeImpl(V, Info, IsSigned, DL);
+    return decomposeImpl(V, Info, IsSigned, DL, Depth);
 
   PointerIntPair<Value *, 1, bool> Key(V, IsSigned);
   auto &Cache = Info.getDecomposeCache();
@@ -711,18 +726,19 @@ static Decomposition decompose(Value *V, ConstraintInfo &Info, bool IsSigned,
   if (It != Cache.end())
     return It->second;
 
-  Decomposition Result = decomposeImpl(V, Info, IsSigned, DL);
+  Decomposition Result = decomposeImpl(V, Info, IsSigned, DL, Depth);
   Info.getDecomposeCache().insert({Key, Result});
   return Result;
 }
 
 static Decomposition decomposeImpl(Value *V, ConstraintInfo &Info,
-                                   bool IsSigned, const DataLayout &DL) {
-  auto MergeResults = [&Info, IsSigned,
-                       &DL](Value *A, Value *B,
-                            bool IsSignedB) -> std::optional<Decomposition> {
-    auto ResA = decompose(A, Info, IsSigned, DL);
-    auto ResB = decompose(B, Info, IsSignedB, DL);
+                                   bool IsSigned, const DataLayout &DL,
+                                   unsigned Depth) {
+  auto MergeResults = [&Info, IsSigned, &DL,
+                       Depth](Value *A, Value *B,
+                              bool IsSignedB) -> std::optional<Decomposition> {
+    auto ResA = decompose(A, Info, IsSigned, DL, Depth + 1);
+    auto ResB = decompose(B, Info, IsSignedB, DL, Depth + 1);
     if (ResA.add(ResB))
       return std::nullopt;
     return ResA;
@@ -731,7 +747,7 @@ static Decomposition decomposeImpl(Value *V, ConstraintInfo &Info,
   Type *Ty = V->getType()->getScalarType();
   if (Ty->isPointerTy() && !IsSigned) {
     if (auto *GEP = dyn_cast<GEPOperator>(V))
-      return decomposeGEP(*GEP, Info, IsSigned, DL);
+      return decomposeGEP(*GEP, Info, IsSigned, DL, Depth);
     if (isa<ConstantPointerNull>(V))
       return int64_t(0);
 
@@ -794,15 +810,15 @@ static Decomposition decomposeImpl(Value *V, ConstraintInfo &Info,
   // `xor %x, -1` is equivalent to `sub nsw -1, %x`.
   if (IsSigned && match(V, m_Not(m_Value(Op0)))) {
     Decomposition Result(-1);
-    if (!Result.sub(decompose(Op0, Info, IsSigned, DL)))
+    if (!Result.sub(decompose(Op0, Info, IsSigned, DL, Depth + 1)))
       return Result;
     return V;
   }
 
   if (match(V, m_Sub(m_Value(Op0), m_Value(Op1)))) {
     if (isKnownNoWrap(V, Info, IsSigned)) {
-      auto ResA = decompose(Op0, Info, IsSigned, DL);
-      auto ResB = decompose(Op1, Info, IsSigned, DL);
+      auto ResA = decompose(Op0, Info, IsSigned, DL, Depth + 1);
+      auto ResB = decompose(Op1, Info, IsSigned, DL, Depth + 1);
       if (!ResA.sub(ResB))
         return ResA;
     }
@@ -814,7 +830,7 @@ static Decomposition decomposeImpl(Value *V, ConstraintInfo &Info,
     // the unsigned system the multiplier is the constant's unsigned value.
     if (canUseSExt(CI) && (IsSigned || !CI->isNegative()) &&
         isKnownNoWrap(V, Info, IsSigned)) {
-      auto Result = decompose(Op0, Info, IsSigned, DL);
+      auto Result = decompose(Op0, Info, IsSigned, DL, Depth + 1);
       if (!Result.mul(CI->getSExtValue()))
         return Result;
     }
@@ -847,7 +863,7 @@ static Decomposition decomposeImpl(Value *V, ConstraintInfo &Info,
     int64_t MaxShift = IsSigned ? Ty->getIntegerBitWidth() - 1 : 63;
     if (!CI->isNegative() && CI->getSExtValue() < MaxShift &&
         isKnownNoWrap(V, Info, IsSigned)) {
-      auto Result = decompose(Op0, Info, IsSigned, DL);
+      auto Result = decompose(Op0, Info, IsSigned, DL, Depth + 1);
       if (!Result.mul(int64_t{1} << CI->getSExtValue()))
         return Result;
     }
@@ -2484,7 +2500,8 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
   bool Changed = false;
   DT.updateDFSNumbers();
   SmallVector<Value *> FunctionArgs(llvm::make_pointer_range(F.args()));
-  ConstraintInfo Info(F.getDataLayout(), FunctionArgs);
+  ConstraintInfo Info(F.getDataLayout(), FunctionArgs,
+                      Opts.constraint_elimination_max_decompose_depth);
   State S(DT, LI, SE, TLI);
   std::unique_ptr<Module> ReproducerModule(
       Opts.constraint_elimination_dump_reproducers
