@@ -91,7 +91,13 @@ bool VPlanVerifier::verifyPhiRecipes(const VPBasicBlock *VPBB) {
       return false;
     }
 
-    if (!IsHeaderVPBB && isa<VPHeaderPHIRecipe>(*RecipeI)) {
+    // A header phi recipe must be in a header block. After the loop regions
+    // are dissolved, removing the backedge of a single-iteration loop leaves
+    // header phi recipes in a block that is no longer recognized as a header
+    // until they are simplified away, so restrict the check to plans that
+    // still have a vector loop region.
+    if (VPBB->getPlan()->getVectorLoopRegion() && !IsHeaderVPBB &&
+        isa<VPHeaderPHIRecipe>(*RecipeI)) {
       errs() << "Found header PHI recipe in non-header VPBB";
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
       errs() << ": ";

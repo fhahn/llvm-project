@@ -67,6 +67,16 @@
 ; CHECK: VPlan for loop in 'foo' after VPlanTransforms::dissolveLoopRegions
 ; CHECK: VPlan for loop in 'foo' after VPlanTransforms::expandBranchOnTwoConds
 ; CHECK: VPlan for loop in 'foo' after VPlanTransforms::convertToVariableLengthStep
+; CHECK: VPlan for loop in 'foo' after VPlanTransforms::removeBranchOnConst
+; CHECK: VPlan for loop in 'foo' after VPlanTransforms::materializeBackedgeTakenCount
+; CHECK: VPlan for loop in 'foo' after VPlanTransforms::materializeVectorTripCount
+; CHECK: VPlan for loop in 'foo' after VPlanTransforms::materializeFactors
+; CHECK: VPlan for loop in 'foo' after VPlanTransforms::expandSCEVsToVPInstructions
+; CHECK: VPlan for loop in 'foo' after VPlanTransforms::cse
+; CHECK: VPlan for loop in 'foo' after VPlanTransforms::simplifyRecipes
+; CHECK: VPlan for loop in 'foo' after VPlanTransforms::simplifyKnownEVL
+; CHECK: VPlan for loop in 'foo' after VPlanTransforms::expandSCEVs
+; CHECK: VPlan for loop in 'foo' after VPlanTransforms::removeDeadRecipes
 ; CHECK: VPlan for loop in 'foo' after printFinalVPlan
 
 ; Also verify that VPlans are actually printed (we aren't interested in the
