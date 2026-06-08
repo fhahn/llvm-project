@@ -807,21 +807,6 @@ public:
   /// Collect values we want to ignore in the cost model.
   void collectValuesToIgnore();
 
-  /// \returns True if it is more profitable to scalarize instruction \p I for
-  /// vectorization factor \p VF.
-  bool isProfitableToScalarize(Instruction *I, ElementCount VF) const {
-    assert(VF.isVector() &&
-           "Profitable to scalarize relevant only for VF > 1.");
-    assert(
-        TheLoop->isInnermost() &&
-        "cost-model should not be used for outer loops (in VPlan-native path)");
-
-    auto Scalars = InstsToScalarize.find(VF);
-    assert(Scalars != InstsToScalarize.end() &&
-           "VF not yet analyzed for scalarization profitability");
-    return Scalars->second.contains(I);
-  }
-
   /// Returns true if \p I is known to be uniform after vectorization.
   bool isUniformAfterVectorization(Instruction *I, ElementCount VF) const {
     assert(
@@ -866,7 +851,6 @@ public:
         I->getType()->getScalarSizeInBits() < MinBWs.lookup(I))
       return false;
     return VF.isVector() && MinBWs.contains(I) &&
-           !isProfitableToScalarize(I, VF) &&
            !isScalarAfterVectorization(I, VF);
   }
 
@@ -968,8 +952,8 @@ public:
     return Legal->isInductionPhi(Op);
   }
 
-  /// Collects the instructions to scalarize for each predicated instruction in
-  /// the loop.
+  /// Collects the blocks that remain predicated after vectorization, i.e.
+  /// blocks containing instructions that are scalar with predication for \p VF.
   void collectInstsToScalarize(ElementCount VF);
 
   /// Collect values that will not be widened, including Uniforms, Scalars, and
@@ -1367,11 +1351,6 @@ private:
   InstructionCost getScalarizationOverhead(Instruction *I,
                                            ElementCount VF) const;
 
-  /// A type representing the costs for instructions if they were to be
-  /// scalarized rather than vectorized. The entries are Instruction-Cost
-  /// pairs.
-  using ScalarCostsTy = MapVector<Instruction *, InstructionCost>;
-
   /// A set containing all BasicBlocks that are known to present after
   /// vectorization as a predicated block.
   DenseMap<ElementCount, SmallPtrSet<BasicBlock *, 4>>
@@ -1392,12 +1371,6 @@ private:
   /// If partial alias masking is enabled/disabled or not decided.
   AliasMaskingStatus PartialAliasMaskingStatus = AliasMaskingStatus::NotDecided;
 
-  /// A map holding scalar costs for different vectorization factors. The
-  /// presence of a cost for an instruction in the mapping indicates that the
-  /// instruction will be scalarized when vectorizing with the associated
-  /// vectorization factor. The entries are VF-ScalarCostTy pairs.
-  MapVector<ElementCount, ScalarCostsTy> InstsToScalarize;
-
   /// Holds the instructions known to be uniform after vectorization.
   /// The data is collected per VF.
   DenseMap<ElementCount, SmallPtrSet<Instruction *, 4>> Uniforms;
@@ -1409,15 +1382,6 @@ private:
   /// Holds the instructions (address computations) that are forced to be
   /// scalarized.
   DenseMap<ElementCount, SmallPtrSet<Instruction *, 4>> ForcedScalars;
-
-  /// Returns the expected difference in cost from scalarizing the expression
-  /// feeding a predicated instruction \p PredInst. The instructions to
-  /// scalarize and their scalar costs are collected in \p ScalarCosts. A
-  /// non-negative return value implies the expression will be scalarized.
-  /// Currently, only single-use chains are considered for scalarization.
-  InstructionCost computePredInstDiscount(Instruction *PredInst,
-                                          ScalarCostsTy &ScalarCosts,
-                                          ElementCount VF);
 
   /// Collect the instructions that are uniform after vectorization. An
   /// instruction is uniform if we represent it with a single scalar value in
@@ -4001,48 +3965,25 @@ bool LoopVectorizationCostModel::useEmulatedMaskMemRefHack(Instruction *I,
 void LoopVectorizationCostModel::collectInstsToScalarize(ElementCount VF) {
   assert(VF.isVector() && "Expected VF >= 2");
 
-  // If we've already collected the instructions to scalarize or the predicated
-  // BBs after vectorization, there's nothing to do. Collection may already have
-  // occurred if we have a user-selected VF and are now computing the expected
-  // cost for interleaving.
-  if (InstsToScalarize.contains(VF) ||
-      PredicatedBBsAfterVectorization.contains(VF))
+  // If we've already collected the predicated BBs after vectorization, there's
+  // nothing to do. Collection may already have occurred if we have a
+  // user-selected VF and are now computing the expected cost for interleaving.
+  if (PredicatedBBsAfterVectorization.contains(VF))
     return;
 
-  // Initialize a mapping for VF in InstsToScalalarize. If we find that it's
-  // not profitable to scalarize any instructions, the presence of VF in the
-  // map will indicate that we've analyzed it already.
-  ScalarCostsTy &ScalarCostsVF = InstsToScalarize[VF];
+  // Create an entry for VF to mark it as analyzed, even if the loop has no
+  // predicated blocks.
+  PredicatedBBsAfterVectorization.try_emplace(VF);
 
-  // Find all the instructions that are scalar with predication in the loop and
-  // determine if it would be better to not if-convert the blocks they are in.
-  // If so, we also record the instructions to scalarize.
+  // Find all the instructions that are scalar with predication in the loop;
+  // the blocks they are in will remain after vectorization. Chain
+  // scalarization is handled by the VPlan-based
+  // VPlanTransforms::scalarizeIfProfitable.
   for (BasicBlock *BB : TheLoop->blocks()) {
     if (!blockNeedsPredicationForAnyReason(BB))
       continue;
     for (Instruction &I : *BB)
       if (isScalarWithPredication(&I, VF)) {
-        // Chain scalarization for div/rem, calls and stores is handled by
-        // the VPlan-based VPlanTransforms::scalarizeIfProfitable. Skip the
-        // legacy discount computation for them; PredicatedBBsAfterVectorization
-        // is still populated below.
-        unsigned Opcode = I.getOpcode();
-        bool IsDelegatedToVPlan =
-            Opcode == Instruction::UDiv || Opcode == Instruction::SDiv ||
-            Opcode == Instruction::URem || Opcode == Instruction::SRem ||
-            Opcode == Instruction::Call || Opcode == Instruction::Store;
-        ScalarCostsTy ScalarCosts;
-        // Do not apply discount logic for:
-        // 1. Scalars after vectorization, as there will only be a single copy
-        // of the instruction.
-        // 2. Scalable VF, as that would lead to invalid scalarization costs.
-        // 3. Emulated masked memrefs, if a hacked cost is needed.
-        if (!IsDelegatedToVPlan && !isScalarAfterVectorization(&I, VF) &&
-            !VF.isScalable() && !useEmulatedMaskMemRefHack(&I, VF) &&
-            computePredInstDiscount(&I, ScalarCosts, VF) >= 0) {
-          for (const auto &[I, IC] : ScalarCosts)
-            ScalarCostsVF.insert({I, IC});
-        }
         // Remember that BB will remain after vectorization.
         PredicatedBBsAfterVectorization[VF].insert(BB);
         for (auto *Pred : predecessors(BB)) {
@@ -4051,128 +3992,6 @@ void LoopVectorizationCostModel::collectInstsToScalarize(ElementCount VF) {
         }
       }
   }
-}
-
-InstructionCost LoopVectorizationCostModel::computePredInstDiscount(
-    Instruction *PredInst, ScalarCostsTy &ScalarCosts, ElementCount VF) {
-  assert(!isUniformAfterVectorization(PredInst, VF) &&
-         "Instruction marked uniform-after-vectorization will be predicated");
-
-  // Initialize the discount to zero, meaning that the scalar version and the
-  // vector version cost the same.
-  InstructionCost Discount = 0;
-
-  // Holds instructions to analyze. The instructions we visit are mapped in
-  // ScalarCosts. Those instructions are the ones that would be scalarized if
-  // we find that the scalar version costs less.
-  SmallVector<Instruction *, 8> Worklist;
-
-  // Returns true if the given instruction can be scalarized.
-  auto CanBeScalarized = [&](Instruction *I) -> bool {
-    // We only attempt to scalarize instructions forming a single-use chain
-    // from the original predicated block that would otherwise be vectorized.
-    // Although not strictly necessary, we give up on instructions we know will
-    // already be scalar to avoid traversing chains that are unlikely to be
-    // beneficial.
-    if (!I->hasOneUse() || PredInst->getParent() != I->getParent() ||
-        isScalarAfterVectorization(I, VF))
-      return false;
-
-    // If the instruction is scalar with predication, it will be analyzed
-    // separately. We ignore it within the context of PredInst.
-    if (isScalarWithPredication(I, VF))
-      return false;
-
-    // If any of the instruction's operands are uniform after vectorization,
-    // the instruction cannot be scalarized. This prevents, for example, a
-    // masked load from being scalarized.
-    //
-    // We assume we will only emit a value for lane zero of an instruction
-    // marked uniform after vectorization, rather than VF identical values.
-    // Thus, if we scalarize an instruction that uses a uniform, we would
-    // create uses of values corresponding to the lanes we aren't emitting code
-    // for. This behavior can be changed by allowing getScalarValue to clone
-    // the lane zero values for uniforms rather than asserting.
-    for (Use &U : I->operands())
-      if (auto *J = dyn_cast<Instruction>(U.get()))
-        if (isUniformAfterVectorization(J, VF))
-          return false;
-
-    // Otherwise, we can scalarize the instruction.
-    return true;
-  };
-
-  // Compute the expected cost discount from scalarizing the entire expression
-  // feeding the predicated instruction. We currently only consider expressions
-  // that are single-use instruction chains.
-  Worklist.push_back(PredInst);
-  while (!Worklist.empty()) {
-    Instruction *I = Worklist.pop_back_val();
-
-    // If we've already analyzed the instruction, there's nothing to do.
-    if (ScalarCosts.contains(I))
-      continue;
-
-    // Cannot scalarize fixed-order recurrence phis at the moment.
-    if (isa<PHINode>(I) && Legal->isFixedOrderRecurrence(cast<PHINode>(I)))
-      continue;
-
-    // Compute the cost of the vector instruction. Note that this cost already
-    // includes the scalarization overhead of the predicated instruction.
-    InstructionCost VectorCost = getInstructionCost(I, VF);
-
-    // Compute the cost of the scalarized instruction. This cost is the cost of
-    // the instruction as if it wasn't if-converted and instead remained in the
-    // predicated block. We will scale this cost by block probability after
-    // computing the scalarization overhead.
-    InstructionCost ScalarCost =
-        VF.getFixedValue() * getInstructionCost(I, ElementCount::getFixed(1));
-
-    // Compute the scalarization overhead of needed insertelement instructions
-    // and phi nodes.
-    if (isScalarWithPredication(I, VF) && !I->getType()->isVoidTy()) {
-      Type *WideTy = toVectorizedTy(I->getType(), VF);
-      for (Type *VectorTy : getContainedTypes(WideTy)) {
-        ScalarCost += TTI.getScalarizationOverhead(
-            cast<VectorType>(VectorTy), APInt::getAllOnes(VF.getFixedValue()),
-            /*Insert=*/true,
-            /*Extract=*/false, Config.CostKind);
-      }
-      ScalarCost += VF.getFixedValue() *
-                    TTI.getCFInstrCost(Instruction::PHI, Config.CostKind);
-    }
-
-    // Compute the scalarization overhead of needed extractelement
-    // instructions. For each of the instruction's operands, if the operand can
-    // be scalarized, add it to the worklist; otherwise, account for the
-    // overhead.
-    for (Use &U : I->operands())
-      if (auto *J = dyn_cast<Instruction>(U.get())) {
-        assert(canVectorizeTy(J->getType()) &&
-               "Instruction has non-scalar type");
-        if (CanBeScalarized(J))
-          Worklist.push_back(J);
-        else if (needsExtract(J, VF)) {
-          Type *WideTy = toVectorizedTy(J->getType(), VF);
-          for (Type *VectorTy : getContainedTypes(WideTy)) {
-            ScalarCost += TTI.getScalarizationOverhead(
-                cast<VectorType>(VectorTy),
-                APInt::getAllOnes(VF.getFixedValue()), /*Insert*/ false,
-                /*Extract*/ true, Config.CostKind);
-          }
-        }
-      }
-
-    // Scale the total scalar cost by block probability.
-    ScalarCost /= getPredBlockCostDivisor(Config.CostKind, I->getParent());
-
-    // Compute the discount. A non-negative discount means the vector version
-    // of the instruction costs more, and scalarizing would be beneficial.
-    Discount += VectorCost - ScalarCost;
-    ScalarCosts[I] = ScalarCost;
-  }
-
-  return Discount;
 }
 
 InstructionCost LoopVectorizationCostModel::expectedCost(ElementCount VF) {
@@ -4925,9 +4744,6 @@ LoopVectorizationCostModel::getInstructionCost(Instruction *I,
   if (isUniformAfterVectorization(I, VF))
     VF = ElementCount::getFixed(1);
 
-  if (VF.isVector() && isProfitableToScalarize(I, VF))
-    return InstsToScalarize[VF][I];
-
   // Forced scalars do not have any scalarization overhead.
   auto ForcedScalar = ForcedScalars.find(VF);
   if (VF.isVector() && ForcedScalar != ForcedScalars.end()) {
@@ -4946,31 +4762,6 @@ LoopVectorizationCostModel::getInstructionCost(Instruction *I,
 
   Type *VectorTy;
   if (isScalarAfterVectorization(I, VF)) {
-    [[maybe_unused]] auto HasSingleCopyAfterVectorization =
-        [this](Instruction *I, ElementCount VF) -> bool {
-      if (VF.isScalar())
-        return true;
-
-      auto Scalarized = InstsToScalarize.find(VF);
-      assert(Scalarized != InstsToScalarize.end() &&
-             "VF not yet analyzed for scalarization profitability");
-      return !Scalarized->second.count(I) &&
-             llvm::all_of(I->users(), [&](User *U) {
-               auto *UI = cast<Instruction>(U);
-               return !Scalarized->second.count(UI);
-             });
-    };
-
-    // With the exception of GEPs and PHIs, after scalarization there should
-    // only be one copy of the instruction generated in the loop. This is
-    // because the VF is either 1, or any instructions that need scalarizing
-    // have already been dealt with by the time we get here. As a result,
-    // it means we don't have to multiply the instruction cost by VF.
-    assert(I->getOpcode() == Instruction::GetElementPtr ||
-           I->getOpcode() == Instruction::PHI ||
-           (I->getOpcode() == Instruction::BitCast &&
-            I->getType()->isPointerTy()) ||
-           HasSingleCopyAfterVectorization(I, VF));
     VectorTy = RetTy;
   } else
     VectorTy = toVectorizedTy(RetTy, VF);
@@ -5630,8 +5421,7 @@ uint64_t VPCostContext::getPredBlockCostDivisor(BasicBlock *BB) const {
 
 bool VPCostContext::willBeScalarized(Instruction *I, ElementCount VF) const {
   return CM.isScalarWithPredication(I, VF) ||
-         CM.isUniformAfterVectorization(I, VF) || CM.isForcedScalar(I, VF) ||
-         (VF.isVector() && CM.isProfitableToScalarize(I, VF));
+         CM.isUniformAfterVectorization(I, VF) || CM.isForcedScalar(I, VF);
 }
 
 bool VPCostContext::isScalarWithPredication(Instruction *I,
@@ -5722,11 +5512,8 @@ LoopVectorizationPlanner::precomputeCosts(VPlan &Plan, ElementCount VF,
   if (ForceTargetInstructionCost.getNumOccurrences())
     return Cost;
 
-  // Pre-compute costs for instructions that are forced-scalar or profitable to
-  // scalarize. For most such instructions, their scalarization costs are
-  // accounted for here using the legacy cost model. However, some opcodes
-  // are excluded from these precomputed scalarization costs and are instead
-  // modeled later by the VPlan cost model (see UseVPlanCostModel below).
+  // Pre-compute costs for instructions that are forced-scalar. Their
+  // scalarization costs are accounted for here using the legacy cost model.
   for (Instruction *ForcedScalar : CM.ForcedScalars[VF]) {
     if (CostCtx.skipCostComputation(ForcedScalar, VF.isVector()))
       continue;
@@ -5737,29 +5524,6 @@ LoopVectorizationPlanner::precomputeCosts(VPlan &Plan, ElementCount VF,
              << ": forced scalar " << *ForcedScalar << "\n";
     });
     Cost += ForcedCost;
-  }
-
-  auto UseVPlanCostModel = [](Instruction *I) -> bool {
-    switch (I->getOpcode()) {
-    case Instruction::SDiv:
-    case Instruction::UDiv:
-    case Instruction::SRem:
-    case Instruction::URem:
-      return true;
-    default:
-      return false;
-    }
-  };
-  for (const auto &[Scalarized, ScalarCost] : CM.InstsToScalarize[VF]) {
-    if (UseVPlanCostModel(Scalarized) ||
-        CostCtx.skipCostComputation(Scalarized, VF.isVector()))
-      continue;
-    CostCtx.SkipCostComputation.insert(Scalarized);
-    LLVM_DEBUG({
-      dbgs() << "Cost of " << ScalarCost << " for VF " << VF
-             << ": profitable to scalarize " << *Scalarized << "\n";
-    });
-    Cost += ScalarCost;
   }
 
   return Cost;
@@ -6183,8 +5947,7 @@ VPRecipeBase *VPRecipeBuilder::tryToWidenMemory(VPInstruction *VPI,
            "CM decision should be taken at this point.");
     if (Decision == LoopVectorizationCostModel::CM_Interleave)
       return true;
-    if (CM.isScalarAfterVectorization(I, VF) ||
-        CM.isProfitableToScalarize(I, VF))
+    if (CM.isScalarAfterVectorization(I, VF))
       return false;
     return Decision != LoopVectorizationCostModel::CM_Scalarize;
   };
@@ -6291,11 +6054,10 @@ VPRecipeBuilder::tryToOptimizeInductionTruncate(VPInstruction *VPI,
 bool VPRecipeBuilder::shouldWiden(Instruction *I, VFRange &Range) const {
   assert((!isa<UncondBrInst, CondBrInst, PHINode, LoadInst, StoreInst>(I)) &&
          "Instruction should have been handled earlier");
-  // Instruction should be widened, unless it is scalar after vectorization,
-  // scalarization is profitable or it is predicated.
+  // Instruction should be widened, unless it is scalar after vectorization or
+  // it is predicated.
   auto WillScalarize = [this, I](ElementCount VF) -> bool {
     return CM.isScalarAfterVectorization(I, VF) ||
-           CM.isProfitableToScalarize(I, VF) ||
            CM.isScalarWithPredication(I, VF);
   };
   return !LoopVectorizationPlanner::getDecisionAndClampRange(WillScalarize,
