@@ -7146,8 +7146,9 @@ static std::optional<int64_t> getConstantStride(VPValue *Addr, Type *AccessTy,
 
 void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
                                                  VPRecipeBuilder &RecipeBuilder,
-                                                 PredicatedScalarEvolution &PSE,
-                                                 const Loop *L) {
+                                                 VPCostContext &CostCtx) {
+  PredicatedScalarEvolution &PSE = CostCtx.PSE;
+  const Loop *L = CostCtx.L;
   // Collect all loads/stores first. We will start with ones having simpler
   // decisions followed by more complex ones that are potentially
   // guided/dependent on the simpler ones.
@@ -7255,7 +7256,15 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
         });
   }
 
-  // Widen unmasked unit-stride consecutive accesses, matching the legacy CM.
+  // Use a local cost context with its own VPTypeAnalysis for the cost queries
+  // performed when widening consecutive accesses below, so that recipe
+  // creation/erasure during this transform does not leave stale entries in the
+  // shared type cache.
+  VPCostContext LocalCtx(CostCtx.TTI, CostCtx.TLI, Plan, CostCtx.CM,
+                         CostCtx.CostKind, CostCtx.PSE, CostCtx.L);
+
+  // Widen unmasked unit-stride consecutive accesses, matching the legacy CM,
+  // unless scalarization is cheaper.
   VPlanTransforms::runPass(
       "widenConsecutiveMemOps", ProcessSubset, Plan, [&](VPInstruction *VPI) {
         Instruction *I = VPI->getUnderlyingInstr();
@@ -7268,6 +7277,30 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
             IsLoad ? VPI->getScalarType() : VPI->getOperand(0)->getScalarType();
         if (getConstantStride(Ptr, ScalarTy, PSE, L) != 1)
           return false;
+
+        // Compare widening cost against scalarization cost; scalarize if the
+        // latter is cheaper for all vector VFs in the range. This catches the
+        // legacy CM's blind spot of always widening consecutive accesses, e.g.
+        // for sub-vector-width types like <2 x i16> on ARM MVE.
+        auto WillWiden = [&](ElementCount VF) -> bool {
+          if (!VF.isVector())
+            return false;
+          InstructionCost WidenCost =
+              VPWidenMemoryRecipe::computeConsecutiveMemCost(*I, Ptr, VF,
+                                                             LocalCtx);
+          auto Ops = to_vector(VPI->operandsWithoutMask());
+          InstructionCost ScalarCost = VPReplicateRecipe::computeMemCost(
+              I, Ops, /*IsSingleScalar=*/false,
+              /*IsUsedByLoadStoreAddress=*/false, VF, LocalCtx);
+          return !ScalarCost.isValid() || WidenCost <= ScalarCost;
+        };
+        if (!LoopVectorizationPlanner::getDecisionAndClampRange(WillWiden,
+                                                                Range))
+          return ReplaceWith(VPI, new VPReplicateRecipe(
+                                      I, VPI->operandsWithoutMask(),
+                                      /*IsSingleScalar=*/false,
+                                      /*Mask=*/nullptr, *VPI, *VPI,
+                                      VPI->getDebugLoc()));
 
         Type *StrideTy =
             Plan.getDataLayout().getIndexType(Ptr->getScalarType());

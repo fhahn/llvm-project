@@ -324,9 +324,9 @@ define void @test_versioned_with_non_ex_use(i32 %offset, ptr noalias %dst.1, ptr
 ; CHECK:       vector.body:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP9:%.*]] = trunc i64 [[INDEX]] to i32
-; CHECK-NEXT:    [[TMP17:%.*]] = mul i32 [[TMP9]], [[ADD]]
-; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr i8, ptr [[DST_1]], i32 [[TMP17]]
-; CHECK-NEXT:    store <4 x i32> zeroinitializer, ptr [[TMP18]], align 8
+; CHECK-NEXT:    [[TMP11:%.*]] = mul i32 [[TMP9]], [[ADD]]
+; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr i8, ptr [[DST_1]], i32 [[TMP11]]
+; CHECK-NEXT:    store <4 x i32> zeroinitializer, ptr [[TMP12]], align 8
 ; CHECK-NEXT:    [[TMP20:%.*]] = getelementptr i32, ptr [[DST_2]], i64 [[INDEX]]
 ; CHECK-NEXT:    store <4 x i32> zeroinitializer, ptr [[TMP20]], align 8
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4

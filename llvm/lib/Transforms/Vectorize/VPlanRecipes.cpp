@@ -3877,49 +3877,14 @@ InstructionCost VPReplicateRecipe::computeCost(ElementCount VF,
     if (isa_and_nonnull<SCEVCouldNotCompute>(PtrSCEV))
       break;
 
-    Type *ValTy = (IsLoad ? this : getOperand(0))->getScalarType();
-    Type *ScalarPtrTy = PtrOp->getScalarType();
-    const Align Alignment = getLoadStoreAlignment(UI);
-    unsigned AS = cast<PointerType>(ScalarPtrTy)->getAddressSpace();
-    TTI::OperandValueInfo OpInfo = TTI::getOperandInfo(UI->getOperand(0));
-    bool PreferVectorizedAddressing = Ctx.TTI.prefersVectorizedAddressing();
-    bool UsedByLoadStoreAddress =
-        !PreferVectorizedAddressing && vputils::isUsedByLoadStoreAddress(this);
-    InstructionCost ScalarMemOpCost = Ctx.TTI.getMemoryOpCost(
-        UI->getOpcode(), ValTy, Alignment, AS, Ctx.CostKind, OpInfo,
-        UsedByLoadStoreAddress ? UI : nullptr);
+    bool UsedByLoadStoreAddress = !Ctx.TTI.prefersVectorizedAddressing() &&
+                                  vputils::isUsedByLoadStoreAddress(this);
 
-    Type *PtrTy = isSingleScalar() ? ScalarPtrTy : toVectorTy(ScalarPtrTy, VF);
-    InstructionCost ScalarCost =
-        ScalarMemOpCost +
-        Ctx.TTI.getAddressComputationCost(
-            PtrTy, UsedByLoadStoreAddress ? nullptr : Ctx.PSE.getSE(), PtrSCEV,
-            Ctx.CostKind);
-    if (isSingleScalar())
-      return ScalarCost;
-
-    SmallVector<const VPValue *> OpsToScalarize;
-    Type *ResultTy = Type::getVoidTy(PtrTy->getContext());
-    // Set ResultTy and OpsToScalarize, if scalarization is needed. Currently we
-    // don't assign scalarization overhead in general, if the target prefers
-    // vectorized addressing or the loaded value is used as part of an address
-    // of another load or store.
-    if (!UsedByLoadStoreAddress) {
-      bool EfficientVectorLoadStore =
-          Ctx.TTI.supportsEfficientVectorElementLoadStore();
-      if (!(IsLoad && !PreferVectorizedAddressing) &&
-          !(!IsLoad && EfficientVectorLoadStore))
-        append_range(OpsToScalarize, operands());
-
-      if (!EfficientVectorLoadStore)
-        ResultTy = this->getScalarType();
-    }
-
-    TTI::VectorInstrContext VIC =
-        IsLoad ? TTI::VectorInstrContext::Load : TTI::VectorInstrContext::Store;
-    InstructionCost Cost =
-        (ScalarCost * VF.getFixedValue()) +
-        Ctx.getScalarizationOverhead(ResultTy, OpsToScalarize, VF, VIC, true);
+    InstructionCost Cost = computeMemCost(
+        UI, to_vector(operands()), isSingleScalar(), UsedByLoadStoreAddress, VF,
+        Ctx);
+    if (!Cost.isValid())
+      break;
 
     const VPRegionBlock *ParentRegion = getRegion();
     if (ParentRegion && ParentRegion->isReplicator()) {
@@ -4075,6 +4040,63 @@ const VPRecipeBase *VPWidenStoreRecipe::getAsRecipe() const { return this; }
 VPRecipeBase *VPWidenStoreEVLRecipe::getAsRecipe() { return this; }
 const VPRecipeBase *VPWidenStoreEVLRecipe::getAsRecipe() const { return this; }
 
+InstructionCost VPReplicateRecipe::computeMemCost(
+    Instruction *I, ArrayRef<const VPValue *> Operands, bool IsSingleScalar,
+    bool IsUsedByLoadStoreAddress, ElementCount VF, VPCostContext &Ctx) {
+  // Scalarization is not possible for scalable vectors, as the lane count is
+  // unknown at compile time.
+  if (VF.isScalable() && !IsSingleScalar)
+    return InstructionCost::getInvalid();
+
+  bool IsLoad = I->getOpcode() == Instruction::Load;
+  const VPValue *PtrOp = Operands[!IsLoad];
+  const SCEV *PtrSCEV = getAddressAccessSCEV(PtrOp, Ctx.PSE, Ctx.L);
+  if (isa_and_nonnull<SCEVCouldNotCompute>(PtrSCEV))
+    return InstructionCost::getInvalid();
+
+  Type *ValTy = getLoadStoreType(I);
+  Type *ScalarPtrTy = PtrOp->getScalarType();
+  const Align Alignment = getLoadStoreAlignment(I);
+  unsigned AS = cast<PointerType>(ScalarPtrTy)->getAddressSpace();
+  TTI::OperandValueInfo OpInfo = TTI::getOperandInfo(I->getOperand(0));
+  bool PreferVectorizedAddressing = Ctx.TTI.prefersVectorizedAddressing();
+  InstructionCost ScalarMemOpCost = Ctx.TTI.getMemoryOpCost(
+      I->getOpcode(), ValTy, Alignment, AS, Ctx.CostKind, OpInfo,
+      IsUsedByLoadStoreAddress ? I : nullptr);
+
+  Type *PtrTy = IsSingleScalar ? ScalarPtrTy : toVectorTy(ScalarPtrTy, VF);
+  InstructionCost ScalarCost =
+      ScalarMemOpCost +
+      Ctx.TTI.getAddressComputationCost(
+          PtrTy, IsUsedByLoadStoreAddress ? nullptr : Ctx.PSE.getSE(), PtrSCEV,
+          Ctx.CostKind);
+  if (IsSingleScalar)
+    return ScalarCost;
+
+  SmallVector<const VPValue *> OpsToScalarize;
+  Type *ResultTy = Type::getVoidTy(PtrTy->getContext());
+  // Set ResultTy and OpsToScalarize, if scalarization is needed. Currently we
+  // don't assign scalarization overhead in general, if the target prefers
+  // vectorized addressing or the loaded value is used as part of an address
+  // of another load or store.
+  if (!IsUsedByLoadStoreAddress) {
+    bool EfficientVectorLoadStore =
+        Ctx.TTI.supportsEfficientVectorElementLoadStore();
+    if (!(IsLoad && !PreferVectorizedAddressing) &&
+        !(!IsLoad && EfficientVectorLoadStore))
+      append_range(OpsToScalarize, Operands);
+
+    if (!EfficientVectorLoadStore && IsLoad)
+      ResultTy = ValTy;
+  }
+
+  TTI::VectorInstrContext VIC =
+      IsLoad ? TTI::VectorInstrContext::Load : TTI::VectorInstrContext::Store;
+  return (ScalarCost * VF.getFixedValue()) +
+         Ctx.getScalarizationOverhead(ResultTy, OpsToScalarize, VF, VIC,
+                                      /*AlwaysIncludeReplicatingR=*/true);
+}
+
 InstructionCost VPWidenMemoryRecipe::computeCost(ElementCount VF,
                                                  VPCostContext &Ctx) const {
   const VPRecipeBase *R = getAsRecipe();
@@ -4084,7 +4106,6 @@ InstructionCost VPWidenMemoryRecipe::computeCost(ElementCount VF,
   Type *Ty = toVectorTy(ScalarTy, VF);
   unsigned AS =
       cast<PointerType>(getAddr()->getScalarType())->getAddressSpace();
-  unsigned Opcode = IsLoad ? Instruction::Load : Instruction::Store;
 
   if (!Consecutive) {
     // TODO: Using the original IR may not be accurate.
@@ -4122,20 +4143,26 @@ InstructionCost VPWidenMemoryRecipe::computeCost(ElementCount VF,
                Ctx.CostKind);
   }
 
-  InstructionCost Cost = 0;
   if (IsMasked) {
     unsigned IID = isa<VPWidenLoadRecipe>(R) ? Intrinsic::masked_load
                                              : Intrinsic::masked_store;
-    Cost += Ctx.TTI.getMemIntrinsicInstrCost(
+    return Ctx.TTI.getMemIntrinsicInstrCost(
         MemIntrinsicCostAttributes(IID, Ty, Alignment, AS), Ctx.CostKind);
-  } else {
-    TTI::OperandValueInfo OpInfo = Ctx.getOperandInfo(
-        isa<VPWidenLoadRecipe, VPWidenLoadEVLRecipe>(R) ? R->getOperand(0)
-                                                        : R->getOperand(1));
-    Cost += Ctx.TTI.getMemoryOpCost(Opcode, Ty, Alignment, AS, Ctx.CostKind,
-                                    OpInfo, &Ingredient);
   }
-  return Cost;
+
+  return computeConsecutiveMemCost(Ingredient, getAddr(), VF, Ctx);
+}
+
+InstructionCost VPWidenMemoryRecipe::computeConsecutiveMemCost(
+    Instruction &Ingredient, VPValue *PtrOperand, ElementCount VF,
+    VPCostContext &Ctx) {
+  Type *Ty = toVectorTy(getLoadStoreType(&Ingredient), VF);
+  unsigned AS =
+      cast<PointerType>(PtrOperand->getScalarType())->getAddressSpace();
+  const Align Alignment = getLoadStoreAlignment(&Ingredient);
+  TTI::OperandValueInfo OpInfo = TTI::getOperandInfo(Ingredient.getOperand(0));
+  return Ctx.TTI.getMemoryOpCost(Ingredient.getOpcode(), Ty, Alignment, AS,
+                                 Ctx.CostKind, OpInfo, &Ingredient);
 }
 
 void VPWidenLoadRecipe::execute(VPTransformState &State) {

@@ -3440,6 +3440,13 @@ public:
                                          bool IsSingleScalar, ElementCount VF,
                                          VPCostContext &Ctx);
 
+  /// Compute the cost of a replicated load or store for \p VF. Returns an
+  /// invalid cost for scalable VFs when \p IsSingleScalar is false.
+  static InstructionCost
+  computeMemCost(Instruction *I, ArrayRef<const VPValue *> Operands,
+                 bool IsSingleScalar, bool IsUsedByLoadStoreAddress,
+                 ElementCount VF, VPCostContext &Ctx);
+
   bool isSingleScalar() const { return IsSingleScalar; }
 
   bool isPredicated() const { return IsPredicated; }
@@ -3790,6 +3797,12 @@ public:
 
   /// Return the cost of this VPWidenMemoryRecipe.
   InstructionCost computeCost(ElementCount VF, VPCostContext &Ctx) const;
+
+  /// Compute the cost of a consecutive, non-masked widen load or store for
+  /// \p VF without needing a recipe instance.
+  static InstructionCost computeConsecutiveMemCost(
+      Instruction &Ingredient, VPValue *PtrOperand, ElementCount VF,
+      VPCostContext &Ctx);
 
   Instruction &getIngredient() const { return Ingredient; }
 };

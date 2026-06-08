@@ -3,10 +3,9 @@
 
 ; Test for the widening decision made by VPlanTransforms::makeMemOpWideningDecisions
 ; for a consecutive (unit-stride) load/store of a sub-vector-width type. On MVE
-; a <2 x i16> vector access is more expensive than scalarizing it, but the
-; widening decision currently always widens consecutive accesses, so the load
-; and store print as WIDEN here. A later change compares the widening cost
-; against the scalarization cost and scalarizes when that is cheaper.
+; a <2 x i16> vector access is more expensive than scalarizing it, so the
+; widening decision compares the widening cost against the scalarization cost
+; and scalarizes the load and store: they print as REPLICATE.
 
 target datalayout = "e-m:e-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64"
 target triple = "thumbv8.1m.main-none-none-eabi"
@@ -31,12 +30,10 @@ define void @consecutive_i16(ptr noalias %a, ptr noalias %b) #0 {
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%i> = WIDEN-INDUCTION nuw nsw ir<0>, ir<1>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT ir<%gep.a> = getelementptr inbounds ir<%a>, ir<%i>
-; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = vector-pointer inbounds ir<%gep.a>, ir<1>
-; CHECK-NEXT:      WIDEN ir<%lv> = load vp<[[VP4]]>
+; CHECK-NEXT:      REPLICATE ir<%lv> = load ir<%gep.a>
 ; CHECK-NEXT:      EMIT ir<%add> = add ir<%lv>, ir<1>
 ; CHECK-NEXT:      EMIT ir<%gep.b> = getelementptr inbounds ir<%b>, ir<%i>
-; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds ir<%gep.b>, ir<1>
-; CHECK-NEXT:      WIDEN store vp<[[VP5]]>, ir<%add>
+; CHECK-NEXT:      REPLICATE store ir<%add>, ir<%gep.b>
 ; CHECK-NEXT:      EMIT ir<%i.next> = add nuw nsw ir<%i>, ir<1>
 ; CHECK-NEXT:      EMIT ir<%cond> = icmp eq ir<%i.next>, ir<1024>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
