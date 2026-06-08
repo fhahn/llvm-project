@@ -55,6 +55,13 @@ bool isAddressSCEVForCost(const SCEV *Addr, ScalarEvolution &SE, const Loop *L);
 /// same value for all lanes or only has its first lane used.
 bool isSingleScalar(const VPValue *VPV);
 
+/// Returns true if \p VPV is directly a single scalar, i.e. the defining recipe
+/// itself produces a single scalar (a single-scalar VPReplicateRecipe, a
+/// single-scalar VPInstruction, a live-in, etc.), without recursively analyzing
+/// whether a uniformity-preserving operation has single-scalar operands. This
+/// is a conservative, cheaper variant of \ref isSingleScalar.
+bool isDirectSingleScalar(const VPValue *VPV);
+
 /// Checks if \p V is uniform across all VF lanes and UF parts. It is considered
 /// as such if it is either loop invariant (defined outside the vector region)
 /// or its operands are known to be uniform across all VFs and UFs (e.g.
