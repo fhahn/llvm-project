@@ -33,3 +33,65 @@ bb:
   ret i1 %icmp
 }
 
+
+; The following two functions are inputs that used to trigger
+; signed-integer-overflow UB *inside* ConstraintElimination's getConstraint
+; (compiler-UB, witnessed by a UBSan build of opt). The overflowing
+; computations are now overflow-guarded and bail out (returning no usable
+; constraint), so the comparisons below are not folded. They are kept here as
+; regression inputs for those sites.
+;
+; getConstraint: negating Offset1 (`Offset1 *= -1`) is INT64_MIN * -1 (signed
+; overflow) when Op0 decomposes to Offset == INT64_MIN, e.g. via
+; (add nsw INT64_MIN+1, -1). This is now computed with MulOverflow and bails.
+define i1 @offset_negate_int64_min_ub(i64 %p) {
+; CHECK-LABEL: define i1 @offset_negate_int64_min_ub
+; CHECK-SAME: (i64 [[P:%.*]]) {
+; CHECK-NEXT:    [[OP0:%.*]] = add nsw i64 -9223372036854775807, -1
+; CHECK-NEXT:    [[C:%.*]] = icmp slt i64 [[OP0]], [[P]]
+; CHECK-NEXT:    br i1 [[C]], label [[T:%.*]], label [[F:%.*]]
+; CHECK:       t:
+; CHECK-NEXT:    ret i1 true
+; CHECK:       f:
+; CHECK-NEXT:    ret i1 false
+;
+  %op0 = add nsw i64 -9223372036854775807, -1
+  %c = icmp slt i64 %op0, %p
+  br i1 %c, label %t, label %f
+
+t:
+  ret i1 true
+
+f:
+  ret i1 false
+}
+
+; getConstraint: the VariablesA coefficient accumulation `R[i] += coeff` used
+; to be unchecked (unlike the VariablesB loop which uses SubOverflow), so two
+; same-variable entries with coefficients 2^62 + 2^62 overflowed INT64_MAX. It
+; is now computed with AddOverflow and bails on overflow.
+define i1 @coeff_accumulate_overflow_ub(i64 %x, i64 %p) {
+; CHECK-LABEL: define i1 @coeff_accumulate_overflow_ub
+; CHECK-SAME: (i64 [[X:%.*]], i64 [[P:%.*]]) {
+; CHECK-NEXT:    [[A:%.*]] = mul nsw i64 [[X]], 4611686018427387904
+; CHECK-NEXT:    [[B:%.*]] = mul nsw i64 [[X]], 4611686018427387904
+; CHECK-NEXT:    [[OP0:%.*]] = add nsw i64 [[A]], [[B]]
+; CHECK-NEXT:    [[C:%.*]] = icmp slt i64 [[OP0]], [[P]]
+; CHECK-NEXT:    br i1 [[C]], label [[T:%.*]], label [[F:%.*]]
+; CHECK:       t:
+; CHECK-NEXT:    ret i1 true
+; CHECK:       f:
+; CHECK-NEXT:    ret i1 false
+;
+  %a = mul nsw i64 %x, 4611686018427387904
+  %b = mul nsw i64 %x, 4611686018427387904
+  %op0 = add nsw i64 %a, %b
+  %c = icmp slt i64 %op0, %p
+  br i1 %c, label %t, label %f
+
+t:
+  ret i1 true
+
+f:
+  ret i1 false
+}

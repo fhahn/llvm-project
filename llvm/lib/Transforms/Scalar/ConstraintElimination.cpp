@@ -747,7 +747,9 @@ ConstraintInfo::getConstraint(CmpInst::Predicate Pred, Value *Op0, Value *Op1,
                         IsSigned, DL);
   int64_t Offset1 = ADec.Offset;
   int64_t Offset2 = BDec.Offset;
-  Offset1 *= -1;
+  // Negating Offset1 (e.g. INT64_MIN) can overflow; bail in that case.
+  if (MulOverflow(Offset1, int64_t(-1), Offset1))
+    return {};
 
   auto &VariablesA = ADec.Vars;
   auto &VariablesB = BDec.Vars;
@@ -777,8 +779,11 @@ ConstraintInfo::getConstraint(CmpInst::Predicate Pred, Value *Op0, Value *Op1,
       SmallVector<int64_t, 8>(Value2Index.size() + NewVariables.size() + 1, 0),
       IsSigned, IsEq, IsNe);
   auto &R = Res.Coefficients;
-  for (const auto &KV : VariablesA)
-    R[GetOrAddIndex(KV.Variable)] += KV.Coefficient;
+  for (const auto &KV : VariablesA) {
+    auto &Coeff = R[GetOrAddIndex(KV.Variable)];
+    if (AddOverflow(Coeff, KV.Coefficient, Coeff))
+      return {};
+  }
 
   for (const auto &KV : VariablesB) {
     auto &Coeff = R[GetOrAddIndex(KV.Variable)];
