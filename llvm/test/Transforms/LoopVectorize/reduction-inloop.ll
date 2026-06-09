@@ -3136,15 +3136,10 @@ for.exit:
   ret i32 %sub.2
 }
 
-; FIXME: MISCOMPILE. Mixed fadd/fsub in-loop reduction chain
-; (RecurKind::FAddChainWithSubs): acc = ((acc + x[i]) - y[i]) == sum(x) - sum(y).
-; createInLoopReductionRecipes only special-cases the *integer*
-; RecurKind::AddChainWithSubs to negate the sub-link operand; the FP
-; FAddChainWithSubs falls through to the generic path with an un-negated VecOp,
-; and VPReductionRecipe::execute lowers it with FAdd. The vectorized loop
-; therefore computes sum(x) + sum(y) instead of sum(x) - sum(y). The CHECK below
-; captures the current (buggy) IR: the second vector.reduce.fadd (over %b/y) is
-; added rather than subtracted.
+; Mixed fadd/fsub in-loop reduction chain (RecurKind::FAddChainWithSubs):
+; acc = ((acc + x[i]) - y[i]) == sum(x) - sum(y). createInLoopReductionRecipes
+; negates the operand of the fsub link, so VPReductionRecipe (lowered with FAdd)
+; computes sum(x) - sum(y). The second reduction over %b/y is subtracted.
 define float @fadd_fsub_chain_inloop(ptr %a, ptr %b, i64 %n) {
 ; CHECK-LABEL: define float @fadd_fsub_chain_inloop(
 ; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[N:%.*]]) {
@@ -3162,9 +3157,10 @@ define float @fadd_fsub_chain_inloop(ptr %a, ptr %b, i64 %n) {
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x float>, ptr [[TMP0]], align 4
 ; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds float, ptr [[B]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_LOAD1:%.*]] = load <4 x float>, ptr [[TMP1]], align 4
+; CHECK-NEXT:    [[TMP7:%.*]] = fsub fast <4 x float> zeroinitializer, [[WIDE_LOAD1]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = call fast float @llvm.vector.reduce.fadd.v4f32(float 0.000000e+00, <4 x float> [[WIDE_LOAD]])
 ; CHECK-NEXT:    [[TMP3:%.*]] = fadd fast float [[VEC_PHI]], [[TMP2]]
-; CHECK-NEXT:    [[TMP4:%.*]] = call fast float @llvm.vector.reduce.fadd.v4f32(float 0.000000e+00, <4 x float> [[WIDE_LOAD1]])
+; CHECK-NEXT:    [[TMP4:%.*]] = call fast float @llvm.vector.reduce.fadd.v4f32(float 0.000000e+00, <4 x float> [[TMP7]])
 ; CHECK-NEXT:    [[TMP5]] = fadd fast float [[TMP3]], [[TMP4]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
@@ -3213,13 +3209,15 @@ define float @fadd_fsub_chain_inloop(ptr %a, ptr %b, i64 %n) {
 ; CHECK-INTERLEAVED-NEXT:    [[TMP3:%.*]] = getelementptr inbounds float, ptr [[TMP2]], i64 4
 ; CHECK-INTERLEAVED-NEXT:    [[WIDE_LOAD3:%.*]] = load <4 x float>, ptr [[TMP2]], align 4
 ; CHECK-INTERLEAVED-NEXT:    [[WIDE_LOAD4:%.*]] = load <4 x float>, ptr [[TMP3]], align 4
+; CHECK-INTERLEAVED-NEXT:    [[TMP13:%.*]] = fsub fast <4 x float> zeroinitializer, [[WIDE_LOAD3]]
+; CHECK-INTERLEAVED-NEXT:    [[TMP14:%.*]] = fsub fast <4 x float> zeroinitializer, [[WIDE_LOAD4]]
 ; CHECK-INTERLEAVED-NEXT:    [[TMP4:%.*]] = call fast float @llvm.vector.reduce.fadd.v4f32(float 0.000000e+00, <4 x float> [[WIDE_LOAD]])
 ; CHECK-INTERLEAVED-NEXT:    [[TMP5:%.*]] = fadd fast float [[VEC_PHI]], [[TMP4]]
 ; CHECK-INTERLEAVED-NEXT:    [[TMP6:%.*]] = call fast float @llvm.vector.reduce.fadd.v4f32(float 0.000000e+00, <4 x float> [[WIDE_LOAD2]])
 ; CHECK-INTERLEAVED-NEXT:    [[TMP7:%.*]] = fadd fast float [[VEC_PHI1]], [[TMP6]]
-; CHECK-INTERLEAVED-NEXT:    [[TMP8:%.*]] = call fast float @llvm.vector.reduce.fadd.v4f32(float 0.000000e+00, <4 x float> [[WIDE_LOAD3]])
+; CHECK-INTERLEAVED-NEXT:    [[TMP8:%.*]] = call fast float @llvm.vector.reduce.fadd.v4f32(float 0.000000e+00, <4 x float> [[TMP13]])
 ; CHECK-INTERLEAVED-NEXT:    [[TMP9]] = fadd fast float [[TMP5]], [[TMP8]]
-; CHECK-INTERLEAVED-NEXT:    [[TMP10:%.*]] = call fast float @llvm.vector.reduce.fadd.v4f32(float 0.000000e+00, <4 x float> [[WIDE_LOAD4]])
+; CHECK-INTERLEAVED-NEXT:    [[TMP10:%.*]] = call fast float @llvm.vector.reduce.fadd.v4f32(float 0.000000e+00, <4 x float> [[TMP14]])
 ; CHECK-INTERLEAVED-NEXT:    [[TMP11]] = fadd fast float [[TMP7]], [[TMP10]]
 ; CHECK-INTERLEAVED-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-INTERLEAVED-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
