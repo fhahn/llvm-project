@@ -1396,10 +1396,17 @@ static void simplifyRecipe(VPSingleDefRecipe *Def) {
     CmpPredicate Pred;
     if (match(A, m_Cmp(Pred, m_VPValue(), m_VPValue()))) {
       auto *Cmp = cast<VPRecipeWithIRFlags>(A);
-      if (all_of(Cmp->users(),
-                 match_fn(m_CombineOr(
-                     m_Not(m_Specific(Cmp)),
-                     m_Select(m_Specific(Cmp), m_VPValue(), m_VPValue()))))) {
+      // Only fold if every user is either a Not of the cmp or a select that
+      // uses the cmp solely as its condition. If a select also uses the cmp as
+      // a value operand, inverting the predicate in place would flip that value
+      // use, which the condition/operand swap below cannot compensate for.
+      auto IsCondOnlySelect = [Cmp](VPUser *U) {
+        return match(U, m_Select(m_Specific(Cmp), m_VPValue(), m_VPValue())) &&
+               U->getOperand(1) != Cmp && U->getOperand(2) != Cmp;
+      };
+      if (all_of(Cmp->users(), [&](VPUser *U) {
+            return match(U, m_Not(m_Specific(Cmp))) || IsCondOnlySelect(U);
+          })) {
         Cmp->setPredicate(CmpInst::getInversePredicate(Pred));
         for (VPUser *U : to_vector(Cmp->users())) {
           auto *R = cast<VPSingleDefRecipe>(U);
