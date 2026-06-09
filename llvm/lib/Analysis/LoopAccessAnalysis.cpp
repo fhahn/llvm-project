@@ -2198,8 +2198,16 @@ MemoryDepChecker::getDependenceDistanceStrideAndSize(
   uint64_t BSz = DL.getTypeAllocSize(BTy);
   uint64_t TypeByteSize = (AStoreSz == BStoreSz) ? BSz : 0;
 
-  uint64_t StrideAScaled = std::abs(StrideAPtrInt) * ASz;
-  uint64_t StrideBScaled = std::abs(StrideBPtrInt) * BSz;
+  // Compute the magnitude of the strides in an unsigned domain to avoid
+  // signed-overflow UB from std::abs when a stride is INT64_MIN.
+  uint64_t StrideAScaled =
+      (StrideAPtrInt < 0 ? -static_cast<uint64_t>(StrideAPtrInt)
+                         : static_cast<uint64_t>(StrideAPtrInt)) *
+      ASz;
+  uint64_t StrideBScaled =
+      (StrideBPtrInt < 0 ? -static_cast<uint64_t>(StrideBPtrInt)
+                         : static_cast<uint64_t>(StrideBPtrInt)) *
+      BSz;
 
   uint64_t MaxStride = std::max(StrideAScaled, StrideBScaled);
 
