@@ -231,8 +231,8 @@ public:
                               Type *ResultTy, const VPIRFlags &Flags = {},
                               DebugLoc DL = DebugLoc::getUnknown(),
                               const Twine &Name = "") {
-    return tryInsertInstruction(new VPInstructionWithType(
-        Opcode, Operands, ResultTy, Flags, {}, DL, Name));
+    return tryInsertInstruction(
+        new VPInstruction(Opcode, Operands, Flags, {}, DL, Name, ResultTy));
   }
 
   VPInstruction *createFirstActiveLane(ArrayRef<VPValue *> Masks,
@@ -412,19 +412,18 @@ public:
         new VPDerivedIVRecipe(Kind, FPBinOp, Start, Current, Step));
   }
 
-  VPInstructionWithType *createScalarLoad(Type *ResultTy, VPValue *Addr,
-                                          DebugLoc DL,
-                                          const VPIRMetadata &Metadata = {}) {
-    return tryInsertInstruction(new VPInstructionWithType(
-        Instruction::Load, Addr, ResultTy, {}, Metadata, DL));
+  VPInstruction *createScalarLoad(Type *ResultTy, VPValue *Addr, DebugLoc DL,
+                                  const VPIRMetadata &Metadata = {}) {
+    return tryInsertInstruction(new VPInstruction(Instruction::Load, Addr, {},
+                                                  Metadata, DL, "", ResultTy));
   }
 
   VPInstruction *createScalarCast(Instruction::CastOps Opcode, VPValue *Op,
                                   Type *ResultTy, DebugLoc DL,
                                   const VPIRMetadata &Metadata = {}) {
-    return tryInsertInstruction(new VPInstructionWithType(
-        Opcode, Op, ResultTy, VPIRFlags::getDefaultFlags(Opcode), Metadata,
-        DL));
+    return tryInsertInstruction(
+        new VPInstruction(Opcode, Op, VPIRFlags::getDefaultFlags(Opcode),
+                          Metadata, DL, "", ResultTy));
   }
 
   VPInstruction *createScalarCast(Instruction::CastOps Opcode, VPValue *Op,
@@ -432,7 +431,7 @@ public:
                                   const VPIRFlags &Flags,
                                   const VPIRMetadata &Metadata = {}) {
     return tryInsertInstruction(
-        new VPInstructionWithType(Opcode, Op, ResultTy, Flags, Metadata, DL));
+        new VPInstruction(Opcode, Op, Flags, Metadata, DL, "", ResultTy));
   }
 
   /// Create a VScale VPInstruction.
@@ -484,8 +483,10 @@ public:
                                                  DebugLoc DL, Instruction *UV) {
     if (Instruction::isCast(Opcode)) {
       assert(!Mask && "Cast cannot be predicated");
-      return new VPInstructionWithType(Opcode, Operands, UV->getType(), Flags,
-                                       Metadata, DL, UV->getName(), UV);
+      auto *VPI = new VPInstruction(Opcode, Operands, Flags, Metadata, DL,
+                                    UV->getName(), UV->getType());
+      VPI->setUnderlyingValue(UV);
+      return VPI;
     }
     return new VPReplicateRecipe(UV, Operands, /*IsSingleScalar=*/true, Mask,
                                  Flags, Metadata, DL);
