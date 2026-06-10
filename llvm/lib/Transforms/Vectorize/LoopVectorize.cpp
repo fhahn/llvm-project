@@ -168,6 +168,7 @@ const char VerboseDebug[] = DEBUG_TYPE "-verbose";
 #endif
 
 STATISTIC(LoopsVectorized, "Number of loops vectorized");
+STATISTIC(OuterLoopsVectorized, "Number of outer loops vectorized");
 STATISTIC(LoopsAnalyzed, "Number of loops analyzed for vectorization");
 STATISTIC(LoopsEpilogueVectorized, "Number of epilogues vectorized");
 STATISTIC(LoopsEarlyExitVectorized, "Number of early exit loops vectorized");
@@ -8494,9 +8495,11 @@ bool LoopVectorizePass::processLoop(Loop *L) {
                                  VF.MinProfitableTripCount);
     LVP.attachRuntimeChecks(BestPlan, Checks, HasBranchWeights);
 
-    if (!IsInnerLoop)
+    if (!IsInnerLoop) {
       LLVM_DEBUG(dbgs() << "Vectorizing outer loop in \"" << F->getName()
                         << "\"\n");
+      ++OuterLoopsVectorized;
+    }
     LVP.executePlan(VF.Width, IC, BestPlan, LB, DT);
     ++LoopsVectorized;
   }
