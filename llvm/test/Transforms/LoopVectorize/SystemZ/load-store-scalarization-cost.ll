@@ -34,9 +34,9 @@ for.end:
 define void @predicated_store(ptr noalias %dst, ptr %src.float, ptr %src.i32.0, ptr %src.i32.1, i64 %n) #0 {
 ; CHECK-LABEL: LV: Checking a loop in 'predicated_store'
 ; CHECK: Cost of 0 for VF 2: REPLICATE ir<%load.0> = load ir<%gep.0>
-; CHECK: Cost of 0 for VF 2: REPLICATE store ir<0>, ir<%dst>
+; CHECK: Cost of 1 for VF 2: REPLICATE store ir<0>, ir<%dst>
 ; CHECK: Cost of 0 for VF 4: REPLICATE ir<%load.0> = load ir<%gep.0>
-; CHECK: Cost of 0 for VF 4: REPLICATE store ir<0>, ir<%dst>
+; CHECK: Cost of 2 for VF 4: REPLICATE store ir<0>, ir<%dst>
 ;
 entry:
   br label %loop

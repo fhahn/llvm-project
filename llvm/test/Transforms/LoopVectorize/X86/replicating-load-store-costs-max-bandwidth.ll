@@ -11,15 +11,15 @@ define void @replicating_store_with_phi_addr1(ptr noalias %array, i64 %N, i32 %x
 ; CHECK-NEXT:    [[PTR2:%.*]] = alloca i8, align 1
 ; CHECK-NEXT:    [[PTR3:%.*]] = alloca i8, align 1
 ; CHECK-NEXT:    call void @init(ptr [[PTR1]], ptr [[PTR2]], ptr [[PTR3]])
-; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
-; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
+; CHECK:       [[LOOP_HEADER]]:
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <16 x ptr> poison, ptr [[PTR1]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <16 x ptr> [[BROADCAST_SPLATINSERT]], <16 x ptr> poison, <16 x i32> zeroinitializer
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <16 x i1> poison, i1 [[COND]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <16 x i1> [[BROADCAST_SPLATINSERT1]], <16 x i1> poison, <16 x i32> zeroinitializer
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
-; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_STORE_CONTINUE32:.*]] ]
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[LOOP_HEADER]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_STORE_CONTINUE32:.*]] ]
 ; CHECK-NEXT:    [[TMP0:%.*]] = load ptr, ptr [[ARRAY]], align 8
 ; CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr [[TMP0]], align 4
 ; CHECK-NEXT:    [[TMP2:%.*]] = load i32, ptr [[TMP0]], align 4
@@ -224,8 +224,8 @@ define void @replicating_store_with_phi_addr1(ptr noalias %array, i64 %N, i32 %x
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    br label %[[SCALAR_PH:.*]]
 ; CHECK:       [[SCALAR_PH]]:
-; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
-; CHECK:       [[LOOP_HEADER]]:
+; CHECK-NEXT:    br label %[[LOOP_HEADER1:.*]]
+; CHECK:       [[LOOP_HEADER1]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 96, %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
 ; CHECK-NEXT:    [[EC:%.*]] = icmp ne i64 [[IV]], 99
 ; CHECK-NEXT:    br i1 [[EC]], label %[[LOOP_BODY:.*]], label %[[EXIT:.*]]
@@ -246,7 +246,7 @@ define void @replicating_store_with_phi_addr1(ptr noalias %array, i64 %N, i32 %x
 ; CHECK-NEXT:    br label %[[LOOP_LATCH]]
 ; CHECK:       [[LOOP_LATCH]]:
 ; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 1
-; CHECK-NEXT:    br label %[[LOOP_HEADER]], !llvm.loop [[LOOP3:![0-9]+]]
+; CHECK-NEXT:    br label %[[LOOP_HEADER1]], !llvm.loop [[LOOP3:![0-9]+]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void
 ;

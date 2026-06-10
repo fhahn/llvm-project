@@ -583,44 +583,100 @@ define void @struct_return_2xf32_replicate_predicated(ptr %a) {
 ; VF2IC2-NEXT:    br i1 [[TMP4]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
 ; VF2IC2:       [[PRED_STORE_IF]]:
 ; VF2IC2-NEXT:    [[TMP5:%.*]] = extractelement <2 x float> [[WIDE_LOAD]], i64 0
-; VF2IC2-NEXT:    [[TMP6:%.*]] = tail call { float, float } @fn2(float [[TMP5]]) #[[ATTR3:[0-9]+]]
-; VF2IC2-NEXT:    [[TMP8:%.*]] = extractvalue { float, float } [[TMP6]], 0
-; VF2IC2-NEXT:    [[TMP11:%.*]] = fdiv float [[TMP8]], [[TMP5]]
-; VF2IC2-NEXT:    store float [[TMP11]], ptr [[TMP0]], align 8
+; VF2IC2-NEXT:    [[TMP7:%.*]] = tail call { float, float } @fn2(float [[TMP5]]) #[[ATTR3:[0-9]+]]
 ; VF2IC2-NEXT:    br label %[[PRED_STORE_CONTINUE]]
 ; VF2IC2:       [[PRED_STORE_CONTINUE]]:
-; VF2IC2-NEXT:    [[TMP12:%.*]] = extractelement <2 x i1> [[TMP2]], i64 1
+; VF2IC2-NEXT:    [[TMP6:%.*]] = phi { float, float } [ poison, %[[VECTOR_BODY]] ], [ [[TMP7]], %[[PRED_STORE_IF]] ]
+; VF2IC2-NEXT:    [[TMP30:%.*]] = extractelement <2 x i1> [[TMP2]], i64 1
+; VF2IC2-NEXT:    br i1 [[TMP30]], label %[[PRED_CALL_IF2:.*]], label %[[PRED_CALL_CONTINUE3:.*]]
+; VF2IC2:       [[PRED_CALL_IF2]]:
+; VF2IC2-NEXT:    [[TMP9:%.*]] = extractelement <2 x float> [[WIDE_LOAD]], i64 1
+; VF2IC2-NEXT:    [[TMP10:%.*]] = tail call { float, float } @fn2(float [[TMP9]]) #[[ATTR3]]
+; VF2IC2-NEXT:    br label %[[PRED_CALL_CONTINUE3]]
+; VF2IC2:       [[PRED_CALL_CONTINUE3]]:
+; VF2IC2-NEXT:    [[TMP11:%.*]] = phi { float, float } [ poison, %[[PRED_STORE_CONTINUE]] ], [ [[TMP10]], %[[PRED_CALL_IF2]] ]
+; VF2IC2-NEXT:    [[TMP8:%.*]] = extractvalue { float, float } [[TMP6]], 0
+; VF2IC2-NEXT:    [[TMP13:%.*]] = insertelement <2 x float> poison, float [[TMP8]], i64 0
+; VF2IC2-NEXT:    [[TMP55:%.*]] = insertvalue { <2 x float>, <2 x float> } poison, <2 x float> [[TMP13]], 0
+; VF2IC2-NEXT:    [[TMP56:%.*]] = extractvalue { float, float } [[TMP6]], 1
+; VF2IC2-NEXT:    [[TMP59:%.*]] = extractvalue { <2 x float>, <2 x float> } [[TMP55]], 1
+; VF2IC2-NEXT:    [[TMP60:%.*]] = insertelement <2 x float> [[TMP59]], float [[TMP56]], i64 0
+; VF2IC2-NEXT:    [[TMP18:%.*]] = insertvalue { <2 x float>, <2 x float> } [[TMP55]], <2 x float> [[TMP60]], 1
+; VF2IC2-NEXT:    [[TMP61:%.*]] = extractvalue { float, float } [[TMP11]], 0
+; VF2IC2-NEXT:    [[TMP62:%.*]] = extractvalue { <2 x float>, <2 x float> } [[TMP18]], 0
+; VF2IC2-NEXT:    [[TMP63:%.*]] = insertelement <2 x float> [[TMP62]], float [[TMP61]], i64 1
+; VF2IC2-NEXT:    [[TMP22:%.*]] = insertvalue { <2 x float>, <2 x float> } [[TMP18]], <2 x float> [[TMP63]], 0
+; VF2IC2-NEXT:    [[TMP64:%.*]] = extractvalue { float, float } [[TMP11]], 1
+; VF2IC2-NEXT:    [[TMP65:%.*]] = extractvalue { <2 x float>, <2 x float> } [[TMP22]], 1
+; VF2IC2-NEXT:    [[TMP66:%.*]] = insertelement <2 x float> [[TMP65]], float [[TMP64]], i64 1
+; VF2IC2-NEXT:    [[TMP26:%.*]] = insertvalue { <2 x float>, <2 x float> } [[TMP22]], <2 x float> [[TMP66]], 1
+; VF2IC2-NEXT:    [[TMP20:%.*]] = extractelement <2 x i1> [[TMP3]], i64 0
+; VF2IC2-NEXT:    br i1 [[TMP20]], label %[[PRED_CALL_IF4:.*]], label %[[PRED_CALL_CONTINUE5:.*]]
+; VF2IC2:       [[PRED_CALL_IF4]]:
+; VF2IC2-NEXT:    [[TMP28:%.*]] = extractelement <2 x float> [[WIDE_LOAD1]], i64 0
+; VF2IC2-NEXT:    [[TMP67:%.*]] = tail call { float, float } @fn2(float [[TMP28]]) #[[ATTR3]]
+; VF2IC2-NEXT:    br label %[[PRED_CALL_CONTINUE5]]
+; VF2IC2:       [[PRED_CALL_CONTINUE5]]:
+; VF2IC2-NEXT:    [[TMP14:%.*]] = phi { float, float } [ poison, %[[PRED_CALL_CONTINUE3]] ], [ [[TMP67]], %[[PRED_CALL_IF4]] ]
+; VF2IC2-NEXT:    [[TMP12:%.*]] = extractelement <2 x i1> [[TMP3]], i64 1
 ; VF2IC2-NEXT:    br i1 [[TMP12]], label %[[PRED_STORE_IF2:.*]], label %[[PRED_STORE_CONTINUE3:.*]]
 ; VF2IC2:       [[PRED_STORE_IF2]]:
-; VF2IC2-NEXT:    [[TMP13:%.*]] = extractelement <2 x float> [[WIDE_LOAD]], i64 1
-; VF2IC2-NEXT:    [[TMP14:%.*]] = tail call { float, float } @fn2(float [[TMP13]]) #[[ATTR3]]
-; VF2IC2-NEXT:    [[TMP15:%.*]] = add i64 [[INDEX]], 1
-; VF2IC2-NEXT:    [[TMP16:%.*]] = extractvalue { float, float } [[TMP14]], 0
-; VF2IC2-NEXT:    [[TMP17:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[TMP15]]
-; VF2IC2-NEXT:    [[TMP19:%.*]] = fdiv float [[TMP16]], [[TMP13]]
-; VF2IC2-NEXT:    store float [[TMP19]], ptr [[TMP17]], align 8
+; VF2IC2-NEXT:    [[TMP68:%.*]] = extractelement <2 x float> [[WIDE_LOAD1]], i64 1
+; VF2IC2-NEXT:    [[TMP69:%.*]] = tail call { float, float } @fn2(float [[TMP68]]) #[[ATTR3]]
 ; VF2IC2-NEXT:    br label %[[PRED_STORE_CONTINUE3]]
 ; VF2IC2:       [[PRED_STORE_CONTINUE3]]:
-; VF2IC2-NEXT:    [[TMP20:%.*]] = extractelement <2 x i1> [[TMP3]], i64 0
+; VF2IC2-NEXT:    [[TMP34:%.*]] = phi { float, float } [ poison, %[[PRED_CALL_CONTINUE5]] ], [ [[TMP69]], %[[PRED_STORE_IF2]] ]
+; VF2IC2-NEXT:    [[TMP16:%.*]] = extractvalue { float, float } [[TMP14]], 0
+; VF2IC2-NEXT:    [[TMP70:%.*]] = insertelement <2 x float> poison, float [[TMP16]], i64 0
+; VF2IC2-NEXT:    [[TMP37:%.*]] = insertvalue { <2 x float>, <2 x float> } poison, <2 x float> [[TMP70]], 0
+; VF2IC2-NEXT:    [[TMP38:%.*]] = extractvalue { float, float } [[TMP14]], 1
+; VF2IC2-NEXT:    [[TMP39:%.*]] = extractvalue { <2 x float>, <2 x float> } [[TMP37]], 1
+; VF2IC2-NEXT:    [[TMP40:%.*]] = insertelement <2 x float> [[TMP39]], float [[TMP38]], i64 0
+; VF2IC2-NEXT:    [[TMP41:%.*]] = insertvalue { <2 x float>, <2 x float> } [[TMP37]], <2 x float> [[TMP40]], 1
+; VF2IC2-NEXT:    [[TMP42:%.*]] = extractvalue { float, float } [[TMP34]], 0
+; VF2IC2-NEXT:    [[TMP43:%.*]] = extractvalue { <2 x float>, <2 x float> } [[TMP41]], 0
+; VF2IC2-NEXT:    [[TMP44:%.*]] = insertelement <2 x float> [[TMP43]], float [[TMP42]], i64 1
+; VF2IC2-NEXT:    [[TMP45:%.*]] = insertvalue { <2 x float>, <2 x float> } [[TMP41]], <2 x float> [[TMP44]], 0
+; VF2IC2-NEXT:    [[TMP46:%.*]] = extractvalue { float, float } [[TMP34]], 1
+; VF2IC2-NEXT:    [[TMP47:%.*]] = extractvalue { <2 x float>, <2 x float> } [[TMP45]], 1
+; VF2IC2-NEXT:    [[TMP48:%.*]] = insertelement <2 x float> [[TMP47]], float [[TMP46]], i64 1
+; VF2IC2-NEXT:    [[TMP49:%.*]] = insertvalue { <2 x float>, <2 x float> } [[TMP45]], <2 x float> [[TMP48]], 1
+; VF2IC2-NEXT:    [[TMP50:%.*]] = extractvalue { <2 x float>, <2 x float> } [[TMP26]], 0
+; VF2IC2-NEXT:    [[TMP51:%.*]] = extractvalue { <2 x float>, <2 x float> } [[TMP49]], 0
+; VF2IC2-NEXT:    br i1 [[TMP4]], label %[[PRED_STORE_IF1:.*]], label %[[PRED_STORE_CONTINUE1:.*]]
+; VF2IC2:       [[PRED_STORE_IF1]]:
+; VF2IC2-NEXT:    [[TMP52:%.*]] = extractelement <2 x float> [[TMP50]], i64 0
+; VF2IC2-NEXT:    [[TMP53:%.*]] = extractelement <2 x float> [[WIDE_LOAD]], i64 0
+; VF2IC2-NEXT:    [[TMP54:%.*]] = fdiv float [[TMP52]], [[TMP53]]
+; VF2IC2-NEXT:    store float [[TMP54]], ptr [[TMP0]], align 8
+; VF2IC2-NEXT:    br label %[[PRED_STORE_CONTINUE1]]
+; VF2IC2:       [[PRED_STORE_CONTINUE1]]:
+; VF2IC2-NEXT:    br i1 [[TMP30]], label %[[PRED_STORE_IF8:.*]], label %[[PRED_STORE_CONTINUE9:.*]]
+; VF2IC2:       [[PRED_STORE_IF8]]:
+; VF2IC2-NEXT:    [[TMP15:%.*]] = add i64 [[INDEX]], 1
+; VF2IC2-NEXT:    [[TMP17:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[TMP15]]
+; VF2IC2-NEXT:    [[TMP57:%.*]] = extractelement <2 x float> [[TMP50]], i64 1
+; VF2IC2-NEXT:    [[TMP58:%.*]] = extractelement <2 x float> [[WIDE_LOAD]], i64 1
+; VF2IC2-NEXT:    [[TMP19:%.*]] = fdiv float [[TMP57]], [[TMP58]]
+; VF2IC2-NEXT:    store float [[TMP19]], ptr [[TMP17]], align 8
+; VF2IC2-NEXT:    br label %[[PRED_STORE_CONTINUE9]]
+; VF2IC2:       [[PRED_STORE_CONTINUE9]]:
 ; VF2IC2-NEXT:    br i1 [[TMP20]], label %[[PRED_STORE_IF4:.*]], label %[[PRED_STORE_CONTINUE5:.*]]
 ; VF2IC2:       [[PRED_STORE_IF4]]:
-; VF2IC2-NEXT:    [[TMP21:%.*]] = extractelement <2 x float> [[WIDE_LOAD1]], i64 0
-; VF2IC2-NEXT:    [[TMP22:%.*]] = tail call { float, float } @fn2(float [[TMP21]]) #[[ATTR3]]
 ; VF2IC2-NEXT:    [[TMP23:%.*]] = add i64 [[INDEX]], 2
-; VF2IC2-NEXT:    [[TMP24:%.*]] = extractvalue { float, float } [[TMP22]], 0
 ; VF2IC2-NEXT:    [[TMP25:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[TMP23]]
+; VF2IC2-NEXT:    [[TMP24:%.*]] = extractelement <2 x float> [[TMP51]], i64 0
+; VF2IC2-NEXT:    [[TMP21:%.*]] = extractelement <2 x float> [[WIDE_LOAD1]], i64 0
 ; VF2IC2-NEXT:    [[TMP27:%.*]] = fdiv float [[TMP24]], [[TMP21]]
 ; VF2IC2-NEXT:    store float [[TMP27]], ptr [[TMP25]], align 8
 ; VF2IC2-NEXT:    br label %[[PRED_STORE_CONTINUE5]]
 ; VF2IC2:       [[PRED_STORE_CONTINUE5]]:
-; VF2IC2-NEXT:    [[TMP28:%.*]] = extractelement <2 x i1> [[TMP3]], i64 1
-; VF2IC2-NEXT:    br i1 [[TMP28]], label %[[PRED_STORE_IF6:.*]], label %[[PRED_STORE_CONTINUE7]]
+; VF2IC2-NEXT:    br i1 [[TMP12]], label %[[PRED_STORE_IF6:.*]], label %[[PRED_STORE_CONTINUE7]]
 ; VF2IC2:       [[PRED_STORE_IF6]]:
-; VF2IC2-NEXT:    [[TMP29:%.*]] = extractelement <2 x float> [[WIDE_LOAD1]], i64 1
-; VF2IC2-NEXT:    [[TMP30:%.*]] = tail call { float, float } @fn2(float [[TMP29]]) #[[ATTR3]]
 ; VF2IC2-NEXT:    [[TMP31:%.*]] = add i64 [[INDEX]], 3
-; VF2IC2-NEXT:    [[TMP32:%.*]] = extractvalue { float, float } [[TMP30]], 0
 ; VF2IC2-NEXT:    [[TMP33:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[TMP31]]
+; VF2IC2-NEXT:    [[TMP32:%.*]] = extractelement <2 x float> [[TMP51]], i64 1
+; VF2IC2-NEXT:    [[TMP29:%.*]] = extractelement <2 x float> [[WIDE_LOAD1]], i64 1
 ; VF2IC2-NEXT:    [[TMP35:%.*]] = fdiv float [[TMP32]], [[TMP29]]
 ; VF2IC2-NEXT:    store float [[TMP35]], ptr [[TMP33]], align 8
 ; VF2IC2-NEXT:    br label %[[PRED_STORE_CONTINUE7]]

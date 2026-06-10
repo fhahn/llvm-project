@@ -599,14 +599,15 @@ define void @forced_scalar_instr(ptr %gep.dst) {
 ; COMMON-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; COMMON:       [[VECTOR_BODY]]:
 ; COMMON-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_STORE_CONTINUE6:.*]] ]
+; COMMON-NEXT:    [[VEC_IND1:%.*]] = phi <4 x i32> [ <i32 0, i32 1, i32 2, i32 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT1:%.*]], %[[PRED_STORE_CONTINUE6]] ]
 ; COMMON-NEXT:    [[VEC_IND:%.*]] = phi <4 x i8> [ <i8 0, i8 1, i8 2, i8 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[PRED_STORE_CONTINUE6]] ]
-; COMMON-NEXT:    [[TMP0:%.*]] = trunc i64 [[INDEX]] to i32
 ; COMMON-NEXT:    [[TMP1:%.*]] = icmp ule <4 x i8> [[VEC_IND]], splat (i8 4)
+; COMMON-NEXT:    [[TMP3:%.*]] = or <4 x i32> [[VEC_IND1]], splat (i32 1)
 ; COMMON-NEXT:    [[TMP2:%.*]] = extractelement <4 x i1> [[TMP1]], i64 0
 ; COMMON-NEXT:    br i1 [[TMP2]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
 ; COMMON:       [[PRED_STORE_IF]]:
 ; COMMON-NEXT:    [[TMP5:%.*]] = getelementptr i32, ptr [[GEP_DST]], i64 [[INDEX]]
-; COMMON-NEXT:    [[TMP6:%.*]] = or i32 [[TMP0]], 1
+; COMMON-NEXT:    [[TMP6:%.*]] = extractelement <4 x i32> [[TMP3]], i64 0
 ; COMMON-NEXT:    store i32 [[TMP6]], ptr [[TMP5]], align 4
 ; COMMON-NEXT:    br label %[[PRED_STORE_CONTINUE]]
 ; COMMON:       [[PRED_STORE_CONTINUE]]:
@@ -614,9 +615,8 @@ define void @forced_scalar_instr(ptr %gep.dst) {
 ; COMMON-NEXT:    br i1 [[TMP7]], label %[[PRED_STORE_IF1:.*]], label %[[PRED_STORE_CONTINUE2:.*]]
 ; COMMON:       [[PRED_STORE_IF1]]:
 ; COMMON-NEXT:    [[TMP8:%.*]] = add i64 [[INDEX]], 1
-; COMMON-NEXT:    [[TMP9:%.*]] = add i32 [[TMP0]], 1
 ; COMMON-NEXT:    [[TMP10:%.*]] = getelementptr i32, ptr [[GEP_DST]], i64 [[TMP8]]
-; COMMON-NEXT:    [[TMP11:%.*]] = or i32 [[TMP9]], 1
+; COMMON-NEXT:    [[TMP11:%.*]] = extractelement <4 x i32> [[TMP3]], i64 1
 ; COMMON-NEXT:    store i32 [[TMP11]], ptr [[TMP10]], align 4
 ; COMMON-NEXT:    br label %[[PRED_STORE_CONTINUE2]]
 ; COMMON:       [[PRED_STORE_CONTINUE2]]:
@@ -624,9 +624,8 @@ define void @forced_scalar_instr(ptr %gep.dst) {
 ; COMMON-NEXT:    br i1 [[TMP12]], label %[[PRED_STORE_IF3:.*]], label %[[PRED_STORE_CONTINUE4:.*]]
 ; COMMON:       [[PRED_STORE_IF3]]:
 ; COMMON-NEXT:    [[TMP13:%.*]] = add i64 [[INDEX]], 2
-; COMMON-NEXT:    [[TMP14:%.*]] = add i32 [[TMP0]], 2
 ; COMMON-NEXT:    [[TMP15:%.*]] = getelementptr i32, ptr [[GEP_DST]], i64 [[TMP13]]
-; COMMON-NEXT:    [[TMP16:%.*]] = or i32 [[TMP14]], 1
+; COMMON-NEXT:    [[TMP16:%.*]] = extractelement <4 x i32> [[TMP3]], i64 2
 ; COMMON-NEXT:    store i32 [[TMP16]], ptr [[TMP15]], align 4
 ; COMMON-NEXT:    br label %[[PRED_STORE_CONTINUE4]]
 ; COMMON:       [[PRED_STORE_CONTINUE4]]:
@@ -634,13 +633,13 @@ define void @forced_scalar_instr(ptr %gep.dst) {
 ; COMMON-NEXT:    br i1 [[TMP17]], label %[[PRED_STORE_IF5:.*]], label %[[PRED_STORE_CONTINUE6]]
 ; COMMON:       [[PRED_STORE_IF5]]:
 ; COMMON-NEXT:    [[TMP18:%.*]] = add i64 [[INDEX]], 3
-; COMMON-NEXT:    [[TMP19:%.*]] = add i32 [[TMP0]], 3
 ; COMMON-NEXT:    [[TMP20:%.*]] = getelementptr i32, ptr [[GEP_DST]], i64 [[TMP18]]
-; COMMON-NEXT:    [[TMP21:%.*]] = or i32 [[TMP19]], 1
+; COMMON-NEXT:    [[TMP21:%.*]] = extractelement <4 x i32> [[TMP3]], i64 3
 ; COMMON-NEXT:    store i32 [[TMP21]], ptr [[TMP20]], align 4
 ; COMMON-NEXT:    br label %[[PRED_STORE_CONTINUE6]]
 ; COMMON:       [[PRED_STORE_CONTINUE6]]:
 ; COMMON-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; COMMON-NEXT:    [[VEC_IND_NEXT1]] = add <4 x i32> [[VEC_IND1]], splat (i32 4)
 ; COMMON-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i8> [[VEC_IND]], splat (i8 4)
 ; COMMON-NEXT:    [[TMP22:%.*]] = icmp eq i64 [[INDEX_NEXT]], 8
 ; COMMON-NEXT:    br i1 [[TMP22]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP18:![0-9]+]]

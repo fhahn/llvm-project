@@ -6,10 +6,10 @@
 ; costed correctly when deciding whether scalarizing a predicated tree of
 ; operations is profitable. Its result feeds a scatter store that must be
 ; scalarized; the cost model uses the wide-call cost to decide whether to also
-; scalarize the call. At VF=2 scalarizing the call is cheapest, so it is
-; scalarized; at VF=8 the wide variant is cheaper, so the call stays wide and
-; only the store is scalarized. Querying the wide-call cost on this path
-; previously crashed.
+; scalarize the call. The masked wide variant is at least as cheap as the
+; scalarized calls at both VF=2 and VF=8, so the call stays wide and only the
+; store is scalarized. Querying the wide-call cost on this path previously
+; crashed.
 
 define void @pred_call_with_variant(ptr readonly %src, ptr noalias %dest, i64 %N) {
 ; VF2-LABEL: define void @pred_call_with_variant(
@@ -26,12 +26,13 @@ define void @pred_call_with_variant(ptr readonly %src, ptr noalias %dest, i64 %N
 ; VF2-NEXT:    [[TMP0:%.*]] = getelementptr inbounds i64, ptr [[SRC]], i64 [[INDEX]]
 ; VF2-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x i64>, ptr [[TMP0]], align 8
 ; VF2-NEXT:    [[TMP1:%.*]] = icmp ult <2 x i64> [[WIDE_LOAD]], splat (i64 5)
+; VF2-NEXT:    [[TMP11:%.*]] = call <2 x i64> @vector_foo_2(<2 x i64> [[WIDE_LOAD]], <2 x i1> [[TMP1]])
 ; VF2-NEXT:    [[TMP2:%.*]] = extractelement <2 x i1> [[TMP1]], i64 0
 ; VF2-NEXT:    br i1 [[TMP2]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
 ; VF2:       [[PRED_STORE_IF]]:
 ; VF2-NEXT:    [[TMP3:%.*]] = extractelement <2 x i64> [[WIDE_LOAD]], i64 0
-; VF2-NEXT:    [[TMP4:%.*]] = call i64 @foo(i64 [[TMP3]]) #[[ATTR0:[0-9]+]]
 ; VF2-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i64, ptr [[DEST]], i64 [[TMP3]]
+; VF2-NEXT:    [[TMP4:%.*]] = extractelement <2 x i64> [[TMP11]], i64 0
 ; VF2-NEXT:    store i64 [[TMP4]], ptr [[TMP5]], align 8
 ; VF2-NEXT:    br label %[[PRED_STORE_CONTINUE]]
 ; VF2:       [[PRED_STORE_CONTINUE]]:
@@ -39,8 +40,8 @@ define void @pred_call_with_variant(ptr readonly %src, ptr noalias %dest, i64 %N
 ; VF2-NEXT:    br i1 [[TMP6]], label %[[PRED_STORE_IF1:.*]], label %[[PRED_STORE_CONTINUE2]]
 ; VF2:       [[PRED_STORE_IF1]]:
 ; VF2-NEXT:    [[TMP7:%.*]] = extractelement <2 x i64> [[WIDE_LOAD]], i64 1
-; VF2-NEXT:    [[TMP8:%.*]] = call i64 @foo(i64 [[TMP7]]) #[[ATTR0]]
 ; VF2-NEXT:    [[TMP9:%.*]] = getelementptr inbounds i64, ptr [[DEST]], i64 [[TMP7]]
+; VF2-NEXT:    [[TMP8:%.*]] = extractelement <2 x i64> [[TMP11]], i64 1
 ; VF2-NEXT:    store i64 [[TMP8]], ptr [[TMP9]], align 8
 ; VF2-NEXT:    br label %[[PRED_STORE_CONTINUE2]]
 ; VF2:       [[PRED_STORE_CONTINUE2]]:
@@ -60,7 +61,7 @@ define void @pred_call_with_variant(ptr readonly %src, ptr noalias %dest, i64 %N
 ; VF2-NEXT:    [[IFCOND:%.*]] = icmp ult i64 [[IDX]], 5
 ; VF2-NEXT:    br i1 [[IFCOND]], label %[[IF_THEN:.*]], label %[[FOR_LOOP]]
 ; VF2:       [[IF_THEN]]:
-; VF2-NEXT:    [[FOO_RET:%.*]] = call i64 @foo(i64 [[IDX]]) #[[ATTR0]]
+; VF2-NEXT:    [[FOO_RET:%.*]] = call i64 @foo(i64 [[IDX]]) #[[ATTR0:[0-9]+]]
 ; VF2-NEXT:    [[ST_ADDR:%.*]] = getelementptr inbounds i64, ptr [[DEST]], i64 [[IDX]]
 ; VF2-NEXT:    store i64 [[FOO_RET]], ptr [[ST_ADDR]], align 8
 ; VF2-NEXT:    br label %[[FOR_LOOP]]

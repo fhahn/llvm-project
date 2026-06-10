@@ -959,7 +959,7 @@ define i32 @g(i64 %n) {
 ; CHECK-NEXT:    [[INDEX_NEXT16]] = add nuw i32 [[INDEX13]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT17]] = add <4 x i32> [[VEC_IND14]], splat (i32 4)
 ; CHECK-NEXT:    [[TMP26:%.*]] = icmp eq i32 [[INDEX_NEXT16]], [[N_VEC8]]
-; CHECK-NEXT:    br i1 [[TMP26]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP26:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP26]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP25:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[TMP27:%.*]] = call i32 @llvm.vector.reduce.or.v4i32(<4 x i32> [[TMP25]])
 ; CHECK-NEXT:    [[CMP_N18:%.*]] = icmp eq i32 [[TMP1]], [[N_VEC8]]
@@ -1033,13 +1033,13 @@ exit:
 define void @known_deref_load_tail_folding() #4 {
 ; CHECK-LABEL: define void @known_deref_load_tail_folding(
 ; CHECK-SAME: ) #[[ATTR5:[0-9]+]] {
-; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
-; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:  [[VECTOR_PH:.*:]]
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
-; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_STORE_CONTINUE6:.*]] ]
-; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i8> [ <i8 0, i8 1, i8 2, i8 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[PRED_STORE_CONTINUE6]] ]
+; CHECK-NEXT:    br label %[[VECTOR_BODY1:.*]]
+; CHECK:       [[VECTOR_BODY1]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_BODY]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_STORE_CONTINUE6:.*]] ]
+; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i8> [ <i8 0, i8 1, i8 2, i8 3>, %[[VECTOR_BODY]] ], [ [[VEC_IND_NEXT:%.*]], %[[PRED_STORE_CONTINUE6]] ]
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i64 1, [[INDEX]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ule <4 x i8> [[VEC_IND]], splat (i8 10)
 ; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr double, ptr @src.arr, i64 [[TMP0]]
@@ -1047,15 +1047,15 @@ define void @known_deref_load_tail_folding() #4 {
 ; CHECK-NEXT:    [[TMP3:%.*]] = extractelement <4 x i1> [[TMP1]], i64 0
 ; CHECK-NEXT:    br i1 [[TMP3]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
 ; CHECK:       [[PRED_STORE_IF]]:
-; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <4 x double> [[WIDE_MASKED_LOAD]], i64 0
-; CHECK-NEXT:    [[TMP5:%.*]] = fcmp oeq double [[TMP4]], 0.000000e+00
-; CHECK-NEXT:    [[TMP6:%.*]] = select i1 [[TMP5]], ptr @dst.arr.a, ptr @dst.arr.b
-; CHECK-NEXT:    store double 0.000000e+00, ptr [[TMP6]], align 8
+; CHECK-NEXT:    [[TMP16:%.*]] = extractelement <4 x double> [[WIDE_MASKED_LOAD]], i64 0
+; CHECK-NEXT:    [[TMP17:%.*]] = fcmp oeq double [[TMP16]], 0.000000e+00
+; CHECK-NEXT:    [[TMP18:%.*]] = select i1 [[TMP17]], ptr @dst.arr.a, ptr @dst.arr.b
+; CHECK-NEXT:    store double 0.000000e+00, ptr [[TMP18]], align 8
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE]]
 ; CHECK:       [[PRED_STORE_CONTINUE]]:
 ; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <4 x i1> [[TMP1]], i64 1
-; CHECK-NEXT:    br i1 [[TMP7]], label %[[PRED_STORE_IF1:.*]], label %[[PRED_STORE_CONTINUE2:.*]]
-; CHECK:       [[PRED_STORE_IF1]]:
+; CHECK-NEXT:    br i1 [[TMP7]], label %[[EXIT:.*]], label %[[PRED_STORE_CONTINUE2:.*]]
+; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <4 x double> [[WIDE_MASKED_LOAD]], i64 1
 ; CHECK-NEXT:    [[TMP9:%.*]] = fcmp oeq double [[TMP8]], 0.000000e+00
 ; CHECK-NEXT:    [[TMP10:%.*]] = select i1 [[TMP9]], ptr @dst.arr.a, ptr @dst.arr.b
@@ -1074,19 +1074,19 @@ define void @known_deref_load_tail_folding() #4 {
 ; CHECK-NEXT:    [[TMP15:%.*]] = extractelement <4 x i1> [[TMP1]], i64 3
 ; CHECK-NEXT:    br i1 [[TMP15]], label %[[PRED_STORE_IF5:.*]], label %[[PRED_STORE_CONTINUE6]]
 ; CHECK:       [[PRED_STORE_IF5]]:
-; CHECK-NEXT:    [[TMP16:%.*]] = extractelement <4 x double> [[WIDE_MASKED_LOAD]], i64 3
-; CHECK-NEXT:    [[TMP17:%.*]] = fcmp oeq double [[TMP16]], 0.000000e+00
-; CHECK-NEXT:    [[TMP18:%.*]] = select i1 [[TMP17]], ptr @dst.arr.a, ptr @dst.arr.b
-; CHECK-NEXT:    store double 0.000000e+00, ptr [[TMP18]], align 8
+; CHECK-NEXT:    [[TMP20:%.*]] = extractelement <4 x double> [[WIDE_MASKED_LOAD]], i64 3
+; CHECK-NEXT:    [[TMP21:%.*]] = fcmp oeq double [[TMP20]], 0.000000e+00
+; CHECK-NEXT:    [[TMP22:%.*]] = select i1 [[TMP21]], ptr @dst.arr.a, ptr @dst.arr.b
+; CHECK-NEXT:    store double 0.000000e+00, ptr [[TMP22]], align 8
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE6]]
 ; CHECK:       [[PRED_STORE_CONTINUE6]]:
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i8> [[VEC_IND]], splat (i8 4)
 ; CHECK-NEXT:    [[TMP19:%.*]] = icmp eq i64 [[INDEX_NEXT]], 12
-; CHECK-NEXT:    br i1 [[TMP19]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP28:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP19]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY1]], !llvm.loop [[LOOP27:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    br label %[[EXIT:.*]]
-; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    br label %[[EXIT1:.*]]
+; CHECK:       [[EXIT1]]:
 ; CHECK-NEXT:    ret void
 ;
 entry:

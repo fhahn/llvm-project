@@ -3899,30 +3899,42 @@ InstructionCost VPReplicateRecipe::computeCost(ElementCount VF,
     bool IsLoad = UI->getOpcode() == Instruction::Load;
     const VPValue *PtrOp = getOperand(!IsLoad);
     const SCEV *PtrSCEV = getAddressAccessSCEV(PtrOp, Ctx.PSE, Ctx.L);
-    if (isa_and_nonnull<SCEVCouldNotCompute>(PtrSCEV))
+
+    const VPRegionBlock *ParentRegion = getRegion();
+    bool IsPredicated = ParentRegion && ParentRegion->isReplicator();
+
+    // A genuinely scalar-with-predication access (no legal masked or
+    // gather/scatter lowering) is scalarized per-lane, so its address is
+    // computed per-lane as a scalar. Cost it as VF copies of the scalar
+    // instruction, mirroring the legacy computePredInstDiscount; this also
+    // allows costing accesses whose address SCEV is not computable (e.g.
+    // data-dependent scatter/select addresses). Otherwise an uncomputable
+    // address SCEV means we fall back to the legacy cost model.
+    bool ScalarWithPred =
+        IsPredicated && Ctx.isScalarWithPredication(UI, VF);
+    if (isa_and_nonnull<SCEVCouldNotCompute>(PtrSCEV) && !ScalarWithPred)
       break;
 
     bool UsedByLoadStoreAddress = !Ctx.TTI.prefersVectorizedAddressing() &&
                                   vputils::isUsedByLoadStoreAddress(this);
 
-    InstructionCost Cost = computeMemCost(
-        UI, to_vector(operands()), isSingleScalar(), UsedByLoadStoreAddress, VF,
-        Ctx);
+    InstructionCost Cost =
+        computeMemCost(UI, to_vector(operands()), isSingleScalar(),
+                       UsedByLoadStoreAddress, VF, Ctx, ScalarWithPred);
     if (!Cost.isValid())
       break;
 
-    const VPRegionBlock *ParentRegion = getRegion();
-    if (ParentRegion && ParentRegion->isReplicator()) {
-      if (!PtrSCEV)
+    if (IsPredicated) {
+      if (!PtrSCEV && !ScalarWithPred)
         break;
       Cost /= Ctx.getPredBlockCostDivisor(UI->getParent());
-      Cost += Ctx.TTI.getCFInstrCost(Instruction::CondBr, Ctx.CostKind);
-
-      auto *VecI1Ty = VectorType::get(
-          IntegerType::getInt1Ty(Ctx.L->getHeader()->getContext()), VF);
-      Cost += Ctx.TTI.getScalarizationOverhead(
-          VecI1Ty, APInt::getAllOnes(VF.getFixedValue()),
-          /*Insert=*/false, /*Extract=*/true, Ctx.CostKind);
+      // Note: the CondBr + mask-extract cost for per-lane branching around
+      // the predicated block is already accounted for via
+      // LoopVectorizationPlanner::precomputeCosts for the predicated BB's
+      // terminator (whose getInstructionCost for CondBr returns
+      // VF * CondBr + mask_extract when the successor is in
+      // PredicatedBBsAfterVectorization). Adding them again here would
+      // double-count.
 
       if (Ctx.useEmulatedMaskMemRefHack(this, VF)) {
         // Artificially setting to a high enough value to practically disable
@@ -4067,7 +4079,8 @@ const VPRecipeBase *VPWidenStoreEVLRecipe::getAsRecipe() const { return this; }
 
 InstructionCost VPReplicateRecipe::computeMemCost(
     Instruction *I, ArrayRef<const VPValue *> Operands, bool IsSingleScalar,
-    bool IsUsedByLoadStoreAddress, ElementCount VF, VPCostContext &Ctx) {
+    bool IsUsedByLoadStoreAddress, ElementCount VF, VPCostContext &Ctx,
+    bool ScalarWithPred) {
   // Scalarization is not possible for scalable vectors, as the lane count is
   // unknown at compile time.
   if (VF.isScalable() && !IsSingleScalar)
@@ -4076,8 +4089,18 @@ InstructionCost VPReplicateRecipe::computeMemCost(
   bool IsLoad = I->getOpcode() == Instruction::Load;
   const VPValue *PtrOp = Operands[!IsLoad];
   const SCEV *PtrSCEV = getAddressAccessSCEV(PtrOp, Ctx.PSE, Ctx.L);
-  if (isa_and_nonnull<SCEVCouldNotCompute>(PtrSCEV))
-    return InstructionCost::getInvalid();
+  // A scalar-with-predication access is scalarized per-lane, so its address is
+  // computed per-lane as a scalar and an uncomputable address SCEV does not
+  // prevent costing it: mirror the legacy computePredInstDiscount, which costs
+  // VF copies of the scalar instruction (scalar pointer type, no SCEV).
+  // Otherwise the SCEV is needed to take the widening decision, so bail to the
+  // legacy cost model.
+  bool AddressNotComputable = isa_and_nonnull<SCEVCouldNotCompute>(PtrSCEV);
+  if (AddressNotComputable) {
+    if (!ScalarWithPred)
+      return InstructionCost::getInvalid();
+    PtrSCEV = nullptr;
+  }
 
   Type *ValTy = getLoadStoreType(I);
   Type *ScalarPtrTy = PtrOp->getScalarType();
@@ -4089,7 +4112,14 @@ InstructionCost VPReplicateRecipe::computeMemCost(
       I->getOpcode(), ValTy, Alignment, AS, Ctx.CostKind, OpInfo,
       IsUsedByLoadStoreAddress ? I : nullptr);
 
-  Type *PtrTy = IsSingleScalar ? ScalarPtrTy : toVectorTy(ScalarPtrTy, VF);
+  // A scalar-with-predication access is scalarized with a per-lane scalar
+  // address; use the scalar pointer type for the address-computation cost to
+  // avoid the vectorized-address (scatter) overhead, matching
+  // getInstructionCost(I, /*VF=*/1) as used by the legacy
+  // computePredInstDiscount.
+  Type *PtrTy = (IsSingleScalar || ScalarWithPred)
+                    ? ScalarPtrTy
+                    : toVectorTy(ScalarPtrTy, VF);
   InstructionCost ScalarCost =
       ScalarMemOpCost +
       Ctx.TTI.getAddressComputationCost(
@@ -4108,8 +4138,18 @@ InstructionCost VPReplicateRecipe::computeMemCost(
     bool EfficientVectorLoadStore =
         Ctx.TTI.supportsEfficientVectorElementLoadStore();
     if (!(IsLoad && !PreferVectorizedAddressing) &&
-        !(!IsLoad && EfficientVectorLoadStore))
-      append_range(OpsToScalarize, Operands);
+        !(!IsLoad && EfficientVectorLoadStore)) {
+      // The address of a scalarized memory op is always computed as per-lane
+      // scalars, so it never needs a vector-to-scalar extract. In the
+      // scalar-with-predication case the legacy computePredInstDiscount runs
+      // after scalars are collected and excludes it; mirror that by not
+      // charging extraction overhead for the pointer operand. Otherwise the
+      // widening decision is taken before scalars are collected, so the pointer
+      // is conservatively included to match legacy.
+      for (const VPValue *Op : Operands)
+        if (!ScalarWithPred || Op != PtrOp)
+          OpsToScalarize.push_back(Op);
+    }
 
     if (!EfficientVectorLoadStore && IsLoad)
       ResultTy = ValTy;
@@ -4117,6 +4157,9 @@ InstructionCost VPReplicateRecipe::computeMemCost(
 
   TTI::VectorInstrContext VIC =
       IsLoad ? TTI::VectorInstrContext::Load : TTI::VectorInstrContext::Store;
+  // The scalar address of a scalar-with-predication access is computed per-lane
+  // and is excluded from OpsToScalarize above; the remaining operands (e.g. a
+  // widened stored value) still incur extraction overhead.
   return (ScalarCost * VF.getFixedValue()) +
          Ctx.getScalarizationOverhead(ResultTy, OpsToScalarize, VF, VIC,
                                       /*AlwaysIncludeReplicatingR=*/true);

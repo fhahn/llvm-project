@@ -48,6 +48,10 @@ using namespace llvm;
 using namespace VPlanPatternMatch;
 using namespace SCEVPatternMatch;
 
+// Defined in LoopVectorize.cpp; the maximum number of predicated stores in a
+// loop before the emulated-masked-store hack disables their scalarization.
+extern cl::opt<unsigned> NumberOfStoresToPredicate;
+
 bool VPlanTransforms::tryToConvertVPInstructionsToVPRecipes(
     VPlan &Plan, const TargetLibraryInfo &TLI) {
 
@@ -7723,6 +7727,30 @@ void VPlanTransforms::scalarizeIfProfitable(VPlan &Plan, VPCostContext &CostCtx,
     return true;
   };
 
+  // Count predicated stores in the VPlan, matching the legacy cost model's
+  // counter in collectInstsToScalarize and VPCostContext's
+  // useEmulatedMaskMemRefHack: only stores for which a masked scatter is not
+  // legal are counted. This runs before createAndOptimizeReplicateRegions
+  // wraps predicated recipes, so predicated stores live in the top-level
+  // vector-body VPBasicBlock rather than inside replicate regions.
+  unsigned NumPredStores = 0;
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_shallow(VectorLoop->getEntry())))
+    for (VPRecipeBase &R : *VPBB) {
+      auto *RepR = dyn_cast<VPReplicateRecipe>(&R);
+      if (!RepR || !RepR->isPredicated())
+        continue;
+      if (!isa<StoreInst>(RepR->getUnderlyingInstr()))
+        continue;
+      // Don't count stores for which a masked scatter is legal.
+      Type *Ty = RepR->getOperand(0)->getScalarType();
+      auto *VTy = VectorType::get(Ty, Range.Start);
+      const Align Alignment = getLoadStoreAlignment(RepR->getUnderlyingInstr());
+      if (!CostCtx.TTI.isLegalMaskedScatter(VTy, Alignment))
+        ++NumPredStores;
+    }
+  bool EmulatedStoreHack = NumPredStores > NumberOfStoresToPredicate;
+
   // Collect predicated VPReplicateRecipes and their scalarizable operand
   // chains.
   SmallVector<std::pair<VPReplicateRecipe *, SmallVector<VPRecipeBase *>>>
@@ -7739,13 +7767,14 @@ void VPlanTransforms::scalarizeIfProfitable(VPlan &Plan, VPCostContext &CostCtx,
       if (!PredI)
         continue;
 
-      // Defer predicated load/store handling as PredInst. Loads always bail
-      // in the legacy via useEmulatedMaskMemRefHack, and stores need extra
-      // cost-model awareness (AVX-512 efficient masked stores) before they
-      // can match the legacy's discount math. Chain scalarization through
+      // Mirror legacy useEmulatedMaskMemRefHack: skip emulated masked loads
+      // (always "emulated" in legacy) and emulated masked stores past the
+      // per-loop predicated-store threshold. Chain scalarization through
       // VPWidenLoadRecipe is still supported below when they feed into a
       // different predicated instruction (e.g. a div).
-      if (isa<LoadInst, StoreInst>(PredI))
+      if (isa<LoadInst>(PredI))
+        continue;
+      if (isa<StoreInst>(PredI) && EmulatedStoreHack)
         continue;
 
       // Walk backward through single-use operand chains collecting chain

@@ -3441,11 +3441,17 @@ public:
                                          VPCostContext &Ctx);
 
   /// Compute the cost of a replicated load or store for \p VF. Returns an
-  /// invalid cost for scalable VFs when \p IsSingleScalar is false.
+  /// invalid cost for scalable VFs when \p IsSingleScalar is false. \p
+  /// ScalarWithPred indicates the access is scalarized with predication (no
+  /// legal masked or gather/scatter lowering); in that case the address is
+  /// computed per-lane as a scalar and scalarized operands (e.g. a scalar GEP
+  /// pointer) do not incur extraction overhead, matching the legacy cost
+  /// model's computePredInstDiscount, which runs after scalars are collected.
   static InstructionCost
   computeMemCost(Instruction *I, ArrayRef<const VPValue *> Operands,
                  bool IsSingleScalar, bool IsUsedByLoadStoreAddress,
-                 ElementCount VF, VPCostContext &Ctx);
+                 ElementCount VF, VPCostContext &Ctx,
+                 bool ScalarWithPred = false);
 
   bool isSingleScalar() const { return IsSingleScalar; }
 

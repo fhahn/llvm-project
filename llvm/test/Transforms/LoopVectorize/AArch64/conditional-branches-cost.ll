@@ -61,41 +61,41 @@ define void @loop_dependent_cond(ptr %src, ptr noalias %dst, i64 %N) {
 ; DEFAULT-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; DEFAULT:       [[VECTOR_BODY]]:
 ; DEFAULT-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_STORE_CONTINUE7:.*]] ]
-; DEFAULT-NEXT:    [[TMP3:%.*]] = getelementptr double, ptr [[SRC]], i64 [[INDEX]]
-; DEFAULT-NEXT:    [[TMP6:%.*]] = getelementptr double, ptr [[TMP3]], i64 2
-; DEFAULT-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x double>, ptr [[TMP3]], align 8
-; DEFAULT-NEXT:    [[WIDE_LOAD1:%.*]] = load <2 x double>, ptr [[TMP6]], align 8
-; DEFAULT-NEXT:    [[TMP7:%.*]] = call <2 x double> @llvm.fabs.v2f64(<2 x double> [[WIDE_LOAD]])
-; DEFAULT-NEXT:    [[TMP8:%.*]] = call <2 x double> @llvm.fabs.v2f64(<2 x double> [[WIDE_LOAD1]])
-; DEFAULT-NEXT:    [[TMP9:%.*]] = fcmp ogt <2 x double> [[TMP7]], splat (double 1.000000e+00)
-; DEFAULT-NEXT:    [[TMP10:%.*]] = fcmp ogt <2 x double> [[TMP8]], splat (double 1.000000e+00)
-; DEFAULT-NEXT:    [[TMP11:%.*]] = extractelement <2 x i1> [[TMP9]], i64 0
-; DEFAULT-NEXT:    br i1 [[TMP11]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
+; DEFAULT-NEXT:    [[TMP1:%.*]] = getelementptr double, ptr [[SRC]], i64 [[INDEX]]
+; DEFAULT-NEXT:    [[TMP2:%.*]] = getelementptr double, ptr [[TMP1]], i64 2
+; DEFAULT-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x double>, ptr [[TMP1]], align 8
+; DEFAULT-NEXT:    [[WIDE_LOAD1:%.*]] = load <2 x double>, ptr [[TMP2]], align 8
+; DEFAULT-NEXT:    [[TMP3:%.*]] = call <2 x double> @llvm.fabs.v2f64(<2 x double> [[WIDE_LOAD]])
+; DEFAULT-NEXT:    [[TMP4:%.*]] = call <2 x double> @llvm.fabs.v2f64(<2 x double> [[WIDE_LOAD1]])
+; DEFAULT-NEXT:    [[TMP5:%.*]] = fcmp ogt <2 x double> [[TMP3]], splat (double 1.000000e+00)
+; DEFAULT-NEXT:    [[TMP6:%.*]] = fcmp ogt <2 x double> [[TMP4]], splat (double 1.000000e+00)
+; DEFAULT-NEXT:    [[TMP7:%.*]] = extractelement <2 x i1> [[TMP5]], i64 0
+; DEFAULT-NEXT:    br i1 [[TMP7]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
 ; DEFAULT:       [[PRED_STORE_IF]]:
 ; DEFAULT-NEXT:    store i32 0, ptr [[DST]], align 4
 ; DEFAULT-NEXT:    br label %[[PRED_STORE_CONTINUE]]
 ; DEFAULT:       [[PRED_STORE_CONTINUE]]:
-; DEFAULT-NEXT:    [[TMP12:%.*]] = extractelement <2 x i1> [[TMP9]], i64 1
-; DEFAULT-NEXT:    br i1 [[TMP12]], label %[[PRED_STORE_IF2:.*]], label %[[PRED_STORE_CONTINUE3:.*]]
+; DEFAULT-NEXT:    [[TMP8:%.*]] = extractelement <2 x i1> [[TMP5]], i64 1
+; DEFAULT-NEXT:    br i1 [[TMP8]], label %[[PRED_STORE_IF2:.*]], label %[[PRED_STORE_CONTINUE3:.*]]
 ; DEFAULT:       [[PRED_STORE_IF2]]:
 ; DEFAULT-NEXT:    store i32 0, ptr [[DST]], align 4
 ; DEFAULT-NEXT:    br label %[[PRED_STORE_CONTINUE3]]
 ; DEFAULT:       [[PRED_STORE_CONTINUE3]]:
-; DEFAULT-NEXT:    [[TMP13:%.*]] = extractelement <2 x i1> [[TMP10]], i64 0
-; DEFAULT-NEXT:    br i1 [[TMP13]], label %[[PRED_STORE_IF4:.*]], label %[[PRED_STORE_CONTINUE5:.*]]
+; DEFAULT-NEXT:    [[TMP9:%.*]] = extractelement <2 x i1> [[TMP6]], i64 0
+; DEFAULT-NEXT:    br i1 [[TMP9]], label %[[PRED_STORE_IF4:.*]], label %[[PRED_STORE_CONTINUE5:.*]]
 ; DEFAULT:       [[PRED_STORE_IF4]]:
 ; DEFAULT-NEXT:    store i32 0, ptr [[DST]], align 4
 ; DEFAULT-NEXT:    br label %[[PRED_STORE_CONTINUE5]]
 ; DEFAULT:       [[PRED_STORE_CONTINUE5]]:
-; DEFAULT-NEXT:    [[TMP14:%.*]] = extractelement <2 x i1> [[TMP10]], i64 1
-; DEFAULT-NEXT:    br i1 [[TMP14]], label %[[PRED_STORE_IF6:.*]], label %[[PRED_STORE_CONTINUE7]]
+; DEFAULT-NEXT:    [[TMP10:%.*]] = extractelement <2 x i1> [[TMP6]], i64 1
+; DEFAULT-NEXT:    br i1 [[TMP10]], label %[[PRED_STORE_IF6:.*]], label %[[PRED_STORE_CONTINUE7]]
 ; DEFAULT:       [[PRED_STORE_IF6]]:
 ; DEFAULT-NEXT:    store i32 0, ptr [[DST]], align 4
 ; DEFAULT-NEXT:    br label %[[PRED_STORE_CONTINUE7]]
 ; DEFAULT:       [[PRED_STORE_CONTINUE7]]:
 ; DEFAULT-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
-; DEFAULT-NEXT:    [[TMP15:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; DEFAULT-NEXT:    br i1 [[TMP15]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
+; DEFAULT-NEXT:    [[TMP11:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; DEFAULT-NEXT:    br i1 [[TMP11]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; DEFAULT:       [[MIDDLE_BLOCK]]:
 ; DEFAULT-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
 ; DEFAULT-NEXT:    br i1 [[CMP_N]], [[EXIT:label %.*]], label %[[SCALAR_PH]]
@@ -106,19 +106,19 @@ define void @loop_dependent_cond(ptr %src, ptr noalias %dst, i64 %N) {
 ; PRED-NEXT:  [[ENTRY:.*]]:
 ; PRED-NEXT:    br label %[[LOOP_HEADER:.*]]
 ; PRED:       [[LOOP_HEADER]]:
-; PRED-NEXT:    [[IV175:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT176:%.*]], %[[LOOP_LATCH:.*]] ]
-; PRED-NEXT:    [[ARRAYIDX114:%.*]] = getelementptr double, ptr [[SRC]], i64 [[IV175]]
-; PRED-NEXT:    [[TMP0:%.*]] = load double, ptr [[ARRAYIDX114]], align 8
-; PRED-NEXT:    [[TMP1:%.*]] = tail call double @llvm.fabs.f64(double [[TMP0]])
-; PRED-NEXT:    [[CMP115:%.*]] = fcmp ogt double [[TMP1]], 1.000000e+00
-; PRED-NEXT:    br i1 [[CMP115]], label %[[THEN:.*]], label %[[LOOP_LATCH]]
+; PRED-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
+; PRED-NEXT:    [[GEP:%.*]] = getelementptr double, ptr [[SRC]], i64 [[IV]]
+; PRED-NEXT:    [[L:%.*]] = load double, ptr [[GEP]], align 8
+; PRED-NEXT:    [[ABS:%.*]] = tail call double @llvm.fabs.f64(double [[L]])
+; PRED-NEXT:    [[CMP:%.*]] = fcmp ogt double [[ABS]], 1.000000e+00
+; PRED-NEXT:    br i1 [[CMP]], label %[[THEN:.*]], label %[[LOOP_LATCH]]
 ; PRED:       [[THEN]]:
 ; PRED-NEXT:    store i32 0, ptr [[DST]], align 4
 ; PRED-NEXT:    br label %[[LOOP_LATCH]]
 ; PRED:       [[LOOP_LATCH]]:
-; PRED-NEXT:    [[IV_NEXT176]] = add i64 [[IV175]], 1
-; PRED-NEXT:    [[EXITCOND180_NOT:%.*]] = icmp eq i64 [[IV175]], [[N]]
-; PRED-NEXT:    br i1 [[EXITCOND180_NOT]], label %[[EXIT:.*]], label %[[LOOP_HEADER]]
+; PRED-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 1
+; PRED-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV]], [[N]]
+; PRED-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[LOOP_HEADER]]
 ; PRED:       [[EXIT]]:
 ; PRED-NEXT:    ret void
 ;
@@ -284,13 +284,13 @@ define void @latch_branch_cost(ptr %dst) {
 ;
 ; PRED-LABEL: define void @latch_branch_cost(
 ; PRED-SAME: ptr [[DST:%.*]]) {
-; PRED-NEXT:  [[ENTRY:.*:]]
-; PRED-NEXT:    br label %[[VECTOR_PH:.*]]
-; PRED:       [[VECTOR_PH]]:
+; PRED-NEXT:  [[VECTOR_PH:.*:]]
 ; PRED-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; PRED:       [[VECTOR_BODY]]:
-; PRED-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_STORE_CONTINUE6:.*]] ]
-; PRED-NEXT:    [[VEC_IND:%.*]] = phi <4 x i8> [ <i8 0, i8 1, i8 2, i8 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[PRED_STORE_CONTINUE6]] ]
+; PRED-NEXT:    br label %[[VECTOR_BODY1:.*]]
+; PRED:       [[VECTOR_BODY1]]:
+; PRED-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_BODY]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_STORE_CONTINUE6:.*]] ]
+; PRED-NEXT:    [[VEC_IND:%.*]] = phi <4 x i8> [ <i8 0, i8 1, i8 2, i8 3>, %[[VECTOR_BODY]] ], [ [[VEC_IND_NEXT:%.*]], %[[PRED_STORE_CONTINUE6]] ]
 ; PRED-NEXT:    [[TMP0:%.*]] = icmp ule <4 x i8> [[VEC_IND]], splat (i8 99)
 ; PRED-NEXT:    [[TMP1:%.*]] = extractelement <4 x i1> [[TMP0]], i64 0
 ; PRED-NEXT:    br i1 [[TMP1]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
@@ -303,33 +303,33 @@ define void @latch_branch_cost(ptr %dst) {
 ; PRED-NEXT:    br i1 [[TMP4]], label %[[PRED_STORE_IF1:.*]], label %[[PRED_STORE_CONTINUE2:.*]]
 ; PRED:       [[PRED_STORE_IF1]]:
 ; PRED-NEXT:    [[TMP5:%.*]] = add i64 [[INDEX]], 1
-; PRED-NEXT:    [[TMP6:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP5]]
-; PRED-NEXT:    store i8 0, ptr [[TMP6]], align 1
+; PRED-NEXT:    [[TMP13:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP5]]
+; PRED-NEXT:    store i8 0, ptr [[TMP13]], align 1
 ; PRED-NEXT:    br label %[[PRED_STORE_CONTINUE2]]
 ; PRED:       [[PRED_STORE_CONTINUE2]]:
-; PRED-NEXT:    [[TMP7:%.*]] = extractelement <4 x i1> [[TMP0]], i64 2
-; PRED-NEXT:    br i1 [[TMP7]], label %[[PRED_STORE_IF3:.*]], label %[[PRED_STORE_CONTINUE4:.*]]
-; PRED:       [[PRED_STORE_IF3]]:
-; PRED-NEXT:    [[TMP8:%.*]] = add i64 [[INDEX]], 2
-; PRED-NEXT:    [[TMP9:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP8]]
-; PRED-NEXT:    store i8 0, ptr [[TMP9]], align 1
+; PRED-NEXT:    [[TMP6:%.*]] = extractelement <4 x i1> [[TMP0]], i64 2
+; PRED-NEXT:    br i1 [[TMP6]], label %[[EXIT:.*]], label %[[PRED_STORE_CONTINUE4:.*]]
+; PRED:       [[EXIT]]:
+; PRED-NEXT:    [[TMP7:%.*]] = add i64 [[INDEX]], 2
+; PRED-NEXT:    [[TMP8:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP7]]
+; PRED-NEXT:    store i8 0, ptr [[TMP8]], align 1
 ; PRED-NEXT:    br label %[[PRED_STORE_CONTINUE4]]
 ; PRED:       [[PRED_STORE_CONTINUE4]]:
-; PRED-NEXT:    [[TMP10:%.*]] = extractelement <4 x i1> [[TMP0]], i64 3
-; PRED-NEXT:    br i1 [[TMP10]], label %[[PRED_STORE_IF5:.*]], label %[[PRED_STORE_CONTINUE6]]
+; PRED-NEXT:    [[TMP9:%.*]] = extractelement <4 x i1> [[TMP0]], i64 3
+; PRED-NEXT:    br i1 [[TMP9]], label %[[PRED_STORE_IF5:.*]], label %[[PRED_STORE_CONTINUE6]]
 ; PRED:       [[PRED_STORE_IF5]]:
-; PRED-NEXT:    [[TMP11:%.*]] = add i64 [[INDEX]], 3
-; PRED-NEXT:    [[TMP24:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP11]]
-; PRED-NEXT:    store i8 0, ptr [[TMP24]], align 1
+; PRED-NEXT:    [[TMP10:%.*]] = add i64 [[INDEX]], 3
+; PRED-NEXT:    [[TMP11:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP10]]
+; PRED-NEXT:    store i8 0, ptr [[TMP11]], align 1
 ; PRED-NEXT:    br label %[[PRED_STORE_CONTINUE6]]
 ; PRED:       [[PRED_STORE_CONTINUE6]]:
 ; PRED-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; PRED-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i8> [[VEC_IND]], splat (i8 4)
 ; PRED-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[INDEX_NEXT]], 100
-; PRED-NEXT:    br i1 [[TMP12]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
+; PRED-NEXT:    br i1 [[TMP12]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY1]], !llvm.loop [[LOOP0:![0-9]+]]
 ; PRED:       [[MIDDLE_BLOCK]]:
-; PRED-NEXT:    br label %[[EXIT:.*]]
-; PRED:       [[EXIT]]:
+; PRED-NEXT:    br label %[[EXIT1:.*]]
+; PRED:       [[EXIT1]]:
 ; PRED-NEXT:    ret void
 ;
 entry:

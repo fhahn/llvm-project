@@ -358,6 +358,9 @@ struct VPCostContext {
   /// Returns true if \p I is known to be scalarized at \p VF.
   bool willBeScalarized(Instruction *I, ElementCount VF) const;
 
+  /// Forwards to LoopVectorizationCostModel::isScalarWithPredication.
+  bool isScalarWithPredication(Instruction *I, ElementCount VF) const;
+
   /// Forwards to LoopVectorizationCostModel::isMaskRequired.
   bool isMaskRequired(Instruction *I) const;
 

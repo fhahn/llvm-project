@@ -147,14 +147,14 @@ exit:
 define i32 @cost_of_exit_branch_and_cond_insts(ptr %a, ptr %b, i1 %c, i16 %x) #0 {
 ; CHECK-LABEL: define i32 @cost_of_exit_branch_and_cond_insts(
 ; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i1 [[C:%.*]], i16 [[X:%.*]]) #[[ATTR1:[0-9]+]] {
-; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:  [[SCALAR_PH:.*]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = zext i16 [[X]] to i32
 ; CHECK-NEXT:    [[UMAX3:%.*]] = call i32 @llvm.umax.i32(i32 [[TMP0]], i32 111)
 ; CHECK-NEXT:    [[TMP1:%.*]] = sub i32 770, [[UMAX3]]
 ; CHECK-NEXT:    [[SMAX4:%.*]] = call i32 @llvm.smax.i32(i32 [[TMP1]], i32 0)
 ; CHECK-NEXT:    [[TMP2:%.*]] = add nuw nsw i32 [[SMAX4]], 1
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ule i32 [[TMP2]], 19
-; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]]
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH1:.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[A]], i64 1
 ; CHECK-NEXT:    [[TMP3:%.*]] = zext i16 [[X]] to i32
@@ -168,7 +168,7 @@ define i32 @cost_of_exit_branch_and_cond_insts(ptr %a, ptr %b, i1 %c, i16 %x) #0
 ; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[A]], [[SCEVGEP2]]
 ; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[B]], [[SCEVGEP]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
-; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], label %[[SCALAR_PH1]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i32 [[TMP2]], 8
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp eq i32 [[N_MOD_VF]], 0
@@ -176,15 +176,15 @@ define i32 @cost_of_exit_branch_and_cond_insts(ptr %a, ptr %b, i1 %c, i16 %x) #0
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i32 [[TMP2]], [[TMP9]]
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <8 x i1> poison, i1 [[C]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <8 x i1> [[BROADCAST_SPLATINSERT]], <8 x i1> poison, <8 x i32> zeroinitializer
-; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
-; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
+; CHECK:       [[LOOP_HEADER]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_STORE_CONTINUE18:.*]] ]
-; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr i32, ptr [[B]], i32 [[INDEX]]
-; CHECK-NEXT:    br i1 [[C]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
-; CHECK:       [[PRED_STORE_IF]]:
+; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr i32, ptr [[B]], i32 [[INDEX]]
+; CHECK-NEXT:    br i1 [[C]], label %[[THEN:.*]], label %[[LOOP_EXITING:.*]]
+; CHECK:       [[THEN]]:
 ; CHECK-NEXT:    store i1 false, ptr [[A]], align 1, !alias.scope [[META10:![0-9]+]], !noalias [[META13:![0-9]+]]
-; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE]]
-; CHECK:       [[PRED_STORE_CONTINUE]]:
+; CHECK-NEXT:    br label %[[LOOP_EXITING]]
+; CHECK:       [[LOOP_EXITING]]:
 ; CHECK-NEXT:    br i1 [[C]], label %[[PRED_STORE_IF5:.*]], label %[[PRED_STORE_CONTINUE6:.*]]
 ; CHECK:       [[PRED_STORE_IF5]]:
 ; CHECK-NEXT:    store i1 false, ptr [[A]], align 1, !alias.scope [[META10]], !noalias [[META13]]
@@ -220,24 +220,24 @@ define i32 @cost_of_exit_branch_and_cond_insts(ptr %a, ptr %b, i1 %c, i16 %x) #0
 ; CHECK-NEXT:    store i1 false, ptr [[A]], align 1, !alias.scope [[META10]], !noalias [[META13]]
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE18]]
 ; CHECK:       [[PRED_STORE_CONTINUE18]]:
-; CHECK-NEXT:    call void @llvm.masked.store.v8i32.p0(<8 x i32> zeroinitializer, ptr align 4 [[TMP11]], <8 x i1> [[BROADCAST_SPLAT]]), !alias.scope [[META13]]
+; CHECK-NEXT:    call void @llvm.masked.store.v8i32.p0(<8 x i32> zeroinitializer, ptr align 4 [[TMP10]], <8 x i1> [[BROADCAST_SPLAT]]), !alias.scope [[META13]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 8
-; CHECK-NEXT:    [[TMP21:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP21]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP15:![0-9]+]]
+; CHECK-NEXT:    [[TMP12:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP12]], label %[[MIDDLE_BLOCK:.*]], label %[[LOOP_HEADER]], !llvm.loop [[LOOP15:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    br label %[[SCALAR_PH]]
-; CHECK:       [[SCALAR_PH]]:
-; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i32 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ], [ 0, %[[VECTOR_MEMCHECK]] ]
-; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
-; CHECK:       [[LOOP_HEADER]]:
-; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
-; CHECK-NEXT:    br i1 [[C]], label %[[THEN:.*]], label %[[LOOP_EXITING:.*]]
-; CHECK:       [[THEN]]:
+; CHECK-NEXT:    br label %[[SCALAR_PH1]]
+; CHECK:       [[SCALAR_PH1]]:
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i32 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[SCALAR_PH]] ], [ 0, %[[VECTOR_MEMCHECK]] ]
+; CHECK-NEXT:    br label %[[LOOP_HEADER1:.*]]
+; CHECK:       [[LOOP_HEADER1]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ [[BC_RESUME_VAL]], %[[SCALAR_PH1]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
+; CHECK-NEXT:    br i1 [[C]], label %[[THEN1:.*]], label %[[LOOP_EXITING1:.*]]
+; CHECK:       [[THEN1]]:
 ; CHECK-NEXT:    [[GEP:%.*]] = getelementptr inbounds i32, ptr [[B]], i32 [[IV]]
 ; CHECK-NEXT:    store i1 false, ptr [[A]], align 1
 ; CHECK-NEXT:    store i32 0, ptr [[GEP]], align 4
-; CHECK-NEXT:    br label %[[LOOP_EXITING]]
-; CHECK:       [[LOOP_EXITING]]:
+; CHECK-NEXT:    br label %[[LOOP_EXITING1]]
+; CHECK:       [[LOOP_EXITING1]]:
 ; CHECK-NEXT:    [[IV_NEXT]] = add i32 [[IV]], 1
 ; CHECK-NEXT:    [[UMAX:%.*]] = tail call i16 @llvm.umax.i16(i16 [[X]], i16 111)
 ; CHECK-NEXT:    [[UMAX_EXT:%.*]] = zext i16 [[UMAX]] to i32
@@ -245,7 +245,7 @@ define i32 @cost_of_exit_branch_and_cond_insts(ptr %a, ptr %b, i1 %c, i16 %x) #0
 ; CHECK-NEXT:    [[EC:%.*]] = icmp slt i32 [[IV]], [[SUB]]
 ; CHECK-NEXT:    br i1 [[EC]], label %[[LOOP_LATCH]], label %[[EXIT:.*]]
 ; CHECK:       [[LOOP_LATCH]]:
-; CHECK-NEXT:    br label %[[LOOP_HEADER]], !llvm.loop [[LOOP16:![0-9]+]]
+; CHECK-NEXT:    br label %[[LOOP_HEADER1]], !llvm.loop [[LOOP16:![0-9]+]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    br label %[[RETURN:.*]]
 ; CHECK:       [[RETURN]]:

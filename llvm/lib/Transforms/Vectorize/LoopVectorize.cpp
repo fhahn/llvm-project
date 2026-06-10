@@ -4022,7 +4022,7 @@ void LoopVectorizationCostModel::collectInstsToScalarize(ElementCount VF) {
       continue;
     for (Instruction &I : *BB)
       if (isScalarWithPredication(&I, VF)) {
-        // Chain scalarization for predicated div/rem and calls is handled by
+        // Chain scalarization for div/rem, calls and stores is handled by
         // the VPlan-based VPlanTransforms::scalarizeIfProfitable. Skip the
         // legacy discount computation for them; PredicatedBBsAfterVectorization
         // is still populated below.
@@ -4030,7 +4030,7 @@ void LoopVectorizationCostModel::collectInstsToScalarize(ElementCount VF) {
         bool IsDelegatedToVPlan =
             Opcode == Instruction::UDiv || Opcode == Instruction::SDiv ||
             Opcode == Instruction::URem || Opcode == Instruction::SRem ||
-            Opcode == Instruction::Call;
+            Opcode == Instruction::Call || Opcode == Instruction::Store;
         ScalarCostsTy ScalarCosts;
         // Do not apply discount logic for:
         // 1. Scalars after vectorization, as there will only be a single copy
@@ -5632,6 +5632,11 @@ bool VPCostContext::willBeScalarized(Instruction *I, ElementCount VF) const {
   return CM.isScalarWithPredication(I, VF) ||
          CM.isUniformAfterVectorization(I, VF) || CM.isForcedScalar(I, VF) ||
          (VF.isVector() && CM.isProfitableToScalarize(I, VF));
+}
+
+bool VPCostContext::isScalarWithPredication(Instruction *I,
+                                            ElementCount VF) const {
+  return CM.isScalarWithPredication(I, VF);
 }
 
 bool VPCostContext::isMaskRequired(Instruction *I) const {

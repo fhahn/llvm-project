@@ -153,7 +153,7 @@ define void @sink2(i32 %k) {
 ; CHECK-NEXT:      pred.load.if:
 ; CHECK-NEXT:        vp<[[VP8:%[0-9]+]]> = SCALAR-STEPS vp<[[VP5]]>, ir<1>, vp<[[VP0]]>
 ; CHECK-NEXT:        REPLICATE ir<%gep.b> = getelementptr inbounds ir<@b>, ir<0>, vp<[[VP8]]>
-; CHECK-NEXT:        REPLICATE ir<%lv.b> = load ir<%gep.b>
+; CHECK-NEXT:        REPLICATE ir<%lv.b> = load ir<%gep.b> (S->V)
 ; CHECK-NEXT:      Successor(s): pred.load.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.load.continue:
@@ -163,6 +163,7 @@ define void @sink2(i32 %k) {
 ; CHECK-NEXT:    Successor(s): loop.0
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    loop.0:
+; CHECK-NEXT:      WIDEN ir<%add> = add vp<[[VP9]]>, ir<10>
 ; CHECK-NEXT:      EMIT vp<[[VP10:%[0-9]+]]> = shl ir<%iv>, ir<1>
 ; CHECK-NEXT:    Successor(s): pred.store
 ; CHECK-EMPTY:
@@ -173,7 +174,6 @@ define void @sink2(i32 %k) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.store.if:
 ; CHECK-NEXT:        REPLICATE ir<%gep.a> = getelementptr inbounds ir<@a>, ir<0>, vp<[[VP10]]>
-; CHECK-NEXT:        REPLICATE ir<%add> = add vp<[[VP9]]>, ir<10>
 ; CHECK-NEXT:        REPLICATE store ir<%add>, ir<%gep.a>
 ; CHECK-NEXT:      Successor(s): pred.store.continue
 ; CHECK-EMPTY:
@@ -1160,6 +1160,25 @@ define void @update_multiple_users(ptr noalias %src, ptr noalias %dst, i1 %c) {
 ; CHECK-NEXT:  vp<[[VP2:%[0-9]+]]> = CANONICAL-IV
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
+; CHECK-NEXT:    Successor(s): pred.load
+; CHECK-EMPTY:
+; CHECK-NEXT:    <xVFxUF> pred.load: {
+; CHECK-NEXT:      pred.load.entry:
+; CHECK-NEXT:        BRANCH-ON-MASK ir<%c>
+; CHECK-NEXT:      Successor(s): pred.load.if, pred.load.continue
+; CHECK-EMPTY:
+; CHECK-NEXT:      pred.load.if:
+; CHECK-NEXT:        REPLICATE ir<%l1> = load ir<%src> (S->V)
+; CHECK-NEXT:      Successor(s): pred.load.continue
+; CHECK-EMPTY:
+; CHECK-NEXT:      pred.load.continue:
+; CHECK-NEXT:        PHI-PREDICATED-INSTRUCTION vp<[[VP3:%[0-9]+]]> = ir<%l1>
+; CHECK-NEXT:      No successors
+; CHECK-NEXT:    }
+; CHECK-NEXT:    Successor(s): loop.then.0
+; CHECK-EMPTY:
+; CHECK-NEXT:    loop.then.0:
+; CHECK-NEXT:      WIDEN-CAST ir<%l2> = trunc vp<[[VP3]]> to i8
 ; CHECK-NEXT:    Successor(s): pred.store
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    <xVFxUF> pred.store: {
@@ -1168,9 +1187,7 @@ define void @update_multiple_users(ptr noalias %src, ptr noalias %dst, i1 %c) {
 ; CHECK-NEXT:      Successor(s): pred.store.if, pred.store.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.store.if:
-; CHECK-NEXT:        REPLICATE ir<%l1> = load ir<%src>
-; CHECK-NEXT:        REPLICATE ir<%l2> = trunc ir<%l1>
-; CHECK-NEXT:        REPLICATE ir<%cmp> = icmp eq ir<%l1>, ir<0>
+; CHECK-NEXT:        REPLICATE ir<%cmp> = icmp eq vp<[[VP3]]>, ir<0>
 ; CHECK-NEXT:        REPLICATE ir<%sel> = select ir<%cmp>, ir<5>, ir<%l2>
 ; CHECK-NEXT:        REPLICATE store ir<%sel>, ir<%dst>
 ; CHECK-NEXT:      Successor(s): pred.store.continue
