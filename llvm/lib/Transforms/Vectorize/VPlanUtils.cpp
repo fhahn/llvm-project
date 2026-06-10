@@ -206,6 +206,15 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
     return CreateSCEV({LHSVal, RHSVal}, [&](ArrayRef<SCEVUse> Ops) {
       return SE.getAddExpr(Ops[0], Ops[1], SCEV::FlagAnyWrap, 0);
     });
+  // A disjoint or has no bits in common between its operands and is therefore
+  // equivalent to an add, mirroring ScalarEvolution::createSCEV.
+  if (match(V, m_BinaryOr(m_VPValue(LHSVal), m_VPValue(RHSVal)))) {
+    auto *RFlags = cast<VPRecipeWithIRFlags>(V->getDefiningRecipe());
+    if (RFlags->isDisjoint())
+      return CreateSCEV({LHSVal, RHSVal}, [&](ArrayRef<SCEVUse> Ops) {
+        return SE.getAddExpr(Ops[0], Ops[1], SCEV::FlagAnyWrap, 0);
+      });
+  }
   if (match(V, m_Sub(m_VPValue(LHSVal), m_VPValue(RHSVal))))
     return CreateSCEV({LHSVal, RHSVal}, [&](ArrayRef<SCEVUse> Ops) {
       return SE.getMinusSCEV(Ops[0], Ops[1], SCEV::FlagAnyWrap, 0);
