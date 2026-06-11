@@ -5956,14 +5956,20 @@ static bool hasRealignSkeleton(VPlan &Plan) {
 }
 
 VPRegionBlock *VPlanTransforms::prepareRealignSnapshot(
-    VPlan &Plan, Loop *OrigLoop, ElementCount BestVF, unsigned BestUF,
-    VPCostContext &Ctx, bool HasRuntimeDiffChecks) {
+    VPlan &Plan, ElementCount BestVF, unsigned BestUF, VPCostContext &Ctx,
+    bool HasRuntimeDiffChecks) {
   if (!EnableTryToRealignLoop)
     return nullptr;
 
-  // Restrict to fixed, power-of-2 VFs and outermost loops.
+  // Restrict to fixed, power-of-2 VFs: the coverage math below assumes a
+  // scalar lane count, and applyRealignSnapshot masks with VF - 1. The realign
+  // transform operates purely on the loop's own VPlan (vector preheader ->
+  // vector loop -> middle.block -> scalar.ph -> exit); an enclosing loop, if
+  // any, lives outside this VPlan and does not affect re-execution safety,
+  // which is established by the body and exit-block checks below. Early exits
+  // are not supported.
   if (!BestVF.isFixed() || !isPowerOf2_64(BestVF.getFixedValue()) ||
-      OrigLoop->getParentLoop() || Plan.hasEarlyExit())
+      Plan.hasEarlyExit())
     return nullptr;
 
   // Bail if vectorization relies on LAA dependence-distance (diff) runtime

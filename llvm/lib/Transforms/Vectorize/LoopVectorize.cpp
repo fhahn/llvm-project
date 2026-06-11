@@ -5963,7 +5963,7 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
         RtChecks->Need && RtChecks->getDiffChecks().has_value();
     VPCostContext CostCtx(*TLI, BestVPlan, CM, Config);
     RealignSnapshot = VPlanTransforms::prepareRealignSnapshot(
-        BestVPlan, OrigLoop, BestVF, BestUF, CostCtx, HasRuntimeDiffChecks);
+        BestVPlan, BestVF, BestUF, CostCtx, HasRuntimeDiffChecks);
   }
 
   // TODO: Move to VPlan transform stage once the transition to the VPlan-based

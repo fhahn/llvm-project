@@ -615,8 +615,7 @@ struct VPlanTransforms {
   /// costs no more than a single vector operation.
   ///
   /// Returns the cloned region or nullptr if the loop is not a candidate.
-  static VPRegionBlock *prepareRealignSnapshot(VPlan &Plan, Loop *OrigLoop,
-                                               ElementCount BestVF,
+  static VPRegionBlock *prepareRealignSnapshot(VPlan &Plan, ElementCount BestVF,
                                                unsigned BestUF,
                                                VPCostContext &Ctx,
                                                bool HasRuntimeDiffChecks);
