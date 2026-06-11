@@ -4022,14 +4022,22 @@ void LoopVectorizationCostModel::collectInstsToScalarize(ElementCount VF) {
       continue;
     for (Instruction &I : *BB)
       if (isScalarWithPredication(&I, VF)) {
+        // Chain scalarization for predicated div/rem is handled by the
+        // VPlan-based VPlanTransforms::scalarizeIfProfitable. Skip the legacy
+        // discount computation for them; PredicatedBBsAfterVectorization is
+        // still populated below.
+        unsigned Opcode = I.getOpcode();
+        bool IsDelegatedToVPlan =
+            Opcode == Instruction::UDiv || Opcode == Instruction::SDiv ||
+            Opcode == Instruction::URem || Opcode == Instruction::SRem;
         ScalarCostsTy ScalarCosts;
         // Do not apply discount logic for:
         // 1. Scalars after vectorization, as there will only be a single copy
         // of the instruction.
         // 2. Scalable VF, as that would lead to invalid scalarization costs.
         // 3. Emulated masked memrefs, if a hacked cost is needed.
-        if (!isScalarAfterVectorization(&I, VF) && !VF.isScalable() &&
-            !useEmulatedMaskMemRefHack(&I, VF) &&
+        if (!IsDelegatedToVPlan && !isScalarAfterVectorization(&I, VF) &&
+            !VF.isScalable() && !useEmulatedMaskMemRefHack(&I, VF) &&
             computePredInstDiscount(&I, ScalarCosts, VF) >= 0) {
           for (const auto &[I, IC] : ScalarCosts)
             ScalarCostsVF.insert({I, IC});
@@ -6852,6 +6860,10 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan,
     RUN_VPLAN_PASS(VPlanTransforms::convertToAbstractRecipes, *Plan, CostCtx,
                    Range);
   }
+
+  // Walk operand chains of predicated replicate recipes and scalarize if the
+  // resulting discount is non-negative.
+  RUN_VPLAN_PASS(VPlanTransforms::scalarizeIfProfitable, *Plan, CostCtx, Range);
 
   // Interleave memory: for each Interleave Group we marked earlier as relevant
   // for this VPlan, replace the Recipes widening its memory instructions with a

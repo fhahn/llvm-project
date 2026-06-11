@@ -7649,3 +7649,317 @@ void VPlanTransforms::convertToStridedAccesses(VPlan &Plan,
     }
   }
 }
+
+void VPlanTransforms::scalarizeIfProfitable(VPlan &Plan, VPCostContext &CostCtx,
+                                            VFRange &Range) {
+  VPRegionBlock *VectorLoop = Plan.getVectorLoopRegion();
+  if (!VectorLoop)
+    return;
+
+  // Returns the VPValue defined by \p R, or nullptr if \p R isn't a chain
+  // candidate recipe type (VPWidenRecipe, VPWidenGEPRecipe, VPWidenLoadRecipe).
+  auto GetDefinedValue = [](VPRecipeBase *R) -> VPValue * {
+    if (auto *W = dyn_cast<VPWidenRecipe>(R))
+      return W->getVPSingleValue();
+    if (auto *G = dyn_cast<VPWidenGEPRecipe>(R))
+      return G->getVPSingleValue();
+    if (auto *L = dyn_cast<VPWidenLoadRecipe>(R))
+      return L;
+    return nullptr;
+  };
+
+  // Returns the underlying instruction for a chain candidate recipe, or nullptr.
+  auto GetUnderlyingInst = [](VPRecipeBase *R) -> Instruction * {
+    if (auto *W = dyn_cast<VPWidenRecipe>(R))
+      return dyn_cast_or_null<Instruction>(W->getUnderlyingValue());
+    if (auto *G = dyn_cast<VPWidenGEPRecipe>(R))
+      return dyn_cast_or_null<Instruction>(G->getUnderlyingValue());
+    if (auto *L = dyn_cast<VPWidenLoadRecipe>(R))
+      return &L->getIngredient();
+    return nullptr;
+  };
+
+  // Returns true if the given recipe can be scalarized as part of the
+  // operand chain of a predicated instruction.
+  auto CanBeScalarized = [&](VPRecipeBase *R, Instruction *PredI) -> bool {
+    VPValue *Def = GetDefinedValue(R);
+    if (!Def || !Def->hasOneUse())
+      return false;
+
+    Instruction *UI = GetUnderlyingInst(R);
+    if (!UI || UI->getParent() != PredI->getParent())
+      return false;
+
+    // Must have a vectorizable result type (not struct, etc.). Void is fine
+    // (e.g., stores), but stores aren't chain candidates anyway.
+    Type *ScalarTy = Def->getScalarType();
+    if (!ScalarTy->isVoidTy() && !VectorType::isValidElementType(ScalarTy))
+      return false;
+
+    // For VPWidenRecipe, the recipe operands must match the original
+    // instruction operands 1:1. VPWidenGEPRecipe and VPWidenLoadRecipe may
+    // carry extra operands (loads have an optional mask operand), so skip
+    // the check for those.
+    if (auto *W = dyn_cast<VPWidenRecipe>(R))
+      if (W->getNumOperands() != UI->getNumOperands())
+        return false;
+
+    // Iterate the instruction-level operands: for VPWidenRecipe and
+    // VPWidenGEPRecipe these are operands(); for VPWidenLoadRecipe, only
+    // the address operand (mask is a VPlan-level concept).
+    SmallVector<VPValue *, 4> OperandsToCheck;
+    if (auto *L = dyn_cast<VPWidenLoadRecipe>(R))
+      OperandsToCheck.push_back(L->getAddr());
+    else
+      OperandsToCheck.assign(R->op_begin(), R->op_end());
+
+    // If any operand is single-scalar (uniform-after-vectorization in
+    // legacy terms), bail. We assume only lane zero of a single-scalar
+    // value is emitted.
+    for (VPValue *Op : OperandsToCheck)
+      if (Op->getDefiningRecipe() && vputils::isSingleScalar(Op))
+        return false;
+
+    return true;
+  };
+
+  // Collect predicated VPReplicateRecipes and their scalarizable operand
+  // chains.
+  SmallVector<std::pair<VPReplicateRecipe *, SmallVector<VPRecipeBase *>>>
+      ChainsToScalarize;
+
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_shallow(VectorLoop->getEntry()))) {
+    for (VPRecipeBase &R : *VPBB) {
+      auto *RepR = dyn_cast<VPReplicateRecipe>(&R);
+      if (!RepR || !RepR->isPredicated())
+        continue;
+
+      Instruction *PredI = RepR->getUnderlyingInstr();
+      if (!PredI)
+        continue;
+
+      // Defer predicated load/store handling as PredInst. Loads always bail
+      // in the legacy via useEmulatedMaskMemRefHack, and stores need extra
+      // cost-model awareness (AVX-512 efficient masked stores) before they
+      // can match the legacy's discount math. Chain scalarization through
+      // VPWidenLoadRecipe is still supported below when they feed into a
+      // different predicated instruction (e.g. a div).
+      if (isa<LoadInst, StoreInst>(PredI))
+        continue;
+
+      // Walk backward through single-use operand chains collecting chain
+      // candidate recipes (widened arithmetic, widened GEP, widened load).
+      SmallVector<VPRecipeBase *, 8> Worklist;
+      SmallPtrSet<VPRecipeBase *, 8> Visited;
+      SmallVector<VPRecipeBase *> ChainRecipes;
+
+      // Start from the non-mask operands of the predicated recipe.
+      for (unsigned I = 0, E = RepR->getNumOperands() - (RepR->isPredicated());
+           I < E; ++I)
+        if (auto *Def = RepR->getOperand(I)->getDefiningRecipe())
+          Worklist.push_back(Def);
+
+      while (!Worklist.empty()) {
+        auto *Def = Worklist.pop_back_val();
+        if (!Visited.insert(Def).second)
+          continue;
+
+        if (!CanBeScalarized(Def, PredI))
+          continue;
+
+        ChainRecipes.push_back(Def);
+
+        // Add operands to worklist. For loads, only the address operand
+        // feeds the chain (mask is a VPlan-level concept).
+        if (auto *L = dyn_cast<VPWidenLoadRecipe>(Def)) {
+          if (auto *AddrDef = L->getAddr()->getDefiningRecipe())
+            Worklist.push_back(AddrDef);
+        } else {
+          for (VPValue *Op : Def->operands())
+            if (auto *OpDef = Op->getDefiningRecipe())
+              Worklist.push_back(OpDef);
+        }
+      }
+
+      if (!ChainRecipes.empty())
+        ChainsToScalarize.push_back({RepR, std::move(ChainRecipes)});
+    }
+  }
+
+  // For each chain, check if scalarization is profitable across all VFs.
+  for (auto &Chain : ChainsToScalarize) {
+    SmallVector<VPRecipeBase *> &ChainRecipes = Chain.second;
+    Instruction *PredI = Chain.first->getUnderlyingInstr();
+    BasicBlock *PredBB = PredI->getParent();
+
+    // Build a set of recipes in this chain for quick lookup.
+    SmallPtrSet<VPRecipeBase *, 8> ChainSet(ChainRecipes.begin(),
+                                             ChainRecipes.end());
+
+    // Returns the instruction-level operands for cost computation. For
+    // VPWidenLoadRecipe, only the address operand is included; the mask
+    // is a VPlan-level concept that doesn't correspond to an original
+    // instruction operand.
+    auto GetInstOperands = [&](VPRecipeBase *R) -> SmallVector<VPValue *, 4> {
+      if (auto *L = dyn_cast<VPWidenLoadRecipe>(R))
+        return {L->getAddr()};
+      return to_vector(R->operands());
+    };
+
+    // Returns the vector-form cost of \p R at \p VF.
+    auto GetVectorCost = [&](VPRecipeBase *R, ElementCount VF) {
+      if (auto *W = dyn_cast<VPWidenRecipe>(R))
+        return W->computeCost(VF, CostCtx);
+      if (auto *G = dyn_cast<VPWidenGEPRecipe>(R))
+        return G->computeCost(VF, CostCtx);
+      if (auto *L = dyn_cast<VPWidenLoadRecipe>(R))
+        return L->computeCost(VF, CostCtx);
+      return InstructionCost::getInvalid();
+    };
+
+    // Returns the per-lane scalar cost for \p R (before multiplying by VF).
+    auto GetScalarInstructionCost = [&](VPRecipeBase *R) {
+      if (auto *W = dyn_cast<VPWidenRecipe>(R))
+        return W->getCostForRecipeWithOpcode(
+            W->getOpcode(), ElementCount::getFixed(1), CostCtx);
+      if (auto *G = dyn_cast<VPWidenGEPRecipe>(R)) {
+        (void)G;
+        // Scalar GEP is treated as free (matches legacy's
+        // getInstructionCost for GetElementPtr returning 0).
+        return InstructionCost(0);
+      }
+      if (auto *L = dyn_cast<VPWidenLoadRecipe>(R)) {
+        Instruction *I = &L->getIngredient();
+        Type *ValTy = getLoadStoreType(I);
+        const Align Alignment = getLoadStoreAlignment(I);
+        unsigned AS =
+            cast<PointerType>(L->getAddr()->getScalarType())->getAddressSpace();
+        return CostCtx.TTI.getMemoryOpCost(I->getOpcode(), ValTy, Alignment,
+                                           AS, CostCtx.CostKind);
+      }
+      return InstructionCost::getInvalid();
+    };
+
+    auto IsProfitable = [&](ElementCount VF) -> bool {
+      if (!VF.isVector() || VF.isScalable())
+        return false;
+
+      InstructionCost Discount = 0;
+      for (VPRecipeBase *R : ChainRecipes) {
+        // Vector cost: what it costs when widened.
+        InstructionCost VectorCost = GetVectorCost(R, VF);
+        if (!VectorCost.isValid())
+          return false;
+
+        // Scalar cost: VF * scalar instruction cost.
+        InstructionCost ScalarCost = GetScalarInstructionCost(R);
+        if (!ScalarCost.isValid())
+          return false;
+        ScalarCost *= VF.getFixedValue();
+
+        // Add extract overhead for operands that can't be scalarized and
+        // are not already scalar. Skip live-ins (no defining recipe),
+        // VPReplicateRecipes and VPPredInstPHIRecipes (already scalar), and
+        // VPIRValues.
+        for (VPValue *Op : GetInstOperands(R)) {
+          auto *OpDef = Op->getDefiningRecipe();
+          if (!OpDef || ChainSet.count(OpDef) ||
+              isa<VPReplicateRecipe, VPPredInstPHIRecipe>(OpDef) ||
+              isa<VPIRValue>(Op))
+            continue;
+          Type *OpTy = Op->getScalarType();
+          if (!VectorType::isValidElementType(OpTy))
+            continue;
+          Type *VecTy = toVectorTy(OpTy, VF);
+          ScalarCost += CostCtx.TTI.getScalarizationOverhead(
+              cast<VectorType>(VecTy),
+              APInt::getAllOnes(VF.getFixedValue()),
+              /*Insert=*/false, /*Extract=*/true, CostCtx.CostKind);
+        }
+
+        // Scale by block probability.
+        ScalarCost /= CostCtx.getPredBlockCostDivisor(PredBB);
+
+        Discount += VectorCost - ScalarCost;
+      }
+
+      // Add the predicated instruction's contribution to the discount.
+      // Legacy computePredInstDiscount sums (VectorCost - ScalarCost) across
+      // PredInst and the chain. For PredInst, VectorCost (via
+      // getDivRemSpeculationCost -> getScalarizationOverhead) includes
+      // extracts for ALL operands, while ScalarCost only includes extracts
+      // for non-chain operands. The difference reduces to the extract
+      // overhead for chain operands, scaled by block probability.
+      VPReplicateRecipe *RepR = Chain.first;
+      for (unsigned I = 0, E = RepR->getNumOperands() - RepR->isPredicated();
+           I < E; ++I) {
+        VPValue *Op = RepR->getOperand(I);
+        auto *OpDef = Op->getDefiningRecipe();
+        if (!OpDef || !ChainSet.contains(OpDef))
+          continue;
+        Type *OpTy = Op->getScalarType();
+        if (!VectorType::isValidElementType(OpTy))
+          continue;
+        Type *VecTy = toVectorTy(OpTy, VF);
+        InstructionCost SavedExtract = CostCtx.TTI.getScalarizationOverhead(
+            cast<VectorType>(VecTy), APInt::getAllOnes(VF.getFixedValue()),
+            /*Insert=*/false, /*Extract=*/true, CostCtx.CostKind);
+        SavedExtract /= CostCtx.getPredBlockCostDivisor(PredBB);
+        Discount += SavedExtract;
+      }
+
+      return Discount >= 0;
+    };
+
+    // Check across all VFs. Only scalarize if profitable for all vector VFs.
+    bool Profitable = false;
+    for (ElementCount VF : Range) {
+      if (!VF.isVector() || VF.isScalable())
+        continue;
+      if (!IsProfitable(VF)) {
+        Profitable = false;
+        break;
+      }
+      Profitable = true;
+    }
+    if (!Profitable)
+      continue;
+
+    // Replace chain recipes with VPReplicateRecipes. For VPWidenLoadRecipe,
+    // the mask (if any) is passed to VPReplicateRecipe as a separate arg. IR
+    // flags (nsw/nuw/exact, GEP nowrap, ...) and metadata are transferred from
+    // the widened recipe so the scalarized chain is not pessimized.
+    for (VPRecipeBase *R : ChainRecipes) {
+      Instruction *I = nullptr;
+      SmallVector<VPValue *> Operands;
+      VPValue *Mask = nullptr;
+      VPIRFlags Flags;
+      VPIRMetadata Metadata;
+
+      if (auto *W = dyn_cast<VPWidenRecipe>(R)) {
+        I = cast<Instruction>(W->getUnderlyingValue());
+        Operands = to_vector(W->operands());
+        Flags = *W;
+      } else if (auto *G = dyn_cast<VPWidenGEPRecipe>(R)) {
+        I = cast<Instruction>(G->getUnderlyingValue());
+        Operands = to_vector(G->operands());
+        Flags = *G;
+      } else if (auto *L = dyn_cast<VPWidenLoadRecipe>(R)) {
+        I = &L->getIngredient();
+        Operands = {L->getAddr()};
+        Mask = L->getMask();
+        Metadata = *L;
+      } else {
+        continue;
+      }
+
+      auto *Replicate =
+          new VPReplicateRecipe(I, Operands, /*IsSingleScalar=*/false, Mask,
+                                Flags, Metadata, R->getDebugLoc());
+      Replicate->insertBefore(R);
+      GetDefinedValue(R)->replaceAllUsesWith(Replicate);
+      R->eraseFromParent();
+    }
+  }
+}

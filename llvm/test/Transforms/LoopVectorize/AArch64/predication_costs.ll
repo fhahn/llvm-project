@@ -125,18 +125,16 @@ for.end:
 ;
 ; This test checks that we correctly compute the cost of the predicated udiv
 ; instruction and the add instruction it uses. The add is scalarized and sunk
-; inside the predicated block.  If we assume the block probability is 50%, we
-; compute the cost as:
+; inside the predicated block via the VPlan scalarizeIfProfitable transform.
 ;
-; Cost of add:
+; Cost of add (scalar, inside replicate region):
 ;   (add(2) + extractelement(4)) / 2 = 3
-; Cost of udiv:
-;   (udiv(2) + extractelement(4) + insertelement(4)) / 2 = 5
+; Cost of udiv (replicate, with block probability 50%):
+;   (udiv(2) * VF + insertelement(result, 4) + extractelement(load, 4)) / 2 = 6
 ;
-; CHECK: Scalarizing: %tmp3 = add nsw i32 %tmp2, %x
 ; CHECK: Scalarizing and predicating: %tmp4 = udiv i32 %tmp2, %tmp3
-; CHECK: Cost of 3 for VF 2: profitable to scalarize   %tmp3 = add nsw i32 %tmp2, %x
-; CHECK: Cost of 5 for VF 2: REPLICATE ir<%tmp4> = udiv ir<%tmp2>, ir<%tmp3> (S->V)
+; CHECK: Cost of 3 for VF 2: REPLICATE ir<%tmp3> = add nsw ir<%tmp2>, ir<%x>
+; CHECK: Cost of {{.}} for VF 2: REPLICATE ir<%tmp4> = udiv ir<%tmp2>, ir<%tmp3> (S->V)
 ;
 
 define i32 @predicated_udiv_scalarized_operand(ptr %a, i1 %c, i32 %x, i64 %n) {

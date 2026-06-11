@@ -597,6 +597,12 @@ struct VPlanTransforms {
   static void makeCallWideningDecisions(VPlan &Plan, VFRange &Range,
                                         VPRecipeBuilder &RecipeBuilder,
                                         VPCostContext &CostCtx);
+
+  /// Walk operand chains of predicated VPReplicateRecipes and scalarize
+  /// (replace VPWidenRecipes with VPReplicateRecipes) if the discount from
+  /// scalarizing the chain is non-negative.
+  static void scalarizeIfProfitable(VPlan &Plan, VPCostContext &CostCtx,
+                                    VFRange &Range);
 };
 
 } // namespace llvm

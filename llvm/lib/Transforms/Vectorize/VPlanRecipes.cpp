@@ -3825,10 +3825,35 @@ InstructionCost VPReplicateRecipe::computeCost(ElementCount VF,
   case Instruction::Or:
   case Instruction::Xor:
   case Instruction::ICmp:
-  case Instruction::FCmp:
-    return getCostForRecipeWithOpcode(getOpcode(), ElementCount::getFixed(1),
-                                      Ctx) *
-           (isSingleScalar() ? 1 : VF.getFixedValue());
+  case Instruction::FCmp: {
+    InstructionCost ScalarCost = getCostForRecipeWithOpcode(
+        getOpcode(), ElementCount::getFixed(1), Ctx);
+    if (isSingleScalar())
+      return ScalarCost;
+    ScalarCost *= VF.getFixedValue();
+    // For a scalarized arith op in a replicate region, mirror the legacy
+    // computePredInstDiscount cost formula: add extract overhead for operands
+    // that still need to come out of a vector (skip live-ins and
+    // already-scalar recipes), then scale by block probability. The result is
+    // used by the scalar PredInst, so no insert overhead for the result.
+    if (!getRegion() || !getRegion()->isReplicator())
+      return ScalarCost;
+    for (VPValue *Op : operands()) {
+      auto *OpDef = Op->getDefiningRecipe();
+      if (!OpDef || isa<VPReplicateRecipe, VPPredInstPHIRecipe>(OpDef) ||
+          isa<VPIRValue>(Op))
+        continue;
+      Type *OpTy = Op->getScalarType();
+      if (!VectorType::isValidElementType(OpTy))
+        continue;
+      Type *VecTy = toVectorTy(OpTy, VF);
+      ScalarCost += Ctx.TTI.getScalarizationOverhead(
+          cast<VectorType>(VecTy), APInt::getAllOnes(VF.getFixedValue()),
+          /*Insert=*/false, /*Extract=*/true, Ctx.CostKind);
+    }
+    ScalarCost /= Ctx.getPredBlockCostDivisor(UI->getParent());
+    return ScalarCost;
+  }
   case Instruction::SDiv:
   case Instruction::UDiv:
   case Instruction::SRem:
