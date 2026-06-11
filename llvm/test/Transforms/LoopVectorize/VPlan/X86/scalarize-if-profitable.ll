@@ -3,11 +3,11 @@
 ; RUN: opt -passes=loop-vectorize -mcpu=skylake-avx512 -force-vector-width=2 -force-vector-interleave=1 -vplan-print-after=scalarizeIfProfitable -disable-output %s 2>&1 | FileCheck %s --check-prefixes=CHECK,AFTER
 
 ; Tests for VPlanTransforms::scalarizeIfProfitable. The legacy chain
-; scalarization is now disabled for predicated div/rem, so the decision moves
-; to the VPlan transform. Each test prints the VPlan twice: once right BEFORE
-; scalarizeIfProfitable (after convertToAbstractRecipes), where the operand
-; chains feeding the predicated div/rem and gather load are still WIDEN, and
-; once AFTER, where the transform has rewritten them to REPLICATE.
+; scalarization is now disabled for predicated div/rem and calls, so the
+; decision moves to the VPlan transform. Each test prints the VPlan twice: once
+; right BEFORE scalarizeIfProfitable (after convertToAbstractRecipes), where the
+; operand chains feeding the predicated div/rem and gather load are still WIDEN,
+; and once AFTER, where the transform has rewritten them to REPLICATE.
 
 target datalayout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:128:128-a0:0:64-s0:64:64-f80:128:128-n8:16:32:64-S128"
 target triple = "x86_64-apple-macosx10.8.0"
@@ -245,48 +245,91 @@ for.end:
 ; chain, so it is pulled into the scalarized chain: the multiply becomes a
 ; REPLICATE alongside the REPLICATE call.
 define void @cond_call_chain(ptr readonly %src, ptr noalias %dest, i64 %N, i64 %k) {
-; CHECK-LABEL: VPlan for loop in 'cond_call_chain'
-; CHECK:  VPlan ' for UF>=1' {
-; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
-; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
-; CHECK-NEXT:  Live-in ir<%N> = original trip-count
-; CHECK-EMPTY:
-; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
-; CHECK-EMPTY:
-; CHECK-NEXT:  vector.ph:
-; CHECK-NEXT:  Successor(s): vector loop
-; CHECK-EMPTY:
-; CHECK-NEXT:  <x1> vector loop: {
-; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
-; CHECK-EMPTY:
-; CHECK-NEXT:    vector.body:
-; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION nuw nsw ir<0>, ir<1>, vp<[[VP0]]>
-; CHECK-NEXT:      CLONE ir<%ld.addr> = getelementptr inbounds ir<%src>, ir<%iv>
-; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = vector-pointer inbounds ir<%ld.addr>, ir<1>
-; CHECK-NEXT:      WIDEN ir<%ld.value> = load vp<[[VP4]]>
-; CHECK-NEXT:      WIDEN ir<%ifcond> = icmp ult ir<%ld.value>, ir<5>
-; CHECK-NEXT:    Successor(s): if.then
-; CHECK-EMPTY:
-; CHECK-NEXT:    if.then:
-; CHECK-NEXT:      REPLICATE ir<%mul> = mul ir<%ld.value>, ir<%k>
-; CHECK-NEXT:      REPLICATE ir<%foo.ret> = call @foo(ir<%mul>, ir<@foo>)
-; CHECK-NEXT:    Successor(s): for.loop
-; CHECK-EMPTY:
-; CHECK-NEXT:    for.loop:
-; CHECK-NEXT:      EMIT vp<[[VP5:%[0-9]+]]> = not ir<%ifcond>
-; CHECK-NEXT:      BLEND ir<%st.value> = ir<%foo.ret>/ir<%ifcond> ir<%ld.value>/vp<[[VP5]]>
-; CHECK-NEXT:      CLONE ir<%st.addr> = getelementptr inbounds ir<%dest>, ir<%iv>
-; CHECK-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer inbounds ir<%st.addr>, ir<1>
-; CHECK-NEXT:      WIDEN store vp<[[VP6]]>, ir<%st.value>
-; CHECK-NEXT:      CLONE ir<%iv.next> = add nuw nsw ir<%iv>, ir<1>
-; CHECK-NEXT:      CLONE ir<%loopcond> = icmp eq ir<%iv.next>, ir<%N>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
-; CHECK-NEXT:    No successors
-; CHECK-NEXT:  }
-; CHECK-NEXT:  Successor(s): middle.block
+; BEFORE-LABEL: VPlan for loop in 'cond_call_chain'
+; BEFORE:  VPlan ' for UF>=1' {
+; BEFORE-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
+; BEFORE-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
+; BEFORE-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
+; BEFORE-NEXT:  Live-in ir<%N> = original trip-count
+; BEFORE-EMPTY:
+; BEFORE-NEXT:  ir-bb<entry>:
+; BEFORE-NEXT:  Successor(s): scalar.ph, vector.ph
+; BEFORE-EMPTY:
+; BEFORE-NEXT:  vector.ph:
+; BEFORE-NEXT:  Successor(s): vector loop
+; BEFORE-EMPTY:
+; BEFORE-NEXT:  <x1> vector loop: {
+; BEFORE-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
+; BEFORE-EMPTY:
+; BEFORE-NEXT:    vector.body:
+; BEFORE-NEXT:      ir<%iv> = WIDEN-INDUCTION nuw nsw ir<0>, ir<1>, vp<[[VP0]]>
+; BEFORE-NEXT:      CLONE ir<%ld.addr> = getelementptr inbounds ir<%src>, ir<%iv>
+; BEFORE-NEXT:      vp<[[VP4:%[0-9]+]]> = vector-pointer inbounds ir<%ld.addr>, ir<1>
+; BEFORE-NEXT:      WIDEN ir<%ld.value> = load vp<[[VP4]]>
+; BEFORE-NEXT:      WIDEN ir<%ifcond> = icmp ult ir<%ld.value>, ir<5>
+; BEFORE-NEXT:    Successor(s): if.then
+; BEFORE-EMPTY:
+; BEFORE-NEXT:    if.then:
+; BEFORE-NEXT:      WIDEN ir<%mul> = mul ir<%ld.value>, ir<%k>
+; BEFORE-NEXT:      REPLICATE ir<%foo.ret> = call @foo(ir<%mul>, ir<@foo>)
+; BEFORE-NEXT:    Successor(s): for.loop
+; BEFORE-EMPTY:
+; BEFORE-NEXT:    for.loop:
+; BEFORE-NEXT:      EMIT vp<[[VP5:%[0-9]+]]> = not ir<%ifcond>
+; BEFORE-NEXT:      BLEND ir<%st.value> = ir<%foo.ret>/ir<%ifcond> ir<%ld.value>/vp<[[VP5]]>
+; BEFORE-NEXT:      CLONE ir<%st.addr> = getelementptr inbounds ir<%dest>, ir<%iv>
+; BEFORE-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer inbounds ir<%st.addr>, ir<1>
+; BEFORE-NEXT:      WIDEN store vp<[[VP6]]>, ir<%st.value>
+; BEFORE-NEXT:      CLONE ir<%iv.next> = add nuw nsw ir<%iv>, ir<1>
+; BEFORE-NEXT:      CLONE ir<%loopcond> = icmp eq ir<%iv.next>, ir<%N>
+; BEFORE-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; BEFORE-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; BEFORE-NEXT:    No successors
+; BEFORE-NEXT:  }
+; BEFORE-NEXT:  Successor(s): middle.block
+;
+; AFTER-LABEL: VPlan for loop in 'cond_call_chain'
+; AFTER:  VPlan ' for UF>=1' {
+; AFTER-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
+; AFTER-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
+; AFTER-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
+; AFTER-NEXT:  Live-in ir<%N> = original trip-count
+; AFTER-EMPTY:
+; AFTER-NEXT:  ir-bb<entry>:
+; AFTER-NEXT:  Successor(s): scalar.ph, vector.ph
+; AFTER-EMPTY:
+; AFTER-NEXT:  vector.ph:
+; AFTER-NEXT:  Successor(s): vector loop
+; AFTER-EMPTY:
+; AFTER-NEXT:  <x1> vector loop: {
+; AFTER-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
+; AFTER-EMPTY:
+; AFTER-NEXT:    vector.body:
+; AFTER-NEXT:      ir<%iv> = WIDEN-INDUCTION nuw nsw ir<0>, ir<1>, vp<[[VP0]]>
+; AFTER-NEXT:      CLONE ir<%ld.addr> = getelementptr inbounds ir<%src>, ir<%iv>
+; AFTER-NEXT:      vp<[[VP4:%[0-9]+]]> = vector-pointer inbounds ir<%ld.addr>, ir<1>
+; AFTER-NEXT:      WIDEN ir<%ld.value> = load vp<[[VP4]]>
+; AFTER-NEXT:      WIDEN ir<%ifcond> = icmp ult ir<%ld.value>, ir<5>
+; AFTER-NEXT:    Successor(s): if.then
+; AFTER-EMPTY:
+; AFTER-NEXT:    if.then:
+; AFTER-NEXT:      REPLICATE ir<%mul> = mul ir<%ld.value>, ir<%k>
+; AFTER-NEXT:      REPLICATE ir<%foo.ret> = call @foo(ir<%mul>, ir<@foo>)
+; AFTER-NEXT:    Successor(s): for.loop
+; AFTER-EMPTY:
+; AFTER-NEXT:    for.loop:
+; AFTER-NEXT:      EMIT vp<[[VP5:%[0-9]+]]> = not ir<%ifcond>
+; AFTER-NEXT:      BLEND ir<%st.value> = ir<%foo.ret>/ir<%ifcond> ir<%ld.value>/vp<[[VP5]]>
+; AFTER-NEXT:      CLONE ir<%st.addr> = getelementptr inbounds ir<%dest>, ir<%iv>
+; AFTER-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer inbounds ir<%st.addr>, ir<1>
+; AFTER-NEXT:      WIDEN store vp<[[VP6]]>, ir<%st.value>
+; AFTER-NEXT:      CLONE ir<%iv.next> = add nuw nsw ir<%iv>, ir<1>
+; AFTER-NEXT:      CLONE ir<%loopcond> = icmp eq ir<%iv.next>, ir<%N>
+; AFTER-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; AFTER-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; AFTER-NEXT:    No successors
+; AFTER-NEXT:  }
+; AFTER-NEXT:  Successor(s): middle.block
 ;
 entry:
   br label %for.body

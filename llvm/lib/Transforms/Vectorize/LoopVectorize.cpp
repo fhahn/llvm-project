@@ -4022,14 +4022,15 @@ void LoopVectorizationCostModel::collectInstsToScalarize(ElementCount VF) {
       continue;
     for (Instruction &I : *BB)
       if (isScalarWithPredication(&I, VF)) {
-        // Chain scalarization for predicated div/rem is handled by the
-        // VPlan-based VPlanTransforms::scalarizeIfProfitable. Skip the legacy
-        // discount computation for them; PredicatedBBsAfterVectorization is
-        // still populated below.
+        // Chain scalarization for predicated div/rem and calls is handled by
+        // the VPlan-based VPlanTransforms::scalarizeIfProfitable. Skip the
+        // legacy discount computation for them; PredicatedBBsAfterVectorization
+        // is still populated below.
         unsigned Opcode = I.getOpcode();
         bool IsDelegatedToVPlan =
             Opcode == Instruction::UDiv || Opcode == Instruction::SDiv ||
-            Opcode == Instruction::URem || Opcode == Instruction::SRem;
+            Opcode == Instruction::URem || Opcode == Instruction::SRem ||
+            Opcode == Instruction::Call;
         ScalarCostsTy ScalarCosts;
         // Do not apply discount logic for:
         // 1. Scalars after vectorization, as there will only be a single copy
