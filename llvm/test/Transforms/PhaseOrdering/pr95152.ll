@@ -45,10 +45,11 @@ define void @g(ptr dead_on_unwind noalias writable dereferenceable(8) align 8 %p
 
 define void @f(ptr dead_on_unwind noalias %p) {
 ; CHECK-LABEL: define void @f(
-; CHECK-SAME: ptr dead_on_unwind noalias initializes((0, 8)) [[P:%.*]]) local_unnamed_addr {
-; CHECK-NEXT:    store i64 3, ptr [[P]], align 4
+; CHECK-SAME: ptr dead_on_unwind noalias [[P:%.*]]) local_unnamed_addr {
+; CHECK-NEXT:    call void @llvm.assume(i1 true) [ "align"(ptr [[P]], i64 8) ]
+; CHECK-NEXT:    store i64 3, ptr [[P]], align 8
 ; CHECK-NEXT:    tail call void @j(ptr nonnull align 8 dereferenceable(8) [[P]])
-; CHECK-NEXT:    store i64 43, ptr [[P]], align 4
+; CHECK-NEXT:    store i64 43, ptr [[P]], align 8
 ; CHECK-NEXT:    ret void
 ;
   call void @g(ptr %p)

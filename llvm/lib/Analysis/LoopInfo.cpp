@@ -29,6 +29,7 @@
 #include "llvm/IR/DebugLoc.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
@@ -616,6 +617,15 @@ bool Loop::isAnnotatedParallel() const {
   for (BasicBlock *BB : this->blocks()) {
     for (Instruction &I : *BB) {
       if (!I.mayReadOrWriteMemory())
+        continue;
+
+      // llvm.assume only writes inaccessible memory to model a control
+      // dependence; it carries no value across loop iterations and so can never
+      // introduce a loop-carried dependence. It therefore does not need to
+      // carry the access group. This mirrors LoopAccessAnalysis, which also
+      // ignores llvm.assume, and keeps inserting an assume into the loop from
+      // spuriously making it appear non-parallel.
+      if (isa<AssumeInst>(&I))
         continue;
 
       if (MDNode *AccessGroup = I.getMetadata(LLVMContext::MD_access_group)) {

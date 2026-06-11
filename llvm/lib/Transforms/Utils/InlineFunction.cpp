@@ -26,6 +26,7 @@
 #include "llvm/Analysis/CtxProfAnalysis.h"
 #include "llvm/Analysis/IndirectCallVisitor.h"
 #include "llvm/Analysis/InstructionSimplify.h"
+#include "llvm/Analysis/Loads.h"
 #include "llvm/Analysis/MemoryProfileInfo.h"
 #include "llvm/Analysis/ObjCARCAnalysisUtils.h"
 #include "llvm/Analysis/ObjCARCUtil.h"
@@ -106,6 +107,12 @@ static cl::opt<bool>
 PreserveAlignmentAssumptions("preserve-alignment-assumptions-during-inlining",
   cl::init(false), cl::Hidden,
   cl::desc("Convert align attributes to assumptions during inlining."));
+
+static cl::opt<bool> PreserveDereferenceableAssumptions(
+    "preserve-dereferenceable-assumptions-during-inlining", cl::init(true),
+    cl::Hidden,
+    cl::desc("Convert dereferenceable parameter attributes to assumptions "
+             "during inlining."));
 
 static cl::opt<unsigned> InlinerAttributeWindow(
     "max-inst-checked-for-throw-during-inlining", cl::Hidden,
@@ -1820,6 +1827,71 @@ static void AddAlignmentAssumptions(CallBase &CB, InlineFunctionInfo &IFI) {
   }
 }
 
+/// If the inlined function has pointer arguments with a `dereferenceable`
+/// attribute, add @llvm.assume-based assumptions to preserve this information.
+static void AddDereferenceableAssumptions(CallBase &CB,
+                                          InlineFunctionInfo &IFI) {
+  if (!PreserveDereferenceableAssumptions || !IFI.GetAssumptionCache)
+    return;
+
+  AssumptionCache *AC = &IFI.GetAssumptionCache(*CB.getCaller());
+  auto &DL = CB.getDataLayout();
+
+  // To avoid inserting redundant assumptions, we may need a DT of the caller.
+  DominatorTree DT;
+  bool DTCalculated = false;
+
+  Function *CalledFunc = CB.getCalledFunction();
+  for (Argument &Arg : CalledFunc->args()) {
+    // Only handle plain `dereferenceable` (not `dereferenceable_or_null`, which
+    // permits null and is therefore not safe to speculate). Skip
+    // byval/byref/etc. arguments, whose dereferenceability describes a copy.
+    if (!Arg.getType()->isPointerTy() || Arg.hasPassPointeeByValueCopyAttr() ||
+        Arg.use_empty())
+      continue;
+    uint64_t DerefBytes = Arg.getDereferenceableBytes();
+    if (DerefBytes == 0)
+      continue;
+
+    Value *ArgVal = CB.getArgOperand(Arg.getArgNo());
+    Type *ArgValTy = ArgVal->getType();
+    if (!ArgValTy->isPointerTy())
+      continue;
+
+    if (!DTCalculated) {
+      DT.recalculate(*CB.getCaller());
+      DTCalculated = true;
+    }
+
+    // If the fact is already provable in the caller's context, don't bother.
+    APInt DerefBytesAP(DL.getPointerTypeSizeInBits(ArgValTy), DerefBytes);
+    if (isDereferenceableAndAlignedPointer(
+            ArgVal, Align(1), DerefBytesAP,
+            SimplifyQuery(DL, nullptr, &DT, AC, &CB)))
+      continue;
+
+    IRBuilder<> Builder(&CB);
+    Type *IntPtrTy = IntegerType::get(ArgValTy->getContext(), 64);
+    SmallVector<Value *, 4> DerefVals(
+        {ArgVal, ConstantInt::get(IntPtrTy, DerefBytes)});
+    SmallVector<OperandBundleDef, 2> Bundles;
+    Bundles.emplace_back("dereferenceable", std::move(DerefVals));
+
+    // Add align to same assumption unless already known as reasoning using
+    // dereferenceable often requires align.
+    Align CallerAlign = getKnownAlignment(ArgVal, DL, &CB, AC, &DT);
+    Align ParamAlign = Arg.getParamAlign().valueOrOne();
+    if (ParamAlign > CallerAlign)
+      Bundles.emplace_back(
+          "align",
+          SmallVector<Value *, 2>(
+              {ArgVal, ConstantInt::get(IntPtrTy, ParamAlign.value())}));
+
+    CallInst *NewAsmp = Builder.CreateAssumption(Bundles);
+    AC->registerAssumption(cast<AssumeInst>(NewAsmp));
+  }
+}
+
 static void HandleByValArgumentInit(Type *ByValType, Value *Dst, Value *Src,
                                     MaybeAlign SrcAlign, Module *M,
                                     BasicBlock *InsertBlock,
@@ -2832,6 +2904,7 @@ void llvm::InlineFunctionImpl(CallBase &CB, InlineFunctionInfo &IFI,
     // instructions are actually cloned into the caller so that we can easily
     // check what will be known at the start of the inlined code.
     AddAlignmentAssumptions(CB, IFI);
+    AddDereferenceableAssumptions(CB, IFI);
 
     AssumptionCache *AC =
         IFI.GetAssumptionCache ? &IFI.GetAssumptionCache(*Caller) : nullptr;
