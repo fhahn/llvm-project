@@ -1706,10 +1706,10 @@ llvm::getPtrStride(PredicatedScalarEvolution &PSE, Type *AccessTy, Value *Ptr,
   return Stride;
 }
 
-std::optional<uint64_t> llvm::getBoundedAccessBound(const SCEV *PtrSCEV,
-                                                    Type *AccessTy,
-                                                    const Loop *L,
-                                                    ScalarEvolution &SE) {
+std::optional<BoundedAccess> llvm::matchBoundedAccess(const SCEV *PtrSCEV,
+                                                      Type *AccessTy,
+                                                      const Loop *L,
+                                                      ScalarEvolution &SE) {
   if (AccessTy->isScalableTy())
     return std::nullopt;
 
@@ -1735,7 +1735,8 @@ std::optional<uint64_t> llvm::getBoundedAccessBound(const SCEV *PtrSCEV,
   unsigned NarrowWidth = SE.getTypeSizeInBits(Start->getType());
   if (NarrowWidth == 0 || NarrowWidth >= 64)
     return std::nullopt;
-  return uint64_t(1) << NarrowWidth;
+  uint64_t Bound = uint64_t(1) << NarrowWidth;
+  return BoundedAccess{Bound, AllocSize, Base};
 }
 
 std::optional<int64_t> llvm::getPointersDiff(Type *ElemTyA, Value *PtrA,

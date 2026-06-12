@@ -919,13 +919,33 @@ getPtrStride(PredicatedScalarEvolution &PSE, Type *AccessTy, Value *Ptr,
              const DenseMap<Value *, const SCEV *> &StridesMap, bool Assume,
              bool ShouldCheckWrap = true);
 
+/// Result of matching a bounded (i % 2^N) access pattern in a loop.
+struct BoundedAccess {
+  uint64_t Bound;     ///< 2^N for a pattern like A[i % 2^N].
+  uint64_t ElemScale; ///< GEP scale in bytes of the indexed element.
+  const SCEV *Base;   ///< Loop-invariant base SCEV (the array start).
+};
+
 /// If \p PtrSCEV is a bounded access of the form `Base + ElemSize * (i % 2^N)`
-/// where Base is loop invariant in \p L and ElemSize equals the allocation size
-/// of \p AccessTy, returns the bound 2^N.
-LLVM_ABI std::optional<uint64_t> getBoundedAccessBound(const SCEV *PtrSCEV,
-                                                       Type *AccessTy,
-                                                       const Loop *L,
-                                                       ScalarEvolution &SE);
+/// (canonical SCEV: `Base + ElemSize * zext({0,+,1}<iN>)`) where Base is loop
+/// invariant in \p L and ElemSize equals the allocation size of \p AccessTy,
+/// returns the matched description (clamp bound 2^N, element scale and base).
+/// Returns std::nullopt otherwise.
+LLVM_ABI std::optional<BoundedAccess> matchBoundedAccess(const SCEV *PtrSCEV,
+                                                         Type *AccessTy,
+                                                         const Loop *L,
+                                                         ScalarEvolution &SE);
+
+/// Convenience wrapper around \c matchBoundedAccess that returns just the
+/// clamp bound 2^N, or std::nullopt if \p PtrSCEV is not a bounded access.
+inline std::optional<uint64_t> getBoundedAccessBound(const SCEV *PtrSCEV,
+                                                     Type *AccessTy,
+                                                     const Loop *L,
+                                                     ScalarEvolution &SE) {
+  if (auto M = matchBoundedAccess(PtrSCEV, AccessTy, L, SE))
+    return M->Bound;
+  return std::nullopt;
+}
 
 /// Returns the distance between the pointers \p PtrA and \p PtrB iff they are
 /// compatible and it is possible to calculate the distance between them. This
