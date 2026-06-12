@@ -67,8 +67,8 @@ DropUnnecessaryAssumesPass::run(Function &F, FunctionAnalysisManager &FAM) {
   AssumptionCache &AC = FAM.getResult<AssumptionAnalysis>(F);
   bool Changed = false;
 
-  for (const WeakVH &Elem : AC.assumptions()) {
-    auto *Assume = cast_or_null<AssumeInst>(Elem);
+  for (unsigned I = 0, E = AC.assumptions().size(); I != E; ++I) {
+    auto *Assume = cast_or_null<AssumeInst>(AC.assumptions()[I]);
     if (!Assume)
       continue;
 
