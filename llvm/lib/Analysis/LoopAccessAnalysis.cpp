@@ -418,11 +418,44 @@ void RuntimePointerChecking::insert(Loop *Lp, Value *Ptr, const SCEV *PtrExpr,
                                     unsigned DepSetId, unsigned ASId,
                                     PredicatedScalarEvolution &PSE,
                                     bool NeedsFreeze) {
-  const SCEV *SymbolicMaxBTC = PSE.getSymbolicMaxBackedgeTakenCount();
-  const SCEV *BTC = PSE.getBackedgeTakenCount();
-  const auto &[ScStart, ScEnd] = getStartAndEndForAccess(
-      Lp, PtrExpr, AccessTy, BTC, SymbolicMaxBTC, PSE.getSE(),
-      &DC.getPointerBounds(), DC.getDT(), DC.getAC(), LoopGuards);
+  ScalarEvolution *SE = PSE.getSE();
+  const SCEV *ScStart = nullptr;
+  const SCEV *ScEnd = nullptr;
+
+  // For bounded (e.g. A[i % C]) accesses, derive a tight range directly from
+  // the modulo: [Base, Base + Scale * (Bound - 1) + ElemSize). Use the
+  // unrewritten SCEV from SE; PSE.getAsAddRec elsewhere may have rewritten
+  // PtrExpr to an AddRec form by the time this is called. Overflow is computed
+  // with overflow-checked APInt arithmetic in the index-type bitwidth; on
+  // overflow we fall back to the AddRec range from getStartAndEndForAccess.
+  if (auto Mod = matchBoundedAccess(SE->getSCEV(Ptr), AccessTy, Lp, *SE)) {
+    auto &DL = Lp->getHeader()->getDataLayout();
+    uint64_t ElemSize = DL.getTypeStoreSize(AccessTy);
+    unsigned IdxBits =
+        SE->getTypeSizeInBits(DL.getIndexType(PtrExpr->getType()));
+    // Pre-check every operand fits in IdxBits before constructing the APInts:
+    // APInt(IdxBits, V) silently truncates V, which would yield a too-small
+    // (unsound) range. Bound is capped at 128 by the matcher, so Bound - 1
+    // only overflows for a sub-7-bit index type, but check it explicitly.
+    bool Overflow = IdxBits < 64 && (Mod->ElemScale >> IdxBits ||
+                                     ElemSize >> IdxBits ||
+                                     (Mod->Bound - 1) >> IdxBits);
+    APInt EndOffset = APInt(IdxBits, Mod->ElemScale)
+                          .umul_ov(APInt(IdxBits, Mod->Bound - 1), Overflow)
+                          .uadd_ov(APInt(IdxBits, ElemSize), Overflow);
+    if (!Overflow) {
+      ScStart = Mod->Base;
+      ScEnd = SE->getAddExpr(Mod->Base, SE->getConstant(EndOffset));
+    }
+  }
+
+  if (!ScStart) {
+    const SCEV *SymbolicMaxBTC = PSE.getSymbolicMaxBackedgeTakenCount();
+    const SCEV *BTC = PSE.getBackedgeTakenCount();
+    std::tie(ScStart, ScEnd) = getStartAndEndForAccess(
+        Lp, PtrExpr, AccessTy, BTC, SymbolicMaxBTC, SE,
+        &DC.getPointerBounds(), DC.getDT(), DC.getAC(), LoopGuards);
+  }
   assert(!isa<SCEVCouldNotCompute>(ScStart) &&
          !isa<SCEVCouldNotCompute>(ScEnd) &&
          "must be able to compute both start and end expressions");
@@ -479,6 +512,24 @@ bool RuntimePointerChecking::tryToCreateDiffCheck(
   Type *SrcTy = getLoadStoreType(SrcInsts[0]);
   Type *DstTy = getLoadStoreType(SinkInsts[0]);
   if (isa<ScalableVectorType>(SrcTy) || isa<ScalableVectorType>(DstTy))
+    return false;
+
+  // A bounded (i % 2^N) access's footprint is the fixed window
+  // [Base, Base + Bound * ElemSize), not a per-iteration stride. The address
+  // SCEV stored in P.Expr can be rewritten to a narrow-type affine AddRec
+  // (e.g. {Base,+,ElemSize}<iN> wrapping every Bound iterations), which the
+  // Src/Sink match above accepts -- but its step is far smaller than the real
+  // window, so a diff check derived from it would be unsound. Fall back to the
+  // expanded start/end bound checks, which use the tight bounded range computed
+  // in RuntimePointerChecking::insert. (The matcher is run on SE->getSCEV(Ptr),
+  // the unrewritten address, to recognise the pattern regardless of the
+  // rewrite.)
+  auto IsBoundedAccess = [&](Instruction *I) {
+    Value *Ptr = getLoadStorePointerOperand(I);
+    return Ptr && getBoundedAccessBound(SE->getSCEV(Ptr), getLoadStoreType(I),
+                                        InnerLoop, *SE);
+  };
+  if (any_of(SrcInsts, IsBoundedAccess) || any_of(SinkInsts, IsBoundedAccess))
     return false;
 
   const DataLayout &DL = InnerLoop->getHeader()->getDataLayout();
@@ -1297,11 +1348,19 @@ bool AccessAnalysis::createCheckForAccess(
   }
 
   /// Check whether all pointers can participate in a runtime bounds check. They
-  /// must either be invariant or non-wrapping affine AddRecs.
+  /// must either be invariant, non-wrapping affine AddRecs, or bounded accesses
+  /// with a bounded range.
   SmallVector<const SCEVPredicate *> Predicates;
+  bool IsWrite = Access.getInt();
   for (auto &P : RTCheckPtrs) {
     // The bounds for loop-invariant pointer is trivial.
     if (SE->isLoopInvariant(P.getPointer(), TheLoop))
+      continue;
+
+    // Bounded (i % 2^N) accesses skip the AddRec/wrap-predicate path; their
+    // range is computed by RuntimePointerChecking::insert directly from the
+    // modulo bound. This applies to both loads and stores.
+    if (matchBoundedAccess(P.getPointer(), AccessTy, TheLoop, *SE))
       continue;
 
     const SCEVAddRecExpr *AR = dyn_cast<SCEVAddRecExpr>(P.getPointer());
@@ -1343,7 +1402,6 @@ bool AccessAnalysis::createCheckForAccess(
       // Each access has its own dependence set.
       DepId = RunningDepId++;
 
-    bool IsWrite = Access.getInt();
     RtCheck.insert(TheLoop, Ptr, PtrExpr, AccessTy, IsWrite, DepId, ASId, PSE,
                    NeedsFreeze);
     LLVM_DEBUG(dbgs() << "LAA: Found a runtime check ptr:" << *Ptr << '\n');
