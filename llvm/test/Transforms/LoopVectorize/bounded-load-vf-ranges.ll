@@ -396,26 +396,26 @@ define void @bounded_rmw_vf_capped(ptr noalias %A, ptr noalias %B, i32 %n) {
 ; VF8-LABEL: define void @bounded_rmw_vf_capped(
 ; VF8-SAME: ptr noalias [[A:%.*]], ptr noalias [[B:%.*]], i32 [[N:%.*]]) {
 ; VF8-NEXT:  [[ENTRY:.*]]:
-; VF8-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[N]], 8
+; VF8-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[N]], 4
 ; VF8-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; VF8:       [[VECTOR_SCEVCHECK]]:
 ; VF8-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
 ; VF8-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], 3
 ; VF8-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; VF8:       [[VECTOR_PH]]:
-; VF8-NEXT:    [[N_MOD_VF:%.*]] = urem i32 [[N]], 8
+; VF8-NEXT:    [[N_MOD_VF:%.*]] = urem i32 [[N]], 4
 ; VF8-NEXT:    [[N_VEC:%.*]] = sub i32 [[N]], [[N_MOD_VF]]
 ; VF8-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; VF8:       [[VECTOR_BODY]]:
 ; VF8-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; VF8-NEXT:    [[TMP2:%.*]] = urem i32 [[INDEX]], 4
 ; VF8-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i32, ptr [[A]], i32 [[TMP2]]
-; VF8-NEXT:    [[WIDE_LOAD:%.*]] = load <8 x i32>, ptr [[TMP3]], align 4
+; VF8-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP3]], align 4
 ; VF8-NEXT:    [[TMP4:%.*]] = getelementptr inbounds i32, ptr [[B]], i32 [[INDEX]]
-; VF8-NEXT:    [[WIDE_LOAD1:%.*]] = load <8 x i32>, ptr [[TMP4]], align 4
-; VF8-NEXT:    [[TMP5:%.*]] = add <8 x i32> [[WIDE_LOAD]], [[WIDE_LOAD1]]
-; VF8-NEXT:    store <8 x i32> [[TMP5]], ptr [[TMP3]], align 4
-; VF8-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 8
+; VF8-NEXT:    [[WIDE_LOAD1:%.*]] = load <4 x i32>, ptr [[TMP4]], align 4
+; VF8-NEXT:    [[TMP5:%.*]] = add <4 x i32> [[WIDE_LOAD]], [[WIDE_LOAD1]]
+; VF8-NEXT:    store <4 x i32> [[TMP5]], ptr [[TMP3]], align 4
+; VF8-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; VF8-NEXT:    [[TMP6:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; VF8-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
 ; VF8:       [[MIDDLE_BLOCK]]:

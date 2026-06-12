@@ -2209,6 +2209,51 @@ MemoryDepChecker::getDependenceDistanceStrideAndSize(
       BPtr->getType()->getPointerAddressSpace())
     return MemoryDepChecker::Dependence::Unknown;
 
+  // If either side is a bounded (non-monotonic) access, the constant-stride
+  // dep distance reasoning below doesn't apply: the cycle pattern is not a
+  // monotonic stride, so feeding a synthesized stride into MaxStride or the
+  // negative-stride swap would be incorrect. Two cases:
+  //  - Same SCEV on both sides (a single A[i%C] used as both load and store,
+  //    i.e. a read-modify-write): this is safe only while a single vectorized
+  //    iteration stays within one clamp window; see below.
+  //  - Different SCEVs on a bounded pair: the bounded ranges may alias, but we
+  //    can't classify statically -- request a retry with runtime checks so the
+  //    bounded bounded range can disambiguate cross-pointer cases.
+  const SCEV *APtrSCEV = SE.getSCEV(APtr);
+  const SCEV *BPtrSCEV = SE.getSCEV(BPtr);
+  std::optional<BoundedAccess> ABounded =
+      matchBoundedAccess(APtrSCEV, ATy, InnermostLoop, SE);
+  std::optional<BoundedAccess> BBounded =
+      matchBoundedAccess(BPtrSCEV, BTy, InnermostLoop, SE);
+  if (ABounded || BBounded) {
+    if (APtrSCEV == BPtrSCEV) {
+      // The same bounded address A[i % Bound] is used as both load and store
+      // (a read-modify-write). Each residue class is revisited every Bound
+      // iterations, so there is a loop-carried dependence with distance Bound:
+      // iteration i + Bound reads the value iteration i wrote. Vectorizing is
+      // therefore only safe while a single vectorized iteration (VF * UF lanes)
+      // stays within one Bound-sized window, i.e. VF * UF <= Bound; beyond that,
+      // two lanes map to the same element, both read the old value and the last
+      // store wins, dropping updates.
+      //
+      // The standard distance machinery cannot see this hazard: the
+      // per-iteration address SCEV is identical on both sides, so Sink - Src is
+      // 0 and the access would look like a width-agnostic forward dependence.
+      // Cap the safe vector width to Bound elements explicitly instead, which
+      // forces the cost model to VF <= Bound and selectInterleaveCount to
+      // IC = 1.
+      const BoundedAccess &Bounded = ABounded ? *ABounded : *BBounded;
+      uint64_t TypeByteSize =
+          std::min(DL.getTypeStoreSize(ATy), DL.getTypeStoreSize(BTy));
+      uint64_t MaxVFInBits = Bounded.Bound * TypeByteSize * 8;
+      MaxSafeVectorWidthInBits =
+          std::min(MaxSafeVectorWidthInBits, MaxVFInBits);
+      return MemoryDepChecker::Dependence::Forward;
+    }
+    ShouldRetryWithRuntimeChecks = true;
+    return MemoryDepChecker::Dependence::Unknown;
+  }
+
   SmallVector<const SCEVPredicate *> Predicates;
   std::optional<int64_t> StrideAPtr =
       getPtrStride(PSE, ATy, APtr, InnermostLoop, *DT, SymbolicStrides,

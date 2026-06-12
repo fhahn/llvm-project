@@ -176,12 +176,8 @@ define void @wider_i32_nusw_does_not_imply_narrower_i4_nusw(ptr %dst, i64 %n) {
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
 ; CHECK-NEXT:      {1,+,1}<%loop> Added Flags: <nusw>
-; CHECK-NEXT:      {0,+,1}<%loop> Added Flags: <nusw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Expressions re-written:
-; CHECK-NEXT:      [PSE] %gep.dst = getelementptr inbounds nuw i8, ptr %dst, i64 %iv.mod.zext:
-; CHECK-NEXT:        ((zext i4 {0,+,1}<%loop> to i16) + %dst)<nuw>
-; CHECK-NEXT:        --> {%dst,+,1}<%loop>
 ;
 entry:
   br label %loop
