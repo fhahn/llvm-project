@@ -438,9 +438,9 @@ void LoopVectorizationLegality::collectUnitStridePredicates() const {
 
   for (BasicBlock *BB : TheLoop->blocks())
     for (Instruction &I : *BB) {
-      // Bounded loads use the fast path; skip to avoid the wrap predicate
+      // Bounded accesses use the fast path; skip to avoid the wrap predicate
       // getPtrStride would register.
-      if (getBoundedLoadBound(&I))
+      if (getBoundedAccessBound(&I))
         continue;
       if (Value *Ptr = getLoadStorePointerOperand(&I))
         isConsecutivePtr(getLoadStoreType(&I), Ptr);
@@ -467,13 +467,40 @@ int LoopVectorizationLegality::isConsecutivePtr(Type *AccessTy,
 }
 
 std::optional<uint64_t>
-LoopVectorizationLegality::getBoundedLoadBound(Instruction *I) const {
-  auto *LI = dyn_cast<LoadInst>(I);
-  if (!LI || LAI->getNumStores() != 0)
+LoopVectorizationLegality::getBoundedAccessBound(Instruction *I) const {
+  if (!isa<LoadInst, StoreInst>(I))
     return std::nullopt;
-  Value *Ptr = LI->getPointerOperand();
-  return llvm::getBoundedAccessBound(PSE.getSCEV(Ptr), LI->getType(), TheLoop,
-                                     *PSE.getSE());
+  // Use the predicated SCEV so this matches the address SCEV that
+  // vputils::getSCEVExprForVPValue (and thus the VPlan-based bounded-access
+  // widening) sees. Any runtime predicate the address depends on is checked by
+  // the generated SCEV check, so ignoring it here would let the cost model
+  // disagree with the VPlan transform about which accesses are bounded.
+  Value *Ptr = getLoadStorePointerOperand(I);
+  std::optional<uint64_t> Bound = llvm::getBoundedAccessBound(
+      PSE.getSCEV(Ptr), getLoadStoreType(I), TheLoop, *PSE.getSE());
+  if (!Bound)
+    return std::nullopt;
+
+  // The bounded pattern matches on the address SCEV, where a fixed-order
+  // recurrence phi looks like a zext({0,+,1}<iN>) AddRec just like a narrow
+  // induction. The VPlan-based widening recovers the bound via
+  // getSCEVExprForVPValue, which cannot reconstruct that AddRec from a
+  // first-order-recurrence recipe, so it would refuse to widen and leave the
+  // access for the consecutive path. Reject such addresses here so the cost
+  // model and the transform agree on which accesses are bounded.
+  SmallVector<Value *> Worklist = {Ptr};
+  SmallPtrSet<Value *, 4> Visited;
+  while (!Worklist.empty()) {
+    auto *CurrI = dyn_cast<Instruction>(Worklist.pop_back_val());
+    if (!CurrI || !TheLoop->contains(CurrI) || !Visited.insert(CurrI).second)
+      continue;
+    if (auto *Phi = dyn_cast<PHINode>(CurrI);
+        Phi && isFixedOrderRecurrence(Phi))
+      return std::nullopt;
+    Worklist.append(CurrI->op_begin(), CurrI->op_end());
+  }
+
+  return Bound;
 }
 
 bool LoopVectorizationLegality::isInvariant(Value *V) const {

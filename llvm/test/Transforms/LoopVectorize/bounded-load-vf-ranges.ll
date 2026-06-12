@@ -305,32 +305,28 @@ define void @bounded_rmw_vf_capped(ptr noalias %A, ptr noalias %B, i32 %n) {
 ; VF2-SAME: ptr noalias [[A:%.*]], ptr noalias [[B:%.*]], i32 [[N:%.*]]) {
 ; VF2-NEXT:  [[ENTRY:.*]]:
 ; VF2-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[N]], 2
-; VF2-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
-; VF2:       [[VECTOR_SCEVCHECK]]:
-; VF2-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
-; VF2-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], 3
-; VF2-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; VF2-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; VF2:       [[VECTOR_PH]]:
 ; VF2-NEXT:    [[N_MOD_VF:%.*]] = urem i32 [[N]], 2
 ; VF2-NEXT:    [[N_VEC:%.*]] = sub i32 [[N]], [[N_MOD_VF]]
 ; VF2-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; VF2:       [[VECTOR_BODY]]:
 ; VF2-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; VF2-NEXT:    [[TMP2:%.*]] = urem i32 [[INDEX]], 4
-; VF2-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i32, ptr [[A]], i32 [[TMP2]]
-; VF2-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x i32>, ptr [[TMP3]], align 4
-; VF2-NEXT:    [[TMP4:%.*]] = getelementptr inbounds i32, ptr [[B]], i32 [[INDEX]]
-; VF2-NEXT:    [[WIDE_LOAD1:%.*]] = load <2 x i32>, ptr [[TMP4]], align 4
-; VF2-NEXT:    [[TMP5:%.*]] = add <2 x i32> [[WIDE_LOAD]], [[WIDE_LOAD1]]
-; VF2-NEXT:    store <2 x i32> [[TMP5]], ptr [[TMP3]], align 4
+; VF2-NEXT:    [[TMP0:%.*]] = urem i32 [[INDEX]], 4
+; VF2-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i32, ptr [[A]], i32 [[TMP0]]
+; VF2-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x i32>, ptr [[TMP1]], align 4
+; VF2-NEXT:    [[TMP2:%.*]] = getelementptr inbounds i32, ptr [[B]], i32 [[INDEX]]
+; VF2-NEXT:    [[WIDE_LOAD1:%.*]] = load <2 x i32>, ptr [[TMP2]], align 4
+; VF2-NEXT:    [[TMP3:%.*]] = add <2 x i32> [[WIDE_LOAD]], [[WIDE_LOAD1]]
+; VF2-NEXT:    store <2 x i32> [[TMP3]], ptr [[TMP1]], align 4
 ; VF2-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
-; VF2-NEXT:    [[TMP6:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
-; VF2-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
+; VF2-NEXT:    [[TMP4:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
+; VF2-NEXT:    br i1 [[TMP4]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
 ; VF2:       [[MIDDLE_BLOCK]]:
 ; VF2-NEXT:    [[CMP_N:%.*]] = icmp eq i32 [[N]], [[N_VEC]]
 ; VF2-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; VF2:       [[SCALAR_PH]]:
-; VF2-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i32 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ], [ 0, %[[VECTOR_SCEVCHECK]] ]
+; VF2-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i32 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ]
 ; VF2-NEXT:    br label %[[LOOP:.*]]
 ; VF2:       [[LOOP]]:
 ; VF2-NEXT:    [[IV:%.*]] = phi i32 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
@@ -351,32 +347,28 @@ define void @bounded_rmw_vf_capped(ptr noalias %A, ptr noalias %B, i32 %n) {
 ; VF4-SAME: ptr noalias [[A:%.*]], ptr noalias [[B:%.*]], i32 [[N:%.*]]) {
 ; VF4-NEXT:  [[ENTRY:.*]]:
 ; VF4-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[N]], 4
-; VF4-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
-; VF4:       [[VECTOR_SCEVCHECK]]:
-; VF4-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
-; VF4-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], 3
-; VF4-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; VF4-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; VF4:       [[VECTOR_PH]]:
 ; VF4-NEXT:    [[N_MOD_VF:%.*]] = urem i32 [[N]], 4
 ; VF4-NEXT:    [[N_VEC:%.*]] = sub i32 [[N]], [[N_MOD_VF]]
 ; VF4-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; VF4:       [[VECTOR_BODY]]:
 ; VF4-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; VF4-NEXT:    [[TMP2:%.*]] = urem i32 [[INDEX]], 4
-; VF4-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i32, ptr [[A]], i32 [[TMP2]]
-; VF4-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP3]], align 4
-; VF4-NEXT:    [[TMP4:%.*]] = getelementptr inbounds i32, ptr [[B]], i32 [[INDEX]]
-; VF4-NEXT:    [[WIDE_LOAD1:%.*]] = load <4 x i32>, ptr [[TMP4]], align 4
-; VF4-NEXT:    [[TMP5:%.*]] = add <4 x i32> [[WIDE_LOAD]], [[WIDE_LOAD1]]
-; VF4-NEXT:    store <4 x i32> [[TMP5]], ptr [[TMP3]], align 4
+; VF4-NEXT:    [[TMP0:%.*]] = urem i32 [[INDEX]], 4
+; VF4-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i32, ptr [[A]], i32 [[TMP0]]
+; VF4-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP1]], align 4
+; VF4-NEXT:    [[TMP2:%.*]] = getelementptr inbounds i32, ptr [[B]], i32 [[INDEX]]
+; VF4-NEXT:    [[WIDE_LOAD1:%.*]] = load <4 x i32>, ptr [[TMP2]], align 4
+; VF4-NEXT:    [[TMP3:%.*]] = add <4 x i32> [[WIDE_LOAD]], [[WIDE_LOAD1]]
+; VF4-NEXT:    store <4 x i32> [[TMP3]], ptr [[TMP1]], align 4
 ; VF4-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
-; VF4-NEXT:    [[TMP6:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
-; VF4-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
+; VF4-NEXT:    [[TMP4:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
+; VF4-NEXT:    br i1 [[TMP4]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
 ; VF4:       [[MIDDLE_BLOCK]]:
 ; VF4-NEXT:    [[CMP_N:%.*]] = icmp eq i32 [[N]], [[N_VEC]]
 ; VF4-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; VF4:       [[SCALAR_PH]]:
-; VF4-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i32 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ], [ 0, %[[VECTOR_SCEVCHECK]] ]
+; VF4-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i32 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ]
 ; VF4-NEXT:    br label %[[LOOP:.*]]
 ; VF4:       [[LOOP]]:
 ; VF4-NEXT:    [[IV:%.*]] = phi i32 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
@@ -397,11 +389,7 @@ define void @bounded_rmw_vf_capped(ptr noalias %A, ptr noalias %B, i32 %n) {
 ; VF8-SAME: ptr noalias [[A:%.*]], ptr noalias [[B:%.*]], i32 [[N:%.*]]) {
 ; VF8-NEXT:  [[ENTRY:.*]]:
 ; VF8-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[N]], 4
-; VF8-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
-; VF8:       [[VECTOR_SCEVCHECK]]:
-; VF8-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
-; VF8-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], 3
-; VF8-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; VF8-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; VF8:       [[VECTOR_PH]]:
 ; VF8-NEXT:    [[N_MOD_VF:%.*]] = urem i32 [[N]], 4
 ; VF8-NEXT:    [[N_VEC:%.*]] = sub i32 [[N]], [[N_MOD_VF]]
@@ -422,7 +410,7 @@ define void @bounded_rmw_vf_capped(ptr noalias %A, ptr noalias %B, i32 %n) {
 ; VF8-NEXT:    [[CMP_N:%.*]] = icmp eq i32 [[N]], [[N_VEC]]
 ; VF8-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; VF8:       [[SCALAR_PH]]:
-; VF8-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i32 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ], [ 0, %[[VECTOR_SCEVCHECK]] ]
+; VF8-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i32 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ]
 ; VF8-NEXT:    br label %[[LOOP:.*]]
 ; VF8:       [[LOOP]]:
 ; VF8-NEXT:    [[IV:%.*]] = phi i32 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]

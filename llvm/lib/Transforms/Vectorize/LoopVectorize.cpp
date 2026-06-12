@@ -874,7 +874,7 @@ public:
   enum InstWidening {
     CM_Unknown,
     CM_Widen,         // For consecutive accesses with stride +1.
-    CM_Widen_Bounded, // For bounded (i % 2^N) loads in read-only loops.
+    CM_Widen_Bounded, // For bounded (i % 2^N) loads and stores.
     CM_Widen_Reverse, // For consecutive accesses with stride -1.
     CM_Interleave,
     CM_GatherScatter,
@@ -2418,7 +2418,7 @@ bool LoopVectorizationCostModel::isScalarWithPredication(Instruction *I,
   case Instruction::Load:
   case Instruction::Store: {
     bool IsConsecutive =
-        Legal->getBoundedLoadBound(I).has_value() ||
+        Legal->getBoundedAccessBound(I) ||
         Legal->isConsecutivePtr(getLoadStoreType(I),
                                 getLoadStorePointerOperand(I)) != 0;
     return !(IsConsecutive && Config.isLegalMaskedLoadOrStore(I, VF)) &&
@@ -2670,9 +2670,9 @@ LoopVectorizationCostModel::memoryInstructionCanBeWidened(Instruction *I,
   if (isScalarWithPredication(I, VF))
     return std::nullopt;
 
-  // Widen a bounded (i % 2^N) load in a read-only loop as a consecutive
-  // vector load when VF divides the bound.
-  if (std::optional<uint64_t> Bound = Legal->getBoundedLoadBound(I);
+  // Widen a bounded (i % 2^N) load or store as a consecutive vector access
+  // when VF divides the bound.
+  if (std::optional<uint64_t> Bound = Legal->getBoundedAccessBound(I);
       Bound && VF.isFixed()) {
     if (VF.getFixedValue() <= *Bound && *Bound % VF.getFixedValue() == 0)
       return CM_Widen_Bounded;
@@ -6197,7 +6197,7 @@ VPRecipeBase *VPRecipeBuilder::tryToWidenMemory(VPInstruction *VPI,
   LoopVectorizationCostModel::InstWidening Decision =
       CM.getWideningDecision(I, Range.Start);
   assert(Decision != LoopVectorizationCostModel::CM_Widen_Bounded &&
-         "bounded loads must be widened in makeMemOpWideningDecisions");
+         "bounded accesses must be widened in makeMemOpWideningDecisions");
   bool Reverse = Decision == LoopVectorizationCostModel::CM_Widen_Reverse;
   bool Consecutive =
       Reverse || Decision == LoopVectorizationCostModel::CM_Widen;

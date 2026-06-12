@@ -7189,27 +7189,64 @@ static std::optional<int64_t> getConstantStride(VPValue *Addr, Type *AccessTy,
   return getStrideFromAddRec(AddRec, L, AccessTy, /*Ptr=*/nullptr, PSE);
 }
 
+<<<<<<< HEAD
 /// Check if \p VPI is a bounded (i % 2^N) load we can widen. This requires the
 /// vector factor to divide the bound, so that each VF-wide load stays within a
 /// single 2^N window.
 static bool canCreateBoundedLoad(VPInstruction *VPI, VFRange &Range,
                                  VPCostContext &Ctx) {
   if (VPI->getOpcode() != Instruction::Load)
+=======
+/// Check if \p VPI is a bounded (i % 2^N) load or store we can widen. This
+/// requires the vector factor to divide the bound, so that each VF-wide access
+/// stays within a single 2^N window. Note that no cap on the unroll factor is
+/// needed: each unrolled part re-derives its address as
+/// `A[(i + Part * VF) % 2^N]`, which is a multiple of VF in `[0, 2^N)`, so no
+/// part ever accesses past the window, regardless of the unroll factor.
+///
+/// Cross-pointer aliasing between the contiguous bounded window and other
+/// accesses is handled by the runtime alias checks LAA emits from the bounded
+/// range (see RuntimePointerChecking::insert), so this is valid for loops that
+/// also contain stores.
+static bool canCreateBoundedAccess(VPInstruction *VPI, VFRange &Range,
+                                   VPCostContext &Ctx) {
+  bool IsLoad = VPI->getOpcode() == Instruction::Load;
+  if (!IsLoad && VPI->getOpcode() != Instruction::Store)
+>>>>>>> db4664e0f88b ([LV] Vectorize bounded (i % 2^N) stores and loads in read-write loops)
     return false;
 
-  Type *ScalarTy = VPI->getScalarType();
+  // A bounded (i % 2^N) access is widened as a consecutive vector access over a
+  // single clamp window. This is only valid for a "regular" element type whose
+  // allocated size equals its store size; padded types (e.g. i24) match the
+  // bounded pattern below (the GEP stride is the alloc size) but cannot be
+  // packed into a vector access, so they are scalarized instead. The cost model
+  // excludes them via hasIrregularType; mirror that here so the re-derived
+  // decision stays consistent. Use the underlying instruction's access type so
+  // the element type is correct for a store (whose VPInstruction result is
+  // void), not just a load.
+  Type *ScalarTy = getLoadStoreType(VPI->getUnderlyingInstr());
   if (hasIrregularType(ScalarTy, Ctx.L->getHeader()->getDataLayout()))
     return false;
 
+<<<<<<< HEAD
   const SCEV *PtrSCEV =
       vputils::getSCEVExprForVPValue(VPI->getOperand(0), Ctx.PSE, Ctx.L);
+=======
+  // Recover the clamp window 2^N from the VPlan SCEV of the access address.
+  // The address is operand 0 for a load and operand 1 for a store (operand 0
+  // is the stored value). This uses the predicated SCEV (matching the cost
+  // model's getBoundedAccessBound), so any runtime predicate the address
+  // depends on is reflected consistently on both sides.
+  VPValue *Addr = IsLoad ? VPI->getOperand(0) : VPI->getOperand(1);
+  const SCEV *PtrSCEV = vputils::getSCEVExprForVPValue(Addr, Ctx.PSE, Ctx.L);
+>>>>>>> db4664e0f88b ([LV] Vectorize bounded (i % 2^N) stores and loads in read-write loops)
   std::optional<uint64_t> Bound =
       getBoundedAccessBound(PtrSCEV, ScalarTy, Ctx.L, *Ctx.PSE.getSE());
   if (!Bound)
     return false;
 
-  // Only widen for VFs that divide the bound, so each VF-wide load stays within
-  // a single window and does not wrap.
+  // Only widen for VFs that divide the bound, so each VF-wide access stays
+  // within a single window and does not wrap.
   auto DividesBound = [&](ElementCount VF) {
     return VF.isFixed() && VF.getFixedValue() <= *Bound &&
            *Bound % VF.getFixedValue() == 0;
@@ -7238,9 +7275,6 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
   }
 
   // Few helpers to process different kinds of memory operations.
-
-  bool LoopHasStore = any_of(
-      MemOps, [](VPInstruction *VPI) { return VPI->mayWriteToMemory(); });
 
   // To be used as argument to `VPlanTransforms::runPass` which explicitly
   // specified pass name, hence `VPlan &` parameter.
@@ -7285,9 +7319,31 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
         if (VPHistogramRecipe *Histogram = RecipeBuilder.widenIfHistogram(VPI))
           return ReplaceWith(VPI, Histogram);
 
+<<<<<<< HEAD
+=======
+        // Widen bounded (i % 2^N) accesses as a consecutive vector access over
+        // a single clamp window. The widened access reuses the original bounded
+        // address GEP, which is replicated per unrolled part to recompute
+        // `A[(i + part * VF) % 2^N]`, so no cap on the unroll factor is needed.
+        if (canCreateBoundedAccess(VPI, Range, CostCtx)) {
+          auto *I = VPI->getUnderlyingInstr();
+          VPValue *Mask = CostCtx.isMaskRequired(I) ? VPI->getMask() : nullptr;
+          VPRecipeBase *AccessR;
+          if (auto *Load = dyn_cast<LoadInst>(I))
+            AccessR = new VPWidenLoadRecipe(*Load, VPI->getOperand(0), Mask,
+                                            /*Consecutive=*/true, *VPI,
+                                            Load->getDebugLoc());
+          else
+            AccessR = new VPWidenStoreRecipe(
+                cast<StoreInst>(*I), VPI->getOperand(1), VPI->getOperand(0),
+                Mask, /*Consecutive=*/true, *VPI, I->getDebugLoc());
+          return ReplaceWith(VPI, AccessR);
+        }
+
+>>>>>>> db4664e0f88b ([LV] Vectorize bounded (i % 2^N) stores and loads in read-write loops)
         return false;
       });
-
+t reba
   // Filter out scalar VPlan for the remaining memory operations.
   if (LoopVectorizationPlanner::getDecisionAndClampRange(
           [](ElementCount VF) { return VF.isScalar(); }, Range))
