@@ -5891,10 +5891,8 @@ static bool isRealignSafeBody(VPBasicBlock *Header, ElementCount VF,
     // The latch terminator is rebuilt by applyRealignSnapshot.
     if (match(&R, m_Branch()))
       continue;
-    // VPDerivedIV (runtime-start address IV) is enabled by a follow-up;
-    // VPVectorEndPointer is a reverse access, but the coverage math and
-    // alignment reasoning assume a forward IV.
-    if (isa<VPDerivedIVRecipe, VPVectorEndPointerRecipe>(&R))
+    // Reverse accesses: coverage math and alignment assume a forward IV.
+    if (isa<VPVectorEndPointerRecipe>(&R))
       return false;
     // Profitability: admit only cheap recipes (invalid cost compares > 1).
     if (R.cost(VF, Ctx) > 1)
