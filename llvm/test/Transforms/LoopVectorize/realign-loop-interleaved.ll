@@ -133,19 +133,19 @@ define void @realign_overaligned_interleaved(ptr noalias %dst, ptr noalias %src)
 ; UF2-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], 40
 ; UF2-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
 ; UF2:       [[MIDDLE_BLOCK]]:
-; UF2-NEXT:    br label %[[SCALAR_PH:.*]]
-; UF2:       [[SCALAR_PH]]:
-; UF2-NEXT:    br label %[[LOOP:.*]]
-; UF2:       [[LOOP]]:
-; UF2-NEXT:    [[IV:%.*]] = phi i64 [ 40, %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
-; UF2-NEXT:    [[GEP_SRC:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[IV]]
-; UF2-NEXT:    [[V:%.*]] = load i32, ptr [[GEP_SRC]], align 32
-; UF2-NEXT:    [[INC:%.*]] = add i32 [[V]], 1
-; UF2-NEXT:    [[GEP_DST:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[IV]]
-; UF2-NEXT:    store i32 [[INC]], ptr [[GEP_DST]], align 32
-; UF2-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 1
-; UF2-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], 45
-; UF2-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[LOOP]], !llvm.loop [[LOOP4:![0-9]+]]
+; UF2-NEXT:    br label %[[VECTOR_REALIGN_PH:.*]]
+; UF2:       [[VECTOR_REALIGN_PH]]:
+; UF2-NEXT:    br label %[[VECTOR_BODY2:.*]]
+; UF2:       [[VECTOR_BODY2]]:
+; UF2-NEXT:    [[INDEX3:%.*]] = phi i64 [ 37, %[[VECTOR_REALIGN_PH]] ], [ [[INDEX_NEXT5:%.*]], %[[VECTOR_BODY2]] ]
+; UF2-NEXT:    [[TMP7:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[INDEX3]]
+; UF2-NEXT:    [[WIDE_LOAD4:%.*]] = load <4 x i32>, ptr [[TMP7]], align 4
+; UF2-NEXT:    [[TMP8:%.*]] = add <4 x i32> [[WIDE_LOAD4]], splat (i32 1)
+; UF2-NEXT:    [[TMP9:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[INDEX3]]
+; UF2-NEXT:    store <4 x i32> [[TMP8]], ptr [[TMP9]], align 4
+; UF2-NEXT:    [[INDEX_NEXT5]] = add nuw i64 [[INDEX3]], 4
+; UF2-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[INDEX_NEXT5]], 45
+; UF2-NEXT:    br i1 [[TMP10]], label %[[EXIT:.*]], label %[[VECTOR_BODY2]]
 ; UF2:       [[EXIT]]:
 ; UF2-NEXT:    ret void
 ;
@@ -181,19 +181,19 @@ define void @realign_overaligned_interleaved(ptr noalias %dst, ptr noalias %src)
 ; UF4-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[INDEX_NEXT]], 32
 ; UF4-NEXT:    br i1 [[TMP12]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
 ; UF4:       [[MIDDLE_BLOCK]]:
-; UF4-NEXT:    br label %[[SCALAR_PH:.*]]
-; UF4:       [[SCALAR_PH]]:
-; UF4-NEXT:    br label %[[LOOP:.*]]
-; UF4:       [[LOOP]]:
-; UF4-NEXT:    [[IV:%.*]] = phi i64 [ 32, %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
-; UF4-NEXT:    [[GEP_SRC:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[IV]]
-; UF4-NEXT:    [[V:%.*]] = load i32, ptr [[GEP_SRC]], align 32
-; UF4-NEXT:    [[INC:%.*]] = add i32 [[V]], 1
-; UF4-NEXT:    [[GEP_DST:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[IV]]
-; UF4-NEXT:    store i32 [[INC]], ptr [[GEP_DST]], align 32
-; UF4-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 1
-; UF4-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], 45
-; UF4-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[LOOP]], !llvm.loop [[LOOP4:![0-9]+]]
+; UF4-NEXT:    br label %[[VECTOR_REALIGN_PH:.*]]
+; UF4:       [[VECTOR_REALIGN_PH]]:
+; UF4-NEXT:    br label %[[VECTOR_BODY4:.*]]
+; UF4:       [[VECTOR_BODY4]]:
+; UF4-NEXT:    [[INDEX5:%.*]] = phi i64 [ 29, %[[VECTOR_REALIGN_PH]] ], [ [[INDEX_NEXT7:%.*]], %[[VECTOR_BODY4]] ]
+; UF4-NEXT:    [[TMP13:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[INDEX5]]
+; UF4-NEXT:    [[WIDE_LOAD6:%.*]] = load <4 x i32>, ptr [[TMP13]], align 4
+; UF4-NEXT:    [[TMP14:%.*]] = add <4 x i32> [[WIDE_LOAD6]], splat (i32 1)
+; UF4-NEXT:    [[TMP15:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[INDEX5]]
+; UF4-NEXT:    store <4 x i32> [[TMP14]], ptr [[TMP15]], align 4
+; UF4-NEXT:    [[INDEX_NEXT7]] = add nuw i64 [[INDEX5]], 4
+; UF4-NEXT:    [[TMP16:%.*]] = icmp eq i64 [[INDEX_NEXT7]], 45
+; UF4-NEXT:    br i1 [[TMP16]], label %[[EXIT:.*]], label %[[VECTOR_BODY4]]
 ; UF4:       [[EXIT]]:
 ; UF4-NEXT:    ret void
 ;

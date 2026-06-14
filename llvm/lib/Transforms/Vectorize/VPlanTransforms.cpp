@@ -5901,12 +5901,6 @@ static bool isRealignSafeBody(VPBasicBlock *Header, ElementCount VF,
       // Only consecutive (forward) widen loads/stores can be replayed.
       if (!Mem->isConsecutive())
         return false;
-      // The realign start is generally non-VF-aligned, so only natural element
-      // alignment is sound; over-alignment is enabled by a follow-up.
-      Instruction &I = Mem->getIngredient();
-      if (!isAligned(Mem->getAlign(),
-                     I.getDataLayout().getTypeStoreSize(getLoadStoreType(&I))))
-        return false;
       bool IsLoad = isa<VPWidenLoadRecipe, VPWidenLoadEVLRecipe>(&R);
       // A load after a store would observe writes from a previous iteration.
       if (IsLoad && SeenStore)
@@ -6022,6 +6016,24 @@ VPRegionBlock *VPlanTransforms::prepareRealignSnapshot(
   VPBlockUtils::remapOperands(MainRegion->getEntry(), Snapshot->getEntry(),
                               Old2New);
   Snapshot->setName("vector.realign.region");
+
+  // Downgrade alignment on the cloned memory recipes. The main loop accesses
+  // at index k*VF (so its recipes may claim up to VF*EltSize, or more for an
+  // over-aligned base). The realign loop instead starts at TC - K*VF, an index
+  // that is generally not VF-aligned, so only the element's natural alignment
+  // is sound. Without this, an over-claimed alignment (e.g. align 32 on a load
+  // that is actually only element-aligned) is a miscompile. The main loop's
+  // recipes keep their original alignment.
+  for (VPRecipeBase &R : *cast<VPBasicBlock>(Snapshot->getEntry())) {
+    auto *MemR = dyn_cast<VPWidenMemoryRecipe>(&R);
+    if (!MemR)
+      continue;
+    Instruction &I = MemR->getIngredient();
+    uint64_t EltBytes =
+        I.getDataLayout().getTypeStoreSize(getLoadStoreType(&I));
+    MemR->setAlignment(commonAlignment(MemR->getAlign(), EltBytes));
+  }
+
   return Snapshot;
 }
 

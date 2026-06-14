@@ -3787,6 +3787,9 @@ public:
   /// Returns the alignment of the memory access.
   Align getAlign() const { return Alignment; }
 
+  /// Update the alignment of the memory access.
+  void setAlignment(Align A) { Alignment = A; }
+
   /// Return the cost of this VPWidenMemoryRecipe.
   InstructionCost computeCost(ElementCount VF, VPCostContext &Ctx) const;
 

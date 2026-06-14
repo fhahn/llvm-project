@@ -428,19 +428,19 @@ define void @realign_overaligned_load(ptr noalias %dst, ptr noalias %src) {
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq i64 [[INDEX_NEXT]], 32
 ; CHECK-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP14:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    br label %[[SCALAR_PH:.*]]
-; CHECK:       [[SCALAR_PH]]:
-; CHECK-NEXT:    br label %[[LOOP:.*]]
-; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 32, %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
-; CHECK-NEXT:    [[GEP_SRC:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[IV]]
-; CHECK-NEXT:    [[V:%.*]] = load i32, ptr [[GEP_SRC]], align 16
-; CHECK-NEXT:    [[INC:%.*]] = add i32 [[V]], 1
-; CHECK-NEXT:    [[GEP_DST:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[IV]]
-; CHECK-NEXT:    store i32 [[INC]], ptr [[GEP_DST]], align 16
-; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 1
-; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], 34
-; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[LOOP]], !llvm.loop [[LOOP15:![0-9]+]]
+; CHECK-NEXT:    br label %[[VECTOR_REALIGN_PH:.*]]
+; CHECK:       [[VECTOR_REALIGN_PH]]:
+; CHECK-NEXT:    br label %[[VECTOR_BODY1:.*]]
+; CHECK:       [[VECTOR_BODY1]]:
+; CHECK-NEXT:    [[INDEX2:%.*]] = phi i64 [ 30, %[[VECTOR_REALIGN_PH]] ], [ [[INDEX_NEXT4:%.*]], %[[VECTOR_BODY1]] ]
+; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[INDEX2]]
+; CHECK-NEXT:    [[WIDE_LOAD3:%.*]] = load <4 x i32>, ptr [[TMP4]], align 4
+; CHECK-NEXT:    [[TMP5:%.*]] = add <4 x i32> [[WIDE_LOAD3]], splat (i32 1)
+; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[INDEX2]]
+; CHECK-NEXT:    store <4 x i32> [[TMP5]], ptr [[TMP6]], align 4
+; CHECK-NEXT:    [[INDEX_NEXT4]] = add nuw i64 [[INDEX2]], 4
+; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[INDEX_NEXT4]], 34
+; CHECK-NEXT:    br i1 [[TMP7]], label %[[EXIT:.*]], label %[[VECTOR_BODY1]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void
 ;
