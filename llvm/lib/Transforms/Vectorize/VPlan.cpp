@@ -1024,12 +1024,16 @@ void VPlan::execute(VPTransformState *State) {
   State->CFG.DTU.flush();
 
   // Fix the latch (backedge) value of all header phis in all loop headers.
-  for (VPBlockBase *VPB : vp_depth_first_shallow(getEntry())) {
-    if (!VPBlockUtils::isHeader(VPB, State->VPDT))
+  fixupHeaderPhiBackedges(*State);
+}
+
+void VPlan::fixupHeaderPhiBackedges(VPTransformState &State) {
+  for (VPBlockBase *VPB : vp_depth_first_shallow(State.Plan->getEntry())) {
+    if (!VPBlockUtils::isHeader(VPB, State.VPDT))
       continue;
     auto *Header = cast<VPBasicBlock>(VPB);
     auto *LatchVPBB = cast<VPBasicBlock>(Header->getPredecessors()[1]);
-    BasicBlock *VectorLatchBB = State->CFG.VPBB2IRBB[LatchVPBB];
+    BasicBlock *VectorLatchBB = State.CFG.VPBB2IRBB[LatchVPBB];
 
     for (VPRecipeBase &R : Header->phis()) {
       auto *PhiR = cast<VPSingleDefRecipe>(&R);
@@ -1037,8 +1041,8 @@ void VPlan::execute(VPTransformState *State) {
           isa<VPPhi>(PhiR) || (isa<VPReductionPHIRecipe>(PhiR) &&
                                cast<VPReductionPHIRecipe>(PhiR)->isInLoop());
 
-      Value *Phi = State->get(PhiR, NeedsScalar);
-      Value *Val = State->get(PhiR->getOperand(1), NeedsScalar);
+      Value *Phi = State.get(PhiR, NeedsScalar);
+      Value *Val = State.get(PhiR->getOperand(1), NeedsScalar);
       cast<PHINode>(Phi)->addIncoming(Val, VectorLatchBB);
     }
   }

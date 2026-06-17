@@ -4859,6 +4859,11 @@ public:
   /// Generate the IR code for this VPlan.
   void execute(VPTransformState *State);
 
+  /// Add the backedge (latch) incoming value to the canonical, reduction and
+  /// first-order recurrence phis in all loop headers of \p State.Plan, after
+  /// the loop body has been generated into IR via \p State.
+  static void fixupHeaderPhiBackedges(VPTransformState &State);
+
   /// Return the cost of this plan.
   InstructionCost cost(ElementCount VF, VPCostContext &Ctx);
 
