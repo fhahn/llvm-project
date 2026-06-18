@@ -203,6 +203,12 @@ public:
   /// Returns the type of this VPValue when widened to \p VF.
   Type *getWideType(ElementCount VF) const;
 
+  /// Returns the widening factor for this value at plan vectorization factor \p
+  /// VF: the element count of its result type when that type is an explicit
+  /// vector widening beyond the plan's VF (see getWideType), or \p VF itself in
+  /// the common case.
+  ElementCount getWideningVF(ElementCount VF) const;
+
   /// Returns true if this VPValue is defined by a recipe.
   bool hasDefiningRecipe() const { return getDefiningRecipe(); }
 
@@ -337,7 +343,9 @@ class VPRecipeValue : public VPValue {
   friend class VPValue;
   friend class VPDef;
 
-  /// The scalar type of the value produced by this recipe.
+  /// The type of the value produced by this recipe. It is either the scalar
+  /// type, which gets implicitly widened to the plan's VF, or a concrete vector
+  /// type (see VPValue::getWideType).
   Type *Ty = nullptr;
 
 #if !defined(NDEBUG)
@@ -354,8 +362,14 @@ protected:
 public:
   LLVM_ABI_FOR_TEST virtual ~VPRecipeValue() = 0;
 
-  /// Returns the scalar type of this VPRecipeValue.
-  Type *getScalarType() const { return Ty; }
+  /// Returns the scalar type of this VPRecipeValue, i.e. the element type of
+  /// its result type if the result has been widened to an explicit vector type.
+  Type *getScalarType() const { return Ty ? Ty->getScalarType() : nullptr; }
+
+  /// Returns the result type of this VPRecipeValue: the scalar type in the
+  /// common case, or a vector type if the result is widened to a fixed width
+  /// other than the plan's VF (see VPValue::getWideType).
+  Type *getResultType() const { return Ty; }
 
   static bool classof(const VPValue *V) {
     return V->getVPValueID() == VPVMultiDefValueSC ||

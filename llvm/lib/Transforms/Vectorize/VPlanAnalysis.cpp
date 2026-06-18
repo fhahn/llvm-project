@@ -267,6 +267,11 @@ llvm::calculateRegisterUsageForPlan(VPlan &Plan, ArrayRef<ElementCount> VFs,
                               << " to " << VF << " for " << *R << "\n";);
           }
 
+          // Recipes widened beyond the plan's VF (e.g. narrowed interleave
+          // groups, see VPValue::getWideType) occupy registers for their wider
+          // type, not the plan's VF.
+          VF = VPV->getWideningVF(VF);
+
           Type *ScalarTy = VPV->getScalarType();
           unsigned ClassID = TTI.getRegisterClassForType(true, ScalarTy);
           RegUsage[ClassID] += GetRegUsage(ScalarTy, VF);
