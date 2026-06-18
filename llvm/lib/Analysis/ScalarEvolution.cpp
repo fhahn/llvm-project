@@ -7110,8 +7110,27 @@ const ConstantRange &ScalarEvolution::getRangeRef(
                 getRangeRef(Start, SignHint, Depth + 1);
             ConstantRange ExitRange =
                 getRangeRef(ExitValue, SignHint, Depth + 1);
-            ConservativeResult = ConservativeResult.intersectWith(
-                StartRange.unionWith(ExitRange), RangeType);
+            ConstantRange RangeBetween = StartRange.unionWith(ExitRange);
+            // The monotonicity reasoning only bounds the sequence by the
+            // [Start, Exit] interval if that interval does not wrap around
+            // and Start and Exit lie on the expected side of each other for
+            // the proven direction (mirroring the affine
+            // getRangeForAffineNoSelfWrappingAR reasoning). Otherwise the hull
+            // could exclude values the recurrence actually takes.
+            const bool IsSigned = SignHint == HINT_RANGE_SIGNED;
+            bool IsWrappedSet = IsSigned ? RangeBetween.isSignWrappedSet()
+                                         : RangeBetween.isWrappedSet();
+            ICmpInst::Predicate LEPred =
+                IsSigned ? ICmpInst::ICMP_SLE : ICmpInst::ICMP_ULE;
+            ICmpInst::Predicate GEPred =
+                IsSigned ? ICmpInst::ICMP_SGE : ICmpInst::ICMP_UGE;
+            if (!IsWrappedSet &&
+                ((MonotonicInc &&
+                  isKnownPredicateViaConstantRanges(LEPred, Start, ExitValue)) ||
+                 (MonotonicDec &&
+                  isKnownPredicateViaConstantRanges(GEPred, Start, ExitValue))))
+              ConservativeResult =
+                  ConservativeResult.intersectWith(RangeBetween, RangeType);
           }
         }
       }
