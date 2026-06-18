@@ -371,6 +371,14 @@ public:
   /// other than the plan's VF (see VPValue::getWideType).
   Type *getResultType() const { return Ty; }
 
+  /// Makes the vector type of this VPRecipeValue's result explicit, widening it
+  /// to \p VF elements instead of the plan's VF (see VPValue::getWideType).
+  /// Only valid while the result type is still scalar.
+  void materializeVectorType(ElementCount VF) {
+    assert(Ty && !Ty->isVectorTy() && "result type is already a vector");
+    Ty = VectorType::get(Ty, VF);
+  }
+
   static bool classof(const VPValue *V) {
     return V->getVPValueID() == VPVMultiDefValueSC ||
            V->getVPValueID() == VPVSingleDefValueSC;
