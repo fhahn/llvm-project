@@ -1395,7 +1395,7 @@ public:
   VP_CLASSOF_IMPL(VPRecipeBase::VPInstructionSC)
 
   VPInstruction *clone() override {
-    return cloneWithOperands(operands(), getScalarType());
+    return cloneWithOperands(operands(), getResultType());
   }
 
   VPInstruction *cloneWithOperands(ArrayRef<VPValue *> NewOperands,
@@ -1576,8 +1576,6 @@ public:
   /// Return the cost of this VPInstruction.
   InstructionCost computeCost(ElementCount VF,
                               VPCostContext &Ctx) const override;
-
-  Type *getResultType() const { return getScalarType(); }
 
   /// Cast recipes always use scalars of their operand.
   bool usesScalars(const VPValue *Op) const override {
@@ -1830,10 +1828,16 @@ public:
   VPWidenRecipe *clone() override { return cloneWithOperands(operands()); }
 
   VPWidenRecipe *cloneWithOperands(ArrayRef<VPValue *> NewOperands) {
+    VPWidenRecipe *Copy;
     if (auto *UV = getUnderlyingValue())
-      return new VPWidenRecipe(*cast<Instruction>(UV), NewOperands, *this,
+      Copy = new VPWidenRecipe(*cast<Instruction>(UV), NewOperands, *this,
                                *this, getDebugLoc());
-    return new VPWidenRecipe(Opcode, NewOperands, *this, *this, getDebugLoc());
+    else
+      Copy =
+          new VPWidenRecipe(Opcode, NewOperands, *this, *this, getDebugLoc());
+    if (getResultType()->isVectorTy())
+      Copy->setResultType(getResultType());
+    return Copy;
   }
 
   VP_CLASSOF_IMPL(VPRecipeBase::VPWidenSC)
@@ -1889,9 +1893,11 @@ public:
   ~VPWidenCastRecipe() override = default;
 
   VPWidenCastRecipe *clone() override {
-    return new VPWidenCastRecipe(Opcode, getOperand(0), getScalarType(),
-                                 cast_or_null<CastInst>(getUnderlyingValue()),
-                                 *this, *this, getDebugLoc());
+    auto *Copy =
+        new VPWidenCastRecipe(Opcode, getOperand(0), getResultType(),
+                              cast_or_null<CastInst>(getUnderlyingValue()),
+                              *this, *this, getDebugLoc());
+    return Copy;
   }
 
   VP_CLASSOF_IMPL(VPRecipeBase::VPWidenCastSC)
@@ -3792,8 +3798,11 @@ struct LLVM_ABI_FOR_TEST VPWidenLoadRecipe final : public VPSingleDefRecipe,
   }
 
   VPWidenLoadRecipe *clone() override {
-    return new VPWidenLoadRecipe(cast<LoadInst>(Ingredient), getAddr(),
-                                 getMask(), Consecutive, *this, getDebugLoc());
+    auto *Copy =
+        new VPWidenLoadRecipe(cast<LoadInst>(Ingredient), getAddr(), getMask(),
+                              Consecutive, *this, getDebugLoc());
+    Copy->setResultType(getResultType());
+    return Copy;
   }
 
   VP_CLASSOF_IMPL(VPRecipeBase::VPWidenLoadSC);

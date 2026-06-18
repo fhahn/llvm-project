@@ -879,8 +879,12 @@ Value *VPInstruction::generate(VPTransformState &State) {
     return Br;
   }
   case VPInstruction::Broadcast: {
+    // Broadcast to the recipe's result width: an explicit vector result type
+    // (e.g. for a narrowed interleave group wider than the plan's VF) overrides
+    // the plan's VF.
     return Builder.CreateVectorSplat(
-        State.VF, State.get(getOperand(0), /*IsScalar*/ true), "broadcast");
+        getWideningVF(State.VF), State.get(getOperand(0), /*IsScalar*/ true),
+        "broadcast");
   }
   case VPInstruction::BuildStructVector: {
     // For struct types, we need to build a new 'wide' struct type, where each

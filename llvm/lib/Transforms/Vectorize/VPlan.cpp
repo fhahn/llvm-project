@@ -161,8 +161,24 @@ Type *VPValue::getScalarType() const {
   llvm_unreachable("Unhandled VPValue subclass");
 }
 
+Type *VPRecipeValue::getScalarType() const {
+  // Ty is the result type, which may be a vector if the result has been widened
+  // beyond the plan's VF (see setResultType); return its element type.
+  return Ty ? Ty->getScalarType() : nullptr;
+}
+
 Type *VPValue::getWideType(ElementCount VF) const {
-  return toVectorTy(getScalarType(), VF);
+  // A recipe value may carry an explicit result type that is already a vector
+  // wider than the plan's VF (e.g. a narrowed interleave group whose members
+  // form a single wider vector). getWideningVF returns that wider factor.
+  return toVectorTy(getScalarType(), getWideningVF(VF));
+}
+
+ElementCount VPValue::getWideningVF(ElementCount VF) const {
+  if (const auto *RV = dyn_cast<VPRecipeValue>(this))
+    if (auto *VecTy = dyn_cast_if_present<VectorType>(RV->getResultType()))
+      return VecTy->getElementCount();
+  return VF;
 }
 
 VPRecipeValue::~VPRecipeValue() {

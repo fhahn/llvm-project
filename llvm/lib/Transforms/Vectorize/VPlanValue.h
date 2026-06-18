@@ -203,6 +203,12 @@ public:
   /// Returns the type of this VPValue when widened to \p VF.
   Type *getWideType(ElementCount VF) const;
 
+  /// Returns the widening factor for this value at plan vectorization factor \p
+  /// VF: the element count of its result type when that type is an explicit
+  /// vector widening beyond the plan's VF (see getWideType and
+  /// VPRecipeValue::setResultType), or \p VF itself in the common case.
+  ElementCount getWideningVF(ElementCount VF) const;
+
   /// Returns true if this VPValue is defined by a recipe.
   bool hasDefiningRecipe() const { return getDefiningRecipe(); }
 
@@ -337,7 +343,9 @@ class VPRecipeValue : public VPValue {
   friend class VPValue;
   friend class VPDef;
 
-  /// The scalar type of the value produced by this recipe.
+  /// The type of the value produced by this recipe. It either stores the scalar
+  /// type (which gets implicitly widened to the Plan's VF) or to a concrete
+  /// vector type.
   Type *Ty = nullptr;
 
 #if !defined(NDEBUG)
@@ -354,8 +362,20 @@ protected:
 public:
   LLVM_ABI_FOR_TEST virtual ~VPRecipeValue() = 0;
 
-  /// Returns the scalar type of this VPRecipeValue.
-  Type *getScalarType() const { return Ty; }
+  /// Returns the scalar element type of this VPRecipeValue (the element type of
+  /// the result type if it has been widened, see setResultType).
+  Type *getScalarType() const;
+
+  /// Returns the result type of this VPRecipeValue: the scalar type in the
+  /// common case, or a vector type if the result is widened to a fixed width
+  /// other than the plan's VF (see setResultType and VPValue::getWideType).
+  Type *getResultType() const { return Ty; }
+
+  /// Sets the result type of this VPRecipeValue to \p T, which may be a vector
+  /// type to widen the result to a fixed width other than the plan's VF (see
+  /// VPValue::getWideType). \p T's scalar type must match the current scalar
+  /// type.
+  void setResultType(Type *T) { Ty = T; }
 
   static bool classof(const VPValue *V) {
     return V->getVPValueID() == VPVMultiDefValueSC ||
