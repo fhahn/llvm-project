@@ -350,6 +350,13 @@ cl::opt<bool> llvm::EnableVPlanNativePath(
     cl::desc("Enable VPlan-native vectorization path with "
              "support for outer loop vectorization."));
 
+static cl::opt<bool> DisableOuterLoopMemorySafetyCheck(
+    "disable-outer-loop-memory-safety-check", cl::Hidden, cl::init(false),
+    cl::desc("Skip the VPlan-native outer-loop memory-safety check. "
+             "Expert use only: enabling this may miscompile or crash on "
+             "loops with cross-iteration memory dependencies or "
+             "side-effecting instructions."));
+
 cl::opt<bool>
     llvm::VerifyEachVPlan("vplan-verify-each",
 #ifdef EXPENSIVE_CHECKS
@@ -6622,6 +6629,17 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
   assert((IsInnerLoop ||
           verifyOuterLoopInnerIVsAreCanonical(*VPlan0, PSE, OrigLoop)) &&
          "inner loop IV not recognized as canonical on VPlan");
+
+  // Check memory safety for outer loop vectorization. Can be bypassed with
+  // -disable-outer-loop-memory-safety-check for expert use.
+  if (!IsInnerLoop && !DisableOuterLoopMemorySafetyCheck &&
+      !verifyOuterLoopMemorySafety(*VPlan0, PSE, OrigLoop)) {
+    reportVectorizationFailure(
+        "Unsafe memory dependencies in outer loop",
+        "cannot vectorize outer loop with unsafe memory dependencies",
+        "UnsafeMemDepsOuterLoop", ORE, OrigLoop);
+    return nullptr;
+  }
 
   // Add surviving induction predicates to PSE and check constraints.
   bool ForceVectorization = Hints.getForce() == LoopVectorizeHints::FK_Enabled;

@@ -51,6 +51,11 @@ const SCEV *getSCEVExprForVPValue(
     const DenseMap<const VPBasicBlock *, const Loop *> *HeaderVPBBToLoop =
         nullptr);
 
+/// Return the VPValue that represents the base pointer feeding \p Ptr by
+/// stripping VPInstruction GEP recipes. Returns the input unchanged if \p
+/// Ptr is not a GEP chain.
+const VPValue *getUnderlyingObject(const VPValue *Ptr);
+
 /// Returns true if \p Addr is an address SCEV that can be passed to
 /// TTI::getAddressComputationCost, i.e. the address SCEV is loop invariant, an
 /// affine AddRec (i.e. induction ), or an add expression of such operands or a

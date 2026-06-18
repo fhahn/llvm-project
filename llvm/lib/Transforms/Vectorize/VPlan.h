@@ -1522,6 +1522,12 @@ public:
   /// Set the symbolic name for the VPInstruction.
   void setName(StringRef NewName) { Name = NewName.str(); }
 
+  /// For a Call VPInstruction, return the called function, or nullptr if
+  /// the operands do not carry a Function (e.g. an indirect call). The
+  /// function is encoded as a VPIRValue operand at either the last position
+  /// (unmasked call) or the second-to-last position (masked call).
+  Function *getCalledFunction() const;
+
 protected:
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   /// Print the VPInstruction to \p O.

@@ -616,6 +616,23 @@ VPInstruction::VPInstruction(unsigned Opcode, ArrayRef<VPValue *> Operands,
          "number of operands does not match opcode");
 }
 
+Function *VPInstruction::getCalledFunction() const {
+  if (getOpcode() != Instruction::Call || getNumOperands() == 0)
+    return nullptr;
+  unsigned NumOps = getNumOperands();
+  // Look at the last operand first (unmasked call), fall back to the
+  // second-to-last (masked call). Either way, the operand must be a
+  // VPIRValue carrying a Function.
+  for (unsigned Idx : {NumOps - 1, NumOps >= 2 ? NumOps - 2 : NumOps}) {
+    if (Idx >= NumOps)
+      continue;
+    if (auto *Op = dyn_cast<VPIRValue>(getOperand(Idx)))
+      if (auto *F = dyn_cast<Function>(Op->getValue()))
+        return F;
+  }
+  return nullptr;
+}
+
 unsigned VPInstruction::getNumOperandsForOpcode() const {
   if (Instruction::isUnaryOp(Opcode) || Instruction::isCast(Opcode))
     return 1;
@@ -1643,8 +1660,7 @@ bool VPInstruction::opcodeMayReadOrWriteFromMemory() const {
   case VPInstruction::Unpack:
     return false;
   case Instruction::Call:
-    return !getCalledFunction(ArrayRef<VPValue *>(op_begin(), op_end()))
-                ->doesNotAccessMemory();
+    return !getCalledFunction()->doesNotAccessMemory();
   default:
     return true;
   }

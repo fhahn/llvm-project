@@ -1862,7 +1862,8 @@ bool LoopVectorizationLegality::canVectorize(bool UseVPlanNativePath) {
   bool DoExtraAnalysis = ORE->allowExtraAnalysis(DEBUG_TYPE);
   // Check whether the loop-related control flow in the loop nest is expected by
   // vectorizer.
-  if (!canVectorizeLoopNestCFG(TheLoop, UseVPlanNativePath)) {
+  if (!canVectorizeLoopNestCFG(TheLoop,
+                               UseVPlanNativePath || !TheLoop->isInnermost())) {
     if (DoExtraAnalysis) {
       LLVM_DEBUG(dbgs() << "LV: legality check failed: loop nest");
       Result = false;

@@ -28,6 +28,17 @@ bool vputils::onlyFirstLaneUsed(const VPValue *Def) {
                 [Def](const VPUser *U) { return U->usesFirstLaneOnly(Def); });
 }
 
+const VPValue *vputils::getUnderlyingObject(const VPValue *Ptr) {
+  // Follow a chain of VPInstruction GEP recipes to the base pointer.
+  while (auto *VPI =
+             dyn_cast_or_null<VPInstruction>(Ptr->getDefiningRecipe())) {
+    if (VPI->getOpcode() != Instruction::GetElementPtr)
+      break;
+    Ptr = VPI->getOperand(0);
+  }
+  return Ptr;
+}
+
 bool vputils::onlyFirstPartUsed(const VPValue *Def) {
   return all_of(Def->users(),
                 [Def](const VPUser *U) { return U->usesFirstPartOnly(Def); });

@@ -24,6 +24,7 @@
 
 namespace llvm {
 
+class AssumptionCache;
 class InductionDescriptor;
 class Instruction;
 class Loop;

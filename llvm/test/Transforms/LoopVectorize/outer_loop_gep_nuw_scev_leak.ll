@@ -26,9 +26,9 @@ define void @cond_inbounds(ptr noalias %A, ptr noalias %B, i64 %N, i64 %M,
 ;
 ; AFTER-LABEL: 'cond_inbounds'
 ; AFTER:    %sp = getelementptr float, ptr %A, i64 %i
-; AFTER:    --> {((4 * %bc.resume.val) + %A),+,4}<%outer.header> U: full-set S: full-set Exits: (-4 + (4 * %N) + %A) LoopDispositions: { %outer.header: Computable, %inner.body: Invariant }
+; AFTER:    --> {%A,+,4}<%outer.header> U: full-set S: full-set Exits: (-4 + (4 * %N) + %A) LoopDispositions: { %outer.header: Computable, %inner.body: Invariant }
 ; AFTER:    %cp = getelementptr inbounds float, ptr %A, i64 %i
-; AFTER:    --> {((4 * %bc.resume.val) + %A),+,4}<%outer.header> U: full-set S: full-set Exits: (-4 + (4 * %N) + %A) LoopDispositions: { %outer.header: Computable, %inner.body: Invariant }
+; AFTER:    --> {%A,+,4}<%outer.header> U: full-set S: full-set Exits: (-4 + (4 * %N) + %A) LoopDispositions: { %outer.header: Computable, %inner.body: Invariant }
 ; AFTER:    %bp = getelementptr inbounds float, ptr %B, i64 %j
 ; AFTER:    --> {%B,+,4}<nuw><%inner.body> U: full-set S: full-set Exits: (-4 + (4 * %M) + %B) LoopDispositions: { %inner.body: Computable, %outer.header: Uniform }
 ;
