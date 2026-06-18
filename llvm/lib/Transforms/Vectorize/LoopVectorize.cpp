@@ -3292,6 +3292,7 @@ static bool willGenerateVectors(VPlan &Plan, ElementCount VF,
       case VPRecipeBase::VPExpandSCEVSC:
       case VPRecipeBase::VPPredInstPHISC:
       case VPRecipeBase::VPBranchOnMaskSC:
+      case VPRecipeBase::VPSpeculativeLoadOracleSC:
         continue;
       case VPRecipeBase::VPReductionSC:
       case VPRecipeBase::VPActiveLaneMaskPHISC:
@@ -5934,6 +5935,13 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
     ++LoopsPartialAliasVectorized;
   }
 
+  // Attach runtime checks for speculative loads in early exit loops. Only
+  // early-exit plans can carry speculative loads; call directly to keep the
+  // transform out of the per-plan -vplan-print-after-all output.
+  if (BestVPlan.hasEarlyExit())
+    VPlanTransforms::attachSpeculativeLoadChecks(BestVPlan, BestVF, PSE,
+                                                 OrigLoop, HasBranchWeights);
+
   // Retrieving VectorPH now when it's easier while VPlan still has Regions.
   VPBasicBlock *VectorPH = cast<VPBasicBlock>(BestVPlan.getVectorPreheader());
 
@@ -6572,6 +6580,12 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
 
   RUN_VPLAN_PASS(VPlanTransforms::createLoopRegions, *VPlan0,
                  getDebugLocFromInstOrOperands(Legal->getPrimaryInduction()));
+  // Wire any speculative-load oracle to the canonical IV introduced by
+  // createLoopRegions. Only read-only uncountable early exits can have built an
+  // oracle, so restrict to that style and call directly to keep the transform
+  // out of the per-plan -vplan-print-after-all output.
+  if (EEStyle == UncountableExitStyle::ReadOnly)
+    VPlanTransforms::materializeSpeculativeLoadOracleCanonicalIV(*VPlan0);
   if (CM.foldTailByMasking())
     RUN_VPLAN_PASS(VPlanTransforms::foldTailByMasking, *VPlan0);
   RUN_VPLAN_PASS(VPlanTransforms::introduceMasksAndLinearize, *VPlan0);
@@ -6747,7 +6761,8 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan,
       if (isa<VPWidenCanonicalIVRecipe, VPBlendRecipe, VPReductionRecipe,
               VPReplicateRecipe, VPWidenLoadRecipe, VPWidenStoreRecipe,
               VPWidenCallRecipe, VPWidenIntrinsicRecipe, VPVectorPointerRecipe,
-              VPVectorEndPointerRecipe, VPHistogramRecipe>(&R) ||
+              VPVectorEndPointerRecipe, VPHistogramRecipe,
+              VPSpeculativeLoadOracleRecipe>(&R) ||
           (isa<VPInstructionWithType>(R) &&
            Instruction::isCast(cast<VPInstructionWithType>(R).getOpcode()) &&
            vputils::onlyFirstLaneUsed(R.getVPSingleValue())))
@@ -8202,6 +8217,21 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     LLVM_DEBUG(dbgs() << "LV: Not interleaving due to EE with side effects.\n");
     IntDiagMsg = {"EEWithSideEffectsPreventsInterleaving",
                   "Unable to interleave due to early exit with side effects."};
+    InterleaveLoop = false;
+    IC = 1;
+  }
+
+  // Interleaving is not yet supported for loops using a speculative-load
+  // oracle: the oracle's canonical-IV operand is not offset per unrolled part,
+  // so parts >= 1 would replay the wrong lane window. selectInterleaveCount
+  // already returns 1 for early-exit loops, but a user-forced interleave count
+  // overrides that above, so clamp it here. This also covers the case where
+  // the vector cost is invalid and only scalar interleaving would remain: a
+  // scalar plan cannot widen the speculative_load intrinsic.
+  if (InterleaveLoop && BestPlanPtr->hasSpeculativeLoadOracle()) {
+    LLVM_DEBUG(dbgs() << "LV: Not interleaving loop with speculative loads.\n");
+    IntDiagMsg = {"SpeculativeLoadPreventsInterleaving",
+                  "Unable to interleave loop using speculative loads."};
     InterleaveLoop = false;
     IC = 1;
   }

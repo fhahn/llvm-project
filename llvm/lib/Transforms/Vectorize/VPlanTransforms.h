@@ -216,6 +216,11 @@ struct VPlanTransforms {
   /// BranchOnCond with BranchOnCount, using \p DL for the canonical IV.
   LLVM_ABI_FOR_TEST static void createLoopRegions(VPlan &Plan, DebugLoc DL);
 
+  /// Wire the lane-0 canonical IV operand of any VPSpeculativeLoadOracleRecipe
+  /// to \p Plan's canonical IV. Must be called after createLoopRegions, which
+  /// introduces the canonical IV.
+  static void materializeSpeculativeLoadOracleCanonicalIV(VPlan &Plan);
+
   /// Wrap runtime check block \p CheckBlock in a VPIRBB and \p Cond in a
   /// VPValue and connect the block to \p Plan, using the VPValue as branch
   /// condition.
@@ -224,6 +229,12 @@ struct VPlanTransforms {
                                  bool AddBranchWeights);
   static void attachCheckBlock(VPlan &Plan, Value *Cond, BasicBlock *CheckBlock,
                                bool AddBranchWeights);
+
+  /// Attach runtime checks for speculative loads; bypasses to scalar loop if
+  /// checks fail.
+  static void attachSpeculativeLoadChecks(VPlan &Plan, ElementCount VF,
+                                          PredicatedScalarEvolution &PSE,
+                                          Loop *TheLoop, bool AddBranchWeights);
 
   /// Replaces the VPInstructions in \p Plan with corresponding
   /// widen recipes. Returns false if any VPInstructions could not be converted

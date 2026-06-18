@@ -13,9 +13,11 @@
 
 #include "LoopVectorizationPlanner.h"
 #include "VPlan.h"
+#include "VPlanCFG.h"
 #include "VPlanHelpers.h"
 #include "VPlanPatternMatch.h"
 #include "VPlanUtils.h"
+#include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SmallVectorExtras.h"
@@ -25,6 +27,7 @@
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Dominators.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
@@ -3435,6 +3438,131 @@ InstructionCost VPReductionRecipe::computeCost(ElementCount VF,
   return Ctx.TTI.getArithmeticReductionCost(Opcode, VectorTy, OptionalFMF,
                                             Ctx.CostKind);
 }
+
+VPSpeculativeLoadOracleRecipe *VPSpeculativeLoadOracleRecipe::clone() {
+  // CanonIVPlaceholder (a PoisonValue) is shared with the cloned plan: the
+  // duplicated plan re-keys its live-ins by the underlying IR value, so the
+  // clone gets its own VPIRValue for the same poison key. Sharing the key is
+  // therefore safe and required to locate the canonical-IV live-in at execute.
+  return new VPSpeculativeLoadOracleRecipe(
+      std::unique_ptr<VPlan>(OraclePlan->duplicate()), CanonIVPlaceholder,
+      operands());
+}
+
+void VPSpeculativeLoadOracleRecipe::execute(VPTransformState &State) {
+  VPlan &Plan = *OraclePlan;
+  LLVMContext &Ctx = State.Builder.getContext();
+  Type *I64Ty = Type::getInt64Ty(Ctx);
+
+  [[maybe_unused]] auto *OracleEntry = cast<VPBasicBlock>(Plan.getEntry());
+  assert(OracleEntry->getNumSuccessors() == 1 &&
+         !isa<VPIRBasicBlock>(OracleEntry) &&
+         "oracle entry must be a plain single-successor block");
+  Type *IVTy = CanonIVPlaceholder->getType();
+
+  // Materialize each operand's scalar value once: operand 0 is the canonical
+  // IV, the rest are external live-ins collected during buildOraclePlan.
+  auto ArgValues = map_to_vector(
+      operands(), [&](VPValue *Op) { return State.get(Op, /*IsScalar=*/true); });
+  auto ParamTypes = map_to_vector(
+      ArgValues, [](Value *V) -> Type * { return V->getType(); });
+
+  FunctionType *FnTy = FunctionType::get(I64Ty, ParamTypes, false);
+  Module *M = State.Builder.GetInsertBlock()->getModule();
+  Function *OracleFn = Function::Create(
+      FnTy, GlobalValue::InternalLinkage, "speculativeLoadOracle", M);
+  OracleFn->setMemoryEffects(MemoryEffects::argMemOnly(ModRefInfo::Ref));
+  OracleFn->addFnAttr(Attribute::NoInline);
+  // The oracle replays the exit conditions lane-by-lane; keep its body exactly
+  // as emitted so later passes cannot perturb the precise per-lane replay.
+  OracleFn->addFnAttr(Attribute::OptimizeNone);
+
+  // Remap the oracle plan's live-ins to the function arguments. Operand 0 is
+  // the canonical IV, whose oracle-plan live-in is keyed by the poison
+  // placeholder; the remaining operands are external live-ins keyed by their
+  // underlying IR value.
+  for (auto [I, Arg] : enumerate(OracleFn->args())) {
+    Value *Key = I == 0 ? CanonIVPlaceholder : ArgValues[I];
+    Arg.setName(I == 0 ? "canonIV" : Key->getName());
+    VPValue *ArgLiveIn = Plan.getOrAddLiveIn(&Arg);
+    if (I != 0) {
+      Plan.getOrAddLiveIn(Key)->replaceAllUsesWith(ArgLiveIn);
+      continue;
+    }
+    // The canonical-IV placeholder is an interned PoisonValue live-in, which
+    // may be shared with unrelated poison operands in the user's exit
+    // condition (e.g. `or i64 %x, poison`). Restrict the replacement to the
+    // synthesized `adjusted.iv` recipe added by buildOraclePlan, mirroring
+    // materializeSpeculativeLoadOracleCanonicalIV; user recipes cloned from IR
+    // carry an underlying value, whereas the synthesized recipe does not.
+    Plan.getOrAddLiveIn(Key)->replaceUsesWithIf(
+        ArgLiveIn, [](VPUser &U, unsigned) {
+          auto *R = dyn_cast<VPSingleDefRecipe>(&U);
+          return R && !R->getUnderlyingValue();
+        });
+  }
+
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "oracle.entry", OracleFn);
+  IRBuilder<> OracleBuilder(EntryBB);
+
+  // Replace the oracle plan's VF placeholder with the runtime lane count
+  // (constant for fixed VFs, `vscale * VF` for scalable), matching the IV type
+  // so the BranchOnCount types agree and the oracle replays exactly the lanes
+  // the speculative loads produce.
+  Value *RuntimeVF = getRuntimeVF(OracleBuilder, IVTy, State.VF);
+  Plan.getVF().replaceAllUsesWith(Plan.getOrAddLiveIn(RuntimeVF));
+  OracleBuilder.CreateUnreachable();
+
+  // Set up a scalar (VF=1) VPTransformState executing into the oracle function.
+  // A LoopInfo lets VPBasicBlock::execute register the loop; no AssumptionCache
+  // is needed as the oracle only replicates Load/GEP/Freeze recipes (calls are
+  // rejected by canBuildOraclePlan).
+  DominatorTree OracleDT(*OracleFn);
+  LoopInfo OracleLI(OracleDT);
+  VPTransformState OracleState(State.TTI, ElementCount::getFixed(1),
+                               &OracleLI, /*DT=*/nullptr, /*AC=*/nullptr,
+                               OracleBuilder, &Plan,
+                               /*CurrentParentLoop=*/nullptr);
+  // The oracle plan is executed via the generic VPlan::execute lowering rather
+  // than executeAndFinalize, which performs main-loop-specific skeleton setup
+  // and cleanup that does not apply to the self-contained oracle function.
+  // Pass EntryBB so execute registers the already-materialized entry, skips its
+  // code generation, and appends the remaining blocks after it.
+  Plan.execute(&OracleState, EntryBB);
+  Plan.fixupHeaderPhiBackedges(OracleState);
+
+  // Return the byte count from the oracle exit block. buildOraclePlan routed
+  // all exits into a single "oracle.exit", the unique plain VPBasicBlock with
+  // no successors; its last recipe computes the byte count.
+  auto IsExitVPBB = [](VPBlockBase *VPB) {
+    return isa<VPBasicBlock>(VPB) && !isa<VPIRBasicBlock>(VPB) &&
+           VPB->getNumSuccessors() == 0;
+  };
+  auto Blocks = vp_depth_first_shallow(Plan.getEntry());
+  assert(count_if(Blocks, IsExitVPBB) == 1 &&
+         "expected a unique oracle exit block");
+  auto *OracleExitVPBB = cast<VPBasicBlock>(*find_if(Blocks, IsExitVPBB));
+
+  BasicBlock *ExitBB = OracleState.CFG.VPBB2IRBB[OracleExitVPBB];
+  cast<UnreachableInst>(ExitBB->getTerminator())->eraseFromParent();
+  auto *RetRecipe = cast<VPSingleDefRecipe>(&OracleExitVPBB->back());
+  Value *RetVal = OracleState.get(RetRecipe, /*IsScalar=*/true);
+  assert(RetVal->getType() == I64Ty && "Oracle exit value must be i64");
+  OracleBuilder.SetInsertPoint(ExitBB);
+  OracleBuilder.CreateRet(RetVal);
+
+  State.set(this, OracleFn, /*IsScalar=*/true);
+}
+
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+void VPSpeculativeLoadOracleRecipe::printRecipe(
+    raw_ostream &O, const Twine &Indent, VPSlotTracker &Tracker) const {
+  O << Indent << "SPECULATIVE-LOAD-ORACLE ";
+  printAsOperand(O, Tracker);
+  O << " = call ";
+  printOperands(O, Tracker);
+}
+#endif
 
 VPExpressionRecipe::VPExpressionRecipe(
     ExpressionTypes ExpressionType,

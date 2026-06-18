@@ -423,6 +423,7 @@ public:
     VPInstructionSC,
     VPInterleaveEVLSC,
     VPInterleaveSC,
+    VPSpeculativeLoadOracleSC,
     VPReductionEVLSC,
     VPReductionSC,
     VPReplicateSC,
@@ -627,6 +628,7 @@ public:
     case VPRecipeBase::VPExpandSCEVSC:
     case VPRecipeBase::VPExpressionSC:
     case VPRecipeBase::VPInstructionSC:
+    case VPRecipeBase::VPSpeculativeLoadOracleSC:
     case VPRecipeBase::VPReductionEVLSC:
     case VPRecipeBase::VPReductionSC:
     case VPRecipeBase::VPReplicateSC:
@@ -3515,6 +3517,44 @@ public:
   }
 };
 
+/// Holds a cloned VPlan for a speculative load oracle: a scalar loop replaying
+/// early-exit conditions lane-by-lane. execute() emits it as an internal
+/// function returning the valid byte count; the recipe defines that function's
+/// pointer.
+class VPSpeculativeLoadOracleRecipe : public VPSingleDefRecipe {
+  std::unique_ptr<VPlan> OraclePlan;
+  /// PoisonValue keying the canonical-IV placeholder live-in in OraclePlan,
+  /// replaced with the oracle function's first argument during execution.
+  Value *CanonIVPlaceholder;
+
+public:
+  VPSpeculativeLoadOracleRecipe(std::unique_ptr<VPlan> OraclePlan,
+                                Value *CanonIVPlaceholder,
+                                ArrayRef<VPValue *> ExternalOperands)
+      : VPSingleDefRecipe(VPRecipeBase::VPSpeculativeLoadOracleSC,
+                          ExternalOperands,
+                          PointerType::get(CanonIVPlaceholder->getContext(), 0)),
+        OraclePlan(std::move(OraclePlan)),
+        CanonIVPlaceholder(CanonIVPlaceholder) {}
+
+  VP_CLASSOF_IMPL(VPRecipeBase::VPSpeculativeLoadOracleSC)
+
+  VPSpeculativeLoadOracleRecipe *clone() override;
+  void execute(VPTransformState &State) override;
+
+  InstructionCost computeCost(ElementCount, VPCostContext &) const override {
+    return 0;
+  }
+
+  bool usesFirstLaneOnly(const VPValue *Op) const override { return true; }
+
+protected:
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+  void printRecipe(raw_ostream &O, const Twine &Indent,
+                   VPSlotTracker &Tracker) const override;
+#endif
+};
+
 /// A recipe to combine multiple recipes into a single 'expression' recipe,
 /// which should be considered a single entity for cost-modeling and transforms.
 /// The recipe needs to be 'decomposed', i.e. replaced by its individual
@@ -4859,12 +4899,15 @@ public:
   /// Generate IR for the recipes of all blocks of this plan via a
   /// reverse-post-order traversal, calling VPBlockBase::execute on each, after
   /// recomputing the VPlan dominator tree. \p State.CFG.PrevBB must be the IR
-  /// block to append the generated code into. This is the generic
-  /// code-generation primitive; callers are responsible for any skeleton setup
-  /// and for fixing up header-phi backedges via fixupHeaderPhiBackedges
-  /// afterwards. executeAndFinalize wraps it with the main vector-loop skeleton
-  /// setup and original-loop teardown.
-  void execute(VPTransformState *State);
+  /// block to append the generated code into. When \p EntryIRBB is non-null it
+  /// is the IR block already materialized for this plan's entry (e.g. the
+  /// speculative-load oracle builds its own entry block); it is registered in
+  /// the CFG map, becomes PrevBB, and is skipped during traversal. This is the
+  /// generic code-generation primitive; callers are responsible for any
+  /// skeleton setup and for fixing up header-phi backedges via
+  /// fixupHeaderPhiBackedges afterwards. executeAndFinalize wraps it with the
+  /// main vector-loop skeleton setup and original-loop teardown.
+  void execute(VPTransformState *State, BasicBlock *EntryIRBB = nullptr);
 
   /// Generate the IR code for the main vector loop of this VPlan: set up the
   /// vector-loop skeleton CFG, generate code for all recipes via execute(),
@@ -5203,6 +5246,15 @@ public:
     // block and the early exiting edge).
     return NumExitPredecessors > 1;
   }
+
+  /// Returns the VPlan's speculative-load oracle recipe, or null if it does
+  /// not have one, i.e. it does not replace non-dereferenceable early-exit
+  /// loads with speculative loads.
+  VPSpeculativeLoadOracleRecipe *getSpeculativeLoadOracle() const;
+
+  /// Returns true if the VPlan contains a speculative-load oracle recipe, i.e.
+  /// it replaces non-dereferenceable early-exit loads with speculative loads.
+  bool hasSpeculativeLoadOracle() const { return getSpeculativeLoadOracle(); }
 
   /// Returns true if the scalar tail may execute after the vector loop, i.e.
   /// if the middle block is a predecessor of the scalar preheader. Note that

@@ -914,20 +914,37 @@ bool VPlan::isExitBlock(VPBlockBase *VPBB) {
   return is_contained(ExitBlocks, VPBB);
 }
 
+VPSpeculativeLoadOracleRecipe *VPlan::getSpeculativeLoadOracle() const {
+  VPRegionBlock *LoopRegion = const_cast<VPlan *>(this)->getVectorLoopRegion();
+  if (!LoopRegion)
+    return nullptr;
+  VPBasicBlock *HeaderVPBB = LoopRegion->getEntryBasicBlock();
+  auto It = find_if(*HeaderVPBB, IsaPred<VPSpeculativeLoadOracleRecipe>);
+  return It == HeaderVPBB->end() ? nullptr
+                                 : cast<VPSpeculativeLoadOracleRecipe>(&*It);
+}
+
 /// To make RUN_VPLAN_PASS print final VPlan.
 static void printFinalVPlan(VPlan &) {}
 
-void VPlan::execute(VPTransformState *State) {
+void VPlan::execute(VPTransformState *State, BasicBlock *EntryIRBB) {
   // Update VPDominatorTree since VPBasicBlocks may have been added or removed
   // after State was constructed.
   State->VPDT.recalculate(*this);
 
   ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>> RPOT(
       Entry);
-  // Generate code for the VPlan, in parts of the vector skeleton, loop body and
-  // successor blocks including the middle, exit and scalar preheader blocks.
-  for (VPBlockBase *Block : RPOT)
+  for (VPBlockBase *Block : RPOT) {
+    // If the IR block for the entry has already been created (e.g. by the
+    // speculative-load oracle), register it and continue appending the
+    // generated code after it, skipping code generation for the entry itself.
+    if (EntryIRBB && Block == Entry) {
+      State->CFG.VPBB2IRBB[cast<VPBasicBlock>(Entry)] = EntryIRBB;
+      State->CFG.PrevBB = EntryIRBB;
+      continue;
+    }
     Block->execute(State);
+  }
 }
 
 /// Generate the code inside the preheader and body of the vectorized loop.
