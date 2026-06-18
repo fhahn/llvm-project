@@ -917,20 +917,29 @@ bool VPlan::isExitBlock(VPBlockBase *VPBB) {
 /// To make RUN_VPLAN_PASS print final VPlan.
 static void printFinalVPlan(VPlan &) {}
 
+void VPlan::execute(VPTransformState *State) {
+  // Update VPDominatorTree since VPBasicBlocks may have been added or removed
+  // after State was constructed.
+  State->VPDT.recalculate(*this);
+
+  ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>> RPOT(
+      Entry);
+  // Generate code for the VPlan, in parts of the vector skeleton, loop body and
+  // successor blocks including the middle, exit and scalar preheader blocks.
+  for (VPBlockBase *Block : RPOT)
+    Block->execute(State);
+}
+
 /// Generate the code inside the preheader and body of the vectorized loop.
 /// Assumes a single pre-header basic-block was created for this. Introduce
 /// additional basic-blocks as needed, and fill them all.
-void VPlan::execute(VPTransformState *State) {
+void VPlan::executeAndFinalize(VPTransformState *State) {
   assert(none_of(vp_depth_first_shallow(getEntry()), IsaPred<VPRegionBlock>) &&
          "all region blocks must be dissolved before ::execute");
 
   // Initialize CFG state.
   State->CFG.PrevVPBB = nullptr;
   State->CFG.ExitBB = State->CFG.PrevBB->getSingleSuccessor();
-
-  // Update VPDominatorTree since VPBasicBlock may be removed after State was
-  // constructed.
-  State->VPDT.recalculate(*this);
 
   // Disconnect VectorPreHeader from ExitBB in both the CFG and DT.
   BasicBlock *VectorPreHeader = State->CFG.PrevBB;
@@ -956,12 +965,9 @@ void VPlan::execute(VPTransformState *State) {
     State->CFG.DTU.applyUpdates(
         {{DominatorTree::Delete, ScalarPh, ScalarPh->getSingleSuccessor()}});
   }
-  ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>> RPOT(
-      Entry);
-  // Generate code for the VPlan, in parts of the vector skeleton, loop body and
-  // successor blocks including the middle, exit and scalar preheader blocks.
-  for (VPBlockBase *Block : RPOT)
-    Block->execute(State);
+  // Generate code for all recipes, in parts of the vector skeleton, loop body
+  // and successor blocks including the middle, exit and scalar preheader.
+  execute(State);
 
   if (hasEarlyExit()) {
     // Fix up LoopInfo for extra dispatch blocks when vectorizing loops with
@@ -969,6 +975,8 @@ void VPlan::execute(VPTransformState *State) {
     // loop of all successors that are in a loop. Note: we only need to update
     // loop info for blocks after the middle block, but there is no easy way to
     // get those at this point.
+    ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>>
+        RPOT(Entry);
     for (VPBlockBase *VPB : reverse(RPOT)) {
       auto *VPBB = dyn_cast<VPBasicBlock>(VPB);
       if (!VPBB || isa<VPIRBasicBlock>(VPBB))
