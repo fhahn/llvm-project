@@ -26,6 +26,28 @@
 using namespace llvm;
 using namespace VPlanPatternMatch;
 
+/// Verify that a recipe widening its result beyond the plan's VF (an explicit
+/// vector result type) only consumes vector operands of the same width: each
+/// operand it uses as a vector must be widened to the same element count (a
+/// cast may change the element type, so element counts are compared rather than
+/// full types). This catches a narrowing transform that left an operand at the
+/// plan's VF, which would produce a vector-width mismatch when the recipe
+/// executes.
+static bool verifyWideningVF(const VPRecipeBase &R) {
+  for (const VPValue *Def : R.definedValues()) {
+    ElementCount WideVF = Def->getWideningVF();
+    if (WideVF.isZero())
+      continue;
+    if (all_of(R.operands(), [&](const VPValue *Op) {
+          return R.usesScalars(Op) || Op->getWideningVF() == WideVF;
+        }))
+      continue;
+    errs() << "Operand widened to a different factor than its user!\n";
+    return false;
+  }
+  return true;
+}
+
 namespace {
 class VPlanVerifier {
   const VPDominatorTree &VPDT;
@@ -348,6 +370,9 @@ bool VPlanVerifier::verifyVPBasicBlock(const VPBasicBlock *VPBB) {
         return false;
       }
     }
+
+    if (!verifyWideningVF(R))
+      return false;
   }
 
   auto *IRBB = dyn_cast<VPIRBasicBlock>(VPBB);

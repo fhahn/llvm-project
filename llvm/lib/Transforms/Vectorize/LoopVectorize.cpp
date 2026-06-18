@@ -6600,8 +6600,10 @@ void LoopVectorizationPlanner::buildVPlans(VPlan &VPlan1, ElementCount MinVF,
       RUN_VPLAN_PASS(VPlanTransforms::optimizeEVLMasks, *Plan);
     }
 
-    if (auto P =
-            RUN_VPLAN_PASS(VPlanTransforms::narrowInterleaveGroups, *Plan, TTI))
+    VPCostContext CostCtx(CM.TTI, *CM.TLI, *Plan, CM, Config.CostKind, PSE,
+                          OrigLoop);
+    if (auto P = RUN_VPLAN_PASS(VPlanTransforms::narrowInterleaveGroups, *Plan,
+                                CostCtx))
       VPlans.push_back(std::move(P));
 
     TailFoldingStyle Style = CM.getTailFoldingStyle();

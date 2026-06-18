@@ -1229,6 +1229,14 @@ static bool simplifyLogicalRecipe(VPSingleDefRecipe *Def, VPBuilder &Builder,
 static void simplifyRecipe(VPSingleDefRecipe *Def) {
   VPlan *Plan = Def->getParent()->getPlan();
 
+  // Recipes widened beyond the plan's VF (e.g. narrowed interleave groups,
+  // which carry an explicit vector result type, see VPValue::getWideType) are
+  // in their final form; algebraic simplification may rebuild them into fresh
+  // recipes that drop the explicit type, leaving a vector-width mismatch. Leave
+  // them untouched.
+  if (Def->getResultType()->isVectorTy())
+    return;
+
   // Simplification of live-in IR values for SingleDef recipes using
   // InstSimplifyFolder.
   const DataLayout &DL = Plan->getDataLayout();
@@ -3881,6 +3889,16 @@ void VPlanTransforms::sinkPredicatedStores(VPlan &Plan,
   }
 }
 
+/// Returns true if \p IR is a full load interleave group whose value at member
+/// index \p Idx is \p V. \p Idx is a member index in a store group, which may
+/// exceed the number of values defined by a smaller feeding load group, so the
+/// access is guarded before indexing.
+static bool definesGroupMember(const VPInterleaveRecipe *IR, unsigned Idx,
+                               const VPValue *V) {
+  return IR->getInterleaveGroup()->isFull() &&
+         Idx < IR->getNumDefinedValues() && IR->getVPValue(Idx) == V;
+}
+
 /// Returns true if \p V is VPWidenLoadRecipe or VPInterleaveRecipe that can be
 /// converted to a narrower recipe. \p V is used by a wide recipe that feeds a
 /// store interleave group at index \p Idx, \p WideMember0 is the recipe feeding
@@ -3910,7 +3928,7 @@ static bool canNarrowLoad(VPSingleDefRecipe *WideMember0, unsigned OpIdx,
     return !IsScalable && !W->getMask() && W->isConsecutive() &&
            Member0Op == OpV;
   if (auto *IR = dyn_cast<VPInterleaveRecipe>(Member0OpR))
-    return IR->getInterleaveGroup()->isFull() && IR->getVPValue(Idx) == OpV;
+    return definesGroupMember(IR, Idx, OpV);
   return false;
 }
 
@@ -3949,9 +3967,21 @@ static bool canNarrowOps(ArrayRef<VPValue *> Ops, bool IsScalable) {
   return true;
 }
 
-/// Returns VF from \p VFs if \p IR is a full interleave group with factor and
-/// number of members both equal to VF. The interleave group must also access
-/// the full vector width.
+/// Returns the scalar element type accessed by interleave group \p IR (the
+/// stored value type for store groups, the loaded value type for load groups).
+/// All members are assumed to share the same scalar type.
+static Type *getGroupElementType(const VPInterleaveRecipe *IR) {
+  ArrayRef<VPValue *> Stored = IR->getStoredValues();
+  return Stored.empty() ? IR->getVPValue(0)->getScalarType()
+                        : Stored[0]->getScalarType();
+}
+
+/// Returns VF from \p VFs if \p IR is a full interleave group whose members can
+/// be narrowed processing a single original iteration. VF members must saturate
+/// exactly one full vector register. The group factor must be VF (the whole
+/// group becomes one wide op) or, for fixed-width VFs, any value greater than VF
+/// (the group becomes a single wider op spanning multiple registers, widened
+/// via VPValue::getWideType so the plan's VF stays power-of-two).
 static std::optional<ElementCount>
 isConsecutiveInterleaveGroup(VPInterleaveRecipe *InterleaveR,
                              ArrayRef<ElementCount> VFs,
@@ -3959,23 +3989,23 @@ isConsecutiveInterleaveGroup(VPInterleaveRecipe *InterleaveR,
   if (!InterleaveR || InterleaveR->getMask())
     return std::nullopt;
 
-  Type *GroupElementTy = nullptr;
-  if (InterleaveR->getStoredValues().empty()) {
-    GroupElementTy = InterleaveR->getVPValue(0)->getScalarType();
-    if (!all_of(InterleaveR->definedValues(), [GroupElementTy](VPValue *Op) {
-          return Op->getScalarType() == GroupElementTy;
-        }))
-      return std::nullopt;
-  } else {
-    GroupElementTy = InterleaveR->getStoredValues()[0]->getScalarType();
-    if (!all_of(InterleaveR->getStoredValues(), [GroupElementTy](VPValue *Op) {
-          return Op->getScalarType() == GroupElementTy;
-        }))
-      return std::nullopt;
-  }
+  // All members must share the same scalar element type.
+  Type *GroupElementTy = getGroupElementType(InterleaveR);
+  auto SameType = [GroupElementTy](VPValue *Op) {
+    return Op->getScalarType() == GroupElementTy;
+  };
+  if (InterleaveR->getStoredValues().empty()
+          ? !all_of(InterleaveR->definedValues(), SameType)
+          : !all_of(InterleaveR->getStoredValues(), SameType))
+    return std::nullopt;
 
   auto IG = InterleaveR->getInterleaveGroup();
   if (IG->getFactor() != IG->getNumMembers())
+    return std::nullopt;
+
+  // Reverse groups use a vector-end pointer as their address, so the wider
+  // access addressing (a single contiguous op over the group) would be wrong.
+  if (IG->isReverse())
     return std::nullopt;
 
   auto GetVectorBitWidthForVF = [&TTI](ElementCount VF) {
@@ -3990,10 +4020,36 @@ isConsecutiveInterleaveGroup(VPInterleaveRecipe *InterleaveR,
   for (ElementCount VF : VFs) {
     unsigned MinVal = VF.getKnownMinValue();
     unsigned GroupSize = GroupElementTy->getScalarSizeInBits() * MinVal;
-    if (IG->getFactor() == MinVal && GroupSize == GetVectorBitWidthForVF(VF))
+    if (GroupSize != GetVectorBitWidthForVF(VF))
+      continue;
+    // The whole group becomes a single wide op (factor == VF), or, for
+    // fixed-width VFs, a single wider op of `factor` elements (factor > VF),
+    // widened beyond the plan's VF via an explicit widening-factor override.
+    // Wider-than-VF ops are only supported for fixed-width VFs.
+    if (IG->getFactor() == MinVal || (VF.isFixed() && IG->getFactor() > MinVal))
       return {VF};
   }
   return std::nullopt;
+}
+
+/// Returns the cost of accessing interleave group \p G when narrowed to a
+/// single wide memory op of `factor` elements processing one original
+/// iteration. There is no narrowed recipe to query yet, so the cost is computed
+/// via VPWidenMemoryRecipe::computeConsecutiveCost (also used by the recipe's
+/// own computeCost), using the group's VPValue element type to stay consistent
+/// with VPInterleaveRecipe::computeCost.
+static InstructionCost getNarrowedGroupMemCost(const VPInterleaveRecipe *G,
+                                               VPCostContext &Ctx) {
+  const InterleaveGroup<Instruction> *IG = G->getInterleaveGroup();
+  Instruction *InsertPos = IG->getInsertPos();
+  // Use the group's VPValue element type (all members share it) rather than the
+  // IR memory type, to stay consistent with VPInterleaveRecipe::computeCost.
+  Type *ElementTy = getGroupElementType(G);
+  return VPWidenMemoryRecipe::computeConsecutiveCost(
+      InsertPos->getOpcode(),
+      toVectorTy(ElementTy, ElementCount::getFixed(IG->getFactor())),
+      IG->getAlign(), getLoadStoreAddressSpace(InsertPos), Ctx,
+      /*StoredOrLoadedOp=*/nullptr, /*I=*/nullptr);
 }
 
 /// Returns true if \p VPValue is a narrow VPValue.
@@ -4078,9 +4134,115 @@ static VPValue *narrowInterleaveGroupOp(ArrayRef<VPValue *> Members,
   return N;
 }
 
+/// Return a VPValue that broadcasts \p Op to \p WideVF elements, materializing
+/// a VPInstruction::Broadcast with an explicit widening factor (see
+/// VPValue::getWideType) if one was not created for \p Op already (memoized in
+/// \p Broadcasts). This is needed when \p Op is an invariant or uniform scalar
+/// feeding a narrowed group op whose width exceeds the plan's VF: the regular
+/// broadcast paths (lazy VPTransformState::get, materializeBroadcasts) use the
+/// plan's VF, which would be too narrow. Loop-invariant operands are broadcast
+/// in the vector preheader; in-loop scalars right after their definition.
+static VPValue *getWideBroadcast(VPValue *Op, ElementCount WideVF, VPlan &Plan,
+                                 DenseMap<VPValue *, VPValue *> &Broadcasts) {
+  auto [It, Inserted] = Broadcasts.try_emplace(Op);
+  if (!Inserted)
+    return It->second;
+
+  VPBuilder Builder;
+  VPRecipeBase *DefR = Op->getDefiningRecipe();
+  if (DefR && !Op->isDefinedOutsideLoopRegions())
+    Builder.setInsertPoint(DefR->getParent(), std::next(DefR->getIterator()));
+  else {
+    VPBasicBlock *PH = Plan.getVectorPreheader();
+    Builder.setInsertPoint(PH, PH->end());
+  }
+  auto *B = Builder.createNaryOp(VPInstruction::Broadcast, {Op});
+  B->setResultType(toVectorTy(B->getScalarType(), WideVF));
+  It->second = B;
+  return B;
+}
+
+/// Returns true if recipe \p R is a wide recipe produced by narrowing a store
+/// interleave group (the only recipes whose widening factor we override).
+static bool isNarrowedWideOp(const VPRecipeBase *R) {
+  return isa_and_present<VPWidenRecipe, VPWidenCastRecipe, VPWidenLoadRecipe>(R);
+}
+
+/// Return \p Op materialized as a vector of \p WideVF elements for use by a
+/// narrowed group op wider than the plan's VF. \p Op is either a loop-invariant
+/// scalar or a BuildVector assembled from per-member scalars (see
+/// narrowInterleaveGroupOp).
+///
+/// A BuildVector with distinct members already IS the <factor x elty> vector to
+/// process, so it is only given the explicit wide result type; broadcasting it
+/// would splat its first lane and drop the other members. An all-equal
+/// BuildVector or a plain scalar is uniform across all members, so it is
+/// broadcast to the wider width (which simplifyRecipes can later fold to a
+/// single splat).
+static VPValue *getWideGroupOperand(VPValue *Op, ElementCount WideVF,
+                                    VPlan &Plan,
+                                    DenseMap<VPValue *, VPValue *> &Broadcasts) {
+  if (match(Op, m_BuildVector())) {
+    auto *BV = cast<VPInstruction>(Op->getDefiningRecipe());
+    if (!all_equal(BV->operands())) {
+      assert(BV->getNumOperands() == WideVF.getFixedValue() &&
+             "BuildVector must have one operand per narrowed group member");
+      BV->setResultType(toVectorTy(BV->getScalarType(), WideVF));
+      return BV;
+    }
+  }
+  return getWideBroadcast(Op, WideVF, Plan, Broadcasts);
+}
+
+/// The store interleave group narrowed to the op tree rooted at \p Root has a
+/// factor exceeding the plan's VF, so the narrowed recipes form a single vector
+/// of \p WideVF elements (one lane per group member) rather than the plan's VF.
+/// Override the widening factor of every narrowed wide recipe reachable from \p
+/// Root and broadcast any invariant/uniform-scalar vector operand to the wider
+/// width, so no operand is left at the plan's VF. Returns the value to store,
+/// which is \p Root unless \p Root is itself a scalar (a uniform value stored to
+/// all members), in which case it is broadcast to \p WideVF.
+static VPValue *overrideNarrowedGroupWidth(VPValue *Root, ElementCount WideVF,
+                                           VPlan &Plan) {
+  DenseMap<VPValue *, VPValue *> Broadcasts;
+  SmallVector<VPSingleDefRecipe *> Worklist;
+  SmallPtrSet<VPSingleDefRecipe *, 8> Visited;
+  auto Push = [&](VPValue *V) {
+    auto *R = dyn_cast_or_null<VPSingleDefRecipe>(V->getDefiningRecipe());
+    if (isNarrowedWideOp(R) && Visited.insert(R).second)
+      Worklist.push_back(R);
+  };
+
+  Push(Root);
+  while (!Worklist.empty()) {
+    VPSingleDefRecipe *R = Worklist.pop_back_val();
+    R->setResultType(toVectorTy(R->getScalarType(), WideVF));
+
+    // A widened load only reads from a (scalar) address; its data width is set
+    // above. Compute recipes consume their operands as vectors, so any operand
+    // not itself a narrowed wide op must be widened to the wider width.
+    if (isa<VPWidenLoadRecipe>(R))
+      continue;
+    for (const auto &[Idx, Op] : enumerate(R->operands())) {
+      if (R->usesScalars(Op))
+        continue;
+      if (isNarrowedWideOp(Op->getDefiningRecipe())) {
+        Push(Op);
+        continue;
+      }
+      R->setOperand(Idx, getWideGroupOperand(Op, WideVF, Plan, Broadcasts));
+    }
+  }
+
+  if (isNarrowedWideOp(Root->getDefiningRecipe()))
+    return Root;
+  // A uniform value or per-member vector stored to all members: widen it to the
+  // group width.
+  return getWideGroupOperand(Root, WideVF, Plan, Broadcasts);
+}
+
 std::unique_ptr<VPlan>
-VPlanTransforms::narrowInterleaveGroups(VPlan &Plan,
-                                        const TargetTransformInfo &TTI) {
+VPlanTransforms::narrowInterleaveGroups(VPlan &Plan, VPCostContext &Ctx) {
   VPRegionBlock *VectorLoop = Plan.getVectorLoopRegion();
 
   if (!VectorLoop)
@@ -4101,6 +4263,7 @@ VPlanTransforms::narrowInterleaveGroups(VPlan &Plan,
          "unexpected branch-on-count");
 
   SmallVector<VPInterleaveRecipe *> StoreGroups;
+  SmallVector<VPInterleaveRecipe *> AllGroups;
   std::optional<ElementCount> VFToOptimize;
   for (auto &R : *VectorLoop->getEntryBasicBlock()) {
     if (isa<VPDerivedIVRecipe, VPScalarIVStepsRecipe>(&R) &&
@@ -4141,10 +4304,11 @@ VPlanTransforms::narrowInterleaveGroups(VPlan &Plan,
         VFToOptimize ? SmallVector<ElementCount>({*VFToOptimize})
                      : to_vector(Plan.vectorFactors());
     std::optional<ElementCount> NarrowedVF =
-        isConsecutiveInterleaveGroup(InterleaveR, VFs, TTI);
+        isConsecutiveInterleaveGroup(InterleaveR, VFs, Ctx.TTI);
     if (!NarrowedVF || (VFToOptimize && NarrowedVF != VFToOptimize))
       return nullptr;
     VFToOptimize = NarrowedVF;
+    AllGroups.push_back(InterleaveR);
 
     // Skip read interleave groups.
     if (InterleaveR->getStoredValues().empty())
@@ -4163,11 +4327,8 @@ VPlanTransforms::narrowInterleaveGroups(VPlan &Plan,
     // groups.
     if (all_of(enumerate(InterleaveR->getStoredValues()), [](auto Op) {
           VPRecipeBase *DefR = Op.value()->getDefiningRecipe();
-          if (!DefR)
-            return false;
-          auto *IR = dyn_cast<VPInterleaveRecipe>(DefR);
-          return IR && IR->getInterleaveGroup()->isFull() &&
-                 IR->getVPValue(Op.index()) == Op.value();
+          auto *IR = dyn_cast_or_null<VPInterleaveRecipe>(DefR);
+          return IR && definesGroupMember(IR, Op.index(), Op.value());
         })) {
       StoreGroups.push_back(InterleaveR);
       continue;
@@ -4192,6 +4353,34 @@ VPlanTransforms::narrowInterleaveGroups(VPlan &Plan,
   if (MiddleVPBB->getNumSuccessors() != 2 && !RequiresScalarEpilogue)
     return nullptr;
 
+  // When a group's factor exceeds VFToOptimize, the narrowed wide op spans more
+  // than one full vector register (e.g. a `<factor x>` op widened beyond the
+  // plan's VF), so the narrowed form is not unconditionally cheaper than the
+  // interleaved (ldN/stN-style) access the target may provide. Only narrow when
+  // the summed narrowed memory cost across all groups is strictly cheaper than
+  // accessing them as interleave groups. This only applies to fixed-width VFs.
+  //
+  // The costs cover different amounts of work and must be normalized: an
+  // interleave group processes VFToOptimize original iterations per step (its
+  // wide vector holds VFToOptimize * Factor elements), whereas the narrowed
+  // form processes a single original iteration per step. To compare equal work,
+  // scale the per-iteration narrowed cost by VFToOptimize.
+  if (VFToOptimize->isFixed()) {
+    unsigned WideMembers = VFToOptimize->getFixedValue();
+    if (any_of(AllGroups, [WideMembers](VPInterleaveRecipe *G) {
+          return G->getInterleaveGroup()->getFactor() > WideMembers;
+        })) {
+      InstructionCost InterleaveCost = 0;
+      InstructionCost NarrowedCost = 0;
+      for (VPInterleaveRecipe *G : AllGroups) {
+        InterleaveCost += G->cost(*VFToOptimize, Ctx);
+        NarrowedCost += getNarrowedGroupMemCost(G, Ctx);
+      }
+      if (NarrowedCost * WideMembers >= InterleaveCost)
+        return nullptr;
+    }
+  }
+
   // All interleave groups in Plan can be narrowed for VFToOptimize. Split the
   // original Plan into 2: a) a new clone which contains all VFs of Plan, except
   // VFToOptimize, and b) the original Plan with VFToOptimize as single VF.
@@ -4206,12 +4395,27 @@ VPlanTransforms::narrowInterleaveGroups(VPlan &Plan,
   // Convert InterleaveGroup \p R to a single VPWidenLoadRecipe.
   SmallPtrSet<VPValue *, 4> NarrowedOps;
   VPBasicBlock *Preheader = Plan.getVectorPreheader();
-  // Narrow operation tree rooted at store groups.
+  // Narrow the operation tree rooted at each store group to a single wide
+  // memory op processing one original iteration. The group is logically a
+  // factor-wide vector operation; its members become one wide op of `factor`
+  // elements. When factor exceeds the plan's VF, the narrowed recipes are
+  // widened to `factor` elements via an explicit widening-factor override (see
+  // VPValue::getWideType), keeping the plan's VF a power of two so the cost
+  // model is never queried for the (possibly non-power-of-2) factor.
   for (auto *StoreGroup : StoreGroups) {
-    VPValue *Res = narrowInterleaveGroupOp(StoreGroup->getStoredValues(),
-                                           NarrowedOps, Preheader);
-    auto *SI =
-        cast<StoreInst>(StoreGroup->getInterleaveGroup()->getInsertPos());
+    ArrayRef<VPValue *> Stored = StoreGroup->getStoredValues();
+    const auto *IG = StoreGroup->getInterleaveGroup();
+    unsigned Factor = IG->getFactor();
+
+    auto *SI = cast<StoreInst>(IG->getInsertPos());
+    VPValue *Res = narrowInterleaveGroupOp(Stored, NarrowedOps, Preheader);
+
+    // For a group whose factor exceeds the plan's VF, widen the narrowed
+    // recipes to `factor` elements so the single wide op covers all members.
+    if (VFToOptimize->isFixed() && Factor > VFToOptimize->getFixedValue())
+      Res = overrideNarrowedGroupWidth(Res, ElementCount::getFixed(Factor),
+                                       Plan);
+
     VPBuilder(StoreGroup)
         .createWidenStore(*SI, StoreGroup->getAddr(), Res, nullptr,
                           /*Consecutive=*/true, *StoreGroup,
