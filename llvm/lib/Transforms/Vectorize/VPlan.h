@@ -4879,8 +4879,21 @@ public:
     VPBB->setPlan(this);
   }
 
-  /// Generate the IR code for this VPlan.
+  /// Generate IR for the recipes of all blocks of this plan via a
+  /// reverse-post-order traversal, calling VPBlockBase::execute on each, after
+  /// recomputing the VPlan dominator tree. \p State.CFG.PrevBB must be the IR
+  /// block to append the generated code into. This is the generic
+  /// code-generation primitive; callers are responsible for any skeleton setup
+  /// and for fixing up header-phi backedges via
+  /// VPTransformState::fixupHeaderPhis afterwards. executeAndFinalize wraps it
+  /// with the main vector-loop skeleton setup and original-loop teardown.
   void execute(VPTransformState *State);
+
+  /// Generate the IR code for the main vector loop of this VPlan: set up the
+  /// vector-loop skeleton CFG, generate code for all recipes via execute(),
+  /// update LoopInfo, remove the now-dead original loop and fix up header-phi
+  /// backedges.
+  void executeAndFinalize(VPTransformState *State);
 
   /// Return the cost of this plan.
   InstructionCost cost(ElementCount VF, VPCostContext &Ctx);
