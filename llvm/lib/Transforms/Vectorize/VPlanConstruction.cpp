@@ -500,6 +500,13 @@ static void createLoopRegion(VPlan &Plan, VPBlockBase *HeaderVPB, DebugLoc DL) {
   }
 }
 
+/// Extract the last lane of the last unrolled part of \p V, used to compute
+/// the value that resumes scalar execution after the vector loop.
+static VPValue *extractLastLaneOfLastPart(VPBuilder &B, VPValue *V) {
+  VPValue *LastPart = B.createNaryOp(VPInstruction::ExtractLastPart, V);
+  return B.createNaryOp(VPInstruction::ExtractLastLane, LastPart);
+}
+
 /// Creates extracts for values in \p Plan defined in a loop region and used
 /// outside a loop region.
 static void createExtractsForLiveOuts(VPlan &Plan, VPBasicBlock *MiddleVPBB) {
@@ -513,8 +520,7 @@ static void createExtractsForLiveOuts(VPlan &Plan, VPBasicBlock *MiddleVPBB) {
       VPValue *Exiting = ExitIRI->getIncomingValueForBlock(MiddleVPBB);
       if (isa<VPIRValue>(Exiting))
         continue;
-      Exiting = B.createNaryOp(VPInstruction::ExtractLastPart, Exiting);
-      Exiting = B.createNaryOp(VPInstruction::ExtractLastLane, Exiting);
+      Exiting = extractLastLaneOfLastPart(B, Exiting);
       ExitIRI->setIncomingValueForBlock(MiddleVPBB, Exiting);
     }
   }
@@ -586,9 +592,7 @@ static void addInitialSkeleton(VPlan &Plan, Type *InductionTy,
     auto *VectorPhiR = cast<VPPhi>(&PhiR);
     VPValue *BackedgeVal = VectorPhiR->getOperand(1);
     VPValue *ResumeFromVectorLoop =
-        MiddleBuilder.createNaryOp(VPInstruction::ExtractLastPart, BackedgeVal);
-    ResumeFromVectorLoop = MiddleBuilder.createNaryOp(
-        VPInstruction::ExtractLastLane, ResumeFromVectorLoop);
+        extractLastLaneOfLastPart(MiddleBuilder, BackedgeVal);
     // Create scalar resume phi, with the first operand being the incoming value
     // from the middle block and the second operand coming from the entry block.
     auto *ResumePhiR = ScalarPHBuilder.createScalarPhi(
@@ -1636,27 +1640,42 @@ static VPInstruction *findFindIVSelect(VPValue *BackedgeVal) {
       }));
 }
 
+/// Return the min/max operation forming the reduction cycle of \p RedPhiR, that
+/// is the recipe defining its backedge value if it is a VPWidenIntrinsicRecipe
+/// or VPReplicateRecipe whose intrinsic matches the recurrence kind. Returns
+/// nullptr otherwise.
+static VPRecipeWithIRFlags *
+getMinMaxReductionOp(VPReductionPHIRecipe *RedPhiR) {
+  auto *MinOrMaxR =
+      dyn_cast_or_null<VPRecipeWithIRFlags>(RedPhiR->getBackedgeValue());
+  if (!MinOrMaxR)
+    return nullptr;
+
+  Intrinsic::ID ExpectedIntrinsicID =
+      getMinMaxReductionIntrinsicOp(RedPhiR->getRecurrenceKind());
+  if (!match(MinOrMaxR, m_Intrinsic(ExpectedIntrinsicID)))
+    return nullptr;
+  return MinOrMaxR;
+}
+
+/// Return the operand of the min/max operation \p MinOrMaxR that is not the
+/// reduction phi \p RedPhiR.
+static VPValue *getOtherMinMaxOperand(VPRecipeWithIRFlags *MinOrMaxR,
+                                      VPReductionPHIRecipe *RedPhiR) {
+  if (MinOrMaxR->getOperand(0) == RedPhiR)
+    return MinOrMaxR->getOperand(1);
+  assert(MinOrMaxR->getOperand(1) == RedPhiR &&
+         "Reduction phi operand expected");
+  return MinOrMaxR->getOperand(0);
+}
+
 bool VPlanTransforms::handleMaxMinNumReductions(VPlan &Plan) {
   auto GetMinOrMaxCompareValue =
       [](VPReductionPHIRecipe *RedPhiR) -> VPValue * {
-    auto *MinOrMaxR =
-        dyn_cast_or_null<VPRecipeWithIRFlags>(RedPhiR->getBackedgeValue());
+    auto *MinOrMaxR = getMinMaxReductionOp(RedPhiR);
     if (!MinOrMaxR)
       return nullptr;
-
-    // Check that MinOrMaxR is a VPWidenIntrinsicRecipe or VPReplicateRecipe
-    // with an intrinsic that matches the reduction kind.
-    Intrinsic::ID ExpectedIntrinsicID =
-        getMinMaxReductionIntrinsicOp(RedPhiR->getRecurrenceKind());
-    if (!match(MinOrMaxR, m_Intrinsic(ExpectedIntrinsicID)))
-      return nullptr;
-
-    if (MinOrMaxR->getOperand(0) == RedPhiR)
-      return MinOrMaxR->getOperand(1);
-
-    assert(MinOrMaxR->getOperand(1) == RedPhiR &&
-           "Reduction phi operand expected");
-    return MinOrMaxR->getOperand(0);
+    return getOtherMinMaxOperand(MinOrMaxR, RedPhiR);
   };
 
   VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
@@ -2094,24 +2113,15 @@ bool VPlanTransforms::handleMultiUseReductions(VPlan &Plan,
         RecurrenceDescriptor::isIntMinMaxRecurrenceKind(RdxKind) &&
         "only min/max recurrences support users outside the reduction chain");
 
-    auto *MinOrMaxOp =
-        dyn_cast<VPRecipeWithIRFlags>(MinOrMaxPhiR->getBackedgeValue());
+    auto *MinOrMaxOp = getMinMaxReductionOp(MinOrMaxPhiR);
     if (!MinOrMaxOp)
-      return false;
-
-    // Check that MinOrMaxOp is a VPWidenIntrinsicRecipe or VPReplicateRecipe
-    // with an intrinsic that matches the reduction kind.
-    Intrinsic::ID ExpectedIntrinsicID = getMinMaxReductionIntrinsicOp(RdxKind);
-    if (!match(MinOrMaxOp, m_Intrinsic(ExpectedIntrinsicID)))
       return false;
 
     // MinOrMaxOp must have 2 users: 1) MinOrMaxPhiR and 2)
     // ComputeReductionResult.
     assert(MinOrMaxOp->getNumUsers() == 2 &&
            "MinOrMaxOp must have exactly 2 users");
-    VPValue *MinOrMaxOpValue = MinOrMaxOp->getOperand(0);
-    if (MinOrMaxOpValue == MinOrMaxPhiR)
-      MinOrMaxOpValue = MinOrMaxOp->getOperand(1);
+    VPValue *MinOrMaxOpValue = getOtherMinMaxOperand(MinOrMaxOp, MinOrMaxPhiR);
 
     VPValue *CmpOpA;
     VPValue *CmpOpB;
