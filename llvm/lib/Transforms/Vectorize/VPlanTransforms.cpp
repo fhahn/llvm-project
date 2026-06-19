@@ -562,10 +562,9 @@ static void addReplicateRegions(VPlan &Plan) {
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
            vp_depth_first_deep(Plan.getEntry()))) {
     for (VPRecipeBase &R : *VPBB)
-      if (auto *RepR = dyn_cast<VPReplicateRecipe>(&R)) {
-        if (RepR->isPredicated())
-          WorkList.push_back(RepR);
-      }
+      if (auto *RepR = dyn_cast<VPReplicateRecipe>(&R);
+          RepR && RepR->isPredicated())
+        WorkList.push_back(RepR);
   }
 
   unsigned BBNum = 0;
@@ -838,8 +837,8 @@ static SmallVector<VPUser *> collectUsersRecursively(VPValue *V) {
   SetVector<VPUser *> Users(llvm::from_range, V->users());
   for (unsigned I = 0; I != Users.size(); ++I) {
     VPRecipeBase *Cur = cast<VPRecipeBase>(Users[I]);
-    for (VPValue *V : Cur->definedValues())
-      Users.insert_range(V->users());
+    for (VPValue *Def : Cur->definedValues())
+      Users.insert_range(Def->users());
   }
   return Users.takeVector();
 }
@@ -2430,9 +2429,8 @@ void VPlanTransforms::clearReductionWrapFlags(VPlan &Plan) {
       continue;
 
     for (VPUser *U : collectUsersRecursively(PhiR))
-      if (auto *RecWithFlags = dyn_cast<VPRecipeWithIRFlags>(U)) {
+      if (auto *RecWithFlags = dyn_cast<VPRecipeWithIRFlags>(U))
         RecWithFlags->dropPoisonGeneratingFlags();
-      }
   }
 }
 
@@ -3709,10 +3707,10 @@ void VPlanTransforms::createInterleaveGroups(
   for (VPBasicBlock *VPBB :
        VPBlockUtils::blocksOnly<VPBasicBlock>(vp_depth_first_shallow(
            Plan.getVectorLoopRegion()->getEntryBasicBlock())))
-    for (VPRecipeBase &R : make_filter_range(*VPBB, [](VPRecipeBase &R) {
-           return isa<VPWidenMemoryRecipe>(&R);
-         })) {
-      auto *MemR = cast<VPWidenMemoryRecipe>(&R);
+    for (VPRecipeBase &R : *VPBB) {
+      auto *MemR = dyn_cast<VPWidenMemoryRecipe>(&R);
+      if (!MemR)
+        continue;
       IRMemberToRecipe[&MemR->getIngredient()] = MemR;
     }
 
@@ -5144,7 +5142,7 @@ collectComplementaryPredicatedMemOps(VPlan &Plan,
   auto Groups = collectGroupedReplicateMemOps<Opcode>(
       Plan, PSE, L,
       [](VPReplicateRecipe *RepR) { return RepR->isPredicated(); });
-  for (auto Recipes : Groups) {
+  for (auto &Recipes : Groups) {
     if (Recipes.size() < 2)
       continue;
 
