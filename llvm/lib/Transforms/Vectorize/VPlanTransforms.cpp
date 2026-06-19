@@ -398,11 +398,10 @@ static bool sinkScalarOperands(VPlan &Plan) {
 /// the mask.
 static VPValue *getPredicatedMask(VPRegionBlock *R) {
   auto *EntryBB = dyn_cast<VPBasicBlock>(R->getEntry());
-  if (!EntryBB || EntryBB->size() != 1 ||
-      !isa<VPBranchOnMaskRecipe>(EntryBB->begin()))
+  if (!EntryBB || EntryBB->size() != 1)
     return nullptr;
-
-  return cast<VPBranchOnMaskRecipe>(&*EntryBB->begin())->getOperand(0);
+  auto *BOM = dyn_cast<VPBranchOnMaskRecipe>(&*EntryBB->begin());
+  return BOM ? BOM->getOperand(0) : nullptr;
 }
 
 /// If \p R is a triangle region, return the 'then' block of the triangle.
@@ -825,12 +824,12 @@ void VPlanTransforms::removeDeadRecipes(VPlan &Plan) {
       VPUser *PhiUser = PhiR->getSingleUser();
       if (!PhiUser)
         continue;
-      if (PhiUser != Incoming->getDefiningRecipe() ||
-          Incoming->getNumUsers() != 1)
+      VPRecipeBase *IncomingR = Incoming->getDefiningRecipe();
+      if (PhiUser != IncomingR || Incoming->getNumUsers() != 1)
         continue;
       PhiR->replaceAllUsesWith(Start);
       PhiR->eraseFromParent();
-      Incoming->getDefiningRecipe()->eraseFromParent();
+      IncomingR->eraseFromParent();
     }
   }
 }
@@ -2169,7 +2168,7 @@ static bool optimizeVectorInductionWidthForTCAndVFUF(VPlan &Plan,
         Instruction::Trunc, Plan.getOrCreateBackedgeTakenCount(), NewIVTy,
         nullptr, VPIRFlags::getDefaultFlags(Instruction::Trunc));
     Plan.getVectorPreheader()->appendRecipe(NewBTC);
-    auto *Cmp = cast<VPInstruction>(WideIV->getSingleUser());
+    auto *Cmp = cast<VPInstruction>(SingleUser);
     Cmp->replaceAllUsesWith(
         VPBuilder(Cmp).createICmp(Cmp->getPredicate(), NewWideIV, NewBTC));
 
@@ -2614,7 +2613,8 @@ static void licm(VPlan &Plan) {
                                   /*Sinking=*/true))
         continue;
 
-      if (auto *RepR = dyn_cast<VPReplicateRecipe>(&R)) {
+      auto *RepR = dyn_cast<VPReplicateRecipe>(&R);
+      if (RepR) {
         assert(!RepR->isPredicated() &&
                "Expected prior transformation of predicated replicates to "
                "replicate regions");
@@ -2631,7 +2631,6 @@ static void licm(VPlan &Plan) {
           continue;
       }
 
-      [[maybe_unused]] auto *RepR = dyn_cast<VPReplicateRecipe>(&R);
       assert((!R.mayWriteToMemory() ||
               (RepR && RepR->getOpcode() == Instruction::Store &&
                RepR->getOperand(1)->isDefinedOutsideLoopRegions())) &&
@@ -5557,7 +5556,6 @@ void VPlanTransforms::materializeFactors(VPlan &Plan, VPBasicBlock *VectorPH,
 
 void VPlanTransforms::attachAliasMaskToHeaderMask(VPlan &Plan) {
   VPSingleDefRecipe *HeaderMask = vputils::findHeaderMask(Plan);
-  auto *HeaderMaskDef = HeaderMask->getDefiningRecipe();
   Type *I1Ty = IntegerType::getInt1Ty(Plan.getContext());
 
   VPBuilder Builder(Plan.getVectorPreheader());
@@ -5565,10 +5563,10 @@ void VPlanTransforms::attachAliasMaskToHeaderMask(VPlan &Plan) {
       VPInstruction::IncomingAliasMask, {}, nullptr, {}, {},
       DebugLoc::getUnknown(), "incoming.alias.mask", I1Ty);
 
-  if (HeaderMaskDef->isPhi())
-    Builder = VPBuilder(&*HeaderMaskDef->getParent()->getFirstNonPhi());
+  if (HeaderMask->isPhi())
+    Builder = VPBuilder(&*HeaderMask->getParent()->getFirstNonPhi());
   else
-    Builder = VPBuilder::getToInsertAfter(HeaderMaskDef);
+    Builder = VPBuilder::getToInsertAfter(HeaderMask);
 
   // Update all existing users of the header mask to "HeaderMask & AliasMask".
   auto *ClampedHeaderMask = Builder.createAnd(HeaderMask, AliasMask);
@@ -6421,9 +6419,9 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
     if (!SentinelVal || IVOfExpressionToSink) {
       // When we need to create a new select, normalize the condition so that
       // PhiR is the last operand and include the header mask if needed.
-      DebugLoc DL = FindLastSelect->getDefiningRecipe()->getDebugLoc();
-      VPBuilder LoopBuilder(FindLastSelect->getDefiningRecipe());
-      if (FindLastSelect->getDefiningRecipe()->getOperand(1) == PhiR)
+      DebugLoc DL = FindLastSelect->getDebugLoc();
+      VPBuilder LoopBuilder(FindLastSelect);
+      if (FindLastSelect->getOperand(1) == PhiR)
         SelectCond = LoopBuilder.createNot(SelectCond);
 
       // When tail folding, mask the condition with the header mask to prevent
