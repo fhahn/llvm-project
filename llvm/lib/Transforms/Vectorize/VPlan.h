@@ -872,7 +872,7 @@ public:
     ReductionFlags = ReductionFlagsTy(Kind, IsOrdered, IsInLoop, FMFs);
   }
 
-  void transferFlags(VPIRFlags &Other) {
+  void transferFlags(const VPIRFlags &Other) {
     OpType = Other.OpType;
     AllFlags[0] = Other.AllFlags[0];
     AllFlags[1] = Other.AllFlags[1];
@@ -1042,7 +1042,7 @@ public:
 
   bool isDisjoint() const {
     assert(OpType == OperationType::DisjointOp &&
-           "recipe cannot have a disjoing flag");
+           "recipe cannot have a disjoint flag");
     return DisjointFlags.IsDisjoint;
   }
 
@@ -4255,8 +4255,8 @@ public:
 
   VPValue *getStepValue() const { return getOperand(1); }
 
-  /// Return the number of scalars to produce per unroll part, used to compute
-  /// StartIndex during unrolling.
+  /// Return the VF operand (the number of scalars to produce per unroll part),
+  /// used to compute StartIndex during unrolling.
   VPValue *getVFValue() const { return getOperand(2); }
 
   /// Return the StartIndex, or null if known to be zero, valid only after

@@ -165,11 +165,10 @@ public:
     if (user_empty())
       return false;
 
-    // Check if all users match the first user.
-    auto Current = std::next(user_begin());
-    while (Current != user_end() && *user_begin() == *Current)
-      Current++;
-    return Current != user_end();
+    // Check if any user differs from the first user.
+    const VPUser *First = *user_begin();
+    return any_of(drop_begin(users()),
+                  [First](const VPUser *U) { return U != First; });
   }
 
   bool hasOneUse() const { return getNumUsers() == 1; }

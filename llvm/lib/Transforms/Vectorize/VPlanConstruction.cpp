@@ -1186,7 +1186,7 @@ void VPlanTransforms::createInLoopReductionRecipes(VPlan &Plan,
       VPValue *CondOp = cast<VPInstruction>(CurrentLink)->getMask();
       auto *RedRecipe = new VPReductionRecipe(
           Kind, FMFs, CurrentLinkI, PreviousLink, VecOp, CondOp,
-          getReductionStyle(/*IsInLoop=*/true, PhiR->isOrdered(), 1),
+          getReductionStyle(/*InLoop=*/true, PhiR->isOrdered(), 1),
           CurrentLinkI->getDebugLoc());
       // Append the recipe to the end of the VPBasicBlock because we need to
       // ensure that it comes after all of it's inputs, including CondOp.
