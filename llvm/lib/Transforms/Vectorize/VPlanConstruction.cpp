@@ -107,8 +107,9 @@ static bool isHeaderBB(BasicBlock *BB, Loop *L) {
 // Add operands to VPInstructions representing phi nodes from the input IR.
 void PlainCFGBuilder::fixHeaderPhis() {
   for (auto *Phi : PhisToFix) {
-    assert(IRDef2VPValue.count(Phi) && "Missing VPInstruction for PHINode.");
-    VPValue *VPVal = IRDef2VPValue[Phi];
+    auto It = IRDef2VPValue.find(Phi);
+    assert(It != IRDef2VPValue.end() && "Missing VPInstruction for PHINode.");
+    VPValue *VPVal = It->second;
     assert(isa<VPPhi>(VPVal) && "Expected VPPhi for phi node.");
     auto *PhiR = cast<VPPhi>(VPVal);
     assert(PhiR->getNumOperands() == 0 && "Expected VPPhi with no operands.");
@@ -271,10 +272,10 @@ void PlainCFGBuilder::createVPInstructionsForVPBB(VPBasicBlock *VPBB,
                                             CI->getType(), CI->getDebugLoc(),
                                             VPIRFlags(*CI), MD);
         NewR->setUnderlyingValue(CI);
-      } else if (auto *LI = dyn_cast<LoadInst>(Inst)) {
-        NewR = VPIRBuilder.createScalarLoad(LI->getType(), VPOperands[0],
-                                            LI->getDebugLoc(), MD);
-        NewR->setUnderlyingValue(LI);
+      } else if (auto *Load = dyn_cast<LoadInst>(Inst)) {
+        NewR = VPIRBuilder.createScalarLoad(Load->getType(), VPOperands[0],
+                                            Load->getDebugLoc(), MD);
+        NewR->setUnderlyingValue(Load);
       } else {
         // Build VPInstruction for any arbitrary Instruction without specific
         // representation in VPlan.
@@ -395,12 +396,14 @@ static bool canonicalHeaderAndLatch(VPBlockBase *HeaderVPB,
 
   auto *PreheaderVPBB = Preds[0];
   auto *LatchVPBB = Preds[1];
-  if (!VPDT.dominates(PreheaderVPBB, HeaderVPB) ||
-      !VPDT.dominates(HeaderVPB, LatchVPBB)) {
+  auto IsPreheaderAndLatch = [&](VPBlockBase *Preheader, VPBlockBase *Latch) {
+    return VPDT.dominates(Preheader, HeaderVPB) &&
+           VPDT.dominates(HeaderVPB, Latch);
+  };
+  if (!IsPreheaderAndLatch(PreheaderVPBB, LatchVPBB)) {
     std::swap(PreheaderVPBB, LatchVPBB);
 
-    if (!VPDT.dominates(PreheaderVPBB, HeaderVPB) ||
-        !VPDT.dominates(HeaderVPB, LatchVPBB))
+    if (!IsPreheaderAndLatch(PreheaderVPBB, LatchVPBB))
       return false;
 
     // Canonicalize predecessors of header so that preheader is first and
@@ -951,8 +954,10 @@ bool VPlanTransforms::createHeaderPhiRecipes(
                                         Plan, PSE, OrigLoop,
                                         PhiR->getDebugLoc());
 
-    assert(Reductions.contains(Phi) && "only reductions are expected now");
-    const RecurrenceDescriptor &RdxDesc = Reductions.lookup(Phi);
+    auto ReductionIt = Reductions.find(Phi);
+    assert(ReductionIt != Reductions.end() &&
+           "only reductions are expected now");
+    const RecurrenceDescriptor &RdxDesc = ReductionIt->second;
     assert(RdxDesc.getRecurrenceStartValue() ==
                Phi->getIncomingValueForBlock(OrigLoop.getLoopPreheader()) &&
            "incoming value must match start value");
