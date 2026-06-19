@@ -454,7 +454,6 @@ static bool mergeReplicateRegionsIntoSuccessors(VPlan &Plan) {
     if (!Mask1 || Mask1 != Mask2)
       continue;
 
-    assert(Mask1 && Mask2 && "both region must have conditions");
     WorkList.push_back(Region1);
   }
 
@@ -1837,7 +1836,7 @@ static void simplifyRecipe(VPSingleDefRecipe *Def) {
   VPValue *StartV;
   if (match(Def, m_VPInstruction<VPInstruction::ReductionStartVector>(
                      m_VPValue(StartV), m_VPValue(), m_VPValue()))) {
-    Def->replaceUsesWithIf(StartV, [](const VPUser &U, unsigned Idx) {
+    Def->replaceUsesWithIf(StartV, [](const VPUser &U, unsigned) {
       auto *PhiR = dyn_cast<VPReductionPHIRecipe>(&U);
       return PhiR && PhiR->isInLoop();
     });
@@ -4285,8 +4284,7 @@ void VPlanTransforms::convertToConcreteRecipes(VPlan &Plan) {
 
       VPInstruction *Mul = Builder.createNaryOp(
           MulOpc, {VectorStep, ScalarStep}, Flags, R.getDebugLoc());
-      VectorStep = Mul;
-      VPI->replaceAllUsesWith(VectorStep);
+      VPI->replaceAllUsesWith(Mul);
       VPI->eraseFromParent();
     }
   }
@@ -4846,14 +4844,13 @@ tryToMatchAndCreateExtendedReduction(VPReductionRecipe *Red, VPCostContext &Ctx,
           auto *SrcVecTy = cast<VectorType>(toVectorTy(SrcTy, VF));
           TTI::TargetCostKind CostKind = TTI::TCK_RecipThroughput;
 
-          InstructionCost ExtRedCost = InstructionCost::getInvalid();
           InstructionCost ExtCost =
               cast<VPWidenCastRecipe>(VecOp)->computeCost(VF, Ctx);
           InstructionCost RedCost = Red->computeCost(VF, Ctx);
 
           assert(!RedTy->isFloatingPointTy() &&
                  "getExtendedReductionCost only supports integer types");
-          ExtRedCost = Ctx.TTI.getExtendedReductionCost(
+          InstructionCost ExtRedCost = Ctx.TTI.getExtendedReductionCost(
               Opcode, ExtOpc == Instruction::CastOps::ZExt, RedTy, SrcVecTy,
               Red->getFastMathFlagsOrNone(), CostKind);
           return ExtRedCost.isValid() && ExtRedCost < ExtCost + RedCost;
@@ -5105,25 +5102,23 @@ void VPlanTransforms::materializeBroadcasts(VPlan &Plan) {
       continue;
 
     // Add explicit broadcast at the insert point that dominates all users.
-    VPBasicBlock *HoistBlock = VectorPreheader;
     VPBasicBlock::iterator HoistPoint = VectorPreheader->end();
     for (VPUser *User : VPV->users()) {
       if (User->usesScalars(VPV))
         continue;
       if (cast<VPRecipeBase>(User)->getParent() == VectorPreheader)
-        HoistPoint = HoistBlock->begin();
+        HoistPoint = VectorPreheader->begin();
       else
         assert(VPDT.dominates(VectorPreheader,
                               cast<VPRecipeBase>(User)->getParent()) &&
                "All users must be in the vector preheader or dominated by it");
     }
 
-    VPBuilder Builder(cast<VPBasicBlock>(HoistBlock), HoistPoint);
+    VPBuilder Builder(VectorPreheader, HoistPoint);
     auto *Broadcast = Builder.createNaryOp(VPInstruction::Broadcast, {VPV});
-    VPV->replaceUsesWithIf(Broadcast,
-                           [VPV, Broadcast](VPUser &U, unsigned Idx) {
-                             return Broadcast != &U && !U.usesScalars(VPV);
-                           });
+    VPV->replaceUsesWithIf(Broadcast, [VPV, Broadcast](VPUser &U, unsigned) {
+      return Broadcast != &U && !U.usesScalars(VPV);
+    });
   }
 }
 
@@ -5509,7 +5504,7 @@ void VPlanTransforms::materializeVectorTripCount(
   // iterations check ensures that N >= Step.
   if (RequiresScalarEpilogue) {
     assert(!TailByMasking &&
-           "requiring scalar epilogue is not supported with fail folding");
+           "requiring scalar epilogue is not supported with tail folding");
     VPValue *IsZero =
         Builder.createICmp(CmpInst::ICMP_EQ, R, Plan.getZero(TCTy));
     R = Builder.createSelect(IsZero, Step, R);
