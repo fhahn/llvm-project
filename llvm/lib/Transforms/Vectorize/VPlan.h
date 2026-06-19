@@ -128,14 +128,14 @@ class LLVM_ABI_FOR_TEST VPBlockBase {
   /// Remove \p Predecessor from the predecessors of this block.
   void removePredecessor(VPBlockBase *Predecessor) {
     auto Pos = find(Predecessors, Predecessor);
-    assert(Pos && "Predecessor does not exist");
+    assert(Pos != Predecessors.end() && "Predecessor does not exist");
     Predecessors.erase(Pos);
   }
 
   /// Remove \p Successor from the successors of this block.
   void removeSuccessor(VPBlockBase *Successor) {
     auto Pos = find(Successors, Successor);
-    assert(Pos && "Successor does not exist");
+    assert(Pos != Successors.end() && "Successor does not exist");
     Successors.erase(Pos);
   }
 

@@ -545,10 +545,12 @@ public:
 
   /// Returns the VPValue with index \p I defined by the VPDef.
   VPValue *getVPValue(unsigned I) {
+    assert(I < DefinedValues.size() && "index out of bounds");
     assert(DefinedValues[I] && "defined value must be non-null");
     return DefinedValues[I];
   }
   const VPValue *getVPValue(unsigned I) const {
+    assert(I < DefinedValues.size() && "index out of bounds");
     assert(DefinedValues[I] && "defined value must be non-null");
     return DefinedValues[I];
   }
