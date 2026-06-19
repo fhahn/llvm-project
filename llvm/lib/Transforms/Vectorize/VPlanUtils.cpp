@@ -122,13 +122,14 @@ static bool poisonGuaranteesUB(const VPValue *V) {
       continue;
 
     for (VPUser *U : Current->users()) {
+      auto *R = cast<VPRecipeBase>(U);
       // Check if Current is used as an address operand for load/store.
-      if (auto *MemR = dyn_cast<VPWidenMemoryRecipe>(cast<VPRecipeBase>(U))) {
+      if (auto *MemR = dyn_cast<VPWidenMemoryRecipe>(R)) {
         if (MemR->getAddr() == Current)
           return true;
         continue;
       }
-      if (auto *Rep = dyn_cast<VPReplicateRecipe>(U)) {
+      if (auto *Rep = dyn_cast<VPReplicateRecipe>(R)) {
         unsigned Opcode = Rep->getOpcode();
         if ((Opcode == Instruction::Load && Rep->getOperand(0) == Current) ||
             (Opcode == Instruction::Store && Rep->getOperand(1) == Current))
@@ -136,7 +137,6 @@ static bool poisonGuaranteesUB(const VPValue *V) {
       }
 
       // Check if poison propagates through this recipe to any of its users.
-      auto *R = cast<VPRecipeBase>(U);
       for (const VPValue *Op : R->operands()) {
         if (Op == Current && propagatesPoisonFromRecipeOp(R)) {
           Worklist.push_back(R->getVPSingleValue());
@@ -464,13 +464,10 @@ bool vputils::isUniformAcrossVFsAndUFs(const VPValue *V) {
   const VPRecipeBase *R = V->getDefiningRecipe();
   const VPBasicBlock *VPBB = R ? R->getParent() : nullptr;
   const VPlan *Plan = VPBB ? VPBB->getPlan() : nullptr;
-  if (VPBB) {
-    if ((VPBB == Plan->getVectorPreheader() || VPBB == Plan->getEntry())) {
-      if (match(V->getDefiningRecipe(),
-                m_VPInstruction<VPInstruction::CanonicalIVIncrementForPart>()))
-        return false;
-      return all_of(R->operands(), isUniformAcrossVFsAndUFs);
-    }
+  if (VPBB && (VPBB == Plan->getVectorPreheader() || VPBB == Plan->getEntry())) {
+    if (match(R, m_VPInstruction<VPInstruction::CanonicalIVIncrementForPart>()))
+      return false;
+    return all_of(R->operands(), isUniformAcrossVFsAndUFs);
   }
 
   return TypeSwitch<const VPRecipeBase *, bool>(R)
@@ -587,7 +584,7 @@ VPSingleDefRecipe *vputils::findHeaderMask(VPlan &Plan) {
     }
   }
 
-  for (VPRecipeBase &R : LoopRegion->getEntryBasicBlock()->phis()) {
+  for (VPRecipeBase &R : HeaderVPBB->phis()) {
     auto *Def = cast<VPSingleDefRecipe>(&R);
     if (vputils::isHeaderMask(Def, Plan)) {
       assert(!HeaderMask && "Multiple header masks found?");
@@ -694,7 +691,7 @@ VPInstruction *vputils::findCanonicalIVIncrement(VPlan &Plan) {
     VPSymbolicValue &UF = Plan.getUF();
     if (!UF.isMaterialized())
       return Step == &UF ||
-             match(Step, m_c_Mul(m_Specific(&Plan.getUF()),
+             match(Step, m_c_Mul(m_Specific(&UF),
                                  m_VPInstruction<VPInstruction::VScale>()));
 
     // Alias masking: step is number of active lanes of a dependence mask.
