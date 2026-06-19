@@ -464,7 +464,8 @@ bool vputils::isUniformAcrossVFsAndUFs(const VPValue *V) {
   const VPRecipeBase *R = V->getDefiningRecipe();
   const VPBasicBlock *VPBB = R ? R->getParent() : nullptr;
   const VPlan *Plan = VPBB ? VPBB->getPlan() : nullptr;
-  if (VPBB && (VPBB == Plan->getVectorPreheader() || VPBB == Plan->getEntry())) {
+  if (VPBB &&
+      (VPBB == Plan->getVectorPreheader() || VPBB == Plan->getEntry())) {
     if (match(R, m_VPInstruction<VPInstruction::CanonicalIVIncrementForPart>()))
       return false;
     return all_of(R->operands(), isUniformAcrossVFsAndUFs);

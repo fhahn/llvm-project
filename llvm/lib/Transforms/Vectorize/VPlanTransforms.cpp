@@ -2182,8 +2182,9 @@ static bool optimizeVectorInductionWidthForTCAndVFUF(VPlan &Plan,
 /// conveniently available as SCEV, so fall back to the original trip count if
 /// needed; this is stricter than necessary, as it only succeeds if the trip
 /// count equals the vector trip count.
-static bool isKnownVectorTripCountPredicate(CmpInst::Predicate Pred, VPlan &Plan,
-                                            ElementCount BestVF, unsigned BestUF,
+static bool isKnownVectorTripCountPredicate(CmpInst::Predicate Pred,
+                                            VPlan &Plan, ElementCount BestVF,
+                                            unsigned BestUF,
                                             PredicatedScalarEvolution &PSE) {
   const SCEV *VectorTripCount =
       vputils::getSCEVExprForVPValue(&Plan.getVectorTripCount(), PSE);
@@ -2338,8 +2339,8 @@ static bool simplifyBranchConditionForVFAndUF(VPlan &Plan, ElementCount BestVF,
                       m_VPValue(), m_VPValue(), m_VPValue()))))) {
     // Try to simplify the branch condition if VectorTC <= VF * UF when the
     // latch terminator is BranchOnCount or BranchOnCond(Not(ActiveLaneMask)).
-    if (!isKnownVectorTripCountPredicate(CmpInst::ICMP_ULE, Plan, BestVF, BestUF,
-                                         PSE))
+    if (!isKnownVectorTripCountPredicate(CmpInst::ICMP_ULE, Plan, BestVF,
+                                         BestUF, PSE))
       return false;
   } else if (match(Term, m_BranchOnCond(m_VPValue(Cond))) ||
              match(Term, m_BranchOnTwoConds(m_VPValue(), m_VPValue(Cond)))) {
