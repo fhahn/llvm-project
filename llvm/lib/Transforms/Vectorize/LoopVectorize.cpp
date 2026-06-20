@@ -6509,6 +6509,66 @@ VPRecipeBuilder::tryToCreateWidenNonPhiRecipe(VPSingleDefRecipe *R,
 // optimizations.
 static void printOptimizedVPlan(VPlan &) {}
 
+#ifndef NDEBUG
+/// VPlan-native analogue of LoopVectorizationLegality::isUniformLoop's
+/// canonical-IV condition, used purely to validate the VPPhi-to-AddRec SCEV
+/// lowering on real plans. Legality (canVectorizeOuterLoop -> isUniformLoopNest)
+/// has already proven every inner loop of \p OuterLoop uniform before any VPlan
+/// is built, so for every plan that reaches here this must return true. Walks
+/// the flat VPlan0 CFG (no loop regions yet): an inner-loop header is a
+/// VPBasicBlock that dominates one of its two predecessors (the back-edge
+/// source). For each such header, the loop-control phi must lower to an affine
+/// {0,+,1} AddRec in the corresponding inner IR loop via getSCEVExprForVPValue,
+/// which is exactly the recipe shape the VPPhi case now handles.
+static bool verifyOuterLoopInnerIVsAreCanonical(VPlan &Plan,
+                                                PredicatedScalarEvolution &PSE,
+                                                Loop *OuterLoop) {
+  ArrayRef<Loop *> SubLoops = OuterLoop->getSubLoops();
+  if (SubLoops.size() != 1)
+    return true; // Only single-level nests are analyzed here.
+  Loop *InnerLoop = SubLoops.front();
+
+  // Map each header VPBasicBlock to its IR loop so the VPPhi SCEV lowering can
+  // form AddRecs in the right loop. The outer header is found directly; any
+  // other back-edge target in the flat CFG is the inner header.
+  DenseMap<const VPBasicBlock *, const Loop *> HeaderVPBBToLoop;
+  VPBasicBlock *OuterHeader =
+      VPBlockUtils::getPlainCFGHeaderAndLatch(Plan).first;
+  HeaderVPBBToLoop[OuterHeader] = OuterLoop;
+
+  VPDominatorTree VPDT(Plan);
+  VPBasicBlock *InnerHeader = nullptr;
+  for (VPBlockBase *VPB : vp_depth_first_shallow(Plan.getEntry())) {
+    auto *VPBB = dyn_cast<VPBasicBlock>(VPB);
+    if (!VPBB || VPBB == OuterHeader)
+      continue;
+    ArrayRef<VPBlockBase *> Preds = VPBB->getPredecessors();
+    if (Preds.size() != 2)
+      continue;
+    // A back-edge target (header) dominates the latch (its back-edge source).
+    if (!VPDT.dominates(VPBB, Preds[0]) && !VPDT.dominates(VPBB, Preds[1]))
+      continue;
+    HeaderVPBBToLoop[VPBB] = InnerLoop;
+    InnerHeader = VPBB;
+  }
+  if (!InnerHeader)
+    return true;
+
+  for (VPRecipeBase &R : InnerHeader->phis()) {
+    const auto *PhiR = dyn_cast<VPPhi>(&R);
+    if (!PhiR)
+      continue;
+    const SCEV *S =
+        vputils::getSCEVExprForVPValue(PhiR, PSE, OuterLoop, &HeaderVPBBToLoop);
+    // The canonical inner IV must lower to {0,+,1}<InnerLoop>.
+    if (match(S, m_scev_AffineAddRec(m_scev_Zero(), m_scev_One(),
+                                     m_SpecificLoop(InnerLoop))))
+      return true;
+  }
+  return false;
+}
+#endif
+
 VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
   bool IsInnerLoop = OrigLoop->isInnermost();
 
@@ -6554,6 +6614,14 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
   if (const LoopAccessInfo *LAI = Legal->getLAI())
     RUN_VPLAN_PASS(VPlanTransforms::replaceSymbolicStrides, *VPlan0, PSE,
                    LAI->getSymbolicStrides(), VPDT);
+
+  // Legality has already proven the inner loops uniform before building any
+  // VPlan, so the VPlan-native canonical-IV analysis (which exercises the
+  // VPPhi-to-AddRec SCEV lowering) must agree for every outer-loop plan that
+  // reaches this point.
+  assert((IsInnerLoop ||
+          verifyOuterLoopInnerIVsAreCanonical(*VPlan0, PSE, OrigLoop)) &&
+         "inner loop IV not recognized as canonical on VPlan");
 
   // Add surviving induction predicates to PSE and check constraints.
   bool ForceVectorization = Hints.getForce() == LoopVectorizeHints::FK_Enabled;
