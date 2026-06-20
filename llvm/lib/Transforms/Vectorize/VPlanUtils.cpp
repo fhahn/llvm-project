@@ -105,14 +105,70 @@ static bool propagatesPoisonFromRecipeOp(const VPRecipeBase *R) {
         return Opcode == Instruction::GetElementPtr ||
                Instruction::isCast(Opcode);
       })
+      .Case([](const VPInstruction *VPI) {
+        // Outer-loop VPlan represents address arithmetic as plain
+        // VPInstructions; treat GEP, casts and the standard arithmetic
+        // ops here the same way LLVM IR's propagatesPoison treats them
+        // so the address-feeds-memory poison-walk doesn't stop short.
+        unsigned Opcode = VPI->getOpcode();
+        if (Opcode == Instruction::GetElementPtr || Instruction::isCast(Opcode))
+          return true;
+        return Instruction::isBinaryOp(Opcode) && Opcode != Instruction::SDiv &&
+               Opcode != Instruction::UDiv && Opcode != Instruction::SRem &&
+               Opcode != Instruction::URem;
+      })
       .Default([](const VPRecipeBase *) { return false; });
 }
 
+/// Returns true if recipe \p R is guaranteed to execute on every iteration of
+/// each loop that contains it, i.e. it is not under any conditional branch
+/// within those loops. This is the VPlan-native, flat-CFG analogue of
+/// ScalarEvolution::isGuaranteedToTransferExecutionTo used by
+/// isSCEVExprNeverPoison: a recipe must-executes iff, for every loop back-edge
+/// Latch->Header whose Header dominates R's block, R's block also dominates
+/// Latch. Operates on the unconditioned VPlan0 CFG (no loop regions yet), so
+/// loops are identified by their back-edges. Single-block inner loops (the only
+/// shape the outer-loop analysis accepts) keep this check simple.
+static bool mustExecuteEachIteration(const VPRecipeBase *R,
+                                     VPDominatorTree &VPDT) {
+  const VPBasicBlock *RBB = R->getParent();
+  for (const VPBlockBase *VPB :
+       vp_depth_first_shallow(RBB->getPlan()->getEntry())) {
+    const auto *Header = dyn_cast<VPBasicBlock>(VPB);
+    if (!Header)
+      continue;
+    // A back-edge is a predecessor edge Latch->Header where Header dominates
+    // Latch. If such a Header dominates R's block, R is inside that loop and
+    // must dominate the corresponding Latch to run on every iteration.
+    for (const VPBlockBase *Pred : Header->getPredecessors()) {
+      const auto *Latch = dyn_cast<VPBasicBlock>(Pred);
+      if (!Latch || !VPDT.dominates(Header, Latch))
+        continue; // Not a back-edge.
+      if (VPDT.dominates(Header, RBB) && !VPDT.dominates(RBB, Latch))
+        return false;
+    }
+  }
+  return true;
+}
+
 /// Returns true if \p V being poison is guaranteed to trigger UB because it
-/// propagates to the address of a memory recipe.
+/// propagates to the address of a memory recipe that is guaranteed to execute
+/// on every iteration of the loops containing it.
 static bool poisonGuaranteesUB(const VPValue *V) {
   SmallPtrSet<const VPValue *, 8> Visited;
   SmallVector<const VPValue *, 16> Worklist;
+
+  // A conditionally-executed memory access is not a valid poison sink: poison
+  // only triggers UB on the iterations where the access runs, so flags derived
+  // from it cannot be attached to the (shared) SCEV. Reason about must-execute
+  // on VPlan0's flat CFG via dominance over loop back-edges. Building the
+  // dominator tree only reads the plan, so the const_cast is safe.
+  std::optional<VPDominatorTree> VPDT;
+  auto SinkMustExecute = [&](const VPRecipeBase *Sink) {
+    if (!VPDT)
+      VPDT.emplace(*const_cast<VPlan *>(Sink->getParent()->getPlan()));
+    return mustExecuteEachIteration(Sink, *VPDT);
+  };
 
   Worklist.push_back(V);
 
@@ -122,24 +178,35 @@ static bool poisonGuaranteesUB(const VPValue *V) {
       continue;
 
     for (VPUser *U : Current->users()) {
+      auto *UR = cast<VPRecipeBase>(U);
       // Check if Current is used as an address operand for load/store.
-      if (auto *MemR = dyn_cast<VPWidenMemoryRecipe>(cast<VPRecipeBase>(U))) {
-        if (MemR->getAddr() == Current)
+      if (auto *MemR = dyn_cast<VPWidenMemoryRecipe>(UR)) {
+        if (MemR->getAddr() == Current && SinkMustExecute(UR))
           return true;
         continue;
       }
-      if (auto *Rep = dyn_cast<VPReplicateRecipe>(U)) {
+      if (auto *Rep = dyn_cast<VPReplicateRecipe>(UR)) {
         unsigned Opcode = Rep->getOpcode();
-        if ((Opcode == Instruction::Load && Rep->getOperand(0) == Current) ||
-            (Opcode == Instruction::Store && Rep->getOperand(1) == Current))
+        if (((Opcode == Instruction::Load && Rep->getOperand(0) == Current) ||
+             (Opcode == Instruction::Store && Rep->getOperand(1) == Current)) &&
+            SinkMustExecute(UR))
+          return true;
+      }
+      // Outer-loop VPlan analysis represents memory accesses as plain
+      // VPInstructions; recognize those too so flag propagation through
+      // address arithmetic remains sound for that path.
+      if (auto *VPI = dyn_cast<VPInstruction>(UR)) {
+        unsigned Opcode = VPI->getOpcode();
+        if (((Opcode == Instruction::Load && VPI->getOperand(0) == Current) ||
+             (Opcode == Instruction::Store && VPI->getOperand(1) == Current)) &&
+            SinkMustExecute(UR))
           return true;
       }
 
       // Check if poison propagates through this recipe to any of its users.
-      auto *R = cast<VPRecipeBase>(U);
-      for (const VPValue *Op : R->operands()) {
-        if (Op == Current && propagatesPoisonFromRecipeOp(R)) {
-          Worklist.push_back(R->getVPSingleValue());
+      for (const VPValue *Op : UR->operands()) {
+        if (Op == Current && propagatesPoisonFromRecipeOp(UR)) {
+          Worklist.push_back(UR->getVPSingleValue());
           break;
         }
       }
@@ -323,8 +390,23 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
   ArrayRef<VPValue *> Ops;
   Type *SourceElementType;
   if (match(V, m_GetElementPtr(SourceElementType, Ops))) {
+    // Forward inbounds/nuw/nusw onto the SCEV so it can mark resulting AddRecs
+    // with corresponding nowrap flags. As in
+    // ScalarEvolution::getGEPExpr(GEPOperator *), the flags may only be
+    // forwarded when the GEP is guaranteed not to be poison in its defining
+    // scope; otherwise the (shared, uniqued) SCEV node may be reached via a
+    // conditionally-executed GEP that does wrap, leaking an unjustified flag
+    // into the SCEV cache. poisonGuaranteesUB requires that the GEP feeds a
+    // memory access that is guaranteed to execute on every iteration, which is
+    // the VPlan-native analogue of SCEV's isSCEVExprNeverPoison.
+    GEPNoWrapFlags NW = GEPNoWrapFlags::none();
+    if (const auto *VPI =
+            dyn_cast_or_null<VPInstruction>(V->getDefiningRecipe()))
+      if (poisonGuaranteesUB(V))
+        NW = VPI->getGEPNoWrapFlags();
     return CreateSCEV(Ops, [&](ArrayRef<SCEVUse> Ops) {
-      return SE.getGEPExpr(Ops.front(), Ops.drop_front(), SourceElementType);
+      return SE.getGEPExpr(Ops.front(), Ops.drop_front(), SourceElementType,
+                           NW);
     });
   }
 
