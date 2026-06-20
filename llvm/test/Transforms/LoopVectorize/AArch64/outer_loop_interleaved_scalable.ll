@@ -35,9 +35,11 @@ define void @col_major_scalable(ptr noalias %A, i64 %N) {
 ; CHECK-NEXT:    [[TMP4:%.*]] = shl nsw <vscale x 4 x i64> [[J2]], splat (i64 3)
 ; CHECK-NEXT:    [[TMP5:%.*]] = add nsw <vscale x 4 x i64> [[VEC_IND]], [[TMP4]]
 ; CHECK-NEXT:    [[WIDE_GEP:%.*]] = getelementptr inbounds float, ptr [[A]], <vscale x 4 x i64> [[TMP5]]
-; CHECK-NEXT:    [[WIDE_MASKED_GATHER:%.*]] = call <vscale x 4 x float> @llvm.masked.gather.nxv4f32.nxv4p0(<vscale x 4 x ptr> align 4 [[WIDE_GEP]], <vscale x 4 x i1> splat (i1 true), <vscale x 4 x float> poison)
+; CHECK-NEXT:    [[TMP11:%.*]] = extractelement <vscale x 4 x ptr> [[WIDE_GEP]], i64 0
+; CHECK-NEXT:    [[WIDE_MASKED_GATHER:%.*]] = load <vscale x 4 x float>, ptr [[TMP11]], align 4
 ; CHECK-NEXT:    [[TMP6:%.*]] = fmul <vscale x 4 x float> [[WIDE_MASKED_GATHER]], splat (float 2.000000e+00)
-; CHECK-NEXT:    call void @llvm.masked.scatter.nxv4f32.nxv4p0(<vscale x 4 x float> [[TMP6]], <vscale x 4 x ptr> align 4 [[WIDE_GEP]], <vscale x 4 x i1> splat (i1 true))
+; CHECK-NEXT:    [[TMP12:%.*]] = extractelement <vscale x 4 x ptr> [[WIDE_GEP]], i64 0
+; CHECK-NEXT:    store <vscale x 4 x float> [[TMP6]], ptr [[TMP12]], align 4
 ; CHECK-NEXT:    [[TMP7]] = add nuw nsw <vscale x 4 x i64> [[J2]], splat (i64 1)
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp eq <vscale x 4 x i64> [[TMP7]], splat (i64 8)
 ; CHECK-NEXT:    [[TMP9:%.*]] = extractelement <vscale x 4 x i1> [[TMP8]], i64 0

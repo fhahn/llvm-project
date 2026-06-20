@@ -234,9 +234,52 @@ GEPNoWrapFlags vputils::getGEPFlagsForPtr(VPValue *Ptr) {
   return GEPNoWrapFlags::none();
 }
 
-const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
-                                           PredicatedScalarEvolution &PSE,
-                                           const Loop *L) {
+/// Recognize a header-phi recipe \p R (a plain VPPhi or a widened VPWidenPHI
+/// for an IR loop-header phi that has not been turned into a dedicated
+/// induction recipe) as an affine AddRec in its enclosing loop. The phi must
+/// have 2 incoming values, where one operand is the preheader start value and
+/// the other is add(phi, invariant-step); operand order is not canonicalized
+/// for inner-loop phis, so both orders are tried. \p HeaderVPBBToLoop maps the
+/// phi's header VPBasicBlock to its IR loop. Returns SCEVCouldNotCompute if the
+/// shape is not recognized.
+static const SCEV *getSCEVForHeaderPhi(
+    const VPSingleDefRecipe *R, PredicatedScalarEvolution &PSE, const Loop *L,
+    const DenseMap<const VPBasicBlock *, const Loop *> *HeaderVPBBToLoop) {
+  ScalarEvolution &SE = *PSE.getSE();
+  if (!HeaderVPBBToLoop || R->getNumOperands() != 2)
+    return SE.getCouldNotCompute();
+  auto It = HeaderVPBBToLoop->find(R->getParent());
+  if (It == HeaderVPBBToLoop->end())
+    return SE.getCouldNotCompute();
+  const Loop *PhiLoop = It->second;
+
+  VPValue *StepVPV = nullptr;
+  VPValue *StartVPV = nullptr;
+  if (match(R->getOperand(1), m_c_Add(m_Specific(R), m_VPValue(StepVPV))))
+    StartVPV = R->getOperand(0);
+  else if (match(R->getOperand(0), m_c_Add(m_Specific(R), m_VPValue(StepVPV))))
+    StartVPV = R->getOperand(1);
+  else
+    return SE.getCouldNotCompute();
+
+  const SCEV *Step =
+      vputils::getSCEVExprForVPValue(StepVPV, PSE, L, HeaderVPBBToLoop);
+  if (isa<SCEVCouldNotCompute>(Step) || !SE.isLoopInvariant(Step, PhiLoop))
+    return SE.getCouldNotCompute();
+  const SCEV *Start =
+      vputils::getSCEVExprForVPValue(StartVPV, PSE, L, HeaderVPBBToLoop);
+  if (isa<SCEVCouldNotCompute>(Start) || !SE.isLoopInvariant(Start, PhiLoop))
+    return SE.getCouldNotCompute();
+  // Do not attach IR nsw/nuw from the increment recipe onto the AddRec: VPlan
+  // cannot reproduce stock SCEV's dominance-based isAddRecNeverPoison
+  // reasoning, and leaking an unjustified flag into the shared SCEV cache is
+  // unsound.
+  return SE.getAddRecExpr(Start, Step, PhiLoop, SCEV::FlagAnyWrap);
+}
+
+const SCEV *vputils::getSCEVExprForVPValue(
+    const VPValue *V, PredicatedScalarEvolution &PSE, const Loop *L,
+    const DenseMap<const VPBasicBlock *, const Loop *> *HeaderVPBBToLoop) {
   ScalarEvolution &SE = *PSE.getSE();
   if (isa<VPIRValue, VPSymbolicValue>(V)) {
     Value *LiveIn = V->getUnderlyingValue();
@@ -260,7 +303,7 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
       -> const SCEV * {
     SmallVector<SCEVUse, 2> SCEVOps;
     for (VPValue *Op : Ops) {
-      const SCEV *S = getSCEVExprForVPValue(Op, PSE, L);
+      const SCEV *S = getSCEVExprForVPValue(Op, PSE, L, HeaderVPBBToLoop);
       if (isa<SCEVCouldNotCompute>(S))
         return SE.getCouldNotCompute();
       SCEVOps.push_back(S);
@@ -348,8 +391,8 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
     auto *SubR = dyn_cast<VPRecipeWithIRFlags>(LHSVal);
     if (match(LHSVal, m_Sub(m_VPValue(SubLHS), m_VPValue(SubRHS))) && SubR &&
         SubR->hasNoSignedWrap() && poisonGuaranteesUB(LHSVal)) {
-      const SCEV *V1 = getSCEVExprForVPValue(SubLHS, PSE, L);
-      const SCEV *V2 = getSCEVExprForVPValue(SubRHS, PSE, L);
+      const SCEV *V1 = getSCEVExprForVPValue(SubLHS, PSE, L, HeaderVPBBToLoop);
+      const SCEV *V2 = getSCEVExprForVPValue(SubRHS, PSE, L, HeaderVPBBToLoop);
       if (!isa<SCEVCouldNotCompute>(V1) && !isa<SCEVCouldNotCompute>(V2))
         return SE.getMinusSCEV(SE.getSignExtendExpr(V1, DestTy),
                                SE.getSignExtendExpr(V2, DestTy), SCEV::FlagNSW);
@@ -415,32 +458,48 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
   const SCEV *Expr =
       TypeSwitch<const VPRecipeBase *, const SCEV *>(DefR)
           .Case([](const VPExpandSCEVRecipe *R) { return R->getSCEV(); })
-          .Case([&SE, &PSE, L](const VPWidenIntOrFpInductionRecipe *R) {
-            const SCEV *Step = getSCEVExprForVPValue(R->getStepValue(), PSE, L);
+          .Case([&PSE, L, HeaderVPBBToLoop](const VPPhi *R) {
+            return getSCEVForHeaderPhi(R, PSE, L, HeaderVPBBToLoop);
+          })
+          .Case([&PSE, L, HeaderVPBBToLoop](const VPWidenPHIRecipe *R) {
+            // An inner-loop induction phi is converted to a VPWidenPHIRecipe
+            // before the memory accesses that reference it are analyzed, so the
+            // same header-phi-to-AddRec lowering must handle this shape too.
+            return getSCEVForHeaderPhi(R, PSE, L, HeaderVPBBToLoop);
+          })
+          .Case([&SE, &PSE, L,
+                 HeaderVPBBToLoop](const VPWidenIntOrFpInductionRecipe *R) {
+            const SCEV *Step = getSCEVExprForVPValue(R->getStepValue(), PSE, L,
+                                                     HeaderVPBBToLoop);
             if (!L || isa<SCEVCouldNotCompute>(Step))
               return SE.getCouldNotCompute();
-            const SCEV *Start =
-                getSCEVExprForVPValue(R->getStartValue(), PSE, L);
+            const SCEV *Start = getSCEVExprForVPValue(R->getStartValue(), PSE,
+                                                      L, HeaderVPBBToLoop);
             const SCEV *AddRec =
                 SE.getAddRecExpr(Start, Step, L, SCEV::FlagAnyWrap);
             if (R->getTruncInst())
               return SE.getTruncateExpr(AddRec, R->getScalarType());
             return AddRec;
           })
-          .Case([&SE, &PSE, L](const VPWidenPointerInductionRecipe *R) {
-            const SCEV *Start =
-                getSCEVExprForVPValue(R->getStartValue(), PSE, L);
+          .Case([&SE, &PSE, L,
+                 HeaderVPBBToLoop](const VPWidenPointerInductionRecipe *R) {
+            const SCEV *Start = getSCEVExprForVPValue(R->getStartValue(), PSE,
+                                                      L, HeaderVPBBToLoop);
             if (!L || isa<SCEVCouldNotCompute>(Start))
               return SE.getCouldNotCompute();
-            const SCEV *Step = getSCEVExprForVPValue(R->getStepValue(), PSE, L);
+            const SCEV *Step = getSCEVExprForVPValue(R->getStepValue(), PSE, L,
+                                                     HeaderVPBBToLoop);
             if (isa<SCEVCouldNotCompute>(Step))
               return SE.getCouldNotCompute();
             return SE.getAddRecExpr(Start, Step, L, SCEV::FlagAnyWrap);
           })
-          .Case([&SE, &PSE, L](const VPDerivedIVRecipe *R) {
-            const SCEV *Start = getSCEVExprForVPValue(R->getOperand(0), PSE, L);
-            const SCEV *IV = getSCEVExprForVPValue(R->getOperand(1), PSE, L);
-            const SCEV *Scale = getSCEVExprForVPValue(R->getOperand(2), PSE, L);
+          .Case([&SE, &PSE, L, HeaderVPBBToLoop](const VPDerivedIVRecipe *R) {
+            const SCEV *Start = getSCEVExprForVPValue(R->getOperand(0), PSE, L,
+                                                      HeaderVPBBToLoop);
+            const SCEV *IV = getSCEVExprForVPValue(R->getOperand(1), PSE, L,
+                                                   HeaderVPBBToLoop);
+            const SCEV *Scale = getSCEVExprForVPValue(R->getOperand(2), PSE, L,
+                                                      HeaderVPBBToLoop);
             if (any_of(ArrayRef({Start, IV, Scale}),
                        IsaPred<SCEVCouldNotCompute>))
               return SE.getCouldNotCompute();
@@ -450,13 +509,16 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
                 SE.getMulExpr(
                     IV, SE.getTruncateOrSignExtend(Scale, IV->getType())));
           })
-          .Case([&SE, &PSE, L](const VPScalarIVStepsRecipe *R) {
-            const SCEV *IV = getSCEVExprForVPValue(R->getOperand(0), PSE, L);
-            const SCEV *Step = getSCEVExprForVPValue(R->getOperand(1), PSE, L);
-            if (isa<SCEVCouldNotCompute>(IV) || !isa<SCEVConstant>(Step))
-              return SE.getCouldNotCompute();
-            return SE.getTruncateOrSignExtend(IV, Step->getType());
-          })
+          .Case(
+              [&SE, &PSE, L, HeaderVPBBToLoop](const VPScalarIVStepsRecipe *R) {
+                const SCEV *IV = getSCEVExprForVPValue(R->getOperand(0), PSE, L,
+                                                       HeaderVPBBToLoop);
+                const SCEV *Step = getSCEVExprForVPValue(R->getOperand(1), PSE,
+                                                         L, HeaderVPBBToLoop);
+                if (isa<SCEVCouldNotCompute>(IV) || !isa<SCEVConstant>(Step))
+                  return SE.getCouldNotCompute();
+                return SE.getTruncateOrSignExtend(IV, Step->getType());
+              })
           .Default(
               [&SE](const VPRecipeBase *) { return SE.getCouldNotCompute(); });
 

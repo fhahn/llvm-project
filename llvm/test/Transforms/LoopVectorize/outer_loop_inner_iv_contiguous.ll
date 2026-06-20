@@ -8,12 +8,6 @@
 ; element. Recognizing this requires lowering the (widened) inner-loop header
 ; phi to an AddRec, which getSCEVExprForVPValue does via the HeaderVPBBToLoop
 ; map threaded in by tryToConvertVPInstructionsToVPRecipes.
-;
-; These kernels use a symbolic inner trip count M, which is only provably
-; collision-free across the vectorized outer loop with a runtime M >= VF guard
-; (added in a later change). Until then the outer-loop memory-safety check
-; conservatively rejects them, so the check is disabled here to exercise the
-; contiguous-access detection in isolation.
 
 ; --- column-major store: A[i + j*M] ---
 ; for (i = 0; i < N; i++)
@@ -50,9 +44,11 @@ define void @col_major(ptr noalias %A, i64 %N, i64 %M) {
 ; CHECK-NEXT:    [[TMP0:%.*]] = mul nsw <4 x i64> [[J3]], [[BROADCAST_SPLAT]]
 ; CHECK-NEXT:    [[STEP_ADD:%.*]] = add nsw <4 x i64> [[VEC_IND]], [[TMP0]]
 ; CHECK-NEXT:    [[WIDE_GEP:%.*]] = getelementptr inbounds float, ptr [[A]], <4 x i64> [[STEP_ADD]]
-; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = call <4 x float> @llvm.masked.gather.v4f32.v4p0(<4 x ptr> align 4 [[WIDE_GEP]], <4 x i1> splat (i1 true), <4 x float> poison)
+; CHECK-NEXT:    [[TMP2:%.*]] = extractelement <4 x ptr> [[WIDE_GEP]], i64 0
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x float>, ptr [[TMP2]], align 4
 ; CHECK-NEXT:    [[MUL:%.*]] = fmul <4 x float> [[WIDE_LOAD]], splat (float 2.000000e+00)
-; CHECK-NEXT:    call void @llvm.masked.scatter.v4f32.v4p0(<4 x float> [[MUL]], <4 x ptr> align 4 [[WIDE_GEP]], <4 x i1> splat (i1 true))
+; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <4 x ptr> [[WIDE_GEP]], i64 0
+; CHECK-NEXT:    store <4 x float> [[MUL]], ptr [[TMP4]], align 4
 ; CHECK-NEXT:    [[TMP5]] = add nuw nsw <4 x i64> [[J3]], splat (i64 1)
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq <4 x i64> [[TMP5]], [[BROADCAST_SPLAT]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <4 x i1> [[TMP6]], i64 0

@@ -41,9 +41,15 @@ VPValue *getOrCreateVPValueForSCEVExpr(VPlan &Plan, const SCEV *Expr);
 
 /// Return the SCEV expression for \p V. Returns SCEVCouldNotCompute if no
 /// SCEV expression could be constructed.
-const SCEV *getSCEVExprForVPValue(const VPValue *V,
-                                  PredicatedScalarEvolution &PSE,
-                                  const Loop *L = nullptr);
+///
+/// \p HeaderVPBBToLoop, when provided, maps VPBasicBlocks that are the
+/// header of an IR loop to that loop. It enables recognition of plain VPPhi
+/// recipes (IR loop-header phi nodes that have not yet been converted to a
+/// widened-induction recipe) as AddRecs in their enclosing loop.
+const SCEV *getSCEVExprForVPValue(
+    const VPValue *V, PredicatedScalarEvolution &PSE, const Loop *L = nullptr,
+    const DenseMap<const VPBasicBlock *, const Loop *> *HeaderVPBBToLoop =
+        nullptr);
 
 /// Returns true if \p Addr is an address SCEV that can be passed to
 /// TTI::getAddressComputationCost, i.e. the address SCEV is loop invariant, an

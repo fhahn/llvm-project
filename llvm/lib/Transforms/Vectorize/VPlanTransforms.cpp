@@ -48,23 +48,71 @@ using namespace llvm;
 using namespace VPlanPatternMatch;
 using namespace SCEVPatternMatch;
 
+/// Return the constant stride (in units of \p ElemTy) of address SCEV \p S
+/// w.r.t. \p OuterLoop, descending through inner-loop AddRecs whose step does
+/// not vary with \p OuterLoop. For a column-major access such as A[i + j*M] the
+/// SCEV is {{A,+,elt}<outer>,+,elt*M}<inner>: the inner step elt*M is invariant
+/// w.r.t. the outer loop, so the access is still unit-stride across outer-loop
+/// iterations. Returns std::nullopt if no constant outer-loop stride exists.
+static std::optional<int64_t> getOuterLoopStride(const SCEV *S, Loop *OuterLoop,
+                                                 Type *ElemTy,
+                                                 PredicatedScalarEvolution &PSE) {
+  auto *AR = dyn_cast<SCEVAddRecExpr>(S);
+  if (!AR)
+    return std::nullopt;
+  if (AR->getLoop() == OuterLoop)
+    return getStrideFromAddRec(AR, OuterLoop, ElemTy, /*Ptr=*/nullptr, PSE);
+  // An inner-loop AddRec only preserves the outer-loop stride if its step is
+  // invariant w.r.t. the outer loop; the outer stride then lives in its start.
+  if (!PSE.getSE()->isLoopInvariant(AR->getStepRecurrence(*PSE.getSE()),
+                                    OuterLoop))
+    return std::nullopt;
+  return getOuterLoopStride(AR->getStart(), OuterLoop, ElemTy, PSE);
+}
+
 /// Check if the pointer operand \p Addr of a memory access is consecutive
 /// w.r.t. \p OuterLoop, i.e. it is an affine AddRec with unit stride in units
-/// of \p ElemTy.
-static bool isStride1Access(VPValue *Addr, Type *ElemTy,
-                            PredicatedScalarEvolution &PSE, Loop *OuterLoop) {
-  const SCEV *AddrSCEV = vputils::getSCEVExprForVPValue(Addr, PSE, OuterLoop);
-  auto *AddRec = dyn_cast<SCEVAddRecExpr>(AddrSCEV);
-  if (!AddRec)
-    return false;
-
-  return getStrideFromAddRec(AddRec, OuterLoop, ElemTy, /*Ptr=*/nullptr, PSE) ==
-         1;
+/// of \p ElemTy. \p HeaderVPBBToLoop lets the SCEV lowering recognize inner-loop
+/// header phis as AddRecs, so column-major accesses that are unit-stride across
+/// outer-loop iterations are detected as consecutive.
+static bool isStride1Access(
+    VPValue *Addr, Type *ElemTy, PredicatedScalarEvolution &PSE, Loop *OuterLoop,
+    const DenseMap<const VPBasicBlock *, const Loop *> &HeaderVPBBToLoop) {
+  const SCEV *AddrSCEV =
+      vputils::getSCEVExprForVPValue(Addr, PSE, OuterLoop, &HeaderVPBBToLoop);
+  return getOuterLoopStride(AddrSCEV, OuterLoop, ElemTy, PSE) == 1;
 }
 
 bool VPlanTransforms::tryToConvertVPInstructionsToVPRecipes(
     VPlan &Plan, const TargetLibraryInfo &TLI, PredicatedScalarEvolution *PSE,
     Loop *OuterLoop) {
+
+  // Map each header VPBasicBlock to its IR loop so that inner-loop header phis
+  // can be recognized as AddRecs when computing address SCEVs. A header VPBB is
+  // identified via its header phi recipes, whose underlying IR phi lives in the
+  // IR loop header. Only needed for the outer-loop path, where OuterLoop is set.
+  DenseMap<const VPBasicBlock *, const Loop *> HeaderVPBBToLoop;
+  if (OuterLoop) {
+    DenseMap<const BasicBlock *, const Loop *> IRHeaderToLoop;
+    for (const Loop *L : OuterLoop->getLoopsInPreorder())
+      IRHeaderToLoop[L->getHeader()] = L;
+    ReversePostOrderTraversal<VPBlockDeepTraversalWrapper<VPBlockBase *>>
+        MapRPOT(Plan.getVectorLoopRegion());
+    for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(MapRPOT)) {
+      for (const VPRecipeBase &R : VPBB->phis()) {
+        if (R.getNumDefinedValues() != 1)
+          continue;
+        auto *UV = dyn_cast_or_null<Instruction>(
+            R.getVPSingleValue()->getUnderlyingValue());
+        if (!UV)
+          continue;
+        if (const Loop *L = IRHeaderToLoop.lookup(UV->getParent())) {
+          HeaderVPBBToLoop[VPBB] = L;
+          break;
+        }
+      }
+    }
+  }
 
   ReversePostOrderTraversal<VPBlockDeepTraversalWrapper<VPBlockBase *>> RPOT(
       Plan.getVectorLoopRegion());
@@ -96,17 +144,23 @@ bool VPlanTransforms::tryToConvertVPInstructionsToVPRecipes(
                                          Phi->getName());
       } else if (auto *VPI = dyn_cast<VPInstruction>(&Ingredient)) {
         assert(!isa<PHINode>(Inst) && "phis should be handled above");
-        // Create VPWidenMemoryRecipe for loads and stores.
+        // Create VPWidenMemoryRecipe for loads and stores. Contiguous-access
+        // detection requires SCEV and the outer loop; when they are not
+        // provided the access is conservatively treated as non-consecutive.
         if (LoadInst *Load = dyn_cast<LoadInst>(Inst)) {
-          bool IsConsecutive = isStride1Access(
-              VPI->getOperand(0), VPI->getScalarType(), *PSE, OuterLoop);
+          bool IsConsecutive =
+              PSE && OuterLoop &&
+              isStride1Access(VPI->getOperand(0), VPI->getScalarType(), *PSE,
+                              OuterLoop, HeaderVPBBToLoop);
           NewRecipe = new VPWidenLoadRecipe(*Load, Ingredient.getOperand(0),
                                             nullptr /*Mask*/, IsConsecutive,
                                             *VPI, Ingredient.getDebugLoc());
         } else if (StoreInst *Store = dyn_cast<StoreInst>(Inst)) {
-          bool IsConsecutive = isStride1Access(
-              VPI->getOperand(1), VPI->getOperand(0)->getScalarType(), *PSE,
-              OuterLoop);
+          bool IsConsecutive =
+              PSE && OuterLoop &&
+              isStride1Access(VPI->getOperand(1),
+                              VPI->getOperand(0)->getScalarType(), *PSE,
+                              OuterLoop, HeaderVPBBToLoop);
           NewRecipe = new VPWidenStoreRecipe(
               *Store, Ingredient.getOperand(1), Ingredient.getOperand(0),
               nullptr /*Mask*/, IsConsecutive, *VPI, Ingredient.getDebugLoc());
