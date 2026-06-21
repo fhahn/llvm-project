@@ -19,12 +19,46 @@ define void @col_major_m8(ptr noalias %A, i64 %N) {
 ; CHECK-NEXT:    [[CMP_OUTER:%.*]] = icmp sgt i64 [[N]], 0
 ; CHECK-NEXT:    br i1 [[CMP_OUTER]], label %[[SCALAR_PH:.*]], label %[[EXIT:.*]]
 ; CHECK:       [[SCALAR_PH]]:
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH1:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[N]], 4
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[N_MOD_VF]]
 ; CHECK-NEXT:    br label %[[OUTER_HEADER:.*]]
 ; CHECK:       [[OUTER_HEADER]]:
-; CHECK-NEXT:    [[I:%.*]] = phi i64 [ 0, %[[SCALAR_PH]] ], [ [[I_NEXT:%.*]], %[[OUTER_LATCH:.*]] ]
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[OUTER_LATCH3:.*]] ]
+; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[OUTER_LATCH3]] ]
 ; CHECK-NEXT:    br label %[[INNER_BODY:.*]]
 ; CHECK:       [[INNER_BODY]]:
-; CHECK-NEXT:    [[J:%.*]] = phi i64 [ 0, %[[OUTER_HEADER]] ], [ [[J_NEXT:%.*]], %[[INNER_BODY]] ]
+; CHECK-NEXT:    [[J2:%.*]] = phi <4 x i64> [ zeroinitializer, %[[OUTER_HEADER]] ], [ [[TMP5:%.*]], %[[INNER_BODY]] ]
+; CHECK-NEXT:    [[TMP0:%.*]] = shl nsw <4 x i64> [[J2]], splat (i64 3)
+; CHECK-NEXT:    [[TMP1:%.*]] = add nsw <4 x i64> [[VEC_IND]], [[TMP0]]
+; CHECK-NEXT:    [[WIDE_GEP:%.*]] = getelementptr inbounds float, ptr [[A]], <4 x i64> [[TMP1]]
+; CHECK-NEXT:    [[TMP2:%.*]] = extractelement <4 x ptr> [[WIDE_GEP]], i64 0
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x float>, ptr [[TMP2]], align 4
+; CHECK-NEXT:    [[TMP3:%.*]] = fmul <4 x float> [[WIDE_LOAD]], splat (float 2.000000e+00)
+; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <4 x ptr> [[WIDE_GEP]], i64 0
+; CHECK-NEXT:    store <4 x float> [[TMP3]], ptr [[TMP4]], align 4
+; CHECK-NEXT:    [[TMP5]] = add nuw nsw <4 x i64> [[J2]], splat (i64 1)
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq <4 x i64> [[TMP5]], splat (i64 8)
+; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <4 x i1> [[TMP6]], i64 0
+; CHECK-NEXT:    br i1 [[TMP7]], label %[[OUTER_LATCH3]], label %[[INNER_BODY]]
+; CHECK:       [[OUTER_LATCH3]]:
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[VEC_IND]], splat (i64 4)
+; CHECK-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP8]], label %[[MIDDLE_BLOCK:.*]], label %[[OUTER_HEADER]], !llvm.loop [[LOOP0:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT_LOOPEXIT:.*]], label %[[SCALAR_PH1]]
+; CHECK:       [[SCALAR_PH1]]:
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[SCALAR_PH]] ]
+; CHECK-NEXT:    br label %[[OUTER_HEADER1:.*]]
+; CHECK:       [[OUTER_HEADER1]]:
+; CHECK-NEXT:    [[I:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH1]] ], [ [[I_NEXT:%.*]], %[[OUTER_LATCH:.*]] ]
+; CHECK-NEXT:    br label %[[INNER_BODY1:.*]]
+; CHECK:       [[INNER_BODY1]]:
+; CHECK-NEXT:    [[J:%.*]] = phi i64 [ 0, %[[OUTER_HEADER1]] ], [ [[J_NEXT:%.*]], %[[INNER_BODY1]] ]
 ; CHECK-NEXT:    [[J_MUL_M:%.*]] = mul nsw i64 [[J]], 8
 ; CHECK-NEXT:    [[IDX:%.*]] = add nsw i64 [[I]], [[J_MUL_M]]
 ; CHECK-NEXT:    [[A_PTR:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[IDX]]
@@ -33,11 +67,11 @@ define void @col_major_m8(ptr noalias %A, i64 %N) {
 ; CHECK-NEXT:    store float [[MUL]], ptr [[A_PTR]], align 4
 ; CHECK-NEXT:    [[J_NEXT]] = add nuw nsw i64 [[J]], 1
 ; CHECK-NEXT:    [[J_CMP:%.*]] = icmp eq i64 [[J_NEXT]], 8
-; CHECK-NEXT:    br i1 [[J_CMP]], label %[[OUTER_LATCH]], label %[[INNER_BODY]]
+; CHECK-NEXT:    br i1 [[J_CMP]], label %[[OUTER_LATCH]], label %[[INNER_BODY1]]
 ; CHECK:       [[OUTER_LATCH]]:
 ; CHECK-NEXT:    [[I_NEXT]] = add nuw nsw i64 [[I]], 1
 ; CHECK-NEXT:    [[I_CMP:%.*]] = icmp eq i64 [[I_NEXT]], [[N]]
-; CHECK-NEXT:    br i1 [[I_CMP]], label %[[EXIT_LOOPEXIT:.*]], label %[[OUTER_HEADER]], !llvm.loop [[LOOP0:![0-9]+]]
+; CHECK-NEXT:    br i1 [[I_CMP]], label %[[EXIT_LOOPEXIT]], label %[[OUTER_HEADER1]], !llvm.loop [[LOOP3:![0-9]+]]
 ; CHECK:       [[EXIT_LOOPEXIT]]:
 ; CHECK-NEXT:    br label %[[EXIT]]
 ; CHECK:       [[EXIT]]:
@@ -84,12 +118,46 @@ define void @col_major_m2(ptr noalias %A, i64 %N) {
 ; CHECK-NEXT:    [[CMP_OUTER:%.*]] = icmp sgt i64 [[N]], 0
 ; CHECK-NEXT:    br i1 [[CMP_OUTER]], label %[[SCALAR_PH:.*]], label %[[EXIT:.*]]
 ; CHECK:       [[SCALAR_PH]]:
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 2
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH1:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[N]], 2
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[N_MOD_VF]]
 ; CHECK-NEXT:    br label %[[OUTER_HEADER:.*]]
 ; CHECK:       [[OUTER_HEADER]]:
-; CHECK-NEXT:    [[I:%.*]] = phi i64 [ 0, %[[SCALAR_PH]] ], [ [[I_NEXT:%.*]], %[[OUTER_LATCH:.*]] ]
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[OUTER_LATCH3:.*]] ]
+; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <2 x i64> [ <i64 0, i64 1>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[OUTER_LATCH3]] ]
 ; CHECK-NEXT:    br label %[[INNER_BODY:.*]]
 ; CHECK:       [[INNER_BODY]]:
-; CHECK-NEXT:    [[J:%.*]] = phi i64 [ 0, %[[OUTER_HEADER]] ], [ [[J_NEXT:%.*]], %[[INNER_BODY]] ]
+; CHECK-NEXT:    [[J2:%.*]] = phi <2 x i64> [ zeroinitializer, %[[OUTER_HEADER]] ], [ [[TMP5:%.*]], %[[INNER_BODY]] ]
+; CHECK-NEXT:    [[TMP0:%.*]] = shl nsw <2 x i64> [[J2]], splat (i64 1)
+; CHECK-NEXT:    [[TMP1:%.*]] = add nsw <2 x i64> [[VEC_IND]], [[TMP0]]
+; CHECK-NEXT:    [[WIDE_GEP:%.*]] = getelementptr inbounds float, ptr [[A]], <2 x i64> [[TMP1]]
+; CHECK-NEXT:    [[TMP2:%.*]] = extractelement <2 x ptr> [[WIDE_GEP]], i64 0
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x float>, ptr [[TMP2]], align 4
+; CHECK-NEXT:    [[TMP3:%.*]] = fmul <2 x float> [[WIDE_LOAD]], splat (float 2.000000e+00)
+; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <2 x ptr> [[WIDE_GEP]], i64 0
+; CHECK-NEXT:    store <2 x float> [[TMP3]], ptr [[TMP4]], align 4
+; CHECK-NEXT:    [[TMP5]] = add nuw nsw <2 x i64> [[J2]], splat (i64 1)
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq <2 x i64> [[TMP5]], splat (i64 2)
+; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <2 x i1> [[TMP6]], i64 0
+; CHECK-NEXT:    br i1 [[TMP7]], label %[[OUTER_LATCH3]], label %[[INNER_BODY]]
+; CHECK:       [[OUTER_LATCH3]]:
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
+; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <2 x i64> [[VEC_IND]], splat (i64 2)
+; CHECK-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP8]], label %[[MIDDLE_BLOCK:.*]], label %[[OUTER_HEADER]], !llvm.loop [[LOOP4:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT_LOOPEXIT:.*]], label %[[SCALAR_PH1]]
+; CHECK:       [[SCALAR_PH1]]:
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[SCALAR_PH]] ]
+; CHECK-NEXT:    br label %[[OUTER_HEADER1:.*]]
+; CHECK:       [[OUTER_HEADER1]]:
+; CHECK-NEXT:    [[I:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH1]] ], [ [[I_NEXT:%.*]], %[[OUTER_LATCH:.*]] ]
+; CHECK-NEXT:    br label %[[INNER_BODY1:.*]]
+; CHECK:       [[INNER_BODY1]]:
+; CHECK-NEXT:    [[J:%.*]] = phi i64 [ 0, %[[OUTER_HEADER1]] ], [ [[J_NEXT:%.*]], %[[INNER_BODY1]] ]
 ; CHECK-NEXT:    [[J_MUL_M:%.*]] = mul nsw i64 [[J]], 2
 ; CHECK-NEXT:    [[IDX:%.*]] = add nsw i64 [[I]], [[J_MUL_M]]
 ; CHECK-NEXT:    [[A_PTR:%.*]] = getelementptr inbounds float, ptr [[A]], i64 [[IDX]]
@@ -98,11 +166,11 @@ define void @col_major_m2(ptr noalias %A, i64 %N) {
 ; CHECK-NEXT:    store float [[MUL]], ptr [[A_PTR]], align 4
 ; CHECK-NEXT:    [[J_NEXT]] = add nuw nsw i64 [[J]], 1
 ; CHECK-NEXT:    [[J_CMP:%.*]] = icmp eq i64 [[J_NEXT]], 2
-; CHECK-NEXT:    br i1 [[J_CMP]], label %[[OUTER_LATCH]], label %[[INNER_BODY]]
+; CHECK-NEXT:    br i1 [[J_CMP]], label %[[OUTER_LATCH]], label %[[INNER_BODY1]]
 ; CHECK:       [[OUTER_LATCH]]:
 ; CHECK-NEXT:    [[I_NEXT]] = add nuw nsw i64 [[I]], 1
 ; CHECK-NEXT:    [[I_CMP:%.*]] = icmp eq i64 [[I_NEXT]], [[N]]
-; CHECK-NEXT:    br i1 [[I_CMP]], label %[[EXIT_LOOPEXIT:.*]], label %[[OUTER_HEADER]], !llvm.loop [[LOOP0]]
+; CHECK-NEXT:    br i1 [[I_CMP]], label %[[EXIT_LOOPEXIT]], label %[[OUTER_HEADER1]], !llvm.loop [[LOOP5:![0-9]+]]
 ; CHECK:       [[EXIT_LOOPEXIT]]:
 ; CHECK-NEXT:    br label %[[EXIT]]
 ; CHECK:       [[EXIT]]:
@@ -168,7 +236,7 @@ define void @row_major_m8(ptr noalias %A, i64 %N) {
 ; CHECK:       [[OUTER_LATCH]]:
 ; CHECK-NEXT:    [[I_NEXT]] = add nuw nsw i64 [[I]], 1
 ; CHECK-NEXT:    [[I_CMP:%.*]] = icmp eq i64 [[I_NEXT]], [[N]]
-; CHECK-NEXT:    br i1 [[I_CMP]], label %[[EXIT_LOOPEXIT:.*]], label %[[OUTER_HEADER1]], !llvm.loop [[LOOP0]]
+; CHECK-NEXT:    br i1 [[I_CMP]], label %[[EXIT_LOOPEXIT:.*]], label %[[OUTER_HEADER1]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[EXIT_LOOPEXIT]]:
 ; CHECK-NEXT:    br label %[[EXIT]]
 ; CHECK:       [[EXIT]]:
@@ -235,7 +303,7 @@ define void @access_wider_than_outer_stride(ptr noalias %A, i64 %N) {
 ; CHECK:       [[OUTER_LATCH]]:
 ; CHECK-NEXT:    [[I_NEXT]] = add nuw nsw i64 [[I]], 1
 ; CHECK-NEXT:    [[I_CMP:%.*]] = icmp eq i64 [[I_NEXT]], [[N]]
-; CHECK-NEXT:    br i1 [[I_CMP]], label %[[EXIT_LOOPEXIT:.*]], label %[[OUTER_HEADER1]], !llvm.loop [[LOOP0]]
+; CHECK-NEXT:    br i1 [[I_CMP]], label %[[EXIT_LOOPEXIT:.*]], label %[[OUTER_HEADER1]], !llvm.loop [[LOOP6]]
 ; CHECK:       [[EXIT_LOOPEXIT]]:
 ; CHECK-NEXT:    br label %[[EXIT]]
 ; CHECK:       [[EXIT]]:
@@ -278,6 +346,12 @@ exit:
 !2 = !{!"llvm.loop.vectorize.enable", i1 true}
 ;.
 ; CHECK: [[LOOP0]] = distinct !{[[LOOP0]], [[META1:![0-9]+]], [[META2:![0-9]+]]}
-; CHECK: [[META1]] = !{!"llvm.loop.vectorize.width", i32 4}
-; CHECK: [[META2]] = !{!"llvm.loop.vectorize.enable", i1 true}
+; CHECK: [[META1]] = !{!"llvm.loop.isvectorized", i32 1}
+; CHECK: [[META2]] = !{!"llvm.loop.unroll.runtime.disable"}
+; CHECK: [[LOOP3]] = distinct !{[[LOOP3]], [[META2]], [[META1]]}
+; CHECK: [[LOOP4]] = distinct !{[[LOOP4]], [[META1]], [[META2]]}
+; CHECK: [[LOOP5]] = distinct !{[[LOOP5]], [[META2]], [[META1]]}
+; CHECK: [[LOOP6]] = distinct !{[[LOOP6]], [[META7:![0-9]+]], [[META8:![0-9]+]]}
+; CHECK: [[META7]] = !{!"llvm.loop.vectorize.width", i32 4}
+; CHECK: [[META8]] = !{!"llvm.loop.vectorize.enable", i1 true}
 ;.

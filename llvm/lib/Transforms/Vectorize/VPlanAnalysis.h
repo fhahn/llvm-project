@@ -36,9 +36,16 @@ void collectEphemeralRecipesForVPlan(VPlan &Plan,
 /// VPValue operands, and uses getSCEVExprForVPValue for pointer SCEVs.
 /// \p OuterLoop is the IR outer loop the plan represents and is used to
 /// correlate header VPBasicBlocks with their IR loops for VPPhi SCEV
-/// resolution. Returns true if the plan is safe.
-bool verifyOuterLoopMemorySafety(VPlan &Plan, PredicatedScalarEvolution &PSE,
-                                 Loop *OuterLoop);
+/// resolution.
+///
+/// \returns std::nullopt if the plan is unsafe to vectorize at any factor.
+/// Otherwise returns the maximum vectorization factor (in lanes) for which the
+/// plan is safe: UINT_MAX when safety does not depend on the factor, or a
+/// finite bound for interleaved accesses that only stay collision-free while
+/// the factor does not exceed their inner stride.
+std::optional<unsigned>
+verifyOuterLoopMemorySafety(VPlan &Plan, PredicatedScalarEvolution &PSE,
+                            Loop *OuterLoop);
 
 /// A struct that represents some properties of the register usage
 /// of a loop.

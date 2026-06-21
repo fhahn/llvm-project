@@ -837,6 +837,15 @@ class LoopVectorizationPlanner {
 
   SmallVector<VPlanPtr, 4> VPlans;
 
+  /// For outer-loop vectorization, the maximum vectorization factor (in lanes)
+  /// proven memory-safe by verifyOuterLoopMemorySafety: UINT_MAX when safety
+  /// does not depend on the factor, or a finite bound for interleaved accesses
+  /// that stay collision-free only while VF does not exceed their inner stride.
+  /// std::nullopt means the loop is unsafe at any factor (the plan is rejected
+  /// before this is consulted). plan() uses a finite bound to clamp the
+  /// outer-loop VF.
+  std::optional<unsigned> OuterLoopMaxSafeVF;
+
   /// Profitable vector factors.
   SmallVector<VectorizationFactor, 8> ProfitableVFs;
 
