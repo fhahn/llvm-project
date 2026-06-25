@@ -243,3 +243,50 @@ define ptr @return_unknown_noalias_call(ptr %fn) {
   %a = call noalias ptr %fn()
   ret ptr %a
 }
+
+; A null check of the returned allocation does not capture its provenance, so
+; the result is still noalias (the common `p = malloc(); if (!p) ...; return p`
+; wrapper idiom).
+define ptr @return_malloc_null_checked(i64 %size) {
+; CHECK-LABEL: define noalias ptr @return_malloc_null_checked(
+; CHECK-SAME: i64 [[SIZE:%.*]]) {
+; CHECK-NEXT:    [[A:%.*]] = call ptr @malloc(i64 [[SIZE]])
+; CHECK-NEXT:    [[C:%.*]] = icmp eq ptr [[A]], null
+; CHECK-NEXT:    br i1 [[C]], label %[[BB_NULL:.*]], label %[[BB_OK:.*]]
+; CHECK:       [[BB_NULL]]:
+; CHECK-NEXT:    ret ptr null
+; CHECK:       [[BB_OK]]:
+; CHECK-NEXT:    ret ptr [[A]]
+;
+  %a = call ptr @malloc(i64 %size)
+  %c = icmp eq ptr %a, null
+  br i1 %c, label %bb_null, label %bb_ok
+bb_null:
+  ret ptr null
+bb_ok:
+  ret ptr %a
+}
+
+; A null check combined with a real capture (store to a global) must NOT be
+; treated as noalias: the traversal must not stop early at the null comparison.
+define ptr @return_malloc_null_checked_captured(i64 %size) {
+; CHECK-LABEL: define ptr @return_malloc_null_checked_captured(
+; CHECK-SAME: i64 [[SIZE:%.*]]) {
+; CHECK-NEXT:    [[A:%.*]] = call ptr @malloc(i64 [[SIZE]])
+; CHECK-NEXT:    [[C:%.*]] = icmp eq ptr [[A]], null
+; CHECK-NEXT:    store ptr [[A]], ptr @g, align 8
+; CHECK-NEXT:    br i1 [[C]], label %[[BB_NULL:.*]], label %[[BB_OK:.*]]
+; CHECK:       [[BB_NULL]]:
+; CHECK-NEXT:    ret ptr null
+; CHECK:       [[BB_OK]]:
+; CHECK-NEXT:    ret ptr [[A]]
+;
+  %a = call ptr @malloc(i64 %size)
+  %c = icmp eq ptr %a, null
+  store ptr %a, ptr @g
+  br i1 %c, label %bb_null, label %bb_ok
+bb_null:
+  ret ptr null
+bb_ok:
+  ret ptr %a
+}

@@ -1484,7 +1484,19 @@ static bool isFunctionMallocLike(Function *F, const SCCNodeSet &SCCNodes) {
         return false; // Did not come from an allocation.
       }
 
-    if (PointerMayBeCaptured(RetVal, /*ReturnCaptures=*/false))
+    // A comparison of the returned pointer against null (e.g. the null check in
+    // a malloc wrapper like `p = malloc(n); if (!p) abort(); return p;`) does
+    // not capture the pointer's provenance, so it does not prevent the result
+    // from being noalias. Accept captures that only observe whether the address
+    // is null. We must not abort the traversal early on such a capture (the
+    // default StopFn does), or we could miss a real capture on another use.
+    auto CapturesMoreThanNull = [](CaptureComponents CC) {
+      return !capturesNothing(CC) && !capturesAddressIsNullOnly(CC);
+    };
+    CaptureComponents CC =
+        PointerMayBeCaptured(RetVal, CaptureComponents::All, CapturesMoreThanNull)
+            .WithoutRet;
+    if (CapturesMoreThanNull(CC))
       return false;
   }
 
