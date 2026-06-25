@@ -2107,8 +2107,16 @@ static bool tryToReplaceALMWithWideALM(VPlan &Plan, ElementCount VF,
     }
   }
 
-  assert(all_of(Phis, not_equal_to(nullptr)) &&
-         "Expected one VPActiveLaneMaskPHIRecipe for each unroll part");
+  // The wide-lane-mask transform requires exactly one VPActiveLaneMaskPHIRecipe
+  // per unroll part. This does not hold for every loop shape: if the active
+  // lane mask is only used for control flow (e.g. a loop with no masked memory
+  // accesses), the mask phis are dead and removed by removeDeadRecipes, leaving
+  // only the latch ActiveLaneMask feeding the branch and no mask phi in the
+  // header. There is nothing to widen in that case, so bail out gracefully
+  // rather than asserting; the per-part lane masks already produced are
+  // correct.
+  if (!all_of(Phis, not_equal_to(nullptr)))
+    return false;
 
   auto *EntryALM = cast<VPInstruction>(Phis[0]->getStartValue());
   auto *LoopALM = cast<VPInstruction>(Phis[0]->getBackedgeValue());
@@ -2118,8 +2126,14 @@ static bool tryToReplaceALMWithWideALM(VPlan &Plan, ElementCount VF,
          "Expected incoming values of Phi to be ActiveLaneMasks");
 
   // When using wide lane masks, the return type of the get.active.lane.mask
-  // intrinsic is VF x UF (last operand).
-  VPValue *ALMMultiplier = Plan.getConstantInt(64, UF);
+  // intrinsic is VF x UF (last operand). The multiplier must be created with
+  // the same type as the existing multiplier operand of the ActiveLaneMask
+  // (the canonical IV type), which is not necessarily i64 - e.g. for a loop
+  // with an i32 induction it is i32. Using a hardcoded i64 here would violate
+  // VPUser::setOperand's requirement that the new operand's scalar type matches
+  // the old one.
+  VPValue *ALMMultiplier =
+      Plan.getConstantInt(EntryALM->getOperand(2)->getScalarType(), UF);
   EntryALM->setOperand(2, ALMMultiplier);
   LoopALM->setOperand(2, ALMMultiplier);
 
