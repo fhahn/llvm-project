@@ -3485,6 +3485,11 @@ public:
   getExtendedReductionCost(unsigned Opcode, bool IsUnsigned, Type *ResTy,
                            VectorType *Ty, std::optional<FastMathFlags> FMF,
                            TTI::TargetCostKind CostKind) const override {
+    // Targets must implement a default value for the scalable case, since
+    // the generic lowering below relies on a fixed number of lanes.
+    if (isa<ScalableVectorType>(Ty))
+      return InstructionCost::getInvalid();
+
     if (auto *FTy = dyn_cast<FixedVectorType>(Ty);
         FTy && IsUnsigned && Opcode == Instruction::Add &&
         FTy->getElementType() == IntegerType::getInt1Ty(Ty->getContext())) {
@@ -3519,6 +3524,11 @@ public:
     // vecreduce.add(mul(A, B)).
     assert((RedOpcode == Instruction::Add || RedOpcode == Instruction::Sub) &&
            "The reduction opcode is expected to be Add or Sub.");
+    // Targets must implement a default value for the scalable case, since
+    // the generic lowering below relies on a fixed number of lanes.
+    if (isa<ScalableVectorType>(Ty))
+      return InstructionCost::getInvalid();
+
     VectorType *ExtTy = VectorType::get(ResTy, Ty);
     InstructionCost RedCost = thisT()->getArithmeticReductionCost(
         RedOpcode, ExtTy, std::nullopt, CostKind);

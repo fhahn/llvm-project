@@ -6282,8 +6282,13 @@ InstructionCost AArch64TTIImpl::getExtendedReductionCost(
   EVT VecVT = TLI->getValueType(DL, VecTy);
   EVT ResVT = TLI->getValueType(DL, ResTy);
 
+  // The fast path below only handles fixed-width NEON reductions (UADDLV/
+  // UADDLP). Scalable vector types are simple MVTs too, but querying their
+  // size in bits would implicitly convert a scalable TypeSize to a fixed
+  // scalar and crash, so restrict this to fixed-length vectors and let
+  // scalable types fall through to the generic implementation.
   if (Opcode == Instruction::Add && VecVT.isSimple() && ResVT.isSimple() &&
-      VecVT.getSizeInBits() >= 64) {
+      VecVT.isFixedLengthVector() && VecVT.getSizeInBits() >= 64) {
     std::pair<InstructionCost, MVT> LT = getTypeLegalizationCost(VecTy);
 
     // The legal cases are:
