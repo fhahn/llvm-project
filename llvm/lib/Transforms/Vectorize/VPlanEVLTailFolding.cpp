@@ -191,7 +191,11 @@ static VPRecipeBase *optimizeMaskToEVL(VPValue *HeaderMask,
       return new VPReductionEVLRecipe(*Rdx, EVL, Mask);
 
   if (auto *Interleave = dyn_cast<VPInterleaveRecipe>(&CurRecipe))
-    if (Interleave->getMask() &&
+    // An interleave group that needs a mask for its gaps cannot be lowered to
+    // a VPInterleaveEVLRecipe: gap masks are not supported for scalable vectors
+    // (the only target of EVL tail-folding). Leave the recipe masked by the
+    // header mask instead of forming an unsupported EVL recipe.
+    if (!Interleave->needsMaskForGaps() && Interleave->getMask() &&
         match(Interleave->getMask(), m_RemoveMask(HeaderMask, Mask)))
       return new VPInterleaveEVLRecipe(*Interleave, EVL, Mask);
 
