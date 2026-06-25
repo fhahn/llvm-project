@@ -661,7 +661,12 @@ static Decomposition decompose(Value *V, const ConstraintInfo &Info,
   }
 
   if (match(V, m_NUWShl(m_Value(Op1), m_ConstantInt(CI))) && canUseSExt(CI)) {
-    if (CI->getSExtValue() < 0 || CI->getSExtValue() >= 64)
+    // (shl nuw x, shift) is (mul nuw x, (1 << shift)). The scale (1 << shift)
+    // must fit in the signed int64_t coefficient, so reject shift >= 63: a
+    // shift of 63 would compute int64_t{1} << 63, which is signed-overflow UB
+    // (the largest representable scale is 1 << 62 == 2^62). This mirrors the
+    // signed m_NSWShl path above, which requires Shift < bw - 1.
+    if (CI->getSExtValue() < 0 || CI->getSExtValue() >= 63)
       return V;
     auto Result = decompose(Op1, Info, IsSigned, DL, Depth + 1);
     if (!Result.mul(int64_t{1} << CI->getSExtValue()))
@@ -1853,7 +1858,11 @@ void ConstraintInfo::addFactImpl(CmpInst::Predicate Pred, Value *A, Value *B,
   }
 
   if (R.isEq()) {
-    // Also add the inverted constraint for equality constraints.
+    // Also add the inverted constraint for equality constraints. Negating a
+    // coefficient (e.g. INT64_MIN, which can survive getConstraint's
+    // SubOverflow accumulation) can overflow; skip adding the inverted
+    // constraint in that case rather than producing a wrong coefficient. This
+    // mirrors the MulOverflow guard used for Offset1 in getConstraint.
     for (auto &Coeff : R.Coefficients)
       if (MulOverflow(Coeff, int64_t(-1), Coeff))
         return;
