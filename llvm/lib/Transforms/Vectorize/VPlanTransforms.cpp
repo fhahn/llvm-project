@@ -1487,7 +1487,14 @@ static VPValue *simplifyRecipe(VPSingleDefRecipe *Def) {
     if (match(A, m_Broadcast(m_VPValue(X))))
       return X;
 
-    if (isa<VPInstruction, VPReplicateRecipe>(A) && vputils::isSingleScalar(A))
+    // Fold ExtractLastLane(A) -> A only if A is single-scalar and no other user
+    // forces it to be materialized as a vector. If A has a vector user (e.g. it
+    // is the backedge value of a first-order recurrence feeding the recurrence
+    // splice), A is generated as a wide vector and the extract must be kept.
+    if (isa<VPInstruction, VPReplicateRecipe>(A) &&
+        vputils::isSingleScalar(A) && all_of(A->users(), [Def, A](VPUser *U) {
+          return U == Def || U->usesScalars(A);
+        }))
       return A;
 
     if (Plan->hasScalarVFOnly())
