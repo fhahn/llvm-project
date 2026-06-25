@@ -7591,11 +7591,22 @@ static SmallVector<Instruction *> preparePlanForEpilogueVectorLoop(
                 [](const VPUser *U) {
                   if (isa<VPScalarIVStepsRecipe, VPDerivedIVRecipe>(U))
                     return true;
-                  unsigned Opc = cast<VPInstruction>(U)->getOpcode();
-                  return Instruction::isCast(Opc) || Opc == Instruction::Add;
+                  auto *VPI = dyn_cast<VPInstruction>(U);
+                  if (!VPI)
+                    return false;
+                  unsigned Opc = VPI->getOpcode();
+                  // The canonical IV may also feed a cast (when widened or
+                  // narrowed to a different type), the canonical IV increment
+                  // (Add), or a multiply by the stride when computing the base
+                  // pointer of a strided access (e.g. introduced by
+                  // VPlanTransforms::convertToStridedAccesses). All of these
+                  // remain correct after offsetting the IV by the resume value
+                  // below, as they are linear in the canonical IV.
+                  return Instruction::isCast(Opc) || Opc == Instruction::Add ||
+                         Opc == Instruction::Mul;
                 }) &&
-         "the canonical IV should only be used by its increment or "
-         "ScalarIVSteps when resetting the start value");
+         "the canonical IV should only be used by its increment, a cast, a "
+         "stride multiply or ScalarIVSteps when resetting the start value");
   VPBuilder Builder(Header, Header->getFirstNonPhi());
   VPInstruction *Add = Builder.createAdd(IV, VPV);
   // Replace all users of the canonical IV and its increment with the offset
