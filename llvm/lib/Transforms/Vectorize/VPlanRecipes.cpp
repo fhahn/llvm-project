@@ -3170,13 +3170,21 @@ void VPScalarIVStepsRecipe::execute(VPTransformState &State) {
 
   // We build scalar steps for both integer and floating-point induction
   // variables. Here, we determine the kind of arithmetic we will perform.
+  // The lane offset is a positive position within the unrolled vector group and
+  // is always added to the start index (StepAddOp), independent of the
+  // induction direction. Only the final combine with BaseIV uses the induction
+  // opcode (AddOp), so a decreasing (FSub) induction subtracts the positive
+  // StartIdx * Step offset from BaseIV.
   Instruction::BinaryOps AddOp;
+  Instruction::BinaryOps StepAddOp;
   Instruction::BinaryOps MulOp;
   if (BaseIVTy->isIntegerTy()) {
     AddOp = Instruction::Add;
+    StepAddOp = Instruction::Add;
     MulOp = Instruction::Mul;
   } else {
     AddOp = InductionOpcode;
+    StepAddOp = Instruction::FAdd;
     MulOp = Instruction::FMul;
   }
 
@@ -3196,7 +3204,7 @@ void VPScalarIVStepsRecipe::execute(VPTransformState &State) {
             ? ConstantInt::get(BaseIVTy, Lane, /*IsSigned=*/false,
                                /*ImplicitTrunc=*/true)
             : ConstantFP::get(BaseIVTy, Lane);
-    Value *StartIdx = Builder.CreateBinOp(AddOp, StartIdx0, LaneValue);
+    Value *StartIdx = Builder.CreateBinOp(StepAddOp, StartIdx0, LaneValue);
     assert((State.VF.isScalable() || isa<Constant>(StartIdx)) &&
            "Expected StartIdx to be folded to a constant when VF is not "
            "scalable");

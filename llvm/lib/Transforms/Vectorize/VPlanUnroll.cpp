@@ -569,12 +569,12 @@ static void addLaneToStartIndex(VPScalarIVStepsRecipe *Steps, unsigned Lane,
   unsigned AddOpcode;
   // TODO: Retrieve the flags from Steps unconditionally.
   VPIRFlags Flags;
+  // The lane offset is always added to the start index, independent of the
+  // induction direction; the induction opcode is applied when combining BaseIV
+  // with StartIndex * Step in VPScalarIVStepsRecipe::execute.
   if (BaseIVTy->isFloatingPointTy()) {
-    int SignedLane = static_cast<int>(Lane);
-    if (!OldStartIndex && Steps->getInductionOpcode() == Instruction::FSub)
-      SignedLane = -SignedLane;
-    LaneOffset = Plan.getOrAddLiveIn(ConstantFP::get(BaseIVTy, SignedLane));
-    AddOpcode = Steps->getInductionOpcode();
+    LaneOffset = Plan.getOrAddLiveIn(ConstantFP::get(BaseIVTy, Lane));
+    AddOpcode = Instruction::FAdd;
     Flags = VPIRFlags(FastMathFlags());
   } else {
     unsigned BaseIVBits = BaseIVTy->getScalarSizeInBits();
