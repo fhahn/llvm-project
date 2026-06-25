@@ -2007,8 +2007,30 @@ static bool isSafeDependenceDistance(const DataLayout &DL, ScalarEvolution &SE,
   // will be executed only if LoopCount >= VF, proving distance >= LoopCount
   // also guarantees that distance >= VF.
   //
-  const SCEV *Step = SE.getConstant(MaxBTC.getType(), MaxStride);
-  const SCEV *Product = SE.getMulExpr(&MaxBTC, Step);
+  // MaxStride is an unsigned byte stride that may not fit in MaxBTC's type
+  // (e.g. an i8 backedge-taken count with a 256-byte element stride). Building
+  // Step directly via getConstant(MaxBTC.getType(), MaxStride) would silently
+  // truncate MaxStride, making Product (and the proof below) bogus and dropping
+  // a real dependence. Compute the product in a type wide enough to hold the
+  // distance, the backedge-taken count, and the full magnitude of MaxStride.
+  // MaxBTC is a non-negative iteration count, so zero-extend it. When the types
+  // already cover MaxStride (the common case), the casts are no-ops and the
+  // arithmetic is unchanged.
+  //
+  // Note: this widens enough to hold MaxStride but not bits(MaxBTC) +
+  // bits(MaxStride), so the product MaxBTC * Step can in principle still wrap
+  // for an enormous backedge-taken count (~2^63) combined with a non-trivial
+  // stride. Widening further (zero-extending MaxBTC into a much wider type)
+  // defeats the SCEV reasoning that proves safety for loop-guarded distances
+  // and regresses safe loops, so the residual (pre-existing, exotic) wrap is
+  // intentionally left as-is.
+  unsigned StrideBits = MaxStride ? Log2_64(MaxStride) + 1 : 1;
+  Type *WiderTy = SE.getWiderType(
+      SE.getWiderType(Dist.getType(), MaxBTC.getType()),
+      IntegerType::get(SE.getContext(), StrideBits));
+  const SCEV *CastedMaxBTC = SE.getNoopOrZeroExtend(&MaxBTC, WiderTy);
+  const SCEV *Step = SE.getConstant(WiderTy, MaxStride);
+  const SCEV *Product = SE.getMulExpr(CastedMaxBTC, Step);
 
   const SCEV *CastedDist = &Dist;
   const SCEV *CastedProduct = Product;
