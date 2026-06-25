@@ -1302,8 +1302,14 @@ static VPValue *simplifyRecipe(VPlan &Plan, VPSingleDefRecipe *Def) {
     if (match(A, m_Broadcast(m_VPValue(B))))
       return B;
 
+    // Fold ExtractLastLane(A) -> A if A is single-scalar, unless a vector user
+    // forces a recipe A to be materialized as a vector (e.g. a first-order
+    // recurrence splice using it as backedge value).
     if (isa<VPIRValue, VPInstruction, VPReplicateRecipe>(A) &&
-        vputils::isSingleScalar(A))
+        vputils::isSingleScalar(A) &&
+        (isa<VPIRValue>(A) || all_of(A->users(), [Def, A](VPUser *U) {
+           return U == Def || U->usesScalars(A);
+         })))
       return A;
 
     if (Plan.hasScalarVFOnly())
