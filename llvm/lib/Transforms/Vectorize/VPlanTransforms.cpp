@@ -1512,7 +1512,18 @@ static void simplifyRecipe(VPSingleDefRecipe *Def) {
     if (match(A, m_Broadcast(m_VPValue(X))))
       return Def->replaceAllUsesWith(X);
 
-    if (isa<VPInstruction, VPReplicateRecipe>(A) && vputils::isSingleScalar(A))
+    // Fold ExtractLastLane(A) -> A only if A produces a single scalar value,
+    // i.e. it is single-scalar (the same value across all lanes) *and* none of
+    // its other users force it to be materialized as a vector. If A has a
+    // vector user (e.g. it is the backedge value of a first-order recurrence
+    // and feeds the recurrence splice), A is generated as a wide vector and the
+    // last-lane extract must be kept; replacing it with the vector A would
+    // require materializing an extractelement at each (out-of-loop) use, which
+    // is both a type mismatch for scalar phis and may not be dominated by A's
+    // definition. See PR #196355/#202234 and the chained scalable FOR case.
+    if (isa<VPInstruction, VPReplicateRecipe>(A) && vputils::isSingleScalar(A) &&
+        all_of(A->users(),
+               [Def, A](VPUser *U) { return U == Def || U->usesScalars(A); }))
       return Def->replaceAllUsesWith(A);
 
     if (Plan->hasScalarVFOnly())
