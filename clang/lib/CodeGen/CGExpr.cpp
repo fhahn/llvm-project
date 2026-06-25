@@ -5129,11 +5129,7 @@ LValue CodeGenFunction::EmitArraySubscriptExpr(const ArraySubscriptExpr *E,
         E->getType(), !getLangOpts().PointerOverflowDefined, SignedIndices,
         E->getExprLoc(), &arrayType, E->getBase());
     EltBaseInfo = ArrayLV.getBaseInfo();
-    if (!CGM.getCodeGenOpts().NewStructPathTBAA) {
-      // Since CodeGenTBAA::getTypeInfoHelper only handles array types for
-      // new struct path TBAA, we must a use a plain access.
-      EltTBAAInfo = CGM.getTBAAInfoForSubobject(ArrayLV, E->getType());
-    } else if (ArrayLV.getTBAAInfo().isMayAlias()) {
+    if (ArrayLV.getTBAAInfo().isMayAlias()) {
       EltTBAAInfo = TBAAAccessInfo::getMayAliasInfo();
     } else if (ArrayLV.getTBAAInfo().isIncomplete()) {
       // The array element is complete, even if the array is not.

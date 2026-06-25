@@ -57,7 +57,7 @@ void ptradd_8_commuted(struct a *ctx) {
 // CHECK-SAME: ptr nofree noundef writeonly captures(none) initializes((8, 9)) [[CTX:%.*]]) local_unnamed_addr #[[ATTR0]] {
 // CHECK-NEXT:  [[ENTRY:.*:]]
 // CHECK-NEXT:    [[ADD_PTR:%.*]] = getelementptr inbounds nuw i8, ptr [[CTX]], i64 8
-// CHECK-NEXT:    store i8 0, ptr [[ADD_PTR]], align 4, !tbaa [[TBAA5]]
+// CHECK-NEXT:    store i8 0, ptr [[ADD_PTR]], align 4, !tbaa [[TBAA6:![0-9]+]]
 // CHECK-NEXT:    ret void
 //
 void ptrsub_4(struct a *ctx) {
@@ -80,4 +80,7 @@ void neg_ptradd_var_index(struct a *ctx, uint8_t idx) {
 // CHECK: [[META3:![0-9]+]] = !{!"omnipotent char", [[META4:![0-9]+]], i64 0}
 // CHECK: [[META4]] = !{!"Simple C/C++ TBAA"}
 // CHECK: [[TBAA5]] = !{[[META3]], [[META3]], i64 0}
+// CHECK: [[TBAA6]] = !{[[META7:![0-9]+]], [[META3]], i64 8}
+// CHECK: [[META7]] = !{!"a", [[META8:![0-9]+]], i64 0, [[META3]], i64 8}
+// CHECK: [[META8]] = !{!"long long", [[META3]], i64 0}
 //.

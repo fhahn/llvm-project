@@ -325,8 +325,13 @@ llvm::MDNode *CodeGenTBAA::getTypeInfoHelper(const Type *Ty) {
     return createScalarTypeNode(OutName, getAnyPtr(PtrDepth), Size);
   }
 
-  // Accesses to arrays are accesses to objects of their element types.
-  if (CodeGenOpts.NewStructPathTBAA && Ty->isArrayType())
+  // Accesses to arrays are accesses to objects of their element types. This
+  // lets a struct's array member be described by its element type (e.g.
+  // `long arr[4]` -> `long`) rather than falling through to omnipotent char,
+  // so a dynamically-indexed member access `s->arr[i]` can carry a struct-path
+  // access tag {S, elt, offsetof(arr)} and be disambiguated from sibling
+  // fields. Previously gated on NewStructPathTBAA only.
+  if (Ty->isArrayType())
     return getTypeInfo(cast<ArrayType>(Ty)->getElementType());
 
   // Accesses to matrix types are accesses to objects of their element types.

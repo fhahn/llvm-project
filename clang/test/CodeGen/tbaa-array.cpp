@@ -25,20 +25,29 @@ int foo(B *b) {
   return b->a->i;
 }
 
-// Check that members of array types are represented correctly.
+// Check that members of array types are represented correctly. Even in the
+// default (non-new) struct-path format, a struct's array member is described
+// by its element type, so an access carries a struct-path tag and is
+// disambiguated from sibling members.
 int bar(C *c) {
+// CHECK-LABEL: _Z3barP1C
+// CHECK: load i32, {{.*}}, !tbaa [[TAG_C_i:!.*]]
 // CHECK-NEW-LABEL: _Z3barP1C
 // CHECK-NEW: load i32, {{.*}}, !tbaa [[TAG_C_i:!.*]]
   return c->i;
 }
 
 int bar2(C *c) {
+// CHECK-LABEL: _Z4bar2P1C
+// CHECK: load i32, {{.*}}, !tbaa [[TAG_C_x:!.*]]
 // CHECK-NEW-LABEL: _Z4bar2P1C
 // CHECK-NEW: load i32, {{.*}}, !tbaa [[TAG_C_x:!.*]]
   return c->x[2];
 }
 
 int bar3(C *c, int j) {
+// CHECK-LABEL: _Z4bar3P1Ci
+// CHECK: load i32, {{.*}}, !tbaa [[TAG_C_x]]
 // CHECK-NEW-LABEL: _Z4bar3P1Ci
 // CHECK-NEW: load i32, {{.*}}, !tbaa [[TAG_C_x]]
   return c->x[j];
@@ -73,6 +82,9 @@ int bar7(E *e, int j) {
 // CHECK-DAG: [[TAG_A_i]] = !{[[TYPE_A:!.*]], [[TYPE_int:!.*]], i64 0}
 // CHECK-DAG: [[TYPE_A]] = !{!"_ZTS1A", !{{.*}}, i64 0}
 // CHECK-DAG: [[TYPE_int]] = !{!"int", !{{.*}}, i64 0}
+// CHECK-DAG: [[TAG_C_i]] = !{[[TYPE_C:!.*]], [[TYPE_int]], i64 0}
+// CHECK-DAG: [[TAG_C_x]] = !{[[TYPE_C]], [[TYPE_int]], i64 4}
+// CHECK-DAG: [[TYPE_C]] = !{!"_ZTS1C", [[TYPE_int]], i64 0, [[TYPE_int]], i64 4}
 
 // CHECK-NEW-DAG: [[TYPE_char:!.*]] = !{{{.*}}, i64 1, !"omnipotent char"}
 // CHECK-NEW-DAG: [[TYPE_int:!.*]] = !{[[TYPE_char]], i64 4, !"int"}
