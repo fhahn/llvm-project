@@ -6572,8 +6572,11 @@ InstructionCost AArch64TTIImpl::getExtendedReductionCost(
   EVT VecVT = TLI->getValueType(DL, VecTy);
   EVT ResVT = TLI->getValueType(DL, ResTy);
 
+  // The cases below only cover fixed-width NEON reductions; querying the size
+  // in bits of a scalable type would crash converting its TypeSize to a fixed
+  // scalar.
   if (Opcode == Instruction::Add && VecVT.isSimple() && ResVT.isSimple() &&
-      VecVT.getSizeInBits() >= 64) {
+      VecVT.isFixedLengthVector() && VecVT.getSizeInBits() >= 64) {
     std::pair<InstructionCost, MVT> LT = getTypeLegalizationCost(VecTy);
 
     // The legal cases are:
