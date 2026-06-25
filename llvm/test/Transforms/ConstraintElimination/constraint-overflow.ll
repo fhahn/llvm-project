@@ -104,3 +104,68 @@ entry:
   %c = icmp ult i64 %i4, %lim
   ret i1 %c
 }
+
+; An equality fact with normal (in-range) coefficients still adds the inverted
+; constraint, so 'a == b' implies both 'a uge b' and 'a ule b' and both fold to
+; true. This locks in the inverted-constraint behavior for the common case.
+define i1 @eq_inverted_normal_coeff(i64 %a, i64 %b) {
+; CHECK-LABEL: define i1 @eq_inverted_normal_coeff(
+; CHECK-SAME: i64 [[A:%.*]], i64 [[B:%.*]]) {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[CMP:%.*]] = icmp eq i64 [[A]], [[B]]
+; CHECK-NEXT:    br i1 [[CMP]], label [[THEN:%.*]], label [[ELSE:%.*]]
+; CHECK:       then:
+; CHECK-NEXT:    [[RES:%.*]] = and i1 true, true
+; CHECK-NEXT:    ret i1 [[RES]]
+; CHECK:       else:
+; CHECK-NEXT:    ret i1 false
+;
+entry:
+  %cmp = icmp eq i64 %a, %b
+  br i1 %cmp, label %then, label %else
+
+then:
+  %t.1 = icmp uge i64 %a, %b
+  %t.2 = icmp ule i64 %a, %b
+  %res = and i1 %t.1, %t.2
+  ret i1 %res
+
+else:
+  ret i1 false
+}
+
+; A coefficient of exactly INT64_MIN can survive getConstraint's SubOverflow
+; accumulation: -2^62 - 2^62 == INT64_MIN does not overflow. When addFactImpl
+; negates the coefficients to add the inverted constraint for the equality
+; fact, 'INT64_MIN * -1' would be signed-overflow UB. The inverted constraint
+; is conservatively skipped in that case; just make sure we don't crash or
+; invoke UB.
+define i1 @eq_negate_overflow_int64min_coeff(i64 %y, i64 %x) {
+; CHECK-LABEL: define i1 @eq_negate_overflow_int64min_coeff(
+; CHECK-SAME: i64 [[Y:%.*]], i64 [[X:%.*]]) {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[S1:%.*]] = shl nsw i64 [[X]], 62
+; CHECK-NEXT:    [[S2:%.*]] = shl nsw i64 [[X]], 62
+; CHECK-NEXT:    [[SUM:%.*]] = add nsw i64 [[S1]], [[S2]]
+; CHECK-NEXT:    [[EQ:%.*]] = icmp eq i64 [[Y]], [[SUM]]
+; CHECK-NEXT:    br i1 [[EQ]], label [[T:%.*]], label [[E:%.*]]
+; CHECK:       t:
+; CHECK-NEXT:    [[C:%.*]] = icmp eq i64 [[Y]], [[SUM]]
+; CHECK-NEXT:    ret i1 [[C]]
+; CHECK:       e:
+; CHECK-NEXT:    ret i1 false
+;
+entry:
+  %s1 = shl nsw i64 %x, 62
+  %s2 = shl nsw i64 %x, 62
+  %sum = add nsw i64 %s1, %s2
+  %eq = icmp eq i64 %y, %sum
+  br i1 %eq, label %t, label %e
+
+t:
+  %c = icmp eq i64 %y, %sum
+  ret i1 %c
+
+e:
+  ret i1 false
+}

@@ -1392,3 +1392,73 @@ define i1 @shl_nsw_by_bw_plus_1(i64 %x) {
   %t.1 = icmp slt i64 %x, 0
   ret i1 %t.1
 }
+
+; A shift of 62 still produces a representable scale (2^62 fits in a signed
+; i64 coefficient), so the (shl nuw x, 62) is decomposed as before and the
+; comparison is folded.
+define i1 @shl_nuw_by_62(i64 %start, i64 %high) {
+; CHECK-LABEL: @shl_nuw_by_62(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[START_SHL_62:%.*]] = shl nuw i64 [[START:%.*]], 62
+; CHECK-NEXT:    [[C_1:%.*]] = icmp ult i64 [[START_SHL_62]], [[HIGH:%.*]]
+; CHECK-NEXT:    call void @llvm.assume(i1 [[C_1]])
+; CHECK-NEXT:    ret i1 true
+;
+entry:
+  %start.shl.62 = shl nuw i64 %start, 62
+  %c.1 = icmp ult i64 %start.shl.62, %high
+  call void @llvm.assume(i1 %c.1)
+
+  %t.1 = icmp ult i64 %start, %high
+  ret i1 %t.1
+}
+
+; A shift of 63 would require a scale of 2^63, which is not representable in
+; the signed i64 coefficient used by decompose (computing int64_t{1} << 63
+; would be signed-overflow UB). The (shl nuw x, 63) is conservatively not
+; decomposed, so the comparison is not folded. Just make sure we don't crash
+; or invoke UB.
+define i1 @shl_nuw_by_63(i64 %start, i64 %high) {
+; CHECK-LABEL: @shl_nuw_by_63(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[START_SHL_63:%.*]] = shl nuw i64 [[START:%.*]], 63
+; CHECK-NEXT:    [[C_1:%.*]] = icmp ult i64 [[START_SHL_63]], [[HIGH:%.*]]
+; CHECK-NEXT:    call void @llvm.assume(i1 [[C_1]])
+; CHECK-NEXT:    [[T_1:%.*]] = icmp ult i64 [[START]], [[HIGH]]
+; CHECK-NEXT:    ret i1 [[T_1]]
+;
+entry:
+  %start.shl.63 = shl nuw i64 %start, 63
+  %c.1 = icmp ult i64 %start.shl.63, %high
+  call void @llvm.assume(i1 %c.1)
+
+  %t.1 = icmp ult i64 %start, %high
+  ret i1 %t.1
+}
+
+; The same comparison on both branches must still be folded for shl nuw x, 63:
+; the icmp is treated as an opaque value (not decomposed), so it folds against
+; itself without UB.
+define i1 @shl_nuw_by_63_self(i64 %x, i64 %b) {
+; CHECK-LABEL: @shl_nuw_by_63_self(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[S:%.*]] = shl nuw i64 [[X:%.*]], 63
+; CHECK-NEXT:    [[C:%.*]] = icmp ule i64 [[S]], [[B:%.*]]
+; CHECK-NEXT:    br i1 [[C]], label [[T:%.*]], label [[E:%.*]]
+; CHECK:       t:
+; CHECK-NEXT:    ret i1 true
+; CHECK:       e:
+; CHECK-NEXT:    ret i1 false
+;
+entry:
+  %s = shl nuw i64 %x, 63
+  %c = icmp ule i64 %s, %b
+  br i1 %c, label %t, label %e
+
+t:
+  %c2 = icmp ule i64 %s, %b
+  ret i1 %c2
+
+e:
+  ret i1 false
+}
