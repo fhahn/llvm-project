@@ -1957,24 +1957,39 @@ static bool isIndvarOverflowCheckKnownFalse(
           Cost->PSE, Cost->TheLoop,
           /*CanUseConstantMax=*/true, /*CanExcludeZeroTrips=*/false,
           /*ComputeUpperBoundOnly=*/true)) {
-    unsigned MaxVF = VF.getKnownMinValue();
+    // Use 64-bit arithmetic for MaxVF: VF.getKnownMinValue() * MaxVScale (and
+    // the subsequent MaxVF * MaxUF) can exceed 2^32 for large vscale estimates
+    // (e.g. vscale_range(1, 2^30)). A 32-bit multiply would wrap and make the
+    // comparison below spuriously true, incorrectly reporting the overflow
+    // check as known-false (resulting in a wrongful nuw on the IV increment).
+    uint64_t MaxVF = VF.getKnownMinValue();
     unsigned MaxTC = TC->getKnownMinValue();
     if (VF.isScalable() || TC->isScalable()) {
       std::optional<unsigned> MaxVScale =
           getMaxVScale(*Cost->TheFunction, Cost->TTI);
       if (!MaxVScale)
         return false;
-      if (VF.isScalable())
-        MaxVF *= *MaxVScale;
+      bool Overflow;
+      if (VF.isScalable()) {
+        MaxVF = SaturatingMultiply(MaxVF, (uint64_t)*MaxVScale, &Overflow);
+        if (Overflow)
+          return false;
+      }
       if (TC->isScalable()) {
-        bool Overflow;
         MaxTC = SaturatingMultiply(MaxTC, *MaxVScale, &Overflow);
         if (Overflow)
           return false;
       }
     }
 
-    return (MaxUIntTripCount - MaxTC).ugt(MaxVF * MaxUF);
+    // Guard against MaxVF * MaxUF overflowing 64 bits; on overflow be
+    // conservative and report the overflow check is not known-false.
+    bool Overflow;
+    uint64_t MaxVFTimesUF =
+        SaturatingMultiply(MaxVF, (uint64_t)MaxUF, &Overflow);
+    if (Overflow)
+      return false;
+    return (MaxUIntTripCount - MaxTC).ugt(MaxVFTimesUF);
   }
 
   return false;
