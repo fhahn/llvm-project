@@ -354,6 +354,13 @@ std::pair<const SCEV *, const SCEV *> llvm::getStartAndEndForAccess(
   const SCEV *ScStart;
   const SCEV *ScEnd;
 
+  // Tracks whether ScEnd was set to the conservative unsigned-max upper-bound
+  // sentinel below (taken when the exact BTC is unknown and no-wrap cannot be
+  // proven). The sentinel is only meaningful as an *upper* bound, so for a
+  // negative-step AddRec - where the swap moves it into the lower bound - it
+  // must be replaced by the minimum address instead.
+  bool ScEndIsUnsignedMaxSentinel = false;
+
   auto &DL = Lp->getHeader()->getDataLayout();
   if (SE->isLoopInvariant(PtrExpr, Lp)) {
     ScStart = ScEnd = PtrExpr;
@@ -382,6 +389,7 @@ std::pair<const SCEV *, const SCEV *> llvm::getStartAndEndForAccess(
             SE->getSCEV(ConstantExpr::getIntToPtr(
                 ConstantInt::getAllOnesValue(EltSizeSCEV->getType()),
                 AR->getType())));
+        ScEndIsUnsignedMaxSentinel = true;
       }
     }
     const SCEV *Step = AR->getStepRecurrence(*SE);
@@ -389,8 +397,17 @@ std::pair<const SCEV *, const SCEV *> llvm::getStartAndEndForAccess(
     // For expressions with negative step, the upper bound is ScStart and the
     // lower bound is ScEnd.
     if (const auto *CStep = dyn_cast<SCEVConstant>(Step)) {
-      if (CStep->getValue()->isNegative())
+      if (CStep->getValue()->isNegative()) {
         std::swap(ScStart, ScEnd);
+        // After the swap ScStart is the lower bound. If ScEnd held the
+        // unsigned-max upper-bound sentinel (no exact BTC, no-wrap unprovable),
+        // it is now in ScStart and would yield an inverted range (Low > High).
+        // The sound conservative lower bound for a downward-unbounded access is
+        // the minimum address, so use null instead.
+        if (ScEndIsUnsignedMaxSentinel)
+          ScStart = SE->getSCEV(
+              ConstantPointerNull::get(cast<PointerType>(AR->getType())));
+      }
     } else {
       // Fallback case: the step is not constant, but we can still
       // get the upper and lower bounds of the interval by using min/max
