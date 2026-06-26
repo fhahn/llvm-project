@@ -412,6 +412,22 @@ static RecurrenceDescriptor getMinMaxRecurrence(PHINode *Phi, Loop *TheLoop,
       IntermediateStore = SI;
   }
 
+  // The vectorizer drops the per-iteration store to the invariant address and
+  // instead stores the *final reduced value* once in the middle block. That is
+  // only correct if the last store to the address stores the reduction value
+  // (the backedge value) itself; then the memory ends up holding the final
+  // reduction value, matching the scalar loop. If instead the last store stores
+  // a *derived* same-kind min/max of the reduction value (e.g.
+  // `%other = smax(%phi, 42); store %other`), that derived value observes the
+  // per-iteration scalar running min/max and is NOT the reduction value, so
+  // replacing it with the final reduced value would miscompile. Reject such
+  // candidates (mirrors the AddReductionVar IntermediateStore check). Note
+  // earlier stores to the same invariant address are safely overwritten by this
+  // final store, so only the last one needs to match.
+  if (IntermediateStore &&
+      IntermediateStore->getValueOperand() != BackedgeValue)
+    return {};
+
   return RecurrenceDescriptor(
       Phi->getIncomingValueForBlock(TheLoop->getLoopPreheader()),
       cast<Instruction>(BackedgeValue), IntermediateStore, RK, FMF, nullptr,
