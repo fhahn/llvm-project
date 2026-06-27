@@ -1084,23 +1084,30 @@ SCEVUse SCEVAddRecExpr::evaluateAtIteration(SCEVUse ARU, const SCEV *It,
 
   // Preserve use-specific flags (e.g. NUW from an inbounds/nuw GEP) on the
   // closed-form result. A use-NUW flag means each step does not unsigned-wrap
-  // relative to the previous pointer. For the closed form Start + BTC*Step to
-  // not unsigned-wrap relative to the pointer base, Start itself must not wrap
-  // relative to that base. We can only prove this when Start *is* the base,
-  // i.e. it is a SCEVUnknown (offset 0): then together with a non-negative step
-  // the cumulative offset stays at or above the base.
+  // relative to the previous pointer, so the whole recurrence is monotone:
+  // every value is >=u the initial pointer Start - Step. For the closed form
+  // Start + BTC*Step to not unsigned-wrap relative to the pointer base, the
+  // initial pointer must itself not wrap relative to that base. We can prove
+  // this when the initial pointer *is* the base, i.e. a SCEVUnknown:
+  //   - Start is a SCEVUnknown: the recurrence starts at the base directly
+  //     (e.g. a GEP off the base indexed by the IV), or
+  //   - Start - Step is a SCEVUnknown: the recurrence is a pointer that is
+  //     advanced each iteration starting from the base (the first step is the
+  //     GEP off the base), so Start = base + Step.
+  // Together with a non-negative step the cumulative offset stays at or above
+  // the base.
   //
-  // A SCEVAddExpr start such as (Offset + Base) may wrap relative to Base even
-  // when Offset is known non-negative (e.g. Base near the top of the address
-  // space), so it would be unsound to preserve the flag based only on a
-  // non-negative offset. We conservatively drop the flag for such starts.
-  // TODO: Extend to SCEVAddExpr starts that carry a use-NUW flag proving the
-  // start does not unsigned-wrap relative to the base.
+  // A start (or initial pointer) that is a SCEVAddExpr such as (Offset + Base)
+  // may wrap relative to Base even when Offset is known non-negative (e.g. Base
+  // near the top of the address space, with Offset formed by a plain GEP), so
+  // it would be unsound to preserve the flag. We conservatively drop it.
   auto UseFlags = ARU.getUseNoWrapFlags();
   if (UseFlags != SCEVNoWrapFlags::FlagAnyWrap && AR->getNumOperands() == 2 &&
       isa<SCEVAddExpr>(Result) && AR->getType()->isPointerTy() &&
-      isa<SCEVUnknown>(AR->getStart()) &&
-      SE.isKnownNonNegative(AR->getOperand(1)))
+      SE.isKnownNonNegative(AR->getOperand(1)) &&
+      (isa<SCEVUnknown>(AR->getStart()) ||
+       isa<SCEVUnknown>(
+           SE.getMinusSCEV(AR->getStart(), AR->getStepRecurrence(SE)))))
     return SE.getUseWithFlags(Result, UseFlags);
   return Result;
 }

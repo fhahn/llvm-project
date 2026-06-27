@@ -11,10 +11,12 @@
 ;------------------------------------------------------------------------------
 ; Category 1: use-specific NUW is preserved on the rewritten exit value.
 ;
-; The pointer recurrence has a SCEVUnknown start (the base is indexed directly
-; by the induction variable, so the offset relative to the base is 0). With a
-; non-negative step, the closed form base + BTC*Step cannot unsigned-wrap
-; relative to the base, so the exit-value GEP keeps `nuw`.
+; The pointer recurrence's initial pointer is the base itself (a SCEVUnknown):
+; either the start is the base directly (the base is indexed by the induction
+; variable, Start is SCEVUnknown), or the recurrence advances a pointer from
+; the base each iteration (Start - Step is SCEVUnknown). With a non-negative
+; step the closed form base + BTC*Step cannot unsigned-wrap relative to the
+; base, so the exit-value GEP keeps `nuw`.
 ;------------------------------------------------------------------------------
 
 define ptr @unknown_start_inbounds(ptr %p, i64 %n) {
@@ -111,13 +113,9 @@ exit:
 }
 
 ;------------------------------------------------------------------------------
-; Category 2: the rewrite is sound, but the use-specific NUW could only be
-; preserved if the SCEVAddExpr start were known not to unsigned-wrap relative
-; to the base. The start has a known non-negative offset here, so preserving
-; NUW would be valid, but SCEV cannot represent the start's no-wrap flag yet,
-; so the flag is conservatively dropped. These should gain `nuw` once
-; SCEVAddExpr starts carry a use-specific no-wrap flag.
-; TODO: Restore `nuw` on the exit-value GEP for these cases.
+; Category 1 (telescoping): the recurrence advances a pointer from the base
+; each iteration, so Start - Step is the base (a SCEVUnknown) and `nuw` is
+; preserved on the exit value.
 ;------------------------------------------------------------------------------
 
 define ptr @pointer_advance_inbounds(ptr %p, i64 %n) {
@@ -128,7 +126,7 @@ define ptr @pointer_advance_inbounds(ptr %p, i64 %n) {
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    br i1 true, label %[[EXIT:.*]], label %[[LOOP]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[P]], i64 [[N]]
+; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr nuw i8, ptr [[P]], i64 [[N]]
 ; CHECK-NEXT:    ret ptr [[SCEVGEP]]
 ;
 entry:
@@ -156,7 +154,7 @@ define ptr @nonconstant_nonneg_step_inbounds(ptr %p, i64 %n, i32 %s) {
 ; CHECK-NEXT:    br i1 true, label %[[EXIT:.*]], label %[[LOOP]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = mul i64 [[N]], [[STEP]]
-; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[P]], i64 [[TMP0]]
+; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr nuw i8, ptr [[P]], i64 [[TMP0]]
 ; CHECK-NEXT:    ret ptr [[SCEVGEP]]
 ;
 entry:
@@ -179,10 +177,12 @@ exit:
 ; Category 3: the use-specific NUW must not be preserved.
 ;------------------------------------------------------------------------------
 
-; The step GEP is `nuw`, so each step does not unsigned-wrap relative to the
-; previous pointer. But the start `%base + 2` comes from a plain GEP that may
-; itself wrap the address space, so the closed form may unsigned-wrap relative
-; to %base. Preserving `nuw` here would introduce poison (miscompile).
+; Telescoping recurrence whose initial pointer `%base + 2` comes from a plain
+; GEP. The step GEP is `nuw`, so each step does not unsigned-wrap relative to
+; the previous pointer, but Start - Step = (%base + 2) is a SCEVAddExpr, not the
+; base, and may itself wrap the address space. So the closed form may
+; unsigned-wrap relative to %base; preserving `nuw` would introduce poison
+; (miscompile).
 define ptr @wrapping_start_nuw(ptr %base) {
 ; CHECK-LABEL: define ptr @wrapping_start_nuw(
 ; CHECK-SAME: ptr [[BASE:%.*]]) {
