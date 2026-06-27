@@ -1082,15 +1082,25 @@ SCEVUse SCEVAddRecExpr::evaluateAtIteration(SCEVUse ARU, const SCEV *It,
   auto *AR = cast<SCEVAddRecExpr>(ARU);
   const SCEV *Result = evaluateAtIteration(AR->operands(), It, SE);
 
-  // Preserve use-specific flags (e.g. NUW from an inbounds GEP) on the
-  // closed-form result. The flag is only valid if every offset relative to the
-  // pointer base stays non-negative, i.e. the step is non-negative and the
-  // start is not below the base.
+  // Preserve use-specific flags (e.g. NUW from an inbounds/nuw GEP) on the
+  // closed-form result. A use-NUW flag means each step does not unsigned-wrap
+  // relative to the previous pointer. For the closed form Start + BTC*Step to
+  // not unsigned-wrap relative to the pointer base, Start itself must not wrap
+  // relative to that base. We can only prove this when Start *is* the base,
+  // i.e. it is a SCEVUnknown (offset 0): then together with a non-negative step
+  // the cumulative offset stays at or above the base.
+  //
+  // A SCEVAddExpr start such as (Offset + Base) may wrap relative to Base even
+  // when Offset is known non-negative (e.g. Base near the top of the address
+  // space), so it would be unsound to preserve the flag based only on a
+  // non-negative offset. We conservatively drop the flag for such starts.
+  // TODO: Extend to SCEVAddExpr starts that carry a use-NUW flag proving the
+  // start does not unsigned-wrap relative to the base.
   auto UseFlags = ARU.getUseNoWrapFlags();
   if (UseFlags != SCEVNoWrapFlags::FlagAnyWrap && AR->getNumOperands() == 2 &&
       isa<SCEVAddExpr>(Result) && AR->getType()->isPointerTy() &&
-      SE.isKnownNonNegative(AR->getOperand(1)) &&
-      SE.isKnownNonNegative(SE.removePointerBase(AR->getStart())))
+      isa<SCEVUnknown>(AR->getStart()) &&
+      SE.isKnownNonNegative(AR->getOperand(1)))
     return SE.getUseWithFlags(Result, UseFlags);
   return Result;
 }
@@ -3069,7 +3079,7 @@ SCEVUse ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
       const SCEV *NewRec = getAddRecExpr(AddRecOps, AddRecLoop, Flags);
 
       // If all of the other operands were loop invariant, we are done.
-      if (Ops.size() == 1) return SCEVUse(NewRec, UseFlags);
+      if (Ops.size() == 1) return getUseWithFlags(NewRec, UseFlags);
 
       // Otherwise, add the folded AddRec by the non-invariant parts.
       for (unsigned i = 0;; ++i)
@@ -10207,6 +10217,14 @@ const SCEV *ScalarEvolution::computeExitCountExhaustively(const Loop *L,
 }
 
 SCEVUse ScalarEvolution::getSCEVAtScope(SCEVUse V, const Loop *L) {
+  // Only the AddRec at-scope path consumes use-specific no-wrap flags (to
+  // preserve them on the closed-form exit value, see computeSCEVAtScope). For
+  // any other expression the flags are unused here, so drop them to keep the
+  // ValuesAtScopes cache keyed on the canonical SCEV and avoid tracking
+  // flagged at-scope keys that serve no purpose.
+  if (!isa<SCEVAddRecExpr>(V.getPointer()))
+    V = V.getPointer();
+
   auto &Values = ValuesAtScopes[V];
   // Check to see if we've folded this expression at this loop before.
   for (auto &LS : Values)

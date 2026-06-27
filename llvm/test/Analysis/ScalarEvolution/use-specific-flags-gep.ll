@@ -360,17 +360,17 @@ define void @loop_gep_flags(ptr %base, i64 %n) {
 ; CHECK-LABEL: 'loop_gep_flags'
 ; CHECK-NEXT:  Classifying expressions for: @loop_gep_flags
 ; CHECK-NEXT:    %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
-; CHECK-NEXT:    --> {0,+,1}<%loop> U: full-set S: full-set Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {0,+,1}<nuw><%loop> U: full-set S: full-set Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %gep.inbounds = getelementptr inbounds i8, ptr %base, i64 %iv
-; CHECK-NEXT:    --> {%base,+,1}<%loop> U: full-set S: full-set Exits: (-1 + %n + %base) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {%base,+,1}<nw><%loop> U: full-set S: full-set Exits: (-1 + %n + %base) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %gep.nuw = getelementptr nuw i8, ptr %base, i64 %iv
-; CHECK-NEXT:    --> {%base,+,1}<%loop>(u nuw) U: full-set S: full-set Exits: (-1 + %n + %base) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {%base,+,1}<nw><%loop>(u nuw) U: full-set S: full-set Exits: (-1 + %n + %base) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %gep.nusw = getelementptr inbounds nuw i8, ptr %base, i64 %iv
-; CHECK-NEXT:    --> {%base,+,1}<%loop>(u nuw) U: full-set S: full-set Exits: (-1 + %n + %base) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {%base,+,1}<nw><%loop>(u nuw) U: full-set S: full-set Exits: (-1 + %n + %base) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %gep.plain = getelementptr i8, ptr %base, i64 %iv
-; CHECK-NEXT:    --> {%base,+,1}<%loop> U: full-set S: full-set Exits: (-1 + %n + %base) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {%base,+,1}<nw><%loop> U: full-set S: full-set Exits: (-1 + %n + %base) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = add i64 %iv, 1
-; CHECK-NEXT:    --> {1,+,1}<%loop> U: full-set S: full-set Exits: %n LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {1,+,1}<nw><%loop> U: full-set S: full-set Exits: %n LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @loop_gep_flags
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + %n)
 ; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -1
@@ -599,11 +599,11 @@ define void @loop_invariant_flagged_gep(ptr %base, i32 %n, i64 %m) {
 ; CHECK-NEXT:    %ext = zext i32 %n to i64
 ; CHECK-NEXT:    --> (zext i32 %n to i64) U: [0,4294967296) S: [0,4294967296)
 ; CHECK-NEXT:    %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
-; CHECK-NEXT:    --> {0,+,1}<%loop> U: full-set S: full-set Exits: (-1 + %m) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {0,+,1}<nuw><%loop> U: full-set S: full-set Exits: (-1 + %m) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %gep.inv = getelementptr inbounds i8, ptr %base, i64 %ext
 ; CHECK-NEXT:    --> ((zext i32 %n to i64) + %base)(u nuw) U: full-set S: full-set Exits: ((zext i32 %n to i64) + %base) LoopDispositions: { %loop: Invariant }
 ; CHECK-NEXT:    %iv.next = add i64 %iv, 1
-; CHECK-NEXT:    --> {1,+,1}<%loop> U: full-set S: full-set Exits: %m LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {1,+,1}<nw><%loop> U: full-set S: full-set Exits: %m LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @loop_invariant_flagged_gep
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + %m)
 ; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -1
