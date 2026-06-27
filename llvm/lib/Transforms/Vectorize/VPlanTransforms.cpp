@@ -7661,25 +7661,23 @@ void VPlanTransforms::scalarizeIfProfitable(VPlan &Plan, VPCostContext &CostCtx,
     return;
 
   // Returns the VPValue defined by \p R, or nullptr if \p R isn't a chain
-  // candidate recipe type (VPWidenRecipe, VPWidenGEPRecipe, VPWidenLoadRecipe).
+  // candidate recipe type (VPWidenRecipe, VPWidenCastRecipe,
+  // VPWidenIntrinsicRecipe, VPWidenGEPRecipe, VPWidenLoadRecipe).
   auto GetDefinedValue = [](VPRecipeBase *R) -> VPValue * {
-    if (auto *W = dyn_cast<VPWidenRecipe>(R))
-      return W->getVPSingleValue();
-    if (auto *G = dyn_cast<VPWidenGEPRecipe>(R))
-      return G->getVPSingleValue();
-    if (auto *L = dyn_cast<VPWidenLoadRecipe>(R))
-      return L;
+    if (isa<VPWidenRecipe, VPWidenCastRecipe, VPWidenIntrinsicRecipe,
+            VPWidenGEPRecipe, VPWidenLoadRecipe>(R))
+      return R->getVPSingleValue();
     return nullptr;
   };
 
   // Returns the underlying instruction for a chain candidate recipe, or nullptr.
   auto GetUnderlyingInst = [](VPRecipeBase *R) -> Instruction * {
-    if (auto *W = dyn_cast<VPWidenRecipe>(R))
-      return dyn_cast_or_null<Instruction>(W->getUnderlyingValue());
-    if (auto *G = dyn_cast<VPWidenGEPRecipe>(R))
-      return dyn_cast_or_null<Instruction>(G->getUnderlyingValue());
     if (auto *L = dyn_cast<VPWidenLoadRecipe>(R))
       return &L->getIngredient();
+    if (isa<VPWidenRecipe, VPWidenCastRecipe, VPWidenIntrinsicRecipe,
+            VPWidenGEPRecipe>(R))
+      return dyn_cast_or_null<Instruction>(
+          R->getVPSingleValue()->getUnderlyingValue());
     return nullptr;
   };
 
@@ -7708,12 +7706,17 @@ void VPlanTransforms::scalarizeIfProfitable(VPlan &Plan, VPCostContext &CostCtx,
       if (W->getNumOperands() != UI->getNumOperands())
         return false;
 
-    // Iterate the instruction-level operands: for VPWidenRecipe and
-    // VPWidenGEPRecipe these are operands(); for VPWidenLoadRecipe, only
-    // the address operand (mask is a VPlan-level concept).
+    // Iterate the instruction-level operands: for VPWidenRecipe,
+    // VPWidenCastRecipe and VPWidenGEPRecipe these are operands(); for
+    // VPWidenIntrinsicRecipe these are the call arguments; for
+    // VPWidenLoadRecipe, only the address operand (mask is a VPlan-level
+    // concept).
     SmallVector<VPValue *, 4> OperandsToCheck;
     if (auto *L = dyn_cast<VPWidenLoadRecipe>(R))
       OperandsToCheck.push_back(L->getAddr());
+    else if (auto *In = dyn_cast<VPWidenIntrinsicRecipe>(R))
+      OperandsToCheck.assign(In->op_begin(),
+                             In->op_begin() + cast<CallInst>(UI)->arg_size());
     else
       OperandsToCheck.assign(R->op_begin(), R->op_end());
 
@@ -7833,6 +7836,10 @@ void VPlanTransforms::scalarizeIfProfitable(VPlan &Plan, VPCostContext &CostCtx,
     auto GetInstOperands = [&](VPRecipeBase *R) -> SmallVector<VPValue *, 4> {
       if (auto *L = dyn_cast<VPWidenLoadRecipe>(R))
         return {L->getAddr()};
+      if (auto *In = dyn_cast<VPWidenIntrinsicRecipe>(R)) {
+        auto *CI = cast<CallInst>(GetUnderlyingInst(In));
+        return {In->op_begin(), In->op_begin() + CI->arg_size()};
+      }
       return to_vector(R->operands());
     };
 
@@ -7840,6 +7847,10 @@ void VPlanTransforms::scalarizeIfProfitable(VPlan &Plan, VPCostContext &CostCtx,
     auto GetVectorCost = [&](VPRecipeBase *R, ElementCount VF) {
       if (auto *W = dyn_cast<VPWidenRecipe>(R))
         return W->computeCost(VF, CostCtx);
+      if (auto *C = dyn_cast<VPWidenCastRecipe>(R))
+        return C->computeCost(VF, CostCtx);
+      if (auto *In = dyn_cast<VPWidenIntrinsicRecipe>(R))
+        return In->computeCost(VF, CostCtx);
       if (auto *G = dyn_cast<VPWidenGEPRecipe>(R))
         return G->computeCost(VF, CostCtx);
       if (auto *L = dyn_cast<VPWidenLoadRecipe>(R))
@@ -7848,12 +7859,16 @@ void VPlanTransforms::scalarizeIfProfitable(VPlan &Plan, VPCostContext &CostCtx,
     };
 
     // Returns the per-lane scalar cost for \p R (before multiplying by VF).
-    auto GetScalarInstructionCost = [&](VPRecipeBase *R) {
+    auto GetScalarInstructionCost = [&](VPRecipeBase *R) -> InstructionCost {
       if (auto *W = dyn_cast<VPWidenRecipe>(R))
         return W->getCostForRecipeWithOpcode(
             W->getOpcode(), ElementCount::getFixed(1), CostCtx);
-      if (auto *G = dyn_cast<VPWidenGEPRecipe>(R)) {
-        (void)G;
+      if (auto *C = dyn_cast<VPWidenCastRecipe>(R))
+        return C->getCostForRecipeWithOpcode(
+            C->getOpcode(), ElementCount::getFixed(1), CostCtx);
+      if (auto *In = dyn_cast<VPWidenIntrinsicRecipe>(R))
+        return In->computeCost(ElementCount::getFixed(1), CostCtx);
+      if (isa<VPWidenGEPRecipe>(R)) {
         // Scalar GEP is treated as free (matches legacy's
         // getInstructionCost for GetElementPtr returning 0).
         return InstructionCost(0);
@@ -7970,6 +7985,21 @@ void VPlanTransforms::scalarizeIfProfitable(VPlan &Plan, VPCostContext &CostCtx,
         I = cast<Instruction>(W->getUnderlyingValue());
         Operands = to_vector(W->operands());
         Flags = *W;
+      } else if (auto *C = dyn_cast<VPWidenCastRecipe>(R)) {
+        I = cast<Instruction>(C->getUnderlyingValue());
+        Operands = to_vector(C->operands());
+        Flags = *C;
+        Metadata = *C;
+      } else if (auto *In = dyn_cast<VPWidenIntrinsicRecipe>(R)) {
+        auto *CI = cast<CallInst>(In->getUnderlyingValue());
+        I = CI;
+        // A replicated call's operands are the call arguments followed by the
+        // called function, matching the operand layout of the underlying
+        // CallInst (which VPReplicateRecipe::execute clones).
+        Operands.assign(In->op_begin(), In->op_begin() + CI->arg_size());
+        Operands.push_back(Plan.getOrAddLiveIn(CI->getCalledOperand()));
+        Flags = *In;
+        Metadata = *In;
       } else if (auto *G = dyn_cast<VPWidenGEPRecipe>(R)) {
         I = cast<Instruction>(G->getUnderlyingValue());
         Operands = to_vector(G->operands());
