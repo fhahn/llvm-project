@@ -457,6 +457,46 @@ TEST_F(ScalarEvolutionsTest, SCEVAddExpr) {
   EXPECT_EQ(AddWithNSW_NSWNUW->getNoWrapFlags(), SCEV::FlagAnyWrap);
 }
 
+// An N-ary expression node with a use-flagged operand must be a distinct node
+// from the otherwise-identical node with the flag-free operand, and its
+// canonical form must be that flag-free node.
+TEST_F(ScalarEvolutionsTest, FlaggedOperandIdentity) {
+  Type *Ty = Type::getInt64Ty(Context);
+  Type *ArgTys[] = {Ty, Ty};
+  FunctionType *FTy =
+      FunctionType::get(Type::getVoidTy(Context), ArgTys, false);
+  Function *F = Function::Create(FTy, Function::ExternalLinkage, "f", M);
+  BasicBlock *BB = BasicBlock::Create(Context, "entry", F);
+  ReturnInst::Create(Context, nullptr, BB);
+
+  ScalarEvolution SE = buildSE(*F);
+  const SCEV *A = SE.getSCEV(&*F->arg_begin());
+  const SCEV *B = SE.getSCEV(&*std::next(F->arg_begin()));
+
+  // A use-flagged version of A as an operand creates a distinct node, but the
+  // canonical strips the operand flag and matches the flag-free node.
+  SCEVUse AWithNUW = SE.getUseWithFlags(A, SCEVNoWrapFlags::FlagNUW);
+  EXPECT_TRUE(AWithNUW.hasUseFlags());
+  EXPECT_EQ(AWithNUW.getPointer(), A);
+  EXPECT_EQ(AWithNUW.getCanonical(), A);
+
+  SmallVector<SCEVUse, 2> PlainOps = {A, B};
+  SmallVector<SCEVUse, 2> FlaggedOps = {AWithNUW, B};
+  SCEVUse Plain = SE.getAddExpr(PlainOps);
+  SCEVUse Flagged = SE.getAddExpr(FlaggedOps);
+  // Distinct nodes (operand flags are part of identity)...
+  EXPECT_NE(Flagged.getPointer(), Plain.getPointer());
+  // ...but the flagged node's canonical is the flag-free node.
+  EXPECT_EQ(Flagged.getCanonical(), Plain.getPointer());
+  EXPECT_EQ(Plain.getCanonical(), Plain.getPointer());
+  // Building the flagged add again is stable (uniqued on operand flags).
+  SmallVector<SCEVUse, 2> FlaggedOps2 = {AWithNUW, B};
+  EXPECT_EQ(SE.getAddExpr(FlaggedOps2).getPointer(), Flagged.getPointer());
+  // The flag-free build is unaffected by the flagged variant existing.
+  SmallVector<SCEVUse, 2> PlainOps2 = {A, B};
+  EXPECT_EQ(SE.getAddExpr(PlainOps2).getPointer(), Plain.getPointer());
+}
+
 static Instruction &GetInstByName(Function &F, StringRef Name) {
   for (auto &I : instructions(F))
     if (I.getName() == Name)

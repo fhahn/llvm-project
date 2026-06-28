@@ -272,12 +272,15 @@ void SCEV::computeAndSetCanonical(ScalarEvolution &SE) {
 
   // For all other expressions, check whether any immediate operand has a
   // different canonical. Since operands are always created before their parent,
-  // their canonical pointers are already set — no recursion needed.
+  // their canonical pointers are already set — no recursion needed. An operand
+  // that carries use-specific flags is not canonical even when its underlying
+  // pointer is, so compare against the operand's full opaque value (pointer +
+  // flags), not just its pointer.
   bool Changed = false;
   SmallVector<SCEVUse, 4> CanonOps;
   for (SCEVUse Op : operands()) {
     CanonOps.push_back(Op->getCanonical());
-    Changed |= CanonOps.back() != Op.getPointer();
+    Changed |= CanonOps.back() != Op.getOpaqueValue();
   }
 
   if (!Changed) {
@@ -3149,8 +3152,11 @@ SCEVUse ScalarEvolution::getOrCreateAddExpr(ArrayRef<SCEVUse> Ops,
                                             SCEV::NoWrapFlags UseFlags) {
   FoldingSetNodeID ID;
   ID.AddInteger(scAddExpr);
-  for (const SCEV *Op : Ops)
-    ID.AddPointer(Op);
+  // Key on the operands' full opaque value (pointer + use-specific flags) so
+  // that nodes differing only in an operand's use-flags are distinct. For
+  // flag-free operands this is identical to keying on the bare pointer.
+  for (SCEVUse Op : Ops)
+    ID.AddPointer(Op.getOpaqueValue());
   void *IP = nullptr;
   SCEVAddExpr *S =
       static_cast<SCEVAddExpr *>(UniqueSCEVs.FindNodeOrInsertPos(ID, IP));
@@ -3173,8 +3179,8 @@ SCEVUse ScalarEvolution::getOrCreateAddRecExpr(ArrayRef<SCEVUse> Ops,
                                                SCEV::NoWrapFlags UseFlags) {
   FoldingSetNodeID ID;
   ID.AddInteger(scAddRecExpr);
-  for (const SCEV *Op : Ops)
-    ID.AddPointer(Op);
+  for (SCEVUse Op : Ops)
+    ID.AddPointer(Op.getOpaqueValue());
   ID.AddPointer(L);
   void *IP = nullptr;
   SCEVAddRecExpr *S =
@@ -3198,8 +3204,8 @@ SCEVUse ScalarEvolution::getOrCreateMulExpr(ArrayRef<SCEVUse> Ops,
                                             SCEV::NoWrapFlags UseFlags) {
   FoldingSetNodeID ID;
   ID.AddInteger(scMulExpr);
-  for (const SCEV *Op : Ops)
-    ID.AddPointer(Op);
+  for (SCEVUse Op : Ops)
+    ID.AddPointer(Op.getOpaqueValue());
   void *IP = nullptr;
   SCEVMulExpr *S =
     static_cast<SCEVMulExpr *>(UniqueSCEVs.FindNodeOrInsertPos(ID, IP));
@@ -4056,8 +4062,8 @@ SCEV *ScalarEvolution::findExistingSCEVInCache(SCEVTypes SCEVType,
                                                ArrayRef<SCEVUse> Ops) {
   FoldingSetNodeID ID;
   ID.AddInteger(SCEVType);
-  for (const SCEV *Op : Ops)
-    ID.AddPointer(Op);
+  for (SCEVUse Op : Ops)
+    ID.AddPointer(Op.getOpaqueValue());
   void *IP = nullptr;
   return UniqueSCEVs.FindNodeOrInsertPos(ID, IP);
 }
@@ -4178,8 +4184,8 @@ const SCEV *ScalarEvolution::getMinMaxExpr(SCEVTypes Kind,
   // already have one, otherwise create a new one.
   FoldingSetNodeID ID;
   ID.AddInteger(Kind);
-  for (const SCEV *Op : Ops)
-    ID.AddPointer(Op);
+  for (SCEVUse Op : Ops)
+    ID.AddPointer(Op.getOpaqueValue());
   void *IP = nullptr;
   const SCEV *ExistingSCEV = UniqueSCEVs.FindNodeOrInsertPos(ID, IP);
   if (ExistingSCEV)
@@ -4568,8 +4574,8 @@ ScalarEvolution::getSequentialMinMaxExpr(SCEVTypes Kind,
   // already have one, otherwise create a new one.
   FoldingSetNodeID ID;
   ID.AddInteger(Kind);
-  for (const SCEV *Op : Ops)
-    ID.AddPointer(Op);
+  for (SCEVUse Op : Ops)
+    ID.AddPointer(Op.getOpaqueValue());
   void *IP = nullptr;
   const SCEV *ExistingSCEV = UniqueSCEVs.FindNodeOrInsertPos(ID, IP);
   if (ExistingSCEV)
@@ -4797,10 +4803,13 @@ SCEVUse ScalarEvolution::getSCEV(Value *V, bool UseCtx) {
   if (!S)
     S = createSCEVIter(V);
 
-  // When not using context-specific flags, return the canonical SCEV
-  // without any use-specific flags.
+  // When not using context-specific flags, return the canonical SCEV without
+  // any use-specific flags. getCanonical() strips flags from nested operands
+  // too (getPointer() would only drop a top-level flag), so consumers never
+  // observe a variant node that differs from the canonical only in operand
+  // use-flags.
   if (!UseCtx)
-    return S.getPointer();
+    return S.getCanonical();
   return S;
 }
 
