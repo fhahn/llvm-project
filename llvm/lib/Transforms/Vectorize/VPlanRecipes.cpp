@@ -1860,7 +1860,11 @@ void VPInstructionWithType::execute(VPTransformState &State) {
     Value *Op = State.get(getOperand(0), VPLane(0));
     Value *Cast = State.Builder.CreateCast(Instruction::CastOps(getOpcode()),
                                            Op, ResultTy);
-    if (auto *CastOp = dyn_cast<Instruction>(Cast)) {
+    // CreateCast may fold a no-op cast and return the operand (a pre-existing
+    // instruction) unchanged; only apply this recipe's flags/metadata to a
+    // freshly created cast of the expected opcode (see VPWidenCastRecipe).
+    if (auto *CastOp = dyn_cast<CastInst>(Cast);
+        CastOp && CastOp->getOpcode() == getOpcode()) {
       applyFlags(*CastOp);
       applyMetadata(*CastOp);
     }
@@ -2906,7 +2910,14 @@ void VPWidenCastRecipe::execute(VPTransformState &State) {
   Value *A = State.get(Op);
   Value *Cast = Builder.CreateCast(Instruction::CastOps(Opcode), A, DestTy);
   State.set(this, Cast);
-  if (auto *CastOp = dyn_cast<Instruction>(Cast)) {
+  // CreateCast folds a no-op cast (e.g. when MinBWs narrowing makes the source
+  // and destination types equal) and returns the operand unchanged. In that
+  // case Cast is a pre-existing instruction (not the cast this recipe models),
+  // so applying this recipe's cast flags/metadata to it would be incorrect
+  // (e.g. setNonNeg on an icmp). Only apply them to a freshly created cast of
+  // the expected opcode.
+  if (auto *CastOp = dyn_cast<CastInst>(Cast);
+      CastOp && CastOp->getOpcode() == Opcode) {
     applyFlags(*CastOp);
     applyMetadata(*CastOp);
   }
