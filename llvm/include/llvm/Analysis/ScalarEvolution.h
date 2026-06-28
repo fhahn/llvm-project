@@ -334,6 +334,10 @@ public:
     assert(CanonicalSCEV && "canonical SCEV not yet computed");
     return CanonicalSCEV;
   }
+
+  /// Return the canonical SCEV if computeAndSetCanonical has run, otherwise
+  /// nullptr. Safe to call during construction, before the canonical is set.
+  const SCEV *getCanonicalIfComputed() const { return CanonicalSCEV; }
 };
 
 // Specialize FoldingSetTrait for SCEV to avoid needing to compute

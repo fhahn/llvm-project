@@ -1091,26 +1091,37 @@ SCEVUse SCEVAddRecExpr::evaluateAtIteration(SCEVUse ARU, const SCEV *It,
   // every value is >=u the initial pointer Start - Step. For the closed form
   // Start + BTC*Step to not unsigned-wrap relative to the pointer base, the
   // initial pointer must itself not wrap relative to that base. We can prove
-  // this when the initial pointer *is* the base, i.e. a SCEVUnknown:
+  // this in the following cases:
   //   - Start is a SCEVUnknown: the recurrence starts at the base directly
   //     (e.g. a GEP off the base indexed by the IV), or
-  //   - Start - Step is a SCEVUnknown: the recurrence is a pointer that is
-  //     advanced each iteration starting from the base (the first step is the
-  //     GEP off the base), so Start = base + Step.
+  //   - Start - Step is a SCEVUnknown: the recurrence is a pointer advanced
+  //     each iteration starting from the base (the first step is the GEP off
+  //     the base), so Start = base + Step, or
+  //   - Start carries a use-NUW flag: the start was formed by a GEP off the
+  //     base whose result is known not to wrap relative to that base (e.g. a
+  //     GEP off the base indexed by the IV plus a non-negative constant). The
+  //     flag lives on the start operand and is part of the recurrence's
+  //     identity, so it cannot be confused with a start that merely happens to
+  //     have a non-negative offset.
   // Together with a non-negative step the cumulative offset stays at or above
   // the base.
   //
-  // A start (or initial pointer) that is a SCEVAddExpr such as (Offset + Base)
-  // may wrap relative to Base even when Offset is known non-negative (e.g. Base
-  // near the top of the address space, with Offset formed by a plain GEP), so
-  // it would be unsound to preserve the flag. We conservatively drop it.
+  // A start (or initial pointer) that is a SCEVAddExpr without a use-NUW flag,
+  // such as (Offset + Base), may wrap relative to Base even when Offset is
+  // known non-negative (e.g. Base near the top of the address space, with
+  // Offset formed by a plain GEP), so it would be unsound to preserve the flag.
+  // We conservatively drop it.
+  SCEVUse Start = AR->getStart();
   auto UseFlags = ARU.getUseNoWrapFlags();
+  bool StartIsNUWRelBase =
+      any(Start.getUseNoWrapFlags() & SCEVNoWrapFlags::FlagNUW);
+  if (StartIsNUWRelBase)
+    UseFlags |= SCEVNoWrapFlags::FlagNUW;
   if (UseFlags != SCEVNoWrapFlags::FlagAnyWrap && AR->getNumOperands() == 2 &&
       isa<SCEVAddExpr>(Result) && AR->getType()->isPointerTy() &&
       SE.isKnownNonNegative(AR->getOperand(1)) &&
-      (isa<SCEVUnknown>(AR->getStart()) ||
-       isa<SCEVUnknown>(
-           SE.getMinusSCEV(AR->getStart(), AR->getStepRecurrence(SE)))))
+      (isa<SCEVUnknown>(Start) || StartIsNUWRelBase ||
+       isa<SCEVUnknown>(SE.getMinusSCEV(Start, AR->getStepRecurrence(SE)))))
     return SE.getUseWithFlags(Result, UseFlags);
   return Result;
 }
@@ -3080,7 +3091,32 @@ SCEVUse ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
         if (!isGuaranteedToTransferExecutionTo(DefI, ReachI))
           AddFlags = SCEV::FlagAnyWrap;
       }
-      AddRecOps[0] = getAddExpr(LIOps, AddFlags, Depth + 1);
+      // Fold the loop-invariant operands into the recurrence start.
+      //
+      // If this add carries a use-specific flag and folds a loop-invariant
+      // pointer base into the start of an integer-offset recurrence (the
+      // pattern of a GEP off a loop-invariant base indexed by the IV plus a
+      // constant), record the flag on the resulting pointer start operand. The
+      // flag then means "the start does not wrap relative to its pointer base",
+      // which is exactly what is needed to preserve no-wrap on the closed-form
+      // exit value, and (because operand use-flags are part of a node's
+      // identity) keeps this recurrence distinct from one whose start is not
+      // known to be wrap-free relative to the base.
+      //
+      // In all other cases the flag stays on the whole recurrence: for a
+      // SCEVUnknown start (offset 0) the start trivially does not wrap relative
+      // to the base, and for a pointer recurrence (a telescoping pointer
+      // advance) the flag is relative to the previous pointer rather than the
+      // ultimate base and is handled by evaluateAtIteration's Start - Step
+      // check.
+      SCEVUse Start = getAddExpr(LIOps, AddFlags, Depth + 1);
+      bool FlagOnStart = UseFlags != SCEV::FlagAnyWrap &&
+                         !AddRec->getType()->isPointerTy() &&
+                         isa<SCEVAddExpr>(Start) &&
+                         Start->getType()->isPointerTy();
+      if (FlagOnStart)
+        Start = getUseWithFlags(Start, UseFlags);
+      AddRecOps[0] = Start;
 
       // Build the new addrec. Propagate the NUW and NSW flags if both the
       // outer add and the inner addrec are guaranteed to have no overflow.
@@ -3088,8 +3124,10 @@ SCEVUse ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
       Flags = AddRec->getNoWrapFlags(setFlags(Flags, SCEV::FlagNW));
       const SCEV *NewRec = getAddRecExpr(AddRecOps, AddRecLoop, Flags);
 
-      // If all of the other operands were loop invariant, we are done.
-      if (Ops.size() == 1) return getUseWithFlags(NewRec, UseFlags);
+      // If all of the other operands were loop invariant, we are done. The flag
+      // is either on the start operand (FlagOnStart) or on the whole recurrence.
+      if (Ops.size() == 1)
+        return FlagOnStart ? SCEVUse(NewRec) : getUseWithFlags(NewRec, UseFlags);
 
       // Otherwise, add the folded AddRec by the non-invariant parts.
       for (unsigned i = 0;; ++i)
@@ -6687,8 +6725,19 @@ static std::optional<ConstantRange> GetRangeFromMetadata(Value *V) {
 
 void ScalarEvolution::setNoWrapFlags(SCEVAddRecExpr *AddRec,
                                      SCEV::NoWrapFlags Flags) {
-  if (AddRec->getNoWrapFlags(Flags) != Flags) {
-    AddRec->setNoWrapFlags(Flags);
+  // No-wrap flags describe the recurrence values, which are identical for a
+  // node and its canonical (they differ only in operand use-flags). Store them
+  // on the canonical node so that inference performed via any variant is
+  // visible from all of them; getNoWrapFlags reads through to the canonical.
+  auto *Canon =
+      cast<SCEVAddRecExpr>(const_cast<SCEV *>(AddRec->getCanonical()));
+  if (Canon->getNoWrapFlags(Flags) != Flags) {
+    Canon->setNoWrapFlags(Flags);
+    UnsignedRanges.erase(Canon);
+    SignedRanges.erase(Canon);
+    ConstantMultipleCache.erase(Canon);
+  }
+  if (Canon != AddRec) {
     UnsignedRanges.erase(AddRec);
     SignedRanges.erase(AddRec);
     ConstantMultipleCache.erase(AddRec);
@@ -10381,8 +10430,16 @@ SCEVUse ScalarEvolution::computeSCEVAtScope(SCEVUse V, const Loop *L) {
     // Avoid performing the look-up in the common case where the specified
     // expression has no loop-variant portions.
     for (unsigned i = 0, e = AddRec->getNumOperands(); i != e; ++i) {
-      SCEVUse OpAtScope = getSCEVAtScope(AddRec->getOperand(i), L);
-      if (OpAtScope == AddRec->getOperand(i))
+      SCEVUse Op = AddRec->getOperand(i);
+      SCEVUse OpAtScope = getSCEVAtScope(Op, L);
+      // getSCEVAtScope returns the canonical (flag-free) SCEV for non-AddRec
+      // operands. Re-attach the operand's use-flags if it is otherwise
+      // unchanged, so a use-NUW flag recorded on the start operand (meaning the
+      // start does not wrap relative to its pointer base) survives at-scope
+      // evaluation and reaches evaluateAtIteration below.
+      if (OpAtScope.getPointer() == Op.getPointer())
+        OpAtScope = Op;
+      if (OpAtScope == Op)
         continue;
 
       // Okay, at least one of these operands is loop variant but might be

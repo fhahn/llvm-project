@@ -234,7 +234,15 @@ public:
   ArrayRef<SCEVUse> operands() const { return ArrayRef(Operands, NumOperands); }
 
   NoWrapFlags getNoWrapFlags(NoWrapFlags Mask = NoWrapMask) const {
-    return static_cast<NoWrapFlags>(SubclassData) & Mask;
+    // No-wrap flags are an intrinsic property of the recurrence values, shared
+    // by a node and its canonical (which differ only in operand use-flags).
+    // Read them from the canonical node so flag inference performed on any
+    // variant is visible from all of them. Guard against the canonical not yet
+    // being computed (during construction), in which case the node is its own.
+    const SCEV *Canon = getCanonicalIfComputed();
+    const SCEVNAryExpr *Src =
+        (Canon && Canon != this) ? cast<SCEVNAryExpr>(Canon) : this;
+    return static_cast<NoWrapFlags>(Src->SubclassData) & Mask;
   }
 
   bool hasNoUnsignedWrap() const {
