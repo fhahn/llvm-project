@@ -2356,8 +2356,12 @@ private:
   /// Forget predicated/non-predicated backedge taken counts for the given loop.
   void forgetBackedgeTakenCounts(const Loop *L, bool Predicated);
 
-  /// Drop memoized information for all \p SCEVs.
-  void forgetMemoizedResults(ArrayRef<SCEVUse> SCEVs);
+  /// Drop memoized information for all \p SCEVs. If \p PruneLoopUsers is set,
+  /// also remove any forgotten addrecs from LoopUsers; this must only be used
+  /// when the SCEVs are being permanently invalidated (e.g. the underlying IR
+  /// value is going away), not when they are forgotten only to be recomputed.
+  void forgetMemoizedResults(ArrayRef<SCEVUse> SCEVs,
+                             bool PruneLoopUsers = false);
 
   /// Helper for forgetMemoizedResults.
   void forgetMemoizedResultsImpl(const SCEV *S);

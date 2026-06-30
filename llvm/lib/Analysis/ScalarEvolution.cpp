@@ -640,8 +640,9 @@ SCEVSignExtendExpr::SCEVSignExtendExpr(const FoldingSetNodeIDRef ID, SCEVUse op,
 }
 
 void SCEVUnknown::deleted() {
-  // Clear this SCEVUnknown from various maps.
-  SE->forgetMemoizedResults({this});
+  // Clear this SCEVUnknown from various maps. The underlying value is going
+  // away, so prune any addrecs depending on it from LoopUsers as well.
+  SE->forgetMemoizedResults({this}, /*PruneLoopUsers=*/true);
 
   // Remove this SCEVUnknown from the uniquing map.
   SE->UniqueSCEVs.RemoveNode(this);
@@ -651,8 +652,9 @@ void SCEVUnknown::deleted() {
 }
 
 void SCEVUnknown::allUsesReplacedWith(Value *New) {
-  // Clear this SCEVUnknown from various maps.
-  SE->forgetMemoizedResults({this});
+  // Clear this SCEVUnknown from various maps. The old value is going away, so
+  // prune any addrecs depending on it from LoopUsers as well.
+  SE->forgetMemoizedResults({this}, /*PruneLoopUsers=*/true);
 
   // Remove this SCEVUnknown from the uniquing map.
   SE->UniqueSCEVs.RemoveNode(this);
@@ -7022,6 +7024,14 @@ const ConstantRange &ScalarEvolution::getRangeRef(
               AddRec->getStart(), AddRec->getStepRecurrence(*this), MaxBECount);
           ConservativeResult =
               ConservativeResult.intersectWith(RangeFromAffine, RangeType);
+          // Opportunistically record any nowrap flags proven while computing
+          // the range. The precision of these flags depends on how sharp the
+          // backedge-taken count and operand ranges are at this point, so they
+          // are query-order dependent on their own. getBackedgeTakenInfo
+          // re-runs this inference for all of a loop's addrecs once the
+          // backedge-taken count is finalized, which makes the final flags
+          // independent of query order (flags are monotonic, so this only ever
+          // sharpens the result).
           const_cast<SCEVAddRecExpr *>(AddRec)->setNoWrapFlags(Flags);
 
           auto RangeFromFactoring = getRangeViaFactoring(
@@ -8719,12 +8729,18 @@ ScalarEvolution::getBackedgeTakenInfo(const Loop *L) {
   // conservative estimates made without the benefit of trip count
   // information. This invalidation is not necessary for correctness, and is
   // only done to produce more precise results.
+  SmallVector<const SCEVAddRecExpr *, 8> AddRecsToRefine;
   if (Result.hasAnyInfo()) {
     // Invalidate any expression using an addrec in this loop.
     SmallVector<SCEVUse, 8> ToForget;
     auto LoopUsersIt = LoopUsers.find(L);
-    if (LoopUsersIt != LoopUsers.end())
+    if (LoopUsersIt != LoopUsers.end()) {
       append_range(ToForget, LoopUsersIt->second);
+      // Snapshot L's addrecs to re-infer their nowrap flags below, once the
+      // trip count is available. Snapshotting is required as the inference may
+      // create new addrecs and grow LoopUsers[L].
+      append_range(AddRecsToRefine, LoopUsersIt->second);
+    }
     forgetMemoizedResults(ToForget);
 
     // Invalidate constant-evolved loop header phis.
@@ -8737,7 +8753,35 @@ ScalarEvolution::getBackedgeTakenInfo(const Loop *L) {
   // recusive call to getBackedgeTakenInfo (on a different
   // loop), which would invalidate the iterator computed
   // earlier.
-  return BackedgeTakenCounts.find(L)->second = std::move(Result);
+  BackedgeTakenCounts.find(L)->second = std::move(Result);
+
+  // Now that the backedge-taken count for L is available, re-infer nowrap flags
+  // for L's addrecs. Flag inference during range analysis (see getRangeRef)
+  // only takes effect once a constant max backedge-taken count is known, so its
+  // result would otherwise depend on the order in which ranges happen to be
+  // queried. Re-running the inference here, with full backedge-taken
+  // information available, makes the result independent of query order. The
+  // ranges for these addrecs were dropped above, so they are recomputed with
+  // the now-final count, and flags are monotonic so this can only sharpen.
+  //
+  // Only re-infer addrecs that reference no loop other than L. Computing the
+  // range of an addrec referencing another loop would query that loop's
+  // backedge-taken count, blocks, or dominance, which is unsafe if an in-flight
+  // transform has invalidated it (use-after-free). Addrecs referencing only L
+  // are safe: L is the loop currently being analyzed. Addrecs referencing other
+  // loops are re-inferred when those loops' backedge-taken counts are computed.
+  for (const SCEVAddRecExpr *AR : AddRecsToRefine) {
+    if (SCEVExprContains(AR, [L](const SCEV *S) {
+          const auto *InnerAR = dyn_cast<SCEVAddRecExpr>(S);
+          return InnerAR && InnerAR->getLoop() != L;
+        }))
+      continue;
+    inferNoWrapViaConstantRanges(AR);
+  }
+
+  // Re-lookup again, as inferring nowrap flags above may have computed the
+  // backedge-taken count for another loop and rehashed BackedgeTakenCounts.
+  return BackedgeTakenCounts.find(L)->second;
 }
 
 void ScalarEvolution::forgetAllLoops() {
@@ -14597,7 +14641,8 @@ void ScalarEvolution::forgetBackedgeTakenCounts(const Loop *L,
   }
 }
 
-void ScalarEvolution::forgetMemoizedResults(ArrayRef<SCEVUse> SCEVs) {
+void ScalarEvolution::forgetMemoizedResults(ArrayRef<SCEVUse> SCEVs,
+                                            bool PruneLoopUsers) {
   SmallPtrSet<const SCEV *, 8> ToForget(llvm::from_range, SCEVs);
   SmallVector<SCEVUse, 8> Worklist(ToForget.begin(), ToForget.end());
 
@@ -14612,6 +14657,24 @@ void ScalarEvolution::forgetMemoizedResults(ArrayRef<SCEVUse> SCEVs) {
 
   for (const auto *S : ToForget)
     forgetMemoizedResultsImpl(S);
+
+  // If the forgotten SCEVs are being permanently invalidated, drop any addrecs
+  // among them from LoopUsers. Entries in LoopUsers are otherwise never removed,
+  // and addrecs that transitively reference an invalidated value are unsafe to
+  // analyze later (e.g. a SCEVUnknown whose IR value has been deleted).
+  if (PruneLoopUsers) {
+    SmallPtrSet<const Loop *, 4> AffectedLoops;
+    for (const SCEV *S : ToForget)
+      if (const auto *AR = dyn_cast<SCEVAddRecExpr>(S))
+        AffectedLoops.insert(AR->getLoop());
+    for (const Loop *L : AffectedLoops) {
+      auto It = LoopUsers.find(L);
+      if (It != LoopUsers.end())
+        llvm::erase_if(It->second, [&ToForget](const SCEVAddRecExpr *AR) {
+          return ToForget.contains(AR);
+        });
+    }
+  }
 
   PredicatedSCEVRewrites.remove_if(
       [&](const auto &Entry) { return ToForget.count(Entry.first.first); });
