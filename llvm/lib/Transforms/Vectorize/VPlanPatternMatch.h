@@ -383,6 +383,13 @@ m_Broadcast(const Op0_t &Op0) {
   return m_VPInstruction<VPInstruction::Broadcast>(Op0);
 }
 
+template <typename Op0_t, typename Op1_t>
+inline VPInstruction_match<VPInstruction::FirstOrderRecurrenceSplice, Op0_t,
+                           Op1_t>
+m_FirstOrderRecurrenceSplice(const Op0_t &Op0, const Op1_t &Op1) {
+  return m_VPInstruction<VPInstruction::FirstOrderRecurrenceSplice>(Op0, Op1);
+}
+
 template <typename Op0_t>
 inline VPInstruction_match<VPInstruction::ExplicitVectorLength, Op0_t>
 m_EVL(const Op0_t &Op0) {

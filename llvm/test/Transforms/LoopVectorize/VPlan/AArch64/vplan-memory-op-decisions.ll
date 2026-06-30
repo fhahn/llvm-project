@@ -262,10 +262,11 @@ define void @consecutive_load_with_first_order_recurrence_address(ptr noalias %a
 ; CHECK-NEXT:      EMIT-SCALAR ir<%ext> = zext ir<%inc> to i64
 ; CHECK-NEXT:      EMIT vp<[[VP4:%[0-9]+]]> = first-order splice ir<%prev>, ir<%ext>
 ; CHECK-NEXT:      EMIT ir<%gep.a> = getelementptr inbounds ir<%a>, vp<[[VP4]]>
-; CHECK-NEXT:      EMIT-SCALAR ir<%lv> = load ir<%gep.a>
+; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds ir<%gep.a>, ir<1>
+; CHECK-NEXT:      WIDEN ir<%lv> = load vp<[[VP5]]>
 ; CHECK-NEXT:      EMIT ir<%gep.b> = getelementptr inbounds ir<%b>, ir<%iv>
-; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds ir<%gep.b>, ir<1>
-; CHECK-NEXT:      WIDEN store vp<[[VP5]]>, ir<%lv>
+; CHECK-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer inbounds ir<%gep.b>, ir<1>
+; CHECK-NEXT:      WIDEN store vp<[[VP6]]>, ir<%lv>
 ; CHECK-NEXT:      EMIT ir<%ec> = icmp eq ir<%iv.next>, ir<%n>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>

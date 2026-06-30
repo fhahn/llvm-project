@@ -210,6 +210,24 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
     return CreateSCEV({LHSVal, RHSVal}, [&](ArrayRef<SCEVUse> Ops) {
       return SE.getMinusSCEV(Ops[0], Ops[1], SCEV::FlagAnyWrap, 0);
     });
+  // A first-order recurrence splice yields, at scalar iteration i, the
+  // recurrence phi's value phi(i) = backedge(i - 1). Reconstruct it by shifting
+  // the backedge SCEV back by one iteration; the start comes from the phi. The
+  // bare phi recipe has no SCEV mapping, so a backedge that cycles through it
+  // bottoms out at SCEVCouldNotCompute.
+  VPValue *Phi, *BackedgeVal;
+  if (L && match(V, m_FirstOrderRecurrenceSplice(m_VPValue(Phi),
+                                                 m_VPValue(BackedgeVal)))) {
+    VPValue *Start =
+        cast<VPFirstOrderRecurrencePHIRecipe>(Phi->getDefiningRecipe())
+            ->getStartValue();
+    const SCEV *BackedgeSCEV = getSCEVExprForVPValue(BackedgeVal, PSE, L);
+    const SCEV *StartSCEV = getSCEVExprForVPValue(Start, PSE, L);
+    if (isa<SCEVCouldNotCompute>(BackedgeSCEV) ||
+        isa<SCEVCouldNotCompute>(StartSCEV))
+      return SE.getCouldNotCompute();
+    return SE.getShiftedRecurrence(BackedgeSCEV, StartSCEV, L);
+  }
   if (match(V, m_Not(m_VPValue(LHSVal)))) {
     // not X = xor X, -1 = -1 - X
     return CreateSCEV({LHSVal}, [&](ArrayRef<SCEVUse> Ops) {
