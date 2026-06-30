@@ -5244,6 +5244,26 @@ private:
 
 } // end anonymous namespace
 
+const SCEV *ScalarEvolution::getShiftedRecurrence(const SCEV *BackedgeSCEV,
+                                                  const SCEV *StartSCEV,
+                                                  const Loop *L) {
+  // A header phi i that takes StartSCEV from the preheader and BackedgeSCEV
+  // from the latch evolves as the backedge value shifted back by one
+  // iteration, provided the shifted recurrence agrees with the start value:
+  //   PHI(f(0), f({1,+,1})) --> f({0,+,1})
+  // The shift is performed by SCEVShiftRewriter, which descends into any
+  // wrapping casts (e.g. zext/sext) and decrements each affine AddRec for L by
+  // its step, so it stays sound across the extend rather than subtracting the
+  // step from the extended value.
+  const SCEV *Shifted = SCEVShiftRewriter::rewrite(BackedgeSCEV, L, *this);
+  const SCEV *Start = SCEVInitRewriter::rewrite(Shifted, L, *this, false);
+  if (isa<SCEVCouldNotCompute>(Shifted) || isa<SCEVCouldNotCompute>(Start) ||
+      !isGuaranteedNotToCauseUB(Shifted) || !::impliesPoison(Shifted, Start) ||
+      Start != StartSCEV)
+    return getCouldNotCompute();
+  return Shifted;
+}
+
 void ScalarEvolution::inferNoWrapViaConstantRanges(const SCEVAddRecExpr *AR) {
   if (!AR->isAffine())
     return;
@@ -6081,19 +6101,15 @@ const SCEV *ScalarEvolution::createAddRecFromPHI(PHINode *PN) {
     //   PHI(f(0), f({1,+,1})) --> f({0,+,1})
 
     // Do not allow refinement in rewriting of BEValue.
-    const SCEV *Shifted = SCEVShiftRewriter::rewrite(BEValue, L, *this);
-    const SCEV *Start = SCEVInitRewriter::rewrite(Shifted, L, *this, false);
-    if (Shifted != getCouldNotCompute() && Start != getCouldNotCompute() &&
-        isGuaranteedNotToCauseUB(Shifted) && ::impliesPoison(Shifted, Start)) {
-      const SCEV *StartVal = getSCEV(StartValueV);
-      if (Start == StartVal) {
-        // Okay, for the entire analysis of this edge we assumed the PHI
-        // to be symbolic.  We now need to go back and purge all of the
-        // entries for the scalars that use the symbolic expression.
-        forgetMemoizedResults({SymbolicName});
-        insertValueToMap(PN, Shifted);
-        return Shifted;
-      }
+    const SCEV *Shifted =
+        getShiftedRecurrence(BEValue, getSCEV(StartValueV), L);
+    if (!isa<SCEVCouldNotCompute>(Shifted)) {
+      // Okay, for the entire analysis of this edge we assumed the PHI
+      // to be symbolic.  We now need to go back and purge all of the
+      // entries for the scalars that use the symbolic expression.
+      forgetMemoizedResults({SymbolicName});
+      insertValueToMap(PN, Shifted);
+      return Shifted;
     }
   }
 

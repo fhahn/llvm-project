@@ -805,6 +805,17 @@ public:
       std::pair<const SCEV *, SmallVector<const SCEVPredicate *, 3>>>
   createAddRecFromPHIWithCasts(const SCEVUnknown *SymbolicPHI);
 
+  /// Given the SCEV \p BackedgeSCEV of the value coming from the latch and the
+  /// SCEV \p StartSCEV of the value coming from the preheader of a header phi
+  /// in loop \p L, return the SCEV describing the phi if it evolves as the
+  /// backedge value shifted back by one iteration, i.e.
+  /// PHI(f(0), f({1,+,1})) --> f({0,+,1}). This is the closed form of a
+  /// first-order recurrence whose latch value is a unit-stride function of the
+  /// induction. Returns SCEVCouldNotCompute if no such closed form exists.
+  LLVM_ABI const SCEV *getShiftedRecurrence(const SCEV *BackedgeSCEV,
+                                            const SCEV *StartSCEV,
+                                            const Loop *L);
+
   /// Returns an expression for a GEP
   ///
   /// \p GEP The GEP. The indices contained in the GEP itself are ignored,
