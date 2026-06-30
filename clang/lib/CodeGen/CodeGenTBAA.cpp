@@ -500,7 +500,20 @@ CodeGenTBAA::CollectFields(uint64_t BaseOffset,
   /* Otherwise, treat whatever it is as a field. */
   uint64_t Offset = BaseOffset;
   uint64_t Size = Context.getTypeSizeInChars(QTy).getQuantity();
-  llvm::MDNode *TBAAType = MayAlias ? getChar() : getTypeInfo(QTy);
+  // In the default (non-new) struct-path format, getTypeInfo() maps an array to
+  // its element type. If that element is an aggregate, the resulting type node
+  // is a struct node, which is not a valid scalar access type for a field tag
+  // (it produces invalid IR that crashes the backend once SROA splits the
+  // aggregate copy). Fall back to the char type for such array members, as we
+  // already do for unions and bitfields. The new struct-path format describes
+  // these with a full struct-path tag, so it is left unchanged. Arrays of
+  // scalars keep their precise element tag.
+  bool IsArrayOfAggregate =
+      Context.getBaseElementType(QTy)->isRecordType() && QTy->isArrayType();
+  llvm::MDNode *TBAAType =
+      (MayAlias || (!CodeGenOpts.NewStructPathTBAA && IsArrayOfAggregate))
+          ? getChar()
+          : getTypeInfo(QTy);
   llvm::MDNode *TBAATag = getAccessTagInfo(TBAAAccessInfo(TBAAType, Size));
   Fields.push_back(llvm::MDBuilder::TBAAStructField(Offset, Size, TBAATag));
   return true;
