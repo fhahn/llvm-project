@@ -231,3 +231,67 @@ exit:
   ret void
 }
 
+; The load address %gep.a is indexed by %prev, a first-order recurrence whose
+; backedge value (zext i16 {1,+,1}) is a unit-stride AddRec. Reconstructing the
+; SCEV of the first-order-recurrence-splice lets widenConsecutiveMemOps prove the
+; address is unit-stride and widen the load (vector-pointer + WIDEN load), rather
+; than leaving it scalarized.
+define void @consecutive_load_with_first_order_recurrence_address(ptr noalias %a, ptr noalias %b, i64 %n) {
+; CHECK-LABEL: VPlan for loop in 'consecutive_load_with_first_order_recurrence_address'
+; CHECK:  VPlan ' for UF>=1' {
+; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
+; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
+; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
+; CHECK-NEXT:  Live-in ir<%n> = original trip-count
+; CHECK-EMPTY:
+; CHECK-NEXT:  ir-bb<entry>:
+; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
+; CHECK-EMPTY:
+; CHECK-NEXT:  vector.ph:
+; CHECK-NEXT:  Successor(s): vector loop
+; CHECK-EMPTY:
+; CHECK-NEXT:  <x1> vector loop: {
+; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
+; CHECK-EMPTY:
+; CHECK-NEXT:    vector.body:
+; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION nuw nsw ir<0>, ir<1>, vp<[[VP0]]>
+; CHECK-NEXT:      ir<%narrow> = WIDEN-INDUCTION ir<0>, ir<1>, vp<[[VP0]]>
+; CHECK-NEXT:      FIRST-ORDER-RECURRENCE-PHI ir<%prev> = phi ir<0>, ir<%ext>
+; CHECK-NEXT:      EMIT ir<%iv.next> = add nuw nsw ir<%iv>, ir<1>
+; CHECK-NEXT:      EMIT ir<%inc> = add ir<%narrow>, ir<1>
+; CHECK-NEXT:      EMIT-SCALAR ir<%ext> = zext ir<%inc> to i64
+; CHECK-NEXT:      EMIT vp<[[VP4:%[0-9]+]]> = first-order splice ir<%prev>, ir<%ext>
+; CHECK-NEXT:      EMIT ir<%gep.a> = getelementptr inbounds ir<%a>, vp<[[VP4]]>
+; CHECK-NEXT:      EMIT-SCALAR ir<%lv> = load ir<%gep.a>
+; CHECK-NEXT:      EMIT ir<%gep.b> = getelementptr inbounds ir<%b>, ir<%iv>
+; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds ir<%gep.b>, ir<1>
+; CHECK-NEXT:      WIDEN store vp<[[VP5]]>, ir<%lv>
+; CHECK-NEXT:      EMIT ir<%ec> = icmp eq ir<%iv.next>, ir<%n>
+; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:    No successors
+; CHECK-NEXT:  }
+; CHECK-NEXT:  Successor(s): middle.block
+; CHECK-EMPTY:
+; CHECK-NEXT:  middle.block:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %narrow = phi i16 [ 0, %entry ], [ %inc, %loop ]
+  %prev = phi i64 [ 0, %entry ], [ %ext, %loop ]
+  %iv.next = add nuw nsw i64 %iv, 1
+  %inc = add i16 %narrow, 1
+  %ext = zext i16 %inc to i64
+  %gep.a = getelementptr inbounds i32, ptr %a, i64 %prev
+  %lv = load i32, ptr %gep.a, align 4
+  %gep.b = getelementptr inbounds i32, ptr %b, i64 %iv
+  store i32 %lv, ptr %gep.b, align 4
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
