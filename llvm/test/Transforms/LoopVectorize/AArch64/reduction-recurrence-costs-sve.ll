@@ -412,10 +412,10 @@ define i32 @chained_recurrences(i32 %x, i64 %y, ptr %src.1, i32 %z, ptr %src.2) 
 ; PRED-NEXT:    [[TMP20:%.*]] = or i32 [[Z]], [[X]]
 ; PRED-NEXT:    [[BROADCAST_SPLATINSERT2:%.*]] = insertelement <vscale x 4 x i32> poison, i32 [[TMP20]], i64 0
 ; PRED-NEXT:    [[TMP16:%.*]] = shufflevector <vscale x 4 x i32> [[BROADCAST_SPLATINSERT2]], <vscale x 4 x i32> poison, <vscale x 4 x i32> zeroinitializer
-; PRED-NEXT:    [[TMP17:%.*]] = and <vscale x 4 x i32> [[TMP16]], splat (i32 1)
-; PRED-NEXT:    [[TMP18:%.*]] = xor <vscale x 4 x i32> [[TMP17]], splat (i32 1)
-; PRED-NEXT:    [[TMP19:%.*]] = zext <vscale x 4 x i32> [[TMP18]] to <vscale x 4 x i64>
-; PRED-NEXT:    [[DOTSPLAT:%.*]] = getelementptr i32, ptr [[SRC_2]], <vscale x 4 x i64> [[TMP19]]
+; PRED-NEXT:    [[TMP10:%.*]] = and <vscale x 4 x i32> [[TMP16]], splat (i32 1)
+; PRED-NEXT:    [[TMP17:%.*]] = xor <vscale x 4 x i32> [[TMP10]], splat (i32 1)
+; PRED-NEXT:    [[TMP18:%.*]] = zext <vscale x 4 x i32> [[TMP17]] to <vscale x 4 x i64>
+; PRED-NEXT:    [[DOTSPLAT:%.*]] = getelementptr i32, ptr [[SRC_2]], <vscale x 4 x i64> [[TMP18]]
 ; PRED-NEXT:    [[ACTIVE_LANE_MASK_ENTRY:%.*]] = call <vscale x 4 x i1> @llvm.get.active.lane.mask.nxv4i1.i64(i64 0, i64 [[TMP0]])
 ; PRED-NEXT:    [[TMP22:%.*]] = call i32 @llvm.vscale.i32()
 ; PRED-NEXT:    [[TMP23:%.*]] = mul nuw i32 [[TMP22]], 4

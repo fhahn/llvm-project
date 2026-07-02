@@ -82,9 +82,9 @@ define void @test_predicated_load_cast_hint(ptr %dst.1, ptr %dst.2, ptr %src, i8
 ; CHECK:       [[PRED_STORE_IF19]]:
 ; CHECK-NEXT:    [[TMP114:%.*]] = extractelement <2 x i64> [[TMP26]], i64 0
 ; CHECK-NEXT:    [[TMP115:%.*]] = getelementptr [16 x i64], ptr [[DST_1]], i64 [[TMP114]], i64 [[OFF]]
-; CHECK-NEXT:    [[TMP116:%.*]] = extractelement <2 x i64> [[TMP25]], i64 0
-; CHECK-NEXT:    [[TMP117:%.*]] = or i64 [[TMP116]], 1
-; CHECK-NEXT:    store i64 [[TMP117]], ptr [[TMP115]], align 8, !alias.scope [[META3]]
+; CHECK-NEXT:    [[TMP30:%.*]] = extractelement <2 x i64> [[TMP25]], i64 0
+; CHECK-NEXT:    [[TMP31:%.*]] = or i64 [[TMP30]], 1
+; CHECK-NEXT:    store i64 [[TMP31]], ptr [[TMP115]], align 8, !alias.scope [[META3]]
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE20]]
 ; CHECK:       [[PRED_STORE_CONTINUE20]]:
 ; CHECK-NEXT:    [[TMP42:%.*]] = extractelement <2 x i1> [[ACTIVE_LANE_MASK]], i64 1
@@ -92,9 +92,9 @@ define void @test_predicated_load_cast_hint(ptr %dst.1, ptr %dst.2, ptr %src, i8
 ; CHECK:       [[PRED_STORE_IF21]]:
 ; CHECK-NEXT:    [[TMP120:%.*]] = extractelement <2 x i64> [[TMP26]], i64 1
 ; CHECK-NEXT:    [[TMP121:%.*]] = getelementptr [16 x i64], ptr [[DST_1]], i64 [[TMP120]], i64 [[OFF]]
-; CHECK-NEXT:    [[TMP122:%.*]] = extractelement <2 x i64> [[TMP25]], i64 1
-; CHECK-NEXT:    [[TMP123:%.*]] = or i64 [[TMP122]], 1
-; CHECK-NEXT:    store i64 [[TMP123]], ptr [[TMP121]], align 8, !alias.scope [[META3]]
+; CHECK-NEXT:    [[TMP35:%.*]] = extractelement <2 x i64> [[TMP25]], i64 1
+; CHECK-NEXT:    [[TMP36:%.*]] = or i64 [[TMP35]], 1
+; CHECK-NEXT:    store i64 [[TMP36]], ptr [[TMP121]], align 8, !alias.scope [[META3]]
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE22]]
 ; CHECK:       [[PRED_STORE_CONTINUE22]]:
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add i32 [[INDEX]], 2

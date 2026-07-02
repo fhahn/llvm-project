@@ -63,10 +63,10 @@ define void @truncate_i16_to_i8_cse(ptr noalias %src, ptr noalias %dst) {
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 8 x i16> poison, i16 [[TMP5]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 8 x i16> [[BROADCAST_SPLATINSERT]], <vscale x 8 x i16> poison, <vscale x 8 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP6:%.*]] = trunc <vscale x 8 x i16> [[BROADCAST_SPLAT]] to <vscale x 8 x i8>
-; CHECK-NEXT:    [[TMP7:%.*]] = call i32 @llvm.vscale.i32()
-; CHECK-NEXT:    [[TMP8:%.*]] = mul nuw i32 [[TMP7]], 8
-; CHECK-NEXT:    [[TMP9:%.*]] = sub i32 [[TMP8]], 1
-; CHECK-NEXT:    [[TMP10:%.*]] = extractelement <vscale x 8 x i8> [[TMP6]], i32 [[TMP9]]
+; CHECK-NEXT:    [[TMP8:%.*]] = call i32 @llvm.vscale.i32()
+; CHECK-NEXT:    [[TMP9:%.*]] = mul nuw i32 [[TMP8]], 8
+; CHECK-NEXT:    [[TMP7:%.*]] = sub i32 [[TMP9]], 1
+; CHECK-NEXT:    [[TMP10:%.*]] = extractelement <vscale x 8 x i8> [[TMP6]], i32 [[TMP7]]
 ; CHECK-NEXT:    store i8 [[TMP10]], ptr null, align 1
 ; CHECK-NEXT:    store i8 [[TMP10]], ptr [[DST]], align 1
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP3]]

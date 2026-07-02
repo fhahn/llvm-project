@@ -468,9 +468,9 @@ public:
         new VPInstruction(Instruction::Freeze, Op, {}, {}, DL));
   }
 
-  VPWidenCastRecipe *createWidenCast(Instruction::CastOps Opcode, VPValue *Op,
-                                     Type *ResultTy) {
-    return tryInsertInstruction(new VPWidenCastRecipe(
+  VPInstruction *createWidenCast(Instruction::CastOps Opcode, VPValue *Op,
+                                 Type *ResultTy) {
+    return tryInsertInstruction(VPInstruction::createWideCast(
         Opcode, Op, ResultTy, nullptr, VPIRFlags::getDefaultFlags(Opcode)));
   }
 
