@@ -79,7 +79,7 @@ target triple = "aarch64-unknown-linux-gnu"
 ; CHECK-NEXT:     CLONE [[GEP_IDX:.*]] = getelementptr inbounds ir<%indices>, [[STEPS]]
 ; CHECK-NEXT:     [[VECP_IDX:vp.*]] = vector-pointer inbounds i32, [[GEP_IDX]]
 ; CHECK-NEXT:     WIDEN [[IDX:.*]] = load [[VECP_IDX]]
-; CHECK-NEXT:     WIDEN-CAST [[EXT_IDX:.*]] = zext [[IDX]] to i64
+; CHECK-NEXT:     EMIT [[EXT_IDX:.*]] = zext [[IDX]] to i64
 ; CHECK-NEXT:     WIDEN-GEP [[GEP_BUCKET:.*]] = getelementptr inbounds ir<%buckets>, [[EXT_IDX]]
 ; CHECK-NEXT:     WIDEN-HISTOGRAM buckets: [[GEP_BUCKET]], inc: ir<1>
 ; CHECK-NEXT:     EMIT [[IV_NEXT:.*]] = add nuw [[IV]], [[VFxUF]]
@@ -174,7 +174,7 @@ for.exit:
 ; CHECK-NEXT:     CLONE [[GEP_IDX3:.*]] = getelementptr inbounds ir<%indices>, [[STEPS3]]
 ; CHECK-NEXT:     [[VECP_IDX3:vp.*]] = vector-pointer inbounds i32, [[GEP_IDX3]]
 ; CHECK-NEXT:     WIDEN [[IDX3:.*]] = load [[VECP_IDX3]]
-; CHECK-NEXT:     WIDEN-CAST [[EXT_IDX3:.*]] = zext [[IDX3]] to i64
+; CHECK-NEXT:     EMIT [[EXT_IDX3:.*]] = zext [[IDX3]] to i64
 ; CHECK-NEXT:     WIDEN-GEP [[GEP_BUCKET3:.*]] = getelementptr inbounds ir<%buckets>, [[EXT_IDX3]]
 ; CHECK-NEXT:     WIDEN-HISTOGRAM buckets: [[GEP_BUCKET3]], saturated inc: ir<1>
 ; CHECK-NEXT:     EMIT [[IV_NEXT3:.*]] = add nuw [[IV3]], [[VFxUF3]]

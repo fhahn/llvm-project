@@ -430,9 +430,9 @@ bool vputils::isAddressSCEVForCost(const SCEV *Addr, ScalarEvolution &SE,
 
 unsigned vputils::getOpcode(const VPValue *V) {
   return TypeSwitch<const VPValue *, unsigned>(V)
-      .Case<VPInstruction, VPWidenRecipe, VPWidenCastRecipe, VPWidenGEPRecipe,
-            VPReplicateRecipe, VPWidenPHIRecipe, VPWidenLoadRecipe,
-            VPWidenLoadEVLRecipe>([](auto *I) { return I->getOpcode(); })
+      .Case<VPInstruction, VPWidenRecipe, VPWidenGEPRecipe, VPReplicateRecipe,
+            VPWidenPHIRecipe, VPWidenLoadRecipe, VPWidenLoadEVLRecipe>(
+          [](auto *I) { return I->getOpcode(); })
       .Case<VPVectorPointerRecipe, VPPredInstPHIRecipe, VPScalarIVStepsRecipe>(
           [](auto *I) {
             // For recipes that do not directly map to LLVM IR instructions,
@@ -507,6 +507,7 @@ bool vputils::isSingleScalar(const VPValue *VPV) {
   if (auto *VPI = dyn_cast<VPInstruction>(VPV))
     return VPI->doesGenerateSingleScalar() || VPI->isVectorToScalar() ||
            (preservesUniformity(VPI->getOpcode()) &&
+            !match(VPI, m_WidenCast()) &&
             all_of(VPI->operands(), isSingleScalar));
   if (auto *RR = dyn_cast<VPReductionRecipe>(VPV))
     return !RR->isPartialReduction();
@@ -563,10 +564,6 @@ bool vputils::isUniformAcrossVFsAndUFs(const VPValue *V) {
         return (VPI->doesGenerateSingleScalar() || VPI->isVectorToScalar() ||
                 preservesUniformity(VPI->getOpcode())) &&
                all_of(VPI->operands(), isUniformAcrossVFsAndUFs);
-      })
-      .Case([](const VPWidenCastRecipe *R) {
-        // A cast is uniform according to its operand.
-        return isUniformAcrossVFsAndUFs(R->getOperand(0));
       })
       .Default([](const VPRecipeBase *) { // A value is considered non-uniform
                                           // unless proven otherwise.
