@@ -423,15 +423,16 @@ public:
                                   const VPIRMetadata &Metadata = {}) {
     return tryInsertInstruction(
         new VPInstruction(Opcode, Op, VPIRFlags::getDefaultFlags(Opcode),
-                          Metadata, DL, "", ResultTy));
+                          Metadata, DL, "", ResultTy, /*IsSingleScalar=*/true));
   }
 
   VPInstruction *createScalarCast(Instruction::CastOps Opcode, VPValue *Op,
                                   Type *ResultTy, DebugLoc DL,
                                   const VPIRFlags &Flags,
                                   const VPIRMetadata &Metadata = {}) {
-    return tryInsertInstruction(
-        new VPInstruction(Opcode, Op, Flags, Metadata, DL, "", ResultTy));
+    return tryInsertInstruction(new VPInstruction(Opcode, Op, Flags, Metadata,
+                                                  DL, "", ResultTy,
+                                                  /*IsSingleScalar=*/true));
   }
 
   /// Create a VScale VPInstruction.
@@ -484,7 +485,8 @@ public:
     if (Instruction::isCast(Opcode)) {
       assert(!Mask && "Cast cannot be predicated");
       auto *VPI = new VPInstruction(Opcode, Operands, Flags, Metadata, DL,
-                                    UV->getName(), UV->getType());
+                                    UV->getName(), UV->getType(),
+                                    /*IsSingleScalar=*/true);
       VPI->setUnderlyingValue(UV);
       return VPI;
     }

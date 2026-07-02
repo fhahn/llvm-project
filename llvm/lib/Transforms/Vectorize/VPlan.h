@@ -1362,6 +1362,13 @@ private:
   /// An optional name that can be used for the generated IR instruction.
   std::string Name;
 
+  /// Whether this VPInstruction produces a single scalar value, rather than a
+  /// vector with one lane per VF. For opcodes that are always single-scalar
+  /// (e.g. PHI) this is derived from the opcode in isSingleScalar(); for casts
+  /// it records whether the recipe is a scalar or a wide (vector) cast. Set at
+  /// construction and never changed.
+  const bool IsSingleScalar;
+
   /// Returns true if we can generate a scalar for the first lane only if
   /// needed.
   bool canGenerateScalarForFirstLane() const;
@@ -1389,7 +1396,7 @@ public:
   VPInstruction(unsigned Opcode, ArrayRef<VPValue *> Operands,
                 const VPIRFlags &Flags = {}, const VPIRMetadata &MD = {},
                 DebugLoc DL = DebugLoc::getUnknown(), const Twine &Name = "",
-                Type *ResultTy = nullptr);
+                Type *ResultTy = nullptr, bool IsSingleScalar = false);
 
   VP_CLASSOF_IMPL(VPRecipeBase::VPInstructionSC)
 
@@ -1399,8 +1406,9 @@ public:
 
   VPInstruction *cloneWithOperands(ArrayRef<VPValue *> NewOperands,
                                    Type *ResultTy = nullptr) {
-    auto *New = new VPInstruction(Opcode, NewOperands, *this, *this,
-                                  getDebugLoc(), Name, ResultTy);
+    auto *New =
+        new VPInstruction(Opcode, NewOperands, *this, *this, getDebugLoc(),
+                          Name, ResultTy, IsSingleScalar);
     if (getUnderlyingValue())
       New->setUnderlyingValue(getUnderlyingInstr());
     return New;
