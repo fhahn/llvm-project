@@ -1211,21 +1211,20 @@ void VPlanTransforms::createInLoopReductionRecipes(VPlan &Plan,
 
 /// Return true if /p Plan  can be converted to a speculative load oracle.
 static bool canBuildOraclePlan(VPlan &Plan, VPBasicBlock *HeaderVPBB) {
-  auto IsUnsupportedOpcode = [](VPRecipeBase &R) {
+  // Integer division/remainder is unsafe: a speculative load's trailing lane
+  // is frozen poison, which can be zero, so a widened div/rem could divide by
+  // zero (immediate UB, not just poison) in a lane the original loop never
+  // executed.
+  auto IsDivOrRem = [](VPRecipeBase &R) {
     auto *VPI = dyn_cast<VPInstruction>(&R);
     if (!VPI)
       return false;
     unsigned Opc = VPI->getOpcode();
-    // Integer division/remainder is unsafe: a speculative load's trailing
-    // lane is frozen poison, which can be zero, so a widened div/rem could
-    // divide by zero (immediate UB, not just poison) in a lane the original
-    // loop never executed.
-    return Opc == Instruction::Call || Opc == Instruction::UDiv ||
-           Opc == Instruction::SDiv || Opc == Instruction::URem ||
-           Opc == Instruction::SRem;
+    return Opc == Instruction::UDiv || Opc == Instruction::SDiv ||
+           Opc == Instruction::URem || Opc == Instruction::SRem;
   };
   for (VPBasicBlock *VPBB : vp_rpo_plain_cfg_loop_body(HeaderVPBB))
-    if (any_of(*VPBB, IsUnsupportedOpcode))
+    if (any_of(*VPBB, IsDivOrRem))
       return false;
 
   for (VPRecipeBase &R : HeaderVPBB->phis()) {

@@ -708,6 +708,7 @@ bool VPInstruction::canGenerateScalarForFirstLane() const {
   case Instruction::ICmp:
   case Instruction::PHI:
   case Instruction::Select:
+  case Instruction::Call:
   case VPInstruction::BranchOnCond:
   case VPInstruction::BranchOnTwoConds:
   case VPInstruction::BranchOnCount:
@@ -1117,6 +1118,26 @@ Value *VPInstruction::generate(VPTransformState &State) {
     }
 
     return Result;
+  }
+  case Instruction::Call: {
+    // Scalar execution of a call, used in the speculative-load helper.
+    auto *OrigCI = cast<CallInst>(getUnderlyingValue());
+    SmallVector<Value *, 4> Args;
+    for (unsigned I = 0, E = getNumOperands() - 1; I < E; ++I)
+      Args.push_back(State.get(getOperand(I), VPLane(0)));
+    Value *Callee = State.get(getOperand(getNumOperands() - 1), VPLane(0));
+    CallInst *NewCI =
+        Builder.CreateCall(OrigCI->getFunctionType(), Callee, Args, Name);
+    NewCI->setCallingConv(OrigCI->getCallingConv());
+    SmallVector<OperandBundleDef, 1> OpBundles;
+    OrigCI->getOperandBundlesAsDefs(OpBundles);
+    if (!OpBundles.empty()) {
+      auto *BundledCI = CallInst::Create(NewCI, OpBundles);
+      Builder.Insert(BundledCI);
+      NewCI->eraseFromParent();
+      return BundledCI;
+    }
+    return NewCI;
   }
   default:
     llvm_unreachable("Unsupported opcode for instruction");
