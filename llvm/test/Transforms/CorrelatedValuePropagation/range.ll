@@ -748,7 +748,7 @@ define i8 @test17(i8 %a) {
 ; CHECK-LABEL: define i8 @test17(
 ; CHECK-SAME: i8 [[A:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[C:%.*]] = add i8 [[A]], 3
+; CHECK-NEXT:    [[C:%.*]] = add nuw nsw i8 [[A]], 3
 ; CHECK-NEXT:    br label %[[DISPATCH:.*]]
 ; CHECK:       [[DISPATCH]]:
 ; CHECK-NEXT:    [[CMP:%.*]] = icmp eq i8 [[A]], 93
@@ -772,7 +772,7 @@ define i8 @test17_2(i8 %a) {
 ; CHECK-LABEL: define i8 @test17_2(
 ; CHECK-SAME: i8 [[A:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[C:%.*]] = add i8 [[A]], [[A]]
+; CHECK-NEXT:    [[C:%.*]] = add nuw i8 [[A]], [[A]]
 ; CHECK-NEXT:    br label %[[DISPATCH:.*]]
 ; CHECK:       [[DISPATCH]]:
 ; CHECK-NEXT:    [[CMP:%.*]] = icmp eq i8 [[A]], 93
@@ -845,7 +845,7 @@ define i8 @test19(i8 %a) {
 ; CHECK-LABEL: define i8 @test19(
 ; CHECK-SAME: i8 [[A:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[C:%.*]] = add i8 [[A]], 3
+; CHECK-NEXT:    [[C:%.*]] = add nuw nsw i8 [[A]], 3
 ; CHECK-NEXT:    br label %[[DISPATCH:.*]]
 ; CHECK:       [[DISPATCH]]:
 ; CHECK-NEXT:    switch i8 [[A]], label %[[DISPATCH]] [
