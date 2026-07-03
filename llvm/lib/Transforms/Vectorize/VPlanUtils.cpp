@@ -759,6 +759,39 @@ VPInstruction *vputils::findCanonicalIVIncrement(VPRegionBlock &Region) {
   return Increment;
 }
 
+VPInstruction *vputils::offsetCanonicalIV(VPRegionBlock &Region,
+                                          VPValue *Offset) {
+  VPBasicBlock *Header = Region.getEntryBasicBlock();
+  VPRegionValue *IV = Region.getCanonicalIV();
+  VPInstruction *Increment = findCanonicalIVIncrement(Region);
+  assert(Increment && "Must have a canonical IV increment at this point");
+  assert(all_of(IV->users(),
+                [](const VPUser *U) {
+                  if (isa<VPScalarIVStepsRecipe, VPDerivedIVRecipe>(U))
+                    return true;
+                  unsigned Opc = cast<VPInstruction>(U)->getOpcode();
+                  return Instruction::isCast(Opc) || Opc == Instruction::Add;
+                }) &&
+         "the canonical IV should only be used by its increment, casts, Add, "
+         "ScalarIVSteps or DerivedIV when offsetting the start value");
+
+  // Add the offset to the canonical IV and its increment, then redirect all
+  // other users of the IV and its increment to the offset versions. The IV phi
+  // keeps its original zero start; a later simplifyRecipes fold collapses the
+  //   phi(0, Inc); OffsetIV = phi + Offset; Def = Inc + Offset
+  // shape into phi(Offset, Inc) so the offset start propagates into the phi.
+  VPBuilder Builder(Header, Header->getFirstNonPhi());
+  VPInstruction *OffsetIV = Builder.createAdd(IV, Offset);
+  IV->replaceUsesWithIf(OffsetIV, [OffsetIV, Increment](VPUser &U, unsigned) {
+    return &U != OffsetIV && &U != Increment;
+  });
+  VPInstruction *OffsetIVInc =
+      VPBuilder::getToInsertAfter(Increment).createAdd(Increment, Offset);
+  Increment->replaceAllUsesWith(OffsetIVInc);
+  OffsetIVInc->setOperand(0, Increment);
+  return OffsetIVInc;
+}
+
 /// Find the ComputeReductionResult recipe for \p PhiR, looking through selects
 /// inserted for predicated reductions or tail folding.
 VPInstruction *vputils::findComputeReductionResult(VPReductionPHIRecipe *PhiR) {

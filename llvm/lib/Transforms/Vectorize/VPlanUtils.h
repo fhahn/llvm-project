@@ -167,6 +167,13 @@ inline VPRecipeBase *findRecipe(VPValue *Start, PredT Pred) {
 /// Find the canonical IV increment of \p Region. Returns nullptr if not found.
 VPInstruction *findCanonicalIVIncrement(VPRegionBlock &Region);
 
+/// Add \p Offset to the canonical IV of \p Region and its increment, and
+/// redirect all other users to the offset versions, so the loop effectively
+/// iterates starting at \p Offset. \p Region must have a canonical IV
+/// increment. Returns the offset increment. Used to reset the start value of
+/// the epilogue vector loop.
+VPInstruction *offsetCanonicalIV(VPRegionBlock &Region, VPValue *Offset);
+
 /// Returns the GEP nowrap flags for \p Ptr, looking through pointer casts
 /// mirroring Value::stripPointerCasts.
 GEPNoWrapFlags getGEPFlagsForPtr(VPValue *Ptr);

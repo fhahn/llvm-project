@@ -7563,7 +7563,6 @@ static SmallVector<Instruction *> preparePlanForEpilogueVectorLoop(
   VPBasicBlock *Header = VectorLoop->getEntryBasicBlock();
   Header->setName("vec.epilog.vector.body");
 
-  VPValue *IV = VectorLoop->getCanonicalIV();
   // When vectorizing the epilogue loop, the canonical induction needs to start
   // at the resume value from the main vector loop. Find the resume value
   // created during execution of the main VPlan. Add this resume value as an
@@ -7592,28 +7591,9 @@ static SmallVector<Instruction *> preparePlanForEpilogueVectorLoop(
     EPI.VectorTripCount = EPResumeVal;
   }
   VPValue *VPV = Plan.getOrAddLiveIn(EPResumeVal);
-  assert(all_of(IV->users(),
-                [](const VPUser *U) {
-                  if (isa<VPScalarIVStepsRecipe, VPDerivedIVRecipe>(U))
-                    return true;
-                  unsigned Opc = cast<VPInstruction>(U)->getOpcode();
-                  return Instruction::isCast(Opc) || Opc == Instruction::Add;
-                }) &&
-         "the canonical IV should only be used by its increment or "
-         "ScalarIVSteps when resetting the start value");
-  VPBuilder Builder(Header, Header->getFirstNonPhi());
-  VPInstruction *Add = Builder.createAdd(IV, VPV);
-  // Replace all users of the canonical IV and its increment with the offset
-  // version, except for the Add itself and the canonical IV increment.
-  auto *Increment = vputils::findCanonicalIVIncrement(*VectorLoop);
-  assert(Increment && "Must have a canonical IV increment at this point");
-  IV->replaceUsesWithIf(Add, [Add, Increment](VPUser &U, unsigned) {
-    return &U != Add && &U != Increment;
-  });
-  VPInstruction *OffsetIVInc =
-      VPBuilder::getToInsertAfter(Increment).createAdd(Increment, VPV);
-  Increment->replaceAllUsesWith(OffsetIVInc);
-  OffsetIVInc->setOperand(0, Increment);
+  // Offset the canonical IV of the epilogue loop by the resume value from the
+  // main vector loop, so it starts at the right index.
+  vputils::offsetCanonicalIV(*VectorLoop, VPV);
 
   DenseMap<Value *, Value *> ToFrozen;
   SmallVector<Instruction *> InstsToMove;
