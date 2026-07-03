@@ -1220,10 +1220,9 @@ static bool canBuildOraclePlan(VPlan &Plan, VPBasicBlock *HeaderVPBB) {
     // lane is frozen poison, which can be zero, so a widened div/rem could
     // divide by zero (immediate UB, not just poison) in a lane the original
     // loop never executed.
-    return Opc == Instruction::Call || Opc == Instruction::FCmp ||
-           Instruction::isUnaryOp(Opc) || Opc == Instruction::UDiv ||
-           Opc == Instruction::SDiv || Opc == Instruction::URem ||
-           Opc == Instruction::SRem;
+    return Opc == Instruction::Call || Instruction::isUnaryOp(Opc) ||
+           Opc == Instruction::UDiv || Opc == Instruction::SDiv ||
+           Opc == Instruction::URem || Opc == Instruction::SRem;
   };
   for (VPBasicBlock *VPBB : vp_rpo_plain_cfg_loop_body(HeaderVPBB))
     if (any_of(*VPBB, IsUnsupportedOpcode))

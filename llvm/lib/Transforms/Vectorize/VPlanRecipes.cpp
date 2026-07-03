@@ -702,6 +702,7 @@ bool VPInstruction::canGenerateScalarForFirstLane() const {
   if (isSingleScalar() || isVectorToScalar())
     return true;
   switch (Opcode) {
+  case Instruction::FCmp:
   case Instruction::Freeze:
   case Instruction::ICmp:
   case Instruction::PHI:
