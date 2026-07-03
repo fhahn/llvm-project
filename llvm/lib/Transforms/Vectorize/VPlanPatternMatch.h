@@ -296,6 +296,7 @@ private:
     // Check for recipes that do not have opcodes.
     if constexpr (std::is_same_v<RecipeTy, VPScalarIVStepsRecipe> ||
                   std::is_same_v<RecipeTy, VPDerivedIVRecipe> ||
+                  std::is_same_v<RecipeTy, VPVectorPointerRecipe> ||
                   std::is_same_v<RecipeTy, VPVectorEndPointerRecipe>)
       return DefR;
     else
@@ -990,6 +991,16 @@ template <typename Op0_t, typename Op1_t>
 VectorEndPointerRecipe_match<Op0_t, Op1_t> m_VecEndPtr(const Op0_t &Op0,
                                                        const Op1_t &Op1) {
   return VectorEndPointerRecipe_match<Op0_t, Op1_t>(Op0, Op1);
+}
+
+/// Match a vector-pointer recipe with pointer operand \p Op0 and stride
+/// operand \p Op1.
+template <typename Op0_t, typename Op1_t>
+inline Recipe_match<std::tuple<Op0_t, Op1_t>, 0, /*Commutative*/ false,
+                    VPVectorPointerRecipe>
+m_VectorPointer(const Op0_t &Op0, const Op1_t &Op1) {
+  return Recipe_match<std::tuple<Op0_t, Op1_t>, 0, /*Commutative*/ false,
+                      VPVectorPointerRecipe>(Op0, Op1);
 }
 
 /// Match a call argument at a given argument index.

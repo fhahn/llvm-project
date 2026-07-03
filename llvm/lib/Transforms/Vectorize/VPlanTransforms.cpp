@@ -4108,8 +4108,9 @@ static VPValue *narrowInterleaveGroupOp(ArrayRef<VPValue *> Members,
 
   auto *WideLoad = cast<VPWidenLoadRecipe>(R);
   VPValue *PtrOp = WideLoad->getAddr();
-  if (auto *VecPtr = dyn_cast<VPVectorPointerRecipe>(PtrOp))
-    PtrOp = VecPtr->getOperand(0);
+  VPValue *VecPtrOp;
+  if (match(PtrOp, m_VectorPointer(m_VPValue(VecPtrOp), m_VPValue())))
+    PtrOp = VecPtrOp;
   // Narrow wide load to uniform scalar load, as transformed VPlan will only
   // process one original iteration.
   auto *N = new VPReplicateRecipe(&WideLoad->getIngredient(), {PtrOp},
