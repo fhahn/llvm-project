@@ -701,10 +701,10 @@ vputils::getMemoryLocation(const VPRecipeBase &R) {
   return Loc;
 }
 
-VPInstruction *vputils::findCanonicalIVIncrement(VPlan &Plan) {
-  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
-  VPRegionValue *CanIV = LoopRegion->getCanonicalIV();
+VPInstruction *vputils::findCanonicalIVIncrement(VPRegionBlock &Region) {
+  VPRegionValue *CanIV = Region.getCanonicalIV();
   assert(CanIV && "Expected loop region to have a canonical IV");
+  VPlan &Plan = *Region.getPlan();
 
   VPSymbolicValue &VFxUF = Plan.getVFxUF();
 
@@ -754,7 +754,7 @@ VPInstruction *vputils::findCanonicalIVIncrement(VPlan &Plan) {
   assert((!VFxUF.isMaterialized() || Increment) &&
          "After materializing VFxUF, an increment must exist");
   assert((!Increment ||
-          LoopRegion->hasCanonicalIVNUW() == Increment->hasNoUnsignedWrap()) &&
+          Region.hasCanonicalIVNUW() == Increment->hasNoUnsignedWrap()) &&
          "NUW flag in region and increment must match");
   return Increment;
 }

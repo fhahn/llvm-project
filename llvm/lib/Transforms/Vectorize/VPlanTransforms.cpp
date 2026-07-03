@@ -4263,7 +4263,7 @@ VPlanTransforms::narrowInterleaveGroups(VPlan &Plan,
 
   // Adjust induction to reflect that the transformed plan only processes one
   // original iteration.
-  VPInstruction *CanIVInc = vputils::findCanonicalIVIncrement(Plan);
+  VPInstruction *CanIVInc = vputils::findCanonicalIVIncrement(*VectorLoop);
   Type *CanIVTy = VectorLoop->getCanonicalIVType();
   VPBasicBlock *VectorPH = Plan.getVectorPreheader();
   VPBuilder PHBuilder(VectorPH, VectorPH->begin());
