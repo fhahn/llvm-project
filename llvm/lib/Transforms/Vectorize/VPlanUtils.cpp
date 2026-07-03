@@ -920,6 +920,43 @@ VPValue *VPSCEVExpander::tryToExpand(const SCEV *S) {
     }
     return Builder.createScalarCast(Opcode, Op, S->getType(), DL);
   }
+  case scUMaxExpr:
+  case scSMaxExpr:
+  case scUMinExpr:
+  case scSMinExpr: {
+    auto *MinMax = cast<SCEVMinMaxExpr>(S);
+    Intrinsic::ID IntrinsicID;
+    switch (S->getSCEVType()) {
+    case scUMaxExpr:
+      IntrinsicID = Intrinsic::umax;
+      break;
+    case scSMaxExpr:
+      IntrinsicID = Intrinsic::smax;
+      break;
+    case scUMinExpr:
+      IntrinsicID = Intrinsic::umin;
+      break;
+    case scSMinExpr:
+      IntrinsicID = Intrinsic::smin;
+      break;
+    default:
+      llvm_unreachable("not a min/max SCEV");
+    }
+    // Chain operands left-to-right with the corresponding min/max intrinsic,
+    // matching SCEVExpander's expansion of min/max expressions.
+    VPValue *Result = tryToExpand(MinMax->getOperand(MinMax->getNumOperands()-1));
+    if (!Result)
+      return nullptr;
+    Type *Ty = MinMax->getType();
+    for (const SCEVUse &Op : drop_begin(reverse(MinMax->operands()))) {
+      VPValue *RHS = tryToExpand(Op);
+      if (!RHS)
+        return nullptr;
+      Result = Builder.createScalarIntrinsic(IntrinsicID, {Result, RHS}, Ty,
+                                                 DL);
+    }
+    return Result;
+  }
   default:
     return nullptr;
   }
