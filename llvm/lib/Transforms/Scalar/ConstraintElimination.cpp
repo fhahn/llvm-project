@@ -16,6 +16,7 @@
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Analysis/ConstantFolding.h"
 #include "llvm/Analysis/ConstraintSystem.h"
 #include "llvm/Analysis/GlobalsModRef.h"
 #include "llvm/Analysis/LoopInfo.h"
@@ -954,65 +955,88 @@ void State::addInfoForInductions(BasicBlock &BB) {
   Value *B;
   CmpPredicate Pred;
 
-  if (!match(BB.getTerminator(),
-             m_Br(m_ICmp(Pred, m_Value(A), m_Value(B)), m_Value(), m_Value())))
-    return;
-  PHINode *PN = dyn_cast<PHINode>(A);
-  if (!PN) {
-    Pred = CmpInst::getSwappedPredicate(Pred);
-    std::swap(A, B);
-    PN = dyn_cast<PHINode>(A);
-  }
+  // The loop is controlled by an equality/inequality compare on an induction
+  // value against a loop-invariant bound. Usually that compare is in the header,
+  // but it may instead sit in the latch while the header exits on an unrelated
+  // condition (e.g. a bounds check). In the latch case the counting compare uses
+  // the post-increment of the induction; recognizing it lets us bound the header
+  // phi for the whole loop body.
+  //
+  // Try to recognize such a compare in \p TestBB. On success, sets Pred/A/B so
+  // that A is the induction value (looking through a post-increment), PN to the
+  // header phi, ComparesIncrement to whether A was an add on top of PN, and
+  // IncrementStep to that add's constant (validated against the step below).
+  PHINode *PN = nullptr;
+  bool ComparesIncrement = false;
+  const APInt *IncrementStep = nullptr;
+  auto MatchInductionValue = [&](Value *V) -> PHINode * {
+    ComparesIncrement = false;
+    IncrementStep = nullptr;
+    if (auto *P = dyn_cast<PHINode>(V))
+      return P;
+    // Look through a post-increment `PN + C` with a constant C. The constant is
+    // validated against the induction step below; requiring a constant here
+    // keeps that check syntactic and avoids expensive SCEV queries.
+    Value *Op;
+    if (match(V, m_c_Add(m_Value(Op), m_APInt(IncrementStep)))) {
+      if (auto *P = dyn_cast<PHINode>(Op)) {
+        ComparesIncrement = true;
+        return P;
+      }
+      IncrementStep = nullptr;
+    }
+    return nullptr;
+  };
+  auto TryMatchController = [&](BasicBlock *TestBB) -> bool {
+    if (!match(TestBB->getTerminator(),
+               m_Br(m_ICmp(Pred, m_Value(A), m_Value(B)), m_Value(),
+                    m_Value())))
+      return false;
+    // Only EQ/NE compares determine the exact exit value of the induction.
+    if (Pred != CmpInst::ICMP_EQ && Pred != CmpInst::ICMP_NE)
+      return false;
+    PN = MatchInductionValue(A);
+    if (!PN) {
+      std::swap(A, B);
+      PN = MatchInductionValue(A);
+    }
+    return PN && PN->getParent() == L->getHeader();
+  };
 
-  if (!PN || PN->getParent() != &BB || PN->getNumIncomingValues() != 2 ||
-      !SE.isSCEVable(PN->getType()))
+  BasicBlock *CondBB = nullptr;
+  BasicBlock *Latch = L->getLoopLatch();
+  if (TryMatchController(&BB)) {
+    CondBB = &BB;
+  } else if (Latch && Latch != &BB && TryMatchController(Latch)) {
+    CondBB = Latch;
+  } else {
+    return;
+  }
+  bool LatchControlled = CondBB != &BB;
+
+  if (PN->getNumIncomingValues() != 2)
+    return;
+
+  // The latch-controlled case is only sound when the counting compare is on the
+  // post-increment of the induction (a raw-phi latch compare does not bound the
+  // header value: the header can still equal the bound).
+  if (LatchControlled && !ComparesIncrement)
     return;
 
   BasicBlock *InLoopSucc = nullptr;
   if (Pred == CmpInst::ICMP_NE)
-    InLoopSucc = cast<CondBrInst>(BB.getTerminator())->getSuccessor(0);
+    InLoopSucc = cast<CondBrInst>(CondBB->getTerminator())->getSuccessor(0);
   else if (Pred == CmpInst::ICMP_EQ)
-    InLoopSucc = cast<CondBrInst>(BB.getTerminator())->getSuccessor(1);
+    InLoopSucc = cast<CondBrInst>(CondBB->getTerminator())->getSuccessor(1);
   else
     return;
 
-  if (!L->contains(InLoopSucc) || !L->isLoopExiting(&BB) || InLoopSucc == &BB)
+  if (!L->contains(InLoopSucc) || !L->isLoopExiting(CondBB) ||
+      InLoopSucc == CondBB)
     return;
 
-  auto *AR = dyn_cast_or_null<SCEVAddRecExpr>(SE.getSCEV(PN));
   BasicBlock *LoopPred = L->getLoopPredecessor();
-  if (!AR || AR->getLoop() != L || !LoopPred)
-    return;
-
-  const SCEV *StartSCEV = AR->getStart();
-  Value *StartValue = nullptr;
-  if (auto *C = dyn_cast<SCEVConstant>(StartSCEV)) {
-    StartValue = C->getValue();
-  } else {
-    StartValue = PN->getIncomingValueForBlock(LoopPred);
-    assert(SE.getSCEV(StartValue) == StartSCEV && "inconsistent start value");
-  }
-
-  DomTreeNode *DTN = DT.getNode(InLoopSucc);
-  auto IncUnsigned = SE.getMonotonicPredicateType(AR, CmpInst::ICMP_UGT);
-  auto IncSigned = SE.getMonotonicPredicateType(AR, CmpInst::ICMP_SGT);
-  bool MonotonicallyIncreasingUnsigned =
-      IncUnsigned == ScalarEvolution::MonotonicallyIncreasing;
-  bool MonotonicallyIncreasingSigned =
-      IncSigned == ScalarEvolution::MonotonicallyIncreasing;
-  // If SCEV guarantees that AR does not wrap, PN >= StartValue can be added
-  // unconditionally.
-  if (MonotonicallyIncreasingUnsigned)
-    WorkList.push_back(
-        FactOrCheck::getConditionFact(DTN, CmpInst::ICMP_UGE, PN, StartValue));
-  if (MonotonicallyIncreasingSigned)
-    WorkList.push_back(
-        FactOrCheck::getConditionFact(DTN, CmpInst::ICMP_SGE, PN, StartValue));
-
-  APInt StepOffset;
-  if (auto *C = dyn_cast<SCEVConstant>(AR->getStepRecurrence(SE)))
-    StepOffset = C->getAPInt();
-  else
+  if (!LoopPred)
     return;
 
   // Make sure the bound B is loop-invariant.
@@ -1027,7 +1051,7 @@ void State::addInfoForInductions(BasicBlock &BB) {
   // count when used outside that branch (e.g. merged into a phi). The number of
   // visited values is bounded so the walk stays cheap even when B is a widely
   // used value; on hitting the limit we conservatively assume a consumer exists.
-  Instruction *CountingTerm = BB.getTerminator();
+  Instruction *CountingTerm = CondBB->getTerminator();
   Value *CountingCmp = CountingTerm->getOperand(0);
   SmallVector<Value *> Worklist(PN->user_begin(), PN->user_end());
   if (isa<Instruction, Argument>(B))
@@ -1061,10 +1085,71 @@ void State::addInfoForInductions(BasicBlock &BB) {
   }
   ++NumInductionFactsDerived;
 
+  // Read the induction's start value, constant step and no-wrap flags. For the
+  // common integer add-induction read them straight off the IR: SE.getSCEV(PN)
+  // builds an add-recurrence and is this pass' dominant cost, and SCEV is not
+  // preserved across ConstraintElimination, so it is rebuilt from scratch every
+  // run. An IR nuw/nsw flag is exactly what SCEV attaches to the recurrence, so
+  // this is sound. Pointer inductions and unrecognized increments use SCEV.
+  Value *StartValue = PN->getIncomingValueForBlock(LoopPred);
+  Value *Backedge = PN->getIncomingValueForBlock(
+      PN->getIncomingBlock(0) == LoopPred ? PN->getIncomingBlock(1)
+                                          : PN->getIncomingBlock(0));
+  APInt StepOffset;
+  bool NoUnsignedWrap, NoSignedWrap;
+  const SCEV *StartSCEV = nullptr;
+  const APInt *Step;
+  if (PN->getType()->isIntegerTy() &&
+      match(Backedge, m_c_Add(m_Specific(PN), m_APInt(Step)))) {
+    StepOffset = *Step;
+    auto *Inc = cast<OverflowingBinaryOperator>(Backedge);
+    NoUnsignedWrap = Inc->hasNoUnsignedWrap();
+    NoSignedWrap = Inc->hasNoSignedWrap();
+    // Fold a constant-computing start (e.g. `add i8 254, 1`) as SCEV would, so
+    // it can be matched against a constant bound.
+    if (auto *StartI = dyn_cast<Instruction>(StartValue))
+      if (Constant *C = ConstantFoldInstruction(StartI, StartI->getDataLayout()))
+        StartValue = C;
+  } else {
+    if (!SE.isSCEVable(PN->getType()))
+      return;
+    auto *AR = dyn_cast_or_null<SCEVAddRecExpr>(SE.getSCEV(PN));
+    if (!AR || AR->getLoop() != L)
+      return;
+    auto *StepC = dyn_cast<SCEVConstant>(AR->getStepRecurrence(SE));
+    if (!StepC)
+      return;
+    StepOffset = StepC->getAPInt();
+    NoUnsignedWrap = AR->hasNoUnsignedWrap();
+    NoSignedWrap = AR->hasNoSignedWrap();
+    StartSCEV = AR->getStart();
+    if (auto *C = dyn_cast<SCEVConstant>(StartSCEV))
+      StartValue = C->getValue();
+  }
+
+  // If the counting compare looked through an add `PN + C`, make sure that add
+  // is really the induction's post-increment, i.e. its constant C equals the
+  // induction step. Otherwise the loop exits at a different value than B - Step
+  // (or not at all), and PN u< B would be unsound. This is a cheap syntactic
+  // check on the already-matched constant, avoiding SCEV queries.
+  if (ComparesIncrement && *IncrementStep != StepOffset)
+    return;
+
+  // For the latch-controlled case the induction facts hold on entry to every
+  // header iteration, so anchor them at the header (which dominates the whole
+  // body). InLoopSucc is the latch's in-loop successor, i.e. the header, so this
+  // is already the right node.
+  DomTreeNode *DTN = DT.getNode(InLoopSucc);
+
   // Handle negative steps.
   if (StepOffset.isNegative()) {
     // TODO: Extend to allow steps > -1.
     if (!(-StepOffset).isOne())
+      return;
+
+    // The latch-controlled reasoning below assumes a non-negative step; the
+    // decreasing-induction facts are only derived for header-controlled loops.
+    if (LatchControlled)
       return;
 
     // AR may wrap.
@@ -1087,14 +1172,33 @@ void State::addInfoForInductions(BasicBlock &BB) {
     return;
   }
 
+  // Reaching here the step is strictly non-negative, so monotonicity reduces to
+  // the induction's no-wrap flags. Derive it directly instead of using the more
+  // expensive getMonotonicPredicateType() range queries.
+  bool MonotonicallyIncreasingUnsigned = NoUnsignedWrap;
+  bool MonotonicallyIncreasingSigned = NoSignedWrap;
+  // If the induction is known not to wrap, PN >= StartValue can be added
+  // unconditionally.
+  if (MonotonicallyIncreasingUnsigned)
+    WorkList.push_back(
+        FactOrCheck::getConditionFact(DTN, CmpInst::ICMP_UGE, PN, StartValue));
+  if (MonotonicallyIncreasingSigned)
+    WorkList.push_back(
+        FactOrCheck::getConditionFact(DTN, CmpInst::ICMP_SGE, PN, StartValue));
+
   // Make sure AR either steps by 1 or that the value we compare against is a
   // GEP based on the same start value and all offsets are a multiple of the
   // step size, to guarantee that the induction will reach the value.
-  if (StepOffset.isZero() || StepOffset.isNegative())
+  if (StepOffset.isZero())
     return;
 
   if (!StepOffset.isOne()) {
-    // Check whether B-Start is known to be a multiple of StepOffset.
+    // Check whether B-Start is known to be a multiple of StepOffset. This is
+    // the one place that genuinely needs ScalarEvolution; it only runs for the
+    // rarer non-unit-step loops and still avoids building an add-recurrence for
+    // PN.
+    if (!StartSCEV)
+      StartSCEV = SE.getSCEV(StartValue);
     const SCEV *BMinusStart = SE.getMinusSCEV(SE.getSCEV(B), StartSCEV);
     if (isa<SCEVCouldNotCompute>(BMinusStart) ||
         !SE.getConstantMultiple(BMinusStart).urem(StepOffset).isZero())
@@ -1113,27 +1217,65 @@ void State::addInfoForInductions(BasicBlock &BB) {
         DTN, CmpInst::ICMP_SGE, PN, StartValue,
         ConditionTy(CmpInst::ICMP_SLE, StartValue, B)));
 
-  WorkList.push_back(FactOrCheck::getConditionFact(
-      DTN, CmpInst::ICMP_ULT, PN, B,
-      ConditionTy(CmpInst::ICMP_ULE, StartValue, B)));
-  WorkList.push_back(FactOrCheck::getConditionFact(
-      DTN, CmpInst::ICMP_SLT, PN, B,
-      ConditionTy(CmpInst::ICMP_SLE, StartValue, B)));
+  // When the counting compare is on the post-increment PN + Step, the loop
+  // exits once PN reaches B - Step. Bounding PN < B is then only sound when the
+  // loop is guaranteed to run at least one iteration, i.e. StartValue + Step <=
+  // B. This also rejects the degenerate B == StartValue case, where the
+  // post-increment compare would never match on the first iteration and the loop
+  // would not exit through it (so PN could grow past B). Materialize
+  // StartValue + Step as the precondition operand; only handle a constant start
+  // to keep this cheap, and require the addition to not overflow in the relevant
+  // signedness so the materialized bound is exact.
+  ConstantInt *StartC =
+      ComparesIncrement ? dyn_cast<ConstantInt>(StartValue) : nullptr;
+  if (ComparesIncrement && !StartC)
+    return;
+  auto FirstBackedgeVal = [&](bool Signed) -> Value * {
+    if (!ComparesIncrement)
+      return StartValue;
+    bool Overflow = false;
+    APInt Sum = Signed ? StartC->getValue().sadd_ov(StepOffset, Overflow)
+                       : StartC->getValue().uadd_ov(StepOffset, Overflow);
+    if (Overflow)
+      return nullptr;
+    return ConstantInt::get(StartValue->getType(), Sum);
+  };
 
-  // Try to add condition from header to the dedicated exit blocks. When exiting
-  // either with EQ or NE in the header, we know that the induction value must
-  // be u<= B, as other exits may only exit earlier.
+  Value *ULo = FirstBackedgeVal(/*Signed=*/false);
+  if (ULo)
+    WorkList.push_back(FactOrCheck::getConditionFact(
+        DTN, CmpInst::ICMP_ULT, PN, B, ConditionTy(CmpInst::ICMP_ULE, ULo, B)));
+  if (Value *SLo = FirstBackedgeVal(/*Signed=*/true))
+    WorkList.push_back(FactOrCheck::getConditionFact(
+        DTN, CmpInst::ICMP_SLT, PN, B,
+        ConditionTy(CmpInst::ICMP_SLE, SLo, B)));
+
+  // Try to add condition from the controlling block to the dedicated exit
+  // blocks. When exiting either with EQ or NE, we know that the induction value
+  // must be u<= B, as other exits may only exit earlier. When the counting
+  // compare is on the post-increment (A == PN + Step), use the same first-
+  // backedge lower bound as the precondition: with the weaker StartValue u<= B
+  // the degenerate StartValue == B loop takes a different exit on the first
+  // iteration where A = StartValue + Step already exceeds B, making A u<= B
+  // unsound.
   assert(!StepOffset.isNegative() && "induction must be increasing");
   assert((Pred == CmpInst::ICMP_EQ || Pred == CmpInst::ICMP_NE) &&
          "unsupported predicate");
-  ConditionTy Precond = {CmpInst::ICMP_ULE, StartValue, B};
-  SmallVector<BasicBlock *> ExitBBs;
-  L->getExitBlocks(ExitBBs);
-  for (BasicBlock *EB : ExitBBs) {
-    // Bail out on non-dedicated exits.
-    if (DT.dominates(&BB, EB)) {
-      WorkList.emplace_back(FactOrCheck::getConditionFact(
-          DT.getNode(EB), CmpInst::ICMP_ULE, A, B, Precond));
+  Value *ExitPrecondLo = ComparesIncrement ? ULo : StartValue;
+  if (ExitPrecondLo) {
+    ConditionTy Precond = {CmpInst::ICMP_ULE, ExitPrecondLo, B};
+    SmallVector<BasicBlock *> ExitBBs;
+    L->getExitBlocks(ExitBBs);
+    auto *AInst = dyn_cast<Instruction>(A);
+    for (BasicBlock *EB : ExitBBs) {
+      // Bail out on non-dedicated exits and on exit blocks A does not reach (A
+      // is defined in the controlling block and only dominates exits dominated
+      // by it, e.g. the exit taken directly from the counting branch).
+      if (DT.dominates(CondBB, EB) &&
+          (!AInst || DT.dominates(AInst->getParent(), EB))) {
+        WorkList.emplace_back(FactOrCheck::getConditionFact(
+            DT.getNode(EB), CmpInst::ICMP_ULE, A, B, Precond));
+      }
     }
   }
 }
