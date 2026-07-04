@@ -385,6 +385,17 @@ public:
   /// isn't part of a region, return nullptr for the exiting block.
   static std::pair<VPBlockBase *, VPBlockBase *> cloneFrom(VPBlockBase *Entry);
 
+  /// Remap the operands of the recipes in the blocks reachable from \p
+  /// NewEntry (a clone of the blocks reachable from \p Entry) to their cloned
+  /// counterparts. First collects old-to-new mappings for all cloned defined
+  /// VPValues (in two phases, to handle cycles in PHI recipes), seeded with
+  /// any entries the caller already placed in \p Old2New (e.g. live-ins or a
+  /// region's canonical IV), then rewrites the operands that have a mapping.
+  /// Operands without one (live-ins, defs outside the cloned blocks) are left
+  /// untouched. Used after cloneFrom, which does not remap operands.
+  static void remapOperands(VPBlockBase *Entry, VPBlockBase *NewEntry,
+                            DenseMap<VPValue *, VPValue *> &Old2New);
+
   /// Return an iterator range over \p Range which only includes \p BlockTy
   /// blocks. The accesses are casted to \p BlockTy.
   template <typename BlockTy, typename T> static auto blocksOnly(T &&Range) {

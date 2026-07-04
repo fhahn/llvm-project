@@ -1199,8 +1199,8 @@ LLVM_DUMP_METHOD
 void VPlan::dump() const { print(dbgs()); }
 #endif
 
-static void remapOperands(VPBlockBase *Entry, VPBlockBase *NewEntry,
-                          DenseMap<VPValue *, VPValue *> &Old2NewVPValues) {
+void VPBlockUtils::remapOperands(VPBlockBase *Entry, VPBlockBase *NewEntry,
+                                 DenseMap<VPValue *, VPValue *> &Old2New) {
   // Update the operands of all cloned recipes starting at NewEntry. This
   // traverses all reachable blocks. This is done in two steps, to handle cycles
   // in PHI recipes.
@@ -1222,18 +1222,18 @@ static void remapOperands(VPBlockBase *Entry, VPBlockBase *NewEntry,
              "recipes must define the same number of operands");
       for (const auto &[OldV, NewV] :
            zip(OldR.definedValues(), NewR.definedValues()))
-        Old2NewVPValues[OldV] = NewV;
+        Old2New[OldV] = NewV;
     }
   }
 
-  // Update all operands to use cloned VPValues.
+  // Update the mapped operands to use cloned VPValues; leave operands without a
+  // mapping (live-ins, defs outside the cloned blocks) untouched.
   for (VPBasicBlock *NewBB :
        VPBlockUtils::blocksOnly<VPBasicBlock>(NewDeepRPOT)) {
     for (VPRecipeBase &NewR : *NewBB)
-      for (unsigned I = 0, E = NewR.getNumOperands(); I != E; ++I) {
-        VPValue *NewOp = Old2NewVPValues.lookup(NewR.getOperand(I));
-        NewR.setOperand(I, NewOp);
-      }
+      for (unsigned I = 0, E = NewR.getNumOperands(); I != E; ++I)
+        if (VPValue *NewOp = Old2New.lookup(NewR.getOperand(I)))
+          NewR.setOperand(I, NewOp);
   }
 }
 
@@ -1296,7 +1296,7 @@ VPlan *VPlan::duplicate() {
       NewSV->markMaterialized();
   }
 
-  remapOperands(Entry, NewEntry, Old2NewVPValues);
+  VPBlockUtils::remapOperands(Entry, NewEntry, Old2NewVPValues);
 
   // Initialize remaining fields of cloned VPlan.
   NewPlan->VFs = VFs;
