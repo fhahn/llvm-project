@@ -709,10 +709,12 @@ VPInstruction *vputils::findCanonicalIVIncrement(VPRegionBlock &Region) {
   VPSymbolicValue &VFxUF = Plan.getVFxUF();
 
   // Check if \p Step matches the expected increment step, accounting for
-  // materialization of VFxUF and UF.
+  // materialization of VFxUF and UF. Before materialization the step may also
+  // be VF, for regions covering a single vector iteration (e.g. the
+  // realign-loop transform's snapshot region).
   auto IsIncrementStep = [&](VPValue *Step) -> bool {
     if (!VFxUF.isMaterialized())
-      return Step == &VFxUF;
+      return Step == &VFxUF || Step == &Plan.getVF();
 
     VPSymbolicValue &UF = Plan.getUF();
     if (!UF.isMaterialized())

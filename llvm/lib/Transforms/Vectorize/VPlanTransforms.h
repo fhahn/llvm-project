@@ -599,6 +599,35 @@ struct VPlanTransforms {
   static void makeCallWideningDecisions(VPlan &Plan, VFRange &Range,
                                         VPRecipeBuilder &RecipeBuilder,
                                         VPCostContext &CostCtx);
+
+  /// Clone the vector loop region of \p Plan to be used as a realigned VF-only
+  /// epilogue once the main VFxUF loop finishes. Runs before \c unrollByUF, so
+  /// the clone naturally contains a single set of recipes (one part). The
+  /// returned region is held outside the CFG and inserted later by
+  /// \c applyRealignSnapshot.
+  ///
+  /// \p HasRuntimeDiffChecks must be true when vectorization relies on LAA
+  /// dependence-distance (diff) runtime checks, which do not prove the load and
+  /// store ranges are disjoint; re-executing the body could then re-read
+  /// locations the main loop already wrote, so the transform bails.
+  ///
+  /// \p Ctx is used to cost the body recipes: realign only fires when every one
+  /// costs no more than a single vector operation.
+  ///
+  /// Returns the cloned region or nullptr if the loop is not a candidate.
+  static VPRegionBlock *prepareRealignSnapshot(VPlan &Plan, Loop *OrigLoop,
+                                               ElementCount BestVF,
+                                               unsigned BestUF,
+                                               VPCostContext &Ctx,
+                                               bool HasRuntimeDiffChecks);
+
+  /// Insert \p Snapshot (a region produced by \c prepareRealignSnapshot) into
+  /// \p Plan's CFG as a sibling of the main vector loop region. Its IV is
+  /// rewritten to step by \p BestVF and offset by TC - K * VF, where
+  /// K = ceil((TC % (VF * UF)) / VF), so the iterations cover [TC - K*VF, TC).
+  /// Must be called before \c dissolveLoopRegions.
+  static void applyRealignSnapshot(VPlan &Plan, VPRegionBlock *Snapshot,
+                                   ElementCount BestVF, unsigned BestUF);
 };
 
 } // namespace llvm

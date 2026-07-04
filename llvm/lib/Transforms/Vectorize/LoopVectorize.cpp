@@ -5947,9 +5947,34 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   RUN_VPLAN_PASS(VPlanTransforms::replaceWideCanonicalIVWithWideIV, BestVPlan,
                  *PSE.getSE(), TTI, Config.CostKind, BestVF, BestUF,
                  CM.ValuesToIgnore);
+
+  // Snapshot the vector loop region BEFORE unrolling, so it can be re-used as
+  // a VF-only realigned epilogue. It only clones a detached region, so there is
+  // nothing to verify or print and it does not go through RUN_VPLAN_PASS.
+  VPRegionBlock *RealignSnapshot = nullptr;
+  // Realign only applies to inner loops, which have LoopAccess info; the
+  // VPlan-native outer-loop path has none.
+  if (EpilogueVecKind == EpilogueVectorizationKind::None && Legal->getLAI()) {
+    // The realign body re-reads the overlap lanes, which is only sound if the
+    // load and store ranges are disjoint. LAA dependence-distance (diff) checks
+    // only bound the main loop's forward distance, not full disjointness.
+    const RuntimePointerChecking *RtChecks = Legal->getRuntimePointerChecking();
+    bool HasRuntimeDiffChecks =
+        RtChecks->Need && RtChecks->getDiffChecks().has_value();
+    VPCostContext CostCtx(*TLI, BestVPlan, CM, Config);
+    RealignSnapshot = VPlanTransforms::prepareRealignSnapshot(
+        BestVPlan, OrigLoop, BestVF, BestUF, CostCtx, HasRuntimeDiffChecks);
+  }
+
   // TODO: Move to VPlan transform stage once the transition to the VPlan-based
   // cost model is complete for better cost estimates.
   RUN_VPLAN_PASS(VPlanTransforms::unrollByUF, BestVPlan, BestUF);
+  // Insert the snapshot right after unrollByUF, so it is never left
+  // disconnected: later passes building a VPDominatorTree or walking live-in
+  // users would choke on an orphaned region.
+  if (RealignSnapshot)
+    RUN_VPLAN_PASS(VPlanTransforms::applyRealignSnapshot, BestVPlan,
+                   RealignSnapshot, BestVF, BestUF);
   RUN_VPLAN_PASS(VPlanTransforms::materializePacksAndUnpacks, BestVPlan);
   RUN_VPLAN_PASS(VPlanTransforms::materializeBroadcasts, BestVPlan);
   RUN_VPLAN_PASS(VPlanTransforms::replicateByVF, BestVPlan, BestVF);

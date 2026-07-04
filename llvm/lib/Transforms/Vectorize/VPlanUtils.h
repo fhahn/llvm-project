@@ -171,7 +171,7 @@ VPInstruction *findCanonicalIVIncrement(VPRegionBlock &Region);
 /// redirect all other users to the offset versions, so the loop effectively
 /// iterates starting at \p Offset. \p Region must have a canonical IV
 /// increment. Returns the offset increment. Used to reset the start value of
-/// the epilogue vector loop.
+/// the epilogue and realign vector loops.
 VPInstruction *offsetCanonicalIV(VPRegionBlock &Region, VPValue *Offset);
 
 /// Returns the GEP nowrap flags for \p Ptr, looking through pointer casts

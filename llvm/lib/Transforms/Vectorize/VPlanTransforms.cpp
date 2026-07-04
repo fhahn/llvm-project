@@ -23,8 +23,10 @@
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SetOperations.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Analysis/IVDescriptors.h"
 #include "llvm/Analysis/Loads.h"
@@ -32,6 +34,7 @@
 #include "llvm/Analysis/MemoryLocation.h"
 #include "llvm/Analysis/ScalarEvolutionPatternMatch.h"
 #include "llvm/Analysis/ScopedNoAliasAA.h"
+#include "llvm/Analysis/ValueTracking.h"
 #include "llvm/Analysis/VectorUtils.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/Metadata.h"
@@ -42,6 +45,10 @@
 using namespace llvm;
 using namespace VPlanPatternMatch;
 using namespace SCEVPatternMatch;
+
+#define DEBUG_TYPE "loop-vectorize"
+
+STATISTIC(NumRealignApplied, "Number of plans where realign body was applied");
 
 /// If the pointer operand \p Addr of a memory access is an affine AddRec
 /// w.r.t. \p L with a constant stride, return the stride in units of
@@ -5863,4 +5870,215 @@ void VPlanTransforms::convertToStridedAccesses(VPlan &Plan,
       LoadR->replaceAllUsesWith(StridedLoad);
     }
   }
+}
+
+static cl::opt<bool> EnableTryToRealignLoop(
+    "vplan-try-to-realign-loop", cl::init(false), cl::Hidden,
+    cl::desc("Enable experimental loop-tail-realignment transform that "
+             "vectorizes the scalar tail by re-executing the vector body "
+             "once with a shifted base pointer."));
+
+// Return true if \p Header's body is safe and profitable to re-execute on the
+// realign overlap lanes: every non-control recipe must be pure, cost <= 1 at
+// \p VF, and the loads/stores must not self-alias.
+static bool isRealignSafeBody(VPBasicBlock *Header, ElementCount VF,
+                              VPCostContext &Ctx) {
+  // Underlying objects of loads / stores; a shared object means the body
+  // self-aliases across iterations and re-execution would observe its writes.
+  SmallPtrSet<const Value *, 4> LoadBases, StoreBases;
+  bool SeenStore = false;
+  for (VPRecipeBase &R : *Header) {
+    // The latch terminator is rebuilt by applyRealignSnapshot.
+    if (match(&R, m_Branch()))
+      continue;
+    // VPDerivedIV (runtime-start address IV) is enabled by a follow-up;
+    // VPVectorEndPointer is a reverse access, but the coverage math and
+    // alignment reasoning assume a forward IV.
+    if (isa<VPDerivedIVRecipe, VPVectorEndPointerRecipe>(&R))
+      return false;
+    // Profitability: admit only cheap recipes (invalid cost compares > 1).
+    if (R.cost(VF, Ctx) > 1)
+      return false;
+    if (auto *Mem = dyn_cast<VPWidenMemoryRecipe>(&R)) {
+      // Only consecutive (forward) widen loads/stores can be replayed.
+      if (!Mem->isConsecutive())
+        return false;
+      // The realign start is generally non-VF-aligned, so only natural element
+      // alignment is sound; over-alignment is enabled by a follow-up.
+      Instruction &I = Mem->getIngredient();
+      if (!isAligned(Mem->getAlign(),
+                     I.getDataLayout().getTypeStoreSize(getLoadStoreType(&I))))
+        return false;
+      bool IsLoad = isa<VPWidenLoadRecipe, VPWidenLoadEVLRecipe>(&R);
+      // A load after a store would observe writes from a previous iteration.
+      if (IsLoad && SeenStore)
+        return false;
+      SeenStore |= !IsLoad;
+      // The address is a vector-pointer over a live-in base or a GEP off one;
+      // getUnderlyingObjects unifies e.g. %a and gep(%a, 5).
+      VPIRValue *Base;
+      if (!match(Mem->getAddr(),
+                 m_VectorPointer(m_CombineOr(m_GetElementPtr(m_VPIRValue(Base),
+                                                             m_VPValue()),
+                                             m_VPIRValue(Base)),
+                                 m_VPValue())))
+        return false;
+      SmallVector<const Value *, 4> Objects;
+      getUnderlyingObjects(Base->getValue(), Objects);
+      (IsLoad ? LoadBases : StoreBases).insert_range(Objects);
+      continue;
+    }
+    // Any other recipe must be pure to re-execute idempotently: rejects
+    // interleave groups, predicated stores, gathers/scatters, etc.
+    if (R.mayHaveSideEffects() || R.mayReadOrWriteMemory())
+      return false;
+    // Per-lane recipes are expanded by replicateByVF /
+    // materializePacksAndUnpacks, which only visit the main region.
+    if (vputils::doesGeneratePerAllLanes(&R))
+      return false;
+  }
+  return !set_intersects(LoadBases, StoreBases);
+}
+
+// Return true if \p Plan has the CFG skeleton applyRealignSnapshot needs:
+// scalar.ph is middle.block's back() (cmp.n-false) successor, and there is a
+// single exit block with no live-out phis (the snapshot's exit edge becomes a
+// new predecessor we do not patch).
+static bool hasRealignSkeleton(VPlan &Plan) {
+  VPBasicBlock *ScalarPH = Plan.getScalarPreheader();
+  VPBasicBlock *MiddleBB = Plan.getMiddleBlock();
+  if (!ScalarPH || MiddleBB->getSuccessors().empty() ||
+      MiddleBB->getSuccessors().back() != ScalarPH ||
+      Plan.getExitBlocks().size() != 1)
+    return false;
+  VPIRBasicBlock *ExitBB = Plan.getExitBlocks()[0];
+  return ExitBB->phis().empty() && ExitBB->getIRBasicBlock()->phis().empty();
+}
+
+VPRegionBlock *VPlanTransforms::prepareRealignSnapshot(
+    VPlan &Plan, Loop *OrigLoop, ElementCount BestVF, unsigned BestUF,
+    VPCostContext &Ctx, bool HasRuntimeDiffChecks) {
+  if (!EnableTryToRealignLoop)
+    return nullptr;
+
+  // Restrict to fixed, power-of-2 VFs and outermost loops.
+  if (!BestVF.isFixed() || !isPowerOf2_64(BestVF.getFixedValue()) ||
+      OrigLoop->getParentLoop() || Plan.hasEarlyExit())
+    return nullptr;
+
+  // Bail if vectorization relies on LAA dependence-distance (diff) runtime
+  // checks: a diff check only proves forward distance >= VF*UF, not that the
+  // load and store ranges are disjoint, so the realign body could re-read the
+  // main loop's stores. A full-range overlap check (or noalias) does prove
+  // disjointness and is left as a candidate.
+  if (HasRuntimeDiffChecks)
+    return nullptr;
+
+  // Only fire for a literal ConstantInt trip count, so the profitability gate
+  // is decided statically; runtime-TC support follows separately. Cap at 32
+  // bits so TCVal % Stride and TC - K*VF cannot overflow uint64_t.
+  uint64_t TCVal;
+  if (!match(Plan.getTripCount(), m_ConstantInt(TCVal)) || !isUIntN(32, TCVal))
+    return nullptr;
+  // Require Tail >= 2 (a 1-element tail is cheaper as a scalar iteration) and
+  // TCVal >= VF*UF (the main loop runs, so the realign start cannot underflow).
+  uint64_t Stride = BestVF.getFixedValue() * BestUF;
+  if (TCVal % Stride < 2 || TCVal < Stride)
+    return nullptr;
+
+  VPRegionBlock *MainRegion = Plan.getVectorLoopRegion();
+  if (!MainRegion)
+    return nullptr;
+  // Only a single-block loop body is handled for now.
+  VPBasicBlock *Header = MainRegion->getEntryBasicBlock();
+  if (Header != MainRegion->getExitingBasicBlock())
+    return nullptr;
+
+  // Reject header phis other than the canonical IV (reductions, recurrences,
+  // widen-IV): pre-unroll the canonical IV is a VPRegionValue, not a phi.
+  if (!Header->phis().empty())
+    return nullptr;
+
+  if (!isRealignSafeBody(Header, BestVF, Ctx))
+    return nullptr;
+
+  // Verify the CFG skeleton and IV-increment shape before cloning, so a
+  // mismatched plan bails rather than orphaning a clone. VFxUF must still be
+  // symbolic: a plan that materialized it steps by UF
+  // (narrowInterleaveGroups), which breaks the coverage math below.
+  if (!hasRealignSkeleton(Plan) || Plan.getVFxUF().isMaterialized() ||
+      !vputils::findCanonicalIVIncrement(*MainRegion))
+    return nullptr;
+
+  // clone() does not remap operands, and the canonical IV is a VPRegionValue
+  // rather than recipe-defined, so seed the map with it.
+  VPRegionBlock *Snapshot = MainRegion->clone();
+  DenseMap<VPValue *, VPValue *> Old2New = {
+      {MainRegion->getCanonicalIV(), Snapshot->getCanonicalIV()}};
+  VPBlockUtils::remapOperands(MainRegion->getEntry(), Snapshot->getEntry(),
+                              Old2New);
+  Snapshot->setName("vector.realign.region");
+  return Snapshot;
+}
+
+void VPlanTransforms::applyRealignSnapshot(VPlan &Plan, VPRegionBlock *Snapshot,
+                                           ElementCount BestVF,
+                                           unsigned BestUF) {
+  assert(Snapshot && "applyRealignSnapshot requires a snapshot region");
+
+  // Only unrollByUF runs between prepare and apply, which disturbs neither the
+  // skeleton nor the trip count; re-assert rather than re-check.
+  VPBasicBlock *ScalarPH = Plan.getScalarPreheader();
+  VPBasicBlock *MiddleBB = Plan.getMiddleBlock();
+  assert(hasRealignSkeleton(Plan) &&
+         "realign preconditions must hold from prepareRealignSnapshot");
+  assert(!Plan.getVectorTripCount().isMaterialized() &&
+         "applyRealignSnapshot must run before VTC materialization");
+
+  // The realign loop covers the Tail = TC % (VF*UF) remaining lanes VF at a
+  // time, so it runs K = ceil(Tail / VF) iterations starting at TC - K*VF.
+  VPValue *TC = Plan.getTripCount();
+  uint64_t VFLanes = BestVF.getFixedValue();
+  uint64_t TCVal = cast<VPConstantInt>(TC)->getZExtValue();
+  uint64_t RealignK = divideCeil(TCVal % (VFLanes * BestUF), VFLanes);
+
+  VPBasicBlock *RealignPH = Plan.createVPBasicBlock("vector.realign.ph");
+  VPValue *RealignStart =
+      VPBuilder(RealignPH, RealignPH->end())
+          .createSub(
+              TC, Plan.getConstantInt(TC->getScalarType(), RealignK * VFLanes));
+
+  // Splice the snapshot in as a sibling of the main vector loop by redirecting
+  // middle.block's scalar.ph (cmp.n-false) edge to realign.ph; the scalar tail
+  // loses its entry and dies. Tail >= 2 is decided statically, so no runtime
+  // check is needed:
+  //
+  //   middle.block -- cmp.n (tail==0) --> exit
+  //                -- else --> realign.ph --> region --> exit
+  //
+  // Wire the CFG before touching recipes so getPlan() works on the snapshot.
+  for (VPRecipeBase &R : ScalarPH->phis())
+    cast<VPPhiAccessors>(&R)->removeIncomingValueFor(MiddleBB);
+  VPBlockUtils::disconnectBlocks(MiddleBB, ScalarPH);
+  VPBlockUtils::connectBlocks(MiddleBB, RealignPH);
+  VPBlockUtils::connectBlocks(RealignPH, Snapshot);
+  VPBlockUtils::connectBlocks(Snapshot, Plan.getExitBlocks()[0]);
+
+  // The snapshot covers one vector worth of lanes per iteration, independently
+  // of how the main loop was unrolled.
+  vputils::findCanonicalIVIncrement(*Snapshot)->setOperand(1, &Plan.getVF());
+
+  // Offset the IV so the loop iterates [RealignStart, TC); a later
+  // simplifyRecipes folds the offset into the IV phi's start.
+  VPInstruction *OffsetIVInc =
+      vputils::offsetCanonicalIV(*Snapshot, RealignStart);
+
+  // The latch's BranchOnCount now compares the offset increment against TC.
+  VPRecipeBase *LatchTerm = Snapshot->getExitingBasicBlock()->getTerminator();
+  assert(
+      match(LatchTerm, m_BranchOnCount(m_Specific(OffsetIVInc), m_VPValue())) &&
+      "expected snapshot latch to be BranchOnCount(OffsetIVInc, ?)");
+  LatchTerm->setOperand(1, TC);
+
+  ++NumRealignApplied;
 }
