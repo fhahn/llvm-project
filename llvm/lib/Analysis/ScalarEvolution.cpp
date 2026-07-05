@@ -2519,26 +2519,41 @@ ScalarEvolution::getStrengthenedNoWrapFlagsFromBinOp(
 
   bool Deduced = false;
 
-  if (OBO->getOpcode() != Instruction::Add &&
-      OBO->getOpcode() != Instruction::Sub &&
-      OBO->getOpcode() != Instruction::Mul)
-    return std::nullopt;
-
+  Instruction::BinaryOps Opcode = (Instruction::BinaryOps)OBO->getOpcode();
   const SCEV *LHS = getSCEV(OBO->getOperand(0));
   const SCEV *RHS = getSCEV(OBO->getOperand(1));
+
+  // A left shift by a constant is a multiply by a power of two. Reuse the
+  // multiply overflow reasoning below by rewriting `shl X, C` as `mul X, 1<<C`,
+  // with one caveat: `nsw` for a plain shl is only valid when the shift amount
+  // is smaller than bitwidth - 1 (a shift by bitwidth - 1 can produce the sign
+  // bit without being nsw). `nuw` transfers unconditionally.
+  bool CanDeduceNSW = true;
+  if (Opcode == Instruction::Shl) {
+    const APInt *ShiftAmt;
+    if (!match(OBO->getOperand(1), m_APInt(ShiftAmt)))
+      return std::nullopt;
+    unsigned BitWidth = ShiftAmt->getBitWidth();
+    if (ShiftAmt->uge(BitWidth))
+      return std::nullopt;
+    CanDeduceNSW = ShiftAmt->ult(BitWidth - 1);
+    Opcode = Instruction::Mul;
+    RHS = getConstant(APInt::getOneBitSet(BitWidth, ShiftAmt->getZExtValue()));
+  } else if (Opcode != Instruction::Add && Opcode != Instruction::Sub &&
+             Opcode != Instruction::Mul) {
+    return std::nullopt;
+  }
 
   const Instruction *CtxI =
       UseContextForNoWrapFlagInference ? dyn_cast<Instruction>(OBO) : nullptr;
   if (!OBO->hasNoUnsignedWrap() &&
-      willNotOverflow((Instruction::BinaryOps)OBO->getOpcode(),
-                      /* Signed */ false, LHS, RHS, CtxI)) {
+      willNotOverflow(Opcode, /* Signed */ false, LHS, RHS, CtxI)) {
     Flags = ScalarEvolution::setFlags(Flags, SCEV::FlagNUW);
     Deduced = true;
   }
 
-  if (!OBO->hasNoSignedWrap() &&
-      willNotOverflow((Instruction::BinaryOps)OBO->getOpcode(),
-                      /* Signed */ true, LHS, RHS, CtxI)) {
+  if (CanDeduceNSW && !OBO->hasNoSignedWrap() &&
+      willNotOverflow(Opcode, /* Signed */ true, LHS, RHS, CtxI)) {
     Flags = ScalarEvolution::setFlags(Flags, SCEV::FlagNSW);
     Deduced = true;
   }
