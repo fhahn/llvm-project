@@ -3004,8 +3004,9 @@ addVPLaneMaskPhiAndUpdateExitBranch(VPlan &Plan) {
   LaneMaskPhi->addBackedgeValue(ALM);
 
   // Replace the original terminator with BranchOnCond. We have to invert the
-  // mask here because a true condition means jumping to the exit block.
-  auto *NotMask = Builder.createNot(ALM, DL);
+  // mask here because a true condition means jumping to the exit block. The
+  // inverted mask only feeds the scalar BranchOnCond, so it is single-scalar.
+  auto *NotMask = Builder.createNot(ALM, DL, "", /*IsSingleScalar=*/true);
   Builder.createNaryOp(VPInstruction::BranchOnCond, {NotMask}, DL);
   OriginalTerminator->eraseFromParent();
   return LaneMaskPhi;

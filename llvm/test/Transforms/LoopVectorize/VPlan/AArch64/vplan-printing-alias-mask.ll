@@ -41,7 +41,7 @@ define void @alias_mask(ptr noalias %a, ptr %b, ptr %c, i64 %n) {
 ; FINAL-NEXT:    WIDEN store ir<%ptr.c>, ir<%add>, vp<[[VP7]]>
 ; FINAL-NEXT:    EMIT vp<%index.next> = add vp<%index>, vp<%num.active.lanes>
 ; FINAL-NEXT:    EMIT vp<%active.lane.mask.next> = active lane mask vp<%index.next>, ir<%n>, ir<1>
-; FINAL-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = not vp<%active.lane.mask.next>
+; FINAL-NEXT:    EMIT-SCALAR vp<[[VP8:%[0-9]+]]> = not vp<%active.lane.mask.next>
 ; FINAL-NEXT:    EMIT branch-on-cond vp<[[VP8]]>
 ; FINAL-NEXT:  Successor(s): middle.block, vector.body
 ; FINAL-EMPTY:
