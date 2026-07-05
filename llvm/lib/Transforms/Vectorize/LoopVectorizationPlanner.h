@@ -463,9 +463,11 @@ public:
     return createScalarCast(CastOp, Op, ResultTy, DL);
   }
 
-  VPValue *createScalarFreeze(VPValue *Op, Type *ResultTy, DebugLoc DL) {
+  VPValue *createScalarFreeze(VPValue *Op, Type *ResultTy, DebugLoc DL,
+                              const Twine &Name = "") {
     return tryInsertInstruction(
-        new VPInstruction(Instruction::Freeze, Op, {}, {}, DL));
+        new VPInstruction(Instruction::Freeze, Op, {}, {}, DL, Name,
+                          /*ResultTy=*/nullptr, /*IsSingleScalar=*/true));
   }
 
   VPInstruction *createWidenCast(Instruction::CastOps Opcode, VPValue *Op,

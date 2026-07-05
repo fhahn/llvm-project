@@ -1647,7 +1647,7 @@ VPInstruction *VPBuilder::createAnyOfReduction(VPValue *ChainOp,
                   FastMathFlags());
   auto *OrReduce =
       createNaryOp(VPInstruction::ComputeReductionResult, {ChainOp}, Flags, DL);
-  auto *Freeze = createNaryOp(Instruction::Freeze, {OrReduce}, DL);
+  auto *Freeze = createScalarFreeze(OrReduce, OrReduce->getScalarType(), DL);
   return createSelect(Freeze, TrueVal, FalseVal, DL, "rdx.select");
 }
 

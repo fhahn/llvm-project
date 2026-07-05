@@ -775,7 +775,7 @@ Value *VPInstruction::generate(VPTransformState &State) {
     return Builder.CreateInsertElement(Vec, Elt, Idx, Name);
   }
   case Instruction::Freeze: {
-    Value *Op = State.get(getOperand(0), vputils::onlyFirstLaneUsed(this));
+    Value *Op = State.get(getOperand(0), isSingleScalar());
     return Builder.CreateFreeze(Op, Name);
   }
   case Instruction::FCmp:
