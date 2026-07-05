@@ -5970,9 +5970,20 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   bool HasBranchWeights =
       hasBranchWeightMD(*OrigLoop->getLoopLatch()->getTerminator());
   if (HasBranchWeights) {
+    // The branch weights recorded on predicated blocks come from block
+    // frequency info, which falls back to static heuristics for any conditional
+    // branch lacking profile data. Only emit them as profile metadata on the
+    // dissolved regions' branches when *every* conditional branch in the loop
+    // is profiled, so the per-block probability is fully profile-derived rather
+    // than partly fabricated. A profiled latch alone only reflects the trip
+    // count, not the predicate edges.
+    bool AllBranchesProfiled = all_of(OrigLoop->blocks(), [](BasicBlock *BB) {
+      const Instruction *T = BB->getTerminator();
+      return T->getNumSuccessors() <= 1 || hasBranchWeightMD(*T);
+    });
     std::optional<unsigned> VScale = Config.getVScaleForTuning();
-    RUN_VPLAN_PASS(VPlanTransforms::addBranchWeightToMiddleTerminator,
-                   BestVPlan, BestVF, VScale);
+    RUN_VPLAN_PASS(VPlanTransforms::annotateProfileMetadata, BestVPlan, BestVF,
+                   VScale, AllBranchesProfiled);
   }
 
   if (CM.maskPartialAliasing()) {
@@ -6565,10 +6576,11 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
 
   // Create initial base VPlan0, to serve as common starting point for all
   // candidates built later for specific VF ranges. For inner loops, seed each
-  // block's branch_weights from its estimated execution probability, recorded
-  // on the block and later used to scale predicated blocks' costs. The
-  // VPlan-native path is skipped: it creates no replicate regions and breaks
-  // the single-header frequency assumption.
+  // block's branch_weights from its estimated execution probability. The
+  // weights recorded on each block are later used to scale predicated blocks'
+  // costs and emitted as profile metadata when replicate regions are dissolved
+  // (gated on real profile data). The VPlan-native path is skipped: it creates
+  // no replicate regions and breaks the single-header frequency assumption.
   auto GetBranchWeights = [this](const BasicBlock *BB) {
     return CM.getEstimatedPredBlockWeights(BB);
   };

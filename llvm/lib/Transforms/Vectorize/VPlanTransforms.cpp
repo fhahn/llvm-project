@@ -6243,9 +6243,31 @@ VPlanTransforms::narrowInterleaveGroups(VPlan &Plan,
   return NewPlan;
 }
 
-/// Add branch weight metadata, if the \p Plan's middle block is terminated by a
-/// BranchOnCond recipe.
-void VPlanTransforms::addBranchWeightToMiddleTerminator(
+/// Attach the branch weights recorded on \p Plan's dissolved predicated blocks
+/// as MD_prof to the BranchOnCond guarding entry into each one. The weight is
+/// stored on the predicated block itself (the taken, first successor of its
+/// guard), so walk each block, find its recorded weights, and annotate the
+/// terminator of its single predecessor.
+static void addPredicateBranchWeights(VPlan &Plan) {
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_deep(Plan.getEntry()))) {
+    MDNode *BW = VPBB->getBranchWeights();
+    if (!BW)
+      continue;
+    auto *Pred = dyn_cast_or_null<VPBasicBlock>(VPBB->getSinglePredecessor());
+    if (!Pred || Pred->getNumSuccessors() != 2 ||
+        Pred->getSuccessors()[0] != VPBB)
+      continue;
+    auto *Term = dyn_cast_or_null<VPInstruction>(Pred->getTerminator());
+    if (Term && Term->getOpcode() == VPInstruction::BranchOnCond)
+      Term->setMetadata(LLVMContext::MD_prof, BW);
+  }
+}
+
+/// Annotate the middle block's BranchOnCond, if any, with branch weights
+/// derived from the vector step, assuming that `TripCount % VectorStep` is
+/// equally distributed.
+static void addMiddleTerminatorBranchWeights(
     VPlan &Plan, ElementCount VF, std::optional<unsigned> VScaleForTuning) {
   VPBasicBlock *MiddleVPBB = Plan.getMiddleBlock();
   auto *MiddleTerm =
@@ -6256,7 +6278,6 @@ void VPlanTransforms::addBranchWeightToMiddleTerminator(
 
   assert(MiddleTerm->getOpcode() == VPInstruction::BranchOnCond &&
          "must have a BranchOnCond");
-  // Assume that `TripCount % VectorStep ` is equally distributed.
   unsigned VectorStep = Plan.getConcreteUF() * VF.getKnownMinValue();
   if (VF.isScalable() && VScaleForTuning.has_value())
     VectorStep *= *VScaleForTuning;
@@ -6265,6 +6286,14 @@ void VPlanTransforms::addBranchWeightToMiddleTerminator(
   MDNode *BranchWeights =
       MDB.createBranchWeights({1, VectorStep - 1}, /*IsExpected=*/false);
   MiddleTerm->setMetadata(LLVMContext::MD_prof, BranchWeights);
+}
+
+void VPlanTransforms::annotateProfileMetadata(
+    VPlan &Plan, ElementCount VF, std::optional<unsigned> VScaleForTuning,
+    bool AddPredicateWeights) {
+  if (AddPredicateWeights)
+    addPredicateBranchWeights(Plan);
+  addMiddleTerminatorBranchWeights(Plan, VF, VScaleForTuning);
 }
 
 void VPlanTransforms::adjustFirstOrderRecurrenceMiddleUsers(VPlan &Plan,

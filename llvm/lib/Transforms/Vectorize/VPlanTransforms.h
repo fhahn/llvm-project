@@ -557,11 +557,18 @@ struct VPlanTransforms {
       TargetTransformInfo::TargetCostKind CostKind, ElementCount VF,
       unsigned UF, const SmallPtrSetImpl<const Value *> &ValuesToIgnore);
 
-  /// Add branch weight metadata, if the \p Plan's middle block is terminated by
-  /// a BranchOnCond recipe.
+  /// Annotate branches in \p Plan with profile metadata (MD_prof), after \p
+  /// Plan has been unrolled by UF and its replicate regions dissolved:
+  ///  - The middle block's BranchOnCond gets branch weights derived from \p VF,
+  ///    the concrete UF and \p VScaleForTuning, assuming the remainder trip
+  ///    count is equally distributed.
+  ///  - If \p AddPredicateWeights is true, each dissolved predicated block's
+  ///    recorded branch weights are attached to the BranchOnCond guarding entry
+  ///    into it.
   static void
-  addBranchWeightToMiddleTerminator(VPlan &Plan, ElementCount VF,
-                                    std::optional<unsigned> VScaleForTuning);
+  annotateProfileMetadata(VPlan &Plan, ElementCount VF,
+                          std::optional<unsigned> VScaleForTuning,
+                          bool AddPredicateWeights);
 
   /// Adjust first-order recurrence users in the middle block: create
   /// penultimate element extracts for LCSSA phi users, and handle penultimate
