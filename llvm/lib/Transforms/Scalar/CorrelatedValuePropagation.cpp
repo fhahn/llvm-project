@@ -1210,7 +1210,7 @@ static NoWrapFlags inferNoWrapFromUses(BinaryOperator *BinOp,
                                        bool WantNUW) {
   // Skip analysis, when there are too many uses to check or any use is in the
   // same block.
-  const unsigned MaxUsesToInspect = 4;
+  const unsigned MaxUsesToInspect = 1;
   BasicBlock *DefBB = BinOp->getParent();
   unsigned NumUses = 0;
   for (Use &U : BinOp->uses()) {
