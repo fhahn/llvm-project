@@ -1980,6 +1980,22 @@ static void narrowToSingleScalarRecipes(VPlan &Plan) {
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
            vp_depth_first_deep(Plan.getEntry()))) {
     for (VPRecipeBase &R : make_early_inc_range(reverse(*VPBB))) {
+      // A Not VPInstruction whose result is only used by its first lane can be
+      // marked single-scalar. It has no underlying IR instruction, so instead
+      // of turning it into a VPReplicateRecipe it is cloned with the
+      // single-scalar flag set.
+      if (auto *VPI = dyn_cast<VPInstruction>(&R);
+          VPI && VPI->getOpcode() == VPInstruction::Not &&
+          !VPI->isSingleScalar() && vputils::onlyFirstLaneUsed(VPI)) {
+        auto *Clone = new VPInstruction(
+            VPInstruction::Not, VPI->operands(), *VPI, *VPI, VPI->getDebugLoc(),
+            VPI->getName(), /*ResultTy=*/nullptr, /*IsSingleScalar=*/true);
+        Clone->insertBefore(VPI);
+        VPI->replaceAllUsesWith(Clone);
+        if (isDeadRecipe(*VPI))
+          VPI->eraseFromParent();
+        continue;
+      }
       if (!isa<VPWidenRecipe, VPWidenGEPRecipe, VPReplicateRecipe,
                VPWidenIntrinsicRecipe>(&R))
         continue;

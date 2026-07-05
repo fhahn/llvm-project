@@ -72,20 +72,20 @@ exit:
 define i32 @test_scalar_and_widen_not_cost(ptr readonly %a, i64 noundef %n) {
 ; CHECK-LABEL: 'test_scalar_and_widen_not_cost'
 ; CHECK:  Cost of 1 for VF 2: EMIT vp<[[VP7:%[0-9]+]]> = not ir<%cmp1>
-; CHECK:  Cost of 1 for VF 2: EMIT vp<[[VP12:%[0-9]+]]> = not vp<[[VP11:%[0-9]+]]>
+; CHECK:  Cost of 1 for VF 2: EMIT-SCALAR vp<[[VP12:%[0-9]+]]> = not vp<[[VP11:%[0-9]+]]>
 ; CHECK:  Cost of 1 for VF 4: EMIT vp<[[VP7]]> = not ir<%cmp1>
-; CHECK:  Cost of 1 for VF 4: EMIT vp<[[VP12]]> = not vp<[[VP11]]>
+; CHECK:  Cost of 1 for VF 4: EMIT-SCALAR vp<[[VP12]]> = not vp<[[VP11]]>
 ; CHECK:  Cost of 1 for VF 8: EMIT vp<[[VP7]]> = not ir<%cmp1>
-; CHECK:  Cost of 1 for VF 8: EMIT vp<[[VP12]]> = not vp<[[VP11]]>
+; CHECK:  Cost of 1 for VF 8: EMIT-SCALAR vp<[[VP12]]> = not vp<[[VP11]]>
 ; CHECK:  Cost of 1 for VF 16: EMIT vp<[[VP7]]> = not ir<%cmp1>
-; CHECK:  Cost of 1 for VF 16: EMIT vp<[[VP12]]> = not vp<[[VP11]]>
+; CHECK:  Cost of 1 for VF 16: EMIT-SCALAR vp<[[VP12]]> = not vp<[[VP11]]>
 ; CHECK:  Cost of 2 for VF 32: EMIT vp<[[VP7]]> = not ir<%cmp1>
-; CHECK:  Cost of 1 for VF 32: EMIT vp<[[VP12]]> = not vp<[[VP11]]>
+; CHECK:  Cost of 1 for VF 32: EMIT-SCALAR vp<[[VP12]]> = not vp<[[VP11]]>
 ; CHECK:  Cost of 4 for VF 64: EMIT vp<[[VP7]]> = not ir<%cmp1>
-; CHECK:  Cost of 1 for VF 64: EMIT vp<[[VP12]]> = not vp<[[VP11]]>
+; CHECK:  Cost of 1 for VF 64: EMIT-SCALAR vp<[[VP12]]> = not vp<[[VP11]]>
 ; CHECK:  Cost of 8 for VF 128: EMIT vp<[[VP7]]> = not ir<%cmp1>
-; CHECK:  Cost of 1 for VF 128: EMIT vp<[[VP12]]> = not vp<[[VP11]]>
-; CHECK:  Cost of 1 for VF 16: EMIT vp<[[VP12]]> = not vp<[[VP11]]>
+; CHECK:  Cost of 1 for VF 128: EMIT-SCALAR vp<[[VP12]]> = not vp<[[VP11]]>
+; CHECK:  Cost of 1 for VF 16: EMIT-SCALAR vp<[[VP12]]> = not vp<[[VP11]]>
 ;
 entry:
   br label %loop
