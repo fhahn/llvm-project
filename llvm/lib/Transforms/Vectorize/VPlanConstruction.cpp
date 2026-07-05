@@ -85,8 +85,11 @@ public:
       : TheLoop(Lp), LI(LI), LVer(LVer),
         Plan(std::make_unique<VPlan>(Lp, IdxTy)) {}
 
-  /// Build plain CFG for TheLoop and connect it to Plan's entry.
-  std::unique_ptr<VPlan> buildPlainCFG();
+  /// Build plain CFG for TheLoop and connect it to Plan's entry. \p
+  /// GetBranchWeights, if set, maps an original IR block to the branch_weights
+  /// recorded on its VPBasicBlock.
+  std::unique_ptr<VPlan>
+  buildPlainCFG(function_ref<MDNode *(const BasicBlock *)> GetBranchWeights);
 };
 } // anonymous namespace
 
@@ -289,7 +292,8 @@ void PlainCFGBuilder::createVPInstructionsForVPBB(VPBasicBlock *VPBB,
 }
 
 // Main interface to build the plain CFG.
-std::unique_ptr<VPlan> PlainCFGBuilder::buildPlainCFG() {
+std::unique_ptr<VPlan> PlainCFGBuilder::buildPlainCFG(
+    function_ref<MDNode *(const BasicBlock *)> GetBranchWeights) {
   VPIRBasicBlock *Entry = cast<VPIRBasicBlock>(Plan->getEntry());
   BB2VPBB[Entry->getIRBasicBlock()] = Entry;
   for (VPIRBasicBlock *ExitVPBB : Plan->getExitBlocks())
@@ -324,6 +328,12 @@ std::unique_ptr<VPlan> PlainCFGBuilder::buildPlainCFG() {
 
     // Create VPInstructions for BB.
     createVPInstructionsForVPBB(VPBB, BB);
+
+    // Record the block's estimated branch weights; they are carried along as
+    // the block is split/cloned to form its replicate region and read back by
+    // the cost model.
+    if (GetBranchWeights)
+      VPBB->setBranchWeights(GetBranchWeights(BB));
 
     // Set VPBB successors. We create empty VPBBs for successors if they don't
     // exist already. Recipes will be created when the successor is visited
@@ -618,9 +628,11 @@ static void printAfterInitialConstruction(VPlan &) {}
 std::unique_ptr<VPlan>
 VPlanTransforms::buildVPlan0(Loop *TheLoop, LoopInfo &LI, Type *InductionTy,
                              PredicatedScalarEvolution &PSE,
-                             LoopVersioning *LVer) {
+                             LoopVersioning *LVer,
+                             function_ref<MDNode *(const BasicBlock *)>
+                                 GetBranchWeights) {
   PlainCFGBuilder Builder(TheLoop, &LI, LVer, InductionTy);
-  std::unique_ptr<VPlan> VPlan0 = Builder.buildPlainCFG();
+  std::unique_ptr<VPlan> VPlan0 = Builder.buildPlainCFG(GetBranchWeights);
   addInitialSkeleton(*VPlan0, InductionTy, PSE, TheLoop);
   simplifyLiveInsWithSCEV(*VPlan0, PSE);
 

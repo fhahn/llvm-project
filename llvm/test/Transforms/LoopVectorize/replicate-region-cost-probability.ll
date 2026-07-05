@@ -103,6 +103,53 @@ exit:
   ret void
 }
 
+; Two adjacent predicated blocks guarded by the same condition are merged into a
+; single replicate region by mergeReplicateRegionsIntoSuccessors. The recipes
+; from the first region are moved into the second, so the surviving region's
+; recorded weights are used to cost all of them. The two blocks are equally
+; likely (identical mask), but here they carry inconsistent estimated weights
+; ({1, 3} -> reciprocal 4 and {1, 99} -> reciprocal 100). The merge keeps the
+; smaller reciprocal (the higher probability), so a recipe moved into the
+; surviving region is never costed as less likely than its own estimate: the
+; predicated sdiv is scaled by 4 (cost 10 / 4 -> 2.5), not by 100 (which would
+; make it look nearly free at 10 / 100 -> 0).
+; CHECK-LABEL: LV: Checking a loop in 'merged_regions_use_conservative_probability'
+; CHECK: Cost of 2.5 for VF 2: REPLICATE ir<%d2> = sdiv ir<%val>, ir<%y>
+define void @merged_regions_use_conservative_probability(ptr noalias %a, ptr noalias %b, i32 %n, i32 %x, i32 %y) {
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i32 [ 0, %entry ], [ %iv.next, %latch ]
+  %gep = getelementptr inbounds i32, ptr %a, i32 %iv
+  %val = load i32, ptr %gep, align 4
+  %cmp = icmp sgt i32 %val, 0
+  br i1 %cmp, label %then1, label %bb1, !prof !1
+
+then1:
+  %d1 = sdiv i32 %val, %x
+  store i32 %d1, ptr %gep, align 4
+  br label %bb1
+
+bb1:
+  br i1 %cmp, label %then2, label %latch, !prof !3
+
+then2:
+  %d2 = sdiv i32 %val, %y
+  %gep.b = getelementptr inbounds i32, ptr %b, i32 %iv
+  store i32 %d2, ptr %gep.b, align 4
+  br label %latch
+
+latch:
+  %iv.next = add nuw nsw i32 %iv, 1
+  %exitcond = icmp eq i32 %iv.next, %n
+  br i1 %exitcond, label %exit, label %loop, !prof !0
+
+exit:
+  ret void
+}
+
 !0 = !{!"branch_weights", i32 1, i32 1000}
 !1 = !{!"branch_weights", i32 1, i32 3}
 !2 = !{!"branch_weights", i32 1, i32 7}
+!3 = !{!"branch_weights", i32 1, i32 99}

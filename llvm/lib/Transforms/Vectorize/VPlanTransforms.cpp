@@ -39,6 +39,7 @@
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/Metadata.h"
+#include "llvm/IR/ProfDataUtils.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/TypeSize.h"
 #include "llvm/Transforms/Utils/LoopUtils.h"
@@ -391,6 +392,16 @@ static bool sinkScalarOperands(VPlan &Plan) {
   return Changed;
 }
 
+/// Returns the reciprocal entry probability encoded in \p BW (the sum of its
+/// branch weights), or 1 if \p BW is null, i.e. the block is treated as always
+/// executed. See VPBasicBlock::BranchWeights.
+static uint64_t getReciprocalFromBranchWeights(MDNode *BW) {
+  uint64_t Total;
+  if (BW && extractProfTotalWeight(BW, Total))
+    return Total;
+  return 1;
+}
+
 /// If \p R is a region with a VPBranchOnMaskRecipe in the entry block, return
 /// the mask.
 static VPValue *getPredicatedMask(VPRegionBlock *R) {
@@ -475,6 +486,16 @@ static bool mergeReplicateRegionsIntoSuccessors(VPlan &Plan) {
     for (VPRecipeBase &ToMove : make_early_inc_range(reverse(*Then1)))
       ToMove.moveBefore(*Then2, Then2->getFirstNonPhi());
 
+    // The regions have identical masks, so both '.if' blocks execute for
+    // exactly the same lanes and are equi-probable; for a consistent profile
+    // their estimated branch weights match. Should they disagree (e.g. from a
+    // self-inconsistent input profile), keep the one with the smaller
+    // reciprocal, i.e. the higher entry probability, so the recipes moved into
+    // Then2 are never costed as less likely than their own estimate.
+    if (getReciprocalFromBranchWeights(Then1->getBranchWeights()) <
+        getReciprocalFromBranchWeights(Then2->getBranchWeights()))
+      Then2->setBranchWeights(Then1->getBranchWeights());
+
     auto *Merge1 = cast<VPBasicBlock>(Then1->getSingleSuccessor());
     auto *Merge2 = cast<VPBasicBlock>(Then2->getSingleSuccessor());
 
@@ -536,6 +557,9 @@ static VPRegionBlock *createReplicateRegion(VPReplicateRecipe *PredRecipe,
       PredRecipe->getDebugLoc());
   auto *Pred =
       Plan.createVPBasicBlock(Twine(RegionName) + ".if", RecipeWithoutMask);
+  // Carry the predicated block's estimated branch weights over to the region's
+  // ".if" block, which now holds the predicated recipe the cost model queries.
+  Pred->setBranchWeights(PredRecipe->getParent()->getBranchWeights());
   auto *Exiting = Plan.createVPBasicBlock(Twine(RegionName) + ".continue");
   VPRegionBlock *Region =
       Plan.createReplicateRegion(Entry, Exiting, RegionName);
@@ -583,6 +607,19 @@ static void addReplicateRegions(VPlan &Plan) {
     VPRegionBlock *ParentRegion = Region->getParent();
     if (ParentRegion && ParentRegion->getExiting() == CurrentBlock)
       ParentRegion->setExiting(SplitBlock);
+  }
+
+  // splitAt propagates a predicated block's branch weights onto the split-off
+  // continuation blocks, but only the replicate regions' ".if" blocks (which
+  // hold the conditionally-executed recipes the cost model scales) should
+  // retain them; every other block now executes unconditionally per iteration.
+  // Clear the stale weights so they don't mislead the cost model or a later
+  // transform emitting them as profile metadata.
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_deep(Plan.getEntry()))) {
+    const VPRegionBlock *ParentRegion = VPBB->getParent();
+    if (!ParentRegion || !ParentRegion->isReplicator())
+      VPBB->setBranchWeights(nullptr);
   }
 }
 
