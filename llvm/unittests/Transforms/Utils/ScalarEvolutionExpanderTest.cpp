@@ -1036,4 +1036,71 @@ TEST_F(ScalarEvolutionExpanderTest, InsertBinopReuseShlWithMatchingFlags) {
   EXPECT_TRUE(ShlInst->hasNoSignedWrap());
 }
 
+// When expanding a ptrtoaddr SCEV and an equivalent ptrtoint of the same
+// pointer already exists but does not dominate the insertion point, the
+// expander should emit a ptrtoint (rather than a ptrtoaddr) so that a later
+// CSE/GVN pass can merge the two. ptrtoint and ptrtoaddr compute the same
+// value here, and no alias-analysis precision is lost because the pointer's
+// provenance is already captured by the pre-existing ptrtoint.
+TEST_F(ScalarEvolutionExpanderTest, ExpandPtrToAddrReusesPtrToInt) {
+  LLVMContext C;
+  SMDiagnostic Err;
+  std::unique_ptr<Module> M = parseAssemblyString(
+      "define i64 @f(ptr %p) { "
+      "entry: "
+      "  br label %next "
+      "next: "
+      "  %pi = ptrtoint ptr %p to i64 "
+      "  ret i64 %pi "
+      "} ",
+      Err, C);
+  assert(M && "Could not parse module?");
+  assert(!verifyModule(*M) && "Must have been well formed!");
+
+  Function *F = M->getFunction("f");
+  ASSERT_NE(F, nullptr) << "Could not find function 'f'";
+
+  ScalarEvolution SE = buildSE(*F);
+  const SCEV *Addr = SE.getPtrToAddrExpr(SE.getSCEV(F->getArg(0)));
+  ASSERT_FALSE(isa<SCEVCouldNotCompute>(Addr));
+
+  // Expand in the entry block, which does not contain (and is dominated by no)
+  // ptrtoint. The pre-existing %pi in %next does not dominate the insertion
+  // point, so it can't be reused directly, but its presence should steer the
+  // expander to emit a ptrtoint.
+  auto *InsertBefore = F->getEntryBlock().getTerminator();
+  SCEVExpander Exp(SE, "expander");
+  auto *I = cast<Instruction>(Exp.expandCodeFor(Addr, nullptr, InsertBefore));
+  EXPECT_EQ(I->getOpcode(), Instruction::PtrToInt)
+      << "Expected ptrtoint to be emitted when an equivalent ptrtoint exists";
+}
+
+// When expanding a ptrtoaddr SCEV and no equivalent ptrtoint of the same
+// pointer exists, the expander should emit a ptrtoaddr, preserving the
+// stronger alias-analysis semantics (ptrtoaddr captures only the address).
+TEST_F(ScalarEvolutionExpanderTest, ExpandPtrToAddrKeepsPtrToAddr) {
+  LLVMContext C;
+  SMDiagnostic Err;
+  std::unique_ptr<Module> M = parseAssemblyString("define i64 @f(ptr %p) { "
+                                                  "entry: "
+                                                  "  ret i64 0 "
+                                                  "} ",
+                                                  Err, C);
+  assert(M && "Could not parse module?");
+  assert(!verifyModule(*M) && "Must have been well formed!");
+
+  Function *F = M->getFunction("f");
+  ASSERT_NE(F, nullptr) << "Could not find function 'f'";
+
+  ScalarEvolution SE = buildSE(*F);
+  const SCEV *Addr = SE.getPtrToAddrExpr(SE.getSCEV(F->getArg(0)));
+  ASSERT_FALSE(isa<SCEVCouldNotCompute>(Addr));
+
+  auto *InsertBefore = F->getEntryBlock().getTerminator();
+  SCEVExpander Exp(SE, "expander");
+  auto *I = cast<Instruction>(Exp.expandCodeFor(Addr, nullptr, InsertBefore));
+  EXPECT_EQ(I->getOpcode(), Instruction::PtrToAddr)
+      << "Expected ptrtoaddr to be kept when no equivalent ptrtoint exists";
+}
+
 } // end namespace llvm
