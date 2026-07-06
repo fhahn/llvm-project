@@ -1249,14 +1249,13 @@ static void recursivelyDeleteDeadRecipes(VPValue *V) {
 /// an intrinsic ID.
 static std::optional<std::pair<bool, unsigned>>
 getOpcodeOrIntrinsicID(const VPSingleDefRecipe *R) {
+  if (Intrinsic::ID IID = vputils::getIntrinsicID(R))
+    return std::make_pair(true, IID);
   return TypeSwitch<const VPSingleDefRecipe *,
                     std::optional<std::pair<bool, unsigned>>>(R)
       .Case<VPInstruction, VPWidenRecipe, VPWidenCastRecipe, VPWidenGEPRecipe,
             VPReplicateRecipe>(
           [](auto *I) { return std::make_pair(false, I->getOpcode()); })
-      .Case([](const VPWidenIntrinsicRecipe *I) {
-        return std::make_pair(true, I->getVectorIntrinsicID());
-      })
       .Case<VPVectorPointerRecipe, VPPredInstPHIRecipe, VPScalarIVStepsRecipe>(
           [](auto *I) {
             // For recipes that do not directly map to LLVM IR instructions,
@@ -1277,6 +1276,19 @@ static VPIRValue *tryToFoldLiveIns(VPSingleDefRecipe &R,
   auto OpcodeOrIID = getOpcodeOrIntrinsicID(&R);
   if (!OpcodeOrIID)
     return nullptr;
+
+  // For recipes carrying an intrinsic ID, only the intrinsic's arguments should
+  // be passed to the folder. Drop any trailing operands that are not arguments
+  // (the intrinsic ID constant or the callee), plus the mask of a predicated
+  // recipe. VPWidenIntrinsicRecipe stores only arguments, so nothing to drop.
+  if (OpcodeOrIID->first) {
+    auto *VPI = dyn_cast<VPInstruction>(&R);
+    if (auto *RepR = dyn_cast<VPReplicateRecipe>(&R))
+      Operands = Operands.take_front(RepR->getNumOperandsWithoutMask() - 1);
+    else if (isa<VPWidenCallRecipe>(&R) ||
+             (VPI && VPI->getOpcode() == Instruction::Call))
+      Operands = Operands.drop_back();
+  }
 
   SmallVector<Value *, 4> Ops;
   for (VPValue *Op : Operands) {
