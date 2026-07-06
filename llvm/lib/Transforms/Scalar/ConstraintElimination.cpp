@@ -52,6 +52,11 @@ using namespace PatternMatch;
 #define DEBUG_TYPE "constraint-elimination"
 
 STATISTIC(NumCondsRemoved, "Number of instructions removed");
+STATISTIC(NumInductionFactsGated,
+          "Number of loops for which induction facts were not derived because "
+          "no comparison consumes them");
+STATISTIC(NumInductionFactsDerived,
+          "Number of loops for which induction facts were derived");
 DEBUG_COUNTER(EliminatedCounter, "conds-eliminated",
               "Controls which conditions are eliminated");
 
@@ -65,6 +70,10 @@ static cl::opt<bool> DumpReproducers(
 
 static int64_t MaxConstraintValue = std::numeric_limits<int64_t>::max();
 static int64_t MinSignedConstraintValue = std::numeric_limits<int64_t>::min();
+
+/// Maximum number of values visited when checking whether a loop induction's
+/// facts have a consuming comparison (see addInfoForInductions).
+static constexpr unsigned MaxInductionConsumerWalk = 64;
 
 static Instruction *getContextInstForUse(Use &U) {
   Instruction *UserI = cast<Instruction>(U.getUser());
@@ -1009,6 +1018,48 @@ void State::addInfoForInductions(BasicBlock &BB) {
   // Make sure the bound B is loop-invariant.
   if (!L->isLoopInvariant(B))
     return;
+
+  // Only derive induction facts if some comparison could actually use them.
+  // Walk the transitive users of the induction and of the loop-invariant bound
+  // (the induction facts relate both) looking for such a comparison. The
+  // loop-controlling counting compare is not itself a useful consumer (it always
+  // exists and simplifying the controlling branch is not the goal), but it does
+  // count when used outside that branch (e.g. merged into a phi). The number of
+  // visited values is bounded so the walk stays cheap even when B is a widely
+  // used value; on hitting the limit we conservatively assume a consumer exists.
+  Instruction *CountingTerm = BB.getTerminator();
+  Value *CountingCmp = CountingTerm->getOperand(0);
+  SmallVector<Value *> Worklist(PN->user_begin(), PN->user_end());
+  if (isa<Instruction, Argument>(B))
+    Worklist.append(B->user_begin(), B->user_end());
+  SmallPtrSet<Value *, 16> Seen;
+  bool HasConsumer = false;
+  while (!Worklist.empty()) {
+    Value *V = Worklist.pop_back_val();
+    if (!Seen.insert(V).second)
+      continue;
+    if (Seen.size() > MaxInductionConsumerWalk) {
+      // Give up and keep the facts rather than spend more time deciding.
+      HasConsumer = true;
+      break;
+    }
+    if (auto *Cmp = dyn_cast<ICmpInst>(V)) {
+      // A comparison other than the counting compare consumes the facts; so does
+      // the counting compare itself if it feeds anything but its own branch.
+      if (Cmp != CountingCmp ||
+          any_of(Cmp->users(),
+                 [CountingTerm](User *U) { return U != CountingTerm; })) {
+        HasConsumer = true;
+        break;
+      }
+    } else if (isa<CastInst, BinaryOperator, GetElementPtrInst>(V))
+      Worklist.append(V->user_begin(), V->user_end());
+  }
+  if (!HasConsumer) {
+    ++NumInductionFactsGated;
+    return;
+  }
+  ++NumInductionFactsDerived;
 
   // Handle negative steps.
   if (StepOffset.isNegative()) {
