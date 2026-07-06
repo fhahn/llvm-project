@@ -516,20 +516,20 @@ define void @diff_check_via_i32_ptrarith(ptr %origin, ptr %dst, ptr %base, i32 %
 ; CHECK-NEXT:    [[CMP:%.*]] = icmp ult i32 [[OP]], [[N]]
 ; CHECK-NEXT:    br i1 [[CMP]], label %[[LOOP_PH:.*]], [[EXIT:label %.*]]
 ; CHECK:       [[LOOP_PH]]:
-; CHECK-NEXT:    [[TMP3:%.*]] = trunc i64 [[LHS]] to i32
 ; CHECK-NEXT:    [[TMP1:%.*]] = trunc i64 [[RHS]] to i32
-; CHECK-NEXT:    [[TMP2:%.*]] = sub i32 [[D]], [[TMP3]]
-; CHECK-NEXT:    [[TMP14:%.*]] = add i32 [[TMP2]], [[TMP1]]
+; CHECK-NEXT:    [[TMP14:%.*]] = add i32 [[D]], [[TMP1]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = add i32 [[TMP14]], -1
-; CHECK-NEXT:    [[TMP5:%.*]] = zext i32 [[TMP4]] to i64
+; CHECK-NEXT:    [[TMP3:%.*]] = trunc i64 [[LHS]] to i32
+; CHECK-NEXT:    [[TMP7:%.*]] = sub i32 [[TMP4]], [[TMP3]]
+; CHECK-NEXT:    [[TMP5:%.*]] = zext i32 [[TMP7]] to i64
 ; CHECK-NEXT:    [[TMP6:%.*]] = add nuw nsw i64 [[TMP5]], 1
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP6]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[TMP12:%.*]] = add i64 [[BASE1]], [[IDX_EXT]]
 ; CHECK-NEXT:    [[TMP13:%.*]] = sub i64 [[LHS]], [[TMP12]]
-; CHECK-NEXT:    [[TMP14:%.*]] = sub i64 [[TMP13]], 1
-; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP14]], 3
+; CHECK-NEXT:    [[TMP9:%.*]] = sub i64 [[TMP13]], 1
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP9]], 3
 ; CHECK-NEXT:    br i1 [[DIFF_CHECK]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
 ;
 entry:
@@ -590,7 +590,8 @@ define void @phi_of_ptrtoint_diff_check(ptr %base, ptr %end, i64 %n, i1 %cond) {
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[N]], [[DST_PTR1]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = sub i64 [[TMP2]], [[DST_INT]]
-; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP5]], 4
+; CHECK-NEXT:    [[TMP6:%.*]] = sub i64 [[TMP5]], 1
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP6]], 3
 ; CHECK-NEXT:    br i1 [[DIFF_CHECK]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
 ;
 entry:
