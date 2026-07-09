@@ -959,22 +959,44 @@ void State::addInfoForInductions(BasicBlock &BB) {
   auto IndValue =
       m_Value(A, m_CombineOr(m_Phi(PN), m_c_Add(m_Phi(PN), m_APInt(IncStep))));
 
-  if (!match(BB.getTerminator(),
-             m_Br(m_c_ICmp(Pred, IndValue, m_Value(B)), m_Value(), m_Value())))
-    return;
-  if (PN->getParent() != &BB || PN->getNumIncomingValues() != 2 ||
-      !SE.isSCEVable(PN->getType()))
-    return;
+  // The counting compare is usually in the header, but it may instead sit in
+  // the latch while the header exits on an unrelated condition (e.g. a bounds
+  // check). Match an EQ/NE counting compare on the header phi in TestBB; only
+  // equality pins the induction's exact exit value.
+  auto TryMatchController = [&](BasicBlock *TestBB) {
+    PN = nullptr;
+    IncStep = nullptr;
+    return match(TestBB->getTerminator(),
+                 m_Br(m_c_ICmp(Pred, IndValue, m_Value(B)), m_Value(),
+                      m_Value())) &&
+           ICmpInst::isEquality(Pred) && PN->getParent() == &BB;
+  };
 
-  BasicBlock *InLoopSucc = nullptr;
-  if (Pred == CmpInst::ICMP_NE)
-    InLoopSucc = cast<CondBrInst>(BB.getTerminator())->getSuccessor(0);
-  else if (Pred == CmpInst::ICMP_EQ)
-    InLoopSucc = cast<CondBrInst>(BB.getTerminator())->getSuccessor(1);
+  BasicBlock *CondBB = nullptr;
+  BasicBlock *Latch = L->getLoopLatch();
+  if (TryMatchController(&BB))
+    CondBB = &BB;
+  else if (Latch && Latch != &BB && TryMatchController(Latch))
+    CondBB = Latch;
   else
     return;
+  bool LatchControlled = CondBB != &BB;
 
-  if (!L->contains(InLoopSucc) || !L->isLoopExiting(&BB) || InLoopSucc == &BB)
+  if (PN->getNumIncomingValues() != 2 || !SE.isSCEVable(PN->getType()))
+    return;
+
+  // The latch-controlled case is only sound when the counting compare is on the
+  // post-increment of the induction (a raw-phi latch compare does not bound the
+  // header value: the header can still equal the bound).
+  if (LatchControlled && !IncStep)
+    return;
+
+  BasicBlock *InLoopSucc =
+      cast<CondBrInst>(CondBB->getTerminator())
+          ->getSuccessor(Pred == CmpInst::ICMP_NE ? 0 : 1);
+
+  if (!L->contains(InLoopSucc) || !L->isLoopExiting(CondBB) ||
+      InLoopSucc == CondBB)
     return;
 
   BasicBlock *LoopPred = L->getLoopPredecessor();
@@ -1113,9 +1135,9 @@ void State::addInfoForInductions(BasicBlock &BB) {
       DTN, CmpInst::ICMP_ULT, PN, B,
       ConditionTy(CmpInst::ICMP_ULE, LowerBound, B)));
 
-  // Try to add condition from header to the dedicated exit blocks. When exiting
-  // either with EQ or NE in the header, we know that the induction value must
-  // be u<= B, as other exits may only exit earlier.
+  // Try to add condition from the controlling block to the dedicated exit
+  // blocks. When exiting either with EQ or NE, we know that the induction value
+  // must be u<= B, as other exits may only exit earlier.
   assert(!StepOffset->isNegative() && "induction must be increasing");
   assert((Pred == CmpInst::ICMP_EQ || Pred == CmpInst::ICMP_NE) &&
          "unsupported predicate");
@@ -1123,8 +1145,11 @@ void State::addInfoForInductions(BasicBlock &BB) {
   SmallVector<BasicBlock *> ExitBBs;
   L->getExitBlocks(ExitBBs);
   for (BasicBlock *EB : ExitBBs) {
-    // Bail out on non-dedicated exits.
-    if (DT.dominates(&BB, EB)) {
+    // Bail out on non-dedicated exits. In the latch-controlled case this keeps
+    // only the exit taken directly from the counting branch (where the
+    // induction equals B); the header's unrelated exit is not dominated by the
+    // latch and stays unconstrained.
+    if (DT.dominates(CondBB, EB)) {
       WorkList.emplace_back(FactOrCheck::getConditionFact(
           DT.getNode(EB), CmpInst::ICMP_ULE, A, B, Precond));
     }
