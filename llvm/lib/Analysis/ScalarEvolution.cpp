@@ -11358,8 +11358,67 @@ bool ScalarEvolution::isKnownViaInduction(CmpPredicate Pred, SCEVUse LHS,
          isLoopEntryGuardedByCond(MDL, Pred, SplitLHS.first, SplitRHS.first);
 }
 
+/// Try to prove \p LHS \p Pred \p RHS by decomposing a min/max expression on
+/// either side into its operands.
+///
+/// A min/max expression is equal to one of its operands, so proving the
+/// predicate for all of them proves it for the whole expression:
+///
+///   minmax(X0, ..., Xn) Pred RHS  if  Xi Pred RHS for all i, and
+///   LHS Pred minmax(Y0, ..., Yn)  if  LHS Pred Yi for all i.
+///
+/// If in addition the min/max signedness matches \p Pred, then
+/// min(X0, ..., Xn) is no greater than each Xi and max(Y0, ..., Yn) no less
+/// than each Yi, so a single operand is sufficient:
+///
+///   min(X0, ..., Xn) Pred RHS  if  Xi Pred RHS for some i, and
+///   LHS Pred max(Y0, ..., Yn)  if  LHS Pred Yi for some i.
+static bool isKnownViaMinMaxDecomposition(ScalarEvolution &SE,
+                                          CmpPredicate Pred, SCEVUse LHS,
+                                          SCEVUse RHS) {
+  if (!isa<SCEVMinMaxExpr>(LHS) && !isa<SCEVMinMaxExpr>(RHS))
+    return false;
+
+  // A samesign flag holds for the original operand pair only, not for the
+  // per-operand sub-queries below, so drop it.
+  CmpInst::Predicate P = Pred.dropSameSign();
+
+  // Normalize the predicate to less-than(-or-equal), so only a min on the LHS
+  // and a max on the RHS need the "for some i" rules.
+  if (ICmpInst::isGT(P) || ICmpInst::isGE(P)) {
+    std::swap(LHS, RHS);
+    P = ICmpInst::getSwappedPredicate(P);
+  }
+  if (!ICmpInst::isLT(P) && !ICmpInst::isLE(P))
+    return false;
+
+  bool IsSigned = ICmpInst::isSigned(P);
+  if (const auto *MinMax = dyn_cast<SCEVMinMaxExpr>(LHS)) {
+    auto Holds = [&](SCEVUse Op) { return SE.isKnownPredicate(P, Op, RHS); };
+    bool IsMatchingMin =
+        IsSigned ? isa<SCEVSMinExpr>(MinMax) : isa<SCEVUMinExpr>(MinMax);
+    if (IsMatchingMin ? any_of(MinMax->operands(), Holds)
+                      : all_of(MinMax->operands(), Holds))
+      return true;
+  }
+  if (const auto *MinMax = dyn_cast<SCEVMinMaxExpr>(RHS)) {
+    auto Holds = [&](SCEVUse Op) { return SE.isKnownPredicate(P, LHS, Op); };
+    bool IsMatchingMax =
+        IsSigned ? isa<SCEVSMaxExpr>(MinMax) : isa<SCEVUMaxExpr>(MinMax);
+    if (IsMatchingMax ? any_of(MinMax->operands(), Holds)
+                      : all_of(MinMax->operands(), Holds))
+      return true;
+  }
+  return false;
+}
+
 bool ScalarEvolution::isKnownPredicate(CmpPredicate Pred, SCEVUse LHS,
                                        SCEVUse RHS) {
+  // Try to prove the predicate by decomposing a min/max expression before
+  // canonicalizing the operands, which may hide the min/max structure.
+  if (isKnownViaMinMaxDecomposition(*this, Pred, LHS, RHS))
+    return true;
+
   // Canonicalize the inputs first.
   (void)SimplifyICmpOperands(Pred, LHS, RHS);
 
@@ -12880,29 +12939,6 @@ static bool IsKnownPredicateViaMinOrMax(ScalarEvolution &SE, CmpPredicate Pred,
         IsMinMaxConsistingOf<SCEVUMinExpr>(LHS, RHS) ||
         // A <= max(A, ...)
         IsMinMaxConsistingOf<SCEVUMaxExpr>(RHS, LHS);
-
-  case ICmpInst::ICMP_UGT:
-    std::swap(LHS, RHS);
-    [[fallthrough]];
-  case ICmpInst::ICMP_ULT:
-    // umin(Ops) u<= each Op, so proving Op u< RHS for any Op proves
-    // umin(Ops) u< RHS.
-    //
-    // Use computeConstantDifference instead of the more powerful
-    // isKnownPredicate to keep this check cheap: isKnownPredicateViaMinOrMax
-    // is called from isKnownViaNonRecursiveReasoning, so recursing into
-    // the full predicate prover would be expensive.
-    if (const auto *Min = dyn_cast<SCEVUMinExpr>(LHS)) {
-      for (SCEVUse Op : Min->operands()) {
-        std::optional<APInt> Diff = SE.computeConstantDifference(RHS, Op);
-        // When Op and RHS share a common base differing by a
-        // constant offset D (RHS - Op = D), Op u< RHS holds iff D != 0 and
-        // RHS >= D (unsigned), i.e. the subtraction doesn't underflow.
-        if (Diff && !Diff->isZero() && SE.getUnsignedRangeMin(RHS).uge(*Diff))
-          return true;
-      }
-    }
-    return false;
   }
 
   llvm_unreachable("covered switch fell through?!");
