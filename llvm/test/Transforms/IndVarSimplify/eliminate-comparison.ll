@@ -1151,55 +1151,48 @@ exit:
 ; %guard is equivalent to %iv slt smin(%n, 49), which needs
 ; isKnownPredicateViaMinMaxDecomposition to take the smin apart into %n and 49
 ; and then isKnownViaInduction to prove %iv slt %n from the assume and the
-; backedge condition. Proving it lets indvars fold %guard (renamed below to
-; the loop's other canonicalized exit test) to a constant.
-;
-; FIXME: isKnownPredicateViaMinMaxDecomposition's per-operand sub-query only
-; tries isKnownViaNonRecursiveReasoning, which does not include
-; isKnownViaInduction, so the exit test below is only canonicalized, not
-; folded to a constant.
-define void @func_29(i32 %n) {
-; CHECK-LABEL: @func_29(
+; backedge condition. Proving it lets indvars fold %guard to a constant.
+define void @smin_bound_requires_induction(i32 %n) {
+; CHECK-LABEL: @smin_bound_requires_induction(
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[POS:%.*]] = icmp sgt i32 [[N:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[POS]])
 ; CHECK-NEXT:    [[BOUND:%.*]] = call i32 @llvm.smin.i32(i32 [[N]], i32 49)
-; CHECK-NEXT:    br label [[LOOP:%.*]]
-; CHECK:       loop:
-; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ 0, [[ENTRY:%.*]] ], [ [[IV_INC:%.*]], [[BE:%.*]] ]
-; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp ne i32 [[IV]], [[BOUND]]
-; CHECK-NEXT:    br i1 [[EXITCOND]], label [[STAY:%.*]], label [[LEAVE:%.*]]
-; CHECK:       stay:
+; CHECK-NEXT:    br label [[LOOP_HEADER:%.*]]
+; CHECK:       loop.header:
+; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ 0, [[ENTRY:%.*]] ], [ [[IV_INC:%.*]], [[LOOP_LATCH:%.*]] ]
+; CHECK-NEXT:    br i1 true, label [[LOOP_BODY:%.*]], label [[LOOP_EXIT:%.*]]
+; CHECK:       loop.body:
 ; CHECK-NEXT:    call void @side_effect()
-; CHECK-NEXT:    br label [[BE]]
-; CHECK:       be:
+; CHECK-NEXT:    br label [[LOOP_LATCH]]
+; CHECK:       loop.latch:
 ; CHECK-NEXT:    [[IV_INC]] = add nuw nsw i32 [[IV]], 1
-; CHECK-NEXT:    [[EXITCOND1:%.*]] = icmp ne i32 [[IV_INC]], [[BOUND]]
-; CHECK-NEXT:    br i1 [[EXITCOND1]], label [[LOOP]], label [[LEAVE]]
-; CHECK:       leave:
+; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp ne i32 [[IV_INC]], [[BOUND]]
+; CHECK-NEXT:    br i1 [[EXITCOND]], label [[LOOP_HEADER]], label [[LOOP_EXIT]]
+; CHECK:       loop.exit:
 ; CHECK-NEXT:    ret void
 ;
 entry:
   %pos = icmp sgt i32 %n, 0
   call void @llvm.assume(i1 %pos)
   %bound = call i32 @llvm.smin.i32(i32 %n, i32 49)
-  br label %loop
+  br label %loop.header
 
-loop:
-  %iv = phi i32 [ 0, %entry ], [ %iv.inc, %be ]
+loop.header:
+  %iv = phi i32 [ 0, %entry ], [ %iv.inc, %loop.latch ]
   %guard = icmp slt i32 %iv, %bound
-  br i1 %guard, label %stay, label %leave
+  br i1 %guard, label %loop.body, label %loop.exit
 
-stay:
+loop.body:
   call void @side_effect()
-  br label %be
+  br label %loop.latch
 
-be:
+loop.latch:
   %iv.inc = add i32 %iv, 1
   %be.cond = icmp slt i32 %iv.inc, %bound
-  br i1 %be.cond, label %loop, label %leave
+  br i1 %be.cond, label %loop.header, label %loop.exit
 
-leave:
+loop.exit:
   ret void
 }
 
