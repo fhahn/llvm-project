@@ -27,18 +27,18 @@ define void @cast_flags_mixed(ptr noalias %A, ptr noalias %B) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION nsw ir<0>, ir<1>, vp<[[VP0]]>, vp<[[VP5]]>, vp<%step.add>
-; CHECK-NEXT:      vp<[[VP8:%[0-9]+]]> = WIDEN-INDUCTION nuw ir<0>, ir<1>, vp<[[VP0]]>, vp<[[VP6]]>, vp<%step.add>.1
+; CHECK-NEXT:      vp<[[VP9:%[0-9]+]]> = WIDEN-INDUCTION nuw ir<0>, ir<1>, vp<[[VP0]]>, vp<[[VP6]]>, vp<%step.add>.1
 ; CHECK-NEXT:      EMIT vp<%step.add> = add nsw ir<%iv>, vp<[[VP5]]>
-; CHECK-NEXT:      EMIT vp<%step.add>.1 = add nuw vp<[[VP8]]>, vp<[[VP6]]>
-; CHECK-NEXT:      EMIT vp<[[VP9:%[0-9]+]]> = icmp ule vp<[[VP8]]>, vp<[[VP3]]>
-; CHECK-NEXT:      EMIT vp<[[VP10:%[0-9]+]]> = icmp ule vp<%step.add>.1, vp<[[VP3]]>
+; CHECK-NEXT:      EMIT vp<%step.add>.1 = add nuw vp<[[VP9]]>, vp<[[VP6]]>
+; CHECK-NEXT:      EMIT vp<[[VP10:%[0-9]+]]> = icmp ule vp<[[VP9]]>, vp<[[VP3]]>
+; CHECK-NEXT:      EMIT vp<[[VP11:%[0-9]+]]> = icmp ule vp<%step.add>.1, vp<[[VP3]]>
 ; CHECK-NEXT:      WIDEN-CAST ir<%sext.plain> = sext ir<%iv> to i64
 ; CHECK-NEXT:      WIDEN-CAST ir<%sext.plain>.1 = sext vp<%step.add> to i64
 ; CHECK-NEXT:    Successor(s): pred.store
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    <xVFxUF> pred.store: {
 ; CHECK-NEXT:      pred.store.entry:
-; CHECK-NEXT:        BRANCH-ON-MASK vp<[[VP9]]>
+; CHECK-NEXT:        BRANCH-ON-MASK vp<[[VP10]]>
 ; CHECK-NEXT:      Successor(s): pred.store.if, pred.store.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.store.if:
@@ -53,7 +53,7 @@ define void @cast_flags_mixed(ptr noalias %A, ptr noalias %B) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    <xVFxUF> pred.store: {
 ; CHECK-NEXT:      pred.store.entry:
-; CHECK-NEXT:        BRANCH-ON-MASK vp<[[VP10]]>
+; CHECK-NEXT:        BRANCH-ON-MASK vp<[[VP11]]>
 ; CHECK-NEXT:      Successor(s): pred.store.if, pred.store.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.store.if:
@@ -117,11 +117,11 @@ define void @cast_flags_single(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:  vp<[[VP6:%[0-9]+]]> = CANONICAL-IV
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
-; CHECK-NEXT:      vp<[[VP7:%[0-9]+]]> = WIDEN-INDUCTION nuw ir<0>, ir<1>, vp<[[VP0]]>, vp<[[VP5]]>, vp<%step.add>
-; CHECK-NEXT:      EMIT vp<%step.add> = add nuw vp<[[VP7]]>, vp<[[VP5]]>
-; CHECK-NEXT:      vp<[[VP8:%[0-9]+]]> = DERIVED-IV ir<0> + vp<[[VP6]]> * ir<1>
-; CHECK-NEXT:      EMIT vp<[[VP9:%[0-9]+]]> = icmp ule vp<[[VP7]]>, vp<[[VP3]]>
+; CHECK-NEXT:      vp<[[VP8:%[0-9]+]]> = WIDEN-INDUCTION nuw ir<0>, ir<1>, vp<[[VP0]]>, vp<[[VP5]]>, vp<%step.add>
+; CHECK-NEXT:      EMIT vp<%step.add> = add nuw vp<[[VP8]]>, vp<[[VP5]]>
+; CHECK-NEXT:      EMIT vp<[[VP9:%[0-9]+]]> = icmp ule vp<[[VP8]]>, vp<[[VP3]]>
 ; CHECK-NEXT:      EMIT vp<[[VP10:%[0-9]+]]> = icmp ule vp<%step.add>, vp<[[VP3]]>
+; CHECK-NEXT:      vp<[[VP11:%[0-9]+]]> = DERIVED-IV ir<0> + vp<[[VP6]]> * ir<1>
 ; CHECK-NEXT:    Successor(s): pred.store
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    <xVFxUF> pred.store: {
@@ -130,11 +130,11 @@ define void @cast_flags_single(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:      Successor(s): pred.store.if, pred.store.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.store.if:
-; CHECK-NEXT:        vp<[[VP11:%[0-9]+]]> = SCALAR-STEPS vp<[[VP8]]>, ir<1>, vp<[[VP0]]>
-; CHECK-NEXT:        REPLICATE ir<%gep.a> = getelementptr ir<%A>, vp<[[VP11]]>
+; CHECK-NEXT:        vp<[[VP12:%[0-9]+]]> = SCALAR-STEPS vp<[[VP11]]>, ir<1>, vp<[[VP0]]>
+; CHECK-NEXT:        REPLICATE ir<%gep.a> = getelementptr ir<%A>, vp<[[VP12]]>
 ; CHECK-NEXT:        REPLICATE store ir<3>, ir<%gep.a>
 ; CHECK-NEXT:        REPLICATE store ir<3>, ir<%gep.a>
-; CHECK-NEXT:        REPLICATE ir<%gep.b> = getelementptr ir<%B>, vp<[[VP11]]>
+; CHECK-NEXT:        REPLICATE ir<%gep.b> = getelementptr ir<%B>, vp<[[VP12]]>
 ; CHECK-NEXT:        REPLICATE store ir<3>, ir<%gep.b>
 ; CHECK-NEXT:      Successor(s): pred.store.continue
 ; CHECK-EMPTY:
@@ -149,12 +149,12 @@ define void @cast_flags_single(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:      Successor(s): pred.store.if, pred.store.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.store.if:
-; CHECK-NEXT:        EMIT-SCALAR vp<[[VP12:%[0-9]+]]> = trunc vp<[[VP0]]> to i16
-; CHECK-NEXT:        vp<[[VP13:%[0-9]+]]> = SCALAR-STEPS vp<[[VP8]]>, ir<1>, vp<[[VP0]]>, vp<[[VP12]]>
-; CHECK-NEXT:        REPLICATE ir<%gep.a>.1 = getelementptr ir<%A>, vp<[[VP13]]>
+; CHECK-NEXT:        EMIT-SCALAR vp<[[VP13:%[0-9]+]]> = trunc vp<[[VP0]]> to i16
+; CHECK-NEXT:        vp<[[VP14:%[0-9]+]]> = SCALAR-STEPS vp<[[VP11]]>, ir<1>, vp<[[VP0]]>, vp<[[VP13]]>
+; CHECK-NEXT:        REPLICATE ir<%gep.a>.1 = getelementptr ir<%A>, vp<[[VP14]]>
 ; CHECK-NEXT:        REPLICATE store ir<3>, ir<%gep.a>.1
 ; CHECK-NEXT:        REPLICATE store ir<3>, ir<%gep.a>.1
-; CHECK-NEXT:        REPLICATE ir<%gep.b>.1 = getelementptr ir<%B>, vp<[[VP13]]>
+; CHECK-NEXT:        REPLICATE ir<%gep.b>.1 = getelementptr ir<%B>, vp<[[VP14]]>
 ; CHECK-NEXT:        REPLICATE store ir<3>, ir<%gep.b>.1
 ; CHECK-NEXT:      Successor(s): pred.store.continue
 ; CHECK-EMPTY:
