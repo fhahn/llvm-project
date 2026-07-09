@@ -1205,27 +1205,17 @@ void State::addInfoForInductions(BasicBlock &BB) {
       return;
   }
 
-  // AR may wrap. Add PN >= StartValue conditional on StartValue <= B which
-  // guarantees that the loop exits before wrapping in combination with the
-  // restrictions on B and the step above.
-  if (!MonotonicallyIncreasingUnsigned)
-    WorkList.push_back(FactOrCheck::getConditionFact(
-        DTN, CmpInst::ICMP_UGE, PN, StartValue,
-        ConditionTy(CmpInst::ICMP_ULE, StartValue, B)));
-  if (!MonotonicallyIncreasingSigned)
-    WorkList.push_back(FactOrCheck::getConditionFact(
-        DTN, CmpInst::ICMP_SGE, PN, StartValue,
-        ConditionTy(CmpInst::ICMP_SLE, StartValue, B)));
-
-  // When the counting compare is on the post-increment PN + Step, the loop
-  // exits once PN reaches B - Step. Bounding PN < B is then only sound when the
-  // loop is guaranteed to run at least one iteration, i.e. StartValue + Step <=
-  // B. This also rejects the degenerate B == StartValue case, where the
-  // post-increment compare would never match on the first iteration and the loop
-  // would not exit through it (so PN could grow past B). Materialize
-  // StartValue + Step as the precondition operand; only handle a constant start
-  // to keep this cheap, and require the addition to not overflow in the relevant
-  // signedness so the materialized bound is exact.
+  // The "may wrap" facts below hold only when the loop is guaranteed to exit
+  // before the induction wraps. When the counting compare is on the
+  // post-increment PN + Step, the loop exits once PN reaches B - Step, so the
+  // induction stays in [StartValue, B - Step] only if the loop runs at least one
+  // iteration, i.e. StartValue + Step <= B. (This also rejects the degenerate
+  // B == StartValue case, where the post-increment compare never matches on the
+  // first iteration and PN can grow past B.) Materialize StartValue + Step as
+  // the precondition operand; only handle a constant start to keep this cheap,
+  // and require the addition to not overflow in the relevant signedness so the
+  // materialized bound is exact. For the raw-phi header case (ComparesIncrement
+  // == false) the loop exits at PN == B and the lower bound is just StartValue.
   ConstantInt *StartC =
       ComparesIncrement ? dyn_cast<ConstantInt>(StartValue) : nullptr;
   if (ComparesIncrement && !StartC)
@@ -1240,12 +1230,30 @@ void State::addInfoForInductions(BasicBlock &BB) {
       return nullptr;
     return ConstantInt::get(StartValue->getType(), Sum);
   };
-
   Value *ULo = FirstBackedgeVal(/*Signed=*/false);
+  Value *SLo = FirstBackedgeVal(/*Signed=*/true);
+
+  // AR may wrap. Add PN >= StartValue conditional on the first backedge value
+  // being <= B, which guarantees that the loop exits before wrapping in
+  // combination with the restrictions on B and the step above. Using the weaker
+  // StartValue <= B here would be unsound in the post-increment case: the loop
+  // then exits at PN == B - Step, so with StartValue == B (Step > 0) PN wraps
+  // all the way around and PN >= StartValue no longer holds.
+  if (!MonotonicallyIncreasingUnsigned && ULo)
+    WorkList.push_back(FactOrCheck::getConditionFact(
+        DTN, CmpInst::ICMP_UGE, PN, StartValue,
+        ConditionTy(CmpInst::ICMP_ULE, ULo, B)));
+  if (!MonotonicallyIncreasingSigned && SLo)
+    WorkList.push_back(FactOrCheck::getConditionFact(
+        DTN, CmpInst::ICMP_SGE, PN, StartValue,
+        ConditionTy(CmpInst::ICMP_SLE, SLo, B)));
+
+  // Bounding PN < B holds under the same precondition (the loop runs at least
+  // one iteration).
   if (ULo)
     WorkList.push_back(FactOrCheck::getConditionFact(
         DTN, CmpInst::ICMP_ULT, PN, B, ConditionTy(CmpInst::ICMP_ULE, ULo, B)));
-  if (Value *SLo = FirstBackedgeVal(/*Signed=*/true))
+  if (SLo)
     WorkList.push_back(FactOrCheck::getConditionFact(
         DTN, CmpInst::ICMP_SLT, PN, B,
         ConditionTy(CmpInst::ICMP_SLE, SLo, B)));

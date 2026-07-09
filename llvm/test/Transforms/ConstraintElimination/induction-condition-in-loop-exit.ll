@@ -1056,8 +1056,7 @@ define i1 @latch_counted_bound_consumer_not_folded(ptr %s, i64 %n) {
 ; CHECK-NEXT:    br i1 [[EXITCOND_NOT]], label %[[EXIT:.*]], label %[[LOOP_HEADER]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    [[SUB:%.*]] = add i64 [[N]], -1
-; CHECK-NEXT:    [[CMP_NOT:%.*]] = icmp eq i64 [[SUB]], 0
-; CHECK-NEXT:    ret i1 [[CMP_NOT]]
+; CHECK-NEXT:    ret i1 false
 ;
 entry:
   br label %loop.header
@@ -1077,4 +1076,124 @@ exit:
   %sub = add i64 %n, -1
   %cmp.not = icmp eq i64 %sub, 0
   ret i1 %cmp.not
+}
+
+; The post-increment counting compare (iv.next == 0) makes the loop exit when
+; iv reaches -1/UINT8_MAX, i.e. iv sweeps the whole i8 range 0..255. With no
+; wrap flags on the increment the induction genuinely wraps the signed boundary,
+; so the header fact `iv s>= start(0)` does NOT hold: `icmp slt i8 %iv, 0` is
+; true for iv in [128, 255] and must not be folded. Regression test for an
+; unsound signed lower-bound fact whose precondition (start s<= B) ignored the
+; post-increment step.
+define void @latch_postinc_no_wrap_signed_lower_bound(ptr %p) {
+; CHECK-LABEL: define void @latch_postinc_no_wrap_signed_lower_bound(
+; CHECK-SAME: ptr [[P:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LATCH:.*]] ]
+; CHECK-NEXT:    [[NEG:%.*]] = icmp slt i8 [[IV]], 0
+; CHECK-NEXT:    [[Z:%.*]] = zext i1 [[NEG]] to i8
+; CHECK-NEXT:    store i8 [[Z]], ptr [[P]], align 1
+; CHECK-NEXT:    br label %[[LATCH]]
+; CHECK:       [[LATCH]]:
+; CHECK-NEXT:    [[IV_NEXT]] = add i8 [[IV]], 1
+; CHECK-NEXT:    [[DONE:%.*]] = icmp eq i8 [[IV_NEXT]], 0
+; CHECK-NEXT:    br i1 [[DONE]], label %[[EXIT:.*]], label %[[LOOP]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %loop
+loop:
+  %iv = phi i8 [ 0, %entry ], [ %iv.next, %latch ]
+  %neg = icmp slt i8 %iv, 0
+  %z = zext i1 %neg to i8
+  store i8 %z, ptr %p, align 1
+  br label %latch
+latch:
+  %iv.next = add i8 %iv, 1
+  %done = icmp eq i8 %iv.next, 0
+  br i1 %done, label %exit, label %loop
+exit:
+  ret void
+}
+
+; Unsigned analog: for (i8 iv = 100; ++iv != 100;) sweeps iv through 100..255
+; then wraps to 0..99, so `icmp ult i8 %iv, 100` is true for iv in [0, 99] and
+; must not be folded. Here start == B == 100, so start u<= B holds but the loop
+; still wraps -- the precondition must be start + step u<= B instead.
+define void @latch_postinc_no_wrap_unsigned_lower_bound(ptr %p) {
+; CHECK-LABEL: define void @latch_postinc_no_wrap_unsigned_lower_bound(
+; CHECK-SAME: ptr [[P:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i8 [ 100, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LATCH:.*]] ]
+; CHECK-NEXT:    [[LT:%.*]] = icmp ult i8 [[IV]], 100
+; CHECK-NEXT:    [[Z:%.*]] = zext i1 [[LT]] to i8
+; CHECK-NEXT:    store i8 [[Z]], ptr [[P]], align 1
+; CHECK-NEXT:    br label %[[LATCH]]
+; CHECK:       [[LATCH]]:
+; CHECK-NEXT:    [[IV_NEXT]] = add i8 [[IV]], 1
+; CHECK-NEXT:    [[DONE:%.*]] = icmp eq i8 [[IV_NEXT]], 100
+; CHECK-NEXT:    br i1 [[DONE]], label %[[EXIT:.*]], label %[[LOOP]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i8 [ 100, %entry ], [ %iv.next, %latch ]
+  %lt = icmp ult i8 %iv, 100
+  %z = zext i1 %lt to i8
+  store i8 %z, ptr %p, align 1
+  br label %latch
+
+latch:
+  %iv.next = add i8 %iv, 1
+  %done = icmp eq i8 %iv.next, 100
+  br i1 %done, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; With nuw on the increment the induction cannot wrap, so the unsigned lower
+; bound `iv u>= start` IS sound and the redundant check folds. Guards that the
+; fix only tightened the wrap-permitting case.
+define void @latch_postinc_nuw_unsigned_lower_bound_folds(ptr %p) {
+; CHECK-LABEL: define void @latch_postinc_nuw_unsigned_lower_bound_folds(
+; CHECK-SAME: ptr [[P:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i8 [ 100, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LATCH:.*]] ]
+; CHECK-NEXT:    [[Z:%.*]] = zext i1 false to i8
+; CHECK-NEXT:    store i8 [[Z]], ptr [[P]], align 1
+; CHECK-NEXT:    br label %[[LATCH]]
+; CHECK:       [[LATCH]]:
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw i8 [[IV]], 1
+; CHECK-NEXT:    br i1 false, label %[[EXIT:.*]], label %[[LOOP]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i8 [ 100, %entry ], [ %iv.next, %latch ]
+  %lt = icmp ult i8 %iv, 100
+  %z = zext i1 %lt to i8
+  store i8 %z, ptr %p, align 1
+  br label %latch
+
+latch:
+  %iv.next = add nuw i8 %iv, 1
+  %done = icmp eq i8 %iv.next, 100
+  br i1 %done, label %exit, label %loop
+
+exit:
+  ret void
 }
