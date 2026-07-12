@@ -3489,9 +3489,13 @@ void VPReductionEVLRecipe::execute(VPTransformState &State) {
     if (RecurrenceDescriptor::isMinMaxRecurrenceKind(Kind))
       NewRed = createMinMaxOp(Builder, Kind, NewRed, Prev);
     else
+      // Match the operand order of the non-EVL in-loop path
+      // (VPReductionRecipe::execute): the previous accumulator is the first
+      // operand. This is required for non-commutative recurrences (e.g. Sub),
+      // where (NewRed, Prev) would compute the negated result.
       NewRed = Builder.CreateBinOp(
-          (Instruction::BinaryOps)RecurrenceDescriptor::getOpcode(Kind), NewRed,
-          Prev);
+          (Instruction::BinaryOps)RecurrenceDescriptor::getOpcode(Kind), Prev,
+          NewRed);
   }
   State.set(this, NewRed, !isPartialReduction());
 }
