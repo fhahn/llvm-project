@@ -5634,11 +5634,15 @@ static bool areVFParamsOk(const VFInfo &Info, ArrayRef<VPValue *> Args,
     case VFParamKind::Vector:
     case VFParamKind::GlobalPredicate:
       return true;
-    case VFParamKind::OMP_Uniform:
-      return SE->isSCEVable(Args[Param.ParamPos]->getScalarType()) &&
-             SE->isLoopInvariant(
-                 vputils::getSCEVExprForVPValue(Args[Param.ParamPos], PSE, L),
-                 L);
+    case VFParamKind::OMP_Uniform: {
+      if (!SE->isSCEVable(Args[Param.ParamPos]->getScalarType()))
+        return false;
+      // getSCEVExprForVPValue may return SCEVCouldNotCompute (e.g. for a
+      // loop-varying value such as a widened load); isLoopInvariant asserts on
+      // it, so guard the query. A non-computable SCEV is not loop-invariant.
+      const SCEV *S = vputils::getSCEVExprForVPValue(Args[Param.ParamPos], PSE, L);
+      return !isa<SCEVCouldNotCompute>(S) && SE->isLoopInvariant(S, L);
+    }
     case VFParamKind::OMP_Linear:
       return match(vputils::getSCEVExprForVPValue(Args[Param.ParamPos], PSE, L),
                    m_scev_AffineAddRec(
