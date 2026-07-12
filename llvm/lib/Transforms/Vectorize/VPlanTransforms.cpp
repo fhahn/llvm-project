@@ -4932,7 +4932,11 @@ static void transformToPartialReduction(const VPPartialReductionChain &Chain,
       Chain.Blend ? cast<VPValue>(Chain.Blend) : cast<VPValue>(WidenRecipe);
 
   VPValue *Cond = nullptr;
-  VPValue *ExitValue = cast_or_null<VPInstruction>(
+  // The select feeding a predicated reduction chain may be a widened select
+  // (a VPWidenRecipe), not a VPInstruction (e.g. one introduced by
+  // tail-folding). Match any single-def recipe, mirroring the sibling
+  // findUserOf calls; casting narrowly to VPInstruction would assert.
+  VPValue *ExitValue = dyn_cast_or_null<VPSingleDefRecipe>(
       findUserOf(ExitSearch, m_Select(m_VPValue(Cond), m_Specific(ExitSearch),
                                       m_Specific(RdxPhi))));
 
@@ -4964,7 +4968,29 @@ static void transformToPartialReduction(const VPPartialReductionChain &Chain,
                                  : FastMathFlags(),
       WidenRecipe->getUnderlyingInstr(), Accumulator, ExtendedOp, Cond,
       RdxUnordered{/*VFScaleFactor=*/Chain.ScaleFactor});
-  PartialRed->insertBefore(WidenRecipe);
+  // The reduction consumes Cond. For a data-conditional chain (a plain select,
+  // no Blend) Cond is the select's condition, which may be defined after
+  // WidenRecipe; inserting the new recipe before WidenRecipe would then be a
+  // use-before-def. In that case anchor it at the select (ExitValue), which is
+  // dominated by both Cond and WidenRecipe. Otherwise (Cond dominates
+  // WidenRecipe, e.g. a header/tail-fold mask, or no Cond) keep the original
+  // insertion point before WidenRecipe, which the Blend case also relies on.
+  VPRecipeBase *InsertPt = WidenRecipe;
+  if (ExitValue && !Chain.Blend && Cond) {
+    VPRecipeBase *CondR = Cond->getDefiningRecipe();
+    // Cond is defined after WidenRecipe only when it is a recipe in the same
+    // block that follows WidenRecipe (scanning from just after WidenRecipe).
+    if (CondR && CondR->getParent() == WidenRecipe->getParent()) {
+      for (VPRecipeBase &R : make_range(std::next(WidenRecipe->getIterator()),
+                                        WidenRecipe->getParent()->end())) {
+        if (&R == CondR) {
+          InsertPt = ExitValue->getDefiningRecipe();
+          break;
+        }
+      }
+    }
+  }
+  PartialRed->insertBefore(InsertPt);
 
   if (ExitValue)
     ExitValue->replaceAllUsesWith(PartialRed);
@@ -4974,7 +5000,7 @@ static void transformToPartialReduction(const VPPartialReductionChain &Chain,
 
   // For cost-model purposes, fold this into a VPExpression.
   VPExpressionRecipe *E = createPartialReductionExpression(PartialRed);
-  E->insertBefore(WidenRecipe);
+  E->insertBefore(InsertPt);
   PartialRed->replaceAllUsesWith(E);
 
   // We only need to update the PHI node once, which is when we find the
