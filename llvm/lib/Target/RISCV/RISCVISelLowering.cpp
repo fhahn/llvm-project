@@ -2148,7 +2148,12 @@ bool RISCVTargetLowering::shouldExpandGetVectorLength(EVT TripCountVT,
 }
 
 bool RISCVTargetLowering::shouldExpandCttzElements(EVT VT) const {
-  return !Subtarget.hasVInstructions() ||
+  // A non-vector type (including the unknown/Other type produced by
+  // getValueType(..., AllowUnknown=true) for a type-based cost query on an
+  // illegal vector, e.g. an over-wide scalable predicate) cannot use the
+  // native VFIRST_M sequence, so it must be expanded. Guard the vector-element
+  // query so it is not run on a scalar EVT.
+  return !Subtarget.hasVInstructions() || !VT.isVector() ||
          VT.getVectorElementType() != MVT::i1 || !isTypeLegal(VT);
 }
 
