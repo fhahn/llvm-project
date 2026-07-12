@@ -3269,7 +3269,10 @@ void VPVectorPointerRecipe::execute(VPTransformState &State) {
   Value *Offset = State.get(getVFxPart(), true);
   // TODO: Expand to VPInstruction to support constant folding.
   if (!match(getStride(), m_One())) {
-    Value *Stride = Builder.CreateZExtOrTrunc(State.get(getStride(), true),
+    // The stride is a signed byte stride (negative for a downward access), so
+    // extend it as a signed value; a zero-extension would turn a negative
+    // stride narrower than the offset type into a large positive one.
+    Value *Stride = Builder.CreateSExtOrTrunc(State.get(getStride(), true),
                                               Offset->getType());
     Offset = Builder.CreateMul(Offset, Stride);
   }
