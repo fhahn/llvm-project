@@ -88,7 +88,7 @@ define void @reduction_intermediate_store(ptr %a, i64 %n, i32 %start, ptr %addr)
 ; IF-EVL-INLOOP-NEXT:    [[TMP19:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[EVL_BASED_IV]]
 ; IF-EVL-INLOOP-NEXT:    [[VP_OP_LOAD:%.*]] = call <vscale x 4 x i32> @llvm.vp.load.nxv4i32.p0(ptr align 4 [[TMP19]], <vscale x 4 x i1> splat (i1 true), i32 [[TMP14]]), !alias.scope [[META0:![0-9]+]]
 ; IF-EVL-INLOOP-NEXT:    [[TMP21:%.*]] = call i32 @llvm.vp.reduce.add.nxv4i32(i32 0, <vscale x 4 x i32> [[VP_OP_LOAD]], <vscale x 4 x i1> splat (i1 true), i32 [[TMP14]])
-; IF-EVL-INLOOP-NEXT:    [[TMP22]] = add i32 [[TMP21]], [[VEC_PHI]]
+; IF-EVL-INLOOP-NEXT:    [[TMP22]] = add i32 [[VEC_PHI]], [[TMP21]]
 ; IF-EVL-INLOOP-NEXT:    [[TMP23:%.*]] = zext i32 [[TMP14]] to i64
 ; IF-EVL-INLOOP-NEXT:    [[INDEX_EVL_NEXT]] = add i64 [[TMP23]], [[EVL_BASED_IV]]
 ; IF-EVL-INLOOP-NEXT:    [[AVL_NEXT]] = sub nuw i64 [[TMP13]], [[TMP23]]
