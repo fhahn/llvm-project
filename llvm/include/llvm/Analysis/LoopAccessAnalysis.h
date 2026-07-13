@@ -979,6 +979,18 @@ LLVM_ABI std::pair<const SCEV *, const SCEV *> getStartAndEndForAccess(
     DominatorTree *DT, AssumptionCache *AC,
     std::optional<ScalarEvolution::LoopGuards> &LoopGuards);
 
+/// Return the number of bytes known to be dereferenceable starting from \p
+/// Start, based on dereferenceable assumptions in \p AC that are valid at \p
+/// CtxI. An assumption deref(P, Sz) contributes (SCEV(P) - Start) + Sz bytes
+/// when P is at a known non-negative constant offset from \p Start. The offset
+/// cancels through the SCEV subtraction, so this naturally handles assumptions
+/// placed on the base pointer as well as on offset pointers, e.g. deref(%p +
+/// 16, Sz) for an access starting at %p + 16. Returns a zero SCEV if no useful
+/// assumption is found.
+LLVM_ABI const SCEV *getDereferenceableBytesFromAssumptions(
+    const SCEV *Start, ScalarEvolution &SE, AssumptionCache *AC,
+    const Instruction *CtxI, DominatorTree *DT);
+
 class LoopAccessInfoManager {
   /// The cache.
   DenseMap<Loop *, std::unique_ptr<LoopAccessInfo>> LoopAccessInfoMap;

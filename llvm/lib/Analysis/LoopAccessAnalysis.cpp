@@ -208,6 +208,42 @@ static const SCEV *mulSCEVNoOverflow(const SCEV *A, const SCEV *B,
   return SE.getMulExpr(A, B);
 }
 
+const SCEV *llvm::getDereferenceableBytesFromAssumptions(
+    const SCEV *Start, ScalarEvolution &SE, AssumptionCache *AC,
+    const Instruction *CtxI, DominatorTree *DT) {
+  const SCEV *DerefBytes = SE.getZero(Start->getType());
+  if (!AC || !CtxI)
+    return DerefBytes;
+
+  for (auto &Elem : AC->assumptions()) {
+    auto *Assume = dyn_cast_or_null<AssumeInst>(Elem);
+    if (!Assume)
+      continue;
+    for (const CallBase::BundleOpInfo &BOI : Assume->bundle_op_infos()) {
+      RetainedKnowledge RK = getKnowledgeFromBundle(*Assume, BOI);
+      if (RK.AttrKind != Attribute::Dereferenceable || !RK.WasOn ||
+          !RK.IRArgValue || !RK.WasOn->getType()->isPointerTy() ||
+          !isValidAssumeForContext(Assume, CtxI, DT))
+        continue;
+      // The assumed pointer must be at a non-negative constant offset from
+      // Start, so its dereferenceable range starts at or after Start. The
+      // offset cancels through the SCEV subtraction, so an assumption on Start
+      // itself (offset 0) and on an offset pointer are handled uniformly.
+      auto *Off =
+          dyn_cast<SCEVConstant>(SE.getMinusSCEV(SE.getSCEV(RK.WasOn), Start));
+      if (!Off || Off->getAPInt().isNegative())
+        continue;
+      const SCEV *AssumedBytes = SE.getAddExpr(Off, SE.getSCEV(RK.IRArgValue));
+      Type *CommonTy =
+          SE.getWiderType(DerefBytes->getType(), AssumedBytes->getType());
+      DerefBytes =
+          SE.getUMaxExpr(SE.getNoopOrZeroExtend(DerefBytes, CommonTy),
+                         SE.getNoopOrZeroExtend(AssumedBytes, CommonTy));
+    }
+  }
+  return DerefBytes;
+}
+
 /// Return true, if evaluating \p AR at \p MaxBTC cannot wrap, because \p AR at
 /// \p MaxBTC is guaranteed inbounds of the accessed object.
 static bool evaluatePtrAddRecAtMaxBTCWillNotWrap(
@@ -240,20 +276,13 @@ static bool evaluatePtrAddRecAtMaxBTCWillNotWrap(
     if (isa<UncondBrInst, CondBrInst>(LoopPred->getTerminator()))
       CtxI = LoopPred->getTerminator();
   }
-  getKnowledgeForValue(
-      StartPtrV, Attribute::Dereferenceable, *AC,
-      [&](RetainedKnowledge RK, Instruction *Assume, auto) {
-        if (!isValidAssumeForContext(Assume, CtxI, DT))
-          return false;
-        const SCEV *DerefRKSCEV = SE.getSCEV(RK.IRArgValue);
-        Type *CommonTy =
-            SE.getWiderType(DerefBytesSCEV->getType(), DerefRKSCEV->getType());
-        DerefBytesSCEV = SE.getNoopOrZeroExtend(DerefBytesSCEV, CommonTy);
-        DerefRKSCEV = SE.getNoopOrZeroExtend(DerefRKSCEV, CommonTy);
-        DerefBytesSCEV = SE.getUMaxExpr(DerefBytesSCEV, DerefRKSCEV);
-        // Continue with other assumptions.
-        return false;
-      });
+  const SCEV *AssumedBytes =
+      getDereferenceableBytesFromAssumptions(StartPtr, SE, AC, CtxI, DT);
+  Type *CommonTy =
+      SE.getWiderType(DerefBytesSCEV->getType(), AssumedBytes->getType());
+  DerefBytesSCEV =
+      SE.getUMaxExpr(SE.getNoopOrZeroExtend(DerefBytesSCEV, CommonTy),
+                     SE.getNoopOrZeroExtend(AssumedBytes, CommonTy));
 
   if (DerefBytesSCEV->isZero())
     return false;
@@ -265,11 +294,17 @@ static bool evaluatePtrAddRecAtMaxBTCWillNotWrap(
   Step = SE.getNoopOrSignExtend(Step, WiderTy);
   MaxBTC = SE.getNoopOrZeroExtend(MaxBTC, WiderTy);
 
-  // For the computations below, make sure they don't unsigned wrap.
-  if (!SE.isKnownPredicate(CmpInst::ICMP_UGE, AR->getStart(), StartPtr))
+  // For the computations below, make sure they don't unsigned wrap. The offset
+  // of the access start from the pointer base may be a non-negative constant
+  // (e.g. when the AddRec is {(16 + %p),+,1} for an assumption on %p + 16),
+  // which cannot wrap on its own; the final bounds check confirms it lies
+  // within the dereferenceable range.
+  const SCEV *StartToBase = SE.getMinusSCEV(AR->getStart(), StartPtr);
+  auto *StartToBaseC = dyn_cast<SCEVConstant>(StartToBase);
+  if ((!StartToBaseC || StartToBaseC->getAPInt().isNegative()) &&
+      !SE.isKnownPredicate(CmpInst::ICMP_UGE, AR->getStart(), StartPtr))
     return false;
-  const SCEV *StartOffset = SE.getNoopOrZeroExtend(
-      SE.getMinusSCEV(AR->getStart(), StartPtr), WiderTy);
+  const SCEV *StartOffset = SE.getNoopOrZeroExtend(StartToBase, WiderTy);
 
   if (!LoopGuards)
     LoopGuards.emplace(ScalarEvolution::LoopGuards::collect(AR->getLoop(), SE));

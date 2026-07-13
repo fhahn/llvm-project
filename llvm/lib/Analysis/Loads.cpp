@@ -422,6 +422,24 @@ bool llvm::isDereferenceableAndAlignedInLoop(
       CtxI = LoopPred->getTerminator();
   }
   SimplifyQuery SQ(DL, &DT, AC, CtxI);
+  // The access [Base, Base + AccessSize) is dereferenceable if a dominating
+  // assumption proves at least AccessSize dereferenceable bytes from Base.
+  // AccessSizeSCEV is relative to Base, so compare it against the bytes
+  // available from Base. getDereferenceableBytesFromAssumptions also folds in
+  // assumptions on constant-offset pointers derived from Base.
+  const SCEV *DerefBytes = getDereferenceableBytesFromAssumptions(
+      SE.getSCEV(Base), SE, AC, CtxI, &DT);
+  if (!DerefBytes->isZero() &&
+      Base->getPointerAlignment(DL) >= Alignment) {
+    Type *Ty = SE.getWiderType(AccessSizeSCEV->getType(), DerefBytes->getType());
+    if (SE.isKnownPredicate(
+            CmpInst::ICMP_ULE,
+            SE.applyLoopGuards(SE.getNoopOrZeroExtend(AccessSizeSCEV, Ty),
+                               *LoopGuards),
+            SE.applyLoopGuards(SE.getNoopOrZeroExtend(DerefBytes, Ty),
+                               *LoopGuards)))
+      return true;
+  }
   return isDereferenceableAndAlignedPointerViaAssumption(
              Base, Alignment, SQ, /*IgnoreFree=*/false,
              [&SE, AccessSizeSCEV, &LoopGuards](const RetainedKnowledge &RK) {
