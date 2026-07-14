@@ -15,6 +15,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Analysis/InstSimplifyFolder.h"
+#include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/MemoryLocation.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/Analysis/ScalarEvolutionPatternMatch.h"
@@ -858,7 +859,7 @@ VPValue *VPSCEVExpander::tryToReuseIRValue(const SCEV *S) {
   return nullptr;
 }
 
-VPValue *VPSCEVExpander::tryToExpand(const SCEV *S) {
+VPValue *VPSCEVExpander::expand(const SCEV *S) {
   if (VPValue *V = tryToReuseIRValue(S))
     return V;
 
@@ -874,15 +875,11 @@ VPValue *VPSCEVExpander::tryToExpand(const SCEV *S) {
     VPIRFlags::WrapFlagsTy WrapFlags(AddE->hasNoUnsignedWrap(),
                                      AddE->hasNoSignedWrap());
 
-    // Expanded poiner SCEVAddExpr as a ptradd of the pointer base and the
+    // Expand pointer SCEVAddExpr as a ptradd of the pointer base and the
     // integer offset, matching SCEVExpander.
     if (S->getType()->isPointerTy()) {
-      VPValue *Base = tryToExpand(SE.getPointerBase(S));
-      if (!Base)
-        return nullptr;
-      VPValue *Offset = tryToExpand(SE.removePointerBase(S));
-      if (!Offset)
-        return nullptr;
+      VPValue *Base = expand(SE.getPointerBase(S));
+      VPValue *Offset = expand(SE.removePointerBase(S));
       GEPNoWrapFlags GEPFlags = WrapFlags.HasNUW
                                     ? GEPNoWrapFlags::noUnsignedWrap()
                                     : GEPNoWrapFlags::none();
@@ -905,10 +902,7 @@ VPValue *VPSCEVExpander::tryToExpand(const SCEV *S) {
     for (const SCEV *Op : SCEVOps) {
       // The first operand starts the result, so it is never subtracted.
       bool Negate = !Ops.empty() && UseSubtract(Op);
-      VPValue *OpV = tryToExpand(Negate ? SE.getNegativeSCEV(Op) : Op);
-      if (!OpV)
-        return nullptr;
-      Ops.push_back(OpV);
+      Ops.push_back(expand(Negate ? SE.getNegativeSCEV(Op) : Op));
     }
     VPValue *Result = Ops.front();
     for (auto [Op, OpV] : drop_begin(zip_equal(SCEVOps, Ops))) {
@@ -932,12 +926,8 @@ VPValue *VPSCEVExpander::tryToExpand(const SCEV *S) {
     VPIRFlags::WrapFlagsTy WrapFlags(MulE->hasNoUnsignedWrap(),
                                      MulE->hasNoSignedWrap());
     SmallVector<VPValue *, 2> Ops;
-    for (const SCEV *Op : reverse(MulE->operands())) {
-      VPValue *OpV = tryToExpand(Op);
-      if (!OpV)
-        return nullptr;
-      Ops.push_back(OpV);
-    }
+    for (const SCEV *Op : reverse(MulE->operands()))
+      Ops.push_back(expand(Op));
     VPValue *Result = Ops.front();
     for (VPValue *OpV : drop_begin(Ops)) {
       Result = Builder.createOverflowingOp(Instruction::Mul, {Result, OpV},
@@ -947,13 +937,9 @@ VPValue *VPSCEVExpander::tryToExpand(const SCEV *S) {
   }
   case scUDivExpr: {
     auto *UDiv = cast<SCEVUDivExpr>(S);
-    VPValue *LHS = tryToExpand(UDiv->getLHS());
-    if (!LHS)
-      return nullptr;
+    VPValue *LHS = expand(UDiv->getLHS());
     const SCEV *RHSExpr = UDiv->getRHS();
-    VPValue *RHS = tryToExpand(RHSExpr);
-    if (!RHS)
-      return nullptr;
+    VPValue *RHS = expand(RHSExpr);
     if (SafeUDivMode) {
       // Make sure the UDiv's divisor is guaranteed to not be zero/poison, to
       // avoid UB.
@@ -976,9 +962,7 @@ VPValue *VPSCEVExpander::tryToExpand(const SCEV *S) {
   case scSignExtend:
   case scPtrToAddr: {
     auto *Cast = cast<SCEVCastExpr>(S);
-    VPValue *Op = tryToExpand(Cast->getOperand());
-    if (!Op)
-      return nullptr;
+    VPValue *Op = expand(Cast->getOperand());
     Instruction::CastOps Opcode;
     switch (S->getSCEVType()) {
     case scTruncate:
@@ -1050,10 +1034,8 @@ VPValue *VPSCEVExpander::tryToExpand(const SCEV *S) {
       bool MayShortCircuit =
           IsSequential && Ops.size() != MinMax->getNumOperands() - 1;
       SafeUDivMode = MayShortCircuit || PrevSafeMode;
-      VPValue *OpV = tryToExpand(SCEVOp);
+      VPValue *OpV = expand(SCEVOp);
       SafeUDivMode = PrevSafeMode;
-      if (!OpV)
-        return nullptr;
       if (MayShortCircuit)
         OpV = Builder.createScalarFreeze(OpV, DL);
       Ops.push_back(OpV);
@@ -1064,9 +1046,26 @@ VPValue *VPSCEVExpander::tryToExpand(const SCEV *S) {
                                              ResultTy, DL);
     return Result;
   }
-  default:
-    return nullptr;
+  case scAddRecExpr: {
+    VPlan &Plan = Builder.getPlan();
+    VPBasicBlock *Entry = Plan.getEntry();
+    assert(SE.DT.dominates(cast<SCEVAddRecExpr>(S)->getLoop()->getHeader(),
+                           cast<VPIRBasicBlock>(Entry)->getIRBasicBlock()) &&
+           "can only expand AddRecs for loops outside VPlan's scope");
+    // AddRecs cannot be expanded to VPInstructions and must be expanded to IR
+    // later. Reuse an existing VPExpandSCEVRecipe for \p S if there is one,
+    // otherwise create a new one in the entry block.
+    for (VPRecipeBase &R : *Entry) {
+      auto *ExpSCEV = dyn_cast<VPExpandSCEVRecipe>(&R);
+      if (ExpSCEV && ExpSCEV->getSCEV() == S)
+        return ExpSCEV;
+    }
+    return vputils::getOrCreateVPValueForSCEVExpr(Plan, S);
   }
+  case scCouldNotCompute:
+    llvm_unreachable("Attempt to expand a SCEVCouldNotCompute");
+  }
+  llvm_unreachable("Unknown SCEV kind!");
 }
 
 bool vputils::isDeadRecipe(VPRecipeBase &R) {
