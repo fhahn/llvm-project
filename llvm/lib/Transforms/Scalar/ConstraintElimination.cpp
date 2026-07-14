@@ -972,7 +972,7 @@ void State::addInfoForInductions(BasicBlock &BB) {
     return;
 
   BasicBlock *LoopPred = L->getLoopPredecessor();
-  if (!LoopPred || !L->isLoopInvariant(B) || !SE.isSCEVable(PN->getType()))
+  if (!LoopPred || !L->isLoopInvariant(B))
     return;
 
   Value *StartValue = PN->getIncomingValueForBlock(LoopPred);
@@ -980,25 +980,38 @@ void State::addInfoForInductions(BasicBlock &BB) {
                                ? PN->getIncomingBlock(1)
                                : PN->getIncomingBlock(0);
   Value *Backedge = PN->getIncomingValueForBlock(BackedgeBB);
-  const APInt *StepOffset;
-  // Monotonicity is only used if the step is non-negative, so it reduces to the
-  // induction wrap flags.
-  bool MonotonicallyIncreasingUnsigned, MonotonicallyIncreasingSigned;
+  const APInt *StepOffset = nullptr;
   const SCEV *StartSCEV = nullptr;
+
+  // Compute (and cache) the induction's SCEV AddRec lazily, so we query SCEV at
+  // most once and only when the IR increment is not enough: to recover the step
+  // for non-trivial increments and to prove no-wrap flags the IR increment may
+  // be missing.
+  const SCEVAddRecExpr *AR = nullptr;
+  bool TriedAR = false;
+  auto getAddRec = [&]() -> const SCEVAddRecExpr * {
+    if (!TriedAR) {
+      TriedAR = true;
+      AR = dyn_cast<SCEVAddRecExpr>(SE.getSCEV(PN));
+      if (AR && AR->getLoop() != L)
+        AR = nullptr;
+    }
+    return AR;
+  };
+
+  // Read the step from a plain `PN + StepOffset` IR increment when possible; its
+  // no-wrap flags are picked up below. Otherwise fall back to SCEV for the step.
+  OverflowingBinaryOperator *Inc = nullptr;
   if (match(Backedge, m_c_Add(m_Specific(PN), m_APInt(StepOffset)))) {
-    auto *Inc = cast<OverflowingBinaryOperator>(Backedge);
-    MonotonicallyIncreasingUnsigned = Inc->hasNoUnsignedWrap();
-    MonotonicallyIncreasingSigned = Inc->hasNoSignedWrap();
+    Inc = cast<OverflowingBinaryOperator>(Backedge);
   } else {
-    const SCEV *Expr = SE.getSCEV(PN);
-    if (!match(Expr,
-               m_scev_AffineAddRec(m_SCEV(StartSCEV), m_scev_APInt(StepOffset),
-                                   m_SpecificLoop(L))))
+    const SCEVAddRecExpr *IndAR = getAddRec();
+    const APInt *Step;
+    if (!IndAR || !IndAR->isAffine() ||
+        !match(IndAR->getStepRecurrence(SE), m_scev_APInt(Step)))
       return;
-    MonotonicallyIncreasingUnsigned =
-        cast<SCEVAddRecExpr>(Expr)->hasNoUnsignedWrap();
-    MonotonicallyIncreasingSigned =
-        cast<SCEVAddRecExpr>(Expr)->hasNoSignedWrap();
+    StartSCEV = IndAR->getStart();
+    StepOffset = Step;
   }
 
   DomTreeNode *DTN = DT.getNode(InLoopSucc);
@@ -1032,6 +1045,26 @@ void State::addInfoForInductions(BasicBlock &BB) {
         DTN, CmpInst::ICMP_SGT, PN, B,
         ConditionTy(CmpInst::ICMP_SLE, B, StartValue)));
     return;
+  }
+
+  // Determine whether the induction is known not to wrap. The step is known to
+  // be non-negative here, so monotonicity reduces to the induction's no-wrap
+  // flags. Prefer the cheap IR increment flags and only fall back to SCEV for
+  // the flags SCEV may still prove (e.g. via the trip count) that the IR
+  // increment is missing.
+  bool MonotonicallyIncreasingUnsigned = Inc && Inc->hasNoUnsignedWrap();
+  bool MonotonicallyIncreasingSigned = Inc && Inc->hasNoSignedWrap();
+  if (!(MonotonicallyIncreasingUnsigned && MonotonicallyIncreasingSigned)) {
+    if (const SCEVAddRecExpr *IndAR = getAddRec()) {
+      if (!MonotonicallyIncreasingUnsigned)
+        MonotonicallyIncreasingUnsigned =
+            SE.getMonotonicPredicateType(IndAR, CmpInst::ICMP_UGT) ==
+            ScalarEvolution::MonotonicallyIncreasing;
+      if (!MonotonicallyIncreasingSigned)
+        MonotonicallyIncreasingSigned =
+            SE.getMonotonicPredicateType(IndAR, CmpInst::ICMP_SGT) ==
+            ScalarEvolution::MonotonicallyIncreasing;
+    }
   }
 
   // If the induction is known not to wrap, PN >= StartValue can be added
