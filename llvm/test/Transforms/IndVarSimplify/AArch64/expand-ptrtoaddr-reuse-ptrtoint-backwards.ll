@@ -15,7 +15,7 @@ define i64 @f(ptr %start, ptr %bound) {
 ; CHECK-LABEL: define i64 @f(
 ; CHECK-SAME: ptr [[START:%.*]], ptr [[BOUND:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    [[START3:%.*]] = ptrtoint ptr [[START]] to i64
+; CHECK-NEXT:    [[START3:%.*]] = ptrtoaddr ptr [[START]] to i64
 ; CHECK-NEXT:    [[BOUND2:%.*]] = ptrtoint ptr [[BOUND]] to i64
 ; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 [[BOUND2]], [[START3]]
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[START]], i64 [[TMP0]]

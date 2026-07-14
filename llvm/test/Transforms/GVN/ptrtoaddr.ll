@@ -42,12 +42,15 @@ define i64 @ptrtoaddr_reuses_dominating_ptrtoint(ptr %p) {
   ret i64 %r
 }
 
-define i64 @ptrtoint_not_replaced_by_dominating_ptrtoaddr(ptr %p) {
-; CHECK-LABEL: define i64 @ptrtoint_not_replaced_by_dominating_ptrtoaddr(
+; A dominating ptrtoaddr is promoted to a ptrtoint when a ptrtoint of the same
+; pointer is encountered later, so the two collapse to a single ptrtoint.
+; Promoting ptrtoaddr to ptrtoint only adds provenance capture, which is already
+; implied by the later ptrtoint, so no alias-analysis precision is lost.
+define i64 @ptrtoint_promotes_dominating_ptrtoaddr(ptr %p) {
+; CHECK-LABEL: define i64 @ptrtoint_promotes_dominating_ptrtoaddr(
 ; CHECK-SAME: ptr [[P:%.*]]) {
-; CHECK-NEXT:    [[A:%.*]] = ptrtoaddr ptr [[P]] to i64
 ; CHECK-NEXT:    [[I:%.*]] = ptrtoint ptr [[P]] to i64
-; CHECK-NEXT:    [[R:%.*]] = add i64 [[A]], [[I]]
+; CHECK-NEXT:    [[R:%.*]] = add i64 [[I]], [[I]]
 ; CHECK-NEXT:    ret i64 [[R]]
 ;
   %a = ptrtoaddr ptr %p to i64
@@ -74,17 +77,18 @@ define i64 @ptrtoaddr_wrong_type(ptr %p) {
   ret i64 %r
 }
 
-define i64 @ptrtoint_not_pred_from_ptrtoaddr(ptr %p, i1 %c) {
-; CHECK-LABEL: define i64 @ptrtoint_not_pred_from_ptrtoaddr(
+; Promotion works across a control-flow diamond: the entry ptrtoaddr dominates
+; the later ptrtoint in %merge, so it is promoted to ptrtoint and the two merge.
+define i64 @ptrtoint_promotes_ptrtoaddr_across_diamond(ptr %p, i1 %c) {
+; CHECK-LABEL: define i64 @ptrtoint_promotes_ptrtoaddr_across_diamond(
 ; CHECK-SAME: ptr [[P:%.*]], i1 [[C:%.*]]) {
-; CHECK-NEXT:    [[A:%.*]] = ptrtoaddr ptr [[P]] to i64
+; CHECK-NEXT:    [[I:%.*]] = ptrtoint ptr [[P]] to i64
 ; CHECK-NEXT:    br i1 [[C]], label %[[THEN:.*]], label %[[ELSE:.*]]
 ; CHECK:       [[THEN]]:
 ; CHECK-NEXT:    br label %[[MERGE:.*]]
 ; CHECK:       [[ELSE]]:
 ; CHECK-NEXT:    br label %[[MERGE]]
 ; CHECK:       [[MERGE]]:
-; CHECK-NEXT:    [[I:%.*]] = ptrtoint ptr [[P]] to i64
 ; CHECK-NEXT:    ret i64 [[I]]
 ;
   %a = ptrtoaddr ptr %p to i64
@@ -101,14 +105,14 @@ merge:
   ret i64 %i
 }
 
-define i64 @no_transitive_merge_of_ptrtoint_and_ptrtoaddr(ptr %p) {
-; CHECK-LABEL: define i64 @no_transitive_merge_of_ptrtoint_and_ptrtoaddr(
+; Promoting the dominating ptrtoaddr to ptrtoint also exposes downstream
+; redundancy: after promotion both `add ..., 7` share an operand and merge.
+define i64 @transitive_merge_after_promoting_ptrtoaddr(ptr %p) {
+; CHECK-LABEL: define i64 @transitive_merge_after_promoting_ptrtoaddr(
 ; CHECK-SAME: ptr [[P:%.*]]) {
-; CHECK-NEXT:    [[A:%.*]] = ptrtoaddr ptr [[P]] to i64
-; CHECK-NEXT:    [[ADDA:%.*]] = add i64 [[A]], 7
 ; CHECK-NEXT:    [[I:%.*]] = ptrtoint ptr [[P]] to i64
 ; CHECK-NEXT:    [[ADDI:%.*]] = add i64 [[I]], 7
-; CHECK-NEXT:    [[R:%.*]] = add i64 [[ADDA]], [[ADDI]]
+; CHECK-NEXT:    [[R:%.*]] = add i64 [[ADDI]], [[ADDI]]
 ; CHECK-NEXT:    ret i64 [[R]]
 ;
   %a = ptrtoaddr ptr %p to i64
@@ -117,4 +121,47 @@ define i64 @no_transitive_merge_of_ptrtoint_and_ptrtoaddr(ptr %p) {
   %addi = add i64 %i, 7
   %r = add i64 %adda, %addi
   ret i64 %r
+}
+
+; When the dominating ptrtoaddr has multiple uses, promoting it to a ptrtoint
+; rewires all of them to the single ptrtoint.
+define i64 @promote_ptrtoaddr_with_multiple_uses(ptr %p) {
+; CHECK-LABEL: define i64 @promote_ptrtoaddr_with_multiple_uses(
+; CHECK-SAME: ptr [[P:%.*]]) {
+; CHECK-NEXT:    [[I:%.*]] = ptrtoint ptr [[P]] to i64
+; CHECK-NEXT:    [[U1:%.*]] = add i64 [[I]], 1
+; CHECK-NEXT:    [[U2:%.*]] = add i64 [[I]], 2
+; CHECK-NEXT:    [[R:%.*]] = add i64 [[U1]], [[U2]]
+; CHECK-NEXT:    ret i64 [[R]]
+;
+  %a = ptrtoaddr ptr %p to i64
+  %u1 = add i64 %a, 1
+  %i = ptrtoint ptr %p to i64
+  %u2 = add i64 %i, 2
+  %r = add i64 %u1, %u2
+  ret i64 %r
+}
+
+; A ptrtoaddr that does not dominate the ptrtoint (they are on sibling branches)
+; is not a promotion candidate; both are preserved.
+define i64 @no_promote_when_ptrtoaddr_does_not_dominate(ptr %p, i1 %c) {
+; CHECK-LABEL: define i64 @no_promote_when_ptrtoaddr_does_not_dominate(
+; CHECK-SAME: ptr [[P:%.*]], i1 [[C:%.*]]) {
+; CHECK-NEXT:    br i1 [[C]], label %[[A:.*]], label %[[B:.*]]
+; CHECK:       [[A]]:
+; CHECK-NEXT:    [[PA:%.*]] = ptrtoaddr ptr [[P]] to i64
+; CHECK-NEXT:    ret i64 [[PA]]
+; CHECK:       [[B]]:
+; CHECK-NEXT:    [[PI:%.*]] = ptrtoint ptr [[P]] to i64
+; CHECK-NEXT:    ret i64 [[PI]]
+;
+  br i1 %c, label %a, label %b
+
+a:
+  %pa = ptrtoaddr ptr %p to i64
+  ret i64 %pa
+
+b:
+  %pi = ptrtoint ptr %p to i64
+  ret i64 %pi
 }

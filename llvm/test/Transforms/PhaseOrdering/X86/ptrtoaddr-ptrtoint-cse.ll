@@ -7,17 +7,17 @@
 ; A byte at %0 is loaded (so %0's address is needed) and a backward loop counts
 ; down to %0 (so SCEVExpander materializes the loop exit value from %0). After
 ; the ptrtoaddr canonicalization, the exit value uses `ptrtoaddr ptr %0` while the
-; byte address computation uses `ptrtoint ptr %0`; the two do not CSE, so %0 is
-; converted twice. Before the change a single `ptrtoint ptr %0` was shared.
+; byte address computation uses `ptrtoint ptr %0`.
 ;
 ; The `store ptr %0, ptr %0` is a reduced stand-in for the surrounding code that
 ; keeps a second, integer use of %0 live to the exit; it is what forces the
 ; `ptrtoint ptr %0` that the `ptrtoaddr ptr %0` fails to CSE with.
 ;
-; This test pins the CURRENT (regressed) output: %0 is converted by BOTH
-; ptrtoaddr and ptrtoint. Once SCEVExpander reuses/emits a matching ptrtoint (or
-; CSE unifies the two opcodes on integral targets), this should collapse back to
-; a single conversion and the test must be updated.
+; The `ptrtoaddr` is emitted first (by SCEVExpander in IndVarSimplify), before
+; the `ptrtoint` appears. GVN promotes the dominating `ptrtoaddr` to a
+; `ptrtoint` when it later encounters the `ptrtoint` of the same pointer, so the
+; two collapse to a single conversion. This test pins that single-conversion
+; output.
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-pc-linux-gnu"
