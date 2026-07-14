@@ -88,12 +88,11 @@ define ptr @cancel_out_of_range(ptr %p) {
 ; CHECK-LABEL: define noalias noundef ptr @cancel_out_of_range(
 ; CHECK-SAME: ptr [[P:%.*]]) local_unnamed_addr #[[ATTR2:[0-9]+]] {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    store ptr [[P]], ptr [[P]], align 8
 ; CHECK-NEXT:    [[P1:%.*]] = ptrtoint ptr [[P]] to i64
+; CHECK-NEXT:    store ptr [[P]], ptr [[P]], align 8
 ; CHECK-NEXT:    [[TMP0:%.*]] = and i64 [[P1]], 255
 ; CHECK-NEXT:    [[IS_ZERO:%.*]] = icmp eq i64 [[TMP0]], 0
-; CHECK-NEXT:    [[P2:%.*]] = ptrtoaddr ptr [[P]] to i64
-; CHECK-NEXT:    [[SPEC_SELECT_IDX:%.*]] = select i1 [[IS_ZERO]], i64 0, i64 [[P2]]
+; CHECK-NEXT:    [[SPEC_SELECT_IDX:%.*]] = select i1 [[IS_ZERO]], i64 0, i64 [[P1]]
 ; CHECK-NEXT:    [[SPEC_SELECT:%.*]] = getelementptr i8, ptr null, i64 [[SPEC_SELECT_IDX]]
 ; CHECK-NEXT:    ret ptr [[SPEC_SELECT]]
 ;

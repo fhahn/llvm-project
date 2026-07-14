@@ -760,6 +760,14 @@ uint32_t GVNPass::ValueTable::lookupPtrToInt(Value *Ptr, Type *Ty) {
   return ExpressionNumbering.lookup(Exp);
 }
 
+/// Returns the value number of ptrtoaddr \p Ptr to \Ty.
+uint32_t GVNPass::ValueTable::lookupPtrToAddr(Value *Ptr, Type *Ty) {
+  Expression Exp(Instruction::PtrToAddr);
+  Exp.Ty = Ty;
+  Exp.VarArgs.push_back(lookupOrAdd(Ptr));
+  return ExpressionNumbering.lookup(Exp);
+}
+
 /// Remove all entries from the ValueTable.
 void GVNPass::ValueTable::clear() {
   ValueNumbering.clear();
@@ -3410,6 +3418,47 @@ bool GVNPass::processInstruction(Instruction *I) {
           VN.lookupPtrToInt(PTA->getPointerOperand(), PTA->getType());
       if (Value *PTI = findLeader(I->getParent(), PTINum)) {
         patchAndReplaceAllUsesWith(I, PTI);
+        salvageAndRemoveInstruction(I);
+        return true;
+      }
+    }
+  }
+
+  // The reverse of the above: when processing a ptrtoint whose value is also
+  // computed by a dominating ptrtoaddr of the same pointer, promote that
+  // dominating ptrtoaddr to a ptrtoint. Both compute the same value under the
+  // width guard, and rewriting ptrtoaddr as ptrtoint only *adds* provenance
+  // capture, which is already implied by the ptrtoint being processed here, so
+  // no alias-analysis precision is lost. The promoted ptrtoint then dominates
+  // I and, sharing its value number, lets I be eliminated as redundant below.
+  // This handles the case where the ptrtoaddr is emitted first (e.g. by
+  // SCEVExpander) and the ptrtoint only appears later.
+  if (auto *PTI = dyn_cast<PtrToIntInst>(I)) {
+    const DataLayout &DL = I->getDataLayout();
+    unsigned AS = PTI->getPointerAddressSpace();
+    if (DL.getAddressSizeInBits(AS) == DL.getPointerSizeInBits(AS) &&
+        !DL.hasUnstableRepresentation(AS)) {
+      uint32_t PTANum =
+          VN.lookupPtrToAddr(PTI->getPointerOperand(), PTI->getType());
+      if (auto *PTA = dyn_cast_or_null<PtrToAddrInst>(
+              findLeader(I->getParent(), PTANum))) {
+        // Materialize a ptrtoint in place of the dominating ptrtoaddr.
+        auto *NewPTI = new PtrToIntInst(PTA->getPointerOperand(),
+                                        PTA->getType(), PTA->getName(),
+                                        PTA->getIterator());
+        NewPTI->setDebugLoc(PTA->getDebugLoc());
+        ICF->insertInstructionTo(NewPTI, PTA->getParent());
+        // The new ptrtoint shares I's value number (same opcode, type and
+        // pointer operand).
+        [[maybe_unused]] uint32_t NewNum = VN.lookupOrAdd(NewPTI);
+        assert(NewNum == Num && "Promoted ptrtoint should share I's VN");
+        LeaderTable.insert(Num, NewPTI, PTA->getParent());
+
+        // Replace the dominating ptrtoaddr and I with the promoted ptrtoint.
+        patchAndReplaceAllUsesWith(PTA, NewPTI);
+        LeaderTable.erase(PTANum, PTA, PTA->getParent());
+        salvageAndRemoveInstruction(PTA);
+        patchAndReplaceAllUsesWith(I, NewPTI);
         salvageAndRemoveInstruction(I);
         return true;
       }
