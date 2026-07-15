@@ -835,6 +835,14 @@ bool LoopVectorizationLegality::canVectorizeInstrs() {
   if (PrimaryInduction && WidestIndTy != PrimaryInduction->getType())
     PrimaryInduction = nullptr;
 
+  // The primary induction must be modeled as an induction, as it drives the
+  // canonical vector IV. Make sure it is not also considered as a fixed-order
+  // recurrence: otherwise createHeaderPhiRecipes could model it as a FOR while
+  // other parts of the vectorizer (e.g. the induction-truncate optimization)
+  // still expect a widened induction recipe.
+  if (PrimaryInduction)
+    FixedOrderRecurrences.erase(PrimaryInduction);
+
   return Result;
 }
 
