@@ -32820,9 +32820,11 @@ Value *AArch64TargetLowering::emitCanLoadSpeculatively(IRBuilderBase &Builder,
 
   if (auto *CI = dyn_cast<ConstantInt>(Size)) {
     uint64_t SizeVal = CI->getZExtValue();
-    assert(isPowerOf2_64(SizeVal) && "size must be power-of-two");
-    // For constant sizes > 16, return nullptr (default false).
-    if (SizeVal > 16)
+    // The alignment check below only works for power-of-2 sizes; for any other
+    // size (including 0) the result is allowed to be poison, so conservatively
+    // return nullptr (default false). Constant sizes > 16 also return nullptr
+    // (default false).
+    if (!isPowerOf2_64(SizeVal) || SizeVal > 16)
       return nullptr;
 
     // Power-of-2 constant size <= 16: use fast alignment check.

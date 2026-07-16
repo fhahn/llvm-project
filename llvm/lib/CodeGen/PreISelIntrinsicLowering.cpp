@@ -149,15 +149,19 @@ static bool lowerCanLoadSpeculatively(Function &F, const TargetMachine *TM) {
       continue;
 
     Function *ParentFunc = CI->getFunction();
-    const TargetLowering *TLI =
-        TM->getSubtargetImpl(*ParentFunc)->getTargetLowering();
 
     IRBuilder<> Builder(CI);
     Value *Ptr = CI->getArgOperand(0);
     Value *Size = CI->getArgOperand(1);
 
-    // Ask target for expansion; nullptr means use default (return false)
-    Value *Result = TLI->emitCanLoadSpeculatively(Builder, Ptr, Size);
+    // Ask the target for an expansion; a null result (including when there is
+    // no target machine) means use the default (return false).
+    Value *Result = nullptr;
+    if (TM) {
+      const TargetLowering *TLI =
+          TM->getSubtargetImpl(*ParentFunc)->getTargetLowering();
+      Result = TLI->emitCanLoadSpeculatively(Builder, Ptr, Size);
+    }
     if (!Result)
       Result = Builder.getFalse();
 
