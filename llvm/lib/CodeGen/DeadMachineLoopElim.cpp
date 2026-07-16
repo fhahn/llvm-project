@@ -57,6 +57,10 @@ INITIALIZE_PASS_END(DeadMachineLoopElim, DEBUG_TYPE,
 
 static bool isLoopDead(MachineLoop *L, const MachineRegisterInfo &MRI,
                        const TargetRegisterInfo &TRI) {
+  // Physical registers that are live on entry to any of the loop's exit blocks
+  // cannot be considered dead. Note that this only catches escapes that are
+  // visible to register liveness; opaque physical-register writes are handled
+  // separately below.
   LiveRegUnits LiveAtExit(TRI);
   SmallVector<MachineBasicBlock *> ExitBlocks;
   L->getExitBlocks(ExitBlocks);
@@ -74,9 +78,24 @@ static bool isLoopDead(MachineLoop *L, const MachineRegisterInfo &MRI,
                        }))
         return false;
 
+      // Inline assembly and FAKE_USE can keep a value live in a physical
+      // register through channels that are invisible to register liveness:
+      // inline asm may reference registers by name in its template string or
+      // clobber list, and FAKE_USE (e.g. from llvm.write_register) is emitted
+      // precisely to keep an otherwise-dead physical register live. Treating
+      // such loops as dead would drop those writes, so bail out conservatively.
+      if (MI.isInlineAsm() || MI.isFakeUse())
+        return false;
+
       for (const MachineOperand &MO : MI.all_defs()) {
         Register Reg = MO.getReg();
         if (Reg.isPhysical()) {
+          // A COPY into a physical register (e.g. the lowering of
+          // llvm.write_register) can make that register's value escape the loop
+          // without any register-operand use that liveness could track. Bail
+          // out rather than risk deleting such a write.
+          if (MI.isCopy())
+            return false;
           if (!LiveAtExit.available(Reg))
             return false;
         } else {
