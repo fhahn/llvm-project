@@ -115,5 +115,23 @@ define i1 @can_load_speculatively_runtime(ptr %ptr, i64 %size) {
   ret i1 %can_load
 }
 
+; Test constant size 0: not a power of 2, so return false.
+define i1 @can_load_speculatively_0(ptr %ptr) {
+; CHECK-LABEL: @can_load_speculatively_0(
+; CHECK-NEXT:    ret i1 false
+;
+  %can_load = call i1 @llvm.can.load.speculatively.p0(ptr %ptr, i64 0)
+  ret i1 %can_load
+}
+
+; Test constant non-power-of-2 size: return false.
+define i1 @can_load_speculatively_3(ptr %ptr) {
+; CHECK-LABEL: @can_load_speculatively_3(
+; CHECK-NEXT:    ret i1 false
+;
+  %can_load = call i1 @llvm.can.load.speculatively.p0(ptr %ptr, i64 3)
+  ret i1 %can_load
+}
+
 declare i1 @llvm.can.load.speculatively.p0(ptr, i64)
 declare i1 @llvm.can.load.speculatively.p1(ptr addrspace(1), i64)
