@@ -124,6 +124,11 @@ struct FactOrCheck {
   unsigned NumIn;
   unsigned NumOut;
   EntryTy Ty;
+  /// True for loop-induction condition facts (see addInfoForInductions), which
+  /// are pushed in matching signed/unsigned pairs. Their cross-system
+  /// counterpart is therefore already provided explicitly, so the implicit
+  /// signed<->unsigned transfer in the main loop is redundant and skipped.
+  bool IsInductionFact = false;
 
   FactOrCheck(EntryTy Ty, DomTreeNode *DTN, Instruction *Inst)
       : Inst(Inst), NumIn(DTN->getDFSNumIn()), NumOut(DTN->getDFSNumOut()),
@@ -1075,6 +1080,16 @@ void State::addInfoForInductions(BasicBlock &BB) {
     return;
   }
   ++NumInductionFactsDerived;
+
+  // Mark every induction fact pushed below (across all early-return paths).
+  // They are pushed in matching signed/unsigned pairs, so their cross-system
+  // counterpart is already provided explicitly; skipping the implicit transfer
+  // for them avoids re-deriving facts that are already in the system.
+  unsigned FirstInductionFact = WorkList.size();
+  llvm::scope_exit MarkInductionFacts([&]() {
+    for (unsigned I = FirstInductionFact, E = WorkList.size(); I != E; ++I)
+      WorkList[I].IsInductionFact = true;
+  });
 
   // If we looked through `PN + C`, only derive facts when that add is
   // really the induction's post-increment.
@@ -2099,7 +2114,11 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
         if (Pred.hasSameSign())
           Info.addFact(ICmpInst::getFlippedSignednessPredicate(Pred), A, B,
                        CB.NumIn, CB.NumOut, DFSInStack);
-        else
+        else if (!CB.IsInductionFact)
+          // Induction facts are pushed as matching signed/unsigned pairs, so
+          // their cross-system counterpart is already added explicitly. Skip
+          // the implicit transfer, which would only re-derive it and inflate
+          // the constraint system for every dominated check.
           Info.transferToOtherSystem(Pred, A, B, CB.NumIn, CB.NumOut,
                                      DFSInStack);
       }
