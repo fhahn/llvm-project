@@ -96,14 +96,15 @@ define void @reduc_store_inside_unrolled(ptr noalias %dst, ptr noalias readonly 
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
+; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = reduction-start-vector ir<0>, ir<0>, ir<1>
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {
-; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
+; CHECK-NEXT:  vp<[[VP4:%[0-9]+]]> = CANONICAL-IV
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION nuw nsw ir<0>, ir<2>, vp<[[VP0]]>
-; CHECK-NEXT:      WIDEN-REDUCTION-PHI ir<%sum> = phi (add) ir<0>, ir<%sum.2>
+; CHECK-NEXT:      WIDEN-REDUCTION-PHI ir<%sum> = phi (add) vp<[[VP3]]>, ir<%sum.2>
 ; CHECK-NEXT:      EMIT ir<%gep.src> = getelementptr inbounds ir<%src>, ir<%iv>
 ; CHECK-NEXT:      EMIT-SCALAR ir<%0> = load ir<%gep.src>
 ; CHECK-NEXT:      EMIT ir<%sum.1> = add nsw ir<%0>, ir<%sum>
@@ -113,7 +114,7 @@ define void @reduc_store_inside_unrolled(ptr noalias %dst, ptr noalias readonly 
 ; CHECK-NEXT:      EMIT ir<%sum.2> = add nsw ir<%2>, ir<%sum.1>
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add nuw nsw ir<%iv>, ir<2>
 ; CHECK-NEXT:      EMIT ir<%cmp> = icmp sge ir<%iv.next>, ir<1000>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -121,9 +122,9 @@ define void @reduc_store_inside_unrolled(ptr noalias %dst, ptr noalias readonly 
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
 ; CHECK-NEXT:    CLONE store ir<%sum.2>, ir<%gep.dst>
-; CHECK-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = exiting-iv-value ir<%iv>
-; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = extract-last-part ir<%sum.2>
-; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = extract-last-lane vp<[[VP6]]>
+; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = exiting-iv-value ir<%iv>
+; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = extract-last-part ir<%sum.2>
+; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = extract-last-lane vp<[[VP7]]>
 ; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<500>, vp<[[VP2]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
@@ -132,8 +133,8 @@ define void @reduc_store_inside_unrolled(ptr noalias %dst, ptr noalias readonly 
 ; CHECK-NEXT:  No successors
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  scalar.ph:
-; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP5]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
-; CHECK-NEXT:    EMIT-SCALAR vp<%bc.merge.rdx> = phi [ vp<[[VP7]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
+; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP6]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
+; CHECK-NEXT:    EMIT-SCALAR vp<%bc.merge.rdx> = phi [ vp<[[VP8]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
 ; CHECK-NEXT:  Successor(s): ir-bb<for.body>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<for.body>:

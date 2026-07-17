@@ -989,12 +989,49 @@ bool VPlanTransforms::createHeaderPhiRecipes(
         RdxDesc.hasUsesOutsideReductionChain());
   };
 
+  // The plain-CFG header's first predecessor is the vector preheader, its
+  // second one the latch, see VPBlockUtils::getPlainCFGHeaderAndLatch.
+  auto *PreheaderVPBB = cast<VPBasicBlock>(HeaderVPBB->getPredecessors()[0]);
+
   for (VPRecipeBase &R : make_early_inc_range(HeaderVPBB->phis())) {
     auto *PhiR = cast<VPPhi>(&R);
     VPHeaderPHIRecipe *HeaderPhiR = CreateHeaderPhiRecipe(PhiR);
     HeaderPhiR->insertBefore(PhiR);
     PhiR->replaceAllUsesWith(HeaderPhiR);
     PhiR->eraseFromParent();
+
+    auto *RedPhiR = dyn_cast<VPReductionPHIRecipe>(HeaderPhiR);
+    if (!RedPhiR)
+      continue;
+
+    // A reduction phi whose backedge value is the phi itself is invariant and
+    // equal to its start value. Clean up such trivial non-reductions before
+    // creating any recipes for them.
+    if (RedPhiR->getBackedgeValue() == RedPhiR) {
+      RedPhiR->replaceAllUsesWith(RedPhiR->getStartValue());
+      RedPhiR->eraseFromParent();
+      continue;
+    }
+
+    RecurKind RK = RedPhiR->getRecurrenceKind();
+    bool IsStandardRdx = !RecurrenceDescriptor::isAnyOfRecurrenceKind(RK) &&
+                         !RecurrenceDescriptor::isFindIVRecurrenceKind(RK) &&
+                         !RecurrenceDescriptor::isMinMaxRecurrenceKind(RK) &&
+                         !RecurrenceDescriptor::isFindLastRecurrenceKind(RK);
+
+    // For standard reductions, wrap the start value in a ReductionStartVector
+    // recipe in the vector preheader. The scale factor is 1 here and updated
+    // later for partial reductions.
+    if (IsStandardRdx) {
+      VPBuilder PHBuilder(PreheaderVPBB);
+      VPValue *Iden = Plan.getOrAddLiveIn(getRecurrenceIdentity(
+          RK, RedPhiR->getScalarType(), RedPhiR->getFastMathFlagsOrNone()));
+      auto *ScaleFactorVPV = Plan.getConstantInt(/*BitWidth=*/32, /*Value=*/1);
+      VPValue *StartV = PHBuilder.createNaryOp(
+          VPInstruction::ReductionStartVector,
+          {RedPhiR->getStartValue(), Iden, ScaleFactorVPV}, *RedPhiR);
+      RedPhiR->setOperand(0, StartV);
+    }
   }
 
   if (!tryToSinkOrHoistRecurrenceUsers(HeaderVPBB, VPDT))
