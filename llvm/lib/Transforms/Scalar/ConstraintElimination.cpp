@@ -822,12 +822,16 @@ bool ConstraintTy::isValid(const ConstraintInfo &Info) const {
 
 std::optional<bool>
 ConstraintTy::isImpliedBy(const ConstraintSystem &CS) const {
-  bool IsConditionImplied = CS.isConditionImplied(Coefficients);
+  // A condition and its negations reference the same variables, so they share a
+  // connected component. Build it once and reuse it for all the checks below
+  // rather than recomputing it inside each isConditionImplied call.
+  auto CC = CS.getConnectedComponent(Coefficients);
+  bool IsConditionImplied = CC.isConditionImplied(Coefficients);
 
   if (IsEq || IsNe) {
     auto NegatedOrEqual = ConstraintSystem::negateOrEqual(Coefficients);
     bool IsNegatedOrEqualImplied =
-        !NegatedOrEqual.empty() && CS.isConditionImplied(NegatedOrEqual);
+        !NegatedOrEqual.empty() && CC.isConditionImplied(NegatedOrEqual);
 
     // In order to check that `%a == %b` is true (equality), both conditions `%a
     // >= %b` and `%a <= %b` must hold true. When checking for equality (`IsEq`
@@ -836,11 +840,11 @@ ConstraintTy::isImpliedBy(const ConstraintSystem &CS) const {
       return IsEq;
 
     auto Negated = ConstraintSystem::negate(Coefficients);
-    bool IsNegatedImplied = !Negated.empty() && CS.isConditionImplied(Negated);
+    bool IsNegatedImplied = !Negated.empty() && CC.isConditionImplied(Negated);
 
     auto StrictLessThan = ConstraintSystem::toStrictLessThan(Coefficients);
     bool IsStrictLessThanImplied =
-        !StrictLessThan.empty() && CS.isConditionImplied(StrictLessThan);
+        !StrictLessThan.empty() && CC.isConditionImplied(StrictLessThan);
 
     // In order to check that `%a != %b` is true (non-equality), either
     // condition `%a > %b` or `%a < %b` must hold true. When checking for
@@ -856,7 +860,7 @@ ConstraintTy::isImpliedBy(const ConstraintSystem &CS) const {
     return true;
 
   auto Negated = ConstraintSystem::negate(Coefficients);
-  auto IsNegatedImplied = !Negated.empty() && CS.isConditionImplied(Negated);
+  auto IsNegatedImplied = !Negated.empty() && CC.isConditionImplied(Negated);
   if (IsNegatedImplied)
     return false;
 

@@ -63,6 +63,21 @@ class ConstraintSystem {
   /// Get list of variable names from the Value2Index map.
   SmallVector<std::string> getVarNamesList() const;
 
+  /// Build the sub-system of constraints connected (transitively, through
+  /// shared variables) to query \p R, with variables compacted to a dense index
+  /// range. \p OldToNew is filled to map a variable's index in this system to
+  /// its compact index in the result (0 for variables outside the component).
+  ConstraintSystem
+  extractConnectedComponent(ArrayRef<int64_t> R,
+                            SmallVectorImpl<unsigned> &OldToNew) const;
+
+  /// Solve `Component + ¬R` for satisfiability. \p R is a query over the
+  /// original system's variables and \p OldToNew maps those to \p Component's
+  /// compact indices. \p Component is consumed (destroyed) by the solve.
+  static bool solveInComponent(ConstraintSystem Component,
+                               ArrayRef<unsigned> OldToNew,
+                               SmallVector<int64_t, 8> R);
+
 public:
   ConstraintSystem() = default;
   ConstraintSystem(ArrayRef<Value *> FunctionArgs) {
@@ -144,6 +159,18 @@ public:
     return R;
   }
 
+  /// The subset of the constraint system that shares a variable, transitively,
+  /// with a query. Only this connected component can affect whether the query
+  /// is implied (see isConditionImplied); rows over disjoint variables are
+  /// independently satisfiable. Precomputing it lets a family of queries over
+  /// the same variables -- e.g. a condition and its negations -- be checked
+  /// without rebuilding the component for each one. Defined out-of-line below,
+  /// as it holds a ConstraintSystem by value.
+  class ConnectedComponent;
+
+  /// Build the connected component of \p R's variables (see ConnectedComponent).
+  LLVM_ABI ConnectedComponent getConnectedComponent(ArrayRef<int64_t> R) const;
+
   LLVM_ABI bool isConditionImplied(SmallVector<int64_t, 8> R) const;
 
   SmallVector<int64_t> getLastConstraint() const {
@@ -165,6 +192,24 @@ public:
 
   /// Print the constraints in the system.
   LLVM_ABI void dump() const;
+};
+
+/// See ConstraintSystem::ConnectedComponent. Defined here rather than nested in
+/// the class body because it holds a ConstraintSystem by value.
+class ConstraintSystem::ConnectedComponent {
+  friend class ConstraintSystem;
+  /// The component's rows, with variables compacted to a dense index range so
+  /// Fourier-Motzkin elimination iterates only over them.
+  ConstraintSystem Component;
+  /// Maps a variable's index in the full system to its compact index in
+  /// \p Component (0 for variables outside the component).
+  SmallVector<unsigned, 16> OldToNew;
+
+public:
+  /// Returns true if \p R is implied by the constraints in the component. \p R
+  /// must be a query over the same variables the component was built for (a
+  /// condition and its negations all qualify).
+  LLVM_ABI bool isConditionImplied(SmallVector<int64_t, 8> R) const;
 };
 } // namespace llvm
 

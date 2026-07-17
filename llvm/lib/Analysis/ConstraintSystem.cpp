@@ -198,10 +198,15 @@ void ConstraintSystem::dump() const {
         break;
       if (E.Id == 0)
         continue;
+      // The Value2Index map (and hence Names) may be absent, e.g. for the
+      // temporary system solved in isConditionImplied. Fall back to a generic
+      // variable name in that case.
+      std::string Name = E.Id <= Names.size() ? Names[E.Id - 1]
+                                              : ("%v" + std::to_string(E.Id));
       std::string Coefficient;
       if (E.Coefficient != 1)
         Coefficient = std::to_string(E.Coefficient) + " * ";
-      Parts.push_back(Coefficient + Names[E.Id - 1]);
+      Parts.push_back(Coefficient + Name);
     }
     // assert(!Parts.empty() && "need to have at least some parts");
     int64_t ConstPart = 0;
@@ -221,7 +226,75 @@ bool ConstraintSystem::mayHaveSolution() {
   return HasSolution;
 }
 
-bool ConstraintSystem::isConditionImplied(SmallVector<int64_t, 8> R) const {
+ConstraintSystem
+ConstraintSystem::extractConnectedComponent(ArrayRef<int64_t> R,
+                                            SmallVectorImpl<unsigned> &OldToNew) const {
+  // Only constraints that share a variable (transitively) with a query R can
+  // affect whether `system + ¬R` has a solution: rows over variables in a
+  // disjoint connected component are independently satisfiable and cannot
+  // contribute to a contradiction involving R's variables. Building and solving
+  // just R's connected component avoids copying and Fourier-Motzkin-eliminating
+  // the (frequently much larger) remainder of the system on every check.
+  //
+  // This is sound: the restricted system is a subset of the full one, so an
+  // UNSAT result on it implies the full system is UNSAT as well (we never report
+  // a condition implied when it is not). It can only differ from solving the
+  // full system if the full system is itself inconsistent through a component
+  // disjoint from R (i.e. an unreachable program point); such folds are on dead
+  // code removed by later passes and do not change the optimized output.
+
+  // Mark the variables mentioned by the query and grow to the transitive
+  // closure over variables that co-occur in a constraint row. The row count is
+  // small, so a simple fixpoint is cheap.
+  SmallVector<bool, 16> InComponent(NumVariables + 1, false);
+  for (unsigned Id = 1, E = R.size(); Id < E; ++Id)
+    if (R[Id] != 0)
+      InComponent[Id] = true;
+  bool Changed = true;
+  while (Changed) {
+    Changed = false;
+    for (const auto &Row : Constraints) {
+      if (none_of(Row, [&](const Entry &E) {
+            return E.Id != 0 && InComponent[E.Id];
+          }))
+        continue;
+      for (const Entry &E : Row)
+        if (E.Id != 0 && !InComponent[E.Id]) {
+          InComponent[E.Id] = true;
+          Changed = true;
+        }
+    }
+  }
+
+  // Assign compact indices to the component's variables so the sub-system's
+  // Fourier-Motzkin elimination iterates only over them.
+  OldToNew.assign(NumVariables + 1, 0);
+  unsigned NextIdx = 1;
+  for (unsigned Id = 1; Id <= NumVariables; ++Id)
+    if (InComponent[Id])
+      OldToNew[Id] = NextIdx++;
+
+  ConstraintSystem Component;
+  Component.NumVariables = NextIdx;
+  for (const auto &Row : Constraints) {
+    if (none_of(Row, [&](const Entry &E) {
+          return E.Id != 0 && InComponent[E.Id];
+        }))
+      continue;
+    SmallVector<Entry, 8> NewRow;
+    for (const Entry &E : Row)
+      NewRow.emplace_back(E.Coefficient, E.Id == 0 ? 0 : OldToNew[E.Id]);
+    Component.Constraints.push_back(std::move(NewRow));
+  }
+  return Component;
+}
+
+/// Solve `Component + ¬R` for satisfiability, where \p R is a query over the
+/// original system's variables and \p OldToNew maps those to \p Component's
+/// compact indices. \p Component is taken by value and destroyed by the solve.
+bool ConstraintSystem::solveInComponent(ConstraintSystem Component,
+                                        ArrayRef<unsigned> OldToNew,
+                                        SmallVector<int64_t, 8> R) {
   // If all variable coefficients are 0, we have 'C >= 0'. If the constant is >=
   // 0, R is always true, regardless of the system.
   if (all_of(ArrayRef(R).drop_front(1), equal_to(0)))
@@ -233,7 +306,44 @@ bool ConstraintSystem::isConditionImplied(SmallVector<int64_t, 8> R) const {
   if (R.empty())
     return false;
 
-  auto NewSystem = *this;
-  NewSystem.addVariableRow(R);
-  return !NewSystem.mayHaveSolution();
+  // Remap the query row into the component's compact index space. R only
+  // references the component's variables, so every nonzero entry has a valid
+  // compact index.
+  SmallVector<int64_t, 8> NewR(Component.NumVariables, 0);
+  NewR[0] = R[0];
+  for (unsigned Id = 1, E = R.size(); Id < E; ++Id)
+    if (R[Id] != 0)
+      NewR[OldToNew[Id]] = R[Id];
+  Component.addVariableRow(NewR);
+  return !Component.mayHaveSolution();
+}
+
+ConstraintSystem::ConnectedComponent
+ConstraintSystem::getConnectedComponent(ArrayRef<int64_t> R) const {
+  ConnectedComponent CC;
+  CC.Component = extractConnectedComponent(R, CC.OldToNew);
+  return CC;
+}
+
+bool ConstraintSystem::ConnectedComponent::isConditionImplied(
+    SmallVector<int64_t, 8> R) const {
+  // Solve on a copy of the component; the component is reused across a family
+  // of related queries (a condition and its negations), so it must survive.
+  return solveInComponent(Component, OldToNew, std::move(R));
+}
+
+bool ConstraintSystem::isConditionImplied(SmallVector<int64_t, 8> R) const {
+  if (R.empty())
+    return false;
+
+  // Queries with no variables are trivially decided without building any
+  // component.
+  if (all_of(ArrayRef(R).drop_front(1), equal_to(0)))
+    return R[0] >= 0;
+
+  // A single query: build the component and solve it in place. Solving destroys
+  // the built sub-system, but it is a temporary here, so no copy is needed.
+  SmallVector<unsigned, 16> OldToNew;
+  ConstraintSystem Component = extractConnectedComponent(R, OldToNew);
+  return solveInComponent(std::move(Component), OldToNew, std::move(R));
 }
