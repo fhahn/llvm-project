@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Analysis/ConstraintSystem.h"
+#include "llvm/ADT/IntEqClasses.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/IR/Value.h"
@@ -243,47 +244,63 @@ ConstraintSystem::extractConnectedComponent(ArrayRef<int64_t> R,
   // disjoint from R (i.e. an unreachable program point); such folds are on dead
   // code removed by later passes and do not change the optimized output.
 
-  // Mark the variables mentioned by the query and grow to the transitive
-  // closure over variables that co-occur in a constraint row. The row count is
-  // small, so a simple fixpoint is cheap.
-  SmallVector<bool, 16> InComponent(NumVariables + 1, false);
+  // A query only references variables of this system, so it cannot be wider
+  // than it. (Callers reject queries that would introduce new variables.)
+  assert((Constraints.empty() || R.size() <= NumVariables + 1) &&
+         "query is wider than the system");
+
+  // Partition the variables into connected components by joining, for every
+  // row, all variables that co-occur in it. Variable 0 is the constant term and
+  // never joins anything. Union-find keeps this linear in the total number of
+  // entries, rather than the row-count fixpoint a naive transitive closure
+  // would need.
+  IntEqClasses Components(NumVariables + 1);
+  auto JoinVars = [&](uint16_t &First, uint16_t Id) {
+    if (Id == 0)
+      return;
+    if (First == 0)
+      First = Id;
+    else
+      Components.join(First, Id);
+  };
+  for (const auto &Row : Constraints) {
+    uint16_t First = 0;
+    for (const Entry &E : Row)
+      JoinVars(First, E.Id);
+  }
+  // The query relates its own variables too. Join them so that variables tied
+  // together only by R (not by any stored row) share one component; otherwise
+  // the query would be restricted to just one of them and mis-solved.
+  uint16_t FirstR = 0;
   for (unsigned Id = 1, E = R.size(); Id < E; ++Id)
     if (R[Id] != 0)
-      InComponent[Id] = true;
-  bool Changed = true;
-  while (Changed) {
-    Changed = false;
-    for (const auto &Row : Constraints) {
-      if (none_of(Row, [&](const Entry &E) {
-            return E.Id != 0 && InComponent[E.Id];
-          }))
-        continue;
-      for (const Entry &E : Row)
-        if (E.Id != 0 && !InComponent[E.Id]) {
-          InComponent[E.Id] = true;
-          Changed = true;
-        }
-    }
-  }
+      JoinVars(FirstR, Id);
+
+  // R's component leader identifies the variables that can affect the query.
+  // A constant-only query (FirstR == 0) reaches here via getConnectedComponent;
+  // leave Leader as 0, which no real variable maps to, yielding an empty
+  // component that solveInComponent decides from the constant alone.
+  unsigned Leader = FirstR == 0 ? 0 : Components.findLeader(FirstR);
 
   // Assign compact indices to the component's variables so the sub-system's
-  // Fourier-Motzkin elimination iterates only over them.
+  // Fourier-Motzkin elimination iterates only over them. OldToNew doubles as
+  // the membership marker: it is 0 for variables outside the component.
   OldToNew.assign(NumVariables + 1, 0);
   unsigned NextIdx = 1;
   for (unsigned Id = 1; Id <= NumVariables; ++Id)
-    if (InComponent[Id])
+    if (Components.findLeader(Id) == Leader)
       OldToNew[Id] = NextIdx++;
 
   ConstraintSystem Component;
   Component.NumVariables = NextIdx;
   for (const auto &Row : Constraints) {
-    if (none_of(Row, [&](const Entry &E) {
-          return E.Id != 0 && InComponent[E.Id];
-        }))
+    // A row is in the component iff any of its variables is; since all of a
+    // row's variables share one component, testing the first one suffices.
+    if (none_of(Row, [&](const Entry &E) { return OldToNew[E.Id] != 0; }))
       continue;
     SmallVector<Entry, 8> NewRow;
     for (const Entry &E : Row)
-      NewRow.emplace_back(E.Coefficient, E.Id == 0 ? 0 : OldToNew[E.Id]);
+      NewRow.emplace_back(E.Coefficient, OldToNew[E.Id]);
     Component.Constraints.push_back(std::move(NewRow));
   }
   return Component;
