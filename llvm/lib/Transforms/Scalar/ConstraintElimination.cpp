@@ -1024,8 +1024,8 @@ void State::addInfoForInductions(BasicBlock &BB) {
   DomTreeNode *DTN = DT.getNode(InLoopSucc);
 
   // If we looked through `PN + C`, only derive facts when that add is
-  // really the induction's post-increment.
-  if (IncStep && (*IncStep != *StepOffset || StepOffset->isNegative()))
+  // really the induction's post-increment or post-decrement.
+  if (IncStep && *IncStep != *StepOffset)
     return;
 
   // Handle negative steps.
@@ -1034,23 +1034,59 @@ void State::addInfoForInductions(BasicBlock &BB) {
     if (!(-*StepOffset).isOne())
       return;
 
+    // A step of -1 with no-wrap flags is monotonically decreasing, so
+    // StartValue >= PN holds unconditionally (regardless of where the loop
+    // exits), mirroring the unconditional monotonicity facts derived for
+    // non-negative steps below. Signed decreasing monotonicity follows from an
+    // nsw decrement; if the wrap flags are missing, refine via SCEV.
+    bool MonotonicallyDecreasingUnsigned = Inc && Inc->hasNoUnsignedWrap();
+    bool MonotonicallyDecreasingSigned = Inc && Inc->hasNoSignedWrap();
+    if (!(MonotonicallyDecreasingUnsigned && MonotonicallyDecreasingSigned)) {
+      const SCEVAddRecExpr *IndAR = cast<SCEVAddRecExpr>(SE.getSCEV(PN));
+      if (!MonotonicallyDecreasingUnsigned)
+        MonotonicallyDecreasingUnsigned =
+            SE.getMonotonicPredicateType(IndAR, CmpInst::ICMP_ULT) ==
+            ScalarEvolution::MonotonicallyDecreasing;
+      if (!MonotonicallyDecreasingSigned)
+        MonotonicallyDecreasingSigned =
+            SE.getMonotonicPredicateType(IndAR, CmpInst::ICMP_SLT) ==
+            ScalarEvolution::MonotonicallyDecreasing;
+    }
+    if (MonotonicallyDecreasingUnsigned)
+      WorkList.push_back(
+          FactOrCheck::getConditionFact(DTN, CmpInst::ICMP_UGE, StartValue, PN));
+    if (MonotonicallyDecreasingSigned)
+      WorkList.push_back(
+          FactOrCheck::getConditionFact(DTN, CmpInst::ICMP_SGE, StartValue, PN));
+
+    // The loop exits when the counting value reaches B. For a raw-phi compare
+    // that is PN == B, so the body runs with B < PN <= StartValue and the
+    // induction reaches B without wrapping as long as B <= StartValue. For a
+    // post-decrement compare (`icmp (PN + Step), B`) the loop instead exits at
+    // PN == B + 1, so the body runs with B + 1 < PN <= StartValue and reaching
+    // B + 1 without wrapping requires B < StartValue (strict); the strict
+    // precondition is also what makes the derived facts hold: at B == StartValue
+    // a post-decrement loop steps past B and wraps around the whole range.
+    CmpInst::Predicate UPrecond =
+        IncStep ? CmpInst::ICMP_ULT : CmpInst::ICMP_ULE;
+    CmpInst::Predicate SPrecond =
+        IncStep ? CmpInst::ICMP_SLT : CmpInst::ICMP_SLE;
+
     // AR may wrap.
-    // Add StartValue >= PN conditional on B <= StartValue which guarantees that
-    // the loop exits before wrapping with a step of -1.
+    // Add StartValue >= PN conditional on the no-wrap precondition, which
+    // guarantees that the loop exits before wrapping with a step of -1.
     WorkList.push_back(FactOrCheck::getConditionFact(
         DTN, CmpInst::ICMP_UGE, StartValue, PN,
-        ConditionTy(CmpInst::ICMP_ULE, B, StartValue)));
+        ConditionTy(UPrecond, B, StartValue)));
     WorkList.push_back(FactOrCheck::getConditionFact(
         DTN, CmpInst::ICMP_SGE, StartValue, PN,
-        ConditionTy(CmpInst::ICMP_SLE, B, StartValue)));
-    // Add PN > B conditional on B <= StartValue which guarantees that the loop
-    // exits when reaching B with a step of -1.
+        ConditionTy(SPrecond, B, StartValue)));
+    // Add PN > B conditional on the no-wrap precondition, which guarantees that
+    // the loop exits when reaching B with a step of -1.
     WorkList.push_back(FactOrCheck::getConditionFact(
-        DTN, CmpInst::ICMP_UGT, PN, B,
-        ConditionTy(CmpInst::ICMP_ULE, B, StartValue)));
+        DTN, CmpInst::ICMP_UGT, PN, B, ConditionTy(UPrecond, B, StartValue)));
     WorkList.push_back(FactOrCheck::getConditionFact(
-        DTN, CmpInst::ICMP_SGT, PN, B,
-        ConditionTy(CmpInst::ICMP_SLE, B, StartValue)));
+        DTN, CmpInst::ICMP_SGT, PN, B, ConditionTy(SPrecond, B, StartValue)));
     return;
   }
 
