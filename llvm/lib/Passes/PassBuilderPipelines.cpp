@@ -791,6 +791,16 @@ PassBuilder::buildFunctionSimplificationPipeline(OptimizationLevel Level,
   FPM.addPass(InstCombinePass());
   invokePeepholeEPCallbacks(FPM, Level);
 
+  // Re-run constraint elimination now that the loop passes (IndVarSimplify),
+  // SCCP and InstCombine have run. Those passes strengthen no-wrap flags and
+  // canonicalize induction/derived values into forms the constraint solver can
+  // reason about (e.g. `add nsw` on a decrementing IV), and loop rotation can
+  // re-materialize induction range checks after the earlier constraint
+  // elimination pass. Running it here catches the resulting redundant checks
+  // (frequent in Swift/bounds-checked code) that were not yet provable earlier.
+  if (EnableConstraintElimination)
+    FPM.addPass(ConstraintEliminationPass());
+
   // Re-consider control flow based optimizations after redundancy elimination,
   // redo DCE, etc.
   if (EnableDFAJumpThreading)
