@@ -1236,7 +1236,8 @@ void State::addInfoFor(BasicBlock &BB) {
       }
       break;
     }
-    // Enqueue ssub_with_overflow for simplification.
+    // Enqueue sadd/ssub_with_overflow for simplification.
+    case Intrinsic::sadd_with_overflow:
     case Intrinsic::ssub_with_overflow:
     case Intrinsic::ucmp:
     case Intrinsic::scmp:
@@ -1829,16 +1830,18 @@ void ConstraintInfo::addFactImpl(CmpInst::Predicate Pred, Value *A, Value *B,
   }
 }
 
-static bool replaceSubOverflowUses(IntrinsicInst *II, Value *A, Value *B,
-                                   SmallVectorImpl<Instruction *> &ToRemove) {
+static bool replaceOverflowUses(IntrinsicInst *II,
+                                Instruction::BinaryOps Opcode, Value *A,
+                                Value *B,
+                                SmallVectorImpl<Instruction *> &ToRemove) {
   bool Changed = false;
   IRBuilder<> Builder(II->getParent(), II->getIterator());
-  Value *Sub = nullptr;
+  Value *Res = nullptr;
   for (User *U : make_early_inc_range(II->users())) {
     if (match(U, m_ExtractValue<0>(m_Value()))) {
-      if (!Sub)
-        Sub = Builder.CreateSub(A, B);
-      U->replaceAllUsesWith(Sub);
+      if (!Res)
+        Res = Builder.CreateBinOp(Opcode, A, B);
+      U->replaceAllUsesWith(Res);
       Changed = true;
     } else if (match(U, m_ExtractValue<1>(m_Value()))) {
       U->replaceAllUsesWith(Builder.getFalse());
@@ -1884,7 +1887,36 @@ tryToSimplifyOverflowMath(IntrinsicInst *II, ConstraintInfo &Info,
         !DoesConditionHold(CmpInst::ICMP_SGE, B,
                            ConstantInt::get(A->getType(), 0), Info))
       return false;
-    Changed = replaceSubOverflowUses(II, A, B, ToRemove);
+    Changed = replaceOverflowUses(II, Instruction::Sub, A, B, ToRemove);
+  } else if (II->getIntrinsicID() == Intrinsic::sadd_with_overflow) {
+    // sadd.with.overflow(A, C) with a constant C does not overflow when A stays
+    // within the signed range after adding C: for C s>= 0 that needs
+    // A s<= SMAX - C, for C s< 0 it needs A s>= SMIN - C. This is the common
+    // shape for a bounded induction increment (`i + 1` with i below the loop
+    // bound), where the constraint solver knows the bound on A.
+    Value *A = II->getArgOperand(0);
+    const APInt *C;
+    if (!match(II->getArgOperand(1), m_APInt(C)))
+      return false;
+    unsigned BitWidth = C->getBitWidth();
+    Value *Limit;
+    CmpInst::Predicate Pred;
+    if (C->isNonNegative()) {
+      // A s<= SMAX - C  <=>  A s< SMAX - C + 1 (SMAX - C + 1 does not wrap as
+      // C s>= 0, so SMAX - C + 1 s> SMIN).
+      Limit = ConstantInt::get(A->getType(),
+                               APInt::getSignedMaxValue(BitWidth) - *C);
+      Pred = CmpInst::ICMP_SLE;
+    } else {
+      // A s>= SMIN - C (SMIN - C does not wrap as C s< 0).
+      Limit = ConstantInt::get(A->getType(),
+                               APInt::getSignedMinValue(BitWidth) - *C);
+      Pred = CmpInst::ICMP_SGE;
+    }
+    if (!Info.doesHold(Pred, A, Limit))
+      return false;
+    Changed = replaceOverflowUses(II, Instruction::Add, A, II->getArgOperand(1),
+                                  ToRemove);
   }
   return Changed;
 }

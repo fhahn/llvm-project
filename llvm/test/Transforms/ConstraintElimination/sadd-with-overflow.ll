@@ -13,11 +13,9 @@ define i8 @sadd_no_overflow_pos_const(i8 %a) {
 ; CHECK-NEXT:    [[OK:%.*]] = and i1 [[LO]], [[HI]]
 ; CHECK-NEXT:    br i1 [[OK]], label %[[THEN:.*]], label %[[ELSE:.*]]
 ; CHECK:       [[THEN]]:
-; CHECK-NEXT:    [[S:%.*]] = call { i8, i1 } @llvm.sadd.with.overflow.i8(i8 [[A]], i8 1)
-; CHECK-NEXT:    [[V:%.*]] = extractvalue { i8, i1 } [[S]], 0
-; CHECK-NEXT:    [[O:%.*]] = extractvalue { i8, i1 } [[S]], 1
-; CHECK-NEXT:    call void @use(i1 [[O]])
-; CHECK-NEXT:    ret i8 [[V]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i8 [[A]], 1
+; CHECK-NEXT:    call void @use(i1 false)
+; CHECK-NEXT:    ret i8 [[TMP0]]
 ; CHECK:       [[ELSE]]:
 ; CHECK-NEXT:    ret i8 0
 ;
@@ -48,11 +46,9 @@ define i8 @sadd_no_overflow_neg_const(i8 %a) {
 ; CHECK-NEXT:    [[OK:%.*]] = and i1 [[LO]], [[HI]]
 ; CHECK-NEXT:    br i1 [[OK]], label %[[THEN:.*]], label %[[ELSE:.*]]
 ; CHECK:       [[THEN]]:
-; CHECK-NEXT:    [[S:%.*]] = call { i8, i1 } @llvm.sadd.with.overflow.i8(i8 [[A]], i8 -1)
-; CHECK-NEXT:    [[V:%.*]] = extractvalue { i8, i1 } [[S]], 0
-; CHECK-NEXT:    [[O:%.*]] = extractvalue { i8, i1 } [[S]], 1
-; CHECK-NEXT:    call void @use(i1 [[O]])
-; CHECK-NEXT:    ret i8 [[V]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i8 [[A]], -1
+; CHECK-NEXT:    call void @use(i1 false)
+; CHECK-NEXT:    ret i8 [[TMP0]]
 ; CHECK:       [[ELSE]]:
 ; CHECK-NEXT:    ret i8 0
 ;
