@@ -1303,7 +1303,8 @@ void State::addInfoFor(BasicBlock &BB) {
         WorkList.push_back(FactOrCheck::getInstFact(DT.getNode(&BB), BO));
     }
 
-    GuaranteedToExecute &= isGuaranteedToTransferExecutionToSuccessor(&I);
+    if (GuaranteedToExecute)
+      GuaranteedToExecute &= isGuaranteedToTransferExecutionToSuccessor(&I);
   }
 
   if (auto *Switch = dyn_cast<SwitchInst>(BB.getTerminator())) {
