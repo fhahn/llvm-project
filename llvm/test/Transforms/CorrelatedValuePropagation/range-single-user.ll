@@ -120,7 +120,7 @@ define i8 @no_refine_phi_user(i8 %a) {
 ; CHECK-LABEL: define range(i8 0, 97) i8 @no_refine_phi_user(
 ; CHECK-SAME: i8 [[A:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    [[C:%.*]] = add i8 [[A]], 3
+; CHECK-NEXT:    [[C:%.*]] = add nuw nsw i8 [[A]], 3
 ; CHECK-NEXT:    [[CMP:%.*]] = icmp eq i8 [[A]], 93
 ; CHECK-NEXT:    br i1 [[CMP]], label %[[THEN:.*]], label %[[EXIT:.*]]
 ; CHECK:       [[THEN]]:

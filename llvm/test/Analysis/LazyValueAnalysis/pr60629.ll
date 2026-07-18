@@ -11,7 +11,7 @@ define i32 @test(i32 %arg) {
 ; CHECK:       loop:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ 127, [[ENTRY:%.*]] ], [ [[IV_NEXT:%.*]], [[DO_SHIFT:%.*]] ]
 ; CHECK-NEXT:    [[SHIFTED_IV:%.*]] = phi i32 [ 0, [[ENTRY]] ], [ [[SHIFT:%.*]], [[DO_SHIFT]] ]
-; CHECK-NEXT:    [[IV_NEXT]] = add i32 [[IV]], 1
+; CHECK-NEXT:    [[IV_NEXT]] = add nsw i32 [[IV]], 1
 ; CHECK-NEXT:    [[LOOP_COND:%.*]] = icmp sgt i32 [[IV]], 127
 ; CHECK-NEXT:    br i1 [[LOOP_COND]], label [[EXIT:%.*]], label [[DO_SHIFT]]
 ; CHECK:       do.shift:

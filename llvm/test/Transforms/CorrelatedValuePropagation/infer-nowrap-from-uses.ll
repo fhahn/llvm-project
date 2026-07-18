@@ -254,11 +254,13 @@ exit:
   ret void
 }
 
-define i8 @neg_phi_use(i8 %i) {
-; CHECK-LABEL: define range(i8 0, -3) i8 @neg_phi_use(
+; A phi use is constrained by the incoming edge feeding it: the value reaches
+; the phi only via the guarded `uses` edge (i < 10), so `shl i, 2` is nsw+nuw.
+define i8 @phi_use_guarded_edge(i8 %i) {
+; CHECK-LABEL: define range(i8 0, -3) i8 @phi_use_guarded_edge(
 ; CHECK-SAME: i8 [[I:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    [[R:%.*]] = shl i8 [[I]], 2
+; CHECK-NEXT:    [[R:%.*]] = shl nuw nsw i8 [[I]], 2
 ; CHECK-NEXT:    [[C:%.*]] = icmp ult i8 [[I]], 10
 ; CHECK-NEXT:    br i1 [[C]], label %[[USES:.*]], label %[[EXIT:.*]]
 ; CHECK:       [[USES]]:
@@ -277,6 +279,39 @@ uses:
 
 exit:
   %p = phi i8 [ %r, %uses ], [ 0, %entry ]
+  ret i8 %p
+}
+
+; Negative: the value reaches the phi via the *unguarded* entry edge (i
+; unconstrained), so no-wrap cannot be inferred.
+define i8 @neg_phi_use_unguarded_edge(i8 %i, i1 %cc) {
+; CHECK-LABEL: define range(i8 0, -3) i8 @neg_phi_use_unguarded_edge(
+; CHECK-SAME: i8 [[I:%.*]], i1 [[CC:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[R:%.*]] = shl i8 [[I]], 2
+; CHECK-NEXT:    br i1 [[CC]], label %[[MID:.*]], label %[[EXIT:.*]]
+; CHECK:       [[MID]]:
+; CHECK-NEXT:    [[C:%.*]] = icmp ult i8 [[I]], 10
+; CHECK-NEXT:    br i1 [[C]], label %[[USES:.*]], label %[[EXIT]]
+; CHECK:       [[USES]]:
+; CHECK-NEXT:    br label %[[EXIT]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    [[P:%.*]] = phi i8 [ [[R]], %[[ENTRY]] ], [ [[R]], %[[USES]] ], [ 99, %[[MID]] ]
+; CHECK-NEXT:    ret i8 [[P]]
+;
+entry:
+  %r = shl i8 %i, 2
+  br i1 %cc, label %mid, label %exit
+
+mid:
+  %c = icmp ult i8 %i, 10
+  br i1 %c, label %uses, label %exit
+
+uses:
+  br label %exit
+
+exit:
+  %p = phi i8 [ %r, %entry ], [ %r, %uses ], [ 99, %mid ]
   ret i8 %p
 }
 

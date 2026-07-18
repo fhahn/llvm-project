@@ -1205,11 +1205,17 @@ static NoWrapFlags computeNoWrapFlags(Instruction::BinaryOps Opcode,
 // Try to prove that \p BinOp does not wrap by looking at the operand ranges
 // constrained at each of its use sites, rather than at the definition. This
 // improves results, e.g. when all uses are constrained by a runtime check.
+//
+// For a phi use the constraining program point is the incoming edge feeding the
+// phi (the phi block itself does not constrain the value), so the operand
+// ranges are queried on that edge.
 static NoWrapFlags inferNoWrapFromUses(BinaryOperator *BinOp,
                                        LazyValueInfo *LVI, bool WantNSW,
                                        bool WantNUW) {
-  // Skip analysis, when there are too many uses to check or any use is in the
-  // same block.
+  // Skip analysis when there are too many uses to check, or any use (or, for a
+  // phi, its incoming edge) is in the same block as the definition. A use in
+  // the def block is not constrained by a dominating guard, and a phi incoming
+  // edge from the def block gives the value no guarding branch to constrain it.
   const unsigned MaxUsesToInspect = 4;
   BasicBlock *DefBB = BinOp->getParent();
   unsigned NumUses = 0;
@@ -1217,23 +1223,37 @@ static NoWrapFlags inferNoWrapFromUses(BinaryOperator *BinOp,
     if (++NumUses > MaxUsesToInspect)
       return {};
     auto *UserI = cast<Instruction>(U.getUser());
-    if (isa<PHINode>(UserI) || UserI->getParent() == DefBB)
+    if (auto *PHI = dyn_cast<PHINode>(UserI)) {
+      if (PHI->getIncomingBlock(U) == DefBB)
+        return {};
+    } else if (UserI->getParent() == DefBB) {
       return {};
+    }
   }
   if (NumUses == 0)
     return {};
 
   Instruction::BinaryOps Opcode = BinOp->getOpcode();
+  Value *Op0 = BinOp->getOperand(0);
+  Value *Op1 = BinOp->getOperand(1);
   NoWrapFlags Flags;
   Flags.NSW = WantNSW;
   Flags.NUW = WantNUW;
   for (Use &U : BinOp->uses()) {
     auto *UserI = cast<Instruction>(U.getUser());
     // Constrain both operands at this use site and see which flags still hold.
-    ConstantRange LRange = LVI->getConstantRange(BinOp->getOperand(0), UserI,
-                                                 /*UndefAllowed=*/false);
-    ConstantRange RRange = LVI->getConstantRange(BinOp->getOperand(1), UserI,
-                                                 /*UndefAllowed=*/false);
+    // A phi consumes its incoming value on the corresponding edge, so query the
+    // operand ranges on that edge rather than in the phi's block.
+    ConstantRange LRange(BinOp->getType()->getScalarSizeInBits(), true);
+    ConstantRange RRange = LRange;
+    if (auto *PHI = dyn_cast<PHINode>(UserI)) {
+      BasicBlock *Pred = PHI->getIncomingBlock(U);
+      LRange = LVI->getConstantRangeOnEdge(Op0, Pred, PHI->getParent());
+      RRange = LVI->getConstantRangeOnEdge(Op1, Pred, PHI->getParent());
+    } else {
+      LRange = LVI->getConstantRange(Op0, UserI, /*UndefAllowed=*/false);
+      RRange = LVI->getConstantRange(Op1, UserI, /*UndefAllowed=*/false);
+    }
     Flags = computeNoWrapFlags(Opcode, LRange, RRange, Flags.NSW, Flags.NUW);
     if (!Flags.NSW && !Flags.NUW)
       return {};
