@@ -10,7 +10,6 @@
 #define LLVM_ANALYSIS_CONSTRAINTSYSTEM_H
 
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MathExtras.h"
@@ -50,29 +49,15 @@ class ConstraintSystem {
   ///   c0 >= v0 * c1 + .... + v{n-1} * cn
   SmallVector<SmallVector<Entry, 8>, 4> Constraints;
 
-  /// A map of variables (IR values) to their corresponding index in the
-  /// constraint system.
-  DenseMap<Value *, unsigned> Value2Index;
-
   // Eliminate constraints from the system using Fourier–Motzkin elimination.
   bool eliminateUsingFM();
 
   /// Returns true if there may be a solution for the constraints in the system.
   bool mayHaveSolutionImpl();
 
-  /// Get list of variable names from the Value2Index map.
-  SmallVector<std::string> getVarNamesList() const;
-
 public:
   ConstraintSystem() = default;
-  ConstraintSystem(ArrayRef<Value *> FunctionArgs) {
-    NumVariables += FunctionArgs.size();
-    for (auto *Arg : FunctionArgs) {
-      Value2Index.insert({Arg, Value2Index.size() + 1});
-    }
-  }
-  ConstraintSystem(const DenseMap<Value *, unsigned> &Value2Index)
-      : NumVariables(Value2Index.size()), Value2Index(Value2Index) {}
+  ConstraintSystem(unsigned NumVariables) : NumVariables(NumVariables) {}
 
   bool addVariableRow(ArrayRef<int64_t> R) {
     assert(Constraints.empty() || R.size() == NumVariables);
@@ -95,11 +80,6 @@ public:
       NumVariables = R.size();
     Constraints.push_back(std::move(NewRow));
     return true;
-  }
-
-  DenseMap<Value *, unsigned> &getValue2Index() { return Value2Index; }
-  const DenseMap<Value *, unsigned> &getValue2Index() const {
-    return Value2Index;
   }
 
   bool addVariableRowFill(ArrayRef<int64_t> R) {
@@ -174,8 +154,10 @@ public:
   /// Returns the number of rows in the constraint system.
   unsigned size() const { return Constraints.size(); }
 
-  /// Print the constraints in the system.
-  LLVM_ABI void dump() const;
+  /// Print the constraints in the system. \p Names optionally provides a
+  /// display name for each variable (indexed by variable id - 1); ids without
+  /// a name fall back to a generic \c %%vN placeholder.
+  LLVM_ABI void dump(ArrayRef<std::string> Names = {}) const;
 };
 } // namespace llvm
 

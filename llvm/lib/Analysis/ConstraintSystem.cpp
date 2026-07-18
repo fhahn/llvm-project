@@ -10,7 +10,6 @@
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/IR/Value.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
 
@@ -172,26 +171,10 @@ bool ConstraintSystem::mayHaveSolutionImpl() {
   });
 }
 
-SmallVector<std::string> ConstraintSystem::getVarNamesList() const {
-  SmallVector<std::string> Names(Value2Index.size(), "");
-#ifndef NDEBUG
-  for (auto &[V, Index] : Value2Index) {
-    std::string OperandName;
-    if (V->getName().empty())
-      OperandName = V->getNameOrAsOperand();
-    else
-      OperandName = std::string("%") + V->getName().str();
-    Names[Index - 1] = OperandName;
-  }
-#endif
-  return Names;
-}
-
-void ConstraintSystem::dump() const {
+void ConstraintSystem::dump(ArrayRef<std::string> Names) const {
 #ifndef NDEBUG
   if (Constraints.empty())
     return;
-  SmallVector<std::string> Names = getVarNamesList();
   for (const auto &Row : Constraints) {
     SmallVector<std::string, 16> Parts;
     for (const Entry &E : Row) {
@@ -199,8 +182,8 @@ void ConstraintSystem::dump() const {
         break;
       if (E.Id == 0)
         continue;
-      // The Value2Index map (and hence Names) may be absent, e.g. for the
-      // temporary system solved in isConditionImplied. Fall back to a generic
+      // Names may be absent (e.g. for the temporary sub-system solved in
+      // isConditionImplied) or only partially populated. Fall back to a generic
       // variable name in that case.
       std::string Name = E.Id <= Names.size() ? Names[E.Id - 1]
                                               : ("%v" + std::to_string(E.Id));

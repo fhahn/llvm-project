@@ -259,11 +259,24 @@ class ConstraintInfo {
   ConstraintSystem UnsignedCS;
   ConstraintSystem SignedCS;
 
+  /// Maps of variables (IR values) to their corresponding index in the
+  /// unsigned/signed constraint system. Kept alongside the systems here rather
+  /// than inside ConstraintSystem so the (potentially large) maps are not
+  /// copied when a system is copied to solve a query.
+  DenseMap<Value *, unsigned> UnsignedValue2Index;
+  DenseMap<Value *, unsigned> SignedValue2Index;
+
   const DataLayout &DL;
 
 public:
   ConstraintInfo(const DataLayout &DL, ArrayRef<Value *> FunctionArgs)
-      : UnsignedCS(FunctionArgs), SignedCS(FunctionArgs), DL(DL) {
+      : UnsignedCS(FunctionArgs.size()), SignedCS(FunctionArgs.size()), DL(DL) {
+    // Both systems track the function arguments as their initial variables.
+    for (Value *Arg : FunctionArgs) {
+      unsigned Idx = UnsignedValue2Index.size() + 1;
+      UnsignedValue2Index.insert({Arg, Idx});
+      SignedValue2Index.insert({Arg, Idx});
+    }
     auto &Value2Index = getValue2Index(false);
     // Add Arg > -1 constraints to unsigned system for all function arguments.
     for (Value *Arg : FunctionArgs) {
@@ -275,10 +288,10 @@ public:
   }
 
   DenseMap<Value *, unsigned> &getValue2Index(bool Signed) {
-    return Signed ? SignedCS.getValue2Index() : UnsignedCS.getValue2Index();
+    return Signed ? SignedValue2Index : UnsignedValue2Index;
   }
   const DenseMap<Value *, unsigned> &getValue2Index(bool Signed) const {
-    return Signed ? SignedCS.getValue2Index() : UnsignedCS.getValue2Index();
+    return Signed ? SignedValue2Index : UnsignedValue2Index;
   }
 
   ConstraintSystem &getCS(bool Signed) {
@@ -934,11 +947,27 @@ void ConstraintInfo::transferToOtherSystem(
 
 #ifndef NDEBUG
 
+/// Build the list of variable display names for \p Value2Index, indexed by
+/// variable id - 1, for use with ConstraintSystem::dump.
+static SmallVector<std::string>
+getVarNamesList(const DenseMap<Value *, unsigned> &Value2Index) {
+  SmallVector<std::string> Names(Value2Index.size(), "");
+  for (auto &[V, Index] : Value2Index) {
+    std::string OperandName;
+    if (V->getName().empty())
+      OperandName = V->getNameOrAsOperand();
+    else
+      OperandName = std::string("%") + V->getName().str();
+    Names[Index - 1] = OperandName;
+  }
+  return Names;
+}
+
 static void dumpConstraint(ArrayRef<int64_t> C,
                            const DenseMap<Value *, unsigned> &Value2Index) {
-  ConstraintSystem CS(Value2Index);
+  ConstraintSystem CS(Value2Index.size());
   CS.addVariableRowFill(C);
-  CS.dump();
+  CS.dump(getVarNamesList(Value2Index));
 }
 #endif
 
@@ -1532,7 +1561,7 @@ static std::optional<bool> checkCondition(CmpInst::Predicate Pred, Value *A,
                                            : CmpInst::getInversePredicate(Pred),
                          A, B);
         dbgs() << " implied by dominating constraints\n";
-        CSToUse.dump();
+        CSToUse.dump(getVarNamesList(Info.getValue2Index(R.IsSigned)));
       });
       return ImpliedCondition;
     }
