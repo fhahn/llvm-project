@@ -800,11 +800,13 @@ ConstraintInfo::getConstraint(CmpInst::Predicate Pred, Value *Op0, Value *Op1,
 ConstraintTy ConstraintInfo::getConstraintForSolving(CmpInst::Predicate Pred,
                                                      Value *Op0,
                                                      Value *Op1) const {
-  Constant *NullC = Constant::getNullValue(Op0->getType());
   // Handle trivially true compares directly to avoid adding V UGE 0 constraints
-  // for all variables in the unsigned system.
-  if ((Pred == CmpInst::ICMP_ULE && Op0 == NullC) ||
-      (Pred == CmpInst::ICMP_UGE && Op1 == NullC)) {
+  // for all variables in the unsigned system. Only compute the null constant
+  // for the predicates that can be trivially true.
+  if ((Pred == CmpInst::ICMP_ULE &&
+       Op0 == Constant::getNullValue(Op0->getType())) ||
+      (Pred == CmpInst::ICMP_UGE &&
+       Op1 == Constant::getNullValue(Op1->getType()))) {
     auto &Value2Index = getValue2Index(false);
     // Return constraint that's trivially true.
     return ConstraintTy(SmallVector<int64_t, 8>(Value2Index.size(), 0), false,
