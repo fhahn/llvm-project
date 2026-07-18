@@ -239,14 +239,20 @@ ConstraintSystem::getSubSystem(ArrayRef<int64_t> R) const {
   for (unsigned Id = 1, E = R.size(); Id < E; ++Id)
     if (R[Id] != 0)
       InSystem[Id] = true;
+
+  SmallBitVector RowInSystem(Constraints.size(), false);
   bool Changed = true;
   while (Changed) {
     Changed = false;
-    for (const auto &Row : Constraints) {
-      // No common variables, skip.
+    for (unsigned RowIdx = 0, E = Constraints.size(); RowIdx != E; ++RowIdx) {
+      if (RowInSystem[RowIdx])
+        continue;
+      const auto &Row = Constraints[RowIdx];
+      // No common variables (yet), skip.
       if (none_of(Row,
                   [&](const Entry &E) { return E.Id != 0 && InSystem[E.Id]; }))
         continue;
+      RowInSystem[RowIdx] = true;
       for (const Entry &E : Row)
         if (E.Id != 0 && !InSystem[E.Id]) {
           InSystem[E.Id] = true;
@@ -262,12 +268,10 @@ ConstraintSystem::getSubSystem(ArrayRef<int64_t> R) const {
   for (unsigned Id : InSystem.set_bits())
     OldToNew[Id] = NextIdx++;
 
-  // Build new compact set of rows.
+  // Build new compact set of rows from the rows marked as included above.
   SubSystem.NumVariables = NextIdx;
-  for (const auto &Row : Constraints) {
-    if (none_of(Row,
-                [&](const Entry &E) { return E.Id != 0 && InSystem[E.Id]; }))
-      continue;
+  for (unsigned RowIdx : RowInSystem.set_bits()) {
+    const auto &Row = Constraints[RowIdx];
     SmallVector<Entry, 8> NewRow;
     for (const Entry &E : Row) {
       if (!E.Id)
