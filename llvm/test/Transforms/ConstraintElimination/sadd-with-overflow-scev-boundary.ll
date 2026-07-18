@@ -16,11 +16,9 @@ define i8 @sadd_stride2_boundary_folded() {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[I:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[I_NEXT:%.*]], %[[LATCH:.*]] ]
-; CHECK-NEXT:    [[S:%.*]] = call { i8, i1 } @llvm.sadd.with.overflow.i8(i8 [[I]], i8 2)
-; CHECK-NEXT:    [[I_NEXT]] = extractvalue { i8, i1 } [[S]], 0
-; CHECK-NEXT:    [[O:%.*]] = extractvalue { i8, i1 } [[S]], 1
-; CHECK-NEXT:    br i1 [[O]], label %[[TRAP:.*]], label %[[LATCH]]
+; CHECK-NEXT:    [[I:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[TMP0:%.*]], %[[LATCH:.*]] ]
+; CHECK-NEXT:    [[TMP0]] = add nsw i8 [[I]], 2
+; CHECK-NEXT:    br i1 false, label %[[TRAP:.*]], label %[[LATCH]]
 ; CHECK:       [[LATCH]]:
 ; CHECK-NEXT:    [[COND:%.*]] = icmp slt i8 [[I]], 100
 ; CHECK-NEXT:    br i1 [[COND]], label %[[LOOP]], label %[[DONE:.*]]
@@ -58,10 +56,8 @@ define i8 @sadd_negstep_folded() {
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[I:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[I_NEXT:%.*]], %[[LATCH:.*]] ]
-; CHECK-NEXT:    [[S:%.*]] = call { i8, i1 } @llvm.sadd.with.overflow.i8(i8 [[I]], i8 -2)
 ; CHECK-NEXT:    [[I_NEXT]] = add i8 [[I]], -1
-; CHECK-NEXT:    [[O:%.*]] = extractvalue { i8, i1 } [[S]], 1
-; CHECK-NEXT:    br i1 [[O]], label %[[TRAP:.*]], label %[[LATCH]]
+; CHECK-NEXT:    br i1 false, label %[[TRAP:.*]], label %[[LATCH]]
 ; CHECK:       [[LATCH]]:
 ; CHECK-NEXT:    [[COND:%.*]] = icmp sgt i8 [[I]], -126
 ; CHECK-NEXT:    br i1 [[COND]], label %[[LOOP]], label %[[DONE:.*]]

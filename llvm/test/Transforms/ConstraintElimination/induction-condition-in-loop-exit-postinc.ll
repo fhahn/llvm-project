@@ -127,8 +127,7 @@ define i1 @postinc_sadd_with_overflow_header_ne(i1 %c) {
 ; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
 ; CHECK:       [[LOOP_HEADER]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
-; CHECK-NEXT:    [[S:%.*]] = call { i64, i1 } @llvm.sadd.with.overflow.i64(i64 [[IV]], i64 1)
-; CHECK-NEXT:    [[IV_NEXT]] = extractvalue { i64, i1 } [[S]], 0
+; CHECK-NEXT:    [[IV_NEXT]] = add nsw i64 [[IV]], 1
 ; CHECK-NEXT:    [[DONE:%.*]] = icmp ne i64 [[IV_NEXT]], 100
 ; CHECK-NEXT:    br i1 [[DONE]], label %[[LOOP_LATCH]], label %[[EXIT:.*]]
 ; CHECK:       [[LOOP_LATCH]]:
@@ -207,8 +206,7 @@ define i1 @postinc_sadd_with_overflow_header_eq_exit_fact(i1 %c) {
 ; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
 ; CHECK:       [[LOOP_HEADER]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
-; CHECK-NEXT:    [[S:%.*]] = call { i64, i1 } @llvm.sadd.with.overflow.i64(i64 [[IV]], i64 1)
-; CHECK-NEXT:    [[IV_NEXT]] = extractvalue { i64, i1 } [[S]], 0
+; CHECK-NEXT:    [[IV_NEXT]] = add nsw i64 [[IV]], 1
 ; CHECK-NEXT:    [[DONE:%.*]] = icmp eq i64 [[IV_NEXT]], 100
 ; CHECK-NEXT:    br i1 [[DONE]], label %[[EXIT:.*]], label %[[LOOP_LATCH]]
 ; CHECK:       [[LOOP_LATCH]]:
@@ -286,8 +284,7 @@ define i1 @postinc_sadd_with_overflow_step_2(i1 %c) {
 ; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
 ; CHECK:       [[LOOP_HEADER]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
-; CHECK-NEXT:    [[S:%.*]] = call { i64, i1 } @llvm.sadd.with.overflow.i64(i64 [[IV]], i64 2)
-; CHECK-NEXT:    [[IV_NEXT]] = extractvalue { i64, i1 } [[S]], 0
+; CHECK-NEXT:    [[IV_NEXT]] = add nsw i64 [[IV]], 2
 ; CHECK-NEXT:    [[DONE:%.*]] = icmp ne i64 [[IV_NEXT]], 100
 ; CHECK-NEXT:    br i1 [[DONE]], label %[[LOOP_LATCH]], label %[[EXIT:.*]]
 ; CHECK:       [[LOOP_LATCH]]:
@@ -412,8 +409,7 @@ define i1 @postinc_sadd_with_overflow_incstep_ne_step_not_folded(i1 %c) {
 ; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
 ; CHECK:       [[LOOP_HEADER]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
-; CHECK-NEXT:    [[S:%.*]] = call { i64, i1 } @llvm.sadd.with.overflow.i64(i64 [[IV]], i64 2)
-; CHECK-NEXT:    [[IV_PLUS2:%.*]] = extractvalue { i64, i1 } [[S]], 0
+; CHECK-NEXT:    [[IV_PLUS2:%.*]] = add nsw i64 [[IV]], 2
 ; CHECK-NEXT:    [[DONE:%.*]] = icmp eq i64 [[IV_PLUS2]], 100
 ; CHECK-NEXT:    br i1 [[DONE]], label %[[EXIT:.*]], label %[[BODY:.*]]
 ; CHECK:       [[BODY]]:
@@ -546,8 +542,7 @@ define i1 @postdec_sadd_with_overflow_negative_step(i1 %c) {
 ; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
 ; CHECK:       [[LOOP_HEADER]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 100, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
-; CHECK-NEXT:    [[S:%.*]] = call { i64, i1 } @llvm.sadd.with.overflow.i64(i64 [[IV]], i64 -1)
-; CHECK-NEXT:    [[IV_NEXT]] = extractvalue { i64, i1 } [[S]], 0
+; CHECK-NEXT:    [[IV_NEXT]] = add nsw i64 [[IV]], -1
 ; CHECK-NEXT:    [[DONE:%.*]] = icmp eq i64 [[IV_NEXT]], 0
 ; CHECK-NEXT:    br i1 [[DONE]], label %[[EXIT:.*]], label %[[LOOP_LATCH]]
 ; CHECK:       [[LOOP_LATCH]]:

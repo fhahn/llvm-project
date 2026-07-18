@@ -55,6 +55,8 @@ using namespace SCEVPatternMatch;
 #define DEBUG_TYPE "constraint-elimination"
 
 STATISTIC(NumCondsRemoved, "Number of instructions removed");
+STATISTIC(NumOverflowSCEVQueries,
+          "Number of SCEV signed-range queries for overflow simplification");
 DEBUG_COUNTER(EliminatedCounter, "conds-eliminated",
               "Controls which conditions are eliminated");
 
@@ -2605,6 +2607,25 @@ static bool hasStrictBoundWitness(ConstraintInfo &Info, Value *A,
   });
 }
 
+/// Returns true if SCEV's signed range for \p A proves that adding \p C cannot
+/// signed-overflow. The constraint solver cannot always discharge that bound:
+/// it fails when the bound is a variable (e.g. a loop counter `i` bounded by
+/// `count - 1`), and for i64 the SMAX/SMIN sentinels reserved by the solver's
+/// fixed-width encoding make `A s<= SMAX`/`A s>= SMIN` unrepresentable (see
+/// canUseSExt). SCEV's signed range captures the range of a loop induction from
+/// its start value and exit bound, exactly the information the solver lacks
+/// here. Only queried after the cheap solver check failed, to limit
+/// compile-time.
+static bool hasSCEVNoWrapRange(ScalarEvolution &SE, Value *A, Value *B) {
+  auto *C = dyn_cast<ConstantInt>(B);
+  if (!C || !SE.isSCEVable(A->getType()))
+    return false;
+  ++NumOverflowSCEVQueries;
+  ConstantRange RA = SE.getSignedRange(SE.getSCEV(A));
+  return RA.signedAddMayOverflow(ConstantRange(C->getValue())) ==
+         ConstantRange::OverflowResult::NeverOverflows;
+}
+
 /// Returns true if \p Info proves that `sadd.with.overflow(A, B)` with a
 /// *variable* B does not overflow, by bounding the mathematical sum from both
 /// sides.
@@ -2667,14 +2688,16 @@ static bool hasSumBoundWitnesses(WithOverflowInst *WO, ConstraintInfo &Info,
 
 static bool
 tryToSimplifyOverflowMath(WithOverflowInst *WO, ConstraintInfo &Info,
-                          DominatorTree &DT,
+                          ScalarEvolution *SE, DominatorTree &DT,
                           SmallVectorImpl<Instruction *> &ToRemove) {
   // The exact no-wrap range is not representable for the widest integer type,
   // so for sadd.with.overflow fall back to the witness rules if it does not
-  // hold: the unit-step rule for a constant RHS, sum bounds for a variable one.
+  // hold: SCEV's signed range and then the unit-step rule for a constant RHS,
+  // sum bounds for a variable one.
   if (!isKnownNoWrap(WO, Info, WO->isSigned()) &&
       !(WO->getIntrinsicID() == Intrinsic::sadd_with_overflow &&
-        (hasStrictBoundWitness(Info, WO->getLHS(), WO->getRHS()) ||
+        ((SE && hasSCEVNoWrapRange(*SE, WO->getLHS(), WO->getRHS())) ||
+         hasStrictBoundWitness(Info, WO->getLHS(), WO->getRHS()) ||
          hasSumBoundWitnesses(WO, Info, DT))))
     return false;
   return replaceOverflowUses(WO, ToRemove);
@@ -2825,7 +2848,7 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
       LLVM_DEBUG(dbgs() << "Processing condition to simplify: " << *Inst
                         << "\n");
       if (auto *II = dyn_cast<WithOverflowInst>(Inst)) {
-        Changed |= tryToSimplifyOverflowMath(II, Info, S.DT, ToRemove);
+        Changed |= tryToSimplifyOverflowMath(II, Info, SE, S.DT, ToRemove);
       } else if (match(Inst, m_ICmpLike(Pred, m_Value(A), m_Value(B)))) {
         bool Simplified = checkAndReplaceCondition(
             Pred, A, B, Inst, Info, CB.NumIn, CB.NumOut, CB.getContextInst(),
