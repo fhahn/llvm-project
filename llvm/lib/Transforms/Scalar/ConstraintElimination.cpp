@@ -54,6 +54,8 @@ using namespace SCEVPatternMatch;
 #define DEBUG_TYPE "constraint-elimination"
 
 STATISTIC(NumCondsRemoved, "Number of instructions removed");
+STATISTIC(NumOverflowSCEVQueries,
+          "Number of SCEV signed-range queries for overflow simplification");
 DEBUG_COUNTER(EliminatedCounter, "conds-eliminated",
               "Controls which conditions are eliminated");
 
@@ -2251,6 +2253,7 @@ static bool replaceOverflowUses(IntrinsicInst *II,
 
 static bool
 tryToSimplifyOverflowMath(IntrinsicInst *II, ConstraintInfo &Info,
+                          ScalarEvolution &SE,
                           SmallVectorImpl<Instruction *> &ToRemove) {
   auto DoesConditionHold = [](CmpInst::Predicate Pred, Value *A, Value *B,
                               ConstraintInfo &Info) {
@@ -2282,8 +2285,9 @@ tryToSimplifyOverflowMath(IntrinsicInst *II, ConstraintInfo &Info,
     // shape for a bounded induction increment (`i + 1` with i below the loop
     // bound), where the constraint solver knows the bound on A.
     Value *A = II->getArgOperand(0);
+    Value *CVal = II->getArgOperand(1);
     const APInt *C;
-    if (!match(II->getArgOperand(1), m_APInt(C)))
+    if (!match(CVal, m_APInt(C)))
       return false;
     unsigned BitWidth = C->getBitWidth();
     Value *Limit;
@@ -2300,10 +2304,24 @@ tryToSimplifyOverflowMath(IntrinsicInst *II, ConstraintInfo &Info,
                                APInt::getSignedMinValue(BitWidth) - *C);
       Pred = CmpInst::ICMP_SGE;
     }
-    if (!Info.doesHold(Pred, A, Limit))
-      return false;
-    Changed = replaceOverflowUses(II, Instruction::Add, A, II->getArgOperand(1),
-                                  ToRemove);
+    if (!Info.doesHold(Pred, A, Limit)) {
+      // The constraint solver cannot always discharge the bound on A: it fails
+      // when that bound is a variable (e.g. a loop counter `i` bounded by
+      // `count - 1`), and for i64 the SMAX/SMIN sentinels reserved by the
+      // solver's fixed-width encoding make `A s<= SMAX`/`A s>= SMIN`
+      // unrepresentable (see canUseSExt). Fall back to SCEV's signed range for
+      // A, which captures the range of a loop induction from its start value
+      // and exit bound - exactly the information the solver lacks here. Gated
+      // behind the failed (cheap) solver check to limit compile-time.
+      if (!SE.isSCEVable(A->getType()))
+        return false;
+      ++NumOverflowSCEVQueries;
+      ConstantRange RA = SE.getSignedRange(SE.getSCEV(A));
+      if (RA.signedAddMayOverflow(ConstantRange(*C)) !=
+          ConstantRange::OverflowResult::NeverOverflows)
+        return false;
+    }
+    Changed = replaceOverflowUses(II, Instruction::Add, A, CVal, ToRemove);
   }
   return Changed;
 }
@@ -2402,7 +2420,7 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
       LLVM_DEBUG(dbgs() << "Processing condition to simplify: " << *Inst
                         << "\n");
       if (auto *II = dyn_cast<WithOverflowInst>(Inst)) {
-        Changed |= tryToSimplifyOverflowMath(II, Info, ToRemove);
+        Changed |= tryToSimplifyOverflowMath(II, Info, SE, ToRemove);
       } else if (match(Inst, m_ICmpLike(Pred, m_Value(A), m_Value(B)))) {
         bool Simplified = checkAndReplaceCondition(
             Pred, A, B, Inst, Info, CB.NumIn, CB.NumOut, CB.getContextInst(),

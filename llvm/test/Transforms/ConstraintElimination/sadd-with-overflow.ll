@@ -219,10 +219,8 @@ define i1 @sadd_var_bound_induction(i64 %count) {
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[I:%.*]] = phi i64 [ 0, %[[LOOP_PREHEADER]] ], [ [[I_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
-; CHECK-NEXT:    [[S:%.*]] = call { i64, i1 } @llvm.sadd.with.overflow.i64(i64 [[I]], i64 1)
-; CHECK-NEXT:    [[I_NEXT]] = extractvalue { i64, i1 } [[S]], 0
-; CHECK-NEXT:    [[OV:%.*]] = extractvalue { i64, i1 } [[S]], 1
-; CHECK-NEXT:    br i1 [[OV]], label %[[TRAP:.*]], label %[[LOOP_LATCH]]
+; CHECK-NEXT:    [[I_NEXT]] = add nsw i64 [[I]], 1
+; CHECK-NEXT:    br i1 false, label %[[TRAP:.*]], label %[[LOOP_LATCH]]
 ; CHECK:       [[LOOP_LATCH]]:
 ; CHECK-NEXT:    [[COND:%.*]] = icmp slt i64 [[I_NEXT]], [[SUB]]
 ; CHECK-NEXT:    br i1 [[COND]], label %[[LOOP]], label %[[DONE]]
@@ -270,10 +268,8 @@ define i1 @sadd_var_bound_induction_i8(i8 %count) {
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[I:%.*]] = phi i8 [ 0, %[[LOOP_PREHEADER]] ], [ [[I_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
-; CHECK-NEXT:    [[S:%.*]] = call { i8, i1 } @llvm.sadd.with.overflow.i8(i8 [[I]], i8 1)
-; CHECK-NEXT:    [[I_NEXT]] = extractvalue { i8, i1 } [[S]], 0
-; CHECK-NEXT:    [[OV:%.*]] = extractvalue { i8, i1 } [[S]], 1
-; CHECK-NEXT:    br i1 [[OV]], label %[[TRAP:.*]], label %[[LOOP_LATCH]]
+; CHECK-NEXT:    [[I_NEXT]] = add nsw i8 [[I]], 1
+; CHECK-NEXT:    br i1 false, label %[[TRAP:.*]], label %[[LOOP_LATCH]]
 ; CHECK:       [[LOOP_LATCH]]:
 ; CHECK-NEXT:    [[COND:%.*]] = icmp slt i8 [[I_NEXT]], [[SUB]]
 ; CHECK-NEXT:    br i1 [[COND]], label %[[LOOP]], label %[[DONE]]
