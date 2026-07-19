@@ -2372,10 +2372,37 @@ static bool replaceOverflowUses(WithOverflowInst *II,
   return Changed;
 }
 
+/// Returns true if \p Info proves that the unit step \p C (1 or -1) cannot make
+/// \p A signed-overflow, by finding a strict bound for \p A in the signed
+/// system. A + 1 overflows only if A is SMAX and A + (-1) only if A is SMIN, so
+/// it is enough to prove A is strictly bounded by *some* other value W already
+/// in the system: any such W is an in-range integer (W s<= SMAX, W s>= SMIN),
+/// so A s< W implies A s<= SMAX - 1 and A s> W implies A s>= SMIN + 1. This
+/// side-steps the SMAX/SMIN sentinels of the solver's fixed-width encoding (see
+/// canUseSExt), which make the exact limit unrepresentable for the widest
+/// integer type and prevent folding a bounded induction increment `i + 1`.
+static bool hasStrictBoundWitness(ConstraintInfo &Info, Value *A,
+                                  Value *B) {
+  auto *C = dyn_cast<ConstantInt>(B);
+  if (!C || (!C->isOne() && !C->isMinusOne()))
+    return false;
+
+  CmpInst::Predicate Pred = C->isOne() ? CmpInst::ICMP_SLT : CmpInst::ICMP_SGT;
+  return any_of(Info.getValue2Index(/*Signed=*/true), [&](const auto &KV) {
+    Value *W = KV.first;
+    return W != A && !isa<Constant>(W) && W->getType() == A->getType() &&
+           Info.doesHold(Pred, A, W);
+  });
+}
+
 static bool
 tryToSimplifyOverflowMath(WithOverflowInst *II, ConstraintInfo &Info,
                           SmallVectorImpl<Instruction *> &ToRemove) {
-  if (!isKnownNoWrap(II, Info, II->isSigned()))
+  // The exact no-wrap range is not representable for the widest integer type,
+  // so fall back to the unit-step witness rule if it does not hold.
+  if (!isKnownNoWrap(II, Info, II->isSigned()) &&
+      !(II->getIntrinsicID() == Intrinsic::sadd_with_overflow &&
+        hasStrictBoundWitness(Info, II->getLHS(), II->getRHS())))
     return false;
   return replaceOverflowUses(II, ToRemove);
 }
