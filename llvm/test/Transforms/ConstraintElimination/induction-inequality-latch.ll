@@ -22,8 +22,7 @@ define void @stride2_slt_latch(i64 %n) {
 ; CHECK-NEXT:    br label %[[H:.*]]
 ; CHECK:       [[H]]:
 ; CHECK-NEXT:    [[I:%.*]] = phi i64 [ 0, %[[PH]] ], [ [[INEXT:%.*]], %[[LATCH:.*]] ]
-; CHECK-NEXT:    [[OOB:%.*]] = icmp ult i64 [[I]], [[N]]
-; CHECK-NEXT:    call void @use(i1 [[OOB]])
+; CHECK-NEXT:    call void @use(i1 true)
 ; CHECK-NEXT:    br label %[[LATCH]]
 ; CHECK:       [[LATCH]]:
 ; CHECK-NEXT:    [[INEXT]] = add nsw i64 [[I]], 2
@@ -66,8 +65,7 @@ define void @stride2_sge_or_latch(i64 %n) {
 ; CHECK-NEXT:    br label %[[H:.*]]
 ; CHECK:       [[H]]:
 ; CHECK-NEXT:    [[I:%.*]] = phi i64 [ 0, %[[PH]] ], [ [[INEXT:%.*]], %[[LATCH:.*]] ]
-; CHECK-NEXT:    [[OOB:%.*]] = icmp ult i64 [[I]], [[N]]
-; CHECK-NEXT:    call void @use(i1 [[OOB]])
+; CHECK-NEXT:    call void @use(i1 true)
 ; CHECK-NEXT:    br label %[[LATCH]]
 ; CHECK:       [[LATCH]]:
 ; CHECK-NEXT:    [[INEXT]] = add nsw i64 [[I]], 2
