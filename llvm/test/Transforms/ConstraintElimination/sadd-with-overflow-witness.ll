@@ -17,9 +17,7 @@ define i1 @sadd_one_witness_slt(i64 %a, i64 %w) {
 ; CHECK-SAME: i64 [[A:%.*]], i64 [[W:%.*]]) {
 ; CHECK-NEXT:    [[PRE:%.*]] = icmp slt i64 [[A]], [[W]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[PRE]])
-; CHECK-NEXT:    [[S:%.*]] = call { i64, i1 } @llvm.sadd.with.overflow.i64(i64 [[A]], i64 1)
-; CHECK-NEXT:    [[O:%.*]] = extractvalue { i64, i1 } [[S]], 1
-; CHECK-NEXT:    ret i1 [[O]]
+; CHECK-NEXT:    ret i1 false
 ;
   %pre = icmp slt i64 %a, %w
   call void @llvm.assume(i1 %pre)
@@ -34,9 +32,7 @@ define i1 @sadd_negone_witness_sgt(i64 %a, i64 %w) {
 ; CHECK-SAME: i64 [[A:%.*]], i64 [[W:%.*]]) {
 ; CHECK-NEXT:    [[PRE:%.*]] = icmp sgt i64 [[A]], [[W]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[PRE]])
-; CHECK-NEXT:    [[S:%.*]] = call { i64, i1 } @llvm.sadd.with.overflow.i64(i64 [[A]], i64 -1)
-; CHECK-NEXT:    [[O:%.*]] = extractvalue { i64, i1 } [[S]], 1
-; CHECK-NEXT:    ret i1 [[O]]
+; CHECK-NEXT:    ret i1 false
 ;
   %pre = icmp sgt i64 %a, %w
   call void @llvm.assume(i1 %pre)
