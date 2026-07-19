@@ -1307,7 +1307,10 @@ void State::addInfoForInductions(BasicBlock &BB) {
     return;
 
   // A is either a phi or a post-increment PN + C with constant step. For the
-  // latter, extract the constant IncStep.
+  // latter, extract the constant IncStep. The post-increment may be a plain
+  // add or the value component of a checked add (sadd.with.overflow), which
+  // Swift emits for overflow-checked counters; the extractvalue<0> equals
+  // PN + C regardless of the overflow flag.
   Value *A;
   Value *B;
   PHINode *PN = nullptr;
