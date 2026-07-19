@@ -15,8 +15,7 @@ define i1 @sub_not_ugt_bound(i32 %count, i32 %i) {
 ; CHECK-NEXT:    [[PRE:%.*]] = icmp ult i32 [[I]], [[COUNT]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[PRE]])
 ; CHECK-NEXT:    [[D:%.*]] = sub i32 [[COUNT]], [[I]]
-; CHECK-NEXT:    [[C:%.*]] = icmp ugt i32 [[D]], [[COUNT]]
-; CHECK-NEXT:    ret i1 [[C]]
+; CHECK-NEXT:    ret i1 false
 ;
   %pre = icmp ult i32 %i, %count
   call void @llvm.assume(i1 %pre)
@@ -34,8 +33,7 @@ define i1 @sub_derived_index_bound(i32 %count, i32 %i) {
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[PRE]])
 ; CHECK-NEXT:    [[CM1:%.*]] = sub nuw i32 [[COUNT]], 1
 ; CHECK-NEXT:    [[D:%.*]] = sub i32 [[CM1]], [[I]]
-; CHECK-NEXT:    [[C:%.*]] = icmp uge i32 [[D]], [[COUNT]]
-; CHECK-NEXT:    ret i1 [[C]]
+; CHECK-NEXT:    ret i1 false
 ;
   %half = lshr i32 %count, 1
   %pre = icmp ult i32 %i, %half

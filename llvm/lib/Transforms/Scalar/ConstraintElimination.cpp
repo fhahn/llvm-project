@@ -683,6 +683,22 @@ static Decomposition decompose(Value *V, const ConstraintInfo &Info,
     return V;
   }
 
+  // A plain sub A, B computes A - B modulo the bit width. In the unsigned
+  // system it can be decomposed as A - B as long as it does not wrap, i.e.
+  // A u>= B. This is the shape a checked subtraction (ssub.with.overflow)
+  // lowers to once its overflow flag has been folded away, e.g. a decreasing
+  // derived index `count - 1 - i`. A constant A - B is already handled by
+  // constant folding, so require a non-constant minuend.
+  if (match(V, m_Sub(m_Value(Op0), m_Value(Op1))) && !isa<Constant>(Op0)) {
+    if (!Info.doesHold(CmpInst::ICMP_UGE, Op0, Op1))
+      return V;
+    auto ResA = decompose(Op0, Info, IsSigned, DL);
+    auto ResB = decompose(Op1, Info, IsSigned, DL);
+    if (!ResA.sub(ResB))
+      return ResA;
+    return V;
+  }
+
   return V;
 }
 

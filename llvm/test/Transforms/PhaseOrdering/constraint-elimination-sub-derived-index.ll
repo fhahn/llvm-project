@@ -16,7 +16,7 @@ declare void @llvm.assume(i1)
 
 define i1 @is_palindrome(ptr %p, i64 %count) {
 ; CHECK-LABEL: define noundef i1 @is_palindrome(
-; CHECK-SAME: ptr nofree readonly captures(none) [[P:%.*]], i64 [[COUNT:%.*]]) local_unnamed_addr #[[ATTR2:[0-9]+]] {
+; CHECK-SAME: ptr nofree readonly captures(none) [[P:%.*]], i64 [[COUNT:%.*]]) local_unnamed_addr #[[ATTR1:[0-9]+]] {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[NN:%.*]] = icmp sgt i64 [[COUNT]], -1
 ; CHECK-NEXT:    tail call void @llvm.assume(i1 [[NN]])
@@ -24,27 +24,23 @@ define i1 @is_palindrome(ptr %p, i64 %count) {
 ; CHECK-NEXT:    [[DONE2:%.*]] = icmp eq i64 [[HALF]], 0
 ; CHECK-NEXT:    br i1 [[DONE2]], label %[[COMMON_RET:.*]], label %[[BODY_PREHEADER:.*]]
 ; CHECK:       [[BODY_PREHEADER]]:
-; CHECK-NEXT:    [[I3:%.*]] = phi i64 [ [[I_NEXT:%.*]], %[[ACCESS:.*]] ], [ 0, %[[ENTRY]] ]
-; CHECK-NEXT:    [[TMP1:%.*]] = xor i64 [[I3]], -1
-; CHECK-NEXT:    [[TMP2:%.*]] = add nsw i64 [[COUNT]], [[TMP1]]
-; CHECK-NEXT:    [[HI_NOT:%.*]] = icmp ult i64 [[TMP2]], [[COUNT]]
-; CHECK-NEXT:    br i1 [[HI_NOT]], label %[[ACCESS]], label %[[TRAP:.*]]
+; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr [8 x i8], ptr [[P]], i64 [[COUNT]]
+; CHECK-NEXT:    br label %[[ACCESS:.*]]
 ; CHECK:       [[ACCESS]]:
-; CHECK-NEXT:    [[ADDR_I:%.*]] = getelementptr inbounds nuw [8 x i8], ptr [[P]], i64 [[I3]]
+; CHECK-NEXT:    [[TMP2:%.*]] = phi i64 [ [[I_NEXT:%.*]], %[[ACCESS]] ], [ 0, %[[BODY_PREHEADER]] ]
+; CHECK-NEXT:    [[TMP1:%.*]] = xor i64 [[TMP2]], -1
 ; CHECK-NEXT:    [[ADDR_D:%.*]] = getelementptr inbounds nuw [8 x i8], ptr [[P]], i64 [[TMP2]]
-; CHECK-NEXT:    [[VI:%.*]] = load i64, ptr [[ADDR_I]], align 8
-; CHECK-NEXT:    [[VD:%.*]] = load i64, ptr [[ADDR_D]], align 8
+; CHECK-NEXT:    [[ADDR_D1:%.*]] = getelementptr [8 x i8], ptr [[TMP0]], i64 [[TMP1]]
+; CHECK-NEXT:    [[VI:%.*]] = load i64, ptr [[ADDR_D]], align 8
+; CHECK-NEXT:    [[VD:%.*]] = load i64, ptr [[ADDR_D1]], align 8
 ; CHECK-NEXT:    [[EQ:%.*]] = icmp eq i64 [[VI]], [[VD]]
-; CHECK-NEXT:    [[I_NEXT]] = add nuw nsw i64 [[I3]], 1
+; CHECK-NEXT:    [[I_NEXT]] = add nuw nsw i64 [[TMP2]], 1
 ; CHECK-NEXT:    [[DONE:%.*]] = icmp ne i64 [[I_NEXT]], [[HALF]]
 ; CHECK-NEXT:    [[OR_COND_NOT:%.*]] = select i1 [[EQ]], i1 [[DONE]], i1 false
-; CHECK-NEXT:    br i1 [[OR_COND_NOT]], label %[[BODY_PREHEADER]], label %[[COMMON_RET]]
+; CHECK-NEXT:    br i1 [[OR_COND_NOT]], label %[[ACCESS]], label %[[COMMON_RET]]
 ; CHECK:       [[COMMON_RET]]:
 ; CHECK-NEXT:    [[DONE_LCSSA:%.*]] = phi i1 [ true, %[[ENTRY]] ], [ [[EQ]], %[[ACCESS]] ]
 ; CHECK-NEXT:    ret i1 [[DONE_LCSSA]]
-; CHECK:       [[TRAP]]:
-; CHECK-NEXT:    tail call void @llvm.trap()
-; CHECK-NEXT:    unreachable
 ;
 entry:
   %nn = icmp sge i64 %count, 0
