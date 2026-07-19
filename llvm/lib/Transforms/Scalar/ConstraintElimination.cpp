@@ -979,14 +979,140 @@ void State::addInfoForInductions(BasicBlock &BB) {
     return;
 
   // A is either a phi or a post-increment PN + C with constant step. For the
-  // latter, extract the constant IncStep.
+  // latter, extract the constant IncStep. The post-increment may be a plain
+  // add or the value component of a checked add (sadd.with.overflow), which
+  // Swift emits for overflow-checked counters; the extractvalue<0> equals
+  // PN + C regardless of the overflow flag.
   Value *A;
   Value *B;
   PHINode *PN = nullptr;
   const APInt *IncStep = nullptr;
   CmpPredicate Pred;
-  auto IndValue =
-      m_Value(A, m_CombineOr(m_Phi(PN), m_c_Add(m_Phi(PN), m_APInt(IncStep))));
+  auto PostInc = m_CombineOr(
+      m_c_Add(m_Phi(PN), m_APInt(IncStep)),
+      m_ExtractValue<0>(m_Intrinsic<Intrinsic::sadd_with_overflow>(
+          m_Phi(PN), m_APInt(IncStep))));
+  auto IndValue = m_Value(A, m_CombineOr(m_Phi(PN), PostInc));
+
+  // A latch that continues while `PN + step </<= B` (an inequality counting
+  // compare on the post-increment) does not pin the exact exit value like the
+  // EQ/NE case, but still lets us derive that the header value stays below the
+  // bound: on every back-edge the compare held for PN + step, and PN equals the
+  // previous PN + step, so PN </<= B holds in the loop (the first iteration is
+  // covered by a StartValue precondition below). Handle this separately from the
+  // EQ/NE machinery, which relies on reaching B exactly.
+  //
+  // ContinuePred is the predicate, oriented so that continuing the loop implies
+  // `PN + step ContinuePred B` (an s< or s<= relation).
+  CmpPredicate ContinuePred;
+  auto TryMatchInequalityController = [&](BasicBlock *TestBB) {
+    PN = nullptr;
+    IncStep = nullptr;
+    Value *Cond;
+    BasicBlock *TrueSucc, *FalseSucc;
+    if (!match(TestBB->getTerminator(),
+               m_Br(m_Value(Cond), m_BasicBlock(TrueSucc),
+                    m_BasicBlock(FalseSucc))))
+      return false;
+    // The loop stays in the loop on exactly one edge.
+    bool InLoopIsTrue = L->contains(TrueSucc) && !L->contains(FalseSucc);
+    bool InLoopIsFalse = L->contains(FalseSucc) && !L->contains(TrueSucc);
+    if (!InLoopIsTrue && !InLoopIsFalse)
+      return false;
+    // Swift emits the exit test as `or(overflow, i+step s>= B)` (exit when
+    // true) or `and(..., i+step s< B)` (continue when true). Look through a
+    // top-level and/or whose polarity matches the exit direction for the
+    // counting compare; the other operands only make the loop exit earlier,
+    // which cannot invalidate a `PN below B` fact.
+    bool Matched;
+    if (InLoopIsFalse)
+      Matched = match(Cond, m_ICmp(Pred, IndValue, m_Value(B))) ||
+                match(Cond, m_c_Or(m_ICmp(Pred, IndValue, m_Value(B)),
+                                   m_Value()));
+    else
+      Matched = match(Cond, m_ICmp(Pred, IndValue, m_Value(B))) ||
+                match(Cond, m_c_And(m_ICmp(Pred, IndValue, m_Value(B)),
+                                    m_Value()));
+    if (!Matched || !IncStep || PN->getParent() != &BB)
+      return false;
+    // Normalise to the "continue" direction: on the false edge the effective
+    // predicate is negated.
+    ContinuePred = InLoopIsTrue ? CmpInst::Predicate(Pred)
+                                : CmpInst::getInversePredicate(Pred);
+    return ContinuePred == CmpInst::ICMP_SLT ||
+           ContinuePred == CmpInst::ICMP_SLE;
+  };
+
+  // First handle an inequality latch (continue while PN + step </<= B).
+  if (Latch && Latch != &BB && TryMatchInequalityController(Latch)) {
+    // The header is re-entered on the continue edge; the derived facts apply
+    // there.
+    if (!L->isLoopExiting(Latch))
+      return;
+
+    BasicBlock *LoopPred = L->getLoopPredecessor();
+    if (!LoopPred || !L->isLoopInvariant(B))
+      return;
+    if (PN->getNumIncomingValues() != 2 || !SE.isSCEVable(PN->getType()))
+      return;
+
+    Value *StartValue = PN->getIncomingValueForBlock(LoopPred);
+    BasicBlock *BackedgeBB = PN->getIncomingBlock(0) == LoopPred
+                                 ? PN->getIncomingBlock(1)
+                                 : PN->getIncomingBlock(0);
+    Value *Backedge = PN->getIncomingValueForBlock(BackedgeBB);
+    const APInt *StepOffset = nullptr;
+    // The compared value must be the induction's own positive post-increment
+    // (PN + step), so that continuing implies the next header value is bounded.
+    // Accept a plain add or a checked add's value component.
+    auto *Inc = dyn_cast<OverflowingBinaryOperator>(Backedge);
+    if (!match(Backedge, m_c_Add(m_Specific(PN), m_APInt(StepOffset))) &&
+        !match(Backedge,
+               m_ExtractValue<0>(m_Intrinsic<Intrinsic::sadd_with_overflow>(
+                   m_Specific(PN), m_APInt(StepOffset)))))
+      return;
+    if (!StepOffset->isStrictlyPositive() || *IncStep != *StepOffset)
+      return;
+
+    // Monotonic increase (no signed wrap) guarantees PN = prev + step really is
+    // larger, so the bound propagates across the back-edge without wrap.
+    bool NoSignedWrap = Inc && Inc->hasNoSignedWrap();
+    if (!NoSignedWrap) {
+      const SCEVAddRecExpr *IndAR = cast<SCEVAddRecExpr>(SE.getSCEV(PN));
+      NoSignedWrap = SE.getMonotonicPredicateType(IndAR, CmpInst::ICMP_SGT) ==
+                     ScalarEvolution::MonotonicallyIncreasing;
+    }
+    if (!NoSignedWrap)
+      return;
+
+    DomTreeNode *DTN = DT.getNode(&BB);
+    // A signed-monotonic increasing induction never goes below its start, so
+    // PN s>= StartValue holds unconditionally; this also lets the bound below
+    // transfer to the unsigned system when StartValue is non-negative.
+    WorkList.push_back(
+        FactOrCheck::getConditionFact(DTN, CmpInst::ICMP_SGE, PN, StartValue));
+    // PN </<= B in the loop, conditional on StartValue </<= B for the first
+    // iteration (the back-edge cases follow from the continue condition).
+    WorkList.push_back(FactOrCheck::getConditionFact(
+        DTN, ContinuePred, PN, B, ConditionTy(ContinuePred, StartValue, B)));
+    // When the start value is non-negative the induction climbs from
+    // StartValue toward B without going negative, so the bound also holds in
+    // the unsigned domain. Emitting it with an unsigned precondition
+    // (StartValue u</u<= B) lets the fact be discharged from a `B != 0` guard
+    // (the StartValue == 0 case) without relying on a signed `0 s< B`, which
+    // the solver cannot derive from `B != 0` alone.
+    if (isKnownNonNegative(StartValue, BB.getDataLayout())) {
+      CmpInst::Predicate UPred = ICmpInst::getUnsignedPredicate(ContinuePred);
+      WorkList.push_back(FactOrCheck::getConditionFact(
+          DTN, UPred, PN, B, ConditionTy(UPred, StartValue, B)));
+    }
+    return;
+  }
+
+  // A failed inequality match above may have left PN/IncStep bound; reset them
+  // so the EQ/NE match below cannot observe a stale step.
+  PN = nullptr;
+  IncStep = nullptr;
 
   if (!match(BB.getTerminator(),
              m_Br(m_c_ICmp(Pred, IndValue, m_Value(B)), m_Value(), m_Value())))
