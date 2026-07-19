@@ -17,7 +17,7 @@ declare void @llvm.assume(i1)
 
 define i1 @is_sorted(ptr %p, i64 %count) {
 ; CHECK-LABEL: define noundef i1 @is_sorted(
-; CHECK-SAME: ptr nofree readonly captures(none) [[P:%.*]], i64 [[COUNT:%.*]]) local_unnamed_addr #[[ATTR3:[0-9]+]] {
+; CHECK-SAME: ptr nofree readonly captures(none) [[P:%.*]], i64 [[COUNT:%.*]]) local_unnamed_addr #[[ATTR1:[0-9]+]] {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[NN:%.*]] = icmp sgt i64 [[COUNT]], -1
 ; CHECK-NEXT:    tail call void @llvm.assume(i1 [[NN]])
@@ -26,29 +26,22 @@ define i1 @is_sorted(ptr %p, i64 %count) {
 ; CHECK:       [[PH]]:
 ; CHECK-NEXT:    [[SUB:%.*]] = add nsw i64 [[COUNT]], -1
 ; CHECK-NEXT:    [[DONE1:%.*]] = icmp eq i64 [[SUB]], 0
-; CHECK-NEXT:    br i1 [[DONE1]], label %[[COMMON_RET]], label %[[ACCESS:.*]]
-; CHECK:       [[ACCESS]]:
-; CHECK-NEXT:    [[I2:%.*]] = phi i64 [ [[TMP0:%.*]], %[[ACCESS1:.*]] ], [ 0, %[[PH]] ]
-; CHECK-NEXT:    [[S:%.*]] = tail call { i64, i1 } @llvm.sadd.with.overflow.i64(i64 [[I2]], i64 1)
-; CHECK-NEXT:    [[OV:%.*]] = extractvalue { i64, i1 } [[S]], 1
-; CHECK-NEXT:    br i1 [[OV]], label %[[TRAP:.*]], label %[[ACCESS1]]
+; CHECK-NEXT:    br i1 [[DONE1]], label %[[COMMON_RET]], label %[[ACCESS1:.*]]
 ; CHECK:       [[ACCESS1]]:
-; CHECK-NEXT:    [[TMP0]] = extractvalue { i64, i1 } [[S]], 0
-; CHECK-NEXT:    [[A0:%.*]] = getelementptr inbounds [8 x i8], ptr [[P]], i64 [[I2]]
-; CHECK-NEXT:    [[A1:%.*]] = getelementptr inbounds [8 x i8], ptr [[P]], i64 [[TMP0]]
+; CHECK-NEXT:    [[I2:%.*]] = phi i64 [ [[TMP0:%.*]], %[[ACCESS1]] ], [ 0, %[[PH]] ]
+; CHECK-NEXT:    [[TMP0]] = add nuw nsw i64 [[I2]], 1
+; CHECK-NEXT:    [[A0:%.*]] = getelementptr inbounds nuw [8 x i8], ptr [[P]], i64 [[I2]]
+; CHECK-NEXT:    [[A1:%.*]] = getelementptr inbounds nuw [8 x i8], ptr [[P]], i64 [[TMP0]]
 ; CHECK-NEXT:    [[V0:%.*]] = load i64, ptr [[A0]], align 8
 ; CHECK-NEXT:    [[V1:%.*]] = load i64, ptr [[A1]], align 8
 ; CHECK-NEXT:    [[GT:%.*]] = icmp sle i64 [[V0]], [[V1]]
 ; CHECK-NEXT:    [[GT_NOT:%.*]] = xor i1 [[GT]], true
 ; CHECK-NEXT:    [[DONE:%.*]] = icmp eq i64 [[TMP0]], [[SUB]]
 ; CHECK-NEXT:    [[OR_COND:%.*]] = or i1 [[GT_NOT]], [[DONE]]
-; CHECK-NEXT:    br i1 [[OR_COND]], label %[[COMMON_RET]], label %[[ACCESS]]
+; CHECK-NEXT:    br i1 [[OR_COND]], label %[[COMMON_RET]], label %[[ACCESS1]]
 ; CHECK:       [[COMMON_RET]]:
 ; CHECK-NEXT:    [[COMMON_RET_OP:%.*]] = phi i1 [ true, %[[ENTRY]] ], [ true, %[[PH]] ], [ [[GT]], %[[ACCESS1]] ]
 ; CHECK-NEXT:    ret i1 [[COMMON_RET_OP]]
-; CHECK:       [[TRAP]]:
-; CHECK-NEXT:    tail call void @llvm.trap()
-; CHECK-NEXT:    unreachable
 ;
 entry:
   %nn = icmp sge i64 %count, 0

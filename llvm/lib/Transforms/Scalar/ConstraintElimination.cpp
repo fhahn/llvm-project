@@ -2313,12 +2313,40 @@ tryToSimplifyOverflowMath(IntrinsicInst *II, ConstraintInfo &Info,
       // A, which captures the range of a loop induction from its start value
       // and exit bound - exactly the information the solver lacks here. Gated
       // behind the failed (cheap) solver check to limit compile-time.
-      if (!SE.isSCEVable(A->getType()))
-        return false;
-      ++NumOverflowSCEVQueries;
-      ConstantRange RA = SE.getSignedRange(SE.getSCEV(A));
-      if (RA.signedAddMayOverflow(ConstantRange(*C)) !=
-          ConstantRange::OverflowResult::NeverOverflows)
+      bool NoOverflow = false;
+      if (SE.isSCEVable(A->getType())) {
+        ++NumOverflowSCEVQueries;
+        ConstantRange RA = SE.getSignedRange(SE.getSCEV(A));
+        NoOverflow = RA.signedAddMayOverflow(ConstantRange(*C)) ==
+                     ConstantRange::OverflowResult::NeverOverflows;
+      }
+
+      // Final fallback for the unit-step case (the common induction increment
+      // `i + 1` / decrement `i - 1`). The SMAX/SMIN limit above is not
+      // representable for the widest type, but overflow of A + 1 requires
+      // A == SMAX, and overflow of A - 1 requires A == SMIN. It is therefore
+      // enough to prove A is strictly bounded by *some* other value already in
+      // the system: any such value W is an in-range integer (W s<= SMAX,
+      // W s>= SMIN), so A s< W implies A s<= SMAX - 1 (no positive overflow of
+      // A + 1) and A s> W implies A s>= SMIN + 1 (no negative overflow of
+      // A - 1). This side-steps the sentinel entirely because W is a real
+      // operand, not the SMAX/SMIN constant. Scan the signed system's known
+      // values for such a witness.
+      if (!NoOverflow && (C->isOne() || C->isAllOnes())) {
+        CmpInst::Predicate WitnessPred =
+            C->isOne() ? CmpInst::ICMP_SLT : CmpInst::ICMP_SGT;
+        for (auto &KV : Info.getValue2Index(/*Signed=*/true)) {
+          Value *W = KV.first;
+          if (W == A || isa<Constant>(W) || W->getType() != A->getType())
+            continue;
+          if (Info.doesHold(WitnessPred, A, W)) {
+            NoOverflow = true;
+            break;
+          }
+        }
+      }
+
+      if (!NoOverflow)
         return false;
     }
     Changed = replaceOverflowUses(II, Instruction::Add, A, CVal, ToRemove);
