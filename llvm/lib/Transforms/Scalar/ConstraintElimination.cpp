@@ -1091,7 +1091,10 @@ void State::addInfoForInductions(BasicBlock &BB) {
     return;
 
   // A is either a phi or a post-increment PN + C with constant step. For the
-  // latter, extract the constant IncStep.
+  // latter, extract the constant IncStep. The post-increment may be a plain
+  // add or the value component of a checked add (sadd.with.overflow), which
+  // Swift emits for overflow-checked counters; the extractvalue<0> equals
+  // PN + C regardless of the overflow flag.
   Value *A;
   Value *B;
   PHINode *PN = nullptr;
@@ -1160,6 +1163,17 @@ void State::addInfoForInductions(BasicBlock &BB) {
     // value (StartValue ContinuePred B), we can add B as bound of PN.
     WorkList.push_back(FactOrCheck::getConditionFact(
         DTN, ContinuePred, PN, B, ConditionTy(ContinuePred, StartValue, B)));
+
+    // If the backedge value is non-negative, a signed latch condition also
+    // bounds PN in the unsigned system. Add that with an unsigned precondition,
+    // which can be discharged from a `B != 0` guard when starting at 0, unlike
+    // the signed `0 s< B` above.
+    if (ICmpInst::isSigned(ContinuePred) &&
+        isKnownNonNegative(Backedge, BB.getDataLayout())) {
+      CmpInst::Predicate UPred = ICmpInst::getUnsignedPredicate(ContinuePred);
+      WorkList.push_back(FactOrCheck::getConditionFact(
+          DTN, UPred, PN, B, ConditionTy(UPred, StartValue, B)));
+    }
 
     // A relational latch steps past B rather than landing on it, so none of the
     // reasoning below applies.
