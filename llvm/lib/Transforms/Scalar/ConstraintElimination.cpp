@@ -574,6 +574,28 @@ static Decomposition decompose(Value *V,
       }
     }
 
+    // (shl nuw x, shift) equals (mul x, (1<<shift)) as a signed value when the
+    // result stays non-negative, i.e. x <s (1 << (bw - 1 - shift)). nuw already
+    // guarantees x >= 0 for shift >= 1, so a single upper-bound precondition
+    // makes the signed decomposition sound.
+    if (match(V, m_NUWShl(m_Value(Op0), m_ConstantInt(CI)))) {
+      uint64_t Shift = CI->getValue().getLimitedValue();
+      unsigned BitWidth = Ty->getIntegerBitWidth();
+      if (Shift >= 1 && Shift < BitWidth - 1) {
+        assert(Shift < 64 && "Would overflow");
+        auto Result = decompose(Op0, Preconditions, IsSigned, DL);
+        if (!Result.mul(int64_t(1) << Shift)) {
+          Preconditions.emplace_back(
+              CmpInst::ICMP_SLT, Op0,
+              ConstantInt::get(
+                  Op0->getType(),
+                  APInt::getOneBitSet(BitWidth, BitWidth - 1 - Shift)));
+          return Result;
+        }
+        return V;
+      }
+    }
+
     return V;
   }
 
