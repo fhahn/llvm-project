@@ -1449,33 +1449,65 @@ Value *SCEVExpander::visitAddRecExpr(SCEVUseT<const SCEVAddRecExpr *> S) {
   return expand(T);
 }
 
+/// Return true if \p CI computes the same value as a `ptrtoaddr` of its
+/// pointer operand to \p Ty. A `ptrtoaddr` (to \p Ty) always qualifies; a
+/// `ptrtoint` only when the pointer's representation and address widths match,
+/// since otherwise `ptrtoint` yields the full representation, which differs
+/// from the address bits.
+static bool canReuseCastForPtrToAddr(const CastInst *CI, Type *Ty,
+                                     const DataLayout &DL) {
+  if (CI->getType() != Ty)
+    return false;
+  if (CI->getOpcode() == CastInst::PtrToAddr)
+    return true;
+  if (CI->getOpcode() != CastInst::PtrToInt)
+    return false;
+  unsigned AS = CI->getSrcTy()->getPointerAddressSpace();
+  return DL.getPointerSizeInBits(AS) == DL.getIndexSizeInBits(AS);
+}
+
+CastInst *SCEVExpander::findReusableCastForPtrToAddr(
+    Value *PtrOp, Type *Ty, const DataLayout &DL,
+    function_ref<bool(const CastInst *)> Dominates, bool *FallbackToPtrToInt) {
+  // Constants have no use list to scan.
+  if (isa<Constant>(PtrOp))
+    return nullptr;
+  for (User *U : PtrOp->users()) {
+    auto *CI = dyn_cast<CastInst>(U);
+    if (!CI || !canReuseCastForPtrToAddr(CI, Ty, DL))
+      continue;
+    if (Dominates(CI))
+      return CI;
+    // An equivalent ptrtoint exists but does not dominate, so it cannot be
+    // reused directly. Let the caller emit a ptrtoint instead of a ptrtoaddr:
+    // both compute the same value, and materializing the same opcode lets a
+    // later CSE/GVN pass merge the two. This does not lose alias-analysis
+    // precision: ptrtoint captures the pointer's provenance in addition to its
+    // address, but that provenance is already captured by the existing
+    // ptrtoint.
+    if (FallbackToPtrToInt && CI->getOpcode() == CastInst::PtrToInt)
+      *FallbackToPtrToInt = true;
+  }
+  return nullptr;
+}
+
 Value *SCEVExpander::visitPtrToAddrExpr(SCEVUseT<const SCEVPtrToAddrExpr *> S) {
   Value *V = expand(S->getOperand());
   Type *Ty = S->getType();
 
-  // ptrtoaddr and ptrtoint produce the same value if the result type matches,
-  // so try to reuse either.
-  CastInst::CastOps Opcode = CastInst::PtrToAddr;
-  if (!isa<Constant>(V)) {
-    BasicBlock::iterator BIP = Builder.GetInsertPoint();
-    for (User *U : V->users()) {
-      auto *CI = dyn_cast<CastInst>(U);
-      if (CI && CI->getType() == Ty &&
-          (CI->getOpcode() == CastInst::PtrToAddr ||
-           CI->getOpcode() == CastInst::PtrToInt) &&
-          &*BIP != CI && SE.DT.dominates(CI, &*BIP))
-        return CI;
-      // If an equivalent ptrtoint of the same pointer already exists (but does
-      // not dominate the insertion point, so cannot be reused directly), emit
-      // a ptrtoint rather than a ptrtoaddr. Both compute the same value, and
-      // materializing the same opcode lets a later CSE/GVN pass merge the two.
-      // This does not lose any alias-analysis precision: ptrtoint captures the
-      // pointer's provenance in addition to its address, but that provenance
-      // is already captured by the pre-existing ptrtoint.
-      if (CI && CI->getType() == Ty && CI->getOpcode() == CastInst::PtrToInt)
-        Opcode = CastInst::PtrToInt;
-    }
-  }
+  // ptrtoaddr and ptrtoint can produce the same value, so try to reuse either.
+  BasicBlock::iterator BIP = Builder.GetInsertPoint();
+  bool FallbackToPtrToInt = false;
+  if (CastInst *CI = findReusableCastForPtrToAddr(
+          V, Ty, DL,
+          [&](const CastInst *CI) {
+            return &*BIP != CI && SE.DT.dominates(CI, &*BIP);
+          },
+          &FallbackToPtrToInt))
+    return CI;
+
+  CastInst::CastOps Opcode =
+      FallbackToPtrToInt ? CastInst::PtrToInt : CastInst::PtrToAddr;
   return ReuseOrCreateCast(V, Ty, Opcode,
                            GetOptimalInsertionPointForCastOf(V));
 }

@@ -15,6 +15,7 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/STLFunctionalExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Analysis/InstSimplifyFolder.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
@@ -315,6 +316,21 @@ public:
   LLVM_ABI static void
   dropPoisonGeneratingAnnotationsAndReinfer(ScalarEvolution &SE,
                                             Instruction *I);
+
+  /// Find an existing cast among \p PtrOp's users that computes the same value
+  /// as a `ptrtoaddr` of \p PtrOp to \p Ty and can therefore be reused when
+  /// expanding such an expression. A `ptrtoaddr` (to \p Ty) always qualifies;
+  /// a `ptrtoint` only when the pointer's representation and address widths
+  /// match, since otherwise `ptrtoint` yields the full representation, which
+  /// differs from the address bits. Returns the first candidate for which
+  /// \p Dominates returns true, or nullptr. If no dominating candidate is
+  /// found but a reusable `ptrtoint` exists elsewhere and \p FallbackToPtrToInt
+  /// is non-null, it is set to true so the caller can emit a `ptrtoint` (which
+  /// a later CSE can merge) rather than a fresh `ptrtoaddr`.
+  LLVM_ABI static CastInst *findReusableCastForPtrToAddr(
+      Value *PtrOp, Type *Ty, const DataLayout &DL,
+      function_ref<bool(const CastInst *)> Dominates,
+      bool *FallbackToPtrToInt = nullptr);
 
   /// Insert code to directly compute the specified SCEV expression into the
   /// program.  The code is inserted into the specified block.

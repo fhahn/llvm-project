@@ -934,6 +934,25 @@ VPValue *VPSCEVExpander::tryToExpand(const SCEV *S) {
     default:
       llvm_unreachable("Unhandled cast SCEV");
     }
+
+    // ptrtoaddr and ptrtoint can produce the same value. If an equivalent cast
+    // of the same pointer already exists and dominates the plan's entry block,
+    // reuse it instead of materializing a new one. This mirrors
+    // SCEVExpander::visitPtrToAddrExpr and keeps the reuse that was previously
+    // provided by SCEV modeling ptrtoint directly.
+    if (Opcode == Instruction::PtrToAddr) {
+      VPlan &Plan = Builder.getPlan();
+      BasicBlock *PH = cast<VPIRBasicBlock>(Plan.getEntry())->getIRBasicBlock();
+      if (auto *IRV = dyn_cast<VPIRValue>(Op)) {
+        if (CastInst *CI = SCEVExpander::findReusableCastForPtrToAddr(
+                IRV->getValue(), S->getType(), PH->getDataLayout(),
+                [&](const CastInst *CI) {
+                  return SE.DT.dominates(CI->getParent(), PH);
+                }))
+          return Plan.getOrAddLiveIn(CI);
+      }
+    }
+
     return Builder.createScalarCast(Opcode, Op, S->getType(), DL);
   }
   case scUMaxExpr:
