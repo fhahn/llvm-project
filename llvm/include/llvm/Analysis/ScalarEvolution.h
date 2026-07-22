@@ -2207,6 +2207,15 @@ private:
                                 bool isSigned, bool IsSubExpr,
                                 bool AllowPredicates = false);
 
+  /// Return true if \p Start is known to be >= the largest value the unit-stride
+  /// affine recurrence \p RHS takes over its loop's iteration space, i.e. \p RHS
+  /// never exceeds \p Start. This proves the clamp min(\p RHS, \p Start) == \p
+  /// RHS. \p Pred must be the >= predicate matching \p IsSigned (SGE / UGE). \p L
+  /// is the loop whose exit count is being computed; entry guards of \p L may be
+  /// used for the final comparison.
+  bool isStartKnownGERecurrenceMax(const SCEV *Start, const SCEV *RHS,
+                                   const Loop *L, CmpPredicate Pred);
+
   /// Return a predecessor of BB (which may not be an immediate predecessor)
   /// which has exactly one successor from which BB is reachable, or null if
   /// no such block is found.

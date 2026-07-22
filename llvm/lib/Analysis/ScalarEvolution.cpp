@@ -13887,6 +13887,67 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
                    Predicates);
 }
 
+bool ScalarEvolution::isStartKnownGERecurrenceMax(const SCEV *Start,
+                                                  const SCEV *RHS,
+                                                  const Loop *L,
+                                                  CmpPredicate Pred) {
+  // Only handle a unit-stride affine recurrence: a step of one cannot cross the
+  // wrap boundary in a single iteration, which keeps the no-wrap reasoning
+  // below a simple endpoint comparison.
+  const auto *RHSAR = dyn_cast<SCEVAddRecExpr>(RHS);
+  if (!RHSAR || !RHSAR->isAffine() ||
+      RHSAR->getStepRecurrence(*this) != getOne(RHSAR->getType()))
+    return false;
+
+  const Loop *RHSLoop = RHSAR->getLoop();
+  const SCEV *SymMax = getSymbolicMaxBackedgeTakenCount(RHSLoop);
+  const SCEV *ConstMax = getConstantMaxBackedgeTakenCount(RHSLoop);
+  // evaluateAtIteration truncates the iteration count to the recurrence's type,
+  // so a wider count could underestimate the last value. Require both counts to
+  // be no wider, then extend them to that type.
+  auto TooWide = [&](const SCEV *N) {
+    return isa<SCEVCouldNotCompute>(N) ||
+           getTypeSizeInBits(N->getType()) > getTypeSizeInBits(RHSAR->getType());
+  };
+  if (TooWide(SymMax) || TooWide(ConstMax))
+    return false;
+  SymMax = getNoopOrZeroExtend(SymMax, RHSAR->getType());
+  ConstMax = getNoopOrZeroExtend(ConstMax, RHSAR->getType());
+
+  // The no-wrap check below is proven at ConstMax, but the final bound is taken
+  // at SymMax, so soundness relies on SymMax <= ConstMax. This holds at the loop
+  // level: getSymbolicMaxBackedgeTakenCount is a sequential-umin over the
+  // per-exit counts, while getConstantMaxBackedgeTakenCount is a umin (over
+  // must-exit exits) / umax (over the remaining exits) of their upper bounds, so
+  // the constant max is never smaller than the symbolic one. Assert it
+  // defensively so a future change to that aggregation cannot silently turn this
+  // into a miscompile.
+  assert(!isKnownPredicate(ICmpInst::ICMP_UGT, SymMax, ConstMax) &&
+         "symbolic max backedge-taken count exceeds the constant max");
+
+  // The counts are only upper bounds on the trip count, and the recurrence's
+  // no-wrap flags may have been inferred from an exit whose count is unknown,
+  // so the recurrence could wrap before reaching them. With a unit stride,
+  // Start(RHS) <= RHS-at-ConstMax proves it does not over [0, ConstMax]: had it
+  // wrapped, the endpoint would appear smaller than the start (a single +1 walk
+  // of length <= 2^width - 1 crosses the wrap boundary at most once). The
+  // constant count is used here because it is a literal and thus easier to
+  // reason about than the symbolic one.
+  CmpPredicate LEPred = ICmpInst::getSwappedCmpPredicate(Pred);
+  const SCEV *RHSAtConstMax = RHSAR->evaluateAtIteration(ConstMax, *this);
+  if (!isKnownPredicate(LEPred, RHSAR->getStart(), RHSAtConstMax))
+    return false;
+
+  // No-wrap over [0, ConstMax] implies no-wrap over [0, SymMax] as well (since
+  // SymMax <= ConstMax), so with the positive unit stride the recurrence is
+  // increasing there and RHS-at-SymMax is an upper bound on every value RHS
+  // takes. The Start >= that-bound relation only has to hold on executions that
+  // reach L, so loop-entry guards of L may be used in addition to known facts.
+  const SCEV *RHSMax = RHSAR->evaluateAtIteration(SymMax, *this);
+  return isKnownPredicate(LEPred, RHSMax, Start) ||
+         isLoopEntryGuardedByCond(L, LEPred, RHSMax, Start);
+}
+
 ScalarEvolution::ExitLimit ScalarEvolution::howManyGreaterThans(
     const SCEV *LHS, const SCEV *RHS, const Loop *L, bool IsSigned,
     bool ControlsOnlyExit, bool AllowPredicates) {
@@ -13929,8 +13990,10 @@ ScalarEvolution::ExitLimit ScalarEvolution::howManyGreaterThans(
   if (!isLoopEntryGuardedByCond(L, Cond, getAddExpr(Start, Stride), RHS)) {
     // If we know that Start >= RHS in the context of loop, then we know that
     // min(RHS, Start) = RHS at this point.
-    if (isLoopEntryGuardedByCond(
-            L, IsSigned ? ICmpInst::ICMP_SGE : ICmpInst::ICMP_UGE, Start, RHS))
+    ICmpInst::Predicate GEPred =
+        IsSigned ? ICmpInst::ICMP_SGE : ICmpInst::ICMP_UGE;
+    if (isLoopEntryGuardedByCond(L, GEPred, Start, RHS) ||
+        isStartKnownGERecurrenceMax(Start, RHS, L, GEPred))
       End = RHS;
     else
       End = IsSigned ? getSMinExpr(RHS, Start) : getUMinExpr(RHS, Start);
