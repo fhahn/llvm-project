@@ -5986,6 +5986,24 @@ const SCEV *ScalarEvolution::createAddRecFromPHI(PHINode *PN) {
   if (!BEValueV || !StartValueV)
     return nullptr;
 
+  // If the start value is a PHI defined in a loop that strictly encloses L and
+  // has not been analyzed yet, analyze it first. A parent IV that advances by
+  // an entire inner loop is only recognized as an add-recurrence once the IVs
+  // it depends on have been resolved (see the nested-add-recurrence handling
+  // below). Analyzing the enclosing PHI first establishes that top-down order;
+  // it may recursively compute PN, which is fine as we re-check below. Guarding
+  // on a missing SCEV prevents unbounded recursion.
+  if (auto *StartPN = dyn_cast<PHINode>(StartValueV)) {
+    const Loop *StartLoop = LI.getLoopFor(StartPN->getParent());
+    if (StartLoop && StartLoop != L && StartLoop->contains(L) &&
+        StartLoop->getHeader() == StartPN->getParent() &&
+        !getExistingSCEV(StartPN)) {
+      getSCEV(StartPN);
+      if (const SCEV *S = getExistingSCEV(PN))
+        return S;
+    }
+  }
+
   assert(ValueExprMap.find_as(PN) == ValueExprMap.end() &&
          "PHI node already processed?");
 
@@ -6001,6 +6019,19 @@ const SCEV *ScalarEvolution::createAddRecFromPHI(PHINode *PN) {
   // Using this symbolic name for the PHI, analyze the value coming around
   // the back-edge.
   const SCEV *BEValue = getSCEV(BEValueV);
+
+  // If the value coming around the backedge is an add recurrence of a loop
+  // nested inside L, then the PHI is advanced by the entire inner loop on each
+  // iteration of L (e.g. a pointer or integer IV that keeps accumulating across
+  // an inner loop). Its closed form only becomes an add recurrence in L once
+  // the inner loop's contribution is summarized by its exit value, so fold the
+  // backedge value at the scope of L to expose the "SymbolicName + step" shape
+  // handled below.
+  if (const auto *BEAddRec = dyn_cast<SCEVAddRecExpr>(BEValue)) {
+    const Loop *BELoop = BEAddRec->getLoop();
+    if (BELoop != L && L->contains(BELoop))
+      BEValue = getSCEVAtScope(BEValue, L);
+  }
 
   // NOTE: If BEValue is loop invariant, we know that the PHI node just
   // has a special value for the first iteration of the loop.
