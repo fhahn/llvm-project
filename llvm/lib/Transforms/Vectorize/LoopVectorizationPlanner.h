@@ -53,6 +53,31 @@ extern cl::opt<bool> EnableVPlanNativePath;
 extern cl::opt<unsigned> ForceTargetInstructionCost;
 extern cl::opt<bool> PreferInLoopReductions;
 
+// Loop vectorization cost-model hints how the epilogue/tail loop should be
+// lowered.
+enum EpilogueLowering {
+
+  // The default: allowing epilogues.
+  CM_EpilogueAllowed,
+
+  // Vectorization with OptForSize: don't allow epilogues.
+  CM_EpilogueNotAllowedOptSize,
+
+  // A special case of vectorisation with OptForSize: loops with a very small
+  // trip count are considered for vectorization under OptForSize, thereby
+  // making sure the cost of their loop body is dominant, free of runtime
+  // guards and scalar iteration overheads.
+  CM_EpilogueNotAllowedLowTripLoop,
+
+  // Loop hint indicating an epilogue is undesired, apply tail folding.
+  CM_EpilogueNotNeededFoldTail,
+
+  // Directive indicating we must either fold the epilogue/tail or not vectorize
+  CM_EpilogueNotAllowedFoldTail
+};
+
+enum class AliasMaskingStatus { NotDecided, Disabled, Enabled };
+
 /// \return An upper bound for vscale based on TTI or the vscale_range
 /// attribute.
 std::optional<unsigned> getMaxVScale(const Function &F,
