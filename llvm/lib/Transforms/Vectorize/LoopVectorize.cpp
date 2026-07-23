@@ -1154,6 +1154,9 @@ public:
     return FS != ForcedScalars.end() && FS->second.contains(I);
   }
 
+  /// Returns the VF selection context holding loop-level decisions.
+  const VFSelectionContext &getConfig() const { return Config; }
+
 private:
   unsigned NumPredStores = 0;
 
@@ -1355,12 +1358,6 @@ public:
   /// The interleave access information contains groups of interleaved accesses
   /// with the same stride and close to each other.
   InterleavedAccessInfo &InterleaveInfo;
-
-  /// Values to ignore in the cost model.
-  SmallPtrSet<const Value *, 16> ValuesToIgnore;
-
-  /// Values to ignore in the cost model when VF > 1.
-  SmallPtrSet<const Value *, 16> VecValuesToIgnore;
 };
 } // end namespace llvm
 
@@ -3635,7 +3632,7 @@ LoopVectorizationPlanner::selectInterleaveCount(VPlan &Plan, ElementCount VF,
     return 1;
 
   VPRegisterUsage R =
-      calculateRegisterUsageForPlan(Plan, {VF}, TTI, CM.ValuesToIgnore)[0];
+      calculateRegisterUsageForPlan(Plan, {VF}, TTI, Config.ValuesToIgnore)[0];
 
   // If we did not calculate the cost for VF (because the user selected the VF)
   // then we calculate the cost of VF here.
@@ -4135,8 +4132,8 @@ InstructionCost LoopVectorizationCostModel::expectedCost(ElementCount VF) {
     // For each instruction in the old loop.
     for (Instruction &I : *BB) {
       // Skip ignored values.
-      if (ValuesToIgnore.count(&I) ||
-          (VF.isVector() && VecValuesToIgnore.count(&I)))
+      if (Config.ValuesToIgnore.count(&I) ||
+          (VF.isVector() && Config.VecValuesToIgnore.count(&I)))
         continue;
 
       InstructionCost C = getInstructionCost(&I, VF);
@@ -5302,6 +5299,9 @@ LoopVectorizationCostModel::getInstructionCost(Instruction *I,
 }
 
 void LoopVectorizationCostModel::collectValuesToIgnore() {
+  SmallPtrSet<const Value *, 16> &ValuesToIgnore = Config.ValuesToIgnore;
+  SmallPtrSet<const Value *, 16> &VecValuesToIgnore = Config.VecValuesToIgnore;
+
   // Ignore ephemeral values.
   CodeMetrics::collectEphemeralValues(TheLoop, AC, ValuesToIgnore);
 
@@ -5327,7 +5327,7 @@ void LoopVectorizationCostModel::collectValuesToIgnore() {
       // Add instructions that would be trivially dead and are only used by
       // values already ignored to DeadOps to seed worklist.
       if (wouldInstructionBeTriviallyDead(&I, TLI) &&
-          all_of(I.users(), [this, IsLiveOutDead](User *U) {
+          all_of(I.users(), [&](User *U) {
             return VecValuesToIgnore.contains(U) ||
                    ValuesToIgnore.contains(U) || IsLiveOutDead(U);
           }))
@@ -5354,7 +5354,7 @@ void LoopVectorizationCostModel::collectValuesToIgnore() {
   // by other dead computations.
   for (unsigned I = 0; I != DeadInterleavePointerOps.size(); ++I) {
     auto *Op = dyn_cast<Instruction>(DeadInterleavePointerOps[I]);
-    if (!Op || !TheLoop->contains(Op) || any_of(Op->users(), [this](User *U) {
+    if (!Op || !TheLoop->contains(Op) || any_of(Op->users(), [&](User *U) {
           Instruction *UI = cast<Instruction>(U);
           return !VecValuesToIgnore.contains(U) &&
                  (!isAccessInterleaved(UI) ||
@@ -5372,8 +5372,8 @@ void LoopVectorizationCostModel::collectValuesToIgnore() {
   // Returns true if the block contains only dead instructions. Such blocks will
   // be removed by VPlan-to-VPlan transforms and won't be considered by the
   // VPlan-based cost model, so skip them in the legacy cost-model as well.
-  auto IsEmptyBlock = [this](BasicBlock *BB) {
-    return all_of(*BB, [this](Instruction &I) {
+  auto IsEmptyBlock = [&](BasicBlock *BB) {
+    return all_of(*BB, [&](Instruction &I) {
       return ValuesToIgnore.contains(&I) || VecValuesToIgnore.contains(&I) ||
              isa<UncondBrInst>(&I);
     });
@@ -5405,7 +5405,7 @@ void LoopVectorizationCostModel::collectValuesToIgnore() {
     if (!Op || !TheLoop->contains(Op) ||
         (isa<PHINode>(Op) && Op->getParent() == Header) ||
         !wouldInstructionBeTriviallyDead(Op, TLI) ||
-        any_of(Op->users(), [this, IsLiveOutDead](User *U) {
+        any_of(Op->users(), [&](User *U) {
           return !VecValuesToIgnore.contains(U) &&
                  !ValuesToIgnore.contains(U) && !IsLiveOutDead(U);
         }))
@@ -5415,7 +5415,7 @@ void LoopVectorizationCostModel::collectValuesToIgnore() {
     // which applies for both scalar and vector versions. Otherwise it is only
     // dead in vector versions, so only add it to VecValuesToIgnore.
     if (all_of(Op->users(),
-               [this](User *U) { return ValuesToIgnore.contains(U); }))
+               [&](User *U) { return ValuesToIgnore.contains(U); }))
       ValuesToIgnore.insert(Op);
 
     VecValuesToIgnore.insert(Op);
@@ -5439,7 +5439,7 @@ void LoopVectorizationCostModel::collectValuesToIgnore() {
 
 void LoopVectorizationPlanner::plan(ElementCount UserVF, unsigned UserIC) {
   CM.collectValuesToIgnore();
-  Config.collectElementTypesForWidening(&CM.ValuesToIgnore);
+  Config.collectElementTypesForWidening(&Config.ValuesToIgnore);
 
   FixedScalableVFPair MaxFactors = CM.computeMaxVF(UserVF, UserIC);
   if (!MaxFactors) // Cases that should not to be vectorized nor interleaved.
@@ -5565,8 +5565,9 @@ InstructionCost VPCostContext::getLegacyCost(Instruction *UI,
 }
 
 bool VPCostContext::skipCostComputation(Instruction *UI, bool IsVector) const {
-  return CM.ValuesToIgnore.contains(UI) ||
-         (IsVector && CM.VecValuesToIgnore.contains(UI)) ||
+  const VFSelectionContext &Config = CM.getConfig();
+  return Config.ValuesToIgnore.contains(UI) ||
+         (IsVector && Config.VecValuesToIgnore.contains(UI)) ||
          SkipCostComputation.contains(UI);
 }
 
@@ -5814,7 +5815,7 @@ LoopVectorizationPlanner::computeBestVF() {
       return Config.shouldConsiderRegPressureForVF(VF);
     });
     if (ConsiderRegPressure)
-      RUs = calculateRegisterUsageForPlan(*P, VFs, TTI, CM.ValuesToIgnore);
+      RUs = calculateRegisterUsageForPlan(*P, VFs, TTI, Config.ValuesToIgnore);
 
     for (unsigned I = 0; I < VFs.size(); I++) {
       ElementCount VF = VFs[I];
@@ -5873,7 +5874,7 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
 
   RUN_VPLAN_PASS(VPlanTransforms::replaceWideCanonicalIVWithWideIV, BestVPlan,
                  *PSE.getSE(), TTI, Config.CostKind, BestVF, BestUF,
-                 CM.ValuesToIgnore);
+                 Config.ValuesToIgnore);
   // TODO: Move to VPlan transform stage once the transition to the VPlan-based
   // cost model is complete for better cost estimates.
   RUN_VPLAN_PASS(VPlanTransforms::unrollByUF, BestVPlan, BestUF);

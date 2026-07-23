@@ -772,6 +772,14 @@ public:
   /// or profile information.
   const bool OptForSize;
 
+  /// Values to ignore in the cost model. Populated by the cost model's
+  /// collectValuesToIgnore().
+  SmallPtrSet<const Value *, 16> ValuesToIgnore;
+
+  /// Values to ignore in the cost model when VF > 1. Populated by the cost
+  /// model's collectValuesToIgnore().
+  SmallPtrSet<const Value *, 16> VecValuesToIgnore;
+
   VFSelectionContext(const TargetTransformInfo &TTI,
                      const LoopVectorizationLegality *Legal,
                      const Loop *TheLoop, const Function &F,
