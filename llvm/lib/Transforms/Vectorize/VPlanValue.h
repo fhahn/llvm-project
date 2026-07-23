@@ -28,6 +28,7 @@
 #include "llvm/IR/DebugLoc.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/TypeSize.h"
 
 namespace llvm {
 
@@ -198,6 +199,9 @@ public:
   /// Returns the scalar type of this VPValue, dispatching based on the
   /// concrete subclass.
   Type *getScalarType() const;
+
+  /// Returns the type of this VPValue when widened to \p VF.
+  Type *getWideType(ElementCount VF) const;
 
   /// Returns true if this VPValue is defined by a recipe.
   bool hasDefiningRecipe() const { return getDefiningRecipe(); }
