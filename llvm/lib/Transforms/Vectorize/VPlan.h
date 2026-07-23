@@ -3782,6 +3782,17 @@ public:
   /// Return the cost of this VPWidenMemoryRecipe.
   InstructionCost computeCost(ElementCount VF, VPCostContext &Ctx) const;
 
+  /// Return the cost of a consecutive, unmasked widened memory access of type
+  /// \p WideTy with \p Opcode (Load/Store), \p Alignment and address space \p
+  /// AS. \p StoredOrLoadedOp, if non-null, is the value operand used to refine
+  /// the cost (its OperandValueInfo); \p I, if non-null, is the underlying
+  /// instruction. Shared by computeCost and by VPlan transforms that estimate a
+  /// widened access cost before the recipe exists.
+  static InstructionCost
+  computeConsecutiveCost(unsigned Opcode, Type *WideTy, Align Alignment,
+                         unsigned AS, VPCostContext &Ctx,
+                         VPValue *StoredOrLoadedOp, const Instruction *I);
+
   Instruction &getIngredient() const { return Ingredient; }
 };
 

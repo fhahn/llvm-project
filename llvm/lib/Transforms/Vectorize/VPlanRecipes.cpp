@@ -4090,6 +4090,16 @@ const VPRecipeBase *VPWidenStoreRecipe::getAsRecipe() const { return this; }
 VPRecipeBase *VPWidenStoreEVLRecipe::getAsRecipe() { return this; }
 const VPRecipeBase *VPWidenStoreEVLRecipe::getAsRecipe() const { return this; }
 
+InstructionCost VPWidenMemoryRecipe::computeConsecutiveCost(
+    unsigned Opcode, Type *WideTy, Align Alignment, unsigned AS,
+    VPCostContext &Ctx, VPValue *StoredOrLoadedOp, const Instruction *I) {
+  TTI::OperandValueInfo OpInfo =
+      StoredOrLoadedOp ? Ctx.getOperandInfo(StoredOrLoadedOp)
+                       : TTI::OperandValueInfo{};
+  return Ctx.TTI.getMemoryOpCost(Opcode, WideTy, Alignment, AS, Ctx.CostKind,
+                                 OpInfo, I);
+}
+
 InstructionCost VPWidenMemoryRecipe::computeCost(ElementCount VF,
                                                  VPCostContext &Ctx) const {
   const VPRecipeBase *R = getAsRecipe();
@@ -4125,20 +4135,18 @@ InstructionCost VPWidenMemoryRecipe::computeCost(ElementCount VF,
                Ctx.CostKind);
   }
 
-  InstructionCost Cost = 0;
   if (IsMasked) {
     unsigned IID = isa<VPWidenLoadRecipe>(R) ? Intrinsic::masked_load
                                              : Intrinsic::masked_store;
-    Cost += Ctx.TTI.getMemIntrinsicInstrCost(
+    return Ctx.TTI.getMemIntrinsicInstrCost(
         MemIntrinsicCostAttributes(IID, Ty, Alignment, AS), Ctx.CostKind);
-  } else {
-    TTI::OperandValueInfo OpInfo = Ctx.getOperandInfo(
-        isa<VPWidenLoadRecipe, VPWidenLoadEVLRecipe>(R) ? R->getOperand(0)
-                                                        : R->getOperand(1));
-    Cost += Ctx.TTI.getMemoryOpCost(Opcode, Ty, Alignment, AS, Ctx.CostKind,
-                                    OpInfo, &Ingredient);
   }
-  return Cost;
+
+  VPValue *OpForInfo = isa<VPWidenLoadRecipe, VPWidenLoadEVLRecipe>(R)
+                           ? R->getOperand(0)
+                           : R->getOperand(1);
+  return computeConsecutiveCost(Opcode, Ty, Alignment, AS, Ctx, OpForInfo,
+                                &Ingredient);
 }
 
 void VPWidenLoadRecipe::execute(VPTransformState &State) {
