@@ -6526,12 +6526,15 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
                                              Legal->getWidestInductionType(),
                                              PSE, LVer ? &*LVer : nullptr);
 
+  std::unique_ptr<VPlan> VPlan0Clone(VPlan0->duplicate());
   VPDominatorTree VPDT(*VPlan0);
   if (const LoopAccessInfo *LAI = Legal->getLAI())
     RUN_VPLAN_PASS(VPlanTransforms::replaceSymbolicStrides, *VPlan0, PSE,
                    LAI->getSymbolicStrides(), VPDT);
   RUN_VPLAN_PASS(VPlanTransforms::simplifyRecipes, *VPlan0);
   RUN_VPLAN_PASS(VPlanTransforms::removeDeadRecipes, *VPlan0);
+
+
 
   // Create recipes for header phis. For outer loops, reductions, recurrences
   // and in-loop reductions are empty since legality doesn't detect them.
@@ -6573,7 +6576,7 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
                   ? UncountableExitStyle::MaskedHandleExitInScalarLoop
                   : UncountableExitStyle::ReadOnly;
 
-  if (!RUN_VPLAN_PASS(VPlanTransforms::handleEarlyExits, *VPlan0, EEStyle,
+  if (!RUN_VPLAN_PASS(VPlanTransforms::handleEarlyExits, *VPlan0, *VPlan0Clone, EEStyle,
                       OrigLoop, PSE, *DT, Legal->getAssumptionCache())) {
     return nullptr;
   }

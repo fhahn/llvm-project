@@ -1209,9 +1209,7 @@ void VPlanTransforms::createInLoopReductionRecipes(VPlan &Plan,
     R->eraseFromParent();
 }
 
-/// Check if a VPlan can be converted to a speculative load oracle: no
-/// unsupported opcodes and no pointer inductions. Call on the original plan
-/// before cloning to avoid an expensive Plan.duplicate() that would be wasted.
+/// Return true if /p Plan  can be converted to a speculative load oracle.
 static bool canBuildOraclePlan(VPlan &Plan, VPBasicBlock *HeaderVPBB) {
   auto IsUnsupportedOpcode = [](VPRecipeBase &R) {
     auto *VPI = dyn_cast<VPInstruction>(&R);
@@ -1234,13 +1232,6 @@ static bool canBuildOraclePlan(VPlan &Plan, VPBasicBlock *HeaderVPBB) {
   for (VPRecipeBase &R : HeaderVPBB->phis()) {
     if (isa<VPWidenPointerInductionRecipe>(&R))
       return false;
-    // buildOraclePlan installs a fresh oracle entry and disconnects the
-    // original one. A widened induction whose step is computed by a recipe
-    // (e.g. a VPExpandSCEVRecipe expanding a runtime step) has that recipe in
-    // the now-unreachable original entry, leaving the oracle's
-    // VPDerivedIVRecipe with a dangling operand that later crashes
-    // Plan::duplicate(). Only plain live-in steps survive, so bail out
-    // otherwise. (The start value is always a live-in and needs no check.)
     if (auto *WideIV = dyn_cast<VPWidenIntOrFpInductionRecipe>(&R))
       if (WideIV->getStepValue()->getDefiningRecipe())
         return false;
@@ -1259,10 +1250,6 @@ static bool canBuildOraclePlan(VPlan &Plan, VPBasicBlock *HeaderVPBB) {
 static VPSpeculativeLoadOracleRecipe *
 buildOraclePlan(std::unique_ptr<VPlan> OraclePlan, VPValue *CanonIVOperand,
                 VPlan &Plan, uint64_t EltStoreSize) {
-  // The oracle plan stays in plain-CFG form: it is code-generated via the
-  // RPOT-based VPlan::execute (not executeAndFinalize), so it never needs loop
-  // regions or a canonical IV. Build the scalar IV (phi 0, step 1) and
-  // BranchOnCount latch (trip VF) directly on the plain CFG.
   auto [HeaderVPBB, LatchVPBB] =
       VPBlockUtils::getPlainCFGHeaderAndLatch(*OraclePlan);
   auto *MiddleVPBB = VPBlockUtils::getPlainCFGMiddleBlock(*OraclePlan);
@@ -1294,9 +1281,9 @@ buildOraclePlan(std::unique_ptr<VPlan> OraclePlan, VPValue *CanonIVOperand,
 
   // Make the header the oracle plan's entry's single successor. The original
   // VPIRBasicBlock entry and the vector bypass chain become unreachable.
+  auto *VecPH = cast<VPBasicBlock>(HeaderVPBB->getPredecessors()[0]);
   auto *NewEntry = OraclePlan->createVPBasicBlock("oracle.entry");
   OraclePlan->setEntry(NewEntry);
-  auto *VecPH = cast<VPBasicBlock>(HeaderVPBB->getPredecessors()[0]);
   VPBlockUtils::disconnectBlocks(VecPH, HeaderVPBB);
   VPBlockUtils::connectBlocks(NewEntry, HeaderVPBB);
   HeaderVPBB->swapPredecessors();
@@ -1440,7 +1427,7 @@ buildOraclePlan(std::unique_ptr<VPlan> OraclePlan, VPValue *CanonIVOperand,
 /// be called before handleUncountableEarlyExits. Returns true if all loads
 /// are safe (either dereferenceable or replaced with speculative loads).
 static bool replaceUnsafeLoadsWithSpeculative(
-    VPlan &Plan, VPBasicBlock *HeaderVPBB, VPBasicBlock *MiddleVPBB,
+    VPlan &Plan, VPlan &Plan0, VPBasicBlock *HeaderVPBB, VPBasicBlock *MiddleVPBB,
     Loop *TheLoop, PredicatedScalarEvolution &PSE, DominatorTree &DT,
     AssumptionCache *AC) {
   ScalarEvolution &SE = *PSE.getSE();
@@ -1524,7 +1511,7 @@ static bool replaceUnsafeLoadsWithSpeculative(
   }
 
   // Validate the plan can be converted to an oracle before the expensive clone.
-  if (!canBuildOraclePlan(Plan, HeaderVPBB))
+  if (!canBuildOraclePlan(Plan0, HeaderVPBB))
     return false;
 
   // The oracle returns a single byte count shared by all speculative loads, so
@@ -1574,7 +1561,7 @@ static bool replaceUnsafeLoadsWithSpeculative(
   VPValue *CanonIVOperand = Plan.getPoison(IVTy);
 
   // Clone the plan before handleUncountableEarlyExits flattens early exits.
-  std::unique_ptr<VPlan> OraclePlan(Plan.duplicate());
+  std::unique_ptr<VPlan> OraclePlan(Plan0.duplicate());
 
   VPSpeculativeLoadOracleRecipe *Oracle =
       buildOraclePlan(std::move(OraclePlan), CanonIVOperand, Plan, EltStoreSize);
@@ -1607,7 +1594,7 @@ static bool replaceUnsafeLoadsWithSpeculative(
   return true;
 }
 
-bool VPlanTransforms::handleEarlyExits(VPlan &Plan, UncountableExitStyle Style,
+bool VPlanTransforms::handleEarlyExits(VPlan &Plan, VPlan &VPlan0, UncountableExitStyle Style,
                                        Loop *TheLoop,
                                        PredicatedScalarEvolution &PSE,
                                        DominatorTree &DT, AssumptionCache *AC) {
@@ -1623,11 +1610,11 @@ bool VPlanTransforms::handleEarlyExits(VPlan &Plan, UncountableExitStyle Style,
     // stores, as only the loads contributing to the exit condition need to
     // be checked.
     if (Style == UncountableExitStyle::ReadOnly &&
-        !replaceUnsafeLoadsWithSpeculative(Plan, HeaderVPBB, MiddleVPBB,
+        !replaceUnsafeLoadsWithSpeculative(Plan, VPlan0, HeaderVPBB, MiddleVPBB,
                                            TheLoop, PSE, DT, AC))
       return false;
     // TODO: Check target preference for style.
-    return handleUncountableEarlyExits(Plan, HeaderVPBB, LatchVPBB, MiddleVPBB,
+    return handleUncountableEarlyExits(Plan, VPlan0, HeaderVPBB, LatchVPBB, MiddleVPBB,
                                        TheLoop, PSE, DT, AC, Style);
   }
 

@@ -3191,7 +3191,7 @@ static bool handleUncountableExitsWithSideEffects(
 }
 
 bool VPlanTransforms::handleUncountableEarlyExits(
-    VPlan &Plan, VPBasicBlock *HeaderVPBB, VPBasicBlock *LatchVPBB,
+    VPlan &Plan, VPlan &VPlan0, VPBasicBlock *HeaderVPBB, VPBasicBlock *LatchVPBB,
     VPBasicBlock *MiddleVPBB, Loop *TheLoop, PredicatedScalarEvolution &PSE,
     DominatorTree &DT, AssumptionCache *AC, UncountableExitStyle Style) {
 #ifndef NDEBUG

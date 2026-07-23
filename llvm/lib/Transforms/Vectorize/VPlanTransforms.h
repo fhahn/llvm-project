@@ -179,7 +179,7 @@ struct VPlanTransforms {
   /// loads are dereferenceable. Returns false if a non-dereferenceable load is
   /// found.
   LLVM_ABI_FOR_TEST static bool
-  handleEarlyExits(VPlan &Plan, UncountableExitStyle Style, Loop *TheLoop,
+  handleEarlyExits(VPlan &Plan, VPlan &Plan0, UncountableExitStyle Style, Loop *TheLoop,
                    PredicatedScalarEvolution &PSE, DominatorTree &DT,
                    AssumptionCache *AC);
 
@@ -373,7 +373,7 @@ struct VPlanTransforms {
   /// latch exit condition. Multiple exits are handled with a dispatch block
   /// that determines which exit to take based on lane-by-lane semantics.
   static bool handleUncountableEarlyExits(
-      VPlan &Plan, VPBasicBlock *HeaderVPBB, VPBasicBlock *LatchVPBB,
+      VPlan &Plan, VPlan &VPlan0, VPBasicBlock *HeaderVPBB, VPBasicBlock *LatchVPBB,
       VPBasicBlock *MiddleVPBB, Loop *TheLoop, PredicatedScalarEvolution &PSE,
       DominatorTree &DT, AssumptionCache *AC, UncountableExitStyle Style);
 
