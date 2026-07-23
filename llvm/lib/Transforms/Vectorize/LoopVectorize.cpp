@@ -752,9 +752,8 @@ class LoopVectorizationCostModel {
   friend class LoopVectorizationPlanner;
 
 public:
-  LoopVectorizationCostModel(EpilogueLowering SEL, Loop *L,
-                             PredicatedScalarEvolution &PSE, LoopInfo *LI,
-                             LoopVectorizationLegality *Legal,
+  LoopVectorizationCostModel(Loop *L, PredicatedScalarEvolution &PSE,
+                             LoopInfo *LI, LoopVectorizationLegality *Legal,
                              const TargetTransformInfo &TTI,
                              const TargetLibraryInfo *TLI, AssumptionCache *AC,
                              OptimizationRemarkEmitter *ORE,
@@ -762,9 +761,9 @@ public:
                              const Function *F, const LoopVectorizeHints *Hints,
                              InterleavedAccessInfo &IAI,
                              VFSelectionContext &Config)
-      : Config(Config), EpilogueLoweringStatus(SEL), TheLoop(L), PSE(PSE),
-        LI(LI), Legal(Legal), TTI(TTI), TLI(TLI), AC(AC), ORE(ORE),
-        GetBFI(GetBFI), TheFunction(F), Hints(Hints), InterleaveInfo(IAI) {}
+      : Config(Config), TheLoop(L), PSE(PSE), LI(LI), Legal(Legal), TTI(TTI),
+        TLI(TLI), AC(AC), ORE(ORE), GetBFI(GetBFI), TheFunction(F),
+        Hints(Hints), InterleaveInfo(IAI) {}
 
   /// \return An upper bound for the vectorization factors (both fixed and
   /// scalable). If the factors are 0, vectorization and interleaving should be
@@ -1075,168 +1074,41 @@ public:
 
   /// Returns true if an epilogue is allowed (e.g., not prevented by
   /// optsize or a loop hint annotation).
-  bool isEpilogueAllowed() const {
-    return EpilogueLoweringStatus == CM_EpilogueAllowed;
-  }
+  bool isEpilogueAllowed() const { return Config.isEpilogueAllowed(); }
 
   /// Returns true if tail-folding is preferred over an epilogue.
-  bool preferTailFoldedLoop() const {
-    return EpilogueLoweringStatus == CM_EpilogueNotNeededFoldTail ||
-           EpilogueLoweringStatus == CM_EpilogueNotAllowedFoldTail;
-  }
+  bool preferTailFoldedLoop() const { return Config.preferTailFoldedLoop(); }
 
   /// Returns the TailFoldingStyle that is best for the current loop.
   TailFoldingStyle getTailFoldingStyle() const {
-    return ChosenTailFoldingStyle;
-  }
-
-  /// Selects and saves TailFoldingStyle.
-  /// \param IsScalableVF true if scalable vector factors enabled.
-  /// \param UserIC User specific interleave count.
-  void setTailFoldingStyle(bool IsScalableVF, unsigned UserIC) {
-    assert(ChosenTailFoldingStyle == TailFoldingStyle::None &&
-           "Tail folding must not be selected yet.");
-    if (!Legal->canFoldTailByMasking()) {
-      ChosenTailFoldingStyle = TailFoldingStyle::None;
-      return;
-    }
-
-    // Default to TTI preference, but allow command line override.
-    ChosenTailFoldingStyle = TTI.getPreferredTailFoldingStyle();
-    if (ForceTailFoldingStyle.getNumOccurrences())
-      ChosenTailFoldingStyle = ForceTailFoldingStyle.getValue();
-
-    if (ChosenTailFoldingStyle != TailFoldingStyle::DataWithEVL)
-      return;
-    // Override EVL styles if needed.
-    // FIXME: Investigate opportunity for fixed vector factor.
-    bool EVLIsLegal = UserIC <= 1 && IsScalableVF &&
-                      TTI.hasActiveVectorLength() && !EnableVPlanNativePath;
-    if (EVLIsLegal)
-      return;
-    // If for some reason EVL mode is unsupported, fallback to an epilogue
-    // if it's allowed, or DataWithoutLaneMask otherwise.
-    if (EpilogueLoweringStatus == CM_EpilogueAllowed ||
-        EpilogueLoweringStatus == CM_EpilogueNotNeededFoldTail)
-      ChosenTailFoldingStyle = TailFoldingStyle::None;
-    else
-      ChosenTailFoldingStyle = TailFoldingStyle::DataWithoutLaneMask;
-
-    LLVM_DEBUG(
-        dbgs() << "LV: Preference for VP intrinsics indicated. Will "
-                  "not try to generate VP Intrinsics "
-               << (UserIC > 1
-                       ? "since interleave count specified is greater than 1.\n"
-                       : "due to non-interleaving reasons.\n"));
+    return Config.getTailFoldingStyle();
   }
 
   /// Returns true if all loop blocks should be masked to fold tail loop.
-  bool foldTailByMasking() const {
-    return getTailFoldingStyle() != TailFoldingStyle::None;
-  }
-
-  void tryToEnablePartialAliasMasking() {
-    assert(foldTailByMasking() && "Expected tail folding to be enabled!");
-    assert(!foldTailWithEVL() &&
-           "Did not expect to enable alias masking with EVL!");
-    assert(PartialAliasMaskingStatus == AliasMaskingStatus::NotDecided);
-
-    // Assume we fail to enable alias masking (in case we early exit).
-    PartialAliasMaskingStatus = AliasMaskingStatus::Disabled;
-
-    // Note: FixedOrderRecurrences are not supported yet as we cannot handle
-    // the required `splice.right` with the alias-mask.
-    if (!ForcePartialAliasingVectorization ||
-        !Legal->getFixedOrderRecurrences().empty())
-      return;
-
-    const RuntimePointerChecking *Checks = Legal->getRuntimePointerChecking();
-    if (!Checks)
-      return;
-
-    auto DiffChecks = Checks->getDiffChecks();
-    if (!DiffChecks || DiffChecks->empty())
-      return;
-
-    [[maybe_unused]] auto HasPointerArgs = [](CallBase *CB) {
-      return any_of(CB->args(), [](Value const *Arg) {
-        return Arg->getType()->isPointerTy();
-      });
-    };
-
-    for (BasicBlock *BB : TheLoop->blocks()) {
-      for (Instruction &I : *BB) {
-        if (!isa<LoadInst, StoreInst>(I)) {
-          [[maybe_unused]] auto *Call = dyn_cast<CallInst>(&I);
-          assert(
-              (!I.mayReadOrWriteMemory() || (Call && !HasPointerArgs(Call))) &&
-              "Skipped unexpected memory access");
-          continue;
-        }
-
-        Type *ScalarTy = getLoadStoreType(&I);
-        Value *Ptr = getLoadStorePointerOperand(&I);
-
-        // Currently, we can't handle alias masking in reverse. Reversing the
-        // alias mask is not correct (or necessary). When combined with
-        // tail-folding the active lane mask should only be reversed where the
-        // alias-mask is true.
-        if (Legal->isConsecutivePtr(ScalarTy, Ptr) == -1)
-          return;
-      }
-    }
-
-    PartialAliasMaskingStatus = AliasMaskingStatus::Enabled;
-  }
+  bool foldTailByMasking() const { return Config.foldTailByMasking(); }
 
   /// Returns true if all loop blocks should have partial aliases masked.
-  bool maskPartialAliasing() const {
-    return PartialAliasMaskingStatus == AliasMaskingStatus::Enabled;
-  }
+  bool maskPartialAliasing() const { return Config.maskPartialAliasing(); }
 
   /// Returns true if the use of wide lane masks is requested and the loop is
   /// using tail-folding with a lane mask for control flow.
-  bool useWideActiveLaneMask() const {
-    if (!EnableWideActiveLaneMask)
-      return false;
-
-    return getTailFoldingStyle() == TailFoldingStyle::DataAndControlFlow;
-  }
+  bool useWideActiveLaneMask() const { return Config.useWideActiveLaneMask(); }
 
   /// Returns true if the instructions in this block requires predication
   /// for any reason, e.g. because tail folding now requires a predicate
   /// or because the block in the original loop was predicated.
   bool blockNeedsPredicationForAnyReason(BasicBlock *BB) const {
-    return foldTailByMasking() || Legal->blockNeedsPredication(BB);
+    return Config.blockNeedsPredicationForAnyReason(BB);
   }
 
   /// Returns true if VP intrinsics with explicit vector length support should
   /// be generated in the tail folded loop.
-  bool foldTailWithEVL() const {
-    return getTailFoldingStyle() == TailFoldingStyle::DataWithEVL;
-  }
+  bool foldTailWithEVL() const { return Config.foldTailWithEVL(); }
 
   /// Returns true if the predicated reduction select should be used to set the
   /// incoming value for the reduction phi.
   bool usePredicatedReductionSelect(RecurKind RecurrenceKind) const {
-    // Force to use predicated reduction select since the EVL of the
-    // second-to-last iteration might not be VF*UF.
-    if (foldTailWithEVL())
-      return true;
-
-    // Force a predicated select with alias-masking to avoid propagating poison
-    // values to the header phi for lanes outside the alias-mask.
-    if (maskPartialAliasing())
-      return true;
-
-    // Note: For FindLast recurrences we prefer a predicated select to simplify
-    // matching in handleFindLastReductions(), rather than handle multiple
-    // cases.
-    if (RecurrenceDescriptor::isFindLastRecurrenceKind(RecurrenceKind))
-      return true;
-
-    return PreferPredicatedReductionSelect ||
-           TTI.preferPredicatedReductionSelect();
+    return Config.usePredicatedReductionSelect(RecurrenceKind);
   }
 
   /// Estimate cost of an intrinsic call instruction CI if it were vectorized
@@ -1295,24 +1167,20 @@ private:
     // With alias-masking our runtime VF is [2, VF] (and not necessarily a
     // power-of-two). Something that is uniform for VF may not be for the full
     // range.
-    assert(PartialAliasMaskingStatus != AliasMaskingStatus::NotDecided &&
+    assert(Config.isPartialAliasMaskingDecided() &&
            "alias-mask status must be decided already");
-    return Legal->isUniform(V, PartialAliasMaskingStatus ==
-                                       AliasMaskingStatus::Disabled
-                                   ? std::optional(VF)
-                                   : std::nullopt);
+    return Legal->isUniform(
+        V, Config.maskPartialAliasing() ? std::nullopt : std::optional(VF));
   }
 
   /// Wrapper around LoopVectorizationLegality::isUniformMemOp() that takes into
   /// account if alias-masking is enabled. We consider the VF to be unknown when
   /// alias masking.
   bool isUniformMemOp(Instruction &I, ElementCount VF) const {
-    assert(PartialAliasMaskingStatus != AliasMaskingStatus::NotDecided &&
+    assert(Config.isPartialAliasMaskingDecided() &&
            "alias-mask status must be decided already");
-    return Legal->isUniformMemOp(I, PartialAliasMaskingStatus ==
-                                            AliasMaskingStatus::Disabled
-                                        ? std::optional(VF)
-                                        : std::nullopt);
+    return Legal->isUniformMemOp(
+        I, Config.maskPartialAliasing() ? std::nullopt : std::optional(VF));
   }
 
   /// Calculate vectorization cost of memory instruction \p I.
@@ -1352,21 +1220,6 @@ private:
   /// vectorization as a predicated block.
   DenseMap<ElementCount, SmallPtrSet<BasicBlock *, 4>>
       PredicatedBBsAfterVectorization;
-
-  /// Records whether it is allowed to have the original scalar loop execute at
-  /// least once. This may be needed as a fallback loop in case runtime
-  /// aliasing/dependence checks fail, or to handle the tail/remainder
-  /// iterations when the trip count is unknown or doesn't divide by the VF,
-  /// or as a peel-loop to handle gaps in interleave-groups.
-  /// Under optsize and when the trip count is very small we don't allow any
-  /// iterations to execute in the scalar loop.
-  EpilogueLowering EpilogueLoweringStatus = CM_EpilogueAllowed;
-
-  /// Control finally chosen tail folding style.
-  TailFoldingStyle ChosenTailFoldingStyle = TailFoldingStyle::None;
-
-  /// If partial alias masking is enabled/disabled or not decided.
-  AliasMaskingStatus PartialAliasMaskingStatus = AliasMaskingStatus::NotDecided;
 
   /// A map holding scalar costs for different vectorization factors. The
   /// presence of a cost for an instruction in the mapping indicates that the
@@ -2896,11 +2749,9 @@ void LoopVectorizationCostModel::collectLoopUniforms(ElementCount VF) {
 
 FixedScalableVFPair
 LoopVectorizationCostModel::computeMaxVF(ElementCount UserVF, unsigned UserIC) {
-  // Make sure once we return PartialAliasMaskingStatus is not "NotDecided".
-  scope_exit EnsureAliasMaskingStatusIsDecidedOnReturn([this] {
-    if (PartialAliasMaskingStatus == AliasMaskingStatus::NotDecided)
-      PartialAliasMaskingStatus = AliasMaskingStatus::Disabled;
-  });
+  // Make sure once we return the partial alias-masking status is decided.
+  scope_exit EnsureAliasMaskingStatusIsDecidedOnReturn(
+      [this] { Config.ensurePartialAliasMaskingDecided(); });
 
   // For outer loops, use simple type-based heuristic VF. No cost model or
   // memory dependence analysis is available.
@@ -2921,7 +2772,7 @@ LoopVectorizationCostModel::computeMaxVF(ElementCount UserVF, unsigned UserIC) {
   ScalarEvolution *SE = PSE.getSE();
   ElementCount TC = getSmallConstantTripCount(SE, TheLoop);
   unsigned MaxTC = PSE.getSmallConstantMaxTripCount();
-  if (!MaxTC && EpilogueLoweringStatus == CM_EpilogueAllowed)
+  if (!MaxTC && Config.isEpilogueAllowed())
     MaxTC = getMaxTCFromNonZeroRange(PSE, TheLoop);
   LLVM_DEBUG(dbgs() << "LV: Found trip count: " << TC << '\n');
   if (TC != ElementCount::getFixed(MaxTC))
@@ -2953,7 +2804,7 @@ LoopVectorizationCostModel::computeMaxVF(ElementCount UserVF, unsigned UserIC) {
   assert(WideningDecisions.empty() && Uniforms.empty() && Scalars.empty() &&
          "No cost-modeling decisions should have been taken at this point");
 
-  switch (EpilogueLoweringStatus) {
+  switch (Config.getEpilogueLoweringStatus()) {
   case CM_EpilogueAllowed:
     return Config.computeFeasibleMaxVF(MaxTC, UserVF, UserIC, false,
                                        requiresScalarEpilogue(true));
@@ -2967,7 +2818,7 @@ LoopVectorizationCostModel::computeMaxVF(ElementCount UserVF, unsigned UserIC) {
   case CM_EpilogueNotAllowedLowTripLoop:
     // fallthrough as a special case of OptForSize
   case CM_EpilogueNotAllowedOptSize:
-    if (EpilogueLoweringStatus == CM_EpilogueNotAllowedOptSize)
+    if (Config.getEpilogueLoweringStatus() == CM_EpilogueNotAllowedOptSize)
       LLVM_DEBUG(dbgs() << "LV: Not allowing epilogue due to -Os/-Oz.\n");
     else
       LLVM_DEBUG(dbgs() << "LV: Not allowing epilogue due to low trip "
@@ -3049,7 +2900,8 @@ LoopVectorizationCostModel::computeMaxVF(ElementCount UserVF, unsigned UserIC) {
       // If we have a low-trip-count, and the fixed-width VF is known to divide
       // the trip count but the scalable factor does not, use the fixed-width
       // factor in preference to allow the generation of a non-predicated loop.
-      if (EpilogueLoweringStatus == CM_EpilogueNotAllowedLowTripLoop &&
+      if (Config.getEpilogueLoweringStatus() ==
+              CM_EpilogueNotAllowedLowTripLoop &&
           NoScalarEpilogueNeeded(MaxFactors.FixedVF.getFixedValue())) {
         LLVM_DEBUG(dbgs() << "LV: Picking a fixed-width so that no tail will "
                              "remain for any chosen VF.\n");
@@ -3070,7 +2922,7 @@ LoopVectorizationCostModel::computeMaxVF(ElementCount UserVF, unsigned UserIC) {
   // by masking.
   // FIXME: look for a smaller MaxVF that does divide TC rather than masking.
   bool ContainsScalableVF = MaxFactors.ScalableVF.isNonZero();
-  setTailFoldingStyle(ContainsScalableVF, UserIC);
+  Config.setTailFoldingStyle(ContainsScalableVF, UserIC);
   if (foldTailByMasking()) {
     if (foldTailWithEVL()) {
       LLVM_DEBUG(
@@ -3085,21 +2937,21 @@ LoopVectorizationCostModel::computeMaxVF(ElementCount UserVF, unsigned UserIC) {
 
       MaxFactors.FixedVF = ElementCount::getFixed(1);
     } else {
-      tryToEnablePartialAliasMasking();
+      Config.tryToEnablePartialAliasMasking();
     }
     return MaxFactors;
   }
 
   // If there was a tail-folding hint/switch, but we can't fold the tail by
   // masking, fallback to a vectorization with an epilogue.
-  if (EpilogueLoweringStatus == CM_EpilogueNotNeededFoldTail) {
+  if (Config.getEpilogueLoweringStatus() == CM_EpilogueNotNeededFoldTail) {
     LLVM_DEBUG(dbgs() << "LV: Cannot fold tail by masking: vectorize with an "
                          "epilogue instead.\n");
-    EpilogueLoweringStatus = CM_EpilogueAllowed;
+    Config.allowEpilogueAfterFailedTailFold();
     return MaxFactors;
   }
 
-  if (EpilogueLoweringStatus == CM_EpilogueNotAllowedFoldTail) {
+  if (Config.getEpilogueLoweringStatus() == CM_EpilogueNotAllowedFoldTail) {
     LLVM_DEBUG(dbgs() << "LV: Can't fold tail by masking: don't vectorize\n");
     return FixedScalableVFPair::getNone();
   }
@@ -3408,6 +3260,131 @@ bool LoopVectorizationPlanner::isCandidateForEpilogueVectorization(
   return true;
 }
 
+bool VFSelectionContext::blockNeedsPredicationForAnyReason(
+    BasicBlock *BB) const {
+  return foldTailByMasking() || Legal->blockNeedsPredication(BB);
+}
+
+void VFSelectionContext::setTailFoldingStyle(bool IsScalableVF,
+                                             unsigned UserIC) {
+  assert(ChosenTailFoldingStyle == TailFoldingStyle::None &&
+         "Tail folding must not be selected yet.");
+  if (!Legal->canFoldTailByMasking()) {
+    ChosenTailFoldingStyle = TailFoldingStyle::None;
+    return;
+  }
+
+  // Default to TTI preference, but allow command line override.
+  ChosenTailFoldingStyle = TTI.getPreferredTailFoldingStyle();
+  if (ForceTailFoldingStyle.getNumOccurrences())
+    ChosenTailFoldingStyle = ForceTailFoldingStyle.getValue();
+
+  if (ChosenTailFoldingStyle != TailFoldingStyle::DataWithEVL)
+    return;
+  // Override EVL styles if needed.
+  // FIXME: Investigate opportunity for fixed vector factor.
+  bool EVLIsLegal = UserIC <= 1 && IsScalableVF && TTI.hasActiveVectorLength() &&
+                    !EnableVPlanNativePath;
+  if (EVLIsLegal)
+    return;
+  // If for some reason EVL mode is unsupported, fallback to an epilogue
+  // if it's allowed, or DataWithoutLaneMask otherwise.
+  if (EpilogueLoweringStatus == CM_EpilogueAllowed ||
+      EpilogueLoweringStatus == CM_EpilogueNotNeededFoldTail)
+    ChosenTailFoldingStyle = TailFoldingStyle::None;
+  else
+    ChosenTailFoldingStyle = TailFoldingStyle::DataWithoutLaneMask;
+
+  LLVM_DEBUG(
+      dbgs() << "LV: Preference for VP intrinsics indicated. Will "
+                "not try to generate VP Intrinsics "
+             << (UserIC > 1
+                     ? "since interleave count specified is greater than 1.\n"
+                     : "due to non-interleaving reasons.\n"));
+}
+
+bool VFSelectionContext::useWideActiveLaneMask() const {
+  if (!EnableWideActiveLaneMask)
+    return false;
+
+  return getTailFoldingStyle() == TailFoldingStyle::DataAndControlFlow;
+}
+
+void VFSelectionContext::tryToEnablePartialAliasMasking() {
+  assert(foldTailByMasking() && "Expected tail folding to be enabled!");
+  assert(!foldTailWithEVL() &&
+         "Did not expect to enable alias masking with EVL!");
+  assert(PartialAliasMaskingStatus == AliasMaskingStatus::NotDecided);
+
+  // Assume we fail to enable alias masking (in case we early exit).
+  PartialAliasMaskingStatus = AliasMaskingStatus::Disabled;
+
+  // Note: FixedOrderRecurrences are not supported yet as we cannot handle
+  // the required `splice.right` with the alias-mask.
+  if (!ForcePartialAliasingVectorization ||
+      !Legal->getFixedOrderRecurrences().empty())
+    return;
+
+  const RuntimePointerChecking *Checks = Legal->getRuntimePointerChecking();
+  if (!Checks)
+    return;
+
+  auto DiffChecks = Checks->getDiffChecks();
+  if (!DiffChecks || DiffChecks->empty())
+    return;
+
+  [[maybe_unused]] auto HasPointerArgs = [](CallBase *CB) {
+    return any_of(CB->args(), [](Value const *Arg) {
+      return Arg->getType()->isPointerTy();
+    });
+  };
+
+  for (BasicBlock *BB : TheLoop->blocks()) {
+    for (Instruction &I : *BB) {
+      if (!isa<LoadInst, StoreInst>(I)) {
+        [[maybe_unused]] auto *Call = dyn_cast<CallInst>(&I);
+        assert((!I.mayReadOrWriteMemory() || (Call && !HasPointerArgs(Call))) &&
+               "Skipped unexpected memory access");
+        continue;
+      }
+
+      Type *ScalarTy = getLoadStoreType(&I);
+      Value *Ptr = getLoadStorePointerOperand(&I);
+
+      // Currently, we can't handle alias masking in reverse. Reversing the
+      // alias mask is not correct (or necessary). When combined with
+      // tail-folding the active lane mask should only be reversed where the
+      // alias-mask is true.
+      if (Legal->isConsecutivePtr(ScalarTy, Ptr) == -1)
+        return;
+    }
+  }
+
+  PartialAliasMaskingStatus = AliasMaskingStatus::Enabled;
+}
+
+bool VFSelectionContext::usePredicatedReductionSelect(
+    RecurKind RecurrenceKind) const {
+  // Force to use predicated reduction select since the EVL of the
+  // second-to-last iteration might not be VF*UF.
+  if (foldTailWithEVL())
+    return true;
+
+  // Force a predicated select with alias-masking to avoid propagating poison
+  // values to the header phi for lanes outside the alias-mask.
+  if (maskPartialAliasing())
+    return true;
+
+  // Note: For FindLast recurrences we prefer a predicated select to simplify
+  // matching in handleFindLastReductions(), rather than handle multiple
+  // cases.
+  if (RecurrenceDescriptor::isFindLastRecurrenceKind(RecurrenceKind))
+    return true;
+
+  return PreferPredicatedReductionSelect ||
+         TTI.preferPredicatedReductionSelect();
+}
+
 bool VFSelectionContext::isEpilogueVectorizationProfitable(
     const ElementCount VF, const unsigned IC) const {
   // FIXME: We need a much better cost-model to take different parameters such
@@ -3432,13 +3409,13 @@ std::unique_ptr<VPlan> LoopVectorizationPlanner::selectBestEpiloguePlan(
     return nullptr;
   }
 
-  if (!CM.isEpilogueAllowed()) {
+  if (!Config.isEpilogueAllowed()) {
     LLVM_DEBUG(dbgs() << "LEV: Unable to vectorize epilogue because no "
                          "epilogue is allowed.\n");
     return nullptr;
   }
 
-  if (CM.maskPartialAliasing()) {
+  if (Config.maskPartialAliasing()) {
     LLVM_DEBUG(
         dbgs()
         << "LEV: Epilogue vectorization not supported with alias masking.\n");
@@ -3628,8 +3605,8 @@ LoopVectorizationPlanner::selectInterleaveCount(VPlan &Plan, ElementCount VF,
   // overhead of multiple instructions to calculate the predicate is likely
   // not beneficial. If an epilogue is not allowed for any other reason,
   // do not interleave.
-  if (!CM.isEpilogueAllowed() &&
-      !(CM.preferTailFoldedLoop() && CM.useWideActiveLaneMask()))
+  if (!Config.isEpilogueAllowed() &&
+      !(Config.preferTailFoldedLoop() && Config.useWideActiveLaneMask()))
     return 1;
 
   if (any_of(Plan.getVectorLoopRegion()->getEntryBasicBlock()->phis(),
@@ -3749,7 +3726,7 @@ LoopVectorizationPlanner::selectInterleaveCount(VPlan &Plan, ElementCount VF,
   auto BestKnownTC =
       getSmallBestKnownTC(PSE, OrigLoop,
                           /*CanUseConstantMax=*/true,
-                          /*CanExcludeZeroTrips=*/CM.isEpilogueAllowed());
+                          /*CanExcludeZeroTrips=*/Config.isEpilogueAllowed());
 
   // For fixed length VFs treat a scalable trip count as unknown.
   if (BestKnownTC && (BestKnownTC->isFixed() || VF.isScalable())) {
@@ -5494,7 +5471,7 @@ void LoopVectorizationPlanner::plan(ElementCount UserVF, unsigned UserIC) {
   Config.computeMinimalBitwidths();
 
   // Invalidate interleave groups if all blocks of loop will be predicated.
-  if (CM.blockNeedsPredicationForAnyReason(OrigLoop->getHeader()) &&
+  if (Config.blockNeedsPredicationForAnyReason(OrigLoop->getHeader()) &&
       !useMaskedInterleavedAccesses(TTI)) {
     LLVM_DEBUG(
         dbgs()
@@ -5507,7 +5484,7 @@ void LoopVectorizationPlanner::plan(ElementCount UserVF, unsigned UserIC) {
       CM.invalidateCostModelingDecisions();
   }
 
-  if (CM.foldTailByMasking())
+  if (Config.foldTailByMasking())
     Legal->prepareToFoldTailByMasking();
 
   ElementCount MaxUserVF =
@@ -5911,7 +5888,7 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
                    BestVPlan, BestVF, VScale);
   }
 
-  if (CM.maskPartialAliasing()) {
+  if (Config.maskPartialAliasing()) {
     assert(BestVPlan.hasTailFolded() && "Expected tail folding to be enabled");
     RUN_VPLAN_PASS(VPlanTransforms::materializeAliasMaskCheckBlock, BestVPlan,
                    *Legal->getRuntimePointerChecking()->getDiffChecks(),
@@ -6528,8 +6505,8 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
   bool ForceVectorization = Hints.getForce() == LoopVectorizeHints::FK_Enabled;
   bool OptForSize =
       !ForceVectorization &&
-      (CM.EpilogueLoweringStatus == CM_EpilogueNotAllowedOptSize ||
-       CM.EpilogueLoweringStatus == CM_EpilogueNotAllowedLowTripLoop);
+      (Config.getEpilogueLoweringStatus() == CM_EpilogueNotAllowedOptSize ||
+       Config.getEpilogueLoweringStatus() == CM_EpilogueNotAllowedLowTripLoop);
   unsigned SCEVCheckThreshold = ForceVectorization
                                     ? PragmaVectorizeSCEVCheckThreshold
                                     : VectorizeSCEVCheckThreshold;
@@ -6557,7 +6534,7 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
 
   RUN_VPLAN_PASS(VPlanTransforms::createLoopRegions, *VPlan0,
                  getDebugLocFromInstOrOperands(Legal->getPrimaryInduction()));
-  if (CM.foldTailByMasking())
+  if (Config.foldTailByMasking())
     RUN_VPLAN_PASS(VPlanTransforms::foldTailByMasking, *VPlan0);
   RUN_VPLAN_PASS(VPlanTransforms::introduceMasksAndLinearize, *VPlan0);
 
@@ -6586,7 +6563,7 @@ void LoopVectorizationPlanner::buildVPlans(VPlan &VPlan1, ElementCount MinVF,
                    Config.getMinimalBitwidths());
     RUN_VPLAN_PASS(VPlanTransforms::optimize, *Plan);
     // TODO: try to put addExplicitVectorLength close to addActiveLaneMask
-    if (CM.foldTailWithEVL()) {
+    if (Config.foldTailWithEVL()) {
       RUN_VPLAN_PASS(VPlanTransforms::addExplicitVectorLength, *Plan,
                      Config.getMaxSafeElements());
       RUN_VPLAN_PASS(VPlanTransforms::optimizeEVLMasks, *Plan);
@@ -6596,7 +6573,7 @@ void LoopVectorizationPlanner::buildVPlans(VPlan &VPlan1, ElementCount MinVF,
             RUN_VPLAN_PASS(VPlanTransforms::narrowInterleaveGroups, *Plan, TTI))
       VPlans.push_back(std::move(P));
 
-    TailFoldingStyle Style = CM.getTailFoldingStyle();
+    TailFoldingStyle Style = Config.getTailFoldingStyle();
     RUN_VPLAN_PASS(VPlanTransforms::materializeHeaderMask, *Plan,
                    useActiveLaneMask(Style),
                    useActiveLaneMaskForControlFlow(Style));
@@ -6655,7 +6632,7 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan,
   for (ElementCount VF : Range)
     IVUpdateMayOverflow |= !isIndvarOverflowCheckKnownFalse(&CM, VF);
 
-  TailFoldingStyle Style = CM.getTailFoldingStyle();
+  TailFoldingStyle Style = Config.getTailFoldingStyle();
   // Use NUW for the induction increment if we proved that it won't overflow in
   // the vector loop or when not folding the tail. In the later case, we know
   // that the canonical induction increment will not overflow as the vector trip
@@ -6812,7 +6789,7 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan,
   // range for better cost estimation.
   // TODO: Enable following transform when the EVL-version of extended-reduction
   // and mulacc-reduction are implemented.
-  if (!CM.foldTailWithEVL()) {
+  if (!Config.foldTailWithEVL()) {
     RUN_VPLAN_PASS(VPlanTransforms::createPartialReductions, *Plan, CostCtx,
                    Range);
     RUN_VPLAN_PASS(VPlanTransforms::convertToAbstractRecipes, *Plan, CostCtx,
@@ -6823,7 +6800,7 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan,
   // for this VPlan, replace the Recipes widening its memory instructions with a
   // single VPInterleaveRecipe at its insertion point.
   RUN_VPLAN_PASS(VPlanTransforms::createInterleaveGroups, *Plan,
-                 InterleaveGroups, CM.isEpilogueAllowed());
+                 InterleaveGroups, Config.isEpilogueAllowed());
 
   // Convert memory recipes to strided access recipes if the strided access is
   // legal and profitable.
@@ -6840,7 +6817,7 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan,
 
   RUN_VPLAN_PASS(VPlanTransforms::dropPoisonGeneratingRecipes, *Plan);
 
-  if (CM.maskPartialAliasing())
+  if (Config.maskPartialAliasing())
     RUN_VPLAN_PASS(VPlanTransforms::attachAliasMaskToHeaderMask, *Plan);
 
   assert(verifyVPlanIsValid(*Plan) && "VPlan is invalid");
@@ -6884,7 +6861,7 @@ void LoopVectorizationPlanner::addReductionResultComputation(
 
     // Remove the predicated select if the target doesn't want it.
     VPValue *V;
-    if (!CM.usePredicatedReductionSelect(RecurrenceKind) &&
+    if (!Config.usePredicatedReductionSelect(RecurrenceKind) &&
         match(PhiR->getBackedgeValue(),
               m_Select(m_Specific(HeaderMask), m_VPValue(V), m_Specific(PhiR))))
       PhiR->setBackedgeValue(V);
@@ -7171,7 +7148,8 @@ getEpilogueLowering(Function *F, Loop *L, LoopVectorizeHints &Hints,
 /// \return CM_EpilogueNotNeededFoldTail if epilogue tail-folding is possible,
 /// otherwise CM_EpilogueAllowed.
 static EpilogueLowering
-getEpilogueTailLowering(const LoopVectorizationCostModel &MainCM, const Loop *L,
+getEpilogueTailLowering(const LoopVectorizationCostModel &MainCM,
+                        const VFSelectionContext &Config, const Loop *L,
                         OptimizationRemarkEmitter *ORE) {
   // Epilogue TF is only enabled when explicitly requested via command line.
   if (!EpilogueTailFoldingPolicy.getNumOccurrences() ||
@@ -7195,7 +7173,7 @@ getEpilogueTailLowering(const LoopVectorizationCostModel &MainCM, const Loop *L,
   }
 
   // If having epilogue is NOT allowed, then no epilogue to apply TF for.
-  if (!MainCM.isEpilogueAllowed()) {
+  if (!Config.isEpilogueAllowed()) {
     LLVM_DEBUG(dbgs() << "LV: No epilogue to apply tail-folding for.\n"
                          "LV: Fall back to a normal epilogue\n");
     return CM_EpilogueAllowed;
@@ -8016,16 +7994,16 @@ bool LoopVectorizePass::processLoop(Loop *L) {
   }
 
   // Use the cost model.
-  VFSelectionContext Config(*TTI, &LVL, L, *F, PSE, DB, ORE, &Hints,
-                            OptForSize);
-  LoopVectorizationCostModel CM(SEL, L, PSE, LI, &LVL, *TTI, TLI, AC, ORE,
-                                GetBFI, F, &Hints, IAI, Config);
+  VFSelectionContext Config(*TTI, &LVL, L, *F, PSE, DB, ORE, &Hints, OptForSize,
+                            SEL);
+  LoopVectorizationCostModel CM(L, PSE, LI, &LVL, *TTI, TLI, AC, ORE, GetBFI, F,
+                                &Hints, IAI, Config);
   // Use the planner for vectorization.
   LoopVectorizationPlanner LVP(L, LI, DT, TLI, *TTI, &LVL, CM, Config, IAI, PSE,
                                Hints, ORE);
 
   EpilogueLowering EpilogueTailLoweringStatus =
-      getEpilogueTailLowering(CM, L, ORE);
+      getEpilogueTailLowering(CM, Config, L, ORE);
   if (EpilogueTailLoweringStatus ==
       EpilogueLowering::CM_EpilogueNotNeededFoldTail) {
     // TODO: Apply tail-folding on the vectorized epilogue loop.
@@ -8059,11 +8037,11 @@ bool LoopVectorizePass::processLoop(Loop *L) {
   if (IsInnerLoop && ORE->allowExtraAnalysis(LV_NAME))
     LVP.emitInvalidCostRemarks(ORE);
 
-  assert((IsInnerLoop || !CM.maskPartialAliasing()) &&
+  assert((IsInnerLoop || !Config.maskPartialAliasing()) &&
          "Did not expect to alias-mask outer loop");
 
   GeneratedRTChecks Checks(PSE, DT, LI, TTI, Config.CostKind,
-                           CM.maskPartialAliasing());
+                           Config.maskPartialAliasing());
   if (IsInnerLoop && LVP.hasPlanWithVF(VF.Width)) {
     // Select the interleave count.
     IC = LVP.selectInterleaveCount(*BestPlanPtr, VF.Width, VF.Cost);
@@ -8172,7 +8150,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
   // Override IC if user provided an interleave count.
   IC = UserIC > 0 ? UserIC : IC;
 
-  if (CM.maskPartialAliasing()) {
+  if (Config.maskPartialAliasing()) {
     LLVM_DEBUG(
         dbgs()
         << "LV: Not interleaving due to partial aliasing vectorization.\n");

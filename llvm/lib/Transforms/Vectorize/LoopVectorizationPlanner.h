@@ -724,6 +724,18 @@ class VFSelectionContext {
   /// initialized during object construction.
   std::optional<unsigned> VScaleForTuning;
 
+  /// Describes how the epilogue/tail loop should be lowered. A loop-level
+  /// decision, independent of the chosen vectorization factor.
+  EpilogueLowering EpilogueLoweringStatus = CM_EpilogueAllowed;
+
+  /// The finally chosen tail folding style. A loop-level decision, independent
+  /// of the chosen vectorization factor.
+  TailFoldingStyle ChosenTailFoldingStyle = TailFoldingStyle::None;
+
+  /// Whether partial alias masking is enabled/disabled or not decided. A
+  /// loop-level decision, independent of the chosen vectorization factor.
+  AliasMaskingStatus PartialAliasMaskingStatus = AliasMaskingStatus::NotDecided;
+
   /// The highest VF possible for this loop, without using MaxBandwidth.
   FixedScalableVFPair MaxPermissibleVFWithoutMaxBW;
 
@@ -765,9 +777,10 @@ public:
                      const Loop *TheLoop, const Function &F,
                      PredicatedScalarEvolution &PSE, DemandedBits *DB,
                      OptimizationRemarkEmitter *ORE,
-                     const LoopVectorizeHints *Hints, bool OptForSize)
+                     const LoopVectorizeHints *Hints, bool OptForSize,
+                     EpilogueLowering SEL)
       : TTI(TTI), Legal(Legal), TheLoop(TheLoop), F(F), PSE(PSE), DB(DB),
-        ORE(ORE), Hints(Hints),
+        ORE(ORE), Hints(Hints), EpilogueLoweringStatus(SEL),
         CostKind(F.hasMinSize() ? TTI::TCK_CodeSize : TTI::TCK_RecipThroughput),
         OptForSize(OptForSize) {
     initializeVScaleForTuning();
@@ -782,6 +795,84 @@ public:
 
   /// \return The loop being analyzed.
   const Loop *getLoop() const { return TheLoop; }
+
+  /// Returns the epilogue lowering status decided for the loop.
+  EpilogueLowering getEpilogueLoweringStatus() const {
+    return EpilogueLoweringStatus;
+  }
+
+  /// If there was a tail-folding hint/switch but the tail can't be folded by
+  /// masking, fall back to vectorizing with an epilogue instead.
+  void allowEpilogueAfterFailedTailFold() {
+    assert(EpilogueLoweringStatus == CM_EpilogueNotNeededFoldTail &&
+           "Expected a tail-folding hint");
+    EpilogueLoweringStatus = CM_EpilogueAllowed;
+  }
+
+  /// Returns true if an epilogue is allowed (e.g., not prevented by
+  /// optsize or a loop hint annotation).
+  bool isEpilogueAllowed() const {
+    return EpilogueLoweringStatus == CM_EpilogueAllowed;
+  }
+
+  /// Returns true if tail-folding is preferred over an epilogue.
+  bool preferTailFoldedLoop() const {
+    return EpilogueLoweringStatus == CM_EpilogueNotNeededFoldTail ||
+           EpilogueLoweringStatus == CM_EpilogueNotAllowedFoldTail;
+  }
+
+  /// Returns the TailFoldingStyle that is best for the current loop.
+  TailFoldingStyle getTailFoldingStyle() const { return ChosenTailFoldingStyle; }
+
+  /// Selects and saves TailFoldingStyle.
+  /// \param IsScalableVF true if scalable vector factors enabled.
+  /// \param UserIC User specific interleave count.
+  void setTailFoldingStyle(bool IsScalableVF, unsigned UserIC);
+
+  /// Returns true if all loop blocks should be masked to fold tail loop.
+  bool foldTailByMasking() const {
+    return getTailFoldingStyle() != TailFoldingStyle::None;
+  }
+
+  /// Returns true if VP intrinsics with explicit vector length support should
+  /// be generated in the tail folded loop.
+  bool foldTailWithEVL() const {
+    return getTailFoldingStyle() == TailFoldingStyle::DataWithEVL;
+  }
+
+  /// Returns true if the use of wide lane masks is requested and the loop is
+  /// using tail-folding with a lane mask for control flow.
+  bool useWideActiveLaneMask() const;
+
+  /// Returns true if the instructions in this block requires predication
+  /// for any reason, e.g. because tail folding now requires a predicate
+  /// or because the block in the original loop was predicated.
+  bool blockNeedsPredicationForAnyReason(BasicBlock *BB) const;
+
+  /// Determine whether partial alias masking can be enabled for the loop, and
+  /// record the decision. Must be called once tail-folding has been decided.
+  void tryToEnablePartialAliasMasking();
+
+  /// Ensure the partial alias-masking status is decided, defaulting to disabled
+  /// if it has not been decided yet.
+  void ensurePartialAliasMaskingDecided() {
+    if (PartialAliasMaskingStatus == AliasMaskingStatus::NotDecided)
+      PartialAliasMaskingStatus = AliasMaskingStatus::Disabled;
+  }
+
+  /// Returns true if the partial alias-masking status has been decided.
+  bool isPartialAliasMaskingDecided() const {
+    return PartialAliasMaskingStatus != AliasMaskingStatus::NotDecided;
+  }
+
+  /// Returns true if all loop blocks should have partial aliases masked.
+  bool maskPartialAliasing() const {
+    return PartialAliasMaskingStatus == AliasMaskingStatus::Enabled;
+  }
+
+  /// Returns true if the predicated reduction select should be used to set the
+  /// incoming value for the reduction phi.
+  bool usePredicatedReductionSelect(RecurKind RecurrenceKind) const;
 
   /// Returns true if epilogue vectorization is considered profitable for a
   /// main loop with vectorization factor \p VF and interleave count \p IC.

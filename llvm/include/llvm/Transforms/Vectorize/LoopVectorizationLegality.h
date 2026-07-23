@@ -338,6 +338,9 @@ public:
 
   /// Return the fixed-order recurrences found in the loop.
   RecurrenceSet &getFixedOrderRecurrences() { return FixedOrderRecurrences; }
+  const RecurrenceSet &getFixedOrderRecurrences() const {
+    return FixedOrderRecurrences;
+  }
 
   /// Returns the widest induction type.
   IntegerType *getWidestInductionType() { return WidestIndTy; }
