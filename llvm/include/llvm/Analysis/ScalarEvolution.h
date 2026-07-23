@@ -1932,6 +1932,12 @@ private:
   /// Cache for \c getLoopProperties.
   DenseMap<const Loop *, LoopProperties> LoopPropertiesCache;
 
+  /// Cache of loop guards collected for a loop by \c LoopGuards::collect, used
+  /// by the applyLoopGuards(Expr, L) overload to avoid re-collecting guards for
+  /// the same loop within a burst of queries. Conservatively cleared on any
+  /// SCEV invalidation (see \c forget* methods).
+  DenseMap<const Loop *, LoopGuards> LoopGuardsCache;
+
   /// Return a \c LoopProperties instance for \p L, creating one if necessary.
   LLVM_ABI LoopProperties getLoopProperties(const Loop *L);
 

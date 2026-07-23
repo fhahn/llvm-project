@@ -8778,6 +8778,7 @@ void ScalarEvolution::forgetAllLoops() {
   PredicatedSCEVRewrites.clear();
   FoldCache.clear();
   FoldCacheUser.clear();
+  LoopGuardsCache.clear();
 }
 void ScalarEvolution::visitAndClearUsers(
     SmallVectorImpl<Instruction *> &Worklist,
@@ -8835,6 +8836,9 @@ void ScalarEvolution::forgetLoop(const Loop *L) {
     LoopWorklist.append(CurrL->begin(), CurrL->end());
   }
   forgetMemoizedResults(ToForget);
+  // Loop guards depend on loop structure and conditions in surrounding blocks;
+  // conservatively drop all cached guards when any loop is forgotten.
+  LoopGuardsCache.clear();
 }
 
 void ScalarEvolution::forgetTopmostLoop(const Loop *L) {
@@ -8854,6 +8858,7 @@ void ScalarEvolution::forgetValue(Value *V) {
   visitAndClearUsers(Worklist, Visited, ToForget);
 
   forgetMemoizedResults(ToForget);
+  LoopGuardsCache.clear();
 }
 
 void ScalarEvolution::forgetLcssaPhiWithNewPredecessor(Loop *L, PHINode *V) {
@@ -16523,7 +16528,16 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
 }
 
 const SCEV *ScalarEvolution::applyLoopGuards(const SCEV *Expr, const Loop *L) {
-  return applyLoopGuards(Expr, LoopGuards::collect(L, *this));
+  if (auto It = LoopGuardsCache.find(L); It != LoopGuardsCache.end())
+    return applyLoopGuards(Expr, It->second);
+
+  // Note: collect() may transitively query SCEV and re-enter this function, so
+  // compute the guards into a local before inserting to avoid invalidating an
+  // iterator into LoopGuardsCache. A re-entrant call may insert the same entry;
+  // insert() below is a no-op in that case.
+  LoopGuards Guards = LoopGuards::collect(L, *this);
+  auto It = LoopGuardsCache.insert({L, std::move(Guards)}).first;
+  return applyLoopGuards(Expr, It->second);
 }
 
 const SCEV *ScalarEvolution::applyLoopGuards(const SCEV *Expr,
