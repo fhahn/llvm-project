@@ -1810,17 +1810,19 @@ class LLVM_ABI_FOR_TEST VPWidenRecipe : public VPRecipeWithIRFlags,
 public:
   VPWidenRecipe(Instruction &I, ArrayRef<VPValue *> Operands,
                 const VPIRFlags &Flags = {}, const VPIRMetadata &Metadata = {},
-                DebugLoc DL = {})
-      : VPWidenRecipe(I.getOpcode(), Operands, Flags, Metadata, DL) {
+                DebugLoc DL = {}, Type *ResultTy = nullptr)
+      : VPWidenRecipe(I.getOpcode(), Operands, Flags, Metadata, DL, ResultTy) {
     setUnderlyingValue(&I);
   }
 
   VPWidenRecipe(unsigned Opcode, ArrayRef<VPValue *> Operands,
                 const VPIRFlags &Flags = {}, const VPIRMetadata &Metadata = {},
-                DebugLoc DL = {})
-      : VPRecipeWithIRFlags(VPRecipeBase::VPWidenSC, Operands,
-                            computeScalarTypeForInstruction(Opcode, Operands),
-                            Flags, DL),
+                DebugLoc DL = {}, Type *ResultTy = nullptr)
+      : VPRecipeWithIRFlags(
+            VPRecipeBase::VPWidenSC, Operands,
+            ResultTy ? ResultTy
+                     : computeScalarTypeForInstruction(Opcode, Operands),
+            Flags, DL),
         VPIRMetadata(Metadata), Opcode(Opcode) {}
 
   ~VPWidenRecipe() override = default;
@@ -1828,16 +1830,16 @@ public:
   VPWidenRecipe *clone() override { return cloneWithOperands(operands()); }
 
   VPWidenRecipe *cloneWithOperands(ArrayRef<VPValue *> NewOperands) {
-    VPWidenRecipe *Copy;
+    // Preserve an explicit vector result type (e.g. a narrowed interleave group
+    // wider than the plan's VF). Otherwise pass no result type, so it is
+    // re-inferred from the (possibly narrower) operands, which
+    // truncateToMinimalBitwidths relies on to pick up the shrunk type.
+    Type *ResultTy = getResultType()->isVectorTy() ? getResultType() : nullptr;
     if (auto *UV = getUnderlyingValue())
-      Copy = new VPWidenRecipe(*cast<Instruction>(UV), NewOperands, *this,
-                               *this, getDebugLoc());
-    else
-      Copy =
-          new VPWidenRecipe(Opcode, NewOperands, *this, *this, getDebugLoc());
-    if (getResultType()->isVectorTy())
-      Copy->setResultType(getResultType());
-    return Copy;
+      return new VPWidenRecipe(*cast<Instruction>(UV), NewOperands, *this, *this,
+                               getDebugLoc(), ResultTy);
+    return new VPWidenRecipe(Opcode, NewOperands, *this, *this, getDebugLoc(),
+                             ResultTy);
   }
 
   VP_CLASSOF_IMPL(VPRecipeBase::VPWidenSC)
@@ -1893,11 +1895,9 @@ public:
   ~VPWidenCastRecipe() override = default;
 
   VPWidenCastRecipe *clone() override {
-    auto *Copy =
-        new VPWidenCastRecipe(Opcode, getOperand(0), getResultType(),
-                              cast_or_null<CastInst>(getUnderlyingValue()),
-                              *this, *this, getDebugLoc());
-    return Copy;
+    return new VPWidenCastRecipe(Opcode, getOperand(0), getResultType(),
+                                 cast_or_null<CastInst>(getUnderlyingValue()),
+                                 *this, *this, getDebugLoc());
   }
 
   VP_CLASSOF_IMPL(VPRecipeBase::VPWidenCastSC)
@@ -3790,19 +3790,21 @@ public:
 struct LLVM_ABI_FOR_TEST VPWidenLoadRecipe final : public VPSingleDefRecipe,
                                                    public VPWidenMemoryRecipe {
   VPWidenLoadRecipe(LoadInst &Load, VPValue *Addr, VPValue *Mask,
-                    bool Consecutive, const VPIRMetadata &Metadata, DebugLoc DL)
-      : VPSingleDefRecipe(VPRecipeBase::VPWidenLoadSC, {Addr}, Load.getType(),
-                          &Load, DL),
+                    bool Consecutive, const VPIRMetadata &Metadata, DebugLoc DL,
+                    Type *ResultTy = nullptr)
+      : VPSingleDefRecipe(VPRecipeBase::VPWidenLoadSC, {Addr},
+                          ResultTy ? ResultTy : Load.getType(), &Load, DL),
         VPWidenMemoryRecipe(Load, Consecutive, Metadata) {
     setMask(Mask);
   }
 
   VPWidenLoadRecipe *clone() override {
-    auto *Copy =
-        new VPWidenLoadRecipe(cast<LoadInst>(Ingredient), getAddr(), getMask(),
-                              Consecutive, *this, getDebugLoc());
-    Copy->setResultType(getResultType());
-    return Copy;
+    // Preserve the result type, which may be an explicit vector wider than the
+    // plan's VF (e.g. a narrowed interleave group). Loads are never re-typed
+    // from their operands, so it is always safe to carry it over verbatim.
+    return new VPWidenLoadRecipe(cast<LoadInst>(Ingredient), getAddr(),
+                                 getMask(), Consecutive, *this, getDebugLoc(),
+                                 getResultType());
   }
 
   VP_CLASSOF_IMPL(VPRecipeBase::VPWidenLoadSC);
