@@ -1875,6 +1875,12 @@ getValueOnEdge(Value *V, BasicBlock *FromBB, BasicBlock *ToBB,
 ValueLatticeElement LazyValueInfoImpl::getValueAtUse(const Use &U) {
   Value *V = U.get();
   auto *CxtI = cast<Instruction>(U.getUser());
+  if (!isa<PHINode>(CxtI) && CxtI->hasOneUse() &&
+      isSafeToSpeculativelyExecuteWithVariableReplaced(CxtI)) {
+    auto *SingleUser = cast<Instruction>(CxtI->user_back());
+    if (!isa<PHINode>(SingleUser))
+      CxtI = SingleUser;
+  }
   ValueLatticeElement VL = getValueInBlock(V, CxtI->getParent(), CxtI);
 
   // Check whether the only (possibly transitive) use of the value is in a
@@ -2042,21 +2048,7 @@ ConstantRange LazyValueInfo::getConstantRange(Value *V, Instruction *CxtI,
 ConstantRange LazyValueInfo::getConstantRangeAtUse(const Use &U,
                                                    bool UndefAllowed) {
   ValueLatticeElement Result = getOrCreateImpl().getValueAtUse(U);
-  ConstantRange R = Result.asConstantRange(U->getType(), UndefAllowed);
-
-  // If the used value flows into a single user, refine the result using the
-  // range that hold at that user.
-  auto *UserI = cast<Instruction>(U.getUser());
-  if (isa<PHINode>(UserI) || !UserI->hasOneUse() ||
-      !isSafeToSpeculativelyExecuteWithVariableReplaced(UserI))
-    return R;
-
-  auto *SingleUser = cast_or_null<Instruction>(UserI->user_back());
-  if (!SingleUser || isa<PHINode>(SingleUser) ||
-      SingleUser->getParent() == UserI->getParent())
-    return R;
-
-  return R.intersectWith(getConstantRange(U, SingleUser, UndefAllowed));
+  return Result.asConstantRange(U->getType(), UndefAllowed);
 }
 
 /// Determine whether the specified value is known to be a
