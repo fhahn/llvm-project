@@ -1875,12 +1875,10 @@ getValueOnEdge(Value *V, BasicBlock *FromBB, BasicBlock *ToBB,
 ValueLatticeElement LazyValueInfoImpl::getValueAtUse(const Use &U) {
   Value *V = U.get();
   auto *CxtI = cast<Instruction>(U.getUser());
-  if (!isa<PHINode>(CxtI) &&
+  if (!isa<PHINode>(CxtI) && CxtI->hasOneUse() &&
       isSafeToSpeculativelyExecuteWithVariableReplaced(CxtI)) {
-
-    auto *SingleUser =
-        cast_or_null<Instruction>(CxtI->getUniqueUndroppableUser());
-    if (SingleUser && !isa<PHINode>(SingleUser))
+    auto *SingleUser = cast<Instruction>(CxtI->user_back());
+    if (!isa<PHINode>(SingleUser))
       CxtI = SingleUser;
   }
   ValueLatticeElement VL = getValueInBlock(V, CxtI->getParent(), CxtI);
