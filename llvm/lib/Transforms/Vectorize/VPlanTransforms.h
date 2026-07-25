@@ -611,8 +611,9 @@ struct VPlanTransforms {
   /// store ranges are disjoint; re-executing the body could then re-read
   /// locations the main loop already wrote, so the transform bails.
   ///
-  /// \p Ctx is used to cost the body recipes: realign only fires when every one
-  /// costs no more than a single vector operation.
+  /// \p Ctx is used to cost the body recipes: realign only fires when every
+  /// body recipe costs no more than a single vector operation, so the
+  /// redundant re-execution on the overlap lanes stays profitable.
   ///
   /// Returns the cloned region or nullptr if the loop is not a candidate.
   static VPRegionBlock *prepareRealignSnapshot(VPlan &Plan, ElementCount BestVF,
@@ -622,9 +623,11 @@ struct VPlanTransforms {
 
   /// Insert \p Snapshot (a region produced by \c prepareRealignSnapshot) into
   /// \p Plan's CFG as a sibling of the main vector loop region. Its IV is
-  /// rewritten to step by \p BestVF and offset by TC - K * VF, where
-  /// K = ceil((TC % (VF * UF)) / VF), so the iterations cover [TC - K*VF, TC).
-  /// Must be called before \c dissolveLoopRegions.
+  /// rewritten to step by \p BestVF and offset so the iterations cover
+  /// [RealignStart, TC), with RealignStart = TC - K * VF where
+  /// K = ceil((TC % (VF * UF)) / VF) if that is known at compile time, and an
+  /// equivalent symbolic expression otherwise. Must be called before
+  /// \c dissolveLoopRegions, which then dissolves both regions uniformly.
   static void applyRealignSnapshot(VPlan &Plan, VPRegionBlock *Snapshot,
                                    ElementCount BestVF, unsigned BestUF);
 };

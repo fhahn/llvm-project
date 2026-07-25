@@ -5952,8 +5952,9 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   // a VF-only realigned epilogue. It only clones a detached region, so there is
   // nothing to verify or print and it does not go through RUN_VPLAN_PASS.
   VPRegionBlock *RealignSnapshot = nullptr;
-  // Realign only applies to inner loops, which have LoopAccess info; the
-  // VPlan-native outer-loop path has none.
+  // The realign transform only applies to inner loops, which have LoopAccess
+  // info; the VPlan-native outer-loop path has no LAI
+  // (getRuntimePointerChecking would dereference null), so require it here.
   if (EpilogueVecKind == EpilogueVectorizationKind::None && Legal->getLAI()) {
     // The realign body re-reads the overlap lanes, which is only sound if the
     // load and store ranges are disjoint. LAA dependence-distance (diff) checks

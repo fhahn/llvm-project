@@ -6127,25 +6127,26 @@ void VPlanTransforms::applyRealignSnapshot(VPlan &Plan, VPRegionBlock *Snapshot,
   assert(isPowerOf2_64(VFLanes) && "realign requires a power-of-2 VF");
 
   // Compute realign.start in a new realign.ph so the VF-stepping loop covers
-  // exactly [RealignStart, TC). The realign loop runs K = ceil(Tail / VF)
-  // iterations, which is known at compile time when the trip count is constant
-  // (K = ceil(TC % (VF*UF) / VF)) and, for any trip count, when UF == 1 (the
-  // tail is then below VF, so the loop runs a single VF-wide iteration). In
-  // those cases the start folds to TC - K*VF, a single subtract; otherwise
-  // (runtime TC, UF > 1) K is unknown and the start is built symbolically.
+  // exactly [RealignStart, TC), using the folded form when the iteration count
+  // is known at compile time and the symbolic one otherwise.
   VPValue *TC = Plan.getTripCount();
   Type *TCTy = TC->getScalarType();
   VPSymbolicValue *VTC = &Plan.getVectorTripCount();
+  // The realign loop runs K = ceil(Tail / VF) iterations. That is known at
+  // compile time when the trip count is constant (K = ceil(TC % (VF*UF) / VF))
+  // and, for any trip count, when UF == 1 (the tail is then below VF, so the
+  // loop runs a single VF-wide iteration); otherwise K is left unset.
   uint64_t TCVal;
-  uint64_t RealignK =
-      match(TC, m_ConstantInt(TCVal))
-          ? divideCeil(TCVal % (VFLanes * BestUF), VFLanes)
-          : (BestUF == 1 ? 1 : 0);
+  std::optional<unsigned> RealignK;
+  if (match(TC, m_ConstantInt(TCVal)))
+    RealignK = divideCeil(TCVal % (VFLanes * BestUF), VFLanes);
+  else if (BestUF == 1)
+    RealignK = 1;
 
   VPBasicBlock *RealignPH = Plan.createVPBasicBlock("vector.realign.ph");
   VPBuilder PHB(RealignPH, RealignPH->end());
   VPValue *RealignStart =
-      RealignK ? createConstantRealignStart(PHB, Plan, TC, VFLanes, RealignK)
+      RealignK ? createConstantRealignStart(PHB, Plan, TC, VFLanes, *RealignK)
                : createRuntimeRealignStart(PHB, Plan, TC, VTC, VFLanes);
 
   // Insert realign.check on middle.block's scalar.ph (cmp.n-false) edge and
