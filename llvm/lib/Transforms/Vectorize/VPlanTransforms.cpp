@@ -5942,13 +5942,20 @@ static bool isRealignSafeBody(VPBasicBlock *Header, ElementCount VF,
 }
 
 // Return true if \p Plan has the CFG skeleton applyRealignSnapshot needs:
-// scalar.ph is middle.block's back() (cmp.n-false) successor, and there is a
-// single exit block with no live-out phis (the snapshot's exit edge becomes a
-// new predecessor we do not patch).
+// middle.block branches on cmp.n to [exit, scalar.ph], and there is a single
+// exit block with no live-out phis (the snapshot's exit edge becomes a new
+// predecessor we do not patch).
+//
+// Requiring both successors also rules out loops that need a scalar epilogue
+// unconditionally (see LoopVectorizationCostModel::requiresScalarEpilogue),
+// whose middle.block has scalar.ph as its only successor: their final
+// iterations must run in scalar form, so the realign loop must not replay
+// them, and shortcutting scalar.ph would break the VPlan-based
+// LoopVectorizationPlanner::requiresScalarEpilogue query.
 static bool hasRealignSkeleton(VPlan &Plan) {
   VPBasicBlock *ScalarPH = Plan.getScalarPreheader();
   VPBasicBlock *MiddleBB = Plan.getMiddleBlock();
-  if (!ScalarPH || MiddleBB->getSuccessors().empty() ||
+  if (!ScalarPH || MiddleBB->getNumSuccessors() != 2 ||
       MiddleBB->getSuccessors().back() != ScalarPH ||
       Plan.getExitBlocks().size() != 1)
     return false;
