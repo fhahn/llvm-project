@@ -175,6 +175,13 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
     return CreateSCEV({LHSVal, RHSVal}, [&](ArrayRef<SCEVUse> Ops) {
       return SE.getMinusSCEV(Ops[0], Ops[1], SCEV::FlagAnyWrap, 0);
     });
+  // A disjoint OR is equivalent to an ADD, as the operands have no bits in
+  // common (or the result is poison).
+  if (match(V, m_BinaryOr(m_VPValue(LHSVal), m_VPValue(RHSVal))) &&
+      cast<VPRecipeWithIRFlags>(V->getDefiningRecipe())->isDisjoint())
+    return CreateSCEV({LHSVal, RHSVal}, [&](ArrayRef<SCEVUse> Ops) {
+      return SE.getAddExpr(Ops[0], Ops[1], SCEV::FlagAnyWrap, 0);
+    });
   if (match(V, m_Not(m_VPValue(LHSVal)))) {
     // not X = xor X, -1 = -1 - X
     return CreateSCEV({LHSVal}, [&](ArrayRef<SCEVUse> Ops) {
