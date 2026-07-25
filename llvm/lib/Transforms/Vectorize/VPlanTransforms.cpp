@@ -5887,18 +5887,59 @@ static cl::opt<bool> EnableTryToRealignLoop(
              "vectorizes the scalar tail by re-executing the vector body "
              "once with a shifted base pointer."));
 
+// Collect the underlying memory objects of a consecutive access's address \p
+// Addr into \p Objects, returning false if the address is not a supported
+// consecutive-access shape. Walks back through the recipe chain to the live-in
+// base pointer: a vector-pointer or widen-GEP (pre-dissolution), or a
+// replicated (scalar) GEP (post-dissolution, as produced for the epilogue
+// vector loop), all rooted at a live-in with an underlying IR value. Resolving
+// that base through getUnderlyingObjects unifies distinct SSA pointers into the
+// same object (e.g. %a and gep(%a, 5)), which is what makes the self-alias
+// check sound. Only a VPValue's underlying IR value is inspected, never a
+// recipe's ingredient scalar pointer.
+static bool
+collectUnderlyingObjectsForAddr(VPValue *Addr,
+                                SmallVectorImpl<const Value *> &Objects) {
+  VPValue *Cur = Addr;
+  while (Cur) {
+    if (Value *V = Cur->getUnderlyingValue()) {
+      getUnderlyingObjects(V, Objects);
+      return true;
+    }
+    VPRecipeBase *DefR = Cur->getDefiningRecipe();
+    if (!DefR)
+      return false;
+    if (auto *Rep = dyn_cast<VPReplicateRecipe>(DefR)) {
+      if (!isa<GetElementPtrInst>(Rep->getUnderlyingInstr()))
+        return false;
+      Cur = Rep->getOperand(0);
+      continue;
+    }
+    if (isa<VPWidenGEPRecipe, VPVectorPointerRecipe>(DefR)) {
+      Cur = DefR->getOperand(0);
+      continue;
+    }
+    return false;
+  }
+  return false;
+}
+
+
 // Return true if \p Header's body is safe and profitable to re-execute on the
 // realign overlap lanes: every non-control recipe must be pure, cost <= 1 at
-// \p VF, and the loads/stores must not self-alias.
-static bool isRealignSafeBody(VPBasicBlock *Header, ElementCount VF,
-                              VPCostContext &Ctx) {
+// \p VF, and the loads/stores must not self-alias. \p IsLoopControl identifies
+// the loop-control recipes to skip, letting the pre-dissolution snapshot path
+// (latch by opcode) and the post-dissolution epilogue rewrite (recipes by
+// identity) share this check.
+static bool
+isRealignSafeBody(VPBasicBlock *Header, ElementCount VF, VPCostContext &Ctx,
+                  function_ref<bool(VPRecipeBase &)> IsLoopControl) {
   // Underlying objects of loads / stores; a shared object means the body
   // self-aliases across iterations and re-execution would observe its writes.
   SmallPtrSet<const Value *, 4> LoadBases, StoreBases;
   bool SeenStore = false;
   for (VPRecipeBase &R : *Header) {
-    // The latch terminator is rebuilt by applyRealignSnapshot.
-    if (match(&R, m_Branch()))
+    if (IsLoopControl(R))
       continue;
     // Reverse accesses: coverage math and alignment assume a forward IV.
     if (isa<VPVectorEndPointerRecipe>(&R))
@@ -5915,17 +5956,12 @@ static bool isRealignSafeBody(VPBasicBlock *Header, ElementCount VF,
       if (IsLoad && SeenStore)
         return false;
       SeenStore |= !IsLoad;
-      // The address is a vector-pointer over a live-in base or a GEP off one;
-      // getUnderlyingObjects unifies e.g. %a and gep(%a, 5).
-      VPIRValue *Base;
-      if (!match(Mem->getAddr(),
-                 m_VectorPointer(m_CombineOr(m_GetElementPtr(m_VPIRValue(Base),
-                                                             m_VPValue()),
-                                             m_VPIRValue(Base)),
-                                 m_VPValue())))
-        return false;
+      // Record the base's underlying objects for the self-alias check. Walk
+      // the address recipe chain to its live-in base and resolve it through
+      // getUnderlyingObjects; bail on any unsupported address shape.
       SmallVector<const Value *, 4> Objects;
-      getUnderlyingObjects(Base->getValue(), Objects);
+      if (!collectUnderlyingObjectsForAddr(Mem->getAddr(), Objects))
+        return false;
       (IsLoad ? LoadBases : StoreBases).insert_range(Objects);
       continue;
     }
@@ -5962,6 +5998,13 @@ static bool hasRealignSkeleton(VPlan &Plan) {
   VPIRBasicBlock *ExitBB = Plan.getExitBlocks()[0];
   return ExitBB->phis().empty() && ExitBB->getIRBasicBlock()->phis().empty();
 }
+
+// Predicate identifying the latch BranchOn* terminator inside a realign-
+// candidate header. Used as the loop-control filter for isRealignSafeBody:
+// pre-dissolution the latch is the only recipe that needs to be skipped
+// (the canonical IV-increment is a generic Add VPInstruction and falls
+// through the side-effect check).
+static bool isLatchBranchOn(VPRecipeBase &R) { return match(&R, m_Branch()); }
 
 VPRegionBlock *VPlanTransforms::prepareRealignSnapshot(
     VPlan &Plan, ElementCount BestVF, unsigned BestUF, VPCostContext &Ctx,
@@ -6018,7 +6061,9 @@ VPRegionBlock *VPlanTransforms::prepareRealignSnapshot(
   if (!Header->phis().empty())
     return nullptr;
 
-  if (!isRealignSafeBody(Header, BestVF, Ctx))
+  // Pre-dissolution the only loop-control recipe is the latch BranchOn*; the
+  // canonical IV-increment is a generic Add and falls through the checks.
+  if (!isRealignSafeBody(Header, BestVF, Ctx, isLatchBranchOn))
     return nullptr;
 
   // Verify the CFG skeleton and IV-increment shape before cloning, so a
@@ -6185,6 +6230,108 @@ void VPlanTransforms::applyRealignSnapshot(VPlan &Plan, VPRegionBlock *Snapshot,
   VPValue *NotProfit =
       CheckB.createICmp(CmpInst::ICMP_ULT, Tail, Plan.getConstantInt(TCTy, 2));
   CheckB.createNaryOp(VPInstruction::BranchOnCond, {NotProfit});
+
+  ++NumRealignApplied;
+}
+
+void VPlanTransforms::tryToRealignEpilogueVPlan(VPlan &Plan,
+                                                VPBasicBlock *VectorPH,
+                                                Loop *OrigLoop,
+                                                ElementCount BestVF,
+                                                VPCostContext &Ctx) {
+  if (!EnableTryToRealignLoop)
+    return;
+
+  if (!BestVF.isFixed() || (OrigLoop && OrigLoop->getParentLoop()) ||
+      Plan.hasEarlyExit())
+    return;
+  uint64_t VFLanes = BestVF.getFixedValue();
+  if (!isPowerOf2_64(VFLanes))
+    return;
+
+  // After dissolveLoopRegions the epilogue vector loop is laid out as
+  //   VectorPH -> Header -> {Header (back-edge), Middle}
+  // The plan's vector preheader holds the materialised vec.epilog.ph.
+  if (!VectorPH)
+    return;
+  auto *Header =
+      dyn_cast_if_present<VPBasicBlock>(VectorPH->getSingleSuccessor());
+  if (!Header || Header->getNumPredecessors() != 2 ||
+      Header->getPredecessors()[1] != Header)
+    return;
+
+  // The canonical IV is materialized as a single VPPhi at the start of
+  // the header, with operands [start, IVInc]. Reductions/FORs/widen-IV
+  // recipes would add more phi-like recipes here; reject those.
+  auto HeaderPhis = Header->phis();
+  if (!hasSingleElement(HeaderPhis))
+    return;
+  auto *CanIVPhi = dyn_cast<VPPhi>(&*HeaderPhis.begin());
+  if (!CanIVPhi || CanIVPhi->getNumOperands() != 2)
+    return;
+
+  // Match the latch terminator: BranchOnCond(ICmp EQ %IVInc, %VTC).
+  auto *LatchTerm = cast<VPInstruction>(Header->getTerminator());
+  VPValue *IVInc;
+  VPValue *VTC;
+  if (!match(LatchTerm,
+             m_BranchOnCond(m_SpecificCmp(
+                 CmpInst::ICMP_EQ, m_VPValue(IVInc), m_VPValue(VTC)))))
+    return;
+  auto *LatchCmp = cast<VPInstruction>(LatchTerm->getOperand(0));
+  auto *IVIncRec = IVInc->getDefiningRecipe();
+
+  // Body-shape allowlist (post-dissolve): same shape as in
+  // prepareRealignSnapshot, but with the loop-control recipes identified by
+  // identity rather than by opcode -- the IV is now a VPPhi and the latch
+  // branches via an explicit ICmp recipe.
+  if (!isRealignSafeBody(Header, BestVF, Ctx, [&](VPRecipeBase &R) {
+        return &R == CanIVPhi || &R == IVIncRec || &R == LatchCmp ||
+               &R == LatchTerm;
+      }))
+    return;
+
+  // Modify the existing epi loop's start and exit so the last iteration
+  // ends at TC when the main loop ran. The main-skipped path keeps the
+  // standard start (0) and exit (n.vec_epi); a realigned start would
+  // underflow when resume_val = 0 and Tail % VF_epi != 0. Both behaviors
+  // share the same loop body via select-based parameters in the preheader.
+  Type *TCTy = Plan.getTripCount()->getScalarType();
+
+  // CanIVPhi has 2 operands: [preheader_val, iv_inc] in some order.
+  unsigned PreheaderIdx = CanIVPhi->getOperand(0) == IVInc ? 1 : 0;
+  VPValue *OldStart = CanIVPhi->getOperand(PreheaderIdx);
+
+  // Insert select-based new_start and new_exit at end of preheader, before
+  // its terminator.
+  VPBuilder Builder(VectorPH, VectorPH->getTerminator()
+                                  ? VectorPH->getTerminator()->getIterator()
+                                  : VectorPH->end());
+  VPValue *TC = Plan.getTripCount();
+  VPValue *Zero = Plan.getZero(TCTy);
+  VPValue *VFm1 = Plan.getConstantInt(TCTy, VFLanes - 1);
+
+  // Shift = (-Tail) & (VF-1) where Tail = TC - OldStart. Folded to a
+  // single subtract (OldStart - TC == -Tail) to avoid the redundant negate.
+  VPValue *NegTail = Builder.createSub(OldStart, TC);
+  VPValue *Shift = Builder.createAnd(NegTail, VFm1);
+  // IsMainRan = OldStart != 0 (= we came via vec.epilog.iter.check, not
+  // vec.main.iter.check, so the main loop ran and OldStart = VTC_main).
+  VPValue *IsMainRan = Builder.createICmp(CmpInst::ICMP_NE, OldStart, Zero);
+  VPValue *EffShift = Builder.createSelect(IsMainRan, Shift, Zero);
+  VPValue *NewStart = Builder.createSub(OldStart, EffShift);
+  // NewExit = IsMainRan ? TC : VTC. VTC is the standard n_vec_epi value
+  // already materialised in the preheader, so reuse it instead of
+  // recomputing TC - (TC & VFm1).
+  VPInstruction *NewExit = Builder.createSelect(IsMainRan, TC, VTC);
+
+  // Plumb new_start into the IV phi's preheader operand.
+  CanIVPhi->setOperand(PreheaderIdx, NewStart);
+  // Plumb new_exit into all uses of VTC (latch ICmp + cmp.n_epi), but
+  // skip the new select itself which reuses VTC as its false operand.
+  VTC->replaceUsesWithIf(NewExit, [NewExit](VPUser &U, unsigned) {
+    return &U != NewExit;
+  });
 
   ++NumRealignApplied;
 }

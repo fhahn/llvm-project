@@ -630,6 +630,17 @@ struct VPlanTransforms {
   /// \c dissolveLoopRegions, which then dissolves both regions uniformly.
   static void applyRealignSnapshot(VPlan &Plan, VPRegionBlock *Snapshot,
                                    ElementCount BestVF, unsigned BestUF);
+
+  /// Modify the epilogue VPlan in-place so the existing epi vector loop
+  /// covers the [TC - VF_epi, TC) lanes when the main loop ran (selecting
+  /// a shifted start from the preheader). The main-skipped path keeps the
+  /// standard start (0) and exit (n.vec_epi). No new blocks are inserted;
+  /// only select chains in the existing vec.epilog.ph. \p Ctx is used to cost
+  /// the body recipes against the same per-recipe profitability gate as
+  /// \c prepareRealignSnapshot.
+  static void tryToRealignEpilogueVPlan(VPlan &Plan, VPBasicBlock *VectorPH,
+                                        Loop *OrigLoop, ElementCount BestVF,
+                                        VPCostContext &Ctx);
 };
 
 } // namespace llvm
