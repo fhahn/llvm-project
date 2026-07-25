@@ -1193,35 +1193,55 @@ public:
   // Returns the max constant multiple of S. If S is exactly 0, return 1.
   LLVM_ABI APInt getNonZeroConstantMultiple(const SCEV *S);
 
+  /// If \p S is a SCEVConstant, return a pointer to its value, otherwise
+  /// nullptr. The range of a constant C is the single-element range
+  /// [C, C+1), so its unsigned/signed min and max are all just C. The range
+  /// accessors below use this to answer such queries directly instead of
+  /// going through getRangeRef's cache lookup; roughly 30% of range queries
+  /// are on constants.
+  LLVM_ABI const APInt *getConstantAPIntOrNull(const SCEV *S) const;
+
   /// Determine the unsigned range for a particular SCEV.
   /// NOTE: This returns a copy of the reference returned by getRangeRef.
   ConstantRange getUnsignedRange(const SCEV *S) {
+    if (const APInt *C = getConstantAPIntOrNull(S))
+      return ConstantRange(*C);
     return getRangeRef(S, HINT_RANGE_UNSIGNED);
   }
 
   /// Determine the min of the unsigned range for a particular SCEV.
   APInt getUnsignedRangeMin(const SCEV *S) {
+    if (const APInt *C = getConstantAPIntOrNull(S))
+      return *C;
     return getRangeRef(S, HINT_RANGE_UNSIGNED).getUnsignedMin();
   }
 
   /// Determine the max of the unsigned range for a particular SCEV.
   APInt getUnsignedRangeMax(const SCEV *S) {
+    if (const APInt *C = getConstantAPIntOrNull(S))
+      return *C;
     return getRangeRef(S, HINT_RANGE_UNSIGNED).getUnsignedMax();
   }
 
   /// Determine the signed range for a particular SCEV.
   /// NOTE: This returns a copy of the reference returned by getRangeRef.
   ConstantRange getSignedRange(const SCEV *S) {
+    if (const APInt *C = getConstantAPIntOrNull(S))
+      return ConstantRange(*C);
     return getRangeRef(S, HINT_RANGE_SIGNED);
   }
 
   /// Determine the min of the signed range for a particular SCEV.
   APInt getSignedRangeMin(const SCEV *S) {
+    if (const APInt *C = getConstantAPIntOrNull(S))
+      return *C;
     return getRangeRef(S, HINT_RANGE_SIGNED).getSignedMin();
   }
 
   /// Determine the max of the signed range for a particular SCEV.
   APInt getSignedRangeMax(const SCEV *S) {
+    if (const APInt *C = getConstantAPIntOrNull(S))
+      return *C;
     return getRangeRef(S, HINT_RANGE_SIGNED).getSignedMax();
   }
 
