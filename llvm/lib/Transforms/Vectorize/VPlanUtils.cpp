@@ -202,6 +202,29 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
         return SE.getUDivExpr(Ops[0], SE.getPowerOfTwo(Ty, ShiftAmt));
       });
   }
+  // Handle the two-shift sign-extend-in-register idiom
+  //   ashr (shl X, ShlAmt), AShrAmt
+  // with ShlAmt >= AShrAmt, which is equivalent to
+  //   sext (trunc(X) * 2^(ShlAmt - AShrAmt))
+  // where the truncation is to a type AShrAmt bits narrower than X's.
+  // TODO: Also handle `ashr (add (shl X, ShlAmt), C), AShrAmt` like
+  //       ScalarEvolution does.
+  uint64_t AShrAmt;
+  if (match(V, m_AShr(m_Shl(m_VPValue(LHSVal), m_ConstantInt(ShiftAmt)),
+                      m_ConstantInt(AShrAmt)))) {
+    Type *OuterTy = V->getScalarType();
+    uint64_t BitWidth = SE.getTypeSizeInBits(OuterTy);
+    if (ShiftAmt < BitWidth && ShiftAmt >= AShrAmt) {
+      unsigned TruncBits = BitWidth - AShrAmt;
+      Type *TruncTy = IntegerType::get(OuterTy->getContext(), TruncBits);
+      return CreateSCEV(LHSVal, [&](ArrayRef<SCEVUse> Ops) {
+        const SCEV *Mul = SE.getMulExpr(
+            SE.getTruncateExpr(Ops[0], TruncTy),
+            SE.getConstant(APInt::getOneBitSet(TruncBits, ShiftAmt - AShrAmt)));
+        return SE.getSignExtendExpr(Mul, OuterTy);
+      });
+    }
+  }
   if (match(V, m_UDiv(m_VPValue(LHSVal), m_VPValue(RHSVal))))
     return CreateSCEV({LHSVal, RHSVal}, [&](ArrayRef<SCEVUse> Ops) {
       return SE.getUDivExpr(Ops[0], Ops[1]);
