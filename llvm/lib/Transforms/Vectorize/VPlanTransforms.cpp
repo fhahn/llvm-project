@@ -6275,11 +6275,23 @@ void VPlanTransforms::tryToRealignEpilogueVPlan(VPlan &Plan,
   VPValue *IVInc;
   VPValue *VTC;
   if (!match(LatchTerm,
-             m_BranchOnCond(m_SpecificCmp(
-                 CmpInst::ICMP_EQ, m_VPValue(IVInc), m_VPValue(VTC)))))
+             m_BranchOnCond(m_SpecificCmp(CmpInst::ICMP_EQ, m_VPValue(IVInc),
+                                          m_VPValue(VTC)))))
     return;
   auto *LatchCmp = cast<VPInstruction>(LatchTerm->getOperand(0));
   auto *IVIncRec = IVInc->getDefiningRecipe();
+
+  // The new exit value is computed at the end of the preheader and replaces
+  // every use of VTC, so it has to dominate all of them. VTC is materialized
+  // in the preheader, hence every use is already dominated by that block --
+  // except uses in the preheader itself, e.g. an induction resume or exit
+  // value derived from VTC, which would reference a later definition.
+  VPRecipeBase *VTCDef = VTC->getDefiningRecipe();
+  if (!VTCDef || VTCDef->getParent() != VectorPH ||
+      any_of(VTC->users(), [&](VPUser *U) {
+        return cast<VPRecipeBase>(U)->getParent() == VectorPH;
+      }))
+    return;
 
   // Body-shape allowlist (post-dissolve): same shape as in
   // prepareRealignSnapshot, but with the loop-control recipes identified by
@@ -6329,9 +6341,8 @@ void VPlanTransforms::tryToRealignEpilogueVPlan(VPlan &Plan,
   CanIVPhi->setOperand(PreheaderIdx, NewStart);
   // Plumb new_exit into all uses of VTC (latch ICmp + cmp.n_epi), but
   // skip the new select itself which reuses VTC as its false operand.
-  VTC->replaceUsesWithIf(NewExit, [NewExit](VPUser &U, unsigned) {
-    return &U != NewExit;
-  });
+  VTC->replaceUsesWithIf(
+      NewExit, [NewExit](VPUser &U, unsigned) { return &U != NewExit; });
 
   ++NumRealignApplied;
 }
