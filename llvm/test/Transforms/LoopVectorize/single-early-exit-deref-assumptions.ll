@@ -67,8 +67,8 @@ define i64 @early_exit_alignment_and_deref_via_assumption_with_constant_size_too
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ [[INDEX_NEXT:%.*]], %[[LOOP_INC:.*]] ], [ 0, %[[ENTRY]] ]
-; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i8, ptr [[P1]], i64 [[INDEX]]
-; CHECK-NEXT:    [[LD1:%.*]] = load i8, ptr [[ARRAYIDX]], align 1
+; CHECK-NEXT:    [[ARRAYIDX2:%.*]] = getelementptr inbounds i8, ptr [[P1]], i64 [[INDEX]]
+; CHECK-NEXT:    [[LD1:%.*]] = load i8, ptr [[ARRAYIDX2]], align 1
 ; CHECK-NEXT:    [[ARRAYIDX1:%.*]] = getelementptr inbounds i8, ptr [[P2]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[LD2:%.*]] = load i8, ptr [[ARRAYIDX1]], align 1
 ; CHECK-NEXT:    [[CMP3:%.*]] = icmp eq i8 [[LD1]], [[LD2]]
@@ -194,11 +194,11 @@ define i64 @early_exit_alignment_and_deref_known_via_assumption_n_may_be_zero(pt
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    call void @llvm.assume(i1 true) [ "align"(ptr [[P1]], i64 4), "dereferenceable"(ptr [[P1]], i64 [[N]]) ]
 ; CHECK-NEXT:    call void @llvm.assume(i1 true) [ "align"(ptr [[P2]], i64 4), "dereferenceable"(ptr [[P2]], i64 [[N]]) ]
-; CHECK-NEXT:    br label %[[LOOP:.*]]
-; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    br label %[[LOOP1:.*]]
+; CHECK:       [[LOOP1]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ [[INDEX_NEXT:%.*]], %[[LOOP_INC:.*]] ], [ 0, %[[ENTRY]] ]
-; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i8, ptr [[P1]], i64 [[INDEX]]
-; CHECK-NEXT:    [[LD1:%.*]] = load i8, ptr [[ARRAYIDX]], align 1
+; CHECK-NEXT:    [[ARRAYIDX2:%.*]] = getelementptr inbounds i8, ptr [[P1]], i64 [[INDEX]]
+; CHECK-NEXT:    [[LD1:%.*]] = load i8, ptr [[ARRAYIDX2]], align 1
 ; CHECK-NEXT:    [[ARRAYIDX1:%.*]] = getelementptr inbounds i8, ptr [[P2]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[LD2:%.*]] = load i8, ptr [[ARRAYIDX1]], align 1
 ; CHECK-NEXT:    [[CMP3:%.*]] = icmp eq i8 [[LD1]], [[LD2]]
@@ -206,9 +206,9 @@ define i64 @early_exit_alignment_and_deref_known_via_assumption_n_may_be_zero(pt
 ; CHECK:       [[LOOP_INC]]:
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 1
 ; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp ne i64 [[INDEX_NEXT]], [[N]]
-; CHECK-NEXT:    br i1 [[EXITCOND]], label %[[LOOP]], label %[[LOOP_END]]
+; CHECK-NEXT:    br i1 [[EXITCOND]], label %[[LOOP1]], label %[[LOOP_END]]
 ; CHECK:       [[LOOP_END]]:
-; CHECK-NEXT:    [[RETVAL:%.*]] = phi i64 [ [[INDEX]], %[[LOOP]] ], [ -1, %[[LOOP_INC]] ]
+; CHECK-NEXT:    [[RETVAL:%.*]] = phi i64 [ [[INDEX]], %[[LOOP1]] ], [ -1, %[[LOOP_INC]] ]
 ; CHECK-NEXT:    ret i64 [[RETVAL]]
 ;
 entry:
@@ -244,23 +244,23 @@ define i64 @early_exit_alignment_and_deref_known_via_assumption_n_not_zero_i16(p
 ; CHECK-NEXT:    call void @llvm.assume(i1 true) [ "align"(ptr [[P1]], i64 4), "dereferenceable"(ptr [[P1]], i64 [[N_SCALED]]) ]
 ; CHECK-NEXT:    call void @llvm.assume(i1 true) [ "align"(ptr [[P2]], i64 4), "dereferenceable"(ptr [[P2]], i64 [[N_SCALED]]) ]
 ; CHECK-NEXT:    [[C:%.*]] = icmp ne i64 [[N_EXT]], 0
-; CHECK-NEXT:    br i1 [[C]], label %[[LOOP_PREHEADER:.*]], label %[[LOOP_END:.*]]
-; CHECK:       [[LOOP_PREHEADER]]:
-; CHECK-NEXT:    br label %[[LOOP:.*]]
-; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ [[INDEX_NEXT:%.*]], %[[LOOP_INC:.*]] ], [ 0, %[[LOOP_PREHEADER]] ]
-; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i8, ptr [[P1]], i64 [[INDEX]]
-; CHECK-NEXT:    [[LD1:%.*]] = load i8, ptr [[ARRAYIDX]], align 1
-; CHECK-NEXT:    [[ARRAYIDX1:%.*]] = getelementptr inbounds i8, ptr [[P2]], i64 [[INDEX]]
-; CHECK-NEXT:    [[LD2:%.*]] = load i8, ptr [[ARRAYIDX1]], align 1
-; CHECK-NEXT:    [[CMP3:%.*]] = icmp eq i8 [[LD1]], [[LD2]]
-; CHECK-NEXT:    br i1 [[CMP3]], label %[[LOOP_INC]], label %[[LOOP_END_LOOPEXIT:.*]]
+; CHECK-NEXT:    br i1 [[C]], label %[[SCALAR_PH1:.*]], label %[[LOOP_END:.*]]
+; CHECK:       [[SCALAR_PH1]]:
+; CHECK-NEXT:    br label %[[LOOP1:.*]]
+; CHECK:       [[LOOP1]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ [[INDEX_NEXT:%.*]], %[[LOOP_INC:.*]] ], [ 0, %[[SCALAR_PH1]] ]
+; CHECK-NEXT:    [[GEP_P3:%.*]] = getelementptr inbounds i8, ptr [[P1]], i64 [[INDEX]]
+; CHECK-NEXT:    [[LD1:%.*]] = load i8, ptr [[GEP_P3]], align 1
+; CHECK-NEXT:    [[GEP_P2:%.*]] = getelementptr inbounds i8, ptr [[P2]], i64 [[INDEX]]
+; CHECK-NEXT:    [[LD2:%.*]] = load i8, ptr [[GEP_P2]], align 1
+; CHECK-NEXT:    [[C_0:%.*]] = icmp eq i8 [[LD1]], [[LD2]]
+; CHECK-NEXT:    br i1 [[C_0]], label %[[LOOP_INC]], label %[[LOOP_END_LOOPEXIT:.*]]
 ; CHECK:       [[LOOP_INC]]:
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 1
 ; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp ne i64 [[INDEX_NEXT]], [[N_EXT]]
-; CHECK-NEXT:    br i1 [[EXITCOND]], label %[[LOOP]], label %[[LOOP_END_LOOPEXIT]]
+; CHECK-NEXT:    br i1 [[EXITCOND]], label %[[LOOP1]], label %[[LOOP_END_LOOPEXIT]]
 ; CHECK:       [[LOOP_END_LOOPEXIT]]:
-; CHECK-NEXT:    [[RETVAL_PH:%.*]] = phi i64 [ -1, %[[LOOP_INC]] ], [ [[INDEX]], %[[LOOP]] ]
+; CHECK-NEXT:    [[RETVAL_PH:%.*]] = phi i64 [ -1, %[[LOOP_INC]] ], [ [[INDEX]], %[[LOOP1]] ]
 ; CHECK-NEXT:    br label %[[LOOP_END]]
 ; CHECK:       [[LOOP_END]]:
 ; CHECK-NEXT:    [[RETVAL:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[RETVAL_PH]], %[[LOOP_END_LOOPEXIT]] ]
@@ -641,10 +641,10 @@ define i64 @early_exit_alignment_and_deref_known_via_assumption_with_constant_si
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[INDEX1:%.*]] = phi i64 [ [[INDEX_NEXT:%.*]], %[[LOOP_INC:.*]] ], [ 0, %[[LOOP_PREHEADER]] ]
-; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds i8, ptr [[P1]], i64 [[INDEX1]]
-; CHECK-NEXT:    [[LD1:%.*]] = load i8, ptr [[TMP0]], align 1
-; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i8, ptr [[P2]], i64 [[INDEX1]]
-; CHECK-NEXT:    [[LD2:%.*]] = load i8, ptr [[TMP1]], align 1
+; CHECK-NEXT:    [[ARRAYIDX2:%.*]] = getelementptr inbounds i8, ptr [[P1]], i64 [[INDEX1]]
+; CHECK-NEXT:    [[LD1:%.*]] = load i8, ptr [[ARRAYIDX2]], align 1
+; CHECK-NEXT:    [[ARRAYIDX1:%.*]] = getelementptr inbounds i8, ptr [[P2]], i64 [[INDEX1]]
+; CHECK-NEXT:    [[LD2:%.*]] = load i8, ptr [[ARRAYIDX1]], align 1
 ; CHECK-NEXT:    [[CMP3:%.*]] = icmp eq i8 [[LD1]], [[LD2]]
 ; CHECK-NEXT:    br i1 [[CMP3]], label %[[LOOP_INC]], label %[[LOOP_END:.*]]
 ; CHECK:       [[LOOP_INC]]:
@@ -816,8 +816,8 @@ define i64 @find_if_pointer_distance_deref_via_assumption_mayfree_call(ptr %vec)
 ; CHECK:       [[LOOP_PREHEADER]]:
 ; CHECK-NEXT:    call void @may_free()
 ; CHECK-NEXT:    [[END_PTR:%.*]] = getelementptr i8, ptr [[BEGIN]], i64 [[DISTANCE]]
-; CHECK-NEXT:    br label %[[LOOP:.*]]
-; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    br label %[[LOOP1:.*]]
+; CHECK:       [[LOOP1]]:
 ; CHECK-NEXT:    [[PTR:%.*]] = phi ptr [ [[PTR_NEXT:%.*]], %[[LOOP_INC:.*]] ], [ [[BEGIN]], %[[LOOP_PREHEADER]] ]
 ; CHECK-NEXT:    [[VAL:%.*]] = load i16, ptr [[PTR]], align 2
 ; CHECK-NEXT:    [[FOUND:%.*]] = icmp eq i16 [[VAL]], 1
@@ -825,9 +825,9 @@ define i64 @find_if_pointer_distance_deref_via_assumption_mayfree_call(ptr %vec)
 ; CHECK:       [[LOOP_INC]]:
 ; CHECK-NEXT:    [[PTR_NEXT]] = getelementptr inbounds nuw i8, ptr [[PTR]], i64 2
 ; CHECK-NEXT:    [[DONE:%.*]] = icmp eq ptr [[PTR_NEXT]], [[END]]
-; CHECK-NEXT:    br i1 [[DONE]], label %[[EXIT_LOOPEXIT]], label %[[LOOP]]
+; CHECK-NEXT:    br i1 [[DONE]], label %[[EXIT_LOOPEXIT]], label %[[LOOP1]]
 ; CHECK:       [[EXIT_LOOPEXIT]]:
-; CHECK-NEXT:    [[RESULT_PH:%.*]] = phi ptr [ [[END_PTR]], %[[LOOP_INC]] ], [ [[PTR]], %[[LOOP]] ]
+; CHECK-NEXT:    [[RESULT_PH:%.*]] = phi ptr [ [[END_PTR]], %[[LOOP_INC]] ], [ [[PTR]], %[[LOOP1]] ]
 ; CHECK-NEXT:    [[DOTRESULT_INT:%.*]] = ptrtoint ptr [[RESULT_PH]] to i64
 ; CHECK-NEXT:    br label %[[EXIT]]
 ; CHECK:       [[EXIT]]:
@@ -894,8 +894,8 @@ define i64 @find_if_deref_via_assumption_invoke_may_free_in_assume_block(ptr %ve
 ; CHECK-NEXT:            to label %[[LOOP_PREHEADER:.*]] unwind label %[[LPAD:.*]]
 ; CHECK:       [[LOOP_PREHEADER]]:
 ; CHECK-NEXT:    [[END_PTR:%.*]] = getelementptr i8, ptr [[BEGIN]], i64 [[DISTANCE]]
-; CHECK-NEXT:    br label %[[LOOP:.*]]
-; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    br label %[[LOOP1:.*]]
+; CHECK:       [[LOOP1]]:
 ; CHECK-NEXT:    [[PTR:%.*]] = phi ptr [ [[PTR_NEXT:%.*]], %[[LOOP_INC:.*]] ], [ [[BEGIN]], %[[LOOP_PREHEADER]] ]
 ; CHECK-NEXT:    [[VAL:%.*]] = load i16, ptr [[PTR]], align 2
 ; CHECK-NEXT:    [[FOUND:%.*]] = icmp eq i16 [[VAL]], 1
@@ -903,13 +903,13 @@ define i64 @find_if_deref_via_assumption_invoke_may_free_in_assume_block(ptr %ve
 ; CHECK:       [[LOOP_INC]]:
 ; CHECK-NEXT:    [[PTR_NEXT]] = getelementptr inbounds nuw i8, ptr [[PTR]], i64 2
 ; CHECK-NEXT:    [[DONE:%.*]] = icmp eq ptr [[PTR_NEXT]], [[END]]
-; CHECK-NEXT:    br i1 [[DONE]], label %[[EXIT_LOOPEXIT]], label %[[LOOP]]
+; CHECK-NEXT:    br i1 [[DONE]], label %[[EXIT_LOOPEXIT]], label %[[LOOP1]]
 ; CHECK:       [[LPAD]]:
 ; CHECK-NEXT:    [[LP:%.*]] = landingpad { ptr, i32 }
 ; CHECK-NEXT:            cleanup
 ; CHECK-NEXT:    resume { ptr, i32 } [[LP]]
 ; CHECK:       [[EXIT_LOOPEXIT]]:
-; CHECK-NEXT:    [[RESULT_PH:%.*]] = phi ptr [ [[END_PTR]], %[[LOOP_INC]] ], [ [[PTR]], %[[LOOP]] ]
+; CHECK-NEXT:    [[RESULT_PH:%.*]] = phi ptr [ [[END_PTR]], %[[LOOP_INC]] ], [ [[PTR]], %[[LOOP1]] ]
 ; CHECK-NEXT:    [[DOTRESULT_INT:%.*]] = ptrtoint ptr [[RESULT_PH]] to i64
 ; CHECK-NEXT:    br label %[[EXIT:.*]]
 ; CHECK:       [[EXIT]]:
@@ -981,8 +981,8 @@ define i64 @find_if_deref_via_assumption_invoke_may_free_in_preheader(ptr %vec) 
 ; CHECK-NEXT:    invoke void @may_free()
 ; CHECK-NEXT:            to label %[[LOOP_PREHEADER1:.*]] unwind label %[[LPAD:.*]]
 ; CHECK:       [[LOOP_PREHEADER1]]:
-; CHECK-NEXT:    br label %[[LOOP:.*]]
-; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    br label %[[LOOP1:.*]]
+; CHECK:       [[LOOP1]]:
 ; CHECK-NEXT:    [[PTR:%.*]] = phi ptr [ [[PTR_NEXT:%.*]], %[[LOOP_INC:.*]] ], [ [[BEGIN]], %[[LOOP_PREHEADER1]] ]
 ; CHECK-NEXT:    [[VAL:%.*]] = load i16, ptr [[PTR]], align 2
 ; CHECK-NEXT:    [[FOUND:%.*]] = icmp eq i16 [[VAL]], 1
@@ -990,13 +990,13 @@ define i64 @find_if_deref_via_assumption_invoke_may_free_in_preheader(ptr %vec) 
 ; CHECK:       [[LOOP_INC]]:
 ; CHECK-NEXT:    [[PTR_NEXT]] = getelementptr inbounds nuw i8, ptr [[PTR]], i64 2
 ; CHECK-NEXT:    [[DONE:%.*]] = icmp eq ptr [[PTR_NEXT]], [[END]]
-; CHECK-NEXT:    br i1 [[DONE]], label %[[EXIT_LOOPEXIT]], label %[[LOOP]]
+; CHECK-NEXT:    br i1 [[DONE]], label %[[EXIT_LOOPEXIT]], label %[[LOOP1]]
 ; CHECK:       [[LPAD]]:
 ; CHECK-NEXT:    [[LP:%.*]] = landingpad { ptr, i32 }
 ; CHECK-NEXT:            cleanup
 ; CHECK-NEXT:    resume { ptr, i32 } [[LP]]
 ; CHECK:       [[EXIT_LOOPEXIT]]:
-; CHECK-NEXT:    [[RESULT_PH:%.*]] = phi ptr [ [[END_PTR]], %[[LOOP_INC]] ], [ [[PTR]], %[[LOOP]] ]
+; CHECK-NEXT:    [[RESULT_PH:%.*]] = phi ptr [ [[END_PTR]], %[[LOOP_INC]] ], [ [[PTR]], %[[LOOP1]] ]
 ; CHECK-NEXT:    [[DOTRESULT_INT:%.*]] = ptrtoint ptr [[RESULT_PH]] to i64
 ; CHECK-NEXT:    br label %[[EXIT]]
 ; CHECK:       [[EXIT]]:

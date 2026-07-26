@@ -26,6 +26,7 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Analysis/IVDescriptors.h"
 #include "llvm/Analysis/LoopAccessAnalysis.h"
+#include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/ScalarEvolutionPatternMatch.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/MDBuilder.h"
@@ -1155,6 +1156,220 @@ VPlanTransforms::expandSCEVs(VPlan &Plan, ScalarEvolution &SE) {
   }
 
   return ExpandedSCEVs;
+}
+
+/// The parts of a converted oracle plan its enclosing function is built from.
+struct OraclePlanParts {
+  /// The plan's single exit block.
+  VPBasicBlock *ExitVPBB;
+  /// The number of valid bytes, computed in \p ExitVPBB.
+  VPValue *ByteCount;
+  /// The replayed induction, whose start value is bound to the chunk start.
+  VPPhi *IV;
+};
+
+/// Turn \p OraclePlan, a copy of the scalar loop taken before the vectorization
+/// skeleton was added, into a speculative-load oracle: a scalar loop replaying
+/// the original loop's exit conditions for the first VF lanes. The number of
+/// valid bytes it computes is the number of replayed lanes times \p
+/// EltStoreSize.
+static OraclePlanParts convertToOraclePlan(VPlan &OraclePlan,
+                                           uint64_t EltStoreSize) {
+  // Route all exits (early exits and the latch's normal exit) into a single
+  // shared exit block, replacing the original loop's VPIRBasicBlock exits, and
+  // drop the recipes of those now-detached blocks. This must happen before the
+  // dead-recipe removal below: their VPIRPhis keep values live that only the
+  // original loop's live-outs used, which would then be replayed by the oracle
+  // and turn their operands into oracle arguments.
+  auto *ExitVPBB = OraclePlan.createVPBasicBlock("oracle.exit");
+  for (VPIRBasicBlock *ExitVPIRBB : OraclePlan.getExitBlocks()) {
+    for (VPBlockBase *Pred : to_vector(ExitVPIRBB->getPredecessors()))
+      VPBlockUtils::connectBlocks(Pred, ExitVPBB, /*PredIdx=*/-1u,
+                                  Pred->getIndexForSuccessor(ExitVPIRBB));
+    for (VPRecipeBase &R : make_early_inc_range(*ExitVPIRBB))
+      R.eraseFromParent();
+  }
+
+  // The oracle replays the loop body as-is into an optnone function, so drop
+  // recipes not feeding the exit conditions. They are not merely redundant:
+  // replaying them would emit their loads, and their operands would become
+  // oracle arguments.
+  VPlanTransforms::removeDeadRecipes(OraclePlan, /*RemovePhis=*/false);
+
+  auto [HeaderVPBB, LatchVPBB] =
+      VPBlockUtils::getPlainCFGHeaderAndLatch(OraclePlan);
+  Type *IVTy = OraclePlan.getIndexType();
+
+  // The replayed induction is the loop's only header phi, as ensured by
+  // replaceUnsafeLoadsWithSpeculative. Capture it before adding the lane
+  // counter below.
+  auto *IV = cast<VPPhi>(&*HeaderVPBB->phis().begin());
+
+  // Count the lanes replayed so far, starting at 1, and use the counter to
+  // bound the replay to a single chunk. It replaces the original latch
+  // condition, which cannot trigger inside a chunk as the vector loop only
+  // executes full chunks. Deleting that condition also keeps the trip count
+  // from becoming a spurious oracle argument.
+  auto *LatchTerm = cast<VPInstruction>(LatchVPBB->getTerminator());
+  assert(match(LatchTerm, m_BranchOnCond(m_VPValue())) &&
+         "expected plain-CFG latch to be terminated by BranchOnCond");
+  DebugLoc DL = LatchTerm->getDebugLoc();
+  VPValue *One = OraclePlan.getConstantInt(IVTy, 1);
+  auto *Lane = VPBuilder(HeaderVPBB, HeaderVPBB->getFirstNonPhi())
+                   .createScalarPhi({One, One}, DL, "lane");
+  VPBuilder LatchBuilder(LatchTerm);
+  Lane->setOperand(1, LatchBuilder.createAdd(Lane, One, DL));
+  LatchBuilder.createNaryOp(VPInstruction::BranchOnCount,
+                            {Lane, &OraclePlan.getVF()}, DL);
+  VPValue *OrigLatchCond = LatchTerm->getOperand(0);
+  LatchTerm->eraseFromParent();
+  vputils::recursivelyDeleteDeadRecipes(OrigLatchCond);
+
+  // Replicate the memory, address and freeze recipes: the oracle is a scalar
+  // loop, so they must generate a single scalar each rather than being widened.
+  for (VPBasicBlock *VPBB : vp_rpo_plain_cfg_loop_body(HeaderVPBB)) {
+    for (VPRecipeBase &R : make_early_inc_range(*VPBB)) {
+      auto *VPI = dyn_cast<VPInstruction>(&R);
+      if (!VPI || (VPI->getOpcode() != Instruction::Load &&
+                   VPI->getOpcode() != Instruction::GetElementPtr &&
+                   VPI->getOpcode() != Instruction::Freeze))
+        continue;
+      auto *Replicate = VPBuilder::createSingleScalarOp(
+          VPI->getOpcode(), VPI->operands(), /*Mask=*/nullptr, *VPI, *VPI,
+          VPI->getDebugLoc(), VPI->getUnderlyingInstr());
+      Replicate->insertBefore(VPI);
+      VPI->replaceAllUsesWith(Replicate);
+      VPI->eraseFromParent();
+    }
+  }
+
+  // Compute the byte count as an i64. Per @llvm.speculative.load semantics it
+  // marks bytes [0, N) of the loaded vector as valid, so it is relative to the
+  // start of the chunk.
+  Type *I64Ty = Type::getInt64Ty(OraclePlan.getContext());
+  VPBuilder ExitBuilder(ExitVPBB, ExitVPBB->begin());
+  VPValue *Bytes = ExitBuilder.createScalarZExtOrTrunc(Lane, I64Ty, {});
+  if (EltStoreSize != 1)
+    Bytes = ExitBuilder.createNaryOp(
+        Instruction::Mul,
+        {Bytes, OraclePlan.getConstantInt(I64Ty, EltStoreSize)},
+        VPIRFlags::getDefaultFlags(Instruction::Mul));
+
+  VPlanTransforms::convertToConcreteRecipes(OraclePlan);
+  return {ExitVPBB, Bytes, IV};
+}
+
+void VPlanTransforms::generateOracle(VPlan &Plan, VPlan &ScalarPlan,
+                                     ElementCount VF,
+                                     const TargetTransformInfo &TTI) {
+  SmallVector<VPWidenIntrinsicRecipe *> SpeculativeLoads =
+      vputils::collectSpeculativeLoads(Plan);
+  if (SpeculativeLoads.empty())
+    return;
+
+  // Build the oracle plan from a fresh copy of the scalar loop. All speculative
+  // loads share one element type, hence one byte count.
+  VPlanPtr OraclePlanPtr(ScalarPlan.duplicate());
+  VPlan &OraclePlan = *OraclePlanPtr;
+  Type *EltTy = SpeculativeLoads.front()->getScalarType();
+  auto [OracleExitVPBB, ByteCount, OracleIV] = convertToOraclePlan(
+      OraclePlan, Plan.getDataLayout().getTypeStoreSize(EltTy).getFixedValue());
+
+  // The oracle takes the index of the current chunk's first lane, passed by the
+  // speculative loads as their first argument after the callee, followed by the
+  // live-ins the replay reads. Only constants that cannot name memory are
+  // materialized in the oracle function directly; everything else must be
+  // passed in - in particular globals and constant expressions referring to
+  // them - as the oracle is emitted with memory(argmem: read), as
+  // @llvm.speculative.load requires.
+  SmallVector<VPIRValue *> LiveIns;
+  for (VPIRValue *LiveIn : OraclePlan.getLiveIns())
+    if (!LiveIn->user_empty() &&
+        !isa<ConstantInt, ConstantFP, UndefValue>(LiveIn->getValue()))
+      LiveIns.push_back(LiveIn);
+  SmallVector<Type *> ParamTys = {OraclePlan.getIndexType()};
+  append_range(ParamTys, map_range(LiveIns, [](VPIRValue *LiveIn) {
+                 return LiveIn->getScalarType();
+               }));
+
+  Type *I64Ty = Type::getInt64Ty(Plan.getContext());
+  Function *OracleFn = Function::Create(
+      FunctionType::get(I64Ty, ParamTys, false), GlobalValue::InternalLinkage,
+      "speculativeLoadOracle", Plan.getModule());
+  OracleFn->setMemoryEffects(MemoryEffects::argMemOnly(ModRefInfo::Ref));
+  OracleFn->addFnAttr(Attribute::NoInline);
+  // Keep the body exactly as emitted, so later passes cannot perturb the
+  // precise per-lane replay.
+  OracleFn->addFnAttr(Attribute::OptimizeNone);
+
+  // Bind the oracle plan's live-ins to the matching arguments. Argument 0 is
+  // the chunk's first lane, which the replayed induction starts at.
+  Argument *ChunkStart = OracleFn->getArg(0);
+  ChunkStart->setName("chunk.start");
+  OracleIV->setOperand(0, OraclePlan.getOrAddLiveIn(ChunkStart));
+  for (auto [LiveIn, Param] :
+       zip_equal(LiveIns, drop_begin(OracleFn->args()))) {
+    Param.setName(LiveIn->getValue()->getName());
+    LiveIn->replaceAllUsesWith(OraclePlan.getOrAddLiveIn(&Param));
+  }
+
+  BasicBlock *EntryBB =
+      BasicBlock::Create(Plan.getContext(), "oracle.entry", OracleFn);
+  IRBuilder<> OracleBuilder(EntryBB);
+
+  // Replace the VF placeholder with the runtime lane count, so the oracle
+  // replays exactly the lanes the speculative loads produce.
+  Value *RuntimeVF = getRuntimeVF(OracleBuilder, OraclePlan.getIndexType(), VF);
+  OraclePlan.getVF().replaceAllUsesWith(OraclePlan.getOrAddLiveIn(RuntimeVF));
+  // Placeholder terminator, replaced by VPlan::execute when stitching up the
+  // plan's CFG.
+  OracleBuilder.CreateUnreachable();
+
+  // Make the materialized entry block the plan's entry, taking over the
+  // original loop preheader's edge to the header.
+  auto *NewEntry = OraclePlan.createEmptyVPIRBasicBlock(EntryBB);
+  VPBlockUtils::reassociateBlocks(cast<VPBasicBlock>(OraclePlan.getEntry()),
+                                  NewEntry);
+  OraclePlan.setEntry(NewEntry);
+
+  // Execute the oracle plan into the oracle function with VF=1. A LoopInfo lets
+  // VPBasicBlock::execute register the loop; no AssumptionCache is needed as
+  // the oracle only replicates Load/GEP/Freeze recipes. Use the generic
+  // VPlan::execute rather than executeAndFinalize, which performs
+  // main-loop-specific skeleton setup and cleanup.
+  DominatorTree OracleDT(*OracleFn);
+  LoopInfo OracleLI(OracleDT);
+  VPTransformState OracleState(&TTI, ElementCount::getFixed(1), &OracleLI,
+                               /*DT=*/nullptr, /*AC=*/nullptr, OracleBuilder,
+                               &OraclePlan, /*CurrentParentLoop=*/nullptr);
+  OracleState.CFG.PrevBB = EntryBB;
+  OraclePlan.execute(&OracleState);
+  OracleState.fixupHeaderPhis();
+
+  // Return the byte count computed in the oracle exit block.
+  BasicBlock *ExitBB = OracleState.CFG.VPBB2IRBB[OracleExitVPBB];
+  ExitBB->getTerminator()->eraseFromParent();
+  OracleBuilder.SetInsertPoint(ExitBB);
+  OracleBuilder.CreateRet(OracleState.get(ByteCount, /*IsScalar=*/true));
+
+  // Rebuild the speculative loads with the generated oracle function as callee,
+  // replacing the poison placeholder, and the live-in arguments it reads
+  // appended.
+  VPValue *OracleCallee = Plan.getOrAddLiveIn(OracleFn);
+  SmallVector<VPValue *> OracleLiveIns;
+  for (VPIRValue *LiveIn : LiveIns)
+    OracleLiveIns.push_back(Plan.getOrAddLiveIn(LiveIn->getValue()));
+  for (VPWidenIntrinsicRecipe *R : SpeculativeLoads) {
+    SmallVector<VPValue *> Ops = {R->getOperand(0), R->getOperand(1),
+                                  OracleCallee, R->getOperand(3)};
+    append_range(Ops, OracleLiveIns);
+    auto *NewR = new VPWidenIntrinsicRecipe(Intrinsic::speculative_load, Ops,
+                                            R->getScalarType(), *R, *R,
+                                            R->getDebugLoc());
+    NewR->insertBefore(R);
+    R->replaceAllUsesWith(NewR);
+    R->eraseFromParent();
+  }
 }
 
 /// Add branch weight metadata, if the \p Plan's middle block is terminated by a

@@ -5013,6 +5013,10 @@ public:
     return getScalarHeader()->getIRBasicBlock()->getDataLayout();
   }
 
+  Module &getModule() const {
+    return *getScalarHeader()->getIRBasicBlock()->getModule();
+  }
+
   void addVF(ElementCount VF) { VFs.insert(VF); }
 
   void setVF(ElementCount VF) {

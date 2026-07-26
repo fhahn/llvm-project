@@ -185,8 +185,10 @@ struct VPlanTransforms {
 
   /// Update \p Plan to account for all early exits. If \p Style is not
   /// NoUncountableExit, handles uncountable early exits and checks that all
-  /// loads are dereferenceable. Returns false if a non-dereferenceable load is
-  /// found.
+  /// loads are dereferenceable. For read-only uncountable early exits,
+  /// non-dereferenceable loads are replaced by @llvm.speculative.load
+  /// intrinsics, backed by an oracle generateOracle emits at execute time.
+  /// Returns false if a load cannot be handled either way.
   LLVM_ABI_FOR_TEST static bool
   handleEarlyExits(VPlan &Plan, UncountableExitStyle Style, Loop *TheLoop,
                    PredicatedScalarEvolution &PSE, DominatorTree &DT,
@@ -233,6 +235,22 @@ struct VPlanTransforms {
                                  bool AddBranchWeights);
   static void attachCheckBlock(VPlan &Plan, Value *Cond, BasicBlock *CheckBlock,
                                bool AddBranchWeights);
+
+  /// Add a check block before the vector preheader of \p Plan verifying that
+  /// the pointers of \p Plan's @llvm.speculative.load intrinsics can be
+  /// accessed speculatively, bypassing to the scalar loop if not.
+  static void attachSpeculativeLoadChecks(VPlan &Plan, ElementCount VF,
+                                          PredicatedScalarEvolution &PSE,
+                                          Loop *TheLoop, bool AddBranchWeights);
+
+  /// Generate a speculative-load oracle for \p Plan into a new internal
+  /// function in \p Plan's module: a scalar loop, built from a copy of \p
+  /// ScalarPlan, that replays the loop's early-exit conditions for \p VF lanes
+  /// and returns the number of valid bytes. Set it as the callee of \p Plan's
+  /// @llvm.speculative.load intrinsics, whose callee operand is a poison
+  /// placeholder on entry, and append the live-in arguments it reads.
+  static void generateOracle(VPlan &Plan, VPlan &ScalarPlan, ElementCount VF,
+                             const TargetTransformInfo &TTI);
 
   /// Replaces the VPInstructions in \p Plan with corresponding
   /// widen recipes. Returns false if any VPInstructions could not be converted

@@ -82,20 +82,17 @@ end:
 ;   }
 ;   return false;
 ; }
-; TODO: Today we do not vectorize this, but we could teach the vectorizer, once
-; the hard part of proving/speculating A[i:VF - 1] loads does not fault is handled by the
-; compiler/hardware.
 
 define i32 @test2(ptr nocapture %A, i32 %Length, i32 %K) {
 ; CHECK-LABEL: define i32 @test2(
 ; CHECK-SAME: ptr captures(none) [[A:%.*]], i32 [[LENGTH:%.*]], i32 [[K:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[CMP8:%.*]] = icmp sgt i32 [[LENGTH]], 0
-; CHECK-NEXT:    br i1 [[CMP8]], label %[[FOR_BODY_PREHEADER:.*]], label %[[END:.*]]
-; CHECK:       [[FOR_BODY_PREHEADER]]:
-; CHECK-NEXT:    br label %[[FOR_BODY:.*]]
-; CHECK:       [[FOR_BODY]]:
-; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ [[INDVARS_IV_NEXT:%.*]], %[[IF_ELSE:.*]] ], [ 0, %[[FOR_BODY_PREHEADER]] ]
+; CHECK-NEXT:    br i1 [[CMP8]], label %[[SCALAR_PH1:.*]], label %[[END:.*]]
+; CHECK:       [[SCALAR_PH1]]:
+; CHECK-NEXT:    br label %[[FOR_BODY1:.*]]
+; CHECK:       [[FOR_BODY1]]:
+; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ [[INDVARS_IV_NEXT:%.*]], %[[IF_ELSE:.*]] ], [ 0, %[[SCALAR_PH1]] ]
 ; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[INDVARS_IV]]
 ; CHECK-NEXT:    [[LD:%.*]] = load i32, ptr [[ARRAYIDX]], align 4
 ; CHECK-NEXT:    [[CMP1:%.*]] = icmp eq i32 [[LD]], [[K]]
@@ -104,9 +101,9 @@ define i32 @test2(ptr nocapture %A, i32 %Length, i32 %K) {
 ; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add nuw nsw i64 [[INDVARS_IV]], 1
 ; CHECK-NEXT:    [[TRUNC:%.*]] = trunc i64 [[INDVARS_IV_NEXT]] to i32
 ; CHECK-NEXT:    [[CMP:%.*]] = icmp slt i32 [[TRUNC]], [[LENGTH]]
-; CHECK-NEXT:    br i1 [[CMP]], label %[[FOR_BODY]], label %[[END_LOOPEXIT]]
+; CHECK-NEXT:    br i1 [[CMP]], label %[[FOR_BODY1]], label %[[END_LOOPEXIT]]
 ; CHECK:       [[END_LOOPEXIT]]:
-; CHECK-NEXT:    [[RESULT_LCSSA:%.*]] = phi i32 [ 1, %[[FOR_BODY]] ], [ 0, %[[IF_ELSE]] ]
+; CHECK-NEXT:    [[RESULT_LCSSA:%.*]] = phi i32 [ 1, %[[FOR_BODY1]] ], [ 0, %[[IF_ELSE]] ]
 ; CHECK-NEXT:    br label %[[END]]
 ; CHECK:       [[END]]:
 ; CHECK-NEXT:    [[RESULT:%.*]] = phi i32 [ [[RESULT_LCSSA]], %[[END_LOOPEXIT]] ], [ 0, %[[ENTRY]] ]
@@ -149,18 +146,16 @@ end:
 ;   }
 ;   return -1;
 ; }
-; TODO: Today we do not vectorize this, but we could teach the vectorizer (once
-; we handle the speculation safety of the widened load).
 define i32 @test3(ptr nocapture %A, i32 %Length, i32 %K) {
 ; CHECK-LABEL: define i32 @test3(
 ; CHECK-SAME: ptr captures(none) [[A:%.*]], i32 [[LENGTH:%.*]], i32 [[K:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[CMP8:%.*]] = icmp sgt i32 [[LENGTH]], 0
-; CHECK-NEXT:    br i1 [[CMP8]], label %[[FOR_BODY_PREHEADER:.*]], label %[[END:.*]]
-; CHECK:       [[FOR_BODY_PREHEADER]]:
-; CHECK-NEXT:    br label %[[FOR_BODY:.*]]
-; CHECK:       [[FOR_BODY]]:
-; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ [[INDVARS_IV_NEXT:%.*]], %[[IF_ELSE:.*]] ], [ 0, %[[FOR_BODY_PREHEADER]] ]
+; CHECK-NEXT:    br i1 [[CMP8]], label %[[SCALAR_PH1:.*]], label %[[END:.*]]
+; CHECK:       [[SCALAR_PH1]]:
+; CHECK-NEXT:    br label %[[FOR_BODY1:.*]]
+; CHECK:       [[FOR_BODY1]]:
+; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ [[INDVARS_IV_NEXT:%.*]], %[[IF_ELSE:.*]] ], [ 0, %[[SCALAR_PH1]] ]
 ; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[INDVARS_IV]]
 ; CHECK-NEXT:    [[LD:%.*]] = load i32, ptr [[ARRAYIDX]], align 4
 ; CHECK-NEXT:    [[CMP1:%.*]] = icmp eq i32 [[LD]], [[K]]
@@ -169,9 +164,9 @@ define i32 @test3(ptr nocapture %A, i32 %Length, i32 %K) {
 ; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add nuw nsw i64 [[INDVARS_IV]], 1
 ; CHECK-NEXT:    [[TRUNC:%.*]] = trunc i64 [[INDVARS_IV_NEXT]] to i32
 ; CHECK-NEXT:    [[CMP:%.*]] = icmp slt i32 [[TRUNC]], [[LENGTH]]
-; CHECK-NEXT:    br i1 [[CMP]], label %[[FOR_BODY]], label %[[END_LOOPEXIT]]
+; CHECK-NEXT:    br i1 [[CMP]], label %[[FOR_BODY1]], label %[[END_LOOPEXIT]]
 ; CHECK:       [[END_LOOPEXIT]]:
-; CHECK-NEXT:    [[RESULT_LCSSA:%.*]] = phi i64 [ [[INDVARS_IV]], %[[FOR_BODY]] ], [ -1, %[[IF_ELSE]] ]
+; CHECK-NEXT:    [[RESULT_LCSSA:%.*]] = phi i64 [ [[INDVARS_IV]], %[[FOR_BODY1]] ], [ -1, %[[IF_ELSE]] ]
 ; CHECK-NEXT:    [[RES_TRUNC:%.*]] = trunc i64 [[RESULT_LCSSA]] to i32
 ; CHECK-NEXT:    br label %[[END]]
 ; CHECK:       [[END]]:
@@ -242,33 +237,33 @@ define void @test4(ptr nocapture %A, i32 %Length, i32 %K, i32 %J) {
 ; CHECK-NEXT:    store i32 [[J]], ptr [[TMP1]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE]]
 ; CHECK:       [[PRED_STORE_CONTINUE]]:
-; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <4 x i1> [[TMP2]], i64 1
-; CHECK-NEXT:    br i1 [[TMP4]], label %[[PRED_STORE_IF1:.*]], label %[[PRED_STORE_CONTINUE2:.*]]
+; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <4 x i1> [[TMP2]], i64 1
+; CHECK-NEXT:    br i1 [[TMP5]], label %[[PRED_STORE_IF1:.*]], label %[[PRED_STORE_CONTINUE2:.*]]
 ; CHECK:       [[PRED_STORE_IF1]]:
-; CHECK-NEXT:    [[TMP5:%.*]] = add i64 [[INDEX]], 1
-; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[TMP5]]
-; CHECK-NEXT:    store i32 [[J]], ptr [[TMP6]], align 4
+; CHECK-NEXT:    [[TMP6:%.*]] = add i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[TMP6]]
+; CHECK-NEXT:    store i32 [[J]], ptr [[TMP7]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE2]]
 ; CHECK:       [[PRED_STORE_CONTINUE2]]:
-; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <4 x i1> [[TMP2]], i64 2
-; CHECK-NEXT:    br i1 [[TMP7]], label %[[PRED_STORE_IF3:.*]], label %[[PRED_STORE_CONTINUE4:.*]]
+; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <4 x i1> [[TMP2]], i64 2
+; CHECK-NEXT:    br i1 [[TMP8]], label %[[PRED_STORE_IF3:.*]], label %[[PRED_STORE_CONTINUE4:.*]]
 ; CHECK:       [[PRED_STORE_IF3]]:
-; CHECK-NEXT:    [[TMP8:%.*]] = add i64 [[INDEX]], 2
-; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[TMP8]]
-; CHECK-NEXT:    store i32 [[J]], ptr [[TMP9]], align 4
+; CHECK-NEXT:    [[TMP9:%.*]] = add i64 [[INDEX]], 2
+; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[TMP9]]
+; CHECK-NEXT:    store i32 [[J]], ptr [[TMP10]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE4]]
 ; CHECK:       [[PRED_STORE_CONTINUE4]]:
-; CHECK-NEXT:    [[TMP10:%.*]] = extractelement <4 x i1> [[TMP2]], i64 3
-; CHECK-NEXT:    br i1 [[TMP10]], label %[[PRED_STORE_IF5:.*]], label %[[PRED_STORE_CONTINUE6]]
+; CHECK-NEXT:    [[TMP11:%.*]] = extractelement <4 x i1> [[TMP2]], i64 3
+; CHECK-NEXT:    br i1 [[TMP11]], label %[[PRED_STORE_IF5:.*]], label %[[PRED_STORE_CONTINUE6]]
 ; CHECK:       [[PRED_STORE_IF5]]:
-; CHECK-NEXT:    [[TMP11:%.*]] = add i64 [[INDEX]], 3
-; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[TMP11]]
-; CHECK-NEXT:    store i32 [[J]], ptr [[TMP12]], align 4
+; CHECK-NEXT:    [[TMP12:%.*]] = add i64 [[INDEX]], 3
+; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[TMP12]]
+; CHECK-NEXT:    store i32 [[J]], ptr [[TMP13]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE6]]
 ; CHECK:       [[PRED_STORE_CONTINUE6]]:
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
-; CHECK-NEXT:    [[TMP13:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP13]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
+; CHECK-NEXT:    [[TMP14:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP14]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[END_LOOPEXIT_LOOPEXIT:.*]], label %[[SCALAR_PH]]

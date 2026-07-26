@@ -596,6 +596,28 @@ vputils::getEarlyExits(const VPlan &Plan, const VPBlockBase *MiddleVPBB) {
   return Exits;
 }
 
+SmallVector<VPWidenIntrinsicRecipe *>
+vputils::collectSpeculativeLoads(VPlan &Plan) {
+  SmallVector<VPWidenIntrinsicRecipe *> SpeculativeLoads;
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_deep(Plan.getEntry())))
+    for (VPRecipeBase &R : *VPBB)
+      if (match(&R, m_WidenIntrinsic<Intrinsic::speculative_load>()))
+        SpeculativeLoads.push_back(cast<VPWidenIntrinsicRecipe>(&R));
+  return SpeculativeLoads;
+}
+
+bool vputils::hasSpeculativeLoads(const VPlan &Plan) {
+  return any_of(VPBlockUtils::blocksOnly<const VPBasicBlock>(
+                    vp_depth_first_deep(Plan.getEntry())),
+                [](const VPBasicBlock *VPBB) {
+                  return any_of(*VPBB, [](const VPRecipeBase &R) {
+                    return match(&R,
+                                 m_WidenIntrinsic<Intrinsic::speculative_load>());
+                  });
+                });
+}
+
 VPScalarIVStepsRecipe *vputils::createScalarIVSteps(
     VPlan &Plan, InductionDescriptor::InductionKind Kind,
     Instruction::BinaryOps InductionOpcode, FPMathOperator *FPBinOp,

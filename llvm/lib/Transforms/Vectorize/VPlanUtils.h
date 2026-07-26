@@ -188,6 +188,14 @@ VPValue *findIncomingAliasMask(const VPlan &Plan);
 SmallVector<std::pair<VPBasicBlock *, VPIRBasicBlock *>>
 getEarlyExits(const VPlan &Plan, const VPBlockBase *MiddleVPBB);
 
+/// Collects \p Plan's @llvm.speculative.load recipes, which replace loads that
+/// are not known dereferenceable in loops with an uncountable early exit. The
+/// result is empty if \p Plan does not use speculative loads.
+SmallVector<VPWidenIntrinsicRecipe *> collectSpeculativeLoads(VPlan &Plan);
+
+/// Returns true if \p Plan contains any @llvm.speculative.load recipe.
+bool hasSpeculativeLoads(const VPlan &Plan);
+
 /// Create a scalar-iv-steps recipe over \p Plan's canonical IV for an
 /// induction of \p Kind with \p InductionOpcode / \p FPBinOp, start value \p
 /// StartV and step \p Step, truncated to \p TruncI's type if \p TruncI is

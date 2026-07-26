@@ -888,6 +888,11 @@ class LoopVectorizationPlanner {
 
   SmallVector<VPlanPtr, 4> VPlans;
 
+  /// A copy of the scalar loop as a plain-CFG VPlan, taken before the
+  /// vectorization skeleton was added, or null if not needed. Used to build the
+  /// speculative-load oracle in generateOracle.
+  VPlanPtr ScalarPlan;
+
   /// Profitable vector factors.
   SmallVector<VectorizationFactor, 8> ProfitableVFs;
 

@@ -5977,6 +5977,13 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
     ++LoopsPartialAliasVectorized;
   }
 
+  // Only plans built from a scalar-loop copy can carry speculative loads. Add
+  // their runtime checks here, while the scalar loop the checks bypass to is
+  // still part of the plan.
+  if (ScalarPlan)
+    RUN_VPLAN_PASS(VPlanTransforms::attachSpeculativeLoadChecks, BestVPlan,
+                   BestVF, PSE, OrigLoop, HasBranchWeights);
+
   // Retrieving VectorPH now when it's easier while VPlan still has Regions.
   VPBasicBlock *VectorPH = cast<VPBasicBlock>(BestVPlan.getVectorPreheader());
 
@@ -6002,6 +6009,13 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
     });
     return DenseMap<const SCEV *, Value *>();
   }
+
+  // Generate the oracle the plan's speculative loads call, after the last
+  // bail-out above, so an abandoned plan does not leave an unused oracle
+  // function behind in the module.
+  if (ScalarPlan)
+    RUN_VPLAN_PASS(VPlanTransforms::generateOracle, BestVPlan, *ScalarPlan,
+                   BestVF, TTI);
 
   RUN_VPLAN_PASS(VPlanTransforms::removeDeadRecipes, BestVPlan, true);
 
@@ -6563,6 +6577,24 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
 
   VPDominatorTree VPDT(*VPlan0);
 
+  // If we're vectorizing a loop with an uncountable exit, make sure that the
+  // recipes are safe to handle.
+  // TODO: Remove this once we can properly check the VPlan itself for both
+  //       the presence of an uncountable exit and the presence of stores in
+  //       the loop inside handleEarlyExits itself.
+  UncountableExitStyle EEStyle = UncountableExitStyle::NoUncountableExit;
+  if (Legal->hasUncountableEarlyExit())
+    EEStyle = Legal->hasUncountableExitWithSideEffects()
+                  ? UncountableExitStyle::MaskedHandleExitInScalarLoop
+                  : UncountableExitStyle::ReadOnly;
+
+  // Keep a copy of the scalar loop, before any transform introduces recipes in
+  // the entry block or the vector skeleton. generateOracle builds the
+  // speculative-load oracle from it, once per executed plan, as each needs its
+  // own oracle for its VF.
+  if (EEStyle == UncountableExitStyle::ReadOnly)
+    ScalarPlan.reset(VPlan0->duplicate());
+
   if (const LoopAccessInfo *LAI = Legal->getLAI())
     RUN_VPLAN_PASS(VPlanTransforms::replaceSymbolicStrides, *VPlan0, PSE,
                    LAI->getSymbolicStrides(), VPDT);
@@ -6599,17 +6631,6 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
     return nullptr;
 
   RUN_VPLAN_PASS(VPlanTransforms::addMiddleCheck, *VPlan0);
-
-  // If we're vectorizing a loop with an uncountable exit, make sure that the
-  // recipes are safe to handle.
-  // TODO: Remove this once we can properly check the VPlan itself for both
-  //       the presence of an uncountable exit and the presence of stores in
-  //       the loop inside handleEarlyExits itself.
-  UncountableExitStyle EEStyle = UncountableExitStyle::NoUncountableExit;
-  if (Legal->hasUncountableEarlyExit())
-    EEStyle = Legal->hasUncountableExitWithSideEffects()
-                  ? UncountableExitStyle::MaskedHandleExitInScalarLoop
-                  : UncountableExitStyle::ReadOnly;
 
   if (!RUN_VPLAN_PASS(VPlanTransforms::handleEarlyExits, *VPlan0, EEStyle,
                       OrigLoop, PSE, *DT, Legal->getAssumptionCache())) {
@@ -8249,6 +8270,18 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     LLVM_DEBUG(dbgs() << "LV: Not interleaving due to EE with side effects.\n");
     IntDiagMsg = {"EEWithSideEffectsPreventsInterleaving",
                   "Unable to interleave due to early exit with side effects."};
+    InterleaveLoop = false;
+    IC = 1;
+  }
+
+  // Interleaving is not yet supported for loops using speculative loads: the
+  // oracle's chunk-start operand is not offset per unrolled part, so parts >= 1
+  // would replay the wrong lane window. This also prevents executing a VF = 1
+  // plan, only reachable via IC > 1, whose intrinsics cannot be widened.
+  if (InterleaveLoop && vputils::hasSpeculativeLoads(*BestPlanPtr)) {
+    LLVM_DEBUG(dbgs() << "LV: Not interleaving loop with speculative loads.\n");
+    IntDiagMsg = {"SpeculativeLoadPreventsInterleaving",
+                  "Unable to interleave loop using speculative loads."};
     InterleaveLoop = false;
     IC = 1;
   }

@@ -650,4 +650,224 @@ loop.end:
 declare i32 @foo(i32) readonly
 declare <vscale x 4 x i32> @foo_vec(<vscale x 4 x i32>)
 
+; Non-dereferenceable load in the latch (past all early exits) used as live-out.
+; Cannot be safely speculated, so the loop should not be vectorized.
+define i64 @load_in_latch_past_all_exits(ptr %src, ptr %p1) {
+; CHECK-LABEL: define i64 @load_in_latch_past_all_exits(
+; CHECK-SAME: ptr [[SRC:%.*]], ptr [[P1:%.*]]) {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    call void @init_mem(ptr [[P1]], i64 1024)
+; CHECK-NEXT:    br label [[LOOP_HEADER:%.*]]
+; CHECK:       loop.header:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ [[INDEX_NEXT:%.*]], [[LOOP_LATCH:%.*]] ], [ 0, [[ENTRY:%.*]] ]
+; CHECK-NEXT:    [[GEP1:%.*]] = getelementptr inbounds i8, ptr [[P1]], i64 [[INDEX]]
+; CHECK-NEXT:    [[LD1:%.*]] = load i8, ptr [[GEP1]], align 1
+; CHECK-NEXT:    [[CMP1:%.*]] = icmp eq i8 [[LD1]], 42
+; CHECK-NEXT:    br i1 [[CMP1]], label [[LOOP_END:%.*]], label [[LOOP_LATCH]]
+; CHECK:       loop.latch:
+; CHECK-NEXT:    [[GEP_SRC:%.*]] = getelementptr inbounds i64, ptr [[SRC]], i64 [[INDEX]]
+; CHECK-NEXT:    [[LD_OUT:%.*]] = load i64, ptr [[GEP_SRC]], align 4
+; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 1
+; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp ne i64 [[INDEX_NEXT]], 67
+; CHECK-NEXT:    br i1 [[EXITCOND]], label [[LOOP_HEADER]], label [[LOOP_END]]
+; CHECK:       loop.end:
+; CHECK-NEXT:    [[RETVAL:%.*]] = phi i64 [ 0, [[LOOP_HEADER]] ], [ [[LD_OUT]], [[LOOP_LATCH]] ]
+; CHECK-NEXT:    ret i64 [[RETVAL]]
+;
+entry:
+  call void @init_mem(ptr %p1, i64 1024)
+  br label %loop.header
+
+loop.header:
+  %index = phi i64 [ %index.next, %loop.latch ], [ 0, %entry ]
+  %gep1 = getelementptr inbounds i8, ptr %p1, i64 %index
+  %ld1 = load i8, ptr %gep1, align 1
+  %cmp1 = icmp eq i8 %ld1, 42
+  br i1 %cmp1, label %loop.end, label %loop.latch
+
+loop.latch:
+  %gep.src = getelementptr inbounds i64, ptr %src, i64 %index
+  %ld.out = load i64, ptr %gep.src, align 4
+  %index.next = add i64 %index, 1
+  %exitcond = icmp ne i64 %index.next, 67
+  br i1 %exitcond, label %loop.header, label %loop.end
+
+loop.end:
+  %retval = phi i64 [ 0, %loop.header ], [ %ld.out, %loop.latch ]
+  ret i64 %retval
+}
+
+; Two early exits with a non-dereferenceable load in the latch (past all exits).
+; Cannot be safely speculated, so the loop should not be vectorized.
+define i64 @two_exits_load_in_latch_past_all_exits(ptr %src, ptr %p1, ptr %p2) {
+; CHECK-LABEL: define i64 @two_exits_load_in_latch_past_all_exits(
+; CHECK-SAME: ptr [[SRC:%.*]], ptr [[P1:%.*]], ptr [[P2:%.*]]) {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    call void @init_mem(ptr [[P1]], i64 1024)
+; CHECK-NEXT:    call void @init_mem(ptr [[P2]], i64 1024)
+; CHECK-NEXT:    br label [[LOOP_HEADER:%.*]]
+; CHECK:       loop.header:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ [[INDEX_NEXT:%.*]], [[LOOP_LATCH:%.*]] ], [ 0, [[ENTRY:%.*]] ]
+; CHECK-NEXT:    [[GEP1:%.*]] = getelementptr inbounds i8, ptr [[P1]], i64 [[INDEX]]
+; CHECK-NEXT:    [[LD1:%.*]] = load i8, ptr [[GEP1]], align 1
+; CHECK-NEXT:    [[CMP1:%.*]] = icmp eq i8 [[LD1]], 42
+; CHECK-NEXT:    br i1 [[CMP1]], label [[LOOP_END:%.*]], label [[LOOP_MID:%.*]]
+; CHECK:       loop.mid:
+; CHECK-NEXT:    [[GEP2:%.*]] = getelementptr inbounds i8, ptr [[P2]], i64 [[INDEX]]
+; CHECK-NEXT:    [[LD2:%.*]] = load i8, ptr [[GEP2]], align 1
+; CHECK-NEXT:    [[CMP2:%.*]] = icmp eq i8 [[LD1]], [[LD2]]
+; CHECK-NEXT:    br i1 [[CMP2]], label [[LOOP_END]], label [[LOOP_LATCH]]
+; CHECK:       loop.latch:
+; CHECK-NEXT:    [[GEP_SRC:%.*]] = getelementptr inbounds i64, ptr [[SRC]], i64 [[INDEX]]
+; CHECK-NEXT:    [[LD_OUT:%.*]] = load i64, ptr [[GEP_SRC]], align 4
+; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 1
+; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp ne i64 [[INDEX_NEXT]], 67
+; CHECK-NEXT:    br i1 [[EXITCOND]], label [[LOOP_HEADER]], label [[LOOP_END]]
+; CHECK:       loop.end:
+; CHECK-NEXT:    [[RETVAL:%.*]] = phi i64 [ 0, [[LOOP_HEADER]] ], [ 0, [[LOOP_MID]] ], [ [[LD_OUT]], [[LOOP_LATCH]] ]
+; CHECK-NEXT:    ret i64 [[RETVAL]]
+;
+entry:
+  call void @init_mem(ptr %p1, i64 1024)
+  call void @init_mem(ptr %p2, i64 1024)
+  br label %loop.header
+
+loop.header:
+  %index = phi i64 [ %index.next, %loop.latch ], [ 0, %entry ]
+  %gep1 = getelementptr inbounds i8, ptr %p1, i64 %index
+  %ld1 = load i8, ptr %gep1, align 1
+  %cmp1 = icmp eq i8 %ld1, 42
+  br i1 %cmp1, label %loop.end, label %loop.mid
+
+loop.mid:
+  %gep2 = getelementptr inbounds i8, ptr %p2, i64 %index
+  %ld2 = load i8, ptr %gep2, align 1
+  %cmp2 = icmp eq i8 %ld1, %ld2
+  br i1 %cmp2, label %loop.end, label %loop.latch
+
+loop.latch:
+  %gep.src = getelementptr inbounds i64, ptr %src, i64 %index
+  %ld.out = load i64, ptr %gep.src, align 4
+  %index.next = add i64 %index, 1
+  %exitcond = icmp ne i64 %index.next, 67
+  br i1 %exitcond, label %loop.header, label %loop.end
+
+loop.end:
+  %retval = phi i64 [ 0, %loop.header ], [ 0, %loop.mid ], [ %ld.out, %loop.latch ]
+  ret i64 %retval
+}
+
+; The non-dereferenceable loads have an i24 element type, whose 3-byte store
+; size is not a power of 2. @llvm.speculative.load requires a power-of-2 return
+; type size, so the speculative-load helper cannot be used and the loop is not
+; vectorized.
+define i64 @spec_load_non_pow2_elt_size(ptr %A, ptr %B, i64 %n) {
+; CHECK-LABEL: define i64 @spec_load_non_pow2_elt_size(
+; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[N:%.*]]) {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[CMP_ENTRY:%.*]] = icmp sgt i64 [[N]], 0
+; CHECK-NEXT:    br i1 [[CMP_ENTRY]], label [[LOOP_PREHEADER:%.*]], label [[EXIT:%.*]]
+; CHECK:       loop.preheader:
+; CHECK-NEXT:    br label [[LOOP:%.*]]
+; CHECK:       loop:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[IV_NEXT:%.*]], [[LOOP_LATCH:%.*]] ], [ 0, [[LOOP_PREHEADER]] ]
+; CHECK-NEXT:    [[GEP_A:%.*]] = getelementptr inbounds i24, ptr [[A]], i64 [[IV]]
+; CHECK-NEXT:    [[LD_A:%.*]] = load i24, ptr [[GEP_A]], align 4
+; CHECK-NEXT:    [[GEP_B:%.*]] = getelementptr inbounds i24, ptr [[B]], i64 [[IV]]
+; CHECK-NEXT:    [[LD_B:%.*]] = load i24, ptr [[GEP_B]], align 4
+; CHECK-NEXT:    [[CMP:%.*]] = icmp ne i24 [[LD_A]], [[LD_B]]
+; CHECK-NEXT:    br i1 [[CMP]], label [[EARLY_EXIT:%.*]], label [[LOOP_LATCH]]
+; CHECK:       loop.latch:
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp ne i64 [[IV_NEXT]], [[N]]
+; CHECK-NEXT:    br i1 [[EC]], label [[LOOP]], label [[EXIT_LOOPEXIT:%.*]]
+; CHECK:       early.exit:
+; CHECK-NEXT:    [[IV_LCSSA:%.*]] = phi i64 [ [[IV]], [[LOOP]] ]
+; CHECK-NEXT:    ret i64 [[IV_LCSSA]]
+; CHECK:       exit.loopexit:
+; CHECK-NEXT:    br label [[EXIT]]
+; CHECK:       exit:
+; CHECK-NEXT:    ret i64 -1
+;
+entry:
+  %cmp.entry = icmp sgt i64 %n, 0
+  br i1 %cmp.entry, label %loop, label %exit
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop.latch ]
+  %gep.A = getelementptr inbounds i24, ptr %A, i64 %iv
+  %ld.A = load i24, ptr %gep.A, align 4
+  %gep.B = getelementptr inbounds i24, ptr %B, i64 %iv
+  %ld.B = load i24, ptr %gep.B, align 4
+  %cmp = icmp ne i24 %ld.A, %ld.B
+  br i1 %cmp, label %early.exit, label %loop.latch
+
+loop.latch:
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp ne i64 %iv.next, %n
+  br i1 %ec, label %loop, label %exit
+
+early.exit:
+  ret i64 %iv
+
+exit:
+  ret i64 -1
+}
+
+; A second induction whose step is a runtime value computed by an instruction
+; (%step = mul %s, %s) is backed by a VPExpandSCEVRecipe in the plan's entry
+; block. buildOraclePlan installs a fresh entry and disconnects the original,
+; orphaning that recipe, so the speculative-load helper cannot be built and the
+; loop is not vectorized.
+define i64 @spec_load_induction_with_computed_step(ptr %A, i64 %n, i64 %s) {
+; CHECK-LABEL: define i64 @spec_load_induction_with_computed_step(
+; CHECK-SAME: ptr [[A:%.*]], i64 [[N:%.*]], i64 [[S:%.*]]) {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[STEP:%.*]] = mul i64 [[S]], [[S]]
+; CHECK-NEXT:    br label [[LOOP:%.*]]
+; CHECK:       loop:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, [[ENTRY:%.*]] ], [ [[IV_NEXT:%.*]], [[LOOP_LATCH:%.*]] ]
+; CHECK-NEXT:    [[J:%.*]] = phi i64 [ 0, [[ENTRY]] ], [ [[J_NEXT:%.*]], [[LOOP_LATCH]] ]
+; CHECK-NEXT:    [[GEP_A:%.*]] = getelementptr inbounds i8, ptr [[A]], i64 [[IV]]
+; CHECK-NEXT:    [[LD_A:%.*]] = load i8, ptr [[GEP_A]], align 1
+; CHECK-NEXT:    [[CONV:%.*]] = trunc i64 [[J]] to i8
+; CHECK-NEXT:    [[CMP:%.*]] = icmp ne i8 [[LD_A]], [[CONV]]
+; CHECK-NEXT:    br i1 [[CMP]], label [[EARLY_EXIT:%.*]], label [[LOOP_LATCH]]
+; CHECK:       loop.latch:
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; CHECK-NEXT:    [[J_NEXT]] = add nsw i64 [[J]], [[STEP]]
+; CHECK-NEXT:    [[EC:%.*]] = icmp ne i64 [[IV_NEXT]], [[N]]
+; CHECK-NEXT:    br i1 [[EC]], label [[LOOP]], label [[EXIT:%.*]]
+; CHECK:       early.exit:
+; CHECK-NEXT:    [[IV_LCSSA:%.*]] = phi i64 [ [[IV]], [[LOOP]] ]
+; CHECK-NEXT:    ret i64 [[IV_LCSSA]]
+; CHECK:       exit:
+; CHECK-NEXT:    ret i64 -1
+;
+entry:
+  %step = mul i64 %s, %s
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop.latch ]
+  %j = phi i64 [ 0, %entry ], [ %j.next, %loop.latch ]
+  %gep.A = getelementptr inbounds i8, ptr %A, i64 %iv
+  %ld.A = load i8, ptr %gep.A, align 1
+  %conv = trunc i64 %j to i8
+  %cmp = icmp ne i8 %ld.A, %conv
+  br i1 %cmp, label %early.exit, label %loop.latch
+
+loop.latch:
+  %iv.next = add nuw nsw i64 %iv, 1
+  %j.next = add nsw i64 %j, %step
+  %ec = icmp ne i64 %iv.next, %n
+  br i1 %ec, label %loop, label %exit
+
+early.exit:
+  ret i64 %iv
+
+exit:
+  ret i64 -1
+}
+
 attributes #0 = { "vector-function-abi-variant"="_ZGVsNxv_foo(foo_vec)" }
