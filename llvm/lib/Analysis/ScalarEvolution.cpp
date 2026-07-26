@@ -3652,7 +3652,11 @@ const SCEV *ScalarEvolution::getUDivExpr(SCEVUse LHS, SCEVUse RHS) {
       }
 
       // (A+B)/C --> (A/C + B/C) if safe and A/C and B/C can be folded.
-      if (const SCEVAddExpr *A = dyn_cast<SCEVAddExpr>(LHS)) {
+      // The zero-extension only distributes over the add if the add does not
+      // wrap, so testing the flag first avoids building the wide operands for
+      // the ~80% of adds where the comparison below cannot succeed anyway.
+      if (const SCEVAddExpr *A = dyn_cast<SCEVAddExpr>(LHS);
+          A && A->hasNoUnsignedWrap()) {
         SmallVector<SCEVUse, 4> Operands;
         for (const SCEV *Op : A->operands())
           Operands.push_back(getZeroExtendExpr(Op, ExtTy));
