@@ -70,7 +70,7 @@ bool doesGeneratePerAllLanes(const VPRecipeBase *R);
 
 /// Returns the header block of the first, top-level loop, or null if none
 /// exist.
-VPBasicBlock *getFirstLoopHeader(VPlan &Plan, VPDominatorTree &VPDT);
+VPBasicBlock *getFirstLoopHeader(VPlan &Plan, const VPDominatorTree &VPDT);
 
 /// Get the VF scaling factor applied to the recipe's output, if the recipe has
 /// one.

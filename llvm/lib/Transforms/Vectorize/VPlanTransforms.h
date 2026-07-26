@@ -104,7 +104,16 @@ struct VPlanTransforms {
   /// \p TheLoop being directly translated to VPBasicBlocks with VPInstruction
   /// corresponding to the input IR.
   ///
-  /// The created loop is wrapped in an initial skeleton to facilitate
+  /// The loop is not yet wrapped in the vectorization skeleton; it is a plain
+  /// CFG loop hanging off the plan's entry block, so it can still be
+  /// simplified as a scalar loop. Its header and latch are canonicalized, so
+  /// the header's predecessors are (preheader, latch) and the latch leaves the
+  /// loop when its condition is true. addInitialSkeleton adds the skeleton.
+  LLVM_ABI_FOR_TEST static std::unique_ptr<VPlan>
+  buildVPlan0(Loop *TheLoop, LoopInfo &LI, Type *InductionTy,
+              PredicatedScalarEvolution &PSE, LoopVersioning *LVer = nullptr);
+
+  /// Wrap \p Plan's plain CFG loop in an initial skeleton to facilitate
   /// vectorization, consisting of a vector pre-header, an exit block for the
   /// main vector loop (middle.block) and a new block as preheader of the scalar
   /// loop (scalar.ph). See below for an illustration. It also creates a
@@ -140,9 +149,9 @@ struct VPlanTransforms {
   ///    \   |
   ///     \  v
   ///      >[ ]     <-- original loop exit block(s), wrapped in VPIRBasicBlocks.
-  LLVM_ABI_FOR_TEST static std::unique_ptr<VPlan>
-  buildVPlan0(Loop *TheLoop, LoopInfo &LI, Type *InductionTy,
-              PredicatedScalarEvolution &PSE, LoopVersioning *LVer = nullptr);
+  LLVM_ABI_FOR_TEST static void
+  addInitialSkeleton(VPlan &Plan, PredicatedScalarEvolution &PSE,
+                     Loop *TheLoop);
 
   /// Replace VPPhi recipes in \p Plan's header with corresponding
   /// VPHeaderPHIRecipe subclasses for inductions, reductions, and
@@ -355,7 +364,7 @@ struct VPlanTransforms {
                                        VPCostContext &Ctx, VFRange &Range);
 
   /// Remove dead recipes from \p Plan.
-  static void removeDeadRecipes(VPlan &Plan);
+  static void removeDeadRecipes(VPlan &Plan, bool RemovePhis=true);
 
   /// Update \p Plan to account for uncountable early exits by introducing
   /// appropriate branching logic in the latch that handles early exits and the

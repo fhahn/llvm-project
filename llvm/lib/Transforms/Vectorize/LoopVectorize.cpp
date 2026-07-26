@@ -6003,7 +6003,7 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
     return DenseMap<const SCEV *, Value *>();
   }
 
-  RUN_VPLAN_PASS(VPlanTransforms::removeDeadRecipes, BestVPlan);
+  RUN_VPLAN_PASS(VPlanTransforms::removeDeadRecipes, BestVPlan, true);
 
   RUN_VPLAN_PASS(VPlanTransforms::convertToConcreteRecipes, BestVPlan);
   // Convert the exit condition to AVLNext == 0 for EVL tail folded loops.
@@ -6562,12 +6562,15 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
                                              PSE, LVer ? &*LVer : nullptr);
 
   VPDominatorTree VPDT(*VPlan0);
+
   if (const LoopAccessInfo *LAI = Legal->getLAI())
     RUN_VPLAN_PASS(VPlanTransforms::replaceSymbolicStrides, *VPlan0, PSE,
                    LAI->getSymbolicStrides(), VPDT);
   RUN_VPLAN_PASS(VPlanTransforms::simplifyRecipes, *VPlan0);
-  RUN_VPLAN_PASS(VPlanTransforms::removeDeadRecipes, *VPlan0);
+  RUN_VPLAN_PASS(VPlanTransforms::removeDeadRecipes, *VPlan0, /*RemovePhis=*/false);
 
+  RUN_VPLAN_PASS(VPlanTransforms::addInitialSkeleton, *VPlan0, PSE, OrigLoop);
+  VPDT.recalculate(*VPlan0);
   // Create recipes for header phis. For outer loops, reductions, recurrences
   // and in-loop reductions are empty since legality doesn't detect them.
   if (!RUN_VPLAN_PASS(VPlanTransforms::createHeaderPhiRecipes, *VPlan0, PSE,

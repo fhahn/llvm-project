@@ -80,6 +80,7 @@ protected:
     PredicatedScalarEvolution PSE(*SE, *L);
     auto Plan =
         VPlanTransforms::buildVPlan0(L, *LI, IntegerType::get(*Ctx, 64), PSE);
+    VPlanTransforms::addInitialSkeleton(*Plan, PSE, L);
 
     if (Style != UncountableExitStyle::NoUncountableExit) {
       Inductions.clear();

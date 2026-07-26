@@ -680,13 +680,15 @@ static void removeRedundantInductionCasts(VPlan &Plan) {
   }
 }
 
-void VPlanTransforms::removeDeadRecipes(VPlan &Plan) {
+void VPlanTransforms::removeDeadRecipes(VPlan &Plan, bool RemovePhis) {
   PostOrderTraversal<VPBlockDeepTraversalWrapper<VPBlockBase *>> POT(
       Plan.getEntry());
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(POT)) {
     // The recipes in the block are processed in reverse order, to catch chains
     // of dead recipes.
     for (VPRecipeBase &R : make_early_inc_range(reverse(*VPBB))) {
+      if (isa<VPPhi>(R) && !RemovePhis)
+        continue;
       if (vputils::isDeadRecipe(R)) {
         R.eraseFromParent();
         continue;
@@ -2634,7 +2636,7 @@ void VPlanTransforms::optimize(VPlan &Plan) {
 
   RUN_VPLAN_PASS(reassociateHeaderMask, Plan);
   RUN_VPLAN_PASS(simplifyRecipes, Plan);
-  RUN_VPLAN_PASS(removeDeadRecipes, Plan);
+  RUN_VPLAN_PASS(removeDeadRecipes, Plan, true);
   RUN_VPLAN_PASS(simplifyBlends, Plan);
   RUN_VPLAN_PASS(legalizeAndOptimizeInductions, Plan);
   RUN_VPLAN_PASS(narrowToSingleScalarRecipes, Plan);
@@ -2643,7 +2645,7 @@ void VPlanTransforms::optimize(VPlan &Plan) {
   RUN_VPLAN_PASS(simplifyRecipes, Plan);
   RUN_VPLAN_PASS(removeBranchOnConst, Plan, /*OnlyLatches=*/false);
   RUN_VPLAN_PASS(simplifyReverses, Plan);
-  RUN_VPLAN_PASS(removeDeadRecipes, Plan);
+  RUN_VPLAN_PASS(removeDeadRecipes, Plan, true);
 
   RUN_VPLAN_PASS(createAndOptimizeReplicateRegions, Plan);
   RUN_VPLAN_PASS(mergeBlocksIntoPredecessors, Plan);

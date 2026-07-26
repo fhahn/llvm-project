@@ -517,12 +517,10 @@ static void createExtractsForLiveOuts(VPlan &Plan, VPBasicBlock *MiddleVPBB) {
   }
 }
 
-static void addInitialSkeleton(VPlan &Plan, Type *InductionTy,
-                               PredicatedScalarEvolution &PSE, Loop *TheLoop) {
-  VPDominatorTree VPDT(Plan);
-
+void VPlanTransforms::addInitialSkeleton(VPlan &Plan,
+                                         PredicatedScalarEvolution &PSE,
+                                         Loop *TheLoop) {
   auto *HeaderVPBB = cast<VPBasicBlock>(Plan.getEntry()->getSingleSuccessor());
-  canonicalHeaderAndLatch(HeaderVPBB, VPDT);
   auto *LatchVPBB = cast<VPBasicBlock>(HeaderVPBB->getPredecessors()[1]);
 
   VPBasicBlock *VecPreheader = Plan.createVPBasicBlock("vector.ph");
@@ -552,8 +550,8 @@ static void addInitialSkeleton(VPlan &Plan, Type *InductionTy,
   assert(!isa<SCEVCouldNotCompute>(BackedgeTakenCountSCEV) &&
          "Invalid backedge-taken count");
   ScalarEvolution &SE = *PSE.getSE();
-  const SCEV *TripCount = SE.getTripCountFromExitCount(BackedgeTakenCountSCEV,
-                                                       InductionTy, TheLoop);
+  const SCEV *TripCount = SE.getTripCountFromExitCount(
+      BackedgeTakenCountSCEV, Plan.getIndexType(), TheLoop);
   Plan.setTripCount(vputils::getOrCreateVPValueForSCEVExpr(Plan, TripCount));
 
   VPBasicBlock *ScalarPH = Plan.createVPBasicBlock("scalar.ph");
@@ -621,7 +619,18 @@ VPlanTransforms::buildVPlan0(Loop *TheLoop, LoopInfo &LI, Type *InductionTy,
                              LoopVersioning *LVer) {
   PlainCFGBuilder Builder(TheLoop, &LI, LVer, InductionTy);
   std::unique_ptr<VPlan> VPlan0 = Builder.buildPlainCFG();
-  addInitialSkeleton(*VPlan0, InductionTy, PSE, TheLoop);
+
+  // Canonicalize the loop's header and latch up-front, so every consumer of the
+  // plain CFG - including addInitialSkeleton and anything working on a copy
+  // taken before the skeleton is added - can rely on the header's predecessors
+  // being (preheader, latch) and on the latch leaving the loop when its
+  // condition is true.
+  VPDominatorTree VPDT(*VPlan0);
+  auto *HeaderVPBB =
+      cast<VPBasicBlock>(VPlan0->getEntry()->getSingleSuccessor());
+  [[maybe_unused]] bool IsLoop = canonicalHeaderAndLatch(HeaderVPBB, VPDT);
+  assert(IsLoop && "VPlan0 must contain a loop");
+
   simplifyLiveInsWithSCEV(*VPlan0, PSE);
 
   RUN_VPLAN_PASS_NO_VERIFY(printAfterInitialConstruction, *VPlan0);

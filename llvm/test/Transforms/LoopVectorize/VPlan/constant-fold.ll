@@ -17,13 +17,10 @@ define void @f1() {
 ; CHECK-NEXT:  VPlan ' for UF>=1' {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<bb1>:
-; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
-; CHECK-EMPTY:
-; CHECK-NEXT:  vector.ph:
 ; CHECK-NEXT:  Successor(s): bb2
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  bb2:
-; CHECK-NEXT:    EMIT-SCALAR ir<%c.1.0> = phi [ ir<0>, vector.ph ], [ ir<%_tmp9>, bb2 ]
+; CHECK-NEXT:    EMIT-SCALAR ir<%c.1.0> = phi [ ir<0>, ir-bb<bb1> ], [ ir<%_tmp9>, bb2 ]
 ; CHECK-NEXT:    EMIT-SCALAR ir<%_tmp1> = zext ir<0> to i64
 ; CHECK-NEXT:    EMIT ir<%_tmp2> = getelementptr ir<@a>, ir<0>, ir<0>
 ; CHECK-NEXT:    EMIT-SCALAR ir<%_tmp6> = sext ir<%c.1.0> to i64
@@ -33,7 +30,7 @@ define void @f1() {
 ; CHECK-NEXT:    EMIT ir<%_tmp11> = icmp sge ir<%_tmp9>, ir<2>
 ; CHECK-NEXT:    EMIT vp<{{.+}}> = not ir<%_tmp11>
 ; CHECK-NEXT:    EMIT branch-on-cond ir<%_tmp11>
-; CHECK-NEXT:  Successor(s): middle.block, bb2
+; CHECK-NEXT:  Successor(s): ir-bb<bb3>, bb2
 ;
 bb1:
   br label %bb2
@@ -59,16 +56,12 @@ bb3:
 define void @redundant_or_1(ptr %dst, i1 %c.0, i1 %c.1) {
 ; CHECK-LABEL: VPlan for loop in 'redundant_or_1' after VPlanTransforms::simplifyRecipes
 ; CHECK-NEXT:  VPlan ' for UF>=1' {
-; CHECK-NEXT:  Live-in ir<3> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
-; CHECK-EMPTY:
-; CHECK-NEXT:  vector.ph:
 ; CHECK-NEXT:  Successor(s): loop.header
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  loop.header:
-; CHECK-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, loop.latch ]
+; CHECK-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, ir-bb<entry> ], [ ir<%iv.next>, loop.latch ]
 ; CHECK-NEXT:    EMIT branch-on-cond ir<%c.0>
 ; CHECK-NEXT:  Successor(s): loop.latch, then.1
 ; CHECK-EMPTY:
@@ -110,16 +103,12 @@ exit:
 define void @redundant_or_2(ptr %dst, i1 %c.0, i1 %c.1) {
 ; CHECK-LABEL: VPlan for loop in 'redundant_or_2' after VPlanTransforms::simplifyRecipes
 ; CHECK-NEXT:  VPlan ' for UF>=1' {
-; CHECK-NEXT:  Live-in ir<3> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
-; CHECK-EMPTY:
-; CHECK-NEXT:  vector.ph:
 ; CHECK-NEXT:  Successor(s): loop.header
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  loop.header:
-; CHECK-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, loop.latch ]
+; CHECK-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, ir-bb<entry> ], [ ir<%iv.next>, loop.latch ]
 ; CHECK-NEXT:    EMIT branch-on-cond ir<%c.0>
 ; CHECK-NEXT:  Successor(s): loop.latch, then.1
 ; CHECK-EMPTY:
@@ -161,16 +150,12 @@ exit:
 define void @redundant_and_1(ptr %dst, i1 %c.0, i1 %c.1) {
 ; CHECK-LABEL: VPlan for loop in 'redundant_and_1' after VPlanTransforms::simplifyRecipes
 ; CHECK-NEXT:  VPlan ' for UF>=1' {
-; CHECK-NEXT:  Live-in ir<3> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
-; CHECK-EMPTY:
-; CHECK-NEXT:  vector.ph:
 ; CHECK-NEXT:  Successor(s): loop.header
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  loop.header:
-; CHECK-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, loop.latch ]
+; CHECK-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, ir-bb<entry> ], [ ir<%iv.next>, loop.latch ]
 ; CHECK-NEXT:    EMIT branch-on-cond ir<%c.0>
 ; CHECK-NEXT:  Successor(s): loop.latch, then.1
 ; CHECK-EMPTY:
@@ -213,16 +198,12 @@ exit:
 define void @redundant_and_2(ptr %dst, i1 %c.0, i1 %c.1) {
 ; CHECK-LABEL: VPlan for loop in 'redundant_and_2' after VPlanTransforms::simplifyRecipes
 ; CHECK-NEXT:  VPlan ' for UF>=1' {
-; CHECK-NEXT:  Live-in ir<3> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
-; CHECK-EMPTY:
-; CHECK-NEXT:  vector.ph:
 ; CHECK-NEXT:  Successor(s): loop.header
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  loop.header:
-; CHECK-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, loop.latch ]
+; CHECK-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, ir-bb<entry> ], [ ir<%iv.next>, loop.latch ]
 ; CHECK-NEXT:    EMIT branch-on-cond ir<%c.0>
 ; CHECK-NEXT:  Successor(s): loop.latch, then.1
 ; CHECK-EMPTY:
@@ -263,16 +244,12 @@ exit:
 define void @fold_replicating_umax_equal_live_ins(ptr noalias %dst, ptr %cond, i32 %x) {
 ; CHECK-LABEL: VPlan for loop in 'fold_replicating_umax_equal_live_ins' after VPlanTransforms::simplifyRecipes
 ; CHECK-NEXT:  VPlan ' for UF>=1' {
-; CHECK-NEXT:  Live-in ir<1024> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
-; CHECK-EMPTY:
-; CHECK-NEXT:  vector.ph:
 ; CHECK-NEXT:  Successor(s): loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  loop:
-; CHECK-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, latch ]
+; CHECK-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, ir-bb<entry> ], [ ir<%iv.next>, latch ]
 ; CHECK-NEXT:    EMIT ir<%cond.gep> = getelementptr ir<%cond>, ir<%iv>
 ; CHECK-NEXT:    EMIT-SCALAR ir<%c> = load ir<%cond.gep>
 ; CHECK-NEXT:    EMIT ir<%tobool> = icmp ne ir<%c>, ir<0>
@@ -289,7 +266,7 @@ define void @fold_replicating_umax_equal_live_ins(ptr noalias %dst, ptr %cond, i
 ; CHECK-NEXT:    EMIT ir<%iv.next> = add ir<%iv>, ir<1>
 ; CHECK-NEXT:    EMIT ir<%ec> = icmp eq ir<%iv.next>, ir<1024>
 ; CHECK-NEXT:    EMIT branch-on-cond ir<%ec>
-; CHECK-NEXT:  Successor(s): middle.block, loop
+; CHECK-NEXT:  Successor(s): ir-bb<exit>, loop
 ;
 entry:
   br label %loop

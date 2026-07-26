@@ -521,7 +521,7 @@ bool vputils::doesGeneratePerAllLanes(const VPRecipeBase *R) {
   return false;
 }
 
-VPBasicBlock *vputils::getFirstLoopHeader(VPlan &Plan, VPDominatorTree &VPDT) {
+VPBasicBlock *vputils::getFirstLoopHeader(VPlan &Plan, const VPDominatorTree &VPDT) {
   auto DepthFirst = vp_depth_first_shallow(Plan.getEntry());
   auto I = find_if(DepthFirst, [&VPDT](VPBlockBase *VPB) {
     return VPBlockUtils::isHeader(VPB, VPDT);

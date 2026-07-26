@@ -8,13 +8,10 @@ define void @cast_flags_mixed(ptr noalias %A, ptr noalias %B) {
 ; CHECK:  VPlan ' for UF>=1' {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
-; CHECK-EMPTY:
-; CHECK-NEXT:  vector.ph:
 ; CHECK-NEXT:  Successor(s): loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  loop:
-; CHECK-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, loop ]
+; CHECK-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, ir-bb<entry> ], [ ir<%iv.next>, loop ]
 ; CHECK-NEXT:    EMIT-SCALAR ir<%zext.nneg> = zext nneg ir<3> to i64
 ; CHECK-NEXT:    EMIT ir<%gep.zext> = getelementptr ir<%A>, ir<%zext.nneg>
 ; CHECK-NEXT:    EMIT-SCALAR ir<%sext.plain> = sext ir<%iv> to i64
@@ -27,9 +24,11 @@ define void @cast_flags_mixed(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    EMIT ir<%ec> = icmp slt ir<%iv.next>, ir<4>
 ; CHECK-NEXT:    EMIT vp<[[VP1:%[0-9]+]]> = not ir<%ec>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP1]]>
-; CHECK-NEXT:  Successor(s): middle.block, loop
+; CHECK-NEXT:  Successor(s): ir-bb<exit>, loop
 ; CHECK-EMPTY:
-; CHECK-NEXT:  middle.block:
+; CHECK-NEXT:  ir-bb<exit>:
+; CHECK-NEXT:  No successors
+; CHECK-NEXT:  }
 ;
 entry:
   br label %loop
@@ -57,13 +56,10 @@ define void @cast_flags_single(ptr noalias %A, ptr noalias %B) {
 ; CHECK:  VPlan ' for UF>=1' {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
-; CHECK-EMPTY:
-; CHECK-NEXT:  vector.ph:
 ; CHECK-NEXT:  Successor(s): loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  loop:
-; CHECK-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, loop ]
+; CHECK-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, ir-bb<entry> ], [ ir<%iv.next>, loop ]
 ; CHECK-NEXT:    EMIT-SCALAR ir<%trunc.nuw.only> = trunc nuw ir<3> to i8
 ; CHECK-NEXT:    EMIT-SCALAR ir<%trunc.nsw.only> = trunc nsw ir<3> to i8
 ; CHECK-NEXT:    EMIT-SCALAR ir<%zext.plain> = zext ir<3> to i64
@@ -76,9 +72,11 @@ define void @cast_flags_single(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    EMIT ir<%ec> = icmp slt ir<%iv.next>, ir<4>
 ; CHECK-NEXT:    EMIT vp<[[VP1:%[0-9]+]]> = not ir<%ec>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP1]]>
-; CHECK-NEXT:  Successor(s): middle.block, loop
+; CHECK-NEXT:  Successor(s): ir-bb<exit>, loop
 ; CHECK-EMPTY:
-; CHECK-NEXT:  middle.block:
+; CHECK-NEXT:  ir-bb<exit>:
+; CHECK-NEXT:  No successors
+; CHECK-NEXT:  }
 ;
 entry:
   br label %loop

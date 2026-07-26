@@ -6,16 +6,12 @@
 define void @predicated_store_profile_metadata(ptr %a, i32 %n) {
 ; CHECK-LABEL: VPlan for loop in 'predicated_store_profile_metadata'
 ; CHECK:  VPlan ' for UF>=1' {
-; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
-; CHECK-EMPTY:
-; CHECK-NEXT:  vector.ph:
 ; CHECK-NEXT:  Successor(s): loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  loop:
-; CHECK-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, latch ]
+; CHECK-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, ir-bb<entry> ], [ ir<%iv.next>, latch ]
 ; CHECK-NEXT:    EMIT ir<%gep> = getelementptr inbounds ir<%a>, ir<%iv>
 ; CHECK-NEXT:    EMIT-SCALAR ir<%val> = load ir<%gep>
 ; CHECK-NEXT:    EMIT ir<%cmp> = icmp sgt ir<%val>, ir<0>
@@ -30,9 +26,11 @@ define void @predicated_store_profile_metadata(ptr %a, i32 %n) {
 ; CHECK-NEXT:    EMIT ir<%iv.next> = add ir<%iv>, ir<1>
 ; CHECK-NEXT:    EMIT ir<%ec> = icmp eq ir<%iv.next>, ir<%n>
 ; CHECK-NEXT:    EMIT branch-on-cond ir<%ec>
-; CHECK-NEXT:  Successor(s): middle.block, loop
+; CHECK-NEXT:  Successor(s): ir-bb<exit>, loop
 ; CHECK-EMPTY:
-; CHECK-NEXT:  middle.block:
+; CHECK-NEXT:  ir-bb<exit>:
+; CHECK-NEXT:  No successors
+; CHECK-NEXT:  }
 ;
 entry:
   br label %loop
@@ -67,16 +65,12 @@ exit:
 define void @two_predicated_blocks(ptr noalias %a, i32 %n) {
 ; CHECK-LABEL: VPlan for loop in 'two_predicated_blocks'
 ; CHECK:  VPlan ' for UF>=1' {
-; CHECK-NEXT:  Live-in ir<%n> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
-; CHECK-EMPTY:
-; CHECK-NEXT:  vector.ph:
 ; CHECK-NEXT:  Successor(s): loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  loop:
-; CHECK-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, latch ]
+; CHECK-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, ir-bb<entry> ], [ ir<%iv.next>, latch ]
 ; CHECK-NEXT:    EMIT ir<%gep> = getelementptr inbounds ir<%a>, ir<%iv>
 ; CHECK-NEXT:    EMIT-SCALAR ir<%val> = load ir<%gep>
 ; CHECK-NEXT:    EMIT ir<%c1> = icmp sgt ir<%val>, ir<0>
@@ -100,9 +94,11 @@ define void @two_predicated_blocks(ptr noalias %a, i32 %n) {
 ; CHECK-NEXT:    EMIT ir<%iv.next> = add ir<%iv>, ir<1>
 ; CHECK-NEXT:    EMIT ir<%ec> = icmp eq ir<%iv.next>, ir<%n>
 ; CHECK-NEXT:    EMIT branch-on-cond ir<%ec>
-; CHECK-NEXT:  Successor(s): middle.block, loop
+; CHECK-NEXT:  Successor(s): ir-bb<exit>, loop
 ; CHECK-EMPTY:
-; CHECK-NEXT:  middle.block:
+; CHECK-NEXT:  ir-bb<exit>:
+; CHECK-NEXT:  No successors
+; CHECK-NEXT:  }
 ;
 entry:
   br label %loop
