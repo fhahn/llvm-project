@@ -319,6 +319,16 @@ template <typename Op0_t, typename Op1_t> struct SCEVURem_match {
     if (!SCEVPatternMatch::match(Expr, m_scev_Add(m_scev_Mul(Mul), m_SCEV(A))))
       return false;
 
+    // getURemExpr builds the remainder as A -nuw ((A udiv B) *nuw B). The
+    // multiply therefore carries the (A udiv B) operand, unless getUDivExpr
+    // managed to fold the division away - in which case the product is A
+    // itself and the remainder folds to a constant rather than to this add.
+    // So a multiply with no udiv operand cannot be a remainder, and bailing
+    // out here avoids building the throwaway nodes the probes below need.
+    if (llvm::none_of(Mul->operands(),
+                      [](const SCEV *Op) { return isa<SCEVUDivExpr>(Op); }))
+      return false;
+
     const auto MatchURemWithDivisor = [&](const SCEV *B) {
       // (SomeExpr + (-(SomeExpr / B) * B)).
       if (Expr == SE.getURemExpr(A, B))
