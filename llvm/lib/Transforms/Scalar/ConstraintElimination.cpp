@@ -1468,14 +1468,21 @@ void State::addInfoFor(BasicBlock &BB) {
       break;
     }
 
-    // Add facts from unsigned division, remainder and logical shift right.
+    // Add facts from unsigned division, remainder and logical shift right, and
+    // from signed remainder.
     //   urem x, n: result < n  and  result <= x
     //   udiv x, n: result <= x
     //   lshr x, n: result <= x
+    //   srem x, n: result >= 0 and result <= x, if x >= 0
+    //              result < n,                  if n > 0
+    // The srem facts are only valid under a pre-condition on the sign of an
+    // operand, which is checked against the constraint system when the facts
+    // are added.
     if (auto *BO = dyn_cast<BinaryOperator>(&I)) {
       if ((BO->getOpcode() == Instruction::URem ||
            BO->getOpcode() == Instruction::UDiv ||
-           BO->getOpcode() == Instruction::LShr) &&
+           BO->getOpcode() == Instruction::LShr ||
+           BO->getOpcode() == Instruction::SRem) &&
           isGuaranteedNotToBePoison(BO))
         WorkList.push_back(FactOrCheck::getInstFact(DT.getNode(&BB), BO));
     }
@@ -2429,6 +2436,30 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
         if (BO->getOpcode() == Instruction::LShr) {
           // lshr x, n: result <= x (right shift cannot increase the value)
           AddFact(CmpInst::ICMP_ULE, BO, BO->getOperand(0));
+          continue;
+        }
+        if (BO->getOpcode() == Instruction::SRem) {
+          // The result of srem takes the sign of the dividend and its
+          // magnitude is smaller than the magnitude of the divisor. Both
+          // signed bounds therefore need a pre-condition on the sign of an
+          // operand, which we check against the current constraint system.
+          Value *X = BO->getOperand(0);
+          Value *N = BO->getOperand(1);
+          Constant *Zero = Constant::getNullValue(BO->getType());
+          if (Info.doesHold(CmpInst::ICMP_SGE, X, Zero) ||
+              isKnownNonNegative(X, F.getDataLayout())) {
+            // srem x, n: result >= 0, if x >= 0 (result has the sign of x)
+            AddFact(CmpInst::ICMP_SGE, BO, Zero);
+            // srem x, n: result <= x, if x >= 0 (|result| <= |x| and both are
+            // non-negative)
+            AddFact(CmpInst::ICMP_SLE, BO, X);
+          }
+          if (Info.doesHold(CmpInst::ICMP_SGT, N, Zero) ||
+              isKnownPositive(N, F.getDataLayout())) {
+            // srem x, n: result < n, if n > 0 (|result| < n, so result <= n - 1
+            // if result is non-negative and result < 0 <= n - 1 otherwise)
+            AddFact(CmpInst::ICMP_SLT, BO, N);
+          }
           continue;
         }
       }
