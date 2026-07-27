@@ -16428,11 +16428,9 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
           if (cast<SCEVConstant>(Expr->getOperand(0))->getAPInt().isAllOnes()) {
             S = Map.lookup(Expr->getOperand(1));
           } else {
-            const SCEV *NewC = SE.getAddExpr(Expr->getOperand(0),
-                                             SE.getOne(Expr->getType()));
-            SmallVector<SCEVUse, 2> Ops = {NewC, Expr->getOperand(1)};
-            if (const SCEV *Key = SE.findExistingSCEVInCache(scAddExpr, Ops))
-              S = Map.lookup(Key);
+            const SCEV *NewC =
+                SE.getAddExpr(Expr->getOperand(0), SE.getOne(Expr->getType()));
+            S = Map.lookup(SE.getAddExpr(NewC, Expr->getOperand(1)));
           }
           if (S)
             return SE.getAddExpr(S, SE.getMinusOne(Expr->getType()));
