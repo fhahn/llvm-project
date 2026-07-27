@@ -324,6 +324,12 @@ private:
   void addFactImpl(CmpInst::Predicate Pred, Value *A, Value *B, unsigned NumIn,
                    unsigned NumOut, SmallVectorImpl<StackEntry> &DFSInStack,
                    bool ForceSignedSystem);
+
+  /// Try to use the disequality \p A != \p B to tighten a bound already implied
+  /// by the \p IsSigned system.
+  void addFactFromDisequality(Value *A, Value *B, bool IsSigned, unsigned NumIn,
+                              unsigned NumOut,
+                              SmallVectorImpl<StackEntry> &DFSInStack);
 };
 
 /// Represents a (Coefficient * Variable) entry after IR decomposition.
@@ -1788,6 +1794,48 @@ void ConstraintInfo::addFact(CmpInst::Predicate Pred, Value *A, Value *B,
   // If the Pred is eq/ne, also add the fact to signed system.
   if (CmpInst::isEquality(Pred))
     addFactImpl(Pred, A, B, NumIn, NumOut, DFSInStack, true);
+  // A disequality is a disjunction and cannot be added as a row, but it can be
+  // used to tighten a bound the system already implies.
+  if (Pred == CmpInst::ICMP_NE) {
+    addFactFromDisequality(A, B, /*IsSigned=*/false, NumIn, NumOut, DFSInStack);
+    addFactFromDisequality(A, B, /*IsSigned=*/true, NumIn, NumOut, DFSInStack);
+  }
+}
+
+void ConstraintInfo::addFactFromDisequality(
+    Value *A, Value *B, bool IsSigned, unsigned NumIn, unsigned NumOut,
+    SmallVectorImpl<StackEntry> &DFSInStack) {
+  // Only handle disequalities against a constant, to keep the number of extra
+  // solver queries per fact small.
+  if (!isa<ConstantInt>(B) || !A->getType()->isIntegerTy())
+    return;
+
+  // In the unsigned system `A u>= 0` holds for every A, so `A != 0` implies
+  // `A u> 0` unconditionally; getConstraint already turns the fact into that
+  // row directly. `A u<= 0` on the other hand means `A == 0`, which contradicts
+  // the fact. Neither direction needs a query here.
+  if (!IsSigned && match(B, m_Zero()))
+    return;
+
+  // If the system implies `A >= B` then together with `A != B` we get the
+  // strict `A > B`; symmetrically `A <= B` becomes `A < B`. Only one of the two
+  // can be productive for a consistent system, so stop after the first hit. No
+  // constant is computed here, the strict predicate is handed to getConstraint
+  // which performs the offset arithmetic with the usual overflow checks.
+  CmpInst::Predicate GE = IsSigned ? CmpInst::ICMP_SGE : CmpInst::ICMP_UGE;
+  CmpInst::Predicate LE = IsSigned ? CmpInst::ICMP_SLE : CmpInst::ICMP_ULE;
+  for (CmpInst::Predicate NonStrict : {GE, LE}) {
+    if (!doesHold(NonStrict, A, B))
+      continue;
+    CmpInst::Predicate Strict = CmpInst::getStrictPredicate(NonStrict);
+    LLVM_DEBUG(dbgs() << "Tightening '";
+               dumpUnpackedICmp(dbgs(), NonStrict, A, B); dbgs() << "' to '";
+               dumpUnpackedICmp(dbgs(), Strict, A, B);
+               dbgs() << "' using disequality\n");
+    addFactImpl(Strict, A, B, NumIn, NumOut, DFSInStack,
+                /*ForceSignedSystem=*/false);
+    break;
+  }
 }
 
 void ConstraintInfo::addFactImpl(CmpInst::Predicate Pred, Value *A, Value *B,
