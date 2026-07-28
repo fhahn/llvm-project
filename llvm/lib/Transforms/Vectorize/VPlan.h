@@ -1211,6 +1211,14 @@ public:
   /// nodes that are common to both.
   void intersect(const VPIRMetadata &MD);
 
+  /// Remove metadata of kind \p Kind, if present.
+  void eraseMetadata(unsigned Kind) {
+    llvm::erase_if(Metadata,
+                   [Kind](const std::pair<unsigned, MDNode *> &P) {
+                     return P.first == Kind;
+                   });
+  }
+
   /// Get metadata of kind \p Kind. Returns nullptr if not found.
   MDNode *getMetadata(unsigned Kind) const {
     auto It =
@@ -3489,13 +3497,16 @@ protected:
 };
 
 /// A recipe for generating conditional branches on the bits of a mask.
-class LLVM_ABI_FOR_TEST VPBranchOnMaskRecipe : public VPRecipeBase {
+class LLVM_ABI_FOR_TEST VPBranchOnMaskRecipe : public VPRecipeBase,
+                                               public VPIRMetadata {
 public:
-  VPBranchOnMaskRecipe(VPValue *BlockInMask, DebugLoc DL)
-      : VPRecipeBase(VPRecipeBase::VPBranchOnMaskSC, {BlockInMask}, DL) {}
+  VPBranchOnMaskRecipe(VPValue *BlockInMask, DebugLoc DL,
+                       const VPIRMetadata &Metadata = {})
+      : VPRecipeBase(VPRecipeBase::VPBranchOnMaskSC, {BlockInMask}, DL),
+        VPIRMetadata(Metadata) {}
 
   VPBranchOnMaskRecipe *clone() override {
-    return new VPBranchOnMaskRecipe(getOperand(0), getDebugLoc());
+    return new VPBranchOnMaskRecipe(getOperand(0), getDebugLoc(), *this);
   }
 
   VP_CLASSOF_IMPL(VPRecipeBase::VPBranchOnMaskSC)
@@ -4358,7 +4369,8 @@ struct CastInfo<VPIRMetadata, VPRecipeBase *>
     : vpdetail::CastInfoMixinImpl<
           VPIRMetadata, VPInstruction, VPWidenRecipe, VPWidenCastRecipe,
           VPWidenIntrinsicRecipe, VPWidenCallRecipe, VPReplicateRecipe,
-          VPInterleaveBase, VPWidenMemoryRecipe, VPHistogramRecipe> {};
+          VPInterleaveBase, VPWidenMemoryRecipe, VPHistogramRecipe,
+          VPBranchOnMaskRecipe> {};
 
 template <>
 struct CastInfo<VPIRMetadata, const VPRecipeBase *>

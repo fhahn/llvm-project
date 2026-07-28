@@ -535,6 +535,11 @@ static VPRegionBlock *createReplicateRegion(VPReplicateRecipe *PredRecipe,
   auto *MaskDef = BlockInMask->getDefiningRecipe();
   auto *BOMRecipe = new VPBranchOnMaskRecipe(
       BlockInMask, MaskDef ? MaskDef->getDebugLoc() : DebugLoc::getUnknown());
+  // The predicated block's branch weights are recorded on \p PredRecipe. Move
+  // them onto the guarding branch-on-mask, where they describe how often the
+  // block is entered and are emitted as MD_prof when the region is dissolved.
+  if (MDNode *BW = PredRecipe->getMetadata(LLVMContext::MD_prof))
+    BOMRecipe->setMetadata(LLVMContext::MD_prof, BW);
   auto *Entry =
       Plan.createVPBasicBlock(Twine(RegionName) + ".entry", BOMRecipe);
 
@@ -544,6 +549,10 @@ static VPRegionBlock *createReplicateRegion(VPReplicateRecipe *PredRecipe,
       PredRecipe->getUnderlyingInstr(), PredRecipe->operandsWithoutMask(),
       PredRecipe->isSingleScalar(), nullptr /*Mask*/, *PredRecipe, *PredRecipe,
       PredRecipe->getDebugLoc());
+  // The branch weights describe the guarding branch, not the predicated
+  // instruction; drop them from the unmasked recipe so they are not attached to
+  // the generated instruction.
+  RecipeWithoutMask->eraseMetadata(LLVMContext::MD_prof);
   auto *Pred =
       Plan.createVPBasicBlock(Twine(RegionName) + ".if", RecipeWithoutMask);
   auto *Exiting = Plan.createVPBasicBlock(Twine(RegionName) + ".continue");
@@ -2633,6 +2642,24 @@ bool VPlanTransforms::removeBranchOnConst(VPlan &Plan, bool OnlyLatches) {
   return SimplifiedPhi;
 }
 
+/// Drop the branch weights recorded during predication from all recipes that
+/// do not turn into a branch. They describe how often the predicated block
+/// executes, which only remains meaningful on the branch-on-mask guarding a
+/// replicate region, created from predicated VPReplicateRecipes below.
+/// branch_weights are not valid on any other instruction.
+static void dropNonBranchProbabilities(VPlan &Plan) {
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_deep(Plan.getEntry()))) {
+    for (VPRecipeBase &R : *VPBB) {
+      auto *RepR = dyn_cast<VPReplicateRecipe>(&R);
+      if (RepR && RepR->isPredicated())
+        continue;
+      if (auto *MD = dyn_cast<VPIRMetadata>(&R))
+        MD->eraseMetadata(LLVMContext::MD_prof);
+    }
+  }
+}
+
 void VPlanTransforms::optimize(VPlan &Plan) {
   RUN_VPLAN_PASS(removeRedundantInductionCasts, Plan);
 
@@ -2649,6 +2676,7 @@ void VPlanTransforms::optimize(VPlan &Plan) {
   RUN_VPLAN_PASS(simplifyReverses, Plan);
   RUN_VPLAN_PASS(removeDeadRecipes, Plan);
 
+  RUN_VPLAN_PASS(dropNonBranchProbabilities, Plan);
   RUN_VPLAN_PASS(createAndOptimizeReplicateRegions, Plan);
   RUN_VPLAN_PASS(mergeBlocksIntoPredecessors, Plan);
   RUN_VPLAN_PASS(licm, Plan);
@@ -3722,12 +3750,18 @@ void VPlanTransforms::convertToAbstractRecipes(VPlan &Plan, VPCostContext &Ctx,
   }
 }
 
-// Collect common metadata from a group of replicate recipes by intersecting
-// metadata from all recipes in the group.
+// Collect common metadata from a group of predicated replicate recipes by
+// intersecting metadata from all recipes in the group. The result is used for
+// the unpredicated recipe replacing the group.
 static VPIRMetadata getCommonMetadata(ArrayRef<VPReplicateRecipe *> Recipes) {
   VPIRMetadata CommonMetadata = *Recipes.front();
   for (VPReplicateRecipe *Recipe : drop_begin(Recipes))
     CommonMetadata.intersect(*Recipe);
+  // Branch weights on a predicated recipe describe how often its guarding
+  // branch is taken (see VPPredicator::getBlockProbabilityWeights), not the
+  // memory operation itself. Drop them, as the replacement executes
+  // unconditionally and MD_prof must not be attached to a plain load or store.
+  CommonMetadata.eraseMetadata(LLVMContext::MD_prof);
   return CommonMetadata;
 }
 

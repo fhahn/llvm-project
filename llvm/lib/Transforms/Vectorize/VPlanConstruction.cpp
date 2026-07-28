@@ -183,6 +183,14 @@ VPValue *PlainCFGBuilder::getOrCreateVPOperand(Value *IRVal) {
   return NewVPVal;
 }
 
+// Copy the branch weights of \p Term, if any, to \p BranchR. They describe the
+// edges leaving Term in the order of its successors, which matches the order of
+// the successors of the VPBasicBlock created for Term's parent.
+static void copyBranchWeights(const Instruction &Term, VPInstruction &BranchR) {
+  if (MDNode *BW = Term.getMetadata(LLVMContext::MD_prof))
+    BranchR.setMetadata(LLVMContext::MD_prof, BW);
+}
+
 // Create new VPInstructions in a VPBasicBlock, given its BasicBlock
 // counterpart. This function must be invoked in RPO so that the operands of a
 // VPInstruction in \p BB have been visited before (except for Phi nodes).
@@ -206,8 +214,10 @@ void PlainCFGBuilder::createVPInstructionsForVPBB(VPBasicBlock *VPBB,
       // Conditional branch instruction are represented using BranchOnCond
       // recipes.
       VPValue *Cond = getOrCreateVPOperand(Br->getCondition());
-      VPIRBuilder.createNaryOp(VPInstruction::BranchOnCond, {Cond}, Inst, {},
-                               VPIRMetadata(*Inst), Inst->getDebugLoc());
+      auto *BranchR = VPIRBuilder.createNaryOp(
+          VPInstruction::BranchOnCond, {Cond}, Inst, {}, VPIRMetadata(*Inst),
+          Inst->getDebugLoc());
+      copyBranchWeights(*Inst, *BranchR);
       continue;
     }
 
@@ -218,8 +228,10 @@ void PlainCFGBuilder::createVPInstructionsForVPBB(VPBasicBlock *VPBB,
       SmallVector<VPValue *> Ops = {getOrCreateVPOperand(SI->getCondition())};
       for (auto Case : SI->cases())
         Ops.push_back(getOrCreateVPOperand(Case.getCaseValue()));
-      VPIRBuilder.createNaryOp(Instruction::Switch, Ops, Inst, {},
-                               VPIRMetadata(*Inst), Inst->getDebugLoc());
+      auto *SwitchR =
+          VPIRBuilder.createNaryOp(Instruction::Switch, Ops, Inst, {},
+                                   VPIRMetadata(*Inst), Inst->getDebugLoc());
+      copyBranchWeights(*Inst, *SwitchR);
       continue;
     }
 

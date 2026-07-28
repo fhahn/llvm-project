@@ -19,6 +19,10 @@
 #include "VPlanTransforms.h"
 #include "VPlanUtils.h"
 #include "llvm/ADT/PostOrderIterator.h"
+#include "llvm/IR/MDBuilder.h"
+#include "llvm/IR/ProfDataUtils.h"
+#include "llvm/Support/BranchProbability.h"
+#include <numeric>
 
 using namespace llvm;
 using namespace VPlanPatternMatch;
@@ -46,6 +50,16 @@ class VPPredicator {
   EdgeMaskCacheTy EdgeMaskCache;
 
   BlockMaskCacheTy BlockMaskCache;
+
+  /// Probability of executing each block, relative to the loop header. Only
+  /// populated for blocks whose predecessors all have a known probability, see
+  /// computeBlockProbability.
+  DenseMap<const VPBasicBlock *, BranchProbability> BlockProbabilities;
+
+  /// Returns the probability of the edge from \p Src to \p Dst, taken from the
+  /// branch weights recorded on Src's terminator, or nullopt if unknown.
+  std::optional<BranchProbability> getEdgeProbability(const VPBasicBlock *Src,
+                                                      const VPBasicBlock *Dst);
 
   /// Create an edge mask for every destination of cases and/or default.
   void createSwitchEdgeMasks(const VPInstruction *SI);
@@ -107,10 +121,99 @@ public:
   /// Compute the predicate of \p VPBB.
   void createBlockInMask(VPBasicBlock *VPBB);
 
+  /// Compute the probability of executing \p VPBB relative to the loop header,
+  /// by accumulating the edge probabilities of its incoming edges. Must be
+  /// called in RPO, so all predecessors have been processed already.
+  void computeBlockProbability(VPBasicBlock *VPBB, VPBasicBlock *Header);
+
+  /// Returns branch weights describing how often \p VPBB is executed relative
+  /// to the loop header, or nullptr if the probability is unknown or carries no
+  /// information (the block is never or always executed).
+  MDNode *getBlockProbabilityWeights(const VPBasicBlock *VPBB) const;
+
   /// Convert phi recipes in \p VPBB to VPBlendRecipes.
   void convertPhisToBlends(VPBasicBlock *VPBB);
 };
 } // namespace
+
+std::optional<BranchProbability>
+VPPredicator::getEdgeProbability(const VPBasicBlock *Src,
+                                 const VPBasicBlock *Dst) {
+  // With a single successor the edge is always taken.
+  ArrayRef<VPBlockBase *> Successors = Src->getSuccessors();
+  if (Successors.size() == 1)
+    return BranchProbability::getOne();
+
+  auto *Term = dyn_cast_or_null<VPInstruction>(Src->getTerminator());
+  if (!Term)
+    return std::nullopt;
+  SmallVector<uint32_t> Weights;
+  if (!extractBranchWeights(Term->getMetadata(LLVMContext::MD_prof), Weights) ||
+      Weights.size() != Successors.size())
+    return std::nullopt;
+
+  // Sum the weights of all edges from Src to Dst; the same block may be the
+  // destination of multiple successors, e.g. for switches.
+  uint64_t Total = 0, ToDst = 0;
+  for (const auto &[Succ, Weight] : zip(Successors, Weights)) {
+    Total += Weight;
+    if (Succ == Dst)
+      ToDst += Weight;
+  }
+  if (Total == 0)
+    return std::nullopt;
+  return BranchProbability::getBranchProbability(ToDst, Total);
+}
+
+void VPPredicator::computeBlockProbability(VPBasicBlock *VPBB,
+                                           VPBasicBlock *Header) {
+  if (VPBB == Header) {
+    BlockProbabilities[VPBB] = BranchProbability::getOne();
+    return;
+  }
+
+  // The block is executed if any of its incoming edges is taken. Bail out if
+  // the probability of any of them is unknown.
+  BranchProbability Prob = BranchProbability::getZero();
+  for (VPBlockBase *Pred : VPBB->getPredecessors()) {
+    auto *PredVPBB = cast<VPBasicBlock>(Pred);
+    auto PredProb = BlockProbabilities.find(PredVPBB);
+    if (PredProb == BlockProbabilities.end())
+      return;
+    std::optional<BranchProbability> EdgeProb =
+        getEdgeProbability(PredVPBB, VPBB);
+    if (!EdgeProb)
+      return;
+    // Multiplying probabilities rounds down to zero once the result drops
+    // below BranchProbability's resolution, e.g. for deeply nested predicates.
+    // Keep such blocks at the smallest non-zero probability, as they are rarely
+    // but not never executed.
+    BranchProbability Contribution = PredProb->second * *EdgeProb;
+    if (Contribution.isZero() && !PredProb->second.isZero() &&
+        !EdgeProb->isZero())
+      Contribution = BranchProbability::getRaw(1);
+    Prob += Contribution;
+  }
+  BlockProbabilities[VPBB] = Prob;
+}
+
+MDNode *
+VPPredicator::getBlockProbabilityWeights(const VPBasicBlock *VPBB) const {
+  auto It = BlockProbabilities.find(VPBB);
+  if (It == BlockProbabilities.end())
+    return nullptr;
+  BranchProbability Prob = It->second;
+  // A never or always executed block carries no useful information.
+  if (Prob.isZero() || Prob.isOne())
+    return nullptr;
+  // The probabilities are scaled to BranchProbability's fixed denominator;
+  // reduce them to their smallest integer ratio to keep the weights readable.
+  uint32_t Taken = Prob.getNumerator();
+  uint32_t NotTaken = Prob.getCompl().getNumerator();
+  uint32_t G = std::gcd(Taken, NotTaken);
+  MDBuilder MDB(VPBB->getPlan()->getContext());
+  return MDB.createBranchWeights(Taken / G, NotTaken / G);
+}
 
 VPValue *VPPredicator::createEdgeMask(const VPBasicBlock *Src,
                                       const VPBasicBlock *Dst) {
@@ -414,14 +517,27 @@ void VPlanTransforms::introduceMasksAndLinearize(VPlan &Plan) {
     if (VPBB != Header)
       Predicator.createBlockInMask(VPBB);
 
+    // Compute how often VPBB executes relative to the header, before the
+    // branches holding the edge probabilities are removed below.
+    Predicator.computeBlockProbability(VPBB, Header);
+
     VPValue *BlockMask = Predicator.getBlockInMask(VPBB);
     if (!BlockMask)
       continue;
 
-    // Mask all VPInstructions in the block.
+    // Mask all VPInstructions in the block, recording how often the block is
+    // executed on them. Recipes created from them inherit the weights, which
+    // end up on the branch guarding the block once replicate regions are
+    // created and dissolved. They must be dropped from any recipe that does
+    // not become a branch, as branch_weights are only valid on branches.
+    MDNode *Weights = Predicator.getBlockProbabilityWeights(VPBB);
     for (VPRecipeBase &R : *VPBB) {
-      if (auto *VPI = dyn_cast<VPInstruction>(&R))
-        VPI->addMask(BlockMask);
+      auto *VPI = dyn_cast<VPInstruction>(&R);
+      if (!VPI)
+        continue;
+      VPI->addMask(BlockMask);
+      if (Weights)
+        VPI->setMetadata(LLVMContext::MD_prof, Weights);
     }
   }
 
