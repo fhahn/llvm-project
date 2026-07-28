@@ -625,3 +625,155 @@ loop:
 exit:
   ret void
 }
+
+; Negative test for the "any_of" max-on-RHS rule, which is deliberately
+; restricted to the unsigned form. Here the predicate is signed but the limit
+; is a *umax*: concluding %bound s< umax(%x0, %x1) from the single guard
+; (%bound sle %x0) would be unsound (e.g. %x0 = 0, %x1 = -1 gives umax = -1,
+; and 0 s< -1 is false), so the umax must survive in the backedge-taken count.
+; Dropping the !IsSigned condition on that rule folds it away and miscompiles.
+define void @umax_limit_signed_pred_mismatch(i64 %x0, i64 %x1, i64 %bound) {
+; CHECK-LABEL: 'umax_limit_signed_pred_mismatch'
+; CHECK-NEXT:  Determining loop execution counts for: @umax_limit_signed_pred_mismatch
+; CHECK-NEXT:  Loop %loop: backedge-taken count is ((-1 * %bound) + ((%x0 umax %x1) smax %bound))
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((-1 * %bound) + ((%x0 umax %x1) smax %bound))
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %pre.x0 = icmp sle i64 %bound, %x0
+  call void @llvm.assume(i1 %pre.x0)
+  %lim = call i64 @llvm.umax.i64(i64 %x0, i64 %x1)
+  br label %loop
+
+loop:
+  %iv = phi i64 [ %bound, %entry ], [ %iv.next, %loop ]
+  call void @use(i64 %iv)
+  %iv.next = add nsw i64 %iv, 1
+  %cond = icmp slt i64 %iv, %lim
+  br i1 %cond, label %loop, label %exit
+
+exit:
+  ret void
+}
+
+; Negative test for the "any_of" min-on-LHS rule with mismatched signedness in
+; the other direction from @smin_start_pred_mismatch: an unsigned umin start
+; with signed guards/exit condition. The signedness check on that rule rejects
+; this, so the umin survives in the backedge-taken count.
+define void @umin_start_signed_pred_mismatch(i64 %x0, i64 %x1, i64 %bound) {
+; CHECK-LABEL: 'umin_start_signed_pred_mismatch'
+; CHECK-NEXT:  Determining loop execution counts for: @umin_start_signed_pred_mismatch
+; CHECK-NEXT:  Loop %loop: backedge-taken count is ((-1 * (%x0 umin %x1)) + ((%x0 umin %x1) smax %bound))
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((-1 * (%x0 umin %x1)) + ((%x0 umin %x1) smax %bound))
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %pre.x0 = icmp sle i64 %x0, %bound
+  call void @llvm.assume(i1 %pre.x0)
+  %start = call i64 @llvm.umin.i64(i64 %x0, i64 %x1)
+  br label %loop
+
+loop:
+  %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop ]
+  call void @use(i64 %iv)
+  %iv.next = add nsw i64 %iv, 1
+  %cond = icmp slt i64 %iv, %bound
+  br i1 %cond, label %loop, label %exit
+
+exit:
+  ret void
+}
+
+; The removed SCEVUMinExpr ULT/UGT fast-path in IsKnownPredicateViaMinOrMax was
+; also reachable from isKnownViaNonRecursiveReasoning callers that do not go
+; through isKnownPredicate, where the new decomposition does not run. Here
+; howManyLessThans queries isLoopEntryGuardedByCond(ULT, umin(%a, %b), %a + 4),
+; which the fast-path proved via computeConstantDifference. The decomposition
+; cannot replace it on that path, so the umax survives where it did not before.
+define void @umin_start_bounded_rhs(i64 %x, i64 %b) {
+; CHECK-LABEL: 'umin_start_bounded_rhs'
+; CHECK-NEXT:  Determining loop execution counts for: @umin_start_bounded_rhs
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (3 + (zext i8 (trunc i64 %x to i8) to i64) + (-1 * ((zext i8 (trunc i64 %x to i8) to i64) umin %b))<nsw>)
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 258
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (3 + (zext i8 (trunc i64 %x to i8) to i64) + (-1 * ((zext i8 (trunc i64 %x to i8) to i64) umin %b))<nsw>)
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %a = and i64 %x, 255
+  %m = call i64 @llvm.umin.i64(i64 %a, i64 %b)
+  %rhs = add nuw i64 %a, 4
+  br label %loop
+
+loop:
+  %iv = phi i64 [ %m, %entry ], [ %iv.next, %loop ]
+  call void @use(i64 %iv)
+  %iv.next = add i64 %iv, 1
+  %cond = icmp ult i64 %iv.next, %rhs
+  br i1 %cond, label %loop, label %exit
+
+exit:
+  ret void
+}
+
+; The decomposition forwards Pred into per-operand sub-queries, where a
+; samesign flag established for the original operand pair no longer applies, so
+; it is dropped on entry. Nothing in-tree currently reaches the decomposition
+; with samesign set; this pins the umin/umax behaviour for such a caller.
+define void @umin_limit_samesign_guards(i64 %x0, i64 %x1, i64 %bound) {
+; CHECK-LABEL: 'umin_limit_samesign_guards'
+; CHECK-NEXT:  Determining loop execution counts for: @umin_limit_samesign_guards
+; CHECK-NEXT:  Loop %loop: backedge-taken count is ((-1 * %bound) + ((%x0 umin %x1) umax %bound))
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((-1 * %bound) + ((%x0 umin %x1) umax %bound))
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %pre.x0 = icmp samesign ule i64 %bound, %x0
+  call void @llvm.assume(i1 %pre.x0)
+  %pre.x1 = icmp samesign ule i64 %bound, %x1
+  call void @llvm.assume(i1 %pre.x1)
+  %lim = call i64 @llvm.umin.i64(i64 %x0, i64 %x1)
+  br label %loop
+
+loop:
+  %iv = phi i64 [ %bound, %entry ], [ %iv.next, %loop ]
+  call void @use(i64 %iv)
+  %iv.next = add nuw i64 %iv, 1
+  %cond = icmp ult i64 %iv, %lim
+  br i1 %cond, label %loop, label %exit
+
+exit:
+  ret void
+}
+
+; any_of max on the RHS, signed. The bounding operand is %x1, reached via
+; (%bound sle %x1 - 1), so the syntactic "A <= max(A, ...)" check in
+; IsMinMaxConsistingOf cannot match and the smax is only folded away by the
+; signed form of this rule.
+define void @smax_limit_offset_guard(i64 %x0, i64 %x1, i64 %bound) {
+; CHECK-LABEL: 'smax_limit_offset_guard'
+; CHECK-NEXT:  Determining loop execution counts for: @smax_limit_offset_guard
+; CHECK-NEXT:  Loop %loop: backedge-taken count is ((-1 * %bound) + (%x0 smax %x1 smax %bound))
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((-1 * %bound) + (%x0 smax %x1 smax %bound))
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %x1.m1 = add nsw i64 %x1, -1
+  %pre = icmp sle i64 %bound, %x1.m1
+  call void @llvm.assume(i1 %pre)
+  %lim = call i64 @llvm.smax.i64(i64 %x0, i64 %x1)
+  br label %loop
+
+loop:
+  %iv = phi i64 [ %bound, %entry ], [ %iv.next, %loop ]
+  call void @use(i64 %iv)
+  %iv.next = add nsw i64 %iv, 1
+  %cond = icmp slt i64 %iv, %lim
+  br i1 %cond, label %loop, label %exit
+
+exit:
+  ret void
+}
