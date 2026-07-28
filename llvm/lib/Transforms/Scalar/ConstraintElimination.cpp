@@ -2138,16 +2138,30 @@ void ConstraintInfo::addFactImpl(CmpInst::Predicate Pred, Value *A, Value *B,
   }
 }
 
-static bool replaceOverflowUses(IntrinsicInst *II, Instruction::BinaryOps Opcode,
-                                Value *A, Value *B,
+/// Replace the uses of \p WO, which has been proven not to overflow, by a plain
+/// binary operator and \p false for the overflow flag.
+static bool replaceOverflowUses(WithOverflowInst *WO, Value *A, Value *B,
                                 SmallVectorImpl<Instruction *> &ToRemove) {
   bool Changed = false;
-  IRBuilder<> Builder(II->getParent(), II->getIterator());
+  IRBuilder<> Builder(WO->getParent(), WO->getIterator());
   Value *Res = nullptr;
-  for (User *U : make_early_inc_range(II->users())) {
+  for (User *U : make_early_inc_range(WO->users())) {
     if (match(U, m_ExtractValue<0>(m_Value()))) {
-      if (!Res)
-        Res = Builder.CreateBinOp(Opcode, A, B);
+      if (!Res) {
+        Res = Builder.CreateBinOp(WO->getBinaryOp(), A, B);
+        // The uses are only replaced after proving the operation cannot
+        // overflow in the intrinsic's signedness domain, so the replacement can
+        // carry the matching no-wrap flag. Keeping the flag matters because the
+        // guard that established it is usually folded away at the same time,
+        // and later passes (SCEV/IndVarSimplify) can then no longer re-derive
+        // the bound.
+        if (auto *BO = dyn_cast<BinaryOperator>(Res)) {
+          if (WO->isSigned())
+            BO->setHasNoSignedWrap();
+          else
+            BO->setHasNoUnsignedWrap();
+        }
+      }
       U->replaceAllUsesWith(Res);
       Changed = true;
     } else if (match(U, m_ExtractValue<1>(m_Value()))) {
@@ -2159,20 +2173,20 @@ static bool replaceOverflowUses(IntrinsicInst *II, Instruction::BinaryOps Opcode
     if (U->use_empty()) {
       auto *I = cast<Instruction>(U);
       ToRemove.push_back(I);
-      I->setOperand(0, PoisonValue::get(II->getType()));
+      I->setOperand(0, PoisonValue::get(WO->getType()));
       Changed = true;
     }
   }
 
-  if (II->use_empty()) {
-    II->eraseFromParent();
+  if (WO->use_empty()) {
+    WO->eraseFromParent();
     Changed = true;
   }
   return Changed;
 }
 
 static bool
-tryToSimplifyOverflowMath(IntrinsicInst *II, ConstraintInfo &Info,
+tryToSimplifyOverflowMath(WithOverflowInst *WO, ConstraintInfo &Info,
                           ScalarEvolution &SE,
                           SmallVectorImpl<Instruction *> &ToRemove) {
   auto DoesConditionHold = [](CmpInst::Predicate Pred, Value *A, Value *B,
@@ -2186,24 +2200,24 @@ tryToSimplifyOverflowMath(IntrinsicInst *II, ConstraintInfo &Info,
   };
 
   bool Changed = false;
-  if (II->getIntrinsicID() == Intrinsic::ssub_with_overflow) {
+  if (WO->getIntrinsicID() == Intrinsic::ssub_with_overflow) {
     // If A s>= B && B s>= 0, ssub.with.overflow(a, b) should not overflow and
     // can be simplified to a regular sub.
-    Value *A = II->getArgOperand(0);
-    Value *B = II->getArgOperand(1);
+    Value *A = WO->getLHS();
+    Value *B = WO->getRHS();
     if (!DoesConditionHold(CmpInst::ICMP_SGE, A, B, Info) ||
         !DoesConditionHold(CmpInst::ICMP_SGE, B,
                            ConstantInt::get(A->getType(), 0), Info))
       return false;
-    Changed = replaceOverflowUses(II, Instruction::Sub, A, B, ToRemove);
-  } else if (II->getIntrinsicID() == Intrinsic::sadd_with_overflow) {
+    Changed = replaceOverflowUses(WO, A, B, ToRemove);
+  } else if (WO->getIntrinsicID() == Intrinsic::sadd_with_overflow) {
     // sadd.with.overflow(A, C) with a constant C does not overflow when A stays
     // within the signed range after adding C: for C s>= 0 that needs
     // A s<= SMAX - C, for C s< 0 it needs A s>= SMIN - C. This is the common
     // shape for a bounded induction increment (`i + 1` with i below the loop
     // bound), where the constraint solver knows the bound on A.
-    Value *A = II->getArgOperand(0);
-    Value *CVal = II->getArgOperand(1);
+    Value *A = WO->getLHS();
+    Value *CVal = WO->getRHS();
     const APInt *C;
     if (!match(CVal, m_APInt(C)))
       return false;
@@ -2266,7 +2280,7 @@ tryToSimplifyOverflowMath(IntrinsicInst *II, ConstraintInfo &Info,
       if (!NoOverflow)
         return false;
     }
-    Changed = replaceOverflowUses(II, Instruction::Add, A, CVal, ToRemove);
+    Changed = replaceOverflowUses(WO, A, CVal, ToRemove);
   }
   return Changed;
 }
