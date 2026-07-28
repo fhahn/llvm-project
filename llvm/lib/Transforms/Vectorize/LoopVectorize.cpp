@@ -5743,27 +5743,38 @@ LoopVectorizationPlanner::precomputeCosts(VPlan &Plan, ElementCount VF,
     Cost += ForcedCost;
   }
 
-  auto UseVPlanCostModel = [](Instruction *I) -> bool {
-    switch (I->getOpcode()) {
-    case Instruction::SDiv:
-    case Instruction::UDiv:
-    case Instruction::SRem:
-    case Instruction::URem:
-      return true;
-    default:
-      return false;
+  // The scalarization costs in InstsToScalarize are determined by the legacy
+  // cost model up-front, for each instruction that is scalar-with-predication
+  // together with the single-use chain feeding it, independently of the VPlan
+  // that is eventually built. Scalarizing with predication requires a replicate
+  // region, so a plan without any does not scalarize those instructions and the
+  // recorded costs do not describe it. Skip them entirely in that case and let
+  // the VPlan cost model charge for the recipes the plan does contain: the
+  // operation may be performed by an interleave group instead, or not at all if
+  // it was removed as dead or hoisted out of the loop.
+  if (hasReplicatorRegion(Plan)) {
+    auto UseVPlanCostModel = [](Instruction *I) -> bool {
+      switch (I->getOpcode()) {
+      case Instruction::SDiv:
+      case Instruction::UDiv:
+      case Instruction::SRem:
+      case Instruction::URem:
+        return true;
+      default:
+        return false;
+      }
+    };
+    for (const auto &[Scalarized, ScalarCost] : CM.InstsToScalarize[VF]) {
+      if (UseVPlanCostModel(Scalarized) ||
+          CostCtx.skipCostComputation(Scalarized, VF.isVector()))
+        continue;
+      CostCtx.SkipCostComputation.insert(Scalarized);
+      LLVM_DEBUG({
+        dbgs() << "Cost of " << ScalarCost << " for VF " << VF
+               << ": profitable to scalarize " << *Scalarized << "\n";
+      });
+      Cost += ScalarCost;
     }
-  };
-  for (const auto &[Scalarized, ScalarCost] : CM.InstsToScalarize[VF]) {
-    if (UseVPlanCostModel(Scalarized) ||
-        CostCtx.skipCostComputation(Scalarized, VF.isVector()))
-      continue;
-    CostCtx.SkipCostComputation.insert(Scalarized);
-    LLVM_DEBUG({
-      dbgs() << "Cost of " << ScalarCost << " for VF " << VF
-             << ": profitable to scalarize " << *Scalarized << "\n";
-    });
-    Cost += ScalarCost;
   }
 
   return Cost;
