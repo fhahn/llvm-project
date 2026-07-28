@@ -1469,7 +1469,7 @@ define i8 @early_exit_deref_or_null_arg_with_deref_assumption(ptr dereferenceabl
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP3]], label %[[VECTOR_EARLY_EXIT:.*]], label %[[VECTOR_BODY_INTERIM]]
 ; CHECK:       [[VECTOR_BODY_INTERIM]]:
-; CHECK-NEXT:    br i1 [[TMP4]], label %[[MIDDLE_BLOCK:.*]], label %[[LOOP1]], !llvm.loop [[LOOP18:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP4]], label %[[MIDDLE_BLOCK:.*]], label %[[LOOP1]], !llvm.loop [[LOOP22:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[LEN]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[DEOPT_LOOPEXIT:.*]], label %[[SCALAR_PH]]
@@ -1489,7 +1489,7 @@ define i8 @early_exit_deref_or_null_arg_with_deref_assumption(ptr dereferenceabl
 ; CHECK:       [[LATCH]]:
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
 ; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[LEN]]
-; CHECK-NEXT:    br i1 [[EC]], label %[[DEOPT_LOOPEXIT]], label %[[LOOP]], !llvm.loop [[LOOP19:![0-9]+]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[DEOPT_LOOPEXIT]], label %[[LOOP]], !llvm.loop [[LOOP23:![0-9]+]]
 ; CHECK:       [[DEOPT_LOOPEXIT]]:
 ; CHECK-NEXT:    br label %[[DEOPT]]
 ; CHECK:       [[DEOPT]]:

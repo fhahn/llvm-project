@@ -91,6 +91,17 @@ deopt:
 }
 
 ; The trip count is %c and the dereferenceable region is umin(%a, %b).
+;
+; This is *not* vectorized, unlike its @deref_umin_swapped_guards twin below,
+; even though both have the same trip count (-1 + %c) and the same SCEV
+; decomposition proof is available. The difference is upstream of this patch,
+; in how LoopGuards rewrites the guards: 'icmp ule %c, %a' rewrites the *trip
+; count* to umin(%c, %a, %b), so the max-BTC handed to
+; evaluatePtrAddRecAtMaxBTCWillNotWrap becomes (-1 + (1 umax (%c umin %a umin
+; %b))) and loses the nsw flag, making the addSCEVNoOverflow() check for
+; MaxBTC + EltSize fail before any dereferenceability query is issued. The uge
+; form instead rewrites %a/%b and leaves the trip count as (-1 + (1 umax %c)),
+; which keeps nsw. Neither form vectorized before this patch either.
 define i1 @deref_umin_all_operands_bounded(ptr %ptr, i64 %a, i64 %b, i64 %c) #0 {
 ; CHECK-LABEL: define i1 @deref_umin_all_operands_bounded(
 ; CHECK-SAME: ptr [[PTR:%.*]], i64 [[A:%.*]], i64 [[B:%.*]], i64 [[C:%.*]]) #[[ATTR0]] {
@@ -149,7 +160,9 @@ exit.1:
   ret i1 false
 }
 
-; Same as above, but the guards are written in swapped (uge) form.
+; Same as above, but the guards are written in swapped (uge) form. Unlike the
+; ule form, this one *is* vectorized: see the comment above for why the guard
+; form decides whether the max-BTC keeps its nsw flag.
 define i1 @deref_umin_swapped_guards(ptr %ptr, i64 %a, i64 %b, i64 %c) #0 {
 ; CHECK-LABEL: define i1 @deref_umin_swapped_guards(
 ; CHECK-SAME: ptr [[PTR:%.*]], i64 [[A:%.*]], i64 [[B:%.*]], i64 [[C:%.*]]) #[[ATTR0]] {
