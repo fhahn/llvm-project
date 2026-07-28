@@ -699,6 +699,23 @@ static Decomposition decompose(Value *V, const ConstraintInfo &Info,
     return V;
   }
 
+  // usub.sat(A, B) is max(A - B, 0), which is exactly A - B when the
+  // subtraction does not saturate, i.e. A u>= B. This is the only way to give
+  // the solver a lower bound on the saturating difference: the bound is
+  // `usub.sat(A, B) + B u>= A`, and the sum on the left is not an IR value, so
+  // it cannot be named by a fact and only becomes a row via decomposition.
+  // Swift lowers a span offset bound to this shape, `usub.sat(count, base)`
+  // under a dominating `base u<= count`.
+  if (match(V, m_Intrinsic<Intrinsic::usub_sat>(m_Value(Op0), m_Value(Op1)))) {
+    if (!Info.doesHold(CmpInst::ICMP_UGE, Op0, Op1))
+      return V;
+    auto ResA = decompose(Op0, Info, IsSigned, DL);
+    auto ResB = decompose(Op1, Info, IsSigned, DL);
+    if (!ResA.sub(ResB))
+      return ResA;
+    return V;
+  }
+
   return V;
 }
 
