@@ -29,9 +29,9 @@ define i1 @is_sorted(ptr %p, i64 %count) {
 ; CHECK-NEXT:    br i1 [[DONE1]], label %[[COMMON_RET]], label %[[ACCESS1:.*]]
 ; CHECK:       [[ACCESS1]]:
 ; CHECK-NEXT:    [[I2:%.*]] = phi i64 [ [[TMP0:%.*]], %[[ACCESS1]] ], [ 0, %[[PH]] ]
-; CHECK-NEXT:    [[TMP0]] = add i64 [[I2]], 1
-; CHECK-NEXT:    [[A0:%.*]] = getelementptr inbounds [8 x i8], ptr [[P]], i64 [[I2]]
-; CHECK-NEXT:    [[A1:%.*]] = getelementptr inbounds [8 x i8], ptr [[P]], i64 [[TMP0]]
+; CHECK-NEXT:    [[TMP0]] = add nuw nsw i64 [[I2]], 1
+; CHECK-NEXT:    [[A0:%.*]] = getelementptr inbounds nuw [8 x i8], ptr [[P]], i64 [[I2]]
+; CHECK-NEXT:    [[A1:%.*]] = getelementptr inbounds nuw [8 x i8], ptr [[P]], i64 [[TMP0]]
 ; CHECK-NEXT:    [[V0:%.*]] = load i64, ptr [[A0]], align 8
 ; CHECK-NEXT:    [[V1:%.*]] = load i64, ptr [[A1]], align 8
 ; CHECK-NEXT:    [[GT:%.*]] = icmp sle i64 [[V0]], [[V1]]

@@ -17,7 +17,7 @@ define i8 @sadd_stride2_boundary_folded() {
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[I:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[TMP0:%.*]], %[[LATCH:.*]] ]
-; CHECK-NEXT:    [[TMP0]] = add i8 [[I]], 2
+; CHECK-NEXT:    [[TMP0]] = add nsw i8 [[I]], 2
 ; CHECK-NEXT:    br i1 false, label %[[TRAP:.*]], label %[[LATCH]]
 ; CHECK:       [[LATCH]]:
 ; CHECK-NEXT:    [[COND:%.*]] = icmp slt i8 [[I]], 100

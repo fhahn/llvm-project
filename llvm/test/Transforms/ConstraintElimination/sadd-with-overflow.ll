@@ -21,7 +21,7 @@ define i8 @sadd_no_overflow_pos_const(i8 %a) {
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[LO]])
 ; CHECK-NEXT:    [[HI:%.*]] = icmp slt i8 [[A]], 100
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[HI]])
-; CHECK-NEXT:    [[TMP1:%.*]] = add i8 [[A]], 1
+; CHECK-NEXT:    [[TMP1:%.*]] = add nsw i8 [[A]], 1
 ; CHECK-NEXT:    call void @use(i1 false)
 ; CHECK-NEXT:    ret i8 [[TMP1]]
 ;
@@ -44,7 +44,7 @@ define i8 @sadd_no_overflow_neg_const(i8 %a) {
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[LO]])
 ; CHECK-NEXT:    [[HI:%.*]] = icmp sle i8 [[A]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[HI]])
-; CHECK-NEXT:    [[TMP1:%.*]] = add i8 [[A]], -1
+; CHECK-NEXT:    [[TMP1:%.*]] = add nsw i8 [[A]], -1
 ; CHECK-NEXT:    call void @use(i1 false)
 ; CHECK-NEXT:    ret i8 [[TMP1]]
 ;
@@ -67,7 +67,7 @@ define i8 @sadd_c_smin(i8 %a) {
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[LO]])
 ; CHECK-NEXT:    [[HI:%.*]] = icmp slt i8 [[A]], 100
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[HI]])
-; CHECK-NEXT:    [[TMP1:%.*]] = add i8 [[A]], -128
+; CHECK-NEXT:    [[TMP1:%.*]] = add nsw i8 [[A]], -128
 ; CHECK-NEXT:    call void @use(i1 false)
 ; CHECK-NEXT:    ret i8 [[TMP1]]
 ;
@@ -90,7 +90,7 @@ define i8 @sadd_c_smax(i8 %a) {
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[LO]])
 ; CHECK-NEXT:    [[HI:%.*]] = icmp sle i8 [[A]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[HI]])
-; CHECK-NEXT:    [[TMP1:%.*]] = add i8 [[A]], 127
+; CHECK-NEXT:    [[TMP1:%.*]] = add nsw i8 [[A]], 127
 ; CHECK-NEXT:    call void @use(i1 false)
 ; CHECK-NEXT:    ret i8 [[TMP1]]
 ;
@@ -112,7 +112,7 @@ define i8 @sadd_unsigned_bound(i8 %a) {
 ; CHECK-SAME: i8 [[A:%.*]]) {
 ; CHECK-NEXT:    [[HI:%.*]] = icmp ult i8 [[A]], 100
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[HI]])
-; CHECK-NEXT:    [[TMP1:%.*]] = add i8 [[A]], 1
+; CHECK-NEXT:    [[TMP1:%.*]] = add nsw i8 [[A]], 1
 ; CHECK-NEXT:    call void @use(i1 false)
 ; CHECK-NEXT:    ret i8 [[TMP1]]
 ;
@@ -134,7 +134,7 @@ define i64 @sadd_no_overflow_i64_const(i64 %a) {
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[LO]])
 ; CHECK-NEXT:    [[HI:%.*]] = icmp slt i64 [[A]], 100
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[HI]])
-; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[A]], 1
+; CHECK-NEXT:    [[TMP1:%.*]] = add nsw i64 [[A]], 1
 ; CHECK-NEXT:    call void @use(i1 false)
 ; CHECK-NEXT:    ret i64 [[TMP1]]
 ;
@@ -158,7 +158,7 @@ define i8 @sadd_aggregate_escapes(i8 %a) {
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[LO]])
 ; CHECK-NEXT:    [[HI:%.*]] = icmp slt i8 [[A]], 100
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[HI]])
-; CHECK-NEXT:    [[TMP1:%.*]] = add i8 [[A]], 1
+; CHECK-NEXT:    [[TMP1:%.*]] = add nsw i8 [[A]], 1
 ; CHECK-NEXT:    [[S:%.*]] = call { i8, i1 } @llvm.sadd.with.overflow.i8(i8 [[A]], i8 1)
 ; CHECK-NEXT:    call void @use.agg({ i8, i1 } [[S]])
 ; CHECK-NEXT:    call void @use(i1 false)
@@ -211,7 +211,7 @@ define i1 @sadd_var_bound_induction(i64 %count) {
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[I:%.*]] = phi i64 [ 0, %[[LOOP_PREHEADER]] ], [ [[I_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
-; CHECK-NEXT:    [[I_NEXT]] = add i64 [[I]], 1
+; CHECK-NEXT:    [[I_NEXT]] = add nsw i64 [[I]], 1
 ; CHECK-NEXT:    br i1 false, label %[[TRAP:.*]], label %[[LOOP_LATCH]]
 ; CHECK:       [[LOOP_LATCH]]:
 ; CHECK-NEXT:    [[COND:%.*]] = icmp slt i64 [[I_NEXT]], [[SUB]]
@@ -260,7 +260,7 @@ define i1 @sadd_var_bound_induction_i8(i8 %count) {
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[I:%.*]] = phi i8 [ 0, %[[LOOP_PREHEADER]] ], [ [[I_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
-; CHECK-NEXT:    [[I_NEXT]] = add i8 [[I]], 1
+; CHECK-NEXT:    [[I_NEXT]] = add nsw i8 [[I]], 1
 ; CHECK-NEXT:    br i1 false, label %[[TRAP:.*]], label %[[LOOP_LATCH]]
 ; CHECK:       [[LOOP_LATCH]]:
 ; CHECK-NEXT:    [[COND:%.*]] = icmp slt i8 [[I_NEXT]], [[SUB]]
