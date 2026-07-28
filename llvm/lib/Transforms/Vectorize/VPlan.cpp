@@ -1706,19 +1706,6 @@ VPBuilder::createConsecutiveVectorPointer(VPValue *Ptr, Type *SourceElementTy,
   return createVectorPointer(Ptr, SourceElementTy, StrideOne, Flags, DL);
 }
 
-VPlan &LoopVectorizationPlanner::getPlanFor(ElementCount VF) const {
-  assert(count_if(VPlans,
-                  [VF](const VPlanPtr &Plan) { return Plan->hasVF(VF); }) ==
-             1 &&
-         "Multiple VPlans for VF.");
-
-  for (const VPlanPtr &Plan : VPlans) {
-    if (Plan->hasVF(VF))
-      return *Plan.get();
-  }
-  llvm_unreachable("No plan found!");
-}
-
 static void addRuntimeUnrollDisableMetaData(Loop *L) {
   SmallVector<Metadata *, 4> MDs;
   // Reserve first location for self reference to the LoopID metadata node.

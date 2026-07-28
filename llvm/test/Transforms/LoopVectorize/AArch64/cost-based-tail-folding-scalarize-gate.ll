@@ -3,21 +3,19 @@
 ; RUN:   -enable-cost-based-tail-folding -debug-only=loop-vectorize \
 ; RUN:   -disable-output %s 2>&1 | FileCheck %s
 
-; Cost-based tail folding builds tail-folded VPlans that are then costed by
-; computeBestVF() with the primary (scalar-epilogue) cost model. That is only
-; reliable when tail folding does not scalarize an op the primary model would
-; widen: a tail-fold-scalarized op becomes scalar-with-predication, whose cost
-; the primary model splits across precomputeCosts' scalarization set and a
-; skipped recipe (i.e. mis-costs it). The planner therefore declines to offer
-; tail-folded plans for loops where tail folding scalarizes.
+; All VPlans are costed with the primary cost model, whose scalarization
+; decisions assume a scalar epilogue. Tail-folded plans that scalarize
+; operations are therefore dropped, as their cost would not be comparable to
+; the corresponding scalar-epilogue plan.
 
 target datalayout = "e-m:e-p:64:64-i64:64-i128:128-n32:64-S128"
 target triple = "aarch64-linux-gnu"
 
 ; Store to a non-affine address: scalarized under tail folding, so the
-; tail-folded plans are not built.
+; tail-folded plans are dropped and no plan uses an active lane mask.
 ; CHECK-LABEL: LV: Checking a loop in 'scalarized_store'
-; CHECK: LV: Not building tail-folded plans: tail folding scalarizes an op
+; CHECK-NOT: active lane mask
+; CHECK-LABEL: LV: Checking a loop in 'widened_masked_store'
 define void @scalarized_store(ptr noalias %dst) {
 entry:
   br label %loop
@@ -34,9 +32,8 @@ exit:
 }
 
 ; Consecutive store on SVE: widened-and-masked (not scalarized) under tail
-; folding, so tail-folded plans are built and the gate stays out of the way.
-; CHECK-LABEL: LV: Checking a loop in 'widened_masked_store'
-; CHECK-NOT: LV: Not building tail-folded plans
+; folding, so the tail-folded plans are kept and considered by the cost model.
+; CHECK: active lane mask
 define void @widened_masked_store(ptr noalias %dst) #0 {
 entry:
   br label %loop

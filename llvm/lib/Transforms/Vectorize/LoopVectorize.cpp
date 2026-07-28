@@ -3502,16 +3502,6 @@ std::unique_ptr<VPlan> LoopVectorizationPlanner::selectBestEpiloguePlan(
     return nullptr;
   }
 
-  // Find the first plan with a scalar tail that supports the given VF.
-  // Epilogue vectorization requires a scalar tail plan since the epilogue
-  // loop handles remaining iterations.
-  auto FindScalarTailPlan = [&](ElementCount VF) -> VPlan * {
-    for (auto &Plan : VPlans)
-      if (Plan->hasScalarTail() && Plan->hasVF(VF))
-        return &*Plan;
-    return nullptr;
-  };
-
   if (hasForcedEpilogueVF()) {
     if (estimateElementCount(EpilogueVectorizationForceVF,
                              Config.getVScaleForTuning()) >=
@@ -3525,7 +3515,7 @@ std::unique_ptr<VPlan> LoopVectorizationPlanner::selectBestEpiloguePlan(
     }
 
     LLVM_DEBUG(dbgs() << "LEV: Epilogue vectorization factor is forced.\n");
-    if (VPlan *P = FindScalarTailPlan(EpilogueVectorizationForceVF)) {
+    if (VPlan *P = getScalarTailPlanFor(EpilogueVectorizationForceVF)) {
       std::unique_ptr<VPlan> Clone(P->duplicate());
       Clone->setVF(EpilogueVectorizationForceVF);
       return Clone;
@@ -3617,7 +3607,7 @@ std::unique_ptr<VPlan> LoopVectorizationPlanner::selectBestEpiloguePlan(
   VPlan *BestPlan = nullptr;
   for (auto &NextVF : ProfitableVFs) {
     // Skip candidate VFs without a corresponding scalar-tail VPlan.
-    VPlan *CurrentPlan = FindScalarTailPlan(NextVF.Width);
+    VPlan *CurrentPlan = getScalarTailPlanFor(NextVF.Width);
     if (!CurrentPlan)
       continue;
 
@@ -5532,7 +5522,7 @@ void LoopVectorizationPlanner::plan(ElementCount UserVF, unsigned UserIC) {
   if (MaxFactors.FixedVF.isVector() || MaxFactors.ScalableVF.isVector())
     Legal->collectUnitStridePredicates();
 
-  auto VPlan1 = tryToBuildVPlan1(CM);
+  auto VPlan1 = tryToBuildVPlan1(CM.foldTailByMasking());
   if (!VPlan1)
     return;
 
@@ -5566,16 +5556,6 @@ void LoopVectorizationPlanner::plan(ElementCount UserVF, unsigned UserIC) {
 
   if (CM.foldTailByMasking())
     Legal->prepareToFoldTailByMasking();
-
-  // Check if we can additionally build tail-folded plans. Only when the default
-  // is non-tail-folding and tail-folding is possible. Tail-folded plans are
-  // built after default plans since prepareToFoldTailByMasking is additive,
-  // avoiding the need to save/restore MaskedOp state. Skip when it would
-  // require destructively invalidating interleave groups.
-  bool CanBuildTailFoldedPlans =
-      !CM.foldTailByMasking() && CM.isEpilogueAllowed() &&
-      CM.Legal->canFoldTailByMasking() &&
-      (useMaskedInterleavedAccesses(TTI) || !CM.InterleaveInfo.hasGroups());
 
   ElementCount MaxUserVF =
       UserVF.isScalable() ? MaxFactors.ScalableVF : MaxFactors.FixedVF;
@@ -5613,92 +5593,69 @@ void LoopVectorizationPlanner::plan(ElementCount UserVF, unsigned UserIC) {
     }
   }
 
-  // Helper lambda to build VPlans for a given maximum fixed VF, starting from
-  // the shared \p VPlan1 base plan. When SkipScalarVF is true, skip VF=1 (used
-  // when building non-default plans, since the scalar plan is independent of
-  // the tail-folding strategy).
-  auto BuildVPlansForVFs = [&](VPlan &VPlan1, ElementCount MaxFixedVF,
-                               LoopVectorizationCostModel &TheCM,
-                               bool SkipScalarVF = false) {
-    ElementCount MinFixedVF =
-        SkipScalarVF ? ElementCount::getFixed(2) : ElementCount::getFixed(1);
-    // Collect the Vectorization Factor Candidates.
-    SmallVector<ElementCount> VFCandidates;
-    for (auto VF = MinFixedVF; ElementCount::isKnownLE(VF, MaxFixedVF);
+  // Builds VPlans for all candidate VFs, starting from the base plan \p VPlan1.
+  // \p MinFixedVF bounds the fixed-width VFs from below; scalable VFs are
+  // always built from vscale x 1.
+  auto BuildVPlansForVFs = [&](VPlan &VPlan1, ElementCount MinFixedVF,
+                               LoopVectorizationCostModel &TheCM) {
+    // Collect Uniform and Scalar instructions after vectorization for all
+    // candidate VFs.
+    for (auto VF = MinFixedVF; ElementCount::isKnownLE(VF, MaxFactors.FixedVF);
          VF *= 2)
-      VFCandidates.push_back(VF);
+      TheCM.collectNonVectorizedAndSetWideningDecisions(VF);
     for (auto VF = ElementCount::getScalable(1);
          ElementCount::isKnownLE(VF, MaxFactors.ScalableVF); VF *= 2)
-      VFCandidates.push_back(VF);
-
-    Config.collectInLoopReductions();
-    for (const auto &VF : VFCandidates)
       TheCM.collectNonVectorizedAndSetWideningDecisions(VF);
 
-    buildVPlans(VPlan1, MinFixedVF, MaxFixedVF, TheCM);
+    buildVPlans(VPlan1, MinFixedVF, MaxFactors.FixedVF, TheCM);
     buildVPlans(VPlan1, ElementCount::getScalable(1), MaxFactors.ScalableVF,
                 TheCM);
   };
 
-  // Build default plans.
-  BuildVPlansForVFs(*VPlan1, MaxFactors.FixedVF, CM);
+  // Build the default plans, following the tail-folding decision of the primary
+  // cost model.
+  BuildVPlansForVFs(*VPlan1, ElementCount::getFixed(1), CM);
 
-  // Additionally build tail-folded plans for cost-based tail folding selection.
-  // Since prepareToFoldTailByMasking is additive (only adds entries to
-  // MaskedOp), building tail-folded plans after non-tail-folded plans avoids
-  // the need to save/restore MaskedOp state.
-  // Use a separate cost model instance to avoid mutating the primary CM's
-  // state, which would cause extra debug output and cached decision changes.
-  if (EnableCostBasedTailFolding && CanBuildTailFoldedPlans) {
+  // With cost-based tail folding, additionally build tail-folded plans to
+  // compare against the default scalar-epilogue plans. Skipped if tail folding
+  // is already the default, is not legal, or would require destructively
+  // invalidating interleave groups. Tail-folded plans are built after the
+  // default plans, as prepareToFoldTailByMasking only adds to the set of masked
+  // operations, avoiding the need to save and restore it.
+  if (EnableCostBasedTailFolding && !CM.foldTailByMasking() &&
+      CM.isEpilogueAllowed() && Legal->canFoldTailByMasking() &&
+      (useMaskedInterleavedAccesses(TTI) || !CM.InterleaveInfo.hasGroups())) {
+    // Use a separate cost model instance to avoid mutating the primary cost
+    // model's cached decisions. It is only used to build the plans; costing in
+    // computeBestVF() uses the primary cost model for all plans.
     LoopVectorizationCostModel TFCM(CM_EpilogueNotAllowedFoldTail, CM.TheLoop,
                                     CM.PSE, CM.LI, CM.Legal, CM.TTI, CM.TLI,
                                     CM.AC, CM.ORE, CM.GetBFI, CM.TheFunction,
                                     CM.Hints, CM.InterleaveInfo, Config);
     TFCM.collectValuesToIgnore();
     TFCM.setTailFoldingStyle(!MaxFactors.ScalableVF.isZero(), UserIC);
+    // Partial alias masking is normally decided by computeMaxVF, which is not
+    // run for TFCM. Tail-folded plans are only built as alternatives to plans
+    // without alias masking, so leave it disabled.
+    TFCM.PartialAliasMaskingStatus = AliasMaskingStatus::Disabled;
+
+    // setTailFoldingStyle may still fall back to a scalar epilogue, e.g. if EVL
+    // tail folding is preferred but not supported for the loop.
     if (TFCM.foldTailByMasking()) {
-      // The alias-masking decision is normally settled by computeMaxVF, which
-      // this separate cost model does not run. Mirror its handling here so the
-      // widening-decision queries below have a decided status: EVL tail folding
-      // is incompatible with partial alias masking, matching computeMaxVF where
-      // the EVL path leaves the status disabled.
-      if (TFCM.foldTailWithEVL())
-        TFCM.PartialAliasMaskingStatus = AliasMaskingStatus::Disabled;
-      else
-        TFCM.tryToEnablePartialAliasMasking();
       Legal->prepareToFoldTailByMasking();
+      unsigned NumScalarEpiloguePlans = VPlans.size();
+      if (auto TFVPlan1 = tryToBuildVPlan1(/*FoldTailByMasking=*/true))
+        BuildVPlansForVFs(*TFVPlan1, ElementCount::getFixed(2), TFCM);
 
-      // The tail-folded plans are costed by computeBestVF() with the primary
-      // (scalar-epilogue) cost model, not with TFCM. That is only reliable if
-      // tail folding does not scalarize an op the primary model would widen: a
-      // tail-fold-scalarized op becomes scalar-with-predication, whose cost the
-      // primary model splits across precomputeCosts' scalarization set and a
-      // skipped recipe (i.e. mis-costs it). Populate TFCM's per-VF widening
-      // decisions (which also fills InstsToScalarize) for the VFs the plans
-      // would be built at, and skip offering tail-folded plans if any op would
-      // be scalarized. TFCM is only used for building and is discarded here; it
-      // never participates in costing.
-      for (auto VF = ElementCount::getFixed(2);
-           ElementCount::isKnownLE(VF, MaxFactors.FixedVF); VF *= 2)
-        TFCM.collectNonVectorizedAndSetWideningDecisions(VF);
-      for (auto VF = ElementCount::getScalable(1);
-           ElementCount::isKnownLE(VF, MaxFactors.ScalableVF); VF *= 2)
-        TFCM.collectNonVectorizedAndSetWideningDecisions(VF);
-
-      bool TailFoldingScalarizes = any_of(
-          TFCM.InstsToScalarize,
-          [](const auto &Entry) { return !Entry.second.empty(); });
-      if (TailFoldingScalarizes) {
-        LLVM_DEBUG(dbgs() << "LV: Not building tail-folded plans: tail folding "
-                             "scalarizes an op the primary cost model would "
-                             "mis-cost.\n");
-      } else if (auto TFVPlan1 = tryToBuildVPlan1(TFCM)) {
-        // Build a separate base plan that folds the tail by masking, so the
-        // alternative tail-folded VPlans can be compared against the default
-        // scalar-epilogue plans by the cost model.
-        BuildVPlansForVFs(*TFVPlan1, MaxFactors.FixedVF, TFCM,
-                          /*SkipScalarVF=*/true);
-      }
+      // All plans are costed with the primary cost model, whose scalarization
+      // decisions assume a scalar epilogue. Drop tail-folded plans that
+      // scalarize operations, as their cost would not be comparable to the
+      // corresponding scalar-epilogue plan.
+      VPlans.erase(remove_if(drop_begin(VPlans, NumScalarEpiloguePlans),
+                             [](const VPlanPtr &P) {
+                               return hasReplicatorRegion(*P);
+                             }),
+                   VPlans.end());
     }
   }
 
@@ -5977,6 +5934,7 @@ LoopVectorizationPlanner::computeBestVF() {
   }
 
   VPlan *PlanForBestVF = &FirstPlan;
+
   for (auto &P : VPlans) {
     ArrayRef<ElementCount> VFs(P->vectorFactors().begin(),
                                P->vectorFactors().end());
@@ -6628,8 +6586,7 @@ VPRecipeBuilder::tryToCreateWidenNonPhiRecipe(VPSingleDefRecipe *R,
 // optimizations.
 static void printOptimizedVPlan(VPlan &) {}
 
-VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1(
-    LoopVectorizationCostModel &TheCM) {
+VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1(bool FoldTailByMasking) {
   bool IsInnerLoop = OrigLoop->isInnermost();
 
   // Set up loop versioning for inner loops with memory runtime checks.
@@ -6708,7 +6665,7 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1(
 
   RUN_VPLAN_PASS(VPlanTransforms::createLoopRegions, *VPlan0,
                  getDebugLocFromInstOrOperands(Legal->getPrimaryInduction()));
-  if (TheCM.foldTailByMasking())
+  if (FoldTailByMasking)
     RUN_VPLAN_PASS(VPlanTransforms::foldTailByMasking, *VPlan0);
   RUN_VPLAN_PASS(VPlanTransforms::introduceMasksAndLinearize, *VPlan0);
 

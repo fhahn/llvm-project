@@ -929,10 +929,6 @@ public:
   /// interleaving should be avoided up-front, no plans are generated.
   void plan(ElementCount UserVF, unsigned UserIC);
 
-  /// Return the VPlan for \p VF. At the moment, there is always a single VPlan
-  /// for each VF.
-  VPlan &getPlanFor(ElementCount VF) const;
-
   /// Compute and return the most profitable vectorization factor and the
   /// corresponding best VPlan. Also collect all profitable VFs in
   /// ProfitableVFs.
@@ -974,6 +970,16 @@ public:
   bool hasPlanWithVF(ElementCount VF) const {
     return any_of(VPlans,
                   [&](const VPlanPtr &Plan) { return Plan->hasVF(VF); });
+  }
+
+  /// Return the plan with a scalar tail supporting \p VF, or nullptr if there
+  /// is none. Epilogue vectorization requires a scalar-tail plan, as the
+  /// epilogue loop handles the remaining iterations.
+  VPlan *getScalarTailPlanFor(ElementCount VF) const {
+    auto I = find_if(VPlans, [VF](const VPlanPtr &Plan) {
+      return Plan->hasScalarTail() && Plan->hasVF(VF);
+    });
+    return I == VPlans.end() ? nullptr : I->get();
   }
 
   /// Test a \p Predicate on a \p Range of VF's. Return the value of applying
@@ -1023,10 +1029,10 @@ public:
 
 private:
   /// Build an initial VPlan, with HCFG wrapping the original scalar loop and
-  /// scalar transformations applied. The tail-folding decision is taken from
-  /// \p TheCM, so different cost models produce different base plans. Returns
-  /// null if an initial VPlan cannot be built.
-  VPlanPtr tryToBuildVPlan1(LoopVectorizationCostModel &TheCM);
+  /// scalar transformations applied. The tail is folded by masking if
+  /// \p FoldTailByMasking is true. Returns null if an initial VPlan cannot be
+  /// built.
+  VPlanPtr tryToBuildVPlan1(bool FoldTailByMasking);
 
   /// Build a VPlan using VPRecipes according to the information gathered by
   /// Legal and VPlan-based analysis. For outer loops, performs basic recipe
