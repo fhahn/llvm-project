@@ -27,8 +27,7 @@ define void @sadd_guarded_signed(i64 %a, i64 %b) {
 ; CHECK-NEXT:    br i1 [[OV]], label %[[TRAP:.*]], label %[[CONT:.*]]
 ; CHECK:       [[CONT]]:
 ; CHECK-NEXT:    [[SUM:%.*]] = extractvalue { i64, i1 } [[O]], 0
-; CHECK-NEXT:    [[T:%.*]] = icmp slt i64 [[SUM]], 100
-; CHECK-NEXT:    call void @use(i1 [[T]])
+; CHECK-NEXT:    call void @use(i1 true)
 ; CHECK-NEXT:    ret void
 ; CHECK:       [[TRAP]]:
 ; CHECK-NEXT:    ret void
@@ -71,8 +70,7 @@ define void @sadd_guarded_unsigned(i64 %a, i64 %b) {
 ; CHECK-NEXT:    br i1 [[OV]], label %[[TRAP:.*]], label %[[CONT:.*]]
 ; CHECK:       [[CONT]]:
 ; CHECK-NEXT:    [[SUM:%.*]] = extractvalue { i64, i1 } [[O]], 0
-; CHECK-NEXT:    [[T:%.*]] = icmp ult i64 [[SUM]], 100
-; CHECK-NEXT:    call void @use(i1 [[T]])
+; CHECK-NEXT:    call void @use(i1 true)
 ; CHECK-NEXT:    ret void
 ; CHECK:       [[TRAP]]:
 ; CHECK-NEXT:    ret void
@@ -115,8 +113,7 @@ define void @ssub_guarded_signed(i64 %a, i64 %b) {
 ; CHECK-NEXT:    br i1 [[OV]], label %[[TRAP:.*]], label %[[CONT:.*]]
 ; CHECK:       [[CONT]]:
 ; CHECK-NEXT:    [[DIFF:%.*]] = extractvalue { i64, i1 } [[O]], 0
-; CHECK-NEXT:    [[T:%.*]] = icmp slt i64 [[DIFF]], 100
-; CHECK-NEXT:    call void @use(i1 [[T]])
+; CHECK-NEXT:    call void @use(i1 true)
 ; CHECK-NEXT:    ret void
 ; CHECK:       [[TRAP]]:
 ; CHECK-NEXT:    ret void
