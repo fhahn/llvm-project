@@ -183,12 +183,15 @@ VPValue *PlainCFGBuilder::getOrCreateVPOperand(Value *IRVal) {
   return NewVPVal;
 }
 
-// Copy the branch weights of \p Term, if any, to \p BranchR. They describe the
-// edges leaving Term in the order of its successors, which matches the order of
-// the successors of the VPBasicBlock created for Term's parent.
-static void copyBranchWeights(const Instruction &Term, VPInstruction &BranchR) {
+// Returns the metadata to preserve for terminator \p Term, including its branch
+// weights. They describe the edges leaving Term in the order of its successors,
+// which matches the order of the successors of the VPBasicBlock created for
+// Term's parent.
+static VPIRMetadata getTerminatorMetadata(Instruction &Term) {
+  VPIRMetadata MD(Term);
   if (MDNode *BW = Term.getMetadata(LLVMContext::MD_prof))
-    BranchR.setMetadata(LLVMContext::MD_prof, BW);
+    MD.setMetadata(LLVMContext::MD_prof, BW);
+  return MD;
 }
 
 // Create new VPInstructions in a VPBasicBlock, given its BasicBlock
@@ -214,10 +217,9 @@ void PlainCFGBuilder::createVPInstructionsForVPBB(VPBasicBlock *VPBB,
       // Conditional branch instruction are represented using BranchOnCond
       // recipes.
       VPValue *Cond = getOrCreateVPOperand(Br->getCondition());
-      auto *BranchR = VPIRBuilder.createNaryOp(
-          VPInstruction::BranchOnCond, {Cond}, Inst, {}, VPIRMetadata(*Inst),
-          Inst->getDebugLoc());
-      copyBranchWeights(*Inst, *BranchR);
+      VPIRBuilder.createNaryOp(VPInstruction::BranchOnCond, {Cond}, Inst, {},
+                               getTerminatorMetadata(*Inst),
+                               Inst->getDebugLoc());
       continue;
     }
 
@@ -228,10 +230,9 @@ void PlainCFGBuilder::createVPInstructionsForVPBB(VPBasicBlock *VPBB,
       SmallVector<VPValue *> Ops = {getOrCreateVPOperand(SI->getCondition())};
       for (auto Case : SI->cases())
         Ops.push_back(getOrCreateVPOperand(Case.getCaseValue()));
-      auto *SwitchR =
-          VPIRBuilder.createNaryOp(Instruction::Switch, Ops, Inst, {},
-                                   VPIRMetadata(*Inst), Inst->getDebugLoc());
-      copyBranchWeights(*Inst, *SwitchR);
+      VPIRBuilder.createNaryOp(Instruction::Switch, Ops, Inst, {},
+                               getTerminatorMetadata(*Inst),
+                               Inst->getDebugLoc());
       continue;
     }
 

@@ -1213,10 +1213,7 @@ public:
 
   /// Remove metadata of kind \p Kind, if present.
   void eraseMetadata(unsigned Kind) {
-    llvm::erase_if(Metadata,
-                   [Kind](const std::pair<unsigned, MDNode *> &P) {
-                     return P.first == Kind;
-                   });
+    erase_if(Metadata, [Kind](const auto &P) { return P.first == Kind; });
   }
 
   /// Get metadata of kind \p Kind. Returns nullptr if not found.
