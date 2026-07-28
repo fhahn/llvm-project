@@ -1179,6 +1179,10 @@ struct VPRecipeWithIRFlags : public VPSingleDefRecipe, public VPIRFlags {
 class LLVM_ABI_FOR_TEST VPIRMetadata {
   SmallVector<std::pair<unsigned, MDNode *>> Metadata;
 
+  /// True if the MD_prof metadata in \p Metadata is estimated from static
+  /// heuristics rather than taken from the original IR's profile data.
+  bool EstimatedProfile = false;
+
 public:
   VPIRMetadata() = default;
 
@@ -1207,13 +1211,30 @@ public:
       Metadata.emplace_back(Kind, Node);
   }
 
+  /// Copy the MD_prof metadata of \p From, including whether it is estimated.
+  void copyProfileFrom(const VPIRMetadata &From) {
+    if (MDNode *BW = From.getMetadata(LLVMContext::MD_prof)) {
+      setMetadata(LLVMContext::MD_prof, BW);
+      EstimatedProfile = From.EstimatedProfile;
+    }
+  }
+
   /// Intersect this VPIRMetadata object with \p MD, keeping only metadata
   /// nodes that are common to both.
   void intersect(const VPIRMetadata &MD);
 
   /// Remove metadata of kind \p Kind, if present.
   void eraseMetadata(unsigned Kind) {
+<<<<<<< HEAD
     erase_if(Metadata, [Kind](const auto &P) { return P.first == Kind; });
+=======
+    llvm::erase_if(Metadata,
+                   [Kind](const std::pair<unsigned, MDNode *> &P) {
+                     return P.first == Kind;
+                   });
+    if (Kind == LLVMContext::MD_prof)
+      EstimatedProfile = false;
+>>>>>>> c31fa9b71c47 ([VPlan] Record estimated branch probabilities on VPlan0 for cost modeling)
   }
 
   /// Get metadata of kind \p Kind. Returns nullptr if not found.
@@ -1221,6 +1242,18 @@ public:
     auto It =
         find_if(Metadata, [Kind](const auto &P) { return P.first == Kind; });
     return It != Metadata.end() ? It->second : nullptr;
+  }
+
+  /// Returns true if the MD_prof metadata is estimated from static heuristics
+  /// rather than taken from the original IR's profile data.
+  bool hasEstimatedProfile() const { return EstimatedProfile; }
+
+  /// Set MD_prof metadata \p Node estimated from static heuristics. Such
+  /// metadata must only be used for cost modeling and is dropped before
+  /// codegen, see dropEstimatedProfiles.
+  void setEstimatedProfile(MDNode *Node) {
+    setMetadata(LLVMContext::MD_prof, Node);
+    EstimatedProfile = true;
   }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)

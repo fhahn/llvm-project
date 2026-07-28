@@ -140,9 +140,16 @@ struct VPlanTransforms {
   ///    \   |
   ///     \  v
   ///      >[ ]     <-- original loop exit block(s), wrapped in VPIRBasicBlocks.
+  ///
+  /// The branch weights of the loop's conditional branches are recorded as
+  /// MD_prof on the branch recipes created for them. If \p BPI is non-null,
+  /// branches without profile data get estimated weights, marked as estimated
+  /// so they are only used for cost modeling, see VPIRMetadata.
   LLVM_ABI_FOR_TEST static std::unique_ptr<VPlan>
   buildVPlan0(Loop *TheLoop, LoopInfo &LI, Type *InductionTy,
-              PredicatedScalarEvolution &PSE, LoopVersioning *LVer = nullptr);
+              PredicatedScalarEvolution &PSE,
+              const BranchProbabilityInfo *BPI = nullptr,
+              LoopVersioning *LVer = nullptr);
 
   /// Replace VPPhi recipes in \p Plan's header with corresponding
   /// VPHeaderPHIRecipe subclasses for inductions, reductions, and
@@ -374,6 +381,14 @@ struct VPlanTransforms {
 
   /// Replace loop regions with explicit CFG.
   static void dissolveLoopRegions(VPlan &Plan);
+
+  /// Drop MD_prof metadata estimated from static heuristics rather than taken
+  /// from the original IR's profile data. Such metadata is only meaningful for
+  /// cost modeling and must not be emitted as profile data. Must run after
+  /// abstract recipes have been decomposed, as those hide the recipes carrying
+  /// the metadata.
+  static void dropEstimatedProfiles(VPlan &Plan);
+
 
   /// Expand BranchOnTwoConds instructions into explicit CFG with
   /// BranchOnCond instructions. Should be called after dissolveLoopRegions.

@@ -56,6 +56,18 @@ class VPPredicator {
   /// without a known one, see computeBlockProbability.
   DenseMap<const VPBasicBlock *, BranchProbability> BlockProbabilities;
 
+<<<<<<< HEAD
+=======
+  /// Blocks whose probability is composed from at least one estimated edge
+  /// probability, and which must therefore not reach codegen.
+  DenseSet<const VPBasicBlock *> EstimatedProbabilities;
+
+  /// Returns the probability of the edge from \p Src to \p Dst, taken from the
+  /// branch weights recorded on Src's terminator, or nullopt if unknown.
+  std::optional<BranchProbability> getEdgeProbability(const VPBasicBlock *Src,
+                                                      const VPBasicBlock *Dst);
+
+>>>>>>> c31fa9b71c47 ([VPlan] Record estimated branch probabilities on VPlan0 for cost modeling)
   /// Create an edge mask for every destination of cases and/or default.
   void createSwitchEdgeMasks(const VPInstruction *SI);
 
@@ -123,6 +135,12 @@ public:
   /// RPO, so all predecessors have been processed already.
   MDNode *computeBlockProbability(VPBasicBlock *VPBB, VPBasicBlock *Header);
 
+  /// Returns true if the probability of \p VPBB is composed from at least one
+  /// estimated edge probability.
+  bool hasEstimatedProbability(const VPBasicBlock *VPBB) const {
+    return EstimatedProbabilities.contains(VPBB);
+  }
+
   /// Convert phi recipes in \p VPBB to VPBlendRecipes.
   void convertPhisToBlends(VPBasicBlock *VPBB);
 };
@@ -157,6 +175,7 @@ static BranchProbability getEdgeProbability(const VPBasicBlock *Src,
   return BranchProbability::getBranchProbability(ToDst, Total);
 }
 
+<<<<<<< HEAD
 MDNode *VPPredicator::computeBlockProbability(VPBasicBlock *VPBB,
                                               VPBasicBlock *Header) {
   // The header always executes. Any other block executes if any of its incoming
@@ -185,6 +204,48 @@ MDNode *VPPredicator::computeBlockProbability(VPBasicBlock *VPBB,
     }
   }
   BlockProbabilities[VPBB] = Prob;
+=======
+void VPPredicator::computeBlockProbability(VPBasicBlock *VPBB,
+                                           VPBasicBlock *Header) {
+  if (VPBB == Header) {
+    BlockProbabilities[VPBB] = BranchProbability::getOne();
+    return;
+  }
+
+  // The block is executed if any of its incoming edges is taken. Bail out if
+  // the probability of any of them is unknown.
+  BranchProbability Prob = BranchProbability::getZero();
+  bool IsEstimated = false;
+  for (VPBlockBase *Pred : VPBB->getPredecessors()) {
+    auto *PredVPBB = cast<VPBasicBlock>(Pred);
+    auto PredProb = BlockProbabilities.find(PredVPBB);
+    if (PredProb == BlockProbabilities.end())
+      return;
+    std::optional<BranchProbability> EdgeProb =
+        getEdgeProbability(PredVPBB, VPBB);
+    if (!EdgeProb)
+      return;
+    // The composed probability is only as trustworthy as its least trustworthy
+    // input: it is estimated if the predecessor's probability is, or if the
+    // edge weights it is derived from are.
+    auto *Term = dyn_cast_or_null<VPInstruction>(PredVPBB->getTerminator());
+    IsEstimated |= EstimatedProbabilities.contains(PredVPBB) ||
+                   (Term && Term->hasEstimatedProfile());
+    // Multiplying probabilities rounds down to zero once the result drops
+    // below BranchProbability's resolution, e.g. for deeply nested predicates.
+    // Keep such blocks at the smallest non-zero probability, as they are rarely
+    // but not never executed.
+    BranchProbability Contribution = PredProb->second * *EdgeProb;
+    if (Contribution.isZero() && !PredProb->second.isZero() &&
+        !EdgeProb->isZero())
+      Contribution = BranchProbability::getRaw(1);
+    Prob += Contribution;
+  }
+  BlockProbabilities[VPBB] = Prob;
+  if (IsEstimated)
+    EstimatedProbabilities.insert(VPBB);
+}
+>>>>>>> c31fa9b71c47 ([VPlan] Record estimated branch probabilities on VPlan0 for cost modeling)
 
   // An unknown, never or always executed block carries no useful information.
   if (Prob.isUnknown() || Prob.isZero() || Prob.isOne())
@@ -515,12 +576,21 @@ void VPlanTransforms::introduceMasksAndLinearize(VPlan &Plan) {
     // end up on the branch guarding the block once replicate regions are
     // created and dissolved. They must be dropped from any recipe that does
     // not become a branch, as branch_weights are only valid on branches.
+<<<<<<< HEAD
+=======
+    MDNode *Weights = Predicator.getBlockProbabilityWeights(VPBB);
+    bool IsEstimated = Predicator.hasEstimatedProbability(VPBB);
+>>>>>>> c31fa9b71c47 ([VPlan] Record estimated branch probabilities on VPlan0 for cost modeling)
     for (VPRecipeBase &R : *VPBB) {
       auto *VPI = dyn_cast<VPInstruction>(&R);
       if (!VPI)
         continue;
       VPI->addMask(BlockMask);
-      if (Weights)
+      if (!Weights)
+        continue;
+      if (IsEstimated)
+        VPI->setEstimatedProfile(Weights);
+      else
         VPI->setMetadata(LLVMContext::MD_prof, Weights);
     }
   }

@@ -412,6 +412,15 @@ static bool sinkScalarOperands(VPlan &Plan) {
   return Changed;
 }
 
+/// Returns the reciprocal entry probability encoded in the branch weights \p BW,
+/// i.e. the total weight, or 1 if \p BW is null.
+static uint64_t getReciprocalFromBranchWeights(MDNode *BW) {
+  uint64_t Total;
+  if (BW && extractProfTotalWeight(BW, Total))
+    return Total;
+  return 1;
+}
+
 /// If \p R is a triangle region, return the 'then' block of the triangle.
 static VPBasicBlock *getPredicatedThenBlock(VPRegionBlock *R) {
   auto *EntryBB = cast<VPBasicBlock>(R->getEntry());
@@ -477,6 +486,18 @@ static bool mergeReplicateRegionsIntoSuccessors(VPlan &Plan) {
     if (!Then1 || !Then2)
       continue;
 
+    // The merged region is entered whenever either of the original regions was,
+    // so its recipes execute at least as often as the more frequently entered
+    // one. Use the smaller reciprocal probability, i.e. the more conservative
+    // of the two, for the guard of the merged region.
+    VPBranchOnMaskRecipe *Guard1 = Region1->getEntryBranchOnMask();
+    VPBranchOnMaskRecipe *Guard2 = Region2->getEntryBranchOnMask();
+    if (getReciprocalFromBranchWeights(
+            Guard1->getMetadata(LLVMContext::MD_prof)) <
+        getReciprocalFromBranchWeights(
+            Guard2->getMetadata(LLVMContext::MD_prof)))
+      Guard2->copyProfileFrom(*Guard1);
+
     // Note: No fusion-preventing memory dependencies are expected in either
     // region. Such dependencies should be rejected during earlier dependence
     // checks, which guarantee accesses can be re-ordered for vectorization.
@@ -535,6 +556,7 @@ static VPRegionBlock *createReplicateRegion(VPReplicateRecipe *PredRecipe,
   auto *MaskDef = BlockInMask->getDefiningRecipe();
   auto *BOMRecipe = new VPBranchOnMaskRecipe(
       BlockInMask, MaskDef ? MaskDef->getDebugLoc() : DebugLoc::getUnknown());
+<<<<<<< HEAD
   // Move the predicated block's branch weights from PredRecipe onto the
   // guarding branch-on-mask, where they describe how often the block is
   // entered and are emitted as MD_prof when the region is dissolved. They must
@@ -544,6 +566,12 @@ static VPRegionBlock *createReplicateRegion(VPReplicateRecipe *PredRecipe,
     BOMRecipe->setMetadata(LLVMContext::MD_prof, BW);
     PredRecipe->eraseMetadata(LLVMContext::MD_prof);
   }
+=======
+  // The predicated block's branch weights are recorded on \p PredRecipe. Move
+  // them onto the guarding branch-on-mask, where they describe how often the
+  // block is entered and are emitted as MD_prof when the region is dissolved.
+  BOMRecipe->copyProfileFrom(*PredRecipe);
+>>>>>>> c31fa9b71c47 ([VPlan] Record estimated branch probabilities on VPlan0 for cost modeling)
   auto *Entry =
       Plan.createVPBasicBlock(Twine(RegionName) + ".entry", BOMRecipe);
 
@@ -2655,6 +2683,37 @@ bool VPlanTransforms::removeBranchOnConst(VPlan &Plan, bool OnlyLatches) {
   return SimplifiedPhi;
 }
 
+<<<<<<< HEAD
+=======
+/// Drop the branch weights recorded during predication from all recipes that
+/// do not turn into a branch. They describe how often the predicated block
+/// executes, which only remains meaningful on the branch-on-mask guarding a
+/// replicate region, created from predicated VPReplicateRecipes below.
+/// branch_weights are not valid on any other instruction.
+static void dropNonBranchProbabilities(VPlan &Plan) {
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_deep(Plan.getEntry()))) {
+    for (VPRecipeBase &R : *VPBB) {
+      auto *RepR = dyn_cast<VPReplicateRecipe>(&R);
+      if (RepR && RepR->isPredicated())
+        continue;
+      if (auto *MD = dyn_cast<VPIRMetadata>(&R))
+        MD->eraseMetadata(LLVMContext::MD_prof);
+    }
+  }
+}
+
+void VPlanTransforms::dropEstimatedProfiles(VPlan &Plan) {
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_deep(Plan.getEntry()))) {
+    for (VPRecipeBase &R : *VPBB) {
+      auto *MD = dyn_cast<VPIRMetadata>(&R);
+      if (MD && MD->hasEstimatedProfile())
+        MD->eraseMetadata(LLVMContext::MD_prof);
+    }
+  }
+}
+>>>>>>> c31fa9b71c47 ([VPlan] Record estimated branch probabilities on VPlan0 for cost modeling)
 void VPlanTransforms::optimize(VPlan &Plan) {
   RUN_VPLAN_PASS(removeRedundantInductionCasts, Plan);
 

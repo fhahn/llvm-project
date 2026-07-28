@@ -21,6 +21,7 @@
 #include "VPlanTransforms.h"
 #include "VPlanUtils.h"
 #include "llvm/ADT/SmallVectorExtras.h"
+#include "llvm/Analysis/BranchProbabilityInfo.h"
 #include "llvm/Analysis/Loads.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/LoopIterator.h"
@@ -53,6 +54,10 @@ class PlainCFGBuilder {
   // Loop versioning for alias metadata.
   LoopVersioning *LVer;
 
+  // Branch probabilities for the incoming IR, used to estimate the weights of
+  // branches without profile data. Only used for cost modeling. May be null.
+  const BranchProbabilityInfo *BPI;
+
   // Vectorization plan that we are working on.
   std::unique_ptr<VPlan> Plan;
 
@@ -79,10 +84,12 @@ class PlainCFGBuilder {
 #endif
   VPValue *getOrCreateVPOperand(Value *IRVal);
   void createVPInstructionsForVPBB(VPBasicBlock *VPBB, BasicBlock *BB);
+  void setBranchWeights(const Instruction &Term, VPInstruction &BranchR);
 
 public:
-  PlainCFGBuilder(Loop *Lp, LoopInfo *LI, LoopVersioning *LVer, Type *IdxTy)
-      : TheLoop(Lp), LI(LI), LVer(LVer),
+  PlainCFGBuilder(Loop *Lp, LoopInfo *LI, LoopVersioning *LVer, Type *IdxTy,
+                  const BranchProbabilityInfo *BPI = nullptr)
+      : TheLoop(Lp), LI(LI), LVer(LVer), BPI(BPI),
         Plan(std::make_unique<VPlan>(Lp, IdxTy)) {}
 
   /// Build plain CFG for TheLoop and connect it to Plan's entry.
@@ -183,6 +190,7 @@ VPValue *PlainCFGBuilder::getOrCreateVPOperand(Value *IRVal) {
   return NewVPVal;
 }
 
+<<<<<<< HEAD
 // Returns the metadata to preserve for terminator \p Term, including its branch
 // weights. They describe the edges leaving Term in the order of its successors,
 // which matches the order of the successors of the VPBasicBlock created for
@@ -192,6 +200,30 @@ static VPIRMetadata getTerminatorMetadata(Instruction &Term) {
   if (MDNode *BW = Term.getMetadata(LLVMContext::MD_prof))
     MD.setMetadata(LLVMContext::MD_prof, BW);
   return MD;
+=======
+// Record the branch weights of \p Term on \p BranchR. They describe the edges
+// leaving Term in the order of its successors, which matches the order of the
+// successors of the VPBasicBlock created for Term's parent.
+//
+// The weights of the original IR are preserved through to codegen. If Term has
+// no profile data, the weights estimated by BranchProbabilityInfo are recorded
+// instead, marked as estimated so they are only used for cost modeling and
+// dropped before codegen.
+void PlainCFGBuilder::setBranchWeights(const Instruction &Term,
+                                       VPInstruction &BranchR) {
+  if (MDNode *BW = Term.getMetadata(LLVMContext::MD_prof)) {
+    BranchR.setMetadata(LLVMContext::MD_prof, BW);
+    return;
+  }
+  if (!BPI)
+    return;
+  const BasicBlock *Src = Term.getParent();
+  SmallVector<uint32_t> Weights;
+  for (unsigned I : seq(Term.getNumSuccessors()))
+    Weights.push_back(BPI->getEdgeProbability(Src, I).getNumerator());
+  BranchR.setEstimatedProfile(
+      MDBuilder(Plan->getContext()).createBranchWeights(Weights));
+>>>>>>> c31fa9b71c47 ([VPlan] Record estimated branch probabilities on VPlan0 for cost modeling)
 }
 
 // Create new VPInstructions in a VPBasicBlock, given its BasicBlock
@@ -217,9 +249,16 @@ void PlainCFGBuilder::createVPInstructionsForVPBB(VPBasicBlock *VPBB,
       // Conditional branch instruction are represented using BranchOnCond
       // recipes.
       VPValue *Cond = getOrCreateVPOperand(Br->getCondition());
+<<<<<<< HEAD
       VPIRBuilder.createNaryOp(VPInstruction::BranchOnCond, {Cond}, Inst, {},
                                getTerminatorMetadata(*Inst),
                                Inst->getDebugLoc());
+=======
+      auto *BranchR = VPIRBuilder.createNaryOp(
+          VPInstruction::BranchOnCond, {Cond}, Inst, {}, VPIRMetadata(*Inst),
+          Inst->getDebugLoc());
+      setBranchWeights(*Inst, *BranchR);
+>>>>>>> c31fa9b71c47 ([VPlan] Record estimated branch probabilities on VPlan0 for cost modeling)
       continue;
     }
 
@@ -230,9 +269,16 @@ void PlainCFGBuilder::createVPInstructionsForVPBB(VPBasicBlock *VPBB,
       SmallVector<VPValue *> Ops = {getOrCreateVPOperand(SI->getCondition())};
       for (auto Case : SI->cases())
         Ops.push_back(getOrCreateVPOperand(Case.getCaseValue()));
+<<<<<<< HEAD
       VPIRBuilder.createNaryOp(Instruction::Switch, Ops, Inst, {},
                                getTerminatorMetadata(*Inst),
                                Inst->getDebugLoc());
+=======
+      auto *SwitchR =
+          VPIRBuilder.createNaryOp(Instruction::Switch, Ops, Inst, {},
+                                   VPIRMetadata(*Inst), Inst->getDebugLoc());
+      setBranchWeights(*Inst, *SwitchR);
+>>>>>>> c31fa9b71c47 ([VPlan] Record estimated branch probabilities on VPlan0 for cost modeling)
       continue;
     }
 
@@ -631,8 +677,9 @@ static void printAfterInitialConstruction(VPlan &) {}
 std::unique_ptr<VPlan>
 VPlanTransforms::buildVPlan0(Loop *TheLoop, LoopInfo &LI, Type *InductionTy,
                              PredicatedScalarEvolution &PSE,
+                             const BranchProbabilityInfo *BPI,
                              LoopVersioning *LVer) {
-  PlainCFGBuilder Builder(TheLoop, &LI, LVer, InductionTy);
+  PlainCFGBuilder Builder(TheLoop, &LI, LVer, InductionTy, BPI);
   std::unique_ptr<VPlan> VPlan0 = Builder.buildPlainCFG();
   addInitialSkeleton(*VPlan0, InductionTy, PSE, TheLoop);
   simplifyLiveInsWithSCEV(*VPlan0, PSE);

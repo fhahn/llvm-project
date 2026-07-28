@@ -1036,6 +1036,10 @@ public:
   getPredBlockCostDivisor(TargetTransformInfo::TargetCostKind CostKind,
                           const BasicBlock *BB);
 
+  /// Returns the BranchProbabilityInfo for the function, which is retained by
+  /// the BlockFrequencyInfo. Returns nullptr if unavailable.
+  const BranchProbabilityInfo *getBPI() { return getBFI().getBPI(); }
+
   /// Returns true if an artificially high cost for emulated masked memrefs
   /// should be used.
   bool useEmulatedMaskMemRefHack(Instruction *I, ElementCount VF);
@@ -5633,8 +5637,24 @@ void VPCostContext::invalidateWideningDecision(Instruction *I,
                          LoopVectorizationCostModel::CM_InvalidatedDecision, 0);
 }
 
-uint64_t VPCostContext::getPredBlockCostDivisor(BasicBlock *BB) const {
-  return CM.getPredBlockCostDivisor(CostKind, BB);
+uint64_t
+VPCostContext::getPredBlockCostDivisor(const VPRegionBlock *Region) const {
+  if (CostKind == TTI::TCK_CodeSize)
+    return 1;
+  // The branch weights of the guarding branch-on-mask describe how often the
+  // predicated block is entered, relative to the loop header. They are composed
+  // from all the predicates guarding the block when introducing masks, so there
+  // is no need to reach back to the original IR.
+  const auto *BOM = Region->getEntryBranchOnMask();
+  SmallVector<uint32_t, 2> Weights;
+  if (!extractBranchWeights(BOM->getMetadata(LLVMContext::MD_prof), Weights) ||
+      Weights[0] == 0)
+    return 1;
+  // The weights are {Taken, NotTaken}; the block executes with probability
+  // Taken / (Taken + NotTaken), so scale its cost by the inverse. Round to
+  // nearest, as the weights are a fixed-point approximation of the probability.
+  uint64_t Total = (uint64_t)Weights[0] + Weights[1];
+  return std::max<uint64_t>((Total + Weights[0] / 2) / Weights[0], 1);
 }
 
 bool VPCostContext::willBeScalarized(Instruction *I, ElementCount VF) const {
@@ -5982,6 +6002,10 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   RUN_VPLAN_PASS(VPlanTransforms::removeDeadRecipes, BestVPlan);
 
   RUN_VPLAN_PASS(VPlanTransforms::convertToConcreteRecipes, BestVPlan);
+  // Estimated branch weights have served their purpose in the cost model by
+  // now. Drop them once abstract recipes have been decomposed, which exposes
+  // the recipes they were bundled into, so they cannot reach codegen.
+  RUN_VPLAN_PASS(VPlanTransforms::dropEstimatedProfiles, BestVPlan);
   // Convert the exit condition to AVLNext == 0 for EVL tail folded loops.
   RUN_VPLAN_PASS(VPlanTransforms::convertEVLExitCond, BestVPlan);
   // Regions are dissolved after optimizing for VF and UF, which completely
@@ -6532,10 +6556,12 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
   }
 
   // Create initial base VPlan0, to serve as common starting point for all
-  // candidates built later for specific VF ranges.
-  auto VPlan0 = VPlanTransforms::buildVPlan0(OrigLoop, *LI,
-                                             Legal->getWidestInductionType(),
-                                             PSE, LVer ? &*LVer : nullptr);
+  // candidates built later for specific VF ranges. The branch weights of the
+  // original loop are recorded on the branch recipes, with branches lacking
+  // profile data getting estimated weights for cost modeling.
+  auto VPlan0 = VPlanTransforms::buildVPlan0(
+      OrigLoop, *LI, Legal->getWidestInductionType(), PSE, CM.getBPI(),
+      LVer ? &*LVer : nullptr);
 
   VPDominatorTree VPDT(*VPlan0);
   if (const LoopAccessInfo *LAI = Legal->getLAI())
