@@ -18,8 +18,7 @@ define i1 @usub_sat_lower_bound(i64 %a, i64 %b) {
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[PRE]])
 ; CHECK-NEXT:    [[SUB:%.*]] = call i64 @llvm.usub.sat.i64(i64 [[A]], i64 [[B]])
 ; CHECK-NEXT:    [[ADD:%.*]] = add nuw i64 [[SUB]], [[B]]
-; CHECK-NEXT:    [[C:%.*]] = icmp uge i64 [[ADD]], [[A]]
-; CHECK-NEXT:    ret i1 [[C]]
+; CHECK-NEXT:    ret i1 true
 ;
   %pre = icmp uge i64 %a, %b
   call void @llvm.assume(i1 %pre)
@@ -37,8 +36,7 @@ define i1 @usub_sat_upper_bound_of_sum(i64 %a, i64 %b) {
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[PRE]])
 ; CHECK-NEXT:    [[SUB:%.*]] = call i64 @llvm.usub.sat.i64(i64 [[A]], i64 [[B]])
 ; CHECK-NEXT:    [[ADD:%.*]] = add nuw i64 [[SUB]], [[B]]
-; CHECK-NEXT:    [[C:%.*]] = icmp ule i64 [[ADD]], [[A]]
-; CHECK-NEXT:    ret i1 [[C]]
+; CHECK-NEXT:    ret i1 true
 ;
   %pre = icmp uge i64 %a, %b
   call void @llvm.assume(i1 %pre)
@@ -58,8 +56,7 @@ define i1 @usub_sat_lower_bound_branch(i64 %a, i64 %b) {
 ; CHECK:       [[BB]]:
 ; CHECK-NEXT:    [[SUB:%.*]] = call i64 @llvm.usub.sat.i64(i64 [[A]], i64 [[B]])
 ; CHECK-NEXT:    [[ADD:%.*]] = add nuw i64 [[SUB]], [[B]]
-; CHECK-NEXT:    [[C:%.*]] = icmp uge i64 [[ADD]], [[A]]
-; CHECK-NEXT:    ret i1 [[C]]
+; CHECK-NEXT:    ret i1 true
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret i1 false
 ;
@@ -85,8 +82,7 @@ define i1 @usub_sat_lower_bound_strict_precond(i64 %a, i64 %b) {
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[PRE]])
 ; CHECK-NEXT:    [[SUB:%.*]] = call i64 @llvm.usub.sat.i64(i64 [[A]], i64 [[B]])
 ; CHECK-NEXT:    [[ADD:%.*]] = add nuw i64 [[SUB]], [[B]]
-; CHECK-NEXT:    [[C:%.*]] = icmp uge i64 [[ADD]], [[A]]
-; CHECK-NEXT:    ret i1 [[C]]
+; CHECK-NEXT:    ret i1 true
 ;
   %pre = icmp ugt i64 %a, %b
   call void @llvm.assume(i1 %pre)
@@ -107,8 +103,7 @@ define i1 @usub_sat_span_offset_bound(i64 %count, i64 %base, i64 %i) {
 ; CHECK-NEXT:    [[INBOUNDS:%.*]] = icmp ult i64 [[I]], [[LIM]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[INBOUNDS]])
 ; CHECK-NEXT:    [[IDX:%.*]] = add nuw i64 [[BASE]], [[I]]
-; CHECK-NEXT:    [[C:%.*]] = icmp ult i64 [[IDX]], [[COUNT]]
-; CHECK-NEXT:    ret i1 [[C]]
+; CHECK-NEXT:    ret i1 true
 ;
   %pre = icmp ule i64 %base, %count
   call void @llvm.assume(i1 %pre)
@@ -130,8 +125,7 @@ define i1 @usub_sat_decompose_operands(i64 %a, i64 %b) {
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[PRE]])
 ; CHECK-NEXT:    [[SUB:%.*]] = call i64 @llvm.usub.sat.i64(i64 [[A]], i64 [[B1]])
 ; CHECK-NEXT:    [[ADD:%.*]] = add nuw i64 [[SUB]], [[B]]
-; CHECK-NEXT:    [[C:%.*]] = icmp ult i64 [[ADD]], [[A]]
-; CHECK-NEXT:    ret i1 [[C]]
+; CHECK-NEXT:    ret i1 true
 ;
   %b1 = add nuw i64 %b, 1
   %pre = icmp uge i64 %a, %b1
