@@ -27,8 +27,7 @@ define void @sadd_guarded_signed(i64 %a, i64 %b) {
 ; CHECK-NEXT:    br i1 [[OV]], label %[[TRAP:.*]], label %[[CONT:.*]]
 ; CHECK:       [[CONT]]:
 ; CHECK-NEXT:    [[SUM:%.*]] = extractvalue { i64, i1 } [[O]], 0
-; CHECK-NEXT:    [[T:%.*]] = icmp slt i64 [[SUM]], 100
-; CHECK-NEXT:    call void @use(i1 [[T]])
+; CHECK-NEXT:    call void @use(i1 true)
 ; CHECK-NEXT:    ret void
 ; CHECK:       [[TRAP]]:
 ; CHECK-NEXT:    ret void
@@ -71,8 +70,7 @@ define void @sadd_guarded_unsigned(i64 %a, i64 %b) {
 ; CHECK-NEXT:    br i1 [[OV]], label %[[TRAP:.*]], label %[[CONT:.*]]
 ; CHECK:       [[CONT]]:
 ; CHECK-NEXT:    [[SUM:%.*]] = extractvalue { i64, i1 } [[O]], 0
-; CHECK-NEXT:    [[T:%.*]] = icmp ult i64 [[SUM]], 100
-; CHECK-NEXT:    call void @use(i1 [[T]])
+; CHECK-NEXT:    call void @use(i1 true)
 ; CHECK-NEXT:    ret void
 ; CHECK:       [[TRAP]]:
 ; CHECK-NEXT:    ret void
@@ -115,8 +113,7 @@ define void @ssub_guarded_signed(i64 %a, i64 %b) {
 ; CHECK-NEXT:    br i1 [[OV]], label %[[TRAP:.*]], label %[[CONT:.*]]
 ; CHECK:       [[CONT]]:
 ; CHECK-NEXT:    [[DIFF:%.*]] = extractvalue { i64, i1 } [[O]], 0
-; CHECK-NEXT:    [[T:%.*]] = icmp slt i64 [[DIFF]], 100
-; CHECK-NEXT:    call void @use(i1 [[T]])
+; CHECK-NEXT:    call void @use(i1 true)
 ; CHECK-NEXT:    ret void
 ; CHECK:       [[TRAP]]:
 ; CHECK-NEXT:    ret void
@@ -386,4 +383,38 @@ cont:
 
 trap:
   ret void
+}
+
+; The recorded value component may be folded away while the pass is still
+; running: here the constant-RHS sadd rule replaces %sum and detaches it from
+; its intrinsic (the aggregate operand becomes poison). A later fact mentioning
+; %sum must not try to decompose it.
+define i64 @erased_guarded_op_is_not_decomposed(i64 %d) {
+; CHECK-LABEL: define i64 @erased_guarded_op_is_not_decomposed(
+; CHECK-SAME: i64 [[D:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    br i1 false, label %[[TRAP:.*]], label %[[CONT:.*]]
+; CHECK:       [[CONT]]:
+; CHECK-NEXT:    [[C:%.*]] = icmp ule i64 12, [[D]]
+; CHECK-NEXT:    br i1 [[C]], label %[[USE:.*]], label %[[TRAP]]
+; CHECK:       [[USE]]:
+; CHECK-NEXT:    ret i64 [[D]]
+; CHECK:       [[TRAP]]:
+; CHECK-NEXT:    ret i64 0
+;
+entry:
+  %o = call { i64, i1 } @llvm.sadd.with.overflow.i64(i64 3, i64 9)
+  %ov = extractvalue { i64, i1 } %o, 1
+  br i1 %ov, label %trap, label %cont
+
+cont:
+  %sum = extractvalue { i64, i1 } %o, 0
+  %c = icmp ule i64 %sum, %d
+  br i1 %c, label %use, label %trap
+
+use:
+  ret i64 %d
+
+trap:
+  ret i64 0
 }
