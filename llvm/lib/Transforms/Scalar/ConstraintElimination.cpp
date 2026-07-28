@@ -285,6 +285,11 @@ class ConstraintInfo {
 
   const DataLayout &DL;
 
+  /// Value components (`extractvalue <0>`) of signed checked add/sub
+  /// intrinsics that are only evaluated when the operation did not overflow.
+  /// See collectGuardedCheckedOps.
+  SmallPtrSet<const Value *, 4> GuardedCheckedOps;
+
 public:
   ConstraintInfo(const DataLayout &DL, ArrayRef<Value *> FunctionArgs)
       : UnsignedCS(FunctionArgs), SignedCS(FunctionArgs), DL(DL) {
@@ -319,6 +324,16 @@ public:
   /// Returns true if \p V is known to be non-negative, either because the
   /// signed system implies it or because ValueTracking can prove it.
   bool isKnownNonNegative(Value *V) const;
+
+  /// Record that \p EV, the value component of a signed checked add/sub, is
+  /// only reachable when that operation did not overflow, so it can be
+  /// decomposed as the exact sum/difference of its operands.
+  void addGuardedCheckedOp(const Value *EV) { GuardedCheckedOps.insert(EV); }
+
+  /// Returns true if \p V was recorded by addGuardedCheckedOp.
+  bool isGuardedCheckedOp(const Value *V) const {
+    return GuardedCheckedOps.contains(V);
+  }
 
   void addFact(CmpInst::Predicate Pred, Value *A, Value *B, unsigned NumIn,
                unsigned NumOut, SmallVectorImpl<StackEntry> &DFSInStack);
@@ -490,6 +505,49 @@ static bool preconditionHolds(const ConstraintInfo &Info,
   return Info.doesHold(Pred, Op, ConstantInt::get(Op->getType(), RHS));
 }
 
+/// If \p V is the value component of a signed checked add/sub that is only
+/// evaluated when the operation did not overflow (see collectGuardedCheckedOps)
+/// decompose it as the exact sum/difference of the intrinsic's operands.
+/// Returns std::nullopt if \p V is not such a value, or if the decomposition is
+/// not valid in the requested system.
+static std::optional<Decomposition>
+decomposeGuardedCheckedOp(Value *V, const ConstraintInfo &Info, bool IsSigned,
+                          const DataLayout &DL) {
+  if (!Info.isGuardedCheckedOp(V))
+    return std::nullopt;
+  // The recorded value may since have been scheduled for removal, which detaches
+  // it from its intrinsic by poisoning the aggregate operand.  There is nothing
+  // left to decompose then.
+  auto *WO = dyn_cast<WithOverflowInst>(
+      cast<ExtractValueInst>(V)->getAggregateOperand());
+  if (!WO)
+    return std::nullopt;
+  bool IsAdd = WO->getIntrinsicID() == Intrinsic::sadd_with_overflow;
+  Value *Op0 = WO->getLHS();
+  Value *Op1 = WO->getRHS();
+
+  // The absence of signed overflow makes the result the exact mathematical
+  // sum/difference, which is all the signed system needs. The unsigned system
+  // additionally requires the operation to not wrap when interpreted as
+  // unsigned: an add needs both operands non-negative (the sum is then at most
+  // SMAX and cannot wrap), a sub needs the minuend to not be smaller.
+  if (!IsSigned) {
+    if (IsAdd) {
+      for (Value *Op : {Op0, Op1})
+        if (!isKnownNonNegative(Op, DL) &&
+            !preconditionHolds(Info, CmpInst::ICMP_SGE, Op, 0))
+          return std::nullopt;
+    } else if (!Info.doesHold(CmpInst::ICMP_UGE, Op0, Op1))
+      return std::nullopt;
+  }
+
+  auto ResA = decompose(Op0, Info, IsSigned, DL);
+  auto ResB = decompose(Op1, Info, IsSigned, DL);
+  if (IsAdd ? ResA.add(ResB) : ResA.sub(ResB))
+    return std::nullopt;
+  return ResA;
+}
+
 static Decomposition decomposeGEP(GEPOperator &GEP, const ConstraintInfo &Info,
                                   bool IsSigned, const DataLayout &DL) {
   // Do not reason about pointers where the index size is larger than 64 bits,
@@ -564,6 +622,11 @@ static Decomposition decompose(Value *V, const ConstraintInfo &Info,
   // would not.
   if (!Ty->isIntegerTy() || Ty->getIntegerBitWidth() > 64)
     return V;
+
+  // A checked add/sub whose value component is only evaluated when the
+  // operation did not overflow is exactly that sum/difference there.
+  if (auto Decomp = decomposeGuardedCheckedOp(V, Info, IsSigned, DL))
+    return *Decomp;
 
   // Decompose \p V used with a signed predicate.
   if (IsSigned) {
@@ -2354,6 +2417,56 @@ tryToSimplifyOverflowMath(IntrinsicInst *II, ConstraintInfo &Info,
   return Changed;
 }
 
+/// Collect the value components of signed checked add/sub intrinsics that are
+/// only evaluated on the no-overflow edge of the branch on their overflow flag,
+/// and record them in \p Info so decompose can look through them.
+///
+/// Swift emits an overflow-checked `a + b` as
+///   %op = call {i64, i1} @llvm.sadd.with.overflow.i64(i64 %a, i64 %b)
+///   %ov = extractvalue {i64, i1} %op, 1
+///   br i1 %ov, label %trap, label %cont
+/// cont:
+///   %sum = extractvalue {i64, i1} %op, 0
+/// The intrinsic itself is opaque to the solver, which blocks any reasoning
+/// about a bounds check on %sum. On the %cont edge the addition provably did
+/// not overflow, so there %sum is exactly the mathematical sum %a + %b.
+///
+/// Soundness relies on placement rather than on a per-use check: the fact is
+/// attached to the extractvalue *instruction*, and is only recorded when that
+/// instruction's parent block is dominated by the no-overflow edge. By SSA
+/// dominance every use of the extractvalue is then also dominated by that edge,
+/// so there is no program point at which the recorded decomposition is invalid.
+/// An extractvalue placed outside the guarded region (or reachable when the
+/// operation did overflow) is simply not recorded and stays opaque.
+static void collectGuardedCheckedOps(Function &F, DominatorTree &DT,
+                                     ConstraintInfo &Info) {
+  for (BasicBlock &BB : F) {
+    // Only look at branches on the overflow flag of a signed checked op.
+    auto *Br = dyn_cast<CondBrInst>(BB.getTerminator());
+    if (!Br)
+      continue;
+    WithOverflowInst *WO;
+    if (!match(Br->getCondition(), m_ExtractValue<1>(m_WithOverflowInst(WO))))
+      continue;
+    if (WO->getIntrinsicID() != Intrinsic::sadd_with_overflow &&
+        WO->getIntrinsicID() != Intrinsic::ssub_with_overflow)
+      continue;
+    // The overflow flag is false on the second successor, and the value
+    // component only equals the exact sum/difference where that edge holds.
+    BasicBlockEdge NoOverflowEdge(&BB, Br->getSuccessor(1));
+
+    for (User *U : WO->users()) {
+      auto *EV = dyn_cast<ExtractValueInst>(U);
+      if (!EV || EV->getNumIndices() != 1 || *EV->idx_begin() != 0)
+        continue;
+      // Require the extractvalue to be placed inside the no-overflow region,
+      // which by SSA dominance covers all of its uses.
+      if (DT.dominates(NoOverflowEdge, EV->getParent()))
+        Info.addGuardedCheckedOp(EV);
+    }
+  }
+}
+
 static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
                                  ScalarEvolution &SE,
                                  OptimizationRemarkEmitter &ORE,
@@ -2362,6 +2475,7 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
   DT.updateDFSNumbers();
   SmallVector<Value *> FunctionArgs(llvm::make_pointer_range(F.args()));
   ConstraintInfo Info(F.getDataLayout(), FunctionArgs);
+  collectGuardedCheckedOps(F, DT, Info);
   State S(DT, LI, SE, TLI);
   std::unique_ptr<Module> ReproducerModule(
       DumpReproducers ? new Module(F.getName(), F.getContext()) : nullptr);
