@@ -236,6 +236,17 @@ computeBlockProbabilities(ArrayRef<VPBasicBlock *> Blocks);
 /// carries none.
 BranchProbability getRegionEntryProbability(const VPRegionBlock *Region);
 
+/// Returns how much the cost of a block executing with probability \p Prob
+/// should be divided by, i.e. the inverse of \p Prob rounded to nearest.
+/// Returns 1 if \p Prob is unknown or zero, so the cost is not scaled.
+inline uint64_t getCostDivisorForProbability(BranchProbability Prob) {
+  if (Prob.isUnknown() || Prob.isZero())
+    return 1;
+  uint64_t Denominator = BranchProbability::getDenominator();
+  uint64_t Numerator = Prob.getNumerator();
+  return std::max<uint64_t>((Denominator + Numerator / 2) / Numerator, 1);
+}
+
 namespace detail {
 
 /// Template-independent implementation for pullOutPermutations.
