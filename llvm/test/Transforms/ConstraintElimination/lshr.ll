@@ -95,8 +95,7 @@ define i1 @lshr_rescale(i64 noundef %x) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    [[S:%.*]] = lshr i64 [[X]], 3
 ; CHECK-NEXT:    [[M:%.*]] = shl nuw i64 [[S]], 3
-; CHECK-NEXT:    [[CHK:%.*]] = icmp ule i64 [[M]], [[X]]
-; CHECK-NEXT:    ret i1 [[CHK]]
+; CHECK-NEXT:    ret i1 true
 ;
 entry:
   %s = lshr i64 %x, 3
@@ -117,8 +116,7 @@ define i1 @lshr_rescale_chunked_index(i64 %count, i64 %c) {
 ; CHECK:       [[GUARDED]]:
 ; CHECK-NEXT:    [[BASE:%.*]] = shl nuw nsw i64 [[C]], 2
 ; CHECK-NEXT:    [[IDX:%.*]] = add nuw nsw i64 [[BASE]], 3
-; CHECK-NEXT:    [[CHK:%.*]] = icmp ult i64 [[IDX]], [[COUNT]]
-; CHECK-NEXT:    ret i1 [[CHK]]
+; CHECK-NEXT:    ret i1 true
 ; CHECK:       [[OUT]]:
 ; CHECK-NEXT:    ret i1 false
 ;
