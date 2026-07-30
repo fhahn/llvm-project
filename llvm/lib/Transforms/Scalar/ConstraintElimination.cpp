@@ -1856,6 +1856,22 @@ static std::optional<bool> checkCondition(CmpInst::Predicate Pred, Value *A,
   if (auto ImpliedCondition = TryWithConstraint(R))
     return ImpliedCondition;
 
+  // For non-negative operands the signed and unsigned orderings coincide, so an
+  // unsigned comparison can also be answered by the signed system. This is the
+  // reverse of the signed -> unsigned conversion in getConstraintForSolving and
+  // reaches decompositions that are only valid signed, e.g. `xor X, -1` as
+  // `-1 - X`. Run it as a fallback so no fold handled by the unsigned system is
+  // lost.
+  if (CmpInst::isUnsigned(Pred) && A->getType()->isIntegerTy() &&
+      Info.isKnownNonNegative(A) && Info.isKnownNonNegative(B)) {
+    SmallVector<Value *> NewVariables;
+    auto SR = Info.getConstraint(ICmpInst::getSignedPredicate(Pred), A, B,
+                                 NewVariables);
+    if (NewVariables.empty())
+      if (auto ImpliedCondition = TryWithConstraint(SR))
+        return ImpliedCondition;
+  }
+
   // Additionally, query the signed system for eq/ne predicates if we know about
   // A or B.
   if (CmpInst::isEquality(Pred)) {
