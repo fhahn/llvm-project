@@ -128,6 +128,11 @@ static cl::opt<bool> AllowReorderTraps(
              "unanalyzable trap exit, predicate dominating trap exits using a "
              "symbolic upper bound (may change which trap fires and when)"));
 
+static cl::opt<bool> LoopPredicationBypassStores(
+    "indvars-predicate-loop-bypass-stores", cl::Hidden, cl::init(false),
+    cl::desc("When predicating a trap exit, also bypass volatile/atomic stores "
+             "before the trap (assumes they are unobserved before it)"));
+
 static cl::opt<bool>
 AllowIVWidening("indvars-widen-indvars", cl::Hidden, cl::init(true),
                 cl::desc("Allow widening of indvars to eliminate s/zext"));
@@ -2030,8 +2035,9 @@ bool IndVarSimplify::predicateLoopExits(Loop *L, SCEVExpander &Rewriter) {
           // Simple stores cannot be observed by other threads.
           // If HasThreadLocalSideEffects is set, we check
           // crashingBBWithoutEffect to make sure that the crashing BB cannot
-          // observe them either.
-          if (!SI->isSimple())
+          // observe them either.  Non-simple (volatile/atomic) stores are
+          // bypassed only under an explicit opt-in.
+          if (!SI->isSimple() && !LoopPredicationBypassStores)
             return false;
         } else {
           return false;
