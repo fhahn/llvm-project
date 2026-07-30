@@ -321,13 +321,20 @@ public:
   void addFact(CmpInst::Predicate Pred, Value *A, Value *B, unsigned NumIn,
                unsigned NumOut, SmallVectorImpl<StackEntry> &DFSInStack);
 
-  /// Turn a comparison of the form \p Op0 \p Pred \p Op1 into a vector of
-  /// constraints, using indices from the corresponding constraint system.
-  /// New variables that need to be added to the system are collected in
+  /// Add the fact `\p Scale * \p A u<= \p B` to the unsigned system. Scaling
+  /// \p A is needed for facts whose left-hand side is not an IR value and can
+  /// therefore not be named by a plain addFact.
+  void addScaledFact(int64_t Scale, Value *A, Value *B, unsigned NumIn,
+                     unsigned NumOut, SmallVectorImpl<StackEntry> &DFSInStack);
+
+  /// Turn a comparison of the form \p Op0Scale * \p Op0 \p Pred \p Op1 into a
+  /// vector of constraints, using indices from the corresponding constraint
+  /// system. New variables that need to be added to the system are collected in
   /// \p NewVariables.
   ConstraintTy getConstraint(CmpInst::Predicate Pred, Value *Op0, Value *Op1,
                              SmallVectorImpl<Value *> &NewVariables,
-                             bool ForceSignedSystem = false) const;
+                             bool ForceSignedSystem = false,
+                             int64_t Op0Scale = 1) const;
 
   /// Turns a comparison of the form \p Op0 \p Pred \p Op1 into a vector of
   /// constraints using getConstraint. Returns an empty constraint if the result
@@ -348,10 +355,10 @@ public:
 private:
   /// Adds facts into constraint system. \p ForceSignedSystem can be set when
   /// the \p Pred is eq/ne, and signed constraint system is used when it's
-  /// specified.
+  /// specified. \p Op0Scale scales the decomposition of \p A.
   void addFactImpl(CmpInst::Predicate Pred, Value *A, Value *B, unsigned NumIn,
                    unsigned NumOut, SmallVectorImpl<StackEntry> &DFSInStack,
-                   bool ForceSignedSystem);
+                   bool ForceSignedSystem, int64_t Op0Scale = 1);
 
   /// Try to use the inequality \p A != \p B to tighten a non-strict bound the
   /// system already implies to the corresponding strict bound.
@@ -718,10 +725,13 @@ static Decomposition decompose(Value *V, const ConstraintInfo &Info,
 ConstraintTy
 ConstraintInfo::getConstraint(CmpInst::Predicate Pred, Value *Op0, Value *Op1,
                               SmallVectorImpl<Value *> &NewVariables,
-                              bool ForceSignedSystem) const {
+                              bool ForceSignedSystem, int64_t Op0Scale) const {
   assert(NewVariables.empty() && "NewVariables must be empty when passed in");
   assert((!ForceSignedSystem || CmpInst::isEquality(Pred)) &&
          "signed system can only be forced on eq/ne");
+  assert((Op0Scale == 1 || Pred == CmpInst::ICMP_ULE) &&
+         "scaling Op0 is only supported for unsigned <=, which leaves the "
+         "operand order unchanged below");
 
   bool IsEq = false;
   bool IsNe = false;
@@ -765,6 +775,8 @@ ConstraintInfo::getConstraint(CmpInst::Predicate Pred, Value *Op0, Value *Op1,
   auto &Value2Index = getValue2Index(IsSigned);
   auto ADec = decompose(Op0->stripPointerCastsSameRepresentation(), *this,
                         IsSigned, DL);
+  if (Op0Scale != 1 && ADec.mul(Op0Scale))
+    return {};
   auto BDec = decompose(Op1->stripPointerCastsSameRepresentation(), *this,
                         IsSigned, DL);
   int64_t Offset1 = ADec.Offset;
@@ -2087,6 +2099,15 @@ void ConstraintInfo::addFact(CmpInst::Predicate Pred, Value *A, Value *B,
     tightenBoundUsingNe(A, B, NumIn, NumOut, DFSInStack);
 }
 
+void ConstraintInfo::addScaledFact(int64_t Scale, Value *A, Value *B,
+                                   unsigned NumIn, unsigned NumOut,
+                                   SmallVectorImpl<StackEntry> &DFSInStack) {
+  LLVM_DEBUG(dbgs() << "Adding scaled fact: " << Scale << " * " << *A
+                    << " u<= " << *B << "\n");
+  addFactImpl(CmpInst::ICMP_ULE, A, B, NumIn, NumOut, DFSInStack,
+              /*ForceSignedSystem=*/false, Scale);
+}
+
 void ConstraintInfo::tightenBoundUsingNe(
     Value *A, Value *B, unsigned NumIn, unsigned NumOut,
     SmallVectorImpl<StackEntry> &DFSInStack) {
@@ -2131,9 +2152,9 @@ void ConstraintInfo::tightenBoundUsingNe(
 void ConstraintInfo::addFactImpl(CmpInst::Predicate Pred, Value *A, Value *B,
                                  unsigned NumIn, unsigned NumOut,
                                  SmallVectorImpl<StackEntry> &DFSInStack,
-                                 bool ForceSignedSystem) {
+                                 bool ForceSignedSystem, int64_t Op0Scale) {
   SmallVector<Value *> NewVariables;
-  auto R = getConstraint(Pred, A, B, NewVariables, ForceSignedSystem);
+  auto R = getConstraint(Pred, A, B, NewVariables, ForceSignedSystem, Op0Scale);
 
   // TODO: Support non-equality for facts as well.
   if (R.empty() || R.isNe())
@@ -2467,6 +2488,25 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
       }
     };
 
+    // Add the fact `Scale * A u<= B`. The scaled left-hand side is not an IR
+    // value, so it cannot be handed to AddFact as a pair of values. Only the
+    // unsigned system is used, and no signed counterpart is derived.
+    auto AddScaledFact = [&](int64_t Scale, Value *A, Value *B) {
+      if (Info.getCS(/*Signed=*/false).size() > MaxRows) {
+        LLVM_DEBUG(
+            dbgs()
+            << "Skip adding constraint because system has too many rows.\n");
+        return;
+      }
+      Info.addScaledFact(Scale, A, B, CB.NumIn, CB.NumOut, DFSInStack);
+      // The fact cannot be spelled as an icmp, so record placeholders to keep
+      // ReproducerCondStack in sync with DFSInStack.
+      if (ReproducerModule)
+        while (DFSInStack.size() > ReproducerCondStack.size())
+          ReproducerCondStack.emplace_back(ICmpInst::BAD_ICMP_PREDICATE,
+                                           nullptr, nullptr);
+    };
+
     if (!CB.isConditionFact()) {
       Value *X;
       if (match(CB.Inst, m_Intrinsic<Intrinsic::abs>(m_Value(X)))) {
@@ -2515,6 +2555,21 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
         if (BO->getOpcode() == Instruction::LShr) {
           // lshr x, n: result <= x (right shift cannot increase the value)
           AddFact(CmpInst::ICMP_ULE, BO, BO->getOperand(0));
+          // lshr x, k: result * 2^k <= x, for a constant k. Scaling the shifted
+          // value back up by the same power of two recovers x without its low k
+          // bits, and dropping those bits cannot increase the value. This is
+          // the bound needed to relate a chunk count `x >> k` to the index of
+          // the last element those chunks cover. `result * 2^k` is not an IR
+          // value, so the row is added with an explicit scale on the shift
+          // result rather than as a plain fact.
+          auto *Shift = dyn_cast<ConstantInt>(BO->getOperand(1));
+          // A shift amount >= the bit width makes the shift poison, and the
+          // scale must fit the signed 64-bit coefficients of the system.
+          if (Shift && BO->getType()->isIntegerTy() &&
+              Shift->getValue().ult(
+                  std::min(BO->getType()->getIntegerBitWidth(), 63u)))
+            AddScaledFact(int64_t(1) << Shift->getZExtValue(), BO,
+                          BO->getOperand(0));
           continue;
         }
         if (BO->getOpcode() == Instruction::SRem) {
