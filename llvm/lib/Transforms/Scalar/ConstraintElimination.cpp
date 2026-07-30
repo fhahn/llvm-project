@@ -616,6 +616,23 @@ static Decomposition decompose(Value *V, const ConstraintInfo &Info,
       return V;
     }
 
+    // `xor X, -1` is the bitwise complement of X, which as a signed value is
+    // exactly `-1 - X` for every X, with no wrapping and no precondition. This
+    // is only valid in the signed system: read unsigned, the complement is
+    // `2^bw - 1 - X` instead.
+    //
+    // InstCombine canonicalizes `sub (C - 1), X` into `add C, (xor X, -1)`, so
+    // a reverse-iterating index such as `count - 1 - i` reaches us as an add of
+    // a complement. Without this the enclosing `add nsw` cannot be decomposed
+    // either, because its non-negative-operand preconditions never hold for a
+    // complement.
+    if (match(V, m_Not(m_Value(Op0)))) {
+      Decomposition Result(-1);
+      if (!Result.sub(decompose(Op0, Info, IsSigned, DL)))
+        return Result;
+      return V;
+    }
+
     if (match(V, m_NSWSub(m_Value(Op0), m_Value(Op1)))) {
       auto ResA = decompose(Op0, Info, IsSigned, DL);
       auto ResB = decompose(Op1, Info, IsSigned, DL);
