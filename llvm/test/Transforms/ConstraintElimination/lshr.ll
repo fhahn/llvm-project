@@ -85,3 +85,174 @@ guarded:
 out:
   ret i1 false
 }
+
+; `lshr x, k` also gives the stronger bound `(x >> k) * 2^k <= x`, because
+; scaling the shifted value back up recovers x without its low k bits. The
+; scaled left-hand side is not an IR value, so the row is added with an explicit
+; coefficient on the shift result. `noundef` is needed on the arguments of the
+; tests below that have no branch, because otherwise the shift may be poison and
+; no fact is added at all.
+define i1 @lshr_rescale_mul(i64 noundef %x) {
+; CHECK-LABEL: define i1 @lshr_rescale_mul(
+; CHECK-SAME: i64 noundef [[X:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[S:%.*]] = lshr i64 [[X]], 2
+; CHECK-NEXT:    [[M:%.*]] = mul nuw i64 [[S]], 4
+; CHECK-NEXT:    ret i1 true
+;
+entry:
+  %s = lshr i64 %x, 2
+  %m = mul nuw i64 %s, 4
+  %chk = icmp ule i64 %m, %x
+  ret i1 %chk
+}
+
+; Same, with the `shl` form InstCombine canonicalizes the multiply to.
+define i1 @lshr_rescale_shl(i64 noundef %x) {
+; CHECK-LABEL: define i1 @lshr_rescale_shl(
+; CHECK-SAME: i64 noundef [[X:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[S:%.*]] = lshr i64 [[X]], 3
+; CHECK-NEXT:    [[M:%.*]] = shl nuw i64 [[S]], 3
+; CHECK-NEXT:    ret i1 true
+;
+entry:
+  %s = lshr i64 %x, 3
+  %m = shl nuw i64 %s, 3
+  %chk = icmp ule i64 %m, %x
+  ret i1 %chk
+}
+
+; The motivating shape: with `chunks = count >> 2` and `c < chunks`, every index
+; `4 * c + j` for `j <= 3` is in bounds.
+define i1 @lshr_rescale_chunked_index(i64 %count, i64 %c) {
+; CHECK-LABEL: define i1 @lshr_rescale_chunked_index(
+; CHECK-SAME: i64 [[COUNT:%.*]], i64 [[C:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[CHUNKS:%.*]] = lshr i64 [[COUNT]], 2
+; CHECK-NEXT:    [[LT:%.*]] = icmp ult i64 [[C]], [[CHUNKS]]
+; CHECK-NEXT:    br i1 [[LT]], label %[[GUARDED:.*]], label %[[OUT:.*]]
+; CHECK:       [[GUARDED]]:
+; CHECK-NEXT:    [[BASE:%.*]] = shl nuw nsw i64 [[C]], 2
+; CHECK-NEXT:    [[IDX:%.*]] = add nuw nsw i64 [[BASE]], 3
+; CHECK-NEXT:    ret i1 true
+; CHECK:       [[OUT]]:
+; CHECK-NEXT:    ret i1 false
+;
+entry:
+  %chunks = lshr i64 %count, 2
+  %lt = icmp ult i64 %c, %chunks
+  br i1 %lt, label %guarded, label %out
+
+guarded:
+  %base = shl nuw nsw i64 %c, 2
+  %idx = add nuw nsw i64 %base, 3
+  %chk = icmp ult i64 %idx, %count
+  ret i1 %chk
+
+out:
+  ret i1 false
+}
+
+; Negative: the bound is not strict. `4 * (x >> 2) == x` whenever x is a
+; multiple of 4, so `<` must not be folded.
+define i1 @lshr_rescale_not_strict(i64 noundef %x) {
+; CHECK-LABEL: define i1 @lshr_rescale_not_strict(
+; CHECK-SAME: i64 noundef [[X:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[S:%.*]] = lshr i64 [[X]], 2
+; CHECK-NEXT:    [[M:%.*]] = mul nuw i64 [[S]], 4
+; CHECK-NEXT:    [[CHK:%.*]] = icmp ult i64 [[M]], [[X]]
+; CHECK-NEXT:    ret i1 [[CHK]]
+;
+entry:
+  %s = lshr i64 %x, 2
+  %m = mul nuw i64 %s, 4
+  %chk = icmp ult i64 %m, %x
+  ret i1 %chk
+}
+
+; Negative: scaling by more than the shifted-out amount does not hold, e.g.
+; x = 4 gives 5 * 1 > 4.
+define i1 @lshr_rescale_scale_too_large(i64 noundef %x) {
+; CHECK-LABEL: define i1 @lshr_rescale_scale_too_large(
+; CHECK-SAME: i64 noundef [[X:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[S:%.*]] = lshr i64 [[X]], 2
+; CHECK-NEXT:    [[M:%.*]] = mul nuw i64 [[S]], 5
+; CHECK-NEXT:    [[CHK:%.*]] = icmp ule i64 [[M]], [[X]]
+; CHECK-NEXT:    ret i1 [[CHK]]
+;
+entry:
+  %s = lshr i64 %x, 2
+  %m = mul nuw i64 %s, 5
+  %chk = icmp ule i64 %m, %x
+  ret i1 %chk
+}
+
+; Negative: one index past the last element of the last chunk is out of bounds,
+; e.g. count = 4, c = 0 gives idx = 4.
+define i1 @lshr_rescale_chunk_overrun(i64 %count, i64 %c) {
+; CHECK-LABEL: define i1 @lshr_rescale_chunk_overrun(
+; CHECK-SAME: i64 [[COUNT:%.*]], i64 [[C:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[CHUNKS:%.*]] = lshr i64 [[COUNT]], 2
+; CHECK-NEXT:    [[LT:%.*]] = icmp ult i64 [[C]], [[CHUNKS]]
+; CHECK-NEXT:    br i1 [[LT]], label %[[GUARDED:.*]], label %[[OUT:.*]]
+; CHECK:       [[GUARDED]]:
+; CHECK-NEXT:    [[BASE:%.*]] = shl nuw nsw i64 [[C]], 2
+; CHECK-NEXT:    [[IDX:%.*]] = add nuw nsw i64 [[BASE]], 4
+; CHECK-NEXT:    [[CHK:%.*]] = icmp ult i64 [[IDX]], [[COUNT]]
+; CHECK-NEXT:    ret i1 [[CHK]]
+; CHECK:       [[OUT]]:
+; CHECK-NEXT:    ret i1 false
+;
+entry:
+  %chunks = lshr i64 %count, 2
+  %lt = icmp ult i64 %c, %chunks
+  br i1 %lt, label %guarded, label %out
+
+guarded:
+  %base = shl nuw nsw i64 %c, 2
+  %idx = add nuw nsw i64 %base, 4
+  %chk = icmp ult i64 %idx, %count
+  ret i1 %chk
+
+out:
+  ret i1 false
+}
+
+; Negative: a variable shift amount gives no constant scale factor.
+define i1 @lshr_rescale_var_shift(i64 noundef %x, i64 %k) {
+; CHECK-LABEL: define i1 @lshr_rescale_var_shift(
+; CHECK-SAME: i64 noundef [[X:%.*]], i64 [[K:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[S:%.*]] = lshr i64 [[X]], [[K]]
+; CHECK-NEXT:    [[M:%.*]] = mul nuw i64 [[S]], 4
+; CHECK-NEXT:    [[CHK:%.*]] = icmp ule i64 [[M]], [[X]]
+; CHECK-NEXT:    ret i1 [[CHK]]
+;
+entry:
+  %s = lshr i64 %x, %k
+  %m = mul nuw i64 %s, 4
+  %chk = icmp ule i64 %m, %x
+  ret i1 %chk
+}
+
+; Negative: the bound holds for a shift by bitwidth - 1, but 2^63 does not fit
+; the signed 64-bit coefficients of the constraint system, so it is not added.
+define i1 @lshr_rescale_scale_does_not_fit(i64 noundef %x) {
+; CHECK-LABEL: define i1 @lshr_rescale_scale_does_not_fit(
+; CHECK-SAME: i64 noundef [[X:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[S:%.*]] = lshr i64 [[X]], 63
+; CHECK-NEXT:    [[M:%.*]] = shl nuw i64 [[S]], 63
+; CHECK-NEXT:    [[CHK:%.*]] = icmp ule i64 [[M]], [[X]]
+; CHECK-NEXT:    ret i1 [[CHK]]
+;
+entry:
+  %s = lshr i64 %x, 63
+  %m = shl nuw i64 %s, 63
+  %chk = icmp ule i64 %m, %x
+  ret i1 %chk
+}
