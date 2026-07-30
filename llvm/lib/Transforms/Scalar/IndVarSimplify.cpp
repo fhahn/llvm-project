@@ -133,6 +133,19 @@ static cl::opt<bool> LoopPredicationBypassStores(
     cl::desc("When predicating a trap exit, also bypass volatile/atomic stores "
              "before the trap (assumes they are unobserved before it)"));
 
+static cl::opt<bool> LoopPredicationBypassMemSideEffects(
+    "indvars-predicate-loop-bypass-mem-sideeffects", cl::Hidden,
+    cl::init(false),
+    cl::desc("When predicating a trap exit, also bypass calls that only write "
+             "memory and are guaranteed to return (e.g. memset) before the "
+             "trap (assumes the writes are unobserved before it)"));
+
+static cl::opt<bool> LoopPredicationBypassNoReturn(
+    "indvars-predicate-loop-bypass-noreturn", cl::Hidden, cl::init(false),
+    cl::desc("Extends -indvars-predicate-loop-bypass-mem-sideeffects to also "
+             "bypass memory-writing calls that may not return; unsound in "
+             "general (the trap replaces leaving the loop through the call)"));
+
 static cl::opt<bool>
 AllowIVWidening("indvars-widen-indvars", cl::Hidden, cl::init(true),
                 cl::desc("Allow widening of indvars to eliminate s/zext"));
@@ -2040,7 +2053,17 @@ bool IndVarSimplify::predicateLoopExits(Loop *L, SCEVExpander &Rewriter) {
           if (!SI->isSimple() && !LoopPredicationBypassStores)
             return false;
         } else {
-          return false;
+          // A non-store side effect may be bypassed only if skipping it can't
+          // change whether the trap is reached: require a call that only writes
+          // memory, is nounwind, and returns.  -bypass-noreturn drops the
+          // willReturn requirement (unsound: trap replaces leaving via the
+          // call).
+          auto *CB = dyn_cast<CallBase>(&I);
+          bool MayNotReturnOK =
+              LoopPredicationBypassNoReturn || (CB && CB->willReturn());
+          if (!LoopPredicationBypassMemSideEffects || !CB ||
+              !CB->onlyWritesMemory() || !MayNotReturnOK || CB->mayThrow())
+            return false;
         }
       }
 

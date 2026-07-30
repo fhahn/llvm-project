@@ -21,7 +21,7 @@ define i64 @reverse_iterate(i64 %count, ptr %p) {
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[ACC:%.*]] = phi i64 [ [[ACC_NEXT:%.*]], %[[LOOP]] ], [ 0, %[[ENTRY]] ]
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[DEC:%.*]], %[[LOOP]] ], [ [[COUNT]], %[[ENTRY]] ]
-; CHECK-NEXT:    [[DEC]] = add nsw i64 [[IV]], -1
+; CHECK-NEXT:    [[DEC]] = add i64 [[IV]], -1
 ; CHECK-NEXT:    [[GEP:%.*]] = getelementptr inbounds nuw [8 x i8], ptr [[P]], i64 [[DEC]]
 ; CHECK-NEXT:    [[V:%.*]] = load i64, ptr [[GEP]], align 4
 ; CHECK-NEXT:    [[ACC_NEXT]] = add i64 [[V]], [[ACC]]
