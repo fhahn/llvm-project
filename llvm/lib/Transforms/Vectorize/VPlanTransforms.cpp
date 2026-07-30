@@ -129,7 +129,7 @@ bool VPlanTransforms::tryToConvertVPInstructionsToVPRecipes(
           } else {
             NewRecipe = new VPWidenIntrinsicRecipe(
                 *CI, VectorID, drop_end(Ingredient.operands()), CI->getType(),
-                VPIRFlags(*CI), *VPI, CI->getDebugLoc());
+                VPIRFlags(*CI), *VPI, VPIRAttributes(*CI), CI->getDebugLoc());
           }
         } else if (auto *CI = dyn_cast<CastInst>(Inst)) {
           NewRecipe = new VPWidenCastRecipe(
@@ -3361,12 +3361,10 @@ static void fixupVFUsersForEVL(VPlan &Plan, VPValue &EVL) {
                   // Only the strided-load widened intrinsic recipe consumes VF
                   // here.
                   auto IsAllowedUser = [](VPUser *U) {
-                    if (isa<VPVectorEndPointerRecipe, VPScalarIVStepsRecipe,
-                            VPWidenIntOrFpInductionRecipe>(U))
-                      return true;
-                    auto *I = dyn_cast<VPWidenIntrinsicRecipe>(U);
-                    return I && I->getVectorIntrinsicID() ==
-                                    Intrinsic::experimental_vp_strided_load;
+                    return isa<VPVectorEndPointerRecipe, VPScalarIVStepsRecipe,
+                               VPWidenIntOrFpInductionRecipe>(U) ||
+                           match(U, m_Intrinsic(
+                                        Intrinsic::experimental_vp_strided_load));
                   };
                   if (match(U, m_Trunc(m_Specific(&Plan.getVF()))))
                     return all_of(cast<VPSingleDefRecipe>(U)->users(),
@@ -7667,8 +7665,9 @@ void VPlanTransforms::makeCallWideningDecisions(VPlan &Plan, VFRange &Range,
       case CallWideningDecision::KindTy::Intrinsic: {
         Intrinsic::ID ID = getVectorIntrinsicIDForCall(CI, &CostCtx.TLI);
         Type *ResultTy = VPI->getScalarType();
-        Replacement = new VPWidenIntrinsicRecipe(*CI, ID, Ops, ResultTy, *VPI,
-                                                 *VPI, VPI->getDebugLoc());
+        Replacement = new VPWidenIntrinsicRecipe(
+            *CI, ID, Ops, ResultTy, *VPI, *VPI, VPIRAttributes(*CI),
+            VPI->getDebugLoc());
         break;
       }
       case CallWideningDecision::KindTy::VectorVariant: {

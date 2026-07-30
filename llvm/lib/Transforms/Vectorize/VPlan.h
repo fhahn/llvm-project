@@ -2011,17 +2011,20 @@ public:
                          ArrayRef<VPValue *> CallArguments, Type *Ty,
                          const VPIRFlags &Flags = {},
                          const VPIRMetadata &MD = {},
+                         const VPIRAttributes &Attrs = {},
                          DebugLoc DL = DebugLoc::getUnknown())
-      : VPWidenIntrinsicRecipe(VPRecipeBase::VPWidenIntrinsicSC,
-                               VectorIntrinsicID, CallArguments, Ty, Flags, MD,
-                               VPIRAttributes(CI), DL) {
+      : VPRecipeWithIRFlags(VPRecipeBase::VPWidenIntrinsicSC, CallArguments, Ty,
+                            Flags, DL),
+        VPIRMetadata(MD), VPIRAttributes(Attrs),
+        VectorIntrinsicID(VectorIntrinsicID),
+        // The widened call keeps the scalar call's operand bundles, which can
+        // imply effects beyond the intrinsic ID's defaults (e.g. a "deopt"
+        // bundle), so preserve the scalar call's effects to avoid unsound
+        // hoisting/sinking.
+        MayReadFromMemory(CI.mayReadFromMemory()),
+        MayWriteToMemory(CI.mayWriteToMemory()),
+        MayHaveSideEffects(CI.mayHaveSideEffects()) {
     setUnderlyingValue(&CI);
-    // The widened call keeps the scalar call's operand bundles, which can imply
-    // effects beyond the intrinsic ID's defaults (e.g. a "deopt" bundle), so
-    // preserve the scalar call's effects to avoid unsound hoisting/sinking.
-    MayReadFromMemory = CI.mayReadFromMemory();
-    MayWriteToMemory = CI.mayWriteToMemory();
-    MayHaveSideEffects = CI.mayHaveSideEffects();
   }
 
   VPWidenIntrinsicRecipe(Intrinsic::ID VectorIntrinsicID,
@@ -2037,17 +2040,14 @@ public:
 
   VPWidenIntrinsicRecipe *clone() override {
     Value *CI = getUnderlyingValue();
-    auto *C =
-        CI ? new VPWidenIntrinsicRecipe(*cast<CallInst>(CI), VectorIntrinsicID,
+    if (CI)
+      return new VPWidenIntrinsicRecipe(*cast<CallInst>(CI), VectorIntrinsicID,
                                         operands(), getScalarType(), *this,
-                                        *this, getDebugLoc())
-           : new VPWidenIntrinsicRecipe(VectorIntrinsicID, operands(),
-                                        getScalarType(), *this, *this,
-                                        getDebugLoc());
-    // The constructors recompute or default the attributes, so copy over this
-    // recipe's current (possibly CSE-intersected) attributes.
-    static_cast<VPIRAttributes &>(*C) = *this;
-    return C;
+                                        *this, *this, getDebugLoc());
+    return new VPWidenIntrinsicRecipe(VPRecipeBase::VPWidenIntrinsicSC,
+                                      VectorIntrinsicID, operands(),
+                                      getScalarType(), *this, *this, *this,
+                                      getDebugLoc());
   }
 
   static inline bool classof(const VPRecipeBase *R) {

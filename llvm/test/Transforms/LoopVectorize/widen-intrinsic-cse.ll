@@ -209,5 +209,55 @@ exit:
   ret void
 }
 
+; Two intrinsic calls with identical operands but different range attributes on
+; both the return value and an argument. CSE merges them and intersects the
+; attributes; for range the intersection is the union, so the merged widened
+; intrinsic carries range(i32 0, 100) on the argument and range(i32 0, 33) on
+; the return.
+define void @cse_intersects_param_and_ret_range(ptr %p, ptr noalias %r1, ptr noalias %r2) {
+; CHECK-LABEL: define void @cse_intersects_param_and_ret_range(
+; CHECK-SAME: ptr [[P:%.*]], ptr noalias [[R1:%.*]], ptr noalias [[R2:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr i32, ptr [[P]], i32 [[INDEX]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP0]], align 4
+; CHECK-NEXT:    [[TMP1:%.*]] = call range(i32 0, 33) <4 x i32> @llvm.ctlz.v4i32(<4 x i32> range(i32 0, 100) [[WIDE_LOAD]], i1 true)
+; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr i32, ptr [[R1]], i32 [[INDEX]]
+; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr i32, ptr [[R2]], i32 [[INDEX]]
+; CHECK-NEXT:    store <4 x i32> [[TMP1]], ptr [[TMP2]], align 4
+; CHECK-NEXT:    store <4 x i32> [[TMP1]], ptr [[TMP3]], align 4
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
+; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq i32 [[INDEX_NEXT]], 1024
+; CHECK-NEXT:    br i1 [[TMP4]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    br label %[[EXIT:.*]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i32 [0, %entry], [%iv.next, %loop]
+  %pa = getelementptr i32, ptr %p, i32 %iv
+  %a = load i32, ptr %pa
+  %c1 = call range(i32 0, 33) i32 @llvm.ctlz.i32(i32 range(i32 0, 100) %a, i1 true)
+  %c2 = call range(i32 0, 20) i32 @llvm.ctlz.i32(i32 range(i32 0, 50) %a, i1 true)
+  %gep.r1 = getelementptr i32, ptr %r1, i32 %iv
+  %gep.r2 = getelementptr i32, ptr %r2, i32 %iv
+  store i32 %c1, ptr %gep.r1
+  store i32 %c2, ptr %gep.r2
+  %iv.next = add i32 %iv, 1
+  %done = icmp eq i32 %iv.next, 1024
+  br i1 %done, label %exit, label %loop
+
+exit:
+  ret void
+}
+
 attributes #0 = { memory(none) "target-cpu"="generic" }
 attributes #1 = { memory(none) "target-cpu"="skylake" }
