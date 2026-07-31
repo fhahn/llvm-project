@@ -26,3 +26,47 @@ define void @print_vplan(ptr %a, ptr %b, ptr %c) {
   store i32 %s1, ptr %c1
   ret void
 }
+
+define void @print_gep(ptr %src, ptr %dst) {
+; CHECK-LABEL: SLP: VPlan for tree:
+; CHECK-NEXT:  VPlan 'SLP tree for UF>=1' {
+; CHECK-EMPTY:
+; CHECK-NEXT:  {{.+}}:
+; CHECK-NEXT:    WIDEN ir<[[S:%.+]]> = load ir<%src>
+; CHECK-NEXT:    WIDEN-GEP ir<[[G:%.+]]> = getelementptr ir<[[S]]>, ir<16>
+; CHECK-NEXT:    WIDEN store ir<%dst>, ir<[[G]]>
+; CHECK-NEXT:  No successors
+; CHECK-NEXT:  }
+;
+  %s0 = load ptr, ptr %src, align 8
+  %src1 = getelementptr ptr, ptr %src, i64 1
+  %s1 = load ptr, ptr %src1, align 8
+  %gep0 = getelementptr i32, ptr %s0, i64 16
+  %gep1 = getelementptr i32, ptr %s1, i64 16
+  store ptr %gep0, ptr %dst, align 8
+  %dst1 = getelementptr ptr, ptr %dst, i64 1
+  store ptr %gep1, ptr %dst1, align 8
+  ret void
+}
+
+define void @print_gep_inbounds(ptr %src, ptr %dst) {
+; CHECK-LABEL: SLP: VPlan for tree:
+; CHECK-NEXT:  VPlan 'SLP tree for UF>=1' {
+; CHECK-EMPTY:
+; CHECK-NEXT:  {{.+}}:
+; CHECK-NEXT:    WIDEN ir<[[S:%.+]]> = load ir<%src>
+; CHECK-NEXT:    WIDEN-GEP ir<[[G:%.+]]> = getelementptr inbounds ir<[[S]]>, ir<4>
+; CHECK-NEXT:    WIDEN store ir<%dst>, ir<[[G]]>
+; CHECK-NEXT:  No successors
+; CHECK-NEXT:  }
+;
+  %s0 = load ptr, ptr %src, align 8
+  %src1 = getelementptr ptr, ptr %src, i64 1
+  %s1 = load ptr, ptr %src1, align 8
+  %gep0 = getelementptr inbounds i32, ptr %s0, i64 4
+  %gep1 = getelementptr inbounds i32, ptr %s1, i64 4
+  store ptr %gep0, ptr %dst, align 8
+  %dst1 = getelementptr ptr, ptr %dst, i64 1
+  store ptr %gep1, ptr %dst1, align 8
+  ret void
+}

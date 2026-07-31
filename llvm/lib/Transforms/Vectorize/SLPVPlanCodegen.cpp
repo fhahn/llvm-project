@@ -29,6 +29,7 @@ bool slpvectorizer::isSupportedVPlanCodegenOpcode(unsigned Opcode) {
     return true;
   switch (Opcode) {
   case Instruction::FNeg:
+  case Instruction::GetElementPtr:
   case Instruction::Load:
   case Instruction::Store:
     return true;
@@ -72,6 +73,9 @@ VPValue *slpvectorizer::createRecipeForBundle(VPlan &Plan, VPBuilder &VPB,
     // Stores do not define a value.
     return nullptr;
   }
+  if (auto *GEP = dyn_cast<GetElementPtrInst>(MainOp))
+    return VPB.insert(
+        new VPWidenGEPRecipe(GEP->getSourceElementType(), Ops, Flags, DL, GEP));
   return VPB.insert(new VPWidenRecipe(*MainOp, Ops, Flags, Metadata, DL));
 }
 

@@ -25939,8 +25939,19 @@ bool BoUpSLP::isVPlanEligible() {
     if (MinBWs.contains(TE.get()))
       return false;
 
-    // Only handle plain Vectorize entries, i.e. no gathers or combined entries,
-    // without any lane permutation.
+    // No vector-typed scalars (revec); the recipes and live-ins assume scalar
+    // element types and would create invalid vector-of-vector types.
+    if (TE->Scalars.front()->getType()->isVectorTy())
+      return false;
+
+    // Constant-splat gathers, e.g. the constant indices of a GEP entry, are
+    // materialized as live-ins.
+    if (TE->isGather() && isa<Constant>(TE->Scalars.front()) &&
+        all_equal(TE->Scalars))
+      continue;
+
+    // Only handle plain Vectorize entries, i.e. no other gathers or combined
+    // entries, without any lane permutation.
     if (TE->State != TreeEntry::Vectorize || !TE->hasState() ||
         TE->CombinedOp != TreeEntry::NotCombinedOp || TE->isAltShuffle() ||
         !TE->ReorderIndices.empty() || !TE->ReuseShuffleIndices.empty())
@@ -25952,10 +25963,6 @@ bool BoUpSLP::isVPlanEligible() {
 
     // All recipes are emitted into the root's block.
     if (TE->getMainOp()->getParent() != RootBB)
-      return false;
-
-    // The recipes assume scalar element types, so revec is not supported.
-    if (TE->Scalars.front()->getType()->isVectorTy())
       return false;
 
     // Lanes with a different opcode, e.g. copyables, need their IR flags
@@ -26026,6 +26033,10 @@ std::unique_ptr<VPlan> BoUpSLP::buildVPlanForTree() {
   // operands first. Operand entries are never deleted, see isVPlanEligible().
   DenseMap<const TreeEntry *, VPValue *> EntryToVPValue;
   auto AddEntry = [&](TreeEntry *E, auto &Self) -> VPValue * {
+    // Constant-splat gathers, e.g. the constant indices of a GEP entry, are
+    // materialized as live-ins.
+    if (E->isGather())
+      return Plan->getOrAddLiveIn(E->Scalars.front());
     if (auto It = EntryToVPValue.find(E); It != EntryToVPValue.end())
       return It->second;
     SmallVector<VPValue *> Ops;
@@ -26037,7 +26048,7 @@ std::unique_ptr<VPlan> BoUpSLP::buildVPlanForTree() {
   };
   SmallVector<TreeEntry *> Entries;
   for (const std::unique_ptr<TreeEntry> &TE : VectorizableTree)
-    if (!DeletedNodes.contains(TE.get()))
+    if (!DeletedNodes.contains(TE.get()) && !TE->isGather())
       Entries.push_back(TE.get());
   stable_sort(Entries, [&](const TreeEntry *A, const TreeEntry *B) {
     return getLastInstructionInBundle(A).comesBefore(
