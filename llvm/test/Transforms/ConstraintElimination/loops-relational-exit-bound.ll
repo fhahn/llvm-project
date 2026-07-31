@@ -19,12 +19,9 @@ define void @ult_nuw_step1_start_0(i32 %n) {
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw i32 [[IV]], 1
 ; CHECK-NEXT:    br label %[[LOOP_HEADER]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[F_1:%.*]] = icmp ugt i32 [[IV]], [[N]]
-; CHECK-NEXT:    call void @use(i1 [[F_1]])
-; CHECK-NEXT:    [[T_1:%.*]] = icmp ule i32 [[IV]], [[N]]
-; CHECK-NEXT:    call void @use(i1 [[T_1]])
-; CHECK-NEXT:    [[T_2:%.*]] = icmp eq i32 [[IV]], [[N]]
-; CHECK-NEXT:    call void @use(i1 [[T_2]])
+; CHECK-NEXT:    call void @use(i1 false)
+; CHECK-NEXT:    call void @use(i1 true)
+; CHECK-NEXT:    call void @use(i1 true)
 ; CHECK-NEXT:    ret void
 ;
 entry:
@@ -65,8 +62,7 @@ define void @ult_nuw_step1_symbolic_start_guarded(i32 %start, i32 %n) {
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw i32 [[IV]], 1
 ; CHECK-NEXT:    br label %[[LOOP_HEADER]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[F_1:%.*]] = icmp ugt i32 [[IV]], [[N]]
-; CHECK-NEXT:    call void @use(i1 [[F_1]])
+; CHECK-NEXT:    call void @use(i1 false)
 ; CHECK-NEXT:    ret void
 ; CHECK:       [[EXIT_EARLY]]:
 ; CHECK-NEXT:    ret void
@@ -147,10 +143,8 @@ define void @slt_nsw_step1_guarded(i32 %start, i32 %n) {
 ; CHECK-NEXT:    [[IV_NEXT]] = add nsw i32 [[IV]], 1
 ; CHECK-NEXT:    br label %[[LOOP_HEADER]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[F_1:%.*]] = icmp sgt i32 [[IV]], [[N]]
-; CHECK-NEXT:    call void @use(i1 [[F_1]])
-; CHECK-NEXT:    [[T_1:%.*]] = icmp sle i32 [[IV]], [[N]]
-; CHECK-NEXT:    call void @use(i1 [[T_1]])
+; CHECK-NEXT:    call void @use(i1 false)
+; CHECK-NEXT:    call void @use(i1 true)
 ; CHECK-NEXT:    ret void
 ; CHECK:       [[EXIT_EARLY]]:
 ; CHECK-NEXT:    ret void
@@ -196,8 +190,7 @@ define void @ult_no_wrap_flags(i32 %start, i32 %n) {
 ; CHECK-NEXT:    [[IV_NEXT]] = add i32 [[IV]], 1
 ; CHECK-NEXT:    br label %[[LOOP_HEADER]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[F_1:%.*]] = icmp ugt i32 [[IV]], [[N]]
-; CHECK-NEXT:    call void @use(i1 [[F_1]])
+; CHECK-NEXT:    call void @use(i1 false)
 ; CHECK-NEXT:    ret void
 ; CHECK:       [[EXIT_EARLY]]:
 ; CHECK-NEXT:    ret void
@@ -238,8 +231,7 @@ define void @slt_no_wrap_flags(i32 %start, i32 %n) {
 ; CHECK-NEXT:    [[IV_NEXT]] = add i32 [[IV]], 1
 ; CHECK-NEXT:    br label %[[LOOP_HEADER]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[F_1:%.*]] = icmp sgt i32 [[IV]], [[N]]
-; CHECK-NEXT:    call void @use(i1 [[F_1]])
+; CHECK-NEXT:    call void @use(i1 false)
 ; CHECK-NEXT:    ret void
 ; CHECK:       [[EXIT_EARLY]]:
 ; CHECK-NEXT:    ret void
@@ -287,8 +279,7 @@ define void @slt_exit_nuw_increment(i32 %start, i32 %n) {
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw i32 [[IV]], 1
 ; CHECK-NEXT:    br label %[[LOOP_HEADER]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[F_1:%.*]] = icmp sgt i32 [[IV]], [[N]]
-; CHECK-NEXT:    call void @use(i1 [[F_1]])
+; CHECK-NEXT:    call void @use(i1 false)
 ; CHECK-NEXT:    [[F_2:%.*]] = icmp ugt i32 [[IV]], [[N]]
 ; CHECK-NEXT:    call void @use(i1 [[F_2]])
 ; CHECK-NEXT:    ret void
@@ -340,8 +331,7 @@ define void @ult_exit_nsw_increment(i32 %start, i32 %n) {
 ; CHECK-NEXT:    [[IV_NEXT]] = add nsw i32 [[IV]], 1
 ; CHECK-NEXT:    br label %[[LOOP_HEADER]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[F_1:%.*]] = icmp ugt i32 [[IV]], [[N]]
-; CHECK-NEXT:    call void @use(i1 [[F_1]])
+; CHECK-NEXT:    call void @use(i1 false)
 ; CHECK-NEXT:    [[F_2:%.*]] = icmp sgt i32 [[IV]], [[N]]
 ; CHECK-NEXT:    call void @use(i1 [[F_2]])
 ; CHECK-NEXT:    ret void
@@ -426,8 +416,7 @@ define void @ugt_swapped_operands(i32 %n) {
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw i32 [[IV]], 1
 ; CHECK-NEXT:    br label %[[LOOP_HEADER]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[F_1:%.*]] = icmp ugt i32 [[IV]], [[N]]
-; CHECK-NEXT:    call void @use(i1 [[F_1]])
+; CHECK-NEXT:    call void @use(i1 false)
 ; CHECK-NEXT:    ret void
 ;
 entry:
@@ -463,8 +452,7 @@ define void @uge_inverted_condition(i32 %n) {
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw i32 [[IV]], 1
 ; CHECK-NEXT:    br label %[[LOOP_HEADER]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[F_1:%.*]] = icmp ugt i32 [[IV]], [[N]]
-; CHECK-NEXT:    call void @use(i1 [[F_1]])
+; CHECK-NEXT:    call void @use(i1 false)
 ; CHECK-NEXT:    ret void
 ;
 entry:
@@ -541,8 +529,7 @@ define void @ult_postinc_latch(i32 %n) {
 ; CHECK-NEXT:    [[EC:%.*]] = icmp ult i32 [[IV_NEXT]], [[N]]
 ; CHECK-NEXT:    br i1 [[EC]], label %[[LOOP_HEADER]], label %[[EXIT:.*]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[F_1:%.*]] = icmp ugt i32 [[IV_NEXT]], [[N]]
-; CHECK-NEXT:    call void @use(i1 [[F_1]])
+; CHECK-NEXT:    call void @use(i1 false)
 ; CHECK-NEXT:    ret void
 ; CHECK:       [[EXIT_EARLY]]:
 ; CHECK-NEXT:    ret void
@@ -584,8 +571,7 @@ define void @ult_postinc_header(i32 %n) {
 ; CHECK:       [[LOOP_LATCH]]:
 ; CHECK-NEXT:    br label %[[LOOP_HEADER]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[F_1:%.*]] = icmp ugt i32 [[IV_NEXT]], [[N]]
-; CHECK-NEXT:    call void @use(i1 [[F_1]])
+; CHECK-NEXT:    call void @use(i1 false)
 ; CHECK-NEXT:    ret void
 ; CHECK:       [[EXIT_EARLY]]:
 ; CHECK-NEXT:    ret void
@@ -628,8 +614,7 @@ define void @ptr_ult_step1_guarded(ptr %start, ptr %end) {
 ; CHECK-NEXT:    [[PTR_IV_NEXT]] = getelementptr inbounds i8, ptr [[PTR_IV]], i64 1
 ; CHECK-NEXT:    br label %[[LOOP_HEADER]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[F_1:%.*]] = icmp ugt ptr [[PTR_IV]], [[END]]
-; CHECK-NEXT:    call void @use(i1 [[F_1]])
+; CHECK-NEXT:    call void @use(i1 false)
 ; CHECK-NEXT:    ret void
 ; CHECK:       [[EXIT_EARLY]]:
 ; CHECK-NEXT:    ret void
@@ -762,8 +747,7 @@ define void @ult_multiple_exits(i32 %n) {
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw i32 [[IV]], 1
 ; CHECK-NEXT:    br label %[[LOOP_HEADER]]
 ; CHECK:       [[EXIT_HEADER]]:
-; CHECK-NEXT:    [[F_1:%.*]] = icmp ugt i32 [[IV]], [[N]]
-; CHECK-NEXT:    call void @use(i1 [[F_1]])
+; CHECK-NEXT:    call void @use(i1 false)
 ; CHECK-NEXT:    ret void
 ; CHECK:       [[EXIT_BODY]]:
 ; CHECK-NEXT:    call void @use(i1 false)

@@ -1123,13 +1123,21 @@ void State::addInfoForInductions(BasicBlock &BB) {
   if (&BB == Latch && !IncStep)
     return;
 
+  auto *Br = cast<CondBrInst>(BB.getTerminator());
   BasicBlock *InLoopSucc = nullptr;
-  if (Pred == CmpInst::ICMP_NE)
-    InLoopSucc = cast<CondBrInst>(BB.getTerminator())->getSuccessor(0);
-  else if (Pred == CmpInst::ICMP_EQ)
-    InLoopSucc = cast<CondBrInst>(BB.getTerminator())->getSuccessor(1);
-  else
+  if (Pred == CmpInst::ICMP_NE || ICmpInst::isLT(Pred)) {
+    InLoopSucc = Br->getSuccessor(0);
+  } else if (Pred == CmpInst::ICMP_EQ) {
+    InLoopSucc = Br->getSuccessor(1);
+  } else if (ICmpInst::isGE(Pred)) {
+    // Canonicalize the predicate to the one under which the loop continues,
+    // i.e. A u< B or A s< B.
+    InLoopSucc = Br->getSuccessor(1);
+    Pred = ICmpInst::getInverseCmpPredicate(Pred);
+  } else {
     return;
+  }
+  bool IsRelational = ICmpInst::isRelational(Pred);
 
   if (!L->contains(InLoopSucc) || !L->isLoopExiting(&BB) || InLoopSucc == &BB)
     return;
@@ -1162,6 +1170,11 @@ void State::addInfoForInductions(BasicBlock &BB) {
     StepFromGEP = true;
     IncNUW = isPtrIncrementNUW(cast<GEPOperator>(Backedge)->getNoWrapFlags(),
                                PtrStepOffset);
+  } else if (IsRelational) {
+    // The facts for relational exit conditions only need a step of one, which
+    // the increment in the IR provides directly. Bail out instead of querying
+    // SCEV for the step of the many loops with a relational exit condition.
+    return;
   } else {
     const SCEV *Expr = SE.getSCEV(PN);
     if (!match(Expr,
@@ -1176,6 +1189,55 @@ void State::addInfoForInductions(BasicBlock &BB) {
   // really the induction's post-increment.
   if (IncStep && (*IncStep != *StepOffset || StepOffset->isNegative()))
     return;
+
+  // Together with the restrictions on B and the step, StartValue u<= B
+  // guarantees that the induction takes the value B exactly, and hence that the
+  // loop exits before wrapping. If A is the post-increment, the loop instead
+  // exits when StartValue + K * StepOffset == B for some K >= 1, which
+  // additionally requires StartValue != B. As B - StartValue is a multiple of
+  // StepOffset, the strict StartValue u< B is equivalent to StartValue +
+  // StepOffset u<= B and also implies that the sum does not wrap. The same
+  // holds for the signed variants.
+  ConditionTy StartBeforeBoundU = {
+      IncStep ? CmpInst::ICMP_ULT : CmpInst::ICMP_ULE, StartValue, B};
+  ConditionTy StartBeforeBoundS = {
+      IncStep ? CmpInst::ICMP_SLT : CmpInst::ICMP_SLE, StartValue, B};
+
+  // For a relational exit condition, the loop continues while A u< B (A s< B),
+  // so the exit is taken when A u>= B (A s>= B). With a step of exactly one,
+  // A u<= B (A s<= B) holds in the block the loop exits to:
+  //  * If the exit is taken in the first iteration, A is StartValue, or
+  //    StartValue + 1 for a post-increment, which the precondition bounds by B.
+  //  * Otherwise the exit condition held in the previous iteration, i.e.
+  //    A_prev u< B (A_prev s< B), so A_prev is at most B - 1 and A, which is
+  //    A_prev + 1, is at most B. Adding one to A_prev cannot wrap, as B - 1 is
+  //    below the largest representable value, so no no-wrap flag is required on
+  //    the increment. For a post-increment, A_prev is the phi and A the
+  //    increment itself.
+  // Together with A u>= B (A s>= B) from the failing exit condition, this pins
+  // A to B in the exit block. The signedness of the fact is the one of the exit
+  // condition: an unsigned condition only bounds A_prev unsigned, which says
+  // nothing about the signed value of A_prev + 1, and vice versa. With a step
+  // S > 1 the induction could go from B - 1 to B + S - 1, so nothing can be
+  // derived.
+  if (IsRelational) {
+    if (!StepOffset->isOne())
+      return;
+    bool Signed = ICmpInst::isSigned(Pred);
+    // Add the fact to the successor taken when the exit condition fails, if the
+    // exiting edge dominates it. Then A is the value computed by the last
+    // execution of BB, which is the value the reasoning above is about. The
+    // loop's other exit blocks are only reached after the exit condition held,
+    // where the branch itself provides the stronger A u< B (A s< B).
+    BasicBlock *ExitSucc = InLoopSucc == Br->getSuccessor(0)
+                               ? Br->getSuccessor(1)
+                               : Br->getSuccessor(0);
+    if (canAddSuccessor(BB, ExitSucc))
+      WorkList.push_back(FactOrCheck::getConditionFact(
+          DT.getNode(ExitSucc), Signed ? CmpInst::ICMP_SLE : CmpInst::ICMP_ULE,
+          A, B, Signed ? StartBeforeBoundS : StartBeforeBoundU));
+    return;
+  }
 
   // Handle negative steps.
   if (StepOffset->isNegative()) {
@@ -1249,19 +1311,6 @@ void State::addInfoForInductions(BasicBlock &BB) {
         !SE.getConstantMultiple(BMinusStart).urem(*StepOffset).isZero())
       return;
   }
-
-  // Together with the restrictions on B and the step above, StartValue u<= B
-  // guarantees that the induction takes the value B exactly, and hence that the
-  // loop exits before wrapping. If A is the post-increment, the loop instead
-  // exits when StartValue + K * StepOffset == B for some K >= 1, which
-  // additionally requires StartValue != B. As B - StartValue is a multiple of
-  // StepOffset, the strict StartValue u< B is equivalent to StartValue +
-  // StepOffset u<= B and also implies that the latter does not wrap. The same
-  // holds for the signed variants.
-  ConditionTy StartBeforeBoundU = {
-      IncStep ? CmpInst::ICMP_ULT : CmpInst::ICMP_ULE, StartValue, B};
-  ConditionTy StartBeforeBoundS = {
-      IncStep ? CmpInst::ICMP_SLT : CmpInst::ICMP_SLE, StartValue, B};
 
   // AR may wrap. Add PN >= StartValue conditional on StartValue <= B, which
   // guarantees that the loop exits before wrapping in combination with the
