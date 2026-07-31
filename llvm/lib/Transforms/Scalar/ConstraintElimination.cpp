@@ -1329,20 +1329,57 @@ void State::addInfoForInductions(BasicBlock &BB) {
   WorkList.push_back(FactOrCheck::getConditionFact(DTN, CmpInst::ICMP_ULT, PN,
                                                    B, StartBeforeBoundU));
 
-  // Try to add condition from the header or latch to the dedicated exit
-  // blocks. When exiting either with EQ or NE, we know that the induction value
-  // must be u<= B, as other exits may only exit earlier.
+  // When exiting either with EQ or NE, the induction takes the value B exactly
+  // and only takes values up to B.
   assert(!StepOffset->isNegative() && "induction must be increasing");
   assert((Pred == CmpInst::ICMP_EQ || Pred == CmpInst::ICMP_NE) &&
          "unsupported predicate");
+
+  // PN u<= B (PN s<= B) holds on entry to the header in every iteration:
+  //  * In the first iteration PN is StartValue, which the precondition bounds
+  //    by B.
+  //  * In every later iteration the previous iteration continued through
+  //    InLoopSucc, so the induction had not reached B yet. As B - StartValue
+  //    and PN - StartValue are multiples of StepOffset, so is B - PN, hence PN
+  //    was at least StepOffset below B and the increment neither wraps nor
+  //    steps over B.
+  // If A is the post-increment, the loop exits when PN + StepOffset == B, so PN
+  // itself never reaches B and the bound is strict, matching the strict
+  // precondition.
+  //
+  // The fact is attached to the header, which dominates all blocks in the loop
+  // and every exit block whose predecessors are all in the loop. In a block
+  // dominated by the header PN refers to the value computed by the last
+  // execution of the header, which the reasoning above is about. Exit blocks
+  // that are also reachable from outside the loop are not dominated by the
+  // header and hence do not get the fact; no extra check is needed for them.
+  //
+  // For a latch exit condition InLoopSucc is the header and the facts added
+  // above are the same, only with a strict predicate, which is correct there
+  // because InLoopSucc is only reached when the exit condition was false.
+  DomTreeNode *HeaderDTN = DT.getNode(Header);
+  if (HeaderDTN != DTN) {
+    WorkList.push_back(FactOrCheck::getConditionFact(
+        HeaderDTN, IncStep ? CmpInst::ICMP_ULT : CmpInst::ICMP_ULE, PN, B,
+        StartBeforeBoundU));
+    WorkList.push_back(FactOrCheck::getConditionFact(
+        HeaderDTN, IncStep ? CmpInst::ICMP_SLT : CmpInst::ICMP_SLE, PN, B,
+        StartBeforeBoundS));
+  }
+
+  // If A is the post-increment, also add A u<= B to the exit blocks dominated
+  // by BB. This pins the value in the blocks the loop exited from and is
+  // stronger than the bound for PN at the header for steps > 1. For A == PN the
+  // fact at the header already covers all those blocks.
+  if (!IncStep)
+    return;
   SmallVector<BasicBlock *> ExitBBs;
   L->getExitBlocks(ExitBBs);
   for (BasicBlock *EB : ExitBBs) {
     // Bail out on non-dedicated exits.
-    if (DT.dominates(&BB, EB)) {
+    if (DT.dominates(&BB, EB))
       WorkList.emplace_back(FactOrCheck::getConditionFact(
           DT.getNode(EB), CmpInst::ICMP_ULE, A, B, StartBeforeBoundU));
-    }
   }
 }
 

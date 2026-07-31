@@ -17,8 +17,7 @@ define void @bound_in_header(i32 %start, i32 %n) {
 ; CHECK-NEXT:    br label [[LOOP_HEADER:%.*]]
 ; CHECK:       loop.header:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ [[START]], [[LOOP_PH]] ], [ [[IV_NEXT:%.*]], [[LOOP_LATCH:%.*]] ]
-; CHECK-NEXT:    [[T_HDR:%.*]] = icmp ule i32 [[IV]], [[N]]
-; CHECK-NEXT:    call void @use.i1(i1 [[T_HDR]])
+; CHECK-NEXT:    call void @use.i1(i1 true)
 ; CHECK-NEXT:    [[EC:%.*]] = icmp eq i32 [[IV]], [[N]]
 ; CHECK-NEXT:    br i1 [[EC]], label [[EXIT]], label [[LOOP_BODY:%.*]]
 ; CHECK:       loop.body:
@@ -246,8 +245,7 @@ define i1 @header_eq_post_inc_no_nuw_merge(i32 %start, i32 %n) {
 ; CHECK:       loop.latch:
 ; CHECK-NEXT:    br label [[LOOP_HEADER]]
 ; CHECK:       exit.merge:
-; CHECK-NEXT:    [[T:%.*]] = icmp ult i32 [[IV]], [[N]]
-; CHECK-NEXT:    ret i1 [[T]]
+; CHECK-NEXT:    ret i1 true
 ; CHECK:       exit.guard:
 ; CHECK-NEXT:    ret i1 false
 ;
@@ -405,9 +403,8 @@ define i1 @header_eq_signed_merge(i32 %start, i32 %n) {
 ; CHECK-NEXT:    [[IV_NEXT]] = add nsw i32 [[IV]], 1
 ; CHECK-NEXT:    br label [[LOOP_HEADER]]
 ; CHECK:       exit.merge:
-; CHECK-NEXT:    [[T_S:%.*]] = icmp sle i32 [[IV]], [[N]]
 ; CHECK-NEXT:    [[T_U:%.*]] = icmp ule i32 [[IV]], [[N]]
-; CHECK-NEXT:    [[AND:%.*]] = and i1 [[T_S]], [[T_U]]
+; CHECK-NEXT:    [[AND:%.*]] = and i1 true, [[T_U]]
 ; CHECK-NEXT:    ret i1 [[AND]]
 ; CHECK:       exit.guard:
 ; CHECK-NEXT:    ret i1 false
