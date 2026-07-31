@@ -621,3 +621,130 @@ loop.latch:
 exit:
   ret void
 }
+
+; The start value of the induction is not a constant. The guard provides
+; %start u< %n, so the induction reaches %n and %iv u< %n holds in the loop.
+define void @postinc_latch_symbolic_start(ptr %p, i8 %start, i8 %n) {
+; CHECK-LABEL: define void @postinc_latch_symbolic_start(
+; CHECK-SAME: ptr [[P:%.*]], i8 [[START:%.*]], i8 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[GUARD:%.*]] = icmp ult i8 [[START]], [[N]]
+; CHECK-NEXT:    br i1 [[GUARD]], label %[[LOOP_HEADER:.*]], label %[[EXIT:.*]]
+; CHECK:       [[LOOP_HEADER]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i8 [ [[START]], %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
+; CHECK-NEXT:    [[LB:%.*]] = icmp ult i8 [[IV]], [[START]]
+; CHECK-NEXT:    [[UB:%.*]] = icmp ult i8 [[IV]], [[N]]
+; CHECK-NEXT:    [[Z0:%.*]] = zext i1 [[LB]] to i8
+; CHECK-NEXT:    [[Z1:%.*]] = zext i1 [[UB]] to i8
+; CHECK-NEXT:    store i8 [[Z0]], ptr [[P]], align 1
+; CHECK-NEXT:    store i8 [[Z1]], ptr [[P]], align 1
+; CHECK-NEXT:    br label %[[LOOP_LATCH]]
+; CHECK:       [[LOOP_LATCH]]:
+; CHECK-NEXT:    [[IV_NEXT]] = add i8 [[IV]], 1
+; CHECK-NEXT:    [[DONE:%.*]] = icmp eq i8 [[IV_NEXT]], [[N]]
+; CHECK-NEXT:    br i1 [[DONE]], label %[[EXIT]], label %[[LOOP_HEADER]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  %guard = icmp ult i8 %start, %n
+  br i1 %guard, label %loop.header, label %exit
+
+loop.header:
+  %iv = phi i8 [ %start, %entry ], [ %iv.next, %loop.latch ]
+  %lb = icmp ult i8 %iv, %start
+  %ub = icmp ult i8 %iv, %n
+  %z0 = zext i1 %lb to i8
+  %z1 = zext i1 %ub to i8
+  store i8 %z0, ptr %p, align 1
+  store i8 %z1, ptr %p, align 1
+  br label %loop.latch
+
+loop.latch:
+  %iv.next = add i8 %iv, 1
+  %done = icmp eq i8 %iv.next, %n
+  br i1 %done, label %exit, label %loop.header
+
+exit:
+  ret void
+}
+
+; Negative test: without the guard, %start may be equal to %n, in which case the
+; post-increment never equals %n and the loop wraps around instead of exiting.
+define void @postinc_latch_symbolic_start_no_guard(ptr %p, i8 %start, i8 %n) {
+; CHECK-LABEL: define void @postinc_latch_symbolic_start_no_guard(
+; CHECK-SAME: ptr [[P:%.*]], i8 [[START:%.*]], i8 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
+; CHECK:       [[LOOP_HEADER]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i8 [ [[START]], %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
+; CHECK-NEXT:    [[UB:%.*]] = icmp ult i8 [[IV]], [[N]]
+; CHECK-NEXT:    [[Z1:%.*]] = zext i1 [[UB]] to i8
+; CHECK-NEXT:    store i8 [[Z1]], ptr [[P]], align 1
+; CHECK-NEXT:    br label %[[LOOP_LATCH]]
+; CHECK:       [[LOOP_LATCH]]:
+; CHECK-NEXT:    [[IV_NEXT]] = add i8 [[IV]], 1
+; CHECK-NEXT:    [[DONE:%.*]] = icmp eq i8 [[IV_NEXT]], [[N]]
+; CHECK-NEXT:    br i1 [[DONE]], label %[[EXIT:.*]], label %[[LOOP_HEADER]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %loop.header
+
+loop.header:
+  %iv = phi i8 [ %start, %entry ], [ %iv.next, %loop.latch ]
+  %ub = icmp ult i8 %iv, %n
+  %z1 = zext i1 %ub to i8
+  store i8 %z1, ptr %p, align 1
+  br label %loop.latch
+
+loop.latch:
+  %iv.next = add i8 %iv, 1
+  %done = icmp eq i8 %iv.next, %n
+  br i1 %done, label %exit, label %loop.header
+
+exit:
+  ret void
+}
+
+; Negative test: the guard only provides %start u<= %n, which allows %start ==
+; %n and hence a loop that does not exit when the induction reaches %n.
+define void @postinc_latch_symbolic_start_non_strict_guard(ptr %p, i8 %start, i8 %n) {
+; CHECK-LABEL: define void @postinc_latch_symbolic_start_non_strict_guard(
+; CHECK-SAME: ptr [[P:%.*]], i8 [[START:%.*]], i8 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[GUARD:%.*]] = icmp ule i8 [[START]], [[N]]
+; CHECK-NEXT:    br i1 [[GUARD]], label %[[LOOP_HEADER:.*]], label %[[EXIT:.*]]
+; CHECK:       [[LOOP_HEADER]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i8 [ [[START]], %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
+; CHECK-NEXT:    [[UB:%.*]] = icmp ult i8 [[IV]], [[N]]
+; CHECK-NEXT:    [[Z1:%.*]] = zext i1 [[UB]] to i8
+; CHECK-NEXT:    store i8 [[Z1]], ptr [[P]], align 1
+; CHECK-NEXT:    br label %[[LOOP_LATCH]]
+; CHECK:       [[LOOP_LATCH]]:
+; CHECK-NEXT:    [[IV_NEXT]] = add i8 [[IV]], 1
+; CHECK-NEXT:    [[DONE:%.*]] = icmp eq i8 [[IV_NEXT]], [[N]]
+; CHECK-NEXT:    br i1 [[DONE]], label %[[EXIT]], label %[[LOOP_HEADER]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  %guard = icmp ule i8 %start, %n
+  br i1 %guard, label %loop.header, label %exit
+
+loop.header:
+  %iv = phi i8 [ %start, %entry ], [ %iv.next, %loop.latch ]
+  %ub = icmp ult i8 %iv, %n
+  %z1 = zext i1 %ub to i8
+  store i8 %z1, ptr %p, align 1
+  br label %loop.latch
+
+loop.latch:
+  %iv.next = add i8 %iv, 1
+  %done = icmp eq i8 %iv.next, %n
+  br i1 %done, label %exit, label %loop.header
+
+exit:
+  ret void
+}
