@@ -192,6 +192,10 @@ struct State {
   /// L's header. Those do not depend on \p L's exit conditions.
   void addInfoForMonotonicHeaderPhis(Loop &L);
 
+  /// Add facts for the phis in \p L's header implied by the condition
+  /// controlling \p L's backedge.
+  void addInfoForLatchCondition(Loop &L);
+
   /// Returns true if we can add a known condition from BB to its successor
   /// block Succ.
   bool canAddSuccessor(BasicBlock &BB, BasicBlock *Succ) const {
@@ -1076,6 +1080,82 @@ void State::addInfoForMonotonicHeaderPhis(Loop &L) {
   }
 }
 
+void State::addInfoForLatchCondition(Loop &L) {
+  BasicBlock *Header = L.getHeader();
+  BasicBlock *Latch = L.getLoopLatch();
+  BasicBlock *LoopPred = L.getLoopPredecessor();
+  if (!Latch || !LoopPred)
+    return;
+
+  CmpPredicate Pred;
+  Value *A, *B;
+  if (!match(Latch->getTerminator(),
+             m_Br(m_ICmp(Pred, m_Value(A), m_Value(B)), m_Value(), m_Value())))
+    return;
+
+  // Only handle relational predicates. For an EQ/NE latch condition on an
+  // induction's post-increment, addInfoForInductions already derives the
+  // strictly stronger PN u< B (PN s< B) for the header below.
+  if (!ICmpInst::isRelational(Pred))
+    return;
+
+  // Determine the successor of the latch that continues the loop. Bail out if
+  // the latch has two edges to the header, which would mean the value the phis
+  // below take in the next iteration is not determined by a single edge.
+  auto *Br = cast<CondBrInst>(Latch->getTerminator());
+  bool HeaderIsTrueSucc = Br->getSuccessor(0) == Header;
+  if (HeaderIsTrueSucc == (Br->getSuccessor(1) == Header))
+    return;
+
+  // Bring the compared induction value to the left-hand side. The bound needs
+  // to be loop-invariant, which also means it dominates the header: it either
+  // is not an instruction, or it is defined outside the loop and dominates the
+  // latch, and a block outside the loop dominating the latch also dominates the
+  // header, as all paths from it to the latch go through the header.
+  if (!L.isLoopInvariant(B)) {
+    std::swap(A, B);
+    Pred = ICmpInst::getSwappedCmpPredicate(Pred);
+    if (!L.isLoopInvariant(B))
+      return;
+  }
+
+  // The condition holds on the edge from the latch to the header, inverted if
+  // the header is the branch's false successor. If the condition is poison the
+  // branch is immediate UB, so the condition may be assumed on the taken edge.
+  if (!HeaderIsTrueSucc)
+    Pred = ICmpInst::getInverseCmpPredicate(Pred);
+
+  // Drop samesign: a samesign fact is added to both the signed and the unsigned
+  // system, while the precondition below is only checked in one of them, so the
+  // fact for the other system would be added without its precondition proven.
+  CmpInst::Predicate FactPred = Pred.dropSameSign();
+
+  // Pred(A, B) holds on entry to the header in every iteration:
+  //  * On the edge from the latch, A is the value the phi takes in the next
+  //    iteration, and the branch to the header establishes Pred(A, B).
+  //  * On the edge from LoopPred, the phi is StartValue, which the precondition
+  //    Pred(StartValue, B) covers.
+  // This needs no information about the shape of the increment, in particular
+  // no no-wrap flags, as it only relies on the phi's incoming value being the
+  // compared value itself.
+  DomTreeNode *HeaderDTN = DT.getNode(Header);
+  for (PHINode &PN : Header->phis()) {
+    // Only handle phis with 2 incoming values, one from LoopPred and one from
+    // the latch, i.e. those are the header's only predecessors.
+    if (PN.getNumIncomingValues() != 2)
+      continue;
+    int LoopPredIdx = PN.getBasicBlockIndex(LoopPred);
+    int LatchIdx = PN.getBasicBlockIndex(Latch);
+    if (LoopPredIdx < 0 || LatchIdx < 0 || LoopPredIdx == LatchIdx ||
+        PN.getIncomingValue(LatchIdx) != A)
+      continue;
+
+    Value *StartValue = PN.getIncomingValue(LoopPredIdx);
+    WorkList.push_back(FactOrCheck::getConditionFact(
+        HeaderDTN, FactPred, &PN, B, ConditionTy(FactPred, StartValue, B)));
+  }
+}
+
 void State::addInfoForInductions(BasicBlock &BB) {
   auto *L = LI.getLoopFor(&BB);
   if (!L)
@@ -1088,8 +1168,10 @@ void State::addInfoForInductions(BasicBlock &BB) {
 
   // Add facts that hold independent of the loop's exit conditions once per
   // loop, when visiting the header.
-  if (Header == &BB)
+  if (Header == &BB) {
     addInfoForMonotonicHeaderPhis(*L);
+    addInfoForLatchCondition(*L);
+  }
 
   // Match the exit condition as a comparison of an induction value A against a
   // bound B. A is either the induction phi PN itself or its post-increment, in
