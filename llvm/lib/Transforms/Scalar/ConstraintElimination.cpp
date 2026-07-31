@@ -188,6 +188,10 @@ struct State {
   /// controlling the loop header.
   void addInfoForInductions(BasicBlock &BB);
 
+  /// Add facts implied by the monotonicity of the AddRecs for the phis in \p
+  /// L's header. Those do not depend on \p L's exit conditions.
+  void addInfoForMonotonicHeaderPhis(Loop &L);
+
   /// Returns true if we can add a known condition from BB to its successor
   /// block Succ.
   bool canAddSuccessor(BasicBlock &BB, BasicBlock *Succ) const {
@@ -950,6 +954,81 @@ static void dumpConstraint(ArrayRef<int64_t> C,
 }
 #endif
 
+void State::addInfoForMonotonicHeaderPhis(Loop &L) {
+  BasicBlock *Header = L.getHeader();
+  BasicBlock *LoopPred = L.getLoopPredecessor();
+  if (!LoopPred)
+    return;
+  const DataLayout &DL = Header->getDataLayout();
+
+  // The facts below hold on entry to the header: in the first iteration the
+  // phi's value is the value incoming from LoopPred, in all later iterations it
+  // is bounded by it, due to the monotonicity of the induction. Hence they can
+  // be attached to the header, which means they are also available in all
+  // blocks dominated by the header. This includes the loop's exit blocks
+  // dominated by the header: a use of the phi in such a block refers to the
+  // value computed by the last execution of the header.
+  DomTreeNode *DTN = DT.getNode(Header);
+  for (PHINode &PN : Header->phis()) {
+    // Only handle phis with 2 incoming values, i.e. the loop has a single
+    // latch, so the value incoming from LoopPred is the value the induction
+    // starts with and the other incoming value is the increment.
+    if (PN.getNumIncomingValues() != 2 || !PN.getType()->isIntOrPtrTy())
+      continue;
+
+    // LoopPred is the only predecessor of the header outside the loop and thus
+    // dominates the header, hence so does StartValue.
+    Value *StartValue = PN.getIncomingValueForBlock(LoopPred);
+    BasicBlock *BackedgeBB = PN.getIncomingBlock(0) == LoopPred
+                                 ? PN.getIncomingBlock(1)
+                                 : PN.getIncomingBlock(0);
+    Value *Backedge = PN.getIncomingValueForBlock(BackedgeBB);
+
+    // Determine the monotonicity from the wrap flags of the increment in the
+    // IR. Querying SCEV for every header phi would be too expensive.
+    const APInt *StepOffset = nullptr;
+    bool HasNUW = false, HasNSW = false;
+    if (match(Backedge, m_c_Add(m_Specific(&PN), m_APInt(StepOffset)))) {
+      auto *Inc = cast<OverflowingBinaryOperator>(Backedge);
+      HasNUW = Inc->hasNoUnsignedWrap();
+      HasNSW = Inc->hasNoSignedWrap();
+    } else if (match(Backedge, m_c_Add(m_Specific(&PN), m_Value()))) {
+      // The step is not a constant, so its sign is unknown. That does not
+      // matter for the unsigned bound below.
+      HasNUW = cast<OverflowingBinaryOperator>(Backedge)->hasNoUnsignedWrap();
+    } else if (auto *GEP = dyn_cast<GEPOperator>(Backedge);
+               GEP && GEP->getPointerOperand() == &PN) {
+      // For nuw GEPs, adding the offsets to the address does not wrap in an
+      // unsigned sense, same as for add nuw. For nusw GEPs (implied by
+      // inbounds), the offsets are added as signed values without wrapping,
+      // which also means the address does not decrease if the total offset is
+      // non-negative.
+      GEPNoWrapFlags NW = GEP->getNoWrapFlags();
+      APInt Offset(DL.getIndexTypeSizeInBits(GEP->getType()), 0);
+      HasNUW =
+          NW.hasNoUnsignedWrap() ||
+          (NW.hasNoUnsignedSignedWrap() &&
+           GEP->accumulateConstantOffset(DL, Offset) && !Offset.isNegative());
+    }
+
+    // An increment that does not wrap unsigned never decreases the value, hence
+    // PN u>= StartValue in every iteration, independent of the sign of the
+    // step. If the increment wraps in some iteration, the phi is poison in all
+    // later iterations and any fact about it holds trivially.
+    if (HasNUW)
+      WorkList.push_back(FactOrCheck::getConditionFact(DTN, CmpInst::ICMP_UGE,
+                                                       &PN, StartValue));
+
+    // An increment that does not wrap signed increases (decreases) the value if
+    // the step is non-negative (negative), hence PN s>= StartValue (PN s<=
+    // StartValue) in every iteration.
+    if (HasNSW)
+      WorkList.push_back(FactOrCheck::getConditionFact(
+          DTN, StepOffset->isNegative() ? CmpInst::ICMP_SLE : CmpInst::ICMP_SGE,
+          &PN, StartValue));
+  }
+}
+
 void State::addInfoForInductions(BasicBlock &BB) {
   auto *L = LI.getLoopFor(&BB);
   if (!L)
@@ -959,6 +1038,11 @@ void State::addInfoForInductions(BasicBlock &BB) {
   BasicBlock *Latch = L->getLoopLatch();
   if (Header != &BB && Latch != &BB)
     return;
+
+  // Add facts that hold independent of the loop's exit conditions once per
+  // loop, when visiting the header.
+  if (Header == &BB)
+    addInfoForMonotonicHeaderPhis(*L);
 
   // A is either a phi or a post-increment PN + C with constant step. For the
   // latter, extract the constant IncStep.
@@ -1071,11 +1155,14 @@ void State::addInfoForInductions(BasicBlock &BB) {
   }
 
   // If the induction is known not to wrap, PN >= StartValue can be added
-  // unconditionally.
-  if (MonotonicallyIncreasingUnsigned)
+  // unconditionally. When the wrap flags of the increment itself imply
+  // monotonicity, addInfoForMonotonicHeaderPhis already added the facts for the
+  // header, which dominates DTN, so only add them here if monotonicity was
+  // proven via SCEV.
+  if (MonotonicallyIncreasingUnsigned && !(Inc && Inc->hasNoUnsignedWrap()))
     WorkList.push_back(
         FactOrCheck::getConditionFact(DTN, CmpInst::ICMP_UGE, PN, StartValue));
-  if (MonotonicallyIncreasingSigned)
+  if (MonotonicallyIncreasingSigned && !(Inc && Inc->hasNoSignedWrap()))
     WorkList.push_back(
         FactOrCheck::getConditionFact(DTN, CmpInst::ICMP_SGE, PN, StartValue));
 
