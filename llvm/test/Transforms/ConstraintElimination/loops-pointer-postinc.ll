@@ -20,8 +20,7 @@ define void @postinc_latch_step_1(ptr %start, ptr %end) {
 ; CHECK-NEXT:    br i1 [[GUARD]], label %[[LOOP_HEADER:.*]], label %[[EXIT:.*]]
 ; CHECK:       [[LOOP_HEADER]]:
 ; CHECK-NEXT:    [[P:%.*]] = phi ptr [ [[START]], %[[ENTRY]] ], [ [[P_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
-; CHECK-NEXT:    [[T_1:%.*]] = icmp ult ptr [[P]], [[END]]
-; CHECK-NEXT:    call void @use(i1 [[T_1]])
+; CHECK-NEXT:    call void @use(i1 true)
 ; CHECK-NEXT:    br label %[[LOOP_LATCH]]
 ; CHECK:       [[LOOP_LATCH]]:
 ; CHECK-NEXT:    [[P_NEXT]] = getelementptr inbounds i8, ptr [[P]], i64 1
@@ -62,8 +61,7 @@ define void @postinc_header_step_1(ptr %start, ptr %end) {
 ; CHECK-NEXT:    [[EC:%.*]] = icmp ne ptr [[P_NEXT]], [[END]]
 ; CHECK-NEXT:    br i1 [[EC]], label %[[LOOP_BODY:.*]], label %[[EXIT]]
 ; CHECK:       [[LOOP_BODY]]:
-; CHECK-NEXT:    [[T_1:%.*]] = icmp ult ptr [[P]], [[END]]
-; CHECK-NEXT:    call void @use(i1 [[T_1]])
+; CHECK-NEXT:    call void @use(i1 true)
 ; CHECK-NEXT:    br label %[[LOOP_LATCH]]
 ; CHECK:       [[LOOP_LATCH]]:
 ; CHECK-NEXT:    br label %[[LOOP_HEADER]]
@@ -105,8 +103,7 @@ define void @postinc_header_step_1_eq(ptr %start, ptr %end) {
 ; CHECK-NEXT:    [[EC:%.*]] = icmp eq ptr [[P_NEXT]], [[END]]
 ; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP_BODY:.*]]
 ; CHECK:       [[LOOP_BODY]]:
-; CHECK-NEXT:    [[T_1:%.*]] = icmp ult ptr [[P]], [[END]]
-; CHECK-NEXT:    call void @use(i1 [[T_1]])
+; CHECK-NEXT:    call void @use(i1 true)
 ; CHECK-NEXT:    br label %[[LOOP_LATCH]]
 ; CHECK:       [[LOOP_LATCH]]:
 ; CHECK-NEXT:    br label %[[LOOP_HEADER]]
@@ -151,8 +148,7 @@ define i1 @postinc_header_exit_facts_multi_exit(ptr %start, ptr %end, i1 %c) {
 ; CHECK:       [[LOOP_LATCH]]:
 ; CHECK-NEXT:    br i1 [[C]], label %[[EXIT_EARLY:.*]], label %[[LOOP_HEADER]]
 ; CHECK:       [[EXIT_EARLY]]:
-; CHECK-NEXT:    [[T_1:%.*]] = icmp ugt ptr [[P_NEXT]], [[END]]
-; CHECK-NEXT:    ret i1 [[T_1]]
+; CHECK-NEXT:    ret i1 false
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret i1 false
 ;
@@ -188,8 +184,7 @@ define void @postinc_latch_step_4(ptr %start, i64 %n) {
 ; CHECK-NEXT:    br i1 [[GUARD]], label %[[LOOP_HEADER:.*]], label %[[EXIT:.*]]
 ; CHECK:       [[LOOP_HEADER]]:
 ; CHECK-NEXT:    [[P:%.*]] = phi ptr [ [[START]], %[[ENTRY]] ], [ [[P_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
-; CHECK-NEXT:    [[T_1:%.*]] = icmp ult ptr [[P]], [[END]]
-; CHECK-NEXT:    call void @use(i1 [[T_1]])
+; CHECK-NEXT:    call void @use(i1 true)
 ; CHECK-NEXT:    br label %[[LOOP_LATCH]]
 ; CHECK:       [[LOOP_LATCH]]:
 ; CHECK-NEXT:    [[P_NEXT]] = getelementptr inbounds i32, ptr [[P]], i64 1
@@ -421,8 +416,7 @@ define void @postinc_latch_multi_index_negative_first_index(ptr %start, ptr %end
 ; CHECK-NEXT:    br i1 [[GUARD]], label %[[LOOP_HEADER:.*]], label %[[EXIT:.*]]
 ; CHECK:       [[LOOP_HEADER]]:
 ; CHECK-NEXT:    [[P:%.*]] = phi ptr [ [[START]], %[[ENTRY]] ], [ [[P_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
-; CHECK-NEXT:    [[T_1:%.*]] = icmp ult ptr [[P]], [[END]]
-; CHECK-NEXT:    call void @use(i1 [[T_1]])
+; CHECK-NEXT:    call void @use(i1 true)
 ; CHECK-NEXT:    br label %[[LOOP_LATCH]]
 ; CHECK:       [[LOOP_LATCH]]:
 ; CHECK-NEXT:    [[P_NEXT]] = getelementptr nuw [4 x i8], ptr [[P]], i64 -1, i64 5
@@ -460,8 +454,7 @@ define void @postinc_latch_addrspace_with_32_bit_index(ptr addrspace(1) %start, 
 ; CHECK-NEXT:    br i1 [[GUARD]], label %[[LOOP_HEADER:.*]], label %[[EXIT:.*]]
 ; CHECK:       [[LOOP_HEADER]]:
 ; CHECK-NEXT:    [[P:%.*]] = phi ptr addrspace(1) [ [[START]], %[[ENTRY]] ], [ [[P_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
-; CHECK-NEXT:    [[T_1:%.*]] = icmp ult ptr addrspace(1) [[P]], [[END]]
-; CHECK-NEXT:    call void @use(i1 [[T_1]])
+; CHECK-NEXT:    call void @use(i1 true)
 ; CHECK-NEXT:    br label %[[LOOP_LATCH]]
 ; CHECK:       [[LOOP_LATCH]]:
 ; CHECK-NEXT:    [[P_NEXT]] = getelementptr inbounds i8, ptr addrspace(1) [[P]], i32 1

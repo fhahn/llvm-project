@@ -632,10 +632,8 @@ define void @postinc_latch_symbolic_start(ptr %p, i8 %start, i8 %n) {
 ; CHECK-NEXT:    br i1 [[GUARD]], label %[[LOOP_HEADER:.*]], label %[[EXIT:.*]]
 ; CHECK:       [[LOOP_HEADER]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i8 [ [[START]], %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
-; CHECK-NEXT:    [[LB:%.*]] = icmp ult i8 [[IV]], [[START]]
-; CHECK-NEXT:    [[UB:%.*]] = icmp ult i8 [[IV]], [[N]]
-; CHECK-NEXT:    [[Z0:%.*]] = zext i1 [[LB]] to i8
-; CHECK-NEXT:    [[Z1:%.*]] = zext i1 [[UB]] to i8
+; CHECK-NEXT:    [[Z0:%.*]] = zext i1 false to i8
+; CHECK-NEXT:    [[Z1:%.*]] = zext i1 true to i8
 ; CHECK-NEXT:    store i8 [[Z0]], ptr [[P]], align 1
 ; CHECK-NEXT:    store i8 [[Z1]], ptr [[P]], align 1
 ; CHECK-NEXT:    br label %[[LOOP_LATCH]]

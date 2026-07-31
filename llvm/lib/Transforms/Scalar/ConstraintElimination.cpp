@@ -954,6 +954,59 @@ static void dumpConstraint(ArrayRef<int64_t> C,
 }
 #endif
 
+/// Return true if incrementing a pointer by a getelementptr with \p NW and
+/// total offset \p Offset is known not to wrap in an unsigned sense. For nuw
+/// GEPs, adding the offsets to the address does not wrap in an unsigned sense,
+/// same as for add nuw. For nusw GEPs (implied by inbounds), the offsets are
+/// added as signed values without wrapping, which also means the address does
+/// not decrease if the total offset is non-negative. No signed no-wrap
+/// information can be derived, as only the offsets of a nusw GEP are treated as
+/// signed values, while the address itself is unsigned.
+static bool isPtrIncrementNUW(GEPNoWrapFlags NW, const APInt &Offset) {
+  return NW.hasNoUnsignedWrap() ||
+         (NW.hasNoUnsignedSignedWrap() && !Offset.isNegative());
+}
+
+/// If \p V is a getelementptr on \p Ptr with a constant total offset, return
+/// that offset, using the bit width of the pointer's index type.
+static std::optional<APInt> getConstantPtrIncrement(Value *V, const Value *Ptr,
+                                                    const DataLayout &DL) {
+  auto *GEP = dyn_cast<GEPOperator>(V);
+  if (!GEP || GEP->getPointerOperand() != Ptr)
+    return std::nullopt;
+  APInt Offset(DL.getIndexTypeSizeInBits(GEP->getType()), 0);
+  if (!GEP->accumulateConstantOffset(DL, Offset))
+    return std::nullopt;
+  return Offset;
+}
+
+/// Match \p V as the value of an induction in the current iteration: either a
+/// phi, or the post-increment of a phi by a constant step, which is returned in
+/// \p IncStep. The post-increment is an add for integer inductions and a
+/// getelementptr with a constant total offset for pointer inductions. Returns
+/// the phi, or nullptr if \p V is neither.
+static PHINode *matchInductionValue(Value *V, std::optional<APInt> &IncStep,
+                                    const DataLayout &DL) {
+  if (auto *PN = dyn_cast<PHINode>(V))
+    return PN;
+
+  PHINode *PN = nullptr;
+  const APInt *Step = nullptr;
+  if (match(V, m_c_Add(m_Phi(PN), m_APInt(Step)))) {
+    IncStep = *Step;
+    return PN;
+  }
+
+  auto *GEP = dyn_cast<GEPOperator>(V);
+  if (!GEP)
+    return nullptr;
+  PN = dyn_cast<PHINode>(GEP->getPointerOperand());
+  if (!PN)
+    return nullptr;
+  IncStep = getConstantPtrIncrement(V, PN, DL);
+  return IncStep ? PN : nullptr;
+}
+
 void State::addInfoForMonotonicHeaderPhis(Loop &L) {
   BasicBlock *Header = L.getHeader();
   BasicBlock *LoopPred = L.getLoopPredecessor();
@@ -998,17 +1051,11 @@ void State::addInfoForMonotonicHeaderPhis(Loop &L) {
       HasNUW = cast<OverflowingBinaryOperator>(Backedge)->hasNoUnsignedWrap();
     } else if (auto *GEP = dyn_cast<GEPOperator>(Backedge);
                GEP && GEP->getPointerOperand() == &PN) {
-      // For nuw GEPs, adding the offsets to the address does not wrap in an
-      // unsigned sense, same as for add nuw. For nusw GEPs (implied by
-      // inbounds), the offsets are added as signed values without wrapping,
-      // which also means the address does not decrease if the total offset is
-      // non-negative.
       GEPNoWrapFlags NW = GEP->getNoWrapFlags();
       APInt Offset(DL.getIndexTypeSizeInBits(GEP->getType()), 0);
-      HasNUW =
-          NW.hasNoUnsignedWrap() ||
-          (NW.hasNoUnsignedSignedWrap() &&
-           GEP->accumulateConstantOffset(DL, Offset) && !Offset.isNegative());
+      HasNUW = NW.hasNoUnsignedWrap() ||
+               (GEP->accumulateConstantOffset(DL, Offset) &&
+                isPtrIncrementNUW(NW, Offset));
     }
 
     // An increment that does not wrap unsigned never decreases the value, hence
@@ -1044,20 +1091,26 @@ void State::addInfoForInductions(BasicBlock &BB) {
   if (Header == &BB)
     addInfoForMonotonicHeaderPhis(*L);
 
-  // A is either a phi or a post-increment PN + C with constant step. For the
-  // latter, extract the constant IncStep.
+  // Match the exit condition as a comparison of an induction value A against a
+  // bound B. A is either the induction phi PN itself or its post-increment, in
+  // which case IncStep is the constant step.
   Value *A;
   Value *B;
-  PHINode *PN = nullptr;
-  const APInt *IncStep = nullptr;
   CmpPredicate Pred;
-  auto IndValue =
-      m_Value(A, m_CombineOr(m_Phi(PN), m_c_Add(m_Phi(PN), m_APInt(IncStep))));
-
   if (!match(BB.getTerminator(),
-             m_Br(m_c_ICmp(Pred, IndValue, m_Value(B)), m_Value(), m_Value())))
+             m_Br(m_ICmp(Pred, m_Value(A), m_Value(B)), m_Value(), m_Value())))
     return;
-  if (PN->getParent() != Header || PN->getNumIncomingValues() != 2 ||
+
+  const DataLayout &DL = BB.getDataLayout();
+  std::optional<APInt> IncStep;
+  PHINode *PN = matchInductionValue(A, IncStep, DL);
+  if (!PN) {
+    // The induction value may also be the second operand.
+    std::swap(A, B);
+    Pred = ICmpInst::getSwappedCmpPredicate(Pred);
+    PN = matchInductionValue(A, IncStep, DL);
+  }
+  if (!PN || PN->getParent() != Header || PN->getNumIncomingValues() != 2 ||
       !SE.isSCEVable(PN->getType()))
     return;
 
@@ -1092,11 +1145,23 @@ void State::addInfoForInductions(BasicBlock &BB) {
   Value *Backedge = PN->getIncomingValueForBlock(BackedgeBB);
   const APInt *StepOffset = nullptr;
   const SCEV *StartSCEV = nullptr;
-  OverflowingBinaryOperator *Inc = nullptr;
+  APInt PtrStepOffset;
+  bool StepFromGEP = false;
+  bool IncNUW = false, IncNSW = false;
   if (match(Backedge, m_c_Add(m_Specific(PN), m_APInt(StepOffset)))) {
     if (StepOffset->isZero())
       return;
-    Inc = cast<OverflowingBinaryOperator>(Backedge);
+    auto *Inc = cast<OverflowingBinaryOperator>(Backedge);
+    IncNUW = Inc->hasNoUnsignedWrap();
+    IncNSW = Inc->hasNoSignedWrap();
+  } else if (std::optional<APInt> Step =
+                 getConstantPtrIncrement(Backedge, PN, DL);
+             Step && !Step->isZero()) {
+    PtrStepOffset = std::move(*Step);
+    StepOffset = &PtrStepOffset;
+    StepFromGEP = true;
+    IncNUW = isPtrIncrementNUW(cast<GEPOperator>(Backedge)->getNoWrapFlags(),
+                               PtrStepOffset);
   } else {
     const SCEV *Expr = SE.getSCEV(PN);
     if (!match(Expr,
@@ -1138,11 +1203,14 @@ void State::addInfoForInductions(BasicBlock &BB) {
     return;
   }
 
-  // Monotonicity is only used if the step is non-negative. If Inc is set it
-  // reduces to the induction wrap flags. If that fails, try to refine via SCEV.
-  bool MonotonicallyIncreasingUnsigned = Inc && Inc->hasNoUnsignedWrap();
-  bool MonotonicallyIncreasingSigned = Inc && Inc->hasNoSignedWrap();
-  if (!(MonotonicallyIncreasingUnsigned && MonotonicallyIncreasingSigned)) {
+  // Monotonicity is only used if the step is non-negative. If the increment's
+  // wrap flags are known it reduces to those. If that fails, try to refine via
+  // SCEV, unless the step comes from a GEP: for pointer AddRecs SCEV derives
+  // the nuw flag from the same GEP nowrap flags, so it cannot do better.
+  bool MonotonicallyIncreasingUnsigned = IncNUW;
+  bool MonotonicallyIncreasingSigned = IncNSW;
+  if (!StepFromGEP &&
+      !(MonotonicallyIncreasingUnsigned && MonotonicallyIncreasingSigned)) {
     const SCEVAddRecExpr *IndAR = cast<SCEVAddRecExpr>(SE.getSCEV(PN));
     if (!MonotonicallyIncreasingUnsigned)
       MonotonicallyIncreasingUnsigned =
@@ -1159,10 +1227,10 @@ void State::addInfoForInductions(BasicBlock &BB) {
   // monotonicity, addInfoForMonotonicHeaderPhis already added the facts for the
   // header, which dominates DTN, so only add them here if monotonicity was
   // proven via SCEV.
-  if (MonotonicallyIncreasingUnsigned && !(Inc && Inc->hasNoUnsignedWrap()))
+  if (MonotonicallyIncreasingUnsigned && !IncNUW)
     WorkList.push_back(
         FactOrCheck::getConditionFact(DTN, CmpInst::ICMP_UGE, PN, StartValue));
-  if (MonotonicallyIncreasingSigned && !(Inc && Inc->hasNoSignedWrap()))
+  if (MonotonicallyIncreasingSigned && !IncNSW)
     WorkList.push_back(
         FactOrCheck::getConditionFact(DTN, CmpInst::ICMP_SGE, PN, StartValue));
 
@@ -1182,41 +1250,35 @@ void State::addInfoForInductions(BasicBlock &BB) {
       return;
   }
 
-  Value *LowerBound = StartValue;
-  bool LowerBoundNUW = true, LowerBoundNSW = true;
-  if (IncStep) {
-    auto *StartC = dyn_cast<ConstantInt>(StartValue);
-    if (!StartC)
-      return;
-    bool UOverflow = false, SOverflow = false;
-    APInt Sum = StartC->getValue().uadd_ov(*StepOffset, UOverflow);
-    (void)StartC->getValue().sadd_ov(*StepOffset, SOverflow);
-    LowerBound = ConstantInt::get(StartValue->getType(), Sum);
-    LowerBoundNUW = !UOverflow;
-    LowerBoundNSW = !SOverflow;
-  }
+  // Together with the restrictions on B and the step above, StartValue u<= B
+  // guarantees that the induction takes the value B exactly, and hence that the
+  // loop exits before wrapping. If A is the post-increment, the loop instead
+  // exits when StartValue + K * StepOffset == B for some K >= 1, which
+  // additionally requires StartValue != B. As B - StartValue is a multiple of
+  // StepOffset, the strict StartValue u< B is equivalent to StartValue +
+  // StepOffset u<= B and also implies that the latter does not wrap. The same
+  // holds for the signed variants.
+  ConditionTy StartBeforeBoundU = {
+      IncStep ? CmpInst::ICMP_ULT : CmpInst::ICMP_ULE, StartValue, B};
+  ConditionTy StartBeforeBoundS = {
+      IncStep ? CmpInst::ICMP_SLT : CmpInst::ICMP_SLE, StartValue, B};
 
-  // AR may wrap. Add PN >= StartValue conditional on LowerBound <= B, which
+  // AR may wrap. Add PN >= StartValue conditional on StartValue <= B, which
   // guarantees that the loop exits before wrapping in combination with the
   // restrictions on B and the step above.
-  ConditionTy StartBeforeBoundULE = {CmpInst::ICMP_ULE, LowerBound, B};
-  ConditionTy StartBeforeBoundSLE = {CmpInst::ICMP_SLE, LowerBound, B};
-  if (!MonotonicallyIncreasingUnsigned && LowerBoundNUW)
+  if (!MonotonicallyIncreasingUnsigned)
     WorkList.push_back(FactOrCheck::getConditionFact(
-        DTN, CmpInst::ICMP_UGE, PN, StartValue, StartBeforeBoundULE));
-  if (!MonotonicallyIncreasingSigned && LowerBoundNSW)
+        DTN, CmpInst::ICMP_UGE, PN, StartValue, StartBeforeBoundU));
+  if (!MonotonicallyIncreasingSigned)
     WorkList.push_back(FactOrCheck::getConditionFact(
-        DTN, CmpInst::ICMP_SGE, PN, StartValue, StartBeforeBoundSLE));
+        DTN, CmpInst::ICMP_SGE, PN, StartValue, StartBeforeBoundS));
 
-  if (LowerBoundNSW)
-    WorkList.push_back(FactOrCheck::getConditionFact(DTN, CmpInst::ICMP_SLT, PN,
-                                                     B, StartBeforeBoundSLE));
-
-  if (!LowerBoundNUW)
-    return;
-
+  // DTN is only reached when the exit condition was false, i.e. A != B, and the
+  // induction only takes values up to B, hence PN is strictly below B there.
+  WorkList.push_back(FactOrCheck::getConditionFact(DTN, CmpInst::ICMP_SLT, PN,
+                                                   B, StartBeforeBoundS));
   WorkList.push_back(FactOrCheck::getConditionFact(DTN, CmpInst::ICMP_ULT, PN,
-                                                   B, StartBeforeBoundULE));
+                                                   B, StartBeforeBoundU));
 
   // Try to add condition from the header or latch to the dedicated exit
   // blocks. When exiting either with EQ or NE, we know that the induction value
@@ -1230,7 +1292,7 @@ void State::addInfoForInductions(BasicBlock &BB) {
     // Bail out on non-dedicated exits.
     if (DT.dominates(&BB, EB)) {
       WorkList.emplace_back(FactOrCheck::getConditionFact(
-          DT.getNode(EB), CmpInst::ICMP_ULE, A, B, StartBeforeBoundULE));
+          DT.getNode(EB), CmpInst::ICMP_ULE, A, B, StartBeforeBoundU));
     }
   }
 }
