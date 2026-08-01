@@ -632,6 +632,14 @@ VPInstruction::VPInstruction(unsigned Opcode, ArrayRef<VPValue *> Operands,
          "number of operands does not match opcode");
 }
 
+SmallVector<int> VPInstruction::getShuffleMask() const {
+  assert(getOpcode() == VPInstruction::Shuffle && "not a shuffle");
+  SmallVector<int> Mask;
+  for (const VPValue *Op : drop_begin(operands(), 2))
+    Mask.push_back(cast<VPConstantInt>(Op)->getAPInt().getSExtValue());
+  return Mask;
+}
+
 unsigned VPInstruction::getNumOperandsForOpcode() const {
   if (Instruction::isUnaryOp(Opcode) || Instruction::isCast(Opcode))
     return 1;
@@ -658,6 +666,7 @@ unsigned VPInstruction::getNumOperandsForOpcode() const {
   case VPInstruction::Not:
   case VPInstruction::Reverse:
   case VPInstruction::Unpack:
+  case VPInstruction::VectorLiveIn:
   case VPInstruction::NumActiveLanes:
     return 1;
   case Instruction::ICmp:
@@ -699,6 +708,7 @@ unsigned VPInstruction::getNumOperandsForOpcode() const {
   case VPInstruction::LastActiveLane:
   case VPInstruction::ExtractLane:
   case VPInstruction::ExtractLastActive:
+  case VPInstruction::Shuffle:
     // Cannot determine the number of operands from the opcode.
     return -1u;
   }
@@ -929,6 +939,16 @@ Value *VPInstruction::generate(VPTransformState &State) {
       Res = Builder.CreateInsertElement(Res, State.get(Op, true),
                                         Builder.getInt64(Idx));
     return Res;
+  }
+  case VPInstruction::VectorLiveIn:
+    // The operand is a single value already holding the whole vector, so there
+    // is nothing to generate.
+    return State.get(getOperand(0), /*IsScalar=*/true);
+  case VPInstruction::Shuffle: {
+    // The first two operands are single values already holding whole vectors.
+    return Builder.CreateShuffleVector(
+        State.get(getOperand(0), /*IsScalar=*/true),
+        State.get(getOperand(1), /*IsScalar=*/true), getShuffleMask());
   }
   case VPInstruction::ReductionStartVector: {
     if (State.VF.isScalar())
@@ -1481,6 +1501,21 @@ InstructionCost VPInstruction::computeCost(ElementCount VF,
                                   I32Ty, {Arg0Ty, I32Ty, I1Ty});
     return Ctx.TTI.getIntrinsicInstrCost(Attrs, Ctx.CostKind);
   }
+  case VPInstruction::Shuffle: {
+    SmallVector<int> Mask = getShuffleMask();
+    // The operands hold whole vectors, so their scalar type is the vector type
+    // being shuffled.
+    auto *SrcTy = cast<VectorType>(getOperand(0)->getScalarType());
+    auto *DstTy = cast<VectorType>(
+        toVectorTy(getScalarType(), ElementCount::getFixed(Mask.size())));
+    auto *Poison = dyn_cast<VPConstant>(getOperand(1));
+    bool SingleSrc = getOperand(0) == getOperand(1) ||
+                     (Poison && isa<PoisonValue>(Poison->getConstant()));
+    return Ctx.TTI.getShuffleCost(SingleSrc
+                                      ? TargetTransformInfo::SK_PermuteSingleSrc
+                                      : TargetTransformInfo::SK_PermuteTwoSrc,
+                                  DstTy, SrcTy, Ctx.CostKind, Mask);
+  }
   case VPInstruction::Reverse: {
     assert(VF.isVector() && "Reverse operation must be vector type");
     Type *EltTy = this->getScalarType();
@@ -1712,7 +1747,9 @@ bool VPInstruction::opcodeMayReadOrWriteFromMemory() const {
   case VPInstruction::StepVector:
   case VPInstruction::ReductionStartVector:
   case VPInstruction::Reverse:
+  case VPInstruction::Shuffle:
   case VPInstruction::Unpack:
+  case VPInstruction::VectorLiveIn:
     return false;
   case VPInstruction::Intrinsic: {
     LLVMContext &Ctx = getScalarType()->getContext();
@@ -1761,6 +1798,8 @@ bool VPInstruction::usesFirstLaneOnly(const VPValue *Op) const {
   case VPInstruction::Intrinsic:
   case VPInstruction::ReductionStartVector:
   case VPInstruction::ResumeForEpilogue:
+  case VPInstruction::Shuffle:
+  case VPInstruction::VectorLiveIn:
     return true;
   case VPInstruction::BuildStructVector:
   case VPInstruction::BuildVector:
@@ -1855,6 +1894,12 @@ void VPInstruction::printRecipe(raw_ostream &O, const Twine &Indent,
     break;
   case VPInstruction::BuildVector:
     O << "buildvector";
+    break;
+  case VPInstruction::VectorLiveIn:
+    O << "vector-live-in";
+    break;
+  case VPInstruction::Shuffle:
+    O << "shuffle";
     break;
   case VPInstruction::ExitingIVValue:
     O << "exiting-iv-value";
