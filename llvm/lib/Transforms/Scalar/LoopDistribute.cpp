@@ -1008,6 +1008,9 @@ static bool runImpl(Function &F, LoopInfo *LI, DominatorTree *DT,
 PreservedAnalyses LoopDistributePass::run(Function &F,
                                           FunctionAnalysisManager &AM) {
   auto &LI = AM.getResult<LoopAnalysis>(F);
+  if (LI.empty())
+    return PreservedAnalyses::all();
+
   auto &DT = AM.getResult<DominatorTreeAnalysis>(F);
   auto &SE = AM.getResult<ScalarEvolutionAnalysis>(F);
   auto &ORE = AM.getResult<OptimizationRemarkEmitterAnalysis>(F);

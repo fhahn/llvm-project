@@ -173,11 +173,13 @@ struct FactOrCheck {
 struct State {
   DominatorTree &DT;
   LoopInfo &LI;
-  ScalarEvolution &SE;
+  /// Only required to reason about inductions, so it is null for functions
+  /// without loops, where addInfoForInductions returns early.
+  ScalarEvolution *SE;
   TargetLibraryInfo &TLI;
   SmallVector<FactOrCheck, 64> WorkList;
 
-  State(DominatorTree &DT, LoopInfo &LI, ScalarEvolution &SE,
+  State(DominatorTree &DT, LoopInfo &LI, ScalarEvolution *SE,
         TargetLibraryInfo &TLI)
       : DT(DT), LI(LI), SE(SE), TLI(TLI) {}
 
@@ -974,7 +976,7 @@ void State::addInfoForInductions(BasicBlock &BB) {
              m_Br(m_c_ICmp(Pred, IndValue, m_Value(B)), m_Value(), m_Value())))
     return;
   if (PN->getParent() != Header || PN->getNumIncomingValues() != 2 ||
-      !SE.isSCEVable(PN->getType()))
+      !SE->isSCEVable(PN->getType()))
     return;
 
   // For latch conditions, we need to inject the condition that holds for the
@@ -1014,7 +1016,7 @@ void State::addInfoForInductions(BasicBlock &BB) {
       return;
     Inc = cast<OverflowingBinaryOperator>(Backedge);
   } else {
-    const SCEV *Expr = SE.getSCEV(PN);
+    const SCEV *Expr = SE->getSCEV(PN);
     if (!match(Expr,
                m_scev_AffineAddRec(m_SCEV(StartSCEV), m_scev_APInt(StepOffset),
                                    m_SpecificLoop(L))))
@@ -1059,14 +1061,14 @@ void State::addInfoForInductions(BasicBlock &BB) {
   bool MonotonicallyIncreasingUnsigned = Inc && Inc->hasNoUnsignedWrap();
   bool MonotonicallyIncreasingSigned = Inc && Inc->hasNoSignedWrap();
   if (!(MonotonicallyIncreasingUnsigned && MonotonicallyIncreasingSigned)) {
-    const SCEVAddRecExpr *IndAR = cast<SCEVAddRecExpr>(SE.getSCEV(PN));
+    const SCEVAddRecExpr *IndAR = cast<SCEVAddRecExpr>(SE->getSCEV(PN));
     if (!MonotonicallyIncreasingUnsigned)
       MonotonicallyIncreasingUnsigned =
-          SE.getMonotonicPredicateType(IndAR, CmpInst::ICMP_UGT) ==
+          SE->getMonotonicPredicateType(IndAR, CmpInst::ICMP_UGT) ==
           ScalarEvolution::MonotonicallyIncreasing;
     if (!MonotonicallyIncreasingSigned)
       MonotonicallyIncreasingSigned =
-          SE.getMonotonicPredicateType(IndAR, CmpInst::ICMP_SGT) ==
+          SE->getMonotonicPredicateType(IndAR, CmpInst::ICMP_SGT) ==
           ScalarEvolution::MonotonicallyIncreasing;
   }
 
@@ -1088,10 +1090,10 @@ void State::addInfoForInductions(BasicBlock &BB) {
   if (!StepOffset->isOne()) {
     // Check whether B-Start is known to be a multiple of StepOffset.
     if (!StartSCEV)
-      StartSCEV = SE.getSCEV(StartValue);
-    const SCEV *BMinusStart = SE.getMinusSCEV(SE.getSCEV(B), StartSCEV);
+      StartSCEV = SE->getSCEV(StartValue);
+    const SCEV *BMinusStart = SE->getMinusSCEV(SE->getSCEV(B), StartSCEV);
     if (isa<SCEVCouldNotCompute>(BMinusStart) ||
-        !SE.getConstantMultiple(BMinusStart).urem(*StepOffset).isZero())
+        !SE->getConstantMultiple(BMinusStart).urem(*StepOffset).isZero())
       return;
   }
 
@@ -1954,7 +1956,7 @@ tryToSimplifyOverflowMath(IntrinsicInst *II, ConstraintInfo &Info,
 }
 
 static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
-                                 ScalarEvolution &SE,
+                                 ScalarEvolution *SE,
                                  OptimizationRemarkEmitter &ORE,
                                  TargetLibraryInfo &TLI) {
   bool Changed = false;
@@ -2253,7 +2255,10 @@ PreservedAnalyses ConstraintEliminationPass::run(Function &F,
                                                  FunctionAnalysisManager &AM) {
   auto &DT = AM.getResult<DominatorTreeAnalysis>(F);
   auto &LI = AM.getResult<LoopAnalysis>(F);
-  auto &SE = AM.getResult<ScalarEvolutionAnalysis>(F);
+  // ScalarEvolution is only used to reason about inductions, so avoid building
+  // it for functions without loops.
+  ScalarEvolution *SE =
+      LI.empty() ? nullptr : &AM.getResult<ScalarEvolutionAnalysis>(F);
   auto &ORE = AM.getResult<OptimizationRemarkEmitterAnalysis>(F);
   auto &TLI = AM.getResult<TargetLibraryAnalysis>(F);
   if (!eliminateConstraints(F, DT, LI, SE, ORE, TLI))
