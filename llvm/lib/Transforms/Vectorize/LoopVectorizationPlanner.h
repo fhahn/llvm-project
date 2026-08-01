@@ -870,6 +870,17 @@ class LoopVectorizationPlanner {
 
   SmallVector<VPlanPtr, 4> VPlans;
 
+  /// The initial, VF-independent VPlan the per-VF plans in \p VPlans are built
+  /// from. Only retained when the scalar (VF=1) plan is built lazily, see
+  /// \p ScalarPlanIsLazy.
+  VPlanPtr VPlan1ForScalarPlan;
+
+  /// Set when plan() only built plans for vector VFs, leaving the scalar VF=1
+  /// plan to be built on demand by computeBestVF. The scalar plan is only
+  /// needed when no vector VF is profitable, which is the minority of loops, so
+  /// building it eagerly would waste a full plan construction per loop.
+  bool ScalarPlanIsLazy = false;
+
   /// Profitable vector factors.
   SmallVector<VectorizationFactor, 8> ProfitableVFs;
 
@@ -1020,6 +1031,10 @@ private:
   /// based on \p VPlan1 and according to the information gathered by Legal
   /// when it checked if it is legal to vectorize the loop.
   void buildVPlans(VPlan &VPlan1, ElementCount MinVF, ElementCount MaxVF);
+
+  /// Build the scalar (VF=1) VPlan that plan() deferred, append it to \p VPlans
+  /// and return it. Only valid when \p ScalarPlanIsLazy is set.
+  VPlan *buildScalarVPlan();
 
   /// Add ComputeReductionResult recipes to the middle block to compute the
   /// final reduction results. Add Select recipes to the latch block when
