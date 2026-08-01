@@ -1,5 +1,7 @@
 ; RUN: opt -S -mtriple=amdgpu9.08-amd-amdhsa -passes=slp-vectorizer < %s | FileCheck -check-prefixes=GCN,GFX908 %s
+; RUN: opt -slp-use-vplan-codegen -S -mtriple=amdgpu9.08-amd-amdhsa -passes=slp-vectorizer < %s | FileCheck -check-prefixes=GCN,GFX908 %s
 ; RUN: opt -S -mtriple=amdgpu9.0a-amd-amdhsa -passes=slp-vectorizer < %s | FileCheck -check-prefixes=GCN,GFX90A %s
+; RUN: opt -slp-use-vplan-codegen -S -mtriple=amdgpu9.0a-amd-amdhsa -passes=slp-vectorizer < %s | FileCheck -check-prefixes=GCN,GFX90A %s
 
 ; GCN-LABEL: @fadd_combine
 ; GFX908: fadd float

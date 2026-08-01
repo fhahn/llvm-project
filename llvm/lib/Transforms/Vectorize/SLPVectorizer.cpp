@@ -20,6 +20,10 @@
 #include "SLPVectorizer/SLPCompatibilityAnalysis.h"
 #include "SLPVectorizer/SLPCostAnalysis.h"
 #include "SLPVectorizer/SLPUtils.h"
+
+#include "LoopVectorizationPlanner.h"
+#include "VPlan.h"
+#include "VPlanHelpers.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/PriorityQueue.h"
@@ -122,6 +126,9 @@ STATISTIC(NumVectorInstructions, "Number of vector instructions generated");
 STATISTIC(NumStridedStoreChains, "Number of vectorized stride stores");
 STATISTIC(NumStoreChains, "Number of vector stores created");
 STATISTIC(NumVectorizedStores, "Number of vectorized stores");
+
+STATISTIC(NumVPlanCodegen, "Number of SLP trees using VPlan-based codegen");
+STATISTIC(NumLegacyCodegen, "Number of SLP trees using legacy codegen");
 
 DEBUG_COUNTER(VectorizedGraphs, "slp-vectorized",
               "Controls which SLP graphs should be vectorized.");
@@ -333,6 +340,10 @@ static cl::opt<unsigned> SLPRuntimeAliasChecksMaxScalarCostPercent(
     cl::desc("Maximum SLP runtime alias check cost, as a percentage of the "
              "guarded scalar region cost, before versioning is rejected to "
              "avoid pessimizing the scalar fallback path."));
+
+static cl::opt<bool>
+    SLPUseVPlanCodegen("slp-use-vplan-codegen", cl::init(true), cl::Hidden,
+                       cl::desc("Use VPlan-based codegen in SLP vectorizer"));
 
 // Limit the number of alias checks. The limit is chosen so that
 // it has no negative effect on the llvm benchmarks.
@@ -717,6 +728,19 @@ public:
                 Instruction *ReductionRoot = nullptr,
                 ArrayRef<std::tuple<WeakTrackingVH, unsigned, bool, bool>>
                     VectorValuesAndScales = {});
+
+  /// Returns true if the current SLP tree is eligible for VPlan-based codegen.
+  bool isVPlanEligible() const;
+
+  /// Build a VPlan for the current SLP tree, populating \p ScalarToExtract with
+  /// the mapping from externally used scalars to the extracts replacing them.
+  std::unique_ptr<VPlan>
+  buildVPlanForTree(DenseMap<Value *, VPValue *> &ScalarToExtract);
+
+  /// Execute \p Plan, generating vector IR for the SLP tree, and replace the
+  /// scalars in \p ScalarToExtract with the generated extracts.
+  void executeVPlanForTree(VPlan &Plan,
+                           const DenseMap<Value *, VPValue *> &ScalarToExtract);
 
   /// \returns the cost incurred by unwanted spills and fills, caused by
   /// holding live values over call sites.
@@ -25000,6 +25024,432 @@ void BoUpSLP::versionBlocksForRuntimeChecks() {
   CFGChanged = true;
 }
 
+/// Returns true if operand \p J of an entry with main opcode \p Opcode is a
+/// plan live-in rather than being defined by another tree entry. Loads and
+/// stores take their pointer operand this way, extractelement its source
+/// vector. An insertelement bundle does not use its source vector at all: it
+/// overwrites every lane, so the vector built from its inserted values is
+/// already the result.
+static bool isLiveInOperand(unsigned Opcode, unsigned J) {
+  return (Opcode == Instruction::Load && J == 0) ||
+         (Opcode == Instruction::Store && J == 1) ||
+         (Opcode == Instruction::ExtractElement && J == 0) ||
+         (Opcode == Instruction::InsertElement && J == 0);
+}
+
+/// Returns true if VPlan-based codegen can emit a recipe for a tree entry with
+/// main opcode \p Opcode. Keep in sync with the recipe creation in
+/// buildVPlanForTree().
+static bool isSupportedVPlanCodegenOpcode(unsigned Opcode) {
+  if (Instruction::isBinaryOp(Opcode) || Instruction::isCast(Opcode))
+    return true;
+  switch (Opcode) {
+  case Instruction::ExtractElement:
+  case Instruction::FCmp:
+  case Instruction::FNeg:
+  case Instruction::GetElementPtr:
+  case Instruction::ICmp:
+  case Instruction::InsertElement:
+  case Instruction::Load:
+  case Instruction::Select:
+  case Instruction::Store:
+    return true;
+  default:
+    return false;
+  }
+}
+
+bool BoUpSLP::isVPlanEligible() const {
+  // Non-instruction users, and PHI users which would need the extract placed
+  // in the incoming block, are not supported yet.
+  if (any_of(ExternalUses, [](const ExternalUser &EU) {
+        return EU.User && (!isa<Instruction>(EU.User) || isa<PHINode>(EU.User));
+      }))
+    return false;
+
+  BasicBlock *RootBB =
+      cast<Instruction>(VectorizableTree[0]->Scalars.front())->getParent();
+  for (const std::unique_ptr<TreeEntry> &TE : VectorizableTree) {
+    if (DeletedNodes.contains(TE.get()))
+      continue;
+
+    if (MinBWs.contains(TE.get()))
+      return false;
+
+    if (TE->isGather()) {
+      // A gather is materialized with one live-in per lane, which assumes a
+      // scalar element type.
+      if (TE->Scalars.front()->getType()->isVectorTy())
+        return false;
+      // Gathers are supported as long as all their scalars are live-in, i.e.
+      // constants or values defined outside the tree.
+      if (any_of(TE->Scalars,
+                 [&](Value *V) { return ScalarToTreeEntries.contains(V); }))
+        return false;
+      // A gather is materialized with one lane per scalar, so entries that
+      // permute their lanes or list only the unique ones are not supported;
+      // the vector they build would be too narrow.
+      if (!TE->ReorderIndices.empty() || !TE->ReuseShuffleIndices.empty())
+        return false;
+      continue;
+    }
+
+    // Only handle plain Vectorize entries without any lane permutation.
+    if (TE->State != TreeEntry::Vectorize || !TE->hasState() ||
+        TE->isAltShuffle() || !TE->ReorderIndices.empty() ||
+        !TE->ReuseShuffleIndices.empty())
+      return false;
+
+    unsigned Opcode = TE->getOpcode();
+
+    // No vector-typed scalars (revec). VPlan recipes and live-ins assume scalar
+    // element types and would create invalid vector-of-vector types. The
+    // scalars of an insertelement bundle are vector-typed by construction; it
+    // emits no recipe of its own, and the entry providing its lanes is checked
+    // separately.
+    if (TE->Scalars.front()->getType()->isVectorTy() &&
+        Opcode != Instruction::InsertElement)
+      return false;
+
+    // All lanes must use the main opcode. Lanes with a different opcode, e.g.
+    // copyable elements, are emitted using the main opcode, which requires
+    // adjusting the IR flags accordingly; not implemented yet.
+    if (TE->hasCopyableElements() || any_of(TE->Scalars, [&](Value *V) {
+          auto *I = dyn_cast<Instruction>(V);
+          return I && I->getOpcode() != Opcode;
+        }))
+      return false;
+
+    // Each recipe takes the operands of the main op, so bundles with extra
+    // operands, e.g. reassociated ones, are not supported. Extractelement
+    // entries only record their source vector, and insertelement entries their
+    // source vector and inserted values, both dropping the index operand.
+    if (Opcode == Instruction::ExtractElement) {
+      // The entry reuses its source vector as-is, so the vector must supply
+      // exactly the entry's lanes, in order. canReuseExtract already ensures
+      // this for entries without reordering, which is checked above.
+      auto *VecTy = dyn_cast<FixedVectorType>(
+          cast<ExtractElementInst>(TE->getMainOp())->getVectorOperandType());
+      if (!VecTy || VecTy->getNumElements() != TE->Scalars.size())
+        return false;
+    } else if (Opcode == Instruction::InsertElement) {
+      // The vector built from the inserted values is reused as-is, so the
+      // bundle must fill its destination vector completely, inserting lane I at
+      // index I. Empty ReorderIndices, checked above, already implies the
+      // scalars are ordered by increasing index.
+      auto *VecTy = dyn_cast<FixedVectorType>(TE->getMainOp()->getType());
+      if (!VecTy || VecTy->getNumElements() != TE->Scalars.size())
+        return false;
+      for (const auto &[Idx, V] : enumerate(TE->Scalars)) {
+        std::optional<unsigned> InsertIdx = getElementIndex(V);
+        if (!InsertIdx || *InsertIdx != Idx)
+          return false;
+      }
+    } else if (TE->getNumOperands() != TE->getMainOp()->getNumOperands()) {
+      return false;
+    }
+
+    // All recipes are emitted into a single VPBasicBlock, using insert points
+    // in the root's block.
+    if (TE->getMainOp()->getParent() != RootBB)
+      return false;
+
+    if (!isSupportedVPlanCodegenOpcode(Opcode))
+      return false;
+
+    // All operands must be defined by entries that are still in the tree.
+    for (unsigned J : seq<unsigned>(TE->getNumOperands())) {
+      if (isLiveInOperand(Opcode, J))
+        continue;
+      auto It = OperandsToTreeEntry.find({TE.get(), J});
+      if (It == OperandsToTreeEntry.end() || DeletedNodes.contains(It->second))
+        return false;
+    }
+
+    // An insertelement bundle reuses the vector built from its inserted values.
+    // If those come from a gather that is materialized one lane at a time, the
+    // bundle would replace an insertelement chain with an equivalent one;
+    // besides being pointless, the new chain would be matched again on the next
+    // run over the block, and never converge. A splat does not have that
+    // problem: it needs at most a single insert.
+    if (Opcode == Instruction::InsertElement) {
+      const TreeEntry *OpE = getOperandEntry(TE.get(), 1);
+      if (OpE->isGather() && !all_equal(OpE->Scalars))
+        return false;
+    }
+  }
+  return true;
+}
+
+/// Returns the IR flags common to all of \p Scalars, seeded from \p MainOp.
+static VPIRFlags computeIntersectedFlags(Instruction *MainOp,
+                                         ArrayRef<Value *> Scalars) {
+  // Lanes of a compare entry may use the swapped predicate, with their operands
+  // swapped accordingly. Keep the main predicate and only intersect the
+  // fast-math flags.
+  if (auto *Cmp = dyn_cast<CmpInst>(MainOp)) {
+    if (!isa<FCmpInst>(Cmp))
+      return VPIRFlags(Cmp->getPredicate());
+    FastMathFlags FMF = cast<FPMathOperator>(Cmp)->getFastMathFlags();
+    for (Value *V : Scalars)
+      if (auto *FPOp = dyn_cast<FPMathOperator>(V))
+        FMF &= FPOp->getFastMathFlags();
+    return VPIRFlags(Cmp->getPredicate(), FMF);
+  }
+
+  VPIRFlags Flags(*MainOp);
+  for (Value *V : Scalars) {
+    // Drop all flags if a lane is not an instruction, e.g. poison.
+    auto *I = dyn_cast<Instruction>(V);
+    if (!I)
+      return VPIRFlags();
+    Flags.intersectFlags(VPIRFlags(*I));
+  }
+  return Flags;
+}
+
+/// Returns the metadata common to all of \p Scalars, for a combined instruction
+/// represented by \p MainOp. Only instructions carry metadata, so other lanes,
+/// e.g. poison, are skipped, as ::propagateMetadata() does on the existing
+/// codegen path.
+static VPIRMetadata computeIntersectedMetadata(Instruction *MainOp,
+                                               ArrayRef<Value *> Scalars) {
+  SmallVector<Value *> Insts;
+  for (Value *V : Scalars)
+    if (isa<Instruction>(V))
+      Insts.push_back(V);
+  return VPIRMetadata(*MainOp, Insts);
+}
+
+std::unique_ptr<VPlan>
+BoUpSLP::buildVPlanForTree(DenseMap<Value *, VPValue *> &ScalarToExtract) {
+  BasicBlock *RootBB =
+      cast<Instruction>(VectorizableTree[0]->Scalars.front())->getParent();
+  auto Plan =
+      std::make_unique<VPlan>(RootBB, Type::getInt32Ty(F->getContext()));
+  VPBasicBlock *VPBB = Plan->createVPBasicBlock("slp.body");
+  VPBlockUtils::insertBlockAfter(VPBB, Plan->getEntry());
+  VPBuilder VPB(VPBB, VPBB->end());
+
+  // Order the entries so that an entry's operands come before it. Scheduling
+  // has placed each bundle before its users, so this also matches program
+  // order, but deriving it from the tree avoids walking the containing block.
+  SmallVector<TreeEntry *> OrderedEntries;
+  SmallPtrSet<TreeEntry *, 16> Visited;
+  auto AddEntry = [&](TreeEntry *E, auto &Self) -> void {
+    if (DeletedNodes.contains(E) || E->isGather() || !Visited.insert(E).second)
+      return;
+    for (unsigned J : seq<unsigned>(E->getNumOperands()))
+      if (!isLiveInOperand(E->getOpcode(), J))
+        Self(getOperandEntry(E, J), Self);
+    OrderedEntries.push_back(E);
+  };
+  for (const std::unique_ptr<TreeEntry> &TEPtr : VectorizableTree)
+    AddEntry(TEPtr.get(), AddEntry);
+
+  // Bucket the external uses by defining entry, to avoid re-scanning the whole
+  // list for every entry below.
+  DenseMap<const TreeEntry *, SmallVector<const ExternalUser *>>
+      ExternalUsesByEntry;
+  for (const ExternalUser &EU : ExternalUses)
+    ExternalUsesByEntry[&EU.E].push_back(&EU);
+
+  DenseMap<const TreeEntry *, VPValue *> EntryToVPValue;
+  // Returns the VPValue for operand \p J of \p E. Gather entries are
+  // materialized on first use, either as a live-in for constant splats or
+  // lane-by-lane otherwise.
+  auto GetOperandVPValue = [&](TreeEntry *E, unsigned J) -> VPValue * {
+    TreeEntry *OpE = getOperandEntry(E, J);
+    if (VPValue *Op = EntryToVPValue.lookup(OpE))
+      return Op;
+    assert(OpE->isGather() && "operand entry must have been processed");
+    Value *Front = OpE->Scalars.front();
+    VPValue *Op;
+    if (all_equal(OpE->Scalars)) {
+      // All lanes hold the same value. A constant is broadcast by whoever uses
+      // it; anything else gets an explicit splat, as the existing codegen path
+      // does, rather than an insert per lane.
+      Op = Plan->getOrAddLiveIn(Front);
+      if (!isa<Constant>(Front))
+        Op = VPB.createNaryOp(VPInstruction::Broadcast, {Op});
+    } else {
+      SmallVector<VPValue *> Lanes;
+      for (Value *V : OpE->Scalars)
+        Lanes.push_back(Plan->getOrAddLiveIn(V));
+      Op = VPB.createNaryOp(VPInstruction::BuildVector, Lanes);
+    }
+    EntryToVPValue[OpE] = Op;
+    return Op;
+  };
+
+  // Map from (entry, lane) to its extract, to emit a single extract per lane.
+  DenseMap<std::pair<const TreeEntry *, unsigned>, VPValue *> ExtractVPValues;
+  for (TreeEntry *E : OrderedEntries) {
+    // Set the insert point after the entry's last bundle instruction;
+    // VPIRInstruction::execute advances the builder past it.
+    VPB.insert(VPIRInstruction::create(getLastInstructionInBundle(E)));
+
+    unsigned Opcode = E->getOpcode();
+    Instruction *MainOp = E->getMainOp();
+    VPIRFlags Flags = computeIntersectedFlags(MainOp, E->Scalars);
+    VPIRMetadata Metadata = computeIntersectedMetadata(MainOp, E->Scalars);
+    DebugLoc DL = MainOp->getDebugLoc();
+
+    // Materialize the operands first, so any recipe created for a gather
+    // operand is placed before the entry's own recipe below.
+    SmallVector<VPValue *> Ops;
+    for (unsigned J : seq<unsigned>(E->getNumOperands()))
+      if (!isLiveInOperand(Opcode, J))
+        Ops.push_back(GetOperandVPValue(E, J));
+
+    VPValue *EntryVPV = nullptr;
+    if (Opcode == Instruction::ExtractElement) {
+      // The bundle extracts all elements of a single source vector in order
+      // (checked by isVPlanEligible), so that vector already provides all
+      // lanes. Reuse it directly instead of generating any IR, as the existing
+      // codegen path does.
+      Value *Vec = cast<ExtractElementInst>(MainOp)->getVectorOperand();
+      EntryVPV = VPB.createNaryOp(VPInstruction::VectorLiveIn,
+                                  {Plan->getOrAddLiveIn(Vec)},
+                                  MainOp->getType(), /*Flags=*/{}, DL);
+      EntryToVPValue[E] = EntryVPV;
+    } else if (Opcode == Instruction::InsertElement) {
+      // The bundle overwrites every lane of its destination vector in order
+      // (checked by isVPlanEligible), so the vector built from the inserted
+      // values, i.e. the entry's single non-live-in operand, is already the
+      // result. Reuse it directly instead of generating any IR, as the existing
+      // codegen path does.
+      assert(Ops.size() == 1 && "insertelement bundle takes the source vector "
+                                "and the inserted values");
+      EntryVPV = Ops[0];
+      EntryToVPValue[E] = EntryVPV;
+    } else {
+      VPRecipeBase *R;
+      if (Opcode == Instruction::Load) {
+        auto *LI = cast<LoadInst>(MainOp);
+        R = new VPWidenLoadRecipe(*LI,
+                                  Plan->getOrAddLiveIn(LI->getPointerOperand()),
+                                  /*Mask=*/nullptr,
+                                  /*Consecutive=*/true, Metadata, DL);
+      } else if (Opcode == Instruction::Store) {
+        auto *SI = cast<StoreInst>(MainOp);
+        R = new VPWidenStoreRecipe(
+            *SI, Plan->getOrAddLiveIn(SI->getPointerOperand()), Ops[0],
+            /*Mask=*/nullptr, /*Consecutive=*/true, Metadata, DL);
+      } else if (Opcode == Instruction::GetElementPtr) {
+        auto *GEP = cast<GetElementPtrInst>(MainOp);
+        R = new VPWidenGEPRecipe(GEP->getSourceElementType(), Ops, Flags, DL,
+                                 GEP);
+      } else if (Instruction::isCast(Opcode)) {
+        auto *CI = cast<CastInst>(MainOp);
+        R = new VPWidenCastRecipe(CI->getOpcode(), Ops[0], CI->getType(), CI,
+                                  Flags, Metadata, DL);
+      } else {
+        R = new VPWidenRecipe(*MainOp, Ops, Flags, Metadata, DL);
+      }
+      VPB.insert(R);
+      // Stores do not define a value.
+      EntryVPV = dyn_cast<VPSingleDefRecipe>(R);
+      if (EntryVPV)
+        EntryToVPValue[E] = EntryVPV;
+    }
+
+    // Emit extracts for the external uses of this entry directly after its
+    // recipe, which dominates all external users (guaranteed by scheduling).
+    for (const ExternalUser *EU : ExternalUsesByEntry.lookup(E)) {
+      // Skip in-tree users; they are handled by their own recipes.
+      if (EU->User && isVectorized(EU->User))
+        continue;
+      // Uses the cost model decided to keep as the original scalar are served
+      // by the scalar instruction itself, which is left in place instead of
+      // being erased, so they need no extract at all.
+      if (ExternalUsesAsOriginalScalar.contains(EU->Scalar))
+        continue;
+      // A scalar of an insertelement bundle is the built vector itself, not one
+      // of its lanes, so replace it with the whole vector.
+      if (Opcode == Instruction::InsertElement) {
+        ScalarToExtract[EU->Scalar] = EntryVPV;
+        continue;
+      }
+      VPValue *&Ext = ExtractVPValues[{E, EU->Lane}];
+      if (!Ext) {
+        assert(EntryVPV && "external use of entry that defines no value");
+        Ext = VPB.createNaryOp(Instruction::ExtractElement,
+                               {EntryVPV, Plan->getConstantInt(32, EU->Lane)});
+      }
+      // Record the mapping for RAUW after execution.
+      ScalarToExtract[EU->Scalar] = Ext;
+    }
+  }
+
+  return Plan;
+}
+
+void BoUpSLP::executeVPlanForTree(
+    VPlan &Plan, const DenseMap<Value *, VPValue *> &ScalarToExtract) {
+  VPTransformState State(
+      TTI, ElementCount::getFixed(VectorizableTree[0]->Scalars.size()), LI, DT,
+      AC, Builder, &Plan, /*CurrentParentLoop=*/nullptr);
+
+  // The recipes are already in execution order, with VPIRInstructions setting
+  // the insert point for the recipes following them.
+  for (VPRecipeBase &R :
+       *cast<VPBasicBlock>(Plan.getEntry()->getSingleSuccessor()))
+    R.execute(State);
+
+  // The splats, buildvectors and extracts this plan created are gather
+  // sequences, just like the ones the existing codegen path creates. Hand them
+  // to optimizeGatherSequence(), so they are hoisted out of loops and CSE'd the
+  // same way.
+  for (VPRecipeBase &R :
+       *cast<VPBasicBlock>(Plan.getEntry()->getSingleSuccessor())) {
+    auto *VPI = dyn_cast<VPInstruction>(&R);
+    if (!VPI)
+      continue;
+    // Collect the sequence from its last instruction back: a splat is a
+    // shufflevector of a single insert, a buildvector a chain of inserts.
+    SmallVector<Instruction *, 8> Seq;
+    switch (VPI->getOpcode()) {
+    case VPInstruction::Broadcast:
+    case VPInstruction::BuildVector: {
+      Value *V = State.get(VPI, /*IsScalar=*/false);
+      if (auto *SV = dyn_cast<ShuffleVectorInst>(V)) {
+        Seq.push_back(SV);
+        V = SV->getOperand(0);
+      }
+      while (auto *IE = dyn_cast<InsertElementInst>(V)) {
+        Seq.push_back(IE);
+        V = IE->getOperand(0);
+      }
+      break;
+    }
+    case Instruction::ExtractElement: {
+      auto *EE = dyn_cast<ExtractElementInst>(State.get(VPI, /*IsScalar=*/true));
+      // Match the existing path, which skips extracts that are not pure
+      // def-use.
+      if (EE && !mayHaveNonDefUseDependency(*EE))
+        Seq.push_back(EE);
+      break;
+    }
+    default:
+      continue;
+    }
+    // optimizeGatherSequence() hoists in insertion order, and an insert can
+    // only be hoisted once the one it inserts into has been, so record the
+    // sequence front to back.
+    for (Instruction *I : reverse(Seq)) {
+      GatherShuffleExtractSeq.insert(I);
+      CSEBlocks.insert(I->getParent());
+    }
+  }
+
+  // Vector-typed scalars come from insertelement bundles, which map to the
+  // whole vector rather than to one of its lanes.
+  for (const auto &[Scalar, Ext] : ScalarToExtract)
+    Scalar->replaceAllUsesWith(
+        State.get(Ext, /*IsScalar=*/!Scalar->getType()->isVectorTy()));
+}
+
 Value *BoUpSLP::vectorizeTree() {
   ExtraValueToDebugLocsMap ExternallyUsedValues;
   return vectorizeTree(ExternallyUsedValues);
@@ -25046,6 +25496,21 @@ Value *BoUpSLP::vectorizeTree(
   else
     Builder.SetInsertPoint(&F->getEntryBlock(), F->getEntryBlock().begin());
 
+  // Use VPlan-based codegen if enabled and the tree is eligible. It is not used
+  // in a reduction context (ReductionRoot is set), as the caller needs
+  // VectorizedValue on the root entry to emit the reduction.
+  bool UsedVPlan = SLPUseVPlanCodegen && !ReductionRoot && isVPlanEligible();
+  if (UsedVPlan)
+    ++NumVPlanCodegen;
+  else
+    ++NumLegacyCodegen;
+
+  SmallDenseSet<ExtractElementInst *, 4> IgnoredExtracts;
+  if (UsedVPlan) {
+    DenseMap<Value *, VPValue *> ScalarToExtract;
+    std::unique_ptr<VPlan> Plan = buildVPlanForTree(ScalarToExtract);
+    executeVPlanForTree(*Plan, ScalarToExtract);
+  } else {
   // Vectorize gather operands of the nodes with the external uses only.
   SmallVector<std::pair<TreeEntry *, Instruction *>> GatherEntries;
   // Multiple gather TEs may share the same UserTE - cache the per-UserTE
@@ -25221,7 +25686,6 @@ Value *BoUpSLP::vectorizeTree(
   SmallDenseSet<Value *, 4> UsedInserts;
   DenseMap<std::pair<Value *, Type *>, Value *> VectorCasts;
   SmallDenseSet<Value *, 4> ScalarsWithNullptrUser;
-  SmallDenseSet<ExtractElementInst *, 4> IgnoredExtracts;
   // Extract all of the elements with the external uses.
   for (const auto &ExternalUse : ExternalUses) {
     Value *Scalar = ExternalUse.Scalar;
@@ -25679,6 +26143,7 @@ Value *BoUpSLP::vectorizeTree(
     }
     CSEBlocks.insert(LastInsert->getParent());
   }
+  } // end of legacy codegen path
 
   SmallVector<Instruction *> RemovedInsts;
   // For each vectorized value:
@@ -25712,7 +26177,8 @@ Value *BoUpSLP::vectorizeTree(
       continue;
     }
 
-    assert(Entry->VectorizedValue && "Can't find vectorizable value");
+    assert((Entry->VectorizedValue || UsedVPlan) &&
+           "Can't find vectorizable value");
 
     // For each lane:
     for (int Lane = 0, LE = Entry->Scalars.size(); Lane != LE; ++Lane) {
@@ -25724,6 +26190,10 @@ Value *BoUpSLP::vectorizeTree(
       if (auto *EE = dyn_cast<ExtractElementInst>(Scalar);
           EE && IgnoredExtracts.contains(EE))
         continue;
+      // VPlan-based codegen leaves scalars kept as originals in place instead of
+      // replacing their external uses with a clone, so they must not be erased.
+      if (UsedVPlan && ExternalUsesAsOriginalScalar.contains(Scalar))
+        continue;
       if (!isa<Instruction>(Scalar) || Entry->isCopyableElement(Scalar))
         continue;
 #ifndef NDEBUG
@@ -25733,7 +26203,7 @@ Value *BoUpSLP::vectorizeTree(
           LLVM_DEBUG(dbgs() << "SLP: \tvalidating user:" << *U << ".\n");
 
           // It is legal to delete users in the ignorelist.
-          assert((isVectorized(U) ||
+          assert((isVectorized(U) || UsedVPlan ||
                   (UserIgnoreList && UserIgnoreList->contains(U)) ||
                   (isa_and_nonnull<Instruction>(U) &&
                    isDeleted(cast<Instruction>(U)))) &&
@@ -25817,7 +26287,8 @@ Value *BoUpSLP::vectorizeTree(
 
   // Merge the DIAssignIDs from the about-to-be-deleted instructions into the
   // new vector instruction.
-  if (auto *V = dyn_cast<Instruction>(VectorizableTree[0]->VectorizedValue))
+  if (auto *V =
+          dyn_cast_or_null<Instruction>(VectorizableTree[0]->VectorizedValue))
     V->mergeDIAssignID(RemovedInsts);
 
   // Clear up reduction references, if any.
