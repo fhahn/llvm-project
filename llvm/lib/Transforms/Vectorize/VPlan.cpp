@@ -299,6 +299,11 @@ Value *VPTransformState::get(const VPValue *Def, const VPLane &Lane) {
     return get(BuildVector->getOperand(Lane.getKnownLane()), true);
   }
 
+  // All lanes of a broadcast are the scalar it broadcasts; use it directly
+  // instead of extracting it back out of the broadcast.
+  if (match(Def, m_Broadcast(m_VPValue())))
+    return get(cast<VPInstruction>(Def)->getOperand(0), VPLane(0));
+
   assert(hasVectorValue(Def));
   auto *VecPart = Data.VPV2Vector[Def];
   if (!VecPart->getType()->isVectorTy()) {

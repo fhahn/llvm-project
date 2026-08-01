@@ -1,5 +1,7 @@
 ; RUN: opt -S -mtriple=amdgpu12.50-amd-amdhsa -passes=slp-vectorizer < %s | FileCheck -check-prefixes=GCN,GFX1250 %s
+; RUN: opt -slp-use-vplan-codegen -S -mtriple=amdgpu12.50-amd-amdhsa -passes=slp-vectorizer < %s | FileCheck -check-prefixes=GCN,GFX1250 %s
 ; RUN: opt -S -mtriple=amdgpu12.51-amd-amdhsa -passes=slp-vectorizer < %s | FileCheck -check-prefixes=GCN,GFX1251 %s
+; RUN: opt -slp-use-vplan-codegen -S -mtriple=amdgpu12.51-amd-amdhsa -passes=slp-vectorizer < %s | FileCheck -check-prefixes=GCN,GFX1251 %s
 
 ; GCN-LABEL: @add_combine
 ; GFX1250: add i64

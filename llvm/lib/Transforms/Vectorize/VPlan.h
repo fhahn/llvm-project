@@ -1207,6 +1207,15 @@ public:
         Metadata.emplace_back(LLVMContext::MD_prof, BW);
   }
 
+  /// Adds the metadata that can be preserved when combining all of \p VL into
+  /// a single instruction represented by \p Repr.
+  VPIRMetadata(Instruction &Repr, ArrayRef<Value *> VL) {
+    getMetadataToPropagate(&Repr, VL, Metadata);
+    // Kinds the bundle does not agree on come back with a null node, meaning
+    // the combined instruction must not carry them. Only keep the ones it does.
+    erase_if(Metadata, [](const auto &P) { return !P.second; });
+  }
+
   /// Copy constructor for cloning.
   VPIRMetadata(const VPIRMetadata &Other) = default;
 
@@ -1310,6 +1319,13 @@ public:
     /// Creates a fixed-width vector containing all operands. The number of
     /// operands matches the vector element count.
     BuildVector,
+    /// Reinterprets its single operand, which holds a whole vector in one
+    /// value, as this plan's VF lanes. Generates no IR: the result is the
+    /// operand itself. The result type must be passed explicitly, as it is the
+    /// operand's element type rather than the operand's own type. Used when the
+    /// vector for a set of lanes already exists, e.g. for an SLP bundle
+    /// extracting all elements of a vector in order.
+    VectorLiveIn,
     /// Extracts all lanes from its (non-scalable) vector operand. This is an
     /// abstract VPInstruction whose single defined VPValue represents VF
     /// scalars extracted from a vector, to be replaced by VF ExtractElement
@@ -1602,6 +1618,7 @@ public:
     case VPInstruction::WideIVStep:
     case VPInstruction::StepVector:
     case VPInstruction::Intrinsic:
+    case VPInstruction::VectorLiveIn:
     case Instruction::Load:
       return true;
     default:
@@ -4938,11 +4955,13 @@ public:
   VPlan(Loop *L, Type *IdxTy);
 
   /// Construct a VPlan with a new VPBasicBlock as entry, a VPIRBasicBlock
-  /// wrapping \p ScalarHeaderBB and vector loop index of type \p IdxTy.
+  /// wrapping \p ScalarHeaderBB and vector loop index of type \p IdxTy. The
+  /// scalar header is left empty; callers that need recipes for the
+  /// instructions in \p ScalarHeaderBB must create them themselves.
   VPlan(BasicBlock *ScalarHeaderBB, Type *IdxTy)
       : VectorTripCount(IdxTy), VF(IdxTy), UF(IdxTy), VFxUF(IdxTy) {
     setEntry(createVPBasicBlock("preheader"));
-    ScalarHeader = createVPIRBasicBlock(ScalarHeaderBB);
+    ScalarHeader = createEmptyVPIRBasicBlock(ScalarHeaderBB);
   }
 
   LLVM_ABI_FOR_TEST ~VPlan();

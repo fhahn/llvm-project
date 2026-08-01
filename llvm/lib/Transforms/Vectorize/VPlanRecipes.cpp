@@ -652,6 +652,7 @@ unsigned VPInstruction::getNumOperandsForOpcode() const {
   case VPInstruction::Not:
   case VPInstruction::Reverse:
   case VPInstruction::Unpack:
+  case VPInstruction::VectorLiveIn:
   case VPInstruction::NumActiveLanes:
     return 1;
   case Instruction::ICmp:
@@ -1660,6 +1661,7 @@ bool VPInstruction::opcodeMayReadOrWriteFromMemory() const {
   case VPInstruction::ReductionStartVector:
   case VPInstruction::Reverse:
   case VPInstruction::Unpack:
+  case VPInstruction::VectorLiveIn:
     return false;
   case VPInstruction::Intrinsic: {
     LLVMContext &Ctx = getScalarType()->getContext();
@@ -1708,6 +1710,7 @@ bool VPInstruction::usesFirstLaneOnly(const VPValue *Op) const {
   case VPInstruction::Intrinsic:
   case VPInstruction::ReductionStartVector:
   case VPInstruction::ResumeForEpilogue:
+  case VPInstruction::VectorLiveIn:
     return true;
   case VPInstruction::BuildStructVector:
   case VPInstruction::BuildVector:
@@ -1803,6 +1806,9 @@ void VPInstruction::printRecipe(raw_ostream &O, const Twine &Indent,
   case VPInstruction::BuildVector:
     O << "buildvector";
     break;
+  case VPInstruction::VectorLiveIn:
+    O << "vector-live-in";
+    break;
   case VPInstruction::ExitingIVValue:
     O << "exiting-iv-value";
     break;
@@ -1889,6 +1895,11 @@ void VPInstructionWithType::execute(VPTransformState &State) {
     return;
   }
   switch (getOpcode()) {
+  case VPInstruction::VectorLiveIn:
+    // The operand is a single value already holding the whole vector, so there
+    // is nothing to generate.
+    State.set(this, State.get(getOperand(0), /*IsScalar=*/true));
+    break;
   case VPInstruction::StepVector: {
     Value *StepVector =
         State.Builder.CreateStepVector(VectorType::get(ResultTy, State.VF));
