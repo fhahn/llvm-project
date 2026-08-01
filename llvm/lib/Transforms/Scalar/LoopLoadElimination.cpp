@@ -39,6 +39,7 @@
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
+#include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Instructions.h"
@@ -163,6 +164,85 @@ static bool doesStoreDominatesAllLatches(BasicBlock *StoreBlock, Loop *L,
 /// Return true if the load is not executed on all paths in the loop.
 static bool isLoadConditional(LoadInst *Load, Loop *L) {
   return Load->getParent() != L->getHeader();
+}
+
+/// Strip \p V to the object the pointer's AddRec is based on. Header PHIs are
+/// followed to their preheader incoming value, so that two separate pointer
+/// inductions over the same object map to the same base.
+static const Value *getAddRecBase(Value *V, Loop *L) {
+  BasicBlock *PH = L->getLoopPreheader();
+  for (unsigned I = 0; I != 8; ++I) {
+    // MaxLookup == 0 strips the whole GEP chain, so that two pointers are only
+    // considered equal if they really share a base.
+    const Value *U = getUnderlyingObject(V, /*MaxLookup=*/0);
+    auto *PN = dyn_cast<PHINode>(U);
+    if (!PN || !PH || PN->getParent() != L->getHeader() ||
+        PN->getBasicBlockIndex(PH) < 0)
+      return U;
+    V = PN->getIncomingValueForBlock(PH);
+  }
+  return V;
+}
+
+/// Cheap, SCEV-free necessary conditions for a store-to-load forwarding
+/// candidate, checked on the IR before the (expensive) LoopAccessInfo is built.
+/// Mirrors the tests findStoreToLoadDependences and processLoop apply to every
+/// candidate, so returning false means processLoop could not have found one.
+static bool mayHaveStoreToLoadCandidate(Loop *L, DominatorTree *DT) {
+  // getAddRecBase relies on a preheader; loops without one are rejected later
+  // by isLoopSimplifyForm, so just let them through.
+  if (!L->getLoopPreheader())
+    return true;
+
+  SmallVector<BasicBlock *, 8> Latches;
+  L->getLoopLatches(Latches);
+
+  // Only stores dominating all latches can forward (doesStoreDominatesAllLatches).
+  SmallVector<StoreInst *, 8> Stores;
+  for (BasicBlock *BB : L->blocks()) {
+    if (!all_of(Latches, [&](const BasicBlock *Latch) {
+          return DT->dominates(BB, Latch);
+        }))
+      continue;
+    for (Instruction &I : *BB)
+      if (auto *SI = dyn_cast<StoreInst>(&I))
+        Stores.push_back(SI);
+  }
+  if (Stores.empty())
+    return false;
+
+  // Only unconditional loads can forward (isLoadConditional).
+  SmallVector<LoadInst *, 8> Loads;
+  for (Instruction &I : *L->getHeader())
+    if (auto *LI = dyn_cast<LoadInst>(&I))
+      Loads.push_back(LI);
+  if (Loads.empty())
+    return false;
+
+  // A loop-invariant pointer has stride 0, which isDependenceDistanceOfOne
+  // rejects.
+  auto IsVariantInLoop = [L](Value *Ptr) {
+    auto *I = dyn_cast<Instruction>(Ptr);
+    return I && L->contains(I);
+  };
+
+  for (StoreInst *SI : Stores) {
+    if (!IsVariantInLoop(SI->getPointerOperand()))
+      continue;
+    for (LoadInst *LI : Loads) {
+      if (!IsVariantInLoop(LI->getPointerOperand()))
+        continue;
+      if (!CastInst::isBitOrNoopPointerCastable(
+              getLoadStoreType(SI), getLoadStoreType(LI), SI->getDataLayout()))
+        continue;
+      // isDependenceDistanceOfOne needs the pointer difference to be constant,
+      // which requires both AddRecs to be based on the same object.
+      if (getAddRecBase(SI->getPointerOperand(), L) ==
+          getAddRecBase(LI->getPointerOperand(), L))
+        return true;
+    }
+  }
+  return false;
 }
 
 namespace {
@@ -674,6 +754,10 @@ static bool eliminateLoadsAcrossLoops(Function &F, LoopInfo &LI,
   for (Loop *L : Worklist) {
     // Match historical behavior
     if (!L->isRotatedForm() || !L->getExitingBlock())
+      continue;
+    // Skip loops that cannot have a forwarding candidate, to avoid building a
+    // LoopAccessInfo for them.
+    if (!mayHaveStoreToLoadCandidate(L, &DT))
       continue;
     // The actual work is performed by LoadEliminationForLoop.
     LoadEliminationForLoop LEL(L, &LI, LAIs.getInfo(*L), &DT, BFI, PSI);

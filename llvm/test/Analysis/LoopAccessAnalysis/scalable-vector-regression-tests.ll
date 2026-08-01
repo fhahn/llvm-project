@@ -75,6 +75,9 @@ loop:
   %4 = trunc i64 %iv to i32
   %5 = insertelement <vscale x 4 x i32> zeroinitializer, i32 %4, i64 0
   %6 = getelementptr i32, ptr %ptr_a, i64 %3
+  ; Load from the stored-to object, so that loop-load-elimination considers this
+  ; loop a forwarding candidate and the accesses below reach LoopAccessAnalysis.
+  %ld = load <vscale x 4 x i32>, ptr %6, align 4
   store <vscale x 4 x i32> %5, ptr %6, align 4
   %.reass3 = or i32 %4, 1
   %7 = insertelement <vscale x 4 x i32> zeroinitializer, i32 %.reass3, i64 0
