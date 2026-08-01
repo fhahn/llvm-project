@@ -1,4 +1,5 @@
 ; RUN: opt < %s -mattr=+sve2 -passes=loop-vectorize -enable-histogram-loop-vectorization -sve-gather-overhead=2 -sve-scatter-overhead=2 -force-vector-interleave=1 -vplan-print-after=printOptimizedVPlan --disable-output -S 2>&1 | FileCheck %s
+; RUN: opt < %s -mattr=+sve2 -passes=loop-vectorize -enable-histogram-loop-vectorization -force-vector-width=1 -vplan-print-after=printOptimizedVPlan --disable-output -S 2>&1 | FileCheck %s --check-prefix=SCALAR
 
 target triple = "aarch64-unknown-linux-gnu"
 
@@ -10,53 +11,53 @@ target triple = "aarch64-unknown-linux-gnu"
 ;; }
 
 ;; Check that the scalar plan contains the original instructions.
-; CHECK: VPlan 'Initial VPlan for VF={1},UF>=1' {
-; CHECK-NEXT: Live-in [[VF:.*]] = VF
-; CHECK-NEXT: Live-in [[VFxUF:.*]] = VF * UF
-; CHECK-NEXT: Live-in [[VTC:.*]] = vector-trip-count
-; CHECK-NEXT: Live-in [[OTC:.*]] = original trip-count
-; CHECK-EMPTY:
-; CHECK-NEXT: ir-bb<entry>:
-; CHECK-NEXT: Successor(s): scalar.ph, vector.ph
-; CHECK-EMPTY:
-; CHECK-NEXT: vector.ph:
-; CHECK-NEXT: Successor(s): vector loop
-; CHECK-EMPTY:
-; CHECK-NEXT: <x1> vector loop: {
-; CHECK-NEXT:   [[IV:.*]] = CANONICAL-IV
-; CHECK-EMPTY:
-; CHECK-NEXT:   vector.body:
-; CHECK-NEXT:     [[STEPS:vp.*]] = SCALAR-STEPS [[IV]], ir<1>, [[VF]]
-; CHECK-NEXT:     CLONE [[GEP_IDX:.*]] = getelementptr inbounds ir<%indices>, [[STEPS]]
-; CHECK-NEXT:     CLONE [[IDX:.*]] = load [[GEP_IDX]]
-; CHECK-NEXT:     EMIT-SCALAR [[EXT_IDX:.*]] = zext [[IDX]]
-; CHECK-NEXT:     CLONE [[GEP_BUCKET:.*]] = getelementptr inbounds ir<%buckets>, [[EXT_IDX]]
-; CHECK-NEXT:     CLONE [[HISTVAL:.*]] = load [[GEP_BUCKET]]
-; CHECK-NEXT:     CLONE [[UPDATE:.*]] = add nsw [[HISTVAL]], ir<1>
-; CHECK-NEXT:     CLONE store [[UPDATE]], [[GEP_BUCKET]]
-; CHECK-NEXT:     EMIT [[IV_NEXT:.*]] = add nuw [[IV]], [[VFxUF]]
-; CHECK-NEXT:     EMIT branch-on-count [[IV_NEXT]], [[VTC]]
-; CHECK-NEXT:   No successors
-; CHECK-NEXT: }
-; CHECK-NEXT: Successor(s): middle.block
-; CHECK-EMPTY:
-; CHECK-NEXT: middle.block:
-; CHECK-NEXT:   EMIT [[TC_CHECK:.*]] = icmp eq [[OTC:.*]], [[VTC]]
-; CHECK-NEXT:   EMIT branch-on-cond [[TC_CHECK]]
-; CHECK-NEXT: Successor(s): ir-bb<for.exit>, scalar.ph
-; CHECK-EMPTY:
-; CHECK-NEXT: ir-bb<for.exit>:
-; CHECK-NEXT: No successors
-; CHECK-EMPTY:
-; CHECK-NEXT: scalar.ph:
-; CHECK-NEXT:   EMIT-SCALAR vp<[[RESUME:%.+]]> = phi [ [[VTC]], middle.block ], [ ir<0>, ir-bb<entry> ]
-; CHECK-NEXT: Successor(s): ir-bb<for.body>
-; CHECK-EMPTY:
-; CHECK-NEXT: ir-bb<for.body>:
-; CHECK-NEXT:   IR   %iv = phi i64 [ 0, %entry ], [ %iv.next, %for.body ] (extra operand: vp<[[RESUME]]> from scalar.ph)
-; CHECK:        IR   %exitcond = icmp eq i64 %iv.next, %N
-; CHECK-NEXT: No successors
-; CHECK-NEXT: }
+; SCALAR: VPlan 'Initial VPlan for VF={1},UF>=1' {
+; SCALAR-NEXT: Live-in [[VF:.*]] = VF
+; SCALAR-NEXT: Live-in [[VFxUF:.*]] = VF * UF
+; SCALAR-NEXT: Live-in [[VTC:.*]] = vector-trip-count
+; SCALAR-NEXT: Live-in [[OTC:.*]] = original trip-count
+; SCALAR-EMPTY:
+; SCALAR-NEXT: ir-bb<entry>:
+; SCALAR-NEXT: Successor(s): scalar.ph, vector.ph
+; SCALAR-EMPTY:
+; SCALAR-NEXT: vector.ph:
+; SCALAR-NEXT: Successor(s): vector loop
+; SCALAR-EMPTY:
+; SCALAR-NEXT: <x1> vector loop: {
+; SCALAR-NEXT:   [[IV:.*]] = CANONICAL-IV
+; SCALAR-EMPTY:
+; SCALAR-NEXT:   vector.body:
+; SCALAR-NEXT:     [[STEPS:vp.*]] = SCALAR-STEPS [[IV]], ir<1>, [[VF]]
+; SCALAR-NEXT:     CLONE [[GEP_IDX:.*]] = getelementptr inbounds ir<%indices>, [[STEPS]]
+; SCALAR-NEXT:     CLONE [[IDX:.*]] = load [[GEP_IDX]]
+; SCALAR-NEXT:     EMIT-SCALAR [[EXT_IDX:.*]] = zext [[IDX]]
+; SCALAR-NEXT:     CLONE [[GEP_BUCKET:.*]] = getelementptr inbounds ir<%buckets>, [[EXT_IDX]]
+; SCALAR-NEXT:     CLONE [[HISTVAL:.*]] = load [[GEP_BUCKET]]
+; SCALAR-NEXT:     CLONE [[UPDATE:.*]] = add nsw [[HISTVAL]], ir<1>
+; SCALAR-NEXT:     CLONE store [[UPDATE]], [[GEP_BUCKET]]
+; SCALAR-NEXT:     EMIT [[IV_NEXT:.*]] = add nuw [[IV]], [[VFxUF]]
+; SCALAR-NEXT:     EMIT branch-on-count [[IV_NEXT]], [[VTC]]
+; SCALAR-NEXT:   No successors
+; SCALAR-NEXT: }
+; SCALAR-NEXT: Successor(s): middle.block
+; SCALAR-EMPTY:
+; SCALAR-NEXT: middle.block:
+; SCALAR-NEXT:   EMIT [[TC_CHECK:.*]] = icmp eq [[OTC:.*]], [[VTC]]
+; SCALAR-NEXT:   EMIT branch-on-cond [[TC_CHECK]]
+; SCALAR-NEXT: Successor(s): ir-bb<for.exit>, scalar.ph
+; SCALAR-EMPTY:
+; SCALAR-NEXT: ir-bb<for.exit>:
+; SCALAR-NEXT: No successors
+; SCALAR-EMPTY:
+; SCALAR-NEXT: scalar.ph:
+; SCALAR-NEXT:   EMIT-SCALAR vp<[[RESUME:%.+]]> = phi [ [[VTC]], middle.block ], [ ir<0>, ir-bb<entry> ]
+; SCALAR-NEXT: Successor(s): ir-bb<for.body>
+; SCALAR-EMPTY:
+; SCALAR-NEXT: ir-bb<for.body>:
+; SCALAR-NEXT:   IR   %iv = phi i64 [ 0, %entry ], [ %iv.next, %for.body ] (extra operand: vp<[[RESUME]]> from scalar.ph)
+; SCALAR:        IR   %exitcond = icmp eq i64 %iv.next, %N
+; SCALAR-NEXT: No successors
+; SCALAR-NEXT: }
 
 ;; Check that the vectorized plan contains a histogram recipe instead.
 ; CHECK: VPlan 'Initial VPlan for VF={vscale x 2,vscale x 4},UF>=1' {

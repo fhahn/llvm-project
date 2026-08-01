@@ -5572,10 +5572,42 @@ void LoopVectorizationPlanner::plan(ElementCount UserVF, unsigned UserIC) {
     CM.collectNonVectorizedAndSetWideningDecisions(VF);
   }
 
-  buildVPlans(*VPlan1, ElementCount::getFixed(1), MaxFactors.FixedVF);
+  // Only build plans for vector VFs here. The scalar VF=1 plan is only needed
+  // if no vector VF turns out to be profitable, and its cost does not come from
+  // a VPlan (computeBestVF uses CM.expectedCost), so defer building it to
+  // buildScalarVPlan().
+  ScalarPlanIsLazy = true;
+  buildVPlans(*VPlan1, ElementCount::getFixed(2), MaxFactors.FixedVF);
   buildVPlans(*VPlan1, ElementCount::getScalable(1), MaxFactors.ScalableVF);
+  VPlan1ForScalarPlan = std::move(VPlan1);
+
+  // If no vector plan could be built at all, the scalar plan is the only
+  // candidate (e.g. when only interleaving is possible). Build it eagerly so
+  // that computeBestVF sees the same single-plan shape as before.
+  if (VPlans.empty()) {
+    buildScalarVPlan();
+    ScalarPlanIsLazy = false;
+  }
 
   LLVM_DEBUG(printPlans(dbgs()));
+}
+
+VPlan *LoopVectorizationPlanner::buildScalarVPlan() {
+  assert(VPlan1ForScalarPlan && "no deferred scalar plan to build");
+  size_t NumPlansBefore = VPlans.size();
+  buildVPlans(*VPlan1ForScalarPlan, ElementCount::getFixed(1),
+              ElementCount::getFixed(1));
+  // tryToBuildVPlan can fail, in which case no plan is added.
+  if (VPlans.size() == NumPlansBefore)
+    return nullptr;
+  assert(VPlans.size() == NumPlansBefore + 1 &&
+         "expected at most one scalar plan to be built");
+  // The eager path always split VF=1 off into its own sub-range, because
+  // widening decisions differ between scalar and vector VFs. If that ever stops
+  // holding, the vector plans built from VF=2 would overlap this one.
+  assert(VPlans.back()->hasScalarVFOnly() &&
+         "deferred scalar plan must cover VF=1 only");
+  return VPlans.back().get();
 }
 
 VPCostContext::VPCostContext(const TargetLibraryInfo &TLI, const VPlan &Plan,
@@ -5815,7 +5847,7 @@ LoopVectorizationPlanner::computeBestVF() {
   VPlan &FirstPlan = *VPlans[0];
 
   ElementCount UserVF = Hints.getWidth();
-  if (VPlans.size() == 1) {
+  if (!ScalarPlanIsLazy && VPlans.size() == 1) {
     // For outer loops, the plan has a single vector VF determined by the
     // heuristic.
     assert((FirstPlan.hasScalarVFOnly() || hasPlanWithVF(UserVF) ||
@@ -5844,7 +5876,7 @@ LoopVectorizationPlanner::computeBestVF() {
                             : "Unknown\n"));
 
   ElementCount ScalarVF = ElementCount::getFixed(1);
-  assert(FirstPlan.hasVF(ScalarVF) &&
+  assert((ScalarPlanIsLazy || FirstPlan.hasVF(ScalarVF)) &&
          "More than a single plan/VF w/o any plan having scalar VF");
 
   // TODO: Compute scalar cost using VPlan-based cost model.
@@ -5861,7 +5893,9 @@ LoopVectorizationPlanner::computeBestVF() {
     BestFactor.Cost = InstructionCost::getMax();
   }
 
-  VPlan *PlanForBestVF = &FirstPlan;
+  // In lazy mode no scalar plan exists yet; it is only built below if no vector
+  // VF wins.
+  VPlan *PlanForBestVF = ScalarPlanIsLazy ? nullptr : &FirstPlan;
 
   for (auto &P : VPlans) {
     ArrayRef<ElementCount> VFs(P->vectorFactors().begin(),
@@ -5907,6 +5941,15 @@ LoopVectorizationPlanner::computeBestVF() {
       if (isMoreProfitable(CurrentFactor, ScalarFactor, P->hasScalarTail()))
         ProfitableVFs.push_back(CurrentFactor);
     }
+  }
+
+  // No vector VF was profitable, so the scalar plan is the winner. Build it now
+  // if plan() deferred it.
+  if (!PlanForBestVF) {
+    assert(BestFactor.Width.isScalar() &&
+           "must have a plan for a non-scalar best VF");
+    PlanForBestVF = buildScalarVPlan();
+    assert(PlanForBestVF && "scalar plan must be buildable here");
   }
 
   VPlan &BestPlan = *PlanForBestVF;
