@@ -2166,15 +2166,19 @@ struct PointerBounds {
   Value *StrideToCheck;
 };
 
+/// SCEV bounds of a pointer group, after the optional widening to the outer
+/// loop performed for hoisting.
+struct AdjustedBounds {
+  const SCEV *Low;
+  const SCEV *High;
+  const SCEV *Stride; ///< nullptr if no stride check is needed.
+};
+
 /// Expand code for the lower and upper bound of the pointer group \p CG
 /// in \p TheLoop.  \return the values for the bounds.
-static PointerBounds expandBounds(const RuntimeCheckingPtrGroup *CG,
-                                  Loop *TheLoop, Instruction *Loc,
-                                  SCEVExpander &Exp, bool HoistRuntimeChecks) {
-  LLVMContext &Ctx = Loc->getContext();
-  Type *PtrArithTy = PointerType::get(Ctx, CG->AddressSpace);
-
-  Value *Start = nullptr, *End = nullptr;
+static AdjustedBounds adjustBounds(const RuntimeCheckingPtrGroup *CG,
+                                   Loop *TheLoop, ScalarEvolution &SE,
+                                   bool HoistRuntimeChecks) {
   LLVM_DEBUG(dbgs() << "LAA: Adding RT check for range:\n");
   const SCEV *Low = CG->Low, *High = CG->High, *Stride = nullptr;
 
@@ -2193,7 +2197,6 @@ static PointerBounds expandBounds(const RuntimeCheckingPtrGroup *CG,
     auto *HighAR = cast<SCEVAddRecExpr>(High);
     auto *LowAR = cast<SCEVAddRecExpr>(Low);
     const Loop *OuterLoop = TheLoop->getParentLoop();
-    ScalarEvolution &SE = *Exp.getSE();
     const SCEV *Recur = LowAR->getStepRecurrence(SE);
     if (Recur == HighAR->getStepRecurrence(SE) &&
         HighAR->getLoop() == OuterLoop && LowAR->getLoop() == OuterLoop) {
@@ -2222,38 +2225,35 @@ static PointerBounds expandBounds(const RuntimeCheckingPtrGroup *CG,
     }
   }
 
-  Start = Exp.expandCodeFor(Low, PtrArithTy, Loc);
-  End = Exp.expandCodeFor(High, PtrArithTy, Loc);
+  LLVM_DEBUG(dbgs() << "Start: " << *Low << " End: " << *High << "\n");
+  return {Low, High, Stride};
+}
+
+/// Expand the adjusted bounds \p Adj of pointer group \p CG.
+static PointerBounds expandBounds(const RuntimeCheckingPtrGroup *CG,
+                                  const AdjustedBounds &Adj, Instruction *Loc,
+                                  SCEVExpander &Exp) {
+  Type *PtrArithTy = PointerType::get(Loc->getContext(), CG->AddressSpace);
+  Value *Start = Exp.expandCodeFor(Adj.Low, PtrArithTy, Loc);
+  Value *End = Exp.expandCodeFor(Adj.High, PtrArithTy, Loc);
   if (CG->NeedsFreeze) {
     IRBuilder<> Builder(Loc);
     Start = Builder.CreateFreeze(Start, Start->getName() + ".fr");
     End = Builder.CreateFreeze(End, End->getName() + ".fr");
   }
   Value *StrideVal =
-      Stride ? Exp.expandCodeFor(Stride, Stride->getType(), Loc) : nullptr;
-  LLVM_DEBUG(dbgs() << "Start: " << *Low << " End: " << *High << "\n");
+      Adj.Stride ? Exp.expandCodeFor(Adj.Stride, Adj.Stride->getType(), Loc)
+                 : nullptr;
   return {Start, End, StrideVal};
 }
 
-/// Turns a collection of checks into a collection of expanded upper and
-/// lower bounds for both pointers in the check.
-static SmallVector<std::pair<PointerBounds, PointerBounds>, 4>
-expandBounds(const SmallVectorImpl<RuntimePointerCheck> &PointerChecks, Loop *L,
-             Instruction *Loc, SCEVExpander &Exp, bool HoistRuntimeChecks) {
-  SmallVector<std::pair<PointerBounds, PointerBounds>, 4> ChecksWithBounds;
-
-  // Here we're relying on the SCEV Expander's cache to only emit code for the
-  // same bounds once.
-  transform(PointerChecks, std::back_inserter(ChecksWithBounds),
-            [&](const RuntimePointerCheck &Check) {
-              PointerBounds First = expandBounds(Check.first, L, Loc, Exp,
-                                                 HoistRuntimeChecks),
-                            Second = expandBounds(Check.second, L, Loc, Exp,
-                                                  HoistRuntimeChecks);
-              return std::make_pair(First, Second);
-            });
-
-  return ChecksWithBounds;
+/// Return true if SCEV can prove the ranges [A.Low, A.High) and [B.Low, B.High)
+/// do not overlap, in which case the two pointer groups can never conflict.
+static bool areBoundsKnownDisjoint(const AdjustedBounds &A,
+                                   const AdjustedBounds &B,
+                                   ScalarEvolution &SE) {
+  return SE.isKnownPredicate(ICmpInst::ICMP_UGE, A.Low, B.High) ||
+         SE.isKnownPredicate(ICmpInst::ICMP_UGE, B.Low, A.High);
 }
 
 Value *llvm::addRuntimeChecks(
@@ -2262,18 +2262,60 @@ Value *llvm::addRuntimeChecks(
     SCEVExpander &Exp, bool HoistRuntimeChecks) {
   // TODO: Move noalias annotation code from LoopVersioning here and share with LV if possible.
   // TODO: Pass  RtPtrChecking instead of PointerChecks and SE separately, if possible
-  auto ExpandedChecks =
-      expandBounds(PointerChecks, TheLoop, Loc, Exp, HoistRuntimeChecks);
+  if (PointerChecks.empty())
+    return nullptr;
 
-  LLVMContext &Ctx = Loc->getContext();
-  IRBuilder ChkBuilder(Ctx, InstSimplifyFolder(Loc->getDataLayout()));
+  ScalarEvolution &SE = *Exp.getSE();
+
+  // Compute the (possibly outer-loop-widened) SCEV bounds of every group.
+  DenseMap<const RuntimeCheckingPtrGroup *, AdjustedBounds> GroupToBounds;
+  for (const auto &[First, Second] : PointerChecks)
+    for (const auto *CG : {First, Second})
+      if (auto [It, Inserted] = GroupToBounds.try_emplace(CG); Inserted)
+        It->second = adjustBounds(CG, TheLoop, SE, HoistRuntimeChecks);
+
+  // A pair whose ranges SCEV can prove disjoint can never conflict, so its
+  // bound compares are dead. This is not redundant with LAA's own filtering:
+  // widening the bounds for hoisting happens after LAA decided a check was
+  // needed, and can make two groups (e.g. adjacent fields of one struct)
+  // trivially disjoint. A pair that still needs a stride check is kept, since
+  // that check is what guarantees the widening above was valid.
+  SmallVector<const RuntimePointerCheck *, 4> LiveChecks;
+  for (const RuntimePointerCheck &Check : PointerChecks) {
+    const AdjustedBounds &A = GroupToBounds.at(Check.first);
+    const AdjustedBounds &B = GroupToBounds.at(Check.second);
+    if (areBoundsKnownDisjoint(A, B, SE) && !A.Stride && !B.Stride)
+      continue;
+    LiveChecks.push_back(&Check);
+  }
+
+  // Every pair may have been dropped as provably disjoint, in which case no
+  // check is needed. Return a false constant rather than nullptr: callers rely
+  // on getting a value back whenever checks were requested, and they already
+  // handle a check that folds to false.
+  if (LiveChecks.empty())
+    return ConstantInt::getFalse(Loc->getContext());
+
+  // Here we're relying on the SCEV Expander's cache to only emit code for the
+  // same bounds once.
+  DenseMap<const RuntimeCheckingPtrGroup *, PointerBounds> Expanded;
+  for (const RuntimePointerCheck *Check : LiveChecks)
+    for (const auto *CG : {Check->first, Check->second})
+      if (auto [It, Inserted] = Expanded.try_emplace(CG); Inserted)
+        It->second = expandBounds(CG, GroupToBounds.at(CG), Loc, Exp);
+
+  IRBuilder ChkBuilder(Loc->getContext(),
+                       InstSimplifyFolder(Loc->getDataLayout()));
   ChkBuilder.SetInsertPoint(Loc);
   // Our instructions might fold to a constant.
   Value *MemoryRuntimeCheck = nullptr;
+  SmallPtrSet<const SCEV *, 4> CheckedStrides;
 
-  for (const auto &[A, B] : ExpandedChecks) {
-    // Check if two pointers (A and B) conflict where conflict is computed as:
-    // start(A) <= end(B) && start(B) <= end(A)
+  for (const RuntimePointerCheck *Check : LiveChecks) {
+    const PointerBounds &A = Expanded.at(Check->first);
+    const PointerBounds &B = Expanded.at(Check->second);
+    const AdjustedBounds &AdjA = GroupToBounds.at(Check->first);
+    const AdjustedBounds &AdjB = GroupToBounds.at(Check->second);
 
     assert((A.Start->getType()->getPointerAddressSpace() ==
             B.End->getType()->getPointerAddressSpace()) &&
@@ -2289,21 +2331,27 @@ Value *llvm::addRuntimeChecks(
     // bound0 = (B.Start < A.End)
     // bound1 = (A.Start < B.End)
     //  IsConflict = bound0 & bound1
-    Value *Cmp0 = ChkBuilder.CreateICmpULT(A.Start, B.End, "bound0");
-    Value *Cmp1 = ChkBuilder.CreateICmpULT(B.Start, A.End, "bound1");
-    Value *IsConflict = ChkBuilder.CreateAnd(Cmp0, Cmp1, "found.conflict");
-    if (A.StrideToCheck) {
-      Value *IsNegativeStride = ChkBuilder.CreateICmpSLT(
-          A.StrideToCheck, ConstantInt::get(A.StrideToCheck->getType(), 0),
-          "stride.check");
-      IsConflict = ChkBuilder.CreateOr(IsConflict, IsNegativeStride);
+    Value *IsConflict = nullptr;
+    if (!areBoundsKnownDisjoint(AdjA, AdjB, SE)) {
+      Value *Cmp0 = ChkBuilder.CreateICmpULT(A.Start, B.End, "bound0");
+      Value *Cmp1 = ChkBuilder.CreateICmpULT(B.Start, A.End, "bound1");
+      IsConflict = ChkBuilder.CreateAnd(Cmp0, Cmp1, "found.conflict");
     }
-    if (B.StrideToCheck) {
+    // A stride only has to be checked once, even if it is shared by both
+    // groups of this check or by an earlier one.
+    for (const auto &[StrideSCEV, StrideVal] :
+         {std::make_pair(AdjA.Stride, A.StrideToCheck),
+          std::make_pair(AdjB.Stride, B.StrideToCheck)}) {
+      if (!StrideVal || !CheckedStrides.insert(StrideSCEV).second)
+        continue;
       Value *IsNegativeStride = ChkBuilder.CreateICmpSLT(
-          B.StrideToCheck, ConstantInt::get(B.StrideToCheck->getType(), 0),
-          "stride.check");
-      IsConflict = ChkBuilder.CreateOr(IsConflict, IsNegativeStride);
+          StrideVal, ConstantInt::get(StrideVal->getType(), 0), "stride.check");
+      IsConflict = IsConflict
+                       ? ChkBuilder.CreateOr(IsConflict, IsNegativeStride)
+                       : IsNegativeStride;
     }
+    if (!IsConflict)
+      continue;
     if (MemoryRuntimeCheck) {
       IsConflict =
           ChkBuilder.CreateOr(MemoryRuntimeCheck, IsConflict, "conflict.rdx");
