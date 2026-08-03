@@ -4881,7 +4881,10 @@ static void transformToPartialReduction(const VPPartialReductionChain &Chain,
       Chain.Blend ? cast<VPValue>(Chain.Blend) : cast<VPValue>(WidenRecipe);
 
   VPValue *Cond = nullptr;
-  VPValue *ExitValue = cast_or_null<VPInstruction>(
+  // The select feeding a predicated reduction chain may be a widened select
+  // (a VPWidenRecipe), not a VPInstruction, so match any single-def recipe,
+  // mirroring the sibling findUserOf calls.
+  VPValue *ExitValue = dyn_cast_or_null<VPSingleDefRecipe>(
       findUserOf(ExitSearch, m_Select(m_VPValue(Cond), m_Specific(ExitSearch),
                                       m_Specific(RdxPhi))));
 
@@ -4919,7 +4922,15 @@ static void transformToPartialReduction(const VPPartialReductionChain &Chain,
                                  : FastMathFlags(),
       WidenRecipe->getUnderlyingInstr(), Accumulator, ExtendedOp, Cond,
       RdxUnordered{/*VFScaleFactor=*/Chain.ScaleFactor});
-  PartialRed->insertBefore(WidenRecipe);
+  // The reduction consumes Cond, which for a data-conditional chain (a plain
+  // select, no Blend) may be defined anywhere before the select, including
+  // after WidenRecipe. Anchor the recipe at the select, which is dominated by
+  // both Cond and WidenRecipe. The Blend case relies on inserting before
+  // WidenRecipe instead, so that the Blend stays dominated by the result.
+  VPRecipeBase *InsertPt = WidenRecipe;
+  if (ExitValue && !Chain.Blend)
+    InsertPt = ExitValue->getDefiningRecipe();
+  PartialRed->insertBefore(InsertPt);
 
   if (ExitValue)
     ExitValue->replaceAllUsesWith(PartialRed);
@@ -4929,7 +4940,7 @@ static void transformToPartialReduction(const VPPartialReductionChain &Chain,
 
   // For cost-model purposes, fold this into a VPExpression.
   VPExpressionRecipe *E = createPartialReductionExpression(PartialRed);
-  E->insertBefore(WidenRecipe);
+  E->insertBefore(InsertPt);
   PartialRed->replaceAllUsesWith(E);
 
   // We only need to update the PHI node once, which is when we find the
