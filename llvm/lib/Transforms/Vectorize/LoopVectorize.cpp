@@ -5461,8 +5461,12 @@ void LoopVectorizationPlanner::plan(ElementCount UserVF, unsigned UserIC) {
   if (CM.foldTailByMasking())
     Legal->prepareToFoldTailByMasking();
 
-  ElementCount MaxUserVF =
-      UserVF.isScalable() ? MaxFactors.ScalableVF : MaxFactors.FixedVF;
+  // Returns the maximum VF the loop can be vectorized with, for VFs with the
+  // same scalability as \p VF.
+  auto GetMaxVFFor = [&MaxFactors](ElementCount VF) {
+    return VF.isScalable() ? MaxFactors.ScalableVF : MaxFactors.FixedVF;
+  };
+  ElementCount MaxUserVF = GetMaxVFFor(UserVF);
   if (UserVF) {
     if (!ElementCount::isKnownLE(UserVF, MaxUserVF)) {
       reportVectorizationInfo(
@@ -5475,9 +5479,16 @@ void LoopVectorizationPlanner::plan(ElementCount UserVF, unsigned UserIC) {
       // profitable to scalarize.
       CM.collectNonVectorizedAndSetWideningDecisions(UserVF);
       buildVPlans(*VPlan1, UserVF, UserVF);
+      // Also build a plan for a forced epilogue VF, if it is smaller than the
+      // main VF and a VF the loop can be vectorized with. The latter needs
+      // checking separately, as the forced epilogue VF may have a different
+      // scalability than UserVF; fixed VFs are limited to 1 when folding the
+      // tail with EVL, for example.
       ElementCount EpilogueUserVF = EpilogueVectorizationForceVF;
       if (EpilogueUserVF.isVector() &&
-          ElementCount::isKnownLT(EpilogueUserVF, UserVF)) {
+          ElementCount::isKnownLT(EpilogueUserVF, UserVF) &&
+          ElementCount::isKnownLE(EpilogueUserVF,
+                                  GetMaxVFFor(EpilogueUserVF))) {
         CM.collectNonVectorizedAndSetWideningDecisions(EpilogueUserVF);
         buildVPlans(*VPlan1, EpilogueUserVF, EpilogueUserVF);
       }
