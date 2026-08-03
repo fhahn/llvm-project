@@ -1137,6 +1137,22 @@ void VPlanTransforms::createInLoopReductionRecipes(VPlan &Plan,
                                       CurrentLinkI->getDebugLoc());
         Sub->setUnderlyingValue(CurrentLinkI);
         VecOp = Sub;
+      } else if (Kind == RecurKind::FAddChainWithSubs &&
+                 match(CurrentLink,
+                       m_Binary<Instruction::FSub>(m_VPValue(), m_VPValue()))) {
+        // The reduction lowers FAddChainWithSubs as an FAdd, so negate the
+        // operand of an fsub link to turn the addition into a subtraction.
+        // Negate via -0.0 - X, which is exact for all inputs, including the
+        // sign of zero, unlike +0.0 - X. Carry the link's fast-math flags onto
+        // the negation.
+        Type *PhiTy = PhiR->getScalarType();
+        auto *NegZero = Plan.getOrAddLiveIn(ConstantFP::get(PhiTy, -0.0));
+        auto *FNeg = new VPInstruction(
+            Instruction::FSub, {NegZero, CurrentLink->getOperand(1)},
+            CurrentLinkI->getFastMathFlags(), {}, CurrentLinkI->getDebugLoc());
+        LinkVPBB->insert(FNeg, CurrentLink->getIterator());
+        FNeg->setUnderlyingValue(CurrentLinkI);
+        VecOp = FNeg;
       } else {
         // Index of the first operand which holds a non-mask vector operand.
         unsigned IndexOfFirstOperand = 0;
