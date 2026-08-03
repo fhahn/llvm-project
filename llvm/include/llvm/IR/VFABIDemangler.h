@@ -211,6 +211,15 @@ getVectorVariantNames(const CallInst &CI,
 LLVM_ABI FunctionType *createFunctionType(const VFInfo &Info,
                                           const FunctionType *ScalarFTy);
 
+/// Look up the vector function declaration named by \p Info.VectorName in \p M
+/// and validate that its signature matches the type implied by \p Info and
+/// \p ScalarFTy. Returns the declaration on success, or nullptr if it is
+/// missing or its signature does not match the shape (e.g., a masked variant
+/// whose declaration omits the trailing mask parameter, or a parameter whose
+/// vector width or element type disagrees with the shape).
+LLVM_ABI Function *getMatchingVectorVariant(const Module &M, const VFInfo &Info,
+                                            const FunctionType *ScalarFTy);
+
 /// Overwrite the Vector Function ABI variants attribute with the names provide
 /// in \p VariantMappings.
 LLVM_ABI void setVectorVariantNames(CallInst *CI,

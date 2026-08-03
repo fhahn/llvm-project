@@ -579,6 +579,18 @@ FunctionType *VFABI::createFunctionType(const VFInfo &Info,
   return FunctionType::get(RetTy, VecTypes, false);
 }
 
+Function *VFABI::getMatchingVectorVariant(const Module &M, const VFInfo &Info,
+                                          const FunctionType *ScalarFTy) {
+  Function *Candidate = M.getFunction(Info.VectorName);
+  if (!Candidate)
+    return nullptr;
+  // FunctionTypes are uniqued, so a pointer comparison validates the full
+  // signature (return type, parameter count, and parameter types).
+  if (Candidate->getFunctionType() != createFunctionType(Info, ScalarFTy))
+    return nullptr;
+  return Candidate;
+}
+
 void VFABI::setVectorVariantNames(CallInst *CI,
                                   ArrayRef<std::string> VariantMappings) {
   if (VariantMappings.empty())
