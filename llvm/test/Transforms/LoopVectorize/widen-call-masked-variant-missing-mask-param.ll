@@ -15,11 +15,28 @@ define void @masked_variant_missing_mask_param(ptr %a, i64 %n) {
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[TMP0]]
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
-; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_CALL_CONTINUE2:.*]] ]
 ; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr float, ptr [[A]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x float>, ptr [[TMP1]], align 4
 ; CHECK-NEXT:    [[TMP2:%.*]] = fcmp ogt <2 x float> [[WIDE_LOAD]], zeroinitializer
-; CHECK-NEXT:    [[TMP12:%.*]] = call <2 x float> @vec_fn(<2 x float> [[WIDE_LOAD]])
+; CHECK-NEXT:    [[TMP3:%.*]] = extractelement <2 x i1> [[TMP2]], i64 0
+; CHECK-NEXT:    br i1 [[TMP3]], label %[[PRED_CALL_IF:.*]], label %[[PRED_CALL_CONTINUE:.*]]
+; CHECK:       [[PRED_CALL_IF]]:
+; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <2 x float> [[WIDE_LOAD]], i64 0
+; CHECK-NEXT:    [[TMP5:%.*]] = call float @fn(float [[TMP4]]) #[[ATTR0:[0-9]+]]
+; CHECK-NEXT:    [[TMP6:%.*]] = insertelement <2 x float> poison, float [[TMP5]], i64 0
+; CHECK-NEXT:    br label %[[PRED_CALL_CONTINUE]]
+; CHECK:       [[PRED_CALL_CONTINUE]]:
+; CHECK-NEXT:    [[TMP7:%.*]] = phi <2 x float> [ poison, %[[VECTOR_BODY]] ], [ [[TMP6]], %[[PRED_CALL_IF]] ]
+; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <2 x i1> [[TMP2]], i64 1
+; CHECK-NEXT:    br i1 [[TMP8]], label %[[PRED_CALL_IF1:.*]], label %[[PRED_CALL_CONTINUE2]]
+; CHECK:       [[PRED_CALL_IF1]]:
+; CHECK-NEXT:    [[TMP9:%.*]] = extractelement <2 x float> [[WIDE_LOAD]], i64 1
+; CHECK-NEXT:    [[TMP10:%.*]] = call float @fn(float [[TMP9]]) #[[ATTR0]]
+; CHECK-NEXT:    [[TMP11:%.*]] = insertelement <2 x float> [[TMP7]], float [[TMP10]], i64 1
+; CHECK-NEXT:    br label %[[PRED_CALL_CONTINUE2]]
+; CHECK:       [[PRED_CALL_CONTINUE2]]:
+; CHECK-NEXT:    [[TMP12:%.*]] = phi <2 x float> [ [[TMP7]], %[[PRED_CALL_CONTINUE]] ], [ [[TMP11]], %[[PRED_CALL_IF1]] ]
 ; CHECK-NEXT:    [[PREDPHI:%.*]] = select <2 x i1> [[TMP2]], <2 x float> [[TMP12]], <2 x float> [[WIDE_LOAD]]
 ; CHECK-NEXT:    store <2 x float> [[PREDPHI]], ptr [[TMP1]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
@@ -38,7 +55,7 @@ define void @masked_variant_missing_mask_param(ptr %a, i64 %n) {
 ; CHECK-NEXT:    [[C:%.*]] = fcmp ogt float [[L]], 0.000000e+00
 ; CHECK-NEXT:    br i1 [[C]], label %[[THEN:.*]], label %[[LOOP_LATCH]]
 ; CHECK:       [[THEN]]:
-; CHECK-NEXT:    [[CALL:%.*]] = call float @fn(float [[L]]) #[[ATTR0:[0-9]+]]
+; CHECK-NEXT:    [[CALL:%.*]] = call float @fn(float [[L]]) #[[ATTR0]]
 ; CHECK-NEXT:    br label %[[LOOP_LATCH]]
 ; CHECK:       [[LOOP_LATCH]]:
 ; CHECK-NEXT:    [[M:%.*]] = phi float [ [[L]], %[[LOOP_HEADER]] ], [ [[CALL]], %[[THEN]] ]
