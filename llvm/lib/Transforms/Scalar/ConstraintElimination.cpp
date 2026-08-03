@@ -258,7 +258,7 @@ class ConstraintInfo {
 
 public:
   ConstraintInfo(const DataLayout &DL, ArrayRef<Value *> FunctionArgs)
-      : UnsignedCS(FunctionArgs), SignedCS(FunctionArgs), DL(DL) {
+      : UnsignedCS(FunctionArgs), DL(DL) {
     auto &Value2Index = getValue2Index(false);
     // Add Arg > -1 constraints to unsigned system for all function arguments.
     for (Value *Arg : FunctionArgs) {
@@ -281,6 +281,15 @@ public:
   }
   const ConstraintSystem &getCS(bool Signed) const {
     return Signed ? SignedCS : UnsignedCS;
+  }
+
+  /// Returns true if the system for \p Signed may be able to decide a query
+  /// mentioning \p V, i.e. either \p V is a variable in the system, or it is a
+  /// function argument. Function arguments are not variables in the signed
+  /// system, as no facts are added for them up-front, but a query mentioning
+  /// them can still be decided if all variable coefficients cancel out.
+  bool mayHaveInfoFor(Value *V, bool Signed) const {
+    return getValue2Index(Signed).contains(V) || isa<Argument>(V);
   }
 
   void popLastConstraint(bool Signed) { getCS(Signed).popLastConstraint(); }
@@ -1583,8 +1592,8 @@ static std::optional<bool> checkCondition(CmpInst::Predicate Pred, Value *A,
   // Additionally, query the signed system for eq/ne predicates if we know about
   // A or B.
   if (CmpInst::isEquality(Pred)) {
-    const auto &Value2Index = Info.getValue2Index(/*Signed=*/true);
-    if (!Value2Index.contains(A) && !Value2Index.contains(B))
+    if (!Info.mayHaveInfoFor(A, /*Signed=*/true) &&
+        !Info.mayHaveInfoFor(B, /*Signed=*/true))
       return std::nullopt;
 
     SmallVector<Value *> NewVariables;
@@ -1815,10 +1824,9 @@ void ConstraintInfo::tightenBoundUsingNe(
       continue;
 
     // Skip if there are any unknown variables.
-    const auto &Value2Index = getValue2Index(IsSigned);
     if (any_of(decompose(A, *this, IsSigned, DL).Vars,
-               [&Value2Index](const DecompEntry &E) {
-                 return !Value2Index.contains(E.Variable);
+               [this, IsSigned](const DecompEntry &E) {
+                 return !mayHaveInfoFor(E.Variable, IsSigned);
                }))
       continue;
 

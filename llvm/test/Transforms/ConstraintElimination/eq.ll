@@ -505,3 +505,53 @@ define i1 @assume_a_le_b_and_b_le_c_signed(i64 %a, i64 %b, i64 %c) {
   %eq = icmp eq i64 %a, %c
   ret i1 %eq
 }
+
+; The signed system can decompose %add to (%a + 1), so all variable
+; coefficients of the query cancel out and it can be decided without any facts.
+; The unsigned system cannot look through the add nsw.
+define i1 @eq_add_nsw_arg_no_facts(i32 %a) {
+; CHECK-LABEL: @eq_add_nsw_arg_no_facts(
+; CHECK-NEXT:    [[ADD:%.*]] = add nsw i32 [[A:%.*]], 1
+; CHECK-NEXT:    ret i1 false
+;
+  %add = add nsw i32 %a, 1
+  %eq = icmp eq i32 %add, %a
+  ret i1 %eq
+}
+
+define i1 @ne_sub_nsw_arg_no_facts(i32 %a) {
+; CHECK-LABEL: @ne_sub_nsw_arg_no_facts(
+; CHECK-NEXT:    [[SUB:%.*]] = sub nsw i32 [[A:%.*]], 3
+; CHECK-NEXT:    ret i1 true
+;
+  %sub = sub nsw i32 %a, 3
+  %ne = icmp ne i32 %sub, %a
+  ret i1 %ne
+}
+
+define i1 @ne_add_sub_nsw_arg_no_facts(i32 %a, i32 %b) {
+; CHECK-LABEL: @ne_add_sub_nsw_arg_no_facts(
+; CHECK-NEXT:    [[ADD:%.*]] = add nsw i32 [[A:%.*]], [[B:%.*]]
+; CHECK-NEXT:    [[SUB:%.*]] = sub nsw i32 [[ADD]], [[B]]
+; CHECK-NEXT:    ret i1 false
+;
+  %add = add nsw i32 %a, %b
+  %sub = sub nsw i32 %add, %b
+  %ne = icmp ne i32 %sub, %a
+  ret i1 %ne
+}
+
+; Same as @eq_add_nsw_arg_no_facts, but neither operand is a function argument,
+; so the signed system isn't queried and the compare is not simplified.
+define i1 @eq_add_nsw_load_no_facts(ptr %p) {
+; CHECK-LABEL: @eq_add_nsw_load_no_facts(
+; CHECK-NEXT:    [[L:%.*]] = load i32, ptr [[P:%.*]], align 4
+; CHECK-NEXT:    [[ADD:%.*]] = add nsw i32 [[L]], 1
+; CHECK-NEXT:    [[EQ:%.*]] = icmp eq i32 [[ADD]], [[L]]
+; CHECK-NEXT:    ret i1 [[EQ]]
+;
+  %l = load i32, ptr %p
+  %add = add nsw i32 %l, 1
+  %eq = icmp eq i32 %add, %l
+  ret i1 %eq
+}
