@@ -2026,8 +2026,18 @@ static bool isSafeDependenceDistance(const DataLayout &DL, ScalarEvolution &SE,
   // will be executed only if LoopCount >= VF, proving distance >= LoopCount
   // also guarantees that distance >= VF.
   //
-  const SCEV *Step = SE.getConstant(MaxBTC.getType(), MaxStride);
-  const SCEV *Product = SE.getMulExpr(&MaxBTC, Step);
+  // MaxStride may not fit in MaxBTC's type (e.g. an i8 backedge-taken count
+  // with a 256-byte element stride), in which case getConstant would silently
+  // truncate it. Compute the product in a type wide enough for the distance,
+  // the backedge-taken count and MaxStride; MaxBTC is a non-negative iteration
+  // count, so zero-extend it. The casts are no-ops in the common case.
+  unsigned StrideBits = MaxStride ? Log2_64(MaxStride) + 1 : 1;
+  Type *WiderTy =
+      SE.getWiderType(SE.getWiderType(Dist.getType(), MaxBTC.getType()),
+                      IntegerType::get(SE.getContext(), StrideBits));
+  const SCEV *CastedMaxBTC = SE.getNoopOrZeroExtend(&MaxBTC, WiderTy);
+  const SCEV *Step = SE.getConstant(WiderTy, MaxStride);
+  const SCEV *Product = SE.getMulExpr(CastedMaxBTC, Step);
 
   const SCEV *CastedDist = &Dist;
   const SCEV *CastedProduct = Product;
