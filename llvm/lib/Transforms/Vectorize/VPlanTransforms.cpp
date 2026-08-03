@@ -5462,29 +5462,48 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
         return false;
       });
 
+  // Execute a load from an address that is the same for all lanes and parts as
+  // a single scalar load, broadcast to all lanes on use.
+  VPlanTransforms::runPass(
+      "scalarizeUniformLoads", ProcessSubset, Plan, [&](VPInstruction *VPI) {
+        // A masked load is not executed for all lanes, so it cannot be replaced
+        // by an unconditional single scalar load. The header mask is fine, as
+        // it is true at least for the first lane whenever the vector loop runs.
+        VPValue *Mask = VPI->getMask();
+        if (VPI->getOpcode() != Instruction::Load ||
+            (Mask && !match(Mask, m_HeaderMask())))
+          return false;
+
+        VPValue *Ptr = VPI->getOperand(0);
+        if (!vputils::isUniformAcrossVFsAndUFs(Ptr))
+          return false;
+
+        return ReplaceWith(
+            VPI, VPBuilder(VPI).insert(new VPReplicateRecipe(
+                     VPI->getUnderlyingInstr(), Ptr, /*IsSingleScalar=*/true,
+                     /*Mask=*/nullptr, *VPI, *VPI, VPI->getDebugLoc())));
+      });
+
   if (!RecipeBuilder.prefersVectorizedAddressing()) {
     VPlanTransforms::runPass(
         "makeVPlanMemOpDecision", ProcessSubset, Plan, [&](VPInstruction *VPI) {
-          Instruction *I = VPI->getUnderlyingInstr();
           bool IsLoad = VPI->getOpcode() == Instruction::Load;
-          if (RecipeBuilder.isPredicatedInst(I) || !IsLoad ||
+          if (!IsLoad || VPI->getMask() ||
               !vputils::isUsedByLoadStoreAddress(VPI))
             return false;
 
-          // Scalarize loads used as addresses, matching the legacy CM. The load
-          // is single-scalar if the pointer is loop-invariant, otherwise it is
-          // replicated per-lane. No mask is needed as the load is not
-          // predicated.
+          // Scalarize loads used as addresses, matching the legacy CM. The
+          // load is replicated per-lane; no mask is needed, as it carries none
+          // in the plan. Loads from an address that is uniform across VF and UF
+          // have already been turned into single scalar loads above.
           VPValue *Ptr = VPI->getOperand(0);
-          const SCEV *PtrSCEV =
-              vputils::getSCEVExprForVPValue(Ptr, CostCtx.PSE, CostCtx.L);
-          bool IsSingleScalarLoad =
-              !isa<SCEVCouldNotCompute>(PtrSCEV) &&
-              CostCtx.PSE.getSE()->isLoopInvariant(PtrSCEV, CostCtx.L);
+          assert(!vputils::isUniformAcrossVFsAndUFs(Ptr) &&
+                 "uniform-address loads must already be single-scalar");
 
           ReplaceWith(VPI,
                       VPBuilder(VPI).insert(new VPReplicateRecipe(
-                          I, Ptr, /*IsSingleScalar=*/IsSingleScalarLoad,
+                          VPI->getUnderlyingInstr(), Ptr,
+                          /*IsSingleScalar=*/false,
                           /*Mask=*/nullptr, *VPI, *VPI, VPI->getDebugLoc())));
           return true;
         });
