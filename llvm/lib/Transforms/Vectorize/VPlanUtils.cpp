@@ -872,8 +872,11 @@ VPValue *VPSCEVExpander::expand(const SCEV *S) {
     return Builder.createVScale(S->getType(), DL);
   case scAddExpr: {
     auto *AddE = cast<SCEVAddExpr>(S);
-    VPIRFlags::WrapFlagsTy WrapFlags(AddE->hasNoUnsignedWrap(),
-                                     AddE->hasNoSignedWrap());
+    // Take the flags from the SCEVUse, which is the union of the use-specific
+    // and the underlying SCEV's flags, matching SCEVExpander.
+    SCEVNoWrapFlags NWFlags = S.getNoWrapFlags();
+    VPIRFlags::WrapFlagsTy WrapFlags(any(NWFlags & SCEVNoWrapFlags::FlagNUW),
+                                     any(NWFlags & SCEVNoWrapFlags::FlagNSW));
 
     // Expand pointer SCEVAddExpr as a ptradd of the pointer base and the
     // integer offset, matching SCEVExpander.
@@ -923,8 +926,11 @@ VPValue *VPSCEVExpander::expand(const SCEV *S) {
   }
   case scMulExpr: {
     auto *MulE = cast<SCEVMulExpr>(S);
-    VPIRFlags::WrapFlagsTy WrapFlags(MulE->hasNoUnsignedWrap(),
-                                     MulE->hasNoSignedWrap());
+    // Take the flags from the SCEVUse, which is the union of the use-specific
+    // and the underlying SCEV's flags, matching SCEVExpander.
+    SCEVNoWrapFlags NWFlags = S.getNoWrapFlags();
+    VPIRFlags::WrapFlagsTy WrapFlags(any(NWFlags & SCEVNoWrapFlags::FlagNUW),
+                                     any(NWFlags & SCEVNoWrapFlags::FlagNSW));
     SmallVector<VPValue *, 2> Ops;
     for (const SCEV *Op : reverse(MulE->operands()))
       Ops.push_back(expand(Op));
