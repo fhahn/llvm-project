@@ -3980,6 +3980,11 @@ isConsecutiveInterleaveGroup(VPInterleaveRecipe *InterleaveR,
   if (IG->getFactor() != IG->getNumMembers())
     return std::nullopt;
 
+  // A reverse group's address is the end of the accessed range, which the
+  // narrowed access cannot use as its base.
+  if (IG->isReverse())
+    return std::nullopt;
+
   auto GetVectorBitWidthForVF = [&TTI](ElementCount VF) {
     TypeSize Size = TTI.getRegisterBitWidth(
         VF.isFixed() ? TargetTransformInfo::RGK_FixedWidthVector
