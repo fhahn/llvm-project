@@ -1928,6 +1928,15 @@ static bool checkOrAndOpImpliedByOther(
         Pred = CmpInst::getInversePredicate(Pred);
       // Optimistically add fact from the other compares in the AND/OR.
       Info.addFact(Pred, LHS, RHS, CB.NumIn, CB.NumOut, DFSInStack);
+      // Keep ReproducerCondStack in sync with DFSInStack, as the scope exit
+      // above pops entries off both in lockstep.
+      if (ReproducerModule) {
+        if (DFSInStack.size() > ReproducerCondStack.size())
+          ReproducerCondStack.emplace_back(Pred, LHS, RHS);
+        while (DFSInStack.size() > ReproducerCondStack.size())
+          ReproducerCondStack.emplace_back(ICmpInst::BAD_ICMP_PREDICATE,
+                                           nullptr, nullptr);
+      }
       continue;
     }
     if (IsOr ? match(Val, m_LogicalOr(m_Value(LHS), m_Value(RHS)))
