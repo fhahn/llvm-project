@@ -497,7 +497,7 @@ bool RuntimePointerChecking::tryToCreateDiffCheck(
       DC.getInstructionsForAccess(Sink->PointerValue, Sink->IsWritePtr);
   Type *SrcTy = getLoadStoreType(SrcInsts[0]);
   Type *DstTy = getLoadStoreType(SinkInsts[0]);
-  if (isa<ScalableVectorType>(SrcTy) || isa<ScalableVectorType>(DstTy))
+  if (SrcTy->isScalableTy() || DstTy->isScalableTy())
     return false;
 
   const DataLayout &DL = InnerLoop->getHeader()->getDataLayout();
@@ -990,7 +990,7 @@ std::optional<int64_t>
 llvm::getStrideFromAddRec(const SCEVAddRecExpr *AR, const Loop *Lp,
                           Type *AccessTy, Value *Ptr,
                           PredicatedScalarEvolution &PSE) {
-  if (isa<ScalableVectorType>(AccessTy)) {
+  if (AccessTy->isScalableTy()) {
     LLVM_DEBUG(dbgs() << "LAA: Bad stride - Scalable object: " << *AccessTy
                       << "\n");
     return std::nullopt;
