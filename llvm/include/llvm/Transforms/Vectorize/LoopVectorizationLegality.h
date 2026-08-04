@@ -279,6 +279,11 @@ public:
         ORE(ORE), Requirements(R), Hints(H), DB(DB), AC(AC),
         AllowRuntimeSCEVChecks(AllowRuntimeSCEVChecks), AA(AA) {}
 
+  /// Maps an address to the largest access size and the largest alignment that
+  /// are known to be safe to access at that address in the loop. Both facts
+  /// hold independently of each other.
+  using SafeAccessesMap = SmallDenseMap<Value *, std::pair<TypeSize, Align>, 8>;
+
   /// ReductionList contains the reduction descriptors for all
   /// of the reductions that were found in the loop.
   using ReductionList = MapVector<PHINode *, RecurrenceDescriptor>;
@@ -631,13 +636,15 @@ private:
 
   /// Return true if all of the instructions in the block can be speculatively
   /// executed, and record the loads/stores that require masking.
-  /// \p SafePtrs is a list of addresses that are known to be legal and we know
-  /// that we can read from them without segfault.
+  /// \p SafeAccesses maps an address that can be accessed without introducing
+  /// a fault to the largest access size and alignment known to be safe for it.
+  /// A load can only be speculated if its own access size and alignment are
+  /// covered by that entry.
   /// \p MaskedOp is a list of instructions that have to be transformed into
   /// calls to the appropriate masked intrinsic when the loop is vectorized
   /// or dropped if the instruction is a conditional assume intrinsic.
   bool
-  blockCanBePredicated(BasicBlock *BB, SmallPtrSetImpl<Value *> &SafePtrs,
+  blockCanBePredicated(BasicBlock *BB, SafeAccessesMap &SafeAccesses,
                        SmallPtrSetImpl<const Instruction *> &MaskedOp) const;
 
   /// Updates the vectorization state by adding \p Phi to the inductions list.
