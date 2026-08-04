@@ -855,6 +855,66 @@ for.exit:
   ret void
 }
 
+; A conditional store of a reduction to a loop-invariant address must not be
+; vectorized, even if the loop also contains a histogram.
+define void @histogram_with_conditional_invariant_store(ptr noalias %buckets, ptr readonly %indices, ptr noalias %p, i64 %N) #0 {
+; CHECK-LABEL: define void @histogram_with_conditional_invariant_store(
+; CHECK-SAME: ptr noalias [[BUCKETS:%.*]], ptr readonly [[INDICES:%.*]], ptr noalias [[P:%.*]], i64 [[N:%.*]]) #[[ATTR0]] {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    br label [[LOOP:%.*]]
+; CHECK:       loop:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, [[ENTRY:%.*]] ], [ [[IV_NEXT:%.*]], [[LOOP_LATCH:%.*]] ]
+; CHECK-NEXT:    [[SUM:%.*]] = phi i32 [ 0, [[ENTRY]] ], [ [[ADD:%.*]], [[LOOP_LATCH]] ]
+; CHECK-NEXT:    [[GEP_INDICES:%.*]] = getelementptr inbounds i32, ptr [[INDICES]], i64 [[IV]]
+; CHECK-NEXT:    [[L_IDX:%.*]] = load i32, ptr [[GEP_INDICES]], align 4
+; CHECK-NEXT:    [[IDXPROM:%.*]] = zext i32 [[L_IDX]] to i64
+; CHECK-NEXT:    [[GEP_BUCKET:%.*]] = getelementptr inbounds i32, ptr [[BUCKETS]], i64 [[IDXPROM]]
+; CHECK-NEXT:    [[L_BUCKET:%.*]] = load i32, ptr [[GEP_BUCKET]], align 4
+; CHECK-NEXT:    [[INC:%.*]] = add nsw i32 [[L_BUCKET]], 1
+; CHECK-NEXT:    store i32 [[INC]], ptr [[GEP_BUCKET]], align 4
+; CHECK-NEXT:    [[ADD]] = add i32 [[SUM]], [[L_IDX]]
+; CHECK-NEXT:    [[C:%.*]] = icmp ugt i32 [[L_IDX]], 10
+; CHECK-NEXT:    br i1 [[C]], label [[THEN:%.*]], label [[LOOP_LATCH]]
+; CHECK:       then:
+; CHECK-NEXT:    store i32 [[ADD]], ptr [[P]], align 4
+; CHECK-NEXT:    br label [[LOOP_LATCH]]
+; CHECK:       loop.latch:
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
+; CHECK-NEXT:    br i1 [[EC]], label [[EXIT:%.*]], label [[LOOP]]
+; CHECK:       exit:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop.latch ]
+  %sum = phi i32 [ 0, %entry ], [ %add, %loop.latch ]
+  %gep.indices = getelementptr inbounds i32, ptr %indices, i64 %iv
+  %l.idx = load i32, ptr %gep.indices, align 4
+  %idxprom = zext i32 %l.idx to i64
+  %gep.bucket = getelementptr inbounds i32, ptr %buckets, i64 %idxprom
+  %l.bucket = load i32, ptr %gep.bucket, align 4
+  %inc = add nsw i32 %l.bucket, 1
+  store i32 %inc, ptr %gep.bucket, align 4
+  %add = add i32 %sum, %l.idx
+  %c = icmp ugt i32 %l.idx, 10
+  br i1 %c, label %then, label %loop.latch
+
+then:
+  store i32 %add, ptr %p, align 4
+  br label %loop.latch
+
+loop.latch:
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %N
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
 attributes #0 = { "target-features"="+sve2" vscale_range(1,16) }
 
 ;; Verify that uadd_sat/umax/umin histograms are NOT generated on SVE2
