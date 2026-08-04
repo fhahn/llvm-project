@@ -3814,6 +3814,14 @@ protected:
       : VPIRMetadata(Metadata), Ingredient(I),
         Alignment(getLoadStoreAlignment(&I)), Consecutive(Consecutive) {}
 
+  /// Construct a recipe for \p I, using \p Alignment instead of \p I's
+  /// alignment. Used when the widened access starts at a different address than
+  /// \p I, e.g. at the base of an interleave group.
+  VPWidenMemoryRecipe(Instruction &I, Align Alignment, bool Consecutive,
+                      const VPIRMetadata &Metadata)
+      : VPIRMetadata(Metadata), Ingredient(I), Alignment(Alignment),
+        Consecutive(Consecutive) {}
+
 public:
   virtual ~VPWidenMemoryRecipe() = default;
 
@@ -3852,16 +3860,20 @@ public:
 struct LLVM_ABI_FOR_TEST VPWidenLoadRecipe final : public VPSingleDefRecipe,
                                                    public VPWidenMemoryRecipe {
   VPWidenLoadRecipe(LoadInst &Load, VPValue *Addr, VPValue *Mask,
-                    bool Consecutive, const VPIRMetadata &Metadata, DebugLoc DL)
+                    bool Consecutive, const VPIRMetadata &Metadata, DebugLoc DL,
+                    std::optional<Align> Alignment = std::nullopt)
       : VPSingleDefRecipe(VPRecipeBase::VPWidenLoadSC, {Addr}, Load.getType(),
                           &Load, DL),
-        VPWidenMemoryRecipe(Load, Consecutive, Metadata) {
+        VPWidenMemoryRecipe(Load,
+                            Alignment.value_or(getLoadStoreAlignment(&Load)),
+                            Consecutive, Metadata) {
     setMask(Mask);
   }
 
   VPWidenLoadRecipe *clone() override {
     return new VPWidenLoadRecipe(cast<LoadInst>(Ingredient), getAddr(),
-                                 getMask(), Consecutive, *this, getDebugLoc());
+                                 getMask(), Consecutive, *this, getDebugLoc(),
+                                 getAlign());
   }
 
   VP_CLASSOF_IMPL(VPRecipeBase::VPWidenLoadSC);
@@ -3909,7 +3921,8 @@ struct LLVM_ABI_FOR_TEST VPWidenLoadEVLRecipe final
       : VPSingleDefRecipe(VPRecipeBase::VPWidenLoadEVLSC, {Addr, &EVL},
                           L.getIngredient().getType(), &L.getIngredient(),
                           L.getDebugLoc()),
-        VPWidenMemoryRecipe(L.getIngredient(), L.isConsecutive(), L) {
+        VPWidenMemoryRecipe(L.getIngredient(), L.getAlign(), L.isConsecutive(),
+                            L) {
     setMask(Mask);
   }
 
@@ -3958,16 +3971,19 @@ struct LLVM_ABI_FOR_TEST VPWidenStoreRecipe final : public VPRecipeBase,
                                                     public VPWidenMemoryRecipe {
   VPWidenStoreRecipe(StoreInst &Store, VPValue *Addr, VPValue *StoredVal,
                      VPValue *Mask, bool Consecutive,
-                     const VPIRMetadata &Metadata, DebugLoc DL)
+                     const VPIRMetadata &Metadata, DebugLoc DL,
+                     std::optional<Align> Alignment = std::nullopt)
       : VPRecipeBase(VPRecipeBase::VPWidenStoreSC, {Addr, StoredVal}, DL),
-        VPWidenMemoryRecipe(Store, Consecutive, Metadata) {
+        VPWidenMemoryRecipe(Store,
+                            Alignment.value_or(getLoadStoreAlignment(&Store)),
+                            Consecutive, Metadata) {
     setMask(Mask);
   }
 
   VPWidenStoreRecipe *clone() override {
     return new VPWidenStoreRecipe(cast<StoreInst>(Ingredient), getAddr(),
                                   getStoredValue(), getMask(), Consecutive,
-                                  *this, getDebugLoc());
+                                  *this, getDebugLoc(), getAlign());
   }
 
   VP_CLASSOF_IMPL(VPRecipeBase::VPWidenStoreSC);
@@ -4014,7 +4030,8 @@ struct LLVM_ABI_FOR_TEST VPWidenStoreEVLRecipe final
                         VPValue *StoredVal, VPValue &EVL, VPValue *Mask)
       : VPRecipeBase(VPRecipeBase::VPWidenStoreEVLSC, {Addr, StoredVal, &EVL},
                      S.getDebugLoc()),
-        VPWidenMemoryRecipe(S.getIngredient(), S.isConsecutive(), S) {
+        VPWidenMemoryRecipe(S.getIngredient(), S.getAlign(), S.isConsecutive(),
+                            S) {
     setMask(Mask);
   }
 
