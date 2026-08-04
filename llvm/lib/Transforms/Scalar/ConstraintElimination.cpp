@@ -1587,6 +1587,31 @@ static void generateReproducer(Instruction *Cond, bool IsSigned, Module *M,
   ValueToValueMapTy Old2New;
   SmallVector<Value *> Args;
   SmallPtrSet<Value *, 8> Seen;
+  bool Failed = false;
+
+  // Clone any global referenced by \p C into the reproducer module, so the
+  // cloned instructions using it do not reference the original module. Returns
+  // false if a global cannot be cloned.
+  std::function<bool(Constant *)> CloneGlobals = [&](Constant *C) -> bool {
+    if (auto *GV = dyn_cast<GlobalValue>(C)) {
+      if (Old2New.count(GV))
+        return true;
+      // Clone global variables as definitions, so the reproducer preserves
+      // their size, which facts about memory accesses depend on.
+      auto *G = dyn_cast<GlobalVariable>(GV);
+      if (!G)
+        return false;
+      auto *NewG = new GlobalVariable(
+          *M, G->getValueType(), G->isConstant(), GlobalValue::ExternalLinkage,
+          Constant::getNullValue(G->getValueType()), G->getName(), nullptr,
+          G->getThreadLocalMode(), G->getAddressSpace());
+      NewG->setAlignment(G->getAlign());
+      Old2New[GV] = NewG;
+      return true;
+    }
+    return all_of(C->operands(),
+                  [&](Value *Op) { return CloneGlobals(cast<Constant>(Op)); });
+  };
   // Traverse Cond and its operands recursively until we reach a value that's in
   // Value2Index or not an instruction, or not a operation that
   // ConstraintElimination can decompose. Such values will be considered as
@@ -1601,8 +1626,14 @@ static void generateReproducer(Instruction *Cond, bool IsSigned, Module *M,
         continue;
       if (Old2New.find(V) != Old2New.end())
         continue;
-      if (isa<Constant>(V))
+      if (auto *C = dyn_cast<Constant>(V)) {
+        // Constants can be used as-is, but globals belong to the original
+        // module and cannot be referenced from the reproducer module, so they
+        // need cloning into it.
+        if (!CloneGlobals(C))
+          Failed = true;
         continue;
+      }
 
       auto *I = dyn_cast<Instruction>(V);
       if (Value2Index.contains(V) || !I ||
@@ -1620,6 +1651,12 @@ static void generateReproducer(Instruction *Cond, bool IsSigned, Module *M,
     if (Entry.Pred != ICmpInst::BAD_ICMP_PREDICATE)
       CollectArguments({Entry.LHS, Entry.RHS}, ICmpInst::isSigned(Entry.Pred));
   CollectArguments(Cond, IsSigned);
+
+  if (Failed) {
+    LLVM_DEBUG(
+        dbgs() << "  could not clone all referenced globals, skipping\n");
+    return;
+  }
 
   SmallVector<Type *> ParamTys;
   for (auto *P : Args)
