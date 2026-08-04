@@ -2375,12 +2375,15 @@ static void licm(VPlan &Plan) {
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
            vp_depth_first_shallow(LoopRegion->getEntry()))) {
     for (VPRecipeBase &R : make_early_inc_range(*VPBB)) {
-      if (cannotHoistOrSinkRecipe(R, LoopRegion->getEntryBasicBlock(),
-                                  LoopRegion->getExitingBasicBlock()))
-        continue;
+      // Only recipes with all operands defined outside the loop regions can be
+      // hoisted. Check this first, as it is much cheaper than the alias checks
+      // cannotHoistOrSinkRecipe performs for memory recipes.
       if (any_of(R.operands(), [](VPValue *Op) {
             return !Op->isDefinedOutsideLoopRegions();
           }))
+        continue;
+      if (cannotHoistOrSinkRecipe(R, LoopRegion->getEntryBasicBlock(),
+                                  LoopRegion->getExitingBasicBlock()))
         continue;
       R.moveBefore(*Preheader, Preheader->end());
     }
@@ -2396,11 +2399,9 @@ static void licm(VPlan &Plan) {
       LoopRegion->getEntry());
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(POT)) {
     for (VPRecipeBase &R : make_early_inc_range(reverse(*VPBB))) {
-      if (cannotHoistOrSinkRecipe(R, LoopRegion->getEntryBasicBlock(),
-                                  LoopRegion->getExitingBasicBlock(),
-                                  /*Sinking=*/true))
-        continue;
-
+      // Check the cheap replicate-recipe eligibility conditions first, as they
+      // are much cheaper than the alias checks cannotHoistOrSinkRecipe performs
+      // for memory recipes.
       if (auto *RepR = dyn_cast<VPReplicateRecipe>(&R)) {
         assert(!RepR->isPredicated() &&
                "Expected prior transformation of predicated replicates to "
@@ -2417,6 +2418,11 @@ static void licm(VPlan &Plan) {
             !RepR->getOperand(1)->isDefinedOutsideLoopRegions())
           continue;
       }
+
+      if (cannotHoistOrSinkRecipe(R, LoopRegion->getEntryBasicBlock(),
+                                  LoopRegion->getExitingBasicBlock(),
+                                  /*Sinking=*/true))
+        continue;
 
       [[maybe_unused]] auto *RepR = dyn_cast<VPReplicateRecipe>(&R);
       assert((!R.mayWriteToMemory() ||
