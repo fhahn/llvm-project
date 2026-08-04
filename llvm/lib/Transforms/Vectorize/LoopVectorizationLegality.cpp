@@ -994,6 +994,18 @@ bool LoopVectorizationLegality::canVectorizeInstr(Instruction &I) {
            all_of(Inst.users(), IsaPred<ExtractValueInst>);
   };
 
+  // Each execution of an alloca yields a new object, distinct from the objects
+  // of all other executions, and those objects stay live until the function
+  // returns. A vectorized iteration executes a single alloca for all its
+  // lanes, so their addresses would no longer be distinct.
+  if (isa<AllocaInst>(&I)) {
+    reportVectorizationFailure(
+        "Found an alloca in the loop body",
+        "value alloca'd in the loop cannot be vectorized",
+        "CantVectorizeAllocaInLoop", ORE, TheLoop, &I);
+    return false;
+  }
+
   // Check that the instruction return type is vectorizable.
   // We can't vectorize casts from vector type to scalar type.
   // Also, we can't vectorize extractelement instructions.
