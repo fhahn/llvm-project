@@ -1461,6 +1461,12 @@ static bool getConstraintFromMemoryAccess(GetElementPtrInst &GEP,
   if (Index->getType()->getScalarSizeInBits() != BitWidth)
     return false;
 
+  // The index does not contribute to the offset if the scales of its uses add
+  // up to zero, so no bound for it can be derived (and the division below
+  // would divide by zero).
+  if (Scale.isZero())
+    return false;
+
   // Index * Scale + ConstOffset + AccessSize <= AllocSize
   // With nuw flag, we know that the index addition doesn't have unsigned wrap.
   // If (AllocSize - (ConstOffset + AccessSize)) wraps around, there is no valid
