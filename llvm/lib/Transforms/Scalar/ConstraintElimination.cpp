@@ -1283,6 +1283,12 @@ static bool getConstraintFromMemoryAccess(GetElementPtrInst &GEP,
   if (Index->getType()->getScalarSizeInBits() != BitWidth)
     return false;
 
+  // The index does not contribute to the offset if the scales of its uses add
+  // up to zero, so no bound for it can be derived (and the division below
+  // would divide by zero).
+  if (Scale.isZero())
+    return false;
+
   ObjectSizeOpts Opts;
   // Workaround for gep inbounds, ptr null, idx.
   Opts.NullIsUnknownSize = true;
