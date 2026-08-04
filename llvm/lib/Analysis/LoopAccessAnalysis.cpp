@@ -258,6 +258,11 @@ static bool evaluatePtrAddRecAtMaxBTCWillNotWrap(
         return false;
       });
 
+  // A dereferenceable assumption may use a wider type than WiderTy (the size
+  // operand of the assume bundle is an i64, for example). Continue with the
+  // widest type, so all computations below use matching types.
+  WiderTy = SE.getWiderType(WiderTy, DerefBytesSCEV->getType());
+
   if (DerefBytesSCEV->isZero())
     return false;
 
