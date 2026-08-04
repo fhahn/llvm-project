@@ -3389,15 +3389,14 @@ protected:
 /// The Operands are {ChainOp, VecOp, EVL, [Condition]}.
 class LLVM_ABI_FOR_TEST VPReductionEVLRecipe : public VPReductionRecipe {
 public:
-  VPReductionEVLRecipe(VPReductionRecipe &R, VPValue &EVL, VPValue *CondOp,
-                       DebugLoc DL = DebugLoc::getUnknown())
+  VPReductionEVLRecipe(VPReductionRecipe &R, VPValue &EVL, VPValue *CondOp)
       : VPReductionRecipe(VPRecipeBase::VPReductionEVLSC, R.getRecurrenceKind(),
                           R.getFastMathFlagsOrNone(),
                           cast_or_null<Instruction>(R.getUnderlyingValue()),
                           {R.getChainOp(), R.getVecOp(), &EVL}, CondOp,
                           getReductionStyle(R.isInLoop(), R.isOrdered(),
                                             R.getVFScaleFactor()),
-                          DL) {}
+                          R.getDebugLoc()) {}
 
   ~VPReductionEVLRecipe() override = default;
 
