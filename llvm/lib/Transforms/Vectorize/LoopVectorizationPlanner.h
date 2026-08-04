@@ -535,10 +535,10 @@ public:
   /// be null).
   VPWidenLoadRecipe *createWidenLoad(LoadInst &Load, VPValue *Addr,
                                      VPValue *Mask, bool Consecutive,
-                                     const VPIRMetadata &Metadata,
-                                     DebugLoc DL) {
-    return tryInsertInstruction(
-        new VPWidenLoadRecipe(Load, Addr, Mask, Consecutive, Metadata, DL));
+                                     const VPIRMetadata &Metadata, DebugLoc DL,
+                                     std::optional<Align> Alignment = {}) {
+    return tryInsertInstruction(new VPWidenLoadRecipe(
+        Load, Addr, Mask, Consecutive, Metadata, DL, Alignment));
   }
 
   /// Create a recipe widening \p Store, storing \p StoredVal to \p Addr with
@@ -547,9 +547,10 @@ public:
                                        VPValue *StoredVal, VPValue *Mask,
                                        bool Consecutive,
                                        const VPIRMetadata &Metadata,
-                                       DebugLoc DL) {
+                                       DebugLoc DL,
+                                       std::optional<Align> Alignment = {}) {
     return tryInsertInstruction(new VPWidenStoreRecipe(
-        Store, Addr, StoredVal, Mask, Consecutive, Metadata, DL));
+        Store, Addr, StoredVal, Mask, Consecutive, Metadata, DL, Alignment));
   }
 
   //===--------------------------------------------------------------------===//

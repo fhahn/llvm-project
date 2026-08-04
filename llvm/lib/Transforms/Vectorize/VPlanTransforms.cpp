@@ -4051,10 +4051,14 @@ static VPValue *narrowInterleaveGroupOp(ArrayRef<VPValue *> Members,
   if (auto *LoadGroup = dyn_cast<VPInterleaveRecipe>(R)) {
     // Narrow interleave group to wide load, as transformed VPlan will only
     // process one original iteration.
-    auto *LI = cast<LoadInst>(LoadGroup->getInterleaveGroup()->getInsertPos());
+    const InterleaveGroup<Instruction> *IG = LoadGroup->getInterleaveGroup();
+    auto *LI = cast<LoadInst>(IG->getInsertPos());
+    // The narrowed load starts at the group's base address, so it must use the
+    // group's alignment; the insert position may be any member and its
+    // alignment does not hold at the base.
     auto *L = VPBuilder(LoadGroup).createWidenLoad(
         *LI, LoadGroup->getAddr(), LoadGroup->getMask(), /*Consecutive=*/true,
-        *LoadGroup, LoadGroup->getDebugLoc());
+        *LoadGroup, LoadGroup->getDebugLoc(), IG->getAlign());
     NarrowedOps.insert(L);
     return L;
   }
@@ -4212,12 +4216,12 @@ VPlanTransforms::narrowInterleaveGroups(VPlan &Plan,
   for (auto *StoreGroup : StoreGroups) {
     VPValue *Res = narrowInterleaveGroupOp(StoreGroup->getStoredValues(),
                                            NarrowedOps, Preheader);
-    auto *SI =
-        cast<StoreInst>(StoreGroup->getInterleaveGroup()->getInsertPos());
+    const InterleaveGroup<Instruction> *IG = StoreGroup->getInterleaveGroup();
+    auto *SI = cast<StoreInst>(IG->getInsertPos());
     VPBuilder(StoreGroup)
         .createWidenStore(*SI, StoreGroup->getAddr(), Res, nullptr,
                           /*Consecutive=*/true, *StoreGroup,
-                          StoreGroup->getDebugLoc());
+                          StoreGroup->getDebugLoc(), IG->getAlign());
     StoreGroup->eraseFromParent();
   }
 
