@@ -7,7 +7,8 @@
 define i32 @add_reduction(ptr %src, i64 %n) !dbg !3 {
 ; CHECK-LABEL: define i32 @add_reduction(
 ; CHECK:       vector.body:
-; CHECK:         call i32 @llvm.vp.reduce.add.nxv4i32({{.*}}){{$}}
+; CHECK:         call i32 @llvm.vp.reduce.add.nxv4i32({{.*}}), !dbg [[DBG:![0-9]+]]
+; CHECK:       [[DBG]] = !DILocation(line: 2,
 ;
 entry:
   br label %loop
