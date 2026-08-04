@@ -874,3 +874,41 @@ attributes #0 = { "target-features"="+sve2" vscale_range(1,16) }
 !11 = !{!10, !12}
 !12 = distinct !{!12, !13, !"scope-bucket-2"}
 !13 = distinct !{!13, !"scopes-buckets"}
+
+; A conditional store of a reduction to a loop-invariant address is not
+; vectorizable, as the vectorized loop would store the final reduction value
+; unconditionally. Finding a histogram in the same loop must not bypass that.
+define i32 @histogram_with_conditional_invariant_store(ptr noalias %buckets, ptr noalias readonly %indices, ptr noalias %p, i64 %N) #0 {
+; CHECK-LABEL: define i32 @histogram_with_conditional_invariant_store(
+; CHECK-NOT:     call void @llvm.experimental.vector.histogram
+; CHECK-NOT:     vector.body
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %latch ]
+  %sum = phi i32 [ 0, %entry ], [ %add, %latch ]
+  %gep.idx = getelementptr inbounds i32, ptr %indices, i64 %iv
+  %l.idx = load i32, ptr %gep.idx, align 4
+  %idxprom = zext i32 %l.idx to i64
+  %gep.bucket = getelementptr inbounds i32, ptr %buckets, i64 %idxprom
+  %l.bucket = load i32, ptr %gep.bucket, align 4
+  %inc = add nsw i32 %l.bucket, 1
+  store i32 %inc, ptr %gep.bucket, align 4
+  %add = add i32 %sum, %l.idx
+  %c = icmp ugt i32 %l.idx, 10
+  br i1 %c, label %if.then, label %latch
+
+if.then:
+  store i32 %add, ptr %p, align 4
+  br label %latch
+
+latch:
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %N
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret i32 %add
+}
