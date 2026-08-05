@@ -2788,7 +2788,10 @@ bool LoopAccessInfo::analyzeLoop(AAResults *AA, const LoopInfo *LI,
           HasComplexMemInst = true;
           continue;
         }
-        if (!Ld->isSimple() && !IsAnnotatedParallel) {
+        // Note llvm.loop.parallel_accesses only asserts the absence of
+        // cross-iteration dependences, so it does not make a volatile or
+        // atomic access safe to widen.
+        if (!Ld->isSimple()) {
           recordAnalysis("NonSimpleLoad", Ld)
               << "read with atomic ordering or volatile read";
           LLVM_DEBUG(dbgs() << "LAA: Found a non-simple load.\n");
@@ -2812,7 +2815,7 @@ bool LoopAccessInfo::analyzeLoop(AAResults *AA, const LoopInfo *LI,
           HasComplexMemInst = true;
           continue;
         }
-        if (!St->isSimple() && !IsAnnotatedParallel) {
+        if (!St->isSimple()) {
           recordAnalysis("NonSimpleStore", St)
               << "write with atomic ordering or volatile write";
           LLVM_DEBUG(dbgs() << "LAA: Found a non-simple store.\n");
