@@ -326,7 +326,7 @@ private:
   const DenseMap<Value *, const SCEV *> &SymbolicStrides;
 
   /// Maps access locations (ptr, read/write) to program order.
-  DenseMap<MemAccessInfo, std::vector<unsigned> > Accesses;
+  DenseMap<MemAccessInfo, SmallVector<unsigned, 2>> Accesses;
 
   /// Memory access instructions in program order.
   SmallVector<Instruction *, 16> InstMap;

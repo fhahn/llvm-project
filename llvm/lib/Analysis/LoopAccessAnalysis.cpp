@@ -65,7 +65,6 @@
 #include <iterator>
 #include <utility>
 #include <variant>
-#include <vector>
 
 using namespace llvm;
 using namespace llvm::SCEVPatternMatch;
@@ -2482,17 +2481,23 @@ bool MemoryDepChecker::areDepsSafe(const DepCandidates &DepCands,
       // stores do (WAW), so start from AI for writes and next(AI) for reads.
       EquivalenceClasses<MemAccessInfo>::member_iterator OI =
           (AIIsWrite ? AI : std::next(AI));
+      // The program order indices for *AI do not change while iterating over
+      // OI, so look them up once here.
+      ArrayRef<unsigned> OrderA =
+          getOrderForAccess(AI->getPointer(), AIIsWrite);
       while (OI != AE) {
-        // Check every accessing instruction pair in program order.
-        auto &Acc = Accesses[*AI];
-        for (std::vector<unsigned>::iterator I1 = Acc.begin(), I1E = Acc.end();
+        // Check every accessing instruction pair in program order. As above,
+        // the indices for *OI do not change in the loops below.
+        ArrayRef<unsigned> OrderB =
+            OI == AI ? OrderA
+                     : getOrderForAccess(OI->getPointer(), OI->getInt());
+        for (const unsigned *I1 = OrderA.begin(), *I1E = OrderA.end();
              I1 != I1E; ++I1)
           // When checking for WAW (OI == AI) caused by multiple writes to the
           // same pointer, start I2 at the next access past I1 to avoid
           // self-comparison.
-          for (std::vector<unsigned>::iterator
-                   I2 = (OI == AI ? std::next(I1) : Accesses[*OI].begin()),
-                   I2E = (OI == AI ? I1E : Accesses[*OI].end());
+          for (const unsigned *I2 = OI == AI ? std::next(I1) : OrderB.begin(),
+                              *I2E = OrderB.end();
                I2 != I2E; ++I2) {
             auto A = std::make_pair(&*AI, *I1);
             auto B = std::make_pair(&*OI, *I2);
