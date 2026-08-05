@@ -9,18 +9,17 @@ define i8 @ult_nsw_rhs_crosses_zero() {
 ; CHECK-LABEL: 'ult_nsw_rhs_crosses_zero'
 ; CHECK-NEXT:  Classifying expressions for: @ult_nsw_rhs_crosses_zero
 ; CHECK-NEXT:    %l = phi i8 [ 0, %entry ], [ %l.next, %loop ]
-; CHECK-NEXT:    --> {0,+,4}<nuw><nsw><%loop> U: [0,5) S: [0,5) Exits: 4 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {0,+,4}<nuw><%loop> U: [0,-3) S: [-128,125) Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %r = phi i8 [ 1, %entry ], [ %r.next, %loop ]
-; CHECK-NEXT:    --> {1,+,-2}<nuw><nsw><%loop> U: [-1,2) S: [-1,2) Exits: -1 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {1,+,-2}<nsw><%loop> U: [-125,2) S: [-125,2) Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %l.next = add nuw i8 %l, 4
-; CHECK-NEXT:    --> {4,+,4}<nuw><nsw><%loop> U: [4,9) S: [4,9) Exits: 8 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {4,+,4}<nw><%loop> U: [0,-3) S: [-128,125) Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %r.next = add nsw i8 %r, -2
-; CHECK-NEXT:    --> {-1,+,-2}<nsw><%loop> U: [-3,0) S: [-3,0) Exits: -3 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {-1,+,-2}<nsw><%loop> U: [-127,0) S: [-127,0) Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @ult_nsw_rhs_crosses_zero
-; CHECK-NEXT:  Loop %loop: backedge-taken count is i8 1
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i8 1
-; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i8 1
-; CHECK-NEXT:  Loop %loop: Trip multiple is 2
+; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i8 63
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i8 63
 ;
 entry:
   br label %loop
