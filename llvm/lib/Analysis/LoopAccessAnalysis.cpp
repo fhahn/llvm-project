@@ -1402,8 +1402,15 @@ bool AccessAnalysis::canCheckPtrAtRT(
       }
       Instruction *Src = Dep.getSource(DepChecker);
       Instruction *Dst = Dep.getDestination(DepChecker);
-      DepCands.eraseClass({getPointerOperand(Src), Src->mayWriteToMemory()});
-      DepCands.eraseClass({getPointerOperand(Dst), Dst->mayWriteToMemory()});
+      // The accesses were added for the pointers visitPointers expands the
+      // pointer operand to, which is not the operand itself for a pointer phi
+      // in the loop. Erase the classes of the expanded pointers, as erasing the
+      // class of the operand would not find anything, leaving the accesses in
+      // one class and thus without a runtime check between them.
+      for (Instruction *I : {Src, Dst})
+        visitPointers(getPointerOperand(I), *TheLoop, [&](Value *Ptr) {
+          DepCands.eraseClass({Ptr, I->mayWriteToMemory()});
+        });
     }
   } else {
     CheckDeps.clear();
