@@ -13497,8 +13497,13 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
              *BECountIfBackedgeTaken = nullptr;
   if (!isLoopInvariant(RHS, L)) {
     const auto *RHSAddRec = dyn_cast<SCEVAddRecExpr>(RHS);
+    // The closed form below is the meeting point of the two sequences over the
+    // integers, so it only matches the machine iteration count if the RHS does
+    // not wrap in the signedness of the comparison. Any other no-wrap flag says
+    // nothing about that.
     if (PositiveStride && RHSAddRec != nullptr && RHSAddRec->getLoop() == L &&
-        any(RHSAddRec->getNoWrapFlags())) {
+        hasFlags(RHSAddRec->getNoWrapFlags(),
+                 IsSigned ? SCEV::FlagNSW : SCEV::FlagNUW)) {
       // The structure of loop we are trying to calculate backedge count of:
       //
       //  left = left_start
