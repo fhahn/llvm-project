@@ -6,8 +6,7 @@
 
 define double @fdiv_reduction_reassoc_only(ptr %src, double %start, i64 %n) {
 ; CHECK-LABEL: define double @fdiv_reduction_reassoc_only(
-; CHECK:         vector.body
-; CHECK:         call reassoc double @llvm.vector.reduce.fmul.v2f64(
+; CHECK-NOT:     vector.body
 ;
 entry:
   br label %loop
