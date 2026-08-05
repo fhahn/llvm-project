@@ -1020,6 +1020,13 @@ RecurrenceDescriptor::isRecurrenceInstr(Loop *L, PHINode *OrigPhi,
   case Instruction::Xor:
     return InstDesc(Kind == RecurKind::Xor, I);
   case Instruction::FDiv:
+    // An FMul recurrence is lowered by combining the partial products with
+    // fmul, starting from the identity 1.0, so an fdiv link turns into a
+    // multiplication by 1.0 / x. That needs arcp, and reassociation permission
+    // cannot stand in for it.
+    if (!I->hasAllowReciprocal())
+      return InstDesc(false, I);
+    [[fallthrough]];
   case Instruction::FMul:
     return InstDesc(Kind == RecurKind::FMul, I,
                     I->hasAllowReassoc() ? nullptr : I);
