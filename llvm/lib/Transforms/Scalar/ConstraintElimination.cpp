@@ -185,8 +185,13 @@ struct State {
   void addInfoFor(BasicBlock &BB);
 
   /// Try to add facts for loop inductions (AddRecs) in EQ/NE compares
-  /// controlling the loop header.
+  /// controlling the loop header, as well as lower bounds for all inductions in
+  /// the loop header.
   void addInfoForInductions(BasicBlock &BB);
+
+  /// Add facts bounding every induction phi in the header of \p L from below by
+  /// its start value.
+  void addInfoForHeaderInductions(Loop &L);
 
   /// Returns true if we can add a known condition from BB to its successor
   /// block Succ.
@@ -965,6 +970,69 @@ static void dumpConstraint(ArrayRef<int64_t> C,
 }
 #endif
 
+/// Returns true if the induction phi \p PN, which steps to \p Backedge in each
+/// iteration, never goes below its start value in the signed (\p IsSigned) or
+/// unsigned sense, based on the no-wrap flags of the step.
+static bool isMonotonicallyIncreasing(const PHINode &PN, const Value *Backedge,
+                                      bool IsSigned, const DataLayout &DL) {
+  // PN + C with a non-negative step: the no-wrap flags of the add carry over.
+  const APInt *Step;
+  if (match(Backedge, m_c_Add(m_Specific(&PN), m_APInt(Step)))) {
+    const auto *Add = cast<OverflowingBinaryOperator>(Backedge);
+    return !Step->isNegative() &&
+           (IsSigned ? Add->hasNoSignedWrap() : Add->hasNoUnsignedWrap());
+  }
+
+  // getelementptr PN, <constant indices> with a non-negative offset. A gep nuw
+  // does not wrap in the unsigned sense, and per LangRef a gep nusw with a
+  // non-negative offset implies nuw. Pointers are only decomposed in the
+  // unsigned system, so there is no signed bound to derive.
+  if (const auto *GEP = dyn_cast<GEPOperator>(Backedge)) {
+    APInt Offset(DL.getIndexTypeSizeInBits(GEP->getType()), 0);
+    return !IsSigned && GEP->getPointerOperand() == &PN &&
+           (GEP->hasNoUnsignedWrap() || GEP->hasNoUnsignedSignedWrap()) &&
+           GEP->accumulateConstantOffset(DL, Offset) && !Offset.isNegative();
+  }
+
+  return false;
+}
+
+void State::addInfoForHeaderInductions(Loop &L) {
+  BasicBlock *LoopPred = L.getLoopPredecessor();
+  if (!LoopPred)
+    return;
+
+  BasicBlock *Header = L.getHeader();
+  const DataLayout &DL = Header->getDataLayout();
+  DomTreeNode *DTN = DT.getNode(Header);
+  for (PHINode &PN : Header->phis()) {
+    // Constraints are only tracked for scalar integers and pointers.
+    if (PN.getNumIncomingValues() != 2 ||
+        (!PN.getType()->isIntegerTy() && !PN.getType()->isPointerTy()))
+      continue;
+
+    Value *Start = PN.getIncomingValueForBlock(LoopPred);
+    Value *Backedge = PN.getIncomingValue(PN.getIncomingBlock(0) == LoopPred);
+    // The induction equals Start in the first iteration and does not decrease
+    // afterwards, so the bound holds on entry to the header in every iteration.
+    // In the unsigned system every value is implicitly bounded from below by 0,
+    // so a zero start value does not add any information there.
+    bool Unsigned =
+        !match(Start, m_Zero()) &&
+        isMonotonicallyIncreasing(PN, Backedge, /*IsSigned=*/false, DL);
+    bool Signed = isMonotonicallyIncreasing(PN, Backedge, /*IsSigned=*/true, DL);
+    if (!Unsigned && !Signed)
+      continue;
+
+    // If the bound holds in both senses, add it as a single samesign fact, which
+    // adds the constraint to both systems directly, instead of adding two facts
+    // that each re-derive the other one via the signed <-> unsigned transfer.
+    CmpPredicate Pred(Unsigned ? CmpInst::ICMP_UGE : CmpInst::ICMP_SGE,
+                      /*HasSameSign=*/Unsigned && Signed);
+    WorkList.push_back(FactOrCheck::getConditionFact(DTN, Pred, &PN, Start));
+  }
+}
+
 void State::addInfoForInductions(BasicBlock &BB) {
   auto *L = LI.getLoopFor(&BB);
   if (!L)
@@ -972,6 +1040,10 @@ void State::addInfoForInductions(BasicBlock &BB) {
 
   BasicBlock *Header = L->getHeader();
   BasicBlock *Latch = L->getLoopLatch();
+  // Lower bounds for all header inductions do not depend on the shape of the
+  // loop-controlling condition matched below.
+  if (Header == &BB)
+    addInfoForHeaderInductions(*L);
   if (Header != &BB && Latch != &BB)
     return;
 
@@ -1023,11 +1095,9 @@ void State::addInfoForInductions(BasicBlock &BB) {
   Value *Backedge = PN->getIncomingValueForBlock(BackedgeBB);
   const APInt *StepOffset = nullptr;
   const SCEV *StartSCEV = nullptr;
-  OverflowingBinaryOperator *Inc = nullptr;
   if (match(Backedge, m_c_Add(m_Specific(PN), m_APInt(StepOffset)))) {
     if (StepOffset->isZero())
       return;
-    Inc = cast<OverflowingBinaryOperator>(Backedge);
   } else {
     const SCEV *Expr = SE.getSCEV(PN);
     if (!match(Expr,
@@ -1069,10 +1139,15 @@ void State::addInfoForInductions(BasicBlock &BB) {
     return;
   }
 
-  // Monotonicity is only used if the step is non-negative. If Inc is set it
-  // reduces to the induction wrap flags. If that fails, try to refine via SCEV.
-  bool MonotonicallyIncreasingUnsigned = Inc && Inc->hasNoUnsignedWrap();
-  bool MonotonicallyIncreasingSigned = Inc && Inc->hasNoSignedWrap();
+  // Monotonicity is only used if the step is non-negative. It reduces to the
+  // no-wrap flags of the step. If that fails, try to refine via SCEV.
+  const DataLayout &DL = BB.getDataLayout();
+  bool FromFlagsUnsigned =
+      isMonotonicallyIncreasing(*PN, Backedge, /*IsSigned=*/false, DL);
+  bool FromFlagsSigned =
+      isMonotonicallyIncreasing(*PN, Backedge, /*IsSigned=*/true, DL);
+  bool MonotonicallyIncreasingUnsigned = FromFlagsUnsigned;
+  bool MonotonicallyIncreasingSigned = FromFlagsSigned;
   if (!(MonotonicallyIncreasingUnsigned && MonotonicallyIncreasingSigned)) {
     const SCEVAddRecExpr *IndAR = cast<SCEVAddRecExpr>(SE.getSCEV(PN));
     if (!MonotonicallyIncreasingUnsigned)
@@ -1086,11 +1161,12 @@ void State::addInfoForInductions(BasicBlock &BB) {
   }
 
   // If the induction is known not to wrap, PN >= StartValue can be added
-  // unconditionally.
-  if (MonotonicallyIncreasingUnsigned)
+  // unconditionally. addInfoForHeaderInductions already added it for the loop
+  // header, which dominates this block, whenever the no-wrap flags prove it.
+  if (MonotonicallyIncreasingUnsigned && !FromFlagsUnsigned)
     WorkList.push_back(
         FactOrCheck::getConditionFact(DTN, CmpInst::ICMP_UGE, PN, StartValue));
-  if (MonotonicallyIncreasingSigned)
+  if (MonotonicallyIncreasingSigned && !FromFlagsSigned)
     WorkList.push_back(
         FactOrCheck::getConditionFact(DTN, CmpInst::ICMP_SGE, PN, StartValue));
 
