@@ -15,6 +15,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Analysis/InstSimplifyFolder.h"
+#include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/MemoryLocation.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/Analysis/ScalarEvolutionPatternMatch.h"
@@ -184,6 +185,53 @@ GEPNoWrapFlags vputils::getGEPFlagsForPtr(VPValue *Ptr) {
     Ptr = PtrVPI->getOperand(0);
   }
   return GEPNoWrapFlags::none();
+}
+
+/// Recognize a header-phi recipe \p R for an IR loop-header phi that has not
+/// been turned into a dedicated induction recipe as an affine AddRec in its
+/// loop, which must be \p L or nested inside it. The phi must have 2 incoming
+/// values, where one operand is the preheader start value and the other is
+/// add(phi, invariant-step); operand order is not canonicalized for inner-loop
+/// phis, so both orders are tried. The start and step come from the recipe's
+/// operands; the underlying IR phi is only used to determine the loop the
+/// AddRec is for, as SCEV keys AddRecs on IR loops. Returns SCEVCouldNotCompute
+/// if the shape is not recognized.
+static const SCEV *getSCEVForHeaderPhi(const VPSingleDefRecipe *R,
+                                       PredicatedScalarEvolution &PSE,
+                                       const Loop *L) {
+  ScalarEvolution &SE = *PSE.getSE();
+  auto *IRPhi = dyn_cast_or_null<PHINode>(R->getUnderlyingValue());
+  if (!L || !IRPhi || R->getNumOperands() != 2)
+    return SE.getCouldNotCompute();
+  const Loop *PhiLoop = nullptr;
+  for (const Loop *Cur : L->getLoopsInPreorder())
+    if (Cur->getHeader() == IRPhi->getParent()) {
+      PhiLoop = Cur;
+      break;
+    }
+  if (!PhiLoop)
+    return SE.getCouldNotCompute();
+
+  VPValue *StepVPV = nullptr;
+  VPValue *StartVPV = nullptr;
+  if (match(R->getOperand(1), m_c_Add(m_Specific(R), m_VPValue(StepVPV))))
+    StartVPV = R->getOperand(0);
+  else if (match(R->getOperand(0), m_c_Add(m_Specific(R), m_VPValue(StepVPV))))
+    StartVPV = R->getOperand(1);
+  else
+    return SE.getCouldNotCompute();
+
+  const SCEV *Step = vputils::getSCEVExprForVPValue(StepVPV, PSE, L);
+  if (isa<SCEVCouldNotCompute>(Step) || !SE.isLoopInvariant(Step, PhiLoop))
+    return SE.getCouldNotCompute();
+  const SCEV *Start = vputils::getSCEVExprForVPValue(StartVPV, PSE, L);
+  if (isa<SCEVCouldNotCompute>(Start) || !SE.isLoopInvariant(Start, PhiLoop))
+    return SE.getCouldNotCompute();
+  // Do not attach IR nsw/nuw from the increment recipe onto the AddRec: VPlan
+  // cannot reproduce stock SCEV's dominance-based isAddRecNeverPoison
+  // reasoning, and leaking an unjustified flag into the shared SCEV cache is
+  // unsound.
+  return SE.getAddRecExpr(Start, Step, PhiLoop, SCEV::FlagAnyWrap);
 }
 
 const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
@@ -366,6 +414,9 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
   const SCEV *Expr =
       TypeSwitch<const VPRecipeBase *, const SCEV *>(DefR)
           .Case([](const VPExpandSCEVRecipe *R) { return R->getSCEV(); })
+          .Case([&PSE, L](const VPPhi *R) {
+            return getSCEVForHeaderPhi(R, PSE, L);
+          })
           .Case([&SE, &PSE, L](const VPWidenIntOrFpInductionRecipe *R) {
             const SCEV *Step = getSCEVExprForVPValue(R->getStepValue(), PSE, L);
             if (!L || isa<SCEVCouldNotCompute>(Step))

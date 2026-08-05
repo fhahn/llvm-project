@@ -58,12 +58,21 @@ static std::optional<int64_t> getConstantStride(VPValue *Addr, Type *AccessTy,
   if (DL.getTypeSizeInBits(AccessTy) != DL.getTypeAllocSizeInBits(AccessTy))
     return {};
 
+  ScalarEvolution &SE = *PSE.getSE();
   const SCEV *AddrSCEV = vputils::getSCEVExprForVPValue(Addr, PSE, L);
-  auto *AddRec = dyn_cast<SCEVAddRecExpr>(AddrSCEV);
-  if (!AddRec)
-    return {};
-
-  return getStrideFromAddRec(AddRec, L, AccessTy, /*Ptr=*/nullptr, PSE);
+  // Descend through AddRecs for loops nested inside \p L whose step does not
+  // vary with \p L. For a column-major access such as A[i + j*M] the SCEV is
+  // {{A,+,elt}<L>,+,elt*M}<inner>: the inner step elt*M is invariant w.r.t.
+  // \p L, so the access is still unit-stride across \p L's iterations and the
+  // stride w.r.t. \p L lives in the start expression.
+  while (auto *AddRec = dyn_cast<SCEVAddRecExpr>(AddrSCEV)) {
+    if (AddRec->getLoop() == L)
+      return getStrideFromAddRec(AddRec, L, AccessTy, /*Ptr=*/nullptr, PSE);
+    if (!SE.isLoopInvariant(AddRec->getStepRecurrence(SE), L))
+      return {};
+    AddrSCEV = AddRec->getStart();
+  }
+  return {};
 }
 
 bool VPlanTransforms::tryToConvertVPInstructionsToVPRecipes(
@@ -72,6 +81,31 @@ bool VPlanTransforms::tryToConvertVPInstructionsToVPRecipes(
 
   ReversePostOrderTraversal<VPBlockDeepTraversalWrapper<VPBlockBase *>> RPOT(
       Plan.getVectorLoopRegion());
+
+  // Collect the memory accesses that are consecutive w.r.t. OuterLoop. This
+  // must happen before converting the header phis below, as VPWidenPHIRecipe
+  // does not retain the underlying IR phi the SCEV lowering uses to recognize
+  // inner-loop induction phis.
+  SmallPtrSet<const VPValue *, 4> ConsecutiveAccesses;
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(RPOT)) {
+    if (!VPBB->getParent())
+      break;
+    for (VPRecipeBase &R : *VPBB) {
+      auto *VPI = dyn_cast<VPInstruction>(&R);
+      if (!VPI)
+        continue;
+      bool IsLoad = VPI->getOpcode() == Instruction::Load;
+      if (!IsLoad && VPI->getOpcode() != Instruction::Store)
+        continue;
+      VPValue *Addr = VPI->getOperand(IsLoad ? 0 : 1);
+      Type *ScalarTy =
+          IsLoad ? VPI->getScalarType() : VPI->getOperand(0)->getScalarType();
+      if (getConstantStride(Addr, ScalarTy, Plan.getDataLayout(), PSE,
+                            OuterLoop) == 1)
+        ConsecutiveAccesses.insert(VPI);
+    }
+  }
+
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(RPOT)) {
     // Skip blocks outside region
     if (!VPBB->getParent())
@@ -101,18 +135,12 @@ bool VPlanTransforms::tryToConvertVPInstructionsToVPRecipes(
       } else if (auto *VPI = dyn_cast<VPInstruction>(&Ingredient)) {
         assert(!isa<PHINode>(Inst) && "phis should be handled above");
         // Create VPWidenMemoryRecipe for loads and stores.
+        bool IsConsecutive = ConsecutiveAccesses.contains(VPI);
         if (LoadInst *Load = dyn_cast<LoadInst>(Inst)) {
-          bool IsConsecutive =
-              getConstantStride(VPI->getOperand(0), VPI->getScalarType(),
-                                Plan.getDataLayout(), PSE, OuterLoop) == 1;
           NewRecipe = new VPWidenLoadRecipe(*Load, Ingredient.getOperand(0),
                                             nullptr /*Mask*/, IsConsecutive,
                                             *VPI, Ingredient.getDebugLoc());
         } else if (StoreInst *Store = dyn_cast<StoreInst>(Inst)) {
-          bool IsConsecutive =
-              getConstantStride(VPI->getOperand(1),
-                                VPI->getOperand(0)->getScalarType(),
-                                Plan.getDataLayout(), PSE, OuterLoop) == 1;
           NewRecipe = new VPWidenStoreRecipe(
               *Store, Ingredient.getOperand(1), Ingredient.getOperand(0),
               nullptr /*Mask*/, IsConsecutive, *VPI, Ingredient.getDebugLoc());

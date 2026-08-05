@@ -41,7 +41,8 @@ bool onlyScalarValuesUsed(const VPValue *Def);
 VPValue *getOrCreateVPValueForSCEVExpr(VPlan &Plan, const SCEV *Expr);
 
 /// Return the SCEV expression for \p V. Returns SCEVCouldNotCompute if no
-/// SCEV expression could be constructed.
+/// SCEV expression could be constructed. Loop-header phi recipes of \p L or of
+/// a loop nested inside it are recognized as AddRecs in their loop.
 const SCEV *getSCEVExprForVPValue(const VPValue *V,
                                   PredicatedScalarEvolution &PSE,
                                   const Loop *L = nullptr);
