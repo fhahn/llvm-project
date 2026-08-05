@@ -7,12 +7,18 @@
 
 define i8 @ult_nsw_rhs_crosses_zero() {
 ; CHECK-LABEL: define i8 @ult_nsw_rhs_crosses_zero() {
-; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    br i1 true, label %[[LOOP]], label %[[EXIT:.*]]
+; CHECK-NEXT:    [[L:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[L_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[R:%.*]] = phi i8 [ 1, %[[ENTRY]] ], [ [[R_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[L_NEXT]] = add nuw i8 [[L]], 4
+; CHECK-NEXT:    [[R_NEXT]] = add nsw i8 [[R]], -2
+; CHECK-NEXT:    [[EC:%.*]] = icmp ult i8 [[L]], [[R]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[LOOP]], label %[[EXIT:.*]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    ret i8 4
+; CHECK-NEXT:    [[L_LCSSA:%.*]] = phi i8 [ [[L]], %[[LOOP]] ]
+; CHECK-NEXT:    ret i8 [[L_LCSSA]]
 ;
 entry:
   br label %loop
