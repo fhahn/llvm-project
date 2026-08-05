@@ -47,8 +47,17 @@ using namespace SCEVPatternMatch;
 /// w.r.t. \p L with a constant stride, return the stride in units of
 /// \p AccessTy. Otherwise return std::nullopt.
 static std::optional<int64_t> getConstantStride(VPValue *Addr, Type *AccessTy,
+                                                const DataLayout &DL,
                                                 PredicatedScalarEvolution &PSE,
                                                 const Loop *L) {
+  // A unit stride is used to emit a packed <VF x AccessTy> vector access, which
+  // is only byte-equivalent to VF consecutive scalar accesses if AccessTy is
+  // not bit-packed in vectors: i1/i2/i4 occupy a full byte each as scalars, but
+  // pack to sub-byte lanes in a vector, so a wide <VF x i1> access would cover
+  // the wrong bytes.
+  if (DL.getTypeSizeInBits(AccessTy) != DL.getTypeAllocSizeInBits(AccessTy))
+    return {};
+
   const SCEV *AddrSCEV = vputils::getSCEVExprForVPValue(Addr, PSE, L);
   auto *AddRec = dyn_cast<SCEVAddRecExpr>(AddrSCEV);
   if (!AddRec)
@@ -94,16 +103,16 @@ bool VPlanTransforms::tryToConvertVPInstructionsToVPRecipes(
         // Create VPWidenMemoryRecipe for loads and stores.
         if (LoadInst *Load = dyn_cast<LoadInst>(Inst)) {
           bool IsConsecutive =
-              getConstantStride(VPI->getOperand(0), VPI->getScalarType(), PSE,
-                                OuterLoop) == 1;
+              getConstantStride(VPI->getOperand(0), VPI->getScalarType(),
+                                Plan.getDataLayout(), PSE, OuterLoop) == 1;
           NewRecipe = new VPWidenLoadRecipe(*Load, Ingredient.getOperand(0),
                                             nullptr /*Mask*/, IsConsecutive,
                                             *VPI, Ingredient.getDebugLoc());
         } else if (StoreInst *Store = dyn_cast<StoreInst>(Inst)) {
           bool IsConsecutive =
               getConstantStride(VPI->getOperand(1),
-                                VPI->getOperand(0)->getScalarType(), PSE,
-                                OuterLoop) == 1;
+                                VPI->getOperand(0)->getScalarType(),
+                                Plan.getDataLayout(), PSE, OuterLoop) == 1;
           NewRecipe = new VPWidenStoreRecipe(
               *Store, Ingredient.getOperand(1), Ingredient.getOperand(0),
               nullptr /*Mask*/, IsConsecutive, *VPI, Ingredient.getDebugLoc());
@@ -5482,8 +5491,8 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
         VPValue *Ptr = VPI->getOperand(!IsLoad);
         Type *ScalarTy =
             IsLoad ? VPI->getScalarType() : VPI->getOperand(0)->getScalarType();
-        std::optional<int64_t> Stride =
-            getConstantStride(Ptr, ScalarTy, CostCtx.PSE, CostCtx.L);
+        std::optional<int64_t> Stride = getConstantStride(
+            Ptr, ScalarTy, Plan.getDataLayout(), CostCtx.PSE, CostCtx.L);
         if (Stride != 1 && Stride != -1)
           return false;
         bool Reverse = Stride == -1;
