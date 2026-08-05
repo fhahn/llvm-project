@@ -1158,35 +1158,13 @@ void State::addInfoForInductions(BasicBlock &BB) {
   }
 
   // Monotonicity is only used if the step is non-negative. It reduces to the
-  // no-wrap flags of the step. If that fails, try to refine via SCEV.
+  // no-wrap flags of the step, and addInfoForHeaderInductions has already added
+  // PN >= StartValue for the loop header, which dominates this block.
   const DataLayout &DL = BB.getDataLayout();
-  bool FromFlagsUnsigned =
+  bool MonotonicallyIncreasingUnsigned =
       isMonotonicallyIncreasing(*PN, Backedge, /*IsSigned=*/false, DL);
-  bool FromFlagsSigned =
+  bool MonotonicallyIncreasingSigned =
       isMonotonicallyIncreasing(*PN, Backedge, /*IsSigned=*/true, DL);
-  bool MonotonicallyIncreasingUnsigned = FromFlagsUnsigned;
-  bool MonotonicallyIncreasingSigned = FromFlagsSigned;
-  if (!(MonotonicallyIncreasingUnsigned && MonotonicallyIncreasingSigned)) {
-    const SCEVAddRecExpr *IndAR = cast<SCEVAddRecExpr>(SE.getSCEV(PN));
-    if (!MonotonicallyIncreasingUnsigned)
-      MonotonicallyIncreasingUnsigned =
-          SE.getMonotonicPredicateType(IndAR, CmpInst::ICMP_UGT) ==
-          ScalarEvolution::MonotonicallyIncreasing;
-    if (!MonotonicallyIncreasingSigned)
-      MonotonicallyIncreasingSigned =
-          SE.getMonotonicPredicateType(IndAR, CmpInst::ICMP_SGT) ==
-          ScalarEvolution::MonotonicallyIncreasing;
-  }
-
-  // If the induction is known not to wrap, PN >= StartValue can be added
-  // unconditionally. addInfoForHeaderInductions already added it for the loop
-  // header, which dominates this block, whenever the no-wrap flags prove it.
-  if (MonotonicallyIncreasingUnsigned && !FromFlagsUnsigned)
-    WorkList.push_back(
-        FactOrCheck::getConditionFact(DTN, CmpInst::ICMP_UGE, PN, StartValue));
-  if (MonotonicallyIncreasingSigned && !FromFlagsSigned)
-    WorkList.push_back(
-        FactOrCheck::getConditionFact(DTN, CmpInst::ICMP_SGE, PN, StartValue));
 
   // Make sure AR either steps by 1 or that the value we compare against is a
   // GEP based on the same start value and all offsets are a multiple of the
