@@ -434,6 +434,18 @@ VPExpandSCEVRecipe::VPExpandSCEVRecipe(const SCEV *Expr)
     : VPSingleDefRecipe(VPRecipeBase::VPExpandSCEVSC, {}, Expr->getType()),
       Expr(Expr) {}
 
+/// For call VPInstruction operands, return the called function, or nullptr if
+/// none of the candidate operands is a Function (e.g. for an indirect call).
+/// The function is either the last operand (for unmasked calls) or the
+/// second-to-last operand (for masked calls).
+static Function *tryGetCalledFunction(ArrayRef<VPValue *> Operands) {
+  for (VPValue *Op : reverse(Operands.take_back(2)))
+    if (auto *IRV = dyn_cast<VPIRValue>(Op))
+      if (auto *F = dyn_cast<Function>(IRV->getValue()))
+        return F;
+  return nullptr;
+}
+
 /// For call VPInstruction operands, return the operand index of the called
 /// function. The function is either the last operand (for unmasked calls) or
 /// the second-to-last operand (for masked calls).
@@ -619,6 +631,11 @@ VPInstruction::VPInstruction(unsigned Opcode, ArrayRef<VPValue *> Operands,
           getNumOperandsForOpcode() == getNumOperands() ||
           (isMasked() && getNumOperandsForOpcode() + 1 == getNumOperands())) &&
          "number of operands does not match opcode");
+}
+
+Function *VPInstruction::getCalledFunction() const {
+  assert(getOpcode() == Instruction::Call && "must be a call");
+  return tryGetCalledFunction(operands());
 }
 
 unsigned VPInstruction::getNumOperandsForOpcode() const {
@@ -1653,8 +1670,11 @@ bool VPInstruction::opcodeMayReadOrWriteFromMemory() const {
         Intrinsic::getFnAttributes(Ctx, vputils::getIntrinsicID(this));
     return !Attrs.getMemoryEffects().doesNotAccessMemory();
   }
-  case Instruction::Call:
-    return !getCalledFunction(operands())->doesNotAccessMemory();
+  case Instruction::Call: {
+    // An indirect call may access memory.
+    Function *Callee = getCalledFunction();
+    return !Callee || !Callee->doesNotAccessMemory();
+  }
   default:
     return true;
   }

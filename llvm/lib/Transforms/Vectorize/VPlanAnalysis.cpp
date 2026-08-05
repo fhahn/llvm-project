@@ -12,11 +12,22 @@
 #include "VPlanDominatorTree.h"
 #include "VPlanHelpers.h"
 #include "VPlanPatternMatch.h"
+#include "VPlanUtils.h"
 #include "llvm/ADT/PostOrderIterator.h"
+#include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Analysis/AliasAnalysis.h"
+#include "llvm/Analysis/LoopInfo.h"
+#include "llvm/Analysis/ScalarEvolution.h"
+#include "llvm/Analysis/ScalarEvolutionPatternMatch.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
+#include "llvm/Analysis/VectorUtils.h"
+#include "llvm/IR/Instruction.h"
+#include "llvm/IR/Operator.h"
+#include "llvm/IR/PatternMatch.h"
 
 using namespace llvm;
 using namespace VPlanPatternMatch;
+using namespace SCEVPatternMatch;
 
 #define DEBUG_TYPE "vplan"
 
@@ -336,4 +347,247 @@ SmallVector<VPRegisterUsage, 8> llvm::calculateRegisterUsageForPlan(
   }
 
   return RUs;
+}
+
+//===----------------------------------------------------------------------===//
+// Outer-loop memory safety analysis (VPlan-native).
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// Per-outer-iteration address range [Start, End) of one memory access recipe.
+struct OuterLoopMemAccess {
+  VPValue *Ptr;
+  const SCEV *Start;
+  const SCEV *End;
+  /// Step of Start w.r.t. the outer loop, or nullptr if the address does not
+  /// vary in the outer loop.
+  const SCEV *OuterStep;
+  bool IsStore;
+};
+
+} // end anonymous namespace
+
+/// Compute the per-outer-iteration address range [Start, End) for a pointer
+/// SCEV, using pure SCEV operations. If \p PtrSCEV is an inner-loop AddRec
+/// {Start, +, InnerStep}<inner>, the range is
+/// [Start, Start + InnerMaxBTC*InnerStep + AccessSize). Otherwise the
+/// access is inner-invariant and the range is [Ptr, Ptr + AccessSize).
+/// Returns std::nullopt on failure (e.g. a non-positive inner step would
+/// invert the range under unsigned arithmetic).
+static std::optional<std::pair<const SCEV *, const SCEV *>>
+computeInnerRange(const SCEV *PtrSCEV, const Loop *InnerLoop,
+                  const SCEV *InnerMaxBTC, uint64_t AccessSize,
+                  ScalarEvolution &SE) {
+  // All address arithmetic below is done in the pointer expression's integer
+  // type so that getAddExpr never sees mismatched operand widths (the inner
+  // backedge-taken count and inner step may be narrower, e.g. an i32 inner
+  // counter with i64-width addresses).
+  Type *PtrTy = SE.getEffectiveSCEVType(PtrSCEV->getType());
+  const auto *InnerAR = dyn_cast<SCEVAddRecExpr>(PtrSCEV);
+  if (!InnerAR || InnerAR->getLoop() != InnerLoop || !InnerAR->isAffine())
+    return std::make_pair(
+        PtrSCEV, SE.getAddExpr(PtrSCEV, SE.getConstant(PtrTy, AccessSize)));
+
+  const SCEV *Start = InnerAR->getStart();
+  const SCEV *InnerStep = InnerAR->getStepRecurrence(SE);
+  // The [Start, End) range is computed with unsigned arithmetic. A
+  // non-positive InnerStep would yield End < Start, inverting the range
+  // and making subsequent unsigned predicates spuriously hold. Bail out
+  // unless the step is known strictly positive.
+  if (!SE.isKnownPositive(InnerStep))
+    return std::nullopt;
+  // Compute Span = MaxBTC * InnerStep in the pointer type, zero-extending the
+  // (possibly narrower) backedge-taken count and step so no magnitude is lost
+  // and all operands share the address width. If the backedge-taken count is
+  // wider than the address type (exotic), bail out rather than narrow it.
+  if (SE.getTypeSizeInBits(InnerMaxBTC->getType()) >
+          SE.getTypeSizeInBits(PtrTy) ||
+      SE.getTypeSizeInBits(InnerStep->getType()) > SE.getTypeSizeInBits(PtrTy))
+    return std::nullopt;
+
+  const SCEV *MaxBTC = SE.getNoopOrZeroExtend(InnerMaxBTC, PtrTy);
+  const SCEV *Step = SE.getNoopOrZeroExtend(InnerStep, PtrTy);
+  const SCEV *Span = SE.getMulExpr(MaxBTC, Step);
+  const SCEV *AccessSz = SE.getConstant(PtrTy, AccessSize);
+  return std::make_pair(Start,
+                        SE.getAddExpr(Start, SE.getAddExpr(Span, AccessSz)));
+}
+
+/// Returns true if the base objects of \p PtrA and \p PtrB provably cannot
+/// point to the same object. Mirrors the distinct-underlying-object reasoning
+/// in BasicAAResult::aliasCheck: two distinct underlying objects do not alias
+/// when (a) both are identified objects, or (b) one is an argument and the
+/// other is an identified function-local object (alloca / noalias call /
+/// noalias or byval argument). It is NOT enough for just one base to be a
+/// noalias argument or alloca: such a pointer only guarantees non-aliasing
+/// with pointers not based on it, so the *other* base could be derived from it
+/// via an opaque op (a call or load result) that getUnderlyingObject cannot
+/// trace.
+static bool provablyDistinctObjects(const VPValue *PtrA, const VPValue *PtrB) {
+  // Use the VPlan-level base pointers rather than reaching into the underlying
+  // IR for AA.
+  auto GetIRBase = [](const VPValue *Ptr) -> const Value * {
+    // Follow a chain of GEP recipes to the base pointer.
+    while (auto *VPI =
+               dyn_cast_or_null<VPInstruction>(Ptr->getDefiningRecipe())) {
+      if (VPI->getOpcode() != Instruction::GetElementPtr)
+        break;
+      Ptr = VPI->getOperand(0);
+    }
+    const auto *IRV = dyn_cast<VPIRValue>(Ptr);
+    return IRV ? IRV->getValue() : nullptr;
+  };
+  // An argument is not "based on" a distinct identified function-local object,
+  // so the two cannot alias.
+  const Value *ObjA = GetIRBase(PtrA);
+  const Value *ObjB = GetIRBase(PtrB);
+  if (!ObjA || !ObjB || ObjA == ObjB)
+    return false;
+  return (isIdentifiedObject(ObjA) && isIdentifiedObject(ObjB)) ||
+         (isa<Argument>(ObjA) && isIdentifiedFunctionLocal(ObjB)) ||
+         (isa<Argument>(ObjB) && isIdentifiedFunctionLocal(ObjA));
+}
+
+bool llvm::verifyOuterLoopMemorySafety(VPlan &Plan,
+                                       PredicatedScalarEvolution &PSE,
+                                       Loop *OuterLoop) {
+  ScalarEvolution &SE = *PSE.getSE();
+  const DataLayout &DL = Plan.getDataLayout();
+
+  // We only handle single-level nesting (outer loop with one inner loop). For
+  // deeper nests, an access that varies in a loop nested inside InnerLoop has
+  // an address AddRec for that loop, as SCEV nests the innermost loop
+  // outermost. No outer-loop start recurrence can be extracted from it below,
+  // so such a nest is rejected; accesses invariant in the deeper loops are
+  // analyzed as usual.
+  ArrayRef<Loop *> SubLoops = OuterLoop->getSubLoops();
+  if (SubLoops.size() != 1)
+    return false;
+  Loop *InnerLoop = SubLoops.front();
+
+  // The address ranges below use a single inner-loop bound for every outer
+  // iteration, so that bound must not vary with the outer loop. (Inner loops
+  // with a non-uniform trip count are already rejected by legality, as
+  // outer-loop vectorization runs the inner loop once for all lanes.)
+  const SCEV *InnerMaxBTC = SE.getSymbolicMaxBackedgeTakenCount(InnerLoop);
+  if (isa<SCEVCouldNotCompute>(InnerMaxBTC) ||
+      !SE.isLoopInvariant(InnerMaxBTC, OuterLoop))
+    return false;
+
+  SmallVector<OuterLoopMemAccess, 8> Accesses;
+
+  // Walk VPlan recipes. All structural decisions come from recipe opcodes
+  // and VPValue operands; SCEV lookups go through getSCEVExprForVPValue.
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_deep(Plan.getEntry()))) {
+    for (VPRecipeBase &R : *VPBB) {
+      auto *VPI = dyn_cast<VPInstruction>(&R);
+      if (!VPI)
+        continue;
+
+      unsigned Opcode = VPI->getOpcode();
+      VPValue *PtrOp = nullptr;
+      Type *AccessTy = nullptr;
+      bool IsStore = false;
+      if (Opcode == Instruction::Load) {
+        PtrOp = VPI->getOperand(0);
+        AccessTy = VPI->getScalarType();
+      } else if (Opcode == Instruction::Store) {
+        PtrOp = VPI->getOperand(1);
+        AccessTy = VPI->getOperand(0)->getScalarType();
+        IsStore = true;
+      } else {
+        // Only calls to trivially vectorizable intrinsics can be widened.
+        if (Opcode == Instruction::Call) {
+          Function *Callee = VPI->getCalledFunction();
+          if (!Callee || !isTriviallyVectorizable(Callee->getIntrinsicID()))
+            return false;
+        }
+        // Any other recipe accessing memory (atomicrmw, cmpxchg, fence, memory
+        // intrinsics) is not covered by the load/store dependency reasoning
+        // below and cannot be widened while preserving its semantics.
+        if (VPI->mayReadOrWriteMemory())
+          return false;
+        continue;
+      }
+
+      // Volatility and atomicity are not modeled on recipes at all, so this
+      // has to come from the underlying load/store.
+      auto *UI = dyn_cast_or_null<Instruction>(VPI->getUnderlyingValue());
+      if (UI && (UI->isVolatile() || UI->isAtomic()))
+        return false;
+
+      const SCEV *PtrSCEV =
+          vputils::getSCEVExprForVPValue(PtrOp, PSE, OuterLoop);
+      if (isa<SCEVCouldNotCompute>(PtrSCEV))
+        return false;
+
+      uint64_t AccessSize = DL.getTypeStoreSize(AccessTy);
+      auto Range =
+          computeInnerRange(PtrSCEV, InnerLoop, InnerMaxBTC, AccessSize, SE);
+      if (!Range)
+        return false;
+
+      auto [Start, End] = *Range;
+      // Extract the outer step from Start; for a[i*M+j], Start takes the form
+      // {base, +, OuterStep}<outer>.
+      const SCEV *OuterStep = nullptr;
+      match(Start, m_scev_AffineAddRec(m_SCEV(), m_SCEV(OuterStep),
+                                       m_SpecificLoop(OuterLoop)));
+      LLVM_DEBUG(dbgs() << "LV: outer-loop access " << *PtrSCEV
+                        << " IsStore=" << IsStore << " range [" << *Start
+                        << ", " << *End << ")\n");
+
+      // Stores must have an outer-loop-dependent address; otherwise they
+      // WAW across outer iterations.
+      if (!OuterStep && IsStore)
+        return false;
+
+      Accesses.push_back({PtrOp, Start, End, OuterStep, IsStore});
+    }
+  }
+
+  if (none_of(Accesses, [](const OuterLoopMemAccess &A) { return A.IsStore; }))
+    return true;
+
+  for (const auto &[I, A] : enumerate(Accesses)) {
+    for (const OuterLoopMemAccess &B : ArrayRef(Accesses).drop_front(I)) {
+      if (!A.IsStore && !B.IsStore)
+        continue;
+
+      if (provablyDistinctObjects(A.Ptr, B.Ptr))
+        continue;
+
+      if (!A.OuterStep || !B.OuterStep)
+        return false;
+
+      // Adjacent-iteration non-overlap:
+      //   EndA(i) <= StartB(i+1) = StartB(i) + OuterStepB
+      //   EndB(i) <= StartA(i+1) = StartA(i) + OuterStepA
+      const SCEV *NextStartA = SE.getAddExpr(A.Start, A.OuterStep);
+      const SCEV *NextStartB = SE.getAddExpr(B.Start, B.OuterStep);
+      if (!SE.isKnownPredicate(ICmpInst::ICMP_ULE, A.End, NextStartB) ||
+          !SE.isKnownPredicate(ICmpInst::ICMP_ULE, B.End, NextStartA))
+        return false;
+
+      // Monotonicity: extend the adjacent-iteration non-overlap to all
+      // iteration distances. Inbounds asserts the final pointer stays in
+      // the allocation but does not imply unsigned ordering of successive
+      // Start values, so rely on SCEV's nowrap-based reasoning instead:
+      // require the Start AddRec to have nuw (no unsigned wrap when
+      // adding the outer step) and the outer step to be non-negative.
+      auto IsMonotonic = [&](const SCEV *Start, const SCEV *Step) {
+        const auto *AR = dyn_cast<SCEVAddRecExpr>(Start);
+        if (!AR || AR->getLoop() != OuterLoop || !AR->hasNoUnsignedWrap())
+          return false;
+        return SE.isKnownNonNegative(Step);
+      };
+      if (!IsMonotonic(A.Start, A.OuterStep) ||
+          !IsMonotonic(B.Start, B.OuterStep))
+        return false;
+    }
+  }
+
+  return true;
 }

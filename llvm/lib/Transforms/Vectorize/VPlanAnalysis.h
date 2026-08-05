@@ -30,6 +30,14 @@ struct VPCostContext;
 void collectEphemeralRecipesForVPlan(VPlan &Plan,
                                      DenseSet<VPRecipeBase *> &EphRecipes);
 
+/// Verify that the recipes of the outer-loop VPlan \p Plan for IR loop
+/// \p OuterLoop have no cross-iteration memory hazards and use only
+/// instructions that can be widened for vectorization. Operates on VPlan
+/// recipes: inspects recipe opcodes and VPValue operands, and uses
+/// getSCEVExprForVPValue for pointer SCEVs. Returns true if the plan is safe.
+bool verifyOuterLoopMemorySafety(VPlan &Plan, PredicatedScalarEvolution &PSE,
+                                 Loop *OuterLoop);
+
 /// A struct that represents some properties of the register usage
 /// of a loop.
 struct VPRegisterUsage {
