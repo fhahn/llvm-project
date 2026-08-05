@@ -5,9 +5,13 @@
 ; a runtime check between them.
 define void @unknown_dependence_between_pointer_phis(ptr %a, i64 %n, i64 %k, i1 %c) {
 ; CHECK-LABEL: 'unknown_dependence_between_pointer_phis'
-; CHECK:         Memory dependences are safe{{$}}
+; CHECK:         Memory dependences are safe with run-time checks
 ; CHECK:         Run-time memory checks:
-; CHECK-NEXT:    Grouped accesses:
+; CHECK-NEXT:    Check 0:
+; CHECK-NEXT:      Comparing group GRP0:
+; CHECK-NEXT:        %gep = getelementptr i32, ptr %a, i64 %iv
+; CHECK-NEXT:      Against group GRP1:
+; CHECK-NEXT:        %gep.k = getelementptr i32, ptr %a, i64 %iv.k
 ;
 entry:
   br label %loop.header
