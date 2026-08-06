@@ -176,4 +176,41 @@ TEST(ConstraintSolverTest, IsConditionImpliedOverflow) {
   addVariableRow(CS, {Limit - 1, Limit - 2, Limit - 3});
   EXPECT_FALSE(isConditionImplied(CS, {Limit - 1, Limit - 2, Limit - 3}));
 }
+
+TEST(ConstraintSolverTest, LargeVariableIndex) {
+  // A variable index that does not fit in 16 bits must not be truncated, as
+  // that would record the constraint against an unrelated variable. Such
+  // indices are reachable in practice, e.g. for a function with more than
+  // 65535 arguments.
+  constexpr unsigned BigIdx = 65537;
+  // The index BigIdx aliases when truncated to 16 bits.
+  constexpr unsigned AliasIdx = BigIdx & 0xffff;
+  static_assert(AliasIdx == 1, "expected BigIdx to alias variable 1");
+
+  // Build the rows directly rather than via addVariableRow, to avoid dense
+  // coefficient vectors with 65538 entries.
+  ConstraintSystem CS;
+  // v[BigIdx] <= 4
+  RowTy Row = {{4, 0}, {1, BigIdx}};
+  ASSERT_TRUE(CS.addRow(Row, BigIdx));
+
+  // The coefficient must be recorded for BigIdx, not for AliasIdx.
+  const RowTy &Last = CS.getLastConstraint();
+  ASSERT_EQ(Last.size(), 2u);
+  EXPECT_EQ(Last[1].Id, BigIdx);
+  EXPECT_EQ(Last[1].Coefficient, 1);
+
+  // The system does not constrain v[AliasIdx], so v[AliasIdx] <= 4 must not be
+  // implied.
+  RowTy AliasQuery = {{4, 0}, {1, AliasIdx}};
+  EXPECT_FALSE(CS.isConditionImplied(AliasQuery));
+  EXPECT_FALSE(CS.isConditionImpliedInSubSystem(AliasQuery));
+
+  // v[BigIdx] <= 4 is implied, v[BigIdx] <= 3 is not.
+  EXPECT_TRUE(CS.isConditionImplied(Row));
+  EXPECT_TRUE(CS.isConditionImpliedInSubSystem(Row));
+  Row[0].Coefficient = 3;
+  EXPECT_FALSE(CS.isConditionImplied(Row));
+  EXPECT_FALSE(CS.isConditionImpliedInSubSystem(Row));
+}
 } // namespace
