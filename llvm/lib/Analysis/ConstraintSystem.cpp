@@ -92,7 +92,7 @@ bool ConstraintSystem::eliminateUsingFM() {
         // Starts with index 0 and updates every coefficients.
         int64_t UpperV = 0;
         int64_t LowerV = 0;
-        uint16_t CurrentId = std::numeric_limits<uint16_t>::max();
+        unsigned CurrentId = std::numeric_limits<unsigned>::max();
         if (IdxUpper < UpperRow.size()) {
           CurrentId = std::min(UpperRow[IdxUpper].Id, CurrentId);
         }

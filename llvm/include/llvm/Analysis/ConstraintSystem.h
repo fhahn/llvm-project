@@ -24,17 +24,24 @@ class ConstraintSystem {
 public:
   struct Entry {
     int64_t Coefficient;
-    uint16_t Id;
+    /// Index of the variable this coefficient belongs to, matching the values
+    /// of Value2Index below. Must be able to hold any index in Value2Index; a
+    /// narrower type would silently alias distinct variables.
+    unsigned Id;
 
-    Entry(int64_t Coefficient, uint16_t Id)
+    Entry(int64_t Coefficient, unsigned Id)
         : Coefficient(Coefficient), Id(Id) {}
   };
+  // Widening Id from 16 to 32 bits is free, as Coefficient forces the struct to
+  // be padded to a multiple of its own alignment either way.
+  static_assert(sizeof(Entry) == sizeof(int64_t) + alignof(int64_t),
+                "Entry is densely allocated, keep it small");
 
   /// A single constraint of the form 'c >= v1 * c1 + ... + vn * cn'.
   using RowTy = SmallVector<Entry, 8>;
 
 private:
-  static int64_t getLastCoefficient(ArrayRef<Entry> R, uint16_t Id) {
+  static int64_t getLastCoefficient(ArrayRef<Entry> R, unsigned Id) {
     if (R.empty() || R.back().Id != Id)
       return 0;
     return R.back().Coefficient;
