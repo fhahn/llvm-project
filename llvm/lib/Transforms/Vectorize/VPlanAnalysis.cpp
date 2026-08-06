@@ -355,7 +355,17 @@ SmallVector<VPRegisterUsage, 8> llvm::calculateRegisterUsageForPlan(
 
 namespace {
 
-/// Per-outer-iteration address range [Start, End) of one memory access recipe.
+/// Per-outer-iteration address range [Start, End) of a memory access, plus the
+/// step of its address w.r.t. the inner loop.
+struct InnerRange {
+  const SCEV *Start;
+  const SCEV *End;
+  /// Step of the address AddRec w.r.t. the inner loop, in bytes, or nullptr if
+  /// the address does not vary in the inner loop.
+  const SCEV *InnerStep;
+};
+
+/// Per-outer-iteration address range of one memory access recipe.
 struct OuterLoopMemAccess {
   VPValue *Ptr;
   const SCEV *Start;
@@ -363,6 +373,11 @@ struct OuterLoopMemAccess {
   /// Step of Start w.r.t. the outer loop, or nullptr if the address does not
   /// vary in the outer loop.
   const SCEV *OuterStep;
+  /// Step of the address w.r.t. the inner loop, or nullptr if the address does
+  /// not vary in the inner loop.
+  const SCEV *InnerStep;
+  /// Number of bytes accessed, i.e. the store size of the accessed type.
+  uint64_t AccessSize;
   bool IsStore;
 };
 
@@ -375,10 +390,11 @@ struct OuterLoopMemAccess {
 /// access is inner-invariant and the range is [Ptr, Ptr + AccessSize).
 /// Returns std::nullopt on failure (e.g. a non-positive inner step would
 /// invert the range under unsigned arithmetic).
-static std::optional<std::pair<const SCEV *, const SCEV *>>
-computeInnerRange(const SCEV *PtrSCEV, const Loop *InnerLoop,
-                  const SCEV *InnerMaxBTC, uint64_t AccessSize,
-                  ScalarEvolution &SE) {
+static std::optional<InnerRange> computeInnerRange(const SCEV *PtrSCEV,
+                                                   const Loop *InnerLoop,
+                                                   const SCEV *InnerMaxBTC,
+                                                   uint64_t AccessSize,
+                                                   ScalarEvolution &SE) {
   // All address arithmetic below is done in the pointer expression's integer
   // type so that getAddExpr never sees mismatched operand widths (the inner
   // backedge-taken count and inner step may be narrower, e.g. an i32 inner
@@ -386,8 +402,9 @@ computeInnerRange(const SCEV *PtrSCEV, const Loop *InnerLoop,
   Type *PtrTy = SE.getEffectiveSCEVType(PtrSCEV->getType());
   const auto *InnerAR = dyn_cast<SCEVAddRecExpr>(PtrSCEV);
   if (!InnerAR || InnerAR->getLoop() != InnerLoop || !InnerAR->isAffine())
-    return std::make_pair(
-        PtrSCEV, SE.getAddExpr(PtrSCEV, SE.getConstant(PtrTy, AccessSize)));
+    return InnerRange{PtrSCEV,
+                      SE.getAddExpr(PtrSCEV, SE.getConstant(PtrTy, AccessSize)),
+                      nullptr};
 
   const SCEV *Start = InnerAR->getStart();
   const SCEV *InnerStep = InnerAR->getStepRecurrence(SE);
@@ -395,8 +412,19 @@ computeInnerRange(const SCEV *PtrSCEV, const Loop *InnerLoop,
   // non-positive InnerStep would yield End < Start, inverting the range
   // and making subsequent unsigned predicates spuriously hold. Bail out
   // unless the step is known strictly positive.
-  if (!SE.isKnownPositive(InnerStep))
-    return std::nullopt;
+  //
+  // For a symbolic step such as 4*%M, isKnownPositive fails because the product
+  // may overflow for very large %M, even though the guarded form knows %M >= 1.
+  // The byte step is a product of a positive constant (the access size) and the
+  // index step, so it is positive iff the index step is: strip the constant
+  // factor and prove the rest positive via the inner loop's guards.
+  if (!SE.isKnownPositive(InnerStep)) {
+    const auto *Mul = dyn_cast<SCEVMulExpr>(InnerStep);
+    if (!Mul || Mul->getNumOperands() != 2 ||
+        !SE.isKnownPositive(Mul->getOperand(0)) ||
+        !SE.isKnownPositive(SE.applyLoopGuards(Mul->getOperand(1), InnerLoop)))
+      return std::nullopt;
+  }
   // Compute Span = MaxBTC * InnerStep in the pointer type, zero-extending the
   // (possibly narrower) backedge-taken count and step so no magnitude is lost
   // and all operands share the address width. If the backedge-taken count is
@@ -410,8 +438,8 @@ computeInnerRange(const SCEV *PtrSCEV, const Loop *InnerLoop,
   const SCEV *Step = SE.getNoopOrZeroExtend(InnerStep, PtrTy);
   const SCEV *Span = SE.getMulExpr(MaxBTC, Step);
   const SCEV *AccessSz = SE.getConstant(PtrTy, AccessSize);
-  return std::make_pair(Start,
-                        SE.getAddExpr(Start, SE.getAddExpr(Span, AccessSz)));
+  return InnerRange{Start, SE.getAddExpr(Start, SE.getAddExpr(Span, AccessSz)),
+                    InnerStep};
 }
 
 /// Returns true if the base objects of \p PtrA and \p PtrB provably cannot
@@ -449,9 +477,45 @@ static bool provablyDistinctObjects(const VPValue *PtrA, const VPValue *PtrB) {
          (isa<Argument>(ObjB) && isIdentifiedFunctionLocal(ObjA));
 }
 
-bool llvm::verifyOuterLoopMemorySafety(VPlan &Plan,
-                                       PredicatedScalarEvolution &PSE,
-                                       Loop *OuterLoop) {
+/// If \p A and \p B are the same interleaved access pattern, return the maximum
+/// vectorization factor for which their lanes are guaranteed to be distinct.
+///
+/// Outer-loop vectorization with factor VF runs VF adjacent outer iterations as
+/// lanes of one vector iteration, and vector iterations execute in program
+/// order. For an address {{base,+,OuterStep}<outer>,+,InnerStep}<inner>, lane l
+/// at inner iteration j touches offset l*OuterStep + j*InnerStep, so two lanes
+/// collide only if InnerStep < OuterStep*VF, i.e. the access is collision-free
+/// for all VF <= InnerStep/OuterStep. This certifies the column-major
+/// A[i + j*M] pattern, which the whole-range overlap test rejects.
+///
+/// This requires \p A and \p B to share the same address recurrence, so their
+/// addresses coincide only within a lane at equal offsets, where program order
+/// is preserved. OuterStep must be at least both access sizes, as adjacent
+/// lanes are only OuterStep bytes apart, and inbounds keeps all offsets inside
+/// a single object, so the reasoning above holds in exact arithmetic.
+static std::optional<unsigned> getLaneDistinctMaxVF(const OuterLoopMemAccess &A,
+                                                    const OuterLoopMemAccess &B,
+                                                    ScalarEvolution &SE) {
+  const auto *OuterStep = dyn_cast<SCEVConstant>(A.OuterStep);
+  if (!A.InnerStep || A.InnerStep != B.InnerStep || A.Start != B.Start ||
+      !OuterStep || !OuterStep->getAPInt().isStrictlyPositive() ||
+      OuterStep->getAPInt().ult(A.AccessSize) ||
+      OuterStep->getAPInt().ult(B.AccessSize) ||
+      !vputils::getGEPFlagsForPtr(A.Ptr).isInBounds() ||
+      !vputils::getGEPFlagsForPtr(B.Ptr).isInBounds())
+    return std::nullopt;
+
+  // The ratio is rounded down, which only lowers the bound.
+  const auto *Ratio =
+      dyn_cast<SCEVConstant>(SE.getUDivExpr(A.InnerStep, OuterStep));
+  if (!Ratio || !Ratio->getAPInt().ugt(1))
+    return std::nullopt;
+  return Ratio->getAPInt().getLimitedValue(MaxSafeVFUnbounded);
+}
+
+std::optional<unsigned>
+llvm::verifyOuterLoopMemorySafety(VPlan &Plan, PredicatedScalarEvolution &PSE,
+                                  Loop *OuterLoop) {
   ScalarEvolution &SE = *PSE.getSE();
   const DataLayout &DL = Plan.getDataLayout();
 
@@ -463,7 +527,7 @@ bool llvm::verifyOuterLoopMemorySafety(VPlan &Plan,
   // analyzed as usual.
   ArrayRef<Loop *> SubLoops = OuterLoop->getSubLoops();
   if (SubLoops.size() != 1)
-    return false;
+    return std::nullopt;
   Loop *InnerLoop = SubLoops.front();
 
   // The address ranges below use a single inner-loop bound for every outer
@@ -473,7 +537,7 @@ bool llvm::verifyOuterLoopMemorySafety(VPlan &Plan,
   const SCEV *InnerMaxBTC = SE.getSymbolicMaxBackedgeTakenCount(InnerLoop);
   if (isa<SCEVCouldNotCompute>(InnerMaxBTC) ||
       !SE.isLoopInvariant(InnerMaxBTC, OuterLoop))
-    return false;
+    return std::nullopt;
 
   SmallVector<OuterLoopMemAccess, 8> Accesses;
 
@@ -502,13 +566,13 @@ bool llvm::verifyOuterLoopMemorySafety(VPlan &Plan,
         if (Opcode == Instruction::Call) {
           Function *Callee = VPI->getCalledFunction();
           if (!Callee || !isTriviallyVectorizable(Callee->getIntrinsicID()))
-            return false;
+            return std::nullopt;
         }
         // Any other recipe accessing memory (atomicrmw, cmpxchg, fence, memory
         // intrinsics) is not covered by the load/store dependency reasoning
         // below and cannot be widened while preserving its semantics.
         if (VPI->mayReadOrWriteMemory())
-          return false;
+          return std::nullopt;
         continue;
       }
 
@@ -516,20 +580,20 @@ bool llvm::verifyOuterLoopMemorySafety(VPlan &Plan,
       // has to come from the underlying load/store.
       auto *UI = dyn_cast_or_null<Instruction>(VPI->getUnderlyingValue());
       if (UI && (UI->isVolatile() || UI->isAtomic()))
-        return false;
+        return std::nullopt;
 
       const SCEV *PtrSCEV =
           vputils::getSCEVExprForVPValue(PtrOp, PSE, OuterLoop);
       if (isa<SCEVCouldNotCompute>(PtrSCEV))
-        return false;
+        return std::nullopt;
 
       uint64_t AccessSize = DL.getTypeStoreSize(AccessTy);
       auto Range =
           computeInnerRange(PtrSCEV, InnerLoop, InnerMaxBTC, AccessSize, SE);
       if (!Range)
-        return false;
+        return std::nullopt;
 
-      auto [Start, End] = *Range;
+      auto [Start, End, InnerStep] = *Range;
       // Extract the outer step from Start; for a[i*M+j], Start takes the form
       // {base, +, OuterStep}<outer>.
       const SCEV *OuterStep = nullptr;
@@ -542,14 +606,22 @@ bool llvm::verifyOuterLoopMemorySafety(VPlan &Plan,
       // Stores must have an outer-loop-dependent address; otherwise they
       // WAW across outer iterations.
       if (!OuterStep && IsStore)
-        return false;
+        return std::nullopt;
 
-      Accesses.push_back({PtrOp, Start, End, OuterStep, IsStore});
+      Accesses.push_back(
+          {PtrOp, Start, End, OuterStep, InnerStep, AccessSize, IsStore});
     }
   }
 
   if (none_of(Accesses, [](const OuterLoopMemAccess &A) { return A.IsStore; }))
-    return true;
+    return MaxSafeVFUnbounded;
+
+  // The largest VF for which every access pair is proven safe. Pairs proven
+  // safe regardless of VF (via the whole-range / distinct-base reasoning) leave
+  // this unbounded; a pair proven safe only via lane-distinctness lowers it to
+  // the inner stride (in elements), since that interleaving stays
+  // collision-free only while VF <= inner-stride.
+  unsigned GlobalMaxSafeVF = MaxSafeVFUnbounded;
 
   for (const auto &[I, A] : enumerate(Accesses)) {
     for (const OuterLoopMemAccess &B : ArrayRef(Accesses).drop_front(I)) {
@@ -560,7 +632,17 @@ bool llvm::verifyOuterLoopMemorySafety(VPlan &Plan,
         continue;
 
       if (!A.OuterStep || !B.OuterStep)
-        return false;
+        return std::nullopt;
+
+      // Lane-distinctness: accesses interleaved across the lanes of a vector
+      // iteration are safe up to a bounded factor.
+      if (std::optional<unsigned> MaxVF = getLaneDistinctMaxVF(A, B, SE)) {
+        LLVM_DEBUG(
+            dbgs() << "LV: lane-distinct interleaved access, max safe VF="
+                   << *MaxVF << "\n");
+        GlobalMaxSafeVF = std::min(GlobalMaxSafeVF, *MaxVF);
+        continue;
+      }
 
       // Adjacent-iteration non-overlap:
       //   EndA(i) <= StartB(i+1) = StartB(i) + OuterStepB
@@ -569,7 +651,7 @@ bool llvm::verifyOuterLoopMemorySafety(VPlan &Plan,
       const SCEV *NextStartB = SE.getAddExpr(B.Start, B.OuterStep);
       if (!SE.isKnownPredicate(ICmpInst::ICMP_ULE, A.End, NextStartB) ||
           !SE.isKnownPredicate(ICmpInst::ICMP_ULE, B.End, NextStartA))
-        return false;
+        return std::nullopt;
 
       // Monotonicity: extend the adjacent-iteration non-overlap to all
       // iteration distances. Inbounds asserts the final pointer stays in
@@ -585,9 +667,9 @@ bool llvm::verifyOuterLoopMemorySafety(VPlan &Plan,
       };
       if (!IsMonotonic(A.Start, A.OuterStep) ||
           !IsMonotonic(B.Start, B.OuterStep))
-        return false;
+        return std::nullopt;
     }
   }
 
-  return true;
+  return GlobalMaxSafeVF;
 }

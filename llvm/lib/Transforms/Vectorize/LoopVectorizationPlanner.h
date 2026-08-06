@@ -25,6 +25,7 @@
 #define LLVM_TRANSFORMS_VECTORIZE_LOOPVECTORIZATIONPLANNER_H
 
 #include "VPlan.h"
+#include "VPlanAnalysis.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Support/InstructionCost.h"
@@ -869,6 +870,12 @@ class LoopVectorizationPlanner {
   OptimizationRemarkEmitter *ORE;
 
   SmallVector<VPlanPtr, 4> VPlans;
+
+  /// For outer-loop vectorization, the maximum vectorization factor (in lanes)
+  /// proven memory-safe by verifyOuterLoopMemorySafety, which plan() uses to
+  /// clamp the outer-loop VF. MaxSafeVFUnbounded if safety does not depend on
+  /// the factor, if the check is disabled, or for inner loops.
+  unsigned OuterLoopMaxSafeVF = MaxSafeVFUnbounded;
 
   /// Profitable vector factors.
   SmallVector<VectorizationFactor, 8> ProfitableVFs;

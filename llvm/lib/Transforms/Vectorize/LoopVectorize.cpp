@@ -5576,6 +5576,27 @@ void LoopVectorizationPlanner::plan(ElementCount UserVF, unsigned UserIC) {
     // plan for that VF only.
     ElementCount VF =
         MaxFactors.FixedVF ? MaxFactors.FixedVF : MaxFactors.ScalableVF;
+
+    // Clamp the VF to the maximum factor proven memory-safe by the outer-loop
+    // memory-safety check. A finite bound comes from interleaved accesses that
+    // stay collision-free only while VF <= the bound (e.g. column-major
+    // A[i + j*M], safe for VF <= M). A scalable VF cannot be used with a finite
+    // bound, as its runtime lane count vscale*N is not known to stay below it.
+    if (OuterLoopMaxSafeVF != MaxSafeVFUnbounded) {
+      unsigned MaxSafeVF = llvm::bit_floor(OuterLoopMaxSafeVF);
+      if (VF.isScalable() || MaxSafeVF < 2) {
+        LLVM_DEBUG(dbgs() << "LV: cannot use VF " << VF
+                          << " for outer loop requiring VF <= "
+                          << OuterLoopMaxSafeVF << "; not vectorizing.\n");
+        return;
+      }
+      if (VF.getFixedValue() > MaxSafeVF) {
+        LLVM_DEBUG(dbgs() << "LV: clamping outer-loop VF from " << VF << " to "
+                          << MaxSafeVF << " for memory safety.\n");
+        VF = ElementCount::getFixed(MaxSafeVF);
+      }
+    }
+
     buildVPlans(*VPlan1, VF, VF);
     LLVM_DEBUG(printPlans(dbgs()));
     return;
@@ -6649,14 +6670,21 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
                    LAI->getSymbolicStrides(), VPDT);
 
   // Check memory safety for outer loop vectorization. Can be bypassed with
-  // -disable-outer-loop-memory-safety-check for expert use.
-  if (!IsInnerLoop && !DisableOuterLoopMemorySafetyCheck &&
-      !verifyOuterLoopMemorySafety(*VPlan0, PSE, OrigLoop)) {
-    reportVectorizationFailure(
-        "Unsafe memory dependencies in outer loop",
-        "cannot vectorize outer loop with unsafe memory dependencies",
-        "UnsafeMemDepsOuterLoop", ORE, OrigLoop);
-    return nullptr;
+  // -disable-outer-loop-memory-safety-check for expert use. The check returns
+  // the maximum memory-safe vectorization factor (UINT_MAX if unconstrained);
+  // std::nullopt means the loop is unsafe at any factor. plan() clamps the
+  // chosen outer-loop VF to this bound.
+  if (!IsInnerLoop && !DisableOuterLoopMemorySafetyCheck) {
+    std::optional<unsigned> MaxSafeVF =
+        verifyOuterLoopMemorySafety(*VPlan0, PSE, OrigLoop);
+    if (!MaxSafeVF) {
+      reportVectorizationFailure(
+          "Unsafe memory dependencies in outer loop",
+          "cannot vectorize outer loop with unsafe memory dependencies",
+          "UnsafeMemDepsOuterLoop", ORE, OrigLoop);
+      return nullptr;
+    }
+    OuterLoopMaxSafeVF = *MaxSafeVF;
   }
 
   // Add surviving induction predicates to PSE and check constraints.

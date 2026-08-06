@@ -30,13 +30,24 @@ struct VPCostContext;
 void collectEphemeralRecipesForVPlan(VPlan &Plan,
                                      DenseSet<VPRecipeBase *> &EphRecipes);
 
+/// Value returned by verifyOuterLoopMemorySafety when memory safety does not
+/// depend on the vectorization factor.
+constexpr unsigned MaxSafeVFUnbounded = std::numeric_limits<unsigned>::max();
+
 /// Verify that the recipes of the outer-loop VPlan \p Plan for IR loop
 /// \p OuterLoop have no cross-iteration memory hazards and use only
 /// instructions that can be widened for vectorization. Operates on VPlan
 /// recipes: inspects recipe opcodes and VPValue operands, and uses
-/// getSCEVExprForVPValue for pointer SCEVs. Returns true if the plan is safe.
-bool verifyOuterLoopMemorySafety(VPlan &Plan, PredicatedScalarEvolution &PSE,
-                                 Loop *OuterLoop);
+/// getSCEVExprForVPValue for pointer SCEVs.
+///
+/// \returns std::nullopt if the plan is unsafe to vectorize at any factor.
+/// Otherwise returns the maximum vectorization factor (in lanes) for which the
+/// plan is safe: MaxSafeVFUnbounded when safety does not depend on the factor,
+/// or a finite bound for interleaved accesses that only stay collision-free
+/// while the factor does not exceed their inner stride.
+std::optional<unsigned>
+verifyOuterLoopMemorySafety(VPlan &Plan, PredicatedScalarEvolution &PSE,
+                            Loop *OuterLoop);
 
 /// A struct that represents some properties of the register usage
 /// of a loop.
