@@ -130,6 +130,18 @@ enum : unsigned {
   INVALID_MEMORYACCESS_ID = -1U
 };
 
+/// Return true if \p F contains an instruction that MemorySSA may model as a
+/// MemoryDef, or a memory intrinsic. This is a cheap conservative scan over the
+/// instructions of \p F that lets passes which can only act on memory writes
+/// bail out before requesting MemorySSA (and any other analysis they need).
+///
+/// MemorySSA models an instruction as a MemoryDef when alias analysis reports
+/// Mod for it, which implies Instruction::mayWriteToMemory(), or when it is a
+/// load or store that is not unordered, which implies Instruction::isAtomic().
+/// Memory intrinsics are additionally checked explicitly, so that the answer
+/// does not depend on the memory attributes of the call site.
+LLVM_ABI bool mayWriteToMemory(const Function &F);
+
 template <class T> class memoryaccess_def_iterator_base;
 using memoryaccess_def_iterator = memoryaccess_def_iterator_base<MemoryAccess>;
 using const_memoryaccess_def_iterator =

@@ -33,6 +33,7 @@
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
@@ -2365,6 +2366,13 @@ struct DOTGraphTraits<DOTFuncMSSAInfo *> : public DefaultDOTGraphTraits {
 } // namespace llvm
 
 AnalysisKey MemorySSAAnalysis::Key;
+
+bool llvm::mayWriteToMemory(const Function &F) {
+  for (const Instruction &I : instructions(F))
+    if (I.mayWriteToMemory() || I.isAtomic() || isa<MemIntrinsic>(&I))
+      return true;
+  return false;
+}
 
 MemorySSAAnalysis::Result MemorySSAAnalysis::run(Function &F,
                                                  FunctionAnalysisManager &AM) {

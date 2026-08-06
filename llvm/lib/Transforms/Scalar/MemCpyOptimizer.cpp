@@ -2231,6 +2231,14 @@ bool MemCpyOptPass::iterateOnFunction(Function &F) {
 }
 
 PreservedAnalyses MemCpyOptPass::run(Function &F, FunctionAnalysisManager &AM) {
+  // Every transform this pass performs starts from a store, a memory intrinsic,
+  // or a call argument fed by a memcpy (see iterateOnFunction). None of those
+  // can exist in a function without a memory write, so bail out before
+  // requesting MemorySSA and the post-dominator tree, which such a function may
+  // not need at all.
+  if (!mayWriteToMemory(F))
+    return PreservedAnalyses::all();
+
   auto &TLI = AM.getResult<TargetLibraryAnalysis>(F);
   auto *AA = &AM.getResult<AAManager>(F);
   auto *AC = &AM.getResult<AssumptionAnalysis>(F);

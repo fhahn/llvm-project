@@ -2825,6 +2825,14 @@ static bool eliminateDeadStores(Function &F, AliasAnalysis &AA, MemorySSA &MSSA,
 // DSE Pass
 //===----------------------------------------------------------------------===//
 PreservedAnalyses DSEPass::run(Function &F, FunctionAnalysisManager &AM) {
+  // eliminateDeadStores() only ever removes instructions reachable from
+  // DSEState::MemDefs, which collects MemorySSA MemoryDefs, or (in
+  // eliminateRedundantStoresViaDominatingConditions) StoreInsts. A function
+  // without a memory write has neither, so bail out before requesting
+  // MemorySSA and the post-dominator tree.
+  if (!mayWriteToMemory(F))
+    return PreservedAnalyses::all();
+
   AliasAnalysis &AA = AM.getResult<AAManager>(F);
   const TargetLibraryInfo &TLI = AM.getResult<TargetLibraryAnalysis>(F);
   DominatorTree &DT = AM.getResult<DominatorTreeAnalysis>(F);

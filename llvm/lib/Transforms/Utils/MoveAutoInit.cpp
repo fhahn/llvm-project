@@ -219,6 +219,11 @@ static bool runMoveAutoInit(Function &F, DominatorTree &DT, MemorySSA &MSSA) {
 
 PreservedAnalyses MoveAutoInitPass::run(Function &F,
                                         FunctionAnalysisManager &AM) {
+  // runMoveAutoInit() only moves instructions for which writeToAlloca()
+  // succeeds, i.e. memory intrinsics and stores. Bail out before requesting
+  // MemorySSA if the function has none.
+  if (!mayWriteToMemory(F))
+    return PreservedAnalyses::all();
 
   auto &DT = AM.getResult<DominatorTreeAnalysis>(F);
   auto &MSSA = AM.getResult<MemorySSAAnalysis>(F).getMSSA();
