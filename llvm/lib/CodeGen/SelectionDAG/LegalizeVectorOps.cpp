@@ -481,6 +481,7 @@ SDValue VectorLegalizer::LegalizeOp(SDValue Op) {
   case ISD::UCMP:
   case ISD::LOOP_DEPENDENCE_WAR_MASK:
   case ISD::LOOP_DEPENDENCE_RAW_MASK:
+  case ISD::GET_ACTIVE_LANE_MASK:
   case ISD::MASKED_UDIV:
   case ISD::MASKED_SDIV:
   case ISD::MASKED_UREM:
@@ -1315,6 +1316,11 @@ void VectorLegalizer::Expand(SDNode *Node, SmallVectorImpl<SDValue> &Results) {
   case ISD::LOOP_DEPENDENCE_WAR_MASK:
   case ISD::LOOP_DEPENDENCE_RAW_MASK:
     Results.push_back(ExpandLOOP_DEPENDENCE_MASK(Node));
+    return;
+  case ISD::GET_ACTIVE_LANE_MASK:
+    Results.push_back(TLI.expandGetActiveLaneMask(
+        SDLoc(Node), Node->getValueType(0), Node->getOperand(0),
+        Node->getOperand(1), DAG));
     return;
 
   case ISD::FADD:

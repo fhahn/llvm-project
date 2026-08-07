@@ -11219,7 +11219,17 @@ SDValue TargetLowering::expandGetActiveLaneMask(const SDLoc &DL, EVT VT,
   SDValue VectorInduction =
       DAG.getNode(ISD::UADDSAT, DL, VecVT, VectorIndex, VectorStep);
 
-  return DAG.getSetCC(DL, VT, VectorInduction, VectorTripCount, ISD::SETULT);
+  // While VT is still illegal the type legalizer will adjust the SETCC result
+  // type for us, so compare straight into it. Once VT is legal it no longer
+  // will, and a comparison whose result type is not the target's SETCC result
+  // type may not be selectable, so compare into that type and convert.
+  if (!isTypeLegal(VT))
+    return DAG.getSetCC(DL, VT, VectorInduction, VectorTripCount, ISD::SETULT);
+
+  EVT CmpVT = getSetCCResultType(DAG.getDataLayout(), *DAG.getContext(), VecVT);
+  SDValue Mask =
+      DAG.getSetCC(DL, CmpVT, VectorInduction, VectorTripCount, ISD::SETULT);
+  return DAG.getBoolExtOrTrunc(Mask, DL, VT, VecVT);
 }
 
 SDValue TargetLowering::expandABS(SDNode *N, SelectionDAG &DAG,
