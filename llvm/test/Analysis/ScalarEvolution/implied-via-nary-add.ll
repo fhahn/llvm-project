@@ -16,7 +16,7 @@ define void @nary_add_with_negative_operand(ptr %base, i64 range(i64 -2, 0) %a, 
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
-; CHECK-NEXT:    call void @use(i1 true)
+; CHECK-NEXT:    call void @use(i1 false)
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
 ; CHECK-NEXT:    [[EC:%.*]] = icmp samesign ult i64 [[IV_NEXT]], 4
 ; CHECK-NEXT:    br i1 [[EC]], label %[[LOOP]], label %[[EXIT:.*]]
