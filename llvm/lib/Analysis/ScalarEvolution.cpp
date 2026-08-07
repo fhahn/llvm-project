@@ -12986,6 +12986,12 @@ bool ScalarEvolution::isImpliedViaOperations(CmpPredicate Pred, const SCEV *LHS,
     if (!LHSAddExpr->hasNoSignedWrap())
       return false;
 
+    // The rule below reasons about both operands of the add, so it does not
+    // apply if there are more than two: the operands that are not looked at
+    // may be negative.
+    if (LHSAddExpr->getNumOperands() != 2)
+      return false;
+
     SCEVUse LL = LHSAddExpr->getOperand(0);
     SCEVUse LR = LHSAddExpr->getOperand(1);
     auto *MinusOne = getMinusOne(RHS->getType());
