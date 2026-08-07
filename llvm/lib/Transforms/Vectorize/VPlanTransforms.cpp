@@ -3278,6 +3278,18 @@ bool VPlanTransforms::handleUncountableEarlyExits(
   for (const EarlyExitInfo &Info : drop_begin(Exits))
     Combined = LatchBuilder.createLogicalOr(Combined, Info.CondToExit);
 
+  // The exit conditions are computed for all lanes of a vector iteration,
+  // including lanes the scalar loop would not execute, so Combined may contain
+  // poison lanes. Freeze it once here and share the frozen value: whether any
+  // early exit is taken (AnyOf below) and which lane it is taken in
+  // (FirstActiveLane in the dispatch block) must agree, and two separate
+  // freezes of the same value are not guaranteed to produce the same result.
+  // This is not needed for MaskedHandleExitInScalarLoop, which leaves the
+  // exiting lane to the scalar loop and restricts the exit condition to a
+  // compare of a loaded value, which cannot be poison.
+  if (Style != UncountableExitStyle::MaskedHandleExitInScalarLoop)
+    Combined = LatchBuilder.createNaryOp(Instruction::Freeze, {Combined});
+
   VPValue *IsAnyExitTaken =
       LatchBuilder.createNaryOp(VPInstruction::AnyOf, {Combined});
 

@@ -1019,9 +1019,16 @@ Value *VPInstruction::generate(VPTransformState &State) {
     return Builder.CreatePtrAdd(Ptr, Addend, Name, getGEPNoWrapFlags());
   }
   case VPInstruction::AnyOf: {
-    Value *Res = Builder.CreateFreeze(State.get(getOperand(0)));
+    // Any lane after an early exit may be poison, and any poison lane would
+    // poison the result of the reduction below, so freeze all inputs. Inputs
+    // already frozen in the plan don't need to be frozen again.
+    auto GetFrozen = [&State, &Builder](VPValue *Op) {
+      Value *V = State.get(Op);
+      return match(Op, m_Freeze(m_VPValue())) ? V : Builder.CreateFreeze(V);
+    };
+    Value *Res = GetFrozen(getOperand(0));
     for (VPValue *Op : drop_begin(operands()))
-      Res = Builder.CreateOr(Res, Builder.CreateFreeze(State.get(Op)));
+      Res = Builder.CreateOr(Res, GetFrozen(Op));
     return State.VF.isScalar() ? Res : Builder.CreateOrReduce(Res);
   }
   case VPInstruction::ExtractLane: {
