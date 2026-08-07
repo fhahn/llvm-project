@@ -5810,6 +5810,15 @@ public:
   /// \returns The expansion result or SDValue() if it fails.
   SDValue expandLoopDependenceMask(SDNode *N, SelectionDAG &DAG) const;
 
+  /// Expand GET_ACTIVE_LANE_MASK into a comparison of a saturating induction
+  /// vector against a splat of \p TripCount.
+  /// \param VT Type of the mask to produce
+  /// \param Index Scalar index of the first lane
+  /// \param TripCount Scalar trip count
+  /// \returns The expansion result.
+  SDValue expandGetActiveLaneMask(const SDLoc &DL, EVT VT, SDValue Index,
+                                  SDValue TripCount, SelectionDAG &DAG) const;
+
   /// Expand ABS nodes. Expands vector/scalar ABS nodes,
   /// vector nodes can only succeed if all operations are legal/custom.
   /// (ABS x) -> (XOR (ADD x, (SRA x, type_size)), (SRA x, type_size))

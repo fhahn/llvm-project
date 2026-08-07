@@ -8422,17 +8422,7 @@ void SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I,
       return;
     }
 
-    EVT VecTy = EVT::getVectorVT(*DAG.getContext(), ElementVT,
-                                 CCVT.getVectorElementCount());
-
-    SDValue VectorIndex = DAG.getSplat(VecTy, sdl, Index);
-    SDValue VectorTripCount = DAG.getSplat(VecTy, sdl, TripCount);
-    SDValue VectorStep = DAG.getStepVector(sdl, VecTy);
-    SDValue VectorInduction = DAG.getNode(
-        ISD::UADDSAT, sdl, VecTy, VectorIndex, VectorStep);
-    SDValue SetCC = DAG.getSetCC(sdl, CCVT, VectorInduction,
-                                 VectorTripCount, ISD::CondCode::SETULT);
-    setValue(&I, SetCC);
+    setValue(&I, TLI.expandGetActiveLaneMask(sdl, CCVT, Index, TripCount, DAG));
     return;
   }
   case Intrinsic::experimental_get_vector_length: {

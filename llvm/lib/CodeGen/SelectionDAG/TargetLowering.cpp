@@ -11204,6 +11204,24 @@ SDValue TargetLowering::expandLoopDependenceMask(SDNode *N,
   return DAG.getNode(ISD::GET_ACTIVE_LANE_MASK, DL, VT, LaneOffset, MaskN);
 }
 
+SDValue TargetLowering::expandGetActiveLaneMask(const SDLoc &DL, EVT VT,
+                                                SDValue Index,
+                                                SDValue TripCount,
+                                                SelectionDAG &DAG) const {
+  EVT VecVT = EVT::getVectorVT(*DAG.getContext(), Index.getValueType(),
+                               VT.getVectorElementCount());
+
+  SDValue VectorIndex = DAG.getSplat(VecVT, DL, Index);
+  SDValue VectorTripCount = DAG.getSplat(VecVT, DL, TripCount);
+  SDValue VectorStep = DAG.getStepVector(DL, VecVT);
+  // Saturate the addition, so that lanes whose index would wrap around stay
+  // below the trip count and are hence inactive.
+  SDValue VectorInduction =
+      DAG.getNode(ISD::UADDSAT, DL, VecVT, VectorIndex, VectorStep);
+
+  return DAG.getSetCC(DL, VT, VectorInduction, VectorTripCount, ISD::SETULT);
+}
+
 SDValue TargetLowering::expandABS(SDNode *N, SelectionDAG &DAG,
                                   bool IsNegative) const {
   SDLoc dl(N);
