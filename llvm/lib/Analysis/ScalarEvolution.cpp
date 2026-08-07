@@ -15354,7 +15354,7 @@ bool SCEVComparePredicate::implies(const SCEVPredicate *N,
   if (Pred != ICmpInst::ICMP_EQ)
     return false;
 
-  return Op->LHS == LHS && Op->RHS == RHS;
+  return Op->Pred == Pred && Op->LHS == LHS && Op->RHS == RHS;
 }
 
 bool SCEVComparePredicate::isAlwaysTrue() const { return false; }
