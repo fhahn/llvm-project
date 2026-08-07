@@ -9,14 +9,17 @@ define void @eq_and_ne_assumption_on_same_scev(ptr %A, i64 %k, i64 %n) {
 ; CHECK-NEXT:    da analyze - input [0]!
 ; CHECK-NEXT:    Runtime Assumptions:
 ; CHECK-NEXT:    Equal predicate: (zext i2 (trunc i64 %k to i2) to i64) == 0
+; CHECK-NEXT:    Compare predicate: (zext i2 (trunc i64 %k to i2) to i64) ne) 0
 ; CHECK-NEXT:  Src: %l = load i32, ptr %gep, align 4 --> Dst: store i32 %add, ptr %gep, align 4
 ; CHECK-NEXT:    da analyze - anti [0|<]!
 ; CHECK-NEXT:    Runtime Assumptions:
 ; CHECK-NEXT:    Equal predicate: (zext i2 (trunc i64 %k to i2) to i64) == 0
+; CHECK-NEXT:    Compare predicate: (zext i2 (trunc i64 %k to i2) to i64) ne) 0
 ; CHECK-NEXT:  Src: store i32 %add, ptr %gep, align 4 --> Dst: store i32 %add, ptr %gep, align 4
 ; CHECK-NEXT:    da analyze - output [0]!
 ; CHECK-NEXT:    Runtime Assumptions:
 ; CHECK-NEXT:    Equal predicate: (zext i2 (trunc i64 %k to i2) to i64) == 0
+; CHECK-NEXT:    Compare predicate: (zext i2 (trunc i64 %k to i2) to i64) ne) 0
 ;
 entry:
   %step = and i64 %k, 3

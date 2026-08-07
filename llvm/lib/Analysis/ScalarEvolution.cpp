@@ -15364,15 +15364,9 @@ SCEVComparePredicate::SCEVComparePredicate(const FoldingSetNodeIDRef ID,
 
 bool SCEVComparePredicate::implies(const SCEVPredicate *N,
                                    ScalarEvolution &SE) const {
-  const auto *Op = dyn_cast<SCEVComparePredicate>(N);
-
-  if (!Op)
-    return false;
-
-  if (Pred != ICmpInst::ICMP_EQ)
-    return false;
-
-  return Op->LHS == LHS && Op->RHS == RHS;
+  // Compare predicates are uniqued, so only an identical equality predicate is
+  // implied.
+  return Pred == ICmpInst::ICMP_EQ && N == this;
 }
 
 bool SCEVComparePredicate::isAlwaysTrue() const { return false; }
