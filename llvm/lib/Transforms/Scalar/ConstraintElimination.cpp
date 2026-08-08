@@ -115,6 +115,9 @@ struct FactOrCheck {
   unsigned NumIn;
   unsigned NumOut;
   EntryTy Ty;
+  /// For condition facts, whether neither operand is a constant integer. Cached
+  /// because it is used as a sort key for the whole work-list.
+  bool HasNoConstOp = false;
 
   FactOrCheck(EntryTy Ty, DomTreeNode *DTN, Instruction *Inst)
       : Inst(Inst), NumIn(DTN->getDFSNumIn()), NumOut(DTN->getDFSNumOut()),
@@ -127,7 +130,8 @@ struct FactOrCheck {
   FactOrCheck(DomTreeNode *DTN, CmpPredicate Pred, Value *Op0, Value *Op1,
               ConditionTy Precond = {})
       : Cond(Pred, Op0, Op1), DoesHold(Precond), NumIn(DTN->getDFSNumIn()),
-        NumOut(DTN->getDFSNumOut()), Ty(EntryTy::ConditionFact) {}
+        NumOut(DTN->getDFSNumOut()), Ty(EntryTy::ConditionFact),
+        HasNoConstOp(!isa<ConstantInt>(Op0) && !isa<ConstantInt>(Op1)) {}
 
   static FactOrCheck getConditionFact(DomTreeNode *DTN, CmpPredicate Pred,
                                       Value *Op0, Value *Op1,
@@ -2029,19 +2033,11 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
   // increases the effectiveness of the current signed <-> unsigned fact
   // transfer logic.
   stable_sort(S.WorkList, [](const FactOrCheck &A, const FactOrCheck &B) {
-    auto HasNoConstOp = [](const FactOrCheck &B) {
-      Value *V0 = B.isConditionFact() ? B.Cond.Op0 : B.Inst->getOperand(0);
-      Value *V1 = B.isConditionFact() ? B.Cond.Op1 : B.Inst->getOperand(1);
-      return !isa<ConstantInt>(V0) && !isa<ConstantInt>(V1);
-    };
     // If both entries have the same In numbers, conditional facts come first.
     // Otherwise use the relative order in the basic block.
     if (A.NumIn == B.NumIn) {
-      if (A.isConditionFact() && B.isConditionFact()) {
-        bool NoConstOpA = HasNoConstOp(A);
-        bool NoConstOpB = HasNoConstOp(B);
-        return NoConstOpA < NoConstOpB;
-      }
+      if (A.isConditionFact() && B.isConditionFact())
+        return A.HasNoConstOp < B.HasNoConstOp;
       if (A.isConditionFact())
         return true;
       if (B.isConditionFact())
