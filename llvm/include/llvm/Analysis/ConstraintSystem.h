@@ -76,17 +76,19 @@ public:
 
   bool addVariableRow(ArrayRef<int64_t> R) {
     assert(Constraints.empty() || R.size() == NumVariables);
-    // If all variable coefficients are 0, the constraint does not provide any
-    // usable information.
-    if (all_of(ArrayRef(R).drop_front(1), [](int64_t C) { return C == 0; }))
-      return false;
-
     SmallVector<Entry, 4> NewRow;
+    bool HasVariable = false;
     for (const auto &[Idx, C] : enumerate(R)) {
       if (C == 0)
         continue;
+      HasVariable |= Idx != 0;
       NewRow.emplace_back(C, Idx);
     }
+    // If all variable coefficients are 0, the constraint does not provide any
+    // usable information.
+    if (!HasVariable)
+      return false;
+
     if (Constraints.empty())
       NumVariables = R.size();
     Constraints.push_back(std::move(NewRow));
