@@ -843,6 +843,14 @@ ConstraintTy ConstraintInfo::getConstraintForSolving(CmpInst::Predicate Pred,
 std::optional<bool>
 ConstraintTy::isImpliedBy(const ConstraintSystem &CS) const {
   const auto &[SubCS, NewCoefficients] = CS.getSubSystem(Coefficients);
+  // If no constraint in the system shares a variable (transitively) with the
+  // query, none of the queries below can be implied. Queries without any
+  // variable are decided by isConditionImplied and must not be skipped.
+  if (SubCS.size() == 0 &&
+      any_of(ArrayRef(NewCoefficients).drop_front(1),
+             [](int64_t C) { return C != 0; }))
+    return std::nullopt;
+
   bool IsConditionImplied = SubCS.isConditionImplied(NewCoefficients);
 
   if (IsEq || IsNe) {

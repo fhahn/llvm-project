@@ -303,6 +303,11 @@ bool ConstraintSystem::isConditionImplied(SmallVector<int64_t, 8> R) const {
   if (all_of(ArrayRef(R).drop_front(1), equal_to(0)))
     return R[0] >= 0;
 
+  // A condition mentioning at least one variable can never be implied by an
+  // empty system, so there is no need to build and solve one.
+  if (Constraints.empty())
+    return false;
+
   // If there is no solution with the negation of R added to the system, the
   // condition must hold based on the existing constraints.
   R = ConstraintSystem::negate(R);
