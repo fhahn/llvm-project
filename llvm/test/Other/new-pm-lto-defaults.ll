@@ -57,6 +57,7 @@
 ; CHECK-O23-NEXT: Running analysis: OuterAnalysisManagerProxy
 ; CHECK-O23-NEXT: Running pass: ArgumentPromotionPass
 ; CHECK-O23-NEXT: Running pass: SROAPass
+; CHECK-O23-NEXT: Running analysis: LastRunTrackingAnalysis
 ; CHECK-O23-NEXT: Running pass: IPSCCPPass
 ; CHECK-O23-NEXT: Running pass: CalledValuePropagationPass
 ; CHECK-O-NEXT: Running pass: ReversePostOrderFunctionAttrsPass
@@ -72,7 +73,6 @@
 ; CHECK-O23-NEXT: Running pass: ConstantMergePass
 ; CHECK-O23-NEXT: Running pass: DeadArgumentEliminationPass
 ; CHECK-O23-NEXT: Running pass: InstCombinePass
-; CHECK-O23-NEXT: Running analysis: LastRunTrackingAnalysis
 ; CHECK-O23-NEXT: Running pass: AggressiveInstCombinePass
 ; CHECK-EP-PEEPHOLE-NEXT: Running pass: NoOpFunctionPass
 ; CHECK-O23-NEXT: Running pass: ExpandVariadicsPass

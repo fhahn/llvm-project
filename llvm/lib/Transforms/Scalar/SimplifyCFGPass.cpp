@@ -28,6 +28,7 @@
 #include "llvm/Analysis/CFG.h"
 #include "llvm/Analysis/DomTreeUpdater.h"
 #include "llvm/Analysis/GlobalsModRef.h"
+#include "llvm/Analysis/LastRunTrackingAnalysis.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/CFG.h"
@@ -269,6 +270,37 @@ static bool iterativelySimplifyCFG(Function &F, const TargetTransformInfo &TTI,
   return Changed;
 }
 
+/// Unique identifier for SimplifyCFGPass in LastRunTrackingAnalysis.
+static char SimplifyCFGPassID;
+
+namespace {
+/// The subset of SimplifyCFGOptions that determines what the pass will do.
+/// Two runs may only be considered equivalent by LastRunTrackingAnalysis if
+/// every requested simplification matches; \c SimplifyCFGOptions::AC is
+/// excluded because it is a cache pointer rather than a request.
+struct SimplifyCFGTrackedOptions {
+  int BonusInstThreshold;
+  uint16_t Flags;
+
+  explicit SimplifyCFGTrackedOptions(const SimplifyCFGOptions &Options)
+      : BonusInstThreshold(Options.BonusInstThreshold),
+        Flags(Options.ForwardSwitchCondToPhi << 0 |
+              Options.ConvertSwitchRangeToICmp << 1 |
+              Options.ConvertSwitchToArithmetic << 2 |
+              Options.ConvertSwitchToLookupTable << 3 |
+              Options.NeedCanonicalLoop << 4 | Options.HoistCommonInsts << 5 |
+              Options.HoistLoadsStoresWithCondFaulting << 6 |
+              Options.SinkCommonInsts << 7 | Options.SimplifyCondBranch << 8 |
+              Options.SpeculateBlocks << 9 |
+              Options.SpeculateUnpredictables << 10) {}
+
+  bool isCompatibleWith(const SimplifyCFGTrackedOptions &LastOpt) const {
+    return BonusInstThreshold == LastOpt.BonusInstThreshold &&
+           Flags == LastOpt.Flags;
+  }
+};
+} // namespace
+
 static bool simplifyFunctionCFGImpl(Function &F, const TargetTransformInfo &TTI,
                                     DominatorTree *DT,
                                     const SimplifyCFGOptions &Options) {
@@ -377,16 +409,25 @@ void SimplifyCFGPass::printPipeline(
 
 PreservedAnalyses SimplifyCFGPass::run(Function &F,
                                        FunctionAnalysisManager &AM) {
+  auto &LRT = AM.getResult<LastRunTrackingAnalysis>(F);
+  SimplifyCFGTrackedOptions TrackedOptions(Options);
+  if (LRT.shouldSkip(&SimplifyCFGPassID, TrackedOptions))
+    return PreservedAnalyses::all();
+
   auto &TTI = AM.getResult<TargetIRAnalysis>(F);
   Options.AC = &AM.getResult<AssumptionAnalysis>(F);
   DominatorTree *DT = nullptr;
   if (RequireAndPreserveDomTree)
     DT = &AM.getResult<DominatorTreeAnalysis>(F);
-  if (!simplifyFunctionCFG(F, TTI, DT, Options))
+  if (!simplifyFunctionCFG(F, TTI, DT, Options)) {
+    LRT.update(&SimplifyCFGPassID, /*Changed=*/false, TrackedOptions);
     return PreservedAnalyses::all();
+  }
   // If we removed some blocks, update block numbers to keep dense numbering.
   F.renumberBlocks();
   PreservedAnalyses PA;
+  LRT.update(&SimplifyCFGPassID, /*Changed=*/true, TrackedOptions);
+  PA.preserve<LastRunTrackingAnalysis>();
   if (RequireAndPreserveDomTree) {
     DT->updateBlockNumbers();
     PA.preserve<DominatorTreeAnalysis>();

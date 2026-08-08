@@ -123,8 +123,8 @@
 ; CHECK-O-NEXT: Running pass: InstCombinePass
 ; CHECK-O23-NEXT: Running pass: DFAJumpThreadingPass
 ; CHECK-O23-NEXT: Running pass: JumpThreadingPass
-; CHECK-O23-NEXT: Running analysis: LazyValueAnalysis
 ; CHECK-O23-NEXT: Running pass: CorrelatedValuePropagationPass
+; CHECK-O23-NEXT: Running analysis: LazyValueAnalysis
 ; CHECK-O23-NEXT: Invalidating analysis: LazyValueAnalysis
 ; CHECK-O1-NEXT: Running pass: CoroElidePass
 ; CHECK-O-NEXT: Running pass: ADCEPass

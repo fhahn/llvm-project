@@ -28,6 +28,7 @@
 ; CHECK-O-NEXT: Running pass: EntryExitInstrumenterPass
 ; CHECK-O-NEXT: Running pass: LowerExpectIntrinsicPass
 ; CHECK-O-NEXT: Running pass: SimplifyCFGPass
+; CHECK-O-NEXT: Running analysis: LastRunTrackingAnalysis
 ; CHECK-O-NEXT: Running analysis: TargetIRAnalysis
 ; CHECK-O-NEXT: Running analysis: AssumptionAnalysis
 ; CHECK-O-NEXT: Running pass: SROAPass
@@ -45,7 +46,6 @@
 ; CHECK-O-NEXT: Running pass: GlobalOptPass
 ; CHECK-O-NEXT: Running pass: PromotePass
 ; CHECK-O-NEXT: Running pass: InstCombinePass
-; CHECK-O-NEXT: Running analysis: LastRunTrackingAnalysis
 ; CHECK-O-NEXT: Running analysis: OptimizationRemarkEmitterAnalysis on foo
 ; CHECK-O-NEXT: Running analysis: AAManager on foo
 ; CHECK-O-NEXT: Running analysis: BasicAA
@@ -127,8 +127,8 @@
 ; CHECK-O-NEXT: Running pass: InstCombinePass
 ; CHECK-O23-NEXT: Running pass: DFAJumpThreadingPass
 ; CHECK-O23-NEXT: Running pass: JumpThreadingPass
-; CHECK-O23-NEXT: Running analysis: LazyValueAnalysis
 ; CHECK-O23-NEXT: Running pass: CorrelatedValuePropagationPass
+; CHECK-O23-NEXT: Running analysis: LazyValueAnalysis
 ; CHECK-O23-NEXT: Invalidating analysis: LazyValueAnalysis
 ; CHECK-O1-NEXT: Running pass: CoroElidePass
 ; CHECK-O-NEXT: Running pass: ADCEPass
