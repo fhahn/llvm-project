@@ -139,10 +139,12 @@ inline const_succ_iterator succ_end(const Instruction *I) {
   return I->successors().end();
 }
 inline bool succ_empty(const Instruction *I) {
-  return succ_begin(I) == succ_end(I);
+  const_succ_range S = I->successors();
+  return S.begin() == S.end();
 }
 inline unsigned succ_size(const Instruction *I) {
-  return std::distance(succ_begin(I), succ_end(I));
+  const_succ_range S = I->successors();
+  return std::distance(S.begin(), S.end());
 }
 inline succ_range successors(Instruction *I) { return I->successors(); }
 inline const_succ_range successors(const Instruction *I) {
@@ -162,10 +164,10 @@ inline const_succ_iterator succ_end(const BasicBlock *BB) {
   return succ_end(BB->getTerminator());
 }
 inline bool succ_empty(const BasicBlock *BB) {
-  return succ_begin(BB) == succ_end(BB);
+  return succ_empty(BB->getTerminator());
 }
 inline unsigned succ_size(const BasicBlock *BB) {
-  return std::distance(succ_begin(BB), succ_end(BB));
+  return succ_size(BB->getTerminator());
 }
 inline succ_range successors(BasicBlock *BB) {
   return successors(BB->getTerminator());

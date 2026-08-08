@@ -466,7 +466,9 @@ bool llvm::wouldInstructionBeTriviallyDead(const Instruction *I,
     }
   }
 
-  if (!I->mayHaveSideEffects())
+  // This is mayHaveSideEffects() without the willReturn() term, which the check
+  // above has already established.
+  if (!I->mayWriteToMemory() && !I->mayThrow())
     return true;
 
   // Special case intrinsics that "may have side effects" but can be deleted
