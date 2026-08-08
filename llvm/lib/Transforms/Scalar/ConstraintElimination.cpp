@@ -894,6 +894,9 @@ bool ConstraintInfo::doesHold(CmpInst::Predicate Pred, Value *A,
 }
 
 bool ConstraintInfo::isKnownNonNegative(Value *V) const {
+  // Avoid building a constraint to answer this for constants.
+  if (auto *CI = dyn_cast<ConstantInt>(V))
+    return !CI->isNegative();
   return doesHold(CmpInst::ICMP_SGE, V, ConstantInt::get(V->getType(), 0)) ||
          ::isKnownNonNegative(V, DL, /*Depth=*/MaxAnalysisRecursionDepth - 1);
 }
