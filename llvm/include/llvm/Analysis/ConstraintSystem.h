@@ -170,6 +170,10 @@ public:
   /// Returns the number of rows in the constraint system.
   unsigned size() const { return Constraints.size(); }
 
+  /// Returns true if \p R is already a row of the system. Such a row does not
+  /// add any information, but is scanned by every later query.
+  LLVM_ABI bool hasRow(ArrayRef<int64_t> R) const;
+
   /// Print the constraints in the system.
   LLVM_ABI void dump() const;
 };

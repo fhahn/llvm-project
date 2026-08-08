@@ -1880,6 +1880,13 @@ void ConstraintInfo::addFactImpl(CmpInst::Predicate Pred, Value *A, Value *B,
   if (R.Coefficients.empty())
     return;
 
+  // A row that is already part of the system does not add any information, but
+  // would be scanned by every later query. Only variables of existing rows can
+  // be involved, so there are no new variables to add in that case. Equality
+  // constraints also add the inverted row below, which may be new.
+  if (!R.isEq() && NewVariables.empty() && CSToUse.hasRow(R.Coefficients))
+    return;
+
   bool Added = CSToUse.addVariableRowFill(R.Coefficients);
   if (!Added)
     return;

@@ -227,6 +227,16 @@ bool ConstraintSystem::mayHaveSolution() {
   return HasSolution;
 }
 
+bool ConstraintSystem::hasRow(ArrayRef<int64_t> R) const {
+  unsigned NumNonZero = count_if(R, [](int64_t C) { return C != 0; });
+  return any_of(Constraints, [&](const SmallVectorImpl<Entry> &Row) {
+    return Row.size() == NumNonZero &&
+           all_of(Row, [&R](const Entry &E) {
+             return E.Id < R.size() && R[E.Id] == E.Coefficient;
+           });
+  });
+}
+
 std::pair<ConstraintSystem, SmallVector<int64_t, 8>>
 ConstraintSystem::getSubSystem(ArrayRef<int64_t> R) const {
   // Only constraints that share a variable (transitively) with a query R can
