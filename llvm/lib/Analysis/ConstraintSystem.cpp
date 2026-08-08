@@ -329,7 +329,19 @@ bool ConstraintSystem::isConditionImpliedInSubSystem(
   if (all_of(ArrayRef(R).drop_front(1), equal_to(0)))
     return R[0] >= 0;
 
-  // A single query: build the component and solve it in place.
-  const auto &[SubCS, NewR] = getSubSystem(R);
-  return SubCS.isConditionImplied(NewR);
+  // A single query: build the component and solve it in place. The component is
+  // a temporary, so it can be solved destructively, without the copy
+  // isConditionImplied has to make.
+  auto [SubCS, NewR] = getSubSystem(R);
+  if (SubCS.Constraints.empty())
+    return false;
+
+  NewR = ConstraintSystem::negate(NewR);
+  if (NewR.empty())
+    return false;
+
+  // If there is no solution with the negation of the query added to the
+  // component, the condition must hold based on the existing constraints.
+  SubCS.addVariableRow(NewR);
+  return !SubCS.mayHaveSolution();
 }
