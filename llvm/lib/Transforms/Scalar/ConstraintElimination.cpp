@@ -470,6 +470,11 @@ static Decomposition decomposeGEP(GEPOperator &GEP, const ConstraintInfo &Info,
 
   assert(!IsSigned && "The logic below only supports decomposition for "
                       "unsigned predicates at the moment.");
+  // Decomposing requires a no-wrap flag, and the flags of a GEP chain can only
+  // be weaker than the outer GEP's, so check them before collecting offsets.
+  if (GEP.getNoWrapFlags() == GEPNoWrapFlags::none())
+    return &GEP;
+
   const auto &[BasePtr, ConstantOffset, VariableOffsets, NW] =
       collectOffsets(GEP, DL);
   // We support either plain gep nuw, or gep nusw with non-negative offset,
@@ -1181,6 +1186,12 @@ static bool getConstraintFromMemoryAccess(GetElementPtrInst &GEP,
                                           CmpPredicate &Pred, Value *&A,
                                           Value *&B, const DataLayout &DL,
                                           const TargetLibraryInfo &TLI) {
+  // The constraint below requires the offset to not wrap in the unsigned sense.
+  // The flags of a GEP chain can only be weaker than the outer GEP's, so check
+  // them before collecting the offsets.
+  if (!cast<GEPOperator>(GEP).hasNoUnsignedWrap())
+    return false;
+
   auto Offset = collectOffsets(cast<GEPOperator>(GEP), DL);
   if (!Offset.NW.hasNoUnsignedWrap())
     return false;
