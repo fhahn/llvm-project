@@ -19,6 +19,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/AssumptionCache.h"
+#include "llvm/Analysis/LastRunTrackingAnalysis.h"
 #include "llvm/Analysis/GlobalsModRef.h"
 #include "llvm/Analysis/GuardUtils.h"
 #include "llvm/Analysis/InstructionSimplify.h"
@@ -1806,8 +1807,27 @@ bool EarlyCSE::run() {
   return Changed;
 }
 
+/// Unique identifier for EarlyCSEPass in LastRunTrackingAnalysis.
+static char EarlyCSEPassID;
+
+namespace {
+/// The one option that determines what EarlyCSE will do.
+struct EarlyCSETrackedOptions {
+  bool UseMemorySSA;
+
+  bool isCompatibleWith(const EarlyCSETrackedOptions &LastOpt) const {
+    return UseMemorySSA == LastOpt.UseMemorySSA;
+  }
+};
+} // namespace
+
 PreservedAnalyses EarlyCSEPass::run(Function &F,
                                     FunctionAnalysisManager &AM) {
+  auto &LRT = AM.getResult<LastRunTrackingAnalysis>(F);
+  EarlyCSETrackedOptions TrackedOptions{UseMemorySSA};
+  if (LRT.shouldSkip(&EarlyCSEPassID, TrackedOptions))
+    return PreservedAnalyses::all();
+
   auto &TLI = AM.getResult<TargetLibraryAnalysis>(F);
   auto &TTI = AM.getResult<TargetIRAnalysis>(F);
   auto &DT = AM.getResult<DominatorTreeAnalysis>(F);
@@ -1817,10 +1837,14 @@ PreservedAnalyses EarlyCSEPass::run(Function &F,
 
   EarlyCSE CSE(F.getDataLayout(), TLI, TTI, DT, AC, MSSA);
 
-  if (!CSE.run())
+  if (!CSE.run()) {
+    LRT.update(&EarlyCSEPassID, /*Changed=*/false, TrackedOptions);
     return PreservedAnalyses::all();
+  }
 
   PreservedAnalyses PA;
+  LRT.update(&EarlyCSEPassID, /*Changed=*/true, TrackedOptions);
+  PA.preserve<LastRunTrackingAnalysis>();
   PA.preserveSet<CFGAnalyses>();
   if (UseMemorySSA)
     PA.preserve<MemorySSAAnalysis>();

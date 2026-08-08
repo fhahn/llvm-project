@@ -24,6 +24,7 @@
 #include "llvm/Analysis/CFG.h"
 #include "llvm/Analysis/ConstantFolding.h"
 #include "llvm/Analysis/GlobalsModRef.h"
+#include "llvm/Analysis/LastRunTrackingAnalysis.h"
 #include "llvm/Analysis/GuardUtils.h"
 #include "llvm/Analysis/InstructionSimplify.h"
 #include "llvm/Analysis/LazyValueInfo.h"
@@ -237,8 +238,27 @@ static void updatePredecessorProfileMetadata(PHINode *PN, BasicBlock *BB) {
   }
 }
 
+/// Unique identifier for JumpThreadingPass in LastRunTrackingAnalysis.
+static char JumpThreadingPassID;
+
+namespace {
+/// The one option that determines what JumpThreading will do.
+struct JumpThreadingTrackedOptions {
+  unsigned DefaultBBDupThreshold;
+
+  bool isCompatibleWith(const JumpThreadingTrackedOptions &LastOpt) const {
+    return DefaultBBDupThreshold == LastOpt.DefaultBBDupThreshold;
+  }
+};
+} // namespace
+
 PreservedAnalyses JumpThreadingPass::run(Function &F,
                                          FunctionAnalysisManager &AM) {
+  auto &LRT = AM.getResult<LastRunTrackingAnalysis>(F);
+  JumpThreadingTrackedOptions TrackedOptions{DefaultBBDupThreshold};
+  if (LRT.shouldSkip(&JumpThreadingPassID, TrackedOptions))
+    return PreservedAnalyses::all();
+
   auto &TTI = AM.getResult<TargetIRAnalysis>(F);
   // Jump Threading has no sense for the targets with divergent CF
   if (TTI.hasBranchDivergence(&F))
@@ -254,10 +274,12 @@ PreservedAnalyses JumpThreadingPass::run(Function &F,
                   &DT, nullptr, DomTreeUpdater::UpdateStrategy::Lazy),
               nullptr, nullptr);
 
-  if (!Changed)
+  if (!Changed) {
+    LRT.update(&JumpThreadingPassID, /*Changed=*/false, TrackedOptions);
     return PreservedAnalyses::all();
+  }
 
-
+  LRT.update(&JumpThreadingPassID, /*Changed=*/true, TrackedOptions);
   getDomTreeUpdater()->flush();
 
 #if defined(EXPENSIVE_CHECKS)
@@ -3220,6 +3242,7 @@ bool JumpThreadingPass::threadGuard(BasicBlock *BB, IntrinsicInst *Guard,
 
 PreservedAnalyses JumpThreadingPass::getPreservedAnalysis() const {
   PreservedAnalyses PA;
+  PA.preserve<LastRunTrackingAnalysis>();
   PA.preserve<LazyValueAnalysis>();
   PA.preserve<DominatorTreeAnalysis>();
 

@@ -39,6 +39,7 @@
 #include "llvm/ADT/iterator.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Analysis/AssumptionCache.h"
+#include "llvm/Analysis/LastRunTrackingAnalysis.h"
 #include "llvm/Analysis/DomTreeUpdater.h"
 #include "llvm/Analysis/GlobalsModRef.h"
 #include "llvm/Analysis/Loads.h"
@@ -6336,15 +6337,42 @@ std::pair<bool /*Changed*/, bool /*CFGChanged*/> SROA::runSROA(Function &F) {
   return {Changed, CFGChanged};
 }
 
+/// Unique identifier for SROAPass in LastRunTrackingAnalysis.
+static char SROAPassID;
+
+namespace {
+/// The subset of SROAOptions that determines what the pass will do.
+struct SROATrackedOptions {
+  unsigned Flags;
+
+  explicit SROATrackedOptions(const SROAOptions &Options)
+      : Flags((Options.CFG == SROAOptions::ModifyCFG) |
+              (Options.AggregateToVector << 1)) {}
+
+  bool isCompatibleWith(const SROATrackedOptions &LastOpt) const {
+    return Flags == LastOpt.Flags;
+  }
+};
+} // namespace
+
 PreservedAnalyses SROAPass::run(Function &F, FunctionAnalysisManager &AM) {
+  auto &LRT = AM.getResult<LastRunTrackingAnalysis>(F);
+  SROATrackedOptions TrackedOptions(Options);
+  if (LRT.shouldSkip(&SROAPassID, TrackedOptions))
+    return PreservedAnalyses::all();
+
   DominatorTree &DT = AM.getResult<DominatorTreeAnalysis>(F);
   AssumptionCache &AC = AM.getResult<AssumptionAnalysis>(F);
   DomTreeUpdater DTU(DT, DomTreeUpdater::UpdateStrategy::Lazy);
   auto [Changed, CFGChanged] =
       SROA(&F.getContext(), &DTU, &AC, Options).runSROA(F);
-  if (!Changed)
+  if (!Changed) {
+    LRT.update(&SROAPassID, /*Changed=*/false, TrackedOptions);
     return PreservedAnalyses::all();
+  }
   PreservedAnalyses PA;
+  LRT.update(&SROAPassID, /*Changed=*/true, TrackedOptions);
+  PA.preserve<LastRunTrackingAnalysis>();
   if (!CFGChanged)
     PA.preserveSet<CFGAnalyses>();
   PA.preserve<DominatorTreeAnalysis>();
