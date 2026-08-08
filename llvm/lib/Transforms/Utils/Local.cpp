@@ -135,8 +135,6 @@ bool llvm::ConstantFoldTerminator(BasicBlock *BB, bool DeleteDeadConditions,
                                   const TargetLibraryInfo *TLI,
                                   DomTreeUpdater *DTU) {
   Instruction *T = BB->getTerminator();
-  IRBuilder<> Builder(T);
-
   // Branch - See if we are conditional jumping on constant
   if (auto *BI = dyn_cast<CondBrInst>(T)) {
     BasicBlock *Dest1 = BI->getSuccessor(0);
@@ -152,6 +150,7 @@ bool llvm::ConstantFoldTerminator(BasicBlock *BB, bool DeleteDeadConditions,
       Dest1->removePredecessor(BI->getParent());
 
       // Replace the conditional branch with an unconditional one.
+      IRBuilder<> Builder(T);
       UncondBrInst *NewBI = Builder.CreateBr(Dest1);
 
       // Transfer the metadata to the new branch instruction.
@@ -176,6 +175,7 @@ bool llvm::ConstantFoldTerminator(BasicBlock *BB, bool DeleteDeadConditions,
       OldDest->removePredecessor(BB);
 
       // Replace the conditional branch with an unconditional one.
+      IRBuilder<> Builder(T);
       UncondBrInst *NewBI = Builder.CreateBr(Destination);
 
       // Transfer the metadata to the new branch instruction.
@@ -274,7 +274,7 @@ bool llvm::ConstantFoldTerminator(BasicBlock *BB, bool DeleteDeadConditions,
     // now.
     if (TheOnlyDest) {
       // Insert the new branch.
-      Builder.CreateBr(TheOnlyDest);
+      IRBuilder<>(T).CreateBr(TheOnlyDest);
       BasicBlock *BB = SI->getParent();
 
       SmallPtrSet<BasicBlock *, 8> RemovedSuccessors;
@@ -311,6 +311,7 @@ bool llvm::ConstantFoldTerminator(BasicBlock *BB, bool DeleteDeadConditions,
       // Otherwise, we can fold this switch into a conditional branch
       // instruction if it has only one non-default destination.
       auto FirstCase = *SI->case_begin();
+      IRBuilder<> Builder(T);
       Value *Cond = Builder.CreateICmpEQ(SI->getCondition(),
           FirstCase.getCaseValue(), "cond");
 
@@ -347,7 +348,7 @@ bool llvm::ConstantFoldTerminator(BasicBlock *BB, bool DeleteDeadConditions,
       SmallPtrSet<BasicBlock *, 8> RemovedSuccessors;
 
       // Insert the new branch.
-      Builder.CreateBr(TheOnlyDest);
+      IRBuilder<>(T).CreateBr(TheOnlyDest);
 
       BasicBlock *SuccToKeep = TheOnlyDest;
       for (unsigned i = 0, e = IBI->getNumDestinations(); i != e; ++i) {
