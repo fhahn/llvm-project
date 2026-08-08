@@ -23,6 +23,7 @@
 #include "llvm/Support/TypeSize.h"
 #include <cassert>
 #include <cstdint>
+#include <iterator>
 
 namespace llvm {
 
@@ -503,24 +504,77 @@ namespace llvm {
       return (MVT::SimpleValueType)(MVT::INVALID_SIMPLE_VALUE_TYPE);
     }
 
-    static MVT getVectorVT(MVT VT, unsigned NumElements) {
+  private:
+    /// One entry per vector MVT, in SimpleValueType order.
+    struct VecVTEntry {
+      uint16_t Ty;
+      uint16_t NumElements;
+      uint16_t ElTy;
+      bool Scalable;
+      bool Tuple;
+    };
+
+    static constexpr VecVTEntry VecVTTable[] = {
 #define GET_VT_VECATTR(Ty, Sc, Tup, nElem, ElTy)                             \
-    if (!Sc && !Tup && VT.SimpleTy == ElTy && NumElements == nElem)            \
-      return Ty;
+    {Ty, nElem, ElTy, Sc, Tup},
 #include "llvm/CodeGen/GenVT.inc"
 #undef GET_VT_VECATTR
+    };
 
+    /// For each element type, the half-open range of \c VecVTTable holding the
+    /// vector MVTs with that element type. Fixed-length and scalable vectors
+    /// are indexed separately.
+    struct VecVTIndex {
+      uint16_t FixedFirst[VALUETYPE_SIZE];
+      uint16_t FixedLast[VALUETYPE_SIZE];
+      uint16_t ScalableFirst[VALUETYPE_SIZE];
+      uint16_t ScalableLast[VALUETYPE_SIZE];
+    };
+
+    /// The vector MVTs sharing an element type are consecutive in
+    /// SimpleValueType order, and within such a group the element count is
+    /// increasing, so one range per element type replaces a scan over every
+    /// vector MVT.
+    static constexpr VecVTIndex buildVecVTIndex() {
+      VecVTIndex Index{};
+      for (unsigned I = 0, E = std::size(VecVTTable); I != E; ++I) {
+        if (VecVTTable[I].Tuple)
+          continue;
+        uint16_t *First =
+            VecVTTable[I].Scalable ? Index.ScalableFirst : Index.FixedFirst;
+        uint16_t *Last =
+            VecVTTable[I].Scalable ? Index.ScalableLast : Index.FixedLast;
+        if (Last[VecVTTable[I].ElTy] == 0)
+          First[VecVTTable[I].ElTy] = I;
+        Last[VecVTTable[I].ElTy] = I + 1;
+      }
+      return Index;
+    }
+
+    static MVT lookupVectorVT(MVT VT, unsigned NumElements, bool Scalable) {
+      static constexpr VecVTIndex Index = buildVecVTIndex();
+      if ((unsigned)VT.SimpleTy < VALUETYPE_SIZE) {
+        unsigned I = Scalable ? Index.ScalableFirst[VT.SimpleTy]
+                              : Index.FixedFirst[VT.SimpleTy];
+        unsigned E = Scalable ? Index.ScalableLast[VT.SimpleTy]
+                              : Index.FixedLast[VT.SimpleTy];
+        for (; I != E; ++I) {
+          if (VecVTTable[I].NumElements == NumElements)
+            return (MVT::SimpleValueType)VecVTTable[I].Ty;
+          if (VecVTTable[I].NumElements > NumElements)
+            break;
+        }
+      }
       return (MVT::SimpleValueType)(MVT::INVALID_SIMPLE_VALUE_TYPE);
     }
 
-    static MVT getScalableVectorVT(MVT VT, unsigned NumElements) {
-#define GET_VT_VECATTR(Ty, Sc, Tup, nElem, ElTy)                             \
-    if (Sc && VT.SimpleTy == ElTy && NumElements == nElem)                     \
-      return Ty;
-#include "llvm/CodeGen/GenVT.inc"
-#undef GET_VT_VECATTR
+  public:
+    static MVT getVectorVT(MVT VT, unsigned NumElements) {
+      return lookupVectorVT(VT, NumElements, /*Scalable=*/false);
+    }
 
-      return (MVT::SimpleValueType)(MVT::INVALID_SIMPLE_VALUE_TYPE);
+    static MVT getScalableVectorVT(MVT VT, unsigned NumElements) {
+      return lookupVectorVT(VT, NumElements, /*Scalable=*/true);
     }
 
     static MVT getRISCVVectorTupleVT(unsigned Sz, unsigned NFields) {
