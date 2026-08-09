@@ -81,13 +81,58 @@ static bool isAddressOperand(const VPRecipeBase *R, const VPValue *V) {
          (Opcode == Instruction::Store && R->getOperand(1) == V);
 }
 
+/// Returns true if \p R may fail to transfer execution to its successor,
+/// because it may throw or may not return. Only calls can do so. Neither
+/// property is modeled on recipes, so query the callee, which call recipes carry
+/// as an operand; intrinsics VPlan widens always return and do not throw, while
+/// a call without a known callee is handled conservatively.
+static bool mayNotTransferExecutionToSuccessor(const VPRecipeBase &R) {
+  if (vputils::getIntrinsicID(&R) != Intrinsic::not_intrinsic)
+    return false;
+
+  const Function *Callee = nullptr;
+  if (const auto *WidenCall = dyn_cast<VPWidenCallRecipe>(&R)) {
+    Callee = WidenCall->getCalledScalarFunction();
+  } else if (const auto *VPI = dyn_cast<VPInstruction>(&R)) {
+    if (VPI->getOpcode() != Instruction::Call)
+      return false;
+    Callee = VPI->getCalledFunction();
+  } else if (const auto *Rep = dyn_cast<VPReplicateRecipe>(&R)) {
+    if (Rep->getOpcode() != Instruction::Call)
+      return false;
+    // The callee is the last operand, excluding the mask if predicated.
+    const auto *CalleeOp = dyn_cast<VPIRValue>(
+        Rep->getOperand(Rep->getNumOperandsWithoutMask() - 1));
+    Callee = CalleeOp ? dyn_cast<Function>(CalleeOp->getValue()) : nullptr;
+  } else {
+    return false;
+  }
+
+  return !Callee || !Callee->willReturn() || !Callee->doesNotThrow();
+}
+
+/// Returns true if any recipe in \p Plan may fail to transfer execution to its
+/// successor. If so, no access in \p Plan is guaranteed to execute on every
+/// iteration, analogous to SimpleLoopSafetyInfo's may-throw check on IR.
+static bool anyRecipeMayNotTransferExecution(const VPlan &Plan) {
+  VPBlockBase *Entry = const_cast<VPlan &>(Plan).getEntry();
+  for (VPBasicBlock *VPBB :
+       VPBlockUtils::blocksOnly<VPBasicBlock>(vp_depth_first_deep(Entry)))
+    if (any_of(*VPBB, [](const VPRecipeBase &R) {
+          return mayNotTransferExecutionToSuccessor(R);
+        }))
+      return true;
+  return false;
+}
+
 /// Returns true if recipe \p R is guaranteed to execute on every iteration of
-/// each loop that contains it, i.e. it is not under any conditional branch
-/// within those loops. This is the VPlan analogue of the must-execute reasoning
-/// ScalarEvolution::isSCEVExprNeverPoison performs on IR. Loops of a flat CFG
-/// (as used by the outer-loop path) are identified by their back-edges: \p R
-/// must-executes iff, for every back-edge Latch->Header whose Header dominates
-/// \p R's block, \p R's block also dominates Latch.
+/// each loop that contains it, i.e. neither a conditional branch nor an exit of
+/// those loops can bypass it. This is the VPlan analogue of the must-execute
+/// reasoning ScalarEvolution::isSCEVExprNeverPoison performs on IR. Loops of a
+/// flat CFG (as used by the outer-loop path) are identified by their back-edges:
+/// for every back-edge Latch->Header of a loop containing \p R, all paths from
+/// Header to Latch and to any block the loop can be left from must go through
+/// \p R's block, mirroring IR's allLoopPathsLeadToBlock.
 static bool mustExecuteEachIteration(const VPRecipeBase *R,
                                      VPDominatorTree &VPDT) {
   const VPBasicBlock *RBB = R->getParent();
@@ -102,12 +147,39 @@ static bool mustExecuteEachIteration(const VPRecipeBase *R,
        vp_depth_first_shallow(RBB->getPlan()->getEntry())) {
     if (!VPDT.dominates(Header, RBB))
       continue;
-    // Header dominates R's block. For each back-edge Latch->Header, i.e. each
-    // predecessor edge from a block Header dominates, R is inside that loop and
-    // must dominate the latch to execute on every iteration.
-    for (const VPBlockBase *Latch : Header->getPredecessors())
-      if (VPDT.dominates(Header, Latch) && !VPDT.dominates(RBB, Latch))
-        return false;
+    // Header dominates R's block. Each predecessor edge from a block Header
+    // dominates is a back-edge, i.e. Header is the header of a loop.
+    for (const VPBlockBase *Latch : Header->getPredecessors()) {
+      if (!VPDT.dominates(Header, Latch))
+        continue;
+
+      // Collect the blocks of the loop with back-edge Latch->Header, by walking
+      // predecessors from Latch up to Header.
+      SmallSetVector<const VPBlockBase *, 8> Body;
+      Body.insert(Header);
+      Body.insert(Latch);
+      for (unsigned I = 1; I != Body.size(); ++I)
+        for (const VPBlockBase *Pred : Body[I]->getPredecessors())
+          Body.insert(Pred);
+
+      // If R is outside the loop it does not constrain the flags; the loop's
+      // header dominating R only means R comes after the loop.
+      if (!Body.contains(RBB))
+        continue;
+
+      // R executes on each iteration only if it comes before the back-edge and
+      // before every exit of the loop, that is if its block dominates the latch
+      // and every block the loop can be left from.
+      for (const VPBlockBase *VPBB : Body) {
+        bool LeavesLoop =
+            VPBB == Latch || any_of(VPBB->getSuccessors(),
+                                    [&Body](const VPBlockBase *Succ) {
+                                      return !Body.contains(Succ);
+                                    });
+        if (LeavesLoop && !VPDT.dominates(RBB, VPBB))
+          return false;
+      }
+    }
   }
   return true;
 }
@@ -119,11 +191,13 @@ static bool poisonGuaranteesUB(const VPValue *V) {
   SmallPtrSet<const VPValue *, 8> Visited;
   SmallVector<const VPValue *, 16> Worklist;
 
-  // An access that is skipped on some iterations - because it is masked or
-  // because its block is conditional - is not a valid poison sink: poison only
-  // triggers UB on the iterations where the access executes. The dominator tree
-  // is built on demand; building it only reads the plan, hence the const_cast.
+  // An access that is skipped on some iterations - because it is masked, because
+  // its block is conditional, or because an exit or a call that may not return
+  // comes first - is not a valid poison sink: poison only triggers UB on the
+  // iterations where the access executes. The dominator tree is built on demand;
+  // building it only reads the plan, hence the const_cast.
   std::optional<VPDominatorTree> VPDT;
+  std::optional<bool> MayNotTransferExecution;
   auto IsValidSink = [&](const VPRecipeBase *Sink) {
     if (auto *MemR = dyn_cast<VPWidenMemoryRecipe>(Sink))
       if (MemR->isMasked())
@@ -134,8 +208,13 @@ static bool poisonGuaranteesUB(const VPValue *V) {
     if (auto *VPI = dyn_cast<VPInstruction>(Sink))
       if (VPI->isMasked())
         return false;
+    const VPlan *Plan = Sink->getParent()->getPlan();
+    if (!MayNotTransferExecution)
+      MayNotTransferExecution = anyRecipeMayNotTransferExecution(*Plan);
+    if (*MayNotTransferExecution)
+      return false;
     if (!VPDT)
-      VPDT.emplace(*const_cast<VPlan *>(Sink->getParent()->getPlan()));
+      VPDT.emplace(*const_cast<VPlan *>(Plan));
     return mustExecuteEachIteration(Sink, *VPDT);
   };
 
