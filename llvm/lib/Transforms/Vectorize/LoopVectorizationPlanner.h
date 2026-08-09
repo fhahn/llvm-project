@@ -870,16 +870,11 @@ class LoopVectorizationPlanner {
 
   SmallVector<VPlanPtr, 4> VPlans;
 
-  /// The initial, VF-independent VPlan the per-VF plans in \p VPlans are built
-  /// from. Only retained when the scalar (VF=1) plan is built lazily, see
-  /// \p ScalarPlanIsLazy.
-  VPlanPtr VPlan1ForScalarPlan;
-
-  /// Set when plan() only built plans for vector VFs, leaving the scalar VF=1
-  /// plan to be built on demand by computeBestVF. The scalar plan is only
-  /// needed when no vector VF is profitable, which is the minority of loops, so
-  /// building it eagerly would waste a full plan construction per loop.
-  bool ScalarPlanIsLazy = false;
+  /// The plain-CFG VPlan wrapping the original scalar loop, as created by
+  /// VPlanTransforms::buildVPlan0. It is retained after plan(), so
+  /// tryToBuildVPlan1 can be re-run on a copy of it to build further plans on
+  /// demand, see getOrBuildScalarPlan().
+  VPlanPtr VPlan0;
 
   /// Profitable vector factors.
   SmallVector<VectorizationFactor, 8> ProfitableVFs;
@@ -1012,9 +1007,9 @@ public:
       bool DisableRuntimeUnroll, bool UnrollVectorizedLoop);
 
 private:
-  /// Build an initial VPlan, with HCFG wrapping the original scalar loop and
-  /// scalar transformations applied. Returns null if an initial VPlan cannot
-  /// be built.
+  /// Build VPlan1 by applying the VF-independent transforms to a copy of
+  /// VPlan0, creating VPlan0 first if needed. Returns null if VPlan1 cannot be
+  /// built.
   VPlanPtr tryToBuildVPlan1();
 
   /// Build a VPlan using VPRecipes according to the information gathered by
@@ -1032,9 +1027,12 @@ private:
   /// when it checked if it is legal to vectorize the loop.
   void buildVPlans(VPlan &VPlan1, ElementCount MinVF, ElementCount MaxVF);
 
-  /// Build the scalar (VF=1) VPlan that plan() deferred, append it to \p VPlans
-  /// and return it. Only valid when \p ScalarPlanIsLazy is set.
-  VPlan *buildScalarVPlan();
+  /// Return the plan containing the scalar VF=1, building it from VPlan0 first
+  /// if it has not been built yet. It is only needed if no vector VF turns out
+  /// to be profitable, and its cost does not come from a VPlan (computeBestVF
+  /// uses CM.expectedCost), hence plan() does not build it up-front. Returns
+  /// nullptr if no plan for VF=1 could be built.
+  VPlan *getOrBuildScalarPlan();
 
   /// Add ComputeReductionResult recipes to the middle block to compute the
   /// final reduction results. Add Select recipes to the latch block when

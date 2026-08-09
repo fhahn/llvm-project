@@ -5502,7 +5502,7 @@ void LoopVectorizationPlanner::plan(ElementCount UserVF, unsigned UserIC) {
   if (MaxFactors.FixedVF.isVector() || MaxFactors.ScalableVF.isVector())
     Legal->collectUnitStridePredicates();
 
-  auto VPlan1 = tryToBuildVPlan1();
+  VPlanPtr VPlan1 = tryToBuildVPlan1();
   if (!VPlan1)
     return;
 
@@ -5587,42 +5587,25 @@ void LoopVectorizationPlanner::plan(ElementCount UserVF, unsigned UserIC) {
     CM.collectNonVectorizedAndSetWideningDecisions(VF);
   }
 
-  // Only build plans for vector VFs here. The scalar VF=1 plan is only needed
-  // if no vector VF turns out to be profitable, and its cost does not come from
-  // a VPlan (computeBestVF uses CM.expectedCost), so defer building it to
-  // buildScalarVPlan().
-  ScalarPlanIsLazy = true;
   buildVPlans(*VPlan1, ElementCount::getFixed(2), MaxFactors.FixedVF);
   buildVPlans(*VPlan1, ElementCount::getScalable(1), MaxFactors.ScalableVF);
-  VPlan1ForScalarPlan = std::move(VPlan1);
 
-  // If no vector plan could be built at all, the scalar plan is the only
-  // candidate (e.g. when only interleaving is possible). Build it eagerly so
-  // that computeBestVF sees the same single-plan shape as before.
-  if (VPlans.empty()) {
-    buildScalarVPlan();
-    ScalarPlanIsLazy = false;
-  }
+  // If no vector plan could be built, the scalar plan is the only candidate
+  // (e.g. when only interleaving is possible); build it while VPlan1 is around.
+  if (VPlans.empty())
+    buildVPlans(*VPlan1, ElementCount::getFixed(1), ElementCount::getFixed(1));
 
   LLVM_DEBUG(printPlans(dbgs()));
 }
 
-VPlan *LoopVectorizationPlanner::buildScalarVPlan() {
-  assert(VPlan1ForScalarPlan && "no deferred scalar plan to build");
-  size_t NumPlansBefore = VPlans.size();
-  buildVPlans(*VPlan1ForScalarPlan, ElementCount::getFixed(1),
-              ElementCount::getFixed(1));
-  // tryToBuildVPlan can fail, in which case no plan is added.
-  if (VPlans.size() == NumPlansBefore)
-    return nullptr;
-  assert(VPlans.size() == NumPlansBefore + 1 &&
-         "expected at most one scalar plan to be built");
-  // The eager path always split VF=1 off into its own sub-range, because
-  // widening decisions differ between scalar and vector VFs. If that ever stops
-  // holding, the vector plans built from VF=2 would overlap this one.
-  assert(VPlans.back()->hasScalarVFOnly() &&
-         "deferred scalar plan must cover VF=1 only");
-  return VPlans.back().get();
+VPlan *LoopVectorizationPlanner::getOrBuildScalarPlan() {
+  ElementCount ScalarVF = ElementCount::getFixed(1);
+  // Run the pipeline on VPlan0 again for VF=1, if the scalar plan hasn't been
+  // built yet. This may fail, in which case no plan is added.
+  if (!hasPlanWithVF(ScalarVF))
+    if (VPlanPtr VPlan1 = tryToBuildVPlan1())
+      buildVPlans(*VPlan1, ScalarVF, ScalarVF);
+  return hasPlanWithVF(ScalarVF) ? &getPlanFor(ScalarVF) : nullptr;
 }
 
 VPCostContext::VPCostContext(const TargetLibraryInfo &TLI, const VPlan &Plan,
@@ -5859,27 +5842,23 @@ std::pair<VectorizationFactor, VPlan *>
 LoopVectorizationPlanner::computeBestVF() {
   if (VPlans.empty())
     return {VectorizationFactor::Disabled(), nullptr};
-  // If there is a single VPlan with a single VF, return it directly.
   VPlan &FirstPlan = *VPlans[0];
 
-  ElementCount UserVF = Hints.getWidth();
-  if (!ScalarPlanIsLazy && VPlans.size() == 1) {
-    // For outer loops, the plan has a single vector VF determined by the
-    // heuristic.
-    assert((FirstPlan.hasScalarVFOnly() || hasPlanWithVF(UserVF) ||
-            FirstPlan.isOuterLoop()) &&
-           "must have a single scalar VF, UserVF or an outer loop");
+  // For outer loops, the plan has a single vector VF determined by the
+  // heuristic; there is no cost model to compare VFs against.
+  if (FirstPlan.isOuterLoop()) {
+    assert(VPlans.size() == 1 && "expected a single plan for an outer loop");
     return {VectorizationFactor(FirstPlan.getSingleVF(), 0, 0), &FirstPlan};
   }
 
-  if (hasPlanWithVF(UserVF) && hasForcedEpilogueVF()) {
-    assert(VPlans.size() == 2 && "Must have exactly 2 VPlans built");
-    assert(VPlans[0]->getSingleVF() == UserVF &&
-           "expected second plan to be for the forced UserVF");
-    assert(VPlans[1]->getSingleVF() == EpilogueVectorizationForceVF &&
-           "expected first plan to be for the forced epilogue VF");
-    return {VectorizationFactor(UserVF, 0, 0), VPlans[0].get()};
-  }
+  // If the first plan was built for a single, user-specified VF with a valid
+  // cost, use it directly, as the user explicitly requested that VF. As for
+  // scalar VFs in plan(), skip the cost check for VF=1, as the VPlan-based cost
+  // model is designed for vector VFs only.
+  ElementCount UserVF = Hints.getWidth();
+  if (FirstPlan.hasSingleVF() && FirstPlan.hasVF(UserVF) &&
+      (UserVF.isScalar() || cost(FirstPlan, UserVF, /*RU=*/nullptr).isValid()))
+    return {VectorizationFactor(UserVF, 0, 0), &FirstPlan};
 
   LLVM_DEBUG(dbgs() << "LV: Computing best VF using cost kind: "
                     << (Config.CostKind == TTI::TCK_RecipThroughput
@@ -5892,8 +5871,6 @@ LoopVectorizationPlanner::computeBestVF() {
                             : "Unknown\n"));
 
   ElementCount ScalarVF = ElementCount::getFixed(1);
-  assert((ScalarPlanIsLazy || FirstPlan.hasVF(ScalarVF)) &&
-         "More than a single plan/VF w/o any plan having scalar VF");
 
   // TODO: Compute scalar cost using VPlan-based cost model.
   InstructionCost ScalarCost = CM.expectedCost(ScalarVF);
@@ -5909,9 +5886,7 @@ LoopVectorizationPlanner::computeBestVF() {
     BestFactor.Cost = InstructionCost::getMax();
   }
 
-  // In lazy mode no scalar plan exists yet; it is only built below if no vector
-  // VF wins.
-  VPlan *PlanForBestVF = ScalarPlanIsLazy ? nullptr : &FirstPlan;
+  VPlan *PlanForBestVF = nullptr;
 
   for (auto &P : VPlans) {
     ArrayRef<ElementCount> VFs(P->vectorFactors().begin(),
@@ -5960,12 +5935,13 @@ LoopVectorizationPlanner::computeBestVF() {
   }
 
   // No vector VF was profitable, so the scalar plan is the winner. Build it now
-  // if plan() deferred it.
+  // if plan() deferred it; if it cannot be built, there is nothing to execute.
   if (!PlanForBestVF) {
     assert(BestFactor.Width.isScalar() &&
            "must have a plan for a non-scalar best VF");
-    PlanForBestVF = buildScalarVPlan();
-    assert(PlanForBestVF && "scalar plan must be buildable here");
+    PlanForBestVF = getOrBuildScalarPlan();
+    if (!PlanForBestVF)
+      return {VectorizationFactor::Disabled(), nullptr};
   }
 
   VPlan &BestPlan = *PlanForBestVF;
@@ -6581,40 +6557,43 @@ VPRecipeBuilder::tryToCreateWidenNonPhiRecipe(VPSingleDefRecipe *R,
 static void printOptimizedVPlan(VPlan &) {}
 
 VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
-  bool IsInnerLoop = OrigLoop->isInnermost();
-
-  // Set up loop versioning for inner loops with memory runtime checks.
-  // Outer loops don't have LoopAccessInfo since canVectorizeMemory() is not
-  // called for them.
-  std::optional<LoopVersioning> LVer;
-  if (IsInnerLoop) {
-    const LoopAccessInfo *LAI = Legal->getLAI();
-    LVer.emplace(*LAI, LAI->getRuntimePointerChecking()->getChecks(), OrigLoop,
-                 LI, DT, PSE.getSE());
-    if (!LAI->getRuntimePointerChecking()->getChecks().empty() &&
-        !LAI->getRuntimePointerChecking()->getDiffChecks()) {
-      // Only use noalias metadata when using memory checks guaranteeing no
-      // overlap across all iterations.
-      LVer->prepareNoAliasMetadata();
+  // Create the initial base VPlan0 on first use, to serve as common starting
+  // point for all candidates built later, for specific VF ranges here and for
+  // VF=1 on demand in getOrBuildScalarPlan().
+  if (!VPlan0) {
+    // Set up loop versioning for inner loops with memory runtime checks.
+    // Outer loops don't have LoopAccessInfo since canVectorizeMemory() is not
+    // called for them.
+    std::optional<LoopVersioning> LVer;
+    if (OrigLoop->isInnermost()) {
+      const LoopAccessInfo *LAI = Legal->getLAI();
+      LVer.emplace(*LAI, LAI->getRuntimePointerChecking()->getChecks(),
+                   OrigLoop, LI, DT, PSE.getSE());
+      if (!LAI->getRuntimePointerChecking()->getChecks().empty() &&
+          !LAI->getRuntimePointerChecking()->getDiffChecks()) {
+        // Only use noalias metadata when using memory checks guaranteeing no
+        // overlap across all iterations.
+        LVer->prepareNoAliasMetadata();
+      }
     }
+    VPlan0 = VPlanTransforms::buildVPlan0(OrigLoop, *LI,
+                                          Legal->getWidestInductionType(), PSE,
+                                          LVer ? &*LVer : nullptr);
   }
 
-  // Create initial base VPlan0, to serve as common starting point for all
-  // candidates built later for specific VF ranges.
-  auto VPlan0 = VPlanTransforms::buildVPlan0(OrigLoop, *LI,
-                                             Legal->getWidestInductionType(),
-                                             PSE, LVer ? &*LVer : nullptr);
+  // Transform a copy of VPlan0, leaving it available to build further plans.
+  VPlanPtr VPlan1(VPlan0->duplicate());
 
-  VPDominatorTree VPDT(*VPlan0);
+  VPDominatorTree VPDT(*VPlan1);
   if (const LoopAccessInfo *LAI = Legal->getLAI())
-    RUN_VPLAN_PASS(VPlanTransforms::replaceSymbolicStrides, *VPlan0, PSE,
+    RUN_VPLAN_PASS(VPlanTransforms::replaceSymbolicStrides, *VPlan1, PSE,
                    LAI->getSymbolicStrides(), VPDT);
-  RUN_VPLAN_PASS(VPlanTransforms::simplifyRecipes, *VPlan0);
-  RUN_VPLAN_PASS(VPlanTransforms::removeDeadRecipes, *VPlan0);
+  RUN_VPLAN_PASS(VPlanTransforms::simplifyRecipes, *VPlan1);
+  RUN_VPLAN_PASS(VPlanTransforms::removeDeadRecipes, *VPlan1);
 
   // Create recipes for header phis. For outer loops, reductions, recurrences
   // and in-loop reductions are empty since legality doesn't detect them.
-  if (!RUN_VPLAN_PASS(VPlanTransforms::createHeaderPhiRecipes, *VPlan0, PSE,
+  if (!RUN_VPLAN_PASS(VPlanTransforms::createHeaderPhiRecipes, *VPlan1, PSE,
                       *OrigLoop, VPDT, Legal->getInductionVars(),
                       Legal->getReductionVars(),
                       Legal->getFixedOrderRecurrences(),
@@ -6623,7 +6602,7 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
   }
 
   if (const LoopAccessInfo *LAI = Legal->getLAI())
-    RUN_VPLAN_PASS(VPlanTransforms::replaceSymbolicStrides, *VPlan0, PSE,
+    RUN_VPLAN_PASS(VPlanTransforms::replaceSymbolicStrides, *VPlan1, PSE,
                    LAI->getSymbolicStrides(), VPDT);
 
   // Add surviving induction predicates to PSE and check constraints.
@@ -6635,11 +6614,11 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
   unsigned SCEVCheckThreshold = ForceVectorization
                                     ? PragmaVectorizeSCEVCheckThreshold
                                     : VectorizeSCEVCheckThreshold;
-  if (!RUN_VPLAN_PASS(VPlanTransforms::finalizeSCEVPredicates, *VPlan0, PSE,
+  if (!RUN_VPLAN_PASS(VPlanTransforms::finalizeSCEVPredicates, *VPlan1, PSE,
                       OptForSize, SCEVCheckThreshold, ORE, OrigLoop))
     return nullptr;
 
-  RUN_VPLAN_PASS(VPlanTransforms::addMiddleCheck, *VPlan0);
+  RUN_VPLAN_PASS(VPlanTransforms::addMiddleCheck, *VPlan1);
 
   // If we're vectorizing a loop with an uncountable exit, make sure that the
   // recipes are safe to handle.
@@ -6652,18 +6631,18 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
                   ? UncountableExitStyle::MaskedHandleExitInScalarLoop
                   : UncountableExitStyle::ReadOnly;
 
-  if (!RUN_VPLAN_PASS(VPlanTransforms::handleEarlyExits, *VPlan0, EEStyle,
+  if (!RUN_VPLAN_PASS(VPlanTransforms::handleEarlyExits, *VPlan1, EEStyle,
                       OrigLoop, PSE, *DT, Legal->getAssumptionCache())) {
     return nullptr;
   }
 
-  RUN_VPLAN_PASS(VPlanTransforms::createLoopRegions, *VPlan0,
+  RUN_VPLAN_PASS(VPlanTransforms::createLoopRegions, *VPlan1,
                  getDebugLocFromInstOrOperands(Legal->getPrimaryInduction()));
   if (CM.foldTailByMasking())
-    RUN_VPLAN_PASS(VPlanTransforms::foldTailByMasking, *VPlan0);
-  RUN_VPLAN_PASS(VPlanTransforms::introduceMasksAndLinearize, *VPlan0);
+    RUN_VPLAN_PASS(VPlanTransforms::foldTailByMasking, *VPlan1);
+  RUN_VPLAN_PASS(VPlanTransforms::introduceMasksAndLinearize, *VPlan1);
 
-  return VPlan0;
+  return VPlan1;
 }
 
 void LoopVectorizationPlanner::buildVPlans(VPlan &VPlan1, ElementCount MinVF,

@@ -5032,6 +5032,9 @@ public:
     return VFs[0];
   }
 
+  /// Returns true if the plan has been built for a single VF.
+  bool hasSingleVF() const { return VFs.size() == 1; }
+
   bool hasScalarVFOnly() const {
     bool HasScalarVFOnly = VFs.size() == 1 && VFs[0].isScalar();
     assert(HasScalarVFOnly == hasVF(ElementCount::getFixed(1)) &&
