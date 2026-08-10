@@ -269,7 +269,7 @@ bool ConstraintSystem::mayHaveSolution() {
   return HasSolution;
 }
 
-std::pair<ConstraintSystem, SmallVector<int64_t, 8>>
+std::pair<ConstraintSystem, ConstraintSystem::CoeffVector>
 ConstraintSystem::getSubSystem(ArrayRef<int64_t> R) const {
   // Only constraints that share a variable (transitively) with a query R can
   // affect whether system + !R has a solution.
@@ -321,7 +321,7 @@ ConstraintSystem::getSubSystem(ArrayRef<int64_t> R) const {
   }
 
   // Remap the query row into the component's compact index space.
-  SmallVector<int64_t, 8> NewR(SubSystem.NumVariables, 0);
+  CoeffVector NewR(SubSystem.NumVariables, 0);
   NewR[0] = R[0];
   for (unsigned Id = 1, E = R.size(); Id < E; ++Id)
     if (R[Id] != 0)
@@ -329,7 +329,7 @@ ConstraintSystem::getSubSystem(ArrayRef<int64_t> R) const {
   return {std::move(SubSystem), std::move(NewR)};
 }
 
-bool ConstraintSystem::isConditionImplied(SmallVector<int64_t, 8> R) const {
+bool ConstraintSystem::isConditionImplied(CoeffVector R) const {
   // If all variable coefficients are 0, we have 'C >= 0'. If the constant is >=
   // 0, R is always true, regardless of the system.
   if (all_of(ArrayRef(R).drop_front(1), equal_to(0)))
@@ -346,8 +346,7 @@ bool ConstraintSystem::isConditionImplied(SmallVector<int64_t, 8> R) const {
   return !Copy.mayHaveSolution();
 }
 
-bool ConstraintSystem::isConditionImpliedInSubSystem(
-    SmallVector<int64_t, 8> R) const {
+bool ConstraintSystem::isConditionImpliedInSubSystem(CoeffVector R) const {
   if (R.empty())
     return false;
 
