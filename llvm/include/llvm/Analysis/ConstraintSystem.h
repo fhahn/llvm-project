@@ -125,13 +125,30 @@ public:
   /// Returns true if there may be a solution for the constraints in the system.
   LLVM_ABI bool mayHaveSolution();
 
-  static CoeffVector negate(CoeffVector R) {
+  /// Negates \p R in place, turning 'R <= C' into 'R > C'. Returns false if a
+  /// coefficient overflows, in which case \p R must not be used any longer.
+  static bool negateInPlace(CoeffVector &R) {
     // The negated constraint R is obtained by multiplying by -1 and adding 1 to
     // the constant.
     if (AddOverflow(R[0], int64_t(1), R[0]))
-      return {};
+      return false;
 
-    return negateOrEqual(R);
+    return negateOrEqualInPlace(R);
+  }
+
+  /// Multiplies each coefficient of \p R by -1, in place. Returns false if a
+  /// coefficient overflows, in which case \p R must not be used any longer.
+  static bool negateOrEqualInPlace(CoeffVector &R) {
+    for (auto &C : R)
+      if (MulOverflow(C, int64_t(-1), C))
+        return false;
+    return true;
+  }
+
+  static CoeffVector negate(CoeffVector R) {
+    if (!negateInPlace(R))
+      return {};
+    return R;
   }
 
   /// Multiplies each coefficient in the given vector by -1. Does not modify the
@@ -139,10 +156,8 @@ public:
   ///
   /// \param R The vector of coefficients to be negated.
   static CoeffVector negateOrEqual(CoeffVector R) {
-    // The negated constraint R is obtained by multiplying by -1.
-    for (auto &C : R)
-      if (MulOverflow(C, int64_t(-1), C))
-        return {};
+    if (!negateOrEqualInPlace(R))
+      return {};
     return R;
   }
 
@@ -165,7 +180,12 @@ public:
   getSubSystem(ArrayRef<int64_t> R) const;
 
   LLVM_ABI bool isConditionImplied(CoeffVector R) const;
-  LLVM_ABI bool isConditionImpliedInSubSystem(CoeffVector R) const;
+
+  /// Like isConditionImplied, but solves the system in place instead of
+  /// copying it first. The system must not be used afterwards.
+  LLVM_ABI bool isConditionImpliedDestructive(CoeffVector R);
+
+  LLVM_ABI bool isConditionImpliedInSubSystem(ArrayRef<int64_t> R) const;
 
   SmallVector<int64_t> getLastConstraint() const {
     assert(!Constraints.empty() && "Constraint system is empty");

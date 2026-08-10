@@ -329,33 +329,49 @@ ConstraintSystem::getSubSystem(ArrayRef<int64_t> R) const {
   return {std::move(SubSystem), std::move(NewR)};
 }
 
-bool ConstraintSystem::isConditionImplied(CoeffVector R) const {
+bool ConstraintSystem::isConditionImpliedDestructive(CoeffVector R) {
   // If all variable coefficients are 0, we have 'C >= 0'. If the constant is >=
   // 0, R is always true, regardless of the system.
   if (all_of(ArrayRef(R).drop_front(1), equal_to(0)))
     return R[0] >= 0;
 
-  // If there is no solution with the negation of R added to the system, the
-  // condition must hold based on the existing constraints.
-  R = ConstraintSystem::negate(R);
-  if (R.empty())
+  // A condition mentioning at least one variable can never be implied by a
+  // system without any rows, so there is no need to solve one.
+  if (Constraints.empty())
     return false;
 
-  auto Copy = *this;
-  Copy.addVariableRow(R);
-  return !Copy.mayHaveSolution();
+  // If there is no solution with the negation of R added to the system, the
+  // condition must hold based on the existing constraints.
+  if (!negateInPlace(R))
+    return false;
+
+  addVariableRow(R);
+  return !mayHaveSolution();
 }
 
-bool ConstraintSystem::isConditionImpliedInSubSystem(CoeffVector R) const {
+bool ConstraintSystem::isConditionImplied(CoeffVector R) const {
+  // Queries that need no solving are decided without copying the system.
+  if (all_of(ArrayRef(R).drop_front(1), equal_to(0)))
+    return R[0] >= 0;
+  if (Constraints.empty())
+    return false;
+
+  // mayHaveSolution destroys the system, so it has to run on a copy.
+  auto Copy = *this;
+  return Copy.isConditionImpliedDestructive(std::move(R));
+}
+
+bool ConstraintSystem::isConditionImpliedInSubSystem(ArrayRef<int64_t> R) const {
   if (R.empty())
     return false;
 
   // Queries with no variables are trivially decided without building any
   // component.
-  if (all_of(ArrayRef(R).drop_front(1), equal_to(0)))
+  if (all_of(R.drop_front(1), equal_to(0)))
     return R[0] >= 0;
 
-  // A single query: build the component and solve it in place.
-  const auto &[SubCS, NewR] = getSubSystem(R);
-  return SubCS.isConditionImplied(NewR);
+  // A single query: the component is a temporary owned by this function, so it
+  // can be solved in place, without the copy isConditionImplied has to make.
+  auto [SubCS, NewR] = getSubSystem(R);
+  return SubCS.isConditionImpliedDestructive(std::move(NewR));
 }

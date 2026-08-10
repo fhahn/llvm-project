@@ -851,7 +851,15 @@ ConstraintTy ConstraintInfo::getConstraintForSolving(CmpInst::Predicate Pred,
 
 std::optional<bool>
 ConstraintTy::isImpliedBy(const ConstraintSystem &CS) const {
-  const auto &[SubCS, NewCoefficients] = CS.getSubSystem(Coefficients);
+  auto [SubCS, NewCoefficients] = CS.getSubSystem(Coefficients);
+  // If no row of the system shares a variable (transitively) with the query,
+  // none of the queries below can be implied. Queries without any variable are
+  // decided from the constant alone and must not be skipped here.
+  if (SubCS.size() == 0 &&
+      any_of(ArrayRef(NewCoefficients).drop_front(1),
+             [](int64_t C) { return C != 0; }))
+    return std::nullopt;
+
   bool IsConditionImplied = SubCS.isConditionImplied(NewCoefficients);
 
   if (IsEq || IsNe) {
@@ -886,8 +894,12 @@ ConstraintTy::isImpliedBy(const ConstraintSystem &CS) const {
   if (IsConditionImplied)
     return true;
 
-  auto Negated = ConstraintSystem::negate(NewCoefficients);
-  auto IsNegatedImplied = !Negated.empty() && SubCS.isConditionImplied(Negated);
+  // This is the last query against SubCS, which is a temporary owned by this
+  // function, so it can be solved in place instead of on another copy.
+  auto Negated = std::move(NewCoefficients);
+  auto IsNegatedImplied =
+      ConstraintSystem::negateInPlace(Negated) &&
+      SubCS.isConditionImpliedDestructive(std::move(Negated));
   if (IsNegatedImplied)
     return false;
 
