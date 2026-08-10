@@ -54,8 +54,15 @@ class ConstraintSystem {
   /// constraint system.
   DenseMap<Value *, unsigned> Value2Index;
 
+  /// Result of eliminating a single variable using Fourier–Motzkin.
+  enum class FMResult {
+    Eliminated, ///< The variable was eliminated from the system.
+    Unsat,      ///< A contradiction was derived, the system has no solution.
+    TooLarge    ///< The system grew too large, give up.
+  };
+
   // Eliminate constraints from the system using Fourier–Motzkin elimination.
-  bool eliminateUsingFM();
+  FMResult eliminateUsingFM();
 
   /// Returns true if there may be a solution for the constraints in the system.
   bool mayHaveSolutionImpl();
