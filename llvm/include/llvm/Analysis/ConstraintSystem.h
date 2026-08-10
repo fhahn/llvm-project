@@ -100,6 +100,12 @@ public:
   /// system, so a small inline capacity makes most queries allocate.
   using CoeffVector = SmallVector<int64_t, 32>;
 
+  /// Returns true if no variable of \p R has a non-zero coefficient, i.e. \p R
+  /// is a statement about constants alone.
+  static bool isConstantOnly(ArrayRef<int64_t> R) {
+    return all_of(R.drop_front(1), equal_to(0));
+  }
+
   ConstraintSystem() = default;
   ConstraintSystem(ArrayRef<Value *> FunctionArgs) {
     NumVariables += FunctionArgs.size();
@@ -115,7 +121,7 @@ public:
     assert(Constraints.empty() || R.size() == NumVariables);
     // If all variable coefficients are 0, the constraint does not provide any
     // usable information.
-    if (all_of(ArrayRef(R).drop_front(1), [](int64_t C) { return C == 0; }))
+    if (isConstantOnly(R))
       return false;
 
     SmallVector<Entry, 4> NewRow;
@@ -138,7 +144,7 @@ public:
   bool addVariableRowFill(ArrayRef<int64_t> R) {
     // If all variable coefficients are 0, the constraint does not provide any
     // usable information.
-    if (all_of(ArrayRef(R).drop_front(1), [](int64_t C) { return C == 0; }))
+    if (isConstantOnly(R))
       return false;
 
     NumVariables = std::max(R.size(), NumVariables);
@@ -231,6 +237,9 @@ public:
 
   /// Returns the number of rows in the constraint system.
   unsigned size() const { return Constraints.size(); }
+
+  /// Returns true if the system does not have any rows.
+  bool empty() const { return Constraints.empty(); }
 
   /// Print the constraints in the system.
   LLVM_ABI void dump() const;

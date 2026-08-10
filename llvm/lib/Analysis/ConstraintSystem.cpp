@@ -337,12 +337,12 @@ bool ConstraintSystem::isConditionImpliedDestructive(CoeffVector R) {
   assertNotSolved();
   // If all variable coefficients are 0, we have 'C >= 0'. If the constant is >=
   // 0, R is always true, regardless of the system.
-  if (all_of(ArrayRef(R).drop_front(1), equal_to(0)))
+  if (isConstantOnly(R))
     return R[0] >= 0;
 
   // A condition mentioning at least one variable can never be implied by a
   // system without any rows, so there is no need to solve one.
-  if (Constraints.empty())
+  if (empty())
     return false;
 
   // If there is no solution with the negation of R added to the system, the
@@ -355,24 +355,24 @@ bool ConstraintSystem::isConditionImpliedDestructive(CoeffVector R) {
 }
 
 bool ConstraintSystem::isConditionImplied(CoeffVector R) const {
-  // Queries that need no solving are decided without copying the system.
-  if (all_of(ArrayRef(R).drop_front(1), equal_to(0)))
+  assertNotSolved();
+  // A query that does not need the system is decided without copying it.
+  if (isConstantOnly(R))
     return R[0] >= 0;
-  if (Constraints.empty())
-    return false;
 
   // mayHaveSolution destroys the system, so it has to run on a copy.
   auto Copy = *this;
   return Copy.isConditionImpliedDestructive(std::move(R));
 }
 
-bool ConstraintSystem::isConditionImpliedInSubSystem(ArrayRef<int64_t> R) const {
+bool ConstraintSystem::isConditionImpliedInSubSystem(
+    ArrayRef<int64_t> R) const {
   if (R.empty())
     return false;
 
   // Queries with no variables are trivially decided without building any
   // component.
-  if (all_of(R.drop_front(1), equal_to(0)))
+  if (isConstantOnly(R))
     return R[0] >= 0;
 
   // A single query: the component is a temporary owned by this function, so it
