@@ -376,15 +376,19 @@ public:
   }
 
   /// Return the value of this chain of recurrences at the specified
-  /// iteration number.
-  LLVM_ABI const SCEV *evaluateAtIteration(const SCEV *It,
-                                           ScalarEvolution &SE) const;
+  /// iteration number. \p Flags are the no-wrap flags to put on the resulting
+  /// closed form; only pass the recurrence's own flags for iteration numbers
+  /// the recurrence is known to actually reach.
+  LLVM_ABI const SCEV *
+  evaluateAtIteration(const SCEV *It, ScalarEvolution &SE,
+                      SCEV::NoWrapFlags Flags = SCEV::FlagAnyWrap) const;
 
   /// Return the value of this chain of recurrences at the specified iteration
   /// number. Takes an explicit list of operands to represent an AddRec.
-  LLVM_ABI static const SCEV *evaluateAtIteration(ArrayRef<SCEVUse> Operands,
-                                                  const SCEV *It,
-                                                  ScalarEvolution &SE);
+  LLVM_ABI static const SCEV *
+  evaluateAtIteration(ArrayRef<SCEVUse> Operands, const SCEV *It,
+                      ScalarEvolution &SE,
+                      SCEV::NoWrapFlags Flags = SCEV::FlagAnyWrap);
 
   /// Return the number of iterations of this loop that produce
   /// values in the specified constant range.  Another way of

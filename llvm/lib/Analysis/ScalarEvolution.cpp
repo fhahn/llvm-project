@@ -1031,14 +1031,30 @@ static const SCEV *BinomialCoefficient(const SCEV *It, unsigned K,
 ///
 /// where BC(It, k) stands for binomial coefficient.
 const SCEV *SCEVAddRecExpr::evaluateAtIteration(const SCEV *It,
-                                                ScalarEvolution &SE) const {
-  return evaluateAtIteration(operands(), It, SE);
+                                                ScalarEvolution &SE,
+                                                SCEV::NoWrapFlags Flags) const {
+  return evaluateAtIteration(operands(), It, SE, Flags);
 }
 
 const SCEV *SCEVAddRecExpr::evaluateAtIteration(ArrayRef<SCEVUse> Operands,
                                                 const SCEV *It,
-                                                ScalarEvolution &SE) {
+                                                ScalarEvolution &SE,
+                                                SCEV::NoWrapFlags Flags) {
   assert(Operands.size() > 0);
+  // Only an affine recurrence has a closed form of the shape the recurrence's
+  // own no-wrap flags can carry over to.
+  Flags = Operands.size() == 2
+              ? ScalarEvolution::maskFlags(Flags, SCEV::FlagNUW | SCEV::FlagNSW)
+              : SCEV::FlagAnyWrap;
+  if (ScalarEvolution::hasFlags(Flags, SCEV::FlagNSW)) {
+    // It * Step is value(It) - Start. For FlagNUW that is bounded by
+    // UINT_MAX - Start and cannot wrap, but in the signed sense it is only
+    // representable if Start and Step have the same sign.
+    SCEVUse Start = Operands[0], Step = Operands[1];
+    if (!((SE.isKnownNonNegative(Start) && SE.isKnownNonNegative(Step)) ||
+          (SE.isKnownNonPositive(Start) && SE.isKnownNonPositive(Step))))
+      Flags = ScalarEvolution::clearFlags(Flags, SCEV::FlagNSW);
+  }
   const SCEV *Result = Operands[0].getPointer();
   for (unsigned i = 1, e = Operands.size(); i != e; ++i) {
     // The computation is correct in the face of overflow provided that the
@@ -1048,8 +1064,8 @@ const SCEV *SCEVAddRecExpr::evaluateAtIteration(ArrayRef<SCEVUse> Operands,
     if (isa<SCEVCouldNotCompute>(Coeff))
       return Coeff;
 
-    Result =
-        SE.getAddExpr(Result, SE.getMulExpr(Operands[i].getPointer(), Coeff));
+    Result = SE.getAddExpr(
+        Result, SE.getMulExpr(Operands[i].getPointer(), Coeff, Flags), Flags);
   }
   return Result;
 }
@@ -10294,8 +10310,10 @@ const SCEV *ScalarEvolution::computeSCEVAtScope(const SCEV *V, const Loop *L) {
       if (BackedgeTakenCount == getCouldNotCompute())
         return AddRec;
 
-      // Then, evaluate the AddRec.
-      return AddRec->evaluateAtIteration(BackedgeTakenCount, *this);
+      // Then, evaluate the AddRec. The recurrence reaches this iteration, so
+      // its no-wrap flags hold for the value computed here.
+      return AddRec->evaluateAtIteration(BackedgeTakenCount, *this,
+                                         AddRec->getNoWrapFlags());
     }
 
     return AddRec;

@@ -50,13 +50,13 @@ define void @infer.zext.0(ptr %c, i32 %start, ptr %buf) {
 ; CHECK-NEXT:    %counter = phi i32 [ 0, %entry ], [ %counter.inc, %loop ]
 ; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,2) S: [0,2) Exits: 1 LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %idx = phi i32 [ %start, %entry ], [ %idx.inc, %loop ]
-; CHECK-NEXT:    --> {%start,+,1}<nuw><%loop> U: full-set S: full-set Exits: (1 + %start) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {%start,+,1}<nuw><%loop> U: full-set S: full-set Exits: (1 + %start)<nuw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %idx.inc = add nuw i32 %idx, 1
-; CHECK-NEXT:    --> {(1 + %start)<nuw>,+,1}<nuw><%loop> U: [1,0) S: [1,0) Exits: (2 + %start) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(1 + %start)<nuw>,+,1}<nuw><%loop> U: [1,0) S: [1,0) Exits: (2 + %start)<nuw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %idx.inc.sext = zext i32 %idx.inc to i64
 ; CHECK-NEXT:    --> {(1 + (zext i32 %start to i64))<nuw><nsw>,+,1}<nuw><%loop> U: [1,4294967298) S: [1,4294967298) Exits: (2 + (zext i32 %start to i64))<nuw><nsw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %buf.gep = getelementptr inbounds i32, ptr %buf, i32 %idx.inc
-; CHECK-NEXT:    --> ((4 * (sext i32 {(1 + %start)<nuw>,+,1}<nuw><%loop> to i64))<nsw> + %buf) U: full-set S: full-set Exits: ((4 * (sext i32 (2 + %start) to i64))<nsw> + %buf) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> ((4 * (sext i32 {(1 + %start)<nuw>,+,1}<nuw><%loop> to i64))<nsw> + %buf) U: full-set S: full-set Exits: ((4 * (sext i32 (2 + %start)<nuw> to i64))<nsw> + %buf) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %val = load i32, ptr %buf.gep, align 4
 ; CHECK-NEXT:    --> %val U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:    %counter.inc = add i32 %counter, 1

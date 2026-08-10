@@ -1154,9 +1154,9 @@ define void @test-mul-nuw(ptr %input, i32 %stride, i32 %numIterations) {
 ; CHECK-NEXT:    %i = phi i32 [ %nexti, %loop ], [ 0, %entry ]
 ; CHECK-NEXT:    --> {0,+,1}<nuw><%loop> U: full-set S: full-set Exits: (-1 + %numIterations) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %index32 = mul nuw i32 %i, %stride
-; CHECK-NEXT:    --> {0,+,%stride}<nuw><%loop> U: full-set S: full-set Exits: ((-1 + %numIterations) * %stride) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {0,+,%stride}<nuw><%loop> U: full-set S: full-set Exits: ((-1 + %numIterations) * %stride)<nuw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %ptr = getelementptr inbounds float, ptr %input, i32 %index32
-; CHECK-NEXT:    --> ((4 * (sext i32 {0,+,%stride}<nuw><%loop> to i64))<nsw> + %input) U: full-set S: full-set Exits: ((4 * (sext i32 ((-1 + %numIterations) * %stride) to i64))<nsw> + %input) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> ((4 * (sext i32 {0,+,%stride}<nuw><%loop> to i64))<nsw> + %input) U: full-set S: full-set Exits: ((4 * (sext i32 ((-1 + %numIterations) * %stride)<nuw> to i64))<nsw> + %input) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %nexti = add nuw i32 %i, 1
 ; CHECK-NEXT:    --> {1,+,1}<nuw><%loop> U: [1,0) S: [1,0) Exits: %numIterations LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @test-mul-nuw
@@ -2044,9 +2044,9 @@ define void @addrec_gep_inbounds_nneg(ptr %p, ptr %end) {
 ; CHECK-LABEL: 'addrec_gep_inbounds_nneg'
 ; CHECK-NEXT:  Classifying expressions for: @addrec_gep_inbounds_nneg
 ; CHECK-NEXT:    %iv = phi ptr [ %p, %entry ], [ %iv.next, %loop ]
-; CHECK-NEXT:    --> {%p,+,4}<nuw><%loop> U: full-set S: full-set Exits: ((4 * ((-4 + (-1 * (ptrtoaddr ptr %p to i64)) + (ptrtoaddr ptr %end to i64)) /u 4))<nuw> + %p) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {%p,+,4}<nuw><%loop> U: full-set S: full-set Exits: ((4 * ((-4 + (-1 * (ptrtoaddr ptr %p to i64)) + (ptrtoaddr ptr %end to i64)) /u 4))<nuw> + %p)<nuw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = getelementptr inbounds i32, ptr %iv, i64 1
-; CHECK-NEXT:    --> {(4 + %p)<nuw>,+,4}<nuw><%loop> U: [4,0) S: [4,0) Exits: (4 + (4 * ((-4 + (-1 * (ptrtoaddr ptr %p to i64)) + (ptrtoaddr ptr %end to i64)) /u 4))<nuw> + %p) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(4 + %p)<nuw>,+,4}<nuw><%loop> U: [4,0) S: [4,0) Exits: (4 + (4 * ((-4 + (-1 * (ptrtoaddr ptr %p to i64)) + (ptrtoaddr ptr %end to i64)) /u 4))<nuw> + %p)<nuw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @addrec_gep_inbounds_nneg
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is ((-4 + (-1 * (ptrtoaddr ptr %p to i64)) + (ptrtoaddr ptr %end to i64)) /u 4)
 ; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 4611686018427387903
@@ -2092,9 +2092,9 @@ define void @addrec_gep_nusw_nneg(ptr %p, ptr %end) {
 ; CHECK-LABEL: 'addrec_gep_nusw_nneg'
 ; CHECK-NEXT:  Classifying expressions for: @addrec_gep_nusw_nneg
 ; CHECK-NEXT:    %iv = phi ptr [ %p, %entry ], [ %iv.next, %loop ]
-; CHECK-NEXT:    --> {%p,+,4}<nuw><%loop> U: full-set S: full-set Exits: ((4 * ((-4 + (-1 * (ptrtoaddr ptr %p to i64)) + (ptrtoaddr ptr %end to i64)) /u 4))<nuw> + %p) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {%p,+,4}<nuw><%loop> U: full-set S: full-set Exits: ((4 * ((-4 + (-1 * (ptrtoaddr ptr %p to i64)) + (ptrtoaddr ptr %end to i64)) /u 4))<nuw> + %p)<nuw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = getelementptr nusw i32, ptr %iv, i64 1
-; CHECK-NEXT:    --> {(4 + %p)<nuw>,+,4}<nuw><%loop> U: [4,0) S: [4,0) Exits: (4 + (4 * ((-4 + (-1 * (ptrtoaddr ptr %p to i64)) + (ptrtoaddr ptr %end to i64)) /u 4))<nuw> + %p) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(4 + %p)<nuw>,+,4}<nuw><%loop> U: [4,0) S: [4,0) Exits: (4 + (4 * ((-4 + (-1 * (ptrtoaddr ptr %p to i64)) + (ptrtoaddr ptr %end to i64)) /u 4))<nuw> + %p)<nuw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @addrec_gep_nusw_nneg
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is ((-4 + (-1 * (ptrtoaddr ptr %p to i64)) + (ptrtoaddr ptr %end to i64)) /u 4)
 ; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 4611686018427387903

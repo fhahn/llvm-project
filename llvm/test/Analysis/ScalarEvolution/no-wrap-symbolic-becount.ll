@@ -126,7 +126,7 @@ define void @pointer_iv_nowrap_guard(ptr %startptr, ptr %endptr) local_unnamed_a
 ; CHECK-NEXT:    %init = getelementptr inbounds i32, ptr %startptr, i64 2000
 ; CHECK-NEXT:    --> (8000 + %startptr)<nuw> U: [8000,0) S: [8000,0)
 ; CHECK-NEXT:    %iv = phi ptr [ %init, %entry ], [ %iv.next, %loop ]
-; CHECK-NEXT:    --> {(8000 + %startptr)<nuw>,+,4}<nuw><%loop> U: [8000,0) S: [8000,0) Exits: (8000 + (4 * ((-8001 + (-1 * (ptrtoaddr ptr %startptr to i64)) + ((8004 + (ptrtoaddr ptr %startptr to i64)) umax (ptrtoaddr ptr %endptr to i64))) /u 4))<nuw> + %startptr) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(8000 + %startptr)<nuw>,+,4}<nuw><%loop> U: [8000,0) S: [8000,0) Exits: (8000 + (4 * ((-8001 + (-1 * (ptrtoaddr ptr %startptr to i64)) + ((8004 + (ptrtoaddr ptr %startptr to i64)) umax (ptrtoaddr ptr %endptr to i64))) /u 4))<nuw> + %startptr)<nuw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = getelementptr inbounds i32, ptr %iv, i64 1
 ; CHECK-NEXT:    --> {(8004 + %startptr),+,4}<nuw><%loop> U: full-set S: full-set Exits: (8004 + (4 * ((-8001 + (-1 * (ptrtoaddr ptr %startptr to i64)) + ((8004 + (ptrtoaddr ptr %startptr to i64)) umax (ptrtoaddr ptr %endptr to i64))) /u 4))<nuw> + %startptr) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @pointer_iv_nowrap_guard
