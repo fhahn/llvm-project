@@ -2398,6 +2398,77 @@ static Instruction *foldICmpUSubSatWithAndForMostSignificantBitCmp(
 }
 
 /// Visit a SelectInst that has an ICmpInst as its first operand.
+/// Fold a select between a shift and the constant that shift produces at the
+/// value the condition compares against, into a shift by a clamped amount:
+///   (X u< C) ? (A shift C) : (A shift X) --> A shift umax(X, C)
+///   (X u> C) ? (A shift C) : (A shift X) --> A shift umin(X, C)
+/// The constant arm is exactly the shift evaluated at the boundary, so clamping
+/// the shift amount gives the same value on both sides of the compare. This
+/// recovers the min/max form when the compare is against the shift amount
+/// instead of the shift itself.
+static Value *foldSelectWithClampedShiftAmount(SelectInst &SI, ICmpInst &ICI,
+                                               InstCombiner::BuilderTy &Builder) {
+  const APInt *CmpC;
+  if (!match(ICI.getOperand(1), m_APInt(CmpC)))
+    return nullptr;
+  Value *X = ICI.getOperand(0);
+
+  // Normalize so that the constant is the arm selected when the compare holds.
+  CmpInst::Predicate Pred = ICI.getPredicate();
+  Value *ConstArm = SI.getTrueValue(), *ShiftArm = SI.getFalseValue();
+  const APInt *ArmC;
+  if (!match(ConstArm, m_APInt(ArmC))) {
+    std::swap(ConstArm, ShiftArm);
+    Pred = CmpInst::getInversePredicate(Pred);
+    if (!match(ConstArm, m_APInt(ArmC)))
+      return nullptr;
+  }
+
+  // Only the strict predicates have a well-defined boundary value; InstCombine
+  // canonicalizes the others to those.
+  Intrinsic::ID ClampID;
+  if (Pred == ICmpInst::ICMP_ULT)
+    ClampID = Intrinsic::umax;
+  else if (Pred == ICmpInst::ICMP_UGT)
+    ClampID = Intrinsic::umin;
+  else
+    return nullptr;
+
+  // The shift has to be by the compared value, and go away with the select. An
+  // out-of-range shift amount would make the boundary value poison, so it
+  // cannot be the constant the other arm matched.
+  BinaryOperator *Shift;
+  const APInt *ShiftedC;
+  if (!match(ShiftArm, m_OneUse(m_CombineAnd(
+                           m_BinOp(Shift),
+                           m_Shift(m_APInt(ShiftedC), m_Specific(X))))) ||
+      CmpC->uge(ShiftedC->getBitWidth()))
+    return nullptr;
+
+  APInt AtBoundary;
+  switch (Shift->getOpcode()) {
+  case Instruction::Shl:
+    AtBoundary = ShiftedC->shl(*CmpC);
+    break;
+  case Instruction::LShr:
+    AtBoundary = ShiftedC->lshr(*CmpC);
+    break;
+  case Instruction::AShr:
+    AtBoundary = ShiftedC->ashr(*CmpC);
+    break;
+  default:
+    llvm_unreachable("not a shift");
+  }
+  if (AtBoundary != *ArmC)
+    return nullptr;
+
+  Value *Clamped = Builder.CreateBinaryIntrinsic(
+      ClampID, X, ConstantInt::get(X->getType(), *CmpC));
+  // The shift by the clamped amount can lose bits the original could not, so
+  // the no-wrap and exact flags do not carry over.
+  return Builder.CreateBinOp(Shift->getOpcode(), Shift->getOperand(0), Clamped);
+}
+
 Instruction *InstCombinerImpl::foldSelectInstWithICmp(SelectInst &SI,
                                                       ICmpInst *ICI) {
   if (Value *V =
@@ -2408,6 +2479,9 @@ Instruction *InstCombinerImpl::foldSelectInstWithICmp(SelectInst &SI,
     return replaceInstUsesWith(SI, V);
 
   if (Value *V = canonicalizeClampLike(SI, *ICI, Builder, *this))
+    return replaceInstUsesWith(SI, V);
+
+  if (Value *V = foldSelectWithClampedShiftAmount(SI, *ICI, Builder))
     return replaceInstUsesWith(SI, V);
 
   if (Instruction *NewSel =
