@@ -12915,6 +12915,41 @@ static bool IsKnownPredicateViaAddRecStart(ScalarEvolution &SE,
   return SE.isKnownPredicate(Pred, LStart, RStart);
 }
 
+/// Is LHS `Pred` RHS true because one of them is an AddRec that is known not to
+/// go below its own start value, which is the other side?
+static bool IsKnownPredicateViaAddRecMonotonicity(ScalarEvolution &SE,
+                                                  CmpPredicate Pred,
+                                                  const SCEV *LHS,
+                                                  const SCEV *RHS) {
+  if (!ICmpInst::isRelational(Pred))
+    return false;
+
+  // Normalize to (AddRec Pred Start).
+  if (!isa<SCEVAddRecExpr>(LHS) && isa<SCEVAddRecExpr>(RHS)) {
+    Pred = ICmpInst::getSwappedCmpPredicate(Pred);
+    std::swap(LHS, RHS);
+  }
+
+  const auto *AR = dyn_cast<SCEVAddRecExpr>(LHS);
+  if (!AR || AR->getStart() != RHS)
+    return false;
+
+  // With FlagNUW every step adds without unsigned wrap, so the recurrence
+  // cannot become unsigned-smaller than the value it started at, whatever the
+  // steps are. In the signed sense the same holds with FlagNSW, as long as the
+  // step cannot be negative.
+  bool IsSigned = ICmpInst::isSigned(Pred);
+  if (!AR->getNoWrapFlags(IsSigned ? SCEV::FlagNSW : SCEV::FlagNUW))
+    return false;
+  if (IsSigned && (!AR->isAffine() ||
+                   !SE.isKnownNonNegative(AR->getStepRecurrence(SE))))
+    return false;
+
+  // The recurrence is equal to Start in the first iteration, so only the
+  // non-strict predicate holds.
+  return Pred == (IsSigned ? ICmpInst::ICMP_SGE : ICmpInst::ICMP_UGE);
+}
+
 /// Is LHS `Pred` RHS true on the virtue of LHS or RHS being a Min or Max
 /// expression?
 static bool IsKnownPredicateViaMinOrMax(ScalarEvolution &SE, CmpPredicate Pred,
@@ -13175,6 +13210,7 @@ bool ScalarEvolution::isKnownViaNonRecursiveReasoning(CmpPredicate Pred,
          isKnownPredicateViaConstantRanges(Pred, LHS, RHS) ||
          IsKnownPredicateViaMinOrMax(*this, Pred, LHS, RHS) ||
          IsKnownPredicateViaAddRecStart(*this, Pred, LHS, RHS) ||
+         IsKnownPredicateViaAddRecMonotonicity(*this, Pred, LHS, RHS) ||
          isKnownPredicateViaNoOverflow(Pred, LHS, RHS);
 }
 
