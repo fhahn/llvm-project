@@ -71,6 +71,13 @@ class ConstraintSystem {
   SmallVector<std::string> getVarNamesList() const;
 
 public:
+  /// Dense vector of coefficients of a constraint, indexed by variable, with
+  /// the constant part at index 0. The inline capacity covers the vast
+  /// majority of the constraints built for a query, which keeps them off the
+  /// heap; the vectors are sized after the number of variables of the whole
+  /// system, so a small inline capacity makes most queries allocate.
+  using CoeffVector = SmallVector<int64_t, 32>;
+
   ConstraintSystem() = default;
   ConstraintSystem(ArrayRef<Value *> FunctionArgs) {
     NumVariables += FunctionArgs.size();
@@ -118,7 +125,7 @@ public:
   /// Returns true if there may be a solution for the constraints in the system.
   LLVM_ABI bool mayHaveSolution();
 
-  static SmallVector<int64_t, 8> negate(SmallVector<int64_t, 8> R) {
+  static CoeffVector negate(CoeffVector R) {
     // The negated constraint R is obtained by multiplying by -1 and adding 1 to
     // the constant.
     if (AddOverflow(R[0], int64_t(1), R[0]))
@@ -131,7 +138,7 @@ public:
   /// original vector.
   ///
   /// \param R The vector of coefficients to be negated.
-  static SmallVector<int64_t, 8> negateOrEqual(SmallVector<int64_t, 8> R) {
+  static CoeffVector negateOrEqual(CoeffVector R) {
     // The negated constraint R is obtained by multiplying by -1.
     for (auto &C : R)
       if (MulOverflow(C, int64_t(-1), C))
@@ -143,7 +150,7 @@ public:
   /// modify the original vector.
   ///
   /// \param R The vector of coefficients to be converted.
-  static SmallVector<int64_t, 8> toStrictLessThan(SmallVector<int64_t, 8> R) {
+  static CoeffVector toStrictLessThan(CoeffVector R) {
     // The strict less than is obtained by subtracting 1 from the constant.
     if (SubOverflow(R[0], int64_t(1), R[0])) {
       return {};
@@ -154,11 +161,11 @@ public:
   /// Build and return a sub-system of constraints connected (transitively) to
   /// query \p R, with variables compacted to a dense index range. Also
   /// translate \p R's entries to the sub-system.
-  LLVM_ABI std::pair<ConstraintSystem, SmallVector<int64_t, 8>>
+  LLVM_ABI std::pair<ConstraintSystem, CoeffVector>
   getSubSystem(ArrayRef<int64_t> R) const;
 
-  LLVM_ABI bool isConditionImplied(SmallVector<int64_t, 8> R) const;
-  LLVM_ABI bool isConditionImpliedInSubSystem(SmallVector<int64_t, 8> R) const;
+  LLVM_ABI bool isConditionImplied(CoeffVector R) const;
+  LLVM_ABI bool isConditionImpliedInSubSystem(CoeffVector R) const;
 
   SmallVector<int64_t> getLastConstraint() const {
     assert(!Constraints.empty() && "Constraint system is empty");
