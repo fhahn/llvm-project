@@ -2415,6 +2415,72 @@ static Instruction *foldICmpUSubSatWithAndForMostSignificantBitCmp(
   return BinaryOperator::CreateAnd(Or, MSBConst);
 }
 
+/// Fold a select between a shift and the constant that shift produces at the
+/// value the condition compares against, into a shift by a clamped amount:
+///   (X u< C) ? (A shift C) : (A shift X) --> A shift umax(X, C)
+///   (X u> C) ? (A shift C) : (A shift X) --> A shift umin(X, C)
+/// and the same with the arms swapped and the predicate inverted. The constant
+/// arm is exactly the shift evaluated at the boundary, so clamping the shift
+/// amount gives the same value on both sides of the compare. This recovers the
+/// min/max form when the compare is against the shift amount instead of the
+/// shift itself.
+static Value *
+foldSelectWithClampedShiftAmount(SelectInst &SI, ICmpInst &ICI,
+                                 InstCombiner::BuilderTy &Builder) {
+  const APInt *CmpC;
+  if (!ICI.isUnsigned() || !match(ICI.getOperand(1), m_APInt(CmpC)))
+    return nullptr;
+  Value *X = ICI.getOperand(0);
+
+  // Normalize so that the constant is the arm selected when the compare holds.
+  CmpInst::Predicate Pred = ICI.getPredicate();
+  Value *ConstArm = SI.getTrueValue(), *ShiftArm = SI.getFalseValue();
+  if (!isa<Constant>(ConstArm)) {
+    std::swap(ConstArm, ShiftArm);
+    Pred = CmpInst::getInversePredicate(Pred);
+    if (!isa<Constant>(ConstArm))
+      return nullptr;
+  }
+
+  // The shift has to be by the compared value, and go away with the select.
+  auto *Shift = dyn_cast<BinaryOperator>(ShiftArm);
+  Constant *ShiftedC;
+  if (!Shift || !Shift->hasOneUse() ||
+      !match(Shift, m_Shift(m_Constant(ShiftedC), m_Specific(X))))
+    return nullptr;
+
+  // The compare selects the constant arm for a contiguous low (X u<= B) or high
+  // (X u>= B) range of X, with B the boundary. Clamping the shift amount from
+  // below to B pins a low range to a single amount and leaves the rest of X
+  // alone, clamping from above to B does the same for a high range, and so does
+  // clamping to the first value past the boundary. Both candidates have to be
+  // tried, because only one of them may reproduce the constant arm. Ruling out
+  // the empty and full ranges keeps that neighbour from wrapping.
+  ConstantRange CR = ConstantRange::makeExactICmpRegion(Pred, *CmpC);
+  if (CR.isEmptySet() || CR.isFullSet())
+    return nullptr;
+  bool IsLowRange = CR.getUnsignedMin().isZero();
+  APInt B = IsLowRange ? CR.getUnsignedMax() : CR.getUnsignedMin();
+
+  for (const APInt &ClampC : {B, IsLowRange ? B + 1 : B - 1}) {
+    // An out-of-range shift amount would be poison where the source selected
+    // the constant arm, so such a candidate is never usable.
+    if (ClampC.uge(CmpC->getBitWidth()))
+      continue;
+    Constant *ClampCV = ConstantInt::get(X->getType(), ClampC);
+    if (ConstantFoldBinaryOpOperands(Shift->getOpcode(), ShiftedC, ClampCV,
+                                     SI.getDataLayout()) != ConstArm)
+      continue;
+
+    Value *Clamped = Builder.CreateBinaryIntrinsic(
+        IsLowRange ? Intrinsic::umax : Intrinsic::umin, X, ClampCV);
+    // The shift by the clamped amount can lose bits the original could not, so
+    // the no-wrap and exact flags do not carry over.
+    return Builder.CreateBinOp(Shift->getOpcode(), ShiftedC, Clamped);
+  }
+  return nullptr;
+}
+
 /// Visit a SelectInst that has an ICmpInst as its first operand.
 Instruction *InstCombinerImpl::foldSelectInstWithICmp(SelectInst &SI,
                                                       ICmpInst *ICI) {
@@ -2426,6 +2492,9 @@ Instruction *InstCombinerImpl::foldSelectInstWithICmp(SelectInst &SI,
     return replaceInstUsesWith(SI, V);
 
   if (Value *V = canonicalizeClampLike(SI, *ICI, Builder, *this))
+    return replaceInstUsesWith(SI, V);
+
+  if (Value *V = foldSelectWithClampedShiftAmount(SI, *ICI, Builder))
     return replaceInstUsesWith(SI, V);
 
   if (Instruction *NewSel =
