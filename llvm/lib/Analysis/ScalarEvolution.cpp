@@ -1030,16 +1030,30 @@ static const SCEV *BinomialCoefficient(const SCEV *It, unsigned K,
 ///   A*BC(It, 0) + B*BC(It, 1) + C*BC(It, 2) + D*BC(It, 3)
 ///
 /// where BC(It, k) stands for binomial coefficient.
-const SCEV *SCEVAddRecExpr::evaluateAtIteration(const SCEV *It,
-                                                ScalarEvolution &SE) const {
-  return evaluateAtIteration(operands(), It, SE);
+SCEVUse SCEVAddRecExpr::evaluateAtIteration(const SCEV *It, ScalarEvolution &SE,
+                                            SCEV::NoWrapFlags Flags) const {
+  return evaluateAtIteration(operands(), It, SE, Flags);
 }
 
-const SCEV *SCEVAddRecExpr::evaluateAtIteration(ArrayRef<SCEVUse> Operands,
-                                                const SCEV *It,
-                                                ScalarEvolution &SE) {
+SCEVUse SCEVAddRecExpr::evaluateAtIteration(ArrayRef<SCEVUse> Operands,
+                                            const SCEV *It, ScalarEvolution &SE,
+                                            SCEV::NoWrapFlags Flags) {
   assert(Operands.size() > 0);
-  const SCEV *Result = Operands[0].getPointer();
+  // Only an affine recurrence has a closed form of the shape the recurrence's
+  // own no-wrap flags can carry over to.
+  Flags = Operands.size() == 2
+              ? ScalarEvolution::maskFlags(Flags, SCEV::FlagNUW | SCEV::FlagNSW)
+              : SCEV::FlagAnyWrap;
+  if (ScalarEvolution::hasFlags(Flags, SCEV::FlagNSW)) {
+    // It * Step is value(It) - Start. For FlagNUW that is bounded by
+    // UINT_MAX - Start and cannot wrap, but in the signed sense it is only
+    // representable if Start and Step have the same sign.
+    SCEVUse Start = Operands[0], Step = Operands[1];
+    if (!((SE.isKnownNonNegative(Start) && SE.isKnownNonNegative(Step)) ||
+          (SE.isKnownNonPositive(Start) && SE.isKnownNonPositive(Step))))
+      Flags = ScalarEvolution::clearFlags(Flags, SCEV::FlagNSW);
+  }
+  SCEVUse Result = Operands[0].getPointer();
   for (unsigned i = 1, e = Operands.size(); i != e; ++i) {
     // The computation is correct in the face of overflow provided that the
     // multiplication is performed _after_ the evaluation of the binomial
@@ -1048,8 +1062,19 @@ const SCEV *SCEVAddRecExpr::evaluateAtIteration(ArrayRef<SCEVUse> Operands,
     if (isa<SCEVCouldNotCompute>(Coeff))
       return Coeff;
 
-    Result =
-        SE.getAddExpr(Result, SE.getMulExpr(Operands[i].getPointer(), Coeff));
+    // Build the closed form itself without flags. It is a uniqued, shared node
+    // whose scope is wherever its operands are defined, while the flags only
+    // hold where the recurrence really reached this iteration; they are
+    // attached to the returned use below instead.
+    // Do not set the flags on the shared node: its scope is wherever the
+    // operands are defined, while the flags only hold where the recurrence
+    // really reached this iteration. Pass them as use flags instead, which only
+    // get attached if the sum was not folded: they hold for
+    // `Start + (Step * It)`, and for nothing else.
+    Result = SE.getAddExpr(
+        Result, SE.getMulExpr(Operands[i].getPointer(), Coeff,
+                              SCEV::FlagAnyWrap),
+        SCEV::FlagAnyWrap, Flags);
   }
   return Result;
 }
@@ -2560,6 +2585,28 @@ static SCEV::NoWrapFlags StrengthenNoWrapFlags(ScalarEvolution *SE,
 
 bool ScalarEvolution::isAvailableAtLoopEntry(const SCEV *S, const Loop *L) {
   return isLoopInvariant(S, L) && properlyDominates(S, L->getHeader());
+}
+
+/// Return true if \p S is a two-operand \p ExprT over exactly \p LHS and \p RHS
+/// - in either order, as operands get sorted by complexity.
+template <typename ExprT>
+static bool isBinExprOf(const SCEV *S, SCEVUse LHS, SCEVUse RHS) {
+  auto *E = dyn_cast<ExprT>(S);
+  return E && E->getNumOperands() == 2 &&
+         ((E->getOperand(0) == LHS && E->getOperand(1) == RHS) ||
+          (E->getOperand(0) == RHS && E->getOperand(1) == LHS));
+}
+
+SCEVUse ScalarEvolution::getAddExpr(SCEVUse LHS, SCEVUse RHS,
+                                    SCEV::NoWrapFlags Flags,
+                                    SCEV::NoWrapFlags UseFlags) {
+  const SCEV *Res = getAddExpr(LHS, RHS, Flags);
+  // The flags hold for `LHS + RHS` and for nothing else. If something folded -
+  // an operand folded away, a nested add flattened, a constant distributed -
+  // Res is a different expression and must not carry them.
+  if (!isBinExprOf<SCEVAddExpr>(Res, LHS, RHS))
+    return Res;
+  return getUseWithFlags(Res, UseFlags);
 }
 
 /// Get a canonical add expression, or something simpler if possible.
@@ -10215,6 +10262,14 @@ static Constant *BuildConstantFromSCEV(const SCEV *V) {
 
 const SCEV *ScalarEvolution::getWithOperands(const SCEV *S,
                                              SmallVectorImpl<SCEVUse> &NewOps) {
+  // Drop any use-specific flags the operands picked up from being evaluated at a
+  // scope: they hold for the use the at-scope value was computed for, not for an
+  // operand of a shared expression rebuilt from it. Not every expression keys
+  // its uniquing on the operands' flags, so a flagged operand stored in a shared
+  // node would become visible to every other user of that node.
+  for (SCEVUse &Op : NewOps)
+    Op = Op.getPointer();
+
   switch (S->getSCEVType()) {
   case scTruncate:
   case scZeroExtend:
@@ -10294,8 +10349,12 @@ SCEVUse ScalarEvolution::computeSCEVAtScope(SCEVUse V, const Loop *L) {
       if (BackedgeTakenCount == getCouldNotCompute())
         return AddRec;
 
-      // Then, evaluate the AddRec.
-      return AddRec->evaluateAtIteration(BackedgeTakenCount, *this);
+      // Then, evaluate the AddRec. The recurrence reaches this iteration, so
+      // its no-wrap flags hold for the value computed here. They come back as
+      // use-specific flags, valid only for contexts reached via this loop's
+      // exit rather than everywhere the closed-form SCEV is defined.
+      return AddRec->evaluateAtIteration(BackedgeTakenCount, *this,
+                                         AddRec->getNoWrapFlags());
     }
 
     return AddRec;

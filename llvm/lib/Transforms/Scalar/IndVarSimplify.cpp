@@ -1044,7 +1044,14 @@ static Value *genLoopLimit(PHINode *IndVar, BasicBlock *ExitingBB,
   }
 
   const SCEVAddRecExpr *ARBase = UsePostInc ? AR->getPostIncExpr(*SE) : AR;
-  const SCEV *IVLimit = ARBase->evaluateAtIteration(ExitCount, *SE);
+  // The recurrence's no-wrap flags only hold for the iterations it reaches.
+  // ExitCount is the count for this exit alone; if the loop can leave through
+  // another exit first, that iteration may never be reached and the closed form
+  // may wrap. Only the loop's exact backedge-taken count is guaranteed reached.
+  SCEV::NoWrapFlags Flags = SCEV::FlagAnyWrap;
+  if (ExitCount == SE->getBackedgeTakenCount(L))
+    Flags = ARBase->getNoWrapFlags();
+  SCEVUse IVLimit = ARBase->evaluateAtIteration(ExitCount, *SE, Flags);
   assert(SE->isLoopInvariant(IVLimit, L) &&
          "Computed iteration count is not loop invariant!");
   return Rewriter.expandCodeFor(IVLimit, ARBase->getType(),

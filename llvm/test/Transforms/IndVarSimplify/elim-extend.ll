@@ -9,7 +9,7 @@ define void @postincConstIV(ptr %base, i32 %limit) nounwind {
 ; CHECK-LABEL: @postincConstIV(
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[SMAX:%.*]] = call i32 @llvm.smax.i32(i32 [[LIMIT:%.*]], i32 0)
-; CHECK-NEXT:    [[TMP0:%.*]] = add nuw i32 [[SMAX]], 1
+; CHECK-NEXT:    [[TMP0:%.*]] = add nuw nsw i32 [[SMAX]], 1
 ; CHECK-NEXT:    [[WIDE_TRIP_COUNT:%.*]] = zext i32 [[TMP0]] to i64
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:

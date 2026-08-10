@@ -37,7 +37,7 @@ define void @alloca_icmp_null_exit_count() {
 ; CHECK-NEXT:    %alloca.end = getelementptr inbounds i32, ptr %alloca, i64 3
 ; CHECK-NEXT:    --> (12 + %alloca)<nuw> U: [16,-3) S: [-9223372036854775808,9223372036854775805)
 ; CHECK-NEXT:    %ptr = phi ptr [ %ptr.next, %loop ], [ %alloca, %entry ]
-; CHECK-NEXT:    --> {%alloca,+,4}<nuw><%loop> U: [4,-7) S: [-9223372036854775808,9223372036854775805) Exits: (8 + %alloca)<nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {%alloca,+,4}<nuw><%loop> U: [4,-7) S: [-9223372036854775808,9223372036854775805) Exits: (8 + %alloca)<nuw>(u nuw) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %ptr.next = getelementptr i32, ptr %ptr, i64 1
 ; CHECK-NEXT:    --> {(4 + %alloca)<nuw>,+,4}<nuw><%loop> U: [8,-3) S: [-9223372036854775808,9223372036854775805) Exits: (12 + %alloca)<nuw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %and = and i1 %cmp1, %cmp2

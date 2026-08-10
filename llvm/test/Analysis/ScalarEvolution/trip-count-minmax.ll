@@ -244,7 +244,7 @@ define void @umin_seq2(i32 %n, i32 %m) {
 ; CHECK-NEXT:    %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
 ; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,-2147483648) S: [0,-2147483648) Exits: ((-1 + (1 umax (2 * %n))) umin_seq (-1 + (1 umax (16 * %m)))) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i.next = add nuw nsw i32 %i, 1
-; CHECK-NEXT:    --> {1,+,1}<nuw><%loop> U: [1,-15) S: [1,-15) Exits: (1 + ((-1 + (1 umax (2 * %n))) umin_seq (-1 + (1 umax (16 * %m)))))<nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {1,+,1}<nuw><%loop> U: [1,-15) S: [1,-15) Exits: (1 + ((-1 + (1 umax (2 * %n))) umin_seq (-1 + (1 umax (16 * %m)))))<nuw>(u nuw) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %cond = select i1 %cond_p0, i1 %cond_p1, i1 false
 ; CHECK-NEXT:    --> (%cond_p0 umin_seq %cond_p1) U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:  Determining loop execution counts for: @umin_seq2

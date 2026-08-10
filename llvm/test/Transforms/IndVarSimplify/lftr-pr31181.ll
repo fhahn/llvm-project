@@ -150,7 +150,7 @@ define i32 @test_drop_nsw_var_lim(i32 %lim) {
 ; CHECK-NEXT:    [[C:%.*]] = icmp ult i32 [[LIM:%.*]], -1
 ; CHECK-NEXT:    br i1 [[C]], label [[LOOP_PREHEADER:%.*]], label [[EXIT:%.*]]
 ; CHECK:       loop.preheader:
-; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[LIM]], 1
+; CHECK-NEXT:    [[TMP0:%.*]] = add nuw i32 [[LIM]], 1
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
 ; CHECK-NEXT:    [[STOREMERGE:%.*]] = phi i32 [ [[INC:%.*]], [[LOOP]] ], [ 0, [[LOOP_PREHEADER]] ]

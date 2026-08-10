@@ -45,7 +45,7 @@ define void @loop_guard_improves_exact_backedge_taken_count_2(i32 %conv) {
 ; CHECK-NEXT:    %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
 ; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,2) S: [0,2) Exits: (zext i1 (trunc i32 %conv to i1) to i64) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = add i64 %iv, 1
-; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,3) S: [1,3) Exits: (1 + (zext i1 (trunc i32 %conv to i1) to i64))<nuw><nsw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,3) S: [1,3) Exits: (1 + (zext i1 (trunc i32 %conv to i1) to i64))<nuw><nsw>(u nuw)(u nsw) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @loop_guard_improves_exact_backedge_taken_count_2
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is (zext i1 (trunc i32 %conv to i1) to i64)
 ; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 1
