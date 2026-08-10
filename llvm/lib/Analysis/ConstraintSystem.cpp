@@ -20,7 +20,7 @@ using namespace llvm;
 
 #define DEBUG_TYPE "constraint-system"
 
-bool ConstraintSystem::eliminateUsingFM() {
+ConstraintSystem::FMResult ConstraintSystem::eliminateUsingFM() {
   // Implementation of Fourier–Motzkin elimination, with some tricks from the
   // paper Pugh, William. "The Omega test: a fast and practical integer
   // programming algorithm for dependence
@@ -75,11 +75,36 @@ bool ConstraintSystem::eliminateUsingFM() {
         std::swap(LowerLast, UpperLast);
       }
 
+      auto &LowerRow = RemainingRows[LowerR];
+      auto &UpperRow = RemainingRows[UpperR];
+
+      // A row that mentions no variable besides the one being eliminated is a
+      // plain bound on it. Combining two such bounds cancels the variable and
+      // leaves a statement about constants alone, which can be decided
+      // directly, without building a row for it. Most rows of a system are
+      // such bounds, so this avoids the general merge below for a large share
+      // of the pairs.
+      auto IsBoundOnEliminatedVar = [LastIdx](ArrayRef<Entry> Row) {
+        return Row.size() == 1 ||
+               (Row.size() == 2 && Row[0].Id == 0 && Row[1].Id == LastIdx);
+      };
+      if (IsBoundOnEliminatedVar(LowerRow) &&
+          IsBoundOnEliminatedVar(UpperRow)) {
+        int64_t M1, M2, N;
+        if (MulOverflow(getConstPart(UpperRow[0]), -1 * LowerLast, M1) ||
+            MulOverflow(getConstPart(LowerRow[0]), UpperLast, M2) ||
+            AddOverflow(M1, M2, N))
+          continue;
+        // A negative constant is a contradiction, otherwise the combination
+        // holds trivially and can be dropped.
+        if (N < 0)
+          return FMResult::Unsat;
+        continue;
+      }
+
       SmallVector<Entry, 8> NR;
       unsigned IdxUpper = 0;
       unsigned IdxLower = 0;
-      auto &LowerRow = RemainingRows[LowerR];
-      auto &UpperRow = RemainingRows[UpperR];
       // Combine the two rows to eliminate the variable. If any coefficient
       // computation overflows, skip them.
       bool Overflow = false;
@@ -143,21 +168,38 @@ bool ConstraintSystem::eliminateUsingFM() {
       }
       if (Overflow || NR.empty())
         continue;
+      // A combination without any variable left is a statement about constants
+      // alone. It never constrains another row, so it does not belong in the
+      // system: either it holds trivially and can be dropped, or it is a
+      // contradiction and the whole system is unsatisfiable. Deciding it here
+      // avoids combining the remaining pairs for a result that is already
+      // known.
+      if (NR.size() == 1 && NR[0].Id == 0) {
+        if (NR[0].Coefficient < 0)
+          return FMResult::Unsat;
+        continue;
+      }
       Constraints.push_back(std::move(NR));
       // Give up if the new system gets too big.
       if (Constraints.size() > 500)
-        return false;
+        return FMResult::TooLarge;
     }
   }
   NumVariables -= 1;
 
-  return true;
+  return FMResult::Eliminated;
 }
 
 bool ConstraintSystem::mayHaveSolutionImpl() {
   while (!Constraints.empty() && NumVariables > 1) {
-    if (!eliminateUsingFM())
+    switch (eliminateUsingFM()) {
+    case FMResult::Eliminated:
+      break;
+    case FMResult::Unsat:
+      return false;
+    case FMResult::TooLarge:
       return true;
+    }
   }
 
   if (Constraints.empty() || NumVariables > 1)
