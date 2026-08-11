@@ -6234,12 +6234,17 @@ void VPlanTransforms::applyRealignSnapshot(VPlan &Plan, VPRegionBlock *Snapshot,
   ++NumRealignApplied;
 }
 
-void VPlanTransforms::tryToRealignEpilogueVPlan(VPlan &Plan,
-                                                VPBasicBlock *VectorPH,
-                                                Loop *OrigLoop,
-                                                ElementCount BestVF,
-                                                VPCostContext &Ctx) {
+void VPlanTransforms::tryToRealignEpilogueVPlan(
+    VPlan &Plan, VPBasicBlock *VectorPH, Loop *OrigLoop, ElementCount BestVF,
+    VPCostContext &Ctx, bool HasRuntimeDiffChecks) {
   if (!EnableTryToRealignLoop)
+    return;
+
+  // The realigned epi loop re-executes lanes the main loop already ran, so it
+  // must not rely on LAA dependence-distance (diff) checks: they only bound the
+  // main loop's forward distance, not that the load and store ranges are
+  // disjoint, so a re-read could observe the main loop's stores.
+  if (HasRuntimeDiffChecks)
     return;
 
   if (!BestVF.isFixed() || (OrigLoop && OrigLoop->getParentLoop()) ||

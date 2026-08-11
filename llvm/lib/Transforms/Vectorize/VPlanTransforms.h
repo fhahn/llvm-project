@@ -637,10 +637,12 @@ struct VPlanTransforms {
   /// standard start (0) and exit (n.vec_epi). No new blocks are inserted;
   /// only select chains in the existing vec.epilog.ph. \p Ctx is used to cost
   /// the body recipes against the same per-recipe profitability gate as
-  /// \c prepareRealignSnapshot.
+  /// \c prepareRealignSnapshot, and \p HasRuntimeDiffChecks bails for the same
+  /// reason: the shifted epi loop re-executes lanes the main loop already ran.
   static void tryToRealignEpilogueVPlan(VPlan &Plan, VPBasicBlock *VectorPH,
                                         Loop *OrigLoop, ElementCount BestVF,
-                                        VPCostContext &Ctx);
+                                        VPCostContext &Ctx,
+                                        bool HasRuntimeDiffChecks);
 };
 
 } // namespace llvm

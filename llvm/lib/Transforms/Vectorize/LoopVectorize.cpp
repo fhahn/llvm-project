@@ -5948,6 +5948,18 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
                  *PSE.getSE(), TTI, Config.CostKind, BestVF, BestUF,
                  CM.ValuesToIgnore);
 
+  // Both realign transforms re-execute body iterations the main loop already
+  // ran, which is only sound if the load and store ranges are disjoint. LAA
+  // dependence-distance (diff) checks only bound the main loop's forward
+  // distance, not full disjointness. Realign also only applies to inner loops,
+  // which have LoopAccess info; the VPlan-native outer-loop path has no LAI
+  // (getRuntimePointerChecking would dereference null), so treat a missing LAI
+  // as relying on diff checks.
+  const RuntimePointerChecking *RtChecks =
+      Legal->getLAI() ? Legal->getRuntimePointerChecking() : nullptr;
+  bool HasRuntimeDiffChecks =
+      !RtChecks || (RtChecks->Need && RtChecks->getDiffChecks().has_value());
+
   // Snapshot the vector loop region BEFORE unrolling, so it can be re-used as
   // a VF-only realigned epilogue. It only clones a detached region, so there is
   // nothing to verify or print and it does not go through RUN_VPLAN_PASS. Only
@@ -5955,16 +5967,7 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   // an in-place rewrite (see below) and the main VPlan during epi-vec leaves
   // the tail to the EPI VPlan.
   VPRegionBlock *RealignSnapshot = nullptr;
-  // The realign transform only applies to inner loops, which have LoopAccess
-  // info; the VPlan-native outer-loop path has no LAI
-  // (getRuntimePointerChecking would dereference null), so require it here.
-  if (EpilogueVecKind == EpilogueVectorizationKind::None && Legal->getLAI()) {
-    // The realign body re-reads the overlap lanes, which is only sound if the
-    // load and store ranges are disjoint. LAA dependence-distance (diff) checks
-    // only bound the main loop's forward distance, not full disjointness.
-    const RuntimePointerChecking *RtChecks = Legal->getRuntimePointerChecking();
-    bool HasRuntimeDiffChecks =
-        RtChecks->Need && RtChecks->getDiffChecks().has_value();
+  if (EpilogueVecKind == EpilogueVectorizationKind::None) {
     VPCostContext CostCtx(*TLI, BestVPlan, CM, Config);
     RealignSnapshot = VPlanTransforms::prepareRealignSnapshot(
         BestVPlan, BestVF, BestUF, CostCtx, HasRuntimeDiffChecks);
@@ -6075,7 +6078,8 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   if (EpilogueVecKind == EpilogueVectorizationKind::Epilogue) {
     VPCostContext CostCtx(*TLI, BestVPlan, CM, Config);
     VPlanTransforms::tryToRealignEpilogueVPlan(BestVPlan, VectorPH, OrigLoop,
-                                               BestVF, CostCtx);
+                                               BestVF, CostCtx,
+                                               HasRuntimeDiffChecks);
   }
 
   // 0. Generate SCEV-dependent code in the entry, including TripCount, before
