@@ -6077,9 +6077,8 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   // scan sees a clean VPReplicate(GEP) / VPVectorPointerRecipe chain.
   if (EpilogueVecKind == EpilogueVectorizationKind::Epilogue) {
     VPCostContext CostCtx(*TLI, BestVPlan, CM, Config);
-    VPlanTransforms::tryToRealignEpilogueVPlan(BestVPlan, VectorPH, OrigLoop,
-                                               BestVF, CostCtx,
-                                               HasRuntimeDiffChecks);
+    VPlanTransforms::tryToRealignEpilogueVPlan(
+        BestVPlan, VectorPH, OrigLoop, BestVF, CostCtx, HasRuntimeDiffChecks);
   }
 
   // 0. Generate SCEV-dependent code in the entry, including TripCount, before
@@ -8049,31 +8048,29 @@ static bool sinkRealignedEpilogueSetup(BasicBlock *VecEpiloguePH) {
   Value *StartOnMainRan = RanB.CreateSub(ResumeOnMainRan, RanShift);
 
   // The exit value on the main-skipped edge is the standard epilogue vector
-  // trip count (VTC_epi). It is computed inside the preheader, so it does not
-  // dominate the main-skipped predecessor's edge into the phi. Rematerialize
-  // its (short) defining chain there. VTC_epi = n - (n urem VF_epi): all leaf
-  // operands (the trip count and constants) dominate every predecessor, so a
-  // shallow clone is always legal.
-  IRBuilder<> SkipB(MainSkipPred->getTerminator());
-  std::function<Value *(Value *)> rematInSkip = [&](Value *V) -> Value * {
-    auto *I = dyn_cast<Instruction>(V);
-    if (!I || I->getParent() != VecEpiloguePH)
-      return V; // Dominates already (arg/constant/earlier block).
+  // trip count (VTC_epi = n - (n & (VF_epi - 1))). It is computed inside the
+  // preheader, so it does not dominate the main-skipped predecessor's edge into
+  // the phi. Every use of it has already been redirected to the NewExit select
+  // that is about to die, so hoist its (short) defining chain into that
+  // predecessor instead of duplicating it; its leaf operands (the trip count
+  // and constants) dominate every predecessor.
+  SmallVector<Instruction *> ToHoist;
+  SmallPtrSet<Instruction *, 4> Seen;
+  SmallVector<Value *, 4> Worklist = {VTCEpi};
+  while (!Worklist.empty()) {
+    auto *I = dyn_cast<Instruction>(Worklist.pop_back_val());
+    // Values defined outside the preheader dominate the predecessor already.
+    if (!I || I->getParent() != VecEpiloguePH || !Seen.insert(I).second)
+      continue;
     if (isa<PHINode>(I))
-      return nullptr; // Don't clone phis; bail.
-    Instruction *Clone = I->clone();
-    for (unsigned Op = 0, E = Clone->getNumOperands(); Op != E; ++Op) {
-      Value *NewOp = rematInSkip(I->getOperand(Op));
-      if (!NewOp)
-        return nullptr;
-      Clone->setOperand(Op, NewOp);
-    }
-    SkipB.Insert(Clone);
-    return Clone;
-  };
-  Value *VTCEpiOnSkip = rematInSkip(VTCEpi);
-  if (!VTCEpiOnSkip)
-    return false;
+      return false; // A phi cannot be hoisted out of its block.
+    ToHoist.push_back(I);
+    append_range(Worklist, I->operands());
+  }
+  // ToHoist lists users before the operands they were reached through, so move
+  // them in reverse to keep each definition ahead of its uses.
+  for (Instruction *I : reverse(ToHoist))
+    I->moveBefore(MainSkipPred->getTerminator()->getIterator());
 
   // Build the two phis at the top of the preheader. On the main-skipped edge
   // the values are the plain baseline ones (start = resume(=0), exit = VTC_epi)
@@ -8084,7 +8081,7 @@ static bool sinkRealignedEpilogueSetup(BasicBlock *VecEpiloguePH) {
   StartPhi->addIncoming(ResumeOnMainSkip, MainSkipPred);
   auto *ExitPhi = PHB.CreatePHI(NewExit->getType(), 2);
   ExitPhi->addIncoming(TC, MainRanPred);
-  ExitPhi->addIncoming(VTCEpiOnSkip, MainSkipPred);
+  ExitPhi->addIncoming(VTCEpi, MainSkipPred);
 
   NewStartSub->replaceAllUsesWith(StartPhi);
   NewExit->replaceAllUsesWith(ExitPhi);

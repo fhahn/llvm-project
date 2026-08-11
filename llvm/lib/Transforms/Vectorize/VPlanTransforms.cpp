@@ -5924,7 +5924,6 @@ collectUnderlyingObjectsForAddr(VPValue *Addr,
   return false;
 }
 
-
 // Return true if \p Header's body is safe and profitable to re-execute on the
 // realign overlap lanes: every non-control recipe must be pure, cost <= 1 at
 // \p VF, and the loads/stores must not self-alias. \p IsLoopControl identifies
@@ -5999,13 +5998,6 @@ static bool hasRealignSkeleton(VPlan &Plan) {
   return ExitBB->phis().empty() && ExitBB->getIRBasicBlock()->phis().empty();
 }
 
-// Predicate identifying the latch BranchOn* terminator inside a realign-
-// candidate header. Used as the loop-control filter for isRealignSafeBody:
-// pre-dissolution the latch is the only recipe that needs to be skipped
-// (the canonical IV-increment is a generic Add VPInstruction and falls
-// through the side-effect check).
-static bool isLatchBranchOn(VPRecipeBase &R) { return match(&R, m_Branch()); }
-
 VPRegionBlock *VPlanTransforms::prepareRealignSnapshot(
     VPlan &Plan, ElementCount BestVF, unsigned BestUF, VPCostContext &Ctx,
     bool HasRuntimeDiffChecks) {
@@ -6063,7 +6055,8 @@ VPRegionBlock *VPlanTransforms::prepareRealignSnapshot(
 
   // Pre-dissolution the only loop-control recipe is the latch BranchOn*; the
   // canonical IV-increment is a generic Add and falls through the checks.
-  if (!isRealignSafeBody(Header, BestVF, Ctx, isLatchBranchOn))
+  if (!isRealignSafeBody(Header, BestVF, Ctx,
+                         [](VPRecipeBase &R) { return match(&R, m_Branch()); }))
     return nullptr;
 
   // Verify the CFG skeleton and IV-increment shape before cloning, so a
@@ -6103,46 +6096,6 @@ VPRegionBlock *VPlanTransforms::prepareRealignSnapshot(
   return Snapshot;
 }
 
-/// Build the start index of the realign loop in \p PHB. The realign loop steps
-/// by VF (\p VFLanes lanes) and runs \p K iterations, the last ending exactly
-/// at \p TC, so its start is
-///   RealignStart = TC - K * VF
-/// a single subtract of a compile-time constant. This applies whenever K is
-/// known at compile time: always for UF == 1 (the profitability gate forces
-/// K == 1), and for any UF when the trip count is a compile-time constant
-/// (then K = ceil(Tail / VF)). Folding K*VF also lets later passes prove the
-/// realign loop's trip count and, for K == 1, collapse it to a straight-line
-/// vector iteration.
-///
-/// (Algebraically TC - K*VF == VTC - ((VTC - TC) & (VF - 1)); the latter
-/// symbolic form is what createRuntimeRealignStart builds when K is unknown.)
-static VPValue *createConstantRealignStart(VPBuilder &PHB, VPlan &Plan,
-                                           VPValue *TC, uint64_t VFLanes,
-                                           uint64_t K) {
-  return PHB.createSub(TC,
-                       Plan.getConstantInt(TC->getScalarType(), K * VFLanes));
-}
-
-/// Build the start index of the realign loop when the trip count is not a
-/// compile-time constant. The realign loop steps by VF (\p VFLanes lanes) and
-/// its last iteration must end at \p TC, covering the trailing
-/// Tail = TC - VTC lanes. Since Tail is unknown here, compute the start
-/// symbolically as
-///   RealignStart = VTC - ((VTC - TC) & (VF - 1))
-/// The and-expression is 0 when the remainder is a multiple of VF and
-/// (VF - remainder%VF) otherwise, so the realign loop covers [RealignStart, TC)
-/// in between 1 and UF iterations. This matches the constant-TC TC - K*VF form
-/// (see createConstantRealignStart) but does not depend on a known Tail.
-static VPValue *createRuntimeRealignStart(VPBuilder &PHB, VPlan &Plan,
-                                          VPValue *TC, VPSymbolicValue *VTC,
-                                          uint64_t VFLanes) {
-  Type *TCTy = TC->getScalarType();
-  VPValue *VFm1 = Plan.getConstantInt(TCTy, VFLanes - 1);
-  VPValue *NegRem = PHB.createSub(VTC, TC);
-  VPValue *Shift = PHB.createAnd(NegRem, VFm1);
-  return PHB.createSub(VTC, Shift);
-}
-
 void VPlanTransforms::applyRealignSnapshot(VPlan &Plan, VPRegionBlock *Snapshot,
                                            ElementCount BestVF,
                                            unsigned BestUF) {
@@ -6172,27 +6125,39 @@ void VPlanTransforms::applyRealignSnapshot(VPlan &Plan, VPRegionBlock *Snapshot,
   assert(isPowerOf2_64(VFLanes) && "realign requires a power-of-2 VF");
 
   // Compute realign.start in a new realign.ph so the VF-stepping loop covers
-  // exactly [RealignStart, TC), using the folded form when the iteration count
-  // is known at compile time and the symbolic one otherwise.
+  // exactly [RealignStart, TC). The loop runs K = ceil(Tail / VF) iterations,
+  // the last ending exactly at TC, so it starts at
+  //   RealignStart = TC - K * VF
+  // K is known at compile time when the trip count is constant (then
+  // K = ceil(TC % (VF * UF) / VF)) and, for any trip count, when UF == 1 (the
+  // tail is then below VF, so a single VF-wide iteration suffices). Folding
+  // K * VF into a single subtract of a constant also lets later passes prove
+  // the realign loop's trip count and, for K == 1, collapse it to a
+  // straight-line vector iteration.
+  //
+  // When K is unknown, build the equivalent symbolic form
+  //   RealignStart = VTC - ((VTC - TC) & (VF - 1))
+  // whose and-expression is 0 if the tail is a multiple of VF and
+  // VF - Tail % VF otherwise, so the loop again covers [RealignStart, TC), in
+  // between 1 and UF iterations.
   VPValue *TC = Plan.getTripCount();
   Type *TCTy = TC->getScalarType();
   VPSymbolicValue *VTC = &Plan.getVectorTripCount();
-  // The realign loop runs K = ceil(Tail / VF) iterations. That is known at
-  // compile time when the trip count is constant (K = ceil(TC % (VF*UF) / VF))
-  // and, for any trip count, when UF == 1 (the tail is then below VF, so the
-  // loop runs a single VF-wide iteration); otherwise K is left unset.
-  uint64_t TCVal;
-  std::optional<unsigned> RealignK;
-  if (match(TC, m_ConstantInt(TCVal)))
-    RealignK = divideCeil(TCVal % (VFLanes * BestUF), VFLanes);
-  else if (BestUF == 1)
-    RealignK = 1;
-
   VPBasicBlock *RealignPH = Plan.createVPBasicBlock("vector.realign.ph");
   VPBuilder PHB(RealignPH, RealignPH->end());
-  VPValue *RealignStart =
-      RealignK ? createConstantRealignStart(PHB, Plan, TC, VFLanes, *RealignK)
-               : createRuntimeRealignStart(PHB, Plan, TC, VTC, VFLanes);
+  uint64_t TCVal;
+  VPValue *RealignStart;
+  if (match(TC, m_ConstantInt(TCVal))) {
+    uint64_t K = divideCeil(TCVal % (VFLanes * BestUF), VFLanes);
+    RealignStart = PHB.createSub(TC, Plan.getConstantInt(TCTy, K * VFLanes));
+  } else if (BestUF == 1) {
+    RealignStart = PHB.createSub(TC, Plan.getConstantInt(TCTy, VFLanes));
+  } else {
+    VPValue *NegTail = PHB.createSub(VTC, TC);
+    VPValue *Shift =
+        PHB.createAnd(NegTail, Plan.getConstantInt(TCTy, VFLanes - 1));
+    RealignStart = PHB.createSub(VTC, Shift);
+  }
 
   // Insert realign.check on middle.block's scalar.ph (cmp.n-false) edge and
   // route it on to realign.ph. Wire the CFG before touching recipes so
