@@ -12961,39 +12961,37 @@ static bool IsKnownPredicateViaAddRecStart(ScalarEvolution &SE,
   return SE.isKnownPredicate(Pred, LStart, RStart);
 }
 
+/// Returns true if \p AR is known not to go below its start value in the signed
+/// (\p IsSigned) or unsigned sense. With FlagNUW every step adds without
+/// unsigned wrap, so the recurrence is non-decreasing in the unsigned sense
+/// whatever the steps are. With FlagNSW the same holds in the signed sense, as
+/// long as the step cannot be negative.
+static bool isAddRecNeverBelowStart(const SCEVAddRecExpr *AR, bool IsSigned,
+                                    ScalarEvolution &SE) {
+  if (!AR->getNoWrapFlags(IsSigned ? SCEV::FlagNSW : SCEV::FlagNUW))
+    return false;
+  return !IsSigned ||
+         (AR->isAffine() && SE.isKnownNonNegative(AR->getStepRecurrence(SE)));
+}
+
 /// Is LHS `Pred` RHS true because one of them is an AddRec that is known not to
 /// go below its own start value, which is the other side?
 static bool IsKnownPredicateViaAddRecMonotonicity(ScalarEvolution &SE,
                                                   CmpPredicate Pred,
                                                   const SCEV *LHS,
                                                   const SCEV *RHS) {
-  if (!ICmpInst::isRelational(Pred))
-    return false;
-
-  // Normalize to (AddRec Pred Start).
-  if (!isa<SCEVAddRecExpr>(LHS) && isa<SCEVAddRecExpr>(RHS)) {
+  // Normalize to (AddRec Pred Start). Only the non-strict predicate holds, as
+  // the recurrence equals its start value in the first iteration.
+  if (!isa<SCEVAddRecExpr>(LHS)) {
     Pred = ICmpInst::getSwappedCmpPredicate(Pred);
     std::swap(LHS, RHS);
   }
+  if (Pred != ICmpInst::ICMP_SGE && Pred != ICmpInst::ICMP_UGE)
+    return false;
 
   const auto *AR = dyn_cast<SCEVAddRecExpr>(LHS);
-  if (!AR || AR->getStart() != RHS)
-    return false;
-
-  // With FlagNUW every step adds without unsigned wrap, so the recurrence
-  // cannot become unsigned-smaller than the value it started at, whatever the
-  // steps are. In the signed sense the same holds with FlagNSW, as long as the
-  // step cannot be negative.
-  bool IsSigned = ICmpInst::isSigned(Pred);
-  if (!AR->getNoWrapFlags(IsSigned ? SCEV::FlagNSW : SCEV::FlagNUW))
-    return false;
-  if (IsSigned && (!AR->isAffine() ||
-                   !SE.isKnownNonNegative(AR->getStepRecurrence(SE))))
-    return false;
-
-  // The recurrence is equal to Start in the first iteration, so only the
-  // non-strict predicate holds.
-  return Pred == (IsSigned ? ICmpInst::ICMP_SGE : ICmpInst::ICMP_UGE);
+  return AR && AR->getStart() == RHS &&
+         isAddRecNeverBelowStart(AR, ICmpInst::isSigned(Pred), SE);
 }
 
 /// Is LHS `Pred` RHS true on the virtue of LHS or RHS being a Min or Max
@@ -16147,6 +16145,15 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
       append_range(Worklist, S->operands());
     };
 
+    // A recurrence that never goes below its start value is only bounded from
+    // above by RHS if its start value is, so an upper bound carries over to the
+    // start value.
+    auto EnqueueAddRecStart = [&Worklist, &SE](const SCEV *S, bool IsSigned) {
+      const auto *AR = dyn_cast<SCEVAddRecExpr>(S);
+      if (AR && isAddRecNeverBelowStart(AR, IsSigned, SE))
+        Worklist.push_back(AR->getStart());
+    };
+
     while (!Worklist.empty()) {
       const SCEV *From = Worklist.pop_back_val();
       if (isa<SCEVConstant>(From))
@@ -16162,12 +16169,14 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
         To = SE.getUMinExpr(FromRewritten, RHS);
         if (auto *UMax = dyn_cast<SCEVUMaxExpr>(FromRewritten))
           EnqueueOperands(UMax);
+        EnqueueAddRecStart(FromRewritten, /*IsSigned=*/false);
         break;
       case CmpInst::ICMP_SLT:
       case CmpInst::ICMP_SLE:
         To = SE.getSMinExpr(FromRewritten, RHS);
         if (auto *SMax = dyn_cast<SCEVSMaxExpr>(FromRewritten))
           EnqueueOperands(SMax);
+        EnqueueAddRecStart(FromRewritten, /*IsSigned=*/true);
         break;
       case CmpInst::ICMP_UGT:
       case CmpInst::ICMP_UGE:
