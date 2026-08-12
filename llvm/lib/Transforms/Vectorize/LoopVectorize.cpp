@@ -5588,13 +5588,19 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   RUN_VPLAN_PASS(VPlanTransforms::materializeUnpacks, BestVPlan);
   RUN_VPLAN_PASS(VPlanTransforms::materializeBroadcasts, BestVPlan);
   RUN_VPLAN_PASS(VPlanTransforms::replicateByVF, BestVPlan, BestVF);
+  // Retrieve the estimated trip count up front: the middle block's weights
+  // below need it, and the original loop may be removed when executing the
+  // plan.
+  unsigned OrigLoopInvocationWeight = 0;
+  std::optional<unsigned> OrigAverageTripCount =
+      getLoopEstimatedTripCount(OrigLoop, &OrigLoopInvocationWeight);
+  unsigned EstimatedVFxUF =
+      estimateElementCount(BestVF * BestUF, Config.getVScaleForTuning());
   bool HasBranchWeights =
       hasBranchWeightMD(*OrigLoop->getLoopLatch()->getTerminator());
-  if (HasBranchWeights) {
-    std::optional<unsigned> VScale = Config.getVScaleForTuning();
+  if (HasBranchWeights)
     RUN_VPLAN_PASS(VPlanTransforms::addBranchWeightToMiddleTerminator,
-                   BestVPlan, BestVF, VScale);
-  }
+                   BestVPlan, EstimatedVFxUF, OrigAverageTripCount);
 
   if (vputils::findIncomingAliasMask(BestVPlan)) {
     assert(BestVPlan.hasTailFolded() && "Expected tail folding to be enabled");
@@ -5737,9 +5743,6 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   // Retrieve loop information before executing the plan, which may remove the
   // original loop, if it becomes unreachable.
   MDNode *LID = OrigLoop->getLoopID();
-  unsigned OrigLoopInvocationWeight = 0;
-  std::optional<unsigned> OrigAverageTripCount =
-      getLoopEstimatedTripCount(OrigLoop, &OrigLoopInvocationWeight);
 
   BestVPlan.execute(&State);
 
@@ -5756,8 +5759,7 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
                  : nullptr,
       HeaderVPBB, BestVPlan,
       EpilogueVecKind == EpilogueVectorizationKind::Epilogue, LID,
-      OrigAverageTripCount, OrigLoopInvocationWeight,
-      estimateElementCount(BestVF * BestUF, Config.getVScaleForTuning()),
+      OrigAverageTripCount, OrigLoopInvocationWeight, EstimatedVFxUF,
       RequiresScalarEpilogue, DisableRuntimeUnroll, UnrollVectorizedLoop);
 
   // 3. Remove redundant induction instructions, if a vector loop remains.

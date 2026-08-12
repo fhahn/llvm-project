@@ -115,12 +115,12 @@ define void @_Z3foo2v() {
 ; CHECK-SCALABLE:    [[VEC_IND_NEXT:%.*]] = add <vscale x 4 x i32> [[VEC_IND:%.*]], [[BROADCAST_SPLAT]]
 ; CHECK-SCALABLE:    br i1 [[TMP10:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP10:![0-9]+]]
 ; CHECK-SCALABLE:  [[MIDDLE_BLOCK]]:
-; CHECK-SCALABLE:    br i1 [[CMP_N:%.*]], label %[[FOR_COND_CLEANUP:.*]], label %[[SCALAR_PH]], !prof [[PROF6]]
+; CHECK-SCALABLE:    br i1 [[CMP_N:%.*]], label %[[FOR_COND_CLEANUP:.*]], label %[[SCALAR_PH]], !prof [[PROF11:![0-9]+]]
 ; CHECK-SCALABLE:  [[SCALAR_PH]]:
 ; CHECK-SCALABLE:    br label %[[FOR_BODY:.*]]
 ; CHECK-SCALABLE:  [[FOR_COND_CLEANUP]]:
 ; CHECK-SCALABLE:  [[FOR_BODY]]:
-; CHECK-SCALABLE:    br i1 [[EXITCOND:%.*]], label %[[FOR_COND_CLEANUP]], label %[[FOR_BODY]], !prof [[PROF11:![0-9]+]], !llvm.loop [[LOOP12:![0-9]+]]
+; CHECK-SCALABLE:    br i1 [[EXITCOND:%.*]], label %[[FOR_COND_CLEANUP]], label %[[FOR_BODY]], !prof [[PROF12:![0-9]+]], !llvm.loop [[LOOP13:![0-9]+]]
 ;
 entry:
   br label %for.body
@@ -173,12 +173,13 @@ for.body:
 ; CHECK-SCALABLE: [[META3]] = !{!"llvm.loop.isvectorized", i32 1}
 ; CHECK-SCALABLE: [[META4]] = !{!"llvm.loop.unroll.runtime.disable"}
 ; CHECK-SCALABLE: [[META5]] = !{!"llvm.loop.estimated_trip_count", i32 256}
-; CHECK-SCALABLE: [[PROF6]] = !{!"branch_weights", i32 1, i32 3}
+; CHECK-SCALABLE: [[PROF6]] = !{!"branch_weights", i32 3, i32 1}
 ; CHECK-SCALABLE: [[PROF7]] = !{!"branch_weights", i32 1, i32 0}
 ; CHECK-SCALABLE: [[LOOP8]] = distinct !{[[LOOP8]], [[META4]], [[META3]], [[META9:![0-9]+]]}
 ; CHECK-SCALABLE: [[META9]] = !{!"llvm.loop.estimated_trip_count", i32 0}
 ; CHECK-SCALABLE: [[LOOP10]] = distinct !{[[LOOP10]], [[META3]], [[META4]], [[META5]]}
-; CHECK-SCALABLE: [[PROF11]] = !{!"branch_weights", i32 1, i32 2}
-; CHECK-SCALABLE: [[LOOP12]] = distinct !{[[LOOP12]], [[META4]], [[META3]], [[META13:![0-9]+]]}
-; CHECK-SCALABLE: [[META13]] = !{!"llvm.loop.estimated_trip_count", i32 3}
+; CHECK-SCALABLE: [[PROF11]] = !{!"branch_weights", i32 1, i32 3}
+; CHECK-SCALABLE: [[PROF12]] = !{!"branch_weights", i32 1, i32 2}
+; CHECK-SCALABLE: [[LOOP13]] = distinct !{[[LOOP13]], [[META4]], [[META3]], [[META14:![0-9]+]]}
+; CHECK-SCALABLE: [[META14]] = !{!"llvm.loop.estimated_trip_count", i32 3}
 ;.

@@ -84,13 +84,13 @@ define void @predicated_store(ptr noalias %a, ptr noalias %b, i64 %n) !prof !0 {
 ; CHECK:  [[PRED_STORE_CONTINUE6]]:
 ; CHECK:    br i1 [[TMP18:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF2]], !llvm.loop [[LOOP8:![0-9]+]]
 ; CHECK:  [[MIDDLE_BLOCK]]:
-; CHECK:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF1]]
+; CHECK:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF9:![0-9]+]]
 ; CHECK:  [[SCALAR_PH]]:
 ; CHECK:  [[LOOP_HEADER:.*]]:
 ; CHECK:    br i1 [[C:%.*]], label %[[THEN:.*]], label %[[LOOP_LATCH:.*]], !prof [[PROF1]]
 ; CHECK:  [[THEN]]:
 ; CHECK:  [[LOOP_LATCH]]:
-; CHECK:    br i1 [[EC:%.*]], label %[[EXIT]], label %[[LOOP_HEADER]], !prof [[PROF9:![0-9]+]], !llvm.loop [[LOOP10:![0-9]+]]
+; CHECK:    br i1 [[EC:%.*]], label %[[EXIT]], label %[[LOOP_HEADER]], !prof [[PROF10:![0-9]+]], !llvm.loop [[LOOP11:![0-9]+]]
 ; CHECK:  [[EXIT]]:
 ;
 entry:
@@ -148,7 +148,7 @@ define void @tail_folded_predicated_store_not_profiled(ptr noalias %a, ptr noali
 ; CHECK:    br i1 [[TMP36:%.*]], label %[[PRED_STORE_IF11:.*]], label %[[PRED_STORE_CONTINUE12:.*]], !prof [[PROF1]]
 ; CHECK:  [[PRED_STORE_IF11]]:
 ; CHECK:  [[PRED_STORE_CONTINUE12]]:
-; CHECK:    br i1 [[TMP39:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF2]], !llvm.loop [[LOOP12:![0-9]+]]
+; CHECK:    br i1 [[TMP39:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF2]], !llvm.loop [[LOOP13:![0-9]+]]
 ; CHECK:  [[MIDDLE_BLOCK]]:
 ; CHECK:  [[EXIT:.*:]]
 ;
@@ -189,8 +189,9 @@ exit:
 ; CHECK: [[META6]] = !{!"llvm.loop.estimated_trip_count", i32 25}
 ; CHECK: [[PROF7]] = !{!"branch_weights", i32 1, i32 127}
 ; CHECK: [[LOOP8]] = distinct !{[[LOOP8]], [[META4]], [[META5]], [[META6]]}
-; CHECK: [[PROF9]] = !{!"branch_weights", i32 1, i32 0}
-; CHECK: [[LOOP10]] = distinct !{[[LOOP10]], [[META5]], [[META4]], [[META11:![0-9]+]]}
-; CHECK: [[META11]] = !{!"llvm.loop.estimated_trip_count", i32 0}
-; CHECK: [[LOOP12]] = distinct !{[[LOOP12]], [[META4]], [[META5]], [[META6]]}
+; CHECK: [[PROF9]] = !{!"branch_weights", i32 3, i32 1}
+; CHECK: [[PROF10]] = !{!"branch_weights", i32 1, i32 0}
+; CHECK: [[LOOP11]] = distinct !{[[LOOP11]], [[META5]], [[META4]], [[META12:![0-9]+]]}
+; CHECK: [[META12]] = !{!"llvm.loop.estimated_trip_count", i32 0}
+; CHECK: [[LOOP13]] = distinct !{[[LOOP13]], [[META4]], [[META5]], [[META6]]}
 ;.

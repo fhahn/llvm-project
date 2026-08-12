@@ -607,10 +607,12 @@ struct VPlanTransforms {
                                    ElementCount VF, unsigned UF);
 
   /// Add branch weight metadata, if the \p Plan's middle block is terminated by
-  /// a BranchOnCond recipe.
+  /// a BranchOnCond recipe. \p VectorStep is the estimated number of
+  /// iterations a vector iteration processes. If \p EstimatedTripCount is a
+  /// multiple of the vector step, the weights favor skipping the remainder.
   static void
-  addBranchWeightToMiddleTerminator(VPlan &Plan, ElementCount VF,
-                                    std::optional<unsigned> VScaleForTuning);
+  addBranchWeightToMiddleTerminator(VPlan &Plan, unsigned VectorStep,
+                                    std::optional<unsigned> EstimatedTripCount);
 
   /// Adjust first-order recurrence users in the middle block: create
   /// penultimate element extracts for LCSSA phi users, and handle penultimate

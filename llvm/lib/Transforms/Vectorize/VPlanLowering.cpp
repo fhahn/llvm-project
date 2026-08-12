@@ -1129,7 +1129,8 @@ VPlanTransforms::expandSCEVs(VPlan &Plan, ScalarEvolution &SE) {
 /// Add branch weight metadata, if the \p Plan's middle block is terminated by a
 /// BranchOnCond recipe.
 void VPlanTransforms::addBranchWeightToMiddleTerminator(
-    VPlan &Plan, ElementCount VF, std::optional<unsigned> VScaleForTuning) {
+    VPlan &Plan, unsigned VectorStep,
+    std::optional<unsigned> EstimatedTripCount) {
   VPBasicBlock *MiddleVPBB = Plan.getMiddleBlock();
   auto *MiddleTerm =
       dyn_cast_or_null<VPInstruction>(MiddleVPBB->getTerminator());
@@ -1139,13 +1140,12 @@ void VPlanTransforms::addBranchWeightToMiddleTerminator(
 
   assert(MiddleTerm->getOpcode() == VPInstruction::BranchOnCond &&
          "must have a BranchOnCond");
-  // Assume that `TripCount % VectorStep ` is equally distributed.
-  unsigned VectorStep = Plan.getConcreteUF() * VF.getKnownMinValue();
-  if (VF.isScalable() && VScaleForTuning.has_value())
-    VectorStep *= *VScaleForTuning;
-  assert(VectorStep > 0 && "trip count should not be zero");
+  assert(VectorStep > 0 && "vector step should not be zero");
+  // An estimated trip count that is a multiple of the step swaps the weights
+  // around, without ruling a remainder out, as the estimate is only an average.
   MDBuilder MDB(Plan.getContext());
-  MDNode *BranchWeights =
-      MDB.createBranchWeights({1, VectorStep - 1}, /*IsExpected=*/false);
+  MDNode *BranchWeights = MDB.createBranchWeights(
+      vputils::getRemainderBranchWeights(VectorStep, EstimatedTripCount),
+      /*IsExpected=*/false);
   MiddleTerm->setMetadata(LLVMContext::MD_prof, BranchWeights);
 }

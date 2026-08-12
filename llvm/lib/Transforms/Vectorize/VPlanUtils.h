@@ -258,6 +258,17 @@ inline std::array<uint32_t, 2> getLikelyBranchWeights(unsigned Step,
   return {1, Likely};
 }
 
+/// Returns the branch weights of a branch on whether the trip count is a
+/// multiple of \p Step, for its {no remainder, remainder} successors. Assume
+/// `TripCount % Step` to be equally distributed, leaving a remainder in all but
+/// one of \p Step cases, unless \p EstimatedTripCount is a multiple of \p Step.
+inline std::array<uint32_t, 2>
+getRemainderBranchWeights(unsigned Step,
+                          std::optional<unsigned> EstimatedTripCount) {
+  return getLikelyBranchWeights(Step, EstimatedTripCount &&
+                                          *EstimatedTripCount % Step == 0);
+}
+
 /// Get the value type of a VPInstruction or VPReplicateRecipe load or store.
 inline Type *getLoadStoreValueType(VPSingleDefRecipe *R) {
   bool IsLoad = vputils::getOpcode(R) == Instruction::Load;
