@@ -26,11 +26,10 @@ define void @inner_loop_reduction(ptr noalias nocapture readonly %a.in, ptr noal
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_LATCH:.*]] ]
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_LATCH]] ]
-; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds double, ptr [[A_IN]], <4 x i64> [[VEC_IND]]
-; CHECK-NEXT:    [[TMP1:%.*]] = extractelement <4 x ptr> [[TMP0]], i64 0
+; CHECK-NEXT:    [[TMP0:%.*]] = extractelement <4 x i64> [[VEC_IND]], i64 0
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds double, ptr [[A_IN]], i64 [[TMP0]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x double>, ptr [[TMP1]], align 8
-; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds double, ptr [[B_IN]], <4 x i64> [[VEC_IND]]
-; CHECK-NEXT:    [[TMP3:%.*]] = extractelement <4 x ptr> [[TMP2]], i64 0
+; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds double, ptr [[B_IN]], i64 [[TMP0]]
 ; CHECK-NEXT:    [[WIDE_LOAD1:%.*]] = load <4 x double>, ptr [[TMP3]], align 8
 ; CHECK-NEXT:    br label %[[FOR2_HEADER2:.*]]
 ; CHECK:       [[FOR2_HEADER2]]:
@@ -38,12 +37,12 @@ define void @inner_loop_reduction(ptr noalias nocapture readonly %a.in, ptr noal
 ; CHECK-NEXT:    [[A_REDUCTION4:%.*]] = phi <4 x double> [ [[WIDE_LOAD]], %[[VECTOR_BODY]] ], [ [[TMP4:%.*]], %[[FOR2_HEADER2]] ]
 ; CHECK-NEXT:    [[TMP4]] = fadd <4 x double> [[WIDE_LOAD1]], [[A_REDUCTION4]]
 ; CHECK-NEXT:    [[TMP5]] = add nuw nsw <4 x i32> [[INDVAR23]], splat (i32 1)
-; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq <4 x i32> [[TMP5]], splat (i32 10000)
-; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <4 x i1> [[TMP6]], i64 0
+; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <4 x i32> [[TMP5]], i64 0
+; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i32 [[TMP6]], 10000
 ; CHECK-NEXT:    br i1 [[TMP7]], label %[[VECTOR_LATCH]], label %[[FOR2_HEADER2]]
 ; CHECK:       [[VECTOR_LATCH]]:
-; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds double, ptr [[C_OUT]], <4 x i64> [[VEC_IND]]
-; CHECK-NEXT:    [[TMP9:%.*]] = extractelement <4 x ptr> [[TMP8]], i64 0
+; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <4 x i64> [[VEC_IND]], i64 0
+; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds double, ptr [[C_OUT]], i64 [[TMP8]]
 ; CHECK-NEXT:    store <4 x double> [[TMP4]], ptr [[TMP9]], align 8
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[VEC_IND]], splat (i64 4)

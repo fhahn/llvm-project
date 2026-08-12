@@ -19,9 +19,9 @@ define void @nested_outer_loop_vect(i32 %n, i64 %outer_tc) {
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_LATCH:.*]] ]
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_LATCH]] ]
-; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [8 x i32], ptr @arr2, i64 0, <4 x i64> [[VEC_IND]]
+; CHECK-NEXT:    [[TMP0:%.*]] = extractelement <4 x i64> [[VEC_IND]], i64 0
+; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds [8 x i32], ptr @arr2, i64 0, i64 [[TMP0]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = trunc <4 x i64> [[VEC_IND]] to <4 x i32>
-; CHECK-NEXT:    [[TMP9:%.*]] = extractelement <4 x ptr> [[TMP0]], i64 0
 ; CHECK-NEXT:    store <4 x i32> [[TMP1]], ptr [[TMP9]], align 4
 ; CHECK-NEXT:    [[TMP2:%.*]] = add nsw <4 x i32> [[TMP1]], [[BROADCAST_SPLAT]]
 ; CHECK-NEXT:    br label %[[LOOP2_HEADER1:.*]]
@@ -30,8 +30,8 @@ define void @nested_outer_loop_vect(i32 %n, i64 %outer_tc) {
 ; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [8 x [8 x i32]], ptr @arr, i64 0, <4 x i64> [[TMP3]], <4 x i64> [[VEC_IND]]
 ; CHECK-NEXT:    call void @llvm.masked.scatter.v4i32.v4p0(<4 x i32> [[TMP2]], <4 x ptr> align 4 [[TMP4]], <4 x i1> splat (i1 true))
 ; CHECK-NEXT:    [[TMP5]] = add nuw nsw <4 x i64> [[TMP3]], splat (i64 1)
-; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq <4 x i64> [[TMP5]], splat (i64 8)
-; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <4 x i1> [[TMP6]], i64 0
+; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <4 x i64> [[TMP5]], i64 0
+; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[TMP6]], 8
 ; CHECK-NEXT:    br i1 [[TMP7]], label %[[VECTOR_LATCH]], label %[[LOOP2_HEADER1]]
 ; CHECK:       [[VECTOR_LATCH]]:
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4

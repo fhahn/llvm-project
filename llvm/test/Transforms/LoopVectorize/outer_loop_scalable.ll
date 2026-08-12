@@ -29,8 +29,8 @@ define void @foo() {
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[OUTER_LOOP_LATCH4:.*]] ]
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <vscale x 4 x i64> [ [[TMP4]], %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[OUTER_LOOP_LATCH4]] ]
-; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [1024 x float], ptr @A, i64 0, <vscale x 4 x i64> [[VEC_IND]]
-; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <vscale x 4 x ptr> [[TMP10]], i64 0
+; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <vscale x 4 x i64> [[VEC_IND]], i64 0
+; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [1024 x float], ptr @A, i64 0, i64 [[TMP5]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <vscale x 4 x float>, ptr [[TMP6]], align 4
 ; CHECK-NEXT:    br label %[[INNER_LOOP1:.*]]
 ; CHECK:       [[INNER_LOOP1]]:
@@ -40,12 +40,11 @@ define void @foo() {
 ; CHECK-NEXT:    [[WIDE_MASKED_GATHER3:%.*]] = call <vscale x 4 x float> @llvm.masked.gather.nxv4f32.nxv4p0(<vscale x 4 x ptr> align 4 [[TMP11]], <vscale x 4 x i1> splat (i1 true), <vscale x 4 x float> poison)
 ; CHECK-NEXT:    [[TMP12]] = fmul <vscale x 4 x float> [[VEC_PHI2]], [[WIDE_MASKED_GATHER3]]
 ; CHECK-NEXT:    [[TMP13]] = add nuw nsw <vscale x 4 x i64> [[VEC_PHI]], splat (i64 1)
-; CHECK-NEXT:    [[TMP14:%.*]] = icmp eq <vscale x 4 x i64> [[TMP13]], splat (i64 512)
-; CHECK-NEXT:    [[TMP15:%.*]] = extractelement <vscale x 4 x i1> [[TMP14]], i64 0
+; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <vscale x 4 x i64> [[TMP13]], i64 0
+; CHECK-NEXT:    [[TMP15:%.*]] = icmp eq i64 [[TMP8]], 512
 ; CHECK-NEXT:    br i1 [[TMP15]], label %[[OUTER_LOOP_LATCH4]], label %[[INNER_LOOP1]]
 ; CHECK:       [[OUTER_LOOP_LATCH4]]:
-; CHECK-NEXT:    [[TMP16:%.*]] = extractelement <vscale x 4 x ptr> [[TMP10]], i64 0
-; CHECK-NEXT:    store <vscale x 4 x float> [[TMP12]], ptr [[TMP16]], align 4
+; CHECK-NEXT:    store <vscale x 4 x float> [[TMP12]], ptr [[TMP6]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP1]]
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <vscale x 4 x i64> [[VEC_IND]], [[DOTSPLAT]]
 ; CHECK-NEXT:    [[TMP20:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]

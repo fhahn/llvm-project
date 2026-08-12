@@ -33,8 +33,8 @@ define void @test_no_scalarization(ptr %a, ptr noalias %b, i32 %idx, i32 %n) #0 
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <vscale x 2 x i32> [ [[INDUCTION]], [[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i32 [[IDX]], [[INDEX]]
-; CHECK-NEXT:    [[TMP15:%.*]] = getelementptr i64, ptr [[A:%.*]], <vscale x 2 x i32> [[VEC_IND]]
-; CHECK-NEXT:    [[TMP16:%.*]] = extractelement <vscale x 2 x ptr> [[TMP15]], i64 0
+; CHECK-NEXT:    [[TMP9:%.*]] = extractelement <vscale x 2 x i32> [[VEC_IND]], i64 0
+; CHECK-NEXT:    [[TMP16:%.*]] = getelementptr i64, ptr [[A:%.*]], i32 [[TMP9]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <vscale x 2 x double>, ptr [[TMP16]], align 8
 ; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr i64, ptr [[B:%.*]], i32 [[OFFSET_IDX]]
 ; CHECK-NEXT:    store <vscale x 2 x double> [[WIDE_LOAD]], ptr [[TMP18]], align 8

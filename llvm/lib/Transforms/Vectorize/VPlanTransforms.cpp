@@ -1754,6 +1754,32 @@ getUnmaskedDivRemOpcode(Intrinsic::ID ID) {
   }
 }
 
+/// Returns true if every lane of \p R other than the first is dead, because all
+/// users of \p R only demand its first lane. Computing a single scalar is then
+/// equivalent to computing all lanes.
+///
+/// This is the demand-based counterpart to vputils::isSingleScalar, which only
+/// reasons about the value a recipe produces. Note the demand of a recipe's
+/// users is only known once all users have been converted to recipes, so this
+/// must not be queried during initial recipe construction.
+static bool onlyFirstLaneDemanded(VPRecipeWithIRFlags *R) {
+  // Executing the recipe fewer times must not drop stores or other
+  // side-effects. Memory reads could be narrowed as well - dropping the loads
+  // of dead lanes is always safe - but are left to a separate change.
+  if (R->mayReadOrWriteMemory() || R->mayHaveSideEffects())
+    return false;
+
+  // A recipe in a replicate region is executed once per lane, and its first
+  // lane is not available while the region executes for another lane.
+  if (auto *RepR = dyn_cast<VPReplicateRecipe>(R)) {
+    const VPRegionBlock *Region = RepR->getRegion();
+    if (Region && Region->isReplicator())
+      return false;
+  }
+
+  return vputils::onlyFirstLaneUsed(R);
+}
+
 static void narrowToSingleScalarRecipes(VPlan &Plan) {
   if (Plan.hasScalarVFOnly())
     return;
@@ -1807,8 +1833,13 @@ static void narrowToSingleScalarRecipes(VPlan &Plan) {
         continue;
       }
 
-      // Skip recipes that aren't single scalars.
-      if (!vputils::isSingleScalar(RepOrWidenR))
+      // Narrow the recipe if it produces a single scalar, or if all lanes but
+      // the first are dead. Either makes computing one scalar equivalent to
+      // computing all lanes, as the recipes handled here (widen, widen-GEP and
+      // replicate) are all lane-wise: lane I of the result only depends on lane
+      // I of the operands.
+      if (!vputils::isSingleScalar(RepOrWidenR) &&
+          !onlyFirstLaneDemanded(RepOrWidenR))
         continue;
 
       // Predicate to check if a user of Op introduces extra broadcasts.

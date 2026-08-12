@@ -25,8 +25,8 @@ define void @scale_rows(ptr noalias %A, ptr noalias %scale, i64 %N, i64 %M) {
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[OUTER_LATCH4:.*]] ]
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[OUTER_LATCH4]] ]
-; CHECK-NEXT:    [[WIDE_GEP:%.*]] = getelementptr inbounds float, ptr [[SCALE]], <4 x i64> [[VEC_IND]]
-; CHECK-NEXT:    [[TMP1:%.*]] = extractelement <4 x ptr> [[WIDE_GEP]], i64 0
+; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <4 x i64> [[VEC_IND]], i64 0
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds float, ptr [[SCALE]], i64 [[TMP6]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x float>, ptr [[TMP1]], align 4
 ; CHECK-NEXT:    [[TMP2:%.*]] = mul nsw <4 x i64> [[VEC_IND]], [[BROADCAST_SPLAT]]
 ; CHECK-NEXT:    br label %[[INNER_BODY1:.*]]
@@ -38,8 +38,8 @@ define void @scale_rows(ptr noalias %A, ptr noalias %scale, i64 %N, i64 %M) {
 ; CHECK-NEXT:    [[TMP4:%.*]] = fmul <4 x float> [[WIDE_MASKED_GATHER]], [[WIDE_LOAD]]
 ; CHECK-NEXT:    call void @llvm.masked.scatter.v4f32.v4p0(<4 x float> [[TMP4]], <4 x ptr> align 4 [[WIDE_GEP3]], <4 x i1> splat (i1 true))
 ; CHECK-NEXT:    [[TMP5]] = add nuw nsw <4 x i64> [[J2]], splat (i64 1)
-; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq <4 x i64> [[TMP5]], [[BROADCAST_SPLAT]]
-; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <4 x i1> [[TMP6]], i64 0
+; CHECK-NEXT:    [[TMP9:%.*]] = extractelement <4 x i64> [[TMP5]], i64 0
+; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[TMP9]], [[M]]
 ; CHECK-NEXT:    br i1 [[TMP7]], label %[[OUTER_LATCH4]], label %[[INNER_BODY1]]
 ; CHECK:       [[OUTER_LATCH4]]:
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
@@ -116,8 +116,8 @@ define void @stride2_float_load(ptr noalias %A, ptr noalias %scale, i64 %N, i64 
 ; CHECK-NEXT:    [[TMP4:%.*]] = fmul <4 x float> [[WIDE_MASKED_GATHER4]], [[WIDE_MASKED_GATHER]]
 ; CHECK-NEXT:    call void @llvm.masked.scatter.v4f32.v4p0(<4 x float> [[TMP4]], <4 x ptr> align 4 [[WIDE_GEP3]], <4 x i1> splat (i1 true))
 ; CHECK-NEXT:    [[TMP5]] = add nuw nsw <4 x i64> [[J2]], splat (i64 1)
-; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq <4 x i64> [[TMP5]], [[BROADCAST_SPLAT]]
-; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <4 x i1> [[TMP6]], i64 0
+; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <4 x i64> [[TMP5]], i64 0
+; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[TMP6]], [[M]]
 ; CHECK-NEXT:    br i1 [[TMP7]], label %[[OUTER_LATCH5]], label %[[INNER_BODY1]]
 ; CHECK:       [[OUTER_LATCH5]]:
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
@@ -181,8 +181,8 @@ define void @stride1_double_load(ptr noalias %A, ptr noalias %scale, i64 %N, i64
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[OUTER_LATCH4:.*]] ]
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[OUTER_LATCH4]] ]
-; CHECK-NEXT:    [[WIDE_GEP:%.*]] = getelementptr inbounds double, ptr [[SCALE]], <4 x i64> [[VEC_IND]]
-; CHECK-NEXT:    [[TMP1:%.*]] = extractelement <4 x ptr> [[WIDE_GEP]], i64 0
+; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <4 x i64> [[VEC_IND]], i64 0
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds double, ptr [[SCALE]], i64 [[TMP6]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x double>, ptr [[TMP1]], align 8
 ; CHECK-NEXT:    [[TMP2:%.*]] = mul nsw <4 x i64> [[VEC_IND]], [[BROADCAST_SPLAT]]
 ; CHECK-NEXT:    br label %[[INNER_BODY1:.*]]
@@ -194,8 +194,8 @@ define void @stride1_double_load(ptr noalias %A, ptr noalias %scale, i64 %N, i64
 ; CHECK-NEXT:    [[TMP4:%.*]] = fmul <4 x double> [[WIDE_MASKED_GATHER]], [[WIDE_LOAD]]
 ; CHECK-NEXT:    call void @llvm.masked.scatter.v4f64.v4p0(<4 x double> [[TMP4]], <4 x ptr> align 8 [[WIDE_GEP3]], <4 x i1> splat (i1 true))
 ; CHECK-NEXT:    [[TMP5]] = add nuw nsw <4 x i64> [[J2]], splat (i64 1)
-; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq <4 x i64> [[TMP5]], [[BROADCAST_SPLAT]]
-; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <4 x i1> [[TMP6]], i64 0
+; CHECK-NEXT:    [[TMP9:%.*]] = extractelement <4 x i64> [[TMP5]], i64 0
+; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[TMP9]], [[M]]
 ; CHECK-NEXT:    br i1 [[TMP7]], label %[[OUTER_LATCH4]], label %[[INNER_BODY1]]
 ; CHECK:       [[OUTER_LATCH4]]:
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
@@ -274,8 +274,8 @@ define void @stride1_i1_load_store(ptr noalias %A, ptr noalias %flags, i64 %N, i
 ; CHECK-NEXT:    [[WIDE_GEP3:%.*]] = getelementptr inbounds i8, ptr [[A]], <4 x i64> [[TMP4]]
 ; CHECK-NEXT:    call void @llvm.masked.scatter.v4i8.v4p0(<4 x i8> [[TMP3]], <4 x ptr> align 1 [[WIDE_GEP3]], <4 x i1> splat (i1 true))
 ; CHECK-NEXT:    [[TMP5]] = add nuw nsw <4 x i64> [[J2]], splat (i64 1)
-; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq <4 x i64> [[TMP5]], [[BROADCAST_SPLAT]]
-; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <4 x i1> [[TMP6]], i64 0
+; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <4 x i64> [[TMP5]], i64 0
+; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[TMP6]], [[M]]
 ; CHECK-NEXT:    br i1 [[TMP7]], label %[[OUTER_LATCH4]], label %[[INNER_BODY1]]
 ; CHECK:       [[OUTER_LATCH4]]:
 ; CHECK-NEXT:    [[TMP8:%.*]] = xor <4 x i1> [[WIDE_LOAD]], splat (i1 true)
@@ -349,8 +349,8 @@ define void @stride1_i4_load_store(ptr noalias %A, ptr noalias %vals, i64 %N, i6
 ; CHECK-NEXT:    [[WIDE_GEP3:%.*]] = getelementptr inbounds i8, ptr [[A]], <4 x i64> [[TMP4]]
 ; CHECK-NEXT:    call void @llvm.masked.scatter.v4i8.v4p0(<4 x i8> [[TMP3]], <4 x ptr> align 1 [[WIDE_GEP3]], <4 x i1> splat (i1 true))
 ; CHECK-NEXT:    [[TMP5]] = add nuw nsw <4 x i64> [[J2]], splat (i64 1)
-; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq <4 x i64> [[TMP5]], [[BROADCAST_SPLAT]]
-; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <4 x i1> [[TMP6]], i64 0
+; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <4 x i64> [[TMP5]], i64 0
+; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[TMP6]], [[M]]
 ; CHECK-NEXT:    br i1 [[TMP7]], label %[[OUTER_LATCH4]], label %[[INNER_BODY1]]
 ; CHECK:       [[OUTER_LATCH4]]:
 ; CHECK-NEXT:    [[TMP8:%.*]] = add <4 x i4> [[WIDE_LOAD]], splat (i4 1)
@@ -413,8 +413,8 @@ define void @stride1_i8_load_store(ptr noalias %A, ptr noalias %vals, i64 %N, i6
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[OUTER_LATCH4:.*]] ]
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[OUTER_LATCH4]] ]
-; CHECK-NEXT:    [[WIDE_GEP:%.*]] = getelementptr inbounds i8, ptr [[VALS]], <4 x i64> [[VEC_IND]]
-; CHECK-NEXT:    [[TMP1:%.*]] = extractelement <4 x ptr> [[WIDE_GEP]], i64 0
+; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <4 x i64> [[VEC_IND]], i64 0
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i8, ptr [[VALS]], i64 [[TMP5]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i8>, ptr [[TMP1]], align 1
 ; CHECK-NEXT:    [[TMP2:%.*]] = mul nsw <4 x i64> [[VEC_IND]], [[BROADCAST_SPLAT]]
 ; CHECK-NEXT:    br label %[[INNER_BODY1:.*]]
@@ -424,13 +424,12 @@ define void @stride1_i8_load_store(ptr noalias %A, ptr noalias %vals, i64 %N, i6
 ; CHECK-NEXT:    [[WIDE_GEP3:%.*]] = getelementptr inbounds i8, ptr [[A]], <4 x i64> [[TMP3]]
 ; CHECK-NEXT:    call void @llvm.masked.scatter.v4i8.v4p0(<4 x i8> [[WIDE_LOAD]], <4 x ptr> align 1 [[WIDE_GEP3]], <4 x i1> splat (i1 true))
 ; CHECK-NEXT:    [[TMP4]] = add nuw nsw <4 x i64> [[J2]], splat (i64 1)
-; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq <4 x i64> [[TMP4]], [[BROADCAST_SPLAT]]
-; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <4 x i1> [[TMP5]], i64 0
+; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <4 x i64> [[TMP4]], i64 0
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[TMP8]], [[M]]
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[OUTER_LATCH4]], label %[[INNER_BODY1]]
 ; CHECK:       [[OUTER_LATCH4]]:
 ; CHECK-NEXT:    [[TMP7:%.*]] = add <4 x i8> [[WIDE_LOAD]], splat (i8 1)
-; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <4 x ptr> [[WIDE_GEP]], i64 0
-; CHECK-NEXT:    store <4 x i8> [[TMP7]], ptr [[TMP8]], align 1
+; CHECK-NEXT:    store <4 x i8> [[TMP7]], ptr [[TMP1]], align 1
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[VEC_IND]], splat (i64 4)
 ; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]

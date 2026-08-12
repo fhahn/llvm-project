@@ -35,9 +35,9 @@ define void @foo_i32(i32 %n) {
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_LATCH:.*]] ]
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_LATCH]] ]
-; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [8 x i32], ptr @arr2, i64 0, <4 x i64> [[VEC_IND]]
+; CHECK-NEXT:    [[TMP0:%.*]] = extractelement <4 x i64> [[VEC_IND]], i64 0
+; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [8 x i32], ptr @arr2, i64 0, i64 [[TMP0]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = trunc <4 x i64> [[VEC_IND]] to <4 x i32>
-; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <4 x ptr> [[TMP0]], i64 0
 ; CHECK-NEXT:    store <4 x i32> [[TMP1]], ptr [[TMP8]], align 4
 ; CHECK-NEXT:    [[TMP2:%.*]] = add nsw <4 x i32> [[TMP1]], [[BROADCAST_SPLAT]]
 ; CHECK-NEXT:    br label %[[FOR_BODY31:.*]]
@@ -46,8 +46,8 @@ define void @foo_i32(i32 %n) {
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [8 x [8 x i32]], ptr @arr, i64 0, <4 x i64> [[VEC_PHI]], <4 x i64> [[VEC_IND]]
 ; CHECK-NEXT:    call void @llvm.masked.scatter.v4i32.v4p0(<4 x i32> [[TMP2]], <4 x ptr> align 4 [[TMP3]], <4 x i1> splat (i1 true))
 ; CHECK-NEXT:    [[TMP4]] = add nuw nsw <4 x i64> [[VEC_PHI]], splat (i64 1)
-; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq <4 x i64> [[TMP4]], splat (i64 8)
-; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <4 x i1> [[TMP5]], i64 0
+; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <4 x i64> [[TMP4]], i64 0
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[TMP5]], 8
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[VECTOR_LATCH]], label %[[FOR_BODY31]]
 ; CHECK:       [[VECTOR_LATCH]]:
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
@@ -100,8 +100,8 @@ define void @foo_i64(i64 %n) {
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_LATCH:.*]] ]
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <2 x i64> [ <i64 0, i64 1>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_LATCH]] ]
-; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds [8 x i64], ptr @arrX, i64 0, <2 x i64> [[VEC_IND]]
-; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <2 x ptr> [[TMP0]], i64 0
+; CHECK-NEXT:    [[TMP0:%.*]] = extractelement <2 x i64> [[VEC_IND]], i64 0
+; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [8 x i64], ptr @arrX, i64 0, i64 [[TMP0]]
 ; CHECK-NEXT:    store <2 x i64> [[VEC_IND]], ptr [[TMP7]], align 4
 ; CHECK-NEXT:    [[TMP1:%.*]] = add nsw <2 x i64> [[VEC_IND]], [[BROADCAST_SPLAT]]
 ; CHECK-NEXT:    br label %[[FOR_BODY31:.*]]
@@ -110,8 +110,8 @@ define void @foo_i64(i64 %n) {
 ; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [8 x [8 x i64]], ptr @arrY, i64 0, <2 x i64> [[VEC_PHI]], <2 x i64> [[VEC_IND]]
 ; CHECK-NEXT:    call void @llvm.masked.scatter.v2i64.v2p0(<2 x i64> [[TMP1]], <2 x ptr> align 4 [[TMP2]], <2 x i1> splat (i1 true))
 ; CHECK-NEXT:    [[TMP3]] = add nuw nsw <2 x i64> [[VEC_PHI]], splat (i64 1)
-; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq <2 x i64> [[TMP3]], splat (i64 8)
-; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <2 x i1> [[TMP4]], i64 0
+; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <2 x i64> [[TMP3]], i64 0
+; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[TMP4]], 8
 ; CHECK-NEXT:    br i1 [[TMP5]], label %[[VECTOR_LATCH]], label %[[FOR_BODY31]]
 ; CHECK:       [[VECTOR_LATCH]]:
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2

@@ -15,8 +15,6 @@ define void @inner_latch_header_first_successor(i64 %N, i32 %c, i64 %M) {
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[M]], [[N_MOD_VF]]
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[C]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x i64> poison, i64 [[N]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT1]], <4 x i64> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_LATCH:.*]] ]
@@ -34,8 +32,8 @@ define void @inner_latch_header_first_successor(i64 %N, i32 %c, i64 %M) {
 ; CHECK-NEXT:    [[TMP2:%.*]] = add nsw <4 x i64> [[WIDE_MASKED_GATHER5]], [[VEC_PHI4]]
 ; CHECK-NEXT:    [[TMP3]] = add nsw <4 x i64> [[TMP2]], [[VEC_PHI4]]
 ; CHECK-NEXT:    [[TMP4]] = add nuw nsw <4 x i64> [[VEC_PHI]], splat (i64 1)
-; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq <4 x i64> [[TMP4]], [[BROADCAST_SPLAT2]]
-; CHECK-NEXT:    [[TMP9:%.*]] = extractelement <4 x i1> [[TMP6]], i64 0
+; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <4 x i64> [[TMP4]], i64 0
+; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq i64 [[TMP6]], [[N]]
 ; CHECK-NEXT:    br i1 [[TMP9]], label %[[VECTOR_LATCH]], label %[[INNER3]]
 ; CHECK:       [[VECTOR_LATCH]]:
 ; CHECK-NEXT:    store <4 x i64> [[TMP3]], ptr [[TMP5]], align 4
@@ -117,8 +115,6 @@ define void @inner_latch_header_second_successor(i64 %N, i32 %c, i64 %M) {
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[M]], [[N_MOD_VF]]
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[C]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x i64> poison, i64 [[N]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT1]], <4 x i64> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_LATCH:.*]] ]
@@ -136,8 +132,8 @@ define void @inner_latch_header_second_successor(i64 %N, i32 %c, i64 %M) {
 ; CHECK-NEXT:    [[TMP2:%.*]] = add nsw <4 x i64> [[WIDE_MASKED_GATHER5]], [[VEC_PHI4]]
 ; CHECK-NEXT:    [[TMP3]] = add nsw <4 x i64> [[TMP2]], [[VEC_PHI4]]
 ; CHECK-NEXT:    [[TMP4]] = add nuw nsw <4 x i64> [[VEC_PHI]], splat (i64 1)
-; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq <4 x i64> [[TMP4]], [[BROADCAST_SPLAT2]]
-; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <4 x i1> [[TMP5]], i64 0
+; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <4 x i64> [[TMP4]], i64 0
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[TMP5]], [[N]]
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[VECTOR_LATCH]], label %[[INNER3]]
 ; CHECK:       [[VECTOR_LATCH]]:
 ; CHECK-NEXT:    store <4 x i64> [[TMP3]], ptr [[TMP9]], align 4

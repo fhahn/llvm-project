@@ -28,8 +28,8 @@ define void @outer_with_i20_access(ptr %a, i64 %n, i64 %m) {
 ; CHECK-NEXT:    [[TMP2:%.*]] = add <4 x i20> [[WIDE_MASKED_GATHER]], [[WIDE_MASKED_GATHER]]
 ; CHECK-NEXT:    call void @llvm.masked.scatter.v4i20.v4p0(<4 x i20> [[TMP2]], <4 x ptr> align 4 [[WIDE_GEP]], <4 x i1> splat (i1 true))
 ; CHECK-NEXT:    [[TMP3]] = add <4 x i64> [[J2]], splat (i64 1)
-; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq <4 x i64> [[TMP3]], [[BROADCAST_SPLAT]]
-; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <4 x i1> [[TMP4]], i64 0
+; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <4 x i64> [[TMP3]], i64 0
+; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[TMP7]], [[M]]
 ; CHECK-NEXT:    br i1 [[TMP5]], label %[[OUTER_LATCH3]], label %[[INNER1]]
 ; CHECK:       [[OUTER_LATCH3]]:
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
