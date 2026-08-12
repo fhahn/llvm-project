@@ -5704,12 +5704,17 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   RUN_VPLAN_PASS(VPlanTransforms::materializePacksAndUnpacks, BestVPlan);
   RUN_VPLAN_PASS(VPlanTransforms::materializeBroadcasts, BestVPlan);
   RUN_VPLAN_PASS(VPlanTransforms::replicateByVF, BestVPlan, BestVF);
+  // Retrieve the estimated trip count before executing the plan, which may
+  // remove the original loop, if it becomes unreachable.
+  unsigned OrigLoopInvocationWeight = 0;
+  std::optional<unsigned> OrigAverageTripCount =
+      getLoopEstimatedTripCount(OrigLoop, &OrigLoopInvocationWeight);
   bool HasBranchWeights =
       hasBranchWeightMD(*OrigLoop->getLoopLatch()->getTerminator());
   if (HasBranchWeights) {
     std::optional<unsigned> VScale = Config.getVScaleForTuning();
     RUN_VPLAN_PASS(VPlanTransforms::addBranchWeightToMiddleTerminator,
-                   BestVPlan, BestVF, VScale);
+                   BestVPlan, BestVF, VScale, OrigAverageTripCount);
   }
 
   if (vputils::findIncomingAliasMask(BestVPlan)) {
@@ -5852,9 +5857,6 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   // Retrieve loop information before executing the plan, which may remove the
   // original loop, if it becomes unreachable.
   MDNode *LID = OrigLoop->getLoopID();
-  unsigned OrigLoopInvocationWeight = 0;
-  std::optional<unsigned> OrigAverageTripCount =
-      getLoopEstimatedTripCount(OrigLoop, &OrigLoopInvocationWeight);
 
   BestVPlan.execute(&State);
 

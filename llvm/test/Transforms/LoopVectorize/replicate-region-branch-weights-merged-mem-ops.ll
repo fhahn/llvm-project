@@ -261,7 +261,7 @@ exit:
 ; CHECK: [[META11]] = !{!"llvm.loop.isvectorized", i32 1}
 ; CHECK: [[META12]] = !{!"llvm.loop.unroll.runtime.disable"}
 ; CHECK: [[META13]] = !{!"llvm.loop.estimated_trip_count", i32 250}
-; CHECK: [[PROF14]] = !{!"branch_weights", i32 1, i32 3}
+; CHECK: [[PROF14]] = !{!"branch_weights", i32 3, i32 1}
 ; CHECK: [[PROF15]] = !{!"branch_weights", i32 1, i32 1}
 ; CHECK: [[PROF16]] = !{!"branch_weights", i32 1, i32 0}
 ; CHECK: [[LOOP17]] = distinct !{[[LOOP17]], [[META11]], [[META18:![0-9]+]]}

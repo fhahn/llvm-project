@@ -290,7 +290,7 @@ define void @f2(ptr %p, i64 %n) !prof !0 {
 ; MAINVF4IC1_EPI4:    br i1 [[TMP1]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF2]], !llvm.loop [[LOOP22:![0-9]+]]
 ; MAINVF4IC1_EPI4:  [[MIDDLE_BLOCK]]:
 ; MAINVF4IC1_EPI4:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
-; MAINVF4IC1_EPI4:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]], !prof [[PROF8]]
+; MAINVF4IC1_EPI4:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]], !prof [[PROF9]]
 ; MAINVF4IC1_EPI4:  [[VEC_EPILOG_ITER_CHECK]]:
 ; MAINVF4IC1_EPI4:    [[MIN_EPILOG_ITERS_CHECK:%.*]] = icmp ult i64 [[N_MOD_VF:%.*]], 4
 ; MAINVF4IC1_EPI4:    br i1 [[MIN_EPILOG_ITERS_CHECK]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF9]]
@@ -301,12 +301,12 @@ define void @f2(ptr %p, i64 %n) !prof !0 {
 ; MAINVF4IC1_EPI4:    br i1 [[TMP3]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !prof [[PROF10]], !llvm.loop [[LOOP24:![0-9]+]]
 ; MAINVF4IC1_EPI4:  [[VEC_EPILOG_MIDDLE_BLOCK]]:
 ; MAINVF4IC1_EPI4:    [[CMP_N6:%.*]] = icmp eq i64 [[N]], [[N_VEC3]]
-; MAINVF4IC1_EPI4:    br i1 [[CMP_N6]], label %[[EXIT]], label %[[VEC_EPILOG_SCALAR_PH]], !prof [[PROF13]]
+; MAINVF4IC1_EPI4:    br i1 [[CMP_N6]], label %[[EXIT]], label %[[VEC_EPILOG_SCALAR_PH]], !prof [[PROF25:![0-9]+]]
 ; MAINVF4IC1_EPI4:  [[VEC_EPILOG_SCALAR_PH]]:
 ; MAINVF4IC1_EPI4:    br label %[[LOOP:.*]]
 ; MAINVF4IC1_EPI4:  [[LOOP]]:
 ; MAINVF4IC1_EPI4:    [[CMP_LOOP:%.*]] = icmp eq i64 [[IV_NEXT:%.*]], [[N]]
-; MAINVF4IC1_EPI4:    br i1 [[CMP_LOOP]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF10]], !llvm.loop [[LOOP25:![0-9]+]]
+; MAINVF4IC1_EPI4:    br i1 [[CMP_LOOP]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF10]], !llvm.loop [[LOOP26:![0-9]+]]
 ; MAINVF4IC1_EPI4:  [[EXIT]]:
 ;
 ; MAINVF4IC2_EPI4-LABEL: define void @f2(
@@ -324,7 +324,7 @@ define void @f2(ptr %p, i64 %n) !prof !0 {
 ; MAINVF4IC2_EPI4:    br i1 [[TMP2]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF2]], !llvm.loop [[LOOP22:![0-9]+]]
 ; MAINVF4IC2_EPI4:  [[MIDDLE_BLOCK]]:
 ; MAINVF4IC2_EPI4:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
-; MAINVF4IC2_EPI4:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]], !prof [[PROF8]]
+; MAINVF4IC2_EPI4:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]], !prof [[PROF9]]
 ; MAINVF4IC2_EPI4:  [[VEC_EPILOG_ITER_CHECK]]:
 ; MAINVF4IC2_EPI4:    [[MIN_EPILOG_ITERS_CHECK:%.*]] = icmp ult i64 [[N_MOD_VF:%.*]], 4
 ; MAINVF4IC2_EPI4:    br i1 [[MIN_EPILOG_ITERS_CHECK]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF9]]
@@ -335,12 +335,12 @@ define void @f2(ptr %p, i64 %n) !prof !0 {
 ; MAINVF4IC2_EPI4:    br i1 [[TMP4]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !prof [[PROF10]], !llvm.loop [[LOOP24:![0-9]+]]
 ; MAINVF4IC2_EPI4:  [[VEC_EPILOG_MIDDLE_BLOCK]]:
 ; MAINVF4IC2_EPI4:    [[CMP_N6:%.*]] = icmp eq i64 [[N]], [[N_VEC3]]
-; MAINVF4IC2_EPI4:    br i1 [[CMP_N6]], label %[[EXIT]], label %[[VEC_EPILOG_SCALAR_PH]], !prof [[PROF13]]
+; MAINVF4IC2_EPI4:    br i1 [[CMP_N6]], label %[[EXIT]], label %[[VEC_EPILOG_SCALAR_PH]], !prof [[PROF25:![0-9]+]]
 ; MAINVF4IC2_EPI4:  [[VEC_EPILOG_SCALAR_PH]]:
 ; MAINVF4IC2_EPI4:    br label %[[LOOP:.*]]
 ; MAINVF4IC2_EPI4:  [[LOOP]]:
 ; MAINVF4IC2_EPI4:    [[CMP_LOOP:%.*]] = icmp eq i64 [[IV_NEXT:%.*]], [[N]]
-; MAINVF4IC2_EPI4:    br i1 [[CMP_LOOP]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF10]], !llvm.loop [[LOOP25:![0-9]+]]
+; MAINVF4IC2_EPI4:    br i1 [[CMP_LOOP]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF10]], !llvm.loop [[LOOP26:![0-9]+]]
 ; MAINVF4IC2_EPI4:  [[EXIT]]:
 ;
 ; MAINVF8IC1_EPI2-LABEL: define void @f2(
@@ -358,10 +358,10 @@ define void @f2(ptr %p, i64 %n) !prof !0 {
 ; MAINVF8IC1_EPI2:    br i1 [[TMP1]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF2]], !llvm.loop [[LOOP20:![0-9]+]]
 ; MAINVF8IC1_EPI2:  [[MIDDLE_BLOCK]]:
 ; MAINVF8IC1_EPI2:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
-; MAINVF8IC1_EPI2:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]], !prof [[PROF8]]
+; MAINVF8IC1_EPI2:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]], !prof [[PROF22:![0-9]+]]
 ; MAINVF8IC1_EPI2:  [[VEC_EPILOG_ITER_CHECK]]:
 ; MAINVF8IC1_EPI2:    [[MIN_EPILOG_ITERS_CHECK:%.*]] = icmp ult i64 [[N_MOD_VF:%.*]], 2
-; MAINVF8IC1_EPI2:    br i1 [[MIN_EPILOG_ITERS_CHECK]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF22:![0-9]+]]
+; MAINVF8IC1_EPI2:    br i1 [[MIN_EPILOG_ITERS_CHECK]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF22]]
 ; MAINVF8IC1_EPI2:  [[VEC_EPILOG_PH]]:
 ; MAINVF8IC1_EPI2:    br label %[[VEC_EPILOG_VECTOR_BODY:.*]]
 ; MAINVF8IC1_EPI2:  [[VEC_EPILOG_VECTOR_BODY]]:
@@ -405,10 +405,10 @@ define void @f3(ptr %p, i64 %n) !prof !0 {
 ; MAINVF4IC1_EPI4:    br label %[[VECTOR_BODY:.*]]
 ; MAINVF4IC1_EPI4:  [[VECTOR_BODY]]:
 ; MAINVF4IC1_EPI4:    [[TMP2:%.*]] = icmp eq i64 [[INDEX_NEXT:%.*]], [[N_VEC:%.*]]
-; MAINVF4IC1_EPI4:    br i1 [[TMP2]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF10]], !llvm.loop [[LOOP26:![0-9]+]]
+; MAINVF4IC1_EPI4:    br i1 [[TMP2]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF10]], !llvm.loop [[LOOP27:![0-9]+]]
 ; MAINVF4IC1_EPI4:  [[MIDDLE_BLOCK]]:
 ; MAINVF4IC1_EPI4:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
-; MAINVF4IC1_EPI4:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]], !prof [[PROF8]]
+; MAINVF4IC1_EPI4:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]], !prof [[PROF9]]
 ; MAINVF4IC1_EPI4:  [[VEC_EPILOG_ITER_CHECK]]:
 ; MAINVF4IC1_EPI4:    [[MIN_EPILOG_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP0:%.*]], 4
 ; MAINVF4IC1_EPI4:    br i1 [[MIN_EPILOG_ITERS_CHECK]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF9]]
@@ -416,15 +416,15 @@ define void @f3(ptr %p, i64 %n) !prof !0 {
 ; MAINVF4IC1_EPI4:    br label %[[VEC_EPILOG_VECTOR_BODY:.*]]
 ; MAINVF4IC1_EPI4:  [[VEC_EPILOG_VECTOR_BODY]]:
 ; MAINVF4IC1_EPI4:    [[TMP5:%.*]] = icmp eq i64 [[INDEX_NEXT4:%.*]], [[N_VEC2:%.*]]
-; MAINVF4IC1_EPI4:    br i1 [[TMP5]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !prof [[PROF10]], !llvm.loop [[LOOP27:![0-9]+]]
+; MAINVF4IC1_EPI4:    br i1 [[TMP5]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !prof [[PROF10]], !llvm.loop [[LOOP28:![0-9]+]]
 ; MAINVF4IC1_EPI4:  [[VEC_EPILOG_MIDDLE_BLOCK]]:
 ; MAINVF4IC1_EPI4:    [[CMP_N5:%.*]] = icmp eq i64 [[N]], [[N_VEC2]]
-; MAINVF4IC1_EPI4:    br i1 [[CMP_N5]], label %[[EXIT]], label %[[VEC_EPILOG_SCALAR_PH]], !prof [[PROF13]]
+; MAINVF4IC1_EPI4:    br i1 [[CMP_N5]], label %[[EXIT]], label %[[VEC_EPILOG_SCALAR_PH]], !prof [[PROF25]]
 ; MAINVF4IC1_EPI4:  [[VEC_EPILOG_SCALAR_PH]]:
 ; MAINVF4IC1_EPI4:    br label %[[LOOP:.*]]
 ; MAINVF4IC1_EPI4:  [[LOOP]]:
 ; MAINVF4IC1_EPI4:    [[CMP_LOOP:%.*]] = icmp eq i64 [[IV_NEXT:%.*]], [[N]]
-; MAINVF4IC1_EPI4:    br i1 [[CMP_LOOP]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF10]], !llvm.loop [[LOOP28:![0-9]+]]
+; MAINVF4IC1_EPI4:    br i1 [[CMP_LOOP]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF10]], !llvm.loop [[LOOP29:![0-9]+]]
 ; MAINVF4IC1_EPI4:  [[EXIT]]:
 ;
 ; MAINVF4IC2_EPI4-LABEL: define void @f3(
@@ -439,10 +439,10 @@ define void @f3(ptr %p, i64 %n) !prof !0 {
 ; MAINVF4IC2_EPI4:    br label %[[VECTOR_BODY:.*]]
 ; MAINVF4IC2_EPI4:  [[VECTOR_BODY]]:
 ; MAINVF4IC2_EPI4:    [[TMP3:%.*]] = icmp eq i64 [[INDEX_NEXT:%.*]], [[N_VEC:%.*]]
-; MAINVF4IC2_EPI4:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF10]], !llvm.loop [[LOOP26:![0-9]+]]
+; MAINVF4IC2_EPI4:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF10]], !llvm.loop [[LOOP27:![0-9]+]]
 ; MAINVF4IC2_EPI4:  [[MIDDLE_BLOCK]]:
 ; MAINVF4IC2_EPI4:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
-; MAINVF4IC2_EPI4:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]], !prof [[PROF8]]
+; MAINVF4IC2_EPI4:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]], !prof [[PROF9]]
 ; MAINVF4IC2_EPI4:  [[VEC_EPILOG_ITER_CHECK]]:
 ; MAINVF4IC2_EPI4:    [[MIN_EPILOG_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP0:%.*]], 4
 ; MAINVF4IC2_EPI4:    br i1 [[MIN_EPILOG_ITERS_CHECK]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF9]]
@@ -450,15 +450,15 @@ define void @f3(ptr %p, i64 %n) !prof !0 {
 ; MAINVF4IC2_EPI4:    br label %[[VEC_EPILOG_VECTOR_BODY:.*]]
 ; MAINVF4IC2_EPI4:  [[VEC_EPILOG_VECTOR_BODY]]:
 ; MAINVF4IC2_EPI4:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT4:%.*]], [[N_VEC2:%.*]]
-; MAINVF4IC2_EPI4:    br i1 [[TMP6]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !prof [[PROF10]], !llvm.loop [[LOOP27:![0-9]+]]
+; MAINVF4IC2_EPI4:    br i1 [[TMP6]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !prof [[PROF10]], !llvm.loop [[LOOP28:![0-9]+]]
 ; MAINVF4IC2_EPI4:  [[VEC_EPILOG_MIDDLE_BLOCK]]:
 ; MAINVF4IC2_EPI4:    [[CMP_N5:%.*]] = icmp eq i64 [[N]], [[N_VEC2]]
-; MAINVF4IC2_EPI4:    br i1 [[CMP_N5]], label %[[EXIT]], label %[[VEC_EPILOG_SCALAR_PH]], !prof [[PROF13]]
+; MAINVF4IC2_EPI4:    br i1 [[CMP_N5]], label %[[EXIT]], label %[[VEC_EPILOG_SCALAR_PH]], !prof [[PROF25]]
 ; MAINVF4IC2_EPI4:  [[VEC_EPILOG_SCALAR_PH]]:
 ; MAINVF4IC2_EPI4:    br label %[[LOOP:.*]]
 ; MAINVF4IC2_EPI4:  [[LOOP]]:
 ; MAINVF4IC2_EPI4:    [[CMP_LOOP:%.*]] = icmp eq i64 [[IV_NEXT:%.*]], [[N]]
-; MAINVF4IC2_EPI4:    br i1 [[CMP_LOOP]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF10]], !llvm.loop [[LOOP28:![0-9]+]]
+; MAINVF4IC2_EPI4:    br i1 [[CMP_LOOP]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF10]], !llvm.loop [[LOOP29:![0-9]+]]
 ; MAINVF4IC2_EPI4:  [[EXIT]]:
 ;
 ; MAINVF8IC1_EPI2-LABEL: define void @f3(
@@ -476,7 +476,7 @@ define void @f3(ptr %p, i64 %n) !prof !0 {
 ; MAINVF8IC1_EPI2:    br i1 [[TMP2]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF9]], !llvm.loop [[LOOP26:![0-9]+]]
 ; MAINVF8IC1_EPI2:  [[MIDDLE_BLOCK]]:
 ; MAINVF8IC1_EPI2:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
-; MAINVF8IC1_EPI2:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]], !prof [[PROF8]]
+; MAINVF8IC1_EPI2:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]], !prof [[PROF22]]
 ; MAINVF8IC1_EPI2:  [[VEC_EPILOG_ITER_CHECK]]:
 ; MAINVF8IC1_EPI2:    [[MIN_EPILOG_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP0:%.*]], 2
 ; MAINVF8IC1_EPI2:    br i1 [[MIN_EPILOG_ITERS_CHECK]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF22]]
@@ -529,7 +529,7 @@ define void @f4(ptr %p) !prof !0 {
 ; MAINVF4IC1_EPI4:    br label %[[VECTOR_BODY:.*]]
 ; MAINVF4IC1_EPI4:  [[VECTOR_BODY]]:
 ; MAINVF4IC1_EPI4:    [[TMP1:%.*]] = icmp eq i64 [[INDEX_NEXT:%.*]], 1024
-; MAINVF4IC1_EPI4:    br i1 [[TMP1]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF2]], !llvm.loop [[LOOP29:![0-9]+]]
+; MAINVF4IC1_EPI4:    br i1 [[TMP1]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF2]], !llvm.loop [[LOOP30:![0-9]+]]
 ; MAINVF4IC1_EPI4:  [[MIDDLE_BLOCK]]:
 ; MAINVF4IC1_EPI4:    br i1 false, label %[[EXIT:.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]], !prof [[PROF8]]
 ; MAINVF4IC1_EPI4:  [[VEC_EPILOG_ITER_CHECK]]:
@@ -538,14 +538,14 @@ define void @f4(ptr %p) !prof !0 {
 ; MAINVF4IC1_EPI4:    br label %[[VEC_EPILOG_VECTOR_BODY:.*]]
 ; MAINVF4IC1_EPI4:  [[VEC_EPILOG_VECTOR_BODY]]:
 ; MAINVF4IC1_EPI4:    [[TMP3:%.*]] = icmp eq i64 [[INDEX_NEXT2:%.*]], 1028
-; MAINVF4IC1_EPI4:    br i1 [[TMP3]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !prof [[PROF10]], !llvm.loop [[LOOP30:![0-9]+]]
+; MAINVF4IC1_EPI4:    br i1 [[TMP3]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !prof [[PROF10]], !llvm.loop [[LOOP31:![0-9]+]]
 ; MAINVF4IC1_EPI4:  [[VEC_EPILOG_MIDDLE_BLOCK]]:
 ; MAINVF4IC1_EPI4:    br i1 false, label %[[EXIT]], label %[[VEC_EPILOG_SCALAR_PH]], !prof [[PROF13]]
 ; MAINVF4IC1_EPI4:  [[VEC_EPILOG_SCALAR_PH]]:
 ; MAINVF4IC1_EPI4:    br label %[[LOOP:.*]]
 ; MAINVF4IC1_EPI4:  [[LOOP]]:
 ; MAINVF4IC1_EPI4:    [[CMP_LOOP:%.*]] = icmp eq i64 [[IV_NEXT:%.*]], 1030
-; MAINVF4IC1_EPI4:    br i1 [[CMP_LOOP]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF31:![0-9]+]], !llvm.loop [[LOOP32:![0-9]+]]
+; MAINVF4IC1_EPI4:    br i1 [[CMP_LOOP]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF32:![0-9]+]], !llvm.loop [[LOOP33:![0-9]+]]
 ; MAINVF4IC1_EPI4:  [[EXIT]]:
 ;
 ; MAINVF4IC2_EPI4-LABEL: define void @f4(
@@ -558,7 +558,7 @@ define void @f4(ptr %p) !prof !0 {
 ; MAINVF4IC2_EPI4:    br label %[[VECTOR_BODY:.*]]
 ; MAINVF4IC2_EPI4:  [[VECTOR_BODY]]:
 ; MAINVF4IC2_EPI4:    [[TMP2:%.*]] = icmp eq i64 [[INDEX_NEXT:%.*]], 1024
-; MAINVF4IC2_EPI4:    br i1 [[TMP2]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF2]], !llvm.loop [[LOOP29:![0-9]+]]
+; MAINVF4IC2_EPI4:    br i1 [[TMP2]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF2]], !llvm.loop [[LOOP30:![0-9]+]]
 ; MAINVF4IC2_EPI4:  [[MIDDLE_BLOCK]]:
 ; MAINVF4IC2_EPI4:    br i1 false, label %[[EXIT:.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]], !prof [[PROF8]]
 ; MAINVF4IC2_EPI4:  [[VEC_EPILOG_ITER_CHECK]]:
@@ -567,14 +567,14 @@ define void @f4(ptr %p) !prof !0 {
 ; MAINVF4IC2_EPI4:    br label %[[VEC_EPILOG_VECTOR_BODY:.*]]
 ; MAINVF4IC2_EPI4:  [[VEC_EPILOG_VECTOR_BODY]]:
 ; MAINVF4IC2_EPI4:    [[TMP4:%.*]] = icmp eq i64 [[INDEX_NEXT2:%.*]], 1028
-; MAINVF4IC2_EPI4:    br i1 [[TMP4]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !prof [[PROF10]], !llvm.loop [[LOOP30:![0-9]+]]
+; MAINVF4IC2_EPI4:    br i1 [[TMP4]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !prof [[PROF10]], !llvm.loop [[LOOP31:![0-9]+]]
 ; MAINVF4IC2_EPI4:  [[VEC_EPILOG_MIDDLE_BLOCK]]:
 ; MAINVF4IC2_EPI4:    br i1 false, label %[[EXIT]], label %[[VEC_EPILOG_SCALAR_PH]], !prof [[PROF13]]
 ; MAINVF4IC2_EPI4:  [[VEC_EPILOG_SCALAR_PH]]:
 ; MAINVF4IC2_EPI4:    br label %[[LOOP:.*]]
 ; MAINVF4IC2_EPI4:  [[LOOP]]:
 ; MAINVF4IC2_EPI4:    [[CMP_LOOP:%.*]] = icmp eq i64 [[IV_NEXT:%.*]], 1030
-; MAINVF4IC2_EPI4:    br i1 [[CMP_LOOP]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF31:![0-9]+]], !llvm.loop [[LOOP32:![0-9]+]]
+; MAINVF4IC2_EPI4:    br i1 [[CMP_LOOP]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF32:![0-9]+]], !llvm.loop [[LOOP33:![0-9]+]]
 ; MAINVF4IC2_EPI4:  [[EXIT]]:
 ;
 ; MAINVF8IC1_EPI2-LABEL: define void @f4(
@@ -660,15 +660,16 @@ exit:
 ; MAINVF4IC1_EPI4: [[LOOP22]] = distinct !{[[LOOP22]], [[META5]], [[META6]], [[META23:![0-9]+]]}
 ; MAINVF4IC1_EPI4: [[META23]] = !{!"llvm.loop.estimated_trip_count", i32 128}
 ; MAINVF4IC1_EPI4: [[LOOP24]] = distinct !{[[LOOP24]], [[META5]], [[META12]], [[META6]]}
-; MAINVF4IC1_EPI4: [[LOOP25]] = distinct !{[[LOOP25]], [[META6]], [[META5]], [[META12]]}
-; MAINVF4IC1_EPI4: [[LOOP26]] = distinct !{[[LOOP26]], [[META12]], [[META5]], [[META6]]}
+; MAINVF4IC1_EPI4: [[PROF25]] = !{!"branch_weights", i32 3, i32 1}
+; MAINVF4IC1_EPI4: [[LOOP26]] = distinct !{[[LOOP26]], [[META6]], [[META5]], [[META12]]}
 ; MAINVF4IC1_EPI4: [[LOOP27]] = distinct !{[[LOOP27]], [[META12]], [[META5]], [[META6]]}
-; MAINVF4IC1_EPI4: [[LOOP28]] = distinct !{[[LOOP28]], [[META12]], [[META6]], [[META5]]}
-; MAINVF4IC1_EPI4: [[LOOP29]] = distinct !{[[LOOP29]], [[META5]], [[META6]], [[META23]]}
-; MAINVF4IC1_EPI4: [[LOOP30]] = distinct !{[[LOOP30]], [[META5]], [[META6]], [[META20]]}
-; MAINVF4IC1_EPI4: [[PROF31]] = !{!"branch_weights", i32 1, i32 1}
-; MAINVF4IC1_EPI4: [[LOOP32]] = distinct !{[[LOOP32]], [[META6]], [[META5]], [[META33:![0-9]+]]}
-; MAINVF4IC1_EPI4: [[META33]] = !{!"llvm.loop.estimated_trip_count", i32 2}
+; MAINVF4IC1_EPI4: [[LOOP28]] = distinct !{[[LOOP28]], [[META12]], [[META5]], [[META6]]}
+; MAINVF4IC1_EPI4: [[LOOP29]] = distinct !{[[LOOP29]], [[META12]], [[META6]], [[META5]]}
+; MAINVF4IC1_EPI4: [[LOOP30]] = distinct !{[[LOOP30]], [[META5]], [[META6]], [[META23]]}
+; MAINVF4IC1_EPI4: [[LOOP31]] = distinct !{[[LOOP31]], [[META5]], [[META6]], [[META20]]}
+; MAINVF4IC1_EPI4: [[PROF32]] = !{!"branch_weights", i32 1, i32 1}
+; MAINVF4IC1_EPI4: [[LOOP33]] = distinct !{[[LOOP33]], [[META6]], [[META5]], [[META34:![0-9]+]]}
+; MAINVF4IC1_EPI4: [[META34]] = !{!"llvm.loop.estimated_trip_count", i32 2}
 ;.
 ; MAINVF4IC2_EPI4: [[PROF0]] = !{!"function_entry_count", i64 13}
 ; MAINVF4IC2_EPI4: [[PROF1]] = !{!"branch_weights", i32 12, i32 1}
@@ -695,15 +696,16 @@ exit:
 ; MAINVF4IC2_EPI4: [[LOOP22]] = distinct !{[[LOOP22]], [[META5]], [[META6]], [[META23:![0-9]+]]}
 ; MAINVF4IC2_EPI4: [[META23]] = !{!"llvm.loop.estimated_trip_count", i32 128}
 ; MAINVF4IC2_EPI4: [[LOOP24]] = distinct !{[[LOOP24]], [[META5]], [[META12]], [[META6]]}
-; MAINVF4IC2_EPI4: [[LOOP25]] = distinct !{[[LOOP25]], [[META6]], [[META5]], [[META12]]}
-; MAINVF4IC2_EPI4: [[LOOP26]] = distinct !{[[LOOP26]], [[META12]], [[META5]], [[META6]]}
+; MAINVF4IC2_EPI4: [[PROF25]] = !{!"branch_weights", i32 3, i32 1}
+; MAINVF4IC2_EPI4: [[LOOP26]] = distinct !{[[LOOP26]], [[META6]], [[META5]], [[META12]]}
 ; MAINVF4IC2_EPI4: [[LOOP27]] = distinct !{[[LOOP27]], [[META12]], [[META5]], [[META6]]}
-; MAINVF4IC2_EPI4: [[LOOP28]] = distinct !{[[LOOP28]], [[META12]], [[META6]], [[META5]]}
-; MAINVF4IC2_EPI4: [[LOOP29]] = distinct !{[[LOOP29]], [[META5]], [[META6]], [[META23]]}
-; MAINVF4IC2_EPI4: [[LOOP30]] = distinct !{[[LOOP30]], [[META5]], [[META6]], [[META20]]}
-; MAINVF4IC2_EPI4: [[PROF31]] = !{!"branch_weights", i32 1, i32 1}
-; MAINVF4IC2_EPI4: [[LOOP32]] = distinct !{[[LOOP32]], [[META6]], [[META5]], [[META33:![0-9]+]]}
-; MAINVF4IC2_EPI4: [[META33]] = !{!"llvm.loop.estimated_trip_count", i32 2}
+; MAINVF4IC2_EPI4: [[LOOP28]] = distinct !{[[LOOP28]], [[META12]], [[META5]], [[META6]]}
+; MAINVF4IC2_EPI4: [[LOOP29]] = distinct !{[[LOOP29]], [[META12]], [[META6]], [[META5]]}
+; MAINVF4IC2_EPI4: [[LOOP30]] = distinct !{[[LOOP30]], [[META5]], [[META6]], [[META23]]}
+; MAINVF4IC2_EPI4: [[LOOP31]] = distinct !{[[LOOP31]], [[META5]], [[META6]], [[META20]]}
+; MAINVF4IC2_EPI4: [[PROF32]] = !{!"branch_weights", i32 1, i32 1}
+; MAINVF4IC2_EPI4: [[LOOP33]] = distinct !{[[LOOP33]], [[META6]], [[META5]], [[META34:![0-9]+]]}
+; MAINVF4IC2_EPI4: [[META34]] = !{!"llvm.loop.estimated_trip_count", i32 2}
 ;.
 ; MAINVF8IC1_EPI2: [[PROF0]] = !{!"function_entry_count", i64 13}
 ; MAINVF8IC1_EPI2: [[PROF1]] = !{!"branch_weights", i32 12, i32 1}
