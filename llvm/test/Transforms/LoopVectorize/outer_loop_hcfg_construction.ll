@@ -37,9 +37,7 @@ define void @non_outermost_loop_hcfg_construction(i64 %n, ptr %a) {
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
-; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[MIDDLE_LOOP_LATCH4:.*]] ]
-; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[MIDDLE_LOOP_LATCH4]] ]
-; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <4 x i64> [[VEC_IND]], i64 0
+; CHECK-NEXT:    [[TMP6:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[MIDDLE_LOOP_LATCH4:.*]] ]
 ; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds ptr, ptr [[A]], i64 [[TMP6]]
 ; CHECK-NEXT:    [[WIDE_MASKED_GATHER:%.*]] = load <4 x ptr>, ptr [[TMP8]], align 8
 ; CHECK-NEXT:    br label %[[INNERMOST_LOOP3:.*]]
@@ -52,8 +50,7 @@ define void @non_outermost_loop_hcfg_construction(i64 %n, ptr %a) {
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[TMP9]], [[N]]
 ; CHECK-NEXT:    br i1 [[TMP7]], label %[[MIDDLE_LOOP_LATCH4]], label %[[INNERMOST_LOOP3]]
 ; CHECK:       [[MIDDLE_LOOP_LATCH4]]:
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
-; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[VEC_IND]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP6]], 4
 ; CHECK-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP10]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

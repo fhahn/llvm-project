@@ -12,9 +12,7 @@ define void @widen_call_instruction(ptr noalias nocapture readonly %a.in, ptr no
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
-; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_LATCH:.*]] ]
-; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_LATCH]] ]
-; CHECK-NEXT:    [[TMP0:%.*]] = extractelement <4 x i64> [[VEC_IND]], i64 0
+; CHECK-NEXT:    [[TMP0:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_LATCH:.*]] ]
 ; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds double, ptr [[A_IN]], i64 [[TMP0]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x double>, ptr [[TMP9]], align 8
 ; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds double, ptr [[B_IN]], i64 [[TMP0]]
@@ -30,11 +28,9 @@ define void @widen_call_instruction(ptr noalias nocapture readonly %a.in, ptr no
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i32 [[TMP7]], 10000
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[VECTOR_LATCH]], label %[[FOR2_HEADER2]]
 ; CHECK:       [[VECTOR_LATCH]]:
-; CHECK-NEXT:    [[TMP11:%.*]] = extractelement <4 x i64> [[VEC_IND]], i64 0
-; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds double, ptr [[C_OUT]], i64 [[TMP11]]
+; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds double, ptr [[C_OUT]], i64 [[TMP0]]
 ; CHECK-NEXT:    store <4 x double> [[TMP3]], ptr [[TMP12]], align 8
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
-; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[VEC_IND]], splat (i64 4)
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[TMP0]], 4
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1000
 ; CHECK-NEXT:    br i1 [[TMP8]], label %[[FOR1_HEADER:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[FOR1_HEADER]]:
