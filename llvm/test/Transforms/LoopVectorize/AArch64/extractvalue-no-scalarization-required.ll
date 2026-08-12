@@ -9,9 +9,8 @@
 ; Check scalar cost for extractvalue. The constant and loop invariant operands are free,
 ; leaving cost 3 for scalarizing the result + 2 for executing the op with VF 2.
 
-; CM: LV: Found uniform instruction:   %a = extractvalue { i64, i64 } %sv, 0
-; CM: LV: Found uniform instruction:   %b = extractvalue { i64, i64 } %sv, 1
-
+; The extractvalue instructions are executed as single scalars, decided in VPlan
+; by makeScalarizationDecisions rather than by the legacy uniformity analysis.
 ; Ensure the extractvalue + add instructions are hoisted out
 ; CM: vector.ph:
 ; CM:  CLONE ir<%a> = extractvalue ir<%sv>

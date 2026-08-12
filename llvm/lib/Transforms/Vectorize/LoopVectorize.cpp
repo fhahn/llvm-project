@@ -2771,26 +2771,12 @@ void LoopVectorizationCostModel::collectLoopUniforms(ElementCount VF) {
   // lane 0 demanded or b) are uses which demand only lane 0 of their operand.
   for (auto *BB : TheLoop->blocks())
     for (auto &I : *BB) {
-      if (IntrinsicInst *II = dyn_cast<IntrinsicInst>(&I)) {
-        switch (II->getIntrinsicID()) {
-        case Intrinsic::sideeffect:
-        case Intrinsic::experimental_noalias_scope_decl:
-        case Intrinsic::assume:
-        case Intrinsic::lifetime_start:
-        case Intrinsic::lifetime_end:
-          if (TheLoop->hasLoopInvariantOperands(&I))
-            AddToWorklistIfAllowed(&I);
-          break;
-        default:
-          break;
-        }
-      }
-
+      // Intrinsics whose side-effects are invariant, and ExtractValue from an
+      // aggregate defined outside the loop, are executed as a single scalar by
+      // VPlanTransforms::makeScalarizationDecisions.
       if (auto *EVI = dyn_cast<ExtractValueInst>(&I)) {
-        if (IsOutOfScope(EVI->getAggregateOperand())) {
-          AddToWorklistIfAllowed(EVI);
+        if (IsOutOfScope(EVI->getAggregateOperand()))
           continue;
-        }
         // Only ExtractValue instructions where the aggregate value comes from a
         // call are allowed to be non-uniform.
         assert(isa<CallInst>(EVI->getAggregateOperand()) &&

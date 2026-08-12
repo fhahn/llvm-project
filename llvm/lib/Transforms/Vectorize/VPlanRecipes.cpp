@@ -257,6 +257,20 @@ bool VPRecipeBase::isSafeToSpeculativelyExecute() const {
     case Instruction::Mul:
     case Instruction::GetElementPtr:
       return true;
+    case Instruction::Call:
+      // These intrinsics only declare or poison, so executing them for lanes
+      // that were originally inactive is harmless. Note that llvm.assume is
+      // deliberately excluded: asserting a condition that only holds for the
+      // active lanes would be wrong.
+      switch (vputils::getIntrinsicID(cast<VPInstruction>(this))) {
+      case Intrinsic::experimental_noalias_scope_decl:
+      case Intrinsic::lifetime_end:
+      case Intrinsic::lifetime_start:
+      case Intrinsic::sideeffect:
+        return true;
+      default:
+        return false;
+      }
     }
   }
   }

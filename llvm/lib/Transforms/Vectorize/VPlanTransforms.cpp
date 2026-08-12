@@ -5608,6 +5608,33 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
                            });
 }
 
+/// Returns true if executing a single scalar instance of \p VPI produces the
+/// same value, or has the same side-effect, as executing one instance per lane.
+/// This is decided from the plan only, in contrast to the legacy cost model's
+/// uniformity analysis.
+static bool isSingleInstanceEquivalent(const VPInstruction *VPI) {
+  switch (VPI->getOpcode()) {
+  case Instruction::ExtractValue:
+    // Extracting from an aggregate that is the same in all lanes produces the
+    // same value in all lanes.
+    return vputils::isUniformAcrossVFsAndUFs(VPI->getOperand(0));
+  case Instruction::Call:
+    switch (vputils::getIntrinsicID(VPI)) {
+    case Intrinsic::assume:
+    case Intrinsic::experimental_noalias_scope_decl:
+    case Intrinsic::lifetime_end:
+    case Intrinsic::lifetime_start:
+    case Intrinsic::sideeffect:
+      return all_of(VPI->operandsWithoutMask(),
+                    vputils::isUniformAcrossVFsAndUFs);
+    default:
+      return false;
+    }
+  default:
+    return false;
+  }
+}
+
 void VPlanTransforms::makeScalarizationDecisions(VPlan &Plan, VFRange &Range) {
   if (LoopVectorizationPlanner::getDecisionAndClampRange(
           [&](ElementCount VF) { return VF.isScalar(); }, Range))
@@ -5626,8 +5653,13 @@ void VPlanTransforms::makeScalarizationDecisions(VPlan &Plan, VFRange &Range) {
       if (!I)
         continue;
 
+      // A single instance may be enough even when other lanes would have
+      // side-effects or their values are used, if it is equivalent to executing
+      // one instance per lane.
+      bool SingleInstanceEquivalent = isSingleInstanceEquivalent(VPI);
+
       // If executing other lanes produces side-effects we can't avoid them.
-      if (VPI->mayHaveSideEffects())
+      if (VPI->mayHaveSideEffects() && !SingleInstanceEquivalent)
         continue;
 
       // We want to drop the mask operand, verify we can safely do that.
@@ -5641,7 +5673,7 @@ void VPlanTransforms::makeScalarizationDecisions(VPlan &Plan, VFRange &Range) {
         continue;
 
       // Other lanes are needed - can't drop them.
-      if (!vputils::onlyFirstLaneUsed(VPI))
+      if (!SingleInstanceEquivalent && !vputils::onlyFirstLaneUsed(VPI))
         continue;
 
       auto *Recipe = VPBuilder::createSingleScalarOp(
