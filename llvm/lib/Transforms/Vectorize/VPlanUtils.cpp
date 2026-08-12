@@ -514,6 +514,12 @@ bool vputils::isUniformAcrossVFsAndUFs(const VPValue *V) {
         // A cast is uniform according to its operand.
         return isUniformAcrossVFsAndUFs(R->getOperand(0));
       })
+      .Case([](const VPBlendRecipe *R) {
+        // A blend selects between its incoming values per lane. If both the
+        // incoming values and the masks are the same in all lanes, so is the
+        // result.
+        return all_of(R->operands(), isUniformAcrossVFsAndUFs);
+      })
       .Default([](const VPRecipeBase *) { // A value is considered non-uniform
                                           // unless proven otherwise.
         return false;

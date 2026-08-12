@@ -996,32 +996,19 @@ define void @test_widen_exp_v2(ptr noalias %p2, ptr noalias %p, i64 %n) #5 {
 ; TFA_INTERLEAVE-NEXT:    [[TMP0:%.*]] = add i64 [[N]], 1
 ; TFA_INTERLEAVE-NEXT:    br label %[[VECTOR_PH:.*]]
 ; TFA_INTERLEAVE:       [[VECTOR_PH]]:
-; TFA_INTERLEAVE-NEXT:    [[ACTIVE_LANE_MASK_ENTRY:%.*]] = icmp ult i64 0, [[TMP0]]
-; TFA_INTERLEAVE-NEXT:    [[ACTIVE_LANE_MASK_ENTRY1:%.*]] = icmp ult i64 1, [[TMP0]]
+; TFA_INTERLEAVE-NEXT:    [[N_RND_UP:%.*]] = add i64 [[TMP0]], 1
+; TFA_INTERLEAVE-NEXT:    [[TMP4:%.*]] = and i64 [[N_RND_UP]], 1
+; TFA_INTERLEAVE-NEXT:    [[N_VEC:%.*]] = sub i64 [[N_RND_UP]], [[TMP4]]
 ; TFA_INTERLEAVE-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; TFA_INTERLEAVE:       [[VECTOR_BODY]]:
-; TFA_INTERLEAVE-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_STORE_CONTINUE4:.*]] ]
-; TFA_INTERLEAVE-NEXT:    [[ACTIVE_LANE_MASK:%.*]] = phi i1 [ [[ACTIVE_LANE_MASK_ENTRY]], %[[VECTOR_PH]] ], [ [[ACTIVE_LANE_MASK_NEXT:%.*]], %[[PRED_STORE_CONTINUE4]] ]
-; TFA_INTERLEAVE-NEXT:    [[ACTIVE_LANE_MASK2:%.*]] = phi i1 [ [[ACTIVE_LANE_MASK_ENTRY1]], %[[VECTOR_PH]] ], [ [[ACTIVE_LANE_MASK_NEXT5:%.*]], %[[PRED_STORE_CONTINUE4]] ]
+; TFA_INTERLEAVE-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; TFA_INTERLEAVE-NEXT:    [[TMP1:%.*]] = load double, ptr [[P2]], align 8
 ; TFA_INTERLEAVE-NEXT:    [[TMP2:%.*]] = tail call double @llvm.exp.f64(double [[TMP1]]) #[[ATTR7:[0-9]+]]
 ; TFA_INTERLEAVE-NEXT:    [[TMP3:%.*]] = fcmp ogt double [[TMP2]], 0.000000e+00
 ; TFA_INTERLEAVE-NEXT:    [[PREDPHI:%.*]] = select i1 [[TMP3]], double 0.000000e+00, double 1.000000e+00
-; TFA_INTERLEAVE-NEXT:    br i1 [[ACTIVE_LANE_MASK]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
-; TFA_INTERLEAVE:       [[PRED_STORE_IF]]:
 ; TFA_INTERLEAVE-NEXT:    store double [[PREDPHI]], ptr [[P]], align 8
-; TFA_INTERLEAVE-NEXT:    br label %[[PRED_STORE_CONTINUE]]
-; TFA_INTERLEAVE:       [[PRED_STORE_CONTINUE]]:
-; TFA_INTERLEAVE-NEXT:    br i1 [[ACTIVE_LANE_MASK2]], label %[[PRED_STORE_IF3:.*]], label %[[PRED_STORE_CONTINUE4]]
-; TFA_INTERLEAVE:       [[PRED_STORE_IF3]]:
-; TFA_INTERLEAVE-NEXT:    store double [[PREDPHI]], ptr [[P]], align 8
-; TFA_INTERLEAVE-NEXT:    br label %[[PRED_STORE_CONTINUE4]]
-; TFA_INTERLEAVE:       [[PRED_STORE_CONTINUE4]]:
 ; TFA_INTERLEAVE-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 2
-; TFA_INTERLEAVE-NEXT:    [[ACTIVE_LANE_MASK_NEXT]] = icmp ult i64 [[INDEX_NEXT]], [[TMP0]]
-; TFA_INTERLEAVE-NEXT:    [[TMP4:%.*]] = add i64 [[INDEX_NEXT]], 1
-; TFA_INTERLEAVE-NEXT:    [[ACTIVE_LANE_MASK_NEXT5]] = icmp ult i64 [[TMP4]], [[TMP0]]
-; TFA_INTERLEAVE-NEXT:    [[TMP5:%.*]] = xor i1 [[ACTIVE_LANE_MASK_NEXT]], true
+; TFA_INTERLEAVE-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; TFA_INTERLEAVE-NEXT:    br i1 [[TMP5]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
 ; TFA_INTERLEAVE:       [[MIDDLE_BLOCK]]:
 ; TFA_INTERLEAVE-NEXT:    br label %[[END:.*]]
