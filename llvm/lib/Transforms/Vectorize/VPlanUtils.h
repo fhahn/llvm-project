@@ -244,6 +244,20 @@ BranchProbability getExecutionProbability(BlockFrequency Freq);
 DenseMap<const VPBasicBlock *, std::optional<VPExecutionFrequency>>
 computeExecutionFrequencies(ArrayRef<VPBasicBlock *> Blocks);
 
+/// Returns the branch weights of a branch that is estimated to take its likely
+/// successor, the first one if \p FirstIsLikely, in all but one of \p Step
+/// cases. The unlikely successor keeps a weight of 1, as the estimate does not
+/// rule it out, so that neither successor ends up with a profile count of 0.
+/// For a \p Step below 2, which leaves no room for a likely side, returns
+/// {1, 1}, i.e. no preference.
+inline std::array<uint32_t, 2> getLikelyBranchWeights(unsigned Step,
+                                                      bool FirstIsLikely) {
+  uint32_t Likely = std::max(Step, 2u) - 1;
+  if (FirstIsLikely)
+    return {Likely, 1};
+  return {1, Likely};
+}
+
 /// Get the value type of a VPInstruction or VPReplicateRecipe load or store.
 inline Type *getLoadStoreValueType(VPSingleDefRecipe *R) {
   bool IsLoad = vputils::getOpcode(R) == Instruction::Load;

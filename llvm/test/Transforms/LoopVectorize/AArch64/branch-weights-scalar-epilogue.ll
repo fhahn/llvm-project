@@ -67,7 +67,8 @@ exit:
 ; The estimated trip count is 1024, a multiple of the main loop's step of 16.
 ; As the main vector loop requires a scalar epilogue, it leaves 16 iterations
 ; rather than none, so it is estimated to run 63 iterations, the epilogue vector
-; loop 3 and the scalar loop 4.
+; loop 3 and the scalar loop 4. The remainder of 16 makes entering the epilogue
+; vector loop likely.
 define i32 @load_factor_4_with_tail_gap_multiple_of_step(i64 %n, ptr noalias %a) vscale_range(1,16) !prof !0 {
 ; CHECK-LABEL: define i32 @load_factor_4_with_tail_gap_multiple_of_step(
 ; CHECK-SAME: i64 [[N:%.*]], ptr noalias [[A:%.*]]) #[[ATTR0]] !prof [[PROF0]] {
@@ -87,20 +88,20 @@ define i32 @load_factor_4_with_tail_gap_multiple_of_step(i64 %n, ptr noalias %a)
 ; CHECK:    br label %[[VEC_EPILOG_ITER_CHECK:.*]]
 ; CHECK:  [[VEC_EPILOG_ITER_CHECK]]:
 ; CHECK:    [[MIN_EPILOG_ITERS_CHECK:%.*]] = icmp ule i64 [[TMP4:%.*]], 4
-; CHECK:    br i1 [[MIN_EPILOG_ITERS_CHECK]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF7]]
+; CHECK:    br i1 [[MIN_EPILOG_ITERS_CHECK]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF17:![0-9]+]]
 ; CHECK:  [[VEC_EPILOG_PH]]:
 ; CHECK:    [[TMP44:%.*]] = icmp eq i64 [[TMP43:%.*]], 0
 ; CHECK:    br label %[[VEC_EPILOG_VECTOR_BODY:.*]]
 ; CHECK:  [[VEC_EPILOG_VECTOR_BODY]]:
 ; CHECK:    [[TMP51:%.*]] = icmp eq i64 [[INDEX_NEXT20:%.*]], [[N_VEC13:%.*]]
-; CHECK:    br i1 [[TMP51]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !prof [[PROF17:![0-9]+]], !llvm.loop [[LOOP18:![0-9]+]]
+; CHECK:    br i1 [[TMP51]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !prof [[PROF18:![0-9]+]], !llvm.loop [[LOOP19:![0-9]+]]
 ; CHECK:  [[VEC_EPILOG_MIDDLE_BLOCK]]:
 ; CHECK:    br label %[[VEC_EPILOG_SCALAR_PH]]
 ; CHECK:  [[VEC_EPILOG_SCALAR_PH]]:
 ; CHECK:    br label %[[LOOP:.*]]
 ; CHECK:  [[LOOP]]:
 ; CHECK:    [[EXITCOND_NOT:%.*]] = icmp eq i64 [[IV_NEXT:%.*]], [[N]]
-; CHECK:    br i1 [[EXITCOND_NOT]], label %[[EXIT:.*]], label %[[LOOP]], !prof [[PROF11]], !llvm.loop [[LOOP20:![0-9]+]]
+; CHECK:    br i1 [[EXITCOND_NOT]], label %[[EXIT:.*]], label %[[LOOP]], !prof [[PROF11]], !llvm.loop [[LOOP21:![0-9]+]]
 ; CHECK:  [[EXIT]]:
 ;
 entry:
@@ -140,7 +141,7 @@ exit:
 ; CHECK: [[META4]] = !{!"llvm.loop.isvectorized", i32 1}
 ; CHECK: [[META5]] = !{!"llvm.loop.unroll.runtime.disable"}
 ; CHECK: [[META6]] = !{!"llvm.loop.estimated_trip_count", i32 64}
-; CHECK: [[PROF7]] = !{!"branch_weights", i32 4, i32 12}
+; CHECK: [[PROF7]] = !{!"branch_weights", i32 15, i32 1}
 ; CHECK: [[PROF8]] = !{!"branch_weights", i32 1, i32 0}
 ; CHECK: [[LOOP9]] = distinct !{[[LOOP9]], [[META4]], [[META5]], [[META10:![0-9]+]]}
 ; CHECK: [[META10]] = !{!"llvm.loop.estimated_trip_count", i32 0}
@@ -150,8 +151,9 @@ exit:
 ; CHECK: [[PROF14]] = !{!"branch_weights", i32 1, i32 62}
 ; CHECK: [[LOOP15]] = distinct !{[[LOOP15]], [[META4]], [[META5]], [[META16:![0-9]+]]}
 ; CHECK: [[META16]] = !{!"llvm.loop.estimated_trip_count", i32 63}
-; CHECK: [[PROF17]] = !{!"branch_weights", i32 1, i32 2}
-; CHECK: [[LOOP18]] = distinct !{[[LOOP18]], [[META4]], [[META5]], [[META19:![0-9]+]]}
-; CHECK: [[META19]] = !{!"llvm.loop.estimated_trip_count", i32 3}
-; CHECK: [[LOOP20]] = distinct !{[[LOOP20]], [[META5]], [[META4]], [[META13]]}
+; CHECK: [[PROF17]] = !{!"branch_weights", i32 1, i32 15}
+; CHECK: [[PROF18]] = !{!"branch_weights", i32 1, i32 2}
+; CHECK: [[LOOP19]] = distinct !{[[LOOP19]], [[META4]], [[META5]], [[META20:![0-9]+]]}
+; CHECK: [[META20]] = !{!"llvm.loop.estimated_trip_count", i32 3}
+; CHECK: [[LOOP21]] = distinct !{[[LOOP21]], [[META5]], [[META4]], [[META13]]}
 ;.

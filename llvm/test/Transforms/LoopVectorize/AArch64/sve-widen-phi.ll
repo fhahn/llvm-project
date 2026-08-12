@@ -139,7 +139,7 @@ define void @widen_ptr_phi_unrolled(ptr noalias nocapture %a, ptr noalias nocapt
 ; CHECK-EPI-TF-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; CHECK-EPI-TF-NEXT:    br i1 [[CMP_N]], label [[FOR_EXIT:%.*]], label [[VEC_EPILOG_ITER_CHECK:%.*]]
 ; CHECK-EPI-TF:       vec.epilog.iter.check:
-; CHECK-EPI-TF-NEXT:    br i1 false, label [[VEC_EPILOG_SCALAR_PH]], label [[VEC_EPILOG_PH]]
+; CHECK-EPI-TF-NEXT:    br i1 false, label [[VEC_EPILOG_SCALAR_PH]], label [[VEC_EPILOG_PH]], !prof [[PROF4:![0-9]+]]
 ; CHECK-EPI-TF:       vec.epilog.ph:
 ; CHECK-EPI-TF-NEXT:    [[VEC_EPILOG_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], [[VEC_EPILOG_ITER_CHECK]] ], [ 0, [[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
 ; CHECK-EPI-TF-NEXT:    [[TMP21:%.*]] = call i64 @llvm.vscale.i64()
@@ -318,7 +318,7 @@ define void @widen_2ptrs_phi_unrolled(ptr noalias nocapture %dst, ptr noalias no
 ; CHECK-EPI-TF-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; CHECK-EPI-TF-NEXT:    br i1 [[CMP_N]], label [[FOR_COND_CLEANUP:%.*]], label [[VEC_EPILOG_ITER_CHECK:%.*]]
 ; CHECK-EPI-TF:       vec.epilog.iter.check:
-; CHECK-EPI-TF-NEXT:    br i1 false, label [[VEC_EPILOG_SCALAR_PH]], label [[VEC_EPILOG_PH]]
+; CHECK-EPI-TF-NEXT:    br i1 false, label [[VEC_EPILOG_SCALAR_PH]], label [[VEC_EPILOG_PH]], !prof [[PROF4]]
 ; CHECK-EPI-TF:       vec.epilog.ph:
 ; CHECK-EPI-TF-NEXT:    [[VEC_EPILOG_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], [[VEC_EPILOG_ITER_CHECK]] ], [ 0, [[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
 ; CHECK-EPI-TF-NEXT:    [[TMP12:%.*]] = call i64 @llvm.vscale.i64()

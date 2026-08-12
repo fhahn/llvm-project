@@ -1786,7 +1786,7 @@ void VPlanTransforms::addIterationCountCheckBlock(
 void VPlanTransforms::addMinimumVectorEpilogueIterationCheck(
     VPlan &Plan, VPValue *MainVectorTripCount, bool RequiresScalarEpilogue,
     ElementCount EpilogueVF, unsigned MainLoopStep, unsigned EpilogueLoopStep,
-    ScalarEvolution &SE) {
+    std::optional<unsigned> EstimatedRemainingCount, ScalarEvolution &SE) {
   // Add the minimum iteration check for the epilogue vector loop.
   auto *EpilogueCheck =
       cast<VPBasicBlock>(Plan.getVectorPreheader()->getPredecessors().front());
@@ -1796,8 +1796,12 @@ void VPlanTransforms::addMinimumVectorEpilogueIterationCheck(
   if (Plan.hasTailFolded()) {
     assert(!RequiresScalarEpilogue &&
            "Expected no scalar epilogue for tail-folded plan");
-    VPBuilder(EpilogueCheck)
-        .createNaryOp(VPInstruction::BranchOnCond, Plan.getFalse());
+    VPInstruction *Branch =
+        VPBuilder(EpilogueCheck)
+            .createNaryOp(VPInstruction::BranchOnCond, Plan.getFalse());
+    Branch->setMetadata(LLVMContext::MD_prof,
+                        MDBuilder(Plan.getContext())
+                            .createBranchWeights(0, 1, /*IsExpected=*/false));
     return;
   }
 
@@ -1817,15 +1821,17 @@ void VPlanTransforms::addMinimumVectorEpilogueIterationCheck(
   VPInstruction *Branch =
       Builder.createNaryOp(VPInstruction::BranchOnCond, CheckMinIters);
 
-  // We assume the remaining `Count` is equally distributed in
-  // [0, MainLoopStep)
-  // So the probability for `Count < EpilogueLoopStep` should be
-  // min(MainLoopStep, EpilogueLoopStep) / MainLoopStep
-  // TODO: Improve the estimate by taking the estimated trip count into
-  // consideration.
-  unsigned EstimatedSkipCount = std::min(MainLoopStep, EpilogueLoopStep);
-  const uint32_t Weights[] = {EstimatedSkipCount,
-                              MainLoopStep - EstimatedSkipCount};
+  // Without an estimate, assume the remaining `Count` is equally distributed in
+  // [0, MainLoopStep), so the probability for `Count < EpilogueLoopStep` is
+  // min(MainLoopStep, EpilogueLoopStep) / MainLoopStep. An estimate for `Count`
+  // decides the likely side instead, without ruling the other one out, as it is
+  // only an average over all invocations.
+  uint32_t SkipWeight = std::min(MainLoopStep, EpilogueLoopStep);
+  std::array<uint32_t, 2> Weights = {SkipWeight, MainLoopStep - SkipWeight};
+  if (EstimatedRemainingCount)
+    Weights = vputils::getLikelyBranchWeights(
+        MainLoopStep, ICmpInst::compare(APInt(32, *EstimatedRemainingCount),
+                                        APInt(32, EpilogueLoopStep), P));
   MDBuilder MDB(Plan.getContext());
   MDNode *BranchWeights =
       MDB.createBranchWeights(Weights, /*IsExpected=*/false);

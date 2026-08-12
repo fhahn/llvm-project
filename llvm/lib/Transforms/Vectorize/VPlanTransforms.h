@@ -197,11 +197,12 @@ struct VPlanTransforms {
                               DebugLoc DL, PredicatedScalarEvolution &PSE);
 
   /// Add a check to \p Plan to see if the epilogue vector loop should be
-  /// executed.
+  /// executed. If \p EstimatedRemainingCount is set, it decides which successor
+  /// the check's weights favor.
   static void addMinimumVectorEpilogueIterationCheck(
       VPlan &Plan, VPValue *MainVectorTripCount, bool RequiresScalarEpilogue,
       ElementCount EpilogueVF, unsigned MainLoopStep, unsigned EpilogueLoopStep,
-      ScalarEvolution &SE);
+      std::optional<unsigned> EstimatedRemainingCount, ScalarEvolution &SE);
 
   /// Replace loops in \p Plan's flat CFG with VPRegionBlocks, turning \p Plan's
   /// flat CFG into a hierarchical CFG. For the outermost loop, also create the

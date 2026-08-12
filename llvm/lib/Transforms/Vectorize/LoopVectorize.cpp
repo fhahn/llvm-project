@@ -7155,7 +7155,7 @@ static MainPlanResumeMarkers preparePlanForMainVectorLoop(VPlan &MainPlan) {
 /// Prepare \p Plan for vectorizing the epilogue loop. That is, re-use expanded
 /// SCEVs from \p ExpandedSCEVs and set resume values for header recipes.
 static void preparePlanForEpilogueVectorLoop(
-    VPlan &MainPlan, VPlan &Plan, const SCEV2ValueTy &ExpandedSCEVs,
+    VPlan &MainPlan, VPlan &Plan, Loop *L, const SCEV2ValueTy &ExpandedSCEVs,
     ElementCount MainLoopVF, unsigned MainLoopUF, ElementCount EpilogueVF,
     VFSelectionContext &Config, ScalarEvolution &SE,
     const MainPlanResumeMarkers &Markers, VPBasicBlock *MainCheck) {
@@ -7403,10 +7403,18 @@ static void preparePlanForEpilogueVectorLoop(
   auto VScale = Config.getVScaleForTuning();
   unsigned MainLoopStep = estimateElementCount(MainLoopVF * MainLoopUF, VScale);
   unsigned EpilogueLoopStep = estimateElementCount(EpilogueVF, VScale);
+  // Vectorizing the main loop left its estimated trip count on the remainder
+  // loop L, which the epilogue vector loop and the scalar remainder share. It
+  // only does so together with the latch weights, like the main loop requires
+  // them for its estimate, so require them too: without them, L may still
+  // carry the estimate of the original loop.
+  unsigned InvocationWeight = 0;
+  std::optional<unsigned> EstimatedRemainingCount =
+      getLoopEstimatedTripCount(L, &InvocationWeight);
   RUN_VPLAN_PASS(VPlanTransforms::addMinimumVectorEpilogueIterationCheck, Plan,
                  Plan.getOrAddLiveIn(Markers.VectorTC->getUnderlyingValue()),
                  Plan.requiresScalarEpilogue(), EpilogueVF, MainLoopStep,
-                 EpilogueLoopStep, SE);
+                 EpilogueLoopStep, EstimatedRemainingCount, SE);
 }
 
 bool LoopVectorizePass::processLoop(Loop *L) {
@@ -7923,9 +7931,9 @@ bool LoopVectorizePass::processLoop(Loop *L) {
 
     // Second pass vectorizes the epilogue and adjusts the control flow
     // edges from the first pass.
-    preparePlanForEpilogueVectorLoop(BestMainPlan, BestEpiPlan, ExpandedSCEVs,
-                                     VF.Width, IC, EpilogueVF, Config,
-                                     *PSE.getSE(), Markers, MainCheck);
+    preparePlanForEpilogueVectorLoop(BestMainPlan, BestEpiPlan, L,
+                                     ExpandedSCEVs, VF.Width, IC, EpilogueVF,
+                                     Config, *PSE.getSE(), Markers, MainCheck);
     RUN_VPLAN_PASS(VPlanTransforms::simplifyLiveInsWithSCEV, BestEpiPlan, PSE);
     LLVM_DEBUG({
       dbgs() << "Create Skeleton for epilogue vectorized loop (second pass)\n"
