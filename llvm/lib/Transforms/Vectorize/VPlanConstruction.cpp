@@ -1561,7 +1561,8 @@ void VPlanTransforms::addIterationCountCheckBlock(
 void VPlanTransforms::addMinimumVectorEpilogueIterationCheck(
     VPlan &Plan, Value *VectorTripCount, bool RequiresScalarEpilogue,
     ElementCount EpilogueVF, unsigned EpilogueUF, unsigned MainLoopStep,
-    unsigned EpilogueLoopStep, ScalarEvolution &SE) {
+    unsigned EpilogueLoopStep, std::optional<unsigned> EstimatedRemainingCount,
+    ScalarEvolution &SE) {
   // Add the minimum iteration check for the epilogue vector loop.
   VPValue *TC = Plan.getTripCount();
   Value *TripCount = TC->getLiveInIRValue();
@@ -1579,18 +1580,25 @@ void VPlanTransforms::addMinimumVectorEpilogueIterationCheck(
   VPInstruction *Branch =
       Builder.createNaryOp(VPInstruction::BranchOnCond, CheckMinIters);
 
-  // We assume the remaining `Count` is equally distributed in
-  // [0, MainLoopStep)
-  // So the probability for `Count < EpilogueLoopStep` should be
-  // min(MainLoopStep, EpilogueLoopStep) / MainLoopStep
-  // TODO: Improve the estimate by taking the estimated trip count into
-  // consideration.
-  unsigned EstimatedSkipCount = std::min(MainLoopStep, EpilogueLoopStep);
-  const uint32_t Weights[] = {EstimatedSkipCount,
-                              MainLoopStep - EstimatedSkipCount};
+  // Without an estimate, assume the remaining `Count` is equally distributed in
+  // [0, MainLoopStep), so the probability for `Count < EpilogueLoopStep` is
+  // min(MainLoopStep, EpilogueLoopStep) / MainLoopStep. An estimate for `Count`
+  // decides the likely side instead, without ruling the other one out, as it is
+  // only an average over all invocations. Keep the weight of the unlikely side
+  // at 1, so that neither successor ends up with a profile count of 0.
+  assert(MainLoopStep > 0 && "main loop step should not be zero");
+  uint32_t SkipWeight = std::min(MainLoopStep, EpilogueLoopStep);
+  uint32_t EnterWeight = MainLoopStep - SkipWeight;
+  if (EstimatedRemainingCount) {
+    uint32_t Likely = std::max(MainLoopStep, 2u) - 1;
+    bool Skip = ICmpInst::compare(APInt(32, *EstimatedRemainingCount),
+                                  APInt(32, EpilogueLoopStep), P);
+    SkipWeight = Skip ? Likely : 1;
+    EnterWeight = Skip ? 1 : Likely;
+  }
   MDBuilder MDB(Plan.getContext());
   MDNode *BranchWeights =
-      MDB.createBranchWeights(Weights, /*IsExpected=*/false);
+      MDB.createBranchWeights({SkipWeight, EnterWeight}, /*IsExpected=*/false);
   Branch->setMetadata(LLVMContext::MD_prof, BranchWeights);
 }
 

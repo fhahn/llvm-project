@@ -266,17 +266,17 @@ define void @foo_i32_no_bw(i64 %n) {
 ; CHECK-V1-IC1-FORCE-EPI2:  [[MIDDLE_BLOCK]]:
 ; CHECK-V1-IC1-FORCE-EPI2:    br i1 [[CMP_N:%.*]], label %[[FOR_COND_CLEANUP:.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]]
 ; CHECK-V1-IC1-FORCE-EPI2:  [[VEC_EPILOG_ITER_CHECK]]:
-; CHECK-V1-IC1-FORCE-EPI2:    br i1 [[MIN_EPILOG_ITERS_CHECK:%.*]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF6]]
+; CHECK-V1-IC1-FORCE-EPI2:    br i1 [[MIN_EPILOG_ITERS_CHECK:%.*]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF19:![0-9]+]]
 ; CHECK-V1-IC1-FORCE-EPI2:  [[VEC_EPILOG_PH]]:
 ; CHECK-V1-IC1-FORCE-EPI2:    br label %[[VEC_EPILOG_VECTOR_BODY:.*]]
 ; CHECK-V1-IC1-FORCE-EPI2:  [[VEC_EPILOG_VECTOR_BODY]]:
-; CHECK-V1-IC1-FORCE-EPI2:    br i1 [[TMP9:%.*]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP19:![0-9]+]]
+; CHECK-V1-IC1-FORCE-EPI2:    br i1 [[TMP9:%.*]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP20:![0-9]+]]
 ; CHECK-V1-IC1-FORCE-EPI2:  [[VEC_EPILOG_MIDDLE_BLOCK]]:
 ; CHECK-V1-IC1-FORCE-EPI2:    br i1 [[CMP_N7:%.*]], label %[[FOR_COND_CLEANUP]], label %[[VEC_EPILOG_SCALAR_PH]]
 ; CHECK-V1-IC1-FORCE-EPI2:  [[VEC_EPILOG_SCALAR_PH]]:
 ; CHECK-V1-IC1-FORCE-EPI2:    br label %[[FOR_BODY:.*]]
 ; CHECK-V1-IC1-FORCE-EPI2:  [[FOR_BODY]]:
-; CHECK-V1-IC1-FORCE-EPI2:    br i1 [[EXITCOND:%.*]], label %[[FOR_COND_CLEANUP]], label %[[FOR_BODY]], !llvm.loop [[LOOP20:![0-9]+]]
+; CHECK-V1-IC1-FORCE-EPI2:    br i1 [[EXITCOND:%.*]], label %[[FOR_COND_CLEANUP]], label %[[FOR_BODY]], !llvm.loop [[LOOP21:![0-9]+]]
 ; CHECK-V1-IC1-FORCE-EPI2:  [[FOR_COND_CLEANUP]]:
 ;
 ; CHECK-V2-IC1-LABEL: define void @foo_i32_no_bw(
@@ -308,17 +308,17 @@ define void @foo_i32_no_bw(i64 %n) {
 ; CHECK-V2-IC4:  [[MIDDLE_BLOCK]]:
 ; CHECK-V2-IC4:    br i1 [[CMP_N:%.*]], label %[[FOR_COND_CLEANUP:.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]]
 ; CHECK-V2-IC4:  [[VEC_EPILOG_ITER_CHECK]]:
-; CHECK-V2-IC4:    br i1 [[MIN_EPILOG_ITERS_CHECK:%.*]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF7]]
+; CHECK-V2-IC4:    br i1 [[MIN_EPILOG_ITERS_CHECK:%.*]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF20:![0-9]+]]
 ; CHECK-V2-IC4:  [[VEC_EPILOG_PH]]:
 ; CHECK-V2-IC4:    br label %[[VEC_EPILOG_VECTOR_BODY:.*]]
 ; CHECK-V2-IC4:  [[VEC_EPILOG_VECTOR_BODY]]:
-; CHECK-V2-IC4:    br i1 [[TMP13:%.*]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP20:![0-9]+]]
+; CHECK-V2-IC4:    br i1 [[TMP13:%.*]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP21:![0-9]+]]
 ; CHECK-V2-IC4:  [[VEC_EPILOG_MIDDLE_BLOCK]]:
 ; CHECK-V2-IC4:    br i1 [[CMP_N10:%.*]], label %[[FOR_COND_CLEANUP]], label %[[VEC_EPILOG_SCALAR_PH]]
 ; CHECK-V2-IC4:  [[VEC_EPILOG_SCALAR_PH]]:
 ; CHECK-V2-IC4:    br label %[[FOR_BODY:.*]]
 ; CHECK-V2-IC4:  [[FOR_BODY]]:
-; CHECK-V2-IC4:    br i1 [[EXITCOND:%.*]], label %[[FOR_COND_CLEANUP]], label %[[FOR_BODY]], !llvm.loop [[LOOP21:![0-9]+]]
+; CHECK-V2-IC4:    br i1 [[EXITCOND:%.*]], label %[[FOR_COND_CLEANUP]], label %[[FOR_BODY]], !llvm.loop [[LOOP22:![0-9]+]]
 ; CHECK-V2-IC4:  [[FOR_COND_CLEANUP]]:
 ;
 entry:
@@ -352,7 +352,7 @@ for.cond.cleanup:
 ; CHECK-V1-IC1: [[PROF9]] = !{!"branch_weights", i32 1, i32 31}
 ; CHECK-V1-IC1: [[LOOP10]] = distinct !{[[LOOP10]], [[META2]], [[META3]], [[META11:![0-9]+]]}
 ; CHECK-V1-IC1: [[META11]] = !{!"llvm.loop.estimated_trip_count", i32 32}
-; CHECK-V1-IC1: [[PROF12]] = !{!"branch_weights", i32 16, i32 16}
+; CHECK-V1-IC1: [[PROF12]] = !{!"branch_weights", i32 31, i32 1}
 ; CHECK-V1-IC1: [[LOOP13]] = distinct !{[[LOOP13]], [[META2]], [[META8]], [[META3]]}
 ; CHECK-V1-IC1: [[PROF14]] = !{!"branch_weights", i32 1, i32 15}
 ; CHECK-V1-IC1: [[LOOP15]] = distinct !{[[LOOP15]], [[META3]], [[META2]], [[META8]]}
@@ -365,7 +365,7 @@ for.cond.cleanup:
 ; CHECK-V1-IC1-FORCE-EPI2: [[META3]] = !{!"llvm.loop.unroll.runtime.disable"}
 ; CHECK-V1-IC1-FORCE-EPI2: [[META4]] = !{!"llvm.loop.estimated_trip_count", i32 128}
 ; CHECK-V1-IC1-FORCE-EPI2: [[PROF5]] = !{!"branch_weights", i32 1, i32 7}
-; CHECK-V1-IC1-FORCE-EPI2: [[PROF6]] = !{!"branch_weights", i32 2, i32 6}
+; CHECK-V1-IC1-FORCE-EPI2: [[PROF6]] = !{!"branch_weights", i32 7, i32 1}
 ; CHECK-V1-IC1-FORCE-EPI2: [[PROF7]] = !{!"branch_weights", i32 1, i32 0}
 ; CHECK-V1-IC1-FORCE-EPI2: [[LOOP8]] = distinct !{[[LOOP8]], [[META2]], [[META9:![0-9]+]], [[META3]]}
 ; CHECK-V1-IC1-FORCE-EPI2: [[META9]] = !{!"llvm.loop.estimated_trip_count", i32 0}
@@ -374,12 +374,13 @@ for.cond.cleanup:
 ; CHECK-V1-IC1-FORCE-EPI2: [[PROF12]] = !{!"branch_weights", i32 1, i32 31}
 ; CHECK-V1-IC1-FORCE-EPI2: [[LOOP13]] = distinct !{[[LOOP13]], [[META2]], [[META3]], [[META14:![0-9]+]]}
 ; CHECK-V1-IC1-FORCE-EPI2: [[META14]] = !{!"llvm.loop.estimated_trip_count", i32 32}
-; CHECK-V1-IC1-FORCE-EPI2: [[PROF15]] = !{!"branch_weights", i32 2, i32 30}
+; CHECK-V1-IC1-FORCE-EPI2: [[PROF15]] = !{!"branch_weights", i32 31, i32 1}
 ; CHECK-V1-IC1-FORCE-EPI2: [[LOOP16]] = distinct !{[[LOOP16]], [[META2]], [[META9]], [[META3]]}
 ; CHECK-V1-IC1-FORCE-EPI2: [[LOOP17]] = distinct !{[[LOOP17]], [[META3]], [[META2]], [[META9]]}
 ; CHECK-V1-IC1-FORCE-EPI2: [[LOOP18]] = distinct !{[[LOOP18]], [[META2]], [[META3]]}
-; CHECK-V1-IC1-FORCE-EPI2: [[LOOP19]] = distinct !{[[LOOP19]], [[META2]], [[META3]]}
-; CHECK-V1-IC1-FORCE-EPI2: [[LOOP20]] = distinct !{[[LOOP20]], [[META3]], [[META2]]}
+; CHECK-V1-IC1-FORCE-EPI2: [[PROF19]] = !{!"branch_weights", i32 2, i32 6}
+; CHECK-V1-IC1-FORCE-EPI2: [[LOOP20]] = distinct !{[[LOOP20]], [[META2]], [[META3]]}
+; CHECK-V1-IC1-FORCE-EPI2: [[LOOP21]] = distinct !{[[LOOP21]], [[META3]], [[META2]]}
 ;.
 ; CHECK-V2-IC1: [[PROF0]] = !{!"branch_weights", i32 1, i32 127}
 ; CHECK-V2-IC1: [[PROF1]] = !{!"branch_weights", i32 1, i32 255}
@@ -395,7 +396,7 @@ for.cond.cleanup:
 ; CHECK-V2-IC1: [[LOOP11]] = distinct !{[[LOOP11]], [[META3]], [[META4]], [[META12:![0-9]+]]}
 ; CHECK-V2-IC1: [[META12]] = !{!"llvm.loop.estimated_trip_count", i32 64}
 ; CHECK-V2-IC1: [[PROF13]] = !{!"branch_weights", i32 1, i32 15}
-; CHECK-V2-IC1: [[PROF14]] = !{!"branch_weights", i32 4, i32 12}
+; CHECK-V2-IC1: [[PROF14]] = !{!"branch_weights", i32 15, i32 1}
 ; CHECK-V2-IC1: [[LOOP15]] = distinct !{[[LOOP15]], [[META3]], [[META9]], [[META4]]}
 ; CHECK-V2-IC1: [[LOOP16]] = distinct !{[[LOOP16]], [[META4]], [[META3]], [[META9]]}
 ; CHECK-V2-IC1: [[LOOP17]] = distinct !{[[LOOP17]], [[META3]], [[META4]]}
@@ -408,7 +409,7 @@ for.cond.cleanup:
 ; CHECK-V2-IC4: [[META4]] = !{!"llvm.loop.unroll.runtime.disable"}
 ; CHECK-V2-IC4: [[META5]] = !{!"llvm.loop.estimated_trip_count", i32 64}
 ; CHECK-V2-IC4: [[PROF6]] = !{!"branch_weights", i32 1, i32 15}
-; CHECK-V2-IC4: [[PROF7]] = !{!"branch_weights", i32 4, i32 12}
+; CHECK-V2-IC4: [[PROF7]] = !{!"branch_weights", i32 15, i32 1}
 ; CHECK-V2-IC4: [[PROF8]] = !{!"branch_weights", i32 1, i32 0}
 ; CHECK-V2-IC4: [[LOOP9]] = distinct !{[[LOOP9]], [[META3]], [[META10:![0-9]+]], [[META4]]}
 ; CHECK-V2-IC4: [[META10]] = !{!"llvm.loop.estimated_trip_count", i32 0}
@@ -416,11 +417,12 @@ for.cond.cleanup:
 ; CHECK-V2-IC4: [[LOOP12]] = distinct !{[[LOOP12]], [[META4]], [[META3]], [[META10]]}
 ; CHECK-V2-IC4: [[LOOP13]] = distinct !{[[LOOP13]], [[META3]], [[META4]], [[META14:![0-9]+]]}
 ; CHECK-V2-IC4: [[META14]] = !{!"llvm.loop.estimated_trip_count", i32 16}
-; CHECK-V2-IC4: [[PROF15]] = !{!"branch_weights", i32 8, i32 56}
+; CHECK-V2-IC4: [[PROF15]] = !{!"branch_weights", i32 63, i32 1}
 ; CHECK-V2-IC4: [[LOOP16]] = distinct !{[[LOOP16]], [[META3]], [[META10]], [[META4]]}
 ; CHECK-V2-IC4: [[PROF17]] = !{!"branch_weights", i32 1, i32 7}
 ; CHECK-V2-IC4: [[LOOP18]] = distinct !{[[LOOP18]], [[META4]], [[META3]], [[META10]]}
 ; CHECK-V2-IC4: [[LOOP19]] = distinct !{[[LOOP19]], [[META3]], [[META4]]}
-; CHECK-V2-IC4: [[LOOP20]] = distinct !{[[LOOP20]], [[META3]], [[META4]]}
-; CHECK-V2-IC4: [[LOOP21]] = distinct !{[[LOOP21]], [[META4]], [[META3]]}
+; CHECK-V2-IC4: [[PROF20]] = !{!"branch_weights", i32 4, i32 12}
+; CHECK-V2-IC4: [[LOOP21]] = distinct !{[[LOOP21]], [[META3]], [[META4]]}
+; CHECK-V2-IC4: [[LOOP22]] = distinct !{[[LOOP22]], [[META4]], [[META3]]}
 ;.
