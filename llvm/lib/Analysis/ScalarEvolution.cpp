@@ -5992,12 +5992,20 @@ const SCEV *ScalarEvolution::createAddRecFromPHI(PHINode *PN) {
     return S;
 
   // Handle PHI node value symbolically.
-  const SCEV *SymbolicName = getUnknown(PN);
-  insertValueToMap(PN, SymbolicName);
+  insertValueToMap(PN, getUnknown(PN));
 
-  // Using this symbolic name for the PHI, analyze the value coming around
-  // the back-edge.
+  // finishAddRecFromPHI analyzes the value coming around the back-edge using
+  // this symbolic name for the PHI.
+  return finishAddRecFromPHI(PN, BEValueV, StartValueV);
+}
+
+const SCEV *ScalarEvolution::finishAddRecFromPHI(PHINode *PN, Value *BEValueV,
+                                                 Value *StartValueV) {
   const Loop *L = LI.getLoopFor(PN->getParent());
+  const SCEV *SymbolicName = getUnknown(PN);
+
+  // Using the symbolic name for the PHI, analyze the value coming around the
+  // back-edge.
   const SCEV *BEValue = getSCEV(BEValueV);
 
   // NOTE: If BEValue is loop invariant, we know that the PHI node just
@@ -6228,6 +6236,10 @@ const SCEV *ScalarEvolution::createNodeForPHI(PHINode *PN) {
   if (const SCEV *S = createAddRecFromPHI(PN))
     return S;
 
+  return createNodeForPHINotAddRec(PN);
+}
+
+const SCEV *ScalarEvolution::createNodeForPHINotAddRec(PHINode *PN) {
   // We do not allow simplifying phi (undef, X) to X here, to avoid reusing the
   // phi node for X.
   if (Value *V = simplifyInstruction(

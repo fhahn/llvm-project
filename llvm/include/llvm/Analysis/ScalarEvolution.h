@@ -2048,8 +2048,18 @@ private:
   /// Provide the special handling we need to analyze PHI SCEVs.
   const SCEV *createNodeForPHI(PHINode *PN);
 
+  /// The part of createNodeForPHI which runs after createAddRecFromPHI has
+  /// failed.
+  const SCEV *createNodeForPHINotAddRec(PHINode *PN);
+
   /// Helper function called from createNodeForPHI.
   const SCEV *createAddRecFromPHI(PHINode *PN);
+
+  /// The part of createAddRecFromPHI which runs after a symbolic name has been
+  /// inserted for \p PN. Removes the symbolic name again and returns nullptr if
+  /// no add recurrence can be formed.
+  const SCEV *finishAddRecFromPHI(PHINode *PN, Value *BEValueV,
+                                  Value *StartValueV);
 
   /// A helper function for createAddRecFromPHI to handle simple cases.
   const SCEV *createSimpleAffineAddRec(PHINode *PN, Value *BEValueV,
