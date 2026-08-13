@@ -125,9 +125,40 @@ GEPNoWrapFlags vputils::getGEPFlagsForPtr(VPValue *Ptr) {
   return GEPNoWrapFlags::none();
 }
 
+/// Cache of the SCEVs computed for the VPValues visited by a single top-level
+/// getSCEVExprForVPValue query. Recipes with more than one operand make the
+/// recursion below exponential in the depth of the operand DAG without it.
+using VPValueToSCEVMap = SmallDenseMap<const VPValue *, const SCEV *, 8>;
+
+static const SCEV *computeSCEVExprForVPValue(const VPValue *V,
+                                             PredicatedScalarEvolution &PSE,
+                                             const Loop *L,
+                                             VPValueToSCEVMap &Cache);
+
+/// Memoizing wrapper around computeSCEVExprForVPValue.
+static const SCEV *getSCEVExprForVPValueImpl(const VPValue *V,
+                                             PredicatedScalarEvolution &PSE,
+                                             const Loop *L,
+                                             VPValueToSCEVMap &Cache) {
+  auto It = Cache.find(V);
+  if (It != Cache.end())
+    return It->second;
+  const SCEV *Expr = computeSCEVExprForVPValue(V, PSE, L, Cache);
+  Cache[V] = Expr;
+  return Expr;
+}
+
 const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
                                            PredicatedScalarEvolution &PSE,
                                            const Loop *L) {
+  VPValueToSCEVMap Cache;
+  return getSCEVExprForVPValueImpl(V, PSE, L, Cache);
+}
+
+static const SCEV *computeSCEVExprForVPValue(const VPValue *V,
+                                             PredicatedScalarEvolution &PSE,
+                                             const Loop *L,
+                                             VPValueToSCEVMap &Cache) {
   ScalarEvolution &SE = *PSE.getSE();
   if (auto *RV = dyn_cast<VPRegionValue>(V)) {
     assert(RV == RV->getDefiningRegion()->getCanonicalIV() &&
@@ -151,7 +182,7 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
       -> const SCEV * {
     SmallVector<SCEVUse, 2> SCEVOps;
     for (VPValue *Op : Ops) {
-      const SCEV *S = getSCEVExprForVPValue(Op, PSE, L);
+      const SCEV *S = getSCEVExprForVPValueImpl(Op, PSE, L, Cache);
       if (isa<SCEVCouldNotCompute>(S))
         return SE.getCouldNotCompute();
       SCEVOps.push_back(S);
@@ -260,7 +291,7 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
   if (match(V, m_BitCast(m_VPValue(LHSVal))) &&
       SE.isSCEVable(V->getScalarType()) &&
       SE.isSCEVable(LHSVal->getScalarType()))
-    return getSCEVExprForVPValue(LHSVal, PSE, L);
+    return getSCEVExprForVPValueImpl(LHSVal, PSE, L, Cache);
   if (match(V, m_Trunc(m_VPValue(LHSVal)))) {
     Type *DestTy = V->getScalarType();
     return CreateSCEV({LHSVal}, [&](ArrayRef<SCEVUse> Ops) {
@@ -282,8 +313,8 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
     auto *SubR = dyn_cast<VPRecipeWithIRFlags>(LHSVal);
     if (match(LHSVal, m_Sub(m_VPValue(SubLHS), m_VPValue(SubRHS))) && SubR &&
         SubR->hasNoSignedWrap() && poisonGuaranteesUB(LHSVal)) {
-      const SCEV *V1 = getSCEVExprForVPValue(SubLHS, PSE, L);
-      const SCEV *V2 = getSCEVExprForVPValue(SubRHS, PSE, L);
+      const SCEV *V1 = getSCEVExprForVPValueImpl(SubLHS, PSE, L, Cache);
+      const SCEV *V2 = getSCEVExprForVPValueImpl(SubRHS, PSE, L, Cache);
       if (!isa<SCEVCouldNotCompute>(V1) && !isa<SCEVCouldNotCompute>(V2))
         return SE.getMinusSCEV(SE.getSignExtendExpr(V1, DestTy),
                                SE.getSignExtendExpr(V2, DestTy), SCEV::FlagNSW);
@@ -334,32 +365,37 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
   const SCEV *Expr =
       TypeSwitch<const VPRecipeBase *, const SCEV *>(DefR)
           .Case([](const VPExpandSCEVRecipe *R) { return R->getSCEV(); })
-          .Case([&SE, &PSE, L](const VPWidenIntOrFpInductionRecipe *R) {
-            const SCEV *Step = getSCEVExprForVPValue(R->getStepValue(), PSE, L);
+          .Case([&SE, &PSE, L, &Cache](const VPWidenIntOrFpInductionRecipe *R) {
+            const SCEV *Step =
+                getSCEVExprForVPValueImpl(R->getStepValue(), PSE, L, Cache);
             if (!L || isa<SCEVCouldNotCompute>(Step))
               return SE.getCouldNotCompute();
             const SCEV *Start =
-                getSCEVExprForVPValue(R->getStartValue(), PSE, L);
+                getSCEVExprForVPValueImpl(R->getStartValue(), PSE, L, Cache);
             const SCEV *AddRec =
                 SE.getAddRecExpr(Start, Step, L, SCEV::FlagAnyWrap);
             if (R->getTruncInst())
               return SE.getTruncateExpr(AddRec, R->getScalarType());
             return AddRec;
           })
-          .Case([&SE, &PSE, L](const VPWidenPointerInductionRecipe *R) {
+          .Case([&SE, &PSE, L, &Cache](const VPWidenPointerInductionRecipe *R) {
             const SCEV *Start =
-                getSCEVExprForVPValue(R->getStartValue(), PSE, L);
+                getSCEVExprForVPValueImpl(R->getStartValue(), PSE, L, Cache);
             if (!L || isa<SCEVCouldNotCompute>(Start))
               return SE.getCouldNotCompute();
-            const SCEV *Step = getSCEVExprForVPValue(R->getStepValue(), PSE, L);
+            const SCEV *Step =
+                getSCEVExprForVPValueImpl(R->getStepValue(), PSE, L, Cache);
             if (isa<SCEVCouldNotCompute>(Step))
               return SE.getCouldNotCompute();
             return SE.getAddRecExpr(Start, Step, L, SCEV::FlagAnyWrap);
           })
-          .Case([&SE, &PSE, L](const VPDerivedIVRecipe *R) {
-            const SCEV *Start = getSCEVExprForVPValue(R->getOperand(0), PSE, L);
-            const SCEV *IV = getSCEVExprForVPValue(R->getOperand(1), PSE, L);
-            const SCEV *Scale = getSCEVExprForVPValue(R->getOperand(2), PSE, L);
+          .Case([&SE, &PSE, L, &Cache](const VPDerivedIVRecipe *R) {
+            const SCEV *Start =
+                getSCEVExprForVPValueImpl(R->getOperand(0), PSE, L, Cache);
+            const SCEV *IV =
+                getSCEVExprForVPValueImpl(R->getOperand(1), PSE, L, Cache);
+            const SCEV *Scale =
+                getSCEVExprForVPValueImpl(R->getOperand(2), PSE, L, Cache);
             if (any_of(ArrayRef({Start, IV, Scale}),
                        IsaPred<SCEVCouldNotCompute>))
               return SE.getCouldNotCompute();
@@ -369,23 +405,25 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
                 SE.getMulExpr(
                     IV, SE.getTruncateOrSignExtend(Scale, IV->getType())));
           })
-          .Case([&SE, &PSE, L](const VPScalarIVStepsRecipe *R) {
-            const SCEV *IV = getSCEVExprForVPValue(R->getOperand(0), PSE, L);
-            const SCEV *Step = getSCEVExprForVPValue(R->getOperand(1), PSE, L);
+          .Case([&SE, &PSE, L, &Cache](const VPScalarIVStepsRecipe *R) {
+            const SCEV *IV =
+                getSCEVExprForVPValueImpl(R->getOperand(0), PSE, L, Cache);
+            const SCEV *Step =
+                getSCEVExprForVPValueImpl(R->getOperand(1), PSE, L, Cache);
             if (isa<SCEVCouldNotCompute>(IV) || !isa<SCEVConstant>(Step))
               return SE.getCouldNotCompute();
             return SE.getTruncateOrSignExtend(IV, Step->getType());
           })
-          .Case([&SE, &PSE, L](const VPBlendRecipe *R) -> const SCEV * {
+          .Case([&SE, &PSE, L, &Cache](const VPBlendRecipe *R) -> const SCEV * {
             // Exactly one incoming value is selected per lane. If they all
             // have the same SCEV, so has the blend, whatever the masks are.
-            const SCEV *Common =
-                getSCEVExprForVPValue(R->getIncomingValue(0), PSE, L);
+            const SCEV *Common = getSCEVExprForVPValueImpl(
+                R->getIncomingValue(0), PSE, L, Cache);
             if (isa<SCEVCouldNotCompute>(Common))
               return SE.getCouldNotCompute();
             for (unsigned I : seq<unsigned>(1, R->getNumIncomingValues()))
-              if (getSCEVExprForVPValue(R->getIncomingValue(I), PSE, L) !=
-                  Common)
+              if (getSCEVExprForVPValueImpl(R->getIncomingValue(I), PSE, L,
+                                            Cache) != Common)
                 return SE.getCouldNotCompute();
             return Common;
           })
