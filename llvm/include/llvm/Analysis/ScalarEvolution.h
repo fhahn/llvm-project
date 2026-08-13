@@ -2045,27 +2045,23 @@ private:
   /// identical opcodes and operands.
   const SCEV *createNodeForPHIWithIdenticalOperands(PHINode *PN);
 
-  /// Provide the special handling we need to analyze PHI SCEVs.
-  const SCEV *createNodeForPHI(PHINode *PN);
-
-  /// The part of createNodeForPHI which runs after createAddRecFromPHI has
-  /// failed.
+  /// Provide the special handling we need to analyze PHI SCEVs which do not
+  /// form an add recurrence. Add recurrences are handled by createSCEVIter,
+  /// which has to insert a symbolic name for the PHI before it can compute the
+  /// SCEV of the backedge value.
   const SCEV *createNodeForPHINotAddRec(PHINode *PN);
 
-  /// Helper function called from createNodeForPHI.
-  const SCEV *createAddRecFromPHI(PHINode *PN);
+  /// Turn \p PN into an add recurrence, assuming a symbolic name has been
+  /// inserted for it and its backedge value has a SCEV. Removes the symbolic
+  /// name again and returns nullptr if no add recurrence can be formed.
+  const SCEV *finishAddRecFromPHI(PHINode *PN);
 
-  /// The part of createAddRecFromPHI which runs after a symbolic name has been
-  /// inserted for \p PN. Removes the symbolic name again and returns nullptr if
-  /// no add recurrence can be formed.
-  const SCEV *finishAddRecFromPHI(PHINode *PN, Value *BEValueV,
-                                  Value *StartValueV);
-
-  /// A helper function for createAddRecFromPHI to handle simple cases.
+  /// A helper function to handle the simplest (yet most common) add recurrences
+  /// without inserting a symbolic name for \p PN.
   const SCEV *createSimpleAffineAddRec(PHINode *PN, Value *BEValueV,
-                                            Value *StartValueV);
+                                       Value *StartValueV);
 
-  /// Helper function called from createNodeForPHI.
+  /// Helper function called from createNodeForPHINotAddRec.
   const SCEV *createNodeFromSelectLikePHI(PHINode *PN);
 
   /// Provide special handling for a select-like instruction (currently this
@@ -2496,7 +2492,7 @@ private:
   /// add recurrence on the loop \p L.
   bool isAddRecNeverPoison(const Instruction *I, const Loop *L);
 
-  /// Similar to createAddRecFromPHI, but with the additional flexibility of
+  /// Similar to finishAddRecFromPHI, but with the additional flexibility of
   /// suggesting runtime overflow checks in case casts are encountered.
   /// If successful, the analysis records that for this loop, \p SymbolicPHI,
   /// which is the UnknownSCEV currently representing the PHI, can be rewritten

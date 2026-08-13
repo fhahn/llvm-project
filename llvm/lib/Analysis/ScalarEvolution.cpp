@@ -5497,8 +5497,8 @@ static Type *isSimpleCastedPHI(const SCEV *Op, const SCEVUnknown *SymbolicPHI,
                                bool &Signed, ScalarEvolution &SE) {
   // The case where Op == SymbolicPHI (that is, with no type conversions on
   // the way) is handled by the regular add recurrence creating logic and
-  // would have already been triggered in createAddRecForPHI. Reaching it here
-  // means that createAddRecFromPHI had failed for this PHI before (e.g.,
+  // would have already been triggered in finishAddRecFromPHI. Reaching it here
+  // means that finishAddRecFromPHI had failed for this PHI before (e.g.,
   // because one of the other operands of the SCEVAddExpr updating this PHI is
   // not invariant).
   //
@@ -5585,7 +5585,7 @@ static const Loop *isIntegerLoopHeaderPHI(const PHINode *PN, LoopInfo &LI) {
 //      (Trunc iy ((SExt/ZExt ix (%SymbolicPhi) to iy) + InvariantAccum) to ix)
 //    which correspond to a phi->trunc->add->sext/zext->phi update chain.
 //
-// 3) Outline common code with createAddRecFromPHI to avoid duplication.
+// 3) Outline common code with finishAddRecFromPHI to avoid duplication.
 std::optional<std::pair<const SCEV *, SmallVector<const SCEVPredicate *, 3>>>
 ScalarEvolution::createAddRecFromPHIWithCastsImpl(const SCEVUnknown *SymbolicPHI) {
   SmallVector<const SCEVPredicate *, 3> Predicates;
@@ -5860,12 +5860,12 @@ bool PredicatedScalarEvolution::areAddRecsEqualWithPreds(
   return true;
 }
 
-/// A helper function for createAddRecFromPHI to handle simple cases.
+/// A helper function to handle simple add recurrences.
 ///
 /// This function tries to find an AddRec expression for the simplest (yet most
 /// common) cases: PN = PHI(Start, OP(Self, LoopInvariant)), where OP is an add
 /// or a getelementptr with loop-invariant indices.
-/// If it fails, createAddRecFromPHI will use a more general, but slow,
+/// If it fails, finishAddRecFromPHI will use a more general, but slow,
 /// technique for finding the AddRec expression.
 const SCEV *ScalarEvolution::createSimpleAffineAddRec(PHINode *PN,
                                                       Value *BEValueV,
@@ -5910,7 +5910,7 @@ const SCEV *ScalarEvolution::createSimpleAffineAddRec(PHINode *PN,
                        getSizeOfExpr(IntIdxTy, GEP->getSourceElementType()));
 
     // Transfer the GEP's nowrap flags, using the same rules as
-    // createAddRecFromPHI does for this shape. Do not use
+    // finishAddRecFromPHI does for this shape. Do not use
     // isSCEVExprNeverPoison here: it walks the GEP's operands, which would
     // recurse back into PN before it has a SCEV.
     GEPNoWrapFlags NW = GEP->getNoWrapFlags();
@@ -5949,8 +5949,14 @@ const SCEV *ScalarEvolution::createSimpleAffineAddRec(PHINode *PN,
 }
 
 // Compute the initial and backedge values for a PHI node in a loop header.
+// Returns {nullptr, nullptr} if \p V is not a loop header PHI or does not have
+// unique initial and backedge values.
 static std::pair<Value *, Value *> valuesForAddRecFromPHI(LoopInfo &LI,
-                                                          PHINode *PN) {
+                                                          Value *V) {
+  auto *PN = dyn_cast<PHINode>(V);
+  if (!PN)
+    return {};
+
   const Loop *L = LI.getLoopFor(PN->getParent());
   if (!L || L->getHeader() != PN->getParent())
     return {};
@@ -5978,31 +5984,13 @@ static std::pair<Value *, Value *> valuesForAddRecFromPHI(LoopInfo &LI,
   return {BEValueV, StartValueV};
 }
 
-const SCEV *ScalarEvolution::createAddRecFromPHI(PHINode *PN) {
-  assert(ValueExprMap.find_as(PN) == ValueExprMap.end() &&
-         "PHI node already processed?");
-
-  auto [BEValueV, StartValueV] = valuesForAddRecFromPHI(LI, PN);
-  if (!BEValueV || !StartValueV)
-    return nullptr;
-
-  // First, try to find AddRec expression without creating a fictituos symbolic
-  // value for PN.
-  if (auto *S = createSimpleAffineAddRec(PN, BEValueV, StartValueV))
-    return S;
-
-  // Handle PHI node value symbolically.
-  insertValueToMap(PN, getUnknown(PN));
-
-  // finishAddRecFromPHI analyzes the value coming around the back-edge using
-  // this symbolic name for the PHI.
-  return finishAddRecFromPHI(PN, BEValueV, StartValueV);
-}
-
-const SCEV *ScalarEvolution::finishAddRecFromPHI(PHINode *PN, Value *BEValueV,
-                                                 Value *StartValueV) {
+const SCEV *ScalarEvolution::finishAddRecFromPHI(PHINode *PN) {
   const Loop *L = LI.getLoopFor(PN->getParent());
+  auto [BEValueV, StartValueV] = valuesForAddRecFromPHI(LI, PN);
+  assert(BEValueV && StartValueV && "unique start and backedge value needed");
   const SCEV *SymbolicName = getUnknown(PN);
+  assert(getExistingSCEV(PN) == SymbolicName &&
+         "symbolic name must be in place for PN");
 
   // Using the symbolic name for the PHI, analyze the value coming around the
   // back-edge.
@@ -6230,13 +6218,6 @@ ScalarEvolution::createNodeForPHIWithIdenticalOperands(PHINode *PN) {
       all_of(drop_begin(PN->incoming_values()),
              [this, CommonSCEV](Value *V) { return CommonSCEV == getSCEV(V); });
   return SCEVExprsIdentical ? CommonSCEV : nullptr;
-}
-
-const SCEV *ScalarEvolution::createNodeForPHI(PHINode *PN) {
-  if (const SCEV *S = createAddRecFromPHI(PN))
-    return S;
-
-  return createNodeForPHINotAddRec(PN);
 }
 
 const SCEV *ScalarEvolution::createNodeForPHINotAddRec(PHINode *PN) {
@@ -7761,41 +7742,77 @@ bool ScalarEvolution::loopIsFiniteByAssumption(const Loop *L) {
 }
 
 const SCEV *ScalarEvolution::createSCEVIter(Value *V) {
-  // Worklist item with a Value and a bool indicating whether all operands have
-  // been visited already.
-  using PointerTy = PointerIntPair<Value *, 1, bool>;
+  // The state of a worklist item:
+  //  * NeedOperands: the operands to create SCEVs for first are not known yet.
+  //  * Create: all operands have a SCEV, the SCEV for the item can be created.
+  //  * FinishAddRec: the item is a loop header PHI for which a symbolic name
+  //    has been inserted and the backedge value has a SCEV; all that is left is
+  //    to turn it into an add recurrence.
+  enum State { NeedOperands, Create, FinishAddRec };
+  using PointerTy = PointerIntPair<Value *, 2, State>;
   SmallVector<PointerTy> Stack;
 
-  Stack.emplace_back(V, false);
+  Stack.emplace_back(V, NeedOperands);
   while (!Stack.empty()) {
     auto E = Stack.back();
     Value *CurV = E.getPointer();
 
-    if (getExistingSCEV(CurV)) {
+    // In the FinishAddRec state CurV already maps to its symbolic name, so skip
+    // the check.
+    if (E.getInt() != FinishAddRec && getExistingSCEV(CurV)) {
       Stack.pop_back();
       continue;
     }
 
     SmallVector<Value *> Ops;
     const SCEV *CreatedSCEV = nullptr;
-    // If all operands have been visited already, create the SCEV.
-    if (E.getInt()) {
-      CreatedSCEV = createSCEV(CurV);
-    } else {
-      // Otherwise get the operands we need to create SCEV's for before creating
-      // the SCEV for CurV. If the SCEV for CurV can be constructed trivially,
-      // just use it.
+    switch (E.getInt()) {
+    case NeedOperands:
+      // Get the operands we need to create SCEV's for before creating the SCEV
+      // for CurV. If the SCEV for CurV can be constructed trivially, just use
+      // it.
       CreatedSCEV = getOperandsToCreate(CurV, Ops);
+      break;
+    case Create: {
+      // Add recurrences need the SCEV of the backedge value, which has to be
+      // computed with a symbolic name in place for the PHI. Insert the symbolic
+      // name here and queue the backedge value, so it is computed via the
+      // worklist instead of by recursing into it.
+      auto [BEValueV, StartValueV] = valuesForAddRecFromPHI(LI, CurV);
+      if (!BEValueV || !StartValueV) {
+        CreatedSCEV = createSCEV(CurV);
+        break;
+      }
+
+      // First, try to find an AddRec expression without creating a fictitious
+      // symbolic value for the PHI.
+      auto *PN = cast<PHINode>(CurV);
+      CreatedSCEV = createSimpleAffineAddRec(PN, BEValueV, StartValueV);
+      if (!CreatedSCEV) {
+        insertValueToMap(PN, getUnknown(PN));
+        Stack.back().setInt(FinishAddRec);
+        Stack.emplace_back(BEValueV, NeedOperands);
+        continue;
+      }
+      break;
+    }
+    case FinishAddRec: {
+      auto *PN = cast<PHINode>(CurV);
+      CreatedSCEV = finishAddRecFromPHI(PN);
+      if (!CreatedSCEV)
+        CreatedSCEV = createNodeForPHINotAddRec(PN);
+      break;
+    }
     }
 
     if (CreatedSCEV) {
       insertValueToMap(CurV, CreatedSCEV);
       Stack.pop_back();
     } else {
-      Stack.back().setInt(true);
+      Stack.back().setInt(Create);
       // Queue its operands which need to be constructed.
       for (Value *Op : Ops)
-        Stack.emplace_back(Op, false);
+        Stack.emplace_back(Op, NeedOperands);
     }
   }
 
@@ -7958,7 +7975,10 @@ ScalarEvolution::getOperandsToCreate(Value *V, SmallVectorImpl<Value *> &Ops) {
         Ops.push_back(RHS);
       }
     }
-    // The fourth way is createAddRecFromPHI.
+    // The fourth way is an add recurrence. The SCEV for the backedge value has
+    // to be constructed with a symbolic name in place for the PHI, so
+    // createSCEVIter deals with it separately; here we only add the values
+    // createSimpleAffineAddRec needs.
     {
       auto *PN = cast<PHINode>(U);
       auto [BEValueV, StartValueV] = valuesForAddRecFromPHI(LI, PN);
@@ -7974,9 +7994,6 @@ ScalarEvolution::getOperandsToCreate(Value *V, SmallVectorImpl<Value *> &Ops) {
               Ops.push_back(BO->LHS);
           }
         }
-        // FIXME: Find invariant values which feed into BEValueV. This search
-        // probably needs to be integrated into the top-level loop in
-        // createSCEVIter.
       }
     }
     // In addition to getNodeForPHI, also construct nodes which might be needed
@@ -8511,7 +8528,10 @@ const SCEV *ScalarEvolution::createSCEV(Value *V) {
     return createNodeForGEP(cast<GEPOperator>(U));
 
   case Instruction::PHI:
-    return createNodeForPHI(cast<PHINode>(U));
+    // Add recurrences are formed by createSCEVIter, which has to insert a
+    // symbolic name for the PHI before it can compute the SCEV of the backedge
+    // value.
+    return createNodeForPHINotAddRec(cast<PHINode>(U));
 
   case Instruction::Select:
     return createNodeForSelectOrPHI(U, U->getOperand(0), U->getOperand(1),
