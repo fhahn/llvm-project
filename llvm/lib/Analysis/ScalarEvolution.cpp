@@ -7948,10 +7948,20 @@ ScalarEvolution::getOperandsToCreate(Value *V, SmallVectorImpl<Value *> &Ops) {
     }
     // The fourth way is createAddRecFromPHI.
     {
-      auto [BEValueV, StartValueV] =
-          valuesForAddRecFromPHI(LI, cast<PHINode>(U));
+      auto *PN = cast<PHINode>(U);
+      auto [BEValueV, StartValueV] = valuesForAddRecFromPHI(LI, PN);
       if (BEValueV && StartValueV) {
         Ops.push_back(StartValueV);
+        // createSimpleAffineAddRec needs the SCEV of the loop-invariant step.
+        if (auto BO = MatchBinaryOp(BEValueV, getDataLayout(), AC, DT, PN)) {
+          const Loop *L = LI.getLoopFor(PN->getParent());
+          if (BO->Opcode == Instruction::Add) {
+            if (BO->LHS == PN && L->isLoopInvariant(BO->RHS))
+              Ops.push_back(BO->RHS);
+            else if (BO->RHS == PN && L->isLoopInvariant(BO->LHS))
+              Ops.push_back(BO->LHS);
+          }
+        }
         // FIXME: Find invariant values which feed into BEValueV. This search
         // probably needs to be integrated into the top-level loop in
         // createSCEVIter.
