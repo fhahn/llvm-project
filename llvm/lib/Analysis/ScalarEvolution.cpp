@@ -7989,14 +7989,20 @@ ScalarEvolution::getOperandsToCreate(Value *V, SmallVectorImpl<Value *> &Ops) {
       if (BEValueV && StartValueV) {
         Ops.push_back(StartValueV);
         // createSimpleAffineAddRec needs the SCEV of the loop-invariant step.
+        const Loop *L = LI.getLoopFor(PN->getParent());
         if (auto BO = MatchBinaryOp(BEValueV, getDataLayout(), AC, DT, PN)) {
-          const Loop *L = LI.getLoopFor(PN->getParent());
           if (BO->Opcode == Instruction::Add) {
             if (BO->LHS == PN && L->isLoopInvariant(BO->RHS))
               Ops.push_back(BO->RHS);
             else if (BO->RHS == PN && L->isLoopInvariant(BO->LHS))
               Ops.push_back(BO->LHS);
           }
+        } else if (auto *GEP = dyn_cast<GEPOperator>(BEValueV)) {
+          // For a pointer induction variable the step is scaled from the
+          // getelementptr's single loop-invariant index.
+          if (GEP->getPointerOperand() == PN && GEP->getNumIndices() == 1 &&
+              L->isLoopInvariant(*GEP->idx_begin()))
+            Ops.push_back(*GEP->idx_begin());
         }
       }
     }
