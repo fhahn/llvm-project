@@ -5863,7 +5863,8 @@ bool PredicatedScalarEvolution::areAddRecsEqualWithPreds(
 /// A helper function for createAddRecFromPHI to handle simple cases.
 ///
 /// This function tries to find an AddRec expression for the simplest (yet most
-/// common) cases: PN = PHI(Start, OP(Self, LoopInvariant)).
+/// common) cases: PN = PHI(Start, OP(Self, LoopInvariant)), where OP is an add
+/// or a getelementptr with loop-invariant indices.
 /// If it fails, createAddRecFromPHI will use a more general, but slow,
 /// technique for finding the AddRec expression.
 const SCEV *ScalarEvolution::createSimpleAffineAddRec(PHINode *PN,
@@ -5873,27 +5874,59 @@ const SCEV *ScalarEvolution::createSimpleAffineAddRec(PHINode *PN,
   assert(L && L->getHeader() == PN->getParent());
   assert(BEValueV && StartValueV);
 
-  auto BO = MatchBinaryOp(BEValueV, getDataLayout(), AC, DT, PN);
-  if (!BO)
-    return nullptr;
-
-  if (BO->Opcode != Instruction::Add)
-    return nullptr;
-
   const SCEV *Accum = nullptr;
-  if (BO->LHS == PN && L->isLoopInvariant(BO->RHS))
-    Accum = getSCEV(BO->RHS);
-  else if (BO->RHS == PN && L->isLoopInvariant(BO->LHS))
-    Accum = getSCEV(BO->LHS);
-
-  if (!Accum)
-    return nullptr;
-
   SCEV::NoWrapFlags Flags = SCEV::FlagAnyWrap;
-  if (BO->IsNUW)
-    Flags = setFlags(Flags, SCEV::FlagNUW);
-  if (BO->IsNSW)
-    Flags = setFlags(Flags, SCEV::FlagNSW);
+
+  if (auto BO = MatchBinaryOp(BEValueV, getDataLayout(), AC, DT, PN)) {
+    if (BO->Opcode != Instruction::Add)
+      return nullptr;
+
+    if (BO->LHS == PN && L->isLoopInvariant(BO->RHS))
+      Accum = getSCEV(BO->RHS);
+    else if (BO->RHS == PN && L->isLoopInvariant(BO->LHS))
+      Accum = getSCEV(BO->LHS);
+
+    if (!Accum)
+      return nullptr;
+
+    if (BO->IsNUW)
+      Flags = setFlags(Flags, SCEV::FlagNUW);
+    if (BO->IsNSW)
+      Flags = setFlags(Flags, SCEV::FlagNSW);
+  } else if (auto *GEP = dyn_cast<GEPOperator>(BEValueV)) {
+    // A pointer induction variable: PN = PHI(Start, gep PN, LoopInvariant).
+    // The GEP adds the same offset on every iteration, so this is an affine
+    // add recurrence with that offset as its step. Only handle a single index;
+    // anything else goes the general route.
+    if (GEP->getPointerOperand() != PN || GEP->getNumIndices() != 1)
+      return nullptr;
+    Value *IdxV = *GEP->idx_begin();
+    if (!L->isLoopInvariant(IdxV))
+      return nullptr;
+
+    // Getelementptr indices are signed, and scaled by the element size.
+    Type *IntIdxTy = getEffectiveSCEVType(GEP->getType());
+    Accum = getMulExpr(getTruncateOrSignExtend(getSCEV(IdxV), IntIdxTy),
+                       getSizeOfExpr(IntIdxTy, GEP->getSourceElementType()));
+
+    // Transfer the GEP's nowrap flags, using the same rules as
+    // createAddRecFromPHI does for this shape. Do not use
+    // isSCEVExprNeverPoison here: it walks the GEP's operands, which would
+    // recurse back into PN before it has a SCEV.
+    GEPNoWrapFlags NW = GEP->getNoWrapFlags();
+    // If the increment has any nowrap flags, then we know the address space
+    // cannot be wrapped around.
+    if (NW != GEPNoWrapFlags::none())
+      Flags = setFlags(Flags, SCEV::FlagNW);
+    // If the GEP is nuw or nusw with non-negative offset, we know that no
+    // unsigned wrap occurs. We cannot set the nsw flag as only the offset is
+    // treated as signed, while the base is unsigned.
+    if (NW.hasNoUnsignedWrap() ||
+        (NW.hasNoUnsignedSignedWrap() && isKnownNonNegative(Accum)))
+      Flags = setFlags(Flags, SCEV::FlagNUW);
+  } else {
+    return nullptr;
+  }
 
   const SCEV *StartVal = getSCEV(StartValueV);
   const SCEV *PHISCEV = getAddRecExpr(StartVal, Accum, L, Flags);
