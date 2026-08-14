@@ -7940,7 +7940,9 @@ ScalarEvolution::getOperandsToCreate(Value *V, SmallVectorImpl<Value *> &Ops) {
 
   case Instruction::PHI:
     // getNodeForPHI has four ways to turn a PHI into a SCEV; retrieve the
-    // relevant nodes for each of them.
+    // relevant nodes for each of them. createNodeForPHINotAddRec tries the
+    // first three in order and uses the first one that matches, so once one of
+    // them has matched, the operands of the later ones are not needed.
     //
     // The first is just to call simplifyInstruction, and get something back
     // that isn't a PHI.
@@ -7950,6 +7952,7 @@ ScalarEvolution::getOperandsToCreate(Value *V, SmallVectorImpl<Value *> &Ops) {
              /*UseInstrInfo=*/true, /*CanUseUndef=*/false})) {
       assert(V);
       Ops.push_back(V);
+      return nullptr;
     }
     // The second is createNodeForPHIWithIdenticalOperands: this looks for
     // operands which all perform the same operation, but haven't been
@@ -7973,6 +7976,7 @@ ScalarEvolution::getOperandsToCreate(Value *V, SmallVectorImpl<Value *> &Ops) {
         Ops.push_back(Cond);
         Ops.push_back(LHS);
         Ops.push_back(RHS);
+        return nullptr;
       }
     }
     // The fourth way is an add recurrence. The SCEV for the backedge value has
