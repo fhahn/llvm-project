@@ -19,6 +19,7 @@
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/Analysis/ScalarEvolutionPatternMatch.h"
 #include "llvm/IR/Dominators.h"
+#include "llvm/IR/ProfDataUtils.h"
 #include "llvm/Transforms/Utils/ScalarEvolutionExpander.h"
 
 using namespace llvm;
@@ -1160,4 +1161,11 @@ void vputils::detail::pullOutPermutationsImpl(
           Res, [&Res](VPUser &U, unsigned _) { return &U != Res; });
     }
   }
+}
+
+void vputils::setUnknownBranchWeights(VPInstruction &Br, VPlan &Plan) {
+  Function &F = *Plan.getScalarHeader()->getIRBasicBlock()->getParent();
+  if (MDNode *MD =
+          getExplicitlyUnknownBranchWeightsIfProfiled(F, "loop-vectorize"))
+    Br.setMetadata(LLVMContext::MD_prof, MD);
 }

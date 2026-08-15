@@ -11,7 +11,7 @@ define float @fmax_reduction_profiled(ptr %a, i64 %n) !prof !0 {
 ; CHECK-SAME: ptr [[A:%.*]], i64 [[N:%.*]]) !prof [[PROF0:![0-9]+]] {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
-; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]], !prof [[PROF1:![0-9]+]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[N]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[N_MOD_VF]]
@@ -30,10 +30,10 @@ define float @fmax_reduction_profiled(ptr %a, i64 %n) !prof !0 {
 ; CHECK-NEXT:    [[TMP5]] = select nnan nsz <2 x i1> [[TMP3]], <2 x float> [[WIDE_LOAD2]], <2 x float> [[VEC_PHI1]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP1:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP2:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[RDX_MINMAX_CMP:%.*]] = fcmp fast ogt <2 x float> [[TMP4]], [[TMP5]]
-; CHECK-NEXT:    [[RDX_MINMAX_SELECT:%.*]] = select fast <2 x i1> [[RDX_MINMAX_CMP]], <2 x float> [[TMP4]], <2 x float> [[TMP5]], !prof [[PROF4:![0-9]+]]
+; CHECK-NEXT:    [[RDX_MINMAX_SELECT:%.*]] = select fast <2 x i1> [[RDX_MINMAX_CMP]], <2 x float> [[TMP4]], <2 x float> [[TMP5]], !prof [[PROF5:![0-9]+]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = call fast float @llvm.vector.reduce.fmax.v2f32(<2 x float> [[RDX_MINMAX_SELECT]])
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
@@ -50,7 +50,7 @@ define float @fmax_reduction_profiled(ptr %a, i64 %n) !prof !0 {
 ; CHECK-NEXT:    [[MAX_NEXT]] = select nnan nsz i1 [[CMP]], float [[LD]], float [[MAX]]
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
 ; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
-; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[FOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[FOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    [[MAX_NEXT_LCSSA:%.*]] = phi float [ [[MAX_NEXT]], %[[FOR_BODY]] ], [ [[TMP7]], %[[MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    ret float [[MAX_NEXT_LCSSA]]
@@ -99,7 +99,7 @@ define float @fmax_reduction_not_profiled(ptr %a, i64 %n) {
 ; CHECK-NEXT:    [[TMP5]] = select nnan nsz <2 x i1> [[TMP3]], <2 x float> [[WIDE_LOAD2]], <2 x float> [[VEC_PHI1]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[RDX_MINMAX_CMP:%.*]] = fcmp fast ogt <2 x float> [[TMP4]], [[TMP5]]
 ; CHECK-NEXT:    [[RDX_MINMAX_SELECT:%.*]] = select fast <2 x i1> [[RDX_MINMAX_CMP]], <2 x float> [[TMP4]], <2 x float> [[TMP5]]
@@ -119,7 +119,7 @@ define float @fmax_reduction_not_profiled(ptr %a, i64 %n) {
 ; CHECK-NEXT:    [[MAX_NEXT]] = select nnan nsz i1 [[CMP]], float [[LD]], float [[MAX]]
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
 ; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
-; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[FOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[FOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    [[MAX_NEXT_LCSSA:%.*]] = phi float [ [[MAX_NEXT]], %[[FOR_BODY]] ], [ [[TMP7]], %[[MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    ret float [[MAX_NEXT_LCSSA]]
@@ -146,11 +146,12 @@ exit:
 !0 = !{!"function_entry_count", i64 1000}
 ;.
 ; CHECK: [[PROF0]] = !{!"function_entry_count", i64 1000}
-; CHECK: [[LOOP1]] = distinct !{[[LOOP1]], [[META2:![0-9]+]], [[META3:![0-9]+]]}
-; CHECK: [[META2]] = !{!"llvm.loop.isvectorized", i32 1}
-; CHECK: [[META3]] = !{!"llvm.loop.unroll.runtime.disable"}
-; CHECK: [[PROF4]] = !{!"unknown", !"loop-utils"}
-; CHECK: [[LOOP5]] = distinct !{[[LOOP5]], [[META3]], [[META2]]}
-; CHECK: [[LOOP6]] = distinct !{[[LOOP6]], [[META2]], [[META3]]}
-; CHECK: [[LOOP7]] = distinct !{[[LOOP7]], [[META3]], [[META2]]}
+; CHECK: [[PROF1]] = !{!"unknown", !"loop-vectorize"}
+; CHECK: [[LOOP2]] = distinct !{[[LOOP2]], [[META3:![0-9]+]], [[META4:![0-9]+]]}
+; CHECK: [[META3]] = !{!"llvm.loop.isvectorized", i32 1}
+; CHECK: [[META4]] = !{!"llvm.loop.unroll.runtime.disable"}
+; CHECK: [[PROF5]] = !{!"unknown", !"loop-utils"}
+; CHECK: [[LOOP6]] = distinct !{[[LOOP6]], [[META4]], [[META3]]}
+; CHECK: [[LOOP7]] = distinct !{[[LOOP7]], [[META3]], [[META4]]}
+; CHECK: [[LOOP8]] = distinct !{[[LOOP8]], [[META4]], [[META3]]}
 ;.

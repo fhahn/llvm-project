@@ -242,6 +242,12 @@ void pullOutPermutations(VPlan &Plan, Match_t Perm, Builder Build) {
   detail::pullOutPermutationsImpl(Plan, MatchPerm, Build);
 }
 
+/// Mark \p Br, a branch introduced by the vectorizer itself for which it has no
+/// probability to give, as having an explicitly unknown profile, so it does not
+/// look like the branch weights of an original branch were dropped. Does
+/// nothing if \p Plan's function has no profile information.
+void setUnknownBranchWeights(VPInstruction &Br, VPlan &Plan);
+
 } // namespace vputils
 
 /// Lightweight SCEV-to-VPlan expander. Converts SCEV expressions into

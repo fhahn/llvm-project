@@ -1480,6 +1480,8 @@ static void addBypassBranch(VPlan &Plan, VPBasicBlock *CheckBlockVPBB,
     MDNode *BranchWeights =
         MDB.createBranchWeights(CheckBypassWeights, /*IsExpected=*/false);
     Term->setMetadata(LLVMContext::MD_prof, BranchWeights);
+  } else {
+    vputils::setUnknownBranchWeights(*Term, Plan);
   }
 }
 
@@ -1564,6 +1566,8 @@ void VPlanTransforms::addMinimumIterationCheck(
     MDNode *BranchWeights = MDB.createBranchWeights(
         ArrayRef(MinItersBypassWeights, 2), /*IsExpected=*/false);
     Term->setMetadata(LLVMContext::MD_prof, BranchWeights);
+  } else {
+    vputils::setUnknownBranchWeights(*Term, Plan);
   }
 }
 

@@ -37,6 +37,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/ProfDataUtils.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Value.h"
 #include "llvm/Support/Casting.h"
@@ -1838,13 +1839,29 @@ void LoopVectorizationPlanner::updateLoopMetadataAndProfileInfo(
   unsigned RemainderAverageTripCount = 0;
   auto EC = VectorLoop->getLoopPreheader()->getParent()->getEntryCount();
   auto IsProfiled = EC && *EC != 0;
+  // The latch of the vector loop just created leaves the loop, so it needs
+  // branch weights to describe the estimated number of iterations it runs. If
+  // there is no estimate to compute them from, mark them explicitly unknown, so
+  // it does not look like the weights of the original latch were dropped.
+  // FIXME: For a loop that exits somewhere other than the latch, there is no
+  // estimate because estimateLoopTripCount only reads the weights of an exiting
+  // latch branch.
+  auto SetUnknownVectorLatchWeights = [&]() {
+    if (!IsProfiled || !HeaderVPBB)
+      return;
+    Instruction *Term = VectorLoop->getLoopLatch()->getTerminator();
+    if (Term->getNumSuccessors() > 1)
+      setExplicitlyUnknownBranchWeights(*Term, "loop-vectorize");
+  };
   if (!OrigAverageTripCount) {
     if (!IsProfiled)
       return;
     auto &SE = *PSE.getSE();
     AverageVectorTripCount = SE.getSmallConstantTripCount(VectorLoop);
-    if (ProfcheckDisableMetadataFixes || !AverageVectorTripCount)
+    if (ProfcheckDisableMetadataFixes || !AverageVectorTripCount) {
+      SetUnknownVectorLatchWeights();
       return;
+    }
     if (ScalarPH)
       RemainderAverageTripCount =
           SE.getSmallConstantTripCount(OrigLoop) % EstimatedVFxUF;

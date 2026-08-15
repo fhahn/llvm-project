@@ -218,7 +218,6 @@ Transforms/LoopVectorize/hoist-and-sink-mem-ops-with-invariant-pointers.ll
 Transforms/LoopVectorize/hoist-loads.ll
 Transforms/LoopVectorize/hoist-predicated-loads-with-predicated-stores.ll
 Transforms/LoopVectorize/hoist-predicated-loads.ll
-Transforms/LoopVectorize/if-conversion.ll
 Transforms/LoopVectorize/if-pred-non-void.ll
 Transforms/LoopVectorize/if-pred-stores.ll
 Transforms/LoopVectorize/induction.ll
@@ -233,7 +232,6 @@ Transforms/LoopVectorize/load-deref-pred-neg-off.ll
 Transforms/LoopVectorize/load-deref-pred-poison-ub-ops-feeding-pointer.ll
 Transforms/LoopVectorize/load-of-struct-deref-pred.ll
 Transforms/LoopVectorize/loop-form.ll
-Transforms/LoopVectorize/loop-with-constant-exit-condition.ll
 Transforms/LoopVectorize/memdep-fold-tail.ll
 Transforms/LoopVectorize/multi_early_exit.ll
 Transforms/LoopVectorize/multiple-early-exits.ll
@@ -253,7 +251,6 @@ Transforms/LoopVectorize/outer_loop_test1.ll
 Transforms/LoopVectorize/outer_loop_test2.ll
 Transforms/LoopVectorize/pointer-induction.ll
 Transforms/LoopVectorize/pr30654-phiscev-sext-trunc.ll
-Transforms/LoopVectorize/pr32859.ll
 Transforms/LoopVectorize/pr33706.ll
 Transforms/LoopVectorize/pr37248.ll
 Transforms/LoopVectorize/pr39099.ll
