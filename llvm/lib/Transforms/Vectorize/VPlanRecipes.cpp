@@ -2897,7 +2897,8 @@ void VPWidenRecipe::execute(VPTransformState &State) {
   }
   case Instruction::Select: {
     VPValue *CondOp = getOperand(0);
-    Value *Cond = State.get(CondOp, vputils::isSingleScalar(CondOp));
+    bool ScalarCond = vputils::isSingleScalar(CondOp);
+    Value *Cond = State.get(CondOp, ScalarCond);
     Value *Op0 = State.get(getOperand(1));
     Value *Op1 = State.get(getOperand(2));
     Value *Sel = State.Builder.CreateSelect(Cond, Op0, Op1);
@@ -2906,6 +2907,11 @@ void VPWidenRecipe::execute(VPTransformState &State) {
       if (isa<FPMathOperator>(I))
         applyFlags(*I);
       applyMetadata(*I);
+      // The branch weights of the original select describe the probability of
+      // its condition, which no longer has a single value once the condition is
+      // vectorized.
+      if (!ScalarCond)
+        I->setMetadata(LLVMContext::MD_prof, nullptr);
     }
     break;
   }

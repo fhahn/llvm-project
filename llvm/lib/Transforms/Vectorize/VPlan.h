@@ -1186,7 +1186,10 @@ public:
   /// \p I.
   VPIRMetadata(Instruction &I) {
     getMetadataToPropagate(&I, Metadata);
-    if (I.isTerminator())
+    // The branch weights of a terminator or of a select describe the
+    // probability of its condition, which carries over to the terminator or
+    // select generated for the recipe.
+    if (I.isTerminator() || isa<SelectInst>(&I))
       if (MDNode *BW = I.getMetadata(LLVMContext::MD_prof))
         Metadata.emplace_back(LLVMContext::MD_prof, BW);
   }

@@ -5567,9 +5567,13 @@ void VPlanTransforms::dropBranchWeightsFromUnguardedRecipes(VPlan &Plan) {
       if (&R == VPBB->getTerminator())
         continue;
       // Likewise, an explicitly unknown profile is a deliberate statement that
-      // no probability is known for the recipe, not a recorded one.
+      // no probability is known for the recipe, not a recorded one, and a
+      // select carries the branch weights of its own condition.
       MDNode *Prof = MD->getMetadata(LLVMContext::MD_prof);
       if (!Prof || isExplicitlyUnknownProfileMetadata(*Prof))
+        continue;
+      auto *SDR = dyn_cast<VPSingleDefRecipe>(&R);
+      if (SDR && vputils::getOpcode(SDR) == Instruction::Select)
         continue;
       // A predicated replicate recipe is expanded into a replicate region
       // guarded by a branch that the probability describes.

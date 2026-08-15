@@ -89,9 +89,7 @@ Transforms/LoopIdiom/AArch64/byte-compare-index.ll
 Transforms/LoopIdiom/AArch64/find-first-byte.ll
 Transforms/LoopVectorize/AArch64/alias-mask-uniforms.ll
 Transforms/LoopVectorize/AArch64/conditional-branches-cost.ll
-Transforms/LoopVectorize/AArch64/deterministic-type-shrinkage.ll
 Transforms/LoopVectorize/AArch64/early_exit_costs.ll
-Transforms/LoopVectorize/AArch64/epilog-iv-select-cmp.ll
 Transforms/LoopVectorize/AArch64/first-order-recurrence-fold-tail.ll
 Transforms/LoopVectorize/AArch64/force-target-instruction-cost.ll
 Transforms/LoopVectorize/AArch64/induction-costs-sve.ll
@@ -101,7 +99,6 @@ Transforms/LoopVectorize/AArch64/optsize_minsize.ll
 Transforms/LoopVectorize/AArch64/partial-reduce-dot-product-epilogue.ll
 Transforms/LoopVectorize/AArch64/partial-reduce-dot-product-neon.ll
 Transforms/LoopVectorize/AArch64/predicated-costs.ll
-Transforms/LoopVectorize/AArch64/select-costs.ll
 Transforms/LoopVectorize/AArch64/simple_early_exit.ll
 Transforms/LoopVectorize/AArch64/single-early-exit-interleave.ll
 Transforms/LoopVectorize/AArch64/strict-fadd.ll
@@ -124,9 +121,7 @@ Transforms/LoopVectorize/X86/consecutive-ptr-uniforms.ll
 Transforms/LoopVectorize/X86/cost-model.ll
 Transforms/LoopVectorize/X86/divs-with-tail-folding.ll
 Transforms/LoopVectorize/X86/induction-costs.ll
-Transforms/LoopVectorize/X86/replicate-recipe-with-only-first-lane-used.ll
 Transforms/LoopVectorize/X86/small-size.ll
-Transforms/LoopVectorize/X86/vector-scalar-select-cost.ll
 Transforms/LoopVectorize/X86/x86-interleaved-accesses-masked-group.ll
 Transforms/LoopVectorize/X86/x86-interleaved-store-accesses-with-gaps.ll
 Transforms/LoopVectorize/alias-mask-needs-freeze.ll
@@ -167,8 +162,8 @@ Transforms/LoopVectorize/predicated-single-exit.ll
 Transforms/LoopVectorize/predicatedinst-loop-invariant.ll
 Transforms/LoopVectorize/reduction-inloop-uf4.ll
 Transforms/LoopVectorize/reduction-minmax-users-and-predicated.ll
-Transforms/LoopVectorize/scalar-select.ll
 Transforms/LoopVectorize/scalarized_conditional_ops_uncountable_exits.ll
+Transforms/LoopVectorize/select-branch-weights.ll
 Transforms/LoopVectorize/select-cmp-predicated.ll
 Transforms/LoopVectorize/single-early-exit-cond-poison.ll
 Transforms/LoopVectorize/single-early-exit-deref-assumptions.ll

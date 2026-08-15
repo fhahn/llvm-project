@@ -446,7 +446,10 @@ void VPlanTransforms::introduceMasksAndLinearize(VPlan &Plan) {
     for (VPRecipeBase &R : *VPBB) {
       if (auto *VPI = dyn_cast<VPInstruction>(&R)) {
         VPI->addMask(BlockMask);
-        if (Weights && VPI->isMasked())
+        // Don't overwrite branch weights the recipe carries of its own, i.e.
+        // those of a select.
+        if (Weights && VPI->isMasked() &&
+            !VPI->getMetadata(LLVMContext::MD_prof))
           VPI->setMetadata(LLVMContext::MD_prof, Weights);
       }
     }
