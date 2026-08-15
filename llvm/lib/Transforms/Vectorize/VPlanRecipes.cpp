@@ -1022,12 +1022,24 @@ Value *VPInstruction::generate(VPTransformState &State) {
   case VPInstruction::LogicalAnd: {
     Value *A = State.get(getOperand(0));
     Value *B = State.get(getOperand(1));
-    return Builder.CreateLogicalAnd(A, B, Name);
+    Value *Res = Builder.CreateLogicalAnd(A, B, Name);
+    // For scalar operands this is a select on the first condition, whose
+    // probability the vectorizer does not track for either of the two it
+    // combines. For vector operands the condition is a mask, which branch
+    // weights cannot describe.
+    if (auto *Sel = dyn_cast<SelectInst>(Res);
+        Sel && !A->getType()->isVectorTy())
+      setExplicitlyUnknownBranchWeightsIfProfiled(*Sel, DEBUG_TYPE);
+    return Res;
   }
   case VPInstruction::LogicalOr: {
     Value *A = State.get(getOperand(0));
     Value *B = State.get(getOperand(1));
-    return Builder.CreateLogicalOr(A, B, Name);
+    Value *Res = Builder.CreateLogicalOr(A, B, Name);
+    if (auto *Sel = dyn_cast<SelectInst>(Res);
+        Sel && !A->getType()->isVectorTy())
+      setExplicitlyUnknownBranchWeightsIfProfiled(*Sel, DEBUG_TYPE);
+    return Res;
   }
   case VPInstruction::PtrAdd: {
     assert((State.VF.isScalar() || vputils::onlyFirstLaneUsed(this)) &&
@@ -3422,7 +3434,13 @@ void VPReductionRecipe::execute(VPTransformState &State) {
     if (State.VF.isVector())
       Start = State.Builder.CreateVectorSplat(VecTy->getElementCount(), Start);
 
-    Value *Select = State.Builder.CreateSelect(NewCond, NewVecOp, Start);
+    // The select neutralizes the lanes the reduction is not to accumulate. Its
+    // condition is the mask of the predicated block, for which the vectorizer
+    // has no probability of its own here.
+    Value *Select = State.VF.isScalar()
+                        ? State.Builder.CreateSelectWithUnknownProfile(
+                              NewCond, NewVecOp, Start, DEBUG_TYPE)
+                        : State.Builder.CreateSelect(NewCond, NewVecOp, Start);
     NewVecOp = Select;
   }
   Value *NewRed;

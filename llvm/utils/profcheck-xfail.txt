@@ -144,7 +144,6 @@ Transforms/LoopVectorize/first-order-recurrence-tail-folding.ll
 Transforms/LoopVectorize/first-order-recurrence.ll
 Transforms/LoopVectorize/fmax-without-fast-math-flags-interleave.ll
 Transforms/LoopVectorize/fmax-without-fast-math-flags.ll
-Transforms/LoopVectorize/if-pred-non-void.ll
 Transforms/LoopVectorize/iv-select-cmp-decreasing.ll
 Transforms/LoopVectorize/lcssa-crashes.ll
 Transforms/LoopVectorize/loop-form.ll
@@ -164,7 +163,6 @@ Transforms/LoopVectorize/reduction-inloop-uf4.ll
 Transforms/LoopVectorize/reduction-minmax-users-and-predicated.ll
 Transforms/LoopVectorize/scalarized_conditional_ops_uncountable_exits.ll
 Transforms/LoopVectorize/select-branch-weights.ll
-Transforms/LoopVectorize/select-cmp-predicated.ll
 Transforms/LoopVectorize/single-early-exit-cond-poison.ll
 Transforms/LoopVectorize/single-early-exit-deref-assumptions.ll
 Transforms/LoopVectorize/single-early-exit-interleave-hint.ll
