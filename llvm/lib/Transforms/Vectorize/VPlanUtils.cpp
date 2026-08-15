@@ -423,6 +423,19 @@ static bool preservesUniformity(unsigned Opcode) {
   }
 }
 
+/// Returns true if \p R preserves uniformity, i.e. if all its operands are
+/// uniform, its result will also be uniform.
+static bool preservesUniformity(const VPReplicateRecipe *R) {
+  // A call with no side-effects that does not read memory returns the same
+  // value for the same arguments. Calls reading memory must be excluded, as the
+  // lanes correspond to different iterations and memory may be modified in
+  // between.
+  if (R->getOpcode() == Instruction::Call)
+    return !R->isPredicated() && !R->mayReadFromMemory() &&
+           !R->mayHaveSideEffects();
+  return preservesUniformity(R->getOpcode());
+}
+
 bool vputils::isElementwise(const VPValue *V) {
   // TODO: Handle more opcodes and recipes.
   if (!isa<VPInstruction, VPWidenRecipe>(V))
@@ -445,8 +458,8 @@ bool vputils::isSingleScalar(const VPValue *VPV) {
     // lanes.
     if (RegionOfR && RegionOfR->isReplicator())
       return false;
-    return Rep->isSingleScalar() || (preservesUniformity(Rep->getOpcode()) &&
-                                     all_of(Rep->operands(), isSingleScalar));
+    return Rep->isSingleScalar() ||
+           (preservesUniformity(Rep) && all_of(Rep->operands(), isSingleScalar));
   }
   if (isa<VPWidenGEPRecipe, VPBlendRecipe>(VPV))
     return all_of(VPV->getDefiningRecipe()->operands(), isSingleScalar);
