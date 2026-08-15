@@ -467,9 +467,7 @@ define double @test_load_used_by_other_load_scev(ptr %ptr.a, ptr %ptr.b, ptr %pt
 ; I64:       [[VECTOR_BODY]]:
 ; I64-NEXT:    [[TMP0:%.*]] = load double, ptr [[PTR_A]], align 8
 ; I64-NEXT:    [[TMP1:%.*]] = fadd double [[TMP0]], 0.000000e+00
-; I64-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x double> poison, double [[TMP1]], i64 0
-; I64-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x double> [[BROADCAST_SPLATINSERT]], <2 x double> poison, <2 x i32> zeroinitializer
-; I64-NEXT:    [[TMP2:%.*]] = fmul <2 x double> [[BROADCAST_SPLAT]], zeroinitializer
+; I64-NEXT:    [[TMP2:%.*]] = fmul double [[TMP1]], 0.000000e+00
 ; I64-NEXT:    br label %[[VECTOR_BODY1:.*]]
 ; I64:       [[VECTOR_BODY1]]:
 ; I64-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_BODY]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY1]] ]
@@ -477,7 +475,6 @@ define double @test_load_used_by_other_load_scev(ptr %ptr.a, ptr %ptr.b, ptr %pt
 ; I64-NEXT:    [[TMP3:%.*]] = icmp eq i64 [[INDEX_NEXT]], 100
 ; I64-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY1]], !llvm.loop [[LOOP8:![0-9]+]]
 ; I64:       [[MIDDLE_BLOCK]]:
-; I64-NEXT:    [[VECTOR_RECUR_EXTRACT:%.*]] = extractelement <2 x double> [[TMP2]], i64 1
 ; I64-NEXT:    br label %[[SCALAR_PH:.*]]
 ; I64:       [[SCALAR_PH]]:
 ;
@@ -567,9 +564,9 @@ define double @test_load_used_by_other_load_scev_low_trip_count(ptr %ptr.a, ptr 
 ; I64:       [[INNER_LOOP]]:
 ; I64-NEXT:    [[TMP0:%.*]] = load double, ptr [[PTR_A]], align 8
 ; I64-NEXT:    [[TMP1:%.*]] = fadd double [[TMP0]], 0.000000e+00
-; I64-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x double> poison, double [[TMP1]], i64 0
+; I64-NEXT:    [[TMP2:%.*]] = fmul double [[TMP1]], 0.000000e+00
+; I64-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x double> poison, double [[TMP2]], i64 0
 ; I64-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x double> [[BROADCAST_SPLATINSERT]], <2 x double> poison, <2 x i32> zeroinitializer
-; I64-NEXT:    [[TMP2:%.*]] = fmul <2 x double> [[BROADCAST_SPLAT]], zeroinitializer
 ; I64-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; I64:       [[VECTOR_BODY]]:
 ; I64-NEXT:    [[IDX_PLUS1:%.*]] = add i64 1, 1
@@ -593,7 +590,7 @@ define double @test_load_used_by_other_load_scev_low_trip_count(ptr %ptr.a, ptr 
 ; I64-NEXT:    [[TMP21:%.*]] = insertelement <2 x double> [[TMP20]], double [[TMP19]], i64 1
 ; I64-NEXT:    br label %[[MIDDLE_BLOCK:.*]]
 ; I64:       [[MIDDLE_BLOCK]]:
-; I64-NEXT:    [[TMP22:%.*]] = shufflevector <2 x double> [[BROADCAST_SPLAT2]], <2 x double> [[TMP2]], <2 x i32> <i32 1, i32 2>
+; I64-NEXT:    [[TMP22:%.*]] = shufflevector <2 x double> [[BROADCAST_SPLAT2]], <2 x double> [[BROADCAST_SPLAT]], <2 x i32> <i32 1, i32 2>
 ; I64-NEXT:    [[TMP23:%.*]] = fmul <2 x double> [[TMP17]], zeroinitializer
 ; I64-NEXT:    [[TMP24:%.*]] = fadd <2 x double> [[TMP23]], zeroinitializer
 ; I64-NEXT:    [[TMP25:%.*]] = fadd <2 x double> [[TMP24]], splat (double 1.000000e+00)

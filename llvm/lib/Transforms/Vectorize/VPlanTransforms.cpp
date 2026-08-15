@@ -1791,110 +1791,153 @@ getUnmaskedDivRemOpcode(Intrinsic::ID ID) {
   }
 }
 
+/// Returns a predicate to check if a user of \p Op introduces extra broadcasts,
+/// i.e. if it uses \p Op as a vector, treating extracts as scalar users.
+static auto introducesBroadcastOf(const VPValue *Op) {
+  return [Op](const VPUser *U) {
+    // Extracts consume Op lane-wise and are folded away when extracting from a
+    // single-scalar operand, so they don't require a broadcast of it.
+    // TODO: Not all extracts are folded for all VF/UF combinations, in which
+    // case the broadcast remains. In particular, extract-lane retains one
+    // source operand per part after unrolling with UF > 1 and is only folded
+    // when extracting from a single source.
+    if (auto *VPI = dyn_cast<VPInstruction>(U))
+      if (is_contained({VPInstruction::ExtractLane,
+                        VPInstruction::ExtractLastLane,
+                        VPInstruction::ExtractLastPart,
+                        VPInstruction::ExtractPenultimateElement},
+                       VPI->getOpcode()))
+        return false;
+    return !U->usesScalars(Op);
+  };
+}
+
+/// Erase \p ToErase, which has been narrowed to \p Replacement, and add all
+/// recipes whose narrowing conditions may have changed to \p Worklist.
+static void eraseNarrowedAndCollectCandidates(VPRecipeBase &ToErase,
+                                              VPValue *Replacement,
+                                              SetVector<VPUser *> &Worklist) {
+  // The users of Replacement now have a single-scalar operand, which may pay
+  // for a broadcast of their result.
+  Worklist.insert_range(Replacement->users());
+
+  auto Ops = to_vector(ToErase.operands());
+  // ToErase may have been re-inserted above, if it uses its own replacement.
+  // Drop it before its memory is freed.
+  Worklist.remove(&ToErase);
+  ToErase.eraseFromParent();
+
+  for (VPValue *Op : Ops) {
+    // Op lost a user, which may make narrowing it profitable.
+    if (VPRecipeBase *DefR = Op->getDefiningRecipe())
+      Worklist.insert(DefR);
+    // Constants never pay for a broadcast, so their users are unaffected.
+    if (isa<VPConstant>(Op))
+      continue;
+    // Once at most one user requiring a broadcast of Op is left, narrowing any
+    // of Op's users may remove that broadcast. As the number of such users only
+    // decreases, this triggers at most once per operand.
+    if (count_if(Op->users(), introducesBroadcastOf(Op)) <= 1)
+      Worklist.insert_range(Op->users());
+  }
+}
+
 static void narrowToSingleScalarRecipes(VPlan &Plan) {
   if (Plan.hasScalarVFOnly())
     return;
 
+  // Seed the worklist with all recipes in forward order, so they get popped in
+  // reverse order, both across and within blocks, and narrowing a recipe can
+  // enable narrowing its operands. Narrowing may also enable narrowing recipes
+  // popped earlier; eraseNarrowedAndCollectCandidates pushes those back onto
+  // the worklist.
+  SetVector<VPUser *> Worklist;
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
-           vp_depth_first_deep(Plan.getEntry()))) {
-    for (VPRecipeBase &R : make_early_inc_range(reverse(*VPBB))) {
-      if (!isa<VPWidenRecipe, VPWidenGEPRecipe, VPReplicateRecipe,
-               VPWidenIntrinsicRecipe>(&R))
-        continue;
-      auto *RepR = dyn_cast<VPReplicateRecipe>(&R);
-      if (RepR && (RepR->isSingleScalar() || RepR->isPredicated()))
-        continue;
+           vp_depth_first_deep(Plan.getEntry())))
+    Worklist.insert_range(make_pointer_range(*VPBB));
 
-      auto *RepOrWidenR = cast<VPRecipeWithIRFlags>(&R);
-      if (RepR && RepR->getOpcode() == Instruction::Store &&
-          vputils::isSingleScalar(RepR->getOperand(1))) {
-        auto *Clone = new VPReplicateRecipe(
-            RepOrWidenR->getUnderlyingInstr(), RepOrWidenR->operands(),
-            true /*IsSingleScalar*/, nullptr /*Mask*/, *RepR /*Flags*/,
-            *RepR /*Metadata*/, RepR->getDebugLoc());
-        Clone->insertBefore(RepOrWidenR);
-        VPBuilder Builder(Clone);
-        VPValue *ExtractOp = Clone->getOperand(0);
-        if (vputils::isUniformAcrossVFsAndUFs(RepR->getOperand(1)))
-          ExtractOp =
-              Builder.createNaryOp(VPInstruction::ExtractLastPart, ExtractOp);
-        ExtractOp =
-            Builder.createNaryOp(VPInstruction::ExtractLastLane, ExtractOp);
-        Clone->setOperand(0, ExtractOp);
-        RepR->eraseFromParent();
-        continue;
-      }
+  while (!Worklist.empty()) {
+    auto &R = *cast<VPRecipeBase>(Worklist.pop_back_val());
+    if (!isa<VPWidenRecipe, VPWidenGEPRecipe, VPReplicateRecipe,
+             VPWidenIntrinsicRecipe>(&R))
+      continue;
+    auto *RepR = dyn_cast<VPReplicateRecipe>(&R);
+    if (RepR && (RepR->isSingleScalar() || RepR->isPredicated()))
+      continue;
 
-      // Narrow llvm.masked.{u,s}{div,rem} intrinsics with a safe divisor.
-      if (auto *IntrR = dyn_cast<VPWidenIntrinsicRecipe>(RepOrWidenR)) {
-        if (!vputils::onlyFirstLaneUsed(IntrR))
-          continue;
-        auto Opc = getUnmaskedDivRemOpcode(IntrR->getVectorIntrinsicID());
-        if (!Opc)
-          continue;
-        VPBuilder Builder(IntrR);
-        VPValue *SafeDivisor = Builder.createSelect(
-            IntrR->getOperand(2), IntrR->getOperand(1),
-            Plan.getConstantInt(IntrR->getScalarType(), 1));
-        VPValue *Clone = Builder.createNaryOp(
-            *Opc, {IntrR->getOperand(0), SafeDivisor},
-            VPIRFlags::getDefaultFlags(*Opc), IntrR->getDebugLoc());
-        IntrR->replaceAllUsesWith(Clone);
-        IntrR->eraseFromParent();
-        continue;
-      }
-
-      // Skip recipes that aren't single scalars.
-      if (!vputils::isSingleScalar(RepOrWidenR))
-        continue;
-
-      // Predicate to check if a user of Op introduces extra broadcasts.
-      auto IntroducesBCastOf = [](const VPValue *Op) {
-        return [Op](const VPUser *U) {
-          if (auto *VPI = dyn_cast<VPInstruction>(U)) {
-            if (is_contained({VPInstruction::ExtractLane,
-                              VPInstruction::ExtractLastLane,
-                              VPInstruction::ExtractLastPart,
-                              VPInstruction::ExtractPenultimateElement},
-                             VPI->getOpcode()))
-              return false;
-          }
-          return !U->usesScalars(Op);
-        };
-      };
-
-      // A vector select uses a single-scalar condition directly, so narrowing
-      // it does not remove a broadcast of the condition.
-      VPValue *SelectCond =
-          vputils::getOpcode(RepOrWidenR) == Instruction::Select
-              ? RepOrWidenR->getOperand(0)
-              : nullptr;
-      if (any_of(RepOrWidenR->users(), IntroducesBCastOf(RepOrWidenR)) &&
-          none_of(RepOrWidenR->operands(), [&](VPValue *Op) {
-            if (Op == SelectCond)
-              return false;
-            if (any_of(
-                    make_filter_range(Op->users(), not_equal_to(RepOrWidenR)),
-                    IntroducesBCastOf(Op)))
-              return false;
-            // Non-constant live-ins require broadcasts, while constants do not
-            // need explicit broadcasts.
-            bool LiveInNeedsBroadcast =
-                isa<VPIRValue>(Op) && !isa<VPConstant>(Op);
-            auto *OpR = dyn_cast<VPReplicateRecipe>(Op);
-            return LiveInNeedsBroadcast || (OpR && OpR->isSingleScalar());
-          }))
-        continue;
-
-      auto *Clone = VPBuilder::createSingleScalarOp(
-          vputils::getOpcode(RepOrWidenR), RepOrWidenR->operands(),
-          /*Mask=*/nullptr, *RepOrWidenR, {}, DebugLoc::getUnknown(),
-          RepOrWidenR->getUnderlyingInstr());
+    auto *RepOrWidenR = cast<VPRecipeWithIRFlags>(&R);
+    if (RepR && RepR->getOpcode() == Instruction::Store &&
+        vputils::isSingleScalar(RepR->getOperand(1))) {
+      auto *Clone = new VPReplicateRecipe(
+          RepOrWidenR->getUnderlyingInstr(), RepOrWidenR->operands(),
+          true /*IsSingleScalar*/, nullptr /*Mask*/, *RepR /*Flags*/,
+          *RepR /*Metadata*/, RepR->getDebugLoc());
       Clone->insertBefore(RepOrWidenR);
-      RepOrWidenR->replaceAllUsesWith(Clone);
-      if (vputils::isDeadRecipe(*RepOrWidenR))
-        RepOrWidenR->eraseFromParent();
+      VPBuilder Builder(Clone);
+      VPValue *ExtractOp = Clone->getOperand(0);
+      if (vputils::isUniformAcrossVFsAndUFs(RepR->getOperand(1)))
+        ExtractOp =
+            Builder.createNaryOp(VPInstruction::ExtractLastPart, ExtractOp);
+      ExtractOp =
+          Builder.createNaryOp(VPInstruction::ExtractLastLane, ExtractOp);
+      Clone->setOperand(0, ExtractOp);
+      eraseNarrowedAndCollectCandidates(*RepR, Clone, Worklist);
+      continue;
     }
+
+    // Narrow llvm.masked.{u,s}{div,rem} intrinsics with a safe divisor.
+    if (auto *IntrR = dyn_cast<VPWidenIntrinsicRecipe>(RepOrWidenR)) {
+      if (!vputils::onlyFirstLaneUsed(IntrR))
+        continue;
+      auto Opc = getUnmaskedDivRemOpcode(IntrR->getVectorIntrinsicID());
+      if (!Opc)
+        continue;
+      VPBuilder Builder(IntrR);
+      VPValue *SafeDivisor =
+          Builder.createSelect(IntrR->getOperand(2), IntrR->getOperand(1),
+                               Plan.getConstantInt(IntrR->getScalarType(), 1));
+      VPValue *Clone = Builder.createNaryOp(
+          *Opc, {IntrR->getOperand(0), SafeDivisor},
+          VPIRFlags::getDefaultFlags(*Opc), IntrR->getDebugLoc());
+      IntrR->replaceAllUsesWith(Clone);
+      eraseNarrowedAndCollectCandidates(*IntrR, Clone, Worklist);
+      continue;
+    }
+
+    // Skip recipes that aren't single scalars.
+    if (!vputils::isSingleScalar(RepOrWidenR))
+      continue;
+
+    // A vector select uses a single-scalar condition directly, so narrowing it
+    // does not remove a broadcast of the condition.
+    VPValue *SelectCond = vputils::getOpcode(RepOrWidenR) == Instruction::Select
+                              ? RepOrWidenR->getOperand(0)
+                              : nullptr;
+    if (any_of(RepOrWidenR->users(), introducesBroadcastOf(RepOrWidenR)) &&
+        none_of(RepOrWidenR->operands(), [&](VPValue *Op) {
+          if (Op == SelectCond)
+            return false;
+          if (any_of(make_filter_range(Op->users(), not_equal_to(RepOrWidenR)),
+                     introducesBroadcastOf(Op)))
+            return false;
+          // Non-constant live-ins require broadcasts, while constants do not
+          // need explicit broadcasts.
+          bool LiveInNeedsBroadcast =
+              isa<VPIRValue>(Op) && !isa<VPConstant>(Op);
+          auto *OpR = dyn_cast<VPReplicateRecipe>(Op);
+          return LiveInNeedsBroadcast || (OpR && OpR->isSingleScalar());
+        }))
+      continue;
+
+    auto *Clone = VPBuilder::createSingleScalarOp(
+        vputils::getOpcode(RepOrWidenR), RepOrWidenR->operands(),
+        /*Mask=*/nullptr, *RepOrWidenR, {}, DebugLoc::getUnknown(),
+        RepOrWidenR->getUnderlyingInstr());
+    Clone->insertBefore(RepOrWidenR);
+    RepOrWidenR->replaceAllUsesWith(Clone);
+    assert(vputils::isDeadRecipe(*RepOrWidenR) &&
+           "narrowed recipe must be dead: no side-effects, all uses replaced");
+    eraseNarrowedAndCollectCandidates(*RepOrWidenR, Clone, Worklist);
   }
 }
 

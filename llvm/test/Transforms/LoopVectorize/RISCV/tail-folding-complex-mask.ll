@@ -16,10 +16,10 @@ define void @test(i64 %n, ptr noalias %src0, ptr noalias %src1, ptr noalias %src
 ; IF-EVL-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 4 x i1> [[BROADCAST_SPLATINSERT]], <vscale x 4 x i1> poison, <vscale x 4 x i32> zeroinitializer
 ; IF-EVL-NEXT:    [[TMP2:%.*]] = xor <vscale x 4 x i1> [[BROADCAST_SPLAT]], splat (i1 true)
 ; IF-EVL-NEXT:    [[TMP0:%.*]] = xor i1 [[C2]], true
-; IF-EVL-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <vscale x 4 x i1> poison, i1 [[TMP0]], i64 0
+; IF-EVL-NEXT:    [[TMP5:%.*]] = or i1 [[C1]], [[TMP0]]
+; IF-EVL-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <vscale x 4 x i1> poison, i1 [[TMP5]], i64 0
 ; IF-EVL-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <vscale x 4 x i1> [[BROADCAST_SPLATINSERT1]], <vscale x 4 x i1> poison, <vscale x 4 x i32> zeroinitializer
-; IF-EVL-NEXT:    [[TMP1:%.*]] = or <vscale x 4 x i1> [[BROADCAST_SPLAT]], [[BROADCAST_SPLAT2]]
-; IF-EVL-NEXT:    [[TMP3:%.*]] = select <vscale x 4 x i1> [[TMP2]], <vscale x 4 x i1> [[TMP1]], <vscale x 4 x i1> zeroinitializer
+; IF-EVL-NEXT:    [[TMP3:%.*]] = select <vscale x 4 x i1> [[TMP2]], <vscale x 4 x i1> [[BROADCAST_SPLAT2]], <vscale x 4 x i1> zeroinitializer
 ; IF-EVL-NEXT:    [[TMP4:%.*]] = or <vscale x 4 x i1> [[BROADCAST_SPLAT]], [[TMP3]]
 ; IF-EVL-NEXT:    [[BROADCAST_SPLATINSERT3:%.*]] = insertelement <vscale x 4 x i1> poison, i1 [[C3]], i64 0
 ; IF-EVL-NEXT:    [[BROADCAST_SPLAT4:%.*]] = shufflevector <vscale x 4 x i1> [[BROADCAST_SPLATINSERT3]], <vscale x 4 x i1> poison, <vscale x 4 x i32> zeroinitializer
@@ -66,10 +66,10 @@ define void @test(i64 %n, ptr noalias %src0, ptr noalias %src1, ptr noalias %src
 ; NO-VP-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <vscale x 4 x i1> [[BROADCAST_SPLATINSERT1]], <vscale x 4 x i1> poison, <vscale x 4 x i32> zeroinitializer
 ; NO-VP-NEXT:    [[TMP6:%.*]] = xor <vscale x 4 x i1> [[BROADCAST_SPLAT2]], splat (i1 true)
 ; NO-VP-NEXT:    [[TMP4:%.*]] = xor i1 [[C2]], true
-; NO-VP-NEXT:    [[BROADCAST_SPLATINSERT3:%.*]] = insertelement <vscale x 4 x i1> poison, i1 [[TMP4]], i64 0
+; NO-VP-NEXT:    [[TMP7:%.*]] = or i1 [[C1]], [[TMP4]]
+; NO-VP-NEXT:    [[BROADCAST_SPLATINSERT3:%.*]] = insertelement <vscale x 4 x i1> poison, i1 [[TMP7]], i64 0
 ; NO-VP-NEXT:    [[BROADCAST_SPLAT4:%.*]] = shufflevector <vscale x 4 x i1> [[BROADCAST_SPLATINSERT3]], <vscale x 4 x i1> poison, <vscale x 4 x i32> zeroinitializer
-; NO-VP-NEXT:    [[TMP9:%.*]] = or <vscale x 4 x i1> [[BROADCAST_SPLAT2]], [[BROADCAST_SPLAT4]]
-; NO-VP-NEXT:    [[TMP10:%.*]] = select <vscale x 4 x i1> [[TMP6]], <vscale x 4 x i1> [[TMP9]], <vscale x 4 x i1> zeroinitializer
+; NO-VP-NEXT:    [[TMP10:%.*]] = select <vscale x 4 x i1> [[TMP6]], <vscale x 4 x i1> [[BROADCAST_SPLAT4]], <vscale x 4 x i1> zeroinitializer
 ; NO-VP-NEXT:    [[TMP8:%.*]] = or <vscale x 4 x i1> [[BROADCAST_SPLAT2]], [[TMP10]]
 ; NO-VP-NEXT:    [[BROADCAST_SPLATINSERT4:%.*]] = insertelement <vscale x 4 x i1> poison, i1 [[C3]], i64 0
 ; NO-VP-NEXT:    [[TMP12:%.*]] = shufflevector <vscale x 4 x i1> [[BROADCAST_SPLATINSERT4]], <vscale x 4 x i1> poison, <vscale x 4 x i32> zeroinitializer
