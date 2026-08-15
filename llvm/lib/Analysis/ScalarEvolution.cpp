@@ -851,7 +851,7 @@ static void GroupByComplexity(SmallVectorImpl<SCEVUse> &Ops, LoopInfo *LI,
     // If there are any objects of the same complexity and same value as this
     // one, group them.
     for (unsigned j = i+1; j != e && Ops[j]->getSCEVType() == Complexity; ++j) {
-      if (Ops[j] == S) { // Found a duplicate.
+      if (Ops[j].getPointer() == S) { // Found a duplicate.
         // Move it to immediately after i'th element.
         std::swap(Ops[i+1], Ops[j]);
         ++i;   // no need to rescan it.
@@ -2573,10 +2573,10 @@ static SCEV::NoWrapFlags StrengthenNoWrapFlags(ScalarEvolution *SE,
   if (Type == scMulExpr && !ScalarEvolution::hasFlags(Flags, SCEV::FlagNUW) &&
       Ops.size() == 2) {
     if (auto *UDiv = dyn_cast<SCEVUDivExpr>(Ops[0]))
-      if (UDiv->getOperand(1) == Ops[1])
+      if (UDiv->getOperand(1).getPointer() == Ops[1].getPointer())
         Flags = ScalarEvolution::setFlags(Flags, SCEV::FlagNUW);
     if (auto *UDiv = dyn_cast<SCEVUDivExpr>(Ops[1]))
-      if (UDiv->getOperand(1) == Ops[0])
+      if (UDiv->getOperand(1).getPointer() == Ops[0].getPointer())
         Flags = ScalarEvolution::setFlags(Flags, SCEV::FlagNUW);
   }
 
@@ -2660,10 +2660,10 @@ const SCEV *ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
   Type *Ty = Ops[0]->getType();
   bool FoundMatch = false;
   for (unsigned i = 0, e = Ops.size(); i != e-1; ++i)
-    if (Ops[i] == Ops[i+1]) {      //  X + Y + Y  -->  X + Y*2
+    if (Ops[i].getPointer() == Ops[i + 1].getPointer()) { // X + Y + Y -> X + Y*2
       // Scan ahead to count how many equal operands there are.
       unsigned Count = 2;
-      while (i+Count != e && Ops[i+Count] == Ops[i])
+      while (i + Count != e && Ops[i + Count].getPointer() == Ops[i].getPointer())
         ++Count;
       // Merge the values into a multiply.
       SCEVUse Scale = getConstant(Ty, Count);
@@ -2909,7 +2909,7 @@ const SCEV *ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
       SmallVector<SCEVUse, 4> Cofactors;
       SmallVector<unsigned, 4> DeadIndices;
       for (unsigned AddOp = 0, e = Ops.size(); AddOp != e; ++AddOp) {
-        if (MulOpSCEV == Ops[AddOp]) {
+        if (Ops[AddOp].getPointer() == MulOpSCEV) {
           // W + X + (X * Y * Z)  -->  W + (X * ((Y*Z)+1))
           Cofactors.push_back(getOne(Ty));
           DeadIndices.push_back(AddOp);
@@ -2922,7 +2922,7 @@ const SCEV *ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
         const SCEVMulExpr *OtherMul = cast<SCEVMulExpr>(Ops[AddOp]);
         for (unsigned OMulOp = 0, OE = OtherMul->getNumOperands(); OMulOp != OE;
              ++OMulOp) {
-          if (OtherMul->getOperand(OMulOp) == MulOpSCEV) {
+          if (OtherMul->getOperand(OMulOp).getPointer() == MulOpSCEV) {
             // (A*B*C) + (A*D*E)  -->  A * (B*C + D*E)
             Cofactors.push_back(StripFactor(OtherMul, OMulOp));
             DeadIndices.push_back(AddOp);
@@ -2971,10 +2971,16 @@ const SCEV *ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
     SmallVector<SCEVUse, 8> LIOps;
     const SCEVAddRecExpr *AddRec = cast<SCEVAddRecExpr>(Ops[Idx]);
     const Loop *AddRecLoop = AddRec->getLoop();
+    // Track where the recurrence ends up; the erases below shift later operands
+    // down. It must not be located by scanning for it afterwards, as an operand
+    // carrying use-specific flags would not compare equal to the bare pointer.
+    unsigned AddRecIdx = Idx;
     for (unsigned i = 0, e = Ops.size(); i != e; ++i)
       if (isAvailableAtLoopEntry(Ops[i], AddRecLoop)) {
         LIOps.push_back(Ops[i]);
         Ops.erase(Ops.begin()+i);
+        if (i < AddRecIdx)
+          --AddRecIdx;
         --i; --e;
       }
 
@@ -3021,11 +3027,8 @@ const SCEV *ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
       if (Ops.size() == 1) return NewRec;
 
       // Otherwise, add the folded AddRec by the non-invariant parts.
-      for (unsigned i = 0;; ++i)
-        if (Ops[i] == AddRec) {
-          Ops[i] = NewRec;
-          break;
-        }
+      assert(Ops[AddRecIdx].getPointer() == AddRec && "lost the addrec");
+      Ops[AddRecIdx] = NewRec;
       return getAddExpr(Ops, SCEV::FlagAnyWrap, Depth + 1);
     }
 
@@ -3373,10 +3376,14 @@ const SCEV *ScalarEvolution::getMulExpr(SmallVectorImpl<SCEVUse> &Ops,
     // if they are loop invariant w.r.t. the recurrence.
     SmallVector<SCEVUse, 8> LIOps;
     const SCEVAddRecExpr *AddRec = cast<SCEVAddRecExpr>(Ops[Idx]);
+    // See the comment in getAddExpr: track the index rather than scanning.
+    unsigned AddRecIdx = Idx;
     for (unsigned i = 0, e = Ops.size(); i != e; ++i)
       if (isAvailableAtLoopEntry(Ops[i], AddRec->getLoop())) {
         LIOps.push_back(Ops[i]);
         Ops.erase(Ops.begin()+i);
+        if (i < AddRecIdx)
+          --AddRecIdx;
         --i; --e;
       }
 
@@ -3413,11 +3420,8 @@ const SCEV *ScalarEvolution::getMulExpr(SmallVectorImpl<SCEVUse> &Ops,
       if (Ops.size() == 1) return NewRec;
 
       // Otherwise, multiply the folded AddRec by the non-invariant parts.
-      for (unsigned i = 0;; ++i)
-        if (Ops[i] == AddRec) {
-          Ops[i] = NewRec;
-          break;
-        }
+      assert(Ops[AddRecIdx].getPointer() == AddRec && "lost the addrec");
+      Ops[AddRecIdx] = NewRec;
       return getMulExpr(Ops, SCEV::FlagAnyWrap, Depth + 1);
     }
 
@@ -4073,7 +4077,7 @@ const SCEV *ScalarEvolution::getMinMaxExpr(SCEVTypes Kind,
   llvm::CmpInst::Predicate FirstPred = IsMax ? GEPred : LEPred;
   llvm::CmpInst::Predicate SecondPred = IsMax ? LEPred : GEPred;
   for (unsigned i = 0, e = Ops.size() - 1; i != e; ++i) {
-    if (Ops[i] == Ops[i + 1] ||
+    if (Ops[i].getPointer() == Ops[i + 1].getPointer() ||
         isKnownViaNonRecursiveReasoning(FirstPred, Ops[i], Ops[i + 1])) {
       //  X op Y op Y  -->  X op Y
       //  X op Y       -->  X, if we know X, Y are ordered appropriately
