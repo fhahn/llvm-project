@@ -793,8 +793,19 @@ Value *VPInstruction::generate(VPTransformState &State) {
                   OnlyFirstLaneUsed || vputils::isSingleScalar(getOperand(0)));
     Value *Op1 = State.get(getOperand(1), OnlyFirstLaneUsed);
     Value *Op2 = State.get(getOperand(2), OnlyFirstLaneUsed);
-    return Builder.CreateSelectFMF(Cond, Op1, Op2, getFastMathFlagsOrNone(),
-                                   Name);
+    Value *Sel =
+        Builder.CreateSelectFMF(Cond, Op1, Op2, getFastMathFlagsOrNone(), Name);
+    // Branch weights describe the probability of the condition, so they are only
+    // meaningful while it is scalar. The vectorizer creates these selects itself,
+    // so unless the probability was recorded on the recipe it has none to give.
+    if (auto *I = dyn_cast<Instruction>(Sel);
+        I && !Cond->getType()->isVectorTy()) {
+      if (MDNode *BW = getMetadata(LLVMContext::MD_prof))
+        I->setMetadata(LLVMContext::MD_prof, BW);
+      else
+        setExplicitlyUnknownBranchWeightsIfProfiled(*I, DEBUG_TYPE);
+    }
+    return Sel;
   }
   case VPInstruction::ActiveLaneMask:
   case VPInstruction::WideActiveLaneMask: {
@@ -859,7 +870,7 @@ Value *VPInstruction::generate(VPTransformState &State) {
     Value *Cmp =
         Builder.CreateICmp(CmpInst::Predicate::ICMP_UGT, ScalarTC, VFxUF);
     Value *Zero = ConstantInt::getNullValue(ScalarTC->getType());
-    return Builder.CreateSelect(Cmp, Sub, Zero);
+    return Builder.CreateSelectWithUnknownProfile(Cmp, Sub, Zero, DEBUG_TYPE);
   }
   case VPInstruction::ExplicitVectorLength: {
     // TODO: Restructure this code with an explicit remainder loop, vsetvli can
@@ -1056,7 +1067,7 @@ Value *VPInstruction::generate(VPTransformState &State) {
                              State.get(getOperand(Idx)), VectorIdx);
       if (Res) {
         Value *Cmp = Builder.CreateICmpUGE(LaneToExtract, VectorStart);
-        Res = Builder.CreateSelect(Cmp, Ext, Res);
+        Res = Builder.CreateSelectWithUnknownProfile(Cmp, Ext, Res, DEBUG_TYPE);
       } else {
         Res = Ext;
       }
@@ -1091,7 +1102,8 @@ Value *VPInstruction::generate(VPTransformState &State) {
           TrailingZeros);
       if (Res) {
         Value *Cmp = Builder.CreateICmpNE(TrailingZeros, RuntimeVF);
-        Res = Builder.CreateSelect(Cmp, Current, Res);
+        Res = Builder.CreateSelectWithUnknownProfile(Cmp, Current, Res,
+                                                    DEBUG_TYPE);
       } else {
         Res = Current;
       }
@@ -1111,7 +1123,8 @@ Value *VPInstruction::generate(VPTransformState &State) {
       Type *VTy = Data->getType();
 
       if (State.VF.isScalar())
-        Result = Builder.CreateSelect(Mask, Data, Result);
+        Result = Builder.CreateSelectWithUnknownProfile(Mask, Data, Result,
+                                                       DEBUG_TYPE);
       else
         Result = Builder.CreateIntrinsic(
             Intrinsic::experimental_vector_extract_last_active, {VTy},

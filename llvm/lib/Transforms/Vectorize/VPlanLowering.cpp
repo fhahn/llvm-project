@@ -879,7 +879,7 @@ void VPlanTransforms::materializePacksAndUnpacks(VPlan &Plan) {
 void VPlanTransforms::materializeVectorTripCount(
     VPlan &Plan, VPBasicBlock *VectorPHVPBB, bool TailByMasking,
     bool RequiresScalarEpilogue, VPValue *Step,
-    std::optional<uint64_t> MaxRuntimeStep) {
+    std::optional<uint64_t> MaxRuntimeStep, unsigned EstimatedVFxUF) {
   VPSymbolicValue &VectorTC = Plan.getVectorTripCount();
   // There's nothing to do if there are no users of the vector trip count or its
   // IR value has already been set.
@@ -940,6 +940,16 @@ void VPlanTransforms::materializeVectorTripCount(
     VPValue *IsZero =
         Builder.createICmp(CmpInst::ICMP_EQ, R, Plan.getZero(TCTy));
     R = Builder.createSelect(IsZero, Step, R);
+    // The select rounds the vector trip count down by a whole step where the
+    // trip count is a multiple of it. That is the same event the middle block's
+    // terminator branches on, so assume `TripCount % EstimatedVFxUF` to be
+    // equally distributed here as well.
+    if (EstimatedVFxUF > 1) {
+      MDBuilder MDB(Plan.getContext());
+      cast<VPInstruction>(R)->setMetadata(
+          LLVMContext::MD_prof,
+          MDB.createBranchWeights(1, EstimatedVFxUF - 1));
+    }
   }
 
   VPValue *Res =

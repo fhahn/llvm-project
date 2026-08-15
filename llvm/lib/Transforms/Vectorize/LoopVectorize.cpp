@@ -6035,7 +6035,10 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
          "loops not exiting via the latch without required epilogue?");
   VPlanTransforms::materializeVectorTripCount(
       BestVPlan, VectorPH, HasTailFolded, RequiresScalarEpilogue,
-      &BestVPlan.getVFxUF(), MaxRuntimeStep);
+      &BestVPlan.getVFxUF(), MaxRuntimeStep,
+      HasBranchWeights
+          ? estimateElementCount(BestVF * BestUF, Config.getVScaleForTuning())
+          : 0);
   VPlanTransforms::materializeFactors(BestVPlan, VectorPH, BestVF);
   // Limit expansions to VPInstruction to when not vectorizing the epilogue.
   // Currently this code path still relies on code re-using SCEVs expanded
@@ -7690,8 +7693,8 @@ static SmallVector<Instruction *> preparePlanForEpilogueVectorLoop(
           Value *Cmp = Builder.CreateICmpEQ(ResumeV, StartV);
           if (auto *I = dyn_cast<Instruction>(Cmp))
             InstsToMove.push_back(I);
-          ResumeV = Builder.CreateSelect(Cmp, SentinelVPV->getLiveInIRValue(),
-                                         ResumeV);
+          ResumeV = Builder.CreateSelectWithUnknownProfile(
+              Cmp, SentinelVPV->getLiveInIRValue(), ResumeV, DEBUG_TYPE);
           if (auto *I = dyn_cast<Instruction>(ResumeV))
             InstsToMove.push_back(I);
         }
