@@ -124,7 +124,6 @@ Transforms/LoopVectorize/ARM/optsize_minsize.ll
 Transforms/LoopVectorize/ARM/prefer-tail-loop-folding.ll
 Transforms/LoopVectorize/SystemZ/branch-for-predicated-block.ll
 Transforms/LoopVectorize/SystemZ/force-target-instruction-cost.ll
-Transforms/LoopVectorize/SystemZ/load-scalarization-cost-0.ll
 Transforms/LoopVectorize/SystemZ/pr38110.ll
 Transforms/LoopVectorize/SystemZ/pr47665.ll
 Transforms/LoopVectorize/SystemZ/predicated-first-order-recurrence.ll
@@ -250,8 +249,6 @@ Transforms/LoopVectorize/outer_loop_scalable.ll
 Transforms/LoopVectorize/outer_loop_test1.ll
 Transforms/LoopVectorize/outer_loop_test2.ll
 Transforms/LoopVectorize/pointer-induction.ll
-Transforms/LoopVectorize/pr30654-phiscev-sext-trunc.ll
-Transforms/LoopVectorize/pr33706.ll
 Transforms/LoopVectorize/pr37248.ll
 Transforms/LoopVectorize/pr39099.ll
 Transforms/LoopVectorize/pr44488-predication.ll
