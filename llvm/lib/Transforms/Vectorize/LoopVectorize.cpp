@@ -5918,6 +5918,36 @@ LoopVectorizationPlanner::computeBestVF() {
   return {BestFactor, &BestPlan};
 }
 
+/// Returns the estimated trip count of \p L, and if \p InvocationWeight is
+/// non-null, sets it to the weight of the latch's exit edge.
+///
+/// getLoopEstimatedTripCount returns std::nullopt for an explicit estimated
+/// trip count of 0, so that its users can assume it either returns a positive
+/// count or nothing. Vectorizing a loop leaves exactly such a 0 estimate on its
+/// remainder loop whenever the estimate is a multiple of the vector loop's
+/// step. Recover it here, so the remainder loop is treated as estimated not to
+/// be entered instead of as having no estimate at all; the latter would leave
+/// the loops it in turn is vectorized into without any profile information.
+///
+/// Only loops whose latch has branch weights, which are also the ones whose
+/// weights there is anything to update, are supported, and that is what
+/// getLoopEstimatedTripCount setting the invocation weight indicates. Unlike
+/// getLoopEstimatedTripCount, this hence returns std::nullopt for a loop that
+/// carries an estimated trip count in metadata only. Checking for an explicit 0
+/// on top of that is redundant, but spells out which case is recovered.
+static std::optional<unsigned>
+getLoopEstimatedTripCountOrZero(Loop *L, unsigned *InvocationWeight = nullptr) {
+  unsigned LocalWeight = 0;
+  if (!InvocationWeight)
+    InvocationWeight = &LocalWeight;
+  std::optional<unsigned> TripCount =
+      getLoopEstimatedTripCount(L, InvocationWeight);
+  if (!TripCount && *InvocationWeight != 0 &&
+      getOptionalIntLoopAttribute(L, LLVMLoopEstimatedTripCount) == 0)
+    TripCount = 0;
+  return TripCount;
+}
+
 DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
     ElementCount BestVF, unsigned BestUF, VPlan &BestVPlan,
     InnerLoopVectorizer &ILV, DominatorTree *DT,
@@ -6083,7 +6113,7 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   MDNode *LID = OrigLoop->getLoopID();
   unsigned OrigLoopInvocationWeight = 0;
   std::optional<unsigned> OrigAverageTripCount =
-      getLoopEstimatedTripCount(OrigLoop, &OrigLoopInvocationWeight);
+      getLoopEstimatedTripCountOrZero(OrigLoop, &OrigLoopInvocationWeight);
 
   BestVPlan.execute(&State);
 

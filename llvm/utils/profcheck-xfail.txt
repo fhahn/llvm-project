@@ -234,7 +234,6 @@ Transforms/LoopVectorize/as_cast.ll
 Transforms/LoopVectorize/bfi-stale-crash.ll
 Transforms/LoopVectorize/bounded-load-multi-exit.ll
 Transforms/LoopVectorize/bounded-load-predicated.ll
-Transforms/LoopVectorize/branch-weights.ll
 Transforms/LoopVectorize/cast-costs.ll
 Transforms/LoopVectorize/cast-induction.ll
 Transforms/LoopVectorize/conditional-scalar-assignment-interleave-only.ll
