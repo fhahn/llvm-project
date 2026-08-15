@@ -6880,6 +6880,11 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan,
          "entry block must be set to a VPRegionBlock having a non-empty entry "
          "VPBasicBlock");
 
+  // All recipes of the predicated blocks have been created now, so the branch
+  // weights recorded on them during predication can be dropped from everything
+  // that will not be guarded by a branch.
+  RUN_VPLAN_PASS(VPlanTransforms::dropBranchWeightsFromUnguardedRecipes, *Plan);
+
   RUN_VPLAN_PASS(VPlanTransforms::adjustFirstOrderRecurrenceMiddleUsers, *Plan,
                  Range);
 
