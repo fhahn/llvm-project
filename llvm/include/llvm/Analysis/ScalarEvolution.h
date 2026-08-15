@@ -808,6 +808,13 @@ public:
     SmallVector<SCEVUse, 3> Ops = {Op0, Op1, Op2};
     return getMulExpr(Ops, Flags, Depth);
   }
+  /// Return `LHS * RHS`, with \p UseFlags attached to the result as
+  /// use-specific flags - but only if nothing was folded, i.e. the result
+  /// really is the two-operand multiply of \p LHS and \p RHS. See the add
+  /// counterpart above for why that restriction is required.
+  LLVM_ABI SCEVUse getMulExpr(SCEVUse LHS, SCEVUse RHS,
+                              SCEV::NoWrapFlags Flags,
+                              SCEV::NoWrapFlags UseFlags);
   LLVM_ABI const SCEV *getUDivExpr(SCEVUse LHS, SCEVUse RHS);
   LLVM_ABI const SCEV *getUDivExactExpr(SCEVUse LHS, SCEVUse RHS);
   LLVM_ABI const SCEV *getURemExpr(SCEVUse LHS, SCEVUse RHS);

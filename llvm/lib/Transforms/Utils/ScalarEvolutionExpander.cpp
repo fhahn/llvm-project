@@ -377,7 +377,7 @@ Value *SCEVExpander::InsertBinop(Instruction::BinaryOps Opcode,
 /// loop-invariant portions of expressions, after considering what
 /// can be folded using target addressing modes.
 ///
-Value *SCEVExpander::expandAddToGEP(const SCEV *Offset, Value *V,
+Value *SCEVExpander::expandAddToGEP(SCEVUse Offset, Value *V,
                                     SCEV::NoWrapFlags Flags) {
   assert(!isa<Instruction>(V) ||
          SE.DT.dominates(cast<Instruction>(V), &*Builder.GetInsertPoint()));
@@ -539,8 +539,8 @@ Value *SCEVExpander::visitAddExpr(SCEVUseT<const SCEVAddExpr *> S) {
   // Iterate in reverse so that constants are emitted last, all else equal, and
   // so that pointer operands are inserted first, which the code below relies on
   // to form more involved GEPs.
-  SmallVector<std::pair<const Loop *, const SCEV *>, 8> OpsAndLoops;
-  for (const SCEV *Op : reverse(S->operands()))
+  SmallVector<std::pair<const Loop *, SCEVUse>, 8> OpsAndLoops;
+  for (SCEVUse Op : reverse(S->operands()))
     OpsAndLoops.push_back(std::make_pair(getRelevantLoop(Op), Op));
 
   // Sort by loop. Use a stable sort so that constants follow non-constants and
@@ -552,7 +552,7 @@ Value *SCEVExpander::visitAddExpr(SCEVUseT<const SCEVAddExpr *> S) {
   Value *Sum = nullptr;
   for (auto I = OpsAndLoops.begin(), E = OpsAndLoops.end(); I != E;) {
     const Loop *CurLoop = I->first;
-    const SCEV *Op = I->second;
+    SCEVUse Op = I->second;
     if (!Sum) {
       // This is the first operand. Just expand it.
       Sum = expand(Op);
@@ -568,7 +568,7 @@ Value *SCEVExpander::visitAddExpr(SCEVUseT<const SCEVAddExpr *> S) {
       for (; I != E && I->first == CurLoop; ++I) {
         // If the operand is SCEVUnknown and not instructions, peek through
         // it, to enable more of it to be folded into the GEP.
-        const SCEV *X = I->second;
+        SCEVUse X = I->second;
         if (const SCEVUnknown *U = dyn_cast<SCEVUnknown>(X))
           if (!isa<Instruction>(U->getValue()))
             X = SE.getSCEV(U->getValue());
@@ -617,8 +617,8 @@ Value *SCEVExpander::visitMulExpr(SCEVUseT<const SCEVMulExpr *> S) {
 
   // Collect all the mul operands in a loop, along with their associated loops.
   // Iterate in reverse so that constants are emitted last, all else equal.
-  SmallVector<std::pair<const Loop *, const SCEV *>, 8> OpsAndLoops;
-  for (const SCEV *Op : reverse(S->operands()))
+  SmallVector<std::pair<const Loop *, SCEVUse>, 8> OpsAndLoops;
+  for (SCEVUse Op : reverse(S->operands()))
     OpsAndLoops.push_back(std::make_pair(getRelevantLoop(Op), Op));
 
   // Sort by loop. Use a stable sort so that constants follow non-constants.
@@ -1632,7 +1632,11 @@ Value *SCEVExpander::FindValueInExprValueMap(
   if (isa<SCEVConstant>(S) || isa<SCEVUnknown>(S))
     return nullptr;
 
-  for (Value *V : SE.getSCEVValues(S)) {
+  // Look for a value computing the canonical expression. Use-specific flags on
+  // the operands make this a distinct expression, but they are only extra
+  // knowledge about the same value, so an existing value still computes it -
+  // reusing it just does not get those flags onto the reused instruction.
+  for (Value *V : SE.getSCEVValues(S->getCanonical())) {
     Instruction *EntInst = dyn_cast<Instruction>(V);
     if (!EntInst)
       continue;

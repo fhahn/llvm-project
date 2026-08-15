@@ -277,7 +277,9 @@ void SCEV::computeAndSetCanonical(ScalarEvolution &SE) {
   SmallVector<SCEVUse, 4> CanonOps;
   for (SCEVUse Op : operands()) {
     CanonOps.push_back(Op->getCanonical());
-    Changed |= CanonOps.back() != Op.getPointer();
+    // An operand carrying use-specific flags also makes this expression
+    // non-canonical: the canonical form is built from the bare operands.
+    Changed |= CanonOps.back() != Op.getPointer() || Op.hasUseFlags();
   }
 
   if (!Changed) {
@@ -1062,19 +1064,24 @@ SCEVUse SCEVAddRecExpr::evaluateAtIteration(ArrayRef<SCEVUse> Operands,
     if (isa<SCEVCouldNotCompute>(Coeff))
       return Coeff;
 
-    // Build the closed form itself without flags. It is a uniqued, shared node
-    // whose scope is wherever its operands are defined, while the flags only
-    // hold where the recurrence really reached this iteration; they are
-    // attached to the returned use below instead.
-    // Do not set the flags on the shared node: its scope is wherever the
+    // The sum stays in range whenever the recurrence did, but the multiply on
+    // its own only does so if the iteration count is non-negative as a signed
+    // value of this type. A FlagNSW recurrence with non-positive Start and Step
+    // only bounds the count by 2^(W-1), and at exactly that count Step * Coeff
+    // leaves the signed range: for {0,+,-1} of width W the product is -1 * SMIN.
+    SCEV::NoWrapFlags MulFlags = Flags;
+    if (ScalarEvolution::hasFlags(MulFlags, SCEV::FlagNSW) &&
+        !SE.isKnownNonNegative(Coeff))
+      MulFlags = ScalarEvolution::clearFlags(MulFlags, SCEV::FlagNSW);
+
+    // Do not set these flags on the shared nodes: their scope is wherever the
     // operands are defined, while the flags only hold where the recurrence
     // really reached this iteration. Pass them as use flags instead, which only
-    // get attached if the sum was not folded: they hold for
-    // `Start + (Step * It)`, and for nothing else.
-    Result = SE.getAddExpr(
-        Result, SE.getMulExpr(Operands[i].getPointer(), Coeff,
-                              SCEV::FlagAnyWrap),
-        SCEV::FlagAnyWrap, Flags);
+    // get attached if the expression was not folded: they hold for `Step * It`
+    // and for `Start + (Step * It)`, and for nothing else.
+    SCEVUse Mul = SE.getMulExpr(Operands[i].getPointer(), Coeff,
+                                SCEV::FlagAnyWrap, MulFlags);
+    Result = SE.getAddExpr(Result, Mul, SCEV::FlagAnyWrap, Flags);
   }
   return Result;
 }
@@ -2609,6 +2616,15 @@ SCEVUse ScalarEvolution::getAddExpr(SCEVUse LHS, SCEVUse RHS,
   return getUseWithFlags(Res, UseFlags);
 }
 
+SCEVUse ScalarEvolution::getMulExpr(SCEVUse LHS, SCEVUse RHS,
+                                    SCEV::NoWrapFlags Flags,
+                                    SCEV::NoWrapFlags UseFlags) {
+  const SCEV *Res = getMulExpr(LHS, RHS, Flags);
+  if (!isBinExprOf<SCEVMulExpr>(Res, LHS, RHS))
+    return Res;
+  return getUseWithFlags(Res, UseFlags);
+}
+
 /// Get a canonical add expression, or something simpler if possible.
 const SCEV *ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
                                        SCEV::NoWrapFlags OrigFlags,
@@ -3083,8 +3099,8 @@ const SCEV *ScalarEvolution::getOrCreateAddExpr(ArrayRef<SCEVUse> Ops,
                                                 SCEV::NoWrapFlags Flags) {
   FoldingSetNodeID ID;
   ID.AddInteger(scAddExpr);
-  for (const SCEV *Op : Ops)
-    ID.AddPointer(Op);
+  for (SCEVUse Op : Ops)
+    ID.AddPointer(Op.getOpaqueValue());
   void *IP = nullptr;
   SCEVAddExpr *S =
       static_cast<SCEVAddExpr *>(UniqueSCEVs.FindNodeOrInsertPos(ID, IP));
@@ -3106,8 +3122,8 @@ const SCEV *ScalarEvolution::getOrCreateAddRecExpr(ArrayRef<SCEVUse> Ops,
                                                    SCEV::NoWrapFlags Flags) {
   FoldingSetNodeID ID;
   ID.AddInteger(scAddRecExpr);
-  for (const SCEV *Op : Ops)
-    ID.AddPointer(Op);
+  for (SCEVUse Op : Ops)
+    ID.AddPointer(Op.getOpaqueValue());
   ID.AddPointer(L);
   void *IP = nullptr;
   SCEVAddRecExpr *S =
@@ -3130,8 +3146,8 @@ const SCEV *ScalarEvolution::getOrCreateMulExpr(ArrayRef<SCEVUse> Ops,
                                                 SCEV::NoWrapFlags Flags) {
   FoldingSetNodeID ID;
   ID.AddInteger(scMulExpr);
-  for (const SCEV *Op : Ops)
-    ID.AddPointer(Op);
+  for (SCEVUse Op : Ops)
+    ID.AddPointer(Op.getOpaqueValue());
   void *IP = nullptr;
   SCEVMulExpr *S =
     static_cast<SCEVMulExpr *>(UniqueSCEVs.FindNodeOrInsertPos(ID, IP));
@@ -3979,8 +3995,8 @@ SCEV *ScalarEvolution::findExistingSCEVInCache(SCEVTypes SCEVType,
                                                ArrayRef<SCEVUse> Ops) {
   FoldingSetNodeID ID;
   ID.AddInteger(SCEVType);
-  for (const SCEV *Op : Ops)
-    ID.AddPointer(Op);
+  for (SCEVUse Op : Ops)
+    ID.AddPointer(Op.getOpaqueValue());
   void *IP = nullptr;
   return UniqueSCEVs.FindNodeOrInsertPos(ID, IP);
 }
@@ -4101,8 +4117,8 @@ const SCEV *ScalarEvolution::getMinMaxExpr(SCEVTypes Kind,
   // already have one, otherwise create a new one.
   FoldingSetNodeID ID;
   ID.AddInteger(Kind);
-  for (const SCEV *Op : Ops)
-    ID.AddPointer(Op);
+  for (SCEVUse Op : Ops)
+    ID.AddPointer(Op.getOpaqueValue());
   void *IP = nullptr;
   const SCEV *ExistingSCEV = UniqueSCEVs.FindNodeOrInsertPos(ID, IP);
   if (ExistingSCEV)
@@ -4488,8 +4504,8 @@ ScalarEvolution::getSequentialMinMaxExpr(SCEVTypes Kind,
   // already have one, otherwise create a new one.
   FoldingSetNodeID ID;
   ID.AddInteger(Kind);
-  for (const SCEV *Op : Ops)
-    ID.AddPointer(Op);
+  for (SCEVUse Op : Ops)
+    ID.AddPointer(Op.getOpaqueValue());
   void *IP = nullptr;
   const SCEV *ExistingSCEV = UniqueSCEVs.FindNodeOrInsertPos(ID, IP);
   if (ExistingSCEV)

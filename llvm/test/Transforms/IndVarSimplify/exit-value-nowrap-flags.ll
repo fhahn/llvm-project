@@ -20,7 +20,7 @@ define i32 @nuw_kept(i32 %start, i32 %step, i32 %n) {
 ; CHECK:       latch:
 ; CHECK-NEXT:    br label [[LOOP]]
 ; CHECK:       exit:
-; CHECK-NEXT:    [[TMP0:%.*]] = mul i32 [[N:%.*]], [[STEP:%.*]]
+; CHECK-NEXT:    [[TMP0:%.*]] = mul nuw i32 [[N:%.*]], [[STEP:%.*]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = add nuw i32 [[START:%.*]], [[TMP0]]
 ; CHECK-NEXT:    ret i32 [[TMP1]]
 ;
@@ -55,7 +55,7 @@ define i32 @nsw_kept_same_sign(i32 %start.in, i32 %step.in, i32 %n) {
 ; CHECK:       latch:
 ; CHECK-NEXT:    br label [[LOOP]]
 ; CHECK:       exit:
-; CHECK-NEXT:    [[TMP0:%.*]] = mul i32 [[N:%.*]], [[STEP]]
+; CHECK-NEXT:    [[TMP0:%.*]] = mul nuw i32 [[N:%.*]], [[STEP]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = add nuw nsw i32 [[TMP0]], [[START]]
 ; CHECK-NEXT:    ret i32 [[TMP1]]
 ;

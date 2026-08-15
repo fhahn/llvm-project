@@ -6,8 +6,8 @@
 ; SCEVUse only. Anything that reads flags off an operand -- or off a node the
 ; expression is later rebuilt from -- does not see them.
 ;
-; These are missed optimisations, not miscompiles: every flag below is valid,
-; SCEV just does not carry it. See the FIXMEs.
+; This is a missed optimisation, not a miscompile: the flag below is valid,
+; SCEV just does not carry it. See the FIXME.
 
 ; FIXME: the multiply (BTC * 24) forming the exit value is nuw -- the recurrence
 ; is nuw and does reach that iteration -- but the flag is dropped because
@@ -44,72 +44,4 @@ exit:
 
 done:
   ret ptr %first
-}
-
-; FIXME: %i.1's start is loop1's exit value, which is nuw. Adding 4 to it in the
-; exit block cannot unsigned-wrap, but the exit value's use-specific flag is not
-; visible once it becomes the start of the second recurrence.
-define i1 @exit_value_feeds_second_loop(i64 %depth, i64 %rows, i1 %c) {
-; CHECK-LABEL: 'exit_value_feeds_second_loop'
-; CHECK-NEXT:  Classifying expressions for: @exit_value_feeds_second_loop
-; CHECK-NEXT:    %i.0 = phi i64 [ 0, %entry ], [ %add33, %loop1.latch ]
-; CHECK-NEXT:    --> {0,+,6}<nuw><nsw><%loop1> U: [0,-9223372036854775808) S: [0,9223372036854775807) Exits: <<Unknown>> LoopDispositions: { %loop1: Computable }
-; CHECK-NEXT:    %sub = sub i64 %rows, %depth
-; CHECK-NEXT:    --> ((-1 * %depth) + %rows) U: full-set S: full-set Exits: ((-1 * %depth) + %rows) LoopDispositions: { %loop1: Invariant }
-; CHECK-NEXT:    %add33 = add nsw i64 %i.0, 6
-; CHECK-NEXT:    --> {6,+,6}<nuw><%loop1> U: [6,-3) S: [-9223372036854775808,9223372036854775807) Exits: <<Unknown>> LoopDispositions: { %loop1: Computable }
-; CHECK-NEXT:    %i.1 = phi i64 [ %add59, %loop2.latch ], [ %i.0, %loop2.preheader ]
-; CHECK-NEXT:    --> {{\{\{}}0,+,6}<nuw><nsw><%loop1>,+,4}<nuw><nsw><%loop2> U: [0,-9223372036854775808) S: [0,9223372036854775807) Exits: <<Unknown>> LoopDispositions: { %loop2: Computable }
-; CHECK-NEXT:    %add59 = add nsw i64 %i.1, 4
-; CHECK-NEXT:    --> {{\{\{}}4,+,6}<nuw><%loop1>,+,4}<nuw><%loop2> U: [4,-1) S: [-9223372036854775808,9223372036854775807) Exits: <<Unknown>> LoopDispositions: { %loop2: Computable }
-; CHECK-NEXT:  Determining loop execution counts for: @exit_value_feeds_second_loop
-; CHECK-NEXT:  Loop %loop2: <multiple exits> Unpredictable backedge-taken count.
-; CHECK-NEXT:    exit count for loop2: ***COULDNOTCOMPUTE***
-; CHECK-NEXT:    exit count for loop2.body: ***COULDNOTCOMPUTE***
-; CHECK-NEXT:  Loop %loop2: Unpredictable constant max backedge-taken count.
-; CHECK-NEXT:  Loop %loop2: Unpredictable symbolic max backedge-taken count.
-; CHECK-NEXT:    symbolic max exit count for loop2: ***COULDNOTCOMPUTE***
-; CHECK-NEXT:    symbolic max exit count for loop2.body: ***COULDNOTCOMPUTE***
-; CHECK-NEXT:  Loop %loop1: <multiple exits> Unpredictable backedge-taken count.
-; CHECK-NEXT:    exit count for loop1: ***COULDNOTCOMPUTE***
-; CHECK-NEXT:    exit count for loop1.body: ***COULDNOTCOMPUTE***
-; CHECK-NEXT:  Loop %loop1: Unpredictable constant max backedge-taken count.
-; CHECK-NEXT:  Loop %loop1: Unpredictable symbolic max backedge-taken count.
-; CHECK-NEXT:    symbolic max exit count for loop1: ***COULDNOTCOMPUTE***
-; CHECK-NEXT:    symbolic max exit count for loop1.body: ***COULDNOTCOMPUTE***
-;
-entry:
-  br label %loop1
-
-loop1:
-  %i.0 = phi i64 [ 0, %entry ], [ %add33, %loop1.latch ]
-  %sub = sub i64 %rows, %depth
-  %cmp15 = icmp slt i64 %i.0, %sub
-  br i1 %cmp15, label %loop1.body, label %loop2
-
-loop1.body:
-  br i1 %c, label %ret, label %loop1.latch
-
-loop1.latch:
-  %add33 = add nsw i64 %i.0, 6
-  br label %loop1
-
-loop2:
-  %i.1 = phi i64 [ %i.0, %loop1 ], [ %add59, %loop2.latch ]
-  %cmp36 = icmp slt i64 %i.1, %rows
-  br i1 %cmp36, label %loop2.body, label %exit
-
-loop2.body:
-  br i1 %c, label %ret, label %loop2.latch
-
-loop2.latch:
-  %add59 = add nsw i64 %i.1, 4
-  br label %loop2
-
-exit:
-  %cmp82 = icmp slt i64 %i.1, %depth
-  ret i1 %cmp82
-
-ret:
-  ret i1 false
 }
