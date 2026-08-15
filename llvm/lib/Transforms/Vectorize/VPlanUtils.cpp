@@ -1236,7 +1236,7 @@ void vputils::detail::pullOutPermutationsImpl(
   }
 }
 
-void vputils::setUnknownBranchWeights(VPInstruction &Br, VPlan &Plan) {
+void vputils::setUnknownBranchWeights(VPIRMetadata &Br, VPlan &Plan) {
   Function &F = *Plan.getScalarHeader()->getIRBasicBlock()->getParent();
   if (MDNode *MD =
           getExplicitlyUnknownBranchWeightsIfProfiled(F, "loop-vectorize"))

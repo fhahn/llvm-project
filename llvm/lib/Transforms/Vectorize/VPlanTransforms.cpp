@@ -561,10 +561,16 @@ static VPRegionBlock *createReplicateRegion(VPReplicateRecipe *PredRecipe,
       PredRecipe->isSingleScalar(), nullptr /*Mask*/, *PredRecipe, *PredRecipe,
       PredRecipe->getDebugLoc());
   // Move the predicated recipes's branch weights onto the guarding
-  // branch-on-mask.
+  // branch-on-mask. Without a recorded execution probability - the mask is a
+  // lane mask rather than a condition of the original loop, as it is when
+  // folding the tail - the vectorizer has no probability for the guard.
+  // FIXME: For a folded tail, all lanes but those of the last vector iteration
+  // are active, which the estimated trip count pins down.
   if (MDNode *BW = RecipeWithoutMask->getMetadata(LLVMContext::MD_prof)) {
     BOMRecipe->setMetadata(LLVMContext::MD_prof, BW);
     RecipeWithoutMask->eraseMetadata(LLVMContext::MD_prof);
+  } else {
+    vputils::setUnknownBranchWeights(*BOMRecipe, Plan);
   }
   auto *Pred =
       Plan.createVPBasicBlock(Twine(RegionName) + ".if", RecipeWithoutMask);

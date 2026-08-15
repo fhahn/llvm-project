@@ -57,25 +57,25 @@ define void @widened_select_uniform_cond(ptr %a, i1 %c, i64 %n) !prof !0 {
 ; VF1IC2-NEXT:    [[TMP1:%.*]] = add i64 [[INDEX]], 1
 ; VF1IC2-NEXT:    [[TMP2:%.*]] = icmp ule i64 [[INDEX]], [[TRIP_COUNT_MINUS_1]]
 ; VF1IC2-NEXT:    [[TMP3:%.*]] = icmp ule i64 [[TMP1]], [[TRIP_COUNT_MINUS_1]]
-; VF1IC2-NEXT:    br i1 [[TMP2]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
+; VF1IC2-NEXT:    br i1 [[TMP2]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]], !prof [[PROF1:![0-9]+]]
 ; VF1IC2:       [[PRED_STORE_IF]]:
 ; VF1IC2-NEXT:    [[TMP4:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[INDEX]]
 ; VF1IC2-NEXT:    [[TMP5:%.*]] = load i32, ptr [[TMP4]], align 4
-; VF1IC2-NEXT:    [[TMP6:%.*]] = select i1 [[C]], i32 [[TMP5]], i32 0, !prof [[PROF1:![0-9]+]]
+; VF1IC2-NEXT:    [[TMP6:%.*]] = select i1 [[C]], i32 [[TMP5]], i32 0, !prof [[PROF2:![0-9]+]]
 ; VF1IC2-NEXT:    store i32 [[TMP6]], ptr [[TMP4]], align 4
 ; VF1IC2-NEXT:    br label %[[PRED_STORE_CONTINUE]]
 ; VF1IC2:       [[PRED_STORE_CONTINUE]]:
-; VF1IC2-NEXT:    br i1 [[TMP3]], label %[[PRED_STORE_IF1:.*]], label %[[PRED_STORE_CONTINUE2]]
+; VF1IC2-NEXT:    br i1 [[TMP3]], label %[[PRED_STORE_IF1:.*]], label %[[PRED_STORE_CONTINUE2]], !prof [[PROF1]]
 ; VF1IC2:       [[PRED_STORE_IF1]]:
 ; VF1IC2-NEXT:    [[TMP7:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[TMP1]]
 ; VF1IC2-NEXT:    [[TMP8:%.*]] = load i32, ptr [[TMP7]], align 4
-; VF1IC2-NEXT:    [[TMP9:%.*]] = select i1 [[C]], i32 [[TMP8]], i32 0, !prof [[PROF1]]
+; VF1IC2-NEXT:    [[TMP9:%.*]] = select i1 [[C]], i32 [[TMP8]], i32 0, !prof [[PROF2]]
 ; VF1IC2-NEXT:    store i32 [[TMP9]], ptr [[TMP7]], align 4
 ; VF1IC2-NEXT:    br label %[[PRED_STORE_CONTINUE2]]
 ; VF1IC2:       [[PRED_STORE_CONTINUE2]]:
 ; VF1IC2-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 2
 ; VF1IC2-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; VF1IC2-NEXT:    br i1 [[TMP10]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF2:![0-9]+]], !llvm.loop [[LOOP3:![0-9]+]]
+; VF1IC2-NEXT:    br i1 [[TMP10]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP3:![0-9]+]]
 ; VF1IC2:       [[MIDDLE_BLOCK]]:
 ; VF1IC2-NEXT:    br label %[[EXIT:.*]]
 ; VF1IC2:       [[EXIT]]:
@@ -154,27 +154,27 @@ define void @widened_select_varying_cond(ptr %a, i64 %n) !prof !0 {
 ; VF1IC2-NEXT:    [[TMP1:%.*]] = add i64 [[INDEX]], 1
 ; VF1IC2-NEXT:    [[TMP2:%.*]] = icmp ule i64 [[INDEX]], [[TRIP_COUNT_MINUS_1]]
 ; VF1IC2-NEXT:    [[TMP3:%.*]] = icmp ule i64 [[TMP1]], [[TRIP_COUNT_MINUS_1]]
-; VF1IC2-NEXT:    br i1 [[TMP2]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
+; VF1IC2-NEXT:    br i1 [[TMP2]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]], !prof [[PROF1]]
 ; VF1IC2:       [[PRED_STORE_IF]]:
 ; VF1IC2-NEXT:    [[TMP4:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[INDEX]]
 ; VF1IC2-NEXT:    [[TMP5:%.*]] = load i32, ptr [[TMP4]], align 4
 ; VF1IC2-NEXT:    [[TMP6:%.*]] = icmp sgt i32 [[TMP5]], 0
-; VF1IC2-NEXT:    [[TMP7:%.*]] = select i1 [[TMP6]], i32 [[TMP5]], i32 0, !prof [[PROF1]]
+; VF1IC2-NEXT:    [[TMP7:%.*]] = select i1 [[TMP6]], i32 [[TMP5]], i32 0, !prof [[PROF2]]
 ; VF1IC2-NEXT:    store i32 [[TMP7]], ptr [[TMP4]], align 4
 ; VF1IC2-NEXT:    br label %[[PRED_STORE_CONTINUE]]
 ; VF1IC2:       [[PRED_STORE_CONTINUE]]:
-; VF1IC2-NEXT:    br i1 [[TMP3]], label %[[PRED_STORE_IF1:.*]], label %[[PRED_STORE_CONTINUE2]]
+; VF1IC2-NEXT:    br i1 [[TMP3]], label %[[PRED_STORE_IF1:.*]], label %[[PRED_STORE_CONTINUE2]], !prof [[PROF1]]
 ; VF1IC2:       [[PRED_STORE_IF1]]:
 ; VF1IC2-NEXT:    [[TMP8:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[TMP1]]
 ; VF1IC2-NEXT:    [[TMP9:%.*]] = load i32, ptr [[TMP8]], align 4
 ; VF1IC2-NEXT:    [[TMP10:%.*]] = icmp sgt i32 [[TMP9]], 0
-; VF1IC2-NEXT:    [[TMP11:%.*]] = select i1 [[TMP10]], i32 [[TMP9]], i32 0, !prof [[PROF1]]
+; VF1IC2-NEXT:    [[TMP11:%.*]] = select i1 [[TMP10]], i32 [[TMP9]], i32 0, !prof [[PROF2]]
 ; VF1IC2-NEXT:    store i32 [[TMP11]], ptr [[TMP8]], align 4
 ; VF1IC2-NEXT:    br label %[[PRED_STORE_CONTINUE2]]
 ; VF1IC2:       [[PRED_STORE_CONTINUE2]]:
 ; VF1IC2-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 2
 ; VF1IC2-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; VF1IC2-NEXT:    br i1 [[TMP12]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF2]], !llvm.loop [[LOOP6:![0-9]+]]
+; VF1IC2-NEXT:    br i1 [[TMP12]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP6:![0-9]+]]
 ; VF1IC2:       [[MIDDLE_BLOCK]]:
 ; VF1IC2-NEXT:    br label %[[EXIT:.*]]
 ; VF1IC2:       [[EXIT]]:
@@ -214,7 +214,7 @@ define float @ordered_reduction_tail_folded(ptr %src) !prof !0 {
 ; VF4-NEXT:    [[VEC_IND:%.*]] = phi <4 x i8> [ <i8 0, i8 1, i8 2, i8 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[PRED_LOAD_CONTINUE6]] ]
 ; VF4-NEXT:    [[TMP0:%.*]] = icmp ule <4 x i8> [[VEC_IND]], splat (i8 14)
 ; VF4-NEXT:    [[TMP1:%.*]] = extractelement <4 x i1> [[TMP0]], i64 0
-; VF4-NEXT:    br i1 [[TMP1]], label %[[PRED_LOAD_IF:.*]], label %[[PRED_LOAD_CONTINUE:.*]]
+; VF4-NEXT:    br i1 [[TMP1]], label %[[PRED_LOAD_IF:.*]], label %[[PRED_LOAD_CONTINUE:.*]], !prof [[PROF1]]
 ; VF4:       [[PRED_LOAD_IF]]:
 ; VF4-NEXT:    [[TMP2:%.*]] = getelementptr float, ptr [[SRC]], i32 [[INDEX]]
 ; VF4-NEXT:    [[TMP3:%.*]] = load float, ptr [[TMP2]], align 4
@@ -223,7 +223,7 @@ define float @ordered_reduction_tail_folded(ptr %src) !prof !0 {
 ; VF4:       [[PRED_LOAD_CONTINUE]]:
 ; VF4-NEXT:    [[TMP5:%.*]] = phi <4 x float> [ poison, %[[VECTOR_BODY]] ], [ [[TMP4]], %[[PRED_LOAD_IF]] ]
 ; VF4-NEXT:    [[TMP6:%.*]] = extractelement <4 x i1> [[TMP0]], i64 1
-; VF4-NEXT:    br i1 [[TMP6]], label %[[PRED_LOAD_IF1:.*]], label %[[PRED_LOAD_CONTINUE2:.*]]
+; VF4-NEXT:    br i1 [[TMP6]], label %[[PRED_LOAD_IF1:.*]], label %[[PRED_LOAD_CONTINUE2:.*]], !prof [[PROF1]]
 ; VF4:       [[PRED_LOAD_IF1]]:
 ; VF4-NEXT:    [[TMP7:%.*]] = add i32 [[INDEX]], 1
 ; VF4-NEXT:    [[TMP8:%.*]] = getelementptr float, ptr [[SRC]], i32 [[TMP7]]
@@ -233,7 +233,7 @@ define float @ordered_reduction_tail_folded(ptr %src) !prof !0 {
 ; VF4:       [[PRED_LOAD_CONTINUE2]]:
 ; VF4-NEXT:    [[TMP11:%.*]] = phi <4 x float> [ [[TMP5]], %[[PRED_LOAD_CONTINUE]] ], [ [[TMP10]], %[[PRED_LOAD_IF1]] ]
 ; VF4-NEXT:    [[TMP12:%.*]] = extractelement <4 x i1> [[TMP0]], i64 2
-; VF4-NEXT:    br i1 [[TMP12]], label %[[PRED_LOAD_IF3:.*]], label %[[PRED_LOAD_CONTINUE4:.*]]
+; VF4-NEXT:    br i1 [[TMP12]], label %[[PRED_LOAD_IF3:.*]], label %[[PRED_LOAD_CONTINUE4:.*]], !prof [[PROF1]]
 ; VF4:       [[PRED_LOAD_IF3]]:
 ; VF4-NEXT:    [[TMP13:%.*]] = add i32 [[INDEX]], 2
 ; VF4-NEXT:    [[TMP14:%.*]] = getelementptr float, ptr [[SRC]], i32 [[TMP13]]
@@ -243,7 +243,7 @@ define float @ordered_reduction_tail_folded(ptr %src) !prof !0 {
 ; VF4:       [[PRED_LOAD_CONTINUE4]]:
 ; VF4-NEXT:    [[TMP17:%.*]] = phi <4 x float> [ [[TMP11]], %[[PRED_LOAD_CONTINUE2]] ], [ [[TMP16]], %[[PRED_LOAD_IF3]] ]
 ; VF4-NEXT:    [[TMP18:%.*]] = extractelement <4 x i1> [[TMP0]], i64 3
-; VF4-NEXT:    br i1 [[TMP18]], label %[[PRED_LOAD_IF5:.*]], label %[[PRED_LOAD_CONTINUE6]]
+; VF4-NEXT:    br i1 [[TMP18]], label %[[PRED_LOAD_IF5:.*]], label %[[PRED_LOAD_CONTINUE6]], !prof [[PROF1]]
 ; VF4:       [[PRED_LOAD_IF5]]:
 ; VF4-NEXT:    [[TMP19:%.*]] = add i32 [[INDEX]], 3
 ; VF4-NEXT:    [[TMP20:%.*]] = getelementptr float, ptr [[SRC]], i32 [[TMP19]]
@@ -277,23 +277,23 @@ define float @ordered_reduction_tail_folded(ptr %src) !prof !0 {
 ; VF1IC2-NEXT:    [[TMP1:%.*]] = add i32 [[INDEX]], 1
 ; VF1IC2-NEXT:    [[TMP2:%.*]] = icmp ule i32 [[TMP0]], 14
 ; VF1IC2-NEXT:    [[TMP3:%.*]] = icmp ule i32 [[TMP1]], 14
-; VF1IC2-NEXT:    br i1 [[TMP2]], label %[[PRED_LOAD_IF:.*]], label %[[PRED_LOAD_CONTINUE:.*]]
+; VF1IC2-NEXT:    br i1 [[TMP2]], label %[[PRED_LOAD_IF:.*]], label %[[PRED_LOAD_CONTINUE:.*]], !prof [[PROF1]]
 ; VF1IC2:       [[PRED_LOAD_IF]]:
 ; VF1IC2-NEXT:    [[TMP4:%.*]] = getelementptr float, ptr [[SRC]], i32 [[INDEX]]
 ; VF1IC2-NEXT:    [[TMP5:%.*]] = load float, ptr [[TMP4]], align 4
 ; VF1IC2-NEXT:    br label %[[PRED_LOAD_CONTINUE]]
 ; VF1IC2:       [[PRED_LOAD_CONTINUE]]:
 ; VF1IC2-NEXT:    [[TMP6:%.*]] = phi float [ poison, %[[VECTOR_BODY]] ], [ [[TMP5]], %[[PRED_LOAD_IF]] ]
-; VF1IC2-NEXT:    br i1 [[TMP3]], label %[[PRED_LOAD_IF1:.*]], label %[[PRED_LOAD_CONTINUE2]]
+; VF1IC2-NEXT:    br i1 [[TMP3]], label %[[PRED_LOAD_IF1:.*]], label %[[PRED_LOAD_CONTINUE2]], !prof [[PROF1]]
 ; VF1IC2:       [[PRED_LOAD_IF1]]:
 ; VF1IC2-NEXT:    [[TMP7:%.*]] = getelementptr float, ptr [[SRC]], i32 [[TMP1]]
 ; VF1IC2-NEXT:    [[TMP8:%.*]] = load float, ptr [[TMP7]], align 4
 ; VF1IC2-NEXT:    br label %[[PRED_LOAD_CONTINUE2]]
 ; VF1IC2:       [[PRED_LOAD_CONTINUE2]]:
 ; VF1IC2-NEXT:    [[TMP9:%.*]] = phi float [ poison, %[[PRED_LOAD_CONTINUE]] ], [ [[TMP8]], %[[PRED_LOAD_IF1]] ]
-; VF1IC2-NEXT:    [[TMP10:%.*]] = select contract i1 [[TMP2]], float [[TMP6]], float -0.000000e+00, !prof [[PROF2]]
+; VF1IC2-NEXT:    [[TMP10:%.*]] = select contract i1 [[TMP2]], float [[TMP6]], float -0.000000e+00, !prof [[PROF1]]
 ; VF1IC2-NEXT:    [[TMP11:%.*]] = fadd contract float [[VEC_PHI]], [[TMP10]]
-; VF1IC2-NEXT:    [[TMP12:%.*]] = select contract i1 [[TMP3]], float [[TMP9]], float -0.000000e+00, !prof [[PROF2]]
+; VF1IC2-NEXT:    [[TMP12:%.*]] = select contract i1 [[TMP3]], float [[TMP9]], float -0.000000e+00, !prof [[PROF1]]
 ; VF1IC2-NEXT:    [[TMP13]] = fadd contract float [[TMP11]], [[TMP12]]
 ; VF1IC2-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; VF1IC2-NEXT:    [[TMP14:%.*]] = icmp eq i32 [[INDEX_NEXT]], 16
@@ -340,7 +340,7 @@ define i32 @logical_and_of_mask_and_condition(ptr noalias %src1, ptr noalias %sr
 ; VF4-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP1]], align 4
 ; VF4-NEXT:    [[TMP2:%.*]] = icmp sgt <4 x i32> [[WIDE_LOAD]], splat (i32 35)
 ; VF4-NEXT:    [[TMP3:%.*]] = extractelement <4 x i1> [[TMP2]], i64 0
-; VF4-NEXT:    br i1 [[TMP3]], label %[[PRED_LOAD_IF:.*]], label %[[PRED_LOAD_CONTINUE:.*]]
+; VF4-NEXT:    br i1 [[TMP3]], label %[[PRED_LOAD_IF:.*]], label %[[PRED_LOAD_CONTINUE:.*]], !prof [[PROF1]]
 ; VF4:       [[PRED_LOAD_IF]]:
 ; VF4-NEXT:    [[TMP4:%.*]] = getelementptr inbounds i32, ptr [[SRC2]], i64 [[INDEX]]
 ; VF4-NEXT:    [[TMP5:%.*]] = load i32, ptr [[TMP4]], align 4
@@ -349,7 +349,7 @@ define i32 @logical_and_of_mask_and_condition(ptr noalias %src1, ptr noalias %sr
 ; VF4:       [[PRED_LOAD_CONTINUE]]:
 ; VF4-NEXT:    [[TMP7:%.*]] = phi <4 x i32> [ poison, %[[VECTOR_BODY]] ], [ [[TMP6]], %[[PRED_LOAD_IF]] ]
 ; VF4-NEXT:    [[TMP8:%.*]] = extractelement <4 x i1> [[TMP2]], i64 1
-; VF4-NEXT:    br i1 [[TMP8]], label %[[PRED_LOAD_IF1:.*]], label %[[PRED_LOAD_CONTINUE2:.*]]
+; VF4-NEXT:    br i1 [[TMP8]], label %[[PRED_LOAD_IF1:.*]], label %[[PRED_LOAD_CONTINUE2:.*]], !prof [[PROF1]]
 ; VF4:       [[PRED_LOAD_IF1]]:
 ; VF4-NEXT:    [[TMP9:%.*]] = add i64 [[INDEX]], 1
 ; VF4-NEXT:    [[TMP10:%.*]] = getelementptr inbounds i32, ptr [[SRC2]], i64 [[TMP9]]
@@ -359,7 +359,7 @@ define i32 @logical_and_of_mask_and_condition(ptr noalias %src1, ptr noalias %sr
 ; VF4:       [[PRED_LOAD_CONTINUE2]]:
 ; VF4-NEXT:    [[TMP13:%.*]] = phi <4 x i32> [ [[TMP7]], %[[PRED_LOAD_CONTINUE]] ], [ [[TMP12]], %[[PRED_LOAD_IF1]] ]
 ; VF4-NEXT:    [[TMP14:%.*]] = extractelement <4 x i1> [[TMP2]], i64 2
-; VF4-NEXT:    br i1 [[TMP14]], label %[[PRED_LOAD_IF3:.*]], label %[[PRED_LOAD_CONTINUE4:.*]]
+; VF4-NEXT:    br i1 [[TMP14]], label %[[PRED_LOAD_IF3:.*]], label %[[PRED_LOAD_CONTINUE4:.*]], !prof [[PROF1]]
 ; VF4:       [[PRED_LOAD_IF3]]:
 ; VF4-NEXT:    [[TMP15:%.*]] = add i64 [[INDEX]], 2
 ; VF4-NEXT:    [[TMP16:%.*]] = getelementptr inbounds i32, ptr [[SRC2]], i64 [[TMP15]]
@@ -369,7 +369,7 @@ define i32 @logical_and_of_mask_and_condition(ptr noalias %src1, ptr noalias %sr
 ; VF4:       [[PRED_LOAD_CONTINUE4]]:
 ; VF4-NEXT:    [[TMP19:%.*]] = phi <4 x i32> [ [[TMP13]], %[[PRED_LOAD_CONTINUE2]] ], [ [[TMP18]], %[[PRED_LOAD_IF3]] ]
 ; VF4-NEXT:    [[TMP20:%.*]] = extractelement <4 x i1> [[TMP2]], i64 3
-; VF4-NEXT:    br i1 [[TMP20]], label %[[PRED_LOAD_IF5:.*]], label %[[PRED_LOAD_CONTINUE6]]
+; VF4-NEXT:    br i1 [[TMP20]], label %[[PRED_LOAD_IF5:.*]], label %[[PRED_LOAD_CONTINUE6]], !prof [[PROF1]]
 ; VF4:       [[PRED_LOAD_IF5]]:
 ; VF4-NEXT:    [[TMP21:%.*]] = add i64 [[INDEX]], 3
 ; VF4-NEXT:    [[TMP22:%.*]] = getelementptr inbounds i32, ptr [[SRC2]], i64 [[TMP21]]
@@ -434,14 +434,14 @@ define i32 @logical_and_of_mask_and_condition(ptr noalias %src1, ptr noalias %sr
 ; VF1IC2-NEXT:    [[TMP2:%.*]] = add i64 [[INDEX]], 1
 ; VF1IC2-NEXT:    [[TMP3:%.*]] = icmp ule i64 [[TMP1]], [[TRIP_COUNT_MINUS_1]]
 ; VF1IC2-NEXT:    [[TMP4:%.*]] = icmp ule i64 [[TMP2]], [[TRIP_COUNT_MINUS_1]]
-; VF1IC2-NEXT:    br i1 [[TMP3]], label %[[PRED_LOAD_IF:.*]], label %[[PRED_LOAD_CONTINUE:.*]]
+; VF1IC2-NEXT:    br i1 [[TMP3]], label %[[PRED_LOAD_IF:.*]], label %[[PRED_LOAD_CONTINUE:.*]], !prof [[PROF1]]
 ; VF1IC2:       [[PRED_LOAD_IF]]:
 ; VF1IC2-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i32, ptr [[SRC1]], i64 [[INDEX]]
 ; VF1IC2-NEXT:    [[TMP6:%.*]] = load i32, ptr [[TMP5]], align 4
 ; VF1IC2-NEXT:    br label %[[PRED_LOAD_CONTINUE]]
 ; VF1IC2:       [[PRED_LOAD_CONTINUE]]:
 ; VF1IC2-NEXT:    [[TMP7:%.*]] = phi i32 [ poison, %[[VECTOR_BODY]] ], [ [[TMP6]], %[[PRED_LOAD_IF]] ]
-; VF1IC2-NEXT:    br i1 [[TMP4]], label %[[PRED_LOAD_IF2:.*]], label %[[PRED_LOAD_CONTINUE3:.*]]
+; VF1IC2-NEXT:    br i1 [[TMP4]], label %[[PRED_LOAD_IF2:.*]], label %[[PRED_LOAD_CONTINUE3:.*]], !prof [[PROF1]]
 ; VF1IC2:       [[PRED_LOAD_IF2]]:
 ; VF1IC2-NEXT:    [[TMP8:%.*]] = getelementptr inbounds i32, ptr [[SRC1]], i64 [[TMP2]]
 ; VF1IC2-NEXT:    [[TMP9:%.*]] = load i32, ptr [[TMP8]], align 4
@@ -450,16 +450,16 @@ define i32 @logical_and_of_mask_and_condition(ptr noalias %src1, ptr noalias %sr
 ; VF1IC2-NEXT:    [[TMP10:%.*]] = phi i32 [ poison, %[[PRED_LOAD_CONTINUE]] ], [ [[TMP9]], %[[PRED_LOAD_IF2]] ]
 ; VF1IC2-NEXT:    [[TMP11:%.*]] = icmp sgt i32 [[TMP7]], 35
 ; VF1IC2-NEXT:    [[TMP12:%.*]] = icmp sgt i32 [[TMP10]], 35
-; VF1IC2-NEXT:    [[TMP13:%.*]] = select i1 [[TMP3]], i1 [[TMP11]], i1 false, !prof [[PROF2]]
-; VF1IC2-NEXT:    [[TMP14:%.*]] = select i1 [[TMP4]], i1 [[TMP12]], i1 false, !prof [[PROF2]]
-; VF1IC2-NEXT:    br i1 [[TMP13]], label %[[PRED_LOAD_IF4:.*]], label %[[PRED_LOAD_CONTINUE5:.*]]
+; VF1IC2-NEXT:    [[TMP13:%.*]] = select i1 [[TMP3]], i1 [[TMP11]], i1 false, !prof [[PROF1]]
+; VF1IC2-NEXT:    [[TMP14:%.*]] = select i1 [[TMP4]], i1 [[TMP12]], i1 false, !prof [[PROF1]]
+; VF1IC2-NEXT:    br i1 [[TMP13]], label %[[PRED_LOAD_IF4:.*]], label %[[PRED_LOAD_CONTINUE5:.*]], !prof [[PROF1]]
 ; VF1IC2:       [[PRED_LOAD_IF4]]:
 ; VF1IC2-NEXT:    [[TMP15:%.*]] = getelementptr inbounds i32, ptr [[SRC2]], i64 [[INDEX]]
 ; VF1IC2-NEXT:    [[TMP16:%.*]] = load i32, ptr [[TMP15]], align 4
 ; VF1IC2-NEXT:    br label %[[PRED_LOAD_CONTINUE5]]
 ; VF1IC2:       [[PRED_LOAD_CONTINUE5]]:
 ; VF1IC2-NEXT:    [[TMP17:%.*]] = phi i32 [ poison, %[[PRED_LOAD_CONTINUE3]] ], [ [[TMP16]], %[[PRED_LOAD_IF4]] ]
-; VF1IC2-NEXT:    br i1 [[TMP14]], label %[[PRED_LOAD_IF6:.*]], label %[[PRED_LOAD_CONTINUE7]]
+; VF1IC2-NEXT:    br i1 [[TMP14]], label %[[PRED_LOAD_IF6:.*]], label %[[PRED_LOAD_CONTINUE7]], !prof [[PROF1]]
 ; VF1IC2:       [[PRED_LOAD_IF6]]:
 ; VF1IC2-NEXT:    [[TMP18:%.*]] = getelementptr inbounds i32, ptr [[SRC2]], i64 [[TMP2]]
 ; VF1IC2-NEXT:    [[TMP19:%.*]] = load i32, ptr [[TMP18]], align 4
@@ -468,17 +468,17 @@ define i32 @logical_and_of_mask_and_condition(ptr noalias %src1, ptr noalias %sr
 ; VF1IC2-NEXT:    [[TMP20:%.*]] = phi i32 [ poison, %[[PRED_LOAD_CONTINUE5]] ], [ [[TMP19]], %[[PRED_LOAD_IF6]] ]
 ; VF1IC2-NEXT:    [[TMP21:%.*]] = icmp eq i32 [[TMP17]], 2
 ; VF1IC2-NEXT:    [[TMP22:%.*]] = icmp eq i32 [[TMP20]], 2
-; VF1IC2-NEXT:    [[TMP23:%.*]] = select i1 [[TMP13]], i1 [[TMP21]], i1 false, !prof [[PROF2]]
+; VF1IC2-NEXT:    [[TMP23:%.*]] = select i1 [[TMP13]], i1 [[TMP21]], i1 false, !prof [[PROF1]]
 ; VF1IC2-NEXT:    [[TMP24]] = or i1 [[VEC_PHI]], [[TMP23]]
-; VF1IC2-NEXT:    [[TMP25:%.*]] = select i1 [[TMP14]], i1 [[TMP22]], i1 false, !prof [[PROF2]]
+; VF1IC2-NEXT:    [[TMP25:%.*]] = select i1 [[TMP14]], i1 [[TMP22]], i1 false, !prof [[PROF1]]
 ; VF1IC2-NEXT:    [[TMP26]] = or i1 [[VEC_PHI1]], [[TMP25]]
 ; VF1IC2-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 2
 ; VF1IC2-NEXT:    [[TMP27:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; VF1IC2-NEXT:    br i1 [[TMP27]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF2]], !llvm.loop [[LOOP10:![0-9]+]]
+; VF1IC2-NEXT:    br i1 [[TMP27]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP10:![0-9]+]]
 ; VF1IC2:       [[MIDDLE_BLOCK]]:
 ; VF1IC2-NEXT:    [[BIN_RDX:%.*]] = or i1 [[TMP26]], [[TMP24]]
 ; VF1IC2-NEXT:    [[TMP28:%.*]] = freeze i1 [[BIN_RDX]]
-; VF1IC2-NEXT:    [[RDX_SELECT:%.*]] = select i1 [[TMP28]], i32 1, i32 0, !prof [[PROF2]]
+; VF1IC2-NEXT:    [[RDX_SELECT:%.*]] = select i1 [[TMP28]], i32 1, i32 0, !prof [[PROF1]]
 ; VF1IC2-NEXT:    br label %[[EXIT:.*]]
 ; VF1IC2:       [[EXIT]]:
 ; VF1IC2-NEXT:    ret i32 [[RDX_SELECT]]
@@ -531,8 +531,8 @@ exit:
 ; VF4: [[LOOP13]] = distinct !{[[LOOP13]], [[META5]], [[META4]]}
 ;.
 ; VF1IC2: [[PROF0]] = !{!"function_entry_count", i64 1000}
-; VF1IC2: [[PROF1]] = !{!"branch_weights", i32 3, i32 5}
-; VF1IC2: [[PROF2]] = !{!"unknown", !"loop-vectorize"}
+; VF1IC2: [[PROF1]] = !{!"unknown", !"loop-vectorize"}
+; VF1IC2: [[PROF2]] = !{!"branch_weights", i32 3, i32 5}
 ; VF1IC2: [[LOOP3]] = distinct !{[[LOOP3]], [[META4:![0-9]+]], [[META5:![0-9]+]]}
 ; VF1IC2: [[META4]] = !{!"llvm.loop.isvectorized", i32 1}
 ; VF1IC2: [[META5]] = !{!"llvm.loop.unroll.runtime.disable"}

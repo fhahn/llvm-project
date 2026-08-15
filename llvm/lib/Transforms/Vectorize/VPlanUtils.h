@@ -261,7 +261,7 @@ void pullOutPermutations(VPlan &Plan, Match_t Perm, Builder Build) {
 /// probability to give, as having an explicitly unknown profile, so it does not
 /// look like the branch weights of an original branch were dropped. Does
 /// nothing if \p Plan's function has no profile information.
-void setUnknownBranchWeights(VPInstruction &Br, VPlan &Plan);
+void setUnknownBranchWeights(VPIRMetadata &Br, VPlan &Plan);
 
 } // namespace vputils
 

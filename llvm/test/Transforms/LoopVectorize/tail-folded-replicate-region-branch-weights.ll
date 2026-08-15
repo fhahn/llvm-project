@@ -102,19 +102,19 @@ exit:
 define void @tail_folded_no_estimate(ptr noalias %A, ptr noalias %idx, i32 %n) !prof !0 {
 ; VF4IC1-LABEL: define void @tail_folded_no_estimate(
 ; VF4IC1-SAME: ptr noalias [[A:%.*]], ptr noalias [[IDX:%.*]], i32 [[N:%.*]]) !prof [[PROF0]] {
-; VF4IC1:    br i1 [[TMP2:%.*]], [[PRED_STORE_IF:label %.*]], [[PRED_STORE_CONTINUE:label %.*]]
-; VF4IC1:    br i1 [[TMP6:%.*]], [[PRED_STORE_IF1:label %.*]], [[PRED_STORE_CONTINUE2:label %.*]]
-; VF4IC1:    br i1 [[TMP11:%.*]], [[PRED_STORE_IF3:label %.*]], [[PRED_STORE_CONTINUE4:label %.*]]
-; VF4IC1:    br i1 [[TMP16:%.*]], [[PRED_STORE_IF5:label %.*]], [[PRED_STORE_CONTINUE6:label %.*]]
-; VF4IC1:    br i1 [[TMP21:%.*]], [[MIDDLE_BLOCK:label %.*]], [[VECTOR_BODY:label %.*]], !prof [[PROF9:![0-9]+]], !llvm.loop [[LOOP10:![0-9]+]]
+; VF4IC1:    br i1 [[TMP2:%.*]], [[PRED_STORE_IF:label %.*]], [[PRED_STORE_CONTINUE:label %.*]], !prof [[PROF9:![0-9]+]]
+; VF4IC1:    br i1 [[TMP6:%.*]], [[PRED_STORE_IF1:label %.*]], [[PRED_STORE_CONTINUE2:label %.*]], !prof [[PROF9]]
+; VF4IC1:    br i1 [[TMP11:%.*]], [[PRED_STORE_IF3:label %.*]], [[PRED_STORE_CONTINUE4:label %.*]], !prof [[PROF9]]
+; VF4IC1:    br i1 [[TMP16:%.*]], [[PRED_STORE_IF5:label %.*]], [[PRED_STORE_CONTINUE6:label %.*]], !prof [[PROF9]]
+; VF4IC1:    br i1 [[TMP21:%.*]], [[MIDDLE_BLOCK:label %.*]], [[VECTOR_BODY:label %.*]], !prof [[PROF9]], !llvm.loop [[LOOP10:![0-9]+]]
 ;
 ; VF2IC2-LABEL: define void @tail_folded_no_estimate(
 ; VF2IC2-SAME: ptr noalias [[A:%.*]], ptr noalias [[IDX:%.*]], i32 [[N:%.*]]) !prof [[PROF0]] {
-; VF2IC2:    br i1 [[TMP3:%.*]], [[PRED_STORE_IF:label %.*]], [[PRED_STORE_CONTINUE:label %.*]]
-; VF2IC2:    br i1 [[TMP7:%.*]], [[PRED_STORE_IF1:label %.*]], [[PRED_STORE_CONTINUE2:label %.*]]
-; VF2IC2:    br i1 [[TMP12:%.*]], [[PRED_STORE_IF3:label %.*]], [[PRED_STORE_CONTINUE4:label %.*]]
-; VF2IC2:    br i1 [[TMP17:%.*]], [[PRED_STORE_IF5:label %.*]], [[PRED_STORE_CONTINUE6:label %.*]]
-; VF2IC2:    br i1 [[TMP22:%.*]], [[MIDDLE_BLOCK:label %.*]], [[VECTOR_BODY:label %.*]], !prof [[PROF9:![0-9]+]], !llvm.loop [[LOOP10:![0-9]+]]
+; VF2IC2:    br i1 [[TMP3:%.*]], [[PRED_STORE_IF:label %.*]], [[PRED_STORE_CONTINUE:label %.*]], !prof [[PROF9:![0-9]+]]
+; VF2IC2:    br i1 [[TMP7:%.*]], [[PRED_STORE_IF1:label %.*]], [[PRED_STORE_CONTINUE2:label %.*]], !prof [[PROF9]]
+; VF2IC2:    br i1 [[TMP12:%.*]], [[PRED_STORE_IF3:label %.*]], [[PRED_STORE_CONTINUE4:label %.*]], !prof [[PROF9]]
+; VF2IC2:    br i1 [[TMP17:%.*]], [[PRED_STORE_IF5:label %.*]], [[PRED_STORE_CONTINUE6:label %.*]], !prof [[PROF9]]
+; VF2IC2:    br i1 [[TMP22:%.*]], [[MIDDLE_BLOCK:label %.*]], [[VECTOR_BODY:label %.*]], !prof [[PROF9]], !llvm.loop [[LOOP10:![0-9]+]]
 ;
 entry:
   br label %loop.header
