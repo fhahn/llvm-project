@@ -3553,8 +3553,8 @@ const SCEV *ScalarEvolution::getUDivExpr(SCEVUse LHS, SCEVUse RHS) {
 
   FoldingSetNodeID ID;
   ID.AddInteger(scUDivExpr);
-  ID.AddPointer(LHS);
-  ID.AddPointer(RHS);
+  ID.AddPointer(LHS.getOpaqueValue());
+  ID.AddPointer(RHS.getOpaqueValue());
   void *IP = nullptr;
   if (const SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP))
     return S;
@@ -3631,8 +3631,8 @@ const SCEV *ScalarEvolution::getUDivExpr(SCEVUse LHS, SCEVUse RHS) {
                 // already cached.
                 ID.clear();
                 ID.AddInteger(scUDivExpr);
-                ID.AddPointer(LHS);
-                ID.AddPointer(RHS);
+                ID.AddPointer(LHS.getOpaqueValue());
+                ID.AddPointer(RHS.getOpaqueValue());
                 IP = nullptr;
                 if (const SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP))
                   return S;
