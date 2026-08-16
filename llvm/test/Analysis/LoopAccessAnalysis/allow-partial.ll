@@ -19,7 +19,7 @@ define void @gep_loaded_offset(ptr %p, ptr %q, ptr %r, i32 %n) {
 ; ALLOW-BEFORE-NEXT:        ptr %r
 ; ALLOW-BEFORE-NEXT:      Grouped accesses:
 ; ALLOW-BEFORE-NEXT:        Group GRP0:
-; ALLOW-BEFORE-NEXT:          (Low: %p High: (4 + (4 * (zext i32 (-1 + %n)<nsw> to i64))<nuw><nsw> + %p))
+; ALLOW-BEFORE-NEXT:          (Low: %p High: (4 + (4 * (zext i32 (-1 + %n)<nsw> to i64))<nuw><nsw>(u nuw) + %p))
 ; ALLOW-BEFORE-NEXT:            Member: {%p,+,4}<nuw><%while.body>
 ; ALLOW-BEFORE-NEXT:        Group GRP1:
 ; ALLOW-BEFORE-NEXT:          (Low: %r High: (8 + %r))
@@ -67,7 +67,7 @@ define void @gep_loaded_offset(ptr %p, ptr %q, ptr %r, i32 %n) {
 ; ALLOW-AFTER-NEXT:        ptr %r
 ; ALLOW-AFTER-NEXT:      Grouped accesses:
 ; ALLOW-AFTER-NEXT:        Group GRP0:
-; ALLOW-AFTER-NEXT:          (Low: %p High: (4 + (4 * (zext i32 (-1 + %n)<nsw> to i64))<nuw><nsw> + %p))
+; ALLOW-AFTER-NEXT:          (Low: %p High: (4 + (4 * (zext i32 (-1 + %n)<nsw> to i64))<nuw><nsw>(u nuw) + %p))
 ; ALLOW-AFTER-NEXT:            Member: {%p,+,4}<nuw><%while.body>
 ; ALLOW-AFTER-NEXT:        Group GRP1:
 ; ALLOW-AFTER-NEXT:          (Low: %r High: (8 + %r))

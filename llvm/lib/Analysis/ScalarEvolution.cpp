@@ -1091,12 +1091,24 @@ SCEVUse SCEVAddRecExpr::evaluateAtIteration(ArrayRef<SCEVUse> Operands,
     if (isa<SCEVCouldNotCompute>(Coeff))
       return Coeff;
 
-    // Do not set the flags on the shared node: its scope is wherever the
+    // The sum stays in range whenever the recurrence did, but the multiply on
+    // its own only does so if the iteration count is non-negative as a signed
+    // value of this type. A FlagNSW recurrence with non-positive Start and Step
+    // only bounds the count by 2^(W-1), and at exactly that count Step * Coeff
+    // leaves the signed range: for {0,+,-1} of width W the product is -1 * SMIN.
+    SCEV::NoWrapFlags MulFlags = Flags;
+    if (ScalarEvolution::hasFlags(MulFlags, SCEV::FlagNSW) &&
+        !SE.isKnownNonNegative(Coeff))
+      MulFlags = ScalarEvolution::clearFlags(MulFlags, SCEV::FlagNSW);
+
+    // Do not set these flags on the shared nodes: their scope is wherever the
     // operands are defined, while the flags only hold where the recurrence
     // really reached this iteration. Attach them as use flags instead, and only
-    // if the sum was not folded: they hold for `Start + (Step * It)`, and for
-    // nothing else.
-    SCEVUse Mul = SE.getMulExpr(Operands[i].getPointer(), Coeff);
+    // if the expression was not folded: they hold for `Step * It` and for
+    // `Start + (Step * It)`, and for nothing else.
+    SCEVUse Step = Operands[i].getPointer();
+    SCEVUse Mul = withUseFlagsIfExact<SCEVMulExpr>(SE, SE.getMulExpr(Step, Coeff),
+                                                   Step, Coeff, MulFlags);
     Result = withUseFlagsIfExact<SCEVAddExpr>(SE, SE.getAddExpr(Result, Mul),
                                               Result, Mul, Flags);
   }

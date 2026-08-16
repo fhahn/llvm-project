@@ -157,7 +157,7 @@ define void @exit_value_nsw_nonneg(i64 %start.raw, i64 %step.raw) {
 ; CHECK-NEXT:    %step = and i64 %step.raw, 7
 ; CHECK-NEXT:    --> (zext i3 (trunc i64 %step.raw to i3) to i64) U: [0,8) S: [0,8)
 ; CHECK-NEXT:    %x = phi i64 [ %start, %entry ], [ %x.next, %up ]
-; CHECK-NEXT:    --> {(zext i8 (trunc i64 %start.raw to i8) to i64),+,(zext i3 (trunc i64 %step.raw to i3) to i64)}<nuw><nsw><%up> U: [0,319) S: [0,319) Exits: ((zext i8 (trunc i64 %start.raw to i8) to i64) + (9 * (zext i3 (trunc i64 %step.raw to i3) to i64))<nuw><nsw>)(u nuw)(u nsw) LoopDispositions: { %up: Computable }
+; CHECK-NEXT:    --> {(zext i8 (trunc i64 %start.raw to i8) to i64),+,(zext i3 (trunc i64 %step.raw to i3) to i64)}<nuw><nsw><%up> U: [0,319) S: [0,319) Exits: ((zext i8 (trunc i64 %start.raw to i8) to i64) + (9 * (zext i3 (trunc i64 %step.raw to i3) to i64))<nuw><nsw>(u nuw)(u nsw))(u nuw)(u nsw) LoopDispositions: { %up: Computable }
 ; CHECK-NEXT:    %i = phi i32 [ 0, %entry ], [ %i.next, %up ]
 ; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%up> U: [0,10) S: [0,10) Exits: 9 LoopDispositions: { %up: Computable }
 ; CHECK-NEXT:    %x.next = add nsw i64 %x, %step
@@ -194,7 +194,7 @@ define void @exit_value_nsw_nonpos(i64 %start.raw, i64 %step.raw) {
 ; CHECK-NEXT:    %step = or i64 %step.raw, -8
 ; CHECK-NEXT:    --> %step U: [-8,0) S: [-8,0)
 ; CHECK-NEXT:    %x = phi i64 [ %start, %entry ], [ %x.next, %up ]
-; CHECK-NEXT:    --> {%start,+,%step}<nsw><%up> U: [-328,0) S: [-328,0) Exits: ((9 * %step)<nsw> + %start)(u nsw) LoopDispositions: { %up: Computable }
+; CHECK-NEXT:    --> {%start,+,%step}<nsw><%up> U: [-328,0) S: [-328,0) Exits: ((9 * %step)<nsw>(u nsw) + %start)(u nsw) LoopDispositions: { %up: Computable }
 ; CHECK-NEXT:    %i = phi i32 [ 0, %entry ], [ %i.next, %up ]
 ; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%up> U: [0,10) S: [0,10) Exits: 9 LoopDispositions: { %up: Computable }
 ; CHECK-NEXT:    %x.next = add nsw i64 %x, %step
@@ -306,4 +306,41 @@ latch:
 
 exit:
   ret void
+}
+
+; A pointer recurrence: the exit value's offset is (BTC * 24), and both that
+; multiply and the getelementptr adding it to the start carry the recurrence's
+; nuw.
+define ptr @ptr_step_mul_nuw(ptr %first, ptr %last) {
+;
+; CHECK-LABEL: 'ptr_step_mul_nuw'
+; CHECK-NEXT:  Classifying expressions for: @ptr_step_mul_nuw
+; CHECK-NEXT:    %p = phi ptr [ %p.next, %loop ], [ %first, %loop.preheader ]
+; CHECK-NEXT:    --> {%first,+,24}<nuw><%loop> U: full-set S: full-set Exits: ((24 * (((-24 + (-1 * (1 umin (-24 + (-1 * (ptrtoaddr ptr %first to i64)) + ((24 + (ptrtoaddr ptr %first to i64)) umax (ptrtoaddr ptr %last to i64)))))<nuw><nsw> + (-1 * (ptrtoaddr ptr %first to i64)) + ((24 + (ptrtoaddr ptr %first to i64)) umax (ptrtoaddr ptr %last to i64))) /u 24) + (1 umin (-24 + (-1 * (ptrtoaddr ptr %first to i64)) + ((24 + (ptrtoaddr ptr %first to i64)) umax (ptrtoaddr ptr %last to i64))))))(u nuw) + %first)(u nuw) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %p.next = getelementptr inbounds nuw i8, ptr %p, i64 24
+; CHECK-NEXT:    --> {(24 + %first),+,24}<nuw><%loop> U: full-set S: full-set Exits: (24 + (24 * (((-24 + (-1 * (1 umin (-24 + (-1 * (ptrtoaddr ptr %first to i64)) + ((24 + (ptrtoaddr ptr %first to i64)) umax (ptrtoaddr ptr %last to i64)))))<nuw><nsw> + (-1 * (ptrtoaddr ptr %first to i64)) + ((24 + (ptrtoaddr ptr %first to i64)) umax (ptrtoaddr ptr %last to i64))) /u 24) + (1 umin (-24 + (-1 * (ptrtoaddr ptr %first to i64)) + ((24 + (ptrtoaddr ptr %first to i64)) umax (ptrtoaddr ptr %last to i64))))))(u nuw) + %first) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %lc = phi ptr [ %p, %loop ]
+; CHECK-NEXT:    --> {%first,+,24}<nuw><%loop> U: full-set S: full-set --> ((24 * (((-24 + (-1 * (1 umin (-24 + (-1 * (ptrtoaddr ptr %first to i64)) + ((24 + (ptrtoaddr ptr %first to i64)) umax (ptrtoaddr ptr %last to i64)))))<nuw><nsw> + (-1 * (ptrtoaddr ptr %first to i64)) + ((24 + (ptrtoaddr ptr %first to i64)) umax (ptrtoaddr ptr %last to i64))) /u 24) + (1 umin (-24 + (-1 * (ptrtoaddr ptr %first to i64)) + ((24 + (ptrtoaddr ptr %first to i64)) umax (ptrtoaddr ptr %last to i64))))))(u nuw) + %first)(u nuw) U: full-set S: full-set
+; CHECK-NEXT:  Determining loop execution counts for: @ptr_step_mul_nuw
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (((-24 + (-1 * (1 umin (-24 + (-1 * (ptrtoaddr ptr %first to i64)) + ((24 + (ptrtoaddr ptr %first to i64)) umax (ptrtoaddr ptr %last to i64)))))<nuw><nsw> + (-1 * (ptrtoaddr ptr %first to i64)) + ((24 + (ptrtoaddr ptr %first to i64)) umax (ptrtoaddr ptr %last to i64))) /u 24) + (1 umin (-24 + (-1 * (ptrtoaddr ptr %first to i64)) + ((24 + (ptrtoaddr ptr %first to i64)) umax (ptrtoaddr ptr %last to i64)))))
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 768614336404564650
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (((-24 + (-1 * (1 umin (-24 + (-1 * (ptrtoaddr ptr %first to i64)) + ((24 + (ptrtoaddr ptr %first to i64)) umax (ptrtoaddr ptr %last to i64)))))<nuw><nsw> + (-1 * (ptrtoaddr ptr %first to i64)) + ((24 + (ptrtoaddr ptr %first to i64)) umax (ptrtoaddr ptr %last to i64))) /u 24) + (1 umin (-24 + (-1 * (ptrtoaddr ptr %first to i64)) + ((24 + (ptrtoaddr ptr %first to i64)) umax (ptrtoaddr ptr %last to i64)))))
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %c0 = icmp ult ptr %first, %last
+  br i1 %c0, label %loop, label %done
+
+loop:
+  %p = phi ptr [ %first, %entry ], [ %p.next, %loop ]
+  %p.next = getelementptr inbounds nuw i8, ptr %p, i64 24
+  %c = icmp ult ptr %p.next, %last
+  br i1 %c, label %loop, label %exit
+
+exit:
+  %lc = phi ptr [ %p, %loop ]
+  ret ptr %lc
+
+done:
+  ret ptr %first
 }

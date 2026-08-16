@@ -154,7 +154,7 @@ define void @test-addrec-nsw-start-pos-strip-pos(ptr %input, i32 %offset, i32 %n
 ; CHECK-NEXT:    %index32 = add nsw i32 %nexti, %min
 ; CHECK-NEXT:    --> {(1 + (10 smax %offset))<nuw><nsw>,+,1}<nuw><nsw><%loop> U: [11,-2147483648) S: [11,-2147483648) Exits: ((10 smax %offset) + %numIterations) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %ptr = getelementptr inbounds float, ptr %input, i32 %index32
-; CHECK-NEXT:    --> {(4 + (4 * (zext i32 (10 smax %offset) to i64))<nuw><nsw> + %input)<nuw>,+,4}<nuw><%loop> U: [44,0) S: [44,0) Exits: (4 + (4 * (zext i32 (-1 + %numIterations) to i64))<nuw><nsw> + (4 * (zext i32 (10 smax %offset) to i64))<nuw><nsw> + %input) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(4 + (4 * (zext i32 (10 smax %offset) to i64))<nuw><nsw> + %input)<nuw>,+,4}<nuw><%loop> U: [44,0) S: [44,0) Exits: (4 + (4 * (zext i32 (-1 + %numIterations) to i64))<nuw><nsw>(u nuw) + (4 * (zext i32 (10 smax %offset) to i64))<nuw><nsw> + %input) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @test-addrec-nsw-start-pos-strip-pos
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + %numIterations)
 ; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 -1

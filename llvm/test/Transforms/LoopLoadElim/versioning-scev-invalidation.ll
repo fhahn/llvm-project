@@ -7,7 +7,7 @@
 define void @g(ptr %dst.1, ptr %start, i64 %N) {
 ; CHECK-LABEL: @g(
 ; CHECK-NEXT:  loop.1.lver.check:
-; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[N:%.*]], 3
+; CHECK-NEXT:    [[TMP0:%.*]] = shl nuw i64 [[N:%.*]], 3
 ; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], 16
 ; CHECK-NEXT:    [[UGLYGEP:%.*]] = getelementptr i8, ptr @glob.2, i64 [[TMP1]]
 ; CHECK-NEXT:    [[UGLYGEP2:%.*]] = getelementptr i8, ptr [[DST_1:%.*]], i64 8
