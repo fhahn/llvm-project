@@ -24,7 +24,7 @@ define void @f(ptr %A, i32 %N) {
 ; CHECK-NEXT:    %i.0.1 = sext i32 %i.0 to i64
 ; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%bb1> U: [0,2147483648) S: [0,2147483648) Exits: (zext i32 (0 smax %N) to i64) LoopDispositions: { %bb1: Computable }
 ; CHECK-NEXT:    %tmp3 = add nuw nsw i32 %i.0, 3
-; CHECK-NEXT:    --> {3,+,1}<nuw><%bb1> U: [3,-2147483645) S: [3,-2147483645) Exits: (3 + (0 smax %N))<nuw> LoopDispositions: { %bb1: Computable }
+; CHECK-NEXT:    --> {3,+,1}<nuw><%bb1> U: [3,-2147483645) S: [3,-2147483645) Exits: (3 + (0 smax %N))<nuw>(u nuw) LoopDispositions: { %bb1: Computable }
 ; CHECK-NEXT:    %tmp5 = sext i32 %tmp3 to i64
 ; CHECK-NEXT:    --> (sext i32 {3,+,1}<nuw><%bb1> to i64) U: [-2147483648,2147483648) S: [-2147483648,2147483648) Exits: (sext i32 (3 + (0 smax %N))<nuw> to i64) LoopDispositions: { %bb1: Computable }
 ; CHECK-NEXT:    %tmp6 = sext i32 %N to i64
@@ -44,7 +44,7 @@ define void @f(ptr %A, i32 %N) {
 ; CHECK-NEXT:    %tmp21 = getelementptr inbounds i32, ptr %A, i64 %tmp19
 ; CHECK-NEXT:    --> (-12 + (4 * (3 smax {0,+,1}<nuw><nsw><%bb1>))<nuw><nsw> + %A) U: full-set S: full-set Exits: (-12 + (4 * (3 smax (zext i32 (0 smax %N) to i64)))<nuw><nsw> + %A) LoopDispositions: { %bb1: Computable }
 ; CHECK-NEXT:    %tmp23 = add nuw nsw i32 %i.0, 1
-; CHECK-NEXT:    --> {1,+,1}<nuw><%bb1> U: [1,-2147483647) S: [1,-2147483647) Exits: (1 + (0 smax %N))<nuw> LoopDispositions: { %bb1: Computable }
+; CHECK-NEXT:    --> {1,+,1}<nuw><%bb1> U: [1,-2147483647) S: [1,-2147483647) Exits: (1 + (0 smax %N))<nuw>(u nuw) LoopDispositions: { %bb1: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @f
 ; CHECK-NEXT:  Loop %bb1: backedge-taken count is (0 smax %N)
 ; CHECK-NEXT:  Loop %bb1: constant max backedge-taken count is i32 2147483647

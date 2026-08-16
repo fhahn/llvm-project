@@ -1044,7 +1044,7 @@ static Value *genLoopLimit(PHINode *IndVar, BasicBlock *ExitingBB,
   }
 
   const SCEVAddRecExpr *ARBase = UsePostInc ? AR->getPostIncExpr(*SE) : AR;
-  const SCEV *IVLimit = ARBase->evaluateAtIteration(ExitCount, *SE);
+  SCEVUse IVLimit = ARBase->evaluateAtIteration(ExitCount, *SE);
   assert(SE->isLoopInvariant(IVLimit, L) &&
          "Computed iteration count is not loop invariant!");
   return Rewriter.expandCodeFor(IVLimit, ARBase->getType(),
