@@ -348,10 +348,17 @@ public:
   /// vector of constraints, using indices from the corresponding constraint
   /// system. New variables that need to be added to the system are collected in
   /// \p NewVariables.
+  ///
+  /// \p Op0Addend / \p Op1Addend, when set, are added to the respective side.
+  /// This is the only way to query a relation about a *sum* of two IR values:
+  /// the sum itself is not an IR value, so it cannot be named by an operand.
+  /// Only supported for ICMP_SLE/ICMP_ULE, which leave the operand order
+  /// unchanged below.
   ConstraintTy getConstraint(CmpInst::Predicate Pred, Value *Op0, Value *Op1,
                              SmallVectorImpl<Value *> &NewVariables,
                              bool ForceSignedSystem = false,
-                             int64_t Op0Scale = 1) const;
+                             int64_t Op0Scale = 1, Value *Op0Addend = nullptr,
+                             Value *Op1Addend = nullptr) const;
 
   /// Turns a comparison of the form \p Op0 \p Pred \p Op1 into a vector of
   /// constraints using getConstraint. Returns an empty constraint if the result
@@ -790,13 +797,18 @@ static Decomposition decompose(Value *V, const ConstraintInfo &Info,
 ConstraintTy
 ConstraintInfo::getConstraint(CmpInst::Predicate Pred, Value *Op0, Value *Op1,
                               SmallVectorImpl<Value *> &NewVariables,
-                              bool ForceSignedSystem, int64_t Op0Scale) const {
+                              bool ForceSignedSystem, int64_t Op0Scale,
+                              Value *Op0Addend, Value *Op1Addend) const {
   assert(NewVariables.empty() && "NewVariables must be empty when passed in");
   assert((!ForceSignedSystem || CmpInst::isEquality(Pred)) &&
          "signed system can only be forced on eq/ne");
   assert((Op0Scale == 1 || Pred == CmpInst::ICMP_ULE) &&
          "scaling Op0 is only supported for unsigned <=, which leaves the "
          "operand order unchanged below");
+  assert(((!Op0Addend && !Op1Addend) || Pred == CmpInst::ICMP_SLE ||
+          Pred == CmpInst::ICMP_ULE) &&
+         "addends are only supported for <=, which leaves the operand order "
+         "unchanged below");
 
   bool IsEq = false;
   bool IsNe = false;
@@ -844,6 +856,15 @@ ConstraintInfo::getConstraint(CmpInst::Predicate Pred, Value *Op0, Value *Op1,
     return {};
   auto BDec = decompose(Op1->stripPointerCastsSameRepresentation(), *this,
                         IsSigned, DL);
+  for (auto [Addend, Dec] :
+       {std::pair(Op0Addend, &ADec), std::pair(Op1Addend, &BDec)}) {
+    if (!Addend)
+      continue;
+    auto AddDec = decompose(Addend->stripPointerCastsSameRepresentation(), *this,
+                            IsSigned, DL);
+    if (Dec->add(AddDec))
+      return {};
+  }
   int64_t Offset1 = ADec.Offset;
   int64_t Offset2 = BDec.Offset;
   if (MulOverflow(Offset1, int64_t(-1), Offset1))
@@ -2322,9 +2343,73 @@ static bool replaceOverflowUses(WithOverflowInst *WO, Value *A, Value *B,
   return Changed;
 }
 
+/// Try to prove that `sadd.with.overflow(A, B)` with a *variable* B does not
+/// overflow, by bounding the mathematical sum from both sides.
+///
+/// The solver has no name for `A + B`, so neither operand alone can carry the
+/// bound; the sum is passed to getConstraint as an addend instead, which folds
+/// it into one side of an ordinary two-operand query.
+///
+/// Bounding the sum by two other program values proves it is in range: a value
+/// W of the same type always satisfies SMIN s<= W s<= SMAX and its
+/// decomposition is an exact representation of it, so `Lo s<= A + B s<= Hi`
+/// leaves no room for overflow in either direction.  A witness must dominate
+/// the intrinsic: a value defined below it may be derived from the very sum in
+/// question (`A + B + 1`, say), and bounding the sum by itself proves nothing.
+static bool
+tryToSimplifyVariableSAdd(WithOverflowInst *WO, ConstraintInfo &Info,
+                          DominatorTree &DT,
+                          SmallVectorImpl<Instruction *> &ToRemove) {
+  Value *A = WO->getLHS();
+  Value *B = WO->getRHS();
+  Type *Ty = A->getType();
+
+  // Query the signed system directly.  Going through doesHold() would let the
+  // query be answered by the *unsigned* system, where a bound only limits the
+  // sum to UMAX and says nothing about signed overflow.  Only `s<=` is used so
+  // the addend stays on the side it was passed for.
+  auto SumIsBelow = [&](Value *Lo, Value *LoAddend, Value *Hi,
+                        Value *HiAddend) {
+    SmallVector<Value *> NewVariables;
+    ConstraintTy R =
+        Info.getConstraint(CmpInst::ICMP_SLE, Lo, Hi, NewVariables,
+                           /*ForceSignedSystem=*/false, /*Op0Scale=*/1,
+                           LoAddend, HiAddend);
+    if (!NewVariables.empty() || R.empty())
+      return false;
+    assert(R.IsSigned && "signed predicate must build a signed constraint");
+    return Info.getCS(/*Signed=*/true)
+        .isConditionImpliedInSubSystem(R.Coefficients);
+  };
+
+  // `0 s<= A + B` is the cheap and by far most common lower bound: it holds
+  // whenever both operands are known non-negative.
+  Value *Zero = ConstantInt::getNullValue(Ty);
+  bool HasLower = SumIsBelow(Zero, nullptr, A, B);
+  bool HasUpper = false;
+  for (auto &KV : Info.getValue2Index(/*Signed=*/true)) {
+    if (HasLower && HasUpper)
+      break;
+    Value *W = KV.first;
+    if (W->getType() != Ty || isa<Constant>(W))
+      continue;
+    auto *I = dyn_cast<Instruction>(W);
+    if (I && (I == WO || !DT.dominates(I, WO)))
+      continue;
+    if (!HasUpper && SumIsBelow(A, B, W, nullptr))
+      HasUpper = true;
+    if (!HasLower && SumIsBelow(W, nullptr, A, B))
+      HasLower = true;
+  }
+  if (!HasLower || !HasUpper)
+    return false;
+
+  return replaceOverflowUses(WO, A, B, ToRemove);
+}
+
 static bool
 tryToSimplifyOverflowMath(WithOverflowInst *WO, ConstraintInfo &Info,
-                          ScalarEvolution &SE,
+                          ScalarEvolution &SE, DominatorTree &DT,
                           SmallVectorImpl<Instruction *> &ToRemove) {
   auto DoesConditionHold = [](CmpInst::Predicate Pred, Value *A, Value *B,
                               ConstraintInfo &Info) {
@@ -2359,7 +2444,7 @@ tryToSimplifyOverflowMath(WithOverflowInst *WO, ConstraintInfo &Info,
     Value *CVal = WO->getRHS();
     const APInt *C;
     if (!match(CVal, m_APInt(C)))
-      return false;
+      return tryToSimplifyVariableSAdd(WO, Info, DT, ToRemove);
     unsigned BitWidth = C->getBitWidth();
     Value *Limit;
     CmpInst::Predicate Pred;
@@ -2570,7 +2655,7 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
       LLVM_DEBUG(dbgs() << "Processing condition to simplify: " << *Inst
                         << "\n");
       if (auto *II = dyn_cast<WithOverflowInst>(Inst)) {
-        Changed |= tryToSimplifyOverflowMath(II, Info, SE, ToRemove);
+        Changed |= tryToSimplifyOverflowMath(II, Info, SE, S.DT, ToRemove);
       } else if (match(Inst, m_ICmpLike(Pred, m_Value(A), m_Value(B)))) {
         bool Simplified = checkAndReplaceCondition(
             Pred, A, B, Inst, Info, CB.NumIn, CB.NumOut, CB.getContextInst(),
