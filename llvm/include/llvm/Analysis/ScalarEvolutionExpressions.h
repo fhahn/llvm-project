@@ -375,16 +375,26 @@ public:
     SubclassData |= static_cast<unsigned short>(Flags);
   }
 
-  /// Return the value of this chain of recurrences at the specified
-  /// iteration number.
-  LLVM_ABI const SCEV *evaluateAtIteration(const SCEV *It,
-                                           ScalarEvolution &SE) const;
+  /// Return the value of this chain of recurrences at the specified iteration
+  /// number.
+  ///
+  /// If this recurrence is known to reach iteration \p It, its no-wrap flags
+  /// are attached to the result as use-specific flags: they only hold in
+  /// contexts reached via that iteration, not everywhere the closed form is
+  /// defined.
+  LLVM_ABI SCEVUse evaluateAtIteration(const SCEV *It,
+                                       ScalarEvolution &SE) const;
 
   /// Return the value of this chain of recurrences at the specified iteration
   /// number. Takes an explicit list of operands to represent an AddRec.
-  LLVM_ABI static const SCEV *evaluateAtIteration(ArrayRef<SCEVUse> Operands,
-                                                  const SCEV *It,
-                                                  ScalarEvolution &SE);
+  ///
+  /// \p Flags are attached to the result as use-specific flags; the caller must
+  /// have established that the recurrence reaches iteration \p It. Prefer the
+  /// member overload above, which establishes that itself.
+  LLVM_ABI static SCEVUse
+  evaluateAtIteration(ArrayRef<SCEVUse> Operands, const SCEV *It,
+                      ScalarEvolution &SE,
+                      SCEV::NoWrapFlags Flags = SCEV::FlagAnyWrap);
 
   /// Return the number of iterations of this loop that produce
   /// values in the specified constant range.  Another way of

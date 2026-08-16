@@ -404,7 +404,7 @@ define i32 @logical_and_2ops_and_constant(i32 %n, i32 %m, i32 %k) {
 ; CHECK-NEXT:    %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
 ; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,43) S: [0,43) Exits: (42 umin %n) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i.next = add i32 %i, 1
-; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,44) S: [1,44) Exits: (1 + (42 umin %n))<nuw><nsw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,44) S: [1,44) Exits: (1 + (42 umin %n))<nuw><nsw>(u nuw)(u nsw) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %umin = call i32 @llvm.umin.i32(i32 %n, i32 42)
 ; CHECK-NEXT:    --> (42 umin %n) U: [0,43) S: [0,43) Exits: (42 umin %n) LoopDispositions: { %loop: Invariant }
 ; CHECK-NEXT:    %cond = select i1 %cond_p1, i1 true, i1 %cond_p0
@@ -928,7 +928,7 @@ define i32 @logical_and_not_zero(i16 %n, i32 %m) {
 ; CHECK-NEXT:    %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
 ; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,65537) S: [0,65537) Exits: ((1 + (zext i16 %n to i32))<nuw><nsw> umin %m) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i.next = add i32 %i, 1
-; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,65538) S: [1,65538) Exits: (1 + ((1 + (zext i16 %n to i32))<nuw><nsw> umin %m))<nuw><nsw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,65538) S: [1,65538) Exits: (1 + ((1 + (zext i16 %n to i32))<nuw><nsw> umin %m))<nuw><nsw>(u nuw)(u nsw) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %cond = select i1 %cond_p0, i1 %cond_p1, i1 false
 ; CHECK-NEXT:    --> (%cond_p0 umin_seq %cond_p1) U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:  Determining loop execution counts for: @logical_and_not_zero
@@ -962,7 +962,7 @@ define i32 @logical_and_not_zero_wrong_order(i16 %n, i32 %m) {
 ; CHECK-NEXT:    %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
 ; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,65537) S: [0,65537) Exits: (%m umin_seq (1 + (zext i16 %n to i32))<nuw><nsw>) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i.next = add i32 %i, 1
-; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,65538) S: [1,65538) Exits: (1 + (%m umin_seq (1 + (zext i16 %n to i32))<nuw><nsw>))<nuw><nsw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,65538) S: [1,65538) Exits: (1 + (%m umin_seq (1 + (zext i16 %n to i32))<nuw><nsw>))<nuw><nsw>(u nuw)(u nsw) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %cond = select i1 %cond_p0, i1 %cond_p1, i1 false
 ; CHECK-NEXT:    --> (%cond_p0 umin_seq %cond_p1) U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:  Determining loop execution counts for: @logical_and_not_zero_wrong_order
@@ -1029,7 +1029,7 @@ define i32 @logical_and_known_smaller(i16 %n, i16 %m) {
 ; CHECK-NEXT:    %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
 ; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,65536) S: [0,65536) Exits: (zext i16 %n to i32) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i.next = add i32 %i, 1
-; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,65537) S: [1,65537) Exits: (1 + (zext i16 %n to i32))<nuw><nsw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,65537) S: [1,65537) Exits: (1 + (zext i16 %n to i32))<nuw><nsw>(u nuw)(u nsw) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %cond = select i1 %cond_p0, i1 %cond_p1, i1 false
 ; CHECK-NEXT:    --> (%cond_p0 umin_seq %cond_p1) U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:  Determining loop execution counts for: @logical_and_known_smaller
@@ -1066,7 +1066,7 @@ define i32 @logical_and_known_smaller_equal(i16 %n, i16 %m) {
 ; CHECK-NEXT:    %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
 ; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,65536) S: [0,65536) Exits: (zext i16 %n to i32) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i.next = add i32 %i, 1
-; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,65537) S: [1,65537) Exits: (1 + (zext i16 %n to i32))<nuw><nsw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,65537) S: [1,65537) Exits: (1 + (zext i16 %n to i32))<nuw><nsw>(u nuw)(u nsw) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %cond = select i1 %cond_p0, i1 %cond_p1, i1 false
 ; CHECK-NEXT:    --> (%cond_p0 umin_seq %cond_p1) U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:  Determining loop execution counts for: @logical_and_known_smaller_equal
@@ -1103,7 +1103,7 @@ define i32 @logical_and_not_known_smaller_equal(i16 %n, i16 %m) {
 ; CHECK-NEXT:    %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
 ; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,65536) S: [0,65536) Exits: ((zext i16 %n to i32) umin_seq (65534 + (zext i16 %m to i32))<nuw><nsw>) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i.next = add i32 %i, 1
-; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,65537) S: [1,65537) Exits: (1 + ((zext i16 %n to i32) umin_seq (65534 + (zext i16 %m to i32))<nuw><nsw>))<nuw><nsw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,65537) S: [1,65537) Exits: (1 + ((zext i16 %n to i32) umin_seq (65534 + (zext i16 %m to i32))<nuw><nsw>))<nuw><nsw>(u nuw)(u nsw) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %cond = select i1 %cond_p0, i1 %cond_p1, i1 false
 ; CHECK-NEXT:    --> (%cond_p0 umin_seq %cond_p1) U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:  Determining loop execution counts for: @logical_and_not_known_smaller_equal
@@ -1140,7 +1140,7 @@ define i32 @logical_and_known_greater(i16 %n, i16 %m) {
 ; CHECK-NEXT:    %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
 ; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,65536) S: [0,65536) Exits: (zext i16 %n to i32) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i.next = add i32 %i, 1
-; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,65537) S: [1,65537) Exits: (1 + (zext i16 %n to i32))<nuw><nsw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,65537) S: [1,65537) Exits: (1 + (zext i16 %n to i32))<nuw><nsw>(u nuw)(u nsw) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %cond = select i1 %cond_p0, i1 %cond_p1, i1 false
 ; CHECK-NEXT:    --> (%cond_p0 umin_seq %cond_p1) U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:  Determining loop execution counts for: @logical_and_known_greater
@@ -1177,7 +1177,7 @@ define i32 @logical_and_known_greater_equal(i16 %n, i16 %m) {
 ; CHECK-NEXT:    %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
 ; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,65536) S: [0,65536) Exits: (zext i16 %n to i32) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i.next = add i32 %i, 1
-; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,65537) S: [1,65537) Exits: (1 + (zext i16 %n to i32))<nuw><nsw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,65537) S: [1,65537) Exits: (1 + (zext i16 %n to i32))<nuw><nsw>(u nuw)(u nsw) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %cond = select i1 %cond_p0, i1 %cond_p1, i1 false
 ; CHECK-NEXT:    --> (%cond_p0 umin_seq %cond_p1) U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:  Determining loop execution counts for: @logical_and_known_greater_equal
@@ -1214,7 +1214,7 @@ define i32 @logical_and_not_known_greater_equal(i16 %n, i16 %m) {
 ; CHECK-NEXT:    %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
 ; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,65536) S: [0,65536) Exits: ((zext i16 %n to i32) umin (65534 + (zext i16 %m to i32))<nuw><nsw>) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i.next = add i32 %i, 1
-; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,65537) S: [1,65537) Exits: (1 + ((zext i16 %n to i32) umin (65534 + (zext i16 %m to i32))<nuw><nsw>))<nuw><nsw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,65537) S: [1,65537) Exits: (1 + ((zext i16 %n to i32) umin (65534 + (zext i16 %m to i32))<nuw><nsw>))<nuw><nsw>(u nuw)(u nsw) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %cond = select i1 %cond_p0, i1 %cond_p1, i1 false
 ; CHECK-NEXT:    --> (%cond_p0 umin_seq %cond_p1) U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:  Determining loop execution counts for: @logical_and_not_known_greater_equal

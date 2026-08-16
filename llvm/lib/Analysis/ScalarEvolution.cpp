@@ -1020,6 +1020,28 @@ static const SCEV *BinomialCoefficient(const SCEV *It, unsigned K,
                        SE.getTruncateOrZeroExtend(DivResult, ResultTy));
 }
 
+/// Attach \p UseFlags to \p Res as use-specific flags, but only if \p Res really
+/// is the two-operand \p ExprT over \p LHS and \p RHS - in either order, as
+/// operands get sorted by complexity.
+///
+/// Flags established for that operation say nothing about any other expression:
+/// a folded-away operand, a flattened nested expression or a distributed
+/// constant all give a different computation. They must not be attached to it,
+/// because an n-ary expression's no-wrap flags have to hold for all subsets and
+/// orders of its operands, and SCEVExpander relies on that when it stamps them
+/// on every partial sum or product it builds.
+template <typename ExprT>
+static SCEVUse withUseFlagsIfExact(ScalarEvolution &SE, const SCEV *Res,
+                                   SCEVUse LHS, SCEVUse RHS,
+                                   SCEV::NoWrapFlags UseFlags) {
+  auto *E = dyn_cast<ExprT>(Res);
+  if (!E || E->getNumOperands() != 2 ||
+      !((E->getOperand(0) == LHS && E->getOperand(1) == RHS) ||
+        (E->getOperand(0) == RHS && E->getOperand(1) == LHS)))
+    return Res;
+  return SE.getUseWithFlags(Res, UseFlags);
+}
+
 /// Return the value of this chain of recurrences at the specified iteration
 /// number.  We can evaluate this recurrence by multiplying each element in the
 /// chain by the binomial coefficient corresponding to it.  In other words, we
@@ -1028,16 +1050,39 @@ static const SCEV *BinomialCoefficient(const SCEV *It, unsigned K,
 ///   A*BC(It, 0) + B*BC(It, 1) + C*BC(It, 2) + D*BC(It, 3)
 ///
 /// where BC(It, k) stands for binomial coefficient.
-const SCEV *SCEVAddRecExpr::evaluateAtIteration(const SCEV *It,
-                                                ScalarEvolution &SE) const {
-  return evaluateAtIteration(operands(), It, SE);
+SCEVUse SCEVAddRecExpr::evaluateAtIteration(const SCEV *It,
+                                            ScalarEvolution &SE) const {
+  // A recurrence's no-wrap flags describe only the iterations it reaches, so
+  // they carry over to the closed form only for an iteration number the loop is
+  // guaranteed to reach: its exact backedge-taken count. An exit count computed
+  // for a single exit of a multi-exit loop is not enough - the loop may leave
+  // through another exit first and never reach that iteration, and then the
+  // closed form for it may wrap.
+  SCEV::NoWrapFlags Flags = getNoWrapFlags(SCEV::FlagNUW | SCEV::FlagNSW);
+  if (Flags != SCEV::FlagAnyWrap && isAffine() &&
+      It != SE.getBackedgeTakenCount(getLoop()))
+    Flags = SCEV::FlagAnyWrap;
+  return evaluateAtIteration(operands(), It, SE, Flags);
 }
 
-const SCEV *SCEVAddRecExpr::evaluateAtIteration(ArrayRef<SCEVUse> Operands,
-                                                const SCEV *It,
-                                                ScalarEvolution &SE) {
+SCEVUse SCEVAddRecExpr::evaluateAtIteration(ArrayRef<SCEVUse> Operands,
+                                            const SCEV *It, ScalarEvolution &SE,
+                                            SCEV::NoWrapFlags Flags) {
   assert(Operands.size() > 0);
-  const SCEV *Result = Operands[0].getPointer();
+  // Only an affine recurrence has a closed form of the shape the recurrence's
+  // own no-wrap flags can carry over to.
+  if (Operands.size() != 2)
+    Flags = SCEV::FlagAnyWrap;
+  if (ScalarEvolution::hasFlags(Flags, SCEV::FlagNSW)) {
+    // It * Step is value(It) - Start. For FlagNUW that is bounded by
+    // UINT_MAX - Start and cannot wrap, but in the signed sense it is only
+    // representable if Start and Step have the same sign.
+    SCEVUse Start = Operands[0], Step = Operands[1];
+    if (!((SE.isKnownNonNegative(Start) && SE.isKnownNonNegative(Step)) ||
+          (SE.isKnownNonPositive(Start) && SE.isKnownNonPositive(Step))))
+      Flags = ScalarEvolution::clearFlags(Flags, SCEV::FlagNSW);
+  }
+  SCEVUse Result = Operands[0].getPointer();
   for (unsigned i = 1, e = Operands.size(); i != e; ++i) {
     // The computation is correct in the face of overflow provided that the
     // multiplication is performed _after_ the evaluation of the binomial
@@ -1046,8 +1091,14 @@ const SCEV *SCEVAddRecExpr::evaluateAtIteration(ArrayRef<SCEVUse> Operands,
     if (isa<SCEVCouldNotCompute>(Coeff))
       return Coeff;
 
-    Result =
-        SE.getAddExpr(Result, SE.getMulExpr(Operands[i].getPointer(), Coeff));
+    // Do not set the flags on the shared node: its scope is wherever the
+    // operands are defined, while the flags only hold where the recurrence
+    // really reached this iteration. Attach them as use flags instead, and only
+    // if the sum was not folded: they hold for `Start + (Step * It)`, and for
+    // nothing else.
+    SCEVUse Mul = SE.getMulExpr(Operands[i].getPointer(), Coeff);
+    Result = withUseFlagsIfExact<SCEVAddExpr>(SE, SE.getAddExpr(Result, Mul),
+                                              Result, Mul, Flags);
   }
   return Result;
 }
@@ -10280,7 +10331,10 @@ SCEVUse ScalarEvolution::computeSCEVAtScope(const SCEV *V, const Loop *L) {
       if (BackedgeTakenCount == getCouldNotCompute())
         return AddRec;
 
-      // Then, evaluate the AddRec.
+      // Then, evaluate the AddRec. This is the loop's exact backedge-taken
+      // count, so the recurrence's no-wrap flags come back attached to the
+      // result as use-specific flags - valid only for contexts reached via this
+      // loop's exit, rather than everywhere the closed-form SCEV is defined.
       return AddRec->evaluateAtIteration(BackedgeTakenCount, *this);
     }
 
