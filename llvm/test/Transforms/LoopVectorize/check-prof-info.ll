@@ -120,7 +120,7 @@ define void @_Z3foo2v() {
 ; CHECK-SCALABLE:    br label %[[FOR_BODY:.*]]
 ; CHECK-SCALABLE:  [[FOR_COND_CLEANUP]]:
 ; CHECK-SCALABLE:  [[FOR_BODY]]:
-; CHECK-SCALABLE:    br i1 [[EXITCOND:%.*]], label %[[FOR_COND_CLEANUP]], label %[[FOR_BODY]], !prof [[PROF11:![0-9]+]], !llvm.loop [[LOOP12:![0-9]+]]
+; CHECK-SCALABLE:    br i1 [[EXITCOND:%.*]], label %[[FOR_COND_CLEANUP]], label %[[FOR_BODY]], !prof [[PROF7]], !llvm.loop [[LOOP11:![0-9]+]]
 ;
 entry:
   br label %for.body
@@ -153,9 +153,9 @@ for.body:
 ; CHECK: [[META3]] = !{!"llvm.loop.unroll.runtime.disable"}
 ; CHECK: [[META4]] = !{!"llvm.loop.estimated_trip_count", i32 256}
 ; CHECK: [[LOOP5]] = distinct !{[[LOOP5]], [[META2]], [[META3]], [[META4]]}
-; CHECK: [[PROF6]] = !{!"branch_weights", i32 1, i32 2}
+; CHECK: [[PROF6]] = !{!"branch_weights", i32 1, i32 1}
 ; CHECK: [[LOOP7]] = distinct !{[[LOOP7]], [[META3]], [[META2]], [[META8:![0-9]+]]}
-; CHECK: [[META8]] = !{!"llvm.loop.estimated_trip_count", i32 3}
+; CHECK: [[META8]] = !{!"llvm.loop.estimated_trip_count", i32 2}
 ;.
 ; CHECK-MASKED: [[PROF0]] = !{!"branch_weights", i32 1, i32 63}
 ; CHECK-MASKED: [[LOOP1]] = distinct !{[[LOOP1]], [[META2:![0-9]+]], [[META3:![0-9]+]], [[META4:![0-9]+]]}
@@ -163,9 +163,9 @@ for.body:
 ; CHECK-MASKED: [[META3]] = !{!"llvm.loop.unroll.runtime.disable"}
 ; CHECK-MASKED: [[META4]] = !{!"llvm.loop.estimated_trip_count", i32 64}
 ; CHECK-MASKED: [[LOOP5]] = distinct !{[[LOOP5]], [[META2]], [[META3]], [[META4]]}
-; CHECK-MASKED: [[PROF6]] = !{!"branch_weights", i32 1, i32 2}
+; CHECK-MASKED: [[PROF6]] = !{!"branch_weights", i32 1, i32 7}
 ; CHECK-MASKED: [[LOOP7]] = distinct !{[[LOOP7]], [[META3]], [[META2]], [[META8:![0-9]+]]}
-; CHECK-MASKED: [[META8]] = !{!"llvm.loop.estimated_trip_count", i32 3}
+; CHECK-MASKED: [[META8]] = !{!"llvm.loop.estimated_trip_count", i32 8}
 ;.
 ; CHECK-SCALABLE: [[PROF0]] = !{!"branch_weights", i32 1, i32 127}
 ; CHECK-SCALABLE: [[PROF1]] = !{!"branch_weights", i32 1, i32 255}
@@ -174,11 +174,9 @@ for.body:
 ; CHECK-SCALABLE: [[META4]] = !{!"llvm.loop.unroll.runtime.disable"}
 ; CHECK-SCALABLE: [[META5]] = !{!"llvm.loop.estimated_trip_count", i32 256}
 ; CHECK-SCALABLE: [[PROF6]] = !{!"branch_weights", i32 1, i32 3}
-; CHECK-SCALABLE: [[PROF7]] = !{!"branch_weights", i32 1, i32 0}
+; CHECK-SCALABLE: [[PROF7]] = !{!"branch_weights", i32 1, i32 1}
 ; CHECK-SCALABLE: [[LOOP8]] = distinct !{[[LOOP8]], [[META4]], [[META3]], [[META9:![0-9]+]]}
-; CHECK-SCALABLE: [[META9]] = !{!"llvm.loop.estimated_trip_count", i32 0}
+; CHECK-SCALABLE: [[META9]] = !{!"llvm.loop.estimated_trip_count", i32 2}
 ; CHECK-SCALABLE: [[LOOP10]] = distinct !{[[LOOP10]], [[META3]], [[META4]], [[META5]]}
-; CHECK-SCALABLE: [[PROF11]] = !{!"branch_weights", i32 1, i32 2}
-; CHECK-SCALABLE: [[LOOP12]] = distinct !{[[LOOP12]], [[META4]], [[META3]], [[META13:![0-9]+]]}
-; CHECK-SCALABLE: [[META13]] = !{!"llvm.loop.estimated_trip_count", i32 3}
+; CHECK-SCALABLE: [[LOOP11]] = distinct !{[[LOOP11]], [[META4]], [[META3]], [[META9]]}
 ;.

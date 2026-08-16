@@ -20,25 +20,25 @@ define i32 @load_factor_4_with_tail_gap(i64 %n, ptr noalias %a) !prof !0 {
 ; CHECK:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:  [[VECTOR_BODY]]:
 ; CHECK:    [[TMP45:%.*]] = icmp eq i64 [[INDEX_NEXT:%.*]], [[N_VEC:%.*]]
-; CHECK:    br i1 [[TMP45]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF2:![0-9]+]], !llvm.loop [[LOOP3:![0-9]+]]
+; CHECK:    br i1 [[TMP45]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF3:![0-9]+]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:  [[MIDDLE_BLOCK]]:
 ; CHECK:    br label %[[VEC_EPILOG_ITER_CHECK:.*]]
 ; CHECK:  [[VEC_EPILOG_ITER_CHECK]]:
 ; CHECK:    [[MIN_EPILOG_ITERS_CHECK:%.*]] = icmp ule i64 [[TMP5:%.*]], 4
-; CHECK:    br i1 [[MIN_EPILOG_ITERS_CHECK]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF7:![0-9]+]]
+; CHECK:    br i1 [[MIN_EPILOG_ITERS_CHECK]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF8:![0-9]+]]
 ; CHECK:  [[VEC_EPILOG_PH]]:
 ; CHECK:    [[TMP48:%.*]] = icmp eq i64 [[TMP47:%.*]], 0
 ; CHECK:    br label %[[VEC_EPILOG_VECTOR_BODY:.*]]
 ; CHECK:  [[VEC_EPILOG_VECTOR_BODY]]:
 ; CHECK:    [[TMP55:%.*]] = icmp eq i64 [[INDEX_NEXT20:%.*]], [[N_VEC13:%.*]]
-; CHECK:    br i1 [[TMP55]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !prof [[PROF8:![0-9]+]], !llvm.loop [[LOOP9:![0-9]+]]
+; CHECK:    br i1 [[TMP55]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !prof [[PROF10:![0-9]+]], !llvm.loop [[LOOP11:![0-9]+]]
 ; CHECK:  [[VEC_EPILOG_MIDDLE_BLOCK]]:
 ; CHECK:    br label %[[VEC_EPILOG_SCALAR_PH]]
 ; CHECK:  [[VEC_EPILOG_SCALAR_PH]]:
 ; CHECK:    br label %[[LOOP:.*]]
 ; CHECK:  [[LOOP]]:
 ; CHECK:    [[EXITCOND_NOT:%.*]] = icmp eq i64 [[IV_NEXT:%.*]], [[N]]
-; CHECK:    br i1 [[EXITCOND_NOT]], label %[[EXIT:.*]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP11:![0-9]+]]
+; CHECK:    br i1 [[EXITCOND_NOT]], label %[[EXIT:.*]], label %[[LOOP]], !prof [[PROF10]], !llvm.loop [[LOOP13:![0-9]+]]
 ; CHECK:  [[EXIT]]:
 ;
 entry:
@@ -71,15 +71,14 @@ exit:
 ;.
 ; CHECK: [[PROF0]] = !{!"function_entry_count", i64 13}
 ; CHECK: [[PROF1]] = !{!"branch_weights", i32 1, i32 127}
-; CHECK: [[PROF2]] = !{!"branch_weights", i32 1, i32 63}
-; CHECK: [[LOOP3]] = distinct !{[[LOOP3]], [[META4:![0-9]+]], [[META5:![0-9]+]], [[META6:![0-9]+]]}
-; CHECK: [[META4]] = !{!"llvm.loop.isvectorized", i32 1}
-; CHECK: [[META5]] = !{!"llvm.loop.unroll.runtime.disable"}
-; CHECK: [[META6]] = !{!"llvm.loop.estimated_trip_count", i32 64}
-; CHECK: [[PROF7]] = !{!"branch_weights", i32 4, i32 12}
-; CHECK: [[PROF8]] = !{!"branch_weights", i32 1, i32 0}
-; CHECK: [[LOOP9]] = distinct !{[[LOOP9]], [[META4]], [[META5]], [[META10:![0-9]+]]}
-; CHECK: [[META10]] = !{!"llvm.loop.estimated_trip_count", i32 1}
-; CHECK: [[LOOP11]] = distinct !{[[LOOP11]], [[META5]], [[META4]], [[META12:![0-9]+]]}
-; CHECK: [[META12]] = !{!"llvm.loop.estimated_trip_count", i32 0}
+; CHECK: [[PROF3]] = !{!"branch_weights", i32 1, i32 63}
+; CHECK: [[LOOP4]] = distinct !{[[LOOP4]], [[META5:![0-9]+]], [[META6:![0-9]+]], [[META7:![0-9]+]]}
+; CHECK: [[META5]] = !{!"llvm.loop.isvectorized", i32 1}
+; CHECK: [[META6]] = !{!"llvm.loop.unroll.runtime.disable"}
+; CHECK: [[META7]] = !{!"llvm.loop.estimated_trip_count", i32 64}
+; CHECK: [[PROF8]] = !{!"branch_weights", i32 4, i32 12}
+; CHECK: [[PROF10]] = !{!"branch_weights", i32 1, i32 1}
+; CHECK: [[LOOP11]] = distinct !{[[LOOP11]], [[META5]], [[META6]], [[META12:![0-9]+]]}
+; CHECK: [[META12]] = !{!"llvm.loop.estimated_trip_count", i32 2}
+; CHECK: [[LOOP13]] = distinct !{[[LOOP13]], [[META6]], [[META5]], [[META12]]}
 ;.

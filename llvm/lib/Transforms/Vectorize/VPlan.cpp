@@ -1853,8 +1853,26 @@ void LoopVectorizationPlanner::updateLoopMetadataAndProfileInfo(
   } else {
     // Calculate number of iterations in unrolled loop.
     AverageVectorTripCount = *OrigAverageTripCount / EstimatedVFxUF;
-    // Calculate number of iterations for remainder loop.
-    RemainderAverageTripCount = *OrigAverageTripCount % EstimatedVFxUF;
+    // The estimate is an average over all invocations of the loop, so the
+    // iterations left for the remainder loop are not
+    // `*OrigAverageTripCount % EstimatedVFxUF`: the remainder of the average is
+    // not the average of the remainders. Estimates of 1023 and 1025 average to
+    // 1024, which is a multiple of a step of 8, while neither of them leaves the
+    // remainder loop empty.
+    //
+    // Assume `TripCount % EstimatedVFxUF` to be equally distributed instead, as
+    // the middle block's terminator does when it claims the remainder to be
+    // empty in 1 out of EstimatedVFxUF cases. The remainder loop then runs
+    // EstimatedVFxUF / 2 iterations on average whenever it is entered, which is
+    // what latch weights express - how often it is entered is expressed by the
+    // weights of the middle block's terminator. A step of one leaves nothing for
+    // the remainder loop, which EstimatedVFxUF / 2 correctly estimates as 0.
+    //
+    // If the vector loop is not expected to be entered at all, the remainder
+    // loop runs all estimated iterations rather than a part of a step.
+    RemainderAverageTripCount = AverageVectorTripCount == 0
+                                    ? *OrigAverageTripCount
+                                    : EstimatedVFxUF / 2;
   }
   if (HeaderVPBB) {
     setLoopEstimatedTripCount(VectorLoop, AverageVectorTripCount,

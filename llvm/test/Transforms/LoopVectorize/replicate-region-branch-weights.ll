@@ -22,7 +22,7 @@ define void @predicated_store(ptr %a, i32 %n) {
 ; VF4IC1:    br i1 [[TMP15:%.*]], label %[[PRED_STORE_IF5:.*]], label %[[PRED_STORE_CONTINUE6:.*]]
 ; VF4IC1:  [[PRED_STORE_IF5]]:
 ; VF4IC1:  [[PRED_STORE_CONTINUE6]]:
-; VF4IC1:    br i1 [[TMP20:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1:![0-9]+]], !llvm.loop [[LOOP2:![0-9]+]]
+; VF4IC1:    br i1 [[TMP21:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1:![0-9]+]], !llvm.loop [[LOOP2:![0-9]+]]
 ; VF4IC1:  [[MIDDLE_BLOCK]]:
 ; VF4IC1:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF6:![0-9]+]]
 ; VF4IC1:  [[SCALAR_PH]]:
@@ -51,7 +51,7 @@ define void @predicated_store(ptr %a, i32 %n) {
 ; VF2IC2:    br i1 [[TMP17:%.*]], label %[[PRED_STORE_IF6:.*]], label %[[PRED_STORE_CONTINUE7:.*]]
 ; VF2IC2:  [[PRED_STORE_IF6]]:
 ; VF2IC2:  [[PRED_STORE_CONTINUE7]]:
-; VF2IC2:    br i1 [[TMP22:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1:![0-9]+]], !llvm.loop [[LOOP2:![0-9]+]]
+; VF2IC2:    br i1 [[TMP23:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1:![0-9]+]], !llvm.loop [[LOOP2:![0-9]+]]
 ; VF2IC2:  [[MIDDLE_BLOCK]]:
 ; VF2IC2:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF6:![0-9]+]]
 ; VF2IC2:  [[SCALAR_PH]]:
@@ -109,17 +109,17 @@ define void @predicated_store_sunk_address(ptr %a, ptr %b, i32 %n) {
 ; VF4IC1:    br i1 [[TMP17:%.*]], label %[[PRED_STORE_IF7:.*]], label %[[PRED_STORE_CONTINUE8:.*]]
 ; VF4IC1:  [[PRED_STORE_IF7]]:
 ; VF4IC1:  [[PRED_STORE_CONTINUE8]]:
-; VF4IC1:    br i1 [[TMP21:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP11:![0-9]+]]
+; VF4IC1:    br i1 [[TMP22:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP11:![0-9]+]]
 ; VF4IC1:  [[MIDDLE_BLOCK]]:
 ; VF4IC1:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF6]]
 ; VF4IC1:  [[SCALAR_PH]]:
 ; VF4IC1:  [[LOOP:.*]]:
-; VF4IC1:    br i1 [[C1:%.*]], label %[[M:.*]], label %[[LATCH:.*]], !prof [[PROF12:![0-9]+]]
+; VF4IC1:    br i1 [[C1:%.*]], label %[[M:.*]], label %[[LATCH:.*]], !prof [[PROF8]]
 ; VF4IC1:  [[M]]:
 ; VF4IC1:    br i1 [[C2:%.*]], label %[[IF:.*]], label %[[LATCH]], !prof [[PROF6]]
 ; VF4IC1:  [[IF]]:
 ; VF4IC1:  [[LATCH]]:
-; VF4IC1:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP13:![0-9]+]]
+; VF4IC1:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP12:![0-9]+]]
 ; VF4IC1:  [[EXIT]]:
 ;
 ; VF2IC2-LABEL: define void @predicated_store_sunk_address(
@@ -142,17 +142,17 @@ define void @predicated_store_sunk_address(ptr %a, ptr %b, i32 %n) {
 ; VF2IC2:    br i1 [[TMP21:%.*]], label %[[PRED_STORE_IF8:.*]], label %[[PRED_STORE_CONTINUE9:.*]]
 ; VF2IC2:  [[PRED_STORE_IF8]]:
 ; VF2IC2:  [[PRED_STORE_CONTINUE9]]:
-; VF2IC2:    br i1 [[TMP25:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP11:![0-9]+]]
+; VF2IC2:    br i1 [[TMP26:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP11:![0-9]+]]
 ; VF2IC2:  [[MIDDLE_BLOCK]]:
 ; VF2IC2:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF6]]
 ; VF2IC2:  [[SCALAR_PH]]:
 ; VF2IC2:  [[LOOP:.*]]:
-; VF2IC2:    br i1 [[C1:%.*]], label %[[M:.*]], label %[[LATCH:.*]], !prof [[PROF12:![0-9]+]]
+; VF2IC2:    br i1 [[C1:%.*]], label %[[M:.*]], label %[[LATCH:.*]], !prof [[PROF8]]
 ; VF2IC2:  [[M]]:
 ; VF2IC2:    br i1 [[C2:%.*]], label %[[IF:.*]], label %[[LATCH]], !prof [[PROF6]]
 ; VF2IC2:  [[IF]]:
 ; VF2IC2:  [[LATCH]]:
-; VF2IC2:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP13:![0-9]+]]
+; VF2IC2:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP12:![0-9]+]]
 ; VF2IC2:  [[EXIT]]:
 ;
 entry:
@@ -203,7 +203,7 @@ define void @predicated_store_no_profile(ptr %a, i32 %n) {
 ; VF4IC1:    br i1 [[TMP15:%.*]], label %[[PRED_STORE_IF5:.*]], label %[[PRED_STORE_CONTINUE6:.*]]
 ; VF4IC1:  [[PRED_STORE_IF5]]:
 ; VF4IC1:  [[PRED_STORE_CONTINUE6]]:
-; VF4IC1:    br i1 [[TMP20:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP14:![0-9]+]]
+; VF4IC1:    br i1 [[TMP21:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP13:![0-9]+]]
 ; VF4IC1:  [[MIDDLE_BLOCK]]:
 ; VF4IC1:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; VF4IC1:  [[SCALAR_PH]]:
@@ -211,7 +211,7 @@ define void @predicated_store_no_profile(ptr %a, i32 %n) {
 ; VF4IC1:    br i1 [[CMP:%.*]], label %[[IF_THEN:.*]], label %[[LATCH:.*]]
 ; VF4IC1:  [[IF_THEN]]:
 ; VF4IC1:  [[LATCH]]:
-; VF4IC1:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP15:![0-9]+]]
+; VF4IC1:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP14:![0-9]+]]
 ; VF4IC1:  [[EXIT]]:
 ;
 ; VF2IC2-LABEL: define void @predicated_store_no_profile(
@@ -232,7 +232,7 @@ define void @predicated_store_no_profile(ptr %a, i32 %n) {
 ; VF2IC2:    br i1 [[TMP17:%.*]], label %[[PRED_STORE_IF6:.*]], label %[[PRED_STORE_CONTINUE7:.*]]
 ; VF2IC2:  [[PRED_STORE_IF6]]:
 ; VF2IC2:  [[PRED_STORE_CONTINUE7]]:
-; VF2IC2:    br i1 [[TMP22:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP14:![0-9]+]]
+; VF2IC2:    br i1 [[TMP23:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP13:![0-9]+]]
 ; VF2IC2:  [[MIDDLE_BLOCK]]:
 ; VF2IC2:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; VF2IC2:  [[SCALAR_PH]]:
@@ -240,7 +240,7 @@ define void @predicated_store_no_profile(ptr %a, i32 %n) {
 ; VF2IC2:    br i1 [[CMP:%.*]], label %[[IF_THEN:.*]], label %[[LATCH:.*]]
 ; VF2IC2:  [[IF_THEN]]:
 ; VF2IC2:  [[LATCH]]:
-; VF2IC2:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP15:![0-9]+]]
+; VF2IC2:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP14:![0-9]+]]
 ; VF2IC2:  [[EXIT]]:
 ;
 entry:
@@ -287,7 +287,7 @@ define void @predicated_store_unprofiled_predicate(ptr %a, i32 %n) {
 ; VF4IC1:    br i1 [[TMP15:%.*]], label %[[PRED_STORE_IF5:.*]], label %[[PRED_STORE_CONTINUE6:.*]]
 ; VF4IC1:  [[PRED_STORE_IF5]]:
 ; VF4IC1:  [[PRED_STORE_CONTINUE6]]:
-; VF4IC1:    br i1 [[TMP20:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP16:![0-9]+]]
+; VF4IC1:    br i1 [[TMP21:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP15:![0-9]+]]
 ; VF4IC1:  [[MIDDLE_BLOCK]]:
 ; VF4IC1:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF6]]
 ; VF4IC1:  [[SCALAR_PH]]:
@@ -295,7 +295,7 @@ define void @predicated_store_unprofiled_predicate(ptr %a, i32 %n) {
 ; VF4IC1:    br i1 [[CMP:%.*]], label %[[IF_THEN:.*]], label %[[LATCH:.*]]
 ; VF4IC1:  [[IF_THEN]]:
 ; VF4IC1:  [[LATCH]]:
-; VF4IC1:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP17:![0-9]+]]
+; VF4IC1:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP16:![0-9]+]]
 ; VF4IC1:  [[EXIT]]:
 ;
 ; VF2IC2-LABEL: define void @predicated_store_unprofiled_predicate(
@@ -316,7 +316,7 @@ define void @predicated_store_unprofiled_predicate(ptr %a, i32 %n) {
 ; VF2IC2:    br i1 [[TMP17:%.*]], label %[[PRED_STORE_IF6:.*]], label %[[PRED_STORE_CONTINUE7:.*]]
 ; VF2IC2:  [[PRED_STORE_IF6]]:
 ; VF2IC2:  [[PRED_STORE_CONTINUE7]]:
-; VF2IC2:    br i1 [[TMP22:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP16:![0-9]+]]
+; VF2IC2:    br i1 [[TMP23:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP15:![0-9]+]]
 ; VF2IC2:  [[MIDDLE_BLOCK]]:
 ; VF2IC2:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF6]]
 ; VF2IC2:  [[SCALAR_PH]]:
@@ -324,7 +324,7 @@ define void @predicated_store_unprofiled_predicate(ptr %a, i32 %n) {
 ; VF2IC2:    br i1 [[CMP:%.*]], label %[[IF_THEN:.*]], label %[[LATCH:.*]]
 ; VF2IC2:  [[IF_THEN]]:
 ; VF2IC2:  [[LATCH]]:
-; VF2IC2:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP17:![0-9]+]]
+; VF2IC2:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP16:![0-9]+]]
 ; VF2IC2:  [[EXIT]]:
 ;
 entry:
@@ -370,15 +370,15 @@ define void @predicated_store_almost_always_taken(ptr %a, i32 %n) {
 ; VF4IC1:    br i1 [[TMP13:%.*]], label %[[PRED_STORE_IF5:.*]], label %[[PRED_STORE_CONTINUE6:.*]]
 ; VF4IC1:  [[PRED_STORE_IF5]]:
 ; VF4IC1:  [[PRED_STORE_CONTINUE6]]:
-; VF4IC1:    br i1 [[TMP17:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP18:![0-9]+]]
+; VF4IC1:    br i1 [[TMP18:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP17:![0-9]+]]
 ; VF4IC1:  [[MIDDLE_BLOCK]]:
 ; VF4IC1:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF6]]
 ; VF4IC1:  [[SCALAR_PH]]:
 ; VF4IC1:  [[LOOP:.*]]:
-; VF4IC1:    br i1 [[CMP:%.*]], label %[[IF_THEN:.*]], label %[[LATCH:.*]], !prof [[PROF19:![0-9]+]]
+; VF4IC1:    br i1 [[CMP:%.*]], label %[[IF_THEN:.*]], label %[[LATCH:.*]], !prof [[PROF18:![0-9]+]]
 ; VF4IC1:  [[IF_THEN]]:
 ; VF4IC1:  [[LATCH]]:
-; VF4IC1:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP20:![0-9]+]]
+; VF4IC1:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP19:![0-9]+]]
 ; VF4IC1:  [[EXIT]]:
 ;
 ; VF2IC2-LABEL: define void @predicated_store_almost_always_taken(
@@ -399,15 +399,15 @@ define void @predicated_store_almost_always_taken(ptr %a, i32 %n) {
 ; VF2IC2:    br i1 [[TMP17:%.*]], label %[[PRED_STORE_IF6:.*]], label %[[PRED_STORE_CONTINUE7:.*]]
 ; VF2IC2:  [[PRED_STORE_IF6]]:
 ; VF2IC2:  [[PRED_STORE_CONTINUE7]]:
-; VF2IC2:    br i1 [[TMP22:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP18:![0-9]+]]
+; VF2IC2:    br i1 [[TMP23:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP17:![0-9]+]]
 ; VF2IC2:  [[MIDDLE_BLOCK]]:
 ; VF2IC2:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF6]]
 ; VF2IC2:  [[SCALAR_PH]]:
 ; VF2IC2:  [[LOOP:.*]]:
-; VF2IC2:    br i1 [[CMP:%.*]], label %[[IF_THEN:.*]], label %[[LATCH:.*]], !prof [[PROF19:![0-9]+]]
+; VF2IC2:    br i1 [[CMP:%.*]], label %[[IF_THEN:.*]], label %[[LATCH:.*]], !prof [[PROF18:![0-9]+]]
 ; VF2IC2:  [[IF_THEN]]:
 ; VF2IC2:  [[LATCH]]:
-; VF2IC2:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP20:![0-9]+]]
+; VF2IC2:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP19:![0-9]+]]
 ; VF2IC2:  [[EXIT]]:
 ;
 entry:
@@ -455,15 +455,15 @@ define void @predicated_store_non_reciprocal(ptr %a, i32 %n) {
 ; VF4IC1:    br i1 [[TMP15:%.*]], label %[[PRED_STORE_IF5:.*]], label %[[PRED_STORE_CONTINUE6:.*]]
 ; VF4IC1:  [[PRED_STORE_IF5]]:
 ; VF4IC1:  [[PRED_STORE_CONTINUE6]]:
-; VF4IC1:    br i1 [[TMP20:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP21:![0-9]+]]
+; VF4IC1:    br i1 [[TMP21:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP20:![0-9]+]]
 ; VF4IC1:  [[MIDDLE_BLOCK]]:
 ; VF4IC1:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF6]]
 ; VF4IC1:  [[SCALAR_PH]]:
 ; VF4IC1:  [[LOOP:.*]]:
-; VF4IC1:    br i1 [[CMP:%.*]], label %[[IF_THEN:.*]], label %[[LATCH:.*]], !prof [[PROF22:![0-9]+]]
+; VF4IC1:    br i1 [[CMP:%.*]], label %[[IF_THEN:.*]], label %[[LATCH:.*]], !prof [[PROF21:![0-9]+]]
 ; VF4IC1:  [[IF_THEN]]:
 ; VF4IC1:  [[LATCH]]:
-; VF4IC1:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP23:![0-9]+]]
+; VF4IC1:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP22:![0-9]+]]
 ; VF4IC1:  [[EXIT]]:
 ;
 ; VF2IC2-LABEL: define void @predicated_store_non_reciprocal(
@@ -484,15 +484,15 @@ define void @predicated_store_non_reciprocal(ptr %a, i32 %n) {
 ; VF2IC2:    br i1 [[TMP17:%.*]], label %[[PRED_STORE_IF6:.*]], label %[[PRED_STORE_CONTINUE7:.*]]
 ; VF2IC2:  [[PRED_STORE_IF6]]:
 ; VF2IC2:  [[PRED_STORE_CONTINUE7]]:
-; VF2IC2:    br i1 [[TMP22:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP21:![0-9]+]]
+; VF2IC2:    br i1 [[TMP23:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP20:![0-9]+]]
 ; VF2IC2:  [[MIDDLE_BLOCK]]:
 ; VF2IC2:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF6]]
 ; VF2IC2:  [[SCALAR_PH]]:
 ; VF2IC2:  [[LOOP:.*]]:
-; VF2IC2:    br i1 [[CMP:%.*]], label %[[IF_THEN:.*]], label %[[LATCH:.*]], !prof [[PROF22:![0-9]+]]
+; VF2IC2:    br i1 [[CMP:%.*]], label %[[IF_THEN:.*]], label %[[LATCH:.*]], !prof [[PROF21:![0-9]+]]
 ; VF2IC2:  [[IF_THEN]]:
 ; VF2IC2:  [[LATCH]]:
-; VF2IC2:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP23:![0-9]+]]
+; VF2IC2:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP22:![0-9]+]]
 ; VF2IC2:  [[EXIT]]:
 ;
 entry:
@@ -540,17 +540,17 @@ define void @predicated_store_taken_weight_underflow(ptr %a, i32 %n) {
 ; VF4IC1:    br i1 [[TMP11:%.*]], label %[[PRED_STORE_IF5:.*]], label %[[PRED_STORE_CONTINUE6:.*]]
 ; VF4IC1:  [[PRED_STORE_IF5]]:
 ; VF4IC1:  [[PRED_STORE_CONTINUE6]]:
-; VF4IC1:    br i1 [[TMP14:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP24:![0-9]+]]
+; VF4IC1:    br i1 [[TMP15:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP23:![0-9]+]]
 ; VF4IC1:  [[MIDDLE_BLOCK]]:
 ; VF4IC1:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF6]]
 ; VF4IC1:  [[SCALAR_PH]]:
 ; VF4IC1:  [[LOOP:.*]]:
-; VF4IC1:    br i1 [[C1:%.*]], label %[[IF_1:.*]], label %[[LATCH:.*]], !prof [[PROF25:![0-9]+]]
+; VF4IC1:    br i1 [[C1:%.*]], label %[[IF_1:.*]], label %[[LATCH:.*]], !prof [[PROF24:![0-9]+]]
 ; VF4IC1:  [[IF_1]]:
-; VF4IC1:    br i1 [[C2:%.*]], label %[[IF_THEN:.*]], label %[[LATCH]], !prof [[PROF25]]
+; VF4IC1:    br i1 [[C2:%.*]], label %[[IF_THEN:.*]], label %[[LATCH]], !prof [[PROF24]]
 ; VF4IC1:  [[IF_THEN]]:
 ; VF4IC1:  [[LATCH]]:
-; VF4IC1:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP26:![0-9]+]]
+; VF4IC1:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP25:![0-9]+]]
 ; VF4IC1:  [[EXIT]]:
 ;
 ; VF2IC2-LABEL: define void @predicated_store_taken_weight_underflow(
@@ -571,17 +571,17 @@ define void @predicated_store_taken_weight_underflow(ptr %a, i32 %n) {
 ; VF2IC2:    br i1 [[TMP15:%.*]], label %[[PRED_STORE_IF6:.*]], label %[[PRED_STORE_CONTINUE7:.*]]
 ; VF2IC2:  [[PRED_STORE_IF6]]:
 ; VF2IC2:  [[PRED_STORE_CONTINUE7]]:
-; VF2IC2:    br i1 [[TMP18:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP24:![0-9]+]]
+; VF2IC2:    br i1 [[TMP19:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP23:![0-9]+]]
 ; VF2IC2:  [[MIDDLE_BLOCK]]:
 ; VF2IC2:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF6]]
 ; VF2IC2:  [[SCALAR_PH]]:
 ; VF2IC2:  [[LOOP:.*]]:
-; VF2IC2:    br i1 [[C1:%.*]], label %[[IF_1:.*]], label %[[LATCH:.*]], !prof [[PROF25:![0-9]+]]
+; VF2IC2:    br i1 [[C1:%.*]], label %[[IF_1:.*]], label %[[LATCH:.*]], !prof [[PROF24:![0-9]+]]
 ; VF2IC2:  [[IF_1]]:
-; VF2IC2:    br i1 [[C2:%.*]], label %[[IF_THEN:.*]], label %[[LATCH]], !prof [[PROF25]]
+; VF2IC2:    br i1 [[C2:%.*]], label %[[IF_THEN:.*]], label %[[LATCH]], !prof [[PROF24]]
 ; VF2IC2:  [[IF_THEN]]:
 ; VF2IC2:  [[LATCH]]:
-; VF2IC2:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP26:![0-9]+]]
+; VF2IC2:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP25:![0-9]+]]
 ; VF2IC2:  [[EXIT]]:
 ;
 entry:
@@ -630,7 +630,7 @@ define void @predicated_block_with_multiple_ops(ptr noalias %a, ptr noalias %b, 
 ; VF4IC1:    br i1 [[TMP16:%.*]], label %[[PRED_STORE_IF5:.*]], label %[[PRED_STORE_CONTINUE6:.*]]
 ; VF4IC1:  [[PRED_STORE_IF5]]:
 ; VF4IC1:  [[PRED_STORE_CONTINUE6]]:
-; VF4IC1:    br i1 [[TMP21:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP27:![0-9]+]]
+; VF4IC1:    br i1 [[TMP22:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP26:![0-9]+]]
 ; VF4IC1:  [[MIDDLE_BLOCK]]:
 ; VF4IC1:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF6]]
 ; VF4IC1:  [[SCALAR_PH]]:
@@ -638,7 +638,7 @@ define void @predicated_block_with_multiple_ops(ptr noalias %a, ptr noalias %b, 
 ; VF4IC1:    br i1 [[CMP:%.*]], label %[[IF_THEN:.*]], label %[[LATCH:.*]], !prof [[PROF6]]
 ; VF4IC1:  [[IF_THEN]]:
 ; VF4IC1:  [[LATCH]]:
-; VF4IC1:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP28:![0-9]+]]
+; VF4IC1:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP27:![0-9]+]]
 ; VF4IC1:  [[EXIT]]:
 ;
 ; VF2IC2-LABEL: define void @predicated_block_with_multiple_ops(
@@ -659,7 +659,7 @@ define void @predicated_block_with_multiple_ops(ptr noalias %a, ptr noalias %b, 
 ; VF2IC2:    br i1 [[TMP18:%.*]], label %[[PRED_STORE_IF6:.*]], label %[[PRED_STORE_CONTINUE7:.*]]
 ; VF2IC2:  [[PRED_STORE_IF6]]:
 ; VF2IC2:  [[PRED_STORE_CONTINUE7]]:
-; VF2IC2:    br i1 [[TMP23:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP27:![0-9]+]]
+; VF2IC2:    br i1 [[TMP24:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP26:![0-9]+]]
 ; VF2IC2:  [[MIDDLE_BLOCK]]:
 ; VF2IC2:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF6]]
 ; VF2IC2:  [[SCALAR_PH]]:
@@ -667,7 +667,7 @@ define void @predicated_block_with_multiple_ops(ptr noalias %a, ptr noalias %b, 
 ; VF2IC2:    br i1 [[CMP:%.*]], label %[[IF_THEN:.*]], label %[[LATCH:.*]], !prof [[PROF6]]
 ; VF2IC2:  [[IF_THEN]]:
 ; VF2IC2:  [[LATCH]]:
-; VF2IC2:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP28:![0-9]+]]
+; VF2IC2:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP27:![0-9]+]]
 ; VF2IC2:  [[EXIT]]:
 ;
 entry:
@@ -722,19 +722,19 @@ define void @predicated_store_multiple_incoming_edges(ptr %a, i32 %n) {
 ; VF4IC1:    br i1 [[TMP15:%.*]], label %[[PRED_STORE_IF5:.*]], label %[[PRED_STORE_CONTINUE6:.*]]
 ; VF4IC1:  [[PRED_STORE_IF5]]:
 ; VF4IC1:  [[PRED_STORE_CONTINUE6]]:
-; VF4IC1:    br i1 [[TMP18:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP29:![0-9]+]]
+; VF4IC1:    br i1 [[TMP19:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP28:![0-9]+]]
 ; VF4IC1:  [[MIDDLE_BLOCK]]:
 ; VF4IC1:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF6]]
 ; VF4IC1:  [[SCALAR_PH]]:
 ; VF4IC1:  [[LOOP:.*]]:
 ; VF4IC1:    br i1 [[C_1:%.*]], label %[[PATH_A:.*]], label %[[PATH_B:.*]], !prof [[PROF6]]
 ; VF4IC1:  [[PATH_A]]:
-; VF4IC1:    br i1 [[C_2:%.*]], label %[[IF_THEN:.*]], label %[[LATCH:.*]], !prof [[PROF12]]
+; VF4IC1:    br i1 [[C_2:%.*]], label %[[IF_THEN:.*]], label %[[LATCH:.*]], !prof [[PROF8]]
 ; VF4IC1:  [[PATH_B]]:
 ; VF4IC1:    br i1 [[C_3:%.*]], label %[[IF_THEN]], label %[[LATCH]], !prof [[PROF7]]
 ; VF4IC1:  [[IF_THEN]]:
 ; VF4IC1:  [[LATCH]]:
-; VF4IC1:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP30:![0-9]+]]
+; VF4IC1:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP29:![0-9]+]]
 ; VF4IC1:  [[EXIT]]:
 ;
 ; VF2IC2-LABEL: define void @predicated_store_multiple_incoming_edges(
@@ -755,19 +755,19 @@ define void @predicated_store_multiple_incoming_edges(ptr %a, i32 %n) {
 ; VF2IC2:    br i1 [[TMP23:%.*]], label %[[PRED_STORE_IF6:.*]], label %[[PRED_STORE_CONTINUE7:.*]]
 ; VF2IC2:  [[PRED_STORE_IF6]]:
 ; VF2IC2:  [[PRED_STORE_CONTINUE7]]:
-; VF2IC2:    br i1 [[TMP26:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP29:![0-9]+]]
+; VF2IC2:    br i1 [[TMP27:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP28:![0-9]+]]
 ; VF2IC2:  [[MIDDLE_BLOCK]]:
 ; VF2IC2:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF6]]
 ; VF2IC2:  [[SCALAR_PH]]:
 ; VF2IC2:  [[LOOP:.*]]:
 ; VF2IC2:    br i1 [[C_1:%.*]], label %[[PATH_A:.*]], label %[[PATH_B:.*]], !prof [[PROF6]]
 ; VF2IC2:  [[PATH_A]]:
-; VF2IC2:    br i1 [[C_2:%.*]], label %[[IF_THEN:.*]], label %[[LATCH:.*]], !prof [[PROF12]]
+; VF2IC2:    br i1 [[C_2:%.*]], label %[[IF_THEN:.*]], label %[[LATCH:.*]], !prof [[PROF8]]
 ; VF2IC2:  [[PATH_B]]:
 ; VF2IC2:    br i1 [[C_3:%.*]], label %[[IF_THEN]], label %[[LATCH]], !prof [[PROF7]]
 ; VF2IC2:  [[IF_THEN]]:
 ; VF2IC2:  [[LATCH]]:
-; VF2IC2:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP30:![0-9]+]]
+; VF2IC2:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP29:![0-9]+]]
 ; VF2IC2:  [[EXIT]]:
 ;
 entry:
@@ -822,19 +822,19 @@ define void @predicated_store_multiple_incoming_edges_one_unprofiled(ptr %a, i32
 ; VF4IC1:    br i1 [[TMP15:%.*]], label %[[PRED_STORE_IF5:.*]], label %[[PRED_STORE_CONTINUE6:.*]]
 ; VF4IC1:  [[PRED_STORE_IF5]]:
 ; VF4IC1:  [[PRED_STORE_CONTINUE6]]:
-; VF4IC1:    br i1 [[TMP18:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP31:![0-9]+]]
+; VF4IC1:    br i1 [[TMP19:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP30:![0-9]+]]
 ; VF4IC1:  [[MIDDLE_BLOCK]]:
 ; VF4IC1:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF6]]
 ; VF4IC1:  [[SCALAR_PH]]:
 ; VF4IC1:  [[LOOP:.*]]:
 ; VF4IC1:    br i1 [[C_1:%.*]], label %[[PATH_A:.*]], label %[[PATH_B:.*]], !prof [[PROF6]]
 ; VF4IC1:  [[PATH_A]]:
-; VF4IC1:    br i1 [[C_2:%.*]], label %[[IF_THEN:.*]], label %[[LATCH:.*]], !prof [[PROF12]]
+; VF4IC1:    br i1 [[C_2:%.*]], label %[[IF_THEN:.*]], label %[[LATCH:.*]], !prof [[PROF8]]
 ; VF4IC1:  [[PATH_B]]:
 ; VF4IC1:    br i1 [[C_3:%.*]], label %[[IF_THEN]], label %[[LATCH]]
 ; VF4IC1:  [[IF_THEN]]:
 ; VF4IC1:  [[LATCH]]:
-; VF4IC1:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP32:![0-9]+]]
+; VF4IC1:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP31:![0-9]+]]
 ; VF4IC1:  [[EXIT]]:
 ;
 ; VF2IC2-LABEL: define void @predicated_store_multiple_incoming_edges_one_unprofiled(
@@ -855,19 +855,19 @@ define void @predicated_store_multiple_incoming_edges_one_unprofiled(ptr %a, i32
 ; VF2IC2:    br i1 [[TMP23:%.*]], label %[[PRED_STORE_IF6:.*]], label %[[PRED_STORE_CONTINUE7:.*]]
 ; VF2IC2:  [[PRED_STORE_IF6]]:
 ; VF2IC2:  [[PRED_STORE_CONTINUE7]]:
-; VF2IC2:    br i1 [[TMP26:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP31:![0-9]+]]
+; VF2IC2:    br i1 [[TMP27:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP30:![0-9]+]]
 ; VF2IC2:  [[MIDDLE_BLOCK]]:
 ; VF2IC2:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF6]]
 ; VF2IC2:  [[SCALAR_PH]]:
 ; VF2IC2:  [[LOOP:.*]]:
 ; VF2IC2:    br i1 [[C_1:%.*]], label %[[PATH_A:.*]], label %[[PATH_B:.*]], !prof [[PROF6]]
 ; VF2IC2:  [[PATH_A]]:
-; VF2IC2:    br i1 [[C_2:%.*]], label %[[IF_THEN:.*]], label %[[LATCH:.*]], !prof [[PROF12]]
+; VF2IC2:    br i1 [[C_2:%.*]], label %[[IF_THEN:.*]], label %[[LATCH:.*]], !prof [[PROF8]]
 ; VF2IC2:  [[PATH_B]]:
 ; VF2IC2:    br i1 [[C_3:%.*]], label %[[IF_THEN]], label %[[LATCH]]
 ; VF2IC2:  [[IF_THEN]]:
 ; VF2IC2:  [[LATCH]]:
-; VF2IC2:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP32:![0-9]+]]
+; VF2IC2:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP31:![0-9]+]]
 ; VF2IC2:  [[EXIT]]:
 ;
 entry:
@@ -936,16 +936,16 @@ define void @predicated_store_switch_multiple_cases(ptr %a, i32 %n) {
 ; VF4IC1:    br i1 [[TMP18:%.*]], label %[[PRED_STORE_IF13:.*]], label %[[PRED_STORE_CONTINUE14:.*]]
 ; VF4IC1:  [[PRED_STORE_IF13]]:
 ; VF4IC1:  [[PRED_STORE_CONTINUE14]]:
-; VF4IC1:    br i1 [[TMP19:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP33:![0-9]+]]
+; VF4IC1:    br i1 [[TMP20:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP32:![0-9]+]]
 ; VF4IC1:  [[MIDDLE_BLOCK]]:
 ; VF4IC1:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF6]]
 ; VF4IC1:  [[SCALAR_PH]]:
 ; VF4IC1:  [[LOOP:.*]]:
-; VF4IC1:    ], !prof [[PROF34:![0-9]+]]
+; VF4IC1:    ], !prof [[PROF33:![0-9]+]]
 ; VF4IC1:  [[IF_THEN:.*:]]
 ; VF4IC1:  [[OTHER:.*:]]
 ; VF4IC1:  [[LATCH:.*:]]
-; VF4IC1:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP35:![0-9]+]]
+; VF4IC1:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP34:![0-9]+]]
 ; VF4IC1:  [[EXIT]]:
 ;
 ; VF2IC2-LABEL: define void @predicated_store_switch_multiple_cases(
@@ -978,16 +978,16 @@ define void @predicated_store_switch_multiple_cases(ptr %a, i32 %n) {
 ; VF2IC2:    br i1 [[TMP23:%.*]], label %[[PRED_STORE_IF14:.*]], label %[[PRED_STORE_CONTINUE15:.*]]
 ; VF2IC2:  [[PRED_STORE_IF14]]:
 ; VF2IC2:  [[PRED_STORE_CONTINUE15]]:
-; VF2IC2:    br i1 [[TMP24:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP33:![0-9]+]]
+; VF2IC2:    br i1 [[TMP25:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP32:![0-9]+]]
 ; VF2IC2:  [[MIDDLE_BLOCK]]:
 ; VF2IC2:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF6]]
 ; VF2IC2:  [[SCALAR_PH]]:
 ; VF2IC2:  [[LOOP:.*]]:
-; VF2IC2:    ], !prof [[PROF34:![0-9]+]]
+; VF2IC2:    ], !prof [[PROF33:![0-9]+]]
 ; VF2IC2:  [[IF_THEN:.*:]]
 ; VF2IC2:  [[OTHER:.*:]]
 ; VF2IC2:  [[LATCH:.*:]]
-; VF2IC2:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP35:![0-9]+]]
+; VF2IC2:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP34:![0-9]+]]
 ; VF2IC2:  [[EXIT]]:
 ;
 entry:
@@ -1042,18 +1042,18 @@ define void @merged_replicate_regions_inconsistent_weights(ptr noalias %a, ptr n
 ; VF4IC1:    br i1 [[TMP12:%.*]], label %[[PRED_STORE_IF5:.*]], label %[[PRED_STORE_CONTINUE6:.*]]
 ; VF4IC1:  [[PRED_STORE_IF5]]:
 ; VF4IC1:  [[PRED_STORE_CONTINUE6]]:
-; VF4IC1:    br i1 [[TMP16:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP36:![0-9]+]]
+; VF4IC1:    br i1 [[TMP17:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP35:![0-9]+]]
 ; VF4IC1:  [[MIDDLE_BLOCK]]:
 ; VF4IC1:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF6]]
 ; VF4IC1:  [[SCALAR_PH]]:
 ; VF4IC1:  [[LOOP:.*]]:
-; VF4IC1:    br i1 [[CMP:%.*]], label %[[IF_THEN_1:.*]], label %[[MERGE:.*]], !prof [[PROF19]]
+; VF4IC1:    br i1 [[CMP:%.*]], label %[[IF_THEN_1:.*]], label %[[MERGE:.*]], !prof [[PROF18]]
 ; VF4IC1:  [[IF_THEN_1]]:
 ; VF4IC1:  [[MERGE]]:
-; VF4IC1:    br i1 [[CMP]], label %[[IF_THEN_2:.*]], label %[[LATCH:.*]], !prof [[PROF37:![0-9]+]]
+; VF4IC1:    br i1 [[CMP]], label %[[IF_THEN_2:.*]], label %[[LATCH:.*]], !prof [[PROF36:![0-9]+]]
 ; VF4IC1:  [[IF_THEN_2]]:
 ; VF4IC1:  [[LATCH]]:
-; VF4IC1:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP38:![0-9]+]]
+; VF4IC1:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP37:![0-9]+]]
 ; VF4IC1:  [[EXIT]]:
 ;
 ; VF2IC2-LABEL: define void @merged_replicate_regions_inconsistent_weights(
@@ -1074,18 +1074,18 @@ define void @merged_replicate_regions_inconsistent_weights(ptr noalias %a, ptr n
 ; VF2IC2:    br i1 [[TMP14:%.*]], label %[[PRED_STORE_IF6:.*]], label %[[PRED_STORE_CONTINUE7:.*]]
 ; VF2IC2:  [[PRED_STORE_IF6]]:
 ; VF2IC2:  [[PRED_STORE_CONTINUE7]]:
-; VF2IC2:    br i1 [[TMP18:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP36:![0-9]+]]
+; VF2IC2:    br i1 [[TMP19:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP35:![0-9]+]]
 ; VF2IC2:  [[MIDDLE_BLOCK]]:
 ; VF2IC2:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF6]]
 ; VF2IC2:  [[SCALAR_PH]]:
 ; VF2IC2:  [[LOOP:.*]]:
-; VF2IC2:    br i1 [[CMP:%.*]], label %[[IF_THEN_1:.*]], label %[[MERGE:.*]], !prof [[PROF19]]
+; VF2IC2:    br i1 [[CMP:%.*]], label %[[IF_THEN_1:.*]], label %[[MERGE:.*]], !prof [[PROF18]]
 ; VF2IC2:  [[IF_THEN_1]]:
 ; VF2IC2:  [[MERGE]]:
-; VF2IC2:    br i1 [[CMP]], label %[[IF_THEN_2:.*]], label %[[LATCH:.*]], !prof [[PROF37:![0-9]+]]
+; VF2IC2:    br i1 [[CMP]], label %[[IF_THEN_2:.*]], label %[[LATCH:.*]], !prof [[PROF36:![0-9]+]]
 ; VF2IC2:  [[IF_THEN_2]]:
 ; VF2IC2:  [[LATCH]]:
-; VF2IC2:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP38:![0-9]+]]
+; VF2IC2:    br i1 [[EXITCOND:%.*]], label %[[EXIT]], label %[[LOOP]], !prof [[PROF8]], !llvm.loop [[LOOP37:![0-9]+]]
 ; VF2IC2:  [[EXIT]]:
 ;
 entry:
@@ -1136,37 +1136,36 @@ exit:
 ; VF4IC1: [[META5]] = !{!"llvm.loop.estimated_trip_count", i32 250}
 ; VF4IC1: [[PROF6]] = !{!"branch_weights", i32 1, i32 3}
 ; VF4IC1: [[PROF7]] = !{!"branch_weights", i32 1, i32 7}
-; VF4IC1: [[PROF8]] = !{!"branch_weights", i32 1, i32 0}
+; VF4IC1: [[PROF8]] = !{!"branch_weights", i32 1, i32 1}
 ; VF4IC1: [[LOOP9]] = distinct !{[[LOOP9]], [[META4]], [[META3]], [[META10:![0-9]+]]}
-; VF4IC1: [[META10]] = !{!"llvm.loop.estimated_trip_count", i32 1}
+; VF4IC1: [[META10]] = !{!"llvm.loop.estimated_trip_count", i32 2}
 ; VF4IC1: [[LOOP11]] = distinct !{[[LOOP11]], [[META3]], [[META4]], [[META5]]}
-; VF4IC1: [[PROF12]] = !{!"branch_weights", i32 1, i32 1}
-; VF4IC1: [[LOOP13]] = distinct !{[[LOOP13]], [[META3]], [[META10]]}
-; VF4IC1: [[LOOP14]] = distinct !{[[LOOP14]], [[META3]], [[META4]]}
-; VF4IC1: [[LOOP15]] = distinct !{[[LOOP15]], [[META4]], [[META3]]}
-; VF4IC1: [[LOOP16]] = distinct !{[[LOOP16]], [[META3]], [[META4]], [[META5]]}
-; VF4IC1: [[LOOP17]] = distinct !{[[LOOP17]], [[META4]], [[META3]], [[META10]]}
-; VF4IC1: [[LOOP18]] = distinct !{[[LOOP18]], [[META3]], [[META4]], [[META5]]}
-; VF4IC1: [[PROF19]] = !{!"branch_weights", i32 1000, i32 1}
-; VF4IC1: [[LOOP20]] = distinct !{[[LOOP20]], [[META4]], [[META3]], [[META10]]}
-; VF4IC1: [[LOOP21]] = distinct !{[[LOOP21]], [[META3]], [[META4]], [[META5]]}
-; VF4IC1: [[PROF22]] = !{!"branch_weights", i32 3, i32 2}
-; VF4IC1: [[LOOP23]] = distinct !{[[LOOP23]], [[META4]], [[META3]], [[META10]]}
-; VF4IC1: [[LOOP24]] = distinct !{[[LOOP24]], [[META3]], [[META4]], [[META5]]}
-; VF4IC1: [[PROF25]] = !{!"branch_weights", i32 1, i32 100000}
-; VF4IC1: [[LOOP26]] = distinct !{[[LOOP26]], [[META4]], [[META3]], [[META10]]}
-; VF4IC1: [[LOOP27]] = distinct !{[[LOOP27]], [[META3]], [[META4]], [[META5]]}
-; VF4IC1: [[LOOP28]] = distinct !{[[LOOP28]], [[META4]], [[META3]], [[META10]]}
-; VF4IC1: [[LOOP29]] = distinct !{[[LOOP29]], [[META3]], [[META4]], [[META5]]}
-; VF4IC1: [[LOOP30]] = distinct !{[[LOOP30]], [[META4]], [[META3]], [[META10]]}
-; VF4IC1: [[LOOP31]] = distinct !{[[LOOP31]], [[META3]], [[META4]], [[META5]]}
-; VF4IC1: [[LOOP32]] = distinct !{[[LOOP32]], [[META4]], [[META3]], [[META10]]}
-; VF4IC1: [[LOOP33]] = distinct !{[[LOOP33]], [[META3]], [[META4]], [[META5]]}
-; VF4IC1: [[PROF34]] = !{!"branch_weights", i32 4, i32 1, i32 2, i32 1}
-; VF4IC1: [[LOOP35]] = distinct !{[[LOOP35]], [[META4]], [[META3]], [[META10]]}
-; VF4IC1: [[LOOP36]] = distinct !{[[LOOP36]], [[META3]], [[META4]], [[META5]]}
-; VF4IC1: [[PROF37]] = !{!"branch_weights", i32 1, i32 1000}
-; VF4IC1: [[LOOP38]] = distinct !{[[LOOP38]], [[META4]], [[META3]], [[META10]]}
+; VF4IC1: [[LOOP12]] = distinct !{[[LOOP12]], [[META3]], [[META10]]}
+; VF4IC1: [[LOOP13]] = distinct !{[[LOOP13]], [[META3]], [[META4]]}
+; VF4IC1: [[LOOP14]] = distinct !{[[LOOP14]], [[META4]], [[META3]]}
+; VF4IC1: [[LOOP15]] = distinct !{[[LOOP15]], [[META3]], [[META4]], [[META5]]}
+; VF4IC1: [[LOOP16]] = distinct !{[[LOOP16]], [[META4]], [[META3]], [[META10]]}
+; VF4IC1: [[LOOP17]] = distinct !{[[LOOP17]], [[META3]], [[META4]], [[META5]]}
+; VF4IC1: [[PROF18]] = !{!"branch_weights", i32 1000, i32 1}
+; VF4IC1: [[LOOP19]] = distinct !{[[LOOP19]], [[META4]], [[META3]], [[META10]]}
+; VF4IC1: [[LOOP20]] = distinct !{[[LOOP20]], [[META3]], [[META4]], [[META5]]}
+; VF4IC1: [[PROF21]] = !{!"branch_weights", i32 3, i32 2}
+; VF4IC1: [[LOOP22]] = distinct !{[[LOOP22]], [[META4]], [[META3]], [[META10]]}
+; VF4IC1: [[LOOP23]] = distinct !{[[LOOP23]], [[META3]], [[META4]], [[META5]]}
+; VF4IC1: [[PROF24]] = !{!"branch_weights", i32 1, i32 100000}
+; VF4IC1: [[LOOP25]] = distinct !{[[LOOP25]], [[META4]], [[META3]], [[META10]]}
+; VF4IC1: [[LOOP26]] = distinct !{[[LOOP26]], [[META3]], [[META4]], [[META5]]}
+; VF4IC1: [[LOOP27]] = distinct !{[[LOOP27]], [[META4]], [[META3]], [[META10]]}
+; VF4IC1: [[LOOP28]] = distinct !{[[LOOP28]], [[META3]], [[META4]], [[META5]]}
+; VF4IC1: [[LOOP29]] = distinct !{[[LOOP29]], [[META4]], [[META3]], [[META10]]}
+; VF4IC1: [[LOOP30]] = distinct !{[[LOOP30]], [[META3]], [[META4]], [[META5]]}
+; VF4IC1: [[LOOP31]] = distinct !{[[LOOP31]], [[META4]], [[META3]], [[META10]]}
+; VF4IC1: [[LOOP32]] = distinct !{[[LOOP32]], [[META3]], [[META4]], [[META5]]}
+; VF4IC1: [[PROF33]] = !{!"branch_weights", i32 4, i32 1, i32 2, i32 1}
+; VF4IC1: [[LOOP34]] = distinct !{[[LOOP34]], [[META4]], [[META3]], [[META10]]}
+; VF4IC1: [[LOOP35]] = distinct !{[[LOOP35]], [[META3]], [[META4]], [[META5]]}
+; VF4IC1: [[PROF36]] = !{!"branch_weights", i32 1, i32 1000}
+; VF4IC1: [[LOOP37]] = distinct !{[[LOOP37]], [[META4]], [[META3]], [[META10]]}
 ;.
 ; VF2IC2: [[PROF0]] = !{!"branch_weights", i32 1, i32 127}
 ; VF2IC2: [[PROF1]] = !{!"branch_weights", i32 1, i32 249}
@@ -1176,35 +1175,34 @@ exit:
 ; VF2IC2: [[META5]] = !{!"llvm.loop.estimated_trip_count", i32 250}
 ; VF2IC2: [[PROF6]] = !{!"branch_weights", i32 1, i32 3}
 ; VF2IC2: [[PROF7]] = !{!"branch_weights", i32 1, i32 7}
-; VF2IC2: [[PROF8]] = !{!"branch_weights", i32 1, i32 0}
+; VF2IC2: [[PROF8]] = !{!"branch_weights", i32 1, i32 1}
 ; VF2IC2: [[LOOP9]] = distinct !{[[LOOP9]], [[META4]], [[META3]], [[META10:![0-9]+]]}
-; VF2IC2: [[META10]] = !{!"llvm.loop.estimated_trip_count", i32 1}
+; VF2IC2: [[META10]] = !{!"llvm.loop.estimated_trip_count", i32 2}
 ; VF2IC2: [[LOOP11]] = distinct !{[[LOOP11]], [[META3]], [[META4]], [[META5]]}
-; VF2IC2: [[PROF12]] = !{!"branch_weights", i32 1, i32 1}
-; VF2IC2: [[LOOP13]] = distinct !{[[LOOP13]], [[META3]], [[META10]]}
-; VF2IC2: [[LOOP14]] = distinct !{[[LOOP14]], [[META3]], [[META4]]}
-; VF2IC2: [[LOOP15]] = distinct !{[[LOOP15]], [[META4]], [[META3]]}
-; VF2IC2: [[LOOP16]] = distinct !{[[LOOP16]], [[META3]], [[META4]], [[META5]]}
-; VF2IC2: [[LOOP17]] = distinct !{[[LOOP17]], [[META4]], [[META3]], [[META10]]}
-; VF2IC2: [[LOOP18]] = distinct !{[[LOOP18]], [[META3]], [[META4]], [[META5]]}
-; VF2IC2: [[PROF19]] = !{!"branch_weights", i32 1000, i32 1}
-; VF2IC2: [[LOOP20]] = distinct !{[[LOOP20]], [[META4]], [[META3]], [[META10]]}
-; VF2IC2: [[LOOP21]] = distinct !{[[LOOP21]], [[META3]], [[META4]], [[META5]]}
-; VF2IC2: [[PROF22]] = !{!"branch_weights", i32 3, i32 2}
-; VF2IC2: [[LOOP23]] = distinct !{[[LOOP23]], [[META4]], [[META3]], [[META10]]}
-; VF2IC2: [[LOOP24]] = distinct !{[[LOOP24]], [[META3]], [[META4]], [[META5]]}
-; VF2IC2: [[PROF25]] = !{!"branch_weights", i32 1, i32 100000}
-; VF2IC2: [[LOOP26]] = distinct !{[[LOOP26]], [[META4]], [[META3]], [[META10]]}
-; VF2IC2: [[LOOP27]] = distinct !{[[LOOP27]], [[META3]], [[META4]], [[META5]]}
-; VF2IC2: [[LOOP28]] = distinct !{[[LOOP28]], [[META4]], [[META3]], [[META10]]}
-; VF2IC2: [[LOOP29]] = distinct !{[[LOOP29]], [[META3]], [[META4]], [[META5]]}
-; VF2IC2: [[LOOP30]] = distinct !{[[LOOP30]], [[META4]], [[META3]], [[META10]]}
-; VF2IC2: [[LOOP31]] = distinct !{[[LOOP31]], [[META3]], [[META4]], [[META5]]}
-; VF2IC2: [[LOOP32]] = distinct !{[[LOOP32]], [[META4]], [[META3]], [[META10]]}
-; VF2IC2: [[LOOP33]] = distinct !{[[LOOP33]], [[META3]], [[META4]], [[META5]]}
-; VF2IC2: [[PROF34]] = !{!"branch_weights", i32 4, i32 1, i32 2, i32 1}
-; VF2IC2: [[LOOP35]] = distinct !{[[LOOP35]], [[META4]], [[META3]], [[META10]]}
-; VF2IC2: [[LOOP36]] = distinct !{[[LOOP36]], [[META3]], [[META4]], [[META5]]}
-; VF2IC2: [[PROF37]] = !{!"branch_weights", i32 1, i32 1000}
-; VF2IC2: [[LOOP38]] = distinct !{[[LOOP38]], [[META4]], [[META3]], [[META10]]}
+; VF2IC2: [[LOOP12]] = distinct !{[[LOOP12]], [[META3]], [[META10]]}
+; VF2IC2: [[LOOP13]] = distinct !{[[LOOP13]], [[META3]], [[META4]]}
+; VF2IC2: [[LOOP14]] = distinct !{[[LOOP14]], [[META4]], [[META3]]}
+; VF2IC2: [[LOOP15]] = distinct !{[[LOOP15]], [[META3]], [[META4]], [[META5]]}
+; VF2IC2: [[LOOP16]] = distinct !{[[LOOP16]], [[META4]], [[META3]], [[META10]]}
+; VF2IC2: [[LOOP17]] = distinct !{[[LOOP17]], [[META3]], [[META4]], [[META5]]}
+; VF2IC2: [[PROF18]] = !{!"branch_weights", i32 1000, i32 1}
+; VF2IC2: [[LOOP19]] = distinct !{[[LOOP19]], [[META4]], [[META3]], [[META10]]}
+; VF2IC2: [[LOOP20]] = distinct !{[[LOOP20]], [[META3]], [[META4]], [[META5]]}
+; VF2IC2: [[PROF21]] = !{!"branch_weights", i32 3, i32 2}
+; VF2IC2: [[LOOP22]] = distinct !{[[LOOP22]], [[META4]], [[META3]], [[META10]]}
+; VF2IC2: [[LOOP23]] = distinct !{[[LOOP23]], [[META3]], [[META4]], [[META5]]}
+; VF2IC2: [[PROF24]] = !{!"branch_weights", i32 1, i32 100000}
+; VF2IC2: [[LOOP25]] = distinct !{[[LOOP25]], [[META4]], [[META3]], [[META10]]}
+; VF2IC2: [[LOOP26]] = distinct !{[[LOOP26]], [[META3]], [[META4]], [[META5]]}
+; VF2IC2: [[LOOP27]] = distinct !{[[LOOP27]], [[META4]], [[META3]], [[META10]]}
+; VF2IC2: [[LOOP28]] = distinct !{[[LOOP28]], [[META3]], [[META4]], [[META5]]}
+; VF2IC2: [[LOOP29]] = distinct !{[[LOOP29]], [[META4]], [[META3]], [[META10]]}
+; VF2IC2: [[LOOP30]] = distinct !{[[LOOP30]], [[META3]], [[META4]], [[META5]]}
+; VF2IC2: [[LOOP31]] = distinct !{[[LOOP31]], [[META4]], [[META3]], [[META10]]}
+; VF2IC2: [[LOOP32]] = distinct !{[[LOOP32]], [[META3]], [[META4]], [[META5]]}
+; VF2IC2: [[PROF33]] = !{!"branch_weights", i32 4, i32 1, i32 2, i32 1}
+; VF2IC2: [[LOOP34]] = distinct !{[[LOOP34]], [[META4]], [[META3]], [[META10]]}
+; VF2IC2: [[LOOP35]] = distinct !{[[LOOP35]], [[META3]], [[META4]], [[META5]]}
+; VF2IC2: [[PROF36]] = !{!"branch_weights", i32 1, i32 1000}
+; VF2IC2: [[LOOP37]] = distinct !{[[LOOP37]], [[META4]], [[META3]], [[META10]]}
 ;.
