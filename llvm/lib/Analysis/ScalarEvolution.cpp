@@ -320,19 +320,21 @@ void SCEV::computeAndSetCanonical(ScalarEvolution &SE) {
   }
 
   // For all other expressions, check whether any immediate operand has a
-  // different canonical. Since operands are always created before their parent,
-  // their canonical pointers are already set — no recursion needed.
-  bool Changed = false;
-  SmallVector<SCEVUse, 4> CanonOps;
-  for (SCEVUse Op : operands()) {
-    CanonOps.push_back(Op->getCanonical());
-    Changed |= CanonOps.back() != Op.getPointer();
-  }
-
-  if (!Changed) {
+  // different canonical, or carries use-specific flags. Since operands are
+  // always created before their parent, their canonical pointers are already
+  // set — no recursion needed. Only materialize the canonical operand list if
+  // something actually differs; the common case is that nothing does.
+  if (none_of(operands(), [](SCEVUse Op) {
+        return Op.getOpaqueValue() !=
+               static_cast<const void *>(Op->getCanonical());
+      })) {
     CanonicalSCEV = this;
     return;
   }
+
+  SmallVector<SCEVUse, 4> CanonOps;
+  for (SCEVUse Op : operands())
+    CanonOps.push_back(Op->getCanonical());
 
   auto *NAry = dyn_cast<SCEVNAryExpr>(this);
   SCEV::NoWrapFlags Flags = NAry ? NAry->getNoWrapFlags() : SCEV::FlagAnyWrap;
