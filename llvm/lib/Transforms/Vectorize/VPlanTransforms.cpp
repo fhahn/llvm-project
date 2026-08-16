@@ -34,6 +34,7 @@
 #include "llvm/Analysis/ScopedNoAliasAA.h"
 #include "llvm/Analysis/VectorUtils.h"
 #include "llvm/IR/Intrinsics.h"
+#include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/TypeSize.h"
@@ -3248,6 +3249,28 @@ bool VPlanTransforms::handleUncountableEarlyExits(
   }
 
   assert(!Exits.empty() && "must have at least one early exit");
+
+  // Record the probability of an original iteration taking the uncountable exit,
+  // to be turned into the probability of a whole vector iteration taking it once
+  // VF and UF are known. Only a single exit taken directly from the header is
+  // handled: the weights of a branch in any other block are conditional on that
+  // block executing, which is not known here.
+  MDNode *ExitWeights = nullptr;
+  if (Exits.size() == 1 && Exits[0].EarlyExitingVPBB == HeaderVPBB) {
+    auto *Term = cast<VPInstruction>(HeaderVPBB->getTerminator());
+    SmallVector<uint32_t, 2> Weights;
+    if (extractBranchWeights(Term->getMetadata(LLVMContext::MD_prof),
+                             Weights) &&
+        Weights.size() == 2) {
+      // The weights are for the terminator's successors in order, so the exit is
+      // taken with the first weight only if it is the true successor.
+      if (HeaderVPBB->getSuccessors()[0] != Exits[0].EarlyExitVPBB)
+        std::swap(Weights[0], Weights[1]);
+      ExitWeights = MDBuilder(Plan.getContext())
+                        .createBranchWeights(Weights[0], Weights[1]);
+    }
+  }
+
   // Sort exits by RPO order to get correct program order. RPO gives a
   // topological ordering of the CFG, ensuring upstream exits are checked
   // before downstream exits in the dispatch chain.
@@ -3291,8 +3314,11 @@ bool VPlanTransforms::handleUncountableEarlyExits(
   DebugLoc LatchDL = LatchExitingBranch->getDebugLoc();
   LatchExitingBranch->eraseFromParent();
   LatchBuilder.setInsertPoint(LatchVPBB);
-  LatchBuilder.createNaryOp(VPInstruction::BranchOnTwoConds,
-                            {IsAnyExitTaken, IsLatchExitTaken}, LatchDL);
+  auto *ExitBr = cast<VPInstruction>(
+      LatchBuilder.createNaryOp(VPInstruction::BranchOnTwoConds,
+                                {IsAnyExitTaken, IsLatchExitTaken}, LatchDL));
+  if (ExitWeights)
+    ExitBr->setMetadata(LLVMContext::MD_prof, ExitWeights);
   LatchVPBB->clearSuccessors();
 
   if (Style == UncountableExitStyle::MaskedHandleExitInScalarLoop) {
@@ -3420,7 +3446,11 @@ bool VPlanTransforms::handleUncountableEarlyExits(
                        : Plan.createVPBasicBlock(
                              Twine("vector.early.exit.check.") + Twine(I));
 
-    DispatchBuilder.createNaryOp(VPInstruction::BranchOnCond, {LaneVal});
+    // Which of the uncountable exits the exiting lane takes is not something
+    // the vectorizer has a probability for.
+    auto *DispatchBr = cast<VPInstruction>(
+        DispatchBuilder.createNaryOp(VPInstruction::BranchOnCond, {LaneVal}));
+    vputils::setUnknownBranchWeights(*DispatchBr, Plan);
     CurrentBB->setSuccessors({VectorEarlyExitVPBBs[I], FalseBB});
     VectorEarlyExitVPBBs[I]->setPredecessors({CurrentBB});
     FalseBB->setPredecessors({CurrentBB});

@@ -6050,7 +6050,9 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   RUN_VPLAN_PASS(VPlanTransforms::dissolveLoopRegions, BestVPlan);
   // Expand BranchOnTwoConds after dissolution, when latch has direct access to
   // its successors.
-  RUN_VPLAN_PASS(VPlanTransforms::expandBranchOnTwoConds, BestVPlan);
+  RUN_VPLAN_PASS(
+      VPlanTransforms::expandBranchOnTwoConds, BestVPlan,
+      estimateElementCount(BestVF * BestUF, Config.getVScaleForTuning()));
   // Convert loops with variable-length stepping after regions are dissolved.
   RUN_VPLAN_PASS(VPlanTransforms::convertToVariableLengthStep, BestVPlan);
   // Remove dead back-edges for single-iteration loops with BranchOnCond(true).

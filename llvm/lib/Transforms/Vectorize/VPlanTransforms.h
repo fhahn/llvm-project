@@ -376,7 +376,11 @@ struct VPlanTransforms {
 
   /// Expand BranchOnTwoConds instructions into explicit CFG with
   /// BranchOnCond instructions. Should be called after dissolveLoopRegions.
-  static void expandBranchOnTwoConds(VPlan &Plan);
+  /// Expand BranchOnTwoConds into two single-condition branches. \p
+  /// EstimatedVFxUF is the estimated number of original iterations a vector
+  /// iteration packs, used to scale the recorded probability of taking an
+  /// uncountable exit; 0 if not known.
+  static void expandBranchOnTwoConds(VPlan &Plan, unsigned EstimatedVFxUF = 0);
 
   /// Transform loops with variable-length stepping after region
   /// dissolution.
