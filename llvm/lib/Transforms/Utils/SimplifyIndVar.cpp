@@ -242,6 +242,15 @@ bool SimplifyIndvar::makeIVComparisonInvariant(ICmpInst *ICmp,
   ICmp->setPredicate(InvariantPredicate);
   ICmp->setOperand(0, NewLHS);
   ICmp->setOperand(1, NewRHS);
+  // Move the now loop-invariant comparison to the preheader. Both operands are
+  // expanded there, and an icmp is always safe to speculate, so this is just
+  // the hoist LICM would perform later. Doing it here is what makes the extra
+  // unswitching run requested below able to see the condition at all:
+  // SimpleLoopUnswitch only unswitches on conditions defined outside the loop.
+  if (L->contains(ICmp->getParent())) {
+    ICmp->moveBefore(PHTerm->getIterator());
+    SE->forgetBlockAndLoopDispositions(ICmp);
+  }
   RunUnswitching = true;
   return true;
 }
