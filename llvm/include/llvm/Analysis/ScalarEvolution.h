@@ -2545,7 +2545,6 @@ private:
 
   /// Look for a SCEV expression with type `SCEVType` and operands `Ops` in
   /// `UniqueSCEVs`.  Return if found, else nullptr.
-  SCEV *findExistingSCEVInCache(SCEVTypes SCEVType, ArrayRef<const SCEV *> Ops);
   SCEV *findExistingSCEVInCache(SCEVTypes SCEVType, ArrayRef<SCEVUse> Ops);
 
   /// Get reachable blocks in this function, making limited use of SCEV

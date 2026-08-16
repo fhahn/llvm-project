@@ -2165,4 +2165,49 @@ TEST_F(ScalarEvolutionsTest, PrintUseFlagsOfAtScopeValues) {
   });
 }
 
+
+// An operand carrying use-specific no-wrap flags makes the expression built
+// from it distinct from the one built from the bare operand, rather than
+// mutating a shared node - and print() renders the operand's flags.
+TEST_F(ScalarEvolutionsTest, OperandUseFlagsAreDistinctAndPrinted) {
+  LLVMContext C;
+  SMDiagnostic Err;
+  std::unique_ptr<Module> M = parseAssemblyString(
+      R"(define void @f(i32 %x, i32 %y) {
+      entry:
+        ret void
+      })",
+      Err, C);
+
+  if (!M) {
+    Err.print("ScalarEvolutionTest", errs());
+    ASSERT_TRUE(M && "Could not parse module?");
+  }
+
+  runWithSE(*M, "f", [](Function &F, LoopInfo &LI, ScalarEvolution &SE) {
+    const SCEV *X = SE.getSCEV(getArgByName(F, "x"));
+    const SCEV *Y = SE.getSCEV(getArgByName(F, "y"));
+    SCEVUse FlaggedX = SE.getUseWithFlags(X, SCEV::FlagNUW);
+
+    // Each builder keys its uniquing on the operand uses, so the flagged
+    // operand yields a different expression for every kind of node.
+    EXPECT_NE(SE.getAddExpr(FlaggedX, Y), SE.getAddExpr(X, Y));
+    EXPECT_NE(SE.getMulExpr(FlaggedX, Y), SE.getMulExpr(X, Y));
+    EXPECT_NE(SE.getUDivExpr(FlaggedX, Y), SE.getUDivExpr(X, Y));
+    EXPECT_NE(SE.getUMaxExpr(FlaggedX, Y), SE.getUMaxExpr(X, Y));
+
+    // ... and the bare form stays the canonical one.
+    EXPECT_EQ(SE.getAddExpr(FlaggedX, Y)->getCanonical(),
+              SE.getAddExpr(X, Y));
+    EXPECT_EQ(SE.getUDivExpr(FlaggedX, Y)->getCanonical(),
+              SE.getUDivExpr(X, Y));
+
+    std::string Str;
+    raw_string_ostream OS(Str);
+    SE.getAddExpr(FlaggedX, Y)->print(OS);
+    EXPECT_NE(Str.find("(u nuw)"), std::string::npos)
+        << "operand's use flags not printed: " << Str;
+  });
+}
+
 }  // end namespace llvm
