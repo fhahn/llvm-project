@@ -6589,6 +6589,7 @@ void ScalarEvolution::setNoWrapFlags(SCEVAddRecExpr *AddRec,
                                      SCEV::NoWrapFlags Flags) {
   if (AddRec->getNoWrapFlags(Flags) != Flags) {
     AddRec->setNoWrapFlags(Flags);
+    ++RangeMemoGeneration;
     UnsignedRanges.erase(AddRec);
     SignedRanges.erase(AddRec);
     ConstantMultipleCache.erase(AddRec);
@@ -6984,16 +6985,32 @@ const ConstantRange &ScalarEvolution::getRangeRef(
           MaxBECount = MaxBECount.zext(BitWidth);
 
         if (MaxBECount.getBitWidth() == BitWidth) {
-          auto [RangeFromAffine, Flags] = getRangeForAffineAR(
-              AddRec->getStart(), AddRec->getStepRecurrence(*this), MaxBECount);
-          ConservativeResult =
-              ConservativeResult.intersectWith(RangeFromAffine, RangeType);
-          const_cast<SCEVAddRecExpr *>(AddRec)->setNoWrapFlags(Flags);
-
-          auto RangeFromFactoring = getRangeViaFactoring(
-              AddRec->getStart(), AddRec->getStepRecurrence(*this), MaxBECount);
-          ConservativeResult =
-              ConservativeResult.intersectWith(RangeFromFactoring, RangeType);
+          // Both range computations for this addrec (one per sign hint) derive
+          // the same two ranges and the same flags from (start, step,
+          // MaxBECount), so reuse the result of the first one.
+          bool MemoValid = AffineRangeMemoAR == AddRec &&
+                           AffineRangeMemoGeneration == RangeMemoGeneration &&
+                           AffineRangeMemoBECount.getBitWidth() == BitWidth &&
+                           AffineRangeMemoBECount == MaxBECount;
+          if (!MemoValid) {
+            auto [RangeFromAffine, Flags] = getRangeForAffineAR(
+                AddRec->getStart(), AddRec->getStepRecurrence(*this),
+                MaxBECount);
+            AffineRangeMemoAffine = RangeFromAffine;
+            AffineRangeMemoFlags = Flags;
+            AffineRangeMemoFactoring = getRangeViaFactoring(
+                AddRec->getStart(), AddRec->getStepRecurrence(*this),
+                MaxBECount);
+            AffineRangeMemoAR = AddRec;
+            AffineRangeMemoBECount = MaxBECount;
+            AffineRangeMemoGeneration = RangeMemoGeneration;
+          }
+          ConservativeResult = ConservativeResult.intersectWith(
+              *AffineRangeMemoAffine, RangeType);
+          const_cast<SCEVAddRecExpr *>(AddRec)->setNoWrapFlags(
+              AffineRangeMemoFlags);
+          ConservativeResult = ConservativeResult.intersectWith(
+              *AffineRangeMemoFactoring, RangeType);
         }
       }
 
@@ -8769,6 +8786,7 @@ void ScalarEvolution::forgetAllLoops() {
   ValuesAtScopesUsers.clear();
   LoopDispositions.clear();
   BlockDispositions.clear();
+  ++RangeMemoGeneration;
   UnsignedRanges.clear();
   SignedRanges.clear();
   ExprValueMap.clear();
@@ -14739,6 +14757,7 @@ void ScalarEvolution::forgetMemoizedResults(ArrayRef<SCEVUse> SCEVs) {
 }
 
 void ScalarEvolution::forgetMemoizedResultsImpl(const SCEV *S) {
+  ++RangeMemoGeneration;
   LoopDispositions.erase(S);
   BlockDispositions.erase(S);
   UnsignedRanges.erase(S);

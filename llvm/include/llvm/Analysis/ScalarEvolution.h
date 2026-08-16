@@ -1965,6 +1965,22 @@ private:
   /// Memoized results from getRange
   DenseMap<const SCEV *, ConstantRange> SignedRanges;
 
+  /// Bumped whenever a memoized range is dropped, to invalidate
+  /// \p AffineRangeMemo* below.
+  uint64_t RangeMemoGeneration = 1;
+
+  /// Single-entry memo for the sign-hint-independent part of an affine
+  /// addrec's range. getRangeRef computes the range of the same addrec once
+  /// per sign hint, and getRangeForAffineAR / getRangeViaFactoring depend only
+  /// on (start, step, constant max backedge-taken count), so the second query
+  /// can reuse what the first computed. See getRangeRef.
+  const SCEVAddRecExpr *AffineRangeMemoAR = nullptr;
+  uint64_t AffineRangeMemoGeneration = 0;
+  APInt AffineRangeMemoBECount;
+  SCEV::NoWrapFlags AffineRangeMemoFlags = SCEV::FlagAnyWrap;
+  std::optional<ConstantRange> AffineRangeMemoAffine;
+  std::optional<ConstantRange> AffineRangeMemoFactoring;
+
   /// Used to parameterize getRange
   enum RangeSignHint { HINT_RANGE_UNSIGNED, HINT_RANGE_SIGNED };
 
