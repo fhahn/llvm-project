@@ -780,19 +780,6 @@ public:
     SmallVector<SCEVUse, 3> Ops = {Op0, Op1, Op2};
     return getAddExpr(Ops, Flags, Depth);
   }
-  /// Return `LHS + RHS`, with \p UseFlags attached to the result as
-  /// use-specific flags - but only if nothing was folded, i.e. the result
-  /// really is the two-operand add of \p LHS and \p RHS.
-  ///
-  /// Flags established for that sum say nothing about any other expression: a
-  /// folded-away operand, a flattened nested add or a distributed constant all
-  /// give a different computation. They must not be attached to it, because an
-  /// n-ary expression's no-wrap flags have to hold for all subsets and orders
-  /// of its operands, and SCEVExpander relies on that when it stamps them on
-  /// every partial sum it builds.
-  LLVM_ABI SCEVUse getAddExpr(SCEVUse LHS, SCEVUse RHS,
-                              SCEV::NoWrapFlags Flags,
-                              SCEV::NoWrapFlags UseFlags);
   LLVM_ABI const SCEV *getMulExpr(SmallVectorImpl<SCEVUse> &Ops,
                                   SCEV::NoWrapFlags Flags = SCEV::FlagAnyWrap,
                                   unsigned Depth = 0);
@@ -808,13 +795,6 @@ public:
     SmallVector<SCEVUse, 3> Ops = {Op0, Op1, Op2};
     return getMulExpr(Ops, Flags, Depth);
   }
-  /// Return `LHS * RHS`, with \p UseFlags attached to the result as
-  /// use-specific flags - but only if nothing was folded, i.e. the result
-  /// really is the two-operand multiply of \p LHS and \p RHS. See the add
-  /// counterpart above for why that restriction is required.
-  LLVM_ABI SCEVUse getMulExpr(SCEVUse LHS, SCEVUse RHS,
-                              SCEV::NoWrapFlags Flags,
-                              SCEV::NoWrapFlags UseFlags);
   LLVM_ABI const SCEV *getUDivExpr(SCEVUse LHS, SCEVUse RHS);
   LLVM_ABI const SCEV *getUDivExactExpr(SCEVUse LHS, SCEVUse RHS);
   LLVM_ABI const SCEV *getURemExpr(SCEVUse LHS, SCEVUse RHS);

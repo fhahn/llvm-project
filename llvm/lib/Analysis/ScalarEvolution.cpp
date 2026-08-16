@@ -1024,6 +1024,28 @@ static const SCEV *BinomialCoefficient(const SCEV *It, unsigned K,
                        SE.getTruncateOrZeroExtend(DivResult, ResultTy));
 }
 
+/// Attach \p UseFlags to \p Res as use-specific flags, but only if \p Res really
+/// is the two-operand \p ExprT over \p LHS and \p RHS - in either order, as
+/// operands get sorted by complexity.
+///
+/// Flags established for that operation say nothing about any other expression:
+/// a folded-away operand, a flattened nested expression or a distributed
+/// constant all give a different computation. They must not be attached to it,
+/// because an n-ary expression's no-wrap flags have to hold for all subsets and
+/// orders of its operands, and SCEVExpander relies on that when it stamps them
+/// on every partial sum or product it builds.
+template <typename ExprT>
+static SCEVUse withUseFlagsIfExact(ScalarEvolution &SE, const SCEV *Res,
+                                   SCEVUse LHS, SCEVUse RHS,
+                                   SCEV::NoWrapFlags UseFlags) {
+  auto *E = dyn_cast<ExprT>(Res);
+  if (!E || E->getNumOperands() != 2 ||
+      !((E->getOperand(0) == LHS && E->getOperand(1) == RHS) ||
+        (E->getOperand(0) == RHS && E->getOperand(1) == LHS)))
+    return Res;
+  return SE.getUseWithFlags(Res, UseFlags);
+}
+
 /// Return the value of this chain of recurrences at the specified iteration
 /// number.  We can evaluate this recurrence by multiplying each element in the
 /// chain by the binomial coefficient corresponding to it.  In other words, we
@@ -1076,12 +1098,14 @@ SCEVUse SCEVAddRecExpr::evaluateAtIteration(ArrayRef<SCEVUse> Operands,
 
     // Do not set these flags on the shared nodes: their scope is wherever the
     // operands are defined, while the flags only hold where the recurrence
-    // really reached this iteration. Pass them as use flags instead, which only
-    // get attached if the expression was not folded: they hold for `Step * It`
-    // and for `Start + (Step * It)`, and for nothing else.
-    SCEVUse Mul = SE.getMulExpr(Operands[i].getPointer(), Coeff,
-                                SCEV::FlagAnyWrap, MulFlags);
-    Result = SE.getAddExpr(Result, Mul, SCEV::FlagAnyWrap, Flags);
+    // really reached this iteration. Attach them as use flags instead, and only
+    // if the expression was not folded: they hold for `Step * It` and for
+    // `Start + (Step * It)`, and for nothing else.
+    SCEVUse Step = Operands[i].getPointer();
+    SCEVUse Mul = withUseFlagsIfExact<SCEVMulExpr>(SE, SE.getMulExpr(Step, Coeff),
+                                                   Step, Coeff, MulFlags);
+    Result = withUseFlagsIfExact<SCEVAddExpr>(SE, SE.getAddExpr(Result, Mul),
+                                              Result, Mul, Flags);
   }
   return Result;
 }
@@ -2592,37 +2616,6 @@ static SCEV::NoWrapFlags StrengthenNoWrapFlags(ScalarEvolution *SE,
 
 bool ScalarEvolution::isAvailableAtLoopEntry(const SCEV *S, const Loop *L) {
   return isLoopInvariant(S, L) && properlyDominates(S, L->getHeader());
-}
-
-/// Return true if \p S is a two-operand \p ExprT over exactly \p LHS and \p RHS
-/// - in either order, as operands get sorted by complexity.
-template <typename ExprT>
-static bool isBinExprOf(const SCEV *S, SCEVUse LHS, SCEVUse RHS) {
-  auto *E = dyn_cast<ExprT>(S);
-  return E && E->getNumOperands() == 2 &&
-         ((E->getOperand(0) == LHS && E->getOperand(1) == RHS) ||
-          (E->getOperand(0) == RHS && E->getOperand(1) == LHS));
-}
-
-SCEVUse ScalarEvolution::getAddExpr(SCEVUse LHS, SCEVUse RHS,
-                                    SCEV::NoWrapFlags Flags,
-                                    SCEV::NoWrapFlags UseFlags) {
-  const SCEV *Res = getAddExpr(LHS, RHS, Flags);
-  // The flags hold for `LHS + RHS` and for nothing else. If something folded -
-  // an operand folded away, a nested add flattened, a constant distributed -
-  // Res is a different expression and must not carry them.
-  if (!isBinExprOf<SCEVAddExpr>(Res, LHS, RHS))
-    return Res;
-  return getUseWithFlags(Res, UseFlags);
-}
-
-SCEVUse ScalarEvolution::getMulExpr(SCEVUse LHS, SCEVUse RHS,
-                                    SCEV::NoWrapFlags Flags,
-                                    SCEV::NoWrapFlags UseFlags) {
-  const SCEV *Res = getMulExpr(LHS, RHS, Flags);
-  if (!isBinExprOf<SCEVMulExpr>(Res, LHS, RHS))
-    return Res;
-  return getUseWithFlags(Res, UseFlags);
 }
 
 /// Get a canonical add expression, or something simpler if possible.
