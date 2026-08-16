@@ -49,7 +49,7 @@ define i32 @nsw_kept_same_sign(i32 %start.in, i32 %step.in, i32 %n) {
 ; CHECK-NEXT:    br label %[[LOOP]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = mul i32 [[N]], [[STEP]]
-; CHECK-NEXT:    [[TMP1:%.*]] = add nuw i32 [[TMP0]], [[START]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add nuw nsw i32 [[TMP0]], [[START]]
 ; CHECK-NEXT:    ret i32 [[TMP1]]
 ;
 entry:
@@ -332,9 +332,12 @@ exit.2:
   ret i32 %dv2
 }
 
-
-define ptr @exit_value_mul(ptr %first, ptr %last) {
-; CHECK-LABEL: define ptr @exit_value_mul(
+; A pointer recurrence: the exit value's offset is (BTC * 24), and both that
+; multiply and the getelementptr adding it to the start carry the recurrence's
+; nuw.
+define ptr @ptr_step_mul_nuw(ptr %first, ptr %last) {
+;
+; CHECK-LABEL: define ptr @ptr_step_mul_nuw(
 ; CHECK-SAME: ptr [[FIRST:%.*]], ptr [[LAST:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    [[FIRST2:%.*]] = ptrtoaddr ptr [[FIRST]] to i64

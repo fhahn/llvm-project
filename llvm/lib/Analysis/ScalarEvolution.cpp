@@ -1010,6 +1010,15 @@ SCEVUse SCEVAddRecExpr::evaluateAtIteration(ArrayRef<SCEVUse> Operands,
   assert(Operands.size() > 0);
   assert((Operands.size() == 2 || UseFlags == SCEV::FlagAnyWrap) &&
          "use-specific flags only supported for affine AddRecs");
+  // The product It * Step is value(It) - Start, which is only representable in
+  // the signed sense if Start and Step have the same sign. For FlagNUW it is
+  // bounded by UINT_MAX - Start instead, and cannot wrap.
+  if (ScalarEvolution::hasFlags(UseFlags, SCEV::FlagNSW)) {
+    SCEVUse Start = Operands[0], Step = Operands[1];
+    if (!((SE.isKnownNonNegative(Start) && SE.isKnownNonNegative(Step)) ||
+          (SE.isKnownNonPositive(Start) && SE.isKnownNonPositive(Step))))
+      UseFlags = ScalarEvolution::clearFlags(UseFlags, SCEV::FlagNSW);
+  }
   SCEVUse Result = Operands[0].getPointer();
   for (unsigned i = 1, e = Operands.size(); i != e; ++i) {
     // The computation is correct in the face of overflow provided that the
@@ -1019,7 +1028,19 @@ SCEVUse SCEVAddRecExpr::evaluateAtIteration(ArrayRef<SCEVUse> Operands,
     if (isa<SCEVCouldNotCompute>(Coeff))
       return Coeff;
 
-    const SCEV *Mul = SE.getMulExpr(Operands[i].getPointer(), Coeff);
+    // The sum stays in range whenever the recurrence did, but the multiply on
+    // its own only does so if the iteration count is non-negative as a signed
+    // value of this type. A FlagNSW recurrence with non-positive Start and Step
+    // only bounds the count by 2^(W-1), and at exactly that count Step * Coeff
+    // leaves the signed range: for {0,+,-1} of width W the product is -1 * SMIN.
+    SCEV::NoWrapFlags MulFlags = UseFlags;
+    if (ScalarEvolution::hasFlags(MulFlags, SCEV::FlagNSW) &&
+        !SE.isKnownNonNegative(Coeff))
+      MulFlags = ScalarEvolution::clearFlags(MulFlags, SCEV::FlagNSW);
+
+    SCEVUse Step = Operands[i].getPointer();
+    SCEVUse Mul = withUseFlagsIfNotFolded<SCEVMulExpr>(
+        SE.getMulExpr(Step, Coeff), Step, Coeff, MulFlags);
     Result = withUseFlagsIfNotFolded<SCEVAddExpr>(SE.getAddExpr(Result, Mul),
                                                   Result, Mul, UseFlags);
   }
@@ -1033,8 +1054,9 @@ SCEVUse SCEVAddRecExpr::getExitValue(ScalarEvolution &SE) const {
   // The loop reaches iteration BTC, so the value this recurrence computes there
   // is the value it had, and that did not wrap.
   return evaluateAtIteration(operands(), BTC, SE,
-                             isAffine() ? getNoWrapFlags(SCEV::FlagNUW)
-                                        : SCEV::FlagAnyWrap);
+                             isAffine()
+                                 ? getNoWrapFlags(SCEV::FlagNUW | SCEV::FlagNSW)
+                                 : SCEV::FlagAnyWrap);
 }
 
 //===----------------------------------------------------------------------===//
