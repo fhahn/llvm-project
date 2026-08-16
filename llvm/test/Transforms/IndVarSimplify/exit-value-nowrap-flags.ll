@@ -279,11 +279,10 @@ exit:
 
 ; The at-scope value of loop %b's udiv carries %b's nuw as a use flag on the
 ; udiv's operand. Loop %a has the same closed-form exit value but its increment
-; is not nuw, and udiv keys its uniquing on the operand pointer, so if that
-; flagged operand were stored in the shared node %a would pick it up: `add nuw
-; i32 %n, %start` is poison at %start = -1, %n = 2, where %a's exit value is a
-; well-defined 1. Sibling loops are visited in reverse program order, so %b - the
-; one with the flag - is the one that gets to create the node.
+; is not nuw, so it must not pick that flag up: `add nuw i32 %n, %start` is
+; poison at %start = -1, %n = 2, where %a's exit value is a well-defined 1.
+; The flagged operand makes %b's udiv a distinct expression from %a's, so the
+; two carry their own flags - %b keeps the nuw and %a gets none.
 define i32 @no_flag_leak_through_shared_udiv(i32 %start, i32 %n, i1 %c) {
 ; CHECK-LABEL: @no_flag_leak_through_shared_udiv(
 ; CHECK-NEXT:  entry:
@@ -305,7 +304,7 @@ define i32 @no_flag_leak_through_shared_udiv(i32 %start, i32 %n, i1 %c) {
 ; CHECK:       b.latch:
 ; CHECK-NEXT:    br label [[B]]
 ; CHECK:       b.exit:
-; CHECK-NEXT:    [[TMP2:%.*]] = add i32 [[N]], [[START]]
+; CHECK-NEXT:    [[TMP2:%.*]] = add nuw i32 [[N]], [[START]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = udiv i32 [[TMP2]], 3
 ; CHECK-NEXT:    ret i32 [[TMP3]]
 ;

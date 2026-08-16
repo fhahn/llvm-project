@@ -10275,14 +10275,6 @@ static Constant *BuildConstantFromSCEV(const SCEV *V) {
 
 const SCEV *ScalarEvolution::getWithOperands(const SCEV *S,
                                              SmallVectorImpl<SCEVUse> &NewOps) {
-  // Drop any use-specific flags the operands picked up from being evaluated at a
-  // scope: they hold for the use the at-scope value was computed for, not for an
-  // operand of a shared expression rebuilt from it. Not every expression keys
-  // its uniquing on the operands' flags, so a flagged operand stored in a shared
-  // node would become visible to every other user of that node.
-  for (SCEVUse &Op : NewOps)
-    Op = Op.getPointer();
-
   switch (S->getSCEVType()) {
   case scTruncate:
   case scZeroExtend:
