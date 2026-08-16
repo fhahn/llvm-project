@@ -589,13 +589,13 @@ ScalarEvolution::getConstant(Type *Ty, uint64_t V, bool isSigned) {
 }
 
 const SCEV *ScalarEvolution::getVScale(Type *Ty) {
-  FoldingSetNodeID ID;
-  ID.AddInteger(scVScale);
-  ID.AddPointer(Ty);
+  unsigned Words[3];
+  unsigned NumWords = profileWords(Words, scVScale, Ty);
   void *IP = nullptr;
-  if (const SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP))
+  if (const SCEV *S = findUniqued({Words, NumWords}, IP))
     return S;
-  SCEV *S = new (SCEVAllocator) SCEVVScale(ID.Intern(SCEVAllocator), Ty);
+  SCEV *S = new (SCEVAllocator)
+      SCEVVScale(internProfile({Words, NumWords}), Ty);
   UniqueSCEVs.InsertNode(S, IP);
   S->computeAndSetCanonical(*this);
   return S;
@@ -1187,15 +1187,13 @@ const SCEV *ScalarEvolution::getPtrToAddrExpr(const SCEV *Op) {
   // The rewriter handles null pointer constant folding.
   const SCEV *IntOp = SCEVCastSinkingRewriter::rewrite(
       Op, *this, Ty, [this, Ty](const SCEVUnknown *U) {
-        FoldingSetNodeID ID;
-        ID.AddInteger(scPtrToAddr);
-        ID.AddPointer(U);
-        ID.AddPointer(Ty);
+        unsigned Words[5];
+        unsigned NumWords = profileWords(Words, scPtrToAddr, U, Ty);
         void *IP = nullptr;
-        if (const SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP))
+        if (const SCEV *S = findUniqued({Words, NumWords}, IP))
           return S;
         SCEV *S = new (SCEVAllocator)
-            SCEVPtrToAddrExpr(ID.Intern(SCEVAllocator), U, Ty);
+            SCEVPtrToAddrExpr(internProfile({Words, NumWords}), U, Ty);
         UniqueSCEVs.InsertNode(S, IP);
         S->computeAndSetCanonical(*this);
         registerUser(S, U);
@@ -1216,12 +1214,11 @@ const SCEV *ScalarEvolution::getTruncateExpr(const SCEV *Op, Type *Ty,
   assert(!Op->getType()->isPointerTy() && "Can't truncate pointer!");
   Ty = getEffectiveSCEVType(Ty);
 
-  FoldingSetNodeID ID;
-  ID.AddInteger(scTruncate);
-  ID.AddPointer(Op);
-  ID.AddPointer(Ty);
+  unsigned Words[5];
+  unsigned NumWords = profileWords(Words, scTruncate, Op, Ty);
   void *IP = nullptr;
-  if (const SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP)) return S;
+  if (const SCEV *S = findUniqued({Words, NumWords}, IP))
+    return S;
 
   // Fold if the operand is constant.
   if (const SCEVConstant *SC = dyn_cast<SCEVConstant>(Op))
@@ -1242,7 +1239,8 @@ const SCEV *ScalarEvolution::getTruncateExpr(const SCEV *Op, Type *Ty,
 
   if (Depth > MaxCastDepth) {
     SCEV *S =
-        new (SCEVAllocator) SCEVTruncateExpr(ID.Intern(SCEVAllocator), Op, Ty);
+        new (SCEVAllocator)
+            SCEVTruncateExpr(internProfile({Words, NumWords}), Op, Ty);
     UniqueSCEVs.InsertNode(S, IP);
     S->computeAndSetCanonical(*this);
     registerUser(S, Op);
@@ -1275,7 +1273,7 @@ const SCEV *ScalarEvolution::getTruncateExpr(const SCEV *Op, Type *Ty,
     // Although we checked in the beginning that ID is not in the cache, it is
     // possible that during recursion and different modification ID was inserted
     // into the cache. So if we find it, just return it.
-    if (const SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP))
+    if (const SCEV *S = findUniqued({Words, NumWords}, IP))
       return S;
   }
 
@@ -1295,7 +1293,7 @@ const SCEV *ScalarEvolution::getTruncateExpr(const SCEV *Op, Type *Ty,
   // The cast wasn't folded; create an explicit cast node. We can reuse
   // the existing insert position since if we get here, we won't have
   // made any changes which would invalidate it.
-  SCEV *S = new (SCEVAllocator) SCEVTruncateExpr(ID.Intern(SCEVAllocator),
+  SCEV *S = new (SCEVAllocator) SCEVTruncateExpr(internProfile({Words, NumWords}),
                                                  Op, Ty);
   UniqueSCEVs.InsertNode(S, IP);
   S->computeAndSetCanonical(*this);
@@ -1540,14 +1538,11 @@ bool ScalarEvolution::proveNoWrapByVaryingStart(const SCEV *Start,
   for (unsigned Delta : {-2, -1, 1, 2}) {
     const SCEV *PreStart = getConstant(StartAI - Delta);
 
-    FoldingSetNodeID ID;
-    ID.AddInteger(scAddRecExpr);
-    ID.AddPointer(PreStart);
-    ID.AddPointer(Step);
-    ID.AddPointer(L);
+    unsigned Words[7];
+    unsigned NumWords = profileWords(Words, scAddRecExpr, PreStart, Step, L);
     void *IP = nullptr;
     const auto *PreAR =
-      static_cast<SCEVAddRecExpr *>(UniqueSCEVs.FindNodeOrInsertPos(ID, IP));
+        static_cast<SCEVAddRecExpr *>(findUniqued({Words, NumWords}, IP));
 
     // Give up if we don't already have the add recurrence we need because
     // actually constructing an add recurrence is relatively expensive.
@@ -1673,14 +1668,13 @@ const SCEV *ScalarEvolution::getZeroExtendExprImpl(const SCEV *Op, Type *Ty,
 
   // Before doing any expensive analysis, check to see if we've already
   // computed a SCEV for this Op and Ty.
-  FoldingSetNodeID ID;
-  ID.AddInteger(scZeroExtend);
-  ID.AddPointer(Op);
-  ID.AddPointer(Ty);
+  unsigned Words[5];
+  unsigned NumWords = profileWords(Words, scZeroExtend, Op, Ty);
   void *IP = nullptr;
-  if (const SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP)) return S;
+  if (const SCEV *S = findUniqued({Words, NumWords}, IP))
+    return S;
   if (Depth > MaxCastDepth) {
-    SCEV *S = new (SCEVAllocator) SCEVZeroExtendExpr(ID.Intern(SCEVAllocator),
+    SCEV *S = new (SCEVAllocator) SCEVZeroExtendExpr(internProfile({Words, NumWords}),
                                                      Op, Ty);
     UniqueSCEVs.InsertNode(S, IP);
     S->computeAndSetCanonical(*this);
@@ -1964,8 +1958,9 @@ const SCEV *ScalarEvolution::getZeroExtendExprImpl(const SCEV *Op, Type *Ty,
 
   // The cast wasn't folded; create an explicit cast node.
   // Recompute the insert position, as it may have been invalidated.
-  if (const SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP)) return S;
-  SCEV *S = new (SCEVAllocator) SCEVZeroExtendExpr(ID.Intern(SCEVAllocator),
+  if (const SCEV *S = findUniqued({Words, NumWords}, IP))
+    return S;
+  SCEV *S = new (SCEVAllocator) SCEVZeroExtendExpr(internProfile({Words, NumWords}),
                                                    Op, Ty);
   UniqueSCEVs.InsertNode(S, IP);
   S->computeAndSetCanonical(*this);
@@ -2028,15 +2023,14 @@ const SCEV *ScalarEvolution::getSignExtendExprImpl(const SCEV *Op, Type *Ty,
 
   // Before doing any expensive analysis, check to see if we've already
   // computed a SCEV for this Op and Ty.
-  FoldingSetNodeID ID;
-  ID.AddInteger(scSignExtend);
-  ID.AddPointer(Op);
-  ID.AddPointer(Ty);
+  unsigned Words[5];
+  unsigned NumWords = profileWords(Words, scSignExtend, Op, Ty);
   void *IP = nullptr;
-  if (const SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP)) return S;
+  if (const SCEV *S = findUniqued({Words, NumWords}, IP))
+    return S;
   // Limit recursion depth.
   if (Depth > MaxCastDepth) {
-    SCEV *S = new (SCEVAllocator) SCEVSignExtendExpr(ID.Intern(SCEVAllocator),
+    SCEV *S = new (SCEVAllocator) SCEVSignExtendExpr(internProfile({Words, NumWords}),
                                                      Op, Ty);
     UniqueSCEVs.InsertNode(S, IP);
     S->computeAndSetCanonical(*this);
@@ -2227,8 +2221,9 @@ const SCEV *ScalarEvolution::getSignExtendExprImpl(const SCEV *Op, Type *Ty,
 
   // The cast wasn't folded; create an explicit cast node.
   // Recompute the insert position, as it may have been invalidated.
-  if (const SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP)) return S;
-  SCEV *S = new (SCEVAllocator) SCEVSignExtendExpr(ID.Intern(SCEVAllocator),
+  if (const SCEV *S = findUniqued({Words, NumWords}, IP))
+    return S;
+  SCEV *S = new (SCEVAllocator) SCEVSignExtendExpr(internProfile({Words, NumWords}),
                                                    Op, Ty);
   UniqueSCEVs.InsertNode(S, IP);
   S->computeAndSetCanonical(*this);
@@ -3530,12 +3525,10 @@ const SCEV *ScalarEvolution::getUDivExpr(SCEVUse LHS, SCEVUse RHS) {
   assert(LHS->getType() == RHS->getType() &&
          "SCEVUDivExpr operand types don't match!");
 
-  FoldingSetNodeID ID;
-  ID.AddInteger(scUDivExpr);
-  ID.AddPointer(LHS);
-  ID.AddPointer(RHS);
+  unsigned Words[5];
+  unsigned NumWords = profileWords(Words, scUDivExpr, LHS, RHS);
   void *IP = nullptr;
-  if (const SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP))
+  if (const SCEV *S = findUniqued({Words, NumWords}, IP))
     return S;
 
   // 0 udiv Y == 0
@@ -3606,14 +3599,11 @@ const SCEV *ScalarEvolution::getUDivExpr(SCEVUse LHS, SCEVUse RHS) {
               if (LHS != NewLHS) {
                 LHS = NewLHS;
 
-                // Reset the ID to include the new LHS, and check if it is
+                // Rebuild the profile for the new LHS, and check if it is
                 // already cached.
-                ID.clear();
-                ID.AddInteger(scUDivExpr);
-                ID.AddPointer(LHS);
-                ID.AddPointer(RHS);
+                NumWords = profileWords(Words, scUDivExpr, LHS, RHS);
                 IP = nullptr;
-                if (const SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP))
+                if (const SCEV *S = findUniqued({Words, NumWords}, IP))
                   return S;
               }
             }
@@ -3742,8 +3732,9 @@ const SCEV *ScalarEvolution::getUDivExpr(SCEVUse LHS, SCEVUse RHS) {
   // The Insertion Point (IP) might be invalid by now (due to UniqueSCEVs
   // changes). Make sure we get a new one.
   IP = nullptr;
-  if (const SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP)) return S;
-  SCEV *S = new (SCEVAllocator) SCEVUDivExpr(ID.Intern(SCEVAllocator),
+  if (const SCEV *S = findUniqued({Words, NumWords}, IP))
+    return S;
+  SCEV *S = new (SCEVAllocator) SCEVUDivExpr(internProfile({Words, NumWords}),
                                              LHS, RHS);
   UniqueSCEVs.InsertNode(S, IP);
   S->computeAndSetCanonical(*this);
@@ -4106,18 +4097,17 @@ const SCEV *ScalarEvolution::getMinMaxExpr(SCEVTypes Kind,
 
   // Okay, it looks like we really DO need an expr.  Check to see if we
   // already have one, otherwise create a new one.
-  FoldingSetNodeID ID;
-  ID.AddInteger(Kind);
-  for (const SCEV *Op : Ops)
-    ID.AddPointer(Op);
+  SmallVector<unsigned, MaxProfileWords> Words;
+  Words.resize_for_overwrite(1 + 2 * Ops.size());
+  profileWords(Words.data(), Kind, ArrayRef<SCEVUse>(Ops));
   void *IP = nullptr;
-  const SCEV *ExistingSCEV = UniqueSCEVs.FindNodeOrInsertPos(ID, IP);
+  const SCEV *ExistingSCEV = findUniqued(Words, IP);
   if (ExistingSCEV)
     return ExistingSCEV;
   SCEVUse *O = SCEVAllocator.Allocate<SCEVUse>(Ops.size());
   llvm::uninitialized_copy(Ops, O);
   SCEV *S = new (SCEVAllocator)
-      SCEVMinMaxExpr(ID.Intern(SCEVAllocator), Kind, O, Ops.size());
+      SCEVMinMaxExpr(internProfile(Words), Kind, O, Ops.size());
 
   UniqueSCEVs.InsertNode(S, IP);
   S->computeAndSetCanonical(*this);
@@ -4493,19 +4483,19 @@ ScalarEvolution::getSequentialMinMaxExpr(SCEVTypes Kind,
 
   // Okay, it looks like we really DO need an expr.  Check to see if we
   // already have one, otherwise create a new one.
-  FoldingSetNodeID ID;
-  ID.AddInteger(Kind);
-  for (const SCEV *Op : Ops)
-    ID.AddPointer(Op);
+  SmallVector<unsigned, MaxProfileWords> Words;
+  Words.resize_for_overwrite(1 + 2 * Ops.size());
+  profileWords(Words.data(), Kind, ArrayRef<SCEVUse>(Ops));
   void *IP = nullptr;
-  const SCEV *ExistingSCEV = UniqueSCEVs.FindNodeOrInsertPos(ID, IP);
+  const SCEV *ExistingSCEV = findUniqued(Words, IP);
   if (ExistingSCEV)
     return ExistingSCEV;
 
   SCEVUse *O = SCEVAllocator.Allocate<SCEVUse>(Ops.size());
   llvm::uninitialized_copy(Ops, O);
   SCEV *S = new (SCEVAllocator)
-      SCEVSequentialMinMaxExpr(ID.Intern(SCEVAllocator), Kind, O, Ops.size());
+      SCEVSequentialMinMaxExpr(internProfile(Words), Kind, O,
+                               Ops.size());
 
   UniqueSCEVs.InsertNode(S, IP);
   S->computeAndSetCanonical(*this);
