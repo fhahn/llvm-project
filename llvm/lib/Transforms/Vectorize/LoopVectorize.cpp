@@ -5935,6 +5935,33 @@ LoopVectorizationPlanner::computeBestVF() {
 /// getLoopEstimatedTripCount, this hence returns std::nullopt for a loop that
 /// carries an estimated trip count in metadata only. Checking for an explicit 0
 /// on top of that is redundant, but spells out which case is recovered.
+/// Returns the estimated trip count of \p L taken from the weights of its
+/// exiting branch, and sets \p InvocationWeight to the weight of its exit edge.
+///
+/// getLoopEstimatedTripCount only reads an exiting *latch* branch, so a loop that
+/// exits somewhere else has no estimate even though the weights are right there.
+/// Note the estimate is the plain ratio here: the exiting branch of a latch is
+/// taken to stay in the loop one time fewer than there are iterations, hence the
+/// one getLoopEstimatedTripCount adds, while a branch exiting anywhere else stays
+/// in the loop once per iteration.
+static std::optional<unsigned>
+estimateTripCountFromExitingBranch(Loop *L, unsigned &InvocationWeight) {
+  BasicBlock *Exiting = L->getExitingBlock();
+  if (!Exiting || Exiting == L->getLoopLatch())
+    return std::nullopt;
+  auto *Br = dyn_cast<CondBrInst>(Exiting->getTerminator());
+  uint64_t InLoopWeight, ExitWeight;
+  if (!Br || !extractBranchWeights(*Br, InLoopWeight, ExitWeight))
+    return std::nullopt;
+  if (!L->contains(Br->getSuccessor(0)))
+    std::swap(InLoopWeight, ExitWeight);
+  if (!ExitWeight)
+    return std::nullopt;
+  InvocationWeight = ExitWeight;
+  return std::min<uint64_t>(divideNearest(InLoopWeight, ExitWeight),
+                            std::numeric_limits<unsigned>::max());
+}
+
 static std::optional<unsigned>
 getLoopEstimatedTripCountOrZero(Loop *L, unsigned *InvocationWeight = nullptr) {
   unsigned LocalWeight = 0;
@@ -5945,6 +5972,8 @@ getLoopEstimatedTripCountOrZero(Loop *L, unsigned *InvocationWeight = nullptr) {
   if (!TripCount && *InvocationWeight != 0 &&
       getOptionalIntLoopAttribute(L, LLVMLoopEstimatedTripCount) == 0)
     TripCount = 0;
+  if (!TripCount)
+    TripCount = estimateTripCountFromExitingBranch(L, *InvocationWeight);
   return TripCount;
 }
 
@@ -5968,7 +5997,8 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   RUN_VPLAN_PASS(VPlanTransforms::materializeBroadcasts, BestVPlan);
   RUN_VPLAN_PASS(VPlanTransforms::replicateByVF, BestVPlan, BestVF);
   bool HasBranchWeights =
-      hasBranchWeightMD(*OrigLoop->getLoopLatch()->getTerminator());
+      hasBranchWeightMD(*OrigLoop->getLoopLatch()->getTerminator()) ||
+      getLoopEstimatedTripCountOrZero(OrigLoop).has_value();
   if (HasBranchWeights) {
     std::optional<unsigned> VScale = Config.getVScaleForTuning();
     RUN_VPLAN_PASS(VPlanTransforms::addBranchWeightToMiddleTerminator,
@@ -7185,7 +7215,8 @@ void LoopVectorizationPlanner::addMinimumIterationCheck(
     VPlan &Plan, ElementCount VF, unsigned UF,
     ElementCount MinProfitableTripCount) const {
   const uint32_t *BranchWeights =
-      hasBranchWeightMD(*OrigLoop->getLoopLatch()->getTerminator())
+      hasBranchWeightMD(*OrigLoop->getLoopLatch()->getTerminator()) ||
+              getLoopEstimatedTripCountOrZero(OrigLoop)
           ? &MinItersBypassWeights[0]
           : nullptr;
   RUN_VPLAN_PASS(VPlanTransforms::addMinimumIterationCheck, Plan, VF, UF,
@@ -8331,7 +8362,8 @@ bool LoopVectorizePass::processLoop(Loop *L) {
   std::unique_ptr<VPlan> EpiPlan =
       LVP.selectBestEpiloguePlan(BestPlan, VF.Width, IC);
   bool HasBranchWeights =
-      hasBranchWeightMD(*L->getLoopLatch()->getTerminator());
+      hasBranchWeightMD(*L->getLoopLatch()->getTerminator()) ||
+      getLoopEstimatedTripCountOrZero(L).has_value();
   if (EpiPlan) {
     VPlan &BestEpiPlan = *EpiPlan;
     VPlan &BestMainPlan = BestPlan;

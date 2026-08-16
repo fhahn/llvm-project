@@ -109,15 +109,12 @@ Transforms/LoopVectorize/AArch64/partial-reduce-dot-product-epilogue.ll
 Transforms/LoopVectorize/AArch64/partial-reduce-dot-product-neon.ll
 Transforms/LoopVectorize/AArch64/predicated-costs.ll
 Transforms/LoopVectorize/AArch64/predication_costs.ll
-Transforms/LoopVectorize/AArch64/replicating-load-store-costs-apple.ll
-Transforms/LoopVectorize/AArch64/replicating-load-store-costs.ll
 Transforms/LoopVectorize/AArch64/scalarize-store-with-predication.ll
 Transforms/LoopVectorize/AArch64/select-costs.ll
 Transforms/LoopVectorize/AArch64/simple_early_exit.ll
 Transforms/LoopVectorize/AArch64/single-early-exit-interleave.ll
 Transforms/LoopVectorize/AArch64/strict-fadd.ll
 Transforms/LoopVectorize/AArch64/transform-narrow-interleave-fold-tail.ll
-Transforms/LoopVectorize/AArch64/transform-narrow-interleave-group-requires-scalar-epilogue.ll
 Transforms/LoopVectorize/AArch64/transform-narrow-interleave-to-widen-memory-multi-block.ll
 Transforms/LoopVectorize/AArch64/transform-narrow-interleave-to-widen-memory-remove-loop-region.ll
 Transforms/LoopVectorize/AArch64/uniform-args-call-variants.ll
@@ -277,7 +274,6 @@ Transforms/LoopVectorize/reduction-inloop.ll
 Transforms/LoopVectorize/reduction-minmax-users-and-predicated.ll
 Transforms/LoopVectorize/replicate-region-branch-weights.ll
 Transforms/LoopVectorize/replicate-region-cost-probability.ll
-Transforms/LoopVectorize/reuse-lcssa-phi-scev-expansion.ll
 Transforms/LoopVectorize/runtime-checks-difference.ll
 Transforms/LoopVectorize/scalar-select.ll
 Transforms/LoopVectorize/scalarize-masked-call.ll
