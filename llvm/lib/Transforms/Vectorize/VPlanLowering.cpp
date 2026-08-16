@@ -29,10 +29,12 @@
 #include "llvm/Analysis/ScalarEvolutionPatternMatch.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/MDBuilder.h"
+#include "llvm/IR/ProfDataUtils.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/TypeSize.h"
 #include "llvm/Transforms/Utils/ScalarEvolutionExpander.h"
+#include <numeric>
 
 using namespace llvm;
 using namespace VPlanPatternMatch;
@@ -1191,6 +1193,72 @@ VPlanTransforms::expandSCEVs(VPlan &Plan, ScalarEvolution &SE) {
 
 /// Add branch weight metadata, if the \p Plan's middle block is terminated by a
 /// BranchOnCond recipe.
+void VPlanTransforms::scaleReplicateGuardsByLaneActivity(
+    VPlan &Plan, unsigned EstimatedTripCount, unsigned EstimatedVFxUF) {
+  assert(Plan.hasTailFolded() && "only a folded tail masks lanes off");
+  assert(EstimatedTripCount > 0 && EstimatedVFxUF > 0 &&
+         "cannot compute lane activity without a trip count or a step");
+  // Folding the tail rounds the trip count up to a multiple of the step, so the
+  // lanes of the last vector iteration beyond it are inactive. Every guard below
+  // the header mask is conditioned on its lane being active in addition to
+  // whatever the original loop conditioned it on.
+  // An alias mask narrows the active lanes further, by a fraction that is not
+  // known here, so the lanes left active by the folded tail are not the whole
+  // story and scaling by them alone would over-claim. Leave those guards to the
+  // unknown marker.
+  if (vputils::findIncomingAliasMask(Plan))
+    return;
+
+  // Lanes beyond the trip count in the last vector iteration are inactive.
+  uint64_t Slots =
+      uint64_t(divideCeil(EstimatedTripCount, EstimatedVFxUF)) * EstimatedVFxUF;
+
+  // A replicate region's guard is the only carrier of a probability that is per
+  // lane, and hence the only thing to scale: the predicator records the execution
+  // probability on masked recipes, and dropBranchWeightsFromUnguardedRecipes
+  // drops it again from everything that is not expanded into a guarded replicate
+  // region. Whatever else carries MD_prof here carries branch weights of its own,
+  // which the lane mask does not enter into - a terminator those of the branch it
+  // becomes, a select those of its condition - or an explicitly unknown marker,
+  // which states no probability at all. Note this cannot be asserted by recipe
+  // kind: a guard is the only recipe in its block and hence a terminator too.
+  MDBuilder MDB(Plan.getContext());
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_deep(Plan.getEntry()))) {
+    for (VPRecipeBase &R : *VPBB) {
+      auto *Guard = dyn_cast<VPBranchOnMaskRecipe>(&R);
+      if (!Guard)
+        continue;
+      // Without a recorded probability the lane mask is the only condition the
+      // guard has; with one, the two are independent, so multiply them: the
+      // recorded p = W[0] / (W[0] + W[1]) becomes p * EstimatedTripCount / Slots.
+      uint64_t Taken = EstimatedTripCount, Total = Slots;
+      SmallVector<uint32_t, 2> Weights;
+      if (extractBranchWeights(Guard->getMetadata(LLVMContext::MD_prof),
+                               Weights) &&
+          Weights.size() == 2 && (uint64_t(Weights[0]) + Weights[1]) != 0) {
+        Taken = uint64_t(Weights[0]) * EstimatedTripCount;
+        Total = (uint64_t(Weights[0]) + Weights[1]) * Slots;
+      }
+      // Keep both weights at 1 at least: the estimate is an average over all
+      // invocations of the loop and does not pin down either side for any
+      // individual one.
+      uint64_t NotTaken = std::max(Total - Taken, uint64_t(1));
+      Taken = std::max(Taken, uint64_t(1));
+      uint64_t GCD = std::gcd(Taken, NotTaken);
+      Taken /= GCD;
+      NotTaken /= GCD;
+      while (Taken > std::numeric_limits<uint32_t>::max() ||
+             NotTaken > std::numeric_limits<uint32_t>::max()) {
+        Taken = std::max(Taken / 2, uint64_t(1));
+        NotTaken = std::max(NotTaken / 2, uint64_t(1));
+      }
+      Guard->setMetadata(LLVMContext::MD_prof,
+                         MDB.createBranchWeights(Taken, NotTaken));
+    }
+  }
+}
+
 void VPlanTransforms::addBranchWeightToMiddleTerminator(
     VPlan &Plan, ElementCount VF, std::optional<unsigned> VScaleForTuning) {
   VPBasicBlock *MiddleVPBB = Plan.getMiddleBlock();

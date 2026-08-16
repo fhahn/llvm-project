@@ -570,6 +570,13 @@ struct VPlanTransforms {
   addBranchWeightToMiddleTerminator(VPlan &Plan, ElementCount VF,
                                     std::optional<unsigned> VScaleForTuning);
 
+  /// Scale the branch weights of the guards of \p Plan's replicate regions by
+  /// the fraction of lane slots a folded tail leaves active, computed from
+  /// \p EstimatedTripCount and \p EstimatedVFxUF. \p Plan must fold the tail.
+  static void scaleReplicateGuardsByLaneActivity(VPlan &Plan,
+                                                 unsigned EstimatedTripCount,
+                                                 unsigned EstimatedVFxUF);
+
   /// Adjust first-order recurrence users in the middle block: create
   /// penultimate element extracts for LCSSA phi users, and handle penultimate
   /// extracts of the last active lane edge.

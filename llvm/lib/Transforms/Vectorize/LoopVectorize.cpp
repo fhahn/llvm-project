@@ -5990,6 +5990,14 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
 
   RUN_VPLAN_PASS(VPlanTransforms::replaceWideCanonicalIVWithWideIV, BestVPlan,
                  *PSE.getSE(), TTI, Config.CostKind, BestVF, BestUF);
+  if (BestVPlan.hasTailFolded())
+    if (std::optional<unsigned> EstimatedTripCount =
+            getLoopEstimatedTripCountOrZero(OrigLoop))
+      RUN_VPLAN_PASS(
+          VPlanTransforms::scaleReplicateGuardsByLaneActivity, BestVPlan,
+          *EstimatedTripCount,
+          estimateElementCount(BestVF * BestUF, Config.getVScaleForTuning()));
+
   // TODO: Move to VPlan transform stage once the transition to the VPlan-based
   // cost model is complete for better cost estimates.
   RUN_VPLAN_PASS(VPlanTransforms::unrollByUF, BestVPlan, BestUF);

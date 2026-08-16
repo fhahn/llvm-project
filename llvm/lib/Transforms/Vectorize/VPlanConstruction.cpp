@@ -1363,7 +1363,21 @@ void VPlanTransforms::foldTailByMasking(VPlan &Plan) {
   // Abstract header mask, materialized into concrete recipes later.
   VPValue *HeaderMask = LoopRegion->createHeaderMask();
   VPBuilder Builder(Header, Header->getFirstNonPhi());
-  Builder.createNaryOp(VPInstruction::BranchOnCond, HeaderMask);
+  auto *HeaderMaskBr = cast<VPInstruction>(
+      Builder.createNaryOp(VPInstruction::BranchOnCond, HeaderMask));
+  // A vector iteration only executes if it has an active lane, so the block this
+  // branch guards executes on every one of them. Record that, so the
+  // probabilities of the blocks below it stay derivable rather than becoming
+  // unknown, as they would for a multi-successor terminator without weights.
+  //
+  // Which of the block's lanes execute is left to the mask and is not a property
+  // of the CFG: the fraction of lane slots a folded tail leaves active is
+  // multiplied in by scaleReplicateGuardsByLaneActivity once VF and UF are known.
+  // This branch itself is erased when the blocks are linearized and never reaches
+  // the generated IR.
+  MDBuilder MDB(Plan.getContext());
+  HeaderMaskBr->setMetadata(LLVMContext::MD_prof,
+                            MDB.createBranchWeights(1, 0));
 
   VPBasicBlock *OrigLatch = LoopRegion->getExitingBasicBlock();
   VPValue *IVInc;
