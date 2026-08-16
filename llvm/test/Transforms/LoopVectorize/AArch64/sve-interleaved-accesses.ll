@@ -1233,7 +1233,7 @@ define void @PR34743(ptr %a, ptr %b, i64 %n) #1 {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_MEMCHECK:%.*]]
 ; CHECK:       vector.memcheck:
 ; CHECK-NEXT:    [[TMP4:%.*]] = lshr i64 [[N]], 1
-; CHECK-NEXT:    [[TMP5:%.*]] = shl i64 [[TMP4]], 2
+; CHECK-NEXT:    [[TMP5:%.*]] = shl nuw i64 [[TMP4]], 2
 ; CHECK-NEXT:    [[TMP6:%.*]] = add i64 [[TMP5]], 4
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[B:%.*]], i64 [[TMP6]]
 ; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr nuw i8, ptr [[A]], i64 2

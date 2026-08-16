@@ -1054,8 +1054,18 @@ static SCEVUse withUseFlagsIfExact(ScalarEvolution &SE, const SCEV *Res,
 ///   A*BC(It, 0) + B*BC(It, 1) + C*BC(It, 2) + D*BC(It, 3)
 ///
 /// where BC(It, k) stands for binomial coefficient.
-SCEVUse SCEVAddRecExpr::evaluateAtIteration(const SCEV *It, ScalarEvolution &SE,
-                                            SCEV::NoWrapFlags Flags) const {
+SCEVUse SCEVAddRecExpr::evaluateAtIteration(const SCEV *It,
+                                            ScalarEvolution &SE) const {
+  // A recurrence's no-wrap flags describe only the iterations it reaches, so
+  // they carry over to the closed form only for an iteration number the loop is
+  // guaranteed to reach: its exact backedge-taken count. An exit count computed
+  // for a single exit of a multi-exit loop is not enough - the loop may leave
+  // through another exit first and never reach that iteration, and then the
+  // closed form for it may wrap.
+  SCEV::NoWrapFlags Flags = getNoWrapFlags(SCEV::FlagNUW | SCEV::FlagNSW);
+  if (Flags != SCEV::FlagAnyWrap && isAffine() &&
+      It != SE.getBackedgeTakenCount(getLoop()))
+    Flags = SCEV::FlagAnyWrap;
   return evaluateAtIteration(operands(), It, SE, Flags);
 }
 
@@ -10354,12 +10364,11 @@ SCEVUse ScalarEvolution::computeSCEVAtScope(SCEVUse V, const Loop *L) {
       if (BackedgeTakenCount == getCouldNotCompute())
         return AddRec;
 
-      // Then, evaluate the AddRec. The recurrence reaches this iteration, so
-      // its no-wrap flags hold for the value computed here. They come back as
-      // use-specific flags, valid only for contexts reached via this loop's
-      // exit rather than everywhere the closed-form SCEV is defined.
-      return AddRec->evaluateAtIteration(BackedgeTakenCount, *this,
-                                         AddRec->getNoWrapFlags());
+      // Then, evaluate the AddRec. This is the loop's exact backedge-taken
+      // count, so the recurrence's no-wrap flags come back attached to the
+      // result as use-specific flags - valid only for contexts reached via this
+      // loop's exit, rather than everywhere the closed-form SCEV is defined.
+      return AddRec->evaluateAtIteration(BackedgeTakenCount, *this);
     }
 
     return AddRec;
