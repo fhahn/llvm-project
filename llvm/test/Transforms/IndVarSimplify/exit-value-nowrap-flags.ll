@@ -20,7 +20,7 @@ define i32 @nuw_kept(i32 %start, i32 %step, i32 %n) {
 ; CHECK:       latch:
 ; CHECK-NEXT:    br label [[LOOP]]
 ; CHECK:       exit:
-; CHECK-NEXT:    [[TMP0:%.*]] = mul i32 [[N:%.*]], [[STEP:%.*]]
+; CHECK-NEXT:    [[TMP0:%.*]] = mul nuw i32 [[N:%.*]], [[STEP:%.*]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = add nuw i32 [[START:%.*]], [[TMP0]]
 ; CHECK-NEXT:    ret i32 [[TMP1]]
 ;
@@ -55,7 +55,7 @@ define i32 @nsw_kept_same_sign(i32 %start.in, i32 %step.in, i32 %n) {
 ; CHECK:       latch:
 ; CHECK-NEXT:    br label [[LOOP]]
 ; CHECK:       exit:
-; CHECK-NEXT:    [[TMP0:%.*]] = mul i32 [[N:%.*]], [[STEP]]
+; CHECK-NEXT:    [[TMP0:%.*]] = mul nuw i32 [[N:%.*]], [[STEP]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = add nuw nsw i32 [[TMP0]], [[START]]
 ; CHECK-NEXT:    ret i32 [[TMP1]]
 ;
@@ -346,4 +346,52 @@ b.latch:
 
 b.exit:
   ret i32 %dv2
+}
+
+; A pointer recurrence: the exit value's offset is (BTC * 24), and both that
+; multiply and the getelementptr adding it to the start carry the recurrence's
+; nuw.
+define ptr @ptr_step_mul_nuw(ptr %first, ptr %last) {
+;
+; CHECK-LABEL: @ptr_step_mul_nuw(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[FIRST2:%.*]] = ptrtoaddr ptr [[FIRST:%.*]] to i64
+; CHECK-NEXT:    [[LAST1:%.*]] = ptrtoaddr ptr [[LAST:%.*]] to i64
+; CHECK-NEXT:    [[C0:%.*]] = icmp ult ptr [[FIRST]], [[LAST]]
+; CHECK-NEXT:    br i1 [[C0]], label [[LOOP_PREHEADER:%.*]], label [[DONE:%.*]]
+; CHECK:       loop.preheader:
+; CHECK-NEXT:    br label [[LOOP:%.*]]
+; CHECK:       loop:
+; CHECK-NEXT:    br i1 false, label [[LOOP]], label [[EXIT:%.*]]
+; CHECK:       exit:
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[FIRST2]], 24
+; CHECK-NEXT:    [[UMAX:%.*]] = call i64 @llvm.umax.i64(i64 [[LAST1]], i64 [[TMP0]])
+; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[UMAX]], -24
+; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[TMP1]], [[FIRST2]]
+; CHECK-NEXT:    [[UMIN:%.*]] = call i64 @llvm.umin.i64(i64 [[TMP2]], i64 1)
+; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[TMP2]], [[UMIN]]
+; CHECK-NEXT:    [[TMP4:%.*]] = udiv i64 [[TMP3]], 24
+; CHECK-NEXT:    [[TMP5:%.*]] = add i64 [[UMIN]], [[TMP4]]
+; CHECK-NEXT:    [[TMP6:%.*]] = mul nuw i64 [[TMP5]], 24
+; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr nuw i8, ptr [[FIRST]], i64 [[TMP6]]
+; CHECK-NEXT:    ret ptr [[SCEVGEP]]
+; CHECK:       done:
+; CHECK-NEXT:    ret ptr [[FIRST]]
+;
+entry:
+  %c0 = icmp ult ptr %first, %last
+  br i1 %c0, label %loop, label %done
+
+loop:
+  %p = phi ptr [ %first, %entry ], [ %p.next, %loop ]
+  %p.next = getelementptr inbounds nuw i8, ptr %p, i64 24
+  %c = icmp ult ptr %p.next, %last
+  br i1 %c, label %loop, label %exit
+
+exit:
+  %lc = phi ptr [ %p, %loop ]
+  ret ptr %lc
+
+done:
+  ret ptr %first
 }
