@@ -23,6 +23,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/raw_ostream.h"
 #include "gtest/gtest.h"
 
 namespace llvm {
@@ -72,6 +73,17 @@ static std::optional<APInt> computeConstantDifference(ScalarEvolution &SE,
       const SCEV *RHS, ICmpInst::Predicate FoundPred, const SCEV *FoundLHS,
       const SCEV *FoundRHS) {
     return SE.isImpliedCond(Pred, LHS, RHS, FoundPred, FoundLHS, FoundRHS);
+  }
+
+  /// Overwrite the cached value of \p S at scope \p Scope with \p U.
+  static void setValueAtScope(ScalarEvolution &SE, const SCEV *S,
+                              const Loop *Scope, SCEVUse U) {
+    for (auto &LS : SE.ValuesAtScopes[S])
+      if (LS.first == Scope) {
+        LS.second = U;
+        return;
+      }
+    SE.ValuesAtScopes[S].emplace_back(Scope, U);
   }
 };
 
@@ -2061,6 +2073,95 @@ TEST_F(ScalarEvolutionsTest, SimplifyICmpOperands) {
       EXPECT_EQ(NewLHS, A);
       EXPECT_EQ(NewRHS, B);
     }
+  });
+}
+
+// getSCEVAtScope returns a SCEVUse which may carry use-specific no-wrap flags.
+// Check that both places print() renders an at-scope value - the second "-->"
+// for the value at the scope of the containing loop, and "Exits:" for the value
+// at the scope outside it - render those flags rather than the bare SCEV.
+//
+// Nothing attaches use-specific flags yet, so the test puts them into the
+// at-scope cache itself, standing in for what computeSCEVAtScope will produce
+// for the closed form of a recurrence's exit value.
+TEST_F(ScalarEvolutionsTest, PrintUseFlagsOfAtScopeValues) {
+  LLVMContext C;
+  SMDiagnostic Err;
+  std::unique_ptr<Module> M = parseAssemblyString(
+      R"(define void @f() {
+      entry:
+        br label %loop1
+
+      loop1:
+        %x = phi i32 [ 0, %entry ], [ %x.next, %loop1 ]
+        %x.next = add i32 %x, 1
+        %c1 = icmp ult i32 %x.next, 10
+        br i1 %c1, label %loop1, label %loop2
+
+      loop2:
+        %y = phi i32 [ %x, %loop1 ], [ %y.next, %loop2 ]
+        %y.next = add i32 %y, 1
+        %c2 = icmp ult i32 %y.next, 20
+        br i1 %c2, label %loop2, label %exit
+
+      exit:
+        ret void
+      })",
+      Err, C);
+
+  if (!M) {
+    Err.print("ScalarEvolutionTest", errs());
+    ASSERT_TRUE(M && "Could not parse module?");
+  }
+  ASSERT_TRUE(!verifyModule(*M, &errs()) && "Must have been well formed!");
+
+  runWithSE(*M, "f", [](Function &F, LoopInfo &LI, ScalarEvolution &SE) {
+    auto Rendered = [](SCEVUse U) {
+      std::string S;
+      raw_string_ostream OS(S);
+      U.print(OS);
+      return S;
+    };
+
+    Instruction *Y = getInstructionByName(F, "y");
+    const SCEV *SY = SE.getSCEV(Y);
+    const Loop *Inner = LI.getLoopFor(Y->getParent());
+    const Loop *Outer = Inner->getParentLoop();
+
+    // Warm every cache print() touches, so that seeding the at-scope entries
+    // below is not undone by an invalidation from a first-time trip count query.
+    std::string Warm;
+    raw_string_ostream WarmOS(Warm);
+    SE.print(WarmOS);
+
+    // {{0,+,1}<%loop1>,+,1}<%loop2> is the recurrence; at the scope of %loop2
+    // its start folds to %loop1's exit value, and outside both loops the whole
+    // thing folds to a constant.
+    SCEVUse AtInner = SE.getSCEVAtScope(SY, Inner);
+    SCEVUse AtOuter = SE.getSCEVAtScope(SY, Outer);
+    ASSERT_NE(AtInner, SY);
+    ASSERT_TRUE(SE.isLoopInvariant(AtOuter, Inner));
+
+    SCEVUse FlaggedInner = SE.getUseWithFlags(AtInner, SCEV::FlagNUW);
+    SCEVUse FlaggedOuter = SE.getUseWithFlags(AtOuter, SCEV::FlagNSW);
+    setValueAtScope(SE, SY, Inner, FlaggedInner);
+    setValueAtScope(SE, SY, Outer, FlaggedOuter);
+
+    std::string Str;
+    raw_string_ostream OS(Str);
+    SE.print(OS);
+
+    // The flags have to make a difference to the rendering, or the checks below
+    // would pass without print() looking at the use at all.
+    ASSERT_NE(Rendered(FlaggedInner), Rendered(AtInner));
+    ASSERT_NE(Rendered(FlaggedOuter), Rendered(AtOuter));
+
+    EXPECT_NE(Str.find(Rendered(FlaggedInner)), std::string::npos)
+        << "at-scope value printed without its use flags\n"
+        << Str;
+    EXPECT_NE(Str.find("Exits: " + Rendered(FlaggedOuter)), std::string::npos)
+        << "exit value printed without its use flags\n"
+        << Str;
   });
 }
 
