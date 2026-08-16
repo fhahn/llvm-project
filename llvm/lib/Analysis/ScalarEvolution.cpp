@@ -132,6 +132,55 @@
 #include <vector>
 
 using namespace llvm;
+
+/// Maximum profile size handled without heap allocation: covers a node with up
+/// to 32 pointer entries.
+static constexpr unsigned MaxProfileWords = 65;
+
+/// Append \p P to \p Words at index \p W, in exactly the word order
+/// FoldingSetNodeID::AddPointer produces: the low half first, then the high
+/// half. Note this must not be a memcpy of the pointer value, which would
+/// order the halves by host endianness instead.
+static void appendProfilePointer(unsigned *Words, unsigned &W, const void *P) {
+  uintptr_t V = reinterpret_cast<uintptr_t>(P);
+  Words[W++] = static_cast<unsigned>(V);
+  if constexpr (sizeof(unsigned) < sizeof(uintptr_t))
+    Words[W++] = static_cast<unsigned long long>(V) >> 32;
+}
+
+/// Write the uniquing profile of a node with type \p Ty and pointer entries
+/// \p P0..\p P2 into \p Words. Produces exactly the word sequence
+/// FoldingSetNodeID::AddInteger + AddPointer would, so the hash matches.
+static unsigned profileWords(unsigned *Words, unsigned Ty, const void *P0,
+                             const void *P1 = nullptr,
+                             const void *P2 = nullptr) {
+  Words[0] = Ty;
+  unsigned W = 1;
+  for (const void *P : {P0, P1, P2}) {
+    // A null entry terminates the list; a profile must not contain one, as
+    // truncating it here would make distinct expressions share a profile.
+    if (!P)
+      break;
+    appendProfilePointer(Words, W, P);
+  }
+  return W;
+}
+
+/// As above, for a node with an operand list plus an optional trailing entry.
+template <typename OpT>
+static unsigned profileWords(unsigned *Words, unsigned Ty, ArrayRef<OpT> Ops,
+                             const void *Extra = nullptr) {
+  Words[0] = Ty;
+  unsigned W = 1;
+  for (const SCEV *Op : Ops) {
+    assert(Op && "null operand in uniquing profile");
+    appendProfilePointer(Words, W, Op);
+  }
+  if (Extra)
+    appendProfilePointer(Words, W, Extra);
+  return W;
+}
+
 using namespace PatternMatch;
 using namespace SCEVPatternMatch;
 
@@ -513,15 +562,14 @@ const SCEV *ScalarEvolution::getConstant(ConstantInt *V) {
   if (Entry)
     return Entry;
 
-  FoldingSetNodeID ID;
-  ID.AddInteger(scConstant);
-  ID.AddPointer(V);
+  unsigned Words[3];
+  unsigned NumWords = profileWords(Words, scConstant, V);
   void *IP = nullptr;
-  if (SCEVConstant *S =
-          static_cast<SCEVConstant *>(UniqueSCEVs.FindNodeOrInsertPos(ID, IP)))
-    return Entry = S;
-  SCEVConstant *S =
-      new (SCEVAllocator) SCEVConstant(ID.Intern(SCEVAllocator), V);
+  if (auto *Existing =
+          static_cast<SCEVConstant *>(findUniqued({Words, NumWords}, IP)))
+    return Entry = Existing;
+  SCEVConstant *S = new (SCEVAllocator)
+      SCEVConstant(internProfile(Words), V);
   UniqueSCEVs.InsertNode(S, IP);
   S->computeAndSetCanonical(*this);
   return Entry = S;
@@ -3031,18 +3079,15 @@ const SCEV *ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
 
 const SCEV *ScalarEvolution::getOrCreateAddExpr(ArrayRef<SCEVUse> Ops,
                                                 SCEV::NoWrapFlags Flags) {
-  FoldingSetNodeID ID;
-  ID.AddInteger(scAddExpr);
-  for (const SCEV *Op : Ops)
-    ID.AddPointer(Op);
+  SmallVector<unsigned, MaxProfileWords> Words;
+  Words.resize_for_overwrite(1 + 2 * Ops.size());
+  profileWords(Words.data(), scAddExpr, Ops);
   void *IP = nullptr;
-  SCEVAddExpr *S =
-      static_cast<SCEVAddExpr *>(UniqueSCEVs.FindNodeOrInsertPos(ID, IP));
+  auto *S = static_cast<SCEVAddExpr *>(findUniqued(Words, IP));
   if (!S) {
     SCEVUse *O = SCEVAllocator.Allocate<SCEVUse>(Ops.size());
     llvm::uninitialized_copy(Ops, O);
-    S = new (SCEVAllocator)
-        SCEVAddExpr(ID.Intern(SCEVAllocator), O, Ops.size());
+    S = new (SCEVAllocator) SCEVAddExpr(internProfile(Words), O, Ops.size());
     UniqueSCEVs.InsertNode(S, IP);
     S->computeAndSetCanonical(*this);
     registerUser(S, Ops);
@@ -3054,19 +3099,16 @@ const SCEV *ScalarEvolution::getOrCreateAddExpr(ArrayRef<SCEVUse> Ops,
 const SCEV *ScalarEvolution::getOrCreateAddRecExpr(ArrayRef<SCEVUse> Ops,
                                                    const Loop *L,
                                                    SCEV::NoWrapFlags Flags) {
-  FoldingSetNodeID ID;
-  ID.AddInteger(scAddRecExpr);
-  for (const SCEV *Op : Ops)
-    ID.AddPointer(Op);
-  ID.AddPointer(L);
+  SmallVector<unsigned, MaxProfileWords> Words;
+  Words.resize_for_overwrite(3 + 2 * Ops.size());
+  profileWords(Words.data(), scAddRecExpr, Ops, L);
   void *IP = nullptr;
-  SCEVAddRecExpr *S =
-      static_cast<SCEVAddRecExpr *>(UniqueSCEVs.FindNodeOrInsertPos(ID, IP));
+  auto *S = static_cast<SCEVAddRecExpr *>(findUniqued(Words, IP));
   if (!S) {
     SCEVUse *O = SCEVAllocator.Allocate<SCEVUse>(Ops.size());
     llvm::uninitialized_copy(Ops, O);
     S = new (SCEVAllocator)
-        SCEVAddRecExpr(ID.Intern(SCEVAllocator), O, Ops.size(), L);
+        SCEVAddRecExpr(internProfile(Words), O, Ops.size(), L);
     UniqueSCEVs.InsertNode(S, IP);
     S->computeAndSetCanonical(*this);
     LoopUsers[L].push_back(S);
@@ -3078,18 +3120,15 @@ const SCEV *ScalarEvolution::getOrCreateAddRecExpr(ArrayRef<SCEVUse> Ops,
 
 const SCEV *ScalarEvolution::getOrCreateMulExpr(ArrayRef<SCEVUse> Ops,
                                                 SCEV::NoWrapFlags Flags) {
-  FoldingSetNodeID ID;
-  ID.AddInteger(scMulExpr);
-  for (const SCEV *Op : Ops)
-    ID.AddPointer(Op);
+  SmallVector<unsigned, MaxProfileWords> Words;
+  Words.resize_for_overwrite(1 + 2 * Ops.size());
+  profileWords(Words.data(), scMulExpr, Ops);
   void *IP = nullptr;
-  SCEVMulExpr *S =
-    static_cast<SCEVMulExpr *>(UniqueSCEVs.FindNodeOrInsertPos(ID, IP));
+  auto *S = static_cast<SCEVMulExpr *>(findUniqued(Words, IP));
   if (!S) {
     SCEVUse *O = SCEVAllocator.Allocate<SCEVUse>(Ops.size());
     llvm::uninitialized_copy(Ops, O);
-    S = new (SCEVAllocator) SCEVMulExpr(ID.Intern(SCEVAllocator),
-                                        O, Ops.size());
+    S = new (SCEVAllocator) SCEVMulExpr(internProfile(Words), O, Ops.size());
     UniqueSCEVs.InsertNode(S, IP);
     S->computeAndSetCanonical(*this);
     registerUser(S, Ops);
@@ -3914,24 +3953,43 @@ const SCEV *ScalarEvolution::getGEPExpr(SCEVUse BaseExpr,
   return GEPExpr;
 }
 
+SCEV *ScalarEvolution::findUniqued(ArrayRef<unsigned> Words, void *&InsertPos) {
+  unsigned Hash =
+      FoldingSetNodeIDRef(Words.data(), Words.size()).ComputeHash();
+  return UniqueSCEVs.FindNodeOrInsertPosForHash(Hash, InsertPos, [&](SCEV &S) {
+    FoldingSetNodeIDRef R = S.getProfileRef();
+    return R.getSize() == Words.size() &&
+           std::equal(R.getData(), R.getData() + R.getSize(), Words.begin());
+  });
+}
+
+FoldingSetNodeIDRef ScalarEvolution::internProfile(ArrayRef<unsigned> Words) {
+  unsigned *New = SCEVAllocator.Allocate<unsigned>(Words.size());
+  llvm::copy(Words, New);
+  return FoldingSetNodeIDRef(New, Words.size());
+}
+
+/// Write the FoldingSetNodeID profile of an n-ary SCEV with type \p SCEVType
+/// and operands \p Ops into \p Words, which must have room for
+/// 1 + 2 * Ops.size() entries. Produces exactly the same word sequence as
+/// FoldingSetNodeID::AddInteger + AddPointer, so the hash matches.
+template <typename OpT>
+SCEV *ScalarEvolution::findExistingNAry(SCEVTypes SCEVType, ArrayRef<OpT> Ops) {
+  SmallVector<unsigned, MaxProfileWords> Words;
+  Words.resize_for_overwrite(1 + 2 * Ops.size());
+  profileWords(Words.data(), SCEVType, Ops);
+  void *IP;
+  return findUniqued(Words, IP);
+}
+
 SCEV *ScalarEvolution::findExistingSCEVInCache(SCEVTypes SCEVType,
                                                ArrayRef<const SCEV *> Ops) {
-  FoldingSetNodeID ID;
-  ID.AddInteger(SCEVType);
-  for (const SCEV *Op : Ops)
-    ID.AddPointer(Op);
-  void *IP = nullptr;
-  return UniqueSCEVs.FindNodeOrInsertPos(ID, IP);
+  return findExistingNAry(SCEVType, Ops);
 }
 
 SCEV *ScalarEvolution::findExistingSCEVInCache(SCEVTypes SCEVType,
                                                ArrayRef<SCEVUse> Ops) {
-  FoldingSetNodeID ID;
-  ID.AddInteger(SCEVType);
-  for (const SCEV *Op : Ops)
-    ID.AddPointer(Op);
-  void *IP = nullptr;
-  return UniqueSCEVs.FindNodeOrInsertPos(ID, IP);
+  return findExistingNAry(SCEVType, Ops);
 }
 
 const SCEV *ScalarEvolution::getAbsExpr(const SCEV *Op, bool IsNSW) {
@@ -4528,17 +4586,16 @@ const SCEV *ScalarEvolution::getUnknown(Value *V) {
   // interesting possibilities, and any other code that calls getUnknown
   // is doing so in order to hide a value from SCEV canonicalization.
 
-  FoldingSetNodeID ID;
-  ID.AddInteger(scUnknown);
-  ID.AddPointer(V);
+  unsigned Words[3];
+  unsigned NumWords = profileWords(Words, scUnknown, V);
   void *IP = nullptr;
-  if (SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP)) {
-    assert(cast<SCEVUnknown>(S)->getValue() == V &&
+  if (SCEV *Existing = findUniqued({Words, NumWords}, IP)) {
+    assert(cast<SCEVUnknown>(Existing)->getValue() == V &&
            "Stale SCEVUnknown in uniquing map!");
-    return S;
+    return Existing;
   }
-  SCEV *S = new (SCEVAllocator) SCEVUnknown(ID.Intern(SCEVAllocator), V, this,
-                                            FirstUnknown);
+  SCEV *S = new (SCEVAllocator)
+      SCEVUnknown(internProfile(Words), V, this, FirstUnknown);
   FirstUnknown = cast<SCEVUnknown>(S);
   UniqueSCEVs.InsertNode(S, IP);
   S->computeAndSetCanonical(*this);

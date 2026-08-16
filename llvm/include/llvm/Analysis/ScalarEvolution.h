@@ -323,6 +323,9 @@ public:
   /// stream.  This should really only be used for debugging purposes.
   LLVM_ABI void print(raw_ostream &OS) const;
 
+  /// Return this node's interned uniquing profile.
+  FoldingSetNodeIDRef getProfileRef() const { return FastID; }
+
   /// This method is used for debugging.
   LLVM_ABI void dump() const;
 
@@ -2527,6 +2530,16 @@ private:
   /// `UniqueSCEVs`.  Return if found, else nullptr.
   SCEV *findExistingSCEVInCache(SCEVTypes SCEVType, ArrayRef<const SCEV *> Ops);
   SCEV *findExistingSCEVInCache(SCEVTypes SCEVType, ArrayRef<SCEVUse> Ops);
+
+  /// Look up the node with interned profile \p Words in `UniqueSCEVs`. On a
+  /// miss, set \p InsertPos for a subsequent UniqueSCEVs.InsertNode() and
+  /// return nullptr.
+  SCEV *findUniqued(ArrayRef<unsigned> Words, void *&InsertPos);
+  template <typename OpT>
+  SCEV *findExistingNAry(SCEVTypes SCEVType, ArrayRef<OpT> Ops);
+
+  /// Copy \p Words into SCEVAllocator, for use as a SCEV node's profile.
+  FoldingSetNodeIDRef internProfile(ArrayRef<unsigned> Words);
 
   /// Get reachable blocks in this function, making limited use of SCEV
   /// reasoning about conditions.

@@ -453,6 +453,35 @@ public:
   const_iterator begin() const { return const_iterator(Buckets); }
   const_iterator end() const { return const_iterator(Buckets + NumBuckets); }
 
+  /// Look up the node in the bucket for the precomputed \p Hash for which
+  /// \p IsMatch returns true. If there is no such node, return null and set
+  /// \p InsertPos to the insertion token to pass to InsertNode(); the token is
+  /// only valid until the set is modified.
+  ///
+  /// This is an alternative to FindNodeOrInsertPos() for clients that hash and
+  /// compare the profile of a candidate node themselves, which avoids building
+  /// a FoldingSetNodeID for the node being looked up.
+  template <typename FnT>
+  T *FindNodeOrInsertPosForHash(unsigned Hash, void *&InsertPos, FnT IsMatch) {
+    // NumBuckets is always a power of 2.
+    void **Bucket = Buckets + (Hash & (NumBuckets - 1));
+    // Each bucket is a circular singly-linked list, whose last node points
+    // back to the bucket with the low bit set, see GetNextPtr in FoldingSet.cpp.
+    for (void *Probe = *Bucket;
+         Probe && !(reinterpret_cast<uintptr_t>(Probe) & 1);) {
+      T *N = static_cast<T *>(static_cast<Node *>(Probe));
+      if (IsMatch(*N)) {
+        InsertPos = nullptr;
+        return N;
+      }
+      Probe = N->getNextInBucket();
+    }
+
+    // Didn't find the node, return null with the bucket as the InsertPos.
+    InsertPos = Bucket;
+    return nullptr;
+  }
+
   /// Increase the number of buckets such that adding the \p EltCount th node
   /// won't cause a rebucket operation. reserve is permitted to allocate more
   /// space than requested by EltCount.
