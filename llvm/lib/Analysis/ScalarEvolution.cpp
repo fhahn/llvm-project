@@ -6542,6 +6542,7 @@ void ScalarEvolution::setNoWrapFlags(SCEVAddRecExpr *AddRec,
                                      SCEV::NoWrapFlags Flags) {
   if (AddRec->getNoWrapFlags(Flags) != Flags) {
     AddRec->setNoWrapFlags(Flags);
+    AffineRangeCache.reset();
     UnsignedRanges.erase(AddRec);
     SignedRanges.erase(AddRec);
     ConstantMultipleCache.erase(AddRec);
@@ -6937,16 +6938,27 @@ const ConstantRange &ScalarEvolution::getRangeRef(
           MaxBECount = MaxBECount.zext(BitWidth);
 
         if (MaxBECount.getBitWidth() == BitWidth) {
-          auto [RangeFromAffine, Flags] = getRangeForAffineAR(
-              AddRec->getStart(), AddRec->getStepRecurrence(*this), MaxBECount);
-          ConservativeResult =
-              ConservativeResult.intersectWith(RangeFromAffine, RangeType);
-          const_cast<SCEVAddRecExpr *>(AddRec)->setNoWrapFlags(Flags);
-
-          auto RangeFromFactoring = getRangeViaFactoring(
-              AddRec->getStart(), AddRec->getStepRecurrence(*this), MaxBECount);
-          ConservativeResult =
-              ConservativeResult.intersectWith(RangeFromFactoring, RangeType);
+          // Both range computations for this addrec (one per sign hint) derive
+          // the same ranges and flags from (start, step, MaxBECount), so reuse
+          // the result of the first one. Re-applying the flags on a hit would
+          // be a no-op: they are only ever added to, and any refinement of them
+          // goes through ScalarEvolution::setNoWrapFlags, which drops the memo.
+          if (!AffineRangeCache || AffineRangeCache->AR != AddRec ||
+              AffineRangeCache->BECount != MaxBECount) {
+            const SCEV *Start = AddRec->getStart();
+            const SCEV *Step = AddRec->getStepRecurrence(*this);
+            auto [Affine, Flags] = getRangeForAffineAR(Start, Step, MaxBECount);
+            ConstantRange Factoring =
+                getRangeViaFactoring(Start, Step, MaxBECount);
+            // Assign only now: both calls above can recurse into getRangeRef
+            // for a nested addrec and leave a memo of their own behind.
+            AffineRangeCache = {AddRec, MaxBECount, Affine, Factoring};
+            const_cast<SCEVAddRecExpr *>(AddRec)->setNoWrapFlags(Flags);
+          }
+          ConservativeResult = ConservativeResult.intersectWith(
+              AffineRangeCache->Affine, RangeType);
+          ConservativeResult = ConservativeResult.intersectWith(
+              AffineRangeCache->Factoring, RangeType);
         }
       }
 
@@ -8722,6 +8734,7 @@ void ScalarEvolution::forgetAllLoops() {
   ValuesAtScopesUsers.clear();
   LoopDispositions.clear();
   BlockDispositions.clear();
+  AffineRangeCache.reset();
   UnsignedRanges.clear();
   SignedRanges.clear();
   ExprValueMap.clear();
@@ -14692,6 +14705,7 @@ void ScalarEvolution::forgetMemoizedResults(ArrayRef<SCEVUse> SCEVs) {
 }
 
 void ScalarEvolution::forgetMemoizedResultsImpl(const SCEV *S) {
+  AffineRangeCache.reset();
   LoopDispositions.erase(S);
   BlockDispositions.erase(S);
   UnsignedRanges.erase(S);
