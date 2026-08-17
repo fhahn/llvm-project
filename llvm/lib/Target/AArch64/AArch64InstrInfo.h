@@ -436,6 +436,8 @@ public:
                             const MachineBasicBlock *MBB,
                             const MachineFunction &MF) const override;
 
+  bool simplifyInstruction(MachineInstr &MI) const override;
+
   /// analyzeCompare - For a comparison instruction, return the source registers
   /// in SrcReg and SrcReg2, and the value it compares against in CmpValue.
   /// Return true if the comparison instruction can be analyzed.

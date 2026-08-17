@@ -11491,6 +11491,53 @@ void AArch64InstrInfo::buildClearRegister(Register Reg, MachineBasicBlock &MBB,
   }
 }
 
+/// Rewrite \p MI, a variable shift by the zero register, into
+/// "orr Rd, ZeroReg, Rn, lsl #0", the canonical mov alias, using the zero
+/// register \p ZeroReg and the ORR description \p OrrDesc matching the width
+/// of \p MI. Register flags of the source operand are preserved so that
+/// liveness stays accurate.
+static void rewriteShiftToMovAlias(MachineInstr &MI, Register ZeroReg,
+                                   const MCInstrDesc &OrrDesc) {
+  MachineOperand &Src = MI.getOperand(1);
+  MachineOperand &Amount = MI.getOperand(2);
+  Amount.ChangeToRegister(Src.getReg(), /*isDef=*/false, /*isImp=*/false,
+                          Src.isKill(), /*isDead=*/false, Src.isUndef());
+  Amount.setIsRenamable(Src.isRenamable());
+  Src.ChangeToRegister(ZeroReg, /*isDef=*/false);
+
+  // ORR*rs takes an extra shift-amount operand.
+  MI.setDesc(OrrDesc);
+  MI.addOperand(MachineOperand::CreateImm(0));
+}
+
+bool AArch64InstrInfo::simplifyInstruction(MachineInstr &MI) const {
+  switch (MI.getOpcode()) {
+  default:
+    break;
+  case AArch64::LSLVWr:
+  case AArch64::LSRVWr:
+  case AArch64::ASRVWr:
+  case AArch64::RORVWr:
+    // shift Rd, Rn, wzr => mov Rd, Rn
+    if (MI.getOperand(2).getReg() == AArch64::WZR) {
+      rewriteShiftToMovAlias(MI, AArch64::WZR, get(AArch64::ORRWrs));
+      return true;
+    }
+    break;
+  case AArch64::LSLVXr:
+  case AArch64::LSRVXr:
+  case AArch64::ASRVXr:
+  case AArch64::RORVXr:
+    // shift Rd, Rn, xzr => mov Rd, Rn
+    if (MI.getOperand(2).getReg() == AArch64::XZR) {
+      rewriteShiftToMovAlias(MI, AArch64::XZR, get(AArch64::ORRXrs));
+      return true;
+    }
+    break;
+  }
+  return false;
+}
+
 std::optional<DestSourcePair>
 AArch64InstrInfo::isCopyInstrImpl(const MachineInstr &MI) const {
 

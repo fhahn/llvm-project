@@ -13,7 +13,7 @@ body: |
     ; CHECK-LABEL: name: lslv_by_zero
     ; CHECK: liveins: $w1
     ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: renamable $w0 = LSLVWr killed renamable $w1, $wzr
+    ; CHECK-NEXT: renamable $w0 = ORRWrs $wzr, killed renamable $w1, 0
     ; CHECK-NEXT: RET_ReallyLR implicit killed $w0
     renamable $w2 = COPY $wzr
     renamable $w0 = LSLVWr killed renamable $w1, killed renamable $w2
@@ -27,7 +27,7 @@ body: |
     ; CHECK-LABEL: name: lsrv_by_zero
     ; CHECK: liveins: $w1
     ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: renamable $w0 = LSRVWr killed renamable $w1, $wzr
+    ; CHECK-NEXT: renamable $w0 = ORRWrs $wzr, killed renamable $w1, 0
     ; CHECK-NEXT: RET_ReallyLR implicit killed $w0
     renamable $w2 = COPY $wzr
     renamable $w0 = LSRVWr killed renamable $w1, killed renamable $w2
@@ -41,7 +41,7 @@ body: |
     ; CHECK-LABEL: name: asrv_by_zero
     ; CHECK: liveins: $w1
     ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: renamable $w0 = ASRVWr killed renamable $w1, $wzr
+    ; CHECK-NEXT: renamable $w0 = ORRWrs $wzr, killed renamable $w1, 0
     ; CHECK-NEXT: RET_ReallyLR implicit killed $w0
     renamable $w2 = COPY $wzr
     renamable $w0 = ASRVWr killed renamable $w1, killed renamable $w2
@@ -55,7 +55,7 @@ body: |
     ; CHECK-LABEL: name: rorv_by_zero
     ; CHECK: liveins: $w1
     ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: renamable $w0 = RORVWr killed renamable $w1, $wzr
+    ; CHECK-NEXT: renamable $w0 = ORRWrs $wzr, killed renamable $w1, 0
     ; CHECK-NEXT: RET_ReallyLR implicit killed $w0
     renamable $w2 = COPY $wzr
     renamable $w0 = RORVWr killed renamable $w1, killed renamable $w2
@@ -69,7 +69,7 @@ body: |
     ; CHECK-LABEL: name: lslv_by_zero_64
     ; CHECK: liveins: $x1
     ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: renamable $x0 = LSLVXr killed renamable $x1, $xzr
+    ; CHECK-NEXT: renamable $x0 = ORRXrs $xzr, killed renamable $x1, 0
     ; CHECK-NEXT: RET_ReallyLR implicit killed $x0
     renamable $x2 = COPY $xzr
     renamable $x0 = LSLVXr killed renamable $x1, killed renamable $x2
@@ -83,7 +83,7 @@ body: |
     ; CHECK-LABEL: name: lsrv_by_zero_64
     ; CHECK: liveins: $x1
     ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: renamable $x0 = LSRVXr killed renamable $x1, $xzr
+    ; CHECK-NEXT: renamable $x0 = ORRXrs $xzr, killed renamable $x1, 0
     ; CHECK-NEXT: RET_ReallyLR implicit killed $x0
     renamable $x2 = COPY $xzr
     renamable $x0 = LSRVXr killed renamable $x1, killed renamable $x2
@@ -97,7 +97,7 @@ body: |
     ; CHECK-LABEL: name: asrv_by_zero_64
     ; CHECK: liveins: $x1
     ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: renamable $x0 = ASRVXr killed renamable $x1, $xzr
+    ; CHECK-NEXT: renamable $x0 = ORRXrs $xzr, killed renamable $x1, 0
     ; CHECK-NEXT: RET_ReallyLR implicit killed $x0
     renamable $x2 = COPY $xzr
     renamable $x0 = ASRVXr killed renamable $x1, killed renamable $x2
@@ -111,7 +111,7 @@ body: |
     ; CHECK-LABEL: name: rorv_by_zero_64
     ; CHECK: liveins: $x1
     ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: renamable $x0 = RORVXr killed renamable $x1, $xzr
+    ; CHECK-NEXT: renamable $x0 = ORRXrs $xzr, killed renamable $x1, 0
     ; CHECK-NEXT: RET_ReallyLR implicit killed $x0
     renamable $x2 = COPY $xzr
     renamable $x0 = RORVXr killed renamable $x1, killed renamable $x2
@@ -126,7 +126,7 @@ body: |
     ; CHECK-LABEL: name: shift_by_zero_forwarded
     ; CHECK: liveins: $w1, $x3
     ; CHECK-NEXT: {{  $}}
-    ; CHECK-NEXT: renamable $w0 = LSLVWr killed renamable $w1, $wzr
+    ; CHECK-NEXT: renamable $w0 = ORRWrs $wzr, killed renamable $w1, 0
     ; CHECK-NEXT: STRWui killed renamable $w0, killed renamable $x3, 0
     ; CHECK-NEXT: RET_ReallyLR
     renamable $w2 = COPY $wzr
@@ -192,7 +192,7 @@ body: |
     ; CHECK: liveins: $w1, $x3
     ; CHECK-NEXT: {{  $}}
     ; CHECK-NEXT: STRWui renamable $w1, renamable $x3, 0
-    ; CHECK-NEXT: renamable $w0 = LSLVWr killed renamable $w1, $wzr
+    ; CHECK-NEXT: renamable $w0 = ORRWrs $wzr, killed renamable $w1, 0
     ; CHECK-NEXT: RET_ReallyLR implicit killed $w0
     renamable $w2 = COPY $wzr
     STRWui renamable $w1, renamable $x3, 0
@@ -205,7 +205,7 @@ name: preserves_undef_flag
 body: |
   bb.0:
     ; CHECK-LABEL: name: preserves_undef_flag
-    ; CHECK: renamable $w0 = LSLVWr undef renamable $w1, $wzr
+    ; CHECK: renamable $w0 = ORRWrs $wzr, undef renamable $w1, 0
     ; CHECK-NEXT: RET_ReallyLR implicit killed $w0
     renamable $w2 = COPY $wzr
     renamable $w0 = LSLVWr undef renamable $w1, killed renamable $w2

@@ -28,8 +28,7 @@ define void @shift_and_or(i32 %x, ptr %p, i1 %c) {
 ; CHECK-NEXT:    ldp x30, x21, [sp], #32 // 16-byte Folded Reload
 ; CHECK-NEXT:    ret
 ; CHECK-NEXT:  .LBB0_2:
-; CHECK-NEXT:    lsl w8, w20, wzr
-; CHECK-NEXT:    orr w8, w8, wzr
+; CHECK-NEXT:    orr w8, w20, wzr
 ; CHECK-NEXT:    str w8, [x19]
 ; CHECK-NEXT:    ldp x20, x19, [sp, #16] // 16-byte Folded Reload
 ; CHECK-NEXT:    ldp x30, x21, [sp], #32 // 16-byte Folded Reload
@@ -78,8 +77,7 @@ define void @lshr_i32(i32 %x, ptr %p, i1 %c) {
 ; CHECK-NEXT:    ldp x30, x21, [sp], #32 // 16-byte Folded Reload
 ; CHECK-NEXT:    ret
 ; CHECK-NEXT:  .LBB1_2:
-; CHECK-NEXT:    lsr w8, w20, wzr
-; CHECK-NEXT:    orr w8, w8, wzr
+; CHECK-NEXT:    orr w8, w20, wzr
 ; CHECK-NEXT:    str w8, [x19]
 ; CHECK-NEXT:    ldp x20, x19, [sp, #16] // 16-byte Folded Reload
 ; CHECK-NEXT:    ldp x30, x21, [sp], #32 // 16-byte Folded Reload
@@ -128,8 +126,7 @@ define void @ashr_i64(i64 %x, ptr %p, i1 %c) {
 ; CHECK-NEXT:    ldp x30, x21, [sp], #32 // 16-byte Folded Reload
 ; CHECK-NEXT:    ret
 ; CHECK-NEXT:  .LBB2_2:
-; CHECK-NEXT:    asr x8, x20, xzr
-; CHECK-NEXT:    orr x8, x8, xzr
+; CHECK-NEXT:    orr x8, x20, xzr
 ; CHECK-NEXT:    str x8, [x19]
 ; CHECK-NEXT:    ldp x20, x19, [sp, #16] // 16-byte Folded Reload
 ; CHECK-NEXT:    ldp x30, x21, [sp], #32 // 16-byte Folded Reload
@@ -179,8 +176,7 @@ define void @only_shift_folds(i32 %x, i32 %m, ptr %p, i1 %c) {
 ; CHECK-NEXT:    ldp x30, x21, [sp], #32 // 16-byte Folded Reload
 ; CHECK-NEXT:    ret
 ; CHECK-NEXT:  .LBB3_2:
-; CHECK-NEXT:    lsl w8, w21, wzr
-; CHECK-NEXT:    orr w8, w8, w20
+; CHECK-NEXT:    orr w8, w21, w20
 ; CHECK-NEXT:    str w8, [x19]
 ; CHECK-NEXT:    ldp x20, x19, [sp, #16] // 16-byte Folded Reload
 ; CHECK-NEXT:    ldp x30, x21, [sp], #32 // 16-byte Folded Reload
