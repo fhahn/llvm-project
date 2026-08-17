@@ -311,6 +311,18 @@ std::optional<unsigned> llvm::getMaxVScale(const Function &F,
   return std::nullopt;
 }
 
+std::optional<uint64_t> llvm::getMaxRuntimeVF(ElementCount VF,
+                                              const Function &F,
+                                              const TargetTransformInfo &TTI) {
+  if (!VF.isScalable())
+    return VF.getFixedValue();
+
+  if (std::optional<unsigned> MaxVScale = getMaxVScale(F, TTI))
+    return uint64_t(VF.getKnownMinValue()) * *MaxVScale;
+
+  return std::nullopt;
+}
+
 bool VFSelectionContext::isScalableVectorizationAllowed() {
   if (IsScalableVectorizationAllowed)
     return *IsScalableVectorizationAllowed;

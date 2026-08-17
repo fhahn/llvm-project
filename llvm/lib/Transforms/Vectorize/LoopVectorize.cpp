@@ -1937,24 +1937,23 @@ static bool isIndvarOverflowCheckKnownFalse(
           Cost->PSE, Cost->TheLoop,
           /*CanUseConstantMax=*/true, /*CanExcludeZeroTrips=*/false,
           /*ComputeUpperBoundOnly=*/true)) {
-    unsigned MaxVF = VF.getKnownMinValue();
+    std::optional<uint64_t> MaxVF =
+        getMaxRuntimeVF(VF, *Cost->TheFunction, Cost->TTI);
+    if (!MaxVF)
+      return false;
     unsigned MaxTC = TC->getKnownMinValue();
-    if (VF.isScalable() || TC->isScalable()) {
+    if (TC->isScalable()) {
       std::optional<unsigned> MaxVScale =
           getMaxVScale(*Cost->TheFunction, Cost->TTI);
       if (!MaxVScale)
         return false;
-      if (VF.isScalable())
-        MaxVF *= *MaxVScale;
-      if (TC->isScalable()) {
-        bool Overflow;
-        MaxTC = SaturatingMultiply(MaxTC, *MaxVScale, &Overflow);
-        if (Overflow)
-          return false;
-      }
+      bool Overflow;
+      MaxTC = SaturatingMultiply(MaxTC, *MaxVScale, &Overflow);
+      if (Overflow)
+        return false;
     }
 
-    return (MaxUIntTripCount - MaxTC).ugt(MaxVF * MaxUF);
+    return (MaxUIntTripCount - MaxTC).ugt(*MaxVF * MaxUF);
   }
 
   return false;
@@ -3010,25 +3009,24 @@ LoopVectorizationCostModel::computeMaxVF(ElementCount UserVF, unsigned UserIC) {
 
   // Avoid tail folding if the trip count is known to be a multiple of any VF
   // we choose.
-  std::optional<unsigned> MaxPowerOf2RuntimeVF =
+  std::optional<uint64_t> MaxPowerOf2RuntimeVF =
       MaxFactors.FixedVF.getFixedValue();
   if (MaxFactors.ScalableVF) {
-    std::optional<unsigned> MaxVScale = getMaxVScale(*TheFunction, TTI);
-    if (MaxVScale) {
-      MaxPowerOf2RuntimeVF = std::max<unsigned>(
-          *MaxPowerOf2RuntimeVF,
-          *MaxVScale * MaxFactors.ScalableVF.getKnownMinValue());
-    } else
+    std::optional<uint64_t> MaxRuntimeVF =
+        getMaxRuntimeVF(MaxFactors.ScalableVF, *TheFunction, TTI);
+    if (MaxRuntimeVF)
+      MaxPowerOf2RuntimeVF = std::max(*MaxPowerOf2RuntimeVF, *MaxRuntimeVF);
+    else
       MaxPowerOf2RuntimeVF = std::nullopt; // Stick with tail-folding for now.
   }
 
-  auto NoScalarEpilogueNeeded = [this, &UserIC](unsigned MaxVF) {
+  auto NoScalarEpilogueNeeded = [this, &UserIC](uint64_t MaxVF) {
     // Return false if the loop is neither a single-latch-exit loop nor an
     // early-exit loop as tail-folding is not supported in that case.
     if (TheLoop->getExitingBlock() != TheLoop->getLoopLatch() &&
         !Legal->hasUncountableEarlyExit())
       return false;
-    unsigned MaxVFtimesIC = UserIC ? MaxVF * UserIC : MaxVF;
+    uint64_t MaxVFtimesIC = UserIC ? MaxVF * UserIC : MaxVF;
     ScalarEvolution *SE = PSE.getSE();
     // Calling getSymbolicMaxBackedgeTakenCount enables support for loops
     // with uncountable exits. For countable loops, the symbolic maximum must
@@ -3046,7 +3044,7 @@ LoopVectorizationCostModel::computeMaxVF(ElementCount UserVF, unsigned UserIC) {
   };
 
   if (MaxPowerOf2RuntimeVF > 0u) {
-    assert((UserVF.isNonZero() || isPowerOf2_32(*MaxPowerOf2RuntimeVF)) &&
+    assert((UserVF.isNonZero() || isPowerOf2_64(*MaxPowerOf2RuntimeVF)) &&
            "MaxFixedVF must be a power of 2");
     if (NoScalarEpilogueNeeded(*MaxPowerOf2RuntimeVF)) {
       // Accept MaxFixedVF if we do not have a tail.
@@ -5999,8 +5997,9 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   VPlanTransforms::removeBranchOnConst(BestVPlan, /*OnlyLatches=*/true);
   VPlanTransforms::materializeBackedgeTakenCount(BestVPlan, VectorPH);
   std::optional<uint64_t> MaxRuntimeStep;
-  if (auto MaxVScale = getMaxVScale(*OrigLoop->getHeader()->getParent(), TTI))
-    MaxRuntimeStep = uint64_t(*MaxVScale) * BestVF.getKnownMinValue() * BestUF;
+  if (std::optional<uint64_t> MaxRuntimeVF =
+          getMaxRuntimeVF(BestVF, *OrigLoop->getHeader()->getParent(), TTI))
+    MaxRuntimeStep = *MaxRuntimeVF * BestUF;
   assert((LI->getUniqueLatchExitBlock(*OrigLoop) || RequiresScalarEpilogue) &&
          "loops not exiting via the latch without required epilogue?");
   VPlanTransforms::materializeVectorTripCount(
