@@ -101,7 +101,7 @@ struct FactOrCheck {
     InstFact,      /// A fact that holds after Inst executed (e.g. an assume or
                    /// min/mix intrinsic.
     InstCheck,     /// An instruction to simplify (e.g. an overflow math
-                   /// intrinsics).
+                   /// intrinsics) or whose flags may be strengthened.
     UseCheck       /// An use of a compare instruction to simplify.
   };
 
@@ -146,8 +146,8 @@ struct FactOrCheck {
     return FactOrCheck(DTN, U);
   }
 
-  static FactOrCheck getCheck(DomTreeNode *DTN, CallInst *CI) {
-    return FactOrCheck(EntryTy::InstCheck, DTN, CI);
+  static FactOrCheck getCheck(DomTreeNode *DTN, Instruction *I) {
+    return FactOrCheck(EntryTy::InstCheck, DTN, I);
   }
 
   bool isCheck() const {
@@ -1285,6 +1285,49 @@ static bool getConstraintFromMemoryAccess(GetElementPtrInst &GEP,
   return true;
 }
 
+/// Returns true if \p I is a candidate whose poison-generating flags may be
+/// strengthened using the constraint systems.
+static bool canStrengthenFlags(Instruction *I) {
+  switch (I->getOpcode()) {
+  case Instruction::SExt:
+    // Can be replaced by zext nneg, if the operand is non-negative.
+    return I->getType()->isIntegerTy();
+  default:
+    return false;
+  }
+}
+
+
+/// The systems hold facts that are not explicit in the IR, in particular facts
+/// implied by conditions this pass then removes. Later passes cannot re-derive
+/// those facts. Try to materialize them as poison-generating flags on \p I,
+/// which remain valid independently of the conditions they were derived from.
+/// Returns true if \p I was modified.
+static bool tryToStrengthenFlags(Instruction *I, ConstraintInfo &Info,
+                                 SmallVectorImpl<Instruction *> &ToRemove) {
+  assert(canStrengthenFlags(I) && "not a candidate for flag strengthening");
+
+  switch (I->getOpcode()) {
+  case Instruction::SExt: {
+    Value *Op = I->getOperand(0);
+    if (!Op->getType()->isIntegerTy() ||
+        !preconditionHolds(Info, CmpInst::ICMP_SGE, Op, 0))
+      return false;
+    LLVM_DEBUG(dbgs() << "Replacing sext by zext nneg: " << *I << "\n");
+    auto *ZExt = CastInst::Create(Instruction::ZExt, Op, I->getType(), "",
+                                  I->getIterator());
+    ZExt->setNonNeg();
+    ZExt->takeName(I);
+    ZExt->setDebugLoc(I->getDebugLoc());
+    I->replaceAllUsesWith(ZExt);
+    ToRemove.push_back(I);
+    return true;
+  }
+  default:
+    return false;
+  }
+}
+
 void State::addInfoFor(BasicBlock &BB) {
   addBoundsForHeaderInductions(BB);
   addInfoForInductions(BB);
@@ -1397,6 +1440,11 @@ void State::addInfoFor(BasicBlock &BB) {
           isGuaranteedNotToBePoison(BO))
         WorkList.push_back(FactOrCheck::getInstFact(DT.getNode(&BB), BO));
     }
+
+    // Queue instructions whose flags may be strengthened based on the facts
+    // that hold on entry to BB.
+    if (canStrengthenFlags(&I))
+      WorkList.push_back(FactOrCheck::getCheck(DT.getNode(&BB), &I));
 
     GuaranteedToExecute &= isGuaranteedToTransferExecutionToSuccessor(&I);
   }
@@ -2152,6 +2200,10 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
       Instruction *Inst = CB.getInstructionToSimplify();
       if (!Inst)
         continue;
+      if (canStrengthenFlags(Inst)) {
+        Changed |= tryToStrengthenFlags(Inst, Info, ToRemove);
+        continue;
+      }
       LLVM_DEBUG(dbgs() << "Processing condition to simplify: " << *Inst
                         << "\n");
       if (auto *II = dyn_cast<WithOverflowInst>(Inst)) {

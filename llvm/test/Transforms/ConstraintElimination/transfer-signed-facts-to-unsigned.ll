@@ -498,7 +498,7 @@ entry:
 define i32 @sge_2_gep(i32 %idx, ptr %src, i32 %idx.2) {
 ; CHECK-LABEL: @sge_2_gep(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[IDX_EXT:%.*]] = sext i32 [[IDX:%.*]] to i64
+; CHECK-NEXT:    [[IDX_EXT:%.*]] = zext nneg i32 [[IDX:%.*]] to i64
 ; CHECK-NEXT:    [[ADD_PTR:%.*]] = getelementptr inbounds i32, ptr [[SRC:%.*]], i64 [[IDX_EXT]]
 ; CHECK-NEXT:    [[CMP:%.*]] = icmp sge i32 [[IDX]], 2
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[CMP]])

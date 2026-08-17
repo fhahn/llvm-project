@@ -14,17 +14,12 @@ define void @index_mask_removed1(ptr %A, i16 %start, i16 %v, i16 %n) {
 ; CHECK-NEXT:    [[TMP1:%.*]] = add i16 [[N]], [[TMP0]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = zext i16 [[TMP1]] to i32
 ; CHECK-NEXT:    [[TMP3:%.*]] = add nuw nsw i32 [[TMP2]], 1
-; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i16 [[TMP1]], 11
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i16 [[TMP1]], 7
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[LOOP_BODY_PREHEADER3:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
-; CHECK-NEXT:    [[TMP4:%.*]] = xor i16 [[START]], -1
-; CHECK-NEXT:    [[TMP5:%.*]] = add i16 [[N]], [[TMP4]]
-; CHECK-NEXT:    [[TMP6:%.*]] = sext i16 [[V]] to i32
-; CHECK-NEXT:    [[TMP7:%.*]] = zext i16 [[TMP5]] to i32
-; CHECK-NEXT:    [[TMP8:%.*]] = xor i16 [[START]], -1
-; CHECK-NEXT:    [[TMP9:%.*]] = sext i16 [[TMP8]] to i32
-; CHECK-NEXT:    [[TMP10:%.*]] = add nsw i32 [[TMP9]], [[TMP6]]
-; CHECK-NEXT:    [[TMP11:%.*]] = icmp ult i32 [[TMP10]], [[TMP7]]
+; CHECK-NEXT:    [[TMP4:%.*]] = sub i16 [[START]], [[V]]
+; CHECK-NEXT:    [[TMP5:%.*]] = sub i16 [[START]], [[N]]
+; CHECK-NEXT:    [[TMP11:%.*]] = icmp ugt i16 [[TMP4]], [[TMP5]]
 ; CHECK-NEXT:    br i1 [[TMP11]], label %[[LOOP_BODY_PREHEADER3]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_VEC:%.*]] = and i32 [[TMP3]], 131068
@@ -36,8 +31,7 @@ define void @index_mask_removed1(ptr %A, i16 %start, i16 %v, i16 %n) {
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP14:%.*]] = trunc i32 [[INDEX]] to i16
 ; CHECK-NEXT:    [[DOTREASS:%.*]] = add i16 [[TMP14]], [[INVARIANT_OP]]
-; CHECK-NEXT:    [[TMP15:%.*]] = sext i16 [[DOTREASS]] to i64
-; CHECK-NEXT:    [[TMP16:%.*]] = and i64 [[TMP15]], 4294967295
+; CHECK-NEXT:    [[TMP16:%.*]] = zext nneg i16 [[DOTREASS]] to i64
 ; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr inbounds nuw i8, ptr [[A]], i64 [[TMP16]]
 ; CHECK-NEXT:    store <4 x i8> splat (i8 1), ptr [[TMP17]], align 1
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
@@ -52,8 +46,7 @@ define void @index_mask_removed1(ptr %A, i16 %start, i16 %v, i16 %n) {
 ; CHECK:       [[LOOP_BODY]]:
 ; CHECK-NEXT:    [[IV2:%.*]] = phi i16 [ [[IV_NEXT:%.*]], %[[LOOP_BODY]] ], [ [[IV2_PH]], %[[LOOP_BODY_PREHEADER3]] ]
 ; CHECK-NEXT:    [[OFF:%.*]] = sub nsw i16 [[IV2]], [[V]]
-; CHECK-NEXT:    [[EXT:%.*]] = sext i16 [[OFF]] to i64
-; CHECK-NEXT:    [[MASK:%.*]] = and i64 [[EXT]], 4294967295
+; CHECK-NEXT:    [[MASK:%.*]] = zext nneg i16 [[OFF]] to i64
 ; CHECK-NEXT:    [[GEP:%.*]] = getelementptr inbounds nuw i8, ptr [[A]], i64 [[MASK]]
 ; CHECK-NEXT:    store i8 1, ptr [[GEP]], align 1
 ; CHECK-NEXT:    [[IV_NEXT]] = add nsw i16 [[IV2]], 1
@@ -100,17 +93,12 @@ define void @index_mask_removed2(ptr %A, i16 %start, i16 %v, i16 %n) {
 ; CHECK-NEXT:    [[TMP1:%.*]] = add i16 [[N]], [[TMP0]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = zext i16 [[TMP1]] to i32
 ; CHECK-NEXT:    [[TMP3:%.*]] = add nuw nsw i32 [[TMP2]], 1
-; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i16 [[TMP1]], 11
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i16 [[TMP1]], 7
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[LOOP_BODY_PREHEADER3:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
-; CHECK-NEXT:    [[TMP4:%.*]] = xor i16 [[START]], -1
-; CHECK-NEXT:    [[TMP5:%.*]] = add i16 [[N]], [[TMP4]]
-; CHECK-NEXT:    [[TMP6:%.*]] = sext i16 [[V]] to i32
-; CHECK-NEXT:    [[TMP7:%.*]] = zext i16 [[TMP5]] to i32
-; CHECK-NEXT:    [[TMP8:%.*]] = xor i16 [[START]], -1
-; CHECK-NEXT:    [[TMP9:%.*]] = sext i16 [[TMP8]] to i32
-; CHECK-NEXT:    [[TMP10:%.*]] = add nsw i32 [[TMP9]], [[TMP6]]
-; CHECK-NEXT:    [[TMP11:%.*]] = icmp ult i32 [[TMP10]], [[TMP7]]
+; CHECK-NEXT:    [[TMP4:%.*]] = sub i16 [[START]], [[V]]
+; CHECK-NEXT:    [[TMP5:%.*]] = sub i16 [[START]], [[N]]
+; CHECK-NEXT:    [[TMP11:%.*]] = icmp ugt i16 [[TMP4]], [[TMP5]]
 ; CHECK-NEXT:    br i1 [[TMP11]], label %[[LOOP_BODY_PREHEADER3]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_VEC:%.*]] = and i32 [[TMP3]], 131068
@@ -122,8 +110,7 @@ define void @index_mask_removed2(ptr %A, i16 %start, i16 %v, i16 %n) {
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP14:%.*]] = trunc i32 [[INDEX]] to i16
 ; CHECK-NEXT:    [[DOTREASS:%.*]] = add i16 [[TMP14]], [[INVARIANT_OP]]
-; CHECK-NEXT:    [[TMP15:%.*]] = sext i16 [[DOTREASS]] to i64
-; CHECK-NEXT:    [[TMP16:%.*]] = and i64 [[TMP15]], 4294967295
+; CHECK-NEXT:    [[TMP16:%.*]] = zext nneg i16 [[DOTREASS]] to i64
 ; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr inbounds nuw i8, ptr [[A]], i64 [[TMP16]]
 ; CHECK-NEXT:    store <4 x i8> splat (i8 1), ptr [[TMP17]], align 1
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
@@ -138,8 +125,7 @@ define void @index_mask_removed2(ptr %A, i16 %start, i16 %v, i16 %n) {
 ; CHECK:       [[LOOP_BODY]]:
 ; CHECK-NEXT:    [[IV2:%.*]] = phi i16 [ [[IV_NEXT:%.*]], %[[LOOP_BODY]] ], [ [[IV2_PH]], %[[LOOP_BODY_PREHEADER3]] ]
 ; CHECK-NEXT:    [[OFF:%.*]] = sub nsw i16 [[IV2]], [[V]]
-; CHECK-NEXT:    [[EXT:%.*]] = sext i16 [[OFF]] to i64
-; CHECK-NEXT:    [[MASK:%.*]] = and i64 [[EXT]], 4294967295
+; CHECK-NEXT:    [[MASK:%.*]] = zext nneg i16 [[OFF]] to i64
 ; CHECK-NEXT:    [[GEP:%.*]] = getelementptr inbounds nuw i8, ptr [[A]], i64 [[MASK]]
 ; CHECK-NEXT:    store i8 1, ptr [[GEP]], align 1
 ; CHECK-NEXT:    [[IV_NEXT]] = add nsw i16 [[IV2]], 1
@@ -184,8 +170,8 @@ define void @index_not_widened1(ptr %A, i32 %start, i32 %v, i32 %n) {
 ; CHECK:       [[LOOP_BODY]]:
 ; CHECK-NEXT:    [[IV2:%.*]] = phi i32 [ [[IV_NEXT:%.*]], %[[LOOP_BODY]] ], [ [[START]], %[[ENTRY]] ]
 ; CHECK-NEXT:    [[OFF:%.*]] = sub nsw i32 [[IV2]], [[V]]
-; CHECK-NEXT:    [[EXT:%.*]] = sext i32 [[OFF]] to i64
-; CHECK-NEXT:    [[GEP:%.*]] = getelementptr inbounds [4 x i8], ptr [[A]], i64 [[EXT]]
+; CHECK-NEXT:    [[EXT:%.*]] = zext nneg i32 [[OFF]] to i64
+; CHECK-NEXT:    [[GEP:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[A]], i64 [[EXT]]
 ; CHECK-NEXT:    store i32 [[IV2]], ptr [[GEP]], align 4
 ; CHECK-NEXT:    [[IV_NEXT]] = add nsw i32 [[IV2]], 1
 ; CHECK-NEXT:    [[EC_NOT:%.*]] = icmp eq i32 [[IV_NEXT]], [[N]]
@@ -228,8 +214,8 @@ define void @index_not_widened2(ptr %A, i32 %start, i32 %v, i32 %n) {
 ; CHECK:       [[LOOP_BODY]]:
 ; CHECK-NEXT:    [[IV2:%.*]] = phi i32 [ [[IV_NEXT:%.*]], %[[LOOP_BODY]] ], [ [[START]], %[[ENTRY]] ]
 ; CHECK-NEXT:    [[OFF:%.*]] = sub nsw i32 [[IV2]], [[V]]
-; CHECK-NEXT:    [[EXT:%.*]] = sext i32 [[OFF]] to i64
-; CHECK-NEXT:    [[GEP:%.*]] = getelementptr inbounds [4 x i8], ptr [[A]], i64 [[EXT]]
+; CHECK-NEXT:    [[EXT:%.*]] = zext nneg i32 [[OFF]] to i64
+; CHECK-NEXT:    [[GEP:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[A]], i64 [[EXT]]
 ; CHECK-NEXT:    store i32 [[IV2]], ptr [[GEP]], align 4
 ; CHECK-NEXT:    [[IV_NEXT]] = add nsw i32 [[IV2]], 1
 ; CHECK-NEXT:    [[EC_NOT:%.*]] = icmp eq i32 [[IV_NEXT]], [[N]]
