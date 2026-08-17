@@ -2080,7 +2080,8 @@ private:
   /// Match the increment \p BEValueV of the loop header PHI \p PN in \p L
   /// against the shapes createSimpleAffineAddRec turns into an affine add
   /// recurrence: an add of \p PN and a loop-invariant value, or a getelementptr
-  /// of \p PN with a single loop-invariant index.
+  /// of \p PN with a single loop-invariant index. getOperandsToCreate uses this
+  /// to queue the step up front, so both agree on which shapes are matched.
   std::optional<SimpleAffineStep>
   matchSimpleAffineStep(const Loop *L, PHINode *PN, Value *BEValueV);
 

@@ -7796,10 +7796,15 @@ ScalarEvolution::getOperandsToCreate(Value *V, SmallVectorImpl<Value *> &Ops) {
     }
     // The fourth way is createAddRecFromPHI.
     {
-      auto [BEValueV, StartValueV] =
-          valuesForAddRecFromPHI(LI, cast<PHINode>(U));
+      auto *PN = cast<PHINode>(U);
+      auto [BEValueV, StartValueV] = valuesForAddRecFromPHI(LI, PN);
       if (BEValueV && StartValueV) {
         Ops.push_back(StartValueV);
+        // createSimpleAffineAddRec needs the SCEV of the loop-invariant step,
+        // which matchSimpleAffineStep names for both shapes it accepts.
+        if (auto Step = matchSimpleAffineStep(LI.getLoopFor(PN->getParent()),
+                                              PN, BEValueV))
+          Ops.push_back(Step->StepV);
         // FIXME: Find invariant values which feed into BEValueV. This search
         // probably needs to be integrated into the top-level loop in
         // createSCEVIter.
