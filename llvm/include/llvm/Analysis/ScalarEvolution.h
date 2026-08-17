@@ -2065,6 +2065,25 @@ private:
   /// Helper function called from createNodeForPHI.
   const SCEV *createAddRecFromPHI(PHINode *PN);
 
+  /// The loop-invariant step of a loop header PHI of the form
+  /// PN = PHI(Start, OP(PN, Step)); see matchSimpleAffineStep.
+  struct SimpleAffineStep {
+    /// The loop-invariant IR value the step is computed from.
+    Value *StepV = nullptr;
+    /// Set if the increment is a getelementptr, in which case StepV is its
+    /// index and the step is that index scaled by the source element size.
+    GEPOperator *GEP = nullptr;
+    /// The no-wrap flags implied by the increment alone.
+    SCEV::NoWrapFlags Flags = SCEV::FlagAnyWrap;
+  };
+
+  /// Match the increment \p BEValueV of the loop header PHI \p PN in \p L
+  /// against the shapes createSimpleAffineAddRec turns into an affine add
+  /// recurrence: an add of \p PN and a loop-invariant value, or a getelementptr
+  /// of \p PN with a single loop-invariant index.
+  bool matchSimpleAffineStep(const Loop *L, PHINode *PN, Value *BEValueV,
+                             SimpleAffineStep &Step);
+
   /// A helper function for createAddRecFromPHI to handle simple cases.
   const SCEV *createSimpleAffineAddRec(PHINode *PN, Value *BEValueV,
                                             Value *StartValueV);
