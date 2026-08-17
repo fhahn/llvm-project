@@ -9,7 +9,7 @@ define i64 @sext_to_zext_nneg(i32 %n, i32 %m) {
 ; CHECK-NEXT:    br i1 [[C]], label %[[EXIT:.*]], label %[[THEN:.*]]
 ; CHECK:       [[THEN]]:
 ; CHECK-NEXT:    [[SUB:%.*]] = sub nsw i32 [[N]], [[M]]
-; CHECK-NEXT:    [[EXT:%.*]] = sext i32 [[SUB]] to i64
+; CHECK-NEXT:    [[EXT:%.*]] = zext nneg i32 [[SUB]] to i64
 ; CHECK-NEXT:    ret i64 [[EXT]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret i64 0
@@ -74,7 +74,7 @@ define i32 @sub_nuw_relational(i32 %a, i32 %b) {
 ; CHECK-NEXT:    [[C:%.*]] = icmp uge i32 [[A]], [[B]]
 ; CHECK-NEXT:    br i1 [[C]], label %[[THEN:.*]], label %[[EXIT:.*]]
 ; CHECK:       [[THEN]]:
-; CHECK-NEXT:    [[SUB:%.*]] = sub i32 [[A]], [[B]]
+; CHECK-NEXT:    [[SUB:%.*]] = sub nuw i32 [[A]], [[B]]
 ; CHECK-NEXT:    ret i32 [[SUB]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret i32 0
@@ -101,7 +101,7 @@ define i32 @sub_nuw_transitive(i32 %a, i32 %b, i32 %c) {
 ; CHECK-NEXT:    [[C_1:%.*]] = icmp uge i32 [[B]], [[C]]
 ; CHECK-NEXT:    br i1 [[C_1]], label %[[BB_2:.*]], label %[[EXIT]]
 ; CHECK:       [[BB_2]]:
-; CHECK-NEXT:    [[SUB:%.*]] = sub i32 [[A]], [[C]]
+; CHECK-NEXT:    [[SUB:%.*]] = sub nuw i32 [[A]], [[C]]
 ; CHECK-NEXT:    ret i32 [[SUB]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret i32 0
@@ -357,7 +357,7 @@ define void @induction_start_bound_ne_latch(ptr %p, i32 %start, i32 %n) {
 ; CHECK-NEXT:    br i1 [[EC]], label %[[LOOP_BODY:.*]], label %[[EXIT:.*]]
 ; CHECK:       [[LOOP_BODY]]:
 ; CHECK-NEXT:    [[SUB:%.*]] = sub nsw i32 [[IV]], [[START]]
-; CHECK-NEXT:    [[IDX:%.*]] = sext i32 [[SUB]] to i64
+; CHECK-NEXT:    [[IDX:%.*]] = zext nneg i32 [[SUB]] to i64
 ; CHECK-NEXT:    [[GEP:%.*]] = getelementptr nusw i32, ptr [[P]], i64 [[IDX]]
 ; CHECK-NEXT:    store i32 0, ptr [[GEP]], align 4
 ; CHECK-NEXT:    br label %[[LOOP_LATCH]]
