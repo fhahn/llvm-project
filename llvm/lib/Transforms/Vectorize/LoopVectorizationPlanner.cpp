@@ -162,6 +162,16 @@ bool VFSelectionContext::isLegalGatherOrScatter(Value *V,
          (SI && TTI.isLegalMaskedScatter(Ty, Align));
 }
 
+bool VFSelectionContext::isBoundKnownMultipleOfVF(uint64_t Bound,
+                                                  ElementCount VF) const {
+  assert(isPowerOf2_64(Bound) && "Bound must be a power of two");
+  // vscale is a power of two, so if the bound (also a power of two) is a
+  // multiple of the maximum runtime VF, it is a multiple of every possible
+  // runtime VF.
+  std::optional<uint64_t> MaxRuntimeVF = getMaxRuntimeElementCount(VF, F, TTI);
+  return MaxRuntimeVF && Bound % *MaxRuntimeVF == 0;
+}
+
 bool VFSelectionContext::supportsScalableVectors() const {
   return TTI.supportsScalableVectors() || ForceTargetSupportsScalableVectors ||
          VectorizerParams::VectorizationFactor.isScalable();

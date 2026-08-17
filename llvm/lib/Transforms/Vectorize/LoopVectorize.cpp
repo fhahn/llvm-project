@@ -2661,7 +2661,7 @@ LoopVectorizationCostModel::memoryInstructionCanBeWidened(Instruction *I,
 
   // Each VF-wide bounded load must stay within a single 2^N window and must not
   // wrap, so only widen for VFs dividing the bound.
-  if (Bound && !ElementCount::getFixed(Bound).isKnownMultipleOf(VF))
+  if (Bound && !Config.isBoundKnownMultipleOfVF(Bound, VF))
     return std::nullopt;
 
   return Stride == 1 ? CM_Widen : CM_Widen_Reverse;

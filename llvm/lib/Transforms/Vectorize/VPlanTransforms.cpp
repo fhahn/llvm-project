@@ -5339,7 +5339,7 @@ static bool canWidenBoundedLoad(VPInstruction *VPI, VFRange &Range,
   // a single window and does not wrap.
   return LoopVectorizationPlanner::getDecisionAndClampRange(
       [&](ElementCount VF) {
-        return ElementCount::getFixed(Bound).isKnownMultipleOf(VF);
+        return Ctx.Config.isBoundKnownMultipleOfVF(Bound, VF);
       },
       Range);
 }
@@ -5466,8 +5466,8 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
       "widenConsecutiveMemOps", ProcessSubset, Plan, [&](VPInstruction *VPI) {
         Instruction *I = VPI->getUnderlyingInstr();
         bool IsLoad = VPI->getOpcode() == Instruction::Load;
-        // A bounded load is widened without a mask, so it must not be
-        // predicated.
+        // A bounded load is widened without a mask, so the loop must be
+        // read-only and the load must not be predicated.
         if (IsLoad && !LoopHasStore && !RecipeBuilder.isPredicatedInst(I) &&
             canWidenBoundedLoad(VPI, Range, CostCtx))
           return ReplaceWith(VPI, VPBuilder(VPI).createWidenLoad(

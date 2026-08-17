@@ -819,6 +819,12 @@ public:
   /// or scatter operation.
   bool isLegalGatherOrScatter(Value *V, ElementCount VF) const;
 
+  /// Returns true if \p Bound, which must be a power of two, is known to be a
+  /// multiple of \p VF. For scalable VFs, the maximum value of vscale must be
+  /// known; as vscale is a power of two, it is sufficient to check the maximum
+  /// runtime VF.
+  bool isBoundKnownMultipleOfVF(uint64_t Bound, ElementCount VF) const;
+
   /// Split reductions into those that happen in the loop, and those that
   /// happen outside. In-loop reductions are collected into InLoopReductions.
   /// InLoopReductionImmediateChains is filled with each in-loop reduction
