@@ -4584,6 +4584,17 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
         BackedgeVal,
         match_fn(m_VPInstruction<VPInstruction::ComputeReductionResult>())));
 
+    // The select computing the result asks whether the condition of the original
+    // select ever held, so with p the probability of a single iteration's
+    // condition it is taken with probability 1 - (1 - p)^TripCount.
+    MDNode *AnyIterationWeights = nullptr;
+    if (std::optional<unsigned> TC = getLoopEstimatedTripCount(&L))
+      if (auto *FindLastSelectR = dyn_cast_if_present<VPIRMetadata>(
+              FindLastSelect->getDefiningRecipe()))
+        AnyIterationWeights = vputils::getWeightsForAnyIteration(
+            FindLastSelectR->getMetadata(LLVMContext::MD_prof), *TC,
+            Plan.getContext());
+
     VPValue *NewFindLastSelect = BackedgeVal;
     VPValue *SelectCond = Cond;
     if (!SentinelVal || IVOfExpressionToSink) {
@@ -4637,6 +4648,9 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
                                            Sentinel, ExitDL);
       NewRdxResult = MiddleBuilder.createSelect(Cmp, VectorRegionExitingVal,
                                                 StartVPV, ExitDL);
+      if (AnyIterationWeights)
+        cast<VPInstruction>(NewRdxResult)
+            ->setMetadata(LLVMContext::MD_prof, AnyIterationWeights);
       StartVPV = Sentinel;
     } else {
       // Introduce a boolean AnyOf reduction to track if the condition was ever
@@ -4653,6 +4667,9 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
 
       NewRdxResult = MiddleBuilder.createAnyOfReduction(
           OrVal, VectorRegionExitingVal, StartVPV, ExitDL);
+      if (AnyIterationWeights)
+        cast<VPInstruction>(NewRdxResult)
+            ->setMetadata(LLVMContext::MD_prof, AnyIterationWeights);
 
       // Initialize the IV reduction phi with the neutral element, not the
       // original start value, to ensure correct min/max reduction results.

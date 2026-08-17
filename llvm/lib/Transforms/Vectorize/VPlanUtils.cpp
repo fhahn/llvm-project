@@ -19,6 +19,7 @@
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/Analysis/ScalarEvolutionPatternMatch.h"
 #include "llvm/IR/Dominators.h"
+#include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/ProfDataUtils.h"
 #include "llvm/Transforms/Utils/ScalarEvolutionExpander.h"
 
@@ -1241,4 +1242,35 @@ void vputils::setUnknownBranchWeights(VPIRMetadata &Br, VPlan &Plan) {
   if (MDNode *MD =
           getExplicitlyUnknownBranchWeightsIfProfiled(F, "loop-vectorize"))
     Br.setMetadata(LLVMContext::MD_prof, MD);
+}
+
+/// Returns branch weights for a condition that holds at least once across \p
+/// EstimatedTripCount iterations, given the weights \p PerIteration of the
+/// condition of a single iteration: 1 - (1 - p)^EstimatedTripCount. Returns
+/// nullptr if \p PerIteration carries no usable probability.
+MDNode *vputils::getWeightsForAnyIteration(MDNode *PerIteration,
+                                           unsigned EstimatedTripCount,
+                                           LLVMContext &Ctx) {
+  SmallVector<uint32_t, 2> Weights;
+  if (!extractBranchWeights(PerIteration, Weights) || Weights.size() != 2 ||
+      (uint64_t(Weights[0]) + Weights[1]) == 0)
+    return nullptr;
+  BranchProbability NotOnce = BranchProbability::getBranchProbability(
+      Weights[1], uint64_t(Weights[0]) + Weights[1]);
+  BranchProbability NotEver = BranchProbability::getOne();
+  for (unsigned I = 0; I != EstimatedTripCount; ++I) {
+    NotEver *= NotOnce;
+    if (NotEver.isZero())
+      break;
+  }
+  // Keep both weights at 1 at least: the estimate is an average over all
+  // invocations of the loop and does not pin either side down for any individual
+  // one.
+  // Clamp to what an i32 weight prints as a positive number: the probability of
+  // never holding underflows to zero long before a large trip count is reached.
+  uint32_t Ever = std::min(std::max(NotEver.getCompl().getNumerator(), 1u),
+                           uint32_t(std::numeric_limits<int32_t>::max()));
+  uint32_t Never = std::max(NotEver.getNumerator(), 1u);
+  uint32_t GCD = std::gcd(Ever, Never);
+  return MDBuilder(Ctx).createBranchWeights(Ever / GCD, Never / GCD);
 }

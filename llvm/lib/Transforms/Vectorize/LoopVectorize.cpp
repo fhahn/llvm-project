@@ -7101,6 +7101,21 @@ void LoopVectorizationPlanner::addReductionResultComputation(
       Builder.setInsertPoint(MiddleVPBB, IP);
       FinalReductionResult =
           Builder.createAnyOfReduction(NewExiting, NewVal, Start, ExitDL);
+      // The select computing the result asks whether the condition of the
+      // original select ever held, so with p the probability of a single
+      // iteration's condition it is taken with probability
+      // 1 - (1 - p)^TripCount.
+      auto *AnyOfSelectMD =
+          dyn_cast<VPIRMetadata>(static_cast<VPRecipeBase *>(AnyOfSelect));
+      MDNode *MDForAnyOfSelect =
+          AnyOfSelectMD ? AnyOfSelectMD->getMetadata(LLVMContext::MD_prof)
+                        : nullptr;
+      if (std::optional<unsigned> TC = getLoopEstimatedTripCount(OrigLoop))
+        if (MDNode *Weights = vputils::getWeightsForAnyIteration(
+                MDForAnyOfSelect, *TC,
+                Plan->getContext()))
+          cast<VPInstruction>(FinalReductionResult)
+              ->setMetadata(LLVMContext::MD_prof, Weights);
     } else {
       // If the vector reduction can be performed in a smaller type, we
       // truncate then extend the loop exit value to enable InstCombine to

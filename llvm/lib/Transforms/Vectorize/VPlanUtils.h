@@ -257,6 +257,14 @@ void pullOutPermutations(VPlan &Plan, Match_t Perm, Builder Build) {
   detail::pullOutPermutationsImpl(Plan, MatchPerm, Build);
 }
 
+/// Returns branch weights for a condition that holds at least once across \p
+/// EstimatedTripCount iterations, given the weights \p PerIteration of the
+/// condition of a single iteration: 1 - (1 - p)^EstimatedTripCount. Returns
+/// nullptr if \p PerIteration carries no usable probability.
+MDNode *getWeightsForAnyIteration(MDNode *PerIteration,
+                                  unsigned EstimatedTripCount,
+                                  LLVMContext &Ctx);
+
 /// Mark \p Br, a branch introduced by the vectorizer itself for which it has no
 /// probability to give, as having an explicitly unknown profile, so it does not
 /// look like the branch weights of an original branch were dropped. Does
