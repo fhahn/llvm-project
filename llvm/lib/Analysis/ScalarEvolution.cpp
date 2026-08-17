@@ -7787,10 +7787,8 @@ ScalarEvolution::getOperandsToCreate(Value *V, SmallVectorImpl<Value *> &Ops) {
         assert(Cond);
         assert(LHS);
         assert(RHS);
-        if (auto *CondICmp = dyn_cast<ICmpInst>(Cond)) {
-          Ops.push_back(CondICmp->getOperand(0));
-          Ops.push_back(CondICmp->getOperand(1));
-        }
+        if (auto *CondICmp = dyn_cast<ICmpInst>(Cond))
+          llvm::append_range(Ops, CondICmp->operands());
         Ops.push_back(Cond);
         Ops.push_back(LHS);
         Ops.push_back(RHS);
@@ -7838,6 +7836,10 @@ ScalarEvolution::getOperandsToCreate(Value *V, SmallVectorImpl<Value *> &Ops) {
     if (CanSimplifyToUnknown())
       return getUnknown(U);
 
+    // createNodeForSelectOrPHIInstWithICmpInstCond also needs the operands of
+    // an icmp condition, like the select-like PHI case above.
+    if (auto *CondICmp = dyn_cast<ICmpInst>(U->getOperand(0)))
+      llvm::append_range(Ops, CondICmp->operands());
     llvm::append_range(Ops, U->operands());
     return nullptr;
     break;
