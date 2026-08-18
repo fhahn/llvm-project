@@ -273,10 +273,12 @@ struct VPlanTransforms {
   static void replicateByVF(VPlan &Plan, ElementCount VF);
 
   /// Optimize \p Plan based on \p BestVF and \p BestUF. This may restrict the
-  /// resulting plan to \p BestVF and \p BestUF.
+  /// resulting plan to \p BestVF and \p BestUF. \p L is used to apply the
+  /// guards of the original loop when reasoning about its trip count.
   static void optimizeForVFAndUF(VPlan &Plan, ElementCount BestVF,
                                  unsigned BestUF,
-                                 PredicatedScalarEvolution &PSE);
+                                 PredicatedScalarEvolution &PSE,
+                                 const Loop *L);
 
   /// Try to simplify VPInstruction::ExplicitVectorLength recipes when the AVL
   /// is known to be <= VF, replacing them with the AVL directly.

@@ -33,23 +33,7 @@ define void @example1(i32 %n) {
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP7]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       middle.block:
-; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP6]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH:%.*]]
-; CHECK:       scalar.ph:
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
-; CHECK:       loop:
-; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ [[N_VEC]], [[SCALAR_PH]] ], [ [[INDVARS_IV_NEXT:%.*]], [[LOOP]] ]
-; CHECK-NEXT:    [[GEP1:%.*]] = getelementptr inbounds [2048 x i32], ptr @b, i64 0, i64 [[INDVARS_IV]]
-; CHECK-NEXT:    [[LOAD1:%.*]] = load i32, ptr [[GEP1]], align 4
-; CHECK-NEXT:    [[GEP2:%.*]] = getelementptr inbounds [2048 x i32], ptr @c, i64 0, i64 [[INDVARS_IV]]
-; CHECK-NEXT:    [[LOAD2:%.*]] = load i32, ptr [[GEP2]], align 4
-; CHECK-NEXT:    [[ADD:%.*]] = add nsw i32 [[LOAD2]], [[LOAD1]]
-; CHECK-NEXT:    [[GEP3:%.*]] = getelementptr inbounds [2048 x i32], ptr @a, i64 0, i64 [[INDVARS_IV]]
-; CHECK-NEXT:    store i32 [[ADD]], ptr [[GEP3]], align 4
-; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add i64 [[INDVARS_IV]], 1
-; CHECK-NEXT:    [[LFTR_WIDEIV:%.*]] = trunc i64 [[INDVARS_IV_NEXT]] to i32
-; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp eq i32 [[LFTR_WIDEIV]], [[N4]]
-; CHECK-NEXT:    br i1 [[EXITCOND]], label [[EXIT]], label [[LOOP]], !llvm.loop [[LOOP3:![0-9]+]]
 ; CHECK:       exit:
 ; CHECK-NEXT:    ret void
 ;

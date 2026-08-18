@@ -580,11 +580,9 @@ define void @trip_count_vscale_no_epilogue_iterations(ptr noalias %a, ptr noalia
 ; CHECK-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP12]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP16:![0-9]+]]
 ; CHECK:       middle.block:
-; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH:%.*]]
-; CHECK:       scalar.ph:
 ; CHECK-NEXT:    br label [[FOR_BODY:%.*]]
-; CHECK:       for.body:
+; CHECK:       exit:
+; CHECK-NEXT:    ret void
 ;
 ; CHECK-VF8-LABEL: @trip_count_vscale_no_epilogue_iterations(
 ; CHECK-VF8-NEXT:  entry:
@@ -616,11 +614,9 @@ define void @trip_count_vscale_no_epilogue_iterations(ptr noalias %a, ptr noalia
 ; CHECK-VF8-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-VF8-NEXT:    br i1 [[TMP12]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP17:![0-9]+]]
 ; CHECK-VF8:       middle.block:
-; CHECK-VF8-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
-; CHECK-VF8-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH:%.*]]
-; CHECK-VF8:       scalar.ph:
 ; CHECK-VF8-NEXT:    br label [[FOR_BODY:%.*]]
-; CHECK-VF8:       for.body:
+; CHECK-VF8:       exit:
+; CHECK-VF8-NEXT:    ret void
 ;
 entry:
   %v = tail call i64 @llvm.vscale.i64()

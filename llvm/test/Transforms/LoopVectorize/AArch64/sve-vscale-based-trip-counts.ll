@@ -11,10 +11,6 @@ define void @vscale_mul_4(ptr noalias noundef readonly captures(none) %a, ptr no
 ; CHECK-NEXT:    [[TMP1:%.*]] = shl nuw nsw i64 [[TMP0]], 2
 ; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
-; CHECK-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
-; CHECK-NEXT:    [[TMP3:%.*]] = shl nuw i64 [[TMP2]], 2
-; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[TMP1]], [[TMP3]]
-; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP1]], [[N_MOD_VF]]
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <vscale x 4 x float>, ptr [[A]], align 4
@@ -23,23 +19,9 @@ define void @vscale_mul_4(ptr noalias noundef readonly captures(none) %a, ptr no
 ; CHECK-NEXT:    store <vscale x 4 x float> [[TMP4]], ptr [[B]], align 4
 ; CHECK-NEXT:    br label %[[MIDDLE_BLOCK:.*]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP1]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[CMP_N]], label %[[FOR_COND_CLEANUP:.*]], label %[[SCALAR_PH:.*]]
-; CHECK:       [[SCALAR_PH]]:
 ; CHECK-NEXT:    br label %[[FOR_BODY:.*]]
-; CHECK:       [[FOR_COND_CLEANUP]]:
-; CHECK-NEXT:    ret void
 ; CHECK:       [[FOR_BODY]]:
-; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ [[N_VEC]], %[[SCALAR_PH]] ], [ [[INDVARS_IV_NEXT:%.*]], %[[FOR_BODY]] ]
-; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds nuw float, ptr [[A]], i64 [[INDVARS_IV]]
-; CHECK-NEXT:    [[TMP5:%.*]] = load float, ptr [[ARRAYIDX]], align 4
-; CHECK-NEXT:    [[ARRAYIDX3:%.*]] = getelementptr inbounds nuw float, ptr [[B]], i64 [[INDVARS_IV]]
-; CHECK-NEXT:    [[TMP6:%.*]] = load float, ptr [[ARRAYIDX3]], align 4
-; CHECK-NEXT:    [[MUL4:%.*]] = fmul float [[TMP5]], [[TMP6]]
-; CHECK-NEXT:    store float [[MUL4]], ptr [[ARRAYIDX3]], align 4
-; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add nuw nsw i64 [[INDVARS_IV]], 1
-; CHECK-NEXT:    [[EXITCOND_NOT:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT]], [[TMP1]]
-; CHECK-NEXT:    br i1 [[EXITCOND_NOT]], label %[[FOR_COND_CLEANUP]], label %[[FOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
+; CHECK-NEXT:    ret void
 ;
 entry:
   %0 = tail call i64 @llvm.vscale.i64()
@@ -72,9 +54,6 @@ define  void @vscale_mul_8(ptr noalias noundef readonly captures(none) %a, ptr n
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[TMP1:%.*]] = call i64 @llvm.vscale.i64()
 ; CHECK-NEXT:    [[TMP2:%.*]] = shl nuw i64 [[TMP1]], 2
-; CHECK-NEXT:    [[TMP3:%.*]] = shl nuw i64 [[TMP1]], 3
-; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[MUL1]], [[TMP3]]
-; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[MUL1]], [[N_MOD_VF]]
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds nuw float, ptr [[A]], i64 [[TMP2]]
@@ -89,23 +68,9 @@ define  void @vscale_mul_8(ptr noalias noundef readonly captures(none) %a, ptr n
 ; CHECK-NEXT:    store <vscale x 4 x float> [[TMP7]], ptr [[TMP5]], align 4
 ; CHECK-NEXT:    br label %[[MIDDLE_BLOCK:.*]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[MUL1]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[CMP_N]], label %[[FOR_COND_CLEANUP:.*]], label %[[SCALAR_PH:.*]]
-; CHECK:       [[SCALAR_PH]]:
 ; CHECK-NEXT:    br label %[[FOR_BODY:.*]]
-; CHECK:       [[FOR_COND_CLEANUP]]:
-; CHECK-NEXT:    ret void
 ; CHECK:       [[FOR_BODY]]:
-; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ [[N_VEC]], %[[SCALAR_PH]] ], [ [[INDVARS_IV_NEXT:%.*]], %[[FOR_BODY]] ]
-; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds nuw float, ptr [[A]], i64 [[INDVARS_IV]]
-; CHECK-NEXT:    [[TMP8:%.*]] = load float, ptr [[ARRAYIDX]], align 4
-; CHECK-NEXT:    [[ARRAYIDX4:%.*]] = getelementptr inbounds nuw float, ptr [[B]], i64 [[INDVARS_IV]]
-; CHECK-NEXT:    [[TMP9:%.*]] = load float, ptr [[ARRAYIDX4]], align 4
-; CHECK-NEXT:    [[MUL5:%.*]] = fmul float [[TMP8]], [[TMP9]]
-; CHECK-NEXT:    store float [[MUL5]], ptr [[ARRAYIDX4]], align 4
-; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add nuw nsw i64 [[INDVARS_IV]], 1
-; CHECK-NEXT:    [[EXITCOND_NOT:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT]], [[MUL1]]
-; CHECK-NEXT:    br i1 [[EXITCOND_NOT]], label %[[FOR_COND_CLEANUP]], label %[[FOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
+; CHECK-NEXT:    ret void
 ;
 entry:
   %0 = tail call i64 @llvm.vscale.i64()
@@ -151,25 +116,11 @@ define void @vscale_mul_12(ptr noalias noundef readonly captures(none) %a, ptr n
 ; CHECK-NEXT:    store <vscale x 4 x float> [[TMP5]], ptr [[TMP4]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP2]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
-; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[MUL1]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[CMP_N]], label %[[FOR_COND_CLEANUP:.*]], label %[[SCALAR_PH:.*]]
+; CHECK-NEXT:    br i1 [[TMP6]], label %[[SCALAR_PH:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[SCALAR_PH]]:
 ; CHECK-NEXT:    br label %[[FOR_BODY:.*]]
-; CHECK:       [[FOR_COND_CLEANUP]]:
-; CHECK-NEXT:    ret void
 ; CHECK:       [[FOR_BODY]]:
-; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ [[N_VEC]], %[[SCALAR_PH]] ], [ [[INDVARS_IV_NEXT:%.*]], %[[FOR_BODY]] ]
-; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds nuw float, ptr [[A]], i64 [[INDVARS_IV]]
-; CHECK-NEXT:    [[TMP7:%.*]] = load float, ptr [[ARRAYIDX]], align 4
-; CHECK-NEXT:    [[ARRAYIDX4:%.*]] = getelementptr inbounds nuw float, ptr [[B]], i64 [[INDVARS_IV]]
-; CHECK-NEXT:    [[TMP8:%.*]] = load float, ptr [[ARRAYIDX4]], align 4
-; CHECK-NEXT:    [[MUL5:%.*]] = fmul float [[TMP7]], [[TMP8]]
-; CHECK-NEXT:    store float [[MUL5]], ptr [[ARRAYIDX4]], align 4
-; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add nuw nsw i64 [[INDVARS_IV]], 1
-; CHECK-NEXT:    [[EXITCOND_NOT:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT]], [[MUL1]]
-; CHECK-NEXT:    br i1 [[EXITCOND_NOT]], label %[[FOR_COND_CLEANUP]], label %[[FOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
+; CHECK-NEXT:    ret void
 ;
 entry:
   %0 = tail call i64 @llvm.vscale.i64()
@@ -222,7 +173,7 @@ define void @vscale_mul_31(ptr noalias noundef readonly captures(none) %a, ptr n
 ; CHECK-NEXT:    store <vscale x 4 x float> [[TMP9]], ptr [[TMP7]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP3]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP10]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP10]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[MUL1]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[FOR_COND_CLEANUP:.*]], label %[[SCALAR_PH:.*]]
@@ -240,7 +191,7 @@ define void @vscale_mul_31(ptr noalias noundef readonly captures(none) %a, ptr n
 ; CHECK-NEXT:    store float [[MUL5]], ptr [[ARRAYIDX4]], align 4
 ; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add nuw nsw i64 [[INDVARS_IV]], 1
 ; CHECK-NEXT:    [[EXITCOND_NOT:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT]], [[MUL1]]
-; CHECK-NEXT:    br i1 [[EXITCOND_NOT]], label %[[FOR_COND_CLEANUP]], label %[[FOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
+; CHECK-NEXT:    br i1 [[EXITCOND_NOT]], label %[[FOR_COND_CLEANUP]], label %[[FOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ;
 entry:
   %0 = tail call i64 @llvm.vscale.i64()
@@ -293,25 +244,11 @@ define void @vscale_mul_64(ptr noalias noundef readonly captures(none) %a, ptr n
 ; CHECK-NEXT:    store <vscale x 4 x float> [[TMP9]], ptr [[TMP7]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP3]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP10]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
-; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[MUL1]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[CMP_N]], label %[[FOR_COND_CLEANUP:.*]], label %[[SCALAR_PH:.*]]
+; CHECK-NEXT:    br i1 [[TMP10]], label %[[SCALAR_PH:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
 ; CHECK:       [[SCALAR_PH]]:
 ; CHECK-NEXT:    br label %[[FOR_BODY:.*]]
-; CHECK:       [[FOR_COND_CLEANUP]]:
-; CHECK-NEXT:    ret void
 ; CHECK:       [[FOR_BODY]]:
-; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ [[N_VEC]], %[[SCALAR_PH]] ], [ [[INDVARS_IV_NEXT:%.*]], %[[FOR_BODY]] ]
-; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds nuw float, ptr [[A]], i64 [[INDVARS_IV]]
-; CHECK-NEXT:    [[TMP11:%.*]] = load float, ptr [[ARRAYIDX]], align 4
-; CHECK-NEXT:    [[ARRAYIDX4:%.*]] = getelementptr inbounds nuw float, ptr [[B]], i64 [[INDVARS_IV]]
-; CHECK-NEXT:    [[TMP12:%.*]] = load float, ptr [[ARRAYIDX4]], align 4
-; CHECK-NEXT:    [[MUL5:%.*]] = fmul float [[TMP11]], [[TMP12]]
-; CHECK-NEXT:    store float [[MUL5]], ptr [[ARRAYIDX4]], align 4
-; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add nuw nsw i64 [[INDVARS_IV]], 1
-; CHECK-NEXT:    [[EXITCOND_NOT:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT]], [[MUL1]]
-; CHECK-NEXT:    br i1 [[EXITCOND_NOT]], label %[[FOR_COND_CLEANUP]], label %[[FOR_BODY]], !llvm.loop [[LOOP9:![0-9]+]]
+; CHECK-NEXT:    ret void
 ;
 entry:
   %0 = tail call i64 @llvm.vscale.i64()
@@ -368,7 +305,7 @@ define void @trip_count_with_overflow(ptr noalias noundef readonly captures(none
 ; CHECK-NEXT:    store <vscale x 4 x float> [[TMP11]], ptr [[TMP9]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP5]]
 ; CHECK-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP12]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP10:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP12]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP1]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[FOR_COND_CLEANUP:.*]], label %[[SCALAR_PH]]
@@ -387,7 +324,7 @@ define void @trip_count_with_overflow(ptr noalias noundef readonly captures(none
 ; CHECK-NEXT:    store float [[MUL4]], ptr [[ARRAYIDX3]], align 4
 ; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add nuw nsw i64 [[INDVARS_IV]], 1
 ; CHECK-NEXT:    [[EXITCOND_NOT:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT]], [[TMP1]]
-; CHECK-NEXT:    br i1 [[EXITCOND_NOT]], label %[[FOR_COND_CLEANUP]], label %[[FOR_BODY]], !llvm.loop [[LOOP11:![0-9]+]]
+; CHECK-NEXT:    br i1 [[EXITCOND_NOT]], label %[[FOR_COND_CLEANUP]], label %[[FOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
 ;
 entry:
   %0 = tail call i64 @llvm.vscale.i64()
@@ -441,25 +378,11 @@ define void @trip_count_too_big_for_element_count(ptr noalias noundef readonly c
 ; CHECK-NEXT:    store <vscale x 4 x float> [[TMP10]], ptr [[TMP8]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP4]]
 ; CHECK-NEXT:    [[TMP11:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP11]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP12:![0-9]+]]
-; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP1]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[CMP_N]], label %[[FOR_COND_CLEANUP:.*]], label %[[SCALAR_PH:.*]]
+; CHECK-NEXT:    br i1 [[TMP11]], label %[[SCALAR_PH:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; CHECK:       [[SCALAR_PH]]:
 ; CHECK-NEXT:    br label %[[FOR_BODY:.*]]
-; CHECK:       [[FOR_COND_CLEANUP]]:
-; CHECK-NEXT:    ret void
 ; CHECK:       [[FOR_BODY]]:
-; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ [[N_VEC]], %[[SCALAR_PH]] ], [ [[INDVARS_IV_NEXT:%.*]], %[[FOR_BODY]] ]
-; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds nuw float, ptr [[A]], i64 [[INDVARS_IV]]
-; CHECK-NEXT:    [[TMP12:%.*]] = load float, ptr [[ARRAYIDX]], align 4
-; CHECK-NEXT:    [[ARRAYIDX3:%.*]] = getelementptr inbounds nuw float, ptr [[B]], i64 [[INDVARS_IV]]
-; CHECK-NEXT:    [[TMP13:%.*]] = load float, ptr [[ARRAYIDX3]], align 4
-; CHECK-NEXT:    [[MUL4:%.*]] = fmul float [[TMP12]], [[TMP13]]
-; CHECK-NEXT:    store float [[MUL4]], ptr [[ARRAYIDX3]], align 4
-; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add nuw nsw i64 [[INDVARS_IV]], 1
-; CHECK-NEXT:    [[EXITCOND_NOT:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT]], [[TMP1]]
-; CHECK-NEXT:    br i1 [[EXITCOND_NOT]], label %[[FOR_COND_CLEANUP]], label %[[FOR_BODY]], !llvm.loop [[LOOP13:![0-9]+]]
+; CHECK-NEXT:    ret void
 ;
 entry:
   %0 = tail call i64 @llvm.vscale.i64()
@@ -487,17 +410,12 @@ attributes #0 = { vscale_range(1,16) "target-features"="+sve" }
 attributes #1 = { "target-features"="+sve" }
 ;.
 ; CHECK: [[LOOP0]] = distinct !{[[LOOP0]], [[META1:![0-9]+]], [[META2:![0-9]+]]}
-; CHECK: [[META1]] = !{!"llvm.loop.unroll.runtime.disable"}
-; CHECK: [[META2]] = !{!"llvm.loop.isvectorized", i32 1}
+; CHECK: [[META1]] = !{!"llvm.loop.isvectorized", i32 1}
+; CHECK: [[META2]] = !{!"llvm.loop.unroll.runtime.disable"}
 ; CHECK: [[LOOP3]] = distinct !{[[LOOP3]], [[META1]], [[META2]]}
 ; CHECK: [[LOOP4]] = distinct !{[[LOOP4]], [[META2]], [[META1]]}
 ; CHECK: [[LOOP5]] = distinct !{[[LOOP5]], [[META1]], [[META2]]}
-; CHECK: [[LOOP6]] = distinct !{[[LOOP6]], [[META2]], [[META1]]}
-; CHECK: [[LOOP7]] = distinct !{[[LOOP7]], [[META1]], [[META2]]}
-; CHECK: [[LOOP8]] = distinct !{[[LOOP8]], [[META2]], [[META1]]}
-; CHECK: [[LOOP9]] = distinct !{[[LOOP9]], [[META1]], [[META2]]}
-; CHECK: [[LOOP10]] = distinct !{[[LOOP10]], [[META2]], [[META1]]}
-; CHECK: [[LOOP11]] = distinct !{[[LOOP11]], [[META1]], [[META2]]}
-; CHECK: [[LOOP12]] = distinct !{[[LOOP12]], [[META2]], [[META1]]}
-; CHECK: [[LOOP13]] = distinct !{[[LOOP13]], [[META1]], [[META2]]}
+; CHECK: [[LOOP6]] = distinct !{[[LOOP6]], [[META1]], [[META2]]}
+; CHECK: [[LOOP7]] = distinct !{[[LOOP7]], [[META2]], [[META1]]}
+; CHECK: [[LOOP8]] = distinct !{[[LOOP8]], [[META1]], [[META2]]}
 ;.

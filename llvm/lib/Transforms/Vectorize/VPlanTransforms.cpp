@@ -2136,14 +2136,49 @@ static bool simplifyBranchConditionForVFAndUF(VPlan &Plan, ElementCount BestVF,
   return true;
 }
 
+/// Try to simplify the middle block's exit condition of \p Plan, which compares
+/// the trip count against the vector trip count and decides whether the scalar
+/// tail must be executed. If the trip count is known to be a multiple of
+/// \p BestVF * \p BestUF, no iterations are left for the scalar tail and the
+/// condition is always true. Loop guards are applied to the trip count, so
+/// divisibility that is only implied by a check guarding the loop is proven as
+/// well.
+static bool simplifyTailCheckForVFAndUF(VPlan &Plan, ElementCount BestVF,
+                                        unsigned BestUF,
+                                        PredicatedScalarEvolution &PSE,
+                                        const Loop *L) {
+  VPValue *Cond;
+  VPRecipeBase *Term = Plan.getMiddleBlock()->getTerminator();
+  if (!Term || !match(Term, m_BranchOnCond(m_VPValue(Cond))) ||
+      !match(Cond, m_SpecificICmp(CmpInst::ICMP_EQ,
+                                  m_Specific(Plan.getTripCount()),
+                                  m_Specific(&Plan.getVectorTripCount()))))
+    return false;
+
+  const SCEV *TC = vputils::getSCEVExprForVPValue(Plan.getTripCount(), PSE);
+  if (isa<SCEVCouldNotCompute>(TC))
+    return false;
+
+  ScalarEvolution &SE = *PSE.getSE();
+  const SCEV *VFxUF =
+      SE.getElementCount(TC->getType(), BestVF.multiplyCoefficientBy(BestUF));
+  if (!SE.getURemExpr(SE.applyLoopGuards(TC, L), VFxUF)->isZero())
+    return false;
+
+  Cond->replaceAllUsesWith(Plan.getTrue());
+  return true;
+}
+
 void VPlanTransforms::optimizeForVFAndUF(VPlan &Plan, ElementCount BestVF,
-                                         unsigned BestUF,
-                                         PredicatedScalarEvolution &PSE) {
+                                        unsigned BestUF,
+                                        PredicatedScalarEvolution &PSE,
+                                        const Loop *L) {
   assert(Plan.hasVF(BestVF) && "BestVF is not available in Plan");
   assert(Plan.hasUF(BestUF) && "BestUF is not available in Plan");
 
   bool MadeChange =
       simplifyBranchConditionForVFAndUF(Plan, BestVF, BestUF, PSE);
+  MadeChange |= simplifyTailCheckForVFAndUF(Plan, BestVF, BestUF, PSE, L);
   MadeChange |= replaceMaskWithCompare(Plan, BestVF);
   MadeChange |= optimizeVectorInductionWidthForTCAndVFUF(Plan, BestVF, BestUF);
 

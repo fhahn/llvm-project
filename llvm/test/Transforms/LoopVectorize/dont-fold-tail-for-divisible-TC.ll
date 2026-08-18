@@ -24,13 +24,11 @@ define void @alignTC(ptr noalias nocapture %A, i32 %n) optsize {
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP3]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       middle.block:
-; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i32 [[ALIGNEDTC]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH]]
+; CHECK-NEXT:    br label [[EXIT:%.*]]
 ; CHECK:       scalar.ph:
-; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i32 [ [[N_VEC]], [[MIDDLE_BLOCK]] ], [ 0, [[ENTRY:%.*]] ]
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
-; CHECK-NEXT:    [[RIV:%.*]] = phi i32 [ [[BC_RESUME_VAL]], [[SCALAR_PH]] ], [ [[RIVPLUS1:%.*]], [[LOOP]] ]
+; CHECK-NEXT:    [[RIV:%.*]] = phi i32 [ 0, [[SCALAR_PH]] ], [ [[RIVPLUS1:%.*]], [[LOOP]] ]
 ; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i32, ptr [[A]], i32 [[RIV]]
 ; CHECK-NEXT:    store i32 13, ptr [[ARRAYIDX]], align 1
 ; CHECK-NEXT:    [[RIVPLUS1]] = add nuw nsw i32 [[RIV]], 1
@@ -87,13 +85,11 @@ define void @assumeAlignedTC(ptr noalias nocapture %A, i32 %p, i32 %q) optsize {
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP3]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       middle.block:
-; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i32 [[N]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[CMP_N]], label [[EXIT_LOOPEXIT:%.*]], label [[SCALAR_PH]]
+; CHECK-NEXT:    br label [[EXIT_LOOPEXIT:%.*]]
 ; CHECK:       scalar.ph:
-; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i32 [ [[N_VEC]], [[MIDDLE_BLOCK]] ], [ 0, [[LOOP_PREHEADER]] ]
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
-; CHECK-NEXT:    [[RIV:%.*]] = phi i32 [ [[RIVPLUS1:%.*]], [[LOOP]] ], [ [[BC_RESUME_VAL]], [[SCALAR_PH]] ]
+; CHECK-NEXT:    [[RIV:%.*]] = phi i32 [ [[RIVPLUS1:%.*]], [[LOOP]] ], [ 0, [[SCALAR_PH]] ]
 ; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i32, ptr [[A]], i32 [[RIV]]
 ; CHECK-NEXT:    store i32 13, ptr [[ARRAYIDX]], align 1
 ; CHECK-NEXT:    [[RIVPLUS1]] = add nuw nsw i32 [[RIV]], 1

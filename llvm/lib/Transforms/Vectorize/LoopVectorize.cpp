@@ -5961,7 +5961,7 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   RUN_VPLAN_PASS(VPlanTransforms::materializeConstantVectorTripCount, BestVPlan,
                  BestVF, BestUF, PSE);
   RUN_VPLAN_PASS(VPlanTransforms::optimizeForVFAndUF, BestVPlan, BestVF, BestUF,
-                 PSE);
+                 PSE, OrigLoop);
   RUN_VPLAN_PASS(VPlanTransforms::simplifyRecipes, BestVPlan);
   // Check if scalar epilogue is required, before simplifying constant branches.
   const bool RequiresScalarEpilogue = BestVPlan.requiresScalarEpilogue();
