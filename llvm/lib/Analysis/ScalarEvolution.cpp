@@ -8255,8 +8255,27 @@ const SCEV *ScalarEvolution::createSCEV(Value *V) {
   case Instruction::Trunc:
     return getTruncateExpr(getSCEV(U->getOperand(0)), U->getType());
 
-  case Instruction::ZExt:
-    return getZeroExtendExpr(getSCEV(U->getOperand(0)), U->getType());
+  case Instruction::ZExt: {
+    const SCEV *Op = getSCEV(U->getOperand(0));
+    const SCEV *ZExt = getZeroExtendExpr(Op, U->getType());
+    // `zext nneg X` computes the same value as `sext X`, and zero extension does
+    // not distribute over an AddRec that only carries nsw. Use the sign-extended
+    // expression when the zero-extended one stays opaque, so that its invariant
+    // part can be hoisted out of the loop.
+    //
+    // nneg is poison-generating, so it may only be used under the same condition
+    // as the no-wrap flags of a binary operator, see isSCEVExprNeverPoison():
+    // this instruction is poison for a negative operand while `sext X` is not,
+    // and the expression may be materialized from any other instruction mapping
+    // to it, including at a point where the operand is negative.
+    if (isa<SCEVZeroExtendExpr>(ZExt) && cast<ZExtInst>(U)->hasNonNeg() &&
+        isSCEVExprNeverPoison(cast<Instruction>(U))) {
+      const SCEV *SExt = getSignExtendExpr(Op, U->getType());
+      if (!isa<SCEVSignExtendExpr>(SExt))
+        return SExt;
+    }
+    return ZExt;
+  }
 
   case Instruction::SExt:
     if (auto BO = MatchBinaryOp(U->getOperand(0), getDataLayout(), AC, DT,
