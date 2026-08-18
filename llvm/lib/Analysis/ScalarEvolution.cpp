@@ -10174,12 +10174,12 @@ const SCEV *ScalarEvolution::computeExitCountExhaustively(const Loop *L,
   return getCouldNotCompute();
 }
 
-SCEVUse ScalarEvolution::getSCEVAtScope(const SCEV *V, const Loop *L) {
+SCEVUse ScalarEvolution::getSCEVAtScope(SCEVUse V, const Loop *L) {
   auto &Values = ValuesAtScopes[V];
   // Check to see if we've folded this expression at this loop before.
   for (auto &LS : Values)
     if (LS.first == L)
-      return LS.second ? LS.second : SCEVUse(V);
+      return LS.second ? LS.second : V;
 
   Values.emplace_back(L, nullptr);
 
@@ -10188,11 +10188,8 @@ SCEVUse ScalarEvolution::getSCEVAtScope(const SCEV *V, const Loop *L) {
   for (auto &LS : reverse(ValuesAtScopes[V]))
     if (LS.first == L) {
       LS.second = C;
-      // Record the dependency under the bare expression: invalidation walks
-      // expressions, and any use flags on C do not change which expression
-      // this is the value at scope of.
       if (!isa<SCEVConstant>(C))
-        ValuesAtScopesUsers[C.getPointer()].push_back({L, V});
+        ValuesAtScopesUsers[C].push_back({L, V});
       break;
     }
   return C;
@@ -10297,7 +10294,7 @@ const SCEV *ScalarEvolution::getWithOperands(const SCEV *S,
   llvm_unreachable("Unknown SCEV kind!");
 }
 
-SCEVUse ScalarEvolution::computeSCEVAtScope(const SCEV *V, const Loop *L) {
+SCEVUse ScalarEvolution::computeSCEVAtScope(SCEVUse V, const Loop *L) {
   switch (V->getSCEVType()) {
   case scConstant:
   case scVScale:
@@ -10311,7 +10308,7 @@ SCEVUse ScalarEvolution::computeSCEVAtScope(const SCEV *V, const Loop *L) {
     // expression has no loop-variant portions.
     for (unsigned i = 0, e = AddRec->getNumOperands(); i != e; ++i) {
       SCEVUse OpAtScope = getSCEVAtScope(AddRec->getOperand(i), L);
-      if (OpAtScope == AddRec->getOperand(i).getPointer())
+      if (OpAtScope == AddRec->getOperand(i))
         continue;
 
       // Okay, at least one of these operands is loop variant but might be
@@ -10368,8 +10365,8 @@ SCEVUse ScalarEvolution::computeSCEVAtScope(const SCEV *V, const Loop *L) {
     // Avoid performing the look-up in the common case where the specified
     // expression has no loop-variant portions.
     for (unsigned i = 0, e = Ops.size(); i != e; ++i) {
-      SCEVUse OpAtScope = getSCEVAtScope(Ops[i].getPointer(), L);
-      if (OpAtScope != Ops[i].getPointer()) {
+      SCEVUse OpAtScope = getSCEVAtScope(Ops[i], L);
+      if (OpAtScope != Ops[i]) {
         // Okay, at least one of these operands is loop variant but might be
         // foldable.  Build a new instance of the folded commutative expression.
         SmallVector<SCEVUse, 8> NewOps;
@@ -10378,7 +10375,7 @@ SCEVUse ScalarEvolution::computeSCEVAtScope(const SCEV *V, const Loop *L) {
         NewOps.push_back(OpAtScope);
 
         for (++i; i != e; ++i) {
-          OpAtScope = getSCEVAtScope(Ops[i].getPointer(), L);
+          OpAtScope = getSCEVAtScope(Ops[i], L);
           NewOps.push_back(OpAtScope);
         }
 
@@ -14743,7 +14740,7 @@ void ScalarEvolution::forgetMemoizedResults(ArrayRef<SCEVUse> SCEVs) {
       [&](const auto &Entry) { return ToForget.count(Entry.first.first); });
 }
 
-void ScalarEvolution::forgetMemoizedResultsImpl(const SCEV *S) {
+void ScalarEvolution::forgetMemoizedResultsImpl(SCEVUse S) {
   LoopDispositions.erase(S);
   BlockDispositions.erase(S);
   UnsignedRanges.erase(S);
@@ -14766,25 +14763,33 @@ void ScalarEvolution::forgetMemoizedResultsImpl(const SCEV *S) {
     ExprValueMap.erase(ExprIt);
   }
 
-  auto ScopeIt = ValuesAtScopes.find(S);
-  if (ScopeIt != ValuesAtScopes.end()) {
-    for (const auto &Pair : ScopeIt->second)
-      if (!isa_and_nonnull<SCEVConstant>(Pair.second))
-        llvm::erase(ValuesAtScopesUsers[Pair.second.getPointer()],
-                    std::make_pair(Pair.first, S));
-    ValuesAtScopes.erase(ScopeIt);
-  }
+  auto EraseAtScopeKey = [&](SCEVUse Key) {
+    auto ScopeIt = ValuesAtScopes.find(Key);
+    if (ScopeIt != ValuesAtScopes.end()) {
+      for (const auto &Pair : ScopeIt->second)
+        if (!isa_and_nonnull<SCEVConstant>(Pair.second))
+          llvm::erase(ValuesAtScopesUsers[Pair.second],
+                      std::make_pair(Pair.first, Key));
+      ValuesAtScopes.erase(ScopeIt);
+    }
 
-  auto ScopeUserIt = ValuesAtScopesUsers.find(S);
-  if (ScopeUserIt != ValuesAtScopesUsers.end()) {
-    for (const auto &Pair : ScopeUserIt->second)
-      // The recorded value at scope is a use of S, which may carry no-wrap
-      // flags that are not part of this key.
-      llvm::erase_if(ValuesAtScopes[Pair.second], [&](const auto &LS) {
-        return LS.first == Pair.first && LS.second.getPointer() == S;
-      });
-    ValuesAtScopesUsers.erase(ScopeUserIt);
-  }
+    auto ScopeUserIt = ValuesAtScopesUsers.find(Key);
+    if (ScopeUserIt != ValuesAtScopesUsers.end()) {
+      for (const auto &Pair : ScopeUserIt->second)
+        llvm::erase(ValuesAtScopes[Pair.second],
+                    std::make_pair(Pair.first, Key));
+      ValuesAtScopesUsers.erase(ScopeUserIt);
+    }
+  };
+  // Both maps are keyed on SCEVUse, so entries for S may be keyed on a use of it
+  // carrying no-wrap flags, which the expressions driving invalidation do not
+  // know about. A use encodes only NUW and NSW, so erase all 4 variants rather
+  // than tracking which ones exist - that way no path creating a flagged key can
+  // be missed.
+  for (SCEV::NoWrapFlags Flags :
+       {SCEV::FlagAnyWrap, SCEV::FlagNUW, SCEV::FlagNSW,
+        setFlags(SCEV::FlagNUW, SCEV::FlagNSW)})
+    EraseAtScopeKey(SCEVUse(S.getPointer(), Flags));
 
   auto BEUsersIt = BECountUsers.find(S);
   if (BEUsersIt != BECountUsers.end()) {
@@ -15024,12 +15029,12 @@ void ScalarEvolution::verify() const {
 
   // Verify integrity of ValuesAtScopes users.
   for (const auto &ValueAndVec : ValuesAtScopes) {
-    const SCEV *Value = ValueAndVec.first;
+    SCEVUse Value = ValueAndVec.first;
     for (const auto &LoopAndValueAtScope : ValueAndVec.second) {
       const Loop *L = LoopAndValueAtScope.first;
       SCEVUse ValueAtScope = LoopAndValueAtScope.second;
       if (!isa<SCEVConstant>(ValueAtScope)) {
-        auto It = ValuesAtScopesUsers.find(ValueAtScope.getPointer());
+        auto It = ValuesAtScopesUsers.find(ValueAtScope);
         if (It != ValuesAtScopesUsers.end() &&
             is_contained(It->second, std::make_pair(L, Value)))
           continue;
@@ -15041,18 +15046,14 @@ void ScalarEvolution::verify() const {
   }
 
   for (const auto &ValueAtScopeAndVec : ValuesAtScopesUsers) {
-    const SCEV *ValueAtScope = ValueAtScopeAndVec.first;
+    SCEVUse ValueAtScope = ValueAtScopeAndVec.first;
     for (const auto &LoopAndValue : ValueAtScopeAndVec.second) {
       const Loop *L = LoopAndValue.first;
-      const SCEV *Value = LoopAndValue.second;
+      SCEVUse Value = LoopAndValue.second;
       assert(!isa<SCEVConstant>(Value));
       auto It = ValuesAtScopes.find(Value);
-      // The recorded value at scope may carry no-wrap flags that are not part
-      // of the key it is recorded under.
       if (It != ValuesAtScopes.end() &&
-          any_of(It->second, [&](const auto &LS) {
-            return LS.first == L && LS.second.getPointer() == ValueAtScope;
-          }))
+          is_contained(It->second, std::make_pair(L, ValueAtScope)))
         continue;
       dbgs() << "Value: " << *Value << ", Loop: " << *L << ", ValueAtScope: "
              << *ValueAtScope << " missing in ValuesAtScopes\n";
