@@ -5987,6 +5987,10 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   // Regions are dissolved after optimizing for VF and UF, which completely
   // removes unneeded loop regions first.
   const bool HasTailFolded = BestVPlan.hasTailFolded();
+  // The estimated number of the original loop's iterations handled by a single
+  // iteration of the vector loop.
+  const unsigned EstimatedVFxUF =
+      estimateElementCount(BestVF * BestUF, Config.getVScaleForTuning());
   RUN_VPLAN_PASS(VPlanTransforms::dissolveLoopRegions, BestVPlan);
   // Expand BranchOnTwoConds after dissolution, when latch has direct access to
   // its successors.
@@ -6100,8 +6104,7 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
                  : nullptr,
       HeaderVPBB, BestVPlan,
       EpilogueVecKind == EpilogueVectorizationKind::Epilogue, LID,
-      OrigAverageTripCount, OrigLoopInvocationWeight,
-      estimateElementCount(BestVF * BestUF, Config.getVScaleForTuning()),
+      OrigAverageTripCount, OrigLoopInvocationWeight, EstimatedVFxUF,
       DisableRuntimeUnroll, UnrollVectorizedLoop);
 
   // 3. Fix the vectorized code: take care of header phi's, live-outs,
