@@ -74,6 +74,27 @@ static std::optional<APInt> computeConstantDifference(ScalarEvolution &SE,
       const SCEV *FoundRHS) {
     return SE.isImpliedCond(Pred, LHS, RHS, FoundPred, FoundLHS, FoundRHS);
   }
+
+  /// Return the cached value of \p U at scope \p Scope, or a null use if there
+  /// is no cache entry for it. The cache is keyed on SCEVUse, so a use carrying
+  /// no-wrap flags has an entry of its own.
+  static SCEVUse getValueAtScope(ScalarEvolution &SE, SCEVUse U,
+                                 const Loop *Scope) {
+    auto It = SE.ValuesAtScopes.find(U);
+    if (It == SE.ValuesAtScopes.end())
+      return SCEVUse();
+    for (auto &LS : It->second)
+      if (LS.first == Scope)
+        return LS.second;
+    return SCEVUse();
+  }
+
+  /// Rebuild \p S with \p Ops, so a test can construct an expression that
+  /// differs from \p S only in the use flags of one operand.
+  static const SCEV *getWithOperands(ScalarEvolution &SE, const SCEV *S,
+                                     SmallVectorImpl<SCEVUse> &Ops) {
+    return SE.getWithOperands(S, Ops);
+  }
 };
 
 TEST_F(ScalarEvolutionsTest, SCEVUnknownRAUW) {
@@ -2183,4 +2204,381 @@ TEST_F(ScalarEvolutionsTest, OperandUseFlagsArePartOfIdentity) {
                         [](SCEVUse Op) { return Op.hasUseFlags(); }));
   });
 }
+
+// With the at-scope caches keyed on the expression rather than on a use of it,
+// a query for an expression carrying use flags and a query for its canonical
+// form recurse into shared cache entries for their operands. So the order the
+// two are asked in could decide what either one sees. Ask them in both orders,
+// in separate ScalarEvolution instances, and require identical results - printed
+// rather than compared by pointer, so a difference in flags fails too.
+TEST_F(ScalarEvolutionsTest, AtScopeValueIsIndependentOfQueryOrder) {
+  LLVMContext C;
+  SMDiagnostic Err;
+  std::unique_ptr<Module> M = parseAssemblyString(
+      R"(define void @f(i32 %start, i32 %step, i32 %n, i32 %m) {
+      entry:
+        br label %outer
+
+      outer:
+        %o = phi i32 [ %start, %entry ], [ %o.next, %outer.latch ]
+        %oi = phi i32 [ 0, %entry ], [ %oi.next, %outer.latch ]
+        br label %inner
+
+      inner:
+        %i = phi i32 [ 0, %outer ], [ %i.next, %inner ]
+        %red = phi i32 [ %o, %outer ], [ %red.next, %inner ]
+        %red.next = add nuw i32 %red, %step
+        %scaled = mul i32 %red, %n
+        %i.next = add nuw i32 %i, 1
+        %ic = icmp eq i32 %i.next, %n
+        br i1 %ic, label %outer.latch, label %inner
+
+      outer.latch:
+        %o.next = add nuw i32 %red.next, %step
+        %oi.next = add nuw i32 %oi, 1
+        %oc = icmp eq i32 %oi.next, %m
+        br i1 %oc, label %exit, label %outer
+
+      exit:
+        ret void
+      })",
+      Err, C);
+
+  if (!M) {
+    Err.print("ScalarEvolutionTest", errs());
+    ASSERT_TRUE(M && "Could not parse module?");
+  }
+
+  // Ask for the value at scope of every expression, of every variant of it that
+  // differs only in an operand's use flags, and of the canonical form of each
+  // result, at every scope. Returns the rendered results in query order.
+  auto Collect = [&](bool FlaggedFirst) {
+    std::vector<std::string> Results;
+    runWithSE(*M, "f", [&](Function &F, LoopInfo &LI, ScalarEvolution &SE) {
+      SmallVector<const Loop *> Scopes = {nullptr};
+      append_range(Scopes, LI.getLoopsInPreorder());
+
+      auto Render = [](StringRef What, SCEVUse U) {
+        std::string S;
+        raw_string_ostream OS(S);
+        OS << What << ": ";
+        U.print(OS);
+        return S;
+      };
+
+      for (Instruction &I : instructions(F)) {
+        if (!SE.isSCEVable(I.getType()))
+          continue;
+        const SCEV *S = SE.getSCEV(&I);
+        if (isa<SCEVCouldNotCompute>(S))
+          continue;
+
+        for (unsigned Idx = 0, E = S->operands().size(); Idx != E; ++Idx) {
+          for (SCEV::NoWrapFlags Flags :
+               {SCEV::FlagNUW, SCEV::FlagNSW,
+                ScalarEvolution::setFlags(SCEV::FlagNUW, SCEV::FlagNSW)}) {
+            SmallVector<SCEVUse, 4> Ops(S->operands());
+            Ops[Idx] = SE.getUseWithFlags(Ops[Idx].getPointer(), Flags);
+            const SCEV *Variant = getWithOperands(SE, S, Ops);
+
+            for (const Loop *Scope : Scopes) {
+              // Whichever of the two is asked first populates the shared cache
+              // entries for the operands.
+              if (FlaggedFirst) {
+                Results.push_back(
+                    Render("flagged", SE.getSCEVAtScope(Variant, Scope)));
+                Results.push_back(Render("bare", SE.getSCEVAtScope(S, Scope)));
+              } else {
+                std::string Bare =
+                    Render("bare", SE.getSCEVAtScope(S, Scope));
+                Results.push_back(
+                    Render("flagged", SE.getSCEVAtScope(Variant, Scope)));
+                Results.push_back(Bare);
+              }
+            }
+          }
+        }
+      }
+    });
+    return Results;
+  };
+
+  std::vector<std::string> FlaggedFirst = Collect(/*FlaggedFirst=*/true);
+  std::vector<std::string> BareFirst = Collect(/*FlaggedFirst=*/false);
+  ASSERT_FALSE(FlaggedFirst.empty());
+  EXPECT_EQ(FlaggedFirst, BareFirst);
+}
+
+// Use flags are extra knowledge about a value, not a different value: adding
+// them to an operand must not change which expression it is, nor what that
+// expression folds to at any scope. That is what lets the at-scope caches be
+// keyed on the expression rather than on a use of it; if folding ever starts to
+// consume use flags, this test is what should fail.
+//
+// The flagged variants are constructed here rather than taken from whatever the
+// IR happens to produce, so the coverage does not depend on how widely SCEVUse
+// flags are used elsewhere.
+TEST_F(ScalarEvolutionsTest, UseFlagsDoNotChangeFoldingAtScope) {
+  LLVMContext C;
+  SMDiagnostic Err;
+  std::unique_ptr<Module> M = parseAssemblyString(
+      R"(define void @f(i32 %start, i32 %step, i32 %n, i32 %m) {
+      entry:
+        br label %outer
+
+      outer:
+        %o = phi i32 [ %start, %entry ], [ %o.next, %outer.latch ]
+        %oi = phi i32 [ 0, %entry ], [ %oi.next, %outer.latch ]
+        br label %inner
+
+      inner:
+        %i = phi i32 [ 0, %outer ], [ %i.next, %inner ]
+        %red = phi i32 [ %o, %outer ], [ %red.next, %inner ]
+        %red.next = add nuw i32 %red, %step
+        %scaled = mul i32 %red, %n
+        %i.next = add nuw i32 %i, 1
+        %ic = icmp eq i32 %i.next, %n
+        br i1 %ic, label %outer.latch, label %inner
+
+      outer.latch:
+        %o.next = add nuw i32 %red.next, %step
+        %oi.next = add nuw i32 %oi, 1
+        %oc = icmp eq i32 %oi.next, %m
+        br i1 %oc, label %exit, label %outer
+
+      exit:
+        ret void
+      })",
+      Err, C);
+
+  if (!M) {
+    Err.print("ScalarEvolutionTest", errs());
+    ASSERT_TRUE(M && "Could not parse module?");
+  }
+
+  runWithSE(*M, "f", [](Function &F, LoopInfo &LI, ScalarEvolution &SE) {
+    SmallVector<const Loop *> Scopes = {nullptr};
+    append_range(Scopes, LI.getLoopsInPreorder());
+
+    unsigned NumChecked = 0;
+    for (Instruction &I : instructions(F)) {
+      if (!SE.isSCEVable(I.getType()))
+        continue;
+      const SCEV *S = SE.getSCEV(&I);
+      if (isa<SCEVCouldNotCompute>(S))
+        continue;
+
+      for (unsigned Idx = 0, E = S->operands().size(); Idx != E; ++Idx) {
+        for (SCEV::NoWrapFlags Flags :
+             {SCEV::FlagNUW, SCEV::FlagNSW,
+              ScalarEvolution::setFlags(SCEV::FlagNUW, SCEV::FlagNSW)}) {
+          SmallVector<SCEVUse, 4> Ops(S->operands());
+          Ops[Idx] = SE.getUseWithFlags(Ops[Idx].getPointer(), Flags);
+          const SCEV *Variant = getWithOperands(SE, S, Ops);
+
+          // Adding flags to an operand must not change which expression this
+          // is, i.e. every fold has to be insensitive to them.
+          EXPECT_EQ(Variant->getCanonical(), S->getCanonical())
+              << "operand " << Idx << " use flags changed folding of " << *S
+              << " into " << *Variant;
+          if (Variant->getCanonical() != S->getCanonical())
+            continue;
+
+          // And it must not change what the expression folds to at any scope.
+          for (const Loop *Scope : Scopes) {
+            SCEVUse Flagged = SE.getSCEVAtScope(Variant, Scope);
+            SCEVUse Bare = SE.getSCEVAtScope(S, Scope);
+            if (isa<SCEVCouldNotCompute>(Flagged) ||
+                isa<SCEVCouldNotCompute>(Bare))
+              continue;
+            EXPECT_EQ(Flagged.getPointer()->getCanonical(),
+                      Bare.getPointer()->getCanonical())
+                << "at scope "
+                << (Scope ? Scope->getHeader()->getName() : "<none>")
+                << ", operand " << Idx << " use flags changed the value of "
+                << *S << " at scope: " << *Flagged << " vs " << *Bare;
+            ++NumChecked;
+          }
+        }
+      }
+    }
+    EXPECT_GT(NumChecked, 100u) << "too few flagged variants exercised";
+  });
+}
+
+// Use-specific no-wrap flags are extra knowledge about a value, not a different
+// value, so they must not change what an expression folds to at scope: asking
+// about a folded result again, or about the same expression with the flags
+// dropped, has to yield the same value. Check that for every expression and
+// every scope of a nest whose exit values do carry flags.
+TEST_F(ScalarEvolutionsTest, AtScopeValueDoesNotDependOnUseFlags) {
+  LLVMContext C;
+  SMDiagnostic Err;
+  std::unique_ptr<Module> M = parseAssemblyString(
+      R"(define void @f(i32 %start, i32 %step, i32 %n, i32 %m) {
+      entry:
+        br label %outer
+
+      outer:
+        %o = phi i32 [ %start, %entry ], [ %o.next, %outer.latch ]
+        %oi = phi i32 [ 0, %entry ], [ %oi.next, %outer.latch ]
+        br label %inner
+
+      inner:
+        %i = phi i32 [ 0, %outer ], [ %i.next, %inner ]
+        %red = phi i32 [ %o, %outer ], [ %red.next, %inner ]
+        %red.next = add nuw i32 %red, %step
+        %i.next = add nuw i32 %i, 1
+        %ic = icmp eq i32 %i.next, %n
+        br i1 %ic, label %outer.latch, label %inner
+
+      outer.latch:
+        %o.next = add nuw i32 %red.next, %step
+        %oi.next = add nuw i32 %oi, 1
+        %oc = icmp eq i32 %oi.next, %m
+        br i1 %oc, label %exit, label %outer
+
+      exit:
+        ret void
+      })",
+      Err, C);
+
+  if (!M) {
+    Err.print("ScalarEvolutionTest", errs());
+    ASSERT_TRUE(M && "Could not parse module?");
+  }
+
+  runWithSE(*M, "f", [](Function &F, LoopInfo &LI, ScalarEvolution &SE) {
+    SmallVector<const Loop *> Scopes = {nullptr};
+    append_range(Scopes, LI.getLoopsInPreorder());
+
+    unsigned NumWithFlags = 0;
+    for (Instruction &I : instructions(F)) {
+      if (!SE.isSCEVable(I.getType()))
+        continue;
+      for (const Loop *Scope : Scopes) {
+        SCEVUse R = SE.getSCEVAtScope(SE.getSCEV(&I), Scope);
+        if (isa<SCEVCouldNotCompute>(R))
+          continue;
+        const SCEV *Folded = R.getPointer();
+        if (R.hasUseFlags() || Folded != Folded->getCanonical())
+          ++NumWithFlags;
+
+        // Asking about the folded expression again must not change the value.
+        SCEVUse Again = SE.getSCEVAtScope(Folded, Scope);
+        EXPECT_EQ(Again.getPointer()->getCanonical(), Folded->getCanonical())
+            << "at scope " << (Scope ? Scope->getHeader()->getName() : "<none>")
+            << ", value at scope changed when asked about again: " << *Folded
+            << " -> " << *Again;
+
+        // Neither must dropping the use flags from it.
+        SCEVUse Bare = SE.getSCEVAtScope(Folded->getCanonical(), Scope);
+        EXPECT_EQ(Bare.getPointer()->getCanonical(), Folded->getCanonical())
+            << "at scope " << (Scope ? Scope->getHeader()->getName() : "<none>")
+            << ", canonical form of " << *Folded << " folded differently: "
+            << *Bare;
+      }
+    }
+    EXPECT_NE(NumWithFlags, 0u)
+        << "no use flags in play, this test proves nothing";
+  });
+}
+
+// The exit value cached for a recurrence carries use-specific no-wrap flags, so
+// the entry recording that the recurrence depends on it is keyed on a flagged
+// use. Invalidating the exit value has to reach that entry: here only the
+// backedge-taken count's operand is forgotten, so the recurrence itself keeps
+// its cached data, and a surviving entry would hand out an exit value computed
+// from a backedge-taken count that is gone.
+TEST_F(ScalarEvolutionsTest, ForgetInvalidatesFlaggedAtScopeValue) {
+  LLVMContext C;
+  SMDiagnostic Err;
+  std::unique_ptr<Module> M = parseAssemblyString(
+      R"(define void @f(i32 %start, i32 %step, ptr %p) {
+      entry:
+        %n = load i32, ptr %p
+        br label %loop
+
+      loop:
+        %iv = phi i32 [ 0, %entry ], [ %iv.next, %loop ]
+        %red = phi i32 [ %start, %entry ], [ %red.next, %loop ]
+        %red.next = add nuw i32 %red, %step
+        %iv.next = add nuw i32 %iv, 1
+        %ec = icmp eq i32 %iv.next, %n
+        br i1 %ec, label %exit, label %loop
+
+      exit:
+        ret void
+      })",
+      Err, C);
+
+  if (!M) {
+    Err.print("ScalarEvolutionTest", errs());
+    ASSERT_TRUE(M && "Could not parse module?");
+  }
+
+  runWithSE(*M, "f", [](Function &F, LoopInfo &LI, ScalarEvolution &SE) {
+    const SCEV *Red = SE.getSCEV(getInstructionByName(F, "red"));
+    SCEVUse Exit = SE.getSCEVAtScope(Red, nullptr);
+    ASSERT_TRUE(Exit.hasUseFlags())
+        << "exit value expected to carry use flags: " << *Exit;
+    ASSERT_EQ(getValueAtScope(SE, Red, nullptr), Exit);
+
+    // The recurrence does not depend on the load, so it keeps its cached data,
+    // but the backedge-taken count and the exit value computed from it go away.
+    SE.forgetValue(getInstructionByName(F, "n"));
+    EXPECT_EQ(getValueAtScope(SE, Red, nullptr).getPointer(), nullptr)
+        << "stale exit value left cached for the recurrence";
+  });
+}
+
+// An entry is keyed on the use asked about, so a use carrying no-wrap flags has
+// one of its own, which forgetting the expression it is a use of has to reach.
+// Here the value at scope is a constant, and constants are not recorded in the
+// reverse map, so nothing else can clean that entry up: it is reachable only
+// under the key it is stored under, and a surviving entry would answer for a
+// recurrence whose cached data is gone.
+TEST_F(ScalarEvolutionsTest, ForgetInvalidatesAtScopeValueOfFlaggedUse) {
+  LLVMContext C;
+  SMDiagnostic Err;
+  std::unique_ptr<Module> M = parseAssemblyString(
+      R"(define void @f() {
+      entry:
+        br label %loop
+
+      loop:
+        %iv = phi i32 [ 0, %entry ], [ %iv.next, %loop ]
+        %iv.next = add nuw i32 %iv, 1
+        %ec = icmp eq i32 %iv.next, 10
+        br i1 %ec, label %exit, label %loop
+
+      exit:
+        ret void
+      })",
+      Err, C);
+
+  if (!M) {
+    Err.print("ScalarEvolutionTest", errs());
+    ASSERT_TRUE(M && "Could not parse module?");
+  }
+
+  runWithSE(*M, "f", [](Function &F, LoopInfo &LI, ScalarEvolution &SE) {
+    const SCEV *IV = SE.getSCEV(getInstructionByName(F, "iv"));
+    SCEVUse NUWIV = SE.getUseWithFlags(IV, SCEV::FlagNUW);
+
+    SCEVUse Exit = SE.getSCEVAtScope(NUWIV, nullptr);
+    ASSERT_TRUE(isa<SCEVConstant>(Exit))
+        << "exit value expected to be a constant, so that it is not recorded "
+           "in the reverse map: "
+        << *Exit;
+    ASSERT_EQ(getValueAtScope(SE, NUWIV, nullptr), Exit);
+    // The bare use is a separate entry, and it is not the one under test.
+    ASSERT_EQ(getValueAtScope(SE, IV, nullptr).getPointer(), nullptr);
+
+    SE.forgetValue(getInstructionByName(F, "iv"));
+    EXPECT_EQ(getValueAtScope(SE, NUWIV, nullptr).getPointer(), nullptr)
+        << "stale exit value left cached for a flagged use of the recurrence";
+  });
+}
+
 }  // end namespace llvm
