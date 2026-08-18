@@ -58,12 +58,13 @@ extern cl::opt<bool> PreferInLoopReductions;
 std::optional<unsigned> getMaxVScale(const Function &F,
                                      const TargetTransformInfo &TTI);
 
-/// \return An upper bound for the runtime value of \p VF, that is \p VF's
-/// minimum value scaled by the maximum value of vscale if \p VF is scalable.
-/// Returns std::nullopt if \p VF is scalable and no upper bound for vscale is
-/// known.
-std::optional<uint64_t> getMaxRuntimeVF(ElementCount VF, const Function &F,
-                                        const TargetTransformInfo &TTI);
+/// \return The runtime value of \p EC assuming vscale is \p VScale: \p EC's
+/// fixed value if \p EC is fixed, or its minimum value multiplied by \p VScale
+/// if it is scalable. Returns std::nullopt if \p EC is scalable and \p VScale
+/// is not known. Pass getMaxVScale() as \p VScale to obtain an upper bound,
+/// or getVScaleForTuning() to obtain an estimate.
+std::optional<uint64_t> scaleElementCount(ElementCount EC,
+                                          std::optional<unsigned> VScale);
 
 // Utility functions that are used by different vectorization classes
 namespace LoopVectorizationUtils {

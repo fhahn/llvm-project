@@ -311,14 +311,13 @@ std::optional<unsigned> llvm::getMaxVScale(const Function &F,
   return std::nullopt;
 }
 
-std::optional<uint64_t> llvm::getMaxRuntimeVF(ElementCount VF,
-                                              const Function &F,
-                                              const TargetTransformInfo &TTI) {
-  if (!VF.isScalable())
-    return VF.getFixedValue();
+std::optional<uint64_t>
+llvm::scaleElementCount(ElementCount EC, std::optional<unsigned> VScale) {
+  if (!EC.isScalable())
+    return EC.getFixedValue();
 
-  if (std::optional<unsigned> MaxVScale = getMaxVScale(F, TTI))
-    return uint64_t(VF.getKnownMinValue()) * *MaxVScale;
+  if (VScale)
+    return uint64_t(EC.getKnownMinValue()) * *VScale;
 
   return std::nullopt;
 }

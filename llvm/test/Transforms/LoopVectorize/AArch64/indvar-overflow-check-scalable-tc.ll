@@ -53,8 +53,9 @@ exit:
   ret void
 }
 
-; VF is not scalable, but TC is. TC * MaxVScale overflows,
-; and hence IV increment does not have nuw.
+; VF is not scalable, but TC is. TC * MaxVScale (268435457 * 16) is not
+; representable in the type of the i32 induction variable, so no bound on the
+; IV increment can be proven and it does not have nuw.
 define void @tc_maxvscale_overflow(ptr noalias %a, ptr noalias %b) vscale_range(1, 16) {
 ; CHECK-LABEL: define void @tc_maxvscale_overflow(
 ; CHECK-SAME: ptr noalias [[A:%.*]], ptr noalias [[B:%.*]]) #[[ATTR0]] {

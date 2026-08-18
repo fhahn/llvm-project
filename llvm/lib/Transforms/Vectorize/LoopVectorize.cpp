@@ -1937,23 +1937,23 @@ static bool isIndvarOverflowCheckKnownFalse(
           Cost->PSE, Cost->TheLoop,
           /*CanUseConstantMax=*/true, /*CanExcludeZeroTrips=*/false,
           /*ComputeUpperBoundOnly=*/true)) {
-    std::optional<uint64_t> MaxVF =
-        getMaxRuntimeVF(VF, *Cost->TheFunction, Cost->TTI);
-    if (!MaxVF)
+    std::optional<unsigned> MaxVScale =
+        getMaxVScale(*Cost->TheFunction, Cost->TTI);
+    std::optional<uint64_t> MaxRuntimeVF = scaleElementCount(VF, MaxVScale);
+    std::optional<uint64_t> MaxTC = scaleElementCount(*TC, MaxVScale);
+    if (!MaxRuntimeVF || !MaxTC)
       return false;
-    unsigned MaxTC = TC->getKnownMinValue();
-    if (TC->isScalable()) {
-      std::optional<unsigned> MaxVScale =
-          getMaxVScale(*Cost->TheFunction, Cost->TTI);
-      if (!MaxVScale)
-        return false;
-      bool Overflow;
-      MaxTC = SaturatingMultiply(MaxTC, *MaxVScale, &Overflow);
-      if (Overflow)
-        return false;
-    }
 
-    return (MaxUIntTripCount - MaxTC).ugt(*MaxVF * MaxUF);
+    // Bail out if the maximum trip count is not representable in the induction
+    // variable's type, as the subtraction below would wrap.
+    if (MaxUIntTripCount.ult(*MaxTC))
+      return false;
+
+    // Note that this is conservative if MaxRuntimeVF * MaxUF is not
+    // representable in IdxTy: the step is then computed modulo IdxTy in the
+    // vectorized loop and may be much smaller than the bound used here, but no
+    // useful bound on the truncated value is available.
+    return (MaxUIntTripCount - *MaxTC).ugt(*MaxRuntimeVF * MaxUF);
   }
 
   return false;
@@ -2082,10 +2082,8 @@ static void legacyCSE(BasicBlock *BB) {
 /// vscale value.
 static unsigned estimateElementCount(ElementCount VF,
                                      std::optional<unsigned> VScale) {
-  unsigned EstimatedVF = VF.getKnownMinValue();
-  if (VF.isScalable())
-    if (VScale)
-      EstimatedVF *= *VScale;
+  unsigned EstimatedVF = static_cast<unsigned>(
+      scaleElementCount(VF, VScale).value_or(VF.getKnownMinValue()));
   assert(EstimatedVF >= 1 && "Estimated VF shouldn't be less than 1");
   return EstimatedVF;
 }
@@ -3012,21 +3010,21 @@ LoopVectorizationCostModel::computeMaxVF(ElementCount UserVF, unsigned UserIC) {
   std::optional<uint64_t> MaxPowerOf2RuntimeVF =
       MaxFactors.FixedVF.getFixedValue();
   if (MaxFactors.ScalableVF) {
-    std::optional<uint64_t> MaxRuntimeVF =
-        getMaxRuntimeVF(MaxFactors.ScalableVF, *TheFunction, TTI);
-    if (MaxRuntimeVF)
-      MaxPowerOf2RuntimeVF = std::max(*MaxPowerOf2RuntimeVF, *MaxRuntimeVF);
+    if (std::optional<uint64_t> MaxScalableVF = scaleElementCount(
+            MaxFactors.ScalableVF, getMaxVScale(*TheFunction, TTI)))
+      MaxPowerOf2RuntimeVF = std::max(*MaxPowerOf2RuntimeVF, *MaxScalableVF);
     else
       MaxPowerOf2RuntimeVF = std::nullopt; // Stick with tail-folding for now.
   }
 
-  auto NoScalarEpilogueNeeded = [this, &UserIC](uint64_t MaxVF) {
+  auto NoScalarEpilogueNeeded = [this, UserIC](uint64_t MaxRuntimeVF) {
     // Return false if the loop is neither a single-latch-exit loop nor an
     // early-exit loop as tail-folding is not supported in that case.
     if (TheLoop->getExitingBlock() != TheLoop->getLoopLatch() &&
         !Legal->hasUncountableEarlyExit())
       return false;
-    uint64_t MaxVFtimesIC = UserIC ? MaxVF * UserIC : MaxVF;
+    uint64_t MaxRuntimeVFTimesIC =
+        UserIC ? MaxRuntimeVF * UserIC : MaxRuntimeVF;
     ScalarEvolution *SE = PSE.getSE();
     // Calling getSymbolicMaxBackedgeTakenCount enables support for loops
     // with uncountable exits. For countable loops, the symbolic maximum must
@@ -3039,11 +3037,11 @@ LoopVectorizationCostModel::computeMaxVF(ElementCount UserVF, unsigned UserIC) {
         BackedgeTakenCount, SE->getOne(BackedgeTakenCount->getType()));
     const SCEV *Rem = SE->getURemExpr(
         SE->applyLoopGuards(ExitCount, TheLoop),
-        SE->getConstant(BackedgeTakenCount->getType(), MaxVFtimesIC));
+        SE->getConstant(BackedgeTakenCount->getType(), MaxRuntimeVFTimesIC));
     return Rem->isZero();
   };
 
-  if (MaxPowerOf2RuntimeVF > 0u) {
+  if (MaxPowerOf2RuntimeVF > 0) {
     assert((UserVF.isNonZero() || isPowerOf2_64(*MaxPowerOf2RuntimeVF)) &&
            "MaxFixedVF must be a power of 2");
     if (NoScalarEpilogueNeeded(*MaxPowerOf2RuntimeVF)) {
@@ -3057,7 +3055,7 @@ LoopVectorizationCostModel::computeMaxVF(ElementCount UserVF, unsigned UserIC) {
   if (ExpectedTC && ExpectedTC->isFixed() &&
       ExpectedTC->getFixedValue() <=
           TTI.getMinTripCountTailFoldingThreshold()) {
-    if (MaxPowerOf2RuntimeVF > 0u) {
+    if (MaxPowerOf2RuntimeVF > 0) {
       // If we have a low-trip-count, and the fixed-width VF is known to divide
       // the trip count but the scalable factor does not, use the fixed-width
       // factor in preference to allow the generation of a non-predicated loop.
@@ -5997,8 +5995,8 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   VPlanTransforms::removeBranchOnConst(BestVPlan, /*OnlyLatches=*/true);
   VPlanTransforms::materializeBackedgeTakenCount(BestVPlan, VectorPH);
   std::optional<uint64_t> MaxRuntimeStep;
-  if (std::optional<uint64_t> MaxRuntimeVF =
-          getMaxRuntimeVF(BestVF, *OrigLoop->getHeader()->getParent(), TTI))
+  if (std::optional<uint64_t> MaxRuntimeVF = scaleElementCount(
+          BestVF, getMaxVScale(*OrigLoop->getHeader()->getParent(), TTI)))
     MaxRuntimeStep = *MaxRuntimeVF * BestUF;
   assert((LI->getUniqueLatchExitBlock(*OrigLoop) || RequiresScalarEpilogue) &&
          "loops not exiting via the latch without required epilogue?");

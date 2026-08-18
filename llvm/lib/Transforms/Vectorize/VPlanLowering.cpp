@@ -880,6 +880,8 @@ void VPlanTransforms::materializeVectorTripCount(
     VPlan &Plan, VPBasicBlock *VectorPHVPBB, bool TailByMasking,
     bool RequiresScalarEpilogue, VPValue *Step,
     std::optional<uint64_t> MaxRuntimeStep) {
+  assert((!MaxRuntimeStep || Step == &Plan.getVFxUF()) &&
+         "MaxRuntimeStep is only known to bound the plan's VFxUF");
   VPSymbolicValue &VectorTC = Plan.getVectorTripCount();
   // There's nothing to do if there are no users of the vector trip count or its
   // IR value has already been set.
@@ -897,9 +899,11 @@ void VPlanTransforms::materializeVectorTripCount(
   }
   VPBuilder Builder(VectorPHVPBB, InsertPt);
 
-  // For scalable steps, if TC is a constant and is divisible by the maximum
-  // possible runtime step, then TC % Step == 0 for all valid vscale values
-  // and the vector trip count equals TC directly.
+  // If TC is a constant and is divisible by the maximum possible runtime step,
+  // then TC % Step == 0 for all valid vscale values and the vector trip count
+  // equals TC directly. For a fixed Step this is exact; for a scalable Step it
+  // relies on vscale being a power of two, so every runtime value of vscale
+  // divides its maximum.
   const APInt *TCVal;
   if (!RequiresScalarEpilogue && match(TC, m_APInt(TCVal)) && MaxRuntimeStep &&
       TCVal->urem(*MaxRuntimeStep) == 0) {
