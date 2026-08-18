@@ -6088,6 +6088,16 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   unsigned OrigLoopInvocationWeight = 0;
   std::optional<unsigned> OrigAverageTripCount =
       getLoopEstimatedTripCount(OrigLoop, &OrigLoopInvocationWeight);
+  // getLoopEstimatedTripCount maps an estimate of zero to std::nullopt, as some
+  // of its users assume a positive trip count. Here zero is meaningful: it
+  // means the loop is not expected to be entered, e.g. when vectorizing the
+  // epilogue of a main vector loop that is estimated to leave no iterations
+  // behind. Read the estimate directly to tell it apart from a missing one. A
+  // non-zero invocation weight indicates the latch branch weights have been
+  // extracted, so the estimate is missing only because it is zero.
+  if (!OrigAverageTripCount && OrigLoopInvocationWeight != 0)
+    OrigAverageTripCount =
+        getOptionalIntLoopAttribute(OrigLoop, LLVMLoopEstimatedTripCount);
 
   BestVPlan.execute(&State);
 
