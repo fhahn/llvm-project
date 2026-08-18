@@ -72,7 +72,7 @@ define void @tc_multiple_of_step_plus_one(ptr %p, i64 %m) !prof !0 {
 ; CHECK:    br i1 [[MIN_ITERS_CHECK:%.*]], [[SCALAR_PH:label %.*]], [[VECTOR_PH:label %.*]], !prof [[PROF9]]
 ; CHECK:    br i1 [[TMP5:%.*]], [[MIDDLE_BLOCK:label %.*]], [[VECTOR_BODY:label %.*]], !prof [[PROF1]], !llvm.loop [[LOOP17:![0-9]+]]
 ; CHECK:    br i1 [[CMP_N:%.*]], [[EXIT:label %.*]], [[SCALAR_PH]], !prof [[PROF18:![0-9]+]]
-; CHECK:    br i1 [[EC:%.*]], [[EXIT]], [[LOOP:label %.*]], !prof [[PROF6]], !llvm.loop [[LOOP19:![0-9]+]]
+; CHECK:    br i1 [[EC:%.*]], [[EXIT]], [[LOOP:label %.*]], !prof [[PROF19:![0-9]+]], !llvm.loop [[LOOP20:![0-9]+]]
 ;
 entry:
   %mul = mul i64 %m, 64
@@ -99,9 +99,9 @@ define void @tc_multiple_of_step(ptr %p, i64 %m) !prof !0 {
 ; CHECK-LABEL: define void @tc_multiple_of_step(
 ; CHECK-SAME: ptr [[P:%.*]], i64 [[M:%.*]]) !prof [[PROF0]] {
 ; CHECK:    br i1 [[MIN_ITERS_CHECK:%.*]], [[SCALAR_PH:label %.*]], [[VECTOR_PH:label %.*]], !prof [[PROF9]]
-; CHECK:    br i1 [[TMP5:%.*]], [[MIDDLE_BLOCK:label %.*]], [[VECTOR_BODY:label %.*]], !prof [[PROF1]], !llvm.loop [[LOOP20:![0-9]+]]
+; CHECK:    br i1 [[TMP5:%.*]], [[MIDDLE_BLOCK:label %.*]], [[VECTOR_BODY:label %.*]], !prof [[PROF1]], !llvm.loop [[LOOP22:![0-9]+]]
 ; CHECK:    br i1 [[CMP_N:%.*]], [[EXIT:label %.*]], [[SCALAR_PH]], !prof [[PROF18]]
-; CHECK:    br i1 [[EC:%.*]], [[EXIT]], [[LOOP:label %.*]], !prof [[PROF6]], !llvm.loop [[LOOP21:![0-9]+]]
+; CHECK:    br i1 [[EC:%.*]], [[EXIT]], [[LOOP:label %.*]], !prof [[PROF19]], !llvm.loop [[LOOP23:![0-9]+]]
 ;
 entry:
   %tc = mul i64 %m, 64
@@ -127,9 +127,9 @@ define void @unknown_tc(ptr noalias %p, i64 %n) !prof !0 {
 ; CHECK-LABEL: define void @unknown_tc(
 ; CHECK-SAME: ptr noalias [[P:%.*]], i64 [[N:%.*]]) !prof [[PROF0]] {
 ; CHECK:    br i1 [[MIN_ITERS_CHECK:%.*]], [[SCALAR_PH:label %.*]], [[VECTOR_PH:label %.*]], !prof [[PROF9]]
-; CHECK:    br i1 [[TMP5:%.*]], [[MIDDLE_BLOCK:label %.*]], [[VECTOR_BODY:label %.*]], !prof [[PROF1]], !llvm.loop [[LOOP22:![0-9]+]]
+; CHECK:    br i1 [[TMP5:%.*]], [[MIDDLE_BLOCK:label %.*]], [[VECTOR_BODY:label %.*]], !prof [[PROF1]], !llvm.loop [[LOOP25:![0-9]+]]
 ; CHECK:    br i1 [[CMP_N:%.*]], [[EXIT:label %.*]], [[SCALAR_PH]], !prof [[PROF18]]
-; CHECK:    br i1 [[EC:%.*]], [[EXIT]], [[LOOP:label %.*]], !prof [[PROF6]], !llvm.loop [[LOOP23:![0-9]+]]
+; CHECK:    br i1 [[EC:%.*]], [[EXIT]], [[LOOP:label %.*]], !prof [[PROF19]], !llvm.loop [[LOOP26:![0-9]+]]
 ;
 entry:
   br label %loop
@@ -155,8 +155,8 @@ define void @tail_folded_with_memchecks(ptr %a, ptr %b, i64 %n) !prof !0 {
 ; CHECK-LABEL: define void @tail_folded_with_memchecks(
 ; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[N:%.*]]) !prof [[PROF0]] {
 ; CHECK:    br i1 [[FOUND_CONFLICT:%.*]], [[SCALAR_PH:label %.*]], [[VECTOR_PH:label %.*]], !prof [[PROF9]]
-; CHECK:    br i1 [[TMP93:%.*]], [[MIDDLE_BLOCK:label %.*]], [[VECTOR_BODY:label %.*]], !prof [[PROF1]], !llvm.loop [[LOOP29:![0-9]+]]
-; CHECK:    br i1 [[EC:%.*]], [[EXIT:label %.*]], [[LOOP:label %.*]], !prof [[PROF6]], !llvm.loop [[LOOP30:![0-9]+]]
+; CHECK:    br i1 [[TMP93:%.*]], [[MIDDLE_BLOCK:label %.*]], [[VECTOR_BODY:label %.*]], !prof [[PROF1]], !llvm.loop [[LOOP32:![0-9]+]]
+; CHECK:    br i1 [[EC:%.*]], [[EXIT:label %.*]], [[LOOP:label %.*]], !prof [[PROF19]], !llvm.loop [[LOOP33:![0-9]+]]
 ;
 entry:
   br label %loop
@@ -188,19 +188,22 @@ exit:
 ; CHECK: [[META3]] = !{!"llvm.loop.isvectorized", i32 1}
 ; CHECK: [[META4]] = !{!"llvm.loop.unroll.runtime.disable"}
 ; CHECK: [[META5]] = !{!"llvm.loop.estimated_trip_count", i32 125}
-; CHECK: [[PROF6]] = !{!"branch_weights", i32 1, i32 0}
+; CHECK: [[PROF6]] = !{!"branch_weights", i32 1, i32 2}
 ; CHECK: [[LOOP7]] = distinct !{[[LOOP7]], [[META4]], [[META3]], [[META8:![0-9]+]]}
-; CHECK: [[META8]] = !{!"llvm.loop.estimated_trip_count", i32 0}
+; CHECK: [[META8]] = !{!"llvm.loop.estimated_trip_count", i32 3}
 ; CHECK: [[PROF9]] = !{!"branch_weights", i32 1, i32 127}
 ; CHECK: [[LOOP15]] = distinct !{[[LOOP15]], [[META3]], [[META4]], [[META5]]}
 ; CHECK: [[LOOP16]] = distinct !{[[LOOP16]], [[META3]], [[META8]]}
 ; CHECK: [[LOOP17]] = distinct !{[[LOOP17]], [[META3]], [[META4]], [[META5]]}
 ; CHECK: [[PROF18]] = !{!"branch_weights", i32 1, i32 7}
-; CHECK: [[LOOP19]] = distinct !{[[LOOP19]], [[META4]], [[META3]], [[META8]]}
-; CHECK: [[LOOP20]] = distinct !{[[LOOP20]], [[META3]], [[META4]], [[META5]]}
-; CHECK: [[LOOP21]] = distinct !{[[LOOP21]], [[META4]], [[META3]], [[META8]]}
+; CHECK: [[PROF19]] = !{!"branch_weights", i32 1, i32 0}
+; CHECK: [[LOOP20]] = distinct !{[[LOOP20]], [[META4]], [[META3]], [[META21:![0-9]+]]}
+; CHECK: [[META21]] = !{!"llvm.loop.estimated_trip_count", i32 1}
 ; CHECK: [[LOOP22]] = distinct !{[[LOOP22]], [[META3]], [[META4]], [[META5]]}
-; CHECK: [[LOOP23]] = distinct !{[[LOOP23]], [[META4]], [[META3]], [[META8]]}
-; CHECK: [[LOOP29]] = distinct !{[[LOOP29]], [[META3]], [[META4]], [[META5]]}
-; CHECK: [[LOOP30]] = distinct !{[[LOOP30]], [[META3]], [[META8]]}
+; CHECK: [[LOOP23]] = distinct !{[[LOOP23]], [[META4]], [[META3]], [[META24:![0-9]+]]}
+; CHECK: [[META24]] = !{!"llvm.loop.estimated_trip_count", i32 0}
+; CHECK: [[LOOP25]] = distinct !{[[LOOP25]], [[META3]], [[META4]], [[META5]]}
+; CHECK: [[LOOP26]] = distinct !{[[LOOP26]], [[META4]], [[META3]], [[META24]]}
+; CHECK: [[LOOP32]] = distinct !{[[LOOP32]], [[META3]], [[META4]], [[META5]]}
+; CHECK: [[LOOP33]] = distinct !{[[LOOP33]], [[META3]], [[META24]]}
 ;.

@@ -5918,6 +5918,49 @@ LoopVectorizationPlanner::computeBestVF() {
   return {BestFactor, &BestPlan};
 }
 
+/// Return the number of iterations the remainder loop executes whenever it is
+/// entered, as derived from the trip count of the loop it runs the iterations
+/// of, or std::nullopt if that cannot be determined.
+///
+/// With a scalar tail (\p HasScalarTail), the remainder loop runs the iterations
+/// left over by the vector loop, that is `TripCount % EstimatedVFxUF`, or
+/// \p EstimatedVFxUF iterations if the trip count is a multiple of the step and
+/// a scalar epilogue is required (\p RequiresScalarEpilogue). This mirrors the
+/// vector trip count computed by VPlanTransforms::materializeVectorTripCount,
+/// using the estimated vector step \p EstimatedVFxUF, which is exact unless the
+/// VF is scalable.
+///
+/// Without a scalar tail, the remainder loop is only entered when the vector
+/// loop is bypassed and then runs all iterations of \p OrigLoop.
+static std::optional<unsigned>
+getRemainderTripCount(const VPlan &Plan, Loop *OrigLoop,
+                      PredicatedScalarEvolution &PSE, bool HasScalarTail,
+                      unsigned EstimatedVFxUF, bool RequiresScalarEpilogue) {
+  ScalarEvolution &SE = *PSE.getSE();
+  if (!HasScalarTail) {
+    // Use OrigLoop's own trip count here, rather than the plan's: when
+    // vectorizing an epilogue, OrigLoop has already been rewritten to start at
+    // the main vector loop's resume value, so its trip count is the number of
+    // iterations left for the remainder loop, whereas the plan's trip count
+    // still refers to the original loop.
+    if (unsigned TC = SE.getSmallConstantTripCount(OrigLoop))
+      return TC;
+    return std::nullopt;
+  }
+  const SCEV *TC = vputils::getSCEVExprForVPValue(Plan.getTripCount(), PSE);
+  if (isa<SCEVCouldNotCompute>(TC))
+    return std::nullopt;
+  const APInt *Remainder;
+  if (!match(SE.getURemExpr(TC, SE.getConstant(TC->getType(), EstimatedVFxUF)),
+             m_scev_APInt(Remainder)))
+    return std::nullopt;
+  // At least one iteration must be executed in the scalar loop, if a scalar
+  // epilogue is required. The vector loop then executes one step less.
+  if (Remainder->isZero() && RequiresScalarEpilogue)
+    return EstimatedVFxUF;
+  return Remainder->getZExtValue();
+}
+
 DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
     ElementCount BestVF, unsigned BestUF, VPlan &BestVPlan,
     InnerLoopVectorizer &ILV, DominatorTree *DT,
@@ -5991,6 +6034,13 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   // iteration of the vector loop.
   const unsigned EstimatedVFxUF =
       estimateElementCount(BestVF * BestUF, Config.getVScaleForTuning());
+  // Retrieve the number of iterations the remainder loop runs, if it can be
+  // derived from the trip count. Needed to update the profile information after
+  // executing the plan, and depends on the vector loop region, which is
+  // dissolved below.
+  const std::optional<unsigned> RemainderTripCount = getRemainderTripCount(
+      BestVPlan, OrigLoop, PSE, BestVPlan.hasScalarTail(), EstimatedVFxUF,
+      RequiresScalarEpilogue);
   RUN_VPLAN_PASS(VPlanTransforms::dissolveLoopRegions, BestVPlan);
   // Expand BranchOnTwoConds after dissolution, when latch has direct access to
   // its successors.
@@ -6115,7 +6165,7 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
       HeaderVPBB, BestVPlan,
       EpilogueVecKind == EpilogueVectorizationKind::Epilogue, LID,
       OrigAverageTripCount, OrigLoopInvocationWeight, EstimatedVFxUF,
-      DisableRuntimeUnroll, UnrollVectorizedLoop);
+      RemainderTripCount, DisableRuntimeUnroll, UnrollVectorizedLoop);
 
   // 3. Fix the vectorized code: take care of header phi's, live-outs,
   //    predication, updating analyses.

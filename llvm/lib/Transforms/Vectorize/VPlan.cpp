@@ -1769,7 +1769,8 @@ void LoopVectorizationPlanner::updateLoopMetadataAndProfileInfo(
     bool VectorizingEpilogue, MDNode *OrigLoopID,
     std::optional<unsigned> OrigAverageTripCount,
     unsigned OrigLoopInvocationWeight, unsigned EstimatedVFxUF,
-    bool DisableRuntimeUnroll, bool UnrollVectorizedLoop) {
+    std::optional<unsigned> RemainderTripCount, bool DisableRuntimeUnroll,
+    bool UnrollVectorizedLoop) {
   // Update the metadata of the scalar loop. Skip the update when vectorizing
   // the epilogue loop to ensure it is updated only once. Also skip the update
   // when the scalar loop became unreachable.
@@ -1862,6 +1863,15 @@ void LoopVectorizationPlanner::updateLoopMetadataAndProfileInfo(
   }
 
   if (ScalarPH) {
+    if (!ScalarPH->hasPredecessors()) {
+      // The remainder loop is unreachable and will be removed by later passes.
+      // Estimate zero iterations, but still update its branch weights to keep
+      // the profile information complete until then.
+      RemainderAverageTripCount = 0;
+    } else if (RemainderTripCount) {
+      // Use the number of iterations derived from the trip count, if available.
+      RemainderAverageTripCount = *RemainderTripCount;
+    }
     setLoopEstimatedTripCount(OrigLoop, RemainderAverageTripCount,
                               OrigLoopInvocationWeight);
   }

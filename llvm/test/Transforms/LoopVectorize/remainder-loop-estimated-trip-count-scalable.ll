@@ -47,7 +47,7 @@ define void @constant_tc_multiple_of_step(ptr noalias %p) !prof !0 {
 ; CHECK:    br i1 [[MIN_ITERS_CHECK:%.*]], [[SCALAR_PH:label %.*]], [[VECTOR_PH:label %.*]], !prof [[PROF1]]
 ; CHECK:    br i1 [[TMP5:%.*]], [[MIDDLE_BLOCK:label %.*]], [[VECTOR_BODY:label %.*]], !prof [[PROF2]], !llvm.loop [[LOOP11:![0-9]+]]
 ; CHECK:    br i1 [[CMP_N:%.*]], [[EXIT:label %.*]], [[SCALAR_PH]], !prof [[PROF7]]
-; CHECK:    br i1 [[EC:%.*]], [[EXIT]], [[LOOP:label %.*]], !prof [[PROF8]], !llvm.loop [[LOOP12:![0-9]+]]
+; CHECK:    br i1 [[EC:%.*]], [[EXIT]], [[LOOP:label %.*]], !prof [[PROF12:![0-9]+]], !llvm.loop [[LOOP13:![0-9]+]]
 ;
 entry:
   br label %loop
@@ -72,9 +72,9 @@ define void @unknown_tc(ptr noalias %p, i64 %n) !prof !0 {
 ; CHECK-LABEL: define void @unknown_tc(
 ; CHECK-SAME: ptr noalias [[P:%.*]], i64 [[N:%.*]]) !prof [[PROF0]] {
 ; CHECK:    br i1 [[MIN_ITERS_CHECK:%.*]], [[SCALAR_PH:label %.*]], [[VECTOR_PH:label %.*]], !prof [[PROF1]]
-; CHECK:    br i1 [[TMP5:%.*]], [[MIDDLE_BLOCK:label %.*]], [[VECTOR_BODY:label %.*]], !prof [[PROF2]], !llvm.loop [[LOOP13:![0-9]+]]
+; CHECK:    br i1 [[TMP5:%.*]], [[MIDDLE_BLOCK:label %.*]], [[VECTOR_BODY:label %.*]], !prof [[PROF2]], !llvm.loop [[LOOP15:![0-9]+]]
 ; CHECK:    br i1 [[CMP_N:%.*]], [[EXIT:label %.*]], [[SCALAR_PH]], !prof [[PROF7]]
-; CHECK:    br i1 [[EC:%.*]], [[EXIT]], [[LOOP:label %.*]], !prof [[PROF8]], !llvm.loop [[LOOP14:![0-9]+]]
+; CHECK:    br i1 [[EC:%.*]], [[EXIT]], [[LOOP:label %.*]], !prof [[PROF12]], !llvm.loop [[LOOP16:![0-9]+]]
 ;
 entry:
   br label %loop
@@ -104,11 +104,13 @@ exit:
 ; CHECK: [[META5]] = !{!"llvm.loop.unroll.runtime.disable"}
 ; CHECK: [[META6]] = !{!"llvm.loop.estimated_trip_count", i32 256}
 ; CHECK: [[PROF7]] = !{!"branch_weights", i32 1, i32 3}
-; CHECK: [[PROF8]] = !{!"branch_weights", i32 1, i32 0}
+; CHECK: [[PROF8]] = !{!"branch_weights", i32 1, i32 2}
 ; CHECK: [[LOOP9]] = distinct !{[[LOOP9]], [[META5]], [[META4]], [[META10:![0-9]+]]}
-; CHECK: [[META10]] = !{!"llvm.loop.estimated_trip_count", i32 0}
+; CHECK: [[META10]] = !{!"llvm.loop.estimated_trip_count", i32 3}
 ; CHECK: [[LOOP11]] = distinct !{[[LOOP11]], [[META4]], [[META5]], [[META6]]}
-; CHECK: [[LOOP12]] = distinct !{[[LOOP12]], [[META5]], [[META4]], [[META10]]}
-; CHECK: [[LOOP13]] = distinct !{[[LOOP13]], [[META4]], [[META5]], [[META6]]}
-; CHECK: [[LOOP14]] = distinct !{[[LOOP14]], [[META5]], [[META4]], [[META10]]}
+; CHECK: [[PROF12]] = !{!"branch_weights", i32 1, i32 0}
+; CHECK: [[LOOP13]] = distinct !{[[LOOP13]], [[META5]], [[META4]], [[META14:![0-9]+]]}
+; CHECK: [[META14]] = !{!"llvm.loop.estimated_trip_count", i32 0}
+; CHECK: [[LOOP15]] = distinct !{[[LOOP15]], [[META4]], [[META5]], [[META6]]}
+; CHECK: [[LOOP16]] = distinct !{[[LOOP16]], [[META5]], [[META4]], [[META14]]}
 ;.

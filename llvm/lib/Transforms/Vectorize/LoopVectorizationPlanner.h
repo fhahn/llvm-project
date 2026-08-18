@@ -991,14 +991,17 @@ public:
   /// the average trip count and invocation weight of the original loop (\p
   /// OrigAverageTripCount and \p OrigLoopInvocationWeight respectively). They
   /// cannot be retrieved after the plan has been executed, as the original loop
-  /// may have been removed. \p UnrollVectorizedLoop indicates whether the
-  /// target wants the vector loop left eligible for runtime unrolling.
+  /// may have been removed. \p RemainderTripCount is the number of iterations
+  /// the remainder loop runs whenever it is entered, as derived from the trip
+  /// count, if available. \p UnrollVectorizedLoop indicates whether the target
+  /// wants the vector loop left eligible for runtime unrolling.
   void updateLoopMetadataAndProfileInfo(
       Loop *VectorLoop, VPBasicBlock *HeaderVPBB, const VPlan &Plan,
       bool VectorizingEpilogue, MDNode *OrigLoopID,
       std::optional<unsigned> OrigAverageTripCount,
       unsigned OrigLoopInvocationWeight, unsigned EstimatedVFxUF,
-      bool DisableRuntimeUnroll, bool UnrollVectorizedLoop);
+      std::optional<unsigned> RemainderTripCount, bool DisableRuntimeUnroll,
+      bool UnrollVectorizedLoop);
 
 private:
   /// Build an initial VPlan, with HCFG wrapping the original scalar loop and
