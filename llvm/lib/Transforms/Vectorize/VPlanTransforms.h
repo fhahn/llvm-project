@@ -272,6 +272,15 @@ struct VPlanTransforms {
   /// TODO: Also dissolve replicate regions with live outs.
   static void replicateByVF(VPlan &Plan, ElementCount VF);
 
+  /// Try to prove that no iterations are left for the scalar tail of \p Plan,
+  /// i.e. that its trip count is a multiple of \p BestVF * \p BestUF, and if so
+  /// replace the middle block's tail check with true. The guards of \p L are
+  /// applied when reasoning about the trip count. Returns true if the check was
+  /// simplified.
+  static bool simplifyTailCheck(VPlan &Plan, ElementCount BestVF,
+                                unsigned BestUF, PredicatedScalarEvolution &PSE,
+                                const Loop *L);
+
   /// Optimize \p Plan based on \p BestVF and \p BestUF. This may restrict the
   /// resulting plan to \p BestVF and \p BestUF. \p L is used to apply the
   /// guards of the original loop when reasoning about its trip count.

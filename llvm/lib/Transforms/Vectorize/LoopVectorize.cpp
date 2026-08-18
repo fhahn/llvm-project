@@ -3428,16 +3428,23 @@ bool VFSelectionContext::isEpilogueVectorizationProfitable(
 }
 
 std::unique_ptr<VPlan> LoopVectorizationPlanner::selectBestEpiloguePlan(
-    VPlan &MainPlan, ElementCount MainLoopVF, unsigned IC,
-    bool ScalarEpilogueAllowed) {
+    VPlan &MainPlan, ElementCount MainLoopVF, unsigned IC) {
+  using namespace VPlanPatternMatch;
   if (!EnableEpilogueVectorization) {
     LLVM_DEBUG(dbgs() << "LEV: Epilogue vectorization is disabled.\n");
     return nullptr;
   }
 
-  if (!ScalarEpilogueAllowed) {
+  // A tail-folded main loop leaves no iterations behind, and neither does one
+  // whose tail check has been folded to true because the trip count is a known
+  // multiple of VF * UF. Either way there is no scalar tail to vectorize.
+  const VPRecipeBase *MiddleTerm = MainPlan.getMiddleBlock()->getTerminator();
+  bool NoScalarTail =
+      MainPlan.hasTailFolded() ||
+      (MiddleTerm && match(MiddleTerm, m_BranchOnCond(m_True())));
+  if (NoScalarTail) {
     LLVM_DEBUG(dbgs() << "LEV: Unable to vectorize epilogue because no "
-                         "epilogue is allowed.\n");
+                         "iterations are left for a scalar tail.\n");
     return nullptr;
   }
 
@@ -3496,7 +3503,6 @@ std::unique_ptr<VPlan> LoopVectorizationPlanner::selectBestEpiloguePlan(
   // Check if a plan's vector loop processes fewer iterations than VF (e.g. when
   // interleave groups have been narrowed) narrowInterleaveGroups)  and return
   // the adjusted, effective VF.
-  using namespace VPlanPatternMatch;
   auto GetEffectiveVF = [](VPlan &Plan, ElementCount VF) -> ElementCount {
     auto *Exiting = Plan.getVectorLoopRegion()->getExitingBasicBlock();
     if (match(&Exiting->back(),
@@ -8289,19 +8295,18 @@ bool LoopVectorizePass::processLoop(Loop *L) {
   // If we decided that it is *legal* to interleave or vectorize the loop, then
   // do it.
 
-  // Whether a scalar epilogue may be created is decided by the epilogue
-  // lowering policy.
-  // TODO: Also move check to be based on VPlan.
-  bool ScalarEpilogueAllowed = LVP.getCostModel().isEpilogueAllowed();
-
   // Destroy the cost model before executing any plan, so that code generation
   // cannot rely on cost-modeling decisions.
   LVP.clearCostModel();
 
   VPlan &BestPlan = *BestPlanPtr;
+  // Determine up-front whether any iterations can be left for a scalar tail, so
+  // that epilogue selection can read the answer off the plan.
+  RUN_VPLAN_PASS(VPlanTransforms::simplifyTailCheck, BestPlan, VF.Width, IC,
+                 PSE, L);
   // Consider vectorizing the epilogue too if it's profitable.
   std::unique_ptr<VPlan> EpiPlan =
-      LVP.selectBestEpiloguePlan(BestPlan, VF.Width, IC, ScalarEpilogueAllowed);
+      LVP.selectBestEpiloguePlan(BestPlan, VF.Width, IC);
   bool HasBranchWeights =
       hasBranchWeightMD(*L->getLoopLatch()->getTerminator());
   if (EpiPlan) {

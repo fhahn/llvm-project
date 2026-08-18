@@ -9,7 +9,6 @@ define void @predicated_load(i1 %c, ptr %ptr, ptr %dst) {
 ; SCALAR-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
 ; SCALAR-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; SCALAR-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
-; SCALAR-NEXT:  Live-in ir<1024> = original trip-count
 ; SCALAR-EMPTY:
 ; SCALAR-NEXT:  ir-bb<entry>:
 ; SCALAR-NEXT:    EMIT branch-on-cond ir<false>
@@ -64,8 +63,7 @@ define void @predicated_load(i1 %c, ptr %ptr, ptr %dst) {
 ; SCALAR-NEXT:  Successor(s): middle.block
 ; SCALAR-EMPTY:
 ; SCALAR-NEXT:  middle.block:
-; SCALAR-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<1024>, vp<[[VP2]]>
-; SCALAR-NEXT:    EMIT branch-on-cond vp<%cmp.n>
+; SCALAR-NEXT:    EMIT branch-on-cond ir<true>
 ; SCALAR-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; SCALAR-EMPTY:
 ; SCALAR-NEXT:  ir-bb<exit>:
@@ -86,7 +84,6 @@ define void @predicated_load(i1 %c, ptr %ptr, ptr %dst) {
 ; VECTOR-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
 ; VECTOR-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; VECTOR-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
-; VECTOR-NEXT:  Live-in ir<1024> = original trip-count
 ; VECTOR-EMPTY:
 ; VECTOR-NEXT:  ir-bb<entry>:
 ; VECTOR-NEXT:    EMIT branch-on-cond ir<false>
@@ -172,8 +169,7 @@ define void @predicated_load(i1 %c, ptr %ptr, ptr %dst) {
 ; VECTOR-NEXT:  Successor(s): middle.block
 ; VECTOR-EMPTY:
 ; VECTOR-NEXT:  middle.block:
-; VECTOR-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<1024>, vp<[[VP2]]>
-; VECTOR-NEXT:    EMIT branch-on-cond vp<%cmp.n>
+; VECTOR-NEXT:    EMIT branch-on-cond ir<true>
 ; VECTOR-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; VECTOR-EMPTY:
 ; VECTOR-NEXT:  ir-bb<exit>:

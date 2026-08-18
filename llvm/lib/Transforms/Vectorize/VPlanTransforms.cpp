@@ -2143,10 +2143,10 @@ static bool simplifyBranchConditionForVFAndUF(VPlan &Plan, ElementCount BestVF,
 /// condition is always true. Loop guards are applied to the trip count, so
 /// divisibility that is only implied by a check guarding the loop is proven as
 /// well.
-static bool simplifyTailCheckForVFAndUF(VPlan &Plan, ElementCount BestVF,
-                                        unsigned BestUF,
-                                        PredicatedScalarEvolution &PSE,
-                                        const Loop *L) {
+bool VPlanTransforms::simplifyTailCheck(VPlan &Plan, ElementCount BestVF,
+                                       unsigned BestUF,
+                                       PredicatedScalarEvolution &PSE,
+                                       const Loop *L) {
   VPValue *Cond;
   VPRecipeBase *Term = Plan.getMiddleBlock()->getTerminator();
   if (!Term || !match(Term, m_BranchOnCond(m_VPValue(Cond))) ||
@@ -2170,15 +2170,15 @@ static bool simplifyTailCheckForVFAndUF(VPlan &Plan, ElementCount BestVF,
 }
 
 void VPlanTransforms::optimizeForVFAndUF(VPlan &Plan, ElementCount BestVF,
-                                        unsigned BestUF,
-                                        PredicatedScalarEvolution &PSE,
-                                        const Loop *L) {
+                                         unsigned BestUF,
+                                         PredicatedScalarEvolution &PSE,
+                                         const Loop *L) {
   assert(Plan.hasVF(BestVF) && "BestVF is not available in Plan");
   assert(Plan.hasUF(BestUF) && "BestUF is not available in Plan");
 
   bool MadeChange =
       simplifyBranchConditionForVFAndUF(Plan, BestVF, BestUF, PSE);
-  MadeChange |= simplifyTailCheckForVFAndUF(Plan, BestVF, BestUF, PSE, L);
+  MadeChange |= simplifyTailCheck(Plan, BestVF, BestUF, PSE, L);
   MadeChange |= replaceMaskWithCompare(Plan, BestVF);
   MadeChange |= optimizeVectorInductionWidthForTCAndVFUF(Plan, BestVF, BestUF);
 

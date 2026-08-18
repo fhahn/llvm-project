@@ -985,12 +985,9 @@ public:
   /// \return A VPlan for the most profitable epilogue vectorization, with its
   /// VF narrowed to the chosen factor. The returned plan is a duplicate.
   /// Returns nullptr if epilogue vectorization is not supported or not
-  /// profitable for the loop. \p ScalarEpilogueAllowed indicates whether the
-  /// epilogue lowering policy permits creating a scalar epilogue at all.
-  std::unique_ptr<VPlan> selectBestEpiloguePlan(VPlan &MainPlan,
-                                                ElementCount MainLoopVF,
-                                                unsigned IC,
-                                                bool ScalarEpilogueAllowed);
+  /// profitable for the loop.
+  std::unique_ptr<VPlan>
+  selectBestEpiloguePlan(VPlan &MainPlan, ElementCount MainLoopVF, unsigned IC);
 
   /// Emit remarks for recipes with invalid costs in the available VPlans.
   void emitInvalidCostRemarks(OptimizationRemarkEmitter *ORE);
