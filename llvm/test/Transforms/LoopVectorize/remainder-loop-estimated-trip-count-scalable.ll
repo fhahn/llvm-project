@@ -74,7 +74,7 @@ define void @unknown_tc(ptr noalias %p, i64 %n) !prof !0 {
 ; CHECK:    br i1 [[MIN_ITERS_CHECK:%.*]], [[SCALAR_PH:label %.*]], [[VECTOR_PH:label %.*]], !prof [[PROF1]]
 ; CHECK:    br i1 [[TMP5:%.*]], [[MIDDLE_BLOCK:label %.*]], [[VECTOR_BODY:label %.*]], !prof [[PROF2]], !llvm.loop [[LOOP15:![0-9]+]]
 ; CHECK:    br i1 [[CMP_N:%.*]], [[EXIT:label %.*]], [[SCALAR_PH]], !prof [[PROF7]]
-; CHECK:    br i1 [[EC:%.*]], [[EXIT]], [[LOOP:label %.*]], !prof [[PROF12]], !llvm.loop [[LOOP16:![0-9]+]]
+; CHECK:    br i1 [[EC:%.*]], [[EXIT]], [[LOOP:label %.*]], !prof [[PROF16:![0-9]+]], !llvm.loop [[LOOP17:![0-9]+]]
 ;
 entry:
   br label %loop
@@ -112,5 +112,7 @@ exit:
 ; CHECK: [[LOOP13]] = distinct !{[[LOOP13]], [[META5]], [[META4]], [[META14:![0-9]+]]}
 ; CHECK: [[META14]] = !{!"llvm.loop.estimated_trip_count", i32 0}
 ; CHECK: [[LOOP15]] = distinct !{[[LOOP15]], [[META4]], [[META5]], [[META6]]}
-; CHECK: [[LOOP16]] = distinct !{[[LOOP16]], [[META5]], [[META4]], [[META14]]}
+; CHECK: [[PROF16]] = !{!"branch_weights", i32 1, i32 1}
+; CHECK: [[LOOP17]] = distinct !{[[LOOP17]], [[META5]], [[META4]], [[META18:![0-9]+]]}
+; CHECK: [[META18]] = !{!"llvm.loop.estimated_trip_count", i32 2}
 ;.

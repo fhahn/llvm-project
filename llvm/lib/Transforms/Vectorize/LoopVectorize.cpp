@@ -6034,13 +6034,15 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   // iteration of the vector loop.
   const unsigned EstimatedVFxUF =
       estimateElementCount(BestVF * BestUF, Config.getVScaleForTuning());
-  // Retrieve the number of iterations the remainder loop runs, if it can be
-  // derived from the trip count. Needed to update the profile information after
-  // executing the plan, and depends on the vector loop region, which is
-  // dissolved below.
-  const std::optional<unsigned> RemainderTripCount = getRemainderTripCount(
-      BestVPlan, OrigLoop, PSE, BestVPlan.hasScalarTail(), EstimatedVFxUF,
-      RequiresScalarEpilogue);
+  // Retrieve whether the scalar loop runs the iterations left over by the vector
+  // loop and the number of iterations it runs, if it can be derived from the
+  // trip count. Both are needed to update the profile information after
+  // executing the plan. HasScalarTail depends on the vector loop region, which
+  // is dissolved below.
+  const bool HasScalarTail = BestVPlan.hasScalarTail();
+  const std::optional<unsigned> RemainderTripCount =
+      getRemainderTripCount(BestVPlan, OrigLoop, PSE, HasScalarTail,
+                            EstimatedVFxUF, RequiresScalarEpilogue);
   RUN_VPLAN_PASS(VPlanTransforms::dissolveLoopRegions, BestVPlan);
   // Expand BranchOnTwoConds after dissolution, when latch has direct access to
   // its successors.
@@ -6165,7 +6167,8 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
       HeaderVPBB, BestVPlan,
       EpilogueVecKind == EpilogueVectorizationKind::Epilogue, LID,
       OrigAverageTripCount, OrigLoopInvocationWeight, EstimatedVFxUF,
-      RemainderTripCount, DisableRuntimeUnroll, UnrollVectorizedLoop);
+      HasScalarTail, RemainderTripCount, DisableRuntimeUnroll,
+      UnrollVectorizedLoop);
 
   // 3. Fix the vectorized code: take care of header phi's, live-outs,
   //    predication, updating analyses.

@@ -1769,8 +1769,8 @@ void LoopVectorizationPlanner::updateLoopMetadataAndProfileInfo(
     bool VectorizingEpilogue, MDNode *OrigLoopID,
     std::optional<unsigned> OrigAverageTripCount,
     unsigned OrigLoopInvocationWeight, unsigned EstimatedVFxUF,
-    std::optional<unsigned> RemainderTripCount, bool DisableRuntimeUnroll,
-    bool UnrollVectorizedLoop) {
+    bool HasScalarTail, std::optional<unsigned> RemainderTripCount,
+    bool DisableRuntimeUnroll, bool UnrollVectorizedLoop) {
   // Update the metadata of the scalar loop. Skip the update when vectorizing
   // the epilogue loop to ensure it is updated only once. Also skip the update
   // when the scalar loop became unreachable.
@@ -1836,45 +1836,63 @@ void LoopVectorizationPlanner::updateLoopMetadataAndProfileInfo(
   // iterations of the loop are handled in one vector iteration, so instead
   // use the value of vscale used for tuning.
   unsigned AverageVectorTripCount = 0;
-  unsigned RemainderAverageTripCount = 0;
   auto EC = VectorLoop->getLoopPreheader()->getParent()->getEntryCount();
   auto IsProfiled = EC && *EC != 0;
   if (!OrigAverageTripCount) {
     if (!IsProfiled)
       return;
-    auto &SE = *PSE.getSE();
-    AverageVectorTripCount = SE.getSmallConstantTripCount(VectorLoop);
+    AverageVectorTripCount = PSE.getSE()->getSmallConstantTripCount(VectorLoop);
     if (ProfcheckDisableMetadataFixes || !AverageVectorTripCount)
       return;
-    if (ScalarPH)
-      RemainderAverageTripCount =
-          SE.getSmallConstantTripCount(OrigLoop) % EstimatedVFxUF;
     // Setting to 1 should be sufficient to generate the correct branch weights.
     OrigLoopInvocationWeight = 1;
   } else {
     // Calculate number of iterations in unrolled loop.
     AverageVectorTripCount = *OrigAverageTripCount / EstimatedVFxUF;
-    // Calculate number of iterations for remainder loop.
-    RemainderAverageTripCount = *OrigAverageTripCount % EstimatedVFxUF;
   }
   if (HeaderVPBB) {
     setLoopEstimatedTripCount(VectorLoop, AverageVectorTripCount,
                               OrigLoopInvocationWeight);
   }
 
-  if (ScalarPH) {
-    if (!ScalarPH->hasPredecessors()) {
-      // The remainder loop is unreachable and will be removed by later passes.
-      // Estimate zero iterations, but still update its branch weights to keep
-      // the profile information complete until then.
-      RemainderAverageTripCount = 0;
-    } else if (RemainderTripCount) {
-      // Use the number of iterations derived from the trip count, if available.
-      RemainderAverageTripCount = *RemainderTripCount;
-    }
-    setLoopEstimatedTripCount(OrigLoop, RemainderAverageTripCount,
-                              OrigLoopInvocationWeight);
+  if (!ScalarPH)
+    return;
+
+  // Estimate the number of iterations the remainder loop runs whenever it is
+  // entered. The cases below are ordered from most to least specific; in
+  // particular an unreachable remainder loop must be handled before
+  // RemainderTripCount, which describes the iterations left over by a vector
+  // loop the remainder loop is no longer reached from.
+  //
+  // By default assume `TripCount % EstimatedVFxUF` to be equally distributed.
+  // The remainder loop then runs EstimatedVFxUF / 2 iterations on average
+  // whenever it is entered, matching the probability of entering it assumed by
+  // VPlanTransforms::addBranchWeightToMiddleTerminator.
+  unsigned RemainderAverageTripCount = EstimatedVFxUF / 2;
+  if (!ScalarPH->hasPredecessors()) {
+    // The remainder loop is unreachable and will be removed by later passes.
+    // Estimate zero iterations, but still update its branch weights to keep
+    // the profile information complete until then.
+    RemainderAverageTripCount = 0;
+  } else if (RemainderTripCount) {
+    // Use the number of iterations derived from the trip count, if available.
+    RemainderAverageTripCount = *RemainderTripCount;
+  } else if (AverageVectorTripCount == 0) {
+    // The vector loop is not expected to be entered at all, so the remainder
+    // loop runs all estimated iterations.
+    assert(OrigAverageTripCount &&
+           "an unset OrigAverageTripCount implies a non-zero "
+           "AverageVectorTripCount, or returning early above");
+    RemainderAverageTripCount = *OrigAverageTripCount;
+  } else if (!HasScalarTail) {
+    // The remainder loop does not run the iterations left over by the vector
+    // loop; it is only entered when the vector loop is bypassed and then runs
+    // all estimated iterations. Assume it is not entered if there is no
+    // estimate for the original loop.
+    RemainderAverageTripCount = OrigAverageTripCount.value_or(0);
   }
+  setLoopEstimatedTripCount(OrigLoop, RemainderAverageTripCount,
+                            OrigLoopInvocationWeight);
 }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)

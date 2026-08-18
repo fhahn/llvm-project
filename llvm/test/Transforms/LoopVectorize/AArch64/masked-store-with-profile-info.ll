@@ -11,7 +11,7 @@ define void @cond_store(ptr noalias %a, ptr noalias %b, i64 %n) {
 ; CHECK:  [[VECTOR_PH]]:
 ; CHECK:  [[VECTOR_BODY:.*]]:
 ; CHECK:    call void @llvm.masked.store.v4i32.p0(<4 x i32> [[WIDE_LOAD:%.*]], ptr align 4 [[TMP2:%.*]], <4 x i1> [[TMP1:%.*]])
-; CHECK:    br i1 [[TMP3:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1:![0-9]+]], !llvm.loop [[LOOP2:![0-9]+]]
+; CHECK:    br i1 [[TMP4:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1:![0-9]+]], !llvm.loop [[LOOP2:![0-9]+]]
 ; CHECK:  [[MIDDLE_BLOCK]]:
 ; CHECK:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF6:![0-9]+]]
 ; CHECK:  [[SCALAR_PH]]:
@@ -57,7 +57,7 @@ exit:
 ; CHECK: [[META5]] = !{!"llvm.loop.estimated_trip_count", i32 250}
 ; CHECK: [[PROF6]] = !{!"branch_weights", i32 1, i32 3}
 ; CHECK: [[PROF7]] = !{!"branch_weights", i32 1, i32 7}
-; CHECK: [[PROF8]] = !{!"branch_weights", i32 1, i32 0}
+; CHECK: [[PROF8]] = !{!"branch_weights", i32 1, i32 1}
 ; CHECK: [[LOOP9]] = distinct !{[[LOOP9]], [[META4]], [[META3]], [[META10:![0-9]+]]}
-; CHECK: [[META10]] = !{!"llvm.loop.estimated_trip_count", i32 1}
+; CHECK: [[META10]] = !{!"llvm.loop.estimated_trip_count", i32 2}
 ;.

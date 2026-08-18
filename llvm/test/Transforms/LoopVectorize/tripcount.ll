@@ -396,13 +396,14 @@ for.end:
 ; CHECK: [[META7]] = !{!"llvm.loop.unroll.runtime.disable"}
 ; CHECK: [[META8]] = !{!"llvm.loop.estimated_trip_count", i32 250}
 ; CHECK: [[PROF9]] = !{!"branch_weights", i32 1, i32 3}
-; CHECK: [[PROF10]] = !{!"branch_weights", i32 10, i32 0}
+; CHECK: [[PROF10]] = !{!"branch_weights", i32 10, i32 10}
 ; CHECK: [[LOOP11]] = distinct !{[[LOOP11]], [[META7]], [[META6]], [[META12:![0-9]+]]}
-; CHECK: [[META12]] = !{!"llvm.loop.estimated_trip_count", i32 1}
+; CHECK: [[META12]] = !{!"llvm.loop.estimated_trip_count", i32 2}
 ; CHECK: [[LOOP13]] = distinct !{[[LOOP13]], [[META6]], [[META7]]}
 ; CHECK: [[LOOP14]] = distinct !{[[LOOP14]], [[META7]], [[META6]]}
 ; CHECK: [[PROF15]] = !{!"branch_weights", i32 1, i32 249}
 ; CHECK: [[LOOP16]] = distinct !{[[LOOP16]], [[META6]], [[META7]], [[META8]]}
 ; CHECK: [[PROF17]] = !{!"branch_weights", i32 0, i32 1}
-; CHECK: [[LOOP18]] = distinct !{[[LOOP18]], [[META7]], [[META6]], [[META12]]}
+; CHECK: [[LOOP18]] = distinct !{[[LOOP18]], [[META7]], [[META6]], [[META19:![0-9]+]]}
+; CHECK: [[META19]] = !{!"llvm.loop.estimated_trip_count", i32 1}
 ;.
