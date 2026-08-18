@@ -1849,6 +1849,12 @@ void LoopVectorizationPlanner::updateLoopMetadataAndProfileInfo(
   } else {
     // Calculate number of iterations in unrolled loop.
     AverageVectorTripCount = *OrigAverageTripCount / EstimatedVFxUF;
+    // The remainder loop runs a full step only if the trip count is a multiple
+    // of the step and a scalar epilogue is required. The vector loop then
+    // executes one step less; see getRemainderTripCount.
+    if (HasScalarTail && RemainderTripCount == EstimatedVFxUF &&
+        AverageVectorTripCount != 0)
+      --AverageVectorTripCount;
   }
   if (HeaderVPBB) {
     setLoopEstimatedTripCount(VectorLoop, AverageVectorTripCount,

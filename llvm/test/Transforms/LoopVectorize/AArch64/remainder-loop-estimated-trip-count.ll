@@ -65,11 +65,11 @@ exit:
 !2 = !{!"branch_weights", i32 1, i32 2}
 ;.
 ; CHECK: [[PROF0]] = !{!"function_entry_count", i64 1000}
-; CHECK: [[PROF1]] = !{!"branch_weights", i32 1, i32 255}
+; CHECK: [[PROF1]] = !{!"branch_weights", i32 1, i32 254}
 ; CHECK: [[LOOP2]] = distinct !{[[LOOP2]], [[META3:![0-9]+]], [[META4:![0-9]+]], [[META5:![0-9]+]]}
 ; CHECK: [[META3]] = !{!"llvm.loop.isvectorized", i32 1}
 ; CHECK: [[META4]] = !{!"llvm.loop.unroll.runtime.disable"}
-; CHECK: [[META5]] = !{!"llvm.loop.estimated_trip_count", i32 256}
+; CHECK: [[META5]] = !{!"llvm.loop.estimated_trip_count", i32 255}
 ; CHECK: [[PROF6]] = !{!"branch_weights", i32 1, i32 3}
 ; CHECK: [[LOOP7]] = distinct !{[[LOOP7]], [[META4]], [[META3]], [[META8:![0-9]+]]}
 ; CHECK: [[META8]] = !{!"llvm.loop.estimated_trip_count", i32 4}
