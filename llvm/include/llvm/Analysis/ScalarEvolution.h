@@ -1962,20 +1962,42 @@ private:
   /// Memoized results from getRange
   DenseMap<const SCEV *, ConstantRange> SignedRanges;
 
-  /// Single-entry memo for the sign-hint-independent part of an affine
-  /// addrec's range. getRangeRef computes the range of the same addrec once
-  /// per sign hint, and getRangeForAffineAR / getRangeViaFactoring depend only
-  /// on (start, step, constant max backedge-taken count), so the second query
-  /// can reuse what the first computed. Reset wherever a memoized range is
-  /// dropped, so a refined range for the start or the step invalidates it.
-  /// See getRangeRef.
-  struct AffineRangeMemo {
-    const SCEVAddRecExpr *AR;
-    APInt BECount;
-    ConstantRange Affine;
-    ConstantRange Factoring;
+  /// The sign-hint-independent part of an affine addrec's range: what
+  /// \c getRangeForAffineAR and \c getRangeViaFactoring derive from the
+  /// addrec's start, step and constant maximum backedge-taken count. The two
+  /// ranges are kept separately rather than pre-intersected because
+  /// \c ConstantRange::intersectWith is not associative for a given
+  /// PreferredRangeType, so folding them into one would change results.
+  struct AffineRange {
+    const SCEVAddRecExpr *AddRec;
+    const SCEV *MaxBEScev;
+    ConstantRange RangeFromAffine;
+    ConstantRange RangeFromFactoring;
   };
-  std::optional<AffineRangeMemo> AffineRangeCache;
+
+  /// Single-entry cache for \c AffineRange, letting the second of the two
+  /// per-sign-hint range queries for an addrec reuse what the first computed.
+  ///
+  /// The cached ranges are computed from the memoized ranges of the addrec's
+  /// start and step, which can be refined at any time, so they must be dropped
+  /// whenever any memoized range is dropped: drop ranges via \c forgetRanges
+  /// and \c clearRanges rather than erasing \c UnsignedRanges / \c SignedRanges
+  /// directly. The third input, the constant maximum backedge-taken count, is
+  /// instead validated by the key: it is a uniqued \c SCEVConstant, so a
+  /// refined count is a different pointer and misses. \c MaxBEScev is therefore
+  /// load-bearing and cannot be dropped from the key on the grounds that the
+  /// range eviction above already covers it.
+  ///
+  /// Only \c getAffineRanges may read or write this.
+  std::optional<AffineRange> AffineRangeCache;
+
+  /// Return the sign-hint-independent ranges of the affine add recurrence
+  /// \p AddRec, computing them on a miss of \c AffineRangeCache. \p MaxBEScev
+  /// is the loop's constant maximum backedge-taken count and \p MaxBECount is
+  /// it adjusted to \p AddRec's bit width.
+  const AffineRange &getAffineRanges(const SCEVAddRecExpr *AddRec,
+                                     const SCEV *MaxBEScev,
+                                     const APInt &MaxBECount);
 
   /// Used to parameterize getRange
   enum RangeSignHint { HINT_RANGE_UNSIGNED, HINT_RANGE_SIGNED };
@@ -1988,6 +2010,21 @@ private:
 
     auto Pair = Cache.insert_or_assign(S, std::move(CR));
     return Pair.first->second;
+  }
+
+  /// Drop the memoized ranges for the given SCEV, and with them
+  /// \c AffineRangeCache, which is derived from memoized ranges.
+  void forgetRanges(const SCEV *S) {
+    UnsignedRanges.erase(S);
+    SignedRanges.erase(S);
+    AffineRangeCache.reset();
+  }
+
+  /// Drop all memoized ranges.
+  void clearRanges() {
+    UnsignedRanges.clear();
+    SignedRanges.clear();
+    AffineRangeCache.reset();
   }
 
   /// Determine the range for a particular SCEV.

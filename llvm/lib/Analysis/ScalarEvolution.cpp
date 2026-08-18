@@ -5171,7 +5171,9 @@ void ScalarEvolution::inferNoWrapViaConstantRanges(const SCEVAddRecExpr *AR) {
     return;
 
   // Force computation of ranges, which will also perform range-based flag
-  // inference.
+  // inference. Keep the two queries adjacent: getRangeRef caches the
+  // sign-hint-independent part of an affine addrec's range (see
+  // AffineRangeCache), so the second one reuses most of the first one's work.
   if (!AR->hasNoSignedWrap())
     (void)getSignedRange(AR);
 
@@ -6542,9 +6544,7 @@ void ScalarEvolution::setNoWrapFlags(SCEVAddRecExpr *AddRec,
                                      SCEV::NoWrapFlags Flags) {
   if (AddRec->getNoWrapFlags(Flags) != Flags) {
     AddRec->setNoWrapFlags(Flags);
-    AffineRangeCache.reset();
-    UnsignedRanges.erase(AddRec);
-    SignedRanges.erase(AddRec);
+    forgetRanges(AddRec);
     ConstantMultipleCache.erase(AddRec);
   }
 }
@@ -6767,6 +6767,36 @@ ScalarEvolution::getRangeRefIter(const SCEV *S,
   return getRangeRef(S, SignHint, 0);
 }
 
+const ScalarEvolution::AffineRange &
+ScalarEvolution::getAffineRanges(const SCEVAddRecExpr *AddRec,
+                                 const SCEV *MaxBEScev,
+                                 const APInt &MaxBECount) {
+  // Both range computations for this addrec (one per sign hint) derive the same
+  // ranges and flags from (start, step, MaxBECount), so reuse the result of the
+  // first one. MaxBECount is a function of MaxBEScev and the addrec's bit
+  // width, so keying on the uniqued MaxBEScev is equivalent. Re-applying the
+  // flags on a hit would be a no-op: getRangeForAffineAR derives them from the
+  // same start, step and MaxBECount, and an addrec's flags are only ever added
+  // to, so the addrec already carries them.
+  if (AffineRangeCache && AffineRangeCache->AddRec == AddRec &&
+      AffineRangeCache->MaxBEScev == MaxBEScev)
+    return *AffineRangeCache;
+
+  const SCEV *Start = AddRec->getStart();
+  const SCEV *Step = AddRec->getStepRecurrence(*this);
+  auto [RangeFromAffine, Flags] = getRangeForAffineAR(Start, Step, MaxBECount);
+  const_cast<SCEVAddRecExpr *>(AddRec)->setNoWrapFlags(Flags);
+  ConstantRange RangeFromFactoring =
+      getRangeViaFactoring(Start, Step, MaxBECount);
+
+  // Assign only now that both calls above have returned: either can recurse
+  // into getRangeRef for a nested addrec and leave a cache entry of its own
+  // behind, which would otherwise be returned as if it described this addrec.
+  AffineRangeCache = {AddRec, MaxBEScev, std::move(RangeFromAffine),
+                      std::move(RangeFromFactoring)};
+  return *AffineRangeCache;
+}
+
 /// Determine the range for a particular SCEV.  If SignHint is
 /// HINT_RANGE_UNSIGNED (resp. HINT_RANGE_SIGNED) then getRange prefers ranges
 /// with a "cleaner" unsigned (resp. signed) representation.
@@ -6938,27 +6968,12 @@ const ConstantRange &ScalarEvolution::getRangeRef(
           MaxBECount = MaxBECount.zext(BitWidth);
 
         if (MaxBECount.getBitWidth() == BitWidth) {
-          // Both range computations for this addrec (one per sign hint) derive
-          // the same ranges and flags from (start, step, MaxBECount), so reuse
-          // the result of the first one. Re-applying the flags on a hit would
-          // be a no-op: they are only ever added to, and any refinement of them
-          // goes through ScalarEvolution::setNoWrapFlags, which drops the memo.
-          if (!AffineRangeCache || AffineRangeCache->AR != AddRec ||
-              AffineRangeCache->BECount != MaxBECount) {
-            const SCEV *Start = AddRec->getStart();
-            const SCEV *Step = AddRec->getStepRecurrence(*this);
-            auto [Affine, Flags] = getRangeForAffineAR(Start, Step, MaxBECount);
-            ConstantRange Factoring =
-                getRangeViaFactoring(Start, Step, MaxBECount);
-            // Assign only now: both calls above can recurse into getRangeRef
-            // for a nested addrec and leave a memo of their own behind.
-            AffineRangeCache = {AddRec, MaxBECount, Affine, Factoring};
-            const_cast<SCEVAddRecExpr *>(AddRec)->setNoWrapFlags(Flags);
-          }
+          const AffineRange &Ranges =
+              getAffineRanges(AddRec, MaxBEScev, MaxBECount);
           ConservativeResult = ConservativeResult.intersectWith(
-              AffineRangeCache->Affine, RangeType);
+              Ranges.RangeFromAffine, RangeType);
           ConservativeResult = ConservativeResult.intersectWith(
-              AffineRangeCache->Factoring, RangeType);
+              Ranges.RangeFromFactoring, RangeType);
         }
       }
 
@@ -8734,9 +8749,7 @@ void ScalarEvolution::forgetAllLoops() {
   ValuesAtScopesUsers.clear();
   LoopDispositions.clear();
   BlockDispositions.clear();
-  AffineRangeCache.reset();
-  UnsignedRanges.clear();
-  SignedRanges.clear();
+  clearRanges();
   ExprValueMap.clear();
   HasRecMap.clear();
   ConstantMultipleCache.clear();
@@ -14140,6 +14153,7 @@ ScalarEvolution::ScalarEvolution(ScalarEvolution &&Arg)
       SCEVUsers(std::move(Arg.SCEVUsers)),
       UnsignedRanges(std::move(Arg.UnsignedRanges)),
       SignedRanges(std::move(Arg.SignedRanges)),
+      AffineRangeCache(std::move(Arg.AffineRangeCache)),
       UniqueSCEVs(std::move(Arg.UniqueSCEVs)),
       UniquePreds(std::move(Arg.UniquePreds)),
       SCEVAllocator(std::move(Arg.SCEVAllocator)),
@@ -14705,11 +14719,9 @@ void ScalarEvolution::forgetMemoizedResults(ArrayRef<SCEVUse> SCEVs) {
 }
 
 void ScalarEvolution::forgetMemoizedResultsImpl(const SCEV *S) {
-  AffineRangeCache.reset();
   LoopDispositions.erase(S);
   BlockDispositions.erase(S);
-  UnsignedRanges.erase(S);
-  SignedRanges.erase(S);
+  forgetRanges(S);
   HasRecMap.erase(S);
   ConstantMultipleCache.erase(S);
 
