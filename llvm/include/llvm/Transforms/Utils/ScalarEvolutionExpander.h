@@ -565,6 +565,13 @@ private:
 
   void fixupInsertPoints(Instruction *I);
 
+  /// Move any pending insertion point that \p I does not dominate to just after
+  /// \p I, so that a value reused during a nested expansion can be used by the
+  /// instructions built for the enclosing expression.
+  void advanceInsertPointsPast(Instruction *I);
+
+  Value *tryToReuseScaledAddRec(const SCEVAddRecExpr *S,
+                                BasicBlock::iterator InsertPt);
 
   /// Create LCSSA PHIs for \p V, if it is required for uses at the Builder's
   /// current insertion point.

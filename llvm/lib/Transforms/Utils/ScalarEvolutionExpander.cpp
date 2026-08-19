@@ -829,6 +829,24 @@ void SCEVExpander::fixupInsertPoints(Instruction *I) {
       InsertPtGuard->SetInsertPoint(NewInsertPt);
 }
 
+void SCEVExpander::advanceInsertPointsPast(Instruction *I) {
+  BasicBlock *BB = I->getParent();
+  BasicBlock::iterator NewInsertPt = std::next(I->getIterator());
+  while (isa<PHINode>(NewInsertPt))
+    ++NewInsertPt;
+  // Only points in I's own block can be below I, and a block has no internal
+  // control flow, so moving them down keeps dominating everything the enclosing
+  // expansion is being built for.
+  auto NeedsMove = [&](BasicBlock::iterator IP) {
+    return IP != BB->end() && IP->getParent() == BB && !SE.DT.dominates(I, &*IP);
+  };
+  if (Builder.GetInsertBlock() == BB && NeedsMove(Builder.GetInsertPoint()))
+    Builder.SetInsertPoint(BB, NewInsertPt);
+  for (auto *InsertPtGuard : InsertPointGuards)
+    if (NeedsMove(InsertPtGuard->GetInsertPoint()))
+      InsertPtGuard->SetInsertPoint(NewInsertPt);
+}
+
 /// hoistStep - Attempt to hoist a simple IV increment above InsertPos to make
 /// it available to other uses in this loop. Recursively hoist any operands,
 /// until we reach a value that dominates InsertPos.
@@ -1322,6 +1340,108 @@ Value *SCEVExpander::tryToReuseLCSSAPhi(SCEVUseT<const SCEVAddRecExpr *> S) {
   return nullptr;
 }
 
+/// Return an expression T with C * T == S, or nullptr if S is not a constant
+/// multiple of C. Only the shape getMulExpr leaves behind when it distributes a
+/// constant factor is handled; the caller verifies the result by multiplying it
+/// back.
+static const SCEV *divideByConstant(ScalarEvolution &SE, const SCEV *S,
+                                    const APInt &C) {
+  if (const auto *Const = dyn_cast<SCEVConstant>(S)) {
+    APInt Q = Const->getAPInt().sdiv(C);
+    return Q * C == Const->getAPInt() ? SE.getConstant(Q) : nullptr;
+  }
+  // A SCEVMulExpr keeps its constant operand, if any, first.
+  const auto *Mul = dyn_cast<SCEVMulExpr>(S);
+  if (!Mul)
+    return nullptr;
+  const SCEV *Divided = divideByConstant(SE, Mul->getOperand(0), C);
+  if (!Divided)
+    return nullptr;
+  SmallVector<SCEVUse, 4> Ops(Mul->operands());
+  Ops[0] = Divided;
+  return SE.getMulExpr(Ops);
+}
+
+/// ScalarEvolution distributes a constant factor into an AddRec's operands, so
+/// `{8 * X,+,-8}` and `{X,+,-1}` have no expression in common even though the
+/// former is just eight times the latter. If the scaled-down recurrence is
+/// already available, reuse it: expanding \p S structurally instead builds a
+/// second induction variable for the same recurrence.
+///
+/// A candidate may sit below \p InsertPt in the same block, which is where a
+/// loop's own extended IV typically lives, right after the PHIs. It is still
+/// usable, because a block has no internal control flow, so moving the pending
+/// insertion points past it keeps dominating everything being built.
+Value *SCEVExpander::tryToReuseScaledAddRec(const SCEVAddRecExpr *S,
+                                            BasicBlock::iterator InsertPt) {
+  if (!S->isAffine() || S->getType()->isPointerTy())
+    return nullptr;
+  const auto *Step = dyn_cast<SCEVConstant>(S->getStepRecurrence(SE));
+  if (!Step)
+    return nullptr;
+  // Scaling down to a unit step is what recovers a plain induction variable.
+  APInt Factor = Step->getAPInt().abs();
+  if (Factor.ule(1))
+    return nullptr;
+
+  // Peel a constant addend off the start first: `{8 + 8 * X,+,-8}` is eight
+  // above `{8 * X,+,-8}`, and only the latter is a multiple of `{X,+,-1}`.
+  const SCEV *Start = S->getStart();
+  const SCEVConstant *Offset = nullptr;
+  if (const auto *Add = dyn_cast<SCEVAddExpr>(Start))
+    if ((Offset = dyn_cast<SCEVConstant>(Add->getOperand(0)))) {
+      SmallVector<SCEVUse, 4> StartOps(drop_begin(Add->operands()));
+      Start = SE.getAddExpr(StartOps);
+    }
+
+  const SCEV *DividedStart = divideByConstant(SE, Start, Factor);
+  const SCEV *DividedStep = divideByConstant(SE, Step, Factor);
+  if (!DividedStart || !DividedStep)
+    return nullptr;
+  const SCEV *Divided = SE.getAddRecExpr(DividedStart, DividedStep,
+                                         S->getLoop(), SCEV::FlagAnyWrap);
+  const SCEV *FactorS = SE.getConstant(Factor);
+  if (static_cast<const SCEV *>(SE.getMulExpr(Divided, FactorS)) !=
+      static_cast<const SCEV *>(
+          SE.getAddRecExpr(Start, Step, S->getLoop(), SCEV::FlagAnyWrap)))
+    return nullptr;
+
+  // Search from the end of the block, so that a candidate below InsertPt is
+  // considered as well.
+  SmallVector<Instruction *> DropPoisonGeneratingInsts;
+  Value *V = FindValueInExprValueMap(
+      Divided, InsertPt->getParent()->getTerminator(), DropPoisonGeneratingInsts);
+  if (!V)
+    return nullptr;
+  for (Instruction *I : DropPoisonGeneratingInsts) {
+    rememberFlags(I);
+    dropPoisonGeneratingAnnotationsAndReinfer(SE, I);
+  }
+  if (auto *I = dyn_cast<Instruction>(V))
+    advanceInsertPointsPast(I);
+
+  // Carry over the no-wrap facts that hold for the scaling, so the reused form
+  // is no weaker than a structural expansion.
+  SCEV::NoWrapFlags Flags = SCEV::FlagAnyWrap;
+  if (SE.willNotOverflow(Instruction::Mul, /*Signed=*/false, Divided, FactorS))
+    Flags = SE.setFlags(Flags, SCEV::FlagNUW);
+  if (SE.willNotOverflow(Instruction::Mul, /*Signed=*/true, Divided, FactorS))
+    Flags = SE.setFlags(Flags, SCEV::FlagNSW);
+
+  Value *Scaled =
+      Factor.isPowerOf2()
+          ? InsertBinop(Instruction::Shl, V,
+                        ConstantInt::get(V->getType(), Factor.logBase2()),
+                        Flags, /*IsSafeToHoist=*/false)
+          : InsertBinop(Instruction::Mul, V,
+                        ConstantInt::get(V->getType(), Factor), Flags,
+                        /*IsSafeToHoist=*/false);
+  if (!Offset)
+    return Scaled;
+  return InsertBinop(Instruction::Add, Scaled, Offset->getValue(),
+                     SCEV::FlagAnyWrap, /*IsSafeToHoist=*/false);
+}
+
 Value *SCEVExpander::visitAddRecExpr(SCEVUseT<const SCEVAddRecExpr *> S) {
   // In canonical mode we compute the addrec as an expression of a canonical IV
   // using evaluateAtIteration and expand the resulting SCEV expression. This
@@ -1740,7 +1860,16 @@ Value *SCEVExpander::expand(SCEVUse S) {
       rememberFlags(I);
       dropPoisonGeneratingAnnotationsAndReinfer(SE, I);
     }
-  } else {
+  } else if (const auto *AR =
+                 dyn_cast<SCEVAddRecExpr>(static_cast<const SCEV *>(S));
+             AR && CanonicalMode && PostIncLoops.empty()) {
+    V = tryToReuseScaledAddRec(AR, InsertPt);
+    // The scaling is emitted below whatever value it reused.
+    if (auto *I = dyn_cast_or_null<Instruction>(V);
+        I && !SE.DT.dominates(I, &*InsertPt))
+      CacheAt = std::next(I->getIterator());
+  }
+  if (!V) {
     V = visit(S);
     V = fixupLCSSAFormFor(V);
   }
