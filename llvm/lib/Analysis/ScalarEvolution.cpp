@@ -826,7 +826,7 @@ static bool hasHugeExpression(ArrayRef<SCEVUse> Ops) {
 ///  * If a constant satisfies \p IsAbsorber, return it.
 ///  * Sort operands by complexity.
 template <typename FoldT, typename IsIdentityT, typename IsAbsorberT>
-static const SCEV *
+static SCEVUse
 constantFoldAndGroupOps(ScalarEvolution &SE, LoopInfo &LI, DominatorTree &DT,
                         SmallVectorImpl<SCEVUse> &Ops, FoldT Fold,
                         IsIdentityT IsIdentity, IsAbsorberT IsAbsorber) {
@@ -2290,21 +2290,19 @@ static bool CollectAddOperandsWithScales(SmallDenseMap<SCEVUse, APInt, 16> &M,
 bool ScalarEvolution::willNotOverflow(Instruction::BinaryOps BinOp, bool Signed,
                                       const SCEV *LHS, const SCEV *RHS,
                                       const Instruction *CtxI) {
-  const SCEV *(ScalarEvolution::*Operation)(SCEVUse, SCEVUse, SCEV::NoWrapFlags,
-                                            unsigned);
-  switch (BinOp) {
-  default:
-    llvm_unreachable("Unsupported binary op");
-  case Instruction::Add:
-    Operation = &ScalarEvolution::getAddExpr;
-    break;
-  case Instruction::Sub:
-    Operation = &ScalarEvolution::getMinusSCEV;
-    break;
-  case Instruction::Mul:
-    Operation = &ScalarEvolution::getMulExpr;
-    break;
-  }
+  auto Operation = [this, BinOp](SCEVUse L, SCEVUse R, SCEV::NoWrapFlags Flags,
+                                 unsigned Depth) -> const SCEV * {
+    switch (BinOp) {
+    default:
+      llvm_unreachable("Unsupported binary op");
+    case Instruction::Add:
+      return getAddExpr(L, R, Flags, Depth);
+    case Instruction::Sub:
+      return getMinusSCEV(L, R, Flags, Depth);
+    case Instruction::Mul:
+      return getMulExpr(L, R, Flags, Depth);
+    }
+  };
 
   const SCEV *(ScalarEvolution::*Extension)(SCEVUse, Type *, unsigned) =
       Signed ? &ScalarEvolution::getSignExtendExpr
@@ -2315,11 +2313,11 @@ bool ScalarEvolution::willNotOverflow(Instruction::BinaryOps BinOp, bool Signed,
   auto *WideTy =
       IntegerType::get(NarrowTy->getContext(), NarrowTy->getBitWidth() * 2);
 
-  const SCEV *A = (this->*Extension)(
-      (this->*Operation)(LHS, RHS, SCEV::FlagAnyWrap, 0), WideTy, 0);
+  const SCEV *A =
+      (this->*Extension)(Operation(LHS, RHS, SCEV::FlagAnyWrap, 0), WideTy, 0);
   const SCEV *LHSB = (this->*Extension)(LHS, WideTy, 0);
   const SCEV *RHSB = (this->*Extension)(RHS, WideTy, 0);
-  const SCEV *B = (this->*Operation)(LHSB, RHSB, SCEV::FlagAnyWrap, 0);
+  const SCEV *B = Operation(LHSB, RHSB, SCEV::FlagAnyWrap, 0);
   if (A == B)
     return true;
   // Can we use context to prove the fact we need?
@@ -2509,9 +2507,9 @@ bool ScalarEvolution::isAvailableAtLoopEntry(const SCEV *S, const Loop *L) {
 }
 
 /// Get a canonical add expression, or something simpler if possible.
-const SCEV *ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
-                                        SCEV::NoWrapFlags OrigFlags,
-                                        unsigned Depth) {
+SCEVUse ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
+                                    SCEV::NoWrapFlags OrigFlags,
+                                    unsigned Depth) {
   assert(!(OrigFlags & ~(SCEV::FlagNUW | SCEV::FlagNSW)) &&
          "only nuw or nsw allowed");
   assert(!Ops.empty() && "Cannot get empty add!");
@@ -2526,7 +2524,7 @@ const SCEV *ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
   assert(NumPtrs <= 1 && "add has at most one pointer operand");
 #endif
 
-  const SCEV *Folded = constantFoldAndGroupOps(
+  SCEVUse Folded = constantFoldAndGroupOps(
       *this, LI, DT, Ops,
       [](const APInt &C1, const APInt &C2) { return C1 + C2; },
       [](const APInt &C) { return C.isZero(); }, // identity
@@ -3115,9 +3113,9 @@ static bool containsConstantInAddMulChain(const SCEV *StartExpr) {
 }
 
 /// Get a canonical multiply expression, or something simpler if possible.
-const SCEV *ScalarEvolution::getMulExpr(SmallVectorImpl<SCEVUse> &Ops,
-                                        SCEV::NoWrapFlags OrigFlags,
-                                        unsigned Depth) {
+SCEVUse ScalarEvolution::getMulExpr(SmallVectorImpl<SCEVUse> &Ops,
+                                    SCEV::NoWrapFlags OrigFlags,
+                                    unsigned Depth) {
   assert(OrigFlags == maskFlags(OrigFlags, SCEV::FlagNUW | SCEV::FlagNSW) &&
          "only nuw or nsw allowed");
   assert(!Ops.empty() && "Cannot get empty mul!");
@@ -3130,7 +3128,7 @@ const SCEV *ScalarEvolution::getMulExpr(SmallVectorImpl<SCEVUse> &Ops,
            "SCEVMulExpr operand types don't match!");
 #endif
 
-  const SCEV *Folded = constantFoldAndGroupOps(
+  SCEVUse Folded = constantFoldAndGroupOps(
       *this, LI, DT, Ops,
       [](const APInt &C1, const APInt &C2) { return C1 * C2; },
       [](const APInt &C) { return C.isOne(); },   // identity
@@ -3219,7 +3217,8 @@ const SCEV *ScalarEvolution::getMulExpr(SmallVectorImpl<SCEVUse> &Ops,
             hasFlags(StrengthenNoWrapFlags(this, scMulExpr, {NarrowC, InnerAdd},
                                            SCEV::FlagAnyWrap),
                      SCEV::FlagNUW)) {
-          auto *Res = getMulExpr(NarrowC, InnerAdd, SCEV::FlagNUW, Depth + 1);
+          const SCEV *Res =
+              getMulExpr(NarrowC, InnerAdd, SCEV::FlagNUW, Depth + 1);
           return getZeroExtendExpr(Res, Ops[1]->getType(), Depth + 1);
         };
       }
@@ -3827,7 +3826,7 @@ const SCEV *ScalarEvolution::getGEPExpr(SCEVUse BaseExpr,
   bool NUW = NW.hasNoUnsignedWrap() ||
              (NW.hasNoUnsignedSignedWrap() && isKnownNonNegative(Offset));
   SCEV::NoWrapFlags BaseWrap = NUW ? SCEV::FlagNUW : SCEV::FlagAnyWrap;
-  auto *GEPExpr = getAddExpr(BaseExpr, Offset, BaseWrap);
+  const SCEV *GEPExpr = getAddExpr(BaseExpr, Offset, BaseWrap);
   assert(BaseExpr->getType() == GEPExpr->getType() &&
          "GEP should not change type mid-flight.");
   return GEPExpr;
@@ -8015,7 +8014,7 @@ const SCEV *ScalarEvolution::createSCEV(Value *V) {
               SmallVector<SCEVUse, 4> MulOps;
               MulOps.push_back(getConstant(OpC->getAPInt().ashr(GCD)));
               append_range(MulOps, LHSMul->operands().drop_front());
-              auto *NewMul = getMulExpr(MulOps, LHSMul->getNoWrapFlags());
+              const SCEV *NewMul = getMulExpr(MulOps, LHSMul->getNoWrapFlags());
               ShiftedLHS = getUDivExpr(NewMul, getConstant(DivAmt));
             }
           }
@@ -13616,7 +13615,7 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
         //
         // FIXME: Should isLoopEntryGuardedByCond do this for us?
         auto CondGT = IsSigned ? ICmpInst::ICMP_SGT : ICmpInst::ICMP_UGT;
-        auto *StartMinusOne =
+        const SCEV *StartMinusOne =
             getAddExpr(OrigStart, getMinusOne(OrigStart->getType()));
         return isLoopEntryGuardedByCond(L, CondGT, OrigRHS, StartMinusOne);
       };

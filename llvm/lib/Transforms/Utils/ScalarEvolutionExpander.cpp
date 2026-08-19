@@ -17,6 +17,7 @@
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/Analysis/InstructionSimplify.h"
 #include "llvm/Analysis/LoopInfo.h"
+#include "llvm/Analysis/ScalarEvolutionDivision.h"
 #include "llvm/Analysis/ScalarEvolutionPatternMatch.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Analysis/ValueTracking.h"
@@ -551,8 +552,8 @@ Value *SCEVExpander::visitAddExpr(SCEVUseT<const SCEVAddExpr *> S) {
   // Iterate in reverse so that constants are emitted last, all else equal, and
   // so that pointer operands are inserted first, which the code below relies on
   // to form more involved GEPs.
-  SmallVector<std::pair<const Loop *, const SCEV *>, 8> OpsAndLoops;
-  for (const SCEV *Op : reverse(S->operands()))
+  SmallVector<std::pair<const Loop *, SCEVUse>, 8> OpsAndLoops;
+  for (SCEVUse Op : reverse(S->operands()))
     OpsAndLoops.push_back(std::make_pair(getRelevantLoop(Op), Op));
 
   // Sort by loop. Use a stable sort so that constants follow non-constants and
@@ -564,7 +565,7 @@ Value *SCEVExpander::visitAddExpr(SCEVUseT<const SCEVAddExpr *> S) {
   Value *Sum = nullptr;
   for (auto I = OpsAndLoops.begin(), E = OpsAndLoops.end(); I != E;) {
     const Loop *CurLoop = I->first;
-    const SCEV *Op = I->second;
+    SCEVUse Op = I->second;
     if (!Sum) {
       // This is the first operand. Just expand it.
       Sum = expand(Op);
@@ -580,7 +581,7 @@ Value *SCEVExpander::visitAddExpr(SCEVUseT<const SCEVAddExpr *> S) {
       for (; I != E && I->first == CurLoop; ++I) {
         // If the operand is SCEVUnknown and not instructions, peek through
         // it, to enable more of it to be folded into the GEP.
-        const SCEV *X = I->second;
+        SCEVUse X = I->second;
         if (const SCEVUnknown *U = dyn_cast<SCEVUnknown>(X))
           if (!isa<Instruction>(U->getValue()))
             X = SE.getSCEV(U->getValue());
@@ -629,8 +630,8 @@ Value *SCEVExpander::visitMulExpr(SCEVUseT<const SCEVMulExpr *> S) {
 
   // Collect all the mul operands in a loop, along with their associated loops.
   // Iterate in reverse so that constants are emitted last, all else equal.
-  SmallVector<std::pair<const Loop *, const SCEV *>, 8> OpsAndLoops;
-  for (const SCEV *Op : reverse(S->operands()))
+  SmallVector<std::pair<const Loop *, SCEVUse>, 8> OpsAndLoops;
+  for (SCEVUse Op : reverse(S->operands()))
     OpsAndLoops.push_back(std::make_pair(getRelevantLoop(Op), Op));
 
   // Sort by loop. Use a stable sort so that constants follow non-constants.
@@ -1334,6 +1335,67 @@ Value *SCEVExpander::tryToReuseLCSSAPhi(SCEVUseT<const SCEVAddRecExpr *> S) {
   return nullptr;
 }
 
+/// ScalarEvolution distributes a constant factor into an AddRec's operands, so
+/// `{8 * X,+,-8}` and `{X,+,-1}` have no expression in common even though the
+/// former is just eight times the latter. If the scaled-down recurrence is
+/// already available, reuse it: expanding \p S structurally instead builds a
+/// second induction variable for the same recurrence.
+Value *SCEVExpander::tryToReuseScaledAddRec(const SCEVAddRecExpr *S) {
+  // Only a recurrence with a constant step can be scaled down. S is always
+  // affine here: visitAddRecExpr only calls this for two-operand AddRecs.
+  const APInt *Step;
+  if (!S->getType()->isIntegerTy() ||
+      !match(S->getStepRecurrence(SE), m_scev_APInt(Step)))
+    return nullptr;
+  // Scaling down to a unit step is what recovers a plain induction variable.
+  APInt Factor = Step->abs();
+  if (Factor.ule(1))
+    return nullptr;
+  const SCEV *FactorS = SE.getConstant(Factor);
+
+  // Anything that does not divide is left in Offset, and only a constant one
+  // can be added back cheaply: `{5 + 8 * X,+,-8}` leaves 5 behind. divide()
+  // does not guarantee that the quotient multiplies back to S, so check it.
+  const SCEV *Divided, *Offset;
+  SCEVDivision::divide(SE, S, FactorS, &Divided, &Offset);
+  if (!isa<SCEVConstant>(Offset))
+    return nullptr;
+  SCEVUse Scaled = SE.getMulExpr(Divided, FactorS);
+  if (SE.getAddExpr(Scaled, Offset) != S)
+    return nullptr;
+
+  // Wrap the found value as an opaque SCEVUnknown before combining with
+  // Offset: Scaled/Divided already reconstruct S (checked above), so passing
+  // either through getAddExpr unwrapped would just rebuild S and recurse.
+  //
+  // Try the scaling itself first: cheaper, and what a structural expansion
+  // would also find. Skip when Scaled == S (i.e. Offset == 0): expand()
+  // already failed to find S at this insertion point.
+  const Instruction *InsertPt = &*Builder.GetInsertPoint();
+  SCEVUse Reused;
+  if (Value *V = Scaled != S
+                     ? findExistingExpansionAndDropPoisonFlags(Scaled, InsertPt)
+                     : nullptr) {
+    Reused = SE.getUnknown(V);
+  } else if (Value *V =
+                 findExistingExpansionAndDropPoisonFlags(Divided, InsertPt)) {
+    // Carry over the no-wrap facts that hold for the scaling, so the reused
+    // form is no weaker than a structural expansion. These are proven on
+    // Divided; the wrapped V is opaque and would prove nothing on its own.
+    SCEV::NoWrapFlags Flags = SCEV::FlagAnyWrap;
+    if (SE.willNotOverflow(Instruction::Mul, /*Signed=*/false, Divided,
+                           FactorS))
+      Flags = ScalarEvolution::setFlags(Flags, SCEV::FlagNUW);
+    if (SE.willNotOverflow(Instruction::Mul, /*Signed=*/true, Divided, FactorS))
+      Flags = ScalarEvolution::setFlags(Flags, SCEV::FlagNSW);
+    Reused = {SE.getMulExpr(SE.getUnknown(V), FactorS), Flags};
+  } else {
+    return nullptr;
+  }
+  // A zero Offset folds away.
+  return expand(SE.getAddExpr(Reused, Offset));
+}
+
 Value *SCEVExpander::visitAddRecExpr(SCEVUseT<const SCEVAddRecExpr *> S) {
   // In canonical mode we compute the addrec as an expression of a canonical IV
   // using evaluateAtIteration and expand the resulting SCEV expression. This
@@ -1347,6 +1409,10 @@ Value *SCEVExpander::visitAddRecExpr(SCEVUseT<const SCEVAddRecExpr *> S) {
   // back to non-canonical mode for nested addrecs.
   if (!CanonicalMode || (S->getNumOperands() > 2))
     return expandAddRecExprLiterally(S);
+
+  // Check if a recurrence a constant factor away from S is already available.
+  if (Value *V = tryToReuseScaledAddRec(S))
+    return V;
 
   Type *Ty = SE.getEffectiveSCEVType(S->getType());
   const Loop *L = S->getLoop();
