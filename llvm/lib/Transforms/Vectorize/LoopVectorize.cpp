@@ -6010,7 +6010,6 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   if (EpilogueVecKind == EpilogueVectorizationKind::None)
     VPlanTransforms::expandSCEVsToVPInstructions(BestVPlan, *PSE.getSE());
   VPlanTransforms::cse(BestVPlan);
-  VPlanTransforms::simplifyRecipes(BestVPlan);
   // Removing branches and incoming values may expose additional simplification
   // opportunities.
   if (VPlanTransforms::removeBranchOnConst(BestVPlan,

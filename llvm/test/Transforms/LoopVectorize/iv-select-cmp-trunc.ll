@@ -2341,7 +2341,6 @@ define i1 @select_with_trunc_i1_iv(i64 %n, i64 %start) {
 ; CHECK-VF1IC4-NEXT:    [[TMP10:%.*]] = add i1 [[TMP9]], false
 ; CHECK-VF1IC4-NEXT:    [[TMP11:%.*]] = add i1 [[TMP9]], true
 ; CHECK-VF1IC4-NEXT:    [[TMP12:%.*]] = add i1 [[TMP9]], false
-; CHECK-VF1IC4-NEXT:    [[TMP13:%.*]] = add i1 [[TMP9]], true
 ; CHECK-VF1IC4-NEXT:    [[TMP14:%.*]] = icmp ne i64 [[OFFSET_IDX]], 0
 ; CHECK-VF1IC4-NEXT:    [[TMP15:%.*]] = icmp ne i64 [[TMP6]], 0
 ; CHECK-VF1IC4-NEXT:    [[TMP16:%.*]] = icmp ne i64 [[TMP7]], 0
@@ -2360,7 +2359,7 @@ define i1 @select_with_trunc_i1_iv(i64 %n, i64 %start) {
 ; CHECK-VF1IC4-NEXT:    [[TMP29]] = select i1 [[TMP24]], i1 [[TMP10]], i1 [[VEC_PHI]]
 ; CHECK-VF1IC4-NEXT:    [[TMP30]] = select i1 [[TMP24]], i1 [[TMP11]], i1 [[VEC_PHI1]]
 ; CHECK-VF1IC4-NEXT:    [[TMP31]] = select i1 [[TMP24]], i1 [[TMP12]], i1 [[VEC_PHI2]]
-; CHECK-VF1IC4-NEXT:    [[TMP32]] = select i1 [[TMP24]], i1 [[TMP13]], i1 [[VEC_PHI3]]
+; CHECK-VF1IC4-NEXT:    [[TMP32]] = select i1 [[TMP24]], i1 [[TMP11]], i1 [[VEC_PHI3]]
 ; CHECK-VF1IC4-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-VF1IC4-NEXT:    [[TMP33:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-VF1IC4-NEXT:    br i1 [[TMP33]], label %[[MIDDLE_BLOCK:.*]], label %[[LOOP]], !llvm.loop [[LOOP18:![0-9]+]]

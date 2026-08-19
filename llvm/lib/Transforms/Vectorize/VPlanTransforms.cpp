@@ -2232,9 +2232,37 @@ void VPlanTransforms::cse(VPlan &Plan) {
   ReversePostOrderTraversal<VPBlockDeepTraversalWrapper<VPBlockBase *>> RPOT(
       Plan.getEntry());
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(RPOT)) {
-    for (VPRecipeBase &R : *VPBB) {
-      auto *Def = dyn_cast<VPSingleDefRecipe>(&R);
-      if (!Def || !VPCSEDenseMapInfo::canHandle(Def))
+    for (auto I = VPBB->begin(); I != VPBB->end();) {
+      auto *Def = dyn_cast<VPSingleDefRecipe>(&*I);
+      if (!Def) {
+        ++I;
+        continue;
+      }
+      // Simplify Def before looking it up, so that recipes are compared in
+      // canonical form, as in EarlyCSE and GVN. Conversely, definitions are
+      // visited before their users, so Def is simplified only once its operands
+      // have been CSE'd.
+      VPRecipeBase *Prev = Def->getPrevNode();
+      if (VPValue *New = simplifyRecipe(Def)) {
+        if (New != Def) {
+          Def->replaceAllUsesWith(New);
+          // New recipes are inserted directly before Def. Continue with the
+          // first of them, so folds and CSE opportunities they expose are
+          // applied as well.
+          auto NewIt = Prev ? std::next(Prev->getIterator()) : VPBB->begin();
+          I = NewIt == I ? std::next(I) : NewIt;
+          Def->eraseFromParent();
+          continue;
+        }
+        // Recipe was modified in place - it may be dead now.
+        if (vputils::isDeadRecipe(*Def)) {
+          ++I;
+          Def->eraseFromParent();
+          continue;
+        }
+      }
+      ++I;
+      if (!VPCSEDenseMapInfo::canHandle(Def))
         continue;
       if (VPSingleDefRecipe *V = CSEMap.lookup(Def)) {
         // V must dominate Def for a valid replacement.
