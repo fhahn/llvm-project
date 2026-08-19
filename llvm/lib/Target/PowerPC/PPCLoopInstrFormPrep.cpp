@@ -551,8 +551,8 @@ bool PPCLoopInstrFormPrep::rewriteLoadStoresForCommoningChains(
   for (unsigned ChainIdx = 0; ChainIdx < Bucket.ChainBases.size(); ++ChainIdx) {
     unsigned BaseElemIdx = Bucket.ChainSize * ChainIdx;
     const SCEV *BaseSCEV =
-        ChainIdx ? SE->getAddExpr(Bucket.BaseSCEV,
-                                  Bucket.Elements[BaseElemIdx].Offset)
+        ChainIdx ? static_cast<const SCEV *>(SE->getAddExpr(
+                       Bucket.BaseSCEV, Bucket.Elements[BaseElemIdx].Offset))
                  : Bucket.BaseSCEV;
     const SCEVAddRecExpr *BasePtrSCEV = cast<SCEVAddRecExpr>(BaseSCEV);
 
