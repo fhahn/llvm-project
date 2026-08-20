@@ -196,8 +196,12 @@ struct State {
   void addInfoForInductions(BasicBlock &BB);
 
   /// Returns the senses, {unsigned, signed}, in which stepping the induction
-  /// phi \p PN, starting at \p Start, to \p Step cannot decrease it.
-  std::pair<bool, bool> getNonDecreasingInfo(PHINode &PN, Value *Step);
+  /// phi \p PN to \p Step is monotonic in the requested direction: \p PN cannot
+  /// decrease if \p Decreasing is false, and cannot increase otherwise. Only
+  /// the signed sense can be proven for \p Decreasing, so the first element is
+  /// always false there, and pointer inductions are not handled.
+  std::pair<bool, bool> getMonotonicityInfo(PHINode &PN, Value *Step,
+                                            bool Decreasing);
 
   /// Returns true if we can add a known condition from BB to its successor
   /// block Succ.
@@ -986,16 +990,22 @@ getStartAndBackedgeValue(const PHINode &PN, const BasicBlock *LoopPred) {
   return {PN.getIncomingValue(StartIdx), PN.getIncomingValue(1 - StartIdx)};
 }
 
-std::pair<bool, bool> State::getNonDecreasingInfo(PHINode &PN, Value *Step) {
+std::pair<bool, bool> State::getMonotonicityInfo(PHINode &PN, Value *Step,
+                                                 bool Decreasing) {
   bool Unsigned = false, Signed = false;
   const APInt *StepOffset = nullptr;
   if (match(Step, m_c_Add(m_Specific(&PN), m_APInt(StepOffset)))) {
-    if (StepOffset->isNegative())
+    if (StepOffset->isNegative() != Decreasing)
       return {false, false};
     const auto *Add = cast<OverflowingBinaryOperator>(Step);
-    Unsigned = Add->hasNoUnsignedWrap();
+    // A negative step is never unsigned non-increasing: `add nuw PN, -1`
+    // requires PN to be zero, and the result then increases to UINT_MAX.
+    Unsigned = !Decreasing && Add->hasNoUnsignedWrap();
     Signed = Add->hasNoSignedWrap();
   } else if (const auto *GEP = dyn_cast<GEPOperator>(Step)) {
+    // Pointer inductions are only handled in the non-decreasing direction.
+    if (Decreasing)
+      return {false, false};
     const DataLayout &DL = PN.getDataLayout();
     APInt GEPOffset(DL.getIndexTypeSizeInBits(GEP->getType()), 0);
     Unsigned = GEP->getPointerOperand() == &PN &&
@@ -1013,6 +1023,12 @@ std::pair<bool, bool> State::getNonDecreasingInfo(PHINode &PN, Value *Step) {
   const auto *AR = dyn_cast<SCEVAddRecExpr>(SE.getSCEV(&PN));
   if (!AR)
     return {false, false};
+  // The truth value of `AR > X` for a loop-invariant X moves in the same
+  // direction as AR itself. An addrec with FlagNUW is unsigned non-decreasing
+  // by definition, so the unsigned query can never report a decreasing addrec.
+  if (Decreasing)
+    return {false, SE.getMonotonicPredicateType(AR, CmpInst::ICMP_SGT) ==
+                       ScalarEvolution::MonotonicallyDecreasing};
   return {SE.getMonotonicPredicateType(AR, CmpInst::ICMP_UGT) ==
               ScalarEvolution::MonotonicallyIncreasing,
           SE.getMonotonicPredicateType(AR, CmpInst::ICMP_SGT) ==
@@ -1036,7 +1052,8 @@ void State::addLowerBoundsForHeaderInductions(BasicBlock &BB) {
     if (!Start)
       continue;
 
-    auto [Unsigned, Signed] = getNonDecreasingInfo(PN, Step);
+    auto [Unsigned, Signed] =
+        getMonotonicityInfo(PN, Step, /*Decreasing=*/false);
     // Every variable in the unsigned system already has a `V >= 0` row, so a
     // zero start value would just duplicate it.
     if (match(Start, m_Zero()))
@@ -1149,7 +1166,7 @@ void State::addInfoForInductions(BasicBlock &BB) {
   }
 
   auto [MonotonicallyIncreasingUnsigned, MonotonicallyIncreasingSigned] =
-      getNonDecreasingInfo(*PN, Backedge);
+      getMonotonicityInfo(*PN, Backedge, /*Decreasing=*/false);
 
   // Make sure AR either steps by 1 or that the value we compare against is a
   // GEP based on the same start value and all offsets are a multiple of the
