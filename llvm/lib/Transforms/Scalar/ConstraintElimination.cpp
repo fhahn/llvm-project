@@ -1142,36 +1142,44 @@ void State::addInfoForInductions(BasicBlock &BB) {
   DomTreeNode *DTN = DT.getNode(InLoopSucc);
 
   // If we looked through `PN + C`, only derive facts when that add is
-  // really the induction's post-increment.
-  if (IncStep && (*IncStep != *StepOffset || StepOffset->isNegative()))
+  // really the induction's post-increment or post-decrement.
+  if (IncStep && *IncStep != *StepOffset)
     return;
 
   // Handle negative steps.
   if (StepOffset->isNegative()) {
-    // TODO: Extend to allow steps > -1.
+    // TODO: Extend to allow steps > -1. Note that the preconditions below
+    // assume a step of -1; a step of -N needs the bound shifted by N, not by 1.
     if (!(-*StepOffset).isOne())
       return;
 
+    // The loop exits when the counting value reaches B. For a compare on the
+    // phi itself that is PN == B, reached without wrapping as long as
+    // B <= StartValue. A post-decrement compare (`icmp (PN + Step), B`) exits
+    // at PN == B + 1 instead, so it needs the strict B < StartValue: at
+    // B == StartValue the phi steps past B and wraps around the whole range.
+    CmpInst::Predicate UPrecond =
+        IncStep ? CmpInst::ICMP_ULT : CmpInst::ICMP_ULE;
+    ConditionTy BBeforeStartU = {UPrecond, B, StartValue};
+    ConditionTy BBeforeStartS = {ICmpInst::getSignedPredicate(UPrecond), B,
+                                 StartValue};
+
     // AR may wrap.
-    // Add StartValue >= PN conditional on B <= StartValue which guarantees that
-    // the loop exits before wrapping with a step of -1. In the signed sense
+    // Add StartValue >= PN conditional on the no-wrap precondition, which
+    // guarantees that the loop exits before wrapping. In the signed sense
     // addBoundsForHeaderInductions already adds this unconditionally when the
     // induction is known to be non-increasing.
     WorkList.push_back(FactOrCheck::getConditionFact(
-        DTN, CmpInst::ICMP_UGE, StartValue, PN,
-        ConditionTy(CmpInst::ICMP_ULE, B, StartValue)));
+        DTN, CmpInst::ICMP_UGE, StartValue, PN, BBeforeStartU));
     if (!getMonotonicityInfo(*PN, Backedge, /*Decreasing=*/true).second)
       WorkList.push_back(FactOrCheck::getConditionFact(
-          DTN, CmpInst::ICMP_SGE, StartValue, PN,
-          ConditionTy(CmpInst::ICMP_SLE, B, StartValue)));
-    // Add PN > B conditional on B <= StartValue which guarantees that the loop
-    // exits when reaching B with a step of -1.
-    WorkList.push_back(FactOrCheck::getConditionFact(
-        DTN, CmpInst::ICMP_UGT, PN, B,
-        ConditionTy(CmpInst::ICMP_ULE, B, StartValue)));
-    WorkList.push_back(FactOrCheck::getConditionFact(
-        DTN, CmpInst::ICMP_SGT, PN, B,
-        ConditionTy(CmpInst::ICMP_SLE, B, StartValue)));
+          DTN, CmpInst::ICMP_SGE, StartValue, PN, BBeforeStartS));
+    // Add PN > B conditional on the no-wrap precondition, which guarantees that
+    // the loop exits when reaching B.
+    WorkList.push_back(FactOrCheck::getConditionFact(DTN, CmpInst::ICMP_UGT, PN,
+                                                     B, BBeforeStartU));
+    WorkList.push_back(FactOrCheck::getConditionFact(DTN, CmpInst::ICMP_SGT, PN,
+                                                     B, BBeforeStartS));
     return;
   }
 
