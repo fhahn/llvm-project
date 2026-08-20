@@ -188,8 +188,9 @@ struct State {
   void addInfoFor(BasicBlock &BB);
 
   /// If \p BB is a loop header, bound each induction phi in it by its start
-  /// value, if it is non-decreasing.
-  void addLowerBoundsForHeaderInductions(BasicBlock &BB);
+  /// value: from below if the induction is non-decreasing, from above if it is
+  /// non-increasing.
+  void addBoundsForHeaderInductions(BasicBlock &BB);
 
   /// Try to add facts for loop inductions (AddRecs) in EQ/NE compares
   /// controlling the loop header.
@@ -1035,7 +1036,7 @@ std::pair<bool, bool> State::getMonotonicityInfo(PHINode &PN, Value *Step,
               ScalarEvolution::MonotonicallyIncreasing};
 }
 
-void State::addLowerBoundsForHeaderInductions(BasicBlock &BB) {
+void State::addBoundsForHeaderInductions(BasicBlock &BB) {
   Loop *L = LI.getLoopFor(&BB);
   if (!L || L->getHeader() != &BB)
     return;
@@ -1058,12 +1059,18 @@ void State::addLowerBoundsForHeaderInductions(BasicBlock &BB) {
     // zero start value would just duplicate it.
     if (match(Start, m_Zero()))
       Unsigned = false;
-    if (!Unsigned && !Signed)
+    if (Unsigned || Signed) {
+      CmpPredicate Pred(Unsigned ? CmpInst::ICMP_UGE : CmpInst::ICMP_SGE,
+                        /*HasSameSign=*/Unsigned && Signed);
+      WorkList.push_back(FactOrCheck::getConditionFact(DTN, Pred, &PN, Start));
       continue;
+    }
 
-    CmpPredicate Pred(Unsigned ? CmpInst::ICMP_UGE : CmpInst::ICMP_SGE,
-                      /*HasSameSign=*/Unsigned && Signed);
-    WorkList.push_back(FactOrCheck::getConditionFact(DTN, Pred, &PN, Start));
+    // A non-increasing induction cannot step past its start value either, so
+    // bound it from above instead. Only the signed sense is available here.
+    if (getMonotonicityInfo(PN, Step, /*Decreasing=*/true).second)
+      WorkList.push_back(
+          FactOrCheck::getConditionFact(DTN, CmpInst::ICMP_SGE, Start, &PN));
   }
 }
 
@@ -1147,13 +1154,16 @@ void State::addInfoForInductions(BasicBlock &BB) {
 
     // AR may wrap.
     // Add StartValue >= PN conditional on B <= StartValue which guarantees that
-    // the loop exits before wrapping with a step of -1.
+    // the loop exits before wrapping with a step of -1. In the signed sense
+    // addBoundsForHeaderInductions already adds this unconditionally when the
+    // induction is known to be non-increasing.
     WorkList.push_back(FactOrCheck::getConditionFact(
         DTN, CmpInst::ICMP_UGE, StartValue, PN,
         ConditionTy(CmpInst::ICMP_ULE, B, StartValue)));
-    WorkList.push_back(FactOrCheck::getConditionFact(
-        DTN, CmpInst::ICMP_SGE, StartValue, PN,
-        ConditionTy(CmpInst::ICMP_SLE, B, StartValue)));
+    if (!getMonotonicityInfo(*PN, Backedge, /*Decreasing=*/true).second)
+      WorkList.push_back(FactOrCheck::getConditionFact(
+          DTN, CmpInst::ICMP_SGE, StartValue, PN,
+          ConditionTy(CmpInst::ICMP_SLE, B, StartValue)));
     // Add PN > B conditional on B <= StartValue which guarantees that the loop
     // exits when reaching B with a step of -1.
     WorkList.push_back(FactOrCheck::getConditionFact(
@@ -1281,7 +1291,7 @@ static bool getConstraintFromMemoryAccess(GetElementPtrInst &GEP,
 }
 
 void State::addInfoFor(BasicBlock &BB) {
-  addLowerBoundsForHeaderInductions(BB);
+  addBoundsForHeaderInductions(BB);
   addInfoForInductions(BB);
   auto &DL = BB.getDataLayout();
 

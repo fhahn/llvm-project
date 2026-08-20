@@ -269,8 +269,7 @@ define void @add_rec_decreasing_nsw_signed_monotonic(i8 %start, i8 %b) {
 ; CHECK-NEXT:    [[CMP2_NOT:%.*]] = icmp eq i8 [[K_0]], [[B]]
 ; CHECK-NEXT:    br i1 [[CMP2_NOT]], label [[EXIT:%.*]], label [[LOOP_LATCH]]
 ; CHECK:       loop.latch:
-; CHECK-NEXT:    [[S:%.*]] = icmp sle i8 [[K_0]], [[START]]
-; CHECK-NEXT:    call void @use(i1 [[S]])
+; CHECK-NEXT:    call void @use(i1 true)
 ; CHECK-NEXT:    [[U:%.*]] = icmp ule i8 [[K_0]], [[START]]
 ; CHECK-NEXT:    call void @use(i1 [[U]])
 ; CHECK-NEXT:    [[K_DEC]] = add nsw i8 [[K_0]], -1
@@ -388,8 +387,7 @@ define void @add_rec_decreasing_nsw_from_scev(i8 %b) {
 ; CHECK-NEXT:    [[CMP2_NOT:%.*]] = icmp eq i8 [[K_0]], [[B]]
 ; CHECK-NEXT:    br i1 [[CMP2_NOT]], label [[EXIT:%.*]], label [[LOOP_BODY:%.*]]
 ; CHECK:       loop.body:
-; CHECK-NEXT:    [[S:%.*]] = icmp sle i8 [[K_0]], 100
-; CHECK-NEXT:    call void @use(i1 [[S]])
+; CHECK-NEXT:    call void @use(i1 true)
 ; CHECK-NEXT:    [[POSITIVE:%.*]] = icmp sgt i8 [[K_0]], 0
 ; CHECK-NEXT:    br i1 [[POSITIVE]], label [[LOOP_LATCH]], label [[EXIT]]
 ; CHECK:       loop.latch:
@@ -415,6 +413,190 @@ loop.body:
 loop.latch:
   %k.dec = add i8 %k.0, -1
   br label %loop.header
+
+exit:
+  ret void
+}
+
+; The upper bound does not depend on the step being exactly -1.
+define void @add_rec_decreasing_nsw_step_2(i8 %start, i8 %b) {
+; CHECK-LABEL: define void @add_rec_decreasing_nsw_step_2(
+; CHECK-SAME: i8 [[START:%.*]], i8 [[B:%.*]]) {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    br label [[LOOP_HEADER:%.*]]
+; CHECK:       loop.header:
+; CHECK-NEXT:    [[K_0:%.*]] = phi i8 [ [[START]], [[ENTRY:%.*]] ], [ [[K_DEC:%.*]], [[LOOP_LATCH:%.*]] ]
+; CHECK-NEXT:    [[CMP2_NOT:%.*]] = icmp eq i8 [[K_0]], [[B]]
+; CHECK-NEXT:    br i1 [[CMP2_NOT]], label [[EXIT:%.*]], label [[LOOP_LATCH]]
+; CHECK:       loop.latch:
+; CHECK-NEXT:    call void @use(i1 true)
+; CHECK-NEXT:    [[K_DEC]] = add nsw i8 [[K_0]], -2
+; CHECK-NEXT:    br label [[LOOP_HEADER]]
+; CHECK:       exit:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %loop.header
+
+loop.header:
+  %k.0 = phi i8 [ %start, %entry ], [ %k.dec, %loop.latch ]
+  %cmp2.not = icmp eq i8 %k.0, %b
+  br i1 %cmp2.not, label %exit, label %loop.latch
+
+loop.latch:
+  %s = icmp sle i8 %k.0, %start
+  call void @use(i1 %s)
+  %k.dec = add nsw i8 %k.0, -2
+  br label %loop.header
+
+exit:
+  ret void
+}
+
+; The upper bound holds in the header itself, not just in the blocks guarded by
+; the loop-controlling condition.
+define void @add_rec_decreasing_nsw_compare_in_header(i8 %start, i8 %b) {
+; CHECK-LABEL: define void @add_rec_decreasing_nsw_compare_in_header(
+; CHECK-SAME: i8 [[START:%.*]], i8 [[B:%.*]]) {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    br label [[LOOP_HEADER:%.*]]
+; CHECK:       loop.header:
+; CHECK-NEXT:    [[K_0:%.*]] = phi i8 [ [[START]], [[ENTRY:%.*]] ], [ [[K_DEC:%.*]], [[LOOP_LATCH:%.*]] ]
+; CHECK-NEXT:    call void @use(i1 true)
+; CHECK-NEXT:    [[CMP2_NOT:%.*]] = icmp eq i8 [[K_0]], [[B]]
+; CHECK-NEXT:    br i1 [[CMP2_NOT]], label [[EXIT:%.*]], label [[LOOP_LATCH]]
+; CHECK:       loop.latch:
+; CHECK-NEXT:    [[K_DEC]] = add nsw i8 [[K_0]], -1
+; CHECK-NEXT:    br label [[LOOP_HEADER]]
+; CHECK:       exit:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %loop.header
+
+loop.header:
+  %k.0 = phi i8 [ %start, %entry ], [ %k.dec, %loop.latch ]
+  %s = icmp sle i8 %k.0, %start
+  call void @use(i1 %s)
+  %cmp2.not = icmp eq i8 %k.0, %b
+  br i1 %cmp2.not, label %exit, label %loop.latch
+
+loop.latch:
+  %k.dec = add nsw i8 %k.0, -1
+  br label %loop.header
+
+exit:
+  ret void
+}
+
+; The upper bound is added for every header phi, not only the one the
+; loop-controlling condition compares.
+define void @add_rec_decreasing_nsw_second_phi(i8 %start, i8 %b, i8 %start2) {
+; CHECK-LABEL: define void @add_rec_decreasing_nsw_second_phi(
+; CHECK-SAME: i8 [[START:%.*]], i8 [[B:%.*]], i8 [[START2:%.*]]) {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    br label [[LOOP_HEADER:%.*]]
+; CHECK:       loop.header:
+; CHECK-NEXT:    [[K_0:%.*]] = phi i8 [ [[START]], [[ENTRY:%.*]] ], [ [[K_DEC:%.*]], [[LOOP_LATCH:%.*]] ]
+; CHECK-NEXT:    [[J_0:%.*]] = phi i8 [ [[START2]], [[ENTRY]] ], [ [[J_DEC:%.*]], [[LOOP_LATCH]] ]
+; CHECK-NEXT:    [[CMP2_NOT:%.*]] = icmp eq i8 [[K_0]], [[B]]
+; CHECK-NEXT:    br i1 [[CMP2_NOT]], label [[EXIT:%.*]], label [[LOOP_LATCH]]
+; CHECK:       loop.latch:
+; CHECK-NEXT:    call void @use(i1 true)
+; CHECK-NEXT:    [[K_DEC]] = add nsw i8 [[K_0]], -1
+; CHECK-NEXT:    [[J_DEC]] = add nsw i8 [[J_0]], -3
+; CHECK-NEXT:    br label [[LOOP_HEADER]]
+; CHECK:       exit:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %loop.header
+
+loop.header:
+  %k.0 = phi i8 [ %start, %entry ], [ %k.dec, %loop.latch ]
+  %j.0 = phi i8 [ %start2, %entry ], [ %j.dec, %loop.latch ]
+  %cmp2.not = icmp eq i8 %k.0, %b
+  br i1 %cmp2.not, label %exit, label %loop.latch
+
+loop.latch:
+  %s = icmp sle i8 %j.0, %start2
+  call void @use(i1 %s)
+  %k.dec = add nsw i8 %k.0, -1
+  %j.dec = add nsw i8 %j.0, -3
+  br label %loop.header
+
+exit:
+  ret void
+}
+
+; The upper bound does not depend on the shape of the loop-controlling
+; condition; an slt exit works as well as eq/ne.
+define void @add_rec_decreasing_nsw_slt_exit(i8 %start, i8 %b) {
+; CHECK-LABEL: define void @add_rec_decreasing_nsw_slt_exit(
+; CHECK-SAME: i8 [[START:%.*]], i8 [[B:%.*]]) {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    br label [[LOOP_HEADER:%.*]]
+; CHECK:       loop.header:
+; CHECK-NEXT:    [[K_0:%.*]] = phi i8 [ [[START]], [[ENTRY:%.*]] ], [ [[K_DEC:%.*]], [[LOOP_LATCH:%.*]] ]
+; CHECK-NEXT:    [[EC:%.*]] = icmp slt i8 [[K_0]], [[B]]
+; CHECK-NEXT:    br i1 [[EC]], label [[EXIT:%.*]], label [[LOOP_LATCH]]
+; CHECK:       loop.latch:
+; CHECK-NEXT:    call void @use(i1 true)
+; CHECK-NEXT:    [[K_DEC]] = add nsw i8 [[K_0]], -1
+; CHECK-NEXT:    br label [[LOOP_HEADER]]
+; CHECK:       exit:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %loop.header
+
+loop.header:
+  %k.0 = phi i8 [ %start, %entry ], [ %k.dec, %loop.latch ]
+  %ec = icmp slt i8 %k.0, %b
+  br i1 %ec, label %exit, label %loop.latch
+
+loop.latch:
+  %s = icmp sle i8 %k.0, %start
+  call void @use(i1 %s)
+  %k.dec = add nsw i8 %k.0, -1
+  br label %loop.header
+
+exit:
+  ret void
+}
+
+; Negative test: without nsw the decrement wraps past the start value, so no
+; upper bound must be derived. The loop exits at %k.dec == 5, i.e. %k.0 == 6,
+; which is only reached after wrapping, so %k.0 takes the values 6..127.
+define void @add_rec_decreasing_wraps_no_upper_bound() {
+; CHECK-LABEL: define void @add_rec_decreasing_wraps_no_upper_bound() {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    br label [[LOOP_HEADER:%.*]]
+; CHECK:       loop.header:
+; CHECK-NEXT:    [[K_0:%.*]] = phi i8 [ 5, [[ENTRY:%.*]] ], [ [[K_DEC:%.*]], [[LOOP_LATCH:%.*]] ]
+; CHECK-NEXT:    [[S:%.*]] = icmp sle i8 [[K_0]], 5
+; CHECK-NEXT:    call void @use(i1 [[S]])
+; CHECK-NEXT:    br label [[LOOP_LATCH]]
+; CHECK:       loop.latch:
+; CHECK-NEXT:    [[K_DEC]] = add i8 [[K_0]], -1
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i8 [[K_DEC]], 5
+; CHECK-NEXT:    br i1 [[EC]], label [[EXIT:%.*]], label [[LOOP_HEADER]]
+; CHECK:       exit:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %loop.header
+
+loop.header:
+  %k.0 = phi i8 [ 5, %entry ], [ %k.dec, %loop.latch ]
+  %s = icmp sle i8 %k.0, 5
+  call void @use(i1 %s)
+  br label %loop.latch
+
+loop.latch:
+  %k.dec = add i8 %k.0, -1
+  %ec = icmp eq i8 %k.dec, 5
+  br i1 %ec, label %exit, label %loop.header
 
 exit:
   ret void
