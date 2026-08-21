@@ -297,17 +297,6 @@ bool FoldingSetBase::RemoveNode(Node *N) {
   }
 }
 
-FoldingSetBase::Node *
-FoldingSetBase::GetOrInsertNode(Node *N, const FoldingSetInfo &Info) {
-  FoldingSetNodeID ID;
-  Info.GetNodeProfile(this, N, ID);
-  void *IP;
-  if (Node *E = FindNodeOrInsertPos(ID, IP, Info))
-    return E;
-  InsertNode(N, IP, Info);
-  return N;
-}
-
 //===----------------------------------------------------------------------===//
 // FoldingSetIteratorImpl Implementation
 

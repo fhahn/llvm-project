@@ -129,15 +129,22 @@ public:
 /// Specialize FoldingSetTrait for SDVTListNode
 /// to avoid computing temp FoldingSetNodeID and hash value.
 template<> struct FoldingSetTrait<SDVTListNode> : DefaultFoldingSetTrait<SDVTListNode> {
+  static constexpr bool NeedsTempID = false;
+
   static void Profile(const SDVTListNode &X, FoldingSetNodeID& ID) {
     ID = X.FastID;
   }
 
   static bool Equals(const SDVTListNode &X, const FoldingSetNodeID &ID,
-                     unsigned IDHash, FoldingSetNodeID &TempID) {
+                     unsigned IDHash) {
     if (X.HashValue != IDHash)
       return false;
     return ID == X.FastID;
+  }
+
+  static bool Equals(const SDVTListNode &X, const FoldingSetNodeID &ID,
+                     unsigned IDHash, FoldingSetNodeID &TempID) {
+    return Equals(X, ID, IDHash);
   }
 
   static unsigned ComputeHash(const SDVTListNode &X, FoldingSetNodeID &TempID) {

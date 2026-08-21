@@ -1171,7 +1171,8 @@ const SCEV *ScalarEvolution::getTruncateExpr(SCEVUse Op, Type *Ty,
   ID.AddPointer(Op.getOpaqueValue());
   ID.AddPointer(Ty);
   void *IP = nullptr;
-  if (const SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP)) return S;
+  if (const SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP))
+    return S;
 
   // Fold if the operand is constant.
   if (const SCEVConstant *SC = dyn_cast<SCEVConstant>(Op))
@@ -1496,8 +1497,8 @@ bool ScalarEvolution::proveNoWrapByVaryingStart(const SCEV *Start,
     ID.AddPointer(Step);
     ID.AddPointer(L);
     void *IP = nullptr;
-    const auto *PreAR =
-      static_cast<SCEVAddRecExpr *>(UniqueSCEVs.FindNodeOrInsertPos(ID, IP));
+    const auto *PreAR = static_cast<SCEVAddRecExpr *>(
+        UniqueSCEVs.FindNodeOrInsertPos(ID, IP));
 
     // Give up if we don't already have the add recurrence we need because
     // actually constructing an add recurrence is relatively expensive.
@@ -1628,7 +1629,8 @@ const SCEV *ScalarEvolution::getZeroExtendExprImpl(SCEVUse Op, Type *Ty,
   ID.AddPointer(Op.getOpaqueValue());
   ID.AddPointer(Ty);
   void *IP = nullptr;
-  if (const SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP)) return S;
+  if (const SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP))
+    return S;
   if (Depth > MaxCastDepth) {
     SCEV *S = new (SCEVAllocator) SCEVZeroExtendExpr(ID.Intern(SCEVAllocator),
                                                      Op, Ty);
@@ -1914,7 +1916,8 @@ const SCEV *ScalarEvolution::getZeroExtendExprImpl(SCEVUse Op, Type *Ty,
 
   // The cast wasn't folded; create an explicit cast node.
   // Recompute the insert position, as it may have been invalidated.
-  if (const SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP)) return S;
+  if (const SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP))
+    return S;
   SCEV *S = new (SCEVAllocator) SCEVZeroExtendExpr(ID.Intern(SCEVAllocator),
                                                    Op, Ty);
   UniqueSCEVs.InsertNode(S, IP);
@@ -1983,7 +1986,8 @@ const SCEV *ScalarEvolution::getSignExtendExprImpl(SCEVUse Op, Type *Ty,
   ID.AddPointer(Op.getOpaqueValue());
   ID.AddPointer(Ty);
   void *IP = nullptr;
-  if (const SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP)) return S;
+  if (const SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP))
+    return S;
   // Limit recursion depth.
   if (Depth > MaxCastDepth) {
     SCEV *S = new (SCEVAllocator) SCEVSignExtendExpr(ID.Intern(SCEVAllocator),
@@ -2177,7 +2181,8 @@ const SCEV *ScalarEvolution::getSignExtendExprImpl(SCEVUse Op, Type *Ty,
 
   // The cast wasn't folded; create an explicit cast node.
   // Recompute the insert position, as it may have been invalidated.
-  if (const SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP)) return S;
+  if (const SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP))
+    return S;
   SCEV *S = new (SCEVAllocator) SCEVSignExtendExpr(ID.Intern(SCEVAllocator),
                                                    Op, Ty);
   UniqueSCEVs.InsertNode(S, IP);
@@ -3080,7 +3085,7 @@ const SCEV *ScalarEvolution::getOrCreateMulExpr(ArrayRef<SCEVUse> Ops,
     ID.AddPointer(Op.getOpaqueValue());
   void *IP = nullptr;
   SCEVMulExpr *S =
-    static_cast<SCEVMulExpr *>(UniqueSCEVs.FindNodeOrInsertPos(ID, IP));
+      static_cast<SCEVMulExpr *>(UniqueSCEVs.FindNodeOrInsertPos(ID, IP));
   if (!S) {
     SCEVUse *O = SCEVAllocator.Allocate<SCEVUse>(Ops.size());
     llvm::uninitialized_copy(Ops, O);

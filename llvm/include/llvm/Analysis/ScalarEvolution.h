@@ -343,11 +343,18 @@ public:
 // Specialize FoldingSetTrait for SCEV to avoid needing to compute
 // temporary FoldingSetNodeID values.
 template <> struct FoldingSetTrait<SCEV> : DefaultFoldingSetTrait<SCEV> {
+  static constexpr bool NeedsTempID = false;
+
   static void Profile(const SCEV &X, FoldingSetNodeID &ID) { ID = X.FastID; }
+
+  static bool Equals(const SCEV &X, const FoldingSetNodeID &ID,
+                     unsigned IDHash) {
+    return ID == X.FastID;
+  }
 
   static bool Equals(const SCEV &X, const FoldingSetNodeID &ID, unsigned IDHash,
                      FoldingSetNodeID &TempID) {
-    return ID == X.FastID;
+    return Equals(X, ID, IDHash);
   }
 
   static unsigned ComputeHash(const SCEV &X, FoldingSetNodeID &TempID) {
@@ -424,13 +431,20 @@ inline raw_ostream &operator<<(raw_ostream &OS, const SCEVPredicate &P) {
 // temporary FoldingSetNodeID values.
 template <>
 struct FoldingSetTrait<SCEVPredicate> : DefaultFoldingSetTrait<SCEVPredicate> {
+  static constexpr bool NeedsTempID = false;
+
   static void Profile(const SCEVPredicate &X, FoldingSetNodeID &ID) {
     ID = X.FastID;
   }
 
   static bool Equals(const SCEVPredicate &X, const FoldingSetNodeID &ID,
-                     unsigned IDHash, FoldingSetNodeID &TempID) {
+                     unsigned IDHash) {
     return ID == X.FastID;
+  }
+
+  static bool Equals(const SCEVPredicate &X, const FoldingSetNodeID &ID,
+                     unsigned IDHash, FoldingSetNodeID &TempID) {
+    return Equals(X, ID, IDHash);
   }
 
   static unsigned ComputeHash(const SCEVPredicate &X,
