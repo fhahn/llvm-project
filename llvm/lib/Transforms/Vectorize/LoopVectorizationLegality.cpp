@@ -549,12 +549,13 @@ public:
   static const SCEV *rewrite(const SCEV *S, ScalarEvolution &SE,
                              unsigned StepMultiplier, unsigned Offset,
                              Loop *TheLoop) {
-    /// Bail out if the expression does not contain an UDiv expression.
+    /// Bail out if the expression does not contain a UDiv or URem expression.
     /// Uniform values which are not loop invariant require operations to strip
-    /// out the lowest bits. For now just look for UDivs and use it to avoid
-    /// re-writing UDIV-free expressions for other lanes to limit compile time.
+    /// out the lowest bits. For now just look for UDivs/URems and use it to
+    /// avoid re-writing division-free expressions for other lanes to limit
+    /// compile time.
     if (!SCEVExprContains(S,
-                          [](const SCEV *S) { return isa<SCEVUDivExpr>(S); }))
+                          [](const SCEV *S) { return isa<SCEVBinaryExpr>(S); }))
       return SE.getCouldNotCompute();
 
     SCEVAddRecForUniformityRewriter Rewriter(SE, StepMultiplier, Offset,

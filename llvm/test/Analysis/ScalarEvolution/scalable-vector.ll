@@ -87,7 +87,7 @@ define void @vscale_step_ne_tripcount(i64 %N) vscale_range(2, 1024) {
 ; CHECK-NEXT:    %n.rnd.up = add i64 %N, %4
 ; CHECK-NEXT:    --> (-1 + (4 * vscale)<nuw><nsw> + %N) U: full-set S: full-set
 ; CHECK-NEXT:    %n.mod.vf = urem i64 %n.rnd.up, %2
-; CHECK-NEXT:    --> (-1 + (vscale * (4 + (-4 * ((-1 + (4 * vscale)<nuw><nsw> + %N) /u (4 * vscale)<nuw><nsw>))<nsw>)<nsw>) + %N) U: full-set S: full-set
+; CHECK-NEXT:    --> ((-1 + (4 * vscale)<nuw><nsw> + %N) %u (4 * vscale)<nuw><nsw>) U: [0,4096) S: [0,4096)
 ; CHECK-NEXT:    %n.vec = sub i64 %n.rnd.up, %n.mod.vf
 ; CHECK-NEXT:    --> (4 * vscale * ((-1 + (4 * vscale)<nuw><nsw> + %N) /u (4 * vscale)<nuw><nsw>)) U: [0,-3) S: [-9223372036854775808,9223372036854775805)
 ; CHECK-NEXT:    %index = phi i64 [ 0, %vector.ph ], [ %index.next, %vector.body ]

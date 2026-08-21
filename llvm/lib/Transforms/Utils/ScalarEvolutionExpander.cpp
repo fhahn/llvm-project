@@ -463,6 +463,7 @@ const Loop *SCEVExpander::getRelevantLoop(const SCEV *S) {
   case scAddExpr:
   case scMulExpr:
   case scUDivExpr:
+  case scURemExpr:
   case scAddRecExpr:
   case scUMaxExpr:
   case scSMaxExpr:
@@ -525,16 +526,6 @@ public:
 }
 
 Value *SCEVExpander::visitAddExpr(SCEVUseT<const SCEVAddExpr *> S) {
-  // Recognize the canonical representation of an unsimplifed urem.
-  const SCEV *URemLHS = nullptr;
-  const SCEV *URemRHS = nullptr;
-  if (match(S, m_scev_URem(m_SCEV(URemLHS), m_SCEV(URemRHS), SE))) {
-    Value *LHS = expand(URemLHS);
-    Value *RHS = expand(URemRHS);
-    return InsertBinop(Instruction::URem, LHS, RHS, SCEV::FlagAnyWrap,
-                       /*IsSafeToHoist*/ false);
-  }
-
   // -C + umax(C, X) --> usub.sat(X, C)
   const SCEV *UMaxRHS = nullptr;
   const SCEVConstant *C1, *C2;
@@ -716,16 +707,12 @@ Value *SCEVExpander::visitMulExpr(SCEVUseT<const SCEVMulExpr *> S) {
   return Prod;
 }
 
-Value *SCEVExpander::visitUDivExpr(SCEVUseT<const SCEVUDivExpr *> S) {
+/// Expand a udiv or urem, whose divisor may be zero. In SafeUDivMode the
+/// divisor must be forced to a well-defined non-zero value, because the
+/// expansion is speculated.
+Value *SCEVExpander::expandDivRem(const SCEVBinaryExpr *S,
+                                  Instruction::BinaryOps Opcode) {
   Value *LHS = expand(S->getLHS());
-  if (const SCEVConstant *SC = dyn_cast<SCEVConstant>(S->getRHS())) {
-    const APInt &RHS = SC->getAPInt();
-    if (RHS.isPowerOf2())
-      return InsertBinop(Instruction::LShr, LHS,
-                         ConstantInt::get(SC->getType(), RHS.logBase2()),
-                         SCEV::FlagAnyWrap, /*IsSafeToHoist*/ true);
-  }
-
   const SCEV *RHSExpr = S->getRHS();
   Value *RHS = expand(RHSExpr);
   if (SafeUDivMode) {
@@ -741,8 +728,24 @@ Value *SCEVExpander::visitUDivExpr(SCEVUseT<const SCEVUDivExpr *> S) {
       RHS = Builder.CreateIntrinsic(RHS->getType(), Intrinsic::umax,
                                     {RHS, ConstantInt::get(RHS->getType(), 1)});
   }
-  return InsertBinop(Instruction::UDiv, LHS, RHS, SCEV::FlagAnyWrap,
-                     /*IsSafeToHoist*/ SE.isKnownNonZero(S->getRHS()));
+  return InsertBinop(Opcode, LHS, RHS, SCEV::FlagAnyWrap,
+                     /*IsSafeToHoist=*/SE.isKnownNonZero(RHSExpr));
+}
+
+Value *SCEVExpander::visitUDivExpr(SCEVUseT<const SCEVUDivExpr *> S) {
+  if (const SCEVConstant *SC = dyn_cast<SCEVConstant>(S->getRHS())) {
+    const APInt &RHS = SC->getAPInt();
+    if (RHS.isPowerOf2())
+      return InsertBinop(Instruction::LShr, expand(S->getLHS()),
+                         ConstantInt::get(SC->getType(), RHS.logBase2()),
+                         SCEV::FlagAnyWrap, /*IsSafeToHoist*/ true);
+  }
+
+  return expandDivRem(S, Instruction::UDiv);
+}
+
+Value *SCEVExpander::visitURemExpr(SCEVUseT<const SCEVURemExpr *> S) {
+  return expandDivRem(S, Instruction::URem);
 }
 
 /// Determine if this is a well-behaved chain of instructions leading back to
@@ -1695,7 +1698,7 @@ Value *SCEVExpander::expand(SCEVUse S) {
   // otherwise we are risky to move it over the check for zero denominator.
   auto SafeToHoist = [](const SCEV *S) {
     return !SCEVExprContains(S, [](const SCEV *S) {
-              if (const auto *D = dyn_cast<SCEVUDivExpr>(S)) {
+              if (const auto *D = dyn_cast<SCEVBinaryExpr>(S)) {
                 if (const auto *SC = dyn_cast<SCEVConstant>(D->getRHS()))
                   // Division by non-zero constants can be hoisted.
                   return SC->getValue()->isZero();
@@ -2106,6 +2109,9 @@ template<typename T> static InstructionCost costAndCollectOperands(
     Cost = ArithCost(Opcode, 1);
     break;
   }
+  case scURemExpr:
+    Cost = ArithCost(Instruction::URem, 1);
+    break;
   case scAddExpr:
     Cost = ArithCost(Instruction::Add, S->getNumOperands() - 1);
     break;
@@ -2230,7 +2236,8 @@ bool SCEVExpander::isHighCostExpansionHelper(
         costAndCollectOperands<SCEVCastExpr>(WorkItem, TTI, CostKind, Worklist);
     return false; // Will answer upon next entry into this function.
   }
-  case scUDivExpr: {
+  case scUDivExpr:
+  case scURemExpr: {
     // UDivExpr is very likely a UDiv that ScalarEvolution's HowFarToZero or
     // HowManyLessThans produced to compute a precise expression, rather than a
     // UDiv from the user's code. If we can't find a UDiv in the code with some
@@ -2239,12 +2246,13 @@ bool SCEVExpander::isHighCostExpansionHelper(
     // At the beginning of this function we already tried to find existing
     // value for plain 'S'. Now try to lookup 'S + 1' since it is common
     // pattern involving division. This is just a simple search heuristic.
-    if (hasRelatedExistingExpansion(
+    if (S->getSCEVType() == scUDivExpr &&
+        hasRelatedExistingExpansion(
             SE.getAddExpr(S, SE.getConstant(S->getType(), 1)), &At, L))
       return false; // Consider it to be free.
 
-    Cost +=
-        costAndCollectOperands<SCEVUDivExpr>(WorkItem, TTI, CostKind, Worklist);
+    Cost += costAndCollectOperands<SCEVBinaryExpr>(WorkItem, TTI, CostKind,
+                                                   Worklist);
     return false; // Will answer upon next entry into this function.
   }
   case scAddExpr:
@@ -2535,7 +2543,7 @@ struct SCEVFindUnsafe {
       : SE(SE), CanonicalMode(CanonicalMode) {}
 
   bool follow(const SCEV *S) {
-    if (const SCEVUDivExpr *D = dyn_cast<SCEVUDivExpr>(S)) {
+    if (const SCEVBinaryExpr *D = dyn_cast<SCEVBinaryExpr>(S)) {
       if (!SE.isKnownNonZero(D->getRHS()) ||
           !SE.isGuaranteedNotToBePoison(D->getRHS())) {
         IsUnsafe = true;

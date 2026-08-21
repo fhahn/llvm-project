@@ -551,10 +551,12 @@ exit:
 ; Loop with vscale-based trip count vscale x 1024.
 define void @trip_count_vscale_no_epilogue_iterations(ptr noalias %a, ptr noalias %b) vscale_range(1, 16) #0 {
 ; CHECK-LABEL: @trip_count_vscale_no_epilogue_iterations(
-; CHECK-NEXT:  entry:
+; CHECK-NEXT:  iter.check:
 ; CHECK-NEXT:    [[V:%.*]] = tail call i64 @llvm.vscale.i64()
 ; CHECK-NEXT:    [[N:%.*]] = mul nuw nsw i64 [[V]], 1024
-; CHECK-NEXT:    br label [[VECTOR_PH:%.*]]
+; CHECK-NEXT:    br i1 false, label [[VEC_EPILOG_SCALAR_PH:%.*]], label [[VECTOR_MAIN_LOOP_ITER_CHECK:%.*]]
+; CHECK:       vector.main.loop.iter.check:
+; CHECK-NEXT:    br i1 false, label [[VEC_EPILOG_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
 ; CHECK-NEXT:    [[TMP0:%.*]] = call i64 @llvm.vscale.i64()
 ; CHECK-NEXT:    [[TMP3:%.*]] = shl nuw i64 [[TMP0]], 2
@@ -582,8 +584,28 @@ define void @trip_count_vscale_no_epilogue_iterations(ptr noalias %a, ptr noalia
 ; CHECK:       middle.block:
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[SCALAR_PH:%.*]]
-; CHECK:       scalar.ph:
+; CHECK:       vec.epilog.iter.check:
+; CHECK-NEXT:    [[MIN_EPILOG_ITERS_CHECK:%.*]] = icmp ult i64 [[N_MOD_VF]], 4
+; CHECK-NEXT:    br i1 [[MIN_EPILOG_ITERS_CHECK]], label [[VEC_EPILOG_SCALAR_PH]], label [[VEC_EPILOG_PH]], !prof [[PROF13]]
+; CHECK:       vec.epilog.ph:
+; CHECK-NEXT:    [[VEC_EPILOG_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], [[SCALAR_PH]] ], [ 0, [[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
 ; CHECK-NEXT:    br label [[FOR_BODY:%.*]]
+; CHECK:       vec.epilog.vector.body:
+; CHECK-NEXT:    [[INDEX4:%.*]] = phi i64 [ [[VEC_EPILOG_RESUME_VAL]], [[VEC_EPILOG_PH]] ], [ [[INDEX_NEXT7:%.*]], [[FOR_BODY]] ]
+; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr inbounds nuw float, ptr [[A]], i64 [[INDEX4]]
+; CHECK-NEXT:    [[WIDE_LOAD5:%.*]] = load <4 x float>, ptr [[TMP14]], align 4
+; CHECK-NEXT:    [[TMP15:%.*]] = getelementptr inbounds nuw float, ptr [[B]], i64 [[INDEX4]]
+; CHECK-NEXT:    [[WIDE_LOAD6:%.*]] = load <4 x float>, ptr [[TMP15]], align 4
+; CHECK-NEXT:    [[TMP16:%.*]] = fmul <4 x float> [[WIDE_LOAD5]], [[WIDE_LOAD6]]
+; CHECK-NEXT:    store <4 x float> [[TMP16]], ptr [[TMP15]], align 4
+; CHECK-NEXT:    [[INDEX_NEXT7]] = add nuw i64 [[INDEX4]], 4
+; CHECK-NEXT:    [[TMP13:%.*]] = icmp eq i64 [[INDEX_NEXT7]], [[N]]
+; CHECK-NEXT:    br i1 [[TMP13]], label [[VEC_EPILOG_MIDDLE_BLOCK:%.*]], label [[FOR_BODY]], !llvm.loop [[LOOP17:![0-9]+]]
+; CHECK:       vec.epilog.middle.block:
+; CHECK-NEXT:    br i1 true, label [[EXIT]], label [[VEC_EPILOG_SCALAR_PH]]
+; CHECK:       vec.epilog.scalar.ph:
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N]], [[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[N_VEC]], [[SCALAR_PH]] ], [ 0, [[ITER_CHECK:%.*]] ]
+; CHECK-NEXT:    br label [[FOR_BODY1:%.*]]
 ; CHECK:       for.body:
 ;
 ; CHECK-VF8-LABEL: @trip_count_vscale_no_epilogue_iterations(

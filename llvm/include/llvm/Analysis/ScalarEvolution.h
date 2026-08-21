@@ -103,10 +103,10 @@ LLVM_ABI extern bool VerifySCEV;
 /// The above rules describe a maximally hoisted form (without regards to
 /// potential control dependence).  A SCEV is defined anywhere a
 /// corresponding instruction could be defined in said maximally hoisted
-/// form.  Note that SCEVUDivExpr (currently the only expression type which
-/// can trap) can be defined per these rules in regions where it would trap
-/// at runtime.  A SCEV being defined does not require the existence of any
-/// instruction within the defined scope.
+/// form.  Note that SCEVUDivExpr and SCEVURemExpr (currently the only
+/// expression types which can trap) can be defined per these rules in regions
+/// where they would trap at runtime.  A SCEV being defined does not require the
+/// existence of any instruction within the defined scope.
 enum class SCEVNoWrapFlags {
   FlagAnyWrap = 0,    // No guarantee.
   FlagNW = (1 << 0),  // No self-wrap.
@@ -2530,6 +2530,9 @@ private:
 
   // Get UDiv expression already created or create a new one.
   const SCEV *getOrCreateUDivExpr(SCEVUse LHS, SCEVUse RHS);
+
+  // Get URem expression already created or create a new one.
+  const SCEV *getOrCreateURemExpr(SCEVUse LHS, SCEVUse RHS);
 
   /// Return x if \p Val is f(x) where f is a 1-1 function.
   const SCEV *stripInjectiveFunctions(const SCEV *Val) const;

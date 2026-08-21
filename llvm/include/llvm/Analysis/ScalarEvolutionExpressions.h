@@ -46,6 +46,7 @@ enum SCEVTypes : unsigned short {
   scAddExpr,
   scMulExpr,
   scUDivExpr,
+  scURemExpr,
   scAddRecExpr,
   scUMaxExpr,
   scSMaxExpr,
@@ -293,32 +294,55 @@ public:
   static bool classof(const SCEVUse *U) { return classof(U->getPointer()); }
 };
 
-/// This class represents a binary unsigned division operation.
-class SCEVUDivExpr : public SCEV {
-  friend class ScalarEvolution;
-
+/// This is the base class for binary, non-commutative operators.
+class SCEVBinaryExpr : public SCEV {
+protected:
   std::array<SCEVUse, 2> Operands;
 
-  SCEVUDivExpr(const FoldingSetNodeIDRef ID, SCEVUse lhs, SCEVUse rhs)
-      : SCEV(ID, scUDivExpr, computeExpressionSize({lhs, rhs}),
-             lhs->getType()) {
-    Operands[0] = lhs;
-    Operands[1] = rhs;
-  }
+  SCEVBinaryExpr(const FoldingSetNodeIDRef ID, SCEVTypes SCEVTy, SCEVUse LHS,
+                 SCEVUse RHS)
+      : SCEV(ID, SCEVTy, computeExpressionSize({LHS, RHS}), LHS->getType()),
+        Operands({LHS, RHS}) {}
 
 public:
   SCEVUse getLHS() const { return Operands[0]; }
   SCEVUse getRHS() const { return Operands[1]; }
   size_t getNumOperands() const { return 2; }
   SCEVUse getOperand(unsigned i) const {
-    assert((i == 0 || i == 1) && "Operand index out of range!");
-    return i == 0 ? getLHS() : getRHS();
+    assert(i < 2 && "Operand index out of range!");
+    return Operands[i];
   }
 
   ArrayRef<SCEVUse> operands() const { return Operands; }
 
   /// Methods for support type inquiry through isa, cast, and dyn_cast:
+  static bool classof(const SCEV *S) {
+    return S->getSCEVType() == scUDivExpr || S->getSCEVType() == scURemExpr;
+  }
+};
+
+/// This class represents a binary unsigned division operation.
+class SCEVUDivExpr : public SCEVBinaryExpr {
+  friend class ScalarEvolution;
+
+  SCEVUDivExpr(const FoldingSetNodeIDRef ID, SCEVUse LHS, SCEVUse RHS)
+      : SCEVBinaryExpr(ID, scUDivExpr, LHS, RHS) {}
+
+public:
+  /// Methods for support type inquiry through isa, cast, and dyn_cast:
   static bool classof(const SCEV *S) { return S->getSCEVType() == scUDivExpr; }
+};
+
+/// This class represents a binary unsigned remainder operation.
+class SCEVURemExpr : public SCEVBinaryExpr {
+  friend class ScalarEvolution;
+
+  SCEVURemExpr(const FoldingSetNodeIDRef ID, SCEVUse LHS, SCEVUse RHS)
+      : SCEVBinaryExpr(ID, scURemExpr, LHS, RHS) {}
+
+public:
+  /// Methods for support type inquiry through isa, cast, and dyn_cast:
+  static bool classof(const SCEV *S) { return S->getSCEVType() == scURemExpr; }
 };
 
 /// This node represents a polynomial recurrence on the trip count
@@ -609,6 +633,8 @@ template <typename SC, typename RetVal = void> struct SCEVVisitor {
       return ((SC *)this)->visitMulExpr((const SCEVMulExpr *)S);
     case scUDivExpr:
       return ((SC *)this)->visitUDivExpr((const SCEVUDivExpr *)S);
+    case scURemExpr:
+      return ((SC *)this)->visitURemExpr((const SCEVURemExpr *)S);
     case scAddRecExpr:
       return ((SC *)this)->visitAddRecExpr((const SCEVAddRecExpr *)S);
     case scSMaxExpr:
@@ -663,6 +689,9 @@ template <typename SC, typename RetVal = void> struct SCEVUseVisitor {
     case scUDivExpr:
       return ((SC *)this)
           ->visitUDivExpr(cast<SCEVUseT<const SCEVUDivExpr *>>(S));
+    case scURemExpr:
+      return ((SC *)this)
+          ->visitURemExpr(cast<SCEVUseT<const SCEVURemExpr *>>(S));
     case scAddRecExpr:
       return ((SC *)this)
           ->visitAddRecExpr(cast<SCEVUseT<const SCEVAddRecExpr *>>(S));
@@ -734,6 +763,7 @@ public:
       case scAddExpr:
       case scMulExpr:
       case scUDivExpr:
+      case scURemExpr:
       case scSMaxExpr:
       case scUMaxExpr:
       case scSMinExpr:
@@ -867,6 +897,13 @@ public:
     auto *RHS = ((SC *)this)->visit(Expr->getRHS());
     bool Changed = LHS != Expr->getLHS() || RHS != Expr->getRHS();
     return !Changed ? Expr : SE.getUDivExpr(LHS, RHS);
+  }
+
+  const SCEV *visitURemExpr(const SCEVURemExpr *Expr) {
+    auto *LHS = ((SC *)this)->visit(Expr->getLHS());
+    auto *RHS = ((SC *)this)->visit(Expr->getRHS());
+    bool Changed = LHS != Expr->getLHS() || RHS != Expr->getRHS();
+    return !Changed ? Expr : SE.getURemExpr(LHS, RHS);
   }
 
   const SCEV *visitAddRecExpr(const SCEVAddRecExpr *Expr) {

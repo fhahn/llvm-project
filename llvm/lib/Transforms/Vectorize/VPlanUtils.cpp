@@ -943,15 +943,17 @@ VPValue *VPSCEVExpander::expand(const SCEV *S) {
     }
     return Result;
   }
-  case scUDivExpr: {
-    auto *UDiv = cast<SCEVUDivExpr>(S);
-    VPValue *LHS = expand(UDiv->getLHS());
-    const SCEV *RHSExpr = UDiv->getRHS();
+  case scUDivExpr:
+  case scURemExpr: {
+    auto *Bin = cast<SCEVBinaryExpr>(S);
+    unsigned Opcode =
+        S->getSCEVType() == scUDivExpr ? Instruction::UDiv : Instruction::URem;
+    VPValue *LHS = expand(Bin->getLHS());
+    const SCEV *RHSExpr = Bin->getRHS();
     VPValue *RHS = expand(RHSExpr);
     if (SafeUDivMode) {
-      // Make sure the UDiv's divisor is guaranteed to not be zero/poison, to
-      // avoid UB.
-      Type *Ty = UDiv->getType();
+      // Make sure the divisor is guaranteed to not be zero/poison, to avoid UB.
+      Type *Ty = Bin->getType();
       bool GuaranteedNotPoison =
           ScalarEvolution::isGuaranteedNotToBePoison(RHSExpr);
       if (!GuaranteedNotPoison)
@@ -961,9 +963,8 @@ VPValue *VPSCEVExpander::expand(const SCEV *S) {
             Intrinsic::umax, {RHS, Builder.getPlan().getConstantInt(Ty, 1)}, Ty,
             DL);
     }
-    return Builder.createNaryOp(Instruction::UDiv, {LHS, RHS},
-                                VPIRFlags::getDefaultFlags(Instruction::UDiv),
-                                DL);
+    return Builder.createNaryOp(Opcode, {LHS, RHS},
+                                VPIRFlags::getDefaultFlags(Opcode), DL);
   }
   case scTruncate:
   case scZeroExtend:

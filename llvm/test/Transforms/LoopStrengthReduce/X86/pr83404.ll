@@ -7,6 +7,8 @@ define void @test() {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    br label [[FOR_BODY:%.*]]
 ; CHECK:       for.body:
+; CHECK-NEXT:    [[TMP0:%.*]] = phi i64 [ [[DEC:%.*]], [[FOR_BODY]] ], [ 0, [[ENTRY:%.*]] ]
+; CHECK-NEXT:    [[DEC]] = add i64 [[TMP0]], 1
 ; CHECK-NEXT:    br label [[FOR_BODY]]
 ;
 entry:

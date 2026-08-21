@@ -18,18 +18,16 @@ define void @foo() {
 ; CHECK:       bb4:
 ; CHECK-NEXT:    [[LSR_IV:%.*]] = phi i16 [ [[LSR_IV_NEXT:%.*]], [[BB13:%.*]] ], [ 6, [[BB:%.*]] ]
 ; CHECK-NEXT:    [[T5:%.*]] = phi i64 [ 2, [[BB]] ], [ [[T14]], [[BB13]] ]
-; CHECK-NEXT:    [[T6:%.*]] = add i64 [[T5]], 4
-; CHECK-NEXT:    [[T7:%.*]] = trunc i64 [[T6]] to i16
-; CHECK-NEXT:    [[T8:%.*]] = urem i16 [[T7]], 3
+; CHECK-NEXT:    [[T8:%.*]] = urem i16 [[LSR_IV]], 3
 ; CHECK-NEXT:    [[T9:%.*]] = mul i16 [[T8]], 2
-; CHECK-NEXT:    [[LSR_IV_NEXT]] = add nuw nsw i16 [[LSR_IV]], 6
-; CHECK-NEXT:    [[T14]] = add nuw nsw i64 [[T5]], 6
 ; CHECK-NEXT:    [[T10:%.*]] = icmp eq i16 [[T9]], 1
 ; CHECK-NEXT:    br i1 [[T10]], label [[BB11:%.*]], label [[BB13]]
 ; CHECK:       bb11:
 ; CHECK-NEXT:    [[T12:%.*]] = udiv i16 1, [[LSR_IV]]
 ; CHECK-NEXT:    unreachable
 ; CHECK:       bb13:
+; CHECK-NEXT:    [[T14]] = add nuw nsw i64 [[T5]], 6
+; CHECK-NEXT:    [[LSR_IV_NEXT]] = add nuw nsw i16 [[LSR_IV]], 6
 ; CHECK-NEXT:    br i1 true, label [[BB1:%.*]], label [[BB4]]
 ;
 bb:

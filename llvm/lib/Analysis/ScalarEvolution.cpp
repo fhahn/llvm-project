@@ -388,9 +388,11 @@ void SCEV::print(raw_ostream &OS) const {
     }
     return;
   }
-  case scUDivExpr: {
-    const SCEVUDivExpr *UDiv = cast<SCEVUDivExpr>(this);
-    OS << "(" << UDiv->getLHS() << " /u " << UDiv->getRHS() << ")";
+  case scUDivExpr:
+  case scURemExpr: {
+    const SCEVBinaryExpr *Bin = cast<SCEVBinaryExpr>(this);
+    const char *OpStr = getSCEVType() == scUDivExpr ? " /u " : " %u ";
+    OS << "(" << Bin->getLHS() << OpStr << Bin->getRHS() << ")";
     return;
   }
   case scUnknown:
@@ -424,7 +426,8 @@ ArrayRef<SCEVUse> SCEV::operands() const {
   case scSequentialUMinExpr:
     return cast<SCEVNAryExpr>(this)->operands();
   case scUDivExpr:
-    return cast<SCEVUDivExpr>(this)->operands();
+  case scURemExpr:
+    return cast<SCEVBinaryExpr>(this)->operands();
   case scCouldNotCompute:
     llvm_unreachable("Attempt to use a SCEVCouldNotCompute object!");
   }
@@ -729,6 +732,7 @@ CompareSCEVComplexity(const LoopInfo *const LI, const SCEV *LHS,
   case scAddExpr:
   case scMulExpr:
   case scUDivExpr:
+  case scURemExpr:
   case scSMaxExpr:
   case scUMaxExpr:
   case scSMinExpr:
@@ -1514,6 +1518,65 @@ static void insertFoldCacheEntry(
   FoldCacheUser[S].push_back(ID);
 }
 
+/// Match \p Expr as an unsigned remainder, returning the dividend in \p RemLHS
+/// and the divisor in \p RemRHS. Besides a plain SCEVURemExpr node this also
+/// recognizes the two remainder shapes that never become one: `zext (trunc X
+/// to iB) to iY`, which getURemExpr folds power-of-2 divisors to, and
+/// `A - (A /u B) * B`, which is how a remainder written out in IR arrives here.
+static bool matchURem(const SCEV *Expr, const SCEV *&RemLHS,
+                      const SCEV *&RemRHS, ScalarEvolution &SE) {
+  if (match(Expr, m_scev_URem(m_SCEV(RemLHS), m_SCEV(RemRHS))))
+    return true;
+
+  if (Expr->getType()->isPointerTy())
+    return false;
+
+  const SCEV *X;
+  if (match(Expr, m_scev_ZExt(m_scev_Trunc(m_SCEV(X)))) &&
+      X->getType() == Expr->getType()) {
+    unsigned TruncBits = SE.getTypeSizeInBits(
+        cast<SCEVZeroExtendExpr>(Expr)->getOperand()->getType());
+    RemLHS = X;
+    RemRHS = SE.getConstant(
+        APInt::getOneBitSet(SE.getTypeSizeInBits(Expr->getType()), TruncBits));
+    return true;
+  }
+
+  // A and B may have been folded into the udiv (imagine A is X /u 2 and B is 4,
+  // so A /u B became X /u 8), so a candidate divisor can only be checked by
+  // rebuilding the whole expression. Only do that if the multiply has a udiv
+  // operand, as it must for this shape.
+  const SCEV *A;
+  const SCEVMulExpr *Mul;
+  if (!match(Expr, m_scev_Add(m_scev_Mul(Mul), m_SCEV(A))) ||
+      none_of(Mul->operands(),
+              [](const SCEV *Op) { return isa<SCEVUDivExpr>(Op); }))
+    return false;
+
+  auto IsDivisor = [&](const SCEV *B) {
+    const SCEV *Mult = SE.getMulExpr(SE.getUDivExpr(A, B), B, SCEV::FlagNUW);
+    return Expr == SE.getMinusSCEV(A, Mult, SCEV::FlagNUW);
+  };
+
+  // The -1 factor may sit in a separate constant operand, or have been folded
+  // into the divisor or into the udiv, so try the negated operands too.
+  SmallVector<const SCEV *, 4> Divisors;
+  if (Mul->getNumOperands() == 3 && isa<SCEVConstant>(Mul->getOperand(0)))
+    Divisors = {Mul->getOperand(1), Mul->getOperand(2)};
+  else if (Mul->getNumOperands() == 2)
+    Divisors = {Mul->getOperand(1), Mul->getOperand(0),
+                SE.getNegativeSCEV(Mul->getOperand(1)),
+                SE.getNegativeSCEV(Mul->getOperand(0))};
+
+  for (const SCEV *B : Divisors)
+    if (IsDivisor(B)) {
+      RemLHS = A;
+      RemRHS = B;
+      return true;
+    }
+  return false;
+}
+
 const SCEV *ScalarEvolution::getZeroExtendExpr(SCEVUse Op, Type *Ty,
                                                unsigned Depth) {
   assert(getTypeSizeInBits(Op->getType()) < getTypeSizeInBits(Ty) &&
@@ -1736,13 +1799,10 @@ const SCEV *ScalarEvolution::getZeroExtendExprImpl(SCEVUse Op, Type *Ty,
   }
 
   // zext(A % B) --> zext(A) % zext(B)
-  {
-    const SCEV *LHS;
-    const SCEV *RHS;
-    if (match(Op, m_scev_URem(m_SCEV(LHS), m_SCEV(RHS), *this)))
-      return getURemExpr(getZeroExtendExpr(LHS, Ty, Depth + 1),
-                         getZeroExtendExpr(RHS, Ty, Depth + 1));
-  }
+  const SCEV *RemLHS, *RemRHS;
+  if (matchURem(Op, RemLHS, RemRHS, *this))
+    return getURemExpr(getZeroExtendExpr(RemLHS, Ty, Depth + 1),
+                       getZeroExtendExpr(RemRHS, Ty, Depth + 1));
 
   // zext(A / B) --> zext(A) / zext(B).
   if (auto *Div = dyn_cast<SCEVUDivExpr>(Op))
@@ -2690,13 +2750,41 @@ const SCEV *ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
     }
   }
 
-  // Canonicalize (-1 * urem X, Y) + X --> (Y * X/Y)
-  const SCEV *Y;
-  if (Ops.size() == 2 &&
-      match(Ops[0],
-            m_scev_Mul(m_scev_AllOnes(),
-                       m_scev_URem(m_scev_Specific(Ops[1]), m_SCEV(Y), *this))))
-    return getMulExpr(Y, getUDivExpr(Ops[1], Y));
+  // Fold using the identity (X urem Y) + Y * (X /u Y) == X: if the add holds
+  // two of the three terms, replace them by the third. Applied repeatedly this
+  // collapses the flattened index arithmetic of a multi-dimensional access,
+  // e.g. 8 * (i urem 3) + 24 * ((i /u 3) urem 3) + 72 * (i /u 9) --> 8 * i,
+  // which an opaque remainder node would otherwise block.
+  for (unsigned I = 0, E = Ops.size(); I != E; ++I) {
+    const APInt *C = nullptr;
+    const SCEV *Rem = Ops[I], *Scaled, *X, *Y;
+    if (match(Rem, m_scev_Mul(m_scev_APInt(C), m_SCEV(Scaled))))
+      Rem = Scaled;
+    if (!matchURem(Rem, X, Y, *this))
+      continue;
+    SCEVUse Scale = C ? getConstant(*C) : getOne(Rem->getType());
+    SCEVUse Div = getMulExpr(Y, getUDivExpr(X, Y));
+    SCEVUse ScaledDiv = getMulExpr(Scale, Div);
+    for (unsigned J = 0; J != E; ++J) {
+      SCEVUse Folded;
+      if (J == I)
+        continue;
+      if (Ops[J] == ScaledDiv)
+        // C * (X urem Y) + C * Y * (X /u Y) --> C * X
+        Folded = getMulExpr(Scale, X);
+      else if (C && C->isAllOnes() && Ops[J] == X)
+        // X - (X urem Y) --> Y * (X /u Y)
+        Folded = Div;
+      else
+        continue;
+      SmallVector<SCEVUse, 4> NewOps;
+      for (unsigned K = 0; K != E; ++K)
+        if (K != I && K != J)
+          NewOps.push_back(Ops[K]);
+      NewOps.push_back(Folded);
+      return getAddExpr(NewOps, SCEV::FlagAnyWrap, Depth + 1);
+    }
+  }
 
   // Skip past any other cast SCEVs.
   while (Idx < Ops.size() && Ops[Idx]->getSCEVType() < scAddExpr)
@@ -3047,6 +3135,22 @@ const SCEV *ScalarEvolution::getOrCreateUDivExpr(SCEVUse LHS, SCEVUse RHS) {
   if (!S) {
     S = new (SCEVAllocator) SCEVUDivExpr(ID.Intern(SCEVAllocator), LHS, RHS);
     UniqueSCEVs.insert(S, Token);
+    S->computeAndSetCanonical(*this);
+    registerUser(S, ArrayRef<SCEVUse>({LHS, RHS}));
+  }
+  return S;
+}
+
+const SCEV *ScalarEvolution::getOrCreateURemExpr(SCEVUse LHS, SCEVUse RHS) {
+  FoldingSetNodeID ID;
+  ID.AddInteger(scURemExpr);
+  ID.AddPointer(LHS.getOpaqueValue());
+  ID.AddPointer(RHS.getOpaqueValue());
+  void *IP = nullptr;
+  SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP);
+  if (!S) {
+    S = new (SCEVAllocator) SCEVURemExpr(ID.Intern(SCEVAllocator), LHS, RHS);
+    UniqueSCEVs.InsertNode(S, IP);
     S->computeAndSetCanonical(*this);
     registerUser(S, ArrayRef<SCEVUse>({LHS, RHS}));
   }
@@ -3411,31 +3515,45 @@ const SCEV *ScalarEvolution::getMulExpr(SmallVectorImpl<SCEVUse> &Ops,
   return getOrCreateMulExpr(Ops, ComputeFlags(Ops));
 }
 
-/// Represents an unsigned remainder expression based on unsigned division.
+/// Get a canonical unsigned remainder expression, or something simpler if
+/// possible.
 const SCEV *ScalarEvolution::getURemExpr(SCEVUse LHS, SCEVUse RHS) {
-  assert(getEffectiveSCEVType(LHS->getType()) ==
-         getEffectiveSCEVType(RHS->getType()) &&
+  assert(!LHS->getType()->isPointerTy() &&
+         "SCEVURemExpr operand can't be pointer!");
+  assert(LHS->getType() == RHS->getType() &&
          "SCEVURemExpr operand types don't match!");
 
-  // Short-circuit easy cases
-  if (const SCEVConstant *RHSC = dyn_cast<SCEVConstant>(RHS)) {
-    // If constant is one, the result is trivial
-    if (RHSC->getValue()->isOne())
+  // 0 urem Y == 0
+  if (match(LHS, m_scev_Zero()))
+    return LHS;
+
+  const APInt *RHSC;
+  if (match(RHS, m_scev_APInt(RHSC))) {
+    // If the denominator is zero, the result of the urem is undefined. Don't
+    // try to analyze it, because the resolution chosen here may differ from
+    // the resolution chosen in other parts of the compiler.
+    if (RHSC->isZero())
+      return getOrCreateURemExpr(LHS, RHS);
+
+    if (RHSC->isOne())
       return getZero(LHS->getType()); // X urem 1 --> 0
 
-    // If constant is a power of two, fold into a zext(trunc(LHS)).
-    if (RHSC->getAPInt().isPowerOf2()) {
-      Type *FullTy = LHS->getType();
-      Type *TruncTy =
-          IntegerType::get(getContext(), RHSC->getAPInt().logBase2());
-      return getZeroExtendExpr(getTruncateExpr(LHS, TruncTy), FullTy);
-    }
+    // Fold if both operands are constant.
+    const APInt *LHSC;
+    if (match(LHS, m_scev_APInt(LHSC)))
+      return getConstant(LHSC->urem(*RHSC));
+
+    // If the denominator is a power of two, the remainder is just the low
+    // log2(RHS) bits of the numerator. Use zext(trunc(LHS)), which the
+    // truncate folds can reason about, rather than an opaque urem node.
+    if (RHSC->isPowerOf2())
+      return getZeroExtendExpr(
+          getTruncateExpr(LHS,
+                          IntegerType::get(getContext(), RHSC->logBase2())),
+          LHS->getType());
   }
 
-  // Fallback to %a == %x urem %y == %x -<nuw> ((%x udiv %y) *<nuw> %y)
-  const SCEV *UDiv = getUDivExpr(LHS, RHS);
-  const SCEV *Mult = getMulExpr(UDiv, RHS, SCEV::FlagNUW);
-  return getMinusSCEV(LHS, Mult, SCEV::FlagNUW);
+  return getOrCreateURemExpr(LHS, RHS);
 }
 
 /// Get a canonical unsigned division expression, or something simpler if
@@ -4062,6 +4180,8 @@ public:
 
   RetVal visitUDivExpr(const SCEVUDivExpr *Expr) { return Expr; }
 
+  RetVal visitURemExpr(const SCEVURemExpr *Expr) { return Expr; }
+
   RetVal visitAddRecExpr(const SCEVAddRecExpr *Expr) { return Expr; }
 
   RetVal visitSMaxExpr(const SCEVSMaxExpr *Expr) {
@@ -4102,6 +4222,7 @@ static bool scevUnconditionallyPropagatesPoisonFromOperands(SCEVTypes Kind) {
   case scAddExpr:
   case scMulExpr:
   case scUDivExpr:
+  case scURemExpr:
   case scAddRecExpr:
   case scUMaxExpr:
   case scSMaxExpr:
@@ -6314,6 +6435,14 @@ APInt ScalarEvolution::getConstantMultipleImpl(const SCEV *S,
   case scUDivExpr:
   case scVScale:
     return APInt(BitWidth, 1);
+  case scURemExpr: {
+    // X urem Y == X - (X /u Y) * Y, so any common multiple of X and Y is also
+    // a multiple of the remainder.
+    const SCEVURemExpr *R = cast<SCEVURemExpr>(S);
+    return APIntOps::GreatestCommonDivisor(
+        getConstantMultiple(R->getLHS(), CtxI),
+        getConstantMultiple(R->getRHS(), CtxI));
+  }
   case scTruncate: {
     // Only multiples that are a power of 2 will hold after truncation.
     const SCEVTruncateExpr *T = cast<SCEVTruncateExpr>(S);
@@ -6617,6 +6746,7 @@ ScalarEvolution::getRangeRefIter(const SCEV *S,
     case scAddExpr:
     case scMulExpr:
     case scUDivExpr:
+    case scURemExpr:
     case scAddRecExpr:
     case scUMaxExpr:
     case scSMaxExpr:
@@ -6749,12 +6879,12 @@ const ConstantRange &ScalarEvolution::getRangeRef(
   }
   case scAddExpr: {
     const SCEVAddExpr *Add = cast<SCEVAddExpr>(S);
-    // Check if this is a URem pattern: A - (A / B) * B, which is always < B.
-    const SCEV *URemLHS = nullptr, *URemRHS = nullptr;
+    // An `A - (A /u B) * B` add is a remainder, which is always < B.
+    const SCEV *RemLHS, *RemRHS;
     if (SignHint == ScalarEvolution::HINT_RANGE_UNSIGNED &&
-        match(S, m_scev_URem(m_SCEV(URemLHS), m_SCEV(URemRHS), *this))) {
-      ConstantRange LHSRange = getRangeRef(URemLHS, SignHint, Depth + 1);
-      ConstantRange RHSRange = getRangeRef(URemRHS, SignHint, Depth + 1);
+        matchURem(S, RemLHS, RemRHS, *this)) {
+      ConstantRange LHSRange = getRangeRef(RemLHS, SignHint, Depth + 1);
+      ConstantRange RHSRange = getRangeRef(RemRHS, SignHint, Depth + 1);
       ConservativeResult =
           ConservativeResult.intersectWith(LHSRange.urem(RHSRange), RangeType);
     }
@@ -6778,12 +6908,14 @@ const ConstantRange &ScalarEvolution::getRangeRef(
     return setRange(Mul, SignHint,
                     ConservativeResult.intersectWith(X, RangeType));
   }
-  case scUDivExpr: {
-    const SCEVUDivExpr *UDiv = cast<SCEVUDivExpr>(S);
-    ConstantRange X = getRangeRef(UDiv->getLHS(), SignHint, Depth + 1);
-    ConstantRange Y = getRangeRef(UDiv->getRHS(), SignHint, Depth + 1);
-    return setRange(UDiv, SignHint,
-                    ConservativeResult.intersectWith(X.udiv(Y), RangeType));
+  case scUDivExpr:
+  case scURemExpr: {
+    const SCEVBinaryExpr *Bin = cast<SCEVBinaryExpr>(S);
+    ConstantRange X = getRangeRef(Bin->getLHS(), SignHint, Depth + 1);
+    ConstantRange Y = getRangeRef(Bin->getRHS(), SignHint, Depth + 1);
+    ConstantRange Res = S->getSCEVType() == scUDivExpr ? X.udiv(Y) : X.urem(Y);
+    return setRange(Bin, SignHint,
+                    ConservativeResult.intersectWith(Res, RangeType));
   }
   case scAddRecExpr: {
     const SCEVAddRecExpr *AddRec = cast<SCEVAddRecExpr>(S);
@@ -7415,11 +7547,12 @@ bool ScalarEvolution::isGuaranteedNotToBePoison(const SCEV *Op) {
 
 bool ScalarEvolution::isGuaranteedNotToCauseUB(const SCEV *Op) {
   return !SCEVExprContains(Op, [this](const SCEV *S) {
-    const SCEV *Op1;
-    bool M = match(S, m_scev_UDiv(m_SCEV(), m_SCEV(Op1)));
-    // The UDiv may be UB if the divisor is poison or zero. Unless the divisor
-    // is a non-zero constant, we have to assume the UDiv may be UB.
-    return M && (!isKnownNonZero(Op1) || !isGuaranteedNotToBePoison(Op1));
+    // A udiv or urem may be UB if the divisor is poison or zero. Unless the
+    // divisor is a known non-zero, non-poison value, we have to assume it may
+    // be UB.
+    const auto *Bin = dyn_cast<SCEVBinaryExpr>(S);
+    return Bin && (!isKnownNonZero(Bin->getRHS()) ||
+                   !isGuaranteedNotToBePoison(Bin->getRHS()));
   });
 }
 
@@ -10105,6 +10238,7 @@ static Constant *BuildConstantFromSCEV(const SCEV *V) {
   case scSignExtend:
   case scZeroExtend:
   case scUDivExpr:
+  case scURemExpr:
   case scSMaxExpr:
   case scUMaxExpr:
   case scSMinExpr:
@@ -10133,6 +10267,8 @@ const SCEV *ScalarEvolution::getWithOperands(const SCEV *S,
     return getMulExpr(NewOps, cast<SCEVMulExpr>(S)->getNoWrapFlags());
   case scUDivExpr:
     return getUDivExpr(NewOps[0], NewOps[1]);
+  case scURemExpr:
+    return getURemExpr(NewOps[0], NewOps[1]);
   case scUMaxExpr:
   case scSMaxExpr:
   case scUMinExpr:
@@ -10209,6 +10345,7 @@ const SCEV *ScalarEvolution::computeSCEVAtScope(const SCEV *V, const Loop *L) {
   case scAddExpr:
   case scMulExpr:
   case scUDivExpr:
+  case scURemExpr:
   case scUMaxExpr:
   case scSMaxExpr:
   case scUMinExpr:
@@ -14460,6 +14597,7 @@ ScalarEvolution::computeLoopDisposition(const SCEV *S, const Loop *L) {
   case scAddExpr:
   case scMulExpr:
   case scUDivExpr:
+  case scURemExpr:
   case scUMaxExpr:
   case scSMaxExpr:
   case scUMinExpr:
@@ -14550,6 +14688,7 @@ ScalarEvolution::computeBlockDisposition(const SCEV *S, const BasicBlock *BB) {
   case scAddExpr:
   case scMulExpr:
   case scUDivExpr:
+  case scURemExpr:
   case scUMaxExpr:
   case scSMaxExpr:
   case scUMinExpr:
@@ -15834,9 +15973,9 @@ static bool collectDivisibilityInformation(
     return false;
   // If LHS is A % B, i.e. A % B == 0, rewrite A to (A /u B) * B to
   // explicitly express that.
-  const SCEVUnknown *URemLHS = nullptr;
+  const SCEV *URemLHS = nullptr;
   const SCEV *URemRHS = nullptr;
-  if (!match(LHS, m_scev_URem(m_SCEVUnknown(URemLHS), m_SCEV(URemRHS), SE)))
+  if (!matchURem(LHS, URemLHS, URemRHS, SE) || !isa<SCEVUnknown>(URemLHS))
     return false;
 
   const SCEV *Multiple =
@@ -15845,13 +15984,6 @@ static bool collectDivisibilityInformation(
   if (auto *C = dyn_cast<SCEVConstant>(URemRHS))
     Multiples[URemLHS] = C->getAPInt();
   return true;
-}
-
-// Check if the condition is a divisibility guard (A % B == 0).
-static bool isDivisibilityGuard(const SCEV *LHS, const SCEV *RHS,
-                                ScalarEvolution &SE) {
-  const SCEV *X, *Y;
-  return match(LHS, m_scev_URem(m_SCEV(X), m_SCEV(Y), SE)) && RHS->isZero();
 }
 
 // Apply divisibility by \p Divisor on MinMaxExpr with constant values,
@@ -16212,12 +16344,9 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
   // Process divisibility guards in reverse order to populate DivGuards early.
   DenseMap<const SCEV *, APInt> Multiples;
   LoopGuards DivGuards(SE);
-  for (const auto &[Predicate, LHS, RHS] : GuardsToProcess) {
-    if (!isDivisibilityGuard(LHS, RHS, SE))
-      continue;
+  for (const auto &[Predicate, LHS, RHS] : GuardsToProcess)
     collectDivisibilityInformation(Predicate, LHS, RHS, DivGuards.RewriteMap,
                                    Multiples, SE);
-  }
 
   for (const auto &[Predicate, LHS, RHS] : GuardsToProcess)
     CollectCondition(Predicate, LHS, RHS, Guards.RewriteMap, DivGuards);

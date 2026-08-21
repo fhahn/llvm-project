@@ -56,23 +56,26 @@ for.end:                                          ; preds = %for.body, %entry
 
 ; EPILOG: br i1 %niter.ncmp.2, label %for.end.loopexit.unr-lcssa, label %for.body, !llvm.loop ![[LOOP_0:[0-9]+]]
 ; EPILOG-NO-UNROLL: br i1 %epil.iter.cmp, label %for.body.epil, label %for.end.loopexit.epilog-lcssa, !llvm.loop ![[LOOP_2:[0-9]+]]
+
+; With -unroll-remainder the remainder loop is fully unrolled (it runs at most
+; Count-1 = 2 times), so no remainder loop is left to carry FollowupRemainder.
 ; EPILOG-UNROLL: br i1 %epil.iter.cmp, label %for.body.epil.1, label %for.end.loopexit.epilog-lcssa
-; EPILOG-UNROLL: br i1 %epil.iter.cmp.1, label %for.body.epil, label %for.end.loopexit.epilog-lcssa, !llvm.loop ![[LOOP_2:[0-9]+]]
+; EPILOG-UNROLL-NOT: !"FollowupRemainder"
 
 ; EPILOG: ![[LOOP_0]] = distinct !{![[LOOP_0]], ![[FOLLOWUP_ALL:[0-9]+]], ![[FOLLOWUP_UNROLLED:[0-9]+]]}
 ; EPILOG: ![[FOLLOWUP_ALL]] = !{!"FollowupAll"}
 ; EPILOG: ![[FOLLOWUP_UNROLLED]] = !{!"FollowupUnrolled"}
-; EPILOG: ![[LOOP_2]] = distinct !{![[LOOP_2]], ![[FOLLOWUP_ALL]], ![[FOLLOWUP_REMAINDER:[0-9]+]]}
-; EPILOG: ![[FOLLOWUP_REMAINDER]] = !{!"FollowupRemainder"}
+; EPILOG-NO-UNROLL: ![[LOOP_2]] = distinct !{![[LOOP_2]], ![[FOLLOWUP_ALL]], ![[FOLLOWUP_REMAINDER:[0-9]+]]}
+; EPILOG-NO-UNROLL: ![[FOLLOWUP_REMAINDER]] = !{!"FollowupRemainder"}
 
 
 ; PROLOG-UNROLL:  br i1 %prol.iter.cmp, label %for.body.prol.1, label %for.body.prol.loopexit.unr-lcssa
-; PROLOG-UNROLL:  br i1 %prol.iter.cmp.1, label %for.body.prol, label %for.body.prol.loopexit.unr-lcssa, !llvm.loop ![[LOOP_0:[0-9]+]]
+; PROLOG-UNROLL-NOT: !"FollowupRemainder"
 ; PROLOG-NO-UNROLL:  br i1 %prol.iter.cmp, label %for.body.prol, label %for.body.prol.loopexit.unr-lcssa, !llvm.loop ![[LOOP_0:[0-9]+]]
-; PROLOG:  br i1 %exitcond.2, label %for.end.loopexit.unr-lcssa, label %for.body, !llvm.loop ![[LOOP_2:[0-9]+]]
+; PROLOG:  br i1 %exitcond.2, label %for.end.loopexit.unr-lcssa, label %for.body, !llvm.loop ![[LOOP_UNROLLED:[0-9]+]]
 
-; PROLOG: ![[LOOP_0]] = distinct !{![[LOOP_0]], ![[FOLLOWUP_ALL:[0-9]+]], ![[FOLLOWUP_REMAINDER:[0-9]+]]}
-; PROLOG: ![[FOLLOWUP_ALL]] = !{!"FollowupAll"}
-; PROLOG: ![[FOLLOWUP_REMAINDER]] = !{!"FollowupRemainder"}
-; PROLOG: ![[LOOP_2]] = distinct !{![[LOOP_2]], ![[FOLLOWUP_ALL]], ![[FOLLOWUP_UNROLLED:[0-9]+]]}
+; PROLOG-NO-UNROLL: ![[LOOP_0]] = distinct !{![[LOOP_0]], ![[FOLLOWUP_ALL:[0-9]+]], ![[FOLLOWUP_REMAINDER:[0-9]+]]}
+; PROLOG-NO-UNROLL: ![[FOLLOWUP_ALL]] = !{!"FollowupAll"}
+; PROLOG-NO-UNROLL: ![[FOLLOWUP_REMAINDER]] = !{!"FollowupRemainder"}
+; PROLOG: ![[LOOP_UNROLLED]] = distinct !{![[LOOP_UNROLLED]], !{{[0-9]+}}, ![[FOLLOWUP_UNROLLED:[0-9]+]]}
 ; PROLOG: ![[FOLLOWUP_UNROLLED]] = !{!"FollowupUnrolled"}

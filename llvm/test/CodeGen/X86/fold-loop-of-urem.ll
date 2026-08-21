@@ -796,7 +796,6 @@ define void @simple_urem_skip_const_rem_amt(i32 %N) nounwind {
 ; CHECK-NEXT:    pushq %r14
 ; CHECK-NEXT:    pushq %rbx
 ; CHECK-NEXT:    movl %edi, %ebx
-; CHECK-NEXT:    addl $-4, %ebx
 ; CHECK-NEXT:    movl $4, %ebp
 ; CHECK-NEXT:    movabsq $970881267157434368, %r14 # imm = 0xD79435E58000000
 ; CHECK-NEXT:    .p2align 4
@@ -810,7 +809,7 @@ define void @simple_urem_skip_const_rem_amt(i32 %N) nounwind {
 ; CHECK-NEXT:    subl %eax, %edi
 ; CHECK-NEXT:    callq use.i32@PLT
 ; CHECK-NEXT:    incl %ebp
-; CHECK-NEXT:    decl %ebx
+; CHECK-NEXT:    cmpl %ebp, %ebx
 ; CHECK-NEXT:    jne .LBB13_2
 ; CHECK-NEXT:  # %bb.3:
 ; CHECK-NEXT:    popq %rbx

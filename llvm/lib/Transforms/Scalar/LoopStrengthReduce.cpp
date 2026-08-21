@@ -1426,7 +1426,7 @@ static unsigned getSetupCost(const SCEV *Reg, unsigned Depth,
                            [&](unsigned i, const SCEV *Reg) {
                              return i + getSetupCost(Reg, Depth - 1, TTI);
                            });
-  if (auto S = dyn_cast<SCEVUDivExpr>(Reg))
+  if (auto S = dyn_cast<SCEVBinaryExpr>(Reg))
     return getSetupCost(S->getLHS(), Depth - 1, TTI) +
            getSetupCost(S->getRHS(), Depth - 1, TTI);
   return 0;
@@ -3790,7 +3790,7 @@ LSRInstance::CollectLoopInvariantFixupsAndFormulae() {
       append_range(Worklist, N->operands());
     else if (const SCEVIntegralCastExpr *C = dyn_cast<SCEVIntegralCastExpr>(S))
       Worklist.push_back(C->getOperand());
-    else if (const SCEVUDivExpr *D = dyn_cast<SCEVUDivExpr>(S)) {
+    else if (const SCEVBinaryExpr *D = dyn_cast<SCEVBinaryExpr>(S)) {
       Worklist.push_back(D->getLHS());
       Worklist.push_back(D->getRHS());
     } else if (const SCEVUnknown *US = dyn_cast<SCEVUnknown>(S)) {
@@ -6633,10 +6633,11 @@ struct SCEVDbgValueBuilder {
     } else if (const SCEVMulExpr *MulRec = dyn_cast<SCEVMulExpr>(S)) {
       Success &= pushArithmeticExpr(MulRec, llvm::dwarf::DW_OP_mul);
 
-    } else if (const SCEVUDivExpr *UDiv = dyn_cast<SCEVUDivExpr>(S)) {
-      Success &= pushSCEV(UDiv->getLHS());
-      Success &= pushSCEV(UDiv->getRHS());
-      pushOperator(llvm::dwarf::DW_OP_div);
+    } else if (const SCEVBinaryExpr *DivRem = dyn_cast<SCEVBinaryExpr>(S)) {
+      Success &= pushSCEV(DivRem->getLHS());
+      Success &= pushSCEV(DivRem->getRHS());
+      pushOperator(isa<SCEVUDivExpr>(DivRem) ? llvm::dwarf::DW_OP_div
+                                             : llvm::dwarf::DW_OP_mod);
 
     } else if (const SCEVCastExpr *Cast = dyn_cast<SCEVCastExpr>(S)) {
       // Assert if a new and unknown SCEVCastEXpr type is encountered.

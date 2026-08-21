@@ -472,6 +472,10 @@ private:
   Value *InsertBinop(Instruction::BinaryOps Opcode, Value *LHS, Value *RHS,
                      SCEV::NoWrapFlags Flags, bool IsSafeToHoist);
 
+  /// Insert a udiv or urem for \p S, guarding the divisor against zero if
+  /// the expansion is speculated (SafeUDivMode).
+  Value *expandDivRem(const SCEVBinaryExpr *S, Instruction::BinaryOps Opcode);
+
   /// We want to cast \p V. What would be the best place for such a cast?
   BasicBlock::iterator GetOptimalInsertionPointForCastOf(Value *V) const;
 
@@ -537,6 +541,8 @@ private:
   Value *visitMulExpr(SCEVUseT<const SCEVMulExpr *> S);
 
   Value *visitUDivExpr(SCEVUseT<const SCEVUDivExpr *> S);
+
+  Value *visitURemExpr(SCEVUseT<const SCEVURemExpr *> S);
 
   Value *visitAddRecExpr(SCEVUseT<const SCEVAddRecExpr *> S);
 

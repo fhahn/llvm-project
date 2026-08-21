@@ -71,8 +71,8 @@ define i32 @testRem(ptr %p, ptr %p1) {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    br label [[LOOP1:%.*]]
 ; CHECK:       loop1:
-; CHECK-NEXT:    [[LOCAL_0_:%.*]] = phi i32 [ 8, [[ENTRY:%.*]] ], [ [[I9:%.*]], [[LOOP2_EXIT:%.*]] ]
-; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp eq i32 [[LOCAL_0_]], 15
+; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ [[INDVARS_IV_NEXT:%.*]], [[LOOP2_EXIT:%.*]] ], [ 8, [[ENTRY:%.*]] ]
+; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp eq i64 [[INDVARS_IV]], 15
 ; CHECK-NEXT:    br i1 [[EXITCOND]], label [[EXIT:%.*]], label [[GENERAL_CASE24:%.*]]
 ; CHECK:       general_case24:
 ; CHECK-NEXT:    br i1 false, label [[LOOP2_PREHEADER:%.*]], label [[LOOP2_EXIT]]
@@ -86,7 +86,7 @@ define i32 @testRem(ptr %p, ptr %p1) {
 ; CHECK:       loop2.exit.loopexit:
 ; CHECK-NEXT:    br label [[LOOP2_EXIT]]
 ; CHECK:       loop2.exit:
-; CHECK-NEXT:    [[I9]] = add nuw nsw i32 [[LOCAL_0_]], 1
+; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add nuw nsw i64 [[INDVARS_IV]], 1
 ; CHECK-NEXT:    br i1 false, label [[EXIT]], label [[LOOP1]]
 ; CHECK:       exit:
 ; CHECK-NEXT:    ret i32 0
