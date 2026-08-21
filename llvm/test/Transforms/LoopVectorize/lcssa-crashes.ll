@@ -207,17 +207,20 @@ define i32 @exit_phi_sunk_def(ptr noalias %src, ptr noalias %dst) {
 ; CHECK:       pred.store.continue:
 ; CHECK-NEXT:    br i1 true, label [[PRED_STORE_IF1:%.*]], label [[PRED_STORE_CONTINUE2:%.*]]
 ; CHECK:       pred.store.if1:
-; CHECK-NEXT:    store i32 2, ptr [[DST]], align 4
+; CHECK-NEXT:    [[TMP4:%.*]] = add nuw nsw i32 1, 1
+; CHECK-NEXT:    store i32 [[TMP4]], ptr [[DST]], align 4
 ; CHECK-NEXT:    br label [[PRED_STORE_CONTINUE2]]
 ; CHECK:       pred.store.continue2:
 ; CHECK-NEXT:    br i1 true, label [[PRED_STORE_IF3:%.*]], label [[PRED_STORE_CONTINUE4:%.*]]
 ; CHECK:       pred.store.if3:
-; CHECK-NEXT:    store i32 3, ptr [[DST]], align 4
+; CHECK-NEXT:    [[TMP2:%.*]] = add nuw nsw i32 2, 1
+; CHECK-NEXT:    store i32 [[TMP2]], ptr [[DST]], align 4
 ; CHECK-NEXT:    br label [[PRED_STORE_CONTINUE4]]
 ; CHECK:       pred.store.continue4:
 ; CHECK-NEXT:    br i1 false, label [[PRED_STORE_IF5:%.*]], label [[PRED_STORE_CONTINUE6:%.*]]
 ; CHECK:       pred.store.if5:
-; CHECK-NEXT:    store i32 4, ptr [[DST]], align 4
+; CHECK-NEXT:    [[TMP3:%.*]] = add nuw nsw i32 3, 1
+; CHECK-NEXT:    store i32 [[TMP3]], ptr [[DST]], align 4
 ; CHECK-NEXT:    br label [[PRED_STORE_CONTINUE6]]
 ; CHECK:       pred.store.continue6:
 ; CHECK-NEXT:    br label [[MIDDLE_BLOCK:%.*]]

@@ -768,8 +768,23 @@ static void legalizeAndOptimizeInductions(VPlan &Plan) {
           (RepR && (RepR->isSingleScalar() || RepR->isPredicated())))
         continue;
 
-      // Skip recipes that may have other lanes than their first used.
-      if (!vputils::isSingleScalar(Def) && !vputils::onlyFirstLaneUsed(Def))
+      // Narrow Def if it computes a single scalar or all lanes but the first
+      // are dead.
+      bool IsSingleScalar =
+          vputils::isSingleScalar(Def) || vputils::onlyFirstLaneUsed(Def);
+      // Otherwise scalarize the induction increment per lane, if all its users
+      // only use scalars: the induction is replaced by scalar steps below, so
+      // replicating the increment is cheaper than computing all its lanes and
+      // extracting each of them. This needs unrolling by VF (fixed VFs only)
+      // and is pointless if Def already replicates per lane.
+      // TODO: Also handle FP and sub increments. The former needs the FSub
+      // handling in VPScalarIVStepsRecipe fixed first.
+      bool IsPerLaneIVIncrement =
+          !RepR && HasOnlyVectorVFs && !Plan.hasScalableVF() &&
+          match(Def,
+                m_c_Add(m_Specific(PhiR), m_Specific(PhiR->getStepValue()))) &&
+          vputils::onlyScalarValuesUsed(Def);
+      if (!IsSingleScalar && !IsPerLaneIVIncrement)
         continue;
 
       // TODO: Support scalarizing ExtractValue.
@@ -777,10 +792,17 @@ static void legalizeAndOptimizeInductions(VPlan &Plan) {
                 m_Binary<Instruction::ExtractValue>(m_VPValue(), m_VPValue())))
         continue;
 
-      auto *Clone = VPBuilder::createSingleScalarOp(
-          Def->getUnderlyingInstr()->getOpcode(), Def->operands(),
-          /*Mask=*/nullptr, *Def, {}, DebugLoc::getUnknown(),
-          Def->getUnderlyingInstr());
+      VPSingleDefRecipe *Clone;
+      if (IsSingleScalar)
+        Clone = VPBuilder::createSingleScalarOp(
+            Def->getUnderlyingInstr()->getOpcode(), Def->operands(),
+            /*Mask=*/nullptr, *Def, {}, DebugLoc::getUnknown(),
+            Def->getUnderlyingInstr());
+      else
+        Clone = new VPReplicateRecipe(Def->getUnderlyingInstr(),
+                                      Def->operands(), /*IsSingleScalar=*/false,
+                                      /*Mask=*/nullptr, *Def, {},
+                                      DebugLoc::getUnknown());
       Clone->insertAfter(Def);
       Def->replaceAllUsesWith(Clone);
       Def->eraseFromParent();
