@@ -2308,9 +2308,13 @@ void LoopVectorizationCostModel::collectLoopScalars(ElementCount VF) {
     }
   }
 
-  // An induction variable will remain scalar if all users of the induction
-  // variable and induction variable update remain scalar.
+  // A pointer induction variable will remain scalar if all users of the
+  // induction variable and induction variable update remain scalar. Integer and
+  // FP inductions are scalarized in VPlan by legalizeAndOptimizeInductions,
+  // which replaces induction users that only use scalars with scalar steps.
   for (const auto &Induction : Legal->getInductionVars()) {
+    if (Induction.second.getKind() != InductionDescriptor::IK_PtrInduction)
+      continue;
     auto *Ind = Induction.first;
     auto *IndUpdate = cast<Instruction>(Ind->getIncomingValueForBlock(Latch));
 
@@ -2323,9 +2327,7 @@ void LoopVectorizationCostModel::collectLoopScalars(ElementCount VF) {
     // load/store instruction \p I.
     auto IsDirectLoadStoreFromPtrIndvar = [&](Instruction *Indvar,
                                               Instruction *I) {
-      return Induction.second.getKind() ==
-                 InductionDescriptor::IK_PtrInduction &&
-             (isa<LoadInst>(I) || isa<StoreInst>(I)) &&
+      return (isa<LoadInst>(I) || isa<StoreInst>(I)) &&
              Indvar == getLoadStorePointerOperand(I) && IsScalarUse(I, Indvar);
     };
 

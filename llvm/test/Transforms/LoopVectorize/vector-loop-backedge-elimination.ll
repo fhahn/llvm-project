@@ -622,22 +622,25 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF8UF1-NEXT:    [[TRIP_COUNT_MINUS_1:%.*]] = sub i64 [[TMP1]], 1
 ; VF8UF1-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <8 x i64> poison, i64 [[TRIP_COUNT_MINUS_1]], i64 0
 ; VF8UF1-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <8 x i64> [[BROADCAST_SPLATINSERT]], <8 x i64> poison, <8 x i32> zeroinitializer
+; VF8UF1-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <8 x i64> poison, i64 [[STEP]], i64 0
+; VF8UF1-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <8 x i64> [[BROADCAST_SPLATINSERT1]], <8 x i64> poison, <8 x i32> zeroinitializer
+; VF8UF1-NEXT:    [[TMP2:%.*]] = mul <8 x i64> <i64 0, i64 1, i64 2, i64 3, i64 4, i64 5, i64 6, i64 7>, [[BROADCAST_SPLAT2]]
 ; VF8UF1-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; VF8UF1:       [[VECTOR_BODY]]:
 ; VF8UF1-NEXT:    [[TMP3:%.*]] = icmp ule <8 x i64> <i64 0, i64 1, i64 2, i64 3, i64 4, i64 5, i64 6, i64 7>, [[BROADCAST_SPLAT]]
+; VF8UF1-NEXT:    [[TMP5:%.*]] = add <8 x i64> [[TMP2]], [[BROADCAST_SPLAT2]]
 ; VF8UF1-NEXT:    [[TMP4:%.*]] = extractelement <8 x i1> [[TMP3]], i64 0
 ; VF8UF1-NEXT:    br i1 [[TMP4]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
 ; VF8UF1:       [[PRED_STORE_IF]]:
-; VF8UF1-NEXT:    [[TMP8:%.*]] = getelementptr i8, ptr [[DST]], i64 [[STEP]]
+; VF8UF1-NEXT:    [[TMP6:%.*]] = extractelement <8 x i64> [[TMP5]], i64 0
+; VF8UF1-NEXT:    [[TMP8:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP6]]
 ; VF8UF1-NEXT:    store i8 0, ptr [[TMP8]], align 1
 ; VF8UF1-NEXT:    br label %[[PRED_STORE_CONTINUE]]
 ; VF8UF1:       [[PRED_STORE_CONTINUE]]:
 ; VF8UF1-NEXT:    [[TMP9:%.*]] = extractelement <8 x i1> [[TMP3]], i64 1
 ; VF8UF1-NEXT:    br i1 [[TMP9]], label %[[PRED_STORE_IF1:.*]], label %[[PRED_STORE_CONTINUE2:.*]]
 ; VF8UF1:       [[PRED_STORE_IF1]]:
-; VF8UF1-NEXT:    [[TMP10:%.*]] = mul i64 1, [[STEP]]
-; VF8UF1-NEXT:    [[TMP11:%.*]] = add i64 0, [[TMP10]]
-; VF8UF1-NEXT:    [[TMP12:%.*]] = add i64 [[TMP11]], [[STEP]]
+; VF8UF1-NEXT:    [[TMP12:%.*]] = extractelement <8 x i64> [[TMP5]], i64 1
 ; VF8UF1-NEXT:    [[TMP13:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP12]]
 ; VF8UF1-NEXT:    store i8 0, ptr [[TMP13]], align 1
 ; VF8UF1-NEXT:    br label %[[PRED_STORE_CONTINUE2]]
@@ -645,9 +648,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF8UF1-NEXT:    [[TMP14:%.*]] = extractelement <8 x i1> [[TMP3]], i64 2
 ; VF8UF1-NEXT:    br i1 [[TMP14]], label %[[PRED_STORE_IF3:.*]], label %[[PRED_STORE_CONTINUE4:.*]]
 ; VF8UF1:       [[PRED_STORE_IF3]]:
-; VF8UF1-NEXT:    [[TMP15:%.*]] = mul i64 2, [[STEP]]
-; VF8UF1-NEXT:    [[TMP16:%.*]] = add i64 0, [[TMP15]]
-; VF8UF1-NEXT:    [[TMP17:%.*]] = add i64 [[TMP16]], [[STEP]]
+; VF8UF1-NEXT:    [[TMP17:%.*]] = extractelement <8 x i64> [[TMP5]], i64 2
 ; VF8UF1-NEXT:    [[TMP18:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP17]]
 ; VF8UF1-NEXT:    store i8 0, ptr [[TMP18]], align 1
 ; VF8UF1-NEXT:    br label %[[PRED_STORE_CONTINUE4]]
@@ -655,9 +656,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF8UF1-NEXT:    [[TMP19:%.*]] = extractelement <8 x i1> [[TMP3]], i64 3
 ; VF8UF1-NEXT:    br i1 [[TMP19]], label %[[PRED_STORE_IF5:.*]], label %[[PRED_STORE_CONTINUE6:.*]]
 ; VF8UF1:       [[PRED_STORE_IF5]]:
-; VF8UF1-NEXT:    [[TMP20:%.*]] = mul i64 3, [[STEP]]
-; VF8UF1-NEXT:    [[TMP21:%.*]] = add i64 0, [[TMP20]]
-; VF8UF1-NEXT:    [[TMP22:%.*]] = add i64 [[TMP21]], [[STEP]]
+; VF8UF1-NEXT:    [[TMP22:%.*]] = extractelement <8 x i64> [[TMP5]], i64 3
 ; VF8UF1-NEXT:    [[TMP23:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP22]]
 ; VF8UF1-NEXT:    store i8 0, ptr [[TMP23]], align 1
 ; VF8UF1-NEXT:    br label %[[PRED_STORE_CONTINUE6]]
@@ -665,9 +664,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF8UF1-NEXT:    [[TMP24:%.*]] = extractelement <8 x i1> [[TMP3]], i64 4
 ; VF8UF1-NEXT:    br i1 [[TMP24]], label %[[PRED_STORE_IF7:.*]], label %[[PRED_STORE_CONTINUE8:.*]]
 ; VF8UF1:       [[PRED_STORE_IF7]]:
-; VF8UF1-NEXT:    [[TMP25:%.*]] = mul i64 4, [[STEP]]
-; VF8UF1-NEXT:    [[TMP26:%.*]] = add i64 0, [[TMP25]]
-; VF8UF1-NEXT:    [[TMP27:%.*]] = add i64 [[TMP26]], [[STEP]]
+; VF8UF1-NEXT:    [[TMP27:%.*]] = extractelement <8 x i64> [[TMP5]], i64 4
 ; VF8UF1-NEXT:    [[TMP28:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP27]]
 ; VF8UF1-NEXT:    store i8 0, ptr [[TMP28]], align 1
 ; VF8UF1-NEXT:    br label %[[PRED_STORE_CONTINUE8]]
@@ -675,9 +672,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF8UF1-NEXT:    [[TMP29:%.*]] = extractelement <8 x i1> [[TMP3]], i64 5
 ; VF8UF1-NEXT:    br i1 [[TMP29]], label %[[PRED_STORE_IF9:.*]], label %[[PRED_STORE_CONTINUE10:.*]]
 ; VF8UF1:       [[PRED_STORE_IF9]]:
-; VF8UF1-NEXT:    [[TMP30:%.*]] = mul i64 5, [[STEP]]
-; VF8UF1-NEXT:    [[TMP31:%.*]] = add i64 0, [[TMP30]]
-; VF8UF1-NEXT:    [[TMP32:%.*]] = add i64 [[TMP31]], [[STEP]]
+; VF8UF1-NEXT:    [[TMP32:%.*]] = extractelement <8 x i64> [[TMP5]], i64 5
 ; VF8UF1-NEXT:    [[TMP33:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP32]]
 ; VF8UF1-NEXT:    store i8 0, ptr [[TMP33]], align 1
 ; VF8UF1-NEXT:    br label %[[PRED_STORE_CONTINUE10]]
@@ -685,9 +680,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF8UF1-NEXT:    [[TMP34:%.*]] = extractelement <8 x i1> [[TMP3]], i64 6
 ; VF8UF1-NEXT:    br i1 [[TMP34]], label %[[PRED_STORE_IF11:.*]], label %[[PRED_STORE_CONTINUE12:.*]]
 ; VF8UF1:       [[PRED_STORE_IF11]]:
-; VF8UF1-NEXT:    [[TMP35:%.*]] = mul i64 6, [[STEP]]
-; VF8UF1-NEXT:    [[TMP36:%.*]] = add i64 0, [[TMP35]]
-; VF8UF1-NEXT:    [[TMP37:%.*]] = add i64 [[TMP36]], [[STEP]]
+; VF8UF1-NEXT:    [[TMP37:%.*]] = extractelement <8 x i64> [[TMP5]], i64 6
 ; VF8UF1-NEXT:    [[TMP38:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP37]]
 ; VF8UF1-NEXT:    store i8 0, ptr [[TMP38]], align 1
 ; VF8UF1-NEXT:    br label %[[PRED_STORE_CONTINUE12]]
@@ -695,9 +688,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF8UF1-NEXT:    [[TMP39:%.*]] = extractelement <8 x i1> [[TMP3]], i64 7
 ; VF8UF1-NEXT:    br i1 [[TMP39]], label %[[PRED_STORE_IF13:.*]], label %[[PRED_STORE_CONTINUE14:.*]]
 ; VF8UF1:       [[PRED_STORE_IF13]]:
-; VF8UF1-NEXT:    [[TMP40:%.*]] = mul i64 7, [[STEP]]
-; VF8UF1-NEXT:    [[TMP41:%.*]] = add i64 0, [[TMP40]]
-; VF8UF1-NEXT:    [[IV_NEXT:%.*]] = add i64 [[TMP41]], [[STEP]]
+; VF8UF1-NEXT:    [[IV_NEXT:%.*]] = extractelement <8 x i64> [[TMP5]], i64 7
 ; VF8UF1-NEXT:    [[GEP_DST:%.*]] = getelementptr i8, ptr [[DST]], i64 [[IV_NEXT]]
 ; VF8UF1-NEXT:    store i8 0, ptr [[GEP_DST]], align 1
 ; VF8UF1-NEXT:    br label %[[PRED_STORE_CONTINUE14]]
@@ -720,25 +711,31 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF8UF2-NEXT:    br label %[[VECTOR_PH:.*]]
 ; VF8UF2:       [[VECTOR_PH]]:
 ; VF8UF2-NEXT:    [[TRIP_COUNT_MINUS_1:%.*]] = sub i64 [[TMP1]], 1
-; VF8UF2-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <8 x i64> poison, i64 [[TRIP_COUNT_MINUS_1]], i64 0
+; VF8UF2-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <8 x i64> poison, i64 [[STEP]], i64 0
 ; VF8UF2-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <8 x i64> [[BROADCAST_SPLATINSERT]], <8 x i64> poison, <8 x i32> zeroinitializer
+; VF8UF2-NEXT:    [[TMP2:%.*]] = mul <8 x i64> splat (i64 8), [[BROADCAST_SPLAT]]
+; VF8UF2-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <8 x i64> poison, i64 [[TRIP_COUNT_MINUS_1]], i64 0
+; VF8UF2-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <8 x i64> [[BROADCAST_SPLATINSERT1]], <8 x i64> poison, <8 x i32> zeroinitializer
+; VF8UF2-NEXT:    [[TMP8:%.*]] = mul <8 x i64> <i64 0, i64 1, i64 2, i64 3, i64 4, i64 5, i64 6, i64 7>, [[BROADCAST_SPLAT]]
 ; VF8UF2-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; VF8UF2:       [[VECTOR_BODY]]:
-; VF8UF2-NEXT:    [[TMP3:%.*]] = icmp ule <8 x i64> <i64 0, i64 1, i64 2, i64 3, i64 4, i64 5, i64 6, i64 7>, [[BROADCAST_SPLAT]]
-; VF8UF2-NEXT:    [[TMP4:%.*]] = icmp ule <8 x i64> <i64 8, i64 9, i64 10, i64 11, i64 12, i64 13, i64 14, i64 15>, [[BROADCAST_SPLAT]]
+; VF8UF2-NEXT:    [[STEP_ADD:%.*]] = add <8 x i64> [[TMP8]], [[TMP2]]
+; VF8UF2-NEXT:    [[TMP3:%.*]] = icmp ule <8 x i64> <i64 0, i64 1, i64 2, i64 3, i64 4, i64 5, i64 6, i64 7>, [[BROADCAST_SPLAT2]]
+; VF8UF2-NEXT:    [[TMP4:%.*]] = icmp ule <8 x i64> <i64 8, i64 9, i64 10, i64 11, i64 12, i64 13, i64 14, i64 15>, [[BROADCAST_SPLAT2]]
+; VF8UF2-NEXT:    [[TMP6:%.*]] = add <8 x i64> [[TMP8]], [[BROADCAST_SPLAT]]
+; VF8UF2-NEXT:    [[TMP7:%.*]] = add <8 x i64> [[STEP_ADD]], [[BROADCAST_SPLAT]]
 ; VF8UF2-NEXT:    [[TMP5:%.*]] = extractelement <8 x i1> [[TMP3]], i64 0
 ; VF8UF2-NEXT:    br i1 [[TMP5]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
 ; VF8UF2:       [[PRED_STORE_IF]]:
-; VF8UF2-NEXT:    [[TMP9:%.*]] = getelementptr i8, ptr [[DST]], i64 [[STEP]]
+; VF8UF2-NEXT:    [[TMP11:%.*]] = extractelement <8 x i64> [[TMP6]], i64 0
+; VF8UF2-NEXT:    [[TMP9:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP11]]
 ; VF8UF2-NEXT:    store i8 0, ptr [[TMP9]], align 1
 ; VF8UF2-NEXT:    br label %[[PRED_STORE_CONTINUE]]
 ; VF8UF2:       [[PRED_STORE_CONTINUE]]:
 ; VF8UF2-NEXT:    [[TMP10:%.*]] = extractelement <8 x i1> [[TMP3]], i64 1
 ; VF8UF2-NEXT:    br i1 [[TMP10]], label %[[PRED_STORE_IF1:.*]], label %[[PRED_STORE_CONTINUE2:.*]]
 ; VF8UF2:       [[PRED_STORE_IF1]]:
-; VF8UF2-NEXT:    [[TMP11:%.*]] = mul i64 1, [[STEP]]
-; VF8UF2-NEXT:    [[TMP12:%.*]] = add i64 0, [[TMP11]]
-; VF8UF2-NEXT:    [[TMP13:%.*]] = add i64 [[TMP12]], [[STEP]]
+; VF8UF2-NEXT:    [[TMP13:%.*]] = extractelement <8 x i64> [[TMP6]], i64 1
 ; VF8UF2-NEXT:    [[TMP14:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP13]]
 ; VF8UF2-NEXT:    store i8 0, ptr [[TMP14]], align 1
 ; VF8UF2-NEXT:    br label %[[PRED_STORE_CONTINUE2]]
@@ -746,9 +743,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF8UF2-NEXT:    [[TMP15:%.*]] = extractelement <8 x i1> [[TMP3]], i64 2
 ; VF8UF2-NEXT:    br i1 [[TMP15]], label %[[PRED_STORE_IF3:.*]], label %[[PRED_STORE_CONTINUE4:.*]]
 ; VF8UF2:       [[PRED_STORE_IF3]]:
-; VF8UF2-NEXT:    [[TMP16:%.*]] = mul i64 2, [[STEP]]
-; VF8UF2-NEXT:    [[TMP17:%.*]] = add i64 0, [[TMP16]]
-; VF8UF2-NEXT:    [[TMP18:%.*]] = add i64 [[TMP17]], [[STEP]]
+; VF8UF2-NEXT:    [[TMP18:%.*]] = extractelement <8 x i64> [[TMP6]], i64 2
 ; VF8UF2-NEXT:    [[TMP19:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP18]]
 ; VF8UF2-NEXT:    store i8 0, ptr [[TMP19]], align 1
 ; VF8UF2-NEXT:    br label %[[PRED_STORE_CONTINUE4]]
@@ -756,9 +751,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF8UF2-NEXT:    [[TMP20:%.*]] = extractelement <8 x i1> [[TMP3]], i64 3
 ; VF8UF2-NEXT:    br i1 [[TMP20]], label %[[PRED_STORE_IF5:.*]], label %[[PRED_STORE_CONTINUE6:.*]]
 ; VF8UF2:       [[PRED_STORE_IF5]]:
-; VF8UF2-NEXT:    [[TMP21:%.*]] = mul i64 3, [[STEP]]
-; VF8UF2-NEXT:    [[TMP22:%.*]] = add i64 0, [[TMP21]]
-; VF8UF2-NEXT:    [[TMP23:%.*]] = add i64 [[TMP22]], [[STEP]]
+; VF8UF2-NEXT:    [[TMP23:%.*]] = extractelement <8 x i64> [[TMP6]], i64 3
 ; VF8UF2-NEXT:    [[TMP24:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP23]]
 ; VF8UF2-NEXT:    store i8 0, ptr [[TMP24]], align 1
 ; VF8UF2-NEXT:    br label %[[PRED_STORE_CONTINUE6]]
@@ -766,9 +759,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF8UF2-NEXT:    [[TMP25:%.*]] = extractelement <8 x i1> [[TMP3]], i64 4
 ; VF8UF2-NEXT:    br i1 [[TMP25]], label %[[PRED_STORE_IF7:.*]], label %[[PRED_STORE_CONTINUE8:.*]]
 ; VF8UF2:       [[PRED_STORE_IF7]]:
-; VF8UF2-NEXT:    [[TMP26:%.*]] = mul i64 4, [[STEP]]
-; VF8UF2-NEXT:    [[TMP27:%.*]] = add i64 0, [[TMP26]]
-; VF8UF2-NEXT:    [[TMP28:%.*]] = add i64 [[TMP27]], [[STEP]]
+; VF8UF2-NEXT:    [[TMP28:%.*]] = extractelement <8 x i64> [[TMP6]], i64 4
 ; VF8UF2-NEXT:    [[TMP29:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP28]]
 ; VF8UF2-NEXT:    store i8 0, ptr [[TMP29]], align 1
 ; VF8UF2-NEXT:    br label %[[PRED_STORE_CONTINUE8]]
@@ -776,9 +767,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF8UF2-NEXT:    [[TMP30:%.*]] = extractelement <8 x i1> [[TMP3]], i64 5
 ; VF8UF2-NEXT:    br i1 [[TMP30]], label %[[PRED_STORE_IF9:.*]], label %[[PRED_STORE_CONTINUE10:.*]]
 ; VF8UF2:       [[PRED_STORE_IF9]]:
-; VF8UF2-NEXT:    [[TMP31:%.*]] = mul i64 5, [[STEP]]
-; VF8UF2-NEXT:    [[TMP32:%.*]] = add i64 0, [[TMP31]]
-; VF8UF2-NEXT:    [[TMP33:%.*]] = add i64 [[TMP32]], [[STEP]]
+; VF8UF2-NEXT:    [[TMP33:%.*]] = extractelement <8 x i64> [[TMP6]], i64 5
 ; VF8UF2-NEXT:    [[TMP34:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP33]]
 ; VF8UF2-NEXT:    store i8 0, ptr [[TMP34]], align 1
 ; VF8UF2-NEXT:    br label %[[PRED_STORE_CONTINUE10]]
@@ -786,9 +775,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF8UF2-NEXT:    [[TMP35:%.*]] = extractelement <8 x i1> [[TMP3]], i64 6
 ; VF8UF2-NEXT:    br i1 [[TMP35]], label %[[PRED_STORE_IF11:.*]], label %[[PRED_STORE_CONTINUE12:.*]]
 ; VF8UF2:       [[PRED_STORE_IF11]]:
-; VF8UF2-NEXT:    [[TMP36:%.*]] = mul i64 6, [[STEP]]
-; VF8UF2-NEXT:    [[TMP37:%.*]] = add i64 0, [[TMP36]]
-; VF8UF2-NEXT:    [[TMP38:%.*]] = add i64 [[TMP37]], [[STEP]]
+; VF8UF2-NEXT:    [[TMP38:%.*]] = extractelement <8 x i64> [[TMP6]], i64 6
 ; VF8UF2-NEXT:    [[TMP39:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP38]]
 ; VF8UF2-NEXT:    store i8 0, ptr [[TMP39]], align 1
 ; VF8UF2-NEXT:    br label %[[PRED_STORE_CONTINUE12]]
@@ -796,9 +783,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF8UF2-NEXT:    [[TMP40:%.*]] = extractelement <8 x i1> [[TMP3]], i64 7
 ; VF8UF2-NEXT:    br i1 [[TMP40]], label %[[PRED_STORE_IF13:.*]], label %[[PRED_STORE_CONTINUE14:.*]]
 ; VF8UF2:       [[PRED_STORE_IF13]]:
-; VF8UF2-NEXT:    [[TMP41:%.*]] = mul i64 7, [[STEP]]
-; VF8UF2-NEXT:    [[TMP42:%.*]] = add i64 0, [[TMP41]]
-; VF8UF2-NEXT:    [[TMP43:%.*]] = add i64 [[TMP42]], [[STEP]]
+; VF8UF2-NEXT:    [[TMP43:%.*]] = extractelement <8 x i64> [[TMP6]], i64 7
 ; VF8UF2-NEXT:    [[TMP44:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP43]]
 ; VF8UF2-NEXT:    store i8 0, ptr [[TMP44]], align 1
 ; VF8UF2-NEXT:    br label %[[PRED_STORE_CONTINUE14]]
@@ -806,9 +791,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF8UF2-NEXT:    [[TMP45:%.*]] = extractelement <8 x i1> [[TMP4]], i64 0
 ; VF8UF2-NEXT:    br i1 [[TMP45]], label %[[PRED_STORE_IF15:.*]], label %[[PRED_STORE_CONTINUE16:.*]]
 ; VF8UF2:       [[PRED_STORE_IF15]]:
-; VF8UF2-NEXT:    [[TMP46:%.*]] = mul i64 8, [[STEP]]
-; VF8UF2-NEXT:    [[TMP47:%.*]] = add i64 0, [[TMP46]]
-; VF8UF2-NEXT:    [[TMP48:%.*]] = add i64 [[TMP47]], [[STEP]]
+; VF8UF2-NEXT:    [[TMP48:%.*]] = extractelement <8 x i64> [[TMP7]], i64 0
 ; VF8UF2-NEXT:    [[TMP49:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP48]]
 ; VF8UF2-NEXT:    store i8 0, ptr [[TMP49]], align 1
 ; VF8UF2-NEXT:    br label %[[PRED_STORE_CONTINUE16]]
@@ -816,9 +799,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF8UF2-NEXT:    [[TMP50:%.*]] = extractelement <8 x i1> [[TMP4]], i64 1
 ; VF8UF2-NEXT:    br i1 [[TMP50]], label %[[PRED_STORE_IF17:.*]], label %[[PRED_STORE_CONTINUE18:.*]]
 ; VF8UF2:       [[PRED_STORE_IF17]]:
-; VF8UF2-NEXT:    [[TMP51:%.*]] = mul i64 9, [[STEP]]
-; VF8UF2-NEXT:    [[TMP52:%.*]] = add i64 0, [[TMP51]]
-; VF8UF2-NEXT:    [[TMP53:%.*]] = add i64 [[TMP52]], [[STEP]]
+; VF8UF2-NEXT:    [[TMP53:%.*]] = extractelement <8 x i64> [[TMP7]], i64 1
 ; VF8UF2-NEXT:    [[TMP54:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP53]]
 ; VF8UF2-NEXT:    store i8 0, ptr [[TMP54]], align 1
 ; VF8UF2-NEXT:    br label %[[PRED_STORE_CONTINUE18]]
@@ -826,9 +807,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF8UF2-NEXT:    [[TMP55:%.*]] = extractelement <8 x i1> [[TMP4]], i64 2
 ; VF8UF2-NEXT:    br i1 [[TMP55]], label %[[PRED_STORE_IF19:.*]], label %[[PRED_STORE_CONTINUE20:.*]]
 ; VF8UF2:       [[PRED_STORE_IF19]]:
-; VF8UF2-NEXT:    [[TMP56:%.*]] = mul i64 10, [[STEP]]
-; VF8UF2-NEXT:    [[TMP57:%.*]] = add i64 0, [[TMP56]]
-; VF8UF2-NEXT:    [[TMP58:%.*]] = add i64 [[TMP57]], [[STEP]]
+; VF8UF2-NEXT:    [[TMP58:%.*]] = extractelement <8 x i64> [[TMP7]], i64 2
 ; VF8UF2-NEXT:    [[TMP59:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP58]]
 ; VF8UF2-NEXT:    store i8 0, ptr [[TMP59]], align 1
 ; VF8UF2-NEXT:    br label %[[PRED_STORE_CONTINUE20]]
@@ -836,9 +815,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF8UF2-NEXT:    [[TMP60:%.*]] = extractelement <8 x i1> [[TMP4]], i64 3
 ; VF8UF2-NEXT:    br i1 [[TMP60]], label %[[PRED_STORE_IF21:.*]], label %[[PRED_STORE_CONTINUE22:.*]]
 ; VF8UF2:       [[PRED_STORE_IF21]]:
-; VF8UF2-NEXT:    [[TMP61:%.*]] = mul i64 11, [[STEP]]
-; VF8UF2-NEXT:    [[TMP62:%.*]] = add i64 0, [[TMP61]]
-; VF8UF2-NEXT:    [[TMP63:%.*]] = add i64 [[TMP62]], [[STEP]]
+; VF8UF2-NEXT:    [[TMP63:%.*]] = extractelement <8 x i64> [[TMP7]], i64 3
 ; VF8UF2-NEXT:    [[TMP64:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP63]]
 ; VF8UF2-NEXT:    store i8 0, ptr [[TMP64]], align 1
 ; VF8UF2-NEXT:    br label %[[PRED_STORE_CONTINUE22]]
@@ -846,9 +823,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF8UF2-NEXT:    [[TMP65:%.*]] = extractelement <8 x i1> [[TMP4]], i64 4
 ; VF8UF2-NEXT:    br i1 [[TMP65]], label %[[PRED_STORE_IF23:.*]], label %[[PRED_STORE_CONTINUE24:.*]]
 ; VF8UF2:       [[PRED_STORE_IF23]]:
-; VF8UF2-NEXT:    [[TMP66:%.*]] = mul i64 12, [[STEP]]
-; VF8UF2-NEXT:    [[TMP67:%.*]] = add i64 0, [[TMP66]]
-; VF8UF2-NEXT:    [[TMP68:%.*]] = add i64 [[TMP67]], [[STEP]]
+; VF8UF2-NEXT:    [[TMP68:%.*]] = extractelement <8 x i64> [[TMP7]], i64 4
 ; VF8UF2-NEXT:    [[TMP69:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP68]]
 ; VF8UF2-NEXT:    store i8 0, ptr [[TMP69]], align 1
 ; VF8UF2-NEXT:    br label %[[PRED_STORE_CONTINUE24]]
@@ -856,9 +831,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF8UF2-NEXT:    [[TMP70:%.*]] = extractelement <8 x i1> [[TMP4]], i64 5
 ; VF8UF2-NEXT:    br i1 [[TMP70]], label %[[PRED_STORE_IF25:.*]], label %[[PRED_STORE_CONTINUE26:.*]]
 ; VF8UF2:       [[PRED_STORE_IF25]]:
-; VF8UF2-NEXT:    [[TMP71:%.*]] = mul i64 13, [[STEP]]
-; VF8UF2-NEXT:    [[TMP72:%.*]] = add i64 0, [[TMP71]]
-; VF8UF2-NEXT:    [[TMP73:%.*]] = add i64 [[TMP72]], [[STEP]]
+; VF8UF2-NEXT:    [[TMP73:%.*]] = extractelement <8 x i64> [[TMP7]], i64 5
 ; VF8UF2-NEXT:    [[TMP74:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP73]]
 ; VF8UF2-NEXT:    store i8 0, ptr [[TMP74]], align 1
 ; VF8UF2-NEXT:    br label %[[PRED_STORE_CONTINUE26]]
@@ -866,9 +839,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF8UF2-NEXT:    [[TMP75:%.*]] = extractelement <8 x i1> [[TMP4]], i64 6
 ; VF8UF2-NEXT:    br i1 [[TMP75]], label %[[PRED_STORE_IF27:.*]], label %[[PRED_STORE_CONTINUE28:.*]]
 ; VF8UF2:       [[PRED_STORE_IF27]]:
-; VF8UF2-NEXT:    [[TMP76:%.*]] = mul i64 14, [[STEP]]
-; VF8UF2-NEXT:    [[TMP77:%.*]] = add i64 0, [[TMP76]]
-; VF8UF2-NEXT:    [[TMP78:%.*]] = add i64 [[TMP77]], [[STEP]]
+; VF8UF2-NEXT:    [[TMP78:%.*]] = extractelement <8 x i64> [[TMP7]], i64 6
 ; VF8UF2-NEXT:    [[TMP79:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP78]]
 ; VF8UF2-NEXT:    store i8 0, ptr [[TMP79]], align 1
 ; VF8UF2-NEXT:    br label %[[PRED_STORE_CONTINUE28]]
@@ -876,9 +847,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF8UF2-NEXT:    [[TMP80:%.*]] = extractelement <8 x i1> [[TMP4]], i64 7
 ; VF8UF2-NEXT:    br i1 [[TMP80]], label %[[PRED_STORE_IF29:.*]], label %[[PRED_STORE_CONTINUE30:.*]]
 ; VF8UF2:       [[PRED_STORE_IF29]]:
-; VF8UF2-NEXT:    [[TMP81:%.*]] = mul i64 15, [[STEP]]
-; VF8UF2-NEXT:    [[TMP82:%.*]] = add i64 0, [[TMP81]]
-; VF8UF2-NEXT:    [[TMP83:%.*]] = add i64 [[TMP82]], [[STEP]]
+; VF8UF2-NEXT:    [[TMP83:%.*]] = extractelement <8 x i64> [[TMP7]], i64 7
 ; VF8UF2-NEXT:    [[GEP_DST:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP83]]
 ; VF8UF2-NEXT:    store i8 0, ptr [[GEP_DST]], align 1
 ; VF8UF2-NEXT:    br label %[[PRED_STORE_CONTINUE30]]
@@ -903,22 +872,25 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF16UF1-NEXT:    [[TRIP_COUNT_MINUS_1:%.*]] = sub i64 [[TMP1]], 1
 ; VF16UF1-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <16 x i64> poison, i64 [[TRIP_COUNT_MINUS_1]], i64 0
 ; VF16UF1-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <16 x i64> [[BROADCAST_SPLATINSERT]], <16 x i64> poison, <16 x i32> zeroinitializer
+; VF16UF1-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <16 x i64> poison, i64 [[STEP]], i64 0
+; VF16UF1-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <16 x i64> [[BROADCAST_SPLATINSERT1]], <16 x i64> poison, <16 x i32> zeroinitializer
+; VF16UF1-NEXT:    [[TMP2:%.*]] = mul <16 x i64> <i64 0, i64 1, i64 2, i64 3, i64 4, i64 5, i64 6, i64 7, i64 8, i64 9, i64 10, i64 11, i64 12, i64 13, i64 14, i64 15>, [[BROADCAST_SPLAT2]]
 ; VF16UF1-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; VF16UF1:       [[VECTOR_BODY]]:
 ; VF16UF1-NEXT:    [[TMP3:%.*]] = icmp ule <16 x i64> <i64 0, i64 1, i64 2, i64 3, i64 4, i64 5, i64 6, i64 7, i64 8, i64 9, i64 10, i64 11, i64 12, i64 13, i64 14, i64 15>, [[BROADCAST_SPLAT]]
+; VF16UF1-NEXT:    [[TMP5:%.*]] = add <16 x i64> [[TMP2]], [[BROADCAST_SPLAT2]]
 ; VF16UF1-NEXT:    [[TMP4:%.*]] = extractelement <16 x i1> [[TMP3]], i64 0
 ; VF16UF1-NEXT:    br i1 [[TMP4]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
 ; VF16UF1:       [[PRED_STORE_IF]]:
-; VF16UF1-NEXT:    [[TMP8:%.*]] = getelementptr i8, ptr [[DST]], i64 [[STEP]]
+; VF16UF1-NEXT:    [[TMP6:%.*]] = extractelement <16 x i64> [[TMP5]], i64 0
+; VF16UF1-NEXT:    [[TMP8:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP6]]
 ; VF16UF1-NEXT:    store i8 0, ptr [[TMP8]], align 1
 ; VF16UF1-NEXT:    br label %[[PRED_STORE_CONTINUE]]
 ; VF16UF1:       [[PRED_STORE_CONTINUE]]:
 ; VF16UF1-NEXT:    [[TMP9:%.*]] = extractelement <16 x i1> [[TMP3]], i64 1
 ; VF16UF1-NEXT:    br i1 [[TMP9]], label %[[PRED_STORE_IF1:.*]], label %[[PRED_STORE_CONTINUE2:.*]]
 ; VF16UF1:       [[PRED_STORE_IF1]]:
-; VF16UF1-NEXT:    [[TMP10:%.*]] = mul i64 1, [[STEP]]
-; VF16UF1-NEXT:    [[TMP11:%.*]] = add i64 0, [[TMP10]]
-; VF16UF1-NEXT:    [[TMP12:%.*]] = add i64 [[TMP11]], [[STEP]]
+; VF16UF1-NEXT:    [[TMP12:%.*]] = extractelement <16 x i64> [[TMP5]], i64 1
 ; VF16UF1-NEXT:    [[TMP13:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP12]]
 ; VF16UF1-NEXT:    store i8 0, ptr [[TMP13]], align 1
 ; VF16UF1-NEXT:    br label %[[PRED_STORE_CONTINUE2]]
@@ -926,9 +898,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF16UF1-NEXT:    [[TMP14:%.*]] = extractelement <16 x i1> [[TMP3]], i64 2
 ; VF16UF1-NEXT:    br i1 [[TMP14]], label %[[PRED_STORE_IF3:.*]], label %[[PRED_STORE_CONTINUE4:.*]]
 ; VF16UF1:       [[PRED_STORE_IF3]]:
-; VF16UF1-NEXT:    [[TMP15:%.*]] = mul i64 2, [[STEP]]
-; VF16UF1-NEXT:    [[TMP16:%.*]] = add i64 0, [[TMP15]]
-; VF16UF1-NEXT:    [[TMP17:%.*]] = add i64 [[TMP16]], [[STEP]]
+; VF16UF1-NEXT:    [[TMP17:%.*]] = extractelement <16 x i64> [[TMP5]], i64 2
 ; VF16UF1-NEXT:    [[TMP18:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP17]]
 ; VF16UF1-NEXT:    store i8 0, ptr [[TMP18]], align 1
 ; VF16UF1-NEXT:    br label %[[PRED_STORE_CONTINUE4]]
@@ -936,9 +906,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF16UF1-NEXT:    [[TMP19:%.*]] = extractelement <16 x i1> [[TMP3]], i64 3
 ; VF16UF1-NEXT:    br i1 [[TMP19]], label %[[PRED_STORE_IF5:.*]], label %[[PRED_STORE_CONTINUE6:.*]]
 ; VF16UF1:       [[PRED_STORE_IF5]]:
-; VF16UF1-NEXT:    [[TMP20:%.*]] = mul i64 3, [[STEP]]
-; VF16UF1-NEXT:    [[TMP21:%.*]] = add i64 0, [[TMP20]]
-; VF16UF1-NEXT:    [[TMP22:%.*]] = add i64 [[TMP21]], [[STEP]]
+; VF16UF1-NEXT:    [[TMP22:%.*]] = extractelement <16 x i64> [[TMP5]], i64 3
 ; VF16UF1-NEXT:    [[TMP23:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP22]]
 ; VF16UF1-NEXT:    store i8 0, ptr [[TMP23]], align 1
 ; VF16UF1-NEXT:    br label %[[PRED_STORE_CONTINUE6]]
@@ -946,9 +914,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF16UF1-NEXT:    [[TMP24:%.*]] = extractelement <16 x i1> [[TMP3]], i64 4
 ; VF16UF1-NEXT:    br i1 [[TMP24]], label %[[PRED_STORE_IF7:.*]], label %[[PRED_STORE_CONTINUE8:.*]]
 ; VF16UF1:       [[PRED_STORE_IF7]]:
-; VF16UF1-NEXT:    [[TMP25:%.*]] = mul i64 4, [[STEP]]
-; VF16UF1-NEXT:    [[TMP26:%.*]] = add i64 0, [[TMP25]]
-; VF16UF1-NEXT:    [[TMP27:%.*]] = add i64 [[TMP26]], [[STEP]]
+; VF16UF1-NEXT:    [[TMP27:%.*]] = extractelement <16 x i64> [[TMP5]], i64 4
 ; VF16UF1-NEXT:    [[TMP28:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP27]]
 ; VF16UF1-NEXT:    store i8 0, ptr [[TMP28]], align 1
 ; VF16UF1-NEXT:    br label %[[PRED_STORE_CONTINUE8]]
@@ -956,9 +922,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF16UF1-NEXT:    [[TMP29:%.*]] = extractelement <16 x i1> [[TMP3]], i64 5
 ; VF16UF1-NEXT:    br i1 [[TMP29]], label %[[PRED_STORE_IF9:.*]], label %[[PRED_STORE_CONTINUE10:.*]]
 ; VF16UF1:       [[PRED_STORE_IF9]]:
-; VF16UF1-NEXT:    [[TMP30:%.*]] = mul i64 5, [[STEP]]
-; VF16UF1-NEXT:    [[TMP31:%.*]] = add i64 0, [[TMP30]]
-; VF16UF1-NEXT:    [[TMP32:%.*]] = add i64 [[TMP31]], [[STEP]]
+; VF16UF1-NEXT:    [[TMP32:%.*]] = extractelement <16 x i64> [[TMP5]], i64 5
 ; VF16UF1-NEXT:    [[TMP33:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP32]]
 ; VF16UF1-NEXT:    store i8 0, ptr [[TMP33]], align 1
 ; VF16UF1-NEXT:    br label %[[PRED_STORE_CONTINUE10]]
@@ -966,9 +930,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF16UF1-NEXT:    [[TMP34:%.*]] = extractelement <16 x i1> [[TMP3]], i64 6
 ; VF16UF1-NEXT:    br i1 [[TMP34]], label %[[PRED_STORE_IF11:.*]], label %[[PRED_STORE_CONTINUE12:.*]]
 ; VF16UF1:       [[PRED_STORE_IF11]]:
-; VF16UF1-NEXT:    [[TMP35:%.*]] = mul i64 6, [[STEP]]
-; VF16UF1-NEXT:    [[TMP36:%.*]] = add i64 0, [[TMP35]]
-; VF16UF1-NEXT:    [[TMP37:%.*]] = add i64 [[TMP36]], [[STEP]]
+; VF16UF1-NEXT:    [[TMP37:%.*]] = extractelement <16 x i64> [[TMP5]], i64 6
 ; VF16UF1-NEXT:    [[TMP38:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP37]]
 ; VF16UF1-NEXT:    store i8 0, ptr [[TMP38]], align 1
 ; VF16UF1-NEXT:    br label %[[PRED_STORE_CONTINUE12]]
@@ -976,9 +938,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF16UF1-NEXT:    [[TMP39:%.*]] = extractelement <16 x i1> [[TMP3]], i64 7
 ; VF16UF1-NEXT:    br i1 [[TMP39]], label %[[PRED_STORE_IF13:.*]], label %[[PRED_STORE_CONTINUE14:.*]]
 ; VF16UF1:       [[PRED_STORE_IF13]]:
-; VF16UF1-NEXT:    [[TMP40:%.*]] = mul i64 7, [[STEP]]
-; VF16UF1-NEXT:    [[TMP41:%.*]] = add i64 0, [[TMP40]]
-; VF16UF1-NEXT:    [[TMP42:%.*]] = add i64 [[TMP41]], [[STEP]]
+; VF16UF1-NEXT:    [[TMP42:%.*]] = extractelement <16 x i64> [[TMP5]], i64 7
 ; VF16UF1-NEXT:    [[TMP43:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP42]]
 ; VF16UF1-NEXT:    store i8 0, ptr [[TMP43]], align 1
 ; VF16UF1-NEXT:    br label %[[PRED_STORE_CONTINUE14]]
@@ -986,9 +946,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF16UF1-NEXT:    [[TMP44:%.*]] = extractelement <16 x i1> [[TMP3]], i64 8
 ; VF16UF1-NEXT:    br i1 [[TMP44]], label %[[PRED_STORE_IF15:.*]], label %[[PRED_STORE_CONTINUE16:.*]]
 ; VF16UF1:       [[PRED_STORE_IF15]]:
-; VF16UF1-NEXT:    [[TMP45:%.*]] = mul i64 8, [[STEP]]
-; VF16UF1-NEXT:    [[TMP46:%.*]] = add i64 0, [[TMP45]]
-; VF16UF1-NEXT:    [[TMP47:%.*]] = add i64 [[TMP46]], [[STEP]]
+; VF16UF1-NEXT:    [[TMP47:%.*]] = extractelement <16 x i64> [[TMP5]], i64 8
 ; VF16UF1-NEXT:    [[TMP48:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP47]]
 ; VF16UF1-NEXT:    store i8 0, ptr [[TMP48]], align 1
 ; VF16UF1-NEXT:    br label %[[PRED_STORE_CONTINUE16]]
@@ -996,9 +954,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF16UF1-NEXT:    [[TMP49:%.*]] = extractelement <16 x i1> [[TMP3]], i64 9
 ; VF16UF1-NEXT:    br i1 [[TMP49]], label %[[PRED_STORE_IF17:.*]], label %[[PRED_STORE_CONTINUE18:.*]]
 ; VF16UF1:       [[PRED_STORE_IF17]]:
-; VF16UF1-NEXT:    [[TMP50:%.*]] = mul i64 9, [[STEP]]
-; VF16UF1-NEXT:    [[TMP51:%.*]] = add i64 0, [[TMP50]]
-; VF16UF1-NEXT:    [[TMP52:%.*]] = add i64 [[TMP51]], [[STEP]]
+; VF16UF1-NEXT:    [[TMP52:%.*]] = extractelement <16 x i64> [[TMP5]], i64 9
 ; VF16UF1-NEXT:    [[TMP53:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP52]]
 ; VF16UF1-NEXT:    store i8 0, ptr [[TMP53]], align 1
 ; VF16UF1-NEXT:    br label %[[PRED_STORE_CONTINUE18]]
@@ -1006,9 +962,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF16UF1-NEXT:    [[TMP54:%.*]] = extractelement <16 x i1> [[TMP3]], i64 10
 ; VF16UF1-NEXT:    br i1 [[TMP54]], label %[[PRED_STORE_IF19:.*]], label %[[PRED_STORE_CONTINUE20:.*]]
 ; VF16UF1:       [[PRED_STORE_IF19]]:
-; VF16UF1-NEXT:    [[TMP55:%.*]] = mul i64 10, [[STEP]]
-; VF16UF1-NEXT:    [[TMP56:%.*]] = add i64 0, [[TMP55]]
-; VF16UF1-NEXT:    [[TMP57:%.*]] = add i64 [[TMP56]], [[STEP]]
+; VF16UF1-NEXT:    [[TMP57:%.*]] = extractelement <16 x i64> [[TMP5]], i64 10
 ; VF16UF1-NEXT:    [[TMP58:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP57]]
 ; VF16UF1-NEXT:    store i8 0, ptr [[TMP58]], align 1
 ; VF16UF1-NEXT:    br label %[[PRED_STORE_CONTINUE20]]
@@ -1016,9 +970,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF16UF1-NEXT:    [[TMP59:%.*]] = extractelement <16 x i1> [[TMP3]], i64 11
 ; VF16UF1-NEXT:    br i1 [[TMP59]], label %[[PRED_STORE_IF21:.*]], label %[[PRED_STORE_CONTINUE22:.*]]
 ; VF16UF1:       [[PRED_STORE_IF21]]:
-; VF16UF1-NEXT:    [[TMP60:%.*]] = mul i64 11, [[STEP]]
-; VF16UF1-NEXT:    [[TMP61:%.*]] = add i64 0, [[TMP60]]
-; VF16UF1-NEXT:    [[TMP62:%.*]] = add i64 [[TMP61]], [[STEP]]
+; VF16UF1-NEXT:    [[TMP62:%.*]] = extractelement <16 x i64> [[TMP5]], i64 11
 ; VF16UF1-NEXT:    [[TMP63:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP62]]
 ; VF16UF1-NEXT:    store i8 0, ptr [[TMP63]], align 1
 ; VF16UF1-NEXT:    br label %[[PRED_STORE_CONTINUE22]]
@@ -1026,9 +978,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF16UF1-NEXT:    [[TMP64:%.*]] = extractelement <16 x i1> [[TMP3]], i64 12
 ; VF16UF1-NEXT:    br i1 [[TMP64]], label %[[PRED_STORE_IF23:.*]], label %[[PRED_STORE_CONTINUE24:.*]]
 ; VF16UF1:       [[PRED_STORE_IF23]]:
-; VF16UF1-NEXT:    [[TMP65:%.*]] = mul i64 12, [[STEP]]
-; VF16UF1-NEXT:    [[TMP66:%.*]] = add i64 0, [[TMP65]]
-; VF16UF1-NEXT:    [[TMP67:%.*]] = add i64 [[TMP66]], [[STEP]]
+; VF16UF1-NEXT:    [[TMP67:%.*]] = extractelement <16 x i64> [[TMP5]], i64 12
 ; VF16UF1-NEXT:    [[TMP68:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP67]]
 ; VF16UF1-NEXT:    store i8 0, ptr [[TMP68]], align 1
 ; VF16UF1-NEXT:    br label %[[PRED_STORE_CONTINUE24]]
@@ -1036,9 +986,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF16UF1-NEXT:    [[TMP69:%.*]] = extractelement <16 x i1> [[TMP3]], i64 13
 ; VF16UF1-NEXT:    br i1 [[TMP69]], label %[[PRED_STORE_IF25:.*]], label %[[PRED_STORE_CONTINUE26:.*]]
 ; VF16UF1:       [[PRED_STORE_IF25]]:
-; VF16UF1-NEXT:    [[TMP70:%.*]] = mul i64 13, [[STEP]]
-; VF16UF1-NEXT:    [[TMP71:%.*]] = add i64 0, [[TMP70]]
-; VF16UF1-NEXT:    [[TMP72:%.*]] = add i64 [[TMP71]], [[STEP]]
+; VF16UF1-NEXT:    [[TMP72:%.*]] = extractelement <16 x i64> [[TMP5]], i64 13
 ; VF16UF1-NEXT:    [[TMP73:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP72]]
 ; VF16UF1-NEXT:    store i8 0, ptr [[TMP73]], align 1
 ; VF16UF1-NEXT:    br label %[[PRED_STORE_CONTINUE26]]
@@ -1046,9 +994,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF16UF1-NEXT:    [[TMP74:%.*]] = extractelement <16 x i1> [[TMP3]], i64 14
 ; VF16UF1-NEXT:    br i1 [[TMP74]], label %[[PRED_STORE_IF27:.*]], label %[[PRED_STORE_CONTINUE28:.*]]
 ; VF16UF1:       [[PRED_STORE_IF27]]:
-; VF16UF1-NEXT:    [[TMP75:%.*]] = mul i64 14, [[STEP]]
-; VF16UF1-NEXT:    [[TMP76:%.*]] = add i64 0, [[TMP75]]
-; VF16UF1-NEXT:    [[TMP77:%.*]] = add i64 [[TMP76]], [[STEP]]
+; VF16UF1-NEXT:    [[TMP77:%.*]] = extractelement <16 x i64> [[TMP5]], i64 14
 ; VF16UF1-NEXT:    [[TMP78:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP77]]
 ; VF16UF1-NEXT:    store i8 0, ptr [[TMP78]], align 1
 ; VF16UF1-NEXT:    br label %[[PRED_STORE_CONTINUE28]]
@@ -1056,9 +1002,7 @@ define void @scev_expand_step(i64 %x, ptr %dst) {
 ; VF16UF1-NEXT:    [[TMP79:%.*]] = extractelement <16 x i1> [[TMP3]], i64 15
 ; VF16UF1-NEXT:    br i1 [[TMP79]], label %[[PRED_STORE_IF29:.*]], label %[[PRED_STORE_CONTINUE30:.*]]
 ; VF16UF1:       [[PRED_STORE_IF29]]:
-; VF16UF1-NEXT:    [[TMP80:%.*]] = mul i64 15, [[STEP]]
-; VF16UF1-NEXT:    [[TMP81:%.*]] = add i64 0, [[TMP80]]
-; VF16UF1-NEXT:    [[TMP82:%.*]] = add i64 [[TMP81]], [[STEP]]
+; VF16UF1-NEXT:    [[TMP82:%.*]] = extractelement <16 x i64> [[TMP5]], i64 15
 ; VF16UF1-NEXT:    [[GEP_DST:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP82]]
 ; VF16UF1-NEXT:    store i8 0, ptr [[GEP_DST]], align 1
 ; VF16UF1-NEXT:    br label %[[PRED_STORE_CONTINUE30]]
