@@ -1431,38 +1431,26 @@ bool ScalarEvolution::proveNoWrapByVaryingStart(const SCEV *Start,
 // Finds an integer D for an expression (C + x + y + ...) such that the top
 // level addition in (D + (C - D + x + y + ...)) would not wrap (signed or
 // unsigned) and the number of trailing zeros of (C - D + x + y + ...) is
-// maximized, where C is the \p ConstantTerm, x, y, ... are arbitrary SCEVs, and
-// the (C + x + y + ...) expression is \p WholeAddExpr.
+// maximized, where C is the \p ConstantTerm and \p Ops are the remaining,
+// arbitrary operands x, y, ... of the expression.
+//
+// The same applies to an affine AddRec {C,+,x}: there \p Ops is the single
+// step x and (C - D + x * n) is the expression whose trailing zeros are
+// maximized, where n is the loop trip count.
 static APInt extractConstantWithoutWrapping(ScalarEvolution &SE,
-                                            const SCEVConstant *ConstantTerm,
-                                            const SCEVAddExpr *WholeAddExpr) {
-  const APInt &C = ConstantTerm->getAPInt();
-  const unsigned BitWidth = C.getBitWidth();
-  // Find number of trailing zeros of (x + y + ...) w/o the C first:
+                                            const APInt &ConstantTerm,
+                                            ArrayRef<SCEVUse> Ops) {
+  const unsigned BitWidth = ConstantTerm.getBitWidth();
+  // Find the number of trailing zeros of (x + y + ...) w/o the constant first.
   uint32_t TZ = BitWidth;
-  for (unsigned I = 1, E = WholeAddExpr->getNumOperands(); I < E && TZ; ++I)
-    TZ = std::min(TZ, SE.getMinTrailingZeros(WholeAddExpr->getOperand(I)));
-  if (TZ) {
-    // Set D to be as many least significant bits of C as possible while still
-    // guaranteeing that adding D to (C - D + x + y + ...) won't cause a wrap:
-    return TZ < BitWidth ? C.trunc(TZ).zext(BitWidth) : C;
+  for (SCEVUse Op : Ops) {
+    TZ = std::min(TZ, SE.getMinTrailingZeros(Op));
+    if (!TZ)
+      break;
   }
-  return APInt(BitWidth, 0);
-}
-
-// Finds an integer D for an affine AddRec expression {C,+,x} such that the top
-// level addition in (D + {C-D,+,x}) would not wrap (signed or unsigned) and the
-// number of trailing zeros of (C - D + x * n) is maximized, where C is the \p
-// ConstantStart, x is an arbitrary \p Step, and n is the loop trip count.
-static APInt extractConstantWithoutWrapping(ScalarEvolution &SE,
-                                            const APInt &ConstantStart,
-                                            const SCEV *Step) {
-  const unsigned BitWidth = ConstantStart.getBitWidth();
-  const uint32_t TZ = SE.getMinTrailingZeros(Step);
-  if (TZ)
-    return TZ < BitWidth ? ConstantStart.trunc(TZ).zext(BitWidth)
-                         : ConstantStart;
-  return APInt(BitWidth, 0);
+  // D is as many least significant bits of the constant as possible while
+  // still guaranteeing that adding D to (C - D + x + y + ...) won't wrap.
+  return ConstantTerm & APInt::getLowBitsSet(BitWidth, TZ);
 }
 
 static void insertFoldCacheEntry(
@@ -1687,7 +1675,8 @@ const SCEV *ScalarEvolution::getZeroExtendExprImpl(SCEVUse Op, Type *Ty,
     // where D maximizes the number of trailing zeros of (C - D + Step * n)
     if (const auto *SC = dyn_cast<SCEVConstant>(Start)) {
       const APInt &C = SC->getAPInt();
-      const APInt &D = extractConstantWithoutWrapping(*this, C, Step);
+      const APInt &D =
+          extractConstantWithoutWrapping(*this, C, AR->operands().drop_front());
       if (D != 0) {
         const SCEV *SZExtD = getZeroExtendExpr(getConstant(D), Ty, Depth);
         const SCEV *SResidual =
@@ -1754,7 +1743,8 @@ const SCEV *ScalarEvolution::getZeroExtendExprImpl(SCEVUse Op, Type *Ty,
     // This transformation is useful while proving that such expressions are
     // equal or differ by a small constant amount, see LoadStoreVectorizer pass.
     if (const auto *SC = dyn_cast<SCEVConstant>(SA->getOperand(0))) {
-      const APInt &D = extractConstantWithoutWrapping(*this, SC, SA);
+      const APInt &D = extractConstantWithoutWrapping(
+          *this, SC->getAPInt(), SA->operands().drop_front());
       if (D != 0) {
         const SCEV *SZExtD = getZeroExtendExpr(getConstant(D), Ty, Depth);
         const SCEV *SResidual =
@@ -1939,7 +1929,8 @@ const SCEV *ScalarEvolution::getSignExtendExprImpl(SCEVUse Op, Type *Ty,
     // to the same form:
     //     2 + sext(4 + 20 * %x + 24 * %y)
     if (const auto *SC = dyn_cast<SCEVConstant>(SA->getOperand(0))) {
-      const APInt &D = extractConstantWithoutWrapping(*this, SC, SA);
+      const APInt &D = extractConstantWithoutWrapping(
+          *this, SC->getAPInt(), SA->operands().drop_front());
       if (D != 0) {
         const SCEV *SSExtD = getSignExtendExpr(getConstant(D), Ty, Depth);
         const SCEV *SResidual =
@@ -2050,7 +2041,8 @@ const SCEV *ScalarEvolution::getSignExtendExprImpl(SCEVUse Op, Type *Ty,
     // where D maximizes the number of trailing zeros of (C - D + Step * n)
     if (const auto *SC = dyn_cast<SCEVConstant>(Start)) {
       const APInt &C = SC->getAPInt();
-      const APInt &D = extractConstantWithoutWrapping(*this, C, Step);
+      const APInt &D =
+          extractConstantWithoutWrapping(*this, C, AR->operands().drop_front());
       if (D != 0) {
         const SCEV *SSExtD = getSignExtendExpr(getConstant(D), Ty, Depth);
         const SCEV *SResidual =
