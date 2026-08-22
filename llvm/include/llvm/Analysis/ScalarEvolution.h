@@ -139,10 +139,6 @@ struct SCEVUseT : private PointerIntPair<SCEVPtrT, 2> {
   operator SCEVPtrT() const { return getPointer(); }
   SCEVPtrT operator->() const { return getPointer(); }
 
-  /// Returns true if the SCEVUse is canonical, i.e. no SCEVUse flags set in any
-  /// operands.
-  bool isCanonical() const { return getCanonical() == getOpaqueValue(); }
-
   /// Returns true if this use itself carries use-specific no-wrap flags.
   bool hasUseFlags() const { return getOpaqueValue() != getPointer(); }
 
