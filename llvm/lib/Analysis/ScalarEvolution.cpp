@@ -668,14 +668,10 @@ CompareSCEVComplexity(const LoopInfo *LI, const SCEV *LHS, const SCEV *RHS,
   // isn't very important except that it's beneficial to be consistent,
   // so that (a + b) and (b + a) don't end up as different expressions.
   switch (LType) {
-  case scUnknown: {
-    const SCEVUnknown *LU = cast<SCEVUnknown>(LHS);
-    const SCEVUnknown *RU = cast<SCEVUnknown>(RHS);
-
-    int X =
-        CompareValueComplexity(LI, LU->getValue(), RU->getValue(), Depth + 1);
-    return X;
-  }
+  case scUnknown:
+    return CompareValueComplexity(LI, cast<SCEVUnknown>(LHS)->getValue(),
+                                  cast<SCEVUnknown>(RHS)->getValue(),
+                                  Depth + 1);
 
   case scConstant: {
     const SCEVConstant *LC = cast<SCEVConstant>(LHS);
