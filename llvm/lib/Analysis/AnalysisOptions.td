@@ -434,7 +434,7 @@ defm : ValueField<"scev-range-iter-threshold", "unsigned", "32",
 defm : BoolField<"scev-verify-ir", "false",
   "Verify IR correctness when making sensitive SCEV queries (slow)">;
 defm : BoolField<"verify-scev-strict", "false",
-  "Enable stricter verification with -verify-scev is passed">;
+  "Enable stricter verification when -verify-scev is passed">;
 
 // ScopedNoAliasAA.cpp
 // A handy option for disabling scoped no-alias functionality. The same effect
