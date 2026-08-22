@@ -11822,9 +11822,9 @@ bool ScalarEvolution::isLoopBackedgeGuardedByCond(const Loop *L,
   if (!L || !DT.isReachableFromEntry(L->getHeader()))
     return true;
 
-  if (VerifyIR)
-    assert(!verifyFunction(*L->getHeader()->getParent(), &dbgs()) &&
-           "This cannot be done on broken IR!");
+  assert((!VerifyIR ||
+          !verifyFunction(*L->getHeader()->getParent(), &dbgs())) &&
+         "This cannot be done on broken IR!");
 
 
   if (isKnownViaNonRecursiveReasoning(Pred, LHS, RHS))
@@ -11917,9 +11917,8 @@ bool ScalarEvolution::isBasicBlockEntryGuardedByCond(const BasicBlock *BB,
   // Do not bother proving facts for unreachable code.
   if (!DT.isReachableFromEntry(BB))
     return true;
-  if (VerifyIR)
-    assert(!verifyFunction(*BB->getParent(), &dbgs()) &&
-           "This cannot be done on broken IR!");
+  assert((!VerifyIR || !verifyFunction(*BB->getParent(), &dbgs())) &&
+         "This cannot be done on broken IR!");
 
   // If we cannot prove strict comparison (e.g. a > b), maybe we can prove
   // the facts (a >= b && a != b) separately. A typical situation is when the
