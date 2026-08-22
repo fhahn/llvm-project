@@ -437,6 +437,11 @@ bool SCEVCouldNotCompute::classof(const SCEV *S) {
   return S->getSCEVType() == scCouldNotCompute;
 }
 
+void ScalarEvolution::insertNewSCEV(SCEV *S, void *IP) {
+  UniqueSCEVs.InsertNode(S, IP);
+  S->computeAndSetCanonical(*this);
+}
+
 const SCEV *ScalarEvolution::getConstant(ConstantInt *V) {
   auto &Entry = ConstantSCEVs[V];
   if (Entry)
@@ -451,8 +456,7 @@ const SCEV *ScalarEvolution::getConstant(ConstantInt *V) {
     return Entry = S;
   SCEVConstant *S =
       new (SCEVAllocator) SCEVConstant(ID.Intern(SCEVAllocator), V);
-  UniqueSCEVs.InsertNode(S, IP);
-  S->computeAndSetCanonical(*this);
+  insertNewSCEV(S, IP);
   return Entry = S;
 }
 
@@ -477,8 +481,7 @@ const SCEV *ScalarEvolution::getVScale(Type *Ty) {
   if (const SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP))
     return S;
   SCEV *S = new (SCEVAllocator) SCEVVScale(ID.Intern(SCEVAllocator), Ty);
-  UniqueSCEVs.InsertNode(S, IP);
-  S->computeAndSetCanonical(*this);
+  insertNewSCEV(S, IP);
   return S;
 }
 
@@ -1073,8 +1076,7 @@ const SCEV *ScalarEvolution::getPtrToAddrExpr(const SCEV *Op) {
           return S;
         SCEV *S = new (SCEVAllocator)
             SCEVPtrToAddrExpr(ID.Intern(SCEVAllocator), U, Ty);
-        UniqueSCEVs.InsertNode(S, IP);
-        S->computeAndSetCanonical(*this);
+        insertNewSCEV(S, IP);
         registerUser(S, U);
         return static_cast<const SCEV *>(S);
       });
@@ -1120,8 +1122,7 @@ const SCEV *ScalarEvolution::getTruncateExpr(SCEVUse Op, Type *Ty,
   if (Depth > MaxCastDepth) {
     SCEV *S =
         new (SCEVAllocator) SCEVTruncateExpr(ID.Intern(SCEVAllocator), Op, Ty);
-    UniqueSCEVs.InsertNode(S, IP);
-    S->computeAndSetCanonical(*this);
+    insertNewSCEV(S, IP);
     registerUser(S, Op);
     return S;
   }
@@ -1174,8 +1175,7 @@ const SCEV *ScalarEvolution::getTruncateExpr(SCEVUse Op, Type *Ty,
   // made any changes which would invalidate it.
   SCEV *S = new (SCEVAllocator) SCEVTruncateExpr(ID.Intern(SCEVAllocator),
                                                  Op, Ty);
-  UniqueSCEVs.InsertNode(S, IP);
-  S->computeAndSetCanonical(*this);
+  insertNewSCEV(S, IP);
   registerUser(S, Op);
   return S;
 }
@@ -1559,8 +1559,7 @@ const SCEV *ScalarEvolution::getZeroExtendExprImpl(SCEVUse Op, Type *Ty,
   if (Depth > MaxCastDepth) {
     SCEV *S = new (SCEVAllocator) SCEVZeroExtendExpr(ID.Intern(SCEVAllocator),
                                                      Op, Ty);
-    UniqueSCEVs.InsertNode(S, IP);
-    S->computeAndSetCanonical(*this);
+    insertNewSCEV(S, IP);
     registerUser(S, Op);
     return S;
   }
@@ -1844,8 +1843,7 @@ const SCEV *ScalarEvolution::getZeroExtendExprImpl(SCEVUse Op, Type *Ty,
   if (const SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP)) return S;
   SCEV *S = new (SCEVAllocator) SCEVZeroExtendExpr(ID.Intern(SCEVAllocator),
                                                    Op, Ty);
-  UniqueSCEVs.InsertNode(S, IP);
-  S->computeAndSetCanonical(*this);
+  insertNewSCEV(S, IP);
   registerUser(S, Op);
   return S;
 }
@@ -1915,8 +1913,7 @@ const SCEV *ScalarEvolution::getSignExtendExprImpl(SCEVUse Op, Type *Ty,
   if (Depth > MaxCastDepth) {
     SCEV *S = new (SCEVAllocator) SCEVSignExtendExpr(ID.Intern(SCEVAllocator),
                                                      Op, Ty);
-    UniqueSCEVs.InsertNode(S, IP);
-    S->computeAndSetCanonical(*this);
+    insertNewSCEV(S, IP);
     registerUser(S, Op);
     return S;
   }
@@ -2107,8 +2104,7 @@ const SCEV *ScalarEvolution::getSignExtendExprImpl(SCEVUse Op, Type *Ty,
   if (const SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP)) return S;
   SCEV *S = new (SCEVAllocator) SCEVSignExtendExpr(ID.Intern(SCEVAllocator),
                                                    Op, Ty);
-  UniqueSCEVs.InsertNode(S, IP);
-  S->computeAndSetCanonical(*this);
+  insertNewSCEV(S, IP);
   registerUser(S, Op);
   return S;
 }
@@ -2966,8 +2962,7 @@ const SCEV *ScalarEvolution::getOrCreateAddExpr(ArrayRef<SCEVUse> Ops,
     llvm::uninitialized_copy(Ops, O);
     S = new (SCEVAllocator)
         SCEVAddExpr(ID.Intern(SCEVAllocator), O, Ops.size());
-    UniqueSCEVs.InsertNode(S, IP);
-    S->computeAndSetCanonical(*this);
+    insertNewSCEV(S, IP);
     registerUser(S, Ops);
   }
   S->setNoWrapFlags(Flags);
@@ -2990,8 +2985,7 @@ const SCEV *ScalarEvolution::getOrCreateAddRecExpr(ArrayRef<SCEVUse> Ops,
     llvm::uninitialized_copy(Ops, O);
     S = new (SCEVAllocator)
         SCEVAddRecExpr(ID.Intern(SCEVAllocator), O, Ops.size(), L);
-    UniqueSCEVs.InsertNode(S, IP);
-    S->computeAndSetCanonical(*this);
+    insertNewSCEV(S, IP);
     LoopUsers[L].push_back(S);
     registerUser(S, Ops);
   }
@@ -3013,8 +3007,7 @@ const SCEV *ScalarEvolution::getOrCreateMulExpr(ArrayRef<SCEVUse> Ops,
     llvm::uninitialized_copy(Ops, O);
     S = new (SCEVAllocator) SCEVMulExpr(ID.Intern(SCEVAllocator),
                                         O, Ops.size());
-    UniqueSCEVs.InsertNode(S, IP);
-    S->computeAndSetCanonical(*this);
+    insertNewSCEV(S, IP);
     registerUser(S, Ops);
   }
   S->setNoWrapFlags(Flags);
@@ -3030,8 +3023,7 @@ const SCEV *ScalarEvolution::getOrCreateUDivExpr(SCEVUse LHS, SCEVUse RHS) {
   SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP);
   if (!S) {
     S = new (SCEVAllocator) SCEVUDivExpr(ID.Intern(SCEVAllocator), LHS, RHS);
-    UniqueSCEVs.InsertNode(S, IP);
-    S->computeAndSetCanonical(*this);
+    insertNewSCEV(S, IP);
     registerUser(S, ArrayRef<SCEVUse>({LHS, RHS}));
   }
   return S;
@@ -3947,8 +3939,7 @@ const SCEV *ScalarEvolution::getMinMaxExpr(SCEVTypes Kind,
   SCEV *S = new (SCEVAllocator)
       SCEVMinMaxExpr(ID.Intern(SCEVAllocator), Kind, O, Ops.size());
 
-  UniqueSCEVs.InsertNode(S, IP);
-  S->computeAndSetCanonical(*this);
+  insertNewSCEV(S, IP);
   registerUser(S, Ops);
   return S;
 }
@@ -4335,8 +4326,7 @@ ScalarEvolution::getSequentialMinMaxExpr(SCEVTypes Kind,
   SCEV *S = new (SCEVAllocator)
       SCEVSequentialMinMaxExpr(ID.Intern(SCEVAllocator), Kind, O, Ops.size());
 
-  UniqueSCEVs.InsertNode(S, IP);
-  S->computeAndSetCanonical(*this);
+  insertNewSCEV(S, IP);
   registerUser(S, Ops);
   return S;
 }
@@ -4426,8 +4416,7 @@ const SCEV *ScalarEvolution::getUnknown(Value *V) {
   SCEV *S = new (SCEVAllocator) SCEVUnknown(ID.Intern(SCEVAllocator), V, this,
                                             FirstUnknown);
   FirstUnknown = cast<SCEVUnknown>(S);
-  UniqueSCEVs.InsertNode(S, IP);
-  S->computeAndSetCanonical(*this);
+  insertNewSCEV(S, IP);
   return S;
 }
 

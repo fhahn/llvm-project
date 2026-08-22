@@ -247,6 +247,8 @@ struct CastInfo<SCEVUseT<ToSCEVPtrT>, const SCEVUse,
 ///
 class SCEV : public FoldingSetNode {
   friend struct FoldingSetTrait<SCEV>;
+  // Needs computeAndSetCanonical when making a new node visible in UniqueSCEVs.
+  friend class ScalarEvolution;
 
   /// A reference to an Interned FoldingSetNodeID for this node.  The
   /// ScalarEvolution's BumpPtrAllocator holds the data.
@@ -324,15 +326,18 @@ public:
   /// This method is used for debugging.
   LLVM_ABI void dump() const;
 
-  /// Compute and set the canonical SCEV, by constructing a SCEV with the same
-  /// operands, but all SCEVUse flags dropped.
-  LLVM_ABI void computeAndSetCanonical(ScalarEvolution &SE);
-
   /// Return the canonical SCEV.
   const SCEV *getCanonical() const {
     assert(CanonicalSCEV && "canonical SCEV not yet computed");
     return CanonicalSCEV;
   }
+
+private:
+  /// Compute and set the canonical SCEV, by constructing a SCEV with the same
+  /// operands, but all SCEVUse flags dropped. Only called by
+  /// ScalarEvolution::insertNewSCEV, so that a node can never become visible in
+  /// the uniquing set without a canonical SCEV.
+  void computeAndSetCanonical(ScalarEvolution &SE);
 };
 
 // Specialize FoldingSetTrait for SCEV to avoid needing to compute
@@ -2544,6 +2549,12 @@ private:
   /// Look for a SCEV expression with type `SCEVType` and operands `Ops` in
   /// `UniqueSCEVs`.  Return if found, else nullptr.
   SCEV *findExistingSCEVInCache(SCEVTypes SCEVType, ArrayRef<SCEVUse> Ops);
+
+  /// Make the newly created \p S visible in `UniqueSCEVs` at insert position
+  /// \p IP and compute its canonical SCEV. All new nodes must be inserted this
+  /// way, as a node must never be reachable via `UniqueSCEVs` without having a
+  /// canonical SCEV.
+  void insertNewSCEV(SCEV *S, void *IP);
 
   /// Get reachable blocks in this function, making limited use of SCEV
   /// reasoning about conditions.
