@@ -1478,11 +1478,6 @@ const SCEV *ScalarEvolution::getZeroExtendExpr(SCEVUse Op, Type *Ty,
 
 const SCEV *ScalarEvolution::getZeroExtendExprImpl(SCEVUse Op, Type *Ty,
                                                    unsigned Depth) {
-  assert(getTypeSizeInBits(Op->getType()) < getTypeSizeInBits(Ty) &&
-         "This is not an extending conversion!");
-  assert(isSCEVable(Ty) && "This is not a conversion to a SCEVable type!");
-  assert(!Op->getType()->isPointerTy() && "Can't extend pointer!");
-
   // Fold if the operand is constant.
   if (const SCEVConstant *SC = dyn_cast<SCEVConstant>(Op))
     return getConstant(SC->getAPInt().zext(getTypeSizeInBits(Ty)));
@@ -1828,12 +1823,6 @@ const SCEV *ScalarEvolution::getSignExtendExpr(SCEVUse Op, Type *Ty,
 
 const SCEV *ScalarEvolution::getSignExtendExprImpl(SCEVUse Op, Type *Ty,
                                                    unsigned Depth) {
-  assert(getTypeSizeInBits(Op->getType()) < getTypeSizeInBits(Ty) &&
-         "This is not an extending conversion!");
-  assert(isSCEVable(Ty) && "This is not a conversion to a SCEVable type!");
-  assert(!Op->getType()->isPointerTy() && "Can't extend pointer!");
-  Ty = getEffectiveSCEVType(Ty);
-
   // Fold if the operand is constant.
   if (const SCEVConstant *SC = dyn_cast<SCEVConstant>(Op))
     return getConstant(SC->getAPInt().sext(getTypeSizeInBits(Ty)));

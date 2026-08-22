@@ -750,12 +750,8 @@ public:
                   SCEV::NoWrapFlags Flags = SCEV::FlagAnyWrap);
   LLVM_ABI const SCEV *getZeroExtendExpr(SCEVUse Op, Type *Ty,
                                          unsigned Depth = 0);
-  LLVM_ABI const SCEV *getZeroExtendExprImpl(SCEVUse Op, Type *Ty,
-                                             unsigned Depth = 0);
   LLVM_ABI const SCEV *getSignExtendExpr(SCEVUse Op, Type *Ty,
                                          unsigned Depth = 0);
-  LLVM_ABI const SCEV *getSignExtendExprImpl(SCEVUse Op, Type *Ty,
-                                             unsigned Depth = 0);
   LLVM_ABI const SCEV *getCastExpr(SCEVTypes Kind, SCEVUse Op, Type *Ty);
   LLVM_ABI const SCEV *getAnyExtendExpr(SCEVUse Op, Type *Ty);
 
@@ -2522,6 +2518,13 @@ private:
   /// greater-than comparison, knowing the invariant term of the comparison,
   /// the stride.
   bool canIVOverflowOnGT(const SCEV *RHS, const SCEV *Stride, bool IsSigned);
+
+  /// Implementations of get{Zero,Sign}ExtendExpr. The public wrappers check the
+  /// conversion is a valid extension to a SCEVable, non-pointer \p Ty, replace
+  /// \p Ty by its effective SCEV type and maintain the fold cache, so these
+  /// must only be called through them.
+  const SCEV *getZeroExtendExprImpl(SCEVUse Op, Type *Ty, unsigned Depth);
+  const SCEV *getSignExtendExprImpl(SCEVUse Op, Type *Ty, unsigned Depth);
 
   /// Get add expr already created or create a new one.
   const SCEV *getOrCreateAddExpr(ArrayRef<SCEVUse> Ops,
