@@ -327,10 +327,7 @@ void SCEV::print(raw_ostream &OS) const {
   }
   case scAddRecExpr: {
     const SCEVAddRecExpr *AR = cast<SCEVAddRecExpr>(this);
-    OS << "{" << AR->getOperand(0);
-    for (unsigned i = 1, e = AR->getNumOperands(); i != e; ++i)
-      OS << ",+," << AR->getOperand(i);
-    OS << "}<";
+    OS << llvm::interleaved(AR->operands(), ",+,", "{", "}") << "<";
     if (AR->hasNoUnsignedWrap())
       OS << "nuw><";
     if (AR->hasNoSignedWrap())
