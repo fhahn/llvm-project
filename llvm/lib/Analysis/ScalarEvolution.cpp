@@ -507,27 +507,9 @@ SCEVPtrToAddrExpr::SCEVPtrToAddrExpr(const FoldingSetNodeIDRef ID,
 SCEVIntegralCastExpr::SCEVIntegralCastExpr(const FoldingSetNodeIDRef ID,
                                            SCEVTypes SCEVTy, SCEVUse op,
                                            Type *ty)
-    : SCEVCastExpr(ID, SCEVTy, op, ty) {}
-
-SCEVTruncateExpr::SCEVTruncateExpr(const FoldingSetNodeIDRef ID, SCEVUse op,
-                                   Type *ty)
-    : SCEVIntegralCastExpr(ID, scTruncate, op, ty) {
+    : SCEVCastExpr(ID, SCEVTy, op, ty) {
   assert(getOperand()->getType()->isIntOrPtrTy() && getType()->isIntOrPtrTy() &&
-         "Cannot truncate non-integer value!");
-}
-
-SCEVZeroExtendExpr::SCEVZeroExtendExpr(const FoldingSetNodeIDRef ID, SCEVUse op,
-                                       Type *ty)
-    : SCEVIntegralCastExpr(ID, scZeroExtend, op, ty) {
-  assert(getOperand()->getType()->isIntOrPtrTy() && getType()->isIntOrPtrTy() &&
-         "Cannot zero extend non-integer value!");
-}
-
-SCEVSignExtendExpr::SCEVSignExtendExpr(const FoldingSetNodeIDRef ID, SCEVUse op,
-                                       Type *ty)
-    : SCEVIntegralCastExpr(ID, scSignExtend, op, ty) {
-  assert(getOperand()->getType()->isIntOrPtrTy() && getType()->isIntOrPtrTy() &&
-         "Cannot sign extend non-integer value!");
+         "Cannot extend or truncate non-integer value!");
 }
 
 void SCEVUnknown::deleted() {

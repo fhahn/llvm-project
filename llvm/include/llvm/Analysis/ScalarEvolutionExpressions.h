@@ -149,7 +149,8 @@ public:
 class SCEVTruncateExpr : public SCEVIntegralCastExpr {
   friend class ScalarEvolution;
 
-  SCEVTruncateExpr(const FoldingSetNodeIDRef ID, SCEVUse op, Type *ty);
+  SCEVTruncateExpr(const FoldingSetNodeIDRef ID, SCEVUse op, Type *ty)
+      : SCEVIntegralCastExpr(ID, scTruncate, op, ty) {}
 
 public:
   /// Methods for support type inquiry through isa, cast, and dyn_cast:
@@ -161,7 +162,8 @@ public:
 class SCEVZeroExtendExpr : public SCEVIntegralCastExpr {
   friend class ScalarEvolution;
 
-  SCEVZeroExtendExpr(const FoldingSetNodeIDRef ID, SCEVUse op, Type *ty);
+  SCEVZeroExtendExpr(const FoldingSetNodeIDRef ID, SCEVUse op, Type *ty)
+      : SCEVIntegralCastExpr(ID, scZeroExtend, op, ty) {}
 
 public:
   /// Methods for support type inquiry through isa, cast, and dyn_cast:
@@ -175,7 +177,8 @@ public:
 class SCEVSignExtendExpr : public SCEVIntegralCastExpr {
   friend class ScalarEvolution;
 
-  SCEVSignExtendExpr(const FoldingSetNodeIDRef ID, SCEVUse op, Type *ty);
+  SCEVSignExtendExpr(const FoldingSetNodeIDRef ID, SCEVUse op, Type *ty)
+      : SCEVIntegralCastExpr(ID, scSignExtend, op, ty) {}
 
 public:
   /// Methods for support type inquiry through isa, cast, and dyn_cast:
