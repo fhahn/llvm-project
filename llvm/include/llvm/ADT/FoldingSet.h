@@ -415,6 +415,16 @@ protected:
   /// was removed or false if the node was not in the folding set.
   LLVM_ABI bool RemoveNode(Node *N);
 
+  /// If there is an existing node exactly equal to the node \p N,
+  /// return it.  Otherwise, insert \p N and return it instead.
+  LLVM_ABI Node *GetOrInsertNode(Node *N, const FoldingSetInfo &Info);
+
+  /// Look up the node specified by ID.  If it exists, return it.  If not,
+  /// return the insertion token that will make insertion faster.
+  LLVM_ABI Node *FindNodeOrInsertPos(const FoldingSetNodeID &ID,
+                                     void *&InsertPos,
+                                     const FoldingSetInfo &Info);
+
   /// Insert the specified node into the folding set, knowing that
   /// it is not already in the folding set.  InsertPos must be obtained from
   /// FindNodeOrInsertPos.
@@ -500,14 +510,12 @@ class FoldingSetImpl : public FoldingSetBase, public Trait::ContextStorage {
   }
 
   /// Compare \p N against \p ID via the trait, forwarding the context for
-  /// ContextualFoldingSets and \p TempID for traits that need it.
-  template <typename... TempIDT>
-  bool nodeEquals(Node *N, const FoldingSetNodeID &ID, unsigned IDHash,
-                  TempIDT &...TempID) const {
+  /// ContextualFoldingSets. Only used for traits with NeedsTempID == false.
+  bool nodeEquals(Node *N, const FoldingSetNodeID &ID, unsigned IDHash) const {
     if constexpr (std::is_empty_v<typename Trait::ContextStorage>)
-      return Trait::Equals(*static_cast<T *>(N), ID, IDHash, TempID...);
+      return Trait::Equals(*static_cast<T *>(N), ID, IDHash);
     else
-      return Trait::Equals(*static_cast<T *>(N), ID, IDHash, TempID...,
+      return Trait::Equals(*static_cast<T *>(N), ID, IDHash,
                            this->getContext());
   }
 
@@ -549,47 +557,35 @@ public:
   /// If there is an existing node exactly equal to the specified node,
   /// return it.  Otherwise, insert 'N' and return it instead.
   T *GetOrInsertNode(T *N) {
-    FoldingSetNodeID ID;
-    getFoldingSetInfo().GetNodeProfile(this, N, ID);
-    void *IP;
-    if (T *E = FindNodeOrInsertPos(ID, IP))
-      return E;
-    InsertNode(N, IP);
-    return N;
+    return static_cast<T *>(
+        FoldingSetBase::GetOrInsertNode(N, getFoldingSetInfo()));
   }
 
   /// Look up the node specified by ID.  If it exists, return it.  If not,
   /// return the insertion token that will make insertion faster.
-  ///
-  /// This is defined here rather than in FoldingSetBase so that the node
-  /// comparison, which is trivial for clients that intern their profile, is
-  /// called directly instead of through FoldingSetInfo's function pointers.
   T *FindNodeOrInsertPos(const FoldingSetNodeID &ID, void *&InsertPos) {
-    unsigned IDHash = ID.ComputeHash();
-    void **Bucket = getBucketFor(IDHash);
-
-    InsertPos = nullptr;
-
+    // Traits that need a TempID have a node comparison that is too big to be
+    // worth inlining into every lookup; go through FoldingSetBase for those.
     if constexpr (Trait::NeedsTempID) {
-      // Share one TempID across the whole bucket, so recomputing a candidate's
-      // profile does not reallocate for every node in it.
-      FoldingSetNodeID TempID;
-      for (void *Probe = *Bucket; Node *N = GetNextPtr(Probe);
-           Probe = N->getNextInBucket()) {
-        if (nodeEquals(N, ID, IDHash, TempID))
-          return static_cast<T *>(N);
-        TempID.clear();
-      }
+      return static_cast<T *>(FoldingSetBase::FindNodeOrInsertPos(
+          ID, InsertPos, getFoldingSetInfo()));
     } else {
+      // Nodes that intern their profile can be compared against the ID
+      // directly, which is cheap enough to inline and needs no TempID at all.
+      unsigned IDHash = ID.ComputeHash();
+      void **Bucket = getBucketFor(IDHash);
+
+      InsertPos = nullptr;
+
       for (void *Probe = *Bucket; Node *N = GetNextPtr(Probe);
            Probe = N->getNextInBucket())
         if (nodeEquals(N, ID, IDHash))
           return static_cast<T *>(N);
-    }
 
-    // Didn't find the node, return null with the bucket as the InsertPos.
-    InsertPos = Bucket;
-    return nullptr;
+      // Didn't find the node, return null with the bucket as the InsertPos.
+      InsertPos = Bucket;
+      return nullptr;
+    }
   }
 
   /// Insert the specified node into the folding set, knowing that
