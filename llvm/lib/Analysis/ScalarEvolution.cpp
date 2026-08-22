@@ -161,7 +161,7 @@ static cl::opt<bool, true> VerifySCEVOpt(
     cl::desc("Verify ScalarEvolution's backedge taken counts (slow)"));
 static cl::opt<bool> VerifySCEVStrict(
     "verify-scev-strict", cl::Hidden,
-    cl::desc("Enable stricter verification with -verify-scev is passed"));
+    cl::desc("Enable stricter verification when -verify-scev is passed"));
 
 static cl::opt<bool> VerifyIR(
     "scev-verify-ir", cl::Hidden,
