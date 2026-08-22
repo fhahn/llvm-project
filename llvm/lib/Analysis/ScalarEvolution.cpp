@@ -968,12 +968,14 @@ const SCEV *SCEVAddRecExpr::evaluateAtIteration(ArrayRef<SCEVUse> Operands,
 //                    SCEV Expression folder implementations
 //===----------------------------------------------------------------------===//
 
+namespace {
+
 /// The SCEVCastSinkingRewriter takes a scalar evolution expression,
 /// which computes a pointer-typed value, and rewrites the whole expression
 /// tree so that *all* the computations are done on integers, and the only
 /// pointer-typed operands in the expression are SCEVUnknown.
-/// The CreatePtrCast callback is invoked to create the actual conversion
-/// (ptrtoint or ptrtoaddr) at the SCEVUnknown leaves.
+/// The CreatePtrCast callback is invoked to create the actual ptrtoaddr
+/// conversion at the SCEVUnknown leaves.
 class SCEVCastSinkingRewriter
     : public SCEVRewriteVisitor<SCEVCastSinkingRewriter> {
   using Base = SCEVRewriteVisitor<SCEVCastSinkingRewriter>;
@@ -984,11 +986,11 @@ class SCEVCastSinkingRewriter
 public:
   SCEVCastSinkingRewriter(ScalarEvolution &SE, Type *TargetTy,
                           ConversionFn CreatePtrCast)
-      : Base(SE), TargetTy(TargetTy), CreatePtrCast(std::move(CreatePtrCast)) {}
+      : Base(SE), TargetTy(TargetTy), CreatePtrCast(CreatePtrCast) {}
 
   static const SCEV *rewrite(const SCEV *Scev, ScalarEvolution &SE,
                              Type *TargetTy, ConversionFn CreatePtrCast) {
-    SCEVCastSinkingRewriter Rewriter(SE, TargetTy, std::move(CreatePtrCast));
+    SCEVCastSinkingRewriter Rewriter(SE, TargetTy, CreatePtrCast);
     return Rewriter.visit(Scev);
   }
 
@@ -1024,6 +1026,8 @@ public:
     return CreatePtrCast(Expr);
   }
 };
+
+} // end anonymous namespace
 
 const SCEV *ScalarEvolution::getPtrToAddrExpr(const SCEV *Op) {
   assert(Op->getType()->isPointerTy() && "Op must be a pointer");
