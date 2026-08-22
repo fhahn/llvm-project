@@ -570,8 +570,8 @@ void SCEVUnknown::allUsesReplacedWith(Value *New) {
 /// Compare the two values \p LV and \p RV in terms of their "complexity" where
 /// "complexity" is a partial (and somewhat ad-hoc) relation used to order
 /// operands in SCEV expressions.
-static int CompareValueComplexity(const LoopInfo *const LI, Value *LV,
-                                  Value *RV, unsigned Depth) {
+static int CompareValueComplexity(const LoopInfo *LI, Value *LV, Value *RV,
+                                  unsigned Depth) {
   if (Depth > MaxValueCompareDepth)
     return 0;
 
@@ -650,8 +650,8 @@ static int CompareValueComplexity(const LoopInfo *const LI, Value *LV,
 // If the max analysis depth was reached, return std::nullopt, assuming we do
 // not know if they are equivalent for sure.
 static std::optional<int>
-CompareSCEVComplexity(const LoopInfo *const LI, const SCEV *LHS,
-                      const SCEV *RHS, DominatorTree &DT, unsigned Depth = 0) {
+CompareSCEVComplexity(const LoopInfo *LI, const SCEV *LHS, const SCEV *RHS,
+                      DominatorTree &DT, unsigned Depth = 0) {
   // Fast-path: SCEVs are uniqued so we can do a quick equality check.
   if (LHS == RHS)
     return 0;
