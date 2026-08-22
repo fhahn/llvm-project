@@ -2526,6 +2526,14 @@ private:
   const SCEV *getZeroExtendExprImpl(SCEVUse Op, Type *Ty, unsigned Depth);
   const SCEV *getSignExtendExprImpl(SCEVUse Op, Type *Ty, unsigned Depth);
 
+  /// Return the N-ary SCEV of kind \p Kind with operands \p Ops from
+  /// `UniqueSCEVs`, or create, insert and return a new \p SCEVTy node.
+  /// \p TrailingArgs are appended both to the uniquing key and to the
+  /// constructor arguments; this is how an add recurrence's loop is passed.
+  template <typename SCEVTy, typename... ArgTys>
+  SCEVTy *getOrCreateNAryExpr(SCEVTypes Kind, ArrayRef<SCEVUse> Ops,
+                              ArgTys... TrailingArgs);
+
   /// Get add expr already created or create a new one.
   const SCEV *getOrCreateAddExpr(ArrayRef<SCEVUse> Ops,
                                  SCEV::NoWrapFlags Flags);

@@ -127,6 +127,7 @@
 #include <numeric>
 #include <optional>
 #include <tuple>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -2892,23 +2893,35 @@ const SCEV *ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
   return getOrCreateAddExpr(Ops, ComputeFlags(Ops));
 }
 
-const SCEV *ScalarEvolution::getOrCreateAddExpr(ArrayRef<SCEVUse> Ops,
-                                                SCEV::NoWrapFlags Flags) {
+template <typename SCEVTy, typename... ArgTys>
+SCEVTy *ScalarEvolution::getOrCreateNAryExpr(SCEVTypes Kind,
+                                             ArrayRef<SCEVUse> Ops,
+                                             ArgTys... TrailingArgs) {
   FoldingSetNodeID ID;
-  ID.AddInteger(scAddExpr);
+  ID.AddInteger(Kind);
   for (SCEVUse Op : Ops)
     ID.AddPointer(Op.getOpaqueValue());
+  (ID.AddPointer(TrailingArgs), ...);
   void *IP = nullptr;
-  SCEVAddExpr *S =
-      static_cast<SCEVAddExpr *>(UniqueSCEVs.FindNodeOrInsertPos(ID, IP));
-  if (!S) {
-    SCEVUse *O = SCEVAllocator.Allocate<SCEVUse>(Ops.size());
-    llvm::uninitialized_copy(Ops, O);
-    S = new (SCEVAllocator)
-        SCEVAddExpr(ID.Intern(SCEVAllocator), O, Ops.size());
-    insertNewSCEV(S, IP);
-    registerUser(S, Ops);
-  }
+  if (SCEV *S = UniqueSCEVs.FindNodeOrInsertPos(ID, IP))
+    return static_cast<SCEVTy *>(S);
+
+  SCEVUse *O = SCEVAllocator.Allocate<SCEVUse>(Ops.size());
+  llvm::uninitialized_copy(Ops, O);
+  auto *S = new (SCEVAllocator)
+      SCEVTy(ID.Intern(SCEVAllocator), O, Ops.size(), TrailingArgs...);
+  insertNewSCEV(S, IP);
+  // Add recurrences are additionally tracked per loop, so they can be found
+  // when the loop they belong to is invalidated.
+  if constexpr (std::is_same_v<SCEVTy, SCEVAddRecExpr>)
+    LoopUsers[S->getLoop()].push_back(S);
+  registerUser(S, Ops);
+  return S;
+}
+
+const SCEV *ScalarEvolution::getOrCreateAddExpr(ArrayRef<SCEVUse> Ops,
+                                                SCEV::NoWrapFlags Flags) {
+  SCEVAddExpr *S = getOrCreateNAryExpr<SCEVAddExpr>(scAddExpr, Ops);
   S->setNoWrapFlags(Flags);
   return S;
 }
@@ -2916,44 +2929,14 @@ const SCEV *ScalarEvolution::getOrCreateAddExpr(ArrayRef<SCEVUse> Ops,
 const SCEV *ScalarEvolution::getOrCreateAddRecExpr(ArrayRef<SCEVUse> Ops,
                                                    const Loop *L,
                                                    SCEV::NoWrapFlags Flags) {
-  FoldingSetNodeID ID;
-  ID.AddInteger(scAddRecExpr);
-  for (SCEVUse Op : Ops)
-    ID.AddPointer(Op.getOpaqueValue());
-  ID.AddPointer(L);
-  void *IP = nullptr;
-  SCEVAddRecExpr *S =
-      static_cast<SCEVAddRecExpr *>(UniqueSCEVs.FindNodeOrInsertPos(ID, IP));
-  if (!S) {
-    SCEVUse *O = SCEVAllocator.Allocate<SCEVUse>(Ops.size());
-    llvm::uninitialized_copy(Ops, O);
-    S = new (SCEVAllocator)
-        SCEVAddRecExpr(ID.Intern(SCEVAllocator), O, Ops.size(), L);
-    insertNewSCEV(S, IP);
-    LoopUsers[L].push_back(S);
-    registerUser(S, Ops);
-  }
+  SCEVAddRecExpr *S = getOrCreateNAryExpr<SCEVAddRecExpr>(scAddRecExpr, Ops, L);
   setNoWrapFlags(S, Flags);
   return S;
 }
 
 const SCEV *ScalarEvolution::getOrCreateMulExpr(ArrayRef<SCEVUse> Ops,
                                                 SCEV::NoWrapFlags Flags) {
-  FoldingSetNodeID ID;
-  ID.AddInteger(scMulExpr);
-  for (SCEVUse Op : Ops)
-    ID.AddPointer(Op.getOpaqueValue());
-  void *IP = nullptr;
-  SCEVMulExpr *S =
-    static_cast<SCEVMulExpr *>(UniqueSCEVs.FindNodeOrInsertPos(ID, IP));
-  if (!S) {
-    SCEVUse *O = SCEVAllocator.Allocate<SCEVUse>(Ops.size());
-    llvm::uninitialized_copy(Ops, O);
-    S = new (SCEVAllocator) SCEVMulExpr(ID.Intern(SCEVAllocator),
-                                        O, Ops.size());
-    insertNewSCEV(S, IP);
-    registerUser(S, Ops);
-  }
+  SCEVMulExpr *S = getOrCreateNAryExpr<SCEVMulExpr>(scMulExpr, Ops);
   S->setNoWrapFlags(Flags);
   return S;
 }
