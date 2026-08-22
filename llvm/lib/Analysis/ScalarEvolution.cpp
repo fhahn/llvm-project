@@ -283,10 +283,6 @@ void SCEV::computeAndSetCanonical(ScalarEvolution &SE) {
   CanonicalSCEV = SE.getWithOperands(this, CanonOps);
 }
 
-//===----------------------------------------------------------------------===//
-// Implementation of the SCEV class.
-//
-
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 LLVM_DUMP_METHOD void SCEV::dump() const {
   print(dbgs());
