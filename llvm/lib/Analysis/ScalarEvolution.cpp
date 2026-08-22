@@ -252,20 +252,10 @@ static cl::opt<bool> UseContextForNoWrapFlagInference(
 //===----------------------------------------------------------------------===//
 
 void SCEV::computeAndSetCanonical(ScalarEvolution &SE) {
-  // Leaf nodes are always their own canonical.
-  switch (getSCEVType()) {
-  case scConstant:
-  case scVScale:
-  case scUnknown:
-    CanonicalSCEV = this;
-    return;
-  default:
-    break;
-  }
-
-  // For all other expressions, check whether any immediate operand has a
-  // different canonical. Since operands are always created before their parent,
-  // their canonical pointers are already set — no recursion needed.
+  // Check whether any immediate operand has a different canonical. Since
+  // operands are always created before their parent, their canonical pointers
+  // are already set — no recursion needed. Leaf nodes have no operands and thus
+  // are always their own canonical.
   bool Changed = false;
   SmallVector<SCEVUse, 4> CanonOps;
   for (SCEVUse Op : operands()) {
