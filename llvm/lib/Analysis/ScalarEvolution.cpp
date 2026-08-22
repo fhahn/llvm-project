@@ -972,8 +972,8 @@ SCEVUse SCEVAddRecExpr::getExitValue(ScalarEvolution &SE) const {
 /// which computes a pointer-typed value, and rewrites the whole expression
 /// tree so that *all* the computations are done on integers, and the only
 /// pointer-typed operands in the expression are SCEVUnknown.
-/// The CreatePtrCast callback is invoked to create the actual conversion
-/// (ptrtoint or ptrtoaddr) at the SCEVUnknown leaves.
+/// The CreatePtrCast callback is invoked to create the actual ptrtoaddr
+/// conversion at the SCEVUnknown leaves.
 class SCEVCastSinkingRewriter
     : public SCEVRewriteVisitor<SCEVCastSinkingRewriter> {
   using Base = SCEVRewriteVisitor<SCEVCastSinkingRewriter>;
