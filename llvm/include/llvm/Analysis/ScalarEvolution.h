@@ -142,9 +142,6 @@ struct SCEVUseT : private PointerIntPair<SCEVPtrT, 2> {
   /// Returns true if this use itself carries use-specific no-wrap flags.
   bool hasUseFlags() const { return getOpaqueValue() != getPointer(); }
 
-  /// Return the canonical SCEV for this SCEVUse.
-  const SCEV *getCanonical() const;
-
   /// Return the no-wrap flags for this SCEVUse, which is the union of the
   /// use-specific flags and the underlying SCEV's flags, masked by \p Mask.
   SCEVNoWrapFlags
@@ -2766,10 +2763,6 @@ template <> struct DenseMapInfo<ScalarEvolution::FoldID> {
     return LHS == RHS;
   }
 };
-
-template <> inline const SCEV *SCEVUseT<const SCEV *>::getCanonical() const {
-  return getPointer()->getCanonical();
-}
 
 template <typename SCEVPtrT>
 void SCEVUseT<SCEVPtrT>::print(raw_ostream &OS) const {
