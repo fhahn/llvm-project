@@ -1111,29 +1111,21 @@ static const SCEV *getUnsignedOverflowLimitForStep(const SCEV *Step,
 
 namespace {
 
-struct ExtendOpTraitsBase {
-  typedef const SCEV *(ScalarEvolution::*GetExtendExprTy)(SCEVUse, Type *,
-                                                          unsigned);
-};
+// Used to make code generic over signed and unsigned overflow. Members present:
+//
+// static const SCEVFlags WrapType;
+//
+// static constexpr auto GetExtendExpr = &ScalarEvolution::get*ExtendExpr;
+//
+// static const SCEV *getOverflowLimitForStep(const SCEV *Step,
+//                                           ICmpInst::Predicate *Pred,
+//                                           ScalarEvolution *SE);
+template <typename ExtendOp> struct ExtendOpTraits;
 
-// Used to make code generic over signed and unsigned overflow.
-template <typename ExtendOp> struct ExtendOpTraits {
-  // Members present:
-  //
-  // static const SCEVFlags WrapType;
-  //
-  // static const ExtendOpTraitsBase::GetExtendExprTy GetExtendExpr;
-  //
-  // static const SCEV *getOverflowLimitForStep(const SCEV *Step,
-  //                                           ICmpInst::Predicate *Pred,
-  //                                           ScalarEvolution *SE);
-};
-
-template <>
-struct ExtendOpTraits<SCEVSignExtendExpr> : public ExtendOpTraitsBase {
+template <> struct ExtendOpTraits<SCEVSignExtendExpr> {
   static const SCEVFlags WrapType = SCEV::FlagNSW;
 
-  static const GetExtendExprTy GetExtendExpr;
+  static constexpr auto GetExtendExpr = &ScalarEvolution::getSignExtendExpr;
 
   static const SCEV *getOverflowLimitForStep(const SCEV *Step,
                                              ICmpInst::Predicate *Pred,
@@ -1142,14 +1134,10 @@ struct ExtendOpTraits<SCEVSignExtendExpr> : public ExtendOpTraitsBase {
   }
 };
 
-const ExtendOpTraitsBase::GetExtendExprTy ExtendOpTraits<
-    SCEVSignExtendExpr>::GetExtendExpr = &ScalarEvolution::getSignExtendExpr;
-
-template <>
-struct ExtendOpTraits<SCEVZeroExtendExpr> : public ExtendOpTraitsBase {
+template <> struct ExtendOpTraits<SCEVZeroExtendExpr> {
   static const SCEVFlags WrapType = SCEV::FlagNUW;
 
-  static const GetExtendExprTy GetExtendExpr;
+  static constexpr auto GetExtendExpr = &ScalarEvolution::getZeroExtendExpr;
 
   static const SCEV *getOverflowLimitForStep(const SCEV *Step,
                                              ICmpInst::Predicate *Pred,
@@ -1157,9 +1145,6 @@ struct ExtendOpTraits<SCEVZeroExtendExpr> : public ExtendOpTraitsBase {
     return getUnsignedOverflowLimitForStep(Step, Pred, SE);
   }
 };
-
-const ExtendOpTraitsBase::GetExtendExprTy ExtendOpTraits<
-    SCEVZeroExtendExpr>::GetExtendExpr = &ScalarEvolution::getZeroExtendExpr;
 
 } // end anonymous namespace
 
