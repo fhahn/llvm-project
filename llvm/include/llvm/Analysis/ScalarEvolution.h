@@ -747,12 +747,8 @@ public:
                                        SCEVFlags Flags = SCEV::FlagNone);
   LLVM_ABI const SCEV *getZeroExtendExpr(SCEVUse Op, Type *Ty,
                                          unsigned Depth = 0);
-  LLVM_ABI const SCEV *getZeroExtendExprImpl(SCEVUse Op, Type *Ty,
-                                             unsigned Depth = 0);
   LLVM_ABI const SCEV *getSignExtendExpr(SCEVUse Op, Type *Ty,
                                          unsigned Depth = 0);
-  LLVM_ABI const SCEV *getSignExtendExprImpl(SCEVUse Op, Type *Ty,
-                                             unsigned Depth = 0);
   LLVM_ABI const SCEV *getCastExpr(SCEVTypes Kind, SCEVUse Op, Type *Ty);
   LLVM_ABI const SCEV *getAnyExtendExpr(SCEVUse Op, Type *Ty);
 
@@ -2544,6 +2540,12 @@ private:
   /// the IV and \p RHS are inverted
   bool canIVOverflowOnLT(const SCEV *RHS, const SCEV *Stride, bool IsSigned,
                          bool Invert = false);
+
+  /// Implementations of get{Zero,Sign}ExtendExpr, which must only be called
+  /// through them: the public wrappers check that the extension is valid,
+  /// replace \p Ty by its effective SCEV type and maintain the fold cache.
+  const SCEV *getZeroExtendExprImpl(SCEVUse Op, Type *Ty, unsigned Depth);
+  const SCEV *getSignExtendExprImpl(SCEVUse Op, Type *Ty, unsigned Depth);
 
   /// Get add expr already created or create a new one.
   const SCEV *getOrCreateAddExpr(ArrayRef<SCEVUse> Ops, SCEVFlags Flags);
