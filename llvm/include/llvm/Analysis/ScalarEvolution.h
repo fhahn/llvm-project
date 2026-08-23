@@ -2214,10 +2214,21 @@ private:
   ///
   /// If \p AllowPredicates is set, this call will try to use a minimal set of
   /// SCEV predicates in order to return an exact answer.
+  ///
+  /// If \p IsGT is set, \p LHS and \p RHS are the operands of a greater-than
+  /// comparison instead, i.e. the IV is non-increasing and the loop exits when
+  /// it reaches \p RHS from above. Such a loop travels the same distance as
+  /// the mirrored loop with a non-decreasing IV, so it is handled by the same
+  /// code, with each step mirrored; see the comment at the start of the
+  /// definition.
   ExitLimit howManyLessThans(const SCEV *LHS, const SCEV *RHS, const Loop *L,
                              bool isSigned, bool ControlsOnlyExit,
-                             bool AllowPredicates = false);
+                             bool AllowPredicates = false, bool IsGT = false);
 
+  /// Return the number of times an exit condition containing the specified
+  /// greater-than comparison will execute.  If not computable, return
+  /// CouldNotCompute. Implemented in terms of howManyLessThans, see the
+  /// comment on \p IsGT there.
   ExitLimit howManyGreaterThans(const SCEV *LHS, const SCEV *RHS, const Loop *L,
                                 bool isSigned, bool IsSubExpr,
                                 bool AllowPredicates = false);
@@ -2495,7 +2506,8 @@ private:
 
   /// Compute the maximum backedge count based on the range of values
   /// permitted by Start, End, and Stride. This is for loops of the form
-  /// {Start, +, Stride} LT End.
+  /// {Start, +, Stride} LT End, or, if \p IsGT is set, of the form
+  /// {Start, +, -Stride} GT End.
   ///
   /// Preconditions:
   /// * the induction variable is known to be positive.
@@ -2504,7 +2516,7 @@ private:
   /// We *don't* assert these preconditions so please be careful.
   const SCEV *computeMaxBECountForLT(const SCEV *Start, const SCEV *Stride,
                                      const SCEV *End, unsigned BitWidth,
-                                     bool IsSigned);
+                                     bool IsSigned, bool IsGT = false);
 
   /// Verify if an linear IV with positive stride can overflow when in a
   /// less-than comparison, knowing the invariant term of the comparison,
