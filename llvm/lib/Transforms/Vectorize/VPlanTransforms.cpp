@@ -1618,9 +1618,14 @@ static VPValue *simplifyRecipe(VPSingleDefRecipe *Def) {
   VPValue *IVInc;
   if (match(Def, m_Add(m_VPValue(IVInc, m_Add(m_VPValue(X), m_VPValue())),
                        m_VPValue(Y))) &&
-      isa<VPIRValue>(Y) && match(X, m_VPPhi(m_ZeroInt(), m_Specific(IVInc)))) {
+      match(X, m_VPPhi(m_ZeroInt(), m_Specific(IVInc)))) {
     auto *Phi = cast<VPPhi>(X);
-    if (IVInc->getNumUsers() == 2) {
+    // Y must be available where the phi's start value is coming from, that is a
+    // live-in or defined in the corresponding incoming block.
+    VPRecipeBase *YR = Y->getDefiningRecipe();
+    bool AvailableAtStart = isa<VPIRValue>(Y) ||
+                            (YR && YR->getParent() == Phi->getIncomingBlock(0));
+    if (AvailableAtStart && IVInc->getNumUsers() == 2) {
       // If Phi has a second user (besides IVInc's defining recipe), it must
       // be Inc = Phi + Y for the fold to apply.
       auto *Inc = dyn_cast_or_null<VPSingleDefRecipe>(
