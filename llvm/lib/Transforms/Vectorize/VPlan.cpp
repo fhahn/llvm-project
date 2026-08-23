@@ -476,19 +476,23 @@ void VPBasicBlock::connectToPredecessors(VPTransformState &State) {
     } else {
       // Set each forward successor here when it is created, excluding
       // backedges. A backward successor is set when the branch is created.
-      // Branches to VPIRBasicBlocks must have the same successors in VPlan as
-      // in the original IR, except when the predecessor is the entry block.
-      // This enables including SCEV and memory runtime check blocks in VPlan.
-      // TODO: Remove exception by modeling the terminator of entry block using
-      // BranchOnCond.
-      unsigned idx = PredVPSuccessors.front() == this ? 0 : 1;
+      // A VPIRBasicBlock's successors may already be set. If one of them is
+      // NewBB, the edge is already generated and kept. Otherwise it is
+      // redirected, as done for the entry block's terminator and for blocks
+      // bypassing both vector loops during epilogue vectorization.
+      // TODO: Remove exception for the entry block by modeling its terminator
+      // using BranchOnCond.
       auto *TermBr = cast<CondBrInst>(PredBBTerminator);
-      assert((!TermBr->getSuccessor(idx) ||
-              (isa<VPIRBasicBlock>(this) &&
-               (TermBr->getSuccessor(idx) == NewBB ||
-                PredVPBlock == getPlan()->getEntry()))) &&
+      unsigned Idx = PredVPSuccessors.front() == this ? 0 : 1;
+      if (TermBr->getSuccessor(!Idx) == NewBB)
+        Idx = !Idx;
+      BasicBlock *ReplacedSucc = TermBr->getSuccessor(Idx);
+      assert((!ReplacedSucc || ReplacedSucc == NewBB ||
+              isa<VPIRBasicBlock>(PredVPBB)) &&
              "Trying to reset an existing successor block.");
-      TermBr->setSuccessor(idx, NewBB);
+      TermBr->setSuccessor(Idx, NewBB);
+      if (ReplacedSucc && ReplacedSucc != NewBB)
+        CFG.DTU.applyUpdates({{DominatorTree::Delete, PredBB, ReplacedSucc}});
     }
     CFG.DTU.applyUpdates({{DominatorTree::Insert, PredBB, NewBB}});
   }

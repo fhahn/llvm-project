@@ -1404,6 +1404,19 @@ void VPlanTransforms::foldTailByMasking(VPlan &Plan) {
   Plan.getMiddleBlock()->getTerminator()->setOperand(0, Plan.getTrue());
 }
 
+/// Add an incoming value to all phis in \p VPBB for its last predecessor, which
+/// must have just been added, re-using the incoming value of the previously
+/// last predecessor. Blocks bypassing the vector loop(s) resume the scalar loop
+/// at the same values.
+static void addIncomingForLastPredecessor(VPBasicBlock *VPBB) {
+  for (VPRecipeBase &R : VPBB->phis()) {
+    auto *Phi = cast<VPPhi>(&R);
+    assert(Phi->getNumIncoming() == VPBB->getNumPredecessors() - 1 &&
+           "must have incoming values for all predecessors but the new one");
+    Phi->addIncoming(Phi->getIncomingValue(Phi->getNumIncoming() - 1));
+  }
+}
+
 /// Insert \p CheckBlockVPBB on the edge leading to the vector preheader,
 /// connecting it to both vector and scalar preheaders. Updates scalar
 /// preheader phis to account for the new predecessor.
@@ -1415,13 +1428,96 @@ static void insertCheckBlockBeforeVectorLoop(VPlan &Plan,
   VPBlockUtils::insertOnEdge(PreVectorPH, VectorPH, CheckBlockVPBB);
   VPBlockUtils::connectBlocks(CheckBlockVPBB, ScalarPH);
   CheckBlockVPBB->swapSuccessors();
-  unsigned NumPreds = ScalarPH->getNumPredecessors();
-  for (VPRecipeBase &R : ScalarPH->phis()) {
-    auto *Phi = cast<VPPhi>(&R);
-    assert(Phi->getNumIncoming() == NumPreds - 1 &&
-           "must have incoming values for all predecessors");
-    Phi->addIncoming(Phi->getOperand(NumPreds - 2));
+  addIncomingForLastPredecessor(ScalarPH);
+}
+
+BasicBlock *
+VPlanTransforms::modelGeneratedMainLoopBlocks(VPlan &Plan, VPlan &MainPlan,
+                                              VPIRBasicBlock *EnteredFrom) {
+  // After executing MainPlan, each of its VPBasicBlocks wraps the block
+  // generated for it, so the chain to mirror can be read off it. Collect it in
+  // reverse post-order, skipping MainPlan's scalar preheader, scalar header and
+  // exit blocks, which Plan models already.
+  VPBasicBlock *MainScalarPH = MainPlan.getScalarPreheader();
+  SmallVector<VPIRBasicBlock *> Chain;
+  SmallVector<VPIRBasicBlock *> BypassBlocks;
+  ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>> RPOT(
+      MainPlan.getEntry());
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(RPOT)) {
+    if (VPBB == MainScalarPH || VPBB == MainPlan.getScalarHeader() ||
+        MainPlan.isExitBlock(VPBB))
+      continue;
+    Chain.push_back(cast<VPIRBasicBlock>(VPBB));
+    // The blocks holding checks that bypass a vector loop branch to the scalar
+    // preheader as their first successor and to the next block of the check
+    // chain as their second one.
+    if (VPBB->getNumSuccessors() == 2 &&
+        VPBB->getSuccessors()[0] == MainScalarPH)
+      BypassBlocks.push_back(Chain.back());
   }
+  // The chain is collected in reverse post-order, so the last bypassing block
+  // holds the iteration count check for the main vector loop. It bypasses the
+  // main vector loop only, and its edge is mirrored below rather than
+  // redirected.
+  assert(!BypassBlocks.empty() && "main vector loop must have a bypass");
+  VPIRBasicBlock *MainLoopIterationCountCheck = BypassBlocks.pop_back_val();
+
+  // Map each block of the chain to the VPIRBasicBlock modeling it in Plan.
+  // Plan's entry already wraps the block heading the chain and EnteredFrom the
+  // block Plan is entered from; the rest get a fresh, empty wrapper. Only
+  // blocks of the chain are mapped, so the plan cannot reach beyond them.
+  auto *EntryVPBB = cast<VPIRBasicBlock>(Plan.getEntry());
+  assert(EntryVPBB->getIRBasicBlock() == Chain.front()->getIRBasicBlock() &&
+         "entry must wrap the block heading the chain");
+  SmallDenseMap<const VPBlockBase *, VPIRBasicBlock *> Modeled;
+  Modeled[MainScalarPH] = EnteredFrom;
+  Modeled[Chain.front()] = EntryVPBB;
+  for (VPIRBasicBlock *VPBB : drop_begin(Chain))
+    Modeled[VPBB] = Plan.createEmptyVPIRBasicBlock(VPBB->getIRBasicBlock());
+
+  // Model the edges bypassing both vector loops as edges to the scalar
+  // preheader, so executing the plan redirects the branches. Connect them
+  // before the remaining edges, as they are the first successors of the blocks
+  // they belong to, and in reverse of the order the main plan created those
+  // blocks, matching the predecessor order of the block they branch to.
+  VPBasicBlock *ScalarPH = Plan.getScalarPreheader();
+  for (VPIRBasicBlock *VPBB : reverse(BypassBlocks)) {
+    VPBlockUtils::connectBlocks(Modeled.at(VPBB), ScalarPH);
+    addIncomingForLastPredecessor(ScalarPH);
+  }
+
+  // Connect the remaining edges, mirroring the successors of the blocks of the
+  // chain, so every modeled edge is an edge of the generated CFG. Edges leaving
+  // the chain, i.e. to the exit blocks, are not modeled.
+  SmallPtrSet<const VPBlockBase *, 8> Connected;
+  for (VPIRBasicBlock *MainVPBB : Chain) {
+    // The chain is in reverse post-order, so an edge to a block connected
+    // already is a back-edge of the main vector loop, which would add a loop
+    // the plan does not own.
+    Connected.insert(MainVPBB);
+    VPIRBasicBlock *VPBB = Modeled.at(MainVPBB);
+    // The bypass edge of a block bypassing both vector loops has been modeled
+    // above. It is the first successor of that block, so skip the successors
+    // already connected.
+    for (VPBlockBase *Succ :
+         drop_begin(MainVPBB->getSuccessors(), VPBB->getNumSuccessors())) {
+      VPIRBasicBlock *SuccVPBB = Modeled.lookup(Succ);
+      if (!SuccVPBB || Connected.contains(Succ))
+        continue;
+      VPBlockUtils::connectBlocks(VPBB, SuccVPBB);
+      // Only EnteredFrom can have phis; they need an incoming value for the new
+      // predecessor. Re-use the value the main plan already set for the edge.
+      for (VPRecipeBase &R : SuccVPBB->phis()) {
+        auto *PhiR = cast<VPIRPhi>(&R);
+        PhiR->addIncoming(
+            Plan.getOrAddLiveIn(PhiR->getIRPhi().getIncomingValueForBlock(
+                MainVPBB->getIRBasicBlock())));
+      }
+    }
+  }
+
+  Plan.setEntry(EntryVPBB);
+  return MainLoopIterationCountCheck->getIRBasicBlock();
 }
 
 // Likelyhood of bypassing the vectorized loop due to a runtime check block,
