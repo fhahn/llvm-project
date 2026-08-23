@@ -733,7 +733,7 @@ void VPlanTransforms::materializeBroadcasts(VPlan &Plan) {
       if (User->usesScalars(VPV))
         continue;
       if (cast<VPRecipeBase>(User)->getParent() == VectorPreheader)
-        HoistPoint = HoistBlock->begin();
+        HoistPoint = HoistBlock->getFirstNonPhi();
       else
         assert(VPDT.dominates(VectorPreheader,
                               cast<VPRecipeBase>(User)->getParent()) &&
