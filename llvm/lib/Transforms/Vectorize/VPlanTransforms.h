@@ -230,6 +230,16 @@ struct VPlanTransforms {
   static void attachCheckBlock(VPlan &Plan, Value *Cond, BasicBlock *CheckBlock,
                                bool AddBranchWeights);
 
+  /// Model the blocks the executed \p MainPlan generated for the main vector
+  /// loop that branch into \p Plan during epilogue vectorization, wrapping each
+  /// in a VPIRBasicBlock. \p Plan's entry already wraps the block heading the
+  /// chain, \p EnteredFrom the block \p Plan is entered from. Edges to \p
+  /// EnteredFrom from blocks bypassing both vector loops are modeled as edges
+  /// to \p Plan's scalar preheader, redirecting them; all others are mirrored.
+  /// Returns the block holding the main vector loop's iteration count check.
+  static BasicBlock *modelGeneratedMainLoopBlocks(VPlan &Plan, VPlan &MainPlan,
+                                                  VPIRBasicBlock *EnteredFrom);
+
   /// Replaces the VPInstructions in \p Plan with corresponding
   /// widen recipes. Returns false if any VPInstructions could not be converted
   /// to a wide recipe if needed. Uses \p PSE to detect contiguous memory

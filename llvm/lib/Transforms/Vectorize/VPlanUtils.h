@@ -372,11 +372,15 @@ public:
   }
 
   /// Reassociate all the blocks connected to \p Old so that they now point to
-  /// \p New.
+  /// \p New. A self-edge of \p Old becomes a self-edge of \p New.
   static void reassociateBlocks(VPBlockBase *Old, VPBlockBase *New) {
-    for (auto *Pred : to_vector(Old->getPredecessors()))
+    // Snapshot both lists up front, as a self-edge makes Old redirect its own
+    // lists below, which are then copied over to New.
+    auto Preds = to_vector(Old->getPredecessors());
+    auto Succs = to_vector(Old->getSuccessors());
+    for (auto *Pred : Preds)
       Pred->replaceSuccessor(Old, New);
-    for (auto *Succ : to_vector(Old->getSuccessors()))
+    for (auto *Succ : Succs)
       Succ->replacePredecessor(Old, New);
     New->setPredecessors(Old->getPredecessors());
     New->setSuccessors(Old->getSuccessors());
