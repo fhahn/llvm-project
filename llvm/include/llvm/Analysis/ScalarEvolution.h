@@ -2210,10 +2210,10 @@ private:
   ExitLimit howFarToNonZero(const SCEV *V, const Loop *L);
 
   /// Return the number of times an exit condition containing the specified
-  /// less-than comparison will execute.  If not computable, return
-  /// CouldNotCompute.
+  /// less-than (or, if \p IsGT is set, greater-than) comparison will execute.
+  /// If not computable, return CouldNotCompute.
   ///
-  /// \p isSigned specifies whether the less-than is signed.
+  /// \p isSigned specifies whether the comparison is signed.
   ///
   /// \p ControlsOnlyExit is true when the LHS < RHS condition directly controls
   /// the branch (loops exits only if condition is true). In this case, we can
@@ -2221,13 +2221,12 @@ private:
   ///
   /// If \p AllowPredicates is set, this call will try to use a minimal set of
   /// SCEV predicates in order to return an exact answer.
+  ///
+  /// If \p IsGT is set, the IV is non-increasing and only a loop-invariant
+  /// \p RHS is supported.
   ExitLimit howManyLessThans(const SCEV *LHS, const SCEV *RHS, const Loop *L,
                              bool isSigned, bool ControlsOnlyExit,
-                             bool AllowPredicates = false);
-
-  ExitLimit howManyGreaterThans(const SCEV *LHS, const SCEV *RHS, const Loop *L,
-                                bool isSigned, bool IsSubExpr,
-                                bool AllowPredicates = false);
+                             bool AllowPredicates, bool IsGT);
 
   /// Return a predecessor of BB (which may not be an immediate predecessor)
   /// which has exactly one successor from which BB is reachable, or null if
@@ -2500,9 +2499,28 @@ private:
   std::optional<std::pair<const SCEV *, SmallVector<const SCEVPredicate *, 3>>>
   createAddRecFromPHIWithCastsImpl(const SCEVUnknown *SymbolicPHI);
 
+  /// Return the smallest resp. largest value \p S can take in the signed
+  /// (\p IsSigned) or unsigned domain.
+  ///
+  /// If \p Mirrored, the domain is read through the bitwise complement, which
+  /// reverses its order and preserves distances, as "~B - ~A == A - B". This
+  /// lets logic written for a non-decreasing IV serve a non-increasing one;
+  /// see howManyLessThans.
+  APInt getRangeMin(const SCEV *S, bool IsSigned, bool Mirrored = false) {
+    if (Mirrored)
+      return ~(IsSigned ? getSignedRangeMax(S) : getUnsignedRangeMax(S));
+    return IsSigned ? getSignedRangeMin(S) : getUnsignedRangeMin(S);
+  }
+  APInt getRangeMax(const SCEV *S, bool IsSigned, bool Mirrored = false) {
+    if (Mirrored)
+      return ~(IsSigned ? getSignedRangeMin(S) : getUnsignedRangeMin(S));
+    return IsSigned ? getSignedRangeMax(S) : getUnsignedRangeMax(S);
+  }
+
   /// Compute the maximum backedge count based on the range of values
   /// permitted by Start, End, and Stride. This is for loops of the form
-  /// {Start, +, Stride} LT End.
+  /// {Start, +, Stride} LT End, or, if \p IsGT is set, of the form
+  /// {Start, +, -Stride} GT End.
   ///
   /// Preconditions:
   /// * the induction variable is known to be positive.
@@ -2511,17 +2529,13 @@ private:
   /// We *don't* assert these preconditions so please be careful.
   const SCEV *computeMaxBECountForLT(const SCEV *Start, const SCEV *Stride,
                                      const SCEV *End, unsigned BitWidth,
-                                     bool IsSigned);
+                                     bool IsSigned, bool IsGT);
 
-  /// Verify if an linear IV with positive stride can overflow when in a
-  /// less-than comparison, knowing the invariant term of the comparison,
-  /// the stride.
-  bool canIVOverflowOnLT(const SCEV *RHS, const SCEV *Stride, bool IsSigned);
-
-  /// Verify if an linear IV with negative stride can overflow when in a
-  /// greater-than comparison, knowing the invariant term of the comparison,
-  /// the stride.
-  bool canIVOverflowOnGT(const SCEV *RHS, const SCEV *Stride, bool IsSigned);
+  /// Verify if a linear IV with positive \p Stride can overflow when compared
+  /// against the invariant term \p RHS with a less-than, or, if \p IsGT is
+  /// set, when the negated IV is compared with a greater-than.
+  bool canIVOverflow(const SCEV *RHS, const SCEV *Stride, bool IsSigned,
+                     bool IsGT);
 
   /// Get add expr already created or create a new one.
   const SCEV *getOrCreateAddExpr(ArrayRef<SCEVUse> Ops,
