@@ -510,13 +510,37 @@ class FoldingSetImpl : public FoldingSetBase, public Trait::ContextStorage {
   }
 
   /// Compare \p N against \p ID via the trait, forwarding the context for
-  /// ContextualFoldingSets. Only used for traits with NeedsTempID == false.
-  bool nodeEquals(Node *N, const FoldingSetNodeID &ID, unsigned IDHash) const {
+  /// ContextualFoldingSets and \p TempID for traits that need one.
+  template <typename... TempIDT>
+  bool nodeEquals(Node *N, const FoldingSetNodeID &ID, unsigned IDHash,
+                  TempIDT &...TempID) const {
     if constexpr (std::is_empty_v<typename Trait::ContextStorage>)
-      return Trait::Equals(*static_cast<T *>(N), ID, IDHash);
+      return Trait::Equals(*static_cast<T *>(N), ID, IDHash, TempID...);
     else
-      return Trait::Equals(*static_cast<T *>(N), ID, IDHash,
+      return Trait::Equals(*static_cast<T *>(N), ID, IDHash, TempID...,
                            this->getContext());
+  }
+
+  /// Body of FindNodeOrInsertPos for traits whose Equals needs a TempID.
+  T *findNodeOrInsertPosImpl(const FoldingSetNodeID &ID, void *&InsertPos) {
+    unsigned IDHash = ID.ComputeHash();
+    void **Bucket = getBucketFor(IDHash);
+
+    InsertPos = nullptr;
+
+    // Share one TempID across the bucket, so recomputing a candidate's profile
+    // does not reallocate for every node in it.
+    FoldingSetNodeID TempID;
+    for (void *Probe = *Bucket; Node *N = GetNextPtr(Probe);
+         Probe = N->getNextInBucket()) {
+      if (nodeEquals(N, ID, IDHash, TempID))
+        return static_cast<T *>(N);
+      TempID.clear();
+    }
+
+    // Didn't find the node, return null with the bucket as the InsertPos.
+    InsertPos = Bucket;
+    return nullptr;
   }
 
 public:
@@ -564,11 +588,13 @@ public:
   /// Look up the node specified by ID.  If it exists, return it.  If not,
   /// return the insertion token that will make insertion faster.
   T *FindNodeOrInsertPos(const FoldingSetNodeID &ID, void *&InsertPos) {
-    // Traits that need a TempID have a node comparison that is too big to be
-    // worth inlining into every lookup; go through FoldingSetBase for those.
+    // Walk the bucket here rather than in FoldingSetBase, so the node
+    // comparison is called directly instead of through FoldingSetInfo's
+    // function pointers. Without LTO that is the only way for the caller to
+    // specialise it; with LTO the out-of-line walk would have been inlined here
+    // and specialised anyway.
     if constexpr (Trait::NeedsTempID) {
-      return static_cast<T *>(FoldingSetBase::FindNodeOrInsertPos(
-          ID, InsertPos, getFoldingSetInfo()));
+      return findNodeOrInsertPosImpl(ID, InsertPos);
     } else {
       // Nodes that intern their profile can be compared against the ID
       // directly, which is cheap enough to inline and needs no TempID at all.
