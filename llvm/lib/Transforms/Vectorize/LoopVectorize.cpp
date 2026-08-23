@@ -621,7 +621,6 @@ struct EpilogueLoopVectorizationInfo {
   ElementCount EpilogueVF = ElementCount::getFixed(0);
   unsigned EpilogueUF = 0;
   BasicBlock *MainLoopIterationCountCheck = nullptr;
-  BasicBlock *EpilogueIterationCountCheck = nullptr;
   Value *VectorTripCount = nullptr;
   VPlan &EpiloguePlan;
 
@@ -6154,19 +6153,19 @@ BasicBlock *EpilogueVectorizerEpilogueLoop::createVectorizedLoopSkeleton() {
 
   VPBlockUtils::reassociateBlocks(OldEntry, NewEntry);
   Plan.setEntry(NewEntry);
-  // OldEntry is now dead and will be cleaned up when the plan gets destroyed.
 
   // The blocks generated for the main vector loop that bypass both vector loops
   // branch to the original scalar preheader, which is the entry block of the
-  // epilogue plan now. Model them and their edges to the plan's scalar
-  // preheader in the epilogue plan, so executing the plan redirects them to the
-  // scalar preheader created above.
+  // epilogue plan now. Model their edges to the plan's scalar preheader, so
+  // executing the plan redirects them to the scalar preheader created above.
+  // OldEntry already wraps the block holding the iteration count check for the
+  // epilogue loop: the main plan created it by splitting the original preheader
+  // both plans were built with. Re-use it instead of wrapping it again.
+  VPlanTransforms::connectVPBypassBlock(Plan, cast<VPIRBasicBlock>(OldEntry));
   for (BasicBlock *Bypass :
-       {EPI.EpilogueIterationCountCheck, RTChecks.getSCEVChecks().second,
-        RTChecks.getMemRuntimeChecks().second}) {
+       {RTChecks.getSCEVChecks().second, RTChecks.getMemRuntimeChecks().second})
     if (Bypass)
       VPlanTransforms::connectBypassBlock(Plan, Bypass);
-  }
 
   return OriginalScalarPH;
 }
@@ -8306,7 +8305,6 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     BasicBlock *EntryBB =
         cast<VPIRBasicBlock>(BestMainPlan.getEntry())->getIRBasicBlock();
     EntryBB->setName("iter.check");
-    EPI.EpilogueIterationCountCheck = EntryBB;
     // The check chain is: Entry -> [SCEV] -> [Mem] -> MainCheck -> VecPH.
     // MainCheck is the non-bypass successor of the last runtime check block
     // (or Entry if there are no runtime checks).

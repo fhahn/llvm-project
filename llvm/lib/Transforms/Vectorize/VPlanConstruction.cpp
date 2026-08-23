@@ -1434,18 +1434,24 @@ static void insertCheckBlockBeforeVectorLoop(VPlan &Plan,
   addScalarPHIncomingForLastPredecessor(Plan);
 }
 
+void VPlanTransforms::connectVPBypassBlock(VPlan &Plan,
+                                           VPIRBasicBlock *BypassVPBB) {
+  assert(!BypassVPBB->hasPredecessors() && !BypassVPBB->getNumSuccessors() &&
+         "bypass block must not be connected in the plan yet");
+  VPBasicBlock *ScalarPH = Plan.getScalarPreheader();
+  assert(ScalarPH && "plan must have a scalar preheader to bypass to");
+  // BypassVPBB is not reachable from the plan's entry, it only needs its plan
+  // set so VPBlockBase::getPlan keeps working for blocks reachable from it.
+  BypassVPBB->setPlan(&Plan);
+  VPBlockUtils::connectBlocks(BypassVPBB, ScalarPH);
+  addScalarPHIncomingForLastPredecessor(Plan);
+}
+
 void VPlanTransforms::connectBypassBlock(VPlan &Plan, BasicBlock *BypassBlock) {
   assert(cast<CondBrInst>(BypassBlock->getTerminator())->getSuccessor(0) ==
              cast<VPIRBasicBlock>(Plan.getEntry())->getIRBasicBlock() &&
          "must branch to the plan's entry block first");
-  VPBasicBlock *ScalarPH = Plan.getScalarPreheader();
-  assert(ScalarPH && "plan must have a scalar preheader to bypass to");
-  // BypassBlock is not part of the plan's CFG, it only needs its plan set so
-  // VPBlockBase::getPlan keeps working for blocks reachable from it.
-  auto *BypassVPBB = Plan.createEmptyVPIRBasicBlock(BypassBlock);
-  BypassVPBB->setPlan(&Plan);
-  VPBlockUtils::connectBlocks(BypassVPBB, ScalarPH);
-  addScalarPHIncomingForLastPredecessor(Plan);
+  connectVPBypassBlock(Plan, Plan.createEmptyVPIRBasicBlock(BypassBlock));
 }
 
 // Likelyhood of bypassing the vectorized loop due to a runtime check block,
