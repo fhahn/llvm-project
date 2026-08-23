@@ -1997,11 +1997,10 @@ static void executePhiRecipe(VPSingleDefRecipe *R, VPPhiAccessors &Phi,
                              : Phi.getNumIncoming();
   Value *FirstInc = State.get(Phi.getIncomingValue(0), IsScalar);
   PHINode *NewPhi = State.Builder.CreatePHI(FirstInc->getType(), 2, Name);
-  NewPhi->addIncoming(FirstInc,
-                      State.CFG.VPBB2IRBB.at(Phi.getIncomingBlock(0)));
+  NewPhi->addIncoming(FirstInc, State.CFG.getIRBB(Phi.getIncomingBlock(0)));
   for (unsigned Idx = 1; Idx != NumIncoming; ++Idx)
     NewPhi->addIncoming(State.get(Phi.getIncomingValue(Idx), IsScalar),
-                        State.CFG.VPBB2IRBB.at(Phi.getIncomingBlock(Idx)));
+                        State.CFG.getIRBB(Phi.getIncomingBlock(Idx)));
   State.set(R, NewPhi, IsScalar);
 }
 
@@ -2057,7 +2056,7 @@ void VPIRPhi::execute(VPTransformState &State) {
                     : VPLane::getLastLaneForVF(State.VF);
     VPBlockBase *Pred = getParent()->getPredecessors()[Idx];
     auto *PredVPBB = Pred->getExitingBasicBlock();
-    BasicBlock *PredBB = State.CFG.VPBB2IRBB[PredVPBB];
+    BasicBlock *PredBB = State.CFG.getIRBB(PredVPBB);
     // Set insertion point in PredBB in case an extract needs to be generated.
     // TODO: Model extracts explicitly.
     State.Builder.SetInsertPoint(PredBB->getTerminator());

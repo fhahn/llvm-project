@@ -230,6 +230,13 @@ struct VPlanTransforms {
   static void attachCheckBlock(VPlan &Plan, Value *Cond, BasicBlock *CheckBlock,
                                bool AddBranchWeights);
 
+  /// Model \p BypassBlock, an already generated block branching to the entry
+  /// block of \p Plan, and its edge to the plan's scalar preheader in \p Plan.
+  /// Executing the plan redirects the branch to the scalar preheader. Used
+  /// during epilogue vectorization to connect the blocks bypassing both vector
+  /// loops, which have been generated for the main vector loop already.
+  static void connectBypassBlock(VPlan &Plan, BasicBlock *BypassBlock);
+
   /// Replaces the VPInstructions in \p Plan with corresponding
   /// widen recipes. Returns false if any VPInstructions could not be converted
   /// to a wide recipe if needed. Uses \p PSE to detect contiguous memory

@@ -6156,6 +6156,18 @@ BasicBlock *EpilogueVectorizerEpilogueLoop::createVectorizedLoopSkeleton() {
   Plan.setEntry(NewEntry);
   // OldEntry is now dead and will be cleaned up when the plan gets destroyed.
 
+  // The blocks generated for the main vector loop that bypass both vector loops
+  // branch to the original scalar preheader, which is the entry block of the
+  // epilogue plan now. Model them and their edges to the plan's scalar
+  // preheader in the epilogue plan, so executing the plan redirects them to the
+  // scalar preheader created above.
+  for (BasicBlock *Bypass :
+       {EPI.EpilogueIterationCountCheck, RTChecks.getSCEVChecks().second,
+        RTChecks.getMemRuntimeChecks().second}) {
+    if (Bypass)
+      VPlanTransforms::connectBypassBlock(Plan, Bypass);
+  }
+
   return OriginalScalarPH;
 }
 
@@ -7751,15 +7763,7 @@ static void
 fixScalarResumeValuesFromBypass(BasicBlock *BypassBlock, Loop *L,
                                 VPlan &BestEpiPlan,
                                 ArrayRef<VPInstruction *> ResumeValues) {
-  // Fix resume values from the additional bypass block.
   BasicBlock *PH = L->getLoopPreheader();
-  for (auto *Pred : predecessors(PH)) {
-    for (PHINode &Phi : PH->phis()) {
-      if (Phi.getBasicBlockIndex(Pred) != -1)
-        continue;
-      Phi.addIncoming(Phi.getIncomingValueForBlock(BypassBlock), Pred);
-    }
-  }
   auto *ScalarPH = cast<VPIRBasicBlock>(BestEpiPlan.getScalarPreheader());
   if (ScalarPH->hasPredecessors()) {
     // Fix resume values for inductions and reductions from the additional
@@ -7787,7 +7791,6 @@ fixScalarResumeValuesFromBypass(BasicBlock *BypassBlock, Loop *L,
 static void connectEpilogueVectorLoop(VPlan &EpiPlan, Loop *L,
                                       EpilogueLoopVectorizationInfo &EPI,
                                       DominatorTree *DT,
-                                      GeneratedRTChecks &Checks,
                                       ArrayRef<Instruction *> InstsToMove,
                                       ArrayRef<VPInstruction *> ResumeValues) {
   BasicBlock *VecEpilogueIterationCountCheck =
@@ -7798,33 +7801,18 @@ static void connectEpilogueVectorLoop(VPlan &EpiPlan, Loop *L,
           ->getSuccessor(1);
   // Adjust the control flow taking the state info from the main loop
   // vectorization into account.
-  assert(EPI.MainLoopIterationCountCheck && EPI.EpilogueIterationCountCheck &&
+  assert(EPI.MainLoopIterationCountCheck &&
          "expected this to be saved from the previous pass.");
   DomTreeUpdater DTU(DT, DomTreeUpdater::UpdateStrategy::Eager);
 
-  // Helper to redirect an edge from \p BB to \p VecEpilogueIterationCountCheck
-  // to \p NewSucc instead, updating the DomTree.
-  auto RedirectEdge = [&](BasicBlock *BB, BasicBlock *NewSucc) {
-    BB->getTerminator()->replaceUsesOfWith(VecEpilogueIterationCountCheck,
-                                           NewSucc);
-    DTU.applyUpdates(
-        {{DominatorTree::Delete, BB, VecEpilogueIterationCountCheck},
-         {DominatorTree::Insert, BB, NewSucc}});
-  };
-
-  RedirectEdge(EPI.MainLoopIterationCountCheck, VecEpiloguePreHeader);
-
-  BasicBlock *ScalarPH =
-      cast<VPIRBasicBlock>(EpiPlan.getScalarPreheader())->getIRBasicBlock();
-  RedirectEdge(EPI.EpilogueIterationCountCheck, ScalarPH);
-
-  // Adjust the terminators of runtime check blocks and phis using them.
-  BasicBlock *SCEVCheckBlock = Checks.getSCEVChecks().second;
-  BasicBlock *MemCheckBlock = Checks.getMemRuntimeChecks().second;
-  if (SCEVCheckBlock)
-    RedirectEdge(SCEVCheckBlock, ScalarPH);
-  if (MemCheckBlock)
-    RedirectEdge(MemCheckBlock, ScalarPH);
+  // Redirect the edge from the main loop's iteration count check to the
+  // preheader of the epilogue vector loop, updating the DomTree.
+  EPI.MainLoopIterationCountCheck->getTerminator()->replaceUsesOfWith(
+      VecEpilogueIterationCountCheck, VecEpiloguePreHeader);
+  DTU.applyUpdates({{DominatorTree::Delete, EPI.MainLoopIterationCountCheck,
+                     VecEpilogueIterationCountCheck},
+                    {DominatorTree::Insert, EPI.MainLoopIterationCountCheck,
+                     VecEpiloguePreHeader}});
 
   // The vec.epilog.iter.check block may contain Phi nodes from inductions
   // or reductions which merge control-flow from the latch block and the
@@ -7839,19 +7827,12 @@ static void connectEpilogueVectorLoop(VPlan &EpiPlan, Loop *L,
         VecEpilogueIterationCountCheck->getSinglePredecessor(),
         VecEpilogueIterationCountCheck);
 
-    // If the phi doesn't have an incoming value from the
-    // EpilogueIterationCountCheck, we are done. Otherwise remove the
-    // incoming value and also those from other check blocks. This is needed
-    // for reduction phis only.
-    if (none_of(Phi->blocks(), [&](BasicBlock *IncB) {
-          return EPI.EpilogueIterationCountCheck == IncB;
-        }))
-      continue;
-    for (BasicBlock *BB :
-         {EPI.EpilogueIterationCountCheck, SCEVCheckBlock, MemCheckBlock}) {
-      if (BB)
-        Phi->removeIncomingValue(BB);
-    }
+    // Executing the epilogue plan redirected the edges from the blocks
+    // bypassing both vector loops to the scalar preheader. Drop their incoming
+    // values, which are provided by the phis in the scalar preheader now.
+    for (BasicBlock *IncomingBB : to_vector(Phi->blocks()))
+      if (!is_contained(predecessors(VecEpiloguePreHeader), IncomingBB))
+        Phi->removeIncomingValue(IncomingBB, /*DeletePHIIfEmpty=*/false);
   }
 
   auto IP = VecEpiloguePreHeader->getFirstNonPHIIt();
@@ -8351,7 +8332,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     LVP.executePlan(
         EPI.EpilogueVF, EPI.EpilogueUF, BestEpiPlan, EpilogILV, DT,
         LoopVectorizationPlanner::EpilogueVectorizationKind::Epilogue);
-    connectEpilogueVectorLoop(BestEpiPlan, L, EPI, DT, Checks, InstsToMove,
+    connectEpilogueVectorLoop(BestEpiPlan, L, EPI, DT, InstsToMove,
                               ResumeValues);
     ++LoopsEpilogueVectorized;
   } else {

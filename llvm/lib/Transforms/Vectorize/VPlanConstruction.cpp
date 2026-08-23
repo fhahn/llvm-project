@@ -1404,6 +1404,22 @@ void VPlanTransforms::foldTailByMasking(VPlan &Plan) {
   Plan.getMiddleBlock()->getTerminator()->setOperand(0, Plan.getTrue());
 }
 
+/// Add an incoming value to all phis in the scalar preheader of \p Plan for its
+/// last predecessor, which must have just been added. Predecessors of the
+/// scalar preheader other than the middle block bypass the vector loop(s) and
+/// hence resume the scalar loop at the same values, so re-use the incoming
+/// value of the previously last predecessor.
+static void addScalarPHIncomingForLastPredecessor(VPlan &Plan) {
+  auto *ScalarPH = Plan.getScalarPreheader();
+  unsigned NumPreds = ScalarPH->getNumPredecessors();
+  for (VPRecipeBase &R : ScalarPH->phis()) {
+    auto *Phi = cast<VPPhi>(&R);
+    assert(Phi->getNumIncoming() == NumPreds - 1 &&
+           "must have incoming values for all predecessors");
+    Phi->addIncoming(Phi->getOperand(NumPreds - 2));
+  }
+}
+
 /// Insert \p CheckBlockVPBB on the edge leading to the vector preheader,
 /// connecting it to both vector and scalar preheaders. Updates scalar
 /// preheader phis to account for the new predecessor.
@@ -1415,13 +1431,21 @@ static void insertCheckBlockBeforeVectorLoop(VPlan &Plan,
   VPBlockUtils::insertOnEdge(PreVectorPH, VectorPH, CheckBlockVPBB);
   VPBlockUtils::connectBlocks(CheckBlockVPBB, ScalarPH);
   CheckBlockVPBB->swapSuccessors();
-  unsigned NumPreds = ScalarPH->getNumPredecessors();
-  for (VPRecipeBase &R : ScalarPH->phis()) {
-    auto *Phi = cast<VPPhi>(&R);
-    assert(Phi->getNumIncoming() == NumPreds - 1 &&
-           "must have incoming values for all predecessors");
-    Phi->addIncoming(Phi->getOperand(NumPreds - 2));
-  }
+  addScalarPHIncomingForLastPredecessor(Plan);
+}
+
+void VPlanTransforms::connectBypassBlock(VPlan &Plan, BasicBlock *BypassBlock) {
+  assert(cast<CondBrInst>(BypassBlock->getTerminator())->getSuccessor(0) ==
+             cast<VPIRBasicBlock>(Plan.getEntry())->getIRBasicBlock() &&
+         "must branch to the plan's entry block first");
+  VPBasicBlock *ScalarPH = Plan.getScalarPreheader();
+  assert(ScalarPH && "plan must have a scalar preheader to bypass to");
+  // BypassBlock is not part of the plan's CFG, it only needs its plan set so
+  // VPBlockBase::getPlan keeps working for blocks reachable from it.
+  auto *BypassVPBB = Plan.createEmptyVPIRBasicBlock(BypassBlock);
+  BypassVPBB->setPlan(&Plan);
+  VPBlockUtils::connectBlocks(BypassVPBB, ScalarPH);
+  addScalarPHIncomingForLastPredecessor(Plan);
 }
 
 // Likelyhood of bypassing the vectorized loop due to a runtime check block,

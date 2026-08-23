@@ -298,6 +298,12 @@ struct VPTransformState {
     /// of replication, maps the BasicBlock of the last replica created.
     SmallDenseMap<const VPBasicBlock *, BasicBlock *> VPBB2IRBB;
 
+    /// Returns the IR BasicBlock generated for \p VPBB, or nullptr if it has
+    /// not been generated yet. A VPIRBasicBlock always maps to the IR block it
+    /// wraps, including blocks that are not executed as part of the plan, like
+    /// already generated blocks branching into the plan.
+    BasicBlock *getIRBB(const VPBasicBlock *VPBB) const;
+
     /// Updater for the DominatorTree.
     DomTreeUpdater DTU;
 

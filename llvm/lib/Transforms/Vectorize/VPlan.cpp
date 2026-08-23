@@ -228,7 +228,8 @@ VPBasicBlock *VPBlockBase::getEntryBasicBlock() {
 }
 
 void VPBlockBase::setPlan(VPlan *ParentPlan) {
-  assert(ParentPlan->getEntry() == this && "Can only set plan on its entry.");
+  assert(!hasPredecessors() &&
+         "Can only set plan on blocks without predecessors.");
   Plan = ParentPlan;
 }
 
@@ -426,6 +427,13 @@ BasicBlock *VPBasicBlock::createEmptyBasicBlock(VPTransformState &State) {
   return NewBB;
 }
 
+BasicBlock *
+VPTransformState::CFGState::getIRBB(const VPBasicBlock *VPBB) const {
+  if (auto *IRVPBB = dyn_cast<VPIRBasicBlock>(VPBB))
+    return IRVPBB->getIRBasicBlock();
+  return VPBB2IRBB.lookup(VPBB);
+}
+
 void VPBasicBlock::connectToPredecessors(VPTransformState &State) {
   auto &CFG = State.CFG;
   BasicBlock *NewBB = CFG.VPBB2IRBB[this];
@@ -458,9 +466,8 @@ void VPBasicBlock::connectToPredecessors(VPTransformState &State) {
   for (VPBlockBase *PredVPBlock : Preds) {
     VPBasicBlock *PredVPBB = PredVPBlock->getExitingBasicBlock();
     auto &PredVPSuccessors = PredVPBB->getHierarchicalSuccessors();
-    assert(CFG.VPBB2IRBB.contains(PredVPBB) &&
-           "Predecessor basic-block not found building successor.");
-    BasicBlock *PredBB = CFG.VPBB2IRBB[PredVPBB];
+    BasicBlock *PredBB = CFG.getIRBB(PredVPBB);
+    assert(PredBB && "Predecessor basic-block not found building successor.");
     auto *PredBBTerminator = PredBB->getTerminator();
     LLVM_DEBUG(dbgs() << "LV: draw edge from " << PredBB->getName() << '\n');
 
@@ -476,19 +483,22 @@ void VPBasicBlock::connectToPredecessors(VPTransformState &State) {
     } else {
       // Set each forward successor here when it is created, excluding
       // backedges. A backward successor is set when the branch is created.
-      // Branches to VPIRBasicBlocks must have the same successors in VPlan as
-      // in the original IR, except when the predecessor is the entry block.
-      // This enables including SCEV and memory runtime check blocks in VPlan.
-      // TODO: Remove exception by modeling the terminator of entry block using
-      // BranchOnCond.
-      unsigned idx = PredVPSuccessors.front() == this ? 0 : 1;
+      // A VPIRBasicBlock wraps a block that has already been generated, so its
+      // successors may already be set. They must match the successors in VPlan,
+      // except for blocks generated before executing the plan that branch into
+      // it, like the plan's entry block or the blocks bypassing the main vector
+      // loop during epilogue vectorization. Their edges are redirected here.
+      // TODO: Remove exception for the entry block by modeling its terminator
+      // using BranchOnCond.
+      unsigned Idx = PredVPSuccessors.front() == this ? 0 : 1;
       auto *TermBr = cast<CondBrInst>(PredBBTerminator);
-      assert((!TermBr->getSuccessor(idx) ||
-              (isa<VPIRBasicBlock>(this) &&
-               (TermBr->getSuccessor(idx) == NewBB ||
-                PredVPBlock == getPlan()->getEntry()))) &&
+      BasicBlock *ReplacedSucc = TermBr->getSuccessor(Idx);
+      assert((!ReplacedSucc || ReplacedSucc == NewBB ||
+              isa<VPIRBasicBlock>(PredVPBB)) &&
              "Trying to reset an existing successor block.");
-      TermBr->setSuccessor(idx, NewBB);
+      TermBr->setSuccessor(Idx, NewBB);
+      if (ReplacedSucc && ReplacedSucc != NewBB)
+        CFG.DTU.applyUpdates({{DominatorTree::Delete, PredBB, ReplacedSucc}});
     }
     CFG.DTU.applyUpdates({{DominatorTree::Insert, PredBB, NewBB}});
   }

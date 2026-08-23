@@ -38,8 +38,8 @@ define void @unused_expand_scev(i32 %start, ptr %dst) {
 ; CHECK:       [[VEC_EPILOG_MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    br i1 false, label %[[EXIT]], label %[[VEC_EPILOG_SCALAR_PH]]
 ; CHECK:       [[VEC_EPILOG_SCALAR_PH]]:
-; CHECK-NEXT:    [[BC_RESUME_VAL3:%.*]] = phi i64 [ 99, %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ 97, %[[VEC_EPILOG_ITER_CHECK]] ], [ [[START_EXT]], %[[VECTOR_SCEVCHECK]] ], [ [[START_EXT]], %[[ITER_CHECK]] ]
-; CHECK-NEXT:    [[BC_RESUME_VAL4:%.*]] = phi i64 [ 98, %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ 96, %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_SCEVCHECK]] ], [ 0, %[[ITER_CHECK]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL3:%.*]] = phi i64 [ 99, %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ 97, %[[VEC_EPILOG_ITER_CHECK]] ], [ [[START_EXT]], %[[ITER_CHECK]] ], [ [[START_EXT]], %[[VECTOR_SCEVCHECK]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL4:%.*]] = phi i64 [ 98, %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ 96, %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[ITER_CHECK]] ], [ 0, %[[VECTOR_SCEVCHECK]] ]
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[IV_0:%.*]] = phi i64 [ [[BC_RESUME_VAL3]], %[[VEC_EPILOG_SCALAR_PH]] ], [ [[IV_0_NEXT:%.*]], %[[LOOP]] ]
