@@ -687,16 +687,21 @@ protected:
 // vectorization of *epilogue* loops in the process of vectorizing loops and
 // their epilogues.
 class EpilogueVectorizerEpilogueLoop : public InnerLoopAndEpilogueVectorizer {
+  /// Markers for the resume values computed by the main vector loop, used as
+  /// resume values for the scalar loop when the epilogue vector loop is
+  /// skipped.
+  ArrayRef<VPInstruction *> MainLoopHeaderPhiResumes;
+
 public:
-  EpilogueVectorizerEpilogueLoop(Loop *OrigLoop, PredicatedScalarEvolution &PSE,
-                                 LoopInfo *LI, DominatorTree *DT,
-                                 const TargetTransformInfo *TTI,
-                                 AssumptionCache *AC,
-                                 EpilogueLoopVectorizationInfo &EPI,
-                                 GeneratedRTChecks &Checks, VPlan &Plan)
+  EpilogueVectorizerEpilogueLoop(
+      Loop *OrigLoop, PredicatedScalarEvolution &PSE, LoopInfo *LI,
+      DominatorTree *DT, const TargetTransformInfo *TTI, AssumptionCache *AC,
+      EpilogueLoopVectorizationInfo &EPI, GeneratedRTChecks &Checks,
+      VPlan &Plan, ArrayRef<VPInstruction *> MainLoopHeaderPhiResumes)
       : InnerLoopAndEpilogueVectorizer(OrigLoop, PSE, LI, DT, TTI, AC, EPI,
                                        Checks, Plan, EPI.EpilogueVF,
-                                       EPI.EpilogueUF) {}
+                                       EPI.EpilogueUF),
+        MainLoopHeaderPhiResumes(MainLoopHeaderPhiResumes) {}
   /// Implements the interface for creating a vectorized skeleton using the
   /// *epilogue loop* strategy (i.e., the second pass of VPlan execution).
   BasicBlock *createVectorizedLoopSkeleton() final;
@@ -6173,6 +6178,24 @@ BasicBlock *EpilogueVectorizerEpilogueLoop::createVectorizedLoopSkeleton() {
       VPlanTransforms::connectBypassBlock(Plan, Bypass, ScalarPH);
     }
 
+  // When the epilogue vector loop is skipped after executing the main vector
+  // loop, the scalar loop resumes at the values the main vector loop computed.
+  // Update the incoming values of the scalar preheader's phis for the edge from
+  // the plan's entry block accordingly; so far they are the scalar loop's
+  // original start values, which the bypass blocks above resume at.
+  ArrayRef<VPBlockBase *> ScalarPHPreds = ScalarPH->getPredecessors();
+  unsigned EntryIdx = find(ScalarPHPreds, NewEntry) - ScalarPHPreds.begin();
+  assert(EntryIdx < ScalarPHPreds.size() &&
+         "entry block must be a predecessor of the scalar preheader");
+  for (auto [ResumeForEpi, HeaderPhi] :
+       zip_equal(MainLoopHeaderPhiResumes, Plan.getScalarHeader()->phis())) {
+    auto *ScalarPHPhi = dyn_cast<VPPhi>(HeaderPhi.getOperand(0));
+    if (!ScalarPHPhi || ScalarPHPhi->getParent() != ScalarPH)
+      continue;
+    ScalarPHPhi->setOperand(
+        EntryIdx, Plan.getOrAddLiveIn(ResumeForEpi->getUnderlyingValue()));
+  }
+
   return OriginalScalarPH;
 }
 
@@ -7758,43 +7781,13 @@ static void preparePlanForEpilogueVectorLoop(
                  SE);
 }
 
-static void
-fixScalarResumeValuesFromBypass(BasicBlock *BypassBlock, Loop *L,
-                                VPlan &BestEpiPlan,
-                                ArrayRef<VPInstruction *> ResumeValues) {
-  BasicBlock *PH = L->getLoopPreheader();
-  auto *ScalarPH = cast<VPIRBasicBlock>(BestEpiPlan.getScalarPreheader());
-  if (ScalarPH->hasPredecessors()) {
-    // Fix resume values for inductions and reductions from the additional
-    // bypass block using the incoming values from the main loop's resume phis.
-    // ResumeValues correspond 1:1 with the scalar loop header phis.
-    for (auto [ResumeV, HeaderPhi] :
-         zip(ResumeValues, BestEpiPlan.getScalarHeader()->phis())) {
-      auto *HeaderPhiR = cast<VPIRPhi>(&HeaderPhi);
-      auto *EpiResumePhi =
-          cast<PHINode>(HeaderPhiR->getIRPhi().getIncomingValueForBlock(PH));
-      if (EpiResumePhi->getBasicBlockIndex(BypassBlock) == -1)
-        continue;
-      EpiResumePhi->setIncomingValueForBlock(BypassBlock,
-                                            ResumeV->getUnderlyingValue());
-    }
-  }
-}
-
 /// Remove the resume phis the main plan created in its scalar preheader, which
 /// is the entry block of \p EpiPlan. They have been replaced by resume phis in
 /// the preheader of the epilogue vector loop and in the epilogue loop's scalar
 /// preheader.
 /// TODO: Don't create them in the main plan when vectorizing the epilogue.
-static void removeMainLoopResumePhis(VPlan &EpiPlan, Loop *L,
-                                     const MainLoopResumeValues &ResumeValues) {
+static void removeMainLoopResumePhis(VPlan &EpiPlan) {
   auto *Entry = cast<VPIRBasicBlock>(EpiPlan.getEntry());
-  // The block conditionally skips over the epilogue vector loop after executing
-  // the main loop. Update the resume values of inductions and reductions for
-  // that edge before removing the phis.
-  fixScalarResumeValuesFromBypass(Entry->getIRBasicBlock(), L, EpiPlan,
-                                  ResumeValues.HeaderPhis);
-
   for (VPRecipeBase &R : make_early_inc_range(Entry->phis())) {
     PHINode &Phi = cast<VPIRPhi>(R).getIRPhi();
     assert(Phi.use_empty() && "resume phi from the main plan must be dead");
@@ -8273,7 +8266,8 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     // Second pass vectorizes the epilogue and adjusts the control flow
     // edges from the first pass.
     EpilogueVectorizerEpilogueLoop EpilogILV(L, PSE, LI, DT, TTI, AC, EPI,
-                                             Checks, BestEpiPlan);
+                                             Checks, BestEpiPlan,
+                                             ResumeValues.HeaderPhis);
     preparePlanForEpilogueVectorLoop(BestMainPlan, BestEpiPlan, L,
                                      ExpandedSCEVs, EPI, LVP, Config,
                                      *PSE.getSE(), ResumeValues);
@@ -8282,7 +8276,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     LVP.executePlan(
         EPI.EpilogueVF, EPI.EpilogueUF, BestEpiPlan, EpilogILV, DT,
         LoopVectorizationPlanner::EpilogueVectorizationKind::Epilogue);
-    removeMainLoopResumePhis(BestEpiPlan, L, ResumeValues);
+    removeMainLoopResumePhis(BestEpiPlan);
     ++LoopsEpilogueVectorized;
   } else {
     InnerLoopVectorizer LB(L, PSE, LI, DT, TTI, AC, VF.Width, IC, Checks,
