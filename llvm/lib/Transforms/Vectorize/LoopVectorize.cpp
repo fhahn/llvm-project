@@ -7548,6 +7548,19 @@ static MainLoopResumeValues preparePlanForMainVectorLoop(VPlan &MainPlan,
             VPInstruction::ResumeForEpilogue,
             {ResumePhi->getOperand(0), ResumePhi->getOperand(1)});
       }));
+
+  // The resume phis in the main plan's scalar preheader are not needed: the
+  // epilogue plan adds its own resume phis to the scalar preheader it creates.
+  // Remove them, letting the scalar loop resume at its original start values
+  // until the epilogue plan is executed.
+  for (VPRecipeBase &R :
+       make_early_inc_range(MainPlan.getScalarHeader()->phis())) {
+    auto *ResumePhi = dyn_cast<VPPhi>(R.getOperand(0));
+    if (!ResumePhi || ResumePhi->getParent() != MainPlan.getScalarPreheader())
+      continue;
+    ResumePhi->replaceAllUsesWith(ResumePhi->getOperand(1));
+    ResumePhi->eraseFromParent();
+  }
   return ResumeValues;
 }
 
@@ -7779,21 +7792,6 @@ static void preparePlanForEpilogueVectorLoop(
                  EPI.VectorTripCount, Plan.requiresScalarEpilogue(),
                  EPI.EpilogueVF, EPI.EpilogueUF, MainLoopStep, EpilogueLoopStep,
                  SE);
-}
-
-/// Remove the resume phis the main plan created in its scalar preheader, which
-/// is the entry block of \p EpiPlan. They have been replaced by resume phis in
-/// the preheader of the epilogue vector loop and in the epilogue loop's scalar
-/// preheader.
-/// TODO: Don't create them in the main plan when vectorizing the epilogue.
-static void removeMainLoopResumePhis(VPlan &EpiPlan) {
-  auto *Entry = cast<VPIRBasicBlock>(EpiPlan.getEntry());
-  for (VPRecipeBase &R : make_early_inc_range(Entry->phis())) {
-    PHINode &Phi = cast<VPIRPhi>(R).getIRPhi();
-    assert(Phi.use_empty() && "resume phi from the main plan must be dead");
-    R.eraseFromParent();
-    Phi.eraseFromParent();
-  }
 }
 
 bool LoopVectorizePass::processLoop(Loop *L) {
@@ -8276,7 +8274,6 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     LVP.executePlan(
         EPI.EpilogueVF, EPI.EpilogueUF, BestEpiPlan, EpilogILV, DT,
         LoopVectorizationPlanner::EpilogueVectorizationKind::Epilogue);
-    removeMainLoopResumePhis(BestEpiPlan);
     ++LoopsEpilogueVectorized;
   } else {
     InnerLoopVectorizer LB(L, PSE, LI, DT, TTI, AC, VF.Width, IC, Checks,
