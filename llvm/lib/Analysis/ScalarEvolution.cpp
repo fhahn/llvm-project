@@ -3763,43 +3763,34 @@ const SCEV *ScalarEvolution::getMinMaxExpr(SCEVTypes Kind,
   bool IsSigned = Kind == scSMaxExpr || Kind == scSMinExpr;
   bool IsMax = Kind == scSMaxExpr || Kind == scUMaxExpr;
 
+  // FirstPred holds iff the first of two operands is the result of the min/max,
+  // SecondPred iff the second one is.
+  ICmpInst::Predicate FirstPred =
+      IsMax ? (IsSigned ? ICmpInst::ICMP_SGE : ICmpInst::ICMP_UGE)
+            : (IsSigned ? ICmpInst::ICMP_SLE : ICmpInst::ICMP_ULE);
+  ICmpInst::Predicate SecondPred = ICmpInst::getSwappedPredicate(FirstPred);
+
+  // The absorber is the extreme value the min/max saturates at, the identity is
+  // the extreme value at the other end of the range.
+  auto IsExtremeValue = [IsSigned](const APInt &C, bool Max) {
+    if (Max)
+      return IsSigned ? C.isMaxSignedValue() : C.isMaxValue();
+    return IsSigned ? C.isMinSignedValue() : C.isMinValue();
+  };
+
   const SCEV *Folded = constantFoldAndGroupOps(
       *this, LI, DT, Ops,
-      [&](const APInt &C1, const APInt &C2) {
-        switch (Kind) {
-        case scSMaxExpr:
-          return APIntOps::smax(C1, C2);
-        case scSMinExpr:
-          return APIntOps::smin(C1, C2);
-        case scUMaxExpr:
-          return APIntOps::umax(C1, C2);
-        case scUMinExpr:
-          return APIntOps::umin(C1, C2);
-        default:
-          llvm_unreachable("Unknown SCEV min/max opcode");
-        }
+      [FirstPred](const APInt &C1, const APInt &C2) {
+        return ICmpInst::compare(C1, C2, FirstPred) ? C1 : C2;
       },
-      [&](const APInt &C) {
-        // identity
-        if (IsMax)
-          return IsSigned ? C.isMinSignedValue() : C.isMinValue();
-        else
-          return IsSigned ? C.isMaxSignedValue() : C.isMaxValue();
-      },
-      [&](const APInt &C) {
-        // absorber
-        if (IsMax)
-          return IsSigned ? C.isMaxSignedValue() : C.isMaxValue();
-        else
-          return IsSigned ? C.isMinSignedValue() : C.isMinValue();
-      });
+      [&](const APInt &C) { return IsExtremeValue(C, /*Max=*/!IsMax); },
+      [&](const APInt &C) { return IsExtremeValue(C, /*Max=*/IsMax); });
   if (Folded)
     return Folded;
 
   // Check if we have created the same expression before.
-  if (const SCEV *S = findExistingSCEVInCache(Kind, Ops)) {
+  if (const SCEV *S = findExistingSCEVInCache(Kind, Ops))
     return S;
-  }
 
   // Find the first operation of the same kind
   unsigned Idx = 0;
@@ -3824,32 +3815,23 @@ const SCEV *ScalarEvolution::getMinMaxExpr(SCEVTypes Kind,
   // Okay, check to see if the same value occurs in the operand list twice.  If
   // so, delete one.  Since we sorted the list, these values are required to
   // be adjacent.
-  llvm::CmpInst::Predicate GEPred =
-      IsSigned ? ICmpInst::ICMP_SGE : ICmpInst::ICMP_UGE;
-  llvm::CmpInst::Predicate LEPred =
-      IsSigned ? ICmpInst::ICMP_SLE : ICmpInst::ICMP_ULE;
-  llvm::CmpInst::Predicate FirstPred = IsMax ? GEPred : LEPred;
-  llvm::CmpInst::Predicate SecondPred = IsMax ? LEPred : GEPred;
-  for (unsigned i = 0, e = Ops.size() - 1; i != e; ++i) {
-    if (Ops[i] == Ops[i + 1] ||
-        isKnownViaNonRecursiveReasoning(FirstPred, Ops[i], Ops[i + 1])) {
+  for (unsigned I = 0; I + 1 < Ops.size();) {
+    if (Ops[I] == Ops[I + 1] ||
+        isKnownViaNonRecursiveReasoning(FirstPred, Ops[I], Ops[I + 1])) {
       //  X op Y op Y  -->  X op Y
       //  X op Y       -->  X, if we know X, Y are ordered appropriately
-      Ops.erase(Ops.begin() + i + 1, Ops.begin() + i + 2);
-      --i;
-      --e;
-    } else if (isKnownViaNonRecursiveReasoning(SecondPred, Ops[i],
-                                               Ops[i + 1])) {
+      Ops.erase(Ops.begin() + I + 1);
+    } else if (isKnownViaNonRecursiveReasoning(SecondPred, Ops[I],
+                                               Ops[I + 1])) {
       //  X op Y       -->  Y, if we know X, Y are ordered appropriately
-      Ops.erase(Ops.begin() + i, Ops.begin() + i + 1);
-      --i;
-      --e;
+      Ops.erase(Ops.begin() + I);
+    } else {
+      ++I;
     }
   }
 
-  if (Ops.size() == 1) return Ops[0];
-
-  assert(!Ops.empty() && "Reduced smax down to nothing!");
+  if (Ops.size() == 1)
+    return Ops[0];
 
   // Okay, it looks like we really DO need an expr.  Check to see if we
   // already have one, otherwise create a new one.
