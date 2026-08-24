@@ -3541,12 +3541,12 @@ const SCEV *ScalarEvolution::getUDivExpr(SCEVUse LHS, SCEVUse RHS) {
   return getOrCreateUDivExpr(LHS, RHS);
 }
 
-/// Get a canonical unsigned division expression, or something simpler if
-/// possible. There is no representation for an exact udiv in SCEV IR, but we
-/// can attempt to optimize it prior to construction.
+/// Get an unsigned division expression for a division that is known to be
+/// exact. There is no representation for an exact udiv in SCEV IR and there
+/// are no exact-specific folds at the moment, so this simply forwards to
+/// getUDivExpr; it stays a separate entry point to record the callers' intent
+/// and as a hook for such folds.
 const SCEV *ScalarEvolution::getUDivExactExpr(SCEVUse LHS, SCEVUse RHS) {
-  // Currently there is no exact specific logic.
-
   return getUDivExpr(LHS, RHS);
 }
 
