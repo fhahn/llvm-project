@@ -3744,21 +3744,30 @@ const SCEV *ScalarEvolution::getAbsExpr(const SCEV *Op, bool IsNSW) {
   return getSMaxExpr(Op, getNegativeSCEV(Op, Flags));
 }
 
+#ifndef NDEBUG
+/// Returns true if \p Ops are valid operands for a min/max expression: they all
+/// have the same effective type and are either all pointers or all integers.
+/// The latter is not implied by the former, as getEffectiveSCEVType maps a
+/// pointer to an index-sized integer.
+static bool haveValidMinMaxOperandTypes(const ScalarEvolution &SE,
+                                        ArrayRef<SCEVUse> Ops) {
+  Type *Ty = Ops.front()->getType();
+  Type *ETy = SE.getEffectiveSCEVType(Ty);
+  return all_of(drop_begin(Ops), [&](SCEVUse Op) {
+    return SE.getEffectiveSCEVType(Op->getType()) == ETy &&
+           Op->getType()->isPointerTy() == Ty->isPointerTy();
+  });
+}
+#endif
+
 const SCEV *ScalarEvolution::getMinMaxExpr(SCEVTypes Kind,
                                            SmallVectorImpl<SCEVUse> &Ops) {
   assert(SCEVMinMaxExpr::isMinMaxType(Kind) && "Not a SCEVMinMaxExpr!");
   assert(!Ops.empty() && "Cannot get empty (u|s)(min|max)!");
-  if (Ops.size() == 1) return Ops[0];
-#ifndef NDEBUG
-  Type *ETy = getEffectiveSCEVType(Ops[0]->getType());
-  for (unsigned i = 1, e = Ops.size(); i != e; ++i) {
-    assert(getEffectiveSCEVType(Ops[i]->getType()) == ETy &&
-           "Operand types don't match!");
-    assert(Ops[0]->getType()->isPointerTy() ==
-               Ops[i]->getType()->isPointerTy() &&
-           "min/max should be consistently pointerish");
-  }
-#endif
+  if (Ops.size() == 1)
+    return Ops[0];
+  assert(haveValidMinMaxOperandTypes(*this, Ops) &&
+         "Invalid min/max operand types!");
 
   bool IsSigned = Kind == scSMaxExpr || Kind == scSMinExpr;
   bool IsMax = Kind == scSMaxExpr || Kind == scUMaxExpr;
@@ -4078,16 +4087,8 @@ ScalarEvolution::getSequentialMinMaxExpr(SCEVTypes Kind,
   assert(!Ops.empty() && "Cannot get empty (u|s)(min|max)!");
   if (Ops.size() == 1)
     return Ops[0];
-#ifndef NDEBUG
-  Type *ETy = getEffectiveSCEVType(Ops[0]->getType());
-  for (unsigned i = 1, e = Ops.size(); i != e; ++i) {
-    assert(getEffectiveSCEVType(Ops[i]->getType()) == ETy &&
-           "Operand types don't match!");
-    assert(Ops[0]->getType()->isPointerTy() ==
-               Ops[i]->getType()->isPointerTy() &&
-           "min/max should be consistently pointerish");
-  }
-#endif
+  assert(haveValidMinMaxOperandTypes(*this, Ops) &&
+         "Invalid min/max operand types!");
 
   // Note that SCEVSequentialMinMaxExpr is *NOT* commutative,
   // so we can *NOT* do any kind of sorting of the expressions!
