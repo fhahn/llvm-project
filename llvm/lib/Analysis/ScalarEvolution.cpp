@@ -11739,6 +11739,85 @@ bool ScalarEvolution::isKnownPredicateViaConstantRanges(CmpPredicate Pred,
   return CheckRange(CmpInst::isSigned(Pred));
 }
 
+bool ScalarEvolution::isKnownPredicateViaOuterIVRange(CmpPredicate Pred,
+                                                      const SCEV *LHS,
+                                                      const SCEV *RHS) {
+  if (!ICmpInst::isRelational(Pred) || LHS->getType()->isPointerTy())
+    return false;
+
+  // LHS must be the IV of a loop, whose maximum backedge-taken count then
+  // bounds the values it can take.
+  const auto *AR = dyn_cast<SCEVAddRecExpr>(LHS);
+  if (!AR || !AR->isAffine())
+    return false;
+
+  // Establish that AR is monotonic, so that its last iteration produces the
+  // extreme value.
+  const SCEV *Step = AR->getStepRecurrence(*this);
+  if (!AR->hasNoSelfWrap())
+    return false;
+  bool Decreasing = isKnownNegative(Step);
+  if (!Decreasing && !isKnownPositive(Step))
+    return false;
+
+  // Only the side the last iteration lands on is bounded: a decreasing AddRec
+  // gets a lower bound, an increasing one an upper bound.
+  bool WantLowerBound = ICmpInst::isGE(Pred) || ICmpInst::isGT(Pred);
+  if (WantLowerBound != Decreasing)
+    return false;
+
+  const SCEV *MaxBTC = getSymbolicMaxBackedgeTakenCount(AR->getLoop());
+  if (isa<SCEVCouldNotCompute>(MaxBTC) ||
+      getTypeSizeInBits(MaxBTC->getType()) > getTypeSizeInBits(AR->getType()))
+    return false;
+  MaxBTC = getNoopOrZeroExtend(MaxBTC, AR->getType());
+
+  // MaxBTC only bounds the backedge-taken count from above, and the no-wrap
+  // flags may have been inferred from an exit whose count is not known, so AR
+  // is not guaranteed to be wrap-free that far out. Check separately that it
+  // cannot wrap within MaxBTC iterations. Use range queries rather than
+  // isKnownPredicate here: we are called from backedge-taken count computation
+  // and must not recurse back into it.
+  const SCEV *StepAbs = getUMinExpr(Step, getNegativeSCEV(Step));
+  const SCEV *MaxItersWithoutWrap =
+      getUDivExpr(getMinusOne(AR->getType()), StepAbs);
+  if (getUnsignedRangeMax(MaxBTC).ugt(getUnsignedRangeMin(MaxItersWithoutWrap)))
+    return false;
+
+  const SCEV *Extreme = AR->evaluateAtIteration(MaxBTC, *this);
+
+  // MaxBTC bounds the backedge-taken count from above only, so Extreme may be
+  // a value AR never actually takes, in which case it is no bound at all. Rule
+  // that out by requiring Extreme to be on the side of the start value that the
+  // step direction puts it on, which also establishes that [Extreme, Start]
+  // does not wrap. Without this an AddRec {0,+,-1} whose loop reports a maximum
+  // backedge-taken count of 9 would get the "bound" 0 - 9, above its start.
+  // Both ends need the loop guards applied: the start carries the sharper range
+  // for a decreasing AddRec, Extreme does for an increasing one.
+  const SCEV *Start = applyLoopGuards(AR->getStart(), AR->getLoop());
+  const SCEV *GuardedExtreme = applyLoopGuards(Extreme, AR->getLoop());
+  if (!isKnownPredicateViaConstantRanges(Decreasing ? ICmpInst::ICMP_UGE
+                                                    : ICmpInst::ICMP_ULE,
+                                        Start, GuardedExtreme))
+    return false;
+
+  // Monotonicity has to hold in the predicate's own domain.
+  if (ICmpInst::isSigned(Pred)) {
+    if (!AR->hasNoSignedWrap())
+      return false;
+  } else if (!AR->hasNoUnsignedWrap()) {
+    // A signed-monotonic AddRec is monotonic unsigned too as long as it stays
+    // non-negative, which follows from the lower end of its range being
+    // non-negative. Note that the upper end then needs no check: it is one of
+    // the values the AddRec takes, so monotonicity puts it above the lower end.
+    const SCEV *Low = Decreasing ? GuardedExtreme : Start;
+    if (!AR->hasNoSignedWrap() || !getSignedRangeMin(Low).isNonNegative())
+      return false;
+  }
+
+  return isKnownPredicate(Pred, Extreme, RHS);
+}
+
 bool ScalarEvolution::isKnownPredicateViaNoOverflow(CmpPredicate Pred,
                                                     SCEVUse LHS, SCEVUse RHS) {
   // Match X to (A + C1)<ExpectedFlags> and Y to (A + C2)<ExpectedFlags>, where
@@ -13652,6 +13731,12 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
             isKnownPredicate(CondGE, GuardedRHS, GuardedStart))
           return true;
 
+        // OrigStart may be the IV of another loop, in which case that loop's
+        // own trip count bounds it from above.
+        auto CondLE = IsSigned ? ICmpInst::ICMP_SLE : ICmpInst::ICMP_ULE;
+        if (isKnownPredicateViaOuterIVRange(CondLE, OrigStart, OrigRHS))
+          return true;
+
         // (RHS > Start - 1) implies RHS >= Start.
         // * "RHS >= Start" is trivially equivalent to "RHS > Start - 1" if
         //   "Start - 1" doesn't overflow.
@@ -13843,8 +13928,10 @@ ScalarEvolution::ExitLimit ScalarEvolution::howManyGreaterThans(
   if (!isLoopEntryGuardedByCond(L, Cond, getAddExpr(Start, Stride), RHS)) {
     // If we know that Start >= RHS in the context of loop, then we know that
     // min(RHS, Start) = RHS at this point.
-    if (isLoopEntryGuardedByCond(
-            L, IsSigned ? ICmpInst::ICMP_SGE : ICmpInst::ICMP_UGE, Start, RHS))
+    ICmpInst::Predicate GEPred =
+        IsSigned ? ICmpInst::ICMP_SGE : ICmpInst::ICMP_UGE;
+    if (isLoopEntryGuardedByCond(L, GEPred, Start, RHS) ||
+        isKnownPredicateViaOuterIVRange(GEPred, Start, RHS))
       End = RHS;
     else
       End = IsSigned ? getSMinExpr(RHS, Start) : getUMinExpr(RHS, Start);

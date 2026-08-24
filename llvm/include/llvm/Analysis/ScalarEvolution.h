@@ -2374,6 +2374,15 @@ private:
   bool isKnownPredicateViaNoOverflow(CmpPredicate Pred, SCEVUse LHS,
                                      SCEVUse RHS);
 
+  /// Try to prove the condition described by "LHS Pred RHS" where LHS is the
+  /// induction variable of some loop, using that loop's own maximum
+  /// backedge-taken count to bound the values LHS can take. Only relational
+  /// predicates are handled. This is aimed at exit counts of loops whose
+  /// counting IV starts at the IV of another loop, where no condition
+  /// dominating the loop bounds that start value.
+  bool isKnownPredicateViaOuterIVRange(CmpPredicate Pred, const SCEV *LHS,
+                                       const SCEV *RHS);
+
   /// Try to split Pred LHS RHS into logical conjunctions (and's) and try to
   /// prove them individually.
   bool isKnownPredicateViaSplitting(CmpPredicate Pred, SCEVUse LHS,
