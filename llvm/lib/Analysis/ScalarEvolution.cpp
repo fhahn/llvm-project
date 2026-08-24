@@ -3624,51 +3624,44 @@ const SCEV *ScalarEvolution::getGEPExpr(GEPOperator *GEP,
 const SCEV *ScalarEvolution::getGEPExpr(SCEVUse BaseExpr,
                                         ArrayRef<SCEVUse> IndexExprs,
                                         Type *SrcElementTy, GEPNoWrapFlags NW) {
+  // Handle degenerate case of GEP without indices.
+  if (IndexExprs.empty())
+    return BaseExpr;
+  assert(BaseExpr->getType()->isPointerTy() &&
+         "The first index of a GEP indexes a pointer");
+
   SCEV::NoWrapFlags OffsetWrap = SCEV::FlagAnyWrap;
   if (NW.hasNoUnsignedSignedWrap())
     OffsetWrap = setFlags(OffsetWrap, SCEV::FlagNSW);
   if (NW.hasNoUnsignedWrap())
     OffsetWrap = setFlags(OffsetWrap, SCEV::FlagNUW);
 
-  Type *CurTy = BaseExpr->getType();
   Type *IntIdxTy = getEffectiveSCEVType(BaseExpr->getType());
-  bool FirstIter = true;
+  // Null until the first index has been handled; that index indexes the
+  // pointer operand and hence steps into SrcElementTy.
+  Type *CurTy = nullptr;
   SmallVector<SCEVUse, 4> Offsets;
   for (SCEVUse IndexExpr : IndexExprs) {
     // Compute the (potentially symbolic) offset in bytes for this index.
-    if (StructType *STy = dyn_cast<StructType>(CurTy)) {
+    if (auto *STy = dyn_cast_if_present<StructType>(CurTy)) {
       // For a struct, add the member offset.
-      ConstantInt *Index = cast<SCEVConstant>(IndexExpr)->getValue();
-      unsigned FieldNo = Index->getZExtValue();
-      const SCEV *FieldOffset = getOffsetOfExpr(IntIdxTy, STy, FieldNo);
-      Offsets.push_back(FieldOffset);
+      unsigned FieldNo =
+          cast<SCEVConstant>(IndexExpr)->getAPInt().getZExtValue();
+      Offsets.push_back(getOffsetOfExpr(IntIdxTy, STy, FieldNo));
 
-      // Update CurTy to the type of the field at Index.
-      CurTy = STy->getTypeAtIndex(Index);
-    } else {
-      // Update CurTy to its element type.
-      if (FirstIter) {
-        assert(isa<PointerType>(CurTy) &&
-               "The first index of a GEP indexes a pointer");
-        CurTy = SrcElementTy;
-        FirstIter = false;
-      } else {
-        CurTy = GetElementPtrInst::getTypeAtIndex(CurTy, (uint64_t)0);
-      }
-      // For an array, add the element offset, explicitly scaled.
-      const SCEV *ElementSize = getSizeOfExpr(IntIdxTy, CurTy);
-      // Getelementptr indices are signed.
-      IndexExpr = getTruncateOrSignExtend(IndexExpr, IntIdxTy);
-
-      // Multiply the index by the element size to compute the element offset.
-      const SCEV *LocalOffset = getMulExpr(IndexExpr, ElementSize, OffsetWrap);
-      Offsets.push_back(LocalOffset);
+      // Update CurTy to the type of the field at FieldNo.
+      CurTy = STy->getTypeAtIndex(FieldNo);
+      continue;
     }
-  }
 
-  // Handle degenerate case of GEP without offsets.
-  if (Offsets.empty())
-    return BaseExpr;
+    // Update CurTy to its element type.
+    CurTy = CurTy ? GetElementPtrInst::getTypeAtIndex(CurTy, (uint64_t)0)
+                  : SrcElementTy;
+    // For an array, add the element offset, explicitly scaled: multiply the
+    // index, which is signed, by the element size.
+    Offsets.push_back(getMulExpr(getTruncateOrSignExtend(IndexExpr, IntIdxTy),
+                                 getSizeOfExpr(IntIdxTy, CurTy), OffsetWrap));
+  }
 
   // Add the offsets together, assuming nsw if inbounds.
   const SCEV *Offset = getAddExpr(Offsets, OffsetWrap);
