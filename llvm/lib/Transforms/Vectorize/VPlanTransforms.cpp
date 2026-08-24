@@ -2107,7 +2107,8 @@ static bool simplifyBranchConditionForVFAndUF(VPlan &Plan, ElementCount BestVF,
   VPValue *Offset = nullptr;
   auto m_CanIVInc = m_Add(m_VPValue(), m_Specific(&Plan.getVFxUF()));
   // Check if the branch condition compares the canonical IV increment (for main
-  // loop), or the canonical IV increment plus an offset (for epilog loop).
+  // loop), or the canonical IV increment plus an offset (for epilog loop). The
+  // offset must be defined outside the vector loop region.
   bool MatchedCanIVInc =
       match(Term,
             m_BranchOnCount(
