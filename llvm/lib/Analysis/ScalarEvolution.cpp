@@ -3598,51 +3598,6 @@ const SCEV *ScalarEvolution::getAddRecExpr(SmallVectorImpl<SCEVUse> &Operands,
 
   Flags = StrengthenNoWrapFlags(this, scAddRecExpr, Operands, Flags);
 
-  // Canonicalize nested AddRecs in by nesting them in order of loop depth.
-  if (const SCEVAddRecExpr *NestedAR = dyn_cast<SCEVAddRecExpr>(Operands[0])) {
-    const Loop *NestedLoop = NestedAR->getLoop();
-    if (L->contains(NestedLoop)
-            ? (L->getLoopDepth() < NestedLoop->getLoopDepth())
-            : (!NestedLoop->contains(L) &&
-               DT.dominates(L->getHeader(), NestedLoop->getHeader()))) {
-      SmallVector<SCEVUse, 4> NestedOperands(NestedAR->operands());
-      Operands[0] = NestedAR->getStart();
-      // AddRecs require their operands be loop-invariant with respect to their
-      // loops. Don't perform this transformation if it would break this
-      // requirement.
-      bool AllInvariant = all_of(
-          Operands, [&](const SCEV *Op) { return isLoopInvariant(Op, L); });
-
-      if (AllInvariant) {
-        // Create a recurrence for the outer loop with the same step size.
-        //
-        // The outer recurrence keeps its NW flag but only keeps NUW/NSW if the
-        // inner recurrence has the same property.
-        SCEV::NoWrapFlags OuterFlags =
-          maskFlags(Flags, SCEV::FlagNW | NestedAR->getNoWrapFlags());
-
-        NestedOperands[0] = getAddRecExpr(Operands, L, OuterFlags);
-        AllInvariant = all_of(NestedOperands, [&](const SCEV *Op) {
-          return isLoopInvariant(Op, NestedLoop);
-        });
-
-        if (AllInvariant) {
-          // Ok, both add recurrences are valid after the transformation.
-          //
-          // The inner recurrence keeps its NW flag but only keeps NUW/NSW if
-          // the outer recurrence has the same property.
-          SCEV::NoWrapFlags InnerFlags =
-            maskFlags(NestedAR->getNoWrapFlags(), SCEV::FlagNW | Flags);
-          return getAddRecExpr(NestedOperands, NestedLoop, InnerFlags);
-        }
-      }
-      // Reset Operands to its original state.
-      Operands[0] = NestedAR;
-    }
-  }
-
-  // Okay, it looks like we really DO need an addrec expr.  Check to see if we
-  // already have one, otherwise create a new one.
   return getOrCreateAddRecExpr(Operands, L, Flags);
 }
 
