@@ -231,15 +231,18 @@ struct VPlanTransforms {
                                bool AddBranchWeights);
 
   /// Model the edge from \p BypassVPBB, which wraps an already generated block
-  /// branching to the entry block of \p Plan, to the plan's scalar preheader.
-  /// Executing the plan redirects the branch to the scalar preheader. Used
-  /// during epilogue vectorization to connect the blocks bypassing both vector
-  /// loops, which have been generated for the main vector loop already.
-  static void connectVPBypassBlock(VPlan &Plan, VPIRBasicBlock *BypassVPBB);
+  /// branching to the block \p Plan is entered from, to \p Succ in \p Plan.
+  /// Executing the plan redirects the branch, which must be the first successor
+  /// of \p BypassVPBB's terminator, to \p Succ. Used during epilogue
+  /// vectorization to connect the blocks generated for the main vector loop
+  /// that branch into the epilogue plan.
+  static void connectVPBypassBlock(VPlan &Plan, VPIRBasicBlock *BypassVPBB,
+                                   VPBasicBlock *Succ);
 
   /// Wrap \p BypassBlock in a VPIRBasicBlock and connect it to \p Plan, \see
   /// connectVPBypassBlock.
-  static void connectBypassBlock(VPlan &Plan, BasicBlock *BypassBlock);
+  static void connectBypassBlock(VPlan &Plan, BasicBlock *BypassBlock,
+                                 VPBasicBlock *Succ);
 
   /// Replaces the VPInstructions in \p Plan with corresponding
   /// widen recipes. Returns false if any VPInstructions could not be converted
