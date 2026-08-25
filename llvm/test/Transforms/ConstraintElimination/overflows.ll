@@ -33,3 +33,40 @@ bb:
   ret i1 %icmp
 }
 
+
+; The following function is an input that used to trigger
+; signed-integer-overflow UB *inside* ConstraintElimination's getConstraint
+; (compiler-UB, witnessed by a UBSan build of opt). The overflowing computation
+; is now overflow-guarded and bails out (returning no usable constraint), so the
+; comparison below is not folded. It is kept here as a regression input for that
+; site.
+;
+; getConstraint: the VariablesA coefficient accumulation `R[i] += coeff` used
+; to be unchecked (unlike the VariablesB loop which uses SubOverflow), so two
+; same-variable entries with coefficients 2^62 + 2^62 overflowed INT64_MAX. It
+; is now computed with AddOverflow and bails on overflow.
+define i1 @coeff_accumulate_overflow_ub(i64 %x, i64 %p) {
+; CHECK-LABEL: define i1 @coeff_accumulate_overflow_ub
+; CHECK-SAME: (i64 [[X:%.*]], i64 [[P:%.*]]) {
+; CHECK-NEXT:    [[A:%.*]] = mul nsw i64 [[X]], 4611686018427387904
+; CHECK-NEXT:    [[B:%.*]] = mul nsw i64 [[X]], 4611686018427387904
+; CHECK-NEXT:    [[OP0:%.*]] = add nsw i64 [[A]], [[B]]
+; CHECK-NEXT:    [[C:%.*]] = icmp slt i64 [[OP0]], [[P]]
+; CHECK-NEXT:    br i1 [[C]], label [[T:%.*]], label [[F:%.*]]
+; CHECK:       t:
+; CHECK-NEXT:    ret i1 true
+; CHECK:       f:
+; CHECK-NEXT:    ret i1 false
+;
+  %a = mul nsw i64 %x, 4611686018427387904
+  %b = mul nsw i64 %x, 4611686018427387904
+  %op0 = add nsw i64 %a, %b
+  %c = icmp slt i64 %op0, %p
+  br i1 %c, label %t, label %f
+
+t:
+  ret i1 true
+
+f:
+  ret i1 false
+}
