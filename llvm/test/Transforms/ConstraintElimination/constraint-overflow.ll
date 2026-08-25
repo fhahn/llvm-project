@@ -238,3 +238,32 @@ entry:
   %check = icmp sle i64 %a, %b
   ret i1 %check
 }
+
+; The coefficient of %x in the eq fact is INT64_MIN, which cannot be negated to
+; build the inverted constraint.
+define i1 @eq_fact_with_int64_min_coefficient(i64 %x, i64 %y) {
+; CHECK-LABEL: define i1 @eq_fact_with_int64_min_coefficient(
+; CHECK-SAME: i64 [[X:%.*]], i64 [[Y:%.*]]) {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[SHL:%.*]] = shl nsw i64 [[X]], 62
+; CHECK-NEXT:    [[ADD:%.*]] = add nsw i64 [[SHL]], [[SHL]]
+; CHECK-NEXT:    [[CMP:%.*]] = icmp eq i64 [[Y]], [[ADD]]
+; CHECK-NEXT:    br i1 [[CMP]], label [[THEN:%.*]], label [[ELSE:%.*]]
+; CHECK:       then:
+; CHECK-NEXT:    ret i1 true
+; CHECK:       else:
+; CHECK-NEXT:    ret i1 false
+;
+entry:
+  %shl = shl nsw i64 %x, 62
+  %add = add nsw i64 %shl, %shl
+  %cmp = icmp eq i64 %y, %add
+  br i1 %cmp, label %then, label %else
+
+then:
+  %t = icmp eq i64 %y, %add
+  ret i1 %t
+
+else:
+  ret i1 false
+}

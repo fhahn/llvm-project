@@ -33,3 +33,22 @@ bb:
   ret i1 %icmp
 }
 
+; The coefficients of %x on the left-hand side add up to 2^63, which overflows,
+; so no constraint is built for the assumed condition.
+define void @test_overflow_add_coefficients(i64 %x, i64 %y) {
+; CHECK-LABEL: define void @test_overflow_add_coefficients
+; CHECK-SAME: (i64 [[X:%.*]], i64 [[Y:%.*]]) {
+; CHECK-NEXT:  bb:
+; CHECK-NEXT:    [[SHL:%.*]] = shl nsw i64 [[X]], 62
+; CHECK-NEXT:    [[ADD:%.*]] = add nsw i64 [[SHL]], [[SHL]]
+; CHECK-NEXT:    [[ICMP:%.*]] = icmp slt i64 [[ADD]], [[Y]]
+; CHECK-NEXT:    call void @llvm.assume(i1 [[ICMP]])
+; CHECK-NEXT:    ret void
+;
+bb:
+  %shl = shl nsw i64 %x, 62
+  %add = add nsw i64 %shl, %shl
+  %icmp = icmp slt i64 %add, %y
+  call void @llvm.assume(i1 %icmp)
+  ret void
+}
