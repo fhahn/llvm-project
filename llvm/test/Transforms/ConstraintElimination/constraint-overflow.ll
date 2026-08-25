@@ -105,6 +105,9 @@ entry:
   ret i1 %c
 }
 
+; An equality fact with normal (in-range) coefficients still adds the inverted
+; constraint, so 'a == b' implies both 'a uge b' and 'a ule b' and both fold to
+; true. This locks in the inverted-constraint behavior for the common case.
 define i1 @eq_inverted_normal_coeff(i64 %a, i64 %b) {
 ; CHECK-LABEL: define i1 @eq_inverted_normal_coeff(
 ; CHECK-SAME: i64 [[A:%.*]], i64 [[B:%.*]]) {
@@ -214,4 +217,39 @@ entry:
   call void @llvm.assume(i1 %a.nonpos)
   %r = icmp slt i64 %x, 0
   ret i1 %r
+}
+
+; A coefficient of exactly INT64_MIN can survive getConstraint's SubOverflow
+; accumulation: -2^62 - 2^62 == INT64_MIN does not overflow. When addFactImpl
+; negates the coefficients to add the inverted constraint for the equality
+; fact, 'INT64_MIN * -1' would be signed-overflow UB. The inverted constraint
+; is conservatively skipped in that case; just make sure we don't crash or
+; invoke UB.
+define i1 @eq_negate_overflow_int64min_coeff(i64 %y, i64 %x) {
+; CHECK-LABEL: define i1 @eq_negate_overflow_int64min_coeff(
+; CHECK-SAME: i64 [[Y:%.*]], i64 [[X:%.*]]) {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[S1:%.*]] = shl nsw i64 [[X]], 62
+; CHECK-NEXT:    [[S2:%.*]] = shl nsw i64 [[X]], 62
+; CHECK-NEXT:    [[SUM:%.*]] = add nsw i64 [[S1]], [[S2]]
+; CHECK-NEXT:    [[EQ:%.*]] = icmp eq i64 [[Y]], [[SUM]]
+; CHECK-NEXT:    br i1 [[EQ]], label [[T:%.*]], label [[E:%.*]]
+; CHECK:       t:
+; CHECK-NEXT:    ret i1 true
+; CHECK:       e:
+; CHECK-NEXT:    ret i1 false
+;
+entry:
+  %s1 = shl nsw i64 %x, 62
+  %s2 = shl nsw i64 %x, 62
+  %sum = add nsw i64 %s1, %s2
+  %eq = icmp eq i64 %y, %sum
+  br i1 %eq, label %t, label %e
+
+t:
+  %c = icmp eq i64 %y, %sum
+  ret i1 %c
+
+e:
+  ret i1 false
 }

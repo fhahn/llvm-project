@@ -820,8 +820,11 @@ ConstraintInfo::getConstraint(CmpInst::Predicate Pred, Value *Op0, Value *Op1,
       I = R.insert(I, Entry(0, Idx));
     return I->Coefficient;
   };
-  for (const auto &KV : VariablesA)
-    GetCoefficient(GetOrAddIndex(KV.Variable)) += KV.Coefficient;
+  for (const auto &KV : VariablesA) {
+    auto &Coeff = GetCoefficient(GetOrAddIndex(KV.Variable));
+    if (AddOverflow(Coeff, KV.Coefficient, Coeff))
+      return {};
+  }
 
   for (const auto &KV : VariablesB) {
     auto &Coeff = GetCoefficient(GetOrAddIndex(KV.Variable));
