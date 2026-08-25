@@ -467,12 +467,14 @@ struct VPlanTransforms {
 
   /// Materialize vector trip count computations to a set of VPInstructions.
   /// \p Step is used as the step value for the trip count computation.
-  /// \p MaxRuntimeStep is the maximum possible runtime value of Step, used to
-  /// prove the trip count is divisible by the step for scalable VFs.
+  /// \p MaxRuntimeStep is used to prove the trip count is divisible by the
+  /// step. It must be a multiple of every value \p Step can take at execution
+  /// time, which is stronger than being an upper bound for it, so callers that
+  /// replace \p Step with an unrelated value afterwards must leave it unset.
   static void materializeVectorTripCount(
       VPlan &Plan, VPBasicBlock *VectorPHVPBB, bool TailByMasking,
       bool RequiresScalarEpilogue, VPValue *Step,
-      std::optional<uint64_t> MaxRuntimeStep = std::nullopt);
+      std::optional<APInt> MaxRuntimeStep = std::nullopt);
 
   /// Materialize the backedge-taken count to be computed explicitly using
   /// VPInstructions.

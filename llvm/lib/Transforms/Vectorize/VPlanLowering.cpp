@@ -879,7 +879,7 @@ void VPlanTransforms::materializePacksAndUnpacks(VPlan &Plan) {
 void VPlanTransforms::materializeVectorTripCount(
     VPlan &Plan, VPBasicBlock *VectorPHVPBB, bool TailByMasking,
     bool RequiresScalarEpilogue, VPValue *Step,
-    std::optional<uint64_t> MaxRuntimeStep) {
+    std::optional<APInt> MaxRuntimeStep) {
   VPSymbolicValue &VectorTC = Plan.getVectorTripCount();
   // There's nothing to do if there are no users of the vector trip count or its
   // IR value has already been set.
@@ -897,14 +897,18 @@ void VPlanTransforms::materializeVectorTripCount(
   }
   VPBuilder Builder(VectorPHVPBB, InsertPt);
 
-  // For scalable steps, if TC is a constant and is divisible by the maximum
-  // possible runtime step, then TC % Step == 0 for all valid vscale values
-  // and the vector trip count equals TC directly.
+  // If TC is a constant and is divisible by MaxRuntimeStep, then TC % Step == 0
+  // for every value Step can take at execution time, and the vector trip count
+  // equals TC directly. For a fixed Step this is exact; for a scalable Step it
+  // relies on vscale being a power of two, so that every runtime value of
+  // vscale divides its maximum.
   const APInt *TCVal;
-  if (!RequiresScalarEpilogue && match(TC, m_APInt(TCVal)) && MaxRuntimeStep &&
-      TCVal->urem(*MaxRuntimeStep) == 0) {
-    VectorTC.replaceAllUsesWith(TC);
-    return;
+  if (!RequiresScalarEpilogue && match(TC, m_APInt(TCVal)) && MaxRuntimeStep) {
+    unsigned BW = std::max(TCVal->getBitWidth(), MaxRuntimeStep->getBitWidth());
+    if (TCVal->zextOrTrunc(BW).urem(MaxRuntimeStep->zextOrTrunc(BW)).isZero()) {
+      VectorTC.replaceAllUsesWith(TC);
+      return;
+    }
   }
 
   // If the tail is to be folded by masking, round the number of iterations N
