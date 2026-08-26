@@ -72,8 +72,7 @@ define i1 @latch_counted_phi_not_removable(ptr %p, i64 %n, i64 %lim) {
 ; CHECK:       [[LOOP_HEADER]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
 ; CHECK-NEXT:    [[OFF:%.*]] = shl nuw nsw i64 [[IV]], 2
-; CHECK-NEXT:    [[RC:%.*]] = icmp ult i64 [[OFF]], [[LIM]]
-; CHECK-NEXT:    br i1 [[RC]], label %[[LOOP_LATCH]], label %[[EXIT_1]]
+; CHECK-NEXT:    br i1 true, label %[[LOOP_LATCH]], label %[[EXIT_1]]
 ; CHECK:       [[LOOP_LATCH]]:
 ; CHECK-NEXT:    [[GEP:%.*]] = getelementptr i8, ptr [[P]], i64 [[OFF]]
 ; CHECK-NEXT:    store i8 0, ptr [[GEP]], align 1
@@ -331,4 +330,406 @@ exit.0:
 
 exit.1:
   ret i1 false
+}
+
+declare void @use(i1)
+
+; The latch exit test compares the phi itself, not the post-increment, so the
+; header is entered with %iv between the start value and %b, inclusive.
+define void @latch_phi_negative_step(i64 %n, i64 %b) {
+; CHECK-LABEL: define void @latch_phi_negative_step(
+; CHECK-SAME: i64 [[N:%.*]], i64 [[B:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[PRE:%.*]] = icmp ule i64 [[B]], [[N]]
+; CHECK-NEXT:    br i1 [[PRE]], label %[[LOOP_HEADER:.*]], label %[[EXIT:.*]]
+; CHECK:       [[LOOP_HEADER]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[N]], %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
+; CHECK-NEXT:    call void @use(i1 true)
+; CHECK-NEXT:    call void @use(i1 true)
+; CHECK-NEXT:    br label %[[LOOP_LATCH]]
+; CHECK:       [[LOOP_LATCH]]:
+; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], -1
+; CHECK-NEXT:    [[DONE:%.*]] = icmp eq i64 [[IV]], [[B]]
+; CHECK-NEXT:    br i1 [[DONE]], label %[[EXIT]], label %[[LOOP_HEADER]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  %pre = icmp ule i64 %b, %n
+  br i1 %pre, label %loop.header, label %exit
+
+loop.header:
+  %iv = phi i64 [ %n, %entry ], [ %iv.next, %loop.latch ]
+  %upper = icmp ule i64 %iv, %n
+  call void @use(i1 %upper)
+  %lower = icmp uge i64 %iv, %b
+  call void @use(i1 %lower)
+  br label %loop.latch
+
+loop.latch:
+  %iv.next = add i64 %iv, -1
+  %done = icmp eq i64 %iv, %b
+  br i1 %done, label %exit, label %loop.header
+
+exit:
+  ret void
+}
+
+; The lower bound is not strict: the final header entry has %iv == %b.
+define void @latch_phi_negative_step_no_strict_lower_bound(i64 %n, i64 %b) {
+; CHECK-LABEL: define void @latch_phi_negative_step_no_strict_lower_bound(
+; CHECK-SAME: i64 [[N:%.*]], i64 [[B:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[PRE:%.*]] = icmp ule i64 [[B]], [[N]]
+; CHECK-NEXT:    br i1 [[PRE]], label %[[LOOP_HEADER:.*]], label %[[EXIT:.*]]
+; CHECK:       [[LOOP_HEADER]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[N]], %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
+; CHECK-NEXT:    [[LOWER:%.*]] = icmp ugt i64 [[IV]], [[B]]
+; CHECK-NEXT:    call void @use(i1 [[LOWER]])
+; CHECK-NEXT:    br label %[[LOOP_LATCH]]
+; CHECK:       [[LOOP_LATCH]]:
+; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], -1
+; CHECK-NEXT:    [[DONE:%.*]] = icmp eq i64 [[IV]], [[B]]
+; CHECK-NEXT:    br i1 [[DONE]], label %[[EXIT]], label %[[LOOP_HEADER]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  %pre = icmp ule i64 %b, %n
+  br i1 %pre, label %loop.header, label %exit
+
+loop.header:
+  %iv = phi i64 [ %n, %entry ], [ %iv.next, %loop.latch ]
+  %lower = icmp ugt i64 %iv, %b
+  call void @use(i1 %lower)
+  br label %loop.latch
+
+loop.latch:
+  %iv.next = add i64 %iv, -1
+  %done = icmp eq i64 %iv, %b
+  br i1 %done, label %exit, label %loop.header
+
+exit:
+  ret void
+}
+
+; Same for the signed system.
+define void @latch_phi_negative_step_signed(i64 %n, i64 %b) {
+; CHECK-LABEL: define void @latch_phi_negative_step_signed(
+; CHECK-SAME: i64 [[N:%.*]], i64 [[B:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[PRE:%.*]] = icmp sle i64 [[B]], [[N]]
+; CHECK-NEXT:    br i1 [[PRE]], label %[[LOOP_HEADER:.*]], label %[[EXIT:.*]]
+; CHECK:       [[LOOP_HEADER]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[N]], %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
+; CHECK-NEXT:    call void @use(i1 true)
+; CHECK-NEXT:    call void @use(i1 true)
+; CHECK-NEXT:    [[STRICT:%.*]] = icmp sgt i64 [[IV]], [[B]]
+; CHECK-NEXT:    call void @use(i1 [[STRICT]])
+; CHECK-NEXT:    br label %[[LOOP_LATCH]]
+; CHECK:       [[LOOP_LATCH]]:
+; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], -1
+; CHECK-NEXT:    [[DONE:%.*]] = icmp eq i64 [[IV]], [[B]]
+; CHECK-NEXT:    br i1 [[DONE]], label %[[EXIT]], label %[[LOOP_HEADER]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  %pre = icmp sle i64 %b, %n
+  br i1 %pre, label %loop.header, label %exit
+
+loop.header:
+  %iv = phi i64 [ %n, %entry ], [ %iv.next, %loop.latch ]
+  %upper = icmp sle i64 %iv, %n
+  call void @use(i1 %upper)
+  %lower = icmp sge i64 %iv, %b
+  call void @use(i1 %lower)
+  %strict = icmp sgt i64 %iv, %b
+  call void @use(i1 %strict)
+  br label %loop.latch
+
+loop.latch:
+  %iv.next = add i64 %iv, -1
+  %done = icmp eq i64 %iv, %b
+  br i1 %done, label %exit, label %loop.header
+
+exit:
+  ret void
+}
+
+; Negative: without %b <=u %n the induction may wrap before reaching %b.
+define void @latch_phi_negative_step_no_precondition(i64 %n, i64 %b) {
+; CHECK-LABEL: define void @latch_phi_negative_step_no_precondition(
+; CHECK-SAME: i64 [[N:%.*]], i64 [[B:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
+; CHECK:       [[LOOP_HEADER]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[N]], %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
+; CHECK-NEXT:    [[UPPER:%.*]] = icmp ule i64 [[IV]], [[N]]
+; CHECK-NEXT:    call void @use(i1 [[UPPER]])
+; CHECK-NEXT:    br label %[[LOOP_LATCH]]
+; CHECK:       [[LOOP_LATCH]]:
+; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], -1
+; CHECK-NEXT:    [[DONE:%.*]] = icmp eq i64 [[IV]], [[B]]
+; CHECK-NEXT:    br i1 [[DONE]], label %[[EXIT:.*]], label %[[LOOP_HEADER]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %loop.header
+
+loop.header:
+  %iv = phi i64 [ %n, %entry ], [ %iv.next, %loop.latch ]
+  %upper = icmp ule i64 %iv, %n
+  call void @use(i1 %upper)
+  br label %loop.latch
+
+loop.latch:
+  %iv.next = add i64 %iv, -1
+  %done = icmp eq i64 %iv, %b
+  br i1 %done, label %exit, label %loop.header
+
+exit:
+  ret void
+}
+
+; Negative: a step of -2 is not supported.
+define void @latch_phi_negative_step_two(i64 %n, i64 %b) {
+; CHECK-LABEL: define void @latch_phi_negative_step_two(
+; CHECK-SAME: i64 [[N:%.*]], i64 [[B:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[PRE:%.*]] = icmp ule i64 [[B]], [[N]]
+; CHECK-NEXT:    br i1 [[PRE]], label %[[LOOP_HEADER:.*]], label %[[EXIT:.*]]
+; CHECK:       [[LOOP_HEADER]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[N]], %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
+; CHECK-NEXT:    [[UPPER:%.*]] = icmp ule i64 [[IV]], [[N]]
+; CHECK-NEXT:    call void @use(i1 [[UPPER]])
+; CHECK-NEXT:    br label %[[LOOP_LATCH]]
+; CHECK:       [[LOOP_LATCH]]:
+; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], -2
+; CHECK-NEXT:    [[DONE:%.*]] = icmp eq i64 [[IV]], [[B]]
+; CHECK-NEXT:    br i1 [[DONE]], label %[[EXIT]], label %[[LOOP_HEADER]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  %pre = icmp ule i64 %b, %n
+  br i1 %pre, label %loop.header, label %exit
+
+loop.header:
+  %iv = phi i64 [ %n, %entry ], [ %iv.next, %loop.latch ]
+  %upper = icmp ule i64 %iv, %n
+  call void @use(i1 %upper)
+  br label %loop.latch
+
+loop.latch:
+  %iv.next = add i64 %iv, -2
+  %done = icmp eq i64 %iv, %b
+  br i1 %done, label %exit, label %loop.header
+
+exit:
+  ret void
+}
+
+; Increasing induction, latch exit test on the phi: %n <= %iv <= %b.
+define void @latch_phi_positive_step(i64 %n, i64 %b) {
+; CHECK-LABEL: define void @latch_phi_positive_step(
+; CHECK-SAME: i64 [[N:%.*]], i64 [[B:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[PRE:%.*]] = icmp ule i64 [[N]], [[B]]
+; CHECK-NEXT:    br i1 [[PRE]], label %[[LOOP_HEADER:.*]], label %[[EXIT:.*]]
+; CHECK:       [[LOOP_HEADER]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[N]], %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
+; CHECK-NEXT:    call void @use(i1 true)
+; CHECK-NEXT:    call void @use(i1 true)
+; CHECK-NEXT:    br label %[[LOOP_LATCH]]
+; CHECK:       [[LOOP_LATCH]]:
+; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 1
+; CHECK-NEXT:    [[DONE:%.*]] = icmp eq i64 [[IV]], [[B]]
+; CHECK-NEXT:    br i1 [[DONE]], label %[[EXIT]], label %[[LOOP_HEADER]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  %pre = icmp ule i64 %n, %b
+  br i1 %pre, label %loop.header, label %exit
+
+loop.header:
+  %iv = phi i64 [ %n, %entry ], [ %iv.next, %loop.latch ]
+  %lower = icmp uge i64 %iv, %n
+  call void @use(i1 %lower)
+  %upper = icmp ule i64 %iv, %b
+  call void @use(i1 %upper)
+  br label %loop.latch
+
+loop.latch:
+  %iv.next = add i64 %iv, 1
+  %done = icmp eq i64 %iv, %b
+  br i1 %done, label %exit, label %loop.header
+
+exit:
+  ret void
+}
+
+; The upper bound is not strict: the final header entry has %iv == %b.
+define void @latch_phi_positive_step_no_strict_upper_bound(i64 %n, i64 %b) {
+; CHECK-LABEL: define void @latch_phi_positive_step_no_strict_upper_bound(
+; CHECK-SAME: i64 [[N:%.*]], i64 [[B:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[PRE:%.*]] = icmp ule i64 [[N]], [[B]]
+; CHECK-NEXT:    br i1 [[PRE]], label %[[LOOP_HEADER:.*]], label %[[EXIT:.*]]
+; CHECK:       [[LOOP_HEADER]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[N]], %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
+; CHECK-NEXT:    [[UPPER:%.*]] = icmp ult i64 [[IV]], [[B]]
+; CHECK-NEXT:    call void @use(i1 [[UPPER]])
+; CHECK-NEXT:    br label %[[LOOP_LATCH]]
+; CHECK:       [[LOOP_LATCH]]:
+; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 1
+; CHECK-NEXT:    [[DONE:%.*]] = icmp eq i64 [[IV]], [[B]]
+; CHECK-NEXT:    br i1 [[DONE]], label %[[EXIT]], label %[[LOOP_HEADER]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  %pre = icmp ule i64 %n, %b
+  br i1 %pre, label %loop.header, label %exit
+
+loop.header:
+  %iv = phi i64 [ %n, %entry ], [ %iv.next, %loop.latch ]
+  %upper = icmp ult i64 %iv, %b
+  call void @use(i1 %upper)
+  br label %loop.latch
+
+loop.latch:
+  %iv.next = add i64 %iv, 1
+  %done = icmp eq i64 %iv, %b
+  br i1 %done, label %exit, label %loop.header
+
+exit:
+  ret void
+}
+
+; Same for the signed system.
+define void @latch_phi_positive_step_signed(i64 %n, i64 %b) {
+; CHECK-LABEL: define void @latch_phi_positive_step_signed(
+; CHECK-SAME: i64 [[N:%.*]], i64 [[B:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[PRE:%.*]] = icmp sle i64 [[N]], [[B]]
+; CHECK-NEXT:    br i1 [[PRE]], label %[[LOOP_HEADER:.*]], label %[[EXIT:.*]]
+; CHECK:       [[LOOP_HEADER]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[N]], %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
+; CHECK-NEXT:    call void @use(i1 true)
+; CHECK-NEXT:    call void @use(i1 true)
+; CHECK-NEXT:    [[STRICT:%.*]] = icmp slt i64 [[IV]], [[B]]
+; CHECK-NEXT:    call void @use(i1 [[STRICT]])
+; CHECK-NEXT:    br label %[[LOOP_LATCH]]
+; CHECK:       [[LOOP_LATCH]]:
+; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 1
+; CHECK-NEXT:    [[DONE:%.*]] = icmp eq i64 [[IV]], [[B]]
+; CHECK-NEXT:    br i1 [[DONE]], label %[[EXIT]], label %[[LOOP_HEADER]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  %pre = icmp sle i64 %n, %b
+  br i1 %pre, label %loop.header, label %exit
+
+loop.header:
+  %iv = phi i64 [ %n, %entry ], [ %iv.next, %loop.latch ]
+  %lower = icmp sge i64 %iv, %n
+  call void @use(i1 %lower)
+  %upper = icmp sle i64 %iv, %b
+  call void @use(i1 %upper)
+  %strict = icmp slt i64 %iv, %b
+  call void @use(i1 %strict)
+  br label %loop.latch
+
+loop.latch:
+  %iv.next = add i64 %iv, 1
+  %done = icmp eq i64 %iv, %b
+  br i1 %done, label %exit, label %loop.header
+
+exit:
+  ret void
+}
+
+; A step of 2 needs %b - %n to be a multiple of the step, which is not known
+; here, so the induction may step over %b and wrap.
+define void @latch_phi_positive_step_two_not_multiple(i64 %n, i64 %b) {
+; CHECK-LABEL: define void @latch_phi_positive_step_two_not_multiple(
+; CHECK-SAME: i64 [[N:%.*]], i64 [[B:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[PRE:%.*]] = icmp ule i64 [[N]], [[B]]
+; CHECK-NEXT:    br i1 [[PRE]], label %[[LOOP_HEADER:.*]], label %[[EXIT:.*]]
+; CHECK:       [[LOOP_HEADER]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[N]], %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
+; CHECK-NEXT:    [[UPPER:%.*]] = icmp ule i64 [[IV]], [[B]]
+; CHECK-NEXT:    call void @use(i1 [[UPPER]])
+; CHECK-NEXT:    br label %[[LOOP_LATCH]]
+; CHECK:       [[LOOP_LATCH]]:
+; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 2
+; CHECK-NEXT:    [[DONE:%.*]] = icmp eq i64 [[IV]], [[B]]
+; CHECK-NEXT:    br i1 [[DONE]], label %[[EXIT]], label %[[LOOP_HEADER]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  %pre = icmp ule i64 %n, %b
+  br i1 %pre, label %loop.header, label %exit
+
+loop.header:
+  %iv = phi i64 [ %n, %entry ], [ %iv.next, %loop.latch ]
+  %upper = icmp ule i64 %iv, %b
+  call void @use(i1 %upper)
+  br label %loop.latch
+
+loop.latch:
+  %iv.next = add i64 %iv, 2
+  %done = icmp eq i64 %iv, %b
+  br i1 %done, label %exit, label %loop.header
+
+exit:
+  ret void
+}
+
+; Step of 2 with both the start value and the bound even, so %b - %n is a
+; multiple of the step.
+define void @latch_phi_positive_step_two_multiple(i64 %n, i64 %b) {
+; CHECK-LABEL: define void @latch_phi_positive_step_two_multiple(
+; CHECK-SAME: i64 [[N:%.*]], i64 [[B:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[N2:%.*]] = shl i64 [[N]], 1
+; CHECK-NEXT:    [[B2:%.*]] = shl i64 [[B]], 1
+; CHECK-NEXT:    [[PRE:%.*]] = icmp ule i64 [[N2]], [[B2]]
+; CHECK-NEXT:    br i1 [[PRE]], label %[[LOOP_HEADER:.*]], label %[[EXIT:.*]]
+; CHECK:       [[LOOP_HEADER]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[N2]], %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
+; CHECK-NEXT:    call void @use(i1 true)
+; CHECK-NEXT:    br label %[[LOOP_LATCH]]
+; CHECK:       [[LOOP_LATCH]]:
+; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 2
+; CHECK-NEXT:    [[DONE:%.*]] = icmp eq i64 [[IV]], [[B2]]
+; CHECK-NEXT:    br i1 [[DONE]], label %[[EXIT]], label %[[LOOP_HEADER]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  %n2 = shl i64 %n, 1
+  %b2 = shl i64 %b, 1
+  %pre = icmp ule i64 %n2, %b2
+  br i1 %pre, label %loop.header, label %exit
+
+loop.header:
+  %iv = phi i64 [ %n2, %entry ], [ %iv.next, %loop.latch ]
+  %upper = icmp ule i64 %iv, %b2
+  call void @use(i1 %upper)
+  br label %loop.latch
+
+loop.latch:
+  %iv.next = add i64 %iv, 2
+  %done = icmp eq i64 %iv, %b2
+  br i1 %done, label %exit, label %loop.header
+
+exit:
+  ret void
 }

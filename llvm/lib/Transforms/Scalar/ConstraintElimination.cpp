@@ -1106,8 +1106,12 @@ void State::addInfoForInductions(BasicBlock &BB) {
   // header, which also holds for the next loop iteration. This would no longer
   // be correct if the post-inc handling would inject a more precise PN + Step <
   // B constraint instead.
-  if (&BB == Latch && !IncStep)
-    return;
+  //
+  // Latch conditions comparing the phi itself need no such carrying over: the
+  // facts derived below bound the phi by StartValue and B in every iteration,
+  // with a non-strict bound on B, as the header is also entered with PN == B in
+  // the final iteration.
+  bool IsLatchPhiCmp = &BB == Latch && !IncStep;
 
   BasicBlock *InLoopSucc = nullptr;
   if (Pred == CmpInst::ICMP_NE)
@@ -1171,11 +1175,17 @@ void State::addInfoForInductions(BasicBlock &BB) {
     if (!(Info.Decreasing && Info.Signed))
       WorkList.push_back(FactOrCheck::getConditionFact(
           DTN, CmpInst::ICMP_SGE, StartValue, PN, BBeforeStartSigned));
-    // Add PN > B, which holds as the loop exits when reaching B.
-    WorkList.push_back(FactOrCheck::getConditionFact(DTN, CmpInst::ICMP_UGT, PN,
-                                                     B, BBeforeStartUnsigned));
-    WorkList.push_back(FactOrCheck::getConditionFact(DTN, CmpInst::ICMP_SGT, PN,
-                                                     B, BBeforeStartSigned));
+    // Add PN > B, which holds as the loop exits when reaching B. For a latch
+    // condition comparing the phi, the successor is the header of the next
+    // iteration, which is also entered with PN == B in the final iteration, so
+    // only PN >= B holds there.
+    CmpInst::Predicate UBoundOnB =
+        IsLatchPhiCmp ? CmpInst::ICMP_UGE : CmpInst::ICMP_UGT;
+    WorkList.push_back(FactOrCheck::getConditionFact(
+        DTN, UBoundOnB, PN, B, BBeforeStartUnsigned));
+    WorkList.push_back(FactOrCheck::getConditionFact(
+        DTN, ICmpInst::getSignedPredicate(UBoundOnB), PN, B,
+        BBeforeStartSigned));
     return;
   }
 
@@ -1221,15 +1231,22 @@ void State::addInfoForInductions(BasicBlock &BB) {
     WorkList.push_back(FactOrCheck::getConditionFact(
         DTN, CmpInst::ICMP_SGE, PN, StartValue, StartBeforeBoundSLE));
 
+  // PN < B, as the loop exits when the compared value reaches B. For a latch
+  // condition comparing the phi, the successor is the header of the next
+  // iteration, which is also entered with PN == B in the final iteration, so
+  // only PN <= B holds there.
+  CmpInst::Predicate UBoundOnB =
+      IsLatchPhiCmp ? CmpInst::ICMP_ULE : CmpInst::ICMP_ULT;
   if (LowerBoundNSW)
-    WorkList.push_back(FactOrCheck::getConditionFact(DTN, CmpInst::ICMP_SLT, PN,
-                                                     B, StartBeforeBoundSLE));
+    WorkList.push_back(FactOrCheck::getConditionFact(
+        DTN, ICmpInst::getSignedPredicate(UBoundOnB), PN, B,
+        StartBeforeBoundSLE));
 
   if (!LowerBoundNUW)
     return;
 
-  WorkList.push_back(FactOrCheck::getConditionFact(DTN, CmpInst::ICMP_ULT, PN,
-                                                   B, StartBeforeBoundULE));
+  WorkList.push_back(FactOrCheck::getConditionFact(DTN, UBoundOnB, PN, B,
+                                                   StartBeforeBoundULE));
 
   // Try to add condition from the header or latch to the dedicated exit
   // blocks. When exiting either with EQ or NE, we know that the induction value
