@@ -1425,8 +1425,8 @@ void State::addInfoFor(BasicBlock &BB) {
     // Add facts from unsigned division, remainder and logical shift right, and
     // from signed remainder.
     //   urem x, n: result < n  and  result <= x
-    //   udiv x, n: result <= x
-    //   lshr x, n: result <= x
+    //   udiv x, n: result <= x  and  result <= UMAX / n,  if n is constant
+    //   lshr x, n: result <= x  and  result <= UMAX >> n, if n is constant
     //   srem x, n: result >= 0 and result <= x, if x >= 0
     //              result < n,                  if n > 0
     if (auto *BO = dyn_cast<BinaryOperator>(&I)) {
@@ -2320,21 +2320,39 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
       }
 
       if (auto *BO = dyn_cast<BinaryOperator>(CB.Inst)) {
+        Value *Op0 = BO->getOperand(0), *Op1 = BO->getOperand(1);
+        // For a constant Op1, the result is also bounded by the largest value
+        // the operation can produce. Unlike result <= Op0, this is an absolute
+        // bound, which later can be combined with relational facts about the
+        // result.
+        auto AddAbsoluteUpperBound = [&](const APInt &Max) {
+          AddFact(CmpInst::ICMP_ULE, BO, ConstantInt::get(BO->getType(), Max));
+        };
         if (BO->getOpcode() == Instruction::URem) {
           // urem x, n: result < n (remainder is always less than divisor)
-          AddFact(CmpInst::ICMP_ULT, BO, BO->getOperand(1));
+          AddFact(CmpInst::ICMP_ULT, BO, Op1);
           // urem x, n: result <= x (remainder is at most the dividend)
-          AddFact(CmpInst::ICMP_ULE, BO, BO->getOperand(0));
+          AddFact(CmpInst::ICMP_ULE, BO, Op0);
           continue;
         }
         if (BO->getOpcode() == Instruction::UDiv) {
           // udiv x, n: result <= x (quotient is at most the dividend)
-          AddFact(CmpInst::ICMP_ULE, BO, BO->getOperand(0));
+          AddFact(CmpInst::ICMP_ULE, BO, Op0);
+          // udiv x, n: result <= UMAX / n, if n is a non-zero constant
+          if (auto *C = dyn_cast<ConstantInt>(Op1))
+            if (!C->isZero())
+              AddAbsoluteUpperBound(
+                  APInt::getMaxValue(C->getBitWidth()).udiv(C->getValue()));
           continue;
         }
         if (BO->getOpcode() == Instruction::LShr) {
           // lshr x, n: result <= x (right shift cannot increase the value)
-          AddFact(CmpInst::ICMP_ULE, BO, BO->getOperand(0));
+          AddFact(CmpInst::ICMP_ULE, BO, Op0);
+          // lshr x, n: result <= UMAX >> n, if n is an in-range constant
+          if (auto *C = dyn_cast<ConstantInt>(Op1))
+            if (C->getValue().ult(C->getBitWidth()))
+              AddAbsoluteUpperBound(
+                  APInt::getMaxValue(C->getBitWidth()).lshr(C->getValue()));
           continue;
         }
         if (BO->getOpcode() == Instruction::SRem) {

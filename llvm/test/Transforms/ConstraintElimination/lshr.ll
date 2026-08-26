@@ -85,3 +85,83 @@ guarded:
 out:
   ret i1 false
 }
+
+; The shifted-in zero bits give an absolute upper bound, not just result <= x.
+define i1 @lshr_absolute_upper_bound(i64 %x, i64 %n) {
+; CHECK-LABEL: define i1 @lshr_absolute_upper_bound(
+; CHECK-SAME: i64 [[X:%.*]], i64 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[INRANGE:%.*]] = icmp ult i64 [[X]], [[N]]
+; CHECK-NEXT:    br i1 [[INRANGE]], label %[[GUARDED:.*]], label %[[OUT:.*]]
+; CHECK:       [[GUARDED]]:
+; CHECK-NEXT:    [[H:%.*]] = lshr i64 [[X]], 4
+; CHECK-NEXT:    ret i1 true
+; CHECK:       [[OUT]]:
+; CHECK-NEXT:    ret i1 false
+;
+entry:
+  %inrange = icmp ult i64 %x, %n
+  br i1 %inrange, label %guarded, label %out
+
+guarded:
+  %h = lshr i64 %x, 4
+  %chk = icmp ult i64 %h, 1152921504606846976
+  ret i1 %chk
+
+out:
+  ret i1 false
+}
+
+; One less than the bound above, so the check must be preserved.
+define i1 @lshr_absolute_upper_bound_too_tight(i64 %x, i64 %n) {
+; CHECK-LABEL: define i1 @lshr_absolute_upper_bound_too_tight(
+; CHECK-SAME: i64 [[X:%.*]], i64 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[INRANGE:%.*]] = icmp ult i64 [[X]], [[N]]
+; CHECK-NEXT:    br i1 [[INRANGE]], label %[[GUARDED:.*]], label %[[OUT:.*]]
+; CHECK:       [[GUARDED]]:
+; CHECK-NEXT:    [[H:%.*]] = lshr i64 [[X]], 4
+; CHECK-NEXT:    [[CHK:%.*]] = icmp ult i64 [[H]], 1152921504606846975
+; CHECK-NEXT:    ret i1 [[CHK]]
+; CHECK:       [[OUT]]:
+; CHECK-NEXT:    ret i1 false
+;
+entry:
+  %inrange = icmp ult i64 %x, %n
+  br i1 %inrange, label %guarded, label %out
+
+guarded:
+  %h = lshr i64 %x, 4
+  %chk = icmp ult i64 %h, 1152921504606846975
+  ret i1 %chk
+
+out:
+  ret i1 false
+}
+
+; Negative: no absolute bound is known for a variable shift amount.
+define i1 @lshr_no_absolute_upper_bound_variable_shift(i64 %x, i64 %n, i64 %s) {
+; CHECK-LABEL: define i1 @lshr_no_absolute_upper_bound_variable_shift(
+; CHECK-SAME: i64 [[X:%.*]], i64 [[N:%.*]], i64 [[S:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[INRANGE:%.*]] = icmp ult i64 [[X]], [[N]]
+; CHECK-NEXT:    br i1 [[INRANGE]], label %[[GUARDED:.*]], label %[[OUT:.*]]
+; CHECK:       [[GUARDED]]:
+; CHECK-NEXT:    [[H:%.*]] = lshr i64 [[X]], [[S]]
+; CHECK-NEXT:    [[CHK:%.*]] = icmp ult i64 [[H]], 1152921504606846976
+; CHECK-NEXT:    ret i1 [[CHK]]
+; CHECK:       [[OUT]]:
+; CHECK-NEXT:    ret i1 false
+;
+entry:
+  %inrange = icmp ult i64 %x, %n
+  br i1 %inrange, label %guarded, label %out
+
+guarded:
+  %h = lshr i64 %x, %s
+  %chk = icmp ult i64 %h, 1152921504606846976
+  ret i1 %chk
+
+out:
+  ret i1 false
+}
