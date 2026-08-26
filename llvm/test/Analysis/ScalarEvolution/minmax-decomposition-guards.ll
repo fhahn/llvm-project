@@ -578,6 +578,36 @@ exit:
   ret void
 }
 
+; any_of min on the LHS, signed. The bounding operand is %x1, reached via
+; (%x1 + 1 sle %bound), so the syntactic "min(A, ...) <= A" check in
+; IsMinMaxConsistingOf cannot match and the smin is only folded away by the
+; signed form of this rule.
+define void @smin_start_offset_guard(i64 %x0, i64 %x1, i64 %bound) {
+; CHECK-LABEL: 'smin_start_offset_guard'
+; CHECK-NEXT:  Determining loop execution counts for: @smin_start_offset_guard
+; CHECK-NEXT:  Loop %loop: backedge-taken count is ((-1 * (%x0 smin %x1)) + %bound)
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((-1 * (%x0 smin %x1)) + %bound)
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %x1.p1 = add nsw i64 %x1, 1
+  %pre = icmp sle i64 %x1.p1, %bound
+  call void @llvm.assume(i1 %pre)
+  %start = call i64 @llvm.smin.i64(i64 %x0, i64 %x1)
+  br label %loop
+
+loop:
+  %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop ]
+  call void @use(i64 %iv)
+  %iv.next = add nsw i64 %iv, 1
+  %cond = icmp slt i64 %iv, %bound
+  br i1 %cond, label %loop, label %exit
+
+exit:
+  ret void
+}
+
 define void @smin_start_pred_mismatch(i64 %x0, i64 %x1, i64 %bound) {
 ; CHECK-LABEL: 'smin_start_pred_mismatch'
 ; CHECK-NEXT:  Determining loop execution counts for: @smin_start_pred_mismatch
@@ -747,18 +777,19 @@ exit:
   ret void
 }
 
-; The removed SCEVUMinExpr ULT/UGT fast-path in IsKnownPredicateViaMinOrMax was
-; also reachable from isKnownViaNonRecursiveReasoning callers that do not go
-; through isKnownPredicate, where the new decomposition does not run. Here
-; howManyLessThans queries isLoopEntryGuardedByCond(ULT, umin(%a, %b), %a + 4),
-; which the fast-path proved via computeConstantDifference. The decomposition
-; cannot replace it on that path, so the umax survives where it did not before.
+; any_of min on the LHS, reached from a caller that does not go through
+; isKnownPredicate: howManyLessThans queries
+; isLoopEntryGuardedByCond(ULT, umin(%a, %b), %a + 4), which lands directly in
+; isKnownViaNonRecursiveReasoning. The sub-query %a u< (%a + 4)<nuw> is then
+; discharged by isKnownPredicateViaNoOverflow. This used to need a dedicated
+; SCEVUMinExpr ULT/UGT fast-path in IsKnownPredicateViaMinOrMax; keep this test
+; to pin that the decomposition covers that caller too.
 define void @umin_start_bounded_rhs(i64 %x, i64 %b) {
 ; CHECK-LABEL: 'umin_start_bounded_rhs'
 ; CHECK-NEXT:  Determining loop execution counts for: @umin_start_bounded_rhs
-; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + (-1 * ((zext i8 (trunc i64 %x to i8) to i64) umin %b))<nsw> + ((1 + ((zext i8 (trunc i64 %x to i8) to i64) umin %b))<nuw><nsw> umax (4 + (zext i8 (trunc i64 %x to i8) to i64))<nuw><nsw>))
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (3 + (zext i8 (trunc i64 %x to i8) to i64) + (-1 * ((zext i8 (trunc i64 %x to i8) to i64) umin %b))<nsw>)
 ; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 258
-; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + (-1 * ((zext i8 (trunc i64 %x to i8) to i64) umin %b))<nsw> + ((1 + ((zext i8 (trunc i64 %x to i8) to i64) umin %b))<nuw><nsw> umax (4 + (zext i8 (trunc i64 %x to i8) to i64))<nuw><nsw>))
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (3 + (zext i8 (trunc i64 %x to i8) to i64) + (-1 * ((zext i8 (trunc i64 %x to i8) to i64) umin %b))<nsw>)
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
 entry:
@@ -833,6 +864,34 @@ loop:
   call void @use(i64 %iv)
   %iv.next = add nsw i64 %iv, 1
   %cond = icmp slt i64 %iv, %lim
+  br i1 %cond, label %loop, label %exit
+
+exit:
+  ret void
+}
+
+; any_of max on the RHS, unsigned dual of @smax_limit_offset_guard: the bounding
+; operand is %x1, reached via (%bound + 1 ule %x1).
+define void @umax_limit_offset_guard(i64 %x0, i64 %x1, i64 %bound) {
+; CHECK-LABEL: 'umax_limit_offset_guard'
+; CHECK-NEXT:  Determining loop execution counts for: @umax_limit_offset_guard
+; CHECK-NEXT:  Loop %loop: backedge-taken count is ((-1 * %bound) + (%x0 umax %x1))
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((-1 * %bound) + (%x0 umax %x1))
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %bound.p1 = add nuw i64 %bound, 1
+  %pre = icmp ule i64 %bound.p1, %x1
+  call void @llvm.assume(i1 %pre)
+  %lim = call i64 @llvm.umax.i64(i64 %x0, i64 %x1)
+  br label %loop
+
+loop:
+  %iv = phi i64 [ %bound, %entry ], [ %iv.next, %loop ]
+  call void @use(i64 %iv)
+  %iv.next = add nuw i64 %iv, 1
+  %cond = icmp ult i64 %iv, %lim
   br i1 %cond, label %loop, label %exit
 
 exit:

@@ -11356,69 +11356,13 @@ bool ScalarEvolution::isKnownViaInduction(CmpPredicate Pred, SCEVUse LHS,
          isLoopEntryGuardedByCond(MDL, Pred, SplitLHS.first, SplitRHS.first);
 }
 
-/// Try to prove \p LHS \p Pred \p RHS by decomposing a min/max expression on
-/// either side into its operands.
-///
-/// A min/max expression is equal to one of its operands, so proving the
-/// predicate for all of them proves it for the whole expression:
-///
-///   minmax(X0, ..., Xn) Pred RHS  if  Xi Pred RHS for all i, and
-///   LHS Pred minmax(Y0, ..., Yn)  if  LHS Pred Yi for all i.
-///
-/// If in addition the min/max signedness matches \p Pred, then
-/// min(X0, ..., Xn) is no greater than each Xi and max(Y0, ..., Yn) no less
-/// than each Yi, so a single operand is sufficient:
-///
-///   min(X0, ..., Xn) Pred RHS  if  Xi Pred RHS for some i, and
-///   LHS Pred max(Y0, ..., Yn)  if  LHS Pred Yi for some i.
-static bool isKnownViaMinMaxDecomposition(ScalarEvolution &SE,
-                                          CmpPredicate Pred, SCEVUse LHS,
-                                          SCEVUse RHS) {
-  if (!isa<SCEVMinMaxExpr>(LHS) && !isa<SCEVMinMaxExpr>(RHS))
-    return false;
-
-  // A samesign flag holds for the original operand pair only, not for the
-  // per-operand sub-queries below, so drop it.
-  CmpInst::Predicate P = Pred.dropSameSign();
-
-  // Normalize the predicate to less-than(-or-equal), so only a min on the LHS
-  // and a max on the RHS need the "for some i" rules.
-  if (ICmpInst::isGT(P) || ICmpInst::isGE(P)) {
-    std::swap(LHS, RHS);
-    P = ICmpInst::getSwappedPredicate(P);
-  }
-  if (!ICmpInst::isLT(P) && !ICmpInst::isLE(P))
-    return false;
-
-  bool IsSigned = ICmpInst::isSigned(P);
-  if (const auto *MinMax = dyn_cast<SCEVMinMaxExpr>(LHS)) {
-    auto Holds = [&](SCEVUse Op) { return SE.isKnownPredicate(P, Op, RHS); };
-    bool IsMatchingMin =
-        IsSigned ? isa<SCEVSMinExpr>(MinMax) : isa<SCEVUMinExpr>(MinMax);
-    if (IsMatchingMin ? any_of(MinMax->operands(), Holds)
-                      : all_of(MinMax->operands(), Holds))
-      return true;
-  }
-  if (const auto *MinMax = dyn_cast<SCEVMinMaxExpr>(RHS)) {
-    auto Holds = [&](SCEVUse Op) { return SE.isKnownPredicate(P, LHS, Op); };
-    bool IsMatchingMax =
-        IsSigned ? isa<SCEVSMaxExpr>(MinMax) : isa<SCEVUMaxExpr>(MinMax);
-    if (IsMatchingMax ? any_of(MinMax->operands(), Holds)
-                      : all_of(MinMax->operands(), Holds))
-      return true;
-  }
-  return false;
-}
-
 bool ScalarEvolution::isKnownPredicate(CmpPredicate Pred, SCEVUse LHS,
                                        SCEVUse RHS) {
-  // Try to prove the predicate by decomposing a min/max expression before
-  // canonicalizing the operands, which may hide the min/max structure.
-  if (isKnownViaMinMaxDecomposition(*this, Pred, LHS, RHS))
-    return true;
+  CmpPredicate OrigPred = Pred;
+  SCEVUse OrigLHS = LHS, OrigRHS = RHS;
 
   // Canonicalize the inputs first.
-  (void)SimplifyICmpOperands(Pred, LHS, RHS);
+  bool Changed = SimplifyICmpOperands(Pred, LHS, RHS);
 
   if (isKnownViaInduction(Pred, LHS, RHS))
     return true;
@@ -11426,8 +11370,17 @@ bool ScalarEvolution::isKnownPredicate(CmpPredicate Pred, SCEVUse LHS,
   if (isKnownPredicateViaSplitting(Pred, LHS, RHS))
     return true;
 
-  // Otherwise see what can be done with some simple reasoning.
-  return isKnownViaNonRecursiveReasoning(Pred, LHS, RHS);
+  // See what can be done with some simple reasoning. This is a recursive
+  // prover already, so it can afford a second nested min/max level.
+  if (isKnownViaNonRecursiveReasoning(Pred, LHS, RHS, /*MinMaxLevels=*/2))
+    return true;
+
+  // Retry the min/max decomposition on the original operands: canonicalizing
+  // LE/GE to LT/GT buries a min/max under an add. Only worth it if
+  // canonicalization changed anything, as the reasoning above already
+  // decomposed the canonical operands.
+  return Changed && isKnownPredicateViaMinMaxDecomposition(
+                        OrigPred, OrigLHS, OrigRHS, /*MinMaxLevels=*/2);
 }
 
 std::optional<bool> ScalarEvolution::evaluatePredicate(CmpPredicate Pred,
@@ -12942,6 +12895,53 @@ static bool IsKnownPredicateViaMinOrMax(ScalarEvolution &SE, CmpPredicate Pred,
   llvm_unreachable("covered switch fell through?!");
 }
 
+bool ScalarEvolution::isKnownPredicateViaMinMaxDecomposition(
+    CmpPredicate Pred, SCEVUse LHS, SCEVUse RHS, unsigned MinMaxLevels) {
+  if (MinMaxLevels == 0)
+    return false;
+
+  // FIXME: what about umin_seq? SCEVSequentialMinMaxExpr is not a
+  // SCEVMinMaxExpr and is left alone here.
+  if (!isa<SCEVMinMaxExpr>(LHS) && !isa<SCEVMinMaxExpr>(RHS))
+    return false;
+
+  // Samesign holds for the original operand pair only, not for the per-operand
+  // sub-queries below.
+  CmpInst::Predicate P = Pred.dropSameSign();
+
+  // Normalize to less-than(-or-equal), so only a min on the LHS and a max on
+  // the RHS need the "for some i" rules.
+  if (ICmpInst::isGT(P) || ICmpInst::isGE(P)) {
+    std::swap(LHS, RHS);
+    P = ICmpInst::getSwappedPredicate(P);
+  }
+  if (!ICmpInst::isLT(P) && !ICmpInst::isLE(P))
+    return false;
+
+  bool IsSigned = ICmpInst::isSigned(P);
+  if (const auto *MinMax = dyn_cast<SCEVMinMaxExpr>(LHS)) {
+    auto Holds = [&](SCEVUse Op) {
+      return isKnownViaNonRecursiveReasoning(P, Op, RHS, MinMaxLevels - 1);
+    };
+    bool IsMatchingMin =
+        IsSigned ? isa<SCEVSMinExpr>(MinMax) : isa<SCEVUMinExpr>(MinMax);
+    if (IsMatchingMin ? any_of(MinMax->operands(), Holds)
+                      : all_of(MinMax->operands(), Holds))
+      return true;
+  }
+  if (const auto *MinMax = dyn_cast<SCEVMinMaxExpr>(RHS)) {
+    auto Holds = [&](SCEVUse Op) {
+      return isKnownViaNonRecursiveReasoning(P, LHS, Op, MinMaxLevels - 1);
+    };
+    bool IsMatchingMax =
+        IsSigned ? isa<SCEVSMaxExpr>(MinMax) : isa<SCEVUMaxExpr>(MinMax);
+    if (IsMatchingMax ? any_of(MinMax->operands(), Holds)
+                      : all_of(MinMax->operands(), Holds))
+      return true;
+  }
+  return false;
+}
+
 bool ScalarEvolution::isImpliedViaOperations(CmpPredicate Pred, const SCEV *LHS,
                                              const SCEV *RHS,
                                              const SCEV *FoundLHS,
@@ -13140,13 +13140,14 @@ static bool isKnownPredicateExtendIdiom(CmpPredicate Pred, const SCEV *LHS,
 }
 
 bool ScalarEvolution::isKnownViaNonRecursiveReasoning(CmpPredicate Pred,
-                                                      SCEVUse LHS,
-                                                      SCEVUse RHS) {
+                                                      SCEVUse LHS, SCEVUse RHS,
+                                                      unsigned MinMaxLevels) {
   return isKnownPredicateExtendIdiom(Pred, LHS, RHS) ||
          isKnownPredicateViaConstantRanges(Pred, LHS, RHS) ||
          IsKnownPredicateViaMinOrMax(*this, Pred, LHS, RHS) ||
          IsKnownPredicateViaAddRecStart(*this, Pred, LHS, RHS) ||
-         isKnownPredicateViaNoOverflow(Pred, LHS, RHS);
+         isKnownPredicateViaNoOverflow(Pred, LHS, RHS) ||
+         isKnownPredicateViaMinMaxDecomposition(Pred, LHS, RHS, MinMaxLevels);
 }
 
 bool ScalarEvolution::isImpliedCondOperandsHelper(CmpPredicate Pred,
@@ -13154,6 +13155,13 @@ bool ScalarEvolution::isImpliedCondOperandsHelper(CmpPredicate Pred,
                                                   const SCEV *RHS,
                                                   const SCEV *FoundLHS,
                                                   const SCEV *FoundRHS) {
+  // Part of the recursive implication prover, so unlike the plain
+  // isKnownViaNonRecursiveReasoning callers this can afford a second nested
+  // min/max level.
+  auto IsKnown = [&](CmpPredicate P, const SCEV *A, const SCEV *B) {
+    return isKnownViaNonRecursiveReasoning(P, A, B, /*MinMaxLevels=*/2);
+  };
+
   switch (Pred) {
   default:
     llvm_unreachable("Unexpected CmpPredicate value!");
@@ -13164,26 +13172,26 @@ bool ScalarEvolution::isImpliedCondOperandsHelper(CmpPredicate Pred,
     break;
   case ICmpInst::ICMP_SLT:
   case ICmpInst::ICMP_SLE:
-    if (isKnownViaNonRecursiveReasoning(ICmpInst::ICMP_SLE, LHS, FoundLHS) &&
-        isKnownViaNonRecursiveReasoning(ICmpInst::ICMP_SGE, RHS, FoundRHS))
+    if (IsKnown(ICmpInst::ICMP_SLE, LHS, FoundLHS) &&
+        IsKnown(ICmpInst::ICMP_SGE, RHS, FoundRHS))
       return true;
     break;
   case ICmpInst::ICMP_SGT:
   case ICmpInst::ICMP_SGE:
-    if (isKnownViaNonRecursiveReasoning(ICmpInst::ICMP_SGE, LHS, FoundLHS) &&
-        isKnownViaNonRecursiveReasoning(ICmpInst::ICMP_SLE, RHS, FoundRHS))
+    if (IsKnown(ICmpInst::ICMP_SGE, LHS, FoundLHS) &&
+        IsKnown(ICmpInst::ICMP_SLE, RHS, FoundRHS))
       return true;
     break;
   case ICmpInst::ICMP_ULT:
   case ICmpInst::ICMP_ULE:
-    if (isKnownViaNonRecursiveReasoning(ICmpInst::ICMP_ULE, LHS, FoundLHS) &&
-        isKnownViaNonRecursiveReasoning(ICmpInst::ICMP_UGE, RHS, FoundRHS))
+    if (IsKnown(ICmpInst::ICMP_ULE, LHS, FoundLHS) &&
+        IsKnown(ICmpInst::ICMP_UGE, RHS, FoundRHS))
       return true;
     break;
   case ICmpInst::ICMP_UGT:
   case ICmpInst::ICMP_UGE:
-    if (isKnownViaNonRecursiveReasoning(ICmpInst::ICMP_UGE, LHS, FoundLHS) &&
-        isKnownViaNonRecursiveReasoning(ICmpInst::ICMP_ULE, RHS, FoundRHS))
+    if (IsKnown(ICmpInst::ICMP_UGE, LHS, FoundLHS) &&
+        IsKnown(ICmpInst::ICMP_ULE, RHS, FoundRHS))
       return true;
     break;
   }

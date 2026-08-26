@@ -2274,8 +2274,14 @@ private:
 
   /// Test whether the condition described by Pred, LHS, and RHS is true.
   /// Use only simple non-recursive types of checks, such as range analysis etc.
+  ///
+  /// \p MinMaxLevels bounds how many nested min/max expressions may be taken
+  /// apart. The default of 1 is what keeps this non-recursive: the single
+  /// level's per-operand sub-queries run with 0, so an operand that is itself
+  /// a min/max is not decomposed again. Only callers that are recursive
+  /// provers anyway raise it, see isKnownPredicateViaMinMaxDecomposition.
   bool isKnownViaNonRecursiveReasoning(CmpPredicate Pred, SCEVUse LHS,
-                                       SCEVUse RHS);
+                                       SCEVUse RHS, unsigned MinMaxLevels = 1);
 
   /// Test whether the condition described by Pred, LHS, and RHS is true
   /// whenever the condition described by Pred, FoundLHS, and FoundRHS is
@@ -2373,6 +2379,29 @@ private:
   /// prove them individually.
   bool isKnownPredicateViaSplitting(CmpPredicate Pred, SCEVUse LHS,
                                     SCEVUse RHS);
+
+  /// Try to prove the condition described by "LHS Pred RHS" by decomposing a
+  /// min/max expression on either side into its operands. A min/max equals one
+  /// of its operands, so proving the condition for all of them proves it:
+  ///
+  ///   minmax(X0, ..., Xn) Pred RHS  if  Xi Pred RHS for all i, and
+  ///   LHS Pred minmax(Y0, ..., Yn)  if  LHS Pred Yi for all i.
+  ///
+  /// If the min/max signedness matches Pred, a single operand is sufficient:
+  ///
+  ///   min(X0, ..., Xn) Pred RHS  if  Xi Pred RHS for some i, and
+  ///   LHS Pred max(Y0, ..., Yn)  if  LHS Pred Yi for some i.
+  ///
+  /// \p MinMaxLevels bounds how many nested min/max expressions may be taken
+  /// apart: the per-operand sub-queries run with one level less, and at 0 no
+  /// decomposition happens at all. Callers on the non-recursive path stay at a
+  /// single level. Recursive provers (isKnownPredicate,
+  /// isImpliedCondOperandsHelper) ask for two, which pays off because
+  /// applyLoopGuards frequently rewrites one side into a min/max while the
+  /// other side already is one.
+  bool isKnownPredicateViaMinMaxDecomposition(CmpPredicate Pred, SCEVUse LHS,
+                                              SCEVUse RHS,
+                                              unsigned MinMaxLevels);
 
   /// Try to match the Expr as "(L + R)<Flags>".
   bool splitBinaryAdd(SCEVUse Expr, SCEVUse &L, SCEVUse &R,

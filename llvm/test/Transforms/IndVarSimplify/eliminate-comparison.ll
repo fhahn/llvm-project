@@ -1167,7 +1167,8 @@ define void @func_29(i32 %n) {
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ 0, [[ENTRY:%.*]] ], [ [[IV_INC:%.*]], [[BE:%.*]] ]
-; CHECK-NEXT:    br i1 true, label [[STAY:%.*]], label [[LEAVE:%.*]]
+; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp ne i32 [[IV]], [[BOUND]]
+; CHECK-NEXT:    br i1 [[EXITCOND]], label [[STAY:%.*]], label [[LEAVE:%.*]]
 ; CHECK:       stay:
 ; CHECK-NEXT:    call void @side_effect()
 ; CHECK-NEXT:    br label [[BE]]
