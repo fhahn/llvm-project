@@ -603,3 +603,55 @@ exit:
 
   ret i1 %r.10
 }
+
+; and only clears bits, so the result is bounded by both operands. For a
+; constant operand that is an absolute bound.
+define i1 @and_constant_absolute_upper_bound(i64 %x, i64 %n) {
+; CHECK-LABEL: @and_constant_absolute_upper_bound(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[INRANGE:%.*]] = icmp ult i64 [[X:%.*]], [[N:%.*]]
+; CHECK-NEXT:    br i1 [[INRANGE]], label [[GUARDED:%.*]], label [[OUT:%.*]]
+; CHECK:       guarded:
+; CHECK-NEXT:    [[A:%.*]] = and i64 [[X]], 255
+; CHECK-NEXT:    ret i1 true
+; CHECK:       out:
+; CHECK-NEXT:    ret i1 false
+;
+entry:
+  %inrange = icmp ult i64 %x, %n
+  br i1 %inrange, label %guarded, label %out
+
+guarded:
+  %a = and i64 %x, 255
+  %chk = icmp ult i64 %a, 256
+  ret i1 %chk
+
+out:
+  ret i1 false
+}
+
+; Negative: the result may equal the constant operand.
+define i1 @and_constant_absolute_upper_bound_too_tight(i64 %x, i64 %n) {
+; CHECK-LABEL: @and_constant_absolute_upper_bound_too_tight(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[INRANGE:%.*]] = icmp ult i64 [[X:%.*]], [[N:%.*]]
+; CHECK-NEXT:    br i1 [[INRANGE]], label [[GUARDED:%.*]], label [[OUT:%.*]]
+; CHECK:       guarded:
+; CHECK-NEXT:    [[A:%.*]] = and i64 [[X]], 255
+; CHECK-NEXT:    [[CHK:%.*]] = icmp ult i64 [[A]], 255
+; CHECK-NEXT:    ret i1 [[CHK]]
+; CHECK:       out:
+; CHECK-NEXT:    ret i1 false
+;
+entry:
+  %inrange = icmp ult i64 %x, %n
+  br i1 %inrange, label %guarded, label %out
+
+guarded:
+  %a = and i64 %x, 255
+  %chk = icmp ult i64 %a, 255
+  ret i1 %chk
+
+out:
+  ret i1 false
+}

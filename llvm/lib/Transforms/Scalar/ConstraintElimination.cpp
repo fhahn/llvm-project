@@ -1528,6 +1528,7 @@ void State::addInfoFor(BasicBlock &BB) {
     //   urem x, n: result < n  and  result <= x
     //   udiv x, n: result <= x  and  result <= UMAX / n,  if n is constant
     //   lshr x, n: result <= x  and  result <= UMAX >> n, if n is constant
+    //   and  x, n: result <= n,                           if n is constant
     //   srem x, n: result >= 0 and result <= x, if x >= 0
     //              result < n,                  if n > 0
     //   sdiv x, C: result >= 0 and result <= x, if x >= 0 and C > 1
@@ -1536,6 +1537,7 @@ void State::addInfoFor(BasicBlock &BB) {
       if ((BO->getOpcode() == Instruction::URem ||
            BO->getOpcode() == Instruction::UDiv ||
            BO->getOpcode() == Instruction::LShr ||
+           match(BO, m_c_And(m_Value(), m_ConstantInt())) ||
            BO->getOpcode() == Instruction::SRem ||
            BO->getOpcode() == Instruction::SDiv) &&
           isGuaranteedNotToBePoison(BO))
@@ -2526,10 +2528,10 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
 
       if (auto *BO = dyn_cast<BinaryOperator>(CB.Inst)) {
         Value *Op0 = BO->getOperand(0), *Op1 = BO->getOperand(1);
-        // For a constant Op1, the result is also bounded by the largest value
-        // the operation can produce. Unlike result <= Op0, this is an absolute
-        // bound, which later can be combined with relational facts about the
-        // result.
+        // For a constant operand, the result is also bounded by the largest
+        // value the operation can produce. Unlike a relational bound like
+        // result <= Op0, this is an absolute bound, which later can be
+        // combined with relational facts about the result.
         auto AddAbsoluteUpperBound = [&](const APInt &Max) {
           AddFact(CmpInst::ICMP_ULE, BO, ConstantInt::get(BO->getType(), Max));
         };
@@ -2558,6 +2560,14 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
             if (C->getValue().ult(C->getBitWidth()))
               AddAbsoluteUpperBound(
                   APInt::getMaxValue(C->getBitWidth()).lshr(C->getValue()));
+          continue;
+        }
+        if (BO->getOpcode() == Instruction::And) {
+          // and x, n: result <= n, if n is constant (the result only has bits
+          // set that are also set in n)
+          ConstantInt *C;
+          if (match(BO, m_c_And(m_Value(), m_ConstantInt(C))))
+            AddAbsoluteUpperBound(C->getValue());
           continue;
         }
         if (BO->getOpcode() == Instruction::SRem) {
