@@ -2283,8 +2283,10 @@ private:
 
   /// Test whether the condition described by Pred, LHS, and RHS is true.
   /// Use only simple non-recursive types of checks, such as range analysis etc.
+  /// \p MinMaxDepth is the number of min/max expressions
+  /// isKnownPredicateViaMinMaxDecomposition has taken apart so far.
   bool isKnownViaNonRecursiveReasoning(CmpPredicate Pred, SCEVUse LHS,
-                                       SCEVUse RHS);
+                                       SCEVUse RHS, unsigned MinMaxDepth = 0);
 
   /// Test whether the condition described by Pred, LHS, and RHS is true
   /// whenever the condition described by Pred, FoundLHS, and FoundRHS is
@@ -2382,6 +2384,13 @@ private:
   /// prove them individually.
   bool isKnownPredicateViaSplitting(CmpPredicate Pred, SCEVUse LHS,
                                     SCEVUse RHS);
+
+  /// Try to prove the condition described by "LHS Pred RHS" by decomposing a
+  /// min/max expression on either side into its operands. \p MinMaxDepth is the
+  /// number of min/max expressions taken apart so far, bounding the recursion.
+  bool isKnownPredicateViaMinMaxDecomposition(CmpPredicate Pred, SCEVUse LHS,
+                                              SCEVUse RHS,
+                                              unsigned MinMaxDepth = 0);
 
   /// Try to match the Expr as "(L + R)<Flags>".
   bool splitBinaryAdd(SCEVUse Expr, SCEVUse &L, SCEVUse &R,
