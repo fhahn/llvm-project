@@ -359,3 +359,56 @@ check:
 else:
   ret i1 false
 }
+
+; The quotient of a constant divisor has an absolute upper bound.
+define i1 @udiv_absolute_upper_bound(i64 %x, i64 %n) {
+; CHECK-LABEL: define i1 @udiv_absolute_upper_bound(
+; CHECK-SAME: i64 [[X:%.*]], i64 [[N:%.*]]) {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[INRANGE:%.*]] = icmp ult i64 [[X]], [[N]]
+; CHECK-NEXT:    br i1 [[INRANGE]], label [[GUARDED:%.*]], label [[OUT:%.*]]
+; CHECK:       guarded:
+; CHECK-NEXT:    [[D:%.*]] = udiv i64 [[X]], 16
+; CHECK-NEXT:    ret i1 true
+; CHECK:       out:
+; CHECK-NEXT:    ret i1 false
+;
+entry:
+  %inrange = icmp ult i64 %x, %n
+  br i1 %inrange, label %guarded, label %out
+
+guarded:
+  %d = udiv i64 %x, 16
+  %chk = icmp ult i64 %d, 1152921504606846976
+  ret i1 %chk
+
+out:
+  ret i1 false
+}
+
+; Negative: no absolute bound is known for a variable divisor.
+define i1 @udiv_no_absolute_upper_bound_variable_divisor(i64 %x, i64 %n, i64 %d) {
+; CHECK-LABEL: define i1 @udiv_no_absolute_upper_bound_variable_divisor(
+; CHECK-SAME: i64 [[X:%.*]], i64 [[N:%.*]], i64 [[D:%.*]]) {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[INRANGE:%.*]] = icmp ult i64 [[X]], [[N]]
+; CHECK-NEXT:    br i1 [[INRANGE]], label [[GUARDED:%.*]], label [[OUT:%.*]]
+; CHECK:       guarded:
+; CHECK-NEXT:    [[Q:%.*]] = udiv i64 [[X]], [[D]]
+; CHECK-NEXT:    [[CHK:%.*]] = icmp ult i64 [[Q]], 1152921504606846976
+; CHECK-NEXT:    ret i1 [[CHK]]
+; CHECK:       out:
+; CHECK-NEXT:    ret i1 false
+;
+entry:
+  %inrange = icmp ult i64 %x, %n
+  br i1 %inrange, label %guarded, label %out
+
+guarded:
+  %q = udiv i64 %x, %d
+  %chk = icmp ult i64 %q, 1152921504606846976
+  ret i1 %chk
+
+out:
+  ret i1 false
+}
