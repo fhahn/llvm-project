@@ -2142,6 +2142,12 @@ exit:
   ret void
 }
 
+; FIXME: The scalar values of the decreasing induction are wrong: the lane
+;        offset is combined with the base IV using the induction opcode a second
+;        time, so lane L gets %init + L * %fpinc instead of %init - L * %fpinc
+;        (VEC4_INTERL1), and part 1 gets the offsets 4, 3, 2, 1 instead of
+;        4, 5, 6, 7 (VEC4_INTERL2). Note that the wide induction below is
+;        correct, so the two disagree within the same vector iteration.
 define void @fp_iv_used_in_gep_fsub(float %init, ptr noalias nocapture %A, float %fpinc, i32 %N) {
 ; VEC4_INTERL1-LABEL: define void @fp_iv_used_in_gep_fsub(
 ; VEC4_INTERL1-SAME: float [[INIT:%.*]], ptr noalias captures(none) [[A:%.*]], float [[FPINC:%.*]], i32 [[N:%.*]]) {
