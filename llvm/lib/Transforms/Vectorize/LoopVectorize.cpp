@@ -5590,6 +5590,14 @@ LoopVectorizationPlanner::precomputeCosts(VPlan &Plan, ElementCount VF,
   // adding code to simplify VPlans before calculating their costs.
   auto TC = getSmallConstantTripCount(PSE.getSE(), OrigLoop);
   bool IsFullyUnrolled = TC == VF && !Plan.hasTailFolded();
+  // Anything that only feeds the backedge is dead if the vector loop body runs
+  // at most once. Besides the fully unrolled case, that also covers a folded
+  // tail with a trip count below the VF, mirroring how
+  // VPInstruction::computeCost costs BranchOnCount (which derives the trip
+  // count from the plan rather than from SCEV).
+  // TODO: Share this with the BranchOnCount cost via VPCostContext.
+  bool VectorBodyExecutesAtMostOnce =
+      TC.isNonZero() && !TC.isScalable() && ElementCount::isKnownLE(TC, VF);
   SmallPtrSet<const Value *, 4> WidenedIVs;
   if (IsFullyUnrolled) {
     addFullyUnrolledInstructionsToIgnore(OrigLoop, Legal->getInductionVars(),
@@ -5611,9 +5619,9 @@ LoopVectorizationPlanner::precomputeCosts(VPlan &Plan, ElementCount VF,
     // Integer inductions are always costed via the VPlan-based cost model.
     // TODO: Also migrate FP and pointer inductions.
     if (IndDesc.getKind() == InductionDescriptor::IK_IntInduction) {
-      // If the vector loop is executed exactly once, the increment is
+      // If the vector loop body is executed at most once, the increment is
       // simplified away.
-      ChargeCanonicalIVIncrement |= !IsFullyUnrolled;
+      ChargeCanonicalIVIncrement |= !VectorBodyExecutesAtMostOnce;
       continue;
     }
     if (WidenedIVs.contains(IV))
