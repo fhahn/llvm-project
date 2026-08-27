@@ -5598,34 +5598,22 @@ LoopVectorizationPlanner::precomputeCosts(VPlan &Plan, ElementCount VF,
   // TODO: Share this with the BranchOnCount cost via VPCostContext.
   bool VectorBodyExecutesAtMostOnce =
       TC.isNonZero() && !TC.isScalable() && ElementCount::isKnownLE(TC, VF);
-  SmallPtrSet<const Value *, 4> WidenedIVs;
-  if (IsFullyUnrolled) {
+  if (IsFullyUnrolled)
     addFullyUnrolledInstructionsToIgnore(OrigLoop, Legal->getInductionVars(),
                                          CostCtx.SkipCostComputation);
-  } else {
-    // Inductions represented by a VPWidenIntOrFpInductionRecipe have their cost
-    // computed by the recipe, so collect their phis to skip the legacy
-    // increment cost below.
-    VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
-    for (VPRecipeBase &R : *LoopRegion->getEntryBasicBlock())
-      if (auto *WideIV = dyn_cast<VPWidenIntOrFpInductionRecipe>(&R)) {
-        if (PHINode *IVPhi = WideIV->getPHINode())
-          WidenedIVs.insert(IVPhi);
-      }
-  }
 
   bool ChargeCanonicalIVIncrement = false;
   for (const auto &[IV, IndDesc] : Legal->getInductionVars()) {
-    // Integer inductions are always costed via the VPlan-based cost model.
-    // TODO: Also migrate FP and pointer inductions.
-    if (IndDesc.getKind() == InductionDescriptor::IK_IntInduction) {
+    // Integer and FP inductions are always costed via the VPlan-based cost
+    // model.
+    // TODO: Also migrate pointer inductions.
+    if (IndDesc.getKind() == InductionDescriptor::IK_IntInduction ||
+        IndDesc.getKind() == InductionDescriptor::IK_FpInduction) {
       // If the vector loop body is executed at most once, the increment is
       // simplified away.
       ChargeCanonicalIVIncrement |= !VectorBodyExecutesAtMostOnce;
       continue;
     }
-    if (WidenedIVs.contains(IV))
-      continue;
     Instruction *IVInc = cast<Instruction>(
         IV->getIncomingValueForBlock(OrigLoop->getLoopLatch()));
     SmallVector<Instruction *> IVInsts = {IVInc};

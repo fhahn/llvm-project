@@ -3114,10 +3114,9 @@ bool VPScalarIVStepsRecipe::doesGeneratePerAllLanes() const {
 
 InstructionCost VPScalarIVStepsRecipe::computeCost(ElementCount VF,
                                                    VPCostContext &Ctx) const {
-  // TODO: Add costs for floating point.
   Type *BaseIVTy = getOperand(0)->getScalarType();
-  if (!BaseIVTy->isIntegerTy())
-    return 0;
+  assert((BaseIVTy->isIntegerTy() || BaseIVTy->isFloatingPointTy()) &&
+         "VPScalarIVStepsRecipe is only created for integer and FP inductions");
 
   // TODO: Add support for predicated regions. Requires scaling the cost by the
   // probability of entering the block.
@@ -3135,6 +3134,20 @@ InstructionCost VPScalarIVStepsRecipe::computeCost(ElementCount VF,
   //   3. Add the scaled start index to base IV.
   // Any code generated for 1 and 2 should be loop invariant and therefore
   // hoisted out of the loop. We only need to add on the cost of 3.
+  if (BaseIVTy->isFloatingPointTy()) {
+    // The users of an FP induction cannot be re-based on a common value, so
+    // unlike the integer case below each lane needs its own FAdd/FSub, with the
+    // first lane being the base IV itself (see replicateByVF).
+    //
+    // legalizeAndOptimizeInductions only rewires users needing all lanes to
+    // scalar steps if the plan has no scalable VF, so the early return above
+    // covers scalable VFs.
+    assert(!VF.isScalable() &&
+           "FP scalar steps for all lanes are only created for fixed VFs");
+    return (VF.getFixedValue() - 1) *
+           Ctx.TTI.getArithmeticInstrCost(InductionOpcode, BaseIVTy,
+                                          Ctx.CostKind);
+  }
 
   // Given the users of VPScalarIVStepsRecipe tend to be scalarized GEPs, i.e.
   //  %add1 = add i32 %iv, 0
