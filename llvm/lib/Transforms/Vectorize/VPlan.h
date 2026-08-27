@@ -4251,7 +4251,16 @@ protected:
 /// lane is used, and has 3 operands: IV, step and VF. Unrolling adds one extra
 /// operand StartIndex to all unroll parts except part 0, as the recipe
 /// represents the VF scalar values (this number of values is taken from
-/// State.VF rather than from the VF operand) starting at IV + StartIndex.
+/// State.VF rather than from the VF operand) starting at
+/// IV (+/-) StartIndex * step.
+///
+/// StartIndex counts iterations upwards, independently of the induction
+/// opcode. The opcode is applied exactly once, when combining the scaled index
+/// with the IV, so that a decreasing (FSub) induction subtracts the offset
+/// rather than adding it.
+/// TODO: Keep StartIndex an integer iteration count and convert it in execute,
+/// so no FP arithmetic is needed to accumulate it and the induction opcode has
+/// a single use.
 class LLVM_ABI_FOR_TEST VPScalarIVStepsRecipe : public VPRecipeWithIRFlags {
   Instruction::BinaryOps InductionOpcode;
 

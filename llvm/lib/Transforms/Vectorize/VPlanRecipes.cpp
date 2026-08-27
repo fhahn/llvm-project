@@ -2020,7 +2020,7 @@ void VPPhi::printRecipe(raw_ostream &O, const Twine &Indent,
 }
 #endif
 
-VPIRInstruction *VPIRInstruction ::create(Instruction &I) {
+VPIRInstruction *VPIRInstruction::create(Instruction &I) {
   if (auto *Phi = dyn_cast<PHINode>(&I))
     return new VPIRPhi(*Phi);
   return new VPIRInstruction(I);
@@ -3170,15 +3170,13 @@ void VPScalarIVStepsRecipe::execute(VPTransformState &State) {
 
   // We build scalar steps for both integer and floating-point induction
   // variables. Here, we determine the kind of arithmetic we will perform.
-  Instruction::BinaryOps AddOp;
-  Instruction::BinaryOps MulOp;
-  if (BaseIVTy->isIntegerTy()) {
-    AddOp = Instruction::Add;
-    MulOp = Instruction::Mul;
-  } else {
-    AddOp = InductionOpcode;
-    MulOp = Instruction::FMul;
-  }
+  // Accumulating the lane number into the start index uses plain addition, as
+  // the index counts upwards; see VPScalarIVStepsRecipe.
+  bool IsInt = BaseIVTy->isIntegerTy();
+  Instruction::BinaryOps IdxAddOp =
+      IsInt ? Instruction::Add : Instruction::FAdd;
+  Instruction::BinaryOps AddOp = IsInt ? Instruction::Add : InductionOpcode;
+  Instruction::BinaryOps MulOp = IsInt ? Instruction::Mul : Instruction::FMul;
 
   // Determine the number of scalars we need to generate.
   bool FirstLaneOnly = vputils::onlyFirstLaneUsed(this);
@@ -3192,11 +3190,10 @@ void VPScalarIVStepsRecipe::execute(VPTransformState &State) {
     // It is okay if the induction variable type cannot hold the lane number,
     // we expect truncation in this case.
     Constant *LaneValue =
-        BaseIVTy->isIntegerTy()
-            ? ConstantInt::get(BaseIVTy, Lane, /*IsSigned=*/false,
-                               /*ImplicitTrunc=*/true)
-            : ConstantFP::get(BaseIVTy, Lane);
-    Value *StartIdx = Builder.CreateBinOp(AddOp, StartIdx0, LaneValue);
+        IsInt ? ConstantInt::get(BaseIVTy, Lane, /*IsSigned=*/false,
+                                 /*ImplicitTrunc=*/true)
+              : ConstantFP::get(BaseIVTy, Lane);
+    Value *StartIdx = Builder.CreateBinOp(IdxAddOp, StartIdx0, LaneValue);
     assert((State.VF.isScalable() || isa<Constant>(StartIdx)) &&
            "Expected StartIdx to be folded to a constant when VF is not "
            "scalable");
