@@ -818,7 +818,8 @@ const VPBasicBlock *VPBasicBlock::getCFGPredecessor(unsigned Idx) const {
 
 InstructionCost VPRegionBlock::cost(ElementCount VF, VPCostContext &Ctx) {
   if (!isReplicator()) {
-    // Neglect the cost of canonical IV, matching the legacy cost model.
+    // The canonical IV and its increment are not costed here; the increment is
+    // accounted for by LoopVectorizationPlanner::precomputeCosts.
     InstructionCost Cost = 0;
     for (VPBlockBase *Block : vp_depth_first_shallow(getEntry()))
       Cost += Block->cost(VF, Ctx);

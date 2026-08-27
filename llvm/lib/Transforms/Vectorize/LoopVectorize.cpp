@@ -5602,54 +5602,24 @@ LoopVectorizationPlanner::precomputeCosts(VPlan &Plan, ElementCount VF,
     addFullyUnrolledInstructionsToIgnore(OrigLoop, Legal->getInductionVars(),
                                          CostCtx.SkipCostComputation);
 
-  bool ChargeCanonicalIVIncrement = false;
-  for (const auto &[IV, IndDesc] : Legal->getInductionVars()) {
-    // Integer and FP inductions are always costed via the VPlan-based cost
-    // model.
-    // TODO: Also migrate pointer inductions.
-    if (IndDesc.getKind() == InductionDescriptor::IK_IntInduction ||
-        IndDesc.getKind() == InductionDescriptor::IK_FpInduction) {
-      // If the vector loop body is executed at most once, the increment is
-      // simplified away.
-      ChargeCanonicalIVIncrement |= !VectorBodyExecutesAtMostOnce;
-      continue;
-    }
-    Instruction *IVInc = cast<Instruction>(
-        IV->getIncomingValueForBlock(OrigLoop->getLoopLatch()));
-    SmallVector<Instruction *> IVInsts = {IVInc};
-    for (unsigned I = 0; I != IVInsts.size(); I++) {
-      for (Value *Op : IVInsts[I]->operands()) {
-        auto *OpI = dyn_cast<Instruction>(Op);
-        if (Op == IV || !OpI || !OrigLoop->contains(OpI) || !Op->hasOneUse())
-          continue;
-        IVInsts.push_back(OpI);
-      }
-    }
-    IVInsts.push_back(IV);
-    for (User *U : IV->users()) {
-      auto *CI = cast<Instruction>(U);
-      if (!CostCtx.CM.isOptimizableIVTruncate(CI, VF))
-        continue;
-      IVInsts.push_back(CI);
-    }
-
-    for (Instruction *IVInst : IVInsts) {
-      if (CostCtx.skipCostComputation(IVInst, VF.isVector()))
-        continue;
-      InstructionCost InductionCost = CostCtx.getLegacyCost(IVInst, VF);
-      LLVM_DEBUG({
-        dbgs() << "Cost of " << InductionCost << " for VF " << VF
-               << ": induction instruction " << *IVInst << "\n";
-      });
-      Cost += InductionCost;
-      CostCtx.SkipCostComputation.insert(IVInst);
-    }
-  }
-
   // Add the cost for incrementing the canonical IV (or current iteration phi
   // for EVL) explicitly, as VPInstruction::computeCost returns 0 for recipes
   // w/o underlying value.
-  if (ChargeCanonicalIVIncrement) {
+  //
+  // Only charge it if the original loop is advanced by an integer or FP
+  // induction. The scalar cost we compare against is computed by the legacy
+  // cost model, which charges nothing for the GEP incrementing a pointer
+  // induction; charging the canonical IV increment would make the vector loop
+  // pay for bookkeeping the scalar baseline gets for free.
+  // TODO: Charge this on the canonical IV increment recipe instead, once the
+  // scalar cost is also computed via VPlan and the charge cancels out.
+  bool AdvancedByIntOrFPInduction =
+      any_of(Legal->getInductionVars(), [](const auto &KV) {
+        InductionDescriptor::InductionKind Kind = KV.second.getKind();
+        return Kind == InductionDescriptor::IK_IntInduction ||
+               Kind == InductionDescriptor::IK_FpInduction;
+      });
+  if (!VectorBodyExecutesAtMostOnce && AdvancedByIntOrFPInduction) {
     InstructionCost CanIVIncCost =
         ForceTargetInstructionCost.getNumOccurrences()
             ? InstructionCost(ForceTargetInstructionCost)

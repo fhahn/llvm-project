@@ -374,8 +374,6 @@ exit:
 ; the scalar cost we compare against.
 define void @fp_and_ptr_induction(ptr noalias %dst, ptr %end) {
 ; VF2-LABEL: 'fp_and_ptr_induction'
-; VF2:  Cost of 0 for VF 2: induction instruction %p.next = getelementptr inbounds float, ptr %p, i64 1
-; VF2:  Cost of 1 for VF 2: induction instruction %p = phi ptr [ %dst, %entry ], [ %p.next, %loop ]
 ; VF2:  Cost of 1 for VF 2: canonical IV increment
 ; VF2:  Cost of 2 for VF 2: ir<%f.iv> = WIDEN-INDUCTION fast ir<0.000000e+00>, ir<1.000000e+00>, vp<[[VP0:%[0-9]+]]>
 ; VF2:  Cost of 1 for VF 2: vp<[[VP7:%[0-9]+]]> = DERIVED-IV ir<0> + vp<[[VP6:%[0-9]+]]> * ir<4>
@@ -384,8 +382,6 @@ define void @fp_and_ptr_induction(ptr noalias %dst, ptr %end) {
 ; VF2:  Cost of 0 for VF 2: vp<[[VP5:%[0-9]+]]> = DERIVED-IV ir<0.000000e+00> + vp<[[VP2]]> * ir<1.000000e+00>
 ;
 ; VF4-LABEL: 'fp_and_ptr_induction'
-; VF4:  Cost of 0 for VF 4: induction instruction %p.next = getelementptr inbounds float, ptr %p, i64 1
-; VF4:  Cost of 1 for VF 4: induction instruction %p = phi ptr [ %dst, %entry ], [ %p.next, %loop ]
 ; VF4:  Cost of 1 for VF 4: canonical IV increment
 ; VF4:  Cost of 2 for VF 4: ir<%f.iv> = WIDEN-INDUCTION fast ir<0.000000e+00>, ir<1.000000e+00>, vp<[[VP0:%[0-9]+]]>
 ; VF4:  Cost of 1 for VF 4: vp<[[VP7:%[0-9]+]]> = DERIVED-IV ir<0> + vp<[[VP6:%[0-9]+]]> * ir<4>
@@ -414,14 +410,10 @@ exit:
 ; nothing for, so the canonical IV increment must not be charged either.
 define void @ptr_induction_only(ptr %start, ptr %end) {
 ; VF2-LABEL: 'ptr_induction_only'
-; VF2:  Cost of 0 for VF 2: induction instruction %p.next = getelementptr inbounds i8, ptr %p, i64 1
-; VF2:  Cost of 1 for VF 2: induction instruction %p = phi ptr [ %start, %entry ], [ %p.next, %loop ]
 ; VF2:  Cost of 0 for VF 2: vp<[[VP6:%[0-9]+]]> = SCALAR-STEPS vp<[[VP5:%[0-9]+]]>, ir<1>, vp<[[VP0:%[0-9]+]]>
 ; VF2:  Cost of 0 for VF 2: vp<[[VP4:%[0-9]+]]> = DERIVED-IV ir<%start> + vp<[[VP2:%[0-9]+]]> * ir<1>
 ;
 ; VF4-LABEL: 'ptr_induction_only'
-; VF4:  Cost of 0 for VF 4: induction instruction %p.next = getelementptr inbounds i8, ptr %p, i64 1
-; VF4:  Cost of 1 for VF 4: induction instruction %p = phi ptr [ %start, %entry ], [ %p.next, %loop ]
 ; VF4:  Cost of 0 for VF 4: vp<[[VP6:%[0-9]+]]> = SCALAR-STEPS vp<[[VP5:%[0-9]+]]>, ir<1>, vp<[[VP0:%[0-9]+]]>
 ; VF4:  Cost of 0 for VF 4: vp<[[VP4:%[0-9]+]]> = DERIVED-IV ir<%start> + vp<[[VP2:%[0-9]+]]> * ir<1>
 ;
