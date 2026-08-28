@@ -1524,17 +1524,20 @@ void State::addInfoFor(BasicBlock &BB) {
     }
 
     // Add facts from unsigned division, remainder and logical shift right, and
-    // from signed remainder.
+    // from signed division and remainder.
     //   urem x, n: result < n  and  result <= x
     //   udiv x, n: result <= x  and  result <= UMAX / n,  if n is constant
     //   lshr x, n: result <= x  and  result <= UMAX >> n, if n is constant
     //   srem x, n: result >= 0 and result <= x, if x >= 0
     //              result < n,                  if n > 0
+    //   sdiv x, C: result >= 0 and result <= x, if x >= 0 and C > 1
+    //              result < x,                  if x > 0 and C > 1
     if (auto *BO = dyn_cast<BinaryOperator>(&I)) {
       if ((BO->getOpcode() == Instruction::URem ||
            BO->getOpcode() == Instruction::UDiv ||
            BO->getOpcode() == Instruction::LShr ||
-           BO->getOpcode() == Instruction::SRem) &&
+           BO->getOpcode() == Instruction::SRem ||
+           BO->getOpcode() == Instruction::SDiv) &&
           isGuaranteedNotToBePoison(BO))
         WorkList.push_back(FactOrCheck::getInstFact(DT.getNode(&BB), BO));
     }
@@ -2574,6 +2577,35 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
             // srem x, n: result <= n, if n >= 0 (|result| < n, so result <= n -
             // 1
             AddFact(CmpInst::ICMP_SLT, BO, N);
+          }
+          continue;
+        }
+        if (BO->getOpcode() == Instruction::SDiv) {
+          // Only a constant divisor of at least two bounds the quotient by the
+          // dividend: C == 0 makes the division poison, for C == 1 the facts
+          // below are vacuous, and for a negative C the quotient is not below a
+          // non-negative dividend.
+          ConstantInt *C;
+          if (!match(BO->getOperand(1), m_ConstantInt(C)) ||
+              C->getValue().sle(1))
+            continue;
+          Value *X = BO->getOperand(0);
+          Constant *Zero = Constant::getNullValue(BO->getType());
+          if (Info.doesHold(CmpInst::ICMP_SGE, X, Zero) ||
+              isKnownNonNegative(X, F.getDataLayout())) {
+            // sdiv x, C: result >= 0, if x >= 0 and C > 1 (the quotient of a
+            // non-negative dividend by a positive divisor is non-negative)
+            AddFact(CmpInst::ICMP_SGE, BO, Zero);
+            // sdiv x, C: result < x, if x > 0 and C > 1. The division truncates
+            // towards zero, so the result is the floor of x / C, which is below
+            // x for x > 0 and C > 1. For x == 0 the result is 0 and only the
+            // non-strict bound holds. The strict bound is what relates a
+            // binary-search midpoint `low + (high - low) / 2` back to `high`.
+            if (Info.doesHold(CmpInst::ICMP_SGT, X, Zero) ||
+                isKnownPositive(X, F.getDataLayout()))
+              AddFact(CmpInst::ICMP_SLT, BO, X);
+            else
+              AddFact(CmpInst::ICMP_SLE, BO, X);
           }
           continue;
         }
