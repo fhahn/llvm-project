@@ -1451,9 +1451,10 @@ void VPlanTransforms::modelGeneratedMainLoopBlocks(
 
   // Map each block of the chain to the VPIRBasicBlock modeling it in Plan.
   // Plan's entry already wraps the block heading the chain, EnteredFrom the
-  // block Plan is entered from and MainLoopCheck the block whose bypass edge
-  // has been modeled already; the rest get a fresh, empty wrapper. Only blocks
-  // of the chain are mapped, so the plan cannot reach beyond them.
+  // block Plan is entered from and MainLoopCheck, unless the check has been
+  // folded, the block whose bypass edge has been modeled already; the rest get
+  // a fresh, empty wrapper. Only blocks of the chain are mapped, so the plan
+  // cannot reach beyond them.
   auto *EntryVPBB = cast<VPIRBasicBlock>(Plan.getEntry());
   assert(EntryVPBB->getIRBasicBlock() == Chain.front()->getIRBasicBlock() &&
          "entry must wrap the block heading the chain");
@@ -1462,7 +1463,7 @@ void VPlanTransforms::modelGeneratedMainLoopBlocks(
   Modeled[Chain.front()] = EntryVPBB;
   for (VPIRBasicBlock *MainVPBB : drop_begin(Chain)) {
     BasicBlock *BB = MainVPBB->getIRBasicBlock();
-    Modeled[MainVPBB] = BB == MainLoopCheck->getIRBasicBlock()
+    Modeled[MainVPBB] = MainLoopCheck && BB == MainLoopCheck->getIRBasicBlock()
                             ? MainLoopCheck
                             : Plan.createEmptyVPIRBasicBlock(BB);
   }
@@ -1476,7 +1477,9 @@ void VPlanTransforms::modelGeneratedMainLoopBlocks(
   for (VPIRBasicBlock *MainVPBB : reverse(Chain)) {
     VPIRBasicBlock *VPBB = Modeled.at(MainVPBB);
     // MainLoopCheck bypasses the main vector loop only; its bypass edge to the
-    // preheader of the epilogue vector loop has been modeled already.
+    // preheader of the epilogue vector loop has been modeled already. It is
+    // null if the check has been folded, in which case it no longer bypasses
+    // the main vector loop and hence does not match the shape tested for here.
     if (VPBB == MainLoopCheck || MainVPBB->getNumSuccessors() != 2 ||
         MainVPBB->getSuccessors()[0] != MainScalarPH)
       continue;

@@ -245,7 +245,8 @@ struct VPlanTransforms {
   /// already wraps the block holding the iteration count check for the epilogue
   /// vector loop, which heads the chain of generated blocks. \p MainLoopCheck
   /// is the block already modeled for the iteration count check of the main
-  /// vector loop.
+  /// vector loop, or nullptr if the check has been folded and no longer
+  /// bypasses.
   static void modelGeneratedMainLoopBlocks(VPlan &Plan, VPlan &MainPlan,
                                            VPIRBasicBlock *EnteredFrom,
                                            VPIRBasicBlock *MainLoopCheck);
