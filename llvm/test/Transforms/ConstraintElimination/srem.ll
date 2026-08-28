@@ -2,6 +2,7 @@
 ; RUN: opt -passes=constraint-elimination -S %s | FileCheck %s
 
 declare void @llvm.assume(i1)
+declare void @use(i32)
 
 define i1 @srem_sge_zero(i32 noundef %x, i32 noundef %n) {
 ; CHECK-LABEL: define i1 @srem_sge_zero(
@@ -269,8 +270,8 @@ define i1 @neg_srem_wrong_direction(i32 noundef %x, i32 noundef %n, i32 noundef 
   ret i1 %c
 }
 
-define i1 @neg_sdiv_not_handled(i32 noundef %x, i32 noundef %n, i32 noundef %limit) {
-; CHECK-LABEL: define i1 @neg_sdiv_not_handled(
+define i1 @neg_sdiv_non_constant_divisor(i32 noundef %x, i32 noundef %n, i32 noundef %limit) {
+; CHECK-LABEL: define i1 @neg_sdiv_non_constant_divisor(
 ; CHECK-SAME: i32 noundef [[X:%.*]], i32 noundef [[N:%.*]], i32 noundef [[LIMIT:%.*]]) {
 ; CHECK-NEXT:    [[NNEG:%.*]] = icmp sge i32 [[X]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[NNEG]])
@@ -287,4 +288,320 @@ define i1 @neg_sdiv_not_handled(i32 noundef %x, i32 noundef %n, i32 noundef %lim
   %q = sdiv i32 %x, %n
   %c = icmp sle i32 %q, %limit
   ret i1 %c
+}
+
+define i1 @sdiv_sge_zero(i32 noundef %x) {
+; CHECK-LABEL: define i1 @sdiv_sge_zero(
+; CHECK-SAME: i32 noundef [[X:%.*]]) {
+; CHECK-NEXT:    [[NNEG:%.*]] = icmp sge i32 [[X]], 0
+; CHECK-NEXT:    call void @llvm.assume(i1 [[NNEG]])
+; CHECK-NEXT:    [[Q:%.*]] = sdiv i32 [[X]], 4
+; CHECK-NEXT:    ret i1 true
+;
+  %nneg = icmp sge i32 %x, 0
+  call void @llvm.assume(i1 %nneg)
+  %q = sdiv i32 %x, 4
+  %c = icmp sge i32 %q, 0
+  ret i1 %c
+}
+
+define i1 @sdiv_sle_dividend(i32 noundef %x) {
+; CHECK-LABEL: define i1 @sdiv_sle_dividend(
+; CHECK-SAME: i32 noundef [[X:%.*]]) {
+; CHECK-NEXT:    [[NNEG:%.*]] = icmp sge i32 [[X]], 0
+; CHECK-NEXT:    call void @llvm.assume(i1 [[NNEG]])
+; CHECK-NEXT:    [[Q:%.*]] = sdiv i32 [[X]], 2
+; CHECK-NEXT:    ret i1 true
+;
+  %nneg = icmp sge i32 %x, 0
+  call void @llvm.assume(i1 %nneg)
+  %q = sdiv i32 %x, 2
+  %c = icmp sle i32 %q, %x
+  ret i1 %c
+}
+
+define i1 @sdiv_slt_dividend(i32 noundef %x) {
+; CHECK-LABEL: define i1 @sdiv_slt_dividend(
+; CHECK-SAME: i32 noundef [[X:%.*]]) {
+; CHECK-NEXT:    [[POS:%.*]] = icmp sgt i32 [[X]], 0
+; CHECK-NEXT:    call void @llvm.assume(i1 [[POS]])
+; CHECK-NEXT:    [[Q:%.*]] = sdiv i32 [[X]], 2
+; CHECK-NEXT:    ret i1 true
+;
+  %pos = icmp sgt i32 %x, 0
+  call void @llvm.assume(i1 %pos)
+  %q = sdiv i32 %x, 2
+  %c = icmp slt i32 %q, %x
+  ret i1 %c
+}
+
+define i1 @sdiv_upper_bound_transitive(i32 noundef %x, i32 noundef %limit) {
+; CHECK-LABEL: define i1 @sdiv_upper_bound_transitive(
+; CHECK-SAME: i32 noundef [[X:%.*]], i32 noundef [[LIMIT:%.*]]) {
+; CHECK-NEXT:    [[POS:%.*]] = icmp sgt i32 [[X]], 0
+; CHECK-NEXT:    call void @llvm.assume(i1 [[POS]])
+; CHECK-NEXT:    [[LE:%.*]] = icmp sle i32 [[X]], [[LIMIT]]
+; CHECK-NEXT:    call void @llvm.assume(i1 [[LE]])
+; CHECK-NEXT:    [[Q:%.*]] = sdiv i32 [[X]], 3
+; CHECK-NEXT:    ret i1 true
+;
+  %pos = icmp sgt i32 %x, 0
+  call void @llvm.assume(i1 %pos)
+  %le = icmp sle i32 %x, %limit
+  call void @llvm.assume(i1 %le)
+  %q = sdiv i32 %x, 3
+  %c = icmp slt i32 %q, %limit
+  ret i1 %c
+}
+
+define i1 @sdiv_ult_dividend_via_transfer(i32 noundef %x) {
+; CHECK-LABEL: define i1 @sdiv_ult_dividend_via_transfer(
+; CHECK-SAME: i32 noundef [[X:%.*]]) {
+; CHECK-NEXT:    [[POS:%.*]] = icmp sgt i32 [[X]], 0
+; CHECK-NEXT:    call void @llvm.assume(i1 [[POS]])
+; CHECK-NEXT:    [[Q:%.*]] = sdiv i32 [[X]], 4
+; CHECK-NEXT:    ret i1 true
+;
+  %pos = icmp sgt i32 %x, 0
+  call void @llvm.assume(i1 %pos)
+  %q = sdiv i32 %x, 4
+  %c = icmp ult i32 %q, %x
+  ret i1 %c
+}
+
+define i1 @sdiv_nneg_dividend_from_valuetracking(i32 noundef %y) {
+; CHECK-LABEL: define i1 @sdiv_nneg_dividend_from_valuetracking(
+; CHECK-SAME: i32 noundef [[Y:%.*]]) {
+; CHECK-NEXT:    [[X:%.*]] = and i32 [[Y]], 255
+; CHECK-NEXT:    [[Q:%.*]] = sdiv i32 [[X]], 2
+; CHECK-NEXT:    ret i1 true
+;
+  %x = and i32 %y, 255
+  %q = sdiv i32 %x, 2
+  %c = icmp sge i32 %q, 0
+  ret i1 %c
+}
+
+define i1 @sdiv_smax_divisor(i64 noundef %x, i64 noundef %limit) {
+; CHECK-LABEL: define i1 @sdiv_smax_divisor(
+; CHECK-SAME: i64 noundef [[X:%.*]], i64 noundef [[LIMIT:%.*]]) {
+; CHECK-NEXT:    [[POS:%.*]] = icmp sgt i64 [[X]], 0
+; CHECK-NEXT:    call void @llvm.assume(i1 [[POS]])
+; CHECK-NEXT:    [[LE:%.*]] = icmp sle i64 [[X]], [[LIMIT]]
+; CHECK-NEXT:    call void @llvm.assume(i1 [[LE]])
+; CHECK-NEXT:    [[Q:%.*]] = sdiv i64 [[X]], 9223372036854775807
+; CHECK-NEXT:    ret i1 true
+;
+  %pos = icmp sgt i64 %x, 0
+  call void @llvm.assume(i1 %pos)
+  %le = icmp sle i64 %x, %limit
+  call void @llvm.assume(i1 %le)
+  %q = sdiv i64 %x, 9223372036854775807
+  %c = icmp slt i64 %q, %limit
+  ret i1 %c
+}
+
+; The binary-search midpoint `low + (high - low) / 2` stays in [low, high) when
+; low <s high. The lower bound needs `(high - low) / 2 >=s 0`, the upper one the
+; strict `(high - low) / 2 <s high - low`.
+define void @sdiv_binary_search_midpoint_lower(i32 noundef %low, i32 noundef %high) {
+; CHECK-LABEL: define void @sdiv_binary_search_midpoint_lower(
+; CHECK-SAME: i32 noundef [[LOW:%.*]], i32 noundef [[HIGH:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[CMP:%.*]] = icmp slt i32 [[LOW]], [[HIGH]]
+; CHECK-NEXT:    br i1 [[CMP]], label %[[THEN:.*]], label %[[EXIT:.*]]
+; CHECK:       [[THEN]]:
+; CHECK-NEXT:    [[D:%.*]] = sub nsw i32 [[HIGH]], [[LOW]]
+; CHECK-NEXT:    [[HALF:%.*]] = sdiv i32 [[D]], 2
+; CHECK-NEXT:    [[MID:%.*]] = add nsw i32 [[LOW]], [[HALF]]
+; CHECK-NEXT:    br i1 true, label %[[EXIT]], label %[[TRAP:.*]]
+; CHECK:       [[TRAP]]:
+; CHECK-NEXT:    call void @use(i32 [[MID]])
+; CHECK-NEXT:    ret void
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  %cmp = icmp slt i32 %low, %high
+  br i1 %cmp, label %then, label %exit
+
+then:
+  %d = sub nsw i32 %high, %low
+  %half = sdiv i32 %d, 2
+  %mid = add nsw i32 %low, %half
+  %c = icmp sge i32 %mid, %low
+  br i1 %c, label %exit, label %trap
+
+trap:
+  call void @use(i32 %mid)
+  ret void
+
+exit:
+  ret void
+}
+
+define void @sdiv_binary_search_midpoint_upper(i32 noundef %low, i32 noundef %high) {
+; CHECK-LABEL: define void @sdiv_binary_search_midpoint_upper(
+; CHECK-SAME: i32 noundef [[LOW:%.*]], i32 noundef [[HIGH:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[CMP:%.*]] = icmp slt i32 [[LOW]], [[HIGH]]
+; CHECK-NEXT:    br i1 [[CMP]], label %[[THEN:.*]], label %[[EXIT:.*]]
+; CHECK:       [[THEN]]:
+; CHECK-NEXT:    [[D:%.*]] = sub nsw i32 [[HIGH]], [[LOW]]
+; CHECK-NEXT:    [[HALF:%.*]] = sdiv i32 [[D]], 2
+; CHECK-NEXT:    [[MID:%.*]] = add nsw i32 [[LOW]], [[HALF]]
+; CHECK-NEXT:    br i1 true, label %[[EXIT]], label %[[TRAP:.*]]
+; CHECK:       [[TRAP]]:
+; CHECK-NEXT:    call void @use(i32 [[MID]])
+; CHECK-NEXT:    ret void
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  %cmp = icmp slt i32 %low, %high
+  br i1 %cmp, label %then, label %exit
+
+then:
+  %d = sub nsw i32 %high, %low
+  %half = sdiv i32 %d, 2
+  %mid = add nsw i32 %low, %half
+  %c = icmp slt i32 %mid, %high
+  br i1 %c, label %exit, label %trap
+
+trap:
+  call void @use(i32 %mid)
+  ret void
+
+exit:
+  ret void
+}
+
+; Negative tests, one per pre-condition.
+
+; sdiv x, -2 with x == 2 is -1, so the result is not non-negative.
+define i1 @neg_sdiv_negative_divisor(i32 noundef %x) {
+; CHECK-LABEL: define i1 @neg_sdiv_negative_divisor(
+; CHECK-SAME: i32 noundef [[X:%.*]]) {
+; CHECK-NEXT:    [[NNEG:%.*]] = icmp sge i32 [[X]], 0
+; CHECK-NEXT:    call void @llvm.assume(i1 [[NNEG]])
+; CHECK-NEXT:    [[Q:%.*]] = sdiv i32 [[X]], -2
+; CHECK-NEXT:    [[C:%.*]] = icmp sge i32 [[Q]], 0
+; CHECK-NEXT:    ret i1 [[C]]
+;
+  %nneg = icmp sge i32 %x, 0
+  call void @llvm.assume(i1 %nneg)
+  %q = sdiv i32 %x, -2
+  %c = icmp sge i32 %q, 0
+  ret i1 %c
+}
+
+; sdiv x, 1 is x, so the strict bound does not hold.
+define i1 @neg_sdiv_divisor_one(i32 noundef %x) {
+; CHECK-LABEL: define i1 @neg_sdiv_divisor_one(
+; CHECK-SAME: i32 noundef [[X:%.*]]) {
+; CHECK-NEXT:    [[POS:%.*]] = icmp sgt i32 [[X]], 0
+; CHECK-NEXT:    call void @llvm.assume(i1 [[POS]])
+; CHECK-NEXT:    [[Q:%.*]] = sdiv i32 [[X]], 1
+; CHECK-NEXT:    [[C:%.*]] = icmp slt i32 [[Q]], [[X]]
+; CHECK-NEXT:    ret i1 [[C]]
+;
+  %pos = icmp sgt i32 %x, 0
+  call void @llvm.assume(i1 %pos)
+  %q = sdiv i32 %x, 1
+  %c = icmp slt i32 %q, %x
+  ret i1 %c
+}
+
+define i1 @neg_sdiv_divisor_zero(i32 noundef %x) {
+; CHECK-LABEL: define i1 @neg_sdiv_divisor_zero(
+; CHECK-SAME: i32 noundef [[X:%.*]]) {
+; CHECK-NEXT:    [[NNEG:%.*]] = icmp sge i32 [[X]], 0
+; CHECK-NEXT:    call void @llvm.assume(i1 [[NNEG]])
+; CHECK-NEXT:    [[Q:%.*]] = sdiv i32 [[X]], 0
+; CHECK-NEXT:    [[C:%.*]] = icmp sge i32 [[Q]], 0
+; CHECK-NEXT:    ret i1 [[C]]
+;
+  %nneg = icmp sge i32 %x, 0
+  call void @llvm.assume(i1 %nneg)
+  %q = sdiv i32 %x, 0
+  %c = icmp sge i32 %q, 0
+  ret i1 %c
+}
+
+define i1 @neg_sdiv_dividend_sign_unknown(i32 noundef %x) {
+; CHECK-LABEL: define i1 @neg_sdiv_dividend_sign_unknown(
+; CHECK-SAME: i32 noundef [[X:%.*]]) {
+; CHECK-NEXT:    [[Q:%.*]] = sdiv i32 [[X]], 2
+; CHECK-NEXT:    [[C:%.*]] = icmp sge i32 [[Q]], 0
+; CHECK-NEXT:    ret i1 [[C]]
+;
+  %q = sdiv i32 %x, 2
+  %c = icmp sge i32 %q, 0
+  ret i1 %c
+}
+
+; sdiv x, 2 with x == -4 is -2, which is not s<= -4: without the non-negative
+; dividend pre-condition this would fold to true.
+define i1 @neg_sdiv_negative_dividend(i32 noundef %x) {
+; CHECK-LABEL: define i1 @neg_sdiv_negative_dividend(
+; CHECK-SAME: i32 noundef [[X:%.*]]) {
+; CHECK-NEXT:    [[NEG:%.*]] = icmp slt i32 [[X]], 0
+; CHECK-NEXT:    call void @llvm.assume(i1 [[NEG]])
+; CHECK-NEXT:    [[Q:%.*]] = sdiv i32 [[X]], 2
+; CHECK-NEXT:    [[C:%.*]] = icmp sle i32 [[Q]], [[X]]
+; CHECK-NEXT:    ret i1 [[C]]
+;
+  %neg = icmp slt i32 %x, 0
+  call void @llvm.assume(i1 %neg)
+  %q = sdiv i32 %x, 2
+  %c = icmp sle i32 %q, %x
+  ret i1 %c
+}
+
+; sdiv x, 2 with x == 0 is 0, which is not s< 0: the strict bound needs a
+; strictly positive dividend, not just a non-negative one.
+define i1 @neg_sdiv_strict_needs_positive_dividend(i32 noundef %x) {
+; CHECK-LABEL: define i1 @neg_sdiv_strict_needs_positive_dividend(
+; CHECK-SAME: i32 noundef [[X:%.*]]) {
+; CHECK-NEXT:    [[NNEG:%.*]] = icmp sge i32 [[X]], 0
+; CHECK-NEXT:    call void @llvm.assume(i1 [[NNEG]])
+; CHECK-NEXT:    [[Q:%.*]] = sdiv i32 [[X]], 2
+; CHECK-NEXT:    [[C:%.*]] = icmp slt i32 [[Q]], [[X]]
+; CHECK-NEXT:    ret i1 [[C]]
+;
+  %nneg = icmp sge i32 %x, 0
+  call void @llvm.assume(i1 %nneg)
+  %q = sdiv i32 %x, 2
+  %c = icmp slt i32 %q, %x
+  ret i1 %c
+}
+
+; Same as @sdiv_nneg_dividend_from_valuetracking, but the dividend may be
+; poison, so no fact is recorded for the division.
+define i1 @neg_sdiv_no_noundef(i32 %y) {
+; CHECK-LABEL: define i1 @neg_sdiv_no_noundef(
+; CHECK-SAME: i32 [[Y:%.*]]) {
+; CHECK-NEXT:    [[X:%.*]] = and i32 [[Y]], 255
+; CHECK-NEXT:    [[Q:%.*]] = sdiv i32 [[X]], 2
+; CHECK-NEXT:    [[C:%.*]] = icmp sge i32 [[Q]], 0
+; CHECK-NEXT:    ret i1 [[C]]
+;
+  %x = and i32 %y, 255
+  %q = sdiv i32 %x, 2
+  %c = icmp sge i32 %q, 0
+  ret i1 %c
+}
+
+define <2 x i1> @neg_sdiv_vector(<2 x i32> noundef %y) {
+; CHECK-LABEL: define <2 x i1> @neg_sdiv_vector(
+; CHECK-SAME: <2 x i32> noundef [[Y:%.*]]) {
+; CHECK-NEXT:    [[X:%.*]] = and <2 x i32> [[Y]], splat (i32 255)
+; CHECK-NEXT:    [[Q:%.*]] = sdiv <2 x i32> [[X]], splat (i32 2)
+; CHECK-NEXT:    [[C:%.*]] = icmp sge <2 x i32> [[Q]], zeroinitializer
+; CHECK-NEXT:    ret <2 x i1> [[C]]
+;
+  %x = and <2 x i32> %y, splat (i32 255)
+  %q = sdiv <2 x i32> %x, splat (i32 2)
+  %c = icmp sge <2 x i32> %q, zeroinitializer
+  ret <2 x i1> %c
 }
