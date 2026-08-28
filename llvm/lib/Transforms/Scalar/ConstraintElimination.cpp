@@ -574,7 +574,9 @@ static Decomposition decompose(Value *V, const ConstraintInfo &Info,
         V = Op0;
     }
 
-    if (match(V, m_NSWAdd(m_Value(Op0), m_Value(Op1)))) {
+    // `or disjoint` is an add with no carry between its operands, so it cannot
+    // wrap in either direction and is exactly their sum.
+    if (match(V, m_NSWAddLike(m_Value(Op0), m_Value(Op1)))) {
       if (auto Decomp = MergeResults(Op0, Op1, IsSigned))
         return *Decomp;
       return V;

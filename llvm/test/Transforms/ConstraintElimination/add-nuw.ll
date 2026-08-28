@@ -741,4 +741,56 @@ entry:
   ret i1 %res.1
 }
 
+; Negative test: `add nuw` is not the sum of its operands in the signed system,
+; even with both operands known non-negative, so the signed facts below must not
+; be decomposed. Doing so would derive %base + %i <u %count from
+;   %base >=s 0, %cap >=s 0, %base + %cap <=s %count, %i >=s 0, %i <s %cap
+; which is wrong for %base = 64, %cap = 64, %count = 0, %i = 0: both adds are
+; nuw, %cap + %base = -128 <=s 0, but %i + %base = 64 is not <u 0.
+define i1 @test_add_nuw_not_decomposed_in_signed_system(i8 %count, i8 %base, i8 %cap, i8 %i) {
+; CHECK-LABEL: @test_add_nuw_not_decomposed_in_signed_system(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[BASE_NONNEG:%.*]] = icmp sgt i8 [[BASE:%.*]], -1
+; CHECK-NEXT:    [[CAP_NONNEG:%.*]] = icmp sgt i8 [[CAP:%.*]], -1
+; CHECK-NEXT:    [[AND_1:%.*]] = and i1 [[BASE_NONNEG]], [[CAP_NONNEG]]
+; CHECK-NEXT:    br i1 [[AND_1]], label [[GUARD:%.*]], label [[EXIT:%.*]]
+; CHECK:       guard:
+; CHECK-NEXT:    [[SUM:%.*]] = add nuw i8 [[CAP]], [[BASE]]
+; CHECK-NEXT:    [[LE:%.*]] = icmp sge i8 [[COUNT:%.*]], [[SUM]]
+; CHECK-NEXT:    [[I_NONNEG:%.*]] = icmp sgt i8 [[I:%.*]], -1
+; CHECK-NEXT:    [[AND_2:%.*]] = and i1 [[LE]], [[I_NONNEG]]
+; CHECK-NEXT:    [[I_LT_CAP:%.*]] = icmp slt i8 [[I]], [[CAP]]
+; CHECK-NEXT:    [[AND_3:%.*]] = and i1 [[AND_2]], [[I_LT_CAP]]
+; CHECK-NEXT:    br i1 [[AND_3]], label [[THEN:%.*]], label [[EXIT]]
+; CHECK:       then:
+; CHECK-NEXT:    [[IDX:%.*]] = add nuw i8 [[I]], [[BASE]]
+; CHECK-NEXT:    [[C:%.*]] = icmp ult i8 [[IDX]], [[COUNT]]
+; CHECK-NEXT:    ret i1 [[C]]
+; CHECK:       exit:
+; CHECK-NEXT:    ret i1 false
+;
+entry:
+  %base.nonneg = icmp sgt i8 %base, -1
+  %cap.nonneg = icmp sgt i8 %cap, -1
+  %and.1 = and i1 %base.nonneg, %cap.nonneg
+  br i1 %and.1, label %guard, label %exit
+
+guard:
+  %sum = add nuw i8 %cap, %base
+  %le = icmp sge i8 %count, %sum
+  %i.nonneg = icmp sgt i8 %i, -1
+  %and.2 = and i1 %le, %i.nonneg
+  %i.lt.cap = icmp slt i8 %i, %cap
+  %and.3 = and i1 %and.2, %i.lt.cap
+  br i1 %and.3, label %then, label %exit
+
+then:
+  %idx = add nuw i8 %i, %base
+  %c = icmp ult i8 %idx, %count
+  ret i1 %c
+
+exit:
+  ret i1 false
+}
+
 declare void @llvm.assume(i1)
