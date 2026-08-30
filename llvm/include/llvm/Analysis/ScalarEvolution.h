@@ -1557,8 +1557,17 @@ public:
   LLVM_ABI void setNoWrapFlags(SCEVAddRecExpr *AddRec, SCEV::NoWrapFlags Flags);
 
   class LoopGuards {
+    /// A condition (LHS Pred RHS) that is known to hold, collected from the
+    /// CFG, assumptions or guard intrinsics.
+    using GuardCondition =
+        std::tuple<ICmpInst::Predicate, const SCEV *, const SCEV *>;
+
     DenseMap<const SCEV *, const SCEV *> RewriteMap;
     SmallDenseSet<std::pair<const SCEV *, const SCEV *>> NotEqual;
+    /// The conditions RewriteMap has been built from. Only populated while
+    /// collecting the guards, so recursive collections can inspect the
+    /// conditions found for the blocks they descend into.
+    SmallVector<GuardCondition, 4> Conditions;
     bool PreserveNUW = false;
     bool PreserveNSW = false;
     ScalarEvolution &SE;

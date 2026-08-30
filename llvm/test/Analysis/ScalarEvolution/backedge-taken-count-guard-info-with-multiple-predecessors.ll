@@ -409,3 +409,124 @@ bb8:                                              ; preds = %bb8, %bb6
 bb12:                                             ; preds = %bb8, %bb6
   ret void
 }
+
+; The remainder loop of a manually strided loop runs at most 7 times: on the
+; edge from %entry, %i.merge is 0 and %n u< 8, on the edge from the strided
+; loop, %i.merge + 8 u> %n. Both restate to (%n u< %i.merge + 8), which
+; together with the loop guard (%i.merge u< %n) bounds (%n - %i.merge) by 7.
+define void @remainder_after_strided_loop(ptr %dst, i64 %n) {
+; CHECK-LABEL: 'remainder_after_strided_loop'
+; CHECK-NEXT:  Determining loop execution counts for: @remainder_after_strided_loop
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + (-1 * %i.merge) + %n)
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 6
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + (-1 * %i.merge) + %n)
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+; CHECK-NEXT:  Loop %main: Unpredictable backedge-taken count.
+; CHECK-NEXT:  Loop %main: Unpredictable constant max backedge-taken count.
+; CHECK-NEXT:  Loop %main: Unpredictable symbolic max backedge-taken count.
+; CHECK-NEXT:  Loop %main: Predicated backedge-taken count is ((-8 + (zext i64 %n to i128))<nsw> /u 8)
+; CHECK-NEXT:   Predicates:
+; CHECK-NEXT:      {16,+,8}<%main> Added Flags: <nusw>
+; CHECK-NEXT:  Loop %main: Predicated constant max backedge-taken count is i128 2305843009213693950
+; CHECK-NEXT:   Predicates:
+; CHECK-NEXT:      {16,+,8}<%main> Added Flags: <nusw>
+; CHECK-NEXT:  Loop %main: Predicated symbolic max backedge-taken count is ((-8 + (zext i64 %n to i128))<nsw> /u 8)
+; CHECK-NEXT:   Predicates:
+; CHECK-NEXT:      {16,+,8}<%main> Added Flags: <nusw>
+;
+entry:
+  %c = icmp ult i64 %n, 8
+  br i1 %c, label %remainder.ph, label %main.ph
+
+main.ph:
+  br label %main
+
+main:
+  %i = phi i64 [ 0, %main.ph ], [ %i.next, %main ]
+  %gep.main = getelementptr i8, ptr %dst, i64 %i
+  store i8 1, ptr %gep.main
+  %i.next = add i64 %i, 8
+  %bound = add i64 %i.next, 8
+  %ec.main = icmp ugt i64 %bound, %n
+  br i1 %ec.main, label %main.exit, label %main
+
+main.exit:
+  %i.lcssa = phi i64 [ %i.next, %main ]
+  br label %remainder.ph
+
+remainder.ph:
+  %i.merge = phi i64 [ 0, %entry ], [ %i.lcssa, %main.exit ]
+  %c.2 = icmp ult i64 %i.merge, %n
+  br i1 %c.2, label %loop, label %exit
+
+loop:
+  %iv = phi i64 [ %i.merge, %remainder.ph ], [ %iv.next, %loop ]
+  %gep = getelementptr i8, ptr %dst, i64 %iv
+  store i8 0, ptr %gep
+  %iv.next = add nuw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; Same as above, but the guard on the edge from %entry bounds %n by 4, not by
+; the stride of the main loop. The conditions restated for %i.merge differ
+; between the incoming edges, so nothing can be merged.
+define void @remainder_after_strided_loop_mismatched_bounds(ptr %dst, i64 %n) {
+; CHECK-LABEL: 'remainder_after_strided_loop_mismatched_bounds'
+; CHECK-NEXT:  Determining loop execution counts for: @remainder_after_strided_loop_mismatched_bounds
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + (-1 * %i.merge) + %n)
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -2
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + (-1 * %i.merge) + %n)
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+; CHECK-NEXT:  Loop %main: Unpredictable backedge-taken count.
+; CHECK-NEXT:  Loop %main: Unpredictable constant max backedge-taken count.
+; CHECK-NEXT:  Loop %main: Unpredictable symbolic max backedge-taken count.
+; CHECK-NEXT:  Loop %main: Predicated backedge-taken count is ((-9 + (16 umax (1 + (zext i64 %n to i128))<nuw><nsw>))<nsw> /u 8)
+; CHECK-NEXT:   Predicates:
+; CHECK-NEXT:      {16,+,8}<%main> Added Flags: <nusw>
+; CHECK-NEXT:  Loop %main: Predicated constant max backedge-taken count is i128 2305843009213693950
+; CHECK-NEXT:   Predicates:
+; CHECK-NEXT:      {16,+,8}<%main> Added Flags: <nusw>
+; CHECK-NEXT:  Loop %main: Predicated symbolic max backedge-taken count is ((-9 + (16 umax (1 + (zext i64 %n to i128))<nuw><nsw>))<nsw> /u 8)
+; CHECK-NEXT:   Predicates:
+; CHECK-NEXT:      {16,+,8}<%main> Added Flags: <nusw>
+;
+entry:
+  %c = icmp ult i64 %n, 4
+  br i1 %c, label %remainder.ph, label %main.ph
+
+main.ph:
+  br label %main
+
+main:
+  %i = phi i64 [ 0, %main.ph ], [ %i.next, %main ]
+  %gep.main = getelementptr i8, ptr %dst, i64 %i
+  store i8 1, ptr %gep.main
+  %i.next = add i64 %i, 8
+  %bound = add i64 %i.next, 8
+  %ec.main = icmp ugt i64 %bound, %n
+  br i1 %ec.main, label %main.exit, label %main
+
+main.exit:
+  %i.lcssa = phi i64 [ %i.next, %main ]
+  br label %remainder.ph
+
+remainder.ph:
+  %i.merge = phi i64 [ 0, %entry ], [ %i.lcssa, %main.exit ]
+  %c.2 = icmp ult i64 %i.merge, %n
+  br i1 %c.2, label %loop, label %exit
+
+loop:
+  %iv = phi i64 [ %i.merge, %remainder.ph ], [ %iv.next, %loop ]
+  %gep = getelementptr i8, ptr %dst, i64 %iv
+  store i8 0, ptr %gep
+  %iv.next = add nuw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}

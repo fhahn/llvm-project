@@ -15764,6 +15764,22 @@ ScalarEvolution::LoopGuards::collect(const Loop *L, ScalarEvolution &SE) {
   return Guards;
 }
 
+/// Returns true if \p S denotes the same value at \p BB as where it was
+/// formed, i.e. it is built only from values whose definitions dominate \p BB.
+/// AddRecs never qualify, as they denote a different value per iteration.
+static bool isAvailableAt(const SCEV *S, const BasicBlock *BB,
+                          const DominatorTree &DT) {
+  return !SCEVExprContains(S, [&](const SCEV *Op) {
+    if (isa<SCEVAddRecExpr>(Op))
+      return true;
+    const auto *U = dyn_cast<SCEVUnknown>(Op);
+    if (!U)
+      return false;
+    const auto *I = dyn_cast<Instruction>(U->getValue());
+    return I && !DT.dominates(I->getParent(), BB);
+  });
+}
+
 void ScalarEvolution::LoopGuards::collectFromPHI(
     ScalarEvolution &SE, ScalarEvolution::LoopGuards &Guards,
     const PHINode &Phi, SmallPtrSetImpl<const BasicBlock *> &VisitedBlocks,
@@ -15772,26 +15788,39 @@ void ScalarEvolution::LoopGuards::collectFromPHI(
   if (!SE.isSCEVable(Phi.getType()))
     return;
 
-  using MinMaxPattern = std::pair<const SCEVConstant *, SCEVTypes>;
-  auto GetMinMaxConst = [&](unsigned IncomingIdx) -> MinMaxPattern {
+  // Restating conditions in terms of Phi (see CollectPhiRelativeConds below)
+  // needs to add a constant offset to Phi, which requires an integer type.
+  // Skip header phis: on a backedge they hold the value of the previous
+  // iteration, so substituting an incoming value for them would need an index
+  // shift, and (Phi + C) would be an AddRec that is discarded below.
+  const Loop *PhiLoop = SE.LI.getLoopFor(Phi.getParent());
+  const bool CanRestate = !Phi.getType()->isPointerTy() &&
+                          (!PhiLoop || PhiLoop->getHeader() != Phi.getParent());
+
+  // Collect the guards that hold on the incoming edge \p IncomingIdx, or
+  // nullptr if they cannot be collected.
+  auto GetIncomingGuards = [&](unsigned IncomingIdx) -> const LoopGuards * {
     const BasicBlock *InBlock = Phi.getIncomingBlock(IncomingIdx);
     if (!VisitedBlocks.insert(InBlock).second)
-      return {nullptr, scCouldNotCompute};
+      return nullptr;
 
     // Avoid analyzing unreachable blocks so that we don't get trapped
     // traversing cycles with ill-formed dominance or infinite cycles
     if (!SE.DT.isReachableFromEntry(InBlock))
-      return {nullptr, scCouldNotCompute};
+      return nullptr;
 
     auto [G, Inserted] = IncomingGuards.try_emplace(InBlock, LoopGuards(SE));
     if (Inserted)
       collectFromBlock(SE, G->second, Phi.getParent(), InBlock, VisitedBlocks,
                        Depth + 1);
-    auto &RewriteMap = G->second.RewriteMap;
-    if (RewriteMap.empty())
-      return {nullptr, scCouldNotCompute};
-    auto S = RewriteMap.find(SE.getSCEV(Phi.getIncomingValue(IncomingIdx)));
-    if (S == RewriteMap.end())
+    return &G->second;
+  };
+
+  using MinMaxPattern = std::pair<const SCEVConstant *, SCEVTypes>;
+  auto GetMinMaxConst = [&](const LoopGuards &G,
+                            const SCEV *V) -> MinMaxPattern {
+    auto S = G.RewriteMap.find(V);
+    if (S == G.RewriteMap.end())
       return {nullptr, scCouldNotCompute};
     auto *SM = dyn_cast_if_present<SCEVMinMaxExpr>(S->second);
     if (!SM)
@@ -15819,18 +15848,93 @@ void ScalarEvolution::LoopGuards::collectFromPHI(
       llvm_unreachable("Trying to merge non-MinMaxExpr SCEVs.");
     }
   };
-  auto P = GetMinMaxConst(0);
-  for (unsigned int In = 1; In < Phi.getNumIncomingValues(); In++) {
-    if (!P.first)
+
+  // Formed on demand, as forming the SCEV for a phi is expensive and most phis
+  // do not contribute any information here.
+  const SCEV *PhiSCEV = nullptr;
+  auto GetPhiSCEV = [&] {
+    if (!PhiSCEV)
+      PhiSCEV = SE.getSCEV(const_cast<PHINode *>(&Phi));
+    return PhiSCEV;
+  };
+
+  // On the edge from an incoming block, Phi is equal to the corresponding
+  // incoming value \p V. Restate the conditions collected on that edge in
+  // terms of Phi: an operand of the form (V + C) for a constant C can be
+  // replaced by (Phi + C). Conditions obtained this way for every incoming
+  // edge also hold at Phi itself.
+  //
+  // The restated conditions are kept as (Pred, LHS, C), so that no SCEV needs
+  // to be built for the (Phi + C) operand of the candidates that do not hold
+  // on all incoming edges. C determines that operand, so intersecting the
+  // candidates is unaffected.
+  using PhiRelativeCond = std::tuple<ICmpInst::Predicate, const SCEV *, APInt>;
+  auto CollectPhiRelativeConds = [&](const LoopGuards &G, const SCEV *V,
+                                     SmallVectorImpl<PhiRelativeCond> &Result) {
+    // Restate (LHS Pred RHS) as (LHS Pred Phi + C), if RHS is (V + C) for
+    // a constant C. LHS itself has to be usable at the merge point.
+    auto Restate = [&](ICmpInst::Predicate Pred, const SCEV *LHS,
+                       const SCEV *RHS) {
+      if (RHS->getType() != V->getType())
+        return;
+      // Determine the difference structurally instead of subtracting the
+      // operands, which would create SCEV nodes for a difference that is
+      // rarely constant.
+      std::optional<APInt> C = SE.computeConstantDifference(RHS, V);
+      if (!C || !isAvailableAt(LHS, Phi.getParent(), SE.DT))
+        return;
+      Result.emplace_back(Pred, LHS, *C);
+    };
+    for (auto [Pred, LHS, RHS] : G.Conditions) {
+      Restate(Pred, LHS, RHS);
+      Restate(ICmpInst::getSwappedPredicate(Pred), RHS, LHS);
+    }
+  };
+
+  MinMaxPattern P = {nullptr, scCouldNotCompute};
+  SmallVector<PhiRelativeCond> CommonConds;
+  for (unsigned In = 0, E = Phi.getNumIncomingValues(); In != E; ++In) {
+    const LoopGuards *G = GetIncomingGuards(In);
+    if (!G) {
+      P.first = nullptr;
+      CommonConds.clear();
       break;
-    P = MergeMinMaxConst(P, GetMinMaxConst(In));
+    }
+
+    // Only form the SCEV for the incoming value if this edge can contribute
+    // anything.
+    const bool ShouldRestate = CanRestate && !G->Conditions.empty();
+    const SCEV *V = ShouldRestate || !G->RewriteMap.empty()
+                        ? SE.getSCEV(Phi.getIncomingValue(In))
+                        : nullptr;
+
+    MinMaxPattern IncomingP =
+        V ? GetMinMaxConst(*G, V) : MinMaxPattern{nullptr, scCouldNotCompute};
+    P = In == 0 ? IncomingP : MergeMinMaxConst(P, IncomingP);
+
+    SmallVector<PhiRelativeCond> IncomingConds;
+    if (ShouldRestate)
+      CollectPhiRelativeConds(*G, V, IncomingConds);
+    if (In == 0)
+      CommonConds = std::move(IncomingConds);
+    else
+      erase_if(CommonConds, [&IncomingConds](const PhiRelativeCond &C) {
+        return !is_contained(IncomingConds, C);
+      });
+
+    // Nothing left to merge for the remaining incoming values.
+    if (!P.first && CommonConds.empty())
+      break;
   }
+
   if (P.first) {
-    const SCEV *LHS = SE.getSCEV(const_cast<PHINode *>(&Phi));
-    SmallVector<SCEVUse, 2> Ops({P.first, LHS});
-    const SCEV *RHS = SE.getMinMaxExpr(P.second, Ops);
-    Guards.RewriteMap.insert({LHS, RHS});
+    const SCEV *PhiExpr = GetPhiSCEV();
+    SmallVector<SCEVUse, 2> Ops({P.first, PhiExpr});
+    Guards.RewriteMap.insert({PhiExpr, SE.getMinMaxExpr(P.second, Ops)});
   }
+  for (const auto &[Pred, LHS, C] : CommonConds)
+    Guards.Conditions.emplace_back(
+        Pred, LHS, SE.getAddExpr(GetPhiSCEV(), SE.getConstant(C)));
 }
 
 // Return a new SCEV that modifies \p Expr to the closest number divides by
@@ -16197,25 +16301,12 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
     if (Depth > 0 && NumCollectedConditions == 2)
       break;
   }
-  // Finally, if we stopped climbing the predecessor chain because
-  // there wasn't a unique one to continue, try to collect conditions
-  // for PHINodes by recursively following all of their incoming
-  // blocks and try to merge the found conditions to build a new one
-  // for the Phi.
-  if (Pair.second->hasNPredecessorsOrMore(2) &&
-      Depth < MaxLoopGuardCollectionDepth) {
-    SmallDenseMap<const BasicBlock *, LoopGuards> IncomingGuards;
-    for (auto &Phi : Pair.second->phis())
-      collectFromPHI(SE, Guards, Phi, VisitedBlocks, IncomingGuards, Depth);
-  }
-
   // Now apply the information from the collected conditions to
   // Guards.RewriteMap. Conditions are processed in reverse order, so the
   // earliest conditions is processed first, except guards with divisibility
   // information, which are moved to the back. This ensures the SCEVs with the
   // shortest dependency chains are constructed first.
-  SmallVector<std::tuple<CmpInst::Predicate, const SCEV *, const SCEV *>>
-      GuardsToProcess;
+  SmallVector<GuardCondition, 4> &GuardsToProcess = Guards.Conditions;
   for (auto [Term, EnterIfTrue] : reverse(Terms)) {
     SmallVector<Value *, 8> Worklist;
     SmallPtrSet<Value *, 8> Visited;
@@ -16248,6 +16339,17 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
         Worklist.push_back(R);
       }
     }
+  }
+
+  // Finally, if we stopped climbing the predecessor chain because there wasn't
+  // a unique one to continue, try to collect conditions for PHINodes by
+  // recursively following all of their incoming blocks and try to merge the
+  // found conditions to build a new one for the Phi.
+  if (Pair.second->hasNPredecessorsOrMore(2) &&
+      Depth < MaxLoopGuardCollectionDepth) {
+    SmallDenseMap<const BasicBlock *, LoopGuards> IncomingGuards;
+    for (auto &Phi : Pair.second->phis())
+      collectFromPHI(SE, Guards, Phi, VisitedBlocks, IncomingGuards, Depth);
   }
 
   // A pair of guards (A <=u B) and (B <=u A + C), with C constant, bounds the
