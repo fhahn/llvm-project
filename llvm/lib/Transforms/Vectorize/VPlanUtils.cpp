@@ -310,6 +310,20 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
     return CreateSCEV({LHSVal, RHSVal}, [&](ArrayRef<SCEVUse> Ops) {
       return SE.getSMinExpr(Ops[0], Ops[1]);
     });
+  // usub.sat X, Y is X - umin(X, Y), mirroring ScalarEvolution.
+  if (match(V, m_Intrinsic<Intrinsic::usub_sat>(m_VPValue(LHSVal),
+                                                m_VPValue(RHSVal))))
+    return CreateSCEV({LHSVal, RHSVal}, [&](ArrayRef<SCEVUse> Ops) {
+      return SE.getMinusSCEV(Ops[0], SE.getUMinExpr(Ops[0], Ops[1]),
+                             SCEV::FlagNUW);
+    });
+  // uadd.sat X, Y is umin(X, ~Y) + Y, mirroring ScalarEvolution.
+  if (match(V, m_Intrinsic<Intrinsic::uadd_sat>(m_VPValue(LHSVal),
+                                                m_VPValue(RHSVal))))
+    return CreateSCEV({LHSVal, RHSVal}, [&](ArrayRef<SCEVUse> Ops) {
+      return SE.getAddExpr(SE.getUMinExpr(Ops[0], SE.getNotSCEV(Ops[1])),
+                           Ops[1], SCEV::FlagNUW);
+    });
   if (match(V, m_Intrinsic<Intrinsic::abs>(m_VPValue(LHSVal), m_VPValue())))
     return CreateSCEV({LHSVal}, [&](ArrayRef<SCEVUse> Ops) {
       // is_int_min_poison is local to this intrinsic: poison on INT_MIN is
