@@ -180,6 +180,16 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
       return SE.getMinusSCEV(SE.getMinusOne(Ops[0]->getType()), Ops[0]);
     });
   }
+  // xor X, signmask is an add, which InstCombine forms as a strength
+  // reduction of add. Mirrors ScalarEvolution's createSCEV. The general
+  // `xor X, -1` case is handled by the m_Not match above.
+  const APInt *XorC;
+  if (match(V,
+            m_c_Binary<Instruction::Xor>(m_VPValue(LHSVal), m_APInt(XorC))) &&
+      XorC->isSignMask())
+    return CreateSCEV({LHSVal}, [&](ArrayRef<SCEVUse> Ops) {
+      return SE.getAddExpr(Ops[0], SE.getConstant(*XorC), SCEV::FlagAnyWrap, 0);
+    });
   if (match(V, m_Mul(m_VPValue(LHSVal), m_VPValue(RHSVal))))
     return CreateSCEV({LHSVal, RHSVal}, [&](ArrayRef<SCEVUse> Ops) {
       return SE.getMulExpr(Ops[0], Ops[1], SCEV::FlagAnyWrap, 0);
