@@ -16250,6 +16250,36 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
     }
   }
 
+  // A pair of guards (A <=u B) and (B <=u A + C), with C constant, bounds the
+  // difference (B - A) above by C: the first rules out the wrap of B - A, and
+  // a wrapping (A + C) makes both guards unsatisfiable. Trip counts of loops
+  // counting from A up to B are expressed in terms of that difference, while a
+  // rewrite of B alone cannot be related back to A.
+  //
+  // Collect into a map first, to find the matching (A <=u B) and because the
+  // derived guards cannot be appended while iterating GuardsToProcess.
+  SmallMapVector<std::pair<const SCEV *, const SCEV *>, bool, 4> UnsignedLess;
+  for (auto [Pred, LHS, RHS] : GuardsToProcess)
+    if (Pred == ICmpInst::ICMP_ULT || Pred == ICmpInst::ICMP_ULE)
+      UnsignedLess[{LHS, RHS}] |= ICmpInst::isStrictPredicate(Pred);
+
+  for (const auto &[Ops, IsStrict] : UnsignedLess) {
+    const auto &[B, UpperBound] = Ops;
+    const APInt *C;
+    const SCEV *A;
+    if (!match(UpperBound, m_scev_Add(m_scev_APInt(C), m_SCEV(A))) ||
+        !UnsignedLess.contains({A, B}))
+      continue;
+    // Pointer differences need a common base, which is not known here.
+    const SCEV *Diff = SE.getMinusSCEV(B, A);
+    if (isa<SCEVCouldNotCompute>(Diff))
+      continue;
+    // C is never zero, as getAddExpr folds away a zero addend, so (C - 1)
+    // cannot underflow to the vacuous -1.
+    GuardsToProcess.emplace_back(ICmpInst::ICMP_ULE, Diff,
+                                 SE.getConstant(IsStrict ? *C - 1 : *C));
+  }
+
   // Process divisibility guards in reverse order to populate DivGuards early.
   DenseMap<const SCEV *, APInt> Multiples;
   LoopGuards DivGuards(SE);
