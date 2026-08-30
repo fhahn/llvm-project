@@ -1780,6 +1780,70 @@ static void generateReproducer(Instruction *Cond, bool IsSigned, Module *M,
   assert(!verifyFunction(*F, &dbgs()));
 }
 
+/// The constraint systems model unbounded integers, so they do not know that
+/// every value is bounded by the range of its type. That is invisible to
+/// ordinary queries, but it makes a condition that singles out an extreme value
+/// of the type unprovable: `X == SMAX` cannot be refuted from `X s< W` alone,
+/// because the system holds no fact `W s<= SMAX`. For the widest type the bound
+/// is not even representable, as SMAX is the system's sentinel value.
+///
+/// Recover exactly that missing bit of information: if the system proves
+/// `X s< W` for some other value W of the same type, then, W being an in-range
+/// integer (W s<= SMAX), X s<= SMAX - 1. Symmetrically `X s> W` gives
+/// X s>= SMIN + 1. Either fact decides any condition whose truth depends only
+/// on whether X is the corresponding extreme value, such as the `X == SMAX`
+/// that an `sadd.with.overflow(X, 1)` check canonicalizes to.
+static std::optional<bool> checkConditionAtSignedExtreme(
+    CmpInst::Predicate Pred, Value *A, Value *B, const ConstraintInfo &Info) {
+  Type *Ty = A->getType();
+  const APInt *C;
+  if (!Ty->isIntegerTy() || !match(B, m_APInt(C)))
+    return std::nullopt;
+
+  // The set of values of A for which the condition is true.
+  ConstantRange CR = ConstantRange::makeExactICmpRegion(Pred, *C);
+  unsigned BitWidth = Ty->getIntegerBitWidth();
+  for (bool AtMax : {true, false}) {
+    APInt Extreme = AtMax ? APInt::getSignedMaxValue(BitWidth)
+                          : APInt::getSignedMinValue(BitWidth);
+    // Knowing A != Extreme only decides the condition if being Extreme is the
+    // only thing that can make it true, or the only thing that can make it
+    // false. Conditions that are already constant are not this rule's business.
+    auto OnlyExtreme = [&Extreme](const ConstantRange &R) {
+      const APInt *Single = R.getSingleElement();
+      return Single && *Single == Extreme;
+    };
+    std::optional<bool> Result;
+    if (OnlyExtreme(CR))
+      Result = false;
+    else if (OnlyExtreme(CR.inverse()))
+      Result = true;
+    else
+      continue;
+
+    // Look for a bound that keeps A strictly on the near side of Extreme.
+    // Prefer the direct query against the neighbouring constant, which is
+    // representable even when Extreme is not. Otherwise fall back to scanning
+    // for a witness value: any value of the same type serves, because all of
+    // them are in range, and A being strictly beyond one of them puts A at
+    // least one step away from Extreme.
+    CmpInst::Predicate BoundPred =
+        AtMax ? CmpInst::ICMP_SLE : CmpInst::ICMP_SGE;
+    APInt Neighbour = AtMax ? Extreme - 1 : Extreme + 1;
+    if (Info.doesHold(BoundPred, A, ConstantInt::get(Ty, Neighbour)))
+      return Result;
+
+    CmpInst::Predicate WitnessPred =
+        AtMax ? CmpInst::ICMP_SLT : CmpInst::ICMP_SGT;
+    for (const auto &KV : Info.getValue2Index(/*Signed=*/true)) {
+      Value *W = KV.first;
+      if (W != A && W->getType() == Ty && Info.doesHold(WitnessPred, A, W))
+        return Result;
+    }
+  }
+  return std::nullopt;
+}
+
 static std::optional<bool> checkCondition(CmpInst::Predicate Pred, Value *A,
                                           Value *B, Instruction *CheckInst,
                                           ConstraintInfo &Info) {
@@ -1838,6 +1902,21 @@ static std::optional<bool> checkCondition(CmpInst::Predicate Pred, Value *A,
     if (NewVariables.empty())
       if (auto ImpliedCondition = TryWithConstraint(SR))
         return ImpliedCondition;
+  }
+
+  // Finally, handle conditions that only the range of A's type can refute.
+  if (auto ImpliedCondition = checkConditionAtSignedExtreme(Pred, A, B, Info)) {
+    if (!DebugCounter::shouldExecute(EliminatedCounter))
+      return std::nullopt;
+    LLVM_DEBUG({
+      dbgs() << "Condition ";
+      dumpUnpackedICmp(dbgs(),
+                       *ImpliedCondition ? Pred
+                                         : CmpInst::getInversePredicate(Pred),
+                       A, B);
+      dbgs() << " implied by a strict bound at the signed extreme\n";
+    });
+    return ImpliedCondition;
   }
   return std::nullopt;
 }
