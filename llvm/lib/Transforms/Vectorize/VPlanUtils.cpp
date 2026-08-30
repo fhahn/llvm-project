@@ -201,6 +201,27 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
         return SE.getUDivExpr(Ops[0], SE.getPowerOfTwo(Ty, ShiftAmt));
       });
   }
+  // ashr X, C keeps the bits of X above C, sign-extended back to the original
+  // width: sext(trunc(X /u 2^C)). getUDivExpr folds the exact division when X
+  // is a multiple of 2^C, which covers the sign-extend-in-register idiom
+  // `ashr (shl X, n), m` that ScalarEvolution's createSCEV matches
+  // syntactically.
+  uint64_t AShrAmt;
+  if (match(V, m_AShr(m_VPValue(LHSVal), m_ConstantInt(AShrAmt)))) {
+    Type *Ty = V->getScalarType();
+    uint64_t BitWidth = SE.getTypeSizeInBits(Ty);
+    // A shift amount >= the bit width produces poison; do not analyze it, as
+    // the value chosen here may differ from the one chosen elsewhere.
+    if (AShrAmt >= BitWidth)
+      return SE.getCouldNotCompute();
+    Type *TruncTy = IntegerType::get(Ty->getContext(), BitWidth - AShrAmt);
+    return CreateSCEV(LHSVal, [&](ArrayRef<SCEVUse> Ops) {
+      return SE.getSignExtendExpr(
+          SE.getTruncateExpr(
+              SE.getUDivExpr(Ops[0], SE.getPowerOfTwo(Ty, AShrAmt)), TruncTy),
+          Ty);
+    });
+  }
   if (match(V, m_UDiv(m_VPValue(LHSVal), m_VPValue(RHSVal))))
     return CreateSCEV({LHSVal, RHSVal}, [&](ArrayRef<SCEVUse> Ops) {
       return SE.getUDivExpr(Ops[0], Ops[1]);

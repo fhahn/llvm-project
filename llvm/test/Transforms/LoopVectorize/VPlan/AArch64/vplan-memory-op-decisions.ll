@@ -617,8 +617,7 @@ exit:
   ret void
 }
 
-; FIXME: getSCEVExprForVPValue should support `ashr (shl X, C), C` which
-; sign-extends the low bits of X.
+; `ashr (shl X, C), C` sign-extends the low bits of X.
 define void @ashr_of_shl_address(ptr noalias %A) {
 ; CHECK-LABEL: VPlan for loop in 'ashr_of_shl_address'
 ; CHECK:  VPlan ' for UF>=1' {
@@ -641,9 +640,11 @@ define void @ashr_of_shl_address(ptr noalias %A) {
 ; CHECK-NEXT:      EMIT ir<%shl> = shl ir<%iv>, ir<32>
 ; CHECK-NEXT:      EMIT ir<%ashr> = ashr ir<%shl>, ir<32>
 ; CHECK-NEXT:      EMIT ir<%gep> = getelementptr inbounds ir<%A>, ir<%ashr>
-; CHECK-NEXT:      EMIT-SCALAR ir<%lv> = load ir<%gep>
+; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = vector-pointer inbounds i32, ir<%gep>, ir<1>
+; CHECK-NEXT:      WIDEN ir<%lv> = load vp<[[VP4]]>
 ; CHECK-NEXT:      EMIT ir<%add> = add ir<%lv>, ir<1>
-; CHECK-NEXT:      EMIT store ir<%add>, ir<%gep>
+; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds i32, ir<%gep>, ir<1>
+; CHECK-NEXT:      WIDEN store vp<[[VP5]]>, ir<%add>
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add nuw nsw ir<%iv>, ir<1>
 ; CHECK-NEXT:      EMIT ir<%ec> = icmp eq ir<%iv>, ir<100>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
