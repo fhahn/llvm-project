@@ -190,6 +190,20 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
     return CreateSCEV({LHSVal}, [&](ArrayRef<SCEVUse> Ops) {
       return SE.getAddExpr(Ops[0], SE.getConstant(*XorC), SCEV::FlagAnyWrap, 0);
     });
+  // If both arms of a select have the same SCEV, so has the select, whatever
+  // the condition is. ScalarEvolution reaches this through instsimplify, which
+  // requires the arms to be the same Value; comparing SCEVs also covers
+  // distinct instructions computing the same value.
+  VPValue *CondVal;
+  if (match(V, m_Select(m_VPValue(CondVal), m_VPValue(LHSVal),
+                        m_VPValue(RHSVal)))) {
+    // CouldNotCompute is a singleton, so two unanalyzable arms compare equal
+    // and correctly yield CouldNotCompute again.
+    const SCEV *LHSExpr = getSCEVExprForVPValue(LHSVal, PSE, L);
+    if (LHSExpr == getSCEVExprForVPValue(RHSVal, PSE, L))
+      return LHSExpr;
+    return SE.getCouldNotCompute();
+  }
   if (match(V, m_Mul(m_VPValue(LHSVal), m_VPValue(RHSVal))))
     return CreateSCEV({LHSVal, RHSVal}, [&](ArrayRef<SCEVUse> Ops) {
       return SE.getMulExpr(Ops[0], Ops[1], SCEV::FlagAnyWrap, 0);
