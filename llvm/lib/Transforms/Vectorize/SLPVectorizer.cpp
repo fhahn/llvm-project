@@ -2452,11 +2452,25 @@ public:
   void analyzedBundle(ArrayRef<Value *> VL) {
     AnalyzedBundles.insert(hash_value(VL));
   }
+  /// Checks if \p Slice was already rejected as a gather-node subvector
+  /// candidate by transformNodes(), with none of its scalars vectorized at the
+  /// time of the rejection. See analyzedGatherSlice().
+  bool isAnalyzedGatherSlice(ArrayRef<Value *> Slice) const {
+    return AnalyzedGatherSlices.contains(hash_value(Slice));
+  }
+  /// Registers \p Slice as a gather-node subvector candidate that
+  /// transformNodes() failed to turn into a vector node. Only called when none
+  /// of the scalars in \p Slice is vectorized: keying on the slice alone loses
+  /// real vectorization for slices with a vectorized member.
+  void analyzedGatherSlice(ArrayRef<Value *> Slice) {
+    AnalyzedGatherSlices.insert(hash_value(Slice));
+  }
   /// Clear the list of the analyzed reduction root instructions.
   void clearReductionData() {
     AnalyzedReductionsRoots.clear();
     AnalyzedReductionVals.clear();
     AnalyzedBundles.clear();
+    AnalyzedGatherSlices.clear();
     AnalyzedMinBWVals.clear();
   }
   /// Checks if the given value is gathered in one of the nodes.
@@ -3801,6 +3815,10 @@ private:
 
   /// Set of hashes for the bundles, rejected as non-vectorizable.
   SmallDenseSet<size_t, 8> AnalyzedBundles;
+
+  /// Set of hashes for the gather-node subvector slices that transformNodes()
+  /// already failed to vectorize while none of their scalars was vectorized.
+  SmallDenseSet<size_t, 8> AnalyzedGatherSlices;
 
   /// Set of the values, which were a part of the analyzed vector nodes.
   SmallPtrSet<const Value *, 32> AnalyzedScalars;
@@ -15123,6 +15141,20 @@ void BoUpSLP::transformNodes() {
             // If any instruction is vectorized already - do not try again.
             SameTE = getSameValuesTreeEntry(*It, Slice);
           }
+          // The same slice is offered again by every later vector factor at
+          // this offset, every other gather node covering these scalars and
+          // every vectorization attempt in this block, and almost always
+          // fails again. Remember the failures and skip the rebuild. Only a
+          // heuristic: the set is cleared per block, but buildTreeRec() also
+          // depends on state reset per tree, so a hit may rarely skip a slice
+          // that would now succeed. That only drops a candidate, never
+          // miscompiles. Slices with a vectorized member are not memoized,
+          // keying on the slice alone loses real vectorization for those.
+          const bool IsReproducible = !SameTE && none_of(Slice, [&](Value *V) {
+            return isVectorized(V);
+          });
+          if (IsReproducible && isAnalyzedGatherSlice(Slice))
+            continue;
           unsigned PrevSize = VectorizableTree.size();
           [[maybe_unused]] unsigned PrevEntriesSize =
               LoadEntriesToVectorize.size();
@@ -15133,6 +15165,8 @@ void BoUpSLP::transformNodes() {
               VectorizableTree[PrevSize]->getOpcode() !=
                   Instruction::ExtractElement &&
               !isSplat(Slice)) {
+            if (IsReproducible)
+              analyzedGatherSlice(Slice);
             if (UserIgnoreList && E.Idx == 0 && VF == 2)
               analyzedReductionVals(Slice);
             VectorizableTree.pop_back();
