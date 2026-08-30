@@ -1195,6 +1195,12 @@ static VPValue *simplifyLogicalRecipe(VPSingleDefRecipe *Def,
   if (match(Def, m_Select(m_VPValue(), m_VPValue(X), m_Deferred(X))))
     return X;
 
+  // select true, x, y -> x and select false, x, y -> y.
+  if (match(Def, m_Select(m_True(), m_VPValue(X), m_VPValue())))
+    return X;
+  if (match(Def, m_Select(m_False(), m_VPValue(), m_VPValue(X))))
+    return X;
+
   // select c, false, true -> not c
   VPValue *C;
   if (CanCreateNewRecipe &&
@@ -1284,6 +1290,12 @@ static VPValue *simplifyRecipe(VPSingleDefRecipe *Def) {
   // A bitcast to the same type is a no-op.
   if (match(Def, m_BitCast(m_VPValue(A))) &&
       Def->getScalarType() == A->getScalarType())
+    return A;
+
+  // Shifting by zero is a no-op.
+  if (match(Def, m_CombineOr(m_Shl(m_VPValue(A), m_ZeroInt()),
+                             m_CombineOr(m_LShr(m_VPValue(A), m_ZeroInt()),
+                                         m_AShr(m_VPValue(A), m_ZeroInt())))))
     return A;
 
   if (match(Def, m_Trunc(m_VPValue(Z, m_ZExtOrSExt(m_VPValue(A)))))) {
