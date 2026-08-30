@@ -4622,6 +4622,48 @@ InstCombinerImpl::foldExtractOfOverflowIntrinsic(ExtractValueInst &EV) {
     }
   }
 
+  // If every use of the value component is only reachable when the operation
+  // did not overflow, the value is the exact mathematical result at each of
+  // those uses, so a plain binop carrying the corresponding no-wrap flag is
+  // equivalent: it is poison only on paths that reach no use. This hands SCEV
+  // and ValueTracking an ordinary `add nsw`, which they model, instead of an
+  // opaque intrinsic. Only the value is rewritten; the overflow branch and
+  // whatever it guards are left alone.
+  //   %op  = call {iN, i1} @llvm.sadd.with.overflow.iN(iN %a, iN %b)
+  //   %ov  = extractvalue {iN, i1} %op, 1
+  //   br i1 %ov, label %trap, label %cont
+  //   ...
+  //   %sum = extractvalue {iN, i1} %op, 0   ->   %sum = add nsw iN %a, %b
+  //
+  // The condition is on the uses of the *value*: the overflow successor may
+  // return, throw or be unreachable. The binop replaces the extractvalue in
+  // situ rather than being sunk into the no-overflow successor, because the
+  // only use is often a phi whose incoming block is the branch's own block,
+  // which DominatorTree::dominates(BasicBlockEdge, Use) accounts for.
+  if (*EV.idx_begin() == 0 && !EV.use_empty()) {
+    // In canonical form the flag is extracted once and tested by a single
+    // branch, so this visits at most the two extracts of WO.
+    for (User *U : WO->users()) {
+      if (!match(U, m_ExtractValue<1>(m_Value())) || !U->hasOneUse())
+        continue;
+      auto *BI = dyn_cast<CondBrInst>(U->user_back());
+      if (!BI || BI->getSuccessor(0) == BI->getSuccessor(1))
+        continue;
+      // The overflow flag is false on the edge to the second successor.
+      BasicBlockEdge NoOvfEdge(BI->getParent(), BI->getSuccessor(1));
+      if (!all_of(EV.uses(),
+                  [&](const Use &U) { return DT.dominates(NoOvfEdge, U); }))
+        continue;
+      auto *BO =
+          BinaryOperator::Create(WO->getBinaryOp(), WO->getLHS(), WO->getRHS());
+      if (WO->isSigned())
+        BO->setHasNoSignedWrap();
+      else
+        BO->setHasNoUnsignedWrap();
+      return BO;
+    }
+  }
+
   // We're extracting from an overflow intrinsic. See if we're the only user.
   // That allows us to simplify multiple result intrinsics to simpler things
   // that just get one value.

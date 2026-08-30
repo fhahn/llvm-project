@@ -119,7 +119,7 @@ define zeroext i8 @test4(i8 signext %a, i8 signext %b) nounwind ssp {
 ; CHECK-NEXT:    tail call void @throwAnExceptionOrWhatever() #[[ATTR3]]
 ; CHECK-NEXT:    unreachable
 ; CHECK:       if.end:
-; CHECK-NEXT:    [[SADD_RESULT:%.*]] = extractvalue { i8, i1 } [[SADD]], 0
+; CHECK-NEXT:    [[SADD_RESULT:%.*]] = add nsw i8 [[B]], [[A]]
 ; CHECK-NEXT:    ret i8 [[SADD_RESULT]]
 ;
 entry:

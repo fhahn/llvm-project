@@ -345,7 +345,7 @@ define i16 @fold_select_sadd_with_overflow(i1 %c, i16 %a, i16 %b) {
 ; CHECK:       overflow:
 ; CHECK-NEXT:    ret i16 0
 ; CHECK:       normal:
-; CHECK-NEXT:    [[SUM:%.*]] = extractvalue { i16, i1 } [[RES]], 0
+; CHECK-NEXT:    [[SUM:%.*]] = add nsw i16 [[B]], [[A]]
 ; CHECK-NEXT:    ret i16 [[SUM]]
 ;
   %s0 = select i1 %c, i16 %a, i16 %b
@@ -369,7 +369,7 @@ define i16 @fold_select_uadd_with_overflow(i1 %c, i16 %a, i16 %b) {
 ; CHECK:       overflow:
 ; CHECK-NEXT:    ret i16 0
 ; CHECK:       normal:
-; CHECK-NEXT:    [[SUM:%.*]] = extractvalue { i16, i1 } [[RES]], 0
+; CHECK-NEXT:    [[SUM:%.*]] = add nuw i16 [[B]], [[A]]
 ; CHECK-NEXT:    ret i16 [[SUM]]
 ;
   %s0 = select i1 %c, i16 %a, i16 %b
@@ -393,7 +393,7 @@ define i16 @fold_select_smul_with_overflow(i1 %c, i16 %a, i16 %b) {
 ; CHECK:       overflow:
 ; CHECK-NEXT:    ret i16 0
 ; CHECK:       normal:
-; CHECK-NEXT:    [[MUL:%.*]] = extractvalue { i16, i1 } [[RES]], 0
+; CHECK-NEXT:    [[MUL:%.*]] = mul nsw i16 [[B]], [[A]]
 ; CHECK-NEXT:    ret i16 [[MUL]]
 ;
   %s0 = select i1 %c, i16 %a, i16 %b
@@ -417,7 +417,7 @@ define i16 @fold_select_umul_with_overflow(i1 %c, i16 %a, i16 %b) {
 ; CHECK:       overflow:
 ; CHECK-NEXT:    ret i16 0
 ; CHECK:       normal:
-; CHECK-NEXT:    [[MUL:%.*]] = extractvalue { i16, i1 } [[RES]], 0
+; CHECK-NEXT:    [[MUL:%.*]] = mul nuw i16 [[B]], [[A]]
 ; CHECK-NEXT:    ret i16 [[MUL]]
 ;
   %s0 = select i1 %c, i16 %a, i16 %b
