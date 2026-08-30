@@ -411,6 +411,19 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
               return SE.getCouldNotCompute();
             return SE.getTruncateOrSignExtend(IV, Step->getType());
           })
+          .Case([&SE, &PSE, L](const VPBlendRecipe *R) -> const SCEV * {
+            // Exactly one incoming value is selected per lane. If they all
+            // have the same SCEV, so has the blend, whatever the masks are.
+            const SCEV *Common =
+                getSCEVExprForVPValue(R->getIncomingValue(0), PSE, L);
+            if (all_of(seq<unsigned>(1, R->getNumIncomingValues()),
+                       [&](unsigned I) {
+                         return getSCEVExprForVPValue(R->getIncomingValue(I),
+                                                      PSE, L) == Common;
+                       }))
+              return Common;
+            return SE.getCouldNotCompute();
+          })
           .Default(
               [&SE](const VPRecipeBase *) { return SE.getCouldNotCompute(); });
 

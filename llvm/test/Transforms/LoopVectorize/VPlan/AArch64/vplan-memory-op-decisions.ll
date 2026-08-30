@@ -731,7 +731,8 @@ exit:
   ret void
 }
 
-; FIXME: getSCEVExprForVPValue should support blends with all equal incoming values.
+; A blend selects exactly one incoming value per lane, so if they all have the
+; same SCEV, so has the blend.
 define void @blend_with_identical_incoming_values_address(ptr noalias %A, i1 %c) {
 ; CHECK-LABEL: VPlan for loop in 'blend_with_identical_incoming_values_address'
 ; CHECK:  VPlan ' for UF>=1' {
@@ -765,9 +766,11 @@ define void @blend_with_identical_incoming_values_address(ptr noalias %A, i1 %c)
 ; CHECK-NEXT:    latch:
 ; CHECK-NEXT:      BLEND ir<%idx> = ir<%idx.else>/vp<[[VP4]]> ir<%idx.then>/ir<%c>
 ; CHECK-NEXT:      EMIT ir<%gep> = getelementptr inbounds ir<%A>, ir<%idx>
-; CHECK-NEXT:      EMIT-SCALAR ir<%lv> = load ir<%gep>
+; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds i32, ir<%gep>, ir<1>
+; CHECK-NEXT:      WIDEN ir<%lv> = load vp<[[VP5]]>
 ; CHECK-NEXT:      EMIT ir<%add> = add ir<%lv>, ir<1>
-; CHECK-NEXT:      EMIT store ir<%add>, ir<%gep>
+; CHECK-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer inbounds i32, ir<%gep>, ir<1>
+; CHECK-NEXT:      WIDEN store vp<[[VP6]]>, ir<%add>
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add nuw nsw ir<%iv>, ir<1>
 ; CHECK-NEXT:      EMIT ir<%ec> = icmp eq ir<%iv>, ir<100>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
