@@ -404,10 +404,11 @@ define i64 @smax_idx_max_no_exit_user(ptr nocapture readonly %a, i64 %mm, i64 %i
 ; CHECK-VF1UF4-NEXT:    [[VEC_PHI5:%.*]] = phi i64 [ poison, %[[VECTOR_PH]] ], [ [[TMP22:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-VF1UF4-NEXT:    [[VEC_PHI6:%.*]] = phi i64 [ poison, %[[VECTOR_PH]] ], [ [[TMP23:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-VF1UF4-NEXT:    [[VEC_PHI7:%.*]] = phi i64 [ poison, %[[VECTOR_PH]] ], [ [[TMP24:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-VF1UF4-NEXT:    [[TMP1:%.*]] = add i64 [[INDEX]], 0
 ; CHECK-VF1UF4-NEXT:    [[TMP2:%.*]] = add i64 [[INDEX]], 1
 ; CHECK-VF1UF4-NEXT:    [[TMP3:%.*]] = add i64 [[INDEX]], 2
 ; CHECK-VF1UF4-NEXT:    [[TMP4:%.*]] = add i64 [[INDEX]], 3
-; CHECK-VF1UF4-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[INDEX]]
+; CHECK-VF1UF4-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP1]]
 ; CHECK-VF1UF4-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP2]]
 ; CHECK-VF1UF4-NEXT:    [[TMP7:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP3]]
 ; CHECK-VF1UF4-NEXT:    [[TMP8:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP4]]
@@ -423,7 +424,7 @@ define i64 @smax_idx_max_no_exit_user(ptr nocapture readonly %a, i64 %mm, i64 %i
 ; CHECK-VF1UF4-NEXT:    [[TMP18:%.*]] = icmp slt i64 [[VEC_PHI1]], [[TMP10]]
 ; CHECK-VF1UF4-NEXT:    [[TMP19:%.*]] = icmp slt i64 [[VEC_PHI2]], [[TMP11]]
 ; CHECK-VF1UF4-NEXT:    [[TMP20:%.*]] = icmp slt i64 [[VEC_PHI3]], [[TMP12]]
-; CHECK-VF1UF4-NEXT:    [[TMP21]] = select i1 [[TMP17]], i64 [[INDEX]], i64 [[VEC_PHI4]]
+; CHECK-VF1UF4-NEXT:    [[TMP21]] = select i1 [[TMP17]], i64 [[TMP1]], i64 [[VEC_PHI4]]
 ; CHECK-VF1UF4-NEXT:    [[TMP22]] = select i1 [[TMP18]], i64 [[TMP2]], i64 [[VEC_PHI5]]
 ; CHECK-VF1UF4-NEXT:    [[TMP23]] = select i1 [[TMP19]], i64 [[TMP3]], i64 [[VEC_PHI6]]
 ; CHECK-VF1UF4-NEXT:    [[TMP24]] = select i1 [[TMP20]], i64 [[TMP4]], i64 [[VEC_PHI7]]

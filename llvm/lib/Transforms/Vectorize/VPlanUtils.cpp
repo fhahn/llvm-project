@@ -605,6 +605,18 @@ vputils::getEarlyExits(const VPlan &Plan, const VPBlockBase *MiddleVPBB) {
   return Exits;
 }
 
+VPWidenIntOrFpInductionRecipe *
+vputils::createWideCanonicalIV(VPlan &Plan, ScalarEvolution &SE,
+                               VPRecipeBase *InsertPt, DebugLoc DL) {
+  Type *CanIVTy = Plan.getVectorLoopRegion()->getCanonicalIVType();
+  auto *WideIV = new VPWidenIntOrFpInductionRecipe(
+      /*IV=*/nullptr, Plan.getZero(CanIVTy), Plan.getConstantInt(CanIVTy, 1),
+      &Plan.getVF(), InductionDescriptor::getCanonicalIntInduction(CanIVTy, SE),
+      VPIRFlags::WrapFlagsTy(/*HasNUW=*/true, /*HasNSW=*/false), DL);
+  WideIV->insertBefore(InsertPt);
+  return WideIV;
+}
+
 VPScalarIVStepsRecipe *vputils::createScalarIVSteps(
     VPlan &Plan, InductionDescriptor::InductionKind Kind,
     Instruction::BinaryOps InductionOpcode, FPMathOperator *FPBinOp,

@@ -244,7 +244,7 @@ struct VPlanTransforms {
   /// respectively. Otherwise return false.
   static bool handleMultiUseReductions(VPlan &Plan,
                                        OptimizationRemarkEmitter *ORE,
-                                       Loop *TheLoop);
+                                       ScalarEvolution &SE, Loop *TheLoop);
 
   /// Check if \p Plan contains any FMaxNum or FMinNum reductions. If they do,
   /// try to update the vector loop to exit early if any input is NaN and resume

@@ -188,6 +188,14 @@ VPValue *findIncomingAliasMask(const VPlan &Plan);
 SmallVector<std::pair<VPBasicBlock *, VPIRBasicBlock *>>
 getEarlyExits(const VPlan &Plan, const VPBlockBase *MiddleVPBB);
 
+/// Create a widened induction of \p Plan's canonical IV type, starting at 0
+/// with step 1, inserted before \p InsertPt. It counts iterations of the
+/// vector loop, so it cannot wrap for any lane active in it.
+VPWidenIntOrFpInductionRecipe *createWideCanonicalIV(VPlan &Plan,
+                                                     ScalarEvolution &SE,
+                                                     VPRecipeBase *InsertPt,
+                                                     DebugLoc DL);
+
 /// Create a scalar-iv-steps recipe over \p Plan's canonical IV for an
 /// induction of \p Kind with \p InductionOpcode / \p FPBinOp, start value \p
 /// StartV and step \p Step, truncated to \p TruncI's type if \p TruncI is
