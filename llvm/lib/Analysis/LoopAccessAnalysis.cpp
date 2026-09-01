@@ -1789,13 +1789,10 @@ std::optional<int64_t> llvm::getPtrStride(PredicatedScalarEvolution &PSE,
   return Stride;
 }
 
-std::optional<int64_t> llvm::getPointersDiff(Type *ElemTyA, Value *PtrA,
-                                             Type *ElemTyB, Value *PtrB,
-                                             const DataLayout &DL,
-                                             ScalarEvolution &SE,
-                                             bool StrictCheck, bool CheckType) {
-  assert(PtrA && PtrB && "Expected non-nullptr pointers.");
-
+static std::optional<int64_t>
+computePointersDiff(Type *ElemTyA, Value *PtrA, Type *ElemTyB, Value *PtrB,
+                    const DataLayout &DL, ScalarEvolution &SE, bool StrictCheck,
+                    bool CheckType) {
   // Make sure that A and B are different pointers.
   if (PtrA == PtrB)
     return 0;
@@ -1858,9 +1855,32 @@ std::optional<int64_t> llvm::getPointersDiff(Type *ElemTyA, Value *PtrA,
   return std::nullopt;
 }
 
+std::optional<int64_t> llvm::getPointersDiff(Type *ElemTyA, Value *PtrA,
+                                             Type *ElemTyB, Value *PtrB,
+                                             const DataLayout &DL,
+                                             ScalarEvolution &SE,
+                                             bool StrictCheck, bool CheckType,
+                                             PointersDiffCache *Cache) {
+  assert(PtrA && PtrB && "Expected non-nullptr pointers.");
+
+  PointersDiffCache::KeyTy Key = PointersDiffCache::key(
+      ElemTyA, PtrA, ElemTyB, PtrB, StrictCheck, CheckType);
+  if (Cache)
+    if (std::optional<int64_t> *Cached = Cache->find(Key))
+      return *Cached;
+
+  std::optional<int64_t> Res = computePointersDiff(ElemTyA, PtrA, ElemTyB, PtrB,
+                                                   DL, SE, StrictCheck,
+                                                   CheckType);
+  if (Cache)
+    Cache->insert(Key, Res);
+  return Res;
+}
+
 bool llvm::sortPtrAccesses(ArrayRef<Value *> VL, Type *ElemTy,
                            const DataLayout &DL, ScalarEvolution &SE,
-                           SmallVectorImpl<unsigned> &SortedIndices) {
+                           SmallVectorImpl<unsigned> &SortedIndices,
+                           PointersDiffCache *Cache) {
   assert(llvm::all_of(
              VL, [](const Value *V) { return V->getType()->isPointerTy(); }) &&
          "Expected list of pointer operands.");
@@ -1876,7 +1896,7 @@ bool llvm::sortPtrAccesses(ArrayRef<Value *> VL, Type *ElemTy,
   for (auto [Idx, Ptr] : drop_begin(enumerate(VL))) {
     std::optional<int64_t> Diff =
         getPointersDiff(ElemTy, Ptr0, ElemTy, Ptr, DL, SE,
-                        /*StrictCheck=*/true);
+                        /*StrictCheck=*/true, /*CheckType=*/true, Cache);
     if (!Diff)
       return false;
 

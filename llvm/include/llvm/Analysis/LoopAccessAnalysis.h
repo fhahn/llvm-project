@@ -952,15 +952,49 @@ getPtrStride(PredicatedScalarEvolution &PSE, Type *AccessTy, Value *Ptr,
              const SymbolicStrideMap &StridesMap, bool Assume,
              bool ShouldCheckWrap = true);
 
+/// Memoizes getPointersDiff(), whose result is a pure function of its
+/// arguments for a fixed module and ScalarEvolution. Callers that re-ask the
+/// same question many times (SLP offers the same pointer group from every
+/// vector factor and every gather node) can share one of these.
+///
+/// The keys hold raw Value pointers, so a cache must not outlive the values it
+/// has seen: clear() it whenever instructions may have been deleted, since a
+/// freed Instruction's address can be reused by a later allocation.
+class PointersDiffCache {
+public:
+  /// Key of a getPointersDiff() query. DL and SE are not part of it - a cache
+  /// is only ever shared between queries using the same ones. The two bool
+  /// parameters are packed into the unsigned, as DenseMapInfo has no bool.
+  using KeyTy = std::tuple<Type *, Value *, Type *, Value *, unsigned>;
+
+  static KeyTy key(Type *ElemTyA, Value *PtrA, Type *ElemTyB, Value *PtrB,
+                   bool StrictCheck, bool CheckType) {
+    return {ElemTyA, PtrA, ElemTyB, PtrB,
+            (StrictCheck ? 1U : 0U) | (CheckType ? 2U : 0U)};
+  }
+
+  std::optional<int64_t> *find(const KeyTy &K) {
+    auto It = Cache.find(K);
+    return It == Cache.end() ? nullptr : &It->second;
+  }
+  void insert(const KeyTy &K, std::optional<int64_t> V) { Cache[K] = V; }
+  void clear() { Cache.clear(); }
+
+private:
+  DenseMap<KeyTy, std::optional<int64_t>> Cache;
+};
+
 /// Returns the distance between the pointers \p PtrA and \p PtrB iff they are
 /// compatible and it is possible to calculate the distance between them. This
 /// is a simple API that does not depend on the analysis pass.
 /// \param StrictCheck Ensure that the calculated distance matches the
 /// type-based one after all the bitcasts removal in the provided pointers.
+/// \param Cache optional memo shared with other queries on the same module.
 LLVM_ABI std::optional<int64_t>
 getPointersDiff(Type *ElemTyA, Value *PtrA, Type *ElemTyB, Value *PtrB,
                 const DataLayout &DL, ScalarEvolution &SE,
-                bool StrictCheck = false, bool CheckType = true);
+                bool StrictCheck = false, bool CheckType = true,
+                PointersDiffCache *Cache = nullptr);
 
 /// Attempt to sort the pointers in \p VL and return the sorted indices
 /// in \p SortedIndices, if reordering is required.
@@ -974,7 +1008,8 @@ getPointersDiff(Type *ElemTyA, Value *PtrA, Type *ElemTyB, Value *PtrB,
 /// \p SortedIndices as <1,2,0,3>
 LLVM_ABI bool sortPtrAccesses(ArrayRef<Value *> VL, Type *ElemTy,
                               const DataLayout &DL, ScalarEvolution &SE,
-                              SmallVectorImpl<unsigned> &SortedIndices);
+                              SmallVectorImpl<unsigned> &SortedIndices,
+                              PointersDiffCache *Cache = nullptr);
 
 /// Returns true if the memory operations \p A and \p B are consecutive.
 /// This is a simple API that does not depend on the analysis pass.

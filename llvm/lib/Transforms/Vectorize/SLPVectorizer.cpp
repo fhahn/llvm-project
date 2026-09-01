@@ -2329,6 +2329,9 @@ public:
   /// is delayed until BoUpSLP is destructed.
   void eraseInstruction(Instruction *I) {
     DeletedInstructions.insert(I);
+    // The cache keys hold raw pointers to I and its operands, and a freed
+    // Instruction's address can be handed out again by a later allocation.
+    PtrDiffCache.clear();
   }
 
   /// Remove instructions from the parent function and clear the operands of \p
@@ -3862,6 +3865,13 @@ private:
 
   /// List of hashes of vector of loads, which are known to be non vectorizable.
   DenseSet<size_t> ListOfKnonwnNonVectorizableLoads;
+
+  /// Memoizes getPointersDiff(). The same pointer group is offered by every
+  /// vector factor, every gather node covering it and every vectorization
+  /// attempt, so the vast majority of the queries repeat. Cleared whenever
+  /// instructions are deleted - the keys are raw pointers and a freed
+  /// Instruction's address can be reused.
+  mutable PointersDiffCache PtrDiffCache;
 
   /// Represents a scheduling entity, either ScheduleData, ScheduleCopyableData
   /// or ScheduleBundle. ScheduleData used to gather dependecies for a single
@@ -6392,7 +6402,9 @@ bool BoUpSLP::analyzeConstantStrideCandidate(
     Value *Ptr =
         SortedIndices.empty() ? PointerOps[I] : PointerOps[SortedIndices[I]];
     std::optional<int64_t> Offset =
-        getPointersDiff(ScalarTy, PointerOps[0], ScalarTy, Ptr, *DL, *SE);
+        getPointersDiff(ScalarTy, PointerOps[0], ScalarTy, Ptr, *DL, *SE,
+                        /*StrictCheck=*/false, /*CheckType=*/true,
+                        &PtrDiffCache);
     assert(Offset && "sortPtrAccesses should have validated this pointer");
     SortedOffsetsFromBase[I] = *Offset;
   }
@@ -6501,8 +6513,11 @@ bool BoUpSLP::analyzeRtStrideCandidate(ArrayRef<Value *> PointerOps,
         getWidenedType(NewScalarTy, Sz / NumOffsets));
   };
   auto IsLegalStridedTy = [&](FixedVectorType *StridedTy) {
-    return StridedTy && TTI->isTypeLegal(StridedTy) &&
-           TTI->isLegalStridedLoadStore(StridedTy, CommonAlignment);
+    // isLegalStridedLoadStore() is false for every target without strided
+    // memory access, so query it before the more expensive isTypeLegal().
+    return StridedTy &&
+           TTI->isLegalStridedLoadStore(StridedTy, CommonAlignment) &&
+           TTI->isTypeLegal(StridedTy);
   };
   // Determining the offsets below builds the SCEV of every pointer, which is
   // expensive. Most targets support no strided access at all, so first rule
@@ -6742,7 +6757,8 @@ BoUpSLP::LoadsState BoUpSLP::canVectorizeLoads(
 
   Order.clear();
   // Check the order of pointer operands or that all pointers are the same.
-  bool IsSorted = sortPtrAccesses(PointerOps, ScalarTy, *DL, *SE, Order);
+  bool IsSorted =
+      sortPtrAccesses(PointerOps, ScalarTy, *DL, *SE, Order, &PtrDiffCache);
 
   auto *VecTy = dyn_cast<VectorType>(getWidenedType(ScalarTy, Sz));
   if (!VecTy)
@@ -6801,9 +6817,13 @@ BoUpSLP::LoadsState BoUpSLP::canVectorizeLoads(
     // PointerOps[0], so compute the span using PointerOps[0] as intermediate:
     //   Diff = offset(PtrN) - offset(Ptr0) relative to PointerOps[0]
     std::optional<int64_t> Diff0 =
-        getPointersDiff(ScalarTy, PointerOps[0], ScalarTy, Ptr0, *DL, *SE);
+        getPointersDiff(ScalarTy, PointerOps[0], ScalarTy, Ptr0, *DL, *SE,
+                        /*StrictCheck=*/false, /*CheckType=*/true,
+                        &PtrDiffCache);
     std::optional<int64_t> DiffN =
-        getPointersDiff(ScalarTy, PointerOps[0], ScalarTy, PtrN, *DL, *SE);
+        getPointersDiff(ScalarTy, PointerOps[0], ScalarTy, PtrN, *DL, *SE,
+                        /*StrictCheck=*/false, /*CheckType=*/true,
+                        &PtrDiffCache);
     assert(Diff0 && DiffN &&
            "sortPtrAccesses should have validated these pointers");
     int64_t Diff = *DiffN - *Diff0;
