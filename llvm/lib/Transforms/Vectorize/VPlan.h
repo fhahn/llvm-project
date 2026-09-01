@@ -2911,7 +2911,8 @@ class VPReductionPHIRecipe : public VPHeaderPHIRecipe, public VPIRFlags {
   /// sunk. While this is true, epilogue vectorization is disabled to avoid
   /// applying the sunk expression twice (once in the main vector loop and again
   /// in the epilogue), which can produce incorrect results by applying the sunk
-  /// operation twice.
+  /// operation twice. Scaling canonical indices back to the original IV after
+  /// the loop also counts as a sunk expression.
   /// TODO: Remove this flag once epilogue vectorization properly supports
   /// sunk FindIV expressions.
   bool ExpressionSunk = false;

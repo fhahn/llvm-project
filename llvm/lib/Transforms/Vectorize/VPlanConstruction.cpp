@@ -2120,8 +2120,8 @@ bool VPlanTransforms::handleFindLastReductions(VPlan &Plan) {
 /// return the smallest index of the FindLastIV reduction result using UMin,
 /// unless \p MinOrMaxResult equals the start value of its MinOrMax reduction.
 /// In that case, return the start value of the FindLastIV reduction instead.
-/// If \p WideIV is not canonical, a new canonical wide IV is added, and the
-/// final result is scaled back to the non-canonical \p WideIV.
+/// If \p WideIV is not canonical, a canonical wide IV is reused or added, and
+/// the final result is scaled back to the non-canonical \p WideIV.
 /// The final value of the FindLastIV reduction is originally computed using
 /// \p FindIVSelect, \p FindIVCmp, and \p FindIVRdxResult, which are replaced
 /// and removed.
@@ -2164,22 +2164,32 @@ static bool handleFirstArgMinOrMax(
       FindIVSelectR->getOperand(2) != WideIV)
     return false;
 
-  // If the original wide IV is not canonical, create a new one. The canonical
+  // If the original wide IV is not canonical, find or add one. The canonical
   // wide IV is guaranteed to not wrap for all lanes that are active in the
   // vector loop.
   if (!WideIV->isCanonical()) {
     VPIRValue *Zero = Plan.getConstantInt(Ty, 0);
     VPIRValue *One = Plan.getConstantInt(Ty, 1);
-    auto *WidenCanIV = new VPWidenIntOrFpInductionRecipe(
-        nullptr, Zero, One, WideIV->getVFValue(),
-        WideIV->getInductionDescriptor(),
-        VPIRFlags::WrapFlagsTy(/*HasNUW=*/true, /*HasNSW=*/false),
-        WideIV->getDebugLoc());
-    WidenCanIV->insertBefore(WideIV);
+    VPIRFlags::WrapFlagsTy CanIVFlags(/*HasNUW=*/true, /*HasNSW=*/false);
+    VPWidenIntOrFpInductionRecipe *WidenCanIV = nullptr;
+    for (VPRecipeBase &R : WideIV->getParent()->phis())
+      if (match(&R, m_CanonicalWidenIV(WidenCanIV)))
+        break;
+    if (!WidenCanIV) {
+      WidenCanIV = new VPWidenIntOrFpInductionRecipe(
+          nullptr, Zero, One, WideIV->getVFValue(),
+          WideIV->getInductionDescriptor(), CanIVFlags, WideIV->getDebugLoc());
+      WidenCanIV->insertBefore(WideIV);
+    }
+    // NSW of a reused IV may only hold for its original users, which need not
+    // use it once it wraps in the scalar loop.
+    WidenCanIV->intersectFlags(CanIVFlags);
 
     // Update the select to use the wide canonical IV.
     FindIVSelectR->setOperand(FindIVSelectR->getOperand(1) == WideIV ? 1 : 2,
                               WidenCanIV);
+    // Scaling back to WideIV after the loop counts as a sunk expression.
+    FindLastIVPhiR->setExpressionSunk();
   }
   FindLastIVPhiR->setOperand(0, Plan.getPoison(Ty));
 
@@ -2247,7 +2257,7 @@ static bool handleFirstArgMinOrMax(
       VPInstruction::ComputeReductionResult, {FinalIVSelect}, RdxFlags,
       FindIVRdxResult->getDebugLoc());
 
-  // If we used a new wide canonical IV convert the reduction result back to the
+  // If we used a canonical wide IV, convert the reduction result back to the
   // original IV scale before the final select.
   if (!WideIV->isCanonical()) {
     auto *DerivedIVRecipe = new VPDerivedIVRecipe(
