@@ -347,16 +347,23 @@ static RecurrenceDescriptor getMinMaxRecurrence(PHINode *Phi, Loop *TheLoop,
 
   // Handle argmin/argmax pattern: PHI has uses outside the reduction chain
   // that are not intermediate min/max operations (which are handled below).
-  // Requires integer min/max, and single-use BackedgeValue (so vectorizer can
-  // handle both PHIs together).
+  // Requires integer min/max.
   bool PhiHasInvalidUses = any_of(Phi->users(), [&](User *U) {
     Value *A, *B;
     return !Chain.contains(U) && TheLoop->contains(cast<Instruction>(U)) &&
            GetMinMaxRK(U, A, B) == RecurKind::None;
   });
   if (PhiHasInvalidUses) {
-    if (!RecurrenceDescriptor::isIntMinMaxRecurrenceKind(RK) ||
-        !BackedgeValue->hasOneUse())
+    if (!RecurrenceDescriptor::isIntMinMaxRecurrenceKind(RK))
+      return {};
+    // The phi backedge must be the only in-loop user of the min/max value, so
+    // the vectorizer can handle both phis together. Uses outside the loop are
+    // ordinary live-outs of the min/max reduction, e.g. if the extremum is
+    // returned alongside its index.
+    if (any_of(BackedgeValue->users(), [&](User *U) {
+          auto *UI = cast<Instruction>(U);
+          return UI != Phi && TheLoop->contains(UI);
+        }))
       return {};
     return RecurrenceDescriptor(
         Phi->getIncomingValueForBlock(TheLoop->getLoopPreheader()),
