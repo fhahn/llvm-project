@@ -135,3 +135,64 @@ loop:
 exit:
   ret i64 %cond
 }
+
+define ptr @find_last_ptr_iv(ptr %start, ptr %end) {
+; CHECK-LABEL: define ptr @find_last_ptr_iv(
+; CHECK-SAME: ptr [[START:%.*]], ptr [[END:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[END2:%.*]] = ptrtoaddr ptr [[END]] to i64
+; CHECK-NEXT:    [[START1:%.*]] = ptrtoaddr ptr [[START]] to i64
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[END2]], -8
+; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], [[START1]]
+; CHECK-NEXT:    [[TMP2:%.*]] = lshr i64 [[TMP1]], 3
+; CHECK-NEXT:    [[TMP3:%.*]] = add nuw nsw i64 [[TMP2]], 1
+; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[N_RND_UP:%.*]] = add i64 [[TMP3]], 3
+; CHECK-NEXT:    [[TMP4:%.*]] = and i64 [[N_RND_UP]], 3
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N_RND_UP]], [[TMP4]]
+; CHECK-NEXT:    [[TRIP_COUNT_MINUS_1:%.*]] = sub i64 [[TMP3]], 1
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[TRIP_COUNT_MINUS_1]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT]], <4 x i64> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi <4 x i64> [ splat (i64 -9223372036854775808), %[[VECTOR_PH]] ], [ [[TMP9:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP5:%.*]] = icmp ule <4 x i64> [[VEC_IND]], [[BROADCAST_SPLAT]]
+; CHECK-NEXT:    [[TMP6:%.*]] = shl i64 [[INDEX]], 3
+; CHECK-NEXT:    [[NEXT_GEP:%.*]] = getelementptr i8, ptr [[START]], i64 [[TMP6]]
+; CHECK-NEXT:    [[WIDE_MASKED_LOAD:%.*]] = call <4 x ptr> @llvm.masked.load.v4p0.p0(ptr align 8 [[NEXT_GEP]], <4 x i1> [[TMP5]], <4 x ptr> poison)
+; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq <4 x ptr> [[WIDE_MASKED_LOAD]], <ptr inttoptr (i64 -2 to ptr), ptr inttoptr (i64 -2 to ptr), ptr inttoptr (i64 -2 to ptr), ptr inttoptr (i64 -2 to ptr)>
+; CHECK-NEXT:    [[TMP8:%.*]] = select <4 x i1> [[TMP5]], <4 x i1> [[TMP7]], <4 x i1> zeroinitializer
+; CHECK-NEXT:    [[TMP9]] = select <4 x i1> [[TMP8]], <4 x i64> [[VEC_IND]], <4 x i64> [[VEC_PHI]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 4
+; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i64> [[VEC_IND]], splat (i64 4)
+; CHECK-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP10]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[TMP11:%.*]] = call i64 @llvm.vector.reduce.smax.v4i64(<4 x i64> [[TMP9]])
+; CHECK-NEXT:    [[TMP12:%.*]] = shl i64 [[TMP11]], 3
+; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr i8, ptr [[START]], i64 [[TMP12]]
+; CHECK-NEXT:    [[TMP14:%.*]] = icmp ne i64 [[TMP11]], -9223372036854775808
+; CHECK-NEXT:    [[TMP15:%.*]] = select i1 [[TMP14]], ptr [[TMP13]], ptr null
+; CHECK-NEXT:    br label %[[EXIT:.*]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret ptr [[TMP15]]
+;
+entry:
+  br label %loop
+
+loop:
+  %ptr.iv = phi ptr [ %start, %entry ], [ %ptr.iv.next, %loop ]
+  %rdx = phi ptr [ null, %entry ], [ %sel, %loop ]
+  %l = load ptr, ptr %ptr.iv, align 8
+  %c = icmp eq ptr %l, inttoptr (i64 -2 to ptr)
+  %sel = select i1 %c, ptr %ptr.iv, ptr %rdx
+  %ptr.iv.next = getelementptr inbounds nuw i8, ptr %ptr.iv, i64 8
+  %ec = icmp eq ptr %ptr.iv.next, %end
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret ptr %sel
+}

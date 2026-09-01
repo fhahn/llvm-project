@@ -613,9 +613,12 @@ struct VPlanTransforms {
   /// suitable sentinel value. For expressions of IVs, the expression is sunk
   /// to the middle block. The decision is based on SCEV expressions for \p L,
   /// so this must run before any transform that changes the plan's iteration
-  /// space relative to \p L.
+  /// space relative to \p L. A find-last index that is a pointer induction is
+  /// only converted for the VFs in \p Range where that is cheaper according to
+  /// \p Ctx; \p Range is clamped accordingly.
   static void optimizeFindIVReductions(VPlan &Plan,
-                                       PredicatedScalarEvolution &PSE, Loop &L);
+                                       PredicatedScalarEvolution &PSE, Loop &L,
+                                       VPCostContext &Ctx, VFRange &Range);
 
   /// Detect and create partial reduction recipes for scaled or unordered
   /// reductions in \p Plan. Must be called after recipe construction. If

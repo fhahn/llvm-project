@@ -4923,7 +4923,8 @@ static std::optional<bool> getStepDirection(const SCEV *S,
 
 void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
                                                PredicatedScalarEvolution &PSE,
-                                               Loop &L) {
+                                               Loop &L, VPCostContext &Ctx,
+                                               VFRange &Range) {
   ScalarEvolution &SE = *PSE.getSE();
   VPRegionBlock *VectorLoopRegion = Plan.getVectorLoopRegion();
 
@@ -4954,7 +4955,7 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
       continue;
 
     Type *PhiTy = PhiR->getScalarType();
-    if (PhiTy->isPointerTy() || PhiTy->isFloatingPointTy())
+    if (PhiTy->isFloatingPointTy())
       continue;
 
     // If there's a header mask, the backedge select will not be the find-last
@@ -4980,6 +4981,15 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
                             m_Specific(PhiR))))
       continue;
 
+    // A pointer index cannot be reduced with min/max. If it is a pointer
+    // induction, reduce the canonical wide IV instead and rebuild the pointer
+    // from the reduced index in the middle block. handleMultiUseReductions
+    // cannot pair an integer index reduction whose result is a pointer, so
+    // skip argmin/argmax indices.
+    auto *PtrIV = dyn_cast<VPWidenPointerInductionRecipe>(FindLastExpression);
+    if (PhiTy->isPointerTy() && (!PtrIV || isCmpOfMultiUseReductionPhi(Cond)))
+      continue;
+
     // Check if FindLastExpression is a simple expression of a widened IV. If
     // so, we can track the underlying IV instead and sink the expression.
     auto *IVOfExpressionToSink = getExpressionIV(FindLastExpression);
@@ -4990,8 +5000,10 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
     if (IsTruncIV && !isCmpOfMultiUseReductionPhi(Cond))
       IVOfExpressionToSink = nullptr;
     const SCEV *IVSCEV = vputils::getSCEVExprForVPValue(
-        IVOfExpressionToSink ? IVOfExpressionToSink : FindLastExpression, PSE,
-        &L);
+        PtrIV                  ? VectorLoopRegion->getCanonicalIV()
+        : IVOfExpressionToSink ? IVOfExpressionToSink
+                               : FindLastExpression,
+        PSE, &L);
     if (!match(IVSCEV, m_scev_AffineAddRec(m_SCEV(), m_SCEV()))) {
       assert(!match(vputils::getSCEVExprForVPValue(FindLastExpression, PSE, &L),
                     m_scev_AffineAddRec(m_SCEV(), m_SCEV())) &&
@@ -5038,7 +5050,7 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
       }
     }
 
-    bool SinkChangesType = IsTruncIV && IVOfExpressionToSink;
+    bool SinkChangesType = PtrIV || (IsTruncIV && IVOfExpressionToSink);
     // If no sentinel was found, fall back to a boolean AnyOf reduction to track
     // if the condition was ever true. Requires the IV to not wrap, otherwise we
     // cannot use min/max.
@@ -5054,6 +5066,54 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
         UseSigned = false;
       else
         continue;
+    }
+
+    if (PtrIV) {
+      // Only reduce the wide index for VFs where incrementing and selecting it
+      // costs no more than the any-of reduction and whole-vector selects of the
+      // generic lowering.
+      Type *CanIVTy = VectorLoopRegion->getCanonicalIVType();
+      Type *I1Ty = Type::getInt1Ty(Ctx.LLVMCtx);
+      match(Cond, m_Cmp(Pred, m_VPValue(), m_VPValue()));
+      auto GetSelectCost = [&](Type *Ty, Type *CondTy,
+                               CmpPredicate P = CmpInst::BAD_ICMP_PREDICATE) {
+        return Ctx.TTI.getCmpSelInstrCost(Instruction::Select, Ty, CondTy, P,
+                                          Ctx.CostKind);
+      };
+      auto IsCheaper = [&](ElementCount VF) {
+        if (VF.isScalar())
+          return true;
+        auto *MaskTy = VectorType::get(I1Ty, VF);
+        auto *IdxTy = VectorType::get(CanIVTy, VF);
+        InstructionCost WideIdxCost =
+            Ctx.TTI.getArithmeticInstrCost(Instruction::Add, IdxTy,
+                                           Ctx.CostKind) +
+            GetSelectCost(IdxTy, MaskTy, Pred);
+        InstructionCost GenericCost =
+            Ctx.TTI.getArithmeticReductionCost(Instruction::Or, MaskTy,
+                                               std::nullopt, Ctx.CostKind) +
+            GetSelectCost(MaskTy, I1Ty) +
+            GetSelectCost(VectorType::get(PhiTy, VF), I1Ty);
+        return WideIdxCost <= GenericCost;
+      };
+      if (!LoopVectorizationPlanner::getDecisionAndClampRange(IsCheaper, Range))
+        continue;
+
+      VPIRFlags::WrapFlagsTy CanIVFlags(/*HasNUW=*/true, /*HasNSW=*/false);
+      for (VPRecipeBase &R : PtrIV->getParent()->phis())
+        if (match(&R, m_CanonicalWidenIV(IVOfExpressionToSink)))
+          break;
+      if (!IVOfExpressionToSink) {
+        IVOfExpressionToSink = new VPWidenIntOrFpInductionRecipe(
+            /*IV=*/nullptr, Plan.getZero(CanIVTy),
+            Plan.getConstantInt(CanIVTy, 1), &Plan.getVF(),
+            InductionDescriptor::getCanonicalIntInduction(CanIVTy, SE),
+            CanIVFlags, PtrIV->getDebugLoc());
+        IVOfExpressionToSink->insertBefore(PtrIV);
+      }
+      // NSW of a reused IV may only hold for its original users, which need not
+      // use it once it wraps in the scalar loop.
+      IVOfExpressionToSink->intersectFlags(CanIVFlags);
     }
 
     VPInstruction *RdxResult = cast<VPInstruction>(vputils::findRecipe(
@@ -5113,8 +5173,10 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
     VPBuilder MiddleBuilder(RdxResult);
     // Widen the start value if needed. Create it before ReducedIV, so it
     // dominates the result computation handleMultiUseReductions rebuilds there.
-    VPValue *StartVPV = MiddleBuilder.createScalarZExtOrTrunc(
-        PhiR->getStartValue(), NewFindLastSelect->getScalarType(), ExitDL);
+    VPValue *StartVPV = PtrIV ? PhiR->getStartValue()
+                              : MiddleBuilder.createScalarZExtOrTrunc(
+                                    PhiR->getStartValue(),
+                                    NewFindLastSelect->getScalarType(), ExitDL);
     VPValue *ReducedIV =
         MiddleBuilder.createNaryOp(VPInstruction::ComputeReductionResult,
                                    NewFindLastSelect, Flags, ExitDL);
@@ -5127,6 +5189,10 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
           cloneBinOpForScalarIV(cast<VPWidenRecipe>(FindLastExpression),
                                 ReducedIV, IVOfExpressionToSink);
       SunkExpression = true;
+    } else if (PtrIV) {
+      VectorRegionExitingVal = MiddleBuilder.createDerivedIV(
+          InductionDescriptor::IK_PtrInduction, /*FPBinOp=*/nullptr,
+          PtrIV->getStartValue(), ReducedIV, PtrIV->getStepValue());
     }
 
     VPValue *NewRdxResult;
