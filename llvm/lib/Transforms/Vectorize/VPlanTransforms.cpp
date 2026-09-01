@@ -4841,8 +4841,29 @@ void VPlanTransforms::adjustFirstOrderRecurrenceMiddleUsers(VPlan &Plan,
 }
 
 /// Check if \p V is a binary expression of a widened IV and a loop-invariant
-/// value. Returns the widened IV if found, nullptr otherwise.
+/// value, or a truncated induction. Returns the (untruncated) widened IV if
+/// found, nullptr otherwise.
 static VPWidenIntOrFpInductionRecipe *getExpressionIV(VPValue *V) {
+  // A truncated induction is modeled as a narrower induction recipe for the
+  // same phi. Return the untruncated one.
+  if (auto *TruncIV = dyn_cast<VPWidenIntOrFpInductionRecipe>(V);
+      TruncIV && TruncIV->isTruncated()) {
+    for (VPWidenIntOrFpInductionRecipe &IV :
+         make_isa_range<VPWidenIntOrFpInductionRecipe>(
+             TruncIV->getParent()->phis()))
+      if (!IV.isTruncated() && IV.getPHINode() == TruncIV->getPHINode())
+        return &IV;
+    return nullptr;
+  }
+
+  // The truncate is only folded into a narrower induction for some VFs. Also
+  // match a separate truncate, so the decision does not depend on the VF.
+  VPValue *TruncOp;
+  if (match(V, m_Trunc(m_VPValue(TruncOp)))) {
+    auto *IV = dyn_cast<VPWidenIntOrFpInductionRecipe>(TruncOp);
+    return IV && !IV->isTruncated() ? IV : nullptr;
+  }
+
   auto *BinOp = dyn_cast<VPWidenRecipe>(V);
   if (!BinOp || !Instruction::isBinaryOp(BinOp->getOpcode()) ||
       Instruction::isIntDivRem(BinOp->getOpcode()))
@@ -4857,6 +4878,14 @@ static VPWidenIntOrFpInductionRecipe *getExpressionIV(VPValue *V) {
     return nullptr;
 
   return dyn_cast<VPWidenIntOrFpInductionRecipe>(WidenIVCandidate);
+}
+
+/// Returns true if \p Cond compares a reduction phi with uses outside its
+/// reduction chain, i.e. a min/max candidate for handleMultiUseReductions.
+static bool isCmpOfMultiUseReductionPhi(VPValue *Cond) {
+  VPReductionPHIRecipe *PhiR;
+  return match(Cond, m_c_Cmp(m_ReductionPhi(PhiR), m_VPValue())) &&
+         PhiR->hasUsesOutsideReductionChain();
 }
 
 /// Create a scalar version of \p BinOp, with its \p WidenIV operand replaced
@@ -4942,8 +4971,10 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
     // phi. The find-last select should be a select between the phi and the
     // find-last expression.
     VPValue *Cond, *FindLastExpression;
-    if (!match(FindLastSelect, m_SelectLike(m_VPValue(Cond), m_Specific(PhiR),
-                                            m_VPValue(FindLastExpression))) &&
+    bool PhiIsTrueOp =
+        match(FindLastSelect, m_SelectLike(m_VPValue(Cond), m_Specific(PhiR),
+                                           m_VPValue(FindLastExpression)));
+    if (!PhiIsTrueOp &&
         !match(FindLastSelect,
                m_SelectLike(m_VPValue(Cond), m_VPValue(FindLastExpression),
                             m_Specific(PhiR))))
@@ -4952,6 +4983,12 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
     // Check if FindLastExpression is a simple expression of a widened IV. If
     // so, we can track the underlying IV instead and sink the expression.
     auto *IVOfExpressionToSink = getExpressionIV(FindLastExpression);
+    // Sinking a truncation widens the reduction. Only do so for the index of an
+    // argmin/argmax, which handleMultiUseReductions cannot vectorize otherwise.
+    bool IsTruncIV =
+        IVOfExpressionToSink && IVOfExpressionToSink->getScalarType() != PhiTy;
+    if (IsTruncIV && !isCmpOfMultiUseReductionPhi(Cond))
+      IVOfExpressionToSink = nullptr;
     const SCEV *IVSCEV = vputils::getSCEVExprForVPValue(
         IVOfExpressionToSink ? IVOfExpressionToSink : FindLastExpression, PSE,
         &L);
@@ -4976,8 +5013,14 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
     // if FindLastExpression cannot be vectorized via a sentinel. Sinking may
     // also prevent vectorizing using a sentinel (e.g., if the expression is a
     // multiply or divide by large constant, respectively), which also makes
-    // sinking undesirable.
-    if (IVOfExpressionToSink) {
+    // sinking undesirable. Always sink a truncated argmin/argmax index selected
+    // on a strict compare, as handleFirstArgMinOrMax requires a canonical IV.
+    CmpPredicate Pred;
+    bool IsStrictArgMinMaxIdxTrunc =
+        IsTruncIV && IVOfExpressionToSink &&
+        match(Cond, m_Cmp(Pred, m_VPValue(), m_VPValue())) &&
+        CmpInst::isStrictPredicate(Pred) != PhiIsTrueOp;
+    if (IVOfExpressionToSink && !IsStrictArgMinMaxIdxTrunc) {
       const SCEV *FindLastExpressionSCEV =
           vputils::getSCEVExprForVPValue(FindLastExpression, PSE, &L);
       if (std::optional<bool> NewUseMax =
@@ -4995,10 +5038,15 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
       }
     }
 
+    bool SinkChangesType = IsTruncIV && IVOfExpressionToSink;
     // If no sentinel was found, fall back to a boolean AnyOf reduction to track
     // if the condition was ever true. Requires the IV to not wrap, otherwise we
     // cannot use min/max.
     if (!SentinelVal) {
+      // handleMultiUseReductions requires a sentinel for the widened
+      // reduction; an AnyOf reduction would add a second user to the compare.
+      if (SinkChangesType)
+        continue;
       auto *AR = cast<SCEVAddRecExpr>(IVSCEV);
       if (AR->hasNoSignedWrap())
         UseSigned = true;
@@ -5014,13 +5062,32 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
 
     VPValue *NewFindLastSelect = BackedgeVal;
     VPValue *SelectCond = Cond;
-    if (!SentinelVal || IVOfExpressionToSink) {
+    if (SinkChangesType) {
+      // Rebuild PhiR's chain at the wider type, keeping Cond as the select's
+      // condition as handleMultiUseReductions requires.
+      auto *NewPhiR = new VPReductionPHIRecipe(
+          cast<PHINode>(PhiR->getUnderlyingInstr()), RecurKind::FindIV,
+          *Plan.getConstantInt(*SentinelVal),
+          *Plan.getPoison(IVOfExpressionToSink->getScalarType()),
+          RdxUnordered{1}, {}, /*HasUsesOutsideReductionChain=*/false);
+      NewPhiR->setExpressionSunk();
+      NewPhiR->insertBefore(PhiR);
+      VPValue *TrueVal = IVOfExpressionToSink, *FalseVal = NewPhiR;
+      if (PhiIsTrueOp)
+        std::swap(TrueVal, FalseVal);
+      VPBuilder LoopBuilder(BackedgeVal->getDefiningRecipe());
+      NewFindLastSelect = LoopBuilder.createSelect(
+          Cond, TrueVal, FalseVal, FindLastSelect->getDebugLoc());
+      if (HeaderMask)
+        NewFindLastSelect =
+            LoopBuilder.createSelect(HeaderMask, NewFindLastSelect, NewPhiR);
+      NewPhiR->setBackedgeValue(NewFindLastSelect);
+    } else if (!SentinelVal || IVOfExpressionToSink) {
       // When we need to create a new select, normalize the condition so that
       // PhiR is the last operand and include the header mask if needed.
       DebugLoc DL = FindLastSelect->getDefiningRecipe()->getDebugLoc();
       VPBuilder LoopBuilder(FindLastSelect->getDefiningRecipe());
-      if (match(FindLastSelect,
-                m_SelectLike(m_VPValue(Cond), m_Specific(PhiR), m_VPValue())))
+      if (PhiIsTrueOp)
         SelectCond = LoopBuilder.createNot(SelectCond);
 
       // When tail folding, mask the condition with the header mask to prevent
@@ -5044,6 +5111,10 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
                     FastMathFlags());
     DebugLoc ExitDL = RdxResult->getDebugLoc();
     VPBuilder MiddleBuilder(RdxResult);
+    // Widen the start value if needed. Create it before ReducedIV, so it
+    // dominates the result computation handleMultiUseReductions rebuilds there.
+    VPValue *StartVPV = MiddleBuilder.createScalarZExtOrTrunc(
+        PhiR->getStartValue(), NewFindLastSelect->getScalarType(), ExitDL);
     VPValue *ReducedIV =
         MiddleBuilder.createNaryOp(VPInstruction::ComputeReductionResult,
                                    NewFindLastSelect, Flags, ExitDL);
@@ -5051,7 +5122,7 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
     // If IVOfExpressionToSink is an expression to sink, sink it now.
     VPValue *VectorRegionExitingVal = ReducedIV;
     bool SunkExpression = false;
-    if (IVOfExpressionToSink) {
+    if (IVOfExpressionToSink && !SinkChangesType) {
       VectorRegionExitingVal =
           cloneBinOpForScalarIV(cast<VPWidenRecipe>(FindLastExpression),
                                 ReducedIV, IVOfExpressionToSink);
@@ -5059,7 +5130,6 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
     }
 
     VPValue *NewRdxResult;
-    VPValue *StartVPV = PhiR->getStartValue();
     if (SentinelVal) {
       // Sentinel-based approach: reduce IVs with min/max, compare against
       // sentinel to detect if condition was ever true, select accordingly.
@@ -5068,6 +5138,10 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
                                            Sentinel, ExitDL);
       NewRdxResult = MiddleBuilder.createSelect(Cmp, VectorRegionExitingVal,
                                                 StartVPV, ExitDL);
+      // If widened, truncate the select rather than ReducedIV, to keep the
+      // shape handleMultiUseReductions matches.
+      NewRdxResult =
+          MiddleBuilder.createScalarZExtOrTrunc(NewRdxResult, PhiTy, ExitDL);
       StartVPV = Sentinel;
     } else {
       // Introduce a boolean AnyOf reduction to track if the condition was ever
@@ -5092,6 +5166,17 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
     }
     RdxResult->replaceAllUsesWith(NewRdxResult);
     RdxResult->eraseFromParent();
+
+    if (SinkChangesType) {
+      // Erase PhiR's dead chain, so it does not keep alive the compare, which
+      // handleMultiUseReductions requires to have a single user.
+      PhiR->replaceAllUsesWith(Plan.getPoison(PhiTy));
+      PhiR->eraseFromParent();
+      if (BackedgeVal != FindLastSelect)
+        BackedgeVal->getDefiningRecipe()->eraseFromParent();
+      FindLastSelect->eraseFromParent();
+      continue;
+    }
 
     auto *NewPhiR = new VPReductionPHIRecipe(
         cast<PHINode>(PhiR->getUnderlyingInstr()), RecurKind::FindIV, *StartVPV,
