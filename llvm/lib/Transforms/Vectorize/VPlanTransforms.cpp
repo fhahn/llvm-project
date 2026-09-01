@@ -4526,7 +4526,7 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
       continue;
 
     Type *PhiTy = PhiR->getScalarType();
-    if (PhiTy->isPointerTy() || PhiTy->isFloatingPointTy())
+    if (PhiTy->isFloatingPointTy())
       continue;
 
     // If there's a header mask, the backedge select will not be the find-last
@@ -4550,12 +4550,39 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
                             m_Specific(PhiR))))
       continue;
 
+    // A pointer index cannot be reduced with min/max. If it is a pointer
+    // induction, reduce a fresh 0-based unit-step integer IV instead and
+    // rebuild the pointer from the reduced index in the middle block. Restrict
+    // to steps of the canonical IV type, so the reduced index can be multiplied
+    // by the step without a cast, and to indices that are not part of an
+    // argmin/argmax: handleMultiUseReductions cannot pair an integer-typed
+    // index reduction whose result is a pointer.
+    Type *CanIVTy = VectorLoopRegion->getCanonicalIVType();
+    VPWidenPointerInductionRecipe *PtrIV = nullptr;
+    if (PhiTy->isPointerTy()) {
+      PtrIV = dyn_cast<VPWidenPointerInductionRecipe>(FindLastExpression);
+      if (!PtrIV || isPairedArgMinMaxIndex(Cond) ||
+          PtrIV->getStepValue()->getScalarType() != CanIVTy)
+        continue;
+    }
+
     // Check if FindLastExpression is a simple expression of a widened IV. If
     // so, we can track the underlying IV instead and sink the expression.
-    auto *IVOfExpressionToSink = getExpressionIV(FindLastExpression);
-    const SCEV *IVSCEV = vputils::getSCEVExprForVPValue(
-        IVOfExpressionToSink ? IVOfExpressionToSink : FindLastExpression, PSE,
-        &L);
+    VPWidenIntOrFpInductionRecipe *IVOfExpressionToSink =
+        getExpressionIV(FindLastExpression);
+    const SCEV *IVSCEV;
+    if (PtrIV) {
+      IVOfExpressionToSink =
+          vputils::createWideCanonicalIV(Plan, SE, PtrIV, PtrIV->getDebugLoc());
+      // The fresh IV counts vector-loop iterations, so it cannot wrap for any
+      // active lane and SCEV cannot infer that from the recipe alone.
+      IVSCEV = SE.getAddRecExpr(SE.getZero(CanIVTy), SE.getOne(CanIVTy), &L,
+                                SCEV::FlagNUW);
+    } else {
+      IVSCEV = vputils::getSCEVExprForVPValue(
+          IVOfExpressionToSink ? IVOfExpressionToSink : FindLastExpression, PSE,
+          &L);
+    }
     if (!match(IVSCEV, m_scev_AffineAddRec(m_SCEV(), m_SCEV()))) {
       assert(!match(vputils::getSCEVExprForVPValue(FindLastExpression, PSE, &L),
                     m_scev_AffineAddRec(m_SCEV(), m_SCEV())) &&
@@ -4578,7 +4605,7 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
     // also prevent vectorizing using a sentinel (e.g., if the expression is a
     // multiply or divide by large constant, respectively), which also makes
     // sinking undesirable.
-    if (IVOfExpressionToSink) {
+    if (IVOfExpressionToSink && !PtrIV) {
       const SCEV *FindLastExpressionSCEV =
           vputils::getSCEVExprForVPValue(FindLastExpression, PSE, &L);
       if (std::optional<bool> NewUseMax =
@@ -4622,14 +4649,17 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
 
     // Sinking a binary-op expression preserves the type, as its operands must
     // already share PhiR's type, so PhiR's own reduction chain can be reused.
-    // Sinking a truncation does not; PhiR's narrower chain cannot carry the
-    // untruncated IV's values. Add a wider reduction phi/select pair instead
-    // and leave PhiR's chain dead. Its start value is only known after
-    // choosing between a sentinel and AnyOf below.
+    // Sinking a truncation or reducing the index of a pointer induction does
+    // not; PhiR's chain cannot carry those values. Add a reduction phi/select
+    // pair of the new type instead and leave PhiR's chain dead. Its start value
+    // is only known after choosing between a sentinel and AnyOf below.
     bool SinkChangesType =
         IVOfExpressionToSink && IVOfExpressionToSink->getScalarType() != PhiTy;
     Type *RdxTy =
         SinkChangesType ? IVOfExpressionToSink->getScalarType() : PhiTy;
+    // For a sunk truncation the reduced value is narrowed back to PhiTy, for a
+    // pointer index the pointer is rebuilt from it instead.
+    bool SinkTrunc = SinkChangesType && !PtrIV;
 
     VPReductionPHIRecipe *NewPhiR = nullptr;
     if (SinkChangesType) {
@@ -4681,18 +4711,25 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
     // before ReducedIV: handleMultiUseReductions rebuilds the result sequence
     // there and reuses this value.
     VPValue *WideStartVPV = nullptr;
-    if (SinkChangesType && SentinelVal)
+    if (SinkTrunc && SentinelVal)
       WideStartVPV = MiddleBuilder.createScalarCast(
           Instruction::ZExt, PhiR->getStartValue(), RdxTy, ExitDL);
     VPValue *ReducedIV =
         MiddleBuilder.createNaryOp(VPInstruction::ComputeReductionResult,
                                    NewFindLastSelect, Flags, ExitDL);
 
-    // If IVOfExpressionToSink is an expression to sink, sink it now. For a
-    // truncated induction, the expression is the truncation itself. With a
-    // sentinel, the whole select below is truncated instead.
+    // Recover the value the reduced index stands for: rebuild the pointer for a
+    // pointer index, truncate for a sunk truncation - unless there is a
+    // sentinel, in which case the whole select below is truncated - or re-apply
+    // a sunk binary expression.
     VPValue *VectorRegionExitingVal = ReducedIV;
-    if (SinkChangesType) {
+    if (PtrIV) {
+      // Rebuild the pointer the reduced index refers to, as
+      // PtrStart + Index * PtrStep.
+      VectorRegionExitingVal = MiddleBuilder.createDerivedIV(
+          InductionDescriptor::IK_PtrInduction, /*FPBinOp=*/nullptr,
+          PtrIV->getStartValue(), ReducedIV, PtrIV->getStepValue());
+    } else if (SinkTrunc) {
       if (!SentinelVal)
         VectorRegionExitingVal = MiddleBuilder.createScalarCast(
             Instruction::Trunc, ReducedIV, PhiTy, ExitDL);
@@ -4710,7 +4747,7 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
       VPValue *Sentinel = Plan.getConstantInt(*SentinelVal);
       auto *Cmp = MiddleBuilder.createICmp(CmpInst::ICMP_NE, ReducedIV,
                                            Sentinel, ExitDL);
-      if (SinkChangesType) {
+      if (SinkTrunc) {
         // Truncate the select's result rather than ReducedIV, so the select
         // keeps the shape handleMultiUseReductions matches (matchFindIVResult)
         // to find the result of a paired argmin/argmax. This is equivalent, as
