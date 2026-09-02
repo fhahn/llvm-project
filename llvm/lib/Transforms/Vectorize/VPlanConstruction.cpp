@@ -1431,16 +1431,15 @@ static void insertCheckBlockBeforeVectorLoop(VPlan &Plan,
   addIncomingForLastPredecessor(ScalarPH);
 }
 
-BasicBlock *
-VPlanTransforms::modelGeneratedMainLoopBlocks(VPlan &Plan, VPlan &MainPlan,
-                                              VPIRBasicBlock *EnteredFrom) {
+void VPlanTransforms::modelGeneratedMainLoopBlocks(
+    VPlan &Plan, VPlan &MainPlan, VPIRBasicBlock *EnteredFrom,
+    VPIRBasicBlock *MainLoopCheck) {
   // After executing MainPlan, each of its VPBasicBlocks wraps the block
   // generated for it, so the chain to mirror can be read off it. Collect it in
   // reverse post-order, skipping MainPlan's scalar preheader, scalar header and
   // exit blocks, which Plan models already.
   VPBasicBlock *MainScalarPH = MainPlan.getScalarPreheader();
   SmallVector<VPIRBasicBlock *> Chain;
-  SmallVector<VPIRBasicBlock *> BypassBlocks;
   ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>> RPOT(
       MainPlan.getEntry());
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(RPOT)) {
@@ -1448,41 +1447,40 @@ VPlanTransforms::modelGeneratedMainLoopBlocks(VPlan &Plan, VPlan &MainPlan,
         MainPlan.isExitBlock(VPBB))
       continue;
     Chain.push_back(cast<VPIRBasicBlock>(VPBB));
-    // The blocks holding checks that bypass a vector loop branch to the scalar
-    // preheader as their first successor and to the next block of the check
-    // chain as their second one.
-    if (VPBB->getNumSuccessors() == 2 &&
-        VPBB->getSuccessors()[0] == MainScalarPH)
-      BypassBlocks.push_back(Chain.back());
   }
-  // The chain is collected in reverse post-order, so the last bypassing block
-  // holds the iteration count check for the main vector loop. It bypasses the
-  // main vector loop only, and its edge is mirrored below rather than
-  // redirected.
-  assert(!BypassBlocks.empty() && "main vector loop must have a bypass");
-  VPIRBasicBlock *MainLoopIterationCountCheck = BypassBlocks.pop_back_val();
 
   // Map each block of the chain to the VPIRBasicBlock modeling it in Plan.
-  // Plan's entry already wraps the block heading the chain and EnteredFrom the
-  // block Plan is entered from; the rest get a fresh, empty wrapper. Only
-  // blocks of the chain are mapped, so the plan cannot reach beyond them.
+  // Plan's entry already wraps the block heading the chain, EnteredFrom the
+  // block Plan is entered from and MainLoopCheck the block whose bypass edge
+  // has been modeled already; the rest get a fresh, empty wrapper. Only blocks
+  // of the chain are mapped, so the plan cannot reach beyond them.
   auto *EntryVPBB = cast<VPIRBasicBlock>(Plan.getEntry());
   assert(EntryVPBB->getIRBasicBlock() == Chain.front()->getIRBasicBlock() &&
          "entry must wrap the block heading the chain");
   SmallDenseMap<const VPBlockBase *, VPIRBasicBlock *> Modeled;
   Modeled[MainScalarPH] = EnteredFrom;
   Modeled[Chain.front()] = EntryVPBB;
-  for (VPIRBasicBlock *VPBB : drop_begin(Chain))
-    Modeled[VPBB] = Plan.createEmptyVPIRBasicBlock(VPBB->getIRBasicBlock());
+  for (VPIRBasicBlock *MainVPBB : drop_begin(Chain)) {
+    BasicBlock *BB = MainVPBB->getIRBasicBlock();
+    Modeled[MainVPBB] = BB == MainLoopCheck->getIRBasicBlock()
+                            ? MainLoopCheck
+                            : Plan.createEmptyVPIRBasicBlock(BB);
+  }
 
   // Model the edges bypassing both vector loops as edges to the scalar
-  // preheader, so executing the plan redirects the branches. Connect them
-  // before the remaining edges, as they are the first successors of the blocks
-  // they belong to, and in reverse of the order the main plan created those
-  // blocks, matching the predecessor order of the block they branch to.
+  // preheader, so executing the plan redirects the branches. Those blocks
+  // branch to MainPlan's scalar preheader as their first successor, so connect
+  // them before the remaining edges, in reverse of the order the main plan
+  // created them to match the predecessor order of the block they branch to.
   VPBasicBlock *ScalarPH = Plan.getScalarPreheader();
-  for (VPIRBasicBlock *VPBB : reverse(BypassBlocks)) {
-    VPBlockUtils::connectBlocks(Modeled.at(VPBB), ScalarPH);
+  for (VPIRBasicBlock *MainVPBB : reverse(Chain)) {
+    VPIRBasicBlock *VPBB = Modeled.at(MainVPBB);
+    // MainLoopCheck bypasses the main vector loop only; its bypass edge to the
+    // preheader of the epilogue vector loop has been modeled already.
+    if (VPBB == MainLoopCheck || MainVPBB->getNumSuccessors() != 2 ||
+        MainVPBB->getSuccessors()[0] != MainScalarPH)
+      continue;
+    VPBlockUtils::connectBlocks(VPBB, ScalarPH);
     addIncomingForLastPredecessor(ScalarPH);
   }
 
@@ -1496,28 +1494,36 @@ VPlanTransforms::modelGeneratedMainLoopBlocks(VPlan &Plan, VPlan &MainPlan,
     // does not own.
     Visited.insert(MainVPBB);
     VPIRBasicBlock *VPBB = Modeled.at(MainVPBB);
-    // The bypass edge of a block bypassing both vector loops has been modeled
-    // above. It is the first successor of that block, so skip the successors
-    // already connected.
+    // The bypass edges of the blocks bypassing a vector loop have been modeled
+    // already, either above or when modeling the bypass edge of the main vector
+    // loop's check. They are the first successors of those blocks, so skip the
+    // successors already connected.
     for (VPBlockBase *Succ :
          drop_begin(MainVPBB->getSuccessors(), VPBB->getNumSuccessors())) {
       VPIRBasicBlock *SuccVPBB = Modeled.lookup(Succ);
       if (!SuccVPBB || Visited.contains(Succ))
         continue;
+      assert(SuccVPBB->phis().empty() &&
+             "modeled blocks must not have phis needing an incoming value");
       VPBlockUtils::connectBlocks(VPBB, SuccVPBB);
-      // Only EnteredFrom can have phis; they need an incoming value for the new
-      // predecessor. Re-use the value the main plan already set for the edge.
-      for (VPRecipeBase &R : SuccVPBB->phis()) {
-        auto *PhiR = cast<VPIRPhi>(&R);
-        PhiR->addIncoming(
-            Plan.getOrAddLiveIn(PhiR->getIRPhi().getIncomingValueForBlock(
-                MainVPBB->getIRBasicBlock())));
-      }
     }
   }
 
   Plan.setEntry(EntryVPBB);
-  return MainLoopIterationCountCheck->getIRBasicBlock();
+}
+
+VPIRBasicBlock *VPlanTransforms::connectBypassBlock(VPlan &Plan,
+                                                    BasicBlock *BypassBlock) {
+  VPBasicBlock *VectorPH = Plan.getVectorPreheader();
+  assert(VectorPH && "plan must have a vector preheader to bypass to");
+  auto *BypassVPBB = Plan.createEmptyVPIRBasicBlock(BypassBlock);
+  // BypassVPBB is not reachable from the plan's entry until the remaining
+  // already generated blocks are modeled; until then it only needs its plan set
+  // so VPBlockBase::getPlan keeps working for blocks reachable from it.
+  BypassVPBB->setPlan(&Plan);
+  VPBlockUtils::connectBlocks(BypassVPBB, VectorPH);
+  addIncomingForLastPredecessor(VectorPH);
+  return BypassVPBB;
 }
 
 // Likelyhood of bypassing the vectorized loop due to a runtime check block,
@@ -1632,16 +1638,15 @@ void VPlanTransforms::addIterationCountCheckBlock(
 }
 
 void VPlanTransforms::addMinimumVectorEpilogueIterationCheck(
-    VPlan &Plan, Value *VectorTripCount, bool RequiresScalarEpilogue,
+    VPlan &Plan, VPValue *MainVectorTripCount, bool RequiresScalarEpilogue,
     ElementCount EpilogueVF, unsigned EpilogueUF, unsigned MainLoopStep,
     unsigned EpilogueLoopStep, ScalarEvolution &SE) {
   // Add the minimum iteration check for the epilogue vector loop.
   VPValue *TC = Plan.getTripCount();
-  Value *TripCount = TC->getLiveInIRValue();
   VPBuilder Builder(cast<VPBasicBlock>(Plan.getEntry()));
   VPValue *VFxUF = Builder.createExpandSCEV(SE.getElementCount(
-      TripCount->getType(), (EpilogueVF * EpilogueUF), SCEV::FlagNUW));
-  VPValue *Count = Builder.createSub(TC, Plan.getOrAddLiveIn(VectorTripCount),
+      TC->getScalarType(), (EpilogueVF * EpilogueUF), SCEV::FlagNUW));
+  VPValue *Count = Builder.createSub(TC, MainVectorTripCount,
                                      DebugLoc::getUnknown(), "n.vec.remaining");
 
   // Generate code to check if the loop's trip count is less than VF * UF of

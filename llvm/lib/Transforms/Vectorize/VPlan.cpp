@@ -228,7 +228,8 @@ VPBasicBlock *VPBlockBase::getEntryBasicBlock() {
 }
 
 void VPBlockBase::setPlan(VPlan *ParentPlan) {
-  assert(ParentPlan->getEntry() == this && "Can only set plan on its entry.");
+  assert((ParentPlan->getEntry() == this || !hasPredecessors()) &&
+         "Can only set plan on its entry or a block without predecessors.");
   Plan = ParentPlan;
 }
 
@@ -479,7 +480,7 @@ void VPBasicBlock::connectToPredecessors(VPTransformState &State) {
       // A VPIRBasicBlock's successors may already be set. If one of them is
       // NewBB, the edge is already generated and kept. Otherwise it is
       // redirected, as done for the entry block's terminator and for blocks
-      // bypassing both vector loops during epilogue vectorization.
+      // bypassing a vector loop during epilogue vectorization.
       // TODO: Remove exception for the entry block by modeling its terminator
       // using BranchOnCond.
       auto *TermBr = cast<CondBrInst>(PredBBTerminator);

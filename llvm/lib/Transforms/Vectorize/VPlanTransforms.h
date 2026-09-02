@@ -209,9 +209,10 @@ struct VPlanTransforms {
                               DebugLoc DL, PredicatedScalarEvolution &PSE);
 
   /// Add a check to \p Plan to see if the epilogue vector loop should be
-  /// executed.
+  /// executed. \p MainVectorTripCount is the vector trip count of the main
+  /// vector loop, i.e. the number of iterations it executed.
   static void addMinimumVectorEpilogueIterationCheck(
-      VPlan &Plan, Value *VectorTripCount, bool RequiresScalarEpilogue,
+      VPlan &Plan, VPValue *MainVectorTripCount, bool RequiresScalarEpilogue,
       ElementCount EpilogueVF, unsigned EpilogueUF, unsigned MainLoopStep,
       unsigned EpilogueLoopStep, ScalarEvolution &SE);
 
@@ -243,9 +244,21 @@ struct VPlanTransforms {
   /// their first successor; those edges are modeled as edges to \p Plan's
   /// scalar preheader, so executing the plan redirects them. \p Plan's entry
   /// already wraps the block holding the iteration count check for the epilogue
-  /// vector loop, which heads the chain of generated blocks.
-  static BasicBlock *modelGeneratedMainLoopBlocks(VPlan &Plan, VPlan &MainPlan,
-                                                  VPIRBasicBlock *EnteredFrom);
+  /// vector loop, which heads the chain of generated blocks. \p MainLoopCheck
+  /// is the block already modeled for the iteration count check of the main
+  /// vector loop.
+  static void modelGeneratedMainLoopBlocks(VPlan &Plan, VPlan &MainPlan,
+                                           VPIRBasicBlock *EnteredFrom,
+                                           VPIRBasicBlock *MainLoopCheck);
+
+  /// Model the edge from \p BypassBlock, an already generated block branching
+  /// to the block \p Plan is entered from, to \p Plan's vector preheader and
+  /// return the block modeling \p BypassBlock. Executing the plan redirects the
+  /// branch, which must be the first successor of \p BypassBlock's terminator.
+  /// \p BypassBlock is not reachable from \p Plan's entry until the remaining
+  /// already generated blocks are modeled, \see modelGeneratedMainLoopBlocks.
+  static VPIRBasicBlock *connectBypassBlock(VPlan &Plan,
+                                            BasicBlock *BypassBlock);
 
   /// Replaces the VPInstructions in \p Plan with corresponding
   /// widen recipes. Returns false if any VPInstructions could not be converted

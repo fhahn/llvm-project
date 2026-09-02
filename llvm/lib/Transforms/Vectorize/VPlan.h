@@ -196,7 +196,8 @@ public:
   const VPlan *getPlan() const;
 
   /// Sets the pointer of the plan containing the block. The block must be the
-  /// entry block into the VPlan.
+  /// entry block into the VPlan or a block without predecessors, as \ref getPlan
+  /// finds the plan by walking up to a block without predecessors.
   void setPlan(VPlan *ParentPlan);
 
   void setParent(VPRegionBlock *P) { Parent = P; }
