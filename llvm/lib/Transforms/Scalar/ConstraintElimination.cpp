@@ -597,6 +597,13 @@ static Decomposition decompose(Value *V, const ConstraintInfo &Info,
     }
 
     ConstantInt *CI;
+    if (match(V, m_Add(m_Value(Op0), m_ConstantInt(CI))) && CI->isNegative() &&
+        canUseSExt(CI) && Info.isKnownNonNegative(Op0)) {
+      if (auto Decomp = MergeResults(Op0, CI, IsSigned))
+        return *Decomp;
+      return V;
+    }
+
     if (match(V, m_NSWMul(m_Value(Op0), m_ConstantInt(CI))) && canUseSExt(CI)) {
       auto Result = decompose(Op0, Info, IsSigned, DL);
       if (!Result.mul(CI->getSExtValue()))
