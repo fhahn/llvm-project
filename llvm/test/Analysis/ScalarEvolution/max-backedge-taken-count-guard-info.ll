@@ -2044,11 +2044,9 @@ exit:
 }
 
 ; The guards are on pointers sharing the base %base, so their difference is
-; %off and (%off u<= 7) can be derived. The (0 u< %off) guard is required, and
-; not redundant with (%base u< %b): the latter bounds the pointer %b, but the
-; backedge-taken count is expressed in terms of %off, so only the derived
-; guard relates the two. Without it the upper bound alone leaves the minimum
-; at 0 and the constant max backedge-taken count stays -1.
+; %off, and the strict guards bound it to [1, 7]. Note that (%base u< %b) does
+; not bound %off on its own: pointer-typed ULT is not applied to the operands,
+; so both halves of the range come from the derived guards.
 define void @two_sided_guard_bounds_difference_pointers(ptr %dst, ptr %base, i64 %off) {
 ; CHECK-LABEL: 'two_sided_guard_bounds_difference_pointers'
 ; CHECK-NEXT:  Classifying expressions for: @two_sided_guard_bounds_difference_pointers
@@ -2056,10 +2054,8 @@ define void @two_sided_guard_bounds_difference_pointers(ptr %dst, ptr %base, i64
 ; CHECK-NEXT:    --> (%off + %base) U: full-set S: full-set
 ; CHECK-NEXT:    %add = getelementptr i8, ptr %base, i64 8
 ; CHECK-NEXT:    --> (8 + %base) U: full-set S: full-set
-; CHECK-NEXT:    %and.0 = and i1 %c.0, %c.1
+; CHECK-NEXT:    %and = and i1 %c.0, %c.1
 ; CHECK-NEXT:    --> (%c.0 umin %c.1) U: full-set S: full-set
-; CHECK-NEXT:    %and = and i1 %and.0, %c.z
-; CHECK-NEXT:    --> (%c.z umin %c.0 umin %c.1) U: full-set S: full-set
 ; CHECK-NEXT:    %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
 ; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,7) S: [0,7) Exits: (-1 + %off) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %gep = getelementptr i8, ptr %dst, i64 %iv
@@ -2074,12 +2070,10 @@ define void @two_sided_guard_bounds_difference_pointers(ptr %dst, ptr %base, i64
 ;
 entry:
   %b = getelementptr i8, ptr %base, i64 %off
-  %c.z = icmp ugt i64 %off, 0
   %c.0 = icmp ult ptr %base, %b
   %add = getelementptr i8, ptr %base, i64 8
   %c.1 = icmp ult ptr %b, %add
-  %and.0 = and i1 %c.0, %c.1
-  %and = and i1 %and.0, %c.z
+  %and = and i1 %c.0, %c.1
   br i1 %and, label %loop, label %exit
 
 loop:
@@ -2128,6 +2122,87 @@ loop:
   store i8 0, ptr %gep
   %iv.next = add nuw i64 %iv, 1
   %ec = icmp eq i64 %iv.next, 100
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; Same as @two_sided_guard_bounds_difference, but with both guards spelled as
+; unsigned greater-than. InstCombine does not canonicalize those to less-than,
+; so they are normalized when collecting the guards.
+define void @two_sided_guard_bounds_difference_ugt(ptr %dst, i64 %n, i64 %start) {
+; CHECK-LABEL: 'two_sided_guard_bounds_difference_ugt'
+; CHECK-NEXT:  Classifying expressions for: @two_sided_guard_bounds_difference_ugt
+; CHECK-NEXT:    %add = add i64 %start, 8
+; CHECK-NEXT:    --> (8 + %start) U: full-set S: full-set
+; CHECK-NEXT:    %and = and i1 %c.0, %c.1
+; CHECK-NEXT:    --> (%c.0 umin %c.1) U: full-set S: full-set
+; CHECK-NEXT:    %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {%start,+,1}<nuw><%loop> U: full-set S: full-set Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %gep = getelementptr i8, ptr %dst, i64 %iv
+; CHECK-NEXT:    --> {(%start + %dst),+,1}<nw><%loop> U: full-set S: full-set Exits: (-1 + %n + %dst) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add nuw i64 %iv, 1
+; CHECK-NEXT:    --> {(1 + %start),+,1}<nuw><%loop> U: full-set S: full-set Exits: %n LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @two_sided_guard_bounds_difference_ugt
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + (-1 * %start) + %n)
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 6
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + (-1 * %start) + %n)
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %c.0 = icmp ugt i64 %n, %start
+  %add = add i64 %start, 8
+  %c.1 = icmp ugt i64 %add, %n
+  %and = and i1 %c.0, %c.1
+  br i1 %and, label %loop, label %exit
+
+loop:
+  %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop ]
+  %gep = getelementptr i8, ptr %dst, i64 %iv
+  store i8 0, ptr %gep
+  %iv.next = add nuw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; With a non-strict lower guard the difference may be zero, so no lower bound
+; is derived and the backedge-taken count (%n - %start - 1) may still wrap.
+define void @two_sided_guard_non_strict_lower(ptr %dst, i64 %n, i64 %start) {
+; CHECK-LABEL: 'two_sided_guard_non_strict_lower'
+; CHECK-NEXT:  Classifying expressions for: @two_sided_guard_non_strict_lower
+; CHECK-NEXT:    %add = add i64 %start, 8
+; CHECK-NEXT:    --> (8 + %start) U: full-set S: full-set
+; CHECK-NEXT:    %and = and i1 %c.0, %c.1
+; CHECK-NEXT:    --> (%c.1 umin %c.0) U: full-set S: full-set
+; CHECK-NEXT:    %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {%start,+,1}<nuw><%loop> U: full-set S: full-set Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %gep = getelementptr i8, ptr %dst, i64 %iv
+; CHECK-NEXT:    --> {(%start + %dst),+,1}<nw><%loop> U: full-set S: full-set Exits: (-1 + %n + %dst) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add nuw i64 %iv, 1
+; CHECK-NEXT:    --> {(1 + %start),+,1}<nuw><%loop> U: full-set S: full-set Exits: %n LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @two_sided_guard_non_strict_lower
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + (-1 * %start) + %n)
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + (-1 * %start) + %n)
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %c.0 = icmp ule i64 %start, %n
+  %add = add i64 %start, 8
+  %c.1 = icmp ult i64 %n, %add
+  %and = and i1 %c.0, %c.1
+  br i1 %and, label %loop, label %exit
+
+loop:
+  %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop ]
+  %gep = getelementptr i8, ptr %dst, i64 %iv
+  store i8 0, ptr %gep
+  %iv.next = add nuw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
   br i1 %ec, label %exit, label %loop
 
 exit:
