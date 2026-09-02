@@ -6,7 +6,7 @@ define i64 @sub_hoisted_single_use(i64 %a, i64 %b) {
 ; CHECK-SAME: i64 [[A:%.*]], i64 [[B:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    [[C:%.*]] = icmp uge i64 [[A]], [[B]]
-; CHECK-NEXT:    [[SUB:%.*]] = sub i64 [[A]], [[B]]
+; CHECK-NEXT:    [[SUB:%.*]] = sub nuw i64 [[A]], [[B]]
 ; CHECK-NEXT:    br i1 [[C]], label %[[IF_END:.*]], label %[[EXIT:.*]]
 ; CHECK:       [[IF_END]]:
 ; CHECK-NEXT:    ret i64 [[SUB]]
@@ -53,7 +53,7 @@ define i64 @sub_anchored_after_assume(i64 %a, i64 %b) {
 ; CHECK-LABEL: define i64 @sub_anchored_after_assume(
 ; CHECK-SAME: i64 [[A:%.*]], i64 [[B:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[SUB:%.*]] = sub i64 [[A]], [[B]]
+; CHECK-NEXT:    [[SUB:%.*]] = sub nuw i64 [[A]], [[B]]
 ; CHECK-NEXT:    br label %[[MID:.*]]
 ; CHECK:       [[MID]]:
 ; CHECK-NEXT:    call void @barrier()
@@ -73,13 +73,13 @@ mid:
 }
 
 define i64 @sub_used_before_assume(i64 %a, i64 %b) {
-; CHECK-LABEL: define i64 @sub_anchored_after_assume(
+; CHECK-LABEL: define i64 @sub_used_before_assume(
 ; CHECK-SAME: i64 [[A:%.*]], i64 [[B:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    [[SUB:%.*]] = sub i64 [[A]], [[B]]
 ; CHECK-NEXT:    br label %[[MID:.*]]
 ; CHECK:       [[MID]]:
-; CHECK-NEXT:    call void @barrier()
+; CHECK-NEXT:    call void @use(i64 [[SUB]])
 ; CHECK-NEXT:    [[C:%.*]] = icmp uge i64 [[A]], [[B]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[C]])
 ; CHECK-NEXT:    ret i64 [[SUB]]
@@ -93,6 +93,60 @@ mid:
   %c = icmp uge i64 %a, %b
   call void @llvm.assume(i1 %c)
   ret i64 %sub
+}
+
+; Negative test: the use in %other is not dominated by the assume, so the
+; common dominator of all uses is above it and no flag can be inferred.
+define i64 @sub_use_not_dominated_by_assume(i64 %a, i64 %b, i1 %cc) {
+; CHECK-LABEL: define i64 @sub_use_not_dominated_by_assume(
+; CHECK-SAME: i64 [[A:%.*]], i64 [[B:%.*]], i1 [[CC:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[SUB:%.*]] = sub i64 [[A]], [[B]]
+; CHECK-NEXT:    br i1 [[CC]], label %[[MID:.*]], label %[[OTHER:.*]]
+; CHECK:       [[MID]]:
+; CHECK-NEXT:    [[C:%.*]] = icmp uge i64 [[A]], [[B]]
+; CHECK-NEXT:    call void @llvm.assume(i1 [[C]])
+; CHECK-NEXT:    ret i64 [[SUB]]
+; CHECK:       [[OTHER]]:
+; CHECK-NEXT:    ret i64 [[SUB]]
+;
+entry:
+  %sub = sub i64 %a, %b
+  br i1 %cc, label %mid, label %other
+
+mid:
+  %c = icmp uge i64 %a, %b
+  call void @llvm.assume(i1 %c)
+  ret i64 %sub
+
+other:
+  ret i64 %sub
+}
+
+; The mul is hoisted above the branch establishing %a >= 0, but its only use
+; is guarded by it, so nuw can be inferred at the common dominator.
+define i64 @mul_hoisted_single_use(i64 %a) {
+; CHECK-LABEL: define i64 @mul_hoisted_single_use(
+; CHECK-SAME: i64 [[A:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[MUL:%.*]] = mul nuw nsw i64 [[A]], 4
+; CHECK-NEXT:    [[C:%.*]] = icmp sge i64 [[A]], 0
+; CHECK-NEXT:    br i1 [[C]], label %[[IF_END:.*]], label %[[EXIT:.*]]
+; CHECK:       [[IF_END]]:
+; CHECK-NEXT:    ret i64 [[MUL]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret i64 0
+;
+entry:
+  %mul = mul nsw i64 %a, 4
+  %c = icmp sge i64 %a, 0
+  br i1 %c, label %if.end, label %exit
+
+if.end:
+  ret i64 %mul
+
+exit:
+  ret i64 0
 }
 
 declare void @use(i64)
