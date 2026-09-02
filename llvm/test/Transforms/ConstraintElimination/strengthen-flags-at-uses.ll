@@ -95,7 +95,8 @@ mid:
   ret i64 %sub
 }
 
-; The use in %other is not dominated by the assume, so no flag can be inferred.
+; Negative test: the use in %other is not dominated by the assume, so the
+; common dominator of all uses is above it and no flag can be inferred.
 define i64 @sub_use_not_dominated_by_assume(i64 %a, i64 %b, i1 %cc) {
 ; CHECK-LABEL: define i64 @sub_use_not_dominated_by_assume(
 ; CHECK-SAME: i64 [[A:%.*]], i64 [[B:%.*]], i1 [[CC:%.*]]) {
@@ -122,6 +123,8 @@ other:
   ret i64 %sub
 }
 
+; The mul is hoisted above the branch establishing %a >= 0, but its only use
+; is guarded by it, so nuw can be inferred at the common dominator.
 define i64 @mul_hoisted_single_use(i64 %a) {
 ; CHECK-LABEL: define i64 @mul_hoisted_single_use(
 ; CHECK-SAME: i64 [[A:%.*]]) {
