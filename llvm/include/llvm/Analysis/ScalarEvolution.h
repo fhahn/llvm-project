@@ -2078,7 +2078,9 @@ private:
     /// Set if the increment is a getelementptr, in which case StepV is its
     /// index and the step is that index scaled by the source element size.
     GEPOperator *GEP;
-    /// The no-wrap flags implied by the increment alone.
+    /// The no-wrap flags implied by the increment alone. Only set for an add;
+    /// a getelementptr's flags depend on the step's SCEV, so they are derived
+    /// by getAddRecFlagsForGEPIncrement.
     SCEV::NoWrapFlags Flags;
   };
 
@@ -2089,6 +2091,12 @@ private:
   /// to queue the step up front, so both agree on which shapes are matched.
   std::optional<SimpleAffineStep>
   matchSimpleAffineStep(const Loop *L, PHINode *PN, Value *BEValueV);
+
+  /// Return the no-wrap flags for an add recurrence whose increment is the
+  /// getelementptr \p GEP based on the recurrence's PHI, stepping by the
+  /// offset \p Accum.
+  SCEV::NoWrapFlags getAddRecFlagsForGEPIncrement(GEPOperator *GEP,
+                                                  const SCEV *Accum);
 
   /// A helper function to handle the simplest (yet most common) add recurrences
   /// without inserting a symbolic name for \p PN.
