@@ -1028,17 +1028,15 @@ define i32 @test_multi_use_reduction_with_trunc_iv(ptr %src, i32 %n) {
 ; CHECK-NEXT:    br i1 [[MIN_EPILOG_ITERS_CHECK]], label %[[SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF19:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_PH]]:
 ; CHECK-NEXT:    [[VEC_EPILOG_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_PH]] ]
-; CHECK-NEXT:    [[BC_MERGE_RDX18:%.*]] = phi i32 [ [[RDX_SELECT]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_PH]] ]
+; CHECK-NEXT:    [[BC_MERGE_RDX17:%.*]] = phi i32 [ [[TMP15]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_PH]] ]
 ; CHECK-NEXT:    [[TMP32:%.*]] = phi i32 [ [[TMP10]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_PH]] ]
 ; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[TMP0]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 1, %[[VECTOR_PH]] ]
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT20:%.*]] = insertelement <4 x i32> poison, i32 [[TMP32]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT21:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT20]], <4 x i32> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP36:%.*]] = and i64 [[N_EXT]], 3
-; CHECK-NEXT:    [[N_VEC19:%.*]] = sub i64 [[N_EXT]], [[TMP36]]
-; CHECK-NEXT:    [[TMP33:%.*]] = icmp eq i32 [[BC_MERGE_RDX18]], 0
-; CHECK-NEXT:    [[BC_MERGE_RDX17:%.*]] = select i1 [[TMP33]], i32 0, i32 [[BC_MERGE_RDX18]]
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT22:%.*]] = insertelement <4 x i32> poison, i32 [[BC_MERGE_RDX17]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT23:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT22]], <4 x i32> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP33:%.*]] = and i64 [[N_EXT]], 3
+; CHECK-NEXT:    [[N_VEC19:%.*]] = sub i64 [[N_EXT]], [[TMP33]]
 ; CHECK-NEXT:    [[TMP35:%.*]] = add i64 1, [[N_VEC19]]
 ; CHECK-NEXT:    [[TMP34:%.*]] = trunc i64 [[BC_RESUME_VAL]] to i32
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT24:%.*]] = insertelement <4 x i32> poison, i32 [[TMP34]], i64 0

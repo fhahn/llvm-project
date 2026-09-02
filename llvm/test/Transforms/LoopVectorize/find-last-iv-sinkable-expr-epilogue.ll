@@ -244,13 +244,11 @@ define i64 @findlast_mul_pow2_expr_epilogue(ptr %a, i64 %n) {
 ; CHECK-NEXT:    br i1 [[MIN_EPILOG_ITERS_CHECK]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF9:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_PH]]:
 ; CHECK-NEXT:    [[VEC_EPILOG_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
-; CHECK-NEXT:    [[BC_MERGE_RDX:%.*]] = phi i64 [ [[TMP8]], %[[VEC_EPILOG_ITER_CHECK]] ], [ -1, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
-; CHECK-NEXT:    [[TMP9:%.*]] = and i64 [[N]], 3
-; CHECK-NEXT:    [[N_VEC2:%.*]] = sub i64 [[N]], [[TMP9]]
-; CHECK-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[BC_MERGE_RDX]], -1
-; CHECK-NEXT:    [[TMP11:%.*]] = select i1 [[TMP10]], i64 -9223372036854775808, i64 [[BC_MERGE_RDX]]
+; CHECK-NEXT:    [[TMP11:%.*]] = phi i64 [ [[TMP5]], %[[VEC_EPILOG_ITER_CHECK]] ], [ -9223372036854775808, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[TMP11]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT]], <4 x i64> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP9:%.*]] = and i64 [[N]], 3
+; CHECK-NEXT:    [[N_VEC2:%.*]] = sub i64 [[N]], [[TMP9]]
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT3:%.*]] = insertelement <4 x i64> poison, i64 [[VEC_EPILOG_RESUME_VAL]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT4:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT3]], <4 x i64> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[INDUCTION:%.*]] = add nuw nsw <4 x i64> [[BROADCAST_SPLAT4]], <i64 0, i64 1, i64 2, i64 3>

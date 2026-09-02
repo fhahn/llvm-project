@@ -503,13 +503,16 @@ m_ComputeReductionResult(const Op0_t &Op0) {
 
 /// Match FindIV result pattern:
 /// select(icmp ne ComputeReductionResult(ReducedIV), Sentinel),
-///        ComputeReductionResult(ReducedIV), Start.
+///        Found, Start,
+/// where Found is derived from ComputeReductionResult(ReducedIV). It is not
+/// necessarily the reduction result itself, as an expression of the reduced IV
+/// may have been sunk into the middle block.
 template <typename Op0_t, typename Op1_t>
 inline bool matchFindIVResult(VPInstruction *VPI, Op0_t ReducedIV, Op1_t Start) {
   return match(VPI, m_Select(m_SpecificICmp(ICmpInst::ICMP_NE,
                                             m_ComputeReductionResult(ReducedIV),
                                             m_VPValue()),
-                             m_ComputeReductionResult(ReducedIV), Start));
+                             m_VPValue(), Start));
 }
 
 template <typename Op0_t>

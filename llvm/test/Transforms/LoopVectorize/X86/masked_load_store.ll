@@ -2117,7 +2117,7 @@ define i32 @reverse_gather(ptr %p) {
 ; AVX2:       [[VEC_EPILOG_ITER_CHECK]]:
 ; AVX2-NEXT:    br i1 false, label %[[VEC_EPILOG_SCALAR_PH:.*]], label %[[VEC_EPILOG_PH:.*]], !prof [[PROF33]]
 ; AVX2:       [[VEC_EPILOG_PH]]:
-; AVX2-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i1> poison, i1 [[TMP106]], i64 0
+; AVX2-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i1> poison, i1 [[TMP105]], i64 0
 ; AVX2-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i1> [[BROADCAST_SPLATINSERT]], <4 x i1> poison, <4 x i32> zeroinitializer
 ; AVX2-NEXT:    br label %[[VEC_EPILOG_VECTOR_BODY:.*]]
 ; AVX2:       [[VEC_EPILOG_VECTOR_BODY]]:
@@ -2214,7 +2214,7 @@ define i32 @reverse_gather(ptr %p) {
 ; AVX512:       [[VEC_EPILOG_ITER_CHECK]]:
 ; AVX512-NEXT:    br i1 false, label %[[VEC_EPILOG_SCALAR_PH:.*]], label %[[VEC_EPILOG_PH:.*]], !prof [[PROF51:![0-9]+]]
 ; AVX512:       [[VEC_EPILOG_PH]]:
-; AVX512-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i1> poison, i1 [[TMP17]], i64 0
+; AVX512-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i1> poison, i1 [[TMP16]], i64 0
 ; AVX512-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i1> [[BROADCAST_SPLATINSERT]], <4 x i1> poison, <4 x i32> zeroinitializer
 ; AVX512-NEXT:    br label %[[VEC_EPILOG_VECTOR_BODY:.*]]
 ; AVX512:       [[VEC_EPILOG_VECTOR_BODY]]:

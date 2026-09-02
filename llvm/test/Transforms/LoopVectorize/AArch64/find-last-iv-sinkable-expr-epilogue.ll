@@ -64,13 +64,11 @@ define i32 @findlast_add_expr(ptr %a, i32 %n) {
 ; CHECK-NEXT:    br i1 [[MIN_EPILOG_ITERS_CHECK]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF3:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_PH]]:
 ; CHECK-NEXT:    [[VEC_EPILOG_RESUME_VAL:%.*]] = phi i32 [ [[N_VEC]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
-; CHECK-NEXT:    [[BC_MERGE_RDX:%.*]] = phi i32 [ [[TMP19]], %[[VEC_EPILOG_ITER_CHECK]] ], [ -1, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
-; CHECK-NEXT:    [[N_MOD_VF10:%.*]] = and i32 [[N]], 3
-; CHECK-NEXT:    [[N_VEC11:%.*]] = sub i32 [[N]], [[N_MOD_VF10]]
-; CHECK-NEXT:    [[TMP31:%.*]] = icmp eq i32 [[BC_MERGE_RDX]], -1
-; CHECK-NEXT:    [[TMP21:%.*]] = select i1 [[TMP31]], i32 0, i32 [[BC_MERGE_RDX]]
+; CHECK-NEXT:    [[TMP21:%.*]] = phi i32 [ [[TMP17]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[TMP21]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP31:%.*]] = and i32 [[N]], 3
+; CHECK-NEXT:    [[N_VEC11:%.*]] = sub i32 [[N]], [[TMP31]]
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT12:%.*]] = insertelement <4 x i32> poison, i32 [[VEC_EPILOG_RESUME_VAL]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT13:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT12]], <4 x i32> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[INDUCTION:%.*]] = add nuw nsw <4 x i32> [[BROADCAST_SPLAT13]], <i32 0, i32 1, i32 2, i32 3>

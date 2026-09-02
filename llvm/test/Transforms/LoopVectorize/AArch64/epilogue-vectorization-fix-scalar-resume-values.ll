@@ -156,17 +156,15 @@ define i64 @find_last_and_any_of(ptr %Dst, ptr %Src) {
 ; CHECK:       [[VEC_EPILOG_ITER_CHECK]]:
 ; CHECK-NEXT:    br i1 false, label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH:.*]], !prof [[PROF5:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_PH]]:
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x i1> poison, i1 [[TMP20]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT9:%.*]] = shufflevector <4 x i1> [[BROADCAST_SPLATINSERT1]], <4 x i1> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP22:%.*]] = icmp eq i32 [[TMP18]], -1
-; CHECK-NEXT:    [[TMP24:%.*]] = select i1 [[TMP22]], i32 -2147483648, i32 [[TMP18]]
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT10:%.*]] = insertelement <4 x i32> poison, i32 [[TMP24]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT10:%.*]] = insertelement <4 x i32> poison, i32 [[TMP16]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT11:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT10]], <4 x i32> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT7:%.*]] = insertelement <4 x i1> poison, i1 [[TMP19]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT8:%.*]] = shufflevector <4 x i1> [[BROADCAST_SPLATINSERT7]], <4 x i1> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    br label %[[VEC_EPILOG_VECTOR_BODY:.*]]
 ; CHECK:       [[VEC_EPILOG_VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX12:%.*]] = phi i64 [ 992, %[[VEC_EPILOG_PH]] ], [ [[INDEX_NEXT17:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_PHI13:%.*]] = phi <4 x i32> [ [[BROADCAST_SPLAT11]], %[[VEC_EPILOG_PH]] ], [ [[TMP27:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
-; CHECK-NEXT:    [[VEC_PHI14:%.*]] = phi <4 x i1> [ [[BROADCAST_SPLAT9]], %[[VEC_EPILOG_PH]] ], [ [[TMP29:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_PHI14:%.*]] = phi <4 x i1> [ [[BROADCAST_SPLAT8]], %[[VEC_EPILOG_PH]] ], [ [[TMP29:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_IND15:%.*]] = phi <4 x i32> [ <i32 992, i32 993, i32 994, i32 995>, %[[VEC_EPILOG_PH]] ], [ [[VEC_IND_NEXT18:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP25:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[INDEX12]]
 ; CHECK-NEXT:    [[WIDE_LOAD16:%.*]] = load <4 x i32>, ptr [[TMP25]], align 4
