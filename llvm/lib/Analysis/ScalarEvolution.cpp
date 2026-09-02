@@ -264,20 +264,20 @@ void SCEV::computeAndSetCanonical(ScalarEvolution &SE) {
     break;
   }
 
-  // For all other expressions, check whether any immediate operand has a
-  // different canonical. Since operands are always created before their parent,
-  // their canonical pointers are already set — no recursion needed.
-  bool Changed = false;
-  SmallVector<SCEVUse, 4> CanonOps;
-  for (SCEVUse Op : operands()) {
-    CanonOps.push_back(Op->getCanonical());
-    Changed |= CanonOps.back() != Op;
-  }
-
-  if (!Changed) {
+  // For all other expressions, check whether any immediate operand use is not
+  // already its own canonical, i.e. has a different canonical or carries
+  // use-specific flags. Since operands are always created before their parent,
+  // their canonical pointers are already set — no recursion needed. Only
+  // materialize the canonical operand list if something actually differs; the
+  // common case is that nothing does.
+  if (all_of(operands(), [](SCEVUse Op) { return Op.isCanonical(); })) {
     CanonicalSCEV = this;
     return;
   }
+
+  SmallVector<SCEVUse, 4> CanonOps;
+  for (SCEVUse Op : operands())
+    CanonOps.push_back(Op->getCanonical());
 
   // Rebuild the expression from the canonical operands, stripping use flags.
   CanonicalSCEV = SE.getWithOperands(this, CanonOps);
