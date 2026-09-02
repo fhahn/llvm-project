@@ -77,6 +77,22 @@ static Instruction *getContextInstForUse(Use &U) {
   return UserI;
 }
 
+/// Returns the closest program point dominating all uses of \p I, or nullptr if
+/// \p I has no uses or all of them are in unreachable blocks. Note that uses
+/// must only be removed or moved to dominated points afterwards, otherwise the
+/// returned instruction may no longer dominate all uses.
+static Instruction *findCommonDominatorOfUses(Instruction &I,
+                                              DominatorTree &DT) {
+  Instruction *CommonDom = nullptr;
+  for (Use &U : I.uses()) {
+    Instruction *UserI = getContextInstForUse(U);
+    CommonDom =
+        CommonDom ? DT.findNearestCommonDominator(CommonDom, UserI) : UserI;
+  }
+  // Uses in unreachable blocks are not in the dominator tree.
+  return CommonDom && DT.getNode(CommonDom->getParent()) ? CommonDom : nullptr;
+}
+
 namespace {
 using Entry = ConstraintSystem::Entry;
 using RowTy = ConstraintSystem::RowTy;
@@ -113,21 +129,30 @@ struct FactOrCheck {
     ConditionTy Cond;
   };
 
-  /// A pre-condition that must hold for the current fact to be added to the
-  /// system.
-  ConditionTy DoesHold;
+  union {
+    /// A pre-condition that must hold for the current fact to be added to the
+    /// system. Only used by condition facts.
+    ConditionTy DoesHold;
+
+    /// The instruction the entry is anchored at, used to order entries within
+    /// a block. Equal to Inst, except for checks anchored at a point that
+    /// dominates, but does not contain, Inst. Not used by condition facts,
+    /// which are anchored at the start of their block.
+    Instruction *ContextInst;
+  };
 
   unsigned NumIn;
   unsigned NumOut;
   EntryTy Ty;
 
-  FactOrCheck(EntryTy Ty, DomTreeNode *DTN, Instruction *Inst)
-      : Inst(Inst), NumIn(DTN->getDFSNumIn()), NumOut(DTN->getDFSNumOut()),
-        Ty(Ty) {}
+  FactOrCheck(EntryTy Ty, DomTreeNode *DTN, Instruction *Inst,
+              Instruction *ContextInst = nullptr)
+      : Inst(Inst), ContextInst(ContextInst ? ContextInst : Inst),
+        NumIn(DTN->getDFSNumIn()), NumOut(DTN->getDFSNumOut()), Ty(Ty) {}
 
   FactOrCheck(DomTreeNode *DTN, Use *U)
-      : U(U), NumIn(DTN->getDFSNumIn()), NumOut(DTN->getDFSNumOut()),
-        Ty(EntryTy::UseCheck) {}
+      : U(U), ContextInst(nullptr), NumIn(DTN->getDFSNumIn()),
+        NumOut(DTN->getDFSNumOut()), Ty(EntryTy::UseCheck) {}
 
   FactOrCheck(DomTreeNode *DTN, CmpPredicate Pred, Value *Op0, Value *Op1,
               ConditionTy Precond = {})
@@ -148,8 +173,14 @@ struct FactOrCheck {
     return FactOrCheck(DTN, U);
   }
 
-  static FactOrCheck getCheck(DomTreeNode *DTN, Instruction *I) {
-    return FactOrCheck(EntryTy::InstCheck, DTN, I);
+  /// Returns an entry to check \p I at \p DTN. \p ContextInst, if set, anchors
+  /// the entry within \p DTN's block; it is needed when \p DTN dominates \p I's
+  /// uses without containing \p I itself. Defaults to \p I.
+  static FactOrCheck getCheck(DomTreeNode *DTN, Instruction *I,
+                              Instruction *ContextInst = nullptr) {
+    assert((ContextInst ? ContextInst : I)->getParent() == DTN->getBlock() &&
+           "anchoring instruction must be in DTN's block");
+    return FactOrCheck(EntryTy::InstCheck, DTN, I, ContextInst);
   }
 
   bool isCheck() const {
@@ -160,7 +191,12 @@ struct FactOrCheck {
     assert(!isConditionFact());
     if (Ty == EntryTy::UseCheck)
       return getContextInstForUse(*U);
-    return Inst;
+    return ContextInst;
+  }
+
+  const ConditionTy &getDoesHold() const {
+    assert(isConditionFact());
+    return DoesHold;
   }
 
   Instruction *getInstructionToSimplify() const {
@@ -173,6 +209,11 @@ struct FactOrCheck {
 
   bool isConditionFact() const { return Ty == EntryTy::ConditionFact; }
 };
+
+// There is one entry per fact and check in a function; keep it within a cache
+// line.
+static_assert(sizeof(FactOrCheck) <= 64,
+              "FactOrCheck should stay within 64 bytes");
 
 /// The senses in which an induction phi is monotonic, together with the
 /// direction it moves in.
@@ -1658,10 +1699,15 @@ void State::addInfoFor(BasicBlock &BB) {
         WorkList.push_back(FactOrCheck::getInstFact(DT.getNode(&BB), BO));
     }
 
-    // Queue instructions whose flags may be strengthened based on the facts
-    // that hold on entry to BB.
+    // Queue instructions whose flags may be strengthened, checked at the
+    // closest point dominating all uses. That point may be strictly below the
+    // defining block: if the operation does not wrap there, any use of a
+    // wrapped (and hence poison) result is unreachable, so recording the flag
+    // on the definition remains valid.
     if (canStrengthenFlags(&I))
-      WorkList.push_back(FactOrCheck::getCheck(DT.getNode(&BB), &I));
+      if (Instruction *CommonDom = findCommonDominatorOfUses(I, DT))
+        WorkList.push_back(FactOrCheck::getCheck(
+            DT.getNode(CommonDom->getParent()), &I, CommonDom));
 
     GuaranteedToExecute &= isGuaranteedToTransferExecutionToSuccessor(&I);
   }
@@ -2901,14 +2947,14 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
       Pred = CB.Cond.Pred;
       A = CB.Cond.Op0;
       B = CB.Cond.Op1;
-      if (CB.DoesHold.Pred != CmpInst::BAD_ICMP_PREDICATE &&
-          !Info.doesHold(CB.DoesHold.Pred, CB.DoesHold.Op0, CB.DoesHold.Op1)) {
+      const ConditionTy &DoesHold = CB.getDoesHold();
+      if (DoesHold.Pred != CmpInst::BAD_ICMP_PREDICATE &&
+          !Info.doesHold(DoesHold.Pred, DoesHold.Op0, DoesHold.Op1)) {
         LLVM_DEBUG({
           dbgs() << "Not adding fact ";
           dumpUnpackedICmp(dbgs(), Pred, A, B);
           dbgs() << " because precondition ";
-          dumpUnpackedICmp(dbgs(), CB.DoesHold.Pred, CB.DoesHold.Op0,
-                           CB.DoesHold.Op1);
+          dumpUnpackedICmp(dbgs(), DoesHold.Pred, DoesHold.Op0, DoesHold.Op1);
           dbgs() << " does not hold.\n";
         });
         continue;
