@@ -2437,24 +2437,30 @@ static void computeKnownBitsFromOperator(const Operator *I,
       const ExtractValueInst *EVI = cast<ExtractValueInst>(I);
       if (EVI->getNumIndices() != 1) break;
       if (EVI->getIndices()[0] == 0) {
+        // If every use of the value component is guarded by the overflow
+        // check, the operation is known not to wrap there.
+        const auto *WO = dyn_cast<WithOverflowInst>(II);
+        bool NoWrap = WO && Q.DT && isOverflowIntrinsicNoWrap(WO, *Q.DT);
+        bool NSW = NoWrap && WO->isSigned();
+        bool NUW = NoWrap && !WO->isSigned();
         switch (II->getIntrinsicID()) {
         default: break;
         case Intrinsic::uadd_with_overflow:
         case Intrinsic::sadd_with_overflow:
-          computeKnownBitsAddSub(
-              true, II->getArgOperand(0), II->getArgOperand(1), /*NSW=*/false,
-              /* NUW=*/false, DemandedElts, Known, Known2, Q, Depth);
+          computeKnownBitsAddSub(true, II->getArgOperand(0),
+                                 II->getArgOperand(1), NSW, NUW, DemandedElts,
+                                 Known, Known2, Q, Depth);
           break;
         case Intrinsic::usub_with_overflow:
         case Intrinsic::ssub_with_overflow:
-          computeKnownBitsAddSub(
-              false, II->getArgOperand(0), II->getArgOperand(1), /*NSW=*/false,
-              /* NUW=*/false, DemandedElts, Known, Known2, Q, Depth);
+          computeKnownBitsAddSub(false, II->getArgOperand(0),
+                                 II->getArgOperand(1), NSW, NUW, DemandedElts,
+                                 Known, Known2, Q, Depth);
           break;
         case Intrinsic::umul_with_overflow:
         case Intrinsic::smul_with_overflow:
-          computeKnownBitsMul(II->getArgOperand(0), II->getArgOperand(1), false,
-                              false, DemandedElts, Known, Known2, Q, Depth);
+          computeKnownBitsMul(II->getArgOperand(0), II->getArgOperand(1), NSW,
+                              NUW, DemandedElts, Known, Known2, Q, Depth);
           break;
         }
       }
@@ -10703,6 +10709,28 @@ ConstantRange llvm::computeConstantRange(const Value *V, bool ForSigned,
     ConstantRange SrcCR =
         computeConstantRange(TI->getOperand(0), ForSigned, SQ, Depth + 1);
     CR = SrcCR.truncate(BitWidth);
+  } else if (const WithOverflowInst *WO;
+             match(V, m_ExtractValue<0>(m_WithOverflowInst(WO))) && SQ.DT &&
+             isOverflowIntrinsicNoWrap(WO, *SQ.DT)) {
+    // Every use of the value component is guarded by the overflow check, so
+    // the operation is known not to wrap there.
+    ConstantRange L =
+        computeConstantRange(WO->getLHS(), ForSigned, SQ, Depth + 1);
+    ConstantRange R =
+        computeConstantRange(WO->getRHS(), ForSigned, SQ, Depth + 1);
+    unsigned NoWrapKind = WO->isSigned()
+                              ? OverflowingBinaryOperator::NoSignedWrap
+                              : OverflowingBinaryOperator::NoUnsignedWrap;
+    switch (WO->getBinaryOp()) {
+    case Instruction::Add:
+      CR = L.addWithNoWrap(R, NoWrapKind);
+      break;
+    case Instruction::Sub:
+      CR = L.subWithNoWrap(R, NoWrapKind);
+      break;
+    default:
+      break;
+    }
   } else if (isa<FPToUIInst>(V) || isa<FPToSIInst>(V)) {
     APInt Lower = APInt(BitWidth, 0);
     APInt Upper = APInt(BitWidth, 0);
