@@ -671,9 +671,12 @@ bool VPBlockUtils::isHeader(const VPBlockBase *VPB,
     return !R->isReplicator() && !VPBB->hasPredecessors();
 
   // A header dominates its second predecessor (the latch), with the other
-  // predecessor being the preheader
-  return VPB->getPredecessors().size() == 2 &&
-         VPDT.dominates(VPB, VPB->getPredecessors()[1]);
+  // predecessor being the preheader. A predecessor not reachable from the
+  // plan's entry has no node in the dominator tree and is vacuously dominated,
+  // but it cannot be a latch.
+  ArrayRef<VPBlockBase *> Preds = VPB->getPredecessors();
+  return Preds.size() == 2 && VPDT.getNode(Preds[1]) &&
+         VPDT.dominates(VPB, Preds[1]);
 }
 
 bool VPBlockUtils::isLatch(const VPBlockBase *VPB,
