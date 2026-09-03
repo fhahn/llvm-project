@@ -213,3 +213,67 @@ exit:
 }
 
 declare i32 @load(i64)
+
+; Reduced from Swift `for i in stride(from: 0, to: count, by: 2)`, which uses
+; checked increments.
+define i64 @even_index_sum(ptr %p, i64 %count) {
+; CHECK-LABEL: define i64 @even_index_sum(
+; CHECK-SAME: ptr nofree readonly captures(none) [[P:%.*]], i64 [[COUNT:%.*]]) local_unnamed_addr #[[ATTR2:[0-9]+]] {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[NN:%.*]] = icmp sgt i64 [[COUNT]], -1
+; CHECK-NEXT:    tail call void @llvm.assume(i1 [[NN]])
+; CHECK-NEXT:    [[EZ:%.*]] = icmp eq i64 [[COUNT]], 0
+; CHECK-NEXT:    br i1 [[EZ]], label %[[EXIT:.*]], label %[[BODY:.*]]
+; CHECK:       [[BODY]]:
+; CHECK-NEXT:    [[ACC:%.*]] = phi i64 [ [[ACC_NEXT:%.*]], %[[BODY1:.*]] ], [ 0, %[[ENTRY]] ]
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[IV_NEXT:%.*]], %[[BODY1]] ], [ 0, %[[ENTRY]] ]
+; CHECK-NEXT:    [[OOB:%.*]] = icmp ult i64 [[IV]], [[COUNT]]
+; CHECK-NEXT:    br i1 [[OOB]], label %[[BODY1]], label %[[TRAP:.*]]
+; CHECK:       [[BODY1]]:
+; CHECK-NEXT:    [[A:%.*]] = getelementptr inbounds nuw [8 x i8], ptr [[P]], i64 [[IV]]
+; CHECK-NEXT:    [[V:%.*]] = load i64, ptr [[A]], align 8
+; CHECK-NEXT:    [[ACC_NEXT]] = add i64 [[V]], [[ACC]]
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw i64 [[IV]], 2
+; CHECK-NEXT:    [[EC_NOT:%.*]] = icmp slt i64 [[IV_NEXT]], [[COUNT]]
+; CHECK-NEXT:    br i1 [[EC_NOT]], label %[[BODY]], label %[[EXIT]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    [[R:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[ACC_NEXT]], %[[BODY1]] ]
+; CHECK-NEXT:    ret i64 [[R]]
+; CHECK:       [[TRAP]]:
+; CHECK-NEXT:    tail call void @llvm.trap()
+; CHECK-NEXT:    unreachable
+;
+entry:
+  %nn = icmp sge i64 %count, 0
+  call void @llvm.assume(i1 %nn)
+  %ez = icmp eq i64 %count, 0
+  br i1 %ez, label %exit, label %loop.header
+
+loop.header:
+  %acc = phi i64 [ 0, %entry ], [ %acc.next, %loop.latch ]
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop.latch ]
+  %oob = icmp ult i64 %iv, %count
+  br i1 %oob, label %body, label %trap
+
+body:
+  %a = getelementptr inbounds i64, ptr %p, i64 %iv
+  %v = load i64, ptr %a
+  %acc.next = add i64 %acc, %v
+  br label %loop.latch
+
+loop.latch:
+  %s = call { i64, i1 } @llvm.uadd.with.overflow.i64(i64 %iv, i64 2)
+  %iv.next = extractvalue { i64, i1 } %s, 0
+  %ov = extractvalue { i64, i1 } %s, 1
+  %ec = icmp sge i64 %iv.next, %count
+  %cond = or i1 %ov, %ec
+  br i1 %cond, label %exit, label %loop.header
+
+exit:
+  %r = phi i64 [ 0, %entry ], [ %acc.next, %loop.latch ]
+  ret i64 %r
+
+trap:
+  tail call void @llvm.trap()
+  unreachable
+}
