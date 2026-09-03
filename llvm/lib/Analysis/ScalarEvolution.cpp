@@ -13409,7 +13409,7 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
   ICmpInst::Predicate Cond = IsSigned ? ICmpInst::ICMP_SLT : ICmpInst::ICMP_ULT;
 
   const SCEV *Stride = IV->getStepRecurrence(*this);
-  const SCEV *StrideForBounds = Stride;
+  const SCEV *StrideWithGuards = Stride;
 
   // Whether the IV may reach the maximum value before the exit is taken.
   bool IVMayOverflow = true;
@@ -13419,7 +13419,7 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
   if (!PositiveStride) {
     const SCEV *GuardedStride = applyLoopGuards(Stride, L);
     if (isKnownPositive(GuardedStride)) {
-      StrideForBounds = GuardedStride;
+      StrideWithGuards = GuardedStride;
       PositiveStride = true;
     }
   }
@@ -13496,7 +13496,7 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
   } else {
     // Avoid proven overflow cases: this will ensure that the backedge taken
     // count will not generate any unsigned overflow.
-    IVMayOverflow = canIVOverflowOnLT(RHS, StrideForBounds, IsSigned);
+    IVMayOverflow = canIVOverflowOnLT(RHS, StrideWithGuards, IsSigned);
     if (IVMayOverflow && !NoWrap)
       return getCouldNotCompute();
   }
