@@ -1620,15 +1620,18 @@ static VPValue *simplifyRecipe(VPSingleDefRecipe *Def) {
                        m_VPValue(Y))) &&
       match(X, m_VPPhi(m_ZeroInt(), m_Specific(IVInc)))) {
     auto *Phi = cast<VPPhi>(X);
-    // Y must be available where the phi's start value is coming from, that is a
-    // live-in or defined in the corresponding incoming block.
+    // Y must be available on the edge providing the phi's start value.
+    // Conservatively, only allow a live-in or a value defined in the
+    // corresponding incoming block. Note that isa<VPIRValue> is not
+    // interchangeable with !hasDefiningRecipe() or m_LiveIn() here: a
+    // VPRegionValue has no defining recipe, but is defined inside the region.
     VPRecipeBase *YR = Y->getDefiningRecipe();
-    bool AvailableAtStart = isa<VPIRValue>(Y) ||
-                            (YR && YR->getParent() == Phi->getIncomingBlock(0));
-    if (AvailableAtStart && IVInc->getNumUsers() == 2) {
+    bool YAvailableAtStart = YR ? YR->getParent() == Phi->getIncomingBlock(0)
+                                : isa<VPIRValue>(Y);
+    if (YAvailableAtStart && IVInc->getNumUsers() == 2) {
       // If Phi has a second user (besides IVInc's defining recipe), it must
       // be Inc = Phi + Y for the fold to apply.
-      auto *Inc = dyn_cast_or_null<VPSingleDefRecipe>(
+      auto *Inc = dyn_cast_if_present<VPSingleDefRecipe>(
           findUserOf(Phi, m_Add(m_Specific(Phi), m_Specific(Y))));
       if (Phi->getNumUsers() == 1 || (Phi->getNumUsers() == 2 && Inc)) {
         Def->replaceAllUsesWith(IVInc);
