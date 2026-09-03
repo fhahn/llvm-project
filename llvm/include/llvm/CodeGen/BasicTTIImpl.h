@@ -1044,53 +1044,11 @@ public:
 
   /// Estimate the cost of type-legalization and the legalized type.
   std::pair<InstructionCost, MVT> getTypeLegalizationCost(Type *Ty) const {
-    auto [It, Inserted] = TypeLegalizationCostCache.try_emplace(Ty);
-    if (Inserted)
-      It->second = computeTypeLegalizationCost(Ty);
-    return It->second;
+    const TargetLoweringBase *TLI = getTLI();
+    return TLI->getTypeLegalizationCost(Ty->getContext(),
+                                        TLI->getValueType(DL, Ty));
   }
 
-private:
-  std::pair<InstructionCost, MVT> computeTypeLegalizationCost(Type *Ty) const {
-    LLVMContext &C = Ty->getContext();
-    EVT MTy = getTLI()->getValueType(DL, Ty);
-
-    InstructionCost Cost = 1;
-    // We keep legalizing the type until we find a legal kind. We assume that
-    // the only operation that costs anything is the split. After splitting
-    // we need to handle two types.
-    while (true) {
-      TargetLoweringBase::LegalizeKind LK = getTLI()->getTypeConversion(C, MTy);
-
-      if (LK.first == TargetLoweringBase::TypeScalarizeScalableVector) {
-        // Ensure we return a sensible simple VT here, since many callers of
-        // this function require it.
-        MVT VT = MTy.isSimple() ? MTy.getSimpleVT() : MVT::i64;
-        return std::make_pair(InstructionCost::getInvalid(), VT);
-      }
-
-      if (LK.first == TargetLoweringBase::TypeLegal)
-        return std::make_pair(Cost, MTy.getSimpleVT());
-
-      if (LK.first == TargetLoweringBase::TypeSplitVector ||
-          LK.first == TargetLoweringBase::TypeExpandInteger)
-        Cost *= 2;
-
-      // Do not loop with f128 type.
-      if (MTy == LK.second)
-        return std::make_pair(Cost, MTy.getSimpleVT());
-
-      // Keep legalizing the type.
-      MTy = LK.second;
-    }
-  }
-
-  /// Memoizes type legalization cost. The mapping does not depend on the IR, so
-  /// entries stay valid for the lifetime of this object.
-  mutable DenseMap<Type *, std::pair<InstructionCost, MVT>>
-      TypeLegalizationCostCache;
-
-public:
   unsigned getMaxInterleaveFactor(ElementCount VF,
                                   bool HasUnorderedReductions) const override {
     return 1;

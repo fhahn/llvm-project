@@ -54,6 +54,7 @@
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/InstructionCost.h"
 #include "llvm/Support/KnownFPClass.h"
 #include <algorithm>
 #include <cassert>
@@ -1196,6 +1197,12 @@ public:
     }
     return LegalVT;
   }
+
+  /// Estimate the cost of legalizing \p VT, together with the legal type it
+  /// gets legalized to. The cost only depends on the legalization tables set
+  /// up at construction time, so it is memoized for simple value types.
+  std::pair<InstructionCost, MVT> getTypeLegalizationCost(LLVMContext &Context,
+                                                          EVT VT) const;
 
   /// For types supported by the target, this is an identity function.  For
   /// types that must be expanded (i.e. integer types that are larger than the
@@ -3866,6 +3873,13 @@ private:
   /// (e.g. i64 -> i16).  For types natively supported by the system, this holds
   /// the same type (e.g. i32 -> i32).
   MVT TransformToType[MVT::VALUETYPE_SIZE];
+
+  /// Memoizes getTypeLegalizationCost() for simple value types. Entries are
+  /// derived from the tables above, which are fixed once the target is
+  /// constructed, so they stay valid for the lifetime of this object. An entry
+  /// whose MVT is invalid has not been computed yet.
+  mutable std::pair<InstructionCost, MVT>
+      TypeLegalizationCosts[MVT::VALUETYPE_SIZE];
 
   /// For each operation and each value type, keep a LegalizeAction that
   /// indicates how instruction selection should deal with the operation.  Most

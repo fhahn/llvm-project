@@ -1238,6 +1238,56 @@ TargetLoweringBase::getTypeConversion(LLVMContext &Context, EVT VT) const {
   return LegalizeKind(TypeSplitVector, NVT);
 }
 
+std::pair<InstructionCost, MVT>
+TargetLoweringBase::getTypeLegalizationCost(LLVMContext &Context,
+                                            EVT VT) const {
+  // Only simple types are memoized, as the cache is indexed by SimpleTy.
+  std::pair<InstructionCost, MVT> *CacheEntry = nullptr;
+  if (VT.isSimple()) {
+    CacheEntry = &TypeLegalizationCosts[VT.getSimpleVT().SimpleTy];
+    if (CacheEntry->second.isValid())
+      return *CacheEntry;
+  }
+
+  std::pair<InstructionCost, MVT> Result;
+  InstructionCost Cost = 1;
+  // We keep legalizing the type until we find a legal kind. We assume that
+  // the only operation that costs anything is the split. After splitting
+  // we need to handle two types.
+  while (true) {
+    LegalizeKind LK = getTypeConversion(Context, VT);
+
+    if (LK.first == TypeScalarizeScalableVector) {
+      // Ensure we return a sensible simple VT here, since many callers of
+      // this function require it.
+      Result = {InstructionCost::getInvalid(),
+                VT.isSimple() ? VT.getSimpleVT() : MVT::i64};
+      break;
+    }
+
+    if (LK.first == TypeLegal) {
+      Result = {Cost, VT.getSimpleVT()};
+      break;
+    }
+
+    if (LK.first == TypeSplitVector || LK.first == TypeExpandInteger)
+      Cost *= 2;
+
+    // Do not loop with f128 type.
+    if (VT == LK.second) {
+      Result = {Cost, VT.getSimpleVT()};
+      break;
+    }
+
+    // Keep legalizing the type.
+    VT = LK.second;
+  }
+
+  if (CacheEntry)
+    *CacheEntry = Result;
+  return Result;
+}
+
 unsigned TargetLoweringBase::getVectorTypeBreakdownMVT(
     MVT VT, MVT &IntermediateVT, unsigned &NumIntermediates, MVT &RegisterVT) {
   // Figure out the right, legal destination reg to copy into.
