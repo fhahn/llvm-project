@@ -8249,15 +8249,18 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     // it is dead and the markers went away with it, so the epilogue plan would
     // resume at values it never computed.
     VPBasicBlock *MainScalarPH = BestMainPlan.getScalarPreheader();
-    auto IsMiddleBlock = [](const VPBlockBase *VPBB) {
+    // VPlan::hasScalarTail cannot be used here, as VPlan::getMiddleBlock is
+    // unavailable once the loop region has been dissolved; identify the middle
+    // block by the markers it holds instead.
+    auto HasResumeForEpilogueMarkers = [](const VPBlockBase *VPBB) {
       using namespace VPlanPatternMatch;
       return any_of(*cast<VPBasicBlock>(VPBB), [](const VPRecipeBase &R) {
         return match(&R, m_VPInstruction<VPInstruction::ResumeForEpilogue>(
                              m_VPValue(), m_VPValue()));
       });
     };
-    if (!MainScalarPH ||
-        none_of(MainScalarPH->getPredecessors(), IsMiddleBlock))
+    if (!MainScalarPH || none_of(MainScalarPH->getPredecessors(),
+                                 HasResumeForEpilogueMarkers))
       return true;
 
     BasicBlock *EntryBB =
@@ -8280,7 +8283,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     ArrayRef<VPBlockBase *> MainScalarPHPreds = MainScalarPH->getPredecessors();
     assert(count_if(MainScalarPHPreds, BypassesMainVectorLoopOnly) <= 1 &&
            "at most one block may bypass the main vector loop only");
-    auto *It = find_if(MainScalarPHPreds, BypassesMainVectorLoopOnly);
+    auto It = find_if(MainScalarPHPreds, BypassesMainVectorLoopOnly);
     if (It != MainScalarPHPreds.end())
       EPI.MainLoopCheck =
           RUN_VPLAN_PASS(VPlanTransforms::connectBypassBlock, BestEpiPlan,
