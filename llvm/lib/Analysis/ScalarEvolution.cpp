@@ -63,6 +63,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DepthFirstIterator.h"
 #include "llvm/ADT/FoldingSet.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/Sequence.h"
@@ -16248,6 +16249,44 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
         Worklist.push_back(R);
       }
     }
+  }
+
+  // A pair of guards (A <=u B) and (B <=u A + C), with C constant, bounds the
+  // difference (B - A) above by C: the first rules out the wrap of B - A, and
+  // a wrapping (A + C) makes both guards unsatisfiable. Trip counts of loops
+  // counting from A up to B are expressed in terms of that difference, while a
+  // rewrite of B alone cannot be related back to A.
+  //
+  // Collect into a map first, to find the matching (A <=u B) and because the
+  // derived guards cannot be appended while iterating GuardsToProcess. The
+  // value tracks whether the guard was strict, which tightens the bound by one.
+  SmallMapVector<std::pair<const SCEV *, const SCEV *>, bool, 4> UnsignedLess;
+  for (auto [Predicate, LHS, RHS] : GuardsToProcess) {
+    // Normalize the greater-than spellings, which InstCombine does not
+    // canonicalize to less-than, to keep both orders on the same key.
+    if (ICmpInst::isGT(Predicate) || ICmpInst::isGE(Predicate)) {
+      Predicate = ICmpInst::getSwappedPredicate(Predicate);
+      std::swap(LHS, RHS);
+    }
+    if (Predicate == ICmpInst::ICMP_ULT || Predicate == ICmpInst::ICMP_ULE)
+      UnsignedLess[{LHS, RHS}] |= ICmpInst::isStrictPredicate(Predicate);
+  }
+
+  for (const auto &[Ops, IsStrict] : UnsignedLess) {
+    const auto &[B, UpperBound] = Ops;
+    const APInt *C;
+    const SCEV *A;
+    if (!match(UpperBound, m_scev_Add(m_scev_APInt(C), m_SCEV(A))) ||
+        !UnsignedLess.contains({A, B}))
+      continue;
+    // Pointer differences need a common base, which is not known here.
+    const SCEV *Diff = SE.getMinusSCEV(B, A);
+    if (isa<SCEVCouldNotCompute>(Diff))
+      continue;
+    // C is never zero, as getAddExpr folds away a zero addend, so (C - 1)
+    // cannot underflow to the vacuous -1.
+    GuardsToProcess.emplace_back(ICmpInst::ICMP_ULE, Diff,
+                                 SE.getConstant(IsStrict ? *C - 1 : *C));
   }
 
   // Process divisibility guards in reverse order to populate DivGuards early.
