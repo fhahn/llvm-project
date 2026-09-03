@@ -1602,10 +1602,10 @@ void VPInstruction::execute(VPTransformState &State) {
             /*IsScalar*/ GeneratesPerFirstLaneOnly);
   if (getOpcode() == VPInstruction::ResumeForEpilogue ||
       getOpcode() == Instruction::Freeze) {
-    // FIXME: This is a workaround to enable reliable updates of the scalar loop
-    // resume phis, and to let epilogue vectorization recover the frozen
-    // reduction start from the main plan. Must be removed once epilogue
-    // vectorization explicitly connects VPlans.
+    // FIXME: This is a workaround to let epilogue vectorization read the values
+    // the main vector loop computed, and the frozen reduction start, off the
+    // executed main plan. Must be removed once epilogue vectorization
+    // explicitly connects VPlans.
     setUnderlyingValue(GeneratedValue);
   }
 }

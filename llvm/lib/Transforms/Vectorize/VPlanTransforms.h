@@ -236,8 +236,7 @@ struct VPlanTransforms {
   /// VPIRBasicBlock. Every modeled edge mirrors an edge of the generated CFG,
   /// except for the edges bypassing both vector loops, which are redirected. \p
   /// MainPlan must have been executed, so its VPBasicBlocks wrap the blocks
-  /// generated for them. Returns the block holding the iteration count check
-  /// for the main vector loop, which bypasses the main vector loop only.
+  /// generated for them.
   ///
   /// \p EnteredFrom wraps the already generated block \p Plan is entered from.
   /// The blocks holding the checks bypassing both vector loops branch to it as

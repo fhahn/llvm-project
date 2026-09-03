@@ -1406,8 +1406,7 @@ void VPlanTransforms::foldTailByMasking(VPlan &Plan) {
 
 /// Add an incoming value to all phis in \p VPBB for its last predecessor, which
 /// must have just been added, re-using the incoming value of the previously
-/// last predecessor. Blocks bypassing the vector loop(s) resume the scalar loop
-/// at the same values.
+/// last predecessor.
 static void addIncomingForLastPredecessor(VPBasicBlock *VPBB) {
   for (VPRecipeBase &R : VPBB->phis()) {
     auto *Phi = cast<VPPhi>(&R);
@@ -1428,6 +1427,7 @@ static void insertCheckBlockBeforeVectorLoop(VPlan &Plan,
   VPBlockUtils::insertOnEdge(PreVectorPH, VectorPH, CheckBlockVPBB);
   VPBlockUtils::connectBlocks(CheckBlockVPBB, ScalarPH);
   CheckBlockVPBB->swapSuccessors();
+  // Blocks bypassing the vector loop resume the scalar loop at the same values.
   addIncomingForLastPredecessor(ScalarPH);
 }
 
@@ -1481,6 +1481,8 @@ void VPlanTransforms::modelGeneratedMainLoopBlocks(
         MainVPBB->getSuccessors()[0] != MainScalarPH)
       continue;
     VPBlockUtils::connectBlocks(VPBB, ScalarPH);
+    // Blocks bypassing both vector loops resume the scalar loop at the same
+    // values.
     addIncomingForLastPredecessor(ScalarPH);
   }
 
@@ -1516,13 +1518,19 @@ VPIRBasicBlock *VPlanTransforms::connectBypassBlock(VPlan &Plan,
                                                     BasicBlock *BypassBlock) {
   VPBasicBlock *VectorPH = Plan.getVectorPreheader();
   assert(VectorPH && "plan must have a vector preheader to bypass to");
+  // The resume values are modeled after connecting the bypass edge, so the
+  // preheader has no phis needing an incoming value for it yet. Copying the
+  // incoming value of the previously last predecessor, as done for the blocks
+  // bypassing both vector loops, would be wrong here: reaching the preheader
+  // from BypassBlock means the main vector loop has been bypassed.
+  assert(VectorPH->phis().empty() &&
+         "vector preheader must not have phis needing an incoming value");
   auto *BypassVPBB = Plan.createEmptyVPIRBasicBlock(BypassBlock);
   // BypassVPBB is not reachable from the plan's entry until the remaining
   // already generated blocks are modeled; until then it only needs its plan set
   // so VPBlockBase::getPlan keeps working for blocks reachable from it.
   BypassVPBB->setPlan(&Plan);
   VPBlockUtils::connectBlocks(BypassVPBB, VectorPH);
-  addIncomingForLastPredecessor(VectorPH);
   return BypassVPBB;
 }
 

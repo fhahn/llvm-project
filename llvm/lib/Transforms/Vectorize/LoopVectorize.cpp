@@ -7572,12 +7572,13 @@ static void preparePlanForEpilogueVectorLoop(VPlan &Plan,
   VPBasicBlock *Header = VectorLoop->getEntryBasicBlock();
   Header->setName("vec.epilog.vector.body");
 
-  // Create a phi in the vector preheader merging the resume value computed by
-  // the main vector loop with the value to use when it has been bypassed. It is
-  // inserted after the resume phis created earlier, which must come first.
+  // Returns the value to resume at for \p ResumeForEpi, creating a phi in the
+  // vector preheader merging the resume value computed by the main vector loop
+  // with the value to use when it has been bypassed. It is inserted after the
+  // resume phis created earlier, which must come first.
   VPBasicBlock *VectorPH = Plan.getVectorPreheader();
-  auto CreateResumePhi = [&](VPInstruction *ResumeForEpi,
-                             const Twine &Name) -> VPValue * {
+  auto GetResumeValue = [&](VPInstruction *ResumeForEpi,
+                            const Twine &Name) -> VPValue * {
     Value *FromMainLoop = ResumeForEpi->getUnderlyingValue();
     Value *BypassV = ResumeForEpi->getOperand(1)->getUnderlyingValue();
     assert(FromMainLoop && BypassV &&
@@ -7600,7 +7601,7 @@ static void preparePlanForEpilogueVectorLoop(VPlan &Plan,
   VPValue *MainVectorTripCount =
       Plan.getOrAddLiveIn(ResumeValues.CanonicalIV->getUnderlyingValue());
   VPValue *VPV =
-      CreateResumePhi(ResumeValues.CanonicalIV, "vec.epilog.resume.val");
+      GetResumeValue(ResumeValues.CanonicalIV, "vec.epilog.resume.val");
   assert(all_of(IV->users(),
                 [](const VPUser *U) {
                   if (isa<VPScalarIVStepsRecipe, VPDerivedIVRecipe>(U))
@@ -7642,7 +7643,7 @@ static void preparePlanForEpilogueVectorLoop(VPlan &Plan,
 
       VPInstruction *ResumeForEpi = ResumeValues.HeaderPhis.at(
           cast<PHINode>(ReductionPhi->getUnderlyingInstr()));
-      StartVal = CreateResumePhi(ResumeForEpi, "bc.merge.rdx");
+      StartVal = GetResumeValue(ResumeForEpi, "bc.merge.rdx");
 
       // Check for FindIV pattern by looking for icmp user of RdxResult.
       // The pattern is: select(icmp ne RdxResult, Sentinel), RdxResult, Start
@@ -7726,7 +7727,7 @@ static void preparePlanForEpilogueVectorLoop(VPlan &Plan,
       // Retrieve the induction resume value via ResumeForEpilogue.
       PHINode *IndPhi = cast<VPWidenInductionRecipe>(&R)->getPHINode();
       StartVal =
-          CreateResumePhi(ResumeValues.HeaderPhis.at(IndPhi), "bc.resume.val");
+          GetResumeValue(ResumeValues.HeaderPhis.at(IndPhi), "bc.resume.val");
     }
     assert(StartVal && "Must have a resume value");
     cast<VPHeaderPHIRecipe>(&R)->setStartValue(StartVal);
@@ -8225,7 +8226,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     // runtime check blocks. Unlike the iteration count check block created
     // below, they wrap already generated blocks and survive executing the plan,
     // which tells the latter apart afterwards.
-    auto BypassBothVectorLoops =
+    auto BlocksBypassingBothVectorLoops =
         to_vector(VPBlockUtils::blocksOnly<VPIRBasicBlock>(
             BestMainPlan.getScalarPreheader()->getPredecessors()));
     RUN_VPLAN_PASS(
@@ -8255,7 +8256,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     // an incoming value for it.
     VPBasicBlock *MainScalarPH = BestMainPlan.getScalarPreheader();
     auto BypassesMainVectorLoopOnly = [&](VPBlockBase *Pred) {
-      return !is_contained(BypassBothVectorLoops, Pred) &&
+      return !is_contained(BlocksBypassingBothVectorLoops, Pred) &&
              Pred->getNumSuccessors() == 2 &&
              Pred->getSuccessors()[0] == MainScalarPH;
     };
