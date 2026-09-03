@@ -1092,9 +1092,16 @@ VPRegionBlock *VPlan::getVectorLoopRegion() {
   // preheader as its single predecessor.
   SmallPtrSet<VPBlockBase *, 8> Visited;
   for (VPBlockBase *B = Entry; B && Visited.insert(B).second;
-       B = B->hasSuccessors() ? B->getSuccessors().back() : nullptr)
-    if (auto *R = dyn_cast<VPRegionBlock>(B))
-      return R->isReplicator() || R->getNumPredecessors() != 1 ? nullptr : R;
+       B = B->hasSuccessors() ? B->getSuccessors().back() : nullptr) {
+    auto *R = dyn_cast<VPRegionBlock>(B);
+    if (!R)
+      continue;
+    // Bail out if the region is not entered from a single predecessor;
+    // getVectorPreheader() relies on it being the vector preheader.
+    if (R->isReplicator() || R->getNumPredecessors() != 1)
+      return nullptr;
+    return R;
+  }
   return nullptr;
 }
 
