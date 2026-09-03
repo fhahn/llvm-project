@@ -6082,10 +6082,8 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   // branching into it off the executed main plan. All regions are dissolved
   // before executing, so a shallow traversal visits every block.
   if (EpilogueVecKind == EpilogueVectorizationKind::MainLoop) {
-    ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>>
-        RPOT(BestVPlan.getEntry());
-    for (VPBasicBlock *VPBB :
-         to_vector(VPBlockUtils::blocksOnly<VPBasicBlock>(RPOT)))
+    for (VPBasicBlock *VPBB : to_vector(VPBlockUtils::blocksOnly<VPBasicBlock>(
+             vp_depth_first_shallow(BestVPlan.getEntry()))))
       if (!isa<VPIRBasicBlock>(VPBB))
         replaceVPBBWithIRVPBB(VPBB, State.CFG.VPBB2IRBB.at(VPBB), &BestVPlan);
   }

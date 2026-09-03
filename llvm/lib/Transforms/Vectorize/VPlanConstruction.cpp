@@ -1489,12 +1489,12 @@ VPlanTransforms::modelGeneratedMainLoopBlocks(VPlan &Plan, VPlan &MainPlan,
   // Connect the remaining edges, mirroring the successors of the blocks of the
   // chain, so every modeled edge is an edge of the generated CFG. Edges leaving
   // the chain, i.e. to the exit blocks, are not modeled.
-  SmallPtrSet<const VPBlockBase *, 8> Connected;
+  SmallPtrSet<const VPBlockBase *, 8> Visited;
   for (VPIRBasicBlock *MainVPBB : Chain) {
-    // The chain is in reverse post-order, so an edge to a block connected
-    // already is a back-edge of the main vector loop, which would add a loop
-    // the plan does not own.
-    Connected.insert(MainVPBB);
+    // The chain is in reverse post-order, so an edge to a block visited already
+    // is a back-edge of the main vector loop, which would add a loop the plan
+    // does not own.
+    Visited.insert(MainVPBB);
     VPIRBasicBlock *VPBB = Modeled.at(MainVPBB);
     // The bypass edge of a block bypassing both vector loops has been modeled
     // above. It is the first successor of that block, so skip the successors
@@ -1502,7 +1502,7 @@ VPlanTransforms::modelGeneratedMainLoopBlocks(VPlan &Plan, VPlan &MainPlan,
     for (VPBlockBase *Succ :
          drop_begin(MainVPBB->getSuccessors(), VPBB->getNumSuccessors())) {
       VPIRBasicBlock *SuccVPBB = Modeled.lookup(Succ);
-      if (!SuccVPBB || Connected.contains(Succ))
+      if (!SuccVPBB || Visited.contains(Succ))
         continue;
       VPBlockUtils::connectBlocks(VPBB, SuccVPBB);
       // Only EnteredFrom can have phis; they need an incoming value for the new

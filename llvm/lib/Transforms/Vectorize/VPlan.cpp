@@ -484,12 +484,13 @@ void VPBasicBlock::connectToPredecessors(VPTransformState &State) {
       // using BranchOnCond.
       auto *TermBr = cast<CondBrInst>(PredBBTerminator);
       unsigned Idx = PredVPSuccessors.front() == this ? 0 : 1;
-      if (TermBr->getSuccessor(!Idx) == NewBB)
-        Idx = !Idx;
+      if (TermBr->getSuccessor(Idx ^ 1) == NewBB)
+        Idx ^= 1;
       BasicBlock *ReplacedSucc = TermBr->getSuccessor(Idx);
       assert((!ReplacedSucc || ReplacedSucc == NewBB ||
               isa<VPIRBasicBlock>(PredVPBB)) &&
-             "Trying to reset an existing successor block.");
+             "only VPIRBasicBlock predecessors may have an existing successor "
+             "redirected");
       TermBr->setSuccessor(Idx, NewBB);
       if (ReplacedSucc && ReplacedSucc != NewBB)
         CFG.DTU.applyUpdates({{DominatorTree::Delete, PredBB, ReplacedSucc}});
