@@ -316,6 +316,8 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
               return SE.getCouldNotCompute();
             const SCEV *Start =
                 getSCEVExprForVPValue(R->getStartValue(), PSE, L);
+            if (isa<SCEVCouldNotCompute>(Start))
+              return SE.getCouldNotCompute();
             const SCEV *AddRec =
                 SE.getAddRecExpr(Start, Step, L, SCEV::FlagAnyWrap);
             if (R->getTruncInst())
