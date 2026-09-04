@@ -8,6 +8,7 @@
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
 
+declare void @error_overflow() noreturn
 declare void @error_out_of_range()
 declare void @error_negative()
 
@@ -52,4 +53,78 @@ err.range:
 
 done:
   ret void
+}
+
+; The value use is dominated by the no-overflow edge, so it becomes a
+; `sub nuw`, whose range kills the second bounds check.
+define ptr @usub_value_nuw_kills_bounds_check(ptr %p, i64 %end, i64 %off) {
+; CHECK-LABEL: define ptr @usub_value_nuw_kills_bounds_check(
+; CHECK-SAME: ptr nofree readnone captures(ret: address, provenance) [[P:%.*]], i64 [[END:%.*]], i64 [[OFF:%.*]]) local_unnamed_addr {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[OV:%.*]] = icmp ult i64 [[END]], [[OFF]]
+; CHECK-NEXT:    br i1 [[OV]], label %[[ERR_NEGATIVE:.*]], label %[[OK:.*]]
+; CHECK:       [[OK]]:
+; CHECK-NEXT:    [[LEN:%.*]] = sub nuw i64 [[END]], [[OFF]]
+; CHECK-NEXT:    [[Q:%.*]] = getelementptr inbounds i8, ptr [[P]], i64 [[LEN]]
+; CHECK-NEXT:    br label %[[COMMON_RET:.*]]
+; CHECK:       [[COMMON_RET]]:
+; CHECK-NEXT:    [[COMMON_RET_OP:%.*]] = phi ptr [ [[Q]], %[[OK]] ], [ null, %[[ERR_NEGATIVE]] ]
+; CHECK-NEXT:    ret ptr [[COMMON_RET_OP]]
+; CHECK:       [[ERR_NEGATIVE]]:
+; CHECK-NEXT:    tail call void @error_negative()
+; CHECK-NEXT:    br label %[[COMMON_RET]]
+;
+entry:
+  %wo = call { i64, i1 } @llvm.usub.with.overflow.i64(i64 %end, i64 %off)
+  %ov = extractvalue { i64, i1 } %wo, 1
+  br i1 %ov, label %err.negative, label %ok
+
+ok:
+  %len = extractvalue { i64, i1 } %wo, 0
+  %q = getelementptr inbounds i8, ptr %p, i64 %len
+  %c = icmp ugt i64 %len, %end
+  br i1 %c, label %err.range, label %done
+
+done:
+  ret ptr %q
+
+err.negative:
+  call void @error_negative()
+  ret ptr null
+
+err.range:
+  call void @error_out_of_range()
+  ret ptr null
+}
+
+; Negative test: rewriting %v to `add nsw %x, 1` would let the overflow check
+; fold to a plain compare and remove the intrinsic, but that is a
+; pessimization: the intrinsic computes the sum as a side effect of setting
+; the flags, while the compare does not.
+define i32 @add_one_check_stays_intrinsic(i32 %x) {
+; CHECK-LABEL: define range(i32 -2147483647, -2147483648) i32 @add_one_check_stays_intrinsic(
+; CHECK-SAME: i32 [[X:%.*]]) local_unnamed_addr {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[WO:%.*]] = tail call { i32, i1 } @llvm.sadd.with.overflow.i32(i32 [[X]], i32 1)
+; CHECK-NEXT:    [[OV:%.*]] = extractvalue { i32, i1 } [[WO]], 1
+; CHECK-NEXT:    br i1 [[OV]], label %[[ERR:.*]], label %[[OK:.*]]
+; CHECK:       [[OK]]:
+; CHECK-NEXT:    [[V:%.*]] = extractvalue { i32, i1 } [[WO]], 0
+; CHECK-NEXT:    ret i32 [[V]]
+; CHECK:       [[ERR]]:
+; CHECK-NEXT:    tail call void @error_overflow()
+; CHECK-NEXT:    unreachable
+;
+entry:
+  %wo = call { i32, i1 } @llvm.sadd.with.overflow.i32(i32 %x, i32 1)
+  %ov = extractvalue { i32, i1 } %wo, 1
+  br i1 %ov, label %err, label %ok
+
+ok:
+  %v = extractvalue { i32, i1 } %wo, 0
+  ret i32 %v
+
+err:
+  call void @error_overflow()
+  unreachable
 }

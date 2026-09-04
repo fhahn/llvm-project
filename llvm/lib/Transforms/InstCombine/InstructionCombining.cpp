@@ -4622,6 +4622,27 @@ InstCombinerImpl::foldExtractOfOverflowIntrinsic(ExtractValueInst &EV) {
     }
   }
 
+  // If every use of the value component of a usub is only reachable when the
+  // subtraction did not overflow, the value is the exact difference there, so
+  // it is a plain `sub nuw`. That leaves the overflow bit as the intrinsic's
+  // only use, which the fold below turns into an `icmp ult` over the same
+  // operands, so no arithmetic is duplicated.
+  if (OvID == Intrinsic::usub_with_overflow) {
+    if (*EV.idx_begin() == 0) {
+      if (isOverflowIntrinsicNoWrap(WO, DT))
+        return BinaryOperator::CreateNUWSub(WO->getLHS(), WO->getRHS());
+    } else if (any_of(EV.users(), IsaPred<CondBrInst>)) {
+      // The fold above needs the overflow bit to be branched on directly, and
+      // that may only have become true after the value components were last
+      // visited (`br (xor %ov, true)` and friends are canonicalized here).
+      // Nothing re-queues them on such a change, so do it now.
+      for (User *U : WO->users())
+        if (auto *EVI = dyn_cast<ExtractValueInst>(U))
+          if (*EVI->idx_begin() == 0)
+            Worklist.push(EVI);
+    }
+  }
+
   // We're extracting from an overflow intrinsic. See if we're the only user.
   // That allows us to simplify multiple result intrinsics to simpler things
   // that just get one value.
