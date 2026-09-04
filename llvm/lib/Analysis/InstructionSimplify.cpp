@@ -5505,7 +5505,8 @@ Value *llvm::simplifyInsertElementInst(Value *Vec, Value *Val, Value *Idx,
 /// Given operands for an ExtractValueInst, see if we can fold the result.
 /// If not, this returns null.
 static Value *simplifyExtractValueInst(Value *Agg, ArrayRef<unsigned> Idxs,
-                                       const SimplifyQuery &, unsigned) {
+                                       const SimplifyQuery &Q,
+                                       unsigned MaxRecurse) {
   if (auto *CAgg = dyn_cast<Constant>(Agg))
     return ConstantFoldExtractValueInstruction(CAgg, Idxs);
 
@@ -5529,18 +5530,22 @@ static Value *simplifyExtractValueInst(Value *Agg, ArrayRef<unsigned> Idxs,
     }
   }
 
-  // Simplify umul_with_overflow where one operand is 1.
+  // extractvalue (any_with_overflow X, Y), 0 -> simplify(X op Y), as the value
+  // component is the wrapped result of the operation.
+  if (NumIdxs == 1 && Idxs[0] == 0)
+    if (auto *WO = dyn_cast<WithOverflowInst>(Agg))
+      if (Value *V = simplifyBinOp(WO->getBinaryOp(), WO->getLHS(),
+                                   WO->getRHS(), Q, MaxRecurse))
+        return V;
+
+  // umul_with_overflow with an operand of 1 never overflows.
   Value *V;
-  if (Idxs.size() == 1 &&
+  if (NumIdxs == 1 && Idxs[0] == 1 &&
       (match(Agg,
              m_Intrinsic<Intrinsic::umul_with_overflow>(m_Value(V), m_One())) ||
        match(Agg, m_Intrinsic<Intrinsic::umul_with_overflow>(m_One(),
-                                                             m_Value(V))))) {
-    if (Idxs[0] == 0)
-      return V;
-    assert(Idxs[0] == 1 && "invalid index");
+                                                             m_Value(V)))))
     return getFalse(CmpInst::makeCmpResultType(V->getType()));
-  }
 
   return nullptr;
 }

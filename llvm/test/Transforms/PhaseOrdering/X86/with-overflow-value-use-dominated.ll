@@ -36,16 +36,9 @@ define void @add_value_reassociates_with_sub(i64 %off, i64 %size) {
 ; CHECK-NEXT:    [[LEN:%.*]] = sub i64 [[SIZE]], [[OFF]]
 ; CHECK-NEXT:    [[WO:%.*]] = tail call { i64, i1 } @llvm.sadd.with.overflow.i64(i64 [[OFF]], i64 [[LEN]])
 ; CHECK-NEXT:    [[OV:%.*]] = extractvalue { i64, i1 } [[WO]], 1
-; CHECK-NEXT:    br i1 [[OV]], label %[[ERR_NEGATIVE:.*]], label %[[DONE:.*]]
-; CHECK:       [[DONE]]:
-; CHECK-NEXT:    [[V:%.*]] = extractvalue { i64, i1 } [[WO]], 0
-; CHECK-NEXT:    [[C:%.*]] = icmp sgt i64 [[V]], [[SIZE]]
-; CHECK-NEXT:    br i1 [[C]], label %[[ERR_RANGE:.*]], label %[[DONE1:.*]]
+; CHECK-NEXT:    br i1 [[OV]], label %[[ERR_NEGATIVE:.*]], label %[[DONE1:.*]]
 ; CHECK:       [[ERR_NEGATIVE]]:
 ; CHECK-NEXT:    tail call void @error_negative()
-; CHECK-NEXT:    br label %[[DONE1]]
-; CHECK:       [[ERR_RANGE]]:
-; CHECK-NEXT:    tail call void @error_out_of_range()
 ; CHECK-NEXT:    br label %[[DONE1]]
 ; CHECK:       [[DONE1]]:
 ; CHECK-NEXT:    ret void

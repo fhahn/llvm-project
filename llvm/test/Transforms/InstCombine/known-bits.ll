@@ -1113,10 +1113,9 @@ define i1 @extract_value_ssub(i8 %x, i8 %zz) {
 ; CHECK-NEXT:    [[Z:%.*]] = add nuw i8 [[ZZ:%.*]], 1
 ; CHECK-NEXT:    [[Y:%.*]] = add i8 [[X:%.*]], [[Z]]
 ; CHECK-NEXT:    [[SUB_SOV:%.*]] = call { i8, i1 } @llvm.ssub.with.overflow.i8(i8 [[Y]], i8 [[X]])
-; CHECK-NEXT:    [[SUB:%.*]] = extractvalue { i8, i1 } [[SUB_SOV]], 0
 ; CHECK-NEXT:    [[SOV:%.*]] = extractvalue { i8, i1 } [[SUB_SOV]], 1
 ; CHECK-NEXT:    call void @use.i1(i1 [[SOV]])
-; CHECK-NEXT:    call void @use.i8(i8 [[SUB]])
+; CHECK-NEXT:    call void @use.i8(i8 [[Z]])
 ; CHECK-NEXT:    ret i1 false
 ;
   %z = add nuw i8 %zz, 1
