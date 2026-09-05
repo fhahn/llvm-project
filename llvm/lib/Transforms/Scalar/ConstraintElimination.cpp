@@ -1382,12 +1382,6 @@ static bool getConstraintFromMemoryAccess(GetElementPtrInst &GEP,
 /// Returns true if \p I is a candidate whose poison-generating flags may be
 /// strengthened using the constraint systems.
 static bool canStrengthenFlags(Instruction *I) {
-  // A trunc nsw only truncates without unsigned wrap if its operand is
-  // non-negative.
-  if (auto *Trunc = dyn_cast<TruncInst>(I))
-    return Trunc->getType()->isIntegerTy() && Trunc->hasNoSignedWrap() &&
-           !Trunc->hasNoUnsignedWrap();
-
   auto *BO = dyn_cast<BinaryOperator>(I);
   if (!BO || !BO->getType()->isIntegerTy())
     return false;
@@ -1397,7 +1391,6 @@ static bool canStrengthenFlags(Instruction *I) {
     // A - B does not wrap unsigned, if A >=u B. Subs with constant operands get
     // canonicalized to Add.
     return !BO->hasNoUnsignedWrap() && !isa<Constant>(BO->getOperand(1));
-  case Instruction::Add:
   case Instruction::Mul:
   case Instruction::Shl:
     if (BO->hasNoUnsignedWrap() && BO->hasNoSignedWrap())
