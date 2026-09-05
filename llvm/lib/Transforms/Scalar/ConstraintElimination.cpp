@@ -515,6 +515,18 @@ static bool doesHoldInRange(const ConstraintInfo &Info, Value *Op,
                         : APInt::getMinValue(BitWidth);
   APInt MaxVal = Signed ? APInt::getSignedMaxValue(BitWidth)
                         : APInt::getMaxValue(BitWidth);
+  // A bound that decompose cannot turn into a coefficient becomes a new
+  // variable, which makes the query unanswerable. Checking up-front avoids
+  // decomposing \p Op for a query that can only fail; this is what happens for
+  // the unsigned no-wrap bounds of 64 bit operations.
+  auto IsRepresentable = [Signed](const APInt &V) {
+    return Signed ? V.sgt(MinSignedConstraintValue) && V.slt(MaxConstraintValue)
+                  : V.ult(MaxConstraintValue);
+  };
+  if ((Min != MinVal && !IsRepresentable(Min)) ||
+      (Max != MaxVal && !IsRepresentable(Max)))
+    return false;
+
   Type *Ty = Op->getType();
   if (Min != MinVal &&
       !Info.doesHold(Signed ? CmpInst::ICMP_SGE : CmpInst::ICMP_UGE, Op,
@@ -567,8 +579,9 @@ static bool isKnownNoWrap(Value *V, const ConstraintInfo &Info, bool Signed) {
   // The exact result of an nsw add/mul/shl of non-negative operands is
   // non-negative and representable, so the operation does not wrap unsigned
   // either. For shl, only the shifted operand matters.
-  if (!Signed && BO->hasNoSignedWrap() && Info.isKnownNonNegative(Op0) &&
-      (Opcode == Instruction::Shl || Info.isKnownNonNegative(Op1)))
+  if (!Signed && BO->hasNoSignedWrap() &&
+      (Opcode == Instruction::Shl || Info.isKnownNonNegative(Op1)) &&
+      Info.isKnownNonNegative(Op0))
     return true;
 
   // For a constant second operand, the range of Op0 for which the operation
@@ -988,6 +1001,8 @@ bool ConstraintInfo::doesHold(CmpInst::Predicate Pred, Value *A,
 }
 
 bool ConstraintInfo::isKnownNonNegative(Value *V) const {
+  if (auto *CI = dyn_cast<ConstantInt>(V))
+    return !CI->isNegative();
   return ::isKnownNonNegative(V, DL) ||
          doesHold(CmpInst::ICMP_SGE, V, ConstantInt::get(V->getType(), 0));
 }
