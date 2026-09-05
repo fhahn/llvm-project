@@ -572,8 +572,9 @@ static bool isKnownNoWrap(Value *V, const ConstraintInfo &Info, bool Signed) {
   // The exact result of an nsw add/mul/shl of non-negative operands is
   // non-negative and representable, so the operation does not wrap unsigned
   // either. For shl, only the shifted operand matters.
-  if (!Signed && BO->hasNoSignedWrap() && Info.isKnownNonNegative(Op0) &&
-      (Opcode == Instruction::Shl || Info.isKnownNonNegative(Op1)))
+  if (!Signed && BO->hasNoSignedWrap() &&
+      (Opcode == Instruction::Shl || Info.isKnownNonNegative(Op1)) &&
+      Info.isKnownNonNegative(Op0))
     return true;
 
   // For a constant second operand, the range of Op0 for which the operation
@@ -993,6 +994,8 @@ bool ConstraintInfo::doesHold(CmpInst::Predicate Pred, Value *A,
 }
 
 bool ConstraintInfo::isKnownNonNegative(Value *V) const {
+  if (auto *CI = dyn_cast<ConstantInt>(V))
+    return !CI->isNegative();
   return ::isKnownNonNegative(V, DL) ||
          doesHold(CmpInst::ICMP_SGE, V, ConstantInt::get(V->getType(), 0));
 }
