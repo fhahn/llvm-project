@@ -93,7 +93,7 @@ define void @stride2_slt_latch(i64 %n, i1 %header.ec) {
 ; CHECK-NEXT:    call void @use(i1 true)
 ; CHECK-NEXT:    br i1 [[HEADER_EC]], label %[[EXIT:.*]], label %[[LOOP_LATCH]]
 ; CHECK:       [[LOOP_LATCH]]:
-; CHECK-NEXT:    [[IV_NEXT]] = add nsw i64 [[IV]], 2
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 2
 ; CHECK-NEXT:    [[EC:%.*]] = icmp slt i64 [[IV_NEXT]], [[N]]
 ; CHECK-NEXT:    br i1 [[EC]], label %[[LOOP_HEADER]], label %[[EXIT]]
 ; CHECK:       [[EXIT]]:
@@ -130,7 +130,7 @@ define void @stride2_slt_header_is_latch(i64 %n) {
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
 ; CHECK-NEXT:    [[C:%.*]] = icmp slt i64 [[IV]], [[N]]
 ; CHECK-NEXT:    call void @use(i1 [[C]])
-; CHECK-NEXT:    [[IV_NEXT]] = add nsw i64 [[IV]], 2
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 2
 ; CHECK-NEXT:    [[EC:%.*]] = icmp slt i64 [[IV_NEXT]], [[N]]
 ; CHECK-NEXT:    br i1 [[EC]], label %[[LOOP]], label %[[EXIT:.*]]
 ; CHECK:       [[EXIT]]:
@@ -165,7 +165,7 @@ define void @stride2_sge_latch(i64 %n, i1 %header.ec) {
 ; CHECK-NEXT:    call void @use(i1 true)
 ; CHECK-NEXT:    br i1 [[HEADER_EC]], label %[[EXIT:.*]], label %[[LOOP_LATCH]]
 ; CHECK:       [[LOOP_LATCH]]:
-; CHECK-NEXT:    [[IV_NEXT]] = add nsw i64 [[IV]], 2
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 2
 ; CHECK-NEXT:    [[EC:%.*]] = icmp sge i64 [[IV_NEXT]], [[N]]
 ; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP_HEADER]]
 ; CHECK:       [[EXIT]]:
@@ -205,8 +205,8 @@ define void @neg_compared_value_not_backedge(i64 %n, i1 %header.ec) {
 ; CHECK-NEXT:    call void @use(i1 [[C]])
 ; CHECK-NEXT:    br i1 [[HEADER_EC]], label %[[EXIT:.*]], label %[[LOOP_LATCH]]
 ; CHECK:       [[LOOP_LATCH]]:
-; CHECK-NEXT:    [[PROBE:%.*]] = add nsw i64 [[IV]], 2
-; CHECK-NEXT:    [[IV_NEXT]] = add nsw i64 [[IV]], 4
+; CHECK-NEXT:    [[PROBE:%.*]] = add nuw nsw i64 [[IV]], 2
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 4
 ; CHECK-NEXT:    [[EC:%.*]] = icmp slt i64 [[PROBE]], [[N]]
 ; CHECK-NEXT:    br i1 [[EC]], label %[[LOOP_HEADER]], label %[[EXIT]]
 ; CHECK:       [[EXIT]]:
@@ -246,7 +246,7 @@ define void @neg_variant_bound(ptr %p, i1 %header.ec) {
 ; CHECK-NEXT:    call void @use(i1 [[C]])
 ; CHECK-NEXT:    br i1 [[HEADER_EC]], label %[[EXIT:.*]], label %[[LOOP_LATCH]]
 ; CHECK:       [[LOOP_LATCH]]:
-; CHECK-NEXT:    [[IV_NEXT]] = add nsw i64 [[IV]], 2
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 2
 ; CHECK-NEXT:    [[EC:%.*]] = icmp slt i64 [[IV_NEXT]], [[N]]
 ; CHECK-NEXT:    br i1 [[EC]], label %[[LOOP_HEADER]], label %[[EXIT]]
 ; CHECK:       [[EXIT]]:
@@ -325,7 +325,7 @@ define void @neg_wrong_polarity(i64 %n, i1 %header.ec) {
 ; CHECK-NEXT:    call void @use(i1 [[C]])
 ; CHECK-NEXT:    br i1 [[HEADER_EC]], label %[[EXIT:.*]], label %[[LOOP_LATCH]]
 ; CHECK:       [[LOOP_LATCH]]:
-; CHECK-NEXT:    [[IV_NEXT]] = add nsw i64 [[IV]], 2
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 2
 ; CHECK-NEXT:    [[EC:%.*]] = icmp slt i64 [[IV_NEXT]], [[N]]
 ; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP_HEADER]]
 ; CHECK:       [[EXIT]]:
@@ -437,7 +437,7 @@ define void @stride2_sle_latch(i64 %n, i1 %header.ec) {
 ; CHECK-NEXT:    call void @use(i1 true)
 ; CHECK-NEXT:    br i1 [[HEADER_EC]], label %[[EXIT:.*]], label %[[LOOP_LATCH]]
 ; CHECK:       [[LOOP_LATCH]]:
-; CHECK-NEXT:    [[IV_NEXT]] = add nsw i64 [[IV]], 2
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 2
 ; CHECK-NEXT:    [[EC:%.*]] = icmp sle i64 [[IV_NEXT]], [[N]]
 ; CHECK-NEXT:    br i1 [[EC]], label %[[LOOP_HEADER]], label %[[EXIT]]
 ; CHECK:       [[EXIT]]:
@@ -514,7 +514,7 @@ define void @neg_unsigned_latch_no_signed_fact(i64 %n, i1 %header.ec) {
 ; CHECK-NEXT:    call void @use(i1 [[C]])
 ; CHECK-NEXT:    br i1 [[HEADER_EC]], label %[[EXIT:.*]], label %[[LOOP_LATCH]]
 ; CHECK:       [[LOOP_LATCH]]:
-; CHECK-NEXT:    [[IV_NEXT]] = add nsw i64 [[IV]], 2
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 2
 ; CHECK-NEXT:    [[EC:%.*]] = icmp ult i64 [[IV_NEXT]], [[N]]
 ; CHECK-NEXT:    br i1 [[EC]], label %[[LOOP_HEADER]], label %[[EXIT]]
 ; CHECK:       [[EXIT]]:
@@ -594,7 +594,7 @@ define void @commuted_compare(i64 %n, i1 %header.ec) {
 ; CHECK-NEXT:    call void @use(i1 true)
 ; CHECK-NEXT:    br i1 [[HEADER_EC]], label %[[EXIT:.*]], label %[[LOOP_LATCH]]
 ; CHECK:       [[LOOP_LATCH]]:
-; CHECK-NEXT:    [[IV_NEXT]] = add nsw i64 [[IV]], 2
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 2
 ; CHECK-NEXT:    [[EC:%.*]] = icmp sgt i64 [[N]], [[IV_NEXT]]
 ; CHECK-NEXT:    br i1 [[EC]], label %[[LOOP_HEADER]], label %[[EXIT]]
 ; CHECK:       [[EXIT]]:
