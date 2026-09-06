@@ -532,36 +532,40 @@ struct VPlanTransforms {
   static std::unique_ptr<VPlan>
   narrowInterleaveGroups(VPlan &Plan, const TargetTransformInfo &TTI);
 
-  /// Adapts the vector loop region for tail folding by introducing a header
-  /// mask and conditionally executing the content of the region:
+  /// Adapts the loop for tail folding by introducing an abstract header mask
+  /// and conditionally executing the loop body. Runs on the plain CFG, before
+  /// the loop region is created, so the mask is a HeaderMask VPInstruction
+  /// standing in for the region's header mask; createLoopRegions hands over to
+  /// the mask the region owns, and it is materialized into concrete recipes
+  /// after costing.
   ///
-  /// Vector loop region before:
-  /// +-------------------------------------------+
-  /// |%iv = ...                                  |
-  /// |...                                        |
-  /// |%iv.next = add %iv, vfxuf                  |
-  /// |branch-on-count %iv.next, vector-trip-count|
-  /// +-------------------------------------------+
+  /// Plain CFG loop before:
+  /// +--------------------------------------+
+  /// |%iv = ...                             |
+  /// |...                                   |
+  /// |branch-on-cond %ec                    |
+  /// +--------------------------------------+
   ///
-  /// Vector loop region after:
-  /// +-------------------------------------------+
-  /// |%iv = ...                                  |
-  /// |%wide.iv = widen-canonical-iv ...          |
-  /// |%header-mask = icmp ule %wide.iv, BTC      |
-  /// |branch-on-cond %header-mask                |---+
-  /// +-------------------------------------------+   |
-  ///                      |                          |
-  ///                      v                          |
-  /// +-------------------------------------------+   |
-  /// |                   ...                     |   |
-  /// +-------------------------------------------+   |
-  ///                      |                          |
-  ///                      v                          |
-  /// +-------------------------------------------+   |
-  /// |<phis> = phi [..., ...], [poison, header]  |
-  /// |%iv.next = add %iv, vfxuf                  |<--+
-  /// |branch-on-count %iv.next, vector-trip-count|
-  /// +-------------------------------------------+
+  /// Plain CFG loop after:
+  /// +--------------------------------------+
+  /// |%iv = ...                             |
+  /// |%header-mask = header-mask            |
+  /// |branch-on-cond %header-mask           |---+
+  /// +--------------------------------------+   |
+  ///                    |                       |
+  ///                    v                       |
+  /// +--------------------------------------+   |
+  /// |                 ...                  |   |
+  /// +--------------------------------------+   |
+  ///                    |                       |
+  ///                    v                       |
+  /// +--------------------------------------+   |
+  /// |<phis> = phi [..., ...], [poison, hdr]|<--+
+  /// |branch-on-cond false                  |
+  /// +--------------------------------------+
+  ///
+  /// The original exit condition is dropped, as createLoopRegions forms the
+  /// canonical IV increment and the exit test; it must therefore run next.
   ///
   /// Any VPInstruction::ExtractLastLanes are also updated to extract from the
   /// last active lane of the header mask.

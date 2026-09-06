@@ -642,6 +642,7 @@ unsigned VPInstruction::getNumOperandsForOpcode() const {
   switch (Opcode) {
   case VPInstruction::StepVector:
   case VPInstruction::IncomingAliasMask:
+  case VPInstruction::HeaderMask:
     return 0;
   case Instruction::Alloca:
   case Instruction::ExtractValue:
@@ -1695,6 +1696,7 @@ bool VPInstruction::opcodeMayReadOrWriteFromMemory() const {
   case VPInstruction::ActiveLaneMask:
   case VPInstruction::WideActiveLaneMask:
   case VPInstruction::IncomingAliasMask:
+  case VPInstruction::HeaderMask:
   case VPInstruction::ExitingIVValue:
   case VPInstruction::ExplicitVectorLength:
   case VPInstruction::FirstActiveLane:
@@ -1828,6 +1830,9 @@ void VPInstruction::printRecipe(raw_ostream &O, const Twine &Indent,
     break;
   case VPInstruction::IncomingAliasMask:
     O << "incoming-alias-mask";
+    break;
+  case VPInstruction::HeaderMask:
+    O << "header-mask";
     break;
   case VPInstruction::ExplicitVectorLength:
     O << "EXPLICIT-VECTOR-LENGTH";

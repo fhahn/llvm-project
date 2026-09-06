@@ -6500,10 +6500,12 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
     RUN_VPLAN_PASS(VPlanTransforms::handleCountableEarlyExits, *VPlan0);
   }
 
-  RUN_VPLAN_PASS(VPlanTransforms::createLoopRegions, *VPlan0,
-                 getDebugLocFromInstOrOperands(Legal->getPrimaryInduction()));
+  // Fold the tail on the plain CFG: foldTailByMasking introduces the abstract
+  // header mask, which createLoopRegions then hands over to the region.
   if (CM->foldTailByMasking())
     RUN_VPLAN_PASS(VPlanTransforms::foldTailByMasking, *VPlan0);
+  RUN_VPLAN_PASS(VPlanTransforms::createLoopRegions, *VPlan0,
+                 getDebugLocFromInstOrOperands(Legal->getPrimaryInduction()));
 
   assert(verifyExecutionFrequenciesMatchBFI(*VPlan0, OrigLoop, LI, *CM) &&
          "execution frequencies do not match the loop's block frequencies");

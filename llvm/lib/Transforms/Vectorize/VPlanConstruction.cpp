@@ -505,7 +505,8 @@ static void createLoopRegion(VPlan &Plan, VPBlockBase *HeaderVPB, DebugLoc DL) {
     LatchTerm->setOperand(1, IsLatchExitTaken);
   } else {
     // We are replacing the branch to exit the region. Remove the original
-    // BranchOnCond.
+    // BranchOnCond. When the tail is folded, foldTailByMasking left it
+    // branching on false, as the exit test is only formed here.
     assert(match(LatchTerm, m_BranchOnCond()) && "Unexpected terminator");
     DebugLoc LatchDL = LatchTerm->getDebugLoc();
     Builder.createNaryOp(VPInstruction::BranchOnCount,
@@ -1320,46 +1321,55 @@ void VPlanTransforms::createLoopRegions(VPlan &Plan, DebugLoc DL) {
 
   VPRegionBlock *TopRegion = Plan.getVectorLoopRegion();
   TopRegion->setName("vector loop");
-  TopRegion->getEntryBasicBlock()->setName("vector.body");
+  VPBasicBlock *Header = TopRegion->getEntryBasicBlock();
+  Header->setName("vector.body");
+
+  // foldTailByMasking left a HeaderMask standing in for the region's header
+  // mask, which it could not create before the region existed. Hand over to the
+  // mask the region owns and drop the stand-in.
+  auto StandIn = find_if(*Header, [](VPRecipeBase &R) {
+    return match(&R, m_VPInstruction<VPInstruction::HeaderMask>());
+  });
+  if (StandIn != Header->end()) {
+    StandIn->getVPSingleValue()->replaceAllUsesWith(
+        TopRegion->createHeaderMask());
+    StandIn->eraseFromParent();
+  }
 }
 
 void VPlanTransforms::foldTailByMasking(VPlan &Plan) {
+  auto [Header, OrigLatch] = VPBlockUtils::getPlainCFGHeaderAndLatch(Plan);
+  auto *MiddleVPBB = VPBlockUtils::getPlainCFGMiddleBlock(Plan);
   assert(Plan.getExitBlocks().size() == 1 &&
          "only a single-exit block is supported currently");
-  assert(Plan.getExitBlocks().front()->getSinglePredecessor() ==
-             Plan.getMiddleBlock() &&
+  assert(Plan.getExitBlocks().front()->getSinglePredecessor() == MiddleVPBB &&
          "the exit block must have middle block as single predecessor");
 
-  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
-  assert(LoopRegion->getSingleSuccessor() == Plan.getMiddleBlock() &&
-         "The vector loop region must have the middle block as its single "
-         "successor for now");
-  VPBasicBlock *Header = LoopRegion->getEntryBasicBlock();
-
-  Header->splitAt(Header->getFirstNonPhi());
-
-  // Abstract header mask, materialized into concrete recipes later.
-  VPValue *HeaderMask = LoopRegion->createHeaderMask();
-  VPBuilder Builder(Header, Header->getFirstNonPhi());
-  Builder.createNaryOp(VPInstruction::BranchOnCond, HeaderMask);
-
-  VPBasicBlock *OrigLatch = LoopRegion->getExitingBasicBlock();
-  VPValue *IVInc;
-  [[maybe_unused]] bool TermBranchOnCount =
-      match(OrigLatch->getTerminator(),
-            m_BranchOnCount(m_VPValue(IVInc),
-                            m_Specific(&Plan.getVectorTripCount())));
-  assert(TermBranchOnCount &&
-         match(IVInc, m_Add(m_Specific(LoopRegion->getCanonicalIV()),
-                            m_Specific(&Plan.getVFxUF()))) &&
-         std::next(IVInc->getDefiningRecipe()->getIterator()) ==
-             OrigLatch->getTerminator()->getIterator() &&
-         "Unexpected canonical iv increment");
-
-  // Split the latch at the IV update, and branch to it from the header mask.
+  // Split off a latch holding just the terminator, so that the canonical IV
+  // increment and exit test createLoopRegions installs run on every vector
+  // iteration, while the body split off below is guarded by the header mask.
+  //
+  // The original exit condition is dropped here, as createLoopRegions replaces
+  // it with a BranchOnCount on the canonical IV. It cannot be kept in the latch
+  // instead: it may be computed from, or used by, recipes of the now-guarded
+  // body. This leaves the latch without a real exit test, so createLoopRegions
+  // must run next.
   VPBasicBlock *Latch =
-      OrigLatch->splitAt(IVInc->getDefiningRecipe()->getIterator());
+      OrigLatch->splitAt(OrigLatch->getTerminator()->getIterator());
   Latch->setName("vector.latch");
+  Latch->getTerminator()->setOperand(0, Plan.getFalse());
+
+  // Split the header after its phis and branch to the latch from it, so the
+  // loop body can be skipped when no lane is active.
+  Header->splitAt(Header->getFirstNonPhi())->setName("vector.body.split");
+
+  // Abstract header mask, materialized into concrete recipes later. It stands
+  // in for the region's header mask until createLoopRegions forms the region.
+  VPBuilder Builder(Header, Header->getFirstNonPhi());
+  VPValue *HeaderMask = Builder.createNaryOp(
+      VPInstruction::HeaderMask, {}, nullptr, {}, {}, DebugLoc::getUnknown(),
+      "header.mask", IntegerType::getInt1Ty(Plan.getContext()));
+  Builder.createNaryOp(VPInstruction::BranchOnCond, HeaderMask);
   VPBlockUtils::connectBlocks(Header, Latch);
 
   // Collect any values defined in the loop that need a phi. Currently this
@@ -1371,7 +1381,7 @@ void VPlanTransforms::foldTailByMasking(VPlan &Plan) {
       NeedsPhi[cast<VPHeaderPHIRecipe>(R).getBackedgeValue()].push_back(&R);
 
   VPValue *V;
-  for (VPRecipeBase &R : *Plan.getMiddleBlock())
+  for (VPRecipeBase &R : *MiddleVPBB)
     if (match(&R, m_ExtractLastPart(m_VPValue(V))))
       NeedsPhi[V].push_back(&R);
 
@@ -1400,8 +1410,8 @@ void VPlanTransforms::foldTailByMasking(VPlan &Plan) {
   // Any extract of the last element must be updated to extract from the last
   // active lane of the header mask instead (i.e., the lane corresponding to the
   // last active iteration).
-  Builder.setInsertPoint(Plan.getMiddleBlock()->getTerminator());
-  for (VPRecipeBase &R : *Plan.getMiddleBlock()) {
+  Builder.setInsertPoint(MiddleVPBB->getTerminator());
+  for (VPRecipeBase &R : *MiddleVPBB) {
     VPValue *Op;
     if (!match(&R, m_ExtractLastLaneOfLastPart(m_VPValue(Op))))
       continue;
@@ -1414,12 +1424,12 @@ void VPlanTransforms::foldTailByMasking(VPlan &Plan) {
   }
 
   // VectorTripCount now equals TripCount so simplify the MiddleVPBB branch.
-  assert(match(Plan.getMiddleBlock()->getTerminator(),
+  assert(match(MiddleVPBB->getTerminator(),
                m_BranchOnCond(m_SpecificICmp(
                    CmpInst::ICMP_EQ, m_Specific(Plan.getTripCount()),
                    m_Specific(&Plan.getVectorTripCount())))) &&
          "Unexpected MiddleVPBB branch");
-  Plan.getMiddleBlock()->getTerminator()->setOperand(0, Plan.getTrue());
+  MiddleVPBB->getTerminator()->setOperand(0, Plan.getTrue());
 }
 
 /// Add an incoming value to all phis in \p VPBB for its just-added last
