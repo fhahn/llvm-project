@@ -532,39 +532,25 @@ struct VPlanTransforms {
   static std::unique_ptr<VPlan>
   narrowInterleaveGroups(VPlan &Plan, const TargetTransformInfo &TTI);
 
-  /// Adapts the vector loop region for tail folding by introducing a header
-  /// mask and conditionally executing the content of the region:
+  /// Guard the plain-CFG loop body with an abstract header mask to fold the
+  /// tail. Run before createLoopRegions, which replaces the HeaderMask
+  /// instruction with the region's header mask and restores the latch exit
+  /// test. The mask is materialized into concrete recipes after costing.
   ///
-  /// Vector loop region before:
-  /// +-------------------------------------------+
-  /// |%iv = ...                                  |
-  /// |...                                        |
-  /// |%iv.next = add %iv, vfxuf                  |
-  /// |branch-on-count %iv.next, vector-trip-count|
-  /// +-------------------------------------------+
+  ///   header: phis
+  ///     %mask = header-mask
+  ///     branch-on-cond %mask
+  ///          |           |
+  ///          v           |
+  ///        body          |
+  ///          |           |
+  ///          v           v
+  ///   latch: phis [..., body], [..., header]
+  ///     branch-on-cond false
   ///
-  /// Vector loop region after:
-  /// +-------------------------------------------+
-  /// |%iv = ...                                  |
-  /// |%wide.iv = widen-canonical-iv ...          |
-  /// |%header-mask = icmp ule %wide.iv, BTC      |
-  /// |branch-on-cond %header-mask                |---+
-  /// +-------------------------------------------+   |
-  ///                      |                          |
-  ///                      v                          |
-  /// +-------------------------------------------+   |
-  /// |                   ...                     |   |
-  /// +-------------------------------------------+   |
-  ///                      |                          |
-  ///                      v                          |
-  /// +-------------------------------------------+   |
-  /// |<phis> = phi [..., ...], [poison, header]  |
-  /// |%iv.next = add %iv, vfxuf                  |<--+
-  /// |branch-on-count %iv.next, vector-trip-count|
-  /// +-------------------------------------------+
-  ///
-  /// Any VPInstruction::ExtractLastLanes are also updated to extract from the
-  /// last active lane of the header mask.
+  /// Header-phi backedge values and live-outs get phis in the new latch.
+  /// Extractions of the last lane are updated to use the last active lane of
+  /// the header mask.
   static void foldTailByMasking(VPlan &Plan);
 
   /// Predicate and linearize the control-flow in the only loop region of

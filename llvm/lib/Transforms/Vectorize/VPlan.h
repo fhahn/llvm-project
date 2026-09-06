@@ -1419,6 +1419,10 @@ public:
     /// backedge value). Has the wide induction recipe as operand.
     ExitingIVValue,
     MaskedCond,
+    /// Abstract mask guarding the tail-folded body before region construction.
+    /// Takes no operands and produces i1. createLoopRegions replaces it with
+    /// the region's header mask.
+    HeaderMask,
     /// Scale the first operand (vector step) by the second operand
     /// (scalar-step).  Casts both operands to the result type if needed.
     WideIVStep,
@@ -4940,10 +4944,12 @@ public:
   /// loop region contains a nested loop region.
   LLVM_ABI_FOR_TEST bool isOuterLoop() const;
 
-  /// Returns true if the vector loop region is tail-folded.
+  /// Returns true if the vector loop region is tail-folded. Must be called
+  /// after createLoopRegions.
   bool hasTailFolded() const {
     const VPRegionBlock *LoopRegion = getVectorLoopRegion();
-    return LoopRegion && LoopRegion->getHeaderMask();
+    assert(LoopRegion && "must be called after createLoopRegions");
+    return LoopRegion->getHeaderMask();
   }
 
   /// Returns true if the plan requires a scalar epilogue after the vector

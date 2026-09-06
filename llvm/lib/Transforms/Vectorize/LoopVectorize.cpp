@@ -6500,10 +6500,11 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
     RUN_VPLAN_PASS(VPlanTransforms::handleCountableEarlyExits, *VPlan0);
   }
 
-  RUN_VPLAN_PASS(VPlanTransforms::createLoopRegions, *VPlan0,
-                 getDebugLocFromInstOrOperands(Legal->getPrimaryInduction()));
+  // Introduce tail predication before creating the loop region.
   if (CM->foldTailByMasking())
     RUN_VPLAN_PASS(VPlanTransforms::foldTailByMasking, *VPlan0);
+  RUN_VPLAN_PASS(VPlanTransforms::createLoopRegions, *VPlan0,
+                 getDebugLocFromInstOrOperands(Legal->getPrimaryInduction()));
 
   assert(verifyExecutionFrequenciesMatchBFI(*VPlan0, OrigLoop, LI, *CM) &&
          "execution frequencies do not match the loop's block frequencies");

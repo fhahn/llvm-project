@@ -193,7 +193,8 @@ bool VPlanVerifier::verifyLastActiveLaneRecipe(
       Mask = HeaderMask;
 
     // The header mask is a prefix mask. Before being materialized it is the
-    // loop region's abstract header mask; afterwards it is an active lane mask
+    // abstract header mask, either the plain-CFG HeaderMask VPInstruction or
+    // the loop region's header mask; afterwards it is an active lane mask
     // (an intrinsic or a phi), or the icmp checked below.
     if (match(Mask, m_HeaderMask()) || isa<VPActiveLaneMaskPHIRecipe>(Mask) ||
         match(Mask, m_VPInstruction<VPInstruction::ActiveLaneMask>()))

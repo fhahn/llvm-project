@@ -930,11 +930,15 @@ struct canonical_iv_match {
 
 inline canonical_iv_match m_CanonicalIV() { return {}; }
 
-/// Match the abstract header mask of any loop region.
+/// Match the abstract header mask of the vector loop, in either of its forms:
+/// the HeaderMask VPInstruction used while the loop is still a plain CFG, or
+/// the loop region's header mask once the region has been created.
 struct header_mask_match {
   template <typename ArgTy> bool match(const ArgTy *V) const {
-    const auto *RV = dyn_cast<VPRegionValue>(V);
-    return RV && RV->getDefiningRegion()->getHeaderMask() == RV;
+    if (const auto *RV = dyn_cast<VPRegionValue>(V))
+      return RV->getDefiningRegion()->getHeaderMask() == RV;
+    const auto *VPI = dyn_cast<VPInstruction>(V);
+    return VPI && VPI->getOpcode() == VPInstruction::HeaderMask;
   }
 };
 
