@@ -634,14 +634,18 @@ void VPlanTransforms::convertEVLExitCond(VPlan &Plan) {
 
   VPBasicBlock *Latch = LoopRegion->getExitingBasicBlock();
   auto *LatchBr = cast<VPInstruction>(Latch->getTerminator());
-  if (match(LatchBr, m_BranchOnCond(m_True())))
+  // The countable exit condition is the only operand of a BranchOnCond, or the
+  // second operand of the BranchOnTwoConds of a loop with an uncountable early
+  // exit.
+  unsigned CondIdx = match(LatchBr, m_BranchOnTwoConds()) ? 1 : 0;
+  if (match(LatchBr->getOperand(CondIdx), m_True()))
     return;
 
   VPValue *CanIVInc;
-  [[maybe_unused]] bool FoundIncrement = match(
-      LatchBr,
-      m_BranchOnCond(m_SpecificCmp(CmpInst::ICMP_EQ, m_VPValue(CanIVInc),
-                                   m_Specific(&Plan.getVectorTripCount()))));
+  [[maybe_unused]] bool FoundIncrement =
+      match(LatchBr->getOperand(CondIdx),
+            m_SpecificICmp(CmpInst::ICMP_EQ, m_VPValue(CanIVInc),
+                           m_Specific(&Plan.getVectorTripCount())));
   assert(FoundIncrement &&
          match(CanIVInc, m_Add(m_Specific(LoopRegion->getCanonicalIV()),
                                m_Specific(&Plan.getVFxUF()))) &&
@@ -650,6 +654,6 @@ void VPlanTransforms::convertEVLExitCond(VPlan &Plan) {
 
   Type *AVLTy = AVLNext->getScalarType();
   VPBuilder Builder(LatchBr);
-  LatchBr->setOperand(
-      0, Builder.createICmp(CmpInst::ICMP_EQ, AVLNext, Plan.getZero(AVLTy)));
+  LatchBr->setOperand(CondIdx, Builder.createICmp(CmpInst::ICMP_EQ, AVLNext,
+                                                  Plan.getZero(AVLTy)));
 }

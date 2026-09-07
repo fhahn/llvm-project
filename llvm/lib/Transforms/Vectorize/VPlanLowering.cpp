@@ -183,11 +183,17 @@ addVPLaneMaskPhiAndUpdateExitBranch(VPlan &Plan) {
                              "extract.next.alm.part");
   LaneMaskPhi->addBackedgeValue(ALM);
 
-  // Replace the original terminator with BranchOnCond. We have to invert the
-  // mask here because a true condition means jumping to the exit block.
+  // The negated mask is the loop's countable exit condition: a true condition
+  // means jumping to the exit block. For a loop with an uncountable early exit
+  // the latch already branches on two conditions, so only replace the countable
+  // one; otherwise replace the terminator with a BranchOnCond.
   auto *NotMask = Builder.createNot(ALM, DL);
-  Builder.createNaryOp(VPInstruction::BranchOnCond, {NotMask}, DL);
-  OriginalTerminator->eraseFromParent();
+  if (match(OriginalTerminator, m_BranchOnTwoConds())) {
+    OriginalTerminator->setOperand(1, NotMask);
+  } else {
+    Builder.createNaryOp(VPInstruction::BranchOnCond, {NotMask}, DL);
+    OriginalTerminator->eraseFromParent();
+  }
   return LaneMaskPhi;
 }
 
