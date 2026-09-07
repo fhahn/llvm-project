@@ -26,6 +26,7 @@
 #include "llvm/Analysis/CaptureTracking.h"
 #include "llvm/Analysis/CmpInstAnalysis.h"
 #include "llvm/Analysis/ConstantFolding.h"
+#include "llvm/Analysis/DomConditionCache.h"
 #include "llvm/Analysis/FloatingPointPredicateUtils.h"
 #include "llvm/Analysis/InstSimplifyFolder.h"
 #include "llvm/Analysis/Loads.h"
@@ -3122,7 +3123,8 @@ static Value *simplifyICmpWithZero(CmpPredicate Pred, Value *LHS, Value *RHS,
 }
 
 static Value *simplifyICmpWithConstant(CmpPredicate Pred, Value *LHS,
-                                       Value *RHS, const SimplifyQuery &Q) {
+                                       Value *RHS, const SimplifyQuery &Q,
+                                       unsigned MaxRecurse) {
   Type *ITy = getCompareTy(RHS); // The return type.
 
   Value *X;
@@ -3167,6 +3169,22 @@ static Value *simplifyICmpWithConstant(CmpPredicate Pred, Value *LHS,
 
   if (Pred == ICmpInst::ICMP_UGE && C->isOne() && isKnownNonZero(LHS, Q))
     return ConstantInt::getTrue(ITy);
+
+  // (X + C2) == C --> X == (C - C2)
+  // (X + C2) != C --> X != (C - C2)
+  // Only worth the recursive simplification attempt if there are
+  // assumptions or dominating conditions on X that it could fold against;
+  // otherwise the rewritten compare won't simplify either.
+  Value *AddOp;
+  Constant *C2;
+  if (MaxRecurse && ICmpInst::isEquality(Pred) &&
+      match(LHS, m_Add(m_Value(AddOp), m_Constant(C2))) &&
+      ((Q.AC && !Q.AC->assumptionsFor(AddOp).empty()) ||
+       (Q.DC && !Q.DC->conditionsFor(AddOp).empty()))) {
+    Constant *NewRHS = ConstantExpr::getSub(cast<Constant>(RHS), C2);
+    if (Value *V = simplifyICmpInst(Pred, AddOp, NewRHS, Q, MaxRecurse - 1))
+      return V;
+  }
 
   return nullptr;
 }
@@ -3919,7 +3937,7 @@ static Value *simplifyICmpInst(CmpPredicate Pred, Value *LHS, Value *RHS,
   if (Value *V = simplifyICmpWithZero(Pred, LHS, RHS, Q))
     return V;
 
-  if (Value *V = simplifyICmpWithConstant(Pred, LHS, RHS, Q))
+  if (Value *V = simplifyICmpWithConstant(Pred, LHS, RHS, Q, MaxRecurse))
     return V;
 
   // If both operands have range metadata, use the metadata
