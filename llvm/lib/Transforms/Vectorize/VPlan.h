@@ -1418,7 +1418,6 @@ public:
     /// is the value of the last lane of the induction increment (i.e. its
     /// backedge value). Has the wide induction recipe as operand.
     ExitingIVValue,
-    MaskedCond,
     /// Abstract mask guarding the tail-folded body before region construction.
     /// Takes no operands and produces i1. createLoopRegions replaces it with
     /// the region's header mask.
@@ -1460,9 +1459,6 @@ private:
 
   /// Returns true if the VPInstruction does not need masking.
   bool alwaysUnmasked() const {
-    if (Opcode == VPInstruction::MaskedCond)
-      return false;
-
     // For now only VPInstructions with underlying values use masks.
     // TODO: provide masks to VPInstructions w/o underlying values.
     if (!getUnderlyingValue())
