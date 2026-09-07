@@ -6481,6 +6481,11 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
 
   RUN_VPLAN_PASS(VPlanTransforms::addMiddleCheck, *VPlan0);
 
+  // Introduce the tail bypass before rerouting early exits, so the phis
+  // carrying their conditions to the latch also cover the bypass.
+  if (CM->foldTailByMasking())
+    RUN_VPLAN_PASS(VPlanTransforms::foldTailByMasking, *VPlan0);
+
   // If we're vectorizing a loop with an uncountable exit, make sure that the
   // recipes are safe to handle.
   // TODO: Remove this once we can properly check the VPlan itself for both
@@ -6500,9 +6505,6 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
     RUN_VPLAN_PASS(VPlanTransforms::handleCountableEarlyExits, *VPlan0);
   }
 
-  // Introduce tail predication before creating the loop region.
-  if (CM->foldTailByMasking())
-    RUN_VPLAN_PASS(VPlanTransforms::foldTailByMasking, *VPlan0);
   RUN_VPLAN_PASS(VPlanTransforms::createLoopRegions, *VPlan0,
                  getDebugLocFromInstOrOperands(Legal->getPrimaryInduction()));
 
