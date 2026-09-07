@@ -6481,6 +6481,13 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
 
   RUN_VPLAN_PASS(VPlanTransforms::addMiddleCheck, *VPlan0);
 
+  // Fold the tail on the plain CFG: foldTailByMasking introduces the abstract
+  // header mask, which createLoopRegions then hands over to the region. It runs
+  // before the early exits are rerouted, so that the phis carrying their exit
+  // conditions to the latch also cover the path that skips the loop body.
+  if (CM->foldTailByMasking())
+    RUN_VPLAN_PASS(VPlanTransforms::foldTailByMasking, *VPlan0);
+
   // If we're vectorizing a loop with an uncountable exit, make sure that the
   // recipes are safe to handle.
   // TODO: Remove this once we can properly check the VPlan itself for both
@@ -6500,10 +6507,6 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
     RUN_VPLAN_PASS(VPlanTransforms::handleCountableEarlyExits, *VPlan0);
   }
 
-  // Fold the tail on the plain CFG: foldTailByMasking introduces the abstract
-  // header mask, which createLoopRegions then hands over to the region.
-  if (CM->foldTailByMasking())
-    RUN_VPLAN_PASS(VPlanTransforms::foldTailByMasking, *VPlan0);
   RUN_VPLAN_PASS(VPlanTransforms::createLoopRegions, *VPlan0,
                  getDebugLocFromInstOrOperands(Legal->getPrimaryInduction()));
 

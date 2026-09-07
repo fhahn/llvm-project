@@ -1340,10 +1340,14 @@ void VPlanTransforms::createLoopRegions(VPlan &Plan, DebugLoc DL) {
 void VPlanTransforms::foldTailByMasking(VPlan &Plan) {
   auto [Header, OrigLatch] = VPBlockUtils::getPlainCFGHeaderAndLatch(Plan);
   auto *MiddleVPBB = VPBlockUtils::getPlainCFGMiddleBlock(Plan);
-  assert(Plan.getExitBlocks().size() == 1 &&
-         "only a single-exit block is supported currently");
-  assert(Plan.getExitBlocks().front()->getSinglePredecessor() == MiddleVPBB &&
-         "the exit block must have middle block as single predecessor");
+  // Early exits are rerouted after this, by handleUncountableEarlyExits, which
+  // extracts their live-outs at the first lane taking the exit, so only the
+  // countable exit from the middle block is fixed up here.
+  assert(count_if(Plan.getExitBlocks(),
+                  [MiddleVPBB](VPIRBasicBlock *EB) {
+                    return is_contained(EB->getPredecessors(), MiddleVPBB);
+                  }) == 1 &&
+         "expected a single exit block reached from the middle block");
 
   // Split off a latch holding just the terminator, so that the canonical IV
   // increment and exit test createLoopRegions installs run on every vector

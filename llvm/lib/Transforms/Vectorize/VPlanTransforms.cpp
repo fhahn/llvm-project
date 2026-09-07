@@ -1277,11 +1277,6 @@ static VPValue *simplifyRecipe(VPlan &Plan, VPSingleDefRecipe *Def) {
       A->getScalarType() == Def->getScalarType())
     return A;
 
-  // Simplify MaskedCond with no block mask to its single operand.
-  if (match(Def, m_VPInstruction<VPInstruction::MaskedCond>()) &&
-      !cast<VPInstruction>(Def)->isMasked())
-    return Def->getOperand(0);
-
   // Look through ExtractLastLane.
   if (match(Def, m_ExtractLastLane(m_VPValue(A)))) {
     if (match(A, m_BuildVector())) {
@@ -3034,14 +3029,13 @@ getRecipesForUncountableExit(SmallVectorImpl<VPInstruction *> &Recipes,
   //   EMIT ir<%uncountable.addr> = getelementptr inbounds nuw ir<%pred>,ir<%iv>
   //   EMIT ir<%uncountable.val> = load ir<%uncountable.addr>
   //   EMIT ir<%uncountable.cond> = icmp sgt ir<%uncountable.val>, ir<500>
-  //   EMIT vp<%3> = masked-cond ir<%uncountable.cond>
   // Successor(s): for.inc
   //
   // for.inc:
   //   EMIT ir<%iv.next> = add nuw nsw ir<%iv>, ir<1>
   //   EMIT ir<%countable.cond> = icmp eq ir<%iv.next>, ir<20>
   //   EMIT vp<%index.next> = add nuw vp<%2>, vp<%0>
-  //   EMIT vp<%4> = any-of ir<%3>
+  //   EMIT vp<%4> = any-of ir<%uncountable.cond>
   //   EMIT vp<%5> = icmp eq vp<%index.next>, vp<%1>
   //   EMIT branch-on-two-conds vp<%4>, vp<%5>
   // Successor(s): middle.block, middle.block, for.body
@@ -3094,10 +3088,6 @@ getRecipesForUncountableExit(SmallVectorImpl<VPInstruction *> &Recipes,
         return nullptr;
       Recipes.push_back(cast<VPInstruction>(V->getDefiningRecipe()));
       Recipes.push_back(cast<VPInstruction>(GepR));
-    } else if (match(V, m_VPInstruction<VPInstruction::MaskedCond>(
-                            m_VPValue(Op1)))) {
-      Worklist.push_back(Op1);
-      Recipes.push_back(cast<VPInstruction>(V->getDefiningRecipe()));
     } else
       return nullptr;
   }
@@ -3115,6 +3105,9 @@ struct EarlyExitInfo {
   VPBasicBlock *EarlyExitingVPBB;
   VPIRBasicBlock *EarlyExitVPBB;
   VPValue *CondToExit;
+  /// The values incoming to EarlyExitVPBB's phis, in phi order, carried to the
+  /// latch by handleUncountableEarlyExits.
+  SmallVector<VPValue *, 2> IncomingFromExiting;
 };
 
 /// Update \p Plan to mask memory operations in the loop based on whether the
@@ -3128,7 +3121,6 @@ struct EarlyExitInfo {
 ///   EMIT ir<%arrayidx> = getelementptr inbounds nuw ir<@c>, ir<%indvars.iv>
 ///   EMIT-SCALAR ir<%0> = load ir<%arrayidx>
 ///   EMIT ir<%cmp1> = icmp sgt ir<%0>, ir<5>
-///   EMIT vp<%1> = masked-cond ir<%cmp1>
 /// Successor(s): if.end
 ///
 /// if.end:
@@ -3138,7 +3130,7 @@ struct EarlyExitInfo {
 ///   EMIT ir<%arrayidx5> = getelementptr inbounds nuw ir<@dst>, ir<%indvars.iv>
 ///   EMIT store ir<%add>, ir<%arrayidx5>
 ///   EMIT ir<%indvars.iv.next> = add nuw nsw ir<%indvars.iv>, ir<1>
-///   EMIT vp<%3> = any-of ir<%1>
+///   EMIT vp<%3> = any-of ir<%cmp1>
 ///   EMIT ir<%exitcond.not> = icmp eq ir<%indvars.iv.next>, ir<10000>
 ///   EMIT branch-on-two-conds vp<%3>, ir<%exitcond.not>
 /// Successor(s): middle.block, middle.block, for.body
@@ -3156,24 +3148,9 @@ struct EarlyExitInfo {
 ///   Improving upon this requires work in getRecipesForUncountableExit to
 ///   handle more complex recipe graphs.
 static bool handleUncountableExitsWithSideEffects(
-    VPlan &Plan, SmallVectorImpl<EarlyExitInfo> &Exits,
-    VPBasicBlock *HeaderVPBB, VPBasicBlock *LatchVPBB, VPBasicBlock *MiddleVPBB,
-    Loop *TheLoop, PredicatedScalarEvolution &PSE, DominatorTree &DT,
-    AssumptionCache *AC) {
-
-  // Disconnect early exiting blocks from successors, remove branches. We
-  // currently don't support multiple uses for recipes involved in creating
-  // the uncountable exit condition.
-  for (auto &Exit : Exits) {
-    if (Exit.EarlyExitingVPBB == LatchVPBB)
-      continue;
-
-    for (VPRecipeBase &R : Exit.EarlyExitVPBB->phis())
-      cast<VPIRPhi>(&R)->removeIncomingValueFor(Exit.EarlyExitingVPBB);
-    Exit.EarlyExitingVPBB->getTerminator()->eraseFromParent();
-    VPBlockUtils::disconnectBlocks(Exit.EarlyExitingVPBB, Exit.EarlyExitVPBB);
-  }
-
+    VPlan &Plan, VPBasicBlock *HeaderVPBB, VPBasicBlock *LatchVPBB,
+    VPBasicBlock *MiddleVPBB, Loop *TheLoop, PredicatedScalarEvolution &PSE,
+    DominatorTree &DT, AssumptionCache *AC) {
   VPDominatorTree VPDT(Plan);
 
   // We can abandon a VPlan entirely if we return false here, so we shouldn't
@@ -3298,6 +3275,36 @@ static bool handleUncountableExitsWithSideEffects(
   return true;
 }
 
+/// Carry \p V, which is available at the end of \p FromVPBB, to the end of the
+/// loop latch, taking \p Absent on any path that does not go through
+/// \p FromVPBB. \p BodyRPO must list the blocks of the loop body in reverse
+/// post-order, starting at the header and ending at the latch. As the body is
+/// acyclic apart from the backedge, a single sweep tracking the value that
+/// reaches each block, adding a phi wherever a block's predecessors disagree,
+/// is enough. No phi is added if \p FromVPBB dominates the latch.
+static VPValue *carryToLatch(VPValue *V, VPValue *Absent,
+                             VPBasicBlock *FromVPBB,
+                             ArrayRef<VPBasicBlock *> BodyRPO) {
+  DenseMap<const VPBlockBase *, VPValue *> Reaching;
+  Reaching[FromVPBB] = V;
+  for (VPBasicBlock *VPBB : BodyRPO) {
+    if (VPBB == FromVPBB)
+      continue;
+    // A predecessor with no entry has not gone through FromVPBB. This covers
+    // the preheader and the backedge, neither of which is in BodyRPO, as well
+    // as any block FromVPBB does not reach.
+    SmallVector<VPValue *, 2> Incoming;
+    for (VPBlockBase *Pred : VPBB->getPredecessors())
+      Incoming.push_back(Reaching.lookup_or(Pred, Absent));
+    assert(!Incoming.empty() && "a block in the loop must have predecessors");
+    Reaching[VPBB] = all_equal(Incoming)
+                         ? Incoming[0]
+                         : VPBuilder(VPBB, VPBB->begin())
+                               .createScalarPhi(Incoming);
+  }
+  return Reaching.lookup(BodyRPO.back());
+}
+
 bool VPlanTransforms::handleUncountableEarlyExits(
     VPlan &Plan, Loop *TheLoop, PredicatedScalarEvolution &PSE,
     DominatorTree &DT, AssumptionCache *AC, UncountableExitStyle Style) {
@@ -3319,44 +3326,52 @@ bool VPlanTransforms::handleUncountableEarlyExits(
   SmallVector<EarlyExitInfo> Exits;
   for (auto [EarlyExitingVPBB, ExitBlock] :
        vputils::getEarlyExits(Plan, MiddleVPBB)) {
-    // Collect condition for this early exit.
-    VPBlockBase *TrueSucc = EarlyExitingVPBB->getSuccessors()[0];
-    VPValue *CondOfEarlyExitingVPBB;
+    // Collect the condition under which this early exit is taken.
+    VPValue *CondToExit;
     [[maybe_unused]] bool Matched =
         match(EarlyExitingVPBB->getTerminator(),
-              m_BranchOnCond(m_VPValue(CondOfEarlyExitingVPBB)));
+              m_BranchOnCond(m_VPValue(CondToExit)));
     assert(Matched && "Terminator must be BranchOnCond");
+    if (EarlyExitingVPBB->getSuccessors()[0] != ExitBlock)
+      CondToExit =
+          VPBuilder(EarlyExitingVPBB->getTerminator()).createNot(CondToExit);
 
-    // Insert the MaskedCond in the EarlyExitingVPBB so the predicator adds
-    // the correct block mask.
-    VPBuilder EarlyExitingBuilder(EarlyExitingVPBB->getTerminator());
-    auto *CondToEarlyExit = EarlyExitingBuilder.createNaryOp(
-        VPInstruction::MaskedCond,
-        TrueSucc == ExitBlock
-            ? CondOfEarlyExitingVPBB
-            : EarlyExitingBuilder.createNot(CondOfEarlyExitingVPBB));
-    assert((isa<VPIRValue>(CondOfEarlyExitingVPBB) ||
-            !VPDT.properlyDominates(EarlyExitingVPBB, LatchVPBB) ||
-            VPDT.properlyDominates(
-                CondOfEarlyExitingVPBB->getDefiningRecipe()->getParent(),
-                LatchVPBB)) &&
-           "exit condition must dominate the latch");
-    Exits.push_back({
-        EarlyExitingVPBB,
-        ExitBlock,
-        CondToEarlyExit,
-    });
+    // Detach the exit edge and drop the branch, so the exiting block's
+    // remaining in-loop edge becomes unconditional. The mask predication
+    // computes for that edge is then the mask the block executes under.
+    SmallVector<VPValue *, 2> IncomingFromExiting;
+    for (VPRecipeBase &R : ExitBlock->phis()) {
+      auto *ExitIRI = cast<VPIRPhi>(&R);
+      IncomingFromExiting.push_back(
+          ExitIRI->getIncomingValueForBlock(EarlyExitingVPBB));
+      ExitIRI->removeIncomingValueFor(EarlyExitingVPBB);
+    }
+    EarlyExitingVPBB->getTerminator()->eraseFromParent();
+    VPBlockUtils::disconnectBlocks(EarlyExitingVPBB, ExitBlock);
+
+    Exits.push_back({EarlyExitingVPBB, ExitBlock, CondToExit,
+                     std::move(IncomingFromExiting)});
   }
 
   assert(!Exits.empty() && "must have at least one early exit");
+  // Collect the loop body in reverse post-order, from the header up to and
+  // including the latch. All early-exit edges have been detached above, so the
+  // latch is the last body block reachable from the header, and RPO is a
+  // topological order of the body.
+  ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>> RPOT(
+      HeaderVPBB);
+  SmallVector<VPBasicBlock *> BodyRPO;
+  DenseMap<const VPBlockBase *, unsigned> RPOIdx;
+  for (VPBlockBase *VPB : RPOT) {
+    RPOIdx[VPB] = BodyRPO.size();
+    BodyRPO.push_back(cast<VPBasicBlock>(VPB));
+    if (VPB == LatchVPBB)
+      break;
+  }
+
   // Sort exits by RPO order to get correct program order. RPO gives a
   // topological ordering of the CFG, ensuring upstream exits are checked
   // before downstream exits in the dispatch chain.
-  ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>> RPOT(
-      HeaderVPBB);
-  DenseMap<VPBlockBase *, unsigned> RPOIdx;
-  for (const auto &[Num, VPB] : enumerate(RPOT))
-    RPOIdx[VPB] = Num;
   llvm::sort(Exits, [&RPOIdx](const EarlyExitInfo &A, const EarlyExitInfo &B) {
     return RPOIdx[A.EarlyExitingVPBB] < RPOIdx[B.EarlyExitingVPBB];
   });
@@ -3370,6 +3385,31 @@ bool VPlanTransforms::handleUncountableEarlyExits(
                                      Exits[I].EarlyExitingVPBB) &&
              "RPO sort must place dominating exits before dominated ones");
 #endif
+
+  // Carry each exit condition to the latch, taking false on paths that do not
+  // reach the exiting block. Predication turns the phis added along the way
+  // into blends masked by the mask of the edges coming out of the exiting
+  // block, which is that block's own mask now its branch is gone, so the exit
+  // is taken only by lanes that reach the block and satisfy the condition.
+  // Using phis also keeps the plan valid, as a phi may take a value from a
+  // predecessor that does not dominate it, which the exiting block need not
+  // once the tail is folded.
+  //
+  // The values live out along the exit need no mask, only a definition that
+  // reaches the latch: they are extracted at the lane taking the exit, and
+  // that lane went through their defining block. So carry them from there,
+  // which leaves them as they are unless their definition does not already
+  // reach the latch.
+  for (EarlyExitInfo &Info : Exits) {
+    Info.CondToExit = carryToLatch(Info.CondToExit, Plan.getFalse(),
+                                   Info.EarlyExitingVPBB, BodyRPO);
+    for (VPValue *&V : Info.IncomingFromExiting) {
+      VPRecipeBase *Def = V->getDefiningRecipe();
+      if (Def && RPOIdx.contains(Def->getParent()))
+        V = carryToLatch(V, Plan.getPoison(V->getScalarType()),
+                         Def->getParent(), BodyRPO);
+    }
+  }
 
   // Build the AnyOf condition for the latch terminator using logical OR
   // to avoid poison propagation from later exit conditions when an earlier
@@ -3403,7 +3443,7 @@ bool VPlanTransforms::handleUncountableEarlyExits(
     MiddleVPBB->clearPredecessors();
     MiddleVPBB->setPredecessors({LatchVPBB, LatchVPBB});
     return handleUncountableExitsWithSideEffects(
-        Plan, Exits, HeaderVPBB, LatchVPBB, MiddleVPBB, TheLoop, PSE, DT, AC);
+        Plan, HeaderVPBB, LatchVPBB, MiddleVPBB, TheLoop, PSE, DT, AC);
   }
 
   // Create the vector.early.exit blocks.
@@ -3457,33 +3497,23 @@ bool VPlanTransforms::handleUncountableEarlyExits(
   //
   for (auto [Exit, VectorEarlyExitVPBB] :
        zip_equal(Exits, VectorEarlyExitVPBBs)) {
-    auto &[EarlyExitingVPBB, EarlyExitVPBB, _] = Exit;
-    // Adjust the phi nodes in EarlyExitVPBB.
-    //   1. remove incoming values from EarlyExitingVPBB,
-    //   2. extract the incoming value at FirstActiveLane
-    //   3. add back the extracts as last operands for the phis
-    // Then adjust the CFG, removing the edge between EarlyExitingVPBB and
-    // EarlyExitVPBB and adding a new edge between VectorEarlyExitVPBB and
-    // EarlyExitVPBB. The extracts at FirstActiveLane are now the incoming
-    // values from VectorEarlyExitVPBB.
-    for (VPRecipeBase &R : EarlyExitVPBB->phis()) {
-      auto *ExitIRI = cast<VPIRPhi>(&R);
-      VPValue *IncomingVal =
-          ExitIRI->getIncomingValueForBlock(EarlyExitingVPBB);
-      VPValue *NewIncoming = IncomingVal;
-      if (!isa<VPIRValue>(IncomingVal)) {
-        VPBuilder EarlyExitBuilder(VectorEarlyExitVPBB);
-        NewIncoming = EarlyExitBuilder.createNaryOp(
-            VPInstruction::ExtractLane, {FirstActiveLane, IncomingVal},
-            DebugLoc::getUnknown(), "early.exit.value");
-      }
-      ExitIRI->removeIncomingValueFor(EarlyExitingVPBB);
-      ExitIRI->addIncoming(NewIncoming);
+    // Add back the operands removed from the exit block's phis when the exit
+    // edge was detached, now incoming from VectorEarlyExitVPBB: extract each
+    // value carried to the latch at FirstActiveLane and add it as the phi's
+    // last operand. Then connect VectorEarlyExitVPBB to the exit block.
+    VPBuilder EarlyExitBuilder(VectorEarlyExitVPBB);
+    for (const auto &[R, IncomingVal] :
+         zip_equal(Exit.EarlyExitVPBB->phis(), Exit.IncomingFromExiting)) {
+      VPValue *NewIncoming =
+          isa<VPIRValue>(IncomingVal)
+              ? IncomingVal
+              : EarlyExitBuilder.createNaryOp(
+                    VPInstruction::ExtractLane, {FirstActiveLane, IncomingVal},
+                    DebugLoc::getUnknown(), "early.exit.value");
+      cast<VPIRPhi>(&R)->addIncoming(NewIncoming);
     }
 
-    EarlyExitingVPBB->getTerminator()->eraseFromParent();
-    VPBlockUtils::disconnectBlocks(EarlyExitingVPBB, EarlyExitVPBB);
-    VPBlockUtils::connectBlocks(VectorEarlyExitVPBB, EarlyExitVPBB);
+    VPBlockUtils::connectBlocks(VectorEarlyExitVPBB, Exit.EarlyExitVPBB);
   }
 
   // Chain through exits: for each exit, check if its condition is true at
