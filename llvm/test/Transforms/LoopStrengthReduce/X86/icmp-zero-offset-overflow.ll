@@ -49,7 +49,7 @@ define i16 @test2(i16 %arg1, i16 %arg2) {
 ; CHECK-LABEL: define i16 @test2(
 ; CHECK-SAME: i16 [[ARG1:%.*]], i16 [[ARG2:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = add i16 [[ARG2]], [[ARG1]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i16 [[ARG1]], [[ARG2]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = add i16 [[TMP0]], -1
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:

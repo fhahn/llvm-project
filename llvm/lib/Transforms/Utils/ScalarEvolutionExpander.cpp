@@ -547,12 +547,38 @@ Value *SCEVExpander::visitAddExpr(SCEVUseT<const SCEVAddExpr *> S) {
                                    {LHS, RHS});
   }
 
+  // Look for an existing value computing all but one operand and
+  // seed the sum with it.
+  SmallVector<SCEVUse, 8> RemainingOps(S->operands());
+  Value *ReusedSum = nullptr;
+  if (RemainingOps.size() > 2 &&
+      none_of(RemainingOps,
+              [](SCEVUse Op) { return Op->getType()->isPointerTy(); })) {
+    for (unsigned Idx = 0, E = RemainingOps.size(); Idx != E; ++Idx) {
+      SmallVector<SCEVUse, 8> SubOps(RemainingOps);
+      SCEVUse Dropped = SubOps[Idx];
+      SubOps.erase(SubOps.begin() + Idx);
+      SCEVUse Sub = SE.getAddExpr(SubOps);
+      // Only a sub-add that kept all its operands is a real subset; folding
+      // may have produced an expression unrelated to the operands dropped.
+      if (Sub->getSCEVType() != scAddExpr ||
+          cast<SCEVAddExpr>(Sub)->getNumOperands() != SubOps.size())
+        continue;
+      ReusedSum = findExistingExpansionAndDropPoisonFlags(
+          Sub, &*Builder.GetInsertPoint());
+      if (ReusedSum) {
+        RemainingOps = {Dropped};
+        break;
+      }
+    }
+  }
+
   // Collect all the add operands in a loop, along with their associated loops.
   // Iterate in reverse so that constants are emitted last, all else equal, and
   // so that pointer operands are inserted first, which the code below relies on
   // to form more involved GEPs.
   SmallVector<std::pair<const Loop *, const SCEV *>, 8> OpsAndLoops;
-  for (const SCEV *Op : reverse(S->operands()))
+  for (SCEVUse Op : reverse(RemainingOps))
     OpsAndLoops.push_back(std::make_pair(getRelevantLoop(Op), Op));
 
   // Sort by loop. Use a stable sort so that constants follow non-constants and
@@ -561,7 +587,7 @@ Value *SCEVExpander::visitAddExpr(SCEVUseT<const SCEVAddExpr *> S) {
 
   // Emit instructions to add all the operands. Hoist as much as possible
   // out of loops, and form meaningful getelementptrs where possible.
-  Value *Sum = nullptr;
+  Value *Sum = ReusedSum;
   for (auto I = OpsAndLoops.begin(), E = OpsAndLoops.end(); I != E;) {
     const Loop *CurLoop = I->first;
     const SCEV *Op = I->second;

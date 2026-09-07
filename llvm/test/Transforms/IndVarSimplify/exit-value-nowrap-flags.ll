@@ -140,14 +140,14 @@ define i32 @nuw_dropped_sum_flattened(i32 %a, i32 %b, i32 %n) {
 ; CHECK-LABEL: define i32 @nuw_dropped_sum_flattened(
 ; CHECK-SAME: i32 [[A:%.*]], i32 [[B:%.*]], i32 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[START:%.*]] = add i32 [[A]], [[B]]
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    br i1 true, label %[[EXIT:.*]], label %[[LATCH:.*]]
 ; CHECK:       [[LATCH]]:
 ; CHECK-NEXT:    br label %[[LOOP]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[N]], [[B]]
-; CHECK-NEXT:    [[TMP1:%.*]] = add i32 [[TMP0]], [[A]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i32 [[START]], [[N]]
 ; CHECK-NEXT:    ret i32 [[TMP1]]
 ;
 entry:

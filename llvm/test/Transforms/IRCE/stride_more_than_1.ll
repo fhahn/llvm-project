@@ -61,7 +61,7 @@ define void @test_01(ptr %arr, ptr %a_len_ptr) {
 ; CHECK-NEXT:    [[ADDR_POSTLOOP:%.*]] = getelementptr i32, ptr [[ARR]], i32 [[IDX_POSTLOOP]]
 ; CHECK-NEXT:    store i32 0, ptr [[ADDR_POSTLOOP]], align 4
 ; CHECK-NEXT:    [[NEXT_POSTLOOP:%.*]] = icmp slt i32 [[IDX_NEXT_POSTLOOP]], 100
-; CHECK-NEXT:    br i1 [[NEXT_POSTLOOP]], label [[LOOP_POSTLOOP]], label [[EXIT_LOOPEXIT:%.*]], !llvm.loop [[LOOP1:![0-9]+]], !loop_constrainer.loop.clone !6
+; CHECK-NEXT:    br i1 [[NEXT_POSTLOOP]], label [[LOOP_POSTLOOP]], label [[EXIT_LOOPEXIT:%.*]], !llvm.loop [[LOOP1:![0-9]+]], !loop_constrainer.loop.clone [[META6:![0-9]+]]
 ;
 
 entry:
@@ -137,7 +137,7 @@ define void @test_02(ptr %arr, ptr %a_len_ptr) {
 ; CHECK-NEXT:    [[ADDR_POSTLOOP:%.*]] = getelementptr i32, ptr [[ARR]], i32 [[IDX_POSTLOOP]]
 ; CHECK-NEXT:    store i32 0, ptr [[ADDR_POSTLOOP]], align 4
 ; CHECK-NEXT:    [[NEXT_POSTLOOP:%.*]] = icmp slt i32 [[IDX_NEXT_POSTLOOP]], 2147483640
-; CHECK-NEXT:    br i1 [[NEXT_POSTLOOP]], label [[LOOP_POSTLOOP]], label [[EXIT_LOOPEXIT:%.*]], !llvm.loop [[LOOP7:![0-9]+]], !loop_constrainer.loop.clone !6
+; CHECK-NEXT:    br i1 [[NEXT_POSTLOOP]], label [[LOOP_POSTLOOP]], label [[EXIT_LOOPEXIT:%.*]], !llvm.loop [[LOOP7:![0-9]+]], !loop_constrainer.loop.clone [[META6]]
 ;
 
 entry:
@@ -214,7 +214,7 @@ define void @test_03(ptr %arr, ptr %a_len_ptr) {
 ; CHECK-NEXT:    [[ADDR_POSTLOOP:%.*]] = getelementptr i32, ptr [[ARR]], i32 [[IDX_POSTLOOP]]
 ; CHECK-NEXT:    store i32 0, ptr [[ADDR_POSTLOOP]], align 4
 ; CHECK-NEXT:    [[NEXT_POSTLOOP:%.*]] = icmp slt i32 [[IDX_NEXT_POSTLOOP]], 2147483647
-; CHECK-NEXT:    br i1 [[NEXT_POSTLOOP]], label [[LOOP_POSTLOOP]], label [[EXIT_LOOPEXIT:%.*]], !llvm.loop [[LOOP9:![0-9]+]], !loop_constrainer.loop.clone !6
+; CHECK-NEXT:    br i1 [[NEXT_POSTLOOP]], label [[LOOP_POSTLOOP]], label [[EXIT_LOOPEXIT:%.*]], !llvm.loop [[LOOP9:![0-9]+]], !loop_constrainer.loop.clone [[META6]]
 ;
 
 entry:
@@ -292,7 +292,7 @@ define void @test_04(ptr %arr, ptr %a_len_ptr) {
 ; CHECK-NEXT:    [[ADDR_POSTLOOP:%.*]] = getelementptr i32, ptr [[ARR]], i32 [[IDX_POSTLOOP]]
 ; CHECK-NEXT:    store i32 0, ptr [[ADDR_POSTLOOP]], align 4
 ; CHECK-NEXT:    [[NEXT_POSTLOOP:%.*]] = icmp slt i32 [[IDX_NEXT_POSTLOOP]], 2147483647
-; CHECK-NEXT:    br i1 [[NEXT_POSTLOOP]], label [[LOOP_POSTLOOP]], label [[EXIT_LOOPEXIT:%.*]], !llvm.loop [[LOOP11:![0-9]+]], !loop_constrainer.loop.clone !6
+; CHECK-NEXT:    br i1 [[NEXT_POSTLOOP]], label [[LOOP_POSTLOOP]], label [[EXIT_LOOPEXIT:%.*]], !llvm.loop [[LOOP11:![0-9]+]], !loop_constrainer.loop.clone [[META6]]
 ;
 
 
@@ -363,7 +363,7 @@ define void @test_05(ptr %arr, ptr %a_len_ptr) {
 ; CHECK-NEXT:    store i32 0, ptr [[ADDR_PRELOOP]], align 4
 ; CHECK-NEXT:    [[NEXT_PRELOOP:%.*]] = icmp sgt i32 [[IDX_NEXT_PRELOOP]], -1
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp sgt i32 [[IDX_NEXT_PRELOOP]], [[EXIT_PRELOOP_AT]]
-; CHECK-NEXT:    br i1 [[TMP1]], label [[LOOP_PRELOOP]], label [[PRELOOP_EXIT_SELECTOR:%.*]], !llvm.loop [[LOOP12:![0-9]+]], !loop_constrainer.loop.clone !6
+; CHECK-NEXT:    br i1 [[TMP1]], label [[LOOP_PRELOOP]], label [[PRELOOP_EXIT_SELECTOR:%.*]], !llvm.loop [[LOOP12:![0-9]+]], !loop_constrainer.loop.clone [[META6]]
 ; CHECK:       preloop.exit.selector:
 ; CHECK-NEXT:    [[IDX_NEXT_PRELOOP_LCSSA:%.*]] = phi i32 [ [[IDX_NEXT_PRELOOP]], [[IN_BOUNDS_PRELOOP]] ]
 ; CHECK-NEXT:    [[TMP2:%.*]] = icmp sgt i32 [[IDX_NEXT_PRELOOP_LCSSA]], -1
@@ -440,7 +440,7 @@ define void @test_06(ptr %arr, ptr %a_len_ptr) {
 ; CHECK-NEXT:    store i32 0, ptr [[ADDR_PRELOOP]], align 4
 ; CHECK-NEXT:    [[NEXT_PRELOOP:%.*]] = icmp ugt i32 [[IDX_NEXT_PRELOOP]], 6
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[IDX_NEXT_PRELOOP]], [[EXIT_PRELOOP_AT]]
-; CHECK-NEXT:    br i1 [[TMP1]], label [[LOOP_PRELOOP]], label [[PRELOOP_EXIT_SELECTOR:%.*]], !llvm.loop [[LOOP14:![0-9]+]], !loop_constrainer.loop.clone !6
+; CHECK-NEXT:    br i1 [[TMP1]], label [[LOOP_PRELOOP]], label [[PRELOOP_EXIT_SELECTOR:%.*]], !llvm.loop [[LOOP14:![0-9]+]], !loop_constrainer.loop.clone [[META6]]
 ; CHECK:       preloop.exit.selector:
 ; CHECK-NEXT:    [[IDX_NEXT_PRELOOP_LCSSA:%.*]] = phi i32 [ [[IDX_NEXT_PRELOOP]], [[IN_BOUNDS_PRELOOP]] ]
 ; CHECK-NEXT:    [[TMP2:%.*]] = icmp ugt i32 [[IDX_NEXT_PRELOOP_LCSSA]], 6
@@ -564,7 +564,7 @@ define void @test_08(ptr %arr, ptr %a_len_ptr) {
 ; CHECK-NEXT:    store i32 0, ptr [[ADDR_PRELOOP]], align 4
 ; CHECK-NEXT:    [[NEXT_PRELOOP:%.*]] = icmp ugt i32 [[IDX_NEXT_PRELOOP]], 6
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[IDX_NEXT_PRELOOP]], [[EXIT_PRELOOP_AT]]
-; CHECK-NEXT:    br i1 [[TMP1]], label [[LOOP_PRELOOP]], label [[PRELOOP_EXIT_SELECTOR:%.*]], !llvm.loop [[LOOP15:![0-9]+]], !loop_constrainer.loop.clone !6
+; CHECK-NEXT:    br i1 [[TMP1]], label [[LOOP_PRELOOP]], label [[PRELOOP_EXIT_SELECTOR:%.*]], !llvm.loop [[LOOP15:![0-9]+]], !loop_constrainer.loop.clone [[META6]]
 ; CHECK:       preloop.exit.selector:
 ; CHECK-NEXT:    [[IDX_NEXT_PRELOOP_LCSSA:%.*]] = phi i32 [ [[IDX_NEXT_PRELOOP]], [[IN_BOUNDS_PRELOOP]] ]
 ; CHECK-NEXT:    [[TMP2:%.*]] = icmp ugt i32 [[IDX_NEXT_PRELOOP_LCSSA]], 6
@@ -614,18 +614,17 @@ define i32 @test_09(ptr %p, ptr %capacity_p, ptr %num_elements_p) {
 ; CHECK-NEXT:    [[CAPACITY:%.*]] = load i32, ptr [[CAPACITY_P]], align 4, !range [[RNG16:![0-9]+]]
 ; CHECK-NEXT:    [[NUM_ELEMENTS:%.*]] = load i32, ptr [[NUM_ELEMENTS_P]], align 4, !range [[RNG16]]
 ; CHECK-NEXT:    [[LIMIT:%.*]] = sub i32 [[CAPACITY]], 3
-; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[CAPACITY]], -3
-; CHECK-NEXT:    [[TMP1:%.*]] = add nuw i32 [[CAPACITY]], 2147483646
-; CHECK-NEXT:    [[SMAX:%.*]] = call i32 @llvm.smax.i32(i32 [[TMP1]], i32 0)
-; CHECK-NEXT:    [[TMP2:%.*]] = sub i32 [[TMP0]], [[SMAX]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add nuw i32 [[CAPACITY]], 2147483646
+; CHECK-NEXT:    [[SMAX:%.*]] = call i32 @llvm.smax.i32(i32 [[TMP0]], i32 0)
+; CHECK-NEXT:    [[TMP1:%.*]] = sub i32 [[LIMIT]], [[SMAX]]
 ; CHECK-NEXT:    [[SMIN:%.*]] = call i32 @llvm.smin.i32(i32 [[LIMIT]], i32 0)
 ; CHECK-NEXT:    [[SMAX2:%.*]] = call i32 @llvm.smax.i32(i32 [[SMIN]], i32 -1)
-; CHECK-NEXT:    [[TMP3:%.*]] = add nsw i32 [[SMAX2]], 1
-; CHECK-NEXT:    [[TMP4:%.*]] = mul i32 [[TMP2]], [[TMP3]]
-; CHECK-NEXT:    [[SMIN3:%.*]] = call i32 @llvm.smin.i32(i32 [[NUM_ELEMENTS]], i32 [[TMP4]])
+; CHECK-NEXT:    [[TMP2:%.*]] = add nsw i32 [[SMAX2]], 1
+; CHECK-NEXT:    [[TMP3:%.*]] = mul i32 [[TMP1]], [[TMP2]]
+; CHECK-NEXT:    [[SMIN3:%.*]] = call i32 @llvm.smin.i32(i32 [[NUM_ELEMENTS]], i32 [[TMP3]])
 ; CHECK-NEXT:    [[EXIT_MAINLOOP_AT:%.*]] = call i32 @llvm.smax.i32(i32 [[SMIN3]], i32 0)
-; CHECK-NEXT:    [[TMP5:%.*]] = icmp slt i32 0, [[EXIT_MAINLOOP_AT]]
-; CHECK-NEXT:    br i1 [[TMP5]], label [[LOOP_PREHEADER:%.*]], label [[MAIN_PSEUDO_EXIT:%.*]]
+; CHECK-NEXT:    [[TMP4:%.*]] = icmp slt i32 0, [[EXIT_MAINLOOP_AT]]
+; CHECK-NEXT:    br i1 [[TMP4]], label [[LOOP_PREHEADER:%.*]], label [[MAIN_PSEUDO_EXIT:%.*]]
 ; CHECK:       loop.preheader:
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
@@ -638,13 +637,13 @@ define i32 @test_09(ptr %p, ptr %capacity_p, ptr %num_elements_p) {
 ; CHECK-NEXT:    store i32 1, ptr [[EL_PTR]], align 4
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i32 [[IV]], 4
 ; CHECK-NEXT:    [[LOOP_COND:%.*]] = icmp slt i32 [[IV_NEXT]], [[NUM_ELEMENTS]]
-; CHECK-NEXT:    [[TMP6:%.*]] = icmp slt i32 [[IV_NEXT]], [[EXIT_MAINLOOP_AT]]
-; CHECK-NEXT:    br i1 [[TMP6]], label [[LOOP]], label [[MAIN_EXIT_SELECTOR:%.*]]
+; CHECK-NEXT:    [[TMP5:%.*]] = icmp slt i32 [[IV_NEXT]], [[EXIT_MAINLOOP_AT]]
+; CHECK-NEXT:    br i1 [[TMP5]], label [[LOOP]], label [[MAIN_EXIT_SELECTOR:%.*]]
 ; CHECK:       main.exit.selector:
 ; CHECK-NEXT:    [[IV_NEXT_LCSSA:%.*]] = phi i32 [ [[IV_NEXT]], [[BACKEDGE]] ]
 ; CHECK-NEXT:    [[IV_LCSSA:%.*]] = phi i32 [ [[IV]], [[BACKEDGE]] ]
-; CHECK-NEXT:    [[TMP7:%.*]] = icmp slt i32 [[IV_NEXT_LCSSA]], [[NUM_ELEMENTS]]
-; CHECK-NEXT:    br i1 [[TMP7]], label [[MAIN_PSEUDO_EXIT]], label [[EXIT:%.*]]
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp slt i32 [[IV_NEXT_LCSSA]], [[NUM_ELEMENTS]]
+; CHECK-NEXT:    br i1 [[TMP6]], label [[MAIN_PSEUDO_EXIT]], label [[EXIT:%.*]]
 ; CHECK:       main.pseudo.exit:
 ; CHECK-NEXT:    [[IV_COPY:%.*]] = phi i32 [ 0, [[ENTRY:%.*]] ], [ [[IV_NEXT_LCSSA]], [[MAIN_EXIT_SELECTOR]] ]
 ; CHECK-NEXT:    [[INDVAR_END:%.*]] = phi i32 [ 0, [[ENTRY]] ], [ [[IV_NEXT_LCSSA]], [[MAIN_EXIT_SELECTOR]] ]
@@ -673,7 +672,7 @@ define i32 @test_09(ptr %p, ptr %capacity_p, ptr %num_elements_p) {
 ; CHECK-NEXT:    store i32 1, ptr [[EL_PTR_POSTLOOP]], align 4
 ; CHECK-NEXT:    [[IV_NEXT_POSTLOOP]] = add nuw nsw i32 [[IV_POSTLOOP]], 4
 ; CHECK-NEXT:    [[LOOP_COND_POSTLOOP:%.*]] = icmp slt i32 [[IV_NEXT_POSTLOOP]], [[NUM_ELEMENTS]]
-; CHECK-NEXT:    br i1 [[LOOP_COND_POSTLOOP]], label [[LOOP_POSTLOOP]], label [[EXIT_LOOPEXIT]], !llvm.loop [[LOOP18:![0-9]+]], !loop_constrainer.loop.clone !6
+; CHECK-NEXT:    br i1 [[LOOP_COND_POSTLOOP]], label [[LOOP_POSTLOOP]], label [[EXIT_LOOPEXIT]], !llvm.loop [[LOOP18:![0-9]+]], !loop_constrainer.loop.clone [[META6]]
 ;
 entry:
   %capacity = load i32, ptr %capacity_p, !range !4
@@ -710,18 +709,17 @@ define i32 @test_10(ptr %p, ptr %capacity_p, ptr %num_elements_p) {
 ; CHECK-NEXT:    [[CAPACITY:%.*]] = load i32, ptr [[CAPACITY_P]], align 4, !range [[RNG16]]
 ; CHECK-NEXT:    [[NUM_ELEMENTS:%.*]] = load i32, ptr [[NUM_ELEMENTS_P]], align 4, !range [[RNG16]]
 ; CHECK-NEXT:    [[LIMIT:%.*]] = sub i32 [[CAPACITY]], 3
-; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[CAPACITY]], -3
-; CHECK-NEXT:    [[TMP1:%.*]] = add nuw i32 [[CAPACITY]], 2147483646
-; CHECK-NEXT:    [[SMAX:%.*]] = call i32 @llvm.smax.i32(i32 [[TMP1]], i32 0)
-; CHECK-NEXT:    [[TMP2:%.*]] = sub i32 [[TMP0]], [[SMAX]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add nuw i32 [[CAPACITY]], 2147483646
+; CHECK-NEXT:    [[SMAX:%.*]] = call i32 @llvm.smax.i32(i32 [[TMP0]], i32 0)
+; CHECK-NEXT:    [[TMP1:%.*]] = sub i32 [[LIMIT]], [[SMAX]]
 ; CHECK-NEXT:    [[SMIN:%.*]] = call i32 @llvm.smin.i32(i32 [[LIMIT]], i32 0)
 ; CHECK-NEXT:    [[SMAX2:%.*]] = call i32 @llvm.smax.i32(i32 [[SMIN]], i32 -1)
-; CHECK-NEXT:    [[TMP3:%.*]] = add nsw i32 [[SMAX2]], 1
-; CHECK-NEXT:    [[TMP4:%.*]] = mul i32 [[TMP2]], [[TMP3]]
-; CHECK-NEXT:    [[SMIN3:%.*]] = call i32 @llvm.smin.i32(i32 [[NUM_ELEMENTS]], i32 [[TMP4]])
+; CHECK-NEXT:    [[TMP2:%.*]] = add nsw i32 [[SMAX2]], 1
+; CHECK-NEXT:    [[TMP3:%.*]] = mul i32 [[TMP1]], [[TMP2]]
+; CHECK-NEXT:    [[SMIN3:%.*]] = call i32 @llvm.smin.i32(i32 [[NUM_ELEMENTS]], i32 [[TMP3]])
 ; CHECK-NEXT:    [[EXIT_MAINLOOP_AT:%.*]] = call i32 @llvm.smax.i32(i32 [[SMIN3]], i32 0)
-; CHECK-NEXT:    [[TMP5:%.*]] = icmp slt i32 0, [[EXIT_MAINLOOP_AT]]
-; CHECK-NEXT:    br i1 [[TMP5]], label [[LOOP_PREHEADER:%.*]], label [[MAIN_PSEUDO_EXIT:%.*]]
+; CHECK-NEXT:    [[TMP4:%.*]] = icmp slt i32 0, [[EXIT_MAINLOOP_AT]]
+; CHECK-NEXT:    br i1 [[TMP4]], label [[LOOP_PREHEADER:%.*]], label [[MAIN_PSEUDO_EXIT:%.*]]
 ; CHECK:       loop.preheader:
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
@@ -734,13 +732,13 @@ define i32 @test_10(ptr %p, ptr %capacity_p, ptr %num_elements_p) {
 ; CHECK-NEXT:    store i32 1, ptr [[EL_PTR]], align 4
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i32 [[IV]], 4
 ; CHECK-NEXT:    [[LOOP_COND:%.*]] = icmp slt i32 [[IV_NEXT]], [[NUM_ELEMENTS]]
-; CHECK-NEXT:    [[TMP6:%.*]] = icmp slt i32 [[IV_NEXT]], [[EXIT_MAINLOOP_AT]]
-; CHECK-NEXT:    br i1 [[TMP6]], label [[LOOP]], label [[MAIN_EXIT_SELECTOR:%.*]]
+; CHECK-NEXT:    [[TMP5:%.*]] = icmp slt i32 [[IV_NEXT]], [[EXIT_MAINLOOP_AT]]
+; CHECK-NEXT:    br i1 [[TMP5]], label [[LOOP]], label [[MAIN_EXIT_SELECTOR:%.*]]
 ; CHECK:       main.exit.selector:
 ; CHECK-NEXT:    [[IV_NEXT_LCSSA:%.*]] = phi i32 [ [[IV_NEXT]], [[BACKEDGE]] ]
 ; CHECK-NEXT:    [[IV_LCSSA:%.*]] = phi i32 [ [[IV]], [[BACKEDGE]] ]
-; CHECK-NEXT:    [[TMP7:%.*]] = icmp slt i32 [[IV_NEXT_LCSSA]], [[NUM_ELEMENTS]]
-; CHECK-NEXT:    br i1 [[TMP7]], label [[MAIN_PSEUDO_EXIT]], label [[EXIT:%.*]]
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp slt i32 [[IV_NEXT_LCSSA]], [[NUM_ELEMENTS]]
+; CHECK-NEXT:    br i1 [[TMP6]], label [[MAIN_PSEUDO_EXIT]], label [[EXIT:%.*]]
 ; CHECK:       main.pseudo.exit:
 ; CHECK-NEXT:    [[IV_COPY:%.*]] = phi i32 [ 0, [[ENTRY:%.*]] ], [ [[IV_NEXT_LCSSA]], [[MAIN_EXIT_SELECTOR]] ]
 ; CHECK-NEXT:    [[INDVAR_END:%.*]] = phi i32 [ 0, [[ENTRY]] ], [ [[IV_NEXT_LCSSA]], [[MAIN_EXIT_SELECTOR]] ]
@@ -769,7 +767,7 @@ define i32 @test_10(ptr %p, ptr %capacity_p, ptr %num_elements_p) {
 ; CHECK-NEXT:    store i32 1, ptr [[EL_PTR_POSTLOOP]], align 4
 ; CHECK-NEXT:    [[IV_NEXT_POSTLOOP]] = add nuw nsw i32 [[IV_POSTLOOP]], 4
 ; CHECK-NEXT:    [[LOOP_COND_POSTLOOP:%.*]] = icmp slt i32 [[IV_NEXT_POSTLOOP]], [[NUM_ELEMENTS]]
-; CHECK-NEXT:    br i1 [[LOOP_COND_POSTLOOP]], label [[LOOP_POSTLOOP]], label [[EXIT_LOOPEXIT]], !llvm.loop [[LOOP19:![0-9]+]], !loop_constrainer.loop.clone !6
+; CHECK-NEXT:    br i1 [[LOOP_COND_POSTLOOP]], label [[LOOP_POSTLOOP]], label [[EXIT_LOOPEXIT]], !llvm.loop [[LOOP19:![0-9]+]], !loop_constrainer.loop.clone [[META6]]
 ;
 entry:
   %capacity = load i32, ptr %capacity_p, !range !4
@@ -866,7 +864,7 @@ define i32 @test_11(ptr %p, ptr %capacity_p, ptr %num_elements_p) {
 ; CHECK-NEXT:    store i32 1, ptr [[EL_PTR_POSTLOOP]], align 4
 ; CHECK-NEXT:    [[IV_NEXT_POSTLOOP]] = add nuw nsw i32 [[IV_POSTLOOP]], 4
 ; CHECK-NEXT:    [[LOOP_COND_POSTLOOP:%.*]] = icmp slt i32 [[IV_NEXT_POSTLOOP]], [[NUM_ELEMENTS]]
-; CHECK-NEXT:    br i1 [[LOOP_COND_POSTLOOP]], label [[LOOP_POSTLOOP]], label [[EXIT_LOOPEXIT]], !llvm.loop [[LOOP20:![0-9]+]], !loop_constrainer.loop.clone !6
+; CHECK-NEXT:    br i1 [[LOOP_COND_POSTLOOP]], label [[LOOP_POSTLOOP]], label [[EXIT_LOOPEXIT]], !llvm.loop [[LOOP20:![0-9]+]], !loop_constrainer.loop.clone [[META6]]
 ;
 entry:
   %capacity = load i32, ptr %capacity_p, !range !4
@@ -953,7 +951,7 @@ define i32 @binop_or_is_iv_base(ptr %p, i32 %end) {
 ; CHECK-NEXT:    [[IV_ADD_POSTLOOP]] = add i32 [[IV_POSTLOOP]], 8
 ; CHECK-NEXT:    [[IV_OR_POSTLOOP:%.*]] = or disjoint i32 [[IV_ADD_POSTLOOP]], 7
 ; CHECK-NEXT:    [[CMP_POSTLOOP:%.*]] = icmp slt i32 [[IV_OR_POSTLOOP]], [[END]]
-; CHECK-NEXT:    br i1 [[CMP_POSTLOOP]], label [[LOOP_HEADER_POSTLOOP]], label [[COMMON_RET_LOOPEXIT_LOOPEXIT:%.*]], !llvm.loop [[LOOP21:![0-9]+]], !loop_constrainer.loop.clone !6
+; CHECK-NEXT:    br i1 [[CMP_POSTLOOP]], label [[LOOP_HEADER_POSTLOOP]], label [[COMMON_RET_LOOPEXIT_LOOPEXIT:%.*]], !llvm.loop [[LOOP21:![0-9]+]], !loop_constrainer.loop.clone [[META6]]
 ;
 entry:
   %n = load atomic i32, ptr %p unordered, align 8, !range !1

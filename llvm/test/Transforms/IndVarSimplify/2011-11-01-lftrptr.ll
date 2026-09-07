@@ -158,8 +158,7 @@ define i8 @testnullptrint(ptr %buf, ptr %end) nounwind {
 ; PTR64-NEXT:    [[GUARD:%.*]] = icmp ult i32 0, [[CNT]]
 ; PTR64-NEXT:    br i1 [[GUARD]], label [[PREHEADER:%.*]], label [[EXIT:%.*]]
 ; PTR64:       preheader:
-; PTR64-NEXT:    [[TMP1:%.*]] = add i32 [[EI]], -1
-; PTR64-NEXT:    [[TMP2:%.*]] = sub i32 [[TMP1]], [[BI]]
+; PTR64-NEXT:    [[TMP2:%.*]] = add i32 [[CNT]], -1
 ; PTR64-NEXT:    [[TMP3:%.*]] = zext i32 [[TMP2]] to i64
 ; PTR64-NEXT:    [[TMP4:%.*]] = add nuw nsw i64 [[TMP3]], 1
 ; PTR64-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr null, i64 [[TMP4]]
