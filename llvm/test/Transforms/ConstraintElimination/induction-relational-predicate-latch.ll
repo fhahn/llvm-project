@@ -85,7 +85,7 @@ define void @stride2_slt_latch(i64 %n, i1 %header.ec) {
 ; CHECK-LABEL: define void @stride2_slt_latch(
 ; CHECK-SAME: i64 [[N:%.*]], i1 [[HEADER_EC:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    [[PRE:%.*]] = icmp sgt i64 [[N]], 0
+; CHECK-NEXT:    [[PRE:%.*]] = icmp samesign ugt i64 [[N]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[PRE]])
 ; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
 ; CHECK:       [[LOOP_HEADER]]:
@@ -94,7 +94,7 @@ define void @stride2_slt_latch(i64 %n, i1 %header.ec) {
 ; CHECK-NEXT:    br i1 [[HEADER_EC]], label %[[EXIT:.*]], label %[[LOOP_LATCH]]
 ; CHECK:       [[LOOP_LATCH]]:
 ; CHECK-NEXT:    [[IV_NEXT]] = add nsw i64 [[IV]], 2
-; CHECK-NEXT:    [[EC:%.*]] = icmp slt i64 [[IV_NEXT]], [[N]]
+; CHECK-NEXT:    [[EC:%.*]] = icmp samesign ult i64 [[IV_NEXT]], [[N]]
 ; CHECK-NEXT:    br i1 [[EC]], label %[[LOOP_HEADER]], label %[[EXIT]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void
@@ -123,15 +123,15 @@ define void @stride2_slt_header_is_latch(i64 %n) {
 ; CHECK-LABEL: define void @stride2_slt_header_is_latch(
 ; CHECK-SAME: i64 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    [[PRE:%.*]] = icmp sgt i64 [[N]], 0
+; CHECK-NEXT:    [[PRE:%.*]] = icmp samesign ugt i64 [[N]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[PRE]])
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
-; CHECK-NEXT:    [[C:%.*]] = icmp slt i64 [[IV]], [[N]]
+; CHECK-NEXT:    [[C:%.*]] = icmp samesign ult i64 [[IV]], [[N]]
 ; CHECK-NEXT:    call void @use(i1 [[C]])
 ; CHECK-NEXT:    [[IV_NEXT]] = add nsw i64 [[IV]], 2
-; CHECK-NEXT:    [[EC:%.*]] = icmp slt i64 [[IV_NEXT]], [[N]]
+; CHECK-NEXT:    [[EC:%.*]] = icmp samesign ult i64 [[IV_NEXT]], [[N]]
 ; CHECK-NEXT:    br i1 [[EC]], label %[[LOOP]], label %[[EXIT:.*]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void
@@ -157,7 +157,7 @@ define void @stride2_sge_latch(i64 %n, i1 %header.ec) {
 ; CHECK-LABEL: define void @stride2_sge_latch(
 ; CHECK-SAME: i64 [[N:%.*]], i1 [[HEADER_EC:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    [[PRE:%.*]] = icmp sgt i64 [[N]], 0
+; CHECK-NEXT:    [[PRE:%.*]] = icmp samesign ugt i64 [[N]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[PRE]])
 ; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
 ; CHECK:       [[LOOP_HEADER]]:
@@ -166,7 +166,7 @@ define void @stride2_sge_latch(i64 %n, i1 %header.ec) {
 ; CHECK-NEXT:    br i1 [[HEADER_EC]], label %[[EXIT:.*]], label %[[LOOP_LATCH]]
 ; CHECK:       [[LOOP_LATCH]]:
 ; CHECK-NEXT:    [[IV_NEXT]] = add nsw i64 [[IV]], 2
-; CHECK-NEXT:    [[EC:%.*]] = icmp sge i64 [[IV_NEXT]], [[N]]
+; CHECK-NEXT:    [[EC:%.*]] = icmp samesign uge i64 [[IV_NEXT]], [[N]]
 ; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP_HEADER]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void
@@ -196,18 +196,18 @@ define void @neg_compared_value_not_backedge(i64 %n, i1 %header.ec) {
 ; CHECK-LABEL: define void @neg_compared_value_not_backedge(
 ; CHECK-SAME: i64 [[N:%.*]], i1 [[HEADER_EC:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    [[PRE:%.*]] = icmp sgt i64 [[N]], 0
+; CHECK-NEXT:    [[PRE:%.*]] = icmp samesign ugt i64 [[N]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[PRE]])
 ; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
 ; CHECK:       [[LOOP_HEADER]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
-; CHECK-NEXT:    [[C:%.*]] = icmp slt i64 [[IV]], [[N]]
+; CHECK-NEXT:    [[C:%.*]] = icmp samesign ult i64 [[IV]], [[N]]
 ; CHECK-NEXT:    call void @use(i1 [[C]])
 ; CHECK-NEXT:    br i1 [[HEADER_EC]], label %[[EXIT:.*]], label %[[LOOP_LATCH]]
 ; CHECK:       [[LOOP_LATCH]]:
 ; CHECK-NEXT:    [[PROBE:%.*]] = add nsw i64 [[IV]], 2
 ; CHECK-NEXT:    [[IV_NEXT]] = add nsw i64 [[IV]], 4
-; CHECK-NEXT:    [[EC:%.*]] = icmp slt i64 [[PROBE]], [[N]]
+; CHECK-NEXT:    [[EC:%.*]] = icmp samesign ult i64 [[PROBE]], [[N]]
 ; CHECK-NEXT:    br i1 [[EC]], label %[[LOOP_HEADER]], label %[[EXIT]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void
@@ -275,7 +275,7 @@ define void @negative_start_unsigned_precondition_blocks(i64 %n, i1 %header.ec) 
 ; CHECK-LABEL: define void @negative_start_unsigned_precondition_blocks(
 ; CHECK-SAME: i64 [[N:%.*]], i1 [[HEADER_EC:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    [[PRE:%.*]] = icmp sgt i64 [[N]], 0
+; CHECK-NEXT:    [[PRE:%.*]] = icmp samesign ugt i64 [[N]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[PRE]])
 ; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
 ; CHECK:       [[LOOP_HEADER]]:
@@ -429,7 +429,7 @@ define void @stride2_sle_latch(i64 %n, i1 %header.ec) {
 ; CHECK-LABEL: define void @stride2_sle_latch(
 ; CHECK-SAME: i64 [[N:%.*]], i1 [[HEADER_EC:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    [[PRE:%.*]] = icmp sge i64 [[N]], 0
+; CHECK-NEXT:    [[PRE:%.*]] = icmp samesign uge i64 [[N]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[PRE]])
 ; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
 ; CHECK:       [[LOOP_HEADER]]:
@@ -438,7 +438,7 @@ define void @stride2_sle_latch(i64 %n, i1 %header.ec) {
 ; CHECK-NEXT:    br i1 [[HEADER_EC]], label %[[EXIT:.*]], label %[[LOOP_LATCH]]
 ; CHECK:       [[LOOP_LATCH]]:
 ; CHECK-NEXT:    [[IV_NEXT]] = add nsw i64 [[IV]], 2
-; CHECK-NEXT:    [[EC:%.*]] = icmp sle i64 [[IV_NEXT]], [[N]]
+; CHECK-NEXT:    [[EC:%.*]] = icmp samesign ule i64 [[IV_NEXT]], [[N]]
 ; CHECK-NEXT:    br i1 [[EC]], label %[[LOOP_HEADER]], label %[[EXIT]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void
@@ -467,7 +467,7 @@ define void @unsigned_latch_signed_fact(i64 %n, i1 %header.ec) {
 ; CHECK-LABEL: define void @unsigned_latch_signed_fact(
 ; CHECK-SAME: i64 [[N:%.*]], i1 [[HEADER_EC:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    [[PRE:%.*]] = icmp sgt i64 [[N]], 0
+; CHECK-NEXT:    [[PRE:%.*]] = icmp samesign ugt i64 [[N]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[PRE]])
 ; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
 ; CHECK:       [[LOOP_HEADER]]:
@@ -545,7 +545,7 @@ define void @neg_decreasing_no_unsigned_fact(i64 %n, i1 %header.ec) {
 ; CHECK-LABEL: define void @neg_decreasing_no_unsigned_fact(
 ; CHECK-SAME: i64 [[N:%.*]], i1 [[HEADER_EC:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    [[PRE:%.*]] = icmp sgt i64 [[N]], 0
+; CHECK-NEXT:    [[PRE:%.*]] = icmp samesign ugt i64 [[N]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[PRE]])
 ; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
 ; CHECK:       [[LOOP_HEADER]]:
@@ -586,7 +586,7 @@ define void @commuted_compare(i64 %n, i1 %header.ec) {
 ; CHECK-LABEL: define void @commuted_compare(
 ; CHECK-SAME: i64 [[N:%.*]], i1 [[HEADER_EC:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    [[PRE:%.*]] = icmp sgt i64 [[N]], 0
+; CHECK-NEXT:    [[PRE:%.*]] = icmp samesign ugt i64 [[N]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[PRE]])
 ; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
 ; CHECK:       [[LOOP_HEADER]]:
@@ -595,7 +595,7 @@ define void @commuted_compare(i64 %n, i1 %header.ec) {
 ; CHECK-NEXT:    br i1 [[HEADER_EC]], label %[[EXIT:.*]], label %[[LOOP_LATCH]]
 ; CHECK:       [[LOOP_LATCH]]:
 ; CHECK-NEXT:    [[IV_NEXT]] = add nsw i64 [[IV]], 2
-; CHECK-NEXT:    [[EC:%.*]] = icmp sgt i64 [[N]], [[IV_NEXT]]
+; CHECK-NEXT:    [[EC:%.*]] = icmp samesign ugt i64 [[N]], [[IV_NEXT]]
 ; CHECK-NEXT:    br i1 [[EC]], label %[[LOOP_HEADER]], label %[[EXIT]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void

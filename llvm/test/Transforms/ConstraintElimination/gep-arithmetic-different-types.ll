@@ -55,7 +55,7 @@ define i1 @gep_constant_positive_index_chained(ptr %A, ptr %upper) {
 
 define i1 @gep_var_positive_index(ptr %A, ptr %upper, i8 %idx) {
 ; CHECK-LABEL: @gep_var_positive_index(
-; CHECK-NEXT:    [[IDX_POS:%.*]] = icmp sge i8 [[IDX:%.*]], 0
+; CHECK-NEXT:    [[IDX_POS:%.*]] = icmp samesign uge i8 [[IDX:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[IDX_POS]])
 ; CHECK-NEXT:    [[ADD_I16_IDX:%.*]] = getelementptr inbounds i16, ptr [[A:%.*]], i8 [[IDX]]
 ; CHECK-NEXT:    [[C_0:%.*]] = icmp ult ptr [[ADD_I16_IDX]], [[UPPER:%.*]]
@@ -82,7 +82,7 @@ define i1 @gep_var_positive_index(ptr %A, ptr %upper, i8 %idx) {
 
 define i1 @gep_add_nsw_positive_index(ptr %A, ptr %upper, i8 %idx) {
 ; CHECK-LABEL: @gep_add_nsw_positive_index(
-; CHECK-NEXT:    [[IDX_POS:%.*]] = icmp sge i8 [[IDX:%.*]], 0
+; CHECK-NEXT:    [[IDX_POS:%.*]] = icmp samesign uge i8 [[IDX:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[IDX_POS]])
 ; CHECK-NEXT:    [[IDX_3:%.*]] = add nsw i8 [[IDX]], 3
 ; CHECK-NEXT:    [[ADD_I8_IDX_3:%.*]] = getelementptr inbounds i8, ptr [[A:%.*]], i8 [[IDX_3]]
@@ -121,7 +121,7 @@ define i1 @gep_add_nsw_positive_index(ptr %A, ptr %upper, i8 %idx) {
 
 define i1 @gep_shl_nsw_positive_index(ptr %A, ptr %upper, i8 %idx) {
 ; CHECK-LABEL: @gep_shl_nsw_positive_index(
-; CHECK-NEXT:    [[IDX_POS:%.*]] = icmp sge i8 [[IDX:%.*]], 0
+; CHECK-NEXT:    [[IDX_POS:%.*]] = icmp samesign uge i8 [[IDX:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[IDX_POS]])
 ; CHECK-NEXT:    [[IDX_2:%.*]] = shl nuw nsw i8 [[IDX]], 2
 ; CHECK-NEXT:    [[ADD_I8_IDX_2:%.*]] = getelementptr inbounds i8, ptr [[A:%.*]], i8 [[IDX_2]]
@@ -315,7 +315,7 @@ define i1 @gep_zext_shl_nsw_index(ptr %A, ptr %upper, i8 %idx) {
 
 define i1 @gep_zext_shl_nuw_index(ptr %A, ptr %upper, i8 %idx) {
 ; CHECK-LABEL: @gep_zext_shl_nuw_index(
-; CHECK-NEXT:    [[IDX_POS:%.*]] = icmp sgt i8 [[IDX:%.*]], 0
+; CHECK-NEXT:    [[IDX_POS:%.*]] = icmp samesign ugt i8 [[IDX:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[IDX_POS]])
 ; CHECK-NEXT:    [[IDX_2:%.*]] = shl nuw i8 [[IDX]], 2
 ; CHECK-NEXT:    [[IDX_2_EXT:%.*]] = zext i8 [[IDX_2]] to i16
@@ -352,7 +352,7 @@ define i1 @gep_zext_shl_nuw_index(ptr %A, ptr %upper, i8 %idx) {
 
 define i1 @gep_add_nsw_positive_index_struct(ptr %A, ptr %upper, i8 %idx) {
 ; CHECK-LABEL: @gep_add_nsw_positive_index_struct(
-; CHECK-NEXT:    [[IDX_POS:%.*]] = icmp sge i8 [[IDX:%.*]], 0
+; CHECK-NEXT:    [[IDX_POS:%.*]] = icmp samesign uge i8 [[IDX:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[IDX_POS]])
 ; CHECK-NEXT:    [[IDX_3:%.*]] = add nsw i8 [[IDX]], 2
 ; CHECK-NEXT:    [[ADD_I8_IDX_3:%.*]] = getelementptr inbounds [[STRUCT_T:%.*]], ptr [[A:%.*]], i8 [[IDX_3]]

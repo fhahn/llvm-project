@@ -9,8 +9,8 @@ define i1 @len_known_positive_via_idx_1(i8 %len, i8 %idx) {
 ; CHECK-NEXT:    [[AND_1:%.*]] = and i1 [[IDX_POS]], [[IDX_SLT_LEN]]
 ; CHECK-NEXT:    br i1 [[AND_1]], label [[THEN_1:%.*]], label [[ELSE:%.*]]
 ; CHECK:       then.1:
-; CHECK-NEXT:    [[C_1:%.*]] = icmp sge i8 [[LEN]], 2
-; CHECK-NEXT:    [[C_2:%.*]] = icmp sge i8 [[LEN]], 2
+; CHECK-NEXT:    [[C_1:%.*]] = icmp samesign uge i8 [[LEN]], 2
+; CHECK-NEXT:    [[C_2:%.*]] = icmp samesign uge i8 [[LEN]], 2
 ; CHECK-NEXT:    [[RES_1:%.*]] = xor i1 true, true
 ; CHECK-NEXT:    [[RES_2:%.*]] = xor i1 [[RES_1]], [[C_1]]
 ; CHECK-NEXT:    [[RES_3:%.*]] = xor i1 [[RES_2]], [[C_2]]
@@ -46,8 +46,8 @@ define i1 @len_known_positive_via_idx_2(i8 %len, i8 %idx) {
 ; CHECK-NEXT:    [[AND_1:%.*]] = and i1 [[IDX_SLT_LEN]], [[IDX_POS]]
 ; CHECK-NEXT:    br i1 [[AND_1]], label [[THEN_1:%.*]], label [[ELSE:%.*]]
 ; CHECK:       then.1:
-; CHECK-NEXT:    [[C_1:%.*]] = icmp sge i8 [[LEN]], 2
-; CHECK-NEXT:    [[C_2:%.*]] = icmp sge i8 [[LEN]], 2
+; CHECK-NEXT:    [[C_1:%.*]] = icmp samesign uge i8 [[LEN]], 2
+; CHECK-NEXT:    [[C_2:%.*]] = icmp samesign uge i8 [[LEN]], 2
 ; CHECK-NEXT:    [[RES_1:%.*]] = xor i1 true, true
 ; CHECK-NEXT:    [[RES_2:%.*]] = xor i1 [[RES_1]], [[C_1]]
 ; CHECK-NEXT:    [[RES_3:%.*]] = xor i1 [[RES_2]], [[C_2]]
@@ -262,7 +262,7 @@ else:
 define i1 @cnt_positive_sge_against_base_with_zext(ptr %p, i32 %cnt) {
 ; CHECK-LABEL: @cnt_positive_sge_against_base_with_zext(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[CMP:%.*]] = icmp sge i32 [[CNT:%.*]], 0
+; CHECK-NEXT:    [[CMP:%.*]] = icmp samesign uge i32 [[CNT:%.*]], 0
 ; CHECK-NEXT:    tail call void @llvm.assume(i1 [[CMP]])
 ; CHECK-NEXT:    [[EXT:%.*]] = zext i32 [[CNT]] to i64
 ; CHECK-NEXT:    [[ADD_PTR:%.*]] = getelementptr inbounds i32, ptr [[P:%.*]], i64 [[EXT]]
@@ -474,7 +474,7 @@ else:
 define i1 @sge_2(i8 %idx) {
 ; CHECK-LABEL: @sge_2(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[CMP:%.*]] = icmp sge i8 [[IDX:%.*]], 2
+; CHECK-NEXT:    [[CMP:%.*]] = icmp samesign uge i8 [[IDX:%.*]], 2
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[CMP]])
 ; CHECK-NEXT:    [[RES_1:%.*]] = xor i1 true, true
 ; CHECK-NEXT:    [[C_1:%.*]] = icmp uge i8 [[IDX]], 3
@@ -500,7 +500,7 @@ define i32 @sge_2_gep(i32 %idx, ptr %src, i32 %idx.2) {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[IDX_EXT:%.*]] = sext i32 [[IDX:%.*]] to i64
 ; CHECK-NEXT:    [[ADD_PTR:%.*]] = getelementptr inbounds i32, ptr [[SRC:%.*]], i64 [[IDX_EXT]]
-; CHECK-NEXT:    [[CMP:%.*]] = icmp sge i32 [[IDX]], 2
+; CHECK-NEXT:    [[CMP:%.*]] = icmp samesign uge i32 [[IDX]], 2
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[CMP]])
 ; CHECK-NEXT:    [[ADD_PTR_2:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i32 [[IDX_2:%.*]]
 ; CHECK-NEXT:    [[C_1:%.*]] = icmp ult ptr [[SRC]], [[ADD_PTR_2]]
@@ -557,7 +557,7 @@ entry:
 define i1 @sgt_known_pos(i8 %idx) {
 ; CHECK-LABEL: @sgt_known_pos(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[CMP:%.*]] = icmp sgt i8 [[IDX:%.*]], 2
+; CHECK-NEXT:    [[CMP:%.*]] = icmp samesign ugt i8 [[IDX:%.*]], 2
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[CMP]])
 ; CHECK-NEXT:    [[RES_1:%.*]] = xor i1 true, true
 ; CHECK-NEXT:    [[C_1:%.*]] = icmp ugt i8 [[IDX]], 3
@@ -578,7 +578,7 @@ entry:
 define i1 @sgt_to_ugt(i8 %a) {
 ; CHECK-LABEL: @sgt_to_ugt(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[CMP:%.*]] = icmp sgt i8 [[A:%.*]], 2
+; CHECK-NEXT:    [[CMP:%.*]] = icmp samesign ugt i8 [[A:%.*]], 2
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[CMP]])
 ; CHECK-NEXT:    ret i1 true
 ;
@@ -592,7 +592,7 @@ entry:
 define i1 @sgt_to_ugt_less(i8 %a) {
 ; CHECK-LABEL: @sgt_to_ugt_less(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[CMP:%.*]] = icmp sgt i8 [[A:%.*]], 2
+; CHECK-NEXT:    [[CMP:%.*]] = icmp samesign ugt i8 [[A:%.*]], 2
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[CMP]])
 ; CHECK-NEXT:    ret i1 true
 ;
@@ -606,8 +606,8 @@ entry:
 define i1 @sgt_to_ugt_var(i8 %a, i8 %b) {
 ; CHECK-LABEL: @sgt_to_ugt_var(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[CMP:%.*]] = icmp sgt i8 [[A:%.*]], [[B:%.*]]
-; CHECK-NEXT:    [[CMP_2:%.*]] = icmp sgt i8 [[B]], 0
+; CHECK-NEXT:    [[CMP:%.*]] = icmp samesign ugt i8 [[A:%.*]], [[B:%.*]]
+; CHECK-NEXT:    [[CMP_2:%.*]] = icmp samesign ugt i8 [[B]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[CMP]])
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[CMP_2]])
 ; CHECK-NEXT:    ret i1 true
@@ -688,7 +688,7 @@ entry:
 define i1 @slt_first_op_known_pos(i8 %idx) {
 ; CHECK-LABEL: @slt_first_op_known_pos(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[CMP:%.*]] = icmp slt i8 2, [[IDX:%.*]]
+; CHECK-NEXT:    [[CMP:%.*]] = icmp samesign ult i8 2, [[IDX:%.*]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[CMP]])
 ; CHECK-NEXT:    [[RES_1:%.*]] = xor i1 true, true
 ; CHECK-NEXT:    [[C_1:%.*]] = icmp ult i8 3, [[IDX]]
@@ -734,9 +734,9 @@ entry:
 define i1 @sle_a_known_pos(i8 %a, i8 %b) {
 ; CHECK-LABEL: @sle_a_known_pos(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[A_POS:%.*]] = icmp sge i8 [[A:%.*]], 0
+; CHECK-NEXT:    [[A_POS:%.*]] = icmp samesign uge i8 [[A:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[A_POS]])
-; CHECK-NEXT:    [[CMP:%.*]] = icmp sle i8 [[A]], [[B:%.*]]
+; CHECK-NEXT:    [[CMP:%.*]] = icmp samesign ule i8 [[A]], [[B:%.*]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[CMP]])
 ; CHECK-NEXT:    [[C_1:%.*]] = icmp ult i8 [[A]], [[B]]
 ; CHECK-NEXT:    [[RES:%.*]] = xor i1 true, [[C_1]]
@@ -758,7 +758,7 @@ entry:
 define i1 @sle_first_op_known_pos(i8 %idx) {
 ; CHECK-LABEL: @sle_first_op_known_pos(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[CMP:%.*]] = icmp sle i8 2, [[IDX:%.*]]
+; CHECK-NEXT:    [[CMP:%.*]] = icmp samesign ule i8 2, [[IDX:%.*]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[CMP]])
 ; CHECK-NEXT:    [[RES_1:%.*]] = xor i1 true, true
 ; CHECK-NEXT:    [[C_1:%.*]] = icmp ule i8 3, [[IDX]]
@@ -839,7 +839,7 @@ entry:
 define i1 @sle_only_b_known_pos(i8 %a, i8 %b) {
 ; CHECK-LABEL: @sle_only_b_known_pos(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[B_POS:%.*]] = icmp sge i8 [[B:%.*]], 0
+; CHECK-NEXT:    [[B_POS:%.*]] = icmp samesign uge i8 [[B:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[B_POS]])
 ; CHECK-NEXT:    [[CMP:%.*]] = icmp sle i8 [[A:%.*]], [[B]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[CMP]])

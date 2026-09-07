@@ -22,7 +22,7 @@ define i1 @and_negative_sle(i64 %a, i64 %b) {
 ; CHECK-LABEL: define i1 @and_negative_sle(
 ; CHECK-SAME: i64 [[A:%.*]], i64 [[B:%.*]]) {
 ; CHECK-NEXT:    [[O:%.*]] = and i64 [[A]], [[B]]
-; CHECK-NEXT:    [[C:%.*]] = icmp sle i64 [[O]], -1
+; CHECK-NEXT:    [[C:%.*]] = icmp samesign ule i64 [[O]], -1
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[C]])
 ; CHECK-NEXT:    [[RES:%.*]] = icmp slt i64 [[A]], 0
 ; CHECK-NEXT:    ret i1 [[RES]]
@@ -59,7 +59,7 @@ define i1 @and_negative_no_order(i64 %a, i64 %b) {
 ; CHECK-NEXT:    [[O:%.*]] = and i64 [[A]], [[B]]
 ; CHECK-NEXT:    [[C:%.*]] = icmp slt i64 [[O]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[C]])
-; CHECK-NEXT:    [[RES:%.*]] = icmp sge i64 [[A]], [[B]]
+; CHECK-NEXT:    [[RES:%.*]] = icmp samesign uge i64 [[A]], [[B]]
 ; CHECK-NEXT:    ret i1 [[RES]]
 ;
   %o = and i64 %a, %b
@@ -74,7 +74,7 @@ define i1 @and_non_negative(i64 %a, i64 %b) {
 ; CHECK-LABEL: define i1 @and_non_negative(
 ; CHECK-SAME: i64 [[A:%.*]], i64 [[B:%.*]]) {
 ; CHECK-NEXT:    [[O:%.*]] = and i64 [[A]], [[B]]
-; CHECK-NEXT:    [[C:%.*]] = icmp sge i64 [[O]], 0
+; CHECK-NEXT:    [[C:%.*]] = icmp samesign uge i64 [[O]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[C]])
 ; CHECK-NEXT:    [[RES:%.*]] = icmp slt i64 [[A]], 0
 ; CHECK-NEXT:    ret i1 [[RES]]

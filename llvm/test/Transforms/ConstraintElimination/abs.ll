@@ -105,7 +105,7 @@ define i1 @arg_minus_one_strict_greater_min_is_poison(i32 noundef %arg) {
 define i1 @abs_plus_one_unsigned_greater_or_equal_nonnegative_arg_min_is_not_poison(i32 noundef %arg) {
 ; CHECK-LABEL: define i1 @abs_plus_one_unsigned_greater_or_equal_nonnegative_arg_min_is_not_poison(
 ; CHECK-SAME: i32 noundef [[ARG:%.*]]) {
-; CHECK-NEXT:    [[CMP_ARG_NONNEGATIVE:%.*]] = icmp sge i32 [[ARG]], 0
+; CHECK-NEXT:    [[CMP_ARG_NONNEGATIVE:%.*]] = icmp samesign uge i32 [[ARG]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[CMP_ARG_NONNEGATIVE]])
 ; CHECK-NEXT:    [[ABS:%.*]] = tail call i32 @llvm.abs.i32(i32 [[ARG]], i1 false)
 ; CHECK-NEXT:    [[ABS_PLUS_ONE:%.*]] = add nuw i32 [[ABS]], 1
@@ -122,7 +122,7 @@ define i1 @abs_plus_one_unsigned_greater_or_equal_nonnegative_arg_min_is_not_poi
 define i1 @abs_plus_one_unsigned_greater_or_equal_nonnegative_arg_min_is_poison(i32 noundef %arg) {
 ; CHECK-LABEL: define i1 @abs_plus_one_unsigned_greater_or_equal_nonnegative_arg_min_is_poison(
 ; CHECK-SAME: i32 noundef [[ARG:%.*]]) {
-; CHECK-NEXT:    [[CMP_ARG_NONNEGATIVE:%.*]] = icmp sge i32 [[ARG]], 0
+; CHECK-NEXT:    [[CMP_ARG_NONNEGATIVE:%.*]] = icmp samesign uge i32 [[ARG]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[CMP_ARG_NONNEGATIVE]])
 ; CHECK-NEXT:    [[ABS:%.*]] = tail call i32 @llvm.abs.i32(i32 [[ARG]], i1 true)
 ; CHECK-NEXT:    [[ABS_PLUS_ONE:%.*]] = add nuw i32 [[ABS]], 1
@@ -153,7 +153,7 @@ define i1 @abs_plus_one_unsigned_greater_or_equal_cannot_be_simplified(i32 nound
 define i1 @abs_constant_negative_arg() {
 ; CHECK-LABEL: define i1 @abs_constant_negative_arg() {
 ; CHECK-NEXT:    [[ABS:%.*]] = tail call i32 @llvm.abs.i32(i32 -3, i1 false)
-; CHECK-NEXT:    [[CMP:%.*]] = icmp sge i32 [[ABS]], 3
+; CHECK-NEXT:    [[CMP:%.*]] = icmp samesign uge i32 [[ABS]], 3
 ; CHECK-NEXT:    ret i1 [[CMP]]
 ;
   %abs = tail call i32 @llvm.abs.i32(i32 -3, i1 false)

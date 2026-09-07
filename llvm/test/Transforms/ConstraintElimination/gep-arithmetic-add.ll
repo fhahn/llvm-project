@@ -382,7 +382,7 @@ exit:
 define i1 @gep_count_add_1_sge_known_ult_1(i32 %count, ptr %p) {
 ; CHECK-LABEL: @gep_count_add_1_sge_known_ult_1(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[SGE:%.*]] = icmp sge i32 [[COUNT:%.*]], 1
+; CHECK-NEXT:    [[SGE:%.*]] = icmp samesign uge i32 [[COUNT:%.*]], 1
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[SGE]])
 ; CHECK-NEXT:    [[COUNT_EXT:%.*]] = zext i32 [[COUNT]] to i64
 ; CHECK-NEXT:    [[GEP_COUNT:%.*]] = getelementptr inbounds i32, ptr [[P:%.*]], i64 [[COUNT_EXT]]
@@ -407,7 +407,7 @@ entry:
 define i1 @gep_count_add_1_sge_known_uge_1(i32 %count, ptr %p) {
 ; CHECK-LABEL: @gep_count_add_1_sge_known_uge_1(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[SGE:%.*]] = icmp sge i32 [[COUNT:%.*]], 1
+; CHECK-NEXT:    [[SGE:%.*]] = icmp samesign uge i32 [[COUNT:%.*]], 1
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[SGE]])
 ; CHECK-NEXT:    [[COUNT_EXT:%.*]] = zext i32 [[COUNT]] to i64
 ; CHECK-NEXT:    [[GEP_COUNT:%.*]] = getelementptr inbounds i32, ptr [[P:%.*]], i64 [[COUNT_EXT]]
@@ -431,7 +431,7 @@ entry:
 define i1 @gep_count_add_2_sge_not_known_ult_1(i32 %count, ptr %p) {
 ; CHECK-LABEL: @gep_count_add_2_sge_not_known_ult_1(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[SGE:%.*]] = icmp sge i32 [[COUNT:%.*]], 1
+; CHECK-NEXT:    [[SGE:%.*]] = icmp samesign uge i32 [[COUNT:%.*]], 1
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[SGE]])
 ; CHECK-NEXT:    [[COUNT_EXT:%.*]] = zext i32 [[COUNT]] to i64
 ; CHECK-NEXT:    [[GEP_COUNT:%.*]] = getelementptr inbounds i32, ptr [[P:%.*]], i64 [[COUNT_EXT]]
@@ -456,7 +456,7 @@ entry:
 define i1 @gep_count_add_2_sge_not_known_uge_1(i32 %count, ptr %p) {
 ; CHECK-LABEL: @gep_count_add_2_sge_not_known_uge_1(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[SGE:%.*]] = icmp sge i32 [[COUNT:%.*]], 1
+; CHECK-NEXT:    [[SGE:%.*]] = icmp samesign uge i32 [[COUNT:%.*]], 1
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[SGE]])
 ; CHECK-NEXT:    [[COUNT_EXT:%.*]] = zext i32 [[COUNT]] to i64
 ; CHECK-NEXT:    [[GEP_COUNT:%.*]] = getelementptr inbounds i32, ptr [[P:%.*]], i64 [[COUNT_EXT]]

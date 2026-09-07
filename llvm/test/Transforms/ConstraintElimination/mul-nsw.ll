@@ -21,7 +21,7 @@ define void @slt_mul_nsw_3_known_positive_1(i8 %start, i8 %high) {
 ; CHECK-NEXT:    [[START_3:%.*]] = mul nuw nsw i8 [[START]], 3
 ; CHECK-NEXT:    call void @use(i1 true)
 ; CHECK-NEXT:    [[START_4:%.*]] = mul nuw nsw i8 [[START]], 4
-; CHECK-NEXT:    [[C_3:%.*]] = icmp slt i8 [[START_4]], [[HIGH]]
+; CHECK-NEXT:    [[C_3:%.*]] = icmp samesign ult i8 [[START_4]], [[HIGH]]
 ; CHECK-NEXT:    call void @use(i1 [[C_3]])
 ; CHECK-NEXT:    ret void
 ; CHECK:       else:
@@ -339,7 +339,7 @@ define void @slt_mul_nsw_neg_3_known_negative_1(i8 %start, i8 %high) {
 ; CHECK-NEXT:    [[START_3:%.*]] = mul nsw i8 [[START]], -3
 ; CHECK-NEXT:    call void @use(i1 true)
 ; CHECK-NEXT:    [[START_4:%.*]] = mul nsw i8 [[START]], -4
-; CHECK-NEXT:    [[C_3:%.*]] = icmp slt i8 [[START_4]], [[HIGH]]
+; CHECK-NEXT:    [[C_3:%.*]] = icmp samesign ult i8 [[START_4]], [[HIGH]]
 ; CHECK-NEXT:    call void @use(i1 [[C_3]])
 ; CHECK-NEXT:    ret void
 ; CHECK:       else:
@@ -661,7 +661,7 @@ define void @slt_mul_nsw_3_known_nonnegative_1(i8 %start, i8 %high) {
 ; CHECK-NEXT:    [[START_3:%.*]] = mul nuw nsw i8 [[START]], 3
 ; CHECK-NEXT:    call void @use(i1 true)
 ; CHECK-NEXT:    [[START_4:%.*]] = mul nuw nsw i8 [[START]], 4
-; CHECK-NEXT:    [[C_3:%.*]] = icmp slt i8 [[START_4]], [[HIGH]]
+; CHECK-NEXT:    [[C_3:%.*]] = icmp samesign ult i8 [[START_4]], [[HIGH]]
 ; CHECK-NEXT:    call void @use(i1 [[C_3]])
 ; CHECK-NEXT:    ret void
 ; CHECK:       else:
@@ -756,9 +756,9 @@ define void @slt_mul_nsw_both_var_non_negative_1(i8 %start, i8 %scale, i8 %high)
 ; CHECK-NEXT:    [[MUL_3:%.*]] = mul nsw i8 [[START:%.*]], [[SCALE:%.*]]
 ; CHECK-NEXT:    [[C_1:%.*]] = icmp slt i8 [[MUL_3]], [[HIGH:%.*]]
 ; CHECK-NEXT:    [[C_2:%.*]] = icmp sgt i8 [[START]], 0
-; CHECK-NEXT:    [[C3:%.*]] = icmp sgt i8 [[SCALE]], 0
+; CHECK-NEXT:    [[C3:%.*]] = icmp samesign ugt i8 [[SCALE]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[C3]])
-; CHECK-NEXT:    [[C4:%.*]] = icmp sle i8 [[SCALE]], 3
+; CHECK-NEXT:    [[C4:%.*]] = icmp samesign ule i8 [[SCALE]], 3
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[C3]])
 ; CHECK-NEXT:    [[AND:%.*]] = and i1 [[C_1]], [[C_2]]
 ; CHECK-NEXT:    br i1 [[AND]], label [[THEN:%.*]], label [[ELSE:%.*]]
@@ -847,9 +847,9 @@ define void @slt_mul_nsw_both_var_non_negative_2(i8 %start, i8 %scale, i8 %high)
 ; CHECK-NEXT:    [[MUL_3:%.*]] = mul nsw i8 [[START:%.*]], [[SCALE:%.*]]
 ; CHECK-NEXT:    [[C_1:%.*]] = icmp slt i8 [[MUL_3]], [[HIGH:%.*]]
 ; CHECK-NEXT:    [[C_2:%.*]] = icmp sgt i8 [[START]], 0
-; CHECK-NEXT:    [[C3:%.*]] = icmp sgt i8 [[SCALE]], 0
+; CHECK-NEXT:    [[C3:%.*]] = icmp samesign ugt i8 [[SCALE]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[C3]])
-; CHECK-NEXT:    [[C4:%.*]] = icmp sle i8 [[SCALE]], 3
+; CHECK-NEXT:    [[C4:%.*]] = icmp samesign ule i8 [[SCALE]], 3
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[C3]])
 ; CHECK-NEXT:    [[AND:%.*]] = and i1 [[C_1]], [[C_2]]
 ; CHECK-NEXT:    br i1 [[AND]], label [[THEN:%.*]], label [[ELSE:%.*]]

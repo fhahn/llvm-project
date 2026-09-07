@@ -289,7 +289,7 @@ define i4 @ptr_N_step_zext_n_zext(ptr %src, ptr %lower, ptr %upper, i16 %N, i16 
 ; CHECK:       step.check:
 ; CHECK-NEXT:    [[STEP_ADD_1:%.*]] = add nuw nsw i16 [[STEP:%.*]], 1
 ; CHECK-NEXT:    [[STEP_ADD_1_EXT:%.*]] = zext i16 [[STEP_ADD_1]] to i32
-; CHECK-NEXT:    [[STEP_SLT_N:%.*]] = icmp slt i32 [[STEP_ADD_1_EXT]], [[N_ADD_1_EXT]]
+; CHECK-NEXT:    [[STEP_SLT_N:%.*]] = icmp samesign ult i32 [[STEP_ADD_1_EXT]], [[N_ADD_1_EXT]]
 ; CHECK-NEXT:    br i1 [[STEP_SLT_N]], label [[PTR_CHECK:%.*]], label [[EXIT:%.*]]
 ; CHECK:       ptr.check:
 ; CHECK-NEXT:    [[SRC_STEP:%.*]] = getelementptr inbounds i8, ptr [[SRC]], i32 [[STEP_ADD_1_EXT]]
@@ -345,7 +345,7 @@ define i4 @ptr_N_step_zext_n_zext_out_of_bounds(ptr %src, ptr %lower, ptr %upper
 ; CHECK-NEXT:    [[STEP_ADD_2:%.*]] = add nuw nsw i16 [[STEP:%.*]], 2
 ; CHECK-NEXT:    [[STEP_ADD_2_EXT:%.*]] = zext i16 [[STEP_ADD_2]] to i32
 ; CHECK-NEXT:    [[STEP_EXT:%.*]] = zext i16 [[STEP]] to i32
-; CHECK-NEXT:    [[STEP_SLT_N:%.*]] = icmp slt i32 [[STEP_EXT]], [[N_ADD_2_EXT]]
+; CHECK-NEXT:    [[STEP_SLT_N:%.*]] = icmp samesign ult i32 [[STEP_EXT]], [[N_ADD_2_EXT]]
 ; CHECK-NEXT:    br i1 [[STEP_SLT_N]], label [[PTR_CHECK:%.*]], label [[EXIT:%.*]]
 ; CHECK:       ptr.check:
 ; CHECK-NEXT:    [[SRC_STEP:%.*]] = getelementptr inbounds i8, ptr [[SRC]], i32 [[STEP_ADD_2_EXT]]
@@ -389,7 +389,7 @@ exit:
 define i1 @gep_count_add_1_sge_known_slt_1(i32 %count, ptr %p) {
 ; CHECK-LABEL: @gep_count_add_1_sge_known_slt_1(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[SGE:%.*]] = icmp sge i32 [[COUNT:%.*]], 1
+; CHECK-NEXT:    [[SGE:%.*]] = icmp samesign uge i32 [[COUNT:%.*]], 1
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[SGE]])
 ; CHECK-NEXT:    [[COUNT_EXT:%.*]] = zext i32 [[COUNT]] to i64
 ; CHECK-NEXT:    [[GEP_COUNT:%.*]] = getelementptr inbounds i32, ptr [[P:%.*]], i64 [[COUNT_EXT]]
@@ -415,7 +415,7 @@ entry:
 define i1 @gep_count_add_1_sge_known_sge_1(i32 %count, ptr %p) {
 ; CHECK-LABEL: @gep_count_add_1_sge_known_sge_1(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[SGE:%.*]] = icmp sge i32 [[COUNT:%.*]], 1
+; CHECK-NEXT:    [[SGE:%.*]] = icmp samesign uge i32 [[COUNT:%.*]], 1
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[SGE]])
 ; CHECK-NEXT:    [[COUNT_EXT:%.*]] = zext i32 [[COUNT]] to i64
 ; CHECK-NEXT:    [[GEP_COUNT:%.*]] = getelementptr inbounds i32, ptr [[P:%.*]], i64 [[COUNT_EXT]]
@@ -440,7 +440,7 @@ entry:
 define i1 @gep_count_add_2_sge_not_known_slt_1(i32 %count, ptr %p) {
 ; CHECK-LABEL: @gep_count_add_2_sge_not_known_slt_1(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[SGE:%.*]] = icmp sge i32 [[COUNT:%.*]], 1
+; CHECK-NEXT:    [[SGE:%.*]] = icmp samesign uge i32 [[COUNT:%.*]], 1
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[SGE]])
 ; CHECK-NEXT:    [[COUNT_EXT:%.*]] = zext i32 [[COUNT]] to i64
 ; CHECK-NEXT:    [[GEP_COUNT:%.*]] = getelementptr inbounds i32, ptr [[P:%.*]], i64 [[COUNT_EXT]]
@@ -465,7 +465,7 @@ entry:
 define i1 @gep_count_add_2_sge_not_known_sge_1(i32 %count, ptr %p) {
 ; CHECK-LABEL: @gep_count_add_2_sge_not_known_sge_1(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[SGE:%.*]] = icmp sge i32 [[COUNT:%.*]], 1
+; CHECK-NEXT:    [[SGE:%.*]] = icmp samesign uge i32 [[COUNT:%.*]], 1
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[SGE]])
 ; CHECK-NEXT:    [[COUNT_EXT:%.*]] = zext i32 [[COUNT]] to i64
 ; CHECK-NEXT:    [[GEP_COUNT:%.*]] = getelementptr inbounds i32, ptr [[P:%.*]], i64 [[COUNT_EXT]]

@@ -6,7 +6,7 @@ declare void @llvm.assume(i1)
 define i1 @sge_zero_and_ne_zero_implies_sgt_zero(i64 %n) {
 ; CHECK-LABEL: define i1 @sge_zero_and_ne_zero_implies_sgt_zero(
 ; CHECK-SAME: i64 [[N:%.*]]) {
-; CHECK-NEXT:    [[A:%.*]] = icmp sge i64 [[N]], 0
+; CHECK-NEXT:    [[A:%.*]] = icmp samesign uge i64 [[N]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[A]])
 ; CHECK-NEXT:    [[B:%.*]] = icmp ne i64 [[N]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[B]])
@@ -24,7 +24,7 @@ define i1 @sge_zero_and_ne_zero_from_branch(i64 %n) {
 ; CHECK-LABEL: define i1 @sge_zero_and_ne_zero_from_branch(
 ; CHECK-SAME: i64 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[A:%.*]] = icmp sge i64 [[N]], 0
+; CHECK-NEXT:    [[A:%.*]] = icmp samesign uge i64 [[N]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[A]])
 ; CHECK-NEXT:    [[Z:%.*]] = icmp eq i64 [[N]], 0
 ; CHECK-NEXT:    br i1 [[Z]], label %[[ELSE:.*]], label %[[CONT:.*]]
@@ -67,7 +67,7 @@ define i1 @sle_zero_and_ne_zero_implies_slt_zero(i64 %n) {
 define i1 @sge_const_and_ne_const_implies_sge_const_plus_one(i64 %n) {
 ; CHECK-LABEL: define i1 @sge_const_and_ne_const_implies_sge_const_plus_one(
 ; CHECK-SAME: i64 [[N:%.*]]) {
-; CHECK-NEXT:    [[A:%.*]] = icmp sge i64 [[N]], 10
+; CHECK-NEXT:    [[A:%.*]] = icmp samesign uge i64 [[N]], 10
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[A]])
 ; CHECK-NEXT:    [[B:%.*]] = icmp ne i64 [[N]], 10
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[B]])
@@ -137,7 +137,7 @@ define i1 @sge_and_ne_on_add(i64 %n) {
 ; CHECK-LABEL: define i1 @sge_and_ne_on_add(
 ; CHECK-SAME: i64 [[N:%.*]]) {
 ; CHECK-NEXT:    [[ADD:%.*]] = add nsw i64 [[N]], 1
-; CHECK-NEXT:    [[A:%.*]] = icmp sge i64 [[ADD]], 0
+; CHECK-NEXT:    [[A:%.*]] = icmp samesign uge i64 [[ADD]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[A]])
 ; CHECK-NEXT:    [[B:%.*]] = icmp ne i64 [[ADD]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[B]])
@@ -184,11 +184,11 @@ define i1 @neg_ne_zero_without_sign(i64 %n) {
 define i1 @neg_ne_other_const_does_not_tighten_bound(i64 %n) {
 ; CHECK-LABEL: define i1 @neg_ne_other_const_does_not_tighten_bound(
 ; CHECK-SAME: i64 [[N:%.*]]) {
-; CHECK-NEXT:    [[A:%.*]] = icmp sge i64 [[N]], 0
+; CHECK-NEXT:    [[A:%.*]] = icmp samesign uge i64 [[N]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[A]])
 ; CHECK-NEXT:    [[B:%.*]] = icmp ne i64 [[N]], 5
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[B]])
-; CHECK-NEXT:    [[C:%.*]] = icmp sgt i64 [[N]], 0
+; CHECK-NEXT:    [[C:%.*]] = icmp samesign ugt i64 [[N]], 0
 ; CHECK-NEXT:    ret i1 [[C]]
 ;
   %a = icmp sge i64 %n, 0
@@ -202,11 +202,11 @@ define i1 @neg_ne_other_const_does_not_tighten_bound(i64 %n) {
 define i1 @neg_ne_const_above_bound(i64 %n) {
 ; CHECK-LABEL: define i1 @neg_ne_const_above_bound(
 ; CHECK-SAME: i64 [[N:%.*]]) {
-; CHECK-NEXT:    [[A:%.*]] = icmp sge i64 [[N]], 0
+; CHECK-NEXT:    [[A:%.*]] = icmp samesign uge i64 [[N]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[A]])
 ; CHECK-NEXT:    [[B:%.*]] = icmp ne i64 [[N]], 5
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[B]])
-; CHECK-NEXT:    [[C:%.*]] = icmp sge i64 [[N]], 6
+; CHECK-NEXT:    [[C:%.*]] = icmp samesign uge i64 [[N]], 6
 ; CHECK-NEXT:    ret i1 [[C]]
 ;
   %a = icmp sge i64 %n, 0
@@ -220,11 +220,11 @@ define i1 @neg_ne_const_above_bound(i64 %n) {
 define i1 @neg_tightening_is_by_one_only(i64 %n) {
 ; CHECK-LABEL: define i1 @neg_tightening_is_by_one_only(
 ; CHECK-SAME: i64 [[N:%.*]]) {
-; CHECK-NEXT:    [[A:%.*]] = icmp sge i64 [[N]], 0
+; CHECK-NEXT:    [[A:%.*]] = icmp samesign uge i64 [[N]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[A]])
 ; CHECK-NEXT:    [[B:%.*]] = icmp ne i64 [[N]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[B]])
-; CHECK-NEXT:    [[C:%.*]] = icmp sge i64 [[N]], 2
+; CHECK-NEXT:    [[C:%.*]] = icmp samesign uge i64 [[N]], 2
 ; CHECK-NEXT:    ret i1 [[C]]
 ;
   %a = icmp sge i64 %n, 0
@@ -283,7 +283,7 @@ define i1 @neg_no_tightening_at_smin(i64 %n) {
 define i1 @tightened_bound_enables_srem_fact(i64 noundef %x, i64 noundef %n) {
 ; CHECK-LABEL: define i1 @tightened_bound_enables_srem_fact(
 ; CHECK-SAME: i64 noundef [[X:%.*]], i64 noundef [[N:%.*]]) {
-; CHECK-NEXT:    [[A:%.*]] = icmp sge i64 [[N]], 0
+; CHECK-NEXT:    [[A:%.*]] = icmp samesign uge i64 [[N]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[A]])
 ; CHECK-NEXT:    [[B:%.*]] = icmp ne i64 [[N]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[B]])

@@ -165,7 +165,7 @@ define i4 @ptr_N_signed_positive_explicit_check_constant_step(ptr %src, ptr %low
 ; CHECK:       trap.bb:
 ; CHECK-NEXT:    ret i4 2
 ; CHECK:       step.check:
-; CHECK-NEXT:    [[STEP_SLT_N:%.*]] = icmp slt i16 1, [[N]]
+; CHECK-NEXT:    [[STEP_SLT_N:%.*]] = icmp samesign ult i16 1, [[N]]
 ; CHECK-NEXT:    br i1 [[STEP_SLT_N]], label [[PTR_CHECK:%.*]], label [[EXIT:%.*]]
 ; CHECK:       ptr.check:
 ; CHECK-NEXT:    [[SRC_STEP:%.*]] = getelementptr inbounds i8, ptr [[SRC]], i16 1
@@ -220,7 +220,7 @@ define i4 @ptr_N_signed_positive_explicit_check_constant_step_no_inbonds(ptr %sr
 ; CHECK:       trap.bb:
 ; CHECK-NEXT:    ret i4 2
 ; CHECK:       step.check:
-; CHECK-NEXT:    [[STEP_SLT_N:%.*]] = icmp slt i16 1, [[N]]
+; CHECK-NEXT:    [[STEP_SLT_N:%.*]] = icmp samesign ult i16 1, [[N]]
 ; CHECK-NEXT:    br i1 [[STEP_SLT_N]], label [[PTR_CHECK:%.*]], label [[EXIT:%.*]]
 ; CHECK:       ptr.check:
 ; CHECK-NEXT:    [[SRC_STEP:%.*]] = getelementptr i8, ptr [[SRC]], i16 1
@@ -276,7 +276,7 @@ define i4 @ptr_N_and_step_signed_positive_explicit_check_constant_step(ptr %src,
 ; CHECK:       trap.bb:
 ; CHECK-NEXT:    ret i4 2
 ; CHECK:       step.check:
-; CHECK-NEXT:    [[STEP_SLT_N:%.*]] = icmp slt i16 [[STEP]], [[N]]
+; CHECK-NEXT:    [[STEP_SLT_N:%.*]] = icmp samesign ult i16 [[STEP]], [[N]]
 ; CHECK-NEXT:    [[AND_2:%.*]] = and i1 true, [[STEP_SLT_N]]
 ; CHECK-NEXT:    br i1 [[AND_2]], label [[PTR_CHECK:%.*]], label [[EXIT:%.*]]
 ; CHECK:       ptr.check:

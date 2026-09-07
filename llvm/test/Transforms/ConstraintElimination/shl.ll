@@ -1275,7 +1275,7 @@ entry:
 
 define i1 @shl_nsw_x8_slt_x7(i8 %start, i8 %high) {
 ; CHECK-LABEL: @shl_nsw_x8_slt_x7(
-; CHECK-NEXT:    [[C_0:%.*]] = icmp sge i8 [[HIGH:%.*]], 0
+; CHECK-NEXT:    [[C_0:%.*]] = icmp samesign uge i8 [[HIGH:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[C_0]])
 ; CHECK-NEXT:    [[START_SHL_3:%.*]] = shl nsw i8 [[START:%.*]], 3
 ; CHECK-NEXT:    [[C_1:%.*]] = icmp slt i8 [[START_SHL_3]], [[HIGH]]
@@ -1297,7 +1297,7 @@ define i1 @shl_nsw_x8_slt_x7(i8 %start, i8 %high) {
 
 define i1 @shl_nsw_x8_not_slt_x9(i8 %start, i8 %high) {
 ; CHECK-LABEL: @shl_nsw_x8_not_slt_x9(
-; CHECK-NEXT:    [[C_0:%.*]] = icmp sge i8 [[HIGH:%.*]], 0
+; CHECK-NEXT:    [[C_0:%.*]] = icmp samesign uge i8 [[HIGH:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[C_0]])
 ; CHECK-NEXT:    [[START_SHL_3:%.*]] = shl nsw i8 [[START:%.*]], 3
 ; CHECK-NEXT:    [[C_1:%.*]] = icmp slt i8 [[START_SHL_3]], [[HIGH]]
@@ -1361,7 +1361,7 @@ define i1 @shl_nsw_by_bw_minus_1(i64 %x) {
 define i1 @shl_nsw_by_bw(i64 %x) {
 ; CHECK-LABEL: @shl_nsw_by_bw(
 ; CHECK-NEXT:    [[X_SHL:%.*]] = shl nuw nsw i64 [[X:%.*]], 64
-; CHECK-NEXT:    [[C_1:%.*]] = icmp slt i64 [[X_SHL]], 0
+; CHECK-NEXT:    [[C_1:%.*]] = icmp samesign ult i64 [[X_SHL]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[C_1]])
 ; CHECK-NEXT:    [[T_1:%.*]] = icmp slt i64 [[X]], 0
 ; CHECK-NEXT:    ret i1 [[T_1]]
@@ -1378,7 +1378,7 @@ define i1 @shl_nsw_by_bw(i64 %x) {
 define i1 @shl_nsw_by_bw_plus_1(i64 %x) {
 ; CHECK-LABEL: @shl_nsw_by_bw_plus_1(
 ; CHECK-NEXT:    [[X_SHL:%.*]] = shl nuw nsw i64 [[X:%.*]], 65
-; CHECK-NEXT:    [[C_1:%.*]] = icmp slt i64 [[X_SHL]], 0
+; CHECK-NEXT:    [[C_1:%.*]] = icmp samesign ult i64 [[X_SHL]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[C_1]])
 ; CHECK-NEXT:    [[T_1:%.*]] = icmp slt i64 [[X]], 0
 ; CHECK-NEXT:    ret i1 [[T_1]]
@@ -1395,9 +1395,9 @@ define i1 @shl_nsw_by_bw_plus_1(i64 %x) {
 define i1 @shl_nuw_signed_bounded(i64 %c) {
 ; CHECK-LABEL: @shl_nuw_signed_bounded(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[BND:%.*]] = icmp slt i64 [[C:%.*]], 2305843009213693952
+; CHECK-NEXT:    [[BND:%.*]] = icmp samesign ult i64 [[C:%.*]], 2305843009213693952
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[BND]])
-; CHECK-NEXT:    [[NN:%.*]] = icmp sge i64 [[C]], 0
+; CHECK-NEXT:    [[NN:%.*]] = icmp samesign uge i64 [[C]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[NN]])
 ; CHECK-NEXT:    [[M:%.*]] = shl nuw nsw i64 [[C]], 2
 ; CHECK-NEXT:    ret i1 false
@@ -1414,9 +1414,9 @@ entry:
 
 define i1 @shl_nuw_signed_tight_bound(i8 %x) {
 ; CHECK-LABEL: @shl_nuw_signed_tight_bound(
-; CHECK-NEXT:    [[B:%.*]] = icmp slt i8 [[X:%.*]], 32
+; CHECK-NEXT:    [[B:%.*]] = icmp samesign ult i8 [[X:%.*]], 32
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[B]])
-; CHECK-NEXT:    [[NN:%.*]] = icmp sge i8 [[X]], 0
+; CHECK-NEXT:    [[NN:%.*]] = icmp samesign uge i8 [[X]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[NN]])
 ; CHECK-NEXT:    [[M:%.*]] = shl nuw nsw i8 [[X]], 2
 ; CHECK-NEXT:    ret i1 false
@@ -1443,9 +1443,9 @@ define i1 @shl_nuw_signed_no_bound(i8 %x) {
 
 define i1 @shl_nuw_signed_weak_bound(i8 %x) {
 ; CHECK-LABEL: @shl_nuw_signed_weak_bound(
-; CHECK-NEXT:    [[B:%.*]] = icmp slt i8 [[X:%.*]], 64
+; CHECK-NEXT:    [[B:%.*]] = icmp samesign ult i8 [[X:%.*]], 64
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[B]])
-; CHECK-NEXT:    [[NN:%.*]] = icmp sge i8 [[X]], 0
+; CHECK-NEXT:    [[NN:%.*]] = icmp samesign uge i8 [[X]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[NN]])
 ; CHECK-NEXT:    [[M:%.*]] = shl nuw i8 [[X]], 2
 ; CHECK-NEXT:    [[T:%.*]] = icmp slt i8 [[M]], 0

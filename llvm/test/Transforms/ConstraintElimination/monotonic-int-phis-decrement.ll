@@ -77,7 +77,7 @@ define void @add_rec_decreasing_cond_true_start_signed_positive(i8 noundef %star
 ; CHECK-LABEL: define void @add_rec_decreasing_cond_true_start_signed_positive(
 ; CHECK-SAME: i8 noundef [[START:%.*]]) {
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[PRECOND:%.*]] = icmp sge i8 [[START]], 1
+; CHECK-NEXT:    [[PRECOND:%.*]] = icmp samesign uge i8 [[START]], 1
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[PRECOND]])
 ; CHECK-NEXT:    [[START_1:%.*]] = add i8 [[START]], -1
 ; CHECK-NEXT:    br label [[LOOP_HEADER:%.*]]
@@ -117,7 +117,7 @@ define void @add_rec_decreasing_cond_not_true_start_signed_positive(i8 noundef %
 ; CHECK-LABEL: define void @add_rec_decreasing_cond_not_true_start_signed_positive(
 ; CHECK-SAME: i8 noundef [[START:%.*]]) {
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[PRECOND:%.*]] = icmp sge i8 [[START]], 1
+; CHECK-NEXT:    [[PRECOND:%.*]] = icmp samesign uge i8 [[START]], 1
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[PRECOND]])
 ; CHECK-NEXT:    br label [[LOOP_HEADER:%.*]]
 ; CHECK:       loop.header:

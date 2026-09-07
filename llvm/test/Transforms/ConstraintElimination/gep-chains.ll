@@ -202,7 +202,7 @@ define i1 @gep_add_ult_var_idx(ptr %dst, ptr %upper, i8 %idx) {
 
 define i1 @gep_add_ult_var_idx_sgt_1(ptr %dst, ptr %upper, i8 %idx) {
 ; CHECK-LABEL: @gep_add_ult_var_idx_sgt_1(
-; CHECK-NEXT:    [[SGT_1:%.*]] = icmp sgt i8 [[IDX:%.*]], 1
+; CHECK-NEXT:    [[SGT_1:%.*]] = icmp samesign ugt i8 [[IDX:%.*]], 1
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[SGT_1]])
 ; CHECK-NEXT:    [[IDX_EXT:%.*]] = zext i8 [[IDX]] to i16
 ; CHECK-NEXT:    [[DST_ADD_IDX:%.*]] = getelementptr inbounds i8, ptr [[DST:%.*]], i16 [[IDX_EXT]]

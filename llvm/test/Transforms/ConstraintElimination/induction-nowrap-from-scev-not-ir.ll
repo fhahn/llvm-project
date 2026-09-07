@@ -7,8 +7,8 @@ define void @sum_of_induction_and_guard(i8 %n, i8 %j) mustprogress {
 ; CHECK-LABEL: define void @sum_of_induction_and_guard(
 ; CHECK-SAME: i8 [[N:%.*]], i8 [[J:%.*]]) #[[ATTR0:[0-9]+]] {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    [[PRE_0:%.*]] = icmp sgt i8 [[N]], 10
-; CHECK-NEXT:    [[PRE_1:%.*]] = icmp sge i8 [[J]], 20
+; CHECK-NEXT:    [[PRE_0:%.*]] = icmp samesign ugt i8 [[N]], 10
+; CHECK-NEXT:    [[PRE_1:%.*]] = icmp samesign uge i8 [[J]], 20
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[PRE_0]])
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[PRE_1]])
 ; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]

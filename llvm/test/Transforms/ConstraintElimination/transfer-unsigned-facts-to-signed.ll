@@ -10,7 +10,7 @@ define i1 @idx_known_positive_via_len_1(i8 %len, i8 %idx) {
 ; CHECK-NEXT:    br i1 [[AND_1]], label [[THEN_1:%.*]], label [[ELSE:%.*]]
 ; CHECK:       then.1:
 ; CHECK-NEXT:    [[R_1:%.*]] = xor i1 true, true
-; CHECK-NEXT:    [[C_1:%.*]] = icmp sge i8 [[IDX]], 1
+; CHECK-NEXT:    [[C_1:%.*]] = icmp samesign uge i8 [[IDX]], 1
 ; CHECK-NEXT:    [[R_2:%.*]] = xor i1 [[R_1]], [[C_1]]
 ; CHECK-NEXT:    [[R_3:%.*]] = xor i1 [[R_2]], true
 ; CHECK-NEXT:    ret i1 [[R_3]]
@@ -51,7 +51,7 @@ define i1 @idx_known_positive_via_len_2(i8 %len, i8 %idx) {
 ; CHECK-NEXT:    br i1 [[AND_1]], label [[THEN_1:%.*]], label [[ELSE:%.*]]
 ; CHECK:       then.1:
 ; CHECK-NEXT:    [[R_1:%.*]] = xor i1 true, true
-; CHECK-NEXT:    [[C_1:%.*]] = icmp sge i8 [[IDX]], 1
+; CHECK-NEXT:    [[C_1:%.*]] = icmp samesign uge i8 [[IDX]], 1
 ; CHECK-NEXT:    [[R_2:%.*]] = xor i1 [[R_1]], [[C_1]]
 ; CHECK-NEXT:    [[R_3:%.*]] = xor i1 [[R_2]], true
 ; CHECK-NEXT:    ret i1 [[R_3]]
@@ -230,11 +230,11 @@ else:
 
 define i1 @ule_signed_pos_constant_1(i8 %a, i8 %b) {
 ; CHECK-LABEL: @ule_signed_pos_constant_1(
-; CHECK-NEXT:    [[B_NON_NEG:%.*]] = icmp sge i8 [[B:%.*]], 0
+; CHECK-NEXT:    [[B_NON_NEG:%.*]] = icmp samesign uge i8 [[B:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[B_NON_NEG]])
 ; CHECK-NEXT:    [[A_ULE_B:%.*]] = icmp ule i8 [[A:%.*]], [[B]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[A_ULE_B]])
-; CHECK-NEXT:    [[SLT_TEST:%.*]] = icmp slt i8 [[A]], [[B]]
+; CHECK-NEXT:    [[SLT_TEST:%.*]] = icmp samesign ult i8 [[A]], [[B]]
 ; CHECK-NEXT:    [[RESULT_XOR:%.*]] = xor i1 true, [[SLT_TEST]]
 ; CHECK-NEXT:    ret i1 [[RESULT_XOR]]
 ;
@@ -291,7 +291,7 @@ else:
 
 define i1 @uge_assumed_positive_values(i8 %a, i8 %b) {
 ; CHECK-LABEL: @uge_assumed_positive_values(
-; CHECK-NEXT:    [[A_NON_NEG:%.*]] = icmp sge i8 [[A:%.*]], 0
+; CHECK-NEXT:    [[A_NON_NEG:%.*]] = icmp samesign uge i8 [[A:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[A_NON_NEG]])
 ; CHECK-NEXT:    [[A_UGT_B:%.*]] = icmp uge i8 [[A]], [[B:%.*]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[A_UGT_B]])
@@ -309,7 +309,7 @@ define i1 @uge_assumed_positive_values(i8 %a, i8 %b) {
 
 define i1 @ugt_assumed_positive_values(i8 %a, i8 %b) {
 ; CHECK-LABEL: @ugt_assumed_positive_values(
-; CHECK-NEXT:    [[A_NON_NEG:%.*]] = icmp sge i8 [[A:%.*]], 0
+; CHECK-NEXT:    [[A_NON_NEG:%.*]] = icmp samesign uge i8 [[A:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[A_NON_NEG]])
 ; CHECK-NEXT:    [[A_UGT_B:%.*]] = icmp ugt i8 [[A]], [[B:%.*]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[A_UGT_B]])

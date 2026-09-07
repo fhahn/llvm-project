@@ -11,8 +11,7 @@ define i1 @idx_known_positive_via_len_1(i8 %len, i8 %idx) {
 ; CHECK-NEXT:    [[R_1:%.*]] = xor i1 true, true
 ; CHECK-NEXT:    [[C_1:%.*]] = icmp sge i8 [[IDX]], 1
 ; CHECK-NEXT:    [[R_2:%.*]] = xor i1 [[R_1]], [[C_1]]
-; CHECK-NEXT:    [[C_2:%.*]] = icmp sge i8 [[LEN]], 1
-; CHECK-NEXT:    [[R_3:%.*]] = xor i1 [[R_2]], [[C_2]]
+; CHECK-NEXT:    [[R_3:%.*]] = xor i1 [[R_2]], true
 ; CHECK-NEXT:    ret i1 [[R_3]]
 ; CHECK:       else:
 ; CHECK-NEXT:    [[C_3:%.*]] = icmp sge i8 [[IDX]], 0
@@ -52,8 +51,7 @@ define i1 @idx_known_positive_via_len_2(i8 %len, i8 %idx) {
 ; CHECK-NEXT:    [[R_1:%.*]] = xor i1 true, true
 ; CHECK-NEXT:    [[C_1:%.*]] = icmp sge i8 [[IDX]], 1
 ; CHECK-NEXT:    [[R_2:%.*]] = xor i1 [[R_1]], [[C_1]]
-; CHECK-NEXT:    [[C_2:%.*]] = icmp sge i8 [[LEN]], 1
-; CHECK-NEXT:    [[R_3:%.*]] = xor i1 [[R_2]], [[C_2]]
+; CHECK-NEXT:    [[R_3:%.*]] = xor i1 [[R_2]], true
 ; CHECK-NEXT:    ret i1 [[R_3]]
 ; CHECK:       else:
 ; CHECK-NEXT:    [[C_3:%.*]] = icmp sge i8 [[IDX]], 0
@@ -170,7 +168,7 @@ define i1 @ult_signed_pos_constant(i8 %a) {
 ; CHECK-NEXT:    ret i1 [[RES_5]]
 ; CHECK:       else:
 ; CHECK-NEXT:    [[RES_3:%.*]] = xor i1 true, false
-; CHECK-NEXT:    [[C_4:%.*]] = icmp slt i8 [[A]], 5
+; CHECK-NEXT:    [[C_4:%.*]] = icmp samesign ult i8 [[A]], 5
 ; CHECK-NEXT:    [[RES_4:%.*]] = xor i1 [[RES_3]], [[C_4]]
 ; CHECK-NEXT:    ret i1 [[RES_4]]
 ;
@@ -249,7 +247,7 @@ define i1 @ule_signed_pos_constant_2(i8 %a) {
 ; CHECK-NEXT:    ret i1 [[RES_5]]
 ; CHECK:       else:
 ; CHECK-NEXT:    [[RES_3:%.*]] = xor i1 true, false
-; CHECK-NEXT:    [[C_4:%.*]] = icmp sle i8 [[A]], 5
+; CHECK-NEXT:    [[C_4:%.*]] = icmp samesign ule i8 [[A]], 5
 ; CHECK-NEXT:    [[RES_4:%.*]] = xor i1 [[RES_3]], [[C_4]]
 ; CHECK-NEXT:    ret i1 [[RES_4]]
 ;

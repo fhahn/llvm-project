@@ -9,7 +9,7 @@ define void @iv_known_non_negative_constant_trip_count() {
 ; CHECK-NEXT:    br label [[LOOP_HEADER:%.*]]
 ; CHECK:       loop.header:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i8 [ 0, [[ENTRY:%.*]] ], [ [[IV_NEXT:%.*]], [[LOOP_LATCH:%.*]] ]
-; CHECK-NEXT:    [[CMP:%.*]] = icmp slt i8 [[IV]], 2
+; CHECK-NEXT:    [[CMP:%.*]] = icmp samesign ult i8 [[IV]], 2
 ; CHECK-NEXT:    br i1 [[CMP]], label [[LOOP_LATCH]], label [[EXIT_1:%.*]]
 ; CHECK:       loop.latch:
 ; CHECK-NEXT:    call void @use(i1 true)
@@ -198,7 +198,7 @@ define void @iv_known_non_negative_iv_constant_trip_count_sgt() {
 ; CHECK-NEXT:    br label [[LOOP_HEADER:%.*]]
 ; CHECK:       loop.header:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i8 [ 0, [[ENTRY:%.*]] ], [ [[IV_NEXT:%.*]], [[LOOP_LATCH:%.*]] ]
-; CHECK-NEXT:    [[CMP:%.*]] = icmp sgt i8 2, [[IV]]
+; CHECK-NEXT:    [[CMP:%.*]] = icmp samesign ugt i8 2, [[IV]]
 ; CHECK-NEXT:    br i1 [[CMP]], label [[LOOP_LATCH]], label [[EXIT_1:%.*]]
 ; CHECK:       loop.latch:
 ; CHECK-NEXT:    call void @use(i1 false)
@@ -338,7 +338,7 @@ define void @iv_known_non_negative_iv_constant_trip_count_sge() {
 ; CHECK-NEXT:    br label [[LOOP_HEADER:%.*]]
 ; CHECK:       loop.header:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i8 [ 0, [[ENTRY:%.*]] ], [ [[IV_NEXT:%.*]], [[LOOP_LATCH:%.*]] ]
-; CHECK-NEXT:    [[CMP:%.*]] = icmp sge i8 2, [[IV]]
+; CHECK-NEXT:    [[CMP:%.*]] = icmp samesign uge i8 2, [[IV]]
 ; CHECK-NEXT:    br i1 [[CMP]], label [[LOOP_LATCH]], label [[EXIT_1:%.*]]
 ; CHECK:       loop.latch:
 ; CHECK-NEXT:    call void @use(i1 true)

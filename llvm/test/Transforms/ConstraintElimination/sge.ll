@@ -61,9 +61,9 @@ define void @test_1_constant_constraint(i32 %x) {
 ; CHECK:       bb1:
 ; CHECK-NEXT:    call void @use(i1 true)
 ; CHECK-NEXT:    call void @use(i1 true)
-; CHECK-NEXT:    [[C_2:%.*]] = icmp sge i32 [[X]], 11
+; CHECK-NEXT:    [[C_2:%.*]] = icmp samesign uge i32 [[X]], 11
 ; CHECK-NEXT:    call void @use(i1 [[C_2]])
-; CHECK-NEXT:    [[C_4:%.*]] = icmp sge i32 10, [[X]]
+; CHECK-NEXT:    [[C_4:%.*]] = icmp samesign uge i32 10, [[X]]
 ; CHECK-NEXT:    call void @use(i1 [[C_4]])
 ; CHECK-NEXT:    ret void
 ; CHECK:       bb2:

@@ -262,7 +262,7 @@ entry:
 define i1 @test_ult_add_nsw_pos_1_assume_pos(i8 %start, i8 %high) {
 ; CHECK-LABEL: @test_ult_add_nsw_pos_1_assume_pos(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[START_POS:%.*]] = icmp sge i8 [[START:%.*]], 0
+; CHECK-NEXT:    [[START_POS:%.*]] = icmp samesign uge i8 [[START:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[START_POS]])
 ; CHECK-NEXT:    [[ADD:%.*]] = add nsw i8 [[START]], 3
 ; CHECK-NEXT:    [[C_1:%.*]] = icmp ult i8 [[ADD]], [[HIGH:%.*]]
@@ -343,7 +343,7 @@ entry:
 define i1 @test_ult_add_nsw_pos_2_assume_pos(i8 %start, i8 %high) {
 ; CHECK-LABEL: @test_ult_add_nsw_pos_2_assume_pos(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[START_POS:%.*]] = icmp sge i8 [[START:%.*]], 0
+; CHECK-NEXT:    [[START_POS:%.*]] = icmp samesign uge i8 [[START:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[START_POS]])
 ; CHECK-NEXT:    [[ADD:%.*]] = add nsw i8 [[START]], 3
 ; CHECK-NEXT:    [[C_1:%.*]] = icmp ult i8 [[ADD]], [[HIGH:%.*]]
@@ -409,7 +409,7 @@ entry:
 define i1 @test_ult_add_nsw_pos_3_assume_pos(i8 %start, i8 %high) {
 ; CHECK-LABEL: @test_ult_add_nsw_pos_3_assume_pos(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[START_POS:%.*]] = icmp sge i8 [[START:%.*]], 0
+; CHECK-NEXT:    [[START_POS:%.*]] = icmp samesign uge i8 [[START:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[START_POS]])
 ; CHECK-NEXT:    [[ADD:%.*]] = add nsw i8 [[START]], 3
 ; CHECK-NEXT:    [[C_1:%.*]] = icmp ult i8 [[ADD]], [[HIGH:%.*]]
@@ -456,7 +456,7 @@ entry:
 define i1 @test_ult_add_nsw_pos_4_assume_pos(i8 %start, i8 %high) {
 ; CHECK-LABEL: @test_ult_add_nsw_pos_4_assume_pos(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[START_POS:%.*]] = icmp sge i8 [[START:%.*]], 0
+; CHECK-NEXT:    [[START_POS:%.*]] = icmp samesign uge i8 [[START:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[START_POS]])
 ; CHECK-NEXT:    [[ADD:%.*]] = add nsw i8 [[START]], 3
 ; CHECK-NEXT:    [[C_1:%.*]] = icmp ult i8 [[ADD]], [[HIGH:%.*]]
@@ -503,7 +503,7 @@ entry:
 define i1 @test_ult_add_nsw_neg_5_assume_pos(i8 %start, i8 %high) {
 ; CHECK-LABEL: @test_ult_add_nsw_neg_5_assume_pos(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[START_POS:%.*]] = icmp sge i8 [[START:%.*]], 0
+; CHECK-NEXT:    [[START_POS:%.*]] = icmp samesign uge i8 [[START:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[START_POS]])
 ; CHECK-NEXT:    [[ADD:%.*]] = add nsw i8 [[START]], 3
 ; CHECK-NEXT:    [[C_1:%.*]] = icmp ult i8 [[ADD]], [[HIGH:%.*]]
@@ -551,7 +551,7 @@ entry:
 define i1 @test_ult_add_no_nsw_pos_6_assume_pos(i8 %start, i8 %high) {
 ; CHECK-LABEL: @test_ult_add_no_nsw_pos_6_assume_pos(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[START_POS:%.*]] = icmp sge i8 [[START:%.*]], 0
+; CHECK-NEXT:    [[START_POS:%.*]] = icmp samesign uge i8 [[START:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[START_POS]])
 ; CHECK-NEXT:    [[ADD:%.*]] = add i8 [[START]], 3
 ; CHECK-NEXT:    [[C_1:%.*]] = icmp ult i8 [[ADD]], [[HIGH:%.*]]
@@ -578,7 +578,7 @@ define i1 @test_ult_add_nsw_var_7(i8 %start, i8 %off, i8 %high) {
 ; CHECK-NEXT:    [[ADD:%.*]] = add nsw i8 [[START:%.*]], [[OFF:%.*]]
 ; CHECK-NEXT:    [[C_1:%.*]] = icmp ult i8 [[ADD]], [[HIGH:%.*]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[C_1]])
-; CHECK-NEXT:    [[OFF_POS:%.*]] = icmp sge i8 [[OFF]], 0
+; CHECK-NEXT:    [[OFF_POS:%.*]] = icmp samesign uge i8 [[OFF]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[OFF_POS]])
 ; CHECK-NEXT:    [[C:%.*]] = icmp ult i8 [[START]], [[HIGH]]
 ; CHECK-NEXT:    ret i1 [[C]]
@@ -600,7 +600,7 @@ define i1 @test_ult_add_no_nsw_var_7(i8 %start, i8 %off, i8 %high) {
 ; CHECK-NEXT:    [[ADD:%.*]] = add i8 [[START:%.*]], [[OFF:%.*]]
 ; CHECK-NEXT:    [[C_1:%.*]] = icmp ult i8 [[ADD]], [[HIGH:%.*]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[C_1]])
-; CHECK-NEXT:    [[OFF_POS:%.*]] = icmp sge i8 [[OFF]], 0
+; CHECK-NEXT:    [[OFF_POS:%.*]] = icmp samesign uge i8 [[OFF]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[OFF_POS]])
 ; CHECK-NEXT:    [[C:%.*]] = icmp ult i8 [[START]], [[HIGH]]
 ; CHECK-NEXT:    ret i1 [[C]]
@@ -622,9 +622,9 @@ define i1 @test_ult_add_nsw_var_8(i8 %start, i8 %off.1, i8 %off.2, i8 %high) {
 ; CHECK-NEXT:    [[ADD:%.*]] = add nsw i8 [[START:%.*]], [[OFF_2:%.*]]
 ; CHECK-NEXT:    [[C_1:%.*]] = icmp ult i8 [[ADD]], [[HIGH:%.*]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[C_1]])
-; CHECK-NEXT:    [[OFF_1_POS:%.*]] = icmp sge i8 [[OFF_1:%.*]], 0
+; CHECK-NEXT:    [[OFF_1_POS:%.*]] = icmp samesign uge i8 [[OFF_1:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[OFF_1_POS]])
-; CHECK-NEXT:    [[OFF_2_POS:%.*]] = icmp sge i8 [[OFF_2]], 0
+; CHECK-NEXT:    [[OFF_2_POS:%.*]] = icmp samesign uge i8 [[OFF_2]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[OFF_2_POS]])
 ; CHECK-NEXT:    [[OFF_1_ULT:%.*]] = icmp ult i8 [[OFF_1]], [[OFF_2]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[OFF_1_ULT]])
@@ -651,14 +651,14 @@ entry:
 define i1 @test_ult_add_nsw_var_8_all_pos(i8 %start, i8 %off.1, i8 %off.2, i8 %high) {
 ; CHECK-LABEL: @test_ult_add_nsw_var_8_all_pos(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[START_POS:%.*]] = icmp sge i8 [[START:%.*]], 0
+; CHECK-NEXT:    [[START_POS:%.*]] = icmp samesign uge i8 [[START:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[START_POS]])
 ; CHECK-NEXT:    [[ADD:%.*]] = add nsw i8 [[START]], [[OFF_2:%.*]]
 ; CHECK-NEXT:    [[C_1:%.*]] = icmp ult i8 [[ADD]], [[HIGH:%.*]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[C_1]])
-; CHECK-NEXT:    [[OFF_1_POS:%.*]] = icmp sge i8 [[OFF_1:%.*]], 0
+; CHECK-NEXT:    [[OFF_1_POS:%.*]] = icmp samesign uge i8 [[OFF_1:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[OFF_1_POS]])
-; CHECK-NEXT:    [[OFF_2_POS:%.*]] = icmp sge i8 [[OFF_2]], 0
+; CHECK-NEXT:    [[OFF_2_POS:%.*]] = icmp samesign uge i8 [[OFF_2]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[OFF_2_POS]])
 ; CHECK-NEXT:    [[OFF_1_ULT:%.*]] = icmp ult i8 [[OFF_1]], [[OFF_2]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[OFF_1_ULT]])
@@ -686,14 +686,14 @@ entry:
 define i1 @test_ult_add_no_nsw_var_8_all_pos(i8 %start, i8 %off.1, i8 %off.2, i8 %high) {
 ; CHECK-LABEL: @test_ult_add_no_nsw_var_8_all_pos(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[START_POS:%.*]] = icmp sge i8 [[START:%.*]], 0
+; CHECK-NEXT:    [[START_POS:%.*]] = icmp samesign uge i8 [[START:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[START_POS]])
 ; CHECK-NEXT:    [[ADD:%.*]] = add i8 [[START]], [[OFF_2:%.*]]
 ; CHECK-NEXT:    [[C_1:%.*]] = icmp ult i8 [[ADD]], [[HIGH:%.*]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[C_1]])
-; CHECK-NEXT:    [[OFF_1_POS:%.*]] = icmp sge i8 [[OFF_1:%.*]], 0
+; CHECK-NEXT:    [[OFF_1_POS:%.*]] = icmp samesign uge i8 [[OFF_1:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[OFF_1_POS]])
-; CHECK-NEXT:    [[OFF_2_POS:%.*]] = icmp sge i8 [[OFF_2]], 0
+; CHECK-NEXT:    [[OFF_2_POS:%.*]] = icmp samesign uge i8 [[OFF_2]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[OFF_2_POS]])
 ; CHECK-NEXT:    [[OFF_1_ULT:%.*]] = icmp ult i8 [[OFF_1]], [[OFF_2]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[OFF_1_ULT]])
@@ -722,14 +722,14 @@ entry:
 define i1 @test_ult_add_nsw_var_9_all_pos(i8 %start, i8 %off.1, i8 %off.2, i8 %high) {
 ; CHECK-LABEL: @test_ult_add_nsw_var_9_all_pos(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[START_POS:%.*]] = icmp sge i8 [[START:%.*]], 0
+; CHECK-NEXT:    [[START_POS:%.*]] = icmp samesign uge i8 [[START:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[START_POS]])
 ; CHECK-NEXT:    [[ADD:%.*]] = add nsw i8 [[START]], [[OFF_2:%.*]]
 ; CHECK-NEXT:    [[C_1:%.*]] = icmp ult i8 [[ADD]], [[HIGH:%.*]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[C_1]])
-; CHECK-NEXT:    [[OFF_1_POS:%.*]] = icmp sge i8 [[OFF_1:%.*]], 0
+; CHECK-NEXT:    [[OFF_1_POS:%.*]] = icmp samesign uge i8 [[OFF_1:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[OFF_1_POS]])
-; CHECK-NEXT:    [[OFF_2_POS:%.*]] = icmp sge i8 [[OFF_2]], 0
+; CHECK-NEXT:    [[OFF_2_POS:%.*]] = icmp samesign uge i8 [[OFF_2]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[OFF_2_POS]])
 ; CHECK-NEXT:    [[ADD_OFF_2:%.*]] = add nsw i8 [[START]], [[OFF_1]]
 ; CHECK-NEXT:    [[C:%.*]] = icmp ult i8 [[ADD_OFF_2]], [[HIGH]]
@@ -754,7 +754,7 @@ entry:
 define i1 @add_neg_1_known_sge_ult_1(i32 %a) {
 ; CHECK-LABEL: @add_neg_1_known_sge_ult_1(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[A_SGE:%.*]] = icmp sge i32 [[A:%.*]], 1
+; CHECK-NEXT:    [[A_SGE:%.*]] = icmp samesign uge i32 [[A:%.*]], 1
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[A_SGE]])
 ; CHECK-NEXT:    [[SUB:%.*]] = add nsw i32 [[A]], -1
 ; CHECK-NEXT:    ret i1 true
@@ -770,7 +770,7 @@ entry:
 define i1 @add_neg_1_known_sge_uge_1(i32 %a) {
 ; CHECK-LABEL: @add_neg_1_known_sge_uge_1(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[A_SGE:%.*]] = icmp sge i32 [[A:%.*]], 1
+; CHECK-NEXT:    [[A_SGE:%.*]] = icmp samesign uge i32 [[A:%.*]], 1
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[A_SGE]])
 ; CHECK-NEXT:    [[SUB:%.*]] = add nsw i32 [[A]], -1
 ; CHECK-NEXT:    ret i1 true
@@ -786,7 +786,7 @@ entry:
 define i1 @add_neg_1_not_known_sge_ult_1(i32 %a) {
 ; CHECK-LABEL: @add_neg_1_not_known_sge_ult_1(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[A_SGE:%.*]] = icmp sge i32 [[A:%.*]], 0
+; CHECK-NEXT:    [[A_SGE:%.*]] = icmp samesign uge i32 [[A:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[A_SGE]])
 ; CHECK-NEXT:    [[SUB:%.*]] = add nsw i32 [[A]], -1
 ; CHECK-NEXT:    [[C:%.*]] = icmp ult i32 [[SUB]], [[A]]
@@ -803,7 +803,7 @@ entry:
 define i1 @add_neg_1_not_known_sge_uge_1(i32 %a) {
 ; CHECK-LABEL: @add_neg_1_not_known_sge_uge_1(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[A_SGE:%.*]] = icmp sge i32 [[A:%.*]], 0
+; CHECK-NEXT:    [[A_SGE:%.*]] = icmp samesign uge i32 [[A:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[A_SGE]])
 ; CHECK-NEXT:    [[SUB:%.*]] = add nsw i32 [[A]], -1
 ; CHECK-NEXT:    ret i1 true
@@ -819,7 +819,7 @@ entry:
 define i1 @add_neg_3_known_sge_ult_1(i32 %a) {
 ; CHECK-LABEL: @add_neg_3_known_sge_ult_1(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[A_SGE:%.*]] = icmp sge i32 [[A:%.*]], 3
+; CHECK-NEXT:    [[A_SGE:%.*]] = icmp samesign uge i32 [[A:%.*]], 3
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[A_SGE]])
 ; CHECK-NEXT:    [[SUB:%.*]] = add nsw i32 [[A]], -3
 ; CHECK-NEXT:    ret i1 true
@@ -835,7 +835,7 @@ entry:
 define i1 @add_neg_3_known_sge_uge_1(i32 %a) {
 ; CHECK-LABEL: @add_neg_3_known_sge_uge_1(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[A_SGE:%.*]] = icmp sge i32 [[A:%.*]], 4
+; CHECK-NEXT:    [[A_SGE:%.*]] = icmp samesign uge i32 [[A:%.*]], 4
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[A_SGE]])
 ; CHECK-NEXT:    [[SUB:%.*]] = add nsw i32 [[A]], -3
 ; CHECK-NEXT:    ret i1 true
@@ -851,7 +851,7 @@ entry:
 define i1 @add_neg_3_not_known_sge_ult_1(i32 %a) {
 ; CHECK-LABEL: @add_neg_3_not_known_sge_ult_1(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[A_SGE:%.*]] = icmp sge i32 [[A:%.*]], 2
+; CHECK-NEXT:    [[A_SGE:%.*]] = icmp samesign uge i32 [[A:%.*]], 2
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[A_SGE]])
 ; CHECK-NEXT:    [[SUB:%.*]] = add nsw i32 [[A]], -3
 ; CHECK-NEXT:    [[C:%.*]] = icmp ult i32 [[SUB]], [[A]]
@@ -868,7 +868,7 @@ entry:
 define i1 @add_neg_3_not_known_sge_uge_1(i32 %a) {
 ; CHECK-LABEL: @add_neg_3_not_known_sge_uge_1(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[A_SGE:%.*]] = icmp sge i32 [[A:%.*]], 2
+; CHECK-NEXT:    [[A_SGE:%.*]] = icmp samesign uge i32 [[A:%.*]], 2
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[A_SGE]])
 ; CHECK-NEXT:    [[SUB:%.*]] = add nsw i32 [[A]], -3
 ; CHECK-NEXT:    ret i1 true

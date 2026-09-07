@@ -33,7 +33,7 @@ define i1 @sgt_0_unsigned_a_ne_0(i8 %a) {
 
 define i1 @sgt_0_unsigned_a_sgt_0(i8 %a) {
 ; CHECK-LABEL: @sgt_0_unsigned_a_sgt_0(
-; CHECK-NEXT:    [[A_SGT_0:%.*]] = icmp sgt i8 [[A:%.*]], 0
+; CHECK-NEXT:    [[A_SGT_0:%.*]] = icmp samesign ugt i8 [[A:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[A_SGT_0]])
 ; CHECK-NEXT:    [[EXT:%.*]] = zext i8 [[A]] to i16
 ; CHECK-NEXT:    ret i1 true
@@ -47,7 +47,7 @@ define i1 @sgt_0_unsigned_a_sgt_0(i8 %a) {
 
 define i1 @sge_0_unsigned_a_sge_0(i8 %a) {
 ; CHECK-LABEL: @sge_0_unsigned_a_sge_0(
-; CHECK-NEXT:    [[A_SGE_0:%.*]] = icmp sge i8 [[A:%.*]], 0
+; CHECK-NEXT:    [[A_SGE_0:%.*]] = icmp samesign uge i8 [[A:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[A_SGE_0]])
 ; CHECK-NEXT:    [[EXT:%.*]] = zext i8 [[A]] to i16
 ; CHECK-NEXT:    ret i1 true
@@ -78,7 +78,7 @@ define i1 @sgt_1_unsigned_a_ne_0(i8 %a) {
 ; CHECK-NEXT:    [[A_NE_0:%.*]] = icmp ne i8 [[A:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[A_NE_0]])
 ; CHECK-NEXT:    [[EXT:%.*]] = zext i8 [[A]] to i16
-; CHECK-NEXT:    [[CMP:%.*]] = icmp sgt i16 [[EXT]], 1
+; CHECK-NEXT:    [[CMP:%.*]] = icmp samesign ugt i16 [[EXT]], 1
 ; CHECK-NEXT:    ret i1 [[CMP]]
 ;
   %a.ne.0 = icmp ne i8 %a, 0
@@ -107,7 +107,7 @@ define i1 @sge_no_const_unsigned_uge(i8 %a, i16 %b) {
 ; CHECK-NEXT:    [[EXT:%.*]] = zext i8 [[A:%.*]] to i16
 ; CHECK-NEXT:    [[A_UGE_B:%.*]] = icmp uge i16 [[EXT]], [[B:%.*]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[A_UGE_B]])
-; CHECK-NEXT:    [[B_POS:%.*]] = icmp sge i16 [[B]], 0
+; CHECK-NEXT:    [[B_POS:%.*]] = icmp samesign uge i16 [[B]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[B_POS]])
 ; CHECK-NEXT:    ret i1 true
 ;
@@ -138,7 +138,7 @@ define i1 @sgt_0_unsigned_a_ugt_neg_10(i8 %a) {
 define i1 @sge_neg_1_sge_0_known(i8 %a) {
 ; CHECK-LABEL: @sge_neg_1_sge_0_known(
 ; CHECK-NEXT:    [[EXT:%.*]] = zext i8 [[A:%.*]] to i16
-; CHECK-NEXT:    [[A_NE_0:%.*]] = icmp sge i16 [[EXT]], 0
+; CHECK-NEXT:    [[A_NE_0:%.*]] = icmp samesign uge i16 [[EXT]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[A_NE_0]])
 ; CHECK-NEXT:    ret i1 true
 ;

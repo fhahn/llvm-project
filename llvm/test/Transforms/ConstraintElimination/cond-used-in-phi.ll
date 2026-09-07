@@ -166,7 +166,7 @@ define i1 @test_if_then_2(i1 %c, i8 %x) {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    br i1 [[C:%.*]], label [[IF:%.*]], label [[JOIN:%.*]]
 ; CHECK:       if:
-; CHECK-NEXT:    [[CMP1:%.*]] = icmp sgt i8 [[X:%.*]], 1
+; CHECK-NEXT:    [[CMP1:%.*]] = icmp samesign ugt i8 [[X:%.*]], 1
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[CMP1]])
 ; CHECK-NEXT:    br label [[JOIN]]
 ; CHECK:       join:

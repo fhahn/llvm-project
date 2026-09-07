@@ -300,7 +300,7 @@ exit:
 define void @test_monotonic_ptr_iv_step_sign_positive_through_assume_multi_exit(ptr %start, i16 %len, i16 %step) {
 ; CHECK-LABEL: @test_monotonic_ptr_iv_step_sign_positive_through_assume_multi_exit(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[STEP_POS:%.*]] = icmp sge i16 [[STEP:%.*]], 0
+; CHECK-NEXT:    [[STEP_POS:%.*]] = icmp samesign uge i16 [[STEP:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[STEP_POS]])
 ; CHECK-NEXT:    [[UPPER:%.*]] = getelementptr inbounds i32, ptr [[START:%.*]], i16 [[LEN:%.*]]
 ; CHECK-NEXT:    [[LEN_NEG:%.*]] = icmp slt i16 [[LEN]], 0
@@ -784,7 +784,7 @@ define void @test_monotonic_ptr_iv_inc_1_check_outside_loop(ptr %start, i16 %len
 ; CHECK-LABEL: @test_monotonic_ptr_iv_inc_1_check_outside_loop(
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[UPPER:%.*]] = getelementptr inbounds i32, ptr [[START:%.*]], i16 [[LEN:%.*]]
-; CHECK-NEXT:    [[LEN_NEG:%.*]] = icmp sge i16 [[LEN]], 0
+; CHECK-NEXT:    [[LEN_NEG:%.*]] = icmp samesign uge i16 [[LEN]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[LEN_NEG]])
 ; CHECK-NEXT:    br label [[LOOP_PH:%.*]]
 ; CHECK:       loop.ph:

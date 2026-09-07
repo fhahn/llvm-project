@@ -7,7 +7,7 @@ declare void @llvm.assume(i1)
 
 define i1 @gep_idx_implicit_truncate(ptr %dst, i64 %off) {
 ; CHECK-LABEL: @gep_idx_implicit_truncate(
-; CHECK-NEXT:    [[POS:%.*]] = icmp sge i64 [[OFF:%.*]], 0
+; CHECK-NEXT:    [[POS:%.*]] = icmp samesign uge i64 [[OFF:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[POS]])
 ; CHECK-NEXT:    [[GEP_OFF:%.*]] = getelementptr inbounds i8, ptr [[DST:%.*]], i64 [[OFF]]
 ; CHECK-NEXT:    ret i1 true
@@ -21,7 +21,7 @@ define i1 @gep_idx_implicit_truncate(ptr %dst, i64 %off) {
 
 define i1 @gep_idx_explicit_truncate(ptr %dst, i64 %off) {
 ; CHECK-LABEL: @gep_idx_explicit_truncate(
-; CHECK-NEXT:    [[POS:%.*]] = icmp sge i64 [[OFF:%.*]], 0
+; CHECK-NEXT:    [[POS:%.*]] = icmp samesign uge i64 [[OFF:%.*]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[POS]])
 ; CHECK-NEXT:    [[T:%.*]] = trunc i64 [[OFF]] to i32
 ; CHECK-NEXT:    [[GEP_OFF:%.*]] = getelementptr inbounds i8, ptr [[DST:%.*]], i32 [[T]]

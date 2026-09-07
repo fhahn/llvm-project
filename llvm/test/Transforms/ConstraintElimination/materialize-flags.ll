@@ -535,11 +535,11 @@ define i64 @mul_nuw_from_nsw_and_non_negative(i64 %x, i64 %y, i64 %z) {
 ; CHECK-LABEL: define i64 @mul_nuw_from_nsw_and_non_negative(
 ; CHECK-SAME: i64 [[X:%.*]], i64 [[Y:%.*]], i64 [[Z:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[C_0:%.*]] = icmp sge i64 [[X]], [[Z]]
+; CHECK-NEXT:    [[C_0:%.*]] = icmp samesign uge i64 [[X]], [[Z]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[C_0]])
-; CHECK-NEXT:    [[C_1:%.*]] = icmp sge i64 [[Z]], 0
+; CHECK-NEXT:    [[C_1:%.*]] = icmp samesign uge i64 [[Z]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[C_1]])
-; CHECK-NEXT:    [[C_2:%.*]] = icmp sge i64 [[Y]], 0
+; CHECK-NEXT:    [[C_2:%.*]] = icmp samesign uge i64 [[Y]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[C_2]])
 ; CHECK-NEXT:    [[MUL:%.*]] = mul nuw nsw i64 [[X]], [[Y]]
 ; CHECK-NEXT:    ret i64 [[MUL]]
@@ -560,9 +560,9 @@ define i64 @mul_no_nuw_from_nsw_second_operand_may_be_negative(i64 %x, i64 %y, i
 ; CHECK-LABEL: define i64 @mul_no_nuw_from_nsw_second_operand_may_be_negative(
 ; CHECK-SAME: i64 [[X:%.*]], i64 [[Y:%.*]], i64 [[Z:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[C_0:%.*]] = icmp sge i64 [[X]], [[Z]]
+; CHECK-NEXT:    [[C_0:%.*]] = icmp samesign uge i64 [[X]], [[Z]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[C_0]])
-; CHECK-NEXT:    [[C_1:%.*]] = icmp sge i64 [[Z]], 0
+; CHECK-NEXT:    [[C_1:%.*]] = icmp samesign uge i64 [[Z]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[C_1]])
 ; CHECK-NEXT:    [[MUL:%.*]] = mul nsw i64 [[X]], [[Y]]
 ; CHECK-NEXT:    ret i64 [[MUL]]
@@ -581,9 +581,9 @@ define i64 @shl_nuw_from_nsw_and_non_negative(i64 %x, i64 %s, i64 %z) {
 ; CHECK-LABEL: define i64 @shl_nuw_from_nsw_and_non_negative(
 ; CHECK-SAME: i64 [[X:%.*]], i64 [[S:%.*]], i64 [[Z:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[C_0:%.*]] = icmp sge i64 [[X]], [[Z]]
+; CHECK-NEXT:    [[C_0:%.*]] = icmp samesign uge i64 [[X]], [[Z]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[C_0]])
-; CHECK-NEXT:    [[C_1:%.*]] = icmp sge i64 [[Z]], 0
+; CHECK-NEXT:    [[C_1:%.*]] = icmp samesign uge i64 [[Z]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[C_1]])
 ; CHECK-NEXT:    [[SHL:%.*]] = shl nuw nsw i64 [[X]], [[S]]
 ; CHECK-NEXT:    ret i64 [[SHL]]
@@ -602,9 +602,9 @@ define i64 @shl_no_nuw_non_negative_without_nsw(i64 %x, i64 %s, i64 %z) {
 ; CHECK-LABEL: define i64 @shl_no_nuw_non_negative_without_nsw(
 ; CHECK-SAME: i64 [[X:%.*]], i64 [[S:%.*]], i64 [[Z:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[C_0:%.*]] = icmp sge i64 [[X]], [[Z]]
+; CHECK-NEXT:    [[C_0:%.*]] = icmp samesign uge i64 [[X]], [[Z]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[C_0]])
-; CHECK-NEXT:    [[C_1:%.*]] = icmp sge i64 [[Z]], 0
+; CHECK-NEXT:    [[C_1:%.*]] = icmp samesign uge i64 [[Z]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[C_1]])
 ; CHECK-NEXT:    [[SHL:%.*]] = shl i64 [[X]], [[S]]
 ; CHECK-NEXT:    ret i64 [[SHL]]

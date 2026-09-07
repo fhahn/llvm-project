@@ -255,7 +255,7 @@ define i1 @gep_nusw_index_known_non_negative(ptr %p, i64 %idx) {
 ; CHECK-LABEL: define i1 @gep_nusw_index_known_non_negative(
 ; CHECK-SAME: ptr [[P:%.*]], i64 [[IDX:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[C:%.*]] = icmp sge i64 [[IDX]], 0
+; CHECK-NEXT:    [[C:%.*]] = icmp samesign uge i64 [[IDX]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[C]])
 ; CHECK-NEXT:    [[GEP:%.*]] = getelementptr inbounds i8, ptr [[P]], i64 [[IDX]]
 ; CHECK-NEXT:    [[GEP_4:%.*]] = getelementptr inbounds i8, ptr [[GEP]], i64 4

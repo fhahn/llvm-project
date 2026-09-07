@@ -154,6 +154,8 @@ struct FactOrCheck {
     return Ty == EntryTy::InstCheck || Ty == EntryTy::UseCheck;
   }
 
+  bool isInstCheck() const { return Ty == EntryTy::InstCheck; }
+
   Instruction *getContextInst() const {
     assert(!isConditionFact());
     if (Ty == EntryTy::UseCheck)
@@ -317,6 +319,10 @@ public:
   /// Returns true if \p V is known to be non-negative, either because the
   /// signed system implies it or because ValueTracking can prove it.
   bool isKnownNonNegative(Value *V) const;
+
+  /// Returns true if \p V is known to be negative, either because the signed
+  /// system implies it or because ValueTracking can prove it.
+  bool isKnownNegative(Value *V) const;
 
   void addFact(CmpInst::Predicate Pred, Value *A, Value *B, unsigned NumIn,
                unsigned NumOut, SmallVectorImpl<StackEntry> &DFSInStack);
@@ -913,6 +919,11 @@ bool ConstraintInfo::isKnownNonNegative(Value *V) const {
          ::isKnownNonNegative(V, DL, /*Depth=*/MaxAnalysisRecursionDepth - 1);
 }
 
+bool ConstraintInfo::isKnownNegative(Value *V) const {
+  return doesHold(CmpInst::ICMP_SLT, V, ConstantInt::get(V->getType(), 0)) ||
+         ::isKnownNegative(V, DL, /*Depth=*/MaxAnalysisRecursionDepth - 1);
+}
+
 void ConstraintInfo::transferToOtherSystem(
     CmpInst::Predicate Pred, Value *A, Value *B, unsigned NumIn,
     unsigned NumOut, SmallVectorImpl<StackEntry> &DFSInStack) {
@@ -1306,6 +1317,13 @@ static bool getConstraintFromMemoryAccess(GetElementPtrInst &GEP,
 /// Returns true if \p I is a candidate whose poison-generating flags may be
 /// strengthened using the constraint systems.
 static bool canStrengthenFlags(Instruction *I) {
+  // A signed relational compare of two same-sign operands is equivalent to the
+  // unsigned one, which samesign records. The unsigned form is canonical and
+  // understood by more consumers, e.g. SCEV.
+  if (auto *Cmp = dyn_cast<ICmpInst>(I))
+    return Cmp->isRelational() && Cmp->isSigned() &&
+           Cmp->getOperand(0)->getType()->isIntegerTy();
+
   auto *BO = dyn_cast<BinaryOperator>(I);
   if (!BO || !BO->getType()->isIntegerTy())
     return false;
@@ -1365,6 +1383,21 @@ static bool tryToStrengthenFlags(Instruction *I, ConstraintInfo &Info,
 
   using OBO = OverflowingBinaryOperator;
   Value *Op0 = I->getOperand(0), *Op1 = I->getOperand(1);
+
+  // A signed relational compare whose operands are both known non-negative (or
+  // both known negative) compares the same way unsigned. Turn it into the
+  // canonical unsigned form and record the operands' matching sign, so that
+  // consumers reasoning about unsigned predicates can use it.
+  if (auto *Cmp = dyn_cast<ICmpInst>(I)) {
+    if (!(Info.isKnownNonNegative(Op0) && Info.isKnownNonNegative(Op1)) &&
+        !(Info.isKnownNegative(Op0) && Info.isKnownNegative(Op1)))
+      return false;
+    LLVM_DEBUG(dbgs() << "Making " << *I << " unsigned samesign\n");
+    Cmp->setPredicate(Cmp->getUnsignedPredicate());
+    Cmp->setSameSign();
+    return true;
+  }
+
   switch (I->getOpcode()) {
   case Instruction::Sub: {
     // Op0 - Op1 does not wrap unsigned, if Op0 >=u Op1.
@@ -1434,6 +1467,10 @@ void State::addInfoFor(BasicBlock &BB) {
           continue;
         WorkList.push_back(FactOrCheck::getCheck(DTN, &U));
       }
+      // Also queue the compare itself, to try to strengthen its predicate using
+      // the facts that hold on entry to its block.
+      if (canStrengthenFlags(&I))
+        WorkList.push_back(FactOrCheck::getCheck(DT.getNode(&BB), &I));
       continue;
     }
 
@@ -2306,7 +2343,9 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
       Instruction *Inst = CB.getInstructionToSimplify();
       if (!Inst)
         continue;
-      if (canStrengthenFlags(Inst)) {
+      // Only entries queued for the instruction itself strengthen flags; a use
+      // of a compare must still go through ordinary condition folding below.
+      if (CB.isInstCheck() && canStrengthenFlags(Inst)) {
         Changed |= tryToStrengthenFlags(Inst, Info, ToRemove);
         continue;
       }

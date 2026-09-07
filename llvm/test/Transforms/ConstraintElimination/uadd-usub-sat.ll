@@ -66,11 +66,11 @@ define i1 @pr135603(i64 %conv6, i64 %str.coerce, ptr %conv) {
 define i64 @usub_sat_signed_precondition(i64 %a, i64 %b) {
 ; CHECK-LABEL: define i64 @usub_sat_signed_precondition(
 ; CHECK-SAME: i64 [[A:%.*]], i64 [[B:%.*]]) {
-; CHECK-NEXT:    [[A_NNEG:%.*]] = icmp sge i64 [[A]], 0
+; CHECK-NEXT:    [[A_NNEG:%.*]] = icmp samesign uge i64 [[A]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[A_NNEG]])
-; CHECK-NEXT:    [[B_NNEG:%.*]] = icmp sge i64 [[B]], 0
+; CHECK-NEXT:    [[B_NNEG:%.*]] = icmp samesign uge i64 [[B]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[B_NNEG]])
-; CHECK-NEXT:    [[PRE:%.*]] = icmp sge i64 [[A]], [[B]]
+; CHECK-NEXT:    [[PRE:%.*]] = icmp samesign uge i64 [[A]], [[B]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[PRE]])
 ; CHECK-NEXT:    [[SUB:%.*]] = sub nuw nsw i64 [[A]], [[B]]
 ; CHECK-NEXT:    ret i64 [[SUB]]
@@ -89,14 +89,14 @@ define i64 @usub_sat_signed_precondition(i64 %a, i64 %b) {
 define i1 @usub_sat_span_offset(i64 %count, i64 %base, i64 %n) {
 ; CHECK-LABEL: define i1 @usub_sat_span_offset(
 ; CHECK-SAME: i64 [[COUNT:%.*]], i64 [[BASE:%.*]], i64 [[N:%.*]]) {
-; CHECK-NEXT:    [[COUNT_NNEG:%.*]] = icmp sge i64 [[COUNT]], 0
+; CHECK-NEXT:    [[COUNT_NNEG:%.*]] = icmp samesign uge i64 [[COUNT]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[COUNT_NNEG]])
-; CHECK-NEXT:    [[BASE_NNEG:%.*]] = icmp sge i64 [[BASE]], 0
+; CHECK-NEXT:    [[BASE_NNEG:%.*]] = icmp samesign uge i64 [[BASE]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[BASE_NNEG]])
-; CHECK-NEXT:    [[N_NNEG:%.*]] = icmp sge i64 [[N]], 0
+; CHECK-NEXT:    [[N_NNEG:%.*]] = icmp samesign uge i64 [[N]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[N_NNEG]])
 ; CHECK-NEXT:    [[REM:%.*]] = sub nsw i64 [[COUNT]], [[N]]
-; CHECK-NEXT:    [[FITS:%.*]] = icmp sge i64 [[REM]], [[BASE]]
+; CHECK-NEXT:    [[FITS:%.*]] = icmp samesign uge i64 [[REM]], [[BASE]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[FITS]])
 ; CHECK-NEXT:    [[AVAIL:%.*]] = sub nuw nsw i64 [[COUNT]], [[BASE]]
 ; CHECK-NEXT:    ret i1 true
@@ -150,7 +150,7 @@ define i1 @usub_sat_unsigned_query(i64 %a, i64 %b) {
 define i64 @usub_sat_no_nonneg_rhs(i64 %a, i64 %b) {
 ; CHECK-LABEL: define i64 @usub_sat_no_nonneg_rhs(
 ; CHECK-SAME: i64 [[A:%.*]], i64 [[B:%.*]]) {
-; CHECK-NEXT:    [[A_NNEG:%.*]] = icmp sge i64 [[A]], 0
+; CHECK-NEXT:    [[A_NNEG:%.*]] = icmp samesign uge i64 [[A]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[A_NNEG]])
 ; CHECK-NEXT:    [[PRE:%.*]] = icmp sge i64 [[A]], [[B]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[PRE]])
@@ -168,9 +168,9 @@ define i64 @usub_sat_no_nonneg_rhs(i64 %a, i64 %b) {
 define i64 @usub_sat_nonneg_no_order(i64 %a, i64 %b) {
 ; CHECK-LABEL: define i64 @usub_sat_nonneg_no_order(
 ; CHECK-SAME: i64 [[A:%.*]], i64 [[B:%.*]]) {
-; CHECK-NEXT:    [[A_NNEG:%.*]] = icmp sge i64 [[A]], 0
+; CHECK-NEXT:    [[A_NNEG:%.*]] = icmp samesign uge i64 [[A]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[A_NNEG]])
-; CHECK-NEXT:    [[B_NNEG:%.*]] = icmp sge i64 [[B]], 0
+; CHECK-NEXT:    [[B_NNEG:%.*]] = icmp samesign uge i64 [[B]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[B_NNEG]])
 ; CHECK-NEXT:    [[SUB:%.*]] = call i64 @llvm.usub.sat.i64(i64 [[A]], i64 [[B]])
 ; CHECK-NEXT:    ret i64 [[SUB]]
