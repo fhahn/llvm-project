@@ -84,6 +84,39 @@ define void @basic_uge(i32 %x, i32 %y) {
   ret void
 }
 
+; (X + C2) == C is rewritten as X == (C - C2) and folds away using the
+; assumption on X, even though the add has another use.
+define i1 @multiuse_add_ne_implied_by_assume(i64 %n, ptr %p) {
+; CHECK-LABEL: @multiuse_add_ne_implied_by_assume(
+; CHECK-NEXT:    [[C:%.*]] = icmp ugt i64 [[N:%.*]], 10
+; CHECK-NEXT:    call void @llvm.assume(i1 [[C]])
+; CHECK-NEXT:    [[ADD:%.*]] = add i64 [[N]], -1
+; CHECK-NEXT:    store i64 [[ADD]], ptr [[P:%.*]], align 8
+; CHECK-NEXT:    ret i1 true
+;
+  %c = icmp ugt i64 %n, 10
+  call void @llvm.assume(i1 %c)
+  %add = add i64 %n, -1
+  store i64 %add, ptr %p, align 8
+  %cmp = icmp ne i64 %add, 0
+  ret i1 %cmp
+}
+
+; Same as above, but there is no assumption on %n, so the rewritten compare
+; does not fold and the multi-use add is left alone.
+define i1 @multiuse_add_eq_not_implied(i64 %n, ptr %p) {
+; CHECK-LABEL: @multiuse_add_eq_not_implied(
+; CHECK-NEXT:    [[ADD:%.*]] = add i64 [[N:%.*]], -1
+; CHECK-NEXT:    store i64 [[ADD]], ptr [[P:%.*]], align 8
+; CHECK-NEXT:    [[CMP:%.*]] = icmp eq i64 [[ADD]], 0
+; CHECK-NEXT:    ret i1 [[CMP]]
+;
+  %add = add i64 %n, -1
+  store i64 %add, ptr %p, align 8
+  %cmp = icmp eq i64 %add, 0
+  ret i1 %cmp
+}
+
 ; This does not simplify in InstSimplify, because AssumptionCache tracker
 ; does not track values through "and". The "and" assume will be broken
 ; down into two separate assume calls by InstCombine.
