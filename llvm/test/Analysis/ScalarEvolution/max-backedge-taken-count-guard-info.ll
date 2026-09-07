@@ -2042,3 +2042,293 @@ loop:
 exit:
   ret void
 }
+
+; The guards are on pointers with unrelated bases, so the difference is not
+; expressible and nothing must be derived from them.
+define void @two_sided_guard_unrelated_pointers(ptr %dst, ptr %a, ptr %b) {
+; CHECK-LABEL: 'two_sided_guard_unrelated_pointers'
+; CHECK-NEXT:  Classifying expressions for: @two_sided_guard_unrelated_pointers
+; CHECK-NEXT:    %add = getelementptr i8, ptr %a, i64 8
+; CHECK-NEXT:    --> (8 + %a) U: full-set S: full-set
+; CHECK-NEXT:    %and = and i1 %c.0, %c.1
+; CHECK-NEXT:    --> (%c.0 umin %c.1) U: full-set S: full-set
+; CHECK-NEXT:    %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,100) S: [0,100) Exits: 99 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %gep = getelementptr i8, ptr %dst, i64 %iv
+; CHECK-NEXT:    --> {%dst,+,1}<nw><%loop> U: full-set S: full-set Exits: (99 + %dst) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add nuw i64 %iv, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,101) S: [1,101) Exits: 100 LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @two_sided_guard_unrelated_pointers
+; CHECK-NEXT:  Loop %loop: backedge-taken count is i64 99
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 99
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i64 99
+; CHECK-NEXT:  Loop %loop: Trip multiple is 100
+;
+entry:
+  %c.0 = icmp ult ptr %a, %b
+  %add = getelementptr i8, ptr %a, i64 8
+  %c.1 = icmp ult ptr %b, %add
+  %and = and i1 %c.0, %c.1
+  br i1 %and, label %loop, label %exit
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep = getelementptr i8, ptr %dst, i64 %iv
+  store i8 0, ptr %gep
+  %iv.next = add nuw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, 100
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; Same as @two_sided_guard_bounds_difference, but with both guards spelled as
+; unsigned greater-than. InstCombine does not canonicalize those to less-than,
+; so they are normalized when collecting the guards.
+define void @two_sided_guard_bounds_difference_ugt(ptr %dst, i64 %n, i64 %start) {
+; CHECK-LABEL: 'two_sided_guard_bounds_difference_ugt'
+; CHECK-NEXT:  Classifying expressions for: @two_sided_guard_bounds_difference_ugt
+; CHECK-NEXT:    %add = add i64 %start, 8
+; CHECK-NEXT:    --> (8 + %start) U: full-set S: full-set
+; CHECK-NEXT:    %and = and i1 %c.0, %c.1
+; CHECK-NEXT:    --> (%c.0 umin %c.1) U: full-set S: full-set
+; CHECK-NEXT:    %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {%start,+,1}<nuw><%loop> U: full-set S: full-set Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %gep = getelementptr i8, ptr %dst, i64 %iv
+; CHECK-NEXT:    --> {(%start + %dst),+,1}<nw><%loop> U: full-set S: full-set Exits: (-1 + %n + %dst) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add nuw i64 %iv, 1
+; CHECK-NEXT:    --> {(1 + %start),+,1}<nuw><%loop> U: full-set S: full-set Exits: %n LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @two_sided_guard_bounds_difference_ugt
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + (-1 * %start) + %n)
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 6
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + (-1 * %start) + %n)
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %c.0 = icmp ugt i64 %n, %start
+  %add = add i64 %start, 8
+  %c.1 = icmp ugt i64 %add, %n
+  %and = and i1 %c.0, %c.1
+  br i1 %and, label %loop, label %exit
+
+loop:
+  %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop ]
+  %gep = getelementptr i8, ptr %dst, i64 %iv
+  store i8 0, ptr %gep
+  %iv.next = add nuw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; With a non-strict lower guard the difference may be zero, so the derived
+; bound is C rather than (C - 1).
+define void @two_sided_guard_non_strict_lower(ptr %dst, i64 %n, i64 %start) {
+; CHECK-LABEL: 'two_sided_guard_non_strict_lower'
+; CHECK-NEXT:  Classifying expressions for: @two_sided_guard_non_strict_lower
+; CHECK-NEXT:    %add = add i64 %start, 8
+; CHECK-NEXT:    --> (8 + %start) U: full-set S: full-set
+; CHECK-NEXT:    %and = and i1 %c.0, %c.1
+; CHECK-NEXT:    --> (%c.1 umin %c.0) U: full-set S: full-set
+; CHECK-NEXT:    %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {%start,+,1}<nuw><%loop> U: full-set S: full-set Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %gep = getelementptr i8, ptr %dst, i64 %iv
+; CHECK-NEXT:    --> {(%start + %dst),+,1}<nw><%loop> U: full-set S: full-set Exits: (-1 + %n + %dst) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add nuw i64 %iv, 1
+; CHECK-NEXT:    --> {(1 + %start),+,1}<nuw><%loop> U: full-set S: full-set Exits: %n LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @two_sided_guard_non_strict_lower
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + (-1 * %start) + %n)
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + (-1 * %start) + %n)
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %c.0 = icmp ule i64 %start, %n
+  %add = add i64 %start, 8
+  %c.1 = icmp ult i64 %n, %add
+  %and = and i1 %c.0, %c.1
+  br i1 %and, label %loop, label %exit
+
+loop:
+  %iv = phi i64 [ %start, %entry ], [ %iv.next, %loop ]
+  %gep = getelementptr i8, ptr %dst, i64 %iv
+  store i8 0, ptr %gep
+  %iv.next = add nuw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The trip count is the truncated difference (trunc (%n - %start) to i32).
+; getTruncateExpr distributes the truncate over the subtraction, so the guard
+; info collected for the wide difference has to be recovered from the pair of
+; narrow truncates. The zero check is needed because a zero trip count would
+; wrap the narrow IV around. This is the shape of
+; SimpleBitstreamCursor::fillCurWord.
+define void @two_sided_guard_bounds_difference_trunc(ptr %dst, i64 %n, i64 %start) {
+; CHECK-LABEL: 'two_sided_guard_bounds_difference_trunc'
+; CHECK-NEXT:  Classifying expressions for: @two_sided_guard_bounds_difference_trunc
+; CHECK-NEXT:    %add = add i64 %start, 8
+; CHECK-NEXT:    --> (8 + %start) U: full-set S: full-set
+; CHECK-NEXT:    %and = and i1 %c.0, %c.1
+; CHECK-NEXT:    --> (%c.1 umin %c.0) U: full-set S: full-set
+; CHECK-NEXT:    %sub = sub i64 %n, %start
+; CHECK-NEXT:    --> ((-1 * %start) + %n) U: full-set S: full-set
+; CHECK-NEXT:    %len = trunc i64 %sub to i32
+; CHECK-NEXT:    --> ((trunc i64 %n to i32) + (-1 * (trunc i64 %start to i32))) U: full-set S: full-set
+; CHECK-NEXT:    %iv = phi i32 [ 0, %ph ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,7) S: [0,7) Exits: (-1 + (trunc i64 %n to i32) + (-1 * (trunc i64 %start to i32))) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %idx = zext i32 %iv to i64
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,7) S: [0,7) Exits: (zext i32 (-1 + (trunc i64 %n to i32) + (-1 * (trunc i64 %start to i32))) to i64) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %gep = getelementptr i8, ptr %dst, i64 %idx
+; CHECK-NEXT:    --> {%dst,+,1}<nw><%loop> U: full-set S: full-set Exits: ((zext i32 (-1 + (trunc i64 %n to i32) + (-1 * (trunc i64 %start to i32))) to i64) + %dst) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add i32 %iv, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,8) S: [1,8) Exits: ((trunc i64 %n to i32) + (-1 * (trunc i64 %start to i32))) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @two_sided_guard_bounds_difference_trunc
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + (trunc i64 %n to i32) + (-1 * (trunc i64 %start to i32)))
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 6
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + (trunc i64 %n to i32) + (-1 * (trunc i64 %start to i32)))
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %c.0 = icmp ult i64 %start, %n
+  %add = add i64 %start, 8
+  %c.1 = icmp ult i64 %n, %add
+  %and = and i1 %c.0, %c.1
+  br i1 %and, label %ph, label %exit
+
+ph:
+  %sub = sub i64 %n, %start
+  %len = trunc i64 %sub to i32
+  %zero = icmp eq i32 %len, 0
+  br i1 %zero, label %exit, label %loop
+
+loop:
+  %iv = phi i32 [ 0, %ph ], [ %iv.next, %loop ]
+  %idx = zext i32 %iv to i64
+  %gep = getelementptr i8, ptr %dst, i64 %idx
+  store i8 0, ptr %gep
+  %iv.next = add i32 %iv, 1
+  %ec = icmp eq i32 %iv.next, %len
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The wide difference is bounded by 2^33, which does not fit into the narrow
+; type, so nothing may be derived for the truncated difference.
+define void @two_sided_guard_bounds_difference_trunc_bound_too_wide(ptr %dst, i64 %n, i64 %start) {
+; CHECK-LABEL: 'two_sided_guard_bounds_difference_trunc_bound_too_wide'
+; CHECK-NEXT:  Classifying expressions for: @two_sided_guard_bounds_difference_trunc_bound_too_wide
+; CHECK-NEXT:    %add = add i64 %start, 8589934592
+; CHECK-NEXT:    --> (8589934592 + %start) U: full-set S: full-set
+; CHECK-NEXT:    %and = and i1 %c.0, %c.1
+; CHECK-NEXT:    --> (%c.1 umin %c.0) U: full-set S: full-set
+; CHECK-NEXT:    %sub = sub i64 %n, %start
+; CHECK-NEXT:    --> ((-1 * %start) + %n) U: full-set S: full-set
+; CHECK-NEXT:    %len = trunc i64 %sub to i32
+; CHECK-NEXT:    --> ((trunc i64 %n to i32) + (-1 * (trunc i64 %start to i32))) U: full-set S: full-set
+; CHECK-NEXT:    %iv = phi i32 [ 0, %ph ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><%loop> U: [0,-1) S: [0,-1) Exits: (-1 + (trunc i64 %n to i32) + (-1 * (trunc i64 %start to i32))) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %idx = zext i32 %iv to i64
+; CHECK-NEXT:    --> {0,+,1}<nuw><%loop> U: [0,4294967295) S: [0,4294967295) Exits: (zext i32 (-1 + (trunc i64 %n to i32) + (-1 * (trunc i64 %start to i32))) to i64) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %gep = getelementptr i8, ptr %dst, i64 %idx
+; CHECK-NEXT:    --> {%dst,+,1}<nw><%loop> U: full-set S: full-set Exits: ((zext i32 (-1 + (trunc i64 %n to i32) + (-1 * (trunc i64 %start to i32))) to i64) + %dst) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add i32 %iv, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><%loop> U: [1,0) S: [1,0) Exits: ((trunc i64 %n to i32) + (-1 * (trunc i64 %start to i32))) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @two_sided_guard_bounds_difference_trunc_bound_too_wide
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + (trunc i64 %n to i32) + (-1 * (trunc i64 %start to i32)))
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 -2
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + (trunc i64 %n to i32) + (-1 * (trunc i64 %start to i32)))
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %c.0 = icmp ult i64 %start, %n
+  %add = add i64 %start, 8589934592
+  %c.1 = icmp ult i64 %n, %add
+  %and = and i1 %c.0, %c.1
+  br i1 %and, label %ph, label %exit
+
+ph:
+  %sub = sub i64 %n, %start
+  %len = trunc i64 %sub to i32
+  %zero = icmp eq i32 %len, 0
+  br i1 %zero, label %exit, label %loop
+
+loop:
+  %iv = phi i32 [ 0, %ph ], [ %iv.next, %loop ]
+  %idx = zext i32 %iv to i64
+  %gep = getelementptr i8, ptr %dst, i64 %idx
+  store i8 0, ptr %gep
+  %iv.next = add i32 %iv, 1
+  %ec = icmp eq i32 %iv.next, %len
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The two truncates have different source types, so there is no common wide
+; difference to look up and nothing must be derived.
+define void @two_sided_guard_bounds_difference_trunc_mismatched_widths(ptr %dst, i64 %n, i128 %start) {
+; CHECK-LABEL: 'two_sided_guard_bounds_difference_trunc_mismatched_widths'
+; CHECK-NEXT:  Classifying expressions for: @two_sided_guard_bounds_difference_trunc_mismatched_widths
+; CHECK-NEXT:    %start.trunc = trunc i128 %start to i64
+; CHECK-NEXT:    --> (trunc i128 %start to i64) U: full-set S: full-set
+; CHECK-NEXT:    %add = add i64 %start.trunc, 8
+; CHECK-NEXT:    --> (8 + (trunc i128 %start to i64)) U: full-set S: full-set
+; CHECK-NEXT:    %and = and i1 %c.0, %c.1
+; CHECK-NEXT:    --> (%c.1 umin %c.0) U: full-set S: full-set
+; CHECK-NEXT:    %t.n = trunc i64 %n to i32
+; CHECK-NEXT:    --> (trunc i64 %n to i32) U: full-set S: full-set
+; CHECK-NEXT:    %t.start = trunc i128 %start to i32
+; CHECK-NEXT:    --> (trunc i128 %start to i32) U: full-set S: full-set
+; CHECK-NEXT:    %len = sub i32 %t.n, %t.start
+; CHECK-NEXT:    --> ((trunc i64 %n to i32) + (-1 * (trunc i128 %start to i32))) U: full-set S: full-set
+; CHECK-NEXT:    %iv = phi i32 [ 0, %ph ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><%loop> U: [0,-1) S: [0,-1) Exits: (-1 + (trunc i64 %n to i32) + (-1 * (trunc i128 %start to i32))) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %idx = zext i32 %iv to i64
+; CHECK-NEXT:    --> {0,+,1}<nuw><%loop> U: [0,4294967295) S: [0,4294967295) Exits: (zext i32 (-1 + (trunc i64 %n to i32) + (-1 * (trunc i128 %start to i32))) to i64) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %gep = getelementptr i8, ptr %dst, i64 %idx
+; CHECK-NEXT:    --> {%dst,+,1}<nw><%loop> U: full-set S: full-set Exits: ((zext i32 (-1 + (trunc i64 %n to i32) + (-1 * (trunc i128 %start to i32))) to i64) + %dst) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add i32 %iv, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><%loop> U: [1,0) S: [1,0) Exits: ((trunc i64 %n to i32) + (-1 * (trunc i128 %start to i32))) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @two_sided_guard_bounds_difference_trunc_mismatched_widths
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + (trunc i64 %n to i32) + (-1 * (trunc i128 %start to i32)))
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 -2
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + (trunc i64 %n to i32) + (-1 * (trunc i128 %start to i32)))
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %start.trunc = trunc i128 %start to i64
+  %c.0 = icmp ult i64 %start.trunc, %n
+  %add = add i64 %start.trunc, 8
+  %c.1 = icmp ult i64 %n, %add
+  %and = and i1 %c.0, %c.1
+  br i1 %and, label %ph, label %exit
+
+ph:
+  %t.n = trunc i64 %n to i32
+  %t.start = trunc i128 %start to i32
+  %len = sub i32 %t.n, %t.start
+  %zero = icmp eq i32 %len, 0
+  br i1 %zero, label %exit, label %loop
+
+loop:
+  %iv = phi i32 [ 0, %ph ], [ %iv.next, %loop ]
+  %idx = zext i32 %iv to i64
+  %gep = getelementptr i8, ptr %dst, i64 %idx
+  store i8 0, ptr %gep
+  %iv.next = add i32 %iv, 1
+  %ec = icmp eq i32 %iv.next, %len
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}

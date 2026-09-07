@@ -16383,8 +16383,31 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
         return nullptr;
       };
 
+      // Helper to look through a truncated subtraction: for
+      // (trunc(X) - trunc(Y)), check if there is guard info for the wider
+      // (X - Y) and if so return the truncated rewrite. getTruncateExpr
+      // distributes truncates over additions, so guard info collected for a
+      // wide difference is otherwise lost for its truncated uses.
+      //
+      // Truncation is a ring homomorphism, so the narrow difference is
+      // trunc(X - Y). A map entry is equal to its key whenever the guards
+      // hold, hence so are their truncations.
+      auto RewriteTruncatedSubtraction = [&](const SCEV *S) -> const SCEV * {
+        SCEVUse LHS, RHS;
+        const SCEV *WideLHS, *WideRHS;
+        if (!MatchBinarySub(S, LHS, RHS) ||
+            !match(LHS, m_scev_Trunc(m_SCEV(WideLHS))) ||
+            !match(RHS, m_scev_Trunc(m_SCEV(WideRHS))) ||
+            WideLHS->getType() != WideRHS->getType())
+          return nullptr;
+        const SCEV *Wide = Map.lookup(SE.getMinusSCEV(WideLHS, WideRHS));
+        return Wide ? SE.getTruncateExpr(Wide, S->getType()) : nullptr;
+      };
+
       // Check if Expr itself is a subtraction pattern with guard info.
       if (const SCEV *Rewritten = RewriteSubtraction(Expr))
+        return Rewritten;
+      if (const SCEV *Rewritten = RewriteTruncatedSubtraction(Expr))
         return Rewritten;
 
       // Trip count expressions sometimes consist of adding 3 operands, i.e.
@@ -16396,6 +16419,10 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
           const SCEV *Add =
               SE.getAddExpr(Expr->getOperand(1), Expr->getOperand(2));
           if (const SCEV *Rewritten = RewriteSubtraction(Add))
+            return SE.getAddExpr(
+                Expr->getOperand(0), Rewritten,
+                ScalarEvolution::maskFlags(Expr->getNoWrapFlags(), FlagMask));
+          if (const SCEV *Rewritten = RewriteTruncatedSubtraction(Add))
             return SE.getAddExpr(
                 Expr->getOperand(0), Rewritten,
                 ScalarEvolution::maskFlags(Expr->getNoWrapFlags(), FlagMask));
