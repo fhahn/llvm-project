@@ -115,13 +115,9 @@ void VPlanTransforms::replaceWideCanonicalIVWithWideIV(
   WideCanIV->eraseFromParent();
 }
 
-// Add a VPActiveLaneMaskPHIRecipe and related recipes to \p Plan and replace
-// the loop terminator with a branch-on-cond recipe with the negated
-// wide-active-lane-mask as operand. Note that this turns the loop into an
-// uncountable one. Only the existing terminator is replaced, all other existing
-// recipes/users remain unchanged, except for poison-generating flags being
-// dropped from the canonical IV increment. Return the created
-// VPActiveLaneMaskPHIRecipe.
+// Add a VPActiveLaneMaskPHIRecipe and replace the countable exit condition
+// with its negated backedge mask, preserving any early-exit condition. Drop
+// poison-generating flags from the canonical IV increment and return the phi.
 //
 // The function adds the following recipes:
 //
@@ -183,11 +179,17 @@ addVPLaneMaskPhiAndUpdateExitBranch(VPlan &Plan) {
                              "extract.next.alm.part");
   LaneMaskPhi->addBackedgeValue(ALM);
 
-  // Replace the original terminator with BranchOnCond. We have to invert the
-  // mask here because a true condition means jumping to the exit block.
+  // The negated mask is the loop's countable exit condition: a true condition
+  // means jumping to the exit block. For a loop with an uncountable early exit
+  // the latch already branches on two conditions, so only replace the countable
+  // one; otherwise replace the terminator with a BranchOnCond.
   auto *NotMask = Builder.createNot(ALM, DL);
-  Builder.createNaryOp(VPInstruction::BranchOnCond, {NotMask}, DL);
-  OriginalTerminator->eraseFromParent();
+  if (match(OriginalTerminator, m_BranchOnTwoConds())) {
+    OriginalTerminator->setOperand(1, NotMask);
+  } else {
+    Builder.createNaryOp(VPInstruction::BranchOnCond, {NotMask}, DL);
+    OriginalTerminator->eraseFromParent();
+  }
   return LaneMaskPhi;
 }
 
