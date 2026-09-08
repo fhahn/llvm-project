@@ -1349,6 +1349,11 @@ static bool doesHoldInRange(const ConstraintInfo &Info, Value *Op,
                         : APInt::getMinValue(BitWidth);
   APInt MaxVal = Signed ? APInt::getSignedMaxValue(BitWidth)
                         : APInt::getMaxValue(BitWidth);
+  // Bounds too large to be decomposed can be replaced by the largest usable
+  // one; proving the tighter bound implies the original.
+  if (!Signed && Max.uge(MaxConstraintValue))
+    Max = APInt(BitWidth, MaxConstraintValue - 1);
+
   Type *Ty = Op->getType();
   if (Min != MinVal &&
       !Info.doesHold(Signed ? CmpInst::ICMP_SGE : CmpInst::ICMP_UGE, Op,
