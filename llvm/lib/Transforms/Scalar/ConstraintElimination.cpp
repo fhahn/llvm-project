@@ -1317,8 +1317,7 @@ static bool canStrengthenFlags(Instruction *I) {
     return !BO->hasNoUnsignedWrap() && !isa<Constant>(BO->getOperand(1));
   case Instruction::Add:
     // NSW/NUW can be refined using constant ranges.
-    return (!BO->hasNoUnsignedWrap() || !BO->hasNoSignedWrap()) &&
-           isa<Constant>(BO->getOperand(1));
+    return !BO->hasNoUnsignedWrap() || !BO->hasNoSignedWrap();
   case Instruction::Mul:
   case Instruction::Shl:
     if (BO->hasNoUnsignedWrap() && BO->hasNoSignedWrap())
@@ -1366,18 +1365,29 @@ static bool doesHoldInRange(const ConstraintInfo &Info, Value *Op,
   return true;
 }
 
+/// Returns a range \p Op is known to be in according to \p Info, or the full
+/// set. For non-constant \p Op, only its sign is determined.
+static ConstantRange getRangeFromInfo(const ConstraintInfo &Info, Value *Op) {
+  unsigned BitWidth = Op->getType()->getScalarSizeInBits();
+  if (auto *C = dyn_cast<ConstantInt>(Op))
+    return ConstantRange(C->getValue());
+  for (auto Pred : {CmpInst::ICMP_SGE, CmpInst::ICMP_SLE})
+    if (Info.doesHold(Pred, Op, Constant::getNullValue(Op->getType())))
+      return ConstantRange::makeExactICmpRegion(Pred, APInt::getZero(BitWidth));
+  return ConstantRange::getFull(BitWidth);
+}
+
 static bool tryToStrengthenBinOpFlags(Instruction *I, Value *Op0, Value *Op1,
                                       ConstraintInfo &Info) {
-  auto *C = dyn_cast<ConstantInt>(Op1);
-  if (!C)
+  // Given a range for Op1, the ranges of Op0 for which the operation does not
+  // wrap are known; check if the systems imply one of them.
+  ConstantRange Other = getRangeFromInfo(Info, Op1);
+  if (Other.isFullSet())
     return false;
 
-  // For a constant Op1, the ranges of Op0 for which the operation does not
-  // wrap are known exactly; check if the systems imply one of them.
   bool Changed = false;
   auto Opcode = static_cast<Instruction::BinaryOps>(I->getOpcode());
   using OBO = OverflowingBinaryOperator;
-  ConstantRange Other(C->getValue());
   if (!I->hasNoUnsignedWrap() &&
       doesHoldInRange(Info, Op0,
                       ConstantRange::makeGuaranteedNoWrapRegion(

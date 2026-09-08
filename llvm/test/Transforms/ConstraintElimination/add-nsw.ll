@@ -979,9 +979,8 @@ define i1 @add_non_positive_slt(i64 %x, i64 %y, i64 %b) {
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[Y_NON_POS]])
 ; CHECK-NEXT:    [[C:%.*]] = icmp slt i64 [[X]], [[B:%.*]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[C]])
-; CHECK-NEXT:    [[SUB:%.*]] = add i64 [[X]], [[Y]]
-; CHECK-NEXT:    [[T:%.*]] = icmp slt i64 [[SUB]], [[B]]
-; CHECK-NEXT:    ret i1 [[T]]
+; CHECK-NEXT:    [[SUB:%.*]] = add nsw i64 [[X]], [[Y]]
+; CHECK-NEXT:    ret i1 true
 ;
   %x.non.neg = icmp sge i64 %x, 0
   call void @llvm.assume(i1 %x.non.neg)
@@ -1002,9 +1001,8 @@ define i1 @add_non_positive_slt_commuted(i64 %x, i64 %y, i64 %b) {
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[Y_NON_POS]])
 ; CHECK-NEXT:    [[C:%.*]] = icmp slt i64 [[X]], [[B:%.*]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[C]])
-; CHECK-NEXT:    [[SUB:%.*]] = add i64 [[Y]], [[X]]
-; CHECK-NEXT:    [[T:%.*]] = icmp slt i64 [[SUB]], [[B]]
-; CHECK-NEXT:    ret i1 [[T]]
+; CHECK-NEXT:    [[SUB:%.*]] = add nsw i64 [[Y]], [[X]]
+; CHECK-NEXT:    ret i1 true
 ;
   %x.non.neg = icmp sge i64 %x, 0
   call void @llvm.assume(i1 %x.non.neg)
@@ -1204,5 +1202,61 @@ define i64 @add_i64_bound_above_max_constraint_value(i64 %x) {
   %c = icmp ule i64 %x, -9223372036854775808
   call void @llvm.assume(i1 %c)
   %add = add i64 %x, 3
+  ret i64 %add
+}
+
+; %x <=u 100 and %y >=s 0 imply %x + %y does not wrap unsigned.
+define i8 @add_non_negative_op_gains_nuw(i8 %x, i8 %y) {
+; CHECK-LABEL: @add_non_negative_op_gains_nuw(
+; CHECK-NEXT:    [[C_1:%.*]] = icmp ule i8 [[X:%.*]], 100
+; CHECK-NEXT:    call void @llvm.assume(i1 [[C_1]])
+; CHECK-NEXT:    [[C_2:%.*]] = icmp sge i8 [[Y:%.*]], 0
+; CHECK-NEXT:    call void @llvm.assume(i1 [[C_2]])
+; CHECK-NEXT:    [[ADD:%.*]] = add nuw i8 [[X]], [[Y]]
+; CHECK-NEXT:    ret i8 [[ADD]]
+;
+  %c.1 = icmp ule i8 %x, 100
+  call void @llvm.assume(i1 %c.1)
+  %c.2 = icmp sge i8 %y, 0
+  call void @llvm.assume(i1 %c.2)
+  %add = add i8 %x, %y
+  ret i8 %add
+}
+
+; %x <=u 250 does not imply %x + %y does not wrap unsigned.
+define i8 @add_non_negative_op_no_nuw(i8 %x, i8 %y) {
+; CHECK-LABEL: @add_non_negative_op_no_nuw(
+; CHECK-NEXT:    [[C_1:%.*]] = icmp ule i8 [[X:%.*]], -6
+; CHECK-NEXT:    call void @llvm.assume(i1 [[C_1]])
+; CHECK-NEXT:    [[C_2:%.*]] = icmp sge i8 [[Y:%.*]], 0
+; CHECK-NEXT:    call void @llvm.assume(i1 [[C_2]])
+; CHECK-NEXT:    [[ADD:%.*]] = add i8 [[X]], [[Y]]
+; CHECK-NEXT:    ret i8 [[ADD]]
+;
+  %c.1 = icmp ule i8 %x, 250
+  call void @llvm.assume(i1 %c.1)
+  %c.2 = icmp sge i8 %y, 0
+  call void @llvm.assume(i1 %c.2)
+  %add = add i8 %x, %y
+  ret i8 %add
+}
+
+; %x >=s 0 implies (xor %x, -1) = -1 - %x is non-positive.
+define i64 @add_not_of_non_negative(i64 %x, i64 %y) {
+; CHECK-LABEL: @add_not_of_non_negative(
+; CHECK-NEXT:    [[C_1:%.*]] = icmp sge i64 [[X:%.*]], 0
+; CHECK-NEXT:    call void @llvm.assume(i1 [[C_1]])
+; CHECK-NEXT:    [[C_2:%.*]] = icmp sge i64 [[Y:%.*]], 0
+; CHECK-NEXT:    call void @llvm.assume(i1 [[C_2]])
+; CHECK-NEXT:    [[NOT:%.*]] = xor i64 [[X]], -1
+; CHECK-NEXT:    [[ADD:%.*]] = add nsw i64 [[Y]], [[NOT]]
+; CHECK-NEXT:    ret i64 [[ADD]]
+;
+  %c.1 = icmp sge i64 %x, 0
+  call void @llvm.assume(i1 %c.1)
+  %c.2 = icmp sge i64 %y, 0
+  call void @llvm.assume(i1 %c.2)
+  %not = xor i64 %x, -1
+  %add = add i64 %y, %not
   ret i64 %add
 }
