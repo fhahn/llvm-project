@@ -1436,7 +1436,7 @@ VPlanTransforms::modelGeneratedMainLoopBlocks(VPlan &Plan, VPlan &MainPlan,
   // Collect the chain to mirror off the executed MainPlan in reverse
   // post-order, skipping the blocks Plan models already.
   VPBasicBlock *MainScalarPH = MainPlan.getScalarPreheader();
-  SmallVector<VPIRBasicBlock *> Chain, BypassBlocks;
+  SmallVector<VPIRBasicBlock *> Chain;
   ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>> RPOT(
       MainPlan.getEntry());
   for (VPIRBasicBlock *VPBB : VPBlockUtils::blocksAs<VPIRBasicBlock>(RPOT)) {
@@ -1444,15 +1444,21 @@ VPlanTransforms::modelGeneratedMainLoopBlocks(VPlan &Plan, VPlan &MainPlan,
         MainPlan.isExitBlock(VPBB))
       continue;
     Chain.push_back(VPBB);
-    // A block bypassing a vector loop branches to the scalar preheader first
-    // and to the next block of the chain second.
-    if (VPBB->getNumSuccessors() == 2 &&
-        VPBB->getSuccessors()[0] == MainScalarPH)
-      BypassBlocks.push_back(VPBB);
   }
-  // The last one bypasses the main vector loop only; mirror its edge below
-  // instead of redirecting it.
-  VPIRBasicBlock *MainLoopIterationCountCheck = BypassBlocks.pop_back_val();
+
+  // A block bypassing a vector loop branches to the scalar preheader first and
+  // to the next block of the chain second. The chain is in reverse post-order,
+  // so the last of them holds the iteration count check for the main vector
+  // loop, which bypasses that loop only; mirror its edge below instead of
+  // redirecting it.
+  auto BypassesVectorLoop = [&](const VPBlockBase *VPBB) {
+    return VPBB->getNumSuccessors() == 2 &&
+           VPBB->getSuccessors()[0] == MainScalarPH;
+  };
+  auto MainLoopCheckIt = find_if(reverse(Chain), BypassesVectorLoop);
+  assert(MainLoopCheckIt != Chain.rend() &&
+         "main vector loop must be bypassed by a check");
+  VPIRBasicBlock *MainLoopIterationCountCheck = *MainLoopCheckIt;
 
   // Map the chain to the VPIRBasicBlocks modeling it, re-using Plan's entry for
   // its head. Blocks outside the chain stay unmapped, so the plan cannot reach
@@ -1471,8 +1477,11 @@ VPlanTransforms::modelGeneratedMainLoopBlocks(VPlan &Plan, VPlan &MainPlan,
   // first, in reverse order of the chain, to get the predecessor order the
   // scalar preheader had when the incoming values were patched into the IR.
   VPBasicBlock *ScalarPH = Plan.getScalarPreheader();
-  for (VPIRBasicBlock *VPBB : reverse(BypassBlocks)) {
-    VPBlockUtils::connectBlocks(Modeled.at(VPBB), ScalarPH);
+  for (VPIRBasicBlock *MainVPBB : reverse(Chain)) {
+    if (MainVPBB == MainLoopIterationCountCheck ||
+        !BypassesVectorLoop(MainVPBB))
+      continue;
+    VPBlockUtils::connectBlocks(Modeled.at(MainVPBB), ScalarPH);
     addIncomingForLastPredecessor(ScalarPH);
   }
 
