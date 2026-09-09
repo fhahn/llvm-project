@@ -1515,7 +1515,8 @@ void State::addInfoFor(BasicBlock &BB) {
       }
       break;
     }
-    // Enqueue ssub_with_overflow for simplification.
+    // Enqueue sadd/ssub_with_overflow for simplification.
+    case Intrinsic::sadd_with_overflow:
     case Intrinsic::ssub_with_overflow:
     case Intrinsic::ucmp:
     case Intrinsic::scmp:
@@ -2185,16 +2186,23 @@ void ConstraintInfo::addFactImpl(CmpInst::Predicate Pred, Value *A, Value *B,
   }
 }
 
-static bool replaceSubOverflowUses(IntrinsicInst *II, Value *A, Value *B,
-                                   SmallVectorImpl<Instruction *> &ToRemove) {
+/// Replace the uses of the overflow intrinsic \p II, which has been proven not
+/// to signed-overflow, by \p Opcode applied to \p A and \p B and false.
+static bool replaceOverflowUses(IntrinsicInst *II,
+                                Instruction::BinaryOps Opcode, Value *A,
+                                Value *B,
+                                SmallVectorImpl<Instruction *> &ToRemove) {
   bool Changed = false;
   IRBuilder<> Builder(II->getParent(), II->getIterator());
-  Value *Sub = nullptr;
+  Value *Res = nullptr;
   for (User *U : make_early_inc_range(II->users())) {
     if (match(U, m_ExtractValue<0>(m_Value()))) {
-      if (!Sub)
-        Sub = Builder.CreateNSWSub(A, B);
-      U->replaceAllUsesWith(Sub);
+      if (!Res) {
+        Res = Builder.CreateBinOp(Opcode, A, B);
+        if (auto *BO = dyn_cast<BinaryOperator>(Res))
+          BO->setHasNoSignedWrap();
+      }
+      U->replaceAllUsesWith(Res);
       Changed = true;
     } else if (match(U, m_ExtractValue<1>(m_Value()))) {
       U->replaceAllUsesWith(Builder.getFalse());
@@ -2245,7 +2253,28 @@ tryToSimplifyOverflowMath(IntrinsicInst *II, ConstraintInfo &Info,
         !DoesConditionHold(CmpInst::ICMP_SGE, B,
                            ConstantInt::get(A->getType(), 0), Info))
       return false;
-    Changed = replaceSubOverflowUses(II, A, B, ToRemove);
+    Changed = replaceOverflowUses(II, Instruction::Sub, A, B, ToRemove);
+  } else if (II->getIntrinsicID() == Intrinsic::sadd_with_overflow) {
+    Value *A = II->getArgOperand(0);
+    Value *B = II->getArgOperand(1);
+    const APInt *C;
+    if (!match(B, m_APInt(C)))
+      return false;
+
+    // sadd.with.overflow(A, C) with a constant C does not overflow if A stays
+    // in the signed range after adding C: for C s>= 0 that needs
+    // A s<= SMAX - C, for C s< 0 it needs A s>= SMIN - C. Both limits are
+    // representable, so they can be computed without widening.
+    bool IsNonNegative = C->isNonNegative();
+    APInt Limit = (IsNonNegative ? APInt::getSignedMaxValue(C->getBitWidth())
+                                 : APInt::getSignedMinValue(C->getBitWidth())) -
+                  *C;
+    CmpInst::Predicate Pred =
+        IsNonNegative ? CmpInst::ICMP_SLE : CmpInst::ICMP_SGE;
+    if (!DoesConditionHold(Pred, A, ConstantInt::get(A->getType(), Limit),
+                           Info))
+      return false;
+    Changed = replaceOverflowUses(II, Instruction::Add, A, B, ToRemove);
   }
   return Changed;
 }
