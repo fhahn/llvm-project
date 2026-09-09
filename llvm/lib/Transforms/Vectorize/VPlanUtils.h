@@ -114,6 +114,14 @@ template <typename Ty> Intrinsic::ID getIntrinsicID(const Ty *R) {
   return Intrinsic::not_intrinsic;
 }
 
+/// Return the opcode getOpcode() uses for recipes that do not directly map to
+/// LLVM IR instructions, based on their \p RecipeID. Such opcodes are assigned
+/// after the last VPInstruction opcode, which in turn is after the last IR
+/// Instruction opcode.
+constexpr unsigned getOpcodeForRecipeID(VPRecipeBase::VPRecipeTy RecipeID) {
+  return VPInstruction::OpsEnd + 1 + RecipeID;
+}
+
 /// Return the instruction opcode for the recipe defining \p V or 0 for
 /// unsupported recipes and VPValues not defined by a recipe.
 unsigned getOpcode(const VPValue *V);
