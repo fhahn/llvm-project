@@ -5693,25 +5693,27 @@ bool PredicatedScalarEvolution::areAddRecsEqualWithPreds(
   return true;
 }
 
-bool ScalarEvolution::matchSimpleAffineStep(const Loop *L, PHINode *PN,
-                                            Value *BEValueV,
-                                            SimpleAffineStep &Step) {
+std::optional<ScalarEvolution::SimpleAffineStep>
+ScalarEvolution::matchSimpleAffineStep(const Loop *L, PHINode *PN,
+                                       Value *BEValueV) {
   if (auto BO = MatchBinaryOp(BEValueV, getDataLayout(), AC, DT, PN)) {
     if (BO->Opcode != Instruction::Add)
-      return false;
+      return std::nullopt;
 
+    Value *StepV = nullptr;
     if (BO->LHS == PN && L->isLoopInvariant(BO->RHS))
-      Step.StepV = BO->RHS;
+      StepV = BO->RHS;
     else if (BO->RHS == PN && L->isLoopInvariant(BO->LHS))
-      Step.StepV = BO->LHS;
-    if (!Step.StepV)
-      return false;
+      StepV = BO->LHS;
+    if (!StepV)
+      return std::nullopt;
 
+    SCEV::NoWrapFlags Flags = SCEV::FlagAnyWrap;
     if (BO->IsNUW)
-      Step.Flags = setFlags(Step.Flags, SCEV::FlagNUW);
+      Flags = setFlags(Flags, SCEV::FlagNUW);
     if (BO->IsNSW)
-      Step.Flags = setFlags(Step.Flags, SCEV::FlagNSW);
-    return true;
+      Flags = setFlags(Flags, SCEV::FlagNSW);
+    return SimpleAffineStep{StepV, /*GEP=*/nullptr, Flags};
   }
 
   // A pointer induction variable: PN = PHI(Start, gep PN, LoopInvariant). The
@@ -5720,18 +5722,14 @@ bool ScalarEvolution::matchSimpleAffineStep(const Loop *L, PHINode *PN,
   // anything else goes the general route.
   auto *GEP = dyn_cast<GEPOperator>(BEValueV);
   if (!GEP || GEP->getPointerOperand() != PN || GEP->getNumIndices() != 1)
-    return false;
-  if (!L->isLoopInvariant(*GEP->idx_begin()))
-    return false;
+    return std::nullopt;
+  Value *Idx = *GEP->idx_begin();
+  if (!L->isLoopInvariant(Idx))
+    return std::nullopt;
 
-  Step.StepV = *GEP->idx_begin();
-  Step.GEP = GEP;
-  // If the increment has any nowrap flags, then we know the address space
-  // cannot be wrapped around. The remaining flags need the step's SCEV, so
-  // createSimpleAffineAddRec derives them.
-  if (GEP->getNoWrapFlags() != GEPNoWrapFlags::none())
-    Step.Flags = SCEV::FlagNW;
-  return true;
+  // The no-wrap flags need the step's SCEV, so createSimpleAffineAddRec
+  // derives them.
+  return SimpleAffineStep{Idx, GEP, SCEV::FlagAnyWrap};
 }
 
 /// A helper function for createAddRecFromPHI to handle simple cases.
@@ -5748,32 +5746,35 @@ const SCEV *ScalarEvolution::createSimpleAffineAddRec(PHINode *PN,
   assert(L && L->getHeader() == PN->getParent());
   assert(BEValueV && StartValueV);
 
-  SimpleAffineStep Step;
-  if (!matchSimpleAffineStep(L, PN, BEValueV, Step))
+  std::optional<SimpleAffineStep> Step =
+      matchSimpleAffineStep(L, PN, BEValueV);
+  if (!Step)
     return nullptr;
 
-  const SCEV *Accum;
-  SCEV::NoWrapFlags Flags = Step.Flags;
-  if (GEPOperator *GEP = Step.GEP) {
-    // Getelementptr indices are signed, and scaled by the element size.
+  const SCEV *Accum = getSCEV(Step->StepV);
+  SCEV::NoWrapFlags Flags = Step->Flags;
+  if (GEPOperator *GEP = Step->GEP) {
+    // The step is the index scaled by the source element size. Getelementptr
+    // indices are signed.
     Type *IntIdxTy = getEffectiveSCEVType(GEP->getType());
-    Accum = getMulExpr(getTruncateOrSignExtend(getSCEV(Step.StepV), IntIdxTy),
+    Accum = getMulExpr(getTruncateOrSignExtend(Accum, IntIdxTy),
                        getSizeOfExpr(IntIdxTy, GEP->getSourceElementType()));
 
-    // Transfer the remaining nowrap flags, using the same rules as
-    // createAddRecFromPHI does for this shape. Note that isSCEVExprNeverPoison
-    // cannot be used here: it walks the increment's operands, which would
-    // recurse back into PN before it has a SCEV.
-    //
+    // Derive the nowrap flags with the same rules createAddRecFromPHI uses for
+    // this shape. Note that isSCEVExprNeverPoison cannot be used here: it walks
+    // the increment's operands, which would recurse back into PN before it has
+    // a SCEV.
+    GEPNoWrapFlags NW = GEP->getNoWrapFlags();
+    // If the increment has any nowrap flags, then we know the address space
+    // cannot be wrapped around.
+    if (NW != GEPNoWrapFlags::none())
+      Flags = setFlags(Flags, SCEV::FlagNW);
     // If the getelementptr is nuw, or nusw with a non-negative offset, no
     // unsigned wrap occurs. We cannot set the nsw flag as only the offset is
     // treated as signed, while the base is unsigned.
-    GEPNoWrapFlags NW = GEP->getNoWrapFlags();
     if (NW.hasNoUnsignedWrap() ||
         (NW.hasNoUnsignedSignedWrap() && isKnownNonNegative(Accum)))
       Flags = setFlags(Flags, SCEV::FlagNUW);
-  } else {
-    Accum = getSCEV(Step.StepV);
   }
 
   const SCEV *StartVal = getSCEV(StartValueV);

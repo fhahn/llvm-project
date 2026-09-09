@@ -2069,20 +2069,20 @@ private:
   /// PN = PHI(Start, OP(PN, Step)); see matchSimpleAffineStep.
   struct SimpleAffineStep {
     /// The loop-invariant IR value the step is computed from.
-    Value *StepV = nullptr;
+    Value *StepV;
     /// Set if the increment is a getelementptr, in which case StepV is its
     /// index and the step is that index scaled by the source element size.
-    GEPOperator *GEP = nullptr;
+    GEPOperator *GEP;
     /// The no-wrap flags implied by the increment alone.
-    SCEV::NoWrapFlags Flags = SCEV::FlagAnyWrap;
+    SCEV::NoWrapFlags Flags;
   };
 
   /// Match the increment \p BEValueV of the loop header PHI \p PN in \p L
   /// against the shapes createSimpleAffineAddRec turns into an affine add
   /// recurrence: an add of \p PN and a loop-invariant value, or a getelementptr
   /// of \p PN with a single loop-invariant index.
-  bool matchSimpleAffineStep(const Loop *L, PHINode *PN, Value *BEValueV,
-                             SimpleAffineStep &Step);
+  std::optional<SimpleAffineStep>
+  matchSimpleAffineStep(const Loop *L, PHINode *PN, Value *BEValueV);
 
   /// A helper function for createAddRecFromPHI to handle simple cases.
   const SCEV *createSimpleAffineAddRec(PHINode *PN, Value *BEValueV,
