@@ -13,7 +13,7 @@ define i32 @test_icmp_constant_op_zext(ptr %dst) {
 ; CHECK:       vector.body:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[DOTCAST:%.*]] = trunc i32 [[INDEX]] to i16
-; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i16 1, [[DOTCAST]]
+; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i16 [[DOTCAST]], 1
 ; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[DST]], i16 [[OFFSET_IDX]]
 ; CHECK-NEXT:    store <4 x i8> splat (i8 109), ptr [[TMP1]], align 1
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
@@ -74,7 +74,7 @@ define i32 @test_icmp_and_op_zext(ptr %dst, i64 %a) {
 ; CHECK:       vector.body:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[DOTCAST:%.*]] = trunc i32 [[INDEX]] to i16
-; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i16 1, [[DOTCAST]]
+; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i16 [[DOTCAST]], 1
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr [[DST]], i16 [[OFFSET_IDX]]
 ; CHECK-NEXT:    store <4 x i8> [[TMP4]], ptr [[TMP5]], align 1
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
@@ -177,7 +177,7 @@ define void @narrowed_icmp_used_by_ext(ptr noalias %src, ptr noalias %dst) {
 ; CHECK-NEXT:    [[TMP1:%.*]] = trunc <4 x i64> [[WIDE_LOAD]] to <4 x i32>
 ; CHECK-NEXT:    [[TMP2:%.*]] = icmp sle <4 x i32> [[TMP1]], splat (i32 1)
 ; CHECK-NEXT:    [[TMP3:%.*]] = zext <4 x i1> [[TMP2]] to <4 x i32>
-; CHECK-NEXT:    [[TMP4:%.*]] = or <4 x i32> splat (i32 1), [[TMP3]]
+; CHECK-NEXT:    [[TMP4:%.*]] = or <4 x i32> [[TMP3]], splat (i32 1)
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[INDEX]]
 ; CHECK-NEXT:    store <4 x i32> [[TMP4]], ptr [[TMP5]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4

@@ -1005,11 +1005,11 @@ define i32 @scev_usub_sat_n_2(ptr %ptr, i32 %n) {
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[TMP8:%.*]] = and i64 [[TMP0]], 7
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[TMP8]]
-; CHECK-NEXT:    [[TMP9:%.*]] = add i64 1, [[N_VEC]]
+; CHECK-NEXT:    [[TMP9:%.*]] = add i64 [[N_VEC]], 1
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[TMP10:%.*]] = add i64 1, [[INDEX]]
+; CHECK-NEXT:    [[TMP10:%.*]] = add i64 [[INDEX]], 1
 ; CHECK-NEXT:    [[TMP11:%.*]] = shl i64 [[TMP10]], 2
 ; CHECK-NEXT:    [[TMP12:%.*]] = and i64 [[TMP11]], 4294967292
 ; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr i8, ptr [[PTR]], i64 [[TMP12]]

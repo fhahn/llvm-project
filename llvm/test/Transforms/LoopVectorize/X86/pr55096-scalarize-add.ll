@@ -15,7 +15,7 @@ define void @test_pr55096(i64 %c, ptr %p) {
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <2 x i64> [ <i64 122, i64 123>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[PRED_STORE_CONTINUE2]] ]
 ; CHECK-NEXT:    [[DOTCAST:%.*]] = trunc i64 [[INDEX]] to i16
 ; CHECK-NEXT:    [[TMP0:%.*]] = mul i16 [[DOTCAST]], 2008
-; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i16 6229, [[TMP0]]
+; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i16 [[TMP0]], 6229
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp uge <2 x i64> [[VEC_IND]], [[BROADCAST_SPLAT]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = extractelement <2 x i1> [[TMP1]], i64 0
 ; CHECK-NEXT:    br i1 [[TMP2]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]

@@ -16,7 +16,7 @@ define void @test(ptr %dst) personality ptr null {
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[STEP]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP0:%.*]] = mul i32 160, [[STEP]]
+; CHECK-NEXT:    [[TMP0:%.*]] = mul i32 [[STEP]], 160
 ; CHECK-NEXT:    [[TMP1:%.*]] = shl <4 x i32> [[BROADCAST_SPLAT]], splat (i32 2)
 ; CHECK-NEXT:    [[TMP2:%.*]] = mul <4 x i32> <i32 0, i32 1, i32 2, i32 3>, [[BROADCAST_SPLAT]]
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]

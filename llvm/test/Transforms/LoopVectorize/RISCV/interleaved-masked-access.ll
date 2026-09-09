@@ -59,7 +59,7 @@ define void @masked_strided_factor2(ptr noalias nocapture readonly %p, ptr noali
 ; PREDICATED_DATA-NEXT:    [[TMP0:%.*]] = call i32 @llvm.vscale.i32()
 ; PREDICATED_DATA-NEXT:    [[TMP1:%.*]] = shl nuw i32 [[TMP0]], 4
 ; PREDICATED_DATA-NEXT:    [[TMP2:%.*]] = sub i32 [[TMP1]], 1
-; PREDICATED_DATA-NEXT:    [[N_RND_UP:%.*]] = add i32 1024, [[TMP2]]
+; PREDICATED_DATA-NEXT:    [[N_RND_UP:%.*]] = add i32 [[TMP2]], 1024
 ; PREDICATED_DATA-NEXT:    [[N_MOD_VF:%.*]] = urem i32 [[N_RND_UP]], [[TMP1]]
 ; PREDICATED_DATA-NEXT:    [[N_VEC:%.*]] = sub i32 [[N_RND_UP]], [[N_MOD_VF]]
 ; PREDICATED_DATA-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 16 x i32> poison, i32 [[CONV]], i64 0
@@ -235,7 +235,7 @@ define void @masked_strided_factor4(ptr noalias nocapture readonly %p, ptr noali
 ; PREDICATED_DATA-NEXT:    [[TMP0:%.*]] = call i32 @llvm.vscale.i32()
 ; PREDICATED_DATA-NEXT:    [[TMP1:%.*]] = shl nuw i32 [[TMP0]], 4
 ; PREDICATED_DATA-NEXT:    [[TMP2:%.*]] = sub i32 [[TMP1]], 1
-; PREDICATED_DATA-NEXT:    [[N_RND_UP:%.*]] = add i32 1024, [[TMP2]]
+; PREDICATED_DATA-NEXT:    [[N_RND_UP:%.*]] = add i32 [[TMP2]], 1024
 ; PREDICATED_DATA-NEXT:    [[N_MOD_VF:%.*]] = urem i32 [[N_RND_UP]], [[TMP1]]
 ; PREDICATED_DATA-NEXT:    [[N_VEC:%.*]] = sub i32 [[N_RND_UP]], [[N_MOD_VF]]
 ; PREDICATED_DATA-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 16 x i32> poison, i32 [[CONV]], i64 0

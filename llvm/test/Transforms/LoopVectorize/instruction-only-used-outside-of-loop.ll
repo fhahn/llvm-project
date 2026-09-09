@@ -16,7 +16,7 @@ define i32 @one_direct_branch(ptr %src) {
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq i32 [[INDEX_NEXT]], 1000
 ; CHECK-NEXT:    br i1 [[TMP4]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       middle.block:
-; CHECK-NEXT:    [[TMP3:%.*]] = xor <4 x i32> splat (i32 25500), [[WIDE_LOAD]]
+; CHECK-NEXT:    [[TMP3:%.*]] = xor <4 x i32> [[WIDE_LOAD]], splat (i32 25500)
 ; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <4 x i32> [[TMP3]], i64 3
 ; CHECK-NEXT:    br label [[LOOP_LATCH:%.*]]
 ; CHECK:       exit:
@@ -57,7 +57,7 @@ define i32 @two_direct_branch(ptr %src) {
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq i32 [[INDEX_NEXT]], 1000
 ; CHECK-NEXT:    br i1 [[TMP4]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
 ; CHECK:       middle.block:
-; CHECK-NEXT:    [[TMP3:%.*]] = xor <4 x i32> splat (i32 25500), [[WIDE_LOAD]]
+; CHECK-NEXT:    [[TMP3:%.*]] = xor <4 x i32> [[WIDE_LOAD]], splat (i32 25500)
 ; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <4 x i32> [[TMP3]], i64 3
 ; CHECK-NEXT:    br label [[LOOP_LATCH:%.*]]
 ; CHECK:       exit:
@@ -106,7 +106,7 @@ define i32 @cond_branch(i32 %a, ptr %src) {
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i32 [[INDEX_NEXT]], 1000
 ; CHECK-NEXT:    br i1 [[TMP6]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       middle.block:
-; CHECK-NEXT:    [[TMP2:%.*]] = xor <4 x i32> splat (i32 25500), [[WIDE_LOAD]]
+; CHECK-NEXT:    [[TMP2:%.*]] = xor <4 x i32> [[WIDE_LOAD]], splat (i32 25500)
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp ne <4 x i32> [[VEC_IND]], [[BROADCAST_SPLAT]]
 ; CHECK-NEXT:    [[PREDPHI:%.*]] = select <4 x i1> [[TMP3]], <4 x i32> [[TMP2]], <4 x i32> splat (i32 10)
 ; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <4 x i32> [[PREDPHI]], i64 3

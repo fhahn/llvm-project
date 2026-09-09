@@ -616,7 +616,7 @@ define i32 @predicated_iv_inc_liveout_with_lai_preds(ptr %dst, ptr %src, i64 %st
 ; CHECK-NEXT:    [[TMP12:%.*]] = sub nuw i64 [[N_VEC]], 1
 ; CHECK-NEXT:    [[TMP16:%.*]] = trunc i64 [[TMP12]] to i32
 ; CHECK-NEXT:    [[TMP14:%.*]] = mul i32 [[TMP16]], 9
-; CHECK-NEXT:    [[TMP15:%.*]] = add i32 9, [[TMP14]]
+; CHECK-NEXT:    [[TMP15:%.*]] = add i32 [[TMP14]], 9
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[SMAX3]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:

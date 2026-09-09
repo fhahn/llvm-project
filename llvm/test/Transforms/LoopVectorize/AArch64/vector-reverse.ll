@@ -178,10 +178,10 @@ define i32 @reverse_store_with_partial_reduction(ptr noalias %dst, ptr noalias %
 ; CHECK-NEXT:    [[TMP23:%.*]] = getelementptr i16, ptr [[TMP9]], i64 [[TMP20]]
 ; CHECK-NEXT:    [[TMP13:%.*]] = sub i64 [[TMP20]], [[TMP4]]
 ; CHECK-NEXT:    [[TMP19:%.*]] = getelementptr i16, ptr [[TMP9]], i64 [[TMP13]]
-; CHECK-NEXT:    [[TMP16:%.*]] = mul i64 -2, [[TMP4]]
+; CHECK-NEXT:    [[TMP16:%.*]] = mul i64 [[TMP4]], -2
 ; CHECK-NEXT:    [[TMP25:%.*]] = sub i64 [[TMP16]], [[TMP10]]
 ; CHECK-NEXT:    [[TMP28:%.*]] = getelementptr i16, ptr [[TMP9]], i64 [[TMP25]]
-; CHECK-NEXT:    [[TMP21:%.*]] = mul i64 -3, [[TMP4]]
+; CHECK-NEXT:    [[TMP21:%.*]] = mul i64 [[TMP4]], -3
 ; CHECK-NEXT:    [[TMP15:%.*]] = sub i64 [[TMP21]], [[TMP10]]
 ; CHECK-NEXT:    [[TMP29:%.*]] = getelementptr i16, ptr [[TMP9]], i64 [[TMP15]]
 ; CHECK-NEXT:    [[REVERSE:%.*]] = call <vscale x 8 x i16> @llvm.vector.reverse.nxv8i16(<vscale x 8 x i16> [[BROADCAST_SPLAT]])

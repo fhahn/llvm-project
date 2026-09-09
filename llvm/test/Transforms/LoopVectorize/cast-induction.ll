@@ -162,7 +162,7 @@ define void @cast_variable_step(i64 %step) {
 ; VF4-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[TMP0]], i64 0
 ; VF4-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
 ; VF4-NEXT:    [[TMP1:%.*]] = mul <4 x i32> <i32 0, i32 1, i32 2, i32 3>, [[BROADCAST_SPLAT]]
-; VF4-NEXT:    [[INDUCTION:%.*]] = add <4 x i32> splat (i32 10), [[TMP1]]
+; VF4-NEXT:    [[INDUCTION:%.*]] = add <4 x i32> [[TMP1]], splat (i32 10)
 ; VF4-NEXT:    [[TMP2:%.*]] = shl i32 [[TMP0]], 2
 ; VF4-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x i32> poison, i32 [[TMP2]], i64 0
 ; VF4-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT1]], <4 x i32> poison, <4 x i32> zeroinitializer
@@ -192,7 +192,7 @@ define void @cast_variable_step(i64 %step) {
 ; IC2-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; IC2-NEXT:    [[TMP1:%.*]] = add i64 [[INDEX]], 1
 ; IC2-NEXT:    [[TMP2:%.*]] = mul i64 [[INDEX]], [[STEP]]
-; IC2-NEXT:    [[OFFSET_IDX:%.*]] = add i64 10, [[TMP2]]
+; IC2-NEXT:    [[OFFSET_IDX:%.*]] = add i64 [[TMP2]], 10
 ; IC2-NEXT:    [[TMP3:%.*]] = trunc i64 [[OFFSET_IDX]] to i32
 ; IC2-NEXT:    [[TMP4:%.*]] = mul i32 1, [[TMP0]]
 ; IC2-NEXT:    [[TMP5:%.*]] = add i32 [[TMP3]], [[TMP4]]
@@ -444,11 +444,11 @@ define i64 @induction_cast_chain_cleared_by_dce(i64 %n, i64 %mask.init) {
 ; VF4-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP1]], 3
 ; VF4-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP1]], [[N_MOD_VF]]
 ; VF4-NEXT:    [[TMP14:%.*]] = mul i64 [[N_VEC]], [[TMP3]]
-; VF4-NEXT:    [[TMP15:%.*]] = add i64 1, [[TMP14]]
+; VF4-NEXT:    [[TMP15:%.*]] = add i64 [[TMP14]], 1
 ; VF4-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[TMP3]], i64 0
 ; VF4-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT]], <4 x i64> poison, <4 x i32> zeroinitializer
 ; VF4-NEXT:    [[TMP16:%.*]] = mul <4 x i64> <i64 0, i64 1, i64 2, i64 3>, [[BROADCAST_SPLAT]]
-; VF4-NEXT:    [[INDUCTION:%.*]] = add <4 x i64> splat (i64 1), [[TMP16]]
+; VF4-NEXT:    [[INDUCTION:%.*]] = add <4 x i64> [[TMP16]], splat (i64 1)
 ; VF4-NEXT:    [[TMP17:%.*]] = shl i64 [[TMP3]], 2
 ; VF4-NEXT:    [[BROADCAST_SPLATINSERT2:%.*]] = insertelement <4 x i64> poison, i64 [[TMP17]], i64 0
 ; VF4-NEXT:    [[BROADCAST_SPLAT3:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT2]], <4 x i64> poison, <4 x i32> zeroinitializer
@@ -512,14 +512,14 @@ define i64 @induction_cast_chain_cleared_by_dce(i64 %n, i64 %mask.init) {
 ; IC2-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP1]], 1
 ; IC2-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP1]], [[N_MOD_VF]]
 ; IC2-NEXT:    [[TMP14:%.*]] = mul i64 [[N_VEC]], [[TMP3]]
-; IC2-NEXT:    [[TMP15:%.*]] = add i64 1, [[TMP14]]
+; IC2-NEXT:    [[TMP15:%.*]] = add i64 [[TMP14]], 1
 ; IC2-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; IC2:       [[VECTOR_BODY]]:
 ; IC2-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; IC2-NEXT:    [[VEC_PHI:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[TMP20:%.*]], %[[VECTOR_BODY]] ]
 ; IC2-NEXT:    [[VEC_PHI2:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[TMP21:%.*]], %[[VECTOR_BODY]] ]
 ; IC2-NEXT:    [[TMP16:%.*]] = mul i64 [[INDEX]], [[TMP3]]
-; IC2-NEXT:    [[TMP17:%.*]] = add i64 1, [[TMP16]]
+; IC2-NEXT:    [[TMP17:%.*]] = add i64 [[TMP16]], 1
 ; IC2-NEXT:    [[TMP18:%.*]] = mul i64 1, [[TMP3]]
 ; IC2-NEXT:    [[TMP19:%.*]] = add i64 [[TMP17]], [[TMP18]]
 ; IC2-NEXT:    [[TMP20]] = add i64 [[VEC_PHI]], [[TMP17]]

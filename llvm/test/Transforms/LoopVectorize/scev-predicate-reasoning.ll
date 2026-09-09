@@ -75,7 +75,7 @@ define void @integer_induction_wraps_scev_predicate_known(i32 %x, ptr %call, ptr
 ; CHECK-NEXT:    [[TMP3:%.*]] = mul <4 x i64> <i64 0, i64 1, i64 2, i64 3>, [[BROADCAST_SPLAT]]
 ; CHECK-NEXT:    [[VECTOR_GEP:%.*]] = getelementptr i8, ptr [[POINTER_PHI]], <4 x i64> [[TMP3]]
 ; CHECK-NEXT:    [[DOTCAST:%.*]] = trunc i64 [[INDEX]] to i32
-; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i32 30, [[DOTCAST]]
+; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i32 [[DOTCAST]], 30
 ; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr ptr, ptr [[CALL]], i32 [[OFFSET_IDX]]
 ; CHECK-NEXT:    store <4 x ptr> [[VECTOR_GEP]], ptr [[TMP4]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
@@ -142,12 +142,12 @@ define void @implied_wrap_predicate(ptr %A, ptr %B, ptr %C) {
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP4]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP4]], [[N_MOD_VF]]
 ; CHECK-NEXT:    [[DOTCAST:%.*]] = trunc i64 [[N_VEC]] to i16
-; CHECK-NEXT:    [[TMP15:%.*]] = add i16 1, [[DOTCAST]]
-; CHECK-NEXT:    [[TMP16:%.*]] = add i64 1, [[N_VEC]]
+; CHECK-NEXT:    [[TMP15:%.*]] = add i16 [[DOTCAST]], 1
+; CHECK-NEXT:    [[TMP16:%.*]] = add i64 [[N_VEC]], 1
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i64 1, [[INDEX]]
+; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i64 [[INDEX]], 1
 ; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr i64, ptr [[A]], i64 [[OFFSET_IDX]]
 ; CHECK-NEXT:    store <4 x i64> zeroinitializer, ptr [[TMP17]], align 4
 ; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr i64, ptr [[C]], i64 [[OFFSET_IDX]]

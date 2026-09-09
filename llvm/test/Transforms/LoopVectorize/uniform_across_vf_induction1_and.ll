@@ -345,7 +345,7 @@ define void @ld_and_neg2_step1_start1_ind1(ptr noalias %A, ptr noalias %B) {
 ; CHECK:       vector.body:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <2 x i64> [ <i64 1, i64 2>, [[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], [[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[TMP0:%.*]] = add i64 1, [[INDEX]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[INDEX]], 1
 ; CHECK-NEXT:    [[TMP1:%.*]] = and <2 x i64> [[VEC_IND]], splat (i64 -2)
 ; CHECK-NEXT:    [[TMP2:%.*]] = extractelement <2 x i64> [[TMP1]], i64 0
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP2]]
@@ -395,7 +395,7 @@ define void @ld_and_neg2_step2_start1_ind1(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <2 x i64> [ <i64 1, i64 3>, [[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[INDEX]], 1
-; CHECK-NEXT:    [[TMP1:%.*]] = add i64 1, [[TMP0]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], 1
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[TMP1]], 2
 ; CHECK-NEXT:    [[TMP3:%.*]] = and <2 x i64> [[VEC_IND]], splat (i64 -2)
 ; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <2 x i64> [[TMP3]], i64 0
@@ -450,7 +450,7 @@ define void @ld_and_neg2_step3_start1_ind1(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <2 x i64> [ <i64 1, i64 4>, [[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP0:%.*]] = mul i64 [[INDEX]], 3
-; CHECK-NEXT:    [[TMP1:%.*]] = add i64 1, [[TMP0]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], 1
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[TMP1]], 3
 ; CHECK-NEXT:    [[TMP3:%.*]] = and <2 x i64> [[VEC_IND]], splat (i64 -2)
 ; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <2 x i64> [[TMP3]], i64 0
@@ -505,7 +505,7 @@ define void @ld_and_neg3_step3_start1_ind1(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <2 x i64> [ <i64 1, i64 4>, [[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP0:%.*]] = mul i64 [[INDEX]], 3
-; CHECK-NEXT:    [[TMP1:%.*]] = add i64 1, [[TMP0]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], 1
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[TMP1]], 3
 ; CHECK-NEXT:    [[TMP3:%.*]] = and <2 x i64> [[VEC_IND]], splat (i64 -3)
 ; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <2 x i64> [[TMP3]], i64 0

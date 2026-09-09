@@ -21,11 +21,11 @@ define i64 @same_exit_block_pre_inc_use1() #0 {
 ; CHECK-NEXT:    [[TMP4:%.*]] = shl nuw i64 [[TMP0]], 4
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i64 510, [[TMP1]]
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 510, [[N_MOD_VF]]
-; CHECK-NEXT:    [[INDEX_NEXT:%.*]] = add i64 3, [[N_VEC]]
+; CHECK-NEXT:    [[INDEX_NEXT:%.*]] = add i64 [[N_VEC]], 3
 ; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK:       vector.body:
 ; CHECK-NEXT:    [[INDEX1:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT3:%.*]], [[COND_0:%.*]] ]
-; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i64 3, [[INDEX1]]
+; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i64 [[INDEX1]], 3
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds i8, ptr [[P1]], i64 [[OFFSET_IDX]]
 ; CHECK-NEXT:    [[TMP27:%.*]] = shl nuw nsw i64 [[TMP4]], 1
 ; CHECK-NEXT:    [[TMP15:%.*]] = mul nuw nsw i64 [[TMP4]], 3
@@ -86,7 +86,7 @@ define i64 @same_exit_block_pre_inc_use1() #0 {
 ; CHECK-NEXT:    [[TMP57:%.*]] = icmp ne i64 [[TMP61]], [[TMP40]]
 ; CHECK-NEXT:    [[TMP58:%.*]] = select i1 [[TMP57]], i64 [[TMP56]], i64 [[TMP53]]
 ; CHECK-NEXT:    [[TMP16:%.*]] = add i64 [[INDEX1]], [[TMP58]]
-; CHECK-NEXT:    [[TMP17:%.*]] = add i64 3, [[TMP16]]
+; CHECK-NEXT:    [[TMP17:%.*]] = add i64 [[TMP16]], 3
 ; CHECK-NEXT:    br label [[LOOP_END]]
 ; CHECK:       scalar.ph:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ [[INDEX_NEXT]], [[LOOP_INC]] ], [ 3, [[ENTRY:%.*]] ]

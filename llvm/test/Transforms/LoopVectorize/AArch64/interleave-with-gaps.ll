@@ -1008,13 +1008,13 @@ define i32 @load_factor_4_with_gap_reverse(i64 %n, ptr noalias %a) {
 ; CHECK-NOTF-NEXT:    [[TMP8:%.*]] = sub nuw nsw i64 [[TMP3]], 1
 ; CHECK-NOTF-NEXT:    [[TMP9:%.*]] = mul i64 [[TMP8]], -4
 ; CHECK-NOTF-NEXT:    [[TMP10:%.*]] = getelementptr inbounds i32, ptr [[TMP7]], i64 [[TMP9]]
-; CHECK-NOTF-NEXT:    [[TMP11:%.*]] = mul i64 -4, [[TMP3]]
+; CHECK-NOTF-NEXT:    [[TMP11:%.*]] = mul i64 [[TMP3]], -4
 ; CHECK-NOTF-NEXT:    [[TMP12:%.*]] = add i64 [[TMP9]], [[TMP11]]
 ; CHECK-NOTF-NEXT:    [[TMP13:%.*]] = getelementptr inbounds i32, ptr [[TMP7]], i64 [[TMP12]]
-; CHECK-NOTF-NEXT:    [[TMP32:%.*]] = mul i64 -8, [[TMP3]]
+; CHECK-NOTF-NEXT:    [[TMP32:%.*]] = mul i64 [[TMP3]], -8
 ; CHECK-NOTF-NEXT:    [[TMP33:%.*]] = add i64 [[TMP9]], [[TMP32]]
 ; CHECK-NOTF-NEXT:    [[TMP36:%.*]] = getelementptr inbounds i32, ptr [[TMP7]], i64 [[TMP33]]
-; CHECK-NOTF-NEXT:    [[TMP37:%.*]] = mul i64 -12, [[TMP3]]
+; CHECK-NOTF-NEXT:    [[TMP37:%.*]] = mul i64 [[TMP3]], -12
 ; CHECK-NOTF-NEXT:    [[TMP40:%.*]] = add i64 [[TMP9]], [[TMP37]]
 ; CHECK-NOTF-NEXT:    [[TMP41:%.*]] = getelementptr inbounds i32, ptr [[TMP7]], i64 [[TMP40]]
 ; CHECK-NOTF-NEXT:    [[WIDE_VEC:%.*]] = load <vscale x 16 x i32>, ptr [[TMP10]], align 4

@@ -118,6 +118,17 @@ template <typename Ty> Intrinsic::ID getIntrinsicID(const Ty *R) {
 /// unsupported recipes and VPValues not defined by a recipe.
 unsigned getOpcode(const VPValue *V);
 
+/// Return the opcode getOpcode() uses for recipes that do not directly map to
+/// LLVM IR instructions, based on their \p RecipeID. Such opcodes are assigned
+/// after the last VPInstruction opcode, which in turn is after the last IR
+/// Instruction opcode, so that IR opcodes, VPInstruction opcodes and
+/// recipe-ID based opcodes all live in disjoint ranges.
+constexpr unsigned getOpcodeForRecipeID(VPRecipeBase::VPRecipeTy RecipeID) {
+  static_assert(VPInstruction::OpsEnd >= Instruction::OtherOpsEnd,
+                "VPInstruction opcodes must not overlap IR opcodes");
+  return VPInstruction::OpsEnd + 1 + RecipeID;
+}
+
 /// Get the instruction opcode or intrinsic ID for the recipe defining \p V.
 /// Returns an optional pair, where the first element indicates whether it is an
 /// intrinsic ID.

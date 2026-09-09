@@ -14,7 +14,7 @@ define i8 @recurrence_phi_with_same_incoming_values_after_simplifications(i8 %fo
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i32 1, [[INDEX]]
+; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i32 [[INDEX]], 1
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i32 [[OFFSET_IDX]], 1
 ; CHECK-NEXT:    [[TMP3:%.*]] = add i32 [[OFFSET_IDX]], 2
 ; CHECK-NEXT:    [[TMP4:%.*]] = add i32 [[OFFSET_IDX]], 3
@@ -148,7 +148,7 @@ define void @sink_dead_inst(ptr %a) {
 ; CHECK-NEXT:    [[VECTOR_RECUR:%.*]] = phi <4 x i16> [ <i16 poison, i16 poison, i16 poison, i16 0>, %[[VECTOR_PH]] ], [ [[TMP4:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[STEP_ADD:%.*]] = add <4 x i16> [[VEC_IND]], splat (i16 4)
 ; CHECK-NEXT:    [[DOTCAST:%.*]] = trunc i32 [[INDEX]] to i16
-; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i16 -27, [[DOTCAST]]
+; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i16 [[DOTCAST]], -27
 ; CHECK-NEXT:    [[TMP0:%.*]] = add <4 x i16> [[VEC_IND]], splat (i16 1)
 ; CHECK-NEXT:    [[TMP1:%.*]] = add <4 x i16> [[STEP_ADD]], splat (i16 1)
 ; CHECK-NEXT:    [[TMP3:%.*]] = add <4 x i16> [[TMP0]], splat (i16 5)

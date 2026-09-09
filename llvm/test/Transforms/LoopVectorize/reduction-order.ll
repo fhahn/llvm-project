@@ -18,7 +18,7 @@ define i32 @foo() !prof !1 {
 ; CHECK-NEXT:    [[VEC_PHI_2:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[ADD_3:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i8> [ <i8 0, i8 1, i8 2, i8 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP0:%.*]] = icmp ule <4 x i8> [[VEC_IND]], splat (i8 9)
-; CHECK-NEXT:    [[ADD_3]] = add <4 x i32> splat (i32 3), [[VEC_PHI_2]]
+; CHECK-NEXT:    [[ADD_3]] = add <4 x i32> [[VEC_PHI_2]], splat (i32 3)
 ; CHECK-NEXT:    [[ADD_5]] = add <4 x i32> [[VEC_PHI_1]], splat (i32 5)
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i8> [[VEC_IND]], splat (i8 4)

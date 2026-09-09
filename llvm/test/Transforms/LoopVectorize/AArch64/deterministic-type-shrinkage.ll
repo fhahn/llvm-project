@@ -422,8 +422,8 @@ define void @old_and_new_size_equalko(ptr noalias %src, ptr noalias %dst) {
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp sle <4 x i1> [[TMP3]], splat (i1 true)
 ; CHECK-NEXT:    [[TMP6:%.*]] = zext <4 x i1> [[TMP4]] to <4 x i64>
 ; CHECK-NEXT:    [[TMP7:%.*]] = zext <4 x i1> [[TMP5]] to <4 x i64>
-; CHECK-NEXT:    [[TMP8:%.*]] = or <4 x i64> splat (i64 1), [[TMP6]]
-; CHECK-NEXT:    [[TMP9:%.*]] = or <4 x i64> splat (i64 1), [[TMP7]]
+; CHECK-NEXT:    [[TMP8:%.*]] = or <4 x i64> [[TMP6]], splat (i64 1)
+; CHECK-NEXT:    [[TMP9:%.*]] = or <4 x i64> [[TMP7]], splat (i64 1)
 ; CHECK-NEXT:    [[TMP10:%.*]] = trunc <4 x i64> [[TMP8]] to <4 x i32>
 ; CHECK-NEXT:    [[TMP11:%.*]] = trunc <4 x i64> [[TMP9]] to <4 x i32>
 ; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[INDEX]]

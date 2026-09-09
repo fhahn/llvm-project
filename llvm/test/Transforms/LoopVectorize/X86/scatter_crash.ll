@@ -41,7 +41,7 @@ define void @_Z3fn1v() #0 {
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP6]], 15
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP6]], [[N_MOD_VF]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = shl i64 [[N_VEC]], 1
-; CHECK-NEXT:    [[IND_END:%.*]] = add i64 8, [[TMP7]]
+; CHECK-NEXT:    [[IND_END:%.*]] = add i64 [[TMP7]], 8
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
@@ -74,7 +74,7 @@ define void @_Z3fn1v() #0 {
 ; CHECK-NEXT:    [[N_MOD_VF6:%.*]] = and i64 [[TMP6]], 7
 ; CHECK-NEXT:    [[N_VEC7:%.*]] = sub i64 [[TMP6]], [[N_MOD_VF6]]
 ; CHECK-NEXT:    [[TMP17:%.*]] = shl i64 [[N_VEC7]], 1
-; CHECK-NEXT:    [[IND_END8:%.*]] = add i64 8, [[TMP17]]
+; CHECK-NEXT:    [[IND_END8:%.*]] = add i64 [[TMP17]], 8
 ; CHECK-NEXT:    [[DOTSPLATINSERT:%.*]] = insertelement <8 x i64> poison, i64 [[BC_RESUME_VAL]], i64 0
 ; CHECK-NEXT:    [[DOTSPLAT:%.*]] = shufflevector <8 x i64> [[DOTSPLATINSERT]], <8 x i64> poison, <8 x i32> zeroinitializer
 ; CHECK-NEXT:    [[INDUCTION:%.*]] = add nuw nsw <8 x i64> [[DOTSPLAT]], <i64 0, i64 2, i64 4, i64 6, i64 8, i64 10, i64 12, i64 14>
@@ -122,7 +122,7 @@ define void @_Z3fn1v() #0 {
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <16 x i1> poison, i1 [[TOBOOL6]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <16 x i1> [[BROADCAST_SPLATINSERT]], <16 x i1> poison, <16 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP29:%.*]] = shl i64 [[N_VEC32]], 1
-; CHECK-NEXT:    [[IND_END41:%.*]] = add i64 8, [[TMP29]]
+; CHECK-NEXT:    [[IND_END41:%.*]] = add i64 [[TMP29]], 8
 ; CHECK-NEXT:    [[TMP34:%.*]] = xor <16 x i1> [[BROADCAST_SPLAT]], splat (i1 true)
 ; CHECK-NEXT:    br label %[[VECTOR_BODY30:.*]]
 ; CHECK:       [[VECTOR_BODY30]]:
@@ -160,7 +160,7 @@ define void @_Z3fn1v() #0 {
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT49:%.*]] = insertelement <8 x i1> poison, i1 [[TOBOOL6]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT73:%.*]] = shufflevector <8 x i1> [[BROADCAST_SPLATINSERT49]], <8 x i1> poison, <8 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP43:%.*]] = shl i64 [[N_VEC53]], 1
-; CHECK-NEXT:    [[IND_END54:%.*]] = add i64 8, [[TMP43]]
+; CHECK-NEXT:    [[IND_END54:%.*]] = add i64 [[TMP43]], 8
 ; CHECK-NEXT:    [[TMP48:%.*]] = xor <8 x i1> [[BROADCAST_SPLAT73]], splat (i1 true)
 ; CHECK-NEXT:    [[DOTSPLATINSERT62:%.*]] = insertelement <8 x i64> poison, i64 [[BC_RESUME_VAL42]], i64 0
 ; CHECK-NEXT:    [[DOTSPLAT63:%.*]] = shufflevector <8 x i64> [[DOTSPLATINSERT62]], <8 x i64> poison, <8 x i32> zeroinitializer

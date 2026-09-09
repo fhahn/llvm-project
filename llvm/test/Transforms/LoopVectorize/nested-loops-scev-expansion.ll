@@ -17,7 +17,7 @@ define void @pr49538() {
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[TMP1]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i32 [[TMP1]], [[N_MOD_VF]]
 ; CHECK-NEXT:    [[DOTCAST:%.*]] = trunc i32 [[N_VEC]] to i16
-; CHECK-NEXT:    [[TMP2:%.*]] = add i16 -1, [[DOTCAST]]
+; CHECK-NEXT:    [[TMP2:%.*]] = add i16 [[DOTCAST]], -1
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
@@ -225,7 +225,7 @@ define void @pr52024(ptr %dst, i16 %N) {
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i16> poison, i16 [[TMP4]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x i16> [[BROADCAST_SPLATINSERT]], <2 x i16> poison, <2 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP5:%.*]] = mul i16 24, [[TMP4]]
+; CHECK-NEXT:    [[TMP5:%.*]] = mul i16 [[TMP4]], 24
 ; CHECK-NEXT:    [[TMP6:%.*]] = shl <2 x i16> [[BROADCAST_SPLAT]], splat (i16 1)
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT5:%.*]] = insertelement <2 x i16> poison, i16 [[REM_TRUNC]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT6:%.*]] = shufflevector <2 x i16> [[BROADCAST_SPLATINSERT5]], <2 x i16> poison, <2 x i32> zeroinitializer
@@ -235,7 +235,7 @@ define void @pr52024(ptr %dst, i16 %N) {
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <2 x i16> [ [[TMP7]], %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[STEP_ADD:%.*]] = add <2 x i16> [[VEC_IND]], [[TMP6]]
-; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add nuw i32 8, [[INDEX]]
+; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add nuw i32 [[INDEX]], 8
 ; CHECK-NEXT:    [[TMP8:%.*]] = sub <2 x i16> [[VEC_IND]], [[BROADCAST_SPLAT6]]
 ; CHECK-NEXT:    [[TMP9:%.*]] = sub <2 x i16> [[STEP_ADD]], [[BROADCAST_SPLAT6]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = zext <2 x i16> [[TMP8]] to <2 x i32>

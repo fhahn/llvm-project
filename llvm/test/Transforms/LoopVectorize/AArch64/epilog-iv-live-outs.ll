@@ -184,11 +184,11 @@ define i64 @penultimate_iv_non_zero_start(ptr %dst, i64 %N) {
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP0]], 15
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[N_MOD_VF]]
-; CHECK-NEXT:    [[TMP1:%.*]] = add i64 10, [[N_VEC]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[N_VEC]], 10
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add nuw i64 10, [[INDEX]]
+; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add nuw i64 [[INDEX]], 10
 ; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr i32, ptr [[DST]], i64 [[OFFSET_IDX]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr i32, ptr [[TMP2]], i64 4
 ; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr i32, ptr [[TMP2]], i64 8
@@ -211,11 +211,11 @@ define i64 @penultimate_iv_non_zero_start(ptr %dst, i64 %N) {
 ; CHECK-NEXT:    [[VEC_EPILOG_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
 ; CHECK-NEXT:    [[N_MOD_VF2:%.*]] = and i64 [[TMP0]], 3
 ; CHECK-NEXT:    [[N_VEC3:%.*]] = sub i64 [[TMP0]], [[N_MOD_VF2]]
-; CHECK-NEXT:    [[TMP7:%.*]] = add i64 10, [[N_VEC3]]
+; CHECK-NEXT:    [[TMP7:%.*]] = add i64 [[N_VEC3]], 10
 ; CHECK-NEXT:    br label %[[VEC_EPILOG_VECTOR_BODY:.*]]
 ; CHECK:       [[VEC_EPILOG_VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX4:%.*]] = phi i64 [ [[VEC_EPILOG_RESUME_VAL]], %[[VEC_EPILOG_PH]] ], [ [[INDEX_NEXT5:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
-; CHECK-NEXT:    [[TMP8:%.*]] = add nuw i64 10, [[INDEX4]]
+; CHECK-NEXT:    [[TMP8:%.*]] = add nuw i64 [[INDEX4]], 10
 ; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr i32, ptr [[DST]], i64 [[TMP8]]
 ; CHECK-NEXT:    store <4 x i32> zeroinitializer, ptr [[TMP9]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT5]] = add nuw i64 [[INDEX4]], 4
@@ -270,7 +270,7 @@ define i64 @non_unit_step_iv_live_out(ptr %dst, i64 %N) {
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[N]], 15
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[N_MOD_VF]]
 ; CHECK-NEXT:    [[TMP0:%.*]] = mul i64 [[N_VEC]], 3
-; CHECK-NEXT:    [[TMP1:%.*]] = add i64 5, [[TMP0]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], 5
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
@@ -303,7 +303,7 @@ define i64 @non_unit_step_iv_live_out(ptr %dst, i64 %N) {
 ; CHECK-NEXT:    [[N_MOD_VF2:%.*]] = and i64 [[N]], 3
 ; CHECK-NEXT:    [[N_VEC3:%.*]] = sub i64 [[N]], [[N_MOD_VF2]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = mul i64 [[N_VEC3]], 3
-; CHECK-NEXT:    [[TMP8:%.*]] = add i64 5, [[TMP7]]
+; CHECK-NEXT:    [[TMP8:%.*]] = add i64 [[TMP7]], 5
 ; CHECK-NEXT:    [[TMP9:%.*]] = trunc i64 [[BC_RESUME_VAL]] to i32
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[TMP9]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer

@@ -464,7 +464,7 @@ define void @recurrence_3(ptr readonly noalias %a, ptr noalias %b, i32 %n, float
 ; UNROLL-NO-IC:       [[VECTOR_PH]]:
 ; UNROLL-NO-IC-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP2]], 7
 ; UNROLL-NO-IC-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP2]], [[N_MOD_VF]]
-; UNROLL-NO-IC-NEXT:    [[IND_END:%.*]] = add i64 1, [[N_VEC]]
+; UNROLL-NO-IC-NEXT:    [[IND_END:%.*]] = add i64 [[N_VEC]], 1
 ; UNROLL-NO-IC-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x double> poison, double [[CONV1]], i64 0
 ; UNROLL-NO-IC-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x double> [[BROADCAST_SPLATINSERT]], <4 x double> poison, <4 x i32> zeroinitializer
 ; UNROLL-NO-IC-NEXT:    [[VECTOR_RECUR_INIT:%.*]] = insertelement <4 x i16> poison, i16 [[TMP0]], i32 3
@@ -472,7 +472,7 @@ define void @recurrence_3(ptr readonly noalias %a, ptr noalias %b, i32 %n, float
 ; UNROLL-NO-IC:       [[VECTOR_BODY]]:
 ; UNROLL-NO-IC-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; UNROLL-NO-IC-NEXT:    [[VECTOR_RECUR:%.*]] = phi <4 x i16> [ [[VECTOR_RECUR_INIT]], %[[VECTOR_PH]] ], [ [[WIDE_LOAD1:%.*]], %[[VECTOR_BODY]] ]
-; UNROLL-NO-IC-NEXT:    [[OFFSET_IDX:%.*]] = add nuw i64 1, [[INDEX]]
+; UNROLL-NO-IC-NEXT:    [[OFFSET_IDX:%.*]] = add nuw i64 [[INDEX]], 1
 ; UNROLL-NO-IC-NEXT:    [[TMP4:%.*]] = getelementptr inbounds i16, ptr [[A]], i64 [[OFFSET_IDX]]
 ; UNROLL-NO-IC-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i16, ptr [[TMP4]], i64 4
 ; UNROLL-NO-IC-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i16>, ptr [[TMP4]], align 2
@@ -542,12 +542,12 @@ define void @recurrence_3(ptr readonly noalias %a, ptr noalias %b, i32 %n, float
 ; UNROLL-NO-VF:       [[VECTOR_PH]]:
 ; UNROLL-NO-VF-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP2]], 1
 ; UNROLL-NO-VF-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP2]], [[N_MOD_VF]]
-; UNROLL-NO-VF-NEXT:    [[IND_END:%.*]] = add i64 1, [[N_VEC]]
+; UNROLL-NO-VF-NEXT:    [[IND_END:%.*]] = add i64 [[N_VEC]], 1
 ; UNROLL-NO-VF-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; UNROLL-NO-VF:       [[VECTOR_BODY]]:
 ; UNROLL-NO-VF-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; UNROLL-NO-VF-NEXT:    [[VECTOR_RECUR:%.*]] = phi i16 [ [[TMP0]], %[[VECTOR_PH]] ], [ [[TMP8:%.*]], %[[VECTOR_BODY]] ]
-; UNROLL-NO-VF-NEXT:    [[OFFSET_IDX:%.*]] = add nuw i64 1, [[INDEX]]
+; UNROLL-NO-VF-NEXT:    [[OFFSET_IDX:%.*]] = add nuw i64 [[INDEX]], 1
 ; UNROLL-NO-VF-NEXT:    [[TMP4:%.*]] = add i64 [[OFFSET_IDX]], 1
 ; UNROLL-NO-VF-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i16, ptr [[A]], i64 [[OFFSET_IDX]]
 ; UNROLL-NO-VF-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i16, ptr [[A]], i64 [[TMP4]]
@@ -615,7 +615,7 @@ define void @recurrence_3(ptr readonly noalias %a, ptr noalias %b, i32 %n, float
 ; SINK-AFTER:       [[VECTOR_PH]]:
 ; SINK-AFTER-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP2]], 3
 ; SINK-AFTER-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP2]], [[N_MOD_VF]]
-; SINK-AFTER-NEXT:    [[IND_END:%.*]] = add i64 1, [[N_VEC]]
+; SINK-AFTER-NEXT:    [[IND_END:%.*]] = add i64 [[N_VEC]], 1
 ; SINK-AFTER-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x double> poison, double [[CONV1]], i64 0
 ; SINK-AFTER-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x double> [[BROADCAST_SPLATINSERT]], <4 x double> poison, <4 x i32> zeroinitializer
 ; SINK-AFTER-NEXT:    [[VECTOR_RECUR_INIT:%.*]] = insertelement <4 x i16> poison, i16 [[TMP0]], i32 3
@@ -623,7 +623,7 @@ define void @recurrence_3(ptr readonly noalias %a, ptr noalias %b, i32 %n, float
 ; SINK-AFTER:       [[VECTOR_BODY]]:
 ; SINK-AFTER-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; SINK-AFTER-NEXT:    [[VECTOR_RECUR:%.*]] = phi <4 x i16> [ [[VECTOR_RECUR_INIT]], %[[VECTOR_PH]] ], [ [[WIDE_LOAD:%.*]], %[[VECTOR_BODY]] ]
-; SINK-AFTER-NEXT:    [[OFFSET_IDX:%.*]] = add nuw i64 1, [[INDEX]]
+; SINK-AFTER-NEXT:    [[OFFSET_IDX:%.*]] = add nuw i64 [[INDEX]], 1
 ; SINK-AFTER-NEXT:    [[TMP4:%.*]] = getelementptr inbounds i16, ptr [[A]], i64 [[OFFSET_IDX]]
 ; SINK-AFTER-NEXT:    [[WIDE_LOAD]] = load <4 x i16>, ptr [[TMP4]], align 2
 ; SINK-AFTER-NEXT:    [[TMP6:%.*]] = shufflevector <4 x i16> [[VECTOR_RECUR]], <4 x i16> [[WIDE_LOAD]], <4 x i32> <i32 3, i32 4, i32 5, i32 6>
@@ -2446,7 +2446,7 @@ define void @sink_dead_inst(ptr %a) {
 ; UNROLL-NO-IC-NEXT:    [[VECTOR_RECUR:%.*]] = phi <4 x i16> [ <i16 poison, i16 poison, i16 poison, i16 0>, %[[VECTOR_PH]] ], [ [[TMP5:%.*]], %[[VECTOR_BODY]] ]
 ; UNROLL-NO-IC-NEXT:    [[STEP_ADD:%.*]] = add <4 x i16> [[VEC_IND]], splat (i16 4)
 ; UNROLL-NO-IC-NEXT:    [[DOTCAST:%.*]] = trunc i32 [[INDEX]] to i16
-; UNROLL-NO-IC-NEXT:    [[OFFSET_IDX:%.*]] = add i16 -27, [[DOTCAST]]
+; UNROLL-NO-IC-NEXT:    [[OFFSET_IDX:%.*]] = add i16 [[DOTCAST]], -27
 ; UNROLL-NO-IC-NEXT:    [[TMP1:%.*]] = add <4 x i16> [[VEC_IND]], splat (i16 1)
 ; UNROLL-NO-IC-NEXT:    [[TMP2:%.*]] = add <4 x i16> [[STEP_ADD]], splat (i16 1)
 ; UNROLL-NO-IC-NEXT:    [[TMP4:%.*]] = add <4 x i16> [[TMP1]], splat (i16 5)
@@ -2495,7 +2495,7 @@ define void @sink_dead_inst(ptr %a) {
 ; UNROLL-NO-VF-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; UNROLL-NO-VF-NEXT:    [[VECTOR_RECUR:%.*]] = phi i16 [ 0, %[[VECTOR_PH]] ], [ [[TMP6:%.*]], %[[VECTOR_BODY]] ]
 ; UNROLL-NO-VF-NEXT:    [[DOTCAST:%.*]] = trunc i32 [[INDEX]] to i16
-; UNROLL-NO-VF-NEXT:    [[OFFSET_IDX:%.*]] = add i16 -27, [[DOTCAST]]
+; UNROLL-NO-VF-NEXT:    [[OFFSET_IDX:%.*]] = add i16 [[DOTCAST]], -27
 ; UNROLL-NO-VF-NEXT:    [[TMP1:%.*]] = add i16 [[OFFSET_IDX]], 1
 ; UNROLL-NO-VF-NEXT:    [[TMP2:%.*]] = add i16 [[OFFSET_IDX]], 1
 ; UNROLL-NO-VF-NEXT:    [[TMP3:%.*]] = add i16 [[TMP1]], 1
@@ -2541,7 +2541,7 @@ define void @sink_dead_inst(ptr %a) {
 ; SINK-AFTER-NEXT:    [[VEC_IND:%.*]] = phi <4 x i16> [ <i16 -27, i16 -26, i16 -25, i16 -24>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; SINK-AFTER-NEXT:    [[VECTOR_RECUR:%.*]] = phi <4 x i16> [ <i16 poison, i16 poison, i16 poison, i16 0>, %[[VECTOR_PH]] ], [ [[TMP3:%.*]], %[[VECTOR_BODY]] ]
 ; SINK-AFTER-NEXT:    [[DOTCAST:%.*]] = trunc i32 [[INDEX]] to i16
-; SINK-AFTER-NEXT:    [[OFFSET_IDX:%.*]] = add i16 -27, [[DOTCAST]]
+; SINK-AFTER-NEXT:    [[OFFSET_IDX:%.*]] = add i16 [[DOTCAST]], -27
 ; SINK-AFTER-NEXT:    [[TMP1:%.*]] = add <4 x i16> [[VEC_IND]], splat (i16 1)
 ; SINK-AFTER-NEXT:    [[TMP3]] = add <4 x i16> [[TMP1]], splat (i16 5)
 ; SINK-AFTER-NEXT:    [[TMP4:%.*]] = shufflevector <4 x i16> [[VECTOR_RECUR]], <4 x i16> [[TMP3]], <4 x i32> <i32 3, i32 4, i32 5, i32 6>
@@ -3316,7 +3316,7 @@ define void @unused_recurrence(ptr %a, i16 %n) {
 ; UNROLL-NO-IC-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[TMP2]], 7
 ; UNROLL-NO-IC-NEXT:    [[N_VEC:%.*]] = sub i32 [[TMP2]], [[N_MOD_VF]]
 ; UNROLL-NO-IC-NEXT:    [[DOTCAST:%.*]] = trunc i32 [[N_VEC]] to i16
-; UNROLL-NO-IC-NEXT:    [[TMP3:%.*]] = add i16 -27, [[DOTCAST]]
+; UNROLL-NO-IC-NEXT:    [[TMP3:%.*]] = add i16 [[DOTCAST]], -27
 ; UNROLL-NO-IC-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; UNROLL-NO-IC:       [[VECTOR_BODY]]:
 ; UNROLL-NO-IC-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
@@ -3359,7 +3359,7 @@ define void @unused_recurrence(ptr %a, i16 %n) {
 ; UNROLL-NO-VF-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[TMP6]], 1
 ; UNROLL-NO-VF-NEXT:    [[N_VEC:%.*]] = sub i32 [[TMP6]], [[N_MOD_VF]]
 ; UNROLL-NO-VF-NEXT:    [[DOTCAST1:%.*]] = trunc i32 [[N_VEC]] to i16
-; UNROLL-NO-VF-NEXT:    [[TMP3:%.*]] = add i16 -27, [[DOTCAST1]]
+; UNROLL-NO-VF-NEXT:    [[TMP3:%.*]] = add i16 [[DOTCAST1]], -27
 ; UNROLL-NO-VF-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; UNROLL-NO-VF:       [[VECTOR_BODY]]:
 ; UNROLL-NO-VF-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
@@ -3368,7 +3368,7 @@ define void @unused_recurrence(ptr %a, i16 %n) {
 ; UNROLL-NO-VF-NEXT:    br i1 [[TMP7]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP30:![0-9]+]]
 ; UNROLL-NO-VF:       [[MIDDLE_BLOCK]]:
 ; UNROLL-NO-VF-NEXT:    [[DOTCAST2:%.*]] = trunc i32 [[INDEX]] to i16
-; UNROLL-NO-VF-NEXT:    [[OFFSET_IDX:%.*]] = add i16 -27, [[DOTCAST2]]
+; UNROLL-NO-VF-NEXT:    [[OFFSET_IDX:%.*]] = add i16 [[DOTCAST2]], -27
 ; UNROLL-NO-VF-NEXT:    [[TMP9:%.*]] = add i16 [[OFFSET_IDX]], 1
 ; UNROLL-NO-VF-NEXT:    [[TMP8:%.*]] = add i16 [[TMP9]], 1
 ; UNROLL-NO-VF-NEXT:    [[TMP2:%.*]] = add i16 [[TMP8]], 5
@@ -3401,7 +3401,7 @@ define void @unused_recurrence(ptr %a, i16 %n) {
 ; SINK-AFTER-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[TMP2]], 3
 ; SINK-AFTER-NEXT:    [[N_VEC:%.*]] = sub i32 [[TMP2]], [[N_MOD_VF]]
 ; SINK-AFTER-NEXT:    [[DOTCAST:%.*]] = trunc i32 [[N_VEC]] to i16
-; SINK-AFTER-NEXT:    [[TMP3:%.*]] = add i16 -27, [[DOTCAST]]
+; SINK-AFTER-NEXT:    [[TMP3:%.*]] = add i16 [[DOTCAST]], -27
 ; SINK-AFTER-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; SINK-AFTER:       [[VECTOR_BODY]]:
 ; SINK-AFTER-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]

@@ -17,11 +17,11 @@ define void @pr63602_1(ptr %arr) {
 ; CHECK:       vector.body:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP0:%.*]] = mul nuw i64 [[INDEX]], 3
-; CHECK-NEXT:    [[TMP1:%.*]] = add nuw i64 1, [[TMP0]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add nuw i64 [[TMP0]], 1
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[TMP1]], 3
 ; CHECK-NEXT:    [[TMP3:%.*]] = add i64 [[TMP1]], 6
 ; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[TMP1]], 9
-; CHECK-NEXT:    [[TMP5:%.*]] = add nuw i64 4, [[TMP0]]
+; CHECK-NEXT:    [[TMP5:%.*]] = add nuw i64 [[TMP0]], 4
 ; CHECK-NEXT:    [[TMP6:%.*]] = add i64 [[TMP5]], 3
 ; CHECK-NEXT:    [[TMP7:%.*]] = add i64 [[TMP5]], 6
 ; CHECK-NEXT:    [[TMP8:%.*]] = add i64 [[TMP5]], 9
@@ -150,11 +150,11 @@ define void @pr63602_2(ptr %arr) {
 ; CHECK:       vector.body:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP0:%.*]] = mul nuw i64 [[INDEX]], 3
-; CHECK-NEXT:    [[TMP1:%.*]] = add nuw i64 1, [[TMP0]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add nuw i64 [[TMP0]], 1
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[TMP1]], 3
 ; CHECK-NEXT:    [[TMP3:%.*]] = add i64 [[TMP1]], 6
 ; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[TMP1]], 9
-; CHECK-NEXT:    [[TMP5:%.*]] = add nuw i64 4, [[TMP0]]
+; CHECK-NEXT:    [[TMP5:%.*]] = add nuw i64 [[TMP0]], 4
 ; CHECK-NEXT:    [[TMP6:%.*]] = add i64 [[TMP5]], 3
 ; CHECK-NEXT:    [[TMP7:%.*]] = add i64 [[TMP5]], 6
 ; CHECK-NEXT:    [[TMP8:%.*]] = add i64 [[TMP5]], 9

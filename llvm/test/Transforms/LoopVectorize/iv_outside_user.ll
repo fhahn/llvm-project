@@ -871,7 +871,7 @@ define i32 @postinc_not_iv_backedge_value(i32 %k)  {
 ; NOTAILFOLD-NEXT:    br i1 [[TMP0]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], {{!llvm.loop ![0-9]+}}
 ; NOTAILFOLD:       [[MIDDLE_BLOCK]]:
 ; NOTAILFOLD-NEXT:    [[TMP1:%.*]] = sub nuw i32 [[N_VEC]], 1
-; NOTAILFOLD-NEXT:    [[TMP2:%.*]] = add i32 2, [[TMP1]]
+; NOTAILFOLD-NEXT:    [[TMP2:%.*]] = add i32 [[TMP1]], 2
 ; NOTAILFOLD-NEXT:    [[CMP_N:%.*]] = icmp eq i32 [[K]], [[N_VEC]]
 ; NOTAILFOLD-NEXT:    br i1 [[CMP_N]], label %[[FOR_END:.*]], label %[[SCALAR_PH]]
 ; NOTAILFOLD:       [[SCALAR_PH]]:
@@ -903,7 +903,7 @@ define i32 @postinc_not_iv_backedge_value(i32 %k)  {
 ; TAILFOLD-NEXT:    br i1 [[TMP0]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], {{!llvm.loop ![0-9]+}}
 ; TAILFOLD:       [[MIDDLE_BLOCK]]:
 ; TAILFOLD-NEXT:    [[TMP1:%.*]] = sub nuw i32 [[K]], 1
-; TAILFOLD-NEXT:    [[TMP3:%.*]] = add i32 2, [[TMP1]]
+; TAILFOLD-NEXT:    [[TMP3:%.*]] = add i32 [[TMP1]], 2
 ; TAILFOLD-NEXT:    br label %[[FOR_END:.*]]
 ; TAILFOLD:       [[FOR_END]]:
 ; TAILFOLD-NEXT:    ret i32 [[TMP3]]
@@ -1849,7 +1849,7 @@ define i32 @cast_incremented_iv_live_out(ptr %arr, i32 %n) {
 ; VEC:       [[MIDDLE_BLOCK]]:
 ; VEC-NEXT:    [[TMP4:%.*]] = sub nuw i64 [[N_VEC]], 1
 ; VEC-NEXT:    [[TMP5:%.*]] = trunc i64 [[TMP4]] to i32
-; VEC-NEXT:    [[TMP6:%.*]] = add i32 1, [[TMP5]]
+; VEC-NEXT:    [[TMP6:%.*]] = add i32 [[TMP5]], 1
 ; VEC-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[UMAX]], [[N_VEC]]
 ; VEC-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; VEC:       [[SCALAR_PH]]:
@@ -1897,7 +1897,7 @@ define i32 @cast_incremented_iv_live_out(ptr %arr, i32 %n) {
 ; INTERLEAVE:       [[MIDDLE_BLOCK]]:
 ; INTERLEAVE-NEXT:    [[TMP9:%.*]] = sub nuw i64 [[N_VEC]], 1
 ; INTERLEAVE-NEXT:    [[TMP10:%.*]] = trunc i64 [[TMP9]] to i32
-; INTERLEAVE-NEXT:    [[TMP11:%.*]] = add i32 1, [[TMP10]]
+; INTERLEAVE-NEXT:    [[TMP11:%.*]] = add i32 [[TMP10]], 1
 ; INTERLEAVE-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[UMAX]], [[N_VEC]]
 ; INTERLEAVE-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; INTERLEAVE:       [[SCALAR_PH]]:
@@ -1956,7 +1956,7 @@ define i32 @cast_incremented_iv_live_out(ptr %arr, i32 %n) {
 ; TAILFOLD:       [[MIDDLE_BLOCK]]:
 ; TAILFOLD-NEXT:    [[TMP12:%.*]] = sub nuw i64 [[TMP1]], 1
 ; TAILFOLD-NEXT:    [[TMP13:%.*]] = trunc i64 [[TMP12]] to i32
-; TAILFOLD-NEXT:    [[TMP15:%.*]] = add i32 1, [[TMP13]]
+; TAILFOLD-NEXT:    [[TMP15:%.*]] = add i32 [[TMP13]], 1
 ; TAILFOLD-NEXT:    br label %[[EXIT:.*]]
 ; TAILFOLD:       [[EXIT]]:
 ; TAILFOLD-NEXT:    ret i32 [[TMP15]]

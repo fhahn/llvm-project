@@ -173,7 +173,7 @@ define void @int_iv_increment_only_scalar_users(ptr noalias %dst, ptr noalias %s
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[TMP1:%.*]] = and i64 [[TMP0]], 1
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[TMP1]]
-; CHECK-NEXT:    [[TMP2:%.*]] = add i64 100, [[N_VEC]]
+; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[N_VEC]], 100
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_STORE_CONTINUE2:.*]] ]
@@ -359,7 +359,7 @@ define void @increment_used_by_invariant_and_per_lane_store(ptr noalias %dst, pt
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[TMP1:%.*]] = and i64 [[TMP0]], 1
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[TMP1]]
-; CHECK-NEXT:    [[TMP2:%.*]] = add i64 100, [[N_VEC]]
+; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[N_VEC]], 100
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_STORE_CONTINUE2:.*]] ]

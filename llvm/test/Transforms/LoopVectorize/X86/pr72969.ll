@@ -52,7 +52,7 @@ define void @test(ptr %p) {
 ; VEC-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP4]], 7
 ; VEC-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP4]], [[N_MOD_VF]]
 ; VEC-NEXT:    [[DOTCAST:%.*]] = trunc i64 [[N_VEC]] to i16
-; VEC-NEXT:    [[IND_END:%.*]] = add i16 1, [[DOTCAST]]
+; VEC-NEXT:    [[IND_END:%.*]] = add i16 [[DOTCAST]], 1
 ; VEC-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; VEC:       vector.body:
 ; VEC-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]

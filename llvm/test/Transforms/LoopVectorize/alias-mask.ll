@@ -230,7 +230,7 @@ define void @alias_mask_known_trip_count(ptr noalias %a, ptr %b, ptr %c) {
 ; CHECK-NEXT:    br i1 [[TMP5]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[TMP6:%.*]] = sub i64 [[NUM_ACTIVE_LANES]], 1
-; CHECK-NEXT:    [[N_RND_UP:%.*]] = add i64 7, [[TMP6]]
+; CHECK-NEXT:    [[N_RND_UP:%.*]] = add i64 [[TMP6]], 7
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[N_RND_UP]], [[NUM_ACTIVE_LANES]]
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N_RND_UP]], [[N_MOD_VF]]
 ; CHECK-NEXT:    [[TMP14:%.*]] = trunc i64 [[NUM_ACTIVE_LANES]] to i8
@@ -607,7 +607,7 @@ define i64 @any_of_reduction(i64 %a, ptr %src, ptr %dst, i32 %n) {
 ; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi <4 x i1> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[TMP17:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i32> [ <i32 0, i32 1, i32 2, i32 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[HEADER_MASK:%.*]] = icmp ule <4 x i32> [[VEC_IND]], [[BROADCAST_SPLAT]]
-; CHECK-NEXT:    [[TMP10:%.*]] = add nuw i32 1, [[INDEX]]
+; CHECK-NEXT:    [[TMP10:%.*]] = add nuw i32 [[INDEX]], 1
 ; CHECK-NEXT:    [[CLAMPED_HEADER_MASK:%.*]] = and <4 x i1> [[HEADER_MASK]], [[ALIAS_MASK]]
 ; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i32 [[TMP10]]
 ; CHECK-NEXT:    [[WIDE_MASKED_LOAD:%.*]] = call <4 x i32> @llvm.masked.load.v4i32.p0(ptr align 4 [[TMP13]], <4 x i1> [[CLAMPED_HEADER_MASK]], <4 x i32> poison)

@@ -46,7 +46,7 @@ define void @maxvf3() {
 ; CHECK-NEXT:    store i8 69, ptr [[TMP6]], align 8
 ; CHECK-NEXT:    br label [[PRED_STORE_CONTINUE2]]
 ; CHECK:       pred.store.continue2:
-; CHECK-NEXT:    [[TMP7:%.*]] = add nuw nsw <2 x i32> splat (i32 3), [[VEC_IND]]
+; CHECK-NEXT:    [[TMP7:%.*]] = add nuw nsw <2 x i32> [[VEC_IND]], splat (i32 3)
 ; CHECK-NEXT:    br i1 [[TMP1]], label [[PRED_STORE_IF3:%.*]], label [[PRED_STORE_CONTINUE4:%.*]]
 ; CHECK:       pred.store.if3:
 ; CHECK-NEXT:    [[TMP9:%.*]] = extractelement <2 x i32> [[TMP7]], i64 0

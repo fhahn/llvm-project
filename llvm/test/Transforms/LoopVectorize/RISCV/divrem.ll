@@ -643,7 +643,7 @@ define void @udiv_sdiv_with_invariant_divisors(i8 %x, i16 %y, i1 %c, ptr %p) vsc
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT5:%.*]] = insertelement <vscale x 4 x ptr> poison, ptr [[P:%.*]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT6:%.*]] = shufflevector <vscale x 4 x ptr> [[BROADCAST_SPLATINSERT5]], <vscale x 4 x ptr> poison, <vscale x 4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP1:%.*]] = call <vscale x 4 x i8> @llvm.stepvector.nxv4i8()
-; CHECK-NEXT:    [[INDUCTION:%.*]] = add <vscale x 4 x i8> splat (i8 -12), [[TMP1]]
+; CHECK-NEXT:    [[INDUCTION:%.*]] = add <vscale x 4 x i8> [[TMP1]], splat (i8 -12)
 ; CHECK-NEXT:    br label [[LOOP_LATCH:%.*]]
 ; CHECK:       vector.body:
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <vscale x 4 x i8> [ [[INDUCTION]], [[VECTOR_BODY]] ], [ [[VEC_IND_NEXT:%.*]], [[LOOP_LATCH]] ]

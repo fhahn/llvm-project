@@ -877,8 +877,7 @@ define i32 @print_mulacc_extended_const_lhs(ptr %start, ptr %end) {
 ; CHECK-NEXT:      EMIT vp<%next.gep> = ptradd ir<%start>, vp<[[VP10]]>
 ; CHECK-NEXT:      vp<[[VP11:%[0-9]+]]> = vector-pointer i8, vp<%next.gep>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%l> = load vp<[[VP11]]>, vp<[[VP9]]>
-; CHECK-NEXT:      WIDEN-CAST ir<%l.ext> = zext ir<%l> to i32
-; CHECK-NEXT:      EXPRESSION vp<[[VP12]]> = ir<%red> + reduce.add (mul ir<63>, ir<%l.ext>, vp<[[VP9]]>)
+; CHECK-NEXT:      EXPRESSION vp<[[VP12]]> = ir<%red> + reduce.add (mul (ir<%l> zext to i32), (ir<63> zext to i32), vp<[[VP9]]>)
 ; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP6]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors

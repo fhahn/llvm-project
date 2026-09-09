@@ -269,7 +269,7 @@ define i32 @uniform_widened_recurrence_resume(ptr %src, ptr %dst, i64 %n) {
 ; UNROLL-NO-IC-NEXT:    store i8 0, ptr [[DST]], align 1, !alias.scope [[META10:![0-9]+]], !noalias [[META6]]
 ; UNROLL-NO-IC-NEXT:    [[TMP5:%.*]] = shufflevector <4 x i32> [[TMP2]], <4 x i32> [[TMP2]], <4 x i32> <i32 3, i32 4, i32 5, i32 6>
 ; UNROLL-NO-IC-NEXT:    [[TMP6:%.*]] = trunc <4 x i32> [[TMP5]] to <4 x i8>
-; UNROLL-NO-IC-NEXT:    [[TMP7:%.*]] = or <4 x i32> splat (i32 1), [[TMP4]]
+; UNROLL-NO-IC-NEXT:    [[TMP7:%.*]] = or <4 x i32> [[TMP4]], splat (i32 1)
 ; UNROLL-NO-IC-NEXT:    [[VECTOR_RECUR_EXTRACT:%.*]] = extractelement <4 x i32> [[TMP2]], i64 3
 ; UNROLL-NO-IC-NEXT:    [[TMP8:%.*]] = extractelement <4 x i32> [[TMP7]], i64 3
 ; UNROLL-NO-IC-NEXT:    [[TMP9:%.*]] = extractelement <4 x i8> [[TMP6]], i64 3
@@ -326,7 +326,7 @@ define i32 @uniform_widened_recurrence_resume(ptr %src, ptr %dst, i64 %n) {
 ; UNROLL-NO-VF:       [[MIDDLE_BLOCK]]:
 ; UNROLL-NO-VF-NEXT:    store i8 0, ptr [[DST]], align 1, !alias.scope [[META10:![0-9]+]], !noalias [[META6]]
 ; UNROLL-NO-VF-NEXT:    [[TMP4:%.*]] = trunc i32 [[TMP2]] to i8
-; UNROLL-NO-VF-NEXT:    [[TMP5:%.*]] = or i32 1, [[TMP1]]
+; UNROLL-NO-VF-NEXT:    [[TMP5:%.*]] = or i32 [[TMP1]], 1
 ; UNROLL-NO-VF-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
 ; UNROLL-NO-VF-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; UNROLL-NO-VF:       [[SCALAR_PH]]:
@@ -386,7 +386,7 @@ define i32 @uniform_widened_recurrence_resume(ptr %src, ptr %dst, i64 %n) {
 ; SINK-AFTER-NEXT:    store i8 0, ptr [[DST]], align 1, !alias.scope [[META10:![0-9]+]], !noalias [[META6]]
 ; SINK-AFTER-NEXT:    [[TMP5:%.*]] = shufflevector <4 x i32> [[VECTOR_RECUR]], <4 x i32> [[TMP2]], <4 x i32> <i32 3, i32 4, i32 5, i32 6>
 ; SINK-AFTER-NEXT:    [[TMP6:%.*]] = trunc <4 x i32> [[TMP5]] to <4 x i8>
-; SINK-AFTER-NEXT:    [[TMP7:%.*]] = or <4 x i32> splat (i32 1), [[TMP4]]
+; SINK-AFTER-NEXT:    [[TMP7:%.*]] = or <4 x i32> [[TMP4]], splat (i32 1)
 ; SINK-AFTER-NEXT:    [[VECTOR_RECUR_EXTRACT:%.*]] = extractelement <4 x i32> [[TMP2]], i64 3
 ; SINK-AFTER-NEXT:    [[TMP8:%.*]] = extractelement <4 x i32> [[TMP7]], i64 3
 ; SINK-AFTER-NEXT:    [[TMP9:%.*]] = extractelement <4 x i8> [[TMP6]], i64 3

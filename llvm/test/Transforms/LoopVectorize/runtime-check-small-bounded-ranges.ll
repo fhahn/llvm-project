@@ -249,11 +249,11 @@ define void @load_bounded_index_offset_1(ptr %A, ptr %B, i32 %N) {
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[TMP0]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i32 [[TMP0]], [[N_MOD_VF]]
-; CHECK-NEXT:    [[TMP9:%.*]] = add i32 1, [[N_VEC]]
+; CHECK-NEXT:    [[TMP9:%.*]] = add i32 [[N_VEC]], 1
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[TMP10:%.*]] = add nuw i32 1, [[INDEX]]
+; CHECK-NEXT:    [[TMP10:%.*]] = add nuw i32 [[INDEX]], 1
 ; CHECK-NEXT:    [[TMP11:%.*]] = and i32 [[TMP10]], 3
 ; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds i32, ptr [[A]], i32 [[TMP11]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP12]], align 4

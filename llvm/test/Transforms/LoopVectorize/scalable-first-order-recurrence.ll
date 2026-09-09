@@ -358,7 +358,7 @@ define void @recurrence_3(ptr nocapture readonly %a, ptr nocapture %b, i32 %n, f
 ; CHECK-VF4UF1:       [[VECTOR_PH]]:
 ; CHECK-VF4UF1-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[TMP2]], [[TMP4]]
 ; CHECK-VF4UF1-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP2]], [[N_MOD_VF]]
-; CHECK-VF4UF1-NEXT:    [[TMP15:%.*]] = add i64 1, [[N_VEC]]
+; CHECK-VF4UF1-NEXT:    [[TMP15:%.*]] = add i64 [[N_VEC]], 1
 ; CHECK-VF4UF1-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 4 x double> poison, double [[CONV1]], i64 0
 ; CHECK-VF4UF1-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 4 x double> [[BROADCAST_SPLATINSERT]], <vscale x 4 x double> poison, <vscale x 4 x i32> zeroinitializer
 ; CHECK-VF4UF1-NEXT:    [[TMP16:%.*]] = call i32 @llvm.vscale.i32()
@@ -369,7 +369,7 @@ define void @recurrence_3(ptr nocapture readonly %a, ptr nocapture %b, i32 %n, f
 ; CHECK-VF4UF1:       [[VECTOR_BODY]]:
 ; CHECK-VF4UF1-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-VF4UF1-NEXT:    [[VECTOR_RECUR:%.*]] = phi <vscale x 4 x i16> [ [[VECTOR_RECUR_INIT]], %[[VECTOR_PH]] ], [ [[WIDE_LOAD:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-VF4UF1-NEXT:    [[OFFSET_IDX:%.*]] = add nuw i64 1, [[INDEX]]
+; CHECK-VF4UF1-NEXT:    [[OFFSET_IDX:%.*]] = add nuw i64 [[INDEX]], 1
 ; CHECK-VF4UF1-NEXT:    [[TMP19:%.*]] = getelementptr inbounds i16, ptr [[A]], i64 [[OFFSET_IDX]]
 ; CHECK-VF4UF1-NEXT:    [[WIDE_LOAD]] = load <vscale x 4 x i16>, ptr [[TMP19]], align 2, !alias.scope [[META6:![0-9]+]]
 ; CHECK-VF4UF1-NEXT:    [[TMP21:%.*]] = call <vscale x 4 x i16> @llvm.vector.splice.right.nxv4i16(<vscale x 4 x i16> [[VECTOR_RECUR]], <vscale x 4 x i16> [[WIDE_LOAD]], i32 1)
@@ -433,7 +433,7 @@ define void @recurrence_3(ptr nocapture readonly %a, ptr nocapture %b, i32 %n, f
 ; CHECK-VF4UF2-NEXT:    [[TMP13:%.*]] = shl nuw i64 [[TMP3]], 2
 ; CHECK-VF4UF2-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[TMP2]], [[TMP4]]
 ; CHECK-VF4UF2-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP2]], [[N_MOD_VF]]
-; CHECK-VF4UF2-NEXT:    [[TMP15:%.*]] = add i64 1, [[N_VEC]]
+; CHECK-VF4UF2-NEXT:    [[TMP15:%.*]] = add i64 [[N_VEC]], 1
 ; CHECK-VF4UF2-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 4 x double> poison, double [[CONV1]], i64 0
 ; CHECK-VF4UF2-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 4 x double> [[BROADCAST_SPLATINSERT]], <vscale x 4 x double> poison, <vscale x 4 x i32> zeroinitializer
 ; CHECK-VF4UF2-NEXT:    [[TMP16:%.*]] = call i32 @llvm.vscale.i32()
@@ -444,7 +444,7 @@ define void @recurrence_3(ptr nocapture readonly %a, ptr nocapture %b, i32 %n, f
 ; CHECK-VF4UF2:       [[VECTOR_BODY]]:
 ; CHECK-VF4UF2-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-VF4UF2-NEXT:    [[VECTOR_RECUR:%.*]] = phi <vscale x 4 x i16> [ [[VECTOR_RECUR_INIT]], %[[VECTOR_PH]] ], [ [[WIDE_LOAD4:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-VF4UF2-NEXT:    [[OFFSET_IDX:%.*]] = add nuw i64 1, [[INDEX]]
+; CHECK-VF4UF2-NEXT:    [[OFFSET_IDX:%.*]] = add nuw i64 [[INDEX]], 1
 ; CHECK-VF4UF2-NEXT:    [[TMP19:%.*]] = getelementptr inbounds i16, ptr [[A]], i64 [[OFFSET_IDX]]
 ; CHECK-VF4UF2-NEXT:    [[TMP20:%.*]] = getelementptr inbounds i16, ptr [[TMP19]], i64 [[TMP13]]
 ; CHECK-VF4UF2-NEXT:    [[WIDE_LOAD:%.*]] = load <vscale x 4 x i16>, ptr [[TMP19]], align 2, !alias.scope [[META6:![0-9]+]]

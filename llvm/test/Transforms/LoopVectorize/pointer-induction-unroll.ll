@@ -33,7 +33,7 @@ define void @non_constant_scalar_expansion(i32 %0, ptr %call) {
 ; STRIDED:       vector.body:
 ; STRIDED-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
 ; STRIDED-NEXT:    [[DOTCAST:%.*]] = trunc i64 [[INDEX]] to i32
-; STRIDED-NEXT:    [[OFFSET_IDX:%.*]] = add i32 30, [[DOTCAST]]
+; STRIDED-NEXT:    [[OFFSET_IDX:%.*]] = add i32 [[DOTCAST]], 30
 ; STRIDED-NEXT:    [[TMP4:%.*]] = add i32 [[OFFSET_IDX]], 1
 ; STRIDED-NEXT:    [[TMP5:%.*]] = add i32 [[OFFSET_IDX]], 2
 ; STRIDED-NEXT:    [[TMP6:%.*]] = add i32 [[OFFSET_IDX]], 3

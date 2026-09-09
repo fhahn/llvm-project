@@ -959,7 +959,7 @@ define i32 @test_multi_use_reduction_with_trunc_iv(ptr %src, i32 %n) {
 ; CHECK:       [[VECTOR_PH1]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[N_EXT]], 15
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N_EXT]], [[N_MOD_VF]]
-; CHECK-NEXT:    [[TMP0:%.*]] = add i64 1, [[N_VEC]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[N_VEC]], 1
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH1]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
@@ -975,7 +975,7 @@ define i32 @test_multi_use_reduction_with_trunc_iv(ptr %src, i32 %n) {
 ; CHECK-NEXT:    [[STEP_ADD:%.*]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
 ; CHECK-NEXT:    [[STEP_ADD_2:%.*]] = add <4 x i32> [[STEP_ADD]], splat (i32 4)
 ; CHECK-NEXT:    [[STEP_ADD_3:%.*]] = add <4 x i32> [[STEP_ADD_2]], splat (i32 4)
-; CHECK-NEXT:    [[IV:%.*]] = add i64 1, [[INDEX]]
+; CHECK-NEXT:    [[IV:%.*]] = add i64 [[INDEX]], 1
 ; CHECK-NEXT:    [[GEP_SRC:%.*]] = getelementptr i32, ptr [[SRC]], i64 [[IV]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr i32, ptr [[GEP_SRC]], i64 4
 ; CHECK-NEXT:    [[TMP20:%.*]] = getelementptr i32, ptr [[GEP_SRC]], i64 8
@@ -1035,7 +1035,7 @@ define i32 @test_multi_use_reduction_with_trunc_iv(ptr %src, i32 %n) {
 ; CHECK-NEXT:    [[TMP32:%.*]] = select i1 [[TMP31]], i32 0, i32 [[BC_MERGE_RDX]]
 ; CHECK-NEXT:    [[N_MOD_VF18:%.*]] = and i64 [[N_EXT]], 3
 ; CHECK-NEXT:    [[N_VEC19:%.*]] = sub i64 [[N_EXT]], [[N_MOD_VF18]]
-; CHECK-NEXT:    [[TMP33:%.*]] = add i64 1, [[N_VEC19]]
+; CHECK-NEXT:    [[TMP33:%.*]] = add i64 [[N_VEC19]], 1
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT20:%.*]] = insertelement <4 x i32> poison, i32 [[TMP32]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT21:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT20]], <4 x i32> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT22:%.*]] = insertelement <4 x i32> poison, i32 [[BC_MERGE_RDX17]], i64 0
@@ -1050,7 +1050,7 @@ define i32 @test_multi_use_reduction_with_trunc_iv(ptr %src, i32 %n) {
 ; CHECK-NEXT:    [[VEC_PHI27:%.*]] = phi <4 x i32> [ [[BROADCAST_SPLAT21]], %[[VEC_EPILOG_PH]] ], [ [[TMP39:%.*]], %[[LOOP]] ]
 ; CHECK-NEXT:    [[VEC_PHI28:%.*]] = phi <4 x i32> [ [[BROADCAST_SPLAT23]], %[[VEC_EPILOG_PH]] ], [ [[TMP38:%.*]], %[[LOOP]] ]
 ; CHECK-NEXT:    [[VEC_IND29:%.*]] = phi <4 x i32> [ [[INDUCTION]], %[[VEC_EPILOG_PH]] ], [ [[VEC_IND_NEXT32:%.*]], %[[LOOP]] ]
-; CHECK-NEXT:    [[IV1:%.*]] = add i64 1, [[INDEX26]]
+; CHECK-NEXT:    [[IV1:%.*]] = add i64 [[INDEX26]], 1
 ; CHECK-NEXT:    [[GEP_SRC1:%.*]] = getelementptr i32, ptr [[SRC]], i64 [[IV1]]
 ; CHECK-NEXT:    [[WIDE_LOAD30:%.*]] = load <4 x i32>, ptr [[GEP_SRC1]], align 4
 ; CHECK-NEXT:    [[TMP37:%.*]] = icmp ugt <4 x i32> [[WIDE_LOAD30]], [[VEC_PHI28]]

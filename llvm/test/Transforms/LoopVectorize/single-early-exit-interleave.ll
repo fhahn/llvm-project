@@ -85,7 +85,7 @@ define i64 @same_exit_block_pre_inc_use1() {
 ; VF4IC4-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; VF4IC4:       vector.body:
 ; VF4IC4-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY_INTERIM:%.*]] ]
-; VF4IC4-NEXT:    [[OFFSET_IDX:%.*]] = add i64 3, [[INDEX]]
+; VF4IC4-NEXT:    [[OFFSET_IDX:%.*]] = add i64 [[INDEX]], 3
 ; VF4IC4-NEXT:    [[TMP0:%.*]] = getelementptr inbounds i8, ptr [[P1]], i64 [[OFFSET_IDX]]
 ; VF4IC4-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i8, ptr [[TMP0]], i64 4
 ; VF4IC4-NEXT:    [[TMP2:%.*]] = getelementptr inbounds i8, ptr [[TMP0]], i64 8
@@ -137,7 +137,7 @@ define i64 @same_exit_block_pre_inc_use1() {
 ; VF4IC4-NEXT:    [[TMP32:%.*]] = icmp ne i64 [[TMP30]], 4
 ; VF4IC4-NEXT:    [[TMP8:%.*]] = select i1 [[TMP32]], i64 [[TMP31]], i64 [[TMP29]]
 ; VF4IC4-NEXT:    [[TMP9:%.*]] = add i64 [[INDEX]], [[TMP8]]
-; VF4IC4-NEXT:    [[TMP10:%.*]] = add i64 3, [[TMP9]]
+; VF4IC4-NEXT:    [[TMP10:%.*]] = add i64 [[TMP9]], 3
 ; VF4IC4-NEXT:    br label [[LOOP_END]]
 ; VF4IC4:       loop.end:
 ; VF4IC4-NEXT:    [[RETVAL:%.*]] = phi i64 [ [[TMP10]], [[VECTOR_EARLY_EXIT]] ], [ 67, [[MIDDLE_BLOCK]] ]
@@ -263,7 +263,7 @@ define i64 @same_exit_block_post_inc_use() {
 ; VF4IC4-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; VF4IC4:       vector.body:
 ; VF4IC4-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY_INTERIM:%.*]] ]
-; VF4IC4-NEXT:    [[OFFSET_IDX:%.*]] = add i64 3, [[INDEX]]
+; VF4IC4-NEXT:    [[OFFSET_IDX:%.*]] = add i64 [[INDEX]], 3
 ; VF4IC4-NEXT:    [[TMP0:%.*]] = getelementptr inbounds i8, ptr [[P1]], i64 [[OFFSET_IDX]]
 ; VF4IC4-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i8, ptr [[TMP0]], i64 4
 ; VF4IC4-NEXT:    [[TMP2:%.*]] = getelementptr inbounds i8, ptr [[TMP0]], i64 8
@@ -315,7 +315,7 @@ define i64 @same_exit_block_post_inc_use() {
 ; VF4IC4-NEXT:    [[TMP32:%.*]] = icmp ne i64 [[TMP30]], 4
 ; VF4IC4-NEXT:    [[TMP8:%.*]] = select i1 [[TMP32]], i64 [[TMP31]], i64 [[TMP29]]
 ; VF4IC4-NEXT:    [[TMP9:%.*]] = add i64 [[INDEX]], [[TMP8]]
-; VF4IC4-NEXT:    [[TMP10:%.*]] = add i64 3, [[TMP9]]
+; VF4IC4-NEXT:    [[TMP10:%.*]] = add i64 [[TMP9]], 3
 ; VF4IC4-NEXT:    br label [[LOOP_END]]
 ; VF4IC4:       loop.end:
 ; VF4IC4-NEXT:    [[RETVAL:%.*]] = phi i64 [ [[TMP10]], [[VECTOR_EARLY_EXIT]] ], [ 67, [[MIDDLE_BLOCK]] ]
@@ -359,7 +359,7 @@ define i64 @diff_exit_block_pre_inc_use1() {
 ; VF4IC4-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; VF4IC4:       vector.body:
 ; VF4IC4-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY_INTERIM:%.*]] ]
-; VF4IC4-NEXT:    [[OFFSET_IDX:%.*]] = add i64 3, [[INDEX]]
+; VF4IC4-NEXT:    [[OFFSET_IDX:%.*]] = add i64 [[INDEX]], 3
 ; VF4IC4-NEXT:    [[TMP0:%.*]] = getelementptr inbounds i8, ptr [[P1]], i64 [[OFFSET_IDX]]
 ; VF4IC4-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i8, ptr [[TMP0]], i64 4
 ; VF4IC4-NEXT:    [[TMP2:%.*]] = getelementptr inbounds i8, ptr [[TMP0]], i64 8
@@ -411,7 +411,7 @@ define i64 @diff_exit_block_pre_inc_use1() {
 ; VF4IC4-NEXT:    [[TMP32:%.*]] = icmp ne i64 [[TMP30]], 4
 ; VF4IC4-NEXT:    [[TMP8:%.*]] = select i1 [[TMP32]], i64 [[TMP31]], i64 [[TMP29]]
 ; VF4IC4-NEXT:    [[TMP9:%.*]] = add i64 [[INDEX]], [[TMP8]]
-; VF4IC4-NEXT:    [[TMP10:%.*]] = add i64 3, [[TMP9]]
+; VF4IC4-NEXT:    [[TMP10:%.*]] = add i64 [[TMP9]], 3
 ; VF4IC4-NEXT:    br label [[LOOP:%.*]]
 ; VF4IC4:       loop.early.exit:
 ; VF4IC4-NEXT:    ret i64 [[TMP10]]
@@ -460,7 +460,7 @@ define i64 @diff_exit_block_post_inc_use1() {
 ; VF4IC4-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; VF4IC4:       vector.body:
 ; VF4IC4-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY_INTERIM:%.*]] ]
-; VF4IC4-NEXT:    [[OFFSET_IDX:%.*]] = add i64 3, [[INDEX]]
+; VF4IC4-NEXT:    [[OFFSET_IDX:%.*]] = add i64 [[INDEX]], 3
 ; VF4IC4-NEXT:    [[TMP0:%.*]] = getelementptr inbounds i8, ptr [[P1]], i64 [[OFFSET_IDX]]
 ; VF4IC4-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i8, ptr [[TMP0]], i64 4
 ; VF4IC4-NEXT:    [[TMP2:%.*]] = getelementptr inbounds i8, ptr [[TMP0]], i64 8
@@ -512,7 +512,7 @@ define i64 @diff_exit_block_post_inc_use1() {
 ; VF4IC4-NEXT:    [[TMP32:%.*]] = icmp ne i64 [[TMP30]], 4
 ; VF4IC4-NEXT:    [[TMP8:%.*]] = select i1 [[TMP32]], i64 [[TMP31]], i64 [[TMP29]]
 ; VF4IC4-NEXT:    [[TMP9:%.*]] = add i64 [[INDEX]], [[TMP8]]
-; VF4IC4-NEXT:    [[TMP10:%.*]] = add i64 3, [[TMP9]]
+; VF4IC4-NEXT:    [[TMP10:%.*]] = add i64 [[TMP9]], 3
 ; VF4IC4-NEXT:    br label [[LOOP:%.*]]
 ; VF4IC4:       loop.early.exit:
 ; VF4IC4-NEXT:    ret i64 [[TMP10]]

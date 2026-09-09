@@ -19,7 +19,7 @@ define i64 @argmin_argmax(ptr %data, i32 %start_val) {
 ; CHECK-NEXT:    [[VEC_PHI2:%.*]] = phi <2 x i64> [ poison, %[[VECTOR_PH]] ], [ [[TMP2:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_PHI3:%.*]] = phi <2 x i32> [ [[BROADCAST_SPLAT]], %[[VECTOR_PH]] ], [ [[TMP6:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_PHI4:%.*]] = phi <2 x i64> [ poison, %[[VECTOR_PH]] ], [ [[TMP5:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add nuw i64 1, [[INDEX]]
+; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add nuw i64 [[INDEX]], 1
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds i32, ptr [[DATA]], i64 [[OFFSET_IDX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x i32>, ptr [[TMP0]], align 4
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp slt <2 x i32> [[WIDE_LOAD]], [[VEC_PHI]]
@@ -40,7 +40,7 @@ define i64 @argmin_argmax(ptr %data, i32 %start_val) {
 ; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq <2 x i32> [[TMP3]], [[BROADCAST_SPLAT7]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = select <2 x i1> [[TMP9]], <2 x i64> [[TMP2]], <2 x i64> splat (i64 -1)
 ; CHECK-NEXT:    [[TMP11:%.*]] = call i64 @llvm.vector.reduce.umin.v2i64(<2 x i64> [[TMP10]])
-; CHECK-NEXT:    [[DERIVED_IV_RESULT:%.*]] = add i64 1, [[TMP11]]
+; CHECK-NEXT:    [[DERIVED_IV_RESULT:%.*]] = add i64 [[TMP11]], 1
 ; CHECK-NEXT:    [[TMP12:%.*]] = icmp eq i32 [[TMP8]], [[START_VAL]]
 ; CHECK-NEXT:    [[TMP13:%.*]] = select i1 [[TMP12]], i64 0, i64 [[DERIVED_IV_RESULT]]
 ; CHECK-NEXT:    [[TMP14:%.*]] = call i32 @llvm.vector.reduce.smax.v2i32(<2 x i32> [[TMP6]])
@@ -49,7 +49,7 @@ define i64 @argmin_argmax(ptr %data, i32 %start_val) {
 ; CHECK-NEXT:    [[TMP15:%.*]] = icmp eq <2 x i32> [[TMP6]], [[BROADCAST_SPLAT9]]
 ; CHECK-NEXT:    [[TMP16:%.*]] = select <2 x i1> [[TMP15]], <2 x i64> [[TMP5]], <2 x i64> splat (i64 -1)
 ; CHECK-NEXT:    [[TMP17:%.*]] = call i64 @llvm.vector.reduce.umin.v2i64(<2 x i64> [[TMP16]])
-; CHECK-NEXT:    [[DERIVED_IV_RESULT10:%.*]] = add i64 1, [[TMP17]]
+; CHECK-NEXT:    [[DERIVED_IV_RESULT10:%.*]] = add i64 [[TMP17]], 1
 ; CHECK-NEXT:    [[TMP18:%.*]] = icmp eq i32 [[TMP14]], [[START_VAL]]
 ; CHECK-NEXT:    [[TMP19:%.*]] = select i1 [[TMP18]], i64 0, i64 [[DERIVED_IV_RESULT10]]
 ; CHECK-NEXT:    br label %[[SCALAR_PH:.*]]
@@ -123,7 +123,7 @@ define i64 @argmin_argmin(ptr %data, i32 %start_val1, i32 %start_val2) {
 ; CHECK-NEXT:    [[VEC_PHI4:%.*]] = phi <2 x i64> [ poison, %[[VECTOR_PH]] ], [ [[TMP2:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_PHI5:%.*]] = phi <2 x i32> [ [[BROADCAST_SPLAT2]], %[[VECTOR_PH]] ], [ [[TMP6:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_PHI6:%.*]] = phi <2 x i64> [ poison, %[[VECTOR_PH]] ], [ [[TMP5:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add nuw i64 1, [[INDEX]]
+; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add nuw i64 [[INDEX]], 1
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds i32, ptr [[DATA]], i64 [[OFFSET_IDX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x i32>, ptr [[TMP0]], align 4
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp slt <2 x i32> [[WIDE_LOAD]], [[VEC_PHI]]
@@ -144,7 +144,7 @@ define i64 @argmin_argmin(ptr %data, i32 %start_val1, i32 %start_val2) {
 ; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq <2 x i32> [[TMP3]], [[BROADCAST_SPLAT9]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = select <2 x i1> [[TMP9]], <2 x i64> [[TMP2]], <2 x i64> splat (i64 -1)
 ; CHECK-NEXT:    [[TMP11:%.*]] = call i64 @llvm.vector.reduce.umin.v2i64(<2 x i64> [[TMP10]])
-; CHECK-NEXT:    [[DERIVED_IV_RESULT:%.*]] = add i64 1, [[TMP11]]
+; CHECK-NEXT:    [[DERIVED_IV_RESULT:%.*]] = add i64 [[TMP11]], 1
 ; CHECK-NEXT:    [[TMP12:%.*]] = icmp eq i32 [[TMP8]], [[START_VAL1]]
 ; CHECK-NEXT:    [[TMP13:%.*]] = select i1 [[TMP12]], i64 0, i64 [[DERIVED_IV_RESULT]]
 ; CHECK-NEXT:    [[TMP14:%.*]] = call i32 @llvm.vector.reduce.smin.v2i32(<2 x i32> [[TMP6]])
@@ -153,7 +153,7 @@ define i64 @argmin_argmin(ptr %data, i32 %start_val1, i32 %start_val2) {
 ; CHECK-NEXT:    [[TMP15:%.*]] = icmp eq <2 x i32> [[TMP6]], [[BROADCAST_SPLAT11]]
 ; CHECK-NEXT:    [[TMP16:%.*]] = select <2 x i1> [[TMP15]], <2 x i64> [[TMP5]], <2 x i64> splat (i64 -1)
 ; CHECK-NEXT:    [[TMP17:%.*]] = call i64 @llvm.vector.reduce.umin.v2i64(<2 x i64> [[TMP16]])
-; CHECK-NEXT:    [[DERIVED_IV_RESULT12:%.*]] = add i64 1, [[TMP17]]
+; CHECK-NEXT:    [[DERIVED_IV_RESULT12:%.*]] = add i64 [[TMP17]], 1
 ; CHECK-NEXT:    [[TMP18:%.*]] = icmp eq i32 [[TMP14]], [[START_VAL2]]
 ; CHECK-NEXT:    [[TMP19:%.*]] = select i1 [[TMP18]], i64 0, i64 [[DERIVED_IV_RESULT12]]
 ; CHECK-NEXT:    br label %[[SCALAR_PH:.*]]
@@ -227,7 +227,7 @@ define i64 @argmax_argmax(ptr %data, i32 %start_val1, i32 %start_val2) {
 ; CHECK-NEXT:    [[VEC_PHI4:%.*]] = phi <2 x i64> [ poison, %[[VECTOR_PH]] ], [ [[TMP2:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_PHI5:%.*]] = phi <2 x i32> [ [[BROADCAST_SPLAT2]], %[[VECTOR_PH]] ], [ [[TMP6:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_PHI6:%.*]] = phi <2 x i64> [ poison, %[[VECTOR_PH]] ], [ [[TMP5:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add nuw i64 1, [[INDEX]]
+; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add nuw i64 [[INDEX]], 1
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds i32, ptr [[DATA]], i64 [[OFFSET_IDX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x i32>, ptr [[TMP0]], align 4
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp sgt <2 x i32> [[WIDE_LOAD]], [[VEC_PHI]]
@@ -248,7 +248,7 @@ define i64 @argmax_argmax(ptr %data, i32 %start_val1, i32 %start_val2) {
 ; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq <2 x i32> [[TMP3]], [[BROADCAST_SPLAT9]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = select <2 x i1> [[TMP9]], <2 x i64> [[TMP2]], <2 x i64> splat (i64 -1)
 ; CHECK-NEXT:    [[TMP11:%.*]] = call i64 @llvm.vector.reduce.umin.v2i64(<2 x i64> [[TMP10]])
-; CHECK-NEXT:    [[DERIVED_IV_RESULT:%.*]] = add i64 1, [[TMP11]]
+; CHECK-NEXT:    [[DERIVED_IV_RESULT:%.*]] = add i64 [[TMP11]], 1
 ; CHECK-NEXT:    [[TMP12:%.*]] = icmp eq i32 [[TMP8]], [[START_VAL1]]
 ; CHECK-NEXT:    [[TMP13:%.*]] = select i1 [[TMP12]], i64 0, i64 [[DERIVED_IV_RESULT]]
 ; CHECK-NEXT:    [[TMP14:%.*]] = call i32 @llvm.vector.reduce.smax.v2i32(<2 x i32> [[TMP6]])
@@ -257,7 +257,7 @@ define i64 @argmax_argmax(ptr %data, i32 %start_val1, i32 %start_val2) {
 ; CHECK-NEXT:    [[TMP15:%.*]] = icmp eq <2 x i32> [[TMP6]], [[BROADCAST_SPLAT11]]
 ; CHECK-NEXT:    [[TMP16:%.*]] = select <2 x i1> [[TMP15]], <2 x i64> [[TMP5]], <2 x i64> splat (i64 -1)
 ; CHECK-NEXT:    [[TMP17:%.*]] = call i64 @llvm.vector.reduce.umin.v2i64(<2 x i64> [[TMP16]])
-; CHECK-NEXT:    [[DERIVED_IV_RESULT12:%.*]] = add i64 1, [[TMP17]]
+; CHECK-NEXT:    [[DERIVED_IV_RESULT12:%.*]] = add i64 [[TMP17]], 1
 ; CHECK-NEXT:    [[TMP18:%.*]] = icmp eq i32 [[TMP14]], [[START_VAL2]]
 ; CHECK-NEXT:    [[TMP19:%.*]] = select i1 [[TMP18]], i64 0, i64 [[DERIVED_IV_RESULT12]]
 ; CHECK-NEXT:    br label %[[SCALAR_PH:.*]]
@@ -332,7 +332,7 @@ define i64 @argmin_signed_argmax_unsigned(ptr %data, i32 %start_val1, i32 %start
 ; CHECK-NEXT:    [[VEC_PHI4:%.*]] = phi <2 x i64> [ poison, %[[VECTOR_PH]] ], [ [[TMP2:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_PHI5:%.*]] = phi <2 x i32> [ [[BROADCAST_SPLAT2]], %[[VECTOR_PH]] ], [ [[TMP6:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_PHI6:%.*]] = phi <2 x i64> [ poison, %[[VECTOR_PH]] ], [ [[TMP5:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add nuw i64 1, [[INDEX]]
+; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add nuw i64 [[INDEX]], 1
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds i32, ptr [[DATA]], i64 [[OFFSET_IDX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x i32>, ptr [[TMP0]], align 4
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp slt <2 x i32> [[WIDE_LOAD]], [[VEC_PHI]]
@@ -353,7 +353,7 @@ define i64 @argmin_signed_argmax_unsigned(ptr %data, i32 %start_val1, i32 %start
 ; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq <2 x i32> [[TMP3]], [[BROADCAST_SPLAT9]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = select <2 x i1> [[TMP9]], <2 x i64> [[TMP2]], <2 x i64> splat (i64 -1)
 ; CHECK-NEXT:    [[TMP11:%.*]] = call i64 @llvm.vector.reduce.umin.v2i64(<2 x i64> [[TMP10]])
-; CHECK-NEXT:    [[DERIVED_IV_RESULT:%.*]] = add i64 1, [[TMP11]]
+; CHECK-NEXT:    [[DERIVED_IV_RESULT:%.*]] = add i64 [[TMP11]], 1
 ; CHECK-NEXT:    [[TMP12:%.*]] = icmp eq i32 [[TMP8]], [[START_VAL1]]
 ; CHECK-NEXT:    [[TMP13:%.*]] = select i1 [[TMP12]], i64 0, i64 [[DERIVED_IV_RESULT]]
 ; CHECK-NEXT:    [[TMP14:%.*]] = call i32 @llvm.vector.reduce.umax.v2i32(<2 x i32> [[TMP6]])
@@ -362,7 +362,7 @@ define i64 @argmin_signed_argmax_unsigned(ptr %data, i32 %start_val1, i32 %start
 ; CHECK-NEXT:    [[TMP15:%.*]] = icmp eq <2 x i32> [[TMP6]], [[BROADCAST_SPLAT11]]
 ; CHECK-NEXT:    [[TMP16:%.*]] = select <2 x i1> [[TMP15]], <2 x i64> [[TMP5]], <2 x i64> splat (i64 -1)
 ; CHECK-NEXT:    [[TMP17:%.*]] = call i64 @llvm.vector.reduce.umin.v2i64(<2 x i64> [[TMP16]])
-; CHECK-NEXT:    [[DERIVED_IV_RESULT12:%.*]] = add i64 1, [[TMP17]]
+; CHECK-NEXT:    [[DERIVED_IV_RESULT12:%.*]] = add i64 [[TMP17]], 1
 ; CHECK-NEXT:    [[TMP18:%.*]] = icmp eq i32 [[TMP14]], [[START_VAL2]]
 ; CHECK-NEXT:    [[TMP19:%.*]] = select i1 [[TMP18]], i64 0, i64 [[DERIVED_IV_RESULT12]]
 ; CHECK-NEXT:    br label %[[SCALAR_PH:.*]]
@@ -434,7 +434,7 @@ define i64 @argmin_argmax_unsigned(ptr %data, i32 %start_val) {
 ; CHECK-NEXT:    [[VEC_PHI2:%.*]] = phi <2 x i64> [ poison, %[[VECTOR_PH]] ], [ [[TMP2:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_PHI3:%.*]] = phi <2 x i32> [ [[BROADCAST_SPLAT]], %[[VECTOR_PH]] ], [ [[TMP6:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_PHI4:%.*]] = phi <2 x i64> [ poison, %[[VECTOR_PH]] ], [ [[TMP5:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add nuw i64 1, [[INDEX]]
+; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add nuw i64 [[INDEX]], 1
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds i32, ptr [[DATA]], i64 [[OFFSET_IDX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x i32>, ptr [[TMP0]], align 4
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ult <2 x i32> [[WIDE_LOAD]], [[VEC_PHI]]
@@ -455,7 +455,7 @@ define i64 @argmin_argmax_unsigned(ptr %data, i32 %start_val) {
 ; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq <2 x i32> [[TMP3]], [[BROADCAST_SPLAT7]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = select <2 x i1> [[TMP9]], <2 x i64> [[TMP2]], <2 x i64> splat (i64 -1)
 ; CHECK-NEXT:    [[TMP11:%.*]] = call i64 @llvm.vector.reduce.umin.v2i64(<2 x i64> [[TMP10]])
-; CHECK-NEXT:    [[DERIVED_IV_RESULT:%.*]] = add i64 1, [[TMP11]]
+; CHECK-NEXT:    [[DERIVED_IV_RESULT:%.*]] = add i64 [[TMP11]], 1
 ; CHECK-NEXT:    [[TMP12:%.*]] = icmp eq i32 [[TMP8]], [[START_VAL]]
 ; CHECK-NEXT:    [[TMP13:%.*]] = select i1 [[TMP12]], i64 0, i64 [[DERIVED_IV_RESULT]]
 ; CHECK-NEXT:    [[TMP14:%.*]] = call i32 @llvm.vector.reduce.umax.v2i32(<2 x i32> [[TMP6]])
@@ -464,7 +464,7 @@ define i64 @argmin_argmax_unsigned(ptr %data, i32 %start_val) {
 ; CHECK-NEXT:    [[TMP15:%.*]] = icmp eq <2 x i32> [[TMP6]], [[BROADCAST_SPLAT9]]
 ; CHECK-NEXT:    [[TMP16:%.*]] = select <2 x i1> [[TMP15]], <2 x i64> [[TMP5]], <2 x i64> splat (i64 -1)
 ; CHECK-NEXT:    [[TMP17:%.*]] = call i64 @llvm.vector.reduce.umin.v2i64(<2 x i64> [[TMP16]])
-; CHECK-NEXT:    [[DERIVED_IV_RESULT10:%.*]] = add i64 1, [[TMP17]]
+; CHECK-NEXT:    [[DERIVED_IV_RESULT10:%.*]] = add i64 [[TMP17]], 1
 ; CHECK-NEXT:    [[TMP18:%.*]] = icmp eq i32 [[TMP14]], [[START_VAL]]
 ; CHECK-NEXT:    [[TMP19:%.*]] = select i1 [[TMP18]], i64 0, i64 [[DERIVED_IV_RESULT10]]
 ; CHECK-NEXT:    br label %[[SCALAR_PH:.*]]

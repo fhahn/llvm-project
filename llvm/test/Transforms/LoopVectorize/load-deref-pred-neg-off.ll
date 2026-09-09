@@ -20,7 +20,7 @@ define i8 @test_negative_off(i16 %len, ptr %test_base) {
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[PRED_LOAD_CONTINUE2:%.*]] ]
 ; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi <2 x i8> [ zeroinitializer, [[VECTOR_PH]] ], [ [[TMP18:%.*]], [[PRED_LOAD_CONTINUE2]] ]
 ; CHECK-NEXT:    [[DOTCAST:%.*]] = trunc i32 [[INDEX]] to i16
-; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i16 -1000, [[DOTCAST]]
+; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i16 [[DOTCAST]], -1000
 ; CHECK-NEXT:    [[TMP1:%.*]] = add i16 [[OFFSET_IDX]], 1
 ; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds i1, ptr [[TEST_BASE:%.*]], i16 [[OFFSET_IDX]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i1, ptr [[TEST_BASE]], i16 [[TMP1]]

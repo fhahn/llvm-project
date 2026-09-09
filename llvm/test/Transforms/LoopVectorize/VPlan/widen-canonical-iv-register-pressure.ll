@@ -77,13 +77,13 @@ define i32 @two_reductions(i64 %N, ptr %a, ptr %b) {
 ; UF4-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = step-vector i64
 ; UF4-NEXT:    EMIT vp<%vec.iv> = add nuw vp<[[VP5]]>, vp<[[VP6]]>
 ; UF4-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = broadcast ir<4>
-; UF4-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = add vp<[[VP7]]>, vp<[[VP6]]>
+; UF4-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = add vp<[[VP6]]>, vp<[[VP7]]>
 ; UF4-NEXT:    EMIT vp<%vec.iv>.1 = add nuw vp<[[VP5]]>, vp<[[VP8]]>
 ; UF4-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = broadcast ir<8>
-; UF4-NEXT:    EMIT vp<[[VP10:%[0-9]+]]> = add vp<[[VP9]]>, vp<[[VP6]]>
+; UF4-NEXT:    EMIT vp<[[VP10:%[0-9]+]]> = add vp<[[VP6]]>, vp<[[VP9]]>
 ; UF4-NEXT:    EMIT vp<%vec.iv>.2 = add nuw vp<[[VP5]]>, vp<[[VP10]]>
 ; UF4-NEXT:    EMIT vp<[[VP11:%[0-9]+]]> = broadcast ir<12>
-; UF4-NEXT:    EMIT vp<[[VP12:%[0-9]+]]> = add vp<[[VP11]]>, vp<[[VP6]]>
+; UF4-NEXT:    EMIT vp<[[VP12:%[0-9]+]]> = add vp<[[VP6]]>, vp<[[VP11]]>
 ; UF4-NEXT:    EMIT vp<%vec.iv>.3 = add nuw vp<[[VP5]]>, vp<[[VP12]]>
 ; UF4-NEXT:    EMIT vp<[[VP13:%[0-9]+]]> = icmp ule vp<%vec.iv>, vp<[[VP4]]>
 ; UF4-NEXT:    EMIT vp<[[VP14:%[0-9]+]]> = icmp ule vp<%vec.iv>.1, vp<[[VP4]]>

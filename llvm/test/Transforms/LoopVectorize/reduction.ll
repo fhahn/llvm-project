@@ -1213,13 +1213,13 @@ define i64 @reduction_with_phi_with_one_incoming_on_backedge(i16 %n, ptr %A) {
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[TMP1]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i32 [[TMP1]], [[N_MOD_VF]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = trunc i32 [[N_VEC]] to i16
-; CHECK-NEXT:    [[IND_END:%.*]] = add i16 1, [[TMP3]]
+; CHECK-NEXT:    [[IND_END:%.*]] = add i16 [[TMP3]], 1
 ; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK:       vector.body:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi <4 x i64> [ zeroinitializer, [[VECTOR_PH]] ], [ [[TMP4:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[DOTCAST1:%.*]] = trunc i32 [[INDEX]] to i16
-; CHECK-NEXT:    [[TMP7:%.*]] = add i16 1, [[DOTCAST1]]
+; CHECK-NEXT:    [[TMP7:%.*]] = add i16 [[DOTCAST1]], 1
 ; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr i64, ptr [[A]], i16 [[TMP7]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i64>, ptr [[TMP8]], align 4
 ; CHECK-NEXT:    [[TMP4]] = add <4 x i64> [[VEC_PHI]], [[WIDE_LOAD]]
@@ -1291,13 +1291,13 @@ define i64 @reduction_with_phi_with_two_incoming_on_backedge(i16 %n, ptr %A) {
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[TMP1]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i32 [[TMP1]], [[N_MOD_VF]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = trunc i32 [[N_VEC]] to i16
-; CHECK-NEXT:    [[IND_END:%.*]] = add i16 1, [[TMP3]]
+; CHECK-NEXT:    [[IND_END:%.*]] = add i16 [[TMP3]], 1
 ; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK:       vector.body:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi <4 x i64> [ zeroinitializer, [[VECTOR_PH]] ], [ [[TMP4:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[DOTCAST1:%.*]] = trunc i32 [[INDEX]] to i16
-; CHECK-NEXT:    [[TMP7:%.*]] = add i16 1, [[DOTCAST1]]
+; CHECK-NEXT:    [[TMP7:%.*]] = add i16 [[DOTCAST1]], 1
 ; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr i64, ptr [[A]], i16 [[TMP7]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i64>, ptr [[TMP8]], align 4
 ; CHECK-NEXT:    [[TMP4]] = add <4 x i64> [[VEC_PHI]], [[WIDE_LOAD]]

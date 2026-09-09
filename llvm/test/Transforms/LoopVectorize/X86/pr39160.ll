@@ -20,9 +20,9 @@ define i32 @foo(ptr addrspace(1) %p) {
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[TMP0]], 7
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i32 [[TMP0]], [[N_MOD_VF]]
-; CHECK-NEXT:    [[TMP1:%.*]] = add i32 1, [[N_VEC]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i32 [[N_VEC]], 1
 ; CHECK-NEXT:    [[TMP2:%.*]] = shl i32 [[N_VEC]], 1
-; CHECK-NEXT:    [[TMP3:%.*]] = add i32 6, [[TMP2]]
+; CHECK-NEXT:    [[TMP3:%.*]] = add i32 [[TMP2]], 6
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]

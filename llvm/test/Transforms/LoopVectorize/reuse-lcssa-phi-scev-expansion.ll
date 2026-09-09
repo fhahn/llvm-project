@@ -307,7 +307,7 @@ define void @expand_diff_neg_ptrtoint_expr(ptr %src, ptr %start) {
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[TMP5:%.*]] = add i64 1, [[INDEX]]
+; CHECK-NEXT:    [[TMP5:%.*]] = add i64 [[INDEX]], 1
 ; CHECK-NEXT:    [[TMP6:%.*]] = shl i64 [[INDEX]], 3
 ; CHECK-NEXT:    [[NEXT_GEP:%.*]] = getelementptr i8, ptr [[PTR_IV_2_NEXT_LCSSA]], i64 [[TMP6]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = add i64 [[TMP5]], -1

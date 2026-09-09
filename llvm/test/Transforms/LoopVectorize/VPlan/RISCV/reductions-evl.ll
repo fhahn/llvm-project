@@ -600,7 +600,7 @@ define i32 @print_mulacc_extended_const_lhs(ptr %start, ptr %end) vscale_range(2
 ; CHECK-NEXT:      vp<[[VP9:%[0-9]+]]> = vector-pointer i8, vp<%next.gep>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%l> = vp.load vp<[[VP9]]>, vp<%evl>
 ; CHECK-NEXT:      WIDEN-CAST ir<%l.ext> = zext ir<%l> to i32
-; CHECK-NEXT:      WIDEN ir<%mul> = mul ir<63>, ir<%l.ext>
+; CHECK-NEXT:      WIDEN ir<%mul> = mul ir<%l.ext>, ir<63>
 ; CHECK-NEXT:      REDUCE ir<%red.next> = ir<%red> +  vp.reduce.add (ir<%mul>, vp<%evl>)
 ; CHECK-NEXT:      EMIT-SCALAR vp<[[VP10:%[0-9]+]]> = zext vp<%evl> to i64
 ; CHECK-NEXT:      EMIT vp<%current.iteration.next> = add vp<[[VP10]]>, vp<[[VP6]]>

@@ -445,14 +445,14 @@ define i64 @select_argmin_iv_not_canonical(i64 %num, ptr %src) {
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[NUM]], 7
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[NUM]], [[N_MOD_VF]]
-; CHECK-NEXT:    [[TMP0:%.*]] = add i64 1, [[N_VEC]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[N_VEC]], 1
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <8 x i64> [ <i64 0, i64 1, i64 2, i64 3, i64 4, i64 5, i64 6, i64 7>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi <8 x i64> [ poison, %[[VECTOR_PH]] ], [ [[TMP34:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_PHI1:%.*]] = phi <8 x i8> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[TMP32:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i64 1, [[INDEX]]
+; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i64 [[INDEX]], 1
 ; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[OFFSET_IDX]], 1
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[OFFSET_IDX]], 2
 ; CHECK-NEXT:    [[TMP3:%.*]] = add i64 [[OFFSET_IDX]], 3
@@ -498,7 +498,7 @@ define i64 @select_argmin_iv_not_canonical(i64 %num, ptr %src) {
 ; CHECK-NEXT:    [[TMP37:%.*]] = icmp eq <8 x i8> [[TMP32]], [[BROADCAST_SPLAT]]
 ; CHECK-NEXT:    [[TMP38:%.*]] = select <8 x i1> [[TMP37]], <8 x i64> [[TMP34]], <8 x i64> splat (i64 -1)
 ; CHECK-NEXT:    [[TMP39:%.*]] = call i64 @llvm.vector.reduce.umin.v8i64(<8 x i64> [[TMP38]])
-; CHECK-NEXT:    [[DERIVED_IV_RESULT:%.*]] = add i64 1, [[TMP39]]
+; CHECK-NEXT:    [[DERIVED_IV_RESULT:%.*]] = add i64 [[TMP39]], 1
 ; CHECK-NEXT:    [[TMP40:%.*]] = icmp eq i8 [[TMP36]], 0
 ; CHECK-NEXT:    [[TMP41:%.*]] = select i1 [[TMP40]], i64 0, i64 [[DERIVED_IV_RESULT]]
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[NUM]], [[N_VEC]]

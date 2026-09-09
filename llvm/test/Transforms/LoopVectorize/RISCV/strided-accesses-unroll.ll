@@ -14,7 +14,7 @@ define void @negative_stride_nuw(ptr noalias %src, ptr noalias %dst) {
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i64 512, [[TMP1]]
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 512, [[N_MOD_VF]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = mul i64 [[N_VEC]], -2
-; CHECK-NEXT:    [[TMP5:%.*]] = add i64 1022, [[TMP4]]
+; CHECK-NEXT:    [[TMP5:%.*]] = add i64 [[TMP4]], 1022
 ; CHECK-NEXT:    [[TMP6:%.*]] = trunc i64 [[TMP2]] to i32
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr nuw i8, ptr [[SRC]], i64 4088
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]

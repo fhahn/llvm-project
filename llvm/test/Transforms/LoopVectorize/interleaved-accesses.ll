@@ -1344,13 +1344,13 @@ define void @PR27626_5(ptr %a, i32 %x, i32 %y, i32 %z, i64 %n) {
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP2]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP2]], [[N_MOD_VF]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = shl i64 [[N_VEC]], 1
-; CHECK-NEXT:    [[IND_END:%.*]] = add i64 3, [[TMP5]]
+; CHECK-NEXT:    [[IND_END:%.*]] = add i64 [[TMP5]], 3
 ; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK:       vector.body:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 3, i64 5, i64 7, i64 9>, [[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP6:%.*]] = shl nuw i64 [[INDEX]], 1
-; CHECK-NEXT:    [[TMP16:%.*]] = add nuw i64 3, [[TMP6]]
+; CHECK-NEXT:    [[TMP16:%.*]] = add nuw i64 [[TMP6]], 3
 ; CHECK-NEXT:    [[TMP12:%.*]] = add i64 [[TMP16]], 2
 ; CHECK-NEXT:    [[TMP9:%.*]] = add i64 [[TMP16]], 4
 ; CHECK-NEXT:    [[TMP14:%.*]] = add i64 [[TMP16]], 6

@@ -272,7 +272,7 @@ define i64 @three_early_exits_same_exit() {
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY_INTERIM:.*]] ]
-; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i64 3, [[INDEX]]
+; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i64 [[INDEX]], 3
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds i8, ptr [[P1]], i64 [[OFFSET_IDX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i8>, ptr [[TMP0]], align 1
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp eq <4 x i8> [[WIDE_LOAD]], splat (i8 42)
@@ -304,7 +304,7 @@ define i64 @three_early_exits_same_exit() {
 ; CHECK-NEXT:    br label %[[EXIT]]
 ; CHECK:       [[VECTOR_EARLY_EXIT_0]]:
 ; CHECK-NEXT:    [[TMP12:%.*]] = add i64 [[INDEX]], [[FIRST_ACTIVE_LANE]]
-; CHECK-NEXT:    [[TMP13:%.*]] = add i64 3, [[TMP12]]
+; CHECK-NEXT:    [[TMP13:%.*]] = add i64 [[TMP12]], 3
 ; CHECK-NEXT:    br label %[[EXIT]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    [[RETVAL:%.*]] = phi i64 [ 200, %[[VECTOR_EARLY_EXIT_2]] ], [ 100, %[[VECTOR_EARLY_EXIT_1]] ], [ [[TMP13]], %[[VECTOR_EARLY_EXIT_0]] ], [ 43, %[[MIDDLE_BLOCK]] ]
@@ -358,7 +358,7 @@ define i64 @four_early_exits_same_exit() {
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY_INTERIM:.*]] ]
-; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i64 3, [[INDEX]]
+; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i64 [[INDEX]], 3
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds i8, ptr [[P1]], i64 [[OFFSET_IDX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i8>, ptr [[TMP0]], align 1
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp eq <4 x i8> [[WIDE_LOAD]], splat (i8 42)
@@ -399,7 +399,7 @@ define i64 @four_early_exits_same_exit() {
 ; CHECK-NEXT:    br label %[[EXIT]]
 ; CHECK:       [[VECTOR_EARLY_EXIT_0]]:
 ; CHECK-NEXT:    [[TMP16:%.*]] = add i64 [[INDEX]], [[FIRST_ACTIVE_LANE]]
-; CHECK-NEXT:    [[TMP17:%.*]] = add i64 3, [[TMP16]]
+; CHECK-NEXT:    [[TMP17:%.*]] = add i64 [[TMP16]], 3
 ; CHECK-NEXT:    br label %[[EXIT]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    [[RETVAL:%.*]] = phi i64 [ 300, %[[VECTOR_EARLY_EXIT_3]] ], [ 200, %[[VECTOR_EARLY_EXIT_2]] ], [ 100, %[[VECTOR_EARLY_EXIT_1]] ], [ [[TMP17]], %[[VECTOR_EARLY_EXIT_0]] ], [ 43, %[[MIDDLE_BLOCK]] ]
@@ -459,7 +459,7 @@ define i64 @two_early_exits_with_live_out_values() {
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY_INTERIM:.*]] ]
-; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i64 3, [[INDEX]]
+; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i64 [[INDEX]], 3
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds i8, ptr [[P1]], i64 [[OFFSET_IDX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i8>, ptr [[TMP0]], align 1
 ; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i8, ptr [[P2]], i64 [[OFFSET_IDX]]
@@ -483,12 +483,12 @@ define i64 @two_early_exits_with_live_out_values() {
 ; CHECK-NEXT:    br i1 [[TMP9]], label %[[VECTOR_EARLY_EXIT_0:.*]], label %[[VECTOR_EARLY_EXIT_1:.*]]
 ; CHECK:       [[VECTOR_EARLY_EXIT_1]]:
 ; CHECK-NEXT:    [[TMP11:%.*]] = add i64 [[INDEX]], [[FIRST_ACTIVE_LANE]]
-; CHECK-NEXT:    [[TMP12:%.*]] = add i64 3, [[TMP11]]
+; CHECK-NEXT:    [[TMP12:%.*]] = add i64 [[TMP11]], 3
 ; CHECK-NEXT:    [[TMP15:%.*]] = extractelement <4 x i8> [[TMP3]], i64 [[FIRST_ACTIVE_LANE]]
 ; CHECK-NEXT:    br label %[[EXIT]]
 ; CHECK:       [[VECTOR_EARLY_EXIT_0]]:
 ; CHECK-NEXT:    [[TMP13:%.*]] = add i64 [[INDEX]], [[FIRST_ACTIVE_LANE]]
-; CHECK-NEXT:    [[TMP14:%.*]] = add i64 3, [[TMP13]]
+; CHECK-NEXT:    [[TMP14:%.*]] = add i64 [[TMP13]], 3
 ; CHECK-NEXT:    br label %[[EXIT]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    [[RETVAL:%.*]] = phi i64 [ [[TMP12]], %[[VECTOR_EARLY_EXIT_1]] ], [ [[TMP14]], %[[VECTOR_EARLY_EXIT_0]] ], [ 99, %[[MIDDLE_BLOCK]] ]
@@ -543,7 +543,7 @@ define i64 @two_early_exits_negated_condition() {
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY_INTERIM:.*]] ]
-; CHECK-NEXT:    [[IV:%.*]] = add i64 3, [[INDEX]]
+; CHECK-NEXT:    [[IV:%.*]] = add i64 [[INDEX]], 3
 ; CHECK-NEXT:    [[GEP_A:%.*]] = getelementptr inbounds i8, ptr [[P1]], i64 [[IV]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i8>, ptr [[GEP_A]], align 1
 ; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr inbounds i8, ptr [[P2]], i64 [[IV]]
@@ -568,7 +568,7 @@ define i64 @two_early_exits_negated_condition() {
 ; CHECK-NEXT:    br label %[[EXIT:.*]]
 ; CHECK:       [[VECTOR_EARLY_EXIT_0]]:
 ; CHECK-NEXT:    [[TMP9:%.*]] = add i64 [[INDEX]], [[FIRST_ACTIVE_LANE]]
-; CHECK-NEXT:    [[TMP10:%.*]] = add i64 3, [[TMP9]]
+; CHECK-NEXT:    [[TMP10:%.*]] = add i64 [[TMP9]], 3
 ; CHECK-NEXT:    br label %[[EXIT]]
 ; CHECK:       [[SCALAR_PH]]:
 ; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
@@ -634,7 +634,7 @@ define i64 @three_early_exits_three_exit_blocks() {
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY_INTERIM:.*]] ]
-; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i64 3, [[INDEX]]
+; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i64 [[INDEX]], 3
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds i8, ptr [[P1]], i64 [[OFFSET_IDX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i8>, ptr [[TMP0]], align 1
 ; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i8, ptr [[P2]], i64 [[OFFSET_IDX]]
@@ -666,7 +666,7 @@ define i64 @three_early_exits_three_exit_blocks() {
 ; CHECK-NEXT:    br label %[[EXIT2:.*]]
 ; CHECK:       [[VECTOR_EARLY_EXIT_0]]:
 ; CHECK-NEXT:    [[TMP12:%.*]] = add i64 [[INDEX]], [[FIRST_ACTIVE_LANE]]
-; CHECK-NEXT:    [[RET3:%.*]] = add i64 3, [[TMP12]]
+; CHECK-NEXT:    [[RET3:%.*]] = add i64 [[TMP12]], 3
 ; CHECK-NEXT:    br label %[[EXIT1:.*]]
 ; CHECK:       [[EXIT1]]:
 ; CHECK-NEXT:    ret i64 [[RET3]]

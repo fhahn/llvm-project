@@ -506,11 +506,11 @@ define void @test_scev_check_mul_add_expansion(ptr %out, ptr %in, i32 %len, i32 
 ; CHECK:       vector.ph:
 ; CHECK-NEXT:    [[TMP4:%.*]] = and i32 [[TMP1]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i32 [[TMP1]], [[TMP4]]
-; CHECK-NEXT:    [[TMP5:%.*]] = add i32 6, [[N_VEC]]
+; CHECK-NEXT:    [[TMP5:%.*]] = add i32 [[N_VEC]], 6
 ; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK:       vector.body:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[TMP6:%.*]] = add nuw i32 6, [[INDEX]]
+; CHECK-NEXT:    [[TMP6:%.*]] = add nuw i32 [[INDEX]], 6
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr i16, ptr [[OUT]], i32 [[TMP6]]
 ; CHECK-NEXT:    store <4 x i16> zeroinitializer, ptr [[TMP7]], align 2, !alias.scope [[META36:![0-9]+]], !noalias [[META39:![0-9]+]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4

@@ -28,7 +28,7 @@ define i64 @reduction(i64 %arg) #0 {
 ; CHECK-NEXT:    [[BIN_RDX4:%.*]] = or <4 x i32> [[TMP16]], [[BIN_RDX1]]
 ; CHECK-NEXT:    [[BIN_RDX5:%.*]] = or <4 x i32> [[TMP17]], [[BIN_RDX4]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = call i32 @llvm.vector.reduce.or.v4i32(<4 x i32> [[BIN_RDX5]])
-; CHECK-NEXT:    [[TMP8:%.*]] = mul i64 95, [[ARG]]
+; CHECK-NEXT:    [[TMP8:%.*]] = mul i64 [[ARG]], 95
 ; CHECK-NEXT:    [[TMP15:%.*]] = add i64 [[ARG]], [[TMP8]]
 ; CHECK-NEXT:    br i1 false, label %[[EXIT:.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]]
 ; CHECK:       [[VEC_EPILOG_ITER_CHECK]]:
@@ -47,7 +47,7 @@ define i64 @reduction(i64 %arg) #0 {
 ; CHECK-NEXT:    br i1 [[TMP11]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[SCALAR_PH]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[TMP14:%.*]] = call i32 @llvm.vector.reduce.or.v4i32(<4 x i32> [[TMP10]])
-; CHECK-NEXT:    [[TMP12:%.*]] = mul i64 99, [[ARG]]
+; CHECK-NEXT:    [[TMP12:%.*]] = mul i64 [[ARG]], 99
 ; CHECK-NEXT:    [[TMP13:%.*]] = add i64 [[ARG]], [[TMP12]]
 ; CHECK-NEXT:    br i1 true, label %[[EXIT]], label %[[VEC_EPILOG_SCALAR_PH]]
 ; CHECK:       [[VEC_EPILOG_SCALAR_PH]]:

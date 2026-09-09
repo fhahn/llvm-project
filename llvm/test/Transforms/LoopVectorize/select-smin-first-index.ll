@@ -312,7 +312,7 @@ define i64 @test_vectorize_select_smin_idx_iv_start_different(ptr %src, i64 %n) 
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[LOOP]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi <4 x i64> [ poison, %[[LOOP]] ], [ [[TMP3:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_PHI1:%.*]] = phi <4 x i64> [ zeroinitializer, %[[LOOP]] ], [ [[TMP2:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[IV:%.*]] = add nuw i64 20, [[INDEX]]
+; CHECK-NEXT:    [[IV:%.*]] = add nuw i64 [[INDEX]], 20
 ; CHECK-NEXT:    [[GEP:%.*]] = getelementptr i64, ptr [[SRC]], i64 [[IV]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i64>, ptr [[GEP]], align 4
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp sgt <4 x i64> [[VEC_PHI1]], [[WIDE_LOAD]]
@@ -329,7 +329,7 @@ define i64 @test_vectorize_select_smin_idx_iv_start_different(ptr %src, i64 %n) 
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq <4 x i64> [[TMP2]], [[BROADCAST_SPLAT]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = select <4 x i1> [[TMP6]], <4 x i64> [[TMP3]], <4 x i64> splat (i64 -1)
 ; CHECK-NEXT:    [[TMP8:%.*]] = call i64 @llvm.vector.reduce.umin.v4i64(<4 x i64> [[TMP7]])
-; CHECK-NEXT:    [[DERIVED_IV_RESULT:%.*]] = add i64 20, [[TMP8]]
+; CHECK-NEXT:    [[DERIVED_IV_RESULT:%.*]] = add i64 [[TMP8]], 20
 ; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq i64 [[TMP5]], 0
 ; CHECK-NEXT:    [[RES:%.*]] = select i1 [[TMP9]], i64 0, i64 [[DERIVED_IV_RESULT]]
 ; CHECK-NEXT:    br label %[[EXIT1:.*]]
@@ -434,7 +434,7 @@ define i64 @test_vectorize_select_smin_first_idx_non_canonical_wide_iv(ptr %src)
 ; CHECK-NEXT:    [[TMP7:%.*]] = select <4 x i1> [[TMP6]], <4 x i64> [[TMP3]], <4 x i64> splat (i64 -1)
 ; CHECK-NEXT:    [[TMP8:%.*]] = call i64 @llvm.vector.reduce.umin.v4i64(<4 x i64> [[TMP7]])
 ; CHECK-NEXT:    [[TMP9:%.*]] = mul i64 [[TMP8]], 3
-; CHECK-NEXT:    [[DERIVED_IV_RESULT:%.*]] = add i64 5, [[TMP9]]
+; CHECK-NEXT:    [[DERIVED_IV_RESULT:%.*]] = add i64 [[TMP9]], 5
 ; CHECK-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[TMP5]], 0
 ; CHECK-NEXT:    [[TMP11:%.*]] = select i1 [[TMP10]], i64 5, i64 [[DERIVED_IV_RESULT]]
 ; CHECK-NEXT:    br label %[[EXIT:.*]]

@@ -23,7 +23,7 @@ define void @foo(ptr %start, ptr %end) {
 ; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = sub i32 0, [[INDEX]]
 ; CHECK-NEXT:    [[INDUCTION3:%.*]] = add i32 [[OFFSET_IDX]], -1
 ; CHECK-NEXT:    [[TMP4:%.*]] = sub i32 -1, [[INDEX]]
-; CHECK-NEXT:    [[TMP5:%.*]] = add nsw i32 -1, [[INDUCTION3]]
+; CHECK-NEXT:    [[TMP5:%.*]] = add nsw i32 [[INDUCTION3]], -1
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr i8, ptr [[START]], i32 [[TMP4]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr [[START]], i32 [[TMP5]]
 ; CHECK-NEXT:    store i8 0, ptr [[TMP6]], align 1

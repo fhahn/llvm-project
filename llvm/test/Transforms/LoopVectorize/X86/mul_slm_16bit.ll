@@ -48,22 +48,22 @@ for.body:
   %sum1 = add i32 %sum0, %mul3
 ; sources of the mul is sext\-120
 ; use pmullw\sext
-; SLM: Cost of 3 for VF 2: WIDEN ir<%mul4> = mul nsw ir<-120>, ir<%conv3>
+; SLM: Cost of 3 for VF 2: WIDEN ir<%mul4> = mul nsw ir<%conv3>, ir<-120>
   %mul4 = mul nsw i32 -120, %conv3
   %sum2 = add i32 %sum1, %mul4
 ; sources of the mul is sext\250
 ; use pmulhw\pmullw\pshuf
-; SLM: Cost of 2 for VF 2: WIDEN ir<%mul5> = mul nsw ir<250>, ir<%conv3>
+; SLM: Cost of 2 for VF 2: WIDEN ir<%mul5> = mul nsw ir<%conv3>, ir<250>
   %mul5 = mul nsw i32 250, %conv3
   %sum3 = add i32 %sum2, %mul5
 ; sources of the mul is zext\-120
 ; use pmulhw\pmullw\pshuf
-; SLM: Cost of 2 for VF 2: WIDEN ir<%mul6> = mul nsw ir<-120>, ir<%conv4>
+; SLM: Cost of 2 for VF 2: WIDEN ir<%mul6> = mul nsw ir<%conv4>, ir<-120>
   %mul6 = mul nsw i32 -120, %conv4
   %sum4 = add i32 %sum3, %mul6
 ; sources of the mul is zext\250
 ; use pmullw\zext
-; SLM: Cost of 2 for VF 2: WIDEN ir<%mul7> = mul nsw ir<250>, ir<%conv4>
+; SLM: Cost of 2 for VF 2: WIDEN ir<%mul7> = mul nsw ir<%conv4>, ir<250>
   %mul7 = mul nsw i32 250, %conv4
   %sum5 = add i32 %sum4, %mul7
   %add = add i32 %acc.013, 5
@@ -117,22 +117,22 @@ for.body:
   %sum1 = add i32 %sum0, %mul3
 ; sources of the mul is sext\-32000
 ; use pmulhw\pmullw\sext
-; SLM: Cost of 2 for VF 4: WIDEN ir<%mul4> = mul nsw ir<-32000>, ir<%conv3>
+; SLM: Cost of 2 for VF 4: WIDEN ir<%mul4> = mul nsw ir<%conv3>, ir<-32000>
   %mul4 = mul nsw i32 -32000, %conv3
   %sum2 = add i32 %sum1, %mul4
 ; sources of the mul is sext\64000
 ; use pmulld
-; SLM: Cost of 11 for VF 4: WIDEN ir<%mul5> = mul nsw ir<64000>, ir<%conv3>
+; SLM: Cost of 11 for VF 4: WIDEN ir<%mul5> = mul nsw ir<%conv3>, ir<64000>
   %mul5 = mul nsw i32 64000, %conv3
   %sum3 = add i32 %sum2, %mul5
 ; sources of the mul is zext\-32000
 ; use pmulld
-; SLM: Cost of 11 for VF 4: WIDEN ir<%mul6> = mul nsw ir<-32000>, ir<%conv4>
+; SLM: Cost of 11 for VF 4: WIDEN ir<%mul6> = mul nsw ir<%conv4>, ir<-32000>
   %mul6 = mul nsw i32 -32000, %conv4
   %sum4 = add i32 %sum3, %mul6
 ; sources of the mul is zext\64000
 ; use pmulhw\pmullw\zext
-; SLM: Cost of 5 for VF 4: WIDEN ir<%mul7> = mul nsw ir<250>, ir<%conv4>
+; SLM: Cost of 5 for VF 4: WIDEN ir<%mul7> = mul nsw ir<%conv4>, ir<250>
   %mul7 = mul nsw i32 250, %conv4
   %sum5 = add i32 %sum4, %mul7
   %add = add i32 %acc.013, 5

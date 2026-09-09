@@ -388,7 +388,7 @@ unsigned vputils::getOpcode(const VPValue *V) {
             // For recipes that do not directly map to LLVM IR instructions,
             // assign opcodes after the last VPInstruction opcode (which is also
             // after the last IR Instruction opcode), based on the VPRecipeID.
-            return VPInstruction::OpsEnd + 1 + I->getVPRecipeID();
+            return getOpcodeForRecipeID(I->getVPRecipeID());
           })
       .Default([](auto *) { return 0; });
 }
