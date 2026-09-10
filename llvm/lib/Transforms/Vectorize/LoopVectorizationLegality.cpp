@@ -722,6 +722,13 @@ void LoopVectorizationLegality::addInductionPhi(PHINode *Phi,
          "Expected int, ptr, or FP induction phi type");
 
   // Get the widest type.
+  //
+  // FIXME: This is the widest type over all phis that *may* be modeled as an
+  // induction. A phi that is also a fixed-order recurrence may end up modeled
+  // as a recurrence instead, in which case counting iterations in its type
+  // only costs a wider canonical IV and a truncate per iteration. Fixing that
+  // needs the canonical IV type to be derived from the plan's inductions
+  // rather than passed into VPlan construction; see the FIXME in buildVPlan0.
   if (PhiTy->isIntOrPtrTy()) {
     if (!WidestIndTy)
       WidestIndTy = getInductionIntegerTy(DL, PhiTy);
@@ -739,8 +746,13 @@ void LoopVectorizationLegality::addInductionPhi(PHINode *Phi,
     // one if there are multiple (no good reason for doing this other
     // than it is expedient). We've checked that it begins at zero and
     // steps by one, so this is a canonical induction variable.
-    if (!PrimaryInduction ||
-        (PhiTy == WidestIndTy && !FixedOrderRecurrences.contains(Phi)))
+    //
+    // Never pick a phi that is also a fixed-order recurrence: which of the two
+    // models is used is decided in VPlan, by createHeaderPhiRecipes. Making
+    // such a phi the primary induction here would pre-commit to the induction
+    // model, and with it to any runtime SCEV checks it needs.
+    if (!FixedOrderRecurrences.contains(Phi) &&
+        (!PrimaryInduction || PhiTy == WidestIndTy))
       PrimaryInduction = Phi;
   }
 
@@ -835,14 +847,6 @@ bool LoopVectorizationLegality::canVectorizeInstrs() {
   if (PrimaryInduction && WidestIndTy != PrimaryInduction->getType())
     PrimaryInduction = nullptr;
 
-  // The primary induction must be modeled as an induction, as it drives the
-  // canonical vector IV. Make sure it is not also considered as a fixed-order
-  // recurrence: otherwise createHeaderPhiRecipes could model it as a FOR while
-  // other parts of the vectorizer (e.g. the induction-truncate optimization)
-  // still expect a widened induction recipe.
-  if (PrimaryInduction)
-    FixedOrderRecurrences.erase(PrimaryInduction);
-
   return Result;
 }
 
@@ -914,6 +918,10 @@ bool LoopVectorizationLegality::canVectorizeInstr(Instruction &I) {
       return true;
     }
 
+    // A phi can qualify both as a fixed-order recurrence and as a predicated
+    // induction. Record both; createHeaderPhiRecipes picks between them when
+    // building the VPlan. Note that addInductionPhi below reads
+    // FixedOrderRecurrences, so the insert has to happen first.
     bool IsFOR = RecurrenceDescriptor::isFixedOrderRecurrence(Phi, TheLoop, DT);
     if (IsFOR)
       FixedOrderRecurrences.insert(Phi);

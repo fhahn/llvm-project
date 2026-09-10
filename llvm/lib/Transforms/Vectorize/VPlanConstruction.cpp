@@ -616,6 +616,12 @@ static void addInitialSkeleton(VPlan &Plan, Type *InductionTy,
 /// To make RUN_VPLAN_PASS print initial VPlan.
 static void printAfterInitialConstruction(VPlan &) {}
 
+// FIXME: \p InductionTy is the widest type over all phis legality classified as
+// inductions, but which of them are actually modeled as inductions is only
+// decided later, by createHeaderPhiRecipes. The canonical IV type should be
+// derived from the plan's induction recipes instead of being an input here;
+// that requires deferring the trip-count expansion and the typing of the
+// plan's symbolic live-ins until after the header phi recipes exist.
 std::unique_ptr<VPlan> VPlanTransforms::buildVPlan0(
     Loop *TheLoop, LoopInfo &LI, Type *InductionTy,
     PredicatedScalarEvolution &PSE, LoopVersioning *LVer,
@@ -923,15 +929,17 @@ static bool tryToSinkOrHoistRecurrenceUsers(VPBasicBlock *HeaderVPBB,
   return true;
 }
 
-/// Returns true if \p PhiR's increment is used in an exit block.
-static bool isUsedInExitBlock(VPlan &Plan, VPPhi *PhiR) {
-  for (auto *EB : Plan.getExitBlocks())
-    for (VPRecipeBase &R : EB->phis()) {
-      if (any_of(R.operands(), match_fn(m_ExtractLastLaneOfLastPart(
-                                   m_Specific(PhiR->getOperand(1))))))
-        return true;
-    }
-  return false;
+/// Returns true if \p PhiR's incoming value from the latch is live out. Only
+/// the middle-block shape is matched; loops with uncountable early exits are
+/// rejected by legality when they contain fixed-order recurrences, so no other
+/// shape can reach here.
+static bool isLatchIncomingValueLiveOut(VPlan &Plan, VPPhi *PhiR) {
+  return any_of(Plan.getExitBlocks(), [PhiR](VPIRBasicBlock *EB) {
+    return any_of(EB->phis(), [PhiR](VPRecipeBase &R) {
+      return any_of(R.operands(), match_fn(m_ExtractLastLaneOfLastPart(
+                                      m_Specific(PhiR->getOperand(1)))));
+    });
+  });
 }
 
 bool VPlanTransforms::createHeaderPhiRecipes(
@@ -968,13 +976,15 @@ bool VPlanTransforms::createHeaderPhiRecipes(
       // If the phi is also an induction, prefer the induction when its
       // predicates are already implied by the existing PSE predicates (e.g.
       // from LAA), so there is no extra runtime overhead. Otherwise keep the
-      // FOR to avoid adding extra runtime checks.
+      // recurrence, to avoid adding extra runtime checks. Legality records
+      // both classifications and never pre-commits to either, so this is the
+      // single point where the choice is made.
       if (InductionIt != Inductions.end() &&
           all_of(InductionIt->second.getNoWrapPredicates(),
                  [&PSE](const SCEVPredicate *P) {
                    return PSE.getPredicate().implies(P, *PSE.getSE());
                  }) &&
-          !isUsedInExitBlock(Plan, PhiR))
+          !isLatchIncomingValueLiveOut(Plan, PhiR))
         return createWidenInductionRecipe(Phi, PhiR, Start, InductionIt->second,
                                           Plan, PSE, OrigLoop,
                                           PhiR->getDebugLoc());

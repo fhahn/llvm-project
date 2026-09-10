@@ -2313,8 +2313,12 @@ void LoopVectorizationCostModel::collectLoopScalars(ElementCount VF) {
   // variable and induction variable update remain scalar.
   for (const auto &Induction : Legal->getInductionVars()) {
     auto *Ind = Induction.first;
-    // Skip Ind if it can be treated as both a fixed order recurrence or
-    // induction.
+    // Skip phis that qualify both as a fixed-order recurrence and as an
+    // induction: createHeaderPhiRecipes picks one of the two models, and this
+    // seeding of the scalars worklist assumes the induction model. Note that
+    // collectLoopUniforms deliberately does not skip them: when the induction
+    // model is picked, marking the phi and its update uniform is what keeps
+    // them out of the vector loop.
     if (Legal->isFixedOrderRecurrence(Ind))
       continue;
 
@@ -4841,6 +4845,7 @@ LoopVectorizationCostModel::getInstructionCost(Instruction *I,
   case Instruction::PHI: {
     auto *Phi = cast<PHINode>(I);
 
+    // First-order recurrences are replaced by vector shuffles inside the loop.
     if (VF.isVector() && Legal->isFixedOrderRecurrence(Phi)) {
       return TTI.getShuffleCost(
           TargetTransformInfo::SK_Splice, cast<VectorType>(VectorTy),
@@ -6041,8 +6046,14 @@ VPRecipeBuilder::tryToOptimizeInductionTruncate(VPInstruction *VPI,
           Range))
     return nullptr;
 
-  auto *WidenIV = cast<VPWidenIntOrFpInductionRecipe>(
+  // isOptimizableIVTruncate only knows that the truncated phi is an induction.
+  // createHeaderPhiRecipes may still have modeled it as a fixed-order
+  // recurrence, in which case there is no widened induction recipe to fold the
+  // truncate into.
+  auto *WidenIV = dyn_cast<VPWidenIntOrFpInductionRecipe>(
       VPI->getOperand(0)->getDefiningRecipe());
+  if (!WidenIV)
+    return nullptr;
   PHINode *Phi = WidenIV->getPHINode();
   VPValue *Start = WidenIV->getStartValue();
   const InductionDescriptor &IndDesc = WidenIV->getInductionDescriptor();

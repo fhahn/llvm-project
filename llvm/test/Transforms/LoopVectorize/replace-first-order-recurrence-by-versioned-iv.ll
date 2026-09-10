@@ -99,15 +99,15 @@ define void @do_not_replace_first_order_recurrence_with_versioned_iv_for_pointer
 ; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP18]], 31
 ; CHECK-NEXT:    br i1 [[DIFF_CHECK]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
-; CHECK-NEXT:    [[TMP10:%.*]] = and i64 [[SMAX3]], 3
-; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[SMAX3]], [[TMP10]]
+; CHECK-NEXT:    [[TMP19:%.*]] = and i64 [[SMAX3]], 3
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[SMAX3]], [[TMP19]]
 ; CHECK-NEXT:    [[TMP11:%.*]] = trunc i64 [[N_VEC]] to i32
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[TMP15:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP12:%.*]] = trunc i64 [[TMP15]] to i32
-; CHECK-NEXT:    [[TMP19:%.*]] = add i32 [[TMP12]], 1
-; CHECK-NEXT:    [[TMP13:%.*]] = zext i32 [[TMP19]] to i64
+; CHECK-NEXT:    [[TMP20:%.*]] = add i32 [[TMP12]], 1
+; CHECK-NEXT:    [[TMP13:%.*]] = zext i32 [[TMP20]] to i64
 ; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr inbounds double, ptr [[X]], i64 [[TMP13]]
 ; CHECK-NEXT:    [[TMP16:%.*]] = getelementptr inbounds double, ptr [[Y]], i64 [[TMP15]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x double>, ptr [[TMP14]], align 8
@@ -408,8 +408,11 @@ for.end:
   ret void
 }
 
-define void @for_iv_kept_predicate_needed(ptr %dst, i64 %n) {
-; CHECK-LABEL: define void @for_iv_kept_predicate_needed(
+; The store's address needs the same predicate as the induction model of %prev,
+; and collectUnitStridePredicates has already added it to PSE. The induction is
+; therefore free and replaces the recurrence.
+define void @for_iv_replaced_predicate_already_needed_by_store(ptr %dst, i64 %n) {
+; CHECK-LABEL: define void @for_iv_replaced_predicate_already_needed_by_store(
 ; CHECK-SAME: ptr [[DST:%.*]], i64 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[SMAX1:%.*]] = call i64 @llvm.smax.i64(i64 [[N]], i64 1)
