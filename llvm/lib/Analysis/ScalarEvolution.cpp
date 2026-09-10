@@ -13277,15 +13277,15 @@ bool ScalarEvolution::isImpliedCondOperandsViaRanges(
   return LHSRange.icmp(Pred, ConstRHS);
 }
 
-bool ScalarEvolution::canIVOverflowOnLT(const SCEV *RHS, const SCEV *Stride,
-                                        bool IsSigned) {
+bool ScalarEvolution::canIVOverflow(const SCEV *RHS, const SCEV *Stride,
+                                    bool IsSigned, bool Invert) {
   assert(isKnownPositive(Stride) && "Positive stride expected!");
 
   unsigned BitWidth = getTypeSizeInBits(RHS->getType());
   const SCEV *One = getOne(Stride->getType());
 
   if (IsSigned) {
-    APInt MaxRHS = getSignedRangeMax(RHS);
+    APInt MaxRHS = getRangeMax(RHS, /*IsSigned=*/true, Invert);
     APInt MaxValue = APInt::getSignedMaxValue(BitWidth);
     APInt MaxStrideMinusOne = getSignedRangeMax(getMinusSCEV(Stride, One));
 
@@ -13293,35 +13293,12 @@ bool ScalarEvolution::canIVOverflowOnLT(const SCEV *RHS, const SCEV *Stride,
     return (std::move(MaxValue) - MaxStrideMinusOne).slt(MaxRHS);
   }
 
-  APInt MaxRHS = getUnsignedRangeMax(RHS);
+  APInt MaxRHS = getRangeMax(RHS, /*IsSigned=*/false, Invert);
   APInt MaxValue = APInt::getMaxValue(BitWidth);
   APInt MaxStrideMinusOne = getUnsignedRangeMax(getMinusSCEV(Stride, One));
 
   // UMaxRHS + UMaxStrideMinusOne > UMaxValue => overflow!
   return (std::move(MaxValue) - MaxStrideMinusOne).ult(MaxRHS);
-}
-
-bool ScalarEvolution::canIVOverflowOnGT(const SCEV *RHS, const SCEV *Stride,
-                                        bool IsSigned) {
-
-  unsigned BitWidth = getTypeSizeInBits(RHS->getType());
-  const SCEV *One = getOne(Stride->getType());
-
-  if (IsSigned) {
-    APInt MinRHS = getSignedRangeMin(RHS);
-    APInt MinValue = APInt::getSignedMinValue(BitWidth);
-    APInt MaxStrideMinusOne = getSignedRangeMax(getMinusSCEV(Stride, One));
-
-    // SMinRHS - SMaxStrideMinusOne < SMinValue => overflow!
-    return (std::move(MinValue) + MaxStrideMinusOne).sgt(MinRHS);
-  }
-
-  APInt MinRHS = getUnsignedRangeMin(RHS);
-  APInt MinValue = APInt::getMinValue(BitWidth);
-  APInt MaxStrideMinusOne = getUnsignedRangeMax(getMinusSCEV(Stride, One));
-
-  // UMinRHS - UMaxStrideMinusOne < UMinValue => overflow!
-  return (std::move(MinValue) + MaxStrideMinusOne).ugt(MinRHS);
 }
 
 const SCEV *ScalarEvolution::getUDivCeilSCEV(const SCEV *N, const SCEV *D) {
@@ -13337,7 +13314,8 @@ const SCEV *ScalarEvolution::computeMaxBECountForLT(const SCEV *Start,
                                                     const SCEV *Stride,
                                                     const SCEV *End,
                                                     unsigned BitWidth,
-                                                    bool IsSigned) {
+                                                    bool IsSigned,
+                                                    bool Invert) {
   // The logic in this function assumes we can represent a positive stride.
   // If we can't, the backedge-taken count must be zero.
   if (IsSigned && BitWidth == 1)
@@ -13350,9 +13328,10 @@ const SCEV *ScalarEvolution::computeMaxBECountForLT(const SCEV *Start,
     return getCouldNotCompute();
 
   // Calculate the maximum backedge count based on the range of values
-  // permitted by Start, End, and Stride.
-  APInt MinStart =
-      IsSigned ? getSignedRangeMin(Start) : getUnsignedRangeMin(Start);
+  // permitted by Start, End, and Stride. Inverted, Start and End are read as
+  // ~Start and ~End, while Stride is the negated step and the minimum and
+  // maximum are complements of each other (~SMIN == SMAX).
+  APInt MinStart = getRangeMin(Start, IsSigned, Invert);
 
   APInt MinStride =
       IsSigned ? getSignedRangeMin(Stride) : getUnsignedRangeMin(Stride);
@@ -13371,8 +13350,9 @@ const SCEV *ScalarEvolution::computeMaxBECountForLT(const SCEV *Start,
   // the case End = RHS of the loop termination condition. This is safe because
   // in the other case (End - Start) is zero, leading to a zero maximum backedge
   // taken count.
-  APInt MaxEnd = IsSigned ? APIntOps::smin(getSignedRangeMax(End), Limit)
-                          : APIntOps::umin(getUnsignedRangeMax(End), Limit);
+  APInt MaxEnd = getRangeMax(End, IsSigned, Invert);
+  MaxEnd = IsSigned ? APIntOps::smin(MaxEnd, Limit)
+                    : APIntOps::umin(MaxEnd, Limit);
 
   // MaxBECount = ceil((max(MaxEnd, MinStart) - MinStart) / Stride)
   MaxEnd = IsSigned ? APIntOps::smax(MaxEnd, MinStart)
@@ -13381,8 +13361,11 @@ const SCEV *ScalarEvolution::computeMaxBECountForLT(const SCEV *Start,
   APInt Delta = MaxEnd - MinStart;
 
   // Try to refine Delta in case End - Start gives a tighter bound after
-  // folding.
-  Delta = APIntOps::umin(Delta, getUnsignedRangeMax(getMinusSCEV(End, Start)));
+  // folding. Inverted, the distance is read through the complement, and
+  // "~End - ~Start == Start - End".
+  const SCEV *DeltaExpr =
+      Invert ? getMinusSCEV(Start, End) : getMinusSCEV(End, Start);
+  Delta = APIntOps::umin(Delta, getUnsignedRangeMax(DeltaExpr));
 
   return getUDivCeilSCEV(getConstant(Delta), getConstant(StrideForMaxBECount));
 }
@@ -13562,7 +13545,8 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
   } else {
     // Avoid proven overflow cases: this will ensure that the backedge taken
     // count will not generate any unsigned overflow.
-    IVMayOverflow = canIVOverflowOnLT(RHS, GuardedStride, IsSigned);
+    IVMayOverflow =
+        canIVOverflow(RHS, GuardedStride, IsSigned, /*Invert=*/false);
     if (IVMayOverflow && !NoWrap)
       return getCouldNotCompute();
   }
@@ -13571,7 +13555,7 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
   //   IV can be assumed not to overflow up to and including the exiting
   //   iteration.  We proved this in one of two ways:
   //   1) We can show overflow doesn't occur before the exiting iteration
-  //      1a) canIVOverflowOnLT, and b) step of one
+  //      1a) !IVMayOverflow, and b) step of one
   //   2) We can show that if overflow occurs, the loop must execute UB
   //      before any possible exit.
   // Note that we have not yet proved RHS invariant (in general).
@@ -13835,7 +13819,8 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
     MaxOrZero = true;
   } else {
     ConstantMaxBECount = computeMaxBECountForLT(
-        Start, Stride, RHS, getTypeSizeInBits(LHS->getType()), IsSigned);
+        Start, Stride, RHS, getTypeSizeInBits(LHS->getType()), IsSigned,
+        /*Invert=*/false);
   }
 
   if (isa<SCEVCouldNotCompute>(ConstantMaxBECount) &&
@@ -13884,7 +13869,8 @@ ScalarEvolution::ExitLimit ScalarEvolution::howManyGreaterThans(
   bool MayAddOverflow = false;
   const SCEV *Start = IV->getStart();
   const SCEV *End = RHS;
-  if (!Stride->isOne() && canIVOverflowOnGT(RHS, Stride, IsSigned)) {
+  if (!Stride->isOne() &&
+      canIVOverflow(RHS, Stride, IsSigned, /*Invert=*/true)) {
     if (!NoWrap)
       return getCouldNotCompute();
     MayAddOverflow = true;
@@ -13910,6 +13896,11 @@ ScalarEvolution::ExitLimit ScalarEvolution::howManyGreaterThans(
     if (isa<SCEVCouldNotCompute>(End))
       return End;
   }
+  if (RHS->getType()->isPointerTy()) {
+    RHS = getPtrToAddrExpr(RHS);
+    if (isa<SCEVCouldNotCompute>(RHS))
+      return RHS;
+  }
 
   const SCEV *Delta = getMinusSCEV(Start, End);
   const SCEV *BECount;
@@ -13927,28 +13918,14 @@ ScalarEvolution::ExitLimit ScalarEvolution::howManyGreaterThans(
     BECount = getUDivExpr(getAddExpr(Delta, getMinusSCEV(Stride, One)), Stride);
   }
 
-  APInt MaxStart = IsSigned ? getSignedRangeMax(Start)
-                            : getUnsignedRangeMax(Start);
-
-  APInt MinStride = IsSigned ? getSignedRangeMin(Stride)
-                             : getUnsignedRangeMin(Stride);
-
-  unsigned BitWidth = getTypeSizeInBits(LHS->getType());
-  APInt Limit = IsSigned ? APInt::getSignedMinValue(BitWidth) + (MinStride - 1)
-                         : APInt::getMinValue(BitWidth) + (MinStride - 1);
-
-  // Although End can be a MIN expression we estimate MinEnd considering only
-  // the case End = RHS. This is safe because in the other case (Start - End)
-  // is zero, leading to a zero maximum backedge taken count.
-  APInt MinEnd =
-    IsSigned ? APIntOps::smax(getSignedRangeMin(RHS), Limit)
-             : APIntOps::umax(getUnsignedRangeMin(RHS), Limit);
-
+  // "IV > RHS" is analyzed as the equivalent "~IV < ~RHS"; Stride is already
+  // the negated step.
   const SCEV *ConstantMaxBECount =
       isa<SCEVConstant>(BECount)
           ? BECount
-          : getUDivCeilSCEV(getConstant(MaxStart - MinEnd),
-                            getConstant(MinStride));
+          : computeMaxBECountForLT(Start, Stride, RHS,
+                                   getTypeSizeInBits(LHS->getType()), IsSigned,
+                                   /*Invert=*/true);
 
   if (isa<SCEVCouldNotCompute>(ConstantMaxBECount))
     ConstantMaxBECount = BECount;
