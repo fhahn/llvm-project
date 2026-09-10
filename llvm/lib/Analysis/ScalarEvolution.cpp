@@ -13364,8 +13364,12 @@ const SCEV *ScalarEvolution::computeMaxBECountForLT(const SCEV *Start,
   MaxEnd = IsSigned ? APIntOps::smax(MaxEnd, MinStart)
                     : APIntOps::umax(MaxEnd, MinStart);
 
-  return getUDivCeilSCEV(getConstant(MaxEnd - MinStart) /* Delta */,
-                         getConstant(StrideForMaxBECount) /* Step */);
+  APInt Delta = MaxEnd - MinStart;
+
+  // Try to refine Delta in case End - Start gives a tighter bound after
+  Delta = APIntOps::umin(Delta, getUnsignedRangeMax(getMinusSCEV(End, Start)));
+
+  return getUDivCeilSCEV(getConstant(Delta), getConstant(StrideForMaxBECount));
 }
 
 ScalarEvolution::ExitLimit
