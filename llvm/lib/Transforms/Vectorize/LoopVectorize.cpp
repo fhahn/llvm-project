@@ -331,6 +331,12 @@ static cl::opt<bool> EnableVPlanNativePath(
     cl::desc("Enable VPlan-native vectorization path with "
              "support for outer loop vectorization."));
 
+static cl::opt<bool> VPlanOuterLoopLegalityChecks(
+    "vplan-outer-loop-legality-checks", cl::Hidden, cl::init(false),
+    cl::desc("Only vectorize outer loops that can be proven safe to "
+             "vectorize, instead of trusting an explicit vectorization "
+             "pragma."));
+
 cl::opt<bool>
     llvm::VerifyEachVPlan("vplan-verify-each",
 #ifdef EXPENSIVE_CHECKS
@@ -6430,6 +6436,21 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
   if (const LoopAccessInfo *LAI = Legal->getLAI())
     RUN_VPLAN_PASS(VPlanTransforms::replaceSymbolicStrides, *VPlan0, PSE,
                    LAI->getSymbolicStrides(), VPDT);
+
+  // Outer-loop vectorization runs adjacent outer iterations as lanes of one
+  // vector iteration. Unless -vplan-outer-loop-legality-checks is passed, an
+  // explicit vectorization pragma is taken as a promise that this is safe, and
+  // only legality that does not depend on the promise is checked. The only
+  // property the promise currently covers is that the reordering cannot change
+  // the memory the nest accesses.
+  if (!IsInnerLoop && VPlanOuterLoopLegalityChecks &&
+      !proveOuterLoopMemorySafety(*VPlan0, PSE, *Legal->getAA(), OrigLoop)) {
+    reportVectorizationFailure(
+        "Unsafe memory dependencies in outer loop",
+        "cannot vectorize outer loop with unsafe memory dependencies",
+        "UnsafeMemDepsOuterLoop", ORE, OrigLoop);
+    return nullptr;
+  }
 
   // Add surviving induction predicates to PSE and check constraints.
   bool ForceVectorization =

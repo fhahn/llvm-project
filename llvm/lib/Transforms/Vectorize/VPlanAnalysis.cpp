@@ -12,7 +12,10 @@
 #include "VPlanDominatorTree.h"
 #include "VPlanHelpers.h"
 #include "VPlanPatternMatch.h"
+#include "VPlanUtils.h"
 #include "llvm/ADT/PostOrderIterator.h"
+#include "llvm/Analysis/AliasAnalysis.h"
+#include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 
 using namespace llvm;
@@ -335,4 +338,101 @@ llvm::calculateRegisterUsageForPlan(VPlan &Plan, ArrayRef<ElementCount> VFs,
   }
 
   return RUs;
+}
+
+//===----------------------------------------------------------------------===//
+// Outer-loop memory safety analysis.
+//===----------------------------------------------------------------------===//
+
+/// Returns the object \p Ptr is based on by following its chain of GEP recipes,
+/// or nullptr if the chain does not end at a live-in.
+static const Value *getBaseObject(VPValue *Ptr) {
+  while (auto *VPI = dyn_cast<VPInstruction>(Ptr)) {
+    if (VPI->getOpcode() != Instruction::GetElementPtr)
+      break;
+    Ptr = VPI->getOperand(0);
+  }
+  auto *IRV = dyn_cast<VPIRValue>(Ptr);
+  return IRV ? IRV->getValue() : nullptr;
+}
+
+/// Returns true if \p AA can prove \p ObjA and \p ObjB are distinct objects.
+/// Both must be known; an unknown object may be derived from the other through
+/// an opaque operation, which even a noalias base does not rule out.
+static bool provablyDistinctObjects(AAResults &AA, const Value *ObjA,
+                                    const Value *ObjB) {
+  return ObjA && ObjB &&
+         AA.isNoAlias(MemoryLocation::getBeforeOrAfter(ObjA),
+                      MemoryLocation::getBeforeOrAfter(ObjB));
+}
+
+/// Returns true if the store recipe \p Store writes disjoint bytes on every
+/// iteration of \p OuterLoop, so that no two lanes of a vector iteration write
+/// the same location.
+static bool writesDisjointBytesPerIteration(VPInstruction *Store,
+                                            PredicatedScalarEvolution &PSE,
+                                            const Loop *OuterLoop) {
+  VPValue *Addr = Store->getOperand(1);
+  // Every address an inbounds GEP forms on an iteration where it is
+  // dereferenced - here by the store itself - lies in one allocated object, so
+  // the offsets it adds do not wrap the address space. The addresses of two
+  // iterations therefore differ exactly by the difference of their offsets,
+  // which is what the step comparison below relies on.
+  if (!vputils::getGEPFlagsForPtr(Addr).isInBounds())
+    return false;
+
+  const DataLayout &DL = Store->getParent()->getPlan()->getDataLayout();
+  TypeSize StoreSize =
+      DL.getTypeStoreSize(Store->getOperand(0)->getScalarType());
+  if (StoreSize.isScalable())
+    return false;
+
+  // The address must advance with the outer loop by at least the number of
+  // bytes written. Requiring a recurrence of the outer loop itself also rules
+  // out addresses varying in an inner loop or only in an enclosing loop.
+  ScalarEvolution &SE = *PSE.getSE();
+  const auto *AR = dyn_cast<SCEVAddRecExpr>(
+      vputils::getSCEVExprForVPValue(Addr, PSE, OuterLoop));
+  if (!AR || AR->getLoop() != OuterLoop)
+    return false;
+  const auto *Step = dyn_cast<SCEVConstant>(AR->getStepRecurrence(SE));
+  return Step && Step->getAPInt().abs().uge(StoreSize.getFixedValue());
+}
+
+bool llvm::proveOuterLoopMemorySafety(VPlan &Plan,
+                                      PredicatedScalarEvolution &PSE,
+                                      AAResults &AA, const Loop *OuterLoop) {
+  // The objects the nest's loads and stores access, with a null entry for an
+  // access whose object could not be determined.
+  SmallVector<const Value *> LoadObjects, StoreObjects;
+  VPBasicBlock *Header = VPBlockUtils::getPlainCFGHeaderAndLatch(Plan).first;
+  for (VPBasicBlock *VPBB : vp_rpo_plain_cfg_loop_body(Header)) {
+    for (VPRecipeBase &R : *VPBB) {
+      if (!R.mayReadOrWriteMemory())
+        continue;
+      auto *VPI = dyn_cast<VPInstruction>(&R);
+      if (VPI && VPI->getOpcode() == Instruction::Load) {
+        LoadObjects.push_back(getBaseObject(VPI->getOperand(0)));
+        continue;
+      }
+      // Anything touching memory that is not a plain load or store - atomicrmw,
+      // cmpxchg, fence, memory intrinsics - is not covered by the reasoning
+      // below.
+      if (!VPI || VPI->getOpcode() != Instruction::Store ||
+          !writesDisjointBytesPerIteration(VPI, PSE, OuterLoop))
+        return false;
+      StoreObjects.push_back(getBaseObject(VPI->getOperand(1)));
+    }
+  }
+
+  // Each store must access an object no other access of the nest touches, so
+  // that no two lanes of a vector iteration and no load and store of the nest
+  // can access the same location. Two loads may share an object; reordering
+  // reads is always safe.
+  for (auto [I, StoreObj] : enumerate(StoreObjects))
+    for (const Value *Obj : concat<const Value *const>(
+             ArrayRef(StoreObjects).drop_front(I + 1), LoadObjects))
+      if (!provablyDistinctObjects(AA, StoreObj, Obj))
+        return false;
+  return true;
 }
