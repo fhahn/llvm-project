@@ -129,6 +129,58 @@ GEPNoWrapFlags vputils::getGEPFlagsForPtr(VPValue *Ptr) {
   return GEPNoWrapFlags::none();
 }
 
+/// Recognize a VPPhi \p R of the shape (preheader-start, add(phi, live-in
+/// step)) as an affine AddRec. A self-referential phi like this heads a loop,
+/// and the header phis of \p L itself have already been replaced by
+/// dedicated header-phi recipes, so \p R heads a loop nested in \p L. Only
+/// nests with a single, innermost nested loop are handled, which identifies
+/// that loop; SCEV needs it, as it keys AddRecs on IR loops. Start and step
+/// come from \p R's operands, whose order is not canonicalized, so both orders
+/// are tried. Returns SCEVCouldNotCompute if the shape is not recognized.
+static const SCEV *getSCEVForNestedHeaderPhi(const VPPhi *R,
+                                             PredicatedScalarEvolution &PSE,
+                                             const Loop *L) {
+  ScalarEvolution &SE = *PSE.getSE();
+  if (!L || R->getNumOperands() != 2 || L->getSubLoops().size() != 1 ||
+      !L->getSubLoops().front()->isInnermost())
+    return SE.getCouldNotCompute();
+  const Loop *PhiLoop = L->getSubLoops().front();
+
+  // Exactly one operand must be the increment add(phi, step); the other is then
+  // the start value.
+  VPValue *StepVPV = nullptr;
+  VPValue *StartVPV = nullptr;
+  for (unsigned Idx : {0, 1}) {
+    VPValue *Step;
+    if (!match(R->getOperand(Idx), m_c_Add(m_Specific(R), m_VPValue(Step))))
+      continue;
+    if (StepVPV)
+      return SE.getCouldNotCompute();
+    StepVPV = Step;
+    StartVPV = R->getOperand(1 - Idx);
+  }
+  // A live-in step is invariant in PhiLoop without being lowered first; a step
+  // depending on \p R, as in add(phi, phi), would recurse back into this
+  // function. The canonical IV of a nested loop always has a live-in step.
+  if (!StepVPV || StepVPV->hasDefiningRecipe())
+    return SE.getCouldNotCompute();
+
+  // The increment comes from the latch, so the start value comes from the
+  // preheader, which \p R does not dominate: it cannot depend on \p R.
+  auto IsInvariant = [&SE, PhiLoop](const SCEV *S) {
+    return !isa<SCEVCouldNotCompute>(S) && SE.isLoopInvariant(S, PhiLoop);
+  };
+  const SCEV *Step = vputils::getSCEVExprForVPValue(StepVPV, PSE, L);
+  const SCEV *Start = vputils::getSCEVExprForVPValue(StartVPV, PSE, L);
+  if (!IsInvariant(Step) || !IsInvariant(Start))
+    return SE.getCouldNotCompute();
+  // Do not attach IR nsw/nuw from the increment recipe onto the AddRec: VPlan
+  // cannot reproduce stock SCEV's dominance-based isAddRecNeverPoison
+  // reasoning, and leaking an unjustified flag into the shared SCEV cache is
+  // unsound.
+  return SE.getAddRecExpr(Start, Step, PhiLoop, SCEV::FlagAnyWrap);
+}
+
 const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
                                            PredicatedScalarEvolution &PSE,
                                            const Loop *L) {
@@ -313,6 +365,9 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
   const SCEV *Expr =
       TypeSwitch<const VPRecipeBase *, const SCEV *>(DefR)
           .Case([](const VPExpandSCEVRecipe *R) { return R->getSCEV(); })
+          .Case([&PSE, L](const VPPhi *R) {
+            return getSCEVForNestedHeaderPhi(R, PSE, L);
+          })
           .Case([&SE, &PSE, L](const VPWidenIntOrFpInductionRecipe *R) {
             const SCEV *Step = getSCEVExprForVPValue(R->getStepValue(), PSE, L);
             if (!L || isa<SCEVCouldNotCompute>(Step))

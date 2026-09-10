@@ -67,12 +67,21 @@ static std::optional<int64_t> getConstantStride(VPValue *Addr, Type *AccessTy,
                                                 const Loop *L) {
   assert(!hasIrregularType(AccessTy, L->getHeader()->getDataLayout()) &&
          "should not try to widen irregular types");
+  ScalarEvolution &SE = *PSE.getSE();
   const SCEV *AddrSCEV = vputils::getSCEVExprForVPValue(Addr, PSE, L);
-  auto *AddRec = dyn_cast<SCEVAddRecExpr>(AddrSCEV);
-  if (!AddRec)
-    return {};
-
-  return getStrideFromAddRec(AddRec, L, AccessTy, /*Ptr=*/nullptr, PSE);
+  // Descend through AddRecs for loops nested inside \p L whose step does not
+  // vary with \p L. For a column-major access such as A[i + j*M] the SCEV is
+  // {{A,+,elt}<L>,+,elt*M}<inner>: the inner step elt*M is invariant w.r.t.
+  // \p L, so the access is still unit-stride across \p L's iterations and the
+  // stride w.r.t. \p L lives in the start expression.
+  while (auto *AddRec = dyn_cast<SCEVAddRecExpr>(AddrSCEV)) {
+    if (AddRec->getLoop() == L)
+      return getStrideFromAddRec(AddRec, L, AccessTy, /*Ptr=*/nullptr, PSE);
+    if (!SE.isLoopInvariant(AddRec->getStepRecurrence(SE), L))
+      return {};
+    AddrSCEV = AddRec->getStart();
+  }
+  return {};
 }
 
 bool VPlanTransforms::tryToConvertVPInstructionsToVPRecipes(
@@ -88,6 +97,8 @@ bool VPlanTransforms::tryToConvertVPInstructionsToVPRecipes(
 
   ReversePostOrderTraversal<VPBlockDeepTraversalWrapper<VPBlockBase *>> RPOT(
       Plan.getVectorLoopRegion());
+
+  SmallVector<VPPhi *> PhisToWiden;
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(RPOT)) {
     // Skip blocks outside region
     if (!VPBB->getParent())
@@ -111,10 +122,13 @@ bool VPlanTransforms::tryToConvertVPInstructionsToVPRecipes(
 
       VPRecipeBase *NewRecipe = nullptr;
       if (auto *PhiR = dyn_cast<VPPhi>(&Ingredient)) {
-        auto *Phi = cast<PHINode>(PhiR->getUnderlyingValue());
-        NewRecipe = new VPWidenPHIRecipe(PhiR->operands(), PhiR->getDebugLoc(),
-                                         Phi->getName());
-      } else if (auto *VPI = dyn_cast<VPInstruction>(&Ingredient)) {
+        // Widen phis only after all other recipes: VPWidenPHIRecipe is not
+        // lowered to SCEV, so widening a nested loop's induction phi first
+        // would hide the recurrence the consecutive-access check needs.
+        PhisToWiden.push_back(PhiR);
+        continue;
+      }
+      if (auto *VPI = dyn_cast<VPInstruction>(&Ingredient)) {
         assert(!isa<PHINode>(Inst) && "phis should be handled above");
         // Create VPWidenMemoryRecipe for loads and stores.
         if (LoadInst *Load = dyn_cast<LoadInst>(Inst)) {
@@ -191,6 +205,15 @@ bool VPlanTransforms::tryToConvertVPInstructionsToVPRecipes(
                "Only recpies with zero or one defined values expected");
       Ingredient.eraseFromParent();
     }
+  }
+
+  for (VPPhi *PhiR : PhisToWiden) {
+    auto *Phi = cast<PHINode>(PhiR->getUnderlyingValue());
+    auto *WidenPhiR = new VPWidenPHIRecipe(PhiR->operands(),
+                                           PhiR->getDebugLoc(), Phi->getName());
+    WidenPhiR->insertBefore(PhiR);
+    PhiR->replaceAllUsesWith(WidenPhiR);
+    PhiR->eraseFromParent();
   }
   return true;
 }
