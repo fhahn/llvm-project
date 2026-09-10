@@ -2225,7 +2225,12 @@ private:
   /// less-than comparison will execute.  If not computable, return
   /// CouldNotCompute.
   ///
-  /// \p isSigned specifies whether the less-than is signed.
+  /// \p IsSigned specifies whether the less-than is signed.
+  ///
+  /// If \p Invert is set, the comparison analyzed is "~LHS < ~RHS", which is
+  /// the "LHS > RHS" the caller started from. In that case the IV is
+  /// non-increasing, only a loop-invariant \p RHS with a known-positive negated
+  /// step is supported, and no-wrap flags are not inferred for the IV.
   ///
   /// \p ControlsOnlyExit is true when the LHS < RHS condition directly controls
   /// the branch (loops exits only if condition is true). In this case, we can
@@ -2234,12 +2239,8 @@ private:
   /// If \p AllowPredicates is set, this call will try to use a minimal set of
   /// SCEV predicates in order to return an exact answer.
   ExitLimit howManyLessThans(const SCEV *LHS, const SCEV *RHS, const Loop *L,
-                             bool isSigned, bool ControlsOnlyExit,
+                             bool IsSigned, bool Invert, bool ControlsOnlyExit,
                              bool AllowPredicates = false);
-
-  ExitLimit howManyGreaterThans(const SCEV *LHS, const SCEV *RHS, const Loop *L,
-                                bool isSigned, bool IsSubExpr,
-                                bool AllowPredicates = false);
 
   /// Return a predecessor of BB (which may not be an immediate predecessor)
   /// which has exactly one successor from which BB is reachable, or null if
@@ -2514,7 +2515,7 @@ private:
 
   /// Return the smallest resp. largest value \p S can take in the signed
   /// (\p IsSigned) or unsigned domain. If \p Invert, return it for the
-  /// complement ~S instead.
+  /// complement ~S instead; see howManyLessThans.
   APInt getRangeMin(const SCEV *S, bool IsSigned, bool Invert = false) {
     if (Invert)
       return ~getRangeMax(S, IsSigned);
@@ -2542,7 +2543,7 @@ private:
 
   /// Verify if a linear IV with positive \p Stride can overflow when compared
   /// against the invariant \p RHS with a less-than, or, with \p Invert, a
-  /// greater-than read as "~IV < ~RHS" (see getRangeMin).
+  /// greater-than read as "~IV < ~RHS" (see howManyLessThans).
   bool canIVOverflow(const SCEV *RHS, const SCEV *Stride, bool IsSigned,
                      bool Invert);
 
