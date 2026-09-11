@@ -1877,8 +1877,16 @@ static void narrowToSingleScalarRecipes(VPlan &Plan) {
         };
       };
 
+      // A vector select uses a single-scalar condition directly, so narrowing
+      // it does not remove a broadcast of the condition.
+      VPValue *SelectCond =
+          vputils::getOpcode(RepOrWidenR) == Instruction::Select
+              ? RepOrWidenR->getOperand(0)
+              : nullptr;
       if (any_of(RepOrWidenR->users(), IntroducesBCastOf(RepOrWidenR)) &&
           none_of(RepOrWidenR->operands(), [&](VPValue *Op) {
+            if (Op == SelectCond)
+              return false;
             if (any_of(
                     make_filter_range(Op->users(), not_equal_to(RepOrWidenR)),
                     IntroducesBCastOf(Op)))
