@@ -74,8 +74,10 @@ for.end:
   ret void
 }
 
-define void @do_not_replace_first_order_recurrence_with_versioned_iv_for_pointer_use_btc_versioned(ptr %y, ptr %x, i64 %n) {
-; CHECK-LABEL: define void @do_not_replace_first_order_recurrence_with_versioned_iv_for_pointer_use_btc_versioned(
+; %phi64 is the only induction of the widest type, so it is committed to the
+; induction model and the recurrence is replaced after all.
+define void @replace_first_order_recurrence_with_versioned_iv_widest_type_btc_versioned(ptr %y, ptr %x, i64 %n) {
+; CHECK-LABEL: define void @replace_first_order_recurrence_with_versioned_iv_widest_type_btc_versioned(
 ; CHECK-SAME: ptr [[Y:%.*]], ptr [[X:%.*]], i64 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[X2:%.*]] = ptrtoaddr ptr [[X]] to i64

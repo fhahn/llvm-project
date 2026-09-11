@@ -722,13 +722,6 @@ void LoopVectorizationLegality::addInductionPhi(PHINode *Phi,
          "Expected int, ptr, or FP induction phi type");
 
   // Get the widest type.
-  //
-  // FIXME: This is the widest type over all phis that *may* be modeled as an
-  // induction. A phi that is also a fixed-order recurrence may end up modeled
-  // as a recurrence instead, in which case counting iterations in its type
-  // only costs a wider canonical IV and a truncate per iteration. Fixing that
-  // needs the canonical IV type to be derived from the plan's inductions
-  // rather than passed into VPlan construction; see the FIXME in buildVPlan0.
   if (PhiTy->isIntOrPtrTy()) {
     if (!WidestIndTy)
       WidestIndTy = getInductionIntegerTy(DL, PhiTy);
@@ -746,13 +739,7 @@ void LoopVectorizationLegality::addInductionPhi(PHINode *Phi,
     // one if there are multiple (no good reason for doing this other
     // than it is expedient). We've checked that it begins at zero and
     // steps by one, so this is a canonical induction variable.
-    //
-    // Never pick a phi that is also a fixed-order recurrence: which of the two
-    // models is used is decided in VPlan, by createHeaderPhiRecipes. Making
-    // such a phi the primary induction here would pre-commit to the induction
-    // model, and with it to any runtime SCEV checks it needs.
-    if (!FixedOrderRecurrences.contains(Phi) &&
-        (!PrimaryInduction || PhiTy == WidestIndTy))
+    if (!PrimaryInduction || PhiTy == WidestIndTy)
       PrimaryInduction = Phi;
   }
 
@@ -918,23 +905,35 @@ bool LoopVectorizationLegality::canVectorizeInstr(Instruction &I) {
       return true;
     }
 
+    bool IsFixedOrderRecurrence =
+        RecurrenceDescriptor::isFixedOrderRecurrence(Phi, TheLoop, DT);
+
+    // As a last resort, coerce the PHI to an AddRec expression and re-try
+    // classifying it as an induction PHI. Only do so if the runtime SCEV checks
+    // the AddRec may need are allowed; without them the induction cannot be
+    // used, and classifying the phi as one would widen the canonical IV to its
+    // type for nothing.
+    bool IsPredIV = InductionDescriptor::isInductionPHI(
+                        Phi, TheLoop, PSE, ID, AllowRuntimeSCEVChecks) &&
+                    !IsDisallowedStridedPointerInduction(ID);
+
     // A phi can qualify both as a fixed-order recurrence and as a predicated
-    // induction. Record both; createHeaderPhiRecipes picks between them when
-    // building the VPlan. Note that addInductionPhi below reads
-    // FixedOrderRecurrences, so the insert has to happen first.
-    bool IsFOR = RecurrenceDescriptor::isFixedOrderRecurrence(Phi, TheLoop, DT);
-    if (IsFOR)
+    // induction. Record both and let createHeaderPhiRecipes pick between them
+    // when building the VPlan, unless the phi widens the induction type: the
+    // canonical IV and the trip count are then counted in its type, so it has
+    // to be modeled as the induction that widening is for. Only commit in
+    // single-exit loops; isVectorizableEarlyExitLoop() rejects the others based
+    // on FixedOrderRecurrences and has not run yet.
+    if (IsPredIV) {
+      IntegerType *WidestIndTyBefore = WidestIndTy;
+      addInductionPhi(Phi, ID);
+      IsFixedOrderRecurrence &=
+          !TheLoop->getExitingBlock() || WidestIndTy == WidestIndTyBefore;
+    }
+    if (IsFixedOrderRecurrence)
       FixedOrderRecurrences.insert(Phi);
 
-    // As a last resort, coerce the PHI to a AddRec expression
-    // and re-try classifying it a an induction PHI.
-    bool IsPredIV =
-        InductionDescriptor::isInductionPHI(Phi, TheLoop, PSE, ID, true) &&
-        !IsDisallowedStridedPointerInduction(ID);
-    if (IsPredIV)
-      addInductionPhi(Phi, ID);
-
-    if (IsFOR || IsPredIV)
+    if (IsFixedOrderRecurrence || IsPredIV)
       return true;
 
     reportVectorizationFailure("Found an unidentified PHI",

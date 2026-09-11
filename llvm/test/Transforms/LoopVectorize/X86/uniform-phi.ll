@@ -74,12 +74,12 @@ for.end:
 }
 
 ; CHECK-LABEL: PR38786
-; For %phi64, either a first-order recurrence or a versioned induction could
-; be used. As it is used in pointer computations, LAA will already generate
-; SCEV checks to ensure it is an AddRec, so there is no extra cost of using a
-; versioned induction. Using an induction results in better codegen.
-; CHECK: LV: Found uniform instruction:   %phi
-; CHECK-NOT: VPFirstOrderRecurrence
+; %phi64 is both a fixed-order recurrence and a predicated induction. It is the
+; only induction of the widest type (%phi32 is i32), so it determines the type
+; of the canonical IV and is committed to the induction model, which is also
+; better codegen here.
+; CHECK: LV: Found uniform instruction:   %phi64 = phi i64 [ 0, %entry ], [ %i64next, %for.body ]
+; CHECK-NOT: FIRST-ORDER-RECURRENCE-PHI
 define void @PR38786(ptr %y, ptr %x, i64 %n) {
 entry:
   br label %for.body

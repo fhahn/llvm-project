@@ -2313,12 +2313,11 @@ void LoopVectorizationCostModel::collectLoopScalars(ElementCount VF) {
   // variable and induction variable update remain scalar.
   for (const auto &Induction : Legal->getInductionVars()) {
     auto *Ind = Induction.first;
-    // Skip phis that qualify both as a fixed-order recurrence and as an
-    // induction: createHeaderPhiRecipes picks one of the two models, and this
-    // seeding of the scalars worklist assumes the induction model. Note that
-    // collectLoopUniforms deliberately does not skip them: when the induction
-    // model is picked, marking the phi and its update uniform is what keeps
-    // them out of the vector loop.
+    // Skip phis that are still both a fixed-order recurrence and an induction:
+    // createHeaderPhiRecipes may model them either way, and marking them scalar
+    // here assumes the induction model. If the recurrence model is picked, the
+    // splice needs the vector of the update, which would then have to be
+    // assembled from the scalar lanes. collectLoopUniforms skips them too.
     if (Legal->isFixedOrderRecurrence(Ind))
       continue;
 
@@ -2882,6 +2881,13 @@ void LoopVectorizationCostModel::collectLoopUniforms(ElementCount VF) {
   BasicBlock *Latch = TheLoop->getLoopLatch();
   for (const auto &Induction : Legal->getInductionVars()) {
     auto *Ind = Induction.first;
+    // Skip phis that are still both a fixed-order recurrence and an induction,
+    // for the same reason as in collectLoopScalars: if createHeaderPhiRecipes
+    // picks the recurrence model, the splice needs the per-lane values of the
+    // update, but marking it uniform computes it at lane 0 and splats it.
+    if (Legal->isFixedOrderRecurrence(Ind))
+      continue;
+
     auto *IndUpdate = cast<Instruction>(Ind->getIncomingValueForBlock(Latch));
 
     // Determine if all users of the induction variable are uniform after
@@ -6047,8 +6053,8 @@ VPRecipeBuilder::tryToOptimizeInductionTruncate(VPInstruction *VPI,
     return nullptr;
 
   // isOptimizableIVTruncate only knows that the truncated phi is an induction.
-  // createHeaderPhiRecipes may still have modeled it as a fixed-order
-  // recurrence, in which case there is no widened induction recipe to fold the
+  // If it is also a fixed-order recurrence, createHeaderPhiRecipes may have
+  // modeled it as one, and there is no widened induction recipe to fold the
   // truncate into.
   auto *WidenIV = dyn_cast<VPWidenIntOrFpInductionRecipe>(
       VPI->getOperand(0)->getDefiningRecipe());
