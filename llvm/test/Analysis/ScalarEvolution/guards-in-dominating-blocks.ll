@@ -54,13 +54,13 @@ define void @merge_block_without_phi(ptr %p, i1 %c) {
 ; CHECK-NEXT:    %m = add i32 %n, -1
 ; CHECK-NEXT:    --> (-1 + %n) U: full-set S: full-set
 ; CHECK-NEXT:    %i = phi i32 [ 0, %ph ], [ %inc, %loop ]
-; CHECK-NEXT:    --> {0,+,1}<nuw><%loop> U: [0,-1) S: [0,-1) Exits: (-1 + (1 umax (-1 + %n))) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {0,+,1}<nuw><%loop> U: [0,-1) S: [0,-1) Exits: (-2 + %n) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %inc = add nuw i32 %i, 1
-; CHECK-NEXT:    --> {1,+,1}<nuw><%loop> U: [1,0) S: [1,0) Exits: (1 umax (-1 + %n)) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {1,+,1}<nuw><%loop> U: [1,0) S: [1,0) Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @merge_block_without_phi
-; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + (1 umax (-1 + %n)))
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-2 + %n)
 ; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 -2
-; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + (1 umax (-1 + %n)))
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-2 + %n)
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
 entry:
@@ -185,13 +185,13 @@ define void @merge_block_false_edge(ptr %p, i1 %c) {
 ; CHECK-NEXT:    %m = add i32 %n, -1
 ; CHECK-NEXT:    --> (-1 + %n) U: full-set S: full-set
 ; CHECK-NEXT:    %i = phi i32 [ 0, %ph ], [ %inc, %loop ]
-; CHECK-NEXT:    --> {0,+,1}<nuw><%loop> U: [0,-1) S: [0,-1) Exits: (-1 + (1 umax (-1 + %n))) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {0,+,1}<nuw><%loop> U: [0,-1) S: [0,-1) Exits: (-2 + %n) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %inc = add nuw i32 %i, 1
-; CHECK-NEXT:    --> {1,+,1}<nuw><%loop> U: [1,0) S: [1,0) Exits: (1 umax (-1 + %n)) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {1,+,1}<nuw><%loop> U: [1,0) S: [1,0) Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @merge_block_false_edge
-; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + (1 umax (-1 + %n)))
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-2 + %n)
 ; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 -2
-; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + (1 umax (-1 + %n)))
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-2 + %n)
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
 entry:
