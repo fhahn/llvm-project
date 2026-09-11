@@ -227,6 +227,12 @@ static cl::opt<unsigned> MaxLoopGuardCollectionDepth(
     "scalar-evolution-max-loop-guard-collection-depth", cl::Hidden,
     cl::desc("Maximum depth for recursive loop guard collection"), cl::init(1));
 
+static cl::opt<unsigned> MaxGuardDomTreeSteps(
+    "scalar-evolution-max-guard-dom-tree-steps", cl::Hidden,
+    cl::desc("Maximum number of dominator tree steps taken to find guarding "
+             "conditions, once the unique-predecessor climb ran out"),
+    cl::init(8));
+
 static cl::opt<bool>
 ClassifyExpressions("scalar-evolution-classify-expressions",
     cl::Hidden, cl::init(true),
@@ -10909,6 +10915,40 @@ ScalarEvolution::getPredecessorWithUniqueSuccessorForBB(const BasicBlock *BB)
   return {nullptr, BB};
 }
 
+/// Continue the search for conditions guarding \p BB after the cheap
+/// unique-predecessor climb ran out, by walking up the dominator tree from
+/// \p BB. A branch condition only holds at \p BB if the *taken edge* dominates
+/// \p BB, not merely the branching block. Only the previous node on \p BB's
+/// dominator chain can be the target of such an edge, so a single pointer
+/// comparison filters out all steps that cannot contribute (e.g. the head of a
+/// diamond) and at most one edge-dominance query is needed per step.
+///
+/// \p ProcessCond is invoked for each condition found, together with a flag
+/// indicating whether it is known to be true. The walk stops early and returns
+/// true if \p ProcessCond returns true.
+static bool
+collectFromDominatingBranches(const DominatorTree &DT, const BasicBlock *BB,
+                              function_ref<bool(Value *, bool)> ProcessCond) {
+  const DomTreeNode *Node = DT.getNode(BB);
+  for (unsigned I = 0; Node && I != MaxGuardDomTreeSteps; ++I) {
+    const BasicBlock *ChildBB = Node->getBlock();
+    Node = Node->getIDom();
+    if (!Node)
+      break;
+    auto *Br = dyn_cast<CondBrInst>(Node->getBlock()->getTerminator());
+    if (!Br)
+      continue;
+    // If ChildBB is neither or both of the successors, no fact is implied.
+    bool EnterIfTrue = Br->getSuccessor(0) == ChildBB;
+    if (EnterIfTrue == (Br->getSuccessor(1) == ChildBB))
+      continue;
+    if (DT.dominates(BasicBlockEdge(Node->getBlock(), ChildBB), BB) &&
+        ProcessCond(Br->getCondition(), EnterIfTrue))
+      return true;
+  }
+  return false;
+}
+
 /// SCEV structural equivalence is usually sufficient for testing whether two
 /// expressions are equal, however for the purposes of looking for a condition
 /// guarding a loop, it can be useful to be a little more general, since a
@@ -11998,8 +12038,8 @@ bool ScalarEvolution::isBasicBlockEntryGuardedByCond(const BasicBlock *BB,
     PredBB = ContainingLoop->getLoopPredecessor();
   else
     PredBB = BB->getSinglePredecessor();
-  for (std::pair<const BasicBlock *, const BasicBlock *> Pair(PredBB, BB);
-       Pair.first; Pair = getPredecessorWithUniqueSuccessorForBB(Pair.first)) {
+  std::pair<const BasicBlock *, const BasicBlock *> Pair(PredBB, BB);
+  for (; Pair.first; Pair = getPredecessorWithUniqueSuccessorForBB(Pair.first)) {
     const CondBrInst *BlockEntryPredicate =
         dyn_cast<CondBrInst>(Pair.first->getTerminator());
     if (!BlockEntryPredicate)
@@ -12009,6 +12049,16 @@ bool ScalarEvolution::isBasicBlockEntryGuardedByCond(const BasicBlock *BB,
                      BlockEntryPredicate->getSuccessor(0) != Pair.second))
       return true;
   }
+
+  // If the climb above ran out of unique predecessors, keep looking for facts
+  // that dominate the block we stopped at (and hence BB) via the dominator
+  // tree.
+  if (!Pair.first &&
+      collectFromDominatingBranches(
+          DT, Pair.second, [&](Value *Cond, bool EnterIfTrue) {
+            return ProveViaCond(Cond, !EnterIfTrue);
+          }))
+    return true;
 
   // Check conditions due to any @llvm.assume intrinsics.
   for (auto &AssumeVH : AC.assumptions()) {
@@ -16197,6 +16247,17 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
     if (Depth > 0 && NumCollectedConditions == 2)
       break;
   }
+
+  // If the climb above ran out of unique predecessors, keep looking for facts
+  // that dominate the block we stopped at (and hence Block) via the dominator
+  // tree.
+  if (!Pair.first)
+    collectFromDominatingBranches(SE.DT, Pair.second,
+                                  [&](Value *Cond, bool EnterIfTrue) {
+                                    Terms.emplace_back(Cond, EnterIfTrue);
+                                    return false;
+                                  });
+
   // Finally, if we stopped climbing the predecessor chain because
   // there wasn't a unique one to continue, try to collect conditions
   // for PHINodes by recursively following all of their incoming

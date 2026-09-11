@@ -28,7 +28,7 @@ define i32 @test(i1 %c.0, i32 %m) {
 ; COMMON-NEXT:    br i1 [[C_2]], label [[OUTER_LATCH]], label [[INNER_2_HEADER]]
 ; COMMON:       outer.latch:
 ; COMMON-NEXT:    [[MAX_1]] = phi i32 [ [[M]], [[INNER_2_LATCH]] ], [ 0, [[INNER_2_HEADER]] ]
-; COMMON-NEXT:    [[IV_1_NEXT]] = add i32 [[IV_1]], 1
+; COMMON-NEXT:    [[IV_1_NEXT]] = add nsw i32 [[IV_1]], 1
 ; COMMON-NEXT:    [[C_3:%.*]] = icmp ugt i32 [[IV_1]], [[MAX_0]]
 ; COMMON-NEXT:    br i1 [[C_3]], label [[EXIT:%.*]], label [[OUTER_HEADER]], !llvm.loop [[LOOP0:![0-9]+]]
 ; COMMON:       exit:
