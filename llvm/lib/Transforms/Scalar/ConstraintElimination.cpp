@@ -1032,9 +1032,13 @@ bool ConstraintInfo::doesHold(CmpInst::Predicate Pred, Value *A,
     return true;
 
   // For non-negative operands, unsigned queries can also be checked against
-  // the signed system.
+  // the signed system. Only do so if the signed system already knows about one
+  // of the operands; building the signed constraint for every unsigned query
+  // that cannot be proven is not worth the compile time.
+  const auto &SignedValue2Index = getValue2Index(/*Signed=*/true);
   if (!CmpInst::isUnsigned(Pred) || !A->getType()->isIntegerTy() ||
-      getCS(/*Signed=*/true).size() == 0)
+      getCS(/*Signed=*/true).size() == 0 ||
+      (!SignedValue2Index.contains(A) && !SignedValue2Index.contains(B)))
     return false;
   SmallVector<Value *> NewVariables;
   auto SR = getConstraint(ICmpInst::getSignedPredicate(Pred), A, B,
