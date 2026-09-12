@@ -254,18 +254,17 @@ public:
 };
 
 /// Check if a memory operation doesn't alias with memory operations using
-/// scoped noalias metadata, in blocks in the single-successor chain between \p
-/// FirstBB and \p LastBB. If \p SinkInfo is std::nullopt, only recipes that may
-/// write to memory are checked (for load hoisting). Otherwise recipes that both
-/// read and write memory are checked, and SCEV is used to prove no-alias
-/// between the group leader and other replicate recipes (for store sinking).
+/// scoped noalias metadata, in the blocks that may execute between \p FirstBB
+/// and \p LastBB. If \p SinkInfo is std::nullopt, only recipes that may write
+/// to memory are checked (for load hoisting). Otherwise recipes that both read
+/// and write memory are checked, and SCEV is used to prove no-alias between the
+/// group leader and other replicate recipes (for store sinking).
 static bool
 canHoistOrSinkWithNoAliasCheck(const MemoryLocation &MemLoc,
                                VPBasicBlock *FirstBB, VPBasicBlock *LastBB,
                                std::optional<SinkStoreInfo> SinkInfo = {}) {
   bool CheckReads = SinkInfo.has_value();
-  for (VPBasicBlock *VPBB :
-       VPBlockUtils::blocksInSingleSuccessorChainBetween(FirstBB, LastBB)) {
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksBetween(FirstBB, LastBB)) {
     for (VPRecipeBase &R : *VPBB) {
       if (SinkInfo && SinkInfo->shouldSkip(R))
         continue;

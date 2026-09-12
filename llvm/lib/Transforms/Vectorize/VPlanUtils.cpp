@@ -13,6 +13,7 @@
 #include "VPlanDominatorTree.h"
 #include "VPlanPatternMatch.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -571,22 +572,19 @@ bool vputils::cannotHoistOrSinkRecipe(const VPRecipeBase &R, bool Sinking) {
 }
 
 SmallVector<VPBasicBlock *>
-VPBlockUtils::blocksInSingleSuccessorChainBetween(VPBasicBlock *FirstBB,
-                                                  VPBasicBlock *LastBB) {
+VPBlockUtils::blocksBetween(VPBasicBlock *FirstBB, VPBasicBlock *LastBB) {
   assert(FirstBB->getParent() == LastBB->getParent() &&
          "FirstBB and LastBB from different regions");
-#ifndef NDEBUG
-  bool InSingleSuccChain = false;
-  for (VPBlockBase *Succ = FirstBB; Succ; Succ = Succ->getSingleSuccessor())
-    InSingleSuccChain |= (Succ == LastBB);
-  assert(InSingleSuccChain &&
-         "LastBB unreachable from FirstBB in single-successor chain");
-#endif
-  auto Blocks = to_vector(
-      VPBlockUtils::blocksOnly<VPBasicBlock>(vp_depth_first_deep(FirstBB)));
+  // The blocks of a region form a DAG, so a reverse post-order is a
+  // topological order and every block that can reach LastBB precedes it.
+  // Truncating there leaves all blocks on any path from FirstBB to LastBB,
+  // plus possibly blocks that cannot reach LastBB, which callers must treat
+  // conservatively.
+  ReversePostOrderTraversal<VPBlockDeepTraversalWrapper<VPBlockBase *>> RPOT(
+      FirstBB);
+  auto Blocks = to_vector(VPBlockUtils::blocksOnly<VPBasicBlock>(RPOT));
   auto *LastIt = find(Blocks, LastBB);
-  assert(LastIt != Blocks.end() &&
-         "LastBB unreachable from FirstBB in depth-first traversal");
+  assert(LastIt != Blocks.end() && "LastBB unreachable from FirstBB");
   Blocks.erase(std::next(LastIt), Blocks.end());
   return Blocks;
 }
