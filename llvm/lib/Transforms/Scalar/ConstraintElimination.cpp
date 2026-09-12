@@ -1500,51 +1500,69 @@ static bool getConstraintFromMemoryAccess(GetElementPtrInst &GEP,
   return true;
 }
 
-/// Returns true if \p I is a candidate whose poison-generating flags may be
-/// strengthened using the constraint systems.
-static bool canStrengthenFlags(Instruction *I) {
+/// The poison-generating flags of an instruction that are worth querying the
+/// constraint systems for.
+struct FlagsToStrengthen {
+  bool NSW = false;
+  bool NUW = false;
+
+  explicit operator bool() const { return NSW || NUW; }
+};
+
+/// Returns the flags of \p I that may be strengthened using the constraint
+/// systems. Flags for which isKnownNoWrap has no applicable rule, or which are
+/// already set, are not included, so that no queries are spent on them.
+static FlagsToStrengthen getFlagsToStrengthen(Instruction *I) {
   // A trunc nsw only truncates without unsigned wrap if its operand is
-  // non-negative.
+  // non-negative. There is no rule to infer nsw for a trunc.
   if (auto *Trunc = dyn_cast<TruncInst>(I))
-    return Trunc->getType()->isIntegerTy() && Trunc->hasNoSignedWrap() &&
-           !Trunc->hasNoUnsignedWrap();
+    return {/*NSW=*/false,
+            /*NUW=*/Trunc->getType()->isIntegerTy() &&
+                Trunc->hasNoSignedWrap() && !Trunc->hasNoUnsignedWrap()};
 
   auto *BO = dyn_cast<BinaryOperator>(I);
   if (!BO || !BO->getType()->isIntegerTy())
-    return false;
+    return {};
 
+  bool HasConstOp = isa<ConstantInt>(BO->getOperand(1));
   switch (BO->getOpcode()) {
   case Instruction::Sub:
     // A - B does not wrap unsigned, if A >=u B. Subs with constant operands get
     // canonicalized to Add.
-    return !BO->hasNoUnsignedWrap() && !isa<Constant>(BO->getOperand(1));
+    //
+    // Inferring nsw needs a bound on both operands and, as it is not implied
+    // by nuw, would have to be queried for every sub in the function. It is
+    // not worth the compile time.
+    return {/*NSW=*/false,
+            /*NUW=*/!BO->hasNoUnsignedWrap() && !isa<Constant>(BO->getOperand(1))};
   case Instruction::Add:
   case Instruction::Mul:
   case Instruction::Shl:
-    if (BO->hasNoUnsignedWrap() && BO->hasNoSignedWrap())
-      return false;
     // With a constant second operand, we can use bounds on the first operand to
     // refine no-wrap flags. Independently, nuw can be added for nsw if the
     // operands are non-negative.
-    return isa<ConstantInt>(BO->getOperand(1)) || BO->hasNoSignedWrap();
+    return {/*NSW=*/HasConstOp && !BO->hasNoSignedWrap(),
+            /*NUW=*/!BO->hasNoUnsignedWrap() &&
+                (HasConstOp || BO->hasNoSignedWrap())};
   default:
-    return false;
+    return {};
   }
 }
 
 /// Try to strengthen \p I's poison generating flags using \p Info. Returns
 /// true if \p I was modified.
 static bool tryToStrengthenFlags(Instruction *I, ConstraintInfo &Info) {
-  assert(canStrengthenFlags(I) && "not a candidate for flag strengthening");
+  FlagsToStrengthen Flags = getFlagsToStrengthen(I);
+  assert(Flags && "not a candidate for flag strengthening");
 
   bool Changed = false;
   // Check nsw first, as a newly added nsw may in turn imply nuw.
-  if (!I->hasNoSignedWrap() && isKnownNoWrap(I, Info, /*Signed=*/true)) {
+  if (Flags.NSW && isKnownNoWrap(I, Info, /*Signed=*/true)) {
     LLVM_DEBUG(dbgs() << "Adding nsw to " << *I << "\n");
     I->setHasNoSignedWrap();
     Changed = true;
   }
-  if (!I->hasNoUnsignedWrap() && isKnownNoWrap(I, Info, /*Signed=*/false)) {
+  if (Flags.NUW && isKnownNoWrap(I, Info, /*Signed=*/false)) {
     LLVM_DEBUG(dbgs() << "Adding nuw to " << *I << "\n");
     I->setHasNoUnsignedWrap();
     Changed = true;
@@ -1673,7 +1691,7 @@ void State::addInfoFor(BasicBlock &BB) {
 
     // Queue instructions whose flags may be strengthened, checked at the
     // closest point dominating all uses.
-    if (canStrengthenFlags(&I)) {
+    if (getFlagsToStrengthen(&I)) {
       Instruction *CommonDom = findCommonDominatorOfUses(I, DT);
       WorkList.push_back(FactOrCheck::getCheck(
           DT.getNode(CommonDom->getParent()), &I, CommonDom));
@@ -2454,7 +2472,7 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
       Instruction *Inst = CB.getInstructionToSimplify();
       if (!Inst)
         continue;
-      if (canStrengthenFlags(Inst)) {
+      if (getFlagsToStrengthen(Inst)) {
         Changed |= tryToStrengthenFlags(Inst, Info);
         continue;
       }
