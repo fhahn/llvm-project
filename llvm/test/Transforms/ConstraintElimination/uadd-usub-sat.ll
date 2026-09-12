@@ -95,7 +95,7 @@ define i1 @usub_sat_span_offset(i64 %count, i64 %base, i64 %n) {
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[BASE_NNEG]])
 ; CHECK-NEXT:    [[N_NNEG:%.*]] = icmp sge i64 [[N]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[N_NNEG]])
-; CHECK-NEXT:    [[REM:%.*]] = sub nsw i64 [[COUNT]], [[N]]
+; CHECK-NEXT:    [[REM:%.*]] = sub nuw nsw i64 [[COUNT]], [[N]]
 ; CHECK-NEXT:    [[FITS:%.*]] = icmp sge i64 [[REM]], [[BASE]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[FITS]])
 ; CHECK-NEXT:    [[AVAIL:%.*]] = sub nuw nsw i64 [[COUNT]], [[BASE]]

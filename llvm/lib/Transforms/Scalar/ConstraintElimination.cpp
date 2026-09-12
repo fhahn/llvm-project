@@ -1027,8 +1027,21 @@ ConstraintTy::isImpliedBy(const ConstraintSystem &CS) const {
 bool ConstraintInfo::doesHold(CmpInst::Predicate Pred, Value *A,
                               Value *B) const {
   auto R = getConstraintForSolving(Pred, A, B);
-  return !R.empty() &&
-         getCS(R.IsSigned).isConditionImpliedInSubSystem(R.Coefficients);
+  if (!R.empty() &&
+      getCS(R.IsSigned).isConditionImpliedInSubSystem(R.Coefficients))
+    return true;
+
+  // For non-negative operands, unsigned queries can also be checked against
+  // the signed system.
+  if (!CmpInst::isUnsigned(Pred) || !A->getType()->isIntegerTy() ||
+      getCS(/*Signed=*/true).size() == 0)
+    return false;
+  SmallVector<Value *> NewVariables;
+  auto SR = getConstraint(ICmpInst::getSignedPredicate(Pred), A, B,
+                          NewVariables);
+  return NewVariables.empty() && !SR.empty() && isKnownNonNegative(A) &&
+         isKnownNonNegative(B) &&
+         getCS(SR.IsSigned).isConditionImpliedInSubSystem(SR.Coefficients);
 }
 
 std::optional<bool> ConstraintInfo::evaluate(CmpInst::Predicate Pred, Value *A,
