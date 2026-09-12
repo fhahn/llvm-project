@@ -1621,13 +1621,15 @@ void State::addInfoFor(BasicBlock &BB) {
       }
       break;
     }
-    // Enqueue the overflow intrinsics for simplification.
+    // Enqueue the overflow and saturating intrinsics for simplification.
     case Intrinsic::uadd_with_overflow:
     case Intrinsic::sadd_with_overflow:
     case Intrinsic::usub_with_overflow:
     case Intrinsic::ssub_with_overflow:
     case Intrinsic::umul_with_overflow:
     case Intrinsic::smul_with_overflow:
+    case Intrinsic::sadd_sat:
+    case Intrinsic::ssub_sat:
     case Intrinsic::ucmp:
     case Intrinsic::scmp:
       WorkList.push_back(
@@ -1638,12 +1640,11 @@ void State::addInfoFor(BasicBlock &BB) {
     case Intrinsic::umax:
     case Intrinsic::smin:
     case Intrinsic::smax:
+    case Intrinsic::uadd_sat:
     case Intrinsic::usub_sat:
       // TODO: handle llvm.abs as well
       WorkList.push_back(
           FactOrCheck::getCheck(DT.getNode(&BB), cast<CallInst>(&I)));
-      [[fallthrough]];
-    case Intrinsic::uadd_sat:
       // TODO: Check if it is possible to instead only added the min/max facts
       // when simplifying uses of the min/max intrinsics.
       if (!isGuaranteedNotToBePoison(&I))
@@ -2081,22 +2082,34 @@ static bool checkAndReplaceCmp(CmpIntrinsic *I, ConstraintInfo &Info,
   return false;
 }
 
-/// Try to replace \p USub by a plain subtract, if \p Info proves it cannot
-/// saturate. Returns true if \p USub was replaced.
-static bool checkAndReplaceUSubSat(SaturatingInst *USub, ConstraintInfo &Info,
-                                   SmallVectorImpl<Instruction *> &ToRemove) {
-  // usub.sat(A, B) is A - B exactly when A >=u B.
-  Value *A = USub->getLHS();
-  Value *B = USub->getRHS();
-  if (!checkCondition(CmpInst::ICMP_UGE, A, B, USub, Info).value_or(false))
+/// Try to replace \p SI by the plain binary operation it performs, if \p Info
+/// proves that it cannot saturate. Returns true if \p SI was replaced.
+static bool
+checkAndReplaceSaturating(SaturatingInst *SI, ConstraintInfo &Info,
+                          SmallVectorImpl<Instruction *> &ToRemove) {
+  // A saturating intrinsic saturates exactly when the plain operation wraps.
+  Instruction::BinaryOps Opcode = SI->getBinaryOp();
+  Value *A = SI->getLHS(), *B = SI->getRHS();
+  bool Signed = SI->isSigned();
+  if (!isKnownNoWrap(Opcode, A, B, Info, Signed))
     return false;
 
-  IRBuilder<> Builder(USub);
-  Value *Sub = Builder.CreateSub(A, B, "", /*HasNUW=*/true,
-                                 /*HasNSW=*/Info.isKnownNonNegative(A));
-  USub->replaceAllUsesWith(Sub);
-  Sub->takeName(USub);
-  ToRemove.push_back(USub);
+  // The no-wrap flag for the other signedness may hold as well. It is worth
+  // the extra queries here, as the intrinsic is known to be simplified
+  // already.
+  bool HasNSW = Signed || isKnownNoWrap(Opcode, A, B, Info, /*Signed=*/true);
+  bool HasNUW =
+      !Signed || isKnownNoWrap(Opcode, A, B, Info, /*Signed=*/false, HasNSW);
+
+  IRBuilder<> Builder(SI);
+  Value *Res = Builder.CreateBinOp(Opcode, A, B);
+  if (auto *BO = dyn_cast<BinaryOperator>(Res)) {
+    BO->setHasNoSignedWrap(HasNSW);
+    BO->setHasNoUnsignedWrap(HasNUW);
+  }
+  SI->replaceAllUsesWith(Res);
+  Res->takeName(SI);
+  ToRemove.push_back(SI);
   return true;
 }
 
@@ -2464,9 +2477,8 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
         Changed |= checkAndReplaceMinMax(MinMax, Info, ToRemove);
       } else if (auto *CmpIntr = dyn_cast<CmpIntrinsic>(Inst)) {
         Changed |= checkAndReplaceCmp(CmpIntr, Info, ToRemove);
-      } else if (match(Inst, m_Intrinsic<Intrinsic::usub_sat>())) {
-        Changed |=
-            checkAndReplaceUSubSat(cast<SaturatingInst>(Inst), Info, ToRemove);
+      } else if (auto *SatI = dyn_cast<SaturatingInst>(Inst)) {
+        Changed |= checkAndReplaceSaturating(SatI, Info, ToRemove);
       }
       continue;
     }

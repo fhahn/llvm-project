@@ -211,3 +211,51 @@ use:
 unguarded:
   ret i64 %sub
 }
+
+define i64 @uadd_sat_no_saturation_due_to_upper_bound(i64 %a) {
+; CHECK-LABEL: define i64 @uadd_sat_no_saturation_due_to_upper_bound(
+; CHECK-SAME: i64 [[A:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[C_1:%.*]] = icmp ule i64 [[A]], 10
+; CHECK-NEXT:    br i1 [[C_1]], label %[[THEN:.*]], label %[[EXIT:.*]]
+; CHECK:       [[THEN]]:
+; CHECK-NEXT:    [[ADD_SAT:%.*]] = add nuw nsw i64 [[A]], 100
+; CHECK-NEXT:    ret i64 [[ADD_SAT]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret i64 0
+;
+entry:
+  %c.1 = icmp ule i64 %a, 10
+  br i1 %c.1, label %then, label %exit
+
+then:
+  %add.sat = call i64 @llvm.uadd.sat.i64(i64 %a, i64 100)
+  ret i64 %add.sat
+
+exit:
+  ret i64 0
+}
+
+define i64 @uadd_sat_may_saturate(i64 %a, i64 %b) {
+; CHECK-LABEL: define i64 @uadd_sat_may_saturate(
+; CHECK-SAME: i64 [[A:%.*]], i64 [[B:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[C_1:%.*]] = icmp ule i64 [[A]], 10
+; CHECK-NEXT:    br i1 [[C_1]], label %[[THEN:.*]], label %[[EXIT:.*]]
+; CHECK:       [[THEN]]:
+; CHECK-NEXT:    [[ADD_SAT:%.*]] = call i64 @llvm.uadd.sat.i64(i64 [[A]], i64 [[B]])
+; CHECK-NEXT:    ret i64 [[ADD_SAT]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret i64 0
+;
+entry:
+  %c.1 = icmp ule i64 %a, 10
+  br i1 %c.1, label %then, label %exit
+
+then:
+  %add.sat = call i64 @llvm.uadd.sat.i64(i64 %a, i64 %b)
+  ret i64 %add.sat
+
+exit:
+  ret i64 0
+}
