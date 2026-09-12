@@ -35,6 +35,8 @@ class ScalarEvolution;
 class PredicatedScalarEvolution;
 class TargetLibraryInfo;
 class TargetTransformInfo;
+class VFSelectionContext;
+class VPBuilder;
 class VPRecipeBuilder;
 struct VFRange;
 
@@ -397,7 +399,7 @@ struct VPlanTransforms {
   handleUncountableEarlyExits(VPlan &Plan, OptimizationRemarkEmitter *ORE,
                               Loop *TheLoop, PredicatedScalarEvolution &PSE,
                               DominatorTree &DT, AssumptionCache *AC,
-                              UncountableExitStyle Style);
+                              UncountableExitStyle Style, const VFSelectionContext &Config);
 
   /// Disconnect countable early exits from the loop.
   LLVM_ABI_FOR_TEST static void handleCountableEarlyExits(VPlan &Plan);

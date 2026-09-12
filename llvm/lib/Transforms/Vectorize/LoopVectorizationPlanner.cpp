@@ -150,12 +150,6 @@ bool VFSelectionContext::isLegalMaskedLoadOrStore(bool IsLoad, Type *ScalarTy,
                  : TTI.isLegalMaskedStore(ScalarTy, Alignment, AddressSpace));
 }
 
-bool VFSelectionContext::isLegalMaskedLoadOrStore(const Instruction *I) const {
-  return isLegalMaskedLoadOrStore(isa<LoadInst>(I), getLoadStoreType(I),
-                                  getLoadStoreAlignment(I),
-                                  getLoadStoreAddressSpace(I));
-}
-
 bool VFSelectionContext::isLegalGatherOrScatter(bool IsLoad, Type *ScalarTy,
                                                 Align Alignment,
                                                 ElementCount VF) const {

@@ -538,46 +538,51 @@ exit:
   ret void
 }
 
-; Nested uniform branches: the outer branch's guarded block is not a single
-; block, so only the inner branch is kept.
+; Nested branches are if-converted: the outer region has multiple blocks, and
+; evaluating the inner condition unconditionally could introduce poison UB.
 define void @nested_uniform_cond(ptr noalias %dst, i1 %c.0, i1 %c.1) {
 ; CHECK-LABEL: define void @nested_uniform_cond(
 ; CHECK-SAME: ptr noalias [[DST:%.*]], i1 [[C_0:%.*]], i1 [[C_1:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i1> poison, i1 [[C_1]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i1> [[BROADCAST_SPLATINSERT]], <4 x i1> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x i1> poison, i1 [[C_0]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <4 x i1> [[BROADCAST_SPLATINSERT1]], <4 x i1> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP8:%.*]] = select <4 x i1> [[BROADCAST_SPLAT2]], <4 x i1> [[BROADCAST_SPLAT]], <4 x i1> zeroinitializer
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[OUTER_MERGE8:.*]] ]
-; CHECK-NEXT:    br i1 [[C_1]], label %[[INNER_THEN1:.*]], label %[[OUTER_MERGE8]]
-; CHECK:       [[INNER_THEN1]]:
-; CHECK-NEXT:    br i1 [[C_0]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
+; CHECK-NEXT:    [[TMP10:%.*]] = extractelement <4 x i1> [[TMP8]], i64 0
+; CHECK-NEXT:    br i1 [[TMP10]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
 ; CHECK:       [[PRED_STORE_IF]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[INDEX]]
 ; CHECK-NEXT:    store i32 42, ptr [[TMP0]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE]]
 ; CHECK:       [[PRED_STORE_CONTINUE]]:
-; CHECK-NEXT:    br i1 [[C_0]], label %[[PRED_STORE_IF2:.*]], label %[[PRED_STORE_CONTINUE3:.*]]
+; CHECK-NEXT:    [[TMP11:%.*]] = extractelement <4 x i1> [[TMP8]], i64 1
+; CHECK-NEXT:    br i1 [[TMP11]], label %[[PRED_STORE_IF2:.*]], label %[[PRED_STORE_CONTINUE3:.*]]
 ; CHECK:       [[PRED_STORE_IF2]]:
 ; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[INDEX]], 1
 ; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[TMP1]]
 ; CHECK-NEXT:    store i32 42, ptr [[TMP2]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE3]]
 ; CHECK:       [[PRED_STORE_CONTINUE3]]:
-; CHECK-NEXT:    br i1 [[C_0]], label %[[PRED_STORE_IF4:.*]], label %[[PRED_STORE_CONTINUE5:.*]]
+; CHECK-NEXT:    [[TMP12:%.*]] = extractelement <4 x i1> [[TMP8]], i64 2
+; CHECK-NEXT:    br i1 [[TMP12]], label %[[PRED_STORE_IF4:.*]], label %[[PRED_STORE_CONTINUE5:.*]]
 ; CHECK:       [[PRED_STORE_IF4]]:
 ; CHECK-NEXT:    [[TMP3:%.*]] = add i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[TMP3]]
 ; CHECK-NEXT:    store i32 42, ptr [[TMP4]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE5]]
 ; CHECK:       [[PRED_STORE_CONTINUE5]]:
-; CHECK-NEXT:    br i1 [[C_0]], label %[[PRED_STORE_IF6:.*]], label %[[PRED_STORE_CONTINUE7:.*]]
+; CHECK-NEXT:    [[TMP9:%.*]] = extractelement <4 x i1> [[TMP8]], i64 3
+; CHECK-NEXT:    br i1 [[TMP9]], label %[[PRED_STORE_IF6:.*]], label %[[OUTER_MERGE8]]
 ; CHECK:       [[PRED_STORE_IF6]]:
 ; CHECK-NEXT:    [[TMP5:%.*]] = add i64 [[INDEX]], 3
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[TMP5]]
 ; CHECK-NEXT:    store i32 42, ptr [[TMP6]], align 4
-; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE7]]
-; CHECK:       [[PRED_STORE_CONTINUE7]]:
 ; CHECK-NEXT:    br label %[[OUTER_MERGE8]]
 ; CHECK:       [[OUTER_MERGE8]]:
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
@@ -615,30 +620,31 @@ exit:
   ret void
 }
 
-; A uniform branch inside a block that is itself masked: the guarded block
-; inherits the mask of the branch's block.
+; A uniform condition in a varying block may be poison when that block is not
+; reached. If-convert it to retain the enclosing predicate.
 define void @uniform_cond_inside_masked_block(ptr noalias %dst, ptr noalias %src, i1 %c) {
 ; CHECK-LABEL: define void @uniform_cond_inside_masked_block(
 ; CHECK-SAME: ptr noalias [[DST:%.*]], ptr noalias [[SRC:%.*]], i1 [[C:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i1> poison, i1 [[C]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i1> [[BROADCAST_SPLATINSERT]], <4 x i1> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
-; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[MASKED_MERGE8:.*]] ]
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_STORE_CONTINUE7:.*]] ]
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP0]], align 4
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp sgt <4 x i32> [[WIDE_LOAD]], splat (i32 10)
-; CHECK-NEXT:    br i1 [[C]], label %[[IF_THEN1:.*]], label %[[MASKED_MERGE8]]
-; CHECK:       [[IF_THEN1]]:
-; CHECK-NEXT:    [[TMP2:%.*]] = extractelement <4 x i1> [[TMP1]], i64 0
+; CHECK-NEXT:    [[TMP14:%.*]] = select <4 x i1> [[TMP1]], <4 x i1> [[BROADCAST_SPLAT]], <4 x i1> zeroinitializer
+; CHECK-NEXT:    [[TMP2:%.*]] = extractelement <4 x i1> [[TMP14]], i64 0
 ; CHECK-NEXT:    br i1 [[TMP2]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
 ; CHECK:       [[PRED_STORE_IF]]:
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[INDEX]]
 ; CHECK-NEXT:    store i32 42, ptr [[TMP3]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE]]
 ; CHECK:       [[PRED_STORE_CONTINUE]]:
-; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <4 x i1> [[TMP1]], i64 1
+; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <4 x i1> [[TMP14]], i64 1
 ; CHECK-NEXT:    br i1 [[TMP4]], label %[[PRED_STORE_IF2:.*]], label %[[PRED_STORE_CONTINUE3:.*]]
 ; CHECK:       [[PRED_STORE_IF2]]:
 ; CHECK-NEXT:    [[TMP5:%.*]] = add i64 [[INDEX]], 1
@@ -646,7 +652,7 @@ define void @uniform_cond_inside_masked_block(ptr noalias %dst, ptr noalias %src
 ; CHECK-NEXT:    store i32 42, ptr [[TMP6]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE3]]
 ; CHECK:       [[PRED_STORE_CONTINUE3]]:
-; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <4 x i1> [[TMP1]], i64 2
+; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <4 x i1> [[TMP14]], i64 2
 ; CHECK-NEXT:    br i1 [[TMP7]], label %[[PRED_STORE_IF4:.*]], label %[[PRED_STORE_CONTINUE5:.*]]
 ; CHECK:       [[PRED_STORE_IF4]]:
 ; CHECK-NEXT:    [[TMP8:%.*]] = add i64 [[INDEX]], 2
@@ -654,16 +660,14 @@ define void @uniform_cond_inside_masked_block(ptr noalias %dst, ptr noalias %src
 ; CHECK-NEXT:    store i32 42, ptr [[TMP9]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE5]]
 ; CHECK:       [[PRED_STORE_CONTINUE5]]:
-; CHECK-NEXT:    [[TMP10:%.*]] = extractelement <4 x i1> [[TMP1]], i64 3
-; CHECK-NEXT:    br i1 [[TMP10]], label %[[PRED_STORE_IF6:.*]], label %[[PRED_STORE_CONTINUE7:.*]]
+; CHECK-NEXT:    [[TMP10:%.*]] = extractelement <4 x i1> [[TMP14]], i64 3
+; CHECK-NEXT:    br i1 [[TMP10]], label %[[PRED_STORE_IF6:.*]], label %[[PRED_STORE_CONTINUE7]]
 ; CHECK:       [[PRED_STORE_IF6]]:
 ; CHECK-NEXT:    [[TMP11:%.*]] = add i64 [[INDEX]], 3
 ; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[TMP11]]
 ; CHECK-NEXT:    store i32 42, ptr [[TMP12]], align 4
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE7]]
 ; CHECK:       [[PRED_STORE_CONTINUE7]]:
-; CHECK-NEXT:    br label %[[MASKED_MERGE8]]
-; CHECK:       [[MASKED_MERGE8]]:
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP13:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1024
 ; CHECK-NEXT:    br i1 [[TMP13]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP17:![0-9]+]]
