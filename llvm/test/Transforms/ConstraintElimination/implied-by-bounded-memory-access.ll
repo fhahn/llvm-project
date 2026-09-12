@@ -389,3 +389,42 @@ define i8 @load_global_non_canonical_gep(i32 %idx) {
   %add = add i8 %load, %zext
   ret i8 %add
 }
+
+; gep inbounds is nusw, not nuw, but a non-negative index implies nuw.
+define i8 @load_global_inbounds_non_negative_index(i64 %i) {
+; CHECK-LABEL: define i8 @load_global_inbounds_non_negative_index(
+; CHECK-SAME: i64 [[I:%.*]]) {
+; CHECK-NEXT:    [[IDX:%.*]] = and i64 [[I]], 7
+; CHECK-NEXT:    [[GEP:%.*]] = getelementptr inbounds i8, ptr @g, i64 [[IDX]]
+; CHECK-NEXT:    [[LOAD:%.*]] = load i8, ptr [[GEP]], align 1
+; CHECK-NEXT:    [[ZEXT:%.*]] = zext i1 true to i8
+; CHECK-NEXT:    [[ADD:%.*]] = add i8 [[LOAD]], [[ZEXT]]
+; CHECK-NEXT:    ret i8 [[ADD]]
+;
+  %idx = and i64 %i, 7
+  %gep = getelementptr inbounds i8, ptr @g, i64 %idx
+  %load = load i8, ptr %gep
+  %cmp = icmp ult i64 %idx, 5
+  %zext = zext i1 %cmp to i8
+  %add = add i8 %load, %zext
+  ret i8 %add
+}
+
+; The index may be negative, so the gep may wrap unsigned.
+define i8 @load_global_inbounds_maybe_negative_index(i64 %idx) {
+; CHECK-LABEL: define i8 @load_global_inbounds_maybe_negative_index(
+; CHECK-SAME: i64 [[IDX:%.*]]) {
+; CHECK-NEXT:    [[GEP:%.*]] = getelementptr inbounds i8, ptr @g, i64 [[IDX]]
+; CHECK-NEXT:    [[LOAD:%.*]] = load i8, ptr [[GEP]], align 1
+; CHECK-NEXT:    [[CMP:%.*]] = icmp ult i64 [[IDX]], 5
+; CHECK-NEXT:    [[ZEXT:%.*]] = zext i1 [[CMP]] to i8
+; CHECK-NEXT:    [[ADD:%.*]] = add i8 [[LOAD]], [[ZEXT]]
+; CHECK-NEXT:    ret i8 [[ADD]]
+;
+  %gep = getelementptr inbounds i8, ptr @g, i64 %idx
+  %load = load i8, ptr %gep
+  %cmp = icmp ult i64 %idx, 5
+  %zext = zext i1 %cmp to i8
+  %add = add i8 %load, %zext
+  ret i8 %add
+}

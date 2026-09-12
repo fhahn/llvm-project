@@ -506,6 +506,30 @@ static OffsetResult collectOffsets(GEPOperator &GEP, const DataLayout &DL) {
   return Result;
 }
 
+/// Returns true if adding the offsets collected in \p Offsets to the base
+/// pointer is known not to wrap unsigned. \p IsKnownNonNegative is used to
+/// prove nuw from nusw and non-negative indices.
+static bool hasNoUnsignedWrap(const OffsetResult &Offsets,
+                              function_ref<bool(Value *)> IsKnownNonNegative) {
+  // We support either plain gep nuw, or gep nusw with non-negative offsets,
+  // which implies gep nuw.
+  GEPNoWrapFlags NW = Offsets.NW;
+  if (NW == GEPNoWrapFlags::none())
+    return false;
+
+  // For a nuw-only GEP (nuw without nusw/inbounds), the offset must be
+  // interpreted as unsigned.
+  if (!NW.hasNoUnsignedSignedWrap() && Offsets.ConstantOffset.isNegative())
+    return false;
+
+  if (NW.hasNoUnsignedWrap())
+    return true;
+  assert(NW.hasNoUnsignedSignedWrap() && "Must have nusw flag");
+  return all_of(Offsets.VariableOffsets, [&IsKnownNonNegative](const auto &KV) {
+    return IsKnownNonNegative(KV.first);
+  });
+}
+
 static Decomposition decompose(Value *V, const ConstraintInfo &Info,
                                bool IsSigned, const DataLayout &DL);
 
@@ -613,28 +637,16 @@ static Decomposition decomposeGEP(GEPOperator &GEP, const ConstraintInfo &Info,
 
   assert(!IsSigned && "The logic below only supports decomposition for "
                       "unsigned predicates at the moment.");
-  const auto &[BasePtr, ConstantOffset, VariableOffsets, NW] =
-      collectOffsets(GEP, DL);
-  // We support either plain gep nuw, or gep nusw with non-negative offset,
-  // which implies gep nuw.
-  if (!BasePtr || NW == GEPNoWrapFlags::none())
+  const OffsetResult Offsets = collectOffsets(GEP, DL);
+  // If the GEP may wrap unsigned, keep it as-is instead of decomposing it.
+  if (!Offsets.BasePtr ||
+      !hasNoUnsignedWrap(Offsets,
+                         [&Info](Value *V) { return Info.isKnownNonNegative(V); }))
     return &GEP;
 
-  // For a nuw-only GEP (nuw without nusw/inbounds), the offset must be
-  // interpreted as unsigned.
-  if (!NW.hasNoUnsignedSignedWrap() && ConstantOffset.isNegative())
-    return &GEP;
-
-  Decomposition Result(ConstantOffset.getSExtValue(), DecompEntry(1, BasePtr));
-  for (auto [Index, Scale] : VariableOffsets) {
-    if (!NW.hasNoUnsignedWrap()) {
-      // Try to prove nuw from nusw and nneg. If the index cannot be proven
-      // non-negative, keep the GEP as-is instead of decomposing it.
-      assert(NW.hasNoUnsignedSignedWrap() && "Must have nusw flag");
-      if (!Info.isKnownNonNegative(Index))
-        return &GEP;
-    }
-
+  Decomposition Result(Offsets.ConstantOffset.getSExtValue(),
+                       DecompEntry(1, Offsets.BasePtr));
+  for (auto [Index, Scale] : Offsets.VariableOffsets) {
     auto IdxResult = decompose(Index, Info, IsSigned, DL);
     if (IdxResult.mul(Scale.getSExtValue()))
       return &GEP;
@@ -1398,7 +1410,11 @@ static bool getConstraintFromMemoryAccess(GetElementPtrInst &GEP,
                                           Value *&B, const DataLayout &DL,
                                           const TargetLibraryInfo &TLI) {
   auto Offset = collectOffsets(cast<GEPOperator>(GEP), DL);
-  if (!Offset.NW.hasNoUnsignedWrap())
+  // The facts are collected before the systems are populated, so only
+  // ValueTracking is available to prove nuw from nusw.
+  if (!hasNoUnsignedWrap(Offset, [&DL](Value *V) {
+        return ::isKnownNonNegative(V, DL);
+      }))
     return false;
 
   if (Offset.VariableOffsets.size() != 1)
