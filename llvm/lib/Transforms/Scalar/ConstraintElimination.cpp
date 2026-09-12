@@ -703,14 +703,16 @@ static Decomposition decompose(Value *V, const ConstraintInfo &Info,
       V = Op0;
     else if (match(V, m_NNegZExt(m_Value(Op0)))) {
       V = Op0;
-    } else if (match(V, m_NSWTrunc(m_Value(Op0)))) {
-      if (Op0->getType()->getScalarSizeInBits() <= 64)
-        V = Op0;
+    } else if (auto *Trunc = dyn_cast<TruncInst>(V)) {
+      if (Trunc->getSrcTy()->getScalarSizeInBits() <= 64 &&
+          isKnownNoWrap(Trunc, Info, IsSigned))
+        V = Trunc->getOperand(0);
     }
 
-    if (match(V, m_NSWAddLike(m_Value(Op0), m_Value(Op1)))) {
-      if (auto Decomp = MergeResults(Op0, Op1, IsSigned))
-        return *Decomp;
+    if (match(V, m_AddLike(m_Value(Op0), m_Value(Op1)))) {
+      if (isKnownNoWrap(V, Info, IsSigned))
+        if (auto Decomp = MergeResults(Op0, Op1, IsSigned))
+          return *Decomp;
       return V;
     }
 
@@ -722,27 +724,32 @@ static Decomposition decompose(Value *V, const ConstraintInfo &Info,
       return V;
     }
 
-    if (match(V, m_NSWSub(m_Value(Op0), m_Value(Op1)))) {
-      auto ResA = decompose(Op0, Info, IsSigned, DL);
-      auto ResB = decompose(Op1, Info, IsSigned, DL);
-      if (!ResA.sub(ResB))
-        return ResA;
+    if (match(V, m_Sub(m_Value(Op0), m_Value(Op1)))) {
+      if (isKnownNoWrap(V, Info, IsSigned)) {
+        auto ResA = decompose(Op0, Info, IsSigned, DL);
+        auto ResB = decompose(Op1, Info, IsSigned, DL);
+        if (!ResA.sub(ResB))
+          return ResA;
+      }
       return V;
     }
 
     ConstantInt *CI;
-    if (match(V, m_NSWMul(m_Value(Op0), m_ConstantInt(CI))) && canUseSExt(CI)) {
-      auto Result = decompose(Op0, Info, IsSigned, DL);
-      if (!Result.mul(CI->getSExtValue()))
-        return Result;
+    if (match(V, m_Mul(m_Value(Op0), m_ConstantInt(CI))) && canUseSExt(CI)) {
+      if (isKnownNoWrap(V, Info, IsSigned)) {
+        auto Result = decompose(Op0, Info, IsSigned, DL);
+        if (!Result.mul(CI->getSExtValue()))
+          return Result;
+      }
       return V;
     }
 
     // (shl nsw x, shift) is (mul nsw x, (1<<shift)), with the exception of
     // shift == bw-1.
-    if (match(V, m_NSWShl(m_Value(Op0), m_ConstantInt(CI)))) {
+    if (match(V, m_Shl(m_Value(Op0), m_ConstantInt(CI)))) {
       uint64_t Shift = CI->getValue().getLimitedValue();
-      if (Shift < Ty->getIntegerBitWidth() - 1) {
+      if (Shift < Ty->getIntegerBitWidth() - 1 &&
+          isKnownNoWrap(V, Info, IsSigned)) {
         assert(Shift < 64 && "Would overflow");
         auto Result = decompose(Op0, Info, IsSigned, DL);
         if (!Result.mul(int64_t(1) << Shift))
