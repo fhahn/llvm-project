@@ -1858,6 +1858,34 @@ TEST_F(VPInstructionTest, VPSymbolicValueMaterialization) {
 
 using VPUtilsTest = VPlanTestBase;
 
+TEST_F(VPUtilsTest, BlocksBetweenIncludesBothBranchArms) {
+  VPlan &Plan = getPlan();
+  auto *First = Plan.createVPBasicBlock("first");
+  auto *Left = Plan.createVPBasicBlock("left");
+  auto *Right = Plan.createVPBasicBlock("right");
+  auto *Last = Plan.createVPBasicBlock("last");
+  auto *After = Plan.createVPBasicBlock("after");
+  VPBlockUtils::connectBlocks(First, Left);
+  VPBlockUtils::connectBlocks(First, Right);
+  VPBlockUtils::connectBlocks(Left, Last);
+  VPBlockUtils::connectBlocks(Right, Last);
+  VPBlockUtils::connectBlocks(Last, After);
+
+  // Alias checks must visit both arms before stopping at the merge, regardless
+  // of successor order. A depth-first traversal can reach the merge too soon.
+  for (unsigned I = 0; I != 2; ++I) {
+    auto Blocks = VPBlockUtils::blocksBetween(First, Last);
+    ASSERT_EQ(Blocks.size(), 4u);
+    EXPECT_EQ(Blocks.front(), First);
+    EXPECT_EQ(Blocks.back(), Last);
+    EXPECT_TRUE(is_contained(Blocks, Left));
+    EXPECT_TRUE(is_contained(Blocks, Right));
+    First->swapSuccessors();
+  }
+  EXPECT_EQ(VPBlockUtils::blocksBetween(First, First),
+            SmallVector<VPBasicBlock *>({First}));
+}
+
 TEST_F(VPUtilsTest, IsUniformAcrossVFsAndUFsForSingleScalarOpcodes) {
   VPlan &Plan = getPlan();
   IntegerType *Int32 = IntegerType::get(C, 32);
