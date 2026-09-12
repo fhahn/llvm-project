@@ -286,6 +286,16 @@ canHoistOrSinkWithNoAliasCheck(const MemoryLocation &MemLoc,
   return true;
 }
 
+/// Returns true if \p VPBB executes on every iteration of the loop region it
+/// belongs to, i.e. it is not guarded by a branch that has been kept as
+/// control flow. The region's single exiting block is reached on every
+/// iteration, so dominating it is equivalent.
+static bool executesOnEveryIteration(const VPBasicBlock *VPBB,
+                                     const VPRegionBlock *LoopRegion,
+                                     const VPDominatorTree &VPDT) {
+  return VPDT.dominates(VPBB, LoopRegion->getExitingBasicBlock());
+}
+
 /// Get the value type of the replicate load or store. \p IsLoad indicates
 /// whether it is a load.
 static Type *getLoadStoreValueType(VPReplicateRecipe *R, bool IsLoad) {
@@ -306,8 +316,15 @@ collectGroupedReplicateMemOps(
   SmallDenseMap<std::pair<const SCEV *, const Type *>,
                 SmallVector<VPReplicateRecipe *, 4>>
       RecipesByAddressAndType;
+  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
+  VPDominatorTree VPDT(Plan);
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
-           vp_depth_first_deep(Plan.getVectorLoopRegion()->getEntry()))) {
+           vp_depth_first_deep(LoopRegion->getEntry()))) {
+    // The masks of recipes in a block that does not execute on every iteration
+    // do not fully describe when they execute, so combining recipes across
+    // such blocks is not valid.
+    if (!executesOnEveryIteration(VPBB, LoopRegion, VPDT))
+      continue;
     for (VPRecipeBase &R : *VPBB) {
       auto *RepR = dyn_cast<VPReplicateRecipe>(&R);
       if (!RepR || RepR->getOpcode() != Opcode || !FilterFn(RepR))
@@ -322,7 +339,6 @@ collectGroupedReplicateMemOps(
     }
   }
   auto Groups = to_vector(RecipesByAddressAndType.values());
-  VPDominatorTree VPDT(Plan);
   for (auto &Group : Groups) {
     // Sort mem ops by dominance order, with earliest (most dominating) first.
     stable_sort(Group, [&VPDT](VPReplicateRecipe *A, VPReplicateRecipe *B) {
@@ -2402,14 +2418,19 @@ static void licm(VPlan &Plan) {
 
   // Hoist any loop invariant recipes from the vector loop region to the
   // preheader. Preform a shallow traversal of the vector loop region, to
-  // exclude recipes in replicate regions. Since the top-level blocks in the
-  // vector loop region are guaranteed to execute if the vector pre-header is,
-  // we don't need to check speculation safety.
+  // exclude recipes in replicate regions. Since the blocks hoisted from are
+  // guaranteed to execute if the vector pre-header is, we don't need to check
+  // speculation safety.
   VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
   assert(Preheader->getSingleSuccessor() == LoopRegion &&
          "Expected vector prehader's successor to be the vector loop region");
+  VPDominatorTree VPDT(Plan);
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
            vp_depth_first_shallow(LoopRegion->getEntry()))) {
+    // Hoisting a recipe out of a block that does not execute on every
+    // iteration would execute it unconditionally.
+    if (!executesOnEveryIteration(VPBB, LoopRegion, VPDT))
+      continue;
     for (VPRecipeBase &R : make_early_inc_range(*VPBB)) {
       if (cannotHoistOrSinkRecipe(R, LoopRegion->getEntryBasicBlock(),
                                   LoopRegion->getExitingBasicBlock()))
@@ -2422,9 +2443,6 @@ static void licm(VPlan &Plan) {
     }
   }
 
-#ifndef NDEBUG
-  VPDominatorTree VPDT(Plan);
-#endif
   // Sink recipes with no users inside the vector loop region if all users are
   // in the same exit block of the region.
   // TODO: Extend to sink recipes from inner loops.
@@ -2486,10 +2504,11 @@ static void licm(VPlan &Plan) {
       if (!SinkBB)
         SinkBB = cast<VPBasicBlock>(LoopRegion->getSingleSuccessor());
 
-      // TODO: This will need to be a check instead of a assert after
-      // conditional branches in vectorized loops are supported.
-      assert(VPDT.properlyDominates(VPBB, SinkBB) &&
-             "Defining block must dominate sink block");
+      // Cannot sink the recipe if its block does not dominate the sink block,
+      // e.g. because the block is not guaranteed to execute in every
+      // iteration.
+      if (!VPDT.properlyDominates(VPBB, SinkBB))
+        continue;
       // TODO: Clone the recipe if users are on multiple exit paths, instead of
       // just moving.
       Def->moveBefore(*SinkBB, SinkBB->getFirstNonPhi());
