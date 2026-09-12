@@ -22,11 +22,6 @@ define void @load_store_interleave_group_block_invar_cond(ptr noalias %data, ptr
 ; VF2IC1-NEXT:    [[TMP4:%.*]] = shufflevector <2 x i64> [[STRIDED_VEC]], <2 x i64> [[STRIDED_VEC1]], <4 x i32> <i32 0, i32 1, i32 2, i32 3>
 ; VF2IC1-NEXT:    [[INTERLEAVED_VEC:%.*]] = shufflevector <4 x i64> [[TMP4]], <4 x i64> poison, <4 x i32> <i32 0, i32 2, i32 1, i32 3>
 ; VF2IC1-NEXT:    store <4 x i64> [[INTERLEAVED_VEC]], ptr [[TMP1]], align 8
-; VF2IC1-NEXT:    br i1 [[C]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
-; VF2IC1:       [[PRED_STORE_IF]]:
-; VF2IC1-NEXT:    store i8 1, ptr [[DST_0]], align 1
-; VF2IC1-NEXT:    br label %[[PRED_STORE_CONTINUE]]
-; VF2IC1:       [[PRED_STORE_CONTINUE]]:
 ; VF2IC1-NEXT:    br i1 [[C]], label %[[PRED_STORE_IF2:.*]], label %[[PRED_STORE_CONTINUE3]]
 ; VF2IC1:       [[PRED_STORE_IF2]]:
 ; VF2IC1-NEXT:    store i8 1, ptr [[DST_0]], align 1
@@ -67,21 +62,6 @@ define void @load_store_interleave_group_block_invar_cond(ptr noalias %data, ptr
 ; VF2IC2-NEXT:    [[TMP9:%.*]] = shufflevector <2 x i64> [[STRIDED_VEC3]], <2 x i64> [[STRIDED_VEC4]], <4 x i32> <i32 0, i32 1, i32 2, i32 3>
 ; VF2IC2-NEXT:    [[INTERLEAVED_VEC5:%.*]] = shufflevector <4 x i64> [[TMP9]], <4 x i64> poison, <4 x i32> <i32 0, i32 2, i32 1, i32 3>
 ; VF2IC2-NEXT:    store <4 x i64> [[INTERLEAVED_VEC5]], ptr [[TMP4]], align 8
-; VF2IC2-NEXT:    br i1 [[C]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
-; VF2IC2:       [[PRED_STORE_IF]]:
-; VF2IC2-NEXT:    store i8 1, ptr [[DST_0]], align 1
-; VF2IC2-NEXT:    br label %[[PRED_STORE_CONTINUE]]
-; VF2IC2:       [[PRED_STORE_CONTINUE]]:
-; VF2IC2-NEXT:    br i1 [[C]], label %[[PRED_STORE_IF6:.*]], label %[[PRED_STORE_CONTINUE7:.*]]
-; VF2IC2:       [[PRED_STORE_IF6]]:
-; VF2IC2-NEXT:    store i8 1, ptr [[DST_0]], align 1
-; VF2IC2-NEXT:    br label %[[PRED_STORE_CONTINUE7]]
-; VF2IC2:       [[PRED_STORE_CONTINUE7]]:
-; VF2IC2-NEXT:    br i1 [[C]], label %[[PRED_STORE_IF8:.*]], label %[[PRED_STORE_CONTINUE9:.*]]
-; VF2IC2:       [[PRED_STORE_IF8]]:
-; VF2IC2-NEXT:    store i8 1, ptr [[DST_0]], align 1
-; VF2IC2-NEXT:    br label %[[PRED_STORE_CONTINUE9]]
-; VF2IC2:       [[PRED_STORE_CONTINUE9]]:
 ; VF2IC2-NEXT:    br i1 [[C]], label %[[PRED_STORE_IF10:.*]], label %[[PRED_STORE_CONTINUE11]]
 ; VF2IC2:       [[PRED_STORE_IF10]]:
 ; VF2IC2-NEXT:    store i8 1, ptr [[DST_0]], align 1

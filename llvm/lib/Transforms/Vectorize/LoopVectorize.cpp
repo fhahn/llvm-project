@@ -965,6 +965,12 @@ public:
   /// Superset of instructions that return true for isScalarWithPredication.
   bool isPredicatedInst(Instruction *I) const;
 
+  /// Collect the instructions that \p Plan executes without a mask. They are
+  /// not considered predicated, even if they are executed conditionally in
+  /// the original loop, e.g. because they are guarded by a branch with a
+  /// uniform condition kept by VPPredicator.
+  void collectUnmaskedInsts(VPlan &Plan);
+
   /// A helper function that returns how much we should divide the cost of a
   /// predicated block by. Typically this is the reciprocal of the block
   /// probability, i.e. if we return X we are assuming the predicated block will
@@ -1264,10 +1270,15 @@ private:
   bool isUniformMemOp(Instruction &I, ElementCount VF) const {
     assert(PartialAliasMaskingStatus != AliasMaskingStatus::NotDecided &&
            "alias-mask status must be decided already");
-    return Legal->isUniformMemOp(I, PartialAliasMaskingStatus ==
-                                            AliasMaskingStatus::Disabled
-                                        ? std::optional(VF)
-                                        : std::nullopt);
+    std::optional<ElementCount> MaybeVF =
+        PartialAliasMaskingStatus == AliasMaskingStatus::Disabled
+            ? std::optional(VF)
+            : std::nullopt;
+    // Legal does not consider accesses in blocks that need predication uniform,
+    // which does not apply to accesses executed without a mask.
+    if (UnmaskedInsts.contains(&I))
+      return Legal->isUniform(getLoadStorePointerOperand(&I), MaybeVF);
+    return Legal->isUniformMemOp(I, MaybeVF);
   }
 
   /// Calculate vectorization cost of memory instruction \p I.
@@ -1332,6 +1343,9 @@ private:
   /// Holds the instructions known to be uniform after vectorization.
   /// The data is collected per VF.
   DenseMap<ElementCount, SmallPtrSet<Instruction *, 4>> Uniforms;
+
+  /// Instructions executed without a mask. See collectUnmaskedInsts.
+  SmallPtrSet<const Instruction *, 16> UnmaskedInsts;
 
   /// Holds the instructions known to be scalar after vectorization.
   /// The data is collected per VF.
@@ -2370,11 +2384,22 @@ bool LoopVectorizationCostModel::isMaskRequired(Instruction *I) const {
   return Legal->isMaskRequired(I, foldTailByMasking());
 }
 
+void LoopVectorizationCostModel::collectUnmaskedInsts(VPlan &Plan) {
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_deep(Plan.getVectorLoopRegion()->getEntry()))) {
+    for (VPInstruction &VPI : make_isa_range<VPInstruction>(*VPBB)) {
+      auto *I = dyn_cast_or_null<Instruction>(VPI.getUnderlyingValue());
+      if (I && !VPI.isMasked())
+        UnmaskedInsts.insert(I);
+    }
+  }
+}
+
 // TODO: Fold into LoopVectorizationLegality::isMaskRequired.
 bool LoopVectorizationCostModel::isPredicatedInst(Instruction *I) const {
   // TODO: We can use the loop-preheader as context point here and get
   // context sensitive reasoning for isSafeToSpeculativelyExecute.
-  if (isSafeToSpeculativelyExecute(I) ||
+  if (UnmaskedInsts.contains(I) || isSafeToSpeculativelyExecute(I) ||
       (isa<LoadInst, StoreInst, CallInst>(I) && !isMaskRequired(I)) ||
       isa<UncondBrInst, CondBrInst, SwitchInst, PHINode, AllocaInst>(I))
     return false;
@@ -5358,6 +5383,7 @@ void LoopVectorizationPlanner::plan(ElementCount UserVF, unsigned UserIC) {
   auto VPlan1 = tryToBuildVPlan1();
   if (!VPlan1)
     return;
+  CM->collectUnmaskedInsts(*VPlan1);
 
   LLVM_DEBUG(dbgs() << "LV: VPlan created successfully. Loop can be "
                        "vectorized.\n");
@@ -6662,6 +6688,10 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan,
         "Unexpected recipe");
     for (VPInstruction &VPI :
          make_early_inc_range(make_isa_range<VPInstruction>(*VPBB))) {
+      // Keep branches that survived linearization as control flow.
+      if (&VPI == VPBB->getTerminator())
+        continue;
+
       // We represent single-scalar casts directly as VPInstructions.
       if (Instruction::isCast(VPI.getOpcode()) &&
           vputils::onlyFirstLaneUsed(&VPI))

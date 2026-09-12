@@ -70,6 +70,13 @@ bool isSingleScalar(const VPValue *VPV);
 /// VPDerivedIV or the canonical IV).
 LLVM_ABI_FOR_TEST bool isUniformAcrossVFsAndUFs(const VPValue *V);
 
+/// Returns the block guarded by the terminator of \p VPBB, if it is a branch
+/// with a uniform condition worth keeping as control flow, i.e. the guarded
+/// block accesses memory or has side effects. The merge block must not have
+/// phis, as both incoming edges get the same mask and blends cannot tell them
+/// apart.
+VPBasicBlock *getBlockToKeepUnderUniformBranch(VPBasicBlock *VPBB);
+
 /// Return true if \p V is elementwise, i.e. none of the lanes are permuted.
 bool isElementwise(const VPValue *V);
 

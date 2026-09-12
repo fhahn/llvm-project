@@ -49,6 +49,9 @@ class VPPredicator {
 
   BlockMaskCacheTy BlockMaskCache;
 
+  /// Blocks whose outgoing edges survive linearization.
+  SmallPtrSet<const VPBasicBlock *, 8> BlocksToKeep;
+
   /// Create an edge mask for every destination of cases and/or default.
   void createSwitchEdgeMasks(const VPInstruction *SI);
 
@@ -129,8 +132,8 @@ VPValue *VPPredicator::createEdgeMask(const VPBasicBlock *Src,
 
   VPValue *SrcMask = getBlockInMask(Src);
 
-  // If there's a single successor, there's no terminator recipe.
-  if (Src->getNumSuccessors() == 1)
+  // Single-successor blocks and retained branches need no edge predicate.
+  if (Src->getNumSuccessors() == 1 || BlocksToKeep.contains(Src))
     return setEdgeMask(Src, Dst, SrcMask);
 
   auto *Term = cast<VPInstruction>(Src->getTerminator());
@@ -401,7 +404,9 @@ void VPPredicator::convertPhisToBlends(VPBasicBlock *VPBB) {
 }
 
 void VPPredicator::run() {
-  VPBasicBlock *Header = Plan.getVectorLoopRegion()->getEntryBasicBlock();
+  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
+  VPBasicBlock *Header = LoopRegion->getEntryBasicBlock();
+  VPBasicBlock *ExitingVPBB = LoopRegion->getExitingBasicBlock();
   // Scan the body of the loop in a topological order to visit each basic
   // block after having visited its predecessor basic blocks.
   ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>> RPOT(
@@ -410,6 +415,13 @@ void VPPredicator::run() {
   auto Blocks = to_vector(VPBlockUtils::blocksAs<VPBasicBlock>(RPOT));
 
   for (VPBasicBlock *VPBB : Blocks) {
+    // Flattening must not introduce a branch on a potentially poison condition
+    // that the original loop need not evaluate.
+    if (VPDT.dominates(VPBB, ExitingVPBB))
+      if (VPBasicBlock *Guarded =
+              vputils::getBlockToKeepUnderUniformBranch(VPBB))
+        BlocksToKeep.insert({VPBB, Guarded});
+
     // Introduce the mask for VPBB, which may introduce needed edge masks, and
     // convert all phi recipes of VPBB to blend recipes unless VPBB is the
     // header.
@@ -422,8 +434,11 @@ void VPPredicator::run() {
       if (BlockMask)
         VPI.addMask(BlockMask);
 
-      // Drop the execution frequency of unmasked VPInstructions, as they
-      // always execute.
+      // Drop the execution frequency of unmasked VPInstructions. They are
+      // costed as if they execute on every iteration, which is conservative
+      // for blocks guarded by kept branches.
+      // TODO: Scale the cost of blocks guarded by kept branches by their
+      // execution frequency.
       if (!VPI.isMasked())
         VPI.clearExecutionFrequency();
     }
@@ -436,6 +451,14 @@ void VPPredicator::run() {
   // Linearize the blocks of the loop into one serial chain.
   VPBlockBase *PrevVPBB = nullptr;
   for (VPBasicBlock *VPBB : Blocks) {
+    // Kept blocks retain their outgoing edges; the chain resumes at the merge
+    // block they lead to.
+    if (BlocksToKeep.contains(VPBB)) {
+      if (PrevVPBB)
+        VPBlockUtils::connectBlocks(PrevVPBB, VPBB);
+      PrevVPBB = nullptr;
+      continue;
+    }
     auto Successors = to_vector(VPBB->getSuccessors());
     if (Successors.size() > 1)
       VPBB->getTerminator()->eraseFromParent();

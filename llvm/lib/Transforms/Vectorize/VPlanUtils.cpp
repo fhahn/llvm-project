@@ -441,6 +441,31 @@ static bool preservesUniformity(unsigned Opcode) {
   }
 }
 
+VPBasicBlock *vputils::getBlockToKeepUnderUniformBranch(VPBasicBlock *VPBB) {
+  if (VPBB->getNumSuccessors() != 2)
+    return nullptr;
+  VPValue *Cond;
+  if (!match(VPBB->getTerminator(), m_BranchOnCond(m_VPValue(Cond))) ||
+      !isUniformAcrossVFsAndUFs(Cond))
+    return nullptr;
+
+  auto *Guarded = cast<VPBasicBlock>(VPBB->getSuccessors()[0]);
+  auto *Merge = cast<VPBasicBlock>(VPBB->getSuccessors()[1]);
+  if (Guarded->getSingleSuccessor() != Merge)
+    std::swap(Guarded, Merge);
+  if (Guarded->getSinglePredecessor() != VPBB ||
+      Guarded->getSingleSuccessor() != Merge ||
+      Merge->getNumPredecessors() != 2 || !Merge->phis().empty())
+    return nullptr;
+
+  // Avoid retaining a branch just to skip speculatable arithmetic.
+  if (none_of(*Guarded, [](VPRecipeBase &R) {
+        return R.mayReadOrWriteMemory() || R.mayHaveSideEffects();
+      }))
+    return nullptr;
+  return Guarded;
+}
+
 bool vputils::isElementwise(const VPValue *V) {
   // TODO: Handle more opcodes and recipes.
   if (!isa<VPInstruction, VPWidenRecipe>(V))
