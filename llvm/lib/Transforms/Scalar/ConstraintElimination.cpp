@@ -801,22 +801,26 @@ static Decomposition decompose(Value *V, const ConstraintInfo &Info,
     return V;
   }
 
-  if (match(V, m_NUWShl(m_Value(Op1), m_ConstantInt(CI))) && canUseSExt(CI)) {
+  if (match(V, m_Shl(m_Value(Op1), m_ConstantInt(CI))) && canUseSExt(CI)) {
     // The scale 1 << shift must fit in the signed coefficient, so reject a
     // shift of 63, for which int64_t{1} << 63 is INT64_MIN.
     if (CI->getSExtValue() < 0 || CI->getSExtValue() >= 63)
       return V;
-    auto Result = decompose(Op1, Info, IsSigned, DL);
-    if (!Result.mul(int64_t{1} << CI->getSExtValue()))
-      return Result;
+    if (isKnownNoWrap(V, Info, /*Signed=*/false)) {
+      auto Result = decompose(Op1, Info, IsSigned, DL);
+      if (!Result.mul(int64_t{1} << CI->getSExtValue()))
+        return Result;
+    }
     return V;
   }
 
-  if (match(V, m_NUWMul(m_Value(Op1), m_ConstantInt(CI))) && canUseSExt(CI) &&
-      (!CI->isNegative())) {
-    auto Result = decompose(Op1, Info, IsSigned, DL);
-    if (!Result.mul(CI->getSExtValue()))
-      return Result;
+  if (match(V, m_Mul(m_Value(Op1), m_ConstantInt(CI))) && canUseSExt(CI) &&
+      !CI->isNegative()) {
+    if (isKnownNoWrap(V, Info, /*Signed=*/false)) {
+      auto Result = decompose(Op1, Info, IsSigned, DL);
+      if (!Result.mul(CI->getSExtValue()))
+        return Result;
+    }
     return V;
   }
 
