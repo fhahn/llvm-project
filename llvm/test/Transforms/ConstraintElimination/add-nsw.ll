@@ -117,7 +117,7 @@ define void @test.decompose.nonconst(i8 %a, i8 %b, i8 %c, i8 %d) {
 ; CHECK:       if.then.2:
 ; CHECK-NEXT:    [[ADD_0:%.*]] = add nuw nsw i8 [[A]], [[B]]
 ; CHECK-NEXT:    call void @use(i1 true)
-; CHECK-NEXT:    [[ADD_1:%.*]] = add nsw i8 [[A]], [[A]]
+; CHECK-NEXT:    [[ADD_1:%.*]] = add nuw nsw i8 [[A]], [[A]]
 ; CHECK-NEXT:    call void @use(i1 true)
 ; CHECK-NEXT:    [[ADD_2:%.*]] = add nsw i8 [[A]], [[D:%.*]]
 ; CHECK-NEXT:    [[C_4:%.*]] = icmp sge i8 [[ADD_2]], [[C]]
