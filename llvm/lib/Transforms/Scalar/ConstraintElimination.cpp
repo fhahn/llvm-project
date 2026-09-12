@@ -571,14 +571,58 @@ static bool doesHoldInRange(const ConstraintInfo &Info, Value *Op,
   return true;
 }
 
+/// Returns true if \p Info proves that \p Opcode applied to \p Op0 and \p Op1
+/// does not wrap, signed if \p Signed is set and unsigned otherwise. Set
+/// \p NoSignedWrap if the operation is already known not to wrap signed, which
+/// enables additional reasoning for the unsigned case.
+///
+/// This is the single place where no-wrap facts are inferred. It is used to
+/// strengthen the flags of an instruction, to decide whether an expression can
+/// be decomposed, and to remove the overflow handling of the overflow and
+/// saturating intrinsics.
+static bool isKnownNoWrap(Instruction::BinaryOps Opcode, Value *Op0, Value *Op1,
+                          const ConstraintInfo &Info, bool Signed,
+                          bool NoSignedWrap = false) {
+  if (Opcode == Instruction::Sub) {
+    // Op0 - Op1 does not wrap unsigned if Op0 >=u Op1.
+    if (!Signed)
+      return Info.doesHold(CmpInst::ICMP_UGE, Op0, Op1);
+    // Subtracting a non-negative Op1 can only decrease the result and
+    // subtracting a non-positive one can only increase it. In either case a
+    // matching bound on Op0 keeps the exact result in the signed range.
+    Constant *Zero = Constant::getNullValue(Op1->getType());
+    if ((Info.isKnownNonNegative(Op1) &&
+         Info.doesHold(CmpInst::ICMP_SGE, Op0, Op1)) ||
+        (Info.doesHold(CmpInst::ICMP_SLE, Op1, Zero) &&
+         Info.doesHold(CmpInst::ICMP_SLE, Op0, Op1)))
+      return true;
+  } else if (!Signed && NoSignedWrap &&
+             (Opcode == Instruction::Shl || Info.isKnownNonNegative(Op1)) &&
+             Info.isKnownNonNegative(Op0)) {
+    // The exact result of an nsw add/mul/shl of non-negative operands is
+    // non-negative and representable, so the operation does not wrap unsigned
+    // either. For shl, only the shifted operand matters.
+    return true;
+  }
+
+  // For a constant second operand, the range of Op0 for which the operation
+  // does not wrap is known exactly; check if the systems imply it.
+  auto *C = dyn_cast<ConstantInt>(Op1);
+  if (!C)
+    return false;
+  using OBO = OverflowingBinaryOperator;
+  ConstantRange NoWrapRegion = ConstantRange::makeGuaranteedNoWrapRegion(
+      Opcode, ConstantRange(C->getValue()),
+      Signed ? OBO::NoSignedWrap : OBO::NoUnsignedWrap);
+  return doesHoldInRange(Info, Op0, NoWrapRegion, Signed);
+}
+
 /// Returns true if the no-wrap property selected by \p Signed holds for \p V,
 /// either because the corresponding flag is set in the IR or because \p Info
 /// proves the condition under which \p V cannot wrap.
 ///
-/// This is the single place where no-wrap facts are inferred. It is used both
-/// to strengthen the flags of an instruction and to decide whether an
-/// expression can be decomposed; the latter therefore only pays for a query if
-/// flag strengthening has not already materialized the flag in the IR.
+/// Note that the queries are only paid for if flag strengthening has not
+/// already materialized the flag in the IR.
 static bool isKnownNoWrap(Value *V, const ConstraintInfo &Info, bool Signed) {
   // An `or disjoint` never carries, so it behaves like an `add nuw nsw`.
   if (match(V, m_DisjointOr(m_Value(), m_Value())))
@@ -600,32 +644,9 @@ static bool isKnownNoWrap(Value *V, const ConstraintInfo &Info, bool Signed) {
   if (Signed ? BO->hasNoSignedWrap() : BO->hasNoUnsignedWrap())
     return true;
 
-  Value *Op0 = BO->getOperand(0), *Op1 = BO->getOperand(1);
-  auto Opcode = static_cast<Instruction::BinaryOps>(BO->getOpcode());
-
-  // Op0 - Op1 does not wrap unsigned if Op0 >=u Op1. There is no comparable
-  // rule for nsw.
-  if (Opcode == Instruction::Sub)
-    return !Signed && Info.doesHold(CmpInst::ICMP_UGE, Op0, Op1);
-
-  // The exact result of an nsw add/mul/shl of non-negative operands is
-  // non-negative and representable, so the operation does not wrap unsigned
-  // either. For shl, only the shifted operand matters.
-  if (!Signed && BO->hasNoSignedWrap() &&
-      (Opcode == Instruction::Shl || Info.isKnownNonNegative(Op1)) &&
-      Info.isKnownNonNegative(Op0))
-    return true;
-
-  // For a constant second operand, the range of Op0 for which the operation
-  // does not wrap is known exactly; check if the systems imply it.
-  auto *C = dyn_cast<ConstantInt>(Op1);
-  if (!C)
-    return false;
-  using OBO = OverflowingBinaryOperator;
-  ConstantRange NoWrapRegion = ConstantRange::makeGuaranteedNoWrapRegion(
-      Opcode, ConstantRange(C->getValue()),
-      Signed ? OBO::NoSignedWrap : OBO::NoUnsignedWrap);
-  return doesHoldInRange(Info, Op0, NoWrapRegion, Signed);
+  return isKnownNoWrap(static_cast<Instruction::BinaryOps>(BO->getOpcode()),
+                       BO->getOperand(0), BO->getOperand(1), Info, Signed,
+                       BO->hasNoSignedWrap());
 }
 
 static Decomposition decomposeGEP(GEPOperator &GEP, const ConstraintInfo &Info,
@@ -1600,8 +1621,13 @@ void State::addInfoFor(BasicBlock &BB) {
       }
       break;
     }
-    // Enqueue ssub_with_overflow for simplification.
+    // Enqueue the overflow intrinsics for simplification.
+    case Intrinsic::uadd_with_overflow:
+    case Intrinsic::sadd_with_overflow:
+    case Intrinsic::usub_with_overflow:
     case Intrinsic::ssub_with_overflow:
+    case Intrinsic::umul_with_overflow:
+    case Intrinsic::smul_with_overflow:
     case Intrinsic::ucmp:
     case Intrinsic::scmp:
       WorkList.push_back(
@@ -2272,16 +2298,26 @@ void ConstraintInfo::addFactImpl(CmpInst::Predicate Pred, Value *A, Value *B,
   }
 }
 
-static bool replaceSubOverflowUses(IntrinsicInst *II, Value *A, Value *B,
-                                   SmallVectorImpl<Instruction *> &ToRemove) {
+/// Replace the uses of \p II, which is known not to overflow, by the
+/// corresponding plain binary operation and a false overflow flag.
+static bool replaceOverflowUses(WithOverflowInst *II,
+                                SmallVectorImpl<Instruction *> &ToRemove) {
   bool Changed = false;
   IRBuilder<> Builder(II->getParent(), II->getIterator());
-  Value *Sub = nullptr;
+  Value *Res = nullptr;
   for (User *U : make_early_inc_range(II->users())) {
     if (match(U, m_ExtractValue<0>(m_Value()))) {
-      if (!Sub)
-        Sub = Builder.CreateNSWSub(A, B);
-      U->replaceAllUsesWith(Sub);
+      if (!Res) {
+        Res = Builder.CreateBinOp(II->getBinaryOp(), II->getLHS(),
+                                  II->getRHS());
+        if (auto *BO = dyn_cast<BinaryOperator>(Res)) {
+          if (II->isSigned())
+            BO->setHasNoSignedWrap();
+          else
+            BO->setHasNoUnsignedWrap();
+        }
+      }
+      U->replaceAllUsesWith(Res);
       Changed = true;
     } else if (match(U, m_ExtractValue<1>(m_Value()))) {
       U->replaceAllUsesWith(Builder.getFalse());
@@ -2307,21 +2343,15 @@ static bool replaceSubOverflowUses(IntrinsicInst *II, Value *A, Value *B,
   return Changed;
 }
 
+/// Try to replace \p II by the plain binary operation it performs, if \p Info
+/// proves that it cannot overflow. Returns true if \p II was replaced.
 static bool
-tryToSimplifyOverflowMath(IntrinsicInst *II, ConstraintInfo &Info,
+tryToSimplifyOverflowMath(WithOverflowInst *II, ConstraintInfo &Info,
                           SmallVectorImpl<Instruction *> &ToRemove) {
-  bool Changed = false;
-  if (II->getIntrinsicID() == Intrinsic::ssub_with_overflow) {
-    // If A s>= B && B s>= 0, ssub.with.overflow(a, b) should not overflow and
-    // can be simplified to a regular sub.
-    Value *A = II->getArgOperand(0);
-    Value *B = II->getArgOperand(1);
-    if (!Info.doesHold(CmpInst::ICMP_SGE, A, B) ||
-        !Info.doesHold(CmpInst::ICMP_SGE, B, ConstantInt::get(A->getType(), 0)))
-      return false;
-    Changed = replaceSubOverflowUses(II, A, B, ToRemove);
-  }
-  return Changed;
+  if (!isKnownNoWrap(II->getBinaryOp(), II->getLHS(), II->getRHS(), Info,
+                     II->isSigned()))
+    return false;
+  return replaceOverflowUses(II, ToRemove);
 }
 
 static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
