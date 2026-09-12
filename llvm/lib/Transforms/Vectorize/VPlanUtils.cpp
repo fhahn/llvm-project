@@ -575,8 +575,13 @@ VPBlockUtils::blocksInSingleSuccessorChainBetween(VPBasicBlock *FirstBB,
                                                   VPBasicBlock *LastBB) {
   assert(FirstBB->getParent() == LastBB->getParent() &&
          "FirstBB and LastBB from different regions");
-  assert(VPBlockUtils::isReachableViaSingleSuccessors(FirstBB, LastBB) &&
+#ifndef NDEBUG
+  bool InSingleSuccChain = false;
+  for (VPBlockBase *Succ = FirstBB; Succ; Succ = Succ->getSingleSuccessor())
+    InSingleSuccChain |= (Succ == LastBB);
+  assert(InSingleSuccChain &&
          "LastBB unreachable from FirstBB in single-successor chain");
+#endif
   auto Blocks = to_vector(
       VPBlockUtils::blocksOnly<VPBasicBlock>(vp_depth_first_deep(FirstBB)));
   auto *LastIt = find(Blocks, LastBB);
