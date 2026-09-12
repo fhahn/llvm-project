@@ -296,8 +296,15 @@ collectGroupedReplicateMemOps(
   SmallDenseMap<std::pair<const SCEV *, const Type *>,
                 SmallVector<VPReplicateRecipe *, 4>>
       RecipesByAddressAndType;
+  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
+  VPDominatorTree VPDT(Plan);
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
-           vp_depth_first_deep(Plan.getVectorLoopRegion()->getEntry()))) {
+           vp_depth_first_deep(LoopRegion->getEntry()))) {
+    // The masks of recipes in a block that does not execute on every iteration
+    // do not fully describe when they execute, so combining recipes across
+    // such blocks is not valid.
+    if (!VPDT.dominates(VPBB, LoopRegion->getExitingBasicBlock()))
+      continue;
     for (VPReplicateRecipe &RepR : make_isa_range<VPReplicateRecipe>(*VPBB)) {
       if (RepR.getOpcode() != Opcode || !FilterFn(&RepR))
         continue;
@@ -311,7 +318,6 @@ collectGroupedReplicateMemOps(
     }
   }
   auto Groups = to_vector(RecipesByAddressAndType.values());
-  VPDominatorTree VPDT(Plan);
   for (auto &Group : Groups) {
     // Sort mem ops by dominance order, with earliest (most dominating) first.
     stable_sort(Group, [&VPDT](VPReplicateRecipe *A, VPReplicateRecipe *B) {
@@ -2452,14 +2458,27 @@ static void licm(VPlan &Plan) {
 
   // Hoist any loop invariant recipes from the vector loop region to the
   // preheader. Preform a shallow traversal of the vector loop region, to
-  // exclude recipes in replicate regions. Since the top-level blocks in the
-  // vector loop region are guaranteed to execute if the vector pre-header is,
-  // we don't need to check speculation safety.
+  // exclude recipes in replicate regions. Since the blocks hoisted from are
+  // guaranteed to execute if the vector pre-header is, we don't need to check
+  // speculation safety.
   VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
   assert(Preheader->getSingleSuccessor() == LoopRegion &&
          "Expected vector prehader's successor to be the vector loop region");
+  // Blocks that do not dominate the exiting block do not execute on every
+  // iteration, so recipes must not be hoisted or sunk out of them. Only compute
+  // dominance if the region contains branches.
+  SmallPtrSet<VPBlockBase *, 4> ConditionalBlocks;
+  if (any_of(vp_depth_first_shallow(LoopRegion->getEntry()),
+             [](VPBlockBase *VPB) { return VPB->getNumSuccessors() > 1; })) {
+    VPDominatorTree VPDT(Plan);
+    for (VPBlockBase *VPB : vp_depth_first_shallow(LoopRegion->getEntry()))
+      if (!VPDT.dominates(VPB, LoopRegion->getExitingBasicBlock()))
+        ConditionalBlocks.insert(VPB);
+  }
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
            vp_depth_first_shallow(LoopRegion->getEntry()))) {
+    if (ConditionalBlocks.contains(VPBB))
+      continue;
     for (VPRecipeBase &R : make_early_inc_range(*VPBB)) {
       if (any_of(R.operands(), [](VPValue *Op) {
             return !Op->isDefinedOutsideLoopRegions();
@@ -2481,6 +2500,8 @@ static void licm(VPlan &Plan) {
   PostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>> POT(
       LoopRegion->getEntry());
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(POT)) {
+    if (ConditionalBlocks.contains(VPBB))
+      continue;
     for (VPRecipeBase &R : make_early_inc_range(reverse(*VPBB))) {
       // TODO: Use R.definedValues() instead of casting to VPSingleDefRecipe to
       // support recipes with multiple defined values (e.g., interleaved loads).
@@ -2538,8 +2559,6 @@ static void licm(VPlan &Plan) {
       if (!SinkBB)
         SinkBB = cast<VPBasicBlock>(LoopRegion->getSingleSuccessor());
 
-      // TODO: This will need to be a check instead of a assert after
-      // conditional branches in vectorized loops are supported.
       assert(VPDT.properlyDominates(VPBB, SinkBB) &&
              "Defining block must dominate sink block");
       // TODO: Clone the recipe if users are on multiple exit paths, instead of
