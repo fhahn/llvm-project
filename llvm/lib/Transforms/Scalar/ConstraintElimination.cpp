@@ -337,7 +337,22 @@ public:
     getCS(Signed).popLastNVariables(N);
   }
 
+  /// Returns true if \p A \p Pred \p B is implied by the constraint systems.
+  /// Only the condition itself is solved for, so prefer this over evaluate if
+  /// the negation is of no interest.
   bool doesHold(CmpInst::Predicate Pred, Value *A, Value *B) const;
+
+  /// Returns true if \p A \p Pred \p B is implied by the constraint systems,
+  /// false if its negation is implied and std::nullopt if neither is. Deciding
+  /// both at once is cheaper than two doesHold queries, as the sub-system to
+  /// solve in is only built once.
+  std::optional<bool> evaluate(CmpInst::Predicate Pred, Value *A,
+                               Value *B) const;
+
+  /// Returns true if \p R is implied by the system it was built for, false if
+  /// its negation is implied and std::nullopt if neither is or if \p R is
+  /// empty.
+  std::optional<bool> evaluate(const ConstraintTy &R) const;
 
   /// Returns true if \p V is known to be non-negative, either because the
   /// signed system implies it or because ValueTracking can prove it.
@@ -750,19 +765,26 @@ static Decomposition decompose(Value *V, const ConstraintInfo &Info,
   Value *Op1;
   ConstantInt *CI;
   if (match(V, m_AddLike(m_Value(Op0), m_Value(Op1)))) {
-    // The decomposition is exact if the add does not wrap unsigned.
-    if (isKnownNoWrap(V, Info, /*Signed=*/false)) {
-      if (auto Decomp = MergeResults(Op0, Op1, IsSigned))
-        return *Decomp;
+    // `%x + -C` has two possible decompositions: the exact one, if the add
+    // does not wrap unsigned, and `%x - C`, if the subtraction does not wrap.
+    // A single query decides which applies, as `%x >=u C` is exactly the
+    // negation of the region in which the add does not wrap unsigned. Note
+    // that the constant has to be decomposed as signed for the subtraction, to
+    // get the negative offset.
+    if (match(Op1, m_ConstantInt(CI)) && CI->isNegative() && canUseSExt(CI) &&
+        !match(V, m_NUWAddLike(m_Value(), m_Value()))) {
+      std::optional<bool> NoUnsignedWrap = Info.evaluate(
+          CmpInst::ICMP_UGE, Op0,
+          ConstantInt::get(Op0->getType(), -CI->getSExtValue()));
+      if (NoUnsignedWrap)
+        if (auto Decomp = MergeResults(Op0, CI, /*IsSignedB=*/*NoUnsignedWrap))
+          return *Decomp;
       return V;
     }
-    // Otherwise `%x + -C` can still be decomposed as `%x - C`, provided the
-    // subtraction does not wrap. Note that this is not implied by nuw, so the
-    // constant has to be decomposed as signed to get the negative offset.
-    if (match(Op1, m_ConstantInt(CI)) && CI->isNegative() && canUseSExt(CI) &&
-        Info.doesHold(CmpInst::ICMP_UGE, Op0,
-                      ConstantInt::get(Op0->getType(), -CI->getSExtValue())))
-      if (auto Decomp = MergeResults(Op0, CI, /*IsSignedB=*/true))
+
+    // The decomposition is exact if the add does not wrap unsigned.
+    if (isKnownNoWrap(V, Info, /*Signed=*/false))
+      if (auto Decomp = MergeResults(Op0, Op1, IsSigned))
         return *Decomp;
     return V;
   }
@@ -991,6 +1013,17 @@ bool ConstraintInfo::doesHold(CmpInst::Predicate Pred, Value *A,
   auto R = getConstraintForSolving(Pred, A, B);
   return !R.empty() &&
          getCS(R.IsSigned).isConditionImpliedInSubSystem(R.Coefficients);
+}
+
+std::optional<bool> ConstraintInfo::evaluate(CmpInst::Predicate Pred, Value *A,
+                                             Value *B) const {
+  return evaluate(getConstraintForSolving(Pred, A, B));
+}
+
+std::optional<bool> ConstraintInfo::evaluate(const ConstraintTy &R) const {
+  if (R.empty())
+    return std::nullopt;
+  return R.isImpliedBy(getCS(R.IsSigned));
 }
 
 bool ConstraintInfo::isKnownNonNegative(Value *V) const {
@@ -1822,8 +1855,7 @@ static std::optional<bool> checkCondition(CmpInst::Predicate Pred, Value *A,
       return std::nullopt;
     }
 
-    auto &CSToUse = Info.getCS(R.IsSigned);
-    if (auto ImpliedCondition = R.isImpliedBy(CSToUse)) {
+    if (auto ImpliedCondition = Info.evaluate(R)) {
       if (!DebugCounter::shouldExecute(EliminatedCounter))
         return std::nullopt;
       LLVM_DEBUG({
@@ -1833,7 +1865,7 @@ static std::optional<bool> checkCondition(CmpInst::Predicate Pred, Value *A,
                                            : CmpInst::getInversePredicate(Pred),
                          A, B);
         dbgs() << " implied by dominating constraints\n";
-        CSToUse.dump();
+        Info.getCS(R.IsSigned).dump();
       });
       return ImpliedCondition;
     }
