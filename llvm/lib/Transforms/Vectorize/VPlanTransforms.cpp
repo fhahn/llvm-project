@@ -3135,31 +3135,26 @@ struct EarlyExitInfo {
   VPValue *CondToExit;
 };
 
-/// Update \p Plan to mask memory operations in the loop based on whether the
-/// early exit is taken or not.
-///
-/// We're currently expecting to find a loop with properties similar to the
-/// following:
-///
-/// for.body:
-///   ir<%indvars.iv> = WIDEN-INDUCTION nuw nsw ir<0>, ir<1>, vp<%0>
-///   EMIT ir<%arrayidx> = getelementptr inbounds nuw ir<@c>, ir<%indvars.iv>
-///   EMIT-SCALAR ir<%0> = load ir<%arrayidx>
-///   EMIT ir<%cmp1> = icmp sgt ir<%0>, ir<5>
-///   EMIT vp<%1> = masked-cond ir<%cmp1>
-/// Successor(s): if.end
-///
-/// if.end:
-///   EMIT ir<%arrayidx3> = getelementptr inbounds nuw ir<@src>, ir<%indvars.iv>
-///   EMIT-SCALAR ir<%2> = load ir<%arrayidx3>
-///   EMIT ir<%add> = add nsw ir<%2>, ir<42>
-///   EMIT ir<%arrayidx5> = getelementptr inbounds nuw ir<@dst>, ir<%indvars.iv>
-///   EMIT store ir<%add>, ir<%arrayidx5>
-///   EMIT ir<%indvars.iv.next> = add nuw nsw ir<%indvars.iv>, ir<1>
-///   EMIT vp<%3> = any-of ir<%1>
-///   EMIT ir<%exitcond.not> = icmp eq ir<%indvars.iv.next>, ir<10000>
-///   EMIT branch-on-two-conds vp<%3>, ir<%exitcond.not>
-/// Successor(s): middle.block, middle.block, for.body
+/// Result of analysing the uncountable exit condition of a loop with side
+/// effects, shared by the masked and bail-to-scalar handlers.
+struct UncountableExitCondition {
+  /// The (vector) exit condition, true in lanes that take the uncountable
+  /// exit.
+  VPValue *Cond;
+  /// The single load contributing to the exit condition.
+  VPInstruction *Load;
+  /// The unit-stride induction the condition load's address is based on.
+  VPWidenInductionRecipe *IV;
+  /// Insertion point in the header, just past the hoisted condition recipes.
+  VPBasicBlock::iterator InsertIt;
+};
+
+/// Find and validate the load feeding the uncountable exit condition, ensure
+/// it is dereferenceable for the whole vector iteration, and hoist the
+/// condition recipes to the top of \p HeaderVPBB (so the exit condition is
+/// available before any side-effecting operation). Returns std::nullopt if
+/// the loop cannot be handled, in which case the VPlan may be left partially
+/// modified and must be abandoned by the caller.
 ///
 /// We currently expect LoopVectorizationLegality to ensure that:
 /// * There must also be a counted exit. We will need to support speculative
@@ -3173,16 +3168,15 @@ struct EarlyExitInfo {
 ///   uncountable exit comparison, and the other term must be loop-invariant.
 ///   Improving upon this requires work in getRecipesForUncountableExit to
 ///   handle more complex recipe graphs.
-static bool handleUncountableExitsWithSideEffects(
-    VPlan &Plan, SmallVectorImpl<EarlyExitInfo> &Exits,
-    VPBasicBlock *HeaderVPBB, VPBasicBlock *LatchVPBB, VPBasicBlock *MiddleVPBB,
-    Loop *TheLoop, PredicatedScalarEvolution &PSE, DominatorTree &DT,
-    AssumptionCache *AC) {
-
+static std::optional<UncountableExitCondition>
+hoistUncountableExitCondition(VPlan &Plan, ArrayRef<EarlyExitInfo> Exits,
+                              VPBasicBlock *HeaderVPBB, VPBasicBlock *LatchVPBB,
+                              Loop *TheLoop, PredicatedScalarEvolution &PSE,
+                              DominatorTree &DT, AssumptionCache *AC) {
   // Disconnect early exiting blocks from successors, remove branches. We
   // currently don't support multiple uses for recipes involved in creating
   // the uncountable exit condition.
-  for (auto &Exit : Exits) {
+  for (const auto &Exit : Exits) {
     if (Exit.EarlyExitingVPBB == LatchVPBB)
       continue;
 
@@ -3192,16 +3186,16 @@ static bool handleUncountableExitsWithSideEffects(
     VPBlockUtils::disconnectBlocks(Exit.EarlyExitingVPBB, Exit.EarlyExitVPBB);
   }
 
-  VPDominatorTree VPDT(Plan);
-
-  // We can abandon a VPlan entirely if we return false here, so we shouldn't
-  // crash if some earlier assumptions on scalar IR don't hold for the vplan
-  // version of the loop.
+  // We can abandon a VPlan entirely if we return std::nullopt here, so we
+  // shouldn't crash if some earlier assumptions on scalar IR don't hold for
+  // the vplan version of the loop.
   SmallVector<VPInstruction *, 8> ConditionRecipes;
+
+  VPDominatorTree VPDT(Plan);
 
   VPValue *Cond = getRecipesForUncountableExit(ConditionRecipes, LatchVPBB);
   if (!Cond)
-    return false;
+    return std::nullopt;
 
   // Find load contributing to condition.
   // At the moment LoopVectorizationLegality only supports a single
@@ -3236,7 +3230,7 @@ static bool handleUncountableExitsWithSideEffects(
             PtrSCEV, cast<LoadInst>(Load->getUnderlyingInstr())->getAlign(),
             PSE.getSE()->getConstant(EltSize), TheLoop, *PSE.getSE(), DT, AC,
             &Predicates))
-      return false;
+      return std::nullopt;
   }
 
   // Check for a single GEP for the condition load to see if we can link it to
@@ -3245,15 +3239,15 @@ static bool handleUncountableExitsWithSideEffects(
   auto *IV = cast<VPWidenInductionRecipe>(&HeaderVPBB->front());
   if (!match(IV->getStartValue(), m_SpecificInt(0)) ||
       !match(IV->getStepValue(), m_SpecificInt(1)))
-    return false;
+    return std::nullopt;
   if (!match(Ptr, m_VPInstruction<Instruction::GetElementPtr>(m_LiveIn(),
                                                               m_Specific(IV))))
-    return false;
+    return std::nullopt;
 
-  // We want to guarantee that the uncountable exit condition (and the mask
-  // we will generate from it) are available for all operations in the loop
-  // that need to be masked. If the condition recipes are not already the first
-  // recipes in the header after the last phi, move them there.
+  // We want to guarantee that the uncountable exit condition is available for
+  // all operations in the loop that depend on it. If the condition recipes
+  // are not already the first recipes in the header after the last phi, move
+  // them there.
   auto InsertIt = HeaderVPBB->getFirstNonPhi();
   while (InsertIt != HeaderVPBB->end() &&
          is_contained(ConditionRecipes, &*InsertIt)) {
@@ -3263,38 +3257,29 @@ static bool handleUncountableExitsWithSideEffects(
   for (auto *Recipe : reverse(ConditionRecipes))
     Recipe->moveBefore(*HeaderVPBB, InsertIt);
 
-  // Create a mask to represent all lanes that fully execute in the vector loop,
-  // stopping short of any early exit.
-  VPBuilder MaskBuilder(HeaderVPBB, InsertIt);
-  VPValue *FirstActive = MaskBuilder.createFirstActiveLane(Cond);
-  Type *IVScalarTy = IV->getScalarType();
-  VPValue *Zero = Plan.getZero(IVScalarTy);
-  FirstActive =
-      MaskBuilder.createScalarZExtOrTrunc(FirstActive, IVScalarTy, DebugLoc());
-  VPValue *Mask = MaskBuilder.createNaryOp(VPInstruction::ActiveLaneMask,
-                                           {Zero, FirstActive}, DebugLoc(),
-                                           "uncountable.exit.mask");
+  return UncountableExitCondition{Cond, Load, IV, InsertIt};
+}
 
-  // Convert all other memory operations to use the mask.
-  for (VPBasicBlock *VPBB : vp_rpo_plain_cfg_loop_body(HeaderVPBB))
-    for (VPRecipeBase &R : *VPBB)
-      if (R.mayReadOrWriteMemory() && &R != Load) {
-        // TODO: Handle conditional memory operations in the loop.
-        if (!VPDT.dominates(R.getParent(), LatchVPBB))
-          return false;
-        cast<VPInstruction>(&R)->addMask(Mask);
-      }
-
-  // Update middle block branch to compare (IV + however many lanes were active)
-  // against the full trip count, since we may be exiting the vector loop early.
-  // If we didn't take an early exit, we should get the equivalent of VF from
-  // the FirstActiveLane.
+/// For an uncountable early-exit loop that resumes in the scalar loop, update
+/// the middle block and scalar preheader to continue from IV + \p Committed,
+/// where \p Committed is the number of leading lanes whose side effects were
+/// committed in the exiting vector iteration. The middle block branches to
+/// the scalar loop unless the full trip count has been reached. Returns false
+/// if the scalar preheader has an unexpected shape.
+static bool updateScalarResumeForUncountableExit(VPlan &Plan,
+                                                 VPBasicBlock *MiddleVPBB,
+                                                 VPWidenInductionRecipe *IV,
+                                                 VPValue *Committed) {
+  // Update the middle block branch to compare (IV + committed lanes) against
+  // the full trip count, since we may be exiting the vector loop early. If we
+  // didn't take an early exit, this is equivalent to advancing by VF.
   assert(match(MiddleVPBB->getTerminator(), m_BranchOnCond()) &&
          "Expected BranchOnCond terminator for MiddleVPBB");
   VPBuilder MiddleBuilder(MiddleVPBB->getTerminator());
+  VPValue *Zero = Plan.getZero(IV->getScalarType());
   VPValue *ScalarIV = MiddleBuilder.createNaryOp(VPInstruction::ExtractLane,
                                                  {Zero, IV}, DebugLoc());
-  VPValue *ExitIV = MiddleBuilder.createAdd(ScalarIV, FirstActive);
+  VPValue *ExitIV = MiddleBuilder.createAdd(ScalarIV, Committed);
   VPValue *FullTC =
       MiddleBuilder.createICmp(CmpInst::ICMP_EQ, ExitIV, Plan.getTripCount());
   MiddleVPBB->getTerminator()->setOperand(0, FullTC);
@@ -3314,6 +3299,200 @@ static bool handleUncountableExitsWithSideEffects(
       "Continuing from different IV");
   ContinueIV->setOperand(0, ExitIV);
   return true;
+}
+
+/// Update \p Plan to mask memory operations in the loop based on whether the
+/// early exit is taken or not.
+///
+/// We're currently expecting to find a loop with properties similar to the
+/// following:
+///
+/// for.body:
+///   ir<%indvars.iv> = WIDEN-INDUCTION nuw nsw ir<0>, ir<1>, vp<%0>
+///   EMIT ir<%arrayidx> = getelementptr inbounds nuw ir<@c>, ir<%indvars.iv>
+///   EMIT-SCALAR ir<%0> = load ir<%arrayidx>
+///   EMIT ir<%cmp1> = icmp sgt ir<%0>, ir<5>
+///   EMIT vp<%1> = masked-cond ir<%cmp1>
+/// Successor(s): if.end
+///
+/// if.end:
+///   EMIT ir<%arrayidx3> = getelementptr inbounds nuw ir<@src>, ir<%indvars.iv>
+///   EMIT-SCALAR ir<%2> = load ir<%arrayidx3>
+///   EMIT ir<%add> = add nsw ir<%2>, ir<42>
+///   EMIT ir<%arrayidx5> = getelementptr inbounds nuw ir<@dst>, ir<%indvars.iv>
+///   EMIT store ir<%add>, ir<%arrayidx5>
+///   EMIT ir<%indvars.iv.next> = add nuw nsw ir<%indvars.iv>, ir<1>
+///   EMIT vp<%3> = any-of ir<%1>
+///   EMIT ir<%exitcond.not> = icmp eq ir<%indvars.iv.next>, ir<10000>
+///   EMIT branch-on-two-conds vp<%3>, ir<%exitcond.not>
+/// Successor(s): middle.block, middle.block, for.body
+///
+static bool handleUncountableExitsWithSideEffects(
+    VPlan &Plan, const UncountableExitCondition &ExitCond,
+    VPBasicBlock *HeaderVPBB, VPBasicBlock *LatchVPBB,
+    VPBasicBlock *MiddleVPBB) {
+  VPDominatorTree VPDT(Plan);
+  VPValue *Cond = ExitCond.Cond;
+  VPWidenInductionRecipe *IV = ExitCond.IV;
+  VPBasicBlock::iterator InsertIt = ExitCond.InsertIt;
+
+  // Create a mask to represent all lanes that fully execute in the vector loop,
+  // stopping short of any early exit.
+  VPBuilder MaskBuilder(HeaderVPBB, InsertIt);
+  VPValue *FirstActive = MaskBuilder.createFirstActiveLane(Cond);
+  Type *IVScalarTy = IV->getScalarType();
+  VPValue *Zero = Plan.getZero(IVScalarTy);
+  FirstActive =
+      MaskBuilder.createScalarZExtOrTrunc(FirstActive, IVScalarTy, DebugLoc());
+  VPValue *Mask = MaskBuilder.createNaryOp(VPInstruction::ActiveLaneMask,
+                                           {Zero, FirstActive}, DebugLoc(),
+                                           "uncountable.exit.mask");
+
+  // Convert all other memory operations to use the mask.
+  for (VPBasicBlock *VPBB : vp_rpo_plain_cfg_loop_body(HeaderVPBB))
+    for (VPRecipeBase &R : *VPBB)
+      if (R.mayReadOrWriteMemory() && &R != ExitCond.Load) {
+        // TODO: Handle conditional memory operations in the loop.
+        if (!VPDT.dominates(R.getParent(), LatchVPBB))
+          return false;
+        cast<VPInstruction>(&R)->addMask(Mask);
+      }
+
+  // The masked scheme commits all lanes before the first exiting lane, so the
+  // scalar loop resumes at IV + FirstActiveLane.
+  return updateScalarResumeForUncountableExit(Plan, MiddleVPBB, IV,
+                                              FirstActive);
+}
+
+/// Returns true if the loop can be handled by branching around the body when
+/// any lane would take an uncountable exit, see
+/// handleUncountableExitsBailToScalar. \p Exits and \p ExitCond describe the
+/// uncountable exit of \p HeaderVPBB's loop. Must be called before the plan is
+/// modified for either style, so the caller can still fall back to masking.
+static bool canBailToScalarOnUncountableExit(
+    ArrayRef<EarlyExitInfo> Exits, const UncountableExitCondition &ExitCond,
+    VPBasicBlock *HeaderVPBB, VPBasicBlock *LatchVPBB) {
+  // Only a single, unconditional side-effecting body is supported for now,
+  // i.e. the uncountable exit must come from the header and there must be no
+  // internal control flow between the header and the latch. The latter also
+  // makes the branch around the body a uniform branch guarding a single
+  // block, which VPPredicator keeps as control flow instead of if-converting
+  // it and masking the body.
+  if (Exits.size() != 1 || Exits[0].EarlyExitingVPBB != HeaderVPBB ||
+      HeaderVPBB->getSingleSuccessor() != LatchVPBB)
+    return false;
+
+  // The body that is branched around consists of the recipes of the header
+  // from the insertion point on; the recipes before it compute the exit
+  // condition and execute on every iteration.
+  VPBasicBlock::iterator BodyStart = ExitCond.InsertIt;
+  SmallPtrSet<const VPRecipeBase *, 16> BodyRecipes;
+  for (VPRecipeBase &R : make_range(BodyStart, HeaderVPBB->end()))
+    BodyRecipes.insert(&R);
+
+  // Every memory operation other than the condition load must end up in the
+  // body: the blocks outside it still run for the whole vector iteration when
+  // bailing, so an unmasked access left there would access memory past the
+  // exiting lane.
+  // TODO: Sink such operations into the body where legal.
+  for (VPBasicBlock *VPBB : vp_rpo_plain_cfg_loop_body(HeaderVPBB)) {
+    auto End = VPBB == HeaderVPBB ? BodyStart : VPBB->end();
+    for (VPRecipeBase &R : make_range(VPBB->begin(), End)) {
+      if (&R != ExitCond.Load && R.mayReadOrWriteMemory())
+        return false;
+    }
+  }
+
+  // The body is skipped when bailing, so any value it defines is not available
+  // in the latch, middle block or exit blocks. Reject loops where a value
+  // defined in the body is used outside of it (e.g. a live-out extracted in
+  // the middle block).
+  // TODO: Support body live-outs by recomputing them in the scalar loop.
+  for (VPRecipeBase &R : make_range(BodyStart, HeaderVPBB->end())) {
+    for (VPValue *Def : R.definedValues()) {
+      if (any_of(Def->users(), [&BodyRecipes](VPUser *U) {
+            return !BodyRecipes.contains(cast<VPRecipeBase>(U));
+          }))
+        return false;
+    }
+  }
+
+  return true;
+}
+
+/// Update \p Plan to branch around the loop body when any lane would take an
+/// uncountable exit, instead of masking the side-effecting operations.
+///
+/// The condition recipes are hoisted to the top of the header and reduced
+/// with AnyOf. The header is split so that the side-effecting body follows
+/// the condition, and a BranchOnCond is added to the header that skips the
+/// body (branching directly to the latch) when any lane would exit. Memory
+/// operations in the body are therefore left unmasked - they only execute on
+/// iterations in which no lane exits. The uncountable exit is still funnelled
+/// through the latch (which keeps the BranchOnTwoConds set up by the
+/// caller), so the loop region remains single-exit. The scalar loop resumes
+/// from the start of the exiting iteration.
+///
+/// Before:                          After:
+///   header:                          header:
+///     <cond recipes>                   <cond recipes>
+///     <side-effecting body>            EMIT anyExit = any-of <cond>
+///   Successor(s): latch                EMIT branch-on-cond anyExit
+///                                    Successor(s): latch, body
+///   latch:
+///     branch-on-two-conds            body:
+///        anyExit, counted              <side-effecting body>
+///   Successor(s): middle,            Successor(s): latch
+///                 middle, header
+///                                    latch:
+///                                      branch-on-two-conds anyExit, counted
+///                                    Successor(s): middle, middle, header
+///
+/// introduceMasksAndLinearize keeps the branch, as it is a uniform branch
+/// guarding a single block, so the body stays unmasked and the branch is not
+/// linearized away.
+static bool handleUncountableExitsBailToScalar(
+    VPlan &Plan, const UncountableExitCondition &ExitCond,
+    VPBasicBlock *HeaderVPBB, VPBasicBlock *LatchVPBB,
+    VPBasicBlock *MiddleVPBB) {
+  VPValue *Cond = ExitCond.Cond;
+  VPWidenInductionRecipe *IV = ExitCond.IV;
+  VPBasicBlock::iterator InsertIt = ExitCond.InsertIt;
+
+  // Reduce the per-lane condition to a scalar: true if any lane would exit.
+  VPBuilder Builder(HeaderVPBB, InsertIt);
+  VPValue *AnyExit =
+      Builder.createNaryOp(VPInstruction::AnyOf, {Cond}, DebugLoc());
+
+  // Split the header after the condition so the side-effecting body follows
+  // in its own block, then add a branch that skips the body (going straight
+  // to the latch) when any lane would exit.
+  VPBasicBlock *BodyVPBB = HeaderVPBB->splitAt(InsertIt);
+  BodyVPBB->setName("vector.body.nonbailing");
+
+  // splitAt connected HeaderVPBB -> BodyVPBB -> LatchVPBB. Add the skip edge
+  // HeaderVPBB -> LatchVPBB, then order the successors so the BranchOnCond's
+  // true edge (taken when any lane would exit) skips the body and goes
+  // straight to the latch. The successors are [BodyVPBB] after the split, so
+  // appending the latch and swapping yields [LatchVPBB, BodyVPBB].
+  VPBlockUtils::connectBlocks(HeaderVPBB, LatchVPBB);
+  HeaderVPBB->swapSuccessors();
+  VPBuilder(HeaderVPBB).createNaryOp(VPInstruction::BranchOnCond, {AnyExit});
+
+  // On a bail no lanes commit, so the scalar loop resumes at the start of the
+  // iteration; otherwise the whole vector iteration completed and we advance
+  // by VF * UF. The AnyOf is combined across all parts when unrolling, so a
+  // bail skips the body of every part. Compute the committed-lane count in
+  // the middle block and let the shared helper wire up the middle-block
+  // branch and scalar resume value.
+  Type *IVScalarTy = IV->getScalarType();
+  VPBuilder MiddleBuilder(MiddleVPBB->getTerminator());
+  VPValue *VFxUF = MiddleBuilder.createScalarZExtOrTrunc(
+      &Plan.getVFxUF(), IVScalarTy, DebugLoc());
+  VPValue *CommittedLanes = MiddleBuilder.createSelect(
+      AnyExit, Plan.getZero(IVScalarTy), VFxUF, DebugLoc());
+  return updateScalarResumeForUncountableExit(Plan, MiddleVPBB, IV,
+                                              CommittedLanes);
 }
 
 bool VPlanTransforms::handleUncountableEarlyExits(
@@ -3414,14 +3593,31 @@ bool VPlanTransforms::handleUncountableEarlyExits(
                             {IsAnyExitTaken, IsLatchExitTaken}, LatchDL);
   LatchVPBB->clearSuccessors();
 
-  if (Style == UncountableExitStyle::MaskedHandleExitInScalarLoop) {
-    // If handling the exiting lane in the scalar loop, combine the exit
-    // conditions into a single BranchOnCond.
+  if (Style == UncountableExitStyle::MaskedHandleExitInScalarLoop ||
+      Style == UncountableExitStyle::BailToScalarOnEarlyExit) {
+    // Both scalar-tail styles funnel the uncountable exit through the latch:
+    // the BranchOnTwoConds branches to the middle block for either the
+    // uncountable or the countable exit, and otherwise back to the header.
     LatchVPBB->setSuccessors({MiddleVPBB, MiddleVPBB, HeaderVPBB});
     MiddleVPBB->clearPredecessors();
     MiddleVPBB->setPredecessors({LatchVPBB, LatchVPBB});
-    return handleUncountableExitsWithSideEffects(
-        Plan, Exits, HeaderVPBB, LatchVPBB, MiddleVPBB, TheLoop, PSE, DT, AC);
+
+    // Both styles need the uncountable exit condition available at the top of
+    // the header.
+    std::optional<UncountableExitCondition> ExitCond =
+        hoistUncountableExitCondition(Plan, Exits, HeaderVPBB, LatchVPBB,
+                                      TheLoop, PSE, DT, AC);
+    if (!ExitCond)
+      return false;
+
+    // Fall back to masking if the loop cannot bail out to the scalar loop.
+    if (Style == UncountableExitStyle::BailToScalarOnEarlyExit &&
+        canBailToScalarOnUncountableExit(Exits, *ExitCond, HeaderVPBB,
+                                         LatchVPBB))
+      return handleUncountableExitsBailToScalar(Plan, *ExitCond, HeaderVPBB,
+                                                LatchVPBB, MiddleVPBB);
+    return handleUncountableExitsWithSideEffects(Plan, *ExitCond, HeaderVPBB,
+                                                 LatchVPBB, MiddleVPBB);
   }
 
   // Create the vector.early.exit blocks.

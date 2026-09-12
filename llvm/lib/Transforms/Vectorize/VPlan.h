@@ -88,6 +88,14 @@ enum class UncountableExitStyle {
   /// uncountable exit is taken, then all lanes before the exiting lane will
   /// complete, leaving just the final lane to execute in the scalar tail.
   MaskedHandleExitInScalarLoop,
+  /// Bail out of the current vector iteration entirely if any lane would take
+  /// an uncountable exit. The exit condition is computed at the top of the
+  /// vector body; if any lane would exit, control branches around the rest of
+  /// the body (so no side-effecting operation executes) and out to the scalar
+  /// loop, which re-executes the whole iteration from its start. Unlike
+  /// MaskedHandleExitInScalarLoop, memory operations are left unmasked - they
+  /// only execute on iterations in which no lane exits.
+  BailToScalarOnEarlyExit,
 };
 
 /// VPBlockBase is the building block of the Hierarchical Control-Flow Graph.
