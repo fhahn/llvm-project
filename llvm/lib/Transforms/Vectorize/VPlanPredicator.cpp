@@ -49,6 +49,11 @@ class VPPredicator {
 
   BlockMaskCacheTy BlockMaskCache;
 
+  /// Blocks terminated by a uniform branch that is kept as control flow
+  /// instead of being if-converted, mapped to the block in which the branch's
+  /// edges merge again. See getBlockToKeepUnderUniformBranch.
+  DenseMap<const VPBasicBlock *, VPBasicBlock *> UniformBranchToMergeBlock;
+
   /// Create an edge mask for every destination of cases and/or default.
   void createSwitchEdgeMasks(const VPInstruction *SI);
 
@@ -142,6 +147,12 @@ VPValue *VPPredicator::createEdgeMask(const VPBasicBlock *Src,
   assert(Term->getOpcode() == VPInstruction::BranchOnCond &&
          "Unsupported terminator");
   if (Src->getSuccessors()[0] == Src->getSuccessors()[1])
+    return setEdgeMask(Src, Dst, SrcMask);
+
+  // A uniform branch that is kept remains actual control flow. All lanes take
+  // the same edge, so every lane reaching Src also reaches Dst if that edge is
+  // taken.
+  if (UniformBranchToMergeBlock.contains(Src))
     return setEdgeMask(Src, Dst, SrcMask);
 
   EdgeMask = Term->getOperand(0);
@@ -400,6 +411,95 @@ void VPPredicator::convertPhisToBlends(VPBasicBlock *VPBB) {
   }
 }
 
+/// Returns true if \p V produces the same value for all lanes of a vector
+/// iteration, and for all parts once the plan is unrolled.
+///
+/// Note that vputils::isSingleScalar must not be used for this: it also
+/// returns true for values of which only the first lane is used, and it
+/// classifies the loads, casts and phis of the initial VPlan as single-scalar
+/// even though they are widened later.
+static bool isUniformAcrossLanes(const VPValue *V) {
+  // AnyOf reduces a vector to a single i1 that all lanes share, and the
+  // unroller combines it across all parts, so a single use of it is valid for
+  // the whole unrolled iteration.
+  // TODO: Generalize to the other vector-to-scalar opcodes that
+  // VPlanTransforms::unrollByUF combines across parts, once one of them can
+  // be a branch condition.
+  if (match(V, m_AnyOf(m_VPValue())))
+    return true;
+  // Uniform across all VFs and UFs implies uniform across the lanes of a
+  // single vector iteration.
+  return vputils::isUniformAcrossVFsAndUFs(V);
+}
+
+/// Returns the block guarded by the terminator of \p VPBB, if that terminator
+/// is a branch that is better kept as control flow than if-converted, and
+/// nullptr otherwise. Note that this also decides whether keeping the branch
+/// pays off, it is not a purely structural query.
+///
+/// A branch can be kept if its condition is uniform across all lanes: they
+/// then all take the same edge, so the guarded block can execute unmasked
+/// under a real branch. Only the simplest shape is handled, where \p VPBB
+/// branches to a guarded block, which has \p VPBB as its only predecessor, and
+/// to a merge block, which is the guarded block's only successor and has no
+/// other predecessors:
+///
+///     VPBB
+///     |   \
+///     |  Guarded
+///     |   /
+///     Merge
+///
+/// Merge must not contain any phis. Those could stay phis, as the branch stays
+/// control flow, but convertPhisToBlends turns all of them into
+/// VPBlendRecipes, and a blend cannot tell the two edges apart because they
+/// have the same mask.
+/// TODO: Keep the phis of Merge instead of blending them.
+static VPBasicBlock *getBlockToKeepUnderUniformBranch(VPBasicBlock *VPBB) {
+  if (VPBB->getNumSuccessors() != 2)
+    return nullptr;
+  VPValue *Cond;
+  if (!match(VPBB->getTerminator(), m_BranchOnCond(m_VPValue(Cond))) ||
+      !isUniformAcrossLanes(Cond))
+    return nullptr;
+
+  auto *Succ0 = cast<VPBasicBlock>(VPBB->getSuccessors()[0]);
+  auto *Succ1 = cast<VPBasicBlock>(VPBB->getSuccessors()[1]);
+  if (Succ0 == Succ1)
+    return nullptr;
+  auto *Guarded = Succ0->getSingleSuccessor() == Succ1 ? Succ0 : Succ1;
+  auto *Merge = Guarded == Succ0 ? Succ1 : Succ0;
+  if (Guarded->getSinglePredecessor() != VPBB ||
+      Guarded->getSingleSuccessor() != Merge ||
+      Merge->getNumPredecessors() != 2 ||
+      Merge->getFirstNonPhi() != Merge->begin())
+    return nullptr;
+
+  // Merge having no phis, together with Guarded not dominating any other
+  // block, means no value defined in Guarded is used outside of it. That is
+  // what keeps the transforms that run on the kept sub-CFG correct.
+  assert(none_of(*Guarded,
+                 [Guarded](VPRecipeBase &R) {
+                   return any_of(R.definedValues(), [Guarded](VPValue *Def) {
+                     return any_of(Def->users(), [Guarded](VPUser *U) {
+                       return cast<VPRecipeBase>(U)->getParent() != Guarded;
+                     });
+                   });
+                 }) &&
+         "a value defined in the guarded block escapes it");
+
+  // Keeping the branch only pays off if it skips an operation that would
+  // otherwise have to be masked; if-converting a block of plain arithmetic is
+  // cheaper, as it avoids the branch.
+  // TODO: This runs before a VF is chosen, so the cost of both alternatives
+  // cannot be compared here. Model both and decide per VF instead.
+  if (none_of(*Guarded, [](VPRecipeBase &R) {
+        return R.mayReadOrWriteMemory() || R.mayHaveSideEffects();
+      }))
+    return nullptr;
+  return Guarded;
+}
+
 void VPPredicator::run() {
   VPBasicBlock *Header = Plan.getVectorLoopRegion()->getEntryBasicBlock();
   // Scan the body of the loop in a topological order to visit each basic
@@ -410,6 +510,19 @@ void VPPredicator::run() {
   auto Blocks = to_vector(VPBlockUtils::blocksAs<VPBasicBlock>(RPOT));
   DenseMap<const VPBasicBlock *, std::optional<VPExecutionFrequency>>
       Frequencies = vputils::computeExecutionFrequencies(Blocks);
+
+  // Collect the uniform branches to keep as control flow, together with the
+  // blocks of the sub-CFG they guard.
+  SmallPtrSet<const VPBasicBlock *, 4> BlocksInKeptSubCFG;
+  for (VPBasicBlock *VPBB : Blocks) {
+    VPBasicBlock *Guarded = getBlockToKeepUnderUniformBranch(VPBB);
+    if (!Guarded)
+      continue;
+    auto *Merge = cast<VPBasicBlock>(Guarded->getSingleSuccessor());
+    UniformBranchToMergeBlock[VPBB] = Merge;
+    BlocksInKeptSubCFG.insert(Guarded);
+    BlocksInKeptSubCFG.insert(Merge);
+  }
 
   for (VPBasicBlock *VPBB : Blocks) {
     // Introduce the mask for VPBB, which may introduce needed edge masks, and
@@ -439,21 +552,35 @@ void VPPredicator::run() {
     if (VPBB != Header)
       convertPhisToBlends(VPBB);
 
-  // Linearize the blocks of the loop into one serial chain.
+  // Linearize the blocks of the loop into one serial chain. A uniform branch
+  // that is kept together with the block it guards forms a single-entry
+  // single-exit sub-CFG, which is spliced into the chain as a unit: the chain
+  // enters at the branch's block and leaves at its merge block, keeping the
+  // edges in between.
   VPBlockBase *PrevVPBB = nullptr;
   for (VPBasicBlock *VPBB : Blocks) {
-    auto Successors = to_vector(VPBB->getSuccessors());
-    if (Successors.size() > 1)
-      VPBB->getTerminator()->eraseFromParent();
+    // Skip blocks of a kept sub-CFG; they are connected via its entry block.
+    if (BlocksInKeptSubCFG.contains(VPBB))
+      continue;
+    // Find the block the chain continues at. Sub-CFGs can be adjacent, if the
+    // merge block of one is the entry block of the next.
+    VPBasicBlock *SubCFGExit = VPBB;
+    while (VPBasicBlock *Merge = UniformBranchToMergeBlock.lookup(SubCFGExit))
+      SubCFGExit = Merge;
 
-    // Flatten the CFG in the loop. To do so, first disconnect VPBB from its
-    // successors. Then connect VPBB to the previously visited VPBB.
+    auto Successors = to_vector(SubCFGExit->getSuccessors());
+    if (Successors.size() > 1)
+      SubCFGExit->getTerminator()->eraseFromParent();
+
+    // Flatten the CFG in the loop. To do so, first disconnect the sub-CFG's
+    // exit from its successors. Then connect VPBB to the previously visited
+    // VPBB.
     for (auto *Succ : Successors)
-      VPBlockUtils::disconnectBlocks(VPBB, Succ);
+      VPBlockUtils::disconnectBlocks(SubCFGExit, Succ);
     if (PrevVPBB)
       VPBlockUtils::connectBlocks(PrevVPBB, VPBB);
 
-    PrevVPBB = VPBB;
+    PrevVPBB = SubCFGExit;
   }
 }
 

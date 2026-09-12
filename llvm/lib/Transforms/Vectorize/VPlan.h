@@ -1464,8 +1464,11 @@ private:
     if (!getUnderlyingValue())
       return true;
 
+    // A branch is control flow and is never masked. It can reach here if it
+    // survived linearization, e.g. a uniform branch kept by VPPredicator.
     return Instruction::isCast(Opcode) || Opcode == Instruction::PHI ||
-           Opcode == Instruction::GetElementPtr;
+           Opcode == Instruction::GetElementPtr ||
+           Opcode == VPInstruction::BranchOnCond;
   }
 
 public:

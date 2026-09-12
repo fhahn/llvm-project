@@ -8,6 +8,10 @@ target triple = "aarch64--linux-gnu"
 ; and block probability scaling. Note that the functionality being tested is
 ; not specific to AArch64. We specify a target to get actual values for the
 ; instruction costs.
+;
+; The conditions below must stay loop-varying: a branch on a condition that is
+; the same for all lanes is kept as control flow rather than if-converted, and
+; the guarded operations are then not predicated at all.
 
 ; CHECK-LABEL: predicated_udiv
 ;
@@ -62,7 +66,7 @@ for.end:
 ; CHECK: Scalarizing and predicating: store i32 %tmp2, ptr %tmp0, align 4
 ; CHECK: Cost of 4 for VF 2: profitable to scalarize   store i32 %tmp2, ptr %tmp0, align 4
 ;
-define void @predicated_store(ptr %a, i1 %c, i32 %x, i64 %n) {
+define void @predicated_store(ptr %a, i64 %m, i32 %x, i64 %n) {
 entry:
   br label %for.body
 
@@ -71,6 +75,7 @@ for.body:
   %tmp0 = getelementptr inbounds i32, ptr %a, i64 %i
   %tmp1 = load i32, ptr %tmp0, align 4
   %tmp2 = add nsw i32 %tmp1, %x
+  %c = icmp ult i64 %i, %m
   br i1 %c, label %if.then, label %for.inc
 
 if.then:
@@ -96,7 +101,7 @@ for.end:
 ; CHECK: Cost of 0 for VF 2: induction instruction   %addr = phi ptr [ %a, %entry ], [ %addr.next, %for.inc ]
 ; CHECK: Cost of 4 for VF 2: profitable to scalarize   store i32 %tmp2, ptr %addr, align 4
 ;
-define void @predicated_store_phi(ptr %a, i1 %c, i32 %x, i64 %n) {
+define void @predicated_store_phi(ptr %a, i64 %m, i32 %x, i64 %n) {
 entry:
   br label %for.body
 
@@ -105,6 +110,7 @@ for.body:
   %addr = phi ptr [ %a, %entry ], [ %addr.next, %for.inc ]
   %tmp1 = load i32, ptr %addr, align 4
   %tmp2 = add nsw i32 %tmp1, %x
+  %c = icmp ult i64 %i, %m
   br i1 %c, label %if.then, label %for.inc
 
 if.then:
@@ -184,7 +190,7 @@ for.end:
 ; CHECK: Cost of 2 for VF 2: profitable to scalarize   store i32 %tmp2, ptr %tmp0, align 4
 ; CHECK: Cost of 3 for VF 2: profitable to scalarize   %tmp2 = add nsw i32 %tmp1, %x
 ;
-define void @predicated_store_scalarized_operand(ptr %a, i1 %c, i32 %x, i64 %n) {
+define void @predicated_store_scalarized_operand(ptr %a, i64 %m, i32 %x, i64 %n) {
 entry:
   br label %for.body
 
@@ -192,6 +198,7 @@ for.body:
   %i = phi i64 [ 0, %entry ], [ %i.next, %for.inc ]
   %tmp0 = getelementptr inbounds i32, ptr %a, i64 %i
   %tmp1 = load i32, ptr %tmp0, align 4
+  %c = icmp ult i64 %i, %m
   br i1 %c, label %if.then, label %for.inc
 
 if.then:
@@ -240,7 +247,7 @@ for.end:
 ; CHECK: Cost of 7 for VF 2: REPLICATE ir<%tmp3> = sdiv ir<%tmp1>, ir<%tmp2>
 ; CHECK: Cost of 5 for VF 2: REPLICATE ir<%tmp4> = udiv ir<%tmp3>, ir<%tmp2>
 ;
-define void @predication_multi_context(ptr %a, i1 %c, i32 %x, i64 %n) {
+define void @predication_multi_context(ptr %a, i64 %m, i32 %x, i64 %n) {
 entry:
   br label %for.body
 
@@ -248,6 +255,7 @@ for.body:
   %i = phi i64 [ 0, %entry ], [ %i.next, %for.inc ]
   %tmp0 = getelementptr inbounds i32, ptr %a, i64 %i
   %tmp1 = load i32, ptr %tmp0, align 4
+  %c = icmp ult i64 %i, %m
   br i1 %c, label %if.then, label %for.inc
 
 if.then:

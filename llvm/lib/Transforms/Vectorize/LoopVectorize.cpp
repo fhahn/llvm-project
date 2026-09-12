@@ -2371,9 +2371,7 @@ void LoopVectorizationCostModel::collectLoopScalars(ElementCount VF) {
 bool LoopVectorizationCostModel::isLegalMaskedLoadOrStore(
     Instruction *I, ElementCount VF) const {
   assert(isa<LoadInst>(I) || isa<StoreInst>(I));
-  return Config.isLegalMaskedLoadOrStore(isa<LoadInst>(I), getLoadStoreType(I),
-                                         getLoadStoreAlignment(I),
-                                         getLoadStoreAddressSpace(I));
+  return Config.isLegalMaskedLoadOrStore(I);
 }
 
 bool LoopVectorizationCostModel::isLegalGatherOrScatter(Instruction *I,
@@ -6129,8 +6127,10 @@ VPRecipeWithIRFlags *VPRecipeBuilder::tryToWiden(VPInstruction *VPI) {
   case Instruction::UDiv:
   case Instruction::SRem:
   case Instruction::URem:
-    // If not provably safe, use a masked intrinsic.
-    if (CM.isPredicatedInst(I))
+    // If not provably safe, use a masked intrinsic. Note that an operation
+    // that is conditional in the original loop may be unmasked here, if it is
+    // guarded by a branch that has been kept as control flow.
+    if (CM.isPredicatedInst(I) && VPI->isMasked())
       return new VPWidenIntrinsicRecipe(
           getMaskedDivRemIntrinsic(VPI->getOpcode()), VPI->operands(),
           I->getType(), {}, {}, VPI->getDebugLoc());
@@ -6233,7 +6233,10 @@ VPSingleDefRecipe *VPRecipeBuilder::handleReplication(VPInstruction *VPI,
       [&](ElementCount VF) { return CM.isUniformAfterVectorization(I, VF); },
       Range);
 
-  bool IsPredicated = CM.isPredicatedInst(I);
+  // Note that an instruction that is conditional in the original loop may be
+  // unmasked here, if it is guarded by a branch that has been kept as control
+  // flow.
+  bool IsPredicated = CM.isPredicatedInst(I) && VPI->isMasked();
 
   // Even if the instruction is not marked as uniform, there are certain
   // intrinsic calls that can be effectively treated as such, so we check for
@@ -6672,12 +6675,15 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan,
 
   // Now process all other blocks and instructions.
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(RPOT)) {
+    VPRecipeBase *Terminator = VPBB->getTerminator();
     // Convert input VPInstructions to widened recipes.
     for (VPRecipeBase &R : make_early_inc_range(
              make_range(VPBB->getFirstNonPhi(), VPBB->end()))) {
-      // Skip recipes that do not need transforming or have already been
-      // transformed.
-      if (isa<VPWidenCanonicalIVRecipe, VPBlendRecipe, VPReductionRecipe,
+      // Skip the block's terminator, which is a branch that survived
+      // linearization and stays control flow, and recipes that do not need
+      // transforming or have already been transformed.
+      if (&R == Terminator ||
+          isa<VPWidenCanonicalIVRecipe, VPBlendRecipe, VPReductionRecipe,
               VPReplicateRecipe, VPWidenLoadRecipe, VPWidenStoreRecipe,
               VPWidenCallRecipe, VPWidenIntrinsicRecipe, VPVectorPointerRecipe,
               VPVectorEndPointerRecipe, VPHistogramRecipe>(&R) ||

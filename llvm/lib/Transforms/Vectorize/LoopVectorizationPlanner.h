@@ -802,6 +802,11 @@ public:
   bool isLegalMaskedLoadOrStore(bool IsLoad, Type *ScalarTy, Align Alignment,
                                 unsigned AddressSpace) const;
 
+  /// Returns true if the target machine supports a masked version of the load
+  /// or store \p I. The caller must ensure the access is consecutive or part
+  /// of an interleave group.
+  bool isLegalMaskedLoadOrStore(const Instruction *I) const;
+
   /// Returns true if the target machine supports a gather (if \p IsLoad)
   /// or scatter of scalar type \p ScalarTy with \p Alignment for vectorization
   /// factor \p VF.

@@ -5596,8 +5596,8 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
         "makeVPlanMemOpDecision", ProcessSubset, Plan, [&](VPInstruction *VPI) {
           Instruction *I = VPI->getUnderlyingInstr();
           bool IsLoad = VPI->getOpcode() == Instruction::Load;
-          if (RecipeBuilder.isPredicatedInst(I) || !IsLoad ||
-              !vputils::isUsedByLoadStoreAddress(VPI))
+          if ((RecipeBuilder.isPredicatedInst(I) && VPI->isMasked()) ||
+              !IsLoad || !vputils::isUsedByLoadStoreAddress(VPI))
             return false;
 
           // Scalarize loads used as addresses, matching the legacy CM. The load
@@ -5635,9 +5635,12 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
         bool Reverse = Stride == -1;
 
         // A predicated access can only be widened (rather than scalarized) if
-        // the target supports a masked load/store for it.
+        // the target supports a masked load/store for it. Note that an access
+        // that is conditional in the original loop may be unmasked here, if it
+        // is guarded by a branch that has been kept as control flow.
         // TODO: Determine if a load/store needs predication directly in VPlan.
-        bool IsPredicated = RecipeBuilder.isPredicatedInst(I);
+        bool IsPredicated =
+            RecipeBuilder.isPredicatedInst(I) && VPI->isMasked();
         if (IsPredicated && !CostCtx.Config.isLegalMaskedLoadOrStore(
                                 IsLoad, ScalarTy, getLoadStoreAlignment(I),
                                 getLoadStoreAddressSpace(I)))
