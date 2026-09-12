@@ -445,7 +445,7 @@ public:
   /// execute between the two, as it may also contain blocks that cannot reach
   /// \p LastBB.
   static SmallVector<VPBasicBlock *> blocksBetween(VPBasicBlock *FirstBB,
-                                                   VPBasicBlock *LastBB);
+                                                VPBasicBlock *LastBB);
 
   /// Inserts \p BlockPtr on the edge between \p From and \p To. That is, update
   /// \p From's successor to \p To to point to \p BlockPtr and \p To's

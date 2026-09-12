@@ -417,9 +417,7 @@ static cl::opt<bool> EnableEarlyExitVectorizationWithSideEffects(
 
 static cl::opt<bool> EarlyExitVectorizationBailToScalar(
     "early-exit-vectorization-bail-to-scalar", cl::init(false), cl::Hidden,
-    cl::desc("Allow the bail-to-scalar style for early exit loops with side "
-             "effects, for targets on which masking the loop's memory "
-             "operations would scalarize them."));
+    cl::desc("Bail to scalar on early exits when masking is expensive"));
 
 // Returns true if the epilogue VF has been set to a non-zero value other than
 // VF=1 (scalar).
@@ -2377,7 +2375,9 @@ void LoopVectorizationCostModel::collectLoopScalars(ElementCount VF) {
 bool LoopVectorizationCostModel::isLegalMaskedLoadOrStore(
     Instruction *I, ElementCount VF) const {
   assert(isa<LoadInst>(I) || isa<StoreInst>(I));
-  return Config.isLegalMaskedLoadOrStore(I);
+  return Config.isLegalMaskedLoadOrStore(isa<LoadInst>(I), getLoadStoreType(I),
+                                         getLoadStoreAlignment(I),
+                                         getLoadStoreAddressSpace(I));
 }
 
 bool LoopVectorizationCostModel::isLegalGatherOrScatter(Instruction *I,
@@ -6428,26 +6428,6 @@ static bool verifyExecutionFrequenciesMatchBFI(VPlan &Plan, Loop *OrigLoop,
 }
 #endif
 
-/// Returns true if masking a memory operation of \p TheLoop would force it to
-/// be scalarized, because the target has no masked load or store for it. Used
-/// to decide between the uncountable exit styles: bailing out of the whole
-/// vector iteration keeps the memory operations unmasked, which only pays off
-/// if masking them is expensive.
-/// TODO: This is a conservative approximation. It also considers the load
-/// feeding the exit condition, which is never masked, and it does not compare
-/// the cost of the two styles, even though bailing out can be cheaper than
-/// masking that is merely legal.
-static bool maskingMemOpsWouldScalarize(const Loop &TheLoop,
-                                        const VFSelectionContext &Config) {
-  for (BasicBlock *BB : TheLoop.blocks()) {
-    for (Instruction &I : *BB) {
-      if (isa<LoadInst, StoreInst>(I) && !Config.isLegalMaskedLoadOrStore(&I))
-        return true;
-    }
-  }
-  return false;
-}
-
 VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
   bool IsInnerLoop = OrigLoop->isInnermost();
 
@@ -6516,17 +6496,16 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
   //       the presence of an uncountable exit and the presence of stores in
   //       the loop inside handleUncountableEarlyExits itself.
   if (Legal->hasUncountableEarlyExit()) {
-    UncountableExitStyle EEStyle;
-    if (!Legal->hasUncountableExitWithSideEffects())
-      EEStyle = UncountableExitStyle::ReadOnly;
-    else if (EarlyExitVectorizationBailToScalar &&
-             maskingMemOpsWouldScalarize(*OrigLoop, Config))
+    UncountableExitStyle EEStyle =
+        Legal->hasUncountableExitWithSideEffects()
+            ? UncountableExitStyle::MaskedHandleExitInScalarLoop
+            : UncountableExitStyle::ReadOnly;
+    if (EarlyExitVectorizationBailToScalar &&
+        EEStyle == UncountableExitStyle::MaskedHandleExitInScalarLoop)
       EEStyle = UncountableExitStyle::BailToScalarOnEarlyExit;
-    else
-      EEStyle = UncountableExitStyle::MaskedHandleExitInScalarLoop;
     if (!RUN_VPLAN_PASS(VPlanTransforms::handleUncountableEarlyExits, *VPlan0,
                         OrigLoop, PSE, *DT, Legal->getAssumptionCache(),
-                        EEStyle))
+                        EEStyle, Config))
       return nullptr;
   } else {
     RUN_VPLAN_PASS(VPlanTransforms::handleCountableEarlyExits, *VPlan0);

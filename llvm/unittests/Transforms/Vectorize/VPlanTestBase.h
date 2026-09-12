@@ -12,6 +12,7 @@
 #ifndef LLVM_UNITTESTS_TRANSFORMS_VECTORIZE_VPLANTESTBASE_H
 #define LLVM_UNITTESTS_TRANSFORMS_VECTORIZE_VPLANTESTBASE_H
 
+#include "../lib/Transforms/Vectorize/LoopVectorizationPlanner.h"
 #include "../lib/Transforms/Vectorize/VPlan.h"
 #include "../lib/Transforms/Vectorize/VPlanHelpers.h"
 #include "../lib/Transforms/Vectorize/VPlanTransforms.h"
@@ -104,10 +105,13 @@ protected:
           /*AllowReordering=*/false);
     }
 
-    if (Style)
+    if (Style) {
+      TargetTransformInfo TTI(DL);
+      VFSelectionContext Config(TTI, nullptr, L, F, PSE, nullptr, nullptr,
+                                nullptr, false);
       VPlanTransforms::handleUncountableEarlyExits(*Plan, L, PSE, *DT, AC.get(),
-                                                   *Style);
-    else
+                                                *Style, Config);
+    } else
       VPlanTransforms::handleCountableEarlyExits(*Plan);
     VPlanTransforms::addMiddleCheck(*Plan);
 
