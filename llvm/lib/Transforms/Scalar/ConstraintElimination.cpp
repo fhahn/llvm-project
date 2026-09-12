@@ -2482,16 +2482,14 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
           Value *X = BO->getOperand(0);
           Value *N = BO->getOperand(1);
           Constant *Zero = Constant::getNullValue(BO->getType());
-          if (Info.doesHold(CmpInst::ICMP_SGE, X, Zero) ||
-              isKnownNonNegative(X, F.getDataLayout())) {
+          if (Info.isKnownNonNegative(X)) {
             // srem x, n: result >= 0, if x >= 0 (result has the sign of x)
             AddFact(CmpInst::ICMP_SGE, BO, Zero);
             // srem x, n: result <= x, if x >= 0 (|result| <= |x| and both are
             // non-negative)
             AddFact(CmpInst::ICMP_SLE, BO, X);
           }
-          if (Info.doesHold(CmpInst::ICMP_SGE, N, Zero) ||
-              isKnownPositive(N, F.getDataLayout())) {
+          if (Info.isKnownNonNegative(N)) {
             // srem x, n: result <= n, if n >= 0 (|result| < n, so result <= n -
             // 1
             AddFact(CmpInst::ICMP_SLT, BO, N);
