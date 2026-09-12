@@ -65,9 +65,10 @@ bool isAddressSCEVForCost(const SCEV *Addr, ScalarEvolution &SE, const Loop *L);
 bool isSingleScalar(const VPValue *VPV);
 
 /// Checks if \p V is uniform across all VF lanes and UF parts. It is considered
-/// as such if it is either loop invariant (defined outside the vector region)
-/// or its operands are known to be uniform across all VFs and UFs (e.g.
-/// VPDerivedIV or the canonical IV).
+/// as such if it is either loop invariant (defined outside the vector region),
+/// its operands are known to be uniform across all VFs and UFs (e.g.
+/// VPDerivedIV or the canonical IV) or it is an AnyOf, which combines all lanes
+/// and parts of its operand.
 LLVM_ABI_FOR_TEST bool isUniformAcrossVFsAndUFs(const VPValue *V);
 
 /// Returns the block guarded by the terminator of \p VPBB, if it is a branch

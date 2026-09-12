@@ -1926,6 +1926,12 @@ TEST_F(VPUtilsTest, IsUniformAcrossVFsAndUFsForSingleScalarOpcodes) {
   VPInstruction *FirstActiveLaneNonUniform =
       Builder.createNaryOp(VPInstruction::FirstActiveLane, {StepVector}, Int32);
   EXPECT_FALSE(vputils::isUniformAcrossVFsAndUFs(FirstActiveLaneNonUniform));
+
+  // AnyOf combines all lanes and parts, even of a non-uniform operand.
+  VPInstruction *AnyOf = Builder.createNaryOp(
+      VPInstruction::AnyOf,
+      {Builder.createICmp(CmpInst::ICMP_EQ, StepVector, StepVector)});
+  EXPECT_TRUE(vputils::isUniformAcrossVFsAndUFs(AnyOf));
 }
 
 static VPValue *reconstructSSA(VPBasicBlock *VPBB,

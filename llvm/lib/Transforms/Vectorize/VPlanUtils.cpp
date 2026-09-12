@@ -553,6 +553,9 @@ bool vputils::isUniformAcrossVFsAndUFs(const VPValue *V) {
         return false;
       })
       .Case([](const VPInstruction *VPI) {
+        // AnyOf combines all lanes and parts of its operand into one scalar.
+        if (VPI->getOpcode() == VPInstruction::AnyOf)
+          return true;
         return (VPI->isSingleScalar() || VPI->isVectorToScalar() ||
                 preservesUniformity(VPI->getOpcode())) &&
                all_of(VPI->operands(), isUniformAcrossVFsAndUFs);

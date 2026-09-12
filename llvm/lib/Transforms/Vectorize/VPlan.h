@@ -89,6 +89,8 @@ enum class UncountableExitStyle {
   /// an uncountable exit occurre will be masked based on that condition. If an
   /// uncountable exit is taken, then all lanes before the exiting lane will
   /// complete, leaving just the final lane to execute in the scalar tail.
+  /// If the target cannot mask the accesses, the vector iteration is instead
+  /// skipped if any lane exits and executed by the scalar loop, if possible.
   MaskedHandleExitInScalarLoop,
 };
 
