@@ -263,6 +263,14 @@ static bool
 canHoistOrSinkWithNoAliasCheck(const MemoryLocation &MemLoc,
                                VPBasicBlock *FirstBB, VPBasicBlock *LastBB,
                                std::optional<SinkStoreInfo> SinkInfo = {}) {
+  // The alias check below scans the single-successor chain from FirstBB to
+  // LastBB, which blocksInSingleSuccessorChainBetween only asserts. If LastBB
+  // is not reachable from FirstBB through single successors (e.g. there is
+  // conditional control flow in between), there is no chain to scan, so
+  // conservatively disallow hoisting/sinking rather than assert.
+  if (!VPBlockUtils::isReachableViaSingleSuccessors(FirstBB, LastBB))
+    return false;
+
   bool CheckReads = SinkInfo.has_value();
   for (VPBasicBlock *VPBB :
        VPBlockUtils::blocksInSingleSuccessorChainBetween(FirstBB, LastBB)) {
@@ -287,9 +295,9 @@ canHoistOrSinkWithNoAliasCheck(const MemoryLocation &MemLoc,
   return true;
 }
 
-/// Get the value type of the replicate load or store. \p IsLoad indicates
-/// whether it is a load.
-static Type *getLoadStoreValueType(VPReplicateRecipe *R, bool IsLoad) {
+/// Get the value type of the load or store \p R. \p IsLoad indicates whether it
+/// is a load.
+static Type *getLoadStoreValueType(VPSingleDefRecipe *R, bool IsLoad) {
   return (IsLoad ? R : R->getOperand(0))->getScalarType();
 }
 
@@ -3533,6 +3541,139 @@ bool VPlanTransforms::handleUncountableEarlyExits(
   return true;
 }
 
+void VPlanTransforms::convertMaskedEarlyExitToBailToScalar(
+    VPlan &Plan, const VFSelectionContext &Config) {
+  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
+  if (!LoopRegion)
+    return;
+  VPBasicBlock *HeaderVPBB = LoopRegion->getEntryBasicBlock();
+  VPBasicBlock *LatchVPBB = LoopRegion->getExitingBasicBlock();
+  // The masked form has a separate header and latch, chained header -> latch.
+  // Requiring the body to be a single block keeps everything the bail branch
+  // will skip unconditionally executed beforehand, so no recipe has an
+  // execution frequency that the new branch would invalidate.
+  // TODO: Support loop bodies spanning more than one block.
+  if (HeaderVPBB->getSingleSuccessor() != LatchVPBB)
+    return;
+
+  // Match the any-of of the uncountable exit condition in the latch.
+  VPInstruction *AnyOfR;
+  VPValue *Cond;
+  if (!match(LatchVPBB->getTerminator(),
+             m_BranchOnTwoConds(m_CombineAnd(m_VPInstruction(AnyOfR),
+                                             m_AnyOf(m_VPValue(Cond))),
+                                m_VPValue())) ||
+      AnyOfR->getParent() != LatchVPBB)
+    return;
+
+  // Match the mask on the memory operations to skip on a bail; the
+  // first-active-lane may be cast to the IV's type.
+  auto *MaskR = find_singleton<VPInstruction>(
+      *HeaderVPBB, [Cond](VPRecipeBase &R, bool) -> VPInstruction * {
+        if (match(&R, m_VPInstruction<VPInstruction::ActiveLaneMask>(
+                          m_ZeroInt(), m_ZExtOrTruncOrSelf(m_FirstActiveLane(
+                                           m_Specific(Cond))))))
+          return cast<VPInstruction>(&R);
+        return nullptr;
+      });
+  if (!MaskR)
+    return;
+
+  // The recipes after the mask become the non-bailing body.
+  auto BodyRange =
+      make_range(std::next(MaskR->getIterator()), HeaderVPBB->end());
+  SmallPtrSet<VPRecipeBase *, 16> BodyRecipes;
+  for (VPRecipeBase &R : BodyRange)
+    BodyRecipes.insert(&R);
+
+  // All users of the mask must be loads or stores in the body. The producer
+  // masks every side-effecting memory operation with this single mask, so this
+  // also guarantees none is left on the bail path.
+  SmallSetVector<VPInstruction *, 4> MaskedMemOps;
+  for (VPUser *U : MaskR->users()) {
+    auto *VPI = dyn_cast<VPInstruction>(U);
+    if (!VPI ||
+        !is_contained({Instruction::Load, Instruction::Store},
+                      VPI->getOpcode()) ||
+        VPI->getMask() != MaskR || !BodyRecipes.contains(VPI))
+      return;
+    MaskedMemOps.insert(VPI);
+  }
+
+  // The body is skipped on a bail, so must not define values used outside it.
+  // This also means the latch needs no phis to merge the two incoming edges.
+  // TODO: Support body live-outs by recomputing them in the scalar loop.
+  for (VPRecipeBase &R : BodyRange)
+    for (VPValue *Def : R.definedValues())
+      if (any_of(Def->users(), [&BodyRecipes](VPUser *U) {
+            return !BodyRecipes.contains(cast<VPRecipeBase>(U));
+          }))
+        return;
+
+  // Bailing trades extra control flow and re-executed iterations for unmasked
+  // memory operations; only worthwhile if masking them would be scalarized.
+  // TODO: This mirrors the consecutive-access query widenConsecutiveMemOps
+  // makes without checking the stride is +/-1 first, so a non-consecutive
+  // access that would have been widened to a legal masked gather/scatter is
+  // also treated as not maskable.
+  bool MaskingIsLegal = all_of(MaskedMemOps, [&Config](VPInstruction *VPI) {
+    bool IsLoad = VPI->getOpcode() == Instruction::Load;
+    auto *PtrTy = cast<PointerType>(VPI->getOperand(!IsLoad)->getScalarType());
+    // TODO: Model the alignment on the Load/Store VPInstruction, so it does
+    // not have to be retrieved from the underlying instruction.
+    return Config.isLegalMaskedLoadOrStore(
+        IsLoad, getLoadStoreValueType(VPI, IsLoad),
+        getLoadStoreAlignment(VPI->getUnderlyingInstr()),
+        PtrTy->getAddressSpace());
+  });
+  if (MaskingIsLegal)
+    return;
+
+  // Split the header after the mask and unmask the memory operations, which
+  // makes the mask itself dead; erase it below. Dropping the mask is safe: the
+  // body only executes if no lane takes the uncountable exit, in which case
+  // first-active-lane(cond) is VF and active-lane-mask(0, VF) is all-ones.
+  HeaderVPBB->splitAt(std::next(MaskR->getIterator()))
+      ->setName("vector.body.nonbailing");
+  for (VPInstruction *VPI : MaskedMemOps)
+    VPI->dropMask();
+  VPValue *FirstActive = MaskR->getOperand(1);
+  MaskR->eraseFromParent();
+
+  // Move the any-of to the header to feed the skip branch; the latch's
+  // BranchOnTwoConds keeps using it.
+  AnyOfR->moveBefore(*HeaderVPBB, HeaderVPBB->end());
+
+  // Add the skip edge header -> latch and make it the true successor, so the
+  // branch skips the body.
+  VPBlockUtils::connectBlocks(HeaderVPBB, LatchVPBB);
+  HeaderVPBB->swapSuccessors();
+  VPBuilder(HeaderVPBB).createNaryOp(VPInstruction::BranchOnCond, AnyOfR);
+
+  // Resume the scalar loop at IV + select(AnyOf, 0, VF). Insert at the top of
+  // the middle block, as the select replaces the first-active-lane the
+  // producer already added the IV to there.
+  VPBasicBlock *MiddleVPBB = Plan.getMiddleBlock();
+  Type *IVScalarTy = FirstActive->getScalarType();
+  VPBuilder MiddleBuilder(MiddleVPBB, MiddleVPBB->getFirstNonPhi());
+  VPValue *VFAsIVTy = MiddleBuilder.createScalarZExtOrTrunc(
+      &Plan.getVF(), IVScalarTy, DebugLoc());
+  VPValue *CommittedLanes =
+      MiddleBuilder.createSelect(AnyOfR, Plan.getZero(IVScalarTy), VFAsIVTy);
+  FirstActive->replaceAllUsesWith(CommittedLanes);
+  vputils::recursivelyDeleteDeadRecipes(FirstActive);
+
+  // The masked form is built once, before any VF/UF has been chosen, and this
+  // conversion is applied to that same template before it is duplicated per
+  // VF: fix UF to 1 here (rather than relying on the UF=1 decision that
+  // hasEarlyExit() forces later, once a VF has already been chosen and
+  // costed) so that Plan::isUnrolled() holds while candidate VFs for this
+  // plan are being costed, and unrolling-gated simplifications such as the
+  // zero-offset VPVectorPointerRecipe fold in simplifyRecipe apply before
+  // costing rather than after.
+  Plan.setUF(1);
+}
+
 /// This function tries convert extended in-loop reductions to
 /// VPExpressionRecipe and clamp the \p Range if it is beneficial and
 /// valid. The created recipe must be decomposed to its constituent
@@ -5608,8 +5749,7 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
         Instruction *I = VPI->getUnderlyingInstr();
         bool IsLoad = VPI->getOpcode() == Instruction::Load;
         VPValue *Ptr = VPI->getOperand(!IsLoad);
-        Type *ScalarTy =
-            IsLoad ? VPI->getScalarType() : VPI->getOperand(0)->getScalarType();
+        Type *ScalarTy = getLoadStoreValueType(VPI, IsLoad);
         std::optional<int64_t> Stride =
             getConstantStride(Ptr, ScalarTy, CostCtx.PSE, CostCtx.L);
         if (Stride != 1 && Stride != -1)
@@ -5619,17 +5759,22 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
         // A predicated access can only be widened (rather than scalarized) if
         // the target supports a masked load/store for it.
         // TODO: Determine if a load/store needs predication directly in VPlan.
-        bool IsPredicated = RecipeBuilder.isPredicatedInst(I);
-        if (IsPredicated && !CostCtx.Config.isLegalMaskedLoadOrStore(
-                                IsLoad, ScalarTy, getLoadStoreAlignment(I),
-                                getLoadStoreAddressSpace(I)))
+        // isPredicatedInst(I) reasons about the original scalar instruction's
+        // conditional execution and has no way to know that a recipe was
+        // deliberately left unmasked (e.g. by
+        // convertMaskedEarlyExitToBailToScalar), so also check the recipe
+        // itself actually carries a mask.
+        bool NeedsMask = RecipeBuilder.isPredicatedInst(I) && VPI->isMasked();
+        if (NeedsMask && !CostCtx.Config.isLegalMaskedLoadOrStore(
+                             IsLoad, ScalarTy, getLoadStoreAlignment(I),
+                             getLoadStoreAddressSpace(I)))
           return false;
 
         VPBuilder Builder(VPI);
         VPSingleDefRecipe *VectorPtr = Builder.createConsecutiveVectorPointer(
             Ptr, ScalarTy, Reverse, VPI->getDebugLoc());
 
-        VPValue *Mask = IsPredicated ? VPI->getMask() : nullptr;
+        VPValue *Mask = NeedsMask ? VPI->getMask() : nullptr;
         // Reverse the mask so it matches the reversed access order.
         if (Reverse && Mask)
           Mask = Builder.createNaryOp(VPInstruction::Reverse, Mask,

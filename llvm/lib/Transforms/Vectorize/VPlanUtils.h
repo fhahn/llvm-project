@@ -439,6 +439,16 @@ public:
         Range, [](BaseTy *Block) -> BlockTy * { return cast<BlockTy>(Block); });
   }
 
+  /// Returns true if \p To is reachable from \p From by following a chain of
+  /// single successors.
+  static bool isReachableViaSingleSuccessors(VPBlockBase *From,
+                                             VPBlockBase *To) {
+    for (VPBlockBase *Block = From; Block; Block = Block->getSingleSuccessor())
+      if (Block == To)
+        return true;
+    return false;
+  }
+
   /// Returns the blocks between \p FirstBB and \p LastBB, where FirstBB
   /// to LastBB forms a single-sucessor chain.
   static SmallVector<VPBasicBlock *>

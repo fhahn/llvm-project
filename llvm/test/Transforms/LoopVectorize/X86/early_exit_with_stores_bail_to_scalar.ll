@@ -11,10 +11,38 @@
 define void @single_store(ptr noalias %array, ptr align 2 dereferenceable(40) readonly %pred) {
 ; SSE2-LABEL: define void @single_store(
 ; SSE2-SAME: ptr noalias [[ARRAY:%.*]], ptr readonly align 2 dereferenceable(40) [[PRED:%.*]]) {
-; SSE2-NEXT:  [[ENTRY:.*]]:
+; SSE2-NEXT:  [[ENTRY:.*:]]
+; SSE2-NEXT:    br label %[[VECTOR_PH:.*]]
+; SSE2:       [[VECTOR_PH]]:
+; SSE2-NEXT:    br label %[[VECTOR_BODY:.*]]
+; SSE2:       [[VECTOR_BODY]]:
+; SSE2-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[LOOP_LATCH2:.*]] ]
+; SSE2-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw i16, ptr [[PRED]], i64 [[INDEX]]
+; SSE2-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i16>, ptr [[TMP0]], align 2
+; SSE2-NEXT:    [[TMP1:%.*]] = icmp sgt <4 x i16> [[WIDE_LOAD]], splat (i16 500)
+; SSE2-NEXT:    [[TMP2:%.*]] = freeze <4 x i1> [[TMP1]]
+; SSE2-NEXT:    [[TMP3:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP2]])
+; SSE2-NEXT:    br i1 [[TMP3]], label %[[LOOP_LATCH2]], label %[[VECTOR_BODY_NONBAILING:.*]]
+; SSE2:       [[VECTOR_BODY_NONBAILING]]:
+; SSE2-NEXT:    [[TMP4:%.*]] = getelementptr inbounds nuw i16, ptr [[ARRAY]], i64 [[INDEX]]
+; SSE2-NEXT:    [[WIDE_LOAD1:%.*]] = load <4 x i16>, ptr [[TMP4]], align 2
+; SSE2-NEXT:    [[TMP5:%.*]] = add nsw <4 x i16> [[WIDE_LOAD1]], splat (i16 1)
+; SSE2-NEXT:    store <4 x i16> [[TMP5]], ptr [[TMP4]], align 2
+; SSE2-NEXT:    br label %[[LOOP_LATCH2]]
+; SSE2:       [[LOOP_LATCH2]]:
+; SSE2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; SSE2-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], 20
+; SSE2-NEXT:    [[TMP7:%.*]] = or i1 [[TMP3]], [[TMP6]]
+; SSE2-NEXT:    br i1 [[TMP7]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
+; SSE2:       [[MIDDLE_BLOCK]]:
+; SSE2-NEXT:    [[TMP8:%.*]] = select i1 [[TMP3]], i64 0, i64 4
+; SSE2-NEXT:    [[TMP9:%.*]] = add i64 [[INDEX]], [[TMP8]]
+; SSE2-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[TMP9]], 20
+; SSE2-NEXT:    br i1 [[TMP10]], label %[[EXIT:.*]], label %[[SCALAR_PH:.*]]
+; SSE2:       [[SCALAR_PH]]:
 ; SSE2-NEXT:    br label %[[LOOP_HEADER:.*]]
 ; SSE2:       [[LOOP_HEADER]]:
-; SSE2-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
+; SSE2-NEXT:    [[IV:%.*]] = phi i64 [ [[TMP9]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
 ; SSE2-NEXT:    [[ST_ADDR:%.*]] = getelementptr inbounds nuw i16, ptr [[ARRAY]], i64 [[IV]]
 ; SSE2-NEXT:    [[DATA:%.*]] = load i16, ptr [[ST_ADDR]], align 2
 ; SSE2-NEXT:    [[INC:%.*]] = add nsw i16 [[DATA]], 1
@@ -22,11 +50,11 @@ define void @single_store(ptr noalias %array, ptr align 2 dereferenceable(40) re
 ; SSE2-NEXT:    [[EE_ADDR:%.*]] = getelementptr inbounds nuw i16, ptr [[PRED]], i64 [[IV]]
 ; SSE2-NEXT:    [[EE_VAL:%.*]] = load i16, ptr [[EE_ADDR]], align 2
 ; SSE2-NEXT:    [[EE_COND:%.*]] = icmp sgt i16 [[EE_VAL]], 500
-; SSE2-NEXT:    br i1 [[EE_COND]], label %[[EXIT:.*]], label %[[LOOP_LATCH]]
+; SSE2-NEXT:    br i1 [[EE_COND]], label %[[EXIT]], label %[[LOOP_LATCH]]
 ; SSE2:       [[LOOP_LATCH]]:
 ; SSE2-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
 ; SSE2-NEXT:    [[COUNTED_COND:%.*]] = icmp eq i64 [[IV_NEXT]], 20
-; SSE2-NEXT:    br i1 [[COUNTED_COND]], label %[[EXIT]], label %[[LOOP_HEADER]]
+; SSE2-NEXT:    br i1 [[COUNTED_COND]], label %[[EXIT]], label %[[LOOP_HEADER]], !llvm.loop [[LOOP3:![0-9]+]]
 ; SSE2:       [[EXIT]]:
 ; SSE2-NEXT:    ret void
 ;

@@ -35,6 +35,7 @@ class ScalarEvolution;
 class PredicatedScalarEvolution;
 class TargetLibraryInfo;
 class TargetTransformInfo;
+class VFSelectionContext;
 class VPBuilder;
 class VPRecipeBuilder;
 struct VFRange;
@@ -570,6 +571,39 @@ struct VPlanTransforms {
   /// Predicate and linearize the control-flow in the only loop region of
   /// \p Plan.
   static void introduceMasksAndLinearize(VPlan &Plan);
+
+  /// Convert the masked (partial-commit) form of an uncountable early-exit
+  /// loop with side effects, built by handleUncountableEarlyExits for
+  /// UncountableExitStyle::MaskedHandleExitInScalarLoop, to the bail-to-scalar
+  /// form. The masked form masks the memory operations with
+  /// active-lane-mask(0, first-active-lane(vp<%cond>)) and resumes the scalar
+  /// loop at IV + first-active-lane, so that the lanes before the exiting lane
+  /// commit. The bail-to-scalar form instead branches around the whole loop
+  /// body as soon as any lane would take the uncountable exit, so that no lane
+  /// commits and the whole iteration is re-executed in the scalar loop:
+  ///
+  ///   vector.body:                        (header)
+  ///     <IV and uncountable exit condition recipes>
+  ///     EMIT vp<%any> = any-of vp<%cond>
+  ///     EMIT branch-on-cond vp<%any>      -> latch (bail) / body
+  ///   vector.body.nonbailing:             (body)
+  ///     <unmasked memory operations>
+  ///   latch:
+  ///     EMIT branch-on-two-conds vp<%any>, <counted exit condition>
+  ///
+  /// resuming the scalar loop at IV + select(vp<%any>, 0, VF) instead. Also
+  /// sets the unroll factor of \p Plan to 1, as the bail-to-scalar form is only
+  /// modelled for a single part.
+  ///
+  /// Must run after introduceMasksAndLinearize. Leaves \p Plan unchanged if it
+  /// is not in the expected masked form, if masking the memory operations is
+  /// legal on \p Config's target (bailing trades extra control flow and
+  /// re-executed iterations for unmasked memory operations, so it is only
+  /// worthwhile if masking would be scalarized), or if the conversion is not
+  /// supported for \p Plan's shape.
+  static void
+  convertMaskedEarlyExitToBailToScalar(VPlan &Plan,
+                                       const VFSelectionContext &Config);
 
   /// Replace a VPWidenCanonicalIVRecipe if it is present in \p Plan, with a
   /// VPWidenIntOrFpInductionRecipe, provided it would not cause additional
