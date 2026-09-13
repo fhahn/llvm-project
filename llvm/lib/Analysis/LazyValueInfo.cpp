@@ -371,6 +371,16 @@ public:
   void emitInstructionAnnot(const Instruction *I,
                             formatted_raw_ostream &OS) override;
 };
+
+/// Describes a compare operand of the form 'Val + Offset'. If an add-like
+/// operation relates the operand to Val, \p NoWrapKind holds its no-wrap flags
+/// and \p AddIsVal records whether that operation computes Val itself; the two
+/// directions recover Val's range from the operand's differently.
+struct ICmpOperandMatch {
+  APInt Offset;
+  unsigned NoWrapKind = 0;
+  bool AddIsVal = false;
+};
 } // namespace
 // The actual implementation of the lazy analysis and update.
 class LazyValueInfoImpl {
@@ -454,7 +464,7 @@ class LazyValueInfoImpl {
 
   std::optional<ValueLatticeElement>
   getValueFromSimpleICmpCondition(CmpInst::Predicate Pred, Value *RHS,
-                                  const APInt &Offset, Instruction *CxtI,
+                                  const ICmpOperandMatch &Op, Instruction *CxtI,
                                   bool UseBlockValue);
 
   std::optional<ValueLatticeElement>
@@ -1249,44 +1259,53 @@ LazyValueInfoImpl::solveBlockValueExtractValue(ExtractValueInst *EVI,
   return ValueLatticeElement::getOverdefined();
 }
 
-static bool matchICmpOperand(APInt &Offset, Value *LHS, Value *Val,
-                             ICmpInst::Predicate Pred) {
+/// Returns the no-wrap flags that are known to hold for the add-like operation
+/// \p V.
+static unsigned getAddLikeNoWrapKind(Value *V) {
+  using OBO = OverflowingBinaryOperator;
+  // A disjoint or never carries, so it behaves like an add nuw nsw.
+  if (match(V, m_DisjointOr(m_Value(), m_Value())))
+    return OBO::NoUnsignedWrap | OBO::NoSignedWrap;
+  if (auto *BO = dyn_cast<OverflowingBinaryOperator>(V))
+    return BO->getNoWrapKind();
+  return 0;
+}
+
+static std::optional<ICmpOperandMatch>
+matchICmpOperand(Value *LHS, Value *Val, ICmpInst::Predicate Pred) {
+  APInt Zero = APInt::getZero(Val->getType()->getScalarSizeInBits());
   if (LHS == Val)
-    return true;
+    return ICmpOperandMatch{Zero};
 
   // Handle range checking idiom produced by InstCombine. We will subtract the
   // offset from the allowed range for RHS in this case.
   const APInt *C;
-  if (match(LHS, m_AddLike(m_Specific(Val), m_APInt(C)))) {
-    Offset = *C;
-    return true;
-  }
+  if (match(LHS, m_AddLike(m_Specific(Val), m_APInt(C))))
+    return ICmpOperandMatch{*C, getAddLikeNoWrapKind(LHS)};
 
   // Handle the symmetric case. This appears in saturation patterns like
   // (x == 16) ? 16 : (x + 1).
-  if (match(Val, m_AddLike(m_Specific(LHS), m_APInt(C)))) {
-    Offset = -*C;
-    return true;
-  }
+  if (match(Val, m_AddLike(m_Specific(LHS), m_APInt(C))))
+    return ICmpOperandMatch{-*C, getAddLikeNoWrapKind(Val), /*AddIsVal=*/true};
 
   // If (x | y) < C, then (x < C) && (y < C).
   if (match(LHS, m_c_Or(m_Specific(Val), m_Value())) &&
       (Pred == ICmpInst::ICMP_ULT || Pred == ICmpInst::ICMP_ULE))
-    return true;
+    return ICmpOperandMatch{Zero};
 
   // If (x & y) > C, then (x > C) && (y > C).
   if (match(LHS, m_c_And(m_Specific(Val), m_Value())) &&
       (Pred == ICmpInst::ICMP_UGT || Pred == ICmpInst::ICMP_UGE))
-    return true;
+    return ICmpOperandMatch{Zero};
 
-  return false;
+  return std::nullopt;
 }
 
 /// Get value range for a "(Val + Offset) Pred RHS" condition.
 std::optional<ValueLatticeElement>
 LazyValueInfoImpl::getValueFromSimpleICmpCondition(CmpInst::Predicate Pred,
                                                    Value *RHS,
-                                                   const APInt &Offset,
+                                                   const ICmpOperandMatch &Op,
                                                    Instruction *CxtI,
                                                    bool UseBlockValue) {
   ConstantRange RHSRange(RHS->getType()->getScalarSizeInBits(),
@@ -1303,7 +1322,23 @@ LazyValueInfoImpl::getValueFromSimpleICmpCondition(CmpInst::Predicate Pred,
 
   ConstantRange TrueValues =
       ConstantRange::makeAllowedICmpRegion(Pred, RHSRange);
-  return ValueLatticeElement::getRange(TrueValues.subtract(Offset));
+  // Undoing the offset is exact, as it is a shift modulo the bit width.
+  ConstantRange Result = TrueValues.subtract(Op.Offset);
+  // If the shift wrapped around and an add relates the operand to Val, that
+  // add's no-wrap flags rule out the wrapped-around part. Only use the refined
+  // range if it is actually a subset; the intersection with the no-wrap region
+  // is not always representable, in which case it can come back wider in the
+  // other direction.
+  if (Op.NoWrapKind &&
+      (Result.isUpperWrapped() || Result.isUpperSignWrapped())) {
+    ConstantRange Refined =
+        Op.AddIsVal
+            ? TrueValues.addWithNoWrap(ConstantRange(-Op.Offset), Op.NoWrapKind)
+            : TrueValues.subWithNoWrap(ConstantRange(Op.Offset), Op.NoWrapKind);
+    if (Result.contains(Refined))
+      Result = std::move(Refined);
+  }
+  return ValueLatticeElement::getRange(std::move(Result));
 }
 
 static std::optional<ConstantRange>
@@ -1400,14 +1435,13 @@ std::optional<ValueLatticeElement> LazyValueInfoImpl::getValueFromICmpCondition(
   if (auto Range = getRangeForNUWMulSquare(Val, EdgePred, LHS, RHS))
     return ValueLatticeElement::getRange(*Range);
 
-  APInt Offset(BitWidth, 0);
-  if (matchICmpOperand(Offset, LHS, Val, EdgePred))
-    return getValueFromSimpleICmpCondition(EdgePred, RHS, Offset, ICI,
+  if (auto Op = matchICmpOperand(LHS, Val, EdgePred))
+    return getValueFromSimpleICmpCondition(EdgePred, RHS, *Op, ICI,
                                            UseBlockValue);
 
   CmpInst::Predicate SwappedPred = CmpInst::getSwappedPredicate(EdgePred);
-  if (matchICmpOperand(Offset, RHS, Val, SwappedPred))
-    return getValueFromSimpleICmpCondition(SwappedPred, LHS, Offset, ICI,
+  if (auto Op = matchICmpOperand(RHS, Val, SwappedPred))
+    return getValueFromSimpleICmpCondition(SwappedPred, LHS, *Op, ICI,
                                            UseBlockValue);
 
   if (match(LHS, m_Ctpop(m_Specific(Val))))
