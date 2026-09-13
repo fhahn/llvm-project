@@ -248,6 +248,12 @@ BranchProbability getExecutionProbability(BlockFrequency Freq);
 DenseMap<const VPBasicBlock *, std::optional<VPExecutionFrequency>>
 computeExecutionFrequencies(ArrayRef<VPBasicBlock *> Blocks);
 
+/// Mark \p Br, a branch or select the vectorizer created and has no
+/// probability to give, as having an explicitly unknown profile, so it does not
+/// look like the branch weights of an original branch were dropped. Does
+/// nothing if \p Plan's function has no profile information.
+void setUnknownBranchWeights(VPIRMetadata &Br, VPlan &Plan);
+
 namespace detail {
 
 /// Template-independent implementation for pullOutPermutations.

@@ -742,12 +742,16 @@ static void convertRecipesInRegionBlocksToSingleScalar(VPlan &Plan, Type *IdxTy,
         RepR->replaceAllUsesWith(NewR);
         RepR->eraseFromParent();
       } else if (auto *BranchOnMask = dyn_cast<VPBranchOnMaskRecipe>(&OldR)) {
-        // Turn the frequency of the predicated block into branch weights.
+        // Turn the frequency of the predicated block into branch weights. The
+        // vectorizer has no probability to give for the guard if the frequency
+        // could not be computed, so mark it explicitly unknown.
         auto *BOC = Builder.createNaryOp(VPInstruction::BranchOnCond,
                                          {BranchOnMask->getOperand(0)}, OldDL);
         if (MDNode *Weights = convertFrequencyToBranchWeights(
                 BranchOnMask->getExecutionFrequency(), Plan.getContext()))
           BOC->setMetadata(LLVMContext::MD_prof, Weights);
+        else
+          vputils::setUnknownBranchWeights(*BOC, Plan);
         BranchOnMask->eraseFromParent();
       } else if (auto *PredPhi = dyn_cast<VPPredInstPHIRecipe>(&OldR)) {
         VPValue *PredOp = PredPhi->getOperand(0);

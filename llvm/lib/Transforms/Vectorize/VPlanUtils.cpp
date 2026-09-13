@@ -1260,6 +1260,13 @@ vputils::computeExecutionFrequencies(ArrayRef<VPBasicBlock *> Blocks) {
   return Frequencies;
 }
 
+void vputils::setUnknownBranchWeights(VPIRMetadata &Br, VPlan &Plan) {
+  Function &F = *Plan.getScalarHeader()->getIRBasicBlock()->getParent();
+  if (MDNode *MD =
+          getExplicitlyUnknownBranchWeightsIfProfiled(F, "loop-vectorize"))
+    Br.setMetadata(LLVMContext::MD_prof, MD);
+}
+
 VPIRValue *vputils::tryToFoldLiveIns(VPSingleDefRecipe &R,
                                      ArrayRef<VPValue *> Operands,
                                      const DataLayout &DL) {
