@@ -10,12 +10,12 @@ define i64 @early_exit_taken_1_in_4(ptr dereferenceable(1024) %a) !prof !0 {
 ; VF4-LABEL: define i64 @early_exit_taken_1_in_4(
 ; VF4-SAME: ptr dereferenceable(1024) [[A:%.*]]) !prof [[PROF0:![0-9]+]] {
 ; VF4:    br i1 [[TMP3:%.*]], [[VECTOR_EARLY_EXIT:label %.*]], [[VECTOR_BODY_INTERIM:label %.*]], !prof [[PROF1:![0-9]+]]
-; VF4:    br i1 [[TMP4:%.*]], [[MIDDLE_BLOCK:label %.*]], [[VECTOR_BODY:label %.*]], !llvm.loop [[LOOP2:![0-9]+]]
+; VF4:    br i1 [[TMP4:%.*]], [[MIDDLE_BLOCK:label %.*]], [[VECTOR_BODY:label %.*]], !prof [[PROF2:![0-9]+]], !llvm.loop [[LOOP3:![0-9]+]]
 ;
 ; VF2-LABEL: define i64 @early_exit_taken_1_in_4(
 ; VF2-SAME: ptr dereferenceable(1024) [[A:%.*]]) !prof [[PROF0:![0-9]+]] {
 ; VF2:    br i1 [[TMP3:%.*]], [[VECTOR_EARLY_EXIT:label %.*]], [[VECTOR_BODY_INTERIM:label %.*]], !prof [[PROF1:![0-9]+]]
-; VF2:    br i1 [[TMP4:%.*]], [[MIDDLE_BLOCK:label %.*]], [[VECTOR_BODY:label %.*]], !llvm.loop [[LOOP2:![0-9]+]]
+; VF2:    br i1 [[TMP4:%.*]], [[MIDDLE_BLOCK:label %.*]], [[VECTOR_BODY:label %.*]], !prof [[PROF2:![0-9]+]], !llvm.loop [[LOOP3:![0-9]+]]
 ;
 entry:
   br label %loop.header
@@ -45,12 +45,12 @@ define i64 @early_exit_negated(ptr dereferenceable(1024) %a) !prof !0 {
 ; VF4-LABEL: define i64 @early_exit_negated(
 ; VF4-SAME: ptr dereferenceable(1024) [[A:%.*]]) !prof [[PROF0]] {
 ; VF4:    br i1 [[TMP3:%.*]], [[VECTOR_EARLY_EXIT:label %.*]], [[VECTOR_BODY_INTERIM:label %.*]], !prof [[PROF1]]
-; VF4:    br i1 [[TMP4:%.*]], [[MIDDLE_BLOCK:label %.*]], [[VECTOR_BODY:label %.*]], !llvm.loop [[LOOP5:![0-9]+]]
+; VF4:    br i1 [[TMP4:%.*]], [[MIDDLE_BLOCK:label %.*]], [[VECTOR_BODY:label %.*]], !prof [[PROF2]], !llvm.loop [[LOOP6:![0-9]+]]
 ;
 ; VF2-LABEL: define i64 @early_exit_negated(
 ; VF2-SAME: ptr dereferenceable(1024) [[A:%.*]]) !prof [[PROF0]] {
 ; VF2:    br i1 [[TMP3:%.*]], [[VECTOR_EARLY_EXIT:label %.*]], [[VECTOR_BODY_INTERIM:label %.*]], !prof [[PROF1]]
-; VF2:    br i1 [[TMP4:%.*]], [[MIDDLE_BLOCK:label %.*]], [[VECTOR_BODY:label %.*]], !llvm.loop [[LOOP5:![0-9]+]]
+; VF2:    br i1 [[TMP4:%.*]], [[MIDDLE_BLOCK:label %.*]], [[VECTOR_BODY:label %.*]], !prof [[PROF2]], !llvm.loop [[LOOP6:![0-9]+]]
 ;
 entry:
   br label %loop.header
@@ -80,15 +80,17 @@ exit:
 ;.
 ; VF4: [[PROF0]] = !{!"function_entry_count", i64 1000}
 ; VF4: [[PROF1]] = !{!"branch_weights", i32 175, i32 81}
-; VF4: [[LOOP2]] = distinct !{[[LOOP2]], [[META3:![0-9]+]], [[META4:![0-9]+]]}
-; VF4: [[META3]] = !{!"llvm.loop.isvectorized", i32 1}
-; VF4: [[META4]] = !{!"llvm.loop.unroll.runtime.disable"}
-; VF4: [[LOOP5]] = distinct !{[[LOOP5]], [[META3]], [[META4]]}
+; VF4: [[PROF2]] = !{!"unknown", !"loop-vectorize"}
+; VF4: [[LOOP3]] = distinct !{[[LOOP3]], [[META4:![0-9]+]], [[META5:![0-9]+]]}
+; VF4: [[META4]] = !{!"llvm.loop.isvectorized", i32 1}
+; VF4: [[META5]] = !{!"llvm.loop.unroll.runtime.disable"}
+; VF4: [[LOOP6]] = distinct !{[[LOOP6]], [[META4]], [[META5]]}
 ;.
 ; VF2: [[PROF0]] = !{!"function_entry_count", i64 1000}
 ; VF2: [[PROF1]] = !{!"branch_weights", i32 7, i32 9}
-; VF2: [[LOOP2]] = distinct !{[[LOOP2]], [[META3:![0-9]+]], [[META4:![0-9]+]]}
-; VF2: [[META3]] = !{!"llvm.loop.isvectorized", i32 1}
-; VF2: [[META4]] = !{!"llvm.loop.unroll.runtime.disable"}
-; VF2: [[LOOP5]] = distinct !{[[LOOP5]], [[META3]], [[META4]]}
+; VF2: [[PROF2]] = !{!"unknown", !"loop-vectorize"}
+; VF2: [[LOOP3]] = distinct !{[[LOOP3]], [[META4:![0-9]+]], [[META5:![0-9]+]]}
+; VF2: [[META4]] = !{!"llvm.loop.isvectorized", i32 1}
+; VF2: [[META5]] = !{!"llvm.loop.unroll.runtime.disable"}
+; VF2: [[LOOP6]] = distinct !{[[LOOP6]], [[META4]], [[META5]]}
 ;.
