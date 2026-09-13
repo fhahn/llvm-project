@@ -10948,6 +10948,16 @@ ScalarEvolution::getPredecessorWithUniqueSuccessorForBB(const BasicBlock *BB)
   return {nullptr, BB};
 }
 
+/// Returns true if a fact can be derived from \p Cond. Callers of
+/// collectFromDominatingBranches only look at comparisons and logical
+/// combinations of them; a condition of any other shape is discarded again
+/// without deriving anything. Constants are kept, as an edge with a constant
+/// condition may be known to not be taken.
+static bool isUsableGuardCondition(const Value *Cond) {
+  return isa<ICmpInst, ConstantInt>(Cond) || match(Cond, m_LogicalAnd()) ||
+         match(Cond, m_LogicalOr());
+}
+
 /// Continue the search for conditions guarding \p BB after the cheap
 /// unique-predecessor climb ran out, by walking up the dominator tree from
 /// \p BB. A branch condition only holds at \p BB if the *taken edge* dominates
@@ -10959,7 +10969,8 @@ ScalarEvolution::getPredecessorWithUniqueSuccessorForBB(const BasicBlock *BB)
 /// \p ProcessCond is invoked for each condition found, together with a flag
 /// indicating whether it is known to be true. The walk stops early and returns
 /// true if \p ProcessCond returns true. At most \p MaxConditions conditions
-/// are processed, independently of the number of dominator-tree steps.
+/// a fact can be derived from are processed, independently of the number of
+/// dominator-tree steps.
 static bool
 collectFromDominatingBranches(const DominatorTree &DT, const BasicBlock *BB,
                               unsigned MaxConditions,
@@ -10978,7 +10989,10 @@ collectFromDominatingBranches(const DominatorTree &DT, const BasicBlock *BB,
     if (EnterIfTrue == (Br->getSuccessor(1) == ChildBB))
       continue;
     if (DT.dominates(BasicBlockEdge(Node->getBlock(), ChildBB), BB)) {
-      --MaxConditions;
+      // Only conditions a fact can be derived from consume the budget;
+      // charging for the others can starve a later, usable condition.
+      if (isUsableGuardCondition(Br->getCondition()))
+        --MaxConditions;
       if (ProcessCond(Br->getCondition(), EnterIfTrue))
         return true;
     }

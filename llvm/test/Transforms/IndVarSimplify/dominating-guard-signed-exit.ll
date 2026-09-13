@@ -64,3 +64,66 @@ loop:
 exit:
   ret void
 }
+
+; Same, but an extra dominating branch on %flag sits between the loop and the
+; guard. No fact can be derived from %flag, so it must not end the search.
+define void @signed_exit_past_unusable_cond(i64 %a, i64 %b, i32 %start, i1 %flag, i1 %choose, ptr %out) {
+; CHECK-LABEL: define void @signed_exit_past_unusable_cond(
+; CHECK-SAME: i64 [[A:%.*]], i64 [[B:%.*]], i32 [[START:%.*]], i1 [[FLAG:%.*]], i1 [[CHOOSE:%.*]], ptr [[OUT:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[GUARD:%.*]] = icmp slt i64 [[A]], [[B]]
+; CHECK-NEXT:    br i1 [[GUARD]], label %[[EXIT:.*]], label %[[NEAR:.*]]
+; CHECK:       [[NEAR]]:
+; CHECK-NEXT:    br i1 [[FLAG]], label %[[DISPATCH:.*]], label %[[EXIT]]
+; CHECK:       [[DISPATCH]]:
+; CHECK-NEXT:    br i1 [[CHOOSE]], label %[[MERGE:.*]], label %[[CHECK:.*]]
+; CHECK:       [[MERGE]]:
+; CHECK-NEXT:    br label %[[CHECK]]
+; CHECK:       [[CHECK]]:
+; CHECK-NEXT:    [[ENTER:%.*]] = icmp slt i32 [[START]], 0
+; CHECK-NEXT:    br i1 [[ENTER]], label %[[LOOP_PREHEADER:.*]], label %[[EXIT]]
+; CHECK:       [[LOOP_PREHEADER]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = sext i32 [[START]] to i64
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ [[TMP0]], %[[LOOP_PREHEADER]] ], [ [[INDVARS_IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[ADDR:%.*]] = getelementptr i8, ptr [[OUT]], i64 [[INDVARS_IV]]
+; CHECK-NEXT:    store volatile i8 0, ptr [[ADDR]], align 1
+; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add nsw i64 [[INDVARS_IV]], 1
+; CHECK-NEXT:    [[LFTR_WIDEIV:%.*]] = trunc i64 [[INDVARS_IV_NEXT]] to i32
+; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp ne i32 [[LFTR_WIDEIV]], 0
+; CHECK-NEXT:    br i1 [[EXITCOND]], label %[[LOOP]], label %[[EXIT_LOOPEXIT:.*]]
+; CHECK:       [[EXIT_LOOPEXIT]]:
+; CHECK-NEXT:    br label %[[EXIT]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  %guard = icmp slt i64 %a, %b
+  br i1 %guard, label %exit, label %near
+
+near:
+  br i1 %flag, label %dispatch, label %exit
+
+dispatch:
+  br i1 %choose, label %merge, label %check
+
+merge:
+  br label %check
+
+check:
+  %enter = icmp slt i32 %start, 0
+  br i1 %enter, label %loop, label %exit
+
+loop:
+  %iv = phi i32 [ %inc, %loop ], [ %start, %check ]
+  %wide = sext i32 %iv to i64
+  %addr = getelementptr i8, ptr %out, i64 %wide
+  store volatile i8 0, ptr %addr
+  %inc = add nsw i32 %iv, 1
+  %continue = icmp slt i32 %inc, 0
+  br i1 %continue, label %loop, label %exit
+
+exit:
+  ret void
+}
