@@ -10,7 +10,7 @@ define void @safe_avl(ptr %p) vscale_range(2, 1024) !prof !0 {
 ; CHECK:  [[VECTOR_PH:.*:]]
 ; CHECK:  [[VECTOR_BODY:.*]]:
 ; CHECK:    [[SAFE_AVL:%.*]] = select i1 [[TMP0:%.*]], i64 [[AVL:%.*]], i64 1024, !prof [[PROF1:![0-9]+]]
-; CHECK:    br i1 [[TMP6:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP2:![0-9]+]]
+; CHECK:    br i1 [[TMP6:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP2:![0-9]+]]
 ; CHECK:  [[MIDDLE_BLOCK]]:
 ; CHECK:  [[EXIT:.*:]]
 ;

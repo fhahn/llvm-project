@@ -5598,9 +5598,8 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
       estimateElementCount(BestVF * BestUF, Config.getVScaleForTuning());
   bool HasBranchWeights =
       hasBranchWeightMD(*OrigLoop->getLoopLatch()->getTerminator());
-  if (HasBranchWeights)
-    RUN_VPLAN_PASS(VPlanTransforms::addBranchWeightToMiddleTerminator,
-                   BestVPlan, EstimatedVFxUF, OrigAverageTripCount);
+  RUN_VPLAN_PASS(VPlanTransforms::addBranchWeightToMiddleTerminator, BestVPlan,
+                 EstimatedVFxUF, OrigAverageTripCount, HasBranchWeights);
 
   if (vputils::findIncomingAliasMask(BestVPlan)) {
     assert(BestVPlan.hasTailFolded() && "Expected tail folding to be enabled");

@@ -1563,8 +1563,8 @@ VPlanTransforms::modelGeneratedMainLoopBlocks(VPlan &EpiPlan, VPlan &MainPlan,
 // including memory overlap checks block and wrapping/unit-stride checks block.
 static constexpr uint32_t CheckBypassWeights[] = {1, 127};
 
-/// Create a BranchOnCond terminator in \p CheckBlockVPBB. Optionally adds
-/// branch weights.
+/// Create a BranchOnCond terminator in \p CheckBlockVPBB. Adds the constant
+/// bypass weights if \p AddBranchWeights, else marks it unknown.
 static void addBypassBranch(VPlan &Plan, VPBasicBlock *CheckBlockVPBB,
                             VPValue *Cond, bool AddBranchWeights) {
   DebugLoc DL = Plan.getVectorLoopRegion()->getCanonicalIV()->getDebugLoc();
@@ -1575,6 +1575,8 @@ static void addBypassBranch(VPlan &Plan, VPBasicBlock *CheckBlockVPBB,
     MDNode *BranchWeights =
         MDB.createBranchWeights(CheckBypassWeights, /*IsExpected=*/false);
     Term->setMetadata(LLVMContext::MD_prof, BranchWeights);
+  } else {
+    vputils::setUnknownBranchWeights(*Term, Plan);
   }
 }
 
@@ -1768,6 +1770,8 @@ void VPlanTransforms::addMinimumIterationCheck(
     MDNode *BranchWeights = MDB.createBranchWeights(
         ArrayRef(MinItersBypassWeights, 2), /*IsExpected=*/false);
     Term->setMetadata(LLVMContext::MD_prof, BranchWeights);
+  } else {
+    vputils::setUnknownBranchWeights(*Term, Plan);
   }
 }
 

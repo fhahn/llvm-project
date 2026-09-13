@@ -25,7 +25,7 @@ define void @f(i1 %x) !prof !0 {
 ; CHECK-NEXT:    [[CURRENT_ITERATION_NEXT]] = add i64 [[INDEX]], [[TMP4]]
 ; CHECK-NEXT:    [[AVL_NEXT]] = sub nuw nsw i64 [[AVL]], [[TMP4]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[AVL_NEXT]], 0
-; CHECK-NEXT:    br i1 [[TMP5]], label %[[EXIT:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP1:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP5]], label %[[EXIT:.*]], label %[[VECTOR_BODY]], !prof [[PROF1:![0-9]+]], !llvm.loop [[LOOP2:![0-9]+]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void
 ;

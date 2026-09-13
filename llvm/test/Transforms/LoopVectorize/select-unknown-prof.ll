@@ -6,13 +6,13 @@ define i32 @anyof_reduction(ptr %a, i64 %n) !prof !0 {
 ; CHECK-LABEL: define i32 @anyof_reduction(
 ; CHECK-SAME: ptr [[A:%.*]], i64 [[N:%.*]]) !prof [[PROF0:![0-9]+]] {
 ; CHECK:  [[ENTRY:.*:]]
-; CHECK:    br i1 [[MIN_ITERS_CHECK:%.*]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:    br i1 [[MIN_ITERS_CHECK:%.*]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]], !prof [[PROF1:![0-9]+]]
 ; CHECK:  [[VECTOR_PH]]:
 ; CHECK:  [[VECTOR_BODY:.*]]:
-; CHECK:    br i1 [[TMP4:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP1:![0-9]+]]
+; CHECK:    br i1 [[TMP4:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP2:![0-9]+]]
 ; CHECK:  [[MIDDLE_BLOCK]]:
-; CHECK:    [[RDX_SELECT:%.*]] = select i1 [[TMP6:%.*]], i32 1, i32 0, !prof [[PROF4:![0-9]+]]
-; CHECK:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
+; CHECK:    [[RDX_SELECT:%.*]] = select i1 [[TMP6:%.*]], i32 1, i32 0, !prof [[PROF1]]
+; CHECK:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF1]]
 ; CHECK:  [[SCALAR_PH]]:
 ; CHECK:  [[LOOP:.*]]:
 ; CHECK:    [[RES_NEXT:%.*]] = select i1 [[C:%.*]], i32 1, i32 [[RES:%.*]]
@@ -42,14 +42,14 @@ define i64 @find_last_iv_reduction(ptr %a, i64 %n) !prof !0 {
 ; CHECK-LABEL: define i64 @find_last_iv_reduction(
 ; CHECK-SAME: ptr [[A:%.*]], i64 [[N:%.*]]) !prof [[PROF0]] {
 ; CHECK:  [[ENTRY:.*:]]
-; CHECK:    br i1 [[MIN_ITERS_CHECK:%.*]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:    br i1 [[MIN_ITERS_CHECK:%.*]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]], !prof [[PROF1]]
 ; CHECK:  [[VECTOR_PH]]:
 ; CHECK:  [[VECTOR_BODY:.*]]:
 ; CHECK:    [[TMP3:%.*]] = select <4 x i1> [[TMP2:%.*]], <4 x i64> [[VEC_IND:%.*]], <4 x i64> [[VEC_PHI:%.*]]
-; CHECK:    br i1 [[TMP4:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
+; CHECK:    br i1 [[TMP4:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:  [[MIDDLE_BLOCK]]:
-; CHECK:    [[TMP7:%.*]] = select i1 [[TMP6:%.*]], i64 [[TMP5:%.*]], i64 -1, !prof [[PROF4]]
-; CHECK:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
+; CHECK:    [[TMP7:%.*]] = select i1 [[TMP6:%.*]], i64 [[TMP5:%.*]], i64 -1, !prof [[PROF1]]
+; CHECK:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF1]]
 ; CHECK:  [[SCALAR_PH]]:
 ; CHECK:  [[LOOP:.*]]:
 ; CHECK:    [[RES_NEXT:%.*]] = select i1 [[C:%.*]], i64 [[IV:%.*]], i64 [[RES:%.*]]
@@ -80,14 +80,14 @@ define i32 @find_last_iv_negated_mask(i1 %c, i32 %n) !prof !0 {
 ; CHECK-LABEL: define i32 @find_last_iv_negated_mask(
 ; CHECK-SAME: i1 [[C:%.*]], i32 [[N:%.*]]) !prof [[PROF0]] {
 ; CHECK:  [[ENTRY:.*:]]
-; CHECK:    br i1 [[MIN_ITERS_CHECK:%.*]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:    br i1 [[MIN_ITERS_CHECK:%.*]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]], !prof [[PROF1]]
 ; CHECK:  [[VECTOR_PH]]:
 ; CHECK:  [[VECTOR_BODY:.*]]:
-; CHECK:    [[TMP1:%.*]] = select i1 [[C]], <4 x i32> [[VEC_IND:%.*]], <4 x i32> [[VEC_PHI:%.*]], !prof [[PROF4]]
-; CHECK:    br i1 [[TMP3:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
+; CHECK:    [[TMP1:%.*]] = select i1 [[C]], <4 x i32> [[VEC_IND:%.*]], <4 x i32> [[VEC_PHI:%.*]], !prof [[PROF1]]
+; CHECK:    br i1 [[TMP3:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP8:![0-9]+]]
 ; CHECK:  [[MIDDLE_BLOCK]]:
-; CHECK:    [[RDX_SELECT:%.*]] = select i1 [[TMP6:%.*]], i32 [[TMP4:%.*]], i32 -1, !prof [[PROF4]]
-; CHECK:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
+; CHECK:    [[RDX_SELECT:%.*]] = select i1 [[TMP6:%.*]], i32 [[TMP4:%.*]], i32 -1, !prof [[PROF1]]
+; CHECK:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF1]]
 ; CHECK:  [[SCALAR_PH]]:
 ; CHECK:  [[LOOP:.*]]:
 ; CHECK:    br i1 [[C]], label %[[IF_THEN:.*]], label %[[LATCH:.*]]
@@ -123,14 +123,14 @@ define i32 @find_last(ptr %a, i64 %n, i32 %start) !prof !0 {
 ; CHECK-LABEL: define i32 @find_last(
 ; CHECK-SAME: ptr [[A:%.*]], i64 [[N:%.*]], i32 [[START:%.*]]) !prof [[PROF0]] {
 ; CHECK:  [[ENTRY:.*:]]
-; CHECK:    br i1 [[MIN_ITERS_CHECK:%.*]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:    br i1 [[MIN_ITERS_CHECK:%.*]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]], !prof [[PROF1]]
 ; CHECK:  [[VECTOR_PH]]:
 ; CHECK:  [[VECTOR_BODY:.*]]:
-; CHECK:    [[TMP6:%.*]] = select i1 [[TMP5:%.*]], <4 x i1> [[TMP4:%.*]], <4 x i1> [[TMP1:%.*]], !prof [[PROF4]]
-; CHECK:    [[TMP7:%.*]] = select i1 [[TMP5]], <4 x i32> [[WIDE_LOAD:%.*]], <4 x i32> [[VEC_PHI:%.*]], !prof [[PROF4]]
-; CHECK:    br i1 [[TMP8:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP10:![0-9]+]]
+; CHECK:    [[TMP6:%.*]] = select i1 [[TMP5:%.*]], <4 x i1> [[TMP4:%.*]], <4 x i1> [[TMP1:%.*]], !prof [[PROF1]]
+; CHECK:    [[TMP7:%.*]] = select i1 [[TMP5]], <4 x i32> [[WIDE_LOAD:%.*]], <4 x i32> [[VEC_PHI:%.*]], !prof [[PROF1]]
+; CHECK:    br i1 [[TMP8:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP10:![0-9]+]]
 ; CHECK:  [[MIDDLE_BLOCK]]:
-; CHECK:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
+; CHECK:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF1]]
 ; CHECK:  [[SCALAR_PH]]:
 ; CHECK:  [[LOOP:.*]]:
 ; CHECK:    [[RES_NEXT:%.*]] = select i1 [[C:%.*]], i32 [[L:%.*]], i32 [[RES:%.*]]
@@ -161,14 +161,14 @@ define float @fmaxnum_reduction(ptr %src, i64 %n) !prof !0 {
 ; CHECK-LABEL: define float @fmaxnum_reduction(
 ; CHECK-SAME: ptr [[SRC:%.*]], i64 [[N:%.*]]) !prof [[PROF0]] {
 ; CHECK:  [[ENTRY:.*:]]
-; CHECK:    br i1 [[MIN_ITERS_CHECK:%.*]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:    br i1 [[MIN_ITERS_CHECK:%.*]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]], !prof [[PROF1]]
 ; CHECK:  [[VECTOR_PH]]:
 ; CHECK:  [[VECTOR_BODY:.*]]:
-; CHECK:    br i1 [[TMP7:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP12:![0-9]+]]
+; CHECK:    br i1 [[TMP7:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP12:![0-9]+]]
 ; CHECK:  [[MIDDLE_BLOCK]]:
-; CHECK:    [[TMP8:%.*]] = select i1 [[TMP5:%.*]], <4 x float> [[VEC_PHI:%.*]], <4 x float> [[TMP3:%.*]], !prof [[PROF4]]
-; CHECK:    [[TMP9:%.*]] = select i1 [[TMP5]], i64 [[INDEX:%.*]], i64 [[N_VEC:%.*]], !prof [[PROF4]]
-; CHECK:    br i1 [[TMP12:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
+; CHECK:    [[TMP8:%.*]] = select i1 [[TMP5:%.*]], <4 x float> [[VEC_PHI:%.*]], <4 x float> [[TMP3:%.*]], !prof [[PROF1]]
+; CHECK:    [[TMP9:%.*]] = select i1 [[TMP5]], i64 [[INDEX:%.*]], i64 [[N_VEC:%.*]], !prof [[PROF1]]
+; CHECK:    br i1 [[TMP12:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF1]]
 ; CHECK:  [[SCALAR_PH]]:
 ; CHECK:  [[LOOP:.*]]:
 ; CHECK:    br i1 [[EC:%.*]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP13:![0-9]+]]
@@ -196,14 +196,14 @@ define float @fmaxnum_reduction_iv_start(ptr %src, i64 %start, i64 %n) !prof !0 
 ; CHECK-LABEL: define float @fmaxnum_reduction_iv_start(
 ; CHECK-SAME: ptr [[SRC:%.*]], i64 [[START:%.*]], i64 [[N:%.*]]) !prof [[PROF0]] {
 ; CHECK:  [[ENTRY:.*:]]
-; CHECK:    br i1 [[MIN_ITERS_CHECK:%.*]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:    br i1 [[MIN_ITERS_CHECK:%.*]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]], !prof [[PROF1]]
 ; CHECK:  [[VECTOR_PH]]:
 ; CHECK:  [[VECTOR_BODY:.*]]:
-; CHECK:    br i1 [[TMP9:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP14:![0-9]+]]
+; CHECK:    br i1 [[TMP9:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP14:![0-9]+]]
 ; CHECK:  [[MIDDLE_BLOCK]]:
-; CHECK:    [[TMP10:%.*]] = select i1 [[TMP7:%.*]], <4 x float> [[VEC_PHI:%.*]], <4 x float> [[TMP5:%.*]], !prof [[PROF4]]
-; CHECK:    [[TMP11:%.*]] = select i1 [[TMP7]], i64 [[INDEX:%.*]], i64 [[N_VEC:%.*]], !prof [[PROF4]]
-; CHECK:    br i1 [[TMP15:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
+; CHECK:    [[TMP10:%.*]] = select i1 [[TMP7:%.*]], <4 x float> [[VEC_PHI:%.*]], <4 x float> [[TMP5:%.*]], !prof [[PROF1]]
+; CHECK:    [[TMP11:%.*]] = select i1 [[TMP7]], i64 [[INDEX:%.*]], i64 [[N_VEC:%.*]], !prof [[PROF1]]
+; CHECK:    br i1 [[TMP15:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF1]]
 ; CHECK:  [[SCALAR_PH]]:
 ; CHECK:  [[LOOP:.*]]:
 ; CHECK:    br i1 [[EC:%.*]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP15:![0-9]+]]
@@ -230,11 +230,11 @@ define void @requires_scalar_epilogue(ptr noalias %a, ptr noalias %b, i64 %n) !p
 ; CHECK-LABEL: define void @requires_scalar_epilogue(
 ; CHECK-SAME: ptr noalias [[A:%.*]], ptr noalias [[B:%.*]], i64 [[N:%.*]]) !prof [[PROF0]] {
 ; CHECK:  [[ENTRY:.*:]]
-; CHECK:    br i1 [[MIN_ITERS_CHECK:%.*]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:    br i1 [[MIN_ITERS_CHECK:%.*]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]], !prof [[PROF1]]
 ; CHECK:  [[VECTOR_PH]]:
-; CHECK:    [[TMP4:%.*]] = select i1 [[TMP3:%.*]], i64 4, i64 [[TMP2:%.*]], !prof [[PROF4]]
+; CHECK:    [[TMP4:%.*]] = select i1 [[TMP3:%.*]], i64 4, i64 [[TMP2:%.*]], !prof [[PROF1]]
 ; CHECK:  [[VECTOR_BODY:.*]]:
-; CHECK:    br i1 [[TMP7:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP16:![0-9]+]]
+; CHECK:    br i1 [[TMP7:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP16:![0-9]+]]
 ; CHECK:  [[MIDDLE_BLOCK]]:
 ; CHECK:  [[SCALAR_PH]]:
 ; CHECK:  [[LOOP_HEADER:.*]]:
@@ -425,13 +425,13 @@ define i64 @early_exit_first_active_lane_interleaved(ptr dereferenceable(1024) %
 ; CHECK:  [[ENTRY:.*:]]
 ; CHECK:  [[VECTOR_PH:.*:]]
 ; CHECK:  [[VECTOR_BODY:.*]]:
-; CHECK:    br i1 [[TMP7:%.*]], label %[[VECTOR_EARLY_EXIT:.*]], label %[[VECTOR_BODY_INTERIM:.*]], !prof [[PROF4]]
+; CHECK:    br i1 [[TMP7:%.*]], label %[[VECTOR_EARLY_EXIT:.*]], label %[[VECTOR_BODY_INTERIM:.*]], !prof [[PROF1]]
 ; CHECK:  [[VECTOR_BODY_INTERIM]]:
-; CHECK:    br i1 [[TMP8:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP36:![0-9]+]]
+; CHECK:    br i1 [[TMP8:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP36:![0-9]+]]
 ; CHECK:  [[MIDDLE_BLOCK]]:
 ; CHECK:  [[VECTOR_EARLY_EXIT]]:
-; CHECK:    [[TMP12:%.*]] = select i1 [[TMP11:%.*]], i64 [[TMP10:%.*]], i64 [[TMP9:%.*]], !prof [[PROF4]]
-; CHECK:    [[TMP18:%.*]] = select i1 [[TMP17:%.*]], i8 [[TMP16:%.*]], i8 [[TMP14:%.*]], !prof [[PROF4]]
+; CHECK:    [[TMP12:%.*]] = select i1 [[TMP11:%.*]], i64 [[TMP10:%.*]], i64 [[TMP9:%.*]], !prof [[PROF1]]
+; CHECK:    [[TMP18:%.*]] = select i1 [[TMP17:%.*]], i8 [[TMP16:%.*]], i8 [[TMP14:%.*]], !prof [[PROF1]]
 ; CHECK:  [[EXIT:.*:]]
 ;
 entry:
@@ -464,16 +464,16 @@ define void @sink_complementary_predicated_stores(ptr %a, ptr %b, i64 %n) !prof 
 ; CHECK-LABEL: define void @sink_complementary_predicated_stores(
 ; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[N:%.*]]) !prof [[PROF0]] {
 ; CHECK:  [[ENTRY:.*:]]
-; CHECK:    br i1 [[MIN_ITERS_CHECK:%.*]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]]
+; CHECK:    br i1 [[MIN_ITERS_CHECK:%.*]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]], !prof [[PROF1]]
 ; CHECK:  [[VECTOR_MEMCHECK]]:
-; CHECK:    br i1 [[FOUND_CONFLICT:%.*]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK:    br i1 [[FOUND_CONFLICT:%.*]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]], !prof [[PROF1]]
 ; CHECK:  [[VECTOR_PH]]:
 ; CHECK:  [[VECTOR_BODY:.*]]:
-; CHECK:    [[TMP13:%.*]] = select i1 [[TMP11:%.*]], i32 1, i32 0, !prof [[PROF4]]
-; CHECK:    [[TMP14:%.*]] = select i1 [[TMP12:%.*]], i32 1, i32 0, !prof [[PROF4]]
-; CHECK:    br i1 [[TMP15:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP42:![0-9]+]]
+; CHECK:    [[TMP13:%.*]] = select i1 [[TMP11:%.*]], i32 1, i32 0, !prof [[PROF1]]
+; CHECK:    [[TMP14:%.*]] = select i1 [[TMP12:%.*]], i32 1, i32 0, !prof [[PROF1]]
+; CHECK:    br i1 [[TMP15:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP42:![0-9]+]]
 ; CHECK:  [[MIDDLE_BLOCK]]:
-; CHECK:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
+; CHECK:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF1]]
 ; CHECK:  [[SCALAR_PH]]:
 ; CHECK:  [[LOOP_HEADER:.*]]:
 ; CHECK:    br i1 [[C:%.*]], label %[[THEN:.*]], label %[[ELSE:.*]]
@@ -517,18 +517,18 @@ define i32 @find_last_interleave_only(ptr %a, i64 %n, i32 %start) !prof !0 {
 ; CHECK-LABEL: define i32 @find_last_interleave_only(
 ; CHECK-SAME: ptr [[A:%.*]], i64 [[N:%.*]], i32 [[START:%.*]]) !prof [[PROF0]] {
 ; CHECK:  [[ENTRY:.*:]]
-; CHECK:    br i1 [[MIN_ITERS_CHECK:%.*]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:    br i1 [[MIN_ITERS_CHECK:%.*]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]], !prof [[PROF1]]
 ; CHECK:  [[VECTOR_PH]]:
 ; CHECK:  [[VECTOR_BODY:.*]]:
-; CHECK:    [[TMP13:%.*]] = select i1 [[TMP12:%.*]], i1 [[TMP10:%.*]], i1 [[TMP1:%.*]], !prof [[PROF4]]
-; CHECK:    [[TMP14:%.*]] = select i1 [[TMP12]], i1 [[TMP11:%.*]], i1 [[TMP2:%.*]], !prof [[PROF4]]
-; CHECK:    [[TMP15:%.*]] = select i1 [[TMP12]], i32 [[TMP6:%.*]], i32 [[VEC_PHI:%.*]], !prof [[PROF4]]
-; CHECK:    [[TMP16:%.*]] = select i1 [[TMP12]], i32 [[TMP7:%.*]], i32 [[VEC_PHI1:%.*]], !prof [[PROF4]]
-; CHECK:    br i1 [[TMP17:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP44:![0-9]+]]
+; CHECK:    [[TMP13:%.*]] = select i1 [[TMP12:%.*]], i1 [[TMP10:%.*]], i1 [[TMP1:%.*]], !prof [[PROF1]]
+; CHECK:    [[TMP14:%.*]] = select i1 [[TMP12]], i1 [[TMP11:%.*]], i1 [[TMP2:%.*]], !prof [[PROF1]]
+; CHECK:    [[TMP15:%.*]] = select i1 [[TMP12]], i32 [[TMP6:%.*]], i32 [[VEC_PHI:%.*]], !prof [[PROF1]]
+; CHECK:    [[TMP16:%.*]] = select i1 [[TMP12]], i32 [[TMP7:%.*]], i32 [[VEC_PHI1:%.*]], !prof [[PROF1]]
+; CHECK:    br i1 [[TMP17:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP44:![0-9]+]]
 ; CHECK:  [[MIDDLE_BLOCK]]:
-; CHECK:    [[TMP18:%.*]] = select i1 [[TMP13]], i32 [[TMP15]], i32 [[START]], !prof [[PROF4]]
-; CHECK:    [[TMP19:%.*]] = select i1 [[TMP14]], i32 [[TMP16]], i32 [[TMP18]], !prof [[PROF4]]
-; CHECK:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
+; CHECK:    [[TMP18:%.*]] = select i1 [[TMP13]], i32 [[TMP15]], i32 [[START]], !prof [[PROF1]]
+; CHECK:    [[TMP19:%.*]] = select i1 [[TMP14]], i32 [[TMP16]], i32 [[TMP18]], !prof [[PROF1]]
+; CHECK:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !prof [[PROF1]]
 ; CHECK:  [[SCALAR_PH]]:
 ; CHECK:  [[LOOP:.*]]:
 ; CHECK:    [[RES_NEXT:%.*]] = select i1 [[C:%.*]], i32 [[L:%.*]], i32 [[RES:%.*]]
@@ -562,44 +562,44 @@ exit:
 !6 = distinct !{!6, !4}
 ;.
 ; CHECK: [[PROF0]] = !{!"function_entry_count", i64 1000}
-; CHECK: [[LOOP1]] = distinct !{[[LOOP1]], [[META2:![0-9]+]], [[META3:![0-9]+]]}
-; CHECK: [[META2]] = !{!"llvm.loop.isvectorized", i32 1}
-; CHECK: [[META3]] = !{!"llvm.loop.unroll.runtime.disable"}
-; CHECK: [[PROF4]] = !{!"unknown", !"loop-vectorize"}
-; CHECK: [[LOOP5]] = distinct !{[[LOOP5]], [[META3]], [[META2]]}
-; CHECK: [[LOOP6]] = distinct !{[[LOOP6]], [[META2]], [[META3]]}
-; CHECK: [[LOOP7]] = distinct !{[[LOOP7]], [[META3]], [[META2]]}
-; CHECK: [[LOOP8]] = distinct !{[[LOOP8]], [[META2]], [[META3]]}
-; CHECK: [[LOOP9]] = distinct !{[[LOOP9]], [[META3]], [[META2]]}
-; CHECK: [[LOOP10]] = distinct !{[[LOOP10]], [[META2]], [[META3]]}
-; CHECK: [[LOOP11]] = distinct !{[[LOOP11]], [[META3]], [[META2]]}
-; CHECK: [[LOOP12]] = distinct !{[[LOOP12]], [[META2]], [[META3]]}
-; CHECK: [[LOOP13]] = distinct !{[[LOOP13]], [[META3]], [[META2]]}
-; CHECK: [[LOOP14]] = distinct !{[[LOOP14]], [[META2]], [[META3]]}
-; CHECK: [[LOOP15]] = distinct !{[[LOOP15]], [[META3]], [[META2]]}
-; CHECK: [[LOOP16]] = distinct !{[[LOOP16]], [[META2]], [[META3]]}
-; CHECK: [[LOOP17]] = distinct !{[[LOOP17]], [[META3]], [[META2]]}
+; CHECK: [[PROF1]] = !{!"unknown", !"loop-vectorize"}
+; CHECK: [[LOOP2]] = distinct !{[[LOOP2]], [[META3:![0-9]+]], [[META4:![0-9]+]]}
+; CHECK: [[META3]] = !{!"llvm.loop.isvectorized", i32 1}
+; CHECK: [[META4]] = !{!"llvm.loop.unroll.runtime.disable"}
+; CHECK: [[LOOP5]] = distinct !{[[LOOP5]], [[META4]], [[META3]]}
+; CHECK: [[LOOP6]] = distinct !{[[LOOP6]], [[META3]], [[META4]]}
+; CHECK: [[LOOP7]] = distinct !{[[LOOP7]], [[META4]], [[META3]]}
+; CHECK: [[LOOP8]] = distinct !{[[LOOP8]], [[META3]], [[META4]]}
+; CHECK: [[LOOP9]] = distinct !{[[LOOP9]], [[META4]], [[META3]]}
+; CHECK: [[LOOP10]] = distinct !{[[LOOP10]], [[META3]], [[META4]]}
+; CHECK: [[LOOP11]] = distinct !{[[LOOP11]], [[META4]], [[META3]]}
+; CHECK: [[LOOP12]] = distinct !{[[LOOP12]], [[META3]], [[META4]]}
+; CHECK: [[LOOP13]] = distinct !{[[LOOP13]], [[META4]], [[META3]]}
+; CHECK: [[LOOP14]] = distinct !{[[LOOP14]], [[META3]], [[META4]]}
+; CHECK: [[LOOP15]] = distinct !{[[LOOP15]], [[META4]], [[META3]]}
+; CHECK: [[LOOP16]] = distinct !{[[LOOP16]], [[META3]], [[META4]]}
+; CHECK: [[LOOP17]] = distinct !{[[LOOP17]], [[META4]], [[META3]]}
 ; CHECK: [[PROF18]] = !{!"branch_weights", i32 1, i32 127}
 ; CHECK: [[PROF19]] = !{!"branch_weights", i32 3, i32 1}
 ; CHECK: [[PROF20]] = !{!"branch_weights", i32 1, i32 248}
-; CHECK: [[LOOP21]] = distinct !{[[LOOP21]], [[META2]], [[META3]], [[META22:![0-9]+]]}
+; CHECK: [[LOOP21]] = distinct !{[[LOOP21]], [[META3]], [[META4]], [[META22:![0-9]+]]}
 ; CHECK: [[META22]] = !{!"llvm.loop.estimated_trip_count", i32 249}
-; CHECK: [[LOOP23]] = distinct !{[[LOOP23]], [[META3]], [[META2]], [[META24:![0-9]+]]}
+; CHECK: [[LOOP23]] = distinct !{[[LOOP23]], [[META4]], [[META3]], [[META24:![0-9]+]]}
 ; CHECK: [[META24]] = !{!"llvm.loop.estimated_trip_count", i32 4}
 ; CHECK: [[PROF25]] = !{!"branch_weights", i32 1, i32 3}
-; CHECK: [[LOOP26]] = distinct !{[[LOOP26]], [[META2]], [[META3]], [[META22]]}
+; CHECK: [[LOOP26]] = distinct !{[[LOOP26]], [[META3]], [[META4]], [[META22]]}
 ; CHECK: [[PROF27]] = !{!"branch_weights", i32 2, i32 1}
-; CHECK: [[LOOP28]] = distinct !{[[LOOP28]], [[META3]], [[META2]], [[META29:![0-9]+]]}
+; CHECK: [[LOOP28]] = distinct !{[[LOOP28]], [[META4]], [[META3]], [[META29:![0-9]+]]}
 ; CHECK: [[META29]] = !{!"llvm.loop.estimated_trip_count", i32 3}
 ; CHECK: [[PROF30]] = !{!"branch_weights", i32 1, i32 254}
-; CHECK: [[LOOP31]] = distinct !{[[LOOP31]], [[META2]], [[META3]], [[META32:![0-9]+]]}
+; CHECK: [[LOOP31]] = distinct !{[[LOOP31]], [[META3]], [[META4]], [[META32:![0-9]+]]}
 ; CHECK: [[META32]] = !{!"llvm.loop.estimated_trip_count", i32 255}
-; CHECK: [[LOOP33]] = distinct !{[[LOOP33]], [[META3]], [[META2]], [[META24]]}
-; CHECK: [[LOOP34]] = distinct !{[[LOOP34]], [[META2]], [[META3]]}
-; CHECK: [[LOOP35]] = distinct !{[[LOOP35]], [[META3]], [[META2]]}
-; CHECK: [[LOOP36]] = distinct !{[[LOOP36]], [[META2]], [[META3]]}
-; CHECK: [[LOOP42]] = distinct !{[[LOOP42]], [[META2]], [[META3]]}
-; CHECK: [[LOOP43]] = distinct !{[[LOOP43]], [[META2]]}
-; CHECK: [[LOOP44]] = distinct !{[[LOOP44]], [[META2]], [[META3]]}
-; CHECK: [[LOOP45]] = distinct !{[[LOOP45]], [[META2]]}
+; CHECK: [[LOOP33]] = distinct !{[[LOOP33]], [[META4]], [[META3]], [[META24]]}
+; CHECK: [[LOOP34]] = distinct !{[[LOOP34]], [[META3]], [[META4]]}
+; CHECK: [[LOOP35]] = distinct !{[[LOOP35]], [[META4]], [[META3]]}
+; CHECK: [[LOOP36]] = distinct !{[[LOOP36]], [[META3]], [[META4]]}
+; CHECK: [[LOOP42]] = distinct !{[[LOOP42]], [[META3]], [[META4]]}
+; CHECK: [[LOOP43]] = distinct !{[[LOOP43]], [[META3]]}
+; CHECK: [[LOOP44]] = distinct !{[[LOOP44]], [[META3]], [[META4]]}
+; CHECK: [[LOOP45]] = distinct !{[[LOOP45]], [[META3]]}
 ;.

@@ -619,9 +619,12 @@ struct VPlanTransforms {
   /// a BranchOnCond recipe. \p VectorStep is the estimated number of
   /// iterations a vector iteration processes. If \p EstimatedTripCount is a
   /// multiple of the vector step, the weights favor skipping the remainder.
+  /// If the original latch has no branch weights (\p HasBranchWeights is
+  /// false), the branch is marked explicitly unknown instead.
   static void
   addBranchWeightToMiddleTerminator(VPlan &Plan, unsigned VectorStep,
-                                    std::optional<unsigned> EstimatedTripCount);
+                                    std::optional<unsigned> EstimatedTripCount,
+                                    bool HasBranchWeights);
 
   /// Adjust first-order recurrence users in the middle block: create
   /// penultimate element extracts for LCSSA phi users, and handle penultimate

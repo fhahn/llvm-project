@@ -1166,7 +1166,7 @@ VPlanTransforms::expandSCEVs(VPlan &Plan, ScalarEvolution &SE) {
 /// BranchOnCond recipe.
 void VPlanTransforms::addBranchWeightToMiddleTerminator(
     VPlan &Plan, unsigned VectorStep,
-    std::optional<unsigned> EstimatedTripCount) {
+    std::optional<unsigned> EstimatedTripCount, bool HasBranchWeights) {
   VPBasicBlock *MiddleVPBB = Plan.getMiddleBlock();
   auto *MiddleTerm =
       dyn_cast_or_null<VPInstruction>(MiddleVPBB->getTerminator());
@@ -1176,6 +1176,12 @@ void VPlanTransforms::addBranchWeightToMiddleTerminator(
 
   assert(MiddleTerm->getOpcode() == VPInstruction::BranchOnCond &&
          "must have a BranchOnCond");
+  // Without weights on the original latch, there is no profile to base the
+  // weights on.
+  if (!HasBranchWeights) {
+    vputils::setUnknownBranchWeights(*MiddleTerm, Plan);
+    return;
+  }
   assert(VectorStep > 0 && "vector step should not be zero");
   // An estimated trip count that is a multiple of the step swaps the weights
   // around, without ruling a remainder out, as the estimate is only an average.

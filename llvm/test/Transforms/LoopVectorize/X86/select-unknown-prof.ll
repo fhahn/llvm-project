@@ -8,11 +8,11 @@ define void @sdiv_feeding_gep(ptr %dst, i32 %x, i64 %M, i64 %conv6, i64 %N) !pro
 ; CHECK-SAME: ptr [[DST:%.*]], i32 [[X:%.*]], i64 [[M:%.*]], i64 [[CONV6:%.*]], i64 [[N:%.*]]) #[[ATTR0:[0-9]+]] !prof [[PROF0:![0-9]+]] {
 ; CHECK:  [[ENTRY:.*:]]
 ; CHECK:  [[VECTOR_SCEVCHECK:.*:]]
-; CHECK:    br i1 [[TMP4:%.*]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:    br i1 [[TMP4:%.*]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]], !prof [[PROF1:![0-9]+]]
 ; CHECK:  [[VECTOR_PH]]:
 ; CHECK:  [[VECTOR_BODY:.*]]:
-; CHECK:    [[TMP8:%.*]] = select i1 [[TMP7:%.*]], i64 [[CONV6]], i64 1, !prof [[PROF1:![0-9]+]]
-; CHECK:    br i1 [[TMP18:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP2:![0-9]+]]
+; CHECK:    [[TMP8:%.*]] = select i1 [[TMP7:%.*]], i64 [[CONV6]], i64 1, !prof [[PROF1]]
+; CHECK:    br i1 [[TMP18:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF1]], !llvm.loop [[LOOP2:![0-9]+]]
 ; CHECK:  [[MIDDLE_BLOCK]]:
 ; CHECK:  [[SCALAR_PH]]:
 ; CHECK:  [[LOOP:.*]]:
