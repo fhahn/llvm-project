@@ -9961,6 +9961,24 @@ isImpliedCondICmps(CmpPredicate LPred, const Value *L0, const Value *L1,
     }
   }
 
+  // An equality comparison against a constant is invariant under a constant
+  // offset, so cancel the offset out if that exposes the common operand:
+  //   (X + C1) ==/!= C2  <-->  X ==/!= (C2 - C1)
+  // Handling it here rather than rewriting the compare keeps multi-use adds
+  // intact.
+  auto CancelConstOffset = [](CmpPredicate Pred, const Value *&Op0,
+                              const Value *&Op1, const Value *CommonOp) {
+    const APInt *C1, *C2;
+    Value *X;
+    if (ICmpInst::isEquality(Pred) && match(Op1, m_APInt(C2)) &&
+        match(Op0, m_Add(m_Value(X), m_APInt(C1))) && X == CommonOp) {
+      Op0 = X;
+      Op1 = ConstantInt::get(X->getType(), *C2 - *C1);
+    }
+  };
+  CancelConstOffset(RPred, R0, R1, L0);
+  CancelConstOffset(LPred, L0, L1, R0);
+
   // See if we can infer anything if operand-0 matches and we have at least one
   // constant.
   const APInt *Unused;

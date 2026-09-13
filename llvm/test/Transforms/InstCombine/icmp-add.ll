@@ -3612,8 +3612,7 @@ define i1 @multiuse_add_eq_implied_false(i64 %n, ptr %p) {
 ; CHECK:       if:
 ; CHECK-NEXT:    [[ADD:%.*]] = add i64 [[N]], -1
 ; CHECK-NEXT:    store i64 [[ADD]], ptr [[P:%.*]], align 8
-; CHECK-NEXT:    [[CMP:%.*]] = icmp eq i64 [[ADD]], 0
-; CHECK-NEXT:    ret i1 [[CMP]]
+; CHECK-NEXT:    ret i1 false
 ; CHECK:       exit:
 ; CHECK-NEXT:    ret i1 false
 ;
@@ -3637,8 +3636,7 @@ define i1 @multiuse_add_eq_implied_true(i64 %n, ptr %p) {
 ; CHECK:       if:
 ; CHECK-NEXT:    [[ADD:%.*]] = add nsw i64 [[N]], -1
 ; CHECK-NEXT:    store i64 [[ADD]], ptr [[P:%.*]], align 8
-; CHECK-NEXT:    [[CMP:%.*]] = icmp eq i64 [[ADD]], 6
-; CHECK-NEXT:    ret i1 [[CMP]]
+; CHECK-NEXT:    ret i1 true
 ; CHECK:       exit:
 ; CHECK-NEXT:    ret i1 false
 ;
@@ -3685,4 +3683,81 @@ define i1 @multiuse_add_eq_not_implied(i64 %n, ptr %p) {
   store i64 %add, ptr %p, align 8
   %cmp = icmp eq i64 %add, 0
   ret i1 %cmp
+}
+
+; The constant offset is on the dominating condition rather than on the
+; compare: (%x + 5) == 10 implies %x == 5.
+define i1 @multiuse_add_dominating_offset_true(i32 %x, ptr %p) {
+; CHECK-LABEL: @multiuse_add_dominating_offset_true(
+; CHECK-NEXT:    [[A:%.*]] = add i32 [[X:%.*]], 5
+; CHECK-NEXT:    store i32 [[A]], ptr [[P:%.*]], align 4
+; CHECK-NEXT:    [[C:%.*]] = icmp eq i32 [[A]], 10
+; CHECK-NEXT:    br i1 [[C]], label [[IF:%.*]], label [[EXIT:%.*]]
+; CHECK:       if:
+; CHECK-NEXT:    ret i1 true
+; CHECK:       exit:
+; CHECK-NEXT:    ret i1 false
+;
+  %a = add i32 %x, 5
+  store i32 %a, ptr %p, align 4
+  %c = icmp eq i32 %a, 10
+  br i1 %c, label %if, label %exit
+
+if:
+  %cmp = icmp eq i32 %x, 5
+  ret i1 %cmp
+
+exit:
+  ret i1 false
+}
+
+define i1 @multiuse_add_dominating_offset_false(i32 %x, ptr %p) {
+; CHECK-LABEL: @multiuse_add_dominating_offset_false(
+; CHECK-NEXT:    [[A:%.*]] = add i32 [[X:%.*]], 5
+; CHECK-NEXT:    store i32 [[A]], ptr [[P:%.*]], align 4
+; CHECK-NEXT:    [[C:%.*]] = icmp eq i32 [[A]], 10
+; CHECK-NEXT:    br i1 [[C]], label [[IF:%.*]], label [[EXIT:%.*]]
+; CHECK:       if:
+; CHECK-NEXT:    ret i1 false
+; CHECK:       exit:
+; CHECK-NEXT:    ret i1 false
+;
+  %a = add i32 %x, 5
+  store i32 %a, ptr %p, align 4
+  %c = icmp eq i32 %a, 10
+  br i1 %c, label %if, label %exit
+
+if:
+  %cmp = icmp eq i32 %x, 6
+  ret i1 %cmp
+
+exit:
+  ret i1 false
+}
+
+; Negative test: only equality is invariant under a constant offset.
+; (%x - 1) u< 4 does not imply anything about %x u< 4.
+define i1 @multiuse_add_dominating_offset_ult(i8 %x, ptr %p) {
+; CHECK-LABEL: @multiuse_add_dominating_offset_ult(
+; CHECK-NEXT:    [[A:%.*]] = add i8 [[X:%.*]], -1
+; CHECK-NEXT:    store i8 [[A]], ptr [[P:%.*]], align 1
+; CHECK-NEXT:    [[C:%.*]] = icmp ult i8 [[A]], 4
+; CHECK-NEXT:    br i1 [[C]], label [[IF:%.*]], label [[EXIT:%.*]]
+; CHECK:       if:
+; CHECK-NEXT:    [[CMP:%.*]] = icmp ult i8 [[X]], 4
+; CHECK-NEXT:    ret i1 [[CMP]]
+; CHECK:       exit:
+; CHECK-NEXT:    ret i1 false
+;
+  %a = add i8 %x, -1
+  store i8 %a, ptr %p, align 1
+  %c = icmp ult i8 %a, 4
+  br i1 %c, label %if, label %exit
+
+if:
+  %cmp = icmp ult i8 %x, 4
+  ret i1 %cmp
+
+exit:
+  ret i1 false
 }
