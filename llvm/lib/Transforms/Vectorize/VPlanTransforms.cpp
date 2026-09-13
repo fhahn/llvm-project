@@ -1866,7 +1866,8 @@ static void narrowToSingleScalarRecipes(VPlan &Plan) {
       auto IntroducesBCastOf = [](const VPValue *Op) {
         return [Op](const VPUser *U) {
           if (auto *VPI = dyn_cast<VPInstruction>(U)) {
-            if (is_contained({VPInstruction::ExtractLastLane,
+            if (is_contained({VPInstruction::ExtractLane,
+                              VPInstruction::ExtractLastLane,
                               VPInstruction::ExtractLastPart,
                               VPInstruction::ExtractPenultimateElement},
                              VPI->getOpcode()))
