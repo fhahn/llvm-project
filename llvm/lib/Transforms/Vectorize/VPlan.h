@@ -1304,6 +1304,8 @@ public:
 /// the VPInstruction is also a single def-use vertex. Most VPInstruction
 /// opcodes can take an optional mask. Masks may be assigned during
 /// predication.
+/// Instruction::Ret returns the first lane of its single operand and terminates
+/// a top-level block without successors.
 class LLVM_ABI_FOR_TEST VPInstruction : public VPRecipeWithIRFlags,
                                         public VPIRMetadata {
 public:
@@ -3545,9 +3547,10 @@ public:
 };
 
 /// Holds a cloned VPlan for a speculative load oracle: a scalar loop replaying
-/// the early-exit conditions lane-by-lane. Defines the pointer to the function
-/// generated from that plan, returning the number of accessible bytes as i64.
-/// Its operands are that function's arguments: canonical IV, then live-ins.
+/// the early-exit conditions lane-by-lane. Defines the pointer to the oracle
+/// function generated from that plan, which returns the number of accessible
+/// bytes as i64. Its operands are the arguments passed to that function: the
+/// lane-0 canonical IV, followed by the oracle plan's live-ins.
 class VPSpeculativeLoadOracleRecipe : public VPSingleDefRecipe {
   std::unique_ptr<VPlan> OraclePlan;
 
@@ -4557,8 +4560,8 @@ public:
   using VPBlockBase::print; // Get the print(raw_stream &O) version.
 #endif
 
-  /// If the block has multiple successors, return the branch recipe terminating
-  /// the block. If there are no or only a single successor, return nullptr;
+  /// Return the explicit branch or return recipe terminating the block, or
+  /// nullptr if the block has no explicit terminator.
   VPRecipeBase *getTerminator();
   const VPRecipeBase *getTerminator() const;
 

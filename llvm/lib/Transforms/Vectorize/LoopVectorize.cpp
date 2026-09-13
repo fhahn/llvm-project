@@ -5631,8 +5631,9 @@ LoopVectorizationPlanner::computeBestVF() {
     return {VectorizationFactor(FirstPlan.getSingleVF(), 0, 0), &FirstPlan};
   }
 
-  // Check the first plan directly: UserVF may have been rejected due to invalid
-  // costs, leaving plans built by the cost-based path that include UserVF.
+  // Check the first plan directly: UserVF may have been rejected due to
+  // invalid costs, in which case the plans were built by the cost-based path
+  // below and just happen to include one with UserVF.
   if (FirstPlan.hasVF(UserVF) && hasForcedEpilogueVF() && VPlans.size() == 2) {
     assert(VPlans[0]->getSingleVF() == UserVF &&
            "expected second plan to be for the forced UserVF");

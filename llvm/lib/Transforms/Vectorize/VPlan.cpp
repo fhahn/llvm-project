@@ -620,7 +620,7 @@ const VPRegionBlock *VPBasicBlock::getEnclosingLoopRegion() const {
   return getEnclosingLoopRegionForRegion(getParent());
 }
 
-static bool hasConditionalTerminator(const VPBasicBlock *VPBB) {
+static bool hasTerminator(const VPBasicBlock *VPBB) {
   if (VPBB->empty()) {
     assert(
         VPBB->getNumSuccessors() < 2 &&
@@ -629,6 +629,11 @@ static bool hasConditionalTerminator(const VPBasicBlock *VPBB) {
   }
 
   const VPRecipeBase *R = &VPBB->back();
+  if (match(R, m_VPInstruction<Instruction::Ret>())) {
+    assert(!VPBB->getParent() && VPBB->getNumSuccessors() == 0 &&
+           "return must exit the plan");
+    return true;
+  }
   [[maybe_unused]] bool IsSwitch =
       isa<VPInstruction>(R) &&
       cast<VPInstruction>(R)->getOpcode() == Instruction::Switch;
@@ -659,13 +664,13 @@ static bool hasConditionalTerminator(const VPBasicBlock *VPBB) {
 }
 
 VPRecipeBase *VPBasicBlock::getTerminator() {
-  if (hasConditionalTerminator(this))
+  if (hasTerminator(this))
     return &back();
   return nullptr;
 }
 
 const VPRecipeBase *VPBasicBlock::getTerminator() const {
-  if (hasConditionalTerminator(this))
+  if (hasTerminator(this))
     return &back();
   return nullptr;
 }

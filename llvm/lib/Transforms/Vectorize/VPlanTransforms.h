@@ -223,9 +223,9 @@ struct VPlanTransforms {
   /// BranchOnCond with BranchOnCount, using \p DL for the canonical IV.
   LLVM_ABI_FOR_TEST static void createLoopRegions(VPlan &Plan, DebugLoc DL);
 
-  /// Wire the canonical-IV operand of a VPSpeculativeLoadOracleRecipe and its
+  /// Wire the canonical IV operand of a VPSpeculativeLoadOracleRecipe and its
   /// speculative loads to \p Plan's canonical IV. Must run right after
-  /// createLoopRegions, which introduces it.
+  /// createLoopRegions, which introduces the canonical IV.
   static void materializeSpeculativeLoadOracleCanonicalIV(VPlan &Plan);
 
   /// Wrap runtime check block \p CheckBlock in a VPIRBB and \p Cond in a
@@ -380,9 +380,11 @@ struct VPlanTransforms {
   /// Remove dead recipes from \p Plan.
   static void removeDeadRecipes(VPlan &Plan);
 
-  /// Replace loads in \p Plan's loop body that may fault with
-  /// @llvm.speculative.load intrinsics backed by a scalar oracle plan. Must run
-  /// before the early exits are flattened. Returns false on failure.
+  /// Replace loads in \p Plan's loop body that are not known to be
+  /// dereferenceable with @llvm.speculative.load intrinsics, backed by a scalar
+  /// oracle plan replaying the exit conditions lane-by-lane. Must run before
+  /// the early exits are flattened. Returns false if any such load cannot be
+  /// replaced.
   static bool replaceUnsafeLoadsWithSpeculative(VPlan &Plan, Loop *TheLoop,
                                                 PredicatedScalarEvolution &PSE,
                                                 DominatorTree &DT,

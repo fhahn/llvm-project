@@ -361,6 +361,14 @@ bool VPlanVerifier::verifyVPBasicBlock(const VPBasicBlock *VPBB) {
 
 bool VPlanVerifier::verifyBlock(const VPBlockBase *VPB) {
   auto *VPBB = dyn_cast<VPBasicBlock>(VPB);
+  if (VPBB)
+    for (const VPRecipeBase &R : *VPBB)
+      if (match(&R, m_VPInstruction<Instruction::Ret>()) &&
+          (&R != &VPBB->back() || VPBB->getParent() ||
+           VPBB->getNumSuccessors() != 0)) {
+        errs() << "Return must terminate a top-level block without successors!\n";
+        return false;
+      }
   // Check block's condition bit.
   if (VPBB && !isa<VPIRBasicBlock>(VPB)) {
     // For plain CFG VPlans, verify header and latch block structure.

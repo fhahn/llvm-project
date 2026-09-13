@@ -195,6 +195,7 @@ bool VPRecipeBase::mayHaveSideEffects() const {
   case VPInstructionSC: {
     auto *VPI = cast<VPInstruction>(this);
     return mayWriteToMemory() ||
+           VPI->getOpcode() == Instruction::Ret ||
            VPI->getOpcode() == VPInstruction::BranchOnCount ||
            VPI->getOpcode() == VPInstruction::BranchOnCond ||
            VPI->getOpcode() == VPInstruction::BranchOnTwoConds;
@@ -502,6 +503,7 @@ Type *llvm::computeScalarTypeForInstruction(unsigned Opcode,
     for (unsigned Idx = 1; Idx != Operands.size(); ++Idx)
       AssertOperandType(Idx, Op0Ty);
     return Type::getVoidTy(Ctx);
+  case Instruction::Ret:
   case Instruction::Store:
     return Type::getVoidTy(Ctx);
   case Instruction::ICmp:
@@ -647,6 +649,7 @@ unsigned VPInstruction::getNumOperandsForOpcode() const {
   case VPInstruction::IncomingAliasMask:
     return 0;
   case Instruction::Alloca:
+  case Instruction::Ret:
   case Instruction::ExtractValue:
   case Instruction::Freeze:
   case Instruction::Load:
@@ -884,6 +887,13 @@ Value *VPInstruction::generate(VPTransformState &State) {
         Builder.getInt32Ty(), Intrinsic::experimental_get_vector_length,
         {AVL, VFArg, Builder.getTrue()});
     return EVL;
+  }
+  case Instruction::Ret: {
+    Value *RetVal = State.get(getOperand(0), /*IsScalar=*/true);
+    BasicBlock *IRBB = Builder.GetInsertBlock();
+    auto *Ret = Builder.CreateRet(RetVal);
+    cast<UnreachableInst>(IRBB->getTerminator())->eraseFromParent();
+    return Ret;
   }
   case VPInstruction::BranchOnCond: {
     Value *Cond = State.get(getOperand(0), VPLane(0));
@@ -1672,6 +1682,7 @@ bool VPInstruction::opcodeMayReadOrWriteFromMemory() const {
       Instruction::isUnaryOp(getOpcode()) || Instruction::isCast(getOpcode()))
     return false;
   switch (getOpcode()) {
+  case Instruction::Ret:
   case Instruction::ExtractValue:
   case Instruction::InsertValue:
   case Instruction::GetElementPtr:
@@ -1742,6 +1753,7 @@ bool VPInstruction::usesFirstLaneOnly(const VPValue *Op) const {
     return Op == getOperand(1);
   case Instruction::InsertElement:
     return Op == getOperand(1) || Op == getOperand(2);
+  case Instruction::Ret:
   case Instruction::PHI:
     return true;
   case Instruction::FCmp:
@@ -1795,6 +1807,7 @@ bool VPInstruction::usesFirstPartOnly(const VPValue *Op) const {
   case Instruction::ICmp:
   case Instruction::Select:
     return vputils::onlyFirstPartUsed(this);
+  case Instruction::Ret:
   case VPInstruction::BranchOnCount:
   case VPInstruction::BranchOnCond:
   case VPInstruction::BranchOnTwoConds:
@@ -3684,16 +3697,6 @@ void VPSpeculativeLoadOracleRecipe::execute(VPTransformState &State) {
   for (VPBlockBase *Block : drop_begin(RPOT))
     Block->execute(&OracleState);
   OracleState.fixupHeaderPhis();
-
-  // The byte count is the last recipe of the exit block, generated last as it
-  // has no successors.
-  VPBasicBlock *ExitVPBB = OracleState.CFG.PrevVPBB;
-  assert(ExitVPBB->getNumSuccessors() == 0 && "exit block must be last in RPO");
-  BasicBlock *ExitBB = OracleState.CFG.VPBB2IRBB[ExitVPBB];
-  cast<UnreachableInst>(ExitBB->getTerminator())->eraseFromParent();
-  OracleBuilder.SetInsertPoint(ExitBB);
-  OracleBuilder.CreateRet(
-      OracleState.get(ExitVPBB->back().getVPSingleValue(), /*IsScalar=*/true));
 
   State.set(this, OracleFn, /*IsScalar=*/true);
 }
