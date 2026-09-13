@@ -1903,4 +1903,63 @@ _Z9stringlenPKs.exit:
   ret i1 %retval.0.i
 }
 
+; The known bits of (X + C1) are weaker than those of X because of the carry
+; out of the unknown low bits. Cancelling the offset against the constant
+; recovers the precision: %x is in [0, 16), so %add is in [8, 24).
+
+define i1 @add_constant_offset(i8 %a) {
+; CHECK-LABEL: @add_constant_offset(
+; CHECK-NEXT:    ret i1 false
+;
+  %x = and i8 %a, 15
+  %add = add i8 %x, 8
+  %cmp = icmp eq i8 %add, 30
+  ret i1 %cmp
+}
+
+define i1 @add_constant_offset_ne(i8 %a) {
+; CHECK-LABEL: @add_constant_offset_ne(
+; CHECK-NEXT:    ret i1 true
+;
+  %x = and i8 %a, 15
+  %add = add i8 %x, 8
+  %cmp = icmp ne i8 %add, 30
+  ret i1 %cmp
+}
+
+; The offset wraps; %add is in [-8, 8).
+define i1 @add_constant_offset_negative(i8 %a) {
+; CHECK-LABEL: @add_constant_offset_negative(
+; CHECK-NEXT:    ret i1 false
+;
+  %x = and i8 %a, 15
+  %add = add i8 %x, -8
+  %cmp = icmp eq i8 %add, 20
+  ret i1 %cmp
+}
+
+define <2 x i1> @add_constant_offset_vec(<2 x i8> %a) {
+; CHECK-LABEL: @add_constant_offset_vec(
+; CHECK-NEXT:    ret <2 x i1> zeroinitializer
+;
+  %x = and <2 x i8> %a, splat (i8 15)
+  %add = add <2 x i8> %x, splat (i8 8)
+  %cmp = icmp eq <2 x i8> %add, splat (i8 30)
+  ret <2 x i1> %cmp
+}
+
+; Negative test: 20 is in [8, 24), so the compare is not known.
+define i1 @add_constant_offset_unknown(i8 %a) {
+; CHECK-LABEL: @add_constant_offset_unknown(
+; CHECK-NEXT:    [[X:%.*]] = and i8 [[A:%.*]], 15
+; CHECK-NEXT:    [[ADD:%.*]] = add i8 [[X]], 8
+; CHECK-NEXT:    [[CMP:%.*]] = icmp eq i8 [[ADD]], 20
+; CHECK-NEXT:    ret i1 [[CMP]]
+;
+  %x = and i8 %a, 15
+  %add = add i8 %x, 8
+  %cmp = icmp eq i8 %add, 20
+  ret i1 %cmp
+}
+
 !0 = !{ i8 1, i8 5 }
