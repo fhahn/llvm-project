@@ -5631,9 +5631,8 @@ LoopVectorizationPlanner::computeBestVF() {
     return {VectorizationFactor(FirstPlan.getSingleVF(), 0, 0), &FirstPlan};
   }
 
-  // Check the first plan directly: UserVF may have been rejected due to
-  // invalid costs, in which case the plans were built by the cost-based path
-  // below and just happen to include one with UserVF.
+  // Check the first plan directly: UserVF may have been rejected due to invalid
+  // costs, leaving plans built by the cost-based path that include UserVF.
   if (FirstPlan.hasVF(UserVF) && hasForcedEpilogueVF() && VPlans.size() == 2) {
     assert(VPlans[0]->getSingleVF() == UserVF &&
            "expected second plan to be for the forced UserVF");
@@ -8100,7 +8099,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
 
   // The oracle's canonical-IV operand is not offset per unrolled part, so parts
   // >= 1 would replay the wrong lane window.
-  if (InterleaveLoop && BestPlanPtr->getSpeculativeLoadOracle()) {
+  if (InterleaveLoop && vputils::findSpeculativeLoadOracle(*BestPlanPtr)) {
     LLVM_DEBUG(dbgs() << "LV: Not interleaving loop with speculative loads.\n");
     IntDiagMsg = {"SpeculativeLoadPreventsInterleaving",
                   "Unable to interleave loop using speculative loads."};

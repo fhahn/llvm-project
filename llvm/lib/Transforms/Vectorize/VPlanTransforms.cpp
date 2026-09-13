@@ -3310,8 +3310,7 @@ bool VPlanTransforms::handleUncountableEarlyExits(
 
   // Dereferenceability is only handled for uncountable exit loops without
   // stores, as only the loads contributing to the exit condition need to
-  // be checked. Non-dereferenceable loads are replaced with speculative
-  // loads, before the early exits below flatten the loop's CFG.
+  // be checked. Loads that may fault are replaced by speculative loads.
   if (Style == UncountableExitStyle::ReadOnly &&
       !replaceUnsafeLoadsWithSpeculative(Plan, TheLoop, PSE, DT, AC))
     return false;

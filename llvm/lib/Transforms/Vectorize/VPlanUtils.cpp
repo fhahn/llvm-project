@@ -167,9 +167,8 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
   // Broadcast just replicates a scalar, so the SCEV is the same as its operand.
   if (match(V, m_Broadcast(m_VPValue(LHSVal))))
     return getSCEVExprForVPValue(LHSVal, PSE, L);
-  // Lane 0 of a widened value is what the corresponding scalar expression
-  // evaluates to in the current iteration, so it has the same SCEV. Later lanes
-  // are offset from it by a lane-dependent amount and are not handled.
+  // Lane 0 of a widened value has the same SCEV as the scalar expression it
+  // widens. Later lanes are offset by a lane-dependent amount; not handled.
   if (match(V, m_ExtractElement(m_VPValue(LHSVal), m_ZeroInt())))
     return getSCEVExprForVPValue(LHSVal, PSE, L);
   if (match(V, m_Add(m_VPValue(LHSVal), m_VPValue(RHSVal))))
@@ -604,6 +603,13 @@ VPValue *vputils::findIncomingAliasMask(const VPlan &Plan) {
     if (match(&R, m_VPInstruction<VPInstruction::IncomingAliasMask>()))
       return cast<VPInstruction>(&R);
   return nullptr;
+}
+
+VPSpeculativeLoadOracleRecipe *vputils::findSpeculativeLoadOracle(VPlan &Plan) {
+  VPBasicBlock &Header = *Plan.getVectorLoopRegion()->getEntryBasicBlock();
+  auto It = find_if(Header, IsaPred<VPSpeculativeLoadOracleRecipe>);
+  return It == Header.end() ? nullptr
+                            : cast<VPSpeculativeLoadOracleRecipe>(&*It);
 }
 
 SmallVector<std::pair<VPBasicBlock *, VPIRBasicBlock *>>

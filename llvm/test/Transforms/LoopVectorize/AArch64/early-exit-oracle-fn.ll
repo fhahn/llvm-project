@@ -2194,7 +2194,6 @@ exit:
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp ne i8 [[TMP5]], [[TMP7]]
 ; CHECK-NEXT:    br i1 [[TMP8]], label %[[ORACLE_EXIT:.*]], label %[[LOOP_LATCH]]
 ; CHECK:       [[LOOP_LATCH]]:
-; CHECK-NEXT:    [[TMP10:%.*]] = add nuw nsw i64 [[TMP1]], 1
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 1
 ; CHECK-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[INDEX_NEXT]], 4
 ; CHECK-NEXT:    br i1 [[TMP12]], label %[[ORACLE_EXIT]], label %[[VECTOR_BODY]]
@@ -2221,7 +2220,6 @@ exit:
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp ne i8 [[TMP5]], [[TMP6]]
 ; CHECK-NEXT:    br i1 [[TMP7]], label %[[ORACLE_EXIT:.*]], label %[[LOOP_LATCH]]
 ; CHECK:       [[LOOP_LATCH]]:
-; CHECK-NEXT:    [[TMP9:%.*]] = add nuw nsw i64 [[TMP1]], 2
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 1
 ; CHECK-NEXT:    [[TMP11:%.*]] = icmp eq i64 [[INDEX_NEXT]], 4
 ; CHECK-NEXT:    br i1 [[TMP11]], label %[[ORACLE_EXIT]], label %[[VECTOR_BODY]]

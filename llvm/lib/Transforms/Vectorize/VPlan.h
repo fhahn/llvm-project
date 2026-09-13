@@ -3545,10 +3545,9 @@ public:
 };
 
 /// Holds a cloned VPlan for a speculative load oracle: a scalar loop replaying
-/// the early-exit conditions lane-by-lane. Defines the pointer to the oracle
-/// function generated from that plan, which returns the number of accessible
-/// bytes as i64. Its operands are the arguments passed to that function: the
-/// lane-0 canonical IV, followed by the oracle plan's live-ins.
+/// the early-exit conditions lane-by-lane. Defines the pointer to the function
+/// generated from that plan, returning the number of accessible bytes as i64.
+/// Its operands are that function's arguments: canonical IV, then live-ins.
 class VPSpeculativeLoadOracleRecipe : public VPSingleDefRecipe {
   std::unique_ptr<VPlan> OraclePlan;
 
@@ -5290,10 +5289,6 @@ public:
     // block and the early exiting edge).
     return NumExitPredecessors > 1;
   }
-
-  /// Returns the speculative-load oracle recipe in the vector loop header, or
-  /// nullptr if the plan does not use one. Requires loop regions to be created.
-  VPSpeculativeLoadOracleRecipe *getSpeculativeLoadOracle();
 
   /// Returns true if the scalar tail may execute after the vector loop, i.e.
   /// if the middle block is a predecessor of the scalar preheader. Note that

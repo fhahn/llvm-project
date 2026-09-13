@@ -3631,11 +3631,7 @@ VPSpeculativeLoadOracleRecipe *VPSpeculativeLoadOracleRecipe::clone() {
 
 void VPSpeculativeLoadOracleRecipe::execute(VPTransformState &State) {
   VPlan &Plan = *OraclePlan;
-  LLVMContext &Ctx = State.Builder.getContext();
-  Type *I64Ty = Type::getInt64Ty(Ctx);
-
-  // The oracle function's parameters mirror this recipe's operands: the lane-0
-  // canonical IV, followed by the oracle plan's external live-ins.
+  Type *I64Ty = Type::getInt64Ty(State.Builder.getContext());
   auto ParamTypes = map_to_vector(
       operands(), [](VPValue *Op) { return Op->getScalarType(); });
 
@@ -3649,9 +3645,8 @@ void VPSpeculativeLoadOracleRecipe::execute(VPTransformState &State) {
   // The replay loop runs exactly VF iterations, so it always terminates.
   OracleFn->addFnAttr(Attribute::MustProgress);
 
-  // Remap the oracle plan's placeholders to the function's arguments: its
-  // vector-trip-count symbol, standing in for the outer canonical IV, to the
-  // first, its live-ins to the remaining ones.
+  // Remap the oracle plan's placeholders to the function's arguments: the
+  // vector-trip-count symbol to the first (canonical IV), live-ins to the rest.
   Argument *CanonIVArg = OracleFn->getArg(0);
   CanonIVArg->setName("canonIV");
   Plan.getVectorTripCount().replaceAllUsesWith(Plan.getOrAddLiveIn(CanonIVArg));
@@ -3662,18 +3657,18 @@ void VPSpeculativeLoadOracleRecipe::execute(VPTransformState &State) {
     Plan.getOrAddLiveIn(V)->replaceAllUsesWith(Plan.getOrAddLiveIn(&Arg));
   }
 
-  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "oracle.entry", OracleFn);
+  BasicBlock *EntryBB =
+      BasicBlock::Create(OracleFn->getContext(), "oracle.entry", OracleFn);
   IRBuilder<> OracleBuilder(EntryBB);
 
-  // Replace the VF placeholder with the runtime lane count, matching the IV
-  // type so the BranchOnCount types agree.
-  Value *RuntimeVF =
-      getRuntimeVF(OracleBuilder, CanonIVArg->getType(), State.VF);
-  Plan.getVF().replaceAllUsesWith(Plan.getOrAddLiveIn(RuntimeVF));
+  // Replace the VF placeholder with the runtime lane count, in the IV type so
+  // the BranchOnCount types agree.
+  Plan.getVF().replaceAllUsesWith(Plan.getOrAddLiveIn(
+      getRuntimeVF(OracleBuilder, CanonIVArg->getType(), State.VF)));
   OracleBuilder.CreateUnreachable();
 
-  // Set up a VPTransformState for scalar (VF=1) execution into the oracle
-  // function. Create a LoopInfo so VPBasicBlock::execute can register the loop.
+  // Execute the plan scalarly (VF=1) into the oracle function. LoopInfo is
+  // needed because VPBasicBlock::execute registers the loop it generates.
   DominatorTree OracleDT(*OracleFn);
   LoopInfo OracleLI(OracleDT);
   VPTransformState OracleState(State.TTI, ElementCount::getFixed(1), &OracleLI,
@@ -3682,28 +3677,23 @@ void VPSpeculativeLoadOracleRecipe::execute(VPTransformState &State) {
   OracleState.CFG.PrevBB = EntryBB;
   OracleState.CFG.VPBB2IRBB[Plan.getEntry()] = EntryBB;
 
-  // Generate the oracle plan's blocks directly, bypassing VPlan::execute which
-  // does main-plan-specific setup and cleanup. The entry is already mapped to
-  // EntryBB and comes first in RPO, so skip it; the single exit block has no
-  // successors, hence comes last.
+  // Generate the plan's blocks directly, bypassing VPlan::execute and its
+  // main-plan-specific setup. The entry is already mapped, so skip it.
   ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>> RPOT(
       Plan.getEntry());
-  VPBasicBlock *ExitVPBB = nullptr;
-  for (VPBlockBase *Block : drop_begin(RPOT)) {
+  for (VPBlockBase *Block : drop_begin(RPOT))
     Block->execute(&OracleState);
-    ExitVPBB = cast<VPBasicBlock>(Block);
-  }
   OracleState.fixupHeaderPhis();
-  assert(ExitVPBB->getNumSuccessors() == 0 && "exit block must be last in RPO");
 
-  // Return the byte count computed by the last recipe of the exit block.
+  // The byte count is the last recipe of the exit block, generated last as it
+  // has no successors.
+  VPBasicBlock *ExitVPBB = OracleState.CFG.PrevVPBB;
+  assert(ExitVPBB->getNumSuccessors() == 0 && "exit block must be last in RPO");
   BasicBlock *ExitBB = OracleState.CFG.VPBB2IRBB[ExitVPBB];
   cast<UnreachableInst>(ExitBB->getTerminator())->eraseFromParent();
-  Value *RetVal =
-      OracleState.get(ExitVPBB->back().getVPSingleValue(), /*IsScalar=*/true);
-  assert(RetVal->getType() == I64Ty && "Oracle exit value must be i64");
   OracleBuilder.SetInsertPoint(ExitBB);
-  OracleBuilder.CreateRet(RetVal);
+  OracleBuilder.CreateRet(
+      OracleState.get(ExitVPBB->back().getVPSingleValue(), /*IsScalar=*/true));
 
   State.set(this, OracleFn, /*IsScalar=*/true);
 }

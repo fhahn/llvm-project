@@ -3,8 +3,9 @@
 
 target triple = "arm64-apple-macosx"
 
-; Test that the oracle correctly handles an i32 induction variable.
-; The oracle trip count must match the IV type.
+; Test that the oracle correctly handles an i32 induction variable; the oracle
+; trip count must match the IV type. Also check that the metadata of the
+; replaced loads is propagated to the speculative loads.
 define i32 @oracle_i32_iv(ptr %A, ptr %B, i32 %n) {
 ; CHECK-LABEL: define i32 @oracle_i32_iv(
 ; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i32 [[N:%.*]]) {
@@ -27,10 +28,10 @@ define i32 @oracle_i32_iv(ptr %A, ptr %B, i32 %n) {
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY_INTERIM:.*]] ]
 ; CHECK-NEXT:    [[GEP_A:%.*]] = getelementptr inbounds i8, ptr [[A]], i32 [[IV]]
-; CHECK-NEXT:    [[TMP15:%.*]] = call <4 x i8> (ptr, i1, ...) @llvm.speculative.load.v4i8.p0(ptr [[GEP_A]], i1 false, ptr @speculativeLoadOracle, i32 [[IV]], ptr [[A]], ptr [[B]])
+; CHECK-NEXT:    [[TMP15:%.*]] = call <4 x i8> (ptr, i1, ...) @llvm.speculative.load.v4i8.p0(ptr [[GEP_A]], i1 false, ptr @speculativeLoadOracle, i32 [[IV]], ptr [[A]], ptr [[B]]), !tbaa [[CHAR_TBAA0:![0-9]+]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = freeze <4 x i8> [[TMP15]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i8, ptr [[B]], i32 [[IV]]
-; CHECK-NEXT:    [[TMP16:%.*]] = call <4 x i8> (ptr, i1, ...) @llvm.speculative.load.v4i8.p0(ptr [[TMP6]], i1 false, ptr @speculativeLoadOracle, i32 [[IV]], ptr [[A]], ptr [[B]])
+; CHECK-NEXT:    [[TMP16:%.*]] = call <4 x i8> (ptr, i1, ...) @llvm.speculative.load.v4i8.p0(ptr [[TMP6]], i1 false, ptr @speculativeLoadOracle, i32 [[IV]], ptr [[A]], ptr [[B]]), !tbaa [[CHAR_TBAA0]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = freeze <4 x i8> [[TMP16]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp ne <4 x i8> [[TMP5]], [[TMP7]]
 ; CHECK-NEXT:    [[TMP9:%.*]] = freeze <4 x i1> [[TMP8]]
@@ -39,7 +40,7 @@ define i32 @oracle_i32_iv(ptr %A, ptr %B, i32 %n) {
 ; CHECK-NEXT:    [[TMP11:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP10]], label %[[VECTOR_EARLY_EXIT:.*]], label %[[VECTOR_BODY_INTERIM]]
 ; CHECK:       [[VECTOR_BODY_INTERIM]]:
-; CHECK-NEXT:    br i1 [[TMP11]], label %[[MIDDLE_BLOCK:.*]], label %[[LOOP]], !llvm.loop [[LOOP0:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP11]], label %[[MIDDLE_BLOCK:.*]], label %[[LOOP]], !llvm.loop [[LOOP3:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i32 [[N]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT_LOOPEXIT:.*]], label %[[SCALAR_PH1]]
@@ -54,15 +55,15 @@ define i32 @oracle_i32_iv(ptr %A, ptr %B, i32 %n) {
 ; CHECK:       [[LOOP1]]:
 ; CHECK-NEXT:    [[IV1:%.*]] = phi i32 [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ], [ [[BC_RESUME_VAL]], %[[SCALAR_PH1]] ]
 ; CHECK-NEXT:    [[GEP_A1:%.*]] = getelementptr inbounds i8, ptr [[A]], i32 [[IV1]]
-; CHECK-NEXT:    [[LD_A:%.*]] = load i8, ptr [[GEP_A1]], align 1
+; CHECK-NEXT:    [[LD_A:%.*]] = load i8, ptr [[GEP_A1]], align 1, !tbaa [[CHAR_TBAA0]]
 ; CHECK-NEXT:    [[GEP_B:%.*]] = getelementptr inbounds i8, ptr [[B]], i32 [[IV1]]
-; CHECK-NEXT:    [[LD_B:%.*]] = load i8, ptr [[GEP_B]], align 1
+; CHECK-NEXT:    [[LD_B:%.*]] = load i8, ptr [[GEP_B]], align 1, !tbaa [[CHAR_TBAA0]]
 ; CHECK-NEXT:    [[CMP:%.*]] = icmp ne i8 [[LD_A]], [[LD_B]]
 ; CHECK-NEXT:    br i1 [[CMP]], label %[[EARLY_EXIT]], label %[[LOOP_LATCH]]
 ; CHECK:       [[LOOP_LATCH]]:
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i32 [[IV1]], 1
 ; CHECK-NEXT:    [[EC:%.*]] = icmp ne i32 [[IV_NEXT]], [[N]]
-; CHECK-NEXT:    br i1 [[EC]], label %[[LOOP1]], label %[[EXIT_LOOPEXIT]], !llvm.loop [[LOOP3:![0-9]+]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[LOOP1]], label %[[EXIT_LOOPEXIT]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[EARLY_EXIT]]:
 ; CHECK-NEXT:    [[IV_LCSSA:%.*]] = phi i32 [ [[IV1]], %[[LOOP1]] ], [ [[TMP14]], %[[VECTOR_EARLY_EXIT]] ]
 ; CHECK-NEXT:    ret i32 [[IV_LCSSA]]
@@ -78,9 +79,9 @@ entry:
 loop:
   %iv = phi i32 [ 0, %entry ], [ %iv.next, %loop.latch ]
   %gep.A = getelementptr inbounds i8, ptr %A, i32 %iv
-  %ld.A = load i8, ptr %gep.A, align 1
+  %ld.A = load i8, ptr %gep.A, align 1, !tbaa !0
   %gep.B = getelementptr inbounds i8, ptr %B, i32 %iv
-  %ld.B = load i8, ptr %gep.B, align 1
+  %ld.B = load i8, ptr %gep.B, align 1, !tbaa !0
   %cmp = icmp ne i8 %ld.A, %ld.B
   br i1 %cmp, label %early.exit, label %loop.latch
 
@@ -95,9 +96,16 @@ early.exit:
 exit:
   ret i32 -1
 }
+
+!0 = !{!1, !1, i64 0}
+!1 = !{!"omnipotent char", !2, i64 0}
+!2 = !{!"Simple C++ TBAA"}
 ;.
-; CHECK: [[LOOP0]] = distinct !{[[LOOP0]], [[META1:![0-9]+]], [[META2:![0-9]+]]}
-; CHECK: [[META1]] = !{!"llvm.loop.isvectorized", i32 1}
-; CHECK: [[META2]] = !{!"llvm.loop.unroll.runtime.disable"}
-; CHECK: [[LOOP3]] = distinct !{[[LOOP3]], [[META2]], [[META1]]}
+; CHECK: [[CHAR_TBAA0]] = !{[[META1:![0-9]+]], [[META1]], i64 0}
+; CHECK: [[META1]] = !{!"omnipotent char", [[META2:![0-9]+]], i64 0}
+; CHECK: [[META2]] = !{!"Simple C++ TBAA"}
+; CHECK: [[LOOP3]] = distinct !{[[LOOP3]], [[META4:![0-9]+]], [[META5:![0-9]+]]}
+; CHECK: [[META4]] = !{!"llvm.loop.isvectorized", i32 1}
+; CHECK: [[META5]] = !{!"llvm.loop.unroll.runtime.disable"}
+; CHECK: [[LOOP6]] = distinct !{[[LOOP6]], [[META5]], [[META4]]}
 ;.
