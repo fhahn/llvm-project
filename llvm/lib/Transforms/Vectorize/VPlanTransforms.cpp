@@ -1338,18 +1338,25 @@ static VPValue *simplifyRecipe(VPlan &Plan, VPSingleDefRecipe *Def) {
   if (!Plan.isUnrolled())
     return nullptr;
 
-  // After unrolling, extract-lane may be used to extract values from multiple
-  // scalar sources. Only simplify when extracting from a single scalar source.
+  // After unrolling, extract-lane may be used to extract values from one source
+  // per part.
   VPValue *LaneToExtract;
-  if (match(Def, m_ExtractLane(m_VPValue(LaneToExtract), m_VPValue(A)))) {
-    // Simplify extract-lane(%lane_num, %scalar_val) -> %scalar_val.
-    if (vputils::isSingleScalar(A))
+  if (auto *VPI = dyn_cast<VPInstruction>(Def);
+      VPI && VPI->getOpcode() == VPInstruction::ExtractLane) {
+    LaneToExtract = VPI->getOperand(0);
+    auto Sources = drop_begin(VPI->operands());
+    A = *Sources.begin();
+
+    // Simplify extract-lane(%lane_num, %scalar_val, ..., %scalar_val) ->
+    // %scalar_val. All parts hold the same value in every lane, so the lane to
+    // extract does not matter.
+    if (vputils::isSingleScalar(A) && all_equal(Sources))
       return A;
 
     // Replace extract-lane(0, canonical-WIDEN-INDUCTION) with the region's
     // scalar canonical IV.
     VPWidenIntOrFpInductionRecipe *WidenIV;
-    if (match(LaneToExtract, m_ZeroInt()) &&
+    if (VPI->getNumOperands() == 2 && match(LaneToExtract, m_ZeroInt()) &&
         match(A, m_CanonicalWidenIV(WidenIV)))
       return WidenIV->getRegion()->getCanonicalIV();
   }
