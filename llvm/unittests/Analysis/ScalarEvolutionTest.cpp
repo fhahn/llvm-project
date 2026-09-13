@@ -1511,6 +1511,61 @@ TEST_F(ScalarEvolutionsTest, UnsignedIsImpliedViaOperations) {
   });
 }
 
+TEST_F(ScalarEvolutionsTest, EntryGuardsAcrossMerges) {
+  SMDiagnostic Err;
+  auto M = parseAssemblyString(R"IR(
+    define void @test(i32 %n, i1 %c) {
+    entry:
+      %big = icmp ugt i32 %n, 1
+      br i1 %big, label %true.split, label %false.split
+    true.split:
+      br i1 %c, label %true.left, label %true.right
+    true.left:
+      br label %true.guard
+    true.right:
+      br label %true.guard
+    true.guard:
+      br label %merged
+    false.split:
+      br i1 %c, label %false.left, label %false.right
+    false.left:
+      br label %false.guard
+    false.right:
+      br label %false.guard
+    false.guard:
+      br label %merged
+    merged:
+      br i1 %big, label %duplicate, label %duplicate
+    duplicate:
+      ret void
+    }
+  )IR", Err, Context);
+  ASSERT_TRUE(M);
+  ASSERT_FALSE(verifyModule(*M));
+
+  runWithSE(*M, "test", [](Function &F, LoopInfo &, ScalarEvolution &SE) {
+    const SCEV *N = SE.getSCEV(F.getArg(0));
+    const SCEV *One = SE.getOne(N->getType());
+    auto Prove = [&](StringRef Name, ICmpInst::Predicate Pred) {
+      auto BB = llvm::find_if(F, [&](BasicBlock &BB) {
+        return BB.getName() == Name;
+      });
+      assert(BB != F.end());
+      return SE.isBasicBlockEntryGuardedByCond(&*BB, Pred, N, One);
+    };
+
+    // Both polarities remain available beyond a diamond.
+    EXPECT_TRUE(Prove("true.guard", ICmpInst::ICMP_UGT));
+    EXPECT_TRUE(Prove("false.guard", ICmpInst::ICMP_ULE));
+    // Neither fact holds after the paths reconverge, or after a branch with
+    // duplicate successors.
+    EXPECT_FALSE(Prove("merged", ICmpInst::ICMP_UGT));
+    EXPECT_FALSE(Prove("merged", ICmpInst::ICMP_ULE));
+    EXPECT_FALSE(Prove("duplicate", ICmpInst::ICMP_UGT));
+    EXPECT_FALSE(Prove("duplicate", ICmpInst::ICMP_ULE));
+  });
+}
+
 TEST_F(ScalarEvolutionsTest, ProveImplicationViaNarrowing) {
   LLVMContext C;
   SMDiagnostic Err;
