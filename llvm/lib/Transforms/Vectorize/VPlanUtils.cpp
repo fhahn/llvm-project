@@ -23,8 +23,10 @@
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/Analysis/ScalarEvolutionPatternMatch.h"
 #include "llvm/IR/Dominators.h"
+#include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/ProfDataUtils.h"
 #include "llvm/Transforms/Utils/ScalarEvolutionExpander.h"
+#include <numeric>
 
 using namespace llvm;
 using namespace llvm::VPlanPatternMatch;
@@ -1446,6 +1448,20 @@ vputils::computeExecutionFrequencies(ArrayRef<VPBasicBlock *> Blocks) {
     Freq.emplace(BlockFrequency(std::max<uint64_t>(Mass, 1)), IsEstimated[Idx]);
   }
   return Frequencies;
+}
+
+void vputils::setUnknownBranchWeights(VPIRMetadata &Br, const VPlan &Plan) {
+  if (MDNode *MD = getExplicitlyUnknownBranchWeightsIfProfiled(
+          *Plan.getIRFunction(), "loop-vectorize"))
+    Br.setMetadata(LLVMContext::MD_prof, MD);
+}
+
+MDNode *vputils::getBranchWeightsFromProbability(BranchProbability Taken,
+                                                 LLVMContext &Ctx) {
+  uint32_t TakenW = std::max(Taken.getNumerator(), 1u);
+  uint32_t NotTakenW = std::max(Taken.getCompl().getNumerator(), 1u);
+  uint32_t GCD = std::gcd(TakenW, NotTakenW);
+  return MDBuilder(Ctx).createBranchWeights(TakenW / GCD, NotTakenW / GCD);
 }
 
 VPIRValue *vputils::tryToFoldLiveIns(VPSingleDefRecipe &R,

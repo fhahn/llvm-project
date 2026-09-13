@@ -25,8 +25,6 @@
 #include "llvm/Analysis/IVDescriptors.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Intrinsics.h"
-#include "llvm/IR/MDBuilder.h"
-#include <numeric>
 
 using namespace llvm;
 using namespace llvm::VPlanPatternMatch;
@@ -691,14 +689,8 @@ convertFrequencyToBranchWeights(std::optional<VPExecutionFrequency> Freq,
                                 LLVMContext &Ctx) {
   if (!Freq || Freq->IsEstimated)
     return nullptr;
-  BranchProbability P = vputils::getExecutionProbability(Freq->Freq);
-
-  // Use the numerators of P and its complement as weights and reduce them via
-  // gcd to keep them small. Neither is zero, as P is neither zero nor one.
-  uint32_t Taken = P.getNumerator();
-  uint32_t NotTaken = P.getCompl().getNumerator();
-  uint32_t GCD = std::gcd(Taken, NotTaken);
-  return MDBuilder(Ctx).createBranchWeights(Taken / GCD, NotTaken / GCD);
+  return vputils::getBranchWeightsFromProbability(
+      vputils::getExecutionProbability(Freq->Freq), Ctx);
 }
 
 /// Convert recipes in region blocks to operate on a single lane 0.
@@ -752,11 +744,15 @@ static void convertRecipesInRegionBlocksToSingleScalar(VPlan &Plan, Type *IdxTy,
         RepR->eraseFromParent();
       } else if (auto *BranchOnMask = dyn_cast<VPBranchOnMaskRecipe>(&OldR)) {
         // Turn the frequency of the predicated block into branch weights.
+        // Without a known, non-estimated frequency the vectorizer has no
+        // probability to give, so mark the guard explicitly unknown.
         auto *BOC = Builder.createNaryOp(VPInstruction::BranchOnCond,
                                          {BranchOnMask->getOperand(0)}, OldDL);
         if (MDNode *Weights = convertFrequencyToBranchWeights(
                 BranchOnMask->getExecutionFrequency(), Plan.getContext()))
           BOC->setMetadata(LLVMContext::MD_prof, Weights);
+        else
+          vputils::setUnknownBranchWeights(*BOC, Plan);
         BranchOnMask->eraseFromParent();
       } else if (auto *PredPhi = dyn_cast<VPPredInstPHIRecipe>(&OldR)) {
         VPValue *PredOp = PredPhi->getOperand(0);

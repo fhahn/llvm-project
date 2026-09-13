@@ -275,6 +275,18 @@ inline Type *getLoadStoreValueType(VPSingleDefRecipe *R) {
   return (IsLoad ? R : R->getOperand(0))->getScalarType();
 }
 
+/// Mark \p Br, a branch or select created by the vectorizer, for which it has
+/// no probability, as having an explicitly unknown profile, so it does not look
+/// like the branch weights of an original branch were dropped. Does nothing if
+/// \p Plan's function has no profile information.
+void setUnknownBranchWeights(VPIRMetadata &Br, const VPlan &Plan);
+
+/// Returns branch weights for a branch whose first successor is taken with
+/// probability \p Taken. The weights are the numerators of \p Taken and its
+/// complement, each at least 1 and reduced by their gcd to keep them small.
+MDNode *getBranchWeightsFromProbability(BranchProbability Taken,
+                                        LLVMContext &Ctx);
+
 namespace detail {
 
 /// Template-independent implementation for pullOutPermutations.
