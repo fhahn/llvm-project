@@ -3175,6 +3175,12 @@ static Value *simplifyICmpWithConstant(CmpPredicate Pred, Value *LHS,
   // Only worth the recursive simplification attempt if there are
   // assumptions or dominating conditions on X that it could fold against;
   // otherwise the rewritten compare won't simplify either.
+  //
+  // Pass MaxRecurse = 0. The rewrite is here to expose information attached to
+  // X, which the non-recursive checks already cover; letting it thread over a
+  // phi or select operand of X on top of that is not worth the cost. Half of
+  // the rewritten compares have a phi operand, so threadCmpOverPHI dominates
+  // the cost of this fold while accounting for 1.6% of what it finds.
   Value *AddOp;
   Constant *C2;
   if (MaxRecurse && ICmpInst::isEquality(Pred) &&
@@ -3182,7 +3188,7 @@ static Value *simplifyICmpWithConstant(CmpPredicate Pred, Value *LHS,
       ((Q.AC && !Q.AC->assumptionsFor(AddOp).empty()) ||
        (Q.DC && !Q.DC->conditionsFor(AddOp).empty()))) {
     Constant *NewRHS = ConstantExpr::getSub(cast<Constant>(RHS), C2);
-    if (Value *V = simplifyICmpInst(Pred, AddOp, NewRHS, Q, MaxRecurse - 1))
+    if (Value *V = simplifyICmpInst(Pred, AddOp, NewRHS, Q, /*MaxRecurse=*/0))
       return V;
   }
 
