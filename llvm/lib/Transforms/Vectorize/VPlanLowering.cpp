@@ -29,9 +29,11 @@
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/Metadata.h"
+#include "llvm/IR/ProfDataUtils.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/TypeSize.h"
 #include "llvm/Transforms/Utils/ScalarEvolutionExpander.h"
+#include <numeric>
 
 using namespace llvm;
 using namespace VPlanPatternMatch;
@@ -457,7 +459,8 @@ void VPlanTransforms::dissolveLoopRegions(VPlan &Plan) {
     R->dissolveToCFGLoop();
 }
 
-void VPlanTransforms::expandBranchOnTwoConds(VPlan &Plan) {
+void VPlanTransforms::expandBranchOnTwoConds(VPlan &Plan,
+                                             unsigned EstimatedVFxUF) {
   SmallVector<VPInstruction *> WorkList;
   // The transform runs after dissolving loop regions, so all VPBasicBlocks
   // terminated with BranchOnTwoConds are reached via a shallow traversal.
@@ -493,7 +496,9 @@ void VPlanTransforms::expandBranchOnTwoConds(VPlan &Plan) {
     VPBlockBase *Succ2 = Successors[2];
 
     // If the successor block for both conditions is the same, then combine the
-    // two conditions and plant a single conditional branch.
+    // two conditions and plant a single conditional branch. It is the latch
+    // branch of the vector loop and gets its weights from the estimated trip
+    // count, in updateLoopMetadataAndProfileInfo, so none are set here.
     if (Succ0 == Succ1) {
       VPBuilder Builder(Br);
       VPValue *Combined = Builder.createOr(Cond0, Cond1, DL);
@@ -510,8 +515,35 @@ void VPlanTransforms::expandBranchOnTwoConds(VPlan &Plan) {
     VPBasicBlock *InterimBB =
         Plan.createVPBasicBlock(BrOnTwoCondsBB->getName() + ".interim");
 
-    VPBuilder(BrOnTwoCondsBB)
-        .createNaryOp(VPInstruction::BranchOnCond, {Cond0}, DL);
+    // A vector iteration takes the uncountable exit if any of the original
+    // iterations it packs does, so with p recorded on the BranchOnTwoConds as
+    // the probability of one of them taking it, it is taken with probability
+    // 1 - (1 - p)^EstimatedVFxUF. Without a recorded p there is nothing to
+    // derive it from.
+    auto *EarlyExitBr = cast<VPInstruction>(
+        VPBuilder(BrOnTwoCondsBB)
+            .createNaryOp(VPInstruction::BranchOnCond, {Cond0}, DL));
+    SmallVector<uint32_t, 2> Weights;
+    if (EstimatedVFxUF > 0 &&
+        extractBranchWeights(Br->getMetadata(LLVMContext::MD_prof), Weights) &&
+        Weights.size() == 2 && (uint64_t(Weights[0]) + Weights[1]) != 0) {
+      BranchProbability NotTakenOnce = BranchProbability::getBranchProbability(
+          Weights[1], uint64_t(Weights[0]) + Weights[1]);
+      BranchProbability NotTaken = BranchProbability::getOne();
+      for (unsigned I = 0; I != EstimatedVFxUF; ++I)
+        NotTaken *= NotTakenOnce;
+      // Keep both weights at 1 at least: the estimate does not pin either side
+      // down for any individual vector iteration.
+      uint32_t Taken = std::max(NotTaken.getCompl().getNumerator(), 1u);
+      uint32_t NotTakenW = std::max(NotTaken.getNumerator(), 1u);
+      uint32_t GCD = std::gcd(Taken, NotTakenW);
+      EarlyExitBr->setMetadata(LLVMContext::MD_prof,
+                               MDBuilder(Plan.getContext())
+                                   .createBranchWeights(Taken / GCD,
+                                                        NotTakenW / GCD));
+    } else {
+      vputils::setUnknownBranchWeights(*EarlyExitBr, Plan);
+    }
     VPBlockUtils::connectBlocks(BrOnTwoCondsBB, Succ0);
     VPBlockUtils::connectBlocks(BrOnTwoCondsBB, InterimBB);
 
