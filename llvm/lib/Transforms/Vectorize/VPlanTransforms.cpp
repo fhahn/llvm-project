@@ -772,17 +772,26 @@ static bool shouldReplicatePerLane(VPlan &Plan, VPWidenInductionRecipe *PhiR,
   if (Plan.hasScalableVF() || isa<VPReplicateRecipe>(Def))
     return false;
 
+<<<<<<< HEAD
   // TODO: Widen the set of candidates.
 <<<<<<< HEAD
   return match(Def, m_c_Add(m_Specific(PhiR), m_Specific(PhiR->getStepValue()))) && vputils::onlyScalarValuesUsed(Def);
 =======
+=======
+  // Only narrow the induction's own increment.
+  // TODO: Widen the set of candidates.
+>>>>>>> 8c4a518b56de (FP inductions)
   VPValue *Step = PhiR->getStepValue();
   if (!match(Def, m_c_Add(m_Specific(PhiR), m_Specific(Step))) &&
       !match(Def, m_c_FAdd(m_Specific(PhiR), m_Specific(Step))) &&
       !match(Def,
+<<<<<<< HEAD
              m_Binary<Instruction::FSub>(m_Specific(PhiR), m_Specific(Step))) &&
   isa<VPWidenGEPRecipe>(Def) &&
       !match(Def, m_c_Add(m_Specific(PhiR), m_Specific(PhiR->getStepValue()))))
+=======
+             m_Binary<Instruction::FSub>(m_Specific(PhiR), m_Specific(Step))))
+>>>>>>> 8c4a518b56de (FP inductions)
     return false;
 
   if (!vputils::onlyScalarValuesUsed(Def))
