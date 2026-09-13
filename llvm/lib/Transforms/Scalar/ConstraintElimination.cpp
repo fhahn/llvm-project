@@ -711,159 +711,127 @@ static Decomposition decompose(Value *V, const ConstraintInfo &Info,
   if (!Ty->isIntegerTy() || Ty->getIntegerBitWidth() > 64)
     return V;
 
-  // Decompose \p V used with a signed predicate.
-  if (IsSigned) {
-    if (auto *CI = dyn_cast<ConstantInt>(V)) {
+  if (auto *CI = dyn_cast<ConstantInt>(V)) {
+    if (IsSigned) {
       if (canUseSExt(CI))
         return CI->getSExtValue();
-    }
-    Value *Op0;
-    Value *Op1;
-
-    if (match(V, m_SExt(m_Value(Op0))))
-      V = Op0;
-    else if (match(V, m_NNegZExt(m_Value(Op0)))) {
-      V = Op0;
-    } else if (auto *Trunc = dyn_cast<TruncInst>(V)) {
-      if (Trunc->getSrcTy()->getScalarSizeInBits() <= 64 &&
-          isKnownNoWrap(Trunc, Info, IsSigned))
-        V = Trunc->getOperand(0);
-    }
-
-    if (match(V, m_AddLike(m_Value(Op0), m_Value(Op1)))) {
-      if (isKnownNoWrap(V, Info, IsSigned))
-        if (auto Decomp = MergeResults(Op0, Op1, IsSigned))
-          return *Decomp;
-      return V;
-    }
-
-    // `xor %x, -1` is equivalent to `sub nsw -1, %x`.
-    if (match(V, m_Not(m_Value(Op0)))) {
-      Decomposition Result(-1);
-      if (!Result.sub(decompose(Op0, Info, IsSigned, DL)))
-        return Result;
-      return V;
-    }
-
-    if (match(V, m_Sub(m_Value(Op0), m_Value(Op1)))) {
-      if (isKnownNoWrap(V, Info, IsSigned)) {
-        auto ResA = decompose(Op0, Info, IsSigned, DL);
-        auto ResB = decompose(Op1, Info, IsSigned, DL);
-        if (!ResA.sub(ResB))
-          return ResA;
-      }
-      return V;
-    }
-
-    ConstantInt *CI;
-    if (match(V, m_Mul(m_Value(Op0), m_ConstantInt(CI))) && canUseSExt(CI)) {
-      if (isKnownNoWrap(V, Info, IsSigned)) {
-        auto Result = decompose(Op0, Info, IsSigned, DL);
-        if (!Result.mul(CI->getSExtValue()))
-          return Result;
-      }
-      return V;
-    }
-
-    // (shl nsw x, shift) is (mul nsw x, (1<<shift)), with the exception of
-    // shift == bw-1.
-    if (match(V, m_Shl(m_Value(Op0), m_ConstantInt(CI)))) {
-      uint64_t Shift = CI->getValue().getLimitedValue();
-      if (Shift < Ty->getIntegerBitWidth() - 1 &&
-          isKnownNoWrap(V, Info, IsSigned)) {
-        assert(Shift < 64 && "Would overflow");
-        auto Result = decompose(Op0, Info, IsSigned, DL);
-        if (!Result.mul(int64_t(1) << Shift))
-          return Result;
-        return V;
-      }
-    }
-
+    } else if (!CI->uge(MaxConstraintValue))
+      return int64_t(CI->getZExtValue());
     return V;
   }
 
-  if (auto *CI = dyn_cast<ConstantInt>(V)) {
-    if (CI->uge(MaxConstraintValue))
-      return V;
-    return int64_t(CI->getZExtValue());
-  }
-
+  // Look through casts that do not change the value in the system.
   Value *Op0;
-  if (match(V, m_ZExt(m_Value(Op0)))) {
-    V = Op0;
-  } else if (match(V, m_SExt(m_Value(Op0)))) {
-    // Looking through the sext is only valid if the operand is non-negative.
-    if (!Info.isKnownNonNegative(Op0))
+  if (match(V, m_SExt(m_Value(Op0)))) {
+    // For an unsigned predicate, looking through the sext is only valid if the
+    // operand is non-negative.
+    if (!IsSigned && !Info.isKnownNonNegative(Op0))
       return V;
+    V = Op0;
+  } else if (IsSigned ? match(V, m_NNegZExt(m_Value(Op0)))
+                      : match(V, m_ZExt(m_Value(Op0)))) {
+    // A zext preserves the unsigned value; for a signed predicate the result
+    // must also be non-negative, which nneg guarantees.
     V = Op0;
   } else if (auto *Trunc = dyn_cast<TruncInst>(V)) {
     if (Trunc->getSrcTy()->getScalarSizeInBits() <= 64 &&
-        isKnownNoWrap(Trunc, Info, /*Signed=*/false))
+        isKnownNoWrap(Trunc, Info, IsSigned))
       V = Trunc->getOperand(0);
   }
 
-  Value *Op1;
-  ConstantInt *CI;
-  if (match(V, m_AddLike(m_Value(Op0), m_Value(Op1)))) {
+  // Looking through an operation is only valid if it does not wrap for the
+  // predicate's signedness, which isKnownNoWrap decides. Anything else is
+  // kept as an opaque variable.
+  auto *Op = dyn_cast<Operator>(V);
+  if (!Op)
+    return V;
+
+  switch (Op->getOpcode()) {
+  case Instruction::Or:
+    // `or disjoint` never carries, so it behaves like an add.
+    if (!match(V, m_DisjointOr(m_Value(), m_Value())))
+      return V;
+    [[fallthrough]];
+  case Instruction::Add: {
+    Value *LHS = Op->getOperand(0), *RHS = Op->getOperand(1);
+    ConstantInt *CI;
     // `%x + -C` has two possible decompositions: the exact one, if the add
     // does not wrap unsigned, and `%x - C`, if the subtraction does not wrap.
     // A single query decides which applies, as `%x >=u C` is exactly the
     // negation of the region in which the add does not wrap unsigned. Note
     // that the constant has to be decomposed as signed for the subtraction, to
     // get the negative offset.
-    if (match(Op1, m_ConstantInt(CI)) && CI->isNegative() && canUseSExt(CI) &&
-        !match(V, m_NUWAddLike(m_Value(), m_Value()))) {
+    if (!IsSigned && match(RHS, m_ConstantInt(CI)) && CI->isNegative() &&
+        canUseSExt(CI) && !match(V, m_NUWAddLike(m_Value(), m_Value()))) {
       std::optional<bool> NoUnsignedWrap = Info.evaluate(
-          CmpInst::ICMP_UGE, Op0,
-          ConstantInt::get(Op0->getType(), -CI->getSExtValue()));
+          CmpInst::ICMP_UGE, LHS,
+          ConstantInt::get(LHS->getType(), -CI->getSExtValue()));
       if (NoUnsignedWrap)
-        if (auto Decomp = MergeResults(Op0, CI, /*IsSignedB=*/*NoUnsignedWrap))
+        if (auto Decomp = MergeResults(LHS, CI, /*IsSignedB=*/*NoUnsignedWrap))
           return *Decomp;
       return V;
     }
 
-    // The decomposition is exact if the add does not wrap unsigned.
-    if (isKnownNoWrap(V, Info, /*Signed=*/false))
-      if (auto Decomp = MergeResults(Op0, Op1, IsSigned))
+    if (isKnownNoWrap(V, Info, IsSigned))
+      if (auto Decomp = MergeResults(LHS, RHS, IsSigned))
         return *Decomp;
     return V;
   }
-
-  if (match(V, m_Shl(m_Value(Op1), m_ConstantInt(CI))) && canUseSExt(CI)) {
-    // The scale 1 << shift must fit in the signed coefficient, so reject a
-    // shift of 63, for which int64_t{1} << 63 is INT64_MIN.
-    if (CI->getSExtValue() < 0 || CI->getSExtValue() >= 63)
-      return V;
-    if (isKnownNoWrap(V, Info, /*Signed=*/false)) {
-      auto Result = decompose(Op1, Info, IsSigned, DL);
-      if (!Result.mul(int64_t{1} << CI->getSExtValue()))
-        return Result;
+  case Instruction::Sub:
+    if (isKnownNoWrap(V, Info, IsSigned)) {
+      auto ResA = decompose(Op->getOperand(0), Info, IsSigned, DL);
+      auto ResB = decompose(Op->getOperand(1), Info, IsSigned, DL);
+      if (!ResA.sub(ResB))
+        return ResA;
     }
     return V;
-  }
-
-  if (match(V, m_Mul(m_Value(Op1), m_ConstantInt(CI))) && canUseSExt(CI) &&
-      !CI->isNegative()) {
-    if (isKnownNoWrap(V, Info, /*Signed=*/false)) {
-      auto Result = decompose(Op1, Info, IsSigned, DL);
+  case Instruction::Mul: {
+    // Only a constant multiplier can be folded into a coefficient, and for an
+    // unsigned predicate it must be non-negative.
+    ConstantInt *CI;
+    if (!match(Op->getOperand(1), m_ConstantInt(CI)) || !canUseSExt(CI) ||
+        (!IsSigned && CI->isNegative()))
+      return V;
+    if (isKnownNoWrap(V, Info, IsSigned)) {
+      auto Result = decompose(Op->getOperand(0), Info, IsSigned, DL);
       if (!Result.mul(CI->getSExtValue()))
         return Result;
     }
     return V;
   }
-
-  if (match(V, m_Sub(m_Value(Op0), m_Value(Op1)))) {
-    // a - b can be decomposed when there is no unsigned wrap.
-    if (!isKnownNoWrap(V, Info, /*Signed=*/false))
+  case Instruction::Shl: {
+    // (shl x, shift) is (mul x, (1 << shift)). The scale must fit in the
+    // signed coefficient, so reject a shift of 63, for which int64_t{1} << 63
+    // is INT64_MIN. For a signed predicate, a shift of bw - 1 is rejected as
+    // well, as it shifts into the sign bit.
+    ConstantInt *CI;
+    if (!match(Op->getOperand(1), m_ConstantInt(CI)) || !canUseSExt(CI) ||
+        CI->isNegative())
       return V;
-    auto ResA = decompose(Op0, Info, IsSigned, DL);
-    auto ResB = decompose(Op1, Info, IsSigned, DL);
-    if (!ResA.sub(ResB))
-      return ResA;
+    uint64_t Shift = CI->getZExtValue();
+    if (Shift >= (IsSigned ? Ty->getIntegerBitWidth() - 1 : 63))
+      return V;
+    if (isKnownNoWrap(V, Info, IsSigned)) {
+      auto Result = decompose(Op->getOperand(0), Info, IsSigned, DL);
+      if (!Result.mul(int64_t(1) << Shift))
+        return Result;
+    }
     return V;
   }
-
-  return V;
+  case Instruction::Xor: {
+    // `xor %x, -1` is equivalent to `sub nsw -1, %x`. The unsigned system
+    // cannot use it, as the subtraction wraps unless %x is -1.
+    Value *X;
+    if (IsSigned && match(V, m_Not(m_Value(X)))) {
+      Decomposition Result(-1);
+      if (!Result.sub(decompose(X, Info, IsSigned, DL)))
+        return Result;
+    }
+    return V;
+  }
+  default:
+    return V;
+  }
 }
 
 ConstraintTy
