@@ -10966,10 +10966,10 @@ static bool isUsableGuardCondition(const Value *Cond) {
 /// comparison filters out all steps that cannot contribute (e.g. the head of a
 /// diamond) and at most one edge-dominance query is needed per step.
 ///
-/// \p ProcessCond is invoked for each condition found, together with a flag
-/// indicating whether it is known to be true. The walk stops early and returns
-/// true if \p ProcessCond returns true. At most \p MaxConditions conditions
-/// a fact can be derived from are processed, independently of the number of
+/// \p ProcessCond is invoked for each condition a fact can be derived from,
+/// together with a flag indicating whether it is known to be true. The walk
+/// stops early and returns true if \p ProcessCond returns true. At most
+/// \p MaxConditions conditions are processed, independently of the number of
 /// dominator-tree steps.
 static bool
 collectFromDominatingBranches(const DominatorTree &DT, const BasicBlock *BB,
@@ -10988,11 +10988,10 @@ collectFromDominatingBranches(const DominatorTree &DT, const BasicBlock *BB,
     bool EnterIfTrue = Br->getSuccessor(0) == ChildBB;
     if (EnterIfTrue == (Br->getSuccessor(1) == ChildBB))
       continue;
+    if (!isUsableGuardCondition(Br->getCondition()))
+      continue;
     if (DT.dominates(BasicBlockEdge(Node->getBlock(), ChildBB), BB)) {
-      // Only conditions a fact can be derived from consume the budget;
-      // charging for the others can starve a later, usable condition.
-      if (isUsableGuardCondition(Br->getCondition()))
-        --MaxConditions;
+      --MaxConditions;
       if (ProcessCond(Br->getCondition(), EnterIfTrue))
         return true;
     }
