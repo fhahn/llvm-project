@@ -233,6 +233,12 @@ static cl::opt<unsigned> MaxGuardDomTreeSteps(
              "conditions, once the unique-predecessor climb ran out"),
     cl::init(8));
 
+static cl::opt<unsigned> MaxGuardProofs(
+    "scalar-evolution-max-guard-proofs", cl::Hidden,
+    cl::desc("Maximum number of dominating branch conditions used for "
+             "implication proofs after the unique-predecessor climb"),
+    cl::init(1));
+
 static cl::opt<bool>
 ClassifyExpressions("scalar-evolution-classify-expressions",
     cl::Hidden, cl::init(true),
@@ -10952,12 +10958,14 @@ ScalarEvolution::getPredecessorWithUniqueSuccessorForBB(const BasicBlock *BB)
 ///
 /// \p ProcessCond is invoked for each condition found, together with a flag
 /// indicating whether it is known to be true. The walk stops early and returns
-/// true if \p ProcessCond returns true.
+/// true if \p ProcessCond returns true. At most \p MaxConditions conditions
+/// are processed, independently of the number of dominator-tree steps.
 static bool
 collectFromDominatingBranches(const DominatorTree &DT, const BasicBlock *BB,
+                              unsigned MaxConditions,
                               function_ref<bool(Value *, bool)> ProcessCond) {
   const DomTreeNode *Node = DT.getNode(BB);
-  for (unsigned I = 0; Node && I != MaxGuardDomTreeSteps; ++I) {
+  for (unsigned I = 0; Node && I != MaxGuardDomTreeSteps && MaxConditions; ++I) {
     const BasicBlock *ChildBB = Node->getBlock();
     Node = Node->getIDom();
     if (!Node)
@@ -10969,9 +10977,11 @@ collectFromDominatingBranches(const DominatorTree &DT, const BasicBlock *BB,
     bool EnterIfTrue = Br->getSuccessor(0) == ChildBB;
     if (EnterIfTrue == (Br->getSuccessor(1) == ChildBB))
       continue;
-    if (DT.dominates(BasicBlockEdge(Node->getBlock(), ChildBB), BB) &&
-        ProcessCond(Br->getCondition(), EnterIfTrue))
-      return true;
+    if (DT.dominates(BasicBlockEdge(Node->getBlock(), ChildBB), BB)) {
+      --MaxConditions;
+      if (ProcessCond(Br->getCondition(), EnterIfTrue))
+        return true;
+    }
   }
   return false;
 }
@@ -16263,7 +16273,7 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
   // that dominate the block we stopped at (and hence Block) via the dominator
   // tree.
   if (!Pair.first)
-    collectFromDominatingBranches(SE.DT, Pair.second,
+    collectFromDominatingBranches(SE.DT, Pair.second, MaxGuardDomTreeSteps,
                                   [&](Value *Cond, bool EnterIfTrue) {
                                     Terms.emplace_back(Cond, EnterIfTrue);
                                     return false;
