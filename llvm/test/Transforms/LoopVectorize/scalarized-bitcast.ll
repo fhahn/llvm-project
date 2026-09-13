@@ -3,7 +3,7 @@
 
 %struct.foo = type { i32, i64 }
 
-; CHECK: Cost of 0 for VF 2: WIDEN-GEP ir<%b> = getelementptr inbounds ir<%in>, ir<%i.012>, ir<1>
+; CHECK: Cost of 0 for VF 2: REPLICATE ir<%b> = getelementptr inbounds ir<%in>, vp<{{.+}}>, ir<1>
 
 ; The bitcast below is a no-op between identical pointer types and is folded
 ; away, so it costs nothing even though the loop is predicated.

@@ -720,7 +720,6 @@ define void @test_conditional_interleave_group (ptr noalias %src.1, ptr noalias 
 ; DEFAULT-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; DEFAULT:       [[VECTOR_BODY]]:
 ; DEFAULT-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_STORE_CONTINUE27:.*]] ]
-; DEFAULT-NEXT:    [[VEC_IND:%.*]] = phi <8 x i64> [ <i64 0, i64 1, i64 2, i64 3, i64 4, i64 5, i64 6, i64 7>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[PRED_STORE_CONTINUE27]] ]
 ; DEFAULT-NEXT:    [[TMP15:%.*]] = load float, ptr [[SRC_1]], align 4
 ; DEFAULT-NEXT:    [[BROADCAST_SPLATINSERT8:%.*]] = insertelement <8 x float> poison, float [[TMP15]], i64 0
 ; DEFAULT-NEXT:    [[BROADCAST_SPLAT9:%.*]] = shufflevector <8 x float> [[BROADCAST_SPLATINSERT8]], <8 x float> poison, <8 x i32> zeroinitializer
@@ -737,11 +736,10 @@ define void @test_conditional_interleave_group (ptr noalias %src.1, ptr noalias 
 ; DEFAULT-NEXT:    [[BROADCAST_SPLATINSERT12:%.*]] = insertelement <8 x float> poison, float [[TMP21]], i64 0
 ; DEFAULT-NEXT:    [[BROADCAST_SPLAT13:%.*]] = shufflevector <8 x float> [[BROADCAST_SPLATINSERT12]], <8 x float> poison, <8 x i32> zeroinitializer
 ; DEFAULT-NEXT:    [[TMP22:%.*]] = fcmp ogt <8 x float> [[TMP20]], [[BROADCAST_SPLAT13]]
-; DEFAULT-NEXT:    [[TMP23:%.*]] = getelementptr { [4 x float] }, ptr [[DST]], <8 x i64> [[VEC_IND]]
 ; DEFAULT-NEXT:    [[TMP24:%.*]] = extractelement <8 x i1> [[TMP22]], i64 0
 ; DEFAULT-NEXT:    br i1 [[TMP24]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
 ; DEFAULT:       [[PRED_STORE_IF]]:
-; DEFAULT-NEXT:    [[TMP25:%.*]] = extractelement <8 x ptr> [[TMP23]], i64 0
+; DEFAULT-NEXT:    [[TMP25:%.*]] = getelementptr { [4 x float] }, ptr [[DST]], i64 [[INDEX]]
 ; DEFAULT-NEXT:    store float 0.000000e+00, ptr [[TMP25]], align 4
 ; DEFAULT-NEXT:    [[TMP27:%.*]] = getelementptr i8, ptr [[TMP25]], i64 4
 ; DEFAULT-NEXT:    store float 0.000000e+00, ptr [[TMP27]], align 4
@@ -753,7 +751,8 @@ define void @test_conditional_interleave_group (ptr noalias %src.1, ptr noalias 
 ; DEFAULT-NEXT:    [[TMP31:%.*]] = extractelement <8 x i1> [[TMP22]], i64 1
 ; DEFAULT-NEXT:    br i1 [[TMP31]], label %[[PRED_STORE_IF14:.*]], label %[[PRED_STORE_CONTINUE15:.*]]
 ; DEFAULT:       [[PRED_STORE_IF14]]:
-; DEFAULT-NEXT:    [[TMP32:%.*]] = extractelement <8 x ptr> [[TMP23]], i64 1
+; DEFAULT-NEXT:    [[TMP26:%.*]] = add i64 [[INDEX]], 1
+; DEFAULT-NEXT:    [[TMP32:%.*]] = getelementptr { [4 x float] }, ptr [[DST]], i64 [[TMP26]]
 ; DEFAULT-NEXT:    store float 0.000000e+00, ptr [[TMP32]], align 4
 ; DEFAULT-NEXT:    [[TMP34:%.*]] = getelementptr i8, ptr [[TMP32]], i64 4
 ; DEFAULT-NEXT:    store float 0.000000e+00, ptr [[TMP34]], align 4
@@ -765,7 +764,8 @@ define void @test_conditional_interleave_group (ptr noalias %src.1, ptr noalias 
 ; DEFAULT-NEXT:    [[TMP38:%.*]] = extractelement <8 x i1> [[TMP22]], i64 2
 ; DEFAULT-NEXT:    br i1 [[TMP38]], label %[[PRED_STORE_IF16:.*]], label %[[PRED_STORE_CONTINUE17:.*]]
 ; DEFAULT:       [[PRED_STORE_IF16]]:
-; DEFAULT-NEXT:    [[TMP39:%.*]] = extractelement <8 x ptr> [[TMP23]], i64 2
+; DEFAULT-NEXT:    [[TMP33:%.*]] = add i64 [[INDEX]], 2
+; DEFAULT-NEXT:    [[TMP39:%.*]] = getelementptr { [4 x float] }, ptr [[DST]], i64 [[TMP33]]
 ; DEFAULT-NEXT:    store float 0.000000e+00, ptr [[TMP39]], align 4
 ; DEFAULT-NEXT:    [[TMP41:%.*]] = getelementptr i8, ptr [[TMP39]], i64 4
 ; DEFAULT-NEXT:    store float 0.000000e+00, ptr [[TMP41]], align 4
@@ -777,7 +777,8 @@ define void @test_conditional_interleave_group (ptr noalias %src.1, ptr noalias 
 ; DEFAULT-NEXT:    [[TMP45:%.*]] = extractelement <8 x i1> [[TMP22]], i64 3
 ; DEFAULT-NEXT:    br i1 [[TMP45]], label %[[PRED_STORE_IF18:.*]], label %[[PRED_STORE_CONTINUE19:.*]]
 ; DEFAULT:       [[PRED_STORE_IF18]]:
-; DEFAULT-NEXT:    [[TMP46:%.*]] = extractelement <8 x ptr> [[TMP23]], i64 3
+; DEFAULT-NEXT:    [[TMP37:%.*]] = add i64 [[INDEX]], 3
+; DEFAULT-NEXT:    [[TMP46:%.*]] = getelementptr { [4 x float] }, ptr [[DST]], i64 [[TMP37]]
 ; DEFAULT-NEXT:    store float 0.000000e+00, ptr [[TMP46]], align 4
 ; DEFAULT-NEXT:    [[TMP48:%.*]] = getelementptr i8, ptr [[TMP46]], i64 4
 ; DEFAULT-NEXT:    store float 0.000000e+00, ptr [[TMP48]], align 4
@@ -789,7 +790,8 @@ define void @test_conditional_interleave_group (ptr noalias %src.1, ptr noalias 
 ; DEFAULT-NEXT:    [[TMP52:%.*]] = extractelement <8 x i1> [[TMP22]], i64 4
 ; DEFAULT-NEXT:    br i1 [[TMP52]], label %[[PRED_STORE_IF20:.*]], label %[[PRED_STORE_CONTINUE21:.*]]
 ; DEFAULT:       [[PRED_STORE_IF20]]:
-; DEFAULT-NEXT:    [[TMP53:%.*]] = extractelement <8 x ptr> [[TMP23]], i64 4
+; DEFAULT-NEXT:    [[TMP42:%.*]] = add i64 [[INDEX]], 4
+; DEFAULT-NEXT:    [[TMP53:%.*]] = getelementptr { [4 x float] }, ptr [[DST]], i64 [[TMP42]]
 ; DEFAULT-NEXT:    store float 0.000000e+00, ptr [[TMP53]], align 4
 ; DEFAULT-NEXT:    [[TMP55:%.*]] = getelementptr i8, ptr [[TMP53]], i64 4
 ; DEFAULT-NEXT:    store float 0.000000e+00, ptr [[TMP55]], align 4
@@ -801,7 +803,8 @@ define void @test_conditional_interleave_group (ptr noalias %src.1, ptr noalias 
 ; DEFAULT-NEXT:    [[TMP59:%.*]] = extractelement <8 x i1> [[TMP22]], i64 5
 ; DEFAULT-NEXT:    br i1 [[TMP59]], label %[[PRED_STORE_IF22:.*]], label %[[PRED_STORE_CONTINUE23:.*]]
 ; DEFAULT:       [[PRED_STORE_IF22]]:
-; DEFAULT-NEXT:    [[TMP60:%.*]] = extractelement <8 x ptr> [[TMP23]], i64 5
+; DEFAULT-NEXT:    [[TMP47:%.*]] = add i64 [[INDEX]], 5
+; DEFAULT-NEXT:    [[TMP60:%.*]] = getelementptr { [4 x float] }, ptr [[DST]], i64 [[TMP47]]
 ; DEFAULT-NEXT:    store float 0.000000e+00, ptr [[TMP60]], align 4
 ; DEFAULT-NEXT:    [[TMP62:%.*]] = getelementptr i8, ptr [[TMP60]], i64 4
 ; DEFAULT-NEXT:    store float 0.000000e+00, ptr [[TMP62]], align 4
@@ -813,7 +816,8 @@ define void @test_conditional_interleave_group (ptr noalias %src.1, ptr noalias 
 ; DEFAULT-NEXT:    [[TMP66:%.*]] = extractelement <8 x i1> [[TMP22]], i64 6
 ; DEFAULT-NEXT:    br i1 [[TMP66]], label %[[PRED_STORE_IF24:.*]], label %[[PRED_STORE_CONTINUE25:.*]]
 ; DEFAULT:       [[PRED_STORE_IF24]]:
-; DEFAULT-NEXT:    [[TMP67:%.*]] = extractelement <8 x ptr> [[TMP23]], i64 6
+; DEFAULT-NEXT:    [[TMP51:%.*]] = add i64 [[INDEX]], 6
+; DEFAULT-NEXT:    [[TMP67:%.*]] = getelementptr { [4 x float] }, ptr [[DST]], i64 [[TMP51]]
 ; DEFAULT-NEXT:    store float 0.000000e+00, ptr [[TMP67]], align 4
 ; DEFAULT-NEXT:    [[TMP69:%.*]] = getelementptr i8, ptr [[TMP67]], i64 4
 ; DEFAULT-NEXT:    store float 0.000000e+00, ptr [[TMP69]], align 4
@@ -825,7 +829,8 @@ define void @test_conditional_interleave_group (ptr noalias %src.1, ptr noalias 
 ; DEFAULT-NEXT:    [[TMP73:%.*]] = extractelement <8 x i1> [[TMP22]], i64 7
 ; DEFAULT-NEXT:    br i1 [[TMP73]], label %[[PRED_STORE_IF26:.*]], label %[[PRED_STORE_CONTINUE27]]
 ; DEFAULT:       [[PRED_STORE_IF26]]:
-; DEFAULT-NEXT:    [[TMP74:%.*]] = extractelement <8 x ptr> [[TMP23]], i64 7
+; DEFAULT-NEXT:    [[TMP56:%.*]] = add i64 [[INDEX]], 7
+; DEFAULT-NEXT:    [[TMP74:%.*]] = getelementptr { [4 x float] }, ptr [[DST]], i64 [[TMP56]]
 ; DEFAULT-NEXT:    store float 0.000000e+00, ptr [[TMP74]], align 4
 ; DEFAULT-NEXT:    [[TMP76:%.*]] = getelementptr i8, ptr [[TMP74]], i64 4
 ; DEFAULT-NEXT:    store float 0.000000e+00, ptr [[TMP76]], align 4
@@ -835,7 +840,6 @@ define void @test_conditional_interleave_group (ptr noalias %src.1, ptr noalias 
 ; DEFAULT-NEXT:    br label %[[PRED_STORE_CONTINUE27]]
 ; DEFAULT:       [[PRED_STORE_CONTINUE27]]:
 ; DEFAULT-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
-; DEFAULT-NEXT:    [[VEC_IND_NEXT]] = add <8 x i64> [[VEC_IND]], splat (i64 8)
 ; DEFAULT-NEXT:    [[TMP80:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; DEFAULT-NEXT:    br i1 [[TMP80]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP25:![0-9]+]]
 ; DEFAULT:       [[MIDDLE_BLOCK]]:
@@ -872,7 +876,6 @@ define void @test_conditional_interleave_group (ptr noalias %src.1, ptr noalias 
 ; PRED:       [[VECTOR_BODY]]:
 ; PRED-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_STORE_CONTINUE27:.*]] ]
 ; PRED-NEXT:    [[ACTIVE_LANE_MASK:%.*]] = phi <8 x i1> [ [[ACTIVE_LANE_MASK_ENTRY]], %[[VECTOR_PH]] ], [ [[ACTIVE_LANE_MASK_NEXT:%.*]], %[[PRED_STORE_CONTINUE27]] ]
-; PRED-NEXT:    [[VEC_IND:%.*]] = phi <8 x i64> [ <i64 0, i64 1, i64 2, i64 3, i64 4, i64 5, i64 6, i64 7>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[PRED_STORE_CONTINUE27]] ]
 ; PRED-NEXT:    [[TMP18:%.*]] = load float, ptr [[SRC_1]], align 4
 ; PRED-NEXT:    [[BROADCAST_SPLATINSERT8:%.*]] = insertelement <8 x float> poison, float [[TMP18]], i64 0
 ; PRED-NEXT:    [[BROADCAST_SPLAT9:%.*]] = shufflevector <8 x float> [[BROADCAST_SPLATINSERT8]], <8 x float> poison, <8 x i32> zeroinitializer
@@ -890,11 +893,10 @@ define void @test_conditional_interleave_group (ptr noalias %src.1, ptr noalias 
 ; PRED-NEXT:    [[BROADCAST_SPLAT13:%.*]] = shufflevector <8 x float> [[BROADCAST_SPLATINSERT12]], <8 x float> poison, <8 x i32> zeroinitializer
 ; PRED-NEXT:    [[TMP25:%.*]] = fcmp ogt <8 x float> [[TMP23]], [[BROADCAST_SPLAT13]]
 ; PRED-NEXT:    [[TMP26:%.*]] = select <8 x i1> [[ACTIVE_LANE_MASK]], <8 x i1> [[TMP25]], <8 x i1> zeroinitializer
-; PRED-NEXT:    [[TMP27:%.*]] = getelementptr { [4 x float] }, ptr [[DST]], <8 x i64> [[VEC_IND]]
 ; PRED-NEXT:    [[TMP28:%.*]] = extractelement <8 x i1> [[TMP26]], i64 0
 ; PRED-NEXT:    br i1 [[TMP28]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
 ; PRED:       [[PRED_STORE_IF]]:
-; PRED-NEXT:    [[TMP29:%.*]] = extractelement <8 x ptr> [[TMP27]], i64 0
+; PRED-NEXT:    [[TMP29:%.*]] = getelementptr { [4 x float] }, ptr [[DST]], i64 [[INDEX]]
 ; PRED-NEXT:    store float 0.000000e+00, ptr [[TMP29]], align 4
 ; PRED-NEXT:    [[TMP31:%.*]] = getelementptr i8, ptr [[TMP29]], i64 4
 ; PRED-NEXT:    store float 0.000000e+00, ptr [[TMP31]], align 4
@@ -906,7 +908,8 @@ define void @test_conditional_interleave_group (ptr noalias %src.1, ptr noalias 
 ; PRED-NEXT:    [[TMP35:%.*]] = extractelement <8 x i1> [[TMP26]], i64 1
 ; PRED-NEXT:    br i1 [[TMP35]], label %[[PRED_STORE_IF14:.*]], label %[[PRED_STORE_CONTINUE15:.*]]
 ; PRED:       [[PRED_STORE_IF14]]:
-; PRED-NEXT:    [[TMP36:%.*]] = extractelement <8 x ptr> [[TMP27]], i64 1
+; PRED-NEXT:    [[TMP27:%.*]] = add i64 [[INDEX]], 1
+; PRED-NEXT:    [[TMP36:%.*]] = getelementptr { [4 x float] }, ptr [[DST]], i64 [[TMP27]]
 ; PRED-NEXT:    store float 0.000000e+00, ptr [[TMP36]], align 4
 ; PRED-NEXT:    [[TMP38:%.*]] = getelementptr i8, ptr [[TMP36]], i64 4
 ; PRED-NEXT:    store float 0.000000e+00, ptr [[TMP38]], align 4
@@ -918,7 +921,8 @@ define void @test_conditional_interleave_group (ptr noalias %src.1, ptr noalias 
 ; PRED-NEXT:    [[TMP42:%.*]] = extractelement <8 x i1> [[TMP26]], i64 2
 ; PRED-NEXT:    br i1 [[TMP42]], label %[[PRED_STORE_IF16:.*]], label %[[PRED_STORE_CONTINUE17:.*]]
 ; PRED:       [[PRED_STORE_IF16]]:
-; PRED-NEXT:    [[TMP43:%.*]] = extractelement <8 x ptr> [[TMP27]], i64 2
+; PRED-NEXT:    [[TMP32:%.*]] = add i64 [[INDEX]], 2
+; PRED-NEXT:    [[TMP43:%.*]] = getelementptr { [4 x float] }, ptr [[DST]], i64 [[TMP32]]
 ; PRED-NEXT:    store float 0.000000e+00, ptr [[TMP43]], align 4
 ; PRED-NEXT:    [[TMP45:%.*]] = getelementptr i8, ptr [[TMP43]], i64 4
 ; PRED-NEXT:    store float 0.000000e+00, ptr [[TMP45]], align 4
@@ -930,7 +934,8 @@ define void @test_conditional_interleave_group (ptr noalias %src.1, ptr noalias 
 ; PRED-NEXT:    [[TMP49:%.*]] = extractelement <8 x i1> [[TMP26]], i64 3
 ; PRED-NEXT:    br i1 [[TMP49]], label %[[PRED_STORE_IF18:.*]], label %[[PRED_STORE_CONTINUE19:.*]]
 ; PRED:       [[PRED_STORE_IF18]]:
-; PRED-NEXT:    [[TMP50:%.*]] = extractelement <8 x ptr> [[TMP27]], i64 3
+; PRED-NEXT:    [[TMP37:%.*]] = add i64 [[INDEX]], 3
+; PRED-NEXT:    [[TMP50:%.*]] = getelementptr { [4 x float] }, ptr [[DST]], i64 [[TMP37]]
 ; PRED-NEXT:    store float 0.000000e+00, ptr [[TMP50]], align 4
 ; PRED-NEXT:    [[TMP52:%.*]] = getelementptr i8, ptr [[TMP50]], i64 4
 ; PRED-NEXT:    store float 0.000000e+00, ptr [[TMP52]], align 4
@@ -942,7 +947,8 @@ define void @test_conditional_interleave_group (ptr noalias %src.1, ptr noalias 
 ; PRED-NEXT:    [[TMP56:%.*]] = extractelement <8 x i1> [[TMP26]], i64 4
 ; PRED-NEXT:    br i1 [[TMP56]], label %[[PRED_STORE_IF20:.*]], label %[[PRED_STORE_CONTINUE21:.*]]
 ; PRED:       [[PRED_STORE_IF20]]:
-; PRED-NEXT:    [[TMP57:%.*]] = extractelement <8 x ptr> [[TMP27]], i64 4
+; PRED-NEXT:    [[TMP41:%.*]] = add i64 [[INDEX]], 4
+; PRED-NEXT:    [[TMP57:%.*]] = getelementptr { [4 x float] }, ptr [[DST]], i64 [[TMP41]]
 ; PRED-NEXT:    store float 0.000000e+00, ptr [[TMP57]], align 4
 ; PRED-NEXT:    [[TMP59:%.*]] = getelementptr i8, ptr [[TMP57]], i64 4
 ; PRED-NEXT:    store float 0.000000e+00, ptr [[TMP59]], align 4
@@ -954,7 +960,8 @@ define void @test_conditional_interleave_group (ptr noalias %src.1, ptr noalias 
 ; PRED-NEXT:    [[TMP63:%.*]] = extractelement <8 x i1> [[TMP26]], i64 5
 ; PRED-NEXT:    br i1 [[TMP63]], label %[[PRED_STORE_IF22:.*]], label %[[PRED_STORE_CONTINUE23:.*]]
 ; PRED:       [[PRED_STORE_IF22]]:
-; PRED-NEXT:    [[TMP64:%.*]] = extractelement <8 x ptr> [[TMP27]], i64 5
+; PRED-NEXT:    [[TMP46:%.*]] = add i64 [[INDEX]], 5
+; PRED-NEXT:    [[TMP64:%.*]] = getelementptr { [4 x float] }, ptr [[DST]], i64 [[TMP46]]
 ; PRED-NEXT:    store float 0.000000e+00, ptr [[TMP64]], align 4
 ; PRED-NEXT:    [[TMP66:%.*]] = getelementptr i8, ptr [[TMP64]], i64 4
 ; PRED-NEXT:    store float 0.000000e+00, ptr [[TMP66]], align 4
@@ -966,7 +973,8 @@ define void @test_conditional_interleave_group (ptr noalias %src.1, ptr noalias 
 ; PRED-NEXT:    [[TMP70:%.*]] = extractelement <8 x i1> [[TMP26]], i64 6
 ; PRED-NEXT:    br i1 [[TMP70]], label %[[PRED_STORE_IF24:.*]], label %[[PRED_STORE_CONTINUE25:.*]]
 ; PRED:       [[PRED_STORE_IF24]]:
-; PRED-NEXT:    [[TMP71:%.*]] = extractelement <8 x ptr> [[TMP27]], i64 6
+; PRED-NEXT:    [[TMP51:%.*]] = add i64 [[INDEX]], 6
+; PRED-NEXT:    [[TMP71:%.*]] = getelementptr { [4 x float] }, ptr [[DST]], i64 [[TMP51]]
 ; PRED-NEXT:    store float 0.000000e+00, ptr [[TMP71]], align 4
 ; PRED-NEXT:    [[TMP73:%.*]] = getelementptr i8, ptr [[TMP71]], i64 4
 ; PRED-NEXT:    store float 0.000000e+00, ptr [[TMP73]], align 4
@@ -978,7 +986,8 @@ define void @test_conditional_interleave_group (ptr noalias %src.1, ptr noalias 
 ; PRED-NEXT:    [[TMP77:%.*]] = extractelement <8 x i1> [[TMP26]], i64 7
 ; PRED-NEXT:    br i1 [[TMP77]], label %[[PRED_STORE_IF26:.*]], label %[[PRED_STORE_CONTINUE27]]
 ; PRED:       [[PRED_STORE_IF26]]:
-; PRED-NEXT:    [[TMP78:%.*]] = extractelement <8 x ptr> [[TMP27]], i64 7
+; PRED-NEXT:    [[TMP58:%.*]] = add i64 [[INDEX]], 7
+; PRED-NEXT:    [[TMP78:%.*]] = getelementptr { [4 x float] }, ptr [[DST]], i64 [[TMP58]]
 ; PRED-NEXT:    store float 0.000000e+00, ptr [[TMP78]], align 4
 ; PRED-NEXT:    [[TMP80:%.*]] = getelementptr i8, ptr [[TMP78]], i64 4
 ; PRED-NEXT:    store float 0.000000e+00, ptr [[TMP80]], align 4
@@ -991,7 +1000,6 @@ define void @test_conditional_interleave_group (ptr noalias %src.1, ptr noalias 
 ; PRED-NEXT:    [[ACTIVE_LANE_MASK_NEXT]] = call <8 x i1> @llvm.get.active.lane.mask.v8i1.i64(i64 [[INDEX_NEXT]], i64 [[TMP0]])
 ; PRED-NEXT:    [[TMP84:%.*]] = extractelement <8 x i1> [[ACTIVE_LANE_MASK_NEXT]], i64 0
 ; PRED-NEXT:    [[TMP85:%.*]] = xor i1 [[TMP84]], true
-; PRED-NEXT:    [[VEC_IND_NEXT]] = add <8 x i64> [[VEC_IND]], splat (i64 8)
 ; PRED-NEXT:    br i1 [[TMP85]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP19:![0-9]+]]
 ; PRED:       [[MIDDLE_BLOCK]]:
 ; PRED-NEXT:    br [[EXIT:label %.*]]

@@ -773,7 +773,34 @@ static bool shouldReplicatePerLane(VPlan &Plan, VPWidenInductionRecipe *PhiR,
     return false;
 
   // TODO: Widen the set of candidates.
+<<<<<<< HEAD
   return match(Def, m_c_Add(m_Specific(PhiR), m_Specific(PhiR->getStepValue()))) && vputils::onlyScalarValuesUsed(Def);
+=======
+  VPValue *Step = PhiR->getStepValue();
+  if (!match(Def, m_c_Add(m_Specific(PhiR), m_Specific(Step))) &&
+      !match(Def, m_c_FAdd(m_Specific(PhiR), m_Specific(Step))) &&
+      !match(Def,
+             m_Binary<Instruction::FSub>(m_Specific(PhiR), m_Specific(Step))) &&
+  isa<VPWidenGEPRecipe>(Def) &&
+      !match(Def, m_c_Add(m_Specific(PhiR), m_Specific(PhiR->getStepValue()))))
+    return false;
+
+  if (!vputils::onlyScalarValuesUsed(Def))
+    return false;
+
+  // A store to a loop-invariant address only needs the last lane, and licm
+  // moves it out of the vector loop region. Def follows it out while it is a
+  // wide recipe, but not once it is a per-lane replicate, which licm refuses
+  // to sink. So narrowing a Def used only by such stores pins VF scalar
+  // computations inside the loop that would otherwise have left it entirely,
+  // and saves no extract.
+  return !all_of(Def->users(), [](VPUser *U) {
+    auto *RepR = dyn_cast<VPReplicateRecipe>(U);
+    return RepR && RepR->getOpcode() == Instruction::Store &&
+           !RepR->isPredicated() &&
+           RepR->getOperand(1)->isDefinedOutsideLoopRegions();
+  });
+>>>>>>> 1867a49a6991 ([VPlan] Narrow wide GEP users of a widened induction to per-lane replicates)
 }
 
 /// Legalize VPWidenPointerInductionRecipe, by replacing it with a PtrAdd
