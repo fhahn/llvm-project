@@ -11,7 +11,7 @@ define i32 @anyof_reduction(ptr %a, i64 %n) !prof !0 {
 ; CHECK:  [[VECTOR_BODY:.*]]:
 ; CHECK:    br i1 [[TMP4:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP1:![0-9]+]]
 ; CHECK:  [[MIDDLE_BLOCK]]:
-; CHECK:    [[RDX_SELECT:%.*]] = select i1 [[TMP6:%.*]], i32 1, i32 0
+; CHECK:    [[RDX_SELECT:%.*]] = select i1 [[TMP6:%.*]], i32 1, i32 0, !prof [[PROF20:![0-9]+]]
 ; CHECK:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; CHECK:  [[SCALAR_PH]]:
 ; CHECK:  [[LOOP:.*]]:
@@ -48,7 +48,7 @@ define i64 @find_last_iv_reduction(ptr %a, i64 %n) !prof !0 {
 ; CHECK:    [[TMP3:%.*]] = select <4 x i1> [[TMP2:%.*]], <4 x i64> [[VEC_IND:%.*]], <4 x i64> [[VEC_PHI:%.*]]
 ; CHECK:    br i1 [[TMP4:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
 ; CHECK:  [[MIDDLE_BLOCK]]:
-; CHECK:    [[TMP7:%.*]] = select i1 [[TMP6:%.*]], i64 [[TMP5:%.*]], i64 -1
+; CHECK:    [[TMP7:%.*]] = select i1 [[TMP6:%.*]], i64 [[TMP5:%.*]], i64 -1, !prof [[PROF20]]
 ; CHECK:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; CHECK:  [[SCALAR_PH]]:
 ; CHECK:  [[LOOP:.*]]:
@@ -81,7 +81,7 @@ define void @requires_scalar_epilogue(ptr noalias %a, ptr noalias %b, i64 %n) !p
 ; CHECK:  [[ENTRY:.*:]]
 ; CHECK:    br i1 [[MIN_ITERS_CHECK:%.*]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:  [[VECTOR_PH]]:
-; CHECK:    [[TMP4:%.*]] = select i1 [[TMP3:%.*]], i64 4, i64 [[TMP2:%.*]]
+; CHECK:    [[TMP4:%.*]] = select i1 [[TMP3:%.*]], i64 4, i64 [[TMP2:%.*]], !prof [[PROF20]]
 ; CHECK:  [[VECTOR_BODY:.*]]:
 ; CHECK:    br i1 [[TMP7:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
 ; CHECK:  [[MIDDLE_BLOCK]]:
@@ -120,7 +120,7 @@ define void @requires_scalar_epilogue_estimated_tc(ptr noalias %a, ptr noalias %
 ; CHECK:  [[ENTRY:.*:]]
 ; CHECK:    br i1 [[MIN_ITERS_CHECK:%.*]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]], !prof [[PROF9:![0-9]+]]
 ; CHECK:  [[VECTOR_PH]]:
-; CHECK:    [[TMP4:%.*]] = select i1 [[TMP3:%.*]], i64 4, i64 [[TMP2:%.*]]
+; CHECK:    [[TMP4:%.*]] = select i1 [[TMP3:%.*]], i64 4, i64 [[TMP2:%.*]], !prof [[PROF21:![0-9]+]]
 ; CHECK:  [[VECTOR_BODY:.*]]:
 ; CHECK:    br i1 [[TMP7:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !prof [[PROF10:![0-9]+]], !llvm.loop [[LOOP11:![0-9]+]]
 ; CHECK:  [[MIDDLE_BLOCK]]:
@@ -194,12 +194,14 @@ exit:
 ; CHECK: [[LOOP1]] = distinct !{[[LOOP1]], [[META2:![0-9]+]], [[META3:![0-9]+]]}
 ; CHECK: [[META2]] = !{!"llvm.loop.isvectorized", i32 1}
 ; CHECK: [[META3]] = !{!"llvm.loop.unroll.runtime.disable"}
+; CHECK: [[PROF20]] = !{!"unknown", !"loop-vectorize"}
 ; CHECK: [[LOOP4]] = distinct !{[[LOOP4]], [[META3]], [[META2]]}
 ; CHECK: [[LOOP5]] = distinct !{[[LOOP5]], [[META2]], [[META3]]}
 ; CHECK: [[LOOP6]] = distinct !{[[LOOP6]], [[META3]], [[META2]]}
 ; CHECK: [[LOOP7]] = distinct !{[[LOOP7]], [[META2]], [[META3]]}
 ; CHECK: [[LOOP8]] = distinct !{[[LOOP8]], [[META3]], [[META2]]}
 ; CHECK: [[PROF9]] = !{!"branch_weights", i32 1, i32 127}
+; CHECK: [[PROF21]] = !{!"branch_weights", i32 1, i32 3}
 ; CHECK: [[PROF10]] = !{!"branch_weights", i32 1, i32 249}
 ; CHECK: [[LOOP11]] = distinct !{[[LOOP11]], [[META2]], [[META3]], [[META12:![0-9]+]]}
 ; CHECK: [[META12]] = !{!"llvm.loop.estimated_trip_count", i32 250}

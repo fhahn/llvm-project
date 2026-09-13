@@ -303,7 +303,7 @@ define i32 @logical_and_of_mask_and_condition(ptr noalias %src1, ptr noalias %sr
 ; VF4:    [[TMP27:%.*]] = select <4 x i1> [[TMP2:%.*]], <4 x i1> [[TMP26:%.*]], <4 x i1> zeroinitializer
 ; VF4:    br i1 [[TMP29:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP15:![0-9]+]]
 ; VF4:  [[MIDDLE_BLOCK]]:
-; VF4:    [[RDX_SELECT:%.*]] = select i1 [[TMP31:%.*]], i32 1, i32 0
+; VF4:    [[RDX_SELECT:%.*]] = select i1 [[TMP31:%.*]], i32 1, i32 0, !prof [[PROF17:![0-9]+]]
 ; VF4:    br i1 [[CMP_N:%.*]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; VF4:  [[SCALAR_PH]]:
 ; VF4:  [[LOOP_HEADER:.*]]:
@@ -337,7 +337,7 @@ define i32 @logical_and_of_mask_and_condition(ptr noalias %src1, ptr noalias %sr
 ; VF1IC2:    [[TMP25:%.*]] = select i1 [[TMP14]], i1 [[TMP22:%.*]], i1 false
 ; VF1IC2:    br i1 [[TMP27:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP12:![0-9]+]]
 ; VF1IC2:  [[MIDDLE_BLOCK]]:
-; VF1IC2:    [[RDX_SELECT:%.*]] = select i1 [[TMP28:%.*]], i32 1, i32 0
+; VF1IC2:    [[RDX_SELECT:%.*]] = select i1 [[TMP28:%.*]], i32 1, i32 0, !prof [[PROF13:![0-9]+]]
 ; VF1IC2:  [[EXIT:.*:]]
 ;
 entry:
@@ -387,6 +387,7 @@ exit:
 ; VF4: [[LOOP13]] = distinct !{[[LOOP13]], [[META2]], [[META3]], [[META14:![0-9]+]]}
 ; VF4: [[META14]] = !{!"llvm.loop.estimated_trip_count", i32 4}
 ; VF4: [[LOOP15]] = distinct !{[[LOOP15]], [[META2]], [[META3]]}
+; VF4: [[PROF17]] = !{!"unknown", !"loop-vectorize"}
 ; VF4: [[LOOP16]] = distinct !{[[LOOP16]], [[META3]], [[META2]]}
 ;.
 ; VF1IC2: [[PROF0]] = !{!"function_entry_count", i64 1000}
@@ -402,4 +403,5 @@ exit:
 ; VF1IC2: [[LOOP10]] = distinct !{[[LOOP10]], [[META3]], [[META4]], [[META11:![0-9]+]]}
 ; VF1IC2: [[META11]] = !{!"llvm.loop.estimated_trip_count", i32 8}
 ; VF1IC2: [[LOOP12]] = distinct !{[[LOOP12]], [[META3]], [[META4]]}
+; VF1IC2: [[PROF13]] = !{!"unknown", !"loop-vectorize"}
 ;.
