@@ -4300,14 +4300,29 @@ static bool isKnownNonEqual(const Value *V1, const Value *V2,
     return true;
 
   if (V1->getType()->isIntOrIntVectorTy()) {
-    // Are any known bits in V1 contradictory to known bits in V2? If V1
-    // has a known zero where V2 has a known one, they must not be equal.
-    KnownBits Known1 = computeKnownBits(V1, DemandedElts, Q, Depth);
-    if (!Known1.isUnknown()) {
-      KnownBits Known2 = computeKnownBits(V2, DemandedElts, Q, Depth);
-      if (Known1.Zero.intersects(Known2.One) ||
-          Known2.Zero.intersects(Known1.One))
+    // The known bits of (X + C1) lose everything the carry out of the unknown
+    // low bits of X may change. Comparing against a constant does not need
+    // them: the offset cancels exactly, so compare the known bits of X against
+    // (C2 - C1) instead. That is both more precise and cheaper, as it avoids
+    // computing known bits for the add itself.
+    const APInt *C1, *C2;
+    Value *X;
+    if ((match(V2, m_APInt(C2)) && match(V1, m_Add(m_Value(X), m_APInt(C1)))) ||
+        (match(V1, m_APInt(C2)) && match(V2, m_Add(m_Value(X), m_APInt(C1))))) {
+      KnownBits KnownX = computeKnownBits(X, DemandedElts, Q, Depth);
+      APInt Adjusted = *C2 - *C1;
+      if (KnownX.Zero.intersects(Adjusted) || KnownX.One.intersects(~Adjusted))
         return true;
+    } else {
+      // Are any known bits in V1 contradictory to known bits in V2? If V1
+      // has a known zero where V2 has a known one, they must not be equal.
+      KnownBits Known1 = computeKnownBits(V1, DemandedElts, Q, Depth);
+      if (!Known1.isUnknown()) {
+        KnownBits Known2 = computeKnownBits(V2, DemandedElts, Q, Depth);
+        if (Known1.Zero.intersects(Known2.One) ||
+            Known2.Zero.intersects(Known1.One))
+          return true;
+      }
     }
   }
 
