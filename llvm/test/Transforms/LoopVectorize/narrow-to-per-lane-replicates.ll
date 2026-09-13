@@ -177,8 +177,7 @@ define void @int_iv_increment_only_scalar_users(ptr noalias %dst, ptr noalias %s
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_STORE_CONTINUE2:.*]] ]
-; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <2 x i64> [ <i64 100, i64 101>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[PRED_STORE_CONTINUE2]] ]
-; CHECK-NEXT:    [[TMP3:%.*]] = add <2 x i64> [[VEC_IND]], splat (i64 1)
+; CHECK-NEXT:    [[TMP3:%.*]] = add i64 100, [[INDEX]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x i32>, ptr [[TMP4]], align 4
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp sgt <2 x i32> [[WIDE_LOAD]], zeroinitializer
@@ -186,7 +185,7 @@ define void @int_iv_increment_only_scalar_users(ptr noalias %dst, ptr noalias %s
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
 ; CHECK:       [[PRED_STORE_IF]]:
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds i64, ptr [[DST]], i64 [[INDEX]]
-; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <2 x i64> [[TMP3]], i64 0
+; CHECK-NEXT:    [[TMP8:%.*]] = add i64 [[TMP3]], 1
 ; CHECK-NEXT:    store i64 [[TMP8]], ptr [[TMP7]], align 8
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE]]
 ; CHECK:       [[PRED_STORE_CONTINUE]]:
@@ -194,13 +193,13 @@ define void @int_iv_increment_only_scalar_users(ptr noalias %dst, ptr noalias %s
 ; CHECK-NEXT:    br i1 [[TMP9]], label %[[PRED_STORE_IF1:.*]], label %[[PRED_STORE_CONTINUE2]]
 ; CHECK:       [[PRED_STORE_IF1]]:
 ; CHECK-NEXT:    [[TMP10:%.*]] = add i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP14:%.*]] = add i64 [[TMP3]], 1
 ; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr inbounds i64, ptr [[DST]], i64 [[TMP10]]
-; CHECK-NEXT:    [[TMP12:%.*]] = extractelement <2 x i64> [[TMP3]], i64 1
+; CHECK-NEXT:    [[TMP12:%.*]] = add i64 [[TMP14]], 1
 ; CHECK-NEXT:    store i64 [[TMP12]], ptr [[TMP11]], align 8
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE2]]
 ; CHECK:       [[PRED_STORE_CONTINUE2]]:
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
-; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <2 x i64> [[VEC_IND]], splat (i64 2)
 ; CHECK-NEXT:    [[TMP13:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP13]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
@@ -363,9 +362,10 @@ define void @increment_used_by_invariant_and_per_lane_store(ptr noalias %dst, pt
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_STORE_CONTINUE2:.*]] ]
-; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <2 x i64> [ <i64 100, i64 101>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[PRED_STORE_CONTINUE2]] ]
-; CHECK-NEXT:    [[TMP3:%.*]] = add <2 x i64> [[VEC_IND]], splat (i64 1)
-; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <2 x i64> [[TMP3]], i64 1
+; CHECK-NEXT:    [[TMP3:%.*]] = add i64 100, [[INDEX]]
+; CHECK-NEXT:    [[TMP13:%.*]] = add i64 [[TMP3]], 1
+; CHECK-NEXT:    [[TMP9:%.*]] = add i64 [[TMP3]], 1
+; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[TMP13]], 1
 ; CHECK-NEXT:    store i64 [[TMP4]], ptr [[INV]], align 8
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x i32>, ptr [[TMP5]], align 4
@@ -374,7 +374,6 @@ define void @increment_used_by_invariant_and_per_lane_store(ptr noalias %dst, pt
 ; CHECK-NEXT:    br i1 [[TMP7]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
 ; CHECK:       [[PRED_STORE_IF]]:
 ; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds i64, ptr [[DST]], i64 [[INDEX]]
-; CHECK-NEXT:    [[TMP9:%.*]] = extractelement <2 x i64> [[TMP3]], i64 0
 ; CHECK-NEXT:    store i64 [[TMP9]], ptr [[TMP8]], align 8
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE]]
 ; CHECK:       [[PRED_STORE_CONTINUE]]:
@@ -383,12 +382,10 @@ define void @increment_used_by_invariant_and_per_lane_store(ptr noalias %dst, pt
 ; CHECK:       [[PRED_STORE_IF1]]:
 ; CHECK-NEXT:    [[TMP11:%.*]] = add i64 [[INDEX]], 1
 ; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds i64, ptr [[DST]], i64 [[TMP11]]
-; CHECK-NEXT:    [[TMP13:%.*]] = extractelement <2 x i64> [[TMP3]], i64 1
-; CHECK-NEXT:    store i64 [[TMP13]], ptr [[TMP12]], align 8
+; CHECK-NEXT:    store i64 [[TMP4]], ptr [[TMP12]], align 8
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE2]]
 ; CHECK:       [[PRED_STORE_CONTINUE2]]:
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
-; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <2 x i64> [[VEC_IND]], splat (i64 2)
 ; CHECK-NEXT:    [[TMP14:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP14]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:

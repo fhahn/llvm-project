@@ -763,6 +763,19 @@ void VPlanTransforms::removeDeadRecipes(VPlan &Plan) {
   }
 }
 
+/// Returns true if \p Def, a user of the widened induction \p PhiR, should be
+/// computed as one replicate per lane, rather than as a vector that is taken
+/// apart again by one extract per lane. This is a heuristic: the extracts it
+/// saves are only materialized after the plan has been costed.
+static bool shouldReplicatePerLane(VPlan &Plan, VPWidenInductionRecipe *PhiR,
+                                   VPRecipeWithIRFlags *Def) {
+  if (Plan.hasScalableVF() || isa<VPReplicateRecipe>(Def))
+    return false;
+
+  // TODO: Widen the set of candidates.
+  return match(Def, m_c_Add(m_Specific(PhiR), m_Specific(PhiR->getStepValue()))) && vputils::onlyScalarValuesUsed(Def);
+}
+
 /// Legalize VPWidenPointerInductionRecipe, by replacing it with a PtrAdd
 /// (IndStart, ScalarIVSteps (0, Step)) if only its scalar values are used, as
 /// VPWidenPointerInductionRecipe will generate vectors only. If some users
@@ -800,8 +813,11 @@ static void legalizeAndOptimizeInductions(VPlan &Plan) {
           (RepR && (RepR->isSingleScalar() || RepR->isPredicated())))
         continue;
 
-      // Skip recipes that may have other lanes than their first used.
-      if (!vputils::isSingleScalar(Def) && !vputils::onlyFirstLaneUsed(Def))
+      // Narrow Def to a single scalar if it computes a single scalar or all
+      // lanes but the first are dead, otherwise to one replicate per lane.
+      bool NarrowToSingleScalar =
+          vputils::isSingleScalar(Def) || vputils::onlyFirstLaneUsed(Def);
+      if (!NarrowToSingleScalar && !shouldReplicatePerLane(Plan, PhiR, Def))
         continue;
 
       // TODO: Support scalarizing ExtractValue.
@@ -809,10 +825,16 @@ static void legalizeAndOptimizeInductions(VPlan &Plan) {
                 m_Binary<Instruction::ExtractValue>(m_VPValue(), m_VPValue())))
         continue;
 
-      auto *Clone = VPBuilder::createSingleScalarOp(
-          Def->getUnderlyingInstr()->getOpcode(), Def->operands(),
-          /*Mask=*/nullptr, *Def, {}, DebugLoc::getUnknown(),
-          Def->getUnderlyingInstr());
+      Instruction *UI = Def->getUnderlyingInstr();
+      VPSingleDefRecipe *Clone =
+          NarrowToSingleScalar
+              ? VPBuilder::createSingleScalarOp(UI->getOpcode(),
+                                                Def->operands(),
+                                                /*Mask=*/nullptr, *Def, {},
+                                                DebugLoc::getUnknown(), UI)
+              : new VPReplicateRecipe(UI, Def->operands(),
+                                      /*IsSingleScalar=*/false,
+                                      /*Mask=*/nullptr, *Def);
       Clone->insertAfter(Def);
       Def->replaceAllUsesWith(Clone);
       Def->eraseFromParent();

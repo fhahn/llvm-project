@@ -14,10 +14,8 @@ define i32 @test_phi_iterator_invalidation(ptr %A, ptr noalias %B) {
 ; CHECK:       vector.body:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[PRED_LOAD_CONTINUE6:%.*]] ]
 ; CHECK-NEXT:    [[ACTIVE_LANE_MASK:%.*]] = phi <4 x i1> [ [[ACTIVE_LANE_MASK_ENTRY]], [[VECTOR_PH]] ], [ [[ACTIVE_LANE_MASK_NEXT:%.*]], [[PRED_LOAD_CONTINUE6]] ]
-; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, [[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], [[PRED_LOAD_CONTINUE6]] ]
 ; CHECK-NEXT:    [[VECTOR_RECUR:%.*]] = phi <4 x i16> [ <i16 poison, i16 poison, i16 poison, i16 0>, [[VECTOR_PH]] ], [ [[TMP24:%.*]], [[PRED_LOAD_CONTINUE6]] ]
-; CHECK-NEXT:    [[TMP0:%.*]] = add <4 x i64> [[VEC_IND]], splat (i64 1)
-; CHECK-NEXT:    [[TMP27:%.*]] = extractelement <4 x i64> [[TMP0]], i64 0
+; CHECK-NEXT:    [[TMP27:%.*]] = add i64 [[INDEX]], 1
 ; CHECK-NEXT:    [[TMP1:%.*]] = extractelement <4 x i1> [[ACTIVE_LANE_MASK]], i64 0
 ; CHECK-NEXT:    br i1 [[TMP1]], label [[PRED_LOAD_IF:%.*]], label [[PRED_LOAD_CONTINUE:%.*]]
 ; CHECK:       pred.load.if:
@@ -30,7 +28,8 @@ define i32 @test_phi_iterator_invalidation(ptr %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <4 x i1> [[ACTIVE_LANE_MASK]], i64 1
 ; CHECK-NEXT:    br i1 [[TMP7]], label [[PRED_LOAD_IF1:%.*]], label [[PRED_LOAD_CONTINUE2:%.*]]
 ; CHECK:       pred.load.if1:
-; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <4 x i64> [[TMP0]], i64 1
+; CHECK-NEXT:    [[TMP31:%.*]] = add i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP8:%.*]] = add i64 [[TMP31]], 1
 ; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr i32, ptr [[A]], i64 [[TMP8]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = load i16, ptr [[TMP9]], align 2
 ; CHECK-NEXT:    [[TMP11:%.*]] = insertelement <4 x i16> [[TMP6]], i16 [[TMP10]], i64 1
@@ -40,7 +39,8 @@ define i32 @test_phi_iterator_invalidation(ptr %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[TMP13:%.*]] = extractelement <4 x i1> [[ACTIVE_LANE_MASK]], i64 2
 ; CHECK-NEXT:    br i1 [[TMP13]], label [[PRED_LOAD_IF3:%.*]], label [[PRED_LOAD_CONTINUE4:%.*]]
 ; CHECK:       pred.load.if3:
-; CHECK-NEXT:    [[TMP14:%.*]] = extractelement <4 x i64> [[TMP0]], i64 2
+; CHECK-NEXT:    [[TMP32:%.*]] = add i64 [[INDEX]], 2
+; CHECK-NEXT:    [[TMP14:%.*]] = add i64 [[TMP32]], 1
 ; CHECK-NEXT:    [[TMP15:%.*]] = getelementptr i32, ptr [[A]], i64 [[TMP14]]
 ; CHECK-NEXT:    [[TMP16:%.*]] = load i16, ptr [[TMP15]], align 2
 ; CHECK-NEXT:    [[TMP17:%.*]] = insertelement <4 x i16> [[TMP12]], i16 [[TMP16]], i64 2
@@ -50,7 +50,8 @@ define i32 @test_phi_iterator_invalidation(ptr %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[TMP19:%.*]] = extractelement <4 x i1> [[ACTIVE_LANE_MASK]], i64 3
 ; CHECK-NEXT:    br i1 [[TMP19]], label [[PRED_LOAD_IF5:%.*]], label [[PRED_LOAD_CONTINUE6]]
 ; CHECK:       pred.load.if5:
-; CHECK-NEXT:    [[TMP20:%.*]] = extractelement <4 x i64> [[TMP0]], i64 3
+; CHECK-NEXT:    [[TMP33:%.*]] = add i64 [[INDEX]], 3
+; CHECK-NEXT:    [[TMP20:%.*]] = add i64 [[TMP33]], 1
 ; CHECK-NEXT:    [[TMP21:%.*]] = getelementptr i32, ptr [[A]], i64 [[TMP20]]
 ; CHECK-NEXT:    [[TMP22:%.*]] = load i16, ptr [[TMP21]], align 2
 ; CHECK-NEXT:    [[TMP23:%.*]] = insertelement <4 x i16> [[TMP18]], i16 [[TMP22]], i64 3
@@ -65,7 +66,6 @@ define i32 @test_phi_iterator_invalidation(ptr %A, ptr noalias %B) {
 ; CHECK-NEXT:    [[ACTIVE_LANE_MASK_NEXT]] = call <4 x i1> @llvm.get.active.lane.mask.v4i1.i64(i64 [[INDEX_NEXT]], i64 1002)
 ; CHECK-NEXT:    [[TMP29:%.*]] = extractelement <4 x i1> [[ACTIVE_LANE_MASK_NEXT]], i64 0
 ; CHECK-NEXT:    [[TMP30:%.*]] = xor i1 [[TMP29]], true
-; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i64> [[VEC_IND]], splat (i64 4)
 ; CHECK-NEXT:    br i1 [[TMP30]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       middle.block:
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
