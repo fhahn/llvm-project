@@ -425,7 +425,7 @@ define i64 @early_exit_first_active_lane_interleaved(ptr dereferenceable(1024) %
 ; CHECK:  [[ENTRY:.*:]]
 ; CHECK:  [[VECTOR_PH:.*:]]
 ; CHECK:  [[VECTOR_BODY:.*]]:
-; CHECK:    br i1 [[TMP7:%.*]], label %[[VECTOR_EARLY_EXIT:.*]], label %[[VECTOR_BODY_INTERIM:.*]]
+; CHECK:    br i1 [[TMP7:%.*]], label %[[VECTOR_EARLY_EXIT:.*]], label %[[VECTOR_BODY_INTERIM:.*]], !prof [[PROF4]]
 ; CHECK:  [[VECTOR_BODY_INTERIM]]:
 ; CHECK:    br i1 [[TMP8:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP36:![0-9]+]]
 ; CHECK:  [[MIDDLE_BLOCK]]:

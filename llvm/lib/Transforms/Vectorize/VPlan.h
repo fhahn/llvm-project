@@ -1360,7 +1360,9 @@ public:
     // successor 1; otherwise branches to successor 2. Expanded after region
     // dissolution into: (1) an OR of the two conditions branching to
     // middle.split or successor 2, and (2) middle.split branching to successor
-    // 0 or successor 1 based on condition 0.
+    // 0 or successor 1 based on condition 0. Its !prof, if any, holds the
+    // per-scalar-iteration weights of condition 0, i.e. of a single original
+    // iteration taking successor 0.
     BranchOnTwoConds,
     Broadcast,
     /// Creates a fixed-width vector containing all operands. The number of
