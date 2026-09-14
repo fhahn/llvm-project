@@ -19,6 +19,7 @@
 #include "VPlanTransforms.h"
 #include "VPlanUtils.h"
 #include "llvm/ADT/PostOrderIterator.h"
+#include "llvm/ADT/STLExtras.h"
 
 using namespace llvm;
 using namespace VPlanPatternMatch;
@@ -425,13 +426,10 @@ void VPPredicator::run() {
     // Mask all VPInstructions in the block and record the frequency with
     // which the masked recipes execute.
     std::optional<VPExecutionFrequency> Freq = Frequencies.lookup(VPBB);
-    for (VPRecipeBase &R : *VPBB) {
-      auto *VPI = dyn_cast<VPInstruction>(&R);
-      if (!VPI)
-        continue;
-      VPI->addMask(BlockMask);
-      if (VPI->isMasked())
-        VPI->setExecutionFrequency(Freq, Plan.getContext());
+    for (VPInstruction &VPI : make_isa_range<VPInstruction>(*VPBB)) {
+      VPI.addMask(BlockMask);
+      if (VPI.isMasked())
+        VPI.setExecutionFrequency(Freq, Plan.getContext());
     }
   }
 
