@@ -14,7 +14,7 @@ define i32 @test(ptr %base) nounwind uwtable ssp {
 ; CHECK-NEXT:    br label [[WHILE_BODY_I:%.*]]
 ; CHECK:       while.body.i:
 ; CHECK-NEXT:    [[INDVARS_IV7_I:%.*]] = phi i64 [ 16, [[WHILE_BODY_LR_PH_I]] ], [ [[INDVARS_IV_NEXT8_I:%.*]], [[COND_TRUE29_I:%.*]] ]
-; CHECK-NEXT:    [[I_05_I:%.*]] = phi i64 [ 0, [[WHILE_BODY_LR_PH_I]] ], [ [[INDVARS_IV7_I]], [[COND_TRUE29_I]] ]
+; CHECK-NEXT:    [[I_05_I:%.*]] = add i64 [[INDVARS_IV7_I]], -16
 ; CHECK-NEXT:    [[LSR4:%.*]] = trunc i64 [[I_05_I]] to i32
 ; CHECK-NEXT:    [[TMP0:%.*]] = sext i32 [[LSR4]] to i64
 ; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[SCEVGEP]], i64 [[TMP0]]
