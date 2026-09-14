@@ -10964,7 +10964,7 @@ static bool isUsableGuardCondition(const Value *Cond) {
 /// \p BB, not merely the branching block. Only the previous node on \p BB's
 /// dominator chain can be the target of such an edge, so a single pointer
 /// comparison filters out all steps that cannot contribute (e.g. the head of a
-/// diamond) and at most one edge-dominance query is needed per step.
+/// diamond), and an edge-dominance query is only needed at loop headers.
 ///
 /// \p ProcessCond is invoked for each condition a fact can be derived from,
 /// together with a flag indicating whether it is known to be true. The walk
@@ -10972,8 +10972,8 @@ static bool isUsableGuardCondition(const Value *Cond) {
 /// \p MaxConditions conditions are processed, independently of the number of
 /// dominator-tree steps.
 static bool
-collectFromDominatingBranches(const DominatorTree &DT, const BasicBlock *BB,
-                              unsigned MaxConditions,
+collectFromDominatingBranches(const DominatorTree &DT, const LoopInfo &LI,
+                              const BasicBlock *BB, unsigned MaxConditions,
                               function_ref<bool(Value *, bool)> ProcessCond) {
   const DomTreeNode *Node = DT.getNode(BB);
   for (unsigned I = 0; Node && I != MaxGuardDomTreeSteps && MaxConditions; ++I) {
@@ -10990,11 +10990,20 @@ collectFromDominatingBranches(const DominatorTree &DT, const BasicBlock *BB,
       continue;
     if (!isUsableGuardCondition(Br->getCondition()))
       continue;
-    if (DT.dominates(BasicBlockEdge(Node->getBlock(), ChildBB), BB)) {
-      --MaxConditions;
-      if (ProcessCond(Br->getCondition(), EnterIfTrue))
-        return true;
-    }
+    // ChildBB is on BB's dominator chain, so it dominates BB, and the branch
+    // above is in its immediate dominator. The edge therefore dominates BB
+    // exactly when ChildBB cannot be entered any other way. Any other way in
+    // is a predecessor ChildBB dominates, i.e. a backedge, which makes ChildBB
+    // a loop header. So unless ChildBB is one, a single pointer comparison
+    // decides the step, and the edge-dominance query, which has to scan all
+    // predecessors of ChildBB, is only reached for loop headers.
+    if (!ChildBB->getSinglePredecessor() &&
+        (!LI.isLoopHeader(ChildBB) ||
+         !DT.dominates(BasicBlockEdge(Node->getBlock(), ChildBB), BB)))
+      continue;
+    --MaxConditions;
+    if (ProcessCond(Br->getCondition(), EnterIfTrue))
+      return true;
   }
   return false;
 }
@@ -16286,7 +16295,8 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
   // that dominate the block we stopped at (and hence Block) via the dominator
   // tree.
   if (!Pair.first)
-    collectFromDominatingBranches(SE.DT, Pair.second, MaxGuardDomTreeSteps,
+    collectFromDominatingBranches(SE.DT, SE.LI, Pair.second,
+                                  MaxGuardDomTreeSteps,
                                   [&](Value *Cond, bool EnterIfTrue) {
                                     Terms.emplace_back(Cond, EnterIfTrue);
                                     return false;
