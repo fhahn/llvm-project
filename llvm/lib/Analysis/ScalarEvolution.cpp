@@ -16180,15 +16180,18 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
     Terms.emplace_back(AssumeI->getOperand(0), true);
   }
 
-  // Second, collect information from llvm.experimental.guards dominating the loop.
-  auto *GuardDecl = Intrinsic::getDeclarationIfExists(
-      SE.F.getParent(), Intrinsic::experimental_guard);
-  if (GuardDecl)
-    for (const auto *GU : GuardDecl->users())
-      if (const auto *Guard = dyn_cast<IntrinsicInst>(GU))
-        if (Guard->getFunction() == Block->getParent() &&
-            SE.DT.dominates(Guard, Block))
-          Terms.emplace_back(Guard->getArgOperand(0), true);
+  // Second, collect information from llvm.experimental.guards dominating the
+  // loop. HasGuards is a cheap module-wide precondition for the lookup below.
+  if (SE.HasGuards) {
+    auto *GuardDecl = Intrinsic::getDeclarationIfExists(
+        SE.F.getParent(), Intrinsic::experimental_guard);
+    if (GuardDecl)
+      for (const auto *GU : GuardDecl->users())
+        if (const auto *Guard = dyn_cast<IntrinsicInst>(GU))
+          if (Guard->getFunction() == Block->getParent() &&
+              SE.DT.dominates(Guard, Block))
+            Terms.emplace_back(Guard->getArgOperand(0), true);
+  }
 
   // Third, collect conditions from dominating branches. Starting at the loop
   // predecessor, climb up the predecessor chain, as long as there are
