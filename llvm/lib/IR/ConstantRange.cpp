@@ -300,11 +300,9 @@ static ConstantRange makeExactMulNUWRegion(const APInt &V) {
   if (V == 0)
     return ConstantRange::getFull(V.getBitWidth());
 
-  return ConstantRange::getNonEmpty(
-      APIntOps::RoundingUDiv(APInt::getMinValue(BitWidth), V,
-                             APInt::Rounding::UP),
-      APIntOps::RoundingUDiv(APInt::getMaxValue(BitWidth), V,
-                             APInt::Rounding::DOWN) + 1);
+  // 0 * V never wraps, so the lower bound is always zero.
+  return ConstantRange::getNonEmpty(APInt::getZero(BitWidth),
+                                    APInt::getMaxValue(BitWidth).udiv(V) + 1);
 }
 
 /// Exact mul nsw region for single element RHS.
