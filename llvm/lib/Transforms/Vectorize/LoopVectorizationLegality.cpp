@@ -739,7 +739,16 @@ void LoopVectorizationLegality::addInductionPhi(PHINode *Phi,
     // one if there are multiple (no good reason for doing this other
     // than it is expedient). We've checked that it begins at zero and
     // steps by one, so this is a canonical induction variable.
-    if (!PrimaryInduction || PhiTy == WidestIndTy)
+    //
+    // Among equally wide candidates, prefer a phi that is not also a
+    // fixed-order recurrence: canVectorize() commits the primary induction to
+    // the induction model, and a phi that can be modeled as a recurrence
+    // instead should not be forced to pay the induction's runtime SCEV checks.
+    bool DisplacesEquallyWidePrimary =
+        PrimaryInduction && PrimaryInduction->getType() == PhiTy &&
+        FixedOrderRecurrences.contains(Phi);
+    if ((!PrimaryInduction || PhiTy == WidestIndTy) &&
+        !DisplacesEquallyWidePrimary)
       PrimaryInduction = Phi;
   }
 
@@ -905,35 +914,27 @@ bool LoopVectorizationLegality::canVectorizeInstr(Instruction &I) {
       return true;
     }
 
-    bool IsFixedOrderRecurrence =
-        RecurrenceDescriptor::isFixedOrderRecurrence(Phi, TheLoop, DT);
-
-    // As a last resort, coerce the PHI to an AddRec expression and re-try
-    // classifying it as an induction PHI. Only do so if the runtime SCEV checks
-    // the AddRec may need are allowed; without them the induction cannot be
-    // used, and classifying the phi as one would widen the canonical IV to its
-    // type for nothing.
-    bool IsPredIV = InductionDescriptor::isInductionPHI(
-                        Phi, TheLoop, PSE, ID, AllowRuntimeSCEVChecks) &&
-                    !IsDisallowedStridedPointerInduction(ID);
-
     // A phi can qualify both as a fixed-order recurrence and as a predicated
-    // induction. Record both and let createHeaderPhiRecipes pick between them
-    // when building the VPlan, unless the phi widens the induction type: the
-    // canonical IV and the trip count are then counted in its type, so it has
-    // to be modeled as the induction that widening is for. Only commit in
-    // single-exit loops; isVectorizableEarlyExitLoop() rejects the others based
-    // on FixedOrderRecurrences and has not run yet.
-    if (IsPredIV) {
-      IntegerType *WidestIndTyBefore = WidestIndTy;
-      addInductionPhi(Phi, ID);
-      IsFixedOrderRecurrence &=
-          !TheLoop->getExitingBlock() || WidestIndTy == WidestIndTyBefore;
-    }
-    if (IsFixedOrderRecurrence)
+    // induction. Record both; createHeaderPhiRecipes picks between them when
+    // building the VPlan. Note that addInductionPhi below reads
+    // FixedOrderRecurrences, so the insert has to happen first.
+    bool IsFOR = RecurrenceDescriptor::isFixedOrderRecurrence(Phi, TheLoop, DT);
+    if (IsFOR)
       FixedOrderRecurrences.insert(Phi);
 
-    if (IsFixedOrderRecurrence || IsPredIV)
+    // As a last resort, coerce the PHI to an AddRec expression and re-try
+    // classifying it as an induction PHI. For a phi that is already a
+    // fixed-order recurrence, only do so if the runtime SCEV checks the AddRec
+    // may need are allowed: canVectorize() may commit it to the induction
+    // model, and without the checks the induction cannot be used at all.
+    bool IsPredIV = (!IsFOR || AllowRuntimeSCEVChecks) &&
+                    InductionDescriptor::isInductionPHI(Phi, TheLoop, PSE, ID,
+                                                        /*Assume=*/true) &&
+                    !IsDisallowedStridedPointerInduction(ID);
+    if (IsPredIV)
+      addInductionPhi(Phi, ID);
+
+    if (IsFOR || IsPredIV)
       return true;
 
     reportVectorizationFailure("Found an unidentified PHI",
@@ -1981,6 +1982,14 @@ bool LoopVectorizationLegality::canVectorize(bool UseVPlanNativePath) {
       }
     }
   }
+
+  // The canonical IV and the trip count are counted in the type of the primary
+  // induction, so a phi that is both a fixed-order recurrence and the primary
+  // induction has to be modeled as the latter; the choice is not
+  // createHeaderPhiRecipes' to make. This runs after
+  // isVectorizableEarlyExitLoop(), which rejects uncountable early-exit loops
+  // based on FixedOrderRecurrences.
+  FixedOrderRecurrences.erase(PrimaryInduction);
 
   // Go over each instruction and look at memory deps.
   if (!canVectorizeMemory()) {
