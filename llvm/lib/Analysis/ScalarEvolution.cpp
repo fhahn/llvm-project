@@ -233,10 +233,10 @@ static cl::opt<unsigned> MaxGuardDomTreeSteps(
              "conditions, once the unique-predecessor climb ran out"),
     cl::init(8));
 
-static cl::opt<unsigned> MaxGuardProofs(
-    "scalar-evolution-max-guard-proofs", cl::Hidden,
-    cl::desc("Maximum number of dominating branch conditions used for "
-             "implication proofs after the unique-predecessor climb"),
+static cl::opt<unsigned> MaxGuardDomTreeConds(
+    "scalar-evolution-max-guard-dom-tree-conds", cl::Hidden,
+    cl::desc("Maximum number of dominating branch conditions collected by the "
+             "dominator tree walk, once the unique-predecessor climb ran out"),
     cl::init(1));
 
 static cl::opt<bool>
@@ -16296,7 +16296,7 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
   // tree.
   if (!Pair.first)
     collectFromDominatingBranches(SE.DT, SE.LI, Pair.second,
-                                  MaxGuardDomTreeSteps,
+                                  MaxGuardDomTreeConds,
                                   [&](Value *Cond, bool EnterIfTrue) {
                                     Terms.emplace_back(Cond, EnterIfTrue);
                                     return false;
