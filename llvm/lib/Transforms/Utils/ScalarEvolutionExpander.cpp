@@ -1897,6 +1897,59 @@ void SCEVExpander::replaceCongruentIVInc(
   DeadInsts.emplace_back(IsomorphicInc);
 }
 
+/// A header phi whose backedge value is another phi of the same header holds
+/// that phi's value from the previous iteration:
+///
+///   %delayed = phi i64 [ 0, %ph ],  [ %iv, %latch ]
+///   %iv      = phi i64 [ 32, %ph ], [ %iv.next, %latch ]
+///   %iv.next = add i64 %iv, 32
+///
+/// SCEV recognizes this shape (see the shifted-phi case in
+/// createAddRecFromPHI) and gives %delayed {0,+,32} against %iv's {32,+,32},
+/// so the two differ by the constant -32 and %delayed can be rewritten as
+/// `%iv + -32`. That removes a phi, and leaves the value expressed in terms of
+/// the induction variable the loop's exit condition constrains.
+bool SCEVExpander::replaceDelayedIV(
+    PHINode *Phi, Loop *L, SmallVectorImpl<WeakTrackingVH> &DeadInsts) {
+  BasicBlock *Header = L->getHeader();
+  BasicBlock *Latch = L->getLoopLatch();
+  if (!Latch || !Phi->getType()->isIntegerTy())
+    return false;
+
+  auto *Base = dyn_cast<PHINode>(Phi->getIncomingValueForBlock(Latch));
+  if (!Base || Base == Phi || Base->getParent() != Header)
+    return false;
+
+  // SCEV proves the relation; it is only usable if the difference is a
+  // constant, which requires both phis to be recognized as recurrences of L
+  // with the same step. A zero difference means the two are congruent, which
+  // the caller has already handled without paying for an add.
+  const SCEV *BaseSCEV = SE.getSCEV(Base);
+  auto *Off =
+      dyn_cast<SCEVConstant>(SE.getMinusSCEV(SE.getSCEV(Phi), BaseSCEV));
+  if (!Off || Off->getAPInt().isZero())
+    return false;
+
+  IRBuilder<> Builder(Header, Header->getFirstInsertionPt());
+  Builder.SetCurrentDebugLocation(Phi->getDebugLoc());
+  auto *Shifted = cast<Instruction>(
+      Builder.CreateAdd(Base, Off->getValue(), Phi->getName()));
+  // The add is evaluated in the header, so ask for the no-wrap facts there.
+  if (SE.willNotOverflow(Instruction::Add, /*Signed=*/false, BaseSCEV, Off,
+                         Shifted))
+    Shifted->setHasNoUnsignedWrap();
+  if (SE.willNotOverflow(Instruction::Add, /*Signed=*/true, BaseSCEV, Off,
+                         Shifted))
+    Shifted->setHasNoSignedWrap();
+
+  SCEV_DEBUG_WITH_TYPE(
+      DebugType, dbgs() << "INDVARS: Eliminated delayed iv: " << *Phi << '\n');
+  SE.forgetValue(Phi);
+  Phi->replaceAllUsesWith(Shifted);
+  DeadInsts.emplace_back(Phi);
+  return true;
+}
+
 /// replaceCongruentIVs - Check for congruent phis in this loop header and
 /// replace them with their most canonical representative. Return the number of
 /// phis eliminated.
@@ -1998,6 +2051,18 @@ SCEVExpander::replaceCongruentIVs(Loop *L, const DominatorTree *DT,
     Phi->replaceAllUsesWith(NewIV);
     DeadInsts.emplace_back(Phi);
   }
+
+  // Rewriting a delayed phi costs an add, so only consider the phis that
+  // survived congruence elimination: a delayed phi may be the representative
+  // another phi was folded into above, and removing it first would keep that
+  // other phi alive instead.
+  for (PHINode &Phi : L->getHeader()->phis()) {
+    if (Phi.use_empty())
+      continue;
+    if (replaceDelayedIV(&Phi, L, DeadInsts))
+      ++NumElim;
+  }
+
   return NumElim;
 }
 

@@ -9,8 +9,8 @@ define void @delayed_iv_add(i64 %n) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[DELAYED1:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV:%.*]], %[[LOOP]] ]
-; CHECK-NEXT:    [[IV]] = phi i64 [ 32, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 32, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[DELAYED1:%.*]] = add i64 [[IV]], -32
 ; CHECK-NEXT:    call void @use(i64 [[DELAYED1]])
 ; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 32
 ; CHECK-NEXT:    [[EC:%.*]] = icmp slt i64 [[IV_NEXT]], [[N]]
@@ -39,8 +39,8 @@ define void @delayed_iv_sadd_with_overflow(i64 %n) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[DELAYED1:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV:%.*]], %[[LATCH:.*]] ]
-; CHECK-NEXT:    [[IV]] = phi i64 [ 32, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LATCH]] ]
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 32, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LATCH:.*]] ]
+; CHECK-NEXT:    [[DELAYED1:%.*]] = add nsw i64 [[IV]], -32
 ; CHECK-NEXT:    call void @use(i64 [[DELAYED1]])
 ; CHECK-NEXT:    [[STEP:%.*]] = call { i64, i1 } @llvm.sadd.with.overflow.i64(i64 [[IV]], i64 32)
 ; CHECK-NEXT:    [[OV:%.*]] = extractvalue { i64, i1 } [[STEP]], 1
@@ -85,8 +85,8 @@ define void @delayed_iv_uadd_with_overflow(i64 %n) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[DELAYED1:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV:%.*]], %[[LOOP]] ]
-; CHECK-NEXT:    [[IV]] = phi i64 [ 7, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 7, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[DELAYED1:%.*]] = add i64 [[IV]], -7
 ; CHECK-NEXT:    call void @use(i64 [[DELAYED1]])
 ; CHECK-NEXT:    [[STEP:%.*]] = call { i64, i1 } @llvm.uadd.with.overflow.i64(i64 [[IV]], i64 7)
 ; CHECK-NEXT:    [[IV_NEXT]] = extractvalue { i64, i1 } [[STEP]], 0
@@ -117,8 +117,8 @@ define void @delayed_iv_negative_step(i64 %n) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[DELAYED1:%.*]] = phi i64 [ 100, %[[ENTRY]] ], [ [[IV:%.*]], %[[LOOP]] ]
-; CHECK-NEXT:    [[IV]] = phi i64 [ 92, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 92, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[DELAYED1:%.*]] = add i64 [[IV]], 8
 ; CHECK-NEXT:    call void @use(i64 [[DELAYED1]])
 ; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], -8
 ; CHECK-NEXT:    [[EC:%.*]] = icmp sgt i64 [[IV_NEXT]], [[N]]
@@ -147,8 +147,8 @@ define void @delayed_iv_wrapping_start(i8 %n) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[DELAYED1:%.*]] = phi i8 [ -32, %[[ENTRY]] ], [ [[IV:%.*]], %[[LOOP]] ]
-; CHECK-NEXT:    [[IV]] = phi i8 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[IV:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[DELAYED1:%.*]] = add i8 [[IV]], -32
 ; CHECK-NEXT:    [[EXT:%.*]] = zext i8 [[DELAYED1]] to i64
 ; CHECK-NEXT:    call void @use(i64 [[EXT]])
 ; CHECK-NEXT:    [[IV_NEXT]] = add i8 [[IV]], 32

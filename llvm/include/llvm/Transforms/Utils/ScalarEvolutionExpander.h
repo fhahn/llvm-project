@@ -300,8 +300,9 @@ public:
                                                       Instruction *OrigInc,
                                                       Instruction *WideInc);
 
-  /// replace congruent phis with their most canonical representative. Return
-  /// the number of phis eliminated.
+  /// replace congruent phis with their most canonical representative, and
+  /// phis that are another phi delayed by one iteration with a constant
+  /// offset from that phi. Return the number of phis eliminated.
   LLVM_ABI unsigned
   replaceCongruentIVs(Loop *L, const DominatorTree *DT,
                       SmallVectorImpl<WeakTrackingVH> &DeadInsts,
@@ -580,6 +581,12 @@ private:
   void replaceCongruentIVInc(PHINode *&Phi, PHINode *&OrigPhi, Loop *L,
                              const DominatorTree *DT,
                              SmallVectorImpl<WeakTrackingVH> &DeadInsts);
+
+  /// If \p Phi holds another phi of the same header from the previous
+  /// iteration, and the two differ by a constant, replace it with that
+  /// constant offset from the other phi. Return true if \p Phi was replaced.
+  bool replaceDelayedIV(PHINode *Phi, Loop *L,
+                        SmallVectorImpl<WeakTrackingVH> &DeadInsts);
 };
 
 /// Helper to remove instructions inserted during SCEV expansion, unless they
