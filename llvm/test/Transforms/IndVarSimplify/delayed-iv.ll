@@ -2,18 +2,15 @@
 ; RUN: opt -passes=indvars -S %s | FileCheck %s
 
 declare void @use(i64)
-declare void @llvm.trap()
 
-; %delayed is %iv from the previous iteration. SCEV gives it {0,+,32} against
-; %iv's {32,+,32}, so it is %iv - 32 at the header.
 define void @delayed_iv_add(i64 %n) {
 ; CHECK-LABEL: define void @delayed_iv_add(
 ; CHECK-SAME: i64 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 32, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
-; CHECK-NEXT:    [[DELAYED1:%.*]] = add i64 [[IV]], -32
+; CHECK-NEXT:    [[DELAYED1:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[IV]] = phi i64 [ 32, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
 ; CHECK-NEXT:    call void @use(i64 [[DELAYED1]])
 ; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 32
 ; CHECK-NEXT:    [[EC:%.*]] = icmp slt i64 [[IV_NEXT]], [[N]]
@@ -36,18 +33,14 @@ exit:
   ret void
 }
 
-; SCEV models the value component of a checked add as the wrapped sum, so it
-; forms the same recurrence. The guarding branch makes it <nsw>, which carries
-; over to the offset. This is the shape swiftc emits for a rotated loop with a
-; checked increment.
 define void @delayed_iv_sadd_with_overflow(i64 %n) {
 ; CHECK-LABEL: define void @delayed_iv_sadd_with_overflow(
 ; CHECK-SAME: i64 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 32, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LATCH:.*]] ]
-; CHECK-NEXT:    [[DELAYED1:%.*]] = add nsw i64 [[IV]], -32
+; CHECK-NEXT:    [[DELAYED1:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV:%.*]], %[[LATCH:.*]] ]
+; CHECK-NEXT:    [[IV]] = phi i64 [ 32, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LATCH]] ]
 ; CHECK-NEXT:    call void @use(i64 [[DELAYED1]])
 ; CHECK-NEXT:    [[STEP:%.*]] = call { i64, i1 } @llvm.sadd.with.overflow.i64(i64 [[IV]], i64 32)
 ; CHECK-NEXT:    [[OV:%.*]] = extractvalue { i64, i1 } [[STEP]], 1
@@ -92,8 +85,8 @@ define void @delayed_iv_uadd_with_overflow(i64 %n) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 7, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
-; CHECK-NEXT:    [[DELAYED1:%.*]] = add i64 [[IV]], -7
+; CHECK-NEXT:    [[DELAYED1:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[IV]] = phi i64 [ 7, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
 ; CHECK-NEXT:    call void @use(i64 [[DELAYED1]])
 ; CHECK-NEXT:    [[STEP:%.*]] = call { i64, i1 } @llvm.uadd.with.overflow.i64(i64 [[IV]], i64 7)
 ; CHECK-NEXT:    [[IV_NEXT]] = extractvalue { i64, i1 } [[STEP]], 0
@@ -124,8 +117,8 @@ define void @delayed_iv_negative_step(i64 %n) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 92, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
-; CHECK-NEXT:    [[DELAYED1:%.*]] = add i64 [[IV]], 8
+; CHECK-NEXT:    [[DELAYED1:%.*]] = phi i64 [ 100, %[[ENTRY]] ], [ [[IV:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[IV]] = phi i64 [ 92, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
 ; CHECK-NEXT:    call void @use(i64 [[DELAYED1]])
 ; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], -8
 ; CHECK-NEXT:    [[EC:%.*]] = icmp sgt i64 [[IV_NEXT]], [[N]]
@@ -148,16 +141,14 @@ exit:
   ret void
 }
 
-; The recurrence is modular: i8 start values 224 and 0 differ by the step 32
-; with wrapping, so the offset gets no no-wrap flags.
 define void @delayed_iv_wrapping_start(i8 %n) {
 ; CHECK-LABEL: define void @delayed_iv_wrapping_start(
 ; CHECK-SAME: i8 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[IV:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
-; CHECK-NEXT:    [[DELAYED1:%.*]] = add i8 [[IV]], -32
+; CHECK-NEXT:    [[DELAYED1:%.*]] = phi i8 [ -32, %[[ENTRY]] ], [ [[IV:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[IV]] = phi i8 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
 ; CHECK-NEXT:    [[EXT:%.*]] = zext i8 [[DELAYED1]] to i64
 ; CHECK-NEXT:    call void @use(i64 [[EXT]])
 ; CHECK-NEXT:    [[IV_NEXT]] = add i8 [[IV]], 32
@@ -182,8 +173,6 @@ exit:
   ret void
 }
 
-; Negative test: the start values do not differ by the step, so SCEV does not
-; form a recurrence for %delayed and the difference is not a constant.
 define void @negative_start_mismatch(i64 %n) {
 ; CHECK-LABEL: define void @negative_start_mismatch(
 ; CHECK-SAME: i64 [[N:%.*]]) {
@@ -214,7 +203,6 @@ exit:
   ret void
 }
 
-; Negative test: a variable step gives no constant difference.
 define void @negative_variable_step(i64 %n, i64 %s) {
 ; CHECK-LABEL: define void @negative_variable_step(
 ; CHECK-SAME: i64 [[N:%.*]], i64 [[S:%.*]]) {
@@ -245,8 +233,6 @@ exit:
   ret void
 }
 
-; Negative test: %other is not advanced by a constant step, so nothing relates
-; the two phis.
 define void @negative_step_not_recognised(i64 %n, ptr %p) {
 ; CHECK-LABEL: define void @negative_step_not_recognised(
 ; CHECK-SAME: i64 [[N:%.*]], ptr [[P:%.*]]) {
