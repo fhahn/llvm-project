@@ -2,10 +2,7 @@
 ; RUN: opt -passes=indvars -S %s | FileCheck %s
 
 declare void @use(i64)
-declare void @llvm.trap()
 
-; %delayed is %iv from the previous iteration. SCEV gives it {0,+,32} against
-; %iv's {32,+,32}, so it is %iv - 32 at the header.
 define void @delayed_iv_add(i64 %n) {
 ; CHECK-LABEL: define void @delayed_iv_add(
 ; CHECK-SAME: i64 [[N:%.*]]) {
@@ -36,10 +33,6 @@ exit:
   ret void
 }
 
-; SCEV models the value component of a checked add as the wrapped sum, so it
-; forms the same recurrence. The guarding branch makes it <nsw>, which carries
-; over to the offset. This is the shape swiftc emits for a rotated loop with a
-; checked increment.
 define void @delayed_iv_sadd_with_overflow(i64 %n) {
 ; CHECK-LABEL: define void @delayed_iv_sadd_with_overflow(
 ; CHECK-SAME: i64 [[N:%.*]]) {
@@ -148,8 +141,6 @@ exit:
   ret void
 }
 
-; The recurrence is modular: i8 start values 224 and 0 differ by the step 32
-; with wrapping, so the offset gets no no-wrap flags.
 define void @delayed_iv_wrapping_start(i8 %n) {
 ; CHECK-LABEL: define void @delayed_iv_wrapping_start(
 ; CHECK-SAME: i8 [[N:%.*]]) {
@@ -182,8 +173,6 @@ exit:
   ret void
 }
 
-; Negative test: the start values do not differ by the step, so SCEV does not
-; form a recurrence for %delayed and the difference is not a constant.
 define void @negative_start_mismatch(i64 %n) {
 ; CHECK-LABEL: define void @negative_start_mismatch(
 ; CHECK-SAME: i64 [[N:%.*]]) {
@@ -214,7 +203,6 @@ exit:
   ret void
 }
 
-; Negative test: a variable step gives no constant difference.
 define void @negative_variable_step(i64 %n, i64 %s) {
 ; CHECK-LABEL: define void @negative_variable_step(
 ; CHECK-SAME: i64 [[N:%.*]], i64 [[S:%.*]]) {
@@ -245,8 +233,6 @@ exit:
   ret void
 }
 
-; Negative test: %other is not advanced by a constant step, so nothing relates
-; the two phis.
 define void @negative_step_not_recognised(i64 %n, ptr %p) {
 ; CHECK-LABEL: define void @negative_step_not_recognised(
 ; CHECK-SAME: i64 [[N:%.*]], ptr [[P:%.*]]) {
