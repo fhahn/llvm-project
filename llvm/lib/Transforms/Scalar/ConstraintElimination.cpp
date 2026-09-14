@@ -1432,11 +1432,10 @@ static bool tryToStrengthenBinOpFlags(Instruction *I, Value *Op0, Value *Op1,
   bool Changed = false;
   auto Opcode = static_cast<Instruction::BinaryOps>(I->getOpcode());
   using OBO = OverflowingBinaryOperator;
-  ConstantRange Other(C->getValue());
   if (!I->hasNoUnsignedWrap() &&
       doesHoldInRange(Info, Op0,
-                      ConstantRange::makeGuaranteedNoWrapRegion(
-                          Opcode, Other, OBO::NoUnsignedWrap),
+                      ConstantRange::makeExactNoWrapRegion(
+                          Opcode, C->getValue(), OBO::NoUnsignedWrap),
                       /*Signed=*/false)) {
     LLVM_DEBUG(dbgs() << "Adding nuw to " << *I << "\n");
     I->setHasNoUnsignedWrap();
@@ -1444,8 +1443,8 @@ static bool tryToStrengthenBinOpFlags(Instruction *I, Value *Op0, Value *Op1,
   }
   if (!I->hasNoSignedWrap() &&
       doesHoldInRange(Info, Op0,
-                      ConstantRange::makeGuaranteedNoWrapRegion(
-                          Opcode, Other, OBO::NoSignedWrap),
+                      ConstantRange::makeExactNoWrapRegion(
+                          Opcode, C->getValue(), OBO::NoSignedWrap),
                       /*Signed=*/true)) {
     LLVM_DEBUG(dbgs() << "Adding nsw to " << *I << "\n");
     I->setHasNoSignedWrap();
@@ -2304,12 +2303,11 @@ tryToSimplifyOverflowMath(IntrinsicInst *II, ConstraintInfo &Info,
     Value *A = II->getArgOperand(0);
     Value *B = II->getArgOperand(1);
     auto *C = dyn_cast<ConstantInt>(B);
-    if (!C ||
-        !doesHoldInRange(Info, A,
-                         ConstantRange::makeGuaranteedNoWrapRegion(
-                             Instruction::Add, ConstantRange(C->getValue()),
-                             OverflowingBinaryOperator::NoSignedWrap),
-                         /*Signed=*/true))
+    if (!C || !doesHoldInRange(Info, A,
+                               ConstantRange::makeExactNoWrapRegion(
+                                   Instruction::Add, C->getValue(),
+                                   OverflowingBinaryOperator::NoSignedWrap),
+                               /*Signed=*/true))
       return false;
     return replaceOverflowUses(II, Instruction::Add, A, B, ToRemove);
   }
