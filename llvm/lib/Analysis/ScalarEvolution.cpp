@@ -16298,15 +16298,20 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
 
   // Let the rewriter preserve NUW/NSW flags if the unsigned/signed ranges of
   // the replacement expressions are contained in the ranges of the replaced
-  // expressions.
+  // expressions. Both flags are sticky once cleared, so stop as soon as
+  // neither can be preserved instead of computing ranges nothing reads.
   Guards.PreserveNUW = true;
   Guards.PreserveNSW = true;
   for (const SCEV *Expr : ExprsToRewrite) {
+    if (!Guards.PreserveNUW && !Guards.PreserveNSW)
+      break;
     const SCEV *RewriteTo = Guards.RewriteMap[Expr];
-    Guards.PreserveNUW &=
-        SE.getUnsignedRange(Expr).contains(SE.getUnsignedRange(RewriteTo));
-    Guards.PreserveNSW &=
-        SE.getSignedRange(Expr).contains(SE.getSignedRange(RewriteTo));
+    if (Guards.PreserveNUW)
+      Guards.PreserveNUW =
+          SE.getUnsignedRange(Expr).contains(SE.getUnsignedRange(RewriteTo));
+    if (Guards.PreserveNSW)
+      Guards.PreserveNSW =
+          SE.getSignedRange(Expr).contains(SE.getSignedRange(RewriteTo));
   }
 
   // Now that all rewrite information is collect, rewrite the collected
