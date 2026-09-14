@@ -1105,13 +1105,11 @@ void VPlanTransforms::optimizeInductionLiveOutUsers(
   DenseMap<VPValue *, VPValue *> EndValues;
   VPValue *ResumeTC =
       Plan.hasTailFolded() ? Plan.getTripCount() : &Plan.getVectorTripCount();
-  for (auto &Phi : VectorRegion->getEntryBasicBlock()->phis()) {
-    auto *WideIV = dyn_cast<VPWidenInductionRecipe>(&Phi);
-    if (!WideIV)
-      continue;
-    if (VPValue *EndValue =
-            tryToComputeEndValueForInduction(WideIV, VectorPHBuilder, ResumeTC))
-      EndValues[WideIV] = EndValue;
+  for (VPWidenInductionRecipe &WideIV : make_isa_range<VPWidenInductionRecipe>(
+           VectorRegion->getEntryBasicBlock()->phis())) {
+    if (VPValue *EndValue = tryToComputeEndValueForInduction(
+            &WideIV, VectorPHBuilder, ResumeTC))
+      EndValues[&WideIV] = EndValue;
   }
 
   VPBasicBlock *MiddleVPBB = Plan.getMiddleBlock();
@@ -4366,11 +4364,9 @@ void VPlanTransforms::adjustFirstOrderRecurrenceMiddleUsers(VPlan &Plan,
     return VF == ElementCount::getScalable(1);
   };
 
-  for (auto &HeaderPhi : VectorRegion->getEntryBasicBlock()->phis()) {
-    auto *FOR = dyn_cast<VPFirstOrderRecurrencePHIRecipe>(&HeaderPhi);
-    if (!FOR)
-      continue;
-
+  for (VPFirstOrderRecurrencePHIRecipe &FOR :
+       make_isa_range<VPFirstOrderRecurrencePHIRecipe>(
+           VectorRegion->getEntryBasicBlock()->phis())) {
     assert(VectorRegion->getSingleSuccessor() == Plan.getMiddleBlock() &&
            "Cannot handle loops with uncountable early exits");
 
@@ -4378,7 +4374,7 @@ void VPlanTransforms::adjustFirstOrderRecurrenceMiddleUsers(VPlan &Plan,
     // createHeaderPhiRecipes. All uses of FOR have already been replaced with
     // RecurSplice there; only RecurSplice itself still references FOR.
     auto *RecurSplice =
-        findUserOf<VPInstruction::FirstOrderRecurrenceSplice>(FOR);
+        findUserOf<VPInstruction::FirstOrderRecurrenceSplice>(&FOR);
     assert(RecurSplice && "expected FirstOrderRecurrenceSplice");
 
     // For VF vscale x 1, if vscale = 1, we are unable to extract the
