@@ -25,6 +25,7 @@ define void @unsigned_exit(ptr %guard.ptr, i1 %choose, i32 %start, i32 %limit, p
 ; CHECK-NEXT:    br i1 [[ENTER]], label %[[LOOP_PREHEADER:.*]], label %[[EXIT]]
 ; CHECK:       [[LOOP_PREHEADER]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = zext i32 [[START]] to i64
+; CHECK-NEXT:    [[WIDE_TRIP_COUNT:%.*]] = zext i32 [[LIMIT]] to i64
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ [[TMP0]], %[[LOOP_PREHEADER]] ], [ [[INDVARS_IV_NEXT:%.*]], %[[LATCH:.*]] ]
@@ -33,8 +34,7 @@ define void @unsigned_exit(ptr %guard.ptr, i1 %choose, i32 %start, i32 %limit, p
 ; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add nuw nsw i64 [[INDVARS_IV]], 1
 ; CHECK-NEXT:    [[ADDR:%.*]] = getelementptr i8, ptr [[OUT]], i64 [[INDVARS_IV]]
 ; CHECK-NEXT:    store i8 0, ptr [[ADDR]], align 1
-; CHECK-NEXT:    [[LFTR_WIDEIV:%.*]] = trunc i64 [[INDVARS_IV_NEXT]] to i32
-; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp ne i32 [[LFTR_WIDEIV]], [[LIMIT]]
+; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp ne i64 [[INDVARS_IV_NEXT]], [[WIDE_TRIP_COUNT]]
 ; CHECK-NEXT:    br i1 [[EXITCOND]], label %[[LOOP]], label %[[EXIT_LOOPEXIT]]
 ; CHECK:       [[EXIT_LOOPEXIT]]:
 ; CHECK-NEXT:    br label %[[EXIT]]

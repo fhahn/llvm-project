@@ -233,12 +233,6 @@ static cl::opt<unsigned> MaxGuardDomTreeSteps(
              "conditions, once the unique-predecessor climb ran out"),
     cl::init(8));
 
-static cl::opt<unsigned> MaxGuardDomTreeConds(
-    "scalar-evolution-max-guard-dom-tree-conds", cl::Hidden,
-    cl::desc("Maximum number of dominating branch conditions collected by the "
-             "dominator tree walk, once the unique-predecessor climb ran out"),
-    cl::init(1));
-
 static cl::opt<bool>
 ClassifyExpressions("scalar-evolution-classify-expressions",
     cl::Hidden, cl::init(true),
@@ -10948,35 +10942,32 @@ ScalarEvolution::getPredecessorWithUniqueSuccessorForBB(const BasicBlock *BB)
   return {nullptr, BB};
 }
 
-/// Returns true if a fact can be derived from \p Cond. Callers of
+/// Returns true if a fact can be derived from \p Cond. Both users of
 /// collectFromDominatingBranches only look at comparisons and logical
-/// combinations of them; a condition of any other shape is discarded again
-/// without deriving anything. Constants are kept, as an edge with a constant
-/// condition may be known to not be taken.
+/// combinations of them - isImpliedCond bails out on anything else, and
+/// LoopGuards drops it again while turning the collected terms into rewrites -
+/// so recognising them during the walk saves the edge-dominance query and the
+/// work below.
 static bool isUsableGuardCondition(const Value *Cond) {
-  return isa<ICmpInst, ConstantInt>(Cond) || match(Cond, m_LogicalAnd()) ||
+  return isa<ICmpInst>(Cond) || match(Cond, m_LogicalAnd()) ||
          match(Cond, m_LogicalOr());
 }
 
 /// Continue the search for conditions guarding \p BB after the cheap
 /// unique-predecessor climb ran out, by walking up the dominator tree from
-/// \p BB. A branch condition only holds at \p BB if the *taken edge* dominates
-/// \p BB, not merely the branching block. Only the previous node on \p BB's
-/// dominator chain can be the target of such an edge, so a single pointer
-/// comparison filters out all steps that cannot contribute (e.g. the head of a
-/// diamond), and an edge-dominance query is only needed at loop headers.
+/// \p BB, and append the ones a fact can be derived from to \p Terms, together
+/// with a flag indicating whether the condition is known to be true.
 ///
-/// \p ProcessCond is invoked for each condition a fact can be derived from,
-/// together with a flag indicating whether it is known to be true. The walk
-/// stops early and returns true if \p ProcessCond returns true. At most
-/// \p MaxConditions conditions are processed, independently of the number of
-/// dominator-tree steps.
-static bool
-collectFromDominatingBranches(const DominatorTree &DT, const LoopInfo &LI,
-                              const BasicBlock *BB, unsigned MaxConditions,
-                              function_ref<bool(Value *, bool)> ProcessCond) {
+/// A branch condition only holds at \p BB if the *taken edge* dominates \p BB,
+/// not merely the branching block. Only the previous node on \p BB's dominator
+/// chain can be the target of such an edge, so a single pointer comparison
+/// filters out all steps that cannot contribute (e.g. the head of a diamond),
+/// and an edge-dominance query is only needed at loop headers.
+static void collectFromDominatingBranches(
+    const DominatorTree &DT, const LoopInfo &LI, const BasicBlock *BB,
+    SmallVectorImpl<PointerIntPair<Value *, 1, bool>> &Terms) {
   const DomTreeNode *Node = DT.getNode(BB);
-  for (unsigned I = 0; Node && I != MaxGuardDomTreeSteps && MaxConditions; ++I) {
+  for (unsigned I = 0; Node && I != MaxGuardDomTreeSteps; ++I) {
     const BasicBlock *ChildBB = Node->getBlock();
     Node = Node->getIDom();
     if (!Node)
@@ -11001,11 +10992,8 @@ collectFromDominatingBranches(const DominatorTree &DT, const LoopInfo &LI,
         (!LI.isLoopHeader(ChildBB) ||
          !DT.dominates(BasicBlockEdge(Node->getBlock(), ChildBB), BB)))
       continue;
-    --MaxConditions;
-    if (ProcessCond(Br->getCondition(), EnterIfTrue))
-      return true;
+    Terms.emplace_back(Br->getCondition(), EnterIfTrue);
   }
-  return false;
 }
 
 /// SCEV structural equivalence is usually sufficient for testing whether two
@@ -12097,8 +12085,8 @@ bool ScalarEvolution::isBasicBlockEntryGuardedByCond(const BasicBlock *BB,
     PredBB = ContainingLoop->getLoopPredecessor();
   else
     PredBB = BB->getSinglePredecessor();
-  for (std::pair<const BasicBlock *, const BasicBlock *> Pair(PredBB, BB);
-       Pair.first; Pair = getPredecessorWithUniqueSuccessorForBB(Pair.first)) {
+  std::pair<const BasicBlock *, const BasicBlock *> Pair(PredBB, BB);
+  for (; Pair.first; Pair = getPredecessorWithUniqueSuccessorForBB(Pair.first)) {
     const CondBrInst *BlockEntryPredicate =
         dyn_cast<CondBrInst>(Pair.first->getTerminator());
     if (!BlockEntryPredicate)
@@ -12107,6 +12095,18 @@ bool ScalarEvolution::isBasicBlockEntryGuardedByCond(const BasicBlock *BB,
     if (ProveViaCond(BlockEntryPredicate->getCondition(),
                      BlockEntryPredicate->getSuccessor(0) != Pair.second))
       return true;
+  }
+
+  // If the climb above ran out of unique predecessors, keep looking for
+  // conditions that dominate the block we stopped at (and hence BB) via the
+  // dominator tree.
+  if (!Pair.first) {
+    SmallVector<PointerIntPair<Value *, 1, bool>> Terms;
+    collectFromDominatingBranches(DT, LI, Pair.second, Terms);
+    for (auto CondAndEnterIfTrue : Terms)
+      if (ProveViaCond(CondAndEnterIfTrue.getPointer(),
+                       !CondAndEnterIfTrue.getInt()))
+        return true;
   }
 
   // Check conditions due to any @llvm.assume intrinsics.
@@ -12121,15 +12121,19 @@ bool ScalarEvolution::isBasicBlockEntryGuardedByCond(const BasicBlock *BB,
       return true;
   }
 
-  // Check conditions due to any @llvm.experimental.guard intrinsics.
-  auto *GuardDecl = Intrinsic::getDeclarationIfExists(
-      F.getParent(), Intrinsic::experimental_guard);
-  if (GuardDecl)
-    for (const auto *GU : GuardDecl->users())
-      if (const auto *Guard = dyn_cast<IntrinsicInst>(GU))
-        if (Guard->getFunction() == BB->getParent() && DT.dominates(Guard, BB))
-          if (ProveViaCond(Guard->getArgOperand(0), false))
-            return true;
+  // Check conditions due to any @llvm.experimental.guard intrinsics. HasGuards
+  // is a cheap module-wide precondition for the lookup below, which otherwise
+  // searches the module symbol table on every call.
+  if (HasGuards) {
+    auto *GuardDecl = Intrinsic::getDeclarationIfExists(
+        F.getParent(), Intrinsic::experimental_guard);
+    if (GuardDecl)
+      for (const auto *GU : GuardDecl->users())
+        if (const auto *Guard = dyn_cast<IntrinsicInst>(GU))
+          if (Guard->getFunction() == BB->getParent() && DT.dominates(Guard, BB))
+            if (ProveViaCond(Guard->getArgOperand(0), false))
+              return true;
+  }
   return false;
 }
 
@@ -16293,14 +16297,12 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
 
   // If the climb above ran out of unique predecessors, keep looking for facts
   // that dominate the block we stopped at (and hence Block) via the dominator
-  // tree.
-  if (!Pair.first)
-    collectFromDominatingBranches(SE.DT, SE.LI, Pair.second,
-                                  MaxGuardDomTreeConds,
-                                  [&](Value *Cond, bool EnterIfTrue) {
-                                    Terms.emplace_back(Cond, EnterIfTrue);
-                                    return false;
-                                  });
+  // tree. Only do so for the top-level collection: the guards collected for a
+  // PHI's incoming blocks below are used exclusively to merge min/max
+  // constants for that PHI's incoming values, which conditions from further up
+  // the dominator tree do not contribute to.
+  if (!Pair.first && Depth == 0)
+    collectFromDominatingBranches(SE.DT, SE.LI, Pair.second, Terms);
 
   // Finally, if we stopped climbing the predecessor chain because
   // there wasn't a unique one to continue, try to collect conditions

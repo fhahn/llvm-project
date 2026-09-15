@@ -30,8 +30,7 @@ define void @signed_exit(i64 %a, i64 %b, i32 %start, i1 %choose, ptr %out) {
 ; CHECK-NEXT:    [[ADDR:%.*]] = getelementptr i8, ptr [[OUT]], i64 [[INDVARS_IV]]
 ; CHECK-NEXT:    store volatile i8 0, ptr [[ADDR]], align 1
 ; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add nsw i64 [[INDVARS_IV]], 1
-; CHECK-NEXT:    [[LFTR_WIDEIV:%.*]] = trunc i64 [[INDVARS_IV_NEXT]] to i32
-; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp ne i32 [[LFTR_WIDEIV]], 0
+; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp ne i64 [[INDVARS_IV_NEXT]], 0
 ; CHECK-NEXT:    br i1 [[EXITCOND]], label %[[LOOP]], label %[[EXIT_LOOPEXIT:.*]]
 ; CHECK:       [[EXIT_LOOPEXIT]]:
 ; CHECK-NEXT:    br label %[[EXIT]]
@@ -90,8 +89,7 @@ define void @signed_exit_past_unusable_cond(i64 %a, i64 %b, i32 %start, i1 %flag
 ; CHECK-NEXT:    [[ADDR:%.*]] = getelementptr i8, ptr [[OUT]], i64 [[INDVARS_IV]]
 ; CHECK-NEXT:    store volatile i8 0, ptr [[ADDR]], align 1
 ; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add nsw i64 [[INDVARS_IV]], 1
-; CHECK-NEXT:    [[LFTR_WIDEIV:%.*]] = trunc i64 [[INDVARS_IV_NEXT]] to i32
-; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp ne i32 [[LFTR_WIDEIV]], 0
+; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp ne i64 [[INDVARS_IV_NEXT]], 0
 ; CHECK-NEXT:    br i1 [[EXITCOND]], label %[[LOOP]], label %[[EXIT_LOOPEXIT:.*]]
 ; CHECK:       [[EXIT_LOOPEXIT]]:
 ; CHECK-NEXT:    br label %[[EXIT]]
