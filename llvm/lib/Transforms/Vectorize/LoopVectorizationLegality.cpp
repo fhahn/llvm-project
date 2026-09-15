@@ -721,35 +721,33 @@ void LoopVectorizationLegality::addInductionPhi(PHINode *Phi,
   assert((PhiTy->isIntOrPtrTy() || PhiTy->isFloatingPointTy()) &&
          "Expected int, ptr, or FP induction phi type");
 
-  // Get the widest type.
-  if (PhiTy->isIntOrPtrTy()) {
-    if (!WidestIndTy)
-      WidestIndTy = getInductionIntegerTy(DL, PhiTy);
-    else
-      WidestIndTy = getWiderInductionTy(DL, PhiTy, WidestIndTy);
-  }
+  // A phi that is also a fixed-order recurrence may be modeled as one when
+  // building the VPlan. The widest induction type and the primary induction
+  // determine the types of the canonical IV and the trip count, which are
+  // fixed before that choice is made, so only let phis that are certain to be
+  // modeled as inductions contribute to them.
+  if (!FixedOrderRecurrences.contains(Phi)) {
+    // Get the widest type.
+    if (PhiTy->isIntOrPtrTy()) {
+      if (!WidestIndTy)
+        WidestIndTy = getInductionIntegerTy(DL, PhiTy);
+      else
+        WidestIndTy = getWiderInductionTy(DL, PhiTy, WidestIndTy);
+    }
 
-  // Int inductions are special because we only allow one IV.
-  if (ID.getKind() == InductionDescriptor::IK_IntInduction &&
-      ID.getConstIntStepValue() && ID.getConstIntStepValue()->isOne() &&
-      isa<Constant>(ID.getStartValue()) &&
-      cast<Constant>(ID.getStartValue())->isNullValue()) {
+    // Int inductions are special because we only allow one IV.
+    if (ID.getKind() == InductionDescriptor::IK_IntInduction &&
+        ID.getConstIntStepValue() && ID.getConstIntStepValue()->isOne() &&
+        isa<Constant>(ID.getStartValue()) &&
+        cast<Constant>(ID.getStartValue())->isNullValue()) {
 
-    // Use the phi node with the widest type as induction. Use the last
-    // one if there are multiple (no good reason for doing this other
-    // than it is expedient). We've checked that it begins at zero and
-    // steps by one, so this is a canonical induction variable.
-    //
-    // Among equally wide candidates, prefer a phi that is not also a
-    // fixed-order recurrence: canVectorize() commits the primary induction to
-    // the induction model, and a phi that can be modeled as a recurrence
-    // instead should not be forced to pay the induction's runtime SCEV checks.
-    bool DisplacesEquallyWidePrimary =
-        PrimaryInduction && PrimaryInduction->getType() == PhiTy &&
-        FixedOrderRecurrences.contains(Phi);
-    if ((!PrimaryInduction || PhiTy == WidestIndTy) &&
-        !DisplacesEquallyWidePrimary)
-      PrimaryInduction = Phi;
+      // Use the phi node with the widest type as induction. Use the last
+      // one if there are multiple (no good reason for doing this other
+      // than it is expedient). We've checked that it begins at zero and
+      // steps by one, so this is a canonical induction variable.
+      if (!PrimaryInduction || PhiTy == WidestIndTy)
+        PrimaryInduction = Phi;
+    }
   }
 
   LLVM_DEBUG(dbgs() << "LV: Found an induction variable.\n");
@@ -923,12 +921,8 @@ bool LoopVectorizationLegality::canVectorizeInstr(Instruction &I) {
       FixedOrderRecurrences.insert(Phi);
 
     // As a last resort, coerce the PHI to an AddRec expression and re-try
-    // classifying it as an induction PHI. For a phi that is already a
-    // fixed-order recurrence, only do so if the runtime SCEV checks the AddRec
-    // may need are allowed: canVectorize() may commit it to the induction
-    // model, and without the checks the induction cannot be used at all.
-    bool IsPredIV = (!IsFOR || AllowRuntimeSCEVChecks) &&
-                    InductionDescriptor::isInductionPHI(Phi, TheLoop, PSE, ID,
+    // classifying it as an induction PHI.
+    bool IsPredIV = InductionDescriptor::isInductionPHI(Phi, TheLoop, PSE, ID,
                                                         /*Assume=*/true) &&
                     !IsDisallowedStridedPointerInduction(ID);
     if (IsPredIV)
@@ -1982,14 +1976,6 @@ bool LoopVectorizationLegality::canVectorize(bool UseVPlanNativePath) {
       }
     }
   }
-
-  // The canonical IV and the trip count are counted in the type of the primary
-  // induction, so a phi that is both a fixed-order recurrence and the primary
-  // induction has to be modeled as the latter; the choice is not
-  // createHeaderPhiRecipes' to make. This runs after
-  // isVectorizableEarlyExitLoop(), which rejects uncountable early-exit loops
-  // based on FixedOrderRecurrences.
-  FixedOrderRecurrences.erase(PrimaryInduction);
 
   // Go over each instruction and look at memory deps.
   if (!canVectorizeMemory()) {

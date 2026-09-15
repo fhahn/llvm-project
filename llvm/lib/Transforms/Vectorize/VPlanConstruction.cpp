@@ -959,24 +959,23 @@ bool VPlanTransforms::createHeaderPhiRecipes(
     VPValue *BackedgeValue = PhiR->getOperand(1);
 
     auto InductionIt = Inductions.find(Phi);
+    bool IsFOR = FixedOrderRecurrences.contains(Phi);
 
-    // A phi can be both a fixed-order recurrence and a predicated induction.
-    // Legality commits such a phi to the induction model if the canonical IV is
-    // shaped after it; any phi recorded as both here is free to be modeled
-    // either way. Prefer the induction when its predicates are already implied
-    // by the existing PSE predicates (e.g. from LAA), so it needs no extra
-    // runtime check, and keep the recurrence otherwise.
+    // A phi can be recorded both as a fixed-order recurrence and as a
+    // predicated induction, in which case it is free to be modeled either way.
+    // Prefer the induction when its predicates are already implied by the
+    // existing PSE predicates (e.g. from LAA), so it needs no extra runtime
+    // check, and keep the recurrence otherwise.
     if (InductionIt != Inductions.end() &&
-        (!FixedOrderRecurrences.contains(Phi) ||
-         all_of(InductionIt->second.getNoWrapPredicates(),
-                [&PSE](const SCEVPredicate *P) {
-                  return PSE.getPredicate().implies(P, *PSE.getSE());
-                })))
+        (!IsFOR || all_of(InductionIt->second.getNoWrapPredicates(),
+                          [&PSE](const SCEVPredicate *P) {
+                            return PSE.getPredicate().implies(P, *PSE.getSE());
+                          })))
       return createWidenInductionRecipe(Phi, PhiR, Start, InductionIt->second,
                                         Plan, PSE, OrigLoop,
                                         PhiR->getDebugLoc());
 
-    if (FixedOrderRecurrences.contains(Phi)) {
+    if (IsFOR) {
       // TODO: Currently fixed-order recurrences are modeled as chains of
       // first-order recurrences. If there are no users of the intermediate
       // recurrences in the chain, the fixed order recurrence should be
