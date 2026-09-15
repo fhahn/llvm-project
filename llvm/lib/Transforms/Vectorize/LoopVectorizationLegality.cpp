@@ -740,15 +740,15 @@ void LoopVectorizationLegality::addInductionPhi(PHINode *Phi,
     // than it is expedient). We've checked that it begins at zero and
     // steps by one, so this is a canonical induction variable.
     //
-    // Among equally wide candidates, prefer a phi that is not also a
-    // fixed-order recurrence: canVectorize() commits the primary induction to
-    // the induction model, and a phi that can be modeled as a recurrence
-    // instead should not be forced to pay the induction's runtime SCEV checks.
-    bool DisplacesEquallyWidePrimary =
-        PrimaryInduction && PrimaryInduction->getType() == PhiTy &&
-        FixedOrderRecurrences.contains(Phi);
-    if ((!PrimaryInduction || PhiTy == WidestIndTy) &&
-        !DisplacesEquallyWidePrimary)
+    // A phi that is also a fixed-order recurrence can be modeled either way
+    // when building the VPlan, but canVectorize() commits the primary
+    // induction to the induction model. Skip such a phi if its AddRec needs
+    // runtime SCEV checks, as those may not be allowed; VPlan construction
+    // then picks the cheaper of the two models. Leaving the primary induction
+    // unset only means a separate canonical IV is created.
+    bool ForcesSCEVChecks = !ID.getNoWrapPredicates().empty() &&
+                            FixedOrderRecurrences.contains(Phi);
+    if ((!PrimaryInduction || PhiTy == WidestIndTy) && !ForcesSCEVChecks)
       PrimaryInduction = Phi;
   }
 

@@ -74,12 +74,8 @@ for.end:
 }
 
 ; CHECK-LABEL: PR38786
-; %phi64 is both a fixed-order recurrence and a predicated induction. It is the
-; only induction of the widest type (%phi32 is i32), so it determines the type
-; of the canonical IV and is committed to the induction model, which is also
-; better codegen here.
-; CHECK: LV: Found uniform instruction:   %phi64 = phi i64 [ 0, %entry ], [ %i64next, %for.body ]
-; CHECK-NOT: FIRST-ORDER-RECURRENCE-PHI
+; Check that first order recurrence phis (%phi32 and %phi64) are not uniform.
+; CHECK-NOT: LV: Found uniform instruction:   %phi
 define void @PR38786(ptr %y, ptr %x, i64 %n) {
 entry:
   br label %for.body
