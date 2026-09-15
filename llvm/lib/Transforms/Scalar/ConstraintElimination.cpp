@@ -308,15 +308,22 @@ class ConstraintInfo {
 
   const DataLayout &DL;
 
+  /// Used to check that a value reaches a use only along edges on which a
+  /// checked operation it is derived from did not overflow.
+  const DominatorTree &DT;
+
 public:
-  ConstraintInfo(const DataLayout &DL, ArrayRef<Value *> FunctionArgs)
-      : UnsignedCS(FunctionArgs), SignedCS(FunctionArgs), DL(DL) {
+  ConstraintInfo(const DataLayout &DL, const DominatorTree &DT,
+                 ArrayRef<Value *> FunctionArgs)
+      : UnsignedCS(FunctionArgs), SignedCS(FunctionArgs), DL(DL), DT(DT) {
     auto &Value2Index = getValue2Index(false);
     // Add Arg > -1 constraints to unsigned system for all function arguments.
     for (Value *Arg : FunctionArgs)
       UnsignedCS.addRow({Entry(0, 0), Entry(-1, Value2Index.at(Arg))},
                         Value2Index.size());
   }
+
+  const DominatorTree &getDT() const { return DT; }
 
   DenseMap<Value *, unsigned> &getValue2Index(bool Signed) {
     return Signed ? SignedCS.getValue2Index() : UnsignedCS.getValue2Index();
@@ -582,6 +589,98 @@ static bool isKnownNoWrap(Value *V, const ConstraintInfo &Info, bool Signed) {
                          Signed);
 }
 
+/// If the value \p U carries into a phi is that phi, \p PN, advanced by a
+/// constant step that does not wrap in the system selected by \p IsSigned,
+/// return that step.
+static std::optional<APInt> matchNoWrapStep(const Use &U, const PHINode *PN,
+                                            const DominatorTree &DT,
+                                            bool IsSigned) {
+  Value *Inc = U.get();
+  const APInt *Step;
+  if (match(Inc, m_c_Add(m_Specific(PN), m_APInt(Step)))) {
+    auto *Add = cast<OverflowingBinaryOperator>(Inc);
+    if (IsSigned ? Add->hasNoSignedWrap() : Add->hasNoUnsignedWrap())
+      return *Step;
+    return std::nullopt;
+  }
+
+  // The value component of a checked add is the wrapped sum, but on an edge
+  // only taken when the addition did not overflow it is the exact sum. Where
+  // the extractvalue sits does not matter: this edge is the only way the value
+  // reaches the phi.
+  WithOverflowInst *WO;
+  if (!match(Inc, m_ExtractValue<0>(m_WithOverflowInst(WO))) ||
+      WO->getBinaryOp() != Instruction::Add || WO->isSigned() != IsSigned ||
+      WO->getLHS() != PN || !match(WO->getRHS(), m_APInt(Step)))
+    return std::nullopt;
+  for (User *Flag : WO->users()) {
+    if (!match(Flag, m_ExtractValue<1>(m_Value())))
+      continue;
+    for (User *FlagUser : cast<Instruction>(Flag)->users())
+      // The overflow flag is false on the branch's second successor.
+      if (auto *Br = dyn_cast<CondBrInst>(FlagUser))
+        if (DT.dominates(
+                BasicBlockEdge(Br->getParent(), Br->getSuccessor(1)), U))
+          return *Step;
+  }
+  return std::nullopt;
+}
+
+/// A phi taking another phi of the same block on its backedge holds that phi's
+/// value from the previous iteration, so with a constant step the two differ by
+/// it and %delayed below decomposes as `%iv - 32`:
+///
+///   %delayed = phi i64 [ 0, %ph ],  [ %iv, %latch ]
+///   %iv      = phi i64 [ 32, %ph ], [ %iv.next, %latch ]
+///   %iv.next = add nsw i64 %iv, 32
+///
+/// That is what a rotated loop leaves behind when its exit condition tests the
+/// next iteration's value, and it hands what the latch establishes about %iv to
+/// everything derived from %delayed.
+///
+/// Nothing inductive is needed: on the backedge %delayed takes the previous %iv
+/// while %iv takes that same value plus the step, and on the entry edge the
+/// start values differ by the step, so the relation holds however the block was
+/// reached. Both phis are defined at the same point, so it holds at every use.
+static std::optional<Decomposition>
+decomposeDelayedPhi(Value *V, const ConstraintInfo &Info, bool IsSigned) {
+  auto *Delayed = dyn_cast<PHINode>(V);
+  if (!Delayed || Delayed->getNumIncomingValues() != 2)
+    return std::nullopt;
+
+  for (unsigned Back : {0, 1}) {
+    auto *IV = dyn_cast<PHINode>(Delayed->getIncomingValue(Back));
+    if (!IV || IV == Delayed || IV->getParent() != Delayed->getParent())
+      continue;
+    int BackIdx = IV->getBasicBlockIndex(Delayed->getIncomingBlock(Back));
+    int EntryIdx = IV->getBasicBlockIndex(Delayed->getIncomingBlock(!Back));
+    if (BackIdx < 0 || EntryIdx < 0)
+      continue;
+
+    auto Step =
+        matchNoWrapStep(IV->getOperandUse(BackIdx), IV, Info.getDT(), IsSigned);
+    const APInt *Start, *IVStart;
+    if (!Step || !match(Delayed->getIncomingValue(!Back), m_APInt(Start)) ||
+        !match(IV->getIncomingValue(EntryIdx), m_APInt(IVStart)))
+      continue;
+
+    // The start values have to be apart by the step as well, without wrapping.
+    bool Overflow;
+    APInt EntryDiff = IsSigned ? IVStart->ssub_ov(*Step, Overflow)
+                               : IVStart->usub_ov(*Step, Overflow);
+    if (Overflow || EntryDiff != *Start)
+      continue;
+
+    // Negating the step must not overrun the coefficient width.
+    if (IsSigned ? !Step->isSignedIntN(63) : !Step->isIntN(63))
+      continue;
+    int64_t StepVal =
+        IsSigned ? Step->getSExtValue() : int64_t(Step->getZExtValue());
+    return Decomposition(-StepVal, {DecompEntry(1, IV)});
+  }
+  return std::nullopt;
+}
+
 static Decomposition decomposeGEP(GEPOperator &GEP, const ConstraintInfo &Info,
                                   bool IsSigned, const DataLayout &DL) {
   // Do not reason about pointers where the index size is larger than 64 bits,
@@ -655,6 +754,11 @@ static Decomposition decompose(Value *V, const ConstraintInfo &Info,
   // would not.
   if (!Ty->isIntegerTy() || Ty->getIntegerBitWidth() > 64)
     return V;
+
+  // A phi holding another phi of the same block from the previous iteration is
+  // that phi plus a constant.
+  if (auto Decomp = decomposeDelayedPhi(V, Info, IsSigned))
+    return *Decomp;
 
   if (auto *CI = dyn_cast<ConstantInt>(V)) {
     if (IsSigned) {
@@ -2238,7 +2342,7 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
   bool Changed = false;
   DT.updateDFSNumbers();
   SmallVector<Value *> FunctionArgs(llvm::make_pointer_range(F.args()));
-  ConstraintInfo Info(F.getDataLayout(), FunctionArgs);
+  ConstraintInfo Info(F.getDataLayout(), DT, FunctionArgs);
   State S(DT, LI, SE, TLI);
   std::unique_ptr<Module> ReproducerModule(
       DumpReproducers ? new Module(F.getName(), F.getContext()) : nullptr);
