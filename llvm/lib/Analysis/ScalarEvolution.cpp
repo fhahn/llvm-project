@@ -599,6 +599,17 @@ static int CompareValueComplexity(const LoopInfo *const LI, Value *LV,
     return (int)LArgNo - (int)RArgNo;
   }
 
+  // Sort integer constants by their value.
+  if (const auto *LCI = dyn_cast<ConstantInt>(LV)) {
+    const APInt &LA = LCI->getValue(), &RA = cast<ConstantInt>(RV)->getValue();
+    unsigned LBitWidth = LA.getBitWidth(), RBitWidth = RA.getBitWidth();
+    if (LBitWidth != RBitWidth)
+      return (int)LBitWidth - (int)RBitWidth;
+    if (LA == RA)
+      return 0;
+    return LA.ult(RA) ? -1 : 1;
+  }
+
   if (const auto *LGV = dyn_cast<GlobalValue>(LV)) {
     const auto *RGV = cast<GlobalValue>(RV);
 

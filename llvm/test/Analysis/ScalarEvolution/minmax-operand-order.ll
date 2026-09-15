@@ -18,9 +18,9 @@ define i32 @smax_operand_order_calls_with_different_constants(ptr %p) {
 ; CHECK-NEXT:    %max.1 = call i32 @llvm.smax.i32(i32 %x, i32 %y)
 ; CHECK-NEXT:    --> (%x smax %y) U: full-set S: full-set
 ; CHECK-NEXT:    %max.2 = call i32 @llvm.smax.i32(i32 %y, i32 %x)
-; CHECK-NEXT:    --> (%y smax %x) U: full-set S: full-set
+; CHECK-NEXT:    --> (%x smax %y) U: full-set S: full-set
 ; CHECK-NEXT:    %sub = sub i32 %max.1, %max.2
-; CHECK-NEXT:    --> ((-1 * (%y smax %x)) + (%x smax %y)) U: full-set S: full-set
+; CHECK-NEXT:    --> 0 U: [0,1) S: [0,1)
 ; CHECK-NEXT:  Determining loop execution counts for: @smax_operand_order_calls_with_different_constants
 ;
 entry:
@@ -42,9 +42,9 @@ define i32 @umin_operand_order_calls_with_different_constants(ptr %p) {
 ; CHECK-NEXT:    %min.1 = call i32 @llvm.umin.i32(i32 %x, i32 %y)
 ; CHECK-NEXT:    --> (%x umin %y) U: full-set S: full-set
 ; CHECK-NEXT:    %min.2 = call i32 @llvm.umin.i32(i32 %y, i32 %x)
-; CHECK-NEXT:    --> (%y umin %x) U: full-set S: full-set
+; CHECK-NEXT:    --> (%x umin %y) U: full-set S: full-set
 ; CHECK-NEXT:    %sub = sub i32 %min.1, %min.2
-; CHECK-NEXT:    --> ((-1 * (%y umin %x)) + (%x umin %y)) U: full-set S: full-set
+; CHECK-NEXT:    --> 0 U: [0,1) S: [0,1)
 ; CHECK-NEXT:  Determining loop execution counts for: @umin_operand_order_calls_with_different_constants
 ;
 entry:
@@ -67,9 +67,9 @@ define i32 @smax_operand_order_negative_constant(ptr %p) {
 ; CHECK-NEXT:    %max.1 = call i32 @llvm.smax.i32(i32 %x, i32 %y)
 ; CHECK-NEXT:    --> (%x smax %y) U: full-set S: full-set
 ; CHECK-NEXT:    %max.2 = call i32 @llvm.smax.i32(i32 %y, i32 %x)
-; CHECK-NEXT:    --> (%y smax %x) U: full-set S: full-set
+; CHECK-NEXT:    --> (%x smax %y) U: full-set S: full-set
 ; CHECK-NEXT:    %sub = sub i32 %max.1, %max.2
-; CHECK-NEXT:    --> ((-1 * (%y smax %x)) + (%x smax %y)) U: full-set S: full-set
+; CHECK-NEXT:    --> 0 U: [0,1) S: [0,1)
 ; CHECK-NEXT:  Determining loop execution counts for: @smax_operand_order_negative_constant
 ;
 entry:
