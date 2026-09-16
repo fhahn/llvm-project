@@ -461,6 +461,15 @@ struct OffsetResult {
       : BasePtr(GEP.getPointerOperand()), NW(GEP.getNoWrapFlags()) {
     ConstantOffset = APInt(DL.getIndexTypeSizeInBits(BasePtr->getType()), 0);
   }
+
+  /// Returns true if the collected offsets are added to BasePtr without
+  /// unsigned wrap, provided any variable offsets are non-negative: either the
+  /// GEP is nuw, or it is nusw with a non-negative constant offset, which
+  /// implies nuw.
+  bool canDecompose() const {
+    return BasePtr && NW != GEPNoWrapFlags::none() &&
+           (NW.hasNoUnsignedSignedWrap() || !ConstantOffset.isNegative());
+  }
 };
 } // namespace
 
@@ -588,36 +597,94 @@ static bool isKnownNoWrap(Value *V, const ConstraintInfo &Info, bool Signed) {
                          Signed);
 }
 
-/// If the value \p U carries into a phi is that phi, \p PN, advanced by a
-/// constant step that does not wrap in the system selected by \p IsSigned,
-/// return that step. The step must be exact on every iteration, so only flags
-/// on the stepping instruction and the CFG may be used, not the systems.
-static std::optional<APInt> matchNoWrapStep(const Use &U, const PHINode *PN,
-                                            const DominatorTree &DT,
-                                            bool IsSigned) {
+/// Convert \p C, interpreted as signed if \p IsSigned, to a constant offset for
+/// the constraint systems, or nullopt if it does not fit. A bit of headroom is
+/// kept so offsets can still be negated and subtracted.
+static std::optional<int64_t> toOffset(const APInt &C, bool IsSigned) {
+  if (IsSigned ? !C.isSignedIntN(63) : !C.isIntN(63))
+    return std::nullopt;
+  return IsSigned ? C.getSExtValue() : int64_t(C.getZExtValue());
+}
+
+/// Split \p V into a base value plus a constant offset that is exact in the
+/// system selected by \p IsSigned, or \p V itself with offset 0 if no such
+/// split can be established. The base is null if \p V is a constant.
+///
+/// Only flags on the instructions involved may be used. Unlike decompose(),
+/// which may look through an operation because the current query point implies
+/// it does not wrap, the result here has to hold wherever \p V is evaluated.
+static std::pair<Value *, int64_t>
+splitConstantOffset(Value *V, bool IsSigned, const DataLayout &DL) {
+  if (V->getType()->isPointerTy()) {
+    assert(!IsSigned && "pointers are only decomposed for unsigned predicates");
+    auto *GEP = dyn_cast<GEPOperator>(V);
+    if (!GEP)
+      return {V, 0};
+    // Only a constant offset is a step; a variable one would need the systems.
+    const OffsetResult Res = collectOffsets(*GEP, DL);
+    if (!Res.canDecompose() || !Res.VariableOffsets.empty())
+      return {V, 0};
+    // A GEP's constant offset is signed, even in the unsigned system.
+    if (auto Offset = toOffset(Res.ConstantOffset, /*IsSigned=*/true))
+      return {Res.BasePtr, *Offset};
+    return {V, 0};
+  }
+
+  const APInt *C;
+  Value *Op;
+  if (IsSigned ? match(V, m_c_NSWAdd(m_Value(Op), m_APInt(C)))
+               : match(V, m_c_NUWAdd(m_Value(Op), m_APInt(C)))) {
+    if (auto Offset = toOffset(*C, IsSigned))
+      return {Op, *Offset};
+  } else if (match(V, m_APInt(C))) {
+    if (auto Offset = toOffset(*C, IsSigned))
+      return {nullptr, *Offset};
+  }
+  return {V, 0};
+}
+
+/// Return the constant C with \p A == \p B + C, using only instruction flags,
+/// or nullopt if no such C can be established.
+static std::optional<int64_t> matchConstantDifference(Value *A, Value *B,
+                                                      bool IsSigned,
+                                                      const DataLayout &DL) {
+  auto [BaseA, OffsetA] = splitConstantOffset(A, IsSigned, DL);
+  auto [BaseB, OffsetB] = splitConstantOffset(B, IsSigned, DL);
+  int64_t Diff;
+  if (BaseA != BaseB || SubOverflow(OffsetA, OffsetB, Diff))
+    return std::nullopt;
+  return Diff;
+}
+
+/// If \p U carries \p PN advanced by a constant step into a phi, and that step
+/// is known not to wrap in the system selected by \p IsSigned, return it.
+static std::optional<int64_t> matchNoWrapStep(const Use &U, PHINode *PN,
+                                              const DominatorTree &DT,
+                                              bool IsSigned,
+                                              const DataLayout &DL) {
   Value *Inc = U.get();
-  const APInt *Step;
-  if (IsSigned ? match(Inc, m_c_NSWAdd(m_Specific(PN), m_APInt(Step)))
-               : match(Inc, m_c_NUWAdd(m_Specific(PN), m_APInt(Step))))
-    return *Step;
+  auto [Base, Offset] = splitConstantOffset(Inc, IsSigned, DL);
+  if (Base == PN)
+    return Offset;
 
   // The value component of a checked add is the wrapped sum, but on an edge
   // only taken when the addition did not overflow it is the exact sum.
+  const APInt *StepOffset;
   WithOverflowInst *WO;
   if (!match(Inc, m_ExtractValue<0>(m_WithOverflowInst(WO))) ||
       WO->getBinaryOp() != Instruction::Add || WO->isSigned() != IsSigned ||
-      WO->getLHS() != PN || !match(WO->getRHS(), m_APInt(Step)))
+      WO->getLHS() != PN || !match(WO->getRHS(), m_APInt(StepOffset)))
     return std::nullopt;
-  for (User *Flag : WO->users()) {
-    if (!match(Flag, m_ExtractValue<1>(m_Value())))
-      continue;
-    for (User *FlagUser : Flag->users())
-      // The overflow flag is false on the branch's false successor.
-      if (auto *Br = dyn_cast<CondBrInst>(FlagUser))
-        if (DT.dominates(BasicBlockEdge(Br->getParent(), Br->getSuccessor(1)),
-                         U))
-          return *Step;
-  }
+
+  // The overflow flag is false on the branch's false successor.
+  auto IsNoOverflowEdge = [&](const User *FlagUser) {
+    const auto *Br = dyn_cast<CondBrInst>(FlagUser);
+    return Br && DT.dominates({Br->getParent(), Br->getSuccessor(1)}, U);
+  };
+  for (User *Flag : WO->users())
+    if (match(Flag, m_ExtractValue<1>(m_Value())) &&
+        any_of(Flag->users(), IsNoOverflowEdge))
+      return toOffset(*StepOffset, IsSigned);
   return std::nullopt;
 }
 
@@ -629,46 +696,44 @@ static std::optional<APInt> matchNoWrapStep(const Use &U, const PHINode *PN,
 ///   %iv      = phi i64 [ 32, %ph ], [ %iv.next, %latch ]
 ///   %iv.next = add nsw i64 %iv, 32
 ///
+/// The step may also be a constant-offset GEP, and the start values only have
+/// to be a constant apart.
+///
 /// Nothing inductive is needed: on the backedge %delayed takes the previous %iv
 /// while %iv takes that same value plus the step, and on the entry edge the
 /// start values differ by the step. Both phis are defined at the same point, so
 /// the relation holds at every use.
 static std::optional<Decomposition>
-decomposeDelayedPhi(Value *V, const DominatorTree &DT, bool IsSigned) {
+decomposeDelayedPhi(Value *V, const DominatorTree &DT, bool IsSigned,
+                    const DataLayout &DL) {
   auto *Delayed = dyn_cast<PHINode>(V);
   if (!Delayed || Delayed->getNumIncomingValues() != 2)
     return std::nullopt;
 
   for (unsigned Back : {0, 1}) {
-    BasicBlock *BackBB = Delayed->getIncomingBlock(Back);
-    BasicBlock *EntryBB = Delayed->getIncomingBlock(1 - Back);
     auto *IV = dyn_cast<PHINode>(Delayed->getIncomingValue(Back));
     if (!IV || IV == Delayed || IV->getParent() != Delayed->getParent())
       continue;
-    // IV's incoming value on BackBB is derived from IV, so BackBB really is a
-    // backedge.
-    int BackIdx = IV->getBasicBlockIndex(BackBB);
-    assert(BackIdx >= 0 && "phis of a block share its predecessors");
+    // IV's incoming value on Delayed's Back predecessor is derived from IV, so
+    // that predecessor really is a backedge.
+    int BackIdx = IV->getBasicBlockIndex(Delayed->getIncomingBlock(Back));
+    assert(BackIdx >= 0 && IV->getNumIncomingValues() == 2 &&
+           "phis of a block share its predecessors");
 
-    auto Step = matchNoWrapStep(IV->getOperandUse(BackIdx), IV, DT, IsSigned);
-    const APInt *Start, *IVStart;
-    if (!Step || !match(Delayed->getIncomingValue(1 - Back), m_APInt(Start)) ||
-        !match(IV->getIncomingValueForBlock(EntryBB), m_APInt(IVStart)))
+    auto Step =
+        matchNoWrapStep(IV->getOperandUse(BackIdx), IV, DT, IsSigned, DL);
+    if (!Step)
       continue;
 
-    // The start values have to be apart by the step as well, without wrapping.
-    bool Overflow;
-    APInt EntryDiff = IsSigned ? IVStart->ssub_ov(*Step, Overflow)
-                               : IVStart->usub_ov(*Step, Overflow);
-    if (Overflow || EntryDiff != *Start)
+    // The start values have to be apart by the step as well.
+    auto EntryDiff = matchConstantDifference(
+        Delayed->getIncomingValue(1 - Back), IV->getIncomingValue(1 - BackIdx),
+        IsSigned, DL);
+    if (!EntryDiff || *EntryDiff != -*Step)
       continue;
 
-    // Negating the step must not overrun the coefficient width.
-    if (IsSigned ? !Step->isSignedIntN(63) : !Step->isIntN(63))
-      continue;
-    int64_t StepVal =
-        IsSigned ? Step->getSExtValue() : int64_t(Step->getZExtValue());
-    return Decomposition(-StepVal, {DecompEntry(1, IV)});
+    // IV is left as a variable; a chain of delayed phis is not followed.
+    return Decomposition(-*Step, DecompEntry(1, IV));
   }
   return std::nullopt;
 }
@@ -682,17 +747,10 @@ static Decomposition decomposeGEP(GEPOperator &GEP, const ConstraintInfo &Info,
 
   assert(!IsSigned && "The logic below only supports decomposition for "
                       "unsigned predicates at the moment.");
-  const auto &[BasePtr, ConstantOffset, VariableOffsets, NW] =
-      collectOffsets(GEP, DL);
-  // We support either plain gep nuw, or gep nusw with non-negative offset,
-  // which implies gep nuw.
-  if (!BasePtr || NW == GEPNoWrapFlags::none())
+  const OffsetResult Res = collectOffsets(GEP, DL);
+  if (!Res.canDecompose())
     return &GEP;
-
-  // For a nuw-only GEP (nuw without nusw/inbounds), the offset must be
-  // interpreted as unsigned.
-  if (!NW.hasNoUnsignedSignedWrap() && ConstantOffset.isNegative())
-    return &GEP;
+  const auto &[BasePtr, ConstantOffset, VariableOffsets, NW] = Res;
 
   Decomposition Result(ConstantOffset.getSExtValue(), DecompEntry(1, BasePtr));
   for (auto [Index, Scale] : VariableOffsets) {
@@ -737,6 +795,8 @@ static Decomposition decompose(Value *V, const ConstraintInfo &Info,
       return decomposeGEP(*GEP, Info, IsSigned, DL);
     if (isa<ConstantPointerNull>(V))
       return int64_t(0);
+    if (auto Decomp = decomposeDelayedPhi(V, Info.getDT(), IsSigned, DL))
+      return *Decomp;
 
     return V;
   }
@@ -749,7 +809,7 @@ static Decomposition decompose(Value *V, const ConstraintInfo &Info,
 
   // A phi holding another phi of the same block from the previous iteration is
   // that phi plus a constant.
-  if (auto Decomp = decomposeDelayedPhi(V, Info.getDT(), IsSigned))
+  if (auto Decomp = decomposeDelayedPhi(V, Info.getDT(), IsSigned, DL))
     return *Decomp;
 
   if (auto *CI = dyn_cast<ConstantInt>(V)) {

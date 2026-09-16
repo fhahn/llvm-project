@@ -351,3 +351,155 @@ trap:
   call void @llvm.trap()
   unreachable
 }
+
+; The start values do not have to be constants, only a constant apart.
+define i1 @nonconstant_start(i64 %n) {
+; CHECK-LABEL: define i1 @nonconstant_start(
+; CHECK-SAME: i64 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[N1:%.*]] = add nuw i64 [[N]], 1
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[N1]], %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LATCH:.*]] ]
+; CHECK-NEXT:    [[DELAYED:%.*]] = phi i64 [ [[N]], %[[ENTRY]] ], [ [[IV]], %[[LATCH]] ]
+; CHECK-NEXT:    br i1 true, label %[[LATCH]], label %[[EXIT:.*]]
+; CHECK:       [[LATCH]]:
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw i64 [[IV]], 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], 100
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret i1 true
+;
+entry:
+  %n1 = add nuw i64 %n, 1
+  br label %loop
+
+loop:
+  %iv = phi i64 [ %n1, %entry ], [ %iv.next, %latch ]
+  %delayed = phi i64 [ %n, %entry ], [ %iv, %latch ]
+  %c = icmp ult i64 %delayed, %iv
+  br i1 %c, label %latch, label %exit
+
+latch:
+  %iv.next = add nuw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, 100
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret i1 %c
+}
+
+; Negative test: the start values are 2 apart while the step is 1.
+define i1 @negative_nonconstant_start_mismatch(i64 %n) {
+; CHECK-LABEL: define i1 @negative_nonconstant_start_mismatch(
+; CHECK-SAME: i64 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[N2:%.*]] = add nuw i64 [[N]], 2
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[N2]], %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LATCH:.*]] ]
+; CHECK-NEXT:    [[DELAYED:%.*]] = phi i64 [ [[N]], %[[ENTRY]] ], [ [[IV]], %[[LATCH]] ]
+; CHECK-NEXT:    [[C:%.*]] = icmp ult i64 [[DELAYED]], [[IV]]
+; CHECK-NEXT:    br i1 [[C]], label %[[LATCH]], label %[[EXIT:.*]]
+; CHECK:       [[LATCH]]:
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw i64 [[IV]], 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], 100
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret i1 [[C]]
+;
+entry:
+  %n2 = add nuw i64 %n, 2
+  br label %loop
+
+loop:
+  %iv = phi i64 [ %n2, %entry ], [ %iv.next, %latch ]
+  %delayed = phi i64 [ %n, %entry ], [ %iv, %latch ]
+  %c = icmp ult i64 %delayed, %iv
+  br i1 %c, label %latch, label %exit
+
+latch:
+  %iv.next = add nuw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, 100
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret i1 %c
+}
+
+; A pointer phi stepped by a GEP with a constant offset, as left behind by the
+; libc++ insertion sort inner loop: %j always trails %k by one element.
+define i1 @ptr_gep_step(ptr %first, ptr %end) {
+; CHECK-LABEL: define i1 @ptr_gep_step(
+; CHECK-SAME: ptr [[FIRST:%.*]], ptr [[END:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[FIRST_NEXT:%.*]] = getelementptr inbounds nuw i8, ptr [[FIRST]], i64 12
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[K:%.*]] = phi ptr [ [[FIRST]], %[[ENTRY]] ], [ [[K_NEXT:%.*]], %[[LATCH:.*]] ]
+; CHECK-NEXT:    [[J:%.*]] = phi ptr [ [[FIRST_NEXT]], %[[ENTRY]] ], [ [[K]], %[[LATCH]] ]
+; CHECK-NEXT:    br i1 true, label %[[LATCH]], label %[[EXIT:.*]]
+; CHECK:       [[LATCH]]:
+; CHECK-NEXT:    [[K_NEXT]] = getelementptr inbounds i8, ptr [[K]], i64 -12
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq ptr [[K_NEXT]], [[END]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret i1 true
+;
+entry:
+  %first.next = getelementptr inbounds nuw i8, ptr %first, i64 12
+  br label %loop
+
+loop:
+  %k = phi ptr [ %first, %entry ], [ %k.next, %latch ]
+  %j = phi ptr [ %first.next, %entry ], [ %k, %latch ]
+  %c = icmp ugt ptr %j, %k
+  br i1 %c, label %latch, label %exit
+
+latch:
+  %k.next = getelementptr inbounds i8, ptr %k, i64 -12
+  %ec = icmp eq ptr %k.next, %end
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret i1 %c
+}
+
+; Negative test: the stepping GEP has no no-wrap flags, so it may wrap past the
+; end of the address space and %j is not %k + 12.
+define i1 @negative_ptr_gep_step_may_wrap(ptr %first, ptr %end) {
+; CHECK-LABEL: define i1 @negative_ptr_gep_step_may_wrap(
+; CHECK-SAME: ptr [[FIRST:%.*]], ptr [[END:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[FIRST_NEXT:%.*]] = getelementptr inbounds nuw i8, ptr [[FIRST]], i64 12
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[K:%.*]] = phi ptr [ [[FIRST]], %[[ENTRY]] ], [ [[K_NEXT:%.*]], %[[LATCH:.*]] ]
+; CHECK-NEXT:    [[J:%.*]] = phi ptr [ [[FIRST_NEXT]], %[[ENTRY]] ], [ [[K]], %[[LATCH]] ]
+; CHECK-NEXT:    [[C:%.*]] = icmp ugt ptr [[J]], [[K]]
+; CHECK-NEXT:    br i1 [[C]], label %[[LATCH]], label %[[EXIT:.*]]
+; CHECK:       [[LATCH]]:
+; CHECK-NEXT:    [[K_NEXT]] = getelementptr i8, ptr [[K]], i64 -12
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq ptr [[K_NEXT]], [[END]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret i1 [[C]]
+;
+entry:
+  %first.next = getelementptr inbounds nuw i8, ptr %first, i64 12
+  br label %loop
+
+loop:
+  %k = phi ptr [ %first, %entry ], [ %k.next, %latch ]
+  %j = phi ptr [ %first.next, %entry ], [ %k, %latch ]
+  %c = icmp ugt ptr %j, %k
+  br i1 %c, label %latch, label %exit
+
+latch:
+  %k.next = getelementptr i8, ptr %k, i64 -12
+  %ec = icmp eq ptr %k.next, %end
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret i1 %c
+}
