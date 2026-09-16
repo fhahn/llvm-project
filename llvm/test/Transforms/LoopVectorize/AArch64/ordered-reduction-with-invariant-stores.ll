@@ -105,3 +105,97 @@ loop:
 exit:
   ret void
 }
+
+; Multiple ordered reductions storing to distinct invariant addresses. The sunk
+; stores must keep their original relative order, as the addresses are only
+; known to be distinct via the runtime checks.
+define void @multiple_ordered_reductions_distinct_addresses(ptr %p0, ptr %p1, ptr %p2, ptr noalias readonly %src) {
+; CHECK-LABEL: define void @multiple_ordered_reductions_distinct_addresses(
+; CHECK-SAME: ptr [[P0:%.*]], ptr [[P1:%.*]], ptr [[P2:%.*]], ptr noalias readonly [[SRC:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    br label %[[VECTOR_MEMCHECK:.*]]
+; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[P0]], i64 4
+; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[P1]], i64 4
+; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[P2]], i64 4
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[P0]], [[SCEVGEP1]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[P1]], [[SCEVGEP]]
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    [[BOUND03:%.*]] = icmp ult ptr [[P0]], [[SCEVGEP2]]
+; CHECK-NEXT:    [[BOUND14:%.*]] = icmp ult ptr [[P2]], [[SCEVGEP]]
+; CHECK-NEXT:    [[FOUND_CONFLICT5:%.*]] = and i1 [[BOUND03]], [[BOUND14]]
+; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT5]]
+; CHECK-NEXT:    [[BOUND06:%.*]] = icmp ult ptr [[P1]], [[SCEVGEP2]]
+; CHECK-NEXT:    [[BOUND17:%.*]] = icmp ult ptr [[P2]], [[SCEVGEP1]]
+; CHECK-NEXT:    [[FOUND_CONFLICT8:%.*]] = and i1 [[BOUND06]], [[BOUND17]]
+; CHECK-NEXT:    [[CONFLICT_RDX9:%.*]] = or i1 [[CONFLICT_RDX]], [[FOUND_CONFLICT8]]
+; CHECK-NEXT:    br i1 [[CONFLICT_RDX9]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi float [ 0.000000e+00, %[[VECTOR_PH]] ], [ [[TMP3:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_PHI10:%.*]] = phi float [ 0.000000e+00, %[[VECTOR_PH]] ], [ [[TMP5:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_PHI11:%.*]] = phi float [ 0.000000e+00, %[[VECTOR_PH]] ], [ [[TMP7:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds float, ptr [[SRC]], i64 [[INDEX]]
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds float, ptr [[TMP0]], i64 2
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x float>, ptr [[TMP0]], align 4
+; CHECK-NEXT:    [[WIDE_LOAD12:%.*]] = load <2 x float>, ptr [[TMP1]], align 4
+; CHECK-NEXT:    [[TMP2:%.*]] = call float @llvm.vector.reduce.fadd.v2f32(float [[VEC_PHI]], <2 x float> [[WIDE_LOAD]])
+; CHECK-NEXT:    [[TMP3]] = call float @llvm.vector.reduce.fadd.v2f32(float [[TMP2]], <2 x float> [[WIDE_LOAD12]])
+; CHECK-NEXT:    [[TMP4:%.*]] = call float @llvm.vector.reduce.fadd.v2f32(float [[VEC_PHI10]], <2 x float> [[WIDE_LOAD]])
+; CHECK-NEXT:    [[TMP5]] = call float @llvm.vector.reduce.fadd.v2f32(float [[TMP4]], <2 x float> [[WIDE_LOAD12]])
+; CHECK-NEXT:    [[TMP6:%.*]] = call float @llvm.vector.reduce.fadd.v2f32(float [[VEC_PHI11]], <2 x float> [[WIDE_LOAD]])
+; CHECK-NEXT:    [[TMP7]] = call float @llvm.vector.reduce.fadd.v2f32(float [[TMP6]], <2 x float> [[WIDE_LOAD12]])
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; CHECK-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1000
+; CHECK-NEXT:    br i1 [[TMP8]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    store float [[TMP3]], ptr [[P2]], align 4, !alias.scope [[META7:![0-9]+]]
+; CHECK-NEXT:    store float [[TMP5]], ptr [[P1]], align 4, !alias.scope [[META10:![0-9]+]], !noalias [[META7]]
+; CHECK-NEXT:    store float [[TMP7]], ptr [[P0]], align 4, !alias.scope [[META12:![0-9]+]], !noalias [[META14:![0-9]+]]
+; CHECK-NEXT:    br label %[[EXIT:.*]]
+; CHECK:       [[SCALAR_PH]]:
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[C:%.*]] = phi float [ 0.000000e+00, %[[SCALAR_PH]] ], [ [[C_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[B:%.*]] = phi float [ 0.000000e+00, %[[SCALAR_PH]] ], [ [[B_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[A:%.*]] = phi float [ 0.000000e+00, %[[SCALAR_PH]] ], [ [[A_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[GEP:%.*]] = getelementptr inbounds float, ptr [[SRC]], i64 [[IV]]
+; CHECK-NEXT:    [[L:%.*]] = load float, ptr [[GEP]], align 4
+; CHECK-NEXT:    [[A_NEXT]] = fadd float [[A]], [[L]]
+; CHECK-NEXT:    store float [[A_NEXT]], ptr [[P0]], align 4
+; CHECK-NEXT:    [[B_NEXT]] = fadd float [[B]], [[L]]
+; CHECK-NEXT:    store float [[B_NEXT]], ptr [[P1]], align 4
+; CHECK-NEXT:    [[C_NEXT]] = fadd float [[C]], [[L]]
+; CHECK-NEXT:    store float [[C_NEXT]], ptr [[P2]], align 4
+; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], 1000
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP15:![0-9]+]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %c = phi float [ 0.000000e+00, %entry ], [ %c.next, %loop ]
+  %b = phi float [ 0.000000e+00, %entry ], [ %b.next, %loop ]
+  %a = phi float [ 0.000000e+00, %entry ], [ %a.next, %loop ]
+  %gep = getelementptr inbounds float, ptr %src, i64 %iv
+  %l = load float, ptr %gep, align 4
+  %a.next = fadd float %a, %l
+  store float %a.next, ptr %p0, align 4
+  %b.next = fadd float %b, %l
+  store float %b.next, ptr %p1, align 4
+  %c.next = fadd float %c, %l
+  store float %c.next, ptr %p2, align 4
+  %iv.next = add i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, 1000
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
