@@ -37,6 +37,21 @@ define i1 @srem_slt_divisor_bound(i32 noundef %x, i32 noundef %n, i32 noundef %m
   ret i1 %c
 }
 
+; The divisor is only known to be non-negative via ValueTracking, with no facts
+; about it in the constraint system. It cannot be zero, as srem by zero is UB.
+define i1 @srem_slt_divisor_bound_masked_divisor(i32 noundef %x, i32 noundef %a) {
+; CHECK-LABEL: define i1 @srem_slt_divisor_bound_masked_divisor(
+; CHECK-SAME: i32 noundef [[X:%.*]], i32 noundef [[A:%.*]]) {
+; CHECK-NEXT:    [[N:%.*]] = and i32 [[A]], 2147483647
+; CHECK-NEXT:    [[R:%.*]] = srem i32 [[X]], [[N]]
+; CHECK-NEXT:    ret i1 true
+;
+  %n = and i32 %a, 2147483647
+  %r = srem i32 %x, %n
+  %c = icmp slt i32 %r, %n
+  ret i1 %c
+}
+
 define i1 @srem_sle_dividend_bound(i32 noundef %x, i32 noundef %n, i32 noundef %limit) {
 ; CHECK-LABEL: define i1 @srem_sle_dividend_bound(
 ; CHECK-SAME: i32 noundef [[X:%.*]], i32 noundef [[N:%.*]], i32 noundef [[LIMIT:%.*]]) {
