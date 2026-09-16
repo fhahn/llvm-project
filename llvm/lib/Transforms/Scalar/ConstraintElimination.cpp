@@ -308,8 +308,7 @@ class ConstraintInfo {
 
   const DataLayout &DL;
 
-  /// Used to check that a value reaches a use only along edges on which a
-  /// checked operation it is derived from did not overflow.
+  /// Used for dominance queries while decomposing values.
   const DominatorTree &DT;
 
 public:
@@ -591,23 +590,19 @@ static bool isKnownNoWrap(Value *V, const ConstraintInfo &Info, bool Signed) {
 
 /// If the value \p U carries into a phi is that phi, \p PN, advanced by a
 /// constant step that does not wrap in the system selected by \p IsSigned,
-/// return that step.
+/// return that step. The step must be exact on every iteration, so only flags
+/// on the stepping instruction and the CFG may be used, not the systems.
 static std::optional<APInt> matchNoWrapStep(const Use &U, const PHINode *PN,
                                             const DominatorTree &DT,
                                             bool IsSigned) {
   Value *Inc = U.get();
   const APInt *Step;
-  if (match(Inc, m_c_Add(m_Specific(PN), m_APInt(Step)))) {
-    auto *Add = cast<OverflowingBinaryOperator>(Inc);
-    if (IsSigned ? Add->hasNoSignedWrap() : Add->hasNoUnsignedWrap())
-      return *Step;
-    return std::nullopt;
-  }
+  if (IsSigned ? match(Inc, m_c_NSWAdd(m_Specific(PN), m_APInt(Step)))
+               : match(Inc, m_c_NUWAdd(m_Specific(PN), m_APInt(Step))))
+    return *Step;
 
   // The value component of a checked add is the wrapped sum, but on an edge
-  // only taken when the addition did not overflow it is the exact sum. Where
-  // the extractvalue sits does not matter: this edge is the only way the value
-  // reaches the phi.
+  // only taken when the addition did not overflow it is the exact sum.
   WithOverflowInst *WO;
   if (!match(Inc, m_ExtractValue<0>(m_WithOverflowInst(WO))) ||
       WO->getBinaryOp() != Instruction::Add || WO->isSigned() != IsSigned ||
@@ -616,11 +611,11 @@ static std::optional<APInt> matchNoWrapStep(const Use &U, const PHINode *PN,
   for (User *Flag : WO->users()) {
     if (!match(Flag, m_ExtractValue<1>(m_Value())))
       continue;
-    for (User *FlagUser : cast<Instruction>(Flag)->users())
-      // The overflow flag is false on the branch's second successor.
+    for (User *FlagUser : Flag->users())
+      // The overflow flag is false on the branch's false successor.
       if (auto *Br = dyn_cast<CondBrInst>(FlagUser))
-        if (DT.dominates(
-                BasicBlockEdge(Br->getParent(), Br->getSuccessor(1)), U))
+        if (DT.dominates(BasicBlockEdge(Br->getParent(), Br->getSuccessor(1)),
+                         U))
           return *Step;
   }
   return std::nullopt;
@@ -634,34 +629,31 @@ static std::optional<APInt> matchNoWrapStep(const Use &U, const PHINode *PN,
 ///   %iv      = phi i64 [ 32, %ph ], [ %iv.next, %latch ]
 ///   %iv.next = add nsw i64 %iv, 32
 ///
-/// That is what a rotated loop leaves behind when its exit condition tests the
-/// next iteration's value, and it hands what the latch establishes about %iv to
-/// everything derived from %delayed.
-///
 /// Nothing inductive is needed: on the backedge %delayed takes the previous %iv
 /// while %iv takes that same value plus the step, and on the entry edge the
-/// start values differ by the step, so the relation holds however the block was
-/// reached. Both phis are defined at the same point, so it holds at every use.
+/// start values differ by the step. Both phis are defined at the same point, so
+/// the relation holds at every use.
 static std::optional<Decomposition>
-decomposeDelayedPhi(Value *V, const ConstraintInfo &Info, bool IsSigned) {
+decomposeDelayedPhi(Value *V, const DominatorTree &DT, bool IsSigned) {
   auto *Delayed = dyn_cast<PHINode>(V);
   if (!Delayed || Delayed->getNumIncomingValues() != 2)
     return std::nullopt;
 
   for (unsigned Back : {0, 1}) {
+    BasicBlock *BackBB = Delayed->getIncomingBlock(Back);
+    BasicBlock *EntryBB = Delayed->getIncomingBlock(1 - Back);
     auto *IV = dyn_cast<PHINode>(Delayed->getIncomingValue(Back));
     if (!IV || IV == Delayed || IV->getParent() != Delayed->getParent())
       continue;
-    int BackIdx = IV->getBasicBlockIndex(Delayed->getIncomingBlock(Back));
-    int EntryIdx = IV->getBasicBlockIndex(Delayed->getIncomingBlock(!Back));
-    if (BackIdx < 0 || EntryIdx < 0)
-      continue;
+    // IV's incoming value on BackBB is derived from IV, so BackBB really is a
+    // backedge.
+    int BackIdx = IV->getBasicBlockIndex(BackBB);
+    assert(BackIdx >= 0 && "phis of a block share its predecessors");
 
-    auto Step =
-        matchNoWrapStep(IV->getOperandUse(BackIdx), IV, Info.getDT(), IsSigned);
+    auto Step = matchNoWrapStep(IV->getOperandUse(BackIdx), IV, DT, IsSigned);
     const APInt *Start, *IVStart;
-    if (!Step || !match(Delayed->getIncomingValue(!Back), m_APInt(Start)) ||
-        !match(IV->getIncomingValue(EntryIdx), m_APInt(IVStart)))
+    if (!Step || !match(Delayed->getIncomingValue(1 - Back), m_APInt(Start)) ||
+        !match(IV->getIncomingValueForBlock(EntryBB), m_APInt(IVStart)))
       continue;
 
     // The start values have to be apart by the step as well, without wrapping.
@@ -757,7 +749,7 @@ static Decomposition decompose(Value *V, const ConstraintInfo &Info,
 
   // A phi holding another phi of the same block from the previous iteration is
   // that phi plus a constant.
-  if (auto Decomp = decomposeDelayedPhi(V, Info, IsSigned))
+  if (auto Decomp = decomposeDelayedPhi(V, Info.getDT(), IsSigned))
     return *Decomp;
 
   if (auto *CI = dyn_cast<ConstantInt>(V)) {

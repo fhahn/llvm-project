@@ -50,9 +50,7 @@ trap:
 }
 
 ; Same, with the step spelled as a checked add whose overflow flag branches away
-; from the backedge. The extractvalue sits in the guarding branch's own block,
-; which collectGuardedCheckedOps does not record; only the edge into the phi has
-; to be guarded here.
+; from the backedge.
 define void @delayed_phi_checked_add(i64 %count) {
 ; CHECK-LABEL: define void @delayed_phi_checked_add(
 ; CHECK-SAME: i64 [[COUNT:%.*]]) {
@@ -238,6 +236,111 @@ latch:
   %ov = extractvalue { i64, i1 } %s, 1
   store i1 %ov, ptr %p
   %iv.next = extractvalue { i64, i1 } %s, 0
+  %ec = icmp slt i64 %count, %iv.next
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+
+trap:
+  call void @llvm.trap()
+  unreachable
+}
+
+; The no-overflow edge is the backedge itself.
+define void @nooverflow_edge_is_backedge(i64 %count) {
+; CHECK-LABEL: define void @nooverflow_edge_is_backedge(
+; CHECK-SAME: i64 [[COUNT:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[DELAYED:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV:%.*]], %[[LATCH:.*]] ]
+; CHECK-NEXT:    [[IV]] = phi i64 [ 32, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LATCH]] ]
+; CHECK-NEXT:    [[EC:%.*]] = icmp sgt i64 [[IV]], [[COUNT]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[GUARD:.*]]
+; CHECK:       [[GUARD]]:
+; CHECK-NEXT:    br i1 true, label %[[LATCH]], label %[[TRAP:.*]]
+; CHECK:       [[LATCH]]:
+; CHECK-NEXT:    [[S:%.*]] = call { i64, i1 } @llvm.sadd.with.overflow.i64(i64 [[IV]], i64 32)
+; CHECK-NEXT:    [[OV:%.*]] = extractvalue { i64, i1 } [[S]], 1
+; CHECK-NEXT:    [[IV_NEXT]] = extractvalue { i64, i1 } [[S]], 0
+; CHECK-NEXT:    br i1 [[OV]], label %[[EXIT]], label %[[LOOP]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+; CHECK:       [[TRAP]]:
+; CHECK-NEXT:    call void @llvm.trap()
+; CHECK-NEXT:    unreachable
+;
+entry:
+  br label %loop
+
+loop:
+  %delayed = phi i64 [ 0, %entry ], [ %iv, %latch ]
+  %iv = phi i64 [ 32, %entry ], [ %iv.next, %latch ]
+  %ec = icmp sgt i64 %iv, %count
+  br i1 %ec, label %exit, label %guard
+
+guard:
+  %c = icmp slt i64 %delayed, %count
+  br i1 %c, label %latch, label %trap
+
+latch:
+  %s = call { i64, i1 } @llvm.sadd.with.overflow.i64(i64 %iv, i64 32)
+  %ov = extractvalue { i64, i1 } %s, 1
+  %iv.next = extractvalue { i64, i1 } %s, 0
+  br i1 %ov, label %exit, label %loop
+
+exit:
+  ret void
+
+trap:
+  call void @llvm.trap()
+  unreachable
+}
+
+; Negative test: the backedge is the edge on which the checked add did overflow.
+define void @negative_reversed_overflow_polarity(i64 %count) {
+; CHECK-LABEL: define void @negative_reversed_overflow_polarity(
+; CHECK-SAME: i64 [[COUNT:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[G:%.*]] = icmp sgt i64 [[COUNT]], 31
+; CHECK-NEXT:    br i1 [[G]], label %[[LOOP:.*]], label %[[EXIT:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[DELAYED:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV:%.*]], %[[LATCH:.*]] ]
+; CHECK-NEXT:    [[IV]] = phi i64 [ 32, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LATCH]] ]
+; CHECK-NEXT:    [[C:%.*]] = icmp ult i64 [[DELAYED]], [[COUNT]]
+; CHECK-NEXT:    br i1 [[C]], label %[[STEP:.*]], label %[[TRAP:.*]]
+; CHECK:       [[STEP]]:
+; CHECK-NEXT:    [[S:%.*]] = call { i64, i1 } @llvm.sadd.with.overflow.i64(i64 [[IV]], i64 32)
+; CHECK-NEXT:    [[OV:%.*]] = extractvalue { i64, i1 } [[S]], 1
+; CHECK-NEXT:    [[IV_NEXT]] = extractvalue { i64, i1 } [[S]], 0
+; CHECK-NEXT:    br i1 [[OV]], label %[[LATCH]], label %[[TRAP]]
+; CHECK:       [[LATCH]]:
+; CHECK-NEXT:    [[EC:%.*]] = icmp slt i64 [[COUNT]], [[IV_NEXT]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+; CHECK:       [[TRAP]]:
+; CHECK-NEXT:    call void @llvm.trap()
+; CHECK-NEXT:    unreachable
+;
+entry:
+  %g = icmp sgt i64 %count, 31
+  br i1 %g, label %loop, label %exit
+
+loop:
+  %delayed = phi i64 [ 0, %entry ], [ %iv, %latch ]
+  %iv = phi i64 [ 32, %entry ], [ %iv.next, %latch ]
+  %c = icmp ult i64 %delayed, %count
+  br i1 %c, label %step, label %trap
+
+step:
+  %s = call { i64, i1 } @llvm.sadd.with.overflow.i64(i64 %iv, i64 32)
+  %ov = extractvalue { i64, i1 } %s, 1
+  %iv.next = extractvalue { i64, i1 } %s, 0
+  br i1 %ov, label %latch, label %trap
+
+latch:
   %ec = icmp slt i64 %count, %iv.next
   br i1 %ec, label %exit, label %loop
 
