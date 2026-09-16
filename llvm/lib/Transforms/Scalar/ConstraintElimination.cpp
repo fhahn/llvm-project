@@ -548,9 +548,14 @@ static bool isKnownNoWrap(Instruction::BinaryOps Opcode, Value *Op0, Value *Op1,
     if (!Signed)
       return Info.doesHold(CmpInst::ICMP_UGE, Op0, Op1);
 
-    // Op0 - Op1 does not wrap signed if 0 <=s Op1 <=s Op0.
-    if (Info.isKnownNonNegative(Op1) &&
-        Info.doesHold(CmpInst::ICMP_SGE, Op0, Op1))
+    // Subtracting a non-negative Op1 can only decrease the result and
+    // subtracting a non-positive one can only increase it. In either case a
+    // matching bound on Op0 keeps the exact result in the signed range.
+    Constant *Zero = Constant::getNullValue(Op1->getType());
+    if ((Info.isKnownNonNegative(Op1) &&
+         Info.doesHold(CmpInst::ICMP_SGE, Op0, Op1)) ||
+        (Info.doesHold(CmpInst::ICMP_SLE, Op1, Zero) &&
+         Info.doesHold(CmpInst::ICMP_SLE, Op0, Op1)))
       return true;
   }
 
