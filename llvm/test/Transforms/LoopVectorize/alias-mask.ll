@@ -579,7 +579,13 @@ define i64 @any_of_reduction(i64 %a, ptr %src, ptr %dst, i32 %n) {
 ; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[SRC2]], 4
 ; CHECK-NEXT:    br label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
-; CHECK-NEXT:    [[TMP2:%.*]] = icmp slt i32 [[N]], 1
+; CHECK-NEXT:    [[TMP11:%.*]] = add i32 [[N]], -1
+; CHECK-NEXT:    [[MUL:%.*]] = call { i32, i1 } @llvm.umul.with.overflow.i32(i32 1, i32 [[TMP11]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i32, i1 } [[MUL]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i32, i1 } [[MUL]], 1
+; CHECK-NEXT:    [[TMP5:%.*]] = add i32 1, [[MUL_RESULT]]
+; CHECK-NEXT:    [[TMP12:%.*]] = icmp slt i32 [[TMP5]], 1
+; CHECK-NEXT:    [[TMP2:%.*]] = or i1 [[TMP12]], [[MUL_OVERFLOW]]
 ; CHECK-NEXT:    br i1 [[TMP2]], label %[[SCALAR_PH:.*]], label %[[VECTOR_CLAMPED_VF_CHECK:.*]]
 ; CHECK:       [[VECTOR_CLAMPED_VF_CHECK]]:
 ; CHECK-NEXT:    [[ALIAS_MASK:%.*]] = call <4 x i1> @llvm.loop.dependence.war.mask.v4i1.i64(i64 [[TMP1]], i64 [[TMP0]], i64 4)

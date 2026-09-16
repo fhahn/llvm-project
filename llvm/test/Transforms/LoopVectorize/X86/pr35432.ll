@@ -41,19 +41,24 @@ define i32 @main(ptr %ptr) {
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[TMP4]], 24
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_SCEVCHECK:%.*]]
 ; CHECK:       vector.scevcheck:
-; CHECK-NEXT:    [[TMP5:%.*]] = add i8 [[CONV3]], -1
-; CHECK-NEXT:    [[TMP6:%.*]] = zext i8 [[TMP5]] to i32
-; CHECK-NEXT:    [[UMIN:%.*]] = call i32 @llvm.umin.i32(i32 [[TMP0]], i32 [[TMP6]])
-; CHECK-NEXT:    [[TMP7:%.*]] = sub i32 [[TMP6]], [[UMIN]]
+; CHECK-NEXT:    [[TMP7:%.*]] = sub i32 [[TMP2]], [[UMIN1]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = trunc i32 [[TMP7]] to i8
-; CHECK-NEXT:    [[TMP9:%.*]] = sub i8 [[TMP5]], [[TMP8]]
-; CHECK-NEXT:    [[TMP10:%.*]] = icmp ugt i8 [[TMP9]], [[TMP5]]
+; CHECK-NEXT:    [[MUL:%.*]] = call { i8, i1 } @llvm.umul.with.overflow.i8(i8 1, i8 [[TMP8]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i8, i1 } [[MUL]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i8, i1 } [[MUL]], 1
+; CHECK-NEXT:    [[TMP18:%.*]] = sub i8 [[TMP1]], [[MUL_RESULT]]
+; CHECK-NEXT:    [[TMP9:%.*]] = icmp ugt i8 [[TMP18]], [[TMP1]]
+; CHECK-NEXT:    [[TMP10:%.*]] = or i1 [[TMP9]], [[MUL_OVERFLOW]]
 ; CHECK-NEXT:    [[TMP12:%.*]] = icmp ugt i32 [[TMP7]], 255
 ; CHECK-NEXT:    [[TMP13:%.*]] = or i1 [[TMP10]], [[TMP12]]
 ; CHECK-NEXT:    [[TMP14:%.*]] = add i32 [[DOTPROMOTED]], 1
-; CHECK-NEXT:    [[TMP15:%.*]] = add i32 [[TMP14]], [[TMP7]]
+; CHECK-NEXT:    [[MUL2:%.*]] = call { i32, i1 } @llvm.umul.with.overflow.i32(i32 1, i32 [[TMP7]])
+; CHECK-NEXT:    [[MUL_RESULT3:%.*]] = extractvalue { i32, i1 } [[MUL2]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW4:%.*]] = extractvalue { i32, i1 } [[MUL2]], 1
+; CHECK-NEXT:    [[TMP15:%.*]] = add i32 [[TMP14]], [[MUL_RESULT3]]
 ; CHECK-NEXT:    [[TMP16:%.*]] = icmp slt i32 [[TMP15]], [[TMP14]]
-; CHECK-NEXT:    [[TMP17:%.*]] = or i1 [[TMP13]], [[TMP16]]
+; CHECK-NEXT:    [[TMP19:%.*]] = or i1 [[TMP16]], [[MUL_OVERFLOW4]]
+; CHECK-NEXT:    [[TMP17:%.*]] = or i1 [[TMP13]], [[TMP19]]
 ; CHECK-NEXT:    br i1 [[TMP17]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[TMP4]], 7

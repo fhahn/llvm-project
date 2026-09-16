@@ -18,8 +18,8 @@ define void @test_predicated_load_cast_hint(ptr %dst.1, ptr %dst.2, ptr %src, i8
 ; CHECK-NEXT:    br label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-NEXT:    [[SMAX:%.*]] = call i32 @llvm.smax.i32(i32 [[N_SUB]], i32 4)
-; CHECK-NEXT:    [[TMP3:%.*]] = add nsw i32 [[SMAX]], -1
-; CHECK-NEXT:    [[TMP4:%.*]] = lshr i32 [[TMP3]], 2
+; CHECK-NEXT:    [[TMP13:%.*]] = add nsw i32 [[SMAX]], -1
+; CHECK-NEXT:    [[TMP4:%.*]] = lshr i32 [[TMP13]], 2
 ; CHECK-NEXT:    [[TMP5:%.*]] = trunc i32 [[TMP4]] to i8
 ; CHECK-NEXT:    [[MUL:%.*]] = call { i8, i1 } @llvm.umul.with.overflow.i8(i8 4, i8 [[TMP5]])
 ; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i8, i1 } [[MUL]], 0

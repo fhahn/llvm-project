@@ -4110,12 +4110,15 @@ define void @stride_mv_predicated_btc(ptr noalias %p.out, ptr %p, i32 %M, i64 %s
 ; COMPARE-NO-MV-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[TMP1]], 4
 ; COMPARE-NO-MV-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; COMPARE-NO-MV:       [[VECTOR_SCEVCHECK]]:
-; COMPARE-NO-MV-NEXT:    [[SMAX:%.*]] = call i32 @llvm.smax.i32(i32 [[M]], i32 0)
-; COMPARE-NO-MV-NEXT:    [[TMP3:%.*]] = trunc i32 [[SMAX]] to i16
+; COMPARE-NO-MV-NEXT:    [[TMP2:%.*]] = trunc i32 [[TMP0]] to i16
+; COMPARE-NO-MV-NEXT:    [[MUL:%.*]] = call { i16, i1 } @llvm.umul.with.overflow.i16(i16 1, i16 [[TMP2]])
+; COMPARE-NO-MV-NEXT:    [[TMP3:%.*]] = extractvalue { i16, i1 } [[MUL]], 0
+; COMPARE-NO-MV-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i16, i1 } [[MUL]], 1
 ; COMPARE-NO-MV-NEXT:    [[TMP4:%.*]] = add i16 1, [[TMP3]]
 ; COMPARE-NO-MV-NEXT:    [[TMP5:%.*]] = icmp slt i16 [[TMP4]], 1
-; COMPARE-NO-MV-NEXT:    [[TMP6:%.*]] = icmp ugt i32 [[SMAX]], 65535
-; COMPARE-NO-MV-NEXT:    [[TMP7:%.*]] = or i1 [[TMP5]], [[TMP6]]
+; COMPARE-NO-MV-NEXT:    [[TMP15:%.*]] = or i1 [[TMP5]], [[MUL_OVERFLOW]]
+; COMPARE-NO-MV-NEXT:    [[TMP6:%.*]] = icmp ugt i32 [[TMP0]], 65535
+; COMPARE-NO-MV-NEXT:    [[TMP7:%.*]] = or i1 [[TMP15]], [[TMP6]]
 ; COMPARE-NO-MV-NEXT:    br i1 [[TMP7]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; COMPARE-NO-MV:       [[VECTOR_PH]]:
 ; COMPARE-NO-MV-NEXT:    [[TMP8:%.*]] = and i32 [[TMP1]], 3
@@ -4167,12 +4170,15 @@ define void @stride_mv_predicated_btc(ptr noalias %p.out, ptr %p, i32 %M, i64 %s
 ; COMPARE-LAA-MV-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[TMP1]], 4
 ; COMPARE-LAA-MV-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; COMPARE-LAA-MV:       [[VECTOR_SCEVCHECK]]:
-; COMPARE-LAA-MV-NEXT:    [[SMAX:%.*]] = call i32 @llvm.smax.i32(i32 [[M]], i32 0)
-; COMPARE-LAA-MV-NEXT:    [[TMP3:%.*]] = trunc i32 [[SMAX]] to i16
+; COMPARE-LAA-MV-NEXT:    [[TMP2:%.*]] = trunc i32 [[TMP0]] to i16
+; COMPARE-LAA-MV-NEXT:    [[MUL:%.*]] = call { i16, i1 } @llvm.umul.with.overflow.i16(i16 1, i16 [[TMP2]])
+; COMPARE-LAA-MV-NEXT:    [[TMP3:%.*]] = extractvalue { i16, i1 } [[MUL]], 0
+; COMPARE-LAA-MV-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i16, i1 } [[MUL]], 1
 ; COMPARE-LAA-MV-NEXT:    [[TMP4:%.*]] = add i16 1, [[TMP3]]
 ; COMPARE-LAA-MV-NEXT:    [[TMP5:%.*]] = icmp slt i16 [[TMP4]], 1
-; COMPARE-LAA-MV-NEXT:    [[TMP6:%.*]] = icmp ugt i32 [[SMAX]], 65535
-; COMPARE-LAA-MV-NEXT:    [[TMP7:%.*]] = or i1 [[TMP5]], [[TMP6]]
+; COMPARE-LAA-MV-NEXT:    [[TMP15:%.*]] = or i1 [[TMP5]], [[MUL_OVERFLOW]]
+; COMPARE-LAA-MV-NEXT:    [[TMP6:%.*]] = icmp ugt i32 [[TMP0]], 65535
+; COMPARE-LAA-MV-NEXT:    [[TMP7:%.*]] = or i1 [[TMP15]], [[TMP6]]
 ; COMPARE-LAA-MV-NEXT:    br i1 [[TMP7]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; COMPARE-LAA-MV:       [[VECTOR_PH]]:
 ; COMPARE-LAA-MV-NEXT:    [[TMP8:%.*]] = and i32 [[TMP1]], 3

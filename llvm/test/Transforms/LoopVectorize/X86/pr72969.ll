@@ -37,16 +37,19 @@ define void @test(ptr %p) {
 ; VEC-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP4]], 8
 ; VEC-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_SCEVCHECK:%.*]]
 ; VEC:       vector.scevcheck:
-; VEC-NEXT:    [[TMP5:%.*]] = add i64 [[TMP0]], 16
-; VEC-NEXT:    [[UMAX:%.*]] = call i64 @llvm.umax.i64(i64 [[TMP5]], i64 add (i64 ptrtoaddr (ptr @h to i64), i64 1))
+; VEC-NEXT:    [[UMAX:%.*]] = call i64 @llvm.umax.i64(i64 [[TMP1]], i64 add (i64 ptrtoaddr (ptr @h to i64), i64 1))
 ; VEC-NEXT:    [[TMP6:%.*]] = add i64 [[UMAX]], -9
 ; VEC-NEXT:    [[TMP7:%.*]] = sub i64 [[TMP6]], [[TMP0]]
 ; VEC-NEXT:    [[TMP8:%.*]] = lshr i64 [[TMP7]], 3
 ; VEC-NEXT:    [[TMP10:%.*]] = trunc i64 [[TMP8]] to i16
-; VEC-NEXT:    [[TMP11:%.*]] = add i16 2, [[TMP10]]
+; VEC-NEXT:    [[MUL:%.*]] = call { i16, i1 } @llvm.umul.with.overflow.i16(i16 1, i16 [[TMP10]])
+; VEC-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i16, i1 } [[MUL]], 0
+; VEC-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i16, i1 } [[MUL]], 1
+; VEC-NEXT:    [[TMP11:%.*]] = add i16 2, [[MUL_RESULT]]
 ; VEC-NEXT:    [[TMP12:%.*]] = icmp ult i16 [[TMP11]], 2
+; VEC-NEXT:    [[TMP27:%.*]] = or i1 [[TMP12]], [[MUL_OVERFLOW]]
 ; VEC-NEXT:    [[TMP13:%.*]] = icmp ugt i64 [[TMP8]], 65535
-; VEC-NEXT:    [[TMP14:%.*]] = or i1 [[TMP12]], [[TMP13]]
+; VEC-NEXT:    [[TMP14:%.*]] = or i1 [[TMP27]], [[TMP13]]
 ; VEC-NEXT:    br i1 [[TMP14]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
 ; VEC:       vector.ph:
 ; VEC-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP4]], 7

@@ -284,9 +284,14 @@ define void @outside_lattice(ptr noalias %p, ptr noalias %q, i32 %n) {
 ; DEFAULT-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP1]], 4
 ; DEFAULT-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_SCEVCHECK:%.*]]
 ; DEFAULT:       vector.scevcheck:
-; DEFAULT-NEXT:    [[TMP2:%.*]] = call i32 @llvm.usub.sat.i32(i32 [[N]], i32 1)
+; DEFAULT-NEXT:    [[TMP11:%.*]] = call i32 @llvm.umax.i32(i32 [[N]], i32 1)
+; DEFAULT-NEXT:    [[TMP12:%.*]] = add i32 [[TMP11]], -1
+; DEFAULT-NEXT:    [[MUL:%.*]] = call { i32, i1 } @llvm.umul.with.overflow.i32(i32 1, i32 [[TMP12]])
+; DEFAULT-NEXT:    [[TMP2:%.*]] = extractvalue { i32, i1 } [[MUL]], 0
+; DEFAULT-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i32, i1 } [[MUL]], 1
 ; DEFAULT-NEXT:    [[TMP3:%.*]] = icmp slt i32 [[TMP2]], 0
-; DEFAULT-NEXT:    br i1 [[TMP3]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
+; DEFAULT-NEXT:    [[TMP13:%.*]] = or i1 [[TMP3]], [[MUL_OVERFLOW]]
+; DEFAULT-NEXT:    br i1 [[TMP13]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
 ; DEFAULT:       vector.ph:
 ; DEFAULT-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP1]], 3
 ; DEFAULT-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP1]], [[N_MOD_VF]]
@@ -337,9 +342,14 @@ define void @outside_lattice(ptr noalias %p, ptr noalias %q, i32 %n) {
 ; STRIDED-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP1]], 4
 ; STRIDED-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_SCEVCHECK:%.*]]
 ; STRIDED:       vector.scevcheck:
-; STRIDED-NEXT:    [[TMP2:%.*]] = call i32 @llvm.usub.sat.i32(i32 [[N]], i32 1)
+; STRIDED-NEXT:    [[TMP11:%.*]] = call i32 @llvm.umax.i32(i32 [[N]], i32 1)
+; STRIDED-NEXT:    [[TMP12:%.*]] = add i32 [[TMP11]], -1
+; STRIDED-NEXT:    [[MUL:%.*]] = call { i32, i1 } @llvm.umul.with.overflow.i32(i32 1, i32 [[TMP12]])
+; STRIDED-NEXT:    [[TMP2:%.*]] = extractvalue { i32, i1 } [[MUL]], 0
+; STRIDED-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i32, i1 } [[MUL]], 1
 ; STRIDED-NEXT:    [[TMP3:%.*]] = icmp slt i32 [[TMP2]], 0
-; STRIDED-NEXT:    br i1 [[TMP3]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
+; STRIDED-NEXT:    [[TMP13:%.*]] = or i1 [[TMP3]], [[MUL_OVERFLOW]]
+; STRIDED-NEXT:    br i1 [[TMP13]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
 ; STRIDED:       vector.ph:
 ; STRIDED-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP1]], 3
 ; STRIDED-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP1]], [[N_MOD_VF]]

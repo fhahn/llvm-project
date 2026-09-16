@@ -107,17 +107,21 @@ define void @interleave_group_with_countable_early_exit(i64 %n, ptr %dst) vscale
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ule i64 [[TMP0]], [[UMAX]]
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
+; CHECK-NEXT:    [[TMP10:%.*]] = zext i64 [[N]] to i128
 ; CHECK-NEXT:    [[MUL1:%.*]] = call { i64, i1 } @llvm.umul.with.overflow.i64(i64 16, i64 [[N]])
 ; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i64, i1 } [[MUL1]], 0
 ; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i64, i1 } [[MUL1]], 1
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr [[DST]], i64 [[MUL_RESULT]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp ult ptr [[TMP3]], [[DST]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = or i1 [[TMP4]], [[MUL_OVERFLOW]]
+; CHECK-NEXT:    [[TMP8:%.*]] = icmp ugt i128 [[TMP10]], 18446744073709551615
+; CHECK-NEXT:    [[TMP11:%.*]] = or i1 [[TMP5]], [[TMP8]]
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DST]], i64 8
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr i8, ptr [[SCEVGEP]], i64 [[MUL_RESULT]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp ult ptr [[TMP6]], [[SCEVGEP]]
-; CHECK-NEXT:    [[TMP8:%.*]] = or i1 [[TMP7]], [[MUL_OVERFLOW]]
-; CHECK-NEXT:    [[TMP9:%.*]] = or i1 [[TMP5]], [[TMP8]]
+; CHECK-NEXT:    [[TMP16:%.*]] = or i1 [[TMP7]], [[MUL_OVERFLOW]]
+; CHECK-NEXT:    [[TMP17:%.*]] = or i1 [[TMP16]], [[TMP8]]
+; CHECK-NEXT:    [[TMP9:%.*]] = or i1 [[TMP11]], [[TMP17]]
 ; CHECK-NEXT:    br i1 [[TMP9]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[TMP0]], [[TMP1]]
@@ -164,17 +168,21 @@ define void @interleave_group_with_countable_early_exit(i64 %n, ptr %dst) vscale
 ; EPILOGUE-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ule i64 [[TMP0]], [[UMAX]]
 ; EPILOGUE-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; EPILOGUE:       [[VECTOR_SCEVCHECK]]:
+; EPILOGUE-NEXT:    [[TMP10:%.*]] = zext i64 [[N]] to i128
 ; EPILOGUE-NEXT:    [[MUL1:%.*]] = call { i64, i1 } @llvm.umul.with.overflow.i64(i64 16, i64 [[N]])
 ; EPILOGUE-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i64, i1 } [[MUL1]], 0
 ; EPILOGUE-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i64, i1 } [[MUL1]], 1
 ; EPILOGUE-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr [[DST]], i64 [[MUL_RESULT]]
 ; EPILOGUE-NEXT:    [[TMP4:%.*]] = icmp ult ptr [[TMP3]], [[DST]]
 ; EPILOGUE-NEXT:    [[TMP5:%.*]] = or i1 [[TMP4]], [[MUL_OVERFLOW]]
+; EPILOGUE-NEXT:    [[TMP8:%.*]] = icmp ugt i128 [[TMP10]], 18446744073709551615
+; EPILOGUE-NEXT:    [[TMP11:%.*]] = or i1 [[TMP5]], [[TMP8]]
 ; EPILOGUE-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DST]], i64 8
 ; EPILOGUE-NEXT:    [[TMP6:%.*]] = getelementptr i8, ptr [[SCEVGEP]], i64 [[MUL_RESULT]]
 ; EPILOGUE-NEXT:    [[TMP7:%.*]] = icmp ult ptr [[TMP6]], [[SCEVGEP]]
-; EPILOGUE-NEXT:    [[TMP8:%.*]] = or i1 [[TMP7]], [[MUL_OVERFLOW]]
-; EPILOGUE-NEXT:    [[TMP9:%.*]] = or i1 [[TMP5]], [[TMP8]]
+; EPILOGUE-NEXT:    [[TMP16:%.*]] = or i1 [[TMP7]], [[MUL_OVERFLOW]]
+; EPILOGUE-NEXT:    [[TMP17:%.*]] = or i1 [[TMP16]], [[TMP8]]
+; EPILOGUE-NEXT:    [[TMP9:%.*]] = or i1 [[TMP11]], [[TMP17]]
 ; EPILOGUE-NEXT:    br i1 [[TMP9]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; EPILOGUE:       [[VECTOR_PH]]:
 ; EPILOGUE-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[TMP0]], [[TMP1]]

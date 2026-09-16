@@ -16,8 +16,15 @@ define i32 @clamped_load_predicated(ptr %A, i32 %n) {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
+; CHECK-NEXT:    [[TMP4:%.*]] = trunc i32 [[TMP0]] to i7
+; CHECK-NEXT:    [[MUL:%.*]] = call { i7, i1 } @llvm.umul.with.overflow.i7(i7 1, i7 [[TMP4]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i7, i1 } [[MUL]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i7, i1 } [[MUL]], 1
+; CHECK-NEXT:    [[TMP34:%.*]] = icmp ult i7 [[MUL_RESULT]], 0
+; CHECK-NEXT:    [[TMP35:%.*]] = or i1 [[TMP34]], [[MUL_OVERFLOW]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], 127
-; CHECK-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP5:%.*]] = or i1 [[TMP35]], [[TMP1]]
+; CHECK-NEXT:    br i1 [[TMP5]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[N]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i32 [[N]], [[N_MOD_VF]]
@@ -111,8 +118,15 @@ define i32 @clamped_load_predicated(ptr %A, i32 %n) {
 ; IC4-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; IC4:       [[VECTOR_SCEVCHECK]]:
 ; IC4-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
+; IC4-NEXT:    [[TMP116:%.*]] = trunc i32 [[TMP0]] to i7
+; IC4-NEXT:    [[MUL:%.*]] = call { i7, i1 } @llvm.umul.with.overflow.i7(i7 1, i7 [[TMP116]])
+; IC4-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i7, i1 } [[MUL]], 0
+; IC4-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i7, i1 } [[MUL]], 1
+; IC4-NEXT:    [[TMP117:%.*]] = icmp ult i7 [[MUL_RESULT]], 0
+; IC4-NEXT:    [[TMP118:%.*]] = or i1 [[TMP117]], [[MUL_OVERFLOW]]
 ; IC4-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], 127
-; IC4-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; IC4-NEXT:    [[TMP119:%.*]] = or i1 [[TMP118]], [[TMP1]]
+; IC4-NEXT:    br i1 [[TMP119]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; IC4:       [[VECTOR_PH]]:
 ; IC4-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[N]], 15
 ; IC4-NEXT:    [[N_VEC:%.*]] = sub i32 [[N]], [[N_MOD_VF]]
@@ -350,8 +364,15 @@ define i32 @clamped_load_predicated(ptr %A, i32 %n) {
 ; IC8-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; IC8:       [[VECTOR_SCEVCHECK]]:
 ; IC8-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
+; IC8-NEXT:    [[TMP228:%.*]] = trunc i32 [[TMP0]] to i7
+; IC8-NEXT:    [[MUL:%.*]] = call { i7, i1 } @llvm.umul.with.overflow.i7(i7 1, i7 [[TMP228]])
+; IC8-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i7, i1 } [[MUL]], 0
+; IC8-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i7, i1 } [[MUL]], 1
+; IC8-NEXT:    [[TMP229:%.*]] = icmp ult i7 [[MUL_RESULT]], 0
+; IC8-NEXT:    [[TMP230:%.*]] = or i1 [[TMP229]], [[MUL_OVERFLOW]]
 ; IC8-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], 127
-; IC8-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; IC8-NEXT:    [[TMP231:%.*]] = or i1 [[TMP230]], [[TMP1]]
+; IC8-NEXT:    br i1 [[TMP231]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; IC8:       [[VECTOR_PH]]:
 ; IC8-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[N]], 31
 ; IC8-NEXT:    [[N_VEC:%.*]] = sub i32 [[N]], [[N_MOD_VF]]
@@ -817,8 +838,15 @@ define i32 @clamped_load_predicated_ic_capped(ptr %A, i32 %n) {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
+; CHECK-NEXT:    [[TMP32:%.*]] = trunc i32 [[TMP0]] to i4
+; CHECK-NEXT:    [[MUL:%.*]] = call { i4, i1 } @llvm.umul.with.overflow.i4(i4 1, i4 [[TMP32]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i4, i1 } [[MUL]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i4, i1 } [[MUL]], 1
+; CHECK-NEXT:    [[TMP33:%.*]] = icmp ult i4 [[MUL_RESULT]], 0
+; CHECK-NEXT:    [[TMP34:%.*]] = or i1 [[TMP33]], [[MUL_OVERFLOW]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], 15
-; CHECK-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP35:%.*]] = or i1 [[TMP34]], [[TMP1]]
+; CHECK-NEXT:    br i1 [[TMP35]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[N]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i32 [[N]], [[N_MOD_VF]]
@@ -912,8 +940,15 @@ define i32 @clamped_load_predicated_ic_capped(ptr %A, i32 %n) {
 ; IC4-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; IC4:       [[VECTOR_SCEVCHECK]]:
 ; IC4-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
+; IC4-NEXT:    [[TMP116:%.*]] = trunc i32 [[TMP0]] to i4
+; IC4-NEXT:    [[MUL:%.*]] = call { i4, i1 } @llvm.umul.with.overflow.i4(i4 1, i4 [[TMP116]])
+; IC4-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i4, i1 } [[MUL]], 0
+; IC4-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i4, i1 } [[MUL]], 1
+; IC4-NEXT:    [[TMP117:%.*]] = icmp ult i4 [[MUL_RESULT]], 0
+; IC4-NEXT:    [[TMP118:%.*]] = or i1 [[TMP117]], [[MUL_OVERFLOW]]
 ; IC4-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], 15
-; IC4-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; IC4-NEXT:    [[TMP119:%.*]] = or i1 [[TMP118]], [[TMP1]]
+; IC4-NEXT:    br i1 [[TMP119]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; IC4:       [[VECTOR_PH]]:
 ; IC4-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[N]], 15
 ; IC4-NEXT:    [[N_VEC:%.*]] = sub i32 [[N]], [[N_MOD_VF]]
@@ -1151,8 +1186,15 @@ define i32 @clamped_load_predicated_ic_capped(ptr %A, i32 %n) {
 ; IC8-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; IC8:       [[VECTOR_SCEVCHECK]]:
 ; IC8-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
+; IC8-NEXT:    [[TMP228:%.*]] = trunc i32 [[TMP0]] to i4
+; IC8-NEXT:    [[MUL:%.*]] = call { i4, i1 } @llvm.umul.with.overflow.i4(i4 1, i4 [[TMP228]])
+; IC8-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i4, i1 } [[MUL]], 0
+; IC8-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i4, i1 } [[MUL]], 1
+; IC8-NEXT:    [[TMP229:%.*]] = icmp ult i4 [[MUL_RESULT]], 0
+; IC8-NEXT:    [[TMP230:%.*]] = or i1 [[TMP229]], [[MUL_OVERFLOW]]
 ; IC8-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], 15
-; IC8-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; IC8-NEXT:    [[TMP231:%.*]] = or i1 [[TMP230]], [[TMP1]]
+; IC8-NEXT:    br i1 [[TMP231]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; IC8:       [[VECTOR_PH]]:
 ; IC8-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[N]], 31
 ; IC8-NEXT:    [[N_VEC:%.*]] = sub i32 [[N]], [[N_MOD_VF]]

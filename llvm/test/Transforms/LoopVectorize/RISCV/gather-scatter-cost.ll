@@ -12,13 +12,13 @@ define void @predicated_uniform_load(ptr %src, i32 %n, ptr %dst, i1 %cond) {
 ; CHECK-NEXT:    [[TMP3:%.*]] = add nuw i32 [[TMP2]], 1
 ; CHECK-NEXT:    br label [[VECTOR_SCEVCHECK:%.*]]
 ; CHECK:       vector.scevcheck:
-; CHECK-NEXT:    [[TMP4:%.*]] = sext i32 [[IBOX]] to i64
-; CHECK-NEXT:    [[TMP5:%.*]] = add nsw i64 [[TMP4]], 1
-; CHECK-NEXT:    [[SMAX:%.*]] = call i64 @llvm.smax.i64(i64 [[TMP5]], i64 0)
+; CHECK-NEXT:    [[TMP5:%.*]] = sext i32 [[IBOX]] to i64
+; CHECK-NEXT:    [[TMP8:%.*]] = add nsw i64 [[TMP5]], 1
+; CHECK-NEXT:    [[SMAX:%.*]] = call i64 @llvm.smax.i64(i64 [[TMP8]], i64 0)
 ; CHECK-NEXT:    [[TMP6:%.*]] = trunc i64 [[SMAX]] to i32
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp slt i32 [[TMP6]], 0
-; CHECK-NEXT:    [[TMP8:%.*]] = icmp ugt i64 [[SMAX]], 4294967295
-; CHECK-NEXT:    [[TMP9:%.*]] = or i1 [[TMP7]], [[TMP8]]
+; CHECK-NEXT:    [[TMP11:%.*]] = icmp ugt i64 [[SMAX]], 4294967295
+; CHECK-NEXT:    [[TMP9:%.*]] = or i1 [[TMP7]], [[TMP11]]
 ; CHECK-NEXT:    br i1 [[TMP9]], label [[SCALAR_PH:%.*]], label [[VECTOR_MEMCHECK:%.*]]
 ; CHECK:       vector.memcheck:
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[NBRBOXES:%.*]], i64 4

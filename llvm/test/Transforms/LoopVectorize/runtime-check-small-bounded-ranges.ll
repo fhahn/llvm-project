@@ -93,8 +93,15 @@ define i32 @bounded_load_reduction(ptr %A, i32 %N) {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
+; CHECK-NEXT:    [[TMP7:%.*]] = trunc i32 [[TMP0]] to i2
+; CHECK-NEXT:    [[MUL:%.*]] = call { i2, i1 } @llvm.umul.with.overflow.i2(i2 1, i2 [[TMP7]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i2, i1 } [[MUL]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i2, i1 } [[MUL]], 1
+; CHECK-NEXT:    [[TMP8:%.*]] = icmp ult i2 [[MUL_RESULT]], 0
+; CHECK-NEXT:    [[TMP9:%.*]] = or i1 [[TMP8]], [[MUL_OVERFLOW]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], 3
-; CHECK-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP10:%.*]] = or i1 [[TMP9]], [[TMP1]]
+; CHECK-NEXT:    br i1 [[TMP10]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[N]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i32 [[N]], [[N_MOD_VF]]
@@ -432,8 +439,15 @@ define void @bounded_index_equal_dependence(ptr %A, ptr %B, i32 %N) {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
+; CHECK-NEXT:    [[TMP6:%.*]] = trunc i32 [[TMP0]] to i2
+; CHECK-NEXT:    [[MUL:%.*]] = call { i2, i1 } @llvm.umul.with.overflow.i2(i2 1, i2 [[TMP6]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i2, i1 } [[MUL]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i2, i1 } [[MUL]], 1
+; CHECK-NEXT:    [[TMP7:%.*]] = icmp ult i2 [[MUL_RESULT]], 0
+; CHECK-NEXT:    [[TMP8:%.*]] = or i1 [[TMP7]], [[MUL_OVERFLOW]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], 3
-; CHECK-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP9:%.*]] = or i1 [[TMP8]], [[TMP1]]
+; CHECK-NEXT:    br i1 [[TMP9]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[N]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i32 [[N]], [[N_MOD_VF]]
@@ -497,15 +511,26 @@ define void @wider_nusw_does_not_imply_narrower(ptr %dst, i64 %n) {
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[TMP1]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
-; CHECK-NEXT:    [[TMP2:%.*]] = call i64 @llvm.usub.sat.i64(i64 [[N]], i64 1)
+; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[TMP0]], -1
 ; CHECK-NEXT:    [[TMP3:%.*]] = trunc i64 [[TMP2]] to i32
-; CHECK-NEXT:    [[TMP4:%.*]] = add i32 1, [[TMP3]]
+; CHECK-NEXT:    [[MUL:%.*]] = call { i32, i1 } @llvm.umul.with.overflow.i32(i32 1, i32 [[TMP3]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i32, i1 } [[MUL]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i32, i1 } [[MUL]], 1
+; CHECK-NEXT:    [[TMP4:%.*]] = add i32 1, [[MUL_RESULT]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp ult i32 [[TMP4]], 1
+; CHECK-NEXT:    [[TMP18:%.*]] = or i1 [[TMP5]], [[MUL_OVERFLOW]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp ugt i64 [[TMP2]], 4294967295
-; CHECK-NEXT:    [[TMP7:%.*]] = or i1 [[TMP5]], [[TMP6]]
+; CHECK-NEXT:    [[TMP19:%.*]] = or i1 [[TMP18]], [[TMP6]]
+; CHECK-NEXT:    [[TMP20:%.*]] = trunc i64 [[TMP2]] to i4
+; CHECK-NEXT:    [[MUL2:%.*]] = call { i4, i1 } @llvm.umul.with.overflow.i4(i4 1, i4 [[TMP20]])
+; CHECK-NEXT:    [[MUL_RESULT3:%.*]] = extractvalue { i4, i1 } [[MUL2]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW4:%.*]] = extractvalue { i4, i1 } [[MUL2]], 1
+; CHECK-NEXT:    [[TMP21:%.*]] = icmp ult i4 [[MUL_RESULT3]], 0
+; CHECK-NEXT:    [[TMP7:%.*]] = or i1 [[TMP21]], [[MUL_OVERFLOW4]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp ugt i64 [[TMP2]], 15
 ; CHECK-NEXT:    [[TMP9:%.*]] = or i1 [[TMP7]], [[TMP8]]
-; CHECK-NEXT:    br i1 [[TMP9]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP22:%.*]] = or i1 [[TMP19]], [[TMP9]]
+; CHECK-NEXT:    br i1 [[TMP22]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[TMP1]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i32 [[TMP1]], [[N_MOD_VF]]
@@ -530,12 +555,12 @@ define void @wider_nusw_does_not_imply_narrower(ptr %dst, i64 %n) {
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i32 [[TMP1]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:
-; CHECK-NEXT:    [[TMP19:%.*]] = phi i64 [ [[TMP17]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ], [ 0, %[[VECTOR_SCEVCHECK]] ]
-; CHECK-NEXT:    [[TMP20:%.*]] = phi i32 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ], [ 0, %[[VECTOR_SCEVCHECK]] ]
+; CHECK-NEXT:    [[TMP24:%.*]] = phi i64 [ [[TMP17]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ], [ 0, %[[VECTOR_SCEVCHECK]] ]
+; CHECK-NEXT:    [[TMP25:%.*]] = phi i32 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ], [ 0, %[[VECTOR_SCEVCHECK]] ]
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[IV_ZEXT:%.*]] = phi i64 [ [[TMP19]], %[[SCALAR_PH]] ], [ [[IV_NEXT_ZEXT:%.*]], %[[LOOP]] ]
-; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ [[TMP20]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[IV_ZEXT:%.*]] = phi i64 [ [[TMP24]], %[[SCALAR_PH]] ], [ [[IV_NEXT_ZEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ [[TMP25]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
 ; CHECK-NEXT:    [[IV_MOD:%.*]] = and i32 [[IV]], 15
 ; CHECK-NEXT:    [[IV_MOD_ZEXT:%.*]] = zext nneg i32 [[IV_MOD]] to i64
 ; CHECK-NEXT:    [[GEP_DST:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 [[IV_MOD_ZEXT]]

@@ -18,12 +18,12 @@ define void @wide_gep_all_lanes_live_only_scalar_users(ptr noalias %dst, ptr noa
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DST]], i64 4
 ; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr [[SCEVGEP]], i64 [[MUL_RESULT]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp ult ptr [[TMP4]], [[SCEVGEP]]
-; CHECK-NEXT:    [[TMP6:%.*]] = or i1 [[TMP5]], [[MUL_OVERFLOW]]
+; CHECK-NEXT:    [[TMP37:%.*]] = or i1 [[TMP5]], [[MUL_OVERFLOW]]
+; CHECK-NEXT:    [[TMP10:%.*]] = or i1 [[TMP3]], [[TMP37]]
 ; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[DST]], i64 8
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr [[SCEVGEP1]], i64 [[MUL_RESULT]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp ult ptr [[TMP7]], [[SCEVGEP1]]
 ; CHECK-NEXT:    [[TMP9:%.*]] = or i1 [[TMP8]], [[MUL_OVERFLOW]]
-; CHECK-NEXT:    [[TMP10:%.*]] = or i1 [[TMP3]], [[TMP6]]
 ; CHECK-NEXT:    [[TMP11:%.*]] = or i1 [[TMP10]], [[TMP9]]
 ; CHECK-NEXT:    br i1 [[TMP11]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:

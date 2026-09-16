@@ -171,8 +171,9 @@ define void @doit2(i32 %n, i32 %step)  {
 ; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i8, i1 } [[MUL]], 0
 ; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i8, i1 } [[MUL]], 1
 ; CHECK-NEXT:    [[TMP6:%.*]] = sub i8 0, [[MUL_RESULT]]
+; CHECK-NEXT:    [[TMP16:%.*]] = icmp ult i8 [[MUL_RESULT]], 0
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp ugt i8 [[TMP6]], 0
-; CHECK-NEXT:    [[TMP8:%.*]] = select i1 [[TMP3]], i1 [[TMP7]], i1 false
+; CHECK-NEXT:    [[TMP8:%.*]] = select i1 [[TMP3]], i1 [[TMP7]], i1 [[TMP16]]
 ; CHECK-NEXT:    [[TMP9:%.*]] = or i1 [[TMP8]], [[MUL_OVERFLOW]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = icmp ugt i64 [[TMP0]], 255
 ; CHECK-NEXT:    [[TMP11:%.*]] = icmp ne i8 [[TMP1]], 0

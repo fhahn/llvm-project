@@ -1987,9 +1987,13 @@ define i32 @added_step(i32 %n, i32 %step_base, ptr %p) {
 ; VEC-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[UMAX1]], 2
 ; VEC-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; VEC:       [[VECTOR_SCEVCHECK]]:
-; VEC-NEXT:    [[TMP0:%.*]] = call i32 @llvm.usub.sat.i32(i32 [[N]], i32 1)
+; VEC-NEXT:    [[TMP7:%.*]] = add i32 [[UMAX1]], -1
+; VEC-NEXT:    [[MUL:%.*]] = call { i32, i1 } @llvm.umul.with.overflow.i32(i32 1, i32 [[TMP7]])
+; VEC-NEXT:    [[TMP0:%.*]] = extractvalue { i32, i1 } [[MUL]], 0
+; VEC-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i32, i1 } [[MUL]], 1
 ; VEC-NEXT:    [[TMP1:%.*]] = icmp slt i32 [[TMP0]], 0
-; VEC-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; VEC-NEXT:    [[TMP8:%.*]] = or i1 [[TMP1]], [[MUL_OVERFLOW]]
+; VEC-NEXT:    br i1 [[TMP8]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; VEC:       [[VECTOR_PH]]:
 ; VEC-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[UMAX1]], 1
 ; VEC-NEXT:    [[N_VEC:%.*]] = sub i32 [[UMAX1]], [[N_MOD_VF]]
@@ -2076,9 +2080,13 @@ define i32 @added_step(i32 %n, i32 %step_base, ptr %p) {
 ; TAILFOLD-NEXT:    [[TMP0:%.*]] = call i32 @llvm.umax.i32(i32 [[N]], i32 1)
 ; TAILFOLD-NEXT:    br label %[[VECTOR_SCEVCHECK:.*]]
 ; TAILFOLD:       [[VECTOR_SCEVCHECK]]:
-; TAILFOLD-NEXT:    [[TMP1:%.*]] = call i32 @llvm.usub.sat.i32(i32 [[N]], i32 1)
+; TAILFOLD-NEXT:    [[TMP14:%.*]] = add i32 [[TMP0]], -1
+; TAILFOLD-NEXT:    [[MUL:%.*]] = call { i32, i1 } @llvm.umul.with.overflow.i32(i32 1, i32 [[TMP14]])
+; TAILFOLD-NEXT:    [[TMP1:%.*]] = extractvalue { i32, i1 } [[MUL]], 0
+; TAILFOLD-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i32, i1 } [[MUL]], 1
 ; TAILFOLD-NEXT:    [[TMP2:%.*]] = icmp slt i32 [[TMP1]], 0
-; TAILFOLD-NEXT:    br i1 [[TMP2]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; TAILFOLD-NEXT:    [[TMP15:%.*]] = or i1 [[TMP2]], [[MUL_OVERFLOW]]
+; TAILFOLD-NEXT:    br i1 [[TMP15]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; TAILFOLD:       [[VECTOR_PH]]:
 ; TAILFOLD-NEXT:    [[N_RND_UP:%.*]] = add i32 [[TMP0]], 1
 ; TAILFOLD-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[N_RND_UP]], 1

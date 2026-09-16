@@ -16,10 +16,16 @@ define i64 @predicated_iv_with_liveout(ptr %dst, i64 %n) {
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[SMAX1]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
-; CHECK-NEXT:    [[SMAX:%.*]] = call i64 @llvm.smax.i64(i64 [[N]], i64 1)
-; CHECK-NEXT:    [[TMP0:%.*]] = add nsw i64 [[SMAX]], -1
+; CHECK-NEXT:    [[TMP0:%.*]] = add nsw i64 [[SMAX1]], -1
+; CHECK-NEXT:    [[TMP9:%.*]] = trunc i64 [[TMP0]] to i16
+; CHECK-NEXT:    [[MUL:%.*]] = call { i16, i1 } @llvm.umul.with.overflow.i16(i16 1, i16 [[TMP9]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i16, i1 } [[MUL]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i16, i1 } [[MUL]], 1
+; CHECK-NEXT:    [[TMP10:%.*]] = icmp ult i16 [[MUL_RESULT]], 0
+; CHECK-NEXT:    [[TMP11:%.*]] = or i1 [[TMP10]], [[MUL_OVERFLOW]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ugt i64 [[TMP0]], 65535
-; CHECK-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP12:%.*]] = or i1 [[TMP11]], [[TMP1]]
+; CHECK-NEXT:    br i1 [[TMP12]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[SMAX1]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[SMAX1]], [[N_MOD_VF]]
@@ -91,10 +97,16 @@ define i64 @predicated_iv_with_liveout(ptr %dst, i64 %n) {
 ; THRESHOLD1-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[SMAX1]], 4
 ; THRESHOLD1-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; THRESHOLD1:       [[VECTOR_SCEVCHECK]]:
-; THRESHOLD1-NEXT:    [[SMAX:%.*]] = call i64 @llvm.smax.i64(i64 [[N]], i64 1)
-; THRESHOLD1-NEXT:    [[TMP0:%.*]] = add nsw i64 [[SMAX]], -1
+; THRESHOLD1-NEXT:    [[TMP0:%.*]] = add nsw i64 [[SMAX1]], -1
+; THRESHOLD1-NEXT:    [[TMP9:%.*]] = trunc i64 [[TMP0]] to i16
+; THRESHOLD1-NEXT:    [[MUL:%.*]] = call { i16, i1 } @llvm.umul.with.overflow.i16(i16 1, i16 [[TMP9]])
+; THRESHOLD1-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i16, i1 } [[MUL]], 0
+; THRESHOLD1-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i16, i1 } [[MUL]], 1
+; THRESHOLD1-NEXT:    [[TMP10:%.*]] = icmp ult i16 [[MUL_RESULT]], 0
+; THRESHOLD1-NEXT:    [[TMP11:%.*]] = or i1 [[TMP10]], [[MUL_OVERFLOW]]
 ; THRESHOLD1-NEXT:    [[TMP1:%.*]] = icmp ugt i64 [[TMP0]], 65535
-; THRESHOLD1-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; THRESHOLD1-NEXT:    [[TMP12:%.*]] = or i1 [[TMP11]], [[TMP1]]
+; THRESHOLD1-NEXT:    br i1 [[TMP12]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; THRESHOLD1:       [[VECTOR_PH]]:
 ; THRESHOLD1-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[SMAX1]], 3
 ; THRESHOLD1-NEXT:    [[N_VEC:%.*]] = sub i64 [[SMAX1]], [[N_MOD_VF]]
@@ -313,13 +325,15 @@ define void @dead_predicated_iv2(ptr %dst, i64 %n) {
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[SMAX1]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
-; CHECK-NEXT:    [[SMAX:%.*]] = call i64 @llvm.smax.i64(i64 [[N]], i64 1)
-; CHECK-NEXT:    [[TMP0:%.*]] = add nsw i64 [[SMAX]], -1
+; CHECK-NEXT:    [[TMP0:%.*]] = add nsw i64 [[SMAX1]], -1
 ; CHECK-NEXT:    [[TMP1:%.*]] = trunc i64 [[TMP0]] to i8
 ; CHECK-NEXT:    [[MUL:%.*]] = call { i8, i1 } @llvm.umul.with.overflow.i8(i8 9, i8 [[TMP1]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i8, i1 } [[MUL]], 0
 ; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i8, i1 } [[MUL]], 1
+; CHECK-NEXT:    [[TMP7:%.*]] = icmp ult i8 [[MUL_RESULT]], 0
+; CHECK-NEXT:    [[TMP8:%.*]] = or i1 [[TMP7]], [[MUL_OVERFLOW]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = icmp ugt i64 [[TMP0]], 255
-; CHECK-NEXT:    [[TMP3:%.*]] = or i1 [[MUL_OVERFLOW]], [[TMP2]]
+; CHECK-NEXT:    [[TMP3:%.*]] = or i1 [[TMP8]], [[TMP2]]
 ; CHECK-NEXT:    br i1 [[TMP3]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[SMAX1]], 3
@@ -380,13 +394,15 @@ define void @dead_predicated_iv2(ptr %dst, i64 %n) {
 ; THRESHOLD1-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[SMAX1]], 4
 ; THRESHOLD1-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; THRESHOLD1:       [[VECTOR_SCEVCHECK]]:
-; THRESHOLD1-NEXT:    [[SMAX:%.*]] = call i64 @llvm.smax.i64(i64 [[N]], i64 1)
-; THRESHOLD1-NEXT:    [[TMP0:%.*]] = add nsw i64 [[SMAX]], -1
+; THRESHOLD1-NEXT:    [[TMP0:%.*]] = add nsw i64 [[SMAX1]], -1
 ; THRESHOLD1-NEXT:    [[TMP1:%.*]] = trunc i64 [[TMP0]] to i8
 ; THRESHOLD1-NEXT:    [[MUL:%.*]] = call { i8, i1 } @llvm.umul.with.overflow.i8(i8 9, i8 [[TMP1]])
+; THRESHOLD1-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i8, i1 } [[MUL]], 0
 ; THRESHOLD1-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i8, i1 } [[MUL]], 1
+; THRESHOLD1-NEXT:    [[TMP7:%.*]] = icmp ult i8 [[MUL_RESULT]], 0
+; THRESHOLD1-NEXT:    [[TMP8:%.*]] = or i1 [[TMP7]], [[MUL_OVERFLOW]]
 ; THRESHOLD1-NEXT:    [[TMP2:%.*]] = icmp ugt i64 [[TMP0]], 255
-; THRESHOLD1-NEXT:    [[TMP3:%.*]] = or i1 [[MUL_OVERFLOW]], [[TMP2]]
+; THRESHOLD1-NEXT:    [[TMP3:%.*]] = or i1 [[TMP8]], [[TMP2]]
 ; THRESHOLD1-NEXT:    br i1 [[TMP3]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; THRESHOLD1:       [[VECTOR_PH]]:
 ; THRESHOLD1-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[SMAX1]], 3

@@ -285,17 +285,35 @@ class VPSCEVExpander {
   /// zero, matching SCEVExpander's SafeUDivMode.
   bool SafeUDivMode = false;
 
+  /// Expansions of the expressions handed to expand(), to re-use on a repeated
+  /// request for the same expression.
+  SmallDenseMap<const SCEV *, VPValue *> Expanded;
+
   /// Try to find a loop-invariant IR value in the plan's entry block whose
   /// SCEV matches \p S. Returns the corresponding live-in VPValue, or nullptr
   /// if none is found.
   VPValue *tryToReuseIRValue(const SCEV *S);
 
+  /// Expand \p S into recipes and live-ins using the builder.
+  /// TODO: Share sub-expressions, like SCEVExpander does.
+  VPValue *expandImpl(const SCEV *S);
+
 public:
   VPSCEVExpander(VPBuilder &Builder, ScalarEvolution &SE, DebugLoc DL)
       : Builder(Builder), SE(SE), DL(DL) {}
 
-  /// Expand \p S into recipes and live-ins using the builder.
-  VPValue *expand(const SCEV *S);
+  VPBuilder &getBuilder() const { return Builder; }
+  ScalarEvolution &getSE() const { return SE; }
+  DebugLoc getDebugLoc() const { return DL; }
+
+  /// Expand \p S into recipes and live-ins using the builder, re-using the
+  /// result of an earlier expansion of the same expression.
+  VPValue *expand(const SCEV *S) {
+    auto [It, Inserted] = Expanded.try_emplace(S);
+    if (Inserted)
+      It->second = expandImpl(S);
+    return It->second;
+  }
 };
 //===----------------------------------------------------------------------===//
 // Utilities for modifying predecessors and successors of VPlan blocks.

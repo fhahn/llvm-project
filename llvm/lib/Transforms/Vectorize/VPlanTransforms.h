@@ -14,6 +14,7 @@
 #define LLVM_TRANSFORMS_VECTORIZE_VPLANTRANSFORMS_H
 
 #include "VPlan.h"
+#include "VPlanAnalysis.h"
 #include "VPlanVerifier.h"
 #include "llvm/ADT/STLFunctionalExtras.h"
 #include "llvm/ADT/ScopeExit.h"
@@ -235,6 +236,11 @@ struct VPlanTransforms {
                                  bool AddBranchWeights);
   static void attachCheckBlock(VPlan &Plan, Value *Cond, BasicBlock *CheckBlock,
                                bool AddBranchWeights);
+
+  /// Turn the predicates registered on \p Plan, if any, into a check block of
+  /// VPInstructions bypassing the vector loop when any of them does not hold.
+  static void materializePredicates(VPlan &Plan, ScalarEvolution &SE,
+                                    DebugLoc DL, bool AddBranchWeights);
 
   /// Replaces the VPInstructions in \p Plan with corresponding
   /// widen recipes. Returns false if any VPInstructions could not be converted

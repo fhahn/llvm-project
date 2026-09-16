@@ -259,12 +259,12 @@ define void @replace_first_order_recurrence_with_versioned_iv_for_uniform_non_po
 ; CHECK-NEXT:    [[TMP3:%.*]] = add i32 1, [[TMP2]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp ult i32 [[TMP3]], 1
 ; CHECK-NEXT:    [[TMP14:%.*]] = icmp ugt i64 [[TMP1]], 4294967295
-; CHECK-NEXT:    [[TMP17:%.*]] = or i1 [[TMP4]], [[TMP14]]
+; CHECK-NEXT:    [[TMP13:%.*]] = or i1 [[TMP4]], [[TMP14]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = add i32 1, [[TMP2]]
 ; CHECK-NEXT:    [[TMP9:%.*]] = icmp slt i32 [[TMP8]], 1
 ; CHECK-NEXT:    [[TMP10:%.*]] = icmp ugt i64 [[TMP1]], 4294967295
-; CHECK-NEXT:    [[TMP11:%.*]] = or i1 [[TMP9]], [[TMP10]]
-; CHECK-NEXT:    [[TMP12:%.*]] = or i1 [[TMP17]], [[TMP11]]
+; CHECK-NEXT:    [[TMP15:%.*]] = or i1 [[TMP9]], [[TMP10]]
+; CHECK-NEXT:    [[TMP12:%.*]] = or i1 [[TMP13]], [[TMP15]]
 ; CHECK-NEXT:    br i1 [[TMP12]], label %[[SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[TMP18:%.*]] = add i64 [[Y1]], -8
@@ -425,10 +425,16 @@ define void @for_iv_kept_predicate_needed(ptr %dst, i64 %n) {
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[SMAX1]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
-; CHECK-NEXT:    [[SMAX:%.*]] = call i64 @llvm.smax.i64(i64 [[N]], i64 1)
-; CHECK-NEXT:    [[TMP0:%.*]] = add nsw i64 [[SMAX]], -1
+; CHECK-NEXT:    [[TMP0:%.*]] = add nsw i64 [[SMAX1]], -1
+; CHECK-NEXT:    [[TMP8:%.*]] = trunc i64 [[TMP0]] to i16
+; CHECK-NEXT:    [[MUL:%.*]] = call { i16, i1 } @llvm.umul.with.overflow.i16(i16 1, i16 [[TMP8]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i16, i1 } [[MUL]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i16, i1 } [[MUL]], 1
+; CHECK-NEXT:    [[TMP9:%.*]] = icmp ult i16 [[MUL_RESULT]], 0
+; CHECK-NEXT:    [[TMP10:%.*]] = or i1 [[TMP9]], [[MUL_OVERFLOW]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ugt i64 [[TMP0]], 65535
-; CHECK-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP11:%.*]] = or i1 [[TMP10]], [[TMP1]]
+; CHECK-NEXT:    br i1 [[TMP11]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[SMAX1]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[SMAX1]], [[N_MOD_VF]]
@@ -570,9 +576,16 @@ define void @induction_with_predicate_replaceable_by_for(ptr %dst, i32 %len) {
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[UMAX1]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = call i32 @llvm.usub.sat.i32(i32 [[LEN]], i32 1)
+; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[UMAX1]], -1
+; CHECK-NEXT:    [[TMP5:%.*]] = trunc i32 [[TMP0]] to i8
+; CHECK-NEXT:    [[MUL:%.*]] = call { i8, i1 } @llvm.umul.with.overflow.i8(i8 1, i8 [[TMP5]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i8, i1 } [[MUL]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i8, i1 } [[MUL]], 1
+; CHECK-NEXT:    [[TMP7:%.*]] = icmp ult i8 [[MUL_RESULT]], 0
+; CHECK-NEXT:    [[TMP8:%.*]] = or i1 [[TMP7]], [[MUL_OVERFLOW]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], 255
-; CHECK-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH1:.*]]
+; CHECK-NEXT:    [[TMP6:%.*]] = or i1 [[TMP8]], [[TMP1]]
+; CHECK-NEXT:    br i1 [[TMP6]], label %[[SCALAR_PH]], label %[[VECTOR_PH1:.*]]
 ; CHECK:       [[VECTOR_PH1]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[UMAX1]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i32 [[UMAX1]], [[N_MOD_VF]]

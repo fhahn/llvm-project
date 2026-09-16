@@ -89,8 +89,15 @@ define void @test_replicating_store_x86_fp80_cost(i32 %n, ptr %dst) #0 {
 ; FORCED:       [[VECTOR_SCEVCHECK]]:
 ; FORCED-NEXT:    [[TMP1:%.*]] = zext i32 [[N]] to i64
 ; FORCED-NEXT:    [[TMP2:%.*]] = add nuw nsw i64 [[TMP1]], 1
+; FORCED-NEXT:    [[TMP10:%.*]] = trunc i64 [[TMP2]] to i32
+; FORCED-NEXT:    [[MUL:%.*]] = call { i32, i1 } @llvm.umul.with.overflow.i32(i32 1, i32 [[TMP10]])
+; FORCED-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i32, i1 } [[MUL]], 0
+; FORCED-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i32, i1 } [[MUL]], 1
+; FORCED-NEXT:    [[TMP11:%.*]] = icmp ult i32 [[MUL_RESULT]], 0
+; FORCED-NEXT:    [[TMP12:%.*]] = or i1 [[TMP11]], [[MUL_OVERFLOW]]
 ; FORCED-NEXT:    [[TMP3:%.*]] = icmp ugt i64 [[TMP2]], 4294967295
-; FORCED-NEXT:    br i1 [[TMP3]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; FORCED-NEXT:    [[TMP13:%.*]] = or i1 [[TMP12]], [[TMP3]]
+; FORCED-NEXT:    br i1 [[TMP13]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; FORCED:       [[VECTOR_PH]]:
 ; FORCED-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[TMP0]], 1
 ; FORCED-NEXT:    [[N_VEC:%.*]] = sub i32 [[TMP0]], [[N_MOD_VF]]

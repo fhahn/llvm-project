@@ -368,7 +368,11 @@ define void @scalar_cast_dbg(ptr nocapture %a, i32 %start, i64 %k) {
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[K]], -1
 ; CHECK-NEXT:    [[TMP1:%.*]] = trunc i64 [[TMP0]] to i32
-; CHECK-NEXT:    [[TMP2:%.*]] = icmp slt i32 [[TMP1]], 0
+; CHECK-NEXT:    [[MUL:%.*]] = call { i32, i1 } @llvm.umul.with.overflow.i32(i32 1, i32 [[TMP1]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i32, i1 } [[MUL]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i32, i1 } [[MUL]], 1
+; CHECK-NEXT:    [[TMP9:%.*]] = icmp slt i32 [[MUL_RESULT]], 0
+; CHECK-NEXT:    [[TMP2:%.*]] = or i1 [[TMP9]], [[MUL_OVERFLOW]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp ugt i64 [[TMP0]], 4294967295
 ; CHECK-NEXT:    [[TMP4:%.*]] = or i1 [[TMP2]], [[TMP3]]
 ; CHECK-NEXT:    br i1 [[TMP4]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
@@ -411,10 +415,14 @@ define void @scalar_cast_dbg(ptr nocapture %a, i32 %start, i64 %k) {
 ; DEBUGLOC:       [[VECTOR_SCEVCHECK]]:
 ; DEBUGLOC-NEXT:    [[TMP0:%.*]] = add i64 [[K]], -1, !dbg [[DBG74]]
 ; DEBUGLOC-NEXT:    [[TMP1:%.*]] = trunc i64 [[TMP0]] to i32, !dbg [[DBG74]]
-; DEBUGLOC-NEXT:    [[TMP2:%.*]] = icmp slt i32 [[TMP1]], 0, !dbg [[DBG74]]
-; DEBUGLOC-NEXT:    [[TMP3:%.*]] = icmp ugt i64 [[TMP0]], 4294967295, !dbg [[DBG74]]
-; DEBUGLOC-NEXT:    [[TMP4:%.*]] = or i1 [[TMP2]], [[TMP3]], !dbg [[DBG74]]
-; DEBUGLOC-NEXT:    br i1 [[TMP4]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]], !dbg [[DBG75:![0-9]+]]
+; DEBUGLOC-NEXT:    [[MUL:%.*]] = call { i32, i1 } @llvm.umul.with.overflow.i32(i32 1, i32 [[TMP1]]), !dbg [[DBG74]]
+; DEBUGLOC-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i32, i1 } [[MUL]], 0, !dbg [[DBG74]]
+; DEBUGLOC-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i32, i1 } [[MUL]], 1, !dbg [[DBG74]]
+; DEBUGLOC-NEXT:    [[TMP2:%.*]] = icmp slt i32 [[MUL_RESULT]], 0, !dbg [[DBG74]]
+; DEBUGLOC-NEXT:    [[TMP3:%.*]] = or i1 [[TMP2]], [[MUL_OVERFLOW]], !dbg [[DBG74]]
+; DEBUGLOC-NEXT:    [[TMP4:%.*]] = icmp ugt i64 [[TMP0]], 4294967295, !dbg [[DBG74]]
+; DEBUGLOC-NEXT:    [[TMP6:%.*]] = or i1 [[TMP3]], [[TMP4]], !dbg [[DBG74]]
+; DEBUGLOC-NEXT:    br i1 [[TMP6]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]], !dbg [[DBG75:![0-9]+]]
 ; DEBUGLOC:       [[VECTOR_PH]]:
 ; DEBUGLOC-NEXT:    [[TMP5:%.*]] = and i64 [[K]], 3
 ; DEBUGLOC-NEXT:    [[N_VEC:%.*]] = sub i64 [[K]], [[TMP5]]
@@ -422,13 +430,13 @@ define void @scalar_cast_dbg(ptr nocapture %a, i32 %start, i64 %k) {
 ; DEBUGLOC:       [[VECTOR_BODY]]:
 ; DEBUGLOC-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ], !dbg [[DBG75]]
 ; DEBUGLOC-NEXT:    [[VEC_IND:%.*]] = phi <4 x i32> [ <i32 0, i32 1, i32 2, i32 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ], !dbg [[DBG76:![0-9]+]]
-; DEBUGLOC-NEXT:    [[TMP6:%.*]] = trunc i64 [[INDEX]] to i32, !dbg [[DBG76]]
-; DEBUGLOC-NEXT:    [[TMP7:%.*]] = getelementptr inbounds i32, ptr [[A]], i32 [[TMP6]], !dbg [[DBG77:![0-9]+]]
-; DEBUGLOC-NEXT:    store <4 x i32> [[VEC_IND]], ptr [[TMP7]], align 4, !dbg [[DBG78:![0-9]+]]
+; DEBUGLOC-NEXT:    [[TMP7:%.*]] = trunc i64 [[INDEX]] to i32, !dbg [[DBG76]]
+; DEBUGLOC-NEXT:    [[TMP8:%.*]] = getelementptr inbounds i32, ptr [[A]], i32 [[TMP7]], !dbg [[DBG77:![0-9]+]]
+; DEBUGLOC-NEXT:    store <4 x i32> [[VEC_IND]], ptr [[TMP8]], align 4, !dbg [[DBG78:![0-9]+]]
 ; DEBUGLOC-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4, !dbg [[DBG75]]
 ; DEBUGLOC-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4), !dbg [[DBG76]]
-; DEBUGLOC-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]], !dbg [[DBG79:![0-9]+]]
-; DEBUGLOC-NEXT:    br i1 [[TMP8]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !dbg [[DBG79]], !llvm.loop [[LOOP80:![0-9]+]]
+; DEBUGLOC-NEXT:    [[TMP9:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]], !dbg [[DBG79:![0-9]+]]
+; DEBUGLOC-NEXT:    br i1 [[TMP9]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !dbg [[DBG79]], !llvm.loop [[LOOP80:![0-9]+]]
 ; DEBUGLOC:       [[MIDDLE_BLOCK]]:
 ; DEBUGLOC-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[K]], [[N_VEC]], !dbg [[DBG79]]
 ; DEBUGLOC-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]], !dbg [[DBG79]]

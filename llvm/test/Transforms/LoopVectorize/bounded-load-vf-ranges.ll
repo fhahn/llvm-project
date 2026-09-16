@@ -240,8 +240,15 @@ define void @bounded_rmw_vf_capped(ptr noalias %A, ptr noalias %B, i32 %n) {
 ; VF2-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; VF2:       [[VECTOR_SCEVCHECK]]:
 ; VF2-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
+; VF2-NEXT:    [[TMP7:%.*]] = trunc i32 [[TMP0]] to i2
+; VF2-NEXT:    [[MUL:%.*]] = call { i2, i1 } @llvm.umul.with.overflow.i2(i2 1, i2 [[TMP7]])
+; VF2-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i2, i1 } [[MUL]], 0
+; VF2-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i2, i1 } [[MUL]], 1
+; VF2-NEXT:    [[TMP8:%.*]] = icmp ult i2 [[MUL_RESULT]], 0
+; VF2-NEXT:    [[TMP9:%.*]] = or i1 [[TMP8]], [[MUL_OVERFLOW]]
 ; VF2-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], 3
-; VF2-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; VF2-NEXT:    [[TMP10:%.*]] = or i1 [[TMP9]], [[TMP1]]
+; VF2-NEXT:    br i1 [[TMP10]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; VF2:       [[VECTOR_PH]]:
 ; VF2-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[N]], 1
 ; VF2-NEXT:    [[N_VEC:%.*]] = sub i32 [[N]], [[N_MOD_VF]]
@@ -286,8 +293,15 @@ define void @bounded_rmw_vf_capped(ptr noalias %A, ptr noalias %B, i32 %n) {
 ; VF4-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; VF4:       [[VECTOR_SCEVCHECK]]:
 ; VF4-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
+; VF4-NEXT:    [[TMP7:%.*]] = trunc i32 [[TMP0]] to i2
+; VF4-NEXT:    [[MUL:%.*]] = call { i2, i1 } @llvm.umul.with.overflow.i2(i2 1, i2 [[TMP7]])
+; VF4-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i2, i1 } [[MUL]], 0
+; VF4-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i2, i1 } [[MUL]], 1
+; VF4-NEXT:    [[TMP8:%.*]] = icmp ult i2 [[MUL_RESULT]], 0
+; VF4-NEXT:    [[TMP9:%.*]] = or i1 [[TMP8]], [[MUL_OVERFLOW]]
 ; VF4-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], 3
-; VF4-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; VF4-NEXT:    [[TMP10:%.*]] = or i1 [[TMP9]], [[TMP1]]
+; VF4-NEXT:    br i1 [[TMP10]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; VF4:       [[VECTOR_PH]]:
 ; VF4-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[N]], 3
 ; VF4-NEXT:    [[N_VEC:%.*]] = sub i32 [[N]], [[N_MOD_VF]]
@@ -332,8 +346,15 @@ define void @bounded_rmw_vf_capped(ptr noalias %A, ptr noalias %B, i32 %n) {
 ; VF8-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; VF8:       [[VECTOR_SCEVCHECK]]:
 ; VF8-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
+; VF8-NEXT:    [[TMP7:%.*]] = trunc i32 [[TMP0]] to i2
+; VF8-NEXT:    [[MUL:%.*]] = call { i2, i1 } @llvm.umul.with.overflow.i2(i2 1, i2 [[TMP7]])
+; VF8-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i2, i1 } [[MUL]], 0
+; VF8-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i2, i1 } [[MUL]], 1
+; VF8-NEXT:    [[TMP8:%.*]] = icmp ult i2 [[MUL_RESULT]], 0
+; VF8-NEXT:    [[TMP9:%.*]] = or i1 [[TMP8]], [[MUL_OVERFLOW]]
 ; VF8-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], 3
-; VF8-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; VF8-NEXT:    [[TMP10:%.*]] = or i1 [[TMP9]], [[TMP1]]
+; VF8-NEXT:    br i1 [[TMP10]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; VF8:       [[VECTOR_PH]]:
 ; VF8-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[N]], 7
 ; VF8-NEXT:    [[N_VEC:%.*]] = sub i32 [[N]], [[N_MOD_VF]]

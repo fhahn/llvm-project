@@ -1062,6 +1062,12 @@ bool VPlanTransforms::finalizeSCEVPredicates(VPlan &Plan,
     return false;
   }
 
+  // The assumptions are final now; record them on the plan, to be checked at
+  // runtime if it is selected for vectorization.
+  for (const SCEVPredicate *P :
+       cast<SCEVUnionPredicate>(PSE.getPredicate()).getPredicates())
+    Plan.addPredicate(std::make_unique<VPSCEVPredicate>(P));
+
   return true;
 }
 
@@ -1492,6 +1498,189 @@ void VPlanTransforms::attachCheckBlock(VPlan &Plan, Value *Cond,
   VPValue *CondVPV = Plan.getOrAddLiveIn(Cond);
   VPBasicBlock *CheckBlockVPBB = Plan.createVPIRBasicBlock(CheckBlock);
   attachVPCheckBlock(Plan, CondVPV, CheckBlockVPBB, AddBranchWeights);
+}
+
+/// Expand the condition that \p AR wraps, signed if \p Signed. Mirrors
+/// SCEVExpander::generateOverflowCheck, but folds less, as VPBuilder has no
+/// InstSimplifyFolder.
+static VPValue *expandOverflowCheck(const SCEVAddRecExpr *AR, bool Signed,
+                                    VPSCEVExpander &Exp) {
+  assert(AR->isAffine() && "Cannot generate RT check for "
+                           "non-affine expression");
+  ScalarEvolution &SE = Exp.getSE();
+  VPBuilder &Builder = Exp.getBuilder();
+  VPlan &Plan = Builder.getPlan();
+  DebugLoc DL = Exp.getDebugLoc();
+
+  // FIXME: It is highly suspicious that we're ignoring the predicates here.
+  SmallVector<const SCEVPredicate *, 4> Preds;
+  const SCEV *ExitCount =
+      SE.getPredicatedSymbolicMaxBackedgeTakenCount(AR->getLoop(), Preds);
+  assert(!isa<SCEVCouldNotCompute>(ExitCount) && "Invalid loop count");
+
+  const SCEV *Step = AR->getStepRecurrence(SE);
+  const SCEV *Start = AR->getStart();
+  Type *ARTy = AR->getType();
+  unsigned SrcBits = SE.getTypeSizeInBits(ExitCount->getType());
+  unsigned DstBits = SE.getTypeSizeInBits(ARTy);
+
+  // The expression {Start,+,Step} has nusw/nssw if
+  //   Step < 0, Start - |Step| * Backedge <= Start
+  //   Step >= 0, Start + |Step| * Backedge > Start
+  // and |Step| * Backedge doesn't unsigned overflow.
+  VPValue *TripCountVal = Exp.expand(ExitCount);
+  Type *Ty = IntegerType::get(Plan.getContext(), DstBits);
+  VPValue *StepValue = Exp.expand(Step);
+  VPValue *NegStepValue = Exp.expand(SE.getNegativeSCEV(Step));
+  VPValue *StartValue = Exp.expand(Start);
+  VPValue *Zero = Plan.getConstantInt(DstBits, 0);
+
+  // Compute |Step|.
+  VPValue *StepCompare =
+      Builder.createICmp(CmpInst::ICMP_SLT, StepValue, Zero, DL);
+  VPValue *AbsStep =
+      Builder.createSelect(StepCompare, NegStepValue, StepValue, DL);
+
+  // Compute |Step| * Backedge and whether it overflows.
+  VPValue *TruncTripCount =
+      Builder.createScalarZExtOrTrunc(TripCountVal, Ty, DL);
+  auto *OverflowTy =
+      StructType::get(Ty, IntegerType::getInt1Ty(Plan.getContext()));
+  VPValue *Mul = Builder.createScalarIntrinsic(Intrinsic::umul_with_overflow,
+                                               {AbsStep, TruncTripCount},
+                                               OverflowTy, DL, "mul");
+  VPValue *MulV =
+      Builder.createNaryOp(VPInstruction::ExtractStructField,
+                           {Mul, Plan.getConstantInt(32, 0)}, DL, "mul.result");
+  VPValue *OfMul = Builder.createNaryOp(VPInstruction::ExtractStructField,
+                                        {Mul, Plan.getConstantInt(32, 1)}, DL,
+                                        "mul.overflow");
+
+  // Compute:
+  //   1. Start + |Step| * Backedge < Start
+  //   2. Start - |Step| * Backedge > Start
+  //
+  // And select either 1. or 2. depending on whether step is positive or
+  // negative. If Step is known to be positive or negative, only create
+  // either 1. or 2.
+  VPValue *Add = nullptr, *Sub = nullptr;
+  bool NeedPosCheck = !SE.isKnownNegative(Step);
+  bool NeedNegCheck = !SE.isKnownPositive(Step);
+  if (ARTy->isPointerTy()) {
+    VPValue *NegMulV = Builder.createSub(Zero, MulV, DL);
+    if (NeedPosCheck)
+      Add = Builder.createPtrAdd(StartValue, MulV, DL);
+    if (NeedNegCheck)
+      Sub = Builder.createPtrAdd(StartValue, NegMulV, DL);
+  } else {
+    if (NeedPosCheck)
+      Add = Builder.createAdd(StartValue, MulV, DL);
+    if (NeedNegCheck)
+      Sub = Builder.createSub(StartValue, MulV, DL);
+  }
+
+  VPValue *EndCompareLT = nullptr, *EndCompareGT = nullptr, *EndCheck = nullptr;
+  if (NeedPosCheck)
+    EndCheck = EndCompareLT = Builder.createICmp(
+        Signed ? CmpInst::ICMP_SLT : CmpInst::ICMP_ULT, Add, StartValue, DL);
+  if (NeedNegCheck)
+    EndCheck = EndCompareGT = Builder.createICmp(
+        Signed ? CmpInst::ICMP_SGT : CmpInst::ICMP_UGT, Sub, StartValue, DL);
+  if (NeedPosCheck && NeedNegCheck) {
+    // Select the answer based on the sign of Step.
+    EndCheck =
+        Builder.createSelect(StepCompare, EndCompareGT, EndCompareLT, DL);
+  }
+  EndCheck = Builder.createOr(EndCheck, OfMul, DL);
+
+  // If the backedge taken count type is larger than the AddRec type, check that
+  // we don't drop any bits by truncating it. If we are dropping bits, then we
+  // have overflow (unless the step is zero).
+  if (SrcBits > DstBits) {
+    APInt MaxVal = APInt::getMaxValue(DstBits).zext(SrcBits);
+    VPValue *BackedgeCheck = Builder.createICmp(
+        CmpInst::ICMP_UGT, TripCountVal, Plan.getConstantInt(MaxVal), DL);
+    BackedgeCheck = Builder.createAnd(
+        BackedgeCheck,
+        Builder.createICmp(CmpInst::ICMP_NE, StepValue, Zero, DL), DL);
+    EndCheck = Builder.createOr(EndCheck, BackedgeCheck, DL);
+  }
+  return EndCheck;
+}
+
+VPValue *VPSCEVPredicate::expandNegated(VPSCEVExpander &Exp) const {
+  VPBuilder &Builder = Exp.getBuilder();
+  DebugLoc DL = Exp.getDebugLoc();
+  switch (Pred->getKind()) {
+  case SCEVPredicate::P_Union:
+    llvm_unreachable("union predicates are registered member by member");
+  case SCEVPredicate::P_Compare: {
+    const auto *CP = cast<SCEVComparePredicate>(Pred);
+    VPValue *LHS = Exp.expand(CP->getLHS());
+    VPValue *RHS = Exp.expand(CP->getRHS());
+    return Builder.createICmp(ICmpInst::getInversePredicate(CP->getPredicate()),
+                              LHS, RHS, DL, "ident.check");
+  }
+  case SCEVPredicate::P_Wrap: {
+    const auto *WP = cast<SCEVWrapPredicate>(Pred);
+    const auto *AR = cast<SCEVAddRecExpr>(WP->getExpr());
+    VPValue *NUSWCheck = nullptr, *NSSWCheck = nullptr;
+    if (WP->getFlags() & SCEVWrapPredicate::IncrementNUSW)
+      NUSWCheck = expandOverflowCheck(AR, /*Signed=*/false, Exp);
+    if (WP->getFlags() & SCEVWrapPredicate::IncrementNSSW)
+      NSSWCheck = expandOverflowCheck(AR, /*Signed=*/true, Exp);
+    if (NUSWCheck && NSSWCheck)
+      return Builder.createOr(NUSWCheck, NSSWCheck, DL);
+    if (NUSWCheck)
+      return NUSWCheck;
+    if (NSSWCheck)
+      return NSSWCheck;
+    return Builder.getPlan().getFalse();
+  }
+  }
+  llvm_unreachable("Unknown SCEV predicate type");
+}
+
+void VPlanTransforms::materializePredicates(VPlan &Plan, ScalarEvolution &SE,
+                                            DebugLoc DL,
+                                            bool AddBranchWeights) {
+  SmallVector<std::unique_ptr<VPPredicate>, 2> Predicates =
+      Plan.takePredicates();
+
+  /// The block each kind of predicate is checked in, in the order the blocks
+  /// are executed in, and the name of the combined condition.
+  static constexpr struct {
+    VPPredicate::VPPredicateKind Kind;
+    const char *BlockName;
+    const char *CondName;
+  } Groups[] = {
+      {VPPredicate::VPSCEVPredicateSC, "vector.scevcheck", ""},
+  };
+
+  unsigned NumMaterialized = 0;
+  for (const auto &[Kind, BlockName, CondName] : Groups) {
+    auto OfKind = make_filter_range(Predicates, [Kind = Kind](const auto &P) {
+      return P->getKind() == Kind;
+    });
+    if (OfKind.empty())
+      continue;
+
+    auto *CheckVPBB = Plan.createVPBasicBlock(BlockName);
+    insertCheckBlockBeforeVectorLoop(Plan, CheckVPBB);
+    VPBuilder Builder(CheckVPBB);
+    VPSCEVExpander Exp(Builder, SE, DL);
+
+    // Bypass the vector loop if any of the predicates does not hold.
+    VPValue *Cond = nullptr;
+    for (const auto &P : OfKind) {
+      VPValue *Negated = P->expandNegated(Exp);
+      Cond = Cond ? Builder.createOr(Cond, Negated, DL, CondName) : Negated;
+      NumMaterialized++;
+    }
+    addBypassBranch(Plan, CheckVPBB, Cond, AddBranchWeights);
+  }
+  assert(NumMaterialized == Predicates.size() &&
+         "every predicate kind needs an entry in Groups to be checked");
 }
 
 void VPlanTransforms::addMinimumIterationCheck(

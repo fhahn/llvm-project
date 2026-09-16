@@ -378,12 +378,14 @@ define void @overflow_indvar_known_false(ptr nocapture noundef %p, i32 noundef %
 ; CHECK-NEXT:    [[TMP1:%.*]] = sub nsw i64 1028, [[TMP20]]
 ; CHECK-NEXT:    br label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
-; CHECK-NEXT:    [[TMP21:%.*]] = add i32 [[TC]], 1
-; CHECK-NEXT:    [[TMP22:%.*]] = zext i32 [[TMP21]] to i64
-; CHECK-NEXT:    [[TMP23:%.*]] = sub i64 1027, [[TMP22]]
+; CHECK-NEXT:    [[TMP23:%.*]] = sub nsw i64 1027, [[TMP20]]
 ; CHECK-NEXT:    [[TMP24:%.*]] = trunc i64 [[TMP23]] to i32
-; CHECK-NEXT:    [[TMP25:%.*]] = add i32 [[TMP21]], [[TMP24]]
-; CHECK-NEXT:    [[TMP26:%.*]] = icmp ult i32 [[TMP25]], [[TMP21]]
+; CHECK-NEXT:    [[MUL:%.*]] = call { i32, i1 } @llvm.umul.with.overflow.i32(i32 1, i32 [[TMP24]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i32, i1 } [[MUL]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i32, i1 } [[MUL]], 1
+; CHECK-NEXT:    [[TMP6:%.*]] = add i32 [[TMP19]], [[MUL_RESULT]]
+; CHECK-NEXT:    [[TMP7:%.*]] = icmp ult i32 [[TMP6]], [[TMP19]]
+; CHECK-NEXT:    [[TMP26:%.*]] = or i1 [[TMP7]], [[MUL_OVERFLOW]]
 ; CHECK-NEXT:    [[TMP27:%.*]] = icmp ugt i64 [[TMP23]], 4294967295
 ; CHECK-NEXT:    [[TMP28:%.*]] = or i1 [[TMP26]], [[TMP27]]
 ; CHECK-NEXT:    br i1 [[TMP28]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]

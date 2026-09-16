@@ -18,8 +18,15 @@ define i32 @bounded_load_bound64_max_vscale_16(ptr %A, i64 %N) #0 {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[N]], -1
+; CHECK-NEXT:    [[TMP9:%.*]] = trunc i64 [[TMP2]] to i6
+; CHECK-NEXT:    [[MUL:%.*]] = call { i6, i1 } @llvm.umul.with.overflow.i6(i6 1, i6 [[TMP9]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i6, i1 } [[MUL]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i6, i1 } [[MUL]], 1
+; CHECK-NEXT:    [[TMP10:%.*]] = icmp ult i6 [[MUL_RESULT]], 0
+; CHECK-NEXT:    [[TMP11:%.*]] = or i1 [[TMP10]], [[MUL_OVERFLOW]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp ugt i64 [[TMP2]], 63
-; CHECK-NEXT:    br i1 [[TMP3]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP12:%.*]] = or i1 [[TMP11]], [[TMP3]]
+; CHECK-NEXT:    br i1 [[TMP12]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[N]], [[TMP1]]
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[N_MOD_VF]]
@@ -71,8 +78,15 @@ define i32 @bounded_load_bound32_max_vscale_16(ptr %A, i64 %N) #0 {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[N]], -1
+; CHECK-NEXT:    [[TMP9:%.*]] = trunc i64 [[TMP2]] to i5
+; CHECK-NEXT:    [[MUL:%.*]] = call { i5, i1 } @llvm.umul.with.overflow.i5(i5 1, i5 [[TMP9]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i5, i1 } [[MUL]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i5, i1 } [[MUL]], 1
+; CHECK-NEXT:    [[TMP10:%.*]] = icmp ult i5 [[MUL_RESULT]], 0
+; CHECK-NEXT:    [[TMP11:%.*]] = or i1 [[TMP10]], [[MUL_OVERFLOW]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp ugt i64 [[TMP2]], 31
-; CHECK-NEXT:    br i1 [[TMP3]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP12:%.*]] = or i1 [[TMP11]], [[TMP3]]
+; CHECK-NEXT:    br i1 [[TMP12]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[N]], [[TMP1]]
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[N_MOD_VF]]
@@ -123,8 +137,15 @@ define i32 @bounded_load_bound8_max_vscale_2(ptr %A, i64 %N) #1 {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[N]], -1
+; CHECK-NEXT:    [[TMP9:%.*]] = trunc i64 [[TMP2]] to i3
+; CHECK-NEXT:    [[MUL:%.*]] = call { i3, i1 } @llvm.umul.with.overflow.i3(i3 1, i3 [[TMP9]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i3, i1 } [[MUL]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i3, i1 } [[MUL]], 1
+; CHECK-NEXT:    [[TMP10:%.*]] = icmp ult i3 [[MUL_RESULT]], 0
+; CHECK-NEXT:    [[TMP11:%.*]] = or i1 [[TMP10]], [[MUL_OVERFLOW]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp ugt i64 [[TMP2]], 7
-; CHECK-NEXT:    br i1 [[TMP3]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP12:%.*]] = or i1 [[TMP11]], [[TMP3]]
+; CHECK-NEXT:    br i1 [[TMP12]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[N]], [[TMP1]]
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[N_MOD_VF]]
@@ -176,8 +197,15 @@ define i32 @bounded_load_unknown_max_vscale(ptr %A, i64 %N) {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[N]], -1
+; CHECK-NEXT:    [[TMP9:%.*]] = trunc i64 [[TMP2]] to i6
+; CHECK-NEXT:    [[MUL:%.*]] = call { i6, i1 } @llvm.umul.with.overflow.i6(i6 1, i6 [[TMP9]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i6, i1 } [[MUL]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i6, i1 } [[MUL]], 1
+; CHECK-NEXT:    [[TMP10:%.*]] = icmp ult i6 [[MUL_RESULT]], 0
+; CHECK-NEXT:    [[TMP11:%.*]] = or i1 [[TMP10]], [[MUL_OVERFLOW]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp ugt i64 [[TMP2]], 63
-; CHECK-NEXT:    br i1 [[TMP3]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP12:%.*]] = or i1 [[TMP11]], [[TMP3]]
+; CHECK-NEXT:    br i1 [[TMP12]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[N]], [[TMP1]]
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[N_MOD_VF]]
@@ -227,8 +255,15 @@ define i32 @bounded_load_bound64_user_ic(ptr %A, i64 %N) #0 {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[N]], -1
+; CHECK-NEXT:    [[TMP12:%.*]] = trunc i64 [[TMP2]] to i6
+; CHECK-NEXT:    [[MUL:%.*]] = call { i6, i1 } @llvm.umul.with.overflow.i6(i6 1, i6 [[TMP12]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i6, i1 } [[MUL]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i6, i1 } [[MUL]], 1
+; CHECK-NEXT:    [[TMP13:%.*]] = icmp ult i6 [[MUL_RESULT]], 0
+; CHECK-NEXT:    [[TMP14:%.*]] = or i1 [[TMP13]], [[MUL_OVERFLOW]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp ugt i64 [[TMP2]], 63
-; CHECK-NEXT:    br i1 [[TMP3]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP15:%.*]] = or i1 [[TMP14]], [[TMP3]]
+; CHECK-NEXT:    br i1 [[TMP15]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[TMP4:%.*]] = shl nuw i64 [[TMP0]], 2
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[N]], [[TMP1]]

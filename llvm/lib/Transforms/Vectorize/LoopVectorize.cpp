@@ -1537,6 +1537,10 @@ class GeneratedRTChecks {
   /// Basic block which contains the generated memory runtime checks, if any.
   BasicBlock *MemCheckBlock = nullptr;
 
+  /// Set in create() if SCEV checks were generated and did not fold away.
+  /// Unlike SCEVCheckCond, stays set when the pre-built block is dropped.
+  bool HasSCEVChecks = false;
+
   /// The value representing the result of the generated memory runtime checks.
   /// If it is nullptr no memory runtime checks have been generated.
   Value *MemRuntimeCheckCond = nullptr;
@@ -1619,6 +1623,7 @@ public:
         SCEVExpanderCleaner SCEVCleaner(SCEVExp);
         SCEVCleaner.cleanup();
       }
+      HasSCEVChecks = getSCEVChecks().first != nullptr;
     }
 
     const auto &RtPtrChecking = *LAI.getRuntimePointerChecking();
@@ -1790,10 +1795,45 @@ public:
     MemCheckCleaner.cleanup();
     SCEVCleaner.cleanup();
 
-    if (!SCEVChecksUsed)
+    if (!SCEVChecksUsed && SCEVCheckBlock)
       SCEVCheckBlock->eraseFromParent();
     if (!MemChecksUsed)
       MemCheckBlock->eraseFromParent();
+  }
+
+  /// Return true if the pre-built SCEV check block can be dropped in favour of
+  /// VPlan recipes. Memory runtime checks are expanded after the SCEV checks
+  /// and re-use the values expanded for them, which therefore must stay put.
+  /// TODO: Also convert those loops, by expanding the memory checks in VPlan
+  /// as well.
+  bool canDropSCEVChecks() const { return !MemCheckBlock; }
+
+  /// Drop the pre-built SCEV check block, which was only needed to cost the
+  /// checks; they are generated as VPlan recipes instead.
+  /// TODO: Remove once the checks can be costed in VPlan, before VF selection.
+  void dropSCEVChecks() {
+    assert(SCEVCheckBlock && pred_empty(SCEVCheckBlock) &&
+           "cannot drop SCEV checks that are missing or already connected");
+    SCEVExpanderCleaner SCEVCleaner(SCEVExp);
+    auto &SE = *SCEVExp.getSE();
+    // Predicate expansion creates compares that use expanded values. Remove
+    // them before running the SCEVExpanderCleaner.
+    for (auto &I : make_early_inc_range(reverse(*SCEVCheckBlock))) {
+      if (SCEVExp.isInsertedInstruction(&I))
+        continue;
+      SE.forgetValue(&I);
+      I.eraseFromParent();
+    }
+    SCEVCleaner.cleanup();
+    SCEVCheckBlock->eraseFromParent();
+    SCEVCheckBlock = nullptr;
+    SCEVCheckCond = nullptr;
+  }
+
+  /// Return true if the SCEV assumptions were expanded but the check folded
+  /// away, i.e. they are known to hold and need no check at all.
+  bool scevChecksAlwaysHold() const {
+    return SCEVCheckBlock && !getSCEVChecks().first;
   }
 
   /// Retrieves the SCEVCheckCond and SCEVCheckBlock that were generated as IR
@@ -1817,7 +1857,7 @@ public:
 
   /// Return true if any runtime checks have been added
   bool hasChecks() const {
-    return getSCEVChecks().first || getMemRuntimeChecks().first;
+    return HasSCEVChecks || getMemRuntimeChecks().first;
   }
 };
 } // namespace
@@ -6962,15 +7002,45 @@ void LoopVectorizationPlanner::addReductionResultComputation(
 }
 
 void LoopVectorizationPlanner::attachRuntimeChecks(
-    VPlan &Plan, GeneratedRTChecks &RTChecks, bool HasBranchWeights) const {
+    VPlan &Plan, GeneratedRTChecks &RTChecks, bool HasBranchWeights,
+    bool UseVPlanPredicates) const {
+  auto DropPredicates = [&Plan]() {
+    assert(all_of(Plan.getPredicateKinds(),
+                  [](VPPredicate::VPPredicateKind K) {
+                    return K == VPPredicate::VPSCEVPredicateSC;
+                  }) &&
+           "only SCEV predicates are also checked outside the plan");
+    Plan.clearPredicates();
+  };
   const auto &[SCEVCheckCond, SCEVCheckBlock] = RTChecks.getSCEVChecks();
-  if (SCEVCheckBlock && SCEVCheckBlock->hasNPredecessors(0)) {
+  if (RTChecks.scevChecksAlwaysHold()) {
+    // Expanding the assumptions folded the check away, so they are known to
+    // hold; drop the predicates rather than expanding them a second time.
+    DropPredicates();
+  } else if (SCEVCheckBlock && SCEVCheckBlock->hasNPredecessors(0)) {
     assert((!Config.OptForSize ||
             Config.getHints().getForce() == LoopVectorizeHints::FK_Enabled) &&
            "Cannot SCEV check stride or overflow when optimizing for size");
-    RUN_VPLAN_PASS(VPlanTransforms::attachCheckBlock, Plan, SCEVCheckCond,
-                   SCEVCheckBlock, HasBranchWeights);
+    // The plan records the assumptions as predicates and generates the checks
+    // as recipes below; the pre-built block was only needed to cost them.
+    if (UseVPlanPredicates && RTChecks.canDropSCEVChecks()) {
+      RTChecks.dropSCEVChecks();
+    } else {
+      // The pre-built block checks the assumptions the plan recorded, so drop
+      // the predicates rather than checking them twice.
+      DropPredicates();
+      RUN_VPLAN_PASS(VPlanTransforms::attachCheckBlock, Plan, SCEVCheckCond,
+                     SCEVCheckBlock, HasBranchWeights);
+    }
   }
+  // Conditions the plan records while it is built - the SCEV assumptions the
+  // vectorizer made, and the memory ranges an outer loop needs to be disjoint -
+  // are checked at runtime here. They are materialized before the pre-built
+  // memory check block is attached, to keep the order of the check blocks.
+  if (UseVPlanPredicates && Plan.hasPredicates())
+    RUN_VPLAN_PASS(VPlanTransforms::materializePredicates, Plan, *PSE.getSE(),
+                   OrigLoop->getStartLoc(), HasBranchWeights);
+
   const auto &[MemCheckCond, MemCheckBlock] = RTChecks.getMemRuntimeChecks();
   if (MemCheckBlock && MemCheckBlock->hasNPredecessors(0)) {
     // VPlan-native path does not do any analysis for runtime checks
@@ -8135,7 +8205,13 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     // checks for the main plan.
     LVP.addMinimumIterationCheck(BestMainPlan, EPI.EpilogueVF, EPI.EpilogueUF,
                                  ElementCount::getFixed(0));
-    LVP.attachRuntimeChecks(BestMainPlan, Checks, HasBranchWeights);
+    // Epilogue vectorization reads the pre-built check blocks back to find the
+    // main loop's iteration-count check, so it cannot use VPlan predicates yet.
+    LVP.attachRuntimeChecks(BestMainPlan, Checks, HasBranchWeights,
+                            /*UseVPlanPredicates=*/false);
+    // Both vector loops are bypassed by the main plan's check blocks, so the
+    // epilogue plan must not check the same predicates again.
+    BestEpiPlan.clearPredicates();
     RUN_VPLAN_PASS(
         VPlanTransforms::addIterationCountCheckBlock, BestMainPlan,
         EPI.MainLoopVF, EPI.MainLoopUF, BestMainPlan.requiresScalarEpilogue(),
@@ -8186,7 +8262,8 @@ bool LoopVectorizePass::processLoop(Loop *L) {
                            BestPlan);
     LVP.addMinimumIterationCheck(BestPlan, VF.Width, IC,
                                  VF.MinProfitableTripCount);
-    LVP.attachRuntimeChecks(BestPlan, Checks, HasBranchWeights);
+    LVP.attachRuntimeChecks(BestPlan, Checks, HasBranchWeights,
+                            /*UseVPlanPredicates=*/true);
 
     if (!IsInnerLoop)
       LLVM_DEBUG(dbgs() << "Vectorizing outer loop in \"" << F->getName()

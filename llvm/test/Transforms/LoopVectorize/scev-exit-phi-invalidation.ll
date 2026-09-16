@@ -26,13 +26,16 @@ define void @test_pr63368(i1 %c, ptr %A) {
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[TMP3]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
-; CHECK-NEXT:    [[SMAX:%.*]] = call i32 @llvm.smax.i32(i32 [[TMP0]], i32 -1)
-; CHECK-NEXT:    [[TMP4:%.*]] = add i32 [[SMAX]], 1
+; CHECK-NEXT:    [[TMP4:%.*]] = add i32 [[TMP2]], 1
 ; CHECK-NEXT:    [[TMP5:%.*]] = trunc i32 [[TMP4]] to i8
-; CHECK-NEXT:    [[TMP6:%.*]] = add i8 1, [[TMP5]]
+; CHECK-NEXT:    [[MUL:%.*]] = call { i8, i1 } @llvm.umul.with.overflow.i8(i8 1, i8 [[TMP5]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i8, i1 } [[MUL]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i8, i1 } [[MUL]], 1
+; CHECK-NEXT:    [[TMP6:%.*]] = add i8 1, [[MUL_RESULT]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp slt i8 [[TMP6]], 1
+; CHECK-NEXT:    [[TMP15:%.*]] = or i1 [[TMP7]], [[MUL_OVERFLOW]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp ugt i32 [[TMP4]], 255
-; CHECK-NEXT:    [[TMP9:%.*]] = or i1 [[TMP7]], [[TMP8]]
+; CHECK-NEXT:    [[TMP9:%.*]] = or i1 [[TMP15]], [[TMP8]]
 ; CHECK-NEXT:    br i1 [[TMP9]], label %[[SCALAR_PH]], label %[[VECTOR_PH1:.*]]
 ; CHECK:       [[VECTOR_PH1]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[TMP3]], 3

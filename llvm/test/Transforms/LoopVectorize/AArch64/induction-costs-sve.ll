@@ -506,12 +506,16 @@ define void @exit_cond_zext_iv_store32(ptr %dst, i64 %N) {
 ; DEFAULT-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP0]], 4
 ; DEFAULT-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; DEFAULT:       [[VECTOR_SCEVCHECK]]:
-; DEFAULT-NEXT:    [[TMP1:%.*]] = call i64 @llvm.usub.sat.i64(i64 [[N]], i64 1)
+; DEFAULT-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], -1
 ; DEFAULT-NEXT:    [[TMP2:%.*]] = trunc i64 [[TMP1]] to i32
-; DEFAULT-NEXT:    [[TMP3:%.*]] = add i32 1, [[TMP2]]
+; DEFAULT-NEXT:    [[MUL:%.*]] = call { i32, i1 } @llvm.umul.with.overflow.i32(i32 1, i32 [[TMP2]])
+; DEFAULT-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i32, i1 } [[MUL]], 0
+; DEFAULT-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i32, i1 } [[MUL]], 1
+; DEFAULT-NEXT:    [[TMP3:%.*]] = add i32 1, [[MUL_RESULT]]
 ; DEFAULT-NEXT:    [[TMP4:%.*]] = icmp ult i32 [[TMP3]], 1
+; DEFAULT-NEXT:    [[TMP17:%.*]] = or i1 [[TMP4]], [[MUL_OVERFLOW]]
 ; DEFAULT-NEXT:    [[TMP5:%.*]] = icmp ugt i64 [[TMP1]], 4294967295
-; DEFAULT-NEXT:    [[TMP6:%.*]] = or i1 [[TMP4]], [[TMP5]]
+; DEFAULT-NEXT:    [[TMP6:%.*]] = or i1 [[TMP17]], [[TMP5]]
 ; DEFAULT-NEXT:    br i1 [[TMP6]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; DEFAULT:       [[VECTOR_PH]]:
 ; DEFAULT-NEXT:    [[TMP7:%.*]] = and i64 [[TMP0]], 3
@@ -559,12 +563,16 @@ define void @exit_cond_zext_iv_store32(ptr %dst, i64 %N) {
 ; PRED-NEXT:    [[TMP0:%.*]] = call i64 @llvm.umax.i64(i64 [[N]], i64 1)
 ; PRED-NEXT:    br label %[[VECTOR_SCEVCHECK:.*]]
 ; PRED:       [[VECTOR_SCEVCHECK]]:
-; PRED-NEXT:    [[TMP1:%.*]] = call i64 @llvm.usub.sat.i64(i64 [[N]], i64 1)
+; PRED-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], -1
 ; PRED-NEXT:    [[TMP2:%.*]] = trunc i64 [[TMP1]] to i32
-; PRED-NEXT:    [[TMP3:%.*]] = add i32 1, [[TMP2]]
+; PRED-NEXT:    [[MUL:%.*]] = call { i32, i1 } @llvm.umul.with.overflow.i32(i32 1, i32 [[TMP2]])
+; PRED-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i32, i1 } [[MUL]], 0
+; PRED-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i32, i1 } [[MUL]], 1
+; PRED-NEXT:    [[TMP3:%.*]] = add i32 1, [[MUL_RESULT]]
 ; PRED-NEXT:    [[TMP4:%.*]] = icmp ult i32 [[TMP3]], 1
+; PRED-NEXT:    [[TMP15:%.*]] = or i1 [[TMP4]], [[MUL_OVERFLOW]]
 ; PRED-NEXT:    [[TMP5:%.*]] = icmp ugt i64 [[TMP1]], 4294967295
-; PRED-NEXT:    [[TMP6:%.*]] = or i1 [[TMP4]], [[TMP5]]
+; PRED-NEXT:    [[TMP6:%.*]] = or i1 [[TMP15]], [[TMP5]]
 ; PRED-NEXT:    br i1 [[TMP6]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; PRED:       [[VECTOR_PH]]:
 ; PRED-NEXT:    [[N_RND_UP:%.*]] = add i64 [[TMP0]], 3
@@ -654,12 +662,16 @@ define void @exit_cond_zext_iv_store64(ptr %dst, i64 %N) {
 ; DEFAULT-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP0]], 16
 ; DEFAULT-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; DEFAULT:       [[VECTOR_SCEVCHECK]]:
-; DEFAULT-NEXT:    [[TMP1:%.*]] = call i64 @llvm.usub.sat.i64(i64 [[N]], i64 1)
+; DEFAULT-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], -1
 ; DEFAULT-NEXT:    [[TMP2:%.*]] = trunc i64 [[TMP1]] to i32
-; DEFAULT-NEXT:    [[TMP3:%.*]] = add i32 1, [[TMP2]]
+; DEFAULT-NEXT:    [[MUL:%.*]] = call { i32, i1 } @llvm.umul.with.overflow.i32(i32 1, i32 [[TMP2]])
+; DEFAULT-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i32, i1 } [[MUL]], 0
+; DEFAULT-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i32, i1 } [[MUL]], 1
+; DEFAULT-NEXT:    [[TMP3:%.*]] = add i32 1, [[MUL_RESULT]]
 ; DEFAULT-NEXT:    [[TMP4:%.*]] = icmp ult i32 [[TMP3]], 1
+; DEFAULT-NEXT:    [[TMP12:%.*]] = or i1 [[TMP4]], [[MUL_OVERFLOW]]
 ; DEFAULT-NEXT:    [[TMP5:%.*]] = icmp ugt i64 [[TMP1]], 4294967295
-; DEFAULT-NEXT:    [[TMP6:%.*]] = or i1 [[TMP4]], [[TMP5]]
+; DEFAULT-NEXT:    [[TMP6:%.*]] = or i1 [[TMP12]], [[TMP5]]
 ; DEFAULT-NEXT:    br i1 [[TMP6]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; DEFAULT:       [[VECTOR_PH]]:
 ; DEFAULT-NEXT:    [[TMP7:%.*]] = and i64 [[TMP0]], 3

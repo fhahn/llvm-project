@@ -419,7 +419,8 @@ define void @pr43371_pgso(i16 %val) !prof !14 {
 ; NPGSO:       [[VECTOR_SCEVCHECK]]:
 ; NPGSO-NEXT:    [[TMP0:%.*]] = add i16 [[VAL]], 755
 ; NPGSO-NEXT:    [[TMP4:%.*]] = icmp ult i16 [[TMP0]], [[VAL]]
-; NPGSO-NEXT:    br i1 [[TMP4]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; NPGSO-NEXT:    [[TMP6:%.*]] = or i1 [[TMP4]], false
+; NPGSO-NEXT:    br i1 [[TMP6]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; NPGSO:       [[VECTOR_PH]]:
 ; NPGSO-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; NPGSO:       [[VECTOR_BODY]]:

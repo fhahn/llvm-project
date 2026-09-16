@@ -714,9 +714,9 @@ define void @double_stride_int_scaled(ptr %p, ptr %p2, i64 %stride) vscale_range
 ; STRIDED-NEXT:    [[TMP32:%.*]] = icmp ugt ptr [[TMP30]], [[P2]]
 ; STRIDED-NEXT:    [[TMP33:%.*]] = select i1 [[TMP26]], i1 [[TMP32]], i1 [[TMP31]]
 ; STRIDED-NEXT:    [[TMP13:%.*]] = or i1 [[TMP33]], [[MUL_OVERFLOW]]
-; STRIDED-NEXT:    [[TMP34:%.*]] = icmp slt i64 [[TMP24]], 0
-; STRIDED-NEXT:    [[TMP15:%.*]] = select i1 [[TMP34]], i64 [[TMP25]], i64 [[TMP24]]
-; STRIDED-NEXT:    [[MUL1:%.*]] = call { i64, i1 } @llvm.umul.with.overflow.i64(i64 [[TMP15]], i64 1023)
+; STRIDED-NEXT:    [[TMP11:%.*]] = icmp slt i64 [[TMP24]], 0
+; STRIDED-NEXT:    [[TMP14:%.*]] = select i1 [[TMP11]], i64 [[TMP25]], i64 [[TMP24]]
+; STRIDED-NEXT:    [[MUL1:%.*]] = call { i64, i1 } @llvm.umul.with.overflow.i64(i64 [[TMP14]], i64 1023)
 ; STRIDED-NEXT:    [[MUL_RESULT2:%.*]] = extractvalue { i64, i1 } [[MUL1]], 0
 ; STRIDED-NEXT:    [[MUL_OVERFLOW3:%.*]] = extractvalue { i64, i1 } [[MUL1]], 1
 ; STRIDED-NEXT:    [[TMP16:%.*]] = sub i64 0, [[MUL_RESULT2]]
@@ -724,7 +724,7 @@ define void @double_stride_int_scaled(ptr %p, ptr %p2, i64 %stride) vscale_range
 ; STRIDED-NEXT:    [[TMP36:%.*]] = getelementptr i8, ptr [[P]], i64 [[TMP16]]
 ; STRIDED-NEXT:    [[TMP37:%.*]] = icmp ult ptr [[TMP35]], [[P]]
 ; STRIDED-NEXT:    [[TMP38:%.*]] = icmp ugt ptr [[TMP36]], [[P]]
-; STRIDED-NEXT:    [[TMP39:%.*]] = select i1 [[TMP34]], i1 [[TMP38]], i1 [[TMP37]]
+; STRIDED-NEXT:    [[TMP39:%.*]] = select i1 [[TMP11]], i1 [[TMP38]], i1 [[TMP37]]
 ; STRIDED-NEXT:    [[TMP40:%.*]] = or i1 [[TMP39]], [[MUL_OVERFLOW3]]
 ; STRIDED-NEXT:    [[TMP23:%.*]] = or i1 [[TMP13]], [[TMP40]]
 ; STRIDED-NEXT:    br i1 [[TMP23]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]]
@@ -800,18 +800,18 @@ define void @double_stride_int_scaled(ptr %p, ptr %p2, i64 %stride) vscale_range
 ; STRIDED-UF2-NEXT:    [[TMP4:%.*]] = icmp slt i64 [[TMP2]], 0
 ; STRIDED-UF2-NEXT:    [[TMP5:%.*]] = select i1 [[TMP4]], i64 [[TMP3]], i64 [[TMP2]]
 ; STRIDED-UF2-NEXT:    [[MUL:%.*]] = call { i64, i1 } @llvm.umul.with.overflow.i64(i64 [[TMP5]], i64 1023)
-; STRIDED-UF2-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i64, i1 } [[MUL]], 0
+; STRIDED-UF2-NEXT:    [[MUL_RESULT9:%.*]] = extractvalue { i64, i1 } [[MUL]], 0
 ; STRIDED-UF2-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i64, i1 } [[MUL]], 1
-; STRIDED-UF2-NEXT:    [[TMP6:%.*]] = sub i64 0, [[MUL_RESULT]]
-; STRIDED-UF2-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr [[P2]], i64 [[MUL_RESULT]]
+; STRIDED-UF2-NEXT:    [[TMP6:%.*]] = sub i64 0, [[MUL_RESULT9]]
+; STRIDED-UF2-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr [[P2]], i64 [[MUL_RESULT9]]
 ; STRIDED-UF2-NEXT:    [[TMP8:%.*]] = getelementptr i8, ptr [[P2]], i64 [[TMP6]]
 ; STRIDED-UF2-NEXT:    [[TMP9:%.*]] = icmp ult ptr [[TMP7]], [[P2]]
 ; STRIDED-UF2-NEXT:    [[TMP10:%.*]] = icmp ugt ptr [[TMP8]], [[P2]]
 ; STRIDED-UF2-NEXT:    [[TMP11:%.*]] = select i1 [[TMP4]], i1 [[TMP10]], i1 [[TMP9]]
 ; STRIDED-UF2-NEXT:    [[TMP12:%.*]] = or i1 [[TMP11]], [[MUL_OVERFLOW]]
-; STRIDED-UF2-NEXT:    [[TMP13:%.*]] = icmp slt i64 [[TMP2]], 0
-; STRIDED-UF2-NEXT:    [[TMP14:%.*]] = select i1 [[TMP13]], i64 [[TMP3]], i64 [[TMP2]]
-; STRIDED-UF2-NEXT:    [[MUL1:%.*]] = call { i64, i1 } @llvm.umul.with.overflow.i64(i64 [[TMP14]], i64 1023)
+; STRIDED-UF2-NEXT:    [[TMP14:%.*]] = icmp slt i64 [[TMP2]], 0
+; STRIDED-UF2-NEXT:    [[TMP28:%.*]] = select i1 [[TMP14]], i64 [[TMP3]], i64 [[TMP2]]
+; STRIDED-UF2-NEXT:    [[MUL1:%.*]] = call { i64, i1 } @llvm.umul.with.overflow.i64(i64 [[TMP28]], i64 1023)
 ; STRIDED-UF2-NEXT:    [[MUL_RESULT2:%.*]] = extractvalue { i64, i1 } [[MUL1]], 0
 ; STRIDED-UF2-NEXT:    [[MUL_OVERFLOW3:%.*]] = extractvalue { i64, i1 } [[MUL1]], 1
 ; STRIDED-UF2-NEXT:    [[TMP15:%.*]] = sub i64 0, [[MUL_RESULT2]]
@@ -819,7 +819,7 @@ define void @double_stride_int_scaled(ptr %p, ptr %p2, i64 %stride) vscale_range
 ; STRIDED-UF2-NEXT:    [[TMP17:%.*]] = getelementptr i8, ptr [[P]], i64 [[TMP15]]
 ; STRIDED-UF2-NEXT:    [[TMP18:%.*]] = icmp ult ptr [[TMP16]], [[P]]
 ; STRIDED-UF2-NEXT:    [[TMP19:%.*]] = icmp ugt ptr [[TMP17]], [[P]]
-; STRIDED-UF2-NEXT:    [[TMP20:%.*]] = select i1 [[TMP13]], i1 [[TMP19]], i1 [[TMP18]]
+; STRIDED-UF2-NEXT:    [[TMP20:%.*]] = select i1 [[TMP14]], i1 [[TMP19]], i1 [[TMP18]]
 ; STRIDED-UF2-NEXT:    [[TMP21:%.*]] = or i1 [[TMP20]], [[MUL_OVERFLOW3]]
 ; STRIDED-UF2-NEXT:    [[TMP22:%.*]] = or i1 [[TMP12]], [[TMP21]]
 ; STRIDED-UF2-NEXT:    br i1 [[TMP22]], label %[[SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]

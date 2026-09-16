@@ -8,6 +8,8 @@ define i32 @live_out(ptr noalias %p, i32 %n) {
 ; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<%n> = original trip-count
+; CHECK-NEXT:  Predicates:
+; CHECK-NEXT:    {0,+,1}<nuw><%loop> Added Flags: <nssw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
@@ -94,6 +96,8 @@ define i32 @conditional_live_out(ptr noalias %p, i32 %n, i1 %c) {
 ; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<%n> = original trip-count
+; CHECK-NEXT:  Predicates:
+; CHECK-NEXT:    {0,+,1}<nuw><%loop> Added Flags: <nssw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
@@ -111,7 +115,7 @@ define i32 @conditional_live_out(ptr noalias %p, i32 %n, i1 %c) {
 ; CHECK-NEXT:    Successor(s): vector.body.split, vector.latch
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body.split:
-; CHECK-NEXT:      EMIT branch-on-cond ir<%c>
+; CHECK-NEXT:      EMIT branch-on-cond ir<%c> (!vplan.prof.estimated estimated {1073741824, 1073741824})
 ; CHECK-NEXT:    Successor(s): if, latch
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    if:
@@ -261,6 +265,8 @@ define i32 @reduction(ptr noalias %p, i32 %n) {
 ; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<%n> = original trip-count
+; CHECK-NEXT:  Predicates:
+; CHECK-NEXT:    {0,+,1}<nuw><%loop> Added Flags: <nssw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph

@@ -10,8 +10,15 @@ define i32 @bounded_user_ic_exceeds_window(ptr %A, i32 %N) {
 ; IC4-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; IC4:       [[VECTOR_SCEVCHECK]]:
 ; IC4-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
+; IC4-NEXT:    [[TMP13:%.*]] = trunc i32 [[TMP0]] to i3
+; IC4-NEXT:    [[MUL:%.*]] = call { i3, i1 } @llvm.umul.with.overflow.i3(i3 1, i3 [[TMP13]])
+; IC4-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i3, i1 } [[MUL]], 0
+; IC4-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i3, i1 } [[MUL]], 1
+; IC4-NEXT:    [[TMP14:%.*]] = icmp ult i3 [[MUL_RESULT]], 0
+; IC4-NEXT:    [[TMP15:%.*]] = or i1 [[TMP14]], [[MUL_OVERFLOW]]
 ; IC4-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], 7
-; IC4-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; IC4-NEXT:    [[TMP16:%.*]] = or i1 [[TMP15]], [[TMP1]]
+; IC4-NEXT:    br i1 [[TMP16]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; IC4:       [[VECTOR_PH]]:
 ; IC4-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[N]], 15
 ; IC4-NEXT:    [[N_VEC:%.*]] = sub i32 [[N]], [[N_MOD_VF]]
@@ -70,8 +77,15 @@ define i32 @bounded_user_ic_exceeds_window(ptr %A, i32 %N) {
 ; IC3-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; IC3:       [[VECTOR_SCEVCHECK]]:
 ; IC3-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
+; IC3-NEXT:    [[TMP11:%.*]] = trunc i32 [[TMP0]] to i3
+; IC3-NEXT:    [[MUL:%.*]] = call { i3, i1 } @llvm.umul.with.overflow.i3(i3 1, i3 [[TMP11]])
+; IC3-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i3, i1 } [[MUL]], 0
+; IC3-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i3, i1 } [[MUL]], 1
+; IC3-NEXT:    [[TMP12:%.*]] = icmp ult i3 [[MUL_RESULT]], 0
+; IC3-NEXT:    [[TMP13:%.*]] = or i1 [[TMP12]], [[MUL_OVERFLOW]]
 ; IC3-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], 7
-; IC3-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; IC3-NEXT:    [[TMP14:%.*]] = or i1 [[TMP13]], [[TMP1]]
+; IC3-NEXT:    br i1 [[TMP14]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; IC3:       [[VECTOR_PH]]:
 ; IC3-NEXT:    [[N_MOD_VF:%.*]] = urem i32 [[N]], 12
 ; IC3-NEXT:    [[N_VEC:%.*]] = sub i32 [[N]], [[N_MOD_VF]]

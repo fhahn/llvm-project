@@ -365,12 +365,17 @@ define i32 @diff_exit_block_needs_scev_check(i32 %end) {
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP2]], 8
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
-; CHECK-NEXT:    [[TMP3:%.*]] = call i32 @llvm.usub.sat.i32(i32 [[END_CLAMPED]], i32 1)
+; CHECK-NEXT:    [[TMP18:%.*]] = call i32 @llvm.umax.i32(i32 [[END_CLAMPED]], i32 1)
+; CHECK-NEXT:    [[TMP3:%.*]] = add nsw i32 [[TMP18]], -1
 ; CHECK-NEXT:    [[TMP4:%.*]] = trunc i32 [[TMP3]] to i8
-; CHECK-NEXT:    [[TMP5:%.*]] = add i8 1, [[TMP4]]
+; CHECK-NEXT:    [[MUL:%.*]] = call { i8, i1 } @llvm.umul.with.overflow.i8(i8 1, i8 [[TMP4]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i8, i1 } [[MUL]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i8, i1 } [[MUL]], 1
+; CHECK-NEXT:    [[TMP5:%.*]] = add i8 1, [[MUL_RESULT]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp ult i8 [[TMP5]], 1
+; CHECK-NEXT:    [[TMP19:%.*]] = or i1 [[TMP6]], [[MUL_OVERFLOW]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp ugt i32 [[TMP3]], 255
-; CHECK-NEXT:    [[TMP8:%.*]] = or i1 [[TMP6]], [[TMP7]]
+; CHECK-NEXT:    [[TMP8:%.*]] = or i1 [[TMP19]], [[TMP7]]
 ; CHECK-NEXT:    br i1 [[TMP8]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP2]], 3

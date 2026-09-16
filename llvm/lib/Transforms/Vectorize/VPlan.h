@@ -1354,6 +1354,13 @@ public:
     /// scalars extracted from a vector, to be replaced by VF ExtractElement
     /// VPInstructions.
     Unpack,
+    /// Extracts the field of the struct-typed first operand selected by the
+    /// constant second operand. Unlike Instruction::ExtractValue, which takes
+    /// its indices from the underlying instruction, the field is an operand, so
+    /// the recipe can be created without underlying IR.
+    /// TODO: Merge with Instruction::ExtractValue once that carries its index
+    /// as an operand as well.
+    ExtractStructField,
     /// Reduce the operands to the final reduction result using the operation
     /// specified via the operation's VPIRFlags.
     ComputeReductionResult,
@@ -4840,6 +4847,64 @@ inline const VPRegionBlock *VPRecipeBase::getRegion() const {
   return getParent()->getParent();
 }
 
+/// A condition that must hold for a VPlan's vector loop to be executed. Like
+/// the predicates of PredicatedScalarEvolution, predicates are collected while
+/// the plan is built and only later turned into runtime checks, by
+/// VPlanTransforms::materializePredicates().
+class VPPredicate {
+public:
+  /// An enumeration for keeping track of the concrete subclass of VPPredicate.
+  enum VPPredicateKind { VPSCEVPredicateSC };
+
+  VPPredicate(VPPredicateKind Kind) : Kind(Kind) {}
+  VPPredicate(const VPPredicate &) = delete;
+  VPPredicate &operator=(const VPPredicate &) = delete;
+  virtual ~VPPredicate() = default;
+
+  VPPredicateKind getKind() const { return Kind; }
+
+  virtual std::unique_ptr<VPPredicate> clone() const = 0;
+
+  /// Expand the condition under which this predicate does not hold; the vector
+  /// loop is bypassed when it is true.
+  virtual VPValue *expandNegated(VPSCEVExpander &Exp) const = 0;
+
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+  /// Print the predicate on a single line, indented by \p Depth spaces and
+  /// terminated by a newline, matching SCEVPredicate::print.
+  virtual void print(raw_ostream &O, unsigned Depth) const = 0;
+#endif
+
+private:
+  const VPPredicateKind Kind;
+};
+
+/// The SCEV predicate \p Pred holds. Collected from PredicatedScalarEvolution,
+/// which the vectorizer uses to assume away non-affine or wrapping inductions.
+class VPSCEVPredicate : public VPPredicate {
+  const SCEVPredicate *Pred;
+
+public:
+  VPSCEVPredicate(const SCEVPredicate *Pred)
+      : VPPredicate(VPSCEVPredicateSC), Pred(Pred) {}
+
+  static bool classof(const VPPredicate *P) {
+    return P->getKind() == VPSCEVPredicateSC;
+  }
+
+  std::unique_ptr<VPPredicate> clone() const override {
+    return std::make_unique<VPSCEVPredicate>(Pred);
+  }
+
+  VPValue *expandNegated(VPSCEVExpander &Exp) const override;
+
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+  void print(raw_ostream &O, unsigned Depth) const override {
+    Pred->print(O, Depth);
+  }
+#endif
+};
+
 /// VPlan models a candidate for vectorization, encoding various decisions take
 /// to produce efficient output IR, including which branches, basic-blocks and
 /// output IR instructions to generate, and their cost. VPlan holds a
@@ -4906,6 +4971,11 @@ class VPlan {
   /// Blocks allocated and owned by the VPlan. They will be deleted once the
   /// VPlan is destroyed.
   SmallVector<VPBlockBase *> CreatedBlocks;
+
+  /// Conditions that must hold for the vector loop to be executed. They are
+  /// turned into runtime checks bypassing the vector loop by
+  /// VPlanTransforms::materializePredicates().
+  SmallVector<std::unique_ptr<VPPredicate>, 2> Predicates;
 
   /// Construct a VPlan with \p Entry to the plan and with \p ScalarHeader
   /// wrapping the original header of the scalar loop. The vector loop will have
@@ -5020,6 +5090,33 @@ public:
 
   /// Returns true if \p VPBB is an exit block.
   bool isExitBlock(VPBlockBase *VPBB);
+
+  /// Add \p P to the conditions that must hold for the vector loop to be
+  /// executed.
+  void addPredicate(std::unique_ptr<VPPredicate> P) {
+    Predicates.push_back(std::move(P));
+  }
+
+  /// Return true if any condition must hold for the vector loop to be executed.
+  bool hasPredicates() const { return !Predicates.empty(); }
+
+  /// Return the kinds of the conditions that must hold for the vector loop to
+  /// be executed.
+  auto getPredicateKinds() const {
+    return map_range(Predicates, [](const std::unique_ptr<VPPredicate> &P) {
+      return P->getKind();
+    });
+  }
+
+  /// Remove the conditions that must hold for the vector loop to be executed
+  /// and hand them to the caller, which is responsible for checking them.
+  SmallVector<std::unique_ptr<VPPredicate>, 2> takePredicates() {
+    return std::move(Predicates);
+  }
+
+  /// Remove the conditions that must hold for the vector loop to be executed,
+  /// because they are known to hold or are checked without the plan.
+  void clearPredicates() { Predicates.clear(); }
 
   /// The trip count of the original loop.
   VPValue *getTripCount() const {

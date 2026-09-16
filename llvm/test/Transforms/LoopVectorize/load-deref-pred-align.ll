@@ -166,12 +166,17 @@ define i32 @loop_requires_scev_predicate(ptr %dest, i32 %end) {
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[UMAX1]], 2
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_SCEVCHECK:%.*]]
 ; CHECK:       vector.scevcheck:
-; CHECK-NEXT:    [[TMP2:%.*]] = call i32 @llvm.usub.sat.i32(i32 [[END_CLAMPED]], i32 1)
+; CHECK-NEXT:    [[TMP10:%.*]] = call i32 @llvm.umax.i32(i32 [[END_CLAMPED]], i32 1)
+; CHECK-NEXT:    [[TMP2:%.*]] = add nsw i32 [[TMP10]], -1
 ; CHECK-NEXT:    [[TMP3:%.*]] = trunc i32 [[TMP2]] to i8
-; CHECK-NEXT:    [[TMP4:%.*]] = add i8 1, [[TMP3]]
+; CHECK-NEXT:    [[MUL:%.*]] = call { i8, i1 } @llvm.umul.with.overflow.i8(i8 1, i8 [[TMP3]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i8, i1 } [[MUL]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i8, i1 } [[MUL]], 1
+; CHECK-NEXT:    [[TMP4:%.*]] = add i8 1, [[MUL_RESULT]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp ult i8 [[TMP4]], 1
+; CHECK-NEXT:    [[TMP8:%.*]] = or i1 [[TMP5]], [[MUL_OVERFLOW]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp ugt i32 [[TMP2]], 255
-; CHECK-NEXT:    [[TMP7:%.*]] = or i1 [[TMP5]], [[TMP6]]
+; CHECK-NEXT:    [[TMP7:%.*]] = or i1 [[TMP8]], [[TMP6]]
 ; CHECK-NEXT:    br i1 [[TMP7]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[UMAX1]], 1

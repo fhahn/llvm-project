@@ -24,7 +24,6 @@ define void @foo(ptr nocapture %a, ptr nocapture %b, i32 %k, i32 %m) #0 {
 ; CHECK-NEXT:    [[CMP27:%.*]] = icmp sgt i32 [[M:%.*]], 0
 ; CHECK-NEXT:    br i1 [[CMP27]], label [[FOR_BODY3_LR_PH_US_PREHEADER:%.*]], label [[FOR_END15:%.*]]
 ; CHECK:       for.body3.lr.ph.us.preheader:
-; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[M]], -1
 ; CHECK-NEXT:    br label [[FOR_BODY3_LR_PH_US:%.*]]
 ; CHECK:       for.end.us:
 ; CHECK-NEXT:    [[ARRAYIDX9_US:%.*]] = getelementptr inbounds i32, ptr [[B:%.*]], i64 [[INDVARS_IV33:%.*]]
@@ -57,9 +56,14 @@ define void @foo(ptr nocapture %a, ptr nocapture %b, i32 %k, i32 %m) #0 {
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP2]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH]], label [[VECTOR_SCEVCHECK:%.*]]
 ; CHECK:       vector.scevcheck:
+; CHECK-NEXT:    [[TMP7:%.*]] = add i32 [[M]], -1
+; CHECK-NEXT:    [[MUL:%.*]] = call { i32, i1 } @llvm.umul.with.overflow.i32(i32 1, i32 [[TMP7]])
+; CHECK-NEXT:    [[TMP0:%.*]] = extractvalue { i32, i1 } [[MUL]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i32, i1 } [[MUL]], 1
 ; CHECK-NEXT:    [[TMP6:%.*]] = add i32 [[ADD_US]], [[TMP0]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = icmp slt i32 [[TMP6]], [[ADD_US]]
-; CHECK-NEXT:    br i1 [[TMP10]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
+; CHECK-NEXT:    [[TMP9:%.*]] = or i1 [[TMP10]], [[MUL_OVERFLOW]]
+; CHECK-NEXT:    br i1 [[TMP9]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP2]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP2]], [[N_MOD_VF]]

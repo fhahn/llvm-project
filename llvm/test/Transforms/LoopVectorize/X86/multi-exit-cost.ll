@@ -12,11 +12,14 @@ define i64 @test_value_in_exit_compare_chain_used_outside(ptr %src, i64 %x, i64 
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ule i64 [[TMP2]], 8
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
-; CHECK-NEXT:    [[TMP3:%.*]] = add nsw i64 [[N]], -1
-; CHECK-NEXT:    [[TMP4:%.*]] = freeze i64 [[TMP3]]
-; CHECK-NEXT:    [[UMIN:%.*]] = call i64 @llvm.umin.i64(i64 [[TMP4]], i64 [[X]])
-; CHECK-NEXT:    [[TMP5:%.*]] = trunc i64 [[UMIN]] to i1
-; CHECK-NEXT:    [[TMP6:%.*]] = icmp ugt i64 [[UMIN]], 1
+; CHECK-NEXT:    [[TMP4:%.*]] = trunc i64 [[UMIN2]] to i1
+; CHECK-NEXT:    [[MUL:%.*]] = call { i1, i1 } @llvm.umul.with.overflow.i1(i1 true, i1 [[TMP4]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i1, i1 } [[MUL]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i1, i1 } [[MUL]], 1
+; CHECK-NEXT:    [[TMP11:%.*]] = sub i1 false, [[MUL_RESULT]]
+; CHECK-NEXT:    [[TMP12:%.*]] = icmp ugt i1 [[TMP11]], false
+; CHECK-NEXT:    [[TMP5:%.*]] = or i1 [[TMP12]], [[MUL_OVERFLOW]]
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp ugt i64 [[UMIN2]], 1
 ; CHECK-NEXT:    [[TMP7:%.*]] = or i1 [[TMP5]], [[TMP6]]
 ; CHECK-NEXT:    br i1 [[TMP7]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:

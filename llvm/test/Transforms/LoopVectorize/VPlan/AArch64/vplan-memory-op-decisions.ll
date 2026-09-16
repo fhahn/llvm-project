@@ -83,8 +83,8 @@ define void @load_feeding_only_mask_not_scalarized(ptr noalias %A, ptr noalias %
 ; CHECK-NEXT:    then:
 ; CHECK-NEXT:      EMIT ir<%gep.B> = getelementptr ir<%B>, ir<%iv>
 ; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer ptr, ir<%gep.B>, ir<1>
-; CHECK-NEXT:      WIDEN ir<%l.p> = load vp<[[VP5]]>, ir<%cmp>
-; CHECK-NEXT:      EMIT store ir<42>, ir<%l.p>, ir<%cmp>
+; CHECK-NEXT:      WIDEN ir<%l.p> = load vp<[[VP5]]>, ir<%cmp> (!vplan.execution.frequency 5764607523034234880 (62.5%, estimated))
+; CHECK-NEXT:      EMIT store ir<42>, ir<%l.p>, ir<%cmp> (!vplan.execution.frequency 5764607523034234880 (62.5%, estimated))
 ; CHECK-NEXT:    Successor(s): latch
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    latch:
@@ -297,6 +297,8 @@ define void @consecutive_load_with_first_order_recurrence_address(ptr noalias %a
 ; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<%n> = original trip-count
+; CHECK-NEXT:  Predicates:
+; CHECK-NEXT:    {0,+,1}<%loop> Added Flags: <nusw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
@@ -379,11 +381,11 @@ define void @cond_load_store(ptr noalias %a, ptr noalias %b, ptr noalias %cond, 
 ; CHECK-NEXT:    then:
 ; CHECK-NEXT:      EMIT ir<%gep.a> = getelementptr inbounds ir<%a>, ir<%iv>
 ; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds i32, ir<%gep.a>, ir<1>
-; CHECK-NEXT:      WIDEN ir<%lv> = load vp<[[VP5]]>, ir<%cmp>
-; CHECK-NEXT:      EMIT ir<%add> = add ir<%lv>, ir<1>, ir<%cmp>
+; CHECK-NEXT:      WIDEN ir<%lv> = load vp<[[VP5]]>, ir<%cmp> (!vplan.execution.frequency 5764607523034234880 (62.5%, estimated))
+; CHECK-NEXT:      EMIT ir<%add> = add ir<%lv>, ir<1>, ir<%cmp> (!vplan.execution.frequency 5764607523034234880 (62.5%, estimated))
 ; CHECK-NEXT:      EMIT ir<%gep.b> = getelementptr inbounds ir<%b>, ir<%iv>
 ; CHECK-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer inbounds i32, ir<%gep.b>, ir<1>
-; CHECK-NEXT:      WIDEN store vp<[[VP6]]>, ir<%add>, ir<%cmp>
+; CHECK-NEXT:      WIDEN store vp<[[VP6]]>, ir<%add>, ir<%cmp> (!vplan.execution.frequency 5764607523034234880 (62.5%, estimated))
 ; CHECK-NEXT:    Successor(s): latch
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    latch:
@@ -456,14 +458,14 @@ define void @cond_reverse_load_store(ptr noalias %a, ptr noalias %b, ptr noalias
 ; CHECK-NEXT:      EMIT ir<%gep.a> = getelementptr inbounds ir<%a>, ir<%iv>
 ; CHECK-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-end-pointer inbounds i32, ir<%gep.a>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT vp<[[VP7:%[0-9]+]]> = reverse ir<%cmp>
-; CHECK-NEXT:      WIDEN ir<%lv> = load vp<[[VP6]]>, vp<[[VP7]]>
+; CHECK-NEXT:      WIDEN ir<%lv> = load vp<[[VP6]]>, vp<[[VP7]]> (!vplan.execution.frequency 5764607523034234880 (62.5%, estimated))
 ; CHECK-NEXT:      EMIT vp<[[VP8:%[0-9]+]]> = reverse ir<%lv>
-; CHECK-NEXT:      EMIT ir<%add> = add vp<[[VP8]]>, ir<1>, ir<%cmp>
+; CHECK-NEXT:      EMIT ir<%add> = add vp<[[VP8]]>, ir<1>, ir<%cmp> (!vplan.execution.frequency 5764607523034234880 (62.5%, estimated))
 ; CHECK-NEXT:      EMIT ir<%gep.b> = getelementptr inbounds ir<%b>, ir<%iv>
 ; CHECK-NEXT:      vp<[[VP9:%[0-9]+]]> = vector-end-pointer inbounds i32, ir<%gep.b>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT vp<[[VP10:%[0-9]+]]> = reverse ir<%cmp>
 ; CHECK-NEXT:      EMIT vp<[[VP11:%[0-9]+]]> = reverse ir<%add>
-; CHECK-NEXT:      WIDEN store vp<[[VP9]]>, vp<[[VP11]]>, vp<[[VP10]]>
+; CHECK-NEXT:      WIDEN store vp<[[VP9]]>, vp<[[VP11]]>, vp<[[VP10]]> (!vplan.execution.frequency 5764607523034234880 (62.5%, estimated))
 ; CHECK-NEXT:    Successor(s): latch
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    latch:
@@ -754,11 +756,11 @@ define void @blend_with_identical_incoming_values_address(ptr noalias %A, i1 %c)
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    else:
 ; CHECK-NEXT:      EMIT vp<[[VP4:%[0-9]+]]> = not ir<%c>
-; CHECK-NEXT:      EMIT ir<%idx.else> = add nsw ir<%iv>, ir<-1>, vp<[[VP4]]>
+; CHECK-NEXT:      EMIT ir<%idx.else> = add nsw ir<%iv>, ir<-1>, vp<[[VP4]]> (!vplan.execution.frequency 4611686018427387904 (50%, estimated))
 ; CHECK-NEXT:    Successor(s): then
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    then:
-; CHECK-NEXT:      EMIT ir<%idx.then> = add nsw ir<%iv>, ir<-1>, ir<%c>
+; CHECK-NEXT:      EMIT ir<%idx.then> = add nsw ir<%iv>, ir<-1>, ir<%c> (!vplan.execution.frequency 4611686018427387904 (50%, estimated))
 ; CHECK-NEXT:    Successor(s): latch
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    latch:
@@ -997,11 +999,11 @@ define void @blend_with_different_incoming_values_address(ptr noalias %A, ptr no
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    else:
 ; CHECK-NEXT:      EMIT vp<[[VP4:%[0-9]+]]> = not ir<%c>
-; CHECK-NEXT:      EMIT ir<%idx.else> = add nsw ir<%iv>, ir<-2>, vp<[[VP4]]>
+; CHECK-NEXT:      EMIT ir<%idx.else> = add nsw ir<%iv>, ir<-2>, vp<[[VP4]]> (!vplan.execution.frequency 4611686018427387904 (50%, estimated))
 ; CHECK-NEXT:    Successor(s): then
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    then:
-; CHECK-NEXT:      EMIT ir<%idx.then> = add nsw ir<%iv>, ir<-1>, ir<%c>
+; CHECK-NEXT:      EMIT ir<%idx.then> = add nsw ir<%iv>, ir<-1>, ir<%c> (!vplan.execution.frequency 4611686018427387904 (50%, estimated))
 ; CHECK-NEXT:    Successor(s): latch
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    latch:

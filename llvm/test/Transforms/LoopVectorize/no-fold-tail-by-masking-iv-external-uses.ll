@@ -15,10 +15,14 @@ define i32 @test(ptr %arr, i64 %n) {
 ; CHECK:       vector.scevcheck:
 ; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[N]], -2
 ; CHECK-NEXT:    [[TMP7:%.*]] = trunc i64 [[TMP1]] to i8
-; CHECK-NEXT:    [[TMP8:%.*]] = add i8 2, [[TMP7]]
+; CHECK-NEXT:    [[MUL:%.*]] = call { i8, i1 } @llvm.umul.with.overflow.i8(i8 1, i8 [[TMP7]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i8, i1 } [[MUL]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i8, i1 } [[MUL]], 1
+; CHECK-NEXT:    [[TMP8:%.*]] = add i8 2, [[MUL_RESULT]]
 ; CHECK-NEXT:    [[TMP9:%.*]] = icmp ult i8 [[TMP8]], 2
+; CHECK-NEXT:    [[TMP5:%.*]] = or i1 [[TMP9]], [[MUL_OVERFLOW]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = icmp ugt i64 [[TMP1]], 255
-; CHECK-NEXT:    [[TMP12:%.*]] = or i1 [[TMP9]], [[TMP10]]
+; CHECK-NEXT:    [[TMP12:%.*]] = or i1 [[TMP5]], [[TMP10]]
 ; CHECK-NEXT:    br i1 [[TMP12]], label [[SCALAR_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
 ; CHECK-NEXT:    [[N_RND_UP:%.*]] = add i64 [[TMP0]], 3

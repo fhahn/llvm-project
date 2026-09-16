@@ -427,17 +427,18 @@ define i64 @induction_cast_chain_cleared_by_dce(i64 %n, i64 %mask.init) {
 ; VF4-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP1]], 4
 ; VF4-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; VF4:       [[VECTOR_SCEVCHECK]]:
-; VF4-NEXT:    [[TMP4:%.*]] = add nuw nsw i64 [[MASK]], 2
-; VF4-NEXT:    [[SMAX:%.*]] = call i64 @llvm.smax.i64(i64 [[N]], i64 [[TMP4]])
-; VF4-NEXT:    [[TMP5:%.*]] = add i64 [[SMAX]], -2
+; VF4-NEXT:    [[TMP5:%.*]] = add i64 [[TMP2]], -2
 ; VF4-NEXT:    [[TMP6:%.*]] = sub i64 [[TMP5]], [[MASK]]
 ; VF4-NEXT:    [[TMP7:%.*]] = trunc i64 [[TMP6]] to i32
-; VF4-NEXT:    [[TMP8:%.*]] = add i32 1, [[TMP7]]
+; VF4-NEXT:    [[MUL:%.*]] = call { i32, i1 } @llvm.umul.with.overflow.i32(i32 1, i32 [[TMP7]])
+; VF4-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i32, i1 } [[MUL]], 0
+; VF4-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i32, i1 } [[MUL]], 1
+; VF4-NEXT:    [[TMP8:%.*]] = add i32 1, [[MUL_RESULT]]
 ; VF4-NEXT:    [[TMP9:%.*]] = icmp ult i32 [[TMP8]], 1
+; VF4-NEXT:    [[TMP12:%.*]] = or i1 [[TMP9]], [[MUL_OVERFLOW]]
 ; VF4-NEXT:    [[TMP10:%.*]] = icmp ugt i64 [[TMP6]], 4294967295
-; VF4-NEXT:    [[TMP11:%.*]] = or i1 [[TMP9]], [[TMP10]]
-; VF4-NEXT:    [[TMP12:%.*]] = add nuw nsw i64 [[MASK]], 1
-; VF4-NEXT:    [[IDENT_CHECK:%.*]] = icmp ne i64 [[TMP12]], 1
+; VF4-NEXT:    [[TMP11:%.*]] = or i1 [[TMP12]], [[TMP10]]
+; VF4-NEXT:    [[IDENT_CHECK:%.*]] = icmp ne i64 [[TMP3]], 1
 ; VF4-NEXT:    [[TMP13:%.*]] = or i1 [[TMP11]], [[IDENT_CHECK]]
 ; VF4-NEXT:    br i1 [[TMP13]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; VF4:       [[VECTOR_PH]]:
@@ -495,17 +496,18 @@ define i64 @induction_cast_chain_cleared_by_dce(i64 %n, i64 %mask.init) {
 ; IC2-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP1]], 2
 ; IC2-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; IC2:       [[VECTOR_SCEVCHECK]]:
-; IC2-NEXT:    [[TMP4:%.*]] = add nuw nsw i64 [[MASK]], 2
-; IC2-NEXT:    [[SMAX:%.*]] = call i64 @llvm.smax.i64(i64 [[N]], i64 [[TMP4]])
-; IC2-NEXT:    [[TMP5:%.*]] = add i64 [[SMAX]], -2
+; IC2-NEXT:    [[TMP5:%.*]] = add i64 [[TMP2]], -2
 ; IC2-NEXT:    [[TMP6:%.*]] = sub i64 [[TMP5]], [[MASK]]
 ; IC2-NEXT:    [[TMP7:%.*]] = trunc i64 [[TMP6]] to i32
-; IC2-NEXT:    [[TMP8:%.*]] = add i32 1, [[TMP7]]
+; IC2-NEXT:    [[MUL:%.*]] = call { i32, i1 } @llvm.umul.with.overflow.i32(i32 1, i32 [[TMP7]])
+; IC2-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i32, i1 } [[MUL]], 0
+; IC2-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i32, i1 } [[MUL]], 1
+; IC2-NEXT:    [[TMP8:%.*]] = add i32 1, [[MUL_RESULT]]
 ; IC2-NEXT:    [[TMP9:%.*]] = icmp ult i32 [[TMP8]], 1
+; IC2-NEXT:    [[TMP12:%.*]] = or i1 [[TMP9]], [[MUL_OVERFLOW]]
 ; IC2-NEXT:    [[TMP10:%.*]] = icmp ugt i64 [[TMP6]], 4294967295
-; IC2-NEXT:    [[TMP11:%.*]] = or i1 [[TMP9]], [[TMP10]]
-; IC2-NEXT:    [[TMP12:%.*]] = add nuw nsw i64 [[MASK]], 1
-; IC2-NEXT:    [[IDENT_CHECK:%.*]] = icmp ne i64 [[TMP12]], 1
+; IC2-NEXT:    [[TMP11:%.*]] = or i1 [[TMP12]], [[TMP10]]
+; IC2-NEXT:    [[IDENT_CHECK:%.*]] = icmp ne i64 [[TMP3]], 1
 ; IC2-NEXT:    [[TMP13:%.*]] = or i1 [[TMP11]], [[IDENT_CHECK]]
 ; IC2-NEXT:    br i1 [[TMP13]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; IC2:       [[VECTOR_PH]]:

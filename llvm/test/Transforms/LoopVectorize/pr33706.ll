@@ -28,13 +28,11 @@ define void @PR33706(ptr nocapture readonly %arg, ptr nocapture %arg1, i32 %arg2
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP4]], 2
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
-; CHECK-NEXT:    [[TMP5:%.*]] = add nsw i32 [[VAR_TMP10]], -1
-; CHECK-NEXT:    [[TMP6:%.*]] = trunc i32 [[ARG2]] to i16
-; CHECK-NEXT:    [[TMP7:%.*]] = sub i16 0, [[TMP6]]
+; CHECK-NEXT:    [[TMP5:%.*]] = sub i16 0, [[TMP0]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = trunc i32 [[TMP]] to i16
-; CHECK-NEXT:    [[TMP9:%.*]] = icmp slt i16 [[TMP6]], 0
-; CHECK-NEXT:    [[TMP10:%.*]] = select i1 [[TMP9]], i16 [[TMP7]], i16 [[TMP6]]
-; CHECK-NEXT:    [[TMP11:%.*]] = trunc i32 [[TMP5]] to i16
+; CHECK-NEXT:    [[TMP9:%.*]] = icmp slt i16 [[TMP0]], 0
+; CHECK-NEXT:    [[TMP10:%.*]] = select i1 [[TMP9]], i16 [[TMP5]], i16 [[TMP0]]
+; CHECK-NEXT:    [[TMP11:%.*]] = trunc i32 [[TMP2]] to i16
 ; CHECK-NEXT:    [[MUL:%.*]] = call { i16, i1 } @llvm.umul.with.overflow.i16(i16 [[TMP10]], i16 [[TMP11]])
 ; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i16, i1 } [[MUL]], 0
 ; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i16, i1 } [[MUL]], 1
@@ -44,8 +42,8 @@ define void @PR33706(ptr nocapture readonly %arg, ptr nocapture %arg1, i32 %arg2
 ; CHECK-NEXT:    [[TMP15:%.*]] = icmp ugt i16 [[TMP13]], [[TMP8]]
 ; CHECK-NEXT:    [[TMP16:%.*]] = select i1 [[TMP9]], i1 [[TMP15]], i1 [[TMP14]]
 ; CHECK-NEXT:    [[TMP17:%.*]] = or i1 [[TMP16]], [[MUL_OVERFLOW]]
-; CHECK-NEXT:    [[TMP18:%.*]] = icmp ugt i32 [[TMP5]], 65535
-; CHECK-NEXT:    [[TMP19:%.*]] = icmp ne i16 [[TMP6]], 0
+; CHECK-NEXT:    [[TMP18:%.*]] = icmp ugt i32 [[TMP2]], 65535
+; CHECK-NEXT:    [[TMP19:%.*]] = icmp ne i16 [[TMP0]], 0
 ; CHECK-NEXT:    [[TMP20:%.*]] = and i1 [[TMP18]], [[TMP19]]
 ; CHECK-NEXT:    [[TMP21:%.*]] = or i1 [[TMP17]], [[TMP20]]
 ; CHECK-NEXT:    br i1 [[TMP21]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]

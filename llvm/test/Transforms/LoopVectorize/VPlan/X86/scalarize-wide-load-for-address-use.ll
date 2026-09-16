@@ -205,11 +205,11 @@ define void @load_feeds_mask_reaching_address(ptr noalias %src, ptr noalias %dst
 ; CHECK-NEXT:    Successor(s): then
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    then:
-; CHECK-NEXT:      EMIT ir<%idx> = add ir<%iv>, ir<1>, ir<%cmp>
+; CHECK-NEXT:      EMIT ir<%idx> = add ir<%iv>, ir<1>, ir<%cmp> (!vplan.execution.frequency 4611686018427387904 (50%, estimated))
 ; CHECK-NEXT:      EMIT ir<%gep2> = getelementptr ir<@tbl.a>, ir<%idx>
 ; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer double, ir<%gep2>, ir<1>
-; CHECK-NEXT:      WIDEN ir<%val2> = load vp<[[VP5]]>, ir<%cmp>
-; CHECK-NEXT:      REPLICATE store ir<%val2>, ir<%dst>, ir<%cmp>
+; CHECK-NEXT:      WIDEN ir<%val2> = load vp<[[VP5]]>, ir<%cmp> (!vplan.execution.frequency 4611686018427387904 (50%, estimated))
+; CHECK-NEXT:      REPLICATE store ir<%val2>, ir<%dst>, ir<%cmp> (!vplan.execution.frequency 4611686018427387904 (50%, estimated))
 ; CHECK-NEXT:    Successor(s): latch
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    latch:
@@ -257,6 +257,8 @@ define void @symbolic_stride_versioned_to_one(ptr noalias %src, ptr noalias %dst
 ; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<%n> = original trip-count
+; CHECK-NEXT:  Predicates:
+; CHECK-NEXT:    Equal predicate: %stride == 1
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph

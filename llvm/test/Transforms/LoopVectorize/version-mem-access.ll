@@ -15,8 +15,8 @@ define void @test(ptr noalias %A, i64 %AStride, ptr noalias %B, i32 %BStride, pt
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-NEXT:    [[IDENT_CHECK1:%.*]] = icmp ne i32 [[BSTRIDE]], 1
 ; CHECK-NEXT:    [[IDENT_CHECK2:%.*]] = icmp ne i64 [[CSTRIDE]], 1
-; CHECK-NEXT:    [[DIFF_CHECK6:%.*]] = icmp ne i64 [[ASTRIDE]], 1
 ; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = or i1 [[IDENT_CHECK1]], [[IDENT_CHECK2]]
+; CHECK-NEXT:    [[DIFF_CHECK6:%.*]] = icmp ne i64 [[ASTRIDE]], 1
 ; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[DIFF_CHECK]], [[DIFF_CHECK6]]
 ; CHECK-NEXT:    br i1 [[CONFLICT_RDX]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:

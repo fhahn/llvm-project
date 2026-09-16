@@ -1114,6 +1114,12 @@ void VPlan::print(raw_ostream &O) const {
 
   printLiveIns(O);
 
+  if (!Predicates.empty()) {
+    O << "Predicates:\n";
+    for (const auto &P : Predicates)
+      P->print(O, 2);
+  }
+
   ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<const VPBlockBase *>>
       RPOT(getEntry());
   for (const VPBlockBase *Block : RPOT) {
@@ -1260,6 +1266,8 @@ VPlan *VPlan::duplicate() {
   NewPlan->VFs = VFs;
   NewPlan->UFs = UFs;
   NewPlan->ParallelAccessGroups = ParallelAccessGroups;
+  for (const auto &P : Predicates)
+    NewPlan->Predicates.push_back(P->clone());
   // TODO: Adjust names.
   NewPlan->Name = Name;
   if (TripCount) {

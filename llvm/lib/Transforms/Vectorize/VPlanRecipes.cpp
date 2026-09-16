@@ -32,6 +32,7 @@
 #include "llvm/IR/ProfDataUtils.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Value.h"
+#include "llvm/IR/VectorTypeUtils.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -566,7 +567,8 @@ Type *llvm::computeScalarTypeForInstruction(unsigned Opcode,
     assert(Operands[1]->getScalarType()->isIntegerTy() &&
            "expected integer operand");
     return Op0Ty;
-  case Instruction::ExtractValue: {
+  case Instruction::ExtractValue:
+  case VPInstruction::ExtractStructField: {
     assert(Operands.size() == 2 && "expected single level extractvalue");
     auto *StructTy = cast<StructType>(Op0Ty);
     return StructTy->getTypeAtIndex(
@@ -670,6 +672,7 @@ unsigned VPInstruction::getNumOperandsForOpcode() const {
   case VPInstruction::FirstOrderRecurrenceSplice:
   case VPInstruction::LogicalAnd:
   case VPInstruction::LogicalOr:
+  case VPInstruction::ExtractStructField:
   case VPInstruction::PtrAdd:
   case VPInstruction::WidePtrAdd:
   case VPInstruction::WideIVStep:
@@ -721,6 +724,7 @@ bool VPInstruction::canGenerateScalarForFirstLane() const {
   case Instruction::PHI:
   case Instruction::Select:
   case VPInstruction::BranchOnCond:
+  case VPInstruction::ExtractStructField:
   case VPInstruction::BranchOnTwoConds:
   case VPInstruction::BranchOnCount:
   case VPInstruction::CanonicalIVIncrementForPart:
@@ -1147,6 +1151,10 @@ Value *VPInstruction::generate(VPTransformState &State) {
                                          vputils::getIntrinsicID(this), Args,
                                          /*FMFSource=*/nullptr, getName());
   }
+  case VPInstruction::ExtractStructField:
+    return Builder.CreateExtractValue(
+        State.get(getOperand(0), /*IsSingleScalar=*/true),
+        cast<VPConstantInt>(getOperand(1))->getZExtValue(), Name);
   default:
     llvm_unreachable("Unsupported opcode for instruction");
   }
@@ -1647,9 +1655,8 @@ void VPInstruction::execute(VPTransformState &State) {
   bool GeneratesPerFirstLaneOnly = canGenerateScalarForFirstLane() &&
                                    (vputils::onlyFirstLaneUsed(this) ||
                                     isVectorToScalar() || isSingleScalar());
-  assert((((GeneratedValue->getType()->isVectorTy() ||
-            GeneratedValue->getType()->isStructTy()) ==
-           !GeneratesPerFirstLaneOnly) ||
+  assert((isVectorizedTy(GeneratedValue->getType()) ==
+              !GeneratesPerFirstLaneOnly ||
           State.VF.isScalar()) &&
          "scalar value but not only first lane defined");
   State.set(this, GeneratedValue,
@@ -1689,6 +1696,7 @@ bool VPInstruction::opcodeMayReadOrWriteFromMemory() const {
   case VPInstruction::CanonicalIVIncrementForPart:
   case VPInstruction::ComputeReductionResult:
   case VPInstruction::ExtractLane:
+  case VPInstruction::ExtractStructField:
   case VPInstruction::ExtractLastLane:
   case VPInstruction::ExtractLastPart:
   case VPInstruction::ExtractPenultimateElement:

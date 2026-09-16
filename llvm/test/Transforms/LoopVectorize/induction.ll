@@ -3329,15 +3329,18 @@ define void @wrappingindvars1(i8 %t, i32 %len, ptr %A) {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_SCEVCHECK:%.*]]
 ; CHECK:       vector.scevcheck:
 ; CHECK-NEXT:    [[TMP1:%.*]] = trunc i32 [[LEN]] to i8
-; CHECK-NEXT:    [[TMP2:%.*]] = add i8 [[T]], [[TMP1]]
+; CHECK-NEXT:    [[MUL:%.*]] = call { i8, i1 } @llvm.umul.with.overflow.i8(i8 1, i8 [[TMP1]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i8, i1 } [[MUL]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i8, i1 } [[MUL]], 1
+; CHECK-NEXT:    [[TMP2:%.*]] = add i8 [[T]], [[MUL_RESULT]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp slt i8 [[TMP2]], [[T]]
+; CHECK-NEXT:    [[TMP4:%.*]] = or i1 [[TMP3]], [[MUL_OVERFLOW]]
 ; CHECK-NEXT:    [[TMP9:%.*]] = icmp ugt i32 [[LEN]], 255
-; CHECK-NEXT:    [[TMP11:%.*]] = or i1 [[TMP3]], [[TMP9]]
-; CHECK-NEXT:    [[TMP6:%.*]] = add i8 [[T]], [[TMP1]]
-; CHECK-NEXT:    [[TMP7:%.*]] = icmp ult i8 [[TMP6]], [[T]]
-; CHECK-NEXT:    [[TMP8:%.*]] = icmp ugt i32 [[LEN]], 255
-; CHECK-NEXT:    [[TMP12:%.*]] = or i1 [[TMP7]], [[TMP8]]
-; CHECK-NEXT:    [[TMP10:%.*]] = or i1 [[TMP11]], [[TMP12]]
+; CHECK-NEXT:    [[TMP11:%.*]] = or i1 [[TMP4]], [[TMP9]]
+; CHECK-NEXT:    [[TMP7:%.*]] = icmp ult i8 [[TMP2]], [[T]]
+; CHECK-NEXT:    [[TMP12:%.*]] = or i1 [[TMP7]], [[MUL_OVERFLOW]]
+; CHECK-NEXT:    [[TMP14:%.*]] = or i1 [[TMP12]], [[TMP9]]
+; CHECK-NEXT:    [[TMP10:%.*]] = or i1 [[TMP11]], [[TMP14]]
 ; CHECK-NEXT:    br i1 [[TMP10]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[TMP0]], 1
@@ -3396,15 +3399,18 @@ define void @wrappingindvars1(i8 %t, i32 %len, ptr %A) {
 ; IND-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_SCEVCHECK:%.*]]
 ; IND:       vector.scevcheck:
 ; IND-NEXT:    [[TMP1:%.*]] = trunc i32 [[LEN]] to i8
-; IND-NEXT:    [[TMP2:%.*]] = add i8 [[T]], [[TMP1]]
+; IND-NEXT:    [[MUL:%.*]] = call { i8, i1 } @llvm.umul.with.overflow.i8(i8 1, i8 [[TMP1]])
+; IND-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i8, i1 } [[MUL]], 0
+; IND-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i8, i1 } [[MUL]], 1
+; IND-NEXT:    [[TMP2:%.*]] = add i8 [[T]], [[MUL_RESULT]]
 ; IND-NEXT:    [[TMP3:%.*]] = icmp slt i8 [[TMP2]], [[T]]
+; IND-NEXT:    [[TMP5:%.*]] = or i1 [[TMP3]], [[MUL_OVERFLOW]]
 ; IND-NEXT:    [[TMP4:%.*]] = icmp ugt i32 [[LEN]], 255
-; IND-NEXT:    [[TMP5:%.*]] = or i1 [[TMP3]], [[TMP4]]
-; IND-NEXT:    [[TMP6:%.*]] = add i8 [[T]], [[TMP1]]
-; IND-NEXT:    [[TMP7:%.*]] = icmp ult i8 [[TMP6]], [[T]]
-; IND-NEXT:    [[TMP8:%.*]] = icmp ugt i32 [[LEN]], 255
-; IND-NEXT:    [[TMP9:%.*]] = or i1 [[TMP7]], [[TMP8]]
-; IND-NEXT:    [[TMP10:%.*]] = or i1 [[TMP5]], [[TMP9]]
+; IND-NEXT:    [[TMP13:%.*]] = or i1 [[TMP5]], [[TMP4]]
+; IND-NEXT:    [[TMP7:%.*]] = icmp ult i8 [[TMP2]], [[T]]
+; IND-NEXT:    [[TMP9:%.*]] = or i1 [[TMP7]], [[MUL_OVERFLOW]]
+; IND-NEXT:    [[TMP14:%.*]] = or i1 [[TMP9]], [[TMP4]]
+; IND-NEXT:    [[TMP10:%.*]] = or i1 [[TMP13]], [[TMP14]]
 ; IND-NEXT:    br i1 [[TMP10]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
 ; IND:       vector.ph:
 ; IND-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[TMP0]], 1
@@ -3463,15 +3469,18 @@ define void @wrappingindvars1(i8 %t, i32 %len, ptr %A) {
 ; UNROLL-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_SCEVCHECK:%.*]]
 ; UNROLL:       vector.scevcheck:
 ; UNROLL-NEXT:    [[TMP1:%.*]] = trunc i32 [[LEN]] to i8
-; UNROLL-NEXT:    [[TMP2:%.*]] = add i8 [[T]], [[TMP1]]
+; UNROLL-NEXT:    [[MUL:%.*]] = call { i8, i1 } @llvm.umul.with.overflow.i8(i8 1, i8 [[TMP1]])
+; UNROLL-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i8, i1 } [[MUL]], 0
+; UNROLL-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i8, i1 } [[MUL]], 1
+; UNROLL-NEXT:    [[TMP2:%.*]] = add i8 [[T]], [[MUL_RESULT]]
 ; UNROLL-NEXT:    [[TMP3:%.*]] = icmp slt i8 [[TMP2]], [[T]]
+; UNROLL-NEXT:    [[TMP5:%.*]] = or i1 [[TMP3]], [[MUL_OVERFLOW]]
 ; UNROLL-NEXT:    [[TMP4:%.*]] = icmp ugt i32 [[LEN]], 255
-; UNROLL-NEXT:    [[TMP5:%.*]] = or i1 [[TMP3]], [[TMP4]]
-; UNROLL-NEXT:    [[TMP6:%.*]] = add i8 [[T]], [[TMP1]]
-; UNROLL-NEXT:    [[TMP7:%.*]] = icmp ult i8 [[TMP6]], [[T]]
-; UNROLL-NEXT:    [[TMP8:%.*]] = icmp ugt i32 [[LEN]], 255
-; UNROLL-NEXT:    [[TMP10:%.*]] = or i1 [[TMP7]], [[TMP8]]
-; UNROLL-NEXT:    [[TMP9:%.*]] = or i1 [[TMP5]], [[TMP10]]
+; UNROLL-NEXT:    [[TMP14:%.*]] = or i1 [[TMP5]], [[TMP4]]
+; UNROLL-NEXT:    [[TMP7:%.*]] = icmp ult i8 [[TMP2]], [[T]]
+; UNROLL-NEXT:    [[TMP10:%.*]] = or i1 [[TMP7]], [[MUL_OVERFLOW]]
+; UNROLL-NEXT:    [[TMP15:%.*]] = or i1 [[TMP10]], [[TMP4]]
+; UNROLL-NEXT:    [[TMP9:%.*]] = or i1 [[TMP14]], [[TMP15]]
 ; UNROLL-NEXT:    br i1 [[TMP9]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
 ; UNROLL:       vector.ph:
 ; UNROLL-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[TMP0]], 3
@@ -3533,15 +3542,18 @@ define void @wrappingindvars1(i8 %t, i32 %len, ptr %A) {
 ; UNROLL-NO-IC-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_SCEVCHECK:%.*]]
 ; UNROLL-NO-IC:       vector.scevcheck:
 ; UNROLL-NO-IC-NEXT:    [[TMP1:%.*]] = trunc i32 [[LEN]] to i8
-; UNROLL-NO-IC-NEXT:    [[TMP2:%.*]] = add i8 [[T]], [[TMP1]]
+; UNROLL-NO-IC-NEXT:    [[MUL:%.*]] = call { i8, i1 } @llvm.umul.with.overflow.i8(i8 1, i8 [[TMP1]])
+; UNROLL-NO-IC-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i8, i1 } [[MUL]], 0
+; UNROLL-NO-IC-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i8, i1 } [[MUL]], 1
+; UNROLL-NO-IC-NEXT:    [[TMP2:%.*]] = add i8 [[T]], [[MUL_RESULT]]
 ; UNROLL-NO-IC-NEXT:    [[TMP3:%.*]] = icmp slt i8 [[TMP2]], [[T]]
+; UNROLL-NO-IC-NEXT:    [[TMP4:%.*]] = or i1 [[TMP3]], [[MUL_OVERFLOW]]
 ; UNROLL-NO-IC-NEXT:    [[TMP9:%.*]] = icmp ugt i32 [[LEN]], 255
-; UNROLL-NO-IC-NEXT:    [[TMP11:%.*]] = or i1 [[TMP3]], [[TMP9]]
-; UNROLL-NO-IC-NEXT:    [[TMP6:%.*]] = add i8 [[T]], [[TMP1]]
-; UNROLL-NO-IC-NEXT:    [[TMP7:%.*]] = icmp ult i8 [[TMP6]], [[T]]
-; UNROLL-NO-IC-NEXT:    [[TMP8:%.*]] = icmp ugt i32 [[LEN]], 255
-; UNROLL-NO-IC-NEXT:    [[TMP12:%.*]] = or i1 [[TMP7]], [[TMP8]]
-; UNROLL-NO-IC-NEXT:    [[TMP10:%.*]] = or i1 [[TMP11]], [[TMP12]]
+; UNROLL-NO-IC-NEXT:    [[TMP11:%.*]] = or i1 [[TMP4]], [[TMP9]]
+; UNROLL-NO-IC-NEXT:    [[TMP7:%.*]] = icmp ult i8 [[TMP2]], [[T]]
+; UNROLL-NO-IC-NEXT:    [[TMP12:%.*]] = or i1 [[TMP7]], [[MUL_OVERFLOW]]
+; UNROLL-NO-IC-NEXT:    [[TMP14:%.*]] = or i1 [[TMP12]], [[TMP9]]
+; UNROLL-NO-IC-NEXT:    [[TMP10:%.*]] = or i1 [[TMP11]], [[TMP14]]
 ; UNROLL-NO-IC-NEXT:    br i1 [[TMP10]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
 ; UNROLL-NO-IC:       vector.ph:
 ; UNROLL-NO-IC-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[TMP0]], 3
@@ -3603,15 +3615,18 @@ define void @wrappingindvars1(i8 %t, i32 %len, ptr %A) {
 ; INTERLEAVE-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_SCEVCHECK:%.*]]
 ; INTERLEAVE:       vector.scevcheck:
 ; INTERLEAVE-NEXT:    [[TMP1:%.*]] = trunc i32 [[LEN]] to i8
-; INTERLEAVE-NEXT:    [[TMP2:%.*]] = add i8 [[T]], [[TMP1]]
+; INTERLEAVE-NEXT:    [[MUL:%.*]] = call { i8, i1 } @llvm.umul.with.overflow.i8(i8 1, i8 [[TMP1]])
+; INTERLEAVE-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i8, i1 } [[MUL]], 0
+; INTERLEAVE-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i8, i1 } [[MUL]], 1
+; INTERLEAVE-NEXT:    [[TMP2:%.*]] = add i8 [[T]], [[MUL_RESULT]]
 ; INTERLEAVE-NEXT:    [[TMP3:%.*]] = icmp slt i8 [[TMP2]], [[T]]
+; INTERLEAVE-NEXT:    [[TMP5:%.*]] = or i1 [[TMP3]], [[MUL_OVERFLOW]]
 ; INTERLEAVE-NEXT:    [[TMP4:%.*]] = icmp ugt i32 [[LEN]], 255
-; INTERLEAVE-NEXT:    [[TMP5:%.*]] = or i1 [[TMP3]], [[TMP4]]
-; INTERLEAVE-NEXT:    [[TMP6:%.*]] = add i8 [[T]], [[TMP1]]
-; INTERLEAVE-NEXT:    [[TMP7:%.*]] = icmp ult i8 [[TMP6]], [[T]]
-; INTERLEAVE-NEXT:    [[TMP8:%.*]] = icmp ugt i32 [[LEN]], 255
-; INTERLEAVE-NEXT:    [[TMP10:%.*]] = or i1 [[TMP7]], [[TMP8]]
-; INTERLEAVE-NEXT:    [[TMP9:%.*]] = or i1 [[TMP5]], [[TMP10]]
+; INTERLEAVE-NEXT:    [[TMP14:%.*]] = or i1 [[TMP5]], [[TMP4]]
+; INTERLEAVE-NEXT:    [[TMP7:%.*]] = icmp ult i8 [[TMP2]], [[T]]
+; INTERLEAVE-NEXT:    [[TMP10:%.*]] = or i1 [[TMP7]], [[MUL_OVERFLOW]]
+; INTERLEAVE-NEXT:    [[TMP15:%.*]] = or i1 [[TMP10]], [[TMP4]]
+; INTERLEAVE-NEXT:    [[TMP9:%.*]] = or i1 [[TMP14]], [[TMP15]]
 ; INTERLEAVE-NEXT:    br i1 [[TMP9]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
 ; INTERLEAVE:       vector.ph:
 ; INTERLEAVE-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[TMP0]], 7
@@ -3705,15 +3720,18 @@ define void @wrappingindvars2(i8 %t, i32 %len, ptr %A) {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_SCEVCHECK:%.*]]
 ; CHECK:       vector.scevcheck:
 ; CHECK-NEXT:    [[TMP1:%.*]] = trunc i32 [[LEN]] to i8
-; CHECK-NEXT:    [[TMP2:%.*]] = add i8 [[T]], [[TMP1]]
+; CHECK-NEXT:    [[MUL2:%.*]] = call { i8, i1 } @llvm.umul.with.overflow.i8(i8 1, i8 [[TMP1]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i8, i1 } [[MUL2]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i8, i1 } [[MUL2]], 1
+; CHECK-NEXT:    [[TMP2:%.*]] = add i8 [[T]], [[MUL_RESULT]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp slt i8 [[TMP2]], [[T]]
+; CHECK-NEXT:    [[TMP4:%.*]] = or i1 [[TMP3]], [[MUL_OVERFLOW]]
 ; CHECK-NEXT:    [[TMP9:%.*]] = icmp ugt i32 [[LEN]], 255
-; CHECK-NEXT:    [[TMP11:%.*]] = or i1 [[TMP3]], [[TMP9]]
-; CHECK-NEXT:    [[TMP6:%.*]] = add i8 [[T]], [[TMP1]]
-; CHECK-NEXT:    [[TMP7:%.*]] = icmp ult i8 [[TMP6]], [[T]]
-; CHECK-NEXT:    [[TMP8:%.*]] = icmp ugt i32 [[LEN]], 255
-; CHECK-NEXT:    [[TMP13:%.*]] = or i1 [[TMP7]], [[TMP8]]
-; CHECK-NEXT:    [[TMP10:%.*]] = or i1 [[TMP11]], [[TMP13]]
+; CHECK-NEXT:    [[TMP11:%.*]] = or i1 [[TMP4]], [[TMP9]]
+; CHECK-NEXT:    [[TMP7:%.*]] = icmp ult i8 [[TMP2]], [[T]]
+; CHECK-NEXT:    [[TMP13:%.*]] = or i1 [[TMP7]], [[MUL_OVERFLOW]]
+; CHECK-NEXT:    [[TMP15:%.*]] = or i1 [[TMP13]], [[TMP9]]
+; CHECK-NEXT:    [[TMP10:%.*]] = or i1 [[TMP11]], [[TMP15]]
 ; CHECK-NEXT:    br i1 [[TMP10]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[TMP0]], 1
@@ -3775,15 +3793,18 @@ define void @wrappingindvars2(i8 %t, i32 %len, ptr %A) {
 ; IND-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_SCEVCHECK:%.*]]
 ; IND:       vector.scevcheck:
 ; IND-NEXT:    [[TMP1:%.*]] = trunc i32 [[LEN]] to i8
-; IND-NEXT:    [[TMP2:%.*]] = add i8 [[T]], [[TMP1]]
+; IND-NEXT:    [[MUL2:%.*]] = call { i8, i1 } @llvm.umul.with.overflow.i8(i8 1, i8 [[TMP1]])
+; IND-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i8, i1 } [[MUL2]], 0
+; IND-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i8, i1 } [[MUL2]], 1
+; IND-NEXT:    [[TMP2:%.*]] = add i8 [[T]], [[MUL_RESULT]]
 ; IND-NEXT:    [[TMP3:%.*]] = icmp slt i8 [[TMP2]], [[T]]
+; IND-NEXT:    [[TMP5:%.*]] = or i1 [[TMP3]], [[MUL_OVERFLOW]]
 ; IND-NEXT:    [[TMP4:%.*]] = icmp ugt i32 [[LEN]], 255
-; IND-NEXT:    [[TMP5:%.*]] = or i1 [[TMP3]], [[TMP4]]
-; IND-NEXT:    [[TMP6:%.*]] = add i8 [[T]], [[TMP1]]
-; IND-NEXT:    [[TMP7:%.*]] = icmp ult i8 [[TMP6]], [[T]]
-; IND-NEXT:    [[TMP8:%.*]] = icmp ugt i32 [[LEN]], 255
-; IND-NEXT:    [[TMP10:%.*]] = or i1 [[TMP7]], [[TMP8]]
-; IND-NEXT:    [[TMP9:%.*]] = or i1 [[TMP5]], [[TMP10]]
+; IND-NEXT:    [[TMP13:%.*]] = or i1 [[TMP5]], [[TMP4]]
+; IND-NEXT:    [[TMP7:%.*]] = icmp ult i8 [[TMP2]], [[T]]
+; IND-NEXT:    [[TMP10:%.*]] = or i1 [[TMP7]], [[MUL_OVERFLOW]]
+; IND-NEXT:    [[TMP15:%.*]] = or i1 [[TMP10]], [[TMP4]]
+; IND-NEXT:    [[TMP9:%.*]] = or i1 [[TMP13]], [[TMP15]]
 ; IND-NEXT:    br i1 [[TMP9]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
 ; IND:       vector.ph:
 ; IND-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[TMP0]], 1
@@ -3845,15 +3866,18 @@ define void @wrappingindvars2(i8 %t, i32 %len, ptr %A) {
 ; UNROLL-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_SCEVCHECK:%.*]]
 ; UNROLL:       vector.scevcheck:
 ; UNROLL-NEXT:    [[TMP1:%.*]] = trunc i32 [[LEN]] to i8
-; UNROLL-NEXT:    [[TMP2:%.*]] = add i8 [[T]], [[TMP1]]
+; UNROLL-NEXT:    [[MUL2:%.*]] = call { i8, i1 } @llvm.umul.with.overflow.i8(i8 1, i8 [[TMP1]])
+; UNROLL-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i8, i1 } [[MUL2]], 0
+; UNROLL-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i8, i1 } [[MUL2]], 1
+; UNROLL-NEXT:    [[TMP2:%.*]] = add i8 [[T]], [[MUL_RESULT]]
 ; UNROLL-NEXT:    [[TMP3:%.*]] = icmp slt i8 [[TMP2]], [[T]]
+; UNROLL-NEXT:    [[TMP5:%.*]] = or i1 [[TMP3]], [[MUL_OVERFLOW]]
 ; UNROLL-NEXT:    [[TMP4:%.*]] = icmp ugt i32 [[LEN]], 255
-; UNROLL-NEXT:    [[TMP5:%.*]] = or i1 [[TMP3]], [[TMP4]]
-; UNROLL-NEXT:    [[TMP6:%.*]] = add i8 [[T]], [[TMP1]]
-; UNROLL-NEXT:    [[TMP7:%.*]] = icmp ult i8 [[TMP6]], [[T]]
-; UNROLL-NEXT:    [[TMP8:%.*]] = icmp ugt i32 [[LEN]], 255
-; UNROLL-NEXT:    [[TMP10:%.*]] = or i1 [[TMP7]], [[TMP8]]
-; UNROLL-NEXT:    [[TMP9:%.*]] = or i1 [[TMP5]], [[TMP10]]
+; UNROLL-NEXT:    [[TMP15:%.*]] = or i1 [[TMP5]], [[TMP4]]
+; UNROLL-NEXT:    [[TMP7:%.*]] = icmp ult i8 [[TMP2]], [[T]]
+; UNROLL-NEXT:    [[TMP10:%.*]] = or i1 [[TMP7]], [[MUL_OVERFLOW]]
+; UNROLL-NEXT:    [[TMP16:%.*]] = or i1 [[TMP10]], [[TMP4]]
+; UNROLL-NEXT:    [[TMP9:%.*]] = or i1 [[TMP15]], [[TMP16]]
 ; UNROLL-NEXT:    br i1 [[TMP9]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
 ; UNROLL:       vector.ph:
 ; UNROLL-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[TMP0]], 3
@@ -3918,15 +3942,18 @@ define void @wrappingindvars2(i8 %t, i32 %len, ptr %A) {
 ; UNROLL-NO-IC-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_SCEVCHECK:%.*]]
 ; UNROLL-NO-IC:       vector.scevcheck:
 ; UNROLL-NO-IC-NEXT:    [[TMP1:%.*]] = trunc i32 [[LEN]] to i8
-; UNROLL-NO-IC-NEXT:    [[TMP2:%.*]] = add i8 [[T]], [[TMP1]]
+; UNROLL-NO-IC-NEXT:    [[MUL2:%.*]] = call { i8, i1 } @llvm.umul.with.overflow.i8(i8 1, i8 [[TMP1]])
+; UNROLL-NO-IC-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i8, i1 } [[MUL2]], 0
+; UNROLL-NO-IC-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i8, i1 } [[MUL2]], 1
+; UNROLL-NO-IC-NEXT:    [[TMP2:%.*]] = add i8 [[T]], [[MUL_RESULT]]
 ; UNROLL-NO-IC-NEXT:    [[TMP3:%.*]] = icmp slt i8 [[TMP2]], [[T]]
+; UNROLL-NO-IC-NEXT:    [[TMP4:%.*]] = or i1 [[TMP3]], [[MUL_OVERFLOW]]
 ; UNROLL-NO-IC-NEXT:    [[TMP9:%.*]] = icmp ugt i32 [[LEN]], 255
-; UNROLL-NO-IC-NEXT:    [[TMP11:%.*]] = or i1 [[TMP3]], [[TMP9]]
-; UNROLL-NO-IC-NEXT:    [[TMP6:%.*]] = add i8 [[T]], [[TMP1]]
-; UNROLL-NO-IC-NEXT:    [[TMP7:%.*]] = icmp ult i8 [[TMP6]], [[T]]
-; UNROLL-NO-IC-NEXT:    [[TMP8:%.*]] = icmp ugt i32 [[LEN]], 255
-; UNROLL-NO-IC-NEXT:    [[TMP13:%.*]] = or i1 [[TMP7]], [[TMP8]]
-; UNROLL-NO-IC-NEXT:    [[TMP10:%.*]] = or i1 [[TMP11]], [[TMP13]]
+; UNROLL-NO-IC-NEXT:    [[TMP11:%.*]] = or i1 [[TMP4]], [[TMP9]]
+; UNROLL-NO-IC-NEXT:    [[TMP7:%.*]] = icmp ult i8 [[TMP2]], [[T]]
+; UNROLL-NO-IC-NEXT:    [[TMP13:%.*]] = or i1 [[TMP7]], [[MUL_OVERFLOW]]
+; UNROLL-NO-IC-NEXT:    [[TMP15:%.*]] = or i1 [[TMP13]], [[TMP9]]
+; UNROLL-NO-IC-NEXT:    [[TMP10:%.*]] = or i1 [[TMP11]], [[TMP15]]
 ; UNROLL-NO-IC-NEXT:    br i1 [[TMP10]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
 ; UNROLL-NO-IC:       vector.ph:
 ; UNROLL-NO-IC-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[TMP0]], 3
@@ -3991,15 +4018,18 @@ define void @wrappingindvars2(i8 %t, i32 %len, ptr %A) {
 ; INTERLEAVE-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_SCEVCHECK:%.*]]
 ; INTERLEAVE:       vector.scevcheck:
 ; INTERLEAVE-NEXT:    [[TMP1:%.*]] = trunc i32 [[LEN]] to i8
-; INTERLEAVE-NEXT:    [[TMP2:%.*]] = add i8 [[T]], [[TMP1]]
+; INTERLEAVE-NEXT:    [[MUL2:%.*]] = call { i8, i1 } @llvm.umul.with.overflow.i8(i8 1, i8 [[TMP1]])
+; INTERLEAVE-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i8, i1 } [[MUL2]], 0
+; INTERLEAVE-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i8, i1 } [[MUL2]], 1
+; INTERLEAVE-NEXT:    [[TMP2:%.*]] = add i8 [[T]], [[MUL_RESULT]]
 ; INTERLEAVE-NEXT:    [[TMP3:%.*]] = icmp slt i8 [[TMP2]], [[T]]
+; INTERLEAVE-NEXT:    [[TMP5:%.*]] = or i1 [[TMP3]], [[MUL_OVERFLOW]]
 ; INTERLEAVE-NEXT:    [[TMP4:%.*]] = icmp ugt i32 [[LEN]], 255
-; INTERLEAVE-NEXT:    [[TMP5:%.*]] = or i1 [[TMP3]], [[TMP4]]
-; INTERLEAVE-NEXT:    [[TMP6:%.*]] = add i8 [[T]], [[TMP1]]
-; INTERLEAVE-NEXT:    [[TMP7:%.*]] = icmp ult i8 [[TMP6]], [[T]]
-; INTERLEAVE-NEXT:    [[TMP8:%.*]] = icmp ugt i32 [[LEN]], 255
-; INTERLEAVE-NEXT:    [[TMP10:%.*]] = or i1 [[TMP7]], [[TMP8]]
-; INTERLEAVE-NEXT:    [[TMP9:%.*]] = or i1 [[TMP5]], [[TMP10]]
+; INTERLEAVE-NEXT:    [[TMP15:%.*]] = or i1 [[TMP5]], [[TMP4]]
+; INTERLEAVE-NEXT:    [[TMP7:%.*]] = icmp ult i8 [[TMP2]], [[T]]
+; INTERLEAVE-NEXT:    [[TMP10:%.*]] = or i1 [[TMP7]], [[MUL_OVERFLOW]]
+; INTERLEAVE-NEXT:    [[TMP16:%.*]] = or i1 [[TMP10]], [[TMP4]]
+; INTERLEAVE-NEXT:    [[TMP9:%.*]] = or i1 [[TMP15]], [[TMP16]]
 ; INTERLEAVE-NEXT:    br i1 [[TMP9]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
 ; INTERLEAVE:       vector.ph:
 ; INTERLEAVE-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[TMP0]], 7
@@ -4281,7 +4311,11 @@ define void @trunciv(ptr nocapture %a, i32 %start, i64 %k) {
 ; CHECK:       vector.scevcheck:
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[K]], -1
 ; CHECK-NEXT:    [[TMP1:%.*]] = trunc i64 [[TMP0]] to i32
-; CHECK-NEXT:    [[TMP2:%.*]] = icmp slt i32 [[TMP1]], 0
+; CHECK-NEXT:    [[MUL:%.*]] = call { i32, i1 } @llvm.umul.with.overflow.i32(i32 1, i32 [[TMP1]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i32, i1 } [[MUL]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i32, i1 } [[MUL]], 1
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp slt i32 [[MUL_RESULT]], 0
+; CHECK-NEXT:    [[TMP2:%.*]] = or i1 [[TMP6]], [[MUL_OVERFLOW]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp ugt i64 [[TMP0]], 4294967295
 ; CHECK-NEXT:    [[TMP4:%.*]] = or i1 [[TMP2]], [[TMP3]]
 ; CHECK-NEXT:    br i1 [[TMP4]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
@@ -4323,7 +4357,11 @@ define void @trunciv(ptr nocapture %a, i32 %start, i64 %k) {
 ; IND:       vector.scevcheck:
 ; IND-NEXT:    [[TMP0:%.*]] = add i64 [[K]], -1
 ; IND-NEXT:    [[TMP6:%.*]] = trunc i64 [[TMP0]] to i32
-; IND-NEXT:    [[TMP7:%.*]] = icmp slt i32 [[TMP6]], 0
+; IND-NEXT:    [[MUL:%.*]] = call { i32, i1 } @llvm.umul.with.overflow.i32(i32 1, i32 [[TMP6]])
+; IND-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i32, i1 } [[MUL]], 0
+; IND-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i32, i1 } [[MUL]], 1
+; IND-NEXT:    [[TMP8:%.*]] = icmp slt i32 [[MUL_RESULT]], 0
+; IND-NEXT:    [[TMP7:%.*]] = or i1 [[TMP8]], [[MUL_OVERFLOW]]
 ; IND-NEXT:    [[TMP3:%.*]] = icmp ugt i64 [[TMP0]], 4294967295
 ; IND-NEXT:    [[TMP4:%.*]] = or i1 [[TMP7]], [[TMP3]]
 ; IND-NEXT:    br i1 [[TMP4]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
@@ -4365,7 +4403,11 @@ define void @trunciv(ptr nocapture %a, i32 %start, i64 %k) {
 ; UNROLL:       vector.scevcheck:
 ; UNROLL-NEXT:    [[TMP0:%.*]] = add i64 [[K]], -1
 ; UNROLL-NEXT:    [[TMP6:%.*]] = trunc i64 [[TMP0]] to i32
-; UNROLL-NEXT:    [[TMP7:%.*]] = icmp slt i32 [[TMP6]], 0
+; UNROLL-NEXT:    [[MUL:%.*]] = call { i32, i1 } @llvm.umul.with.overflow.i32(i32 1, i32 [[TMP6]])
+; UNROLL-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i32, i1 } [[MUL]], 0
+; UNROLL-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i32, i1 } [[MUL]], 1
+; UNROLL-NEXT:    [[TMP9:%.*]] = icmp slt i32 [[MUL_RESULT]], 0
+; UNROLL-NEXT:    [[TMP7:%.*]] = or i1 [[TMP9]], [[MUL_OVERFLOW]]
 ; UNROLL-NEXT:    [[TMP8:%.*]] = icmp ugt i64 [[TMP0]], 4294967295
 ; UNROLL-NEXT:    [[TMP4:%.*]] = or i1 [[TMP7]], [[TMP8]]
 ; UNROLL-NEXT:    br i1 [[TMP4]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
@@ -4410,7 +4452,11 @@ define void @trunciv(ptr nocapture %a, i32 %start, i64 %k) {
 ; UNROLL-NO-IC:       vector.scevcheck:
 ; UNROLL-NO-IC-NEXT:    [[TMP0:%.*]] = add i64 [[K]], -1
 ; UNROLL-NO-IC-NEXT:    [[TMP1:%.*]] = trunc i64 [[TMP0]] to i32
-; UNROLL-NO-IC-NEXT:    [[TMP2:%.*]] = icmp slt i32 [[TMP1]], 0
+; UNROLL-NO-IC-NEXT:    [[MUL:%.*]] = call { i32, i1 } @llvm.umul.with.overflow.i32(i32 1, i32 [[TMP1]])
+; UNROLL-NO-IC-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i32, i1 } [[MUL]], 0
+; UNROLL-NO-IC-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i32, i1 } [[MUL]], 1
+; UNROLL-NO-IC-NEXT:    [[TMP6:%.*]] = icmp slt i32 [[MUL_RESULT]], 0
+; UNROLL-NO-IC-NEXT:    [[TMP2:%.*]] = or i1 [[TMP6]], [[MUL_OVERFLOW]]
 ; UNROLL-NO-IC-NEXT:    [[TMP3:%.*]] = icmp ugt i64 [[TMP0]], 4294967295
 ; UNROLL-NO-IC-NEXT:    [[TMP4:%.*]] = or i1 [[TMP2]], [[TMP3]]
 ; UNROLL-NO-IC-NEXT:    br i1 [[TMP4]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]
@@ -4455,7 +4501,11 @@ define void @trunciv(ptr nocapture %a, i32 %start, i64 %k) {
 ; INTERLEAVE:       vector.scevcheck:
 ; INTERLEAVE-NEXT:    [[TMP0:%.*]] = add i64 [[K]], -1
 ; INTERLEAVE-NEXT:    [[TMP6:%.*]] = trunc i64 [[TMP0]] to i32
-; INTERLEAVE-NEXT:    [[TMP7:%.*]] = icmp slt i32 [[TMP6]], 0
+; INTERLEAVE-NEXT:    [[MUL:%.*]] = call { i32, i1 } @llvm.umul.with.overflow.i32(i32 1, i32 [[TMP6]])
+; INTERLEAVE-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i32, i1 } [[MUL]], 0
+; INTERLEAVE-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i32, i1 } [[MUL]], 1
+; INTERLEAVE-NEXT:    [[TMP9:%.*]] = icmp slt i32 [[MUL_RESULT]], 0
+; INTERLEAVE-NEXT:    [[TMP7:%.*]] = or i1 [[TMP9]], [[MUL_OVERFLOW]]
 ; INTERLEAVE-NEXT:    [[TMP8:%.*]] = icmp ugt i64 [[TMP0]], 4294967295
 ; INTERLEAVE-NEXT:    [[TMP4:%.*]] = or i1 [[TMP7]], [[TMP8]]
 ; INTERLEAVE-NEXT:    br i1 [[TMP4]], label [[SCALAR_PH]], label [[VECTOR_PH:%.*]]

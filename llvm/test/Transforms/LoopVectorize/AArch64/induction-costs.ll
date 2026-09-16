@@ -366,12 +366,16 @@ define void @zext_iv_increment(ptr %dst, i64 %N) {
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[UMAX1]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = call i64 @llvm.usub.sat.i64(i64 [[N]], i64 1)
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[UMAX1]], -1
 ; CHECK-NEXT:    [[TMP1:%.*]] = trunc i64 [[TMP0]] to i32
-; CHECK-NEXT:    [[TMP2:%.*]] = add i32 1, [[TMP1]]
+; CHECK-NEXT:    [[MUL:%.*]] = call { i32, i1 } @llvm.umul.with.overflow.i32(i32 1, i32 [[TMP1]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i32, i1 } [[MUL]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i32, i1 } [[MUL]], 1
+; CHECK-NEXT:    [[TMP2:%.*]] = add i32 1, [[MUL_RESULT]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp ult i32 [[TMP2]], 1
+; CHECK-NEXT:    [[TMP15:%.*]] = or i1 [[TMP3]], [[MUL_OVERFLOW]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp ugt i64 [[TMP0]], 4294967295
-; CHECK-NEXT:    [[TMP5:%.*]] = or i1 [[TMP3]], [[TMP4]]
+; CHECK-NEXT:    [[TMP5:%.*]] = or i1 [[TMP15]], [[TMP4]]
 ; CHECK-NEXT:    br i1 [[TMP5]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[UMAX1]], 3
@@ -994,13 +998,16 @@ define i32 @scev_usub_sat_n_2(ptr %ptr, i32 %n) {
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP0]], 12
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
-; CHECK-NEXT:    [[TMP1:%.*]] = zext i32 [[N]] to i64
-; CHECK-NEXT:    [[TMP2:%.*]] = call i64 @llvm.usub.sat.i64(i64 [[TMP1]], i64 2)
+; CHECK-NEXT:    [[TMP2:%.*]] = add nsw i64 [[WIDE_TRIP_COUNT]], -2
 ; CHECK-NEXT:    [[TMP3:%.*]] = trunc i64 [[TMP2]] to i30
-; CHECK-NEXT:    [[TMP4:%.*]] = add i30 1, [[TMP3]]
+; CHECK-NEXT:    [[MUL:%.*]] = call { i30, i1 } @llvm.umul.with.overflow.i30(i30 1, i30 [[TMP3]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i30, i1 } [[MUL]], 0
+; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i30, i1 } [[MUL]], 1
+; CHECK-NEXT:    [[TMP4:%.*]] = add i30 1, [[MUL_RESULT]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp ult i30 [[TMP4]], 1
+; CHECK-NEXT:    [[TMP17:%.*]] = or i1 [[TMP5]], [[MUL_OVERFLOW]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp ugt i64 [[TMP2]], 1073741823
-; CHECK-NEXT:    [[TMP7:%.*]] = or i1 [[TMP5]], [[TMP6]]
+; CHECK-NEXT:    [[TMP7:%.*]] = or i1 [[TMP17]], [[TMP6]]
 ; CHECK-NEXT:    br i1 [[TMP7]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[TMP8:%.*]] = and i64 [[TMP0]], 7

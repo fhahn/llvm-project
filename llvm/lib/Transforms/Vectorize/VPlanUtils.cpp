@@ -926,7 +926,7 @@ VPValue *VPSCEVExpander::tryToReuseIRValue(const SCEV *S) {
   return nullptr;
 }
 
-VPValue *VPSCEVExpander::expand(const SCEV *S) {
+VPValue *VPSCEVExpander::expandImpl(const SCEV *S) {
   if (VPValue *V = tryToReuseIRValue(S))
     return V;
 
@@ -945,8 +945,8 @@ VPValue *VPSCEVExpander::expand(const SCEV *S) {
     // Expand pointer SCEVAddExpr as a ptradd of the pointer base and the
     // integer offset, matching SCEVExpander.
     if (S->getType()->isPointerTy()) {
-      VPValue *Base = expand(SE.getPointerBase(S));
-      VPValue *Offset = expand(SE.removePointerBase(S));
+      VPValue *Base = expandImpl(SE.getPointerBase(S));
+      VPValue *Offset = expandImpl(SE.removePointerBase(S));
       GEPNoWrapFlags GEPFlags = WrapFlags.HasNUW
                                     ? GEPNoWrapFlags::noUnsignedWrap()
                                     : GEPNoWrapFlags::none();
@@ -969,7 +969,7 @@ VPValue *VPSCEVExpander::expand(const SCEV *S) {
     for (const SCEV *Op : SCEVOps) {
       // The first operand starts the result, so it is never subtracted.
       bool Negate = !Ops.empty() && UseSubtract(Op);
-      Ops.push_back(expand(Negate ? SE.getNegativeSCEV(Op) : Op));
+      Ops.push_back(expandImpl(Negate ? SE.getNegativeSCEV(Op) : Op));
     }
     VPValue *Result = Ops.front();
     for (auto [Op, OpV] : drop_begin(zip_equal(SCEVOps, Ops))) {
@@ -994,7 +994,7 @@ VPValue *VPSCEVExpander::expand(const SCEV *S) {
                                      MulE->hasNoSignedWrap());
     SmallVector<VPValue *, 2> Ops;
     for (const SCEV *Op : reverse(MulE->operands()))
-      Ops.push_back(expand(Op));
+      Ops.push_back(expandImpl(Op));
     VPValue *Result = Ops.front();
     for (VPValue *OpV : drop_begin(Ops)) {
       Result = Builder.createOverflowingOp(Instruction::Mul, {Result, OpV},
@@ -1004,9 +1004,9 @@ VPValue *VPSCEVExpander::expand(const SCEV *S) {
   }
   case scUDivExpr: {
     auto *UDiv = cast<SCEVUDivExpr>(S);
-    VPValue *LHS = expand(UDiv->getLHS());
+    VPValue *LHS = expandImpl(UDiv->getLHS());
     const SCEV *RHSExpr = UDiv->getRHS();
-    VPValue *RHS = expand(RHSExpr);
+    VPValue *RHS = expandImpl(RHSExpr);
     if (SafeUDivMode) {
       // Make sure the UDiv's divisor is guaranteed to not be zero/poison, to
       // avoid UB.
@@ -1029,7 +1029,7 @@ VPValue *VPSCEVExpander::expand(const SCEV *S) {
   case scSignExtend:
   case scPtrToAddr: {
     auto *Cast = cast<SCEVCastExpr>(S);
-    VPValue *Op = expand(Cast->getOperand());
+    VPValue *Op = expandImpl(Cast->getOperand());
     Instruction::CastOps Opcode;
     switch (S->getSCEVType()) {
     case scTruncate:
@@ -1106,16 +1106,25 @@ VPValue *VPSCEVExpander::expand(const SCEV *S) {
       bool MayShortCircuit =
           IsSequential && Ops.size() != MinMax->getNumOperands() - 1;
       SafeUDivMode = MayShortCircuit || PrevSafeMode;
-      VPValue *OpV = expand(SCEVOp);
+      VPValue *OpV = expandImpl(SCEVOp);
       SafeUDivMode = PrevSafeMode;
       if (MayShortCircuit)
         OpV = Builder.createFreeze(OpV, DL);
       Ops.push_back(OpV);
     }
     VPValue *Result = Ops.front();
-    for (VPValue *Op : drop_begin(Ops))
-      Result = Builder.createScalarIntrinsic(IntrinsicID, {Result, Op},
-                                             ResultTy, DL);
+    for (VPValue *Op : drop_begin(Ops)) {
+      if (ResultTy->isPointerTy()) {
+        // The min/max intrinsics do not support pointer operands, so expand
+        // pointer-typed min/max as cmp + select, matching SCEVExpander.
+        VPValue *Cmp = Builder.createICmp(
+            MinMaxIntrinsic::getPredicate(IntrinsicID), Result, Op, DL);
+        Result = Builder.createSelect(Cmp, Result, Op, DL);
+      } else {
+        Result = Builder.createScalarIntrinsic(IntrinsicID, {Result, Op},
+                                               ResultTy, DL);
+      }
+    }
     return Result;
   }
   case scAddRecExpr: {
@@ -1145,9 +1154,9 @@ VPValue *VPSCEVExpander::expand(const SCEV *S) {
 
     // {Start, +, Step} --> Start + IV * Step, since the AddRec is affine.
     // Compute Offset = IV * Step.
-    VPValue *Start = expand(AR->getStart());
+    VPValue *Start = expandImpl(AR->getStart());
     Value *CanonicalIV = &cast<VPIRPhi>(FoundCanIV)->getIRPhi();
-    VPValue *Offset = expand(
+    VPValue *Offset = expandImpl(
         SE.getMulExpr(SE.getUnknown(CanonicalIV), AR->getStepRecurrence(SE)));
 
     // Compute Start + Offset with nuw from the AddRec.

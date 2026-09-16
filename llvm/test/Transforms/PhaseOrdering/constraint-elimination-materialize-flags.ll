@@ -17,14 +17,11 @@ define void @index_mask_removed(ptr %A, i16 %start, i16 %v, i16 %n) {
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i16 [[TMP1]], 11
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[LOOP_BODY_PREHEADER3:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
-; CHECK-NEXT:    [[TMP4:%.*]] = xor i16 [[START]], -1
-; CHECK-NEXT:    [[TMP5:%.*]] = add i16 [[N]], [[TMP4]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = sext i16 [[V]] to i32
-; CHECK-NEXT:    [[TMP7:%.*]] = zext i16 [[TMP5]] to i32
 ; CHECK-NEXT:    [[TMP8:%.*]] = xor i16 [[START]], -1
 ; CHECK-NEXT:    [[TMP9:%.*]] = sext i16 [[TMP8]] to i32
 ; CHECK-NEXT:    [[TMP10:%.*]] = add nsw i32 [[TMP9]], [[TMP6]]
-; CHECK-NEXT:    [[TMP11:%.*]] = icmp ult i32 [[TMP10]], [[TMP7]]
+; CHECK-NEXT:    [[TMP11:%.*]] = icmp ult i32 [[TMP10]], [[TMP2]]
 ; CHECK-NEXT:    br i1 [[TMP11]], label %[[LOOP_BODY_PREHEADER3]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_VEC:%.*]] = and i32 [[TMP3]], 131068

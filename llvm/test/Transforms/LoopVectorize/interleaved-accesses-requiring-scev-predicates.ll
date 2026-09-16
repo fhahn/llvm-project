@@ -71,11 +71,11 @@ define void @wrap_around_scev_check(ptr noalias %a, ptr noalias %b, i8 %x, i8 %y
 ; CHECK-NEXT:    br label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:
 ; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[LOOP_PREHEADER]] ], [ 0, %[[VECTOR_SCEVCHECK]] ]
-; CHECK-NEXT:    [[BC_RESUME_VAL2:%.*]] = phi i8 [ [[TMP9]], %[[MIDDLE_BLOCK]] ], [ [[X]], %[[LOOP_PREHEADER]] ], [ [[X]], %[[VECTOR_SCEVCHECK]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL3:%.*]] = phi i8 [ [[TMP9]], %[[MIDDLE_BLOCK]] ], [ [[X]], %[[LOOP_PREHEADER]] ], [ [[X]], %[[VECTOR_SCEVCHECK]] ]
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
-; CHECK-NEXT:    [[INDEX_011:%.*]] = phi i8 [ [[BC_RESUME_VAL2]], %[[SCALAR_PH]] ], [ [[ADD:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[INDEX_011:%.*]] = phi i8 [ [[BC_RESUME_VAL3]], %[[SCALAR_PH]] ], [ [[ADD:%.*]], %[[LOOP]] ]
 ; CHECK-NEXT:    [[IDXPROM:%.*]] = zext i8 [[INDEX_011]] to i64
 ; CHECK-NEXT:    [[ARRAYIDX:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[IDXPROM]]
 ; CHECK-NEXT:    [[TMP16:%.*]] = load i32, ptr [[ARRAYIDX]], align 4
@@ -188,9 +188,12 @@ define void @wrap_predicate_for_interleave_group_unknown_trip_count(ptr noalias 
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[N]], -1
 ; CHECK-NEXT:    [[TMP9:%.*]] = trunc i64 [[TMP0]] to i4
 ; CHECK-NEXT:    [[MUL:%.*]] = call { i4, i1 } @llvm.umul.with.overflow.i4(i4 3, i4 [[TMP9]])
+; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i4, i1 } [[MUL]], 0
 ; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i4, i1 } [[MUL]], 1
+; CHECK-NEXT:    [[TMP11:%.*]] = icmp ult i4 [[MUL_RESULT]], 0
+; CHECK-NEXT:    [[TMP12:%.*]] = or i1 [[TMP11]], [[MUL_OVERFLOW]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ugt i64 [[TMP0]], 15
-; CHECK-NEXT:    [[TMP10:%.*]] = or i1 [[MUL_OVERFLOW]], [[TMP1]]
+; CHECK-NEXT:    [[TMP10:%.*]] = or i1 [[TMP12]], [[TMP1]]
 ; CHECK-NEXT:    br i1 [[TMP10]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[N]], 3
