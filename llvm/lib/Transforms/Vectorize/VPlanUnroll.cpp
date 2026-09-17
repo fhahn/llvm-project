@@ -941,8 +941,7 @@ static void replicateReplicateRegionsByVF(VPlan &Plan, ElementCount VF,
 }
 
 void VPlanTransforms::replicateByVF(VPlan &Plan, ElementCount VF) {
-  Type *IdxTy = IntegerType::get(
-      Plan.getScalarHeader()->getIRBasicBlock()->getContext(), 32);
+  Type *IdxTy = Type::getInt64Ty(Plan.getContext());
 
   if (Plan.hasScalarVFOnly()) {
     // When Plan is only unrolled by UF, replicating by VF amounts to dissolving

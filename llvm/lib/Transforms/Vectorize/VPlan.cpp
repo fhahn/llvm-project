@@ -254,12 +254,12 @@ Value *VPTransformState::get(const VPValue *Def, const VPLane &Lane) {
     return Data.VPV2Scalars[Def][0];
   }
 
+  assert(Lane.isFirstLane() &&
+         "extracts of non-first lanes must be modelled explicitly");
   assert(hasVectorValue(Def));
   auto *VecPart = Data.VPV2Vector[Def];
-  if (!VecPart->getType()->isVectorTy()) {
-    assert(Lane.isFirstLane() && "cannot get lane > 0 for scalar");
+  if (!VecPart->getType()->isVectorTy())
     return VecPart;
-  }
   // TODO: Cache created scalar values.
   Value *LaneV = Lane.getAsRuntimeExpr(Builder, VF);
   auto *Extract = Builder.CreateExtractElement(VecPart, LaneV);
