@@ -83,19 +83,6 @@ raw_ostream &llvm::operator<<(raw_ostream &OS, const VPRecipeBase &R) {
 }
 #endif
 
-Value *VPLane::getAsRuntimeExpr(IRBuilderBase &Builder,
-                                const ElementCount &VF) const {
-  switch (LaneKind) {
-  case VPLane::Kind::ScalableLast:
-    // Lane = RuntimeVF - VF.getKnownMinValue() + Lane
-    return Builder.CreateSub(getRuntimeVF(Builder, Builder.getInt32Ty(), VF),
-                             Builder.getInt32(VF.getKnownMinValue() - Lane));
-  case VPLane::Kind::First:
-    return Builder.getInt64(Lane);
-  }
-  llvm_unreachable("Unknown lane kind");
-}
-
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 void VPValue::print(raw_ostream &OS, VPSlotTracker &SlotTracker) const {
   if (const VPRecipeBase *R = getDefiningRecipe())
@@ -354,26 +341,6 @@ void VPTransformState::setDebugLocFrom(DebugLoc DL) {
                         << DIL->getFilename() << " Line: " << DIL->getLine());
   } else
     Builder.SetCurrentDebugLocation(DL);
-}
-
-Value *VPTransformState::packScalarIntoVectorizedValue(const VPValue *Def,
-                                                       Value *WideValue,
-                                                       const VPLane &Lane) {
-  Value *ScalarInst = get(Def, Lane);
-  Value *LaneExpr = Lane.getAsRuntimeExpr(Builder, VF);
-  if (auto *StructTy = dyn_cast<StructType>(WideValue->getType())) {
-    // We must handle each element of a vectorized struct type.
-    for (unsigned I = 0, E = StructTy->getNumElements(); I != E; I++) {
-      Value *ScalarValue = Builder.CreateExtractValue(ScalarInst, I);
-      Value *VectorValue = Builder.CreateExtractValue(WideValue, I);
-      VectorValue =
-          Builder.CreateInsertElement(VectorValue, ScalarValue, LaneExpr);
-      WideValue = Builder.CreateInsertValue(WideValue, VectorValue, I);
-    }
-  } else {
-    WideValue = Builder.CreateInsertElement(WideValue, ScalarInst, LaneExpr);
-  }
-  return WideValue;
 }
 
 void VPTransformState::fixupHeaderPhis() {
