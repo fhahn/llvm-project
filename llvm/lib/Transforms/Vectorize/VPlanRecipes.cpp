@@ -1043,20 +1043,13 @@ Value *VPInstruction::generate(VPTransformState &State,
            "ExtractPenultimateElement");
     unsigned Offset =
         getOpcode() == VPInstruction::ExtractPenultimateElement ? 2 : 1;
-    Value *Res;
-    if (State.VF.isVector()) {
-      assert(Offset <= State.VF.getKnownMinValue() &&
-             "invalid offset to extract from");
-      // Extract lane VF - Offset from the operand.
-      Res = State.get(getOperand(0), VPLane::getLaneFromEnd(State.VF, Offset));
-    } else {
-      // TODO: Remove ExtractLastLane for scalar VFs.
-      assert(Offset <= 1 && "invalid offset to extract from");
-      Res = State.get(getOperand(0));
-    }
-    if (isa<ExtractElementInst>(Res))
-      Res->setName(Name);
-    return Res;
+    // Extracts from scalar operands are folded in VPlan. Use the operand's
+    // width, which may differ from the plan's VF.
+    Value *V = State.get(getOperand(0));
+    ElementCount EC = cast<VectorType>(V->getType())->getElementCount();
+    Value *Idx =
+        VPLane::getLaneFromEnd(EC, Offset).getAsRuntimeExpr(Builder, EC);
+    return Builder.CreateExtractElement(V, Idx, Name);
   }
   case VPInstruction::PtrAdd: {
     assert(GenerateSingleScalar && "Can only generate first lane for PtrAdd");
