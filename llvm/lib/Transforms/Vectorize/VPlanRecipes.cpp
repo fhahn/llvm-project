@@ -777,8 +777,6 @@ Value *VPInstruction::generate(VPTransformState &State,
     assert(GenerateSingleScalar &&
            "Can only generate first lane for ExtractElement");
     assert(State.VF.isVector() && "Only extract elements from vectors");
-    if (auto *Idx = dyn_cast<VPConstantInt>(getOperand(1)))
-      return State.get(getOperand(0), VPLane(Idx->getZExtValue()));
     Value *Vec = State.get(getOperand(0));
     Value *Idx = State.get(getOperand(1), /*NeedsSingleScalar=*/true);
     return Builder.CreateExtractElement(Vec, Idx, Name);

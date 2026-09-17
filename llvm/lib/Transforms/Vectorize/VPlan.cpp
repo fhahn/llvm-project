@@ -283,9 +283,10 @@ Value *VPTransformState::get(const VPValue *Def, const VPLane &Lane) {
     assert(Lane.isFirstLane() && "cannot get lane > 0 for scalar");
     return VecPart;
   }
+  assert(Lane.isFirstLane() &&
+         "extracts of non-first lanes must be modelled explicitly");
   // TODO: Cache created scalar values.
-  Value *LaneV = Lane.getAsRuntimeExpr(Builder, VF);
-  auto *Extract = Builder.CreateExtractElement(VecPart, LaneV);
+  auto *Extract = Builder.CreateExtractElement(VecPart, Builder.getInt64(0));
   // set(Def, Extract, Instance);
   return Extract;
 }
