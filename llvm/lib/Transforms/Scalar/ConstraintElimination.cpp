@@ -750,6 +750,56 @@ static Decomposition decompose(Value *V, const ConstraintInfo &Info,
   return V;
 }
 
+/// Build the row for 'ADec <= BDec', using the indices from \p Value2Index.
+/// Variables not in \p Value2Index are appended to \p NewVariables and get the
+/// indices following the ones in \p Value2Index. Returns an empty row if the
+/// coefficients overflow.
+static RowTy getRowForLessEqual(const Decomposition &ADec,
+                                const Decomposition &BDec,
+                                const DenseMap<Value *, unsigned> &Value2Index,
+                                SmallVectorImpl<Value *> &NewVariables) {
+  int64_t Offset;
+  if (SubOverflow(BDec.Offset, ADec.Offset, Offset))
+    return {};
+
+  // First try to look up \p V in Value2Index and NewVariables. Otherwise add a
+  // new entry to NewVariables.
+  auto GetOrAddIndex = [&Value2Index, &NewVariables](Value *V) -> unsigned {
+    auto V2I = Value2Index.find(V);
+    if (V2I != Value2Index.end())
+      return V2I->second;
+    unsigned Idx = find(NewVariables, V) - NewVariables.begin();
+    if (Idx == NewVariables.size())
+      NewVariables.push_back(V);
+    return Value2Index.size() + Idx + 1;
+  };
+
+  // Build the row, by first adding all coefficients from A and then subtracting
+  // all coefficients from B.
+  RowTy R(1, Entry(Offset, 0));
+  auto GetCoefficient = [&R](unsigned Idx) -> int64_t & {
+    // The entry for Idx, or the place to insert it at, is the first entry with
+    // an index >= Idx.
+    Entry *I =
+        find_if(drop_begin(R), [Idx](const Entry &E) { return E.Id >= Idx; });
+    if (I == R.end() || I->Id != Idx)
+      I = R.insert(I, Entry(0, Idx));
+    return I->Coefficient;
+  };
+  for (const DecompEntry &KV : ADec.Vars)
+    GetCoefficient(GetOrAddIndex(KV.Variable)) += KV.Coefficient;
+
+  for (const DecompEntry &KV : BDec.Vars) {
+    auto &Coeff = GetCoefficient(GetOrAddIndex(KV.Variable));
+    if (SubOverflow(Coeff, KV.Coefficient, Coeff))
+      return {};
+  }
+
+  // Drop coefficients that cancelled out.
+  erase_if(R, [](const Entry &E) { return E.Id != 0 && E.Coefficient == 0; });
+  return R;
+}
+
 ConstraintTy
 ConstraintInfo::getConstraint(CmpInst::Predicate Pred, Value *Op0, Value *Op1,
                               SmallVectorImpl<Value *> &NewVariables,
@@ -802,53 +852,13 @@ ConstraintInfo::getConstraint(CmpInst::Predicate Pred, Value *Op0, Value *Op1,
                         IsSigned, DL);
   auto BDec = decompose(Op1->stripPointerCastsSameRepresentation(), *this,
                         IsSigned, DL);
-  int64_t OffsetSum;
-  if (SubOverflow(BDec.Offset, ADec.Offset, OffsetSum))
+  RowTy R = getRowForLessEqual(ADec, BDec, Value2Index, NewVariables);
+  if (R.empty())
     return {};
 
-  auto &VariablesA = ADec.Vars;
-  auto &VariablesB = BDec.Vars;
-
-  // First try to look up \p V in Value2Index and NewVariables. Otherwise add a
-  // new entry to NewVariables.
-  auto GetOrAddIndex = [&Value2Index, &NewVariables](Value *V) -> unsigned {
-    auto V2I = Value2Index.find(V);
-    if (V2I != Value2Index.end())
-      return V2I->second;
-    unsigned Idx = find(NewVariables, V) - NewVariables.begin();
-    if (Idx == NewVariables.size())
-      NewVariables.push_back(V);
-    return Value2Index.size() + Idx + 1;
-  };
-
-  // Build result constraint, by first adding all coefficients from A and then
-  // subtracting all coefficients from B.
-  RowTy R(1, Entry(0, 0));
-  auto GetCoefficient = [&R](unsigned Idx) -> int64_t & {
-    // The entry for Idx, or the place to insert it at, is the first entry with
-    // an index >= Idx.
-    Entry *I =
-        find_if(drop_begin(R), [Idx](const Entry &E) { return E.Id >= Idx; });
-    if (I == R.end() || I->Id != Idx)
-      I = R.insert(I, Entry(0, Idx));
-    return I->Coefficient;
-  };
-  for (const auto &KV : VariablesA)
-    GetCoefficient(GetOrAddIndex(KV.Variable)) += KV.Coefficient;
-
-  for (const auto &KV : VariablesB) {
-    auto &Coeff = GetCoefficient(GetOrAddIndex(KV.Variable));
-    if (SubOverflow(Coeff, KV.Coefficient, Coeff))
-      return {};
-  }
-
   if (Pred == CmpInst::ICMP_SLT || Pred == CmpInst::ICMP_ULT)
-    if (AddOverflow(OffsetSum, int64_t(-1), OffsetSum))
+    if (AddOverflow(R[0].Coefficient, int64_t(-1), R[0].Coefficient))
       return {};
-  R[0].Coefficient = OffsetSum;
-
-  // Drop coefficients that cancelled out.
-  erase_if(R, [](const Entry &E) { return E.Id != 0 && E.Coefficient == 0; });
 
   // Remove any new variable without a coefficient in the row.
   unsigned NumV2I = Value2Index.size();
@@ -1770,6 +1780,15 @@ static void generateReproducer(Instruction *Cond, bool IsSigned, Module *M,
   assert(!verifyFunction(*F, &dbgs()));
 }
 
+/// Whether an expression can be looked through depends on the facts currently
+/// on the stack, so \p V may be opaque when a fact about it is recorded and
+/// decomposable by the time it is queried. The query then talks about the
+/// operands while the fact talks about the value itself, and the two no longer
+/// connect. \p V has been decomposed away if it is a variable of the system
+/// without a coefficient in \p C. In that case, return the row for
+/// 'V <= decompose(V)', which together with its negation states that both
+/// representations denote the same value. Returns an empty row if there is no
+/// such row over the variables already in the system.
 static std::optional<bool> checkCondition(CmpInst::Predicate Pred, Value *A,
                                           Value *B, Instruction *CheckInst,
                                           ConstraintInfo &Info) {
@@ -1825,9 +1844,12 @@ static std::optional<bool> checkCondition(CmpInst::Predicate Pred, Value *A,
     SmallVector<Value *> NewVariables;
     auto SR = Info.getConstraint(Pred, A, B, NewVariables,
                                  /*ForceSignedSystem=*/true);
-    if (NewVariables.empty())
+    // Queries must only use variables of the system; a value the system does
+    // not know about is unconstrained and cannot prove anything anyway.
+    if (NewVariables.empty()) {
       if (auto ImpliedCondition = TryWithConstraint(SR))
         return ImpliedCondition;
+    }
   }
   return std::nullopt;
 }
