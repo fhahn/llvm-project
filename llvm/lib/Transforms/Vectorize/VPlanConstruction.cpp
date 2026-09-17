@@ -1038,7 +1038,13 @@ bool VPlanTransforms::createHeaderPhiRecipes(
 
     // Create the ComputeReductionResult recipe in the middle block and rewire
     // the reduction's live-out extracts to it. AnyOf reductions need a
-    // different result recipe and are handled per-VF.
+    // different result recipe, which is created by createReductionResults once
+    // the control-flow has been linearized.
+    //
+    // TODO: At the moment ComputeReductionResult also drives creation of the
+    // bc.merge.rdx phi nodes, hence it needs to be created unconditionally
+    // here even for in-loop reductions, until the reduction resume value
+    // handling is also modeled in VPlan.
     if (RecurrenceDescriptor::isAnyOfRecurrenceKind(RK))
       continue;
     VPValue *BackedgeV = RedPhiR->getBackedgeValue();
@@ -1509,6 +1515,156 @@ void VPlanTransforms::foldTailByMasking(VPlan &Plan) {
                    m_Specific(&Plan.getVectorTripCount())))) &&
          "Unexpected MiddleVPBB branch");
   Plan.getMiddleBlock()->getTerminator()->setOperand(0, Plan.getTrue());
+}
+
+/// Convert the AnyOf reduction \p PhiR to operate on a boolean chain and create
+/// its final result in \p Plan's middle block at \p MiddleIP, using \p Builder.
+/// Rebuilds the i1 version of the exiting value (phi, or, and any blends/selects
+/// it flows through) and returns the ComputeAnyOfResult recipe that selects the
+/// final value.
+static VPInstruction *createAnyOfResult(VPBuilder &Builder, VPlan &Plan,
+                                        VPReductionPHIRecipe *PhiR,
+                                        VPValue *OrigExitingVPV,
+                                        VPBasicBlock::iterator MiddleIP,
+                                        DebugLoc ExitDL) {
+  auto *AnyOfSelect = cast<VPSingleDefRecipe>(
+      findUserOf(PhiR, m_Select(m_VPValue(), m_VPValue(), m_VPValue())));
+  VPValue *Start = PhiR->getStartValue();
+  bool TrueValIsPhi = AnyOfSelect->getOperand(1) == PhiR;
+  // NewVal is the non-phi operand of the select.
+  VPValue *NewVal =
+      TrueValIsPhi ? AnyOfSelect->getOperand(2) : AnyOfSelect->getOperand(1);
+
+  // Adjust AnyOf reductions; replace the reduction phi for the selected
+  // value with a boolean reduction phi node to check if the condition is
+  // true in any iteration. The final value is selected by the final
+  // ComputeReductionResult.
+  VPValue *Cmp = AnyOfSelect->getOperand(0);
+  // If the compare is checking the reduction PHI node, adjust it to check
+  // the start value.
+  if (VPRecipeBase *CmpR = Cmp->getDefiningRecipe())
+    CmpR->replaceUsesOfWith(PhiR, PhiR->getStartValue());
+  Builder.setInsertPoint(AnyOfSelect);
+
+  // If the true value of the select is the reduction phi, the new value
+  // is selected if the negated condition is true in any iteration.
+  if (TrueValIsPhi)
+    Cmp = Builder.createNot(Cmp);
+
+  // Build a fresh i1 chain (phi, or, and i1 versions of any blend/select
+  // the exiting value flows through).
+  auto *NewPhiR = PhiR->cloneWithOperands(Plan.getFalse(), Plan.getFalse());
+  NewPhiR->insertBefore(PhiR);
+  VPValue *NewExiting = Builder.createOr(NewPhiR, Cmp);
+
+  // The exiting value may flow through a chain of VPBlendRecipes and select
+  // VPInstructions before reaching OrigExitingVPV. Clone each chain link in
+  // topological order so each clone refers to the already-rewritten i1
+  // operands via Substitutions.
+  DenseMap<VPValue *, VPValue *> Substitutions = {{AnyOfSelect, NewExiting},
+                                                  {PhiR, NewPhiR}};
+  std::function<void(VPSingleDefRecipe *)> CloneChain =
+      [&](VPSingleDefRecipe *Old) {
+        if (Substitutions.contains(Old))
+          return;
+        SmallVector<VPValue *> NewOps;
+        for (VPValue *Op : Old->operands()) {
+          if (isa<VPBlendRecipe>(Op) ||
+              match(Op, m_Select(m_VPValue(), m_VPValue(), m_VPValue())))
+            CloneChain(cast<VPSingleDefRecipe>(Op));
+          NewOps.push_back(Substitutions.lookup_or(Op, Op));
+        }
+        VPSingleDefRecipe *New;
+        if (auto *B = dyn_cast<VPBlendRecipe>(Old))
+          New = B->cloneWithOperands(NewOps);
+        else
+          New = cast<VPInstruction>(Old)->cloneWithOperands(NewOps);
+        New->insertBefore(Old);
+        Substitutions[Old] = New;
+      };
+
+  if (OrigExitingVPV != AnyOfSelect) {
+    CloneChain(cast<VPSingleDefRecipe>(OrigExitingVPV));
+    NewExiting = Substitutions.lookup(OrigExitingVPV);
+  }
+  NewPhiR->setOperand(1, NewExiting);
+  PhiR->replaceAllUsesWith(Plan.getPoison(PhiR->getScalarType()));
+
+  Builder.setInsertPoint(Plan.getMiddleBlock(), MiddleIP);
+  return Builder.createAnyOfReduction(NewExiting, NewVal, Start, ExitDL);
+}
+
+void VPlanTransforms::createReductionResults(VPlan &Plan,
+                                             bool UsePredicatedReductionSelect,
+                                             DebugLoc ExitDL) {
+  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
+  VPBasicBlock *MiddleVPBB = Plan.getMiddleBlock();
+  VPBasicBlock::iterator IP = MiddleVPBB->getFirstNonPhi();
+  VPValue *HeaderMask = LoopRegion->getHeaderMask();
+  VPBuilder Builder;
+  for (VPRecipeBase &R : LoopRegion->getEntryBasicBlock()->phis()) {
+    auto *PhiR = dyn_cast<VPReductionPHIRecipe>(&R);
+    if (!PhiR)
+      continue;
+
+    RecurKind RecurrenceKind = PhiR->getRecurrenceKind();
+
+    // Convert a VPBlendRecipe backedge to a select.
+    if (auto *Blend = dyn_cast<VPBlendRecipe>(PhiR->getBackedgeValue())) {
+      if (Blend->getNumIncomingValues() == 2 &&
+          Blend->getMask(0) == HeaderMask) {
+        auto *Sel = VPBuilder(Blend).createSelect(
+            Blend->getMask(0), Blend->getIncomingValue(0),
+            Blend->getIncomingValue(1), {}, "", *Blend);
+        Blend->replaceAllUsesWith(Sel);
+        Blend->eraseFromParent();
+      }
+    }
+
+    VPValue *OrigExitingVPV = PhiR->getBackedgeValue();
+
+    // Remove the predicated select if the target doesn't want it. For FindLast
+    // recurrences we prefer a predicated select to simplify matching in
+    // handleFindLastReductions(), rather than handle multiple cases.
+    VPValue *V;
+    if (!UsePredicatedReductionSelect &&
+        !RecurrenceDescriptor::isFindLastRecurrenceKind(RecurrenceKind) &&
+        match(OrigExitingVPV,
+              m_Select(m_Specific(HeaderMask), m_VPValue(V), m_Specific(PhiR))))
+      PhiR->setBackedgeValue(V);
+
+    // For AnyOf reductions, find the select among PhiR's users and convert the
+    // reduction phi to operate on bools before creating the final reduction
+    // result. This leaves the original reduction chain dead, it is removed by
+    // the later removeDeadRecipes run. The results of all other reductions have
+    // already been created together with their reduction phis.
+    VPInstruction *FinalReductionResult;
+    if (RecurrenceDescriptor::isAnyOfRecurrenceKind(RecurrenceKind)) {
+      FinalReductionResult =
+          createAnyOfResult(Builder, Plan, PhiR, OrigExitingVPV, IP, ExitDL);
+    } else {
+      FinalReductionResult = vputils::findComputeReductionResult(PhiR);
+      assert(FinalReductionResult &&
+             "the reduction result must have been created with its phi");
+    }
+
+    // Update all users of the exiting value outside the vector region, such as
+    // sunk invariant stores. Also replace redundant extracts.
+    for (auto *U : to_vector(OrigExitingVPV->users())) {
+      if (U == FinalReductionResult ||
+          cast<VPRecipeBase>(U)->getParent()->getParent())
+        continue;
+      U->replaceUsesOfWith(OrigExitingVPV, FinalReductionResult);
+
+      // Look through ExtractLastPart.
+      if (match(U, m_ExtractLastPart(m_VPValue())))
+        U = cast<VPInstruction>(U)->getSingleUser();
+
+      if (match(U, m_CombineOr(m_ExtractLane(m_VPValue(), m_VPValue()),
+                               m_ExtractLastLane(m_VPValue()))))
+        cast<VPInstruction>(U)->replaceAllUsesWith(FinalReductionResult);
+    }
+  }
 }
 
 /// Add an incoming value to all phis in \p VPBB for its just-added last

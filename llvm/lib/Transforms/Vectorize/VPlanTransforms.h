@@ -589,6 +589,16 @@ struct VPlanTransforms {
   /// \p Plan.
   static void introduceMasksAndLinearize(VPlan &Plan);
 
+  /// Finalize the reductions in \p Plan, after the tail has been folded and the
+  /// control-flow has been linearized: convert a blend feeding a reduction phi
+  /// to a select, drop the select again if \p UsePredicatedReductionSelect is
+  /// false, create the final results for AnyOf reductions and update the
+  /// out-of-region users of a reduction's exiting value to use its final
+  /// result. Recipes created in the middle block use \p ExitDL.
+  static void createReductionResults(VPlan &Plan,
+                                     bool UsePredicatedReductionSelect,
+                                     DebugLoc ExitDL);
+
   /// Replace a VPWidenCanonicalIVRecipe if it is present in \p Plan, with a
   /// VPWidenIntOrFpInductionRecipe, provided it would not cause additional
   /// spills for \p VF at unroll factor \p UF.
