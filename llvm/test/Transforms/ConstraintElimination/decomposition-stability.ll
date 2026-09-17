@@ -12,8 +12,7 @@ define i1 @eq_after_unsigned_sub_becomes_decomposable(i64 %a, i64 %y, i64 %z) {
 ; CHECK-NEXT:    [[PRECOND:%.*]] = icmp uge i64 [[Y]], [[Z]]
 ; CHECK-NEXT:    br i1 [[PRECOND]], label %[[QUERY:.*]], label %[[EXIT]]
 ; CHECK:       [[QUERY]]:
-; CHECK-NEXT:    [[EQ:%.*]] = icmp eq i64 [[A]], [[S]]
-; CHECK-NEXT:    ret i1 [[EQ]]
+; CHECK-NEXT:    ret i1 false
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret i1 false
 ;
@@ -47,8 +46,7 @@ define i1 @eq_after_signed_add_becomes_decomposable(i64 %a, i64 %b) {
 ; CHECK-NEXT:    [[PRECOND:%.*]] = icmp slt i64 [[B]], 100
 ; CHECK-NEXT:    br i1 [[PRECOND]], label %[[QUERY:.*]], label %[[EXIT]]
 ; CHECK:       [[QUERY]]:
-; CHECK-NEXT:    [[EQ:%.*]] = icmp eq i64 [[A]], [[ADD]]
-; CHECK-NEXT:    ret i1 [[EQ]]
+; CHECK-NEXT:    ret i1 false
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret i1 false
 ;

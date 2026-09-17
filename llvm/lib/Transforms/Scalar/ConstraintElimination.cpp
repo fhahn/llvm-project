@@ -1789,6 +1789,23 @@ static void generateReproducer(Instruction *Cond, bool IsSigned, Module *M,
 /// 'V <= decompose(V)', which together with its negation states that both
 /// representations denote the same value. Returns an empty row if there is no
 /// such row over the variables already in the system.
+static RowTy getDecompositionLinkRow(Value *V, const ConstraintTy &C,
+                                     const ConstraintInfo &Info,
+                                     const DataLayout &DL) {
+  const auto &Value2Index = Info.getValue2Index(C.IsSigned);
+  auto It = Value2Index.find(V);
+  if (It == Value2Index.end() ||
+      any_of(C.Coefficients,
+             [Id = It->second](const Entry &E) { return E.Id == Id; }))
+    return {};
+
+  SmallVector<Value *> NewVariables;
+  RowTy Row =
+      getRowForLessEqual(Decomposition(V), decompose(V, Info, C.IsSigned, DL),
+                         Value2Index, NewVariables);
+  return NewVariables.empty() ? Row : RowTy();
+}
+
 static std::optional<bool> checkCondition(CmpInst::Predicate Pred, Value *A,
                                           Value *B, Instruction *CheckInst,
                                           ConstraintInfo &Info) {
@@ -1818,8 +1835,39 @@ static std::optional<bool> checkCondition(CmpInst::Predicate Pred, Value *A,
     return std::nullopt;
   };
 
+  // Retry the query after temporarily telling the system that an operand and
+  // its decomposition denote the same value, so facts recorded about either
+  // form can be combined. The extra rows are dropped again afterwards.
+  auto TryWithLinkedDecomposition =
+      [&](const ConstraintTy &C) -> std::optional<bool> {
+    if (C.empty())
+      return std::nullopt;
+
+    auto &CS = Info.getCS(C.IsSigned);
+    unsigned NumVars = Info.getValue2Index(C.IsSigned).size();
+    unsigned NumPushed = 0;
+    for (Value *V : {A, B}) {
+      RowTy Row =
+          getDecompositionLinkRow(V, C, Info, CheckInst->getDataLayout());
+      RowTy Negated = ConstraintSystem::negateOrEqual(Row);
+      if (Row.empty() || Negated.empty())
+        continue;
+      NumPushed += CS.addRow(Row, NumVars);
+      NumPushed += CS.addRow(Negated, NumVars);
+    }
+    if (NumPushed == 0)
+      return std::nullopt;
+
+    std::optional<bool> Res = TryWithConstraint(C);
+    while (NumPushed--)
+      CS.popLastConstraint();
+    return Res;
+  };
+
   auto R = Info.getConstraintForSolving(Pred, A, B);
   if (auto ImpliedCondition = TryWithConstraint(R))
+    return ImpliedCondition;
+  if (auto ImpliedCondition = TryWithLinkedDecomposition(R))
     return ImpliedCondition;
 
   // For non-negative operands unsigned queries can also be checked against the
@@ -1848,6 +1896,8 @@ static std::optional<bool> checkCondition(CmpInst::Predicate Pred, Value *A,
     // not know about is unconstrained and cannot prove anything anyway.
     if (NewVariables.empty()) {
       if (auto ImpliedCondition = TryWithConstraint(SR))
+        return ImpliedCondition;
+      if (auto ImpliedCondition = TryWithLinkedDecomposition(SR))
         return ImpliedCondition;
     }
   }
