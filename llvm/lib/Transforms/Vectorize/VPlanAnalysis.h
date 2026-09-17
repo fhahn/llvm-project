@@ -23,6 +23,7 @@ class VPRecipeBase;
 class VPlan;
 class TargetTransformInfo;
 class InstructionCost;
+class VPDominatorTree;
 
 struct VPCostContext;
 
@@ -39,8 +40,14 @@ void collectEphemeralRecipesForVPlan(VPlan &Plan,
 /// must advance by at least the number of bytes it
 /// writes on each outer-loop iteration, so that no two lanes write the same
 /// location. Loads are unconstrained; reordering reads is always safe.
+///
+/// A pair of accesses that may touch the same bytes is accepted if the memory
+/// each of them touches can be bounded; a VPNoMemoryOverlapPredicate for the
+/// two ranges is then registered on \p Plan.
 bool proveOuterLoopMemorySafety(VPlan &Plan, PredicatedScalarEvolution &PSE,
-                                AAResults &AA, Loop *OuterLoop);
+                                AAResults &AA, const VPDominatorTree &VPDT,
+                                DominatorTree &DT, AssumptionCache &AC,
+                                Loop *OuterLoop);
 
 /// A struct that represents some properties of the register usage
 /// of a loop.

@@ -1641,6 +1641,24 @@ VPValue *VPSCEVPredicate::expandNegated(VPSCEVExpander &Exp) const {
   llvm_unreachable("Unknown SCEV predicate type");
 }
 
+VPValue *
+VPNoMemoryOverlapPredicate::expandNegated(VPSCEVExpander &Exp) const {
+  VPBuilder &Builder = Exp.getBuilder();
+  DebugLoc DL = Exp.getDebugLoc();
+  // Expand the bounds in a fixed order, so the generated code does not depend
+  // on the order the compiler evaluates arguments in.
+  VPValue *AStart = Exp.expand(A.Start);
+  VPValue *AEnd = Exp.expand(A.End);
+  VPValue *BStart = Exp.expand(B.Start);
+  VPValue *BEnd = Exp.expand(B.End);
+  // The two ranges overlap if each of them starts before the other one ends.
+  VPValue *Bound0 =
+      Builder.createICmp(CmpInst::ICMP_ULT, AStart, BEnd, DL, "bound0");
+  VPValue *Bound1 =
+      Builder.createICmp(CmpInst::ICMP_ULT, BStart, AEnd, DL, "bound1");
+  return Builder.createAnd(Bound0, Bound1, DL, "found.conflict");
+}
+
 void VPlanTransforms::materializePredicates(VPlan &Plan, ScalarEvolution &SE,
                                             DebugLoc DL,
                                             bool AddBranchWeights) {
@@ -1655,6 +1673,8 @@ void VPlanTransforms::materializePredicates(VPlan &Plan, ScalarEvolution &SE,
     const char *CondName;
   } Groups[] = {
       {VPPredicate::VPSCEVPredicateSC, "vector.scevcheck", ""},
+      {VPPredicate::VPNoMemoryOverlapPredicateSC, "vector.memcheck",
+       "conflict.rdx"},
   };
 
   unsigned NumMaterialized = 0;

@@ -6450,9 +6450,11 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
   // Outer-loop vectorization runs adjacent outer iterations as lanes of one
   // vector iteration. Prove memory independence from the plan's accesses or
   // their parallel-access annotations; a vectorization hint alone is not a
-  // guarantee of independence.
+  // guarantee of independence. Pairs that cannot be separated statically are
+  // recorded in the plan for runtime checking.
   if (!IsInnerLoop &&
-      !proveOuterLoopMemorySafety(*VPlan0, PSE, *Legal->getAA(), OrigLoop)) {
+      !proveOuterLoopMemorySafety(*VPlan0, PSE, *Legal->getAA(), VPDT, *DT,
+                                  *Legal->getAssumptionCache(), OrigLoop)) {
     reportVectorizationFailure(
         "Cannot prove memory independence in outer loop",
         "cannot prove memory independence for outer-loop vectorization",

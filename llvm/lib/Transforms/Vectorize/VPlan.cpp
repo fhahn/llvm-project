@@ -1130,6 +1130,11 @@ void VPlan::print(raw_ostream &O) const {
   O << "}\n";
 }
 
+void VPNoMemoryOverlapPredicate::print(raw_ostream &O, unsigned Depth) const {
+  O.indent(Depth) << "No overlap: [" << *A.Start << ", " << *A.End << ") and ["
+                  << *B.Start << ", " << *B.End << ")\n";
+}
+
 std::string VPlan::getName() const {
   std::string Out;
   raw_string_ostream RSO(Out);

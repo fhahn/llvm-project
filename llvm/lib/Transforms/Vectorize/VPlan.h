@@ -4847,6 +4847,13 @@ inline const VPRegionBlock *VPRecipeBase::getRegion() const {
   return getParent()->getParent();
 }
 
+/// The memory an access of a loop nest touches over all iterations of the nest,
+/// as the lowest address accessed and one past the highest.
+struct VPMemoryRange {
+  const SCEV *Start = nullptr;
+  const SCEV *End = nullptr;
+};
+
 /// A condition that must hold for a VPlan's vector loop to be executed. Like
 /// the predicates of PredicatedScalarEvolution, predicates are collected while
 /// the plan is built and only later turned into runtime checks, by
@@ -4854,7 +4861,7 @@ inline const VPRegionBlock *VPRecipeBase::getRegion() const {
 class VPPredicate {
 public:
   /// An enumeration for keeping track of the concrete subclass of VPPredicate.
-  enum VPPredicateKind { VPSCEVPredicateSC };
+  enum VPPredicateKind { VPSCEVPredicateSC, VPNoMemoryOverlapPredicateSC };
 
   VPPredicate(VPPredicateKind Kind) : Kind(Kind) {}
   VPPredicate(const VPPredicate &) = delete;
@@ -4902,6 +4909,30 @@ public:
   void print(raw_ostream &O, unsigned Depth) const override {
     Pred->print(O, Depth);
   }
+#endif
+};
+
+/// The memory ranges \p A and \p B do not overlap.
+class VPNoMemoryOverlapPredicate : public VPPredicate {
+  VPMemoryRange A;
+  VPMemoryRange B;
+
+public:
+  VPNoMemoryOverlapPredicate(VPMemoryRange A, VPMemoryRange B)
+      : VPPredicate(VPNoMemoryOverlapPredicateSC), A(A), B(B) {}
+
+  static bool classof(const VPPredicate *P) {
+    return P->getKind() == VPNoMemoryOverlapPredicateSC;
+  }
+
+  std::unique_ptr<VPPredicate> clone() const override {
+    return std::make_unique<VPNoMemoryOverlapPredicate>(A, B);
+  }
+
+  VPValue *expandNegated(VPSCEVExpander &Exp) const override;
+
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+  void print(raw_ostream &O, unsigned Depth) const override;
 #endif
 };
 

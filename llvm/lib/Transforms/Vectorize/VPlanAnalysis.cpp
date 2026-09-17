@@ -15,6 +15,8 @@
 #include "VPlanUtils.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/Analysis/AliasAnalysis.h"
+#include "llvm/Analysis/LoopAccessAnalysis.h"
+#include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 
@@ -398,13 +400,100 @@ static bool writesDisjointBytesPerIteration(VPInstruction *Store,
   return Step && Step->getAPInt().abs().uge(StoreSize.getFixedValue());
 }
 
+/// Returns true if \p R is executed on every iteration of every loop of the
+/// nest \p Plan describes, which at this point is still a plain CFG. A block
+/// dominating the outermost loop's latch is on every path through the nest, so
+/// it is not skipped by any iteration of any of the loops containing it.
+///
+/// Required by the no-wrap reasoning in getAccessRange(). Outer-loop legality
+/// admits branches on an outer-loop invariant condition, so this does not
+/// always hold.
+static bool isExecutedEveryIteration(const VPRecipeBase &R, const VPlan &Plan,
+                                     const VPDominatorTree &VPDT) {
+  VPBasicBlock *Latch = VPBlockUtils::getPlainCFGHeaderAndLatch(Plan).second;
+  return VPDT.dominates(R.getParent(), Latch);
+}
+
+/// Returns the range of memory an access of \p AccessTy at \p Addr touches over
+/// all iterations of \p OuterLoop and the loops nested inside it, or
+/// std::nullopt if it cannot be bounded. \p Addr must be executed on every
+/// iteration of the nest.
+static std::optional<VPMemoryRange>
+getAccessRange(VPValue *Addr, Type *AccessTy, PredicatedScalarEvolution &PSE,
+               DominatorTree &DT, AssumptionCache &AC, const Loop *OuterLoop) {
+  // Every address an inbounds GEP forms on an iteration where it is
+  // dereferenced lies in one allocated object, so none of the recurrences below
+  // wraps the address space: they are monotonic, and evaluating them at a
+  // backedge-taken count gives the last address they form. The caller has
+  // checked that the access is executed on every iteration of the nest, which
+  // is what makes every address the GEP forms a dereferenced one.
+  if (!vputils::getGEPFlagsForPtr(Addr).isInBounds())
+    return std::nullopt;
+
+  ScalarEvolution &SE = *PSE.getSE();
+  const SCEV *Expr = vputils::getSCEVExprForVPValue(Addr, PSE, OuterLoop);
+  if (isa<SCEVCouldNotCompute>(Expr))
+    return std::nullopt;
+
+  const DataLayout &DL = OuterLoop->getHeader()->getDataLayout();
+  const SCEV *AccessSize =
+      SE.getStoreSizeOfExpr(DL.getIndexType(Expr->getType()), AccessTy);
+
+  // Collapse the recurrences of the loops nested inside the outer loop into the
+  // number of bytes a single outer-loop iteration touches. SCEV nests the
+  // innermost loop outermost, so those recurrences are peeled off first.
+  while (const auto *AR = dyn_cast<SCEVAddRecExpr>(Expr)) {
+    const Loop *L = AR->getLoop();
+    if (L == OuterLoop)
+      break;
+    if (!OuterLoop->contains(L) || !AR->isAffine() ||
+        !SE.isKnownNonNegative(AR->getStepRecurrence(SE)))
+      return std::nullopt;
+    const SCEV *BTC = SE.getBackedgeTakenCount(L);
+    if (isa<SCEVCouldNotCompute>(BTC) || !SE.isLoopInvariant(BTC, OuterLoop))
+      return std::nullopt;
+    // With a non-negative step the addresses of the nested loop grow from the
+    // first to the last iteration, so their distance is the span it adds.
+    const SCEV *Span =
+        SE.getMinusSCEV(AR->evaluateAtIteration(BTC, SE), AR->getStart());
+    if (isa<SCEVCouldNotCompute>(Span))
+      return std::nullopt;
+    AccessSize = SE.getAddExpr(AccessSize, Span);
+    Expr = AR->getStart();
+  }
+
+  // What remains must vary with the outer loop alone, if at all.
+  const auto *AR = dyn_cast<SCEVAddRecExpr>(Expr);
+  if (AR ? AR->getLoop() != OuterLoop || !AR->isAffine()
+         : !SE.isLoopInvariant(Expr, OuterLoop))
+    return std::nullopt;
+
+  const SCEV *BTC = SE.getBackedgeTakenCount(OuterLoop);
+  if (isa<SCEVCouldNotCompute>(BTC))
+    return std::nullopt;
+  std::optional<ScalarEvolution::LoopGuards> LoopGuards;
+  auto [Start, End] =
+      getStartAndEndForAccess(OuterLoop, Expr, AccessSize, BTC, BTC, &SE,
+                              /*PointerBounds=*/nullptr, &DT, &AC, LoopGuards);
+  if (isa<SCEVCouldNotCompute>(Start) || isa<SCEVCouldNotCompute>(End))
+    return std::nullopt;
+  return VPMemoryRange{Start, End};
+}
+
 bool llvm::proveOuterLoopMemorySafety(VPlan &Plan,
                                       PredicatedScalarEvolution &PSE,
-                                      AAResults &AA, Loop *OuterLoop) {
-  // The objects the nest's loads and stores access, with a null entry for an
-  // access whose object could not be determined.
-  SmallVector<const Value *, 8> LoadObjects, StoreObjects;
-  SmallVector<VPInstruction *, 8> Stores;
+                                      AAResults &AA,
+                                      const VPDominatorTree &VPDT,
+                                      DominatorTree &DT, AssumptionCache &AC,
+                                      Loop *OuterLoop) {
+  // An access of the nest: the object it is based on, null if it could not be
+  // determined, and the memory it touches, empty if it could not be bounded.
+  struct Access {
+    const Value *Object;
+    std::optional<VPMemoryRange> Range;
+  };
+  SmallVector<Access, 8> Loads, Stores;
+  SmallVector<VPInstruction *, 8> StoreRecipes;
   bool AllAccessesParallel = true;
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
            vp_depth_first_deep(Plan.getEntry()))) {
@@ -449,27 +538,42 @@ bool llvm::proveOuterLoopMemorySafety(VPlan &Plan,
 
       bool IsStore = VPI->getOpcode() == Instruction::Store;
       if (IsStore)
-        Stores.push_back(VPI);
-      (IsStore ? StoreObjects : LoadObjects)
-          .push_back(getBaseObject(VPI->getOperand(IsStore ? 1 : 0)));
+        StoreRecipes.push_back(VPI);
+      VPValue *Addr = VPI->getOperand(IsStore ? 1 : 0);
+      Type *AccessTy = (IsStore ? VPI->getOperand(0) : VPI->getVPSingleValue())
+                           ->getScalarType();
+      std::optional<VPMemoryRange> Range;
+      if (isExecutedEveryIteration(*VPI, Plan, VPDT))
+        Range = getAccessRange(Addr, AccessTy, PSE, DT, AC, OuterLoop);
+      (IsStore ? Stores : Loads).push_back({getBaseObject(Addr), Range});
     }
   }
 
   if (AllAccessesParallel)
     return true;
-  if (!all_of(Stores, [&](VPInstruction *Store) {
+  if (!all_of(StoreRecipes, [&](VPInstruction *Store) {
         return writesDisjointBytesPerIteration(Store, PSE, OuterLoop);
       }))
     return false;
 
-  // Each store must access an object no other access of the nest touches, so
-  // that no two lanes of a vector iteration and no load and store of the nest
-  // can access the same location. Two loads may share an object; reordering
-  // reads is always safe.
-  for (auto [I, StoreObj] : enumerate(StoreObjects))
-    for (const Value *Obj : concat<const Value *const>(
-             ArrayRef(StoreObjects).drop_front(I + 1), LoadObjects))
-      if (!provablyDistinctObjects(AA, StoreObj, Obj))
+  // Each store must access memory no other access of the nest touches, so that
+  // no two lanes of a vector iteration and no load and store of the nest can
+  // access the same location. Two loads may share memory; reordering reads is
+  // always safe. A pair that cannot be separated statically becomes a predicate
+  // of the plan, provided both ranges are known and in the same address space.
+  unsigned NumPredicates = 0;
+  for (auto [I, Store] : enumerate(Stores))
+    for (const Access &Other : concat<const Access>(
+             ArrayRef(Stores).drop_front(I + 1), ArrayRef(Loads))) {
+      if (provablyDistinctObjects(AA, Store.Object, Other.Object))
+        continue;
+      if (!Store.Range || !Other.Range ||
+          Store.Range->Start->getType() != Other.Range->Start->getType())
         return false;
+      if (++NumPredicates > VectorizerParams::RuntimeMemoryCheckThreshold)
+        return false;
+      Plan.addPredicate(std::make_unique<VPNoMemoryOverlapPredicate>(
+          *Store.Range, *Other.Range));
+    }
   return true;
 }
