@@ -1304,6 +1304,57 @@ void VPlanTransforms::createInLoopReductionRecipes(VPlan &Plan,
     R->eraseFromParent();
 }
 
+void VPlanTransforms::truncateReductions(
+    VPlan &Plan, ElementCount MinVF,
+    const MapVector<PHINode *, RecurrenceDescriptor> &Reductions) {
+  if (MinVF.isScalar())
+    return;
+
+  for (VPRecipeBase &R :
+       Plan.getVectorLoopRegion()->getEntryBasicBlock()->phis()) {
+    auto *PhiR = dyn_cast<VPReductionPHIRecipe>(&R);
+    if (!PhiR)
+      continue;
+
+    // AnyOf reductions operate on a boolean chain, they are never truncated.
+    if (RecurrenceDescriptor::isAnyOfRecurrenceKind(PhiR->getRecurrenceKind()))
+      continue;
+    Type *PhiTy = PhiR->getScalarType();
+    const RecurrenceDescriptor &RdxDesc =
+        Reductions.lookup(cast<PHINode>(PhiR->getUnderlyingInstr()));
+    Type *RdxTy = RdxDesc.getRecurrenceType();
+    if (PhiTy == RdxTy)
+      continue;
+    assert(!PhiR->isInLoop() && "Unexpected truncated inloop reduction!");
+    assert(!RecurrenceDescriptor::isMinMaxRecurrenceKind(
+               PhiR->getRecurrenceKind()) &&
+           "Unexpected truncated min-max recurrence!");
+
+    VPInstruction *RdxResult = vputils::findComputeReductionResult(PhiR);
+    assert(RdxResult &&
+           "the reduction result must have been created on the initial VPlan");
+    VPValue *ExitingV = RdxResult->getOperand(0);
+    VPRecipeBase *ExitingR = ExitingV->getDefiningRecipe();
+    auto ExtendOpc = RdxDesc.isSigned() ? Instruction::SExt : Instruction::ZExt;
+    VPBuilder Builder(ExitingR->getParent(), std::next(ExitingR->getIterator()));
+    VPValue *Trunc =
+        Builder.createWidenCast(Instruction::Trunc, ExitingV, RdxTy);
+    VPWidenCastRecipe *Extnd = Builder.createWidenCast(ExtendOpc, Trunc, PhiTy);
+    if (PhiR->getOperand(1) == ExitingV)
+      PhiR->setOperand(1, Extnd);
+
+    // Reduce in the narrow type and extend the result back to the phi type,
+    // replacing the result created on the initial VPlan.
+    auto *NarrowResult = RdxResult->cloneWithOperands({Trunc});
+    NarrowResult->insertBefore(RdxResult);
+    VPValue *Extended =
+        VPBuilder::getToInsertAfter(NarrowResult)
+            .createScalarCast(ExtendOpc, NarrowResult, PhiTy, {});
+    RdxResult->replaceAllUsesWith(Extended);
+    RdxResult->eraseFromParent();
+  }
+}
+
 bool VPlanTransforms::areAllLoadsDereferenceable(VPBasicBlock *HeaderVPBB,
                                                  Loop *TheLoop,
                                                  PredicatedScalarEvolution &PSE,

@@ -194,6 +194,16 @@ struct VPlanTransforms {
   /// VPReductionRecipe instances.
   static void createInLoopReductionRecipes(VPlan &Plan, ElementCount MinVF);
 
+  /// Truncate reductions in \p Plan that can be computed in a type narrower
+  /// than their phi type, as given by \p Reductions, for vector \p MinVF: the
+  /// reduction is computed in the narrow type and its result, created together
+  /// with the reduction phi, is replaced by a narrow result extended back to
+  /// the phi type. This enables InstCombine to evaluate the entire expression
+  /// in the smaller type.
+  static void
+  truncateReductions(VPlan &Plan, ElementCount MinVF,
+                     const MapVector<PHINode *, RecurrenceDescriptor> &);
+
   /// If a check is needed to guard executing the scalar epilogue loop, it will
   /// be added to the middle block.
   LLVM_ABI_FOR_TEST static void addMiddleCheck(VPlan &Plan);

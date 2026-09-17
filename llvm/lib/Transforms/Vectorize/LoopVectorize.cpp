@@ -6647,7 +6647,9 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan,
   // bring the VPlan to its final state.
   // ---------------------------------------------------------------------------
 
-  addReductionResultComputation(Plan, Range.Start);
+  RUN_VPLAN_PASS(VPlanTransforms::truncateReductions, *Plan, Range.Start,
+                 Legal->getReductionVars());
+  RUN_VPLAN_PASS(VPlanTransforms::clearReductionWrapFlags, *Plan);
 
   // Optimize FindIV reductions to use sentinel-based approach when possible.
   RUN_VPLAN_PASS(VPlanTransforms::optimizeFindIVReductions, *Plan, PSE,
@@ -6705,60 +6707,6 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan,
 
   assert(verifyVPlanIsValid(*Plan) && "VPlan is invalid");
   return Plan;
-}
-
-void LoopVectorizationPlanner::addReductionResultComputation(
-    VPlanPtr &Plan, ElementCount MinVF) {
-  for (VPRecipeBase &R :
-       Plan->getVectorLoopRegion()->getEntryBasicBlock()->phis()) {
-    auto *PhiR = dyn_cast<VPReductionPHIRecipe>(&R);
-    if (!PhiR)
-      continue;
-
-    // If the vector reduction can be performed in a smaller type, we truncate
-    // then extend the loop exit value to enable InstCombine to evaluate the
-    // entire expression in the smaller type. AnyOf reductions have already been
-    // converted to operate on a boolean chain, they are never truncated.
-    if (RecurrenceDescriptor::isAnyOfRecurrenceKind(PhiR->getRecurrenceKind()))
-      continue;
-    Type *PhiTy = PhiR->getScalarType();
-    const RecurrenceDescriptor &RdxDesc = Legal->getRecurrenceDescriptor(
-        cast<PHINode>(PhiR->getUnderlyingInstr()));
-    Type *RdxTy = RdxDesc.getRecurrenceType();
-    if (MinVF.isScalar() || PhiTy == RdxTy)
-      continue;
-    assert(!PhiR->isInLoop() && "Unexpected truncated inloop reduction!");
-    assert(!RecurrenceDescriptor::isMinMaxRecurrenceKind(
-               PhiR->getRecurrenceKind()) &&
-           "Unexpected truncated min-max recurrence!");
-
-    VPInstruction *RdxResult = vputils::findComputeReductionResult(PhiR);
-    assert(RdxResult &&
-           "the reduction result must have been created on the initial VPlan");
-    VPValue *ExitingV = RdxResult->getOperand(0);
-    VPRecipeBase *ExitingR = ExitingV->getDefiningRecipe();
-    auto ExtendOpc = RdxDesc.isSigned() ? Instruction::SExt : Instruction::ZExt;
-    VPBuilder::InsertPointGuard Guard(Builder);
-    Builder.setInsertPoint(ExitingR->getParent(),
-                           std::next(ExitingR->getIterator()));
-    VPValue *Trunc =
-        Builder.createWidenCast(Instruction::Trunc, ExitingV, RdxTy);
-    VPWidenCastRecipe *Extnd = Builder.createWidenCast(ExtendOpc, Trunc, PhiTy);
-    if (PhiR->getOperand(1) == ExitingV)
-      PhiR->setOperand(1, Extnd);
-
-    // Reduce in the narrow type and extend the result back to the phi type,
-    // replacing the result created on the initial VPlan.
-    auto *NarrowResult = RdxResult->cloneWithOperands({Trunc});
-    NarrowResult->insertBefore(RdxResult);
-    VPValue *Extended =
-        VPBuilder::getToInsertAfter(NarrowResult)
-            .createScalarCast(ExtendOpc, NarrowResult, PhiTy, {});
-    RdxResult->replaceAllUsesWith(Extended);
-    RdxResult->eraseFromParent();
-  }
-
-  RUN_VPLAN_PASS(VPlanTransforms::clearReductionWrapFlags, *Plan);
 }
 
 void LoopVectorizationPlanner::attachRuntimeChecks(
