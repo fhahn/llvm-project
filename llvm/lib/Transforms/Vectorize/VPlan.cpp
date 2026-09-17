@@ -83,19 +83,6 @@ raw_ostream &llvm::operator<<(raw_ostream &OS, const VPRecipeBase &R) {
 }
 #endif
 
-Value *VPLane::getAsRuntimeExpr(IRBuilderBase &Builder,
-                                const ElementCount &VF) const {
-  switch (LaneKind) {
-  case VPLane::Kind::ScalableLast:
-    // Lane = RuntimeVF - VF.getKnownMinValue() + Lane
-    return Builder.CreateSub(getRuntimeVF(Builder, Builder.getInt32Ty(), VF),
-                             Builder.getInt32(VF.getKnownMinValue() - Lane));
-  case VPLane::Kind::First:
-    return Builder.getInt64(Lane);
-  }
-  llvm_unreachable("Unknown lane kind");
-}
-
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 void VPValue::print(raw_ostream &OS, VPSlotTracker &SlotTracker) const {
   if (const VPRecipeBase *R = getDefiningRecipe())
