@@ -215,3 +215,24 @@ entry:
   %r = icmp slt i64 %x, 0
   ret i1 %r
 }
+
+; Offsets of both operands are INT64_MIN. Their difference is representable,
+; so the comparison can still be decomposed after the offsets cancel.
+define i1 @constraint_offset_min_cancellation(i64 %x, i64 %y) {
+; CHECK-LABEL: define i1 @constraint_offset_min_cancellation(
+; CHECK-SAME: i64 [[X:%.*]], i64 [[Y:%.*]]) {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[A:%.*]] = add nsw i64 [[X]], -4611686018427387904
+; CHECK-NEXT:    [[B:%.*]] = add nsw i64 [[Y]], -4611686018427387904
+; CHECK-NEXT:    [[C:%.*]] = icmp sle i64 [[A]], [[B]]
+; CHECK-NEXT:    call void @llvm.assume(i1 [[C]])
+; CHECK-NEXT:    ret i1 true
+;
+entry:
+  %a = add nsw i64 %x, -4611686018427387904
+  %b = add nsw i64 %y, -4611686018427387904
+  %c = icmp sle i64 %a, %b
+  call void @llvm.assume(i1 %c)
+  %r = icmp sle i64 %x, %y
+  ret i1 %r
+}
