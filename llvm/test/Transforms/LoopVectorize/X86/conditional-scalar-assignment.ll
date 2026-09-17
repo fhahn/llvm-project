@@ -438,15 +438,15 @@ define i32 @multi_use_cmp_for_csa_int_select(i64 %N, ptr %data, i32 %a) {
 ; AVX512-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; AVX512-NEXT:    br i1 [[TMP8]], label %[[MIDDLE_BLOCK:.*]], label %[[LOOP]], !llvm.loop [[LOOP8:![0-9]+]]
 ; AVX512:       [[MIDDLE_BLOCK]]:
-; AVX512-NEXT:    [[TMP9:%.*]] = call i32 @llvm.experimental.vector.extract.last.active.v8i32(<8 x i32> [[TMP6]], <8 x i1> [[TMP5]], i32 -1)
 ; AVX512-NEXT:    [[TMP10:%.*]] = call i64 @llvm.vector.reduce.smax.v8i64(<8 x i64> [[TMP7]])
 ; AVX512-NEXT:    [[TMP11:%.*]] = icmp ne i64 [[TMP10]], -9223372036854775808
 ; AVX512-NEXT:    [[TMP12:%.*]] = select i1 [[TMP11]], i64 [[TMP10]], i64 -1
+; AVX512-NEXT:    [[TMP13:%.*]] = call i32 @llvm.experimental.vector.extract.last.active.v8i32(<8 x i32> [[TMP6]], <8 x i1> [[TMP5]], i32 -1)
 ; AVX512-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; AVX512-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; AVX512:       [[SCALAR_PH]]:
 ; AVX512-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ]
-; AVX512-NEXT:    [[BC_MERGE_RDX:%.*]] = phi i32 [ [[TMP9]], %[[MIDDLE_BLOCK]] ], [ -1, %[[ENTRY]] ]
+; AVX512-NEXT:    [[BC_MERGE_RDX:%.*]] = phi i32 [ [[TMP13]], %[[MIDDLE_BLOCK]] ], [ -1, %[[ENTRY]] ]
 ; AVX512-NEXT:    [[BC_MERGE_RDX2:%.*]] = phi i64 [ [[TMP12]], %[[MIDDLE_BLOCK]] ], [ -1, %[[ENTRY]] ]
 ; AVX512-NEXT:    br label %[[LOOP1:.*]]
 ; AVX512:       [[LOOP1]]:
@@ -462,7 +462,7 @@ define i32 @multi_use_cmp_for_csa_int_select(i64 %N, ptr %data, i32 %a) {
 ; AVX512-NEXT:    [[EXIT_CMP:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
 ; AVX512-NEXT:    br i1 [[EXIT_CMP]], label %[[EXIT]], label %[[LOOP1]], !llvm.loop [[LOOP9:![0-9]+]]
 ; AVX512:       [[EXIT]]:
-; AVX512-NEXT:    [[SELECT_DATA_LCSSA:%.*]] = phi i32 [ [[SELECT_DATA]], %[[LOOP1]] ], [ [[TMP9]], %[[MIDDLE_BLOCK]] ]
+; AVX512-NEXT:    [[SELECT_DATA_LCSSA:%.*]] = phi i32 [ [[SELECT_DATA]], %[[LOOP1]] ], [ [[TMP13]], %[[MIDDLE_BLOCK]] ]
 ; AVX512-NEXT:    [[SELECT_IDX_LCSSA:%.*]] = phi i64 [ [[SELECT_IDX]], %[[LOOP1]] ], [ [[TMP12]], %[[MIDDLE_BLOCK]] ]
 ; AVX512-NEXT:    [[IDX:%.*]] = trunc i64 [[SELECT_IDX_LCSSA]] to i32
 ; AVX512-NEXT:    [[RES:%.*]] = add i32 [[IDX]], [[SELECT_DATA_LCSSA]]

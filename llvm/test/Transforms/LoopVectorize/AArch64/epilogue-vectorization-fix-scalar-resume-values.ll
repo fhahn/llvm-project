@@ -206,13 +206,13 @@ define i64 @find_last_and_any_of(ptr %Dst, ptr %Src) {
 ; CHECK-NEXT:    [[TMP39:%.*]] = icmp eq i64 [[INDEX_NEXT]], 992
 ; CHECK-NEXT:    br i1 [[TMP39]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP12:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[BIN_RDX:%.*]] = or <16 x i1> [[TMP11]], [[TMP10]]
+; CHECK-NEXT:    [[TMP19:%.*]] = call i1 @llvm.vector.reduce.or.v16i1(<16 x i1> [[BIN_RDX]])
+; CHECK-NEXT:    [[TMP20:%.*]] = freeze i1 [[TMP19]]
 ; CHECK-NEXT:    [[RDX_MINMAX:%.*]] = call <16 x i32> @llvm.smax.v16i32(<16 x i32> [[TMP6]], <16 x i32> [[TMP7]])
 ; CHECK-NEXT:    [[TMP16:%.*]] = call i32 @llvm.vector.reduce.smax.v16i32(<16 x i32> [[RDX_MINMAX]])
 ; CHECK-NEXT:    [[TMP17:%.*]] = icmp ne i32 [[TMP16]], -2147483648
 ; CHECK-NEXT:    [[TMP18:%.*]] = select i1 [[TMP17]], i32 [[TMP16]], i32 -1
-; CHECK-NEXT:    [[BIN_RDX:%.*]] = or <16 x i1> [[TMP11]], [[TMP10]]
-; CHECK-NEXT:    [[TMP19:%.*]] = call i1 @llvm.vector.reduce.or.v16i1(<16 x i1> [[BIN_RDX]])
-; CHECK-NEXT:    [[TMP20:%.*]] = freeze i1 [[TMP19]]
 ; CHECK-NEXT:    br i1 false, label %[[EXIT:.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]]
 ; CHECK:       [[VEC_EPILOG_ITER_CHECK]]:
 ; CHECK-NEXT:    br i1 false, label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF9]]
@@ -251,11 +251,11 @@ define i64 @find_last_and_any_of(ptr %Dst, ptr %Src) {
 ; CHECK-NEXT:    [[TMP32:%.*]] = icmp eq i64 [[INDEX_NEXT17]], 1020
 ; CHECK-NEXT:    br i1 [[TMP32]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP13:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[TMP36:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP29]])
+; CHECK-NEXT:    [[TMP37:%.*]] = freeze i1 [[TMP36]]
 ; CHECK-NEXT:    [[TMP33:%.*]] = call i32 @llvm.vector.reduce.smax.v4i32(<4 x i32> [[TMP27]])
 ; CHECK-NEXT:    [[TMP34:%.*]] = icmp ne i32 [[TMP33]], -2147483648
 ; CHECK-NEXT:    [[TMP35:%.*]] = select i1 [[TMP34]], i32 [[TMP33]], i32 -1
-; CHECK-NEXT:    [[TMP36:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP29]])
-; CHECK-NEXT:    [[TMP37:%.*]] = freeze i1 [[TMP36]]
 ; CHECK-NEXT:    br i1 true, label %[[EXIT]], label %[[VEC_EPILOG_SCALAR_PH]]
 ; CHECK:       [[VEC_EPILOG_SCALAR_PH]]:
 ; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ 1020, %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ 992, %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MEMCHECK]] ], [ 0, %[[ITER_CHECK]] ]

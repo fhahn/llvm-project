@@ -992,6 +992,9 @@ bool VPlanTransforms::createHeaderPhiRecipes(
   // The plain-CFG header's first predecessor is the vector preheader, its
   // second one the latch, see VPBlockUtils::getPlainCFGHeaderAndLatch.
   auto *PreheaderVPBB = cast<VPBasicBlock>(HeaderVPBB->getPredecessors()[0]);
+  VPBasicBlock *MiddleVPBB = VPBlockUtils::getPlainCFGMiddleBlock(Plan);
+  // Match the per-VF placement, which uses the latch terminator's debug loc.
+  DebugLoc ExitDL = OrigLoop.getLoopLatch()->getTerminator()->getDebugLoc();
 
   for (VPRecipeBase &R : make_early_inc_range(HeaderVPBB->phis())) {
     auto *PhiR = cast<VPPhi>(&R);
@@ -1031,6 +1034,34 @@ bool VPlanTransforms::createHeaderPhiRecipes(
           VPInstruction::ReductionStartVector,
           {RedPhiR->getStartValue(), Iden, ScaleFactorVPV}, *RedPhiR);
       RedPhiR->setOperand(0, StartV);
+    }
+
+    // Create the ComputeReductionResult recipe in the middle block and rewire
+    // the reduction's live-out extracts to it. AnyOf reductions need a
+    // different result recipe and are handled per-VF.
+    if (RecurrenceDescriptor::isAnyOfRecurrenceKind(RK))
+      continue;
+    VPValue *BackedgeV = RedPhiR->getBackedgeValue();
+    VPBuilder MiddleBuilder(MiddleVPBB, MiddleVPBB->getFirstNonPhi());
+    VPIRFlags Flags(RK, RedPhiR->isOrdered(), RedPhiR->isInLoop(),
+                    RedPhiR->getFastMathFlagsOrNone());
+    auto *RdxResult = MiddleBuilder.createNaryOp(
+        VPInstruction::ComputeReductionResult, {BackedgeV}, Flags, ExitDL);
+
+    // Replace the ExtractLastPart -> ExtractLastLane chains extracting the
+    // backedge value (feeding the exit block and the scalar resume phi) with
+    // the reduction result, and erase the now-dead extract recipes so the
+    // reduction's exiting value is only used by the ComputeReductionResult.
+    for (VPUser *U : to_vector(BackedgeV->users())) {
+      auto *ExtPart = dyn_cast<VPInstruction>(U);
+      if (!ExtPart || !match(ExtPart, m_ExtractLastPart(m_VPValue())))
+        continue;
+      auto *ExtLane = dyn_cast_or_null<VPInstruction>(ExtPart->getSingleUser());
+      assert(ExtLane && match(ExtLane, m_ExtractLastLane(m_VPValue())) &&
+             "expected single extract-last-lane user of extract-last-part");
+      ExtLane->replaceAllUsesWith(RdxResult);
+      ExtLane->eraseFromParent();
+      ExtPart->eraseFromParent();
     }
   }
 
@@ -1419,9 +1450,14 @@ void VPlanTransforms::foldTailByMasking(VPlan &Plan) {
     if (!isa<VPWidenInductionRecipe>(R))
       NeedsPhi[cast<VPHeaderPHIRecipe>(R).getBackedgeValue()].push_back(&R);
 
+  // A ComputeReductionResult created on the initial VPlan consumes the
+  // reduction's exiting value directly, without an extract.
   VPValue *V;
   for (VPRecipeBase &R : *Plan.getMiddleBlock())
-    if (match(&R, m_ExtractLastPart(m_VPValue(V))))
+    if (match(&R, m_CombineOr(
+                      m_ExtractLastPart(m_VPValue(V)),
+                      m_VPInstruction<VPInstruction::ComputeReductionResult>(
+                          m_VPValue(V)))))
       NeedsPhi[V].push_back(&R);
 
   // Insert phis for values coming past the end of the tail.

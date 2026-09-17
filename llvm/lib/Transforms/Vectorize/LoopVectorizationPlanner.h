@@ -1051,7 +1051,8 @@ private:
   void buildVPlans(VPlan &VPlan1, ElementCount MinVF, ElementCount MaxVF);
 
   /// Add ComputeReductionResult recipes to the middle block to compute the
-  /// final reduction results. Add Select recipes to the latch block when
+  /// final reduction results, for reductions whose result has not already been
+  /// created on the initial VPlan. Add Select recipes to the latch block when
   /// folding tail, to feed ComputeReductionResult with the last or penultimate
   /// iteration values according to the header mask.
   void addReductionResultComputation(VPlanPtr &Plan, ElementCount MinVF);

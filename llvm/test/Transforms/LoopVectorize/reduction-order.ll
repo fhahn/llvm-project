@@ -27,8 +27,8 @@ define i32 @foo() !prof !1 {
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[TMP3:%.*]] = select <4 x i1> [[TMP0]], <4 x i32> [[ADD_5]], <4 x i32> [[VEC_PHI_1]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = select <4 x i1> [[TMP0]], <4 x i32> [[ADD_3]], <4 x i32> [[VEC_PHI_2]]
-; CHECK-NEXT:    [[TMP6:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[TMP3]])
 ; CHECK-NEXT:    [[TMP7:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[TMP4]])
+; CHECK-NEXT:    [[TMP6:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[TMP3]])
 ; CHECK-NEXT:    br label %[[EXIT:.*]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    [[ADD:%.*]] = add i32 [[TMP7]], [[TMP6]]

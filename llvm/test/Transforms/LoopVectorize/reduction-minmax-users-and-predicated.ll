@@ -129,8 +129,8 @@ define void @smax_with_invariant_store_user(ptr noalias %src, ptr %dst, i64 %n) 
 ; CHECK-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[TMP4:%.*]] = call i32 @llvm.vector.reduce.smax.v4i32(<4 x i32> [[TMP2]])
-; CHECK-NEXT:    store i32 [[TMP4]], ptr [[DST]], align 4
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
+; CHECK-NEXT:    store i32 [[TMP4]], ptr [[DST]], align 4
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:
 ; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ]
@@ -189,8 +189,8 @@ define void @smax_with_multiple_invariant_store_user_same_addr(ptr noalias %src,
 ; CHECK-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[TMP4:%.*]] = call i32 @llvm.vector.reduce.smax.v4i32(<4 x i32> [[TMP2]])
-; CHECK-NEXT:    store i32 [[TMP4]], ptr [[DST]], align 4
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
+; CHECK-NEXT:    store i32 [[TMP4]], ptr [[DST]], align 4
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:
 ; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ]
@@ -289,8 +289,8 @@ define void @smax_with_multiple_invariant_store_user_same_addr3(ptr noalias %src
 ; CHECK-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[TMP4:%.*]] = call i32 @llvm.vector.reduce.smax.v4i32(<4 x i32> [[TMP2]])
-; CHECK-NEXT:    store i32 [[TMP4]], ptr [[DST]], align 4
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
+; CHECK-NEXT:    store i32 [[TMP4]], ptr [[DST]], align 4
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:
 ; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ]

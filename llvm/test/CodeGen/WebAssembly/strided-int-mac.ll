@@ -217,42 +217,6 @@ define hidden { i32, i32, i32, i32 } @bb2053_inner_loop(ptr nocapture %base0, pt
 ; CHECK-NEXT:    br_if 0 # 0: up to label3
 ; CHECK-NEXT:  # %bb.4: # %middle.block
 ; CHECK-NEXT:    end_loop
-; CHECK-NEXT:    local.get 14
-; CHECK-NEXT:    local.get 14
-; CHECK-NEXT:    local.get 13
-; CHECK-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
-; CHECK-NEXT:    i32x4.add
-; CHECK-NEXT:    local.tee 13
-; CHECK-NEXT:    local.get 13
-; CHECK-NEXT:    local.get 13
-; CHECK-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
-; CHECK-NEXT:    i32x4.add
-; CHECK-NEXT:    i32x4.extract_lane 0
-; CHECK-NEXT:    local.set 10
-; CHECK-NEXT:    local.get 15
-; CHECK-NEXT:    local.get 15
-; CHECK-NEXT:    local.get 13
-; CHECK-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
-; CHECK-NEXT:    i32x4.add
-; CHECK-NEXT:    local.tee 13
-; CHECK-NEXT:    local.get 13
-; CHECK-NEXT:    local.get 13
-; CHECK-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
-; CHECK-NEXT:    i32x4.add
-; CHECK-NEXT:    i32x4.extract_lane 0
-; CHECK-NEXT:    local.set 9
-; CHECK-NEXT:    local.get 16
-; CHECK-NEXT:    local.get 16
-; CHECK-NEXT:    local.get 13
-; CHECK-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
-; CHECK-NEXT:    i32x4.add
-; CHECK-NEXT:    local.tee 13
-; CHECK-NEXT:    local.get 13
-; CHECK-NEXT:    local.get 13
-; CHECK-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
-; CHECK-NEXT:    i32x4.add
-; CHECK-NEXT:    i32x4.extract_lane 0
-; CHECK-NEXT:    local.set 8
 ; CHECK-NEXT:    local.get 17
 ; CHECK-NEXT:    local.get 17
 ; CHECK-NEXT:    local.get 13
@@ -265,6 +229,42 @@ define hidden { i32, i32, i32, i32 } @bb2053_inner_loop(ptr nocapture %base0, pt
 ; CHECK-NEXT:    i32x4.add
 ; CHECK-NEXT:    i32x4.extract_lane 0
 ; CHECK-NEXT:    local.set 7
+; CHECK-NEXT:    local.get 16
+; CHECK-NEXT:    local.get 16
+; CHECK-NEXT:    local.get 13
+; CHECK-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
+; CHECK-NEXT:    i32x4.add
+; CHECK-NEXT:    local.tee 13
+; CHECK-NEXT:    local.get 13
+; CHECK-NEXT:    local.get 13
+; CHECK-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
+; CHECK-NEXT:    i32x4.add
+; CHECK-NEXT:    i32x4.extract_lane 0
+; CHECK-NEXT:    local.set 8
+; CHECK-NEXT:    local.get 15
+; CHECK-NEXT:    local.get 15
+; CHECK-NEXT:    local.get 13
+; CHECK-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
+; CHECK-NEXT:    i32x4.add
+; CHECK-NEXT:    local.tee 13
+; CHECK-NEXT:    local.get 13
+; CHECK-NEXT:    local.get 13
+; CHECK-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
+; CHECK-NEXT:    i32x4.add
+; CHECK-NEXT:    i32x4.extract_lane 0
+; CHECK-NEXT:    local.set 9
+; CHECK-NEXT:    local.get 14
+; CHECK-NEXT:    local.get 14
+; CHECK-NEXT:    local.get 13
+; CHECK-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
+; CHECK-NEXT:    i32x4.add
+; CHECK-NEXT:    local.tee 13
+; CHECK-NEXT:    local.get 13
+; CHECK-NEXT:    local.get 13
+; CHECK-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
+; CHECK-NEXT:    i32x4.add
+; CHECK-NEXT:    i32x4.extract_lane 0
+; CHECK-NEXT:    local.set 10
 ; CHECK-NEXT:    local.get 5
 ; CHECK-NEXT:    local.get 11
 ; CHECK-NEXT:    i32.eq
@@ -907,42 +907,6 @@ define hidden { i32, i32, i32, i32 } @bb2053_inner_loop(ptr nocapture %base0, pt
 ; MAX-BANDWIDTH-NEXT:    br_if 0 # 0: up to label3
 ; MAX-BANDWIDTH-NEXT:  # %bb.4: # %middle.block
 ; MAX-BANDWIDTH-NEXT:    end_loop
-; MAX-BANDWIDTH-NEXT:    local.get 14
-; MAX-BANDWIDTH-NEXT:    local.get 14
-; MAX-BANDWIDTH-NEXT:    local.get 13
-; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
-; MAX-BANDWIDTH-NEXT:    i32x4.add
-; MAX-BANDWIDTH-NEXT:    local.tee 13
-; MAX-BANDWIDTH-NEXT:    local.get 13
-; MAX-BANDWIDTH-NEXT:    local.get 13
-; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
-; MAX-BANDWIDTH-NEXT:    i32x4.add
-; MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
-; MAX-BANDWIDTH-NEXT:    local.set 10
-; MAX-BANDWIDTH-NEXT:    local.get 15
-; MAX-BANDWIDTH-NEXT:    local.get 15
-; MAX-BANDWIDTH-NEXT:    local.get 13
-; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
-; MAX-BANDWIDTH-NEXT:    i32x4.add
-; MAX-BANDWIDTH-NEXT:    local.tee 13
-; MAX-BANDWIDTH-NEXT:    local.get 13
-; MAX-BANDWIDTH-NEXT:    local.get 13
-; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
-; MAX-BANDWIDTH-NEXT:    i32x4.add
-; MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
-; MAX-BANDWIDTH-NEXT:    local.set 9
-; MAX-BANDWIDTH-NEXT:    local.get 16
-; MAX-BANDWIDTH-NEXT:    local.get 16
-; MAX-BANDWIDTH-NEXT:    local.get 13
-; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
-; MAX-BANDWIDTH-NEXT:    i32x4.add
-; MAX-BANDWIDTH-NEXT:    local.tee 13
-; MAX-BANDWIDTH-NEXT:    local.get 13
-; MAX-BANDWIDTH-NEXT:    local.get 13
-; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
-; MAX-BANDWIDTH-NEXT:    i32x4.add
-; MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
-; MAX-BANDWIDTH-NEXT:    local.set 8
 ; MAX-BANDWIDTH-NEXT:    local.get 17
 ; MAX-BANDWIDTH-NEXT:    local.get 17
 ; MAX-BANDWIDTH-NEXT:    local.get 13
@@ -955,6 +919,42 @@ define hidden { i32, i32, i32, i32 } @bb2053_inner_loop(ptr nocapture %base0, pt
 ; MAX-BANDWIDTH-NEXT:    i32x4.add
 ; MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
 ; MAX-BANDWIDTH-NEXT:    local.set 7
+; MAX-BANDWIDTH-NEXT:    local.get 16
+; MAX-BANDWIDTH-NEXT:    local.get 16
+; MAX-BANDWIDTH-NEXT:    local.get 13
+; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
+; MAX-BANDWIDTH-NEXT:    i32x4.add
+; MAX-BANDWIDTH-NEXT:    local.tee 13
+; MAX-BANDWIDTH-NEXT:    local.get 13
+; MAX-BANDWIDTH-NEXT:    local.get 13
+; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
+; MAX-BANDWIDTH-NEXT:    i32x4.add
+; MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
+; MAX-BANDWIDTH-NEXT:    local.set 8
+; MAX-BANDWIDTH-NEXT:    local.get 15
+; MAX-BANDWIDTH-NEXT:    local.get 15
+; MAX-BANDWIDTH-NEXT:    local.get 13
+; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
+; MAX-BANDWIDTH-NEXT:    i32x4.add
+; MAX-BANDWIDTH-NEXT:    local.tee 13
+; MAX-BANDWIDTH-NEXT:    local.get 13
+; MAX-BANDWIDTH-NEXT:    local.get 13
+; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
+; MAX-BANDWIDTH-NEXT:    i32x4.add
+; MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
+; MAX-BANDWIDTH-NEXT:    local.set 9
+; MAX-BANDWIDTH-NEXT:    local.get 14
+; MAX-BANDWIDTH-NEXT:    local.get 14
+; MAX-BANDWIDTH-NEXT:    local.get 13
+; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
+; MAX-BANDWIDTH-NEXT:    i32x4.add
+; MAX-BANDWIDTH-NEXT:    local.tee 13
+; MAX-BANDWIDTH-NEXT:    local.get 13
+; MAX-BANDWIDTH-NEXT:    local.get 13
+; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
+; MAX-BANDWIDTH-NEXT:    i32x4.add
+; MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
+; MAX-BANDWIDTH-NEXT:    local.set 10
 ; MAX-BANDWIDTH-NEXT:    local.get 5
 ; MAX-BANDWIDTH-NEXT:    local.get 11
 ; MAX-BANDWIDTH-NEXT:    i32.eq
@@ -1541,42 +1541,6 @@ define hidden { i32, i32, i32, i32 } @bb2053_inner_loop(ptr nocapture %base0, pt
 ; RELAXED-MAX-BANDWIDTH-NEXT:    br_if 0 # 0: up to label3
 ; RELAXED-MAX-BANDWIDTH-NEXT:  # %bb.4: # %middle.block
 ; RELAXED-MAX-BANDWIDTH-NEXT:    end_loop
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 14
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 14
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 13
-; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
-; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.tee 13
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 13
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 13
-; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
-; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
-; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.set 10
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 15
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 15
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 13
-; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
-; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.tee 13
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 13
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 13
-; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
-; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
-; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.set 9
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 16
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 16
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 13
-; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
-; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.tee 13
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 13
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 13
-; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
-; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
-; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.set 8
 ; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 17
 ; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 17
 ; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 13
@@ -1589,6 +1553,42 @@ define hidden { i32, i32, i32, i32 } @bb2053_inner_loop(ptr nocapture %base0, pt
 ; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
 ; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
 ; RELAXED-MAX-BANDWIDTH-NEXT:    local.set 7
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 16
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 16
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 13
+; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
+; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.tee 13
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 13
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 13
+; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
+; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
+; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.set 8
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 15
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 15
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 13
+; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
+; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.tee 13
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 13
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 13
+; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
+; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
+; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.set 9
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 14
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 14
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 13
+; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
+; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.tee 13
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 13
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 13
+; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
+; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
+; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.set 10
 ; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 5
 ; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 11
 ; RELAXED-MAX-BANDWIDTH-NEXT:    i32.eq
@@ -1892,6 +1892,42 @@ define hidden { i32, i32, i32, i32 } @bb41_inner_loop(ptr nocapture %lhs, ptr no
 ; CHECK-NEXT:    br_if 0 # 0: up to label8
 ; CHECK-NEXT:  # %bb.4: # %middle.block
 ; CHECK-NEXT:    end_loop
+; CHECK-NEXT:    local.get 11
+; CHECK-NEXT:    local.get 11
+; CHECK-NEXT:    local.get 12
+; CHECK-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
+; CHECK-NEXT:    i32x4.add
+; CHECK-NEXT:    local.tee 11
+; CHECK-NEXT:    local.get 11
+; CHECK-NEXT:    local.get 12
+; CHECK-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
+; CHECK-NEXT:    i32x4.add
+; CHECK-NEXT:    i32x4.extract_lane 0
+; CHECK-NEXT:    local.set 4
+; CHECK-NEXT:    local.get 14
+; CHECK-NEXT:    local.get 14
+; CHECK-NEXT:    local.get 12
+; CHECK-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
+; CHECK-NEXT:    i32x4.add
+; CHECK-NEXT:    local.tee 14
+; CHECK-NEXT:    local.get 14
+; CHECK-NEXT:    local.get 12
+; CHECK-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
+; CHECK-NEXT:    i32x4.add
+; CHECK-NEXT:    i32x4.extract_lane 0
+; CHECK-NEXT:    local.set 5
+; CHECK-NEXT:    local.get 13
+; CHECK-NEXT:    local.get 13
+; CHECK-NEXT:    local.get 12
+; CHECK-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
+; CHECK-NEXT:    i32x4.add
+; CHECK-NEXT:    local.tee 13
+; CHECK-NEXT:    local.get 13
+; CHECK-NEXT:    local.get 12
+; CHECK-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
+; CHECK-NEXT:    i32x4.add
+; CHECK-NEXT:    i32x4.extract_lane 0
+; CHECK-NEXT:    local.set 6
 ; CHECK-NEXT:    local.get 12
 ; CHECK-NEXT:    local.get 12
 ; CHECK-NEXT:    local.get 12
@@ -1904,42 +1940,6 @@ define hidden { i32, i32, i32, i32 } @bb41_inner_loop(ptr nocapture %lhs, ptr no
 ; CHECK-NEXT:    i32x4.add
 ; CHECK-NEXT:    i32x4.extract_lane 0
 ; CHECK-NEXT:    local.set 7
-; CHECK-NEXT:    local.get 13
-; CHECK-NEXT:    local.get 13
-; CHECK-NEXT:    local.get 12
-; CHECK-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
-; CHECK-NEXT:    i32x4.add
-; CHECK-NEXT:    local.tee 12
-; CHECK-NEXT:    local.get 12
-; CHECK-NEXT:    local.get 12
-; CHECK-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
-; CHECK-NEXT:    i32x4.add
-; CHECK-NEXT:    i32x4.extract_lane 0
-; CHECK-NEXT:    local.set 6
-; CHECK-NEXT:    local.get 14
-; CHECK-NEXT:    local.get 14
-; CHECK-NEXT:    local.get 12
-; CHECK-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
-; CHECK-NEXT:    i32x4.add
-; CHECK-NEXT:    local.tee 12
-; CHECK-NEXT:    local.get 12
-; CHECK-NEXT:    local.get 12
-; CHECK-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
-; CHECK-NEXT:    i32x4.add
-; CHECK-NEXT:    i32x4.extract_lane 0
-; CHECK-NEXT:    local.set 5
-; CHECK-NEXT:    local.get 11
-; CHECK-NEXT:    local.get 11
-; CHECK-NEXT:    local.get 12
-; CHECK-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
-; CHECK-NEXT:    i32x4.add
-; CHECK-NEXT:    local.tee 12
-; CHECK-NEXT:    local.get 12
-; CHECK-NEXT:    local.get 12
-; CHECK-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
-; CHECK-NEXT:    i32x4.add
-; CHECK-NEXT:    i32x4.extract_lane 0
-; CHECK-NEXT:    local.set 4
 ; CHECK-NEXT:    local.get 3
 ; CHECK-NEXT:    local.get 8
 ; CHECK-NEXT:    i32.eq
@@ -2159,42 +2159,6 @@ define hidden { i32, i32, i32, i32 } @bb41_inner_loop(ptr nocapture %lhs, ptr no
 ; MAX-BANDWIDTH-NEXT:    br_if 0 # 0: up to label8
 ; MAX-BANDWIDTH-NEXT:  # %bb.4: # %middle.block
 ; MAX-BANDWIDTH-NEXT:    end_loop
-; MAX-BANDWIDTH-NEXT:    local.get 12
-; MAX-BANDWIDTH-NEXT:    local.get 12
-; MAX-BANDWIDTH-NEXT:    local.get 11
-; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
-; MAX-BANDWIDTH-NEXT:    i32x4.add
-; MAX-BANDWIDTH-NEXT:    local.tee 11
-; MAX-BANDWIDTH-NEXT:    local.get 11
-; MAX-BANDWIDTH-NEXT:    local.get 11
-; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
-; MAX-BANDWIDTH-NEXT:    i32x4.add
-; MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
-; MAX-BANDWIDTH-NEXT:    local.set 7
-; MAX-BANDWIDTH-NEXT:    local.get 13
-; MAX-BANDWIDTH-NEXT:    local.get 13
-; MAX-BANDWIDTH-NEXT:    local.get 11
-; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
-; MAX-BANDWIDTH-NEXT:    i32x4.add
-; MAX-BANDWIDTH-NEXT:    local.tee 11
-; MAX-BANDWIDTH-NEXT:    local.get 11
-; MAX-BANDWIDTH-NEXT:    local.get 11
-; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
-; MAX-BANDWIDTH-NEXT:    i32x4.add
-; MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
-; MAX-BANDWIDTH-NEXT:    local.set 6
-; MAX-BANDWIDTH-NEXT:    local.get 14
-; MAX-BANDWIDTH-NEXT:    local.get 14
-; MAX-BANDWIDTH-NEXT:    local.get 11
-; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
-; MAX-BANDWIDTH-NEXT:    i32x4.add
-; MAX-BANDWIDTH-NEXT:    local.tee 11
-; MAX-BANDWIDTH-NEXT:    local.get 11
-; MAX-BANDWIDTH-NEXT:    local.get 11
-; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
-; MAX-BANDWIDTH-NEXT:    i32x4.add
-; MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
-; MAX-BANDWIDTH-NEXT:    local.set 5
 ; MAX-BANDWIDTH-NEXT:    local.get 15
 ; MAX-BANDWIDTH-NEXT:    local.get 15
 ; MAX-BANDWIDTH-NEXT:    local.get 11
@@ -2207,6 +2171,42 @@ define hidden { i32, i32, i32, i32 } @bb41_inner_loop(ptr nocapture %lhs, ptr no
 ; MAX-BANDWIDTH-NEXT:    i32x4.add
 ; MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
 ; MAX-BANDWIDTH-NEXT:    local.set 4
+; MAX-BANDWIDTH-NEXT:    local.get 14
+; MAX-BANDWIDTH-NEXT:    local.get 14
+; MAX-BANDWIDTH-NEXT:    local.get 11
+; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
+; MAX-BANDWIDTH-NEXT:    i32x4.add
+; MAX-BANDWIDTH-NEXT:    local.tee 11
+; MAX-BANDWIDTH-NEXT:    local.get 11
+; MAX-BANDWIDTH-NEXT:    local.get 11
+; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
+; MAX-BANDWIDTH-NEXT:    i32x4.add
+; MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
+; MAX-BANDWIDTH-NEXT:    local.set 5
+; MAX-BANDWIDTH-NEXT:    local.get 13
+; MAX-BANDWIDTH-NEXT:    local.get 13
+; MAX-BANDWIDTH-NEXT:    local.get 11
+; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
+; MAX-BANDWIDTH-NEXT:    i32x4.add
+; MAX-BANDWIDTH-NEXT:    local.tee 11
+; MAX-BANDWIDTH-NEXT:    local.get 11
+; MAX-BANDWIDTH-NEXT:    local.get 11
+; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
+; MAX-BANDWIDTH-NEXT:    i32x4.add
+; MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
+; MAX-BANDWIDTH-NEXT:    local.set 6
+; MAX-BANDWIDTH-NEXT:    local.get 12
+; MAX-BANDWIDTH-NEXT:    local.get 12
+; MAX-BANDWIDTH-NEXT:    local.get 11
+; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
+; MAX-BANDWIDTH-NEXT:    i32x4.add
+; MAX-BANDWIDTH-NEXT:    local.tee 11
+; MAX-BANDWIDTH-NEXT:    local.get 11
+; MAX-BANDWIDTH-NEXT:    local.get 11
+; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
+; MAX-BANDWIDTH-NEXT:    i32x4.add
+; MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
+; MAX-BANDWIDTH-NEXT:    local.set 7
 ; MAX-BANDWIDTH-NEXT:    local.get 3
 ; MAX-BANDWIDTH-NEXT:    local.get 8
 ; MAX-BANDWIDTH-NEXT:    i32.eq
@@ -2398,6 +2398,42 @@ define hidden { i32, i32, i32, i32 } @bb41_inner_loop(ptr nocapture %lhs, ptr no
 ; RELAXED-MAX-BANDWIDTH-NEXT:    br_if 0 # 0: up to label8
 ; RELAXED-MAX-BANDWIDTH-NEXT:  # %bb.4: # %middle.block
 ; RELAXED-MAX-BANDWIDTH-NEXT:    end_loop
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 11
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 11
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
+; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
+; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.tee 11
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 11
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
+; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
+; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
+; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.set 4
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 14
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 14
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
+; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
+; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.tee 14
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 14
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
+; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
+; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
+; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.set 5
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 13
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 13
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
+; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
+; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.tee 13
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 13
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
+; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
+; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
+; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.set 6
 ; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
 ; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
 ; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
@@ -2410,42 +2446,6 @@ define hidden { i32, i32, i32, i32 } @bb41_inner_loop(ptr nocapture %lhs, ptr no
 ; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
 ; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
 ; RELAXED-MAX-BANDWIDTH-NEXT:    local.set 7
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 13
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 13
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
-; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
-; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.tee 12
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
-; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
-; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
-; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.set 6
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 14
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 14
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
-; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
-; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.tee 12
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
-; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
-; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
-; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.set 5
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 11
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 11
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
-; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
-; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.tee 12
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
-; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
-; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
-; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.set 4
 ; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 3
 ; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 8
 ; RELAXED-MAX-BANDWIDTH-NEXT:    i32.eq
@@ -2689,6 +2689,42 @@ define hidden { i32, i32, i32, i32 } @bb41_inner_loop_i16(ptr nocapture %lhs, pt
 ; CHECK-NEXT:    br_if 0 # 0: up to label12
 ; CHECK-NEXT:  # %bb.4: # %middle.block
 ; CHECK-NEXT:    end_loop
+; CHECK-NEXT:    local.get 11
+; CHECK-NEXT:    local.get 11
+; CHECK-NEXT:    local.get 12
+; CHECK-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
+; CHECK-NEXT:    i32x4.add
+; CHECK-NEXT:    local.tee 11
+; CHECK-NEXT:    local.get 11
+; CHECK-NEXT:    local.get 12
+; CHECK-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
+; CHECK-NEXT:    i32x4.add
+; CHECK-NEXT:    i32x4.extract_lane 0
+; CHECK-NEXT:    local.set 4
+; CHECK-NEXT:    local.get 14
+; CHECK-NEXT:    local.get 14
+; CHECK-NEXT:    local.get 12
+; CHECK-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
+; CHECK-NEXT:    i32x4.add
+; CHECK-NEXT:    local.tee 14
+; CHECK-NEXT:    local.get 14
+; CHECK-NEXT:    local.get 12
+; CHECK-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
+; CHECK-NEXT:    i32x4.add
+; CHECK-NEXT:    i32x4.extract_lane 0
+; CHECK-NEXT:    local.set 5
+; CHECK-NEXT:    local.get 13
+; CHECK-NEXT:    local.get 13
+; CHECK-NEXT:    local.get 12
+; CHECK-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
+; CHECK-NEXT:    i32x4.add
+; CHECK-NEXT:    local.tee 13
+; CHECK-NEXT:    local.get 13
+; CHECK-NEXT:    local.get 12
+; CHECK-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
+; CHECK-NEXT:    i32x4.add
+; CHECK-NEXT:    i32x4.extract_lane 0
+; CHECK-NEXT:    local.set 6
 ; CHECK-NEXT:    local.get 12
 ; CHECK-NEXT:    local.get 12
 ; CHECK-NEXT:    local.get 12
@@ -2701,42 +2737,6 @@ define hidden { i32, i32, i32, i32 } @bb41_inner_loop_i16(ptr nocapture %lhs, pt
 ; CHECK-NEXT:    i32x4.add
 ; CHECK-NEXT:    i32x4.extract_lane 0
 ; CHECK-NEXT:    local.set 7
-; CHECK-NEXT:    local.get 13
-; CHECK-NEXT:    local.get 13
-; CHECK-NEXT:    local.get 12
-; CHECK-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
-; CHECK-NEXT:    i32x4.add
-; CHECK-NEXT:    local.tee 12
-; CHECK-NEXT:    local.get 12
-; CHECK-NEXT:    local.get 12
-; CHECK-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
-; CHECK-NEXT:    i32x4.add
-; CHECK-NEXT:    i32x4.extract_lane 0
-; CHECK-NEXT:    local.set 6
-; CHECK-NEXT:    local.get 14
-; CHECK-NEXT:    local.get 14
-; CHECK-NEXT:    local.get 12
-; CHECK-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
-; CHECK-NEXT:    i32x4.add
-; CHECK-NEXT:    local.tee 12
-; CHECK-NEXT:    local.get 12
-; CHECK-NEXT:    local.get 12
-; CHECK-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
-; CHECK-NEXT:    i32x4.add
-; CHECK-NEXT:    i32x4.extract_lane 0
-; CHECK-NEXT:    local.set 5
-; CHECK-NEXT:    local.get 11
-; CHECK-NEXT:    local.get 11
-; CHECK-NEXT:    local.get 12
-; CHECK-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
-; CHECK-NEXT:    i32x4.add
-; CHECK-NEXT:    local.tee 12
-; CHECK-NEXT:    local.get 12
-; CHECK-NEXT:    local.get 12
-; CHECK-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
-; CHECK-NEXT:    i32x4.add
-; CHECK-NEXT:    i32x4.extract_lane 0
-; CHECK-NEXT:    local.set 4
 ; CHECK-NEXT:  .LBB2_5: # %scalar.ph
 ; CHECK-NEXT:    end_block # label10:
 ; CHECK-NEXT:    local.get 3
@@ -2956,6 +2956,42 @@ define hidden { i32, i32, i32, i32 } @bb41_inner_loop_i16(ptr nocapture %lhs, pt
 ; MAX-BANDWIDTH-NEXT:    br_if 0 # 0: up to label12
 ; MAX-BANDWIDTH-NEXT:  # %bb.4: # %middle.block
 ; MAX-BANDWIDTH-NEXT:    end_loop
+; MAX-BANDWIDTH-NEXT:    local.get 11
+; MAX-BANDWIDTH-NEXT:    local.get 11
+; MAX-BANDWIDTH-NEXT:    local.get 12
+; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
+; MAX-BANDWIDTH-NEXT:    i32x4.add
+; MAX-BANDWIDTH-NEXT:    local.tee 11
+; MAX-BANDWIDTH-NEXT:    local.get 11
+; MAX-BANDWIDTH-NEXT:    local.get 12
+; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
+; MAX-BANDWIDTH-NEXT:    i32x4.add
+; MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
+; MAX-BANDWIDTH-NEXT:    local.set 4
+; MAX-BANDWIDTH-NEXT:    local.get 14
+; MAX-BANDWIDTH-NEXT:    local.get 14
+; MAX-BANDWIDTH-NEXT:    local.get 12
+; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
+; MAX-BANDWIDTH-NEXT:    i32x4.add
+; MAX-BANDWIDTH-NEXT:    local.tee 14
+; MAX-BANDWIDTH-NEXT:    local.get 14
+; MAX-BANDWIDTH-NEXT:    local.get 12
+; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
+; MAX-BANDWIDTH-NEXT:    i32x4.add
+; MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
+; MAX-BANDWIDTH-NEXT:    local.set 5
+; MAX-BANDWIDTH-NEXT:    local.get 13
+; MAX-BANDWIDTH-NEXT:    local.get 13
+; MAX-BANDWIDTH-NEXT:    local.get 12
+; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
+; MAX-BANDWIDTH-NEXT:    i32x4.add
+; MAX-BANDWIDTH-NEXT:    local.tee 13
+; MAX-BANDWIDTH-NEXT:    local.get 13
+; MAX-BANDWIDTH-NEXT:    local.get 12
+; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
+; MAX-BANDWIDTH-NEXT:    i32x4.add
+; MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
+; MAX-BANDWIDTH-NEXT:    local.set 6
 ; MAX-BANDWIDTH-NEXT:    local.get 12
 ; MAX-BANDWIDTH-NEXT:    local.get 12
 ; MAX-BANDWIDTH-NEXT:    local.get 12
@@ -2968,42 +3004,6 @@ define hidden { i32, i32, i32, i32 } @bb41_inner_loop_i16(ptr nocapture %lhs, pt
 ; MAX-BANDWIDTH-NEXT:    i32x4.add
 ; MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
 ; MAX-BANDWIDTH-NEXT:    local.set 7
-; MAX-BANDWIDTH-NEXT:    local.get 13
-; MAX-BANDWIDTH-NEXT:    local.get 13
-; MAX-BANDWIDTH-NEXT:    local.get 12
-; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
-; MAX-BANDWIDTH-NEXT:    i32x4.add
-; MAX-BANDWIDTH-NEXT:    local.tee 12
-; MAX-BANDWIDTH-NEXT:    local.get 12
-; MAX-BANDWIDTH-NEXT:    local.get 12
-; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
-; MAX-BANDWIDTH-NEXT:    i32x4.add
-; MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
-; MAX-BANDWIDTH-NEXT:    local.set 6
-; MAX-BANDWIDTH-NEXT:    local.get 14
-; MAX-BANDWIDTH-NEXT:    local.get 14
-; MAX-BANDWIDTH-NEXT:    local.get 12
-; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
-; MAX-BANDWIDTH-NEXT:    i32x4.add
-; MAX-BANDWIDTH-NEXT:    local.tee 12
-; MAX-BANDWIDTH-NEXT:    local.get 12
-; MAX-BANDWIDTH-NEXT:    local.get 12
-; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
-; MAX-BANDWIDTH-NEXT:    i32x4.add
-; MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
-; MAX-BANDWIDTH-NEXT:    local.set 5
-; MAX-BANDWIDTH-NEXT:    local.get 11
-; MAX-BANDWIDTH-NEXT:    local.get 11
-; MAX-BANDWIDTH-NEXT:    local.get 12
-; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
-; MAX-BANDWIDTH-NEXT:    i32x4.add
-; MAX-BANDWIDTH-NEXT:    local.tee 12
-; MAX-BANDWIDTH-NEXT:    local.get 12
-; MAX-BANDWIDTH-NEXT:    local.get 12
-; MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
-; MAX-BANDWIDTH-NEXT:    i32x4.add
-; MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
-; MAX-BANDWIDTH-NEXT:    local.set 4
 ; MAX-BANDWIDTH-NEXT:  .LBB2_5: # %scalar.ph
 ; MAX-BANDWIDTH-NEXT:    end_block # label10:
 ; MAX-BANDWIDTH-NEXT:    local.get 3
@@ -3223,6 +3223,42 @@ define hidden { i32, i32, i32, i32 } @bb41_inner_loop_i16(ptr nocapture %lhs, pt
 ; RELAXED-MAX-BANDWIDTH-NEXT:    br_if 0 # 0: up to label12
 ; RELAXED-MAX-BANDWIDTH-NEXT:  # %bb.4: # %middle.block
 ; RELAXED-MAX-BANDWIDTH-NEXT:    end_loop
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 11
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 11
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
+; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
+; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.tee 11
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 11
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
+; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
+; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
+; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.set 4
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 14
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 14
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
+; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
+; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.tee 14
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 14
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
+; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
+; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
+; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.set 5
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 13
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 13
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
+; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
+; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.tee 13
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 13
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
+; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
+; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
+; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
+; RELAXED-MAX-BANDWIDTH-NEXT:    local.set 6
 ; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
 ; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
 ; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
@@ -3235,42 +3271,6 @@ define hidden { i32, i32, i32, i32 } @bb41_inner_loop_i16(ptr nocapture %lhs, pt
 ; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
 ; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
 ; RELAXED-MAX-BANDWIDTH-NEXT:    local.set 7
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 13
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 13
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
-; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
-; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.tee 12
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
-; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
-; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
-; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.set 6
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 14
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 14
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
-; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
-; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.tee 12
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
-; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
-; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
-; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.set 5
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 11
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 11
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
-; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 0, 1, 2, 3
-; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.tee 12
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 12
-; RELAXED-MAX-BANDWIDTH-NEXT:    i8x16.shuffle 4, 5, 6, 7, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3
-; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.add
-; RELAXED-MAX-BANDWIDTH-NEXT:    i32x4.extract_lane 0
-; RELAXED-MAX-BANDWIDTH-NEXT:    local.set 4
 ; RELAXED-MAX-BANDWIDTH-NEXT:  .LBB2_5: # %scalar.ph
 ; RELAXED-MAX-BANDWIDTH-NEXT:    end_block # label10:
 ; RELAXED-MAX-BANDWIDTH-NEXT:    local.get 3

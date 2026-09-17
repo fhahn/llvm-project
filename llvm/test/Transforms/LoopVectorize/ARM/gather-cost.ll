@@ -109,16 +109,16 @@ define float @_Z4testmm(i64 %size, i64 %offset) {
 ; CHECK-NEXT:    [[TMP71:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP71]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[TMP72:%.*]] = call fast float @llvm.vector.reduce.fadd.v4f32(float 0.000000e+00, <4 x float> [[TMP26]])
+; CHECK-NEXT:    [[TMP72:%.*]] = call fast float @llvm.vector.reduce.fadd.v4f32(float 0.000000e+00, <4 x float> [[TMP70]])
 ; CHECK-NEXT:    [[TMP73:%.*]] = call fast float @llvm.vector.reduce.fadd.v4f32(float 0.000000e+00, <4 x float> [[TMP48]])
-; CHECK-NEXT:    [[TMP74:%.*]] = call fast float @llvm.vector.reduce.fadd.v4f32(float 0.000000e+00, <4 x float> [[TMP70]])
+; CHECK-NEXT:    [[TMP74:%.*]] = call fast float @llvm.vector.reduce.fadd.v4f32(float 0.000000e+00, <4 x float> [[TMP26]])
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[SIZE]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:
 ; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ]
-; CHECK-NEXT:    [[BC_MERGE_RDX:%.*]] = phi float [ [[TMP72]], %[[MIDDLE_BLOCK]] ], [ 0.000000e+00, %[[ENTRY]] ]
+; CHECK-NEXT:    [[BC_MERGE_RDX:%.*]] = phi float [ [[TMP74]], %[[MIDDLE_BLOCK]] ], [ 0.000000e+00, %[[ENTRY]] ]
 ; CHECK-NEXT:    [[BC_MERGE_RDX6:%.*]] = phi float [ [[TMP73]], %[[MIDDLE_BLOCK]] ], [ 0.000000e+00, %[[ENTRY]] ]
-; CHECK-NEXT:    [[BC_MERGE_RDX7:%.*]] = phi float [ [[TMP74]], %[[MIDDLE_BLOCK]] ], [ 0.000000e+00, %[[ENTRY]] ]
+; CHECK-NEXT:    [[BC_MERGE_RDX7:%.*]] = phi float [ [[TMP72]], %[[MIDDLE_BLOCK]] ], [ 0.000000e+00, %[[ENTRY]] ]
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
@@ -162,9 +162,9 @@ define float @_Z4testmm(i64 %size, i64 %offset) {
 ; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp ne i64 [[IV_NEXT]], [[SIZE]]
 ; CHECK-NEXT:    br i1 [[EXITCOND]], label %[[LOOP]], label %[[EXIT]], !llvm.loop [[LOOP3:![0-9]+]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[RDX_0_NEXT_LCSSA:%.*]] = phi float [ [[RDX_0_NEXT]], %[[LOOP]] ], [ [[TMP72]], %[[MIDDLE_BLOCK]] ]
+; CHECK-NEXT:    [[RDX_0_NEXT_LCSSA:%.*]] = phi float [ [[RDX_0_NEXT]], %[[LOOP]] ], [ [[TMP74]], %[[MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    [[RDX_1_NEXT_LCSSA:%.*]] = phi float [ [[RDX_1_NEXT]], %[[LOOP]] ], [ [[TMP73]], %[[MIDDLE_BLOCK]] ]
-; CHECK-NEXT:    [[RDX_2_NEXT_LCSSA:%.*]] = phi float [ [[RDX_2_NEXT]], %[[LOOP]] ], [ [[TMP74]], %[[MIDDLE_BLOCK]] ]
+; CHECK-NEXT:    [[RDX_2_NEXT_LCSSA:%.*]] = phi float [ [[RDX_2_NEXT]], %[[LOOP]] ], [ [[TMP72]], %[[MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    [[RES_0:%.*]] = fadd float [[RDX_0_NEXT_LCSSA]], [[RDX_1_NEXT_LCSSA]]
 ; CHECK-NEXT:    [[RES_1:%.*]] = fadd float [[RES_0]], [[RDX_2_NEXT_LCSSA]]
 ; CHECK-NEXT:    ret float [[RES_1]]

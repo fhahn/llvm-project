@@ -299,8 +299,8 @@ define float @multiple_fp_rdx(ptr %A, i64 %N) {
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP5]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP12:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[TMP4:%.*]] = call fast float @llvm.vector.reduce.fmul.v8f32(float 1.000000e+00, <8 x float> [[TMP2]])
 ; CHECK-NEXT:    [[TMP6:%.*]] = call fast float @llvm.vector.reduce.fadd.v8f32(float 0.000000e+00, <8 x float> [[TMP3]])
+; CHECK-NEXT:    [[TMP7:%.*]] = call fast float @llvm.vector.reduce.fmul.v8f32(float 1.000000e+00, <8 x float> [[TMP2]])
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[FOR_END:.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]]
 ; CHECK:       [[VEC_EPILOG_ITER_CHECK]]:
@@ -308,7 +308,7 @@ define float @multiple_fp_rdx(ptr %A, i64 %N) {
 ; CHECK-NEXT:    br i1 [[MIN_EPILOG_ITERS_CHECK]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF3]]
 ; CHECK:       [[VEC_EPILOG_PH]]:
 ; CHECK-NEXT:    [[VEC_EPILOG_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
-; CHECK-NEXT:    [[BC_MERGE_RDX:%.*]] = phi float [ [[TMP4]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 1.500000e+01, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
+; CHECK-NEXT:    [[BC_MERGE_RDX:%.*]] = phi float [ [[TMP7]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 1.500000e+01, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
 ; CHECK-NEXT:    [[BC_MERGE_RDX3:%.*]] = phi float [ [[TMP6]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 1.000000e+01, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
 ; CHECK-NEXT:    [[N_MOD_VF4:%.*]] = and i64 [[N]], 3
 ; CHECK-NEXT:    [[N_VEC5:%.*]] = sub i64 [[N]], [[N_MOD_VF4]]
@@ -327,13 +327,13 @@ define float @multiple_fp_rdx(ptr %A, i64 %N) {
 ; CHECK-NEXT:    [[TMP15:%.*]] = icmp eq i64 [[INDEX_NEXT10]], [[N_VEC5]]
 ; CHECK-NEXT:    br i1 [[TMP15]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP13:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[TMP16:%.*]] = call fast float @llvm.vector.reduce.fmul.v4f32(float 1.000000e+00, <4 x float> [[TMP14]])
 ; CHECK-NEXT:    [[TMP17:%.*]] = call fast float @llvm.vector.reduce.fadd.v4f32(float 0.000000e+00, <4 x float> [[TMP13]])
+; CHECK-NEXT:    [[TMP16:%.*]] = call fast float @llvm.vector.reduce.fmul.v4f32(float 1.000000e+00, <4 x float> [[TMP14]])
 ; CHECK-NEXT:    [[CMP_N11:%.*]] = icmp eq i64 [[N]], [[N_VEC5]]
 ; CHECK-NEXT:    br i1 [[CMP_N11]], label %[[FOR_END]], label %[[VEC_EPILOG_SCALAR_PH]]
 ; CHECK:       [[VEC_EPILOG_SCALAR_PH]]:
 ; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC5]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[N_VEC]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[ITER_CHECK]] ]
-; CHECK-NEXT:    [[BC_MERGE_RDX11:%.*]] = phi float [ [[TMP16]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[TMP4]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 1.500000e+01, %[[ITER_CHECK]] ]
+; CHECK-NEXT:    [[BC_MERGE_RDX11:%.*]] = phi float [ [[TMP16]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[TMP7]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 1.500000e+01, %[[ITER_CHECK]] ]
 ; CHECK-NEXT:    [[BC_MERGE_RDX12:%.*]] = phi float [ [[TMP17]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[TMP6]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 1.000000e+01, %[[ITER_CHECK]] ]
 ; CHECK-NEXT:    br label %[[FOR_BODY:.*]]
 ; CHECK:       [[FOR_BODY]]:
@@ -349,7 +349,7 @@ define float @multiple_fp_rdx(ptr %A, i64 %N) {
 ; CHECK-NEXT:    br i1 [[EXITCOND_NOT]], label %[[FOR_END]], label %[[FOR_BODY]], !llvm.loop [[LOOP14:![0-9]+]]
 ; CHECK:       [[FOR_END]]:
 ; CHECK-NEXT:    [[ADD_LCSSA:%.*]] = phi float [ [[ADD]], %[[FOR_BODY]] ], [ [[TMP6]], %[[MIDDLE_BLOCK]] ], [ [[TMP17]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ]
-; CHECK-NEXT:    [[MUL_LCSSA:%.*]] = phi float [ [[MUL]], %[[FOR_BODY]] ], [ [[TMP4]], %[[MIDDLE_BLOCK]] ], [ [[TMP16]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ]
+; CHECK-NEXT:    [[MUL_LCSSA:%.*]] = phi float [ [[MUL]], %[[FOR_BODY]] ], [ [[TMP7]], %[[MIDDLE_BLOCK]] ], [ [[TMP16]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    [[DIV:%.*]] = fdiv float [[MUL_LCSSA]], [[ADD_LCSSA]]
 ; CHECK-NEXT:    ret float [[DIV]]
 ;

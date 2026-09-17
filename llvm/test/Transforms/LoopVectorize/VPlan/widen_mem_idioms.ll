@@ -121,11 +121,10 @@ define void @reduc_store_inside_unrolled(ptr noalias %dst, ptr noalias readonly 
 ; CHECK-NEXT:  Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    CLONE store ir<%sum.2>, ir<%gep.dst>
-; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = exiting-iv-value ir<%iv>
-; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = extract-last-part ir<%sum.2>
-; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = extract-last-lane vp<[[VP7]]>
+; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = compute-reduction-result (add) ir<%sum.2>
+; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = exiting-iv-value ir<%iv>
 ; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<500>, vp<[[VP2]]>
+; CHECK-NEXT:    CLONE store ir<%sum.2>, ir<%gep.dst>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
@@ -133,8 +132,8 @@ define void @reduc_store_inside_unrolled(ptr noalias %dst, ptr noalias readonly 
 ; CHECK-NEXT:  No successors
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  scalar.ph:
-; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP6]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
-; CHECK-NEXT:    EMIT-SCALAR vp<%bc.merge.rdx> = phi [ vp<[[VP8]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
+; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP7]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
+; CHECK-NEXT:    EMIT-SCALAR vp<%bc.merge.rdx> = phi [ vp<[[VP6]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
 ; CHECK-NEXT:  Successor(s): ir-bb<for.body>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<for.body>:

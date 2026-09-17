@@ -94,8 +94,8 @@ define void @chained_sext_adds(ptr noalias %src, ptr noalias %dst) #0 {
 ; CHECK-NEXT:    br i1 [[TMP8]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP9:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[TMP9:%.*]] = call i32 @llvm.vector.reduce.add.nxv8i32(<vscale x 8 x i32> [[TMP5]])
-; CHECK-NEXT:    store i32 [[TMP9]], ptr [[DST]], align 4
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 1000, [[N_VEC]]
+; CHECK-NEXT:    store i32 [[TMP9]], ptr [[DST]], align 4
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:
 ; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ]

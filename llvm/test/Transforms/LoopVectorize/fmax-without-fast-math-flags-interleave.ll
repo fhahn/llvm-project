@@ -153,17 +153,17 @@ define float @test_fmax_and_fmin(ptr %src.0, ptr %src.1, i64 %n) {
 ; CHECK-NEXT:    [[TMP25:%.*]] = select i1 [[TMP19]], <4 x float> [[VEC_PHI2]], <4 x float> [[TMP4]]
 ; CHECK-NEXT:    [[TMP26:%.*]] = select i1 [[TMP19]], <4 x float> [[VEC_PHI3]], <4 x float> [[TMP5]]
 ; CHECK-NEXT:    [[TMP27:%.*]] = select i1 [[TMP19]], i64 [[IV]], i64 [[N_VEC]]
-; CHECK-NEXT:    [[RDX_MINMAX:%.*]] = call <4 x float> @llvm.minnum.v4f32(<4 x float> [[TMP23]], <4 x float> [[TMP24]])
-; CHECK-NEXT:    [[TMP28:%.*]] = call float @llvm.vector.reduce.fmin.v4f32(<4 x float> [[RDX_MINMAX]])
 ; CHECK-NEXT:    [[RDX_MINMAX9:%.*]] = call <4 x float> @llvm.maxnum.v4f32(<4 x float> [[TMP25]], <4 x float> [[TMP26]])
 ; CHECK-NEXT:    [[TMP29:%.*]] = call float @llvm.vector.reduce.fmax.v4f32(<4 x float> [[RDX_MINMAX9]])
+; CHECK-NEXT:    [[RDX_MINMAX7:%.*]] = call <4 x float> @llvm.minnum.v4f32(<4 x float> [[TMP23]], <4 x float> [[TMP24]])
+; CHECK-NEXT:    [[TMP22:%.*]] = call float @llvm.vector.reduce.fmin.v4f32(<4 x float> [[RDX_MINMAX7]])
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; CHECK-NEXT:    [[TMP30:%.*]] = xor i1 [[TMP19]], true
 ; CHECK-NEXT:    [[TMP31:%.*]] = and i1 [[CMP_N]], [[TMP30]]
 ; CHECK-NEXT:    br i1 [[TMP31]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:
 ; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[TMP27]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ]
-; CHECK-NEXT:    [[BC_MERGE_RDX:%.*]] = phi float [ [[TMP28]], %[[MIDDLE_BLOCK]] ], [ 0.000000e+00, %[[ENTRY]] ]
+; CHECK-NEXT:    [[BC_MERGE_RDX:%.*]] = phi float [ [[TMP22]], %[[MIDDLE_BLOCK]] ], [ 0.000000e+00, %[[ENTRY]] ]
 ; CHECK-NEXT:    [[BC_MERGE_RDX8:%.*]] = phi float [ [[TMP29]], %[[MIDDLE_BLOCK]] ], [ 0.000000e+00, %[[ENTRY]] ]
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
@@ -181,7 +181,7 @@ define float @test_fmax_and_fmin(ptr %src.0, ptr %src.1, i64 %n) {
 ; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP5:![0-9]+]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    [[MAX_NEXT_LCSSA:%.*]] = phi float [ [[MAX_NEXT]], %[[LOOP]] ], [ [[TMP29]], %[[MIDDLE_BLOCK]] ]
-; CHECK-NEXT:    [[MIN_NEXT_LCSSA:%.*]] = phi float [ [[MIN_NEXT]], %[[LOOP]] ], [ [[TMP28]], %[[MIDDLE_BLOCK]] ]
+; CHECK-NEXT:    [[MIN_NEXT_LCSSA:%.*]] = phi float [ [[MIN_NEXT]], %[[LOOP]] ], [ [[TMP22]], %[[MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    [[SUB:%.*]] = fsub float [[MAX_NEXT_LCSSA]], [[MIN_NEXT_LCSSA]]
 ; CHECK-NEXT:    ret float [[SUB]]
 ;

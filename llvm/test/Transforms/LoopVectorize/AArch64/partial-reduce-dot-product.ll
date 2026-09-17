@@ -1032,10 +1032,10 @@ define i32 @dotp_unrolled(i32 %num_out, i64 %num_in, ptr %a, ptr %b) #0 {
 ; CHECK-INTERLEAVE1-NEXT:    [[TMP26:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-INTERLEAVE1-NEXT:    br i1 [[TMP26]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; CHECK-INTERLEAVE1:       [[MIDDLE_BLOCK]]:
-; CHECK-INTERLEAVE1-NEXT:    [[TMP27:%.*]] = call i32 @llvm.vector.reduce.add.nxv4i32(<vscale x 4 x i32> [[PARTIAL_REDUCE13]])
-; CHECK-INTERLEAVE1-NEXT:    [[TMP28:%.*]] = call i32 @llvm.vector.reduce.add.nxv4i32(<vscale x 4 x i32> [[PARTIAL_REDUCE10]])
-; CHECK-INTERLEAVE1-NEXT:    [[TMP29:%.*]] = call i32 @llvm.vector.reduce.add.nxv4i32(<vscale x 4 x i32> [[PARTIAL_REDUCE7]])
 ; CHECK-INTERLEAVE1-NEXT:    [[TMP30:%.*]] = call i32 @llvm.vector.reduce.add.nxv4i32(<vscale x 4 x i32> [[PARTIAL_REDUCE]])
+; CHECK-INTERLEAVE1-NEXT:    [[TMP27:%.*]] = call i32 @llvm.vector.reduce.add.nxv4i32(<vscale x 4 x i32> [[PARTIAL_REDUCE7]])
+; CHECK-INTERLEAVE1-NEXT:    [[TMP28:%.*]] = call i32 @llvm.vector.reduce.add.nxv4i32(<vscale x 4 x i32> [[PARTIAL_REDUCE10]])
+; CHECK-INTERLEAVE1-NEXT:    [[TMP29:%.*]] = call i32 @llvm.vector.reduce.add.nxv4i32(<vscale x 4 x i32> [[PARTIAL_REDUCE13]])
 ; CHECK-INTERLEAVE1-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[NUM_IN]], [[N_VEC]]
 ; CHECK-INTERLEAVE1-NEXT:    br i1 [[CMP_N]], [[EXIT:label %.*]], label %[[SCALAR_PH]]
 ; CHECK-INTERLEAVE1:       [[SCALAR_PH]]:
@@ -1133,13 +1133,13 @@ define i32 @dotp_unrolled(i32 %num_out, i64 %num_in, ptr %a, ptr %b) #0 {
 ; CHECK-INTERLEAVED-NEXT:    [[TMP47:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-INTERLEAVED-NEXT:    br i1 [[TMP47]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; CHECK-INTERLEAVED:       [[MIDDLE_BLOCK]]:
-; CHECK-INTERLEAVED-NEXT:    [[BIN_RDX:%.*]] = add <vscale x 4 x i32> [[PARTIAL_REDUCE29]], [[PARTIAL_REDUCE28]]
+; CHECK-INTERLEAVED-NEXT:    [[BIN_RDX:%.*]] = add <vscale x 4 x i32> [[PARTIAL_REDUCE11]], [[PARTIAL_REDUCE]]
 ; CHECK-INTERLEAVED-NEXT:    [[TMP48:%.*]] = call i32 @llvm.vector.reduce.add.nxv4i32(<vscale x 4 x i32> [[BIN_RDX]])
-; CHECK-INTERLEAVED-NEXT:    [[BIN_RDX30:%.*]] = add <vscale x 4 x i32> [[PARTIAL_REDUCE23]], [[PARTIAL_REDUCE22]]
+; CHECK-INTERLEAVED-NEXT:    [[BIN_RDX30:%.*]] = add <vscale x 4 x i32> [[PARTIAL_REDUCE17]], [[PARTIAL_REDUCE16]]
 ; CHECK-INTERLEAVED-NEXT:    [[TMP49:%.*]] = call i32 @llvm.vector.reduce.add.nxv4i32(<vscale x 4 x i32> [[BIN_RDX30]])
-; CHECK-INTERLEAVED-NEXT:    [[BIN_RDX31:%.*]] = add <vscale x 4 x i32> [[PARTIAL_REDUCE17]], [[PARTIAL_REDUCE16]]
+; CHECK-INTERLEAVED-NEXT:    [[BIN_RDX31:%.*]] = add <vscale x 4 x i32> [[PARTIAL_REDUCE23]], [[PARTIAL_REDUCE22]]
 ; CHECK-INTERLEAVED-NEXT:    [[TMP50:%.*]] = call i32 @llvm.vector.reduce.add.nxv4i32(<vscale x 4 x i32> [[BIN_RDX31]])
-; CHECK-INTERLEAVED-NEXT:    [[BIN_RDX32:%.*]] = add <vscale x 4 x i32> [[PARTIAL_REDUCE11]], [[PARTIAL_REDUCE]]
+; CHECK-INTERLEAVED-NEXT:    [[BIN_RDX32:%.*]] = add <vscale x 4 x i32> [[PARTIAL_REDUCE29]], [[PARTIAL_REDUCE28]]
 ; CHECK-INTERLEAVED-NEXT:    [[TMP51:%.*]] = call i32 @llvm.vector.reduce.add.nxv4i32(<vscale x 4 x i32> [[BIN_RDX32]])
 ; CHECK-INTERLEAVED-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[NUM_IN]], [[N_VEC]]
 ; CHECK-INTERLEAVED-NEXT:    br i1 [[CMP_N]], [[EXIT:label %.*]], label %[[SCALAR_PH]]
@@ -1201,10 +1201,10 @@ define i32 @dotp_unrolled(i32 %num_out, i64 %num_in, ptr %a, ptr %b) #0 {
 ; CHECK-MAXBW-NEXT:    [[TMP26:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-MAXBW-NEXT:    br i1 [[TMP26]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; CHECK-MAXBW:       [[MIDDLE_BLOCK]]:
-; CHECK-MAXBW-NEXT:    [[TMP27:%.*]] = call i32 @llvm.vector.reduce.add.nxv4i32(<vscale x 4 x i32> [[PARTIAL_REDUCE13]])
-; CHECK-MAXBW-NEXT:    [[TMP28:%.*]] = call i32 @llvm.vector.reduce.add.nxv4i32(<vscale x 4 x i32> [[PARTIAL_REDUCE10]])
-; CHECK-MAXBW-NEXT:    [[TMP29:%.*]] = call i32 @llvm.vector.reduce.add.nxv4i32(<vscale x 4 x i32> [[PARTIAL_REDUCE7]])
 ; CHECK-MAXBW-NEXT:    [[TMP30:%.*]] = call i32 @llvm.vector.reduce.add.nxv4i32(<vscale x 4 x i32> [[PARTIAL_REDUCE]])
+; CHECK-MAXBW-NEXT:    [[TMP27:%.*]] = call i32 @llvm.vector.reduce.add.nxv4i32(<vscale x 4 x i32> [[PARTIAL_REDUCE7]])
+; CHECK-MAXBW-NEXT:    [[TMP28:%.*]] = call i32 @llvm.vector.reduce.add.nxv4i32(<vscale x 4 x i32> [[PARTIAL_REDUCE10]])
+; CHECK-MAXBW-NEXT:    [[TMP29:%.*]] = call i32 @llvm.vector.reduce.add.nxv4i32(<vscale x 4 x i32> [[PARTIAL_REDUCE13]])
 ; CHECK-MAXBW-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[NUM_IN]], [[N_VEC]]
 ; CHECK-MAXBW-NEXT:    br i1 [[CMP_N]], [[EXIT:label %.*]], label %[[SCALAR_PH]]
 ; CHECK-MAXBW:       [[SCALAR_PH]]:
@@ -2357,14 +2357,14 @@ define void @not_dotp_high_register_pressure(ptr %a, ptr %b, ptr %sum, i32 %n) #
 ; CHECK-INTERLEAVE1-NEXT:    [[TMP28:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-INTERLEAVE1-NEXT:    br i1 [[TMP28]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP21:![0-9]+]]
 ; CHECK-INTERLEAVE1:       [[MIDDLE_BLOCK]]:
-; CHECK-INTERLEAVE1-NEXT:    [[TMP29:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE21]])
-; CHECK-INTERLEAVE1-NEXT:    [[TMP30:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE20]])
-; CHECK-INTERLEAVE1-NEXT:    [[TMP31:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE19]])
-; CHECK-INTERLEAVE1-NEXT:    [[TMP32:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE18]])
-; CHECK-INTERLEAVE1-NEXT:    [[TMP33:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE17]])
-; CHECK-INTERLEAVE1-NEXT:    [[TMP34:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE16]])
-; CHECK-INTERLEAVE1-NEXT:    [[TMP35:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE15]])
 ; CHECK-INTERLEAVE1-NEXT:    [[TMP36:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE]])
+; CHECK-INTERLEAVE1-NEXT:    [[TMP31:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE15]])
+; CHECK-INTERLEAVE1-NEXT:    [[TMP32:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE16]])
+; CHECK-INTERLEAVE1-NEXT:    [[TMP33:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE17]])
+; CHECK-INTERLEAVE1-NEXT:    [[TMP34:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE18]])
+; CHECK-INTERLEAVE1-NEXT:    [[TMP35:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE19]])
+; CHECK-INTERLEAVE1-NEXT:    [[TMP38:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE20]])
+; CHECK-INTERLEAVE1-NEXT:    [[TMP37:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE21]])
 ; CHECK-INTERLEAVE1-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[WIDE_TRIP_COUNT]], [[N_VEC]]
 ; CHECK-INTERLEAVE1-NEXT:    br i1 [[CMP_N]], [[FOR_COND_FOR_COND_CLEANUP_CRIT_EDGE:label %.*]], label %[[SCALAR_PH]]
 ; CHECK-INTERLEAVE1:       [[SCALAR_PH]]:
@@ -2457,14 +2457,14 @@ define void @not_dotp_high_register_pressure(ptr %a, ptr %b, ptr %sum, i32 %n) #
 ; CHECK-INTERLEAVED-NEXT:    [[TMP28:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-INTERLEAVED-NEXT:    br i1 [[TMP28]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP23:![0-9]+]]
 ; CHECK-INTERLEAVED:       [[MIDDLE_BLOCK]]:
-; CHECK-INTERLEAVED-NEXT:    [[TMP29:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE21]])
-; CHECK-INTERLEAVED-NEXT:    [[TMP30:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE20]])
-; CHECK-INTERLEAVED-NEXT:    [[TMP31:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE19]])
-; CHECK-INTERLEAVED-NEXT:    [[TMP32:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE18]])
-; CHECK-INTERLEAVED-NEXT:    [[TMP33:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE17]])
-; CHECK-INTERLEAVED-NEXT:    [[TMP34:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE16]])
-; CHECK-INTERLEAVED-NEXT:    [[TMP35:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE15]])
 ; CHECK-INTERLEAVED-NEXT:    [[TMP36:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE]])
+; CHECK-INTERLEAVED-NEXT:    [[TMP31:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE15]])
+; CHECK-INTERLEAVED-NEXT:    [[TMP32:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE16]])
+; CHECK-INTERLEAVED-NEXT:    [[TMP33:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE17]])
+; CHECK-INTERLEAVED-NEXT:    [[TMP34:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE18]])
+; CHECK-INTERLEAVED-NEXT:    [[TMP35:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE19]])
+; CHECK-INTERLEAVED-NEXT:    [[TMP38:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE20]])
+; CHECK-INTERLEAVED-NEXT:    [[TMP37:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE21]])
 ; CHECK-INTERLEAVED-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[WIDE_TRIP_COUNT]], [[N_VEC]]
 ; CHECK-INTERLEAVED-NEXT:    br i1 [[CMP_N]], [[FOR_COND_FOR_COND_CLEANUP_CRIT_EDGE:label %.*]], label %[[SCALAR_PH]]
 ; CHECK-INTERLEAVED:       [[SCALAR_PH]]:
@@ -2557,14 +2557,14 @@ define void @not_dotp_high_register_pressure(ptr %a, ptr %b, ptr %sum, i32 %n) #
 ; CHECK-MAXBW-NEXT:    [[TMP28:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-MAXBW-NEXT:    br i1 [[TMP28]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP21:![0-9]+]]
 ; CHECK-MAXBW:       [[MIDDLE_BLOCK]]:
-; CHECK-MAXBW-NEXT:    [[TMP29:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE21]])
-; CHECK-MAXBW-NEXT:    [[TMP30:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE20]])
-; CHECK-MAXBW-NEXT:    [[TMP31:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE19]])
-; CHECK-MAXBW-NEXT:    [[TMP32:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE18]])
-; CHECK-MAXBW-NEXT:    [[TMP33:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE17]])
-; CHECK-MAXBW-NEXT:    [[TMP34:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE16]])
-; CHECK-MAXBW-NEXT:    [[TMP35:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE15]])
 ; CHECK-MAXBW-NEXT:    [[TMP36:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE]])
+; CHECK-MAXBW-NEXT:    [[TMP31:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE15]])
+; CHECK-MAXBW-NEXT:    [[TMP32:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE16]])
+; CHECK-MAXBW-NEXT:    [[TMP33:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE17]])
+; CHECK-MAXBW-NEXT:    [[TMP34:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE18]])
+; CHECK-MAXBW-NEXT:    [[TMP35:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE19]])
+; CHECK-MAXBW-NEXT:    [[TMP38:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE20]])
+; CHECK-MAXBW-NEXT:    [[TMP37:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[PARTIAL_REDUCE21]])
 ; CHECK-MAXBW-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[WIDE_TRIP_COUNT]], [[N_VEC]]
 ; CHECK-MAXBW-NEXT:    br i1 [[CMP_N]], [[FOR_COND_FOR_COND_CLEANUP_CRIT_EDGE:label %.*]], label %[[SCALAR_PH]]
 ; CHECK-MAXBW:       [[SCALAR_PH]]:

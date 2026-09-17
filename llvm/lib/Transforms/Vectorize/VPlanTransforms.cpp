@@ -5553,7 +5553,11 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
   };
 
   VPBasicBlock *MiddleVPBB = Plan.getMiddleBlock();
-  VPBuilder FinalRedStoresBuilder(MiddleVPBB, MiddleVPBB->getFirstNonPhi());
+  // Insert the final stores before the middle block terminator, after any
+  // ComputeReductionResult recipes created on the initial VPlan that the
+  // stores may need to use as their stored value.
+  VPBuilder FinalRedStoresBuilder(MiddleVPBB,
+                                  MiddleVPBB->getTerminator()->getIterator());
   VPlanTransforms::runPass(
       "lowerMemoryIdioms", ProcessSubset, Plan, [&](VPInstruction *VPI) {
         if (RecipeBuilder.replaceWithFinalIfReductionStore(

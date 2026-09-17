@@ -356,17 +356,17 @@ define float @_Z4testmm(i64 %size, i64 %offset) {
 ; CHECK-NEXT:    [[TMP150:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP150]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[BIN_RDX:%.*]] = fadd fast <4 x float> [[TMP65]], [[TMP64]]
-; CHECK-NEXT:    [[BIN_RDX28:%.*]] = fadd fast <4 x float> [[TMP151]], [[BIN_RDX]]
-; CHECK-NEXT:    [[BIN_RDX29:%.*]] = fadd fast <4 x float> [[TMP152]], [[BIN_RDX28]]
+; CHECK-NEXT:    [[BIN_RDX:%.*]] = fadd fast <4 x float> [[TMP149]], [[TMP148]]
+; CHECK-NEXT:    [[BIN_RDX28:%.*]] = fadd fast <4 x float> [[TMP297]], [[BIN_RDX]]
+; CHECK-NEXT:    [[BIN_RDX29:%.*]] = fadd fast <4 x float> [[TMP298]], [[BIN_RDX28]]
 ; CHECK-NEXT:    [[TMP300:%.*]] = call fast float @llvm.vector.reduce.fadd.v4f32(float 0.000000e+00, <4 x float> [[BIN_RDX29]])
 ; CHECK-NEXT:    [[BIN_RDX13:%.*]] = fadd fast <4 x float> [[TMP107]], [[TMP106]]
 ; CHECK-NEXT:    [[BIN_RDX31:%.*]] = fadd fast <4 x float> [[TMP213]], [[BIN_RDX13]]
 ; CHECK-NEXT:    [[BIN_RDX32:%.*]] = fadd fast <4 x float> [[TMP214]], [[BIN_RDX31]]
 ; CHECK-NEXT:    [[TMP301:%.*]] = call fast float @llvm.vector.reduce.fadd.v4f32(float 0.000000e+00, <4 x float> [[BIN_RDX32]])
-; CHECK-NEXT:    [[BIN_RDX14:%.*]] = fadd fast <4 x float> [[TMP149]], [[TMP148]]
-; CHECK-NEXT:    [[BIN_RDX34:%.*]] = fadd fast <4 x float> [[TMP297]], [[BIN_RDX14]]
-; CHECK-NEXT:    [[BIN_RDX35:%.*]] = fadd fast <4 x float> [[TMP298]], [[BIN_RDX34]]
+; CHECK-NEXT:    [[BIN_RDX33:%.*]] = fadd fast <4 x float> [[TMP65]], [[TMP64]]
+; CHECK-NEXT:    [[BIN_RDX34:%.*]] = fadd fast <4 x float> [[TMP151]], [[BIN_RDX33]]
+; CHECK-NEXT:    [[BIN_RDX35:%.*]] = fadd fast <4 x float> [[TMP152]], [[BIN_RDX34]]
 ; CHECK-NEXT:    [[TMP302:%.*]] = call fast float @llvm.vector.reduce.fadd.v4f32(float 0.000000e+00, <4 x float> [[BIN_RDX35]])
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[SIZE]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]]
@@ -375,9 +375,9 @@ define float @_Z4testmm(i64 %size, i64 %offset) {
 ; CHECK-NEXT:    br i1 [[MIN_EPILOG_ITERS_CHECK]], label %[[SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF3:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_PH]]:
 ; CHECK-NEXT:    [[VEC_EPILOG_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_PH]] ]
-; CHECK-NEXT:    [[BC_MERGE_RDX:%.*]] = phi float [ [[TMP300]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0.000000e+00, %[[VECTOR_PH]] ]
+; CHECK-NEXT:    [[BC_MERGE_RDX:%.*]] = phi float [ [[TMP302]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0.000000e+00, %[[VECTOR_PH]] ]
 ; CHECK-NEXT:    [[BC_MERGE_RDX36:%.*]] = phi float [ [[TMP301]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0.000000e+00, %[[VECTOR_PH]] ]
-; CHECK-NEXT:    [[BC_MERGE_RDX37:%.*]] = phi float [ [[TMP302]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0.000000e+00, %[[VECTOR_PH]] ]
+; CHECK-NEXT:    [[BC_MERGE_RDX37:%.*]] = phi float [ [[TMP300]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0.000000e+00, %[[VECTOR_PH]] ]
 ; CHECK-NEXT:    [[N_MOD_VF38:%.*]] = and i64 [[SIZE]], 3
 ; CHECK-NEXT:    [[N_VEC39:%.*]] = sub i64 [[SIZE]], [[N_MOD_VF38]]
 ; CHECK-NEXT:    [[TMP303:%.*]] = insertelement <4 x float> zeroinitializer, float [[BC_MERGE_RDX]], i64 0
@@ -386,9 +386,9 @@ define float @_Z4testmm(i64 %size, i64 %offset) {
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[IV1:%.*]] = phi i64 [ [[VEC_EPILOG_RESUME_VAL]], %[[VEC_EPILOG_PH]] ], [ [[INDEX_NEXT48:%.*]], %[[LOOP]] ]
-; CHECK-NEXT:    [[VEC_PHI41:%.*]] = phi <4 x float> [ [[TMP303]], %[[VEC_EPILOG_PH]] ], [ [[TMP337:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[VEC_PHI40:%.*]] = phi <4 x float> [ [[TMP303]], %[[VEC_EPILOG_PH]] ], [ [[TMP379:%.*]], %[[LOOP]] ]
 ; CHECK-NEXT:    [[VEC_PHI42:%.*]] = phi <4 x float> [ [[TMP304]], %[[VEC_EPILOG_PH]] ], [ [[TMP358:%.*]], %[[LOOP]] ]
-; CHECK-NEXT:    [[VEC_PHI43:%.*]] = phi <4 x float> [ [[TMP305]], %[[VEC_EPILOG_PH]] ], [ [[TMP379:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[VEC_PHI43:%.*]] = phi <4 x float> [ [[TMP305]], %[[VEC_EPILOG_PH]] ], [ [[TMP337:%.*]], %[[LOOP]] ]
 ; CHECK-NEXT:    [[TMP306:%.*]] = add i64 [[IV1]], 1
 ; CHECK-NEXT:    [[TMP307:%.*]] = add i64 [[IV1]], 2
 ; CHECK-NEXT:    [[TMP308:%.*]] = add i64 [[IV1]], 3
@@ -424,7 +424,7 @@ define float @_Z4testmm(i64 %size, i64 %offset) {
 ; CHECK-NEXT:    [[TMP335:%.*]] = getelementptr inbounds [512 x float], ptr @kernel4, i64 0, i64 [[IV1]]
 ; CHECK-NEXT:    [[WIDE_LOAD47:%.*]] = load <4 x float>, ptr [[TMP335]], align 4
 ; CHECK-NEXT:    [[TMP336:%.*]] = fmul fast <4 x float> [[TMP334]], [[WIDE_LOAD47]]
-; CHECK-NEXT:    [[TMP337]] = fadd fast <4 x float> [[VEC_PHI41]], [[TMP336]]
+; CHECK-NEXT:    [[TMP379]] = fadd fast <4 x float> [[VEC_PHI40]], [[TMP336]]
 ; CHECK-NEXT:    [[TMP338:%.*]] = add i64 [[MUL1]], 1
 ; CHECK-NEXT:    [[TMP339:%.*]] = add i64 [[TMP314]], 1
 ; CHECK-NEXT:    [[TMP340:%.*]] = add i64 [[TMP315]], 1
@@ -466,7 +466,7 @@ define float @_Z4testmm(i64 %size, i64 %offset) {
 ; CHECK-NEXT:    [[TMP376:%.*]] = fmul fast <4 x float> [[WIDE_LOAD45]], [[TMP375]]
 ; CHECK-NEXT:    [[TMP377:%.*]] = fmul fast <4 x float> [[WIDE_LOAD46]], [[TMP376]]
 ; CHECK-NEXT:    [[TMP378:%.*]] = fmul fast <4 x float> [[WIDE_LOAD47]], [[TMP377]]
-; CHECK-NEXT:    [[TMP379]] = fadd fast <4 x float> [[VEC_PHI43]], [[TMP378]]
+; CHECK-NEXT:    [[TMP337]] = fadd fast <4 x float> [[VEC_PHI43]], [[TMP378]]
 ; CHECK-NEXT:    [[INDEX_NEXT48]] = add nuw i64 [[IV1]], 4
 ; CHECK-NEXT:    [[TMP380:%.*]] = icmp eq i64 [[INDEX_NEXT48]], [[N_VEC39]]
 ; CHECK-NEXT:    br i1 [[TMP380]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[LOOP]], !llvm.loop [[LOOP4:![0-9]+]]
@@ -478,9 +478,9 @@ define float @_Z4testmm(i64 %size, i64 %offset) {
 ; CHECK-NEXT:    br i1 [[CMP_N49]], label %[[EXIT]], label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:
 ; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC39]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[N_VEC]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[ENTRY]] ]
-; CHECK-NEXT:    [[BC_MERGE_RDX49:%.*]] = phi float [ [[TMP381]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[TMP300]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0.000000e+00, %[[ENTRY]] ]
+; CHECK-NEXT:    [[BC_MERGE_RDX49:%.*]] = phi float [ [[TMP383]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[TMP302]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0.000000e+00, %[[ENTRY]] ]
 ; CHECK-NEXT:    [[BC_MERGE_RDX50:%.*]] = phi float [ [[TMP382]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[TMP301]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0.000000e+00, %[[ENTRY]] ]
-; CHECK-NEXT:    [[BC_MERGE_RDX51:%.*]] = phi float [ [[TMP383]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[TMP302]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0.000000e+00, %[[ENTRY]] ]
+; CHECK-NEXT:    [[BC_MERGE_RDX51:%.*]] = phi float [ [[TMP381]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[TMP300]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0.000000e+00, %[[ENTRY]] ]
 ; CHECK-NEXT:    br label %[[LOOP1:.*]]
 ; CHECK:       [[LOOP1]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP1]] ]
@@ -524,9 +524,9 @@ define float @_Z4testmm(i64 %size, i64 %offset) {
 ; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp ne i64 [[IV_NEXT]], [[SIZE]]
 ; CHECK-NEXT:    br i1 [[EXITCOND]], label %[[LOOP1]], label %[[EXIT]], !llvm.loop [[LOOP5:![0-9]+]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[RDX_0_NEXT_LCSSA:%.*]] = phi float [ [[RDX_0_NEXT]], %[[LOOP1]] ], [ [[TMP300]], %[[MIDDLE_BLOCK]] ], [ [[TMP381]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ]
+; CHECK-NEXT:    [[RDX_0_NEXT_LCSSA:%.*]] = phi float [ [[RDX_0_NEXT]], %[[LOOP1]] ], [ [[TMP302]], %[[MIDDLE_BLOCK]] ], [ [[TMP383]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    [[RDX_1_NEXT_LCSSA:%.*]] = phi float [ [[RDX_1_NEXT]], %[[LOOP1]] ], [ [[TMP301]], %[[MIDDLE_BLOCK]] ], [ [[TMP382]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ]
-; CHECK-NEXT:    [[RDX_2_NEXT_LCSSA:%.*]] = phi float [ [[RDX_2_NEXT]], %[[LOOP1]] ], [ [[TMP302]], %[[MIDDLE_BLOCK]] ], [ [[TMP383]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ]
+; CHECK-NEXT:    [[RDX_2_NEXT_LCSSA:%.*]] = phi float [ [[RDX_2_NEXT]], %[[LOOP1]] ], [ [[TMP300]], %[[MIDDLE_BLOCK]] ], [ [[TMP381]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    [[RES_0:%.*]] = fadd float [[RDX_0_NEXT_LCSSA]], [[RDX_1_NEXT_LCSSA]]
 ; CHECK-NEXT:    [[RES_1:%.*]] = fadd float [[RES_0]], [[RDX_2_NEXT_LCSSA]]
 ; CHECK-NEXT:    ret float [[RES_1]]

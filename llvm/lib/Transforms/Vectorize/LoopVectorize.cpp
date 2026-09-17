@@ -6871,45 +6871,58 @@ void LoopVectorizationPlanner::addReductionResultComputation(
     VPInstruction *FinalReductionResult;
     VPBuilder::InsertPointGuard Guard(Builder);
     Builder.setInsertPoint(MiddleVPBB, IP);
-    // For AnyOf reductions, find the select among PhiR's users and convert
-    // the reduction phi to operate on bools before creating the final
-    // reduction result.
-    if (RecurrenceDescriptor::isAnyOfRecurrenceKind(RecurrenceKind)) {
-      FinalReductionResult =
-          createAnyOfResult(Builder, *Plan, PhiR, OrigExitingVPV, IP, ExitDL);
-    } else {
+    // If the final result was already created on the initial VPlan, the
+    // live-out extracts were already rewired to it. Only update its operand to
+    // the exiting value, which may now be a tail-folding select (use
+    // NewExitingVPV, which still refers to the select even after the predicated
+    // select above may have been removed from the reduction phi's backedge).
+    // Any remaining out-of-region users (e.g. sunk invariant stores) are
+    // rewired to it below.
+    if (VPInstruction *RdxResult = vputils::findComputeReductionResult(PhiR)) {
+      RdxResult->setOperand(0, NewExitingVPV);
+      FinalReductionResult = RdxResult;
+
       // If the vector reduction can be performed in a smaller type, we
       // truncate then extend the loop exit value to enable InstCombine to
       // evaluate the entire expression in the smaller type.
-      VPValue *ReductionOp = NewExitingVPV;
-      Instruction::CastOps ExtendOpc = Instruction::CastOpsEnd;
       if (MinVF.isVector() && PhiTy != RdxDesc.getRecurrenceType()) {
         assert(!PhiR->isInLoop() && "Unexpected truncated inloop reduction!");
         assert(!RecurrenceDescriptor::isMinMaxRecurrenceKind(RecurrenceKind) &&
                "Unexpected truncated min-max recurrence!");
         Type *RdxTy = RdxDesc.getRecurrenceType();
-        ExtendOpc = RdxDesc.isSigned() ? Instruction::SExt : Instruction::ZExt;
+        auto ExtendOpc =
+            RdxDesc.isSigned() ? Instruction::SExt : Instruction::ZExt;
+        VPValue *Trunc;
         {
           VPBuilder::InsertPointGuard Guard(Builder);
           Builder.setInsertPoint(
               NewExitingVPV->getDefiningRecipe()->getParent(),
               std::next(NewExitingVPV->getDefiningRecipe()->getIterator()));
-          ReductionOp =
+          Trunc =
               Builder.createWidenCast(Instruction::Trunc, NewExitingVPV, RdxTy);
           VPWidenCastRecipe *Extnd =
-              Builder.createWidenCast(ExtendOpc, ReductionOp, PhiTy);
+              Builder.createWidenCast(ExtendOpc, Trunc, PhiTy);
           if (PhiR->getOperand(1) == NewExitingVPV)
             PhiR->setOperand(1, Extnd);
         }
+        // Reduce in the narrow type and extend the result back to the phi
+        // type, replacing the result created on the initial VPlan.
+        auto *NarrowResult = RdxResult->cloneWithOperands({Trunc});
+        NarrowResult->insertBefore(RdxResult);
+        FinalReductionResult = VPBuilder::getToInsertAfter(NarrowResult)
+                                   .createScalarCast(ExtendOpc, NarrowResult,
+                                                     PhiTy, {});
+        RdxResult->replaceAllUsesWith(FinalReductionResult);
+        RdxResult->eraseFromParent();
       }
-
-      VPIRFlags Flags(RecurrenceKind, PhiR->isOrdered(), PhiR->isInLoop(),
-                      PhiR->getFastMathFlagsOrNone());
-      FinalReductionResult = Builder.createNaryOp(
-          VPInstruction::ComputeReductionResult, {ReductionOp}, Flags, ExitDL);
-      if (ExtendOpc != Instruction::CastOpsEnd)
-        FinalReductionResult = Builder.createScalarCast(
-            ExtendOpc, FinalReductionResult, PhiTy, {});
+    } else {
+      // For AnyOf reductions, find the select among PhiR's users and convert
+      // the reduction phi to operate on bools before creating the final
+      // reduction result.
+      assert(RecurrenceDescriptor::isAnyOfRecurrenceKind(RecurrenceKind) &&
+             "all other reductions must have a result on the initial VPlan");
+      FinalReductionResult =
+          createAnyOfResult(Builder, *Plan, PhiR, OrigExitingVPV, IP, ExitDL);
     }
 
     // Update all users outside the vector region. Also replace redundant

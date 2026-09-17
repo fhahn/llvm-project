@@ -53,16 +53,16 @@ define nofpclass(nan inf) double @monte_simple(i32 noundef %nblocks, i32 noundef
 ; CHECK-NEXT:    [[TMP20:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP20]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[BIN_RDX:%.*]] = fadd reassoc arcp contract afn <4 x double> [[TMP19]], [[TMP18]]
+; CHECK-NEXT:    [[BIN_RDX:%.*]] = fadd reassoc arcp contract afn <4 x double> [[TMP15]], [[TMP14]]
 ; CHECK-NEXT:    [[TMP21:%.*]] = tail call reassoc arcp contract afn double @llvm.vector.reduce.fadd.v4f64(double -0.000000e+00, <4 x double> [[BIN_RDX]])
-; CHECK-NEXT:    [[BIN_RDX20:%.*]] = fadd reassoc arcp contract afn <4 x double> [[TMP15]], [[TMP14]]
+; CHECK-NEXT:    [[BIN_RDX20:%.*]] = fadd reassoc arcp contract afn <4 x double> [[TMP19]], [[TMP18]]
 ; CHECK-NEXT:    [[TMP22:%.*]] = tail call reassoc arcp contract afn double @llvm.vector.reduce.fadd.v4f64(double -0.000000e+00, <4 x double> [[BIN_RDX20]])
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N_VEC]], [[WIDE_TRIP_COUNT]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[FOR_END_LOOPEXIT:.*]], label %[[FOR_BODY_PREHEADER22]]
 ; CHECK:       [[FOR_BODY_PREHEADER22]]:
 ; CHECK-NEXT:    [[INDVARS_IV_PH:%.*]] = phi i64 [ 0, %[[FOR_BODY_PREHEADER]] ], [ [[N_VEC]], %[[MIDDLE_BLOCK]] ]
-; CHECK-NEXT:    [[V1_011_PH:%.*]] = phi double [ 0.000000e+00, %[[FOR_BODY_PREHEADER]] ], [ [[TMP21]], %[[MIDDLE_BLOCK]] ]
-; CHECK-NEXT:    [[V0_010_PH:%.*]] = phi double [ 0.000000e+00, %[[FOR_BODY_PREHEADER]] ], [ [[TMP22]], %[[MIDDLE_BLOCK]] ]
+; CHECK-NEXT:    [[V1_011_PH:%.*]] = phi double [ 0.000000e+00, %[[FOR_BODY_PREHEADER]] ], [ [[TMP22]], %[[MIDDLE_BLOCK]] ]
+; CHECK-NEXT:    [[V0_010_PH:%.*]] = phi double [ 0.000000e+00, %[[FOR_BODY_PREHEADER]] ], [ [[TMP21]], %[[MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    br label %[[FOR_BODY:.*]]
 ; CHECK:       [[FOR_BODY]]:
 ; CHECK-NEXT:    [[INDVARS_IV1:%.*]] = phi i64 [ [[INDVARS_IV_NEXT:%.*]], %[[FOR_BODY]] ], [ [[INDVARS_IV_PH]], %[[FOR_BODY_PREHEADER22]] ]
@@ -83,8 +83,8 @@ define nofpclass(nan inf) double @monte_simple(i32 noundef %nblocks, i32 noundef
 ; CHECK-NEXT:    [[EXITCOND_NOT:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT]], [[WIDE_TRIP_COUNT]]
 ; CHECK-NEXT:    br i1 [[EXITCOND_NOT]], label %[[FOR_END_LOOPEXIT]], label %[[FOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
 ; CHECK:       [[FOR_END_LOOPEXIT]]:
-; CHECK-NEXT:    [[V0_1_LCSSA:%.*]] = phi double [ [[TMP22]], %[[MIDDLE_BLOCK]] ], [ [[V0_2]], %[[FOR_BODY]] ]
-; CHECK-NEXT:    [[V1_1_LCSSA:%.*]] = phi double [ [[TMP21]], %[[MIDDLE_BLOCK]] ], [ [[V1_2]], %[[FOR_BODY]] ]
+; CHECK-NEXT:    [[V0_1_LCSSA:%.*]] = phi double [ [[TMP21]], %[[MIDDLE_BLOCK]] ], [ [[V0_2]], %[[FOR_BODY]] ]
+; CHECK-NEXT:    [[V1_1_LCSSA:%.*]] = phi double [ [[TMP22]], %[[MIDDLE_BLOCK]] ], [ [[V1_2]], %[[FOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP24:%.*]] = fadd fast double [[V1_1_LCSSA]], [[V0_1_LCSSA]]
 ; CHECK-NEXT:    br label %[[FOR_END]]
 ; CHECK:       [[FOR_END]]:
@@ -241,15 +241,15 @@ define nofpclass(nan inf) double @monte_exp(i32 noundef %nblocks, i32 noundef %R
 ; CHECK-NEXT:    [[TMP24:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP24]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[BIN_RDX:%.*]] = fadd reassoc arcp contract afn <4 x double> [[TMP23]], [[TMP22]]
+; CHECK-NEXT:    [[BIN_RDX:%.*]] = fadd reassoc arcp contract afn <4 x double> [[TMP19]], [[TMP18]]
 ; CHECK-NEXT:    [[TMP25:%.*]] = tail call reassoc arcp contract afn double @llvm.vector.reduce.fadd.v4f64(double -0.000000e+00, <4 x double> [[BIN_RDX]])
-; CHECK-NEXT:    [[BIN_RDX35:%.*]] = fadd reassoc arcp contract afn <4 x double> [[TMP19]], [[TMP18]]
+; CHECK-NEXT:    [[BIN_RDX35:%.*]] = fadd reassoc arcp contract afn <4 x double> [[TMP23]], [[TMP22]]
 ; CHECK-NEXT:    [[TMP26:%.*]] = tail call reassoc arcp contract afn double @llvm.vector.reduce.fadd.v4f64(double -0.000000e+00, <4 x double> [[BIN_RDX35]])
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[FOR_COND1_FOR_INC8_CRIT_EDGE_US]], label %[[FOR_BODY3_US_PREHEADER]]
 ; CHECK:       [[FOR_BODY3_US_PREHEADER]]:
 ; CHECK-NEXT:    [[INDVARS_IV_PH:%.*]] = phi i64 [ 0, %[[FOR_BODY_US]] ], [ [[N_VEC]], %[[MIDDLE_BLOCK]] ]
-; CHECK-NEXT:    [[V1_114_US_PH:%.*]] = phi double [ [[V1_019_US]], %[[FOR_BODY_US]] ], [ [[TMP25]], %[[MIDDLE_BLOCK]] ]
-; CHECK-NEXT:    [[V0_113_US_PH:%.*]] = phi double [ [[V0_018_US]], %[[FOR_BODY_US]] ], [ [[TMP26]], %[[MIDDLE_BLOCK]] ]
+; CHECK-NEXT:    [[V1_114_US_PH:%.*]] = phi double [ [[V1_019_US]], %[[FOR_BODY_US]] ], [ [[TMP26]], %[[MIDDLE_BLOCK]] ]
+; CHECK-NEXT:    [[V0_113_US_PH:%.*]] = phi double [ [[V0_018_US]], %[[FOR_BODY_US]] ], [ [[TMP25]], %[[MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    br label %[[FOR_BODY3_US:.*]]
 ; CHECK:       [[FOR_BODY3_US]]:
 ; CHECK-NEXT:    [[INDVARS_IV1:%.*]] = phi i64 [ [[INDVARS_IV_NEXT:%.*]], %[[FOR_BODY3_US]] ], [ [[INDVARS_IV_PH]], %[[FOR_BODY3_US_PREHEADER]] ]
@@ -271,8 +271,8 @@ define nofpclass(nan inf) double @monte_exp(i32 noundef %nblocks, i32 noundef %R
 ; CHECK-NEXT:    [[EXITCOND25_NOT:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT]], [[WIDE_TRIP_COUNT]]
 ; CHECK-NEXT:    br i1 [[EXITCOND25_NOT]], label %[[FOR_COND1_FOR_INC8_CRIT_EDGE_US]], label %[[FOR_BODY3_US]], !llvm.loop [[LOOP5:![0-9]+]]
 ; CHECK:       [[FOR_COND1_FOR_INC8_CRIT_EDGE_US]]:
-; CHECK-NEXT:    [[V0_2_US_LCSSA]] = phi double [ [[TMP26]], %[[MIDDLE_BLOCK]] ], [ [[V0_2_US]], %[[FOR_BODY3_US]] ]
-; CHECK-NEXT:    [[V1_2_US_LCSSA]] = phi double [ [[TMP25]], %[[MIDDLE_BLOCK]] ], [ [[V1_2_US]], %[[FOR_BODY3_US]] ]
+; CHECK-NEXT:    [[V0_2_US_LCSSA]] = phi double [ [[TMP25]], %[[MIDDLE_BLOCK]] ], [ [[V0_2_US]], %[[FOR_BODY3_US]] ]
+; CHECK-NEXT:    [[V1_2_US_LCSSA]] = phi double [ [[TMP26]], %[[MIDDLE_BLOCK]] ], [ [[V1_2_US]], %[[FOR_BODY3_US]] ]
 ; CHECK-NEXT:    [[INC9_US]] = add nuw nsw i32 [[BLOCK_017_US]], 1
 ; CHECK-NEXT:    [[EXITCOND26_NOT:%.*]] = icmp eq i32 [[INC9_US]], [[NBLOCKS]]
 ; CHECK-NEXT:    br i1 [[EXITCOND26_NOT]], label %[[FOR_END10_LOOPEXIT:.*]], label %[[FOR_BODY_US]]

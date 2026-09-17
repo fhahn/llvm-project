@@ -111,8 +111,8 @@ define void @print_reduction_with_invariant_store(i64 %n, ptr noalias %y, ptr no
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
 ; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = compute-reduction-result (fadd, in-loop) fast ir<%red.next>
-; CHECK-NEXT:    CLONE store vp<[[VP8]]>, ir<%dst>
 ; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
+; CHECK-NEXT:    CLONE store vp<[[VP8]]>, ir<%dst>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
@@ -1428,8 +1428,8 @@ define i64 @print_ext_mul_two_uses(i64 %n, ptr %a, i16 %b, i32 %c) {
 ; CHECK-NEXT:  Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = compute-reduction-result (add, in-loop) vp<[[VP5]]>
 ; CHECK-NEXT:    EMIT vp<%vector.recur.extract.for.phi> = extract-penultimate-element ir<%load.ext.ext>
+; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = compute-reduction-result (add, in-loop) vp<[[VP5]]>
 ; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = extract-last-part ir<%load.ext.ext>
 ; CHECK-NEXT:    EMIT vp<%vector.recur.extract> = extract-last-lane vp<[[VP8]]>
 ; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq vp<[[VP2]]>, vp<[[VP1]]>
