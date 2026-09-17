@@ -1803,8 +1803,79 @@ static std::optional<bool> checkCondition(CmpInst::Predicate Pred, Value *A,
     return std::nullopt;
   };
 
+  // Whether an expression can be looked through depends on the facts currently
+  // on the stack, so a value may be opaque when a fact about it is recorded and
+  // decomposable by the time it is queried. The query then talks about the
+  // operands while the fact talks about the value itself, and the two no longer
+  // connect. Detect that by checking whether \p V, despite being a variable in
+  // the system, has no coefficient in the constraint we just built.
+  auto WasDecomposedAway = [&Info](Value *V, const ConstraintTy &C) {
+    const auto &Value2Index = Info.getValue2Index(C.IsSigned);
+    auto It = Value2Index.find(V);
+    return It != Value2Index.end() && none_of(C.Coefficients, [&It](const Entry &E) {
+             return E.Id == It->second;
+           });
+  };
+
+  // Re-connect the two representations instead: temporarily tell the system
+  // that the variable and its decomposition denote the same value, so facts
+  // recorded about either form can be used together, then drop the extra rows.
+  auto TryWithLinkedRepresentation =
+      [&](const ConstraintTy &C) -> std::optional<bool> {
+    if (C.empty())
+      return std::nullopt;
+
+    const DataLayout &DL = CheckInst->getDataLayout();
+    const auto &Value2Index = Info.getValue2Index(C.IsSigned);
+    SmallVector<RowTy, 4> LinkRows;
+    for (Value *V : {A, B}) {
+      if (!WasDecomposedAway(V, C))
+        continue;
+      // Build the rows for V - decompose(V) <= 0 and its negation.
+      auto D = decompose(V, Info, C.IsSigned, DL);
+      SmallMapVector<unsigned, int64_t, 4> Coeffs;
+      Coeffs[Value2Index.find(V)->second] += 1;
+      for (const DecompEntry &E : D.Vars) {
+        auto It = Value2Index.find(E.Variable);
+        if (It == Value2Index.end())
+          return std::nullopt;
+        if (SubOverflow(Coeffs[It->second], E.Coefficient, Coeffs[It->second]))
+          return std::nullopt;
+      }
+      RowTy Row(1, Entry(D.Offset, 0));
+      for (auto &KV : Coeffs)
+        if (KV.second != 0)
+          Row.emplace_back(KV.second, KV.first);
+      if (Row.size() == 1)
+        return std::nullopt;
+      sort(drop_begin(Row),
+           [](const Entry &X, const Entry &Y) { return X.Id < Y.Id; });
+      RowTy Negated = ConstraintSystem::negateOrEqual(Row);
+      if (Negated.empty())
+        return std::nullopt;
+      LinkRows.push_back(std::move(Row));
+      LinkRows.push_back(std::move(Negated));
+    }
+    if (LinkRows.empty())
+      return std::nullopt;
+
+    auto &CS = Info.getCS(C.IsSigned);
+    unsigned NumPushed = 0;
+    for (const RowTy &Row : LinkRows)
+      if (CS.addRow(Row, Value2Index.size()))
+        NumPushed++;
+    std::optional<bool> Res;
+    if (NumPushed != 0)
+      Res = TryWithConstraint(C);
+    while (NumPushed--)
+      CS.popLastConstraint();
+    return Res;
+  };
+
   auto R = Info.getConstraintForSolving(Pred, A, B);
   if (auto ImpliedCondition = TryWithConstraint(R))
+    return ImpliedCondition;
+  if (auto ImpliedCondition = TryWithLinkedRepresentation(R))
     return ImpliedCondition;
 
   // For non-negative operands unsigned queries can also be checked against the
@@ -1832,6 +1903,8 @@ static std::optional<bool> checkCondition(CmpInst::Predicate Pred, Value *A,
     if (NewVariables.empty())
       if (auto ImpliedCondition = TryWithConstraint(SR))
         return ImpliedCondition;
+    if (auto ImpliedCondition = TryWithLinkedRepresentation(SR))
+      return ImpliedCondition;
   }
   return std::nullopt;
 }
