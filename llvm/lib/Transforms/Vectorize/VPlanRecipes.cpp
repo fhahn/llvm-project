@@ -773,10 +773,9 @@ Value *VPInstruction::generate(VPTransformState &State) {
     return Builder.CreateNot(A, Name);
   }
   case Instruction::ExtractElement: {
-    assert(State.VF.isVector() && "Only extract elements from vectors");
-    if (auto *Idx = dyn_cast<VPConstantInt>(getOperand(1)))
-      return State.get(getOperand(0), VPLane(Idx->getZExtValue()));
     Value *Vec = State.get(getOperand(0));
+    assert(Vec->getType()->isVectorTy() &&
+           "Only extract elements from vectors");
     Value *Idx = State.get(getOperand(1), /*IsScalar=*/true);
     return Builder.CreateExtractElement(Vec, Idx, Name);
   }

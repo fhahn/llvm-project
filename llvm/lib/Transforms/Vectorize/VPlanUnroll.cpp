@@ -942,8 +942,9 @@ static void replicateReplicateRegionsByVF(VPlan &Plan, ElementCount VF,
 }
 
 void VPlanTransforms::replicateByVF(VPlan &Plan, ElementCount VF) {
+  // Type of the constant lane indices of the extracts introduced below.
   Type *IdxTy = IntegerType::get(
-      Plan.getScalarHeader()->getIRBasicBlock()->getContext(), 32);
+      Plan.getScalarHeader()->getIRBasicBlock()->getContext(), 64);
 
   if (Plan.hasScalarVFOnly()) {
     // When Plan is only unrolled by UF, replicating by VF amounts to dissolving
