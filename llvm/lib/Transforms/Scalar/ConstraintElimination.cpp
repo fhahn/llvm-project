@@ -802,9 +802,8 @@ ConstraintInfo::getConstraint(CmpInst::Predicate Pred, Value *Op0, Value *Op1,
                         IsSigned, DL);
   auto BDec = decompose(Op1->stripPointerCastsSameRepresentation(), *this,
                         IsSigned, DL);
-  int64_t Offset1 = ADec.Offset;
-  int64_t Offset2 = BDec.Offset;
-  if (MulOverflow(Offset1, int64_t(-1), Offset1))
+  int64_t OffsetSum;
+  if (SubOverflow(BDec.Offset, ADec.Offset, OffsetSum))
     return {};
 
   auto &VariablesA = ADec.Vars;
@@ -843,9 +842,6 @@ ConstraintInfo::getConstraint(CmpInst::Predicate Pred, Value *Op0, Value *Op1,
       return {};
   }
 
-  int64_t OffsetSum;
-  if (AddOverflow(Offset1, Offset2, OffsetSum))
-    return {};
   if (Pred == CmpInst::ICMP_SLT || Pred == CmpInst::ICMP_ULT)
     if (AddOverflow(OffsetSum, int64_t(-1), OffsetSum))
       return {};
