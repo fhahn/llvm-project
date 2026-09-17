@@ -352,7 +352,8 @@ public:
   /// \p NewVariables.
   ConstraintTy getConstraint(CmpInst::Predicate Pred, Value *Op0, Value *Op1,
                              SmallVectorImpl<Value *> &NewVariables,
-                             bool ForceSignedSystem = false) const;
+                             bool ForceSignedSystem = false,
+                             bool PreferExistingVars = false) const;
 
   /// Turns a comparison of the form \p Op0 \p Pred \p Op1 into a vector of
   /// constraints using getConstraint. Returns an empty constraint if the result
@@ -492,7 +493,8 @@ static OffsetResult collectOffsets(GEPOperator &GEP, const DataLayout &DL) {
 }
 
 static Decomposition decompose(Value *V, const ConstraintInfo &Info,
-                               bool IsSigned, const DataLayout &DL);
+                               bool IsSigned, const DataLayout &DL,
+                               bool PreferExistingVars = false);
 
 static bool canUseSExt(ConstantInt *CI) {
   const APInt &Val = CI->getValue();
@@ -629,12 +631,20 @@ static Decomposition decomposeGEP(GEPOperator &GEP, const ConstraintInfo &Info,
 // Looking through certain expressions is only valid if a pre-condition holds.
 // Pre-conditions are checked against \p Info as needed.
 static Decomposition decompose(Value *V, const ConstraintInfo &Info,
-                               bool IsSigned, const DataLayout &DL) {
-  auto MergeResults = [&Info, IsSigned,
-                       &DL](Value *A, Value *B,
+                               bool IsSigned, const DataLayout &DL,
+                               bool PreferExistingVars) {
+  // The system stores facts using whichever decomposition was valid when they
+  // were added. Looking through a value that is already a variable in the
+  // system would express the query over a different set of variables, losing
+  // the connection to those facts. Keep such values opaque when asked to.
+  if (PreferExistingVars && Info.getValue2Index(IsSigned).contains(V))
+    return V;
+
+  auto MergeResults = [&Info, IsSigned, &DL,
+                       PreferExistingVars](Value *A, Value *B,
                             bool IsSignedB) -> std::optional<Decomposition> {
-    auto ResA = decompose(A, Info, IsSigned, DL);
-    auto ResB = decompose(B, Info, IsSignedB, DL);
+    auto ResA = decompose(A, Info, IsSigned, DL, PreferExistingVars);
+    auto ResB = decompose(B, Info, IsSignedB, DL, PreferExistingVars);
     if (ResA.add(ResB))
       return std::nullopt;
     return ResA;
@@ -753,7 +763,8 @@ static Decomposition decompose(Value *V, const ConstraintInfo &Info,
 ConstraintTy
 ConstraintInfo::getConstraint(CmpInst::Predicate Pred, Value *Op0, Value *Op1,
                               SmallVectorImpl<Value *> &NewVariables,
-                              bool ForceSignedSystem) const {
+                              bool ForceSignedSystem,
+                              bool PreferExistingVars) const {
   assert(NewVariables.empty() && "NewVariables must be empty when passed in");
   assert((!ForceSignedSystem || CmpInst::isEquality(Pred)) &&
          "signed system can only be forced on eq/ne");
@@ -799,9 +810,9 @@ ConstraintInfo::getConstraint(CmpInst::Predicate Pred, Value *Op0, Value *Op1,
   bool IsSigned = ForceSignedSystem || CmpInst::isSigned(Pred);
   auto &Value2Index = getValue2Index(IsSigned);
   auto ADec = decompose(Op0->stripPointerCastsSameRepresentation(), *this,
-                        IsSigned, DL);
+                        IsSigned, DL, PreferExistingVars);
   auto BDec = decompose(Op1->stripPointerCastsSameRepresentation(), *this,
-                        IsSigned, DL);
+                        IsSigned, DL, PreferExistingVars);
   int64_t Offset1 = ADec.Offset;
   int64_t Offset2 = BDec.Offset;
   if (MulOverflow(Offset1, int64_t(-1), Offset1))
@@ -1803,8 +1814,39 @@ static std::optional<bool> checkCondition(CmpInst::Predicate Pred, Value *A,
     return std::nullopt;
   };
 
+  // Whether an expression can be looked through depends on the facts currently
+  // on the stack, so a value may be opaque when a fact about it is recorded and
+  // decomposable by the time it is queried. The query then talks about the
+  // operands while the fact talks about the value itself, and the two no longer
+  // connect. Detect that by checking whether \p V, despite being a variable in
+  // the system, has no coefficient in the constraint we just built.
+  auto WasDecomposedAway = [&Info](Value *V, const ConstraintTy &C) {
+    const auto &Value2Index = Info.getValue2Index(C.IsSigned);
+    auto It = Value2Index.find(V);
+    return It != Value2Index.end() && none_of(C.Coefficients, [&It](const Entry &E) {
+             return E.Id == It->second;
+           });
+  };
+
+  // Retry such a query with values that are already variables kept opaque.
+  auto TryKeepingExistingVarsOpaque =
+      [&](const ConstraintTy &C, bool ForceSignedSystem) -> std::optional<bool> {
+    if (C.empty() || (!WasDecomposedAway(A, C) && !WasDecomposedAway(B, C)))
+      return std::nullopt;
+    SmallVector<Value *> NewVariables;
+    auto OpaqueR = Info.getConstraint(Pred, A, B, NewVariables,
+                                      ForceSignedSystem,
+                                      /*PreferExistingVars=*/true);
+    if (!NewVariables.empty() || OpaqueR.empty())
+      return std::nullopt;
+    return TryWithConstraint(OpaqueR);
+  };
+
   auto R = Info.getConstraintForSolving(Pred, A, B);
   if (auto ImpliedCondition = TryWithConstraint(R))
+    return ImpliedCondition;
+  if (auto ImpliedCondition =
+          TryKeepingExistingVarsOpaque(R, /*ForceSignedSystem=*/false))
     return ImpliedCondition;
 
   // For non-negative operands unsigned queries can also be checked against the
@@ -1832,6 +1874,9 @@ static std::optional<bool> checkCondition(CmpInst::Predicate Pred, Value *A,
     if (NewVariables.empty())
       if (auto ImpliedCondition = TryWithConstraint(SR))
         return ImpliedCondition;
+    if (auto ImpliedCondition =
+            TryKeepingExistingVarsOpaque(SR, /*ForceSignedSystem=*/true))
+      return ImpliedCondition;
   }
   return std::nullopt;
 }
