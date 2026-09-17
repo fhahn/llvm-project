@@ -1001,20 +1001,29 @@ Value *VPInstruction::generate(VPTransformState &State) {
   case VPInstruction::ExtractPenultimateElement: {
     unsigned Offset =
         getOpcode() == VPInstruction::ExtractPenultimateElement ? 2 : 1;
-    Value *Res;
-    if (State.VF.isVector()) {
-      assert(Offset <= State.VF.getKnownMinValue() &&
-             "invalid offset to extract from");
-      // Extract lane VF - Offset from the operand.
-      Res = State.get(getOperand(0), VPLane::getLaneFromEnd(State.VF, Offset));
-    } else {
-      // TODO: Remove ExtractLastLane for scalar VFs.
-      assert(Offset <= 1 && "invalid offset to extract from");
-      Res = State.get(getOperand(0));
-    }
-    if (isa<ExtractElementInst>(Res))
-      Res->setName(Name);
-    return Res;
+    VPValue *Op = getOperand(0);
+    // Live-ins and single scalars have no vector to extract from; they are
+    // their own last lane.
+    if (!State.hasVectorValue(Op) ||
+        (vputils::isSingleScalar(Op) && State.hasScalarValue(Op, VPLane(0))))
+      return State.get(Op, /*NeedsScalar=*/true);
+
+    // TODO: Remove ExtractLastLane for scalar VFs.
+    Value *V = State.get(Op);
+    auto *VecTy = dyn_cast<VectorType>(V->getType());
+    if (!VecTy)
+      return V;
+
+    // Extract the element Offset positions from the end of the operand. Use
+    // the operand's own width rather than the plan's VF, as the two may differ.
+    ElementCount EC = VecTy->getElementCount();
+    assert(Offset <= EC.getKnownMinValue() && "invalid offset to extract from");
+    Value *Idx =
+        EC.isScalable()
+            ? Builder.CreateSub(getRuntimeVF(Builder, Builder.getInt32Ty(), EC),
+                                Builder.getInt32(Offset))
+            : Builder.getInt64(EC.getFixedValue() - Offset);
+    return Builder.CreateExtractElement(V, Idx, Name);
   }
   case VPInstruction::LogicalAnd: {
     Value *A = State.get(getOperand(0));
