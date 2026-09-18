@@ -8712,6 +8712,22 @@ void ScalarEvolution::forgetTopmostLoop(const Loop *L) {
   forgetLoop(L->getOutermostLoop());
 }
 
+void ScalarEvolution::forgetExitCountsFor(const BasicBlock *BB) {
+  // Only a loop containing BB can have it in its list of exiting blocks.
+  for (const Loop *L = LI.getLoopFor(BB); L; L = L->getParentLoop()) {
+    for (bool Predicated : {false, true}) {
+      auto &BECounts =
+          Predicated ? PredicatedBackedgeTakenCounts : BackedgeTakenCounts;
+      auto It = BECounts.find(L);
+      if (It != BECounts.end() &&
+          any_of(It->second.ExitNotTaken, [BB](const ExitNotTakenInfo &ENT) {
+            return ENT.ExitingBlock == BB;
+          }))
+        forgetBackedgeTakenCounts(L, Predicated);
+    }
+  }
+}
+
 void ScalarEvolution::forgetValue(Value *V) {
   Instruction *I = dyn_cast<Instruction>(V);
   if (!I) return;
