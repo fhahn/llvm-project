@@ -269,6 +269,7 @@ struct CastInfo<SCEVUseT<ToSCEVPtrT>, const SCEVUse,
 ///
 class SCEV : public FoldingSetNode {
   friend struct FoldingSetTrait<SCEV>;
+  friend class ScalarEvolution;
 
   /// A reference to an Interned FoldingSetNodeID for this node.  The
   /// ScalarEvolution's BumpPtrAllocator holds the data.
@@ -285,6 +286,15 @@ protected:
   /// miscellaneous information.
   unsigned short SubclassData = 0;
 
+private:
+  /// Bitmask of the ScalarEvolution caches keyed on this expression that may
+  /// hold an entry for it; see ScalarEvolution::SCEVCacheKind. Maintained
+  /// conservatively: a clear bit means the cache definitely holds no entry, a
+  /// set bit means it may. Used to skip the usually-failing lookups when
+  /// invalidating the expression. Fits in padding, so it is free.
+  mutable unsigned short CacheFlags = 0;
+
+protected:
   /// Pointer to the canonical version of the SCEV, i.e. one where all operands
   /// have no SCEVUse flags.
   const SCEV *CanonicalSCEV = nullptr;
@@ -1710,6 +1720,35 @@ private:
   /// This SCEV is used to represent unknown trip counts and things.
   std::unique_ptr<SCEVCouldNotCompute> CouldNotCompute;
 
+  /// The caches keyed on a SCEV expression that have to be flushed by
+  /// forgetMemoizedResultsImpl when the expression is invalidated. Each kind
+  /// owns one bit in SCEV::CacheFlags, set when an entry keyed on the
+  /// expression is added. Invalidation only has to look a cache up if the
+  /// corresponding bit is set, which is rarely the case.
+  enum SCEVCacheKind : unsigned short {
+    CK_LoopDispositions = 1 << 0,
+    CK_BlockDispositions = 1 << 1,
+    CK_UnsignedRanges = 1 << 2,
+    CK_SignedRanges = 1 << 3,
+    CK_HasRecMap = 1 << 4,
+    CK_ConstantMultipleCache = 1 << 5,
+    CK_UnsignedWrapViaInductionTried = 1 << 6,
+    CK_SignedWrapViaInductionTried = 1 << 7,
+    CK_ExprValueMap = 1 << 8,
+    CK_ValuesAtScopes = 1 << 9,
+    CK_ValuesAtScopesUsers = 1 << 10,
+    CK_BECountUsers = 1 << 11,
+    CK_FoldCacheUser = 1 << 12,
+  };
+
+  /// Record that a cache of kind \p K now holds an entry keyed on \p S.
+  static void markCached(const SCEV *S, SCEVCacheKind K) { S->CacheFlags |= K; }
+
+  /// Return true if the cache of kind \p K may hold an entry keyed on \p S.
+  static bool maybeCached(const SCEV *S, SCEVCacheKind K) {
+    return S->CacheFlags & K;
+  }
+
   /// The type for HasRecMap.
   using HasRecMapType = DenseMap<const SCEV *, bool>;
 
@@ -1735,6 +1774,10 @@ private:
   /// SCEV.
   DenseMap<FoldID, const SCEV *> FoldCache;
   DenseMap<const SCEV *, SmallVector<FoldID, 2>> FoldCacheUser;
+
+  /// Record that \p ID folds to \p S in FoldCache, keeping FoldCacheUser in
+  /// sync.
+  void insertFoldCacheEntry(const FoldID &ID, const SCEV *S);
 
   /// Mark predicate values currently being processed by isImpliedCond.
   SmallPtrSet<const Value *, 6> PendingLoopPredicates;
@@ -1994,8 +2037,10 @@ private:
   /// Set the memoized range for the given SCEV.
   const ConstantRange &setRange(const SCEV *S, RangeSignHint Hint,
                                 ConstantRange CR) {
+    bool Unsigned = Hint == HINT_RANGE_UNSIGNED;
     DenseMap<const SCEV *, ConstantRange> &Cache =
-        Hint == HINT_RANGE_UNSIGNED ? UnsignedRanges : SignedRanges;
+        Unsigned ? UnsignedRanges : SignedRanges;
+    markCached(S, Unsigned ? CK_UnsignedRanges : CK_SignedRanges);
 
     auto Pair = Cache.insert_or_assign(S, std::move(CR));
     return Pair.first->second;
