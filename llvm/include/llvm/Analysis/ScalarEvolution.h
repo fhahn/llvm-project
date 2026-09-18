@@ -1166,6 +1166,12 @@ public:
   // outer loop, such as exit counts for branches.
   LLVM_ABI void forgetTopmostLoop(const Loop *L);
 
+  /// Drop the (predicated) backedge-taken counts of any loop whose per-exit
+  /// info names \p BB. ExitNotTakenInfo::ExitingBlock does not track block
+  /// deletion, so this must be called while \p BB is still valid, before
+  /// removing it.
+  LLVM_ABI void forgetExitCountsFor(const BasicBlock *BB);
+
   /// This method should be called by the client when it has changed a value
   /// in a way that may effect its value, or which may disconnect it from a
   /// def-use chain linking it to a loop.

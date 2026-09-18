@@ -1116,17 +1116,17 @@ llvm::UnrollLoop(Loop *L, UnrollLoopOptions ULO, LoopInfo *LI,
 
   // We are going to make changes to this loop. SCEV may be keeping cached info
   // about it, in particular about backedge taken count. The changes we make
-  // are guaranteed to invalidate this information for our loop. It is tempting
-  // to only invalidate the loop being unrolled, but it is incorrect as long as
-  // all exiting branches from all inner loops have impact on the outer loops,
-  // and if something changes inside them then any of outer loops may also
-  // change. When we forget outermost loop, we also forget all contained loops
-  // and this is what we need here.
+  // are guaranteed to invalidate this information for our loop. Enclosing
+  // loops keep their cached facts: unrolling preserves the meaning of their
+  // values, and any value it deletes or replaces is dropped by SCEV's value
+  // handles. The exception is the exiting blocks named by their exit counts,
+  // which no handle tracks; those are invalidated as the blocks are merged
+  // away below.
   if (SE) {
     if (ULO.ForgetAllSCEV)
       SE->forgetAllLoops();
     else {
-      SE->forgetTopmostLoop(L);
+      SE->forgetLoop(L);
       SE->forgetBlockAndLoopDispositions();
     }
   }
@@ -1586,6 +1586,9 @@ llvm::UnrollLoop(Loop *L, UnrollLoopOptions ULO, LoopInfo *LI,
     if (auto *Term = dyn_cast<UncondBrInst>(Latch->getTerminator())) {
       BasicBlock *Dest = Term->getSuccessor();
       BasicBlock *Fold = Dest->getUniquePredecessor();
+      // Dest may be named by the exit counts of the loops containing it.
+      if (SE)
+        SE->forgetExitCountsFor(Dest);
       if (MergeBlockIntoPredecessor(Dest, /*DTU=*/DTUToUse, LI,
                                     /*MSSAU=*/nullptr, /*MemDep=*/nullptr,
                                     /*PredecessorWithTwoSuccessors=*/false,

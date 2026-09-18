@@ -1070,7 +1070,7 @@ bool llvm::UnrollRuntimeLoopRemainder(
 
   // If this loop is nested, then the loop unroller changes the code in the any
   // of its parent loops, so the Scalar Evolution pass needs to be run again.
-  SE->forgetTopmostLoop(L);
+  SE->forgetLoop(L);
 
   // Verify that the Dom Tree and Loop Info are correct.
 #if defined(EXPENSIVE_CHECKS) && !defined(NDEBUG)
@@ -1111,6 +1111,8 @@ bool llvm::UnrollRuntimeLoopRemainder(
     auto *ExitBB = RemainderLatch->getSingleSuccessor();
     assert(ExitBB && "required after breaking cond br backedge");
     DomTreeUpdater DTU(DT, DomTreeUpdater::UpdateStrategy::Eager);
+    // ExitBB may be named by the exit counts of the loops containing it.
+    SE->forgetExitCountsFor(ExitBB);
     MergeBlockIntoPredecessor(ExitBB, &DTU, LI);
   }
 
