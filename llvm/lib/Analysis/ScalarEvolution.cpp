@@ -13890,13 +13890,16 @@ ScalarEvolution::ExitLimit ScalarEvolution::howManyGreaterThans(
     MayAddOverflow = true;
   }
 
-  if (!isLoopEntryGuardedByCond(L, Cond, getAddExpr(Start, Stride), RHS)) {
-    // If we know that Start >= RHS in the context of loop, then we know that
-    // min(RHS, Start) = RHS at this point.
-    if (isLoopEntryGuardedByCond(
-            L, IsSigned ? ICmpInst::ICMP_SGE : ICmpInst::ICMP_UGE, Start, RHS))
-      End = RHS;
-    else
+  // If we know that Start >= RHS in the context of loop, then we know that
+  // min(RHS, Start) = RHS at this point and End needs no clamping.
+  if (!isLoopEntryGuardedByCond(
+          L, IsSigned ? ICmpInst::ICMP_SGE : ICmpInst::ICMP_UGE, Start, RHS)) {
+    // Otherwise Start may be below RHS and Start - RHS underflows. The wrapping
+    // form below still computes the correct count of 0 as long as the underflow
+    // is bounded by Stride, i.e. Start + Stride > RHS. The ceiling division has
+    // no such slack and always needs Start >= End.
+    if (MayAddOverflow ||
+        !isLoopEntryGuardedByCond(L, Cond, getAddExpr(Start, Stride), RHS))
       End = IsSigned ? getSMinExpr(RHS, Start) : getUMinExpr(RHS, Start);
   }
 
@@ -13914,11 +13917,9 @@ ScalarEvolution::ExitLimit ScalarEvolution::howManyGreaterThans(
   const SCEV *Delta = getMinusSCEV(Start, End);
   const SCEV *BECount;
   if (MayAddOverflow) {
-    // The ceiling division instead needs Start >= End, so that (Start - End) is
-    // the exact unsigned distance between them.
-    if (!isLoopEntryGuardedByCond(
-            L, IsSigned ? ICmpInst::ICMP_SGE : ICmpInst::ICMP_UGE, Start, End))
-      return getCouldNotCompute();
+    // Start >= End holds here, either because the loop is guarded by
+    // Start >= RHS or because End has been clamped to min(RHS, Start) above,
+    // so (Start - End) is the exact unsigned distance between them.
     BECount = getUDivCeilSCEV(Delta, Stride);
   } else {
     // Compute ((Start - End) + (Stride - 1)) / Stride, if the IV cannot
