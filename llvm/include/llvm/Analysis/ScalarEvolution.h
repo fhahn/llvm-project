@@ -1591,11 +1591,11 @@ public:
     /// Phi, by calling \p collectFromBlock on the incoming blocks of
     /// \Phi and trying to merge the found constraints into a single
     /// combined one for \p Phi.
-    static void collectFromPHI(
-        ScalarEvolution &SE, ScalarEvolution::LoopGuards &Guards,
-        const PHINode &Phi, SmallPtrSetImpl<const BasicBlock *> &VisitedBlocks,
-        SmallDenseMap<const BasicBlock *, LoopGuards> &IncomingGuards,
-        unsigned Depth);
+    static void
+    collectFromPHI(ScalarEvolution &SE, ScalarEvolution::LoopGuards &Guards,
+                   const PHINode &Phi,
+                   SmallPtrSetImpl<const BasicBlock *> &VisitedBlocks,
+                   unsigned Depth);
 
   public:
     /// Collect rewrite map for loop guards for loop \p L, together with flags
