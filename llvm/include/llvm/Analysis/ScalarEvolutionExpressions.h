@@ -803,7 +803,7 @@ protected:
   // a SCEV is referenced by multiple SCEVs. Without memoization, this
   // visit algorithm would have exponential time complexity in the worst
   // case, causing the compiler to hang on certain tests.
-  SmallDenseMap<const SCEV *, const SCEV *> RewriteResults;
+  SmallDenseMap<const SCEV *, const SCEV *, 16> RewriteResults;
 
 public:
   SCEVRewriteVisitor(ScalarEvolution &SE) : SE(SE) {}
@@ -849,7 +849,7 @@ public:
   }
 
   const SCEV *visitAddExpr(const SCEVAddExpr *Expr) {
-    SmallVector<SCEVUse, 2> Operands;
+    SmallVector<SCEVUse, 4> Operands;
     bool Changed = false;
     for (const SCEV *Op : Expr->operands()) {
       Operands.push_back(((SC *)this)->visit(Op));
@@ -859,7 +859,7 @@ public:
   }
 
   const SCEV *visitMulExpr(const SCEVMulExpr *Expr) {
-    SmallVector<SCEVUse, 2> Operands;
+    SmallVector<SCEVUse, 4> Operands;
     bool Changed = false;
     for (const SCEV *Op : Expr->operands()) {
       Operands.push_back(((SC *)this)->visit(Op));
