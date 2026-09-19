@@ -15981,7 +15981,7 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
 
   assert(SE.DT.isReachableFromEntry(Block) && SE.DT.isReachableFromEntry(Pred));
 
-  SmallVector<SCEVUse> ExprsToRewrite;
+  SmallVector<const SCEV *, 8> ExprsToRewrite;
   auto CollectCondition = [&](ICmpInst::Predicate Predicate, const SCEV *LHS,
                               const SCEV *RHS, RewriteMapTy &RewriteMap,
                               const LoopGuards &DivGuards) {
@@ -16187,7 +16187,7 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
     }
   };
 
-  SmallVector<PointerIntPair<Value *, 1, bool>> Terms;
+  SmallVector<PointerIntPair<Value *, 1, bool>, 16> Terms;
   // First, collect information from assumptions dominating the loop.
   for (auto &AssumeVH : SE.AC.assumptions()) {
     if (!AssumeVH)
@@ -16252,11 +16252,13 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
   // earliest conditions is processed first, except guards with divisibility
   // information, which are moved to the back. This ensures the SCEVs with the
   // shortest dependency chains are constructed first.
-  SmallVector<std::tuple<CmpInst::Predicate, const SCEV *, const SCEV *>>
+  SmallVector<std::tuple<CmpInst::Predicate, const SCEV *, const SCEV *>, 8>
       GuardsToProcess;
+  SmallVector<Value *, 8> Worklist;
+  SmallPtrSet<Value *, 8> Visited;
   for (auto [Term, EnterIfTrue] : reverse(Terms)) {
-    SmallVector<Value *, 8> Worklist;
-    SmallPtrSet<Value *, 8> Visited;
+    Worklist.clear();
+    Visited.clear();
     Worklist.push_back(Term);
     while (!Worklist.empty()) {
       Value *Cond = Worklist.pop_back_val();
