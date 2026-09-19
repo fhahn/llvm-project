@@ -544,13 +544,17 @@ static bool isKnownNoWrap(Instruction::BinaryOps Opcode, Value *Op0, Value *Op1,
 
   if (Opcode == Instruction::Sub) {
     // Op0 - Op1 does not wrap unsigned if Op0 >=u Op1.
-    if (!Signed)
-      return Info.doesHold(CmpInst::ICMP_UGE, Op0, Op1);
+    if (!Signed && Info.doesHold(CmpInst::ICMP_UGE, Op0, Op1))
+      return true;
 
-    // Op0 - Op1 does not wrap signed if 0 <=s Op1 <=s Op0.
+    // Op0 - Op1 does not wrap signed or unsigned if 0 <=s Op1 <=s Op0.
     if (Info.isKnownNonNegative(Op1) &&
         Info.doesHold(CmpInst::ICMP_SGE, Op0, Op1))
       return true;
+
+    // No other rule applies to unsigned sub.
+    if (!Signed)
+      return false;
   }
 
   if (!Signed && (NoWrapFlags & OBO::NoSignedWrap) &&

@@ -212,10 +212,10 @@ define i32 @sub_nuw_from_transitive_signed_facts(i32 %a, i32 %b, i32 %n) {
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[B_NNEG]])
 ; CHECK-NEXT:    [[N_NNEG:%.*]] = icmp sge i32 [[N]], 0
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[N_NNEG]])
-; CHECK-NEXT:    [[REM:%.*]] = sub nsw i32 [[A]], [[N]]
+; CHECK-NEXT:    [[REM:%.*]] = sub nuw nsw i32 [[A]], [[N]]
 ; CHECK-NEXT:    [[FITS:%.*]] = icmp sge i32 [[REM]], [[B]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[FITS]])
-; CHECK-NEXT:    [[SUB:%.*]] = sub nsw i32 [[A]], [[B]]
+; CHECK-NEXT:    [[SUB:%.*]] = sub nuw nsw i32 [[A]], [[B]]
 ; CHECK-NEXT:    ret i32 [[SUB]]
 ;
 entry:
