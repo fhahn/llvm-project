@@ -623,6 +623,23 @@ bool LoopVectorizationLegality::canVectorizeOuterLoop() {
   bool DoExtraAnalysis = ORE->allowExtraAnalysis(DEBUG_TYPE);
 
   for (BasicBlock *BB : TheLoop->blocks()) {
+    // The native path does not model volatile or atomic memory operations.
+    // Reject them before constructing recipes that would lose their semantics,
+    // independently of any parallel-access annotations.
+    for (Instruction &I : *BB) {
+      auto *Load = dyn_cast<LoadInst>(&I);
+      auto *Store = dyn_cast<StoreInst>(&I);
+      if ((!Load || Load->isSimple()) && (!Store || Store->isSimple()))
+        continue;
+      reportVectorizationFailure(
+          "Unsupported volatile or atomic memory operation",
+          "instruction cannot be vectorized", "CantVectorizeInstruction", ORE,
+          TheLoop, &I);
+      if (!DoExtraAnalysis)
+        return false;
+      Result = false;
+    }
+
     // Check whether the BB terminator is a branch. Any other terminator is
     // not supported yet.
     Instruction *Term = BB->getTerminator();
