@@ -219,7 +219,7 @@ define i64 @uadd_sat_no_saturation_due_to_upper_bound(i64 %a) {
 ; CHECK-NEXT:    [[C_1:%.*]] = icmp ule i64 [[A]], 10
 ; CHECK-NEXT:    br i1 [[C_1]], label %[[THEN:.*]], label %[[EXIT:.*]]
 ; CHECK:       [[THEN]]:
-; CHECK-NEXT:    [[ADD_SAT:%.*]] = call i64 @llvm.uadd.sat.i64(i64 [[A]], i64 100)
+; CHECK-NEXT:    [[ADD_SAT:%.*]] = add nuw nsw i64 [[A]], 100
 ; CHECK-NEXT:    ret i64 [[ADD_SAT]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret i64 0

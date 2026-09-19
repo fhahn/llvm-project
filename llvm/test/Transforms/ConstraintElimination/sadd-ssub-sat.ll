@@ -13,7 +13,7 @@ define i8 @sadd_sat_no_saturation_due_to_bounds(i8 %a) {
 ; CHECK-NEXT:    [[AND:%.*]] = and i1 [[C_1]], [[C_2]]
 ; CHECK-NEXT:    br i1 [[AND]], label %[[THEN:.*]], label %[[EXIT:.*]]
 ; CHECK:       [[THEN]]:
-; CHECK-NEXT:    [[ADD_SAT:%.*]] = call i8 @llvm.sadd.sat.i8(i8 [[A]], i8 20)
+; CHECK-NEXT:    [[ADD_SAT:%.*]] = add nuw nsw i8 [[A]], 20
 ; CHECK-NEXT:    ret i8 [[ADD_SAT]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret i8 0
@@ -70,7 +70,7 @@ define i8 @ssub_sat_no_saturation_due_to_non_negative_operands(i8 %a, i8 %b) {
 ; CHECK-NEXT:    [[AND:%.*]] = and i1 [[C_1]], [[C_2]]
 ; CHECK-NEXT:    br i1 [[AND]], label %[[THEN:.*]], label %[[EXIT:.*]]
 ; CHECK:       [[THEN]]:
-; CHECK-NEXT:    [[SUB_SAT:%.*]] = call i8 @llvm.ssub.sat.i8(i8 [[A]], i8 [[B]])
+; CHECK-NEXT:    [[SUB_SAT:%.*]] = sub nuw nsw i8 [[A]], [[B]]
 ; CHECK-NEXT:    ret i8 [[SUB_SAT]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret i8 0
@@ -122,7 +122,7 @@ define i8 @sadd_sat_nsw_only(i8 %a) {
 ; CHECK-NEXT:    [[AND:%.*]] = and i1 [[C_1]], [[C_2]]
 ; CHECK-NEXT:    br i1 [[AND]], label %[[THEN:.*]], label %[[EXIT:.*]]
 ; CHECK:       [[THEN]]:
-; CHECK-NEXT:    [[ADD_SAT:%.*]] = call i8 @llvm.sadd.sat.i8(i8 [[A]], i8 20)
+; CHECK-NEXT:    [[ADD_SAT:%.*]] = add nsw i8 [[A]], 20
 ; CHECK-NEXT:    ret i8 [[ADD_SAT]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret i8 0
@@ -148,7 +148,7 @@ define i8 @ssub_sat_nsw_only(i8 %a) {
 ; CHECK-NEXT:    [[C_1:%.*]] = icmp sle i8 [[A]], 100
 ; CHECK-NEXT:    br i1 [[C_1]], label %[[THEN:.*]], label %[[EXIT:.*]]
 ; CHECK:       [[THEN]]:
-; CHECK-NEXT:    [[SUB_SAT:%.*]] = call i8 @llvm.ssub.sat.i8(i8 [[A]], i8 -5)
+; CHECK-NEXT:    [[SUB_SAT:%.*]] = sub nsw i8 [[A]], -5
 ; CHECK-NEXT:    ret i8 [[SUB_SAT]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret i8 0
