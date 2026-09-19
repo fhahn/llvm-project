@@ -15904,7 +15904,7 @@ static const SCEV *getNextSCEVDivisibleByDivisor(const SCEV *Expr,
 
 static bool collectDivisibilityInformation(
     ICmpInst::Predicate Predicate, const SCEV *LHS, const SCEV *RHS,
-    DenseMap<const SCEV *, const SCEV *> &DivInfo,
+    ScalarEvolution::LoopGuards::RewriteMapTy &DivInfo,
     DenseMap<const SCEV *, APInt> &Multiples, ScalarEvolution &SE) {
   // If we have LHS == 0, check if LHS is computing a property of some unknown
   // SCEV %v which we can rewrite %v to express explicitly.
@@ -15983,8 +15983,7 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
 
   SmallVector<SCEVUse> ExprsToRewrite;
   auto CollectCondition = [&](ICmpInst::Predicate Predicate, const SCEV *LHS,
-                              const SCEV *RHS,
-                              DenseMap<const SCEV *, const SCEV *> &RewriteMap,
+                              const SCEV *RHS, RewriteMapTy &RewriteMap,
                               const LoopGuards &DivGuards) {
     // WARNING: It is generally unsound to apply any wrap flags to the proposed
     // replacement SCEV which isn't directly implied by the structure of that
@@ -16351,7 +16350,7 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
   /// replacement is loop invariant in the loop of the AddRec.
   class SCEVLoopGuardRewriter
       : public SCEVRewriteVisitor<SCEVLoopGuardRewriter> {
-    const DenseMap<const SCEV *, const SCEV *> &Map;
+    const ScalarEvolution::LoopGuards::RewriteMapTy &Map;
     const SmallDenseSet<std::pair<const SCEV *, const SCEV *>> &NotEqual;
 
     SCEV::NoWrapFlags FlagMask = SCEV::FlagAnyWrap;

@@ -1570,7 +1570,14 @@ public:
   LLVM_ABI void setNoWrapFlags(SCEVAddRecExpr *AddRec, SCEV::NoWrapFlags Flags);
 
   class LoopGuards {
-    DenseMap<const SCEV *, const SCEV *> RewriteMap;
+  public:
+    /// Map of the rewrite rules collected from the guards. A plain DenseMap
+    /// allocates 64 buckets on its first insertion; most guard sets are far
+    /// smaller than that.
+    using RewriteMapTy = SmallDenseMap<const SCEV *, const SCEV *, 8>;
+
+  private:
+    RewriteMapTy RewriteMap;
     SmallDenseSet<std::pair<const SCEV *, const SCEV *>> NotEqual;
     bool PreserveNUW = false;
     bool PreserveNSW = false;
