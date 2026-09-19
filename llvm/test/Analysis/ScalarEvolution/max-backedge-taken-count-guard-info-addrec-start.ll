@@ -2,14 +2,13 @@
 ; RUN: opt -passes='print<scalar-evolution>' -scalar-evolution-classify-expressions=0 -disable-output %s 2>&1 | FileCheck %s
 
 ; The guard bounds %iv, which never goes below %start, so %start is bounded by
-; the same value.
-; TODO: The constant max backedge-taken count of %inner, which runs %start
-; times, should be 3.
+; the same value. That bounds the max backedge-taken count of %inner, which
+; runs %start times.
 define void @max_btc_improved_by_ult_guard_on_increasing_addrec(i32 %start) {
 ; CHECK-LABEL: 'max_btc_improved_by_ult_guard_on_increasing_addrec'
 ; CHECK-NEXT:  Determining loop execution counts for: @max_btc_improved_by_ult_guard_on_increasing_addrec
 ; CHECK-NEXT:  Loop %inner: backedge-taken count is %start
-; CHECK-NEXT:  Loop %inner: constant max backedge-taken count is i32 -1
+; CHECK-NEXT:  Loop %inner: constant max backedge-taken count is i32 3
 ; CHECK-NEXT:  Loop %inner: symbolic max backedge-taken count is %start
 ; CHECK-NEXT:  Loop %inner: Trip multiple is 1
 ; CHECK-NEXT:  Loop %outer.header: backedge-taken count is ((-1 * %start) + (4 umax %start))
@@ -42,12 +41,11 @@ exit:
 ; Same as @max_btc_improved_by_ult_guard_on_increasing_addrec, but with a
 ; signed guard on a signed monotonically increasing recurrence. %start is known
 ; positive, so the signed upper bound also bounds it in the unsigned sense.
-; TODO: The constant max backedge-taken count of %inner should be 2.
 define void @max_btc_improved_by_slt_guard_on_increasing_addrec(i32 %start) {
 ; CHECK-LABEL: 'max_btc_improved_by_slt_guard_on_increasing_addrec'
 ; CHECK-NEXT:  Determining loop execution counts for: @max_btc_improved_by_slt_guard_on_increasing_addrec
 ; CHECK-NEXT:  Loop %inner: backedge-taken count is (-1 + %start)
-; CHECK-NEXT:  Loop %inner: constant max backedge-taken count is i32 2147483646
+; CHECK-NEXT:  Loop %inner: constant max backedge-taken count is i32 2
 ; CHECK-NEXT:  Loop %inner: symbolic max backedge-taken count is (-1 + %start)
 ; CHECK-NEXT:  Loop %inner: Trip multiple is 1
 ; CHECK-NEXT:  Loop %outer.header: backedge-taken count is ((-1 * %start) + (4 smax %start))

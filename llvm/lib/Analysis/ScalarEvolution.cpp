@@ -16112,6 +16112,18 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
       append_range(Worklist, S->operands());
     };
 
+    // A non-decreasing recurrence -- one for which "AR >= X" can only go from
+    // false to true -- never goes below its own start value, so it is only
+    // bounded from above by RHS if its start value is. An upper bound therefore
+    // carries over to the start value.
+    auto EnqueueAddRecStart = [&Worklist, &SE](const SCEV *S, bool IsSigned) {
+      const auto *AR = dyn_cast<SCEVAddRecExpr>(S);
+      if (AR && SE.getMonotonicPredicateType(
+                    AR, IsSigned ? ICmpInst::ICMP_SGE : ICmpInst::ICMP_UGE) ==
+                    ScalarEvolution::MonotonicallyIncreasing)
+        Worklist.push_back(AR->getStart());
+    };
+
     while (!Worklist.empty()) {
       const SCEV *From = Worklist.pop_back_val();
       if (isa<SCEVConstant>(From))
@@ -16127,12 +16139,14 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
         To = SE.getUMinExpr(FromRewritten, RHS);
         if (auto *UMax = dyn_cast<SCEVUMaxExpr>(FromRewritten))
           EnqueueOperands(UMax);
+        EnqueueAddRecStart(FromRewritten, /*IsSigned=*/false);
         break;
       case CmpInst::ICMP_SLT:
       case CmpInst::ICMP_SLE:
         To = SE.getSMinExpr(FromRewritten, RHS);
         if (auto *SMax = dyn_cast<SCEVSMaxExpr>(FromRewritten))
           EnqueueOperands(SMax);
+        EnqueueAddRecStart(FromRewritten, /*IsSigned=*/true);
         break;
       case CmpInst::ICMP_UGT:
       case CmpInst::ICMP_UGE:

@@ -6,10 +6,10 @@ target triple = "x86_64-pc-linux-gnu"
 
 ; Reduced from php's zend_jit_vm_helpers.c. After inlining @find_recursive_ret,
 ; nothing compares %depth to 4 directly any longer; the only bound left is the
-; guard on the search loop's induction variable, which starts at %depth.
-; TODO: SCEV should recover %depth s<= 3 from that guard, so the summing loop
-; inlined into @trace_execute runs at most 4 times and is not vectorized, while
-; @sum_frames on its own still is.
+; guard on the search loop's induction variable, which starts at %depth. SCEV
+; recovers %depth s<= 3 from that guard, so the summing loop inlined into
+; @trace_execute runs at most 4 times and is not vectorized, while @sum_frames
+; on its own still is.
 
 define i32 @trace_execute(ptr %frames, i32 %depth) {
 ; CHECK-LABEL: define i32 @trace_execute(
@@ -37,49 +37,23 @@ define i32 @trace_execute(ptr %frames, i32 %depth) {
 ; CHECK-NEXT:    [[F_IS_NULL_I:%.*]] = icmp eq ptr [[NEXT_I]], null
 ; CHECK-NEXT:    br i1 [[F_IS_NULL_I]], label %[[COMMON_RET]], label %[[LOOP_BODY_I]]
 ; CHECK:       [[COMMON_RET]]:
-; CHECK-NEXT:    [[COMMON_RET_OP:%.*]] = phi i32 [ [[SUM_NEXT_I:%.*]], %[[LOOP_LATCH_I1:.*]] ], [ 0, %[[COUNT]] ], [ 0, %[[ENTRY]] ], [ [[TMP5:%.*]], %[[MIDDLE_BLOCK:.*]] ], [ 0, %[[LOOP_BODY_I]] ], [ 0, %[[LOOP_LATCH_I]] ]
+; CHECK-NEXT:    [[COMMON_RET_OP:%.*]] = phi i32 [ [[SUM_NEXT_I:%.*]], %[[LOOP_LATCH_I1:.*]] ], [ 0, %[[COUNT]] ], [ 0, %[[ENTRY]] ], [ 0, %[[LOOP_BODY_I]] ], [ 0, %[[LOOP_LATCH_I]] ]
 ; CHECK-NEXT:    ret i32 [[COMMON_RET_OP]]
 ; CHECK:       [[COUNT]]:
 ; CHECK-NEXT:    [[C1_I:%.*]] = icmp sgt i32 [[DEPTH]], 0
 ; CHECK-NEXT:    br i1 [[C1_I]], label %[[LOOP_LATCH_PREHEADER_I:.*]], label %[[COMMON_RET]]
 ; CHECK:       [[LOOP_LATCH_PREHEADER_I]]:
 ; CHECK-NEXT:    [[WIDE_TRIP_COUNT_I:%.*]] = zext nneg i32 [[DEPTH]] to i64
-; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[DEPTH]], 8
-; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[LOOP_LATCH_I1_PREHEADER:.*]], label %[[VECTOR_PH:.*]]
-; CHECK:       [[VECTOR_PH]]:
-; CHECK-NEXT:    [[N_VEC:%.*]] = and i64 [[WIDE_TRIP_COUNT_I]], 2147483640
-; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
-; CHECK:       [[VECTOR_BODY]]:
-; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[TMP2:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[VEC_PHI8:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[TMP3:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr [4 x i8], ptr [[FRAMES]], i64 [[INDEX]]
-; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[TMP0]], i64 16
-; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP0]], align 4
-; CHECK-NEXT:    [[WIDE_LOAD9:%.*]] = load <4 x i32>, ptr [[TMP1]], align 4
-; CHECK-NEXT:    [[TMP2]] = add <4 x i32> [[WIDE_LOAD]], [[VEC_PHI]]
-; CHECK-NEXT:    [[TMP3]] = add <4 x i32> [[WIDE_LOAD9]], [[VEC_PHI8]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
-; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP4]], label %[[MIDDLE_BLOCK]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
-; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[BIN_RDX:%.*]] = add <4 x i32> [[TMP3]], [[TMP2]]
-; CHECK-NEXT:    [[TMP5]] = tail call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[BIN_RDX]])
-; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N_VEC]], [[WIDE_TRIP_COUNT_I]]
-; CHECK-NEXT:    br i1 [[CMP_N]], label %[[COMMON_RET]], label %[[LOOP_LATCH_I1_PREHEADER]]
-; CHECK:       [[LOOP_LATCH_I1_PREHEADER]]:
-; CHECK-NEXT:    [[INDVARS_IV_I_PH:%.*]] = phi i64 [ 0, %[[LOOP_LATCH_PREHEADER_I]] ], [ [[N_VEC]], %[[MIDDLE_BLOCK]] ]
-; CHECK-NEXT:    [[SUM3_I_PH:%.*]] = phi i32 [ 0, %[[LOOP_LATCH_PREHEADER_I]] ], [ [[TMP5]], %[[MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    br label %[[LOOP_LATCH_I1]]
 ; CHECK:       [[LOOP_LATCH_I1]]:
-; CHECK-NEXT:    [[INDVARS_IV_I:%.*]] = phi i64 [ [[INDVARS_IV_NEXT_I:%.*]], %[[LOOP_LATCH_I1]] ], [ [[INDVARS_IV_I_PH]], %[[LOOP_LATCH_I1_PREHEADER]] ]
-; CHECK-NEXT:    [[SUM3_I:%.*]] = phi i32 [ [[SUM_NEXT_I]], %[[LOOP_LATCH_I1]] ], [ [[SUM3_I_PH]], %[[LOOP_LATCH_I1_PREHEADER]] ]
+; CHECK-NEXT:    [[INDVARS_IV_I:%.*]] = phi i64 [ 0, %[[LOOP_LATCH_PREHEADER_I]] ], [ [[INDVARS_IV_NEXT_I:%.*]], %[[LOOP_LATCH_I1]] ]
+; CHECK-NEXT:    [[SUM3_I:%.*]] = phi i32 [ 0, %[[LOOP_LATCH_PREHEADER_I]] ], [ [[SUM_NEXT_I]], %[[LOOP_LATCH_I1]] ]
 ; CHECK-NEXT:    [[GEP_I:%.*]] = getelementptr [4 x i8], ptr [[FRAMES]], i64 [[INDVARS_IV_I]]
 ; CHECK-NEXT:    [[L_I:%.*]] = load i32, ptr [[GEP_I]], align 4
 ; CHECK-NEXT:    [[SUM_NEXT_I]] = add i32 [[L_I]], [[SUM3_I]]
 ; CHECK-NEXT:    [[INDVARS_IV_NEXT_I]] = add nuw nsw i64 [[INDVARS_IV_I]], 1
 ; CHECK-NEXT:    [[EXITCOND_NOT_I:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT_I]], [[WIDE_TRIP_COUNT_I]]
-; CHECK-NEXT:    br i1 [[EXITCOND_NOT_I]], label %[[COMMON_RET]], label %[[LOOP_LATCH_I1]], !llvm.loop [[LOOP3:![0-9]+]]
+; CHECK-NEXT:    br i1 [[EXITCOND_NOT_I]], label %[[COMMON_RET]], label %[[LOOP_LATCH_I1]]
 ;
 entry:
   %found = call i32 @find_recursive_ret(ptr %frames, i32 %depth)
@@ -155,7 +129,7 @@ define i32 @sum_frames(ptr %p, i32 %n) {
 ; CHECK-NEXT:    [[TMP3]] = add <4 x i32> [[WIDE_LOAD6]], [[VEC_PHI5]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP4]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP4]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[BIN_RDX:%.*]] = add <4 x i32> [[TMP3]], [[TMP2]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = tail call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[BIN_RDX]])
@@ -173,7 +147,7 @@ define i32 @sum_frames(ptr %p, i32 %n) {
 ; CHECK-NEXT:    [[SUM_NEXT]] = add i32 [[L]], [[SUM3]]
 ; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add nuw nsw i64 [[INDVARS_IV]], 1
 ; CHECK-NEXT:    [[EXITCOND_NOT:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT]], [[WIDE_TRIP_COUNT]]
-; CHECK-NEXT:    br i1 [[EXITCOND_NOT]], label %[[EXIT]], label %[[LOOP_LATCH]], !llvm.loop [[LOOP5:![0-9]+]]
+; CHECK-NEXT:    br i1 [[EXITCOND_NOT]], label %[[EXIT]], label %[[LOOP_LATCH]], !llvm.loop [[LOOP3:![0-9]+]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    [[SUM_LCSSA:%.*]] = phi i32 [ 0, %[[ENTRY]] ], [ [[TMP5]], %[[MIDDLE_BLOCK]] ], [ [[SUM_NEXT]], %[[LOOP_LATCH]] ]
 ; CHECK-NEXT:    ret i32 [[SUM_LCSSA]]
@@ -203,6 +177,4 @@ exit:
 ; CHECK: [[META1]] = !{!"llvm.loop.isvectorized", i32 1}
 ; CHECK: [[META2]] = !{!"llvm.loop.unroll.runtime.disable"}
 ; CHECK: [[LOOP3]] = distinct !{[[LOOP3]], [[META2]], [[META1]]}
-; CHECK: [[LOOP4]] = distinct !{[[LOOP4]], [[META1]], [[META2]]}
-; CHECK: [[LOOP5]] = distinct !{[[LOOP5]], [[META2]], [[META1]]}
 ;.
