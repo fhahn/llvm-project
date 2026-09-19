@@ -361,9 +361,7 @@ static const Value *getBaseObject(VPValue *Ptr) {
 /// an opaque operation, which even a noalias base does not rule out.
 static bool provablyDistinctObjects(AAResults &AA, const Value *ObjA,
                                     const Value *ObjB) {
-  return ObjA && ObjB &&
-         AA.isNoAlias(MemoryLocation::getBeforeOrAfter(ObjA),
-                      MemoryLocation::getBeforeOrAfter(ObjB));
+  return ObjA && ObjB && AA.isNoAlias(ObjA, ObjB);
 }
 
 /// Returns true if the store recipe \p Store writes disjoint bytes on every
@@ -406,6 +404,8 @@ bool llvm::proveOuterLoopMemorySafety(VPlan &Plan,
   // The objects the nest's loads and stores access, with a null entry for an
   // access whose object could not be determined.
   SmallVector<const Value *, 8> LoadObjects, StoreObjects;
+  SmallVector<VPInstruction *, 8> Stores;
+  bool AllAccessesParallel = true;
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
            vp_depth_first_deep(Plan.getEntry()))) {
     // VPIRBasicBlocks wrap IR outside the vectorized loop; running several of
@@ -419,17 +419,48 @@ bool llvm::proveOuterLoopMemorySafety(VPlan &Plan,
       // cmpxchg, fence, memory intrinsics - is not covered by the reasoning
       // below.
       auto *VPI = dyn_cast<VPInstruction>(&R);
-      if (!VPI || (VPI->getOpcode() != Instruction::Load &&
-                   VPI->getOpcode() != Instruction::Store))
+      if (!VPI)
+        return false;
+      // These intrinsics model optimization constraints through inaccessible
+      // memory, not accesses to objects used by the loop's loads and stores.
+      switch (vputils::getIntrinsicID(VPI)) {
+      case Intrinsic::assume:
+      case Intrinsic::sideeffect:
+      case Intrinsic::pseudoprobe:
+        continue;
+      default:
+        break;
+      }
+      if (VPI->getOpcode() != Instruction::Load &&
+          VPI->getOpcode() != Instruction::Store)
         return false;
 
+      MDNode *AccessGroup = VPI->getMetadata(LLVMContext::MD_access_group);
+      auto IsParallelGroup = [&](Metadata *Group) {
+        return is_contained(Plan.getParallelAccessGroups(), Group);
+      };
+      AllAccessesParallel &=
+          AccessGroup &&
+          (AccessGroup->getNumOperands() == 0
+               ? IsParallelGroup(AccessGroup)
+               : any_of(AccessGroup->operands(), [&](const MDOperand &Group) {
+                   return IsParallelGroup(Group.get());
+                 }));
+
       bool IsStore = VPI->getOpcode() == Instruction::Store;
-      if (IsStore && !writesDisjointBytesPerIteration(VPI, PSE, OuterLoop))
-        return false;
+      if (IsStore)
+        Stores.push_back(VPI);
       (IsStore ? StoreObjects : LoadObjects)
           .push_back(getBaseObject(VPI->getOperand(IsStore ? 1 : 0)));
     }
   }
+
+  if (AllAccessesParallel)
+    return true;
+  if (!all_of(Stores, [&](VPInstruction *Store) {
+        return writesDisjointBytesPerIteration(Store, PSE, OuterLoop);
+      }))
+    return false;
 
   // Each store must access an object no other access of the nest touches, so
   // that no two lanes of a vector iteration and no load and store of the nest

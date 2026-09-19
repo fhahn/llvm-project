@@ -34,8 +34,9 @@ void collectEphemeralRecipesForVPlan(VPlan &Plan,
 /// of one vector iteration cannot change the memory the nest described by
 /// \p Plan reads and writes.
 ///
-/// Deliberately minimal for now: every store must write bytes no other access
-/// of the nest can touch, and must advance by at least the number of bytes it
+/// Accept accesses covered by the plan's parallel access groups. Otherwise,
+/// every store must write bytes no other access of the nest can touch, and
+/// must advance by at least the number of bytes it
 /// writes on each outer-loop iteration, so that no two lanes write the same
 /// location. Loads are unconstrained; reordering reads is always safe.
 bool proveOuterLoopMemorySafety(VPlan &Plan, PredicatedScalarEvolution &PSE,

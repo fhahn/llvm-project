@@ -870,6 +870,11 @@ VPlan::VPlan(Loop *L, Type *IdxTy)
   setEntry(createVPIRBasicBlock(L->getLoopPreheader()));
   ScalarHeader = createVPIRBasicBlock(L->getHeader());
 
+  if (MDNode *ParallelAccesses =
+          findOptionMDForLoop(L, "llvm.loop.parallel_accesses"))
+    for (const MDOperand &Group : drop_begin(ParallelAccesses->operands()))
+      ParallelAccessGroups.push_back(cast<MDNode>(Group.get()));
+
   SmallVector<BasicBlock *> IRExitBlocks;
   L->getUniqueExitBlocks(IRExitBlocks);
   for (BasicBlock *EB : IRExitBlocks)
@@ -1254,6 +1259,7 @@ VPlan *VPlan::duplicate() {
   // Initialize remaining fields of cloned VPlan.
   NewPlan->VFs = VFs;
   NewPlan->UFs = UFs;
+  NewPlan->ParallelAccessGroups = ParallelAccessGroups;
   // TODO: Adjust names.
   NewPlan->Name = Name;
   if (TripCount) {

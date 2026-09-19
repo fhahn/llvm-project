@@ -4846,6 +4846,11 @@ class VPlan {
   /// e.g. if the scalar epilogue always executes.
   SmallVector<VPIRBasicBlock *, 2> ExitBlocks;
 
+  /// Access groups with no loop-carried dependences in the loop being
+  /// vectorized. Memory recipes must retain their group metadata to use this
+  /// guarantee, including accesses in nested loops.
+  SmallVector<MDNode *, 2> ParallelAccessGroups;
+
   /// Holds the VFs applicable to this VPlan.
   SmallSetVector<ElementCount, 2> VFs;
 
@@ -4901,6 +4906,10 @@ public:
   /// scalar header blocks of the new VPlan. The vector loop will have index
   /// type \p IdxTy.
   VPlan(Loop *L, Type *IdxTy);
+
+  ArrayRef<MDNode *> getParallelAccessGroups() const {
+    return ParallelAccessGroups;
+  }
 
   /// Construct a VPlan with a new VPBasicBlock as entry, a VPIRBasicBlock
   /// wrapping \p ScalarHeaderBB and vector loop index of type \p IdxTy.
