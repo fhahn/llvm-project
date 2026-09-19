@@ -237,3 +237,95 @@ loop:
 exit:
   ret void
 }
+
+; The entry guard proves the decrement positive. While iv > 0, subtracting
+; a positive signed step cannot overflow, so the count is ceil(max(start, 0)/step).
+define void @sgt_guarded_stride(i32 %start, i32 %step) {
+; CHECK-LABEL: 'sgt_guarded_stride'
+; CHECK-NEXT:  Determining loop execution counts for: @sgt_guarded_stride
+; CHECK-NEXT:  Loop %loop: backedge-taken count is ((-1 + (-1 * (0 smin %start)) + (1 umax %step) + %start) /u (1 umax %step))
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 2147483647
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((-1 + (-1 * (0 smin %start)) + (1 umax %step) + %start) /u (1 umax %step))
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %positive = icmp sgt i32 %step, 0
+  br i1 %positive, label %loop, label %exit
+
+loop:
+  %iv = phi i32 [ %start, %entry ], [ %next, %loop ]
+  %next = sub i32 %iv, %step
+  %continue = icmp sgt i32 %iv, 0
+  br i1 %continue, label %loop, label %exit
+
+exit:
+  ret void
+}
+
+; Without the guard, step may be zero or negative and the count is unknown.
+define void @sgt_unguarded_stride(i32 %start, i32 %step) {
+; CHECK-LABEL: 'sgt_unguarded_stride'
+; CHECK-NEXT:  Determining loop execution counts for: @sgt_unguarded_stride
+; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
+; CHECK-NEXT:  Loop %loop: Unpredictable constant max backedge-taken count.
+; CHECK-NEXT:  Loop %loop: Unpredictable symbolic max backedge-taken count.
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i32 [ %start, %entry ], [ %next, %loop ]
+  %next = sub i32 %iv, %step
+  %continue = icmp sgt i32 %iv, 0
+  br i1 %continue, label %loop, label %exit
+
+exit:
+  ret void
+}
+
+; While iv > 127, subtracting a step <= 127 cannot wrap unsigned.
+; The entry guard is still needed to prove the step nonzero.
+define void @ugt_guarded_stride(i32 %start, i32 %raw_step) {
+; CHECK-LABEL: 'ugt_guarded_stride'
+; CHECK-NEXT:  Determining loop execution counts for: @ugt_guarded_stride
+; CHECK-NEXT:  Loop %loop: backedge-taken count is ((-1 + (-1 * (127 umin %start))<nsw> + (1 umax (zext i7 (trunc i32 %raw_step to i7) to i32)) + %start) /u (1 umax (zext i7 (trunc i32 %raw_step to i7) to i32)))
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 -128
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((-1 + (-1 * (127 umin %start))<nsw> + (1 umax (zext i7 (trunc i32 %raw_step to i7) to i32)) + %start) /u (1 umax (zext i7 (trunc i32 %raw_step to i7) to i32)))
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %step = and i32 %raw_step, 127
+  %positive = icmp ugt i32 %step, 0
+  br i1 %positive, label %loop, label %exit
+
+loop:
+  %iv = phi i32 [ %start, %entry ], [ %next, %loop ]
+  %next = sub i32 %iv, %step
+  %continue = icmp ugt i32 %iv, 127
+  br i1 %continue, label %loop, label %exit
+
+exit:
+  ret void
+}
+
+; Without the guard, a zero step can make the loop infinite.
+define void @ugt_unguarded_stride(i32 %start, i32 %raw_step) {
+; CHECK-LABEL: 'ugt_unguarded_stride'
+; CHECK-NEXT:  Determining loop execution counts for: @ugt_unguarded_stride
+; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
+; CHECK-NEXT:  Loop %loop: Unpredictable constant max backedge-taken count.
+; CHECK-NEXT:  Loop %loop: Unpredictable symbolic max backedge-taken count.
+;
+entry:
+  %step = and i32 %raw_step, 127
+  br label %loop
+
+loop:
+  %iv = phi i32 [ %start, %entry ], [ %next, %loop ]
+  %next = sub i32 %iv, %step
+  %continue = icmp ugt i32 %iv, 127
+  br i1 %continue, label %loop, label %exit
+
+exit:
+  ret void
+}
