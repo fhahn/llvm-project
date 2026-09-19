@@ -16472,7 +16472,7 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
             return SE.getAddExpr(S, SE.getMinusOne(Expr->getType()));
         }
       }
-      SmallVector<SCEVUse, 2> Operands;
+      SmallVector<SCEVUse, 4> Operands;
       bool Changed = false;
       for (SCEVUse Op : Expr->operands()) {
         Operands.push_back(
@@ -16488,7 +16488,7 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
     }
 
     const SCEV *visitMulExpr(const SCEVMulExpr *Expr) {
-      SmallVector<SCEVUse, 2> Operands;
+      SmallVector<SCEVUse, 4> Operands;
       bool Changed = false;
       for (SCEVUse Op : Expr->operands()) {
         Operands.push_back(
