@@ -129,22 +129,17 @@ GEPNoWrapFlags vputils::getGEPFlagsForPtr(VPValue *Ptr) {
   return GEPNoWrapFlags::none();
 }
 
-/// Recognize a VPPhi \p R of the shape (preheader-start, add(phi, live-in
-/// step)) as an affine AddRec. A self-referential phi like this heads a loop,
-/// and the header phis of \p L itself have already been replaced by
-/// dedicated header-phi recipes, so \p R heads a loop nested in \p L. Only
-/// nests with a single, innermost nested loop are handled, which identifies
-/// that loop; SCEV needs it, as it keys AddRecs on IR loops. Start and step
-/// come from \p R's operands, whose order is not canonicalized, so both orders
-/// are tried. Returns SCEVCouldNotCompute if the shape is not recognized.
-static const SCEV *getSCEVForNestedHeaderPhi(const VPPhi *R,
-                                             PredicatedScalarEvolution &PSE,
-                                             const Loop *L) {
+/// Recognize an affine header-phi recurrence from its current operands. The
+/// recorded loop supplies only the identity required by SCEV. Both scalar and
+/// widened phi recipes preserve this association and their incoming values.
+template <typename PhiRecipeT>
+static const SCEV *getSCEVForHeaderPhi(const PhiRecipeT *R,
+                                    PredicatedScalarEvolution &PSE,
+                                    const Loop *L) {
   ScalarEvolution &SE = *PSE.getSE();
-  if (!L || R->getNumOperands() != 2 || L->getSubLoops().size() != 1 ||
-      !L->getSubLoops().front()->isInnermost())
+  const Loop *PhiLoop = R->getSCEVLoop();
+  if (!L || !PhiLoop || !L->contains(PhiLoop) || R->getNumOperands() != 2)
     return SE.getCouldNotCompute();
-  const Loop *PhiLoop = L->getSubLoops().front();
 
   // Exactly one operand must be the increment add(phi, step); the other is then
   // the start value.
@@ -365,8 +360,8 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
   const SCEV *Expr =
       TypeSwitch<const VPRecipeBase *, const SCEV *>(DefR)
           .Case([](const VPExpandSCEVRecipe *R) { return R->getSCEV(); })
-          .Case([&PSE, L](const VPPhi *R) {
-            return getSCEVForNestedHeaderPhi(R, PSE, L);
+          .Case<VPPhi, VPWidenPHIRecipe>([&PSE, L](const auto *R) {
+            return getSCEVForHeaderPhi(R, PSE, L);
           })
           .Case([&SE, &PSE, L](const VPWidenIntOrFpInductionRecipe *R) {
             const SCEV *Step = getSCEVExprForVPValue(R->getStepValue(), PSE, L);

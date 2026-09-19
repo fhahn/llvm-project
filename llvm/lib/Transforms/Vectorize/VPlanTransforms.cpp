@@ -98,7 +98,6 @@ bool VPlanTransforms::tryToConvertVPInstructionsToVPRecipes(
   ReversePostOrderTraversal<VPBlockDeepTraversalWrapper<VPBlockBase *>> RPOT(
       Plan.getVectorLoopRegion());
 
-  SmallVector<VPPhi *> PhisToWiden;
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(RPOT)) {
     // Skip blocks outside region
     if (!VPBB->getParent())
@@ -122,13 +121,10 @@ bool VPlanTransforms::tryToConvertVPInstructionsToVPRecipes(
 
       VPRecipeBase *NewRecipe = nullptr;
       if (auto *PhiR = dyn_cast<VPPhi>(&Ingredient)) {
-        // Widen phis only after all other recipes: VPWidenPHIRecipe is not
-        // lowered to SCEV, so widening a nested loop's induction phi first
-        // would hide the recurrence the consecutive-access check needs.
-        PhisToWiden.push_back(PhiR);
-        continue;
-      }
-      if (auto *VPI = dyn_cast<VPInstruction>(&Ingredient)) {
+        NewRecipe = new VPWidenPHIRecipe(
+            PhiR->operands(), PhiR->getDebugLoc(), PhiR->getName(),
+            PhiR->getSCEVLoop());
+      } else if (auto *VPI = dyn_cast<VPInstruction>(&Ingredient)) {
         assert(!isa<PHINode>(Inst) && "phis should be handled above");
         // Create VPWidenMemoryRecipe for loads and stores.
         if (LoadInst *Load = dyn_cast<LoadInst>(Inst)) {
@@ -207,14 +203,6 @@ bool VPlanTransforms::tryToConvertVPInstructionsToVPRecipes(
     }
   }
 
-  for (VPPhi *PhiR : PhisToWiden) {
-    auto *Phi = cast<PHINode>(PhiR->getUnderlyingValue());
-    auto *WidenPhiR = new VPWidenPHIRecipe(PhiR->operands(),
-                                           PhiR->getDebugLoc(), Phi->getName());
-    WidenPhiR->insertBefore(PhiR);
-    PhiR->replaceAllUsesWith(WidenPhiR);
-    PhiR->eraseFromParent();
-  }
   return true;
 }
 

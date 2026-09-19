@@ -15,6 +15,7 @@
 #include "VPlanTestBase.h"
 #include "llvm/ADT/DepthFirstIterator.h"
 #include "llvm/ADT/PostOrderIterator.h"
+#include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/Analysis/VectorUtils.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
@@ -71,6 +72,104 @@ loop:
                                      X->getType());
   EXPECT_EQ(SE->getAbsExpr(XSCEV, /*IsNSW=*/false),
             vputils::getSCEVExprForVPValue(&WrappingAbs, PSE, L));
+}
+
+TEST_F(VPlanSCEVTest, HeaderPhiUsesCurrentOperands) {
+  Module &M = parseModule(R"(
+define void @f(i64 %n) {
+entry:
+  br label %outer
+outer:
+  %i = phi i64 [ 0, %entry ], [ %i.next, %latch ]
+  br label %inner
+inner:
+  %j = phi i64 [ 0, %outer ], [ %j.next, %inner ]
+  %j.next = add nuw i64 %j, 1
+  %j.done = icmp eq i64 %j.next, %n
+  br i1 %j.done, label %second.preheader, label %inner
+second.preheader:
+  br label %second
+second:
+  %k = phi i64 [ 0, %second.preheader ], [ %k.next, %second ]
+  %k.next = add nuw i64 %k, 1
+  %k.done = icmp eq i64 %k.next, %n
+  br i1 %k.done, label %latch, label %second
+latch:
+  %i.next = add nuw i64 %i, 1
+  %done = icmp eq i64 %i.next, %n
+  br i1 %done, label %exit, label %outer
+exit:
+  ret void
+}
+)");
+  Function *F = M.getFunction("f");
+  BasicBlock *Header = F->getEntryBlock().getSingleSuccessor();
+  auto Plan = buildVPlan(Header, std::nullopt, false);
+  Loop *Outer = LI->getLoopFor(Header);
+  PredicatedScalarEvolution PSE(*SE, *Outer);
+  ASSERT_EQ(Outer->getSubLoops().size(), 2u);
+
+  // Sibling loops must keep distinct recurrence identities, even when their
+  // starts and steps are identical. Query both before and after plan cloning.
+  auto CheckPhis = [&](VPlan &P, bool Widen) {
+    unsigned Count = 0;
+    for (VPBasicBlock *BB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+             depth_first(static_cast<VPBlockBase *>(P.getEntry())))) {
+      for (VPRecipeBase &R : make_early_inc_range(*BB)) {
+        auto *Phi = dyn_cast<VPPhi>(&R);
+        if (!Phi || !Phi->getSCEVLoop() || Phi->getSCEVLoop() == Outer)
+          continue;
+        ++Count;
+        const Loop *Inner = Phi->getSCEVLoop();
+        auto *Inc = dyn_cast<VPInstruction>(Phi->getOperand(0));
+        if (!Inc)
+          Inc = cast<VPInstruction>(Phi->getOperand(1));
+        // Change only the plan: consulting the underlying IR would yield 1.
+        Inc->setOperand(1, P.getConstantInt(64, 2));
+        const SCEV *Expected = SE->getAddRecExpr(
+            SE->getZero(Type::getInt64Ty(*Ctx)),
+            SE->getConstant(Type::getInt64Ty(*Ctx), 2), Inner,
+            SCEV::FlagAnyWrap);
+        EXPECT_EQ(vputils::getSCEVExprForVPValue(Phi, PSE, Outer), Expected);
+        EXPECT_EQ(cast<SCEVAddRecExpr>(Expected)->getNoWrapFlags(),
+                  SCEV::FlagAnyWrap);
+        if (!Widen)
+          continue;
+        auto *Wide = new VPWidenPHIRecipe(
+            Phi->operands(), Phi->getDebugLoc(), Phi->getName(), Inner);
+        Wide->insertBefore(Phi);
+        Phi->replaceAllUsesWith(Wide);
+        Phi->eraseFromParent();
+        EXPECT_EQ(vputils::getSCEVExprForVPValue(Wide, PSE, Outer), Expected);
+        // Unassociated phis must not borrow an identity from the loop nest.
+        Wide->setSCEVLoop(nullptr);
+        EXPECT_EQ(vputils::getSCEVExprForVPValue(Wide, PSE, Outer),
+                  SE->getCouldNotCompute());
+        Wide->setSCEVLoop(Inner);
+      }
+    }
+    EXPECT_EQ(Count, 2u);
+  };
+  CheckPhis(*Plan, false);
+  std::unique_ptr<VPlan> Clone(Plan->duplicate());
+  CheckPhis(*Clone, true);
+  std::unique_ptr<VPlan> WideClone(Clone->duplicate());
+  unsigned Count = 0;
+  for (VPBasicBlock *BB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           depth_first(static_cast<VPBlockBase *>(WideClone->getEntry())))) {
+    for (VPRecipeBase &R : *BB) {
+      auto *Phi = dyn_cast<VPWidenPHIRecipe>(&R);
+      if (!Phi)
+        continue;
+      ++Count;
+      const auto *AR = cast<SCEVAddRecExpr>(
+          vputils::getSCEVExprForVPValue(Phi, PSE, Outer));
+      EXPECT_EQ(AR->getLoop(), Phi->getSCEVLoop());
+      EXPECT_EQ(AR->getStepRecurrence(*SE),
+                SE->getConstant(Type::getInt64Ty(*Ctx), 2));
+    }
+  }
+  EXPECT_EQ(Count, 2u);
 }
 
 TEST_F(VPInstructionTest, insertBefore) {

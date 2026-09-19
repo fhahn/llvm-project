@@ -1683,6 +1683,16 @@ public:
 };
 
 struct LLVM_ABI_FOR_TEST VPPhi : public VPInstruction, public VPPhiAccessors {
+private:
+  /// Original iteration domain, used only to identify SCEV recurrences. Start,
+  /// step and flags must be derived from the current recipe operands. Null for
+  /// non-header phis; clear or update it when changing the iteration domain.
+  const Loop *SCEVLoop = nullptr;
+
+public:
+  const Loop *getSCEVLoop() const { return SCEVLoop; }
+  void setSCEVLoop(const Loop *L) { SCEVLoop = L; }
+
   VPPhi(ArrayRef<VPValue *> Operands, const VPIRFlags &Flags, DebugLoc DL,
         const Twine &Name = "", Type *ResultTy = nullptr)
       : VPInstruction(Instruction::PHI, Operands, Flags, {}, DL, Name,
@@ -1706,6 +1716,7 @@ struct LLVM_ABI_FOR_TEST VPPhi : public VPInstruction, public VPPhiAccessors {
   VPPhi *clone() override {
     auto *PhiR = new VPPhi(operands(), *this, getDebugLoc(), getName());
     PhiR->setUnderlyingValue(getUnderlyingValue());
+    PhiR->setSCEVLoop(SCEVLoop);
     return PhiR;
   }
 
@@ -2752,15 +2763,22 @@ class LLVM_ABI_FOR_TEST VPWidenPHIRecipe : public VPSingleDefRecipe,
   /// Name to use for the generated IR instruction for the widened phi.
   std::string Name;
 
+  /// Original iteration domain for SCEV, with the same contract as VPPhi.
+  const Loop *SCEVLoop;
+
 public:
+  const Loop *getSCEVLoop() const { return SCEVLoop; }
+  void setSCEVLoop(const Loop *L) { SCEVLoop = L; }
+
   /// Create a new VPWidenPHIRecipe with incoming values \p IncomingValues,
-  /// debug location \p DL and \p Name.
+  /// debug location \p DL, \p Name and optional SCEV iteration domain.
   VPWidenPHIRecipe(ArrayRef<VPValue *> IncomingValues,
-                   DebugLoc DL = DebugLoc::getUnknown(), const Twine &Name = "")
+                   DebugLoc DL = DebugLoc::getUnknown(), const Twine &Name = "",
+                   const Loop *SCEVLoop = nullptr)
       : VPSingleDefRecipe(VPRecipeBase::VPWidenPHISC, IncomingValues,
                           IncomingValues[0]->getScalarType(),
                           /*UV=*/nullptr, DL),
-        Name(Name.str()) {
+        Name(Name.str()), SCEVLoop(SCEVLoop) {
     assert(all_of(IncomingValues,
                   [this](VPValue *VPV) {
                     return VPV->getScalarType() == getScalarType();
@@ -2769,7 +2787,7 @@ public:
   }
 
   VPWidenPHIRecipe *clone() override {
-    return new VPWidenPHIRecipe(operands(), getDebugLoc(), Name);
+    return new VPWidenPHIRecipe(operands(), getDebugLoc(), Name, SCEVLoop);
   }
 
   ~VPWidenPHIRecipe() override = default;

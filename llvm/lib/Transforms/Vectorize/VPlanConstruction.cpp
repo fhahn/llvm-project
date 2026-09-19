@@ -266,6 +266,7 @@ void PlainCFGBuilder::createVPInstructionsForVPBB(VPBasicBlock *VPBB,
       if (isHeaderBB(Phi->getParent(), LI->getLoopFor(Phi->getParent()))) {
         // Header phis need to be fixed after the VPBB for the latch has been
         // created.
+        cast<VPPhi>(NewR)->setSCEVLoop(LI->getLoopFor(Phi->getParent()));
         PhisToFix.push_back(Phi);
       } else {
         // Add operands for VPPhi in the order matching its predecessors in

@@ -277,8 +277,8 @@ exit:
   ret void
 }
 
-; Not an affine recurrence, so no AddRec is formed and the access stays a
-; gather. Lowering the step would recurse back into the phi.
+; Not an affine recurrence, so no AddRec is formed and memory independence
+; cannot be proved. Lowering the step would recurse back into the phi.
 define void @inner_step_is_phi(ptr noalias %A, i64 %N, i64 %M) {
 ; CHECK-LABEL: define void @inner_step_is_phi(
 ; CHECK-SAME: ptr noalias [[A:%.*]], i64 [[N:%.*]], i64 [[M:%.*]]) {
