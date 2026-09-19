@@ -15929,14 +15929,15 @@ static bool collectDivisibilityInformation(
 static bool isDivisibilityGuard(const SCEV *LHS, const SCEV *RHS,
                                 ScalarEvolution &SE) {
   const SCEV *X, *Y;
-  return match(LHS, m_scev_URem(m_SCEV(X), m_SCEV(Y), SE)) && RHS->isZero();
+  // Check RHS first: the URem matcher builds SCEV expressions speculatively.
+  return RHS->isZero() && match(LHS, m_scev_URem(m_SCEV(X), m_SCEV(Y), SE));
 }
 
 // Apply divisibility by \p Divisor on MinMaxExpr with constant values,
 // recursively. This is done by aligning up/down the constant value to the
 // Divisor.
 static const SCEV *applyDivisibilityOnMinMaxExpr(const SCEV *MinMaxExpr,
-                                                 APInt Divisor,
+                                                 const APInt &Divisor,
                                                  ScalarEvolution &SE) {
   // Return true if \p Expr is a MinMax SCEV expression with a non-negative
   // constant operand. If so, return in \p SCTy the SCEV type and in \p RHS
@@ -16017,9 +16018,8 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
       const SCEVConstant *C1;
       const SCEVUnknown *LHSUnknown;
       auto *C2 = dyn_cast<SCEVConstant>(MatchRHS);
-      if (!match(MatchLHS,
-                 m_scev_Add(m_SCEVConstant(C1), m_SCEVUnknown(LHSUnknown))) ||
-          !C2)
+      if (!C2 || !match(MatchLHS, m_scev_Add(m_SCEVConstant(C1),
+                                             m_SCEVUnknown(LHSUnknown))))
         return false;
 
       auto ExactRegion =
@@ -16294,7 +16294,8 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
   DenseMap<const SCEV *, APInt> Multiples;
   LoopGuards DivGuards(SE);
   for (const auto &[Predicate, LHS, RHS] : GuardsToProcess) {
-    if (!isDivisibilityGuard(LHS, RHS, SE))
+    // collectDivisibilityInformation only handles X %u Y == 0.
+    if (Predicate != CmpInst::ICMP_EQ || !isDivisibilityGuard(LHS, RHS, SE))
       continue;
     collectDivisibilityInformation(Predicate, LHS, RHS, DivGuards.RewriteMap,
                                    Multiples, SE);
@@ -16324,7 +16325,7 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
   for (const SCEV *Expr : ExprsToRewrite) {
     if (!Guards.PreserveNUW && !Guards.PreserveNSW)
       break;
-    const SCEV *RewriteTo = Guards.RewriteMap[Expr];
+    const SCEV *RewriteTo = Guards.RewriteMap.lookup(Expr);
     if (Guards.PreserveNUW)
       Guards.PreserveNUW =
           SE.getUnsignedRange(Expr).contains(SE.getUnsignedRange(RewriteTo));
@@ -16338,8 +16339,13 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
   // sub-expressions.
   if (ExprsToRewrite.size() > 1) {
     for (const SCEV *Expr : ExprsToRewrite) {
-      const SCEV *RewriteTo = Guards.RewriteMap[Expr];
-      Guards.RewriteMap.erase(Expr);
+      auto It = Guards.RewriteMap.find(Expr);
+      assert(It != Guards.RewriteMap.end() &&
+             "every expression to rewrite has a rewrite rule");
+      const SCEV *RewriteTo = It->second;
+      // Erase before rewriting, so the rewrite does not substitute Expr into
+      // its own replacement.
+      Guards.RewriteMap.erase(It);
       Guards.RewriteMap.insert({Expr, Guards.rewrite(RewriteTo)});
     }
   }
