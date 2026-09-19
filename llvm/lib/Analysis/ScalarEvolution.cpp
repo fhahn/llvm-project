@@ -15804,7 +15804,6 @@ ScalarEvolution::LoopGuards::collect(const Loop *L, ScalarEvolution &SE) {
 void ScalarEvolution::LoopGuards::collectFromPHI(
     ScalarEvolution &SE, ScalarEvolution::LoopGuards &Guards,
     const PHINode &Phi, SmallPtrSetImpl<const BasicBlock *> &VisitedBlocks,
-    SmallDenseMap<const BasicBlock *, LoopGuards> &IncomingGuards,
     unsigned Depth) {
   if (!SE.isSCEVable(Phi.getType()))
     return;
@@ -15820,11 +15819,12 @@ void ScalarEvolution::LoopGuards::collectFromPHI(
     if (!SE.DT.isReachableFromEntry(InBlock))
       return {nullptr, scCouldNotCompute};
 
-    auto [G, Inserted] = IncomingGuards.try_emplace(InBlock, LoopGuards(SE));
-    if (Inserted)
-      collectFromBlock(SE, G->second, Phi.getParent(), InBlock, VisitedBlocks,
-                       Depth + 1);
-    auto &RewriteMap = G->second.RewriteMap;
+    // InBlock was not yet in VisitedBlocks above, and VisitedBlocks is only
+    // ever inserted into, so each incoming block is collected for exactly once.
+    LoopGuards IncomingGuards(SE);
+    collectFromBlock(SE, IncomingGuards, Phi.getParent(), InBlock,
+                     VisitedBlocks, Depth + 1);
+    auto &RewriteMap = IncomingGuards.RewriteMap;
     if (RewriteMap.empty())
       return {nullptr, scCouldNotCompute};
     auto S = RewriteMap.find(SE.getSCEV(Phi.getIncomingValue(IncomingIdx)));
@@ -16243,9 +16243,8 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
   // for the Phi.
   if (Pair.second->hasNPredecessorsOrMore(2) &&
       Depth < MaxLoopGuardCollectionDepth) {
-    SmallDenseMap<const BasicBlock *, LoopGuards> IncomingGuards;
     for (auto &Phi : Pair.second->phis())
-      collectFromPHI(SE, Guards, Phi, VisitedBlocks, IncomingGuards, Depth);
+      collectFromPHI(SE, Guards, Phi, VisitedBlocks, Depth);
   }
 
   // Now apply the information from the collected conditions to
