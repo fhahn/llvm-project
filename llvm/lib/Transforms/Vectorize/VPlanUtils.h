@@ -124,9 +124,13 @@ unsigned getOpcode(const VPValue *V);
 std::optional<std::pair<bool, unsigned>>
 getOpcodeOrIntrinsicID(const VPValue *V);
 
+/// Return the address operand of \p R, if it is a load or a store, or nullptr.
+VPValue *getLoadStoreAddress(const VPRecipeBase &R);
+
 /// Return a MemoryLocation for \p R with noalias metadata populated from
 /// \p R, if the recipe is supported and std::nullopt otherwise. The pointer of
-/// the location is conservatively set to nullptr.
+/// the location is the accessed address if known and nullptr otherwise; its
+/// size is not modeled.
 std::optional<MemoryLocation> getMemoryLocation(const VPRecipeBase &R);
 
 /// Extracts and returns NoWrap and FastMath flags from the induction binop in

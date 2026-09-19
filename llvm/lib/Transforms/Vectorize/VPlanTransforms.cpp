@@ -32,6 +32,7 @@
 #include "llvm/Analysis/MemoryLocation.h"
 #include "llvm/Analysis/ScalarEvolutionPatternMatch.h"
 #include "llvm/Analysis/ScopedNoAliasAA.h"
+#include "llvm/Analysis/ValueTracking.h"
 #include "llvm/Analysis/VectorUtils.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/Metadata.h"
@@ -261,9 +262,27 @@ public:
   }
 };
 
-/// Check if a memory operation doesn't alias with memory operations using
-/// scoped noalias metadata, in blocks in the single-successor chain between \p
-/// FirstBB and \p LastBB. If \p SinkInfo is std::nullopt, only recipes that may
+/// Return true if accesses to \p LocA and \p LocB cannot overlap because they
+/// are based on distinct objects, using the object-level reasoning of BasicAA:
+/// two distinct identified objects are disjoint, and an object identified at
+/// the function level cannot be reached through an argument.
+static bool noAliasViaUnderlyingObjects(const MemoryLocation &LocA,
+                                        const MemoryLocation &LocB) {
+  if (!LocA.Ptr || !LocB.Ptr)
+    return false;
+  const Value *OA = getUnderlyingObject(LocA.Ptr);
+  const Value *OB = getUnderlyingObject(LocB.Ptr);
+  if (OA == OB)
+    return false;
+  if (isIdentifiedObject(OA) && isIdentifiedObject(OB))
+    return true;
+  return (isa<Argument>(OA) && isIdentifiedFunctionLocal(OB)) ||
+         (isa<Argument>(OB) && isIdentifiedFunctionLocal(OA));
+}
+
+/// Check if a memory operation doesn't alias with memory operations using their
+/// underlying objects or scoped noalias metadata, in blocks in the
+/// single-successor chain between \p FirstBB and \p LastBB. If \p SinkInfo is std::nullopt, only recipes that may
 /// write to memory are checked (for load hoisting). Otherwise recipes that both
 /// read and write memory are checked, and SCEV is used to prove no-alias
 /// between the group leader and other replicate recipes (for store sinking).
@@ -287,6 +306,9 @@ canHoistOrSinkWithNoAliasCheck(const MemoryLocation &MemLoc,
         // Conservatively assume aliasing for memory operations without
         // location.
         return false;
+
+      if (noAliasViaUnderlyingObjects(*Loc, MemLoc))
+        continue;
 
       if (ScopedNoAliasAAResult::alias(*Loc, MemLoc) != AliasResult::NoAlias)
         return false;

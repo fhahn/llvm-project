@@ -703,12 +703,40 @@ VPBasicBlock *VPBlockUtils::getPlainCFGMiddleBlock(const VPlan &Plan) {
   return cast<VPBasicBlock>(Plan.getScalarPreheader()->getPredecessors()[0]);
 }
 
+/// Return the address operand of \p R, if it is a load or a store, or nullptr.
+VPValue *vputils::getLoadStoreAddress(const VPRecipeBase &R) {
+  if (auto *WMR = dyn_cast<VPWidenMemoryRecipe>(&R))
+    return WMR->getAddr();
+  unsigned Opcode;
+  if (auto *RepR = dyn_cast<VPReplicateRecipe>(&R))
+    Opcode = RepR->getOpcode();
+  else if (auto *VPI = dyn_cast<VPInstruction>(&R))
+    Opcode = VPI->getOpcode();
+  else
+    return nullptr;
+  if (Opcode == Instruction::Load)
+    return R.getOperand(0);
+  if (Opcode == Instruction::Store)
+    return R.getOperand(1);
+  return nullptr;
+}
+
 std::optional<MemoryLocation>
 vputils::getMemoryLocation(const VPRecipeBase &R) {
   auto *M = dyn_cast<VPIRMetadata>(&R);
   if (!M)
     return std::nullopt;
   MemoryLocation Loc;
+  // Record the accessed pointer, if known, so accesses can be disambiguated
+  // via their underlying objects.
+  if (VPValue *Addr = getLoadStoreAddress(R)) {
+    // A pointer induction steps through the object its start value is based
+    // on, like the getelementptrs getUnderlyingObject looks through.
+    if (auto *PtrIV = dyn_cast_if_present<VPWidenPointerInductionRecipe>(
+            Addr->getDefiningRecipe()))
+      Addr = PtrIV->getStartValue();
+    Loc.Ptr = Addr->getUnderlyingValue();
+  }
   // Populate noalias metadata from VPIRMetadata.
   if (MDNode *NoAliasMD = M->getMetadata(LLVMContext::MD_noalias))
     Loc.AATags.NoAlias = NoAliasMD;

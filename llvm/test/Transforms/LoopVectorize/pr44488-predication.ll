@@ -13,11 +13,11 @@ define i16 @test_true_and_false_branch_equal() {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    br label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
+; CHECK-NEXT:    [[TMP0:%.*]] = load i16, ptr @v_38, align 1
+; CHECK-NEXT:    [[TMP3:%.*]] = icmp ne i16 [[TMP0]], 0
 ; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK:       vector.body:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[PRED_SREM_CONTINUE2:%.*]] ]
-; CHECK-NEXT:    [[TMP0:%.*]] = load i16, ptr @v_38, align 1
-; CHECK-NEXT:    [[TMP3:%.*]] = icmp ne i16 [[TMP0]], 0
 ; CHECK-NEXT:    br i1 [[TMP3]], label [[PRED_SREM_IF:%.*]], label [[PRED_SREM_CONTINUE:%.*]]
 ; CHECK:       pred.srem.if:
 ; CHECK-NEXT:    [[TMP4:%.*]] = srem i16 5786, [[TMP0]]
@@ -32,13 +32,13 @@ define i16 @test_true_and_false_branch_equal() {
 ; CHECK-NEXT:    br label [[PRED_SREM_CONTINUE2]]
 ; CHECK:       pred.srem.continue2:
 ; CHECK-NEXT:    [[TMP10:%.*]] = phi <2 x i16> [ [[TMP6]], [[PRED_SREM_CONTINUE]] ], [ [[TMP9]], [[PRED_SREM_IF1]] ]
-; CHECK-NEXT:    [[PREDPHI:%.*]] = select i1 [[TMP3]], <2 x i16> [[TMP10]], <2 x i16> splat (i16 5786)
-; CHECK-NEXT:    [[TMP11:%.*]] = extractelement <2 x i16> [[PREDPHI]], i64 1
-; CHECK-NEXT:    store i16 [[TMP11]], ptr @v_39, align 1
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP12:%.*]] = icmp eq i32 [[INDEX_NEXT]], 12
 ; CHECK-NEXT:    br i1 [[TMP12]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       middle.block:
+; CHECK-NEXT:    [[PREDPHI:%.*]] = select i1 [[TMP3]], <2 x i16> [[TMP10]], <2 x i16> splat (i16 5786)
+; CHECK-NEXT:    [[TMP11:%.*]] = extractelement <2 x i16> [[PREDPHI]], i64 1
+; CHECK-NEXT:    store i16 [[TMP11]], ptr @v_39, align 1
 ; CHECK-NEXT:    br label [[FOR_LATCH:%.*]]
 ; CHECK:       exit:
 ; CHECK-NEXT:    [[RV:%.*]] = load i16, ptr @v_39, align 1

@@ -360,6 +360,7 @@ define void @uniform_gep(i64 %k, ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
+; CHECK-NEXT:    CLONE ir<%lv> = load ir<%A>
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {
@@ -370,7 +371,6 @@ define void @uniform_gep(i64 %k, ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:      EMIT vp<[[VP6:%[0-9]+]]> = WIDEN-CANONICAL-INDUCTION nuw vp<[[VP4]]>
 ; CHECK-NEXT:      EMIT vp<[[VP7:%[0-9]+]]> = icmp ule vp<[[VP6]]>, vp<[[VP3]]>
 ; CHECK-NEXT:      vp<[[VP8:%[0-9]+]]> = DERIVED-IV ir<21> + vp<[[VP4]]> * ir<1>
-; CHECK-NEXT:      CLONE ir<%lv> = load ir<%A>
 ; CHECK-NEXT:      WIDEN ir<%cmp> = icmp uge ir<%iv>, ir<%k>
 ; CHECK-NEXT:      EMIT vp<[[VP9:%[0-9]+]]> = logical-and vp<[[VP7]]>, ir<%cmp>
 ; CHECK-NEXT:    Successor(s): pred.store
@@ -1164,14 +1164,14 @@ define void @update_multiple_users(ptr noalias %src, ptr noalias %dst, i1 %c) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    <xVFxUF> pred.store: {
 ; CHECK-NEXT:      pred.store.entry:
-; CHECK-NEXT:        BRANCH-ON-MASK ir<%c>
+; CHECK-NEXT:        BRANCH-ON-MASK ir<%c> (!vplan.execution.frequency 4611686018427387904 (50%, estimated))
 ; CHECK-NEXT:      Successor(s): pred.store.if, pred.store.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.store.if:
 ; CHECK-NEXT:        REPLICATE ir<%l1> = load ir<%src>
 ; CHECK-NEXT:        REPLICATE ir<%l2> = trunc ir<%l1>
-; CHECK-NEXT:        REPLICATE ir<%cmp> = icmp eq ir<%l1>, ir<0>
-; CHECK-NEXT:        REPLICATE ir<%sel> = select ir<%cmp>, ir<5>, ir<%l2>
+; CHECK-NEXT:        REPLICATE ir<%cmp> = icmp eq ir<%l1>, ir<0> (!vplan.execution.frequency 4611686018427387904 (50%, estimated))
+; CHECK-NEXT:        REPLICATE ir<%sel> = select ir<%cmp>, ir<5>, ir<%l2> (!vplan.execution.frequency 4611686018427387904 (50%, estimated))
 ; CHECK-NEXT:        REPLICATE store ir<%sel>, ir<%dst>
 ; CHECK-NEXT:      Successor(s): pred.store.continue
 ; CHECK-EMPTY:
@@ -1255,7 +1255,7 @@ define void @sinking_requires_duplication(ptr %addr) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    <xVFxUF> pred.store: {
 ; CHECK-NEXT:      pred.store.entry:
-; CHECK-NEXT:        BRANCH-ON-MASK ir<%pred>
+; CHECK-NEXT:        BRANCH-ON-MASK ir<%pred> (!vplan.execution.frequency 3350678122763649024 (36.33%, estimated))
 ; CHECK-NEXT:      Successor(s): pred.store.if, pred.store.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.store.if:
@@ -1344,7 +1344,7 @@ define void @merge_with_dead_gep_between_regions(i32 %n, i32 %k, ptr noalias %sr
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    <xVFxUF> pred.store: {
 ; CHECK-NEXT:      pred.store.entry:
-; CHECK-NEXT:        BRANCH-ON-MASK ir<%cond>
+; CHECK-NEXT:        BRANCH-ON-MASK ir<%cond> (!vplan.execution.frequency 4611686018427387904 (50%, estimated))
 ; CHECK-NEXT:      Successor(s): pred.store.if, pred.store.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.store.if:
@@ -1443,7 +1443,7 @@ define void @ptr_induction_remove_dead_recipe(ptr %start, ptr %end) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    <xVFxUF> pred.store: {
 ; CHECK-NEXT:      pred.store.entry:
-; CHECK-NEXT:        BRANCH-ON-MASK ir<%c.1>
+; CHECK-NEXT:        BRANCH-ON-MASK ir<%c.1> (!vplan.execution.frequency 5764607523034234880 (62.5%, estimated))
 ; CHECK-NEXT:      Successor(s): pred.store.if, pred.store.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.store.if:

@@ -214,9 +214,7 @@ exit:
 define void @ptr_depends_on_possibly_poison_value_from_load(ptr noalias %dst) {
 ; CHECK-LABEL: define void @ptr_depends_on_possibly_poison_value_from_load(
 ; CHECK-SAME: ptr noalias [[DST:%.*]]) {
-; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
-; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:  [[VECTOR_PH:.*:]]
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = load i16, ptr @src, align 1
@@ -224,6 +222,8 @@ define void @ptr_depends_on_possibly_poison_value_from_load(ptr noalias %dst) {
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x i16> [[BROADCAST_SPLATINSERT]], <2 x i16> poison, <2 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP2:%.*]] = sub <2 x i16> splat (i16 1), [[BROADCAST_SPLAT]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = add <2 x i16> [[TMP2]], [[BROADCAST_SPLAT]]
+; CHECK-NEXT:    br label %[[VECTOR_BODY1:.*]]
+; CHECK:       [[VECTOR_BODY1]]:
 ; CHECK-NEXT:    [[TMP4:%.*]] = add <2 x i16> <i16 9, i16 10>, [[TMP3]]
 ; CHECK-NEXT:    br i1 false, label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
 ; CHECK:       [[PRED_STORE_IF]]:
@@ -281,14 +281,14 @@ exit:
 define void @ptr_depends_on_noundef_load(ptr noalias %dst) {
 ; CHECK-LABEL: define void @ptr_depends_on_noundef_load(
 ; CHECK-SAME: ptr noalias [[DST:%.*]]) {
-; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
-; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:  [[VECTOR_PH:.*:]]
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = load i16, ptr @src, align 1, !noundef [[META0:![0-9]+]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = sub i16 1, [[TMP0]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = add i16 [[TMP2]], [[TMP0]]
+; CHECK-NEXT:    br label %[[VECTOR_BODY1:.*]]
+; CHECK:       [[VECTOR_BODY1]]:
 ; CHECK-NEXT:    [[TMP4:%.*]] = add i16 9, [[TMP3]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i64, ptr @src, i16 [[TMP4]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x i64>, ptr [[TMP5]], align 1
