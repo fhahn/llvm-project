@@ -49,9 +49,9 @@ define i16 @test(ptr %arg, i64 %N) {
 ; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP9]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
 ; CHECK:       middle.block:
-; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <2 x i16> [[WIDE_LOAD]], i64 1
-; CHECK-NEXT:    store i16 [[TMP6]], ptr [[L_2]], align 2, !alias.scope [[META6:![0-9]+]], !noalias [[META0]]
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
+; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <2 x i16> [[WIDE_LOAD]], i64 1
+; CHECK-NEXT:    store i16 [[TMP7]], ptr [[L_2]], align 2, !alias.scope [[META6:![0-9]+]], !noalias [[META0]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label [[EXIT_LOOPEXIT:%.*]], label [[SCALAR_PH]]
 ; CHECK:       scalar.ph:
 ; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], [[MIDDLE_BLOCK]] ], [ 0, [[LOOP_3_PREHEADER]] ], [ 0, [[VECTOR_MEMCHECK]] ]

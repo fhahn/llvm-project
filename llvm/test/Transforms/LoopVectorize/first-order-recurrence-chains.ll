@@ -1083,18 +1083,18 @@ define double @test_resinking_required(ptr %p, ptr noalias %a, ptr noalias %b, i
 ; CHECK-NEXT:    [[VECTOR_RECUR2:%.*]] = phi <4 x double> [ <double poison, double poison, double poison, double 0.000000e+00>, %[[VECTOR_PH]] ], [ [[TMP4:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP4]] = shufflevector <4 x double> [[VECTOR_RECUR1]], <4 x double> [[BROADCAST_SPLAT4]], <4 x i32> <i32 3, i32 4, i32 5, i32 6>
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
-; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP7]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP28:![0-9]+]]
+; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP9]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP28:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[TMP9:%.*]] = shufflevector <4 x double> [[VECTOR_RECUR]], <4 x double> [[BROADCAST_SPLAT]], <4 x i32> <i32 3, i32 4, i32 5, i32 6>
-; CHECK-NEXT:    [[TMP2:%.*]] = fdiv <4 x double> zeroinitializer, [[TMP9]]
-; CHECK-NEXT:    [[TMP5:%.*]] = shufflevector <4 x double> [[VECTOR_RECUR2]], <4 x double> [[TMP4]], <4 x i32> <i32 3, i32 4, i32 5, i32 6>
-; CHECK-NEXT:    [[TMP8:%.*]] = fadd <4 x double> [[TMP2]], [[TMP5]]
-; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <4 x double> [[TMP8]], i64 3
-; CHECK-NEXT:    store double [[TMP6]], ptr [[P]], align 8
+; CHECK-NEXT:    [[TMP5:%.*]] = shufflevector <4 x double> [[VECTOR_RECUR]], <4 x double> [[BROADCAST_SPLAT]], <4 x i32> <i32 3, i32 4, i32 5, i32 6>
+; CHECK-NEXT:    [[TMP6:%.*]] = fdiv <4 x double> zeroinitializer, [[TMP5]]
+; CHECK-NEXT:    [[TMP7:%.*]] = shufflevector <4 x double> [[VECTOR_RECUR2]], <4 x double> [[TMP4]], <4 x i32> <i32 3, i32 4, i32 5, i32 6>
+; CHECK-NEXT:    [[TMP8:%.*]] = fadd <4 x double> [[TMP6]], [[TMP7]]
 ; CHECK-NEXT:    [[VECTOR_RECUR_EXTRACT_FOR_PHI:%.*]] = extractelement <4 x double> [[TMP4]], i64 2
 ; CHECK-NEXT:    [[VECTOR_RECUR_EXTRACT:%.*]] = extractelement <4 x double> [[TMP4]], i64 3
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
+; CHECK-NEXT:    [[TMP10:%.*]] = extractelement <4 x double> [[TMP8]], i64 3
+; CHECK-NEXT:    store double [[TMP10]], ptr [[P]], align 8
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[END:.*]], label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:
 ; CHECK-NEXT:    [[SCALAR_RECUR_INIT:%.*]] = phi double [ [[TMP0]], %[[MIDDLE_BLOCK]] ], [ 0.000000e+00, %[[ENTRY]] ]

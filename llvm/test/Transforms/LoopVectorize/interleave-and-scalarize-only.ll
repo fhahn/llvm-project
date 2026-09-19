@@ -169,8 +169,8 @@ define void @first_order_recurrence_using_induction(i32 %n, ptr %dst) {
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP5]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    store i32 [[INDUCTION]], ptr [[DST]], align 4
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP1]], [[N_VEC]]
+; CHECK-NEXT:    store i32 [[INDUCTION]], ptr [[DST]], align 4
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:
 ; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ]
@@ -274,17 +274,17 @@ define void @scalarize_ptrtoint(ptr %src, ptr %dst) {
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[INDEX]], 1
-; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr ptr, ptr [[SRC]], i64 [[TMP0]]
-; CHECK-NEXT:    [[TMP2:%.*]] = load ptr, ptr [[TMP1]], align 8, !alias.scope [[META10:![0-9]+]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1024
-; CHECK-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP13:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP10:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr ptr, ptr [[SRC]], i64 [[TMP1]]
+; CHECK-NEXT:    [[TMP2:%.*]] = load ptr, ptr [[TMP7]], align 8, !alias.scope [[META11:![0-9]+]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = ptrtoint ptr [[TMP2]] to i64
 ; CHECK-NEXT:    [[TMP5:%.*]] = add i64 [[TMP4]], 10
 ; CHECK-NEXT:    [[TMP6:%.*]] = inttoptr i64 [[TMP5]] to ptr
-; CHECK-NEXT:    store ptr [[TMP6]], ptr [[DST]], align 8, !alias.scope [[META14:![0-9]+]], !noalias [[META10]]
+; CHECK-NEXT:    store ptr [[TMP6]], ptr [[DST]], align 8, !alias.scope [[META14:![0-9]+]], !noalias [[META11]]
 ; CHECK-NEXT:    br label %[[EXIT:.*]]
 ; CHECK:       [[SCALAR_PH]]:
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
@@ -401,9 +401,9 @@ define void @pr179671(ptr align 8 dereferenceable(120) %p, ptr %a, i32 %b) {
 ; CHECK-NEXT:    [[INDEX1:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VECTOR_RECUR:%.*]] = phi ptr [ [[A]], %[[VECTOR_PH]] ], [ [[NEXT_GEP3:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP16:%.*]] = trunc i64 [[INDEX1]] to i32
-; CHECK-NEXT:    [[TMP17:%.*]] = mul i32 [[TMP16]], 3
-; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i32 [[B]], [[TMP17]]
-; CHECK-NEXT:    [[TMP11:%.*]] = add i32 [[OFFSET_IDX]], 3
+; CHECK-NEXT:    [[TMP13:%.*]] = mul i32 [[TMP16]], 3
+; CHECK-NEXT:    [[TMP17:%.*]] = add i32 [[B]], [[TMP13]]
+; CHECK-NEXT:    [[TMP18:%.*]] = add i32 [[TMP17]], 3
 ; CHECK-NEXT:    [[OFFSET_IDX2:%.*]] = shl i64 [[INDEX1]], 7
 ; CHECK-NEXT:    [[TMP15:%.*]] = add i64 [[OFFSET_IDX2]], 0
 ; CHECK-NEXT:    [[TMP12:%.*]] = add i64 [[OFFSET_IDX2]], 128
@@ -412,8 +412,8 @@ define void @pr179671(ptr align 8 dereferenceable(120) %p, ptr %a, i32 %b) {
 ; CHECK-NEXT:    store ptr [[VECTOR_RECUR]], ptr [[NEXT_GEP]], align 8
 ; CHECK-NEXT:    store ptr [[NEXT_GEP]], ptr [[NEXT_GEP3]], align 8
 ; CHECK-NEXT:    store ptr [[NEXT_GEP3]], ptr [[INV_PTR]], align 8
-; CHECK-NEXT:    [[TMP13:%.*]] = add i32 [[TMP11]], 3
-; CHECK-NEXT:    store i32 [[TMP13]], ptr [[INV_PTR2]], align 8
+; CHECK-NEXT:    [[TMP20:%.*]] = add i32 [[TMP18]], 3
+; CHECK-NEXT:    store i32 [[TMP20]], ptr [[INV_PTR2]], align 8
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX1]], 2
 ; CHECK-NEXT:    [[TMP19:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[INDEX]]
 ; CHECK-NEXT:    br i1 [[TMP19]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP18:![0-9]+]]
@@ -471,6 +471,61 @@ loop.5:
 exit.0:
   store i32 0, ptr %p, align 4
   ret void
+
+exit:
+  ret void
+}
+
+; The store to the invariant address %q is sunk to the middle block, where its
+; stored value already selects the last part. Unrolling must not select a part
+; for it a second time.
+define void @sunk_invariant_store_is_not_unrolled(ptr noalias %p, ptr noalias %q, i64 %n) {
+; CHECK-LABEL: define void @sunk_invariant_store_is_not_unrolled(
+; CHECK-SAME: ptr noalias [[P:%.*]], ptr noalias [[Q:%.*]], i64 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 2
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = and i64 [[N]], 1
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[TMP0]]
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
+; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP4]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP20:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i32, ptr [[P]], i64 [[TMP2]]
+; CHECK-NEXT:    [[TMP3:%.*]] = load i32, ptr [[TMP5]], align 4
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
+; CHECK-NEXT:    store i32 [[TMP3]], ptr [[Q]], align 4
+; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
+; CHECK:       [[SCALAR_PH]]:
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ]
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[GEP:%.*]] = getelementptr i32, ptr [[P]], i64 [[IV]]
+; CHECK-NEXT:    [[L:%.*]] = load i32, ptr [[GEP]], align 4
+; CHECK-NEXT:    store i32 [[L]], ptr [[Q]], align 4
+; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP21:![0-9]+]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep = getelementptr i32, ptr %p, i64 %iv
+  %l = load i32, ptr %gep, align 4
+  store i32 %l, ptr %q, align 4
+  %iv.next = add i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
 
 exit:
   ret void

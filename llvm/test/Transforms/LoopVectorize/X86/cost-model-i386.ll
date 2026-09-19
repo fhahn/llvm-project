@@ -41,9 +41,9 @@ define void @icmp_predicate_and_branch_cost(i32 %size, ptr %dst, i64 %conv5.i) #
 ; CHECK-NEXT:    [[TMP10:%.*]] = select <16 x i1> [[TMP6]], <16 x i1> [[TMP7]], <16 x i1> zeroinitializer
 ; CHECK-NEXT:    [[PREDPHI:%.*]] = select <16 x i1> [[TMP10]], <16 x i8> zeroinitializer, <16 x i8> [[TMP9]]
 ; CHECK-NEXT:    [[PREDPHI3:%.*]] = select <16 x i1> [[TMP6]], <16 x i8> [[PREDPHI]], <16 x i8> splat (i8 1)
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i32 [[TMP2]], [[N_VEC]]
 ; CHECK-NEXT:    [[TMP11:%.*]] = extractelement <16 x i8> [[PREDPHI3]], i64 15
 ; CHECK-NEXT:    store i8 [[TMP11]], ptr [[DST:%.*]], align 1
-; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i32 [[TMP2]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label [[EXIT:%.*]], label [[VEC_EPILOG_ITER_CHECK:%.*]]
 ; CHECK:       vec.epilog.iter.check:
 ; CHECK-NEXT:    [[MIN_EPILOG_ITERS_CHECK:%.*]] = icmp ult i32 [[N_MOD_VF]], 4
@@ -79,9 +79,9 @@ define void @icmp_predicate_and_branch_cost(i32 %size, ptr %dst, i64 %conv5.i) #
 ; CHECK-NEXT:    [[TMP21:%.*]] = select <4 x i1> [[TMP17]], <4 x i1> [[TMP18]], <4 x i1> zeroinitializer
 ; CHECK-NEXT:    [[PREDPHI17:%.*]] = select <4 x i1> [[TMP21]], <4 x i8> zeroinitializer, <4 x i8> [[TMP20]]
 ; CHECK-NEXT:    [[PREDPHI18:%.*]] = select <4 x i1> [[TMP17]], <4 x i8> [[PREDPHI17]], <4 x i8> splat (i8 1)
+; CHECK-NEXT:    [[CMP_N19:%.*]] = icmp eq i32 [[TMP2]], [[N_VEC6]]
 ; CHECK-NEXT:    [[TMP22:%.*]] = extractelement <4 x i8> [[PREDPHI18]], i64 3
 ; CHECK-NEXT:    store i8 [[TMP22]], ptr [[DST]], align 1
-; CHECK-NEXT:    [[CMP_N19:%.*]] = icmp eq i32 [[TMP2]], [[N_VEC6]]
 ; CHECK-NEXT:    br i1 [[CMP_N19]], label [[EXIT]], label [[SCALAR_PH]]
 ; CHECK:       vec.epilog.scalar.ph:
 ; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i32 [ [[TMP13]], [[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[TMP3]], [[VEC_EPILOG_ITER_CHECK]] ], [ 0, [[ITER_CHECK:%.*]] ]

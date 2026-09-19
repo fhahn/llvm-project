@@ -572,6 +572,19 @@ bool vputils::cannotHoistOrSinkRecipe(const VPRecipeBase &R, bool Sinking) {
 }
 
 SmallVector<VPBasicBlock *>
+VPBlockUtils::blocksInRegion(VPRegionBlock *Region) {
+  SmallVector<VPBasicBlock *> Blocks;
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_deep(Region->getEntry())))
+    for (const VPBlockBase *P = VPBB->getParent(); P; P = P->getParent())
+      if (P == Region) {
+        Blocks.push_back(VPBB);
+        break;
+      }
+  return Blocks;
+}
+
+SmallVector<VPBasicBlock *>
 VPBlockUtils::blocksInSingleSuccessorChainBetween(VPBasicBlock *FirstBB,
                                                   VPBasicBlock *LastBB) {
   assert(FirstBB->getParent() == LastBB->getParent() &&
@@ -727,8 +740,9 @@ vputils::getMemoryLocation(const VPRecipeBase &R) {
   if (!M)
     return std::nullopt;
   MemoryLocation Loc;
-  // Record the accessed pointer, if known, so accesses can be disambiguated
-  // via their underlying objects.
+  // Record the accessed pointer, if known, to allow disambiguating accesses
+  // via their underlying objects. The access size is not modeled; users must
+  // not rely on it.
   if (VPValue *Addr = getLoadStoreAddress(R)) {
     // A pointer induction steps through the object its start value is based
     // on, like the getelementptrs getUnderlyingObject looks through.

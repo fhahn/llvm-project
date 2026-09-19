@@ -280,21 +280,21 @@ static bool noAliasViaUnderlyingObjects(const MemoryLocation &LocA,
          (isa<Argument>(OB) && isIdentifiedFunctionLocal(OA));
 }
 
-/// Check if a memory operation doesn't alias with memory operations using their
-/// underlying objects or scoped noalias metadata, in blocks in the
-/// single-successor chain between \p FirstBB and \p LastBB. If \p SinkInfo is std::nullopt, only recipes that may
+/// Check if a memory operation doesn't alias with the memory operations in \p
+/// Blocks, either because they are based on distinct objects or via scoped
+/// noalias metadata. If \p SinkInfo is std::nullopt, only recipes that may
 /// write to memory are checked (for load hoisting). Otherwise recipes that both
 /// read and write memory are checked, and SCEV is used to prove no-alias
 /// between the group leader and other replicate recipes (for store sinking).
 static bool
 canHoistOrSinkWithNoAliasCheck(const MemoryLocation &MemLoc,
-                               VPBasicBlock *FirstBB, VPBasicBlock *LastBB,
-                               std::optional<SinkStoreInfo> SinkInfo = {}) {
-  bool CheckReads = SinkInfo.has_value();
-  for (VPBasicBlock *VPBB :
-       VPBlockUtils::blocksInSingleSuccessorChainBetween(FirstBB, LastBB)) {
+                               ArrayRef<VPBasicBlock *> Blocks, bool CheckReads,
+                               std::optional<SinkStoreInfo> SinkInfo = {},
+                               ArrayRef<VPRecipeBase *> MovedTogether = {}) {
+  for (VPBasicBlock *VPBB : Blocks) {
     for (VPRecipeBase &R : *VPBB) {
-      if (SinkInfo && SinkInfo->shouldSkip(R))
+      if (is_contained(MovedTogether, &R) ||
+          (SinkInfo && SinkInfo->shouldSkip(R)))
         continue;
 
       // Skip recipes that don't need checking.
@@ -1182,6 +1182,20 @@ void VPlanTransforms::optimizeInductionLiveOutUsers(
         if (Escape)
           ExitIRI->setOperand(Idx, Escape);
       }
+    }
+  }
+
+  // Finally, optimize middle block users, e.g. invariant stores of an
+  // induction sunk out of the vector loop region. Extracting the last lane
+  // would otherwise force the induction to be widened.
+  for (VPRecipeBase &R : *MiddleVPBB) {
+    for (const auto &[Idx, Op] : enumerate(R.operands())) {
+      VPValue *Escape =
+          optimizeLatchExitInductionUser(Plan, Op, EndValues, PSE);
+      if (!Escape)
+        Escape = optimizeLatchExitIVUserViaSCEV(Plan, Op, PSE, ResumeTC, L);
+      if (Escape)
+        R.setOperand(Idx, Escape);
     }
   }
 }
@@ -2426,27 +2440,65 @@ void VPlanTransforms::cse(VPlan &Plan) {
   }
 }
 
+/// Return true if \p R is a store to an address that is invariant in the vector
+/// loop. VPlan0 models stores as VPInstructions, later stages as single-scalar
+/// VPReplicateRecipes.
+static bool isInvariantAddressStore(const VPRecipeBase &R) {
+  unsigned Opcode;
+  if (auto *RepR = dyn_cast<VPReplicateRecipe>(&R))
+    Opcode = RepR->getOpcode();
+  else if (auto *VPI = dyn_cast<VPInstruction>(&R))
+    Opcode = VPI->getOpcode();
+  else
+    return false;
+  if (Opcode != Instruction::Store ||
+      !R.getOperand(1)->isDefinedOutsideLoopRegions())
+    return false;
+  // VPlan does not model volatility or atomic orderings, so check the
+  // underlying store: only a simple store may be executed a different number
+  // of times than in the original loop.
+  auto *SI = dyn_cast_or_null<StoreInst>(
+      cast<VPSingleDefRecipe>(&R)->getUnderlyingValue());
+  return SI && SI->isSimple();
+}
+
 /// Return true if we do not know how to (mechanically) hoist or sink a
-/// non-memory or memory recipe \p R out of a loop region. When sinking, passing
+/// non-memory or memory recipe \p R out of \p LoopRegion. When sinking, passing
 /// \p Sinking = true ensures that assumes aren't sunk.
-static bool cannotHoistOrSinkRecipe(VPRecipeBase &R, VPBasicBlock *FirstBB,
-                                    VPBasicBlock *LastBB,
-                                    bool Sinking = false) {
-  if (!isa<VPReplicateRecipe>(R) || !R.mayReadOrWriteMemory() ||
-      match(&R, m_Intrinsic<Intrinsic::assume>()))
+static bool
+cannotHoistOrSinkRecipe(VPRecipeBase &R, VPRegionBlock *LoopRegion,
+                        bool Sinking = false,
+                        ArrayRef<VPRecipeBase *> MovedTogether = {}) {
+  // A store is only ever moved out of the loop by sinking it; hoisting one
+  // would make it write before the loop, and write the value of the wrong
+  // iteration.
+  if (!Sinking && R.mayWriteToMemory() && vputils::getLoadStoreAddress(R))
+    return true;
+
+  // A store to an address that is invariant in the vector loop is sunk out of
+  // the region as a whole, executing once instead of once per iteration. It has
+  // side effects, so the generic check below would reject it, but it is safe to
+  // move as long as nothing else in the loop may access the address.
+  bool IsInvariantStore = Sinking && isInvariantAddressStore(R);
+  if (!IsInvariantStore &&
+      (!isa<VPReplicateRecipe>(R) || !R.mayReadOrWriteMemory() ||
+       match(&R, m_Intrinsic<Intrinsic::assume>())))
     return vputils::cannotHoistOrSinkRecipe(R, Sinking);
 
-  // Check that the memory operation doesn't alias between FirstBB and LastBB.
+  // Check that the memory operation doesn't alias anything in the region.
   auto MemLoc = vputils::getMemoryLocation(R);
 
   // TODO: Could make use of SinkStoreInfo::isNoAliasViaDistance by collecting
   // stores upfront, and constructing a full SinkStoreInfo.
+  auto *RepR = dyn_cast<VPReplicateRecipe>(&R);
   auto SinkInfo =
-      Sinking ? std::make_optional(SinkStoreInfo(cast<VPReplicateRecipe>(R)))
-              : std::nullopt;
+      Sinking && RepR ? std::make_optional(SinkStoreInfo(*RepR)) : std::nullopt;
 
-  return !MemLoc ||
-         !canHoistOrSinkWithNoAliasCheck(*MemLoc, FirstBB, LastBB, SinkInfo);
+  SmallVector<VPRecipeBase *> Skip(MovedTogether);
+  Skip.push_back(&R);
+  return !MemLoc || !canHoistOrSinkWithNoAliasCheck(
+                        *MemLoc, VPBlockUtils::blocksInRegion(LoopRegion),
+                        /*CheckReads=*/Sinking, SinkInfo, Skip);
 }
 
 /// Hoist loop-invariant recipes to the vector preheader of \p Plan.
@@ -2464,8 +2516,7 @@ static void hoistInvariantRecipes(VPlan &Plan) {
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
            vp_depth_first_shallow(LoopRegion->getEntry()))) {
     for (VPRecipeBase &R : make_early_inc_range(*VPBB)) {
-      if (cannotHoistOrSinkRecipe(R, LoopRegion->getEntryBasicBlock(),
-                                  LoopRegion->getExitingBasicBlock()))
+      if (cannotHoistOrSinkRecipe(R, LoopRegion))
         continue;
       if (any_of(R.operands(), [](VPValue *Op) {
             return !Op->isDefinedOutsideLoopRegions();
@@ -2476,12 +2527,77 @@ static void hoistInvariantRecipes(VPlan &Plan) {
   }
 }
 
+/// Remove the stores in \p InvariantStores which a later store of the same type
+/// to the same address completely overwrites in every iteration, using \p VPDT
+/// to check that the later store is guaranteed to execute. Nothing else in the
+/// loop may alias their address, so no read can observe a removed store.
+static void removeOverwrittenInvariantStores(
+    VPRegionBlock *LoopRegion, const VPDominatorTree &VPDT,
+    SmallVectorImpl<VPRecipeBase *> &InvariantStores) {
+  // Addresses and stored types of the stores that are guaranteed to execute in
+  // every iteration. Blocks are visited in reverse program order, hence any
+  // store found later with a matching address and type is fully overwritten.
+  VPBasicBlock *LatchVPBB = LoopRegion->getExitingBasicBlock();
+  SmallDenseSet<std::pair<VPValue *, Type *>, 2> OverwritingStores;
+  SmallPtrSet<VPRecipeBase *, 2> Removed;
+  PostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>> POT(
+      LoopRegion->getEntry());
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(POT)) {
+    bool AlwaysExecutes = VPDT.dominates(VPBB, LatchVPBB);
+    for (VPRecipeBase &R : make_early_inc_range(reverse(*VPBB))) {
+      if (!isInvariantAddressStore(R))
+        continue;
+      std::pair<VPValue *, Type *> AddrAndTy = {
+          R.getOperand(1), R.getOperand(0)->getScalarType()};
+      if (OverwritingStores.contains(AddrAndTy)) {
+        Removed.insert(&R);
+        R.eraseFromParent();
+      } else if (AlwaysExecutes)
+        OverwritingStores.insert(AddrAndTy);
+    }
+  }
+  erase_if(InvariantStores,
+           [&Removed](VPRecipeBase *R) { return Removed.contains(R); });
+}
+
 /// Sink recipes whose users are all outside the vector loop region of \p Plan.
-static void sinkInvariantRecipes(VPlan &Plan) {
+void VPlanTransforms::sinkInvariantRecipes(VPlan &Plan, bool StoresOnly) {
   VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
-#ifndef NDEBUG
   VPDominatorTree VPDT(Plan);
-#endif
+
+  // Stores to an address that is invariant in the vector loop are sunk as a
+  // group into the region's successor, keeping their relative order, so they
+  // only need to be disambiguated against the accesses left behind. Leaving one
+  // of them in the loop would reorder it with the ones that move, and sinking
+  // one out of a block that is not guaranteed to execute would introduce a
+  // store on a path that did not have one, so either all move or none do.
+  SmallVector<VPRecipeBase *> InvariantStores;
+  auto *SinkBB =
+      dyn_cast_if_present<VPBasicBlock>(LoopRegion->getSingleSuccessor());
+  if (SinkBB) {
+    for (VPBasicBlock *VPBB : VPBlockUtils::blocksInRegion(LoopRegion))
+      for (VPRecipeBase &R : *VPBB)
+        if (isInvariantAddressStore(R))
+          InvariantStores.push_back(&R);
+    if (any_of(InvariantStores, [&](VPRecipeBase *Store) {
+          return cannotHoistOrSinkRecipe(*Store, LoopRegion, /*Sinking=*/true,
+                                         InvariantStores);
+        })) {
+      InvariantStores.clear();
+    } else {
+      // Drop the dead stores first; a dead one may be the only one that is not
+      // guaranteed to execute.
+      removeOverwrittenInvariantStores(LoopRegion, VPDT, InvariantStores);
+      if (any_of(InvariantStores, [&](VPRecipeBase *Store) {
+            return !VPDT.properlyDominates(Store->getParent(), SinkBB);
+          }))
+        InvariantStores.clear();
+    }
+  }
+
+  // Insertion point in each sink block for the most recently sunk store, see
+  // below.
+  DenseMap<VPBasicBlock *, VPRecipeBase *> StoreInsertPt;
   // Sink recipes with no users inside the vector loop region if all users are
   // in the same exit block of the region.
   // TODO: Extend to sink recipes from inner loops.
@@ -2489,9 +2605,9 @@ static void sinkInvariantRecipes(VPlan &Plan) {
       LoopRegion->getEntry());
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(POT)) {
     for (VPRecipeBase &R : make_early_inc_range(reverse(*VPBB))) {
-      if (cannotHoistOrSinkRecipe(R, LoopRegion->getEntryBasicBlock(),
-                                  LoopRegion->getExitingBasicBlock(),
-                                  /*Sinking=*/true))
+      if (isInvariantAddressStore(R)
+              ? !is_contained(InvariantStores, &R)
+              : cannotHoistOrSinkRecipe(R, LoopRegion, /*Sinking=*/true))
         continue;
 
       if (auto *RepR = dyn_cast<VPReplicateRecipe>(&R)) {
@@ -2511,12 +2627,16 @@ static void sinkInvariantRecipes(VPlan &Plan) {
           continue;
       }
 
-      [[maybe_unused]] auto *RepR = dyn_cast<VPReplicateRecipe>(&R);
-      assert((!R.mayWriteToMemory() ||
-              (RepR && RepR->getOpcode() == Instruction::Store &&
-               RepR->getOperand(1)->isDefinedOutsideLoopRegions())) &&
+      assert((!R.mayWriteToMemory() || isInvariantAddressStore(R)) &&
              "The only recipes that may write to memory are expected to be "
              "stores with invariant pointer-operand");
+
+      // Sinking a non-store recipe out of the region loses which lane its
+      // operands refer to; on VPlan0 lane selection has not been materialized
+      // yet, so only stores, whose stored value gets an explicit extract below,
+      // can be sunk there.
+      if (StoresOnly && !R.mayWriteToMemory())
+        continue;
 
       // TODO: Use R.definedValues() instead of casting to VPSingleDefRecipe to
       // support recipes with multiple defined values (e.g., interleaved loads).
@@ -2540,15 +2660,67 @@ static void sinkInvariantRecipes(VPlan &Plan) {
           }))
         continue;
 
-      if (!SinkBB)
-        SinkBB = cast<VPBasicBlock>(LoopRegion->getSingleSuccessor());
+      // Recipes without users are sunk to the successor of the loop region,
+      // which does not exist if the region still has an early exit.
+      if (!SinkBB) {
+        SinkBB =
+            dyn_cast_or_null<VPBasicBlock>(LoopRegion->getSingleSuccessor());
+        if (!SinkBB)
+          continue;
+      }
 
-      // TODO: This will need to be a check instead of a assert after
-      // conditional branches in vectorized loops are supported.
-      assert(VPDT.properlyDominates(VPBB, SinkBB) &&
-             "Defining block must dominate sink block");
+      // Only sink from blocks that are guaranteed to execute; on VPlan0 the
+      // loop region still has explicit control flow, so a recipe may sit in a
+      // conditionally executed block.
+      if (!VPDT.properlyDominates(VPBB, SinkBB))
+        continue;
+
       // TODO: Clone the recipe if users are on multiple exit paths, instead of
       // just moving.
+      // VPInstructions are lowered to concrete recipes only inside the loop
+      // region. Replace one moved out of the region by an equivalent
+      // single-scalar recipe, which executes once outside the loop.
+      auto *VPI = dyn_cast<VPInstruction>(Def);
+      auto *UI = VPI ? dyn_cast_or_null<Instruction>(VPI->getUnderlyingValue())
+                     : nullptr;
+      if (UI) {
+        auto *Scalar = VPBuilder::createSingleScalarOp(
+            VPI->getOpcode(), VPI->operands(), /*Mask=*/nullptr, *VPI, *VPI,
+            VPI->getDebugLoc(), UI);
+        VPI->replaceAllUsesWith(Scalar);
+        Scalar->insertBefore(VPI);
+        VPI->eraseFromParent();
+        Def = Scalar;
+      }
+      if (Def->mayWriteToMemory()) {
+        // Stores have no users and may consume values defined in SinkBB (e.g. a
+        // reduction result), so append them instead of placing them at the top.
+        // Recipes are visited in reverse program order, so inserting each store
+        // before the previously sunk one restores program order.
+        auto *&IP = StoreInsertPt[SinkBB];
+        VPRecipeBase *Term = SinkBB->getTerminator();
+        auto InsertPt = IP     ? IP->getIterator()
+                        : Term ? Term->getIterator()
+                               : SinkBB->end();
+        // The store executes once, after the loop, and must store the value of
+        // the last iteration: the last lane of the last part. foldTailByMasking
+        // rewrites the extract to the last *active* lane when the tail is
+        // folded, and the reduction result computation looks through it to
+        // substitute a reduction's final result.
+        VPRecipeBase *First = Def;
+        if (!Def->getOperand(0)->isDefinedOutsideLoopRegions()) {
+          VPBuilder B(SinkBB, InsertPt);
+          auto *Part = B.createNaryOp(VPInstruction::ExtractLastPart,
+                                      Def->getOperand(0), Def->getDebugLoc());
+          Def->setOperand(0, B.createNaryOp(VPInstruction::ExtractLastLane,
+                                            Part, Def->getDebugLoc()));
+          First = Part;
+        }
+        Def->moveBefore(*SinkBB, InsertPt);
+        IP = First;
+        continue;
+      }
+      // All users of the recipe are in SinkBB, place it before them.
       Def->moveBefore(*SinkBB, SinkBB->getFirstNonPhi());
     }
   }
@@ -2747,7 +2919,8 @@ void VPlanTransforms::optimize(VPlan &Plan) {
   RUN_VPLAN_PASS(createAndOptimizeReplicateRegions, Plan);
   RUN_VPLAN_PASS(mergeBlocksIntoPredecessors, Plan);
   RUN_VPLAN_PASS(hoistInvariantRecipes, Plan);
-  RUN_VPLAN_PASS(sinkInvariantRecipes, Plan);
+  RUN_VPLAN_PASS(VPlanTransforms::sinkInvariantRecipes, Plan,
+                 /*StoresOnly=*/false);
 }
 
 void VPlanTransforms::simplifyLiveInsWithSCEV(VPlan &Plan,
@@ -3938,7 +4111,11 @@ void VPlanTransforms::hoistPredicatedLoads(VPlan &Plan,
 
     // Check that the load doesn't alias with stores between first and last.
     auto LoadLoc = vputils::getMemoryLocation(*EarliestLoad);
-    if (!LoadLoc || !canHoistOrSinkWithNoAliasCheck(*LoadLoc, FirstBB, LastBB))
+    if (!LoadLoc ||
+        !canHoistOrSinkWithNoAliasCheck(
+            *LoadLoc,
+            VPBlockUtils::blocksInSingleSuccessorChainBetween(FirstBB, LastBB),
+            /*CheckReads=*/false))
       continue;
 
     // Collect common metadata from all loads in the group.
@@ -3982,7 +4159,10 @@ canSinkStoreWithNoAliasCheck(ArrayRef<VPReplicateRecipe *> StoresToSink,
   VPBasicBlock *FirstBB = StoresToSink.front()->getParent();
   VPBasicBlock *LastBB = StoresToSink.back()->getParent();
   SinkStoreInfo SinkInfo(StoresToSink, *StoresToSink[0], PSE, L);
-  return canHoistOrSinkWithNoAliasCheck(*StoreLoc, FirstBB, LastBB, SinkInfo);
+  return canHoistOrSinkWithNoAliasCheck(
+      *StoreLoc,
+      VPBlockUtils::blocksInSingleSuccessorChainBetween(FirstBB, LastBB),
+      /*CheckReads=*/true, SinkInfo);
 }
 
 void VPlanTransforms::sinkPredicatedStores(VPlan &Plan,
@@ -5579,18 +5759,8 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
                                 RecipeBuilder.handleReplication(VPI, Range)));
   };
 
-  VPBasicBlock *MiddleVPBB = Plan.getMiddleBlock();
-  // Insert the final stores before the middle block terminator, after any
-  // ComputeReductionResult recipes created on the initial VPlan that the
-  // stores may need to use as their stored value.
-  VPBuilder FinalRedStoresBuilder(MiddleVPBB,
-                                  MiddleVPBB->getTerminator()->getIterator());
   VPlanTransforms::runPass(
       "lowerMemoryIdioms", ProcessSubset, Plan, [&](VPInstruction *VPI) {
-        if (RecipeBuilder.replaceWithFinalIfReductionStore(
-                VPI, FinalRedStoresBuilder))
-          return true;
-
         // Filter out scalar VPlan for the remaining idioms.
         if (LoopVectorizationPlanner::getDecisionAndClampRange(
                 [](ElementCount VF) { return VF.isScalar(); }, Range))

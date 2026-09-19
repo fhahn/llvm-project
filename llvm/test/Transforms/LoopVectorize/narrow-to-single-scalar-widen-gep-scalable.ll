@@ -12,26 +12,19 @@ define void @widengep_narrow(ptr %in, ptr noalias %p) {
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i64 1025, [[TMP1]]
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 1025, [[N_MOD_VF]]
-; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr [[IN]], i64 8
-; CHECK-NEXT:    [[TMP5:%.*]] = call <vscale x 2 x i64> @llvm.stepvector.nxv2i64()
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 2 x i64> poison, i64 [[TMP1]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 2 x i64> [[BROADCAST_SPLATINSERT]], <vscale x 2 x i64> poison, <vscale x 2 x i32> zeroinitializer
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <vscale x 2 x i64> [ [[TMP5]], %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP1]]
-; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <vscale x 2 x i64> [[VEC_IND]], [[BROADCAST_SPLAT]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr i32, ptr [[TMP4]], <vscale x 2 x i64> [[VEC_IND]]
-; CHECK-NEXT:    [[TMP8:%.*]] = call i32 @llvm.vscale.i32()
-; CHECK-NEXT:    [[TMP9:%.*]] = mul nuw i32 [[TMP8]], 2
-; CHECK-NEXT:    [[TMP10:%.*]] = sub i32 [[TMP9]], 1
-; CHECK-NEXT:    [[TMP11:%.*]] = extractelement <vscale x 2 x ptr> [[TMP7]], i32 [[TMP10]]
-; CHECK-NEXT:    store ptr [[TMP11]], ptr [[P]], align 8
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 1025, [[N_VEC]]
+; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr [[IN]], i64 8
+; CHECK-NEXT:    [[TMP4:%.*]] = sub nuw i64 [[N_VEC]], 1
+; CHECK-NEXT:    [[TMP5:%.*]] = shl i64 [[TMP4]], 2
+; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr [[TMP3]], i64 [[TMP5]]
+; CHECK-NEXT:    store ptr [[TMP7]], ptr [[P]], align 8
 ; CHECK-NEXT:    br i1 [[CMP_N]], [[EXIT:label %.*]], label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:
 ;

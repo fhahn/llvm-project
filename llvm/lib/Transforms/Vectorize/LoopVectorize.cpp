@@ -6137,35 +6137,6 @@ VPHistogramRecipe *VPRecipeBuilder::widenIfHistogram(VPInstruction *VPI) {
                                VPI->getDebugLoc());
 }
 
-bool VPRecipeBuilder::replaceWithFinalIfReductionStore(
-    VPInstruction *VPI, VPBuilder &FinalRedStoresBuilder) {
-  StoreInst *SI;
-  if ((SI = dyn_cast<StoreInst>(VPI->getUnderlyingInstr())) &&
-      Legal->isInvariantAddressOfReduction(SI->getPointerOperand())) {
-    // Only create recipe for the final invariant store of the reduction.
-    if (Legal->isInvariantStoreOfReduction(SI)) {
-      VPValue *Val = VPI->getOperand(0);
-      VPValue *Addr = VPI->getOperand(1);
-      // We need to store the exiting value of the reduction, so use the blend
-      // if tail folded.
-      if (auto *Blend = VPlanPatternMatch::findUserOf<VPBlendRecipe>(Val))
-        Val = Blend;
-      [[maybe_unused]] auto *Rdx =
-          VPlanPatternMatch::findUserOf<VPReductionPHIRecipe>(Val);
-      assert((isa<VPIRValue>(Val) || !Rdx || Rdx->getBackedgeValue() == Val) &&
-             "Store of reduction thats not the backedge value?");
-      auto *Recipe = new VPReplicateRecipe(
-          SI, {Val, Addr}, true /* IsUniform */, nullptr /*Mask*/, *VPI, *VPI,
-          VPI->getDebugLoc());
-      FinalRedStoresBuilder.insert(Recipe);
-    }
-    VPI->eraseFromParent();
-    return true;
-  }
-
-  return false;
-}
-
 VPSingleDefRecipe *VPRecipeBuilder::handleReplication(VPInstruction *VPI,
                                                       VFRange &Range) {
   auto *I = VPI->getUnderlyingInstr();
@@ -6444,6 +6415,8 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
 
   RUN_VPLAN_PASS(VPlanTransforms::createLoopRegions, *VPlan0,
                  getDebugLocFromInstOrOperands(Legal->getPrimaryInduction()));
+  RUN_VPLAN_PASS(VPlanTransforms::sinkInvariantRecipes, *VPlan0,
+                 /*StoresOnly=*/true);
   if (CM->foldTailByMasking())
     RUN_VPLAN_PASS(VPlanTransforms::foldTailByMasking, *VPlan0);
 

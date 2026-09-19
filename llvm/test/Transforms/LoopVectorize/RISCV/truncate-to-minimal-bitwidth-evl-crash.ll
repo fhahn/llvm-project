@@ -5,21 +5,16 @@
 ; an underlying value to an EVL recipe. This occurs in this test via
 ; VPlanTransforms::truncateToMinimalBitwidths
 
-define void @truncate_to_minimal_bitwidths_widen_cast_recipe(ptr %src) vscale_range(2, 1024) {
+define void @truncate_to_minimal_bitwidths_widen_cast_recipe(ptr %src, ptr noalias %dst) vscale_range(2, 1024) {
 ; CHECK-LABEL: define void @truncate_to_minimal_bitwidths_widen_cast_recipe(
-; CHECK-SAME: ptr [[SRC:%.*]]) #[[ATTR0:[0-9]+]] {
+; CHECK-SAME: ptr [[SRC:%.*]], ptr noalias [[DST:%.*]]) #[[ATTR0:[0-9]+]] {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
-; CHECK-NEXT:    [[AVL:%.*]] = phi i64 [ 17, %[[VECTOR_PH]] ], [ [[AVL_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[TMP0:%.*]] = call i32 @llvm.experimental.get.vector.length.i64(i64 [[AVL]], i32 4, i1 true)
-; CHECK-NEXT:    call void @llvm.vp.scatter.nxv4i8.nxv4p0(<vscale x 4 x i8> zeroinitializer, <vscale x 4 x ptr> align 1 splat (ptr null), <vscale x 4 x i1> splat (i1 true), i32 [[TMP0]])
-; CHECK-NEXT:    [[TMP1:%.*]] = zext i32 [[TMP0]] to i64
-; CHECK-NEXT:    [[AVL_NEXT]] = sub nuw i64 [[AVL]], [[TMP1]]
-; CHECK-NEXT:    [[TMP2:%.*]] = icmp eq i64 [[AVL_NEXT]], 0
-; CHECK-NEXT:    br i1 [[TMP2]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
+; CHECK-NEXT:    call void @llvm.vp.store.nxv16i8.p0(<vscale x 16 x i8> zeroinitializer, ptr align 1 [[DST]], <vscale x 16 x i1> splat (i1 true), i32 17)
+; CHECK-NEXT:    br label %[[MIDDLE_BLOCK:.*]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    br label %[[EXIT:.*]]
 ; CHECK:       [[EXIT]]:
@@ -36,7 +31,8 @@ loop:
   %mul16 = mul i32 0, %conv
   %shr35 = lshr i32 %mul16, 1
   %conv36 = trunc i32 %shr35 to i8
-  store i8 %conv36, ptr null, align 1
+  %gep.dst = getelementptr i8, ptr %dst, i64 %iv
+  store i8 %conv36, ptr %gep.dst, align 1
   %iv.next = add i64 %iv, 1
   %ec = icmp eq i64 %iv, 16
   br i1 %ec, label %exit, label %loop
@@ -46,9 +42,9 @@ exit:
 }
 
 ; Test case for https://github.com/llvm/llvm-project/issues/162374.
-define void @truncate_i16_to_i8_cse(ptr noalias %src, ptr noalias %dst) vscale_range(2, 1024) {
+define void @truncate_i16_to_i8_cse(ptr noalias %src, ptr noalias %dst, ptr noalias %dst.2) vscale_range(2, 1024) {
 ; CHECK-LABEL: define void @truncate_i16_to_i8_cse(
-; CHECK-SAME: ptr noalias [[SRC:%.*]], ptr noalias [[DST:%.*]]) #[[ATTR0]] {
+; CHECK-SAME: ptr noalias [[SRC:%.*]], ptr noalias [[DST:%.*]], ptr noalias [[DST_2:%.*]]) #[[ATTR0]] {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
@@ -57,22 +53,20 @@ define void @truncate_i16_to_i8_cse(ptr noalias %src, ptr noalias %dst) vscale_r
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[TMP5:%.*]] = load i16, ptr [[SRC]], align 2
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 8 x i16> poison, i16 [[TMP5]], i64 0
+; CHECK-NEXT:    [[TMP2:%.*]] = load i16, ptr [[SRC]], align 2
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 8 x i16> poison, i16 [[TMP2]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 8 x i16> [[BROADCAST_SPLATINSERT]], <vscale x 8 x i16> poison, <vscale x 8 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP6:%.*]] = trunc <vscale x 8 x i16> [[BROADCAST_SPLAT]] to <vscale x 8 x i8>
-; CHECK-NEXT:    [[TMP7:%.*]] = call i32 @llvm.vscale.i32()
-; CHECK-NEXT:    [[TMP8:%.*]] = mul nuw i32 [[TMP7]], 8
-; CHECK-NEXT:    [[TMP9:%.*]] = sub i32 [[TMP8]], 1
-; CHECK-NEXT:    [[TMP10:%.*]] = extractelement <vscale x 8 x i8> [[TMP6]], i32 [[TMP9]]
-; CHECK-NEXT:    store i8 [[TMP10]], ptr null, align 1
-; CHECK-NEXT:    store i8 [[TMP10]], ptr [[DST]], align 1
+; CHECK-NEXT:    [[TMP3:%.*]] = trunc <vscale x 8 x i16> [[BROADCAST_SPLAT]] to <vscale x 8 x i8>
+; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr [[DST_2]], i64 [[INDEX]]
+; CHECK-NEXT:    store <vscale x 8 x i8> [[TMP3]], ptr [[TMP4]], align 1
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr [[DST]], i64 [[INDEX]]
+; CHECK-NEXT:    store <vscale x 8 x i8> [[TMP3]], ptr [[TMP5]], align 1
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP1]]
-; CHECK-NEXT:    [[TMP11:%.*]] = icmp eq i64 [[INDEX_NEXT]], 4294967296
-; CHECK-NEXT:    br i1 [[TMP11]], label %[[SCALAR_PH:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
-; CHECK:       [[SCALAR_PH]]:
-; CHECK-NEXT:    br label %[[LOOP:.*]]
-; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], 4294967296
+; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    br label %[[EXIT:.*]]
+; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void
 ;
 entry:
@@ -84,9 +78,11 @@ loop:
   %val = load i16, ptr %src, align 2
   %val.zext = zext i16 %val to i64
   %val.trunc.zext = trunc i64 %val.zext to i8
-  store i8 %val.trunc.zext, ptr null, align 1
+  %gep.dst.2 = getelementptr i8, ptr %dst.2, i64 %iv
+  store i8 %val.trunc.zext, ptr %gep.dst.2, align 1
   %val.trunc = trunc i16 %val to i8
-  store i8 %val.trunc, ptr %dst, align 1
+  %gep.dst = getelementptr i8, ptr %dst, i64 %iv
+  store i8 %val.trunc, ptr %gep.dst, align 1
   %count.next = add i32 %count, 1
   %exitcond = icmp eq i32 %count.next, 0
   %iv.next = add i64 %iv, 1
@@ -100,5 +96,4 @@ exit:
 ; CHECK: [[LOOP0]] = distinct !{[[LOOP0]], [[META1:![0-9]+]], [[META2:![0-9]+]]}
 ; CHECK: [[META1]] = !{!"llvm.loop.isvectorized", i32 1}
 ; CHECK: [[META2]] = !{!"llvm.loop.unroll.runtime.disable"}
-; CHECK: [[LOOP3]] = distinct !{[[LOOP3]], [[META1]], [[META2]]}
 ;.

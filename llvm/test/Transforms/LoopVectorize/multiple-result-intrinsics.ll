@@ -882,9 +882,9 @@ define void @single_scalar(ptr noalias %src, ptr noalias %dst, i32 %n) {
 ; CHECK:  [[VECTOR_BODY:.*:]]
 ; CHECK:    [[TMP12:%.*]] = tail call { i32, i1 } @llvm.sadd.with.overflow.i32(i32 [[TMP11:%.*]], i32 0)
 ; CHECK:    [[TMP13:%.*]] = extractvalue { i32, i1 } [[TMP12]], 0
+; CHECK:  [[MIDDLE_BLOCK:.*:]]
 ; CHECK:    [[TMP15:%.*]] = extractelement <2 x i8> [[STRIDED_VEC:%.*]], i64 1
 ; CHECK:    store i8 [[TMP15]], ptr [[DST]], align 1
-; CHECK:  [[MIDDLE_BLOCK:.*:]]
 ; CHECK:  [[SCALAR_PH:.*:]]
 ; CHECK:  [[LOOP:.*:]]
 ; CHECK:    [[SADD:%.*]] = tail call { i32, i1 } @llvm.sadd.with.overflow.i32(i32 [[IV:%.*]], i32 0)

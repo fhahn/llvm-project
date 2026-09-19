@@ -41,11 +41,7 @@ define void @test_iv_trunc_crash(ptr %a, ptr %b, i32 %n) {
 ; CHECK-NEXT:    [[TMP17:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP17]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[DOTCAST2:%.*]] = sitofp i32 [[INDEX]] to double
-; CHECK-NEXT:    [[TMP14:%.*]] = fmul reassoc double [[X]], [[DOTCAST2]]
-; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = fadd reassoc double [[SUM_0]], [[TMP14]]
-; CHECK-NEXT:    [[TMP15:%.*]] = fmul reassoc double 7.000000e+00, [[X]]
-; CHECK-NEXT:    [[TMP16:%.*]] = fadd reassoc double [[OFFSET_IDX]], [[TMP15]]
+; CHECK-NEXT:    [[TMP16:%.*]] = fsub reassoc double [[TMP13]], [[X]]
 ; CHECK-NEXT:    store double [[TMP16]], ptr [[B]], align 8
 ; CHECK-NEXT:    br label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:

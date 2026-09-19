@@ -116,7 +116,7 @@ define void @replicating_load_used_as_store_addr_3(ptr noalias %src, ptr noalias
 ; CHECK-NEXT:    [[TMP5:%.*]] = xor i32 [[TMP4]], 111
 ; CHECK-NEXT:    [[TMP6:%.*]] = zext i32 [[TMP4]] to i64
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP6]]
-; CHECK-NEXT:    [[TMP8:%.*]] = trunc i32 [[TMP5]] to i8
+; CHECK-NEXT:    [[TMP10:%.*]] = trunc i32 [[TMP5]] to i8
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
@@ -124,8 +124,8 @@ define void @replicating_load_used_as_store_addr_3(ptr noalias %src, ptr noalias
 ; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq i64 [[INDEX_NEXT]], 100
 ; CHECK-NEXT:    br i1 [[TMP9]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    store i8 [[TMP10]], ptr [[INVAR_DST]], align 1
 ; CHECK-NEXT:    store i8 0, ptr [[TMP7]], align 1
-; CHECK-NEXT:    store i8 [[TMP8]], ptr [[INVAR_DST]], align 1
 ; CHECK-NEXT:    br label %[[EXIT:.*]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void

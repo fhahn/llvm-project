@@ -532,9 +532,9 @@ define void @noalias_metadata(ptr align 8 %dst, ptr align 8 %src) {
 ; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP9]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP17:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP2]], [[N_VEC]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = extractelement <2 x ptr> [[WIDE_LOAD]], i64 1
 ; CHECK-NEXT:    store ptr [[TMP10]], ptr [[DST]], align 8, !alias.scope [[META18:![0-9]+]], !noalias [[META20:![0-9]+]]
-; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP2]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:
 ; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi ptr [ [[TMP7]], %[[MIDDLE_BLOCK]] ], [ [[SRC]], %[[ENTRY]] ], [ [[SRC]], %[[VECTOR_MEMCHECK]] ]
@@ -584,9 +584,9 @@ define void @noalias_metadata(ptr align 8 %dst, ptr align 8 %src) {
 ; INTERLEAVE-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; INTERLEAVE-NEXT:    br i1 [[TMP10]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP17:![0-9]+]]
 ; INTERLEAVE:       [[MIDDLE_BLOCK]]:
+; INTERLEAVE-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP2]], [[N_VEC]]
 ; INTERLEAVE-NEXT:    [[TMP11:%.*]] = extractelement <2 x ptr> [[WIDE_LOAD]], i64 1
 ; INTERLEAVE-NEXT:    store ptr [[TMP11]], ptr [[DST]], align 8, !alias.scope [[META18:![0-9]+]], !noalias [[META20:![0-9]+]]
-; INTERLEAVE-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP2]], [[N_VEC]]
 ; INTERLEAVE-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; INTERLEAVE:       [[SCALAR_PH]]:
 ; INTERLEAVE-NEXT:    [[BC_RESUME_VAL:%.*]] = phi ptr [ [[TMP7]], %[[MIDDLE_BLOCK]] ], [ [[SRC]], %[[ENTRY]] ], [ [[SRC]], %[[VECTOR_MEMCHECK]] ]

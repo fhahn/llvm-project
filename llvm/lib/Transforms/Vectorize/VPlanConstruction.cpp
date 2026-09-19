@@ -1168,7 +1168,8 @@ void VPlanTransforms::createInLoopReductionRecipes(VPlan &Plan,
           continue;
         }
 
-        // Stores using instructions will be sunk later.
+        // Stores may be sunk out of the loop region later; they must not become
+        // part of the reduction chain.
         if (match(UserRecipe, m_VPInstruction<Instruction::Store>()))
           continue;
         Worklist.insert(UserRecipe);
@@ -1278,8 +1279,8 @@ void VPlanTransforms::createInLoopReductionRecipes(VPlan &Plan,
         LinkVPBB->appendRecipe(RedRecipe);
 
       CurrentLink->replaceAllUsesWith(RedRecipe);
-      // Move any store recipes using the RedRecipe that appear before it in the
-      // same block to just after the RedRecipe.
+      // A store of the reduction value that was not sunk out of the loop must
+      // follow the recipe computing the value it stores.
       for (VPRecipeBase *UserR : make_early_inc_range(
                make_isa_range<VPRecipeBase>(RedRecipe->users()))) {
         if (UserR->getParent() != LinkVPBB)
@@ -1443,22 +1444,24 @@ void VPlanTransforms::foldTailByMasking(VPlan &Plan) {
   VPBlockUtils::connectBlocks(Header, Latch);
 
   // Collect any values defined in the loop that need a phi. Currently this
-  // includes header phi backedges and live-outs extracted in the middle block.
+  // includes header phi backedges and values used in the middle block.
   // TODO: Handle early exits via Plan.getExitBlocks()
   MapVector<VPValue *, SmallVector<VPUser *>> NeedsPhi;
   for (VPRecipeBase &R : Header->phis())
     if (!isa<VPWidenInductionRecipe>(R))
       NeedsPhi[cast<VPHeaderPHIRecipe>(R).getBackedgeValue()].push_back(&R);
 
-  // A ComputeReductionResult created on the initial VPlan consumes the
-  // reduction's exiting value directly, without an extract.
-  VPValue *V;
+  // Any middle-block user of a value defined in the loop needs a phi as well:
+  // the live-out extracts, ComputeReductionResults created on the initial VPlan
+  // (which consume the reduction's exiting value directly, without an extract)
+  // and invariant stores sunk to the middle block. ExitingIVValue is exempt;
+  // its operand is the wide induction recipe itself, and it is later replaced
+  // by an end value computed from the trip count.
   for (VPRecipeBase &R : *Plan.getMiddleBlock())
-    if (match(&R, m_CombineOr(
-                      m_ExtractLastPart(m_VPValue(V)),
-                      m_VPInstruction<VPInstruction::ComputeReductionResult>(
-                          m_VPValue(V)))))
-      NeedsPhi[V].push_back(&R);
+    if (!match(&R, m_ExitingIVValue(m_VPValue())))
+      for (VPValue *Op : R.operands())
+        if (!Op->isDefinedOutsideLoopRegions())
+          NeedsPhi[Op].push_back(&R);
 
   // Insert phis for values coming past the end of the tail.
   Builder.setInsertPoint(Latch, Latch->begin());
@@ -1485,13 +1488,14 @@ void VPlanTransforms::foldTailByMasking(VPlan &Plan) {
   // Any extract of the last element must be updated to extract from the last
   // active lane of the header mask instead (i.e., the lane corresponding to the
   // last active iteration).
-  Builder.setInsertPoint(Plan.getMiddleBlock()->getTerminator());
   for (VPRecipeBase &R : *Plan.getMiddleBlock()) {
     VPValue *Op;
     if (!match(&R, m_ExtractLastLaneOfLastPart(m_VPValue(Op))))
       continue;
 
-    // Compute the index of the last active lane.
+    // Compute the index of the last active lane. Insert in place of the
+    // extract, so the result also dominates users in the middle block itself.
+    Builder.setInsertPoint(&R);
     VPValue *LastActiveLane = Builder.createLastActiveLane(HeaderMask);
     auto *Ext =
         Builder.createNaryOp(VPInstruction::ExtractLane, {LastActiveLane, Op});

@@ -227,6 +227,19 @@ struct VPlanTransforms {
   /// BranchOnCond with BranchOnCount, using \p DL for the canonical IV.
   LLVM_ABI_FOR_TEST static void createLoopRegions(VPlan &Plan, DebugLoc DL);
 
+  /// Sink recipes whose users are all outside the vector loop region into the
+  /// block containing the users, or into the region's successor if there are
+  /// none. With \p StoresOnly, only stores are sunk. This is required before
+  /// lane selection has been materialized, as sinking any other recipe would
+  /// lose which lane its operands refer to.
+  ///
+  /// Stores to an address that is invariant in the vector loop have no users
+  /// and are sunk into the middle block, storing the value of the last
+  /// iteration; any store completely overwritten by a later one is dropped.
+  /// A store is only sunk if it is guaranteed to execute and no other access
+  /// in the loop may alias its address.
+  static void sinkInvariantRecipes(VPlan &Plan, bool StoresOnly);
+
   /// Wrap runtime check block \p CheckBlock in a VPIRBB and \p Cond in a
   /// VPValue and connect the block to \p Plan, using the VPValue as branch
   /// condition.
@@ -448,7 +461,8 @@ struct VPlanTransforms {
                                             PredicatedScalarEvolution &PSE,
                                             const Loop *L);
 
-  /// Add explicit broadcasts for live-ins and VPValues defined in \p Plan's entry block if they are used as vectors.
+  /// Add explicit broadcasts for live-ins and VPValues defined in \p Plan's
+  /// entry block if they are used as vectors.
   static void materializeBroadcasts(VPlan &Plan);
 
   /// Hoist predicated loads from the same address to the loop entry block, if

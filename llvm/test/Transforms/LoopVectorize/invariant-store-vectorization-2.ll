@@ -53,9 +53,9 @@ define void @inv_val_store_to_inv_address_conditional_diff_values_ic(ptr %a, i64
 ; CHECK-NEXT:    [[WIDE_LOAD_LCSSA:%.*]] = phi <4 x i32> [ [[WIDE_LOAD]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq <4 x i32> [[WIDE_LOAD_LCSSA]], [[BROADCAST_SPLAT4]]
 ; CHECK-NEXT:    [[PREDPHI:%.*]] = select <4 x i1> [[TMP5]], <4 x i32> [[BROADCAST_SPLAT]], <4 x i32> [[BROADCAST_SPLAT4]]
-; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <4 x i32> [[PREDPHI]], i64 3
-; CHECK-NEXT:    store i32 [[TMP4]], ptr [[A]], align 4, !alias.scope [[META3]]
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[SMAX2]], [[N_VEC]]
+; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <4 x i32> [[PREDPHI]], i64 3
+; CHECK-NEXT:    store i32 [[TMP6]], ptr [[A]], align 4, !alias.scope [[META3]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label [[FOR_END:%.*]], label [[SCALAR_PH]]
 ; CHECK:       scalar.ph:
 ; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], [[MIDDLE_BLOCK]] ], [ 0, [[ENTRY:%.*]] ], [ 0, [[VECTOR_MEMCHECK]] ]
@@ -150,8 +150,8 @@ define void @inv_val_store_to_inv_address_conditional_inv(ptr %a, i64 %n, ptr %b
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP4]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP14:![0-9]+]]
 ; CHECK:       middle.block:
-; CHECK-NEXT:    store i32 [[K]], ptr [[A]], align 4, !alias.scope [[META12]]
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[SMAX2]], [[N_VEC]]
+; CHECK-NEXT:    store i32 [[K]], ptr [[A]], align 4, !alias.scope [[META12]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label [[FOR_END:%.*]], label [[SCALAR_PH]]
 ; CHECK:       scalar.ph:
 ; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], [[MIDDLE_BLOCK]] ], [ 0, [[ENTRY:%.*]] ], [ 0, [[VECTOR_MEMCHECK]] ]
@@ -241,10 +241,10 @@ define i32 @variant_val_store_to_inv_address(ptr %a, i64 %n, ptr %b, i32 %k) {
 ; CHECK:       middle.block:
 ; CHECK-NEXT:    [[WIDE_LOAD_LCSSA:%.*]] = phi <4 x i32> [ [[WIDE_LOAD]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[DOTLCSSA:%.*]] = phi <4 x i32> [ [[TMP3]], [[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <4 x i32> [[WIDE_LOAD_LCSSA]], i64 3
-; CHECK-NEXT:    store i32 [[TMP6]], ptr [[A]], align 4, !alias.scope [[META20:![0-9]+]], !noalias [[META16]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[DOTLCSSA]])
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[SMAX2]], [[N_VEC]]
+; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <4 x i32> [[WIDE_LOAD_LCSSA]], i64 3
+; CHECK-NEXT:    store i32 [[TMP7]], ptr [[A]], align 4, !alias.scope [[META20:![0-9]+]], !noalias [[META16]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label [[FOR_END:%.*]], label [[SCALAR_PH]]
 ; CHECK:       scalar.ph:
 ; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], [[MIDDLE_BLOCK]] ], [ 0, [[ENTRY:%.*]] ], [ 0, [[VECTOR_MEMCHECK]] ]

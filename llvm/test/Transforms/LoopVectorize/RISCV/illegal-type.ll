@@ -124,9 +124,9 @@ define void @uniform_store_i1(ptr noalias %dst, ptr noalias %start, i64 %N) {
 ; CHECK:       middle.block:
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i64, <32 x ptr> [[STEP_ADD]], i64 1
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq <32 x ptr> [[TMP5]], [[BROADCAST_SPLAT]]
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <32 x i1> [[TMP7]], i64 31
 ; CHECK-NEXT:    store i1 [[TMP8]], ptr [[DST:%.*]], align 1
-; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label [[END:%.*]], label [[SCALAR_PH]]
 ; CHECK:       scalar.ph:
 ; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi ptr [ [[IND_END]], [[MIDDLE_BLOCK]] ], [ [[START]], [[ENTRY:%.*]] ]

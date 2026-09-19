@@ -433,6 +433,11 @@ public:
         Range, [](BaseTy *Block) -> BlockTy * { return cast<BlockTy>(Block); });
   }
 
+  /// Returns all basic blocks in \p Region, including those in nested regions.
+  /// Unlike a deep traversal of the region's entry, this does not leave the
+  /// region via its own successors at the exiting block.
+  static SmallVector<VPBasicBlock *> blocksInRegion(VPRegionBlock *Region);
+
   /// Returns the blocks between \p FirstBB and \p LastBB, where FirstBB
   /// to LastBB forms a single-sucessor chain.
   static SmallVector<VPBasicBlock *>

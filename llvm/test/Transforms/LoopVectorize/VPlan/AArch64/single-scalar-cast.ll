@@ -21,11 +21,6 @@ define i16 @narrow_iv_cast_to_single_scalar(ptr %p, ptr %q) {
 ; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
-; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = SCALAR-STEPS vp<[[VP3]]>, ir<1>, vp<[[VP0]]>
-; CHECK-NEXT:      CLONE ir<%shr> = lshr vp<[[VP4]]>, ir<1>
-; CHECK-NEXT:      EMIT-SCALAR ir<%shr.ext> = zext ir<%shr> to i64
-; CHECK-NEXT:      CLONE ir<%gep.p> = getelementptr ir<%p>, ir<%shr.ext>
-; CHECK-NEXT:      CLONE ir<%l> = load ir<%gep.p>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
@@ -85,7 +80,7 @@ define void @sink_replicate_region_with_cast(ptr %dst, i64 %n) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    <xVFxUF> pred.store: {
 ; CHECK-NEXT:      pred.store.entry:
-; CHECK-NEXT:        BRANCH-ON-MASK ir<%c>
+; CHECK-NEXT:        BRANCH-ON-MASK ir<%c> (!vplan.execution.frequency 4611686018427387904 (50%, estimated))
 ; CHECK-NEXT:      Successor(s): pred.store.if, pred.store.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.store.if:

@@ -81,7 +81,6 @@ define i16 @test_incomplete_chain_without_mul(ptr noalias %dst, ptr %A, ptr %B) 
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <16 x i8> poison, i8 [[TMP0]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <16 x i8> [[BROADCAST_SPLATINSERT]], <16 x i8> poison, <16 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP1:%.*]] = zext <16 x i8> [[BROADCAST_SPLAT]] to <16 x i16>
-; CHECK-NEXT:    [[TMP2:%.*]] = extractelement <16 x i16> [[TMP1]], i64 15
 ; CHECK-NEXT:    [[TMP3:%.*]] = load i8, ptr [[B]], align 1
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <16 x i8> poison, i8 [[TMP3]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <16 x i8> [[BROADCAST_SPLATINSERT1]], <16 x i8> poison, <16 x i32> zeroinitializer
@@ -97,8 +96,9 @@ define i16 @test_incomplete_chain_without_mul(ptr noalias %dst, ptr %A, ptr %B) 
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1024
 ; CHECK-NEXT:    br i1 [[TMP8]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY1]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    store i16 [[TMP2]], ptr [[DST]], align 2
 ; CHECK-NEXT:    [[TMP9:%.*]] = call i16 @llvm.vector.reduce.add.v16i16(<16 x i16> [[TMP7]])
+; CHECK-NEXT:    [[TMP10:%.*]] = extractelement <16 x i16> [[TMP1]], i64 15
+; CHECK-NEXT:    store i16 [[TMP10]], ptr [[DST]], align 2
 ; CHECK-NEXT:    br label %[[EXIT:.*]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret i16 [[TMP9]]

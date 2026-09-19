@@ -206,41 +206,13 @@ define void @uniform_store(ptr noalias %p, ptr %p.out, ptr %p.in, i64 %n) {
 ; CHECK-NEXT:    [[BROADCAST_SPLAT1:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT3]], <4 x i64> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
-; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_STORE_CONTINUE10:.*]] ]
-; CHECK-NEXT:    [[VEC_IV:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[PRED_STORE_CONTINUE10]] ]
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_IV:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp ule <4 x i64> [[VEC_IV]], [[BROADCAST_SPLAT]]
 ; CHECK-NEXT:    [[MASK:%.*]] = and <4 x i1> [[TMP8]], [[ALIAS_MASK]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds i64, ptr [[P_IN]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_MASKED_LOAD:%.*]] = call <4 x i64> @llvm.masked.load.v4i64.p0(ptr align 8 [[TMP10]], <4 x i1> [[MASK]], <4 x i64> poison)
 ; CHECK-NEXT:    [[TMP11:%.*]] = add <4 x i64> [[WIDE_MASKED_LOAD]], [[WIDE_MASKED_LOAD]]
-; CHECK-NEXT:    [[TMP12:%.*]] = extractelement <4 x i1> [[MASK]], i64 0
-; CHECK-NEXT:    br i1 [[TMP12]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
-; CHECK:       [[PRED_STORE_IF]]:
-; CHECK-NEXT:    [[TMP13:%.*]] = extractelement <4 x i64> [[TMP11]], i64 0
-; CHECK-NEXT:    store i64 [[TMP13]], ptr [[P]], align 8
-; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE]]
-; CHECK:       [[PRED_STORE_CONTINUE]]:
-; CHECK-NEXT:    [[TMP14:%.*]] = extractelement <4 x i1> [[MASK]], i64 1
-; CHECK-NEXT:    br i1 [[TMP14]], label %[[PRED_STORE_IF5:.*]], label %[[PRED_STORE_CONTINUE6:.*]]
-; CHECK:       [[PRED_STORE_IF5]]:
-; CHECK-NEXT:    [[TMP15:%.*]] = extractelement <4 x i64> [[TMP11]], i64 1
-; CHECK-NEXT:    store i64 [[TMP15]], ptr [[P]], align 8
-; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE6]]
-; CHECK:       [[PRED_STORE_CONTINUE6]]:
-; CHECK-NEXT:    [[TMP16:%.*]] = extractelement <4 x i1> [[MASK]], i64 2
-; CHECK-NEXT:    br i1 [[TMP16]], label %[[PRED_STORE_IF7:.*]], label %[[PRED_STORE_CONTINUE8:.*]]
-; CHECK:       [[PRED_STORE_IF7]]:
-; CHECK-NEXT:    [[TMP17:%.*]] = extractelement <4 x i64> [[TMP11]], i64 2
-; CHECK-NEXT:    store i64 [[TMP17]], ptr [[P]], align 8
-; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE8]]
-; CHECK:       [[PRED_STORE_CONTINUE8]]:
-; CHECK-NEXT:    [[TMP18:%.*]] = extractelement <4 x i1> [[MASK]], i64 3
-; CHECK-NEXT:    br i1 [[TMP18]], label %[[PRED_STORE_IF9:.*]], label %[[PRED_STORE_CONTINUE10]]
-; CHECK:       [[PRED_STORE_IF9]]:
-; CHECK-NEXT:    [[TMP19:%.*]] = extractelement <4 x i64> [[TMP11]], i64 3
-; CHECK-NEXT:    store i64 [[TMP19]], ptr [[P]], align 8
-; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE10]]
-; CHECK:       [[PRED_STORE_CONTINUE10]]:
 ; CHECK-NEXT:    [[TMP20:%.*]] = getelementptr i64, ptr [[P_OUT]], i64 [[INDEX]]
 ; CHECK-NEXT:    call void @llvm.masked.store.v4i64.p0(<4 x i64> [[TMP11]], ptr align 8 [[TMP20]], <4 x i1> [[MASK]])
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], [[NUM_ACTIVE_LANES]]
@@ -248,6 +220,11 @@ define void @uniform_store(ptr noalias %p, ptr %p.out, ptr %p.in, i64 %n) {
 ; CHECK-NEXT:    [[TMP21:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP21]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[TMP15:%.*]] = xor <4 x i1> [[MASK]], splat (i1 true)
+; CHECK-NEXT:    [[FIRST_INACTIVE_LANE:%.*]] = call i64 @llvm.experimental.cttz.elts.i64.v4i1(<4 x i1> [[TMP15]], i1 false)
+; CHECK-NEXT:    [[LAST_ACTIVE_LANE:%.*]] = sub i64 [[FIRST_INACTIVE_LANE]], 1
+; CHECK-NEXT:    [[TMP16:%.*]] = extractelement <4 x i64> [[TMP11]], i64 [[LAST_ACTIVE_LANE]]
+; CHECK-NEXT:    store i64 [[TMP16]], ptr [[P]], align 8
 ; CHECK-NEXT:    br [[EXIT:label %.*]]
 ; CHECK:       [[SCALAR_PH]]:
 ;

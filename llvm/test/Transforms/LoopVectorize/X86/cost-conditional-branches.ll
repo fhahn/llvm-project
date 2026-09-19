@@ -92,11 +92,11 @@ define void @test_replicate_call_chain(float %x, ptr noalias %A, ptr noalias %B,
 ; CHECK-NEXT:    [[TMP74:%.*]] = insertelement <16 x float> [[TMP73]], float [[TMP58]], i64 15
 ; CHECK-NEXT:    call void @llvm.masked.store.v16f32.p0(<16 x float> [[TMP74]], ptr align 4 [[TMP5]], <16 x i1> [[TMP7]])
 ; CHECK-NEXT:    call void @llvm.masked.store.v16f32.p0(<16 x float> zeroinitializer, ptr align 4 [[TMP5]], <16 x i1> [[TMP6]])
-; CHECK-NEXT:    store float 0.000000e+00, ptr [[E:%.*]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 16
 ; CHECK-NEXT:    [[TMP75:%.*]] = icmp eq i64 [[INDEX_NEXT]], 96
 ; CHECK-NEXT:    br i1 [[TMP75]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       middle.block:
+; CHECK-NEXT:    store float 0.000000e+00, ptr [[E:%.*]], align 4
 ; CHECK-NEXT:    br label [[SCALAR_PH:%.*]]
 ; CHECK:       scalar.ph:
 ; CHECK-NEXT:    br label [[LOOP_HEADER:%.*]]

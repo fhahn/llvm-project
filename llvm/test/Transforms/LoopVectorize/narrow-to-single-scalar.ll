@@ -230,7 +230,6 @@ define void @narrow_scatter_with_uniform_addr_to_scalar(ptr noalias %src, ptr no
 ; VF4IC1-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i16> poison, i16 [[TMP0]], i64 0
 ; VF4IC1-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i16> [[BROADCAST_SPLATINSERT]], <4 x i16> poison, <4 x i32> zeroinitializer
 ; VF4IC1-NEXT:    [[TMP1:%.*]] = trunc <4 x i16> [[BROADCAST_SPLAT]] to <4 x i8>
-; VF4IC1-NEXT:    [[TMP2:%.*]] = extractelement <4 x i8> [[TMP1]], i64 3
 ; VF4IC1-NEXT:    br label %[[VECTOR_BODY1:.*]]
 ; VF4IC1:       [[VECTOR_BODY1]]:
 ; VF4IC1-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_BODY]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY1]] ]
@@ -238,8 +237,9 @@ define void @narrow_scatter_with_uniform_addr_to_scalar(ptr noalias %src, ptr no
 ; VF4IC1-NEXT:    [[TMP3:%.*]] = icmp eq i64 [[INDEX_NEXT]], 256
 ; VF4IC1-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY1]], !llvm.loop [[LOOP5:![0-9]+]]
 ; VF4IC1:       [[MIDDLE_BLOCK]]:
-; VF4IC1-NEXT:    store i8 [[TMP2]], ptr [[DST2]], align 1
-; VF4IC1-NEXT:    store i8 [[TMP2]], ptr [[DST]], align 1
+; VF4IC1-NEXT:    [[TMP4:%.*]] = extractelement <4 x i8> [[TMP1]], i64 3
+; VF4IC1-NEXT:    store i8 [[TMP4]], ptr [[DST2]], align 1
+; VF4IC1-NEXT:    store i8 [[TMP4]], ptr [[DST]], align 1
 ; VF4IC1-NEXT:    br label %[[EXIT:.*]]
 ; VF4IC1:       [[EXIT]]:
 ; VF4IC1-NEXT:    ret void
@@ -253,7 +253,6 @@ define void @narrow_scatter_with_uniform_addr_to_scalar(ptr noalias %src, ptr no
 ; VF2IC2-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i16> poison, i16 [[TMP0]], i64 0
 ; VF2IC2-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x i16> [[BROADCAST_SPLATINSERT]], <2 x i16> poison, <2 x i32> zeroinitializer
 ; VF2IC2-NEXT:    [[TMP1:%.*]] = trunc <2 x i16> [[BROADCAST_SPLAT]] to <2 x i8>
-; VF2IC2-NEXT:    [[TMP2:%.*]] = extractelement <2 x i8> [[TMP1]], i64 1
 ; VF2IC2-NEXT:    br label %[[VECTOR_BODY1:.*]]
 ; VF2IC2:       [[VECTOR_BODY1]]:
 ; VF2IC2-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_BODY]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY1]] ]
@@ -261,8 +260,9 @@ define void @narrow_scatter_with_uniform_addr_to_scalar(ptr noalias %src, ptr no
 ; VF2IC2-NEXT:    [[TMP3:%.*]] = icmp eq i64 [[INDEX_NEXT]], 256
 ; VF2IC2-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY1]], !llvm.loop [[LOOP5:![0-9]+]]
 ; VF2IC2:       [[MIDDLE_BLOCK]]:
-; VF2IC2-NEXT:    store i8 [[TMP2]], ptr [[DST2]], align 1
-; VF2IC2-NEXT:    store i8 [[TMP2]], ptr [[DST]], align 1
+; VF2IC2-NEXT:    [[TMP4:%.*]] = extractelement <2 x i8> [[TMP1]], i64 1
+; VF2IC2-NEXT:    store i8 [[TMP4]], ptr [[DST2]], align 1
+; VF2IC2-NEXT:    store i8 [[TMP4]], ptr [[DST]], align 1
 ; VF2IC2-NEXT:    br label %[[EXIT:.*]]
 ; VF2IC2:       [[EXIT]]:
 ; VF2IC2-NEXT:    ret void

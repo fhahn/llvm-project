@@ -304,8 +304,11 @@ void UnrollState::unrollRecipeByUF(VPRecipeBase &R) {
   if (auto *RepR = dyn_cast<VPReplicateRecipe>(&R)) {
     if (isa<StoreInst>(RepR->getUnderlyingValue()) &&
         RepR->getOperand(1)->isDefinedOutsideLoopRegions()) {
-      // Stores to an invariant address only need to store the last part.
-      remapOperands(&R, UF - 1);
+      // Stores to an invariant address only need to store the last part. A
+      // store already sunk out of the loop region executes once and its
+      // operands select the required part explicitly, so leave it alone.
+      if (RepR->getParent()->getEnclosingLoopRegion())
+        remapOperands(&R, UF - 1);
       return;
     }
     if (match(RepR,

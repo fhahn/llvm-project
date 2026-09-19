@@ -245,6 +245,10 @@ define void @main_vector_loop_fixed_single_vector_iteration_with_runtime_checks(
 ; CHECK-NOTF-NEXT:    store i16 [[TMP8]], ptr [[TMP12]], align 2
 ; CHECK-NOTF-NEXT:    [[TMP9:%.*]] = extractelement <4 x i16> [[TMP5]], i64 3
 ; CHECK-NOTF-NEXT:    store i16 [[TMP9]], ptr [[TMP13]], align 2
+; CHECK-NOTF-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; CHECK-NOTF-NEXT:    [[TMP14:%.*]] = icmp eq i64 [[INDEX_NEXT]], 4
+; CHECK-NOTF-NEXT:    br i1 [[TMP14]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
+; CHECK-NOTF:       [[MIDDLE_BLOCK]]:
 ; CHECK-NOTF-NEXT:    store i64 0, ptr [[A]], align 8
 ; CHECK-NOTF-NEXT:    store i64 0, ptr [[B]], align 8
 ; CHECK-NOTF-NEXT:    store i64 0, ptr [[C]], align 8
@@ -255,10 +259,6 @@ define void @main_vector_loop_fixed_single_vector_iteration_with_runtime_checks(
 ; CHECK-NOTF-NEXT:    store i64 0, ptr [[H]], align 8
 ; CHECK-NOTF-NEXT:    store i64 0, ptr [[I]], align 8
 ; CHECK-NOTF-NEXT:    store i64 0, ptr [[L]], align 8
-; CHECK-NOTF-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
-; CHECK-NOTF-NEXT:    [[TMP14:%.*]] = icmp eq i64 [[INDEX_NEXT]], 4
-; CHECK-NOTF-NEXT:    br i1 [[TMP14]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
-; CHECK-NOTF:       [[MIDDLE_BLOCK]]:
 ; CHECK-NOTF-NEXT:    br label %[[SCALAR_PH:.*]]
 ; CHECK-NOTF:       [[SCALAR_PH]]:
 ; CHECK-NOTF-NEXT:    br label %[[LOOP:.*]]

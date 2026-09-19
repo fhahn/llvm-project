@@ -198,9 +198,10 @@ define void @first_order_recurrence_using_induction(i32 %n, ptr %dst) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
 ; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = first-order splice ir<%for>, vp<[[VP6]]>
-; CHECK-NEXT:    CLONE store vp<[[VP8]]>, ir<%dst>
 ; CHECK-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = extract-last-part vp<[[VP6]]>
 ; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq vp<[[VP3]]>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT vp<[[VP10:%[0-9]+]]> = extract-last-part vp<[[VP8]]>
+; CHECK-NEXT:    CLONE store vp<[[VP10]]>, ir<%dst>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
@@ -330,9 +331,6 @@ define void @scalarize_ptrtoint(ptr %src, ptr %dst) {
 ; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
-; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = SCALAR-STEPS vp<[[VP3]]>, ir<1>, vp<[[VP0]]>
-; CHECK-NEXT:      CLONE ir<%gep> = getelementptr ir<%src>, vp<[[VP4]]>
-; CHECK-NEXT:      CLONE ir<%l> = load ir<%gep>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
@@ -340,11 +338,15 @@ define void @scalarize_ptrtoint(ptr %src, ptr %dst) {
 ; CHECK-NEXT:  Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
+; CHECK-NEXT:    vp<[[VP5:%[0-9]+]]> = SCALAR-STEPS vp<[[VP3]]>, ir<1>, vp<[[VP0]]>
+; CHECK-NEXT:    CLONE ir<%gep> = getelementptr ir<%src>, vp<[[VP5]]>
+; CHECK-NEXT:    CLONE ir<%l> = load ir<%gep>
 ; CHECK-NEXT:    EMIT-SCALAR ir<%cast> = ptrtoint ir<%l> to i64
 ; CHECK-NEXT:    CLONE ir<%add> = add ir<%cast>, ir<10>
 ; CHECK-NEXT:    EMIT-SCALAR ir<%cast.2> = inttoptr ir<%add> to ptr
-; CHECK-NEXT:    CLONE store ir<%cast.2>, ir<%dst>
 ; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<1024>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = extract-last-part ir<%cast.2>
+; CHECK-NEXT:    CLONE store vp<[[VP6]]>, ir<%dst>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:

@@ -188,32 +188,17 @@ define void @PR40816() #1 {
 ;
 ; FORCE-LABEL: define void @PR40816(
 ; FORCE-SAME: ) #[[ATTR1:[0-9]+]] {
-; FORCE-NEXT:  [[ENTRY:.*:]]
-; FORCE-NEXT:    br label %[[VECTOR_PH:.*]]
-; FORCE:       [[VECTOR_PH]]:
-; FORCE-NEXT:    br label %[[VECTOR_BODY:.*]]
-; FORCE:       [[VECTOR_BODY]]:
-; FORCE-NEXT:    [[TMP0:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_STORE_CONTINUE2:.*]] ]
-; FORCE-NEXT:    [[VEC_IND:%.*]] = phi <2 x i8> [ <i8 0, i8 1>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[PRED_STORE_CONTINUE2]] ]
-; FORCE-NEXT:    [[TMP2:%.*]] = icmp ule <2 x i8> [[VEC_IND]], splat (i8 2)
-; FORCE-NEXT:    [[TMP3:%.*]] = extractelement <2 x i1> [[TMP2]], i64 0
-; FORCE-NEXT:    br i1 [[TMP3]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
-; FORCE:       [[PRED_STORE_IF]]:
-; FORCE-NEXT:    store i32 [[TMP0]], ptr @b, align 1
-; FORCE-NEXT:    br label %[[PRED_STORE_CONTINUE]]
+; FORCE-NEXT:  [[PRED_STORE_IF:.*:]]
+; FORCE-NEXT:    br label %[[PRED_STORE_CONTINUE:.*]]
 ; FORCE:       [[PRED_STORE_CONTINUE]]:
-; FORCE-NEXT:    [[TMP10:%.*]] = extractelement <2 x i1> [[TMP2]], i64 1
-; FORCE-NEXT:    br i1 [[TMP10]], label %[[PRED_STORE_IF1:.*]], label %[[PRED_STORE_CONTINUE2]]
-; FORCE:       [[PRED_STORE_IF1]]:
-; FORCE-NEXT:    [[TMP1:%.*]] = add i32 [[TMP0]], 1
-; FORCE-NEXT:    store i32 [[TMP1]], ptr @b, align 1
-; FORCE-NEXT:    br label %[[PRED_STORE_CONTINUE2]]
+; FORCE-NEXT:    br label %[[PRED_STORE_CONTINUE2:.*]]
 ; FORCE:       [[PRED_STORE_CONTINUE2]]:
+; FORCE-NEXT:    [[TMP0:%.*]] = phi i32 [ 0, %[[PRED_STORE_CONTINUE]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_STORE_CONTINUE2]] ]
 ; FORCE-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[TMP0]], 2
-; FORCE-NEXT:    [[VEC_IND_NEXT]] = add nuw <2 x i8> [[VEC_IND]], splat (i8 2)
 ; FORCE-NEXT:    [[TMP15:%.*]] = icmp eq i32 [[INDEX_NEXT]], 4
-; FORCE-NEXT:    br i1 [[TMP15]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
+; FORCE-NEXT:    br i1 [[TMP15]], label %[[MIDDLE_BLOCK:.*]], label %[[PRED_STORE_CONTINUE2]], !llvm.loop [[LOOP4:![0-9]+]]
 ; FORCE:       [[MIDDLE_BLOCK]]:
+; FORCE-NEXT:    store i32 2, ptr @b, align 1
 ; FORCE-NEXT:    br label %[[RETURN:.*]]
 ; FORCE:       [[RETURN]]:
 ; FORCE-NEXT:    ret void

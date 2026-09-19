@@ -151,9 +151,9 @@ define void @multiple_ordered_reductions_distinct_addresses(ptr %p0, ptr %p1, pt
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1000
 ; CHECK-NEXT:    br i1 [[TMP8]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    store float [[TMP3]], ptr [[P2]], align 4, !alias.scope [[META7:![0-9]+]]
-; CHECK-NEXT:    store float [[TMP5]], ptr [[P1]], align 4, !alias.scope [[META10:![0-9]+]], !noalias [[META7]]
-; CHECK-NEXT:    store float [[TMP7]], ptr [[P0]], align 4, !alias.scope [[META12:![0-9]+]], !noalias [[META14:![0-9]+]]
+; CHECK-NEXT:    store float [[TMP7]], ptr [[P0]], align 4, !alias.scope [[META7:![0-9]+]], !noalias [[META10:![0-9]+]]
+; CHECK-NEXT:    store float [[TMP5]], ptr [[P1]], align 4, !alias.scope [[META13:![0-9]+]], !noalias [[META14:![0-9]+]]
+; CHECK-NEXT:    store float [[TMP3]], ptr [[P2]], align 4, !alias.scope [[META14]]
 ; CHECK-NEXT:    br label %[[EXIT:.*]]
 ; CHECK:       [[SCALAR_PH]]:
 ; CHECK-NEXT:    br label %[[LOOP:.*]]

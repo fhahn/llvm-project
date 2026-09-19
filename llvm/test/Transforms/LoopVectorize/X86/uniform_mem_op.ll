@@ -201,9 +201,7 @@ define void @uniform_store_varying_value(ptr align(4) %addr) {
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[INDEX_NEXT]], 4096
 ; CHECK-NEXT:    br i1 [[TMP8]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP10:![0-9]+]]
 ; CHECK:       middle.block:
-; CHECK-NEXT:    [[TMP1:%.*]] = trunc i64 [[INDEX]] to i32
-; CHECK-NEXT:    [[TMP2:%.*]] = add i32 [[TMP1]], 15
-; CHECK-NEXT:    store i32 [[TMP2]], ptr [[ADDR:%.*]], align 4
+; CHECK-NEXT:    store i32 4095, ptr [[ADDR:%.*]], align 4
 ; CHECK-NEXT:    br label [[SCALAR_PH:%.*]]
 ; CHECK:       scalar.ph:
 ; CHECK-NEXT:    br label [[FOR_BODY:%.*]]

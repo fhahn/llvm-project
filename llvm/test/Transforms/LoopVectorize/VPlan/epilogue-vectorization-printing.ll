@@ -702,7 +702,6 @@ define i32 @nested_loop(ptr noalias %p, ptr noalias %end, ptr noalias %dst, i64 
 ; CHECK-NEXT:    vp<[[VP8:%[0-9]+]]> = SCALAR-STEPS vp<[[VP7]]>, ir<24>, ir<8>, ir<7>
 ; CHECK-NEXT:    EMIT vp<%next.gep> = ptradd ir<%p>, vp<[[VP8]]>
 ; CHECK-NEXT:    CLONE ir<%l> = load vp<%next.gep>
-; CHECK-NEXT:    CLONE store ir<%l>, ir<%dst>
 ; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<8>
 ; CHECK-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = icmp eq vp<%index.next>, vp<%n.vec>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP9]]>
@@ -710,6 +709,7 @@ define i32 @nested_loop(ptr noalias %p, ptr noalias %end, ptr noalias %dst, i64 
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
 ; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<%3>, vp<%n.vec>
+; CHECK-NEXT:    CLONE store ir<%l>, ir<%dst>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<inner.exit>, ir-bb<scalar.ph>
 ; CHECK-EMPTY:
@@ -757,7 +757,6 @@ define i32 @nested_loop(ptr noalias %p, ptr noalias %end, ptr noalias %dst, i64 
 ; CHECK-NEXT:    vp<[[VP7:%[0-9]+]]> = SCALAR-STEPS vp<[[VP6]]>, ir<24>, ir<4>, ir<3>
 ; CHECK-NEXT:    EMIT vp<%next.gep> = ptradd ir<%p>, vp<[[VP7]]>
 ; CHECK-NEXT:    CLONE ir<%l> = load vp<%next.gep>
-; CHECK-NEXT:    CLONE store ir<%l>, ir<%dst>
 ; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<4>
 ; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = icmp eq vp<%index.next>, vp<%n.vec>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP8]]>
@@ -765,6 +764,7 @@ define i32 @nested_loop(ptr noalias %p, ptr noalias %end, ptr noalias %dst, i64 
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vec.epilog.middle.block:
 ; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<%3>, vp<%n.vec>
+; CHECK-NEXT:    CLONE store ir<%l>, ir<%dst>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<inner.exit>, ir-bb<vec.epilog.scalar.ph>
 ; CHECK-EMPTY:

@@ -3,26 +3,27 @@
 
 ; The VPWidenPointerInductionRecipe is expanded into a ptradd that uses EVL,
 ; make sure we allow it in VPlanVerifier
-define i32 @widenpointerinduction_evl(ptr noalias %p) {
+define i32 @widenpointerinduction_evl(ptr noalias %p, ptr noalias %q) {
 ; CHECK-LABEL: define i32 @widenpointerinduction_evl(
-; CHECK-SAME: ptr noalias [[P:%.*]]) #[[ATTR0:[0-9]+]] {
+; CHECK-SAME: ptr noalias [[P:%.*]], ptr noalias [[Q:%.*]]) #[[ATTR0:[0-9]+]] {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 4 x ptr> poison, ptr [[P]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 4 x ptr> [[BROADCAST_SPLATINSERT]], <vscale x 4 x ptr> poison, <vscale x 4 x i32> zeroinitializer
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[CURRENT_ITERATION_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[POINTER_PHI:%.*]] = phi ptr [ [[P]], %[[VECTOR_PH]] ], [ [[PTR_IND:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[AVL:%.*]] = phi i32 [ 1024, %[[VECTOR_PH]] ], [ [[AVL_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP0:%.*]] = call <vscale x 4 x i32> @llvm.stepvector.nxv4i32()
 ; CHECK-NEXT:    [[VECTOR_GEP:%.*]] = getelementptr i8, ptr [[POINTER_PHI]], <vscale x 4 x i32> [[TMP0]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = call i32 @llvm.experimental.get.vector.length.i32(i32 [[AVL]], i32 4, i1 true)
-; CHECK-NEXT:    call void @llvm.vp.scatter.nxv4p0.nxv4p0(<vscale x 4 x ptr> [[VECTOR_GEP]], <vscale x 4 x ptr> align 4 [[BROADCAST_SPLAT]], <vscale x 4 x i1> splat (i1 true), i32 [[TMP1]])
+; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr ptr, ptr [[Q]], i32 [[INDEX]]
+; CHECK-NEXT:    call void @llvm.vp.store.nxv4p0.p0(<vscale x 4 x ptr> [[VECTOR_GEP]], ptr align 4 [[TMP2]], <vscale x 4 x i1> splat (i1 true), i32 [[TMP1]])
+; CHECK-NEXT:    [[CURRENT_ITERATION_NEXT]] = add i32 [[TMP1]], [[INDEX]]
 ; CHECK-NEXT:    [[AVL_NEXT]] = sub nuw i32 [[AVL]], [[TMP1]]
 ; CHECK-NEXT:    [[PTR_IND]] = getelementptr i8, ptr [[POINTER_PHI]], i32 [[TMP1]]
-; CHECK-NEXT:    [[TMP2:%.*]] = icmp eq i32 [[AVL_NEXT]], 0
-; CHECK-NEXT:    br i1 [[TMP2]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
+; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq i32 [[AVL_NEXT]], 0
+; CHECK-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    br label %[[EXIT:.*]]
 ; CHECK:       [[EXIT]]:
@@ -35,7 +36,8 @@ loop:
   %iv = phi i32 [ 0, %entry ],  [ %iv.next, %loop ]
   %x = phi ptr [ %p, %entry ], [ %x.next, %loop ]
 
-  store ptr %x, ptr %p
+  %gep.q = getelementptr ptr, ptr %q, i32 %iv
+  store ptr %x, ptr %gep.q
 
   %iv.next = add i32 %iv, 1
   %x.next = getelementptr i8, ptr %x, i32 1
