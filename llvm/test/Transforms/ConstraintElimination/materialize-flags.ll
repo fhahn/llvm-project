@@ -204,6 +204,54 @@ entry:
   ret i32 %sub
 }
 
+define i32 @sub_nuw_from_transitive_signed_facts(i32 %a, i32 %b, i32 %n) {
+; CHECK-LABEL: define i32 @sub_nuw_from_transitive_signed_facts(
+; CHECK-SAME: i32 [[A:%.*]], i32 [[B:%.*]], i32 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[B_NNEG:%.*]] = icmp sge i32 [[B]], 0
+; CHECK-NEXT:    call void @llvm.assume(i1 [[B_NNEG]])
+; CHECK-NEXT:    [[N_NNEG:%.*]] = icmp sge i32 [[N]], 0
+; CHECK-NEXT:    call void @llvm.assume(i1 [[N_NNEG]])
+; CHECK-NEXT:    [[REM:%.*]] = sub nsw i32 [[A]], [[N]]
+; CHECK-NEXT:    [[FITS:%.*]] = icmp sge i32 [[REM]], [[B]]
+; CHECK-NEXT:    call void @llvm.assume(i1 [[FITS]])
+; CHECK-NEXT:    [[SUB:%.*]] = sub nsw i32 [[A]], [[B]]
+; CHECK-NEXT:    ret i32 [[SUB]]
+;
+entry:
+  %b.nneg = icmp sge i32 %b, 0
+  call void @llvm.assume(i1 %b.nneg)
+  %n.nneg = icmp sge i32 %n, 0
+  call void @llvm.assume(i1 %n.nneg)
+  %rem = sub nsw i32 %a, %n
+  %fits = icmp sge i32 %rem, %b
+  call void @llvm.assume(i1 %fits)
+  %sub = sub i32 %a, %b
+  ret i32 %sub
+}
+
+define i32 @sub_no_nuw_from_transitive_signed_facts(i32 %a, i32 %b, i32 %n) {
+; CHECK-LABEL: define i32 @sub_no_nuw_from_transitive_signed_facts(
+; CHECK-SAME: i32 [[A:%.*]], i32 [[B:%.*]], i32 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[N_NNEG:%.*]] = icmp sge i32 [[N]], 0
+; CHECK-NEXT:    call void @llvm.assume(i1 [[N_NNEG]])
+; CHECK-NEXT:    [[REM:%.*]] = sub nsw i32 [[A]], [[N]]
+; CHECK-NEXT:    [[FITS:%.*]] = icmp sge i32 [[REM]], [[B]]
+; CHECK-NEXT:    call void @llvm.assume(i1 [[FITS]])
+; CHECK-NEXT:    [[SUB:%.*]] = sub i32 [[A]], [[B]]
+; CHECK-NEXT:    ret i32 [[SUB]]
+;
+entry:
+  %n.nneg = icmp sge i32 %n, 0
+  call void @llvm.assume(i1 %n.nneg)
+  %rem = sub nsw i32 %a, %n
+  %fits = icmp sge i32 %rem, %b
+  call void @llvm.assume(i1 %fits)
+  %sub = sub i32 %a, %b
+  ret i32 %sub
+}
+
 define ptr @gep_nuw_transitive(ptr %p, i64 %i, i64 %j) {
 ; CHECK-LABEL: define ptr @gep_nuw_transitive(
 ; CHECK-SAME: ptr [[P:%.*]], i64 [[I:%.*]], i64 [[J:%.*]]) {
