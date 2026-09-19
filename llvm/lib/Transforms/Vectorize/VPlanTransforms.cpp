@@ -2427,8 +2427,8 @@ static bool cannotHoistOrSinkRecipe(VPRecipeBase &R, VPBasicBlock *FirstBB,
          !canHoistOrSinkWithNoAliasCheck(*MemLoc, FirstBB, LastBB, SinkInfo);
 }
 
-/// Move loop-invariant recipes out of the vector loop region in \p Plan.
-static void licm(VPlan &Plan) {
+/// Hoist loop-invariant recipes to the vector preheader of \p Plan.
+static void hoistInvariantRecipes(VPlan &Plan) {
   VPBasicBlock *Preheader = Plan.getVectorPreheader();
 
   // Hoist any loop invariant recipes from the vector loop region to the
@@ -2452,7 +2452,11 @@ static void licm(VPlan &Plan) {
       R.moveBefore(*Preheader, Preheader->end());
     }
   }
+}
 
+/// Sink recipes whose users are all outside the vector loop region of \p Plan.
+static void sinkInvariantRecipes(VPlan &Plan) {
+  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
 #ifndef NDEBUG
   VPDominatorTree VPDT(Plan);
 #endif
@@ -2720,7 +2724,8 @@ void VPlanTransforms::optimize(VPlan &Plan) {
 
   RUN_VPLAN_PASS(createAndOptimizeReplicateRegions, Plan);
   RUN_VPLAN_PASS(mergeBlocksIntoPredecessors, Plan);
-  RUN_VPLAN_PASS(licm, Plan);
+  RUN_VPLAN_PASS(hoistInvariantRecipes, Plan);
+  RUN_VPLAN_PASS(sinkInvariantRecipes, Plan);
 }
 
 void VPlanTransforms::simplifyLiveInsWithSCEV(VPlan &Plan,
