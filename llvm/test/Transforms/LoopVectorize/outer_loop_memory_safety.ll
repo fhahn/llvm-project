@@ -329,8 +329,9 @@ exit:
   ret void
 }
 
-; Unsafe: the store address does not vary with the outer loop, so every lane
-; writes the same location.
+; The store address does not vary with the outer loop, so every lane writes the
+; same location. Ordered scatter preserves the stores' order, but this does not
+; satisfy the conservative requirement for disjoint stores.
 define void @store_outer_invariant(ptr noalias %A, ptr noalias %B, i64 %N, i64 %M) {
 ; CHECK-LABEL: define void @store_outer_invariant(
 ; CHECK-SAME: ptr noalias [[A:%.*]], ptr noalias [[B:%.*]], i64 [[N:%.*]], i64 [[M:%.*]]) {
@@ -408,8 +409,8 @@ exit:
   ret void
 }
 
-; Unsafe: the store address varies in the inner loop, so one outer iteration
-; writes a whole range and adjacent lanes may overlap.
+; Each outer iteration writes a disjoint row. Proving this requires reasoning
+; about the whole inner-loop range, rather than one address per outer iteration.
 define void @store_in_inner_loop(ptr noalias %A, ptr noalias %B, i64 %N, i64 %M) {
 ; CHECK-LABEL: define void @store_in_inner_loop(
 ; CHECK-SAME: ptr noalias [[A:%.*]], ptr noalias [[B:%.*]], i64 [[N:%.*]], i64 [[M:%.*]]) {
@@ -562,7 +563,8 @@ exit:
   ret void
 }
 
-; Unsafe: the store advances by 4 bytes but writes 8, so adjacent lanes overlap.
+; The store advances by 4 bytes but writes 8, so adjacent lanes overlap.
+; Ordered scatter preserves these stores, but they are not disjoint.
 define void @store_wider_than_step(ptr noalias %A, ptr noalias %B, i64 %N, i64 %M) {
 ; CHECK-LABEL: define void @store_wider_than_step(
 ; CHECK-SAME: ptr noalias [[A:%.*]], ptr noalias [[B:%.*]], i64 [[N:%.*]], i64 [[M:%.*]]) {
@@ -597,7 +599,7 @@ define void @store_wider_than_step(ptr noalias %A, ptr noalias %B, i64 %N, i64 %
 ; CHECK:       [[OUTER_LATCH]]:
 ; CHECK-NEXT:    [[WIDE_GEP5:%.*]] = getelementptr inbounds float, ptr [[B]], <4 x i64> [[VEC_IND]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = fpext <4 x float> [[TMP3]] to <4 x double>
-; CHECK-NEXT:    call void @llvm.masked.scatter.v4f64.v4p0(<4 x double> [[TMP7]], <4 x ptr> align 8 [[WIDE_GEP5]], <4 x i1> splat (i1 true))
+; CHECK-NEXT:    call void @llvm.masked.scatter.v4f64.v4p0(<4 x double> [[TMP7]], <4 x ptr> align 4 [[WIDE_GEP5]], <4 x i1> splat (i1 true))
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[VEC_IND]], splat (i64 4)
 ; CHECK-NEXT:    [[TMP8:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
@@ -633,7 +635,7 @@ inner.body:
 outer.latch:
   %B.ptr = getelementptr inbounds float, ptr %B, i64 %i
   %sum.ext = fpext float %sum.next to double
-  store double %sum.ext, ptr %B.ptr, align 8
+  store double %sum.ext, ptr %B.ptr, align 4
   %i.next = add nuw nsw i64 %i, 1
   %i.cmp = icmp eq i64 %i.next, %N
   br i1 %i.cmp, label %exit, label %outer.header, !llvm.loop !0
@@ -642,7 +644,8 @@ exit:
   ret void
 }
 
-; Unsafe: a memory intrinsic is not covered by the load/store reasoning.
+; This copy between distinct objects is safe, but a memory intrinsic is not
+; covered by the load/store reasoning.
 declare void @llvm.memcpy.p0.p0.i64(ptr, ptr, i64, i1)
 
 define void @memcpy_in_nest(ptr noalias %A, ptr noalias %B, i64 %N, i64 %M) {
