@@ -399,10 +399,12 @@ m_Broadcast(const Op0_t &Op0) {
   return m_VPInstruction<VPInstruction::Broadcast>(Op0);
 }
 
-template <typename Op0_t>
-inline VPInstruction_match<VPInstruction::ExplicitVectorLength, Op0_t>
-m_EVL(const Op0_t &Op0) {
-  return m_VPInstruction<VPInstruction::ExplicitVectorLength>(Op0);
+/// Matches EXPLICIT-VECTOR-LENGTH with \p Op0 as application vector length,
+/// before and after the vector factor operand has been materialized.
+template <typename Op0_t> inline auto m_EVL(const Op0_t &Op0) {
+  return m_CombineOr(
+      m_VPInstruction<VPInstruction::ExplicitVectorLength>(Op0),
+      m_VPInstruction<VPInstruction::ExplicitVectorLength>(Op0, m_VPValue()));
 }
 
 template <typename Op0_t>

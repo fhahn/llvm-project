@@ -986,6 +986,17 @@ void VPlanTransforms::materializeVectorTypes(VPlan &Plan, ElementCount VF) {
 
 void VPlanTransforms::materializeFactors(VPlan &Plan, VPBasicBlock *VectorPH,
                                          ElementCount VFEC) {
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_deep(Plan.getEntry()))) {
+    for (VPRecipeBase &R : *VPBB) {
+      if (!match(&R, m_EVL(m_VPValue())))
+        continue;
+      assert(VFEC.isScalable() && "Expected scalable vector factor.");
+      cast<VPInstruction>(&R)->addOperand(
+          Plan.getConstantInt(32, VFEC.getKnownMinValue()));
+    }
+  }
+
   // If VF and VFxUF have already been materialized (no remaining users),
   // there's nothing more to do.
   if (Plan.getVF().isMaterialized()) {

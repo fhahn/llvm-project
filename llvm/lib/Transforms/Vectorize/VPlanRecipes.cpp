@@ -642,7 +642,6 @@ unsigned VPInstruction::getNumOperandsForOpcode() const {
   case VPInstruction::BranchOnCond:
   case VPInstruction::Broadcast:
   case VPInstruction::ExitingIVValue:
-  case VPInstruction::ExplicitVectorLength:
   case VPInstruction::ExtractLastLane:
   case VPInstruction::ExtractLastPart:
   case VPInstruction::ExtractPenultimateElement:
@@ -687,6 +686,7 @@ unsigned VPInstruction::getNumOperandsForOpcode() const {
   case VPInstruction::Intrinsic:
   case VPInstruction::CanonicalIVIncrementForPart:
   case VPInstruction::ComputeReductionResult:
+  case VPInstruction::ExplicitVectorLength:
   case VPInstruction::FirstActiveLane:
   case VPInstruction::LastActiveLane:
   case VPInstruction::ExtractLane:
@@ -881,8 +881,7 @@ Value *VPInstruction::generate(VPTransformState &State,
     assert(AVL->getType()->isIntegerTy() &&
            "Requested vector length should be an integer.");
 
-    assert(State.VF.isScalable() && "Expected scalable vector factor.");
-    Value *VFArg = Builder.getInt32(State.VF.getKnownMinValue());
+    Value *VFArg = State.get(getOperand(1), /*NeedsSingleScalar=*/true);
 
     Value *EVL = Builder.CreateIntrinsic(
         Builder.getInt32Ty(), Intrinsic::experimental_get_vector_length,
@@ -1653,6 +1652,10 @@ void VPInstruction::addOperand(VPValue *Op) {
   case VPInstruction::BuildStructVector:
     assert(Ty == getOperand(0)->getScalarType() &&
            "appended operand must match operand 0's scalar type");
+    break;
+  case VPInstruction::ExplicitVectorLength:
+    assert(getNumOperands() == 1 && Ty->isIntegerTy(32) &&
+           "the vector factor must be appended as single i32 operand");
     break;
   case VPInstruction::ExtractLane:
     assert((IsVF || Ty == getOperand(1)->getScalarType()) &&

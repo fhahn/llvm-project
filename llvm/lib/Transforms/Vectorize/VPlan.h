@@ -1313,6 +1313,10 @@ public:
     WideActiveLaneMask,
     // Extracts each unrolled part of a (VF * UF) widened vector/mask.
     ExtractVectorForPart,
+    // Computes the number of elements to process in the current iteration from
+    // the application vector length (first operand). Materializing the factors
+    // appends the known minimum of the vector factor as i32 operand; the
+    // vector factor is required to be scalable.
     ExplicitVectorLength,
     // Represents the incoming loop-invariant alias-mask. All memory accesses
     // in the loop must stay within the active lanes.
@@ -1481,8 +1485,9 @@ public:
   unsigned getOpcode() const { return Opcode; }
 
   /// Add \p Op as operand of this VPInstruction. Only supported for AnyOf,
-  /// ComputeReductionResult, BuildVector, BuildStructVector, ExtractLane,
-  /// ExtractLastActive, FirstActiveLane, LastActiveLane.
+  /// ComputeReductionResult, BuildVector, BuildStructVector,
+  /// ExplicitVectorLength, ExtractLane, ExtractLastActive, FirstActiveLane,
+  /// LastActiveLane.
   void addOperand(VPValue *Op);
 
   /// Generate the instruction.
