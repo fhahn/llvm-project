@@ -6865,18 +6865,11 @@ void LoopVectorizationPlanner::addReductionResultComputation(VPlanPtr &Plan) {
   VPBasicBlock *MiddleVPBB = Plan->getMiddleBlock();
   VPBasicBlock::iterator IP = MiddleVPBB->getFirstNonPhi();
   VPValue *HeaderMask = Plan->getVectorLoopRegion()->getHeaderMask();
-  for (VPRecipeBase &R : make_early_inc_range(
-           Plan->getVectorLoopRegion()->getEntryBasicBlock()->phis())) {
+  for (VPRecipeBase &R :
+       Plan->getVectorLoopRegion()->getEntryBasicBlock()->phis()) {
     VPReductionPHIRecipe *PhiR = dyn_cast<VPReductionPHIRecipe>(&R);
     if (!PhiR)
       continue;
-
-    // Clean up reductions that have become invariant.
-    if (PhiR->getBackedgeValue() == PhiR) {
-      PhiR->replaceAllUsesWith(PhiR->getStartValue());
-      PhiR->eraseFromParent();
-      continue;
-    }
 
     RecurKind RecurrenceKind = PhiR->getRecurrenceKind();
 
@@ -6952,21 +6945,6 @@ void LoopVectorizationPlanner::addReductionResultComputation(VPlanPtr &Plan) {
       if (match(U, m_CombineOr(m_ExtractLane(m_VPValue(), m_VPValue()),
                                m_ExtractLastLane(m_VPValue()))))
         cast<VPInstruction>(U)->replaceAllUsesWith(FinalReductionResult);
-    }
-
-    RecurKind RK = PhiR->getRecurrenceKind();
-    if ((!RecurrenceDescriptor::isAnyOfRecurrenceKind(RK) &&
-         !RecurrenceDescriptor::isFindIVRecurrenceKind(RK) &&
-         !RecurrenceDescriptor::isMinMaxRecurrenceKind(RK) &&
-         !RecurrenceDescriptor::isFindLastRecurrenceKind(RK))) {
-      VPBuilder PHBuilder(Plan->getVectorPreheader());
-      VPValue *Iden = Plan->getOrAddLiveIn(getRecurrenceIdentity(
-          RK, PhiR->getScalarType(), PhiR->getFastMathFlagsOrNone()));
-      auto *ScaleFactorVPV = Plan->getConstantInt(32, 1);
-      VPValue *StartV = PHBuilder.createNaryOp(
-          VPInstruction::ReductionStartVector,
-          {PhiR->getStartValue(), Iden, ScaleFactorVPV}, *PhiR);
-      PhiR->setOperand(0, StartV);
     }
   }
 }

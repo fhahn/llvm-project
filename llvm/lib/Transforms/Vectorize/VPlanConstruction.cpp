@@ -989,12 +989,48 @@ bool VPlanTransforms::createHeaderPhiRecipes(
         RdxDesc.hasUsesOutsideReductionChain());
   };
 
+  // In the plain CFG, the header's first predecessor is the vector preheader,
+  // see VPBlockUtils::getPlainCFGHeaderAndLatch.
+  VPBuilder PHBuilder(cast<VPBasicBlock>(HeaderVPBB->getPredecessors()[0]));
+
   for (VPRecipeBase &R : make_early_inc_range(HeaderVPBB->phis())) {
     auto *PhiR = cast<VPPhi>(&R);
     VPHeaderPHIRecipe *HeaderPhiR = CreateHeaderPhiRecipe(PhiR);
     HeaderPhiR->insertBefore(PhiR);
     PhiR->replaceAllUsesWith(HeaderPhiR);
     PhiR->eraseFromParent();
+
+    auto *RedPhiR = dyn_cast<VPReductionPHIRecipe>(HeaderPhiR);
+    if (!RedPhiR)
+      continue;
+
+    // A reduction phi whose backedge value is the phi itself is invariant and
+    // equal to its start value. Fold it here, before the start value gets
+    // wrapped below.
+    if (RedPhiR->getBackedgeValue() == RedPhiR) {
+      RedPhiR->replaceAllUsesWith(RedPhiR->getStartValue());
+      RedPhiR->eraseFromParent();
+      continue;
+    }
+
+    // AnyOf, Find and MinMax reductions use a splat of the start value as
+    // vector start value and do not need a separate identity.
+    RecurKind RK = RedPhiR->getRecurrenceKind();
+    if (RecurrenceDescriptor::isAnyOfRecurrenceKind(RK) ||
+        RecurrenceDescriptor::isFindRecurrenceKind(RK) ||
+        RecurrenceDescriptor::isMinMaxRecurrenceKind(RK))
+      continue;
+
+    // Otherwise combine the start value with the reduction's identity at the
+    // end of the vector preheader. The scale factor is 1 here and updated
+    // later for partial reductions.
+    VPValue *Iden = Plan.getOrAddLiveIn(getRecurrenceIdentity(
+        RK, RedPhiR->getScalarType(), RedPhiR->getFastMathFlagsOrNone()));
+    auto *ScaleFactorVPV = Plan.getConstantInt(32, 1);
+    VPValue *StartV = PHBuilder.createNaryOp(
+        VPInstruction::ReductionStartVector,
+        {RedPhiR->getStartValue(), Iden, ScaleFactorVPV}, *RedPhiR);
+    RedPhiR->setOperand(0, StartV);
   }
 
   if (!tryToSinkOrHoistRecurrenceUsers(HeaderVPBB, VPDT))
