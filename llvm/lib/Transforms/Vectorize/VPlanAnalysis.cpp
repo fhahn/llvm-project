@@ -511,7 +511,8 @@ bool llvm::proveOuterLoopMemorySafety(VPlan &Plan,
                                       const VPDominatorTree &VPDT,
                                       Loop *OuterLoop) {
   // An access of the nest: the object it is based on, null if it could not be
-  // determined, and the memory it touches, empty if it could not be bounded.
+  // determined, its parallel annotation, and its memory range, computed lazily
+  // when a pair needs runtime disambiguation.
   struct Access {
     VPInstruction *Recipe;
     const Value *Object;

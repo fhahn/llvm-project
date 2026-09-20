@@ -1526,7 +1526,7 @@ static VPValue *expandOverflowCheck(const SCEVAddRecExpr *AR, bool Signed,
 
   // The expression {Start,+,Step} has nusw/nssw if
   //   Step < 0, Start - |Step| * Backedge <= Start
-  //   Step >= 0, Start + |Step| * Backedge > Start
+  //   Step >= 0, Start + |Step| * Backedge >= Start
   // and |Step| * Backedge doesn't unsigned overflow.
   VPValue *TripCountVal = Exp.expand(ExitCount);
   Type *Ty = IntegerType::get(Plan.getContext(), DstBits);

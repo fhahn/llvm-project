@@ -236,7 +236,7 @@ struct VPlanTransforms {
   static void attachCheckBlock(VPlan &Plan, Value *Cond, BasicBlock *CheckBlock,
                                bool AddBranchWeights);
 
-  /// Turn the predicates registered on \p Plan, if any, into a check block of
+  /// Turn the predicates registered on \p Plan, if any, into check blocks of
   /// VPInstructions bypassing the vector loop when any of them does not hold.
   static void materializePredicates(VPlan &Plan, ScalarEvolution &SE,
                                     DebugLoc DL, bool AddBranchWeights);
