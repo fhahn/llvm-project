@@ -1240,7 +1240,7 @@ public:
 
   /// Returns true if the predicated reduction select should be used to set the
   /// incoming value for the reduction phi.
-  bool usePredicatedReductionSelect(RecurKind RecurrenceKind) const {
+  bool usePredicatedReductionSelect() const {
     // Force to use predicated reduction select since the EVL of the
     // second-to-last iteration might not be VF*UF.
     if (foldTailWithEVL())
@@ -1249,12 +1249,6 @@ public:
     // Force a predicated select with alias-masking to avoid propagating poison
     // values to the header phi for lanes outside the alias-mask.
     if (maskPartialAliasing())
-      return true;
-
-    // Note: For FindLast recurrences we prefer a predicated select to simplify
-    // matching in handleFindLastReductions(), rather than handle multiple
-    // cases.
-    if (RecurrenceDescriptor::isFindLastRecurrenceKind(RecurrenceKind))
       return true;
 
     return PreferPredicatedReductionSelect ||
@@ -6373,31 +6367,6 @@ static bool verifyExecutionFrequenciesMatchBFI(VPlan &Plan, Loop *OrigLoop,
 }
 #endif
 
-/// Return true if any recipe reachable from a reduction phi in \p Plan's vector
-/// loop region may write to memory.
-static bool reductionChainWritesMemory(VPlan &Plan) {
-  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
-  SmallPtrSet<VPRecipeBase *, 16> Seen;
-  for (VPReductionPHIRecipe &Phi : make_isa_range<VPReductionPHIRecipe>(
-           LoopRegion->getEntryBasicBlock()->phis())) {
-    SmallVector<VPRecipeBase *> Worklist = {&Phi};
-    while (!Worklist.empty()) {
-      VPRecipeBase *R = Worklist.pop_back_val();
-      if (!Seen.insert(R).second)
-        continue;
-      if (R->mayWriteToMemory())
-        return true;
-      for (VPValue *V : R->definedValues())
-        for (VPUser *U : V->users()) {
-          auto *User = cast<VPRecipeBase>(U);
-          if (User->getParent()->getEnclosingLoopRegion())
-            Worklist.push_back(User);
-        }
-    }
-  }
-  return false;
-}
-
 VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
   bool IsInnerLoop = OrigLoop->isInnermost();
 
@@ -6492,10 +6461,15 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
 
   RUN_VPLAN_PASS(VPlanTransforms::introduceMasksAndLinearize, *VPlan0);
 
-  // Reduction chains must not write intermediate values to memory. Generic
-  // sinking can conservatively retain a store when its alias proof is
-  // insufficient; reject that plan instead of vectorizing the reduction.
-  if (reductionChainWritesMemory(*VPlan0))
+  // We want code in the middle block to appear to execute on the location of
+  // the scalar loop's latch terminator because: (a) it is all compiler
+  // generated, (b) these instructions are always executed after evaluating the
+  // latch conditional branch, and (c) other passes may add new predecessors
+  // which terminate on this line. This is the easiest way to ensure we don't
+  // accidentally cause an extra step back into the loop while debugging.
+  if (!RUN_VPLAN_PASS(VPlanTransforms::createReductionResults, *VPlan0,
+                      CM->usePredicatedReductionSelect(),
+                      OrigLoop->getLoopLatch()->getTerminator()->getDebugLoc()))
     return nullptr;
 
   return VPlan0;
@@ -6719,7 +6693,6 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan,
   // bring the VPlan to its final state.
   // ---------------------------------------------------------------------------
 
-  addReductionResultComputation(Plan);
   RUN_VPLAN_PASS(VPlanTransforms::truncateReductions, *Plan, Range.Start,
                  Legal->getReductionVars());
   RUN_VPLAN_PASS(VPlanTransforms::clearReductionWrapFlags, *Plan);
@@ -6780,176 +6753,6 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan,
 
   assert(verifyVPlanIsValid(*Plan) && "VPlan is invalid");
   return Plan;
-}
-
-/// Convert the AnyOf reduction \p PhiR to operate on a boolean chain and create
-/// its final result in \p Plan's middle block at \p MiddleIP. Rebuilds the i1
-/// version of the exiting value \p OrigExitingVPV (phi, or, and any
-/// blends/selects it flows through) and returns the select of the final value.
-static VPInstruction *createAnyOfResult(VPlan &Plan, VPReductionPHIRecipe *PhiR,
-                                        VPValue *OrigExitingVPV,
-                                        VPBasicBlock::iterator MiddleIP,
-                                        DebugLoc ExitDL) {
-  using namespace VPlanPatternMatch;
-  auto *AnyOfSelect = cast<VPSingleDefRecipe>(
-      findUserOf(PhiR, m_Select(m_VPValue(), m_VPValue(), m_VPValue())));
-  VPValue *Start = PhiR->getStartValue();
-  bool TrueValIsPhi = AnyOfSelect->getOperand(1) == PhiR;
-  // NewVal is the non-phi operand of the select.
-  VPValue *NewVal =
-      TrueValIsPhi ? AnyOfSelect->getOperand(2) : AnyOfSelect->getOperand(1);
-
-  // Adjust AnyOf reductions; replace the reduction phi for the selected
-  // value with a boolean reduction phi node to check if the condition is
-  // true in any iteration. The final value is selected by the final
-  // ComputeReductionResult.
-  VPValue *Cmp = AnyOfSelect->getOperand(0);
-  // If the compare is checking the reduction PHI node, adjust it to check
-  // the start value.
-  if (VPRecipeBase *CmpR = Cmp->getDefiningRecipe())
-    CmpR->replaceUsesOfWith(PhiR, PhiR->getStartValue());
-  VPBuilder Builder(AnyOfSelect);
-
-  // If the true value of the select is the reduction phi, the new value
-  // is selected if the negated condition is true in any iteration.
-  if (TrueValIsPhi)
-    Cmp = Builder.createNot(Cmp);
-
-  // Build a fresh i1 chain (phi, or, and i1 versions of any blend/select
-  // the exiting value flows through).
-  auto *NewPhiR = PhiR->cloneWithOperands(Plan.getFalse(), Plan.getFalse());
-  NewPhiR->insertBefore(PhiR);
-  VPValue *NewExiting = Builder.createOr(NewPhiR, Cmp);
-
-  // The exiting value may flow through a chain of VPBlendRecipes and
-  // select recipes (VPInstruction, VPWidenRecipe or VPReplicateRecipe with
-  // Select opcode) before reaching OrigExitingVPV. Clone each chain link
-  // in topological order so each clone refers to the already-rewritten i1
-  // operands via Substitutions.
-  DenseMap<VPValue *, VPValue *> Substitutions = {{AnyOfSelect, NewExiting},
-                                                  {PhiR, NewPhiR}};
-  std::function<void(VPSingleDefRecipe *)> CloneChain =
-      [&](VPSingleDefRecipe *Old) {
-        if (Substitutions.contains(Old))
-          return;
-        SmallVector<VPValue *> NewOps;
-        for (VPValue *Op : Old->operands()) {
-          if (isa<VPBlendRecipe>(Op) ||
-              match(Op, m_Select(m_VPValue(), m_VPValue(), m_VPValue())))
-            CloneChain(cast<VPSingleDefRecipe>(Op));
-          NewOps.push_back(Substitutions.lookup_or(Op, Op));
-        }
-        VPSingleDefRecipe *New;
-        if (auto *B = dyn_cast<VPBlendRecipe>(Old))
-          New = B->cloneWithOperands(NewOps);
-        else if (auto *W = dyn_cast<VPWidenRecipe>(Old))
-          New = W->cloneWithOperands(NewOps);
-        else if (auto *Rep = dyn_cast<VPReplicateRecipe>(Old))
-          New = Rep->cloneWithOperands(NewOps);
-        else
-          New = cast<VPInstruction>(Old)->cloneWithOperands(NewOps);
-        New->insertBefore(Old);
-        Substitutions[Old] = New;
-      };
-
-  if (OrigExitingVPV != AnyOfSelect) {
-    CloneChain(cast<VPSingleDefRecipe>(OrigExitingVPV));
-    NewExiting = Substitutions.lookup(OrigExitingVPV);
-  }
-  NewPhiR->setOperand(1, NewExiting);
-  PhiR->replaceAllUsesWith(Plan.getPoison(PhiR->getScalarType()));
-
-  Builder.setInsertPoint(Plan.getMiddleBlock(), MiddleIP);
-  return Builder.createAnyOfReduction(NewExiting, NewVal, Start, ExitDL);
-}
-
-void LoopVectorizationPlanner::addReductionResultComputation(VPlanPtr &Plan) {
-  using namespace VPlanPatternMatch;
-  VPBasicBlock *MiddleVPBB = Plan->getMiddleBlock();
-  VPBasicBlock::iterator IP = MiddleVPBB->getFirstNonPhi();
-  VPValue *HeaderMask = Plan->getVectorLoopRegion()->getHeaderMask();
-  for (VPRecipeBase &R :
-       Plan->getVectorLoopRegion()->getEntryBasicBlock()->phis()) {
-    VPReductionPHIRecipe *PhiR = dyn_cast<VPReductionPHIRecipe>(&R);
-    if (!PhiR)
-      continue;
-
-    RecurKind RecurrenceKind = PhiR->getRecurrenceKind();
-
-    // Convert a VPBlendRecipe backedge to a select.
-    if (auto *Blend = dyn_cast<VPBlendRecipe>(PhiR->getBackedgeValue())) {
-      if (Blend->getNumIncomingValues() == 2 &&
-          Blend->getMask(0) == HeaderMask) {
-        auto *Sel = VPBuilder(Blend).createSelect(
-            Blend->getMask(0), Blend->getIncomingValue(0),
-            Blend->getIncomingValue(1), {}, "", *Blend);
-        Blend->replaceAllUsesWith(Sel);
-        Blend->eraseFromParent();
-      }
-    }
-
-    auto *OrigExitingVPV = PhiR->getBackedgeValue();
-
-    // Remove the predicated select if the target doesn't want it.
-    VPValue *V;
-    if (!CM->usePredicatedReductionSelect(RecurrenceKind) &&
-        match(PhiR->getBackedgeValue(),
-              m_Select(m_Specific(HeaderMask), m_VPValue(V), m_Specific(PhiR))))
-      PhiR->setBackedgeValue(V);
-
-    // We want code in the middle block to appear to execute on the location of
-    // the scalar loop's latch terminator because: (a) it is all compiler
-    // generated, (b) these instructions are always executed after evaluating
-    // the latch conditional branch, and (c) other passes may add new
-    // predecessors which terminate on this line. This is the easiest way to
-    // ensure we don't accidentally cause an extra step back into the loop while
-    // debugging.
-    DebugLoc ExitDL = OrigLoop->getLoopLatch()->getTerminator()->getDebugLoc();
-
-    // TODO: At the moment ComputeReductionResult also drives creation of the
-    // bc.merge.rdx phi nodes, hence it needs to be created unconditionally here
-    // even for in-loop reductions, until the reduction resume value handling is
-    // also modeled in VPlan.
-    VPInstruction *FinalReductionResult;
-    VPBuilder::InsertPointGuard Guard(Builder);
-    Builder.setInsertPoint(MiddleVPBB, IP);
-    // For AnyOf reductions, find the select among PhiR's users and convert
-    // the reduction phi to operate on bools before creating the final
-    // reduction result.
-    if (RecurrenceDescriptor::isAnyOfRecurrenceKind(RecurrenceKind)) {
-      FinalReductionResult =
-          createAnyOfResult(*Plan, PhiR, OrigExitingVPV, IP, ExitDL);
-    } else {
-      VPIRFlags Flags(RecurrenceKind, PhiR->isOrdered(), PhiR->isInLoop(),
-                      PhiR->getFastMathFlagsOrNone());
-      FinalReductionResult =
-          Builder.createNaryOp(VPInstruction::ComputeReductionResult,
-                               {OrigExitingVPV}, Flags, ExitDL);
-    }
-
-    // Update all users outside the vector region. Also replace redundant
-    // extracts.
-    for (auto *U : to_vector(OrigExitingVPV->users())) {
-      auto *Parent = cast<VPRecipeBase>(U)->getParent();
-      if (FinalReductionResult == U || Parent->getParent())
-        continue;
-      // Skip ComputeReductionResult and FindIV reductions when they are not the
-      // final result.
-      if (match(U, m_VPInstruction<VPInstruction::ComputeReductionResult>()) ||
-          (RecurrenceDescriptor::isFindIVRecurrenceKind(RecurrenceKind) &&
-           match(U, m_VPInstruction<Instruction::ICmp>())))
-        continue;
-      U->replaceUsesOfWith(OrigExitingVPV, FinalReductionResult);
-
-      // Look through ExtractLastPart.
-      if (match(U, m_ExtractLastPart(m_VPValue())))
-        U = cast<VPInstruction>(U)->getSingleUser();
-
-      if (match(U, m_CombineOr(m_ExtractLane(m_VPValue(), m_VPValue()),
-                               m_ExtractLastLane(m_VPValue()))))
-        cast<VPInstruction>(U)->replaceAllUsesWith(FinalReductionResult);
-    }
-  }
 }
 
 void LoopVectorizationPlanner::attachRuntimeChecks(

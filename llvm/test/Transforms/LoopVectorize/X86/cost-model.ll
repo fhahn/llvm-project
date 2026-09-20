@@ -680,14 +680,7 @@ exit:
 define void @reduction_store(ptr noalias %src, ptr %dst, i1 %x) #2 {
 ; CHECK-LABEL: define void @reduction_store(
 ; CHECK-SAME: ptr noalias [[SRC:%.*]], ptr [[DST:%.*]], i1 [[X:%.*]]) #[[ATTR3:[0-9]+]] {
-; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
-; CHECK:       [[VECTOR_PH]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = zext i1 [[X]] to i64
-; CHECK-NEXT:    [[TMP1:%.*]] = lshr i64 [[TMP0]], 12
-; CHECK-NEXT:    [[TMP7:%.*]] = trunc i64 [[TMP1]] to i32
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[TMP7]], i64 0
-; CHECK-NEXT:    [[TMP2:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:  [[VECTOR_PH:.*]]:
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[RED:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[RED_NEXT:%.*]], %[[VECTOR_BODY]] ]
