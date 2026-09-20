@@ -724,7 +724,6 @@ bool VPInstruction::canGenerateScalarForFirstLane() const {
   case Instruction::PHI:
   case Instruction::Select:
   case VPInstruction::BranchOnCond:
-  case VPInstruction::ExtractStructField:
   case VPInstruction::BranchOnTwoConds:
   case VPInstruction::BranchOnCount:
   case VPInstruction::CanonicalIVIncrementForPart:
@@ -1593,6 +1592,7 @@ bool VPInstruction::isSingleScalar() const {
   case VPInstruction::ExplicitVectorLength:
   case VPInstruction::ResumeForEpilogue:
   case VPInstruction::Intrinsic:
+  case VPInstruction::ExtractStructField:
     return true;
   default:
     return Instruction::isCast(getOpcode());
@@ -1767,6 +1767,7 @@ bool VPInstruction::usesFirstLaneOnly(const VPValue *Op) const {
   case VPInstruction::BranchOnTwoConds:
   case VPInstruction::Broadcast:
   case VPInstruction::Intrinsic:
+  case VPInstruction::ExtractStructField:
   case VPInstruction::ReductionStartVector:
   case VPInstruction::ResumeForEpilogue:
     return true;
@@ -1869,6 +1870,9 @@ void VPInstruction::printRecipe(raw_ostream &O, const Twine &Indent,
     break;
   case VPInstruction::MaskedCond:
     O << "masked-cond";
+    break;
+  case VPInstruction::ExtractStructField:
+    O << "extract-struct-field";
     break;
   case VPInstruction::ExtractLane:
     O << "extract-lane";

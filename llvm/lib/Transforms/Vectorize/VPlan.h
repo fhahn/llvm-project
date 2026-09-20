@@ -1354,8 +1354,8 @@ public:
     /// scalars extracted from a vector, to be replaced by VF ExtractElement
     /// VPInstructions.
     Unpack,
-    /// Extracts the field of the struct-typed first operand selected by the
-    /// constant second operand. Unlike Instruction::ExtractValue, which takes
+    /// Extracts a single scalar field of the scalar struct-typed first operand,
+    /// selected by the constant second operand. Unlike Instruction::ExtractValue, which takes
     /// its indices from the underlying instruction, the field is an operand, so
     /// the recipe can be created without underlying IR.
     /// TODO: Merge with Instruction::ExtractValue once that carries its index

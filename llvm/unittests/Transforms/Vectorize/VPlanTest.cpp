@@ -172,6 +172,32 @@ exit:
   EXPECT_EQ(Count, 2u);
 }
 
+TEST_F(VPInstructionTest, ScalarStructField) {
+  VPlan &Plan = getPlan();
+  VPBasicBlock *Check = Plan.createVPBasicBlock("check");
+  VPBlockUtils::connectBlocks(Plan.getEntry(), Check);
+  VPBlockUtils::connectBlocks(Check, Plan.getScalarHeader());
+  VPBuilder Builder(Check);
+  Type *Int32 = Type::getInt32Ty(C);
+  VPValue *One = Plan.getConstantInt(32, 1);
+  auto *Product = Builder.createScalarIntrinsic(
+      Intrinsic::umul_with_overflow, {One, One},
+      StructType::get(Int32, Type::getInt1Ty(C)), DebugLoc());
+  for (unsigned Idx : {0, 1}) {
+    VPValue *Index = Plan.getConstantInt(32, Idx);
+    auto *Field =
+        Builder.createNaryOp(VPInstruction::ExtractStructField, {Product, Index});
+    EXPECT_EQ(Field->getScalarType(), Idx == 0 ? Int32 : Type::getInt1Ty(C));
+    EXPECT_TRUE(Field->isSingleScalar());
+    EXPECT_TRUE(vputils::isSingleScalar(Field));
+    EXPECT_TRUE(vputils::isUniformAcrossVFsAndUFs(Field));
+    EXPECT_TRUE(Field->usesFirstLaneOnly(Product));
+    EXPECT_TRUE(Field->usesFirstLaneOnly(Index));
+    EXPECT_TRUE(Field->usesScalars(Product));
+    EXPECT_TRUE(Field->usesScalars(Index));
+  }
+}
+
 TEST_F(VPInstructionTest, insertBefore) {
   IntegerType *Int32 = IntegerType::get(C, 32);
   VPInstruction *I1 =

@@ -1795,7 +1795,7 @@ public:
     MemCheckCleaner.cleanup();
     SCEVCleaner.cleanup();
 
-    if (!SCEVChecksUsed && SCEVCheckBlock)
+    if (!SCEVChecksUsed)
       SCEVCheckBlock->eraseFromParent();
     if (!MemChecksUsed)
       MemCheckBlock->eraseFromParent();

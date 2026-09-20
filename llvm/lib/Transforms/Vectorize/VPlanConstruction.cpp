@@ -1675,7 +1675,7 @@ void VPlanTransforms::materializePredicates(VPlan &Plan, ScalarEvolution &SE,
     for (const auto &P : OfKind) {
       VPValue *Negated = P->expandNegated(Exp);
       Cond = Cond ? Builder.createOr(Cond, Negated, DL, CondName) : Negated;
-      NumMaterialized++;
+      ++NumMaterialized;
     }
     addBypassBranch(Plan, CheckVPBB, Cond, AddBranchWeights);
   }
