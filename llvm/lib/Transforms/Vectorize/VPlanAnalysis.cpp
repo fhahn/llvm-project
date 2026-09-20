@@ -515,11 +515,11 @@ bool llvm::proveOuterLoopMemorySafety(VPlan &Plan,
   struct Access {
     VPInstruction *Recipe;
     const Value *Object;
+    bool IsParallel;
     std::optional<VPMemoryRange> Range;
   };
   SmallVector<Access, 8> Loads, Stores;
   DenseMap<const Loop *, VPBasicBlock *> LoopHeaders;
-  bool AllAccessesParallel = true;
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
            vp_depth_first_deep(Plan.getEntry()))) {
     // VPIRBasicBlocks wrap IR outside the vectorized loop; running several of
@@ -556,7 +556,7 @@ bool llvm::proveOuterLoopMemorySafety(VPlan &Plan,
       auto IsParallelGroup = [&](Metadata *Group) {
         return is_contained(Plan.getParallelAccessGroups(), Group);
       };
-      AllAccessesParallel &=
+      bool IsParallel =
           AccessGroup &&
           (AccessGroup->getNumOperands() == 0
                ? IsParallelGroup(AccessGroup)
@@ -566,14 +566,14 @@ bool llvm::proveOuterLoopMemorySafety(VPlan &Plan,
 
       bool IsStore = VPI->getOpcode() == Instruction::Store;
       VPValue *Addr = VPI->getOperand(IsStore ? 1 : 0);
-      (IsStore ? Stores : Loads).push_back({VPI, getBaseObject(Addr), std::nullopt});
+      (IsStore ? Stores : Loads)
+          .push_back({VPI, getBaseObject(Addr), IsParallel, std::nullopt});
     }
   }
 
-  if (AllAccessesParallel)
-    return true;
   if (!all_of(Stores, [&](const Access &Store) {
-        return writesDisjointBytesPerIteration(Store.Recipe, PSE, OuterLoop);
+        return Store.IsParallel ||
+               writesDisjointBytesPerIteration(Store.Recipe, PSE, OuterLoop);
       }))
     return false;
 
@@ -585,16 +585,17 @@ bool llvm::proveOuterLoopMemorySafety(VPlan &Plan,
     return A.Range;
   };
 
-  // Each store must access memory no other access of the nest touches, so that
-  // no two lanes of a vector iteration and no load and store of the nest can
-  // access the same location. Two loads may share memory; reordering reads is
-  // always safe. A pair that cannot be separated statically becomes a predicate
-  // of the plan, provided both ranges are known and in the same address space.
+  // Each pair involving a store must be independent across outer iterations.
+  // Access groups can establish this for a pair even if other accesses need
+  // disambiguation. Otherwise separate the objects statically or require
+  // disjoint ranges at runtime, provided both bounds are known and have the
+  // same pointer type. Two loads need no disambiguation.
   unsigned NumPredicates = 0;
   for (auto [I, Store] : enumerate(Stores))
     for (Access &Other : concat<Access>(
              MutableArrayRef(Stores).drop_front(I + 1), MutableArrayRef(Loads))) {
-      if (provablyDistinctObjects(AA, Store.Object, Other.Object))
+      if ((Store.IsParallel && Other.IsParallel) ||
+          provablyDistinctObjects(AA, Store.Object, Other.Object))
         continue;
       if (!GetRange(Store) || !GetRange(Other) ||
           Store.Range->Start->getType() != Other.Range->Start->getType())
