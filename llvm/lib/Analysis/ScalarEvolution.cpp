@@ -16280,8 +16280,11 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
 
   // If the climb above ran out of unique predecessors, keep looking for facts
   // that dominate the block we stopped at (and hence Block) via the dominator
-  // tree.
-  if (!Pair.first)
+  // tree. Only do so for the top-level collection: the guards collected for a
+  // PHI's incoming blocks below feed nothing but the min/max constant merge for
+  // that PHI's incoming values, which conditions from further up the dominator
+  // tree do not contribute to.
+  if (!Pair.first && Depth == 0)
     collectFromDominatingBranches(SE.DT, Pair.second,
                                   [&](Value *Cond, bool EnterIfTrue) {
                                     Terms.emplace_back(Cond, EnterIfTrue);
