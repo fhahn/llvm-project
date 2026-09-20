@@ -1537,10 +1537,6 @@ class GeneratedRTChecks {
   /// Basic block which contains the generated memory runtime checks, if any.
   BasicBlock *MemCheckBlock = nullptr;
 
-  /// Set in create() if SCEV checks were generated and did not fold away.
-  /// Unlike SCEVCheckCond, stays set when the pre-built block is dropped.
-  bool HasSCEVChecks = false;
-
   /// The value representing the result of the generated memory runtime checks.
   /// If it is nullptr no memory runtime checks have been generated.
   Value *MemRuntimeCheckCond = nullptr;
@@ -1623,7 +1619,6 @@ public:
         SCEVExpanderCleaner SCEVCleaner(SCEVExp);
         SCEVCleaner.cleanup();
       }
-      HasSCEVChecks = getSCEVChecks().first != nullptr;
     }
 
     const auto &RtPtrChecking = *LAI.getRuntimePointerChecking();
@@ -1857,7 +1852,7 @@ public:
 
   /// Return true if any runtime checks have been added
   bool hasChecks() const {
-    return HasSCEVChecks || getMemRuntimeChecks().first;
+    return getSCEVChecks().first || getMemRuntimeChecks().first;
   }
 };
 } // namespace
@@ -5827,6 +5822,24 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
     RUN_VPLAN_PASS(VPlanTransforms::combineRecipes, BestVPlan);
   RUN_VPLAN_PASS(VPlanTransforms::simplifyKnownEVL, BestVPlan, BestVF, PSE);
 
+  // A failed runtime check can send the full iteration space to the scalar
+  // loop, so keep runtime unrolling enabled for that fallback. Derive this
+  // from surviving bypass edges in the plan, excluding the entry's minimum
+  // iteration check. Epilogue vectorization still shares pre-built checks
+  // between its two plans and has an additional iteration check here.
+  bool HasRuntimeChecks = ILV.RTChecks.hasChecks();
+  if (EpilogueVecKind == EpilogueVectorizationKind::None) {
+    HasRuntimeChecks = false;
+    for (VPBlockBase *Check = VectorPH->getSinglePredecessor();
+         Check && Check != BestVPlan.getEntry();
+         Check = Check->getSinglePredecessor()) {
+      if (is_contained(Check->getSuccessors(), BestVPlan.getScalarPreheader())) {
+        HasRuntimeChecks = true;
+        break;
+      }
+    }
+  }
+
   // 0. Generate SCEV-dependent code in the entry, including TripCount, before
   // making any changes to the CFG.
   DenseMap<const SCEV *, Value *> ExpandedSCEVs =
@@ -5899,7 +5912,7 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   // Add metadata to disable runtime unrolling a scalar loop when there
   // are no runtime checks about strides and memory. A scalar loop that is
   // rarely used is not worth unrolling.
-  bool DisableRuntimeUnroll = !ILV.RTChecks.hasChecks() && !BestVF.isScalar();
+  bool DisableRuntimeUnroll = !HasRuntimeChecks && !BestVF.isScalar();
   updateLoopMetadataAndProfileInfo(
       HeaderVPBB ? LI->getLoopFor(State.CFG.VPBB2IRBB.lookup(HeaderVPBB))
                  : nullptr,

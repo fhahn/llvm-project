@@ -478,6 +478,7 @@ exit:
 
 !8 = distinct !{!8, !1, !7}
 !7 = !{!"llvm.loop.parallel_accesses", !3, !4}
+
 ;.
 ; CHECK: [[ACC_GRP0]] = distinct !{}
 ; CHECK: [[LOOP1]] = distinct !{[[LOOP1]], [[META2:![0-9]+]], [[META3:![0-9]+]], [[META4:![0-9]+]]}
@@ -492,7 +493,7 @@ exit:
 ; CHECK: [[LOOP10]] = distinct !{[[LOOP10]], [[META3]], [[META4]]}
 ; CHECK: [[LOOP11]] = distinct !{[[LOOP11]], [[META2]], [[META3]], [[META4]]}
 ; CHECK: [[LOOP12]] = distinct !{[[LOOP12]], [[META2]], [[META3]], [[META4]]}
-; CHECK: [[LOOP13]] = distinct !{[[LOOP13]], [[META2]], [[META4]], [[META3]]}
+; CHECK: [[LOOP13]] = distinct !{[[LOOP13]], [[META2]], [[META3]]}
 ; CHECK: [[LOOP14]] = distinct !{[[LOOP14]], [[META15:![0-9]+]], [[META3]], [[META4]]}
 ; CHECK: [[META15]] = !{!"llvm.loop.parallel_accesses", [[ACC_GRP0]], [[ACC_GRP6]]}
 ;.
