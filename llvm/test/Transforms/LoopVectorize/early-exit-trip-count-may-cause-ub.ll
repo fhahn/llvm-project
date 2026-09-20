@@ -27,14 +27,14 @@ define i32 @udiv_by_poison_step(i32 %x, i1 %skip) {
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[TMP2:%.*]] = and i32 [[TMP1]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i32 [[TMP1]], [[TMP2]]
+; CHECK-NEXT:    [[TMP3:%.*]] = mul i32 [[N_VEC]], [[D]]
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i1> poison, i1 [[SKIP]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i1> [[BROADCAST_SPLATINSERT]], <4 x i1> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP3:%.*]] = mul i32 [[N_VEC]], [[D]]
-; CHECK-NEXT:    [[TMP4:%.*]] = freeze <4 x i1> [[BROADCAST_SPLAT]]
-; CHECK-NEXT:    [[TMP5:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP4]])
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY_INTERIM:.*]] ]
+; CHECK-NEXT:    [[TMP4:%.*]] = freeze <4 x i1> [[BROADCAST_SPLAT]]
+; CHECK-NEXT:    [[TMP5:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP4]])
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP5]], label %[[VECTOR_EARLY_EXIT:.*]], label %[[VECTOR_BODY_INTERIM]]
@@ -94,14 +94,14 @@ define i32 @udiv_by_nonzero_nonpoison_step(i32 noundef %x, i1 %skip) {
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[TMP2:%.*]] = and i32 [[TMP1]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i32 [[TMP1]], [[TMP2]]
+; CHECK-NEXT:    [[TMP3:%.*]] = mul i32 [[N_VEC]], [[D]]
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i1> poison, i1 [[SKIP]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i1> [[BROADCAST_SPLATINSERT]], <4 x i1> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP3:%.*]] = mul i32 [[N_VEC]], [[D]]
-; CHECK-NEXT:    [[TMP4:%.*]] = freeze <4 x i1> [[BROADCAST_SPLAT]]
-; CHECK-NEXT:    [[TMP5:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP4]])
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY_INTERIM:.*]] ]
+; CHECK-NEXT:    [[TMP4:%.*]] = freeze <4 x i1> [[BROADCAST_SPLAT]]
+; CHECK-NEXT:    [[TMP5:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP4]])
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP5]], label %[[VECTOR_EARLY_EXIT:.*]], label %[[VECTOR_BODY_INTERIM]]

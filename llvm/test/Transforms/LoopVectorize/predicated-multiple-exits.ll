@@ -495,8 +495,11 @@ define i64 @diamond_merge_then_exit_with_phi_liveout() {
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp slt <4 x i8> [[WIDE_LOAD]], zeroinitializer
 ; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds i8, ptr @C, i64 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_LOAD1:%.*]] = load <4 x i8>, ptr [[TMP2]], align 1
+; CHECK-NEXT:    [[TMP8:%.*]] = zext <4 x i8> [[WIDE_LOAD1]] to <4 x i64>
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i8, ptr @B, i64 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_LOAD2:%.*]] = load <4 x i8>, ptr [[TMP3]], align 1
+; CHECK-NEXT:    [[TMP9:%.*]] = zext <4 x i8> [[WIDE_LOAD2]] to <4 x i64>
+; CHECK-NEXT:    [[PREDPHI3:%.*]] = select <4 x i1> [[TMP1]], <4 x i64> [[TMP9]], <4 x i64> [[TMP8]]
 ; CHECK-NEXT:    [[PREDPHI:%.*]] = select <4 x i1> [[TMP1]], <4 x i8> [[WIDE_LOAD2]], <4 x i8> [[WIDE_LOAD1]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq <4 x i8> [[WIDE_LOAD]], [[PREDPHI]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = freeze <4 x i1> [[TMP4]]
@@ -509,9 +512,6 @@ define i64 @diamond_merge_then_exit_with_phi_liveout() {
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    br label %[[LOOP_END:.*]]
 ; CHECK:       [[VECTOR_EARLY_EXIT]]:
-; CHECK-NEXT:    [[TMP8:%.*]] = zext <4 x i8> [[WIDE_LOAD1]] to <4 x i64>
-; CHECK-NEXT:    [[TMP9:%.*]] = zext <4 x i8> [[WIDE_LOAD2]] to <4 x i64>
-; CHECK-NEXT:    [[PREDPHI3:%.*]] = select <4 x i1> [[TMP1]], <4 x i64> [[TMP9]], <4 x i64> [[TMP8]]
 ; CHECK-NEXT:    [[FIRST_ACTIVE_LANE:%.*]] = call i64 @llvm.experimental.cttz.elts.i64.v4i1(<4 x i1> [[TMP4]], i1 false)
 ; CHECK-NEXT:    [[TMP10:%.*]] = extractelement <4 x i64> [[PREDPHI3]], i64 [[FIRST_ACTIVE_LANE]]
 ; CHECK-NEXT:    br label %[[LOOP_END]]

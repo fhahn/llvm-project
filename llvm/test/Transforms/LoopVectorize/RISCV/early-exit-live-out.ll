@@ -182,10 +182,10 @@ define i64 @strided_search(ptr align 8 dereferenceable(14784) %p) {
 ; RV64-NEXT:    [[N_VEC:%.*]] = sub i64 132, [[N_MOD_VF]]
 ; RV64-NEXT:    [[TMP4:%.*]] = mul i64 [[N_VEC]], 112
 ; RV64-NEXT:    [[TMP7:%.*]] = trunc i64 [[TMP1]] to i32
-; RV64-NEXT:    [[SCEVGEP:%.*]] = getelementptr nuw i8, ptr [[P]], i64 88
 ; RV64-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; RV64:       [[VECTOR_BODY]]:
 ; RV64-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY_INTERIM:.*]] ]
+; RV64-NEXT:    [[SCEVGEP:%.*]] = getelementptr nuw i8, ptr [[P]], i64 88
 ; RV64-NEXT:    [[TMP5:%.*]] = mul nuw i64 [[INDEX]], 112
 ; RV64-NEXT:    [[TMP6:%.*]] = getelementptr nuw i8, ptr [[SCEVGEP]], i64 [[TMP5]]
 ; RV64-NEXT:    [[WIDE_MASKED_GATHER:%.*]] = call <vscale x 2 x i64> @llvm.experimental.vp.strided.load.nxv2i64.p0.i64(ptr align 8 [[TMP6]], i64 112, <vscale x 2 x i1> splat (i1 true), i32 [[TMP7]])
@@ -235,10 +235,10 @@ define i64 @strided_search(ptr align 8 dereferenceable(14784) %p) {
 ; RV32-NEXT:    [[N_VEC:%.*]] = sub i64 132, [[N_MOD_VF]]
 ; RV32-NEXT:    [[TMP4:%.*]] = mul i64 [[N_VEC]], 112
 ; RV32-NEXT:    [[TMP5:%.*]] = trunc i64 [[TMP1]] to i32
-; RV32-NEXT:    [[TMP2:%.*]] = getelementptr nuw i8, ptr [[P]], i32 88
 ; RV32-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; RV32:       [[VECTOR_BODY]]:
 ; RV32-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY_INTERIM:.*]] ]
+; RV32-NEXT:    [[TMP2:%.*]] = getelementptr nuw i8, ptr [[P]], i32 88
 ; RV32-NEXT:    [[TMP6:%.*]] = trunc i64 [[INDEX]] to i32
 ; RV32-NEXT:    [[TMP7:%.*]] = mul nuw i32 [[TMP6]], 112
 ; RV32-NEXT:    [[TMP8:%.*]] = getelementptr nuw i8, ptr [[TMP2]], i32 [[TMP7]]

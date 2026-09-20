@@ -10,11 +10,11 @@ define i64 @early_exit_predicated_single_iter(i1 %c) {
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i1> poison, i1 [[C]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x i1> [[BROADCAST_SPLATINSERT]], <2 x i1> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = xor <2 x i1> [[BROADCAST_SPLAT]], splat (i1 true)
 ; CHECK-NEXT:    [[TMP1:%.*]] = freeze <2 x i1> [[TMP0]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = call i1 @llvm.vector.reduce.or.v2i1(<2 x i1> [[TMP1]])
-; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
-; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    br i1 [[TMP2]], label %[[VECTOR_EARLY_EXIT:.*]], label %[[VECTOR_BODY_INTERIM:.*]]
 ; CHECK:       [[VECTOR_BODY_INTERIM]]:
 ; CHECK-NEXT:    br label %[[MIDDLE_BLOCK:.*]]

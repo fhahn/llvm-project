@@ -353,6 +353,8 @@ define i1 @test_early_exit_max_tc_less_than_16_non_canonical_iv(ptr dereferencea
 ; VF8UF1-NEXT:    [[OFFSET_IDX:%.*]] = add i64 2, [[INDEX]]
 ; VF8UF1-NEXT:    [[TMP0:%.*]] = getelementptr inbounds i8, ptr [[A]], i64 [[OFFSET_IDX]]
 ; VF8UF1-NEXT:    [[WIDE_LOAD:%.*]] = load <8 x i8>, ptr [[TMP0]], align 1
+; VF8UF1-NEXT:    [[TMP8:%.*]] = zext <8 x i8> [[WIDE_LOAD]] to <8 x i64>
+; VF8UF1-NEXT:    [[TMP2:%.*]] = icmp eq <8 x i64> [[TMP8]], [[VEC_IND]]
 ; VF8UF1-NEXT:    [[TMP3:%.*]] = icmp eq <8 x i8> [[WIDE_LOAD]], zeroinitializer
 ; VF8UF1-NEXT:    [[TMP4:%.*]] = freeze <8 x i1> [[TMP3]]
 ; VF8UF1-NEXT:    [[TMP5:%.*]] = call i1 @llvm.vector.reduce.or.v8i1(<8 x i1> [[TMP4]])
@@ -363,8 +365,6 @@ define i1 @test_early_exit_max_tc_less_than_16_non_canonical_iv(ptr dereferencea
 ; VF8UF1:       [[VECTOR_BODY_INTERIM]]:
 ; VF8UF1-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; VF8UF1:       [[MIDDLE_BLOCK]]:
-; VF8UF1-NEXT:    [[TMP9:%.*]] = zext <8 x i8> [[WIDE_LOAD]] to <8 x i64>
-; VF8UF1-NEXT:    [[TMP2:%.*]] = icmp eq <8 x i64> [[TMP9]], [[VEC_IND]]
 ; VF8UF1-NEXT:    [[TMP7:%.*]] = extractelement <8 x i1> [[TMP2]], i64 7
 ; VF8UF1-NEXT:    br label %[[EXIT:.*]]
 ; VF8UF1:       [[VECTOR_EARLY_EXIT]]:
@@ -384,6 +384,8 @@ define i1 @test_early_exit_max_tc_less_than_16_non_canonical_iv(ptr dereferencea
 ; VF8UF2-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i8, ptr [[TMP0]], i64 8
 ; VF8UF2-NEXT:    [[WIDE_LOAD:%.*]] = load <8 x i8>, ptr [[TMP0]], align 1
 ; VF8UF2-NEXT:    [[WIDE_LOAD1:%.*]] = load <8 x i8>, ptr [[TMP1]], align 1
+; VF8UF2-NEXT:    [[TMP2:%.*]] = zext <8 x i8> [[WIDE_LOAD1]] to <8 x i64>
+; VF8UF2-NEXT:    [[TMP3:%.*]] = icmp eq <8 x i64> [[TMP2]], <i64 10, i64 11, i64 12, i64 13, i64 14, i64 15, i64 16, i64 17>
 ; VF8UF2-NEXT:    [[TMP4:%.*]] = icmp eq <8 x i8> [[WIDE_LOAD]], zeroinitializer
 ; VF8UF2-NEXT:    [[TMP5:%.*]] = icmp eq <8 x i8> [[WIDE_LOAD1]], zeroinitializer
 ; VF8UF2-NEXT:    [[TMP6:%.*]] = freeze <8 x i1> [[TMP4]]
@@ -394,8 +396,6 @@ define i1 @test_early_exit_max_tc_less_than_16_non_canonical_iv(ptr dereferencea
 ; VF8UF2:       [[VECTOR_BODY_INTERIM]]:
 ; VF8UF2-NEXT:    br label %[[MIDDLE_BLOCK:.*]]
 ; VF8UF2:       [[MIDDLE_BLOCK]]:
-; VF8UF2-NEXT:    [[TMP10:%.*]] = zext <8 x i8> [[WIDE_LOAD1]] to <8 x i64>
-; VF8UF2-NEXT:    [[TMP3:%.*]] = icmp eq <8 x i64> [[TMP10]], <i64 10, i64 11, i64 12, i64 13, i64 14, i64 15, i64 16, i64 17>
 ; VF8UF2-NEXT:    [[TMP11:%.*]] = extractelement <8 x i1> [[TMP3]], i64 7
 ; VF8UF2-NEXT:    br label %[[EXIT:.*]]
 ; VF8UF2:       [[VECTOR_EARLY_EXIT]]:
@@ -413,6 +413,8 @@ define i1 @test_early_exit_max_tc_less_than_16_non_canonical_iv(ptr dereferencea
 ; VF16UF1:       [[VECTOR_BODY]]:
 ; VF16UF1-NEXT:    [[TMP0:%.*]] = getelementptr inbounds i8, ptr [[A]], i64 2
 ; VF16UF1-NEXT:    [[WIDE_LOAD:%.*]] = load <16 x i8>, ptr [[TMP0]], align 1
+; VF16UF1-NEXT:    [[TMP1:%.*]] = zext <16 x i8> [[WIDE_LOAD]] to <16 x i64>
+; VF16UF1-NEXT:    [[TMP2:%.*]] = icmp eq <16 x i64> [[TMP1]], <i64 2, i64 3, i64 4, i64 5, i64 6, i64 7, i64 8, i64 9, i64 10, i64 11, i64 12, i64 13, i64 14, i64 15, i64 16, i64 17>
 ; VF16UF1-NEXT:    [[TMP3:%.*]] = icmp eq <16 x i8> [[WIDE_LOAD]], zeroinitializer
 ; VF16UF1-NEXT:    [[TMP4:%.*]] = freeze <16 x i1> [[TMP3]]
 ; VF16UF1-NEXT:    [[TMP5:%.*]] = call i1 @llvm.vector.reduce.or.v16i1(<16 x i1> [[TMP4]])
@@ -420,8 +422,6 @@ define i1 @test_early_exit_max_tc_less_than_16_non_canonical_iv(ptr dereferencea
 ; VF16UF1:       [[VECTOR_BODY_INTERIM]]:
 ; VF16UF1-NEXT:    br label %[[MIDDLE_BLOCK:.*]]
 ; VF16UF1:       [[MIDDLE_BLOCK]]:
-; VF16UF1-NEXT:    [[TMP6:%.*]] = zext <16 x i8> [[WIDE_LOAD]] to <16 x i64>
-; VF16UF1-NEXT:    [[TMP2:%.*]] = icmp eq <16 x i64> [[TMP6]], <i64 2, i64 3, i64 4, i64 5, i64 6, i64 7, i64 8, i64 9, i64 10, i64 11, i64 12, i64 13, i64 14, i64 15, i64 16, i64 17>
 ; VF16UF1-NEXT:    [[TMP7:%.*]] = extractelement <16 x i1> [[TMP2]], i64 15
 ; VF16UF1-NEXT:    br label %[[EXIT:.*]]
 ; VF16UF1:       [[VECTOR_EARLY_EXIT]]:

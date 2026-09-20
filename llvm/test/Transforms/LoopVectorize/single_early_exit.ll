@@ -245,12 +245,12 @@ define i32 @diff_blocks_invariant_early_exit_cond(ptr %s) {
 ; CHECK:       vector.ph:
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i1> poison, i1 [[COND]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i1> [[BROADCAST_SPLATINSERT]], <4 x i1> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP0:%.*]] = xor <4 x i1> [[BROADCAST_SPLAT]], splat (i1 true)
-; CHECK-NEXT:    [[TMP4:%.*]] = freeze <4 x i1> [[TMP0]]
-; CHECK-NEXT:    [[TMP1:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP4]])
 ; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK:       vector.body:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY_INTERIM:%.*]] ]
+; CHECK-NEXT:    [[TMP0:%.*]] = xor <4 x i1> [[BROADCAST_SPLAT]], splat (i1 true)
+; CHECK-NEXT:    [[TMP3:%.*]] = freeze <4 x i1> [[TMP0]]
+; CHECK-NEXT:    [[TMP1:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP3]])
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP2:%.*]] = icmp eq i32 [[INDEX_NEXT]], 276
 ; CHECK-NEXT:    br i1 [[TMP1]], label [[VECTOR_EARLY_EXIT:%.*]], label [[VECTOR_BODY_INTERIM]]
