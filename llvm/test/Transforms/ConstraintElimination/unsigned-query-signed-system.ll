@@ -6,7 +6,7 @@ define i1 @ult_query_via_signed_system(i64 %a, i64 %b, i64 %n) {
 ; CHECK-SAME: i64 [[A:%.*]], i64 [[B:%.*]], i64 [[N:%.*]]) {
 ; CHECK-NEXT:    [[PRE_0:%.*]] = icmp sgt i64 [[B]], -1
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[PRE_0]])
-; CHECK-NEXT:    [[S:%.*]] = sub nsw i64 [[A]], [[B]]
+; CHECK-NEXT:    [[S:%.*]] = sub nuw nsw i64 [[A]], [[B]]
 ; CHECK-NEXT:    [[PRE_1:%.*]] = icmp sgt i64 [[S]], -1
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[PRE_1]])
 ; CHECK-NEXT:    [[PRE_2:%.*]] = icmp slt i64 [[A]], [[N]]
@@ -31,7 +31,7 @@ define i1 @uge_query_via_signed_system(i64 %a, i64 %b, i64 %n) {
 ; CHECK-SAME: i64 [[A:%.*]], i64 [[B:%.*]], i64 [[N:%.*]]) {
 ; CHECK-NEXT:    [[PRE_0:%.*]] = icmp sgt i64 [[B]], -1
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[PRE_0]])
-; CHECK-NEXT:    [[S:%.*]] = sub nsw i64 [[A]], [[B]]
+; CHECK-NEXT:    [[S:%.*]] = sub nuw nsw i64 [[A]], [[B]]
 ; CHECK-NEXT:    [[PRE_1:%.*]] = icmp sgt i64 [[S]], -1
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[PRE_1]])
 ; CHECK-NEXT:    [[PRE_2:%.*]] = icmp slt i64 [[A]], [[N]]
