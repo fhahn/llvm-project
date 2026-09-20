@@ -2388,27 +2388,98 @@ void VPlanTransforms::cse(VPlan &Plan) {
   }
 }
 
+/// Return true if a VPInstruction with \p Opcode can be turned into an
+/// executable single-scalar recipe outside the vector loop region.
+static bool canBeSingleScalarOutsideLoopRegion(unsigned Opcode) {
+  // Integer div/rem may need predication for inactive lanes.
+  if (Instruction::isIntDivRem(Opcode))
+    return false;
+  if (Instruction::isBinaryOp(Opcode) || Instruction::isCast(Opcode))
+    return true;
+  switch (Opcode) {
+  case Instruction::FCmp:
+  case Instruction::ICmp:
+  case Instruction::Load:
+  case Instruction::Select:
+  case Instruction::Store:
+    return true;
+  default:
+    return false;
+  }
+}
+
 /// Return true if we do not know how to (mechanically) hoist or sink a
 /// non-memory or memory recipe \p R out of a loop region. When sinking, passing
 /// \p Sinking = true ensures that assumes aren't sunk.
 static bool cannotHoistOrSinkRecipe(VPRecipeBase &R, VPBasicBlock *FirstBB,
                                     VPBasicBlock *LastBB,
                                     bool Sinking = false) {
-  if (!isa<VPReplicateRecipe>(R) || !R.mayReadOrWriteMemory() ||
+  if (vputils::isDeadRecipe(R))
+    return true;
+
+  // A VPInstruction with an underlying instruction has not been lowered to an
+  // executable recipe yet, which only happens inside the loop region. It can
+  // thus only be moved out if moveRecipeOutsideLoop knows how to turn it into a
+  // single-scalar recipe. Masked VPInstructions must stay, as the single-scalar
+  // recipe would drop the mask.
+  auto *VPI = dyn_cast<VPInstruction>(&R);
+  if (VPI && (VPI->isMasked() ||
+              (VPI->getUnderlyingValue() &&
+               !canBeSingleScalarOutsideLoopRegion(VPI->getOpcode()))))
+    return true;
+
+  if (!isa<VPInstruction, VPReplicateRecipe>(R) || !R.mayReadOrWriteMemory() ||
       match(&R, m_Intrinsic<Intrinsic::assume>()))
     return vputils::cannotHoistOrSinkRecipe(R, Sinking);
 
-  // Check that the memory operation doesn't alias between FirstBB and LastBB.
-  auto MemLoc = vputils::getMemoryLocation(R);
+  // Only plain loads and stores with a loop-invariant address can be moved, and
+  // moveRecipeOutsideLoop needs their underlying instruction to create a
+  // single-scalar recipe for them.
+  VPValue *Def = R.getVPSingleValue();
+  unsigned Opcode = vputils::getOpcode(Def);
+  if ((Opcode != Instruction::Load && Opcode != Instruction::Store) ||
+      !isa_and_present<Instruction>(Def->getUnderlyingValue()))
+    return true;
+  if (!R.getOperand(Opcode == Instruction::Store ? 1 : 0)
+           ->isDefinedOutsideLoopRegions())
+    return true;
 
+  // Sinking must consider reads as well, which canHoistOrSinkWithNoAliasCheck
+  // only does when passed a SinkStoreInfo. That requires a replicate recipe.
+  auto *RepR = dyn_cast<VPReplicateRecipe>(&R);
+  if (Sinking && !RepR)
+    return true;
+
+  // Check that the memory operation doesn't alias between FirstBB and LastBB.
   // TODO: Could make use of SinkStoreInfo::isNoAliasViaDistance by collecting
   // stores upfront, and constructing a full SinkStoreInfo.
   auto SinkInfo =
-      Sinking ? std::make_optional(SinkStoreInfo(cast<VPReplicateRecipe>(R)))
-              : std::nullopt;
-
+      Sinking ? std::make_optional(SinkStoreInfo(*RepR)) : std::nullopt;
+  auto MemLoc = vputils::getMemoryLocation(R);
   return !MemLoc ||
          !canHoistOrSinkWithNoAliasCheck(*MemLoc, FirstBB, LastBB, SinkInfo);
+}
+
+/// Move \p R out of the vector loop region, into \p BB before \p IP. A
+/// VPInstruction that still needs lowering is replaced by an equivalent
+/// single-scalar recipe, unless it has operands defined inside the loop region
+/// and thus must retain its lane-wise semantics.
+static void moveRecipeOutsideLoop(VPRecipeBase &R, VPBasicBlock &BB,
+                                  VPBasicBlock::iterator IP) {
+  auto *VPI = dyn_cast<VPInstruction>(&R);
+  if (VPI && VPI->getUnderlyingValue() &&
+      (all_of(VPI->operands(),
+              [](VPValue *Op) { return Op->isDefinedOutsideLoopRegions(); }) ||
+       vputils::onlyFirstLaneUsed(VPI))) {
+    auto *Scalar = VPBuilder::createSingleScalarOp(
+        VPI->getOpcode(), VPI->operands(), /*Mask=*/nullptr, *VPI, *VPI,
+        VPI->getDebugLoc(), VPI->getUnderlyingInstr());
+    Scalar->insertBefore(BB, IP);
+    VPI->replaceAllUsesWith(Scalar);
+    VPI->eraseFromParent();
+    return;
+  }
+  R.moveBefore(BB, IP);
 }
 
 /// Move loop-invariant recipes out of the vector loop region in \p Plan.
@@ -2426,14 +2497,14 @@ static void licm(VPlan &Plan) {
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
            vp_depth_first_shallow(LoopRegion->getEntry()))) {
     for (VPRecipeBase &R : make_early_inc_range(*VPBB)) {
-      if (cannotHoistOrSinkRecipe(R, LoopRegion->getEntryBasicBlock(),
-                                  LoopRegion->getExitingBasicBlock()))
-        continue;
       if (any_of(R.operands(), [](VPValue *Op) {
             return !Op->isDefinedOutsideLoopRegions();
           }))
         continue;
-      R.moveBefore(*Preheader, Preheader->end());
+      if (cannotHoistOrSinkRecipe(R, LoopRegion->getEntryBasicBlock(),
+                                  LoopRegion->getExitingBasicBlock()))
+        continue;
+      moveRecipeOutsideLoop(R, *Preheader, Preheader->end());
     }
   }
 
@@ -2462,19 +2533,7 @@ static void licm(VPlan &Plan) {
         // non-single-scalar replicates correctly.
         if (!RepR->isSingleScalar())
           continue;
-
-        // The pointer operand of stores must be loop-invariant.
-        if (RepR->getOpcode() == Instruction::Store &&
-            !RepR->getOperand(1)->isDefinedOutsideLoopRegions())
-          continue;
       }
-
-      [[maybe_unused]] auto *RepR = dyn_cast<VPReplicateRecipe>(&R);
-      assert((!R.mayWriteToMemory() ||
-              (RepR && RepR->getOpcode() == Instruction::Store &&
-               RepR->getOperand(1)->isDefinedOutsideLoopRegions())) &&
-             "The only recipes that may write to memory are expected to be "
-             "stores with invariant pointer-operand");
 
       // TODO: Use R.definedValues() instead of casting to VPSingleDefRecipe to
       // support recipes with multiple defined values (e.g., interleaved loads).
@@ -2507,7 +2566,7 @@ static void licm(VPlan &Plan) {
              "Defining block must dominate sink block");
       // TODO: Clone the recipe if users are on multiple exit paths, instead of
       // just moving.
-      Def->moveBefore(*SinkBB, SinkBB->getFirstNonPhi());
+      moveRecipeOutsideLoop(R, *SinkBB, SinkBB->getFirstNonPhi());
     }
   }
 }
