@@ -132,7 +132,7 @@ define void @sink_replicate_region_2(i32 %x, i8 %y, ptr %ptr, i32 %z) optsize {
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
-; CHECK-NEXT:    WIDEN-CAST ir<%recur.next> = sext ir<%y> to i32
+; CHECK-NEXT:    EMIT-SCALAR ir<%recur.next> = sext ir<%y> to i32
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {
@@ -150,14 +150,14 @@ define void @sink_replicate_region_2(i32 %x, i8 %y, ptr %ptr, i32 %z) optsize {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    <xVFxUF> pred.store: {
 ; CHECK-NEXT:      pred.store.entry:
-; CHECK-NEXT:        BRANCH-ON-MASK vp<[[VP9]]>
+; CHECK-NEXT:        BRANCH-ON-MASK vp<[[VP9]]> (!vplan.execution.frequency 4611686018427387904 (50%, estimated))
 ; CHECK-NEXT:      Successor(s): pred.store.if, pred.store.continue
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      pred.store.if:
 ; CHECK-NEXT:        REPLICATE ir<%rem> = srem vp<[[VP8]]>, ir<%x>
 ; CHECK-NEXT:        vp<[[VP10:%[0-9]+]]> = SCALAR-STEPS vp<[[VP4]]>, ir<1>, vp<[[VP0]]>
 ; CHECK-NEXT:        REPLICATE ir<%gep> = getelementptr ir<%ptr>, vp<[[VP10]]>
-; CHECK-NEXT:        REPLICATE ir<%add> = add ir<%rem>, ir<%recur.next>
+; CHECK-NEXT:        REPLICATE ir<%add> = add ir<%rem>, ir<%recur.next> (!vplan.execution.frequency 4611686018427387904 (50%, estimated))
 ; CHECK-NEXT:        REPLICATE store ir<%add>, ir<%gep>
 ; CHECK-NEXT:      Successor(s): pred.store.continue
 ; CHECK-EMPTY:
@@ -228,7 +228,7 @@ define i32 @sink_replicate_region_3_reduction(i32 %x, i8 %y, ptr %ptr) optsize {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
 ; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = reduction-start-vector ir<1234>, ir<-1>, ir<1>
-; CHECK-NEXT:    WIDEN-CAST ir<%recur.next> = sext ir<%y> to i32
+; CHECK-NEXT:    EMIT-SCALAR ir<%recur.next> = sext ir<%y> to i32
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {
@@ -468,7 +468,7 @@ define void @sink_replicate_region_after_replicate_region(ptr %ptr, ptr noalias 
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
-; CHECK-NEXT:    WIDEN-CAST ir<%recur.next> = sext ir<%y> to i32
+; CHECK-NEXT:    EMIT-SCALAR ir<%recur.next> = sext ir<%y> to i32
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {

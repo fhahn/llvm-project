@@ -842,8 +842,9 @@ define i64 @print_ext_mul_two_uses(i64 %n, ptr %a, i16 %b, i32 %c) vscale_range(
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
 ; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = reduction-start-vector ir<0>, ir<0>, ir<1>
-; CHECK-NEXT:    WIDEN-CAST ir<%conv> = sext ir<%b> to i32
-; CHECK-NEXT:    WIDEN ir<%mul> = mul ir<%conv>, ir<%conv>
+; CHECK-NEXT:    EMIT-SCALAR ir<%conv> = sext ir<%b> to i32
+; CHECK-NEXT:    CLONE ir<%mul> = mul ir<%conv>, ir<%conv>
+; CHECK-NEXT:    EMIT-SCALAR ir<%mul.ext> = zext ir<%mul> to i64
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {
@@ -851,13 +852,13 @@ define i64 @print_ext_mul_two_uses(i64 %n, ptr %a, i16 %b, i32 %c) vscale_range(
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      CURRENT-ITERATION-PHI vp<[[VP6:%[0-9]+]]> = phi ir<0>, vp<%current.iteration.next>
-; CHECK-NEXT:      WIDEN-REDUCTION-PHI ir<%res2> = phi (add) vp<[[VP3]]>, vp<[[VP7:%[0-9]+]]>
+; CHECK-NEXT:      WIDEN-REDUCTION-PHI ir<%res2> = phi (add) vp<[[VP3]]>, ir<%add>
 ; CHECK-NEXT:      EMIT-SCALAR vp<%avl> = phi [ vp<[[VP2]]>, vector.ph ], [ vp<%avl.next>, vector.body ]
 ; CHECK-NEXT:      EMIT-SCALAR vp<%evl> = EXPLICIT-VECTOR-LENGTH vp<%avl>
-; CHECK-NEXT:      EXPRESSION vp<[[VP7]]> = vp<%evl> + reduce.add (ir<%mul> zext to i64, vp<%evl>)
-; CHECK-NEXT:      EMIT-SCALAR vp<[[VP8:%[0-9]+]]> = zext vp<%evl> to i64
-; CHECK-NEXT:      EMIT vp<%current.iteration.next> = add vp<[[VP8]]>, vp<[[VP6]]>
-; CHECK-NEXT:      EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP8]]>
+; CHECK-NEXT:      REDUCE ir<%add> = ir<%res2> +  vp.reduce.add (ir<%mul.ext>, vp<%evl>)
+; CHECK-NEXT:      EMIT-SCALAR vp<[[VP7:%[0-9]+]]> = zext vp<%evl> to i64
+; CHECK-NEXT:      EMIT vp<%current.iteration.next> = add vp<[[VP7]]>, vp<[[VP6]]>
+; CHECK-NEXT:      EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP7]]>
 ; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP4]]>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
@@ -865,7 +866,7 @@ define i64 @print_ext_mul_two_uses(i64 %n, ptr %a, i16 %b, i32 %c) vscale_range(
 ; CHECK-NEXT:  Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    EMIT vp<[[VP10:%[0-9]+]]> = compute-reduction-result (add, in-loop) vp<[[VP7]]>
+; CHECK-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = compute-reduction-result (add, in-loop) ir<%add>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>
 ;
 entry:

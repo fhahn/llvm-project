@@ -28,7 +28,7 @@ define i32 @test(i32 %limit, i1 %guard, i32 %divisor) {
 ; CHECK-NEXT:  Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    WIDEN ir<%prev.iv> = add nsw ir<%iv>, ir<-1>
+; CHECK-NEXT:    EMIT ir<%prev.iv> = add nsw ir<%iv>, ir<-1>
 ; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = extract-last-part ir<%prev.iv>
 ; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = extract-last-lane vp<[[VP6]]>
 ; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = extract-last-part ir<0>

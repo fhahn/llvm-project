@@ -508,11 +508,11 @@ define void @multi_exit(ptr %dst, ptr %src.1, ptr %src.2, i64 %A, i64 %B) #0 {
 ; CHECK-NEXT:    [[TMP31:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP31]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP11:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[TMP27:%.*]] = icmp eq <2 x i64> [[WIDE_LOAD]], zeroinitializer
-; CHECK-NEXT:    [[TMP28:%.*]] = and <2 x i1> [[BROADCAST_SPLAT]], [[TMP27]]
-; CHECK-NEXT:    [[TMP29:%.*]] = zext <2 x i1> [[TMP28]] to <2 x i8>
-; CHECK-NEXT:    [[TMP30:%.*]] = extractelement <2 x i8> [[TMP29]], i64 1
-; CHECK-NEXT:    store i8 [[TMP30]], ptr [[DST]], align 1, !alias.scope [[META12:![0-9]+]], !noalias [[META14:![0-9]+]]
+; CHECK-NEXT:    [[TMP30:%.*]] = icmp eq <2 x i64> [[WIDE_LOAD]], zeroinitializer
+; CHECK-NEXT:    [[TMP34:%.*]] = and <2 x i1> [[BROADCAST_SPLAT]], [[TMP30]]
+; CHECK-NEXT:    [[TMP32:%.*]] = zext <2 x i1> [[TMP34]] to <2 x i8>
+; CHECK-NEXT:    [[TMP33:%.*]] = extractelement <2 x i8> [[TMP32]], i64 1
+; CHECK-NEXT:    store i8 [[TMP33]], ptr [[DST]], align 1, !alias.scope [[META12:![0-9]+]], !noalias [[META14:![0-9]+]]
 ; CHECK-NEXT:    br label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:
 ;
@@ -683,11 +683,11 @@ define void @reduction_store(ptr noalias %src, ptr %dst, i1 %x) #2 {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i1> poison, i1 [[X]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i1> [[BROADCAST_SPLATINSERT]], <4 x i1> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP0:%.*]] = zext <4 x i1> [[BROADCAST_SPLAT]] to <4 x i64>
-; CHECK-NEXT:    [[TMP1:%.*]] = lshr <4 x i64> [[TMP0]], splat (i64 12)
-; CHECK-NEXT:    [[TMP2:%.*]] = trunc <4 x i64> [[TMP1]] to <4 x i32>
+; CHECK-NEXT:    [[TMP0:%.*]] = zext i1 [[X]] to i64
+; CHECK-NEXT:    [[TMP1:%.*]] = lshr i64 [[TMP0]], 12
+; CHECK-NEXT:    [[TMP7:%.*]] = trunc i64 [[TMP1]] to i32
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[TMP7]], i64 0
+; CHECK-NEXT:    [[TMP2:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
@@ -781,13 +781,11 @@ define i64 @cost_loop_invariant_recipes(i1 %x, i64 %y) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i64> poison, i64 [[Y]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x i64> [[BROADCAST_SPLATINSERT]], <2 x i64> poison, <2 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP0:%.*]] = xor i1 [[X]], true
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <2 x i1> poison, i1 [[TMP0]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <2 x i1> [[BROADCAST_SPLATINSERT1]], <2 x i1> poison, <2 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP1:%.*]] = zext <2 x i1> [[BROADCAST_SPLAT2]] to <2 x i64>
-; CHECK-NEXT:    [[TMP2:%.*]] = shl <2 x i64> [[BROADCAST_SPLAT]], [[TMP1]]
+; CHECK-NEXT:    [[TMP1:%.*]] = zext i1 [[TMP0]] to i64
+; CHECK-NEXT:    [[TMP5:%.*]] = shl i64 [[Y]], [[TMP1]]
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i64> poison, i64 [[TMP5]], i64 0
+; CHECK-NEXT:    [[TMP2:%.*]] = shufflevector <2 x i64> [[BROADCAST_SPLATINSERT]], <2 x i64> poison, <2 x i32> zeroinitializer
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[TMP3:%.*]] = mul <2 x i64> [[TMP2]], splat (i64 1)
@@ -991,11 +989,11 @@ define void @replicating_sdiv_operand_profitable_to_scalarize(i32 %x) #3 {
 ; CHECK-NEXT:    [[TMP0:%.*]] = call <16 x i32> @llvm.masked.sdiv.v16i32(<16 x i32> splat (i32 2), <16 x i32> [[BROADCAST_SPLAT]], <16 x i1> <i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 false, i1 false, i1 false>)
 ; CHECK-NEXT:    br label %[[MIDDLE_BLOCK:.*]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[TMP4:%.*]] = or <16 x i32> [[TMP0]], splat (i32 3)
+; CHECK-NEXT:    [[TMP5:%.*]] = call <16 x i32> @llvm.masked.sdiv.v16i32(<16 x i32> [[TMP0]], <16 x i32> [[TMP4]], <16 x i1> <i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 false, i1 false, i1 false>)
 ; CHECK-NEXT:    [[TMP1:%.*]] = shufflevector <16 x i32> zeroinitializer, <16 x i32> [[TMP0]], <16 x i32> <i32 15, i32 16, i32 17, i32 18, i32 19, i32 20, i32 21, i32 22, i32 23, i32 24, i32 25, i32 26, i32 27, i32 28, i32 29, i32 30>
 ; CHECK-NEXT:    [[TMP2:%.*]] = sub <16 x i32> [[BROADCAST_SPLAT]], [[TMP0]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = or <16 x i32> [[TMP2]], [[TMP1]]
-; CHECK-NEXT:    [[TMP4:%.*]] = or <16 x i32> [[TMP0]], splat (i32 3)
-; CHECK-NEXT:    [[TMP5:%.*]] = call <16 x i32> @llvm.masked.sdiv.v16i32(<16 x i32> [[TMP0]], <16 x i32> [[TMP4]], <16 x i1> <i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 false, i1 false, i1 false>)
 ; CHECK-NEXT:    [[TMP6:%.*]] = or <16 x i32> [[TMP3]], [[TMP5]]
 ; CHECK-NEXT:    [[FIRST_INACTIVE_LANE:%.*]] = call i64 @llvm.experimental.cttz.elts.i64.v16i1(<16 x i1> <i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 true, i1 true, i1 true>, i1 false)
 ; CHECK-NEXT:    [[LAST_ACTIVE_LANE:%.*]] = sub i64 [[FIRST_INACTIVE_LANE]], 1

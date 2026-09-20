@@ -115,7 +115,7 @@ define void @swapped_by_folding_not_into_cmp(ptr %a, ptr %b, i32 %x, i32 %y, i64
 ; VF4:  [[VECTOR_MEMCHECK]]:
 ; VF4:    br i1 [[DIFF_CHECK:%.*]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; VF4:  [[VECTOR_PH]]:
-; VF4:    [[TMP4:%.*]] = select i1 [[TMP3:%.*]], <4 x i32> splat (i32 20), <4 x i32> splat (i32 10)
+; VF4:    [[TMP4:%.*]] = select i1 [[TMP3:%.*]], i32 20, i32 10, !prof [[PROF4]]
 ; VF4:  [[VECTOR_BODY:.*]]:
 ; VF4:    br i1 [[TMP8:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; VF4:  [[MIDDLE_BLOCK]]:
@@ -132,16 +132,15 @@ define void @swapped_by_folding_not_into_cmp(ptr %a, ptr %b, i32 %x, i32 %y, i64
 ; VF1IC2:  [[VECTOR_MEMCHECK:.*:]]
 ; VF1IC2:    br i1 [[DIFF_CHECK:%.*]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; VF1IC2:  [[VECTOR_PH]]:
+; VF1IC2:    [[TMP4:%.*]] = select i1 [[TMP3:%.*]], i32 20, i32 10, !prof [[PROF1]]
 ; VF1IC2:  [[VECTOR_BODY:.*]]:
 ; VF1IC2:    br i1 [[TMP5:%.*]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
 ; VF1IC2:  [[PRED_STORE_IF]]:
-; VF1IC2:    [[TMP8:%.*]] = select i1 [[TMP3:%.*]], i32 20, i32 10, !prof [[PROF1]]
 ; VF1IC2:  [[PRED_STORE_CONTINUE]]:
 ; VF1IC2:    br i1 [[TMP6:%.*]], label %[[PRED_STORE_IF3:.*]], label %[[PRED_STORE_CONTINUE4:.*]]
 ; VF1IC2:  [[PRED_STORE_IF3]]:
-; VF1IC2:    [[TMP12:%.*]] = select i1 [[TMP3]], i32 20, i32 10, !prof [[PROF1]]
 ; VF1IC2:  [[PRED_STORE_CONTINUE4]]:
-; VF1IC2:    br i1 [[TMP15:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
+; VF1IC2:    br i1 [[TMP13:%.*]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; VF1IC2:  [[MIDDLE_BLOCK]]:
 ; VF1IC2:  [[SCALAR_PH]]:
 ; VF1IC2:  [[LOOP:.*]]:

@@ -198,8 +198,9 @@ define void @first_order_recurrence_using_induction(i32 %n, ptr %dst) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
 ; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = first-order splice ir<%for>, vp<[[VP6]]>
-; CHECK-NEXT:    CLONE store vp<[[VP8]]>, ir<%dst>
-; CHECK-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = extract-last-part vp<[[VP6]]>
+; CHECK-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = extract-last-part vp<[[VP8]]>
+; CHECK-NEXT:    CLONE store vp<[[VP9]]>, ir<%dst>
+; CHECK-NEXT:    EMIT vp<[[VP10:%[0-9]+]]> = extract-last-part vp<[[VP6]]>
 ; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq vp<[[VP3]]>, vp<[[VP2]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
@@ -209,7 +210,7 @@ define void @first_order_recurrence_using_induction(i32 %n, ptr %dst) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  scalar.ph:
 ; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP2]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
-; CHECK-NEXT:    EMIT-SCALAR vp<%scalar.recur.init> = phi [ vp<[[VP9]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
+; CHECK-NEXT:    EMIT-SCALAR vp<%scalar.recur.init> = phi [ vp<[[VP10]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
 ; CHECK-NEXT:  Successor(s): ir-bb<loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<loop>:
@@ -343,7 +344,8 @@ define void @scalarize_ptrtoint(ptr %src, ptr %dst) {
 ; CHECK-NEXT:    EMIT-SCALAR ir<%cast> = ptrtoint ir<%l> to i64
 ; CHECK-NEXT:    CLONE ir<%add> = add ir<%cast>, ir<10>
 ; CHECK-NEXT:    EMIT-SCALAR ir<%cast.2> = inttoptr ir<%add> to ptr
-; CHECK-NEXT:    CLONE store ir<%cast.2>, ir<%dst>
+; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = extract-last-part ir<%cast.2>
+; CHECK-NEXT:    CLONE store vp<[[VP6]]>, ir<%dst>
 ; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<1024>, vp<[[VP2]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph

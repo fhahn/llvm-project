@@ -4,15 +4,24 @@
 define i32 @main(i32 %arg, ptr nocapture readnone %arg1) #0 {
 ; CHECK-LABEL: define i32 @main(
 ; CHECK-SAME: i32 [[ARG:%.*]], ptr readnone captures(none) [[ARG1:%.*]]) #[[ATTR0:[0-9]+]] {
-; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    [[TMP0:%.*]] = alloca i8, align 1
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[STOREMERGE_I_I:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[TMP12_I_I:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    br label %[[MIDDLE_BLOCK:.*]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    store i8 7, ptr [[TMP0]], align 2
+; CHECK-NEXT:    br label %[[SCALAR_PH:.*]]
+; CHECK:       [[SCALAR_PH]]:
+; CHECK-NEXT:    br label %[[LOOP1:.*]]
+; CHECK:       [[LOOP1]]:
+; CHECK-NEXT:    [[STOREMERGE_I_I:%.*]] = phi i8 [ 8, %[[SCALAR_PH]] ], [ [[TMP12_I_I:%.*]], %[[LOOP1]] ]
 ; CHECK-NEXT:    store i8 [[STOREMERGE_I_I]], ptr [[TMP0]], align 2
 ; CHECK-NEXT:    [[TMP8_I_I:%.*]] = icmp ult i8 [[STOREMERGE_I_I]], 8
 ; CHECK-NEXT:    [[TMP12_I_I]] = add nuw nsw i8 [[STOREMERGE_I_I]], 1
-; CHECK-NEXT:    br i1 [[TMP8_I_I]], label %[[LOOP]], label %[[RET:.*]]
+; CHECK-NEXT:    br i1 [[TMP8_I_I]], label %[[LOOP1]], label %[[RET:.*]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[RET]]:
 ; CHECK-NEXT:    ret i32 0
 ;
@@ -33,3 +42,8 @@ ret:
 
 attributes #0 = { "target-cpu"="z13" }
 
+;.
+; CHECK: [[LOOP0]] = distinct !{[[LOOP0]], [[META1:![0-9]+]], [[META2:![0-9]+]]}
+; CHECK: [[META1]] = !{!"llvm.loop.unroll.runtime.disable"}
+; CHECK: [[META2]] = !{!"llvm.loop.isvectorized", i32 1}
+;.

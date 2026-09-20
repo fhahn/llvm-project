@@ -236,6 +236,11 @@ struct VPlanTransforms {
   /// BranchOnCond with BranchOnCount, using \p DL for the canonical IV.
   LLVM_ABI_FOR_TEST static void createLoopRegions(VPlan &Plan, DebugLoc DL);
 
+  /// Hoist loop-invariant recipes out of \p Plan's vector loop region into the
+  /// vector preheader and sink recipes whose users are all outside the region
+  /// into the region's successor.
+  static void licm(VPlan &Plan);
+
   /// Wrap runtime check block \p CheckBlock in a VPIRBB and \p Cond in a
   /// VPValue and connect the block to \p Plan, using the VPValue as branch
   /// condition.

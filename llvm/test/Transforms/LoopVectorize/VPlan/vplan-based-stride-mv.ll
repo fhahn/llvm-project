@@ -224,6 +224,7 @@ define void @byte_gep_scaled_stride(ptr noalias %p.out, ptr %p, i64 %stride) {
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
+; CHECK-NEXT:    CLONE ir<%stride.x8> = mul ir<%stride>, ir<8>
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {
@@ -232,7 +233,6 @@ define void @byte_gep_scaled_stride(ptr noalias %p.out, ptr %p, i64 %stride) {
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION nsw ir<0>, ir<1>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add nsw ir<%iv>, ir<1>
-; CHECK-NEXT:      EMIT ir<%stride.x8> = mul ir<%stride>, ir<8>
 ; CHECK-NEXT:      EMIT ir<%idx> = mul ir<%iv>, ir<%stride.x8>
 ; CHECK-NEXT:      EMIT ir<%gep.ld> = getelementptr ir<%p>, ir<%idx>
 ; CHECK-NEXT:      EMIT-SCALAR ir<%ld> = load ir<%gep.ld>
@@ -295,6 +295,7 @@ define void @byte_gep_under_scaled_stride(ptr noalias %p.out, ptr %p, i64 %strid
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
+; CHECK-NEXT:    CLONE ir<%stride.x8> = mul ir<%stride>, ir<4>
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {
@@ -303,7 +304,6 @@ define void @byte_gep_under_scaled_stride(ptr noalias %p.out, ptr %p, i64 %strid
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION nsw ir<0>, ir<1>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add nsw ir<%iv>, ir<1>
-; CHECK-NEXT:      EMIT ir<%stride.x8> = mul ir<%stride>, ir<4>
 ; CHECK-NEXT:      EMIT ir<%idx> = mul ir<%iv>, ir<%stride.x8>
 ; CHECK-NEXT:      EMIT ir<%gep.ld> = getelementptr ir<%p>, ir<%idx>
 ; CHECK-NEXT:      EMIT-SCALAR ir<%ld> = load ir<%gep.ld>
@@ -367,6 +367,7 @@ define void @byte_gep_under_scaled_stride_extra_narrow_use(ptr noalias %p.out, p
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
+; CHECK-NEXT:    CLONE ir<%stride.x8> = mul ir<%stride>, ir<4>
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {
@@ -375,7 +376,6 @@ define void @byte_gep_under_scaled_stride_extra_narrow_use(ptr noalias %p.out, p
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION nsw ir<0>, ir<1>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add nsw ir<%iv>, ir<1>
-; CHECK-NEXT:      EMIT ir<%stride.x8> = mul ir<%stride>, ir<4>
 ; CHECK-NEXT:      EMIT ir<%idx> = mul ir<%iv>, ir<%stride.x8>
 ; CHECK-NEXT:      EMIT ir<%gep.ld> = getelementptr ir<%p>, ir<%idx>
 ; CHECK-NEXT:      EMIT-SCALAR ir<%ld> = load ir<%gep.ld>
@@ -445,6 +445,7 @@ define void @byte_gep_over_scaled_stride(ptr noalias %p.out, ptr %p, i64 %stride
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
+; CHECK-NEXT:    CLONE ir<%stride.x8> = mul ir<%stride>, ir<16>
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {
@@ -453,7 +454,6 @@ define void @byte_gep_over_scaled_stride(ptr noalias %p.out, ptr %p, i64 %stride
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION nsw ir<0>, ir<1>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add nsw ir<%iv>, ir<1>
-; CHECK-NEXT:      EMIT ir<%stride.x8> = mul ir<%stride>, ir<16>
 ; CHECK-NEXT:      EMIT ir<%idx> = mul ir<%iv>, ir<%stride.x8>
 ; CHECK-NEXT:      EMIT ir<%gep.ld> = getelementptr ir<%p>, ir<%idx>
 ; CHECK-NEXT:      EMIT-SCALAR ir<%ld> = load ir<%gep.ld>
@@ -516,6 +516,7 @@ define void @byte_gep_non_power_of_two_scaled_stride(ptr noalias %p.out, ptr %p,
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
+; CHECK-NEXT:    CLONE ir<%stride.x8> = mul ir<%stride>, ir<11>
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {
@@ -524,7 +525,6 @@ define void @byte_gep_non_power_of_two_scaled_stride(ptr noalias %p.out, ptr %p,
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION nsw ir<0>, ir<1>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add nsw ir<%iv>, ir<1>
-; CHECK-NEXT:      EMIT ir<%stride.x8> = mul ir<%stride>, ir<11>
 ; CHECK-NEXT:      EMIT ir<%idx> = mul ir<%iv>, ir<%stride.x8>
 ; CHECK-NEXT:      EMIT ir<%gep.ld> = getelementptr ir<%p>, ir<%idx>
 ; CHECK-NEXT:      EMIT-SCALAR ir<%ld> = load ir<%gep.ld>
@@ -656,6 +656,7 @@ define void @byte_gep_negated_stride(ptr noalias %p.out, ptr %p, i64 %stride) {
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
+; CHECK-NEXT:    CLONE ir<%stride.neg> = sub ir<0>, ir<%stride>
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {
@@ -664,7 +665,6 @@ define void @byte_gep_negated_stride(ptr noalias %p.out, ptr %p, i64 %stride) {
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION nsw ir<0>, ir<1>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add nsw ir<%iv>, ir<1>
-; CHECK-NEXT:      EMIT ir<%stride.neg> = sub ir<0>, ir<%stride>
 ; CHECK-NEXT:      EMIT ir<%idx> = mul ir<%iv>, ir<%stride.neg>
 ; CHECK-NEXT:      EMIT ir<%gep.ld> = getelementptr ir<%p>, ir<%idx>
 ; CHECK-NEXT:      EMIT-SCALAR ir<%ld> = load ir<%gep.ld>
@@ -876,6 +876,7 @@ define void @dependent_strides(ptr noalias %p.out, ptr %p0, ptr %p1, i64 %stride
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
+; CHECK-NEXT:    CLONE ir<%stride1> = add ir<%stride>, ir<1>
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {
@@ -884,7 +885,6 @@ define void @dependent_strides(ptr noalias %p.out, ptr %p0, ptr %p1, i64 %stride
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION nsw ir<0>, ir<1>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add nsw ir<%iv>, ir<1>
-; CHECK-NEXT:      EMIT ir<%stride1> = add ir<%stride>, ir<1>
 ; CHECK-NEXT:      EMIT ir<%idx0> = mul ir<%iv>, ir<%stride>
 ; CHECK-NEXT:      EMIT ir<%idx1> = mul ir<%iv>, ir<%stride1>
 ; CHECK-NEXT:      EMIT ir<%gep.ld0> = getelementptr ir<%p0>, ir<%idx0>
@@ -956,6 +956,7 @@ define void @dependent_strides_reverse_order(ptr noalias %p.out, ptr %p0, ptr %p
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
+; CHECK-NEXT:    CLONE ir<%stride0> = add ir<%stride>, ir<1>
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {
@@ -964,7 +965,6 @@ define void @dependent_strides_reverse_order(ptr noalias %p.out, ptr %p0, ptr %p
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION nsw ir<0>, ir<1>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add nsw ir<%iv>, ir<1>
-; CHECK-NEXT:      EMIT ir<%stride0> = add ir<%stride>, ir<1>
 ; CHECK-NEXT:      EMIT ir<%idx0> = mul ir<%iv>, ir<%stride0>
 ; CHECK-NEXT:      EMIT ir<%idx1> = mul ir<%iv>, ir<%stride>
 ; CHECK-NEXT:      EMIT ir<%gep.ld0> = getelementptr ir<%p0>, ir<%idx0>
@@ -2309,6 +2309,7 @@ define void @sext_stride(ptr noalias %p.out, ptr %p, i32 %stride.i32) {
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
+; CHECK-NEXT:    EMIT-SCALAR ir<%stride> = sext ir<%stride.i32> to i64
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {
@@ -2316,7 +2317,6 @@ define void @sext_stride(ptr noalias %p.out, ptr %p, i32 %stride.i32) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION nsw ir<0>, ir<1>, vp<[[VP0]]>
-; CHECK-NEXT:      EMIT-SCALAR ir<%stride> = sext ir<%stride.i32> to i64
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add nsw ir<%iv>, ir<1>
 ; CHECK-NEXT:      EMIT ir<%idx> = mul ir<%iv>, ir<%stride>
 ; CHECK-NEXT:      EMIT ir<%gep.ld> = getelementptr ir<%p>, ir<%idx>
@@ -2530,6 +2530,7 @@ define void @trunc_stride(ptr noalias %p.out, ptr %p, i64 %stride.i64) {
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
+; CHECK-NEXT:    EMIT-SCALAR ir<%stride> = trunc ir<%stride.i64> to i32
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {
@@ -2537,7 +2538,6 @@ define void @trunc_stride(ptr noalias %p.out, ptr %p, i64 %stride.i64) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION nsw ir<0>, ir<1>, vp<[[VP0]]>
-; CHECK-NEXT:      EMIT-SCALAR ir<%stride> = trunc ir<%stride.i64> to i32
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add nsw ir<%iv>, ir<1>
 ; CHECK-NEXT:      EMIT ir<%idx> = mul ir<%iv>, ir<%stride>
 ; CHECK-NEXT:      EMIT ir<%gep.ld> = getelementptr ir<%p>, ir<%idx>
@@ -2600,6 +2600,8 @@ define void @trunc_stride_extra_narrow_use(ptr noalias %p.out, ptr %p, i64 %stri
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
+; CHECK-NEXT:    EMIT-SCALAR ir<%stride> = trunc ir<%stride.i64> to i32
+; CHECK-NEXT:    CLONE ir<%stride.byte> = mul ir<%stride>, ir<4>
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {
@@ -2607,8 +2609,6 @@ define void @trunc_stride_extra_narrow_use(ptr noalias %p.out, ptr %p, i64 %stri
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION nsw ir<0>, ir<1>, vp<[[VP0]]>
-; CHECK-NEXT:      EMIT-SCALAR ir<%stride> = trunc ir<%stride.i64> to i32
-; CHECK-NEXT:      EMIT ir<%stride.byte> = mul ir<%stride>, ir<4>
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add nsw ir<%iv>, ir<1>
 ; CHECK-NEXT:      EMIT ir<%idx> = mul ir<%iv>, ir<%stride.byte>
 ; CHECK-NEXT:      EMIT ir<%gep.ld> = getelementptr ir<%p>, ir<%idx>

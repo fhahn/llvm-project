@@ -1463,7 +1463,7 @@ void VPlanTransforms::foldTailByMasking(VPlan &Plan) {
   VPBlockUtils::connectBlocks(Header, Latch);
 
   // Collect any values defined in the loop that need a phi. Currently this
-  // includes header phi backedges and live-outs extracted in the middle block.
+  // includes header phi backedges and values extracted in the middle block.
   // TODO: Handle early exits via Plan.getExitBlocks()
   MapVector<VPValue *, SmallVector<VPUser *>> NeedsPhi;
   for (VPRecipeBase &R : Header->phis())
@@ -1500,13 +1500,13 @@ void VPlanTransforms::foldTailByMasking(VPlan &Plan) {
   // Any extract of the last element must be updated to extract from the last
   // active lane of the header mask instead (i.e., the lane corresponding to the
   // last active iteration).
-  Builder.setInsertPoint(Plan.getMiddleBlock()->getTerminator());
   for (VPRecipeBase &R : *Plan.getMiddleBlock()) {
     VPValue *Op;
     if (!match(&R, m_ExtractLastLaneOfLastPart(m_VPValue(Op))))
       continue;
 
-    // Compute the index of the last active lane.
+    // Insert before the extract to dominate its middle-block users as well.
+    Builder.setInsertPoint(&R);
     VPValue *LastActiveLane = Builder.createLastActiveLane(HeaderMask);
     auto *Ext =
         Builder.createNaryOp(VPInstruction::ExtractLane, {LastActiveLane, Op});

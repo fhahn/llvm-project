@@ -176,7 +176,7 @@ define float @uniform_load_replicating_select(ptr %A, ptr %B, i64 %1) {
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP1]], [[N_MOD_VF]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = load float, ptr [[A]], align 4
 ; CHECK-NEXT:    [[TMP10:%.*]] = fcmp ogt float [[TMP6]], 0.000000e+00
-; CHECK-NEXT:    [[TMP32:%.*]] = select i1 [[TMP10]], <4 x float> splat (float 1.000000e+01), <4 x float> splat (float 1.000000e+00)
+; CHECK-NEXT:    [[TMP7:%.*]] = select i1 [[TMP10]], float 1.000000e+01, float 1.000000e+00
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
@@ -200,13 +200,13 @@ define float @uniform_load_replicating_select(ptr %A, ptr %B, i64 %1) {
 ; CHECK-NEXT:    [[TMP29:%.*]] = insertelement <4 x float> [[TMP28]], float [[TMP25]], i64 1
 ; CHECK-NEXT:    [[TMP30:%.*]] = insertelement <4 x float> [[TMP29]], float [[TMP26]], i64 2
 ; CHECK-NEXT:    [[TMP31:%.*]] = insertelement <4 x float> [[TMP30]], float [[TMP27]], i64 3
+; CHECK-NEXT:    [[TMP32:%.*]] = fdiv <4 x float> splat (float 4.000000e+00), [[TMP31]]
+; CHECK-NEXT:    [[TMP33:%.*]] = extractelement <4 x float> [[TMP32]], i64 3
+; CHECK-NEXT:    [[TMP35:%.*]] = tail call float @llvm.pow.f32(float [[TMP7]], float [[TMP33]])
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[TMP34:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP34]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[TMP36:%.*]] = fdiv <4 x float> splat (float 4.000000e+00), [[TMP31]]
-; CHECK-NEXT:    [[TMP33:%.*]] = call <4 x float> @llvm.pow.v4f32(<4 x float> [[TMP32]], <4 x float> [[TMP36]])
-; CHECK-NEXT:    [[TMP35:%.*]] = extractelement <4 x float> [[TMP33]], i64 3
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP1]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:

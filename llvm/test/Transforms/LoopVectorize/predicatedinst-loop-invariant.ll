@@ -10,53 +10,29 @@ define void @loop_invariant_store(ptr %p, i64 %a, i8 %b) {
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i8> poison, i8 [[B]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i8> [[BROADCAST_SPLATINSERT]], <4 x i8> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[A]], 48
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x i64> poison, i64 [[TMP0]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT1]], <4 x i64> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP1:%.*]] = ashr <4 x i64> [[BROADCAST_SPLAT2]], splat (i64 52)
-; CHECK-NEXT:    [[TMP2:%.*]] = trunc <4 x i64> [[TMP1]] to <4 x i32>
+; CHECK-NEXT:    [[TMP1:%.*]] = ashr i64 [[TMP0]], 52
+; CHECK-NEXT:    [[TMP2:%.*]] = trunc i64 [[TMP1]] to i32
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x i32> poison, i32 [[TMP2]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT1]], <4 x i32> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP3:%.*]] = zext <4 x i8> [[BROADCAST_SPLAT]] to <4 x i32>
-; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
-; CHECK:       [[VECTOR_BODY]]:
-; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_STORE_CONTINUE8:.*]] ]
-; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i32> [ <i32 0, i32 1, i32 2, i32 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[PRED_STORE_CONTINUE8]] ]
-; CHECK-NEXT:    [[TMP4:%.*]] = icmp ule <4 x i32> [[VEC_IND]], splat (i32 8)
-; CHECK-NEXT:    [[TMP5:%.*]] = icmp slt <4 x i32> [[VEC_IND]], splat (i32 2)
-; CHECK-NEXT:    [[PREDPHI:%.*]] = select <4 x i1> [[TMP5]], <4 x i32> [[TMP3]], <4 x i32> [[TMP2]]
-; CHECK-NEXT:    [[TMP7:%.*]] = shl <4 x i32> [[PREDPHI]], splat (i32 8)
-; CHECK-NEXT:    [[TMP8:%.*]] = trunc <4 x i32> [[TMP7]] to <4 x i8>
-; CHECK-NEXT:    [[TMP16:%.*]] = extractelement <4 x i1> [[TMP4]], i64 0
-; CHECK-NEXT:    br i1 [[TMP16]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
-; CHECK:       [[PRED_STORE_IF]]:
-; CHECK-NEXT:    [[TMP17:%.*]] = extractelement <4 x i8> [[TMP8]], i64 0
-; CHECK-NEXT:    store i8 [[TMP17]], ptr [[P]], align 1
-; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE]]
-; CHECK:       [[PRED_STORE_CONTINUE]]:
-; CHECK-NEXT:    [[TMP11:%.*]] = extractelement <4 x i1> [[TMP4]], i64 1
-; CHECK-NEXT:    br i1 [[TMP11]], label %[[PRED_STORE_IF3:.*]], label %[[PRED_STORE_CONTINUE4:.*]]
-; CHECK:       [[PRED_STORE_IF3]]:
-; CHECK-NEXT:    [[TMP12:%.*]] = extractelement <4 x i8> [[TMP8]], i64 1
-; CHECK-NEXT:    store i8 [[TMP12]], ptr [[P]], align 1
-; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE4]]
-; CHECK:       [[PRED_STORE_CONTINUE4]]:
-; CHECK-NEXT:    [[TMP13:%.*]] = extractelement <4 x i1> [[TMP4]], i64 2
-; CHECK-NEXT:    br i1 [[TMP13]], label %[[PRED_STORE_IF5:.*]], label %[[PRED_STORE_CONTINUE6:.*]]
-; CHECK:       [[PRED_STORE_IF5]]:
-; CHECK-NEXT:    [[TMP14:%.*]] = extractelement <4 x i8> [[TMP8]], i64 2
-; CHECK-NEXT:    store i8 [[TMP14]], ptr [[P]], align 1
-; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE6]]
-; CHECK:       [[PRED_STORE_CONTINUE6]]:
-; CHECK-NEXT:    [[TMP15:%.*]] = extractelement <4 x i1> [[TMP4]], i64 3
-; CHECK-NEXT:    br i1 [[TMP15]], label %[[PRED_STORE_IF7:.*]], label %[[PRED_STORE_CONTINUE8]]
-; CHECK:       [[PRED_STORE_IF7]]:
-; CHECK-NEXT:    [[TMP9:%.*]] = extractelement <4 x i8> [[TMP8]], i64 3
-; CHECK-NEXT:    store i8 [[TMP9]], ptr [[P]], align 1
-; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE8]]
+; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE8:.*]]
 ; CHECK:       [[PRED_STORE_CONTINUE8]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_STORE_CONTINUE8]] ]
+; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i32> [ <i32 0, i32 1, i32 2, i32 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[PRED_STORE_CONTINUE8]] ]
+; CHECK-NEXT:    [[TMP4:%.*]] = icmp ugt <4 x i32> [[VEC_IND]], splat (i32 8)
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
 ; CHECK-NEXT:    [[TMP10:%.*]] = icmp eq i32 [[INDEX_NEXT]], 12
-; CHECK-NEXT:    br i1 [[TMP10]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP10]], label %[[MIDDLE_BLOCK:.*]], label %[[PRED_STORE_CONTINUE8]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[TMP5:%.*]] = icmp slt <4 x i32> [[VEC_IND]], splat (i32 2)
+; CHECK-NEXT:    [[PREDPHI:%.*]] = select <4 x i1> [[TMP5]], <4 x i32> [[TMP3]], <4 x i32> [[BROADCAST_SPLAT2]]
+; CHECK-NEXT:    [[TMP7:%.*]] = shl <4 x i32> [[PREDPHI]], splat (i32 8)
+; CHECK-NEXT:    [[TMP8:%.*]] = trunc <4 x i32> [[TMP7]] to <4 x i8>
+; CHECK-NEXT:    [[FIRST_INACTIVE_LANE:%.*]] = call i64 @llvm.experimental.cttz.elts.i64.v4i1(<4 x i1> [[TMP4]], i1 false)
+; CHECK-NEXT:    [[LAST_ACTIVE_LANE:%.*]] = sub i64 [[FIRST_INACTIVE_LANE]], 1
+; CHECK-NEXT:    [[TMP9:%.*]] = extractelement <4 x i8> [[TMP8]], i64 [[LAST_ACTIVE_LANE]]
+; CHECK-NEXT:    store i8 [[TMP9]], ptr [[P]], align 1
 ; CHECK-NEXT:    br label %[[EXIT:.*]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void
@@ -98,10 +74,10 @@ define void @loop_invariant_srem(ptr %p, i64 %a, i8 %b) {
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i8> poison, i8 [[B]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i8> [[BROADCAST_SPLATINSERT]], <4 x i8> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[A]], 48
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x i64> poison, i64 [[TMP0]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT1]], <4 x i64> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP1:%.*]] = ashr <4 x i64> [[BROADCAST_SPLAT2]], splat (i64 52)
-; CHECK-NEXT:    [[TMP2:%.*]] = trunc <4 x i64> [[TMP1]] to <4 x i32>
+; CHECK-NEXT:    [[TMP1:%.*]] = ashr i64 [[TMP0]], 52
+; CHECK-NEXT:    [[TMP6:%.*]] = trunc i64 [[TMP1]] to i32
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT2:%.*]] = insertelement <4 x i32> poison, i32 [[TMP6]], i64 0
+; CHECK-NEXT:    [[TMP2:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT2]], <4 x i32> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP3:%.*]] = zext <4 x i8> [[BROADCAST_SPLAT]] to <4 x i32>
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
@@ -234,14 +210,11 @@ define void @test_store_to_invariant_address_needs_mask_due_to_low_trip_count(pt
 ; CHECK-NEXT:  [[VECTOR_PH:.*:]]
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
-; CHECK-NEXT:    store i32 1, ptr [[DST]], align 4
-; CHECK-NEXT:    store i32 1, ptr [[DST]], align 4
-; CHECK-NEXT:    store i32 1, ptr [[DST]], align 4
-; CHECK-NEXT:    store i32 1, ptr [[DST]], align 4
 ; CHECK-NEXT:    br label %[[MIDDLE_BLOCK:.*]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    br label %[[EXIT:.*]]
 ; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    store i32 1, ptr [[DST]], align 4
 ; CHECK-NEXT:    br label %[[EXIT1:.*]]
 ; CHECK:       [[EXIT1]]:
 ; CHECK-NEXT:    ret void

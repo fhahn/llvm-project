@@ -12,14 +12,9 @@ define void @minbw_cast(ptr %dst, i64 %n, i1 %bool1, i1 %bool2) {
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[UMAX]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[UMAX]], [[N_MOD_VF]]
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i1> poison, i1 [[BOOL2]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i1> [[BROADCAST_SPLATINSERT]], <4 x i1> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x i32> poison, i32 [[BOOL1_EXT]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT1]], <4 x i32> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP0:%.*]] = trunc <4 x i32> [[BROADCAST_SPLAT2]] to <4 x i8>
-; CHECK-NEXT:    [[TMP1:%.*]] = zext <4 x i1> [[BROADCAST_SPLAT]] to <4 x i8>
-; CHECK-NEXT:    [[TMP2:%.*]] = xor <4 x i8> [[TMP0]], [[TMP1]]
-; CHECK-NEXT:    [[TMP3:%.*]] = extractelement <4 x i8> [[TMP2]], i64 3
+; CHECK-NEXT:    [[TMP2:%.*]] = zext i1 [[BOOL2]] to i32
+; CHECK-NEXT:    [[TMP5:%.*]] = xor i32 [[BOOL1_EXT]], [[TMP2]]
+; CHECK-NEXT:    [[TMP3:%.*]] = trunc i32 [[TMP5]] to i8
 ; CHECK-NEXT:    store i8 [[TMP3]], ptr [[DST]], align 1
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
@@ -82,9 +77,11 @@ define void @single_scalar_cast_stored(ptr %src, ptr %dst, i32 %n) {
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i32 [[N]], [[N_MOD_VF]]
 ; CHECK-NEXT:    [[TMP0:%.*]] = load i16, ptr [[SRC]], align 2, !alias.scope [[META4:![0-9]+]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq i16 [[TMP0]], 0
-; CHECK-NEXT:    [[TMP4:%.*]] = and i16 [[TMP0]], 15
-; CHECK-NEXT:    [[TMP5:%.*]] = select i1 [[TMP3]], i16 0, i16 [[TMP4]]
-; CHECK-NEXT:    store i16 [[TMP5]], ptr [[DST]], align 2, !alias.scope [[META7:![0-9]+]], !noalias [[META4]]
+; CHECK-NEXT:    [[TMP7:%.*]] = zext i16 [[TMP0]] to i32
+; CHECK-NEXT:    [[TMP4:%.*]] = and i32 [[TMP7]], 15
+; CHECK-NEXT:    [[TMP5:%.*]] = select i1 [[TMP3]], i32 0, i32 [[TMP4]]
+; CHECK-NEXT:    [[TMP8:%.*]] = trunc i32 [[TMP5]] to i16
+; CHECK-NEXT:    store i16 [[TMP8]], ptr [[DST]], align 2, !alias.scope [[META7:![0-9]+]], !noalias [[META4]]
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]

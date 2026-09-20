@@ -1411,16 +1411,19 @@ define i64 @print_ext_mul_two_uses(i64 %n, ptr %a, i16 %b, i32 %c) {
 ; CHECK-NEXT:  vector.ph:
 ; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = reduction-start-vector ir<0>, ir<0>, ir<1>
 ; CHECK-NEXT:    CLONE ir<%load> = load ir<%a>
-; CHECK-NEXT:    WIDEN-CAST ir<%load.ext> = sext ir<%load> to i32
-; CHECK-NEXT:    WIDEN-CAST ir<%load.ext.ext> = sext ir<%load.ext> to i64
+; CHECK-NEXT:    EMIT-SCALAR ir<%conv> = sext ir<%b> to i32
+; CHECK-NEXT:    CLONE ir<%mul> = mul ir<%conv>, ir<%conv>
+; CHECK-NEXT:    EMIT-SCALAR ir<%mul.ext> = zext ir<%mul> to i64
+; CHECK-NEXT:    EMIT-SCALAR ir<%load.ext> = sext ir<%load> to i32
+; CHECK-NEXT:    EMIT-SCALAR ir<%load.ext.ext> = sext ir<%load.ext> to i64
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {
 ; CHECK-NEXT:  vp<[[VP4:%[0-9]+]]> = CANONICAL-IV
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
-; CHECK-NEXT:      WIDEN-REDUCTION-PHI ir<%res2> = phi (add) vp<[[VP3]]>, vp<[[VP5:%[0-9]+]]>
-; CHECK-NEXT:      EXPRESSION vp<[[VP5]]> = ir<%res2> + reduce.add (mul (ir<%b> sext to i64), (ir<%b> sext to i64))
+; CHECK-NEXT:      WIDEN-REDUCTION-PHI ir<%res2> = phi (add) vp<[[VP3]]>, ir<%add>
+; CHECK-NEXT:      REDUCE ir<%add> = ir<%res2> +  reduce.add (ir<%mul.ext>)
 ; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
@@ -1428,24 +1431,24 @@ define i64 @print_ext_mul_two_uses(i64 %n, ptr %a, i16 %b, i32 %c) {
 ; CHECK-NEXT:  Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = compute-reduction-result (add, in-loop) vp<[[VP5]]>
+; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = compute-reduction-result (add, in-loop) ir<%add>
 ; CHECK-NEXT:    EMIT vp<%vector.recur.extract.for.phi> = extract-penultimate-element ir<%load.ext.ext>
-; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = extract-last-part ir<%load.ext.ext>
-; CHECK-NEXT:    EMIT vp<%vector.recur.extract> = extract-last-lane vp<[[VP8]]>
+; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = extract-last-part ir<%load.ext.ext>
+; CHECK-NEXT:    EMIT vp<%vector.recur.extract> = extract-last-lane vp<[[VP7]]>
 ; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq vp<[[VP2]]>, vp<[[VP1]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<exit>:
 ; CHECK-NEXT:    IR   %res1.lcssa = phi i64 [ %res1, %loop ] (extra operand: vp<%vector.recur.extract.for.phi> from middle.block)
-; CHECK-NEXT:    IR   %add.lcssa = phi i64 [ %add, %loop ] (extra operand: vp<[[VP7]]> from middle.block)
+; CHECK-NEXT:    IR   %add.lcssa = phi i64 [ %add, %loop ] (extra operand: vp<[[VP6]]> from middle.block)
 ; CHECK-NEXT:    IR   %res = add i64 %res1.lcssa, %add.lcssa
 ; CHECK-NEXT:  No successors
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  scalar.ph:
 ; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP1]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
 ; CHECK-NEXT:    EMIT-SCALAR vp<%scalar.recur.init> = phi [ vp<%vector.recur.extract>, middle.block ], [ ir<0>, ir-bb<entry> ]
-; CHECK-NEXT:    EMIT-SCALAR vp<%bc.merge.rdx> = phi [ vp<[[VP7]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
+; CHECK-NEXT:    EMIT-SCALAR vp<%bc.merge.rdx> = phi [ vp<[[VP6]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
 ; CHECK-NEXT:  Successor(s): ir-bb<loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<loop>:

@@ -44,15 +44,15 @@ define i32 @live_out(ptr noalias %p, i32 %n) {
 ; CHECK-NEXT:  middle.block:
 ; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = exiting-iv-value ir<%iv>
 ; CHECK-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = extract-last-part vp<[[VP6]]>
-; CHECK-NEXT:    EMIT vp<[[VP10:%[0-9]+]]> = extract-last-lane vp<[[VP9]]>
+; CHECK-NEXT:    EMIT vp<[[VP10:%[0-9]+]]> = last-active-lane vp<[[VP4]]>
+; CHECK-NEXT:    EMIT vp<[[VP11:%[0-9]+]]> = extract-lane vp<[[VP10]]>, vp<[[VP6]]>
+; CHECK-NEXT:    EMIT vp<[[VP12:%[0-9]+]]> = extract-last-lane vp<[[VP9]]>
 ; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
-; CHECK-NEXT:    EMIT vp<[[VP11:%[0-9]+]]> = last-active-lane vp<[[VP4]]>
-; CHECK-NEXT:    EMIT vp<[[VP12:%[0-9]+]]> = extract-lane vp<[[VP11]]>, vp<[[VP6]]>
 ; CHECK-NEXT:    EMIT branch-on-cond ir<true>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<exit>:
-; CHECK-NEXT:    IR   %y.lcssa = phi i32 [ %y, %loop ] (extra operand: vp<[[VP12]]> from middle.block)
+; CHECK-NEXT:    IR   %y.lcssa = phi i32 [ %y, %loop ] (extra operand: vp<[[VP11]]> from middle.block)
 ; CHECK-NEXT:  No successors
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  scalar.ph:
@@ -111,14 +111,14 @@ define i32 @conditional_live_out(ptr noalias %p, i32 %n, i1 %c) {
 ; CHECK-NEXT:    Successor(s): vector.body.split, vector.latch
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body.split:
-; CHECK-NEXT:      EMIT branch-on-cond ir<%c>
+; CHECK-NEXT:      EMIT branch-on-cond ir<%c> (!vplan.prof.estimated estimated {1073741824, 1073741824})
 ; CHECK-NEXT:    Successor(s): if, latch
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    if:
-; CHECK-NEXT:      EMIT ir<%gep> = getelementptr ir<%p>, ir<%iv>
-; CHECK-NEXT:      EMIT-SCALAR ir<%x> = load ir<%gep>
-; CHECK-NEXT:      EMIT ir<%y> = add ir<%x>, ir<1>
-; CHECK-NEXT:      EMIT store ir<%y>, ir<%gep>
+; CHECK-NEXT:      EMIT ir<%gep> = getelementptr ir<%p>, ir<%iv> (!vplan.execution.frequency 4611686018427387904 (50%, estimated))
+; CHECK-NEXT:      EMIT-SCALAR ir<%x> = load ir<%gep> (!vplan.execution.frequency 4611686018427387904 (50%, estimated))
+; CHECK-NEXT:      EMIT ir<%y> = add ir<%x>, ir<1> (!vplan.execution.frequency 4611686018427387904 (50%, estimated))
+; CHECK-NEXT:      EMIT store ir<%y>, ir<%gep> (!vplan.execution.frequency 4611686018427387904 (50%, estimated))
 ; CHECK-NEXT:    Successor(s): latch
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    latch:
@@ -138,15 +138,15 @@ define i32 @conditional_live_out(ptr noalias %p, i32 %n, i1 %c) {
 ; CHECK-NEXT:  middle.block:
 ; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = exiting-iv-value ir<%iv>
 ; CHECK-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = extract-last-part vp<[[VP6]]>
-; CHECK-NEXT:    EMIT vp<[[VP10:%[0-9]+]]> = extract-last-lane vp<[[VP9]]>
+; CHECK-NEXT:    EMIT vp<[[VP10:%[0-9]+]]> = last-active-lane vp<[[VP4]]>
+; CHECK-NEXT:    EMIT vp<[[VP11:%[0-9]+]]> = extract-lane vp<[[VP10]]>, vp<[[VP6]]>
+; CHECK-NEXT:    EMIT vp<[[VP12:%[0-9]+]]> = extract-last-lane vp<[[VP9]]>
 ; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
-; CHECK-NEXT:    EMIT vp<[[VP11:%[0-9]+]]> = last-active-lane vp<[[VP4]]>
-; CHECK-NEXT:    EMIT vp<[[VP12:%[0-9]+]]> = extract-lane vp<[[VP11]]>, vp<[[VP6]]>
 ; CHECK-NEXT:    EMIT branch-on-cond ir<true>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<exit>:
-; CHECK-NEXT:    IR   %phi.lcssa = phi i32 [ %phi, %latch ] (extra operand: vp<[[VP12]]> from middle.block)
+; CHECK-NEXT:    IR   %phi.lcssa = phi i32 [ %phi, %latch ] (extra operand: vp<[[VP11]]> from middle.block)
 ; CHECK-NEXT:  No successors
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  scalar.ph:
@@ -298,24 +298,24 @@ define i32 @reduction(ptr noalias %p, i32 %n) {
 ; CHECK-NEXT:  middle.block:
 ; CHECK-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = exiting-iv-value ir<%iv>
 ; CHECK-NEXT:    EMIT vp<[[VP10:%[0-9]+]]> = extract-last-part vp<[[VP7]]>
-; CHECK-NEXT:    EMIT vp<[[VP11:%[0-9]+]]> = extract-last-lane vp<[[VP10]]>
-; CHECK-NEXT:    EMIT vp<[[VP12:%[0-9]+]]> = extract-last-part vp<[[VP7]]>
-; CHECK-NEXT:    EMIT vp<[[VP13:%[0-9]+]]> = extract-last-lane vp<[[VP12]]>
+; CHECK-NEXT:    EMIT vp<[[VP11:%[0-9]+]]> = last-active-lane vp<[[VP5]]>
+; CHECK-NEXT:    EMIT vp<[[VP12:%[0-9]+]]> = extract-lane vp<[[VP11]]>, vp<[[VP7]]>
+; CHECK-NEXT:    EMIT vp<[[VP13:%[0-9]+]]> = extract-last-lane vp<[[VP10]]>
+; CHECK-NEXT:    EMIT vp<[[VP14:%[0-9]+]]> = extract-last-part vp<[[VP7]]>
+; CHECK-NEXT:    EMIT vp<[[VP15:%[0-9]+]]> = last-active-lane vp<[[VP5]]>
+; CHECK-NEXT:    EMIT vp<[[VP16:%[0-9]+]]> = extract-lane vp<[[VP15]]>, vp<[[VP7]]>
+; CHECK-NEXT:    EMIT vp<[[VP17:%[0-9]+]]> = extract-last-lane vp<[[VP14]]>
 ; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
-; CHECK-NEXT:    EMIT vp<[[VP14:%[0-9]+]]> = last-active-lane vp<[[VP5]]>
-; CHECK-NEXT:    EMIT vp<[[VP15:%[0-9]+]]> = extract-lane vp<[[VP14]]>, vp<[[VP7]]>
-; CHECK-NEXT:    EMIT vp<[[VP16:%[0-9]+]]> = last-active-lane vp<[[VP5]]>
-; CHECK-NEXT:    EMIT vp<[[VP17:%[0-9]+]]> = extract-lane vp<[[VP16]]>, vp<[[VP7]]>
 ; CHECK-NEXT:    EMIT branch-on-cond ir<true>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<exit>:
-; CHECK-NEXT:    IR   %rdx.next.lcssa = phi i32 [ %rdx.next, %loop ] (extra operand: vp<[[VP17]]> from middle.block)
+; CHECK-NEXT:    IR   %rdx.next.lcssa = phi i32 [ %rdx.next, %loop ] (extra operand: vp<[[VP16]]> from middle.block)
 ; CHECK-NEXT:  No successors
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  scalar.ph:
 ; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP9]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
-; CHECK-NEXT:    EMIT-SCALAR vp<%bc.merge.rdx> = phi [ vp<[[VP15]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
+; CHECK-NEXT:    EMIT-SCALAR vp<%bc.merge.rdx> = phi [ vp<[[VP12]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
 ; CHECK-NEXT:  Successor(s): ir-bb<loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<loop>:

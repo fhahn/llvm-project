@@ -1485,10 +1485,10 @@ define void @type_cache_crash(ptr noalias %a, ptr noalias %b, ptr noalias %c, i3
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 2 x double> poison, double [[C0]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 2 x double> [[BROADCAST_SPLATINSERT]], <vscale x 2 x double> poison, <vscale x 2 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP3:%.*]] = fneg <vscale x 2 x double> [[BROADCAST_SPLAT]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = fsub double 0.000000e+00, [[C1]]
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT7:%.*]] = insertelement <vscale x 2 x double> poison, double [[TMP4]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT8:%.*]] = shufflevector <vscale x 2 x double> [[BROADCAST_SPLATINSERT7]], <vscale x 2 x double> poison, <vscale x 2 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP3:%.*]] = fneg <vscale x 2 x double> [[BROADCAST_SPLAT]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr [8 x i8], ptr [[B]], i64 [[C3]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr i8, ptr [[TMP5]], i64 48
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <vscale x 2 x double> poison, double [[C2]], i64 0
@@ -1541,10 +1541,10 @@ define void @type_cache_crash(ptr noalias %a, ptr noalias %b, ptr noalias %c, i3
 ; CHECK-UF2-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 2 x double> poison, double [[C0]], i64 0
 ; CHECK-UF2-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 2 x double> [[BROADCAST_SPLATINSERT]], <vscale x 2 x double> poison, <vscale x 2 x i32> zeroinitializer
 ; CHECK-UF2-NEXT:    [[TMP9:%.*]] = shl i32 [[N_VEC]], 2
-; CHECK-UF2-NEXT:    [[TMP10:%.*]] = fneg <vscale x 2 x double> [[BROADCAST_SPLAT]]
 ; CHECK-UF2-NEXT:    [[TMP11:%.*]] = fsub double 0.000000e+00, [[C1]]
 ; CHECK-UF2-NEXT:    [[BROADCAST_SPLATINSERT5:%.*]] = insertelement <vscale x 2 x double> poison, double [[TMP11]], i64 0
 ; CHECK-UF2-NEXT:    [[BROADCAST_SPLAT6:%.*]] = shufflevector <vscale x 2 x double> [[BROADCAST_SPLATINSERT5]], <vscale x 2 x double> poison, <vscale x 2 x i32> zeroinitializer
+; CHECK-UF2-NEXT:    [[TMP10:%.*]] = fneg <vscale x 2 x double> [[BROADCAST_SPLAT]]
 ; CHECK-UF2-NEXT:    [[TMP12:%.*]] = getelementptr [8 x i8], ptr [[B]], i64 [[C3]]
 ; CHECK-UF2-NEXT:    [[TMP13:%.*]] = getelementptr i8, ptr [[TMP12]], i64 48
 ; CHECK-UF2-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <vscale x 2 x double> poison, double [[C2]], i64 0

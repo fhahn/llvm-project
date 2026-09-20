@@ -64,12 +64,12 @@ define i32 @test_icmp_and_op_zext(ptr %dst, i64 %a) {
 ; CHECK-NEXT:    [[AND:%.*]] = and i64 [[A]], 7304878031173690989
 ; CHECK-NEXT:    br label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[AND]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT]], <4 x i64> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP1:%.*]] = icmp ne <4 x i64> [[BROADCAST_SPLAT]], zeroinitializer
-; CHECK-NEXT:    [[TMP2:%.*]] = zext <4 x i1> [[TMP1]] to <4 x i64>
-; CHECK-NEXT:    [[TMP3:%.*]] = or <4 x i64> [[BROADCAST_SPLAT]], [[TMP2]]
-; CHECK-NEXT:    [[TMP4:%.*]] = trunc <4 x i64> [[TMP3]] to <4 x i8>
+; CHECK-NEXT:    [[TMP0:%.*]] = icmp ne i64 [[AND]], 0
+; CHECK-NEXT:    [[TMP1:%.*]] = zext i1 [[TMP0]] to i64
+; CHECK-NEXT:    [[TMP2:%.*]] = or i64 [[AND]], [[TMP1]]
+; CHECK-NEXT:    [[TMP3:%.*]] = trunc i64 [[TMP2]] to i8
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i8> poison, i8 [[TMP3]], i64 0
+; CHECK-NEXT:    [[TMP4:%.*]] = shufflevector <4 x i8> [[BROADCAST_SPLATINSERT]], <4 x i8> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK:       vector.body:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]

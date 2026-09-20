@@ -2448,6 +2448,22 @@ static bool cannotHoistOrSinkRecipe(VPRecipeBase &R,
                !canBeSingleScalarOutsideLoopRegion(VPI->getOpcode()))))
     return true;
 
+  // VPInstructions that are single-scalar by construction (casts, loads, phis)
+  // are widened when the loop region is lowered. Moving them out of the region
+  // skips that, so they would read the first instead of the last lane of an
+  // operand that is not uniform across all lanes.
+  if (VPI && VPI->isSingleScalar() &&
+      any_of(VPI->operands(), [](VPValue *Op) {
+        if (Op->isDefinedOutsideLoopRegions())
+          return false;
+        // Operands that have not been lowered yet may still be widened, even
+        // though they are single-scalar by construction as well.
+        auto *OpI = dyn_cast<VPInstruction>(Op);
+        return (OpI && OpI->getUnderlyingValue()) ||
+               !vputils::isSingleScalar(Op);
+      }))
+    return true;
+
   if (!isa<VPInstruction, VPReplicateRecipe>(R) || !R.mayReadOrWriteMemory() ||
       match(&R, m_Intrinsic<Intrinsic::assume>()))
     return vputils::cannotHoistOrSinkRecipe(R, Sinking);
@@ -2495,8 +2511,7 @@ static void moveRecipeOutsideLoop(VPRecipeBase &R, VPBasicBlock &BB,
   R.moveBefore(BB, IP);
 }
 
-/// Move loop-invariant recipes out of the vector loop region in \p Plan.
-static void licm(VPlan &Plan) {
+void VPlanTransforms::licm(VPlan &Plan) {
   VPBasicBlock *Preheader = Plan.getVectorPreheader();
   VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
   // The vector loop region of a loop with an early exit has more than one
@@ -2591,7 +2606,21 @@ static void licm(VPlan &Plan) {
         continue;
       // TODO: Clone the recipe if users are on multiple exit paths, instead of
       // just moving.
-      moveRecipeOutsideLoop(R, *SinkBB, SinkBB->getFirstNonPhi());
+      // Compute the insert point up-front, so that R is moved after any
+      // extracts created for it below.
+      VPBasicBlock::iterator IP = SinkBB->getFirstNonPhi();
+      if (vputils::getOpcode(Def) == Instruction::Store &&
+          !Def->getOperand(0)->isDefinedOutsideLoopRegions()) {
+        // A sunk store only writes the value of the last iteration, that is the
+        // last lane of the last part. Model the extracts explicitly here, as
+        // unrolling cannot patch this up for vector values.
+        VPBuilder Builder(SinkBB, IP);
+        VPValue *LastPart = Builder.createNaryOp(VPInstruction::ExtractLastPart,
+                                                 Def->getOperand(0));
+        Def->setOperand(
+            0, Builder.createNaryOp(VPInstruction::ExtractLastLane, LastPart));
+      }
+      moveRecipeOutsideLoop(R, *SinkBB, IP);
     }
   }
 }
@@ -2788,7 +2817,7 @@ void VPlanTransforms::optimize(VPlan &Plan) {
 
   RUN_VPLAN_PASS(createAndOptimizeReplicateRegions, Plan);
   RUN_VPLAN_PASS(mergeBlocksIntoPredecessors, Plan);
-  RUN_VPLAN_PASS(licm, Plan);
+  RUN_VPLAN_PASS(VPlanTransforms::licm, Plan);
 }
 
 void VPlanTransforms::simplifyLiveInsWithSCEV(VPlan &Plan,
@@ -3788,8 +3817,10 @@ tryToMatchAndCreateMulAccumulateReduction(VPReductionRecipe *Red,
     Mul->setOperand(1, ExtB);
   };
 
-  // Try to match reduce.add(mul(...)).
-  if (match(VecOp, m_Mul(m_VPValue(A), m_VPValue(B)))) {
+  // Try to match reduce.add(mul(...)). Only widened recipes can be bundled;
+  // licm may have hoisted an invariant multiply or extend out of the loop as a
+  // single-scalar recipe.
+  if (match(VecOp, m_Isa<VPWidenRecipe>(m_Mul(m_VPValue(A), m_VPValue(B))))) {
     auto *RecipeA = dyn_cast<VPWidenCastRecipe>(A);
     auto *RecipeB = dyn_cast<VPWidenCastRecipe>(B);
     auto *Mul = cast<VPWidenRecipe>(VecOp);
@@ -3816,7 +3847,8 @@ tryToMatchAndCreateMulAccumulateReduction(VPReductionRecipe *Red,
     return nullptr;
 
   // Match reduce.add(ext(mul(A, B))).
-  if (match(VecOp, m_ZExtOrSExt(m_Mul(m_VPValue(A), m_VPValue(B))))) {
+  if (match(VecOp, m_Isa<VPWidenCastRecipe>(m_ZExtOrSExt(m_Isa<VPWidenRecipe>(
+                       m_Mul(m_VPValue(A), m_VPValue(B))))))) {
     auto *Ext = cast<VPWidenCastRecipe>(VecOp);
     auto *Mul = cast<VPWidenRecipe>(Ext->getOperand(0));
     auto *Ext0 = dyn_cast<VPWidenCastRecipe>(A);

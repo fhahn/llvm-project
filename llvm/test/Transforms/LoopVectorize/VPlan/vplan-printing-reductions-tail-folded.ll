@@ -1125,16 +1125,19 @@ define i64 @print_ext_mul_two_uses(i64 %n, ptr %a, i16 %b, i32 %c) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
 ; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = reduction-start-vector ir<0>, ir<0>, ir<1>
+; CHECK-NEXT:    EMIT-SCALAR ir<%conv> = sext ir<%b> to i32
+; CHECK-NEXT:    CLONE ir<%mul> = mul ir<%conv>, ir<%conv>
+; CHECK-NEXT:    EMIT-SCALAR ir<%mul.ext> = zext ir<%mul> to i64
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {
 ; CHECK-NEXT:  vp<[[VP5:%[0-9]+]]> = CANONICAL-IV
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
-; CHECK-NEXT:      WIDEN-REDUCTION-PHI ir<%res2> = phi (add) vp<[[VP4]]>, vp<[[VP9:%[0-9]+]]>
+; CHECK-NEXT:      WIDEN-REDUCTION-PHI ir<%res2> = phi (add) vp<[[VP4]]>, ir<%add>
 ; CHECK-NEXT:      EMIT vp<[[VP7:%[0-9]+]]> = WIDEN-CANONICAL-INDUCTION nuw vp<[[VP5]]>
 ; CHECK-NEXT:      EMIT vp<[[VP8:%[0-9]+]]> = icmp ule vp<[[VP7]]>, vp<[[VP2]]>
-; CHECK-NEXT:      EXPRESSION vp<[[VP9]]> = ir<%res2> + reduce.add (mul (ir<%b> sext to i64), (ir<%b> sext to i64), vp<[[VP8]]>)
+; CHECK-NEXT:      REDUCE ir<%add> = ir<%res2> +  reduce.add (ir<%mul.ext>, vp<[[VP8]]>)
 ; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP5]]>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
@@ -1142,11 +1145,11 @@ define i64 @print_ext_mul_two_uses(i64 %n, ptr %a, i16 %b, i32 %c) {
 ; CHECK-NEXT:  Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    EMIT vp<[[VP11:%[0-9]+]]> = compute-reduction-result (add, in-loop) vp<[[VP9]]>
+; CHECK-NEXT:    EMIT vp<[[VP10:%[0-9]+]]> = compute-reduction-result (add, in-loop) ir<%add>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<exit>:
-; CHECK-NEXT:    IR   %add.lcssa = phi i64 [ %add, %loop ] (extra operand: vp<[[VP11]]> from middle.block)
+; CHECK-NEXT:    IR   %add.lcssa = phi i64 [ %add, %loop ] (extra operand: vp<[[VP10]]> from middle.block)
 ; CHECK-NEXT:  No successors
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  scalar.ph:

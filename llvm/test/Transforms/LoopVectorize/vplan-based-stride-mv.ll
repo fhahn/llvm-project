@@ -1016,9 +1016,11 @@ define void @dependent_strides(ptr noalias %p.out, ptr %p0, ptr %p1, i64 %stride
 ; COMPARE-NO-MV-NEXT:  [[ENTRY:.*:]]
 ; COMPARE-NO-MV-NEXT:    br label %[[VECTOR_PH:.*]]
 ; COMPARE-NO-MV:       [[VECTOR_PH]]:
+; COMPARE-NO-MV-NEXT:    [[TMP3:%.*]] = add i64 [[STRIDE]], 1
+; COMPARE-NO-MV-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x i64> poison, i64 [[TMP3]], i64 0
+; COMPARE-NO-MV-NEXT:    [[TMP2:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT1]], <4 x i64> poison, <4 x i32> zeroinitializer
 ; COMPARE-NO-MV-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[STRIDE]], i64 0
 ; COMPARE-NO-MV-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT]], <4 x i64> poison, <4 x i32> zeroinitializer
-; COMPARE-NO-MV-NEXT:    [[TMP2:%.*]] = add <4 x i64> [[BROADCAST_SPLAT]], splat (i64 1)
 ; COMPARE-NO-MV-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; COMPARE-NO-MV:       [[VECTOR_BODY]]:
 ; COMPARE-NO-MV-NEXT:    [[TMP5:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
@@ -1123,9 +1125,11 @@ define void @dependent_strides_reverse_order(ptr noalias %p.out, ptr %p0, ptr %p
 ; COMPARE-NO-MV-NEXT:  [[ENTRY:.*:]]
 ; COMPARE-NO-MV-NEXT:    br label %[[VECTOR_PH:.*]]
 ; COMPARE-NO-MV:       [[VECTOR_PH]]:
+; COMPARE-NO-MV-NEXT:    [[TMP1:%.*]] = add i64 [[STRIDE]], 1
+; COMPARE-NO-MV-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x i64> poison, i64 [[TMP1]], i64 0
+; COMPARE-NO-MV-NEXT:    [[TMP0:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT1]], <4 x i64> poison, <4 x i32> zeroinitializer
 ; COMPARE-NO-MV-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[STRIDE]], i64 0
 ; COMPARE-NO-MV-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT]], <4 x i64> poison, <4 x i32> zeroinitializer
-; COMPARE-NO-MV-NEXT:    [[TMP0:%.*]] = add <4 x i64> [[BROADCAST_SPLAT]], splat (i64 1)
 ; COMPARE-NO-MV-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; COMPARE-NO-MV:       [[VECTOR_BODY]]:
 ; COMPARE-NO-MV-NEXT:    [[TMP10:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
@@ -2922,9 +2926,9 @@ define void @sext_stride(ptr noalias %p.out, ptr %p, i32 %stride.i32) {
 ; COMPARE-NO-MV-NEXT:  [[ENTRY:.*:]]
 ; COMPARE-NO-MV-NEXT:    br label %[[VECTOR_PH:.*]]
 ; COMPARE-NO-MV:       [[VECTOR_PH]]:
-; COMPARE-NO-MV-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[STRIDE_I32]], i64 0
-; COMPARE-NO-MV-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
-; COMPARE-NO-MV-NEXT:    [[TMP0:%.*]] = sext <4 x i32> [[BROADCAST_SPLAT]] to <4 x i64>
+; COMPARE-NO-MV-NEXT:    [[TMP2:%.*]] = sext i32 [[STRIDE_I32]] to i64
+; COMPARE-NO-MV-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[TMP2]], i64 0
+; COMPARE-NO-MV-NEXT:    [[TMP0:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT]], <4 x i64> poison, <4 x i32> zeroinitializer
 ; COMPARE-NO-MV-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; COMPARE-NO-MV:       [[VECTOR_BODY]]:
 ; COMPARE-NO-MV-NEXT:    [[TMP5:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
@@ -3009,9 +3013,9 @@ define void @trunc_stride(ptr noalias %p.out, ptr %p, i64 %stride.i64) {
 ; COMPARE-NO-MV-NEXT:  [[ENTRY:.*:]]
 ; COMPARE-NO-MV-NEXT:    br label %[[VECTOR_SCEVCHECK:.*]]
 ; COMPARE-NO-MV:       [[VECTOR_SCEVCHECK]]:
-; COMPARE-NO-MV-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[STRIDE_I64]], i64 0
-; COMPARE-NO-MV-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT]], <4 x i64> poison, <4 x i32> zeroinitializer
-; COMPARE-NO-MV-NEXT:    [[TMP0:%.*]] = trunc <4 x i64> [[BROADCAST_SPLAT]] to <4 x i32>
+; COMPARE-NO-MV-NEXT:    [[TMP2:%.*]] = trunc i64 [[STRIDE_I64]] to i32
+; COMPARE-NO-MV-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[TMP2]], i64 0
+; COMPARE-NO-MV-NEXT:    [[TMP0:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
 ; COMPARE-NO-MV-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; COMPARE-NO-MV:       [[VECTOR_BODY]]:
 ; COMPARE-NO-MV-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_SCEVCHECK]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
@@ -3098,9 +3102,9 @@ define void @trunc_stride_extra_narrow_use(ptr noalias %p.out, ptr %p, i64 %stri
 ; COMPARE-NO-MV-NEXT:    [[STRIDE_I1:%.*]] = trunc i64 [[STRIDE_I64]] to i1
 ; COMPARE-NO-MV-NEXT:    br label %[[VECTOR_SCEVCHECK:.*]]
 ; COMPARE-NO-MV:       [[VECTOR_SCEVCHECK]]:
-; COMPARE-NO-MV-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[STRIDE_I64]], i64 0
-; COMPARE-NO-MV-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT]], <4 x i64> poison, <4 x i32> zeroinitializer
-; COMPARE-NO-MV-NEXT:    [[TMP10:%.*]] = trunc <4 x i64> [[BROADCAST_SPLAT]] to <4 x i32>
+; COMPARE-NO-MV-NEXT:    [[TMP0:%.*]] = trunc i64 [[STRIDE_I64]] to i32
+; COMPARE-NO-MV-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[TMP0]], i64 0
+; COMPARE-NO-MV-NEXT:    [[TMP10:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
 ; COMPARE-NO-MV-NEXT:    [[TMP11:%.*]] = shl <4 x i32> [[TMP10]], splat (i32 2)
 ; COMPARE-NO-MV-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; COMPARE-NO-MV:       [[VECTOR_BODY]]:
