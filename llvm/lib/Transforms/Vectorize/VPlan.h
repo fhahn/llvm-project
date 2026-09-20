@@ -1371,7 +1371,8 @@ public:
     AnyOf,
     // Calculates the first active lane index of the vector predicate operands.
     // It produces the lane index across all unrolled iterations. Unrolling will
-    // add all copies of its original operand as additional operands.
+    // add all copies of its original operand as additional operands, followed
+    // by the runtime VF as last operand.
     // Implemented with @llvm.experimental.cttz.elts, but returns the expected
     // result even with operands that are all zeroes.
     FirstActiveLane,
@@ -1390,7 +1391,8 @@ public:
     ReductionStartVector,
     /// Extracts a single lane (first operand) from a set of vector operands.
     /// The lane specifies an index into a vector formed by combining all vector
-    /// operands (all operands after the first one).
+    /// operands (all operands after the first one). Unrolling appends the
+    /// copies for the remaining parts and the runtime VF as last operand.
     ExtractLane,
     /// Explicit user for the resume phi of the canonical induction in the main
     /// VPlan, used by the epilogue vector loop.

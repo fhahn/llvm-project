@@ -436,6 +436,8 @@ void UnrollState::unrollBlock(VPBlockBase *VPB) {
       addUniformForAllParts(VPI);
       for (unsigned Part = 1; Part != UF; ++Part)
         VPI->addOperand(getValueForPart(Op1, Part));
+      if (VPI->getOpcode() == VPInstruction::FirstActiveLane)
+        VPI->addOperand(&Plan.getVF());
       continue;
     }
     VPValue *Op0;
@@ -444,6 +446,7 @@ void UnrollState::unrollBlock(VPBlockBase *VPB) {
       addUniformForAllParts(VPI);
       for (unsigned Part = 1; Part != UF; ++Part)
         VPI->addOperand(getValueForPart(Op1, Part));
+      VPI->addOperand(&Plan.getVF());
       continue;
     }
 

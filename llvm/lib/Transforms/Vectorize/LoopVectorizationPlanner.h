@@ -239,8 +239,11 @@ public:
     // within the index type for the default address space.
     VPlan &Plan = getPlan();
     Type *IndexTy = Plan.getDataLayout().getIndexType(Plan.getContext(), 0);
-    return tryInsertInstruction(new VPInstruction(
+    auto *R = tryInsertInstruction(new VPInstruction(
         VPInstruction::FirstActiveLane, Masks, {}, {}, DL, Name, IndexTy));
+    if (Masks.size() > 1)
+      R->addOperand(&Plan.getVF());
+    return R;
   }
 
   VPInstruction *createLastActiveLane(ArrayRef<VPValue *> Masks,

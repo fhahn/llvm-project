@@ -1329,7 +1329,7 @@ static VPValue *simplifyRecipe(VPlan &Plan, VPSingleDefRecipe *Def) {
 
   // Simplify extracts of the same single-scalar.
   if (match(Def, m_VPInstruction<VPInstruction::ExtractLane>()) &&
-      all_equal(drop_begin(Def->operands())) &&
+      all_equal(drop_end(drop_begin(Def->operands()))) &&
       vputils::isSingleScalar(Def->getOperand(1)))
     return Def->getOperand(1);
 

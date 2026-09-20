@@ -1071,9 +1071,11 @@ Value *VPInstruction::generate(VPTransformState &State,
     Value *LaneToExtract = State.get(getOperand(0), true);
     Type *IdxTy = getOperand(0)->getScalarType();
     Value *Res = nullptr;
-    Value *RuntimeVF = getRuntimeVF(Builder, IdxTy, State.VF);
+    unsigned VFOpIdx = getNumOperands() - 1;
+    Value *RuntimeVF = Builder.CreateZExtOrTrunc(
+        State.get(getOperand(VFOpIdx), /*NeedsSingleScalar=*/true), IdxTy);
 
-    for (unsigned Idx = 1; Idx != getNumOperands(); ++Idx) {
+    for (unsigned Idx = 1; Idx != VFOpIdx; ++Idx) {
       Value *VectorStart =
           Builder.CreateMul(RuntimeVF, ConstantInt::get(IdxTy, Idx - 1));
       Value *VectorIdx = Idx == 1
@@ -1104,8 +1106,10 @@ Value *VPInstruction::generate(VPTransformState &State,
     // If there are multiple operands, create a chain of selects to pick the
     // first operand with an active lane and add the number of lanes of the
     // preceding operands.
-    Value *RuntimeVF = getRuntimeVF(Builder, Ty, State.VF);
-    unsigned LastOpIdx = getNumOperands() - 1;
+    Value *RuntimeVF = Builder.CreateZExtOrTrunc(
+        State.get(getOperand(getNumOperands() - 1), /*NeedsSingleScalar=*/true),
+        Ty);
+    unsigned LastOpIdx = getNumOperands() - 2;
     Value *Res = nullptr;
     for (int Idx = LastOpIdx; Idx >= 0; --Idx) {
       Value *TrailingZeros =
@@ -1633,11 +1637,15 @@ bool VPInstruction::isSingleScalar() const {
 void VPInstruction::addOperand(VPValue *Op) {
 #ifndef NDEBUG
   Type *Ty = Op->getScalarType();
+  bool IsVF = getParent() && Op == &getParent()->getPlan()->getVF();
   switch (getOpcode()) {
   case VPInstruction::AnyOf:
-  case VPInstruction::FirstActiveLane:
   case VPInstruction::LastActiveLane:
     assert(Ty == getOperand(0)->getScalarType() &&
+           "types of operand 0 and new operand must match");
+    break;
+  case VPInstruction::FirstActiveLane:
+    assert((IsVF || Ty == getOperand(0)->getScalarType()) &&
            "types of operand 0 and new operand must match");
     break;
   case VPInstruction::ComputeReductionResult:
@@ -1647,7 +1655,7 @@ void VPInstruction::addOperand(VPValue *Op) {
            "appended operand must match operand 0's scalar type");
     break;
   case VPInstruction::ExtractLane:
-    assert(Ty == getOperand(1)->getScalarType() &&
+    assert((IsVF || Ty == getOperand(1)->getScalarType()) &&
            "appended operand must match operand 1's scalar type");
     break;
   case VPInstruction::ExtractLastActive: {
@@ -1810,8 +1818,12 @@ bool VPInstruction::usesFirstLaneOnly(const VPValue *Op) const {
     // WidePtrAdd supports scalar and vector base addresses.
     return false;
   case VPInstruction::ExitingIVValue:
-  case VPInstruction::ExtractLane:
     return Op == getOperand(0);
+  case VPInstruction::ExtractLane:
+    return Op == getOperand(0) ||
+           (getNumOperands() > 2 && Op == getOperand(getNumOperands() - 1));
+  case VPInstruction::FirstActiveLane:
+    return getNumOperands() > 1 && Op == getOperand(getNumOperands() - 1);
   };
   llvm_unreachable("switch should return");
 }
