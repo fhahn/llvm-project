@@ -6716,7 +6716,10 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan,
   // bring the VPlan to its final state.
   // ---------------------------------------------------------------------------
 
-  addReductionResultComputation(Plan, Range.Start);
+  addReductionResultComputation(Plan);
+  RUN_VPLAN_PASS(VPlanTransforms::truncateReductions, *Plan, Range.Start,
+                 Legal->getReductionVars());
+  RUN_VPLAN_PASS(VPlanTransforms::clearReductionWrapFlags, *Plan);
 
   // Optimize FindIV reductions to use sentinel-based approach when possible.
   RUN_VPLAN_PASS(VPlanTransforms::optimizeFindIVReductions, *Plan, PSE,
@@ -6857,13 +6860,9 @@ static VPInstruction *createAnyOfResult(VPlan &Plan, VPReductionPHIRecipe *PhiR,
   return Builder.createAnyOfReduction(NewExiting, NewVal, Start, ExitDL);
 }
 
-void LoopVectorizationPlanner::addReductionResultComputation(
-    VPlanPtr &Plan, ElementCount MinVF) {
+void LoopVectorizationPlanner::addReductionResultComputation(VPlanPtr &Plan) {
   using namespace VPlanPatternMatch;
-  VPRegionBlock *VectorLoopRegion = Plan->getVectorLoopRegion();
   VPBasicBlock *MiddleVPBB = Plan->getMiddleBlock();
-  VPBasicBlock *LatchVPBB = VectorLoopRegion->getExitingBasicBlock();
-  Builder.setInsertPoint(&*std::prev(std::prev(LatchVPBB->end())));
   VPBasicBlock::iterator IP = MiddleVPBB->getFirstNonPhi();
   VPValue *HeaderMask = Plan->getVectorLoopRegion()->getHeaderMask();
   for (VPRecipeBase &R : make_early_inc_range(
@@ -6880,9 +6879,6 @@ void LoopVectorizationPlanner::addReductionResultComputation(
     }
 
     RecurKind RecurrenceKind = PhiR->getRecurrenceKind();
-    const RecurrenceDescriptor &RdxDesc = Legal->getRecurrenceDescriptor(
-        cast<PHINode>(PhiR->getUnderlyingInstr()));
-    Type *PhiTy = PhiR->getScalarType();
 
     // Convert a VPBlendRecipe backedge to a select.
     if (auto *Blend = dyn_cast<VPBlendRecipe>(PhiR->getBackedgeValue())) {
@@ -6897,7 +6893,6 @@ void LoopVectorizationPlanner::addReductionResultComputation(
     }
 
     auto *OrigExitingVPV = PhiR->getBackedgeValue();
-    auto *NewExitingVPV = OrigExitingVPV;
 
     // Remove the predicated select if the target doesn't want it.
     VPValue *V;
@@ -6929,38 +6924,11 @@ void LoopVectorizationPlanner::addReductionResultComputation(
       FinalReductionResult =
           createAnyOfResult(*Plan, PhiR, OrigExitingVPV, IP, ExitDL);
     } else {
-      // If the vector reduction can be performed in a smaller type, we
-      // truncate then extend the loop exit value to enable InstCombine to
-      // evaluate the entire expression in the smaller type.
-      VPValue *ReductionOp = NewExitingVPV;
-      Instruction::CastOps ExtendOpc = Instruction::CastOpsEnd;
-      if (MinVF.isVector() && PhiTy != RdxDesc.getRecurrenceType()) {
-        assert(!PhiR->isInLoop() && "Unexpected truncated inloop reduction!");
-        assert(!RecurrenceDescriptor::isMinMaxRecurrenceKind(RecurrenceKind) &&
-               "Unexpected truncated min-max recurrence!");
-        Type *RdxTy = RdxDesc.getRecurrenceType();
-        ExtendOpc = RdxDesc.isSigned() ? Instruction::SExt : Instruction::ZExt;
-        {
-          VPBuilder::InsertPointGuard Guard(Builder);
-          Builder.setInsertPoint(
-              NewExitingVPV->getDefiningRecipe()->getParent(),
-              std::next(NewExitingVPV->getDefiningRecipe()->getIterator()));
-          ReductionOp =
-              Builder.createWidenCast(Instruction::Trunc, NewExitingVPV, RdxTy);
-          VPWidenCastRecipe *Extnd =
-              Builder.createWidenCast(ExtendOpc, ReductionOp, PhiTy);
-          if (PhiR->getOperand(1) == NewExitingVPV)
-            PhiR->setOperand(1, Extnd);
-        }
-      }
-
       VPIRFlags Flags(RecurrenceKind, PhiR->isOrdered(), PhiR->isInLoop(),
                       PhiR->getFastMathFlagsOrNone());
-      FinalReductionResult = Builder.createNaryOp(
-          VPInstruction::ComputeReductionResult, {ReductionOp}, Flags, ExitDL);
-      if (ExtendOpc != Instruction::CastOpsEnd)
-        FinalReductionResult = Builder.createScalarCast(
-            ExtendOpc, FinalReductionResult, PhiTy, {});
+      FinalReductionResult =
+          Builder.createNaryOp(VPInstruction::ComputeReductionResult,
+                               {OrigExitingVPV}, Flags, ExitDL);
     }
 
     // Update all users outside the vector region. Also replace redundant
@@ -6992,8 +6960,8 @@ void LoopVectorizationPlanner::addReductionResultComputation(
          !RecurrenceDescriptor::isMinMaxRecurrenceKind(RK) &&
          !RecurrenceDescriptor::isFindLastRecurrenceKind(RK))) {
       VPBuilder PHBuilder(Plan->getVectorPreheader());
-      VPValue *Iden = Plan->getOrAddLiveIn(
-          getRecurrenceIdentity(RK, PhiTy, PhiR->getFastMathFlagsOrNone()));
+      VPValue *Iden = Plan->getOrAddLiveIn(getRecurrenceIdentity(
+          RK, PhiR->getScalarType(), PhiR->getFastMathFlagsOrNone()));
       auto *ScaleFactorVPV = Plan->getConstantInt(32, 1);
       VPValue *StartV = PHBuilder.createNaryOp(
           VPInstruction::ReductionStartVector,
@@ -7001,8 +6969,6 @@ void LoopVectorizationPlanner::addReductionResultComputation(
       PhiR->setOperand(0, StartV);
     }
   }
-
-  RUN_VPLAN_PASS(VPlanTransforms::clearReductionWrapFlags, *Plan);
 }
 
 void LoopVectorizationPlanner::attachRuntimeChecks(

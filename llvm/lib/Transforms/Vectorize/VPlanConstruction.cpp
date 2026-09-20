@@ -1229,6 +1229,58 @@ void VPlanTransforms::createInLoopReductionRecipes(VPlan &Plan,
     R->eraseFromParent();
 }
 
+void VPlanTransforms::truncateReductions(
+    VPlan &Plan, ElementCount MinVF,
+    const MapVector<PHINode *, RecurrenceDescriptor> &Reductions) {
+  if (MinVF.isScalar())
+    return;
+
+  for (VPReductionPHIRecipe &PhiR : make_isa_range<VPReductionPHIRecipe>(
+           Plan.getVectorLoopRegion()->getEntryBasicBlock()->phis())) {
+    // AnyOf reductions have been rewritten to reduce an i1 chain, so their phi
+    // type no longer matches the recurrence type; they are never truncated.
+    RecurKind RK = PhiR.getRecurrenceKind();
+    if (RecurrenceDescriptor::isAnyOfRecurrenceKind(RK))
+      continue;
+
+    auto *Phi = cast<PHINode>(PhiR.getUnderlyingInstr());
+    assert(Reductions.contains(Phi) && "only reductions are expected here");
+    const RecurrenceDescriptor &RdxDesc = Reductions.lookup(Phi);
+    Type *PhiTy = PhiR.getScalarType();
+    Type *RdxTy = RdxDesc.getRecurrenceType();
+    if (PhiTy == RdxTy)
+      continue;
+    assert(!PhiR.isInLoop() && "Unexpected truncated inloop reduction!");
+    assert(!RecurrenceDescriptor::isMinMaxRecurrenceKind(RK) &&
+           "Unexpected truncated min-max recurrence!");
+
+    VPInstruction *RdxResult = vputils::findComputeReductionResult(&PhiR);
+    assert(RdxResult && "Reduction result must have been created");
+    Instruction::CastOps ExtOpc =
+        RdxDesc.isSigned() ? Instruction::SExt : Instruction::ZExt;
+
+    // Truncate the exiting value and extend it back for the reduction phi, so
+    // InstCombine can evaluate the in-loop chain in the narrow type.
+    VPValue *ExitingV = RdxResult->getOperand(0);
+    VPBuilder Builder =
+        VPBuilder::getToInsertAfter(ExitingV->getDefiningRecipe());
+    VPValue *Trunc =
+        Builder.createWidenCast(Instruction::Trunc, ExitingV, RdxTy);
+    VPValue *Ext = Builder.createWidenCast(ExtOpc, Trunc, PhiTy);
+    if (PhiR.getBackedgeValue() == ExitingV)
+      PhiR.setBackedgeValue(Ext);
+
+    // Reduce in the narrow type and extend the result back to the phi type,
+    // replacing the original result.
+    VPInstruction *NarrowResult = RdxResult->cloneWithOperands({Trunc});
+    NarrowResult->insertBefore(RdxResult);
+    VPValue *ExtResult = VPBuilder::getToInsertAfter(NarrowResult)
+                             .createScalarCast(ExtOpc, NarrowResult, PhiTy, {});
+    RdxResult->replaceAllUsesWith(ExtResult);
+    RdxResult->eraseFromParent();
+  }
+}
+
 bool VPlanTransforms::areAllLoadsDereferenceable(VPBasicBlock *HeaderVPBB,
                                                  Loop *TheLoop,
                                                  PredicatedScalarEvolution &PSE,
