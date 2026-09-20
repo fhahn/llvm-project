@@ -47,6 +47,11 @@ public:
     return false;
   }
 
+  /// Returns the alias result for \p LocA and \p LocB based solely on their
+  /// TBAA metadata. Does not require an AAQueryInfo or a context instruction,
+  /// so it can be used outside an alias analysis pipeline.
+  LLVM_ABI AliasResult alias(const MemoryLocation &LocA,
+                             const MemoryLocation &LocB) const;
   LLVM_ABI AliasResult alias(const MemoryLocation &LocA,
                              const MemoryLocation &LocB, AAQueryInfo &AAQI,
                              const Instruction *CtxI);

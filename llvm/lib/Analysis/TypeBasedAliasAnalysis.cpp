@@ -359,8 +359,7 @@ public:
 } // end anonymous namespace
 
 AliasResult TypeBasedAAResult::alias(const MemoryLocation &LocA,
-                                     const MemoryLocation &LocB,
-                                     AAQueryInfo &AAQI, const Instruction *) {
+                                     const MemoryLocation &LocB) const {
   if (!shouldUseTBAA())
     return AliasResult::MayAlias;
 
@@ -369,6 +368,12 @@ AliasResult TypeBasedAAResult::alias(const MemoryLocation &LocA,
 
   // Otherwise return a definitive result.
   return AliasResult::NoAlias;
+}
+
+AliasResult TypeBasedAAResult::alias(const MemoryLocation &LocA,
+                                     const MemoryLocation &LocB, AAQueryInfo &,
+                                     const Instruction *) {
+  return alias(LocA, LocB);
 }
 
 AliasResult TypeBasedAAResult::aliasErrno(const MemoryLocation &Loc,
