@@ -6453,8 +6453,7 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
   // guarantee of independence. Pairs that cannot be separated statically are
   // recorded in the plan for runtime checking.
   if (!IsInnerLoop &&
-      !proveOuterLoopMemorySafety(*VPlan0, PSE, *Legal->getAA(), VPDT, *DT,
-                                  *Legal->getAssumptionCache(), OrigLoop)) {
+      !proveOuterLoopMemorySafety(*VPlan0, PSE, *Legal->getAA(), VPDT, OrigLoop)) {
     reportVectorizationFailure(
         "Cannot prove memory independence in outer loop",
         "cannot prove memory independence for outer-loop vectorization",

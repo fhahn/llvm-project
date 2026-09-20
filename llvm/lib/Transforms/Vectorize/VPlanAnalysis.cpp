@@ -400,33 +400,30 @@ static bool writesDisjointBytesPerIteration(VPInstruction *Store,
   return Step && Step->getAPInt().abs().uge(StoreSize.getFixedValue());
 }
 
-/// Returns true if \p R is executed on every iteration of every loop of the
-/// nest \p Plan describes, which at this point is still a plain CFG. A block
-/// dominating the outermost loop's latch is on every path through the nest, so
-/// it is not skipped by any iteration of any of the loops containing it.
-///
-/// Required by the no-wrap reasoning in getAccessRange(). Outer-loop legality
-/// admits branches on an outer-loop invariant condition, so this does not
-/// always hold.
-static bool isExecutedEveryIteration(const VPRecipeBase &R, const VPlan &Plan,
-                                     const VPDominatorTree &VPDT) {
-  VPBasicBlock *Latch = VPBlockUtils::getPlainCFGHeaderAndLatch(Plan).second;
-  return VPDT.dominates(R.getParent(), Latch);
-}
-
-/// Returns the range of memory an access of \p AccessTy at \p Addr touches over
-/// all iterations of \p OuterLoop and the loops nested inside it, or
-/// std::nullopt if it cannot be bounded. \p Addr must be executed on every
-/// iteration of the nest.
+/// Returns the range of memory \p Access touches over all iterations of
+/// \p OuterLoop and the loops nested inside it, or
+/// std::nullopt if it cannot be bounded. The access must execute on every
+/// iteration of each recurrence whose range is bounded.
 static std::optional<VPMemoryRange>
-getAccessRange(VPValue *Addr, Type *AccessTy, PredicatedScalarEvolution &PSE,
-               DominatorTree &DT, AssumptionCache &AC, const Loop *OuterLoop) {
+getAccessRange(VPInstruction &Access, PredicatedScalarEvolution &PSE,
+               const Loop *OuterLoop, const VPDominatorTree &VPDT,
+               const DenseMap<const Loop *, VPBasicBlock *> &LoopHeaders) {
+  VPlan &Plan = *Access.getParent()->getPlan();
+  auto [OuterHeader, OuterLatch] = VPBlockUtils::getPlainCFGHeaderAndLatch(Plan);
+  if (!VPDT.dominates(OuterHeader, Access.getParent()) ||
+      !VPDT.dominates(Access.getParent(), OuterLatch))
+    return std::nullopt;
+
+  bool IsStore = Access.getOpcode() == Instruction::Store;
+  VPValue *Addr = Access.getOperand(IsStore ? 1 : 0);
+  Type *AccessTy = (IsStore ? Access.getOperand(0) : Access.getVPSingleValue())
+                       ->getScalarType();
   // Every address an inbounds GEP forms on an iteration where it is
   // dereferenced lies in one allocated object, so none of the recurrences below
   // wraps the address space: they are monotonic, and evaluating them at a
-  // backedge-taken count gives the last address they form. The caller has
-  // checked that the access is executed on every iteration of the nest, which
-  // is what makes every address the GEP forms a dereferenced one.
+  // backedge-taken count gives the last address they form. Below we check
+  // that the access executes on every iteration of each recurrence, so that
+  // the intermediate addresses are dereferenced as well.
   if (!vputils::getGEPFlagsForPtr(Addr).isInBounds())
     return std::nullopt;
 
@@ -435,7 +432,7 @@ getAccessRange(VPValue *Addr, Type *AccessTy, PredicatedScalarEvolution &PSE,
   if (isa<SCEVCouldNotCompute>(Expr))
     return std::nullopt;
 
-  const DataLayout &DL = OuterLoop->getHeader()->getDataLayout();
+  const DataLayout &DL = Plan.getDataLayout();
   const SCEV *AccessSize =
       SE.getStoreSizeOfExpr(DL.getIndexType(Expr->getType()), AccessTy);
 
@@ -449,6 +446,27 @@ getAccessRange(VPValue *Addr, Type *AccessTy, PredicatedScalarEvolution &PSE,
     if (!OuterLoop->contains(L) || !AR->isAffine() ||
         !SE.isKnownNonNegative(AR->getStepRecurrence(SE)))
       return std::nullopt;
+    // Use the current plan's recurrence domain. A load after the inner loop
+    // only dereferences its final pointer; intermediate inbounds GEPs may be
+    // poison, so they cannot establish a non-wrapping range.
+    VPBasicBlock *Header = LoopHeaders.lookup(L);
+    if (!Header || Header->getNumPredecessors() != 2)
+      return std::nullopt;
+    auto *Pred0 = Header->getPredecessors()[0];
+    auto *Pred1 = Header->getPredecessors()[1];
+    bool Backedge0 = VPDT.dominates(Header, Pred0);
+    bool Backedge1 = VPDT.dominates(Header, Pred1);
+    if (Backedge0 == Backedge1)
+      return std::nullopt;
+    // Nested predecessor order is only canonicalized by createLoopRegions,
+    // which runs after this analysis.
+    auto *Latch = Backedge0 ? Pred0 : Pred1;
+    auto *Preheader = Backedge0 ? Pred1 : Pred0;
+    if (!VPDT.dominates(Preheader, Header) ||
+        !VPDT.dominates(Header, Access.getParent()) ||
+        !VPDT.dominates(Access.getParent(), Latch))
+      return std::nullopt;
+
     const SCEV *BTC = SE.getBackedgeTakenCount(L);
     if (isa<SCEVCouldNotCompute>(BTC) || !SE.isLoopInvariant(BTC, OuterLoop))
       return std::nullopt;
@@ -468,13 +486,20 @@ getAccessRange(VPValue *Addr, Type *AccessTy, PredicatedScalarEvolution &PSE,
          : !SE.isLoopInvariant(Expr, OuterLoop))
     return std::nullopt;
 
+  // The span of a nested recurrence can vary with the outer iteration even
+  // when its trip count is invariant. Such ranges cannot be checked before
+  // entering the outer loop with this bound computation.
+  if (!SE.isLoopInvariant(AccessSize, OuterLoop))
+    return std::nullopt;
+
   const SCEV *BTC = SE.getBackedgeTakenCount(OuterLoop);
   if (isa<SCEVCouldNotCompute>(BTC))
     return std::nullopt;
   std::optional<ScalarEvolution::LoopGuards> LoopGuards;
   auto [Start, End] =
       getStartAndEndForAccess(OuterLoop, Expr, AccessSize, BTC, BTC, &SE,
-                              /*PointerBounds=*/nullptr, &DT, &AC, LoopGuards);
+                              /*PointerBounds=*/nullptr, /*DT=*/nullptr,
+                              /*AC=*/nullptr, LoopGuards);
   if (isa<SCEVCouldNotCompute>(Start) || isa<SCEVCouldNotCompute>(End))
     return std::nullopt;
   return VPMemoryRange{Start, End};
@@ -484,16 +509,16 @@ bool llvm::proveOuterLoopMemorySafety(VPlan &Plan,
                                       PredicatedScalarEvolution &PSE,
                                       AAResults &AA,
                                       const VPDominatorTree &VPDT,
-                                      DominatorTree &DT, AssumptionCache &AC,
                                       Loop *OuterLoop) {
   // An access of the nest: the object it is based on, null if it could not be
   // determined, and the memory it touches, empty if it could not be bounded.
   struct Access {
+    VPInstruction *Recipe;
     const Value *Object;
     std::optional<VPMemoryRange> Range;
   };
   SmallVector<Access, 8> Loads, Stores;
-  SmallVector<VPInstruction *, 8> StoreRecipes;
+  DenseMap<const Loop *, VPBasicBlock *> LoopHeaders;
   bool AllAccessesParallel = true;
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
            vp_depth_first_deep(Plan.getEntry()))) {
@@ -502,6 +527,9 @@ bool llvm::proveOuterLoopMemorySafety(VPlan &Plan,
     if (isa<VPIRBasicBlock>(VPBB))
       continue;
     for (VPRecipeBase &R : *VPBB) {
+      if (auto *Phi = dyn_cast<VPPhi>(&R))
+        if (const Loop *L = Phi->getSCEVLoop())
+          LoopHeaders.try_emplace(L, VPBB);
       if (!R.mayReadOrWriteMemory())
         continue;
       // Anything touching memory that is not a plain load or store - atomicrmw,
@@ -537,24 +565,25 @@ bool llvm::proveOuterLoopMemorySafety(VPlan &Plan,
                  }));
 
       bool IsStore = VPI->getOpcode() == Instruction::Store;
-      if (IsStore)
-        StoreRecipes.push_back(VPI);
       VPValue *Addr = VPI->getOperand(IsStore ? 1 : 0);
-      Type *AccessTy = (IsStore ? VPI->getOperand(0) : VPI->getVPSingleValue())
-                           ->getScalarType();
-      std::optional<VPMemoryRange> Range;
-      if (isExecutedEveryIteration(*VPI, Plan, VPDT))
-        Range = getAccessRange(Addr, AccessTy, PSE, DT, AC, OuterLoop);
-      (IsStore ? Stores : Loads).push_back({getBaseObject(Addr), Range});
+      (IsStore ? Stores : Loads).push_back({VPI, getBaseObject(Addr), std::nullopt});
     }
   }
 
   if (AllAccessesParallel)
     return true;
-  if (!all_of(StoreRecipes, [&](VPInstruction *Store) {
-        return writesDisjointBytesPerIteration(Store, PSE, OuterLoop);
+  if (!all_of(Stores, [&](const Access &Store) {
+        return writesDisjointBytesPerIteration(Store.Recipe, PSE, OuterLoop);
       }))
     return false;
+
+  // Only compute a range when annotations and static disambiguation could
+  // not discharge a pair. Cache bounds shared by several pairs.
+  auto GetRange = [&](Access &A) -> const std::optional<VPMemoryRange> & {
+    if (!A.Range)
+      A.Range = getAccessRange(*A.Recipe, PSE, OuterLoop, VPDT, LoopHeaders);
+    return A.Range;
+  };
 
   // Each store must access memory no other access of the nest touches, so that
   // no two lanes of a vector iteration and no load and store of the nest can
@@ -563,11 +592,11 @@ bool llvm::proveOuterLoopMemorySafety(VPlan &Plan,
   // of the plan, provided both ranges are known and in the same address space.
   unsigned NumPredicates = 0;
   for (auto [I, Store] : enumerate(Stores))
-    for (const Access &Other : concat<const Access>(
-             ArrayRef(Stores).drop_front(I + 1), ArrayRef(Loads))) {
+    for (Access &Other : concat<Access>(
+             MutableArrayRef(Stores).drop_front(I + 1), MutableArrayRef(Loads))) {
       if (provablyDistinctObjects(AA, Store.Object, Other.Object))
         continue;
-      if (!Store.Range || !Other.Range ||
+      if (!GetRange(Store) || !GetRange(Other) ||
           Store.Range->Start->getType() != Other.Range->Start->getType())
         return false;
       if (++NumPredicates > VectorizerParams::RuntimeMemoryCheckThreshold)

@@ -46,7 +46,6 @@ void collectEphemeralRecipesForVPlan(VPlan &Plan,
 /// two ranges is then registered on \p Plan.
 bool proveOuterLoopMemorySafety(VPlan &Plan, PredicatedScalarEvolution &PSE,
                                 AAResults &AA, const VPDominatorTree &VPDT,
-                                DominatorTree &DT, AssumptionCache &AC,
                                 Loop *OuterLoop);
 
 /// A struct that represents some properties of the register usage

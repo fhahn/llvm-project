@@ -4,8 +4,8 @@
 ; Outer-loop vectorization runs several adjacent outer-loop iterations as lanes
 ; of one vector iteration, so it must not change the memory the nest accesses.
 ; A nest is accepted when every store writes bytes no other access can touch:
-; its base object is provably distinct from every other access's, and its
-; address advances by at least the number of bytes written on each outer-loop
+; distinct objects or non-overlapping runtime ranges separate each pair, and
+; every store advances by at least the number of bytes written on each outer
 ; iteration, so no two lanes write the same location.
 
 ; The accepted shape: the inner loop only reads, and the outer loop stores to a
@@ -459,8 +459,8 @@ exit:
   ret void
 }
 
-; Unsafe: the load address is not formed by an inbounds GEP, so the addresses it
-; forms may wrap the address space and the memory it touches cannot be bounded.
+; The load address is not formed by an inbounds GEP, so this analysis cannot
+; exclude address wrapping or bound the memory it touches.
 define void @may_alias_load_not_inbounds(ptr %A, ptr %B, i64 %N, i64 %M) {
 ; CHECK-LABEL: define void @may_alias_load_not_inbounds(
 ; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[N:%.*]], i64 [[M:%.*]]) {
@@ -529,8 +529,8 @@ exit:
   ret void
 }
 
-; Unsafe: the two ranges live in different address spaces, so they cannot be
-; compared.
+; The two ranges live in different address spaces, so this analysis cannot
+; compare them.
 define void @may_alias_different_address_spaces(ptr addrspace(1) %A, ptr %B, i64 %N, i64 %M) {
 ; CHECK-LABEL: define void @may_alias_different_address_spaces(
 ; CHECK-SAME: ptr addrspace(1) [[A:%.*]], ptr [[B:%.*]], i64 [[N:%.*]], i64 [[M:%.*]]) {
@@ -938,7 +938,7 @@ exit:
   ret void
 }
 
-; Unsafe: the load is guarded by an outer-loop invariant condition, so it is not
+; The load is guarded by an outer-loop invariant condition, so it is not
 ; executed on every iteration of the nest and the inbounds GEP is not
 ; necessarily dereferenced. Its range cannot be bounded, so the pair it forms
 ; with the store cannot be discharged by a runtime check.
