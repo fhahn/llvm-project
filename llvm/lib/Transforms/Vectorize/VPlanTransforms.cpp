@@ -184,8 +184,8 @@ bool VPlanTransforms::tryToConvertVPInstructionsToVPRecipes(
 class SinkStoreInfo {
   SmallPtrSet<VPReplicateRecipe *, 4> ExcludeRecipes;
   VPReplicateRecipe &GroupLeader;
-  PredicatedScalarEvolution *PSE = nullptr;
-  const Loop *L = nullptr;
+  PredicatedScalarEvolution &PSE;
+  const Loop &L;
 
   // Return true if \p A and \p B are known to not alias for all VFs in the
   // plan, checked via the distance between the accesses
@@ -194,18 +194,15 @@ class SinkStoreInfo {
         B->getOpcode() != Instruction::Store)
       return false;
 
-    if (!PSE || !L)
-      return A == B;
-
     VPValue *AddrA = A->getOperand(1);
-    const SCEV *SCEVA = vputils::getSCEVExprForVPValue(AddrA, *PSE, L);
+    const SCEV *SCEVA = vputils::getSCEVExprForVPValue(AddrA, PSE, &L);
     VPValue *AddrB = B->getOperand(1);
-    const SCEV *SCEVB = vputils::getSCEVExprForVPValue(AddrB, *PSE, L);
+    const SCEV *SCEVB = vputils::getSCEVExprForVPValue(AddrB, PSE, &L);
     if (isa<SCEVCouldNotCompute>(SCEVA) || isa<SCEVCouldNotCompute>(SCEVB))
       return false;
 
     const APInt *Distance;
-    ScalarEvolution &SE = *PSE->getSE();
+    ScalarEvolution &SE = *PSE.getSE();
     if (!match(SE.getMinusSCEV(SCEVA, SCEVB), m_scev_APInt(Distance)))
       return false;
 
@@ -232,9 +229,7 @@ public:
                 VPReplicateRecipe &GroupLeader, PredicatedScalarEvolution &PSE,
                 const Loop &L)
       : ExcludeRecipes(ExcludeRecipes.begin(), ExcludeRecipes.end()),
-        GroupLeader(GroupLeader), PSE(&PSE), L(&L) {}
-
-  SinkStoreInfo(VPReplicateRecipe &GroupLeader) : GroupLeader(GroupLeader) {}
+        GroupLeader(GroupLeader), PSE(PSE), L(L) {}
 
   /// Return true if \p R should be skipped during alias checking, either
   /// because it's in the exclude set or because no-alias can be proven via
@@ -246,17 +241,31 @@ public:
   }
 };
 
+/// Return true if \p R is a volatile or atomic memory access. Alias metadata
+/// does not describe the side effects of such accesses, and they must execute
+/// exactly as often and in the same order as written.
+// TODO: Model these properties directly in VPlan.
+static bool hasNonSimpleMemoryAccess(const VPRecipeBase &R) {
+  const Instruction *I = nullptr;
+  if (auto *Mem = dyn_cast<VPWidenMemoryRecipe>(&R))
+    I = &Mem->getIngredient();
+  else if (auto *Def = dyn_cast<VPSingleDefRecipe>(&R))
+    I = dyn_cast_or_null<Instruction>(Def->getUnderlyingValue());
+  return I && (I->isVolatile() || I->isAtomic());
+}
+
 /// Check if a memory operation doesn't alias with memory operations using
-/// scoped noalias or TBAA metadata, in \p Blocks. If \p SinkInfo is
-/// std::nullopt, only recipes that may write to memory are checked (for load
-/// hoisting). Otherwise recipes that both read and write memory are checked,
-/// and SCEV is used to prove no-alias between the group leader and other
-/// replicate recipes (for store sinking).
-static bool
-canHoistOrSinkWithNoAliasCheck(const MemoryLocation &MemLoc,
-                               ArrayRef<VPBasicBlock *> Blocks,
-                               std::optional<SinkStoreInfo> SinkInfo = {}) {
-  bool CheckReads = SinkInfo.has_value();
+/// scoped noalias or TBAA metadata, in \p Blocks. \p IgnoreRecipe is the access
+/// being moved, if any, and is skipped. Recipes that read memory are only
+/// checked when \p IgnoreRecipe writes to memory, or when \p SinkInfo is set,
+/// which in addition uses SCEV to prove no-alias between the group leader and
+/// other replicate recipes.
+static bool canHoistOrSinkWithNoAliasCheck(
+    const MemoryLocation &MemLoc, ArrayRef<VPBasicBlock *> Blocks,
+    std::optional<SinkStoreInfo> SinkInfo = {},
+    const VPRecipeBase *IgnoreRecipe = nullptr) {
+  bool CheckReads = SinkInfo.has_value() ||
+                    (IgnoreRecipe && IgnoreRecipe->mayWriteToMemory());
   // Don't use TBAA if the type sanitizer is used, as it needs to verify the
   // accesses TBAA would allow to disambiguate at runtime.
   const VPlan &Plan = *Blocks.front()->getPlan();
@@ -264,12 +273,16 @@ canHoistOrSinkWithNoAliasCheck(const MemoryLocation &MemLoc,
   TypeBasedAAResult TBAA(F->hasFnAttribute(Attribute::SanitizeType));
   for (VPBasicBlock *VPBB : Blocks) {
     for (VPRecipeBase &R : *VPBB) {
-      if (SinkInfo && SinkInfo->shouldSkip(R))
+      if (&R == IgnoreRecipe || (SinkInfo && SinkInfo->shouldSkip(R)))
         continue;
 
       // Skip recipes that don't need checking.
       if (!R.mayWriteToMemory() && !(CheckReads && R.mayReadFromMemory()))
         continue;
+
+      // Volatile and atomic accesses must not be moved across.
+      if (hasNonSimpleMemoryAccess(R))
+        return false;
 
       auto Loc = vputils::getMemoryLocation(R);
       if (!Loc)
@@ -2441,29 +2454,23 @@ static bool cannotHoistOrSinkRecipe(VPRecipeBase &R,
 
   // Only plain loads and stores with a loop-invariant address can be moved, and
   // moveRecipeOutsideLoop needs their underlying instruction to create a
-  // single-scalar recipe for them.
+  // single-scalar recipe for them. Volatile and atomic accesses must stay where
+  // they are.
   VPValue *Def = R.getVPSingleValue();
   unsigned Opcode = vputils::getOpcode(Def);
   if ((Opcode != Instruction::Load && Opcode != Instruction::Store) ||
-      !isa_and_present<Instruction>(Def->getUnderlyingValue()))
+      !isa_and_present<Instruction>(Def->getUnderlyingValue()) ||
+      hasNonSimpleMemoryAccess(R))
     return true;
   if (!R.getOperand(Opcode == Instruction::Store ? 1 : 0)
            ->isDefinedOutsideLoopRegions())
     return true;
 
-  // Sinking must consider reads as well, which canHoistOrSinkWithNoAliasCheck
-  // only does when passed a SinkStoreInfo. That requires a replicate recipe.
-  auto *RepR = dyn_cast<VPReplicateRecipe>(&R);
-  if (Sinking && !RepR)
-    return true;
-
   // Check that the memory operation doesn't alias with any access in Blocks.
   // TODO: Could make use of SinkStoreInfo::isNoAliasViaDistance by collecting
   // stores upfront, and constructing a full SinkStoreInfo.
-  auto SinkInfo =
-      Sinking ? std::make_optional(SinkStoreInfo(*RepR)) : std::nullopt;
   auto MemLoc = vputils::getMemoryLocation(R);
-  return !MemLoc || !canHoistOrSinkWithNoAliasCheck(*MemLoc, Blocks, SinkInfo);
+  return !MemLoc || !canHoistOrSinkWithNoAliasCheck(*MemLoc, Blocks, {}, &R);
 }
 
 /// Move \p R out of the vector loop region, into \p BB before \p IP. A

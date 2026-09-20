@@ -309,6 +309,105 @@ exit:
   ret void
 }
 
+; A volatile load must not be hoisted out of the loop region, even though TBAA
+; proves it does not alias the store in the loop. The loop is annotated as
+; parallel, so LAA accepts the non-simple access.
+define void @no_hoist_volatile_load_noalias_via_tbaa(ptr %p, ptr %q, i32 %n) {
+; CHECK-LABEL: define void @no_hoist_volatile_load_noalias_via_tbaa(
+; CHECK-SAME: ptr [[P:%.*]], ptr [[Q:%.*]], i32 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[N]], 4
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
+; CHECK:       [[VECTOR_SCEVCHECK]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
+; CHECK-NEXT:    [[TMP1:%.*]] = icmp slt i32 [[TMP0]], 0
+; CHECK-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[TMP2:%.*]] = and i32 [[N]], 3
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i32 [[N]], [[TMP2]]
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP3:%.*]] = load volatile float, ptr [[Q]], align 4, !tbaa [[FLOAT_TBAA37:![0-9]+]], !llvm.access.group [[ACC_GRP38:![0-9]+]]
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x float> poison, float [[TMP3]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x float> [[BROADCAST_SPLATINSERT]], <4 x float> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP4:%.*]] = fptosi <4 x float> [[BROADCAST_SPLAT]] to <4 x i8>
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr [[P]], i32 [[INDEX]]
+; CHECK-NEXT:    store <4 x i8> [[TMP4]], ptr [[TMP5]], align 1, !tbaa [[BOOL_TBAA39:![0-9]+]], !llvm.access.group [[ACC_GRP38]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP40:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i32 [[N]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[CMP_N]], [[EXIT:label %.*]], label %[[SCALAR_PH]]
+; CHECK:       [[SCALAR_PH]]:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i32 [ 0, %entry ], [ %iv.next, %loop ]
+  %l = load volatile float, ptr %q, align 4, !tbaa !7, !llvm.access.group !9
+  %c = fptosi float %l to i8
+  %gep = getelementptr i8, ptr %p, i32 %iv
+  store i8 %c, ptr %gep, align 1, !tbaa !8, !llvm.access.group !9
+  %iv.next = add i32 %iv, 1
+  %ec = icmp eq i32 %iv.next, %n
+  br i1 %ec, label %exit, label %loop, !llvm.loop !10
+
+exit:
+  ret void
+}
+
+; A store to an invariant address must not be moved across a volatile load,
+; even though TBAA proves that the two do not alias.
+define void @no_move_invariant_store_across_volatile_load(ptr noalias %p, ptr noalias %q, ptr noalias %r, i32 %n) {
+; CHECK-LABEL: define void @no_move_invariant_store_across_volatile_load(
+; CHECK-SAME: ptr noalias [[P:%.*]], ptr noalias [[Q:%.*]], ptr noalias [[R:%.*]], i32 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[N]], 4
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
+; CHECK:       [[VECTOR_SCEVCHECK]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[N]], -1
+; CHECK-NEXT:    [[TMP1:%.*]] = icmp slt i32 [[TMP0]], 0
+; CHECK-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[TMP2:%.*]] = and i32 [[N]], 3
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i32 [[N]], [[TMP2]]
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP3:%.*]] = load volatile float, ptr [[Q]], align 4, !tbaa [[FLOAT_TBAA37]], !llvm.access.group [[ACC_GRP38]]
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x float> poison, float [[TMP3]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x float> [[BROADCAST_SPLATINSERT]], <4 x float> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr float, ptr [[R]], i32 [[INDEX]]
+; CHECK-NEXT:    store <4 x float> [[BROADCAST_SPLAT]], ptr [[TMP4]], align 4, !tbaa [[FLOAT_TBAA37]], !llvm.access.group [[ACC_GRP38]]
+; CHECK-NEXT:    store i8 1, ptr [[P]], align 1, !tbaa [[BOOL_TBAA39]], !llvm.access.group [[ACC_GRP38]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
+; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP5]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP43:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i32 [[N]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[CMP_N]], [[EXIT:label %.*]], label %[[SCALAR_PH]]
+; CHECK:       [[SCALAR_PH]]:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i32 [ 0, %entry ], [ %iv.next, %loop ]
+  %l = load volatile float, ptr %q, align 4, !tbaa !7, !llvm.access.group !9
+  %gep = getelementptr float, ptr %r, i32 %iv
+  store float %l, ptr %gep, align 4, !tbaa !7, !llvm.access.group !9
+  store i8 1, ptr %p, align 1, !tbaa !8, !llvm.access.group !9
+  %iv.next = add i32 %iv, 1
+  %ec = icmp eq i32 %iv.next, %n
+  br i1 %ec, label %exit, label %loop, !llvm.loop !10
+
+exit:
+  ret void
+}
+
 !0 = !{!1, !2, i64 0}
 !1 = !{!"foo", !2, i64 0, !2, i64 4, !3, i64 8, !5, i64 9}
 !2 = !{!"float", !3, i64 0}
@@ -316,3 +415,8 @@ exit:
 !4 = !{!"Simple C++ TBAA"}
 !5 = !{!"bool", !3, i64 0}
 !6 = !{!1, !2, i64 4}
+!7 = !{!2, !2, i64 0}
+!8 = !{!5, !5, i64 0}
+!9 = distinct !{}
+!10 = distinct !{!10, !11}
+!11 = !{!"llvm.loop.parallel_accesses", !9}

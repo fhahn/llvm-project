@@ -50,6 +50,7 @@ define void @test() {
 ; CHECK-NEXT:    [[TMP1:%.*]] = add i32 [[INC_LCSSA3]], [[N_VEC]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = sext i32 [[INC54]] to i64
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [1 x i32], ptr @b, i64 0, i64 [[TMP2]]
+; CHECK-NEXT:    store i32 4, ptr [[TMP3]], align 4
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
@@ -57,7 +58,6 @@ define void @test() {
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP4]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    store i32 4, ptr [[TMP3]], align 4
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i32 [[TMP0]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[FOR_COND1_FOR_INC4_CRIT_EDGE]], label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:

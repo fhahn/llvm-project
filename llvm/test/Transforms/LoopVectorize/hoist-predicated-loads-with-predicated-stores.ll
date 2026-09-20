@@ -1625,19 +1625,19 @@ define void @sink_stores_cse_select_dropping_fmf(ptr %dst, ptr %src, ptr %invar.
 ; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <2 x float> [[TMP2]], i64 0
 ; CHECK-NEXT:    [[TMP6:%.*]] = select i1 [[C]], float [[TMP4]], float [[TMP5]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = fmul nnan float [[TMP6]], 5.000000e+00
+; CHECK-NEXT:    store float [[TMP7]], ptr [[INVAR_DST]], align 4, !alias.scope [[META122:![0-9]+]], !noalias [[META119]]
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP8:%.*]] = add i64 [[INDEX]], 1
 ; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds float, ptr [[DST]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds float, ptr [[DST]], i64 [[TMP8]]
-; CHECK-NEXT:    store float [[TMP6]], ptr [[TMP9]], align 4, !alias.scope [[META122:![0-9]+]], !noalias [[META124:![0-9]+]]
-; CHECK-NEXT:    store float [[TMP6]], ptr [[TMP10]], align 4, !alias.scope [[META122]], !noalias [[META124]]
+; CHECK-NEXT:    store float [[TMP6]], ptr [[TMP9]], align 4, !alias.scope [[META124:![0-9]+]], !noalias [[META126:![0-9]+]]
+; CHECK-NEXT:    store float [[TMP6]], ptr [[TMP10]], align 4, !alias.scope [[META124]], !noalias [[META126]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP11:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP11]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP126:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP11]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP127:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    store float [[TMP7]], ptr [[INVAR_DST]], align 4, !alias.scope [[META127:![0-9]+]], !noalias [[META119]]
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], [[EXIT:label %.*]], label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:

@@ -51,14 +51,14 @@ define void @reduced(ptr %0, ptr %1, i64 %iv, ptr %2, i64 %iv76, i64 %iv93) {
 ; CHECK:       vector.ph5:
 ; CHECK-NEXT:    [[TMP8:%.*]] = and i64 [[TMP3]], 3
 ; CHECK-NEXT:    [[N_VEC6:%.*]] = sub i64 [[TMP3]], [[TMP8]]
+; CHECK-NEXT:    store i32 0, ptr [[TMP1]], align 4, !alias.scope [[META4:![0-9]+]], !noalias [[META7:![0-9]+]]
 ; CHECK-NEXT:    br label [[VECTOR_BODY7:%.*]]
 ; CHECK:       vector.body7:
 ; CHECK-NEXT:    [[INDEX8:%.*]] = phi i64 [ 0, [[VECTOR_PH5]] ], [ [[INDEX_NEXT9:%.*]], [[VECTOR_BODY7]] ]
 ; CHECK-NEXT:    [[INDEX_NEXT9]] = add nuw i64 [[INDEX8]], 4
 ; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq i64 [[INDEX_NEXT9]], [[N_VEC6]]
-; CHECK-NEXT:    br i1 [[TMP9]], label [[MIDDLE_BLOCK10:%.*]], label [[VECTOR_BODY7]], !llvm.loop [[LOOP4:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP9]], label [[MIDDLE_BLOCK10:%.*]], label [[VECTOR_BODY7]], !llvm.loop [[LOOP9:![0-9]+]]
 ; CHECK:       middle.block10:
-; CHECK-NEXT:    store i32 0, ptr [[TMP1]], align 4, !alias.scope [[META5:![0-9]+]], !noalias [[META8:![0-9]+]]
 ; CHECK-NEXT:    [[CMP_N11:%.*]] = icmp eq i64 [[TMP3]], [[N_VEC6]]
 ; CHECK-NEXT:    br i1 [[CMP_N11]], label [[LOOP_3_LR_PH:%.*]], label [[SCALAR_PH3]]
 ; CHECK:       scalar.ph3:
@@ -81,14 +81,14 @@ define void @reduced(ptr %0, ptr %1, i64 %iv, ptr %2, i64 %iv76, i64 %iv93) {
 ; CHECK:       vector.ph21:
 ; CHECK-NEXT:    [[TMP12:%.*]] = and i64 [[TMP3]], 3
 ; CHECK-NEXT:    [[N_VEC22:%.*]] = sub i64 [[TMP3]], [[TMP12]]
+; CHECK-NEXT:    store i32 0, ptr [[TMP1]], align 4, !alias.scope [[META10:![0-9]+]], !noalias [[META13:![0-9]+]]
 ; CHECK-NEXT:    br label [[VECTOR_BODY23:%.*]]
 ; CHECK:       vector.body23:
 ; CHECK-NEXT:    [[INDEX24:%.*]] = phi i64 [ 0, [[VECTOR_PH21]] ], [ [[INDEX_NEXT25:%.*]], [[VECTOR_BODY23]] ]
 ; CHECK-NEXT:    [[INDEX_NEXT25]] = add nuw i64 [[INDEX24]], 4
 ; CHECK-NEXT:    [[TMP13:%.*]] = icmp eq i64 [[INDEX_NEXT25]], [[N_VEC22]]
-; CHECK-NEXT:    br i1 [[TMP13]], label [[MIDDLE_BLOCK26:%.*]], label [[VECTOR_BODY23]], !llvm.loop [[LOOP10:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP13]], label [[MIDDLE_BLOCK26:%.*]], label [[VECTOR_BODY23]], !llvm.loop [[LOOP15:![0-9]+]]
 ; CHECK:       middle.block26:
-; CHECK-NEXT:    store i32 0, ptr [[TMP1]], align 4, !alias.scope [[META11:![0-9]+]], !noalias [[META14:![0-9]+]]
 ; CHECK-NEXT:    [[CMP_N27:%.*]] = icmp eq i64 [[TMP3]], [[N_VEC22]]
 ; CHECK-NEXT:    br i1 [[CMP_N27]], label [[LOOP_CLEANUP:%.*]], label [[SCALAR_PH19]]
 ; CHECK:       scalar.ph19:
