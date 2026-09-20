@@ -79,63 +79,6 @@ exit:
 }
 
 define void @print_reduction_with_invariant_store(i64 %n, ptr noalias %y, ptr noalias %dst) {
-; CHECK-LABEL: VPlan for loop in 'print_reduction_with_invariant_store'
-; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
-; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
-; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
-; CHECK-NEXT:  Live-in ir<%n> = original trip-count
-; CHECK-EMPTY:
-; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
-; CHECK-EMPTY:
-; CHECK-NEXT:  vector.ph:
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = reduction-start-vector fast ir<0.000000e+00>, ir<0.000000e+00>, ir<1>
-; CHECK-NEXT:  Successor(s): vector loop
-; CHECK-EMPTY:
-; CHECK-NEXT:  <x1> vector loop: {
-; CHECK-NEXT:  vp<[[VP4:%[0-9]+]]> = CANONICAL-IV
-; CHECK-EMPTY:
-; CHECK-NEXT:    vector.body:
-; CHECK-NEXT:      WIDEN-REDUCTION-PHI ir<%red> = phi (fadd) fast vp<[[VP3]]>, ir<%red.next>
-; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = SCALAR-STEPS vp<[[VP4]]>, ir<1>, vp<[[VP0]]>
-; CHECK-NEXT:      CLONE ir<%arrayidx> = getelementptr inbounds ir<%y>, vp<[[VP5]]>
-; CHECK-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer inbounds float, ir<%arrayidx>, ir<1>
-; CHECK-NEXT:      WIDEN ir<%lv> = load vp<[[VP6]]>
-; CHECK-NEXT:      REDUCE ir<%red.next> = ir<%red> + fast  reduce.fadd (ir<%lv>)
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
-; CHECK-NEXT:    No successors
-; CHECK-NEXT:  }
-; CHECK-NEXT:  Successor(s): middle.block
-; CHECK-EMPTY:
-; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = compute-reduction-result (fadd, in-loop) fast ir<%red.next>
-; CHECK-NEXT:    CLONE store vp<[[VP8]]>, ir<%dst>
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
-; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
-; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
-; CHECK-EMPTY:
-; CHECK-NEXT:  ir-bb<exit>:
-; CHECK-NEXT:  No successors
-; CHECK-EMPTY:
-; CHECK-NEXT:  scalar.ph:
-; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP2]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
-; CHECK-NEXT:    EMIT-SCALAR vp<%bc.merge.rdx> = phi [ vp<[[VP8]]>, middle.block ], [ ir<0.000000e+00>, ir-bb<entry> ]
-; CHECK-NEXT:  Successor(s): ir-bb<loop>
-; CHECK-EMPTY:
-; CHECK-NEXT:  ir-bb<loop>:
-; CHECK-NEXT:    IR   %iv = phi i64 [ %iv.next, %loop ], [ 0, %entry ] (extra operand: vp<%bc.resume.val> from scalar.ph)
-; CHECK-NEXT:    IR   %red = phi float [ %red.next, %loop ], [ 0.000000e+00, %entry ] (extra operand: vp<%bc.merge.rdx> from scalar.ph)
-; CHECK-NEXT:    IR   %arrayidx = getelementptr inbounds float, ptr %y, i64 %iv
-; CHECK-NEXT:    IR   %lv = load float, ptr %arrayidx, align 4
-; CHECK-NEXT:    IR   %red.next = fadd fast float %lv, %red
-; CHECK-NEXT:    IR   store float %red.next, ptr %dst, align 4
-; CHECK-NEXT:    IR   %iv.next = add i64 %iv, 1
-; CHECK-NEXT:    IR   %exitcond = icmp eq i64 %iv.next, %n
-; CHECK-NEXT:  No successors
-; CHECK-NEXT:  }
-;
 entry:
   br label %loop
 

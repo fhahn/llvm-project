@@ -5663,14 +5663,8 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
                                 RecipeBuilder.handleReplication(VPI, Range)));
   };
 
-  VPBasicBlock *MiddleVPBB = Plan.getMiddleBlock();
-  VPBuilder FinalRedStoresBuilder(MiddleVPBB, MiddleVPBB->getFirstNonPhi());
   VPlanTransforms::runPass(
       "lowerMemoryIdioms", ProcessSubset, Plan, [&](VPInstruction *VPI) {
-        if (RecipeBuilder.replaceWithFinalIfReductionStore(
-                VPI, FinalRedStoresBuilder))
-          return true;
-
         // Filter out scalar VPlan for the remaining idioms.
         if (LoopVectorizationPlanner::getDecisionAndClampRange(
                 [](ElementCount VF) { return VF.isScalar(); }, Range))

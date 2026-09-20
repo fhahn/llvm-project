@@ -1136,9 +1136,6 @@ void VPlanTransforms::createInLoopReductionRecipes(VPlan &Plan,
           continue;
         }
 
-        // Stores using instructions will be sunk later.
-        if (match(UserRecipe, m_VPInstruction<Instruction::Store>()))
-          continue;
         Worklist.insert(UserRecipe);
       }
     }
@@ -1246,16 +1243,6 @@ void VPlanTransforms::createInLoopReductionRecipes(VPlan &Plan,
         LinkVPBB->appendRecipe(RedRecipe);
 
       CurrentLink->replaceAllUsesWith(RedRecipe);
-      // Move any store recipes using the RedRecipe that appear before it in the
-      // same block to just after the RedRecipe.
-      for (VPRecipeBase *UserR : make_early_inc_range(
-               make_isa_range<VPRecipeBase>(RedRecipe->users()))) {
-        if (UserR->getParent() != LinkVPBB)
-          continue;
-        if (!match(UserR, m_VPInstruction<Instruction::Store>()))
-          continue;
-        UserR->moveAfter(RedRecipe);
-      }
       ToDelete.push_back(CurrentLink);
       PreviousLink = RedRecipe;
     }

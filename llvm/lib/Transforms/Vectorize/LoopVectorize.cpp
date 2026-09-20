@@ -6183,35 +6183,6 @@ VPHistogramRecipe *VPRecipeBuilder::widenIfHistogram(VPInstruction *VPI) {
                                VPI->getDebugLoc());
 }
 
-bool VPRecipeBuilder::replaceWithFinalIfReductionStore(
-    VPInstruction *VPI, VPBuilder &FinalRedStoresBuilder) {
-  StoreInst *SI;
-  if ((SI = dyn_cast<StoreInst>(VPI->getUnderlyingInstr())) &&
-      Legal->isInvariantAddressOfReduction(SI->getPointerOperand())) {
-    // Only create recipe for the final invariant store of the reduction.
-    if (Legal->isInvariantStoreOfReduction(SI)) {
-      VPValue *Val = VPI->getOperand(0);
-      VPValue *Addr = VPI->getOperand(1);
-      // We need to store the exiting value of the reduction, so use the blend
-      // if tail folded.
-      if (auto *Blend = VPlanPatternMatch::findUserOf<VPBlendRecipe>(Val))
-        Val = Blend;
-      [[maybe_unused]] auto *Rdx =
-          VPlanPatternMatch::findUserOf<VPReductionPHIRecipe>(Val);
-      assert((isa<VPIRValue>(Val) || !Rdx || Rdx->getBackedgeValue() == Val) &&
-             "Store of reduction thats not the backedge value?");
-      auto *Recipe = new VPReplicateRecipe(
-          SI, {Val, Addr}, true /* IsUniform */, nullptr /*Mask*/, *VPI, *VPI,
-          VPI->getDebugLoc());
-      FinalRedStoresBuilder.insert(Recipe);
-    }
-    VPI->eraseFromParent();
-    return true;
-  }
-
-  return false;
-}
-
 VPSingleDefRecipe *VPRecipeBuilder::handleReplication(VPInstruction *VPI,
                                                       VFRange &Range) {
   auto *I = VPI->getUnderlyingInstr();
@@ -6402,6 +6373,31 @@ static bool verifyExecutionFrequenciesMatchBFI(VPlan &Plan, Loop *OrigLoop,
 }
 #endif
 
+/// Return true if any recipe reachable from a reduction phi in \p Plan's vector
+/// loop region may write to memory.
+static bool reductionChainWritesMemory(VPlan &Plan) {
+  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
+  SmallPtrSet<VPRecipeBase *, 16> Seen;
+  for (VPReductionPHIRecipe &Phi : make_isa_range<VPReductionPHIRecipe>(
+           LoopRegion->getEntryBasicBlock()->phis())) {
+    SmallVector<VPRecipeBase *> Worklist = {&Phi};
+    while (!Worklist.empty()) {
+      VPRecipeBase *R = Worklist.pop_back_val();
+      if (!Seen.insert(R).second)
+        continue;
+      if (R->mayWriteToMemory())
+        return true;
+      for (VPValue *V : R->definedValues())
+        for (VPUser *U : V->users()) {
+          auto *User = cast<VPRecipeBase>(U);
+          if (User->getParent()->getEnclosingLoopRegion())
+            Worklist.push_back(User);
+        }
+    }
+  }
+  return false;
+}
+
 VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
   bool IsInnerLoop = OrigLoop->isInnermost();
 
@@ -6495,6 +6491,12 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
     RUN_VPLAN_PASS(VPlanTransforms::foldTailByMasking, *VPlan0);
 
   RUN_VPLAN_PASS(VPlanTransforms::introduceMasksAndLinearize, *VPlan0);
+
+  // Reduction chains must not write intermediate values to memory. Generic
+  // sinking can conservatively retain a store when its alias proof is
+  // insufficient; reject that plan instead of vectorizing the reduction.
+  if (reductionChainWritesMemory(*VPlan0))
+    return nullptr;
 
   return VPlan0;
 }

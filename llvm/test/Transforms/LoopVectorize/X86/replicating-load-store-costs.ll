@@ -1267,62 +1267,52 @@ exit:
 define void @invariant_pred_store_sunk_out_of_loop(ptr noalias %dst, ptr noalias readonly %src) #1 {
 ; I64-LABEL: define void @invariant_pred_store_sunk_out_of_loop(
 ; I64-SAME: ptr noalias [[DST:%.*]], ptr noalias readonly [[SRC:%.*]]) #[[ATTR1:[0-9]+]] {
-; I64-NEXT:  [[ENTRY:.*:]]
+; I64-NEXT:  [[ENTRY:.*]]:
 ; I64-NEXT:    [[GEP_DST:%.*]] = getelementptr inbounds i64, ptr [[DST]], i64 42
-; I64-NEXT:    br label %[[LOOP:.*]]
-; I64:       [[LOOP]]:
 ; I64-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; I64:       [[VECTOR_BODY]]:
-; I64-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[LOOP]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; I64-NEXT:    [[VEC_PHI:%.*]] = phi <2 x i64> [ zeroinitializer, %[[LOOP]] ], [ [[TMP4:%.*]], %[[VECTOR_BODY]] ]
-; I64-NEXT:    [[VEC_PHI1:%.*]] = phi <2 x i64> [ zeroinitializer, %[[LOOP]] ], [ [[TMP5:%.*]], %[[VECTOR_BODY]] ]
+; I64-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LATCH:.*]] ]
+; I64-NEXT:    [[SUM:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[SUM_2:%.*]], %[[LATCH]] ]
 ; I64-NEXT:    [[GEP_SRC:%.*]] = getelementptr inbounds i64, ptr [[SRC]], i64 [[IV]]
-; I64-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i64, ptr [[GEP_SRC]], i64 2
-; I64-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x i64>, ptr [[GEP_SRC]], align 8
-; I64-NEXT:    [[WIDE_LOAD2:%.*]] = load <2 x i64>, ptr [[TMP1]], align 8
-; I64-NEXT:    [[TMP2:%.*]] = add <2 x i64> [[WIDE_LOAD]], [[VEC_PHI]]
-; I64-NEXT:    [[TMP3:%.*]] = add <2 x i64> [[WIDE_LOAD2]], [[VEC_PHI1]]
-; I64-NEXT:    [[TMP4]] = add <2 x i64> [[TMP2]], splat (i64 1)
-; I64-NEXT:    [[TMP5]] = add <2 x i64> [[TMP3]], splat (i64 1)
-; I64-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[IV]], 4
-; I64-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1000
-; I64-NEXT:    br i1 [[TMP6]], label %[[IF_THEN:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP14:![0-9]+]]
+; I64-NEXT:    [[L:%.*]] = load i64, ptr [[GEP_SRC]], align 8
+; I64-NEXT:    [[SUM_1:%.*]] = add nsw i64 [[L]], [[SUM]]
+; I64-NEXT:    [[C:%.*]] = icmp sgt i64 [[L]], 0
+; I64-NEXT:    br i1 [[C]], label %[[IF_THEN:.*]], label %[[LATCH]]
 ; I64:       [[IF_THEN]]:
-; I64-NEXT:    [[BIN_RDX:%.*]] = add <2 x i64> [[TMP5]], [[TMP4]]
-; I64-NEXT:    [[SUM_1:%.*]] = call i64 @llvm.vector.reduce.add.v2i64(<2 x i64> [[BIN_RDX]])
 ; I64-NEXT:    store i64 [[SUM_1]], ptr [[GEP_DST]], align 8
-; I64-NEXT:    br label %[[LATCH:.*]]
+; I64-NEXT:    br label %[[LATCH]]
 ; I64:       [[LATCH]]:
+; I64-NEXT:    [[SUM_2]] = add nsw i64 [[SUM_1]], 1
+; I64-NEXT:    store i64 [[SUM_2]], ptr [[GEP_DST]], align 8
+; I64-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; I64-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], 1000
+; I64-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[VECTOR_BODY]]
+; I64:       [[EXIT]]:
 ; I64-NEXT:    ret void
 ;
 ; I32-LABEL: define void @invariant_pred_store_sunk_out_of_loop(
 ; I32-SAME: ptr noalias [[DST:%.*]], ptr noalias readonly [[SRC:%.*]]) #[[ATTR1:[0-9]+]] {
-; I32-NEXT:  [[ENTRY:.*:]]
+; I32-NEXT:  [[ENTRY:.*]]:
 ; I32-NEXT:    [[GEP_DST:%.*]] = getelementptr inbounds i64, ptr [[DST]], i64 42
-; I32-NEXT:    br label %[[VECTOR_PH:.*]]
-; I32:       [[VECTOR_PH]]:
 ; I32-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; I32:       [[VECTOR_BODY]]:
-; I32-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; I32-NEXT:    [[VEC_PHI:%.*]] = phi <2 x i64> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[TMP4:%.*]], %[[VECTOR_BODY]] ]
-; I32-NEXT:    [[VEC_PHI1:%.*]] = phi <2 x i64> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[TMP5:%.*]], %[[VECTOR_BODY]] ]
+; I32-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[EXIT:.*]] ]
+; I32-NEXT:    [[SUM:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[SUM_2:%.*]], %[[EXIT]] ]
 ; I32-NEXT:    [[TMP0:%.*]] = getelementptr inbounds i64, ptr [[SRC]], i64 [[INDEX]]
-; I32-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i64, ptr [[TMP0]], i32 2
-; I32-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x i64>, ptr [[TMP0]], align 8
-; I32-NEXT:    [[WIDE_LOAD2:%.*]] = load <2 x i64>, ptr [[TMP1]], align 8
-; I32-NEXT:    [[TMP2:%.*]] = add <2 x i64> [[WIDE_LOAD]], [[VEC_PHI]]
-; I32-NEXT:    [[TMP3:%.*]] = add <2 x i64> [[WIDE_LOAD2]], [[VEC_PHI1]]
-; I32-NEXT:    [[TMP4]] = add <2 x i64> [[TMP2]], splat (i64 1)
-; I32-NEXT:    [[TMP5]] = add <2 x i64> [[TMP3]], splat (i64 1)
-; I32-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
-; I32-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1000
-; I32-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP12:![0-9]+]]
+; I32-NEXT:    [[L:%.*]] = load i64, ptr [[TMP0]], align 8
+; I32-NEXT:    [[TMP7:%.*]] = add nsw i64 [[L]], [[SUM]]
+; I32-NEXT:    [[C:%.*]] = icmp sgt i64 [[L]], 0
+; I32-NEXT:    br i1 [[C]], label %[[MIDDLE_BLOCK:.*]], label %[[EXIT]]
 ; I32:       [[MIDDLE_BLOCK]]:
-; I32-NEXT:    [[BIN_RDX:%.*]] = add <2 x i64> [[TMP5]], [[TMP4]]
-; I32-NEXT:    [[TMP7:%.*]] = call i64 @llvm.vector.reduce.add.v2i64(<2 x i64> [[BIN_RDX]])
 ; I32-NEXT:    store i64 [[TMP7]], ptr [[GEP_DST]], align 8
-; I32-NEXT:    br label %[[EXIT:.*]]
+; I32-NEXT:    br label %[[EXIT]]
 ; I32:       [[EXIT]]:
+; I32-NEXT:    [[SUM_2]] = add nsw i64 [[TMP7]], 1
+; I32-NEXT:    store i64 [[SUM_2]], ptr [[GEP_DST]], align 8
+; I32-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[INDEX]], 1
+; I32-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], 1000
+; I32-NEXT:    br i1 [[EC]], label %[[EXIT1:.*]], label %[[VECTOR_BODY]]
+; I32:       [[EXIT1]]:
 ; I32-NEXT:    ret void
 ;
 entry:

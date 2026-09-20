@@ -78,14 +78,6 @@ public:
   /// scalar loop.
   VPHistogramRecipe *widenIfHistogram(VPInstruction *VPI);
 
-  /// If \p VPI is a store of a reduction into an invariant address, delete it.
-  /// If it is the final store of a reduction result, a uniform store recipe
-  /// will be created for it in the middle block. Returns `true` if replacement
-  /// took place. The order of stores must be preserved, hence \p
-  /// FinalRedStoresBuidler.
-  bool replaceWithFinalIfReductionStore(VPInstruction *VPI,
-                                        VPBuilder &FinalRedStoresBuilder);
-
   /// Build a replicating or single-scalar recipe for \p VPI. If it is
   /// predicated, add the mask as last operand. Range.End may be decreased to
   /// ensure same recipe behavior  from \p Range.Start to \p Range.End.

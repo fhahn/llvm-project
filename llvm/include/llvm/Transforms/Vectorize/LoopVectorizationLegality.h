@@ -340,10 +340,6 @@ public:
   /// reductions found in the loop.
   LLVM_ABI bool isInvariantStoreOfReduction(StoreInst *SI);
 
-  /// Returns True if given address is invariant and is used to store recurrent
-  /// expression
-  LLVM_ABI bool isInvariantAddressOfReduction(Value *V);
-
   /// Returns True if V is a Phi node of an induction variable in this loop.
   LLVM_ABI bool isInductionPhi(const Value *V) const;
 

@@ -105,3 +105,54 @@ loop:
 exit:
   ret void
 }
+
+; Multiple ordered reductions storing to distinct invariant addresses. The sunk
+; stores must keep their original relative order, as the addresses are only
+; known to be distinct via the runtime checks.
+define void @multiple_ordered_reductions_distinct_addresses(ptr %p0, ptr %p1, ptr %p2, ptr noalias readonly %src) {
+; CHECK-LABEL: define void @multiple_ordered_reductions_distinct_addresses(
+; CHECK-SAME: ptr [[P0:%.*]], ptr [[P1:%.*]], ptr [[P2:%.*]], ptr noalias readonly [[SRC:%.*]]) {
+; CHECK-NEXT:  [[SCALAR_PH:.*]]:
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[C:%.*]] = phi float [ 0.000000e+00, %[[SCALAR_PH]] ], [ [[C_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[B:%.*]] = phi float [ 0.000000e+00, %[[SCALAR_PH]] ], [ [[B_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[A:%.*]] = phi float [ 0.000000e+00, %[[SCALAR_PH]] ], [ [[A_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[GEP:%.*]] = getelementptr inbounds float, ptr [[SRC]], i64 [[IV]]
+; CHECK-NEXT:    [[L:%.*]] = load float, ptr [[GEP]], align 4
+; CHECK-NEXT:    [[A_NEXT]] = fadd float [[A]], [[L]]
+; CHECK-NEXT:    store float [[A_NEXT]], ptr [[P0]], align 4
+; CHECK-NEXT:    [[B_NEXT]] = fadd float [[B]], [[L]]
+; CHECK-NEXT:    store float [[B_NEXT]], ptr [[P1]], align 4
+; CHECK-NEXT:    [[C_NEXT]] = fadd float [[C]], [[L]]
+; CHECK-NEXT:    store float [[C_NEXT]], ptr [[P2]], align 4
+; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], 1000
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[LOOP]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %c = phi float [ 0.000000e+00, %entry ], [ %c.next, %loop ]
+  %b = phi float [ 0.000000e+00, %entry ], [ %b.next, %loop ]
+  %a = phi float [ 0.000000e+00, %entry ], [ %a.next, %loop ]
+  %gep = getelementptr inbounds float, ptr %src, i64 %iv
+  %l = load float, ptr %gep, align 4
+  %a.next = fadd float %a, %l
+  store float %a.next, ptr %p0, align 4
+  %b.next = fadd float %b, %l
+  store float %b.next, ptr %p1, align 4
+  %c.next = fadd float %c, %l
+  store float %c.next, ptr %p2, align 4
+  %iv.next = add i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, 1000
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
