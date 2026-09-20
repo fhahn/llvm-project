@@ -249,6 +249,9 @@ define void @load_store_noalias_via_tbaa(ptr %p, ptr %q, ptr %n) {
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP4]], [[N_MOD_VF]]
 ; CHECK-NEXT:    [[TMP18:%.*]] = mul i64 [[N_VEC]], 12
 ; CHECK-NEXT:    [[TMP19:%.*]] = getelementptr i8, ptr [[P]], i64 [[TMP18]]
+; CHECK-NEXT:    [[TMP39:%.*]] = load float, ptr [[Q]], align 4, !tbaa [[FLOAT_TBAA21:![0-9]+]], !alias.scope [[META27:![0-9]+]]
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x float> poison, float [[TMP39]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x float> [[BROADCAST_SPLATINSERT]], <4 x float> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
@@ -260,28 +263,25 @@ define void @load_store_noalias_via_tbaa(ptr %p, ptr %q, ptr %n) {
 ; CHECK-NEXT:    [[NEXT_GEP7:%.*]] = getelementptr i8, ptr [[P]], i64 [[TMP21]]
 ; CHECK-NEXT:    [[NEXT_GEP8:%.*]] = getelementptr i8, ptr [[P]], i64 [[TMP22]]
 ; CHECK-NEXT:    [[NEXT_GEP9:%.*]] = getelementptr i8, ptr [[P]], i64 [[TMP23]]
-; CHECK-NEXT:    store float 0.000000e+00, ptr [[NEXT_GEP]], align 4, !tbaa [[FLOAT_TBAA21:![0-9]+]]
-; CHECK-NEXT:    store float 0.000000e+00, ptr [[NEXT_GEP7]], align 4, !tbaa [[FLOAT_TBAA21]]
-; CHECK-NEXT:    store float 0.000000e+00, ptr [[NEXT_GEP8]], align 4, !tbaa [[FLOAT_TBAA21]]
-; CHECK-NEXT:    store float 0.000000e+00, ptr [[NEXT_GEP9]], align 4, !tbaa [[FLOAT_TBAA21]]
-; CHECK-NEXT:    [[TMP39:%.*]] = load float, ptr [[Q]], align 4, !tbaa [[FLOAT_TBAA27:![0-9]+]], !alias.scope [[META28:![0-9]+]]
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x float> poison, float [[TMP39]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x float> [[BROADCAST_SPLATINSERT]], <4 x float> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    store float 0.000000e+00, ptr [[NEXT_GEP]], align 4, !tbaa [[FLOAT_TBAA30:![0-9]+]]
+; CHECK-NEXT:    store float 0.000000e+00, ptr [[NEXT_GEP7]], align 4, !tbaa [[FLOAT_TBAA30]]
+; CHECK-NEXT:    store float 0.000000e+00, ptr [[NEXT_GEP8]], align 4, !tbaa [[FLOAT_TBAA30]]
+; CHECK-NEXT:    store float 0.000000e+00, ptr [[NEXT_GEP9]], align 4, !tbaa [[FLOAT_TBAA30]]
 ; CHECK-NEXT:    [[TMP24:%.*]] = getelementptr i8, ptr [[NEXT_GEP]], i64 4
 ; CHECK-NEXT:    [[TMP25:%.*]] = getelementptr i8, ptr [[NEXT_GEP7]], i64 4
 ; CHECK-NEXT:    [[TMP26:%.*]] = getelementptr i8, ptr [[NEXT_GEP8]], i64 4
 ; CHECK-NEXT:    [[TMP27:%.*]] = getelementptr i8, ptr [[NEXT_GEP9]], i64 4
-; CHECK-NEXT:    [[TMP28:%.*]] = load float, ptr [[TMP24]], align 4, !tbaa [[FLOAT_TBAA27]], !alias.scope [[META31:![0-9]+]]
-; CHECK-NEXT:    [[TMP29:%.*]] = load float, ptr [[TMP25]], align 4, !tbaa [[FLOAT_TBAA27]], !alias.scope [[META31]]
-; CHECK-NEXT:    [[TMP30:%.*]] = load float, ptr [[TMP26]], align 4, !tbaa [[FLOAT_TBAA27]], !alias.scope [[META31]]
-; CHECK-NEXT:    [[TMP31:%.*]] = load float, ptr [[TMP27]], align 4, !tbaa [[FLOAT_TBAA27]], !alias.scope [[META31]]
+; CHECK-NEXT:    [[TMP28:%.*]] = load float, ptr [[TMP24]], align 4, !tbaa [[FLOAT_TBAA21]], !alias.scope [[META31:![0-9]+]]
+; CHECK-NEXT:    [[TMP29:%.*]] = load float, ptr [[TMP25]], align 4, !tbaa [[FLOAT_TBAA21]], !alias.scope [[META31]]
+; CHECK-NEXT:    [[TMP30:%.*]] = load float, ptr [[TMP26]], align 4, !tbaa [[FLOAT_TBAA21]], !alias.scope [[META31]]
+; CHECK-NEXT:    [[TMP31:%.*]] = load float, ptr [[TMP27]], align 4, !tbaa [[FLOAT_TBAA21]], !alias.scope [[META31]]
 ; CHECK-NEXT:    [[TMP32:%.*]] = insertelement <4 x float> poison, float [[TMP28]], i64 0
 ; CHECK-NEXT:    [[TMP33:%.*]] = insertelement <4 x float> [[TMP32]], float [[TMP29]], i64 1
 ; CHECK-NEXT:    [[TMP34:%.*]] = insertelement <4 x float> [[TMP33]], float [[TMP30]], i64 2
 ; CHECK-NEXT:    [[TMP35:%.*]] = insertelement <4 x float> [[TMP34]], float [[TMP31]], i64 3
 ; CHECK-NEXT:    [[TMP36:%.*]] = fadd <4 x float> [[BROADCAST_SPLAT]], [[TMP35]]
 ; CHECK-NEXT:    [[TMP37:%.*]] = extractelement <4 x float> [[TMP36]], i64 3
-; CHECK-NEXT:    store float [[TMP37]], ptr [[P]], align 4, !tbaa [[FLOAT_TBAA27]], !alias.scope [[META33:![0-9]+]], !noalias [[META28]]
+; CHECK-NEXT:    store float [[TMP37]], ptr [[P]], align 4, !tbaa [[FLOAT_TBAA21]], !alias.scope [[META33:![0-9]+]], !noalias [[META27]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP38:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP38]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP35:![0-9]+]]

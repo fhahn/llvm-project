@@ -32,6 +32,7 @@
 #include "llvm/Analysis/MemoryLocation.h"
 #include "llvm/Analysis/ScalarEvolutionPatternMatch.h"
 #include "llvm/Analysis/ScopedNoAliasAA.h"
+#include "llvm/Analysis/TypeBasedAliasAnalysis.h"
 #include "llvm/Analysis/VectorUtils.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/Metadata.h"
@@ -246,16 +247,21 @@ public:
 };
 
 /// Check if a memory operation doesn't alias with memory operations using
-/// scoped noalias metadata, in \p Blocks. If \p SinkInfo is std::nullopt, only
-/// recipes that may write to memory are checked (for load hoisting). Otherwise
-/// recipes that both read and write memory are checked, and SCEV is used to
-/// prove no-alias between the group leader and other replicate recipes (for
-/// store sinking).
+/// scoped noalias or TBAA metadata, in \p Blocks. If \p SinkInfo is
+/// std::nullopt, only recipes that may write to memory are checked (for load
+/// hoisting). Otherwise recipes that both read and write memory are checked,
+/// and SCEV is used to prove no-alias between the group leader and other
+/// replicate recipes (for store sinking).
 static bool
 canHoistOrSinkWithNoAliasCheck(const MemoryLocation &MemLoc,
                                ArrayRef<VPBasicBlock *> Blocks,
                                std::optional<SinkStoreInfo> SinkInfo = {}) {
   bool CheckReads = SinkInfo.has_value();
+  // Don't use TBAA if the type sanitizer is used, as it needs to verify the
+  // accesses TBAA would allow to disambiguate at runtime.
+  const VPlan &Plan = *Blocks.front()->getPlan();
+  const Function *F = Plan.getScalarHeader()->getIRBasicBlock()->getParent();
+  TypeBasedAAResult TBAA(F->hasFnAttribute(Attribute::SanitizeType));
   for (VPBasicBlock *VPBB : Blocks) {
     for (VPRecipeBase &R : *VPBB) {
       if (SinkInfo && SinkInfo->shouldSkip(R))
@@ -271,7 +277,8 @@ canHoistOrSinkWithNoAliasCheck(const MemoryLocation &MemLoc,
         // location.
         return false;
 
-      if (ScopedNoAliasAAResult::alias(*Loc, MemLoc) != AliasResult::NoAlias)
+      if (ScopedNoAliasAAResult::alias(*Loc, MemLoc) != AliasResult::NoAlias &&
+          TBAA.alias(*Loc, MemLoc) != AliasResult::NoAlias)
         return false;
     }
   }

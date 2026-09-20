@@ -723,7 +723,8 @@ vputils::getMemoryLocation(const VPRecipeBase &R) {
   if (!M)
     return std::nullopt;
   MemoryLocation Loc;
-  // Populate noalias metadata from VPIRMetadata.
+  // Populate alias analysis metadata from VPIRMetadata.
+  Loc.AATags.TBAA = M->getMetadata(LLVMContext::MD_tbaa);
   if (MDNode *NoAliasMD = M->getMetadata(LLVMContext::MD_noalias))
     Loc.AATags.NoAlias = NoAliasMD;
   if (MDNode *AliasScopeMD = M->getMetadata(LLVMContext::MD_alias_scope))
