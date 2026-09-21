@@ -12,7 +12,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Transforms/Scalar/ConstraintElimination.h"
-#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/SmallVector.h"
@@ -367,14 +366,15 @@ class ConstraintInfo {
 
   const DataLayout &DL;
 
-  /// Decompositions computed against the current state of the systems. Cleared
-  /// whenever a system changes.
-  DenseMap<PointerIntPair<Value *, 1, bool>, Decomposition> DecomposeCache;
+  /// Decompositions computed against the current state of the systems, indexed
+  /// by whether the value was decomposed for the signed system. Two maps rather
+  /// than one keyed on (value, signedness) so the key is a bare pointer.
+  /// Cleared whenever a system changes.
+  DenseMap<Value *, Decomposition> DecomposeCache[2];
 
 public:
-  DenseMap<PointerIntPair<Value *, 1, bool>, Decomposition> &
-  getDecomposeCache() {
-    return DecomposeCache;
+  DenseMap<Value *, Decomposition> &getDecomposeCache(bool Signed) {
+    return DecomposeCache[Signed];
   }
 
   ConstraintInfo(const DataLayout &DL, ArrayRef<Value *> FunctionArgs)
@@ -401,11 +401,13 @@ public:
   }
 
   void popLastConstraint(bool Signed) {
-    DecomposeCache.clear();
+    DecomposeCache[0].clear();
+    DecomposeCache[1].clear();
     getCS(Signed).popLastConstraint();
   }
   void popLastNVariables(bool Signed, unsigned N) {
-    DecomposeCache.clear();
+    DecomposeCache[0].clear();
+    DecomposeCache[1].clear();
     getCS(Signed).popLastNVariables(N);
   }
 
@@ -670,14 +672,13 @@ static Decomposition decomposeImpl(Value *V, ConstraintInfo &Info,
 // cached results stay valid; it is cleared when the outermost call returns.
 static Decomposition decompose(Value *V, ConstraintInfo &Info, bool IsSigned,
                                const DataLayout &DL) {
-  PointerIntPair<Value *, 1, bool> Key(V, IsSigned);
-  auto &Cache = Info.getDecomposeCache();
-  auto It = Cache.find(Key);
+  auto &Cache = Info.getDecomposeCache(IsSigned);
+  auto It = Cache.find(V);
   if (It != Cache.end())
     return It->second;
 
   Decomposition Result = decomposeImpl(V, Info, IsSigned, DL);
-  Info.getDecomposeCache().insert({Key, Result});
+  Info.getDecomposeCache(IsSigned).insert({V, Result});
   return Result;
 }
 
@@ -2182,7 +2183,8 @@ void ConstraintInfo::addFactImpl(CmpInst::Predicate Pred, Value *A, Value *B,
     return;
 
   // The systems changed, so cached decompositions may no longer be valid.
-  DecomposeCache.clear();
+  DecomposeCache[0].clear();
+  DecomposeCache[1].clear();
 
   // If R has been added to the system, add the new variables and queue it for
   // removal once it goes out-of-scope.
