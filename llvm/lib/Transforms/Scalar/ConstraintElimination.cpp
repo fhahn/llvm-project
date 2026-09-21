@@ -664,6 +664,32 @@ static Decomposition decomposeGEP(GEPOperator &GEP, ConstraintInfo &Info,
 static Decomposition decomposeImpl(Value *V, ConstraintInfo &Info,
                                    bool IsSigned, const DataLayout &DL);
 
+/// Returns true if \p V is an operation decomposeImpl can look through, i.e.
+/// one whose decomposition recurses. Only those are worth memoizing:
+/// decomposeImpl returns in constant time for everything else, so a cache
+/// lookup there costs more than recomputing. Keep in sync with the operations
+/// decomposeImpl matches.
+static bool mayLookThrough(Value *V) {
+  auto *Op = dyn_cast<Operator>(V);
+  if (!Op)
+    return false;
+  switch (Op->getOpcode()) {
+  case Instruction::GetElementPtr:
+  case Instruction::Add:
+  case Instruction::Sub:
+  case Instruction::Mul:
+  case Instruction::Shl:
+  case Instruction::ZExt:
+  case Instruction::SExt:
+  case Instruction::Trunc:
+  case Instruction::Or:  // m_AddLike matches a disjoint or.
+  case Instruction::Xor: // m_Not matches xor X, -1.
+    return true;
+  default:
+    return false;
+  }
+}
+
 // Decomposing an operation decomposes its operands twice: once to check the
 // pre-condition that lets us look through the operation, and once for the
 // operation itself. Share the result between the two, which keeps the cost of
@@ -672,6 +698,9 @@ static Decomposition decomposeImpl(Value *V, ConstraintInfo &Info,
 // cached results stay valid; it is cleared when the outermost call returns.
 static Decomposition decompose(Value *V, ConstraintInfo &Info, bool IsSigned,
                                const DataLayout &DL) {
+  if (!mayLookThrough(V))
+    return decomposeImpl(V, Info, IsSigned, DL);
+
   auto &Cache = Info.getDecomposeCache(IsSigned);
   auto It = Cache.find(V);
   if (It != Cache.end())
