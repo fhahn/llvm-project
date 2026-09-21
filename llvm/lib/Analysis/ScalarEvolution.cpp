@@ -4548,7 +4548,7 @@ void ScalarEvolution::insertValueToMap(Value *V, const SCEV *S) {
   auto It = ValueExprMap.find_as(V);
   if (It == ValueExprMap.end()) {
     ValueExprMap.insert({SCEVCallbackVH(V, this), S});
-    markCached(S, CK_General);
+    markCached(S, CK_IRValues);
     ExprValueMap[S].insert(V);
   }
 }
@@ -10079,7 +10079,7 @@ const SCEV *ScalarEvolution::computeExitCountExhaustively(const Loop *L,
 }
 
 SCEVUse ScalarEvolution::getSCEVAtScope(const SCEV *V, const Loop *L) {
-  markCached(V, CK_General);
+  markCached(V, CK_AtScopes);
   auto &Values = ValuesAtScopes[V];
   // Check to see if we've folded this expression at this loop before.
   for (auto &LS : Values)
@@ -10092,7 +10092,7 @@ SCEVUse ScalarEvolution::getSCEVAtScope(const SCEV *V, const Loop *L) {
   SCEVUse C = computeSCEVAtScope(V, L);
   // computeSCEVAtScope may have invalidated V and dropped its entry; the
   // lookup below re-creates it.
-  markCached(V, CK_General);
+  markCached(V, CK_AtScopes);
   for (auto &LS : reverse(ValuesAtScopes[V]))
     if (LS.first == L) {
       LS.second = C;
@@ -10100,7 +10100,7 @@ SCEVUse ScalarEvolution::getSCEVAtScope(const SCEV *V, const Loop *L) {
       // expressions, and any use flags on C do not change which expression
       // this is the value at scope of.
       if (!isa<SCEVConstant>(C)) {
-        markCached(C.getPointer(), CK_General);
+        markCached(C.getPointer(), CK_AtScopes);
         ValuesAtScopesUsers[C.getPointer()].push_back({L, V});
       }
       break;
@@ -14457,7 +14457,7 @@ void ScalarEvolution::print(raw_ostream &OS) const {
 
 ScalarEvolution::LoopDisposition
 ScalarEvolution::getLoopDisposition(const SCEV *S, const Loop *L) {
-  markCached(S, CK_General);
+  markCached(S, CK_Dispositions);
   auto &Values = LoopDispositions[S];
   for (auto &V : Values) {
     if (V.getPointer() == L)
@@ -14572,7 +14572,7 @@ bool ScalarEvolution::hasComputableLoopEvolution(const SCEV *S, const Loop *L) {
 
 ScalarEvolution::BlockDisposition
 ScalarEvolution::getBlockDisposition(const SCEV *S, const BasicBlock *BB) {
-  markCached(S, CK_General);
+  markCached(S, CK_Dispositions);
   auto &Values = BlockDispositions[S];
   for (auto &V : Values) {
     if (V.getPointer() == BB)
@@ -14706,9 +14706,10 @@ bool ScalarEvolution::isCachedIn(const SCEV *S, unsigned Kinds) const {
     if ((Kinds & CK_Misc) && (UnsignedWrapViaInductionTried.contains(AR) ||
                               SignedWrapViaInductionTried.contains(AR)))
       return true;
-  return In(CK_General, LoopDispositions) ||
-         In(CK_General, BlockDispositions) || In(CK_General, ExprValueMap) ||
-         In(CK_General, ValuesAtScopes) || In(CK_General, ValuesAtScopesUsers) ||
+  return In(CK_Dispositions, LoopDispositions) ||
+         In(CK_Dispositions, BlockDispositions) ||
+         In(CK_IRValues, ExprValueMap) || In(CK_AtScopes, ValuesAtScopes) ||
+         In(CK_AtScopes, ValuesAtScopesUsers) ||
          In(CK_Ranges, UnsignedRanges) || In(CK_Ranges, SignedRanges) ||
          In(CK_Ranges, ConstantMultipleCache) || In(CK_Misc, HasRecMap) ||
          In(CK_Misc, BECountUsers) || In(CK_Misc, FoldCacheUser);
@@ -14727,10 +14728,12 @@ void ScalarEvolution::forgetMemoizedResultsImpl(const SCEV *S) {
     return;
   S->CacheFlags = 0;
 
-  if (Cached & CK_General) {
+  if (Cached & CK_Dispositions) {
     LoopDispositions.erase(S);
     BlockDispositions.erase(S);
+  }
 
+  if (Cached & CK_IRValues) {
     auto ExprIt = ExprValueMap.find(S);
     if (ExprIt != ExprValueMap.end()) {
       for (Value *V : ExprIt->second) {
@@ -14740,14 +14743,16 @@ void ScalarEvolution::forgetMemoizedResultsImpl(const SCEV *S) {
       }
       ExprValueMap.erase(ExprIt);
     }
+  }
 
+  if (Cached & CK_AtScopes) {
     auto ScopeIt = ValuesAtScopes.find(S);
     if (ScopeIt != ValuesAtScopes.end()) {
       for (const auto &Pair : ScopeIt->second)
         // A null entry is a value-at-scope computation still in flight; a
         // constant one is not tracked in ValuesAtScopesUsers.
         if (Pair.second && !isa<SCEVConstant>(Pair.second)) {
-          markCached(Pair.second.getPointer(), CK_General);
+          markCached(Pair.second.getPointer(), CK_AtScopes);
           llvm::erase(ValuesAtScopesUsers[Pair.second.getPointer()],
                       std::make_pair(Pair.first, S));
         }
@@ -14759,7 +14764,7 @@ void ScalarEvolution::forgetMemoizedResultsImpl(const SCEV *S) {
       for (const auto &Pair : ScopeUserIt->second) {
         // The recorded value at scope is a use of S, which may carry no-wrap
         // flags that are not part of this key.
-        markCached(Pair.second, CK_General);
+        markCached(Pair.second, CK_AtScopes);
         llvm::erase_if(ValuesAtScopes[Pair.second], [&](const auto &LS) {
           return LS.first == Pair.first && LS.second.getPointer() == S;
         });

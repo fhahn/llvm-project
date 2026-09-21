@@ -1719,11 +1719,12 @@ private:
   /// populated. Each group owns one bit of SCEV::CacheFlags, so that
   /// invalidation only looks up the groups that can hold an entry.
   enum SCEVCacheKind : unsigned short {
-    CK_General = 1 << 0, ///< Loop/BlockDispositions, ExprValueMap,
-                         ///< ValuesAtScopes and its users.
-    CK_Ranges = 1 << 1,  ///< Un/SignedRanges, ConstantMultipleCache.
-    CK_Misc = 1 << 2,    ///< HasRecMap, *WrapViaInductionTried, BECountUsers,
-                         ///< FoldCacheUser.
+    CK_Dispositions = 1 << 0, ///< Loop/BlockDispositions.
+    CK_IRValues = 1 << 1,     ///< ExprValueMap.
+    CK_AtScopes = 1 << 2,     ///< ValuesAtScopes and its users.
+    CK_Ranges = 1 << 3,       ///< Un/SignedRanges, ConstantMultipleCache.
+    CK_Misc = 1 << 4,         ///< HasRecMap, *WrapViaInductionTried,
+                              ///< BECountUsers, FoldCacheUser.
   };
 
   /// Record that a cache in group \p K now holds an entry keyed on \p S. Every
