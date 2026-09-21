@@ -373,10 +373,6 @@ class ConstraintInfo {
   DenseMap<Value *, Decomposition> DecomposeCache[2];
 
 public:
-  DenseMap<Value *, Decomposition> &getDecomposeCache(bool Signed) {
-    return DecomposeCache[Signed];
-  }
-
   ConstraintInfo(const DataLayout &DL, ArrayRef<Value *> FunctionArgs)
       : UnsignedCS(FunctionArgs), SignedCS(FunctionArgs), DL(DL) {
     auto &Value2Index = getValue2Index(false);
@@ -412,6 +408,11 @@ public:
   }
 
   bool doesHold(CmpInst::Predicate Pred, Value *A, Value *B);
+
+  /// Decompose \p V into a constant offset plus a sum of coefficient/variable
+  /// pairs, see decomposeImpl. Results for values that can be looked through
+  /// are memoized in DecomposeCache.
+  Decomposition decompose(Value *V, bool IsSigned);
 
   /// Returns true if \p V is known to be non-negative, either because the
   /// signed system implies it or because ValueTracking can prove it.
@@ -506,9 +507,6 @@ static OffsetResult collectOffsets(GEPOperator &GEP, const DataLayout &DL) {
   }
   return Result;
 }
-
-static Decomposition decompose(Value *V, ConstraintInfo &Info,
-                               bool IsSigned, const DataLayout &DL);
 
 static bool canUseSExt(ConstantInt *CI) {
   const APInt &Val = CI->getValue();
@@ -646,7 +644,7 @@ static Decomposition decomposeGEP(GEPOperator &GEP, ConstraintInfo &Info,
         return &GEP;
     }
 
-    auto IdxResult = decompose(Index, Info, IsSigned, DL);
+    auto IdxResult = Info.decompose(Index, IsSigned);
     if (IdxResult.mul(Scale.getSExtValue()))
       return &GEP;
     if (Result.add(IdxResult))
@@ -662,62 +660,12 @@ static Decomposition decomposeGEP(GEPOperator &GEP, ConstraintInfo &Info,
 // Looking through certain expressions is only valid if a pre-condition holds.
 // Pre-conditions are checked against \p Info as needed.
 static Decomposition decomposeImpl(Value *V, ConstraintInfo &Info,
-                                   bool IsSigned, const DataLayout &DL);
-
-/// Returns true if \p V is an operation decomposeImpl can look through, i.e.
-/// one whose decomposition recurses. Only those are worth memoizing:
-/// decomposeImpl returns in constant time for everything else, so a cache
-/// lookup there costs more than recomputing. Keep in sync with the operations
-/// decomposeImpl matches.
-static bool mayLookThrough(Value *V) {
-  auto *Op = dyn_cast<Operator>(V);
-  if (!Op)
-    return false;
-  switch (Op->getOpcode()) {
-  case Instruction::GetElementPtr:
-  case Instruction::Add:
-  case Instruction::Sub:
-  case Instruction::Mul:
-  case Instruction::Shl:
-  case Instruction::ZExt:
-  case Instruction::SExt:
-  case Instruction::Trunc:
-  case Instruction::Or:  // m_AddLike matches a disjoint or.
-  case Instruction::Xor: // m_Not matches xor X, -1.
-    return true;
-  default:
-    return false;
-  }
-}
-
-// Decomposing an operation decomposes its operands twice: once to check the
-// pre-condition that lets us look through the operation, and once for the
-// operation itself. Share the result between the two, which keeps the cost of
-// decomposing a deeply nested expression from growing exponentially with its
-// depth. The systems do not change while a decomposition is in flight, so the
-// cached results stay valid; it is cleared when the outermost call returns.
-static Decomposition decompose(Value *V, ConstraintInfo &Info, bool IsSigned,
-                               const DataLayout &DL) {
-  if (!mayLookThrough(V))
-    return decomposeImpl(V, Info, IsSigned, DL);
-
-  auto &Cache = Info.getDecomposeCache(IsSigned);
-  auto It = Cache.find(V);
-  if (It != Cache.end())
-    return It->second;
-
-  Decomposition Result = decomposeImpl(V, Info, IsSigned, DL);
-  Info.getDecomposeCache(IsSigned).insert({V, Result});
-  return Result;
-}
-
-static Decomposition decomposeImpl(Value *V, ConstraintInfo &Info,
                                    bool IsSigned, const DataLayout &DL) {
-  auto MergeResults = [&Info, IsSigned,
-                       &DL](Value *A, Value *B,
-                            bool IsSignedB) -> std::optional<Decomposition> {
-    auto ResA = decompose(A, Info, IsSigned, DL);
-    auto ResB = decompose(B, Info, IsSignedB, DL);
+  auto MergeResults = [&Info, IsSigned](
+                          Value *A, Value *B,
+                          bool IsSignedB) -> std::optional<Decomposition> {
+    auto ResA = Info.decompose(A, IsSigned);
+    auto ResB = Info.decompose(B, IsSignedB);
     if (ResA.add(ResB))
       return std::nullopt;
     return ResA;
@@ -789,15 +737,15 @@ static Decomposition decomposeImpl(Value *V, ConstraintInfo &Info,
   // `xor %x, -1` is equivalent to `sub nsw -1, %x`.
   if (IsSigned && match(V, m_Not(m_Value(Op0)))) {
     Decomposition Result(-1);
-    if (!Result.sub(decompose(Op0, Info, IsSigned, DL)))
+    if (!Result.sub(Info.decompose(Op0, IsSigned)))
       return Result;
     return V;
   }
 
   if (match(V, m_Sub(m_Value(Op0), m_Value(Op1)))) {
     if (isKnownNoWrap(V, Info, IsSigned)) {
-      auto ResA = decompose(Op0, Info, IsSigned, DL);
-      auto ResB = decompose(Op1, Info, IsSigned, DL);
+      auto ResA = Info.decompose(Op0, IsSigned);
+      auto ResB = Info.decompose(Op1, IsSigned);
       if (!ResA.sub(ResB))
         return ResA;
     }
@@ -809,7 +757,7 @@ static Decomposition decomposeImpl(Value *V, ConstraintInfo &Info,
     // the unsigned system the multiplier is the constant's unsigned value.
     if (canUseSExt(CI) && (IsSigned || !CI->isNegative()) &&
         isKnownNoWrap(V, Info, IsSigned)) {
-      auto Result = decompose(Op0, Info, IsSigned, DL);
+      auto Result = Info.decompose(Op0, IsSigned);
       if (!Result.mul(CI->getSExtValue()))
         return Result;
     }
@@ -823,7 +771,7 @@ static Decomposition decomposeImpl(Value *V, ConstraintInfo &Info,
     int64_t MaxShift = IsSigned ? Ty->getIntegerBitWidth() - 1 : 63;
     if (!CI->isNegative() && CI->getSExtValue() < MaxShift &&
         isKnownNoWrap(V, Info, IsSigned)) {
-      auto Result = decompose(Op0, Info, IsSigned, DL);
+      auto Result = Info.decompose(Op0, IsSigned);
       if (!Result.mul(int64_t{1} << CI->getSExtValue()))
         return Result;
     }
@@ -831,6 +779,49 @@ static Decomposition decomposeImpl(Value *V, ConstraintInfo &Info,
   }
 
   return V;
+}
+
+/// Returns true if decomposeImpl may recurse on the operands of \p V. Only
+/// those values are worth memoizing; decomposeImpl returns in constant time for
+/// everything else, where a cache lookup costs more than recomputing. Answering
+/// conservatively in either direction only affects compile time.
+static bool mayLookThrough(Value *V) {
+  auto *Op = dyn_cast<Operator>(V);
+  if (!Op)
+    return false;
+  switch (Op->getOpcode()) {
+  case Instruction::GetElementPtr:
+  case Instruction::Add:
+  case Instruction::Sub:
+  case Instruction::Mul:
+  case Instruction::Shl:
+  case Instruction::ZExt:
+  case Instruction::SExt:
+  case Instruction::Trunc:
+  case Instruction::Or:  // m_AddLike matches a disjoint or.
+  case Instruction::Xor: // m_Not matches xor X, -1.
+    return true;
+  default:
+    return false;
+  }
+}
+
+Decomposition ConstraintInfo::decompose(Value *V, bool IsSigned) {
+  // Looking through an operation requires proving a pre-condition, which
+  // decomposes its operands a second time. Sharing the result between the two
+  // keeps the cost of decomposing a deeply nested expression from growing
+  // exponentially with its depth.
+  if (!mayLookThrough(V))
+    return decomposeImpl(V, *this, IsSigned, DL);
+
+  auto &Cache = DecomposeCache[IsSigned];
+  auto It = Cache.find(V);
+  if (It != Cache.end())
+    return It->second;
+
+  Decomposition Result = decomposeImpl(V, *this, IsSigned, DL);
+  Cache.insert({V, Result});
+  return Result;
 }
 
 /// Build the row for 'ADec <= BDec', using the indices from \p Value2Index.
@@ -929,10 +920,8 @@ ConstraintInfo::getConstraint(CmpInst::Predicate Pred, Value *Op0, Value *Op1,
 
   bool IsSigned = ForceSignedSystem || CmpInst::isSigned(Pred);
   auto &Value2Index = getValue2Index(IsSigned);
-  auto ADec = decompose(Op0->stripPointerCastsSameRepresentation(), *this,
-                        IsSigned, DL);
-  auto BDec = decompose(Op1->stripPointerCastsSameRepresentation(), *this,
-                        IsSigned, DL);
+  auto ADec = decompose(Op0->stripPointerCastsSameRepresentation(), IsSigned);
+  auto BDec = decompose(Op1->stripPointerCastsSameRepresentation(), IsSigned);
   RowTy R = getRowForLessEqual(ADec, BDec, Value2Index, NewVariables);
   if (R.empty())
     return {};
@@ -2166,7 +2155,7 @@ void ConstraintInfo::tightenBoundUsingNe(
 
     // Skip if there are any unknown variables.
     const auto &Value2Index = getValue2Index(IsSigned);
-    if (any_of(decompose(A, *this, IsSigned, DL).Vars,
+    if (any_of(decompose(A, IsSigned).Vars,
                [&Value2Index](const DecompEntry &E) {
                  return !Value2Index.contains(E.Variable);
                }))
