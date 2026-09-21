@@ -529,12 +529,11 @@ define i1 @test_ult_add_no_nsw_pos_6(i8 %start, i8 %high) {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[HIGH_EXT:%.*]] = zext i8 [[HIGH:%.*]] to i16
 ; CHECK-NEXT:    [[START_EXT:%.*]] = zext i8 [[START:%.*]] to i16
-; CHECK-NEXT:    [[ADD_EXT:%.*]] = add i16 [[START_EXT]], 3
+; CHECK-NEXT:    [[ADD_EXT:%.*]] = add nuw nsw i16 [[START_EXT]], 3
 ; CHECK-NEXT:    [[C_1:%.*]] = icmp ult i16 [[ADD_EXT]], [[HIGH_EXT]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[C_1]])
-; CHECK-NEXT:    [[ADD_2:%.*]] = add i16 [[START_EXT]], 2
-; CHECK-NEXT:    [[C:%.*]] = icmp ult i16 [[ADD_2]], [[HIGH_EXT]]
-; CHECK-NEXT:    ret i1 [[C]]
+; CHECK-NEXT:    [[ADD_2:%.*]] = add nuw nsw i16 [[START_EXT]], 2
+; CHECK-NEXT:    ret i1 true
 ;
 entry:
   %high.ext = zext i8 %high to i16

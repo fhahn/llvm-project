@@ -295,6 +295,49 @@ private:
   bool IsNe = false;
 };
 
+/// The constraint systems treat their variables as unbounded integers, but
+/// every variable is an IR value of a fixed-width type and hence satisfies
+/// `MinVal <= V <= MaxVal` for that type's limits. State those limits for the
+/// variable \p Idx, holding \p V, as rows of \p CS, so the solver can use them
+/// like any other fact.
+///
+/// This is what no-wrap reasoning needs: proving `add nsw Op, 1` requires
+/// `Op s<= SMAX - 1`, and from `Op s< W` the solver only derives `Op s<= W - 1`
+/// and stops unless it also knows `W s<= SMAX`.
+///
+/// Limits that do not fit into the systems' 64-bit coefficients are skipped:
+/// -SMIN and UMAX at 64 bits. Returns the number of rows added.
+static unsigned addTypeLimitRows(ConstraintSystem &CS, Value *V, unsigned Idx,
+                                 unsigned NumVars, bool Signed) {
+  unsigned Added = 0;
+  auto AddRow = [&](int64_t Coefficient, int64_t Limit) {
+    CS.addRow({Entry(Limit, 0), Entry(Coefficient, Idx)}, NumVars);
+    ++Added;
+  };
+
+  // In the unsigned system every value is non-negative, including pointers and
+  // integers too wide to have their other limits stated below.
+  if (!Signed)
+    AddRow(-1, 0);
+
+  auto *ITy = dyn_cast<IntegerType>(V->getType());
+  if (!ITy || ITy->getBitWidth() > 64)
+    return Added;
+  unsigned BitWidth = ITy->getBitWidth();
+
+  if (Signed) {
+    // SMAX is 2^(BitWidth - 1) - 1 and fits for every width.
+    AddRow(1, APInt::getSignedMaxValue(BitWidth).getSExtValue());
+    // -SMIN is 2^(BitWidth - 1), which only fits below 64 bits.
+    if (BitWidth < 64)
+      AddRow(-1, -APInt::getSignedMinValue(BitWidth).getSExtValue());
+  } else if (BitWidth < 64) {
+    // UMAX is 2^BitWidth - 1, which only fits below 64 bits.
+    AddRow(1, APInt::getMaxValue(BitWidth).getZExtValue());
+  }
+  return Added;
+}
+
 /// Wrapper encapsulating separate constraint systems and corresponding value
 /// mappings for both unsigned and signed information. Facts are added to and
 /// conditions are checked against the corresponding system depending on the
@@ -311,11 +354,16 @@ class ConstraintInfo {
 public:
   ConstraintInfo(const DataLayout &DL, ArrayRef<Value *> FunctionArgs)
       : UnsignedCS(FunctionArgs), SignedCS(FunctionArgs), DL(DL) {
-    auto &Value2Index = getValue2Index(false);
-    // Add Arg > -1 constraints to unsigned system for all function arguments.
-    for (Value *Arg : FunctionArgs)
-      UnsignedCS.addRow({Entry(0, 0), Entry(-1, Value2Index.at(Arg))},
-                        Value2Index.size());
+    // Both systems index the function arguments identically, as both were
+    // constructed from FunctionArgs.
+    const auto &Value2Index = getValue2Index(false);
+    for (Value *Arg : FunctionArgs) {
+      unsigned Idx = Value2Index.at(Arg);
+      addTypeLimitRows(UnsignedCS, Arg, Idx, Value2Index.size(),
+                       /*Signed=*/false);
+      addTypeLimitRows(SignedCS, Arg, Idx, Value2Index.size(),
+                       /*Signed=*/true);
+    }
   }
 
   DenseMap<Value *, unsigned> &getValue2Index(bool Signed) {
@@ -2164,14 +2212,14 @@ void ConstraintInfo::addFactImpl(CmpInst::Predicate Pred, Value *A, Value *B,
   DFSInStack.emplace_back(NumIn, NumOut, R.IsSigned,
                           std::move(ValuesToRelease));
 
-  if (!R.IsSigned) {
-    for (Value *V : NewVariables) {
-      // Add V > -1 constraints for all new variables.
-      CSToUse.addRow({Entry(0, 0), Entry(-1, Value2Index.at(V))},
-                     Value2Index.size());
+  // Add the limits of each new variable's type, and queue the rows for removal
+  // along with the variable.
+  for (Value *V : NewVariables) {
+    unsigned NumRows = addTypeLimitRows(CSToUse, V, Value2Index.at(V),
+                                        Value2Index.size(), R.IsSigned);
+    for (unsigned I = 0; I != NumRows; ++I)
       DFSInStack.emplace_back(NumIn, NumOut, R.IsSigned,
                               SmallVector<Value *, 2>());
-    }
   }
 
   if (R.isEq()) {
@@ -2242,6 +2290,10 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
   DT.updateDFSNumbers();
   SmallVector<Value *> FunctionArgs(llvm::make_pointer_range(F.args()));
   ConstraintInfo Info(F.getDataLayout(), FunctionArgs);
+  // The rows for the function arguments' type limits are never removed.
+  [[maybe_unused]] const unsigned NumFixedUnsignedRows =
+      Info.getCS(false).size();
+  [[maybe_unused]] const unsigned NumFixedSignedRows = Info.getCS(true).size();
   State S(DT, LI, SE, TLI);
   std::unique_ptr<Module> ReproducerModule(
       DumpReproducers ? new Module(F.getName(), F.getContext()) : nullptr);
@@ -2545,10 +2597,10 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
 #ifndef NDEBUG
   unsigned SignedEntries =
       count_if(DFSInStack, [](const StackEntry &E) { return E.IsSigned; });
-  assert(Info.getCS(false).size() - FunctionArgs.size() ==
+  assert(Info.getCS(false).size() - NumFixedUnsignedRows ==
              DFSInStack.size() - SignedEntries &&
          "updates to CS and DFSInStack are out of sync");
-  assert(Info.getCS(true).size() == SignedEntries &&
+  assert(Info.getCS(true).size() - NumFixedSignedRows == SignedEntries &&
          "updates to CS and DFSInStack are out of sync");
 #endif
 
