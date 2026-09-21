@@ -510,6 +510,50 @@ static bool canUseSExt(ConstantInt *CI) {
   return Val.sgt(MinSignedConstraintValue) && Val.slt(MaxConstraintValue);
 }
 
+/// The systems do not state that each variable W is within its type's limits,
+/// so from `Op s< W` the solver derives `Op s<= W - 1`, but not the
+/// `Op s<= SMAX - 1` needed to prove e.g. `add nsw Op, 1`.
+///
+/// Returns true if the system for \p Signed has a row `Op + Slack <= W`
+/// (\p Upper), proving `Op <= MaxVal - Slack`, or `W + Slack <= Op`
+/// (!\p Upper), proving `Op >= MinVal + Slack`, for an integer W no wider than
+/// \p Op. Only rows stating the relation directly are considered.
+static bool hasLimitWitness(const ConstraintInfo &Info, Value *Op,
+                            const APInt &Slack, bool Signed, bool Upper) {
+  if (Slack.getActiveBits() > 63)
+    return false;
+  int64_t RequiredOffset = -static_cast<int64_t>(Slack.getZExtValue());
+
+  const auto &Value2Index = Info.getValue2Index(Signed);
+  unsigned OpIdx = Value2Index.lookup(Op);
+  if (!OpIdx)
+    return false;
+  int64_t OpCoefficient = Upper ? 1 : -1;
+
+  for (ArrayRef<Entry> Row : Info.getCS(Signed).getConstraints()) {
+    // Match `OpCoefficient * (Op - W) <= C` with C <= -Slack. Rows only store
+    // non-zero entries, the constant first and the variables in index order.
+    if (Row.size() != 3 || Row[0].Id != 0 ||
+        Row[0].Coefficient > RequiredOffset)
+      continue;
+    bool OpFirst = Row[1].Id == OpIdx;
+    const Entry &OpE = Row[OpFirst ? 1 : 2];
+    const Entry &WitnessE = Row[OpFirst ? 2 : 1];
+    if (OpE.Id != OpIdx || OpE.Coefficient != OpCoefficient ||
+        WitnessE.Coefficient != -OpCoefficient)
+      continue;
+
+    auto Witness = find_if(
+        Value2Index, [&](const auto &KV) { return KV.second == WitnessE.Id; });
+    assert(Witness != Value2Index.end() && "row variables must be mapped");
+    Type *WitnessTy = Witness->first->getType();
+    if (WitnessTy->isIntegerTy() &&
+        WitnessTy->getIntegerBitWidth() <= Op->getType()->getScalarSizeInBits())
+      return true;
+  }
+  return false;
+}
+
 /// Returns true if \p Info implies that \p Op is in \p R, interpreting \p R as
 /// a signed range if \p Signed is set and as an unsigned range otherwise.
 static bool doesHoldInRange(ConstraintInfo &Info, Value *Op,
@@ -527,6 +571,8 @@ static bool doesHoldInRange(ConstraintInfo &Info, Value *Op,
                         : APInt::getMinValue(BitWidth);
   APInt MaxVal = Signed ? APInt::getSignedMaxValue(BitWidth)
                         : APInt::getMaxValue(BitWidth);
+  // What a witness has to bridge; computed before Max is clamped below.
+  APInt UpperSlack = MaxVal - Max;
   // Replace bound too large to be decomposed by the largest usable one.
   if (!Signed && Max.uge(MaxConstraintValue))
     Max = APInt(BitWidth, MaxConstraintValue - 1);
@@ -534,11 +580,13 @@ static bool doesHoldInRange(ConstraintInfo &Info, Value *Op,
   Type *Ty = Op->getType();
   if (Min != MinVal &&
       !Info.doesHold(Signed ? CmpInst::ICMP_SGE : CmpInst::ICMP_UGE, Op,
-                     ConstantInt::get(Ty, Min)))
+                     ConstantInt::get(Ty, Min)) &&
+      !hasLimitWitness(Info, Op, Min - MinVal, Signed, /*Upper=*/false))
     return false;
   if (Max != MaxVal &&
       !Info.doesHold(Signed ? CmpInst::ICMP_SLE : CmpInst::ICMP_ULE, Op,
-                     ConstantInt::get(Ty, Max)))
+                     ConstantInt::get(Ty, Max)) &&
+      !hasLimitWitness(Info, Op, UpperSlack, Signed, /*Upper=*/true))
     return false;
   return true;
 }
