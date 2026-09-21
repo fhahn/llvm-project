@@ -51,12 +51,6 @@ private:
     return R.empty() || (R.size() == 1 && R.front().Id == 0);
   }
 
-  /// Returns the constant part of \p R, which is 0 if \p R does not have an
-  /// entry for it.
-  static int64_t getConstant(ArrayRef<Entry> R) {
-    return hasConstantEntry(R) ? R.front().Coefficient : 0;
-  }
-
   /// Number of variables in the system, not counting the constant part. The
   /// variables use the indices 1 to NumVariables.
   size_t NumVariables = 0;
@@ -171,6 +165,15 @@ public:
 
   /// Returns the number of rows in the constraint system.
   unsigned size() const { return Constraints.size(); }
+
+  /// Returns the rows currently in the system.
+  ArrayRef<RowTy> getConstraints() const { return Constraints; }
+
+  /// Returns the constant part of \p R, which is 0 if \p R does not have an
+  /// entry for it.
+  static int64_t getConstant(ArrayRef<Entry> R) {
+    return hasConstantEntry(R) ? R.front().Coefficient : 0;
+  }
 
   /// Print the constraints in the system.
   LLVM_ABI void dump() const;

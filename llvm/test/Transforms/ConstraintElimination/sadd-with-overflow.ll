@@ -164,7 +164,8 @@ define i8 @sadd_pos_const_bound_too_large(i8 %a) {
 ; CHECK-LABEL: define i8 @sadd_pos_const_bound_too_large(
 ; CHECK-SAME: i8 [[A:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    br i1 true, label %[[THEN:.*]], label %[[ELSE:.*]]
+; CHECK-NEXT:    [[HI:%.*]] = icmp sle i8 [[A]], 127
+; CHECK-NEXT:    br i1 [[HI]], label %[[THEN:.*]], label %[[ELSE:.*]]
 ; CHECK:       [[THEN]]:
 ; CHECK-NEXT:    [[S:%.*]] = call { i8, i1 } @llvm.sadd.with.overflow.i8(i8 [[A]], i8 1)
 ; CHECK-NEXT:    [[V:%.*]] = extractvalue { i8, i1 } [[S]], 0
@@ -194,7 +195,8 @@ define i8 @sadd_neg_const_bound_too_small(i8 %a) {
 ; CHECK-LABEL: define i8 @sadd_neg_const_bound_too_small(
 ; CHECK-SAME: i8 [[A:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    br i1 true, label %[[THEN:.*]], label %[[ELSE:.*]]
+; CHECK-NEXT:    [[LO:%.*]] = icmp sge i8 [[A]], -128
+; CHECK-NEXT:    br i1 [[LO]], label %[[THEN:.*]], label %[[ELSE:.*]]
 ; CHECK:       [[THEN]]:
 ; CHECK-NEXT:    [[S:%.*]] = call { i8, i1 } @llvm.sadd.with.overflow.i8(i8 [[A]], i8 -1)
 ; CHECK-NEXT:    [[V:%.*]] = extractvalue { i8, i1 } [[S]], 0

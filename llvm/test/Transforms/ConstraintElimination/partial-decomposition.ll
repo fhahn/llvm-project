@@ -152,7 +152,7 @@ define i1 @sext_operand_used_as_is(i16 %x, i32 %z) {
 ; CHECK-SAME: i16 [[X:%.*]], i32 [[Z:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    [[EXT:%.*]] = sext i16 [[X]] to i32
-; CHECK-NEXT:    [[ADD:%.*]] = add nuw nsw i32 [[EXT]], 4
+; CHECK-NEXT:    [[ADD:%.*]] = add nuw i32 [[EXT]], 4
 ; CHECK-NEXT:    [[C:%.*]] = icmp ugt i32 [[EXT]], [[Z]]
 ; CHECK-NEXT:    call void @llvm.assume(i1 [[C]])
 ; CHECK-NEXT:    ret i1 true

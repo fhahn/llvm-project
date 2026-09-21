@@ -295,49 +295,6 @@ private:
   bool IsNe = false;
 };
 
-/// The constraint systems treat their variables as unbounded integers, but
-/// every variable is an IR value of a fixed-width type and hence satisfies
-/// `MinVal <= V <= MaxVal` for that type's limits. State those limits for the
-/// variable \p Idx, holding \p V, as rows of \p CS, so the solver can use them
-/// like any other fact.
-///
-/// This is what no-wrap reasoning needs: proving `add nsw Op, 1` requires
-/// `Op s<= SMAX - 1`, and from `Op s< W` the solver only derives `Op s<= W - 1`
-/// and stops unless it also knows `W s<= SMAX`.
-///
-/// Limits that do not fit into the systems' 64-bit coefficients are skipped:
-/// -SMIN and UMAX at 64 bits. Returns the number of rows added.
-static unsigned addTypeLimitRows(ConstraintSystem &CS, Value *V, unsigned Idx,
-                                 unsigned NumVars, bool Signed) {
-  unsigned Added = 0;
-  auto AddRow = [&](int64_t Coefficient, int64_t Limit) {
-    CS.addRow({Entry(Limit, 0), Entry(Coefficient, Idx)}, NumVars);
-    ++Added;
-  };
-
-  // In the unsigned system every value is non-negative, including pointers and
-  // integers too wide to have their other limits stated below.
-  if (!Signed)
-    AddRow(-1, 0);
-
-  auto *ITy = dyn_cast<IntegerType>(V->getType());
-  if (!ITy || ITy->getBitWidth() > 64)
-    return Added;
-  unsigned BitWidth = ITy->getBitWidth();
-
-  if (Signed) {
-    // SMAX is 2^(BitWidth - 1) - 1 and fits for every width.
-    AddRow(1, APInt::getSignedMaxValue(BitWidth).getSExtValue());
-    // -SMIN is 2^(BitWidth - 1), which only fits below 64 bits.
-    if (BitWidth < 64)
-      AddRow(-1, -APInt::getSignedMinValue(BitWidth).getSExtValue());
-  } else if (BitWidth < 64) {
-    // UMAX is 2^BitWidth - 1, which only fits below 64 bits.
-    AddRow(1, APInt::getMaxValue(BitWidth).getZExtValue());
-  }
-  return Added;
-}
-
 /// Wrapper encapsulating separate constraint systems and corresponding value
 /// mappings for both unsigned and signed information. Facts are added to and
 /// conditions are checked against the corresponding system depending on the
@@ -354,16 +311,11 @@ class ConstraintInfo {
 public:
   ConstraintInfo(const DataLayout &DL, ArrayRef<Value *> FunctionArgs)
       : UnsignedCS(FunctionArgs), SignedCS(FunctionArgs), DL(DL) {
-    // Both systems index the function arguments identically, as both were
-    // constructed from FunctionArgs.
-    const auto &Value2Index = getValue2Index(false);
-    for (Value *Arg : FunctionArgs) {
-      unsigned Idx = Value2Index.at(Arg);
-      addTypeLimitRows(UnsignedCS, Arg, Idx, Value2Index.size(),
-                       /*Signed=*/false);
-      addTypeLimitRows(SignedCS, Arg, Idx, Value2Index.size(),
-                       /*Signed=*/true);
-    }
+    auto &Value2Index = getValue2Index(false);
+    // Add Arg > -1 constraints to unsigned system for all function arguments.
+    for (Value *Arg : FunctionArgs)
+      UnsignedCS.addRow({Entry(0, 0), Entry(-1, Value2Index.at(Arg))},
+                        Value2Index.size());
   }
 
   DenseMap<Value *, unsigned> &getValue2Index(bool Signed) {
@@ -547,6 +499,79 @@ static bool canUseSExt(ConstantInt *CI) {
   return Val.sgt(MinSignedConstraintValue) && Val.slt(MaxConstraintValue);
 }
 
+/// Returns the value mapped to \p Idx in \p Value2Index. The systems keep no
+/// reverse index; this is only used for the rare witness candidate below.
+static Value *getValueForIndex(const DenseMap<Value *, unsigned> &Value2Index,
+                               unsigned Idx) {
+  for (const auto &[V, I] : Value2Index)
+    if (I == Idx)
+      return V;
+  llvm_unreachable("index must be mapped");
+}
+
+/// The constraint systems treat their variables as unbounded integers, but
+/// every variable is an IR value of a fixed-width type and hence satisfies
+/// `MinVal <= W <= MaxVal` for that type's limits. That fact is never stated in
+/// a system - it only holds facts derived from the program, and for the widest
+/// integer type the limits are not even representable (see canUseSExt).
+///
+/// It is what no-wrap reasoning needs, though: proving `add nsw Op, 1` requires
+/// `Op s<= SMAX - 1`, and from `Op s< W` the solver only derives `Op s<= W - 1`
+/// and stops, having no upper bound for W. Knowing `W s<= SMAX` closes the
+/// chain.
+///
+/// Returns true if the system for \p Signed contains such a chain: a witness W
+/// with `Op + Slack <= W` (\p Upper), which gives `Op <= MaxVal - Slack`, or
+/// with `W + Slack <= Op` (!\p Upper), which gives `Op >= MinVal + Slack`. W
+/// must be no wider than \p Op, so that its own type's limits are within
+/// \p Op's.
+///
+/// Only rows stating the relation directly are considered. Searching for a
+/// witness with the solver would cost a query per value in the system, on a
+/// path that runs for every operand of every constraint built (decompose).
+static bool hasLimitWitness(const ConstraintInfo &Info, Value *Op,
+                            const APInt &Slack, bool Signed, bool Upper) {
+  // Slack is the distance of the required bound from the type's limit and thus
+  // the offset the witness relation has to provide.
+  if (Slack.isZero() || Slack.getActiveBits() > 63)
+    return false;
+  int64_t RequiredOffset = -static_cast<int64_t>(Slack.getZExtValue());
+
+  const DenseMap<Value *, unsigned> &Value2Index = Info.getValue2Index(Signed);
+  auto OpEntry = Value2Index.find(Op);
+  if (OpEntry == Value2Index.end())
+    return false;
+  unsigned OpIdx = OpEntry->second;
+  int64_t OpCoefficient = Upper ? 1 : -1;
+  unsigned OpBitWidth = Op->getType()->getScalarSizeInBits();
+
+  for (ArrayRef<Entry> Row : Info.getCS(Signed).getConstraints()) {
+    if (ConstraintSystem::getConstant(Row) > RequiredOffset)
+      continue;
+    // Match `OpCoefficient * Op - OpCoefficient * W <= -Slack`. The constant
+    // entry is present, as it is at most -Slack, and comes first; the two
+    // variables follow in index order.
+    ArrayRef<Entry> Vars = Row.drop_front();
+    if (Vars.size() != 2)
+      continue;
+    unsigned WitnessIdx;
+    if (Vars[0].Id == OpIdx && Vars[0].Coefficient == OpCoefficient &&
+        Vars[1].Coefficient == -OpCoefficient)
+      WitnessIdx = Vars[1].Id;
+    else if (Vars[1].Id == OpIdx && Vars[1].Coefficient == OpCoefficient &&
+             Vars[0].Coefficient == -OpCoefficient)
+      WitnessIdx = Vars[0].Id;
+    else
+      continue;
+
+    Type *WitnessTy = getValueForIndex(Value2Index, WitnessIdx)->getType();
+    if (WitnessTy->isIntegerTy() &&
+        WitnessTy->getIntegerBitWidth() <= OpBitWidth)
+      return true;
+  }
+  return false;
+}
+
 /// Returns true if \p Info implies that \p Op is in \p R, interpreting \p R as
 /// a signed range if \p Signed is set and as an unsigned range otherwise.
 static bool doesHoldInRange(const ConstraintInfo &Info, Value *Op,
@@ -564,6 +589,10 @@ static bool doesHoldInRange(const ConstraintInfo &Info, Value *Op,
                         : APInt::getMinValue(BitWidth);
   APInt MaxVal = Signed ? APInt::getSignedMaxValue(BitWidth)
                         : APInt::getMaxValue(BitWidth);
+  // The distance of the required bounds from the type's limits, before any
+  // clamping below; this is what a witness has to bridge.
+  APInt LowerSlack = Min - MinVal;
+  APInt UpperSlack = MaxVal - Max;
   // Replace bound too large to be decomposed by the largest usable one.
   if (!Signed && Max.uge(MaxConstraintValue))
     Max = APInt(BitWidth, MaxConstraintValue - 1);
@@ -571,11 +600,17 @@ static bool doesHoldInRange(const ConstraintInfo &Info, Value *Op,
   Type *Ty = Op->getType();
   if (Min != MinVal &&
       !Info.doesHold(Signed ? CmpInst::ICMP_SGE : CmpInst::ICMP_UGE, Op,
-                     ConstantInt::get(Ty, Min)))
+                     ConstantInt::get(Ty, Min)) &&
+      // In the unsigned system MinVal is 0 and every variable already has a
+      // V >= 0 row, so doesHold above already proves this whenever it is
+      // provable; no witness relation can add anything here.
+      (!Signed ||
+       !hasLimitWitness(Info, Op, LowerSlack, Signed, /*Upper=*/false)))
     return false;
   if (Max != MaxVal &&
       !Info.doesHold(Signed ? CmpInst::ICMP_SLE : CmpInst::ICMP_ULE, Op,
-                     ConstantInt::get(Ty, Max)))
+                     ConstantInt::get(Ty, Max)) &&
+      !hasLimitWitness(Info, Op, UpperSlack, Signed, /*Upper=*/true))
     return false;
   return true;
 }
@@ -2212,14 +2247,14 @@ void ConstraintInfo::addFactImpl(CmpInst::Predicate Pred, Value *A, Value *B,
   DFSInStack.emplace_back(NumIn, NumOut, R.IsSigned,
                           std::move(ValuesToRelease));
 
-  // Add the limits of each new variable's type, and queue the rows for removal
-  // along with the variable.
-  for (Value *V : NewVariables) {
-    unsigned NumRows = addTypeLimitRows(CSToUse, V, Value2Index.at(V),
-                                        Value2Index.size(), R.IsSigned);
-    for (unsigned I = 0; I != NumRows; ++I)
+  if (!R.IsSigned) {
+    for (Value *V : NewVariables) {
+      // Add V > -1 constraints for all new variables.
+      CSToUse.addRow({Entry(0, 0), Entry(-1, Value2Index.at(V))},
+                     Value2Index.size());
       DFSInStack.emplace_back(NumIn, NumOut, R.IsSigned,
                               SmallVector<Value *, 2>());
+    }
   }
 
   if (R.isEq()) {
@@ -2290,10 +2325,6 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
   DT.updateDFSNumbers();
   SmallVector<Value *> FunctionArgs(llvm::make_pointer_range(F.args()));
   ConstraintInfo Info(F.getDataLayout(), FunctionArgs);
-  // The rows for the function arguments' type limits are never removed.
-  [[maybe_unused]] const unsigned NumFixedUnsignedRows =
-      Info.getCS(false).size();
-  [[maybe_unused]] const unsigned NumFixedSignedRows = Info.getCS(true).size();
   State S(DT, LI, SE, TLI);
   std::unique_ptr<Module> ReproducerModule(
       DumpReproducers ? new Module(F.getName(), F.getContext()) : nullptr);
@@ -2597,10 +2628,10 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
 #ifndef NDEBUG
   unsigned SignedEntries =
       count_if(DFSInStack, [](const StackEntry &E) { return E.IsSigned; });
-  assert(Info.getCS(false).size() - NumFixedUnsignedRows ==
+  assert(Info.getCS(false).size() - FunctionArgs.size() ==
              DFSInStack.size() - SignedEntries &&
          "updates to CS and DFSInStack are out of sync");
-  assert(Info.getCS(true).size() - NumFixedSignedRows == SignedEntries &&
+  assert(Info.getCS(true).size() == SignedEntries &&
          "updates to CS and DFSInStack are out of sync");
 #endif
 
