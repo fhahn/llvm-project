@@ -147,7 +147,7 @@ bool ConstraintSystem::eliminateUsingFM() {
       normalizeByGCD(NR);
       Constraints.push_back(std::move(NR));
       // Give up if the new system gets too big.
-      if (Constraints.size() > 500)
+      if (Constraints.size() > 700)
         return false;
     }
   }
