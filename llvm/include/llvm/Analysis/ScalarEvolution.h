@@ -286,11 +286,11 @@ protected:
   /// miscellaneous information.
   unsigned short SubclassData = 0;
 
-  /// Set if one of the ScalarEvolution caches flushed by
-  /// forgetMemoizedResultsImpl may hold an entry keyed on this expression. If
-  /// clear, none of them does and invalidation can skip all the lookups. Fits
-  /// in existing padding.
-  mutable bool IsMemoized = false;
+  /// Bitmask of the ScalarEvolution cache groups that may hold an entry keyed
+  /// on this expression; see ScalarEvolution::SCEVCacheKind. A clear bit means
+  /// no cache in that group holds one, so invalidation can skip the group.
+  /// Fits in existing padding.
+  mutable unsigned short CacheFlags = 0;
 
   /// Pointer to the canonical version of the SCEV, i.e. one where all operands
   /// have no SCEVUse flags.
@@ -1715,16 +1715,26 @@ private:
   /// This SCEV is used to represent unknown trip counts and things.
   std::unique_ptr<SCEVCouldNotCompute> CouldNotCompute;
 
-  /// Record that a cache flushed by forgetMemoizedResultsImpl now holds an
-  /// entry keyed on \p S. Every insertion into such a cache must do this;
-  /// forgetMemoizedResultsImpl asserts under EXPENSIVE_CHECKS that nothing was
-  /// missed.
-  static void markMemoized(const SCEV *S) { S->IsMemoized = true; }
+  /// The caches flushed by forgetMemoizedResultsImpl, grouped by how they are
+  /// populated. Each group owns one bit of SCEV::CacheFlags, so that
+  /// invalidation only looks up the groups that can hold an entry.
+  enum SCEVCacheKind : unsigned short {
+    CK_General = 1 << 0, ///< Loop/BlockDispositions, ExprValueMap,
+                         ///< ValuesAtScopes and its users.
+    CK_Ranges = 1 << 1,  ///< Un/SignedRanges, ConstantMultipleCache.
+    CK_Misc = 1 << 2,    ///< HasRecMap, *WrapViaInductionTried, BECountUsers,
+                         ///< FoldCacheUser.
+  };
+
+  /// Record that a cache in group \p K now holds an entry keyed on \p S. Every
+  /// insertion into such a cache must do this; forgetMemoizedResultsImpl
+  /// asserts under EXPENSIVE_CHECKS that nothing was missed.
+  static void markCached(const SCEV *S, SCEVCacheKind K) { S->CacheFlags |= K; }
 
 #ifdef EXPENSIVE_CHECKS
-  /// Return true if any cache flushed by forgetMemoizedResultsImpl holds an
-  /// entry keyed on \p S. Only used to check markMemoized was not forgotten.
-  bool isMemoized(const SCEV *S) const;
+  /// Return true if any cache in the groups in \p Kinds holds an entry keyed on
+  /// \p S. Only used to check that markCached was not forgotten.
+  bool isCachedIn(const SCEV *S, unsigned Kinds) const;
 #endif
 
   /// The type for HasRecMap.
@@ -2017,7 +2027,7 @@ private:
                                 ConstantRange CR) {
     DenseMap<const SCEV *, ConstantRange> &Cache =
         Hint == HINT_RANGE_UNSIGNED ? UnsignedRanges : SignedRanges;
-    markMemoized(S);
+    markCached(S, CK_Ranges);
 
     auto Pair = Cache.insert_or_assign(S, std::move(CR));
     return Pair.first->second;
