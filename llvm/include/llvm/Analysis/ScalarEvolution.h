@@ -1715,16 +1715,23 @@ private:
   /// This SCEV is used to represent unknown trip counts and things.
   std::unique_ptr<SCEVCouldNotCompute> CouldNotCompute;
 
-  /// The caches flushed by forgetMemoizedResultsImpl, grouped by how they are
-  /// populated. Each group owns one bit of SCEV::CacheFlags, so that
-  /// invalidation only looks up the groups that can hold an entry.
+  /// The caches flushed by forgetMemoizedResultsImpl. Each owns one bit of
+  /// SCEV::CacheFlags, so that invalidation only looks up the caches that can
+  /// hold an entry for the expression.
   enum SCEVCacheKind : unsigned short {
-    CK_Dispositions = 1 << 0, ///< Loop/BlockDispositions.
-    CK_IRValues = 1 << 1,     ///< ExprValueMap.
-    CK_AtScopes = 1 << 2,     ///< ValuesAtScopes and its users.
-    CK_Ranges = 1 << 3,       ///< Un/SignedRanges, ConstantMultipleCache.
-    CK_Misc = 1 << 4,         ///< HasRecMap, *WrapViaInductionTried,
-                              ///< BECountUsers, FoldCacheUser.
+    CK_LoopDispositions = 1 << 0,
+    CK_BlockDispositions = 1 << 1,
+    CK_ExprValueMap = 1 << 2,
+    CK_ValuesAtScopes = 1 << 3,
+    CK_ValuesAtScopesUsers = 1 << 4,
+    CK_UnsignedRanges = 1 << 5,
+    CK_SignedRanges = 1 << 6,
+    CK_ConstantMultipleCache = 1 << 7,
+    CK_HasRecMap = 1 << 8,
+    CK_UnsignedWrapViaInductionTried = 1 << 9,
+    CK_SignedWrapViaInductionTried = 1 << 10,
+    CK_BECountUsers = 1 << 11,
+    CK_FoldCacheUser = 1 << 12,
   };
 
   /// Record that a cache in group \p K now holds an entry keyed on \p S. Every
@@ -2026,9 +2033,10 @@ private:
   /// Set the memoized range for the given SCEV.
   const ConstantRange &setRange(const SCEV *S, RangeSignHint Hint,
                                 ConstantRange CR) {
+    bool Unsigned = Hint == HINT_RANGE_UNSIGNED;
     DenseMap<const SCEV *, ConstantRange> &Cache =
-        Hint == HINT_RANGE_UNSIGNED ? UnsignedRanges : SignedRanges;
-    markCached(S, CK_Ranges);
+        Unsigned ? UnsignedRanges : SignedRanges;
+    markCached(S, Unsigned ? CK_UnsignedRanges : CK_SignedRanges);
 
     auto Pair = Cache.insert_or_assign(S, std::move(CR));
     return Pair.first->second;
