@@ -269,6 +269,7 @@ struct CastInfo<SCEVUseT<ToSCEVPtrT>, const SCEVUse,
 ///
 class SCEV : public FoldingSetNode {
   friend struct FoldingSetTrait<SCEV>;
+  friend class ScalarEvolution;
 
   /// A reference to an Interned FoldingSetNodeID for this node.  The
   /// ScalarEvolution's BumpPtrAllocator holds the data.
@@ -284,6 +285,12 @@ protected:
   /// This field is initialized to zero and may be used in subclasses to store
   /// miscellaneous information.
   unsigned short SubclassData = 0;
+
+  /// Set if one of the ScalarEvolution caches flushed by
+  /// forgetMemoizedResultsImpl may hold an entry keyed on this expression. If
+  /// clear, none of them does and invalidation can skip all the lookups. Fits
+  /// in existing padding.
+  mutable bool IsMemoized = false;
 
   /// Pointer to the canonical version of the SCEV, i.e. one where all operands
   /// have no SCEVUse flags.
@@ -1708,6 +1715,18 @@ private:
   /// This SCEV is used to represent unknown trip counts and things.
   std::unique_ptr<SCEVCouldNotCompute> CouldNotCompute;
 
+  /// Record that a cache flushed by forgetMemoizedResultsImpl now holds an
+  /// entry keyed on \p S. Every insertion into such a cache must do this;
+  /// forgetMemoizedResultsImpl asserts under EXPENSIVE_CHECKS that nothing was
+  /// missed.
+  static void markMemoized(const SCEV *S) { S->IsMemoized = true; }
+
+#ifdef EXPENSIVE_CHECKS
+  /// Return true if any cache flushed by forgetMemoizedResultsImpl holds an
+  /// entry keyed on \p S. Only used to check markMemoized was not forgotten.
+  bool isMemoized(const SCEV *S) const;
+#endif
+
   /// The type for HasRecMap.
   using HasRecMapType = DenseMap<const SCEV *, bool>;
 
@@ -1733,6 +1752,10 @@ private:
   /// SCEV.
   DenseMap<FoldID, const SCEV *> FoldCache;
   DenseMap<const SCEV *, SmallVector<FoldID, 2>> FoldCacheUser;
+
+  /// Record that \p ID folds to \p S in FoldCache, keeping FoldCacheUser in
+  /// sync.
+  void insertFoldCacheEntry(const FoldID &ID, const SCEV *S);
 
   /// Mark predicate values currently being processed by isImpliedCond.
   SmallPtrSet<const Value *, 6> PendingLoopPredicates;
@@ -1994,6 +2017,7 @@ private:
                                 ConstantRange CR) {
     DenseMap<const SCEV *, ConstantRange> &Cache =
         Hint == HINT_RANGE_UNSIGNED ? UnsignedRanges : SignedRanges;
+    markMemoized(S);
 
     auto Pair = Cache.insert_or_assign(S, std::move(CR));
     return Pair.first->second;
