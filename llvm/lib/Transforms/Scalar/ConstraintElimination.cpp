@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Transforms/Scalar/ConstraintElimination.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/SmallVector.h"
@@ -368,10 +369,11 @@ class ConstraintInfo {
 
   /// Decompositions computed against the current state of the systems. Cleared
   /// whenever a system changes.
-  DenseMap<std::pair<Value *, unsigned>, Decomposition> DecomposeCache;
+  DenseMap<PointerIntPair<Value *, 1, bool>, Decomposition> DecomposeCache;
 
 public:
-  DenseMap<std::pair<Value *, unsigned>, Decomposition> &getDecomposeCache() {
+  DenseMap<PointerIntPair<Value *, 1, bool>, Decomposition> &
+  getDecomposeCache() {
     return DecomposeCache;
   }
 
@@ -668,7 +670,7 @@ static Decomposition decomposeImpl(Value *V, ConstraintInfo &Info,
 // cached results stay valid; it is cleared when the outermost call returns.
 static Decomposition decompose(Value *V, ConstraintInfo &Info, bool IsSigned,
                                const DataLayout &DL) {
-  std::pair<Value *, unsigned> Key(V, IsSigned ? 1u : 0u);
+  PointerIntPair<Value *, 1, bool> Key(V, IsSigned);
   auto &Cache = Info.getDecomposeCache();
   auto It = Cache.find(Key);
   if (It != Cache.end())
