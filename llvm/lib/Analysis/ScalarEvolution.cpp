@@ -1468,15 +1468,12 @@ static APInt extractConstantWithoutWrapping(ScalarEvolution &SE,
   return APInt(BitWidth, 0);
 }
 
-static void insertFoldCacheEntry(
-    const ScalarEvolution::FoldID &ID, const SCEV *S,
-    DenseMap<ScalarEvolution::FoldID, const SCEV *> &FoldCache,
-    DenseMap<const SCEV *, SmallVector<ScalarEvolution::FoldID, 2>>
-        &FoldCacheUser) {
+void ScalarEvolution::insertFoldCacheEntry(const FoldID &ID, const SCEV *S) {
   auto I = FoldCache.insert({ID, S});
   if (!I.second) {
     // Remove FoldCacheUser entry for ID when replacing an existing FoldCache
     // entry.
+    markMemoized(I.first->second);
     auto &UserIDs = FoldCacheUser[I.first->second];
     assert(count(UserIDs, ID) == 1 && "unexpected duplicates in UserIDs");
     for (unsigned I = 0; I != UserIDs.size(); ++I)
@@ -1487,6 +1484,7 @@ static void insertFoldCacheEntry(
     UserIDs.pop_back();
     I.first->second = S;
   }
+  markMemoized(S);
   FoldCacheUser[S].push_back(ID);
 }
 
@@ -1505,7 +1503,7 @@ const SCEV *ScalarEvolution::getZeroExtendExpr(SCEVUse Op, Type *Ty,
 
   const SCEV *S = getZeroExtendExprImpl(Op, Ty, Depth);
   if (!isa<SCEVZeroExtendExpr>(S))
-    insertFoldCacheEntry(ID, S, FoldCache, FoldCacheUser);
+    insertFoldCacheEntry(ID, S);
   return S;
 }
 
@@ -1857,7 +1855,7 @@ const SCEV *ScalarEvolution::getSignExtendExpr(SCEVUse Op, Type *Ty,
 
   const SCEV *S = getSignExtendExprImpl(Op, Ty, Depth);
   if (!isa<SCEVSignExtendExpr>(S))
-    insertFoldCacheEntry(ID, S, FoldCache, FoldCacheUser);
+    insertFoldCacheEntry(ID, S);
   return S;
 }
 
@@ -4491,6 +4489,7 @@ bool ScalarEvolution::containsAddRecurrence(const SCEV *S) {
 
   bool FoundAddRec =
       SCEVExprContains(S, [](const SCEV *S) { return isa<SCEVAddRecExpr>(S); });
+  markMemoized(S);
   HasRecMap.insert({S, FoundAddRec});
   return FoundAddRec;
 }
@@ -4522,8 +4521,10 @@ void ScalarEvolution::insertValueToMap(Value *V, const SCEV *S) {
   // equivalent, but may not necessarily be exactly the same, e.g. due to lazily
   // inferred nowrap flags. V is only added to ExprValueMap if it was not
   // mapped yet, so it is not in any of ExprValueMap's value lists.
-  if (ValueExprMap.insert({SCEVCallbackVH(V, this), S}).second)
+  if (ValueExprMap.insert({SCEVCallbackVH(V, this), S}).second) {
+    markMemoized(S);
     ExprValueMap[S].push_back(V);
+  }
 }
 
 /// Return an existing SCEV if it exists, otherwise analyze the expression and
@@ -5065,6 +5066,7 @@ ScalarEvolution::proveNoSignedWrapViaInduction(const SCEVAddRecExpr *AR) {
     return Result;
 
   // This function can be expensive, only try to prove NSW once per AddRec.
+  markMemoized(AR);
   if (!SignedWrapViaInductionTried.insert(AR).second)
     return Result;
 
@@ -5118,6 +5120,7 @@ ScalarEvolution::proveNoUnsignedWrapViaInduction(const SCEVAddRecExpr *AR) {
     return Result;
 
   // This function can be expensive, only try to prove NUW once per AddRec.
+  markMemoized(AR);
   if (!UnsignedWrapViaInductionTried.insert(AR).second)
     return Result;
 
@@ -6386,6 +6389,7 @@ APInt ScalarEvolution::getConstantMultiple(const SCEV *S,
     return I->second;
 
   APInt Result = getConstantMultipleImpl(S, CtxI);
+  markMemoized(S);
   auto InsertPair = ConstantMultipleCache.insert({S, Result});
   assert(InsertPair.second && "Should insert a new key");
   return InsertPair.first->second;
@@ -6918,6 +6922,7 @@ const ConstantRange &ScalarEvolution::getRangeRef(
     const DataLayout &DL = getDataLayout();
     auto [It, Inserted] = UnknownKnownBits.try_emplace(U);
     if (Inserted) {
+      markMemoized(U);
       KnownBits Known = computeKnownBits(V, DL, &AC, nullptr, &DT);
       if (Known.getBitWidth() != BitWidth)
         Known = Known.zextOrTrunc(BitWidth);
@@ -9115,11 +9120,12 @@ ScalarEvolution::computeBackedgeTakenCount(const Loop *L,
   // EL.ConstantMaxNotTaken
   // and MaxBECount, which must be SCEVConstant.
   for (const auto &Pair : ExitCounts) {
-    if (!isa<SCEVConstant>(Pair.second.ExactNotTaken))
-      BECountUsers[Pair.second.ExactNotTaken].insert({L, AllowPredicates});
-    if (!isa<SCEVConstant>(Pair.second.SymbolicMaxNotTaken))
-      BECountUsers[Pair.second.SymbolicMaxNotTaken].insert(
-          {L, AllowPredicates});
+    for (const SCEV *BECount :
+         {Pair.second.ExactNotTaken, Pair.second.SymbolicMaxNotTaken})
+      if (!isa<SCEVConstant>(BECount)) {
+        markMemoized(BECount);
+        BECountUsers[BECount].insert({L, AllowPredicates});
+      }
   }
   return BackedgeTakenInfo(std::move(ExitCounts), CouldComputeBECount,
                            MaxBECount, MaxOrZero);
@@ -10080,6 +10086,7 @@ SCEVUse ScalarEvolution::getSCEVAtScope(const SCEV *V, const Loop *L) {
   if (isa<SCEVConstant>(V))
     return V;
 
+  markMemoized(V);
   auto &Values = ValuesAtScopes[V];
   // Check to see if we've folded this expression at this loop before.
   for (auto &LS : Values)
@@ -10090,14 +10097,19 @@ SCEVUse ScalarEvolution::getSCEVAtScope(const SCEV *V, const Loop *L) {
 
   // Otherwise compute it.
   SCEVUse C = computeSCEVAtScope(V, L);
+  // computeSCEVAtScope may have invalidated V and dropped its entry; the
+  // lookup below re-creates it.
+  markMemoized(V);
   for (auto &LS : reverse(ValuesAtScopes[V]))
     if (LS.first == L) {
       LS.second = C;
       // Record the dependency under the bare expression: invalidation walks
       // expressions, and any use flags on C do not change which expression
       // this is the value at scope of.
-      if (!isa<SCEVConstant>(C))
+      if (!isa<SCEVConstant>(C)) {
+        markMemoized(C.getPointer());
         ValuesAtScopesUsers[C.getPointer()].push_back({L, V});
+      }
       break;
     }
   return C;
@@ -14424,6 +14436,7 @@ ScalarEvolution::getLoopDisposition(const SCEV *S, const Loop *L) {
   if (isa<SCEVConstant>(S))
     return LoopInvariant;
 
+  markMemoized(S);
   auto &Values = LoopDispositions[S];
   for (auto &V : Values) {
     if (V.getPointer() == L)
@@ -14541,6 +14554,7 @@ ScalarEvolution::getBlockDisposition(const SCEV *S, const BasicBlock *BB) {
   if (isa<SCEVConstant>(S))
     return ProperlyDominatesBlock;
 
+  markMemoized(S);
   auto &Values = BlockDispositions[S];
   for (auto &V : Values) {
     if (V.getPointer() == BB)
@@ -14661,8 +14675,35 @@ void ScalarEvolution::forgetMemoizedResults(ArrayRef<SCEVUse> SCEVs) {
       [&](const auto &Entry) { return ToForget.count(Entry.first.first); });
 }
 
+#ifdef EXPENSIVE_CHECKS
+bool ScalarEvolution::isMemoized(const SCEV *S) const {
+  if (const auto *AR = dyn_cast<SCEVAddRecExpr>(S))
+    if (UnsignedWrapViaInductionTried.contains(AR) ||
+        SignedWrapViaInductionTried.contains(AR))
+      return true;
+  return LoopDispositions.contains(S) || BlockDispositions.contains(S) ||
+         UnsignedRanges.contains(S) || SignedRanges.contains(S) ||
+         UnknownKnownBits.contains(S) || HasRecMap.contains(S) ||
+         ConstantMultipleCache.contains(S) || ExprValueMap.contains(S) ||
+         ValuesAtScopes.contains(S) || ValuesAtScopesUsers.contains(S) ||
+         BECountUsers.contains(S) || FoldCacheUser.contains(S);
+}
+#endif
+
 void ScalarEvolution::forgetMemoizedResultsImpl(const SCEV *S) {
+  // The affine range memo is not keyed on S, so drop it regardless.
   AffineRangeCache.reset();
+
+  // Most expressions reached via the SCEVUsers closure have never been queried,
+  // so none of the caches below can hold an entry for them.
+  if (!S->IsMemoized) {
+#ifdef EXPENSIVE_CHECKS
+    assert(!isMemoized(S) && "memoized expression not marked by markMemoized");
+#endif
+    return;
+  }
+  S->IsMemoized = false;
+
   LoopDispositions.erase(S);
   BlockDispositions.erase(S);
   UnsignedRanges.erase(S);
@@ -14689,20 +14730,24 @@ void ScalarEvolution::forgetMemoizedResultsImpl(const SCEV *S) {
   auto ScopeIt = ValuesAtScopes.find(S);
   if (ScopeIt != ValuesAtScopes.end()) {
     for (const auto &Pair : ScopeIt->second)
-      if (!isa_and_nonnull<SCEVConstant>(Pair.second))
+      if (Pair.second && !isa<SCEVConstant>(Pair.second)) {
+        markMemoized(Pair.second.getPointer());
         llvm::erase(ValuesAtScopesUsers[Pair.second.getPointer()],
                     std::make_pair(Pair.first, S));
+      }
     ValuesAtScopes.erase(ScopeIt);
   }
 
   auto ScopeUserIt = ValuesAtScopesUsers.find(S);
   if (ScopeUserIt != ValuesAtScopesUsers.end()) {
-    for (const auto &Pair : ScopeUserIt->second)
+    for (const auto &Pair : ScopeUserIt->second) {
       // The recorded value at scope is a use of S, which may carry no-wrap
       // flags that are not part of this key.
+      markMemoized(Pair.second);
       llvm::erase_if(ValuesAtScopes[Pair.second], [&](const auto &LS) {
         return LS.first == Pair.first && LS.second.getPointer() == S;
       });
+    }
     ValuesAtScopesUsers.erase(ScopeUserIt);
   }
 
