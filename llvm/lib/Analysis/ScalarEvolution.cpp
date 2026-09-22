@@ -13794,14 +13794,22 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
 
     if (isa<SCEVCouldNotCompute>(BECount)) {
       auto canProveRHSIsAtOrBeyondStart = [&]() {
-        // Inverted, the claim is "Start >= RHS"; keeping RHS on the left, that
-        // is Cond swapped and made non-strict.
-        auto CondGT = ICmpInst::getSwappedPredicate(Cond);
-        auto CondGE = ICmpInst::getNonStrictPredicate(CondGT);
+        // Inverted, the claim is "Start >= RHS". Reverse the comparisons below
+        // by swapping their operands rather than their predicates:
+        // isLoopEntryGuardedByCond is sensitive to operand order and loses the
+        // proof if the IV bound moves to the other side.
+        auto SwapIfInverted = [&](const SCEV *A, const SCEV *B) {
+          return Invert ? std::pair(B, A) : std::pair(A, B);
+        };
+
+        auto CondGE = IsSigned ? ICmpInst::ICMP_SGE : ICmpInst::ICMP_UGE;
         const SCEV *GuardedRHS = applyLoopGuards(OrigRHS, L);
         const SCEV *GuardedStart = applyLoopGuards(OrigStart, L);
+        if (Invert)
+          std::swap(GuardedRHS, GuardedStart);
 
-        if (isLoopEntryGuardedByCond(L, CondGE, OrigRHS, OrigStart) ||
+        auto [GELHS, GERHS] = SwapIfInverted(OrigRHS, OrigStart);
+        if (isLoopEntryGuardedByCond(L, CondGE, GELHS, GERHS) ||
             isKnownPredicate(CondGE, GuardedRHS, GuardedStart))
           return true;
 
@@ -13814,8 +13822,9 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
         //   to UINT_MAX, and "RHS >u UINT_MAX" is trivially false.
         //
         // FIXME: Should isLoopEntryGuardedByCond do this for us?
-        return isLoopEntryGuardedByCond(L, CondGT, OrigRHS,
-                                        StepBack(OrigStart, One));
+        auto CondGT = IsSigned ? ICmpInst::ICMP_SGT : ICmpInst::ICMP_UGT;
+        auto [GTLHS, GTRHS] = SwapIfInverted(OrigRHS, StepBack(OrigStart, One));
+        return isLoopEntryGuardedByCond(L, CondGT, GTLHS, GTRHS);
       };
 
       // If we know that RHS >= Start in the context of loop, then we know
