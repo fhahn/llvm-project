@@ -234,3 +234,173 @@ loop:
 exit:
   ret void
 }
+
+; The entry guard proves the start is at or beyond the bound, so min(RHS, Start)
+; folds to RHS and the backedge-taken count is the plain difference. The guard
+; compares the narrow values while the IV is extended, which is where the guard
+; queries need the bound on a particular side.
+define void @sgt_guarded_sext_start_and_bound(i32 %start, i32 %bound) {
+; CHECK-LABEL: 'sgt_guarded_sext_start_and_bound'
+; CHECK-NEXT:  Determining loop execution counts for: @sgt_guarded_sext_start_and_bound
+; CHECK-NEXT:  Loop %loop: backedge-taken count is ((sext i32 %start to i64) + (-1 * (sext i32 %bound to i64))<nsw>)
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 4294967295
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((sext i32 %start to i64) + (-1 * (sext i32 %bound to i64))<nsw>)
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %guard = icmp slt i32 %start, %bound
+  br i1 %guard, label %exit, label %ph
+
+ph:
+  %start.ext = sext i32 %start to i64
+  %bound.ext = sext i32 %bound to i64
+  br label %loop
+
+loop:
+  %iv = phi i64 [ %start.ext, %ph ], [ %iv.next, %loop ]
+  %iv.next = add nsw i64 %iv, -1
+  %ec = icmp sgt i64 %iv, %bound.ext
+  br i1 %ec, label %loop, label %exit
+
+exit:
+  ret void
+}
+
+; As above, but the start is zero-extended and the bound sign-extended.
+define void @sgt_guarded_zext_start(i32 %start, i32 %bound) {
+; CHECK-LABEL: 'sgt_guarded_zext_start'
+; CHECK-NEXT:  Determining loop execution counts for: @sgt_guarded_zext_start
+; CHECK-NEXT:  Loop %loop: backedge-taken count is ((zext i32 %start to i64) + (-1 * (sext i32 %bound to i64))<nsw>)
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 6442450943
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((zext i32 %start to i64) + (-1 * (sext i32 %bound to i64))<nsw>)
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %guard = icmp slt i32 %start, %bound
+  br i1 %guard, label %exit, label %ph
+
+ph:
+  %start.ext = zext i32 %start to i64
+  %bound.ext = sext i32 %bound to i64
+  br label %loop
+
+loop:
+  %iv = phi i64 [ %start.ext, %ph ], [ %iv.next, %loop ]
+  %iv.next = add nsw i64 %iv, -1
+  %ec = icmp sgt i64 %iv, %bound.ext
+  br i1 %ec, label %loop, label %exit
+
+exit:
+  ret void
+}
+
+; The bound is an add that is already materialized in the IR. The refined
+; backedge-taken count negates "RHS + 1", and getMulExpr distributes a constant
+; multiplier over an add that contains a constant, so "%a + %b" is broken apart
+; and the count no longer refers to the existing add. Negating the bound on its
+; own would keep it as a single "(-1 * (%a + %b))" operand, which is what
+; SCEVExpander needs to reuse %lim.
+define void @ugt_guarded_bound_is_add(i32 %x, i32 %a, i32 %b) {
+; CHECK-LABEL: 'ugt_guarded_bound_is_add'
+; CHECK-NEXT:  Determining loop execution counts for: @ugt_guarded_bound_is_add
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + (zext i8 (trunc i32 %x to i8) to i32) + (-1 * (%a + %b)))
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 -1
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + (zext i8 (trunc i32 %x to i8) to i32) + (-1 * (%a + %b)))
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %n = and i32 %x, 255
+  %lim = add i32 %a, %b
+  %start = add nsw i32 %n, -1
+  %guard = icmp ugt i32 %n, %lim
+  br i1 %guard, label %loop, label %exit
+
+loop:
+  %iv = phi i32 [ %start, %entry ], [ %iv.next, %loop ]
+  %iv.next = add i32 %iv, -1
+  %ec = icmp ugt i32 %iv, %lim
+  br i1 %ec, label %loop, label %exit
+
+exit:
+  ret void
+}
+
+; As above, signed.
+define void @sgt_guarded_bound_is_add(i32 %x, i32 %a, i32 %b) {
+; CHECK-LABEL: 'sgt_guarded_bound_is_add'
+; CHECK-NEXT:  Determining loop execution counts for: @sgt_guarded_bound_is_add
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + (zext i8 (trunc i32 %x to i8) to i32) + (-1 * (%a + %b)))
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 -2147483394
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + (zext i8 (trunc i32 %x to i8) to i32) + (-1 * (%a + %b)))
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %n = and i32 %x, 255
+  %lim = add i32 %a, %b
+  %start = add nsw i32 %n, -1
+  %guard = icmp sgt i32 %n, %lim
+  br i1 %guard, label %loop, label %exit
+
+loop:
+  %iv = phi i32 [ %start, %entry ], [ %iv.next, %loop ]
+  %iv.next = add nsw i32 %iv, -1
+  %ec = icmp sgt i32 %iv, %lim
+  br i1 %ec, label %loop, label %exit
+
+exit:
+  ret void
+}
+
+; The bound already contains a constant, so it is distributed either way and
+; there is nothing to preserve.
+define void @ugt_guarded_bound_is_add_with_constant(i32 %x, i32 %a, i32 %b) {
+; CHECK-LABEL: 'ugt_guarded_bound_is_add_with_constant'
+; CHECK-NEXT:  Determining loop execution counts for: @ugt_guarded_bound_is_add_with_constant
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-8 + (zext i8 (trunc i32 %x to i8) to i32) + (-1 * %a) + (-1 * %b))
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 -1
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-8 + (zext i8 (trunc i32 %x to i8) to i32) + (-1 * %a) + (-1 * %b))
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %n = and i32 %x, 255
+  %ab = add i32 %a, %b
+  %lim = add i32 %ab, 7
+  %start = add nsw i32 %n, -1
+  %guard = icmp ugt i32 %n, %lim
+  br i1 %guard, label %loop, label %exit
+
+loop:
+  %iv = phi i32 [ %start, %entry ], [ %iv.next, %loop ]
+  %iv.next = add i32 %iv, -1
+  %ec = icmp ugt i32 %iv, %lim
+  br i1 %ec, label %loop, label %exit
+
+exit:
+  ret void
+}
+
+; The range of %start bounds the backedge-taken count by 127, but the
+; MaxOrZero constant max is 241.
+define void @sgt_max_or_zero_looser_than_range(i8 %n) {
+; CHECK-LABEL: 'sgt_max_or_zero_looser_than_range'
+; CHECK-NEXT:  Determining loop execution counts for: @sgt_max_or_zero_looser_than_range
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-16 + (-1 * ((-16 + %n)<nuw> smin (-1 + %n))) + %n)
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i8 127
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-16 + (-1 * ((-16 + %n)<nuw> smin (-1 + %n))) + %n)
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %start = add nuw i8 %n, -16
+  %rhs = add i8 %n, -1
+  %g = icmp slt i8 %start, %rhs
+  br i1 %g, label %loop, label %exit
+
+loop:
+  %iv = phi i8 [ %start, %entry ], [ %iv.next, %loop ]
+  %iv.next = add i8 %iv, -1
+  %c = icmp sgt i8 %iv, %rhs
+  br i1 %c, label %loop, label %exit
+
+exit:
+  ret void
+}
