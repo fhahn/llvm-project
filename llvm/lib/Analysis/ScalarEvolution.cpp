@@ -13473,7 +13473,7 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
   // exiting instruction we're analyzing would trigger UB.
   auto WrapType = IsSigned ? SCEV::FlagNSW : SCEV::FlagNUW;
   bool NoWrap = ControlsOnlyExit && any(IV->getNoWrapFlags(WrapType));
-  // Invert the predicate, so queries stay as LHS Cond RHS.
+  // Inverted, "~A < ~B" is checked as "A > B".
   ICmpInst::Predicate Cond = IsSigned ? ICmpInst::ICMP_SLT : ICmpInst::ICMP_ULT;
   if (Invert)
     Cond = ICmpInst::getSwappedPredicate(Cond);
@@ -13788,12 +13788,12 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
       //   numerator. Neither sub-term wraps unsigned: "RHS - Start"
       //   due to "RHS > Start", and "Stride - 1", as Stride is non-zero.
       const SCEV *Numerator =
-          Distance(StepBack(Start, Stride), StepBack(RHS, One));
+          getMinusSCEV(Distance(StepBack(Start, Stride), RHS), One);
       BECount = getUDivExpr(Numerator, Stride);
     }
 
     if (isa<SCEVCouldNotCompute>(BECount)) {
-      auto canProveRHSIsAtOrBeyondStart = [&]() {
+      auto canProveRHSGreaterThanEqualStart = [&]() {
         // Inverted, the claim is "Start >= RHS". Reverse the comparisons below
         // by swapping their operands rather than their predicates:
         // isLoopEntryGuardedByCond is sensitive to operand order and loses the
@@ -13805,12 +13805,12 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
         auto CondGE = IsSigned ? ICmpInst::ICMP_SGE : ICmpInst::ICMP_UGE;
         const SCEV *GuardedRHS = applyLoopGuards(OrigRHS, L);
         const SCEV *GuardedStart = applyLoopGuards(OrigStart, L);
-        if (Invert)
-          std::swap(GuardedRHS, GuardedStart);
 
         auto [GELHS, GERHS] = SwapIfInverted(OrigRHS, OrigStart);
+        auto [GuardedGELHS, GuardedGERHS] =
+            SwapIfInverted(GuardedRHS, GuardedStart);
         if (isLoopEntryGuardedByCond(L, CondGE, GELHS, GERHS) ||
-            isKnownPredicate(CondGE, GuardedRHS, GuardedStart))
+            isKnownPredicate(CondGE, GuardedGELHS, GuardedGERHS))
           return true;
 
         // (RHS > Start - 1) implies RHS >= Start.
@@ -13829,7 +13829,7 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
 
       // If we know that RHS >= Start in the context of loop, then we know
       // that max(RHS, Start) = RHS at this point.
-      if (canProveRHSIsAtOrBeyondStart()) {
+      if (canProveRHSGreaterThanEqualStart()) {
         End = RHS;
       } else {
         // If RHS < Start, the backedge will be taken zero times.  So in

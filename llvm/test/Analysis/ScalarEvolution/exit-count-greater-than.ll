@@ -298,11 +298,11 @@ exit:
 }
 
 ; The bound is an add that is already materialized in the IR. The refined
-; backedge-taken count negates "RHS + 1", and getMulExpr distributes a constant
-; multiplier over an add that contains a constant, so "%a + %b" is broken apart
-; and the count no longer refers to the existing add. Negating the bound on its
-; own would keep it as a single "(-1 * (%a + %b))" operand, which is what
-; SCEVExpander needs to reuse %lim.
+; backedge-taken count negates the bound on its own and folds the -1 in
+; afterwards, so "%a + %b" stays a single "(-1 * (%a + %b))" operand that
+; SCEVExpander can reuse %lim for. Negating "RHS + 1" instead would let
+; getMulExpr distribute the multiplier over the constant and break the add
+; apart.
 define void @ugt_guarded_bound_is_add(i32 %x, i32 %a, i32 %b) {
 ; CHECK-LABEL: 'ugt_guarded_bound_is_add'
 ; CHECK-NEXT:  Determining loop execution counts for: @ugt_guarded_bound_is_add

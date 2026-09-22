@@ -2550,7 +2550,7 @@ private:
   /// against the invariant \p RHS with a less-than. If \p Invert is true, both
   /// the IV and \p RHS are inverted
   bool canIVOverflowOnLT(const SCEV *RHS, const SCEV *Stride, bool IsSigned,
-                         bool Invert = false);
+                         bool Invert);
 
   /// Get add expr already created or create a new one.
   const SCEV *getOrCreateAddExpr(ArrayRef<SCEVUse> Ops,
