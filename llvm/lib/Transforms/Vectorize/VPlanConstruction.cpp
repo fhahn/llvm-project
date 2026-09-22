@@ -1537,6 +1537,61 @@ void VPlanTransforms::addMemoryRuntimeChecks(
   addBypassBranch(Plan, MemCheckVPBB, Cond, AddBranchWeights);
 }
 
+void VPlanTransforms::addDiffRuntimeChecks(VPlan &Plan,
+                                           ArrayRef<PointerDiffInfo> Checks,
+                                           ScalarEvolution &SE, ElementCount VF,
+                                           unsigned UF, DebugLoc DL,
+                                           bool AddBranchWeights) {
+  assert(!Checks.empty() && "no checks to replace the pre-built block with");
+
+  auto *MemCheckVPBB = Plan.createVPBasicBlock("vector.memcheck");
+  VPBuilder Builder(MemCheckVPBB);
+  insertCheckBlockBeforeVectorLoop(Plan, MemCheckVPBB);
+  VPSCEVExpander Expander(Builder, SE, DL);
+
+  // Expand each SCEV once, matching SCEVExpander re-using earlier expansions.
+  // This also ensures equal SCEVs map to equal VPValues, which the compare
+  // re-use below relies on.
+  SmallDenseMap<const SCEV *, VPValue *> ExpandedSCEVs;
+  auto Expand = [&](const SCEV *S) {
+    VPValue *&Expanded = ExpandedSCEVs[S];
+    if (!Expanded)
+      Expanded = Expander.expand(S);
+    return Expanded;
+  };
+
+  // Set of operand pairs of already created compares, to allow detecting and
+  // re-using redundant compares.
+  SmallDenseSet<std::pair<VPValue *, VPValue *>> SeenCompares;
+  VPValue *Cond = nullptr;
+  for (const auto &[SrcStart, SinkStart, AccessSize, NeedsFreeze] : Checks) {
+    assert(UF * AccessSize > 0 &&
+           "Threshold must be non-zero to use diff-check");
+    Type *Ty = SinkStart->getType();
+    const SCEV *TotalAccessSize = SE.getElementCount(Ty, VF * UF * AccessSize);
+    VPValue *ThresholdMinusOne =
+        Expand(SE.getMinusSCEV(TotalAccessSize, SE.getConstant(Ty, 1)));
+    VPValue *Diff = Expand(SE.getMinusSCEV(SinkStart, SrcStart));
+
+    // If the same compare has already been created earlier, there is no need to
+    // check it again.
+    if (!SeenCompares.insert({Diff, ThresholdMinusOne}).second)
+      continue;
+
+    // Use (Diff - 1) <u (Threshold - 1), equivalent to 0 < Diff <u Threshold,
+    // to exclude Diff == 0 (equal pointers are safe).
+    VPValue *DiffMinusOne =
+        Builder.createSub(Diff, Plan.getConstantInt(Ty, 1), DL);
+    VPValue *IsConflict = Builder.createICmp(
+        CmpInst::ICMP_ULT, DiffMinusOne, ThresholdMinusOne, DL, "diff.check");
+    if (NeedsFreeze)
+      IsConflict = Builder.createFreeze(IsConflict, DL, "diff.check.fr");
+    Cond = Cond ? Builder.createOr(Cond, IsConflict, DL, "conflict.rdx")
+                : IsConflict;
+  }
+  addBypassBranch(Plan, MemCheckVPBB, Cond, AddBranchWeights);
+}
+
 void VPlanTransforms::addMinimumIterationCheck(
     VPlan &Plan, ElementCount VF, unsigned UF,
     ElementCount MinProfitableTripCount, bool RequiresScalarEpilogue,

@@ -7,16 +7,15 @@ define void @diff_check_scalable_vf(ptr %a, ptr %b, i64 %n) {
 ; UF1-LABEL: define void @diff_check_scalable_vf(
 ; UF1-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[N:%.*]]) {
 ; UF1-NEXT:  [[ENTRY:.*:]]
-; UF1-NEXT:    [[A2:%.*]] = ptrtoaddr ptr [[A]] to i64
-; UF1-NEXT:    [[B1:%.*]] = ptrtoaddr ptr [[B]] to i64
 ; UF1-NEXT:    [[TMP0:%.*]] = call i64 @llvm.vscale.i64()
 ; UF1-NEXT:    [[TMP1:%.*]] = shl nuw i64 [[TMP0]], 2
 ; UF1-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], [[TMP1]]
 ; UF1-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; UF1:       [[VECTOR_MEMCHECK]]:
-; UF1-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
-; UF1-NEXT:    [[TMP3:%.*]] = shl i64 [[TMP2]], 4
+; UF1-NEXT:    [[TMP3:%.*]] = shl i64 [[TMP0]], 4
 ; UF1-NEXT:    [[TMP4:%.*]] = add i64 [[TMP3]], -1
+; UF1-NEXT:    [[B1:%.*]] = ptrtoaddr ptr [[B]] to i64
+; UF1-NEXT:    [[A2:%.*]] = ptrtoaddr ptr [[A]] to i64
 ; UF1-NEXT:    [[TMP5:%.*]] = sub i64 [[B1]], [[A2]]
 ; UF1-NEXT:    [[TMP6:%.*]] = sub i64 [[TMP5]], 1
 ; UF1-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP6]], [[TMP4]]
@@ -25,16 +24,15 @@ define void @diff_check_scalable_vf(ptr %a, ptr %b, i64 %n) {
 ; UF2-LABEL: define void @diff_check_scalable_vf(
 ; UF2-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[N:%.*]]) {
 ; UF2-NEXT:  [[ENTRY:.*:]]
-; UF2-NEXT:    [[A2:%.*]] = ptrtoaddr ptr [[A]] to i64
-; UF2-NEXT:    [[B1:%.*]] = ptrtoaddr ptr [[B]] to i64
 ; UF2-NEXT:    [[TMP0:%.*]] = call i64 @llvm.vscale.i64()
 ; UF2-NEXT:    [[TMP1:%.*]] = shl nuw i64 [[TMP0]], 3
 ; UF2-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], [[TMP1]]
 ; UF2-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; UF2:       [[VECTOR_MEMCHECK]]:
-; UF2-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
-; UF2-NEXT:    [[TMP3:%.*]] = shl i64 [[TMP2]], 5
+; UF2-NEXT:    [[TMP3:%.*]] = shl i64 [[TMP0]], 5
 ; UF2-NEXT:    [[TMP4:%.*]] = add i64 [[TMP3]], -1
+; UF2-NEXT:    [[B1:%.*]] = ptrtoaddr ptr [[B]] to i64
+; UF2-NEXT:    [[A2:%.*]] = ptrtoaddr ptr [[A]] to i64
 ; UF2-NEXT:    [[TMP5:%.*]] = sub i64 [[B1]], [[A2]]
 ; UF2-NEXT:    [[TMP6:%.*]] = sub i64 [[TMP5]], 1
 ; UF2-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP6]], [[TMP4]]
@@ -62,20 +60,19 @@ define void @multiple_diff_checks_scalable_vf(ptr %a, ptr %b, ptr %c, i64 %n) {
 ; UF1-LABEL: define void @multiple_diff_checks_scalable_vf(
 ; UF1-SAME: ptr [[A:%.*]], ptr [[B:%.*]], ptr [[C:%.*]], i64 [[N:%.*]]) {
 ; UF1-NEXT:  [[ENTRY:.*:]]
-; UF1-NEXT:    [[B3:%.*]] = ptrtoaddr ptr [[B]] to i64
-; UF1-NEXT:    [[A2:%.*]] = ptrtoaddr ptr [[A]] to i64
-; UF1-NEXT:    [[C1:%.*]] = ptrtoaddr ptr [[C]] to i64
 ; UF1-NEXT:    [[TMP0:%.*]] = call i64 @llvm.vscale.i64()
 ; UF1-NEXT:    [[TMP1:%.*]] = shl nuw i64 [[TMP0]], 2
 ; UF1-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], [[TMP1]]
 ; UF1-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; UF1:       [[VECTOR_MEMCHECK]]:
-; UF1-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
-; UF1-NEXT:    [[TMP3:%.*]] = shl i64 [[TMP2]], 4
+; UF1-NEXT:    [[TMP3:%.*]] = shl i64 [[TMP0]], 4
 ; UF1-NEXT:    [[TMP4:%.*]] = add i64 [[TMP3]], -1
+; UF1-NEXT:    [[C1:%.*]] = ptrtoaddr ptr [[C]] to i64
+; UF1-NEXT:    [[A2:%.*]] = ptrtoaddr ptr [[A]] to i64
 ; UF1-NEXT:    [[TMP5:%.*]] = sub i64 [[C1]], [[A2]]
 ; UF1-NEXT:    [[TMP6:%.*]] = sub i64 [[TMP5]], 1
 ; UF1-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP6]], [[TMP4]]
+; UF1-NEXT:    [[B3:%.*]] = ptrtoaddr ptr [[B]] to i64
 ; UF1-NEXT:    [[TMP7:%.*]] = sub i64 [[C1]], [[B3]]
 ; UF1-NEXT:    [[TMP8:%.*]] = sub i64 [[TMP7]], 1
 ; UF1-NEXT:    [[DIFF_CHECK4:%.*]] = icmp ult i64 [[TMP8]], [[TMP4]]
@@ -85,20 +82,19 @@ define void @multiple_diff_checks_scalable_vf(ptr %a, ptr %b, ptr %c, i64 %n) {
 ; UF2-LABEL: define void @multiple_diff_checks_scalable_vf(
 ; UF2-SAME: ptr [[A:%.*]], ptr [[B:%.*]], ptr [[C:%.*]], i64 [[N:%.*]]) {
 ; UF2-NEXT:  [[ENTRY:.*:]]
-; UF2-NEXT:    [[B3:%.*]] = ptrtoaddr ptr [[B]] to i64
-; UF2-NEXT:    [[A2:%.*]] = ptrtoaddr ptr [[A]] to i64
-; UF2-NEXT:    [[C1:%.*]] = ptrtoaddr ptr [[C]] to i64
 ; UF2-NEXT:    [[TMP0:%.*]] = call i64 @llvm.vscale.i64()
 ; UF2-NEXT:    [[TMP1:%.*]] = shl nuw i64 [[TMP0]], 3
 ; UF2-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], [[TMP1]]
 ; UF2-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; UF2:       [[VECTOR_MEMCHECK]]:
-; UF2-NEXT:    [[TMP2:%.*]] = call i64 @llvm.vscale.i64()
-; UF2-NEXT:    [[TMP3:%.*]] = shl i64 [[TMP2]], 5
+; UF2-NEXT:    [[TMP3:%.*]] = shl i64 [[TMP0]], 5
 ; UF2-NEXT:    [[TMP4:%.*]] = add i64 [[TMP3]], -1
+; UF2-NEXT:    [[C1:%.*]] = ptrtoaddr ptr [[C]] to i64
+; UF2-NEXT:    [[A2:%.*]] = ptrtoaddr ptr [[A]] to i64
 ; UF2-NEXT:    [[TMP5:%.*]] = sub i64 [[C1]], [[A2]]
 ; UF2-NEXT:    [[TMP6:%.*]] = sub i64 [[TMP5]], 1
 ; UF2-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP6]], [[TMP4]]
+; UF2-NEXT:    [[B3:%.*]] = ptrtoaddr ptr [[B]] to i64
 ; UF2-NEXT:    [[TMP7:%.*]] = sub i64 [[C1]], [[B3]]
 ; UF2-NEXT:    [[TMP8:%.*]] = sub i64 [[TMP7]], 1
 ; UF2-NEXT:    [[DIFF_CHECK4:%.*]] = icmp ult i64 [[TMP8]], [[TMP4]]

@@ -14,11 +14,11 @@ define void @diff_check_threshold_follows_interleave_count(ptr %a, ptr %b, i64 %
 ; AUTO-IC-LABEL: define void @diff_check_threshold_follows_interleave_count(
 ; AUTO-IC-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[N:%.*]]) {
 ; AUTO-IC-NEXT:  [[ENTRY:.*:]]
-; AUTO-IC-NEXT:    [[A2:%.*]] = ptrtoaddr ptr [[A]] to i64
-; AUTO-IC-NEXT:    [[B1:%.*]] = ptrtoaddr ptr [[B]] to i64
 ; AUTO-IC-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 8
 ; AUTO-IC-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; AUTO-IC:       [[VECTOR_MEMCHECK]]:
+; AUTO-IC-NEXT:    [[B1:%.*]] = ptrtoaddr ptr [[B]] to i64
+; AUTO-IC-NEXT:    [[A2:%.*]] = ptrtoaddr ptr [[A]] to i64
 ; AUTO-IC-NEXT:    [[TMP0:%.*]] = sub i64 [[B1]], [[A2]]
 ; AUTO-IC-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], 1
 ; AUTO-IC-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP1]], 31
@@ -27,14 +27,14 @@ define void @diff_check_threshold_follows_interleave_count(ptr %a, ptr %b, i64 %
 ; FORCED-IC1-LABEL: define void @diff_check_threshold_follows_interleave_count(
 ; FORCED-IC1-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[N:%.*]]) {
 ; FORCED-IC1-NEXT:  [[ENTRY:.*:]]
-; FORCED-IC1-NEXT:    [[A2:%.*]] = ptrtoaddr ptr [[A]] to i64
-; FORCED-IC1-NEXT:    [[B1:%.*]] = ptrtoaddr ptr [[B]] to i64
 ; FORCED-IC1-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
 ; FORCED-IC1-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; FORCED-IC1:       [[VECTOR_MEMCHECK]]:
+; FORCED-IC1-NEXT:    [[B1:%.*]] = ptrtoaddr ptr [[B]] to i64
+; FORCED-IC1-NEXT:    [[A2:%.*]] = ptrtoaddr ptr [[A]] to i64
 ; FORCED-IC1-NEXT:    [[TMP0:%.*]] = sub i64 [[B1]], [[A2]]
 ; FORCED-IC1-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], 1
-; FORCED-IC1-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP1]], 31
+; FORCED-IC1-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP1]], 15
 ; FORCED-IC1-NEXT:    br i1 [[DIFF_CHECK]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
 ;
 entry:

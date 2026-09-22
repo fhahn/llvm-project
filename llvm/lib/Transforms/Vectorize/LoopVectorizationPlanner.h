@@ -1011,8 +1011,10 @@ public:
 
   /// Attach the runtime checks of \p RTChecks to \p Plan. Generates the memory
   /// checks as recipes if \p UseVPlanMemChecks is true and they are supported.
+  /// \p VF and \p UF are the factors the checks have been generated for.
   void attachRuntimeChecks(VPlan &Plan, GeneratedRTChecks &RTChecks,
-                           bool HasBranchWeights, bool UseVPlanMemChecks) const;
+                           ElementCount VF, unsigned UF, bool HasBranchWeights,
+                           bool UseVPlanMemChecks) const;
 
   /// Update loop metadata and profile info for both the scalar remainder loop
   /// and \p VectorLoop, if it exists. Keeps all loop hints from the original

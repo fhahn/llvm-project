@@ -244,6 +244,15 @@ struct VPlanTransforms {
                                      ScalarEvolution &SE, DebugLoc DL,
                                      bool AddBranchWeights);
 
+  /// Generate recipes for the memory runtime difference checks \p Checks in a
+  /// new block added to \p Plan. Each difference is compared against a
+  /// threshold derived from \p VF, \p UF and the checked access size.
+  static void addDiffRuntimeChecks(VPlan &Plan,
+                                   ArrayRef<PointerDiffInfo> Checks,
+                                   ScalarEvolution &SE, ElementCount VF,
+                                   unsigned UF, DebugLoc DL,
+                                   bool AddBranchWeights);
+
   /// Replaces the VPInstructions in \p Plan with corresponding
   /// widen recipes. Returns false if any VPInstructions could not be converted
   /// to a wide recipe if needed. Uses \p PSE to detect contiguous memory

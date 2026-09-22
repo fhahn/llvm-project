@@ -7014,19 +7014,27 @@ void LoopVectorizationPlanner::addReductionResultComputation(
 static bool
 canModelMemChecksInVPlan(const RuntimePointerChecking &RtPtrChecking,
                          const Loop &OrigLoop, ScalarEvolution &SE) {
-  // Diff checks are not modelled in VPlan yet.
-  if (RtPtrChecking.getDiffChecks())
-    return false;
-
   // The VPlan expander cannot hoist bounds out of an enclosing loop.
   if (OrigLoop.getParentLoop())
     return false;
 
-  // Return true if \p CG's bounds can be expanded in the check block.
-  // VPSCEVExpander only expands AddRecs of loops enclosing the plan's scope.
-  auto BoundsAreVPlanExpandable = [&SE](const RuntimeCheckingPtrGroup &CG) {
-    return !SE.containsAddRecurrence(CG.Low) &&
-           !SE.containsAddRecurrence(CG.High);
+  // Return true if \p S can be expanded in the check block. VPSCEVExpander only
+  // expands AddRecs of loops enclosing the plan's scope.
+  auto IsVPlanExpandable = [&SE](const SCEV *S) {
+    return !SE.containsAddRecurrence(S);
+  };
+
+  // The threshold a difference is compared against only depends on VF, UF and
+  // the access size, so it is always expandable.
+  if (auto DiffChecks = RtPtrChecking.getDiffChecks())
+    return !DiffChecks->empty() &&
+           all_of(*DiffChecks, [&](const PointerDiffInfo &C) {
+             return IsVPlanExpandable(C.SrcStart) &&
+                    IsVPlanExpandable(C.SinkStart);
+           });
+
+  auto BoundsAreVPlanExpandable = [&](const RuntimeCheckingPtrGroup &CG) {
+    return IsVPlanExpandable(CG.Low) && IsVPlanExpandable(CG.High);
   };
 
   ArrayRef<RuntimePointerCheck> Checks = RtPtrChecking.getChecks();
@@ -7037,8 +7045,8 @@ canModelMemChecksInVPlan(const RuntimePointerChecking &RtPtrChecking,
 }
 
 void LoopVectorizationPlanner::attachRuntimeChecks(
-    VPlan &Plan, GeneratedRTChecks &RTChecks, bool HasBranchWeights,
-    bool UseVPlanMemChecks) const {
+    VPlan &Plan, GeneratedRTChecks &RTChecks, ElementCount VF, unsigned UF,
+    bool HasBranchWeights, bool UseVPlanMemChecks) const {
   const auto &[SCEVCheckCond, SCEVCheckBlock] = RTChecks.getSCEVChecks();
   if (SCEVCheckBlock && SCEVCheckBlock->hasNPredecessors(0)) {
     assert((!Config.OptForSize ||
@@ -7075,9 +7083,13 @@ void LoopVectorizationPlanner::attachRuntimeChecks(
     if (UseVPlanMemChecks &&
         canModelMemChecksInVPlan(RtPtrChecking, *OrigLoop, SE)) {
       RTChecks.dropMemRuntimeChecks();
-      RUN_VPLAN_PASS(VPlanTransforms::addMemoryRuntimeChecks, Plan,
-                     RtPtrChecking.getChecks(), SE, OrigLoop->getStartLoc(),
-                     HasBranchWeights);
+      if (auto DiffChecks = RtPtrChecking.getDiffChecks())
+        RUN_VPLAN_PASS(VPlanTransforms::addDiffRuntimeChecks, Plan, *DiffChecks,
+                       SE, VF, UF, OrigLoop->getStartLoc(), HasBranchWeights);
+      else
+        RUN_VPLAN_PASS(VPlanTransforms::addMemoryRuntimeChecks, Plan,
+                       RtPtrChecking.getChecks(), SE, OrigLoop->getStartLoc(),
+                       HasBranchWeights);
       return;
     }
     RUN_VPLAN_PASS(VPlanTransforms::attachCheckBlock, Plan, MemCheckCond,
@@ -8225,7 +8237,8 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     // Epilogue vectorization has not been converted to VPlan memory checks
     // yet; it shares the checks between the main and epilogue plans via the
     // pre-built IR block.
-    LVP.attachRuntimeChecks(BestMainPlan, Checks, HasBranchWeights,
+    LVP.attachRuntimeChecks(BestMainPlan, Checks, EPI.MainLoopVF,
+                            EPI.MainLoopUF, HasBranchWeights,
                             /*UseVPlanMemChecks=*/false);
     RUN_VPLAN_PASS(
         VPlanTransforms::addIterationCountCheckBlock, BestMainPlan,
@@ -8277,7 +8290,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
                            BestPlan);
     LVP.addMinimumIterationCheck(BestPlan, VF.Width, IC,
                                  VF.MinProfitableTripCount);
-    LVP.attachRuntimeChecks(BestPlan, Checks, HasBranchWeights,
+    LVP.attachRuntimeChecks(BestPlan, Checks, VF.Width, IC, HasBranchWeights,
                             /*UseVPlanMemChecks=*/true);
 
     if (!IsInnerLoop)
