@@ -1368,7 +1368,8 @@ static VPSpeculativeLoadOracleRecipe *buildOraclePlan(VPlan &Plan,
 
 bool VPlanTransforms::replaceUnsafeLoadsWithSpeculative(
     VPlan &Plan, Loop *TheLoop, PredicatedScalarEvolution &PSE,
-    DominatorTree &DT, AssumptionCache *AC) {
+    DominatorTree &DT, AssumptionCache *AC,
+    function_ref<bool(LoadInst &)> SupportsFirstFaultingLoad) {
   ScalarEvolution &SE = *PSE.getSE();
   const DataLayout &DL = Plan.getDataLayout();
   auto [HeaderVPBB, LatchVPBB] = VPBlockUtils::getPlainCFGHeaderAndLatch(Plan);
@@ -1436,6 +1437,31 @@ bool VPlanTransforms::replaceUnsafeLoadsWithSpeculative(
     if (!VPDT.dominates(VPI->getParent(), EarlyExitingVPBB) ||
         !VPDT.dominates(VPI->getParent(), LatchVPBB))
       return Bail("conditionally executed unsafe load");
+
+  // Use a first-faulting load if supported. For now, only a single unsafe load
+  // with the canonical IV as the only header phi is supported.
+  auto *IV = dyn_cast<VPWidenIntOrFpInductionRecipe>(&HeaderVPBB->front());
+  bool IsOnlyCanonicalIV =
+      IV && hasSingleElement(HeaderVPBB->phis()) &&
+      match(IV->getStartValue(), m_ZeroInt()) &&
+      match(IV->getStepValue(), m_One()) &&
+      IV->getScalarType() == Plan.getVectorTripCount().getScalarType() &&
+      IV->getNoWrapPredicates().empty();
+  VPInstruction *UnsafeLoad = UnsafeLoads.front();
+  auto *Load = cast<LoadInst>(UnsafeLoad->getUnderlyingValue());
+  if (SupportsFirstFaultingLoad && UnsafeLoads.size() == 1 &&
+      IsOnlyCanonicalIV && SupportsFirstFaultingLoad(*Load)) {
+    VPBuilder Builder(UnsafeLoad);
+    auto *FFLoad = Builder.insert(new VPInstruction(
+        VPInstruction::FirstFaultingLoad,
+        {UnsafeLoad->getOperand(0),
+         Plan.getConstantInt(64, Load->getAlign().value())},
+        {}, *UnsafeLoad, UnsafeLoad->getDebugLoc(), "", EltTy));
+    UnsafeLoad->replaceAllUsesWith(
+        Builder.createFreeze(FFLoad, UnsafeLoad->getDebugLoc()));
+    UnsafeLoad->eraseFromParent();
+    return true;
+  }
 
   // TODO: Extend oracle logic to support remaining recipes.
   auto ContainsUnsupportedRecipes = [](const VPRecipeBase &R) {

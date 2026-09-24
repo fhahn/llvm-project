@@ -196,6 +196,10 @@ VPValue *findIncomingAliasMask(const VPlan &Plan);
 /// Requires loop regions to be created.
 VPSpeculativeLoadOracleRecipe *findSpeculativeLoadOracle(VPlan &Plan);
 
+/// Returns the first-faulting load in \p Plan's vector loop region, if any.
+/// Requires loop regions to be created.
+VPInstruction *findFirstFaultingLoad(VPlan &Plan);
+
 /// Returns the (early exiting block, exit block) pairs of \p Plan, i.e. all
 /// edges to an exit block that do not come from \p MiddleVPBB.
 SmallVector<std::pair<VPBasicBlock *, VPIRBasicBlock *>>

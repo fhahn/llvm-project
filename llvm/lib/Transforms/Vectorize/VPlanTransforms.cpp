@@ -3347,7 +3347,8 @@ static bool handleUncountableExitsWithSideEffects(
 bool VPlanTransforms::handleUncountableEarlyExits(
     VPlan &Plan, OptimizationRemarkEmitter *ORE, Loop *TheLoop,
     PredicatedScalarEvolution &PSE, DominatorTree &DT, AssumptionCache *AC,
-    UncountableExitStyle Style) {
+    UncountableExitStyle Style,
+    function_ref<bool(LoadInst &)> SupportsFirstFaultingLoad) {
 #ifndef NDEBUG
   VPDominatorTree VPDT(Plan);
 #endif
@@ -3356,9 +3357,11 @@ bool VPlanTransforms::handleUncountableEarlyExits(
   auto [HeaderVPBB, LatchVPBB] = VPBlockUtils::getPlainCFGHeaderAndLatch(Plan);
 
   // Dereferenceability is checked separately for uncountable exit loops without
-  // stores; loads that may fault are replaced by speculative loads.
+  // stores; loads that may fault are replaced by first-faulting or speculative
+  // loads.
   if (Style == UncountableExitStyle::ReadOnly &&
-      !replaceUnsafeLoadsWithSpeculative(Plan, TheLoop, PSE, DT, AC)) {
+      !replaceUnsafeLoadsWithSpeculative(Plan, TheLoop, PSE, DT, AC,
+                                         SupportsFirstFaultingLoad)) {
     reportVectorizationFailure(
         "Auto-vectorization of early exit loops with potentially "
         "faulting loads is not supported",

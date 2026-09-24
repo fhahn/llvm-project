@@ -623,6 +623,15 @@ VPSpeculativeLoadOracleRecipe *vputils::findSpeculativeLoadOracle(VPlan &Plan) {
   return nullptr;
 }
 
+VPInstruction *vputils::findFirstFaultingLoad(VPlan &Plan) {
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_shallow(Plan.getVectorLoopRegion()->getEntry())))
+    for (VPRecipeBase &R : *VPBB)
+      if (match(&R, m_VPInstruction<VPInstruction::FirstFaultingLoad>()))
+        return cast<VPInstruction>(&R);
+  return nullptr;
+}
+
 SmallVector<std::pair<VPBasicBlock *, VPIRBasicBlock *>>
 vputils::getEarlyExits(const VPlan &Plan, const VPBlockBase *MiddleVPBB) {
   SmallVector<std::pair<VPBasicBlock *, VPIRBasicBlock *>> Exits;

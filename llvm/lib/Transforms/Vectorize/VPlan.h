@@ -1334,6 +1334,10 @@ public:
     // Yields the value of the plan's live-in at the index given by operand 0,
     // supplied externally when the plan is executed.
     LiveIn,
+    // Loads VF consecutive elements from address operand 0 with alignment
+    // operand 1. Only the first lane may fault; lanes the scalar loop does not
+    // access may be poison. Lowered to @llvm.vp.load.ff.
+    FirstFaultingLoad,
     // Increment the canonical IV separately for each unrolled part.
     CanonicalIVIncrementForPart,
     // Abstract instruction that compares two values and branches. This is
@@ -2082,7 +2086,8 @@ public:
                                DL),
         Alignment(Alignment) {
     assert((VectorIntrinsicID == Intrinsic::experimental_vp_strided_load ||
-            VectorIntrinsicID == Intrinsic::experimental_vp_strided_store) &&
+            VectorIntrinsicID == Intrinsic::experimental_vp_strided_store ||
+            VectorIntrinsicID == Intrinsic::vp_load_ff) &&
            "Unexpected intrinsic");
   }
 

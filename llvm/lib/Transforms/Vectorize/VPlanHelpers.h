@@ -236,7 +236,9 @@ struct VPTransformState {
       set(Def, V, VPLane(0));
       return;
     }
-    assert((VF.isScalar() || isVectorizedTy(V->getType())) &&
+    // Structs may have single-scalar fields, e.g. from @llvm.vp.load.ff.
+    assert((VF.isScalar() || isVectorizedTy(V->getType()) ||
+            V->getType()->isStructTy()) &&
            "scalar values must be stored as (0, 0)");
     Data.VPV2Vector[Def] = V;
   }

@@ -250,6 +250,11 @@ struct VPlanTransforms {
                                           PredicatedScalarEvolution &PSE,
                                           Loop *TheLoop, bool AddBranchWeights);
 
+  /// Lower the first-faulting load in \p Plan, if any, to @llvm.vp.load.ff and
+  /// step the vector loop by the number of lanes read. Must run after unrolling
+  /// with UF = 1 and before the vector trip count is materialized.
+  static void lowerFirstFaultingLoad(VPlan &Plan);
+
   /// Replaces the VPInstructions in \p Plan with corresponding
   /// widen recipes. Returns false if any VPInstructions could not be converted
   /// to a wide recipe if needed. Uses \p PSE to detect contiguous memory
@@ -359,6 +364,12 @@ struct VPlanTransforms {
   addExplicitVectorLength(VPlan &Plan,
                           const std::optional<unsigned> &MaxEVLSafeElements);
 
+  /// Add a VPCurrentIterationPHIRecipe stepping by the i32 \p EVL and replace
+  /// all uses of the canonical IV except its increment with it. VF users must
+  /// be updated by the caller. Returns the phi's increment, whose first operand
+  /// is \p EVL converted to the canonical IV type.
+  static VPInstruction *addCurrentIterationPhi(VPlan &Plan, VPValue &EVL);
+
   /// Optimize recipes which use an EVL-based header mask to VP intrinsics, for
   /// example:
   ///
@@ -387,23 +398,25 @@ struct VPlanTransforms {
   /// Remove dead recipes from \p Plan.
   static void removeDeadRecipes(VPlan &Plan);
 
-  /// Replace loads that may fault with @llvm.speculative.load, backed by an
-  /// oracle plan replaying \p Plan's exit conditions. Must run before the early
-  /// exits are flattened. Returns false if a load cannot be replaced.
-  static bool replaceUnsafeLoadsWithSpeculative(VPlan &Plan, Loop *TheLoop,
-                                                PredicatedScalarEvolution &PSE,
-                                                DominatorTree &DT,
-                                                AssumptionCache *AC);
+  /// Replace loads that may fault with a first-faulting load if possible and
+  /// \p SupportsFirstFaultingLoad allows it, otherwise with
+  /// @llvm.speculative.load, backed by an oracle plan replaying \p Plan's exit
+  /// conditions. Must run before the early exits are flattened. Returns false
+  /// if a load cannot be replaced.
+  static bool replaceUnsafeLoadsWithSpeculative(
+      VPlan &Plan, Loop *TheLoop, PredicatedScalarEvolution &PSE,
+      DominatorTree &DT, AssumptionCache *AC,
+      function_ref<bool(LoadInst &)> SupportsFirstFaultingLoad);
 
   /// Update \p Plan to account for uncountable early exits by introducing
   /// appropriate branching logic in the latch that handles early exits and the
   /// latch exit condition. Multiple exits are handled with a dispatch block
   /// that determines which exit to take based on lane-by-lane semantics.
-  LLVM_ABI_FOR_TEST static bool
-  handleUncountableEarlyExits(VPlan &Plan, OptimizationRemarkEmitter *ORE,
-                              Loop *TheLoop, PredicatedScalarEvolution &PSE,
-                              DominatorTree &DT, AssumptionCache *AC,
-                              UncountableExitStyle Style);
+  LLVM_ABI_FOR_TEST static bool handleUncountableEarlyExits(
+      VPlan &Plan, OptimizationRemarkEmitter *ORE, Loop *TheLoop,
+      PredicatedScalarEvolution &PSE, DominatorTree &DT, AssumptionCache *AC,
+      UncountableExitStyle Style,
+      function_ref<bool(LoadInst &)> SupportsFirstFaultingLoad = nullptr);
 
   /// Disconnect countable early exits from the loop.
   LLVM_ABI_FOR_TEST static void handleCountableEarlyExits(VPlan &Plan);

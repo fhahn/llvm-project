@@ -1037,9 +1037,9 @@ public:
 
 private:
   /// Build an initial VPlan, with HCFG wrapping the original scalar loop and
-  /// scalar transformations applied. Returns null if an initial VPlan cannot
-  /// be built.
-  VPlanPtr tryToBuildVPlan1();
+  /// scalar transformations applied. \p MaxFactors are the maximum candidate
+  /// VFs. Returns null if an initial VPlan cannot be built.
+  VPlanPtr tryToBuildVPlan1(const FixedScalableVFPair &MaxFactors);
 
   /// Build a VPlan using VPRecipes according to the information gathered by
   /// Legal and VPlan-based analysis. For outer loops, performs basic recipe

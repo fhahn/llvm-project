@@ -1164,3 +1164,66 @@ void VPlanTransforms::addBranchWeightToMiddleTerminator(
       MDB.createBranchWeights({1, VectorStep - 1}, /*IsExpected=*/false);
   MiddleTerm->setMetadata(LLVMContext::MD_prof, BranchWeights);
 }
+
+void VPlanTransforms::lowerFirstFaultingLoad(VPlan &Plan) {
+  VPInstruction *FFLoad = vputils::findFirstFaultingLoad(Plan);
+  if (!FFLoad)
+    return;
+  assert(Plan.getConcreteUF() == 1 &&
+         "first-faulting loads of later parts may fault");
+
+  // @llvm.vp.load.ff may read fewer than VF lanes in any iteration; step the
+  // vector loop by the number of lanes read.
+  Type *I32Ty = Type::getInt32Ty(Plan.getContext());
+  DebugLoc DL = DebugLoc::getCompilerGenerated();
+  DebugLoc LoadDL = FFLoad->getDebugLoc();
+  VPBuilder PHBuilder(Plan.getVectorPreheader());
+  VPValue *VF = PHBuilder.createScalarZExtOrTrunc(&Plan.getVF(), I32Ty, DL);
+  VPBuilder Builder(FFLoad);
+  auto *Load = Builder.insert(new VPWidenMemIntrinsicRecipe(
+      Intrinsic::vp_load_ff, {FFLoad->getOperand(0), Plan.getTrue(), VF},
+      StructType::get(Plan.getContext(), {FFLoad->getScalarType(), I32Ty}),
+      Align(cast<VPConstantInt>(FFLoad->getOperand(1))->getZExtValue()),
+      *FFLoad, LoadDL));
+  auto *Data = Builder.insert(
+      new VPWidenRecipe(Instruction::ExtractValue,
+                        {Load, Plan.getConstantInt(32, 0)}, {}, {}, LoadDL));
+  VPValue *NumLanes = Builder.createNaryOp(
+      Instruction::ExtractValue, {Load, Plan.getConstantInt(32, 1)}, LoadDL,
+      "num.lanes");
+  FFLoad->replaceAllUsesWith(Data);
+  FFLoad->eraseFromParent();
+  VPInstruction *NextIter = addCurrentIterationPhi(Plan, *NumLanes);
+  VPValue *Step = NextIter->getOperand(0);
+  // Only widened IVs need to step by the number of lanes read.
+  Plan.getVF().replaceUsesWithIf(Step, [](VPUser &U, unsigned) {
+    return isa<VPWidenIntOrFpInductionRecipe>(U);
+  });
+
+  // Lanes that have not been read must not take the early exit.
+  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
+  auto *LatchTerm =
+      cast<VPInstruction>(LoopRegion->getExitingBasicBlock()->getTerminator());
+  VPValue *EarlyExitCond;
+  [[maybe_unused]] bool Matched =
+      match(LatchTerm,
+            m_BranchOnTwoConds(m_AnyOf(m_VPValue(EarlyExitCond)), m_VPValue()));
+  assert(Matched && "first-faulting loads require a single early exit");
+  VPBuilder LatchBuilder(LatchTerm);
+  VPValue *FirstExitLane =
+      LatchBuilder.createFirstActiveLane(EarlyExitCond, DL);
+  LatchTerm->setOperand(0, LatchBuilder.createICmp(
+                               CmpInst::ICMP_ULT, FirstExitLane,
+                               LatchBuilder.createScalarZExtOrTrunc(
+                                   Step, FirstExitLane->getScalarType(), DL)));
+
+  // Exit once fewer than VF iterations remain. The vector trip count may not
+  // be reached, so resume from the current iteration.
+  VPValue *LastStart =
+      PHBuilder.createSub(Plan.getTripCount(), &Plan.getVF(), DL, "",
+                          {/*NUW=*/true, /*NSW=*/false});
+  LatchTerm->setOperand(
+      1, LatchBuilder.createICmp(CmpInst::ICMP_UGT, NextIter, LastStart));
+  Plan.getVectorTripCount().replaceAllUsesWith(NextIter);
+  removeDeadRecipes(Plan);
+}

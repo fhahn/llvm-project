@@ -70,7 +70,8 @@ bool VPRecipeBase::mayWriteToMemory() const {
   case VPInstructionSC: {
     auto *VPI = cast<VPInstruction>(this);
     // Loads read from memory but don't write to memory.
-    if (VPI->getOpcode() == Instruction::Load)
+    if (VPI->getOpcode() == Instruction::Load ||
+        VPI->getOpcode() == VPInstruction::FirstFaultingLoad)
       return false;
     return VPI->opcodeMayReadOrWriteFromMemory();
   }
@@ -581,6 +582,7 @@ Type *llvm::computeScalarTypeForInstruction(unsigned Opcode,
   case VPInstruction::NumActiveLanes:
   case VPInstruction::LiveIn:
   case VPInstruction::IncomingAliasMask:
+  case VPInstruction::FirstFaultingLoad:
   case Instruction::Load:
   case Instruction::Alloca:
     llvm_unreachable("type must be passed explicitly");
@@ -651,7 +653,6 @@ unsigned VPInstruction::getNumOperandsForOpcode() const {
   case Instruction::Alloca:
   case VPInstruction::LiveIn:
   case Instruction::Ret:
-  case Instruction::ExtractValue:
   case Instruction::Freeze:
   case Instruction::Load:
   case VPInstruction::BranchOnCond:
@@ -682,6 +683,7 @@ unsigned VPInstruction::getNumOperandsForOpcode() const {
   case VPInstruction::WideIVStep:
   case VPInstruction::ResumeForEpilogue:
   case VPInstruction::ExtractVectorForPart:
+  case VPInstruction::FirstFaultingLoad:
     return 2;
   case Instruction::InsertElement:
   case Instruction::Select:
@@ -690,6 +692,9 @@ unsigned VPInstruction::getNumOperandsForOpcode() const {
     return 3;
   case Instruction::Call:
     return getCalledFnOperandIndex(operands()) + 1;
+  case Instruction::ExtractValue:
+    // Without an underlying instruction, the index is the second operand.
+    return getUnderlyingValue() ? 1 : -1u;
   case Instruction::GetElementPtr:
   case Instruction::PHI:
   case Instruction::Switch:
@@ -889,6 +894,10 @@ Value *VPInstruction::generate(VPTransformState &State) {
         {AVL, VFArg, Builder.getTrue()});
     return EVL;
   }
+  case Instruction::ExtractValue:
+    return Builder.CreateExtractValue(
+        State.get(getOperand(0)),
+        cast<VPConstantInt>(getOperand(1))->getZExtValue(), Name);
   case VPInstruction::LiveIn: {
     Argument *Arg = Builder.GetInsertBlock()->getParent()->getArg(
         cast<VPConstantInt>(getOperand(0))->getZExtValue());
@@ -1435,6 +1444,11 @@ InstructionCost VPInstruction::computeCost(ElementCount VF,
     return Ctx.TTI.getArithmeticReductionCost(
         Instruction::Or, cast<VectorType>(VecTy), std::nullopt, Ctx.CostKind);
   }
+  case VPInstruction::FirstFaultingLoad:
+    return VPWidenMemIntrinsicRecipe::computeMemIntrinsicCost(
+        Intrinsic::vp_load_ff, toVectorTy(getScalarType(), VF),
+        /*IsMasked=*/false,
+        Align(cast<VPConstantInt>(getOperand(1))->getZExtValue()), Ctx);
   case VPInstruction::FirstActiveLane: {
     Type *Ty = this->getScalarType();
     Type *ScalarTy = getOperand(0)->getScalarType();
@@ -1612,6 +1626,11 @@ bool VPInstruction::isSingleScalar() const {
   case VPInstruction::ResumeForEpilogue:
   case VPInstruction::Intrinsic:
     return true;
+  case Instruction::ExtractValue:
+    // The lane count returned by @llvm.vp.load.ff is a single scalar.
+    return !getUnderlyingValue() &&
+           match(getOperand(0), m_Intrinsic<Intrinsic::vp_load_ff>()) &&
+           match(getOperand(1), m_One());
   default:
     return Instruction::isCast(getOpcode());
   }
@@ -1770,6 +1789,7 @@ bool VPInstruction::usesFirstLaneOnly(const VPValue *Op) const {
   case Instruction::Ret:
   case Instruction::PHI:
   case VPInstruction::LiveIn:
+  case VPInstruction::FirstFaultingLoad:
     return true;
   case Instruction::FCmp:
   case Instruction::ICmp:
@@ -1858,6 +1878,9 @@ void VPInstruction::printRecipe(raw_ostream &O, const Twine &Indent,
     break;
   case VPInstruction::LiveIn:
     O << "live-in";
+    break;
+  case VPInstruction::FirstFaultingLoad:
+    O << "first-faulting-load";
     break;
   case VPInstruction::IncomingAliasMask:
     O << "incoming-alias-mask";

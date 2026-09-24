@@ -5366,7 +5366,7 @@ void LoopVectorizationPlanner::plan(ElementCount UserVF, unsigned UserIC) {
   if (MaxFactors.FixedVF.isVector() || MaxFactors.ScalableVF.isVector())
     Legal->collectUnitStridePredicates();
 
-  auto VPlan1 = tryToBuildVPlan1();
+  auto VPlan1 = tryToBuildVPlan1(MaxFactors);
   if (!VPlan1)
     return;
 
@@ -5794,6 +5794,7 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
       hasBranchWeightMD(*OrigLoop->getLoopLatch()->getTerminator());
   RUN_VPLAN_PASS(VPlanTransforms::attachSpeculativeLoadChecks, BestVPlan,
                  BestVF, PSE, OrigLoop, HasBranchWeights);
+  RUN_VPLAN_PASS(VPlanTransforms::lowerFirstFaultingLoad, BestVPlan);
   RUN_VPLAN_PASS(VPlanTransforms::materializePacksAndUnpacks, BestVPlan);
   RUN_VPLAN_PASS(VPlanTransforms::materializeBroadcasts, BestVPlan);
   RUN_VPLAN_PASS(VPlanTransforms::replicateByVF, BestVPlan, BestVF);
@@ -6423,7 +6424,8 @@ static bool verifyExecutionFrequenciesMatchBFI(VPlan &Plan, Loop *OrigLoop,
 }
 #endif
 
-VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
+VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1(
+    const FixedScalableVFPair &MaxFactors) {
   bool IsInnerLoop = OrigLoop->isInnermost();
 
   // Set up loop versioning for inner loops with memory runtime checks.
@@ -6501,9 +6503,25 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
         Legal->hasUncountableExitWithSideEffects()
             ? UncountableExitStyle::MaskedHandleExitInScalarLoop
             : UncountableExitStyle::ReadOnly;
+    // Check if the target supports @llvm.vp.load.ff for any maximum VF.
+    auto SupportsFirstFaultingLoad = [&](LoadInst &Load) {
+      Type *EltTy = Load.getType();
+      if (!VectorType::isValidElementType(EltTy))
+        return false;
+      for (ElementCount VF : {MaxFactors.FixedVF, MaxFactors.ScalableVF}) {
+        if (!VF.isVector())
+          continue;
+        MemIntrinsicCostAttributes Attrs(
+            Intrinsic::vp_load_ff, VectorType::get(EltTy, VF), Load.getAlign(),
+            Load.getPointerAddressSpace());
+        if (TTI.getMemIntrinsicInstrCost(Attrs, Config.CostKind).isValid())
+          return true;
+      }
+      return false;
+    };
     if (!RUN_VPLAN_PASS(VPlanTransforms::handleUncountableEarlyExits, *VPlan0,
                         ORE, OrigLoop, PSE, *DT, Legal->getAssumptionCache(),
-                        EEStyle)) {
+                        EEStyle, SupportsFirstFaultingLoad)) {
       return nullptr;
     }
   } else {
@@ -8052,8 +8070,10 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     IC = 1;
   }
 
-  // FIXME: Enable interleaving for plans with speculative loads.
-  if (InterleaveLoop && vputils::findSpeculativeLoadOracle(*BestPlanPtr)) {
+  // FIXME: Enable interleaving for plans with speculative or first-faulting
+  // loads.
+  if (InterleaveLoop && (vputils::findSpeculativeLoadOracle(*BestPlanPtr) ||
+                         vputils::findFirstFaultingLoad(*BestPlanPtr))) {
     LLVM_DEBUG(dbgs() << "LV: Not interleaving loop with speculative loads.\n");
     IntDiagMsg = {"SpeculativeLoadPreventsInterleaving",
                   "Unable to interleave loop using speculative loads."};
