@@ -1204,12 +1204,15 @@ getSuccessorProbabilities(const VPBasicBlock *VPBB) {
 
   // Take the branch weights off the terminator. Without usable weights all
   // successors have unknown probability; zero the weights, so the accumulation
-  // below still visits each of them.
+  // below still visits each of them. Like BranchProbabilityInfo, treat weights
+  // that are all zero as equal instead.
   SmallVector<uint32_t> Weights;
   auto *Term = dyn_cast_if_present<VPInstruction>(VPBB->getTerminator());
   if (!Term || !extractBranchWeights(Term->getBranchWeights(), Weights) ||
       Weights.size() != Successors.size())
     Weights.assign(Successors.size(), 0);
+  else if (all_of(Weights, equal_to(0)))
+    Weights.assign(Successors.size(), 1);
   uint64_t Total = sum_of(Weights, uint64_t(0));
 
   // Sum the weights of parallel edges to the same successor, so that the

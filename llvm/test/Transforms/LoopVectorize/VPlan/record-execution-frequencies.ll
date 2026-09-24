@@ -219,5 +219,106 @@ exit:
   ret void
 }
 
+; All weights of the branch to %if.then are zero. Like BranchProbabilityInfo,
+; treat them as equal, so %if.then is recorded as executing half of the time.
+define void @if_then_all_zero_weights(ptr noalias %a, ptr noalias %idx) {
+; VPLAN0-LABEL: VPlan for loop in 'if_then_all_zero_weights'
+; VPLAN0:  VPlan ' for UF>=1' {
+; VPLAN0-NEXT:  Live-in ir<1024> = original trip-count
+; VPLAN0-EMPTY:
+; VPLAN0-NEXT:  ir-bb<entry>:
+; VPLAN0-NEXT:  Successor(s): scalar.ph, vector.ph
+; VPLAN0-EMPTY:
+; VPLAN0-NEXT:  vector.ph:
+; VPLAN0-NEXT:  Successor(s): loop
+; VPLAN0-EMPTY:
+; VPLAN0-NEXT:  loop:
+; VPLAN0-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, latch ]
+; VPLAN0-NEXT:    EMIT ir<%gep.idx> = getelementptr inbounds ir<%idx>, ir<%iv>
+; VPLAN0-NEXT:    EMIT-SCALAR ir<%i> = load ir<%gep.idx>
+; VPLAN0-NEXT:    EMIT ir<%c> = icmp sgt ir<%i>, ir<0>
+; VPLAN0-NEXT:    EMIT branch-on-cond ir<%c> (!prof {0, 0})
+; VPLAN0-NEXT:  Successor(s): if.then, latch
+; VPLAN0-EMPTY:
+; VPLAN0-NEXT:  if.then:
+; VPLAN0-NEXT:    EMIT ir<%add> = add ir<%i>, ir<10> (!vplan.execution.frequency 4611686018427387904 (50%))
+; VPLAN0-NEXT:    EMIT ir<%gep.a> = getelementptr inbounds ir<%a>, ir<%iv> (!vplan.execution.frequency 4611686018427387904 (50%))
+; VPLAN0-NEXT:    EMIT store ir<%add>, ir<%gep.a> (!vplan.execution.frequency 4611686018427387904 (50%))
+; VPLAN0-NEXT:  Successor(s): latch
+; VPLAN0-EMPTY:
+; VPLAN0-NEXT:  latch:
+; VPLAN0-NEXT:    EMIT ir<%iv.next> = add ir<%iv>, ir<1>
+; VPLAN0-NEXT:    EMIT ir<%ec> = icmp eq ir<%iv.next>, ir<1024>
+; VPLAN0-NEXT:    EMIT branch-on-cond ir<%ec> (!prof {1, 999})
+; VPLAN0-NEXT:  Successor(s): middle.block, loop
+; VPLAN0-EMPTY:
+; VPLAN0-NEXT:  middle.block:
+;
+; MASKED-LABEL: VPlan for loop in 'if_then_all_zero_weights'
+; MASKED:  VPlan ' for UF>=1' {
+; MASKED-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
+; MASKED-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
+; MASKED-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
+; MASKED-NEXT:  Live-in ir<1024> = original trip-count
+; MASKED-EMPTY:
+; MASKED-NEXT:  ir-bb<entry>:
+; MASKED-NEXT:  Successor(s): scalar.ph, vector.ph
+; MASKED-EMPTY:
+; MASKED-NEXT:  vector.ph:
+; MASKED-NEXT:  Successor(s): vector loop
+; MASKED-EMPTY:
+; MASKED-NEXT:  <x1> vector loop: {
+; MASKED-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
+; MASKED-EMPTY:
+; MASKED-NEXT:    vector.body:
+; MASKED-NEXT:      ir<%iv> = WIDEN-INDUCTION ir<0>, ir<1>, vp<[[VP0]]>
+; MASKED-NEXT:      EMIT ir<%gep.idx> = getelementptr inbounds ir<%idx>, ir<%iv>
+; MASKED-NEXT:      EMIT-SCALAR ir<%i> = load ir<%gep.idx>
+; MASKED-NEXT:      EMIT ir<%c> = icmp sgt ir<%i>, ir<0>
+; MASKED-NEXT:    Successor(s): if.then
+; MASKED-EMPTY:
+; MASKED-NEXT:    if.then:
+; MASKED-NEXT:      EMIT ir<%add> = add ir<%i>, ir<10>, ir<%c> (!vplan.execution.frequency 4611686018427387904 (50%))
+; MASKED-NEXT:      EMIT ir<%gep.a> = getelementptr inbounds ir<%a>, ir<%iv>
+; MASKED-NEXT:      EMIT store ir<%add>, ir<%gep.a>, ir<%c> (!vplan.execution.frequency 4611686018427387904 (50%))
+; MASKED-NEXT:    Successor(s): latch
+; MASKED-EMPTY:
+; MASKED-NEXT:    latch:
+; MASKED-NEXT:      EMIT ir<%iv.next> = add ir<%iv>, ir<1>
+; MASKED-NEXT:      EMIT ir<%ec> = icmp eq ir<%iv.next>, ir<1024>
+; MASKED-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; MASKED-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; MASKED-NEXT:    No successors
+; MASKED-NEXT:  }
+; MASKED-NEXT:  Successor(s): middle.block
+; MASKED-EMPTY:
+; MASKED-NEXT:  middle.block:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %latch ]
+  %gep.idx = getelementptr inbounds i32, ptr %idx, i64 %iv
+  %i = load i32, ptr %gep.idx, align 4
+  %c = icmp sgt i32 %i, 0
+  br i1 %c, label %if.then, label %latch, !prof !2
+
+if.then:
+  %add = add i32 %i, 10
+  %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
+  store i32 %add, ptr %gep.a, align 4
+  br label %latch
+
+latch:
+  %iv.next = add i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, 1024
+  br i1 %ec, label %exit, label %loop, !prof !1
+
+exit:
+  ret void
+}
+
 !0 = !{!"branch_weights", i32 1, i32 3}
 !1 = !{!"branch_weights", i32 1, i32 999}
+!2 = !{!"branch_weights", i32 0, i32 0}
