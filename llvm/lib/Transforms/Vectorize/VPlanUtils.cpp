@@ -466,7 +466,10 @@ bool vputils::isSingleScalar(const VPValue *VPV) {
   if (isa<VPWidenGEPRecipe, VPBlendRecipe>(VPV))
     return all_of(VPV->getDefiningRecipe()->operands(), isSingleScalar);
   if (auto *WidenR = dyn_cast<VPWidenRecipe>(VPV)) {
-    return preservesUniformity(WidenR->getOpcode()) &&
+    // A widened freeze freezes each lane independently, so its lanes may differ
+    // even if its operands are uniform.
+    return WidenR->getOpcode() != Instruction::Freeze &&
+           preservesUniformity(WidenR->getOpcode()) &&
            all_of(WidenR->operands(), isSingleScalar);
   }
   if (auto *VPI = dyn_cast<VPInstruction>(VPV))
@@ -516,7 +519,9 @@ bool vputils::isUniformAcrossVFsAndUFs(const VPValue *V) {
                all_of(R->operands(), isUniformAcrossVFsAndUFs);
       })
       .Case([](const VPWidenRecipe *R) {
-        return preservesUniformity(R->getOpcode()) &&
+        // A widened freeze freezes each lane independently.
+        return R->getOpcode() != Instruction::Freeze &&
+               preservesUniformity(R->getOpcode()) &&
                all_of(R->operands(), isUniformAcrossVFsAndUFs);
       })
       .Case([](const VPPhi *) {
