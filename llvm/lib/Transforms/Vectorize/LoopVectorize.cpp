@@ -572,11 +572,6 @@ protected:
   /// is prefixed with \p Prefix.
   BasicBlock *createScalarPreheader(StringRef Prefix);
 
-  /// Allow subclasses to override and print debug traces before/after vplan
-  /// execution, when trace information is requested.
-  virtual void printDebugTracesAtStart() {}
-  virtual void printDebugTracesAtEnd() {}
-
   /// The original loop.
   Loop *OrigLoop;
 
@@ -672,10 +667,6 @@ public:
   /// Implements the interface for creating a vectorized skeleton using the
   /// *epilogue loop* strategy (i.e., the second pass of VPlan execution).
   BasicBlock *createVectorizedLoopSkeleton() final;
-
-protected:
-  void printDebugTracesAtStart() override;
-  void printDebugTracesAtEnd() override;
 };
 } // end namespace llvm
 
@@ -5879,8 +5870,6 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   SE.forgetLoop(OrigLoop);
   SE.forgetBlockAndLoopDispositions();
 
-  ILV.printDebugTracesAtStart();
-
   //===------------------------------------------------===//
   //
   // Notice: any optimization or new instruction that go
@@ -5918,8 +5907,6 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   // 3. Fix the vectorized code: take care of header phi's, live-outs,
   //    predication, updating analyses.
   ILV.fixVectorizedLoop(State);
-
-  ILV.printDebugTracesAtEnd();
 
   // Wrap the generated blocks in VPIRBasicBlocks, so they can be used in the
   // epilogue plan.
@@ -5982,20 +5969,6 @@ BasicBlock *EpilogueVectorizerEpilogueLoop::createVectorizedLoopSkeleton() {
   }
 
   return OriginalScalarPH;
-}
-
-void EpilogueVectorizerEpilogueLoop::printDebugTracesAtStart() {
-  LLVM_DEBUG({
-    dbgs() << "Create Skeleton for epilogue vectorized loop (second pass)\n"
-           << "Epilogue Loop VF:" << EPI.EpilogueVF
-           << ", Epilogue Loop UF:1\n";
-  });
-}
-
-void EpilogueVectorizerEpilogueLoop::printDebugTracesAtEnd() {
-  DEBUG_WITH_TYPE(VerboseDebug, {
-    dbgs() << "final fn:\n" << *OrigLoop->getHeader()->getParent() << "\n";
-  });
 }
 
 bool VPRecipeBuilder::isPredicatedInst(Instruction *I) const {
@@ -7999,9 +7972,17 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     preparePlanForEpilogueVectorLoop(BestEpiPlan, ExpandedSCEVs, EPI, Config,
                                      *PSE.getSE());
     RUN_VPLAN_PASS(VPlanTransforms::simplifyLiveInsWithSCEV, BestEpiPlan, PSE);
+    LLVM_DEBUG({
+      dbgs() << "Create Skeleton for epilogue vectorized loop (second pass)\n"
+             << "Epilogue Loop VF:" << EPI.EpilogueVF
+             << ", Epilogue Loop UF:1\n";
+    });
     LVP.executePlan(
         EPI.EpilogueVF, /*BestUF=*/1, BestEpiPlan, EpilogILV, DT,
         LoopVectorizationPlanner::EpilogueVectorizationKind::Epilogue);
+    DEBUG_WITH_TYPE(VerboseDebug, {
+      dbgs() << "final fn:\n" << *L->getHeader()->getParent() << "\n";
+    });
     ++LoopsEpilogueVectorized;
   } else {
     InnerLoopVectorizer LB(L, PSE, LI, DT, TTI, AC, VF.Width, IC, Checks,
