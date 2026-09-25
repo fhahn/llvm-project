@@ -37,7 +37,7 @@ namespace polly {
 class Scop;
 class ScopStmt;
 
-/// Same as llvm/Analysis/ScalarEvolutionExpressions.h
+/// Maps a loop to the SCEV of the iteration at which its addrecs are evaluated.
 using LoopToScevMapT = llvm::DenseMap<const llvm::Loop *, llvm::SCEVUse>;
 
 /// Enumeration of assumptions Polly can take.
