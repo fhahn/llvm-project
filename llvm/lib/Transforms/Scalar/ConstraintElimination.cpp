@@ -1279,10 +1279,44 @@ void State::addInfoForInductions(BasicBlock &BB) {
       Step->isOne() &&
       (ContinuePred == CmpInst::ICMP_NE || ICmpInst::isLT(ContinuePred));
   if (HasHeaderBound) {
+    // A bound in the header stays in the system for all blocks dominated by the
+    // header, i.e. the loop and everything after it, relating PN and B for all
+    // queries there. For header-tested loops, the in-loop successor already
+    // gets a stronger bound with the same signedness as the compare, so only
+    // add such a bound where it may be used: in the header, or in the exits if
+    // PN is used outside the loop. A constant B only bounds PN, which is cheap.
+    bool IsHeaderTested = &BB != Latch;
+    bool UsedInHeader =
+        isa<ConstantInt>(B) || any_of(PN->users(), [&](User *U) {
+          auto *I = cast<Instruction>(U);
+          return I->getParent() == Header && I != Br->getCondition();
+        });
+    SmallVector<DomTreeNode *, 2> BoundDTNs;
+    if (!IsHeaderTested || UsedInHeader) {
+      BoundDTNs.push_back(HeaderDTN);
+    } else if (any_of(PN->users(), [&](User *U) {
+                 return !L->contains(cast<Instruction>(U));
+               })) {
+      SmallVector<BasicBlock *> ExitBBs;
+      L->getExitBlocks(ExitBBs);
+      for (BasicBlock *EB : ExitBBs)
+        if (DT.dominates(&BB, EB))
+          BoundDTNs.push_back(DT.getNode(EB));
+    }
+
+    bool HasInLoopBound = IsHeaderTested && canAddSuccessor(BB, InLoopSucc);
     for (CmpInst::Predicate BoundPred : {CmpInst::ICMP_ULE, CmpInst::ICMP_SLE}) {
-      WorkList.push_back(FactOrCheck::getConditionFact(
-          HeaderDTN, BoundPred, PN, B, ConditionTy(BoundPred, StartValue, B)));
-      WorkList.back().SkipTransfer = true;
+      bool ImpliedInLoop =
+          HasInLoopBound &&
+          (ContinuePred == CmpInst::ICMP_NE || Pred.hasSameSign() ||
+           ICmpInst::isSigned(ContinuePred) == ICmpInst::isSigned(BoundPred));
+      for (DomTreeNode *BoundDTN :
+           ImpliedInLoop ? ArrayRef(BoundDTNs) : ArrayRef(HeaderDTN)) {
+        WorkList.push_back(FactOrCheck::getConditionFact(
+            BoundDTN, BoundPred, PN, B,
+            ConditionTy(BoundPred, StartValue, B)));
+        WorkList.back().SkipTransfer = true;
+      }
     }
   }
 
