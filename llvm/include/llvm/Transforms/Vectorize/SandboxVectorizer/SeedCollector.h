@@ -280,7 +280,6 @@ public:
   // To support constant-time erase, these just mark the element used, rather
   // than actually removing them from the bundle.
   LLVM_ABI bool erase(Instruction *I);
-  bool erase(const KeyT &Key) { return Bundles.erase(Key); }
   iterator begin() {
     if (Bundles.empty())
       return end();
