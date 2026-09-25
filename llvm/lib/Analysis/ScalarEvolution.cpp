@@ -16117,9 +16117,11 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
     }
 
     const SCEV *RewrittenLHS = GetMaybeRewritten(LHS);
-    // Apply divisibility information when computing the constant multiple.
-    const APInt &DividesBy =
-        SE.getConstantMultiple(DivGuards.rewrite(RewrittenLHS));
+    // Apply divisibility information when computing the constant multiple. It
+    // is only used to align constant bounds, so skip the query otherwise.
+    APInt DividesBy(SE.getTypeSizeInBits(RHS->getType()), 1);
+    if (isa<SCEVConstant>(RHS))
+      DividesBy = SE.getConstantMultiple(DivGuards.rewrite(RewrittenLHS));
 
     // Collect rewrites for LHS and its transitive operands based on the
     // condition.
