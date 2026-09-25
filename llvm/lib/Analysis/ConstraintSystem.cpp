@@ -279,6 +279,24 @@ ConstraintSystem::getSubSystem(ArrayRef<Entry> R) const {
   return {std::move(SubSystem), std::move(NewR)};
 }
 
+bool ConstraintSystem::isImpliedBySingleRow(ArrayRef<Entry> R) const {
+  // Rows are stored without zero coefficients, so ignore them in R as well.
+  SmallVector<Entry, 8> Vars;
+  for (const Entry &E : R)
+    if (E.Id != 0 && E.Coefficient != 0)
+      Vars.push_back(E);
+  int64_t C = getConstant(R);
+  return any_of(Constraints, [&](ArrayRef<Entry> Row) {
+    if (getConstant(Row) > C)
+      return false;
+    if (hasConstantEntry(Row))
+      Row = Row.drop_front();
+    return equal(Row, Vars, [](const Entry &A, const Entry &B) {
+      return A.Id == B.Id && A.Coefficient == B.Coefficient;
+    });
+  });
+}
+
 bool ConstraintSystem::isConditionImplied(RowTy R) const {
   // If all variable coefficients are 0, we have 'C >= 0'. If the constant is >=
   // 0, R is always true, regardless of the system.
