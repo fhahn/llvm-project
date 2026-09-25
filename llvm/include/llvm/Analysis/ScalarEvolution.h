@@ -531,14 +531,6 @@ public:
   }
 
   [[nodiscard]] static SCEVWrapPredicate::IncrementWrapFlags
-  maskFlags(SCEVWrapPredicate::IncrementWrapFlags Flags, int Mask) {
-    assert((Flags & IncrementNoWrapMask) == Flags && "Invalid flags value!");
-    assert((Mask & IncrementNoWrapMask) == Mask && "Invalid mask value!");
-
-    return (SCEVWrapPredicate::IncrementWrapFlags)(Flags & Mask);
-  }
-
-  [[nodiscard]] static SCEVWrapPredicate::IncrementWrapFlags
   setFlags(SCEVWrapPredicate::IncrementWrapFlags Flags,
            SCEVWrapPredicate::IncrementWrapFlags OnFlags) {
     assert((Flags & IncrementNoWrapMask) == Flags && "Invalid flags value!");
