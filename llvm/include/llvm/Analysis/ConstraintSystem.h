@@ -155,6 +155,12 @@ public:
   LLVM_ABI std::pair<ConstraintSystem, RowTy>
   getSubSystem(ArrayRef<Entry> R) const;
 
+  /// Returns true if a single row of the system implies \p R, i.e. the row has
+  /// the same variable coefficients as \p R and a constant that is not larger.
+  /// Like the rows of the system, \p R must not contain zero coefficients for
+  /// variables.
+  LLVM_ABI bool isImpliedBySingleRow(ArrayRef<Entry> R) const;
+
   LLVM_ABI bool isConditionImplied(RowTy R) const;
   LLVM_ABI bool isConditionImpliedInSubSystem(ArrayRef<Entry> R) const;
 
