@@ -1643,8 +1643,6 @@ public:
       assert(Ty);
     }
 
-    FoldID(unsigned short C) : C(C) {}
-
     unsigned computeHash() const {
       return detail::combineHashValue(
           C, detail::combineHashValue(
