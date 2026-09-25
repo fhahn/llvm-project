@@ -75,8 +75,6 @@ class RegionWithScore final : public Region {
 public:
   RegionWithScore(Context &Ctx, const TargetTransformInfo &TTI)
       : Region(Ctx, RegionClassID::RegionWithScoreID), Scoreboard(*this, TTI) {}
-  RegionWithScore(Region &&Rgn, const TargetTransformInfo &TTI)
-      : Region(std::move(Rgn)), Scoreboard(*this, TTI) {}
   // For isa<> cast<> etc.
   static bool classof(const Region *From) {
     return From->getSubclassID() == RegionClassID::RegionWithScoreID;
