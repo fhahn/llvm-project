@@ -256,7 +256,6 @@ public:
     assert(!atBeforeBeginOrNull() && "Expected in/after BB!");
     return std::get<BasicBlock::iterator>(Where);
   }
-  operator BasicBlock::iterator() const { return getIterator(); }
   /// Returns the SchedulingPoint pointing after this.
   SchedulingPoint getNext() const {
     assert(!atEndOrNull() && "Expected before/in BB!");
