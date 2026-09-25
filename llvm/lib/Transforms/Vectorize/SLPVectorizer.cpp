@@ -1941,9 +1941,6 @@ public:
     /// \returns true if the data structure is empty.
     bool empty() const { return OpsVec.empty(); }
 
-    /// Clears the data.
-    void clear() { OpsVec.clear(); }
-
     /// \Returns true if there are enough operands identical to \p Op to fill
     /// the whole vector (it is mixed with constants or loop invariant values).
     /// Note: This modifies the 'IsUsed' flag, so a cleanUsed() must follow.
@@ -3923,12 +3920,6 @@ private:
       if (const auto *CD = dyn_cast<ScheduleCopyableData>(this))
         return CD->getUnscheduledDeps();
       return cast<ScheduleBundle>(this)->unscheduledDepsInBundle();
-    }
-    /// Increments the number of unscheduled dependencies.
-    int incrementUnscheduledDeps(int Incr) {
-      if (auto *SD = dyn_cast<ScheduleData>(this))
-        return SD->incrementUnscheduledDeps(Incr);
-      return cast<ScheduleCopyableData>(this)->incrementUnscheduledDeps(Incr);
     }
     /// Gets the number of dependencies.
     int getDependencies() const {
