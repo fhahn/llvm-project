@@ -1786,8 +1786,6 @@ public:
     return {StatusTy::SafeWithFreeze, ToFreeze};
   }
 
-  /// Returns true if the index can be scalarize without requiring a freeze.
-  bool isSafe() const { return Status == StatusTy::Safe; }
   /// Returns true if the index cannot be scalarized.
   bool isUnsafe() const { return Status == StatusTy::Unsafe; }
   /// Returns true if the index can be scalarize, but requires inserting a
