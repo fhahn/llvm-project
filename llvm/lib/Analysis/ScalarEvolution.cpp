@@ -8449,9 +8449,15 @@ ScalarEvolution::getSmallConstantTripMultiple(const SCEV *ExitCount,
                                               const LoopGuards &Guards) {
   assert(!isa<SCEVCouldNotCompute>(ExitCount) && "Must be computable!");
 
-  // Get the trip count
-  const SCEV *TCExpr =
-      getTripCountFromExitCount(applyLoopGuards(ExitCount, Guards));
+  // Get the trip count. If ExitCount + 1 cannot wrap, it is the trip count in
+  // ExitCount's type. Use it directly instead of forming the trip count in a
+  // type one bit wider, whose expressions are unlikely to be used elsewhere.
+  ExitCount = applyLoopGuards(ExitCount, Guards);
+  const SCEV *TCExpr;
+  if (getUnsignedRangeMax(ExitCount).isMaxValue())
+    TCExpr = getTripCountFromExitCount(ExitCount);
+  else
+    TCExpr = getAddExpr(ExitCount, getOne(ExitCount->getType()));
 
   APInt Multiple = getNonZeroConstantMultiple(TCExpr);
   // If a trip multiple is huge (>=2^32), the trip count is still divisible by
