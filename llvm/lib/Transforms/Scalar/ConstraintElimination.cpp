@@ -419,7 +419,9 @@ public:
   /// system implies it or because ValueTracking can prove it.
   bool isKnownPositive(Value *V);
 
-  void addFact(CmpInst::Predicate Pred, Value *A, Value *B, unsigned NumIn,
+  /// Adds \p A \p Pred \p B to the constraint system. Returns true if the
+  /// fact is already implied by a single row in the system.
+  bool addFact(CmpInst::Predicate Pred, Value *A, Value *B, unsigned NumIn,
                unsigned NumOut, SmallVectorImpl<StackEntry> &DFSInStack);
 
   /// Turn a comparison of the form \p Op0 \p Pred \p Op1 into a vector of
@@ -449,8 +451,9 @@ public:
 private:
   /// Adds facts into constraint system. \p ForceSignedSystem can be set when
   /// the \p Pred is eq/ne, and signed constraint system is used when it's
-  /// specified.
-  void addFactImpl(CmpInst::Predicate Pred, Value *A, Value *B, unsigned NumIn,
+  /// specified. Returns true if the fact is already implied by a single row in
+  /// the system.
+  bool addFactImpl(CmpInst::Predicate Pred, Value *A, Value *B, unsigned NumIn,
                    unsigned NumOut, SmallVectorImpl<StackEntry> &DFSInStack,
                    bool ForceSignedSystem);
 
@@ -2216,15 +2219,16 @@ static bool checkOrAndOpImpliedByOther(
   return false;
 }
 
-void ConstraintInfo::addFact(CmpInst::Predicate Pred, Value *A, Value *B,
+bool ConstraintInfo::addFact(CmpInst::Predicate Pred, Value *A, Value *B,
                              unsigned NumIn, unsigned NumOut,
                              SmallVectorImpl<StackEntry> &DFSInStack) {
-  addFactImpl(Pred, A, B, NumIn, NumOut, DFSInStack, false);
+  bool Implied = addFactImpl(Pred, A, B, NumIn, NumOut, DFSInStack, false);
   // If the Pred is eq/ne, also add the fact to signed system.
   if (CmpInst::isEquality(Pred))
     addFactImpl(Pred, A, B, NumIn, NumOut, DFSInStack, true);
   if (Pred == CmpInst::ICMP_NE)
     tightenBoundUsingNe(A, B, NumIn, NumOut, DFSInStack);
+  return Implied;
 }
 
 void ConstraintInfo::tightenBoundUsingNe(
@@ -2268,7 +2272,7 @@ void ConstraintInfo::tightenBoundUsingNe(
   }
 }
 
-void ConstraintInfo::addFactImpl(CmpInst::Predicate Pred, Value *A, Value *B,
+bool ConstraintInfo::addFactImpl(CmpInst::Predicate Pred, Value *A, Value *B,
                                  unsigned NumIn, unsigned NumOut,
                                  SmallVectorImpl<StackEntry> &DFSInStack,
                                  bool ForceSignedSystem) {
@@ -2277,7 +2281,7 @@ void ConstraintInfo::addFactImpl(CmpInst::Predicate Pred, Value *A, Value *B,
 
   // TODO: Support non-equality for facts as well.
   if (R.empty() || R.isNe())
-    return;
+    return false;
 
   LLVM_DEBUG(dbgs() << "Adding '"; dumpUnpackedICmp(dbgs(), Pred, A, B);
              dbgs() << "'\n");
@@ -2286,10 +2290,10 @@ void ConstraintInfo::addFactImpl(CmpInst::Predicate Pred, Value *A, Value *B,
   // system are removed in reverse order, so the existing row outlives R.
   if (!R.isEq() && NewVariables.empty() &&
       CSToUse.isImpliedBySingleRow(R.Coefficients))
-    return;
+    return true;
   bool Added = CSToUse.addRow(R.Coefficients, R.NumVars);
   if (!Added)
-    return;
+    return false;
 
   DecomposeCache.clear();
 
@@ -2325,12 +2329,13 @@ void ConstraintInfo::addFactImpl(CmpInst::Predicate Pred, Value *A, Value *B,
     // Also add the inverted constraint for equality constraints.
     for (Entry &E : R.Coefficients)
       if (MulOverflow(E.Coefficient, int64_t(-1), E.Coefficient))
-        return;
+        return false;
     CSToUse.addRow(R.Coefficients, R.NumVars);
 
     DFSInStack.emplace_back(NumIn, NumOut, R.IsSigned,
                             SmallVector<Value *, 2>());
   }
+  return false;
 }
 
 /// Replace the uses of \p II, which is known not to overflow, by the
@@ -2524,11 +2529,13 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
         return;
       }
 
-      Info.addFact(Pred, A, B, CB.NumIn, CB.NumOut, DFSInStack);
+      bool Implied = Info.addFact(Pred, A, B, CB.NumIn, CB.NumOut, DFSInStack);
       if (ReproducerModule && DFSInStack.size() > ReproducerCondStack.size())
         ReproducerCondStack.emplace_back(Pred, A, B);
 
-      if (ICmpInst::isRelational(Pred)) {
+      // If the fact is already implied by a single row, the facts derived from
+      // it for the other system are very likely known already as well.
+      if (ICmpInst::isRelational(Pred) && !Implied) {
         // If samesign is present on the ICmp, simply flip the sign of the
         // predicate, transferring the information from the signed system to the
         // unsigned system, and viceversa.
