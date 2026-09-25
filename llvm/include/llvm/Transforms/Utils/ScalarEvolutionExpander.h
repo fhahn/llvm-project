@@ -425,16 +425,6 @@ public:
   /// that had been serving as the insertion point may have been deleted.
   void clearInsertPoint() { Builder.ClearInsertionPoint(); }
 
-  /// Set location information used by debugging information.
-  void SetCurrentDebugLocation(DebugLoc L) {
-    Builder.SetCurrentDebugLocation(std::move(L));
-  }
-
-  /// Get location information used by debugging information.
-  DebugLoc getCurrentDebugLocation() const {
-    return Builder.getCurrentDebugLocation();
-  }
-
   /// Return true if the specified instruction was inserted by the code
   /// rewriter.  If so, the client should not modify the instruction. Note that
   /// this also includes instructions re-used during expansion.
@@ -464,8 +454,6 @@ public:
   LLVM_ABI void eraseDeadInstructions(Value *Root);
 
 private:
-  LLVMContext &getContext() const { return SE.getContext(); }
-
   /// Recursive helper function for isHighCostExpansion.
   LLVM_ABI bool
   isHighCostExpansionHelper(const SCEVOperand &WorkItem, Loop *L,
