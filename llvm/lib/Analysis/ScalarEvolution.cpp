@@ -3953,9 +3953,7 @@ const SCEV *ScalarEvolution::getMinMaxExpr(SCEVTypes Kind,
 
 namespace {
 
-class SCEVSequentialMinMaxDeduplicatingVisitor final
-    : public SCEVVisitor<SCEVSequentialMinMaxDeduplicatingVisitor,
-                         std::optional<const SCEV *>> {
+class SCEVSequentialMinMaxDeduplicatingVisitor final {
   using RetVal = std::optional<const SCEV *>;
 
   ScalarEvolution &SE;
@@ -3963,36 +3961,29 @@ class SCEVSequentialMinMaxDeduplicatingVisitor final
   const SCEVTypes NonSequentialRootKind; // Non-sequential variant of RootKind.
   SmallPtrSet<const SCEV *, 16> SeenOps;
 
-  bool canRecurseInto(SCEVTypes Kind) const {
-    // We can only recurse into the SCEV expression of the same effective type
-    // as the type of our root SCEV expression.
-    return RootKind == Kind || NonSequentialRootKind == Kind;
-  };
-
+  /// Returns \p S with duplicated operands removed, or std::nullopt if \p S
+  /// drops out of the root expression entirely.
   RetVal visit(const SCEV *S) {
     // Has the whole operand been seen already?
     if (!SeenOps.insert(S).second)
       return std::nullopt;
-    if (isa<SCEVMinMaxExpr, SCEVSequentialMinMaxExpr>(S)) {
-      SCEVTypes Kind = S->getSCEVType();
 
-      if (!canRecurseInto(Kind))
-        return S;
+    // We can only recurse into the SCEV expression of the same effective type
+    // as the type of our root SCEV expression. Any other expression is opaque
+    // to us and is kept as-is.
+    SCEVTypes Kind = S->getSCEVType();
+    if (Kind != RootKind && Kind != NonSequentialRootKind)
+      return S;
 
-      auto *NAry = cast<SCEVNAryExpr>(S);
-      SmallVector<SCEVUse> NewOps;
-      bool Changed = visit(Kind, NAry->operands(), NewOps);
+    SmallVector<SCEVUse> NewOps;
+    if (!visit(cast<SCEVNAryExpr>(S)->operands(), NewOps))
+      return S;
+    if (NewOps.empty())
+      return std::nullopt;
 
-      if (!Changed)
-        return S;
-      if (NewOps.empty())
-        return std::nullopt;
-
-      return isa<SCEVSequentialMinMaxExpr>(S)
-                 ? SE.getSequentialMinMaxExpr(Kind, NewOps)
-                 : SE.getMinMaxExpr(Kind, NewOps);
-    }
-    return S;
+    return isa<SCEVSequentialMinMaxExpr>(S)
+               ? SE.getSequentialMinMaxExpr(Kind, NewOps)
+               : SE.getMinMaxExpr(Kind, NewOps);
   }
 
 public:
@@ -4003,7 +3994,7 @@ public:
             SCEVSequentialMinMaxExpr::getEquivalentNonSequentialSCEVType(
                 RootKind)) {}
 
-  bool /*Changed*/ visit(SCEVTypes Kind, ArrayRef<SCEVUse> OrigOps,
+  bool /*Changed*/ visit(ArrayRef<SCEVUse> OrigOps,
                          SmallVectorImpl<SCEVUse> &NewOps) {
     bool Changed = false;
     SmallVector<SCEVUse> Ops;
@@ -4210,7 +4201,7 @@ ScalarEvolution::getSequentialMinMaxExpr(SCEVTypes Kind,
   // Keep only the first instance of an operand.
   {
     SCEVSequentialMinMaxDeduplicatingVisitor Deduplicator(*this, Kind);
-    bool Changed = Deduplicator.visit(Kind, Ops, Ops);
+    bool Changed = Deduplicator.visit(Ops, Ops);
     if (Changed)
       return getSequentialMinMaxExpr(Kind, Ops);
   }
