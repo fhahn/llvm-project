@@ -513,16 +513,7 @@ SCEVIntegralCastExpr::SCEVIntegralCastExpr(const FoldingSetNodeIDRef ID,
          "Cannot extend or truncate non-integer value!");
 }
 
-void SCEVUnknown::deleted() {
-  // Clear this SCEVUnknown from various maps.
-  SE->forgetMemoizedResults({this});
-
-  // Remove this SCEVUnknown from the uniquing map.
-  SE->UniqueSCEVs.erase(this);
-
-  // Release the value.
-  setValPtr(nullptr);
-}
+void SCEVUnknown::deleted() { allUsesReplacedWith(nullptr); }
 
 void SCEVUnknown::allUsesReplacedWith(Value *New) {
   // Clear this SCEVUnknown from various maps.
