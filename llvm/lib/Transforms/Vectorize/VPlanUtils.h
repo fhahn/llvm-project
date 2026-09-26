@@ -13,6 +13,7 @@
 #include "llvm/Support/BlockFrequency.h"
 #include "llvm/Support/BranchProbability.h"
 #include "llvm/Support/Compiler.h"
+#include <limits>
 
 namespace llvm {
 class DominatorTree;
@@ -230,7 +231,10 @@ reconstructSSA(VPBasicBlock *VPBB, DenseMap<VPBasicBlock *, VPValue *> &Defs);
 /// Denominator of the frequencies computed by computeExecutionFrequencies, i.e.
 /// the frequency of a block that always executes. Wider than
 /// BranchProbability's 31-bit one, which truncates rarely executed blocks to 0.
-inline constexpr uint64_t AlwaysExecutesFreq = 1ULL << 63;
+/// Matches the mass BlockFrequencyInfo distributes from a loop header, so the
+/// frequencies are the masses BlockFrequencyInfo computes, rounded up to 1.
+inline constexpr uint64_t AlwaysExecutesFreq =
+    std::numeric_limits<uint64_t>::max();
 
 /// Returns \p Freq as a BranchProbability, relative to AlwaysExecutesFreq.
 BranchProbability getExecutionProbability(BlockFrequency Freq);

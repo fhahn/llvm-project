@@ -2117,8 +2117,6 @@ static VPExecutionFrequency getExecutionFrequencyFromMD(const MDNode *Node) {
   assert(Node->getNumOperands() <= 2 && "unexpected frequency node shape");
   uint64_t Freq =
       mdconst::extract<ConstantInt>(Node->getOperand(0))->getZExtValue();
-  assert(Freq <= vputils::AlwaysExecutesFreq &&
-         "frequency cannot exceed the one of an always executing block");
   return {BlockFrequency(Freq), Node->getNumOperands() == 2};
 }
 
