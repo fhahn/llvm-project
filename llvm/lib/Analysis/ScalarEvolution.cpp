@@ -471,15 +471,9 @@ static int compareValueComplexity(const AnalysisOptions &Opts,
     if (auto L = LGV->getLinkage() - RGV->getLinkage())
       return L;
 
-    const auto IsGVNameSemantic = [&](const GlobalValue *GV) {
-      auto LT = GV->getLinkage();
-      return !(GlobalValue::isPrivateLinkage(LT) ||
-               GlobalValue::isInternalLinkage(LT));
-    };
-
-    // Use the names to distinguish the two values, but only if the
-    // names are semantically important.
-    if (IsGVNameSemantic(LGV) && IsGVNameSemantic(RGV))
+    // Use the names to distinguish the two values, but only if the names are
+    // semantically important. Both have the same linkage here.
+    if (!LGV->hasLocalLinkage())
       return LGV->getName().compare(RGV->getName());
   }
 
