@@ -12212,6 +12212,113 @@ bool ScalarEvolution::isImpliedCond(CmpPredicate Pred, const SCEV *LHS,
                                     FoundRHS, CtxI);
 }
 
+namespace {
+/// A term Coef * Factors[0] * ... * Factors[N-1] of a linear combination.
+struct LinearTerm {
+  APInt Coef;
+  SmallVector<const SCEV *, 2> Factors;
+};
+} // namespace
+
+/// Decompose Coef * S into a constant, accumulated in \p K, and non-constant
+/// terms appended to \p Terms, distributing constant factors over adds.
+/// Returns false if \p S is too large. Does not create new SCEVs.
+static bool decomposeLinear(const SCEV *S, const APInt &Coef, APInt &K,
+                            SmallVectorImpl<LinearTerm> &Terms,
+                            unsigned Depth = 0) {
+  if (Depth > 3 || Terms.size() > 16)
+    return false;
+  if (auto *C = dyn_cast<SCEVConstant>(S)) {
+    K += Coef * C->getAPInt();
+    return true;
+  }
+  if (isa<SCEVAddExpr>(S))
+    return all_of(S->operands(), [&](const SCEV *Op) {
+      return decomposeLinear(Op, Coef, K, Terms, Depth + 1);
+    });
+  if (auto *Mul = dyn_cast<SCEVMulExpr>(S)) {
+    ArrayRef<SCEVUse> Ops = Mul->operands();
+    APInt NewCoef = Coef;
+    if (auto *C = dyn_cast<SCEVConstant>(Ops[0])) {
+      NewCoef *= C->getAPInt();
+      Ops = Ops.drop_front();
+    }
+    if (Ops.size() == 1 && isa<SCEVAddExpr>(Ops[0]))
+      return decomposeLinear(Ops[0], NewCoef, K, Terms, Depth + 1);
+    Terms.push_back({NewCoef, SmallVector<const SCEV *, 2>(Ops)});
+    return true;
+  }
+  Terms.push_back({Coef, {S}});
+  return true;
+}
+
+/// Return the constant A + B if it folds to one, without creating new SCEVs.
+static std::optional<APInt> computeConstantSum(ScalarEvolution &SE,
+                                               const SCEV *A, const SCEV *B,
+                                               unsigned Depth = 0) {
+  auto *AR = dyn_cast<SCEVAddRecExpr>(A);
+  auto *BR = dyn_cast<SCEVAddRecExpr>(B);
+  if (AR || BR) {
+    // {S1,+,X1} + {S2,+,X2} is the constant S1 + S2 if X1 + X2 == 0.
+    if (!AR || !BR || AR->getLoop() != BR->getLoop() || !AR->isAffine() ||
+        !BR->isAffine() || Depth > 2)
+      return std::nullopt;
+    std::optional<APInt> StepSum =
+        computeConstantSum(SE, AR->getOperand(1), BR->getOperand(1), Depth + 1);
+    if (!StepSum || !StepSum->isZero())
+      return std::nullopt;
+    return computeConstantSum(SE, AR->getStart(), BR->getStart(), Depth + 1);
+  }
+
+  unsigned BW = SE.getTypeSizeInBits(A->getType());
+  APInt K(BW, 0), One(BW, 1);
+  SmallVector<LinearTerm, 8> Terms;
+  if (!decomposeLinear(A, One, K, Terms) || !decomposeLinear(B, One, K, Terms))
+    return std::nullopt;
+  // All non-constant terms must cancel.
+  SmallVector<bool, 16> Merged(Terms.size());
+  for (auto [I, T] : enumerate(Terms)) {
+    if (Merged[I])
+      continue;
+    APInt Sum = T.Coef;
+    for (unsigned J = I + 1, E = Terms.size(); J != E; ++J) {
+      if (!Merged[J] && Terms[J].Factors == T.Factors) {
+        Sum += Terms[J].Coef;
+        Merged[J] = true;
+      }
+    }
+    if (!Sum.isZero())
+      return std::nullopt;
+  }
+  return K;
+}
+
+/// Check whether FoundLHS SwapPred FoundRHS implies LHS Pred RHS, for constant
+/// RHS and FoundRHS, when LHS + FoundLHS is a constant K: FoundLHS lies in the
+/// region R given by the found condition (and its own range), so LHS lies in
+/// K - R. This is equivalent to the implication
+///   LHS Pred RHS  <-  ~FoundLHS Pred ~FoundRHS
+/// checked via ranges, without forming ~LHS.
+static bool isImpliedCondViaNegation(ScalarEvolution &SE, CmpPredicate Pred,
+                                     const SCEV *LHS, const SCEV *RHS,
+                                     const SCEV *FoundLHS,
+                                     const SCEV *FoundRHS) {
+  auto *RHSC = dyn_cast<SCEVConstant>(RHS);
+  auto *FoundRHSC = dyn_cast<SCEVConstant>(FoundRHS);
+  if (!RHSC || !FoundRHSC || LHS->getType()->isPointerTy() ||
+      FoundLHS->getType()->isPointerTy())
+    return false;
+  std::optional<APInt> K = computeConstantSum(SE, LHS, FoundLHS);
+  if (!K)
+    return false;
+  ConstantRange FoundLHSRange =
+      ConstantRange::makeExactICmpRegion(ICmpInst::getSwappedCmpPredicate(Pred),
+                                         FoundRHSC->getAPInt())
+          .intersectWith(SE.getSignedRange(FoundLHS))
+          .intersectWith(SE.getUnsignedRange(FoundLHS));
+  return ConstantRange(*K).sub(FoundLHSRange).icmp(Pred, RHSC->getAPInt());
+}
+
 bool ScalarEvolution::isImpliedCondBalancedTypes(
     CmpPredicate Pred, SCEVUse LHS, SCEVUse RHS, CmpPredicate FoundPred,
     SCEVUse FoundLHS, SCEVUse FoundRHS, const Instruction *CtxI) {
@@ -12251,15 +12358,17 @@ bool ScalarEvolution::isImpliedCondBalancedTypes(
     // using one of the following ways:
     // 1.  LHS Pred      RHS  <-   FoundRHS Pred      FoundLHS
     // 2.  RHS SwapPred  LHS  <-   FoundLHS SwapPred  FoundRHS
-    // Both require swapping the operands of one condition. Don't do this if it
-    // would break canonical constant/addrec ordering.
+    // 3.  LHS Pred      RHS  <-  ~FoundLHS Pred     ~FoundRHS
+    // Forms 1. and 2. require swapping the operands of one condition. Don't
+    // do this if it would break canonical constant/addrec ordering. Form 3. is
+    // only checked via ranges, for constant RHS and FoundRHS.
     if (!isa<SCEVConstant>(RHS) && !isa<SCEVAddRecExpr>(LHS))
       return isImpliedCondOperands(ICmpInst::getSwappedCmpPredicate(*P), RHS,
                                    LHS, FoundLHS, FoundRHS, CtxI);
     if (!isa<SCEVConstant>(FoundRHS) && !isa<SCEVAddRecExpr>(FoundLHS))
       return isImpliedCondOperands(*P, LHS, RHS, FoundRHS, FoundLHS, CtxI);
 
-    return false;
+    return isImpliedCondViaNegation(*this, *P, LHS, RHS, FoundLHS, FoundRHS);
   }
 
   auto IsSignFlippedPredicate = [](CmpInst::Predicate P1,
