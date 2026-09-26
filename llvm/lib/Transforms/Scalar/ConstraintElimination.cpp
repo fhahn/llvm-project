@@ -2378,6 +2378,22 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
     S.addInfoFor(BB);
   }
 
+  // A fact is only on the stack while processing entries in the blocks it
+  // dominates, i.e. with NumIn in [NumIn, NumOut] of the fact. Drop facts
+  // without any check in that range. They cannot be used by any check, and
+  // neither can facts added while they are on the stack.
+  SmallVector<unsigned> CheckNumIns;
+  for (const FactOrCheck &CB : S.WorkList)
+    if (CB.isCheck())
+      CheckNumIns.push_back(CB.NumIn);
+  sort(CheckNumIns);
+  erase_if(S.WorkList, [&CheckNumIns](const FactOrCheck &CB) {
+    if (CB.isCheck())
+      return false;
+    auto *It = lower_bound(CheckNumIns, CB.NumIn);
+    return It == CheckNumIns.end() || *It > CB.NumOut;
+  });
+
   // Next, sort worklist by dominance, so that dominating conditions to check
   // and facts come before conditions and facts dominated by them. If a
   // condition to check and a fact have the same numbers, conditional facts come
