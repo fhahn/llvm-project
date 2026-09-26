@@ -6380,16 +6380,6 @@ static bool verifyExecutionFrequenciesMatchBFI(VPlan &Plan, Loop *OrigLoop,
   if (HeaderFreq == 0)
     return true;
 
-  // The recorded frequencies are scaled by edge probabilities rounded to
-  // BranchProbability's precision, unlike BFI's. Bound the error by 1 ULP of
-  // that precision per edge in the region, relative to the header, plus 1 for
-  // BFI truncating its frequencies.
-  uint64_t Edges = 0;
-  for (const VPBasicBlock *VPBB : Blocks)
-    Edges += VPBB->getNumSuccessors();
-  uint64_t Tolerance =
-      Edges * divideCeil(HeaderFreq, BranchProbability::getDenominator()) + 1;
-
   for (const auto &[VPBB, BB] :
        zip_equal(drop_begin(Blocks), drop_begin(OrigRPO))) {
     // Nothing to check for blocks without a recorded frequency.
@@ -6403,8 +6393,9 @@ static bool verifyExecutionFrequenciesMatchBFI(VPlan &Plan, Loop *OrigLoop,
     uint64_t Computed = (APInt(128, Freq->Freq.getFrequency()) * HeaderFreq)
                             .udiv(APInt(128, vputils::AlwaysExecutesFreq))
                             .getZExtValue();
+    // Allow 1 for BFI truncating its frequencies.
     uint64_t Expected = BFI.getBlockFreq(BB).getFrequency();
-    if (AbsoluteDifference(Computed, Expected) <= Tolerance)
+    if (AbsoluteDifference(Computed, Expected) <= 1)
       continue;
 
     errs() << "Block frequency mismatch for " << VPBB->getName() << ": VPlan "

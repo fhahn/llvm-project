@@ -1269,7 +1269,8 @@ public:
     return getInternalMetadata(EstimatedProfileMDName);
   }
 
-  /// Set estimated branch weights to \p Node.
+  /// Set estimated branch weights to \p Node. These are BPI probability
+  /// numerators, whose sum may differ from the denominator due to rounding.
   void setEstimatedBranchWeights(MDNode *Node) {
     assert(!getMetadata(LLVMContext::MD_prof) &&
            "real profile data takes precedence over an estimate");
