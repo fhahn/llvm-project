@@ -1303,9 +1303,19 @@ void State::addInfoForInductions(BasicBlock &BB) {
 
   const APInt *StepOffset = nullptr;
   const SCEV *StartSCEV = nullptr;
+  APInt GEPOffset;
   if (match(Backedge, m_c_Add(m_Specific(PN), m_APInt(StepOffset)))) {
     if (StepOffset->isZero())
       return;
+  } else if (auto *GEP = dyn_cast<GEPOperator>(Backedge);
+             GEP && GEP->getPointerOperand() == PN) {
+    // Pointer inductions stepping by a constant offset also do not need their
+    // SCEV to be formed.
+    const DataLayout &DL = PN->getDataLayout();
+    GEPOffset = APInt(DL.getIndexTypeSizeInBits(GEP->getType()), 0);
+    if (!GEP->accumulateConstantOffset(DL, GEPOffset) || GEPOffset.isZero())
+      return;
+    StepOffset = &GEPOffset;
   } else {
     const SCEV *Expr = SE.getSCEV(PN);
     if (!match(Expr,
