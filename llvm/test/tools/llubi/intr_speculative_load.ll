@@ -1,7 +1,7 @@
 ; RUN: llubi --verbose --entry-function=first_bytes < %s 2>&1 | FileCheck %s --check-prefix=FIRST
 ; RUN: llubi --verbose --entry-function=last_bytes < %s 2>&1 | FileCheck %s --check-prefix=LAST
 ; RUN: llubi --verbose --entry-function=past_end < %s 2>&1 | FileCheck %s --check-prefix=PAST-END
-; RUN: not llubi --verbose --entry-function=oracle_load < %s 2>&1 | FileCheck %s --check-prefix=ORACLE
+; RUN: llubi --verbose --entry-function=oracle_load < %s 2>&1 | FileCheck %s --check-prefix=ORACLE
 
 @a = global [6 x i32] [i32 0, i32 1, i32 2, i32 3, i32 4, i32 5]
 
@@ -47,8 +47,18 @@ define void @oracle_load() {
 ; ORACLE: Entering function: oracle_load
 ; ORACLE-NEXT:   %p = getelementptr i32, ptr @a, i64 4 => ptr 0x20 [@a + 16]
 ; ORACLE-NEXT:   %end = getelementptr i32, ptr @a, i64 6 => ptr 0x28 [@a + 24]
-; ORACLE-NEXT: Unrecognized instruction:   %r = call <4 x i32> (ptr, i1, ...) @llvm.speculative.load.v4i32.p0(ptr %p, i1 false, ptr @oracle, ptr %p, ptr %end)
-; ORACLE-NEXT: error: Execution of function 'oracle_load' failed.
+; ORACLE-NEXT: Entering function: oracle
+; ORACLE-NEXT:   ptr %p = ptr 0x20 [@a + 16]
+; ORACLE-NEXT:   ptr %end = ptr 0x28 [@a + 24]
+; ORACLE-NEXT:   %p.int = ptrtoaddr ptr %p to i64 => i64 32
+; ORACLE-NEXT:   %end.int = ptrtoaddr ptr %end to i64 => i64 40
+; ORACLE-NEXT:   %diff = sub i64 %end.int, %p.int => i64 8
+; ORACLE-NEXT:   %n = call i64 @llvm.umin.i64(i64 %diff, i64 16) => i64 8
+; ORACLE-NEXT:   ret i64 %n
+; ORACLE-NEXT: Exiting function: oracle
+; ORACLE-NEXT:   %r = call <4 x i32> (ptr, i1, ...) @llvm.speculative.load.v4i32.p0(ptr %p, i1 false, ptr @oracle, ptr %p, ptr %end) => { i32 4, i32 5, poison, poison }
+; ORACLE-NEXT:   ret void
+; ORACLE-NEXT: Exiting function: oracle_load
   %p = getelementptr i32, ptr @a, i64 4
   %end = getelementptr i32, ptr @a, i64 6
   %r = call <4 x i32> (ptr, i1, ...) @llvm.speculative.load.v4i32.p0(ptr %p, i1 false, ptr @oracle, ptr %p, ptr %end)

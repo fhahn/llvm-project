@@ -71,7 +71,18 @@ define void @poison_pointer() {
 
 define void @oracle_out_of_bounds() {
 ; ORACLE-OOB: Entering function: oracle_out_of_bounds
-; ORACLE-OOB-NEXT: Unrecognized instruction:   %r = call <4 x i32> (ptr, i1, ...) @llvm.speculative.load.v4i32.p0(ptr @a, i1 false, ptr @oracle_off_by_one, ptr @a, ptr getelementptr (i8, ptr @a, i64 8))
+; ORACLE-OOB-NEXT: Entering function: oracle_off_by_one
+; ORACLE-OOB-NEXT:   ptr %p = ptr 0xC [@a]
+; ORACLE-OOB-NEXT:   ptr %end = ptr 0x14 [@a + 8]
+; ORACLE-OOB-NEXT:   %p.int = ptrtoaddr ptr %p to i64 => i64 12
+; ORACLE-OOB-NEXT:   %end.int = ptrtoaddr ptr %end to i64 => i64 20
+; ORACLE-OOB-NEXT:   %diff = sub i64 %end.int, %p.int => i64 8
+; ORACLE-OOB-NEXT:   %n = add i64 %diff, 4 => i64 12
+; ORACLE-OOB-NEXT:   ret i64 %n
+; ORACLE-OOB-NEXT: Exiting function: oracle_off_by_one
+; ORACLE-OOB-NEXT: Stacktrace:
+; ORACLE-OOB-NEXT: #0   %r = call <4 x i32> (ptr, i1, ...) @llvm.speculative.load.v4i32.p0(ptr @a, i1 false, ptr @oracle_off_by_one, ptr @a, ptr getelementptr (i8, ptr @a, i64 8)) at @oracle_out_of_bounds <stdin>:{{[0-9]+}}
+; ORACLE-OOB-NEXT: Immediate UB detected: Memory access is out of bounds. Accessed size: 12, Address: 0xc, Object base: 0xc, Object size: 8.
 ; ORACLE-OOB-NEXT: error: Execution of function 'oracle_out_of_bounds' failed.
   %r = call <4 x i32> (ptr, i1, ...) @llvm.speculative.load.v4i32.p0(ptr @a, i1 false, ptr @oracle_off_by_one, ptr @a, ptr getelementptr (i8, ptr @a, i64 8))
   ret void
@@ -79,7 +90,9 @@ define void @oracle_out_of_bounds() {
 
 define void @oracle_declaration() {
 ; ORACLE-DECL: Entering function: oracle_declaration
-; ORACLE-DECL-NEXT: Unrecognized instruction:   %r = call <4 x i32> (ptr, i1, ...) @llvm.speculative.load.v4i32.p0(ptr @a, i1 false, ptr @oracle_decl, i64 4)
+; ORACLE-DECL-NEXT: Stacktrace:
+; ORACLE-DECL-NEXT: #0   %r = call <4 x i32> (ptr, i1, ...) @llvm.speculative.load.v4i32.p0(ptr @a, i1 false, ptr @oracle_decl, i64 4) at @oracle_declaration <stdin>:{{[0-9]+}}
+; ORACLE-DECL-NEXT: Error: Unsupported llvm.speculative.load oracle declaration: oracle_decl.
 ; ORACLE-DECL-NEXT: error: Execution of function 'oracle_declaration' failed.
   %r = call <4 x i32> (ptr, i1, ...) @llvm.speculative.load.v4i32.p0(ptr @a, i1 false, ptr @oracle_decl, i64 4)
   ret void
