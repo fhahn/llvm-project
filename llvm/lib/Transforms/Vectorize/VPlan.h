@@ -1392,8 +1392,10 @@ public:
     /// The lane specifies an index into a vector formed by combining all vector
     /// operands (all operands after the first one).
     ExtractLane,
-    /// Explicit user for the resume phi of the canonical induction in the main
-    /// VPlan, used by the epilogue vector loop.
+    /// Marker in the main VPlan keeping a value available for the epilogue
+    /// VPlan. Operand 0 is the value to keep, operand 1 the value to resume at
+    /// when the main vector loop is bypassed. Generates operand 0, recording
+    /// the generated value as the marker's underlying value.
     ResumeForEpilogue,
     /// Extracts the last active lane from a set of vectors. The first operand
     /// is the default value if no lanes in the masks are active. Conceptually,
