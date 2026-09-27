@@ -1646,16 +1646,15 @@ void VPlanTransforms::addMinimumVectorEpilogueIterationCheck(
   VPValue *TC = Plan.getTripCount();
   Value *TripCount = TC->getLiveInIRValue();
   VPBuilder Builder(cast<VPBasicBlock>(Plan.getEntry()));
-  VPValue *VFxUF = Builder.createExpandSCEV(
+  VPValue *RuntimeVF = Builder.createExpandSCEV(
       SE.getElementCount(TripCount->getType(), EpilogueVF, SCEV::FlagNUW));
   VPValue *Count = Builder.createSub(TC, Plan.getOrAddLiveIn(VectorTripCount),
                                      DebugLoc::getUnknown(), "n.vec.remaining");
 
-  // Generate code to check if the loop's trip count is less than VF * UF of
-  // the vector epilogue loop.
+  // Compare the remaining iteration count to the epilogue vector width.
   auto P = RequiresScalarEpilogue ? ICmpInst::ICMP_ULE : ICmpInst::ICMP_ULT;
   auto *CheckMinIters = Builder.createICmp(
-      P, Count, VFxUF, DebugLoc::getUnknown(), "min.epilog.iters.check");
+      P, Count, RuntimeVF, DebugLoc::getUnknown(), "min.epilog.iters.check");
   VPInstruction *Branch =
       Builder.createNaryOp(VPInstruction::BranchOnCond, CheckMinIters);
 
