@@ -12212,6 +12212,57 @@ bool ScalarEvolution::isImpliedCond(CmpPredicate Pred, const SCEV *LHS,
                                     FoundRHS, CtxI);
 }
 
+/// Return K if S is structurally K - FoundS, i.e. (K + (-1 * FoundS)),
+/// (-1 * FoundS), a constant for constant FoundS, or an affine addrec with
+/// start K - FoundStart and step 0 - FoundStep. Does not create new SCEVs.
+static std::optional<APInt> matchConstantMinus(const SCEV *S,
+                                               const SCEV *FoundS) {
+  using namespace SCEVPatternMatch;
+  const APInt *C, *FoundC;
+  if (match(S, m_scev_APInt(C)) && match(FoundS, m_scev_APInt(FoundC)))
+    return *C + *FoundC;
+
+  const SCEV *Start, *Step, *FoundStart, *FoundStep;
+  const Loop *L;
+  if (match(S, m_scev_AffineAddRec(m_SCEV(Start), m_SCEV(Step), m_Loop(L))) &&
+      match(FoundS, m_scev_AffineAddRec(m_SCEV(FoundStart), m_SCEV(FoundStep),
+                                        m_SpecificLoop(L)))) {
+    std::optional<APInt> StepK = matchConstantMinus(Step, FoundStep);
+    if (!StepK || !StepK->isZero())
+      return std::nullopt;
+    return matchConstantMinus(Start, FoundStart);
+  }
+
+  APInt K = APInt::getZero(FoundS->getType()->getScalarSizeInBits());
+  const SCEV *NegFoundS = S;
+  if (match(S, m_scev_Add(m_scev_APInt(C), m_SCEV(NegFoundS))))
+    K = *C;
+  if (match(NegFoundS, m_scev_Mul(m_scev_AllOnes(), m_scev_Specific(FoundS))))
+    return K;
+  return std::nullopt;
+}
+
+/// Check whether FoundLHS SwapPred FoundRHS implies LHS Pred RHS for constant
+/// RHS and FoundRHS, when LHS is K - FoundLHS: FoundLHS is in the region R
+/// given by the found condition, so LHS is in K - R. This is the range check
+/// of the implication LHS Pred RHS <- ~FoundLHS Pred ~FoundRHS, without
+/// forming ~LHS.
+static bool isImpliedCondViaNegation(CmpPredicate Pred, const SCEV *LHS,
+                                     const SCEV *RHS, const SCEV *FoundLHS,
+                                     const SCEV *FoundRHS) {
+  using namespace SCEVPatternMatch;
+  const APInt *RHSC, *FoundRHSC;
+  if (!match(RHS, m_scev_APInt(RHSC)) ||
+      !match(FoundRHS, m_scev_APInt(FoundRHSC)))
+    return false;
+  std::optional<APInt> K = matchConstantMinus(LHS, FoundLHS);
+  if (!K)
+    return false;
+  ConstantRange FoundLHSRange = ConstantRange::makeExactICmpRegion(
+      ICmpInst::getSwappedCmpPredicate(Pred), *FoundRHSC);
+  return ConstantRange(*K).sub(FoundLHSRange).icmp(Pred, *RHSC);
+}
+
 bool ScalarEvolution::isImpliedCondBalancedTypes(
     CmpPredicate Pred, SCEVUse LHS, SCEVUse RHS, CmpPredicate FoundPred,
     SCEVUse FoundLHS, SCEVUse FoundRHS, const Instruction *CtxI) {
@@ -12251,15 +12302,17 @@ bool ScalarEvolution::isImpliedCondBalancedTypes(
     // using one of the following ways:
     // 1.  LHS Pred      RHS  <-   FoundRHS Pred      FoundLHS
     // 2.  RHS SwapPred  LHS  <-   FoundLHS SwapPred  FoundRHS
-    // Both require swapping the operands of one condition. Don't do this if it
-    // would break canonical constant/addrec ordering.
+    // 3.  LHS Pred      RHS  <-  ~FoundLHS Pred     ~FoundRHS
+    // Forms 1. and 2. require swapping the operands of one condition. Don't
+    // do this if it would break canonical constant/addrec ordering. Form 3. is
+    // only checked via ranges, for constant RHS and FoundRHS.
     if (!isa<SCEVConstant>(RHS) && !isa<SCEVAddRecExpr>(LHS))
       return isImpliedCondOperands(ICmpInst::getSwappedCmpPredicate(*P), RHS,
                                    LHS, FoundLHS, FoundRHS, CtxI);
     if (!isa<SCEVConstant>(FoundRHS) && !isa<SCEVAddRecExpr>(FoundLHS))
       return isImpliedCondOperands(*P, LHS, RHS, FoundRHS, FoundLHS, CtxI);
 
-    return false;
+    return isImpliedCondViaNegation(*P, LHS, RHS, FoundLHS, FoundRHS);
   }
 
   auto IsSignFlippedPredicate = [](CmpInst::Predicate P1,
