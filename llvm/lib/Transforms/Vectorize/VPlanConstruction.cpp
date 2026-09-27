@@ -1464,7 +1464,8 @@ void VPlanTransforms::modelGeneratedMainLoopBlocks(
   // check to the vector preheader's already modeled last predecessor.
   VPBlockBase *MainEntry = MainPlan.getEntry();
   VPBlockBase *MainScalarPH = MainPlan.getScalarPreheader();
-  auto *MainLoopCheck = cast<VPIRBasicBlock>(
+  VPBlockBase *MainLoopCheck = MainScalarPH->getPredecessors().back();
+  auto *EpiMainLoopCheck = cast<VPIRBasicBlock>(
       EnteredFrom->getSuccessors().back()->getPredecessors().back());
   SmallMapVector<VPBlockBase *, VPBlockBase *, 8> MainToEpiVPBB;
   MainToEpiVPBB[MainEntry] = EpiPlan.getEntry();
@@ -1475,8 +1476,8 @@ void VPlanTransforms::modelGeneratedMainLoopBlocks(
     // modeled in the epilogue plan.
     if (VPBB != MainEntry && VPBB != MainScalarPH && VPBB->hasSuccessors())
       MainToEpiVPBB[VPBB] =
-          VPBB->getIRBasicBlock() == MainLoopCheck->getIRBasicBlock()
-              ? MainLoopCheck
+          VPBB == MainLoopCheck
+              ? EpiMainLoopCheck
               : EpiPlan.createEmptyVPIRBasicBlock(VPBB->getIRBasicBlock());
   MainToEpiVPBB[MainScalarPH] = EnteredFrom;
 
