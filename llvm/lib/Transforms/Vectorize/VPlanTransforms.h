@@ -243,6 +243,12 @@ struct VPlanTransforms {
   static void modelGeneratedMainLoopBlocks(VPlan &EpiPlan, VPlan &MainPlan,
                                            VPIRBasicBlock *EnteredFrom);
 
+  /// Model the edge from \p MainPlan's iteration count check for the main
+  /// vector loop to \p Plan's vector preheader, so executing \p Plan redirects
+  /// the branch. It is not reachable from \p Plan's entry until \see
+  /// modelGeneratedMainLoopBlocks runs.
+  static void modelMainLoopCheck(VPlan &Plan, VPlan &MainPlan);
+
   /// Replaces the VPInstructions in \p Plan with corresponding
   /// widen recipes. Returns false if any VPInstructions could not be converted
   /// to a wide recipe if needed. Uses \p PSE to detect contiguous memory

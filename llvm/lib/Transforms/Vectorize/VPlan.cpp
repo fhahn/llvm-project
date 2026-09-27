@@ -424,7 +424,7 @@ void VPBasicBlock::connectToPredecessors(VPTransformState &State) {
       // Set each forward successor here when it is created, excluding
       // backedges. A backward successor is set when the branch is created.
       // Generated successors are redirected, as for the entry block and for
-      // blocks bypassing both vector loops during epilogue vectorization. Edges
+      // blocks bypassing a vector loop during epilogue vectorization. Edges
       // already present in the generated IR need no update; this happens during
       // epilogue vectorization, where the plan models blocks generated for the
       // main vector loop.

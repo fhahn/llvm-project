@@ -1460,9 +1460,12 @@ void VPlanTransforms::modelGeneratedMainLoopBlocks(
     VPlan &EpiPlan, VPlan &MainPlan, VPIRBasicBlock *EnteredFrom) {
   // Map blocks from MainPlan to new, empty VPIRBasicBlocks in EpiPlan, so the
   // skeleton CFG can be modeled explicitly. MainPlan's entry maps to EpiPlan's
-  // now-disconnected entry and its scalar PH to EnteredFrom.
+  // now-disconnected entry, its scalar PH to EnteredFrom and its main loop
+  // check to the vector preheader's already modeled last predecessor.
   VPBlockBase *MainEntry = MainPlan.getEntry();
   VPBlockBase *MainScalarPH = MainPlan.getScalarPreheader();
+  auto *MainLoopCheck = cast<VPIRBasicBlock>(
+      EnteredFrom->getSuccessors().back()->getPredecessors().back());
   SmallMapVector<VPBlockBase *, VPBlockBase *, 8> MainToEpiVPBB;
   MainToEpiVPBB[MainEntry] = EpiPlan.getEntry();
   ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>> RPOT(
@@ -1472,7 +1475,9 @@ void VPlanTransforms::modelGeneratedMainLoopBlocks(
     // modeled in the epilogue plan.
     if (VPBB != MainEntry && VPBB != MainScalarPH && VPBB->hasSuccessors())
       MainToEpiVPBB[VPBB] =
-          EpiPlan.createEmptyVPIRBasicBlock(VPBB->getIRBasicBlock());
+          VPBB->getIRBasicBlock() == MainLoopCheck->getIRBasicBlock()
+              ? MainLoopCheck
+              : EpiPlan.createEmptyVPIRBasicBlock(VPBB->getIRBasicBlock());
   MainToEpiVPBB[MainScalarPH] = EnteredFrom;
 
   // First, connect the edges from the bypass blocks (minimum iteration checks,
@@ -1502,6 +1507,23 @@ void VPlanTransforms::modelGeneratedMainLoopBlocks(
       PhiR->addIncoming(EpiPlan.getOrAddLiveIn(
           PhiR->getIRPhi().getIncomingValueForBlock(Pred->getIRBasicBlock())));
   }
+}
+
+void VPlanTransforms::modelMainLoopCheck(VPlan &Plan, VPlan &MainPlan) {
+  VPBasicBlock *VectorPH = Plan.getVectorPreheader();
+  assert(VectorPH && VectorPH->phis().empty() &&
+         "vector preheader must exist and have no phis to update");
+  // The main loop's iteration count check is the last predecessor added to the
+  // scalar preheader, as its check is added after those bypassing both loops.
+  VPBasicBlock *MainScalarPH = MainPlan.getScalarPreheader();
+  auto *MainCheck =
+      cast<VPIRBasicBlock>(MainScalarPH->getPredecessors().back());
+  assert(MainCheck->getNumSuccessors() == 2 &&
+         MainCheck->getSuccessors()[0] == MainScalarPH &&
+         "the iteration count check must bypass the main vector loop");
+  auto *CheckVPBB =
+      Plan.createEmptyVPIRBasicBlock(MainCheck->getIRBasicBlock());
+  VPBlockUtils::connectBlocks(CheckVPBB, VectorPH);
 }
 
 // Likelyhood of bypassing the vectorized loop due to a runtime check block,
