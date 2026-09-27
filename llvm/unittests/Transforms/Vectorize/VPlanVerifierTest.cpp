@@ -246,6 +246,24 @@ TEST_F(VPVerifierTest, DuplicateSuccessorsOutsideRegion) {
   EXPECT_TRUE(verifyVPlanIsValid(Plan));
 }
 
+TEST_F(VPVerifierTest, UnreachablePredecessor) {
+  VPlan &Plan = getPlan();
+  VPBasicBlock *Join = Plan.createVPBasicBlock("join");
+  VPBasicBlock *Unreachable = Plan.createVPBasicBlock("unreachable");
+  VPBlockUtils::connectBlocks(Plan.getEntry(), Join);
+  VPBlockUtils::connectBlocks(Unreachable, Join);
+  VPBlockUtils::connectBlocks(Join, Plan.getScalarHeader());
+
+#if GTEST_HAS_STREAM_REDIRECTION
+  ::testing::internal::CaptureStderr();
+#endif
+  EXPECT_FALSE(verifyVPlanIsValid(Plan));
+#if GTEST_HAS_STREAM_REDIRECTION
+  EXPECT_STREQ("Predecessor is not reachable from the plan entry.\n",
+               ::testing::internal::GetCapturedStderr().c_str());
+#endif
+}
+
 TEST_F(VPVerifierTest, VectorLoopRegionWithMultiplePredecessors) {
   VPlan &Plan = getPlan();
   VPInstruction *BranchOnCond =
@@ -261,8 +279,7 @@ TEST_F(VPVerifierTest, VectorLoopRegionWithMultiplePredecessors) {
 
   VPRegionBlock *R1 = Plan.createLoopRegion(Type::getInt32Ty(C), DebugLoc(),
                                             "R1", VPBB2, VPBB2);
-  // Connect the region twice, so it does not have a single predecessor and
-  // cannot be reached by following the last successors from the entry.
+  // Connect the region twice, so it does not have a single preheader.
   VPBlockUtils::connectBlocks(VPBB1, R1);
   VPBlockUtils::connectBlocks(VPBB1, R1);
   VPBlockUtils::connectBlocks(R1, Plan.getScalarHeader());
@@ -273,7 +290,7 @@ TEST_F(VPVerifierTest, VectorLoopRegionWithMultiplePredecessors) {
   EXPECT_FALSE(verifyVPlanIsValid(Plan));
 #if GTEST_HAS_STREAM_REDIRECTION
   EXPECT_STREQ("VPlan must have a single top-level loop region, reachable from "
-               "the entry by following the last successor of each block\n",
+               "the entry and with a single preheader\n",
                ::testing::internal::GetCapturedStderr().c_str());
 #endif
 }
@@ -306,7 +323,7 @@ TEST_F(VPVerifierTest, MultipleTopLevelLoopRegions) {
   EXPECT_FALSE(verifyVPlanIsValid(Plan));
 #if GTEST_HAS_STREAM_REDIRECTION
   EXPECT_STREQ("VPlan must have a single top-level loop region, reachable from "
-               "the entry by following the last successor of each block\n",
+               "the entry and with a single preheader\n",
                ::testing::internal::GetCapturedStderr().c_str());
 #endif
 }

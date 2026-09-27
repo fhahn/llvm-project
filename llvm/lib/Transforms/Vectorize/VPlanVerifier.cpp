@@ -359,6 +359,13 @@ bool VPlanVerifier::verifyVPBasicBlock(const VPBasicBlock *VPBB) {
 }
 
 bool VPlanVerifier::verifyBlock(const VPBlockBase *VPB) {
+  for (const VPBlockBase *Pred : VPB->getPredecessors()) {
+    if (!VPDT.isReachableFromEntry(Pred)) {
+      errs() << "Predecessor is not reachable from the plan entry.\n";
+      return false;
+    }
+  }
+
   auto *VPBB = dyn_cast<VPBasicBlock>(VPB);
   // Check block's condition bit.
   if (VPBB && !isa<VPIRBasicBlock>(VPB)) {
@@ -485,10 +492,11 @@ bool VPlanVerifier::verify(const VPlan &Plan) {
   if (any_of(VPBlockUtils::blocksOnly<const VPRegionBlock>(
                  vp_depth_first_shallow(Plan.getEntry())),
              [TopRegion](const VPRegionBlock *R) {
-               return !R->isReplicator() && R != TopRegion;
+               return !R->isReplicator() &&
+                      (R != TopRegion || R->getNumPredecessors() != 1);
              })) {
     errs() << "VPlan must have a single top-level loop region, reachable from "
-              "the entry by following the last successor of each block\n";
+              "the entry and with a single preheader\n";
     return false;
   }
 

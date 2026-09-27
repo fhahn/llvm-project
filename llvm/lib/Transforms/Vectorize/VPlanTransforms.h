@@ -213,12 +213,12 @@ struct VPlanTransforms {
                               const uint32_t *MinItersBypassWeights,
                               DebugLoc DL, PredicatedScalarEvolution &PSE);
 
-  /// Add a check to \p Plan to see if the epilogue vector loop should be
-  /// executed.
+  /// Add a check to \p CheckBlock to see if the epilogue vector loop should be
+  /// executed. \p MainVectorTripCount is the main vector loop's trip count.
   static void addMinimumVectorEpilogueIterationCheck(
-      VPlan &Plan, Value *VectorTripCount, bool RequiresScalarEpilogue,
-      ElementCount EpilogueVF, unsigned MainLoopStep, unsigned EpilogueLoopStep,
-      ScalarEvolution &SE);
+      VPlan &Plan, VPBasicBlock *CheckBlock, VPValue *MainVectorTripCount,
+      bool RequiresScalarEpilogue, ElementCount EpilogueVF, unsigned MainLoopStep,
+      unsigned EpilogueLoopStep, ScalarEvolution &SE);
 
   /// Replace loops in \p Plan's flat CFG with VPRegionBlocks, turning \p Plan's
   /// flat CFG into a hierarchical CFG. For the outermost loop, also create the
@@ -237,11 +237,14 @@ struct VPlanTransforms {
 
   /// Model the blocks the executed \p MainPlan generated for the main vector
   /// loop in \p EpiPlan during epilogue vectorization, wrapping each in a
-  /// VPIRBasicBlock, with \p EnteredFrom the block \p EpiPlan is entered from.
+  /// VPIRBasicBlock. Return the main loop's scalar preheader wrapper, where the
+  /// epilogue iteration check will be added.
   /// Edges from blocks bypassing both vector loops are redirected to \p
-  /// EpiPlan's scalar preheader, all others are mirrored.
-  static void modelGeneratedMainLoopBlocks(VPlan &EpiPlan, VPlan &MainPlan,
-                                           VPIRBasicBlock *EnteredFrom);
+  /// EpiPlan's scalar preheader, all others are mirrored. \p MainPlan must not
+  /// have generated any phis in its scalar preheader, as the mirrored edges
+  /// cannot provide incoming values for them.
+  static VPIRBasicBlock *modelGeneratedMainLoopBlocks(VPlan &EpiPlan,
+                                                    VPlan &MainPlan);
 
   /// Replaces the VPInstructions in \p Plan with corresponding
   /// widen recipes. Returns false if any VPInstructions could not be converted

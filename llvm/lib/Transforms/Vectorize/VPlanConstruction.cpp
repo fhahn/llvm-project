@@ -1456,13 +1456,22 @@ static void insertCheckBlockBeforeVectorLoop(VPlan &Plan,
   addIncomingForLastPredecessor(ScalarPH);
 }
 
-void VPlanTransforms::modelGeneratedMainLoopBlocks(
-    VPlan &EpiPlan, VPlan &MainPlan, VPIRBasicBlock *EnteredFrom) {
+VPIRBasicBlock *
+VPlanTransforms::modelGeneratedMainLoopBlocks(VPlan &EpiPlan, VPlan &MainPlan) {
+  VPBasicBlock *VectorPH = EpiPlan.getVectorPreheader();
+  assert(VectorPH && VectorPH->phis().empty() &&
+         "vector preheader must exist and have no phis to update");
+  auto *MainScalarPH = cast<VPIRBasicBlock>(MainPlan.getScalarPreheader());
+  auto *EpilogueCheck =
+      EpiPlan.createEmptyVPIRBasicBlock(MainScalarPH->getIRBasicBlock());
+  assert(MainScalarPH->getIRBasicBlock()->phis().empty() &&
+         "MainPlan must not have generated phis in its scalar preheader");
+  VPBlockUtils::reassociateBlocks(EpiPlan.getEntry(), EpilogueCheck);
+
   // Map blocks from MainPlan to new, empty VPIRBasicBlocks in EpiPlan, so the
   // skeleton CFG can be modeled explicitly. MainPlan's entry maps to EpiPlan's
-  // now-disconnected entry and its scalar PH to EnteredFrom.
+  // now-disconnected entry and its scalar PH to EpilogueCheck.
   VPBlockBase *MainEntry = MainPlan.getEntry();
-  VPBlockBase *MainScalarPH = MainPlan.getScalarPreheader();
   SmallMapVector<VPBlockBase *, VPBlockBase *, 8> MainToEpiVPBB;
   MainToEpiVPBB[MainEntry] = EpiPlan.getEntry();
   ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>> RPOT(
@@ -1473,7 +1482,15 @@ void VPlanTransforms::modelGeneratedMainLoopBlocks(
     if (VPBB != MainEntry && VPBB != MainScalarPH && VPBB->hasSuccessors())
       MainToEpiVPBB[VPBB] =
           EpiPlan.createEmptyVPIRBasicBlock(VPBB->getIRBasicBlock());
-  MainToEpiVPBB[MainScalarPH] = EnteredFrom;
+  MainToEpiVPBB[MainScalarPH] = EpilogueCheck;
+
+  // The last check only bypasses the main loop. Model its bypass edge to the
+  // epilogue vector preheader before mirroring the remaining main-loop edges.
+  VPBlockBase *MainCheck = MainScalarPH->getPredecessors().back();
+  assert(MainCheck->getNumSuccessors() == 2 &&
+         MainCheck->getSuccessors()[0] == MainScalarPH &&
+         "the iteration count check must bypass the main vector loop");
+  VPBlockUtils::connectBlocks(MainToEpiVPBB.lookup(MainCheck), VectorPH);
 
   // First, connect the edges from the bypass blocks (minimum iteration checks,
   // runtime checks) to the scalar preheader, in reverse order, to preserve the
@@ -1492,16 +1509,7 @@ void VPlanTransforms::modelGeneratedMainLoopBlocks(
          drop_begin(MainVPBB->getSuccessors(), EpiVPBB->getNumSuccessors()))
       if (auto *SuccVPBB = MainToEpiVPBB.lookup(Succ))
         VPBlockUtils::connectBlocks(EpiVPBB, SuccVPBB);
-
-  // EnteredFrom is the only modeled block with phis; re-use the incoming values
-  // its IR phis already have for the new predecessors.
-  for (VPRecipeBase &R : EnteredFrom->phis()) {
-    auto *PhiR = cast<VPIRPhi>(&R);
-    for (VPIRBasicBlock *Pred :
-         VPBlockUtils::blocksAs<VPIRBasicBlock>(EnteredFrom->getPredecessors()))
-      PhiR->addIncoming(EpiPlan.getOrAddLiveIn(
-          PhiR->getIRPhi().getIncomingValueForBlock(Pred->getIRBasicBlock())));
-  }
+  return EpilogueCheck;
 }
 
 // Likelyhood of bypassing the vectorized loop due to a runtime check block,
@@ -1616,16 +1624,16 @@ void VPlanTransforms::addIterationCountCheckBlock(
 }
 
 void VPlanTransforms::addMinimumVectorEpilogueIterationCheck(
-    VPlan &Plan, Value *VectorTripCount, bool RequiresScalarEpilogue,
-    ElementCount EpilogueVF, unsigned MainLoopStep, unsigned EpilogueLoopStep,
-    ScalarEvolution &SE) {
+    VPlan &Plan, VPBasicBlock *CheckBlock, VPValue *MainVectorTripCount,
+    bool RequiresScalarEpilogue, ElementCount EpilogueVF, unsigned MainLoopStep,
+    unsigned EpilogueLoopStep, ScalarEvolution &SE) {
   // Add the minimum iteration check for the epilogue vector loop.
   VPValue *TC = Plan.getTripCount();
-  Value *TripCount = TC->getLiveInIRValue();
-  VPBuilder Builder(cast<VPBasicBlock>(Plan.getEntry()));
-  VPValue *RuntimeVF = Builder.createExpandSCEV(
-      SE.getElementCount(TripCount->getType(), EpilogueVF, SCEV::FlagNUW));
-  VPValue *Count = Builder.createSub(TC, Plan.getOrAddLiveIn(VectorTripCount),
+  // expandSCEVs processes SCEV expansions in the plan entry.
+  VPValue *RuntimeVF = VPBuilder(Plan.getEntry()).createExpandSCEV(
+      SE.getElementCount(TC->getScalarType(), EpilogueVF, SCEV::FlagNUW));
+  VPBuilder Builder(CheckBlock);
+  VPValue *Count = Builder.createSub(TC, MainVectorTripCount,
                                      DebugLoc::getUnknown(), "n.vec.remaining");
 
   // Compare the remaining iteration count to the epilogue vector width.

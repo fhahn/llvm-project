@@ -687,9 +687,9 @@ bool VPBlockUtils::isHeader(const VPBlockBase *VPB,
     return !R->isReplicator() && !VPBB->hasPredecessors();
 
   // A header dominates its second predecessor (the latch), with the other
-  // predecessor being the preheader
-  return VPB->getPredecessors().size() == 2 &&
-         VPDT.dominates(VPB, VPB->getPredecessors()[1]);
+  // predecessor being the preheader.
+  ArrayRef<VPBlockBase *> Preds = VPB->getPredecessors();
+  return Preds.size() == 2 && VPDT.dominates(VPB, Preds[1]);
 }
 
 bool VPBlockUtils::isLatch(const VPBlockBase *VPB,
