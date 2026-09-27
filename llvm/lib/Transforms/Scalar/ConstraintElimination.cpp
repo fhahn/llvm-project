@@ -2412,8 +2412,6 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
                                  TargetLibraryInfo &TLI) {
   bool Changed = false;
   DT.updateDFSNumbers();
-  SmallVector<Value *> FunctionArgs(llvm::make_pointer_range(F.args()));
-  ConstraintInfo Info(F.getDataLayout(), FunctionArgs);
   State S(DT, LI, SE, TLI);
   std::unique_ptr<Module> ReproducerModule(
       DumpReproducers ? new Module(F.getName(), F.getContext()) : nullptr);
@@ -2434,6 +2432,9 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
   for (const FactOrCheck &CB : S.WorkList)
     if (CB.isCheck())
       CheckNumIns.push_back(CB.NumIn);
+  // Without any check, there is nothing to simplify.
+  if (CheckNumIns.empty())
+    return false;
   sort(CheckNumIns);
   erase_if(S.WorkList, [&CheckNumIns](const FactOrCheck &CB) {
     if (CB.isCheck())
@@ -2475,6 +2476,8 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
     return A.NumIn < B.NumIn;
   });
 
+  SmallVector<Value *> FunctionArgs(llvm::make_pointer_range(F.args()));
+  ConstraintInfo Info(F.getDataLayout(), FunctionArgs);
   SmallVector<Instruction *> ToRemove;
 
   // Finally, process ordered worklist and eliminate implied conditions.
