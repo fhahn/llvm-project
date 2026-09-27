@@ -7472,9 +7472,8 @@ preparePlanForEpilogueVectorLoop(VPlan &Plan, const SCEV2ValueTy &ExpandedSCEVs,
 
   // For some VPValues in the epilogue plan we must re-use the generated IR
   // values from the main plan. Replace them with live-in VPValues.
-  // TODO: This is a workaround needed for epilogue vectorization and it
-  // should be removed once induction resume value creation is done
-  // directly in VPlan.
+  // TODO: Remove this workaround once the main and epilogue VPlans are
+  // explicitly connected.
   for (auto &R : make_early_inc_range(*Plan.getEntry())) {
     // Re-use frozen values from the main plan for Freeze VPInstructions in the
     // epilogue plan. This ensures all users use the same frozen value.
