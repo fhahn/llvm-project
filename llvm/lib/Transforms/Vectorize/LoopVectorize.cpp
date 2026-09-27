@@ -6380,12 +6380,15 @@ static bool verifyExecutionFrequenciesMatchBFI(VPlan &Plan, Loop *OrigLoop,
   if (HeaderFreq == 0)
     return true;
 
-  // BFI's fixed-point mass propagation loses up to 1 ULP per edge, so bound the
-  // error by the number of edges in the region.
+  // The recorded frequencies are scaled by edge probabilities rounded to
+  // BranchProbability's precision, unlike BFI's. Bound the error by 1 ULP of
+  // that precision per edge in the region, relative to the header, plus 1 for
+  // BFI truncating its frequencies.
   uint64_t Edges = 0;
   for (const VPBasicBlock *VPBB : Blocks)
     Edges += VPBB->getNumSuccessors();
-  uint64_t Tolerance = Edges + BranchProbability::getDenominator() / HeaderFreq;
+  uint64_t Tolerance =
+      Edges * divideCeil(HeaderFreq, BranchProbability::getDenominator()) + 1;
 
   for (const auto &[VPBB, BB] :
        zip_equal(drop_begin(Blocks), drop_begin(OrigRPO))) {
@@ -6394,14 +6397,14 @@ static bool verifyExecutionFrequenciesMatchBFI(VPlan &Plan, Loop *OrigLoop,
         getRecordedExecutionFrequency(VPBB);
     if (!Freq)
       continue;
-    BranchProbability Computed = vputils::getExecutionProbability(Freq->Freq);
 
-    // Clamp to the header's frequency, which BFI's rounding may exceed.
-    uint64_t BBFreq = BFI.getBlockFreq(BB).getFrequency();
-    BranchProbability Expected = BranchProbability::getBranchProbability(
-        std::min(BBFreq, HeaderFreq), HeaderFreq);
-    if (AbsoluteDifference(Computed.getNumerator(), Expected.getNumerator()) <=
-        Tolerance)
+    // Scale the recorded frequency, relative to AlwaysExecutesFreq, to BFI's
+    // frequency of the header.
+    uint64_t Computed = (APInt(128, Freq->Freq.getFrequency()) * HeaderFreq)
+                            .udiv(APInt(128, vputils::AlwaysExecutesFreq))
+                            .getZExtValue();
+    uint64_t Expected = BFI.getBlockFreq(BB).getFrequency();
+    if (AbsoluteDifference(Computed, Expected) <= Tolerance)
       continue;
 
     errs() << "Block frequency mismatch for " << VPBB->getName() << ": VPlan "
