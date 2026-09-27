@@ -1493,21 +1493,13 @@ void VPlanTransforms::modelGeneratedMainLoopBlocks(
 
   // Mirror MainPlan's CFG, skipping the bypass edges connected above, which
   // come first, and edges to blocks not modeled in EpiPlan.
+  assert(EnteredFrom->phis().empty() &&
+         "MainPlan must not have generated phis in its scalar preheader");
   for (auto &[MainVPBB, EpiVPBB] : drop_end(MainToEpiVPBB))
     for (VPBlockBase *Succ :
          drop_begin(MainVPBB->getSuccessors(), EpiVPBB->getNumSuccessors()))
       if (auto *SuccVPBB = MainToEpiVPBB.lookup(Succ))
         VPBlockUtils::connectBlocks(EpiVPBB, SuccVPBB);
-
-  // EnteredFrom is the only modeled block with phis; re-use the incoming values
-  // its IR phis already have for the new predecessors.
-  for (VPRecipeBase &R : EnteredFrom->phis()) {
-    auto *PhiR = cast<VPIRPhi>(&R);
-    for (VPIRBasicBlock *Pred :
-         VPBlockUtils::blocksAs<VPIRBasicBlock>(EnteredFrom->getPredecessors()))
-      PhiR->addIncoming(EpiPlan.getOrAddLiveIn(
-          PhiR->getIRPhi().getIncomingValueForBlock(Pred->getIRBasicBlock())));
-  }
 }
 
 void VPlanTransforms::modelMainLoopCheck(VPlan &Plan, VPlan &MainPlan) {

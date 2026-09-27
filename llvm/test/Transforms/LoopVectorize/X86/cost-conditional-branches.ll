@@ -466,37 +466,37 @@ define void @cost_duplicate_recipe_for_sinking(ptr %A, i64 %N) #2 {
 ; CHECK-NEXT:    [[TMP77:%.*]] = fcmp oeq <4 x double> [[STRIDED_VEC41]], zeroinitializer
 ; CHECK-NEXT:    [[TMP78:%.*]] = extractelement <4 x i1> [[TMP77]], i64 0
 ; CHECK-NEXT:    br i1 [[TMP78]], label [[PRED_STORE_IF42:%.*]], label [[PRED_STORE_CONTINUE43:%.*]]
-; CHECK:       pred.store.if43:
+; CHECK:       pred.store.if42:
 ; CHECK-NEXT:    store double 0.000000e+00, ptr [[TMP76]], align 8
 ; CHECK-NEXT:    br label [[PRED_STORE_CONTINUE43]]
-; CHECK:       pred.store.continue44:
+; CHECK:       pred.store.continue43:
 ; CHECK-NEXT:    [[TMP79:%.*]] = extractelement <4 x i1> [[TMP77]], i64 1
 ; CHECK-NEXT:    br i1 [[TMP79]], label [[PRED_STORE_IF44:%.*]], label [[PRED_STORE_CONTINUE45:%.*]]
-; CHECK:       pred.store.if45:
+; CHECK:       pred.store.if44:
 ; CHECK-NEXT:    [[TMP80:%.*]] = add i64 [[INDEX39]], 1
 ; CHECK-NEXT:    [[TMP81:%.*]] = shl nsw i64 [[TMP80]], 2
 ; CHECK-NEXT:    [[TMP82:%.*]] = getelementptr double, ptr [[A]], i64 [[TMP81]]
 ; CHECK-NEXT:    store double 0.000000e+00, ptr [[TMP82]], align 8
 ; CHECK-NEXT:    br label [[PRED_STORE_CONTINUE45]]
-; CHECK:       pred.store.continue46:
+; CHECK:       pred.store.continue45:
 ; CHECK-NEXT:    [[TMP83:%.*]] = extractelement <4 x i1> [[TMP77]], i64 2
 ; CHECK-NEXT:    br i1 [[TMP83]], label [[PRED_STORE_IF46:%.*]], label [[PRED_STORE_CONTINUE47:%.*]]
-; CHECK:       pred.store.if47:
+; CHECK:       pred.store.if46:
 ; CHECK-NEXT:    [[TMP84:%.*]] = add i64 [[INDEX39]], 2
 ; CHECK-NEXT:    [[TMP85:%.*]] = shl nsw i64 [[TMP84]], 2
 ; CHECK-NEXT:    [[TMP86:%.*]] = getelementptr double, ptr [[A]], i64 [[TMP85]]
 ; CHECK-NEXT:    store double 0.000000e+00, ptr [[TMP86]], align 8
 ; CHECK-NEXT:    br label [[PRED_STORE_CONTINUE47]]
-; CHECK:       pred.store.continue48:
+; CHECK:       pred.store.continue47:
 ; CHECK-NEXT:    [[TMP87:%.*]] = extractelement <4 x i1> [[TMP77]], i64 3
 ; CHECK-NEXT:    br i1 [[TMP87]], label [[PRED_STORE_IF48:%.*]], label [[PRED_STORE_CONTINUE49]]
-; CHECK:       pred.store.if49:
+; CHECK:       pred.store.if48:
 ; CHECK-NEXT:    [[TMP88:%.*]] = add i64 [[INDEX39]], 3
 ; CHECK-NEXT:    [[TMP89:%.*]] = shl nsw i64 [[TMP88]], 2
 ; CHECK-NEXT:    [[TMP90:%.*]] = getelementptr double, ptr [[A]], i64 [[TMP89]]
 ; CHECK-NEXT:    store double 0.000000e+00, ptr [[TMP90]], align 8
 ; CHECK-NEXT:    br label [[PRED_STORE_CONTINUE49]]
-; CHECK:       pred.store.continue50:
+; CHECK:       pred.store.continue49:
 ; CHECK-NEXT:    [[INDEX_NEXT50]] = add nuw i64 [[INDEX39]], 4
 ; CHECK-NEXT:    [[TMP91:%.*]] = icmp eq i64 [[INDEX_NEXT50]], [[N_VEC38]]
 ; CHECK-NEXT:    br i1 [[TMP91]], label [[VEC_EPILOG_MIDDLE_BLOCK:%.*]], label [[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]

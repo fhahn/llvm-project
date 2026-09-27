@@ -239,7 +239,9 @@ struct VPlanTransforms {
   /// loop in \p EpiPlan during epilogue vectorization, wrapping each in a
   /// VPIRBasicBlock, with \p EnteredFrom the block \p EpiPlan is entered from.
   /// Edges from blocks bypassing both vector loops are redirected to \p
-  /// EpiPlan's scalar preheader, all others are mirrored.
+  /// EpiPlan's scalar preheader, all others are mirrored. \p MainPlan must not
+  /// have generated any phis in its scalar preheader, as the mirrored edges
+  /// cannot provide incoming values for them.
   static void modelGeneratedMainLoopBlocks(VPlan &EpiPlan, VPlan &MainPlan,
                                            VPIRBasicBlock *EnteredFrom);
 
