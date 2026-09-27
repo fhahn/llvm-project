@@ -5997,6 +5997,12 @@ void EpilogueVectorizerMainLoop::printDebugTracesAtEnd() {
 // EpilogueVectorizerEpilogueLoop
 //===--------------------------------------------------------------------===//
 
+/// Returns the value the executed main VPlan generated for \p MainV as a
+/// live-in of \p EpiPlan.
+static VPValue *getMainPlanValueAsLiveIn(VPlan &EpiPlan, const VPValue *MainV) {
+  return EpiPlan.getOrAddLiveIn(MainV->getUnderlyingValue());
+}
+
 /// This function creates a new scalar preheader, using the previous one as
 /// entry block to the epilogue VPlan. The minimum iteration check is being
 /// represented in VPlan.
@@ -7373,16 +7379,13 @@ preparePlanForMainVectorLoop(VPlan &MainPlan, VPlan &EpiPlan) {
 }
 
 /// Prepare \p Plan for vectorizing the epilogue loop. That is, re-use expanded
-/// SCEVs from \p ExpandedSCEVs and set resume values for header recipes. Some
-/// reductions require creating new instructions to compute the resume values.
-/// They are collected in a vector and returned. They must be moved to the
-/// preheader of the vector epilogue loop, after created by the execution of \p
-/// Plan.
-static SmallVector<Instruction *> preparePlanForEpilogueVectorLoop(
+/// SCEVs from \p ExpandedSCEVs and set resume values for header recipes.
+static void preparePlanForEpilogueVectorLoop(
     VPlan &MainPlan, VPlan &Plan, Loop *L, const SCEV2ValueTy &ExpandedSCEVs,
     EpilogueLoopVectorizationInfo &EPI, LoopVectorizationPlanner &LVP,
     VFSelectionContext &Config, ScalarEvolution &SE,
     ArrayRef<VPInstruction *> ResumeValues) {
+  using namespace VPlanPatternMatch;
   // Build a map from the scalar-header PHI to the ResumeForEpilogue markers
   // from the main plan.
   // TODO: Replace the IR PHI key.
@@ -7399,13 +7402,12 @@ static SmallVector<Instruction *> preparePlanForEpilogueVectorLoop(
   // at the resume value from the main vector loop. Find the resume value
   // created during execution of the main VPlan. Add this resume value as an
   // offset to the canonical IV of the epilogue loop.
-  using namespace llvm::PatternMatch;
   VPInstruction *ResumeForEpilogue =
       cast<VPInstruction>(&*MainPlan.getScalarPreheader()->getFirstNonPhi());
   Value *EPResumeVal = ResumeForEpilogue->getUnderlyingValue();
   if (auto *ResumePhi = dyn_cast<PHINode>(EPResumeVal)) {
     for (Value *Inc : ResumePhi->incoming_values()) {
-      if (match(Inc, m_SpecificInt(0)))
+      if (PatternMatch::match(Inc, PatternMatch::m_SpecificInt(0)))
         continue;
       assert(!EPI.VectorTripCount &&
              "Must only have a single non-zero incoming value");
@@ -7415,7 +7417,8 @@ static SmallVector<Instruction *> preparePlanForEpilogueVectorLoop(
     // must be zero, which also means the vector trip count is zero.
     if (!EPI.VectorTripCount) {
       assert(ResumePhi->getNumIncomingValues() > 0 &&
-             all_of(ResumePhi->incoming_values(), match_fn(m_SpecificInt(0))) &&
+             all_of(ResumePhi->incoming_values(),
+                    PatternMatch::match_fn(PatternMatch::m_SpecificInt(0))) &&
              "all incoming values must be 0");
       EPI.VectorTripCount = ResumePhi->getIncomingValue(0);
     }
@@ -7447,117 +7450,96 @@ static SmallVector<Instruction *> preparePlanForEpilogueVectorLoop(
   OffsetIVInc->setOperand(0, Increment);
 
   DenseMap<Value *, Value *> ToFrozen;
-  SmallVector<Instruction *> InstsToMove;
+  VPBasicBlock *VectorPH = Plan.getVectorPreheader();
   // Ensure that the start values for all header phi recipes are updated before
   // vectorizing the epilogue loop.
   for (VPRecipeBase &R : Header->phis()) {
-    Value *ResumeV = nullptr;
-    // TODO: Move setting of resume values to prepareToExecute.
-    if (auto *ReductionPhi = dyn_cast<VPReductionPHIRecipe>(&R)) {
+    auto *PhiR = cast<VPHeaderPHIRecipe>(&R);
+    auto *ReductionPhi = dyn_cast<VPReductionPHIRecipe>(&R);
+    VPInstruction *ResumeForEpi =
+        IRPhiToResumeForEpi.at(cast<PHINode>(PhiR->getUnderlyingInstr()));
+    VPValue *StartVal = getMainPlanValueAsLiveIn(Plan, ResumeForEpi);
+    if (ReductionPhi) {
       // Find the reduction result by searching users of the phi or its backedge
       // value.
-      auto IsReductionResult = [](VPRecipeBase *R) {
-        auto *VPI = dyn_cast<VPInstruction>(R);
-        return VPI && VPI->getOpcode() == VPInstruction::ComputeReductionResult;
-      };
-      auto *RdxResult = cast<VPInstruction>(
-          vputils::findRecipe(ReductionPhi->getBackedgeValue(), IsReductionResult));
-      assert(RdxResult && "expected to find reduction result");
-
-      VPInstruction *ResumeForEpi = IRPhiToResumeForEpi.at(
-          cast<PHINode>(ReductionPhi->getUnderlyingInstr()));
-      ResumeV = ResumeForEpi->getUnderlyingValue();
+      auto *RdxResult = cast<VPInstruction>(vputils::findRecipe(
+          ReductionPhi->getBackedgeValue(),
+          match_fn(m_VPInstruction<VPInstruction::ComputeReductionResult>())));
 
       // Check for FindIV pattern by looking for icmp user of RdxResult.
       // The pattern is: select(icmp ne RdxResult, Sentinel), RdxResult, Start
-      using namespace VPlanPatternMatch;
       VPValue *SentinelVPV = nullptr;
       bool IsFindIV = any_of(RdxResult->users(), [&](VPUser *U) {
-        return match(U, VPlanPatternMatch::m_SpecificICmp(
-                            ICmpInst::ICMP_NE, m_Specific(RdxResult),
-                            m_VPValue(SentinelVPV)));
+        return match(U, m_SpecificICmp(ICmpInst::ICMP_NE, m_Specific(RdxResult),
+                                       m_VPValue(SentinelVPV)));
       });
 
       RecurKind RK = ReductionPhi->getRecurrenceKind();
       if (RecurrenceDescriptor::isAnyOfRecurrenceKind(RK) || IsFindIV) {
-        auto *ResumePhi = cast<PHINode>(ResumeV);
         VPValue *BypassOp = ResumeForEpi->getOperand(1);
         assert((isa<VPIRValue>(BypassOp) ||
-                VPlanPatternMatch::match(
-                    BypassOp,
-                    m_VPInstruction<Instruction::Freeze>(m_VPValue()))) &&
+                match(BypassOp, m_Freeze(m_VPValue()))) &&
                "expected live-in or Freeze");
-        Value *StartV = BypassOp->getUnderlyingValue();
-        IRBuilder<> Builder(ResumePhi->getParent(),
-                            ResumePhi->getParent()->getFirstNonPHIIt());
+        VPValue *StartV = getMainPlanValueAsLiveIn(Plan, BypassOp);
+        VPBuilder PHBuilder(VectorPH, VectorPH->getFirstNonPhi());
 
         if (RecurrenceDescriptor::isAnyOfRecurrenceKind(RK)) {
-          // VPReductionPHIRecipes for AnyOf reductions expect a boolean as
-          // start value; compare the final value from the main vector loop
-          // to the start value.
-          ResumeV = Builder.CreateICmpNE(ResumeV, StartV);
-          if (auto *I = dyn_cast<Instruction>(ResumeV))
-            InstsToMove.push_back(I);
+          // AnyOf reductions expect a boolean start value; compare the
+          // resume value from the main vector loop to the start value.
+          StartVal = PHBuilder.createICmp(CmpInst::ICMP_NE, StartVal, StartV);
         } else {
           assert(SentinelVPV && "expected to find icmp using RdxResult");
-          if (auto *FreezeI = dyn_cast<FreezeInst>(StartV))
-            ToFrozen[FreezeI->getOperand(0)] = StartV;
+          assert(!SentinelVPV->getDefiningRecipe() &&
+                 "sentinel must be a live-in to be used in the preheader");
+          if (auto *FreezeI = dyn_cast<FreezeInst>(StartV->getLiveInIRValue()))
+            ToFrozen[FreezeI->getOperand(0)] = FreezeI;
 
           // Adjust resume: select(icmp eq ResumeV, StartV), Sentinel, ResumeV
-          Value *Cmp = Builder.CreateICmpEQ(ResumeV, StartV);
-          if (auto *I = dyn_cast<Instruction>(Cmp))
-            InstsToMove.push_back(I);
-          ResumeV = Builder.CreateSelect(Cmp, SentinelVPV->getLiveInIRValue(),
-                                         ResumeV);
-          if (auto *I = dyn_cast<Instruction>(ResumeV))
-            InstsToMove.push_back(I);
+          VPValue *Cmp =
+              PHBuilder.createICmp(CmpInst::ICMP_EQ, StartVal, StartV);
+          StartVal = PHBuilder.createSelect(Cmp, SentinelVPV, StartVal);
         }
-      } else {
-        VPValue *StartVal = Plan.getOrAddLiveIn(ResumeV);
-        auto *PhiR = dyn_cast<VPReductionPHIRecipe>(&R);
-        if (auto *VPI = dyn_cast<VPInstruction>(PhiR->getStartValue())) {
-          assert(VPI->getOpcode() == VPInstruction::ReductionStartVector &&
-                 "unexpected start value");
-          // Partial sub-reductions always start at 0 and account for the
-          // reduction start value in a final subtraction. Update it to use the
-          // resume value from the main vector loop.
-          if (PhiR->getVFScaleFactor() > 1 &&
-              RecurrenceDescriptor::isSubRecurrenceKind(
-                  PhiR->getRecurrenceKind())) {
-            auto *Sub = cast<VPInstruction>(RdxResult->getSingleUser());
-            assert((Sub->getOpcode() == Instruction::Sub ||
-                    Sub->getOpcode() == Instruction::FSub) &&
-                   "Unexpected opcode");
-            assert(isa<VPIRValue>(Sub->getOperand(0)) &&
-                   "Expected operand to match the original start value of the "
-                   "reduction");
-            // For integer sub-reductions, verify start value is zero.
-            // For FP sub-reductions, verify start value is negative zero.
-            [[maybe_unused]] auto StartValueIsIdentity = [&] {
-              Value *IdentityValue = getRecurrenceIdentity(
-                  PhiR->getRecurrenceKind(), ResumeV->getType(),
-                  PhiR->getFastMathFlagsOrNone());
-              auto *StartValue = dyn_cast<VPIRValue>(VPI->getOperand(0));
-              return StartValue && StartValue->getValue() == IdentityValue;
-            };
-            assert(StartValueIsIdentity() &&
-                   "Expected start value for partial sub-reduction to be zero "
-                   "(or negative zero)");
+        // materializeBroadcasts does not cover the vector preheader; broadcast
+        // here to keep the recipes above single scalar.
+        if (!Plan.hasScalarVFOnly() && !ReductionPhi->isInLoop())
+          StartVal =
+              PHBuilder.createNaryOp(VPInstruction::Broadcast, {StartVal});
+      } else if (auto *VPI =
+                     dyn_cast<VPInstruction>(ReductionPhi->getStartValue())) {
+        assert(VPI->getOpcode() == VPInstruction::ReductionStartVector &&
+               "unexpected start value");
+        // Partial sub-reductions always start at 0 and account for the
+        // reduction start value in a final subtraction. Update it to use the
+        // resume value from the main vector loop.
+        if (ReductionPhi->getVFScaleFactor() > 1 &&
+            RecurrenceDescriptor::isSubRecurrenceKind(RK)) {
+          auto *Sub = cast<VPInstruction>(RdxResult->getSingleUser());
+          assert((Sub->getOpcode() == Instruction::Sub ||
+                  Sub->getOpcode() == Instruction::FSub) &&
+                 "Unexpected opcode");
+          assert(isa<VPIRValue>(Sub->getOperand(0)) &&
+                 "Expected operand to match the original start value of the "
+                 "reduction");
+          // For integer sub-reductions, verify start value is zero.
+          // For FP sub-reductions, verify start value is negative zero.
+          [[maybe_unused]] auto StartValueIsIdentity = [&] {
+            Value *IdentityValue =
+                getRecurrenceIdentity(RK, StartVal->getScalarType(),
+                                      ReductionPhi->getFastMathFlagsOrNone());
+            auto *StartValue = dyn_cast<VPIRValue>(VPI->getOperand(0));
+            return StartValue && StartValue->getValue() == IdentityValue;
+          };
+          assert(StartValueIsIdentity() &&
+                 "Expected start value for partial sub-reduction to be zero "
+                 "(or negative zero)");
 
-            Sub->setOperand(0, StartVal);
-          } else
-            VPI->setOperand(0, StartVal);
-          continue;
-        }
+          Sub->setOperand(0, StartVal);
+        } else
+          VPI->setOperand(0, StartVal);
+        continue;
       }
-    } else {
-      // Retrieve the induction resume value via ResumeForEpilogue.
-      PHINode *IndPhi = cast<VPWidenInductionRecipe>(&R)->getPHINode();
-      ResumeV = IRPhiToResumeForEpi.at(IndPhi)->getUnderlyingValue();
     }
-    assert(ResumeV && "Must have a resume value");
-    VPValue *StartVal = Plan.getOrAddLiveIn(ResumeV);
-    cast<VPHeaderPHIRecipe>(&R)->setStartValue(StartVal);
+    PhiR->setStartValue(StartVal);
   }
 
   // For some VPValues in the epilogue plan we must re-use the generated IR
@@ -7600,8 +7582,6 @@ static SmallVector<Instruction *> preparePlanForEpilogueVectorLoop(
                  EPI.VectorTripCount, Plan.requiresScalarEpilogue(),
                  EPI.EpilogueVF, EPI.EpilogueUF, MainLoopStep, EpilogueLoopStep,
                  SE);
-
-  return InstsToMove;
 }
 
 static void
@@ -7629,12 +7609,9 @@ fixScalarResumeValuesFromBypass(BasicBlock *BypassBlock, VPlan &BestEpiPlan,
 
 /// Connect the epilogue vector loop generated for \p EpiPlan to the main vector
 /// loop, after both plans have executed, updating the branch from the iteration
-/// count check of the main loop, as well as updating various phis. \p
-/// InstsToMove contains instructions that need to be moved to the preheader of
-/// the epilogue vector loop.
+/// count check of the main loop, as well as updating various phis.
 static void connectEpilogueVectorLoop(VPlan &EpiPlan, DominatorTree *DT,
                                       VPIRBasicBlock *VecEpilogueIterCheckVPBB,
-                                      ArrayRef<Instruction *> InstsToMove,
                                       ArrayRef<VPInstruction *> ResumeValues) {
   ArrayRef<VPBlockBase *> Preds = VecEpilogueIterCheckVPBB->getPredecessors();
   BasicBlock *MainLoopIterationCountCheck =
@@ -7666,10 +7643,6 @@ static void connectEpilogueVectorLoop(VPlan &EpiPlan, DominatorTree *DT,
         VecEpilogueIterationCountCheck->getSinglePredecessor(),
         VecEpilogueIterationCountCheck);
   }
-
-  auto IP = VecEpiloguePreHeader->getFirstNonPHIIt();
-  for (auto *I : InstsToMove)
-    I->moveBefore(IP);
 
   // VecEpilogueIterationCountCheck conditionally skips over the epilogue loop
   // after executing the main loop. We need to update the resume values of
@@ -8156,16 +8129,16 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     // edges from the first pass.
     EpilogueVectorizerEpilogueLoop EpilogILV(L, PSE, LI, DT, TTI, AC, EPI,
                                              Checks, BestEpiPlan, BestMainPlan);
-    SmallVector<Instruction *> InstsToMove = preparePlanForEpilogueVectorLoop(
-        BestMainPlan, BestEpiPlan, L, ExpandedSCEVs, EPI, LVP, Config,
-        *PSE.getSE(), ResumeValues);
+    preparePlanForEpilogueVectorLoop(BestMainPlan, BestEpiPlan, L,
+                                     ExpandedSCEVs, EPI, LVP, Config,
+                                     *PSE.getSE(), ResumeValues);
     RUN_VPLAN_PASS(VPlanTransforms::simplifyLiveInsWithSCEV, BestEpiPlan, PSE);
     LVP.executePlan(
         EPI.EpilogueVF, EPI.EpilogueUF, BestEpiPlan, EpilogILV, DT,
         LoopVectorizationPlanner::EpilogueVectorizationKind::Epilogue);
     connectEpilogueVectorLoop(BestEpiPlan, DT,
                               EpilogILV.VecEpilogueIterationCountCheck,
-                              InstsToMove, ResumeValues);
+                              ResumeValues);
     ++LoopsEpilogueVectorized;
   } else {
     InnerLoopVectorizer LB(L, PSE, LI, DT, TTI, AC, VF.Width, IC, Checks,

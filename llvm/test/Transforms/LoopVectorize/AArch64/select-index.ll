@@ -1031,13 +1031,13 @@ define i32 @test_multi_use_reduction_with_trunc_iv(ptr %src, i32 %n) {
 ; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[TMP0]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 1, %[[VECTOR_PH]] ]
 ; CHECK-NEXT:    [[BC_MERGE_RDX:%.*]] = phi i32 [ [[RDX_SELECT]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_PH]] ]
 ; CHECK-NEXT:    [[BC_MERGE_RDX17:%.*]] = phi i32 [ [[TMP10]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_PH]] ]
-; CHECK-NEXT:    [[TMP31:%.*]] = icmp eq i32 [[BC_MERGE_RDX]], 0
-; CHECK-NEXT:    [[TMP32:%.*]] = select i1 [[TMP31]], i32 0, i32 [[BC_MERGE_RDX]]
 ; CHECK-NEXT:    [[N_MOD_VF18:%.*]] = and i64 [[N_EXT]], 3
 ; CHECK-NEXT:    [[N_VEC19:%.*]] = sub i64 [[N_EXT]], [[N_MOD_VF18]]
-; CHECK-NEXT:    [[TMP33:%.*]] = add i64 1, [[N_VEC19]]
+; CHECK-NEXT:    [[TMP33:%.*]] = icmp eq i32 [[BC_MERGE_RDX]], 0
+; CHECK-NEXT:    [[TMP32:%.*]] = select i1 [[TMP33]], i32 0, i32 [[BC_MERGE_RDX]]
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT20:%.*]] = insertelement <4 x i32> poison, i32 [[TMP32]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT21:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT20]], <4 x i32> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP35:%.*]] = add i64 1, [[N_VEC19]]
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT22:%.*]] = insertelement <4 x i32> poison, i32 [[BC_MERGE_RDX17]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT23:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT22]], <4 x i32> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP34:%.*]] = trunc i64 [[BC_RESUME_VAL]] to i32
@@ -1072,7 +1072,7 @@ define i32 @test_multi_use_reduction_with_trunc_iv(ptr %src, i32 %n) {
 ; CHECK-NEXT:    [[CMP_N35:%.*]] = icmp eq i64 [[N_EXT]], [[N_VEC19]]
 ; CHECK-NEXT:    br i1 [[CMP_N35]], label %[[EXIT_LOOPEXIT]], label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:
-; CHECK-NEXT:    [[BC_RESUME_VAL35:%.*]] = phi i64 [ [[TMP33]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[TMP0]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 1, %[[LOOP_PREHEADER]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL35:%.*]] = phi i64 [ [[TMP35]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[TMP0]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 1, %[[LOOP_PREHEADER]] ]
 ; CHECK-NEXT:    [[BC_MERGE_RDX36:%.*]] = phi i32 [ [[TMP46]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[RDX_SELECT]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[LOOP_PREHEADER]] ]
 ; CHECK-NEXT:    [[BC_MERGE_RDX37:%.*]] = phi i32 [ [[TMP41]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[TMP10]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[LOOP_PREHEADER]] ]
 ; CHECK-NEXT:    br label %[[LOOP1:.*]]
