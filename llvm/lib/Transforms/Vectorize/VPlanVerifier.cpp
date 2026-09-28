@@ -359,6 +359,13 @@ bool VPlanVerifier::verifyVPBasicBlock(const VPBasicBlock *VPBB) {
 }
 
 bool VPlanVerifier::verifyBlock(const VPBlockBase *VPB) {
+  for (const VPBlockBase *Pred : VPB->getPredecessors()) {
+    if (!VPDT.isReachableFromEntry(Pred)) {
+      errs() << "Predecessor is not reachable from the plan entry.\n";
+      return false;
+    }
+  }
+
   auto *VPBB = dyn_cast<VPBasicBlock>(VPB);
   // Check block's condition bit.
   if (VPBB && !isa<VPIRBasicBlock>(VPB)) {

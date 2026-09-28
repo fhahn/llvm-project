@@ -246,6 +246,22 @@ TEST_F(VPVerifierTest, DuplicateSuccessorsOutsideRegion) {
   EXPECT_TRUE(verifyVPlanIsValid(Plan));
 }
 
+TEST_F(VPVerifierTest, UnreachablePredecessor) {
+  VPlan &Plan = getPlan();
+  VPBasicBlock *Unreachable = Plan.createVPBasicBlock("unreachable");
+  VPBlockUtils::connectBlocks(Plan.getEntry(), Plan.getScalarHeader());
+  VPBlockUtils::connectBlocks(Unreachable, Plan.getScalarHeader());
+
+#if GTEST_HAS_STREAM_REDIRECTION
+  ::testing::internal::CaptureStderr();
+#endif
+  EXPECT_FALSE(verifyVPlanIsValid(Plan));
+#if GTEST_HAS_STREAM_REDIRECTION
+  EXPECT_STREQ("Predecessor is not reachable from the plan entry.\n",
+               ::testing::internal::GetCapturedStderr().c_str());
+#endif
+}
+
 TEST_F(VPVerifierTest, VectorLoopRegionWithMultiplePredecessors) {
   VPlan &Plan = getPlan();
   VPInstruction *BranchOnCond =
