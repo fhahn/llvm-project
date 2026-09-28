@@ -18,8 +18,7 @@ define i32 @divide_exit(i32 %step, i1 %enter) {
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    br i1 true, label %[[EXIT:.*]], label %[[LOOP]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = mul i32 [[STEP]], 9
-; CHECK-NEXT:    [[TMP1:%.*]] = udiv i32 [[TMP0]], 3
+; CHECK-NEXT:    [[TMP1:%.*]] = mul i32 [[STEP]], 3
 ; CHECK-NEXT:    ret i32 [[TMP1]]
 ; CHECK:       [[BYPASS]]:
 ; CHECK-NEXT:    [[BARE:%.*]] = mul i32 [[STEP]], 9
@@ -61,8 +60,8 @@ define i32 @divide_exit_common_factor(i32 %step, i1 %enter) {
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    br i1 true, label %[[EXIT:.*]], label %[[LOOP]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = mul i32 [[STEP]], 9
-; CHECK-NEXT:    [[TMP1:%.*]] = udiv i32 [[TMP0]], 6
+; CHECK-NEXT:    [[TMP0:%.*]] = mul i32 [[STEP]], 3
+; CHECK-NEXT:    [[TMP1:%.*]] = lshr i32 [[TMP0]], 1
 ; CHECK-NEXT:    ret i32 [[TMP1]]
 ; CHECK:       [[BYPASS]]:
 ; CHECK-NEXT:    [[BARE:%.*]] = mul i32 [[STEP]], 9
@@ -151,8 +150,7 @@ define i32 @divide_exit_bypass_first(i32 %step, i1 %enter) {
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    br i1 true, label %[[EXIT:.*]], label %[[LOOP]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = mul i32 [[STEP]], 9
-; CHECK-NEXT:    [[TMP1:%.*]] = udiv i32 [[TMP0]], 3
+; CHECK-NEXT:    [[TMP1:%.*]] = mul i32 [[STEP]], 3
 ; CHECK-NEXT:    ret i32 [[TMP1]]
 ;
 entry:
@@ -178,4 +176,99 @@ loop:
 exit:
   %last = phi i32 [ %quotient, %loop ]
   ret i32 %last
+}
+
+; Signed no-wrap does not justify unsigned cancellation for negative steps.
+define i32 @divide_exit_nsw(i32 %step, i1 %enter) {
+; CHECK-LABEL: define i32 @divide_exit_nsw(
+; CHECK-SAME: i32 [[STEP:%.*]], i1 [[ENTER:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    br i1 [[ENTER]], label %[[PREHEADER:.*]], label %[[BYPASS:.*]]
+; CHECK:       [[PREHEADER]]:
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    br i1 true, label %[[EXIT:.*]], label %[[LOOP]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = mul i32 [[STEP]], 9
+; CHECK-NEXT:    [[TMP1:%.*]] = udiv i32 [[TMP0]], 3
+; CHECK-NEXT:    ret i32 [[TMP1]]
+; CHECK:       [[BYPASS]]:
+; CHECK-NEXT:    [[BARE:%.*]] = mul i32 [[STEP]], 9
+; CHECK-NEXT:    [[WRAPPING_QUOTIENT:%.*]] = udiv i32 [[BARE]], 3
+; CHECK-NEXT:    ret i32 [[WRAPPING_QUOTIENT]]
+;
+entry:
+  br i1 %enter, label %preheader, label %bypass
+
+preheader:
+  br label %loop
+
+loop:
+  %iv = phi i32 [ 0, %preheader ], [ %next, %loop ]
+  %count = phi i32 [ 0, %preheader ], [ %count.next, %loop ]
+  %quotient = udiv i32 %iv, 3
+  %next = add nsw i32 %iv, %step
+  %count.next = add i32 %count, 1
+  %done = icmp eq i32 %count.next, 10
+  br i1 %done, label %exit, label %loop
+
+exit:
+  %last = phi i32 [ %quotient, %loop ]
+  ret i32 %last
+
+bypass:
+  %bare = mul i32 %step, 9
+  %wrapping.quotient = udiv i32 %bare, 3
+  ret i32 %wrapping.quotient
+}
+
+; Freeze prevents using the recurrence no-wrap fact for the dividend.
+define i32 @divide_exit_freeze(i32 %step, i1 %enter) {
+; CHECK-LABEL: define i32 @divide_exit_freeze(
+; CHECK-SAME: i32 [[STEP:%.*]], i1 [[ENTER:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    br i1 [[ENTER]], label %[[PREHEADER:.*]], label %[[BYPASS:.*]]
+; CHECK:       [[PREHEADER]]:
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ 0, %[[PREHEADER]] ], [ [[NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[COUNT:%.*]] = phi i32 [ 0, %[[PREHEADER]] ], [ [[COUNT_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[FROZEN:%.*]] = freeze i32 [[IV]]
+; CHECK-NEXT:    [[QUOTIENT:%.*]] = udiv i32 [[FROZEN]], 3
+; CHECK-NEXT:    [[NEXT]] = add nuw i32 [[IV]], [[STEP]]
+; CHECK-NEXT:    [[COUNT_NEXT]] = add nuw nsw i32 [[COUNT]], 1
+; CHECK-NEXT:    [[DONE:%.*]] = icmp eq i32 [[COUNT_NEXT]], 10
+; CHECK-NEXT:    br i1 [[DONE]], label %[[EXIT:.*]], label %[[LOOP]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    [[LAST:%.*]] = phi i32 [ [[QUOTIENT]], %[[LOOP]] ]
+; CHECK-NEXT:    ret i32 [[LAST]]
+; CHECK:       [[BYPASS]]:
+; CHECK-NEXT:    [[BARE:%.*]] = mul i32 [[STEP]], 9
+; CHECK-NEXT:    [[WRAPPING_QUOTIENT:%.*]] = udiv i32 [[BARE]], 3
+; CHECK-NEXT:    ret i32 [[WRAPPING_QUOTIENT]]
+;
+entry:
+  br i1 %enter, label %preheader, label %bypass
+
+preheader:
+  br label %loop
+
+loop:
+  %iv = phi i32 [ 0, %preheader ], [ %next, %loop ]
+  %count = phi i32 [ 0, %preheader ], [ %count.next, %loop ]
+  %frozen = freeze i32 %iv
+  %quotient = udiv i32 %frozen, 3
+  %next = add nuw i32 %iv, %step
+  %count.next = add i32 %count, 1
+  %done = icmp eq i32 %count.next, 10
+  br i1 %done, label %exit, label %loop
+
+exit:
+  %last = phi i32 [ %quotient, %loop ]
+  ret i32 %last
+
+bypass:
+  %bare = mul i32 %step, 9
+  %wrapping.quotient = udiv i32 %bare, 3
+  ret i32 %wrapping.quotient
 }

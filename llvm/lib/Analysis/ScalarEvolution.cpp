@@ -826,7 +826,7 @@ static bool hasHugeExpression(ArrayRef<SCEVUse> Ops) {
 ///  * If a constant satisfies \p IsAbsorber, return it.
 ///  * Sort operands by complexity.
 template <typename FoldT, typename IsIdentityT, typename IsAbsorberT>
-static const SCEV *
+static SCEVUse
 constantFoldAndGroupOps(ScalarEvolution &SE, LoopInfo &LI, DominatorTree &DT,
                         SmallVectorImpl<SCEVUse> &Ops, FoldT Fold,
                         IsIdentityT IsIdentity, IsAbsorberT IsAbsorber) {
@@ -857,7 +857,9 @@ constantFoldAndGroupOps(ScalarEvolution &SE, LoopInfo &LI, DominatorTree &DT,
   if (Folded && !IsIdentity(Folded->getAPInt()))
     Ops.insert(Ops.begin(), Folded);
 
-  return Ops.size() == 1 ? Ops[0] : nullptr;
+  if (Ops.size() == 1)
+    return Ops[0];
+  return nullptr;
 }
 
 //===----------------------------------------------------------------------===//
@@ -2534,7 +2536,7 @@ SCEVUse ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
   assert(NumPtrs <= 1 && "add has at most one pointer operand");
 #endif
 
-  const SCEV *Folded = constantFoldAndGroupOps(
+  SCEVUse Folded = constantFoldAndGroupOps(
       *this, LI, DT, Ops,
       [](const APInt &C1, const APInt &C2) { return C1 + C2; },
       [](const APInt &C) { return C.isZero(); }, // identity
@@ -3148,7 +3150,7 @@ SCEVUse ScalarEvolution::getMulExpr(SmallVectorImpl<SCEVUse> &Ops,
            "SCEVMulExpr operand types don't match!");
 #endif
 
-  const SCEV *Folded = constantFoldAndGroupOps(
+  SCEVUse Folded = constantFoldAndGroupOps(
       *this, LI, DT, Ops,
       [](const APInt &C1, const APInt &C2) { return C1 * C2; },
       [](const APInt &C) { return C.isOne(); },   // identity
@@ -3567,7 +3569,7 @@ const SCEV *ScalarEvolution::getUDivExpr(SCEVUse LHS, SCEVUse RHS) {
         }
       // (A*B)/C --> A*(B/C) if safe and B/C can be folded.
       if (const SCEVMulExpr *M = dyn_cast<SCEVMulExpr>(LHS)) {
-        if (M->hasNoUnsignedWrap()) {
+        if (hasFlags(LHS.getNoWrapFlags(), SCEV::FlagNUW)) {
           // Find an operand that's safely divisible.
           for (unsigned i = 0, e = M->getNumOperands(); i != e; ++i) {
             const SCEV *Op = M->getOperand(i);

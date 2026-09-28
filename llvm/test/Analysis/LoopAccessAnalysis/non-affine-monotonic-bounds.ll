@@ -292,7 +292,7 @@ define void @symbolic_step_nuw_udiv(ptr %a, ptr %b, i64 %N, i64 %s) {
 ; CHECK-NEXT:          (Low: %b High: (%N + %b))
 ; CHECK-NEXT:            Member: {%b,+,1}<nuw><%loop>
 ; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %a High: (1 + (((-1 + %N) * %s) /u 64) + %a))
+; CHECK-NEXT:          (Low: %a High: (1 + (((-1 + %N) * %s)<u nuw> /u 64) + %a))
 ; CHECK-NEXT:            Member: (({0,+,%s}<nuw><%loop> /u 64) + %a)<nuw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
