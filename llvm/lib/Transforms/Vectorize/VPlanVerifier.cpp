@@ -429,6 +429,11 @@ bool VPlanVerifier::verifyBlock(const VPBlockBase *VPB) {
       errs() << "Missing successor link.\n";
       return false;
     }
+
+    if (!VPDT.isReachableFromEntry(Pred)) {
+      errs() << "Predecessor is not reachable from the plan entry.\n";
+      return false;
+    }
   }
   return !VPBB || verifyVPBasicBlock(VPBB);
 }
