@@ -16,17 +16,10 @@ define i64 @shifted_start(ptr %dst, i32 %a, i32 %b, i1 %enter) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    br i1 [[ENTER]], label %[[PREHEADER:.*]], label %[[BYPASS:.*]]
 ; CHECK:       [[PREHEADER]]:
-; CHECK-NEXT:    [[A_WIDE:%.*]] = zext i32 [[A]] to i64
-; CHECK-NEXT:    [[B_WIDE:%.*]] = zext i32 [[B]] to i64
-; CHECK-NEXT:    [[OFFSET:%.*]] = add i64 [[A_WIDE]], [[B_WIDE]]
-; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[B]], [[A]]
-; CHECK-NEXT:    [[TMP1:%.*]] = zext i32 [[TMP0]] to i64
-; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[TMP1]], [[OFFSET]]
-; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP2]]
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[LSR_IV:%.*]] = phi i64 [ [[LSR_IV_NEXT:%.*]], %[[LOOP]] ], [ 0, %[[PREHEADER]] ]
-; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[SCEVGEP]], i64 [[LSR_IV]]
+; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[DST]], i64 [[LSR_IV]]
 ; CHECK-NEXT:    store i8 0, ptr [[SCEVGEP1]], align 1
 ; CHECK-NEXT:    [[LSR_IV_NEXT]] = add nuw nsw i64 [[LSR_IV]], 1
 ; CHECK-NEXT:    [[TMP:%.*]] = trunc i64 [[LSR_IV_NEXT]] to i32
@@ -273,17 +266,10 @@ define i64 @shifted_start_bypass_first(ptr %dst, i32 %a, i32 %b, i1 %enter) {
 ; CHECK-NEXT:    [[BARE_WIDE:%.*]] = zext i32 [[BARE]] to i64
 ; CHECK-NEXT:    ret i64 [[BARE_WIDE]]
 ; CHECK:       [[PREHEADER]]:
-; CHECK-NEXT:    [[A_WIDE:%.*]] = zext i32 [[A]] to i64
-; CHECK-NEXT:    [[B_WIDE:%.*]] = zext i32 [[B]] to i64
-; CHECK-NEXT:    [[OFFSET:%.*]] = add i64 [[A_WIDE]], [[B_WIDE]]
-; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[B]], [[A]]
-; CHECK-NEXT:    [[TMP1:%.*]] = zext i32 [[TMP0]] to i64
-; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[TMP1]], [[OFFSET]]
-; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP2]]
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[LSR_IV:%.*]] = phi i64 [ [[LSR_IV_NEXT:%.*]], %[[LOOP]] ], [ 0, %[[PREHEADER]] ]
-; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[SCEVGEP]], i64 [[LSR_IV]]
+; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[DST]], i64 [[LSR_IV]]
 ; CHECK-NEXT:    store i8 0, ptr [[SCEVGEP1]], align 1
 ; CHECK-NEXT:    [[LSR_IV_NEXT]] = add nuw nsw i64 [[LSR_IV]], 1
 ; CHECK-NEXT:    [[TMP:%.*]] = trunc i64 [[LSR_IV_NEXT]] to i32

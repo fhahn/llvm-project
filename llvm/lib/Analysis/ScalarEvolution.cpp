@@ -1766,14 +1766,20 @@ const SCEV *ScalarEvolution::getZeroExtendExprImpl(SCEVUse Op, Type *Ty,
                        getZeroExtendExpr(Div->getRHS(), Ty, Depth + 1));
 
   if (auto *SA = dyn_cast<SCEVAddExpr>(Op)) {
-    // zext((A + B + ...)<nuw>) --> (zext(A) + zext(B) + ...)<nuw>
-    if (SA->hasNoUnsignedWrap()) {
+    // zext((A + B + ...)<nuw>) --> (zext(A) + zext(B) + ...)
+    if (SA->hasNoUnsignedWrap() ||
+        (SA->getNumOperands() == 2 &&
+         hasFlags(Op.getNoWrapFlags(), SCEV::FlagNUW))) {
       // If the addition does not unsign overflow then we can, by definition,
       // commute the zero extension with the addition operation.
       SmallVector<SCEVUse, 4> Ops;
       for (SCEVUse Op : SA->operands())
         Ops.push_back(getZeroExtendExpr(Op, Ty, Depth + 1));
-      return getAddExpr(Ops, SCEV::FlagNUW, Depth + 1);
+      // Recursive extension may use scoped flags and produce operands whose
+      // values differ outside their original uses. Do not transfer NUW to the
+      // widened expression in that case.
+      return getAddExpr(Ops, Op.isCanonical() ? SCEV::FlagNUW : SCEV::FlagNone,
+                        Depth + 1);
     }
 
     const APInt *C, *C2;
@@ -1812,14 +1818,17 @@ const SCEV *ScalarEvolution::getZeroExtendExprImpl(SCEVUse Op, Type *Ty,
   }
 
   if (auto *SM = dyn_cast<SCEVMulExpr>(Op)) {
-    // zext((A * B * ...)<nuw>) --> (zext(A) * zext(B) * ...)<nuw>
+    // zext((A * B * ...)<nuw>) --> (zext(A) * zext(B) * ...)
     if (SM->hasNoUnsignedWrap()) {
       // If the multiply does not unsign overflow then we can, by definition,
       // commute the zero extension with the multiply operation.
       SmallVector<SCEVUse, 4> Ops;
       for (SCEVUse Op : SM->operands())
         Ops.push_back(getZeroExtendExpr(Op, Ty, Depth + 1));
-      return getMulExpr(Ops, SCEV::FlagNUW, Depth + 1);
+      // As for addition, recursively using scoped flags must not strengthen
+      // the shared widened expression.
+      return getMulExpr(Ops, Op.isCanonical() ? SCEV::FlagNUW : SCEV::FlagNone,
+                        Depth + 1);
     }
 
     // zext(2^K * (trunc X to iN)) to iM ->
@@ -2936,7 +2945,16 @@ SCEVUse ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
         if (!isGuaranteedToTransferExecutionTo(DefI, ReachI))
           AddFlags = SCEV::FlagNone;
       }
-      AddRecOps[0] = getAddExpr(LIOps, AddFlags, Depth + 1);
+      // For a binary integer addition of nonconstant operands, the first
+      // iteration evaluates this exact start sum. Preserve NUW for that use
+      // even when it does not hold throughout the wider scope of its operands.
+      auto StartFlags = SCEV::FlagNone;
+      if (Ops.size() == 1 && LIOps.size() == 2 &&
+          LIOps[0]->getType()->isIntegerTy() &&
+          LIOps[1]->getType()->isIntegerTy() &&
+          !isa<SCEVConstant>(LIOps[0]) && !isa<SCEVConstant>(LIOps[1]))
+        StartFlags = maskFlags(Flags, SCEV::FlagNUW);
+      AddRecOps[0] = getAddExpr(LIOps, {AddFlags, StartFlags}, Depth + 1);
 
       // Build the new addrec. Propagate the NUW and NSW flags if both the
       // outer add and the inner addrec are guaranteed to have no overflow.

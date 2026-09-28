@@ -297,15 +297,24 @@ define i1 @test2_a(i32 %a, i32 %b, i1 %will_overflow) {
 ; CHECK-NEXT:    %iv = phi i32 [ %a, %entry ], [ %iv.next, %loop ]
 ; CHECK-NEXT:    --> {%a,+,%b}<nuw><nsw><%loop> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = add nuw nsw i32 %iv, %b
-; CHECK-NEXT:    --> {(%a + %b),+,%b}<nuw><nsw><%loop> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(%a + %b)<u nuw>,+,%b}<nuw><nsw><%loop> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %trap = udiv i32 %a, %iv.next
-; CHECK-NEXT:    --> (%a /u {(%a + %b),+,%b}<nuw><nsw><%loop>) U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> (%a /u {(%a + %b)<u nuw>,+,%b}<nuw><nsw><%loop>) U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %c = add i32 %a, %b
 ; CHECK-NEXT:    --> (%a + %b) U: full-set S: full-set
 ; CHECK-NEXT:  Determining loop execution counts for: @test2_a
 ; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
 ; CHECK-NEXT:  Loop %loop: Unpredictable constant max backedge-taken count.
 ; CHECK-NEXT:  Loop %loop: Unpredictable symbolic max backedge-taken count.
+; CHECK-NEXT:  Loop %loop: Predicated backedge-taken count is ((((-1 * (%a + %b)) + (-1 * (1 umin ((-1 * (%a + %b)) + ((%a + %b) umax %a))))<nuw><nsw> + ((%a + %b) umax %a)) /u (1 umax %b)) + (1 umin ((-1 * (%a + %b)) + ((%a + %b) umax %a))))
+; CHECK-NEXT:   Predicates:
+; CHECK-NEXT:      Compare predicate: %b sgt) 0
+; CHECK-NEXT:  Loop %loop: Predicated constant max backedge-taken count is i32 -1
+; CHECK-NEXT:   Predicates:
+; CHECK-NEXT:      Compare predicate: %b sgt) 0
+; CHECK-NEXT:  Loop %loop: Predicated symbolic max backedge-taken count is ((((-1 * (%a + %b)) + (-1 * (1 umin ((-1 * (%a + %b)) + ((%a + %b) umax %a))))<nuw><nsw> + ((%a + %b) umax %a)) /u (1 umax %b)) + (1 umin ((-1 * (%a + %b)) + ((%a + %b) umax %a))))
+; CHECK-NEXT:   Predicates:
+; CHECK-NEXT:      Compare predicate: %b sgt) 0
 ;
 entry:
   br i1 %will_overflow, label %exit1, label %loop
@@ -335,13 +344,22 @@ define i1 @test2_b(i32 %a, i32 %b, i1 %will_overflow) {
 ; CHECK-NEXT:    %iv = phi i32 [ %a, %entry ], [ %iv.next, %loop ]
 ; CHECK-NEXT:    --> {%a,+,%b}<nuw><nsw><%loop> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = add nuw nsw i32 %iv, %b
-; CHECK-NEXT:    --> {(%a + %b),+,%b}<nuw><nsw><%loop> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(%a + %b)<u nuw>,+,%b}<nuw><nsw><%loop> U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %trap = udiv i32 %a, %iv.next
-; CHECK-NEXT:    --> (%a /u {(%a + %b),+,%b}<nuw><nsw><%loop>) U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> (%a /u {(%a + %b)<u nuw>,+,%b}<nuw><nsw><%loop>) U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @test2_b
 ; CHECK-NEXT:  Loop %loop: Unpredictable backedge-taken count.
 ; CHECK-NEXT:  Loop %loop: Unpredictable constant max backedge-taken count.
 ; CHECK-NEXT:  Loop %loop: Unpredictable symbolic max backedge-taken count.
+; CHECK-NEXT:  Loop %loop: Predicated backedge-taken count is ((((-1 * (%a + %b)) + (-1 * (1 umin ((-1 * (%a + %b)) + ((%a + %b) umax %a))))<nuw><nsw> + ((%a + %b) umax %a)) /u (1 umax %b)) + (1 umin ((-1 * (%a + %b)) + ((%a + %b) umax %a))))
+; CHECK-NEXT:   Predicates:
+; CHECK-NEXT:      Compare predicate: %b sgt) 0
+; CHECK-NEXT:  Loop %loop: Predicated constant max backedge-taken count is i32 -1
+; CHECK-NEXT:   Predicates:
+; CHECK-NEXT:      Compare predicate: %b sgt) 0
+; CHECK-NEXT:  Loop %loop: Predicated symbolic max backedge-taken count is ((((-1 * (%a + %b)) + (-1 * (1 umin ((-1 * (%a + %b)) + ((%a + %b) umax %a))))<nuw><nsw> + ((%a + %b) umax %a)) /u (1 umax %b)) + (1 umin ((-1 * (%a + %b)) + ((%a + %b) umax %a))))
+; CHECK-NEXT:   Predicates:
+; CHECK-NEXT:      Compare predicate: %b sgt) 0
 ;
 entry:
   br i1 %will_overflow, label %exit1, label %loop

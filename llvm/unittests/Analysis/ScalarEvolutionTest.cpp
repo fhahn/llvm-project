@@ -2317,17 +2317,27 @@ TEST_F(ScalarEvolutionsTest, CastsOfUsesWithNoWrapFlags) {
       EXPECT_NE(Cast, Canon);
     };
     CheckCast(SE.getTruncateExpr(NUWAdd, I16), SE.getTruncateExpr(Add, I16));
-    CheckCast(SE.getZeroExtendExpr(NUWAdd, I64),
-              SE.getZeroExtendExpr(Add, I64));
+    // Zero extension commutes with the non-wrapping use, but not with the
+    // wrapping sum. The original expression must not gain NUW.
+    const SCEV *WideAdd = SE.getAddExpr(
+        SE.getZeroExtendExpr(Add->operands()[0], I64),
+        SE.getZeroExtendExpr(Add->operands()[1], I64));
+    EXPECT_EQ(SE.getZeroExtendExpr(NUWAdd, I64), WideAdd);
+    const SCEV *PlainZExt = SE.getZeroExtendExpr(Add, I64);
+    ASSERT_TRUE(isa<SCEVZeroExtendExpr>(PlainZExt));
+    EXPECT_EQ(cast<SCEVZeroExtendExpr>(PlainZExt)->getOperand(), Add);
+    EXPECT_NE(WideAdd, PlainZExt);
+    EXPECT_FALSE(cast<SCEVAddExpr>(Add)->hasNoUnsignedWrap());
     CheckCast(SE.getSignExtendExpr(NUWAdd, I64),
               SE.getSignExtendExpr(Add, I64));
     CheckCast(SE.getCastExpr(scTruncate, NUWAdd, I16),
               SE.getCastExpr(scTruncate, Add, I16));
-    CheckCast(SE.getCastExpr(scZeroExtend, NUWAdd, I64),
-              SE.getCastExpr(scZeroExtend, Add, I64));
+    EXPECT_EQ(SE.getCastExpr(scZeroExtend, NUWAdd, I64), WideAdd);
+    EXPECT_EQ(SE.getCastExpr(scZeroExtend, Add, I64), PlainZExt);
     CheckCast(SE.getCastExpr(scSignExtend, NUWAdd, I64),
               SE.getCastExpr(scSignExtend, Add, I64));
-    CheckCast(SE.getAnyExtendExpr(NUWAdd, I64), SE.getAnyExtendExpr(Add, I64));
+    EXPECT_EQ(SE.getAnyExtendExpr(NUWAdd, I64), WideAdd);
+    EXPECT_EQ(SE.getAnyExtendExpr(Add, I64), PlainZExt);
   });
 }
 
