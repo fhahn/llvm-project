@@ -420,6 +420,14 @@ public:
   /// system implies it or because ValueTracking can prove it.
   bool isKnownPositive(Value *V);
 
+  /// Returns true if a single row implies `Op + Slack <= W` (for an LE \p Pred)
+  /// or `W + Slack <= Op` (for a GE \p Pred), for a non-poison integer W no
+  /// wider than \p Op. As W is within the type limits of \p Op, this bounds
+  /// \p Op away from the limit by \p Slack, which the systems cannot derive as
+  /// they do not contain the type limits.
+  bool hasLimitWitness(CmpInst::Predicate Pred, Value *Op,
+                       const APInt &Slack) const;
+
   void addFact(CmpInst::Predicate Pred, Value *A, Value *B, unsigned NumIn,
                unsigned NumOut, SmallVectorImpl<StackEntry> &DFSInStack);
 
@@ -535,18 +543,20 @@ static bool doesHoldInRange(ConstraintInfo &Info, Value *Op,
                         : APInt::getMinValue(BitWidth);
   APInt MaxVal = Signed ? APInt::getSignedMaxValue(BitWidth)
                         : APInt::getMaxValue(BitWidth);
+  // Computed before Max is clamped below.
+  APInt UpperSlack = MaxVal - Max;
   // Replace bound too large to be decomposed by the largest usable one.
   if (!Signed && Max.uge(MaxConstraintValue))
     Max = APInt(BitWidth, MaxConstraintValue - 1);
 
   Type *Ty = Op->getType();
-  if (Min != MinVal &&
-      !Info.doesHold(Signed ? CmpInst::ICMP_SGE : CmpInst::ICMP_UGE, Op,
-                     ConstantInt::get(Ty, Min)))
+  auto GEPred = Signed ? CmpInst::ICMP_SGE : CmpInst::ICMP_UGE;
+  auto LEPred = Signed ? CmpInst::ICMP_SLE : CmpInst::ICMP_ULE;
+  if (Min != MinVal && !Info.doesHold(GEPred, Op, ConstantInt::get(Ty, Min)) &&
+      !Info.hasLimitWitness(GEPred, Op, Min - MinVal))
     return false;
-  if (Max != MaxVal &&
-      !Info.doesHold(Signed ? CmpInst::ICMP_SLE : CmpInst::ICMP_ULE, Op,
-                     ConstantInt::get(Ty, Max)))
+  if (Max != MaxVal && !Info.doesHold(LEPred, Op, ConstantInt::get(Ty, Max)) &&
+      !Info.hasLimitWitness(LEPred, Op, UpperSlack))
     return false;
   return true;
 }
@@ -1034,6 +1044,30 @@ bool ConstraintInfo::isKnownPositive(Value *V) {
     return CI->getValue().isStrictlyPositive();
   return ::isKnownPositive(V, DL) ||
          doesHold(CmpInst::ICMP_SGT, V, ConstantInt::get(V->getType(), 0));
+}
+
+bool ConstraintInfo::hasLimitWitness(CmpInst::Predicate Pred, Value *Op,
+                                     const APInt &Slack) const {
+  if (Slack.ugt(MaxConstraintValue))
+    return false;
+  bool IsSigned = CmpInst::isSigned(Pred);
+  const auto &Value2Index = getValue2Index(IsSigned);
+  if (!Value2Index.contains(Op))
+    return false;
+
+  return any_of(make_first_range(Value2Index), [&](Value *W) {
+    auto *WTy = dyn_cast<IntegerType>(W->getType());
+    if (W == Op || !WTy || WTy->getBitWidth() > Slack.getBitWidth())
+      return false;
+    auto [Lo, Hi] = ICmpInst::isLE(Pred) ? std::pair(Op, W) : std::pair(W, Op);
+    SmallVector<Value *> NewVariables;
+    RowTy R = getRowForLessEqual(
+        Decomposition(int64_t(Slack.getZExtValue()), DecompEntry(1, Lo)), Hi,
+        Value2Index, NewVariables);
+    // Some facts, e.g. `abs(X) >= X`, are added for a possibly poison W.
+    return getCS(IsSigned).isImpliedBySingleRow(R) &&
+           isGuaranteedNotToBePoison(W);
+  });
 }
 
 void ConstraintInfo::transferToOtherSystem(
