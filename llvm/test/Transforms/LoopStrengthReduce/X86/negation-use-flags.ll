@@ -17,15 +17,10 @@ define i64 @cancel_signed_negation(ptr %dst, i32 %rhs, i1 %enter) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    br i1 [[ENTER]], label %[[PREHEADER:.*]], label %[[BYPASS:.*]]
 ; CHECK:       [[PREHEADER]]:
-; CHECK-NEXT:    [[RHS_WIDE:%.*]] = sext i32 [[RHS]] to i64
-; CHECK-NEXT:    [[TMP0:%.*]] = sub i32 0, [[RHS]]
-; CHECK-NEXT:    [[TMP1:%.*]] = sext i32 [[TMP0]] to i64
-; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[RHS_WIDE]], [[TMP1]]
-; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP2]]
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[LSR_IV:%.*]] = phi i64 [ [[LSR_IV_NEXT:%.*]], %[[LOOP]] ], [ 0, %[[PREHEADER]] ]
-; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[SCEVGEP]], i64 [[LSR_IV]]
+; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[DST]], i64 [[LSR_IV]]
 ; CHECK-NEXT:    store i8 0, ptr [[SCEVGEP1]], align 1
 ; CHECK-NEXT:    [[LSR_IV_NEXT]] = add nuw nsw i64 [[LSR_IV]], 1
 ; CHECK-NEXT:    [[TMP:%.*]] = trunc i64 [[LSR_IV_NEXT]] to i32
@@ -232,15 +227,10 @@ define i64 @cancel_signed_negation_bypass_first(ptr %dst, i32 %rhs, i1 %enter) {
 ; CHECK-NEXT:    [[BARE_WIDE:%.*]] = sext i32 [[BARE]] to i64
 ; CHECK-NEXT:    ret i64 [[BARE_WIDE]]
 ; CHECK:       [[PREHEADER]]:
-; CHECK-NEXT:    [[RHS_WIDE:%.*]] = sext i32 [[RHS]] to i64
-; CHECK-NEXT:    [[TMP0:%.*]] = sub i32 0, [[RHS]]
-; CHECK-NEXT:    [[TMP1:%.*]] = sext i32 [[TMP0]] to i64
-; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[RHS_WIDE]], [[TMP1]]
-; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP2]]
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[LSR_IV:%.*]] = phi i64 [ [[LSR_IV_NEXT:%.*]], %[[LOOP]] ], [ 0, %[[PREHEADER]] ]
-; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[SCEVGEP]], i64 [[LSR_IV]]
+; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[DST]], i64 [[LSR_IV]]
 ; CHECK-NEXT:    store i8 0, ptr [[SCEVGEP1]], align 1
 ; CHECK-NEXT:    [[LSR_IV_NEXT]] = add nuw nsw i64 [[LSR_IV]], 1
 ; CHECK-NEXT:    [[TMP:%.*]] = trunc i64 [[LSR_IV_NEXT]] to i32

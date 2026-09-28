@@ -1968,14 +1968,18 @@ const SCEV *ScalarEvolution::getSignExtendExprImpl(SCEVUse Op, Type *Ty,
   }
 
   if (auto *SA = dyn_cast<SCEVAddExpr>(Op)) {
-    // sext((A + B + ...)<nsw>) --> (sext(A) + sext(B) + ...)<nsw>
+    // sext((A + B + ...)<nsw>) --> (sext(A) + sext(B) + ...)
     if (SA->hasNoSignedWrap()) {
       // If the addition does not sign overflow then we can, by definition,
       // commute the sign extension with the addition operation.
       SmallVector<SCEVUse, 4> Ops;
       for (SCEVUse Op : SA->operands())
         Ops.push_back(getSignExtendExpr(Op, Ty, Depth + 1));
-      return getAddExpr(Ops, SCEV::FlagNSW, Depth + 1);
+      // Recursive extension may use scoped flags and produce operands whose
+      // values differ outside their original uses. Do not transfer NSW to the
+      // widened expression in that case.
+      return getAddExpr(Ops, Op.isCanonical() ? SCEV::FlagNSW : SCEV::FlagNone,
+                        Depth + 1);
     }
 
     // sext(C + x + y + ...) --> (sext(D) + sext((C - D) + x + y + ...))
@@ -2117,6 +2121,13 @@ const SCEV *ScalarEvolution::getSignExtendExprImpl(SCEVUse Op, Type *Ty,
       return getAddRecExpr(Start, Step, L, AR->getNoWrapFlags());
     }
   }
+
+  // sext((-X)<nsw>) --> -sext(X). Recursive extension may use scoped
+  // flags, so let getNegativeSCEV infer flags for the widened expression.
+  const SCEV *Negated;
+  if (hasFlags(Op.getNoWrapFlags(), SCEV::FlagNSW) &&
+      match(Op, m_scev_Mul(m_scev_AllOnes(), m_SCEV(Negated))))
+    return getNegativeSCEV(getSignExtendExpr(Negated, Ty, Depth + 1));
 
   // If the input value is provably positive and we could not simplify
   // away the sext build a zext instead.
@@ -4711,16 +4722,14 @@ const SCEV *ScalarEvolution::getMinusSCEV(SCEVUse LHS, SCEVUse RHS,
     }
   }
 
-  // FIXME: Find a correct way to transfer NSW to (-1)*M when LHS -
-  // RHS is NSW and LHS >= 0.
-  //
-  // The difficulty here is that the NSW flag may have been proven
-  // relative to a loop that is to be found in a recurrence in LHS and
-  // not in RHS. Applying NSW to (-1)*M may then let the NSW have a
-  // larger scope than intended.
+  // The subtraction's NSW flag can exclude INT_MIN for RHS at this use
+  // without excluding it in the wider scope of RHS. Keep that guarantee on
+  // the negation's use, rather than strengthening the shared expression.
   auto NegFlags = RHSIsNotMinSigned ? SCEV::FlagNSW : SCEV::FlagNone;
-
-  return getAddExpr(LHS, getNegativeSCEV(RHS, NegFlags), AddFlags, Depth);
+  SCEVUse NegRHS = getMulExpr(
+      getMinusOne(getEffectiveSCEVType(RHS->getType())), RHS,
+      {NegFlags, AddFlags}, Depth);
+  return getAddExpr(LHS, NegRHS, AddFlags, Depth);
 }
 
 const SCEV *ScalarEvolution::getTruncateOrZeroExtend(const SCEV *V, Type *Ty,

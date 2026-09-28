@@ -1496,7 +1496,7 @@ define void @test-sub-nsw-lhs-non-negative(ptr %input, i32 %sub, i32 %numIterati
 ; CHECK-NEXT:    %i = phi i32 [ %nexti, %loop ], [ 0, %entry ]
 ; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,-2147483648) S: [0,-2147483648) Exits: (-1 + %numIterations) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %index32 = sub nsw i32 %i, %sub
-; CHECK-NEXT:    --> {(-1 * %sub),+,1}<nsw><%loop> U: full-set S: full-set Exits: (-1 + (-1 * %sub) + %numIterations) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(-1 * %sub)<u nsw>,+,1}<nsw><%loop> U: full-set S: full-set Exits: (-1 + (-1 * %sub) + %numIterations) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %index64 = sext i32 %index32 to i64
 ; CHECK-NEXT:    --> {(-1 * (sext i32 %sub to i64))<nsw>,+,1}<nsw><%loop> U: [-2147483647,6442450944) S: [-2147483647,6442450944) Exits: ((zext i32 (-1 + %numIterations) to i64) + (-1 * (sext i32 %sub to i64))<nsw>) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %ptr = getelementptr inbounds float, ptr %input, i64 %index64
@@ -1587,15 +1587,15 @@ define void @test-sub-with-add(ptr %input, i32 %offset, i32 %numIterations) {
 ; CHECK-LABEL: 'test-sub-with-add'
 ; CHECK-NEXT:  Classifying expressions for: @test-sub-with-add
 ; CHECK-NEXT:    %seq = add nuw nsw i32 %index32, 1
-; CHECK-NEXT:    --> {(2 + (-1 * %offset)),+,1}<nw><%loop> U: full-set S: full-set Exits: (1 + (-1 * %offset) + %numIterations) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(2 + (-1 * %offset)<u nsw>),+,1}<nw><%loop> U: full-set S: full-set Exits: (1 + (-1 * %offset)<u nsw> + %numIterations) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i = phi i32 [ %nexti, %loop2 ], [ 0, %entry ]
 ; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,-2147483648) S: [0,-2147483648) Exits: (-1 + %numIterations) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %j = add nsw i32 %i, 1
 ; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,-2147483648) S: [1,-2147483648) Exits: %numIterations LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %index32 = sub nsw i32 %j, %offset
-; CHECK-NEXT:    --> {(1 + (-1 * %offset))<nsw>,+,1}<nsw><%loop> U: [-2147483647,-2147483648) S: [-2147483647,-2147483648) Exits: ((-1 * %offset) + %numIterations) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(1 + (-1 * %offset)<u nsw>)<nsw>,+,1}<nsw><%loop> U: [-2147483647,-2147483648) S: [-2147483647,-2147483648) Exits: ((-1 * %offset)<u nsw> + %numIterations) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %ptr = getelementptr inbounds float, ptr %input, i32 %index32
-; CHECK-NEXT:    --> {(4 + (4 * (sext i32 (-1 * %offset) to i64))<nsw> + %input),+,4}<nw><%loop> U: full-set S: full-set Exits: (4 + (4 * (zext i32 (-1 + %numIterations) to i64))<nuw><nsw> + (4 * (sext i32 (-1 * %offset) to i64))<nsw> + %input) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(4 + (-4 * (sext i32 %offset to i64))<nsw> + %input),+,4}<nw><%loop> U: full-set S: full-set Exits: (4 + (4 * (zext i32 (-1 + %numIterations) to i64))<nuw><nsw> + (-4 * (sext i32 %offset to i64))<nsw> + %input) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %nexti = add nsw i32 %i, 1
 ; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,-2147483648) S: [1,-2147483648) Exits: %numIterations LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @test-sub-with-add

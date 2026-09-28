@@ -12,7 +12,7 @@ define void @add_nsw_zext_fold_results_in_sext(i64 %len) {
 ; CHECK-NEXT:    [[LEN_TRUNC:%.*]] = trunc i64 [[LEN]] to i32
 ; CHECK-NEXT:    [[LZ:%.*]] = tail call range(i32 0, 33) i32 @llvm.ctlz.i32(i32 [[LEN_TRUNC]], i1 false)
 ; CHECK-NEXT:    [[SUB_I:%.*]] = lshr i32 [[LZ]], 3
-; CHECK-NEXT:    [[ADD_I:%.*]] = sub i32 5, [[SUB_I]]
+; CHECK-NEXT:    [[ADD_I:%.*]] = sub nsw i32 5, [[SUB_I]]
 ; CHECK-NEXT:    [[PRECOND:%.*]] = icmp eq i32 [[SUB_I]], 5
 ; CHECK-NEXT:    br i1 [[PRECOND]], label %[[EXIT:.*]], label %[[LOOP_PREHEADER:.*]]
 ; CHECK:       [[LOOP_PREHEADER]]:

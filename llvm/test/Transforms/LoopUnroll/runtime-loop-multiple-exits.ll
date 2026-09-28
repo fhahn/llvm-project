@@ -4560,7 +4560,7 @@ define void @test8() {
 ; EPILOG-BLOCK-NEXT:    br label %outerloop, !llvm.loop !13
 ; EPILOG-BLOCK:       outerloop:
 ; EPILOG-BLOCK-NEXT:    %i = phi i64 [ 3, %bb ], [ 0, %outerloop.loopexit.1 ]
-; EPILOG-BLOCK-NEXT:    %0 = sub i64 100, %i
+; EPILOG-BLOCK-NEXT:    %0 = sub nsw i64 100, %i
 ; EPILOG-BLOCK-NEXT:    %xtraiter = and i64 %0, 1
 ; EPILOG-BLOCK-NEXT:    br i1 false, label %innerH.epil.preheader, label %outerloop.new
 ; EPILOG-BLOCK:       outerloop.new:
@@ -4691,7 +4691,7 @@ define void @test8() {
 ; PROLOG-BLOCK-NEXT:    br label %outerloop, !llvm.loop !13
 ; PROLOG-BLOCK:       outerloop:
 ; PROLOG-BLOCK-NEXT:    %i = phi i64 [ 3, %bb ], [ 0, %outerloop.loopexit.1 ]
-; PROLOG-BLOCK-NEXT:    %0 = sub i64 100, %i
+; PROLOG-BLOCK-NEXT:    %0 = sub nsw i64 100, %i
 ; PROLOG-BLOCK-NEXT:    %xtraiter = and i64 %0, 1
 ; PROLOG-BLOCK-NEXT:    %lcmp.mod = icmp ne i64 %xtraiter, 0
 ; PROLOG-BLOCK-NEXT:    br i1 %lcmp.mod, label %innerH.prol.preheader, label %innerH.prol.loopexit

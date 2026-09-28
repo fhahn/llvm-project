@@ -2331,6 +2331,70 @@ TEST_F(ScalarEvolutionsTest, CastsOfUsesWithNoWrapFlags) {
   });
 }
 
+// Widening can consume nested use flags, changing the result outside those
+// uses. Neither the widened sum nor its negation may acquire expression NSW.
+TEST_F(ScalarEvolutionsTest, RecursiveSignExtensionDoesNotLeakUseFlags) {
+  SMDiagnostic Err;
+  auto M = parseAssemblyString(R"(
+    declare i8 @llvm.smax.i8(i8, i8)
+    define void @f(i8 %a, i8 %b, i1 %enter, ptr %dst) {
+    entry:
+      %na = sub i8 0, %a
+      %nb = sub i8 0, %b
+      %sa = call i8 @llvm.smax.i8(i8 %na, i8 -1)
+      %sb = call i8 @llvm.smax.i8(i8 %nb, i8 -1)
+      %sum = add nsw i8 %sa, %sb
+      %p = getelementptr i8, ptr %dst, i8 %sum
+      store i8 0, ptr %p
+      br i1 %enter, label %scoped, label %exit
+    scoped:
+      %naw = sub nsw i8 0, %a
+      %nbw = sub nsw i8 0, %b
+      %pa = getelementptr i8, ptr %dst, i8 %naw
+      %pb = getelementptr i8, ptr %dst, i8 %nbw
+      store i8 0, ptr %pa
+      store i8 0, ptr %pb
+      br label %exit
+    exit:
+      ret void
+    })", Err, Context);
+  ASSERT_TRUE(M) << "Could not parse module";
+
+  for (bool WideFirst : {false, true})
+    runWithSE(*M, "f", [WideFirst](Function &F, LoopInfo &,
+                                   ScalarEvolution &SE) {
+      Type *I8 = Type::getInt8Ty(F.getContext());
+      Type *I9 = Type::getIntNTy(F.getContext(), 9);
+      const SCEV *A = SE.getSCEV(getArgByName(F, "a"));
+      const SCEV *B = SE.getSCEV(getArgByName(F, "b"));
+      auto NA = SE.getMulExpr(SE.getMinusOne(I8), A,
+                              {SCEV::FlagNone, SCEV::FlagNSW});
+      auto NB = SE.getMulExpr(SE.getMinusOne(I8), B,
+                              {SCEV::FlagNone, SCEV::FlagNSW});
+      const SCEV *Sum = SE.getAddExpr(
+          SE.getSMaxExpr(NA, SE.getMinusOne(I8)),
+          SE.getSMaxExpr(NB, SE.getMinusOne(I8)), SCEV::FlagNSW);
+      const SCEV *Neg = SE.getNegativeSCEV(Sum, SCEV::FlagNSW);
+      auto GetWideSum = [&]() {
+        return SE.getAddExpr(
+            SE.getSMaxExpr(SE.getNegativeSCEV(SE.getSignExtendExpr(A, I9)),
+                           SE.getMinusOne(I9)),
+            SE.getSMaxExpr(SE.getNegativeSCEV(SE.getSignExtendExpr(B, I9)),
+                           SE.getMinusOne(I9)));
+      };
+      if (WideFirst)
+        SE.getNegativeSCEV(GetWideSum());
+      const SCEV *Extended = SE.getSignExtendExpr(Neg, I9);
+      const auto *WideSum = cast<SCEVAddExpr>(GetWideSum());
+      const auto *WideNeg = cast<SCEVMulExpr>(SE.getNegativeSCEV(WideSum));
+      EXPECT_EQ(Extended, WideNeg);
+      // a = b = -128 gives a narrow sum of -2, but the widened sum and
+      // negation both overflow i9. The scoped negations are not executed.
+      EXPECT_FALSE(WideSum->hasNoSignedWrap());
+      EXPECT_FALSE(WideNeg->hasNoSignedWrap());
+    });
+}
+
 TEST_F(ScalarEvolutionsTest, ExtendFoldCacheKeysUseFlags) {
   LLVMContext C;
   SMDiagnostic Err;
