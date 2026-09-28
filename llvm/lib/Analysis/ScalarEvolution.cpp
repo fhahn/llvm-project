@@ -11498,7 +11498,7 @@ bool ScalarEvolution::isKnownPredicateImpl(CmpPredicate Pred, SCEVUse LHS,
   SCEVUse OrigLHS = LHS, OrigRHS = RHS;
 
   // Canonicalize the inputs first.
-  (void)SimplifyICmpOperands(Pred, LHS, RHS);
+  bool Changed = SimplifyICmpOperands(Pred, LHS, RHS);
 
   if (isKnownViaInduction(Pred, LHS, RHS) ||
       isKnownPredicateViaSplitting(Pred, LHS, RHS) ||
@@ -11508,12 +11508,18 @@ bool ScalarEvolution::isKnownPredicateImpl(CmpPredicate Pred, SCEVUse LHS,
   // Limit the nesting of min/max decompositions.
   if (Depth == 2)
     return false;
-  // Decompose min/max on the original operands: canonicalizing LE/GE to LT/GT
-  // can bury a min/max under an add.
-  return isKnownViaMinMaxDecomposition(
-      OrigPred, OrigLHS, OrigRHS, [&](CmpPredicate P, SCEVUse A, SCEVUse B) {
-        return isKnownPredicateImpl(P, A, B, Depth + 1);
-      });
+  auto Prove = [&](CmpPredicate P, SCEVUse A, SCEVUse B) {
+    return isKnownPredicateImpl(P, A, B, Depth + 1);
+  };
+  if (isKnownViaMinMaxDecomposition(Pred, LHS, RHS, Prove))
+    return true;
+
+  // Retry the min/max decomposition on the original operands: canonicalizing
+  // LE/GE to LT/GT buries a min/max under an add. Only worth it if
+  // canonicalization changed anything, as the decomposition above already
+  // handled the canonical operands.
+  return Changed &&
+         isKnownViaMinMaxDecomposition(OrigPred, OrigLHS, OrigRHS, Prove);
 }
 
 std::optional<bool> ScalarEvolution::evaluatePredicate(CmpPredicate Pred,
