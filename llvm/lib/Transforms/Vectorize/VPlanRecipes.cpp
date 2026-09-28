@@ -1696,10 +1696,8 @@ void VPInstruction::execute(VPTransformState &State) {
   State.set(this, GeneratedValue, GenerateSingleScalar);
   if (getOpcode() == VPInstruction::ResumeForEpilogue ||
       getOpcode() == Instruction::Freeze) {
-    // FIXME: This is a workaround to enable reliable updates of the scalar loop
-    // resume phis, and to let epilogue vectorization recover the frozen
-    // reduction start from the main plan. Must be removed once epilogue
-    // vectorization explicitly connects VPlans.
+    // FIXME: Workaround to let epilogue vectorization read values off the
+    // executed main plan. Remove once it explicitly connects VPlans.
     setUnderlyingValue(GeneratedValue);
   }
 }

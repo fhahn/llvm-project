@@ -424,7 +424,7 @@ void VPBasicBlock::connectToPredecessors(VPTransformState &State) {
       // Set each forward successor here when it is created, excluding
       // backedges. A backward successor is set when the branch is created.
       // Generated successors are redirected, as for the entry block and for
-      // blocks bypassing both vector loops during epilogue vectorization. Edges
+      // blocks bypassing a vector loop during epilogue vectorization. Edges
       // already present in the generated IR need no update; this happens during
       // epilogue vectorization, where the plan models blocks generated for the
       // main vector loop.
@@ -1041,12 +1041,17 @@ InstructionCost VPlan::cost(ElementCount VF, VPCostContext &Ctx) {
 
 VPRegionBlock *VPlan::getVectorLoopRegion() {
   // Find the vector loop region by following the last successor of each block,
-  // starting from the plan's entry; the vector code path is always the last
-  // successor. Every block on the path has a single predecessor, except the
-  // vector preheader, which is also entered from the block bypassing the main
-  // vector loop when vectorizing the epilogue. Stop at any other block with
-  // multiple predecessors: in a plain CFG that is the loop header (no region
-  // exists yet), in a region based CFG the scalar preheader.
+  // starting from the plan's entry, or a successor whose last successor is the
+  // region: the vector code path is the last successor, except for the main
+  // loop's iteration count check in the epilogue plan. Every block on the path
+  // has a single predecessor, except the vector preheader, which is also
+  // entered from the block bypassing the main vector loop when vectorizing the
+  // epilogue. Stop at any other block with multiple predecessors: in a plain
+  // CFG that is the loop header (no region exists yet), in a region based CFG
+  // the scalar preheader.
+  auto IsVectorPreheader = [](const VPBlockBase *B) {
+    return B->hasSuccessors() && isa<VPRegionBlock>(B->getSuccessors().back());
+  };
   for (VPBlockBase *B = Entry; B;) {
     if (auto *R = dyn_cast<VPRegionBlock>(B))
       return R->isReplicator() || R->getNumPredecessors() != 1 ? nullptr : R;
@@ -1054,7 +1059,8 @@ VPRegionBlock *VPlan::getVectorLoopRegion() {
         B->hasSuccessors() ? B->getSuccessors().back() : nullptr;
     if (B->getNumPredecessors() > 1 && !isa_and_present<VPRegionBlock>(Succ))
       return nullptr;
-    B = Succ;
+    auto VectorPH = find_if(B->getSuccessors(), IsVectorPreheader);
+    B = VectorPH != B->getSuccessors().end() ? *VectorPH : Succ;
   }
   return nullptr;
 }
