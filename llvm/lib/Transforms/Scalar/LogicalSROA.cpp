@@ -202,10 +202,8 @@ static bool runOnStructuredAlloca(StructuredAllocaInst &SAI) {
 static bool runLogicalSROA(Function &F) {
   SmallVector<StructuredAllocaInst *> Worklist;
   BasicBlock &EntryBB = F.getEntryBlock();
-  for (Instruction &I : EntryBB) {
-    if (StructuredAllocaInst *SAI = dyn_cast<StructuredAllocaInst>(&I))
-      Worklist.push_back(SAI);
-  }
+  for (StructuredAllocaInst &SAI : make_isa_range<StructuredAllocaInst>(EntryBB))
+    Worklist.push_back(&SAI);
 
   bool Changed = false;
   for (StructuredAllocaInst *SAI : Worklist)

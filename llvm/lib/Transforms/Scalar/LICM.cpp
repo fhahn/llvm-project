@@ -904,11 +904,8 @@ static bool isOnlyMemoryAccess(const Instruction *I, const Loop *L,
   for (auto *BB : L->getBlocks())
     if (auto *Accs = MSSAU.getMemorySSA()->getBlockAccesses(BB)) {
       int NotAPhi = 0;
-      for (const auto &Acc : *Accs) {
-        if (isa<MemoryPhi>(&Acc))
-          continue;
-        const auto *MUD = cast<MemoryUseOrDef>(&Acc);
-        if (MUD->getMemoryInst() != I || NotAPhi++ == 1)
+      for (const MemoryUseOrDef &Acc : make_isa_range<MemoryUseOrDef>(*Accs)) {
+        if (Acc.getMemoryInst() != I || NotAPhi++ == 1)
           return false;
       }
     }

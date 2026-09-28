@@ -418,17 +418,15 @@ static bool containsUnconditionalCallSafepoint(Loop *L, BasicBlock *Header,
 
   BasicBlock *Current = Pred;
   while (true) {
-    for (Instruction &I : *Current) {
-      if (auto *Call = dyn_cast<CallBase>(&I))
-        // Note: Technically, needing a safepoint isn't quite the right
-        // condition here.  We should instead be checking if the target method
-        // has an
-        // unconditional poll. In practice, this is only a theoretical concern
-        // since we don't have any methods with conditional-only safepoint
-        // polls.
-        if (needsStatepoint(Call, TLI))
-          return true;
-    }
+    for (CallBase &Call : make_isa_range<CallBase>(*Current))
+      // Note: Technically, needing a safepoint isn't quite the right
+      // condition here.  We should instead be checking if the target method
+      // has an
+      // unconditional poll. In practice, this is only a theoretical concern
+      // since we don't have any methods with conditional-only safepoint
+      // polls.
+      if (needsStatepoint(&Call, TLI))
+        return true;
 
     if (Current == Header)
       break;
