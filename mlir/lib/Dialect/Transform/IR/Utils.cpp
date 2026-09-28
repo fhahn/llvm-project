@@ -214,10 +214,9 @@ transform::detail::mergeSymbolsInto(Operation *target,
   // Move all ops from `other` into target and merge public symbols.
   LDBG() << "moving all symbols into target";
   SmallVector<SymbolOpInterface> processedSymbols;
-  for (Operation &op : other->getRegion(0).front()) {
-    if (auto symbol = dyn_cast<SymbolOpInterface>(op))
-      processedSymbols.push_back(symbol);
-  }
+  for (SymbolOpInterface symbol : llvm::make_isa_range<SymbolOpInterface>(
+           other->getRegion(0).front()))
+    processedSymbols.push_back(symbol);
 
   for (SymbolOpInterface &op : processedSymbols) {
     // Remember potentially colliding op in the target module.

@@ -46,10 +46,9 @@ static std::array<int64_t, 2> getTileShape(ArrayRef<int64_t> operandShape,
 /// Returns the first user of the `op` that is vector.contract. If no
 /// vector.contract user exists, return failure.
 FailureOr<vector::ContractionOp> nvgpu::getUserContract(Operation *op) {
-  for (Operation *user : op->getUsers()) {
-    if (auto contractOp = dyn_cast<vector::ContractionOp>(user))
-      return contractOp;
-  }
+  for (vector::ContractionOp contractOp :
+       llvm::make_isa_range<vector::ContractionOp>(op->getUsers()))
+    return contractOp;
   return failure();
 }
 

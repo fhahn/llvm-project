@@ -49,10 +49,9 @@ static void specializeParallelLoopForUnrolling(ParallelOp op) {
     if (!minOp)
       return;
     int64_t minConstant = std::numeric_limits<int64_t>::max();
-    for (AffineExpr expr : minOp.getMap().getResults()) {
-      if (auto constantIndex = dyn_cast<AffineConstantExpr>(expr))
-        minConstant = std::min(minConstant, constantIndex.getValue());
-    }
+    for (AffineConstantExpr constantIndex :
+         llvm::make_isa_range<AffineConstantExpr>(minOp.getMap().getResults()))
+      minConstant = std::min(minConstant, constantIndex.getValue());
     if (minConstant == std::numeric_limits<int64_t>::max())
       return;
     constantIndices.push_back(minConstant);
@@ -85,10 +84,9 @@ static void specializeForLoopForUnrolling(ForOp op) {
   if (!minOp)
     return;
   int64_t minConstant = std::numeric_limits<int64_t>::max();
-  for (AffineExpr expr : minOp.getMap().getResults()) {
-    if (auto constantIndex = dyn_cast<AffineConstantExpr>(expr))
-      minConstant = std::min(minConstant, constantIndex.getValue());
-  }
+  for (AffineConstantExpr constantIndex :
+       llvm::make_isa_range<AffineConstantExpr>(minOp.getMap().getResults()))
+    minConstant = std::min(minConstant, constantIndex.getValue());
   if (minConstant == std::numeric_limits<int64_t>::max())
     return;
 
