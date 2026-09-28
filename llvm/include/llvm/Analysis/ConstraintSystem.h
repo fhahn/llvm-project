@@ -172,6 +172,9 @@ public:
     NumVariables -= N;
   }
 
+  /// Returns the rows of the constraint system.
+  ArrayRef<RowTy> getRows() const { return Constraints; }
+
   /// Returns the number of rows in the constraint system.
   unsigned size() const { return Constraints.size(); }
 
