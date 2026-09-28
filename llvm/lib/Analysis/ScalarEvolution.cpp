@@ -12438,7 +12438,7 @@ bool ScalarEvolution::splitBinaryAdd(SCEVUse Expr, SCEVUse &L, SCEVUse &R,
   if (!match(Expr, m_scev_Add(m_SCEV(L), m_SCEV(R))))
     return false;
 
-  Flags = cast<SCEVAddExpr>(Expr)->getNoWrapFlags();
+  Flags = Expr.getNoWrapFlags();
   return true;
 }
 

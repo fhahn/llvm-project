@@ -21,9 +21,7 @@ define i32 @exit_umin(i32 %start, i1 %enter) {
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    br i1 true, label %[[EXIT:.*]], label %[[LOOP]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = add nuw i32 [[START]], 9
-; CHECK-NEXT:    [[UMIN:%.*]] = call i32 @llvm.umin.i32(i32 [[TMP0]], i32 [[BOUND]])
-; CHECK-NEXT:    ret i32 [[UMIN]]
+; CHECK-NEXT:    ret i32 [[BOUND]]
 ; CHECK:       [[BYPASS]]:
 ; CHECK-NEXT:    [[BARE:%.*]] = add i32 [[START]], 9
 ; CHECK-NEXT:    [[WRAPPING_MINIMUM:%.*]] = call i32 @llvm.umin.i32(i32 [[BARE]], i32 [[BOUND]])
@@ -32,8 +30,10 @@ define i32 @exit_umin(i32 %start, i1 %enter) {
 entry:
   %bound = add i32 %start, 8
   br i1 %enter, label %preheader, label %bypass
+
 preheader:
   br label %loop
+
 loop:
   %iv = phi i32 [ %start, %preheader ], [ %next, %loop ]
   %count = phi i32 [ 0, %preheader ], [ %count.next, %loop ]
@@ -42,9 +42,11 @@ loop:
   %count.next = add i32 %count, 1
   %done = icmp eq i32 %count.next, 10
   br i1 %done, label %exit, label %loop
+
 exit:
   %last = phi i32 [ %minimum, %loop ]
   ret i32 %last
+
 bypass:
   %bare = add i32 %start, 9
   %wrapping.minimum = call i32 @llvm.umin.i32(i32 %bare, i32 %bound)
@@ -62,8 +64,7 @@ define i32 @exit_umax(i32 %start, i1 %enter) {
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    br i1 true, label %[[EXIT:.*]], label %[[LOOP]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = add nuw i32 [[START]], 9
-; CHECK-NEXT:    [[UMAX:%.*]] = call i32 @llvm.umax.i32(i32 [[TMP0]], i32 [[BOUND]])
+; CHECK-NEXT:    [[UMAX:%.*]] = add i32 [[START]], 9
 ; CHECK-NEXT:    ret i32 [[UMAX]]
 ; CHECK:       [[BYPASS]]:
 ; CHECK-NEXT:    [[BARE:%.*]] = add i32 [[START]], 9
@@ -73,8 +74,10 @@ define i32 @exit_umax(i32 %start, i1 %enter) {
 entry:
   %bound = add i32 %start, 8
   br i1 %enter, label %preheader, label %bypass
+
 preheader:
   br label %loop
+
 loop:
   %iv = phi i32 [ %start, %preheader ], [ %next, %loop ]
   %count = phi i32 [ 0, %preheader ], [ %count.next, %loop ]
@@ -83,9 +86,11 @@ loop:
   %count.next = add i32 %count, 1
   %done = icmp eq i32 %count.next, 10
   br i1 %done, label %exit, label %loop
+
 exit:
   %last = phi i32 [ %maximum, %loop ]
   ret i32 %last
+
 bypass:
   %bare = add i32 %start, 9
   %wrapping.maximum = call i32 @llvm.umax.i32(i32 %bare, i32 %bound)
@@ -114,8 +119,10 @@ define i32 @exit_umin_wrapping(i32 %start, i1 %enter) {
 entry:
   %bound = add i32 %start, 8
   br i1 %enter, label %preheader, label %bypass
+
 preheader:
   br label %loop
+
 loop:
   %iv = phi i32 [ %start, %preheader ], [ %next, %loop ]
   %count = phi i32 [ 0, %preheader ], [ %count.next, %loop ]
@@ -124,9 +131,11 @@ loop:
   %count.next = add i32 %count, 1
   %done = icmp eq i32 %count.next, 10
   br i1 %done, label %exit, label %loop
+
 exit:
   %last = phi i32 [ %minimum, %loop ]
   ret i32 %last
+
 bypass:
   %bare = add i32 %start, 9
   %wrapping.minimum = call i32 @llvm.umin.i32(i32 %bare, i32 %bound)
@@ -148,13 +157,12 @@ define i32 @exit_umin_bypass_first(i32 %start, i1 %enter) {
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    br i1 true, label %[[EXIT:.*]], label %[[LOOP]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = add nuw i32 [[START]], 9
-; CHECK-NEXT:    [[UMIN:%.*]] = call i32 @llvm.umin.i32(i32 [[TMP0]], i32 [[BOUND]])
-; CHECK-NEXT:    ret i32 [[UMIN]]
+; CHECK-NEXT:    ret i32 [[BOUND]]
 ;
 entry:
   %bound = add i32 %start, 8
   br i1 %enter, label %preheader, label %bypass
+
 bypass:
   %bare = add i32 %start, 9
   %wrapping.minimum = call i32 @llvm.umin.i32(i32 %bare, i32 %bound)
@@ -162,6 +170,7 @@ bypass:
 
 preheader:
   br label %loop
+
 loop:
   %iv = phi i32 [ %start, %preheader ], [ %next, %loop ]
   %count = phi i32 [ 0, %preheader ], [ %count.next, %loop ]
@@ -170,7 +179,57 @@ loop:
   %count.next = add i32 %count, 1
   %done = icmp eq i32 %count.next, 10
   br i1 %done, label %exit, label %loop
+
 exit:
   %last = phi i32 [ %minimum, %loop ]
   ret i32 %last
+}
+
+; NUW on the smaller unsigned offset does not prove that the larger one cannot wrap.
+define i32 @exit_umin_larger_wrapping(i32 %start, i1 %enter) {
+; CHECK-LABEL: define i32 @exit_umin_larger_wrapping(
+; CHECK-SAME: i32 [[START:%.*]], i1 [[ENTER:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    br i1 [[ENTER]], label %[[PREHEADER:.*]], label %[[BYPASS:.*]]
+; CHECK:       [[PREHEADER]]:
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    br i1 true, label %[[EXIT:.*]], label %[[LOOP]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[START]], 18
+; CHECK-NEXT:    [[TMP1:%.*]] = add nuw i32 [[START]], 9
+; CHECK-NEXT:    [[UMIN:%.*]] = call i32 @llvm.umin.i32(i32 [[TMP0]], i32 [[TMP1]])
+; CHECK-NEXT:    ret i32 [[UMIN]]
+; CHECK:       [[BYPASS]]:
+; CHECK-NEXT:    [[BARE_A:%.*]] = add i32 [[START]], 9
+; CHECK-NEXT:    [[BARE_B:%.*]] = add i32 [[START]], 18
+; CHECK-NEXT:    [[WRAPPING_MINIMUM:%.*]] = call i32 @llvm.umin.i32(i32 [[BARE_A]], i32 [[BARE_B]])
+; CHECK-NEXT:    ret i32 [[WRAPPING_MINIMUM]]
+;
+entry:
+  br i1 %enter, label %preheader, label %bypass
+
+preheader:
+  br label %loop
+
+loop:
+  %a = phi i32 [ %start, %preheader ], [ %a.next, %loop ]
+  %b = phi i32 [ %start, %preheader ], [ %b.next, %loop ]
+  %count = phi i32 [ 0, %preheader ], [ %count.next, %loop ]
+  %minimum = call i32 @llvm.umin.i32(i32 %a, i32 %b)
+  %a.next = add nuw i32 %a, 1
+  %b.next = add i32 %b, 2
+  %count.next = add i32 %count, 1
+  %done = icmp eq i32 %count.next, 10
+  br i1 %done, label %exit, label %loop
+
+exit:
+  %last = phi i32 [ %minimum, %loop ]
+  ret i32 %last
+
+bypass:
+  %bare.a = add i32 %start, 9
+  %bare.b = add i32 %start, 18
+  %wrapping.minimum = call i32 @llvm.umin.i32(i32 %bare.a, i32 %bare.b)
+  ret i32 %wrapping.minimum
 }
