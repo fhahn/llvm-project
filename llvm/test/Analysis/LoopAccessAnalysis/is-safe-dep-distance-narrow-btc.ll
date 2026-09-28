@@ -14,8 +14,13 @@ target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 define void @backward_dep_narrow_btc_stride_256(ptr %A) {
 ; CHECK-LABEL: 'backward_dep_narrow_btc_stride_256'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Backward loop carried data dependence.
 ; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Backward:
+; CHECK-NEXT:            %l = load i8, ptr %gep.ld, align 1 ->
+; CHECK-NEXT:            store i8 %add, ptr %gep.st, align 1
+; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-EMPTY:
@@ -46,8 +51,13 @@ exit:
 define void @backward_dep_narrow_btc_stride_255(ptr %A) {
 ; CHECK-LABEL: 'backward_dep_narrow_btc_stride_255'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Backward loop carried data dependence.
 ; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Backward:
+; CHECK-NEXT:            %l = load i8, ptr %gep.ld, align 1 ->
+; CHECK-NEXT:            store i8 %add, ptr %gep.st, align 1
+; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-EMPTY:
@@ -117,8 +127,12 @@ exit:
 define void @backward_dep_narrow_btc_product_wraps(ptr %A, i8 %n) {
 ; CHECK-LABEL: 'backward_dep_narrow_btc_product_wraps'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Memory dependences are safe with a maximum safe vector width of 128 bits
 ; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        BackwardVectorizable:
+; CHECK-NEXT:            %l = load i32, ptr %gep.ld, align 4 ->
+; CHECK-NEXT:            store i32 %add, ptr %gep.st, align 4
+; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-EMPTY:

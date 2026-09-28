@@ -2892,9 +2892,8 @@ void MemoryDepChecker::mergeInStatus(VectorizationSafetyStatus S) {
 ///                = out[i];
 ///       out[i+D] =
 ///     }
-static bool isSafeDependenceDistance(const DataLayout &DL, ScalarEvolution &SE,
-                                     const SCEV &MaxBTC, const SCEV &Dist,
-                                     uint64_t MaxStride) {
+static bool isSafeDependenceDistance(ScalarEvolution &SE, const SCEV &MaxBTC,
+                                     const SCEV &Dist, uint64_t MaxStride) {
 
   // If we can prove that
   //      (**) |Dist| > MaxBTC * Step
@@ -2913,21 +2912,18 @@ static bool isSafeDependenceDistance(const DataLayout &DL, ScalarEvolution &SE,
   // will be executed only if LoopCount >= VF, proving distance >= LoopCount
   // also guarantees that distance >= VF.
   //
-  const SCEV *Step = SE.getConstant(MaxBTC.getType(), MaxStride);
-  const SCEV *Product = SE.getMulExpr(&MaxBTC, Step);
-
-  const SCEV *CastedDist = &Dist;
-  const SCEV *CastedProduct = Product;
-  uint64_t DistTypeSizeBits = DL.getTypeSizeInBits(Dist.getType());
-  uint64_t ProductTypeSizeBits = DL.getTypeSizeInBits(Product->getType());
-
-  // The dependence distance can be positive/negative, so we sign extend Dist;
-  // The multiplication of the absolute stride in bytes and the
-  // backedgeTakenCount is non-negative, so we zero extend Product.
-  if (DistTypeSizeBits > ProductTypeSizeBits)
-    CastedProduct = SE.getZeroExtendExpr(Product, Dist.getType());
-  else
-    CastedDist = SE.getNoopOrSignExtend(&Dist, Product->getType());
+  // Compute the product in the wider of the types of the distance and MaxBTC,
+  // so MaxStride, a byte step in the type of the distance, is not truncated
+  // and the product does not wrap in a narrow backedge-taken count type
+  // (e.g. i8). MaxBTC is a non-negative iteration count, so zero-extend it;
+  // the distance may be negative, so sign-extend it.
+  // FIXME: The checks below can still wrap if MaxBTC * MaxStride does not fit
+  // in WideTy with two bits to spare, e.g. for an unbounded i64 MaxBTC.
+  Type *WideTy = SE.getWiderType(Dist.getType(), MaxBTC.getType());
+  const SCEV *Step = SE.getConstant(WideTy, MaxStride);
+  const SCEV *CastedProduct =
+      SE.getMulExpr(SE.getNoopOrZeroExtend(&MaxBTC, WideTy), Step);
+  const SCEV *CastedDist = SE.getNoopOrSignExtend(&Dist, WideTy);
 
   // Is  Dist - (MaxBTC * Step) > 0 ?
   // (If so, then we have proven (**) because |Dist| >= Dist)
@@ -3170,8 +3166,8 @@ MemoryDepChecker::isDependent(const MemAccessInfo &A, unsigned AIdx,
   // they are far enough appart that accesses won't access the same location
   // across all loop ierations.
   if (HasSameSize &&
-      isSafeDependenceDistance(
-          DL, SE, *(PSE.getSymbolicMaxBackedgeTakenCount()), *Dist, MaxStride))
+      isSafeDependenceDistance(SE, *(PSE.getSymbolicMaxBackedgeTakenCount()),
+                               *Dist, MaxStride))
     return Dependence::NoDep;
 
   const APInt *APDist = nullptr;
