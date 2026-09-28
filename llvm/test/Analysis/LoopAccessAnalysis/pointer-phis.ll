@@ -269,12 +269,20 @@ define i32 @store_with_pointer_phi_incoming_phi(ptr %A, ptr %B, ptr %C, i1 %c.0,
 ; CHECK-NEXT:        ptr %C
 ; CHECK-NEXT:        Against group GRP2:
 ; CHECK-NEXT:          %arrayidx = getelementptr inbounds double, ptr %A, i64 %iv
-; CHECK-NEXT:        ptr %A
 ; CHECK-NEXT:      Check 2:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:        ptr %C
+; CHECK-NEXT:        Against group GRP3:
+; CHECK-NEXT:        ptr %A
+; CHECK-NEXT:      Check 3:
 ; CHECK-NEXT:        Comparing group GRP1:
 ; CHECK-NEXT:        ptr %B
 ; CHECK-NEXT:        Against group GRP2:
 ; CHECK-NEXT:          %arrayidx = getelementptr inbounds double, ptr %A, i64 %iv
+; CHECK-NEXT:      Check 4:
+; CHECK-NEXT:        Comparing group GRP1:
+; CHECK-NEXT:        ptr %B
+; CHECK-NEXT:        Against group GRP3:
 ; CHECK-NEXT:        ptr %A
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
@@ -286,6 +294,8 @@ define i32 @store_with_pointer_phi_incoming_phi(ptr %A, ptr %B, ptr %C, i1 %c.0,
 ; CHECK-NEXT:        Group GRP2:
 ; CHECK-NEXT:          (Low: %A High: (256000 + %A))
 ; CHECK-NEXT:            Member: {%A,+,8}<nuw><%loop.header>
+; CHECK-NEXT:        Group GRP3:
+; CHECK-NEXT:          (Low: %A High: (8 + %A))
 ; CHECK-NEXT:            Member: %A
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
@@ -352,12 +362,20 @@ define i32 @store_with_pointer_phi_incoming_phi_irreducible_cycle(ptr %A, ptr %B
 ; CHECK-NEXT:        ptr %C
 ; CHECK-NEXT:        Against group GRP2:
 ; CHECK-NEXT:          %arrayidx = getelementptr inbounds double, ptr %A, i64 %iv
-; CHECK-NEXT:        ptr %A
 ; CHECK-NEXT:      Check 2:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:        ptr %C
+; CHECK-NEXT:        Against group GRP3:
+; CHECK-NEXT:        ptr %A
+; CHECK-NEXT:      Check 3:
 ; CHECK-NEXT:        Comparing group GRP1:
 ; CHECK-NEXT:        ptr %B
 ; CHECK-NEXT:        Against group GRP2:
 ; CHECK-NEXT:          %arrayidx = getelementptr inbounds double, ptr %A, i64 %iv
+; CHECK-NEXT:      Check 4:
+; CHECK-NEXT:        Comparing group GRP1:
+; CHECK-NEXT:        ptr %B
+; CHECK-NEXT:        Against group GRP3:
 ; CHECK-NEXT:        ptr %A
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
@@ -369,6 +387,8 @@ define i32 @store_with_pointer_phi_incoming_phi_irreducible_cycle(ptr %A, ptr %B
 ; CHECK-NEXT:        Group GRP2:
 ; CHECK-NEXT:          (Low: %A High: (256000 + %A))
 ; CHECK-NEXT:            Member: {%A,+,8}<nuw><%loop.header>
+; CHECK-NEXT:        Group GRP3:
+; CHECK-NEXT:          (Low: %A High: (8 + %A))
 ; CHECK-NEXT:            Member: %A
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
