@@ -651,6 +651,7 @@ unsigned VPInstruction::getNumOperandsForOpcode() const {
   case VPInstruction::Reverse:
   case VPInstruction::Unpack:
   case VPInstruction::NumActiveLanes:
+  case VPInstruction::ResumeForEpilogue:
     return 1;
   case Instruction::ICmp:
   case Instruction::FCmp:
@@ -665,7 +666,6 @@ unsigned VPInstruction::getNumOperandsForOpcode() const {
   case VPInstruction::PtrAdd:
   case VPInstruction::WidePtrAdd:
   case VPInstruction::WideIVStep:
-  case VPInstruction::ResumeForEpilogue:
   case VPInstruction::ExtractVectorForPart:
     return 2;
   case Instruction::InsertElement:
@@ -1690,10 +1690,8 @@ void VPInstruction::execute(VPTransformState &State) {
   State.set(this, GeneratedValue, GenerateSingleScalar);
   if (getOpcode() == VPInstruction::ResumeForEpilogue ||
       getOpcode() == Instruction::Freeze) {
-    // FIXME: This is a workaround to enable reliable updates of the scalar loop
-    // resume phis, and to let epilogue vectorization recover the frozen
-    // reduction start from the main plan. Must be removed once epilogue
-    // vectorization explicitly connects VPlans.
+    // FIXME: Workaround to let epilogue vectorization read values off the
+    // executed main plan. Remove once it explicitly connects VPlans.
     setUnderlyingValue(GeneratedValue);
   }
 }

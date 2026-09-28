@@ -213,12 +213,12 @@ struct VPlanTransforms {
                               const uint32_t *MinItersBypassWeights,
                               DebugLoc DL, PredicatedScalarEvolution &PSE);
 
-  /// Add a check to \p Plan to see if the epilogue vector loop should be
+  /// Add a check to \p CheckBlock to see if the epilogue vector loop should be
   /// executed.
   static void addMinimumVectorEpilogueIterationCheck(
-      VPlan &Plan, VPValue *MainVectorTripCount, bool RequiresScalarEpilogue,
-      ElementCount EpilogueVF, unsigned MainLoopStep, unsigned EpilogueLoopStep,
-      ScalarEvolution &SE);
+      VPlan &Plan, VPBasicBlock *CheckBlock, VPValue *MainVectorTripCount,
+      bool RequiresScalarEpilogue, ElementCount EpilogueVF,
+      unsigned MainLoopStep, unsigned EpilogueLoopStep, ScalarEvolution &SE);
 
   /// Replace loops in \p Plan's flat CFG with VPRegionBlocks, turning \p Plan's
   /// flat CFG into a hierarchical CFG. For the outermost loop, also create the
@@ -241,11 +241,15 @@ struct VPlanTransforms {
 
   /// Model the blocks the executed \p MainPlan generated for the main vector
   /// loop in \p EpiPlan during epilogue vectorization, wrapping each in a
-  /// VPIRBasicBlock, with \p EnteredFrom the block \p EpiPlan is entered from.
-  /// Edges from blocks bypassing both vector loops are redirected to \p
-  /// EpiPlan's scalar preheader, all others are mirrored.
-  static void modelGeneratedMainLoopBlocks(VPlan &EpiPlan, VPlan &MainPlan,
-                                           VPIRBasicBlock *EnteredFrom);
+  /// VPIRBasicBlock. Returns the one wrapping \p MainPlan's scalar preheader,
+  /// which must have no phis and becomes the epilogue iteration check. Edges
+  /// from blocks bypassing both vector loops are redirected to \p EpiPlan's
+  /// scalar preheader, and the edge from the block bypassing only the main
+  /// vector loop to \p EpiPlan's vector preheader; all other edges are
+  /// mirrored. \p EpiPlan's entry edges move to the returned block, and its
+  /// entry then models \p MainPlan's entry.
+  static VPIRBasicBlock *modelGeneratedMainLoopBlocks(VPlan &EpiPlan,
+                                                      VPlan &MainPlan);
 
   /// Replaces the VPInstructions in \p Plan with corresponding
   /// widen recipes. Returns false if any VPInstructions could not be converted
