@@ -2449,6 +2449,81 @@ TEST_F(ScalarEvolutionsTest, ExtendFoldCacheKeysUseFlags) {
   });
 }
 
+TEST_F(ScalarEvolutionsTest, ExtendUseFlagsDoNotEscape) {
+  LLVMContext C;
+  SMDiagnostic Err;
+  std::unique_ptr<Module> M = parseAssemblyString(
+      R"(define void @f(ptr %p, i32 %y) {
+      entry:
+        %x = load i32, ptr %p
+        ret void
+      })",
+      Err, C);
+  ASSERT_TRUE(M);
+  ASSERT_FALSE(verifyModule(*M, &errs()));
+
+  // Use a fresh ScalarEvolution for each initial query order. Merely changing
+  // block order in a transform test need not query the wrapping expression.
+  for (bool FlaggedFirst : {false, true}) {
+    runWithSE(*M, "f", [&](Function &F, LoopInfo &LI, ScalarEvolution &SE) {
+      Type *I64 = Type::getInt64Ty(C);
+      Instruction *X = &F.getEntryBlock().front();
+      for (unsigned Round = 0; Round != 3; ++Round) {
+        // Invalidate the operand and its users, then also exercise complete
+        // cache clearing. Requery both variants after each invalidation.
+        if (Round == 1)
+          SE.forgetValue(X);
+        if (Round == 2)
+          SE.forgetAllLoops();
+
+        const SCEV *SX = SE.getSCEV(X);
+        const SCEV *SY = SE.getSCEV(getArgByName(F, "y"));
+        const SCEV *Sum = SE.getAddExpr(SX, SY);
+        const SCEV *Neg = SE.getNegativeSCEV(SX);
+        SCEVUse NUWSum(Sum, SCEV::FlagNUW);
+        SCEVUse NSWNeg(Neg, SCEV::FlagNSW);
+        const SCEV *PlainZExt, *PlainSExt, *FlaggedZExt, *FlaggedSExt;
+        auto QueryPlain = [&] {
+          PlainZExt = SE.getZeroExtendExpr(Sum, I64);
+          PlainSExt = SE.getSignExtendExpr(Neg, I64);
+        };
+        auto QueryFlagged = [&] {
+          FlaggedZExt = SE.getZeroExtendExpr(NUWSum, I64);
+          FlaggedSExt = SE.getSignExtendExpr(NSWNeg, I64);
+        };
+        if (FlaggedFirst) {
+          QueryFlagged();
+          QueryPlain();
+        } else {
+          QueryPlain();
+          QueryFlagged();
+        }
+
+        ASSERT_TRUE(isa<SCEVZeroExtendExpr>(PlainZExt));
+        EXPECT_EQ(cast<SCEVZeroExtendExpr>(PlainZExt)->getOperand(), Sum);
+        ASSERT_TRUE(isa<SCEVSignExtendExpr>(PlainSExt));
+        EXPECT_EQ(cast<SCEVSignExtendExpr>(PlainSExt)->getOperand(), Neg);
+        EXPECT_EQ(FlaggedZExt,
+                  SE.getAddExpr(SE.getZeroExtendExpr(SX, I64),
+                                SE.getZeroExtendExpr(SY, I64)));
+        EXPECT_EQ(FlaggedSExt,
+                  SE.getNegativeSCEV(SE.getSignExtendExpr(SX, I64)));
+        EXPECT_NE(FlaggedZExt, PlainZExt);
+        EXPECT_NE(FlaggedSExt, PlainSExt);
+        EXPECT_FALSE(cast<SCEVAddExpr>(Sum)->hasNoUnsignedWrap());
+        EXPECT_FALSE(cast<SCEVMulExpr>(Neg)->hasNoSignedWrap());
+
+        // Repeat after both entries have been populated.
+        EXPECT_EQ(SE.getZeroExtendExpr(Sum, I64), PlainZExt);
+        EXPECT_EQ(SE.getSignExtendExpr(Neg, I64), PlainSExt);
+        EXPECT_EQ(SE.getZeroExtendExpr(NUWSum, I64), FlaggedZExt);
+        EXPECT_EQ(SE.getSignExtendExpr(NSWNeg, I64), FlaggedSExt);
+        SE.verify();
+      }
+    });
+  }
+}
+
 TEST_F(ScalarEvolutionsTest, AddExprUseFlags) {
   LLVMContext C;
   SMDiagnostic Err;
