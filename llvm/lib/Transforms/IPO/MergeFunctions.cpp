@@ -439,10 +439,7 @@ bool MergeFunctions::doFunctionalCheck(std::vector<WeakTrackingVH> &Worklist) {
 /// instance of this would be CFI checks for function-local types.
 static bool hasDistinctMetadataIntrinsic(const Function &F) {
   for (const BasicBlock &BB : F) {
-    for (const Instruction &I : BB) {
-      if (!isa<IntrinsicInst>(&I))
-        continue;
-
+    for (const IntrinsicInst &I : make_isa_range<IntrinsicInst>(BB)) {
       for (MetadataAsValue *MDL :
            make_isa_range<MetadataAsValue>(I.operands())) {
         if (MDNode *N = dyn_cast<MDNode>(MDL->getMetadata()))

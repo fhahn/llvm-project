@@ -2544,9 +2544,7 @@ template <> struct DOTGraphTraits<PGOUseFunc *> : DefaultDOTGraphTraits {
     if (!PGOInstrSelect)
       return Result;
 
-    for (const Instruction &I : *Node) {
-      if (!isa<SelectInst>(&I))
-        continue;
+    for (const SelectInst &I : make_isa_range<SelectInst>(*Node)) {
       // Display scaled counts for SELECT instruction:
       OS << "SELECT : { T = ";
       uint64_t TC, FC;
