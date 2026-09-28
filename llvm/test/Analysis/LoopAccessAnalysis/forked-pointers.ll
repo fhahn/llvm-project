@@ -464,6 +464,10 @@ define dso_local void @forked_ptrs_add_to_offset(ptr nocapture readonly %Base, p
 ; FULLDEPTH-NEXT:          %arrayidx5 = getelementptr inbounds float, ptr %Dest, i64 %indvars.iv
 ; FULLDEPTH-NEXT:        Against group GRP2:
 ; FULLDEPTH-NEXT:          %arrayidx3 = getelementptr inbounds float, ptr %Base, i64 %offset
+; FULLDEPTH-NEXT:      Check 2:
+; FULLDEPTH-NEXT:        Comparing group GRP0:
+; FULLDEPTH-NEXT:          %arrayidx5 = getelementptr inbounds float, ptr %Dest, i64 %indvars.iv
+; FULLDEPTH-NEXT:        Against group GRP3:
 ; FULLDEPTH-NEXT:          %arrayidx3 = getelementptr inbounds float, ptr %Base, i64 %offset
 ; FULLDEPTH-NEXT:      Grouped accesses:
 ; FULLDEPTH-NEXT:        Group GRP0:
@@ -473,8 +477,10 @@ define dso_local void @forked_ptrs_add_to_offset(ptr nocapture readonly %Base, p
 ; FULLDEPTH-NEXT:          (Low: %Preds High: (400 + %Preds))
 ; FULLDEPTH-NEXT:            Member: {%Preds,+,4}<nuw><%for.body>
 ; FULLDEPTH-NEXT:        Group GRP2:
-; FULLDEPTH-NEXT:          (Low: ((4 * %extra_offset) + %Base) High: (404 + (4 * %extra_offset) + %Base))
+; FULLDEPTH-NEXT:          (Low: (4 + (4 * %extra_offset) + %Base) High: (404 + (4 * %extra_offset) + %Base))
 ; FULLDEPTH-NEXT:            Member: {(4 + (4 * %extra_offset) + %Base),+,4}<%for.body>
+; FULLDEPTH-NEXT:        Group GRP3:
+; FULLDEPTH-NEXT:          (Low: ((4 * %extra_offset) + %Base) High: (400 + (4 * %extra_offset) + %Base))
 ; FULLDEPTH-NEXT:            Member: {((4 * %extra_offset) + %Base),+,4}<%for.body>
 ; FULLDEPTH-EMPTY:
 ; FULLDEPTH-NEXT:      Non vectorizable stores to invariant address were not found in loop.
@@ -544,6 +550,10 @@ define dso_local void @forked_ptrs_sub_from_offset(ptr nocapture readonly %Base,
 ; FULLDEPTH-NEXT:          %arrayidx5 = getelementptr inbounds float, ptr %Dest, i64 %indvars.iv
 ; FULLDEPTH-NEXT:        Against group GRP2:
 ; FULLDEPTH-NEXT:          %arrayidx3 = getelementptr inbounds float, ptr %Base, i64 %offset
+; FULLDEPTH-NEXT:      Check 2:
+; FULLDEPTH-NEXT:        Comparing group GRP0:
+; FULLDEPTH-NEXT:          %arrayidx5 = getelementptr inbounds float, ptr %Dest, i64 %indvars.iv
+; FULLDEPTH-NEXT:        Against group GRP3:
 ; FULLDEPTH-NEXT:          %arrayidx3 = getelementptr inbounds float, ptr %Base, i64 %offset
 ; FULLDEPTH-NEXT:      Grouped accesses:
 ; FULLDEPTH-NEXT:        Group GRP0:
@@ -553,8 +563,10 @@ define dso_local void @forked_ptrs_sub_from_offset(ptr nocapture readonly %Base,
 ; FULLDEPTH-NEXT:          (Low: %Preds High: (400 + %Preds))
 ; FULLDEPTH-NEXT:            Member: {%Preds,+,4}<nuw><%for.body>
 ; FULLDEPTH-NEXT:        Group GRP2:
-; FULLDEPTH-NEXT:          (Low: ((-4 * %extra_offset) + %Base) High: (404 + (-4 * %extra_offset) + %Base))
+; FULLDEPTH-NEXT:          (Low: (4 + (-4 * %extra_offset) + %Base) High: (404 + (-4 * %extra_offset) + %Base))
 ; FULLDEPTH-NEXT:            Member: {(4 + (-4 * %extra_offset) + %Base),+,4}<%for.body>
+; FULLDEPTH-NEXT:        Group GRP3:
+; FULLDEPTH-NEXT:          (Low: ((-4 * %extra_offset) + %Base) High: (400 + (-4 * %extra_offset) + %Base))
 ; FULLDEPTH-NEXT:            Member: {((-4 * %extra_offset) + %Base),+,4}<%for.body>
 ; FULLDEPTH-EMPTY:
 ; FULLDEPTH-NEXT:      Non vectorizable stores to invariant address were not found in loop.
@@ -624,6 +636,10 @@ define dso_local void @forked_ptrs_add_sub_offset(ptr nocapture readonly %Base, 
 ; FULLDEPTH-NEXT:          %arrayidx5 = getelementptr inbounds float, ptr %Dest, i64 %indvars.iv
 ; FULLDEPTH-NEXT:        Against group GRP2:
 ; FULLDEPTH-NEXT:          %arrayidx3 = getelementptr inbounds float, ptr %Base, i64 %offset
+; FULLDEPTH-NEXT:      Check 2:
+; FULLDEPTH-NEXT:        Comparing group GRP0:
+; FULLDEPTH-NEXT:          %arrayidx5 = getelementptr inbounds float, ptr %Dest, i64 %indvars.iv
+; FULLDEPTH-NEXT:        Against group GRP3:
 ; FULLDEPTH-NEXT:          %arrayidx3 = getelementptr inbounds float, ptr %Base, i64 %offset
 ; FULLDEPTH-NEXT:      Grouped accesses:
 ; FULLDEPTH-NEXT:        Group GRP0:
@@ -633,8 +649,10 @@ define dso_local void @forked_ptrs_add_sub_offset(ptr nocapture readonly %Base, 
 ; FULLDEPTH-NEXT:          (Low: %Preds High: (400 + %Preds))
 ; FULLDEPTH-NEXT:            Member: {%Preds,+,4}<nuw><%for.body>
 ; FULLDEPTH-NEXT:        Group GRP2:
-; FULLDEPTH-NEXT:          (Low: ((4 * %to_add) + (-4 * %to_sub) + %Base) High: (404 + (4 * %to_add) + (-4 * %to_sub) + %Base))
+; FULLDEPTH-NEXT:          (Low: (4 + (4 * %to_add) + (-4 * %to_sub) + %Base) High: (404 + (4 * %to_add) + (-4 * %to_sub) + %Base))
 ; FULLDEPTH-NEXT:            Member: {(4 + (4 * %to_add) + (-4 * %to_sub) + %Base),+,4}<%for.body>
+; FULLDEPTH-NEXT:        Group GRP3:
+; FULLDEPTH-NEXT:          (Low: ((4 * %to_add) + (-4 * %to_sub) + %Base) High: (400 + (4 * %to_add) + (-4 * %to_sub) + %Base))
 ; FULLDEPTH-NEXT:            Member: {((4 * %to_add) + (-4 * %to_sub) + %Base),+,4}<%for.body>
 ; FULLDEPTH-EMPTY:
 ; FULLDEPTH-NEXT:      Non vectorizable stores to invariant address were not found in loop.

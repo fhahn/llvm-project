@@ -572,14 +572,21 @@ public:
     bool NeedsFreeze;
     /// True if this entry represents one arm of a forked pointer.
     bool IsForked;
+    /// If not null, Expr is accessed in exactly the loop iterations in which
+    /// this block executes.
+    const BasicBlock *AccessBlock;
+    /// True if the loop accesses both Start and the element ending at End.
+    bool BoundsAreAccessed;
 
     PointerInfo(Value *PointerValue, const SCEV *Start, const SCEV *End,
                 bool IsWritePtr, unsigned DependencySetId, unsigned AliasSetId,
-                const SCEV *Expr, bool NeedsFreeze, bool IsForked)
+                const SCEV *Expr, bool NeedsFreeze, bool IsForked,
+                const BasicBlock *AccessBlock, bool BoundsAreAccessed)
         : PointerValue(PointerValue), Start(Start), End(End),
           IsWritePtr(IsWritePtr), DependencySetId(DependencySetId),
           AliasSetId(AliasSetId), Expr(Expr), NeedsFreeze(NeedsFreeze),
-          IsForked(IsForked) {}
+          IsForked(IsForked), AccessBlock(AccessBlock),
+          BoundsAreAccessed(BoundsAreAccessed) {}
   };
 
   RuntimePointerChecking(MemoryDepChecker &DC, ScalarEvolution *SE,
@@ -601,7 +608,8 @@ public:
   /// according to the assumptions that we've made during the analysis.
   /// The method might also version the pointer stride according to \p Strides,
   /// and add new predicates to \p PSE. Returns false without inserting anything
-  /// if the bounds of \p PtrExpr cannot be computed.
+  /// if the bounds of \p PtrExpr cannot be computed. \p IsForked indicates
+  /// that \p PtrExpr is one of multiple alternatives for \p Ptr.
   LLVM_ABI bool insert(Loop *Lp, Value *Ptr, const SCEV *PtrExpr,
                        Type *AccessTy, bool WritePtr, unsigned DepSetId,
                        unsigned ASId, PredicatedScalarEvolution &PSE,

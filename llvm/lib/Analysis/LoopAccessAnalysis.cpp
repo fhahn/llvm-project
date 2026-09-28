@@ -522,6 +522,34 @@ std::pair<const SCEV *, const SCEV *> llvm::getStartAndEndForAccess(
   return Res;
 }
 
+/// Returns a block of \p L that executes in exactly the iterations in which
+/// \p Insts access \p Ptr with type \p AccessTy, or nullptr if there is no
+/// such block.
+static const BasicBlock *getAccessBlock(ArrayRef<Instruction *> Insts,
+                                        Value *Ptr, Type *AccessTy,
+                                        const Loop *L,
+                                        const DominatorTree &DT) {
+  const BasicBlock *Latch = L->getLoopLatch();
+  const BasicBlock *AccessBlock = nullptr;
+  for (Instruction *I : Insts) {
+    if (getLoadStoreType(I) != AccessTy)
+      continue;
+    // Ptr is one of multiple incoming values of I's pointer operand, and may
+    // not be accessed whenever I executes.
+    if (getLoadStorePointerOperand(I) != Ptr)
+      return nullptr;
+    const BasicBlock *BB = I->getParent();
+    // If the latch is the only exiting block, all blocks dominating it
+    // execute in every iteration.
+    if (L->getExitingBlock() == Latch && DT.dominates(BB, Latch))
+      BB = Latch;
+    if (AccessBlock && AccessBlock != BB)
+      return nullptr;
+    AccessBlock = BB;
+  }
+  return AccessBlock;
+}
+
 /// Calculate Start and End points of memory access using
 /// getStartAndEndForAccess.
 bool RuntimePointerChecking::insert(Loop *Lp, Value *Ptr, const SCEV *PtrExpr,
@@ -536,8 +564,21 @@ bool RuntimePointerChecking::insert(Loop *Lp, Value *Ptr, const SCEV *PtrExpr,
       &DC.getPointerBounds(), DC.getDT(), DC.getAC(), LoopGuards);
   if (isa<SCEVCouldNotCompute>(ScStart) || isa<SCEVCouldNotCompute>(ScEnd))
     return false;
+  // The entries of a written pointer also cover the loads through it.
+  SmallVector<Instruction *, 4> Insts =
+      DC.getInstructionsForAccess(Ptr, /*IsWrite=*/false);
+  append_range(Insts, DC.getInstructionsForAccess(Ptr, /*IsWrite=*/true));
+  const BasicBlock *AccessBlock =
+      IsForked ? nullptr
+               : getAccessBlock(Insts, Ptr, AccessTy, Lp, *DC.getDT());
+  // With an exact backedge-taken count, the bounds of a pointer accessed in
+  // every iteration are accessed in the first and last iteration.
+  const BasicBlock *Latch = Lp->getLoopLatch();
+  bool BoundsAreAccessed = AccessBlock == Latch &&
+                           Lp->getExitingBlock() == Latch &&
+                           !isa<SCEVCouldNotCompute>(BTC);
   Pointers.emplace_back(Ptr, ScStart, ScEnd, WritePtr, DepSetId, ASId, PtrExpr,
-                        NeedsFreeze, IsForked);
+                        NeedsFreeze, IsForked, AccessBlock, BoundsAreAccessed);
   return true;
 }
 
@@ -686,8 +727,43 @@ static const SCEV *getMinFromExprs(const SCEV *I, const SCEV *J,
   return Diff->isNegative() ? J : I;
 }
 
+/// Returns true if the bounds of \p P and \p Q do not wrap around the address
+/// space relative to each other, or neither is accessed by the loop.
+static bool
+haveNonWrappingDistance(const RuntimePointerChecking::PointerInfo &P,
+                        const RuntimePointerChecking::PointerInfo &Q,
+                        const Loop *L, ScalarEvolution &SE) {
+  // Addresses accessed through pointers based on the same object lie in one
+  // allocated object, which cannot cross the unsigned address space boundary.
+  if (P.BoundsAreAccessed && Q.BoundsAreAccessed)
+    return true;
+  // Otherwise, P and Q must be accessed in the same iterations, at the same
+  // distance in each, so they do not wrap relative to each other in any of
+  // them. As P and Q are assumed to not wrap in the loop, the same then holds
+  // for their bounds.
+  if (!P.AccessBlock || P.AccessBlock != Q.AccessBlock)
+    return false;
+  const SCEV *Dist = SE.getMinusSCEV(P.Expr, Q.Expr);
+  return !isa<SCEVCouldNotCompute>(Dist) && SE.isLoopInvariant(Dist, L);
+}
+
 bool RuntimeCheckingPtrGroup::addPointer(
     unsigned Index, const RuntimePointerChecking &RtCheck) {
+  // addPointer orders bounds by the sign of their constant difference. This
+  // matches the unsigned order used by the runtime checks only if the bounds
+  // do not wrap around the address space relative to each other. Otherwise,
+  // e.g. for a conditional access at a large negative offset, the group's Low
+  // may wrap to above its High and the checks never detect a conflict. Only
+  // add pointers that do not wrap relative to any member, or that have the
+  // group's bounds and thus are covered by them.
+  const RuntimePointerChecking::PointerInfo &Ptr = RtCheck.Pointers[Index];
+  if ((Ptr.Start != Low || Ptr.End != High) &&
+      !all_of(Members, [&](unsigned M) {
+        return haveNonWrappingDistance(Ptr, RtCheck.Pointers[M],
+                                       RtCheck.DC.getInnermostLoop(),
+                                       *RtCheck.SE);
+      }))
+    return false;
   return addPointer(
       Index, RtCheck.Pointers[Index].Start, RtCheck.Pointers[Index].End,
       RtCheck.Pointers[Index].PointerValue->getType()->getPointerAddressSpace(),
