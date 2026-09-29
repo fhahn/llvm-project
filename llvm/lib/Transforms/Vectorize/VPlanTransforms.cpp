@@ -2470,6 +2470,8 @@ static void licm(VPlan &Plan) {
   PostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>> POT(
       LoopRegion->getEntry());
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(POT)) {
+    if (!VPDT.dominates(VPBB, LoopRegion->getExitingBasicBlock()))
+      continue;
     for (VPRecipeBase &R : make_early_inc_range(reverse(*VPBB))) {
       // TODO: Use R.definedValues() instead of casting to VPSingleDefRecipe to
       // support recipes with multiple defined values (e.g., interleaved loads).
@@ -2527,11 +2529,8 @@ static void licm(VPlan &Plan) {
       if (!SinkBB)
         SinkBB = cast<VPBasicBlock>(LoopRegion->getSingleSuccessor());
 
-      // Cannot sink the recipe if its block does not dominate the sink block,
-      // e.g. because the block is not guaranteed to execute in every
-      // iteration.
-      if (!VPDT.properlyDominates(VPBB, SinkBB))
-        continue;
+      assert(VPDT.properlyDominates(VPBB, SinkBB) &&
+             "Defining block must dominate sink block");
       // TODO: Clone the recipe if users are on multiple exit paths, instead of
       // just moving.
       Def->moveBefore(*SinkBB, SinkBB->getFirstNonPhi());
