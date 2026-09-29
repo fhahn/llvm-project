@@ -300,10 +300,9 @@ allocLikeToGlobal(transform::TransformRewriter &rewriter,
   // `select`, `memref.subview`), so any deallocation is a direct user of the
   // allocation. Indirect deallocations are not removed and must be handled
   // separately.
-  for (Operation *user : llvm::make_early_inc_range(allocLikeOp->getUsers())) {
-    if (auto dealloc = dyn_cast<memref::DeallocOp>(user))
-      rewriter.eraseOp(dealloc);
-  }
+  for (memref::DeallocOp dealloc : llvm::make_early_inc_range(
+           llvm::make_isa_range<memref::DeallocOp>(allocLikeOp->getUsers())))
+    rewriter.eraseOp(dealloc);
 
   // Replace the allocation with a `memref.get_global` accessing the
   // global symbol inserted above.

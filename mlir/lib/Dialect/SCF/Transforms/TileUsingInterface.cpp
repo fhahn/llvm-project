@@ -1659,10 +1659,9 @@ SliceTrackingListener::SliceTrackingListener(
 
 LogicalResult
 SliceTrackingListener::insertAndApplyPatterns(ArrayRef<Operation *> ops) {
-  for (Operation *op : ops) {
-    if (auto slice = dyn_cast<tensor::ExtractSliceOp>(op))
-      worklist.push_back(slice);
-  }
+  for (tensor::ExtractSliceOp slice :
+       llvm::make_isa_range<tensor::ExtractSliceOp>(ops))
+    worklist.push_back(slice);
 
   if (!patterns)
     return success();

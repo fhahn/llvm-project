@@ -72,10 +72,9 @@ static void replaceAllUsesInUnstructuredComputeRegionWith(
   SmallVector<Operation *> exitOps;
   if constexpr (std::is_same_v<Op, acc::DeclareEnterOp>) {
     // For declare enter/exit pairs, collect all exit ops
-    for (auto *user : op.getToken().getUsers()) {
-      if (auto declareExit = dyn_cast<acc::DeclareExitOp>(user))
-        exitOps.push_back(declareExit);
-    }
+    for (acc::DeclareExitOp declareExit :
+         llvm::make_isa_range<acc::DeclareExitOp>(op.getToken().getUsers()))
+      exitOps.push_back(declareExit);
     if (exitOps.empty())
       return;
   }
