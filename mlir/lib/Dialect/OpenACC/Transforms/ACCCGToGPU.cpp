@@ -2518,22 +2518,21 @@ void ACCCGToGPULowering::processPredicateRegion(
             if (!def || def->getBlock() != epilogueBlock)
               return std::nullopt;
             if (memref::LoadOp loadOp = dyn_cast<memref::LoadOp>(def)) {
-              for (auto *user : loadOp.getMemRef().getUsers()) {
-                if (acc::ReductionAccumulateOp accOp =
-                        dyn_cast<acc::ReductionAccumulateOp>(user)) {
-                  if (llvm::any_of(accOp.getParDims().getArray(),
-                                   [](mlir::acc::GPUParallelDimAttr pd) {
-                                     return pd.isAnyBlock();
-                                   })) {
-                    FailureOr<arith::AtomicRMWKind> kind = getReductionKind(
-                        accOp.getReductionOperator(),
-                        accOp.getValue().getType(), accOp.getLoc());
-                    if (failed(kind)) {
-                      failedReductionKind = true;
-                      return std::nullopt;
-                    }
-                    return *kind;
+              for (acc::ReductionAccumulateOp accOp :
+                   llvm::make_isa_range<acc::ReductionAccumulateOp>(
+                       loadOp.getMemRef().getUsers())) {
+                if (llvm::any_of(accOp.getParDims().getArray(),
+                                 [](mlir::acc::GPUParallelDimAttr pd) {
+                                   return pd.isAnyBlock();
+                                 })) {
+                  FailureOr<arith::AtomicRMWKind> kind = getReductionKind(
+                      accOp.getReductionOperator(), accOp.getValue().getType(),
+                      accOp.getLoc());
+                  if (failed(kind)) {
+                    failedReductionKind = true;
+                    return std::nullopt;
                   }
+                  return *kind;
                 }
               }
               return std::nullopt;
@@ -3184,16 +3183,15 @@ void ACCCGToGPULowering::processSeqLoop(LoopOp loopOp) {
              loopOp->print(llvm::dbgs()); llvm::dbgs() << "\n");
   llvm::SmallPtrSet<Operation *, 4> preProcessedPrivateLocals;
   ModuleOp module = computeRegion->getParentOfType<ModuleOp>();
-  for (auto &bodyOp : loopOp.getBody()->getOperations()) {
-    if (acc::PrivateLocalOp privateLocal =
-            dyn_cast<acc::PrivateLocalOp>(&bodyOp)) {
-      acc::PrivateType privTy =
-          cast<acc::PrivateType>(privateLocal.getPrivatized().getType());
-      MemRefType baseTy = getPrivateBaseMemRefType(privTy.getBaseTy(), module);
-      if (auto copies = isEligibleForSharedMemory(privateLocal, baseTy)) {
-        processPrivateLocal(privateLocal, copies);
-        preProcessedPrivateLocals.insert(privateLocal.getOperation());
-      }
+  for (acc::PrivateLocalOp privateLocal :
+       llvm::make_isa_range<acc::PrivateLocalOp>(
+           loopOp.getBody()->getOperations())) {
+    acc::PrivateType privTy =
+        cast<acc::PrivateType>(privateLocal.getPrivatized().getType());
+    MemRefType baseTy = getPrivateBaseMemRefType(privTy.getBaseTy(), module);
+    if (auto copies = isEligibleForSharedMemory(privateLocal, baseTy)) {
+      processPrivateLocal(privateLocal, copies);
+      preProcessedPrivateLocals.insert(privateLocal.getOperation());
     }
   }
 
@@ -3328,20 +3326,19 @@ void ACCCGToGPULowering::processParallelOp(scf::ParallelOp parallelOp) {
               mlir::acc::getParDimsAttr(parentPar);
           parentDims && llvm::any_of(parentDims.getArray(),
                                      [](auto d) { return d.isThreadX(); })) {
-        for (auto &op : parentPar.getBody()->getOperations()) {
-          if (acc::ReductionAccumulateOp acc =
-                  dyn_cast<acc::ReductionAccumulateOp>(op)) {
-            bool hasBlockDim = false;
-            bool hasThreadDim = false;
-            for (auto d : acc.getParDims().getArray()) {
-              if (d.isAnyBlock())
-                hasBlockDim = true;
-              if (d.isThreadX() || d.isThreadY())
-                hasThreadDim = true;
-            }
-            if (hasThreadDim && !hasBlockDim)
-              hasAccumulateSibling = true;
+        for (acc::ReductionAccumulateOp acc :
+             llvm::make_isa_range<acc::ReductionAccumulateOp>(
+                 parentPar.getBody()->getOperations())) {
+          bool hasBlockDim = false;
+          bool hasThreadDim = false;
+          for (auto d : acc.getParDims().getArray()) {
+            if (d.isAnyBlock())
+              hasBlockDim = true;
+            if (d.isThreadX() || d.isThreadY())
+              hasThreadDim = true;
           }
+          if (hasThreadDim && !hasBlockDim)
+            hasAccumulateSibling = true;
         }
       }
     }
@@ -4132,25 +4129,24 @@ void ACCCGToGPULowering::processCombineRegionOp(
       // Block reduction directly stores to the accumulator using atomic.
       // The predication (tid.x == 0 when subgroup-aligned) is already handled
       // by the parent predicate_region processing.
-      for (Operation *user : op.getSrcVar().getUsers()) {
-        if (acc::ReductionAccumulateOp accumulateOp =
-                dyn_cast<acc::ReductionAccumulateOp>(user)) {
-          Location loc = accumulateOp.getLoc();
-          FailureOr<arith::AtomicRMWKind> kind =
-              getReductionKind(accumulateOp.getReductionOperator(),
-                               accumulateOp.getValue().getType(), loc);
-          if (failed(kind))
-            return;
-          Value srcMemref = mapping.lookupOrDefault(accumulateOp.getMemref());
-          // Recorded and patched in the fixup to avoid the reload race.
-          auto reductionLoad =
-              memref::LoadOp::create(rewriter, loc, srcMemref, ValueRange{});
-          pendingCombineReloads.push_back({srcMemref, reductionLoad});
-          constructAtomicAccumulation(loc,
-                                      mapping.lookupOrDefault(op.getDestVar()),
-                                      /*indices=*/{}, reductionLoad, *kind);
+      for (acc::ReductionAccumulateOp accumulateOp :
+           llvm::make_isa_range<acc::ReductionAccumulateOp>(
+               op.getSrcVar().getUsers())) {
+        Location loc = accumulateOp.getLoc();
+        FailureOr<arith::AtomicRMWKind> kind =
+            getReductionKind(accumulateOp.getReductionOperator(),
+                             accumulateOp.getValue().getType(), loc);
+        if (failed(kind))
           return;
-        }
+        Value srcMemref = mapping.lookupOrDefault(accumulateOp.getMemref());
+        // Recorded and patched in the fixup to avoid the reload race.
+        auto reductionLoad =
+            memref::LoadOp::create(rewriter, loc, srcMemref, ValueRange{});
+        pendingCombineReloads.push_back({srcMemref, reductionLoad});
+        constructAtomicAccumulation(loc,
+                                    mapping.lookupOrDefault(op.getDestVar()),
+                                    /*indices=*/{}, reductionLoad, *kind);
+        return;
       }
       // For decomposed complex reductions, the AccumulateOp was replaced
       // with real/imag AccumulateOps. Load from the private memref which
