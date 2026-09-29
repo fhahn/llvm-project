@@ -1430,7 +1430,7 @@ define i32 @not_vectorized_select_iv_icmp_no_guard(ptr %a, ptr %b, i32 %start, i
 ; CHECK-VF4IC1-NEXT:    [[CMP:%.*]] = icmp sgt i32 [[TMP0]], [[TMP1]]
 ; CHECK-VF4IC1-NEXT:    [[TMP2:%.*]] = trunc i64 [[IV1]] to i32
 ; CHECK-VF4IC1-NEXT:    [[COND]] = select i1 [[CMP]], i32 [[TMP2]], i32 [[RDX]]
-; CHECK-VF4IC1-NEXT:    [[INC]] = add nuw nsw i64 [[IV1]], 1
+; CHECK-VF4IC1-NEXT:    [[INC]] = add i64 [[IV1]], 1
 ; CHECK-VF4IC1-NEXT:    [[EXITCOND_NOT:%.*]] = icmp eq i64 [[INC]], [[WIDE_TRIP_COUNT]]
 ; CHECK-VF4IC1-NEXT:    br i1 [[EXITCOND_NOT]], label %[[EXIT]], label %[[FOR_BODY]], !llvm.loop [[LOOP13:![0-9]+]]
 ; CHECK-VF4IC1:       [[EXIT]]:
@@ -1524,7 +1524,7 @@ define i32 @not_vectorized_select_iv_icmp_no_guard(ptr %a, ptr %b, i32 %start, i
 ; CHECK-VF4IC4-NEXT:    [[CMP:%.*]] = icmp sgt i32 [[TMP0]], [[TMP1]]
 ; CHECK-VF4IC4-NEXT:    [[TMP2:%.*]] = trunc i64 [[IV1]] to i32
 ; CHECK-VF4IC4-NEXT:    [[COND]] = select i1 [[CMP]], i32 [[TMP2]], i32 [[RDX]]
-; CHECK-VF4IC4-NEXT:    [[INC]] = add nuw nsw i64 [[IV1]], 1
+; CHECK-VF4IC4-NEXT:    [[INC]] = add i64 [[IV1]], 1
 ; CHECK-VF4IC4-NEXT:    [[EXITCOND_NOT:%.*]] = icmp eq i64 [[INC]], [[WIDE_TRIP_COUNT]]
 ; CHECK-VF4IC4-NEXT:    br i1 [[EXITCOND_NOT]], label %[[EXIT]], label %[[FOR_BODY]], !llvm.loop [[LOOP13:![0-9]+]]
 ; CHECK-VF4IC4:       [[EXIT]]:
@@ -1618,7 +1618,7 @@ define i32 @not_vectorized_select_iv_icmp_no_guard(ptr %a, ptr %b, i32 %start, i
 ; CHECK-VF1IC4-NEXT:    [[CMP1:%.*]] = icmp sgt i32 [[TMP52]], [[TMP53]]
 ; CHECK-VF1IC4-NEXT:    [[TMP54:%.*]] = trunc i64 [[IV1]] to i32
 ; CHECK-VF1IC4-NEXT:    [[COND]] = select i1 [[CMP1]], i32 [[TMP54]], i32 [[RDX]]
-; CHECK-VF1IC4-NEXT:    [[INC]] = add nuw nsw i64 [[IV1]], 1
+; CHECK-VF1IC4-NEXT:    [[INC]] = add i64 [[IV1]], 1
 ; CHECK-VF1IC4-NEXT:    [[EXITCOND_NOT:%.*]] = icmp eq i64 [[INC]], [[WIDE_TRIP_COUNT]]
 ; CHECK-VF1IC4-NEXT:    br i1 [[EXITCOND_NOT]], label %[[EXIT]], label %[[FOR_BODY1]], !llvm.loop [[LOOP13:![0-9]+]]
 ; CHECK-VF1IC4:       [[EXIT]]:
@@ -1639,7 +1639,7 @@ for.body:
   %cmp = icmp sgt i32 %0, %1
   %2 = trunc i64 %iv to i32
   %cond = select i1 %cmp, i32 %2, i32 %rdx
-  %inc = add nuw nsw i64 %iv, 1
+  %inc = add i64 %iv, 1
   %exitcond.not = icmp eq i64 %inc, %wide.trip.count
   br i1 %exitcond.not, label %exit, label %for.body
 

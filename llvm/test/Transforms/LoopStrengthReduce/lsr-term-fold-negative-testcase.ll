@@ -365,11 +365,11 @@ declare i64 @llvm.umax.i64(i64, i64)
 
 %struct.PAKT_INFO = type { i32, i32, i32, [0 x i32] }
 
-define i64 @alac_seek(ptr %0) {
+define i64 @alac_seek(ptr %0, i64 %d) {
 ; CHECK-LABEL: define i64 @alac_seek
-; CHECK-SAME: (ptr [[TMP0:%.*]]) {
+; CHECK-SAME: (ptr [[TMP0:%.*]], i64 [[D:%.*]]) {
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[DIV:%.*]] = udiv i64 1, 0
+; CHECK-NEXT:    [[DIV:%.*]] = udiv i64 1, [[D]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = add nuw nsw i64 [[DIV]], 1
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[TMP0]], i64 12
 ; CHECK-NEXT:    br label [[FOR_BODY_I:%.*]]
@@ -377,7 +377,7 @@ define i64 @alac_seek(ptr %0) {
 ; CHECK-NEXT:    [[LSR_IV1:%.*]] = phi ptr [ [[SCEVGEP2:%.*]], [[FOR_BODY_I]] ], [ [[SCEVGEP]], [[ENTRY:%.*]] ]
 ; CHECK-NEXT:    [[LSR_IV:%.*]] = phi i64 [ [[LSR_IV_NEXT:%.*]], [[FOR_BODY_I]] ], [ [[TMP1]], [[ENTRY]] ]
 ; CHECK-NEXT:    [[TMP2:%.*]] = load i32, ptr [[LSR_IV1]], align 4
-; CHECK-NEXT:    [[LSR_IV_NEXT]] = add i64 [[LSR_IV]], -1
+; CHECK-NEXT:    [[LSR_IV_NEXT]] = add nsw i64 [[LSR_IV]], -1
 ; CHECK-NEXT:    [[SCEVGEP2]] = getelementptr i8, ptr [[LSR_IV1]], i64 4
 ; CHECK-NEXT:    [[EXITCOND_NOT_I:%.*]] = icmp eq i64 [[LSR_IV_NEXT]], 0
 ; CHECK-NEXT:    br i1 [[EXITCOND_NOT_I]], label [[ALAC_PAKT_BLOCK_OFFSET_EXIT:%.*]], label [[FOR_BODY_I]]
@@ -385,7 +385,7 @@ define i64 @alac_seek(ptr %0) {
 ; CHECK-NEXT:    ret i64 0
 ;
 entry:
-  %div = udiv i64 1, 0
+  %div = udiv i64 1, %d
   br label %for.body.i
 
 for.body.i:                                       ; preds = %for.body.i, %entry

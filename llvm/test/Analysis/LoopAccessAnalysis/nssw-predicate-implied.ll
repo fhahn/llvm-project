@@ -323,7 +323,7 @@ loop:
   %ext.iv.3 = sext i32 %iv.3 to i64
   %gep.iv.3 = getelementptr inbounds i32, ptr %dst, i64 %ext.iv.3
   store i32 %l, ptr %gep.iv.3, align 4
-  %iv.1.next = add nuw nsw i32 %iv.1, 1
+  %iv.1.next = add nuw i32 %iv.1, 1
   %iv.2.next = add i32 %iv.2, 2
   %iv.3.next = add i32 %iv.3, -1
   %ec = icmp eq i32 %iv.1.next, %N

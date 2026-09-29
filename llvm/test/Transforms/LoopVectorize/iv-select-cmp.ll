@@ -2111,7 +2111,7 @@ define i64 @not_vectorized_select_icmp_iv_out_of_bound(ptr %a, ptr %b, i64 %rdx.
 ; CHECK-VF4IC1-NEXT:    [[TMP1:%.*]] = load i64, ptr [[ARRAYIDX1]], align 8
 ; CHECK-VF4IC1-NEXT:    [[CMP2:%.*]] = icmp sgt i64 [[TMP0]], [[TMP1]]
 ; CHECK-VF4IC1-NEXT:    [[COND]] = select i1 [[CMP2]], i64 [[IV_J]], i64 [[RDX]]
-; CHECK-VF4IC1-NEXT:    [[INC]] = add nuw nsw i64 [[IV_I]], 1
+; CHECK-VF4IC1-NEXT:    [[INC]] = add i64 [[IV_I]], 1
 ; CHECK-VF4IC1-NEXT:    [[INC3]] = add nsw i64 [[IV_J]], 1
 ; CHECK-VF4IC1-NEXT:    [[EXITCOND_NOT:%.*]] = icmp eq i64 [[INC]], [[N]]
 ; CHECK-VF4IC1-NEXT:    br i1 [[EXITCOND_NOT]], label %[[EXIT]], label %[[FOR_BODY]], !llvm.loop [[LOOP23:![0-9]+]]
@@ -2203,7 +2203,7 @@ define i64 @not_vectorized_select_icmp_iv_out_of_bound(ptr %a, ptr %b, i64 %rdx.
 ; CHECK-VF4IC4-NEXT:    [[TMP1:%.*]] = load i64, ptr [[ARRAYIDX1]], align 8
 ; CHECK-VF4IC4-NEXT:    [[CMP2:%.*]] = icmp sgt i64 [[TMP0]], [[TMP1]]
 ; CHECK-VF4IC4-NEXT:    [[COND]] = select i1 [[CMP2]], i64 [[IV_J]], i64 [[RDX]]
-; CHECK-VF4IC4-NEXT:    [[INC]] = add nuw nsw i64 [[IV_I]], 1
+; CHECK-VF4IC4-NEXT:    [[INC]] = add i64 [[IV_I]], 1
 ; CHECK-VF4IC4-NEXT:    [[INC3]] = add nsw i64 [[IV_J]], 1
 ; CHECK-VF4IC4-NEXT:    [[EXITCOND_NOT:%.*]] = icmp eq i64 [[INC]], [[N]]
 ; CHECK-VF4IC4-NEXT:    br i1 [[EXITCOND_NOT]], label %[[EXIT]], label %[[FOR_BODY]], !llvm.loop [[LOOP23:![0-9]+]]
@@ -2295,7 +2295,7 @@ define i64 @not_vectorized_select_icmp_iv_out_of_bound(ptr %a, ptr %b, i64 %rdx.
 ; CHECK-VF1IC4-NEXT:    [[TMP37:%.*]] = load i64, ptr [[ARRAYIDX3]], align 8
 ; CHECK-VF1IC4-NEXT:    [[CMP3:%.*]] = icmp sgt i64 [[TMP36]], [[TMP37]]
 ; CHECK-VF1IC4-NEXT:    [[COND1]] = select i1 [[CMP3]], i64 [[IV_J1]], i64 [[RDX1]]
-; CHECK-VF1IC4-NEXT:    [[INC]] = add nuw nsw i64 [[IV_I1]], 1
+; CHECK-VF1IC4-NEXT:    [[INC]] = add i64 [[IV_I1]], 1
 ; CHECK-VF1IC4-NEXT:    [[INC3]] = add nsw i64 [[IV_J1]], 1
 ; CHECK-VF1IC4-NEXT:    [[EXITCOND_NOT:%.*]] = icmp eq i64 [[INC]], [[N]]
 ; CHECK-VF1IC4-NEXT:    br i1 [[EXITCOND_NOT]], label %[[EXIT]], label %[[FOR_BODY1]], !llvm.loop [[LOOP21:![0-9]+]]
@@ -2316,7 +2316,7 @@ for.body:
   %1 = load i64, ptr %arrayidx1, align 8
   %cmp2 = icmp sgt i64 %0, %1
   %cond = select i1 %cmp2, i64 %iv.j, i64 %rdx
-  %inc = add nuw nsw i64 %iv.i, 1
+  %inc = add i64 %iv.i, 1
   %inc3 = add nsw i64 %iv.j, 1
   %exitcond.not = icmp eq i64 %inc, %n
   br i1 %exitcond.not, label %exit, label %for.body

@@ -31,11 +31,12 @@ for.cond4.preheader:
 
 for.cond7.preheader.lr.ph:
   %0 = load ptr, ptr @e, align 8, !tbaa !4
+  %i.init = load i32, ptr @c, align 4, !tbaa !5
   br label %for.cond7.preheader
 
 for.cond7.preheader:
   %y.017 = phi i32 [ 0, %for.cond7.preheader.lr.ph ], [ %inc24, %for.inc23 ]
-  %i.116 = phi i32 [ 0, %for.cond7.preheader.lr.ph ], [ %i.2.lcssa, %for.inc23 ]
+  %i.116 = phi i32 [ %i.init, %for.cond7.preheader.lr.ph ], [ %i.2.lcssa, %for.inc23 ]
   %n.015 = phi i32 [ poison, %for.cond7.preheader.lr.ph ], [ %inc25, %for.inc23 ]
   %1 = load i32, ptr @b, align 4, !tbaa !5
   %tobool11 = icmp eq i32 %1, 0

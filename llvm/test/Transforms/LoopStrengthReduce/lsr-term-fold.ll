@@ -487,7 +487,7 @@ define void @profiled_short_tc(ptr %a, i32 %offset, i32 %n) {
 ; CHECK-NEXT:    [[LSR_IV1:%.*]] = phi ptr [ [[UGLYGEP2:%.*]], [[FOR_BODY]] ], [ [[UGLYGEP]], [[ENTRY:%.*]] ]
 ; CHECK-NEXT:    [[LSR_IV:%.*]] = phi i32 [ [[LSR_IV_NEXT:%.*]], [[FOR_BODY]] ], [ 0, [[ENTRY]] ]
 ; CHECK-NEXT:    store i32 1, ptr [[LSR_IV1]], align 4
-; CHECK-NEXT:    [[LSR_IV_NEXT]] = add nsw i32 [[LSR_IV]], 1
+; CHECK-NEXT:    [[LSR_IV_NEXT]] = add i32 [[LSR_IV]], 1
 ; CHECK-NEXT:    [[UGLYGEP2]] = getelementptr i8, ptr [[LSR_IV1]], i32 [[OFFSET_NONZERO]]
 ; CHECK-NEXT:    [[EXITCOND_NOT:%.*]] = icmp eq i32 [[LSR_IV_NEXT]], [[N:%.*]]
 ; CHECK-NEXT:    br i1 [[EXITCOND_NOT]], label [[FOR_END:%.*]], label [[FOR_BODY]], !prof [[PROF0:![0-9]+]]
@@ -503,7 +503,7 @@ for.body:                                         ; preds = %for.body, %entry
   %lsr.iv1 = phi ptr [ %uglygep2, %for.body ], [ %uglygep, %entry ]
   %lsr.iv = phi i32 [ %lsr.iv.next, %for.body ], [ 0, %entry ]
   store i32 1, ptr %lsr.iv1, align 4
-  %lsr.iv.next = add nsw i32 %lsr.iv, 1
+  %lsr.iv.next = add i32 %lsr.iv, 1
   %uglygep2 = getelementptr i8, ptr %lsr.iv1, i32 %offset.nonzero
   %exitcond.not = icmp eq i32 %lsr.iv.next, %n
   br i1 %exitcond.not, label %for.end, label %for.body, !prof !{!"branch_weights", i32 1, i32 3}
