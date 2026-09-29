@@ -521,6 +521,33 @@ bool vputils::isSingleScalar(const VPValue *VPV) {
   return isa<VPExpandSCEVRecipe>(VPV);
 }
 
+bool vputils::producesVector(const VPValue *VPV) {
+  const VPRecipeBase *R = VPV->getDefiningRecipe();
+  // Live-ins, symbolic and region values are scalars.
+  if (!R)
+    return false;
+  return TypeSwitch<const VPRecipeBase *, bool>(R)
+      .Case([](const VPInstruction *VPI) {
+        return VPI->hasResult() && !VPI->doesGenerateSingleScalar() &&
+               !VPI->isVectorToScalar();
+      })
+      .Case([](const VPWidenGEPRecipe *GEP) {
+        return !vputils::isSingleScalar(GEP);
+      })
+      .Case([](const VPReductionRecipe *Red) {
+        return Red->isPartialReduction();
+      })
+      .Case([](const VPReductionPHIRecipe *Phi) { return !Phi->isInLoop(); })
+      .Case([](const VPExpressionRecipe *Expr) {
+        return !Expr->isVectorToScalar();
+      })
+      .Case<VPReplicateRecipe, VPScalarIVStepsRecipe, VPDerivedIVRecipe,
+            VPExpandSCEVRecipe, VPVectorPointerRecipe, VPVectorEndPointerRecipe,
+            VPCurrentIterationPHIRecipe, VPIRInstruction>(
+          [](auto *) { return false; })
+      .Default(true);
+}
+
 bool vputils::isUniformAcrossVFsAndUFs(const VPValue *V) {
   // Live-ins, symbolic and canonical-IV region values are uniform.
   if (auto *RV = dyn_cast<VPRegionValue>(V))

@@ -863,6 +863,50 @@ void VPlanTransforms::materializeUnpacks(VPlan &Plan) {
   }
 }
 
+void VPlanTransforms::materializeExtracts(VPlan &Plan) {
+  if (Plan.hasScalarVFOnly())
+    return;
+
+  VPValue *Zero = Plan.getConstantInt(64, 0);
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_deep(Plan.getEntry()))) {
+    for (VPRecipeBase &R : make_early_inc_range(*VPBB)) {
+      for (auto [Idx, Op] : enumerate(R.operands())) {
+        if (!vputils::producesVector(Op))
+          continue;
+        bool UsesScalar = R.usesScalars(Op);
+        if (auto *CallR = dyn_cast<VPWidenCallRecipe>(&R)) {
+          FunctionType *VFTy = CallR->getVariant()->getFunctionType();
+          UsesScalar = Idx < VFTy->getNumParams() &&
+                       !VFTy->getParamType(Idx)->isVectorTy();
+        } else if (isa<VPInterleaveRecipe>(&R)) {
+          UsesScalar = Idx == 0;
+        }
+        if (!UsesScalar)
+          continue;
+        VPBuilder Builder(&R);
+        DebugLoc DL = R.getDebugLoc();
+        if (auto *PhiR = dyn_cast<VPPhiAccessors>(&R)) {
+          auto *Pred = const_cast<VPBasicBlock *>(PhiR->getIncomingBlock(Idx));
+          VPRecipeBase *Term = Pred->getTerminator();
+          Builder.setInsertPoint(Pred,
+                                 Term ? Term->getIterator() : Pred->end());
+          DL = Term ? Term->getDebugLoc() : DebugLoc::getUnknown();
+        }
+        VPValue *Ext;
+        if (isa<VPIRPhi>(&R) && !vputils::isSingleScalar(Op))
+          Ext = Builder.createNaryOp(VPInstruction::ExtractLastLane, {Op}, DL);
+        else if (match(Op, m_BuildVector()))
+          Ext = cast<VPInstruction>(Op)->getOperand(0);
+        else
+          Ext =
+              Builder.createNaryOp(Instruction::ExtractElement, {Op, Zero}, DL);
+        R.setOperand(Idx, Ext);
+      }
+    }
+  }
+}
+
 void VPlanTransforms::materializeVectorTripCount(
     VPlan &Plan, VPBasicBlock *VectorPHVPBB, bool TailByMasking,
     bool RequiresScalarEpilogue, VPValue *Step,

@@ -69,6 +69,10 @@ bool isAddressSCEVForCost(const SCEV *Addr, ScalarEvolution &SE, const Loop *L);
 /// same value for all lanes or only has its first lane used.
 bool isSingleScalar(const VPValue *VPV);
 
+/// Returns true if \p VPV is generated as a vector value when executing a plan
+/// with vector VF.
+bool producesVector(const VPValue *VPV);
+
 /// Checks if \p V is uniform across all VF lanes and UF parts. It is considered
 /// as such if it is either loop invariant (defined outside the vector region)
 /// or its operands are known to be uniform across all VFs and UFs (e.g.

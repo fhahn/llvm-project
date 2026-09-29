@@ -99,6 +99,7 @@
 ; CHECK: VPlan for loop in 'foo' [[BEFORE_OR_AFTER]] VPlanTransforms::expandSCEVs
 ; CHECK: VPlan for loop in 'foo' [[BEFORE_OR_AFTER]] VPlanTransforms::narrowToSingleScalarRecipes
 ; CHECK: VPlan for loop in 'foo' [[BEFORE_OR_AFTER]] VPlanTransforms::removeDeadRecipes@3
+; CHECK: VPlan for loop in 'foo' [[BEFORE_OR_AFTER]] VPlanTransforms::materializeExtracts
 ; CHECK: VPlan for loop in 'foo' [[BEFORE_OR_AFTER]] printFinalVPlan
 
 ; Also verify that VPlans are actually printed (we aren't interested in the
