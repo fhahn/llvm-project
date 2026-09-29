@@ -380,14 +380,12 @@ void IRNormalizer::foldInstructionName(Instruction *I) const {
   // Instruction operands.
   SmallVector<SmallString<64>, 4> Operands;
 
-  for (auto &Op : I->operands()) {
-    if (const auto *I = dyn_cast<Instruction>(Op)) {
-      bool HasNormalName =
-          I->getName().starts_with("op") || I->getName().starts_with("vl");
+  for (const Instruction *Op : make_isa_range<Instruction>(I->operands())) {
+    bool HasNormalName =
+        Op->getName().starts_with("op") || Op->getName().starts_with("vl");
 
-      Operands.push_back(HasNormalName ? I->getName().substr(0, 7)
-                                       : I->getName());
-    }
+    Operands.push_back(HasNormalName ? Op->getName().substr(0, 7)
+                                     : Op->getName());
   }
 
   sortCommutativeOperands(I, Operands);
@@ -484,12 +482,11 @@ void IRNormalizer::reorderDefinition(
       return; // TODO: Do some kind of ordering for these instructions.
   }
 
-  for (auto &Operand : Definition->operands()) {
-    if (auto *Op = dyn_cast<Instruction>(Operand)) {
-      if (Op->getParent() != Definition->getParent())
-        continue; // Only reorder instruction within the same basic block
-      reorderDefinition(Op, TopologicalSort, Visited);
-    }
+  for (Instruction *Op :
+       make_isa_range<Instruction>(Definition->operands())) {
+    if (Op->getParent() != Definition->getParent())
+      continue; // Only reorder instruction within the same basic block
+    reorderDefinition(Op, TopologicalSort, Visited);
   }
 
   LLVM_DEBUG(dbgs() << "\t\tNext in topological sort: "; Definition->dump());

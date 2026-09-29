@@ -128,15 +128,13 @@ bool ProfileInjector::inject() {
   uint32_t WeightsForTestOffset = 0;
   for (auto &BB : F) {
     if (AnnotateSelect) {
-      for (auto &I : BB) {
-        if (auto *SI = dyn_cast<SelectInst>(&I)) {
-          if (SI->getCondition()->getType()->isVectorTy())
-            continue;
-          if (I.getMetadata(LLVMContext::MD_prof))
-            continue;
-          setBranchWeights(I, {SelectTrueWeight, SelectFalseWeight},
-                           /*IsExpected=*/false);
-        }
+      for (SelectInst &SI : make_isa_range<SelectInst>(BB)) {
+        if (SI.getCondition()->getType()->isVectorTy())
+          continue;
+        if (SI.getMetadata(LLVMContext::MD_prof))
+          continue;
+        setBranchWeights(SI, {SelectTrueWeight, SelectFalseWeight},
+                         /*IsExpected=*/false);
       }
     }
     auto *Term = getTerminatorBenefitingFromMDProf(BB);

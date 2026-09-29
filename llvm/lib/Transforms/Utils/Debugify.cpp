@@ -440,11 +440,9 @@ bool llvm::collectDebugInfoMetadata(Module &M,
     DebugInfoBeforePass.DIFunctions.insert({&F, SP});
     if (SP) {
       LLVM_DEBUG(dbgs() << "  Collecting subprogram: " << *SP << '\n');
-      for (const MDNode *DN : SP->getRetainedNodes()) {
-        if (const auto *DV = dyn_cast<DILocalVariable>(DN)) {
-          DebugInfoBeforePass.DIVariables[DV] = 0;
-        }
-      }
+      for (const DILocalVariable *DV :
+           make_isa_range<DILocalVariable>(SP->getRetainedNodes()))
+        DebugInfoBeforePass.DIVariables[DV] = 0;
     }
     if (DebugifyLevel > Level::Locations) {
       for (BasicBlock &BB : F) {
@@ -658,11 +656,9 @@ bool llvm::checkDebugInfoMetadata(Module &M,
 
     if (SP) {
       LLVM_DEBUG(dbgs() << "  Collecting subprogram: " << *SP << '\n');
-      for (const MDNode *DN : SP->getRetainedNodes()) {
-        if (const auto *DV = dyn_cast<DILocalVariable>(DN)) {
-          DebugInfoAfterPass.DIVariables[DV] = 0;
-        }
-      }
+      for (const DILocalVariable *DV :
+           make_isa_range<DILocalVariable>(SP->getRetainedNodes()))
+        DebugInfoAfterPass.DIVariables[DV] = 0;
     }
 
     for (BasicBlock &BB : F) {

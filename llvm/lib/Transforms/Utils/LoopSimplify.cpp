@@ -229,13 +229,9 @@ static Loop *separateNestedLoop(Loop *L, BasicBlock *Preheader,
   // available. This is similar to the conservative treatment of
   // convergent function calls in GVNHoist and JumpThreading.
   for (auto *BB : L->blocks()) {
-    for (auto &II : *BB) {
-      if (auto CI = dyn_cast<CallBase>(&II)) {
-        if (CI->isConvergent()) {
-          return nullptr;
-        }
-      }
-    }
+    for (CallBase &CI : make_isa_range<CallBase>(*BB))
+      if (CI.isConvergent())
+        return nullptr;
   }
 
   // The header is not a landing pad; preheader insertion should ensure this.

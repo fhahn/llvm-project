@@ -1476,12 +1476,11 @@ CodeExtractor::extractCodeRegion(const CodeExtractorAnalysisCache &CEAC,
   // Remove @llvm.assume calls that will be moved to the new function from the
   // old function's assumption cache.
   for (BasicBlock *Block : Blocks) {
-    for (Instruction &I : llvm::make_early_inc_range(*Block)) {
-      if (auto *AI = dyn_cast<AssumeInst>(&I)) {
-        if (AC)
-          AC->unregisterAssumption(AI);
-        AI->eraseFromParent();
-      }
+    for (AssumeInst &AI : llvm::make_early_inc_range(
+             make_isa_range<AssumeInst>(*Block))) {
+      if (AC)
+        AC->unregisterAssumption(&AI);
+      AI.eraseFromParent();
     }
   }
 
