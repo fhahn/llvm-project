@@ -4693,16 +4693,14 @@ static bool mergeConditionalStores(CondBrInst *PBI, CondBrInst *QBI,
   for (auto *BB : {PTB, PFB}) {
     if (!BB)
       continue;
-    for (auto &I : *BB)
-      if (StoreInst *SI = dyn_cast<StoreInst>(&I))
-        PStoreAddresses.insert(SI->getPointerOperand());
+    for (StoreInst &SI : make_isa_range<StoreInst>(*BB))
+      PStoreAddresses.insert(SI.getPointerOperand());
   }
   for (auto *BB : {QTB, QFB}) {
     if (!BB)
       continue;
-    for (auto &I : *BB)
-      if (StoreInst *SI = dyn_cast<StoreInst>(&I))
-        QStoreAddresses.insert(SI->getPointerOperand());
+    for (StoreInst &SI : make_isa_range<StoreInst>(*BB))
+      QStoreAddresses.insert(SI.getPointerOperand());
   }
 
   set_intersect(PStoreAddresses, QStoreAddresses);

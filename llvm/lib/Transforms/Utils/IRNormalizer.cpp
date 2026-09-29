@@ -317,9 +317,8 @@ void IRNormalizer::nameAsRegularInstruction(Instruction *I) {
   SmallVector<int, 4> OperandsOpcodes;
 
   // Collect operand opcodes for hashing.
-  for (auto &Op : I->operands())
-    if (auto *I = dyn_cast<Instruction>(Op))
-      OperandsOpcodes.push_back(I->getOpcode());
+  for (Instruction *Op : make_isa_range<Instruction>(I->operands()))
+    OperandsOpcodes.push_back(Op->getOpcode());
 
   sortCommutativeOperands(I, OperandsOpcodes);
 

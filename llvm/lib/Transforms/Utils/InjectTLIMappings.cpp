@@ -135,9 +135,8 @@ static void addMappingsFromTLI(const TargetLibraryInfo &TLI, CallInst &CI) {
 }
 
 static bool runImpl(const TargetLibraryInfo &TLI, Function &F) {
-  for (auto &I : instructions(F))
-    if (auto CI = dyn_cast<CallInst>(&I))
-      addMappingsFromTLI(TLI, *CI);
+  for (CallInst &CI : make_isa_range<CallInst>(instructions(F)))
+    addMappingsFromTLI(TLI, CI);
   // Even if the pass adds IR attributes, the analyses are preserved.
   return false;
 }

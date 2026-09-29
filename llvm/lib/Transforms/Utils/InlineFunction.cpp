@@ -2998,9 +2998,8 @@ void llvm::InlineFunctionImpl(CallBase &CB, InlineFunctionInfo &IFI,
     if (IFI.GetAssumptionCache)
       for (BasicBlock &NewBlock :
            make_range(FirstNewBlock->getIterator(), Caller->end()))
-        for (Instruction &I : NewBlock)
-          if (auto *II = dyn_cast<AssumeInst>(&I))
-            IFI.GetAssumptionCache(*Caller).registerAssumption(II);
+        for (AssumeInst &II : make_isa_range<AssumeInst>(NewBlock))
+          IFI.GetAssumptionCache(*Caller).registerAssumption(&II);
   }
 
   if (IFI.ConvergenceControlToken) {

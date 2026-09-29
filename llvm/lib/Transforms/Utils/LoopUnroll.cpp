@@ -1335,9 +1335,8 @@ llvm::UnrollLoop(Loop *L, UnrollLoopOptions ULO, LoopInfo *LI,
     // Key Instructions: Nothing to do - we've already remapped the atoms.
     remapInstructionsInBlocks(NewBlocks, LastValueMap);
     for (BasicBlock *NewBlock : NewBlocks)
-      for (Instruction &I : *NewBlock)
-        if (auto *II = dyn_cast<AssumeInst>(&I))
-          AC->registerAssumption(II);
+      for (AssumeInst &II : make_isa_range<AssumeInst>(*NewBlock))
+        AC->registerAssumption(&II);
 
     {
       // Identify what other metadata depends on the cloned version. After
