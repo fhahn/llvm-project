@@ -701,13 +701,12 @@ Loop::LocRange Loop::getLocRange() const {
     // We use the first DebugLoc in the header as the start location of the loop
     // and if there is a second DebugLoc in the header we use it as end location
     // of the loop.
-    for (const MDOperand &MDO : llvm::drop_begin(LoopID->operands())) {
-      if (DILocation *L = dyn_cast<DILocation>(MDO)) {
-        if (!Start)
-          Start = DebugLoc(L);
-        else
-          return LocRange(Start, DebugLoc(L));
-      }
+    for (DILocation *L :
+         make_isa_range<DILocation>(llvm::drop_begin(LoopID->operands()))) {
+      if (!Start)
+        Start = DebugLoc(L);
+      else
+        return LocRange(Start, DebugLoc(L));
     }
 
     if (Start)

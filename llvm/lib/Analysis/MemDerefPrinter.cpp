@@ -24,15 +24,13 @@ PreservedAnalyses MemDerefPrinterPass::run(Function &F,
   SmallPtrSet<Value *, 4> DerefAndAligned;
 
   const DataLayout &DL = F.getDataLayout();
-  for (auto &I : instructions(F)) {
-    if (LoadInst *LI = dyn_cast<LoadInst>(&I)) {
-      Value *PO = LI->getPointerOperand();
-      if (isDereferenceablePointer(PO, LI->getType(), SimplifyQuery(DL, LI)))
-        Deref.push_back(PO);
-      if (isDereferenceableAndAlignedPointer(PO, LI->getType(), LI->getAlign(),
-                                             SimplifyQuery(DL, LI)))
-        DerefAndAligned.insert(PO);
-    }
+  for (LoadInst &LI : make_isa_range<LoadInst>(instructions(F))) {
+    Value *PO = LI.getPointerOperand();
+    if (isDereferenceablePointer(PO, LI.getType(), SimplifyQuery(DL, &LI)))
+      Deref.push_back(PO);
+    if (isDereferenceableAndAlignedPointer(PO, LI.getType(), LI.getAlign(),
+                                           SimplifyQuery(DL, &LI)))
+      DerefAndAligned.insert(PO);
   }
 
   OS << "The following are dereferenceable:\n";
