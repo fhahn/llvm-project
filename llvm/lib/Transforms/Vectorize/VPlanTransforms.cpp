@@ -3351,11 +3351,7 @@ static bool handleUncountableExitsWithSideEffects(
     auto *AnyExit =
         cast<VPInstruction>(LatchVPBB->getTerminator()->getOperand(0));
     AnyExit->moveBefore(*HeaderVPBB, InsertIt);
-    VPBasicBlock *Body = HeaderVPBB->splitAt(InsertIt);
-    Body->setName("vector.body.nonbailing");
-    // The new guard's frequency is not the original scalar block's frequency.
-    for (VPInstruction &VPI : make_isa_range<VPInstruction>(*Body))
-      VPI.clearExecutionFrequency();
+    HeaderVPBB->splitAt(InsertIt)->setName("vector.body.nonbailing");
     VPBlockUtils::connectBlocks(HeaderVPBB, LatchVPBB);
     HeaderVPBB->swapSuccessors();
     VPBuilder(HeaderVPBB).createNaryOp(VPInstruction::BranchOnCond, AnyExit);

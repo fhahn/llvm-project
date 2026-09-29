@@ -132,8 +132,8 @@ VPValue *VPPredicator::createEdgeMask(const VPBasicBlock *Src,
 
   VPValue *SrcMask = getBlockInMask(Src);
 
-  // If there's a single successor, there's no terminator recipe.
-  if (Src->getNumSuccessors() == 1)
+  // Single-successor blocks and retained branches need no edge predicate.
+  if (Src->getNumSuccessors() == 1 || BlocksToKeep.contains(Src))
     return setEdgeMask(Src, Dst, SrcMask);
 
   auto *Term = cast<VPInstruction>(Src->getTerminator());
@@ -145,12 +145,6 @@ VPValue *VPPredicator::createEdgeMask(const VPBasicBlock *Src,
   assert(Term->getOpcode() == VPInstruction::BranchOnCond &&
          "Unsupported terminator");
   if (Src->getSuccessors()[0] == Src->getSuccessors()[1])
-    return setEdgeMask(Src, Dst, SrcMask);
-
-  // A uniform branch that is kept remains actual control flow. All lanes take
-  // the same edge, so every lane reaching Src also reaches Dst if that edge is
-  // taken.
-  if (BlocksToKeep.contains(Src))
     return setEdgeMask(Src, Dst, SrcMask);
 
   EdgeMask = Term->getOperand(0);
@@ -422,12 +416,10 @@ static VPBasicBlock *getBlockToKeepUnderUniformBranch(VPBasicBlock *VPBB) {
         vputils::isUniformAcrossVFsAndUFs(Cond)))
     return nullptr;
 
-  auto *Succ0 = cast<VPBasicBlock>(VPBB->getSuccessors()[0]);
-  auto *Succ1 = cast<VPBasicBlock>(VPBB->getSuccessors()[1]);
-  if (Succ0 == Succ1)
-    return nullptr;
-  auto *Guarded = Succ0->getSingleSuccessor() == Succ1 ? Succ0 : Succ1;
-  auto *Merge = Guarded == Succ0 ? Succ1 : Succ0;
+  auto *Guarded = cast<VPBasicBlock>(VPBB->getSuccessors()[0]);
+  auto *Merge = cast<VPBasicBlock>(VPBB->getSuccessors()[1]);
+  if (Guarded->getSingleSuccessor() != Merge)
+    std::swap(Guarded, Merge);
   if (Guarded->getSinglePredecessor() != VPBB ||
       Guarded->getSingleSuccessor() != Merge ||
       Merge->getNumPredecessors() != 2 ||
@@ -454,16 +446,13 @@ void VPPredicator::run() {
   for (VPBasicBlock *VPBB : Blocks) {
     // Flattening must not introduce a branch on a potentially poison condition
     // that the original loop need not evaluate.
-    if (!VPDT.dominates(VPBB,
-                        Plan.getVectorLoopRegion()->getExitingBasicBlock()))
-      continue;
-    if (VPBasicBlock *Guarded = getBlockToKeepUnderUniformBranch(VPBB)) {
-      BlocksToKeep.insert(VPBB);
-      BlocksToKeep.insert(Guarded);
-    }
-  }
+    if (VPDT.dominates(VPBB,
+                       Plan.getVectorLoopRegion()->getExitingBasicBlock()))
+      if (VPBasicBlock *Guarded = getBlockToKeepUnderUniformBranch(VPBB)) {
+        BlocksToKeep.insert(VPBB);
+        BlocksToKeep.insert(Guarded);
+      }
 
-  for (VPBasicBlock *VPBB : Blocks) {
     // Introduce the mask for VPBB, which may introduce needed edge masks, and
     // convert all phi recipes of VPBB to blend recipes unless VPBB is the
     // header.
@@ -476,10 +465,9 @@ void VPPredicator::run() {
       if (BlockMask)
         VPI.addMask(BlockMask);
 
-      // Unmasked instructions in linearized blocks always execute. Retained
-      // blocks keep their original frequency, though their costs are currently
-      // conservatively charged in full.
-      if (!VPI.isMasked() && !BlocksToKeep.contains(VPBB))
+      // Unmasked recipes are costed in full. This is conservative for blocks
+      // guarded by retained branches.
+      if (!VPI.isMasked())
         VPI.clearExecutionFrequency();
     }
   }

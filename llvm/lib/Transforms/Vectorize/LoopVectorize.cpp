@@ -6484,13 +6484,11 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
   //       the presence of an uncountable exit and the presence of stores in
   //       the loop inside handleUncountableEarlyExits itself.
   if (Legal->hasUncountableEarlyExit()) {
-    UncountableExitStyle EEStyle =
-        Legal->hasUncountableExitWithSideEffects()
-            ? UncountableExitStyle::MaskedHandleExitInScalarLoop
-            : UncountableExitStyle::ReadOnly;
-    if (EarlyExitVectorizationBailToScalar &&
-        EEStyle == UncountableExitStyle::MaskedHandleExitInScalarLoop)
-      EEStyle = UncountableExitStyle::BailToScalarOnEarlyExit;
+    UncountableExitStyle EEStyle = UncountableExitStyle::ReadOnly;
+    if (Legal->hasUncountableExitWithSideEffects())
+      EEStyle = EarlyExitVectorizationBailToScalar
+                    ? UncountableExitStyle::BailToScalarOnEarlyExit
+                    : UncountableExitStyle::MaskedHandleExitInScalarLoop;
     if (!RUN_VPLAN_PASS(VPlanTransforms::handleUncountableEarlyExits, *VPlan0,
                         ORE, OrigLoop, PSE, *DT, Legal->getAssumptionCache(),
                         EEStyle, Config)) {
