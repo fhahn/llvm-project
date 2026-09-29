@@ -339,13 +339,12 @@ static void setOptionalCommandlineArguments(NVVMTargetAttr target,
     return;
 
   std::optional<mlir::NamedAttribute> cmdOptions = target.getCmdOptions();
-  for (Attribute attr : cast<ArrayAttr>(cmdOptions->getValue())) {
-    if (auto strAttr = dyn_cast<StringAttr>(attr)) {
-      if constexpr (std::is_same_v<T, StringRef>) {
-        ptxasArgs.push_back(strAttr.getValue());
-      } else if constexpr (std::is_same_v<T, const char *>) {
-        ptxasArgs.push_back(strAttr.getValue().data());
-      }
+  for (StringAttr strAttr : llvm::make_isa_range<StringAttr>(
+           cast<ArrayAttr>(cmdOptions->getValue()))) {
+    if constexpr (std::is_same_v<T, StringRef>) {
+      ptxasArgs.push_back(strAttr.getValue());
+    } else if constexpr (std::is_same_v<T, const char *>) {
+      ptxasArgs.push_back(strAttr.getValue().data());
     }
   }
 }

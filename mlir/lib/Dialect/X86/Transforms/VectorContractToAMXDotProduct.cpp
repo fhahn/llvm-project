@@ -1110,22 +1110,20 @@ struct VectorContractToAMXDotProduct
 
     // Retrive all the contaction operation within the loop.
     SmallVector<vector::ContractionOp> ops;
-    for (mlir::Operation &op : loopLists[0].getBody()->getOperations()) {
+    for (mlir::vector::ContractionOp contract :
+         llvm::make_isa_range<mlir::vector::ContractionOp>(
+             loopLists[0].getBody()->getOperations())) {
+      LogicalResult validate = validateContractOps(
+          rewriter, contract, dimValue, srcBuffLhs, srcBuffRhs, true);
 
-      if (auto contract = llvm::dyn_cast<mlir::vector::ContractionOp>(op)) {
+      if (failed(validate))
+        return rewriter.notifyMatchFailure(
+            contractOp,
+            "The associated contract operations doesn't satisfy "
+            "the re-write conditions either the dimensions are "
+            "wrong or MemRef source are different or many users.");
 
-        LogicalResult validate = validateContractOps(
-            rewriter, contract, dimValue, srcBuffLhs, srcBuffRhs, true);
-
-        if (failed(validate))
-          return rewriter.notifyMatchFailure(
-              contractOp,
-              "The associated contract operations doesn't satisfy "
-              "the re-write conditions either the dimensions are "
-              "wrong or MemRef source are different or many users.");
-
-        ops.push_back(contract);
-      }
+      ops.push_back(contract);
     }
 
     if (!isVnni) {

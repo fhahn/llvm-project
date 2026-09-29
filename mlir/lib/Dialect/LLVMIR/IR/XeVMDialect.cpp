@@ -535,15 +535,13 @@ XeVMTargetAttr::verify(function_ref<InFlightDiagnostic()> emitError, int O,
     return emitError() << "The target chip cannot be empty.";
   }
   if (linkFiles) {
-    for (Attribute fileAttr : linkFiles) {
-      if (auto fileStrAttr = llvm::dyn_cast<StringAttr>(fileAttr)) {
-        StringRef filePath = fileStrAttr.getValue();
-        if (filePath.empty()) {
-          return emitError() << "File paths in linkFiles cannot be empty.";
-        }
-        if (!llvm::sys::fs::exists(filePath)) {
-          return emitError() << "File '" << filePath << "' does not exist.";
-        }
+    for (StringAttr fileStrAttr : llvm::make_isa_range<StringAttr>(linkFiles)) {
+      StringRef filePath = fileStrAttr.getValue();
+      if (filePath.empty()) {
+        return emitError() << "File paths in linkFiles cannot be empty.";
+      }
+      if (!llvm::sys::fs::exists(filePath)) {
+        return emitError() << "File '" << filePath << "' does not exist.";
       }
     }
   }
