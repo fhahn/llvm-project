@@ -17,9 +17,11 @@
 #include "llvm/Analysis/InstructionSimplify.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
+#include "llvm/Analysis/ScalarEvolutionPatternMatch.h"
 #include "llvm/IR/Operator.h"
 
 using namespace llvm;
+using namespace llvm::SCEVPatternMatch;
 
 /// Try to simplify instruction \param I using its SCEV expression.
 ///
@@ -47,6 +49,35 @@ bool UnrolledInstAnalyzer::simplifyInstWithSCEV(Instruction *I) {
   auto *AR = dyn_cast<SCEVAddRecExpr>(S);
   if (!AR || AR->getLoop() != L)
     return false;
+
+  // For affine AddRecs with a constant step, compute the value at the
+  // iteration directly, instead of creating SCEV expressions for each
+  // iteration.
+  const APInt *Step;
+  if (AR->isAffine() && match(AR->getOperand(1), m_scev_APInt(Step))) {
+    APInt IterationOffset = *Step * cast<SCEVConstant>(IterationNumber)
+                                        ->getAPInt()
+                                        .zextOrTrunc(Step->getBitWidth());
+    const SCEV *Start = AR->getStart();
+    if (auto *StartC = dyn_cast<SCEVConstant>(Start)) {
+      SimplifiedValues[I] = ConstantInt::get(
+          StartC->getType(), StartC->getAPInt() + IterationOffset);
+      return true;
+    }
+
+    auto *Base = dyn_cast<SCEVUnknown>(SE.getPointerBase(S));
+    if (!Base)
+      return false;
+    std::optional<APInt> StartOffset =
+        SE.computeConstantDifference(Start, Base);
+    if (!StartOffset)
+      return false;
+    SimplifiedAddress Address;
+    Address.Base = Base->getValue();
+    Address.Offset = *StartOffset + IterationOffset;
+    SimplifiedAddresses[I] = std::move(Address);
+    return false;
+  }
 
   const SCEV *ValueAtIteration = AR->evaluateAtIteration(IterationNumber, SE);
   // Check if the AddRec expression becomes a constant.
