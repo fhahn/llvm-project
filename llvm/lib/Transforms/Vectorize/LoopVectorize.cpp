@@ -7099,12 +7099,9 @@ getEpilogueLowering(Function *F, Loop *L, LoopVectorizeHints &Hints,
 static void checkMixedPrecision(Loop *L, OptimizationRemarkEmitter *ORE) {
   SmallVector<Instruction *, 4> Worklist;
   for (BasicBlock *BB : L->getBlocks()) {
-    for (Instruction &Inst : *BB) {
-      if (auto *S = dyn_cast<StoreInst>(&Inst)) {
-        if (S->getValueOperand()->getType()->isFloatTy())
-          Worklist.push_back(S);
-      }
-    }
+    for (StoreInst &S : make_isa_range<StoreInst>(*BB))
+      if (S.getValueOperand()->getType()->isFloatTy())
+        Worklist.push_back(&S);
   }
 
   // Traverse the floating point stores upwards searching, for floating point

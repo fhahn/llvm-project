@@ -1068,12 +1068,10 @@ static PreservedAnalyses runImpl(Function &F, const TargetLibraryInfo *TLI,
 
   const DataLayout& DL = F.getDataLayout();
   SmallVector<std::pair<CallInst *, LibFunc>, 8> MemCmpCalls;
-  for (Instruction &I : instructions(F)) {
-    if (auto *CI = dyn_cast<CallInst>(&I)) {
-      LibFunc Func = TLI->getLibFunc(*CI);
-      if (Func == LibFunc_memcmp || Func == LibFunc_bcmp)
-        MemCmpCalls.push_back({CI, Func});
-    }
+  for (CallInst &CI : make_isa_range<CallInst>(instructions(F))) {
+    LibFunc Func = TLI->getLibFunc(CI);
+    if (Func == LibFunc_memcmp || Func == LibFunc_bcmp)
+      MemCmpCalls.push_back({&CI, Func});
   }
 
   bool MadeChanges = false;

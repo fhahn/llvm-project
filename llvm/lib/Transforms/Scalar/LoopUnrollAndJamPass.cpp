@@ -243,13 +243,11 @@ static unsigned computeUnrollAndJamCount(
   // outer loop and can become shared.
   unsigned NumInvariant = 0;
   for (BasicBlock *BB : SubLoop->getBlocks()) {
-    for (Instruction &I : *BB) {
-      if (auto *Ld = dyn_cast<LoadInst>(&I)) {
-        Value *V = Ld->getPointerOperand();
-        const SCEV *LSCEV = SE.getSCEVAtScope(V, L);
-        if (SE.isLoopInvariant(LSCEV, L))
-          NumInvariant++;
-      }
+    for (LoadInst &Ld : make_isa_range<LoadInst>(*BB)) {
+      Value *V = Ld.getPointerOperand();
+      const SCEV *LSCEV = SE.getSCEVAtScope(V, L);
+      if (SE.isLoopInvariant(LSCEV, L))
+        NumInvariant++;
     }
   }
   if (NumInvariant == 0) {

@@ -139,13 +139,11 @@ bool AlwaysInlineImpl(
 
     // Collect initial calls.
     for (BasicBlock &BB : *F) {
-      for (Instruction &I : BB) {
-        if (auto *CB = dyn_cast<CallBase>(&I)) {
-          Function *Callee = CB->getCalledFunction();
-          if (!Callee || Callee->isDeclaration())
-            continue;
-          Worklist.push_back({CB, -1});
-        }
+      for (CallBase &CB : make_isa_range<CallBase>(BB)) {
+        Function *Callee = CB.getCalledFunction();
+        if (!Callee || Callee->isDeclaration())
+          continue;
+        Worklist.push_back({&CB, -1});
       }
     }
 
