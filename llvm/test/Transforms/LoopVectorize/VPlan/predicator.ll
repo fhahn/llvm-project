@@ -646,7 +646,7 @@ define void @blend_chain_non_trivial(ptr noalias %a, ptr noalias %b) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION nuw nsw ir<0>, ir<1>, vp<[[VP0:%[0-9]+]]>
-; CHECK-NEXT:      EMIT-SCALAR ir<%lb> = load ir<%b>
+; CHECK-NEXT:      EMIT ir<%lb> = load ir<%b>
 ; CHECK-NEXT:      EMIT ir<%v1> = add ir<%iv>, ir<%lb>
 ; CHECK-NEXT:      EMIT ir<%v2> = mul ir<%iv>, ir<3>
 ; CHECK-NEXT:      EMIT ir<%gep> = getelementptr ir<%a>, ir<%iv>

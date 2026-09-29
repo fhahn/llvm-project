@@ -316,7 +316,7 @@ define void @consecutive_load_with_first_order_recurrence_address(ptr noalias %a
 ; CHECK-NEXT:      EMIT ir<%ext> = zext ir<%inc> to i64
 ; CHECK-NEXT:      EMIT vp<[[VP4:%[0-9]+]]> = first-order splice ir<%prev>, ir<%ext>
 ; CHECK-NEXT:      EMIT ir<%gep.a> = getelementptr inbounds ir<%a>, vp<[[VP4]]>
-; CHECK-NEXT:      EMIT-SCALAR ir<%lv> = load ir<%gep.a>
+; CHECK-NEXT:      EMIT ir<%lv> = load ir<%gep.a>
 ; CHECK-NEXT:      EMIT ir<%gep.b> = getelementptr inbounds ir<%b>, ir<%iv>
 ; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds i32, ir<%gep.b>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP5]]>, ir<%lv>
@@ -641,7 +641,7 @@ define void @ashr_of_shl_address(ptr noalias %A) {
 ; CHECK-NEXT:      EMIT ir<%shl> = shl ir<%iv>, ir<32>
 ; CHECK-NEXT:      EMIT ir<%ashr> = ashr ir<%shl>, ir<32>
 ; CHECK-NEXT:      EMIT ir<%gep> = getelementptr inbounds ir<%A>, ir<%ashr>
-; CHECK-NEXT:      EMIT-SCALAR ir<%lv> = load ir<%gep>
+; CHECK-NEXT:      EMIT ir<%lv> = load ir<%gep>
 ; CHECK-NEXT:      EMIT ir<%add> = add ir<%lv>, ir<1>
 ; CHECK-NEXT:      EMIT store ir<%add>, ir<%gep>
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add nuw nsw ir<%iv>, ir<1>
@@ -698,7 +698,7 @@ define void @extractvalue_of_with_overflow_address(ptr noalias %A) {
 ; CHECK-NEXT:      EMIT ir<%res> = call { i64, i1 } @llvm.sadd.with.overflow.i64(ir<%iv>, ir<1>)
 ; CHECK-NEXT:      EMIT ir<%idx> = extractvalue ir<%res>, ir<0>
 ; CHECK-NEXT:      EMIT ir<%gep> = getelementptr inbounds ir<%A>, ir<%idx>
-; CHECK-NEXT:      EMIT-SCALAR ir<%lv> = load ir<%gep>
+; CHECK-NEXT:      EMIT ir<%lv> = load ir<%gep>
 ; CHECK-NEXT:      EMIT ir<%add> = add ir<%lv>, ir<1>
 ; CHECK-NEXT:      EMIT store ir<%add>, ir<%gep>
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add nuw nsw ir<%iv>, ir<1>
@@ -764,7 +764,7 @@ define void @blend_with_identical_incoming_values_address(ptr noalias %A, i1 %c)
 ; CHECK-NEXT:    latch:
 ; CHECK-NEXT:      BLEND ir<%idx> = ir<%idx.else>/vp<[[VP4]]> ir<%idx.then>/ir<%c>
 ; CHECK-NEXT:      EMIT ir<%gep> = getelementptr inbounds ir<%A>, ir<%idx>
-; CHECK-NEXT:      EMIT-SCALAR ir<%lv> = load ir<%gep>
+; CHECK-NEXT:      EMIT ir<%lv> = load ir<%gep>
 ; CHECK-NEXT:      EMIT ir<%add> = add ir<%lv>, ir<1>
 ; CHECK-NEXT:      EMIT store ir<%add>, ir<%gep>
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add nuw nsw ir<%iv>, ir<1>
@@ -829,7 +829,7 @@ define void @or_without_disjoint_address(ptr noalias %A, ptr noalias %B) {
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION nuw nsw ir<0>, ir<1>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT ir<%idx> = or ir<%iv>, ir<1>
 ; CHECK-NEXT:      EMIT ir<%gep.B> = getelementptr inbounds ir<%B>, ir<%idx>
-; CHECK-NEXT:      EMIT-SCALAR ir<%lv> = load ir<%gep.B>
+; CHECK-NEXT:      EMIT ir<%lv> = load ir<%gep.B>
 ; CHECK-NEXT:      EMIT ir<%gep.A> = getelementptr inbounds ir<%A>, ir<%iv>
 ; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = vector-pointer inbounds i32, ir<%gep.A>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP4]]>, ir<%lv>
@@ -884,7 +884,7 @@ define void @sdiv_with_negative_operand_address(ptr noalias %A, ptr noalias %B) 
 ; CHECK-NEXT:      EMIT ir<%mul> = mul nuw nsw ir<%iv>, ir<4>
 ; CHECK-NEXT:      EMIT ir<%idx> = sdiv ir<%mul>, ir<-4>
 ; CHECK-NEXT:      EMIT ir<%gep.B> = getelementptr inbounds ir<%B>, ir<%idx>
-; CHECK-NEXT:      EMIT-SCALAR ir<%lv> = load ir<%gep.B>
+; CHECK-NEXT:      EMIT ir<%lv> = load ir<%gep.B>
 ; CHECK-NEXT:      EMIT ir<%gep.A> = getelementptr inbounds ir<%A>, ir<%iv>
 ; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = vector-pointer inbounds i32, ir<%gep.A>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP4]]>, ir<%lv>
@@ -940,7 +940,7 @@ define void @ashr_amount_larger_than_shl_address(ptr noalias %A, ptr noalias %B)
 ; CHECK-NEXT:      EMIT ir<%shl> = shl ir<%iv>, ir<16>
 ; CHECK-NEXT:      EMIT ir<%idx> = ashr ir<%shl>, ir<32>
 ; CHECK-NEXT:      EMIT ir<%gep.B> = getelementptr inbounds ir<%B>, ir<%idx>
-; CHECK-NEXT:      EMIT-SCALAR ir<%lv> = load ir<%gep.B>
+; CHECK-NEXT:      EMIT ir<%lv> = load ir<%gep.B>
 ; CHECK-NEXT:      EMIT ir<%gep.A> = getelementptr inbounds ir<%A>, ir<%iv>
 ; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = vector-pointer inbounds i32, ir<%gep.A>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP4]]>, ir<%lv>
@@ -1007,7 +1007,7 @@ define void @blend_with_different_incoming_values_address(ptr noalias %A, ptr no
 ; CHECK-NEXT:    latch:
 ; CHECK-NEXT:      BLEND ir<%idx> = ir<%idx.else>/vp<[[VP4]]> ir<%idx.then>/ir<%c>
 ; CHECK-NEXT:      EMIT ir<%gep.B> = getelementptr inbounds ir<%B>, ir<%idx>
-; CHECK-NEXT:      EMIT-SCALAR ir<%lv> = load ir<%gep.B>
+; CHECK-NEXT:      EMIT ir<%lv> = load ir<%gep.B>
 ; CHECK-NEXT:      EMIT ir<%gep.A> = getelementptr inbounds ir<%A>, ir<%iv>
 ; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds i32, ir<%gep.A>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP5]]>, ir<%lv>

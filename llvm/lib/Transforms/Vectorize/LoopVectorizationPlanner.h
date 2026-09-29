@@ -454,8 +454,9 @@ public:
     VPlan &Plan = getPlan();
     SmallVector<VPValue *, 2> Ops(Operands);
     Ops.push_back(Plan.getConstantInt(8 * sizeof(IntrinsicID), IntrinsicID));
-    return tryInsertInstruction(new VPInstruction(VPInstruction::Intrinsic, Ops,
-                                                  {}, {}, DL, Name, ResultTy));
+    return tryInsertInstruction(
+        new VPInstruction(VPInstruction::Intrinsic, Ops, {}, {}, DL, Name,
+                          ResultTy, /*GeneratesSingleScalar=*/true));
   }
 
   /// Create a scalar llvm.vscale call.

@@ -36,7 +36,7 @@ define void @predicated_block(ptr noalias %a, ptr noalias %idx) {
 ; PREDICATE-NEXT:    vector.body:
 ; PREDICATE-NEXT:      ir<%iv> = WIDEN-INDUCTION ir<0>, ir<1>, vp<[[VP0]]>
 ; PREDICATE-NEXT:      EMIT ir<%gep.idx> = getelementptr inbounds ir<%idx>, ir<%iv>
-; PREDICATE-NEXT:      EMIT-SCALAR ir<%i> = load ir<%gep.idx>
+; PREDICATE-NEXT:      EMIT ir<%i> = load ir<%gep.idx>
 ; PREDICATE-NEXT:      EMIT ir<%cmp> = icmp sgt ir<%i>, ir<0>
 ; PREDICATE-NEXT:    Successor(s): if.then
 ; PREDICATE-EMPTY:
@@ -250,7 +250,7 @@ define void @selects(ptr noalias %a, ptr noalias %b, i1 %c, i64 %n) {
 ; PREDICATE-NEXT:    vector.body:
 ; PREDICATE-NEXT:      ir<%iv> = WIDEN-INDUCTION ir<0>, ir<1>, vp<[[VP0]]>
 ; PREDICATE-NEXT:      EMIT ir<%gep.a> = getelementptr inbounds ir<%a>, ir<%iv>
-; PREDICATE-NEXT:      EMIT-SCALAR ir<%l> = load ir<%gep.a>
+; PREDICATE-NEXT:      EMIT ir<%l> = load ir<%gep.a>
 ; PREDICATE-NEXT:      EMIT ir<%cmp> = icmp sgt ir<%l>, ir<0>
 ; PREDICATE-NEXT:      EMIT ir<%sel.varying> = select ir<%cmp>, ir<%l>, ir<0> (!prof {3, 5})
 ; PREDICATE-NEXT:      EMIT store ir<%sel.varying>, ir<%gep.a>

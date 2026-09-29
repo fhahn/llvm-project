@@ -22,7 +22,7 @@ define void @if_then(ptr noalias %a, ptr noalias %idx) {
 ; VPLAN0-NEXT:  loop:
 ; VPLAN0-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, latch ]
 ; VPLAN0-NEXT:    EMIT ir<%gep.idx> = getelementptr inbounds ir<%idx>, ir<%iv>
-; VPLAN0-NEXT:    EMIT-SCALAR ir<%i> = load ir<%gep.idx>
+; VPLAN0-NEXT:    EMIT ir<%i> = load ir<%gep.idx>
 ; VPLAN0-NEXT:    EMIT ir<%c> = icmp sgt ir<%i>, ir<0>
 ; VPLAN0-NEXT:    EMIT branch-on-cond ir<%c> (!prof {1, 3})
 ; VPLAN0-NEXT:  Successor(s): if.then, latch
@@ -60,7 +60,7 @@ define void @if_then(ptr noalias %a, ptr noalias %idx) {
 ; MASKED-NEXT:    vector.body:
 ; MASKED-NEXT:      ir<%iv> = WIDEN-INDUCTION ir<0>, ir<1>, vp<[[VP0]]>
 ; MASKED-NEXT:      EMIT ir<%gep.idx> = getelementptr inbounds ir<%idx>, ir<%iv>
-; MASKED-NEXT:      EMIT-SCALAR ir<%i> = load ir<%gep.idx>
+; MASKED-NEXT:      EMIT ir<%i> = load ir<%gep.idx>
 ; MASKED-NEXT:      EMIT ir<%c> = icmp sgt ir<%i>, ir<0>
 ; MASKED-NEXT:    Successor(s): if.then
 ; MASKED-EMPTY:
@@ -122,7 +122,7 @@ define void @if_else(ptr noalias %a, ptr noalias %b, ptr noalias %idx) {
 ; VPLAN0-NEXT:  loop:
 ; VPLAN0-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, latch ]
 ; VPLAN0-NEXT:    EMIT ir<%gep.idx> = getelementptr inbounds ir<%idx>, ir<%iv>
-; VPLAN0-NEXT:    EMIT-SCALAR ir<%i> = load ir<%gep.idx>
+; VPLAN0-NEXT:    EMIT ir<%i> = load ir<%gep.idx>
 ; VPLAN0-NEXT:    EMIT ir<%c> = icmp sgt ir<%i>, ir<0>
 ; VPLAN0-NEXT:    EMIT branch-on-cond ir<%c> (!prof {1, 3})
 ; VPLAN0-NEXT:  Successor(s): then, else
@@ -164,7 +164,7 @@ define void @if_else(ptr noalias %a, ptr noalias %b, ptr noalias %idx) {
 ; MASKED-NEXT:    vector.body:
 ; MASKED-NEXT:      ir<%iv> = WIDEN-INDUCTION ir<0>, ir<1>, vp<[[VP0]]>
 ; MASKED-NEXT:      EMIT ir<%gep.idx> = getelementptr inbounds ir<%idx>, ir<%iv>
-; MASKED-NEXT:      EMIT-SCALAR ir<%i> = load ir<%gep.idx>
+; MASKED-NEXT:      EMIT ir<%i> = load ir<%gep.idx>
 ; MASKED-NEXT:      EMIT ir<%c> = icmp sgt ir<%i>, ir<0>
 ; MASKED-NEXT:    Successor(s): else
 ; MASKED-EMPTY:

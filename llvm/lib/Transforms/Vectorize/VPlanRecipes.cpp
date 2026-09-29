@@ -619,11 +619,9 @@ Type *VPReplicateRecipe::computeScalarType(const Instruction *I,
 /// scalar.
 static bool alwaysGeneratesSingleScalar(unsigned Opcode) {
   switch (Opcode) {
-  case Instruction::Load:
   case Instruction::PHI:
   case VPInstruction::ExplicitVectorLength:
   case VPInstruction::ResumeForEpilogue:
-  case VPInstruction::Intrinsic:
     return true;
   default:
     return false;

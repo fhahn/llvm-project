@@ -309,7 +309,7 @@ define void @fold_replicating_umax_equal_live_ins(ptr noalias %dst, ptr %cond, i
 ; CHECK-NEXT:  loop:
 ; CHECK-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, latch ]
 ; CHECK-NEXT:    EMIT ir<%cond.gep> = getelementptr ir<%cond>, ir<%iv>
-; CHECK-NEXT:    EMIT-SCALAR ir<%c> = load ir<%cond.gep>
+; CHECK-NEXT:    EMIT ir<%c> = load ir<%cond.gep>
 ; CHECK-NEXT:    EMIT ir<%tobool> = icmp ne ir<%c>, ir<0>
 ; CHECK-NEXT:    EMIT branch-on-cond ir<%tobool>
 ; CHECK-NEXT:  Successor(s): then, latch

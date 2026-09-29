@@ -19,7 +19,7 @@ define void @scalarize_irregular_types(ptr noalias %p1, ptr noalias %p2) {
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION ir<0>, ir<1>, vp<[[VP0:%[0-9]+]]>
 ; CHECK-NEXT:      EMIT ir<%gep1> = getelementptr ir<%p1>, ir<%iv>
-; CHECK-NEXT:      EMIT-SCALAR ir<%load1> = load ir<%gep1>
+; CHECK-NEXT:      EMIT ir<%load1> = load ir<%gep1>
 ; CHECK-NEXT:      EMIT ir<%gep2> = getelementptr ir<%p2>, ir<%iv>
 ; CHECK-NEXT:      REPLICATE ir<%load2> = load ir<%gep2>
 ; CHECK-NEXT:      EMIT ir<%load2.zext> = zext ir<%load2> to i64
@@ -84,7 +84,7 @@ define void @irregular_gather(ptr noalias %p, ptr noalias %idx, ptr noalias %out
 ; CHECK-NEXT:    vector.body:
 ; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION ir<0>, ir<1>, vp<[[VP0:%[0-9]+]]>
 ; CHECK-NEXT:      EMIT ir<%gep.idx> = getelementptr inbounds ir<%idx>, ir<%iv>
-; CHECK-NEXT:      EMIT-SCALAR ir<%offset> = load ir<%gep.idx>
+; CHECK-NEXT:      EMIT ir<%offset> = load ir<%gep.idx>
 ; CHECK-NEXT:      EMIT ir<%gep.p> = getelementptr inbounds ir<%p>, ir<%offset>
 ; CHECK-NEXT:      REPLICATE ir<%v> = load ir<%gep.p>
 ; CHECK-NEXT:      EMIT ir<%gep.out> = getelementptr inbounds ir<%out>, ir<%iv>

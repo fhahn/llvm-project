@@ -26,7 +26,7 @@ define void @single_pred(ptr noalias %a, ptr noalias %b, ptr noalias %idx) {
 ; VPLAN:       loop:
 ; VPLAN-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, latch ]{{$}}
 ; VPLAN-NEXT:    EMIT ir<%gep.idx> = getelementptr inbounds ir<%idx>, ir<%iv>{{$}}
-; VPLAN-NEXT:    EMIT-SCALAR ir<%i> = load ir<%gep.idx>{{$}}
+; VPLAN-NEXT:    EMIT ir<%i> = load ir<%gep.idx>{{$}}
 ; VPLAN-NEXT:    EMIT ir<%gep.b> = getelementptr inbounds ir<%b>, ir<%iv>{{$}}
 ; VPLAN-NEXT:    EMIT store ir<%i>, ir<%gep.b>{{$}}
 ; VPLAN-NEXT:    EMIT ir<%c.0> = icmp sgt ir<%i>, ir<0>{{$}}
@@ -89,7 +89,7 @@ define void @single_pred_zero_weight(ptr noalias %a, ptr noalias %b, ptr noalias
 ; VPLAN:       loop:
 ; VPLAN-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, latch ]{{$}}
 ; VPLAN-NEXT:    EMIT ir<%gep.idx> = getelementptr inbounds ir<%idx>, ir<%iv>{{$}}
-; VPLAN-NEXT:    EMIT-SCALAR ir<%i> = load ir<%gep.idx>{{$}}
+; VPLAN-NEXT:    EMIT ir<%i> = load ir<%gep.idx>{{$}}
 ; VPLAN-NEXT:    EMIT ir<%gep.b> = getelementptr inbounds ir<%b>, ir<%iv>{{$}}
 ; VPLAN-NEXT:    EMIT store ir<%i>, ir<%gep.b>{{$}}
 ; VPLAN-NEXT:    EMIT ir<%c.0> = icmp sgt ir<%i>, ir<0>{{$}}
@@ -152,7 +152,7 @@ define void @single_pred_zero_weight_sibling(ptr noalias %a, ptr noalias %b, ptr
 ; VPLAN:       loop:
 ; VPLAN-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, latch ]{{$}}
 ; VPLAN-NEXT:    EMIT ir<%gep.idx> = getelementptr inbounds ir<%idx>, ir<%iv>{{$}}
-; VPLAN-NEXT:    EMIT-SCALAR ir<%i> = load ir<%gep.idx>{{$}}
+; VPLAN-NEXT:    EMIT ir<%i> = load ir<%gep.idx>{{$}}
 ; VPLAN-NEXT:    EMIT ir<%gep.b> = getelementptr inbounds ir<%b>, ir<%iv>{{$}}
 ; VPLAN-NEXT:    EMIT store ir<%i>, ir<%gep.b>{{$}}
 ; VPLAN-NEXT:    EMIT ir<%c.0> = icmp sgt ir<%i>, ir<0>{{$}}
@@ -219,7 +219,7 @@ define void @two_preds(ptr noalias %a, ptr noalias %b, ptr noalias %c, ptr noali
 ; VPLAN:       loop:
 ; VPLAN-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, latch ]{{$}}
 ; VPLAN-NEXT:    EMIT ir<%gep.idx> = getelementptr inbounds ir<%idx>, ir<%iv>{{$}}
-; VPLAN-NEXT:    EMIT-SCALAR ir<%i> = load ir<%gep.idx>{{$}}
+; VPLAN-NEXT:    EMIT ir<%i> = load ir<%gep.idx>{{$}}
 ; VPLAN-NEXT:    EMIT ir<%c.0> = icmp sgt ir<%i>, ir<0>{{$}}
 ; VPLAN-NEXT:    EMIT branch-on-cond ir<%c.0> (!prof {1, 3}){{$}}
 ; VPLAN-NEXT:  Successor(s): then, else
@@ -302,7 +302,7 @@ define void @nested_ifs(ptr noalias %a, ptr noalias %b, ptr noalias %idx) {
 ; VPLAN:       loop:
 ; VPLAN-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, latch ]{{$}}
 ; VPLAN-NEXT:    EMIT ir<%gep.idx> = getelementptr inbounds ir<%idx>, ir<%iv>{{$}}
-; VPLAN-NEXT:    EMIT-SCALAR ir<%i> = load ir<%gep.idx>{{$}}
+; VPLAN-NEXT:    EMIT ir<%i> = load ir<%gep.idx>{{$}}
 ; VPLAN-NEXT:    EMIT ir<%c.0> = icmp sgt ir<%i>, ir<0>{{$}}
 ; VPLAN-NEXT:    EMIT branch-on-cond ir<%c.0> (!prof {1, 3}){{$}}
 ; VPLAN-NEXT:  Successor(s): if.0, latch
@@ -445,7 +445,7 @@ define void @switch_common_dest(ptr noalias %a, ptr noalias %b, ptr noalias %c, 
 ; VPLAN:       loop:
 ; VPLAN-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, latch ]{{$}}
 ; VPLAN-NEXT:    EMIT ir<%gep.idx> = getelementptr inbounds ir<%idx>, ir<%iv>{{$}}
-; VPLAN-NEXT:    EMIT-SCALAR ir<%l> = load ir<%gep.idx>{{$}}
+; VPLAN-NEXT:    EMIT ir<%l> = load ir<%gep.idx>{{$}}
 ; VPLAN-NEXT:    EMIT switch ir<%l>, ir<0>, ir<1>, ir<2> (!prof {500, 125, 250, 125}){{$}}
 ; VPLAN-NEXT:  Successor(s): default, if.then, if.then, other
 ; VPLAN-EMPTY:
@@ -529,7 +529,7 @@ define void @switch_common_dest_weight_sum_not_a_power_of_two(ptr noalias %a, pt
 ; VPLAN:       loop:
 ; VPLAN-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, latch ]{{$}}
 ; VPLAN-NEXT:    EMIT ir<%gep.idx> = getelementptr inbounds ir<%idx>, ir<%iv>{{$}}
-; VPLAN-NEXT:    EMIT-SCALAR ir<%l> = load ir<%gep.idx>{{$}}
+; VPLAN-NEXT:    EMIT ir<%l> = load ir<%gep.idx>{{$}}
 ; VPLAN-NEXT:    EMIT switch ir<%l>, ir<0>, ir<1> (!prof {1, 1, 1}){{$}}
 ; VPLAN-NEXT:  Successor(s): default, if.then, if.then
 ; VPLAN-EMPTY:
@@ -601,7 +601,7 @@ define void @switch_common_dest_almost_always_taken(ptr noalias %a, ptr noalias 
 ; VPLAN:       loop:
 ; VPLAN-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, latch ]{{$}}
 ; VPLAN-NEXT:    EMIT ir<%gep.idx> = getelementptr inbounds ir<%idx>, ir<%iv>{{$}}
-; VPLAN-NEXT:    EMIT-SCALAR ir<%l> = load ir<%gep.idx>{{$}}
+; VPLAN-NEXT:    EMIT ir<%l> = load ir<%gep.idx>{{$}}
 ; VPLAN-NEXT:    EMIT switch ir<%l>, ir<0>, ir<1> (!prof {1, 2147483647, 2147483647}){{$}}
 ; VPLAN-NEXT:  Successor(s): default, if.then, if.then
 ; VPLAN-EMPTY:
@@ -675,7 +675,7 @@ define void @switch_common_dest_almost_never_taken(ptr noalias %a, ptr noalias %
 ; VPLAN:       loop:
 ; VPLAN-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, latch ]{{$}}
 ; VPLAN-NEXT:    EMIT ir<%gep.idx> = getelementptr inbounds ir<%idx>, ir<%iv>{{$}}
-; VPLAN-NEXT:    EMIT-SCALAR ir<%l> = load ir<%gep.idx>{{$}}
+; VPLAN-NEXT:    EMIT ir<%l> = load ir<%gep.idx>{{$}}
 ; VPLAN-NEXT:    EMIT ir<%c> = icmp sgt ir<%l>, ir<0>{{$}}
 ; VPLAN-NEXT:    EMIT branch-on-cond ir<%c> (!prof {1, 2147483647}){{$}}
 ; VPLAN-NEXT:  Successor(s): mid, latch
@@ -753,7 +753,7 @@ define void @switch_common_dest_many_edges_almost_never_taken(ptr noalias %a, pt
 ; VPLAN:       loop:
 ; VPLAN-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, latch ]{{$}}
 ; VPLAN-NEXT:    EMIT ir<%gep.idx> = getelementptr inbounds ir<%idx>, ir<%iv>{{$}}
-; VPLAN-NEXT:    EMIT-SCALAR ir<%l> = load ir<%gep.idx>{{$}}
+; VPLAN-NEXT:    EMIT ir<%l> = load ir<%gep.idx>{{$}}
 ; VPLAN-NEXT:    EMIT ir<%c> = icmp sgt ir<%l>, ir<0>{{$}}
 ; VPLAN-NEXT:    EMIT branch-on-cond ir<%c> (!prof {1, 2147483647}){{$}}
 ; VPLAN-NEXT:  Successor(s): mid, latch
@@ -834,7 +834,7 @@ define void @switch_common_dest_weight_sum_exceeds_32_bits(ptr noalias %a, ptr n
 ; VPLAN:       loop:
 ; VPLAN-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, latch ]{{$}}
 ; VPLAN-NEXT:    EMIT ir<%gep.idx> = getelementptr inbounds ir<%idx>, ir<%iv>{{$}}
-; VPLAN-NEXT:    EMIT-SCALAR ir<%l> = load ir<%gep.idx>{{$}}
+; VPLAN-NEXT:    EMIT ir<%l> = load ir<%gep.idx>{{$}}
 ; VPLAN-NEXT:    EMIT switch ir<%l>, ir<0>, ir<1>, ir<2>, ir<3>, ir<4> (!prof {36, 4294967295, 4294967295, 4294967295, 4294967295, 4294967295}){{$}}
 ; VPLAN-NEXT:  Successor(s): latch, if.then, if.then, if.then, if.then, if.then
 ; VPLAN-EMPTY:
