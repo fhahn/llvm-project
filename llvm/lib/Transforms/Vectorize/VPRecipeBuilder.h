@@ -48,10 +48,11 @@ public:
                   LoopVectorizationCostModel &CM, VPBuilder &Builder)
       : Plan(Plan), Legal(Legal), CM(CM), Builder(Builder) {}
 
-  /// Returns true if \p I needs to be predicated (i.e. cannot be executed
-  /// unconditionally for all lanes) in the loop being vectorized.
-  /// FIXME: Fully migrate logic to determine if mask is needed to VPlan.
-  bool isPredicatedInst(Instruction *I) const;
+  /// Returns true if \p VPI needs its mask to execute safely. Unmasked recipes
+  /// may already be guarded by retained control flow; masked recipes may be
+  /// safe to speculate.
+  /// FIXME: Fully migrate speculation checks to VPlan.
+  bool needsMask(VPInstruction *VPI) const;
 
   /// Returns true if the target prefers vectorized addressing.
   bool prefersVectorizedAddressing() const;

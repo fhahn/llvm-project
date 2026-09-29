@@ -6032,8 +6032,8 @@ void EpilogueVectorizerEpilogueLoop::printDebugTracesAtEnd() {
   });
 }
 
-bool VPRecipeBuilder::isPredicatedInst(Instruction *I) const {
-  return CM.isPredicatedInst(I);
+bool VPRecipeBuilder::needsMask(VPInstruction *VPI) const {
+  return VPI->isMasked() && CM.isPredicatedInst(VPI->getUnderlyingInstr());
 }
 
 bool VPRecipeBuilder::prefersVectorizedAddressing() const {
@@ -6128,10 +6128,8 @@ VPRecipeWithIRFlags *VPRecipeBuilder::tryToWiden(VPInstruction *VPI) {
   case Instruction::UDiv:
   case Instruction::SRem:
   case Instruction::URem:
-    // If not provably safe, use a masked intrinsic. Note that an operation
-    // that is conditional in the original loop may be unmasked here, if it is
-    // guarded by a branch that has been kept as control flow.
-    if (CM.isPredicatedInst(I) && VPI->isMasked())
+    // If not provably safe, use a masked intrinsic.
+    if (needsMask(VPI))
       return new VPWidenIntrinsicRecipe(
           getMaskedDivRemIntrinsic(VPI->getOpcode()), VPI->operands(),
           I->getType(), {}, {}, VPI->getDebugLoc());
@@ -6234,10 +6232,7 @@ VPSingleDefRecipe *VPRecipeBuilder::handleReplication(VPInstruction *VPI,
       [&](ElementCount VF) { return CM.isUniformAfterVectorization(I, VF); },
       Range);
 
-  // Note that an instruction that is conditional in the original loop may be
-  // unmasked here, if it is guarded by a branch that has been kept as control
-  // flow.
-  bool IsPredicated = CM.isPredicatedInst(I) && VPI->isMasked();
+  bool IsPredicated = needsMask(VPI);
 
   // Even if the instruction is not marked as uniform, there are certain
   // intrinsic calls that can be effectively treated as such, so we check for
