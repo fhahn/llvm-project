@@ -2117,14 +2117,11 @@ bool NumericalStabilitySanitizer::sanitizeFunction(
   // any loops.
   std::vector<PHINode *> OriginalPhis;
   createShadowArguments(F, TLI, ValueToShadow);
-  for (Instruction *I : OriginalInstructions) {
-    if (PHINode *Phi = dyn_cast<PHINode>(I)) {
-      if (PHINode *Shadow = maybeCreateShadowPhi(*Phi, TLI)) {
-        OriginalPhis.push_back(Phi);
-        ValueToShadow.setShadow(*Phi, *Shadow);
-      }
+  for (PHINode *Phi : make_isa_range<PHINode>(OriginalInstructions))
+    if (PHINode *Shadow = maybeCreateShadowPhi(*Phi, TLI)) {
+      OriginalPhis.push_back(Phi);
+      ValueToShadow.setShadow(*Phi, *Shadow);
     }
-  }
 
   // Create shadow values for all instructions creating FT values.
   for (Instruction *I : OriginalInstructions)

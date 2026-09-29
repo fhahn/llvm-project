@@ -819,11 +819,9 @@ CHRScope * CHR::findScope(Region *R) {
       BasicBlock *BB = E->getEntry();
       // Need to push in the order to make it easier to find the first Select
       // later.
-      for (Instruction &I : *BB) {
-        if (auto *SI = dyn_cast<SelectInst>(&I)) {
-          Selects.push_back(SI);
-          ++Stats.NumBranches;
-        }
+      for (SelectInst &SI : make_isa_range<SelectInst>(*BB)) {
+        Selects.push_back(&SI);
+        ++Stats.NumBranches;
       }
     }
     if (Selects.size() > 0) {
@@ -1724,12 +1722,9 @@ void CHR::transformScopes(CHRScope *Scope, DenseSet<PHINode *> &TrivialPHIs) {
   std::optional<uint64_t> ProfileCount = BFI.getBlockProfileCount(EntryBlock);
 
   SmallVector<AllocaInst *> StaticAllocas;
-  for (Instruction &I : *EntryBlock) {
-    if (auto *AI = dyn_cast<AllocaInst>(&I)) {
-      if (AI->isStaticAlloca())
-        StaticAllocas.push_back(AI);
-    }
-  }
+  for (AllocaInst &AI : make_isa_range<AllocaInst>(*EntryBlock))
+    if (AI.isStaticAlloca())
+      StaticAllocas.push_back(&AI);
 
   // Split the entry block of the first region. The new block becomes the new
   // entry block of the first region. The old entry block becomes the block to

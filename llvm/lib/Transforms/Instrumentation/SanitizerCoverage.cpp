@@ -1242,17 +1242,15 @@ void ModuleSanitizerCoverage::createFunctionControlFlow(Function &F) {
 
     CFs.push_back((Constant *)Constant::getNullValue(PtrTy));
 
-    for (auto &Inst : BB) {
-      if (CallBase *CB = dyn_cast<CallBase>(&Inst)) {
-        if (CB->isIndirectCall()) {
-          // TODO(navidem): handle indirect calls, for now mark its existence.
-          CFs.push_back((Constant *)IRB.CreateIntToPtr(
-              ConstantInt::getAllOnesValue(IntptrTy), PtrTy));
-        } else {
-          auto CalledF = CB->getCalledFunction();
-          if (CalledF && !CalledF->isIntrinsic())
-            CFs.push_back((Constant *)IRB.CreatePointerCast(CalledF, PtrTy));
-        }
+    for (CallBase &CB : make_isa_range<CallBase>(BB)) {
+      if (CB.isIndirectCall()) {
+        // TODO(navidem): handle indirect calls, for now mark its existence.
+        CFs.push_back((Constant *)IRB.CreateIntToPtr(
+            ConstantInt::getAllOnesValue(IntptrTy), PtrTy));
+      } else {
+        auto CalledF = CB.getCalledFunction();
+        if (CalledF && !CalledF->isIntrinsic())
+          CFs.push_back((Constant *)IRB.CreatePointerCast(CalledF, PtrTy));
       }
     }
 

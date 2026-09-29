@@ -3097,14 +3097,12 @@ void AddressSanitizer::markEscapedLocalAllocas(Function &F) {
 // interfering with exception handling assumptions.
 void AddressSanitizer::markCatchParametersAsUninteresting(Function &F) {
   for (BasicBlock &BB : F) {
-    for (Instruction &I : BB) {
-      if (auto *CatchPad = dyn_cast<CatchPadInst>(&I)) {
-        // Mark the parameters to a catch-block as uninteresting to avoid
-        // instrumenting them.
-        for (Value *Operand : CatchPad->arg_operands())
-          if (auto *AI = dyn_cast<AllocaInst>(Operand))
-            ProcessedAllocas[AI] = false;
-      }
+    for (CatchPadInst &CatchPad : make_isa_range<CatchPadInst>(BB)) {
+      // Mark the parameters to a catch-block as uninteresting to avoid
+      // instrumenting them.
+      for (Value *Operand : CatchPad.arg_operands())
+        if (auto *AI = dyn_cast<AllocaInst>(Operand))
+          ProcessedAllocas[AI] = false;
     }
   }
 }
