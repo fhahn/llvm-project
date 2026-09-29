@@ -59,3 +59,32 @@ loop:
 exit:
   ret void
 }
+
+; (x s< 0) does not imply (8 - x s> -1): for x == INT_MIN,
+; 8 - x wraps to a negative value. Keep the smin so this case has zero
+; backedges.
+define void @guard_negative_wrapping(i32 %x) {
+; CHECK-LABEL: 'guard_negative_wrapping'
+; CHECK-NEXT:  Determining loop execution counts for: @guard_negative_wrapping
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (8 + (-1 * (-1 smin (8 + (-1 * %x)))) + (-1 * %x))
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 -2147483648
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (8 + (-1 * (-1 smin (8 + (-1 * %x)))) + (-1 * %x))
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %guard = icmp slt i32 %x, 0
+  br i1 %guard, label %ph, label %exit
+
+ph:
+  %start = sub i32 8, %x
+  br label %loop
+
+loop:
+  %iv = phi i32 [ %start, %ph ], [ %iv.next, %loop ]
+  %iv.next = add i32 %iv, -1
+  %cmp = icmp sgt i32 %iv, -1
+  br i1 %cmp, label %loop, label %exit
+
+exit:
+  ret void
+}

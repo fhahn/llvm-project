@@ -12217,12 +12217,15 @@ bool ScalarEvolution::isImpliedCond(CmpPredicate Pred, const SCEV *LHS,
                                     FoundRHS, CtxI);
 }
 
-/// Return K if S is structurally K - FoundS, i.e. (K + (-1 * FoundS)),
-/// (-1 * FoundS), a constant for constant FoundS, or an affine addrec with
-/// start K - FoundStart and step 0 - FoundStep. Does not create new SCEVs.
-static std::optional<APInt> matchConstantMinus(const SCEV *S,
-                                               const SCEV *FoundS) {
-  using namespace SCEVPatternMatch;
+/// Return K if S == K - FoundS can be matched modulo the type's bit width.
+/// Does not create new SCEVs.
+/// Limit visits to shared subexpressions in nested addrecs using Budget.
+static std::optional<APInt>
+matchConstantMinus(const SCEV *S, const SCEV *FoundS, unsigned &Budget) {
+  if (!Budget)
+    return std::nullopt;
+  --Budget;
+
   const APInt *C, *FoundC;
   if (match(S, m_scev_APInt(C)) && match(FoundS, m_scev_APInt(FoundC)))
     return *C + *FoundC;
@@ -12231,11 +12234,11 @@ static std::optional<APInt> matchConstantMinus(const SCEV *S,
   const Loop *L;
   if (match(S, m_scev_AffineAddRec(m_SCEV(Start), m_SCEV(Step), m_Loop(L))) &&
       match(FoundS, m_scev_AffineAddRec(m_SCEV(FoundStart), m_SCEV(FoundStep),
-                                        m_SpecificLoop(L)))) {
-    std::optional<APInt> StepK = matchConstantMinus(Step, FoundStep);
+                                     m_SpecificLoop(L)))) {
+    std::optional<APInt> StepK = matchConstantMinus(Step, FoundStep, Budget);
     if (!StepK || !StepK->isZero())
       return std::nullopt;
-    return matchConstantMinus(Start, FoundStart);
+    return matchConstantMinus(Start, FoundStart, Budget);
   }
 
   APInt K = APInt::getZero(FoundS->getType()->getScalarSizeInBits());
@@ -12247,20 +12250,18 @@ static std::optional<APInt> matchConstantMinus(const SCEV *S,
   return std::nullopt;
 }
 
-/// Check whether FoundLHS SwapPred FoundRHS implies LHS Pred RHS for constant
-/// RHS and FoundRHS, when LHS is K - FoundLHS: FoundLHS is in the region R
-/// given by the found condition, so LHS is in K - R. This is the range check
-/// of the implication LHS Pred RHS <- ~FoundLHS Pred ~FoundRHS, without
-/// forming ~LHS.
+/// Check whether FoundLHS SwapPred FoundRHS implies LHS Pred RHS when both
+/// right-hand sides are constant and LHS == K - FoundLHS. If the found condition
+/// puts FoundLHS in R, then LHS is in K - R.
 static bool isImpliedCondViaNegation(CmpPredicate Pred, const SCEV *LHS,
-                                     const SCEV *RHS, const SCEV *FoundLHS,
-                                     const SCEV *FoundRHS) {
-  using namespace SCEVPatternMatch;
+                                   const SCEV *RHS, const SCEV *FoundLHS,
+                                   const SCEV *FoundRHS) {
   const APInt *RHSC, *FoundRHSC;
   if (!match(RHS, m_scev_APInt(RHSC)) ||
       !match(FoundRHS, m_scev_APInt(FoundRHSC)))
     return false;
-  std::optional<APInt> K = matchConstantMinus(LHS, FoundLHS);
+  unsigned Budget = 8;
+  std::optional<APInt> K = matchConstantMinus(LHS, FoundLHS, Budget);
   if (!K)
     return false;
   ConstantRange FoundLHSRange = ConstantRange::makeExactICmpRegion(
