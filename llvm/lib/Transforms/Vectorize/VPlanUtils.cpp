@@ -588,8 +588,8 @@ bool vputils::cannotHoistOrSinkRecipe(const VPRecipeBase &R, bool Sinking) {
   return RepR && RepR->getOpcode() == Instruction::Alloca;
 }
 
-SmallVector<VPBasicBlock *>
-VPBlockUtils::blocksBetween(VPBasicBlock *FirstBB, VPBasicBlock *LastBB) {
+SmallVector<VPBasicBlock *> VPBlockUtils::blocksBetween(VPBasicBlock *FirstBB,
+                                                        VPBasicBlock *LastBB) {
   assert(FirstBB->getParent() == LastBB->getParent() &&
          "FirstBB and LastBB from different regions");
   // The blocks of a region form a DAG, so a reverse post-order is a
