@@ -648,12 +648,11 @@ void assignTileIdToValue(IRRewriter &rewriter, Value value,
                          IntegerAttr tileIdAttr) {
   if (auto tileOp = value.getDefiningOp<ArmSMETileOpInterface>())
     rewriter.modifyOpInPlace(tileOp, [&] { tileOp.setTileId(tileIdAttr); });
-  for (Operation *user : value.getUsers()) {
-    if (auto tileOp = dyn_cast<ArmSMETileOpInterface>(user)) {
-      // Ensure ArmSME ops that don't produce a value still get a tile ID.
-      if (!hasTileResult(tileOp))
-        rewriter.modifyOpInPlace(tileOp, [&] { tileOp.setTileId(tileIdAttr); });
-    }
+  for (ArmSMETileOpInterface tileOp :
+       llvm::make_isa_range<ArmSMETileOpInterface>(value.getUsers())) {
+    // Ensure ArmSME ops that don't produce a value still get a tile ID.
+    if (!hasTileResult(tileOp))
+      rewriter.modifyOpInPlace(tileOp, [&] { tileOp.setTileId(tileIdAttr); });
   }
 }
 

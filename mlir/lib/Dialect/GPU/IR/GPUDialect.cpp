@@ -2020,13 +2020,10 @@ LogicalResult GPUModuleOp::verify() {
   if (!targets)
     return success();
 
-  for (auto target : targets) {
-    if (auto verifyTargetAttr =
-            llvm::dyn_cast<TargetAttrVerifyInterface>(target)) {
-      if (verifyTargetAttr.verifyTarget(getOperation()).failed())
-        return failure();
-    }
-  }
+  for (TargetAttrVerifyInterface verifyTargetAttr :
+       llvm::make_isa_range<TargetAttrVerifyInterface>(targets))
+    if (verifyTargetAttr.verifyTarget(getOperation()).failed())
+      return failure();
   return success();
 }
 

@@ -323,12 +323,10 @@ static Value deriveStaticUpperBound(Value upperBound,
   }
 
   if (auto minOp = upperBound.getDefiningOp<AffineMinOp>()) {
-    for (const AffineExpr &result : minOp.getMap().getResults()) {
-      if (auto constExpr = dyn_cast<AffineConstantExpr>(result)) {
-        return arith::ConstantIndexOp::create(rewriter, minOp.getLoc(),
-                                              constExpr.getValue());
-      }
-    }
+    for (AffineConstantExpr constExpr : llvm::make_isa_range<AffineConstantExpr>(
+             minOp.getMap().getResults()))
+      return arith::ConstantIndexOp::create(rewriter, minOp.getLoc(),
+                                            constExpr.getValue());
   }
 
   if (auto minOp = upperBound.getDefiningOp<arith::MinSIOp>()) {

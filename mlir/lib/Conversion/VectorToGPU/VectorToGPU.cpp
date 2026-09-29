@@ -55,16 +55,14 @@ static void getXferIndices(RewriterBase &rewriter, TransferOpType xferOp,
   indices.append(xferOp.getIndices().begin(), xferOp.getIndices().end());
   Location loc = xferOp.getLoc();
   unsigned offsetsIdx = 0;
-  for (auto expr : xferOp.getPermutationMap().getResults()) {
-    if (auto dim = dyn_cast<AffineDimExpr>(expr)) {
-      Value prevIdx = indices[dim.getPosition()];
-      SmallVector<OpFoldResult, 3> dims(dimValues);
-      dims.push_back(prevIdx);
-      AffineExpr d0 = rewriter.getAffineDimExpr(offsetMap.getNumDims());
-      indices[dim.getPosition()] = affine::makeComposedAffineApply(
-          rewriter, loc, d0 + offsetMap.getResult(offsetsIdx++), dims);
-      continue;
-    }
+  for (AffineDimExpr dim : llvm::make_isa_range<AffineDimExpr>(
+           xferOp.getPermutationMap().getResults())) {
+    Value prevIdx = indices[dim.getPosition()];
+    SmallVector<OpFoldResult, 3> dims(dimValues);
+    dims.push_back(prevIdx);
+    AffineExpr d0 = rewriter.getAffineDimExpr(offsetMap.getNumDims());
+    indices[dim.getPosition()] = affine::makeComposedAffineApply(
+        rewriter, loc, d0 + offsetMap.getResult(offsetsIdx++), dims);
   }
 }
 
