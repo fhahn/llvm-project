@@ -67,10 +67,7 @@ define void @test_widen_exp_v2(ptr noalias %p2, ptr noalias %p, i64 %n) #5 {
 ; TFCOMMON-NEXT:    [[ACTIVE_LANE_MASK:%.*]] = phi <2 x i1> [ [[ACTIVE_LANE_MASK_ENTRY]], %[[VECTOR_PH]] ], [ [[ACTIVE_LANE_MASK_NEXT:%.*]], %[[PRED_STORE_CONTINUE2]] ]
 ; TFCOMMON-NEXT:    [[TMP1:%.*]] = load double, ptr [[P2]], align 8
 ; TFCOMMON-NEXT:    [[TMP2:%.*]] = tail call double @llvm.exp.f64(double [[TMP1]]) #[[ATTR3:[0-9]+]]
-; TFCOMMON-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x double> poison, double [[TMP2]], i64 0
-; TFCOMMON-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x double> [[BROADCAST_SPLATINSERT]], <2 x double> poison, <2 x i32> zeroinitializer
-; TFCOMMON-NEXT:    [[TMP3:%.*]] = fcmp ogt <2 x double> [[BROADCAST_SPLAT]], zeroinitializer
-; TFCOMMON-NEXT:    [[TMP4:%.*]] = extractelement <2 x i1> [[TMP3]], i64 0
+; TFCOMMON-NEXT:    [[TMP4:%.*]] = fcmp ogt double [[TMP2]], 0.000000e+00
 ; TFCOMMON-NEXT:    [[PREDPHI:%.*]] = select i1 [[TMP4]], <2 x double> zeroinitializer, <2 x double> splat (double 1.000000e+00)
 ; TFCOMMON-NEXT:    [[TMP5:%.*]] = extractelement <2 x i1> [[ACTIVE_LANE_MASK]], i64 0
 ; TFCOMMON-NEXT:    br i1 [[TMP5]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
@@ -113,10 +110,7 @@ define void @test_widen_exp_v2(ptr noalias %p2, ptr noalias %p, i64 %n) #5 {
 ; TFA_INTERLEAVE-NEXT:    [[ACTIVE_LANE_MASK2:%.*]] = phi <2 x i1> [ [[TMP17]], %[[VECTOR_PH]] ], [ [[TMP16:%.*]], %[[PRED_STORE_CONTINUE8]] ]
 ; TFA_INTERLEAVE-NEXT:    [[TMP1:%.*]] = load double, ptr [[P2]], align 8
 ; TFA_INTERLEAVE-NEXT:    [[TMP2:%.*]] = tail call double @llvm.exp.f64(double [[TMP1]]) #[[ATTR3:[0-9]+]]
-; TFA_INTERLEAVE-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x double> poison, double [[TMP2]], i64 0
-; TFA_INTERLEAVE-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x double> [[BROADCAST_SPLATINSERT]], <2 x double> poison, <2 x i32> zeroinitializer
-; TFA_INTERLEAVE-NEXT:    [[TMP3:%.*]] = fcmp ogt <2 x double> [[BROADCAST_SPLAT]], zeroinitializer
-; TFA_INTERLEAVE-NEXT:    [[TMP4:%.*]] = extractelement <2 x i1> [[TMP3]], i64 0
+; TFA_INTERLEAVE-NEXT:    [[TMP4:%.*]] = fcmp ogt double [[TMP2]], 0.000000e+00
 ; TFA_INTERLEAVE-NEXT:    [[PREDPHI:%.*]] = select i1 [[TMP4]], <2 x double> zeroinitializer, <2 x double> splat (double 1.000000e+00)
 ; TFA_INTERLEAVE-NEXT:    [[TMP5:%.*]] = extractelement <2 x i1> [[ACTIVE_LANE_MASK]], i64 0
 ; TFA_INTERLEAVE-NEXT:    br i1 [[TMP5]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
