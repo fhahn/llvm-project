@@ -3144,16 +3144,12 @@ struct EarlyExitInfo {
 
 /// Check that a bail can skip all memory operations except the condition load,
 /// without leaving a use of a skipped definition on the bail path. Require a
-/// skipped access whose masking lacks target support.
+/// skipped consecutive access whose masking lacks target support.
 static bool canBailToScalar(VPBasicBlock *Header, VPBasicBlock *Latch,
-                           VPBasicBlock::iterator BodyStart,
-                           VPInstruction *ConditionLoad,
-                           const VFSelectionContext &Config) {
+                            VPBasicBlock::iterator BodyStart,
+                            const VFSelectionContext &Config) {
   if (Header->getSingleSuccessor() != Latch)
     return false;
-  for (VPRecipeBase &R : make_range(Header->begin(), BodyStart))
-    if (&R != ConditionLoad && R.mayReadOrWriteMemory())
-      return false;
   if (any_of(*Latch, [](VPRecipeBase &R) { return R.mayReadOrWriteMemory(); }))
     return false;
 
@@ -3168,15 +3164,24 @@ static bool canBailToScalar(VPBasicBlock *Header, VPBasicBlock *Latch,
           }))
         return false;
     if (R.mayReadOrWriteMemory()) {
-      Instruction *I = cast<VPInstruction>(&R)->getUnderlyingInstr();
-      if (!isa<LoadInst, StoreInst>(I))
+      auto *VPI = cast<VPInstruction>(&R);
+      bool IsLoad = VPI->getOpcode() == Instruction::Load;
+      if (!IsLoad && VPI->getOpcode() != Instruction::Store)
         return false;
-      // As in consecutive-access widening, approximate profitability by
-      // whether the target supports masking. A per-VF cost comparison could
-      // also account for gathers/scatters and scalar replay.
+      VPValue *Ptr = VPI->getOperand(!IsLoad);
+      Type *ScalarTy =
+          IsLoad ? VPI->getScalarType() : VPI->getOperand(0)->getScalarType();
+      std::optional<int64_t> Stride = vputils::getConstantStride(
+          Ptr, ScalarTy, Config.getPSE(), Config.getLoop());
+      if (Stride != 1 && Stride != -1)
+        continue;
+      // Use consecutive accesses as evidence that masking is expensive.
+      // A per-VF cost comparison could also account for gathers/scatters and
+      // scalar replay.
+      Instruction *I = VPI->getUnderlyingInstr();
       MaskingIsExpensive |= !Config.isLegalMaskedLoadOrStore(
-          isa<LoadInst>(I), getLoadStoreType(I), getLoadStoreAlignment(I),
-          getLoadStoreAddressSpace(I));
+          IsLoad, ScalarTy, getLoadStoreAlignment(I),
+          Ptr->getScalarType()->getPointerAddressSpace());
     }
   }
   return MaskingIsExpensive;
@@ -3203,7 +3208,8 @@ static bool canBailToScalar(VPBasicBlock *Header, VPBasicBlock *Latch,
 ///   EMIT ir<%arrayidx5> = getelementptr inbounds nuw ir<@dst>, ir<%indvars.iv>
 ///   EMIT store ir<%add>, ir<%arrayidx5>
 ///   EMIT ir<%indvars.iv.next> = add nuw nsw ir<%indvars.iv>, ir<1>
-///   EMIT vp<%3> = any-of ir<%1>
+///   EMIT vp<%freeze> = freeze ir<%1>
+///   EMIT vp<%3> = any-of vp<%freeze>
 ///   EMIT ir<%exitcond.not> = icmp eq ir<%indvars.iv.next>, ir<10000>
 ///   EMIT branch-on-two-conds vp<%3>, ir<%exitcond.not>
 /// Successor(s): middle.block, middle.block, for.body
@@ -3221,11 +3227,11 @@ static bool canBailToScalar(VPBasicBlock *Header, VPBasicBlock *Latch,
 ///   Improving upon this requires work in getRecipesForUncountableExit to
 ///   handle more complex recipe graphs.
 static bool handleUncountableExitsWithSideEffects(
-    VPlan &Plan, ArrayRef<EarlyExitInfo> Exits,
-    VPBasicBlock *HeaderVPBB, VPBasicBlock *LatchVPBB, VPBasicBlock *MiddleVPBB,
-    OptimizationRemarkEmitter *ORE, Loop *TheLoop, PredicatedScalarEvolution &PSE, DominatorTree &DT,
-    AssumptionCache *AC, UncountableExitStyle Style,
-    const VFSelectionContext &Config) {
+    VPlan &Plan, ArrayRef<EarlyExitInfo> Exits, VPBasicBlock *HeaderVPBB,
+    VPBasicBlock *LatchVPBB, VPBasicBlock *MiddleVPBB,
+    OptimizationRemarkEmitter *ORE, Loop *TheLoop,
+    PredicatedScalarEvolution &PSE, DominatorTree &DT, AssumptionCache *AC,
+    UncountableExitStyle Style, const VFSelectionContext &Config) {
 
   // Disconnect early exiting blocks from successors, remove branches. We
   // currently don't support multiple uses for recipes involved in creating
@@ -3339,21 +3345,25 @@ static bool handleUncountableExitsWithSideEffects(
   VPValue *CommittedLanes;
   if (Style == UncountableExitStyle::BailToScalarOnEarlyExit &&
       Exits.size() == 1 && Exits[0].EarlyExitingVPBB == HeaderVPBB &&
-      canBailToScalar(HeaderVPBB, LatchVPBB, InsertIt, Load, Config)) {
+      canBailToScalar(HeaderVPBB, LatchVPBB, InsertIt, Config)) {
     // Reuse the latch reduction to skip the entire body if any lane exits.
     // Predication preserves this uniform triangle and leaves the body unmasked.
     auto *AnyExit =
         cast<VPInstruction>(LatchVPBB->getTerminator()->getOperand(0));
     AnyExit->moveBefore(*HeaderVPBB, InsertIt);
-    HeaderVPBB->splitAt(InsertIt)->setName("vector.body.nonbailing");
+    VPBasicBlock *Body = HeaderVPBB->splitAt(InsertIt);
+    Body->setName("vector.body.nonbailing");
+    // The new guard's frequency is not the original scalar block's frequency.
+    for (VPInstruction &VPI : make_isa_range<VPInstruction>(*Body))
+      VPI.clearExecutionFrequency();
     VPBlockUtils::connectBlocks(HeaderVPBB, LatchVPBB);
     HeaderVPBB->swapSuccessors();
     VPBuilder(HeaderVPBB).createNaryOp(VPInstruction::BranchOnCond, AnyExit);
 
     // Replay the whole vector iteration on a bail; otherwise advance by VF.
     VPBuilder Builder(MiddleVPBB->getTerminator());
-    VPValue *Step = Builder.createScalarZExtOrTrunc(
-        &Plan.getVF(), IVScalarTy, DebugLoc());
+    VPValue *Step =
+        Builder.createScalarZExtOrTrunc(&Plan.getVF(), IVScalarTy, DebugLoc());
     CommittedLanes = Builder.createSelect(AnyExit, Zero, Step);
     // Early-exit loops use UF=1. Expose this before costing as well.
     Plan.setUF(1);
@@ -3364,16 +3374,22 @@ static bool handleUncountableExitsWithSideEffects(
     CommittedLanes = MaskBuilder.createScalarZExtOrTrunc(
         CommittedLanes, IVScalarTy, DebugLoc());
     VPValue *Mask = MaskBuilder.createNaryOp(VPInstruction::ActiveLaneMask,
-                                            {Zero, CommittedLanes}, DebugLoc(),
-                                            "uncountable.exit.mask");
+                                             {Zero, CommittedLanes}, DebugLoc(),
+                                             "uncountable.exit.mask");
 
     // Convert all other memory operations to use the mask.
     for (VPBasicBlock *VPBB : vp_rpo_plain_cfg_loop_body(HeaderVPBB))
       for (VPRecipeBase &R : *VPBB)
         if (R.mayReadOrWriteMemory() && &R != Load) {
           // TODO: Handle conditional memory operations in the loop.
-          if (!VPDT.dominates(R.getParent(), LatchVPBB))
+          if (!VPDT.dominates(R.getParent(), LatchVPBB)) {
+            reportVectorizationFailure(
+                "Early exit loop with side effects contains unsupported "
+                "conditional memory operations",
+                "EarlyExitSideEffectsUnsupportedConditionalMemOps", ORE,
+                TheLoop);
             return false;
+          }
           cast<VPInstruction>(&R)->addMask(Mask);
         }
   }
@@ -3412,9 +3428,9 @@ static bool handleUncountableExitsWithSideEffects(
 }
 
 bool VPlanTransforms::handleUncountableEarlyExits(
-    VPlan &Plan, OptimizationRemarkEmitter *ORE, Loop *TheLoop, PredicatedScalarEvolution &PSE,
-    DominatorTree &DT, AssumptionCache *AC, UncountableExitStyle Style,
-    const VFSelectionContext &Config) {
+    VPlan &Plan, OptimizationRemarkEmitter *ORE, Loop *TheLoop,
+    PredicatedScalarEvolution &PSE, DominatorTree &DT, AssumptionCache *AC,
+    UncountableExitStyle Style, const VFSelectionContext &Config) {
 #ifndef NDEBUG
   VPDominatorTree VPDT(Plan);
 #endif
@@ -3530,8 +3546,8 @@ bool VPlanTransforms::handleUncountableEarlyExits(
     MiddleVPBB->clearPredecessors();
     MiddleVPBB->setPredecessors({LatchVPBB, LatchVPBB});
     return handleUncountableExitsWithSideEffects(
-        Plan, Exits, HeaderVPBB, LatchVPBB, MiddleVPBB, ORE, TheLoop, PSE, DT, AC,
-        Style, Config);
+        Plan, Exits, HeaderVPBB, LatchVPBB, MiddleVPBB, ORE, TheLoop, PSE, DT,
+        AC, Style, Config);
   }
 
   // Create the vector.early.exit blocks.

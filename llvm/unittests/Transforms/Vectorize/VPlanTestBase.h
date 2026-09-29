@@ -111,8 +111,8 @@ protected:
       TargetTransformInfo TTI(DL);
       VFSelectionContext Config(TTI, nullptr, L, F, PSE, nullptr, nullptr,
                                 nullptr, false);
-      VPlanTransforms::handleUncountableEarlyExits(*Plan, &ORE, L, PSE, *DT, AC.get(),
-                                                *Style, Config);
+      VPlanTransforms::handleUncountableEarlyExits(*Plan, &ORE, L, PSE, *DT,
+                                                   AC.get(), *Style, Config);
     } else
       VPlanTransforms::handleCountableEarlyExits(*Plan);
     VPlanTransforms::addMiddleCheck(*Plan);

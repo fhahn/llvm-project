@@ -454,8 +454,8 @@ void VPPredicator::run() {
   for (VPBasicBlock *VPBB : Blocks) {
     // Flattening must not introduce a branch on a potentially poison condition
     // that the original loop need not evaluate.
-    if (!VPDT.dominates(
-            VPBB, Plan.getVectorLoopRegion()->getExitingBasicBlock()))
+    if (!VPDT.dominates(VPBB,
+                        Plan.getVectorLoopRegion()->getExitingBasicBlock()))
       continue;
     if (VPBasicBlock *Guarded = getBlockToKeepUnderUniformBranch(VPBB)) {
       BlocksToKeep.insert(VPBB);
@@ -476,9 +476,10 @@ void VPPredicator::run() {
       if (BlockMask)
         VPI.addMask(BlockMask);
 
-      // Drop the execution frequency of unmasked VPInstructions, as they
-      // always execute.
-      if (!VPI.isMasked())
+      // Unmasked instructions in linearized blocks always execute. Retained
+      // blocks keep their original frequency, though their costs are currently
+      // conservatively charged in full.
+      if (!VPI.isMasked() && !BlocksToKeep.contains(VPBB))
         VPI.clearExecutionFrequency();
     }
   }
