@@ -166,7 +166,8 @@ define void @store_in_latch(ptr noalias %array, ptr align 2 dereferenceable(40) 
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds nuw i16, ptr [[PRED]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i16>, ptr [[TMP3]], align 2
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp sgt <4 x i16> [[WIDE_LOAD]], splat (i16 500)
-; CHECK-NEXT:    [[TMP5:%.*]] = call i64 @llvm.experimental.cttz.elts.i64.v4i1(<4 x i1> [[TMP4]], i1 false)
+; CHECK-NEXT:    [[TMP31:%.*]] = freeze <4 x i1> [[TMP4]]
+; CHECK-NEXT:    [[TMP5:%.*]] = call i64 @llvm.experimental.cttz.elts.i64.v4i1(<4 x i1> [[TMP31]], i1 false)
 ; CHECK-NEXT:    [[UNCOUNTABLE_EXIT_MASK:%.*]] = call <4 x i1> @llvm.get.active.lane.mask.v4i1.i64(i64 0, i64 [[TMP5]])
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds nuw i16, ptr [[ARRAY]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds nuw i16, ptr [[ARRAY]], i64 [[TMP0]]
@@ -229,7 +230,6 @@ define void @store_in_latch(ptr noalias %array, ptr align 2 dereferenceable(40) 
 ; CHECK-NEXT:    store i16 [[TMP30]], ptr [[TMP9]], align 2
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE12]]
 ; CHECK:       [[PRED_STORE_CONTINUE12]]:
-; CHECK-NEXT:    [[TMP31:%.*]] = freeze <4 x i1> [[TMP4]]
 ; CHECK-NEXT:    [[TMP32:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP31]])
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP33:%.*]] = icmp eq i64 [[INDEX_NEXT]], 20
@@ -297,7 +297,8 @@ define i16 @body_live_out(ptr noalias %array, ptr align 2 dereferenceable(40) re
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds nuw i16, ptr [[PRED]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i16>, ptr [[TMP3]], align 2
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp sgt <4 x i16> [[WIDE_LOAD]], splat (i16 500)
-; CHECK-NEXT:    [[TMP5:%.*]] = call i64 @llvm.experimental.cttz.elts.i64.v4i1(<4 x i1> [[TMP4]], i1 false)
+; CHECK-NEXT:    [[TMP31:%.*]] = freeze <4 x i1> [[TMP4]]
+; CHECK-NEXT:    [[TMP5:%.*]] = call i64 @llvm.experimental.cttz.elts.i64.v4i1(<4 x i1> [[TMP31]], i1 false)
 ; CHECK-NEXT:    [[UNCOUNTABLE_EXIT_MASK:%.*]] = call <4 x i1> @llvm.get.active.lane.mask.v4i1.i64(i64 0, i64 [[TMP5]])
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds nuw i16, ptr [[ARRAY]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds nuw i16, ptr [[ARRAY]], i64 [[TMP0]]
@@ -360,7 +361,6 @@ define i16 @body_live_out(ptr noalias %array, ptr align 2 dereferenceable(40) re
 ; CHECK-NEXT:    store i16 [[TMP30]], ptr [[TMP9]], align 2
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE12]]
 ; CHECK:       [[PRED_STORE_CONTINUE12]]:
-; CHECK-NEXT:    [[TMP31:%.*]] = freeze <4 x i1> [[TMP4]]
 ; CHECK-NEXT:    [[TMP32:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP31]])
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP33:%.*]] = icmp eq i64 [[INDEX_NEXT]], 20
@@ -742,7 +742,8 @@ define void @store_in_separate_block(ptr noalias %array, ptr align 2 dereference
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds nuw i16, ptr [[PRED]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i16>, ptr [[TMP3]], align 2
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp sgt <4 x i16> [[WIDE_LOAD]], splat (i16 500)
-; CHECK-NEXT:    [[TMP5:%.*]] = call i64 @llvm.experimental.cttz.elts.i64.v4i1(<4 x i1> [[TMP4]], i1 false)
+; CHECK-NEXT:    [[TMP31:%.*]] = freeze <4 x i1> [[TMP4]]
+; CHECK-NEXT:    [[TMP5:%.*]] = call i64 @llvm.experimental.cttz.elts.i64.v4i1(<4 x i1> [[TMP31]], i1 false)
 ; CHECK-NEXT:    [[UNCOUNTABLE_EXIT_MASK:%.*]] = call <4 x i1> @llvm.get.active.lane.mask.v4i1.i64(i64 0, i64 [[TMP5]])
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds nuw i16, ptr [[ARRAY]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds nuw i16, ptr [[ARRAY]], i64 [[TMP0]]
@@ -805,7 +806,6 @@ define void @store_in_separate_block(ptr noalias %array, ptr align 2 dereference
 ; CHECK-NEXT:    store i16 [[TMP30]], ptr [[TMP9]], align 2
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE12]]
 ; CHECK:       [[PRED_STORE_CONTINUE12]]:
-; CHECK-NEXT:    [[TMP31:%.*]] = freeze <4 x i1> [[TMP4]]
 ; CHECK-NEXT:    [[TMP32:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP31]])
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[TMP33:%.*]] = icmp eq i64 [[INDEX_NEXT]], 20

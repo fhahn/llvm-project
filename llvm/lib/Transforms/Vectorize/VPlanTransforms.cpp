@@ -3645,7 +3645,6 @@ void VPlanTransforms::convertMaskedEarlyExitToBailToScalar(
   auto BodyRange = make_range(std::next(MaskR->getIterator()), HeaderVPBB->end());
   // The producer masks every access except the condition load. All mask users
   // must be accesses in the skipped body.
-  SmallSetVector<VPInstruction *, 4> MaskedMemOps;
   for (VPUser *U : MaskR->users()) {
     auto *VPI = dyn_cast<VPInstruction>(U);
     if (!VPI ||
@@ -3653,7 +3652,6 @@ void VPlanTransforms::convertMaskedEarlyExitToBailToScalar(
                       VPI->getOpcode()) ||
         VPI->getMask() != MaskR || VPI->getParent() != HeaderVPBB)
       return;
-    MaskedMemOps.insert(VPI);
   }
 
   // A same-block non-PHI user follows its definition, so is also in the body.
@@ -3666,9 +3664,10 @@ void VPlanTransforms::convertMaskedEarlyExitToBailToScalar(
           }))
         return;
 
-  // Bail only if an access would otherwise require scalarized masking.
+  // Bail if the target lacks native masked load/store support for an access.
   // TODO: Account for stride and masked gather/scatter support.
-  bool MaskingIsLegal = all_of(MaskedMemOps, [&Config](VPInstruction *VPI) {
+  bool MaskingIsLegal = all_of(MaskR->users(), [&Config](VPUser *U) {
+    auto *VPI = cast<VPInstruction>(U);
     bool IsLoad = VPI->getOpcode() == Instruction::Load;
     auto *PtrTy = cast<PointerType>(VPI->getOperand(!IsLoad)->getScalarType());
     // TODO: Model alignment directly on the recipe.
@@ -3683,8 +3682,8 @@ void VPlanTransforms::convertMaskedEarlyExitToBailToScalar(
   // No lane exits on the non-bailing path, so its mask is all-ones.
   HeaderVPBB->splitAt(std::next(MaskR->getIterator()))
       ->setName("vector.body.nonbailing");
-  for (VPInstruction *VPI : MaskedMemOps)
-    VPI->dropMask();
+  while (!MaskR->user_empty())
+    cast<VPInstruction>(*MaskR->user_begin())->dropMask();
   VPValue *FirstActive = MaskR->getOperand(1);
   MaskR->eraseFromParent();
 
@@ -5788,18 +5787,17 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
         // A predicated access can only be widened (rather than scalarized) if
         // the target supports a masked load/store for it.
         // TODO: Determine if a load/store needs predication directly in VPlan.
-        // A bail-to-scalar body no longer needs masked accesses.
-        bool IsPredicated = RecipeBuilder.isPredicatedInst(I) && VPI->isMasked();
-        if (IsPredicated && !CostCtx.Config.isLegalMaskedLoadOrStore(
-                                IsLoad, ScalarTy, getLoadStoreAlignment(I),
-                                getLoadStoreAddressSpace(I)))
+        VPValue *Mask =
+            RecipeBuilder.isPredicatedInst(I) ? VPI->getMask() : nullptr;
+        if (Mask && !CostCtx.Config.isLegalMaskedLoadOrStore(
+                        IsLoad, ScalarTy, getLoadStoreAlignment(I),
+                        getLoadStoreAddressSpace(I)))
           return false;
 
         VPBuilder Builder(VPI);
         VPSingleDefRecipe *VectorPtr = Builder.createConsecutiveVectorPointer(
             Ptr, ScalarTy, Reverse, VPI->getDebugLoc());
 
-        VPValue *Mask = IsPredicated ? VPI->getMask() : nullptr;
         // Reverse the mask so it matches the reversed access order.
         if (Reverse && Mask)
           Mask = Builder.createNaryOp(VPInstruction::Reverse, Mask,

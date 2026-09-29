@@ -35,6 +35,7 @@ class ScalarEvolution;
 class PredicatedScalarEvolution;
 class TargetLibraryInfo;
 class TargetTransformInfo;
+class VFSelectionContext;
 class VPRecipeBuilder;
 struct VFRange;
 

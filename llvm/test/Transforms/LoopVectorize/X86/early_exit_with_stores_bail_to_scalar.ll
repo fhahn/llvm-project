@@ -3,10 +3,9 @@
 ; RUN: opt -p loop-vectorize -enable-early-exit-vectorization-with-side-effects -mtriple=x86_64-- -mattr=+avx512f,+avx512bw,+avx512vl -S %s | FileCheck --check-prefix=AVX512 %s
 
 ;; Whether the masked (partial-commit) form is converted to the bail-to-scalar
-;; form depends on whether the target can mask the memory operations. Without
-;; AVX512 there is no masked load/store for i16, so masking would be scalarized
-;; and the loop is not profitable to vectorize at all; with AVX512 the masked
-;; form is used as-is.
+;; form depends on whether the target can mask the memory operations. SSE2
+;; requires scalarized masking for i16, so bailing enables profitable
+;; vectorization. With AVX512 the masked form is kept.
 
 define void @single_store(ptr noalias %array, ptr align 2 dereferenceable(40) readonly %pred) {
 ; SSE2-LABEL: define void @single_store(
@@ -67,7 +66,8 @@ define void @single_store(ptr noalias %array, ptr align 2 dereferenceable(40) re
 ; AVX512:       [[VECTOR_BODY]]:
 ; AVX512-NEXT:    [[WIDE_LOAD:%.*]] = load <16 x i16>, ptr [[PRED]], align 2
 ; AVX512-NEXT:    [[TMP0:%.*]] = icmp sgt <16 x i16> [[WIDE_LOAD]], splat (i16 500)
-; AVX512-NEXT:    [[TMP1:%.*]] = call i64 @llvm.experimental.cttz.elts.i64.v16i1(<16 x i1> [[TMP0]], i1 false)
+; AVX512-NEXT:    [[TMP4:%.*]] = freeze <16 x i1> [[TMP0]]
+; AVX512-NEXT:    [[TMP1:%.*]] = call i64 @llvm.experimental.cttz.elts.i64.v16i1(<16 x i1> [[TMP4]], i1 false)
 ; AVX512-NEXT:    [[UNCOUNTABLE_EXIT_MASK:%.*]] = call <16 x i1> @llvm.get.active.lane.mask.v16i1.i64(i64 0, i64 [[TMP1]])
 ; AVX512-NEXT:    [[WIDE_MASKED_LOAD:%.*]] = call <16 x i16> @llvm.masked.load.v16i16.p0(ptr align 2 [[ARRAY]], <16 x i1> [[UNCOUNTABLE_EXIT_MASK]], <16 x i16> poison)
 ; AVX512-NEXT:    [[TMP2:%.*]] = add nsw <16 x i16> [[WIDE_MASKED_LOAD]], splat (i16 1)
