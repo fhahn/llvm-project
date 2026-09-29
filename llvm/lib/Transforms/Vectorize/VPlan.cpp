@@ -256,15 +256,10 @@ Value *VPTransformState::get(const VPValue *Def, const VPLane &Lane) {
 
   assert(hasVectorValue(Def));
   auto *VecPart = Data.VPV2Vector[Def];
-  if (!VecPart->getType()->isVectorTy()) {
-    assert(Lane.isFirstLane() && "cannot get lane > 0 for scalar");
-    return VecPart;
-  }
-  // TODO: Cache created scalar values.
-  Value *LaneV = Lane.getAsRuntimeExpr(Builder, VF);
-  auto *Extract = Builder.CreateExtractElement(VecPart, LaneV);
-  // set(Def, Extract, Instance);
-  return Extract;
+  assert(!VecPart->getType()->isVectorTy() &&
+         "extracts from vector values must be explicit");
+  assert(Lane.isFirstLane() && "cannot get lane > 0 for scalar");
+  return VecPart;
 }
 
 Value *VPTransformState::get(const VPValue *Def, bool NeedsSingleScalar) {
@@ -520,6 +515,15 @@ void VPBasicBlock::executeRecipes(VPTransformState *State, BasicBlock *BB) {
   for (VPRecipeBase &Recipe : Recipes) {
     State->setDebugLocFrom(Recipe.getDebugLoc());
     Recipe.execute(*State);
+    assert((State->VF.isScalar() ||
+            all_of(Recipe.definedValues(),
+                   [State](VPValue *V) {
+                     return V->user_empty() ||
+                            vputils::producesVector(V) ==
+                                (State->hasVectorValue(V) &&
+                                 isVectorizedTy(State->get(V)->getType()));
+                   })) &&
+           "recipe shape must match vputils::producesVector");
   }
 
   LLVM_DEBUG(dbgs() << "LV: filled BB: " << *BB);

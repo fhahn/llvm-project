@@ -5614,6 +5614,7 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
     replaceVPBBWithIRVPBB(ScalarPH, ScalarPHBB, &BestVPlan);
   RUN_VPLAN_PASS(VPlanTransforms::narrowToSingleScalarRecipes, BestVPlan);
   RUN_VPLAN_PASS(VPlanTransforms::removeDeadRecipes, BestVPlan);
+  RUN_VPLAN_PASS(VPlanTransforms::materializeExtracts, BestVPlan);
 
   assert(verifyVPlanIsValid(BestVPlan) && "final VPlan is invalid");
 

@@ -2152,6 +2152,8 @@ public:
   /// Return the cost of widening a call using the vector function \p Variant.
   static InstructionCost computeCallCost(Function *Variant, VPCostContext &Ctx);
 
+  Function *getVariant() const { return Variant; }
+
   Function *getCalledScalarFunction() const {
     return cast<Function>(getLastOperand()->getLiveInIRValue());
   }

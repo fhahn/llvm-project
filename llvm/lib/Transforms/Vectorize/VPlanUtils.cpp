@@ -532,6 +532,19 @@ bool vputils::isSingleScalar(const VPValue *VPV) {
          all_of(VPV->getDefiningRecipe()->operands(), isSingleScalar);
 }
 
+bool vputils::producesVector(const VPValue *VPV) {
+  const VPRecipeBase *R = VPV->getDefiningRecipe();
+  if (!R || doesGenerateSingleScalar(VPV))
+    return false;
+  if (auto *VPI = dyn_cast<VPInstruction>(R))
+    return VPI->hasResult();
+  if (isa<VPWidenGEPRecipe>(R))
+    return !isSingleScalar(VPV);
+  if (auto *RdxPhi = dyn_cast<VPReductionPHIRecipe>(R))
+    return !RdxPhi->isInLoop();
+  return !isa<VPReplicateRecipe, VPScalarIVStepsRecipe, VPIRInstruction>(R);
+}
+
 bool vputils::isUniformAcrossVFsAndUFs(const VPValue *V) {
   // Live-ins, symbolic and canonical-IV region values are uniform.
   if (auto *RV = dyn_cast<VPRegionValue>(V))

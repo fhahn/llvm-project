@@ -756,6 +756,15 @@ static Instruction::BinaryOps getSubRecurOpcode(RecurKind Kind) {
   llvm_unreachable("RecurKind should be Sub/FSub.");
 }
 
+static Value *extractLane(VPTransformState &State, const VPValue *Op,
+                          VPLane Lane) {
+  if (!vputils::producesVector(Op) ||
+      (Lane.getKind() == VPLane::Kind::First && match(Op, m_BuildVector())))
+    return State.get(Op, Lane);
+  return State.Builder.CreateExtractElement(
+      State.get(Op), Lane.getAsRuntimeExpr(State.Builder, State.VF));
+}
+
 Value *VPInstruction::generate(VPTransformState &State,
                                bool GenerateSingleScalar) {
   IRBuilderBase &Builder = State.Builder;
@@ -805,7 +814,7 @@ Value *VPInstruction::generate(VPTransformState &State,
            "Can only generate first lane for ExtractElement");
     assert(State.VF.isVector() && "Only extract elements from vectors");
     if (auto *Idx = dyn_cast<VPConstantInt>(getOperand(1)))
-      return State.get(getOperand(0), VPLane(Idx->getZExtValue()));
+      return extractLane(State, getOperand(0), VPLane(Idx->getZExtValue()));
     Value *Vec = State.get(getOperand(0));
     Value *Idx = State.get(getOperand(1), /*NeedsSingleScalar=*/true);
     return Builder.CreateExtractElement(Vec, Idx, Name);
@@ -1043,7 +1052,8 @@ Value *VPInstruction::generate(VPTransformState &State,
       assert(Offset <= State.VF.getKnownMinValue() &&
              "invalid offset to extract from");
       // Extract lane VF - Offset from the operand.
-      Res = State.get(getOperand(0), VPLane::getLaneFromEnd(State.VF, Offset));
+      Res = extractLane(State, getOperand(0),
+                        VPLane::getLaneFromEnd(State.VF, Offset));
     } else {
       // TODO: Remove ExtractLastLane for scalar VFs.
       assert(Offset <= 1 && "invalid offset to extract from");

@@ -506,6 +506,10 @@ struct VPlanTransforms {
   /// Add explicit Unpack recipes to extract scalars from vectors as needed.
   static void materializeUnpacks(VPlan &Plan);
 
+  /// Materialize explicit extracts of the first lane for users that only use
+  /// scalars of operands produced as vectors.
+  static void materializeExtracts(VPlan &Plan);
+
   /// Materialize UF, VF and VFxUF to be computed explicitly using
   /// VPInstructions.
   static void materializeFactors(VPlan &Plan, VPBasicBlock *VectorPH,
