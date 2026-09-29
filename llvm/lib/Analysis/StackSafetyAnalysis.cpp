@@ -558,9 +558,8 @@ FunctionInfo<GlobalValue> StackSafetyLocalAnalysis::run() {
   LLVM_DEBUG(dbgs() << "[StackSafety] " << F.getName() << "\n");
 
   SmallVector<AllocaInst *, 64> Allocas;
-  for (auto &I : instructions(F))
-    if (auto *AI = dyn_cast<AllocaInst>(&I))
-      Allocas.push_back(AI);
+  for (AllocaInst &AI : make_isa_range<AllocaInst>(instructions(F)))
+    Allocas.push_back(&AI);
   StackLifetime SL(F, Allocas, StackLifetime::LivenessType::Must);
   SL.run();
 

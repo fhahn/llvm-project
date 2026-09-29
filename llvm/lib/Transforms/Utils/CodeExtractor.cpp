@@ -323,9 +323,8 @@ static BasicBlock *getCommonExitBlock(const SetVector<BasicBlock *> &Blocks) {
 
 CodeExtractorAnalysisCache::CodeExtractorAnalysisCache(Function &F) {
   for (BasicBlock &BB : F) {
-    for (Instruction &II : BB)
-      if (auto *AI = dyn_cast<AllocaInst>(&II))
-        Allocas.push_back(AI);
+    for (AllocaInst &AI : make_isa_range<AllocaInst>(BB))
+      Allocas.push_back(&AI);
 
     findSideEffectInfoForBlock(BB);
   }
