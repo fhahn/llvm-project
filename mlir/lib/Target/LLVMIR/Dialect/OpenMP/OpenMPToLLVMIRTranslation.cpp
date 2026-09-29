@@ -205,16 +205,15 @@ public:
     // TODO Add an attribute to `omp.loop_nest` that explicitly lists the
     //      variables that correspond to the loop induction variables.
     BlockArgument arg = loopOp.getIVs().front();
-    for (const Operation *user : arg.getUsers()) {
-      if (auto storeOp = dyn_cast<LLVM::StoreOp>(user)) {
-        for (Value linearVar : simdOp.getLinearVars()) {
-          if (linearVar == storeOp.getAddr()) {
-            if (linearLoopIV && linearLoopIV != linearVar)
-              return simdOp.emitError(
-                  "Could not determine the linear variable associated with the "
-                  "loop nest induction variable");
-            linearLoopIV = linearVar;
-          }
+    for (LLVM::StoreOp storeOp :
+         llvm::make_isa_range<LLVM::StoreOp>(arg.getUsers())) {
+      for (Value linearVar : simdOp.getLinearVars()) {
+        if (linearVar == storeOp.getAddr()) {
+          if (linearLoopIV && linearLoopIV != linearVar)
+            return simdOp.emitError(
+                "Could not determine the linear variable associated with the "
+                "loop nest induction variable");
+          linearLoopIV = linearVar;
         }
       }
     }
@@ -6099,11 +6098,10 @@ static LogicalResult extractAtomicComparePattern(
     info.compareOp = llvm::omp::OMPAtomicCompareOp::EQ;
     info.isXBinopExpr = cplx.isXBinopExpr;
     info.eVal = materializeValue(cplx.eAggregate);
-    for (Operation &op : block.getOperations()) {
-      if (auto selectOp = dyn_cast<LLVM::SelectOp>(op)) {
-        info.dVal = materializeValue(selectOp.getTrueValue());
-        break;
-      }
+    for (LLVM::SelectOp selectOp :
+         llvm::make_isa_range<LLVM::SelectOp>(block.getOperations())) {
+      info.dVal = materializeValue(selectOp.getTrueValue());
+      break;
     }
     return success();
   }
@@ -6402,11 +6400,10 @@ convertOmpAtomicCapture(omp::AtomicCaptureOp atomicCaptureOp,
     if (isMinMax && (isPostfixCapture || isFailOnly)) {
       llvm::BasicBlock *curBB = builder.GetInsertBlock();
       llvm::AtomicRMWInst *rmw = nullptr;
-      for (auto &inst : llvm::reverse(*curBB)) {
-        if (auto *r = dyn_cast<llvm::AtomicRMWInst>(&inst)) {
-          rmw = r;
-          break;
-        }
+      for (llvm::AtomicRMWInst &r :
+           llvm::make_isa_range<llvm::AtomicRMWInst>(llvm::reverse(*curBB))) {
+        rmw = &r;
+        break;
       }
       assert(rmw && "expected atomicrmw for min/max compare capture");
       llvm::Value *oldVal = rmw;
@@ -6751,11 +6748,10 @@ convertOmpAtomicCompare(omp::AtomicCompareOp atomicCompareOp,
 
   if (isComplexPattern) {
     // dVal from SelectOp or YieldOp.
-    for (Operation &op : block.getOperations()) {
-      if (auto selectOp = dyn_cast<LLVM::SelectOp>(op)) {
-        dVal = materializeValue(selectOp.getTrueValue());
-        break;
-      }
+    for (LLVM::SelectOp selectOp :
+         llvm::make_isa_range<LLVM::SelectOp>(block.getOperations())) {
+      dVal = materializeValue(selectOp.getTrueValue());
+      break;
     }
     if (!dVal) {
       auto yieldOp = cast<omp::YieldOp>(block.getTerminator());
