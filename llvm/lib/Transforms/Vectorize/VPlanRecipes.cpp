@@ -1825,6 +1825,13 @@ bool VPInstruction::usesFirstLaneOnly(const VPValue *Op) const {
   }
 }
 
+bool VPInstruction::usesScalars(const VPValue *Op) const {
+  return doesGenerateSingleScalar() || getOpcode() == VPInstruction::PtrAdd ||
+         usesFirstLaneOnly(Op) ||
+         (getOpcode() == Instruction::Select && Op == getOperand(0) &&
+          vputils::isSingleScalar(Op));
+}
+
 bool VPInstruction::usesFirstPartOnly(const VPValue *Op) const {
   assert(is_contained(operands(), Op) && "Op must be an operand of the recipe");
   if (Instruction::isBinaryOp(getOpcode()))
@@ -2973,6 +2980,12 @@ void VPIRFlags::printFlags(raw_ostream &O) const {
   O << " ";
 }
 #endif
+
+bool VPWidenRecipe::usesScalars(const VPValue *Op) const {
+  assert(is_contained(operands(), Op) && "Op must be an operand of the recipe");
+  return Opcode == Instruction::Select && Op == getOperand(0) &&
+         vputils::isSingleScalar(Op);
+}
 
 void VPWidenRecipe::execute(VPTransformState &State) {
   auto &Builder = State.Builder;

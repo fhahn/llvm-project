@@ -1601,10 +1601,7 @@ public:
   bool usesFirstLaneOnly(const VPValue *Op) const override;
 
   /// Returns true if the recipe only uses scalars of operand \p Op.
-  bool usesScalars(const VPValue *Op) const override {
-    return doesGenerateSingleScalar() || getOpcode() == VPInstruction::PtrAdd ||
-           usesFirstLaneOnly(Op);
-  }
+  bool usesScalars(const VPValue *Op) const override;
 
   /// Returns true if the recipe only uses the first part of operand \p Op.
   bool usesFirstPartOnly(const VPValue *Op) const override;
@@ -1908,6 +1905,8 @@ protected:
     return Opcode == Instruction::Select && Op == getOperand(0) &&
            isa<VPIRValue>(Op);
   }
+
+  bool usesScalars(const VPValue *Op) const override;
 };
 
 /// VPWidenCastRecipe is a recipe to create vector cast instructions.
