@@ -497,23 +497,24 @@ public:
         Opcode, Op, ResultTy, nullptr, VPIRFlags::getDefaultFlags(Opcode)));
   }
 
-  /// Create a single-scalar recipe with \p Opcode and \p Operands without
-  /// inserting it.
+  /// Create a single-scalar recipe with \p Opcode, \p Operands and result type
+  /// \p ResultTy without inserting it.
   static VPSingleDefRecipe *createSingleScalarOp(unsigned Opcode,
                                                  ArrayRef<VPValue *> Operands,
-                                                 VPValue *Mask,
+                                                 Type *ResultTy, VPValue *Mask,
                                                  const VPIRFlags &Flags,
                                                  const VPIRMetadata &Metadata,
                                                  DebugLoc DL, Instruction *UV) {
     if (Instruction::isCast(Opcode)) {
       assert(!Mask && "Cast cannot be predicated");
       auto *VPI = new VPInstruction(Opcode, Operands, Flags, Metadata, DL,
-                                    UV->getName(), UV->getType());
+                                    UV->getName(), ResultTy);
       VPI->setUnderlyingValue(UV);
       return VPI;
     }
-    return new VPReplicateRecipe(UV, Operands, /*IsSingleScalar=*/true, Mask,
-                                 Flags, Metadata, DL);
+    return new VPReplicateRecipe(UV, Operands, ResultTy,
+                                 /*IsSingleScalar=*/true, Mask, Flags, Metadata,
+                                 DL);
   }
 
   VPScalarIVStepsRecipe *
@@ -567,14 +568,13 @@ public:
         VectorIntrinsicID, CallArguments, Ty, Alignment, MD, DL));
   }
 
-  /// Create a recipe widening \p Load, loading from \p Addr with \p Mask (may
-  /// be null).
-  VPWidenLoadRecipe *createWidenLoad(LoadInst &Load, VPValue *Addr,
-                                     VPValue *Mask, bool Consecutive,
-                                     const VPIRMetadata &Metadata,
-                                     DebugLoc DL) {
-    return tryInsertInstruction(
-        new VPWidenLoadRecipe(Load, Addr, Mask, Consecutive, Metadata, DL));
+  /// Create a recipe widening \p Load with result type \p ResultTy, loading
+  /// from \p Addr with \p Mask (may be null).
+  VPWidenLoadRecipe *
+  createWidenLoad(LoadInst &Load, Type *ResultTy, VPValue *Addr, VPValue *Mask,
+                  bool Consecutive, const VPIRMetadata &Metadata, DebugLoc DL) {
+    return tryInsertInstruction(new VPWidenLoadRecipe(
+        Load, ResultTy, Addr, Mask, Consecutive, Metadata, DL));
   }
 
   /// Create a recipe widening \p Store, storing \p StoredVal to \p Addr with

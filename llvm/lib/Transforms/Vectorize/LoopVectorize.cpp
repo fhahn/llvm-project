@@ -6090,8 +6090,9 @@ VPRecipeBase *VPRecipeBuilder::tryToWidenMemory(VPInstruction *VPI,
 
   if (VPI->getOpcode() == Instruction::Load) {
     auto *Load = cast<LoadInst>(I);
-    auto *LoadR = Builder.createWidenLoad(*Load, Ptr, Mask, Consecutive, *VPI,
-                                          Load->getDebugLoc());
+    auto *LoadR =
+        Builder.createWidenLoad(*Load, VPI->getScalarType(), Ptr, Mask,
+                                Consecutive, *VPI, Load->getDebugLoc());
     if (Reverse)
       return Builder.createNaryOp(VPInstruction::Reverse, LoadR,
                                   LoadR->getDebugLoc());
@@ -6216,8 +6217,8 @@ bool VPRecipeBuilder::replaceWithFinalIfReductionStore(
       assert((isa<VPIRValue>(Val) || !Rdx || Rdx->getBackedgeValue() == Val) &&
              "Store of reduction thats not the backedge value?");
       auto *Recipe = new VPReplicateRecipe(
-          SI, {Val, Addr}, true /* IsUniform */, nullptr /*Mask*/, *VPI, *VPI,
-          VPI->getDebugLoc());
+          SI, {Val, Addr}, VPI->getScalarType(), true /* IsUniform */,
+          nullptr /*Mask*/, *VPI, *VPI, VPI->getDebugLoc());
       FinalRedStoresBuilder.insert(Recipe);
     }
     VPI->eraseFromParent();
@@ -6287,12 +6288,12 @@ VPSingleDefRecipe *VPRecipeBuilder::handleReplication(VPInstruction *VPI,
          "Should not predicate a uniform recipe");
   if (IsUniform) {
     return VPBuilder::createSingleScalarOp(
-        VPI->getOpcode(), VPI->operandsWithoutMask(), BlockInMask, *VPI, *VPI,
-        VPI->getDebugLoc(), I);
+        VPI->getOpcode(), VPI->operandsWithoutMask(), VPI->getScalarType(),
+        BlockInMask, *VPI, *VPI, VPI->getDebugLoc(), I);
   }
-  auto *Recipe = new VPReplicateRecipe(I, VPI->operandsWithoutMask(),
-                                       /*IsSingleScalar=*/false, BlockInMask,
-                                       *VPI, *VPI, VPI->getDebugLoc());
+  auto *Recipe = new VPReplicateRecipe(
+      I, VPI->operandsWithoutMask(), VPI->getScalarType(),
+      /*IsSingleScalar=*/false, BlockInMask, *VPI, *VPI, VPI->getDebugLoc());
   return Recipe;
 }
 

@@ -3396,11 +3396,12 @@ class LLVM_ABI_FOR_TEST VPReplicateRecipe : public VPRecipeWithIRFlags,
 
 public:
   VPReplicateRecipe(Instruction *I, ArrayRef<VPValue *> Operands,
-                    bool IsSingleScalar, VPValue *Mask = nullptr,
-                    const VPIRFlags &Flags = {}, VPIRMetadata Metadata = {},
+                    Type *ResultTy, bool IsSingleScalar,
+                    VPValue *Mask = nullptr, const VPIRFlags &Flags = {},
+                    VPIRMetadata Metadata = {},
                     DebugLoc DL = DebugLoc::getUnknown())
-      : VPRecipeWithIRFlags(VPRecipeBase::VPReplicateSC, Operands,
-                            computeScalarType(I, Operands), Flags, DL),
+      : VPRecipeWithIRFlags(VPRecipeBase::VPReplicateSC, Operands, ResultTy,
+                            Flags, DL),
         VPIRMetadata(Metadata), IsSingleScalar(IsSingleScalar),
         IsPredicated(Mask) {
     assert((!IsSingleScalar || !I->isCast()) &&
@@ -3412,16 +3413,11 @@ public:
 
   ~VPReplicateRecipe() override = default;
 
-  /// Compute the scalar result type for a VPReplicateRecipe wrapping \p I with
-  /// \p Operands (excluding any predicate mask).
-  static Type *computeScalarType(const Instruction *I,
-                                 ArrayRef<VPValue *> Operands);
-
   VPReplicateRecipe *clone() override { return cloneWithOperands(operands()); }
 
   VPReplicateRecipe *cloneWithOperands(ArrayRef<VPValue *> NewOperands) {
     auto *Copy = new VPReplicateRecipe(
-        getUnderlyingInstr(), NewOperands, IsSingleScalar,
+        getUnderlyingInstr(), NewOperands, getScalarType(), IsSingleScalar,
         isPredicated() ? getMask() : nullptr, *this, *this, getDebugLoc());
     Copy->transferFlags(*this);
     return Copy;
@@ -3805,17 +3801,19 @@ public:
 /// optional mask.
 struct LLVM_ABI_FOR_TEST VPWidenLoadRecipe final : public VPSingleDefRecipe,
                                                    public VPWidenMemoryRecipe {
-  VPWidenLoadRecipe(LoadInst &Load, VPValue *Addr, VPValue *Mask,
-                    bool Consecutive, const VPIRMetadata &Metadata, DebugLoc DL)
-      : VPSingleDefRecipe(VPRecipeBase::VPWidenLoadSC, {Addr}, Load.getType(),
-                          &Load, DL),
+  VPWidenLoadRecipe(LoadInst &Load, Type *ResultTy, VPValue *Addr,
+                    VPValue *Mask, bool Consecutive,
+                    const VPIRMetadata &Metadata, DebugLoc DL)
+      : VPSingleDefRecipe(VPRecipeBase::VPWidenLoadSC, {Addr}, ResultTy, &Load,
+                          DL),
         VPWidenMemoryRecipe(Load, Consecutive, Metadata) {
     setMask(Mask);
   }
 
   VPWidenLoadRecipe *clone() override {
-    return new VPWidenLoadRecipe(cast<LoadInst>(Ingredient), getAddr(),
-                                 getMask(), Consecutive, *this, getDebugLoc());
+    return new VPWidenLoadRecipe(cast<LoadInst>(Ingredient), getScalarType(),
+                                 getAddr(), getMask(), Consecutive, *this,
+                                 getDebugLoc());
   }
 
   VP_CLASSOF_IMPL(VPRecipeBase::VPWidenLoadSC);
@@ -3861,7 +3859,7 @@ struct LLVM_ABI_FOR_TEST VPWidenLoadEVLRecipe final
   VPWidenLoadEVLRecipe(VPWidenLoadRecipe &L, VPValue *Addr, VPValue &EVL,
                        VPValue *Mask)
       : VPSingleDefRecipe(VPRecipeBase::VPWidenLoadEVLSC, {Addr, &EVL},
-                          L.getIngredient().getType(), &L.getIngredient(),
+                          L.getScalarType(), &L.getIngredient(),
                           L.getDebugLoc()),
         VPWidenMemoryRecipe(L.getIngredient(), L.isConsecutive(), L) {
     setMask(Mask);

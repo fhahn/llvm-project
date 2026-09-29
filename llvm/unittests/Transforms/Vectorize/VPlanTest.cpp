@@ -1246,7 +1246,8 @@ TEST_F(VPRecipeTest, CastVPReplicateRecipeToVPUser) {
   Args.push_back(Op1);
   Args.push_back(Op2);
   Args.push_back(CalledFn);
-  VPReplicateRecipe Recipe(Call, make_range(Args.begin(), Args.end()), true);
+  VPReplicateRecipe Recipe(Call, make_range(Args.begin(), Args.end()),
+                           Call->getType(), true);
 
   checkVPRecipeCastImpl<VPReplicateRecipe, VPUser, VPIRMetadata>(&Recipe);
 
@@ -1271,7 +1272,7 @@ TEST_F(VPRecipeTest, CastVPWidenMemoryRecipeToVPUserAndVPRecipeBase) {
       new LoadInst(Int32, PoisonValue::get(Int32Ptr), "", false, Align(1));
   VPValue *Addr = Plan.getOrAddLiveIn(ConstantInt::get(Int32, 1));
   VPValue *Mask = Plan.getOrAddLiveIn(ConstantInt::getTrue(C));
-  VPWidenLoadRecipe Recipe(*Load, Addr, Mask, true, {}, {});
+  VPWidenLoadRecipe Recipe(*Load, Load->getType(), Addr, Mask, true, {}, {});
 
   checkVPRecipeCastImpl<VPWidenLoadRecipe, VPUser, VPIRMetadata>(&Recipe);
 
@@ -1303,7 +1304,7 @@ TEST_F(VPRecipeTest, CastVPWidenLoadEVLRecipeToVPUser) {
   VPValue *Addr = Plan.getOrAddLiveIn(ConstantInt::get(Int32, 1));
   VPValue *Mask = Plan.getOrAddLiveIn(ConstantInt::getTrue(C));
   VPValue *EVL = Plan.getOrAddLiveIn(ConstantInt::get(Int32, 8));
-  VPWidenLoadRecipe BaseLoad(*Load, Addr, Mask, true, {}, {});
+  VPWidenLoadRecipe BaseLoad(*Load, Load->getType(), Addr, Mask, true, {}, {});
   VPWidenLoadEVLRecipe Recipe(BaseLoad, Addr, *EVL, Mask);
 
   checkVPRecipeCastImpl<VPWidenLoadEVLRecipe, VPUser, VPIRMetadata>(&Recipe);
@@ -1424,7 +1425,7 @@ TEST_F(VPRecipeTest, MayHaveSideEffectsAndMayReadWriteMemory) {
         new LoadInst(Int32, PoisonValue::get(Int32Ptr), "", false, Align(1));
     VPValue *Mask = Plan.getOrAddLiveIn(ConstantInt::getTrue(C));
     VPValue *Addr = Plan.getOrAddLiveIn(ConstantInt::get(Int32, 2));
-    VPWidenLoadRecipe Recipe(*Load, Addr, Mask, true, {}, {});
+    VPWidenLoadRecipe Recipe(*Load, Load->getType(), Addr, Mask, true, {}, {});
     EXPECT_FALSE(Recipe.mayHaveSideEffects());
     EXPECT_TRUE(Recipe.mayReadFromMemory());
     EXPECT_FALSE(Recipe.mayWriteToMemory());

@@ -105,9 +105,9 @@ bool VPlanTransforms::tryToConvertVPInstructionsToVPRecipes(
         if (LoadInst *Load = dyn_cast<LoadInst>(Inst)) {
           bool IsConsecutive =
               IsConsecutiveAccess(VPI->getOperand(0), VPI->getScalarType());
-          NewRecipe = new VPWidenLoadRecipe(*Load, Ingredient.getOperand(0),
-                                            nullptr /*Mask*/, IsConsecutive,
-                                            *VPI, Ingredient.getDebugLoc());
+          NewRecipe = new VPWidenLoadRecipe(
+              *Load, VPI->getScalarType(), Ingredient.getOperand(0),
+              nullptr /*Mask*/, IsConsecutive, *VPI, Ingredient.getDebugLoc());
         } else if (StoreInst *Store = dyn_cast<StoreInst>(Inst)) {
           bool IsConsecutive = IsConsecutiveAccess(
               VPI->getOperand(1), VPI->getOperand(0)->getScalarType());
@@ -145,10 +145,10 @@ bool VPlanTransforms::tryToConvertVPInstructionsToVPRecipes(
             // sample count.
             const bool IsSingleScalar = VectorID != Intrinsic::assume &&
                                         VectorID != Intrinsic::pseudoprobe;
-            NewRecipe = new VPReplicateRecipe(CI, Ingredient.operands(),
-                                              /*IsSingleScalar=*/IsSingleScalar,
-                                              /*Mask=*/nullptr, *VPI, *VPI,
-                                              Ingredient.getDebugLoc());
+            NewRecipe = new VPReplicateRecipe(
+                CI, Ingredient.operands(), VPI->getScalarType(),
+                /*IsSingleScalar=*/IsSingleScalar,
+                /*Mask=*/nullptr, *VPI, *VPI, Ingredient.getDebugLoc());
           } else {
             NewRecipe = new VPWidenIntrinsicRecipe(
                 *CI, VectorID, drop_end(Ingredient.operands()), CI->getType(),
@@ -398,7 +398,8 @@ static bool sinkScalarOperands(VPlan &Plan) {
         // then cloning should be sufficient here.
         Clone = VPBuilder::createSingleScalarOp(
             SinkCandidateRepR->getOpcode(), SinkCandidate->operands(),
-            /*Mask=*/nullptr, *SinkCandidateRepR, *SinkCandidateRepR,
+            SinkCandidateRepR->getScalarType(), /*Mask=*/nullptr,
+            *SinkCandidateRepR, *SinkCandidateRepR,
             SinkCandidate->getDebugLoc(), SinkCandidate->getUnderlyingInstr());
         // TODO: add ".cloned" suffix to name of Clone's VPValue.
       } else {
@@ -567,8 +568,8 @@ static VPRegionBlock *createReplicateRegion(VPReplicateRecipe *PredRecipe,
   // mask but in the replicate region.
   auto *RecipeWithoutMask = new VPReplicateRecipe(
       PredRecipe->getUnderlyingInstr(), PredRecipe->operandsWithoutMask(),
-      PredRecipe->isSingleScalar(), nullptr /*Mask*/, *PredRecipe, *PredRecipe,
-      PredRecipe->getDebugLoc());
+      PredRecipe->getScalarType(), PredRecipe->isSingleScalar(),
+      nullptr /*Mask*/, *PredRecipe, *PredRecipe, PredRecipe->getDebugLoc());
   // The predicated recipe executes exactly when the guarding branch-on-mask is
   // taken, so move its execution frequency there.
   BOMRecipe->setExecutionFrequency(RecipeWithoutMask->getExecutionFrequency(),
@@ -812,8 +813,8 @@ static void legalizeAndOptimizeInductions(VPlan &Plan) {
 
       auto *Clone = VPBuilder::createSingleScalarOp(
           Def->getUnderlyingInstr()->getOpcode(), Def->operands(),
-          /*Mask=*/nullptr, *Def, getMetadataOf(Def), DebugLoc::getUnknown(),
-          Def->getUnderlyingInstr());
+          Def->getScalarType(), /*Mask=*/nullptr, *Def, getMetadataOf(Def),
+          DebugLoc::getUnknown(), Def->getUnderlyingInstr());
       Clone->insertAfter(Def);
       Def->replaceAllUsesWith(Clone);
       Def->eraseFromParent();
@@ -1404,8 +1405,8 @@ static VPSingleDefRecipe *combineRecipe(VPlan &Plan, VPSingleDefRecipe *Def,
       match(RepR->getMask(), m_HeaderMask())) {
     auto *Unmasked = new VPReplicateRecipe(
         RepR->getUnderlyingInstr(), RepR->operandsWithoutMask(),
-        RepR->isSingleScalar(), /*Mask=*/nullptr, *RepR, *RepR,
-        RepR->getDebugLoc());
+        RepR->getScalarType(), RepR->isSingleScalar(), /*Mask=*/nullptr, *RepR,
+        *RepR, RepR->getDebugLoc());
     Builder.insert(Unmasked);
     return Unmasked;
   }
@@ -1824,8 +1825,8 @@ static void narrowToSingleScalarRecipes(VPlan &Plan) {
           vputils::isSingleScalar(RepR->getOperand(1))) {
         auto *Clone = new VPReplicateRecipe(
             RepOrWidenR->getUnderlyingInstr(), RepOrWidenR->operands(),
-            true /*IsSingleScalar*/, nullptr /*Mask*/, *RepR /*Flags*/,
-            *RepR /*Metadata*/, RepR->getDebugLoc());
+            RepR->getScalarType(), true /*IsSingleScalar*/, nullptr /*Mask*/,
+            *RepR /*Flags*/, *RepR /*Metadata*/, RepR->getDebugLoc());
         Clone->insertBefore(RepOrWidenR);
         VPBuilder Builder(Clone);
         VPValue *ExtractOp = Clone->getOperand(0);
@@ -1893,8 +1894,9 @@ static void narrowToSingleScalarRecipes(VPlan &Plan) {
 
       auto *Clone = VPBuilder::createSingleScalarOp(
           vputils::getOpcode(RepOrWidenR), RepOrWidenR->operands(),
-          /*Mask=*/nullptr, *RepOrWidenR, getMetadataOf(RepOrWidenR),
-          DebugLoc::getUnknown(), RepOrWidenR->getUnderlyingInstr());
+          RepOrWidenR->getScalarType(), /*Mask=*/nullptr, *RepOrWidenR,
+          getMetadataOf(RepOrWidenR), DebugLoc::getUnknown(),
+          RepOrWidenR->getUnderlyingInstr());
       Clone->insertBefore(RepOrWidenR);
       RepOrWidenR->replaceAllUsesWith(Clone);
       if (vputils::isDeadRecipe(*RepOrWidenR))
@@ -3978,7 +3980,8 @@ void VPlanTransforms::hoistPredicatedLoads(VPlan &Plan,
     // metadata.
     auto *UnpredicatedLoad = new VPReplicateRecipe(
         LoadWithMinAlign->getUnderlyingInstr(), {EarliestLoad->getOperand(0)},
-        IsSingleScalar, /*Mask=*/nullptr, *EarliestLoad, CommonMetadata);
+        EarliestLoad->getScalarType(), IsSingleScalar, /*Mask=*/nullptr,
+        *EarliestLoad, CommonMetadata);
 
     UnpredicatedLoad->insertBefore(EarliestLoad);
 
@@ -4045,10 +4048,11 @@ void VPlanTransforms::sinkPredicatedStores(VPlan &Plan,
     auto *StoreWithMinAlign = findRecipeWithMinAlign<StoreInst>(Group);
 
     // Create unconditional store with selected value and common metadata.
-    auto *UnpredicatedStore = new VPReplicateRecipe(
-        StoreWithMinAlign->getUnderlyingInstr(),
-        {SelectedValue, LastStore->getOperand(1)}, IsSingleScalar,
-        /*Mask=*/nullptr, *LastStore, CommonMetadata);
+    auto *UnpredicatedStore =
+        new VPReplicateRecipe(StoreWithMinAlign->getUnderlyingInstr(),
+                              {SelectedValue, LastStore->getOperand(1)},
+                              LastStore->getScalarType(), IsSingleScalar,
+                              /*Mask=*/nullptr, *LastStore, CommonMetadata);
     UnpredicatedStore->insertBefore(*InsertBB, LastStore->getIterator());
 
     // Remove all predicated stores from the group.
@@ -4227,8 +4231,8 @@ static VPValue *narrowInterleaveGroupOp(ArrayRef<VPValue *> Members,
     // process one original iteration.
     auto *LI = cast<LoadInst>(LoadGroup->getInterleaveGroup()->getInsertPos());
     auto *L = VPBuilder(LoadGroup).createWidenLoad(
-        *LI, LoadGroup->getAddr(), LoadGroup->getMask(), /*Consecutive=*/true,
-        *LoadGroup, LoadGroup->getDebugLoc());
+        *LI, V->getScalarType(), LoadGroup->getAddr(), LoadGroup->getMask(),
+        /*Consecutive=*/true, *LoadGroup, LoadGroup->getDebugLoc());
     NarrowedOps.insert(L);
     return L;
   }
@@ -4247,6 +4251,7 @@ static VPValue *narrowInterleaveGroupOp(ArrayRef<VPValue *> Members,
   // Narrow wide load to uniform scalar load, as transformed VPlan will only
   // process one original iteration.
   auto *N = new VPReplicateRecipe(&WideLoad->getIngredient(), {PtrOp},
+                                  WideLoad->getScalarType(),
                                   /*IsUniform*/ true,
                                   /*Mask*/ nullptr, {}, *WideLoad);
   N->insertBefore(WideLoad);
@@ -5657,7 +5662,8 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
 
           ReplaceWith(VPI,
                       VPBuilder(VPI).insert(new VPReplicateRecipe(
-                          I, Ptr, /*IsSingleScalar=*/IsSingleScalarLoad,
+                          I, Ptr, VPI->getScalarType(),
+                          /*IsSingleScalar=*/IsSingleScalarLoad,
                           /*Mask=*/nullptr, *VPI, *VPI, VPI->getDebugLoc())));
           return true;
         });
@@ -5699,7 +5705,7 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
 
         if (IsLoad) {
           VPSingleDefRecipe *Load = Builder.createWidenLoad(
-              *cast<LoadInst>(I), VectorPtr, Mask,
+              *cast<LoadInst>(I), VPI->getScalarType(), VectorPtr, Mask,
               /*Consecutive=*/true, *VPI, VPI->getDebugLoc());
           // Reverse the loaded values back into program order.
           if (Reverse)
@@ -5764,8 +5770,8 @@ void VPlanTransforms::makeScalarizationDecisions(VPlan &Plan, VFRange &Range) {
         continue;
 
       auto *Recipe = VPBuilder::createSingleScalarOp(
-          VPI.getOpcode(), VPI.operandsWithoutMask(), /*Mask=*/nullptr, VPI,
-          VPI, VPI.getDebugLoc(), I);
+          VPI.getOpcode(), VPI.operandsWithoutMask(), VPI.getScalarType(),
+          /*Mask=*/nullptr, VPI, VPI, VPI.getDebugLoc(), I);
       Recipe->insertBefore(&VPI);
       VPI.replaceAllUsesWith(Recipe);
       VPI.eraseFromParent();
