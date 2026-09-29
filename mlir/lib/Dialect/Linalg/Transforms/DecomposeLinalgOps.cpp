@@ -151,18 +151,17 @@ DecomposeLinalgOp::createPeeledGenericOp(GenericOp genericOp,
     // map and result type that correspond to the yielded value.
 
     std::optional<unsigned> resultNumber;
-    for (auto *user : scalarOpResult.getUsers()) {
-      if (auto yieldOp = dyn_cast<YieldOp>(user)) {
-        // Find the first use of the `scalarOpResult` in the yield op.
-        for (OpOperand &yieldOperand : yieldOp->getOpOperands()) {
-          if (yieldOperand.get() == scalarOpResult) {
-            resultNumber = yieldOperand.getOperandNumber();
-            break;
-          }
+    for (YieldOp yieldOp : llvm::make_isa_range<YieldOp>(
+             scalarOpResult.getUsers())) {
+      // Find the first use of the `scalarOpResult` in the yield op.
+      for (OpOperand &yieldOperand : yieldOp->getOpOperands()) {
+        if (yieldOperand.get() == scalarOpResult) {
+          resultNumber = yieldOperand.getOperandNumber();
+          break;
         }
-        assert(resultNumber && "unable to find use of a value in its user");
-        break;
       }
+      assert(resultNumber && "unable to find use of a value in its user");
+      break;
     }
     if (resultNumber) {
       newInitValues.push_back(

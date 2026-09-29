@@ -1335,11 +1335,9 @@ InParallelOp ForallOp::getTerminator() {
 
 SmallVector<Operation *> ForallOp::getCombiningOps(BlockArgument bbArg) {
   SmallVector<Operation *> storeOps;
-  for (Operation *user : bbArg.getUsers()) {
-    if (auto parallelOp = dyn_cast<ParallelCombiningOpInterface>(user)) {
-      storeOps.push_back(parallelOp);
-    }
-  }
+  for (ParallelCombiningOpInterface parallelOp :
+       llvm::make_isa_range<ParallelCombiningOpInterface>(bbArg.getUsers()))
+    storeOps.push_back(parallelOp);
   return storeOps;
 }
 

@@ -495,11 +495,9 @@ DiagnosedSilenceableFailure transform::LoopCoalesceNestedOp::applyToOne(
 
     // Look for the next nested loop
     scf::ForOp nextLoop = nullptr;
-    for (Operation &bodyOp : body) {
-      if (auto innerFor = dyn_cast<scf::ForOp>(&bodyOp)) {
-        nextLoop = innerFor;
-        break;
-      }
+    for (scf::ForOp innerFor : llvm::make_isa_range<scf::ForOp>(body)) {
+      nextLoop = innerFor;
+      break;
     }
 
     currentLoop = nextLoop;

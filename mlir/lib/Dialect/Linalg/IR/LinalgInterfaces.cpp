@@ -428,14 +428,13 @@ findPermutationsIndexingOperand(AffineMap indexingMap,
                                 utils::IteratorType iter) {
   assert(iterators.size() == indexingMap.getNumDims());
   llvm::SmallDenseSet<int64_t> res;
-  for (AffineExpr e : indexingMap.getResults()) {
-    if (auto d = dyn_cast<AffineDimExpr>(e)) {
-      if (iterators[d.getPosition()] == iter &&
-          llvm::count_if(indexingMap.getResults(), [d](AffineExpr e) {
-            return e.isFunctionOfDim(d.getPosition());
-          }) == 1)
-        res.insert(d.getPosition());
-    }
+  for (AffineDimExpr d :
+       llvm::make_isa_range<AffineDimExpr>(indexingMap.getResults())) {
+    if (iterators[d.getPosition()] == iter &&
+        llvm::count_if(indexingMap.getResults(), [d](AffineExpr e) {
+          return e.isFunctionOfDim(d.getPosition());
+        }) == 1)
+      res.insert(d.getPosition());
   }
   return res;
 }

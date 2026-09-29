@@ -2530,11 +2530,9 @@ gatherLoopsInBlock(Block *block, unsigned currLoopDepth,
   if (currLoopDepth == depthToLoops.size())
     depthToLoops.emplace_back();
 
-  for (auto &op : *block) {
-    if (auto forOp = dyn_cast<AffineForOp>(op)) {
-      depthToLoops[currLoopDepth].push_back(forOp);
-      gatherLoopsInBlock(forOp.getBody(), currLoopDepth + 1, depthToLoops);
-    }
+  for (AffineForOp forOp : llvm::make_isa_range<AffineForOp>(*block)) {
+    depthToLoops[currLoopDepth].push_back(forOp);
+    gatherLoopsInBlock(forOp.getBody(), currLoopDepth + 1, depthToLoops);
   }
 }
 
