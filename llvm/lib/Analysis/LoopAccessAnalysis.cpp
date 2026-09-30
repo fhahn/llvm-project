@@ -367,6 +367,11 @@ getNonAffineMonotonicBounds(const Loop *Lp, const SCEV *PtrExpr,
   if (!PtrAdd || !PtrAdd->hasNoUnsignedWrap())
     return {nullptr, nullptr};
 
+  // The exit value used as upper bound below is only reached if the loop
+  // leaves via one of its exiting blocks.
+  if (!SE->loopHasNoAbnormalExits(Lp))
+    return {nullptr, nullptr};
+
   const SCEV *Base = *find_if(PtrAdd->operands(), [](const auto &Op) {
     return Op->getType()->isPointerTy();
   });
@@ -435,11 +440,13 @@ std::pair<const SCEV *, const SCEV *> llvm::getStartAndEndForAccess(
     // The address of the last accessed element, if it can be computed
     // precisely.
     const SCEV *LastAddr = nullptr;
-    if (!isa<SCEVCouldNotCompute>(BTC)) {
+    if (!isa<SCEVCouldNotCompute>(BTC) && SE->loopHasNoAbnormalExits(Lp)) {
       // Evaluating AR at an exact BTC is safe: LAA separately checks that
       // accesses cannot wrap in the loop. If evaluating AR at BTC wraps, then
       // the loop either triggers UB when executing a memory access with a
-      // poison pointer or the wrapping/poisoned pointer is not used.
+      // poison pointer or the wrapping/poisoned pointer is not used. This
+      // requires the loop to reach BTC once it executes, i.e. it must not exit
+      // abnormally, e.g. via a call that does not return.
       LastAddr = AR->evaluateAtIteration(BTC, *SE);
     } else if (evaluatePtrAddRecAtMaxBTCWillNotWrap(
                    AR, MaxBTC, EltSizeSCEV, *SE, DL, DT, AC, LoopGuards)) {

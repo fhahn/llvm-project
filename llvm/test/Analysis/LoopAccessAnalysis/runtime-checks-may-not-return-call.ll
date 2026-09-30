@@ -24,10 +24,10 @@ define void @stride1_may_not_return(ptr %a, ptr %b, i64 %n) {
 ; CHECK-NEXT:          %gep.b = getelementptr inbounds i32, ptr %b, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %a High: ((4 * %n) + %a))
+; CHECK-NEXT:          (Low: %a High: inttoptr (i64 -1 to ptr))
 ; CHECK-NEXT:            Member: {%a,+,4}<%loop>
 ; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %b High: ((4 * %n) + %b))
+; CHECK-NEXT:          (Low: %b High: inttoptr (i64 -1 to ptr))
 ; CHECK-NEXT:            Member: {%b,+,4}<nuw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
@@ -115,7 +115,7 @@ define void @invariant_load_may_not_return(ptr %a, ptr %b, i64 %n) {
 ; CHECK-NEXT:        ptr %b
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %a High: ((4 * %n) + %a))
+; CHECK-NEXT:          (Low: %a High: inttoptr (i64 -1 to ptr))
 ; CHECK-NEXT:            Member: {%a,+,4}<%loop>
 ; CHECK-NEXT:        Group GRP1:
 ; CHECK-NEXT:          (Low: %b High: (4 + %b))
@@ -192,23 +192,10 @@ exit:
 define void @non_affine_may_not_return(ptr %words, ptr %out, i64 %n) {
 ; CHECK-LABEL: 'non_affine_may_not_return'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Report: cannot identify array bounds
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:      Run-time memory checks:
-; CHECK-NEXT:      Check 0:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.out = getelementptr inbounds i8, ptr %out, i64 %iv
-; CHECK-NEXT:          %gep.out = getelementptr inbounds i8, ptr %out, i64 %iv
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %gep.words = getelementptr inbounds i8, ptr %words, i64 %div
 ; CHECK-NEXT:      Grouped accesses:
-; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %out High: (%n + %out))
-; CHECK-NEXT:            Member: {%out,+,1}<nuw><%loop>
-; CHECK-NEXT:            Member: {%out,+,1}<nuw><%loop>
-; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %words High: (1 + ((-1 + %n) /u 64) + %words))
-; CHECK-NEXT:            Member: (({0,+,1}<nuw><nsw><%loop> /u 64) + %words)<nuw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
