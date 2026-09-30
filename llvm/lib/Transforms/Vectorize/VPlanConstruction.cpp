@@ -539,8 +539,18 @@ static void addInitialSkeleton(VPlan &Plan, Type *InductionTy,
                                PredicatedScalarEvolution &PSE, Loop *TheLoop) {
   VPDominatorTree VPDT(Plan);
 
+  // The plain CFG mirrors the predecessor and successor order of the IR.
+  // Canonicalize the headers and latches of all loops, including inner loops
+  // when vectorizing an outer loop. Collect the blocks up-front, as
+  // canonicalization may swap the successors of latches.
   auto *HeaderVPBB = cast<VPBasicBlock>(Plan.getEntry()->getSingleSuccessor());
-  canonicalHeaderAndLatch(HeaderVPBB, VPDT);
+  if (TheLoop->isInnermost()) {
+    canonicalHeaderAndLatch(HeaderVPBB, VPDT);
+  } else {
+    SmallVector<VPBlockBase *> Blocks(vp_depth_first_shallow(Plan.getEntry()));
+    for (VPBlockBase *VPB : Blocks)
+      canonicalHeaderAndLatch(VPB, VPDT);
+  }
   auto *LatchVPBB = cast<VPBasicBlock>(HeaderVPBB->getPredecessors()[1]);
 
   VPBasicBlock *VecPreheader = Plan.createVPBasicBlock("vector.ph");
@@ -1323,9 +1333,15 @@ void VPlanTransforms::createLoopRegions(VPlan &Plan, DebugLoc DL) {
   VPDominatorTree VPDT(Plan);
   PostOrderTraversal<VPBlockShallowTraversalWrapper<VPBlockBase *>> POT(
       Plan.getEntry());
-  for (VPBlockBase *HeaderVPB : POT)
-    if (canonicalHeaderAndLatch(HeaderVPB, VPDT))
-      createLoopRegion(Plan, HeaderVPB, DL);
+  // Headers and latches have been canonicalized by addInitialSkeleton.
+  for (VPBlockBase *HeaderVPB : POT) {
+    if (!VPBlockUtils::isHeader(HeaderVPB, VPDT))
+      continue;
+    assert(HeaderVPB->getPredecessors()[1]->getSuccessors().back() ==
+               HeaderVPB &&
+           "latch must have the header as last successor");
+    createLoopRegion(Plan, HeaderVPB, DL);
+  }
 
   VPRegionBlock *TopRegion = Plan.getVectorLoopRegion();
   TopRegion->setName("vector loop");
