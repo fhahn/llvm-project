@@ -518,12 +518,12 @@ define void @test_trunc_operand_larger_than_urem_expr(i64 %N) {
 ; CHECK-NEXT:    %and = and i32 %conv, 1
 ; CHECK-NEXT:    --> (zext i1 (trunc i64 %N to i1) to i32) U: [0,2) S: [0,2)
 ; CHECK-NEXT:    %iv = phi i64 [ 0, %entry ], [ %iv.next, %for.body ]
-; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%for.body> U: [0,-9223372036854775808) S: [0,-9223372036854775808) Exits: (-1 + %N) LoopDispositions: { %for.body: Computable }
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%for.body> U: [0,9223372036854775807) S: [0,9223372036854775807) Exits: (-1 + %N) LoopDispositions: { %for.body: Computable }
 ; CHECK-NEXT:    %iv.next = add nuw nsw i64 %iv, 1
 ; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%for.body> U: [1,-9223372036854775808) S: [1,-9223372036854775808) Exits: %N LoopDispositions: { %for.body: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @test_trunc_operand_larger_than_urem_expr
 ; CHECK-NEXT:  Loop %for.body: backedge-taken count is (-1 + %N)
-; CHECK-NEXT:  Loop %for.body: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %for.body: constant max backedge-taken count is i64 9223372036854775806
 ; CHECK-NEXT:  Loop %for.body: symbolic max backedge-taken count is (-1 + %N)
 ; CHECK-NEXT:  Loop %for.body: Trip multiple is 1
 ;

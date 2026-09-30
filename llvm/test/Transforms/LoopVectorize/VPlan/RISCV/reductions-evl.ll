@@ -274,9 +274,9 @@ define i64 @print_extended_reduction(ptr nocapture readonly %x, ptr nocapture re
 ; CHECK-NEXT:      vp<[[VP7:%[0-9]+]]> = vector-pointer inbounds i32, ir<%arrayidx>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%load0> = vp.load vp<[[VP7]]>, vp<%evl>
 ; CHECK-NEXT:      EXPRESSION vp<[[VP8]]> = vp<%evl> + reduce.add (ir<%load0> zext to i64, vp<%evl>)
-; CHECK-NEXT:      EMIT vp<%current.iteration.next> = add vp<%evl>, vp<[[VP5]]>
+; CHECK-NEXT:      EMIT vp<%current.iteration.next> = add nuw vp<%evl>, vp<[[VP5]]>
 ; CHECK-NEXT:      EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<%evl>
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP3]]>, vp<[[VP0]]>
+; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -336,9 +336,9 @@ define i64 @print_mulacc(ptr nocapture readonly %x, ptr nocapture readonly %y, i
 ; CHECK-NEXT:      WIDEN ir<%load1> = vp.load vp<[[VP8]]>, vp<%evl>
 ; CHECK-NEXT:      WIDEN ir<%mul> = mul nsw ir<%load0>, ir<%load1>
 ; CHECK-NEXT:      REDUCE ir<%rdx.next> = ir<%rdx> +  vp.reduce.add (ir<%mul>, vp<%evl>)
-; CHECK-NEXT:      EMIT vp<%current.iteration.next> = add vp<%evl>, vp<[[VP5]]>
+; CHECK-NEXT:      EMIT vp<%current.iteration.next> = add nuw vp<%evl>, vp<[[VP5]]>
 ; CHECK-NEXT:      EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<%evl>
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP3]]>, vp<[[VP0]]>
+; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -402,9 +402,9 @@ define i64 @print_mulacc_extended(ptr nocapture readonly %x, ptr nocapture reado
 ; CHECK-NEXT:      WIDEN-CAST ir<%conv1> = sext ir<%load1> to i32
 ; CHECK-NEXT:      WIDEN ir<%mul> = mul nsw ir<%conv0>, ir<%conv1>
 ; CHECK-NEXT:      EXPRESSION vp<[[VP9]]> = vp<%evl> + reduce.add (ir<%mul> sext to i64, vp<%evl>)
-; CHECK-NEXT:      EMIT vp<%current.iteration.next> = add vp<%evl>, vp<[[VP5]]>
+; CHECK-NEXT:      EMIT vp<%current.iteration.next> = add nuw vp<%evl>, vp<[[VP5]]>
 ; CHECK-NEXT:      EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<%evl>
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP3]]>, vp<[[VP0]]>
+; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }

@@ -11,14 +11,14 @@ define void @gep_iv_constant_step(ptr %p, i64 %n) {
 ; CHECK-NEXT:    %iv = phi ptr [ %p, %entry ], [ %iv.next, %loop ]
 ; CHECK-NEXT:    --> {%p,+,4}<nuw><%loop> U: full-set S: full-set Exits: (-4 + (4 * %n) + %p) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
-; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,-9223372036854775808) S: [0,-9223372036854775808) Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,9223372036854775807) S: [0,9223372036854775807) Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = getelementptr inbounds i32, ptr %iv, i64 1
 ; CHECK-NEXT:    --> {(4 + %p),+,4}<nw><%loop> U: full-set S: full-set Exits: ((4 * %n) + %p) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i.next = add nuw nsw i64 %i, 1
 ; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,-9223372036854775808) S: [1,-9223372036854775808) Exits: %n LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @gep_iv_constant_step
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + %n)
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 9223372036854775806
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + %n)
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
@@ -44,14 +44,14 @@ define void @gep_iv_invariant_step(ptr %p, i64 %step, i64 %n) {
 ; CHECK-NEXT:    %iv = phi ptr [ %p, %entry ], [ %iv.next, %loop ]
 ; CHECK-NEXT:    --> {%p,+,%step}<%loop> U: full-set S: full-set Exits: (((-1 + %n) * %step) + %p) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
-; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,-9223372036854775808) S: [0,-9223372036854775808) Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,9223372036854775807) S: [0,9223372036854775807) Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = getelementptr i8, ptr %iv, i64 %step
 ; CHECK-NEXT:    --> {(%step + %p),+,%step}<%loop> U: full-set S: full-set Exits: ((%step * %n) + %p) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i.next = add nuw nsw i64 %i, 1
 ; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,-9223372036854775808) S: [1,-9223372036854775808) Exits: %n LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @gep_iv_invariant_step
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + %n)
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 9223372036854775806
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + %n)
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
@@ -78,14 +78,14 @@ define void @gep_iv_nusw_negative_step(ptr %p, i64 %n) {
 ; CHECK-NEXT:    %iv = phi ptr [ %p, %entry ], [ %iv.next, %loop ]
 ; CHECK-NEXT:    --> {%p,+,-4}<nw><%loop> U: full-set S: full-set Exits: (4 + (-4 * %n) + %p) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
-; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,-9223372036854775808) S: [0,-9223372036854775808) Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,9223372036854775807) S: [0,9223372036854775807) Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = getelementptr nusw i32, ptr %iv, i64 -1
 ; CHECK-NEXT:    --> {(-4 + %p),+,-4}<nw><%loop> U: full-set S: full-set Exits: ((-4 * %n) + %p) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i.next = add nuw nsw i64 %i, 1
 ; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,-9223372036854775808) S: [1,-9223372036854775808) Exits: %n LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @gep_iv_nusw_negative_step
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + %n)
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 9223372036854775806
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + %n)
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
@@ -113,14 +113,14 @@ define void @gep_iv_narrow_index_type(ptr addrspace(1) %p, i64 %step, i64 %n) {
 ; CHECK-NEXT:    %iv = phi ptr addrspace(1) [ %p, %entry ], [ %iv.next, %loop ]
 ; CHECK-NEXT:    --> {%p,+,(4 * (trunc i64 %step to i32))}<nw><%loop> U: full-set S: full-set Exits: ((4 * (trunc i64 %step to i32) * (-1 + (trunc i64 %n to i32))) + %p) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
-; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,-9223372036854775808) S: [0,-9223372036854775808) Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,9223372036854775807) S: [0,9223372036854775807) Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = getelementptr inbounds i32, ptr addrspace(1) %iv, i64 %step
 ; CHECK-NEXT:    --> {((4 * (trunc i64 %step to i32)) + %p),+,(4 * (trunc i64 %step to i32))}<nw><%loop> U: full-set S: full-set Exits: ((4 * (trunc i64 %step to i32) * (trunc i64 %n to i32)) + %p) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i.next = add nuw nsw i64 %i, 1
 ; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,-9223372036854775808) S: [1,-9223372036854775808) Exits: %n LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @gep_iv_narrow_index_type
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + %n)
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 9223372036854775806
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + %n)
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
@@ -146,14 +146,14 @@ define void @gep_iv_scalable(ptr %p, i64 %n) {
 ; CHECK-NEXT:    %iv = phi ptr [ %p, %entry ], [ %iv.next, %loop ]
 ; CHECK-NEXT:    --> {%p,+,(16 * vscale)}<%loop> U: full-set S: full-set Exits: ((16 * vscale * (-1 + %n)) + %p) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
-; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,-9223372036854775808) S: [0,-9223372036854775808) Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,9223372036854775807) S: [0,9223372036854775807) Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = getelementptr <vscale x 4 x i32>, ptr %iv, i64 1
 ; CHECK-NEXT:    --> {((16 * vscale) + %p),+,(16 * vscale)}<%loop> U: full-set S: full-set Exits: ((16 * vscale * %n) + %p) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i.next = add nuw nsw i64 %i, 1
 ; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,-9223372036854775808) S: [1,-9223372036854775808) Exits: %n LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @gep_iv_scalable
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + %n)
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 9223372036854775806
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + %n)
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
@@ -179,14 +179,14 @@ define void @gep_iv_struct_single_index(ptr %p, i64 %n) {
 ; CHECK-NEXT:    %iv = phi ptr [ %p, %entry ], [ %iv.next, %loop ]
 ; CHECK-NEXT:    --> {%p,+,16}<nuw><%loop> U: full-set S: full-set Exits: (-16 + (16 * %n) + %p) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
-; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,-9223372036854775808) S: [0,-9223372036854775808) Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,9223372036854775807) S: [0,9223372036854775807) Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = getelementptr inbounds %struct.S, ptr %iv, i64 1
 ; CHECK-NEXT:    --> {(16 + %p),+,16}<nw><%loop> U: full-set S: full-set Exits: ((16 * %n) + %p) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i.next = add nuw nsw i64 %i, 1
 ; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,-9223372036854775808) S: [1,-9223372036854775808) Exits: %n LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @gep_iv_struct_single_index
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + %n)
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 9223372036854775806
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + %n)
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
@@ -214,14 +214,14 @@ define void @gep_iv_zero_step(ptr %p, i64 %n) {
 ; CHECK-NEXT:    %iv = phi ptr [ %p, %entry ], [ %iv.next, %loop ]
 ; CHECK-NEXT:    --> %p U: full-set S: full-set Exits: %p LoopDispositions: { %loop: Invariant }
 ; CHECK-NEXT:    %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
-; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,-9223372036854775808) S: [0,-9223372036854775808) Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,9223372036854775807) S: [0,9223372036854775807) Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = getelementptr inbounds i32, ptr %iv, i64 0
 ; CHECK-NEXT:    --> %p U: full-set S: full-set Exits: %p LoopDispositions: { %loop: Invariant }
 ; CHECK-NEXT:    %i.next = add nuw nsw i64 %i, 1
 ; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,-9223372036854775808) S: [1,-9223372036854775808) Exits: %n LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @gep_iv_zero_step
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + %n)
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 9223372036854775806
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + %n)
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
@@ -248,14 +248,14 @@ define void @gep_iv_struct_two_indices(ptr %p, i64 %n) {
 ; CHECK-NEXT:    %iv = phi ptr [ %p, %entry ], [ %iv.next, %loop ]
 ; CHECK-NEXT:    --> {%p,+,16}<nuw><%loop> U: full-set S: full-set Exits: (-16 + (16 * %n) + %p) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
-; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,-9223372036854775808) S: [0,-9223372036854775808) Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,9223372036854775807) S: [0,9223372036854775807) Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = getelementptr inbounds %struct.S, ptr %iv, i64 1, i32 0
 ; CHECK-NEXT:    --> {(16 + %p),+,16}<nw><%loop> U: full-set S: full-set Exits: ((16 * %n) + %p) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i.next = add nuw nsw i64 %i, 1
 ; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,-9223372036854775808) S: [1,-9223372036854775808) Exits: %n LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @gep_iv_struct_two_indices
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + %n)
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 9223372036854775806
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + %n)
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
@@ -282,14 +282,14 @@ define void @gep_iv_variant_step(ptr %p, i64 %n) {
 ; CHECK-NEXT:    %iv = phi ptr [ %p, %entry ], [ %iv.next, %loop ]
 ; CHECK-NEXT:    --> {%p,+,0,+,1}<%loop> U: full-set S: full-set Exits: ((trunc i65 (((zext i64 (-2 + %n) to i65) * (zext i64 (-1 + %n) to i65)) /u 2) to i64) + %p) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
-; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,-9223372036854775808) S: [0,-9223372036854775808) Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,9223372036854775807) S: [0,9223372036854775807) Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = getelementptr i8, ptr %iv, i64 %i
 ; CHECK-NEXT:    --> {%p,+,1,+,1}<%loop> U: full-set S: full-set Exits: (-1 + (trunc i65 (((zext i64 (-2 + %n) to i65) * (zext i64 (-1 + %n) to i65)) /u 2) to i64) + %n + %p) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i.next = add nuw nsw i64 %i, 1
 ; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,-9223372036854775808) S: [1,-9223372036854775808) Exits: %n LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @gep_iv_variant_step
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + %n)
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 9223372036854775806
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + %n)
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
@@ -315,14 +315,14 @@ define void @gep_iv_not_base(ptr %p, ptr %q, i64 %n) {
 ; CHECK-NEXT:    %iv = phi ptr [ %p, %entry ], [ %iv.next, %loop ]
 ; CHECK-NEXT:    --> %iv U: full-set S: full-set Exits: <<Unknown>> LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:    %i = phi i64 [ 0, %entry ], [ %i.next, %loop ]
-; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,-9223372036854775808) S: [0,-9223372036854775808) Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,9223372036854775807) S: [0,9223372036854775807) Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = getelementptr i32, ptr %q, i64 %i
 ; CHECK-NEXT:    --> {%q,+,4}<%loop> U: full-set S: full-set Exits: (-4 + (4 * %n) + %q) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %i.next = add nuw nsw i64 %i, 1
 ; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,-9223372036854775808) S: [1,-9223372036854775808) Exits: %n LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @gep_iv_not_base
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + %n)
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 9223372036854775806
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + %n)
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;

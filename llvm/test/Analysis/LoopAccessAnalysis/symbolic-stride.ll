@@ -624,7 +624,7 @@ define void @unknown_stride_equalto_trunc_tc(i64 %N, ptr %A, ptr %B, i32 %j) {
 ; CHECK-NEXT:            Member: %A
 ; CHECK-NEXT:        Group GRP1:
 ; CHECK-NEXT:          (Low: (((2 * (sext i32 %j to i64))<nsw> + %B) umin ((2 * (sext i32 %j to i64))<nsw> + (2 * (zext i32 (-1 + (trunc i64 %N to i32)) to i64) * (sext i32 (trunc i64 %N to i32) to i64)) + %B)) High: (2 + (((2 * (sext i32 %j to i64))<nsw> + %B) umax ((2 * (sext i32 %j to i64))<nsw> + (2 * (zext i32 (-1 + (trunc i64 %N to i32)) to i64) * (sext i32 (trunc i64 %N to i32) to i64)) + %B))))
-; CHECK-NEXT:            Member: {((2 * (sext i32 %j to i64))<nsw> + %B),+,(2 * (sext i32 (trunc i64 %N to i32) to i64))<nsw>}<%loop>
+; CHECK-NEXT:            Member: {((2 * (sext i32 %j to i64))<nsw> + %B),+,(2 * (sext i32 (trunc i64 %N to i32) to i64))<nsw>}<nw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
@@ -633,7 +633,7 @@ define void @unknown_stride_equalto_trunc_tc(i64 %N, ptr %A, ptr %B, i32 %j) {
 ; CHECK-NEXT:      Expressions re-written:
 ; CHECK-NEXT:      [PSE] %arrayidx = getelementptr inbounds i16, ptr %B, i32 %add:
 ; CHECK-NEXT:        ((2 * (sext i32 {%j,+,(trunc i64 %N to i32)}<nw><%loop> to i64))<nsw> + %B)
-; CHECK-NEXT:        --> {((2 * (sext i32 %j to i64))<nsw> + %B),+,(2 * (sext i32 (trunc i64 %N to i32) to i64))<nsw>}<%loop>
+; CHECK-NEXT:        --> {((2 * (sext i32 %j to i64))<nsw> + %B),+,(2 * (sext i32 (trunc i64 %N to i32) to i64))<nsw>}<nw><%loop>
 ;
 entry:
   %N.trunc = trunc i64 %N to i32

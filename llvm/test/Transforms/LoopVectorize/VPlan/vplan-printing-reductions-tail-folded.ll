@@ -283,7 +283,7 @@ define i64 @print_extended_reduction(ptr nocapture readonly %x, ptr nocapture re
 ; CHECK-NEXT:      vp<[[VP10:%[0-9]+]]> = vector-pointer inbounds i32, ir<%arrayidx>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%load0> = load vp<[[VP10]]>, vp<[[VP8]]>
 ; CHECK-NEXT:      EXPRESSION vp<[[VP11]]> = vp<[[VP8]]> + reduce.add (ir<%load0> zext to i64, vp<[[VP8]]>)
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP5]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP5]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -348,7 +348,7 @@ define i64 @print_mulacc(ptr nocapture readonly %x, ptr nocapture readonly %y, i
 ; CHECK-NEXT:      vp<[[VP11:%[0-9]+]]> = vector-pointer inbounds i64, ir<%arrayidx1>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%load1> = load vp<[[VP11]]>, vp<[[VP8]]>
 ; CHECK-NEXT:      EXPRESSION vp<[[VP12]]> = ir<%rdx> + reduce.add (mul nsw ir<%load0>, ir<%load1>, vp<[[VP8]]>)
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP5]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP5]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -415,7 +415,7 @@ define i64 @print_mulacc_extended(ptr nocapture readonly %x, ptr nocapture reado
 ; CHECK-NEXT:      vp<[[VP11:%[0-9]+]]> = vector-pointer inbounds i16, ir<%arrayidx1>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%load1> = load vp<[[VP11]]>, vp<[[VP8]]>
 ; CHECK-NEXT:      EXPRESSION vp<[[VP12]]> = ir<%rdx> + reduce.add (mul nsw (ir<%load0> sext to i64), (ir<%load1> sext to i64), vp<[[VP8]]>)
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP5]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP5]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -482,7 +482,7 @@ define i64 @print_extended_sub_reduction(ptr nocapture readonly %x, ptr nocaptur
 ; CHECK-NEXT:      vp<[[VP10:%[0-9]+]]> = vector-pointer inbounds i32, ir<%arrayidx>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%load0> = load vp<[[VP10]]>, vp<[[VP8]]>
 ; CHECK-NEXT:      EXPRESSION vp<[[VP11]]> = vp<[[VP8]]> + reduce.sub (ir<%load0> zext to i64, vp<[[VP8]]>)
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP5]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP5]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -684,7 +684,7 @@ define i64 @print_mulacc_sub_extended(ptr nocapture readonly %x, ptr nocapture r
 ; CHECK-NEXT:      vp<[[VP11:%[0-9]+]]> = vector-pointer inbounds i16, ir<%arrayidx1>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%load1> = load vp<[[VP11]]>, vp<[[VP8]]>
 ; CHECK-NEXT:      EXPRESSION vp<[[VP12]]> = ir<%rdx> + reduce.sub (mul nsw (ir<%load0> sext to i64), (ir<%load1> sext to i64), vp<[[VP8]]>)
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP5]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP5]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -751,7 +751,7 @@ define i64 @print_mulacc_duplicate_extends(ptr nocapture readonly %x, ptr nocapt
 ; CHECK-NEXT:      vp<[[VP10:%[0-9]+]]> = vector-pointer inbounds i16, ir<%arrayidx>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%load0> = load vp<[[VP10]]>, vp<[[VP8]]>
 ; CHECK-NEXT:      EXPRESSION vp<[[VP11]]> = ir<%rdx> + reduce.sub (mul nsw (ir<%load0> sext to i64), (ir<%load0> sext to i64), vp<[[VP8]]>)
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP5]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP5]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }

@@ -44,7 +44,7 @@ define i32 @postinc(i32 %k)  {
 ; TAILFOLD-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; TAILFOLD:       [[VECTOR_BODY]]:
 ; TAILFOLD-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; TAILFOLD-NEXT:    [[INDEX_NEXT]] = add i32 [[INDEX]], 2
+; TAILFOLD-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; TAILFOLD-NEXT:    [[TMP0:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; TAILFOLD-NEXT:    br i1 [[TMP0]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], {{!llvm.loop ![0-9]+}}
 ; TAILFOLD:       [[MIDDLE_BLOCK]]:
@@ -107,7 +107,7 @@ define i32 @preinc(i32 %k)  {
 ; TAILFOLD-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; TAILFOLD:       [[VECTOR_BODY]]:
 ; TAILFOLD-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; TAILFOLD-NEXT:    [[INDEX_NEXT]] = add i32 [[INDEX]], 2
+; TAILFOLD-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; TAILFOLD-NEXT:    [[TMP0:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; TAILFOLD-NEXT:    br i1 [[TMP0]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], {{!llvm.loop ![0-9]+}}
 ; TAILFOLD:       [[MIDDLE_BLOCK]]:
@@ -301,7 +301,7 @@ define ptr @both(ptr %p, i32 %k)  {
 ; TAILFOLD-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; TAILFOLD:       [[VECTOR_BODY]]:
 ; TAILFOLD-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; TAILFOLD-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 2
+; TAILFOLD-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; TAILFOLD-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; TAILFOLD-NEXT:    br i1 [[TMP5]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], {{!llvm.loop ![0-9]+}}
 ; TAILFOLD:       [[MIDDLE_BLOCK]]:
@@ -370,7 +370,7 @@ define i32 @multiphi(i32 %k, ptr %p)  {
 ; TAILFOLD-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; TAILFOLD:       [[VECTOR_BODY]]:
 ; TAILFOLD-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; TAILFOLD-NEXT:    [[INDEX_NEXT]] = add i32 [[INDEX]], 2
+; TAILFOLD-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; TAILFOLD-NEXT:    [[TMP0:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; TAILFOLD-NEXT:    br i1 [[TMP0]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], {{!llvm.loop ![0-9]+}}
 ; TAILFOLD:       [[MIDDLE_BLOCK]]:
@@ -832,7 +832,7 @@ define i32 @postinc_swapped_ops(i32 %k)  {
 ; TAILFOLD-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; TAILFOLD:       [[VECTOR_BODY]]:
 ; TAILFOLD-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; TAILFOLD-NEXT:    [[INDEX_NEXT]] = add i32 [[INDEX]], 2
+; TAILFOLD-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; TAILFOLD-NEXT:    [[TMP0:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; TAILFOLD-NEXT:    br i1 [[TMP0]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], {{!llvm.loop ![0-9]+}}
 ; TAILFOLD:       [[MIDDLE_BLOCK]]:
@@ -897,7 +897,7 @@ define i32 @postinc_not_iv_backedge_value(i32 %k)  {
 ; TAILFOLD-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; TAILFOLD:       [[VECTOR_BODY]]:
 ; TAILFOLD-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; TAILFOLD-NEXT:    [[INDEX_NEXT]] = add i32 [[INDEX]], 2
+; TAILFOLD-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; TAILFOLD-NEXT:    [[TMP0:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; TAILFOLD-NEXT:    br i1 [[TMP0]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], {{!llvm.loop ![0-9]+}}
 ; TAILFOLD:       [[MIDDLE_BLOCK]]:

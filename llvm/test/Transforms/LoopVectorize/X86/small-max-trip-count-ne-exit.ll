@@ -14,53 +14,11 @@ define void @ne_exit_small_max_tc(ptr %A, ptr %B, i64 %n, i64 range(i64 0, 4) %s
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    [[S:%.*]] = call i64 @llvm.smin.i64(i64 [[N]], i64 4)
 ; CHECK-NEXT:    [[G:%.*]] = icmp slt i64 [[START]], [[S]]
-; CHECK-NEXT:    br i1 [[G]], label %[[LOOP_PREHEADER:.*]], label %[[EXIT:.*]]
-; CHECK:       [[LOOP_PREHEADER]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 [[S]], [[START]]
-; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP0]], 8
-; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]]
-; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP1:%.*]] = shl nuw nsw i64 [[START]], 3
-; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP1]]
-; CHECK-NEXT:    [[TMP2:%.*]] = shl i64 [[S]], 3
-; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP2]]
-; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP1]]
-; CHECK-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP2]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[SCEVGEP]], [[SCEVGEP3]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SCEVGEP2]], [[SCEVGEP1]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
-; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
-; CHECK:       [[VECTOR_PH]]:
-; CHECK-NEXT:    [[TMP3:%.*]] = and i64 [[TMP0]], 3
-; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[TMP3]]
-; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[START]], [[N_VEC]]
-; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
-; CHECK:       [[VECTOR_BODY]]:
-; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[TMP5:%.*]] = add nuw i64 [[START]], [[INDEX]]
-; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr double, ptr [[B]], i64 [[TMP5]]
-; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr double, ptr [[TMP6]], i64 2
-; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x double>, ptr [[TMP6]], align 8, !alias.scope [[META0:![0-9]+]]
-; CHECK-NEXT:    [[WIDE_LOAD4:%.*]] = load <2 x double>, ptr [[TMP7]], align 8, !alias.scope [[META0]]
-; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr double, ptr [[A]], i64 [[TMP5]]
-; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr double, ptr [[TMP8]], i64 2
-; CHECK-NEXT:    [[WIDE_LOAD5:%.*]] = load <2 x double>, ptr [[TMP8]], align 8, !alias.scope [[META3:![0-9]+]], !noalias [[META0]]
-; CHECK-NEXT:    [[WIDE_LOAD6:%.*]] = load <2 x double>, ptr [[TMP9]], align 8, !alias.scope [[META3]], !noalias [[META0]]
-; CHECK-NEXT:    [[TMP10:%.*]] = fadd <2 x double> [[WIDE_LOAD5]], [[WIDE_LOAD]]
-; CHECK-NEXT:    [[TMP11:%.*]] = fadd <2 x double> [[WIDE_LOAD6]], [[WIDE_LOAD4]]
-; CHECK-NEXT:    store <2 x double> [[TMP10]], ptr [[TMP8]], align 8, !alias.scope [[META3]], !noalias [[META0]]
-; CHECK-NEXT:    store <2 x double> [[TMP11]], ptr [[TMP9]], align 8, !alias.scope [[META3]], !noalias [[META0]]
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
-; CHECK-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP12]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
-; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT_LOOPEXIT:.*]], label %[[SCALAR_PH]]
+; CHECK-NEXT:    br i1 [[G]], label %[[SCALAR_PH:.*]], label %[[EXIT:.*]]
 ; CHECK:       [[SCALAR_PH]]:
-; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[TMP4]], %[[MIDDLE_BLOCK]] ], [ [[START]], %[[LOOP_PREHEADER]] ], [ [[START]], %[[VECTOR_MEMCHECK]] ]
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[IV_NEXT:%.*]], %[[LOOP]] ], [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ]
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[IV_NEXT:%.*]], %[[LOOP]] ], [ [[START]], %[[SCALAR_PH]] ]
 ; CHECK-NEXT:    [[GEP_B:%.*]] = getelementptr double, ptr [[B]], i64 [[IV]]
 ; CHECK-NEXT:    [[B:%.*]] = load double, ptr [[GEP_B]], align 8
 ; CHECK-NEXT:    [[GEP_A:%.*]] = getelementptr double, ptr [[A]], i64 [[IV]]
@@ -69,7 +27,7 @@ define void @ne_exit_small_max_tc(ptr %A, ptr %B, i64 %n, i64 range(i64 0, 4) %s
 ; CHECK-NEXT:    store double [[ADD]], ptr [[GEP_A]], align 8
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
 ; CHECK-NEXT:    [[C:%.*]] = icmp ne i64 [[IV_NEXT]], [[S]]
-; CHECK-NEXT:    br i1 [[C]], label %[[LOOP]], label %[[EXIT_LOOPEXIT]], !llvm.loop [[LOOP8:![0-9]+]]
+; CHECK-NEXT:    br i1 [[C]], label %[[LOOP]], label %[[EXIT_LOOPEXIT:.*]]
 ; CHECK:       [[EXIT_LOOPEXIT]]:
 ; CHECK-NEXT:    br label %[[EXIT]]
 ; CHECK:       [[EXIT]]:
@@ -95,14 +53,3 @@ loop:
 exit:
   ret void
 }
-;.
-; CHECK: [[META0]] = !{[[META1:![0-9]+]]}
-; CHECK: [[META1]] = distinct !{[[META1]], [[META2:![0-9]+]]}
-; CHECK: [[META2]] = distinct !{[[META2]], !"LVerDomain"}
-; CHECK: [[META3]] = !{[[META4:![0-9]+]]}
-; CHECK: [[META4]] = distinct !{[[META4]], [[META2]]}
-; CHECK: [[LOOP5]] = distinct !{[[LOOP5]], [[META6:![0-9]+]], [[META7:![0-9]+]]}
-; CHECK: [[META6]] = !{!"llvm.loop.isvectorized", i32 1}
-; CHECK: [[META7]] = !{!"llvm.loop.unroll.runtime.disable"}
-; CHECK: [[LOOP8]] = distinct !{[[LOOP8]], [[META6]]}
-;.

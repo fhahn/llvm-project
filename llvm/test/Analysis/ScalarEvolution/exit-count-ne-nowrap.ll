@@ -18,7 +18,7 @@ define void @ne_nsw_guarded(ptr %A, i64 %n, i64 range(i64 0, 4) %start) {
 ; CHECK-LABEL: 'ne_nsw_guarded'
 ; CHECK-NEXT:  Determining loop execution counts for: @ne_nsw_guarded
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + (-1 * %start)<nsw> + (4 smin %n))
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -2
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 3
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + (-1 * %start)<nsw> + (4 smin %n))
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
@@ -72,7 +72,7 @@ define void @ne_no_flags_guarded(ptr %A, i64 %n, i64 range(i64 0, 4) %start) {
 ; CHECK-LABEL: 'ne_no_flags_guarded'
 ; CHECK-NEXT:  Determining loop execution counts for: @ne_no_flags_guarded
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + (-1 * %start)<nsw> + (4 smin %n))
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -2
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 3
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + (-1 * %start)<nsw> + (4 smin %n))
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
@@ -98,7 +98,7 @@ define void @ne_nuw_guarded_ult(ptr %A, i64 %n, i64 range(i64 0, 4) %start) {
 ; CHECK-LABEL: 'ne_nuw_guarded_ult'
 ; CHECK-NEXT:  Determining loop execution counts for: @ne_nuw_guarded_ult
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + (-1 * %start)<nsw> + (4 umin %n))
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -2
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 3
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + (-1 * %start)<nsw> + (4 umin %n))
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
@@ -125,7 +125,7 @@ define void @ne_pre_inc_guarded_sle(ptr %A, i64 %n, i64 range(i64 0, 4) %start) 
 ; CHECK-LABEL: 'ne_pre_inc_guarded_sle'
 ; CHECK-NEXT:  Determining loop execution counts for: @ne_pre_inc_guarded_sle
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is ((-1 * %start)<nsw> + (4 smin %n))
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 4
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((-1 * %start)<nsw> + (4 smin %n))
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
@@ -154,9 +154,9 @@ define void @ne_guarded_max_zero(ptr %A, i64 %n, i64 range(i64 0, 4) %start) {
 ;
 ; CHECK-LABEL: 'ne_guarded_max_zero'
 ; CHECK-NEXT:  Determining loop execution counts for: @ne_guarded_max_zero
-; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + (-1 * %start)<nsw> + (1 smin %n))
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -2
-; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + (-1 * %start)<nsw> + (1 smin %n))
+; CHECK-NEXT:  Loop %loop: backedge-taken count is i64 0
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 0
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is i64 0
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
 entry:
@@ -185,7 +185,7 @@ define void @ne_multi_exit_guarded(ptr %A, i64 %n, i64 range(i64 0, 4) %start) {
 ; CHECK-NEXT:  Loop %loop: <multiple exits> Unpredictable backedge-taken count.
 ; CHECK-NEXT:    exit count for loop: (-1 + (-1 * %start)<nsw> + (4 smin %n))
 ; CHECK-NEXT:    exit count for latch: ***COULDNOTCOMPUTE***
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -2
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 3
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + (-1 * %start)<nsw> + (4 smin %n))
 ; CHECK-NEXT:    symbolic max exit count for loop: (-1 + (-1 * %start)<nsw> + (4 smin %n))
 ; CHECK-NEXT:    symbolic max exit count for latch: ***COULDNOTCOMPUTE***
@@ -216,7 +216,7 @@ define void @ne_may_throw_guarded(i64 %n, i64 range(i64 0, 4) %start) {
 ; CHECK-LABEL: 'ne_may_throw_guarded'
 ; CHECK-NEXT:  Determining loop execution counts for: @ne_may_throw_guarded
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + (-1 * %start)<nsw> + (4 smin %n))
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -2
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 3
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + (-1 * %start)<nsw> + (4 smin %n))
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
@@ -245,7 +245,7 @@ define void @ne_nsw_only_exit(ptr %A, i64 %n, i64 range(i64 0, 4) %start) {
 ; CHECK-LABEL: 'ne_nsw_only_exit'
 ; CHECK-NEXT:  Determining loop execution counts for: @ne_nsw_only_exit
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + (-1 * %start)<nsw> + (4 smin %n))
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 3
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + (-1 * %start)<nsw> + (4 smin %n))
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
@@ -269,7 +269,7 @@ define void @ne_nuw_only_exit(ptr %A, i64 %n, i64 range(i64 0, 4) %start) {
 ; CHECK-LABEL: 'ne_nuw_only_exit'
 ; CHECK-NEXT:  Determining loop execution counts for: @ne_nuw_only_exit
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + (-1 * %start)<nsw> + (4 umin %n))
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 3
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + (-1 * %start)<nsw> + (4 umin %n))
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;

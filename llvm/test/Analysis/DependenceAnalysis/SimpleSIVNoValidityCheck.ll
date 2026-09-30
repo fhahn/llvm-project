@@ -78,11 +78,11 @@ for.end14:                                        ; preds = %entry, %for.inc12
 define void @t2(i32 signext %n, i32 signext %m, ptr %a) {
 ; CHECK-LABEL: 't2'
 ; CHECK-NEXT:  Src: %21 = load i32, ptr %arrayidx28, align 4 --> Dst: %21 = load i32, ptr %arrayidx28, align 4
-; CHECK-NEXT:    da analyze - input [0 0 0 * 0]!
+; CHECK-NEXT:    da analyze - none!
 ; CHECK-NEXT:  Src: %21 = load i32, ptr %arrayidx28, align 4 --> Dst: store i32 %21, ptr %arrayidx38, align 4
-; CHECK-NEXT:    da analyze - anti [1 -2 0 * 2]!
+; CHECK-NEXT:    da analyze - anti [1 -2 0 -3 2]!
 ; CHECK-NEXT:  Src: store i32 %21, ptr %arrayidx38, align 4 --> Dst: store i32 %21, ptr %arrayidx38, align 4
-; CHECK-NEXT:    da analyze - output [0 0 0 * 0]!
+; CHECK-NEXT:    da analyze - none!
 ;
 ; LIN-LABEL: 't2'
 ; LIN-NEXT:  Src: %21 = load i32, ptr %arrayidx28, align 4 --> Dst: %21 = load i32, ptr %arrayidx28, align 4

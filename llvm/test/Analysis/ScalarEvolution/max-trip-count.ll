@@ -282,7 +282,7 @@ define i32 @ne_max_trip_count_2(i32 %n) {
 ; CHECK-LABEL: 'ne_max_trip_count_2'
 ; CHECK-NEXT:  Determining loop execution counts for: @ne_max_trip_count_2
 ; CHECK-NEXT:  Loop %for.body: backedge-taken count is (-1 + (zext i3 (trunc i32 %n to i3) to i32))<nsw>
-; CHECK-NEXT:  Loop %for.body: constant max backedge-taken count is i32 -1
+; CHECK-NEXT:  Loop %for.body: constant max backedge-taken count is i32 6
 ; CHECK-NEXT:  Loop %for.body: symbolic max backedge-taken count is (-1 + (zext i3 (trunc i32 %n to i3) to i32))<nsw>
 ; CHECK-NEXT:  Loop %for.body: Trip multiple is 1
 ;
@@ -333,7 +333,7 @@ define i32 @ne_max_trip_count_4(i32 %n) {
 ; CHECK-LABEL: 'ne_max_trip_count_4'
 ; CHECK-NEXT:  Determining loop execution counts for: @ne_max_trip_count_4
 ; CHECK-NEXT:  Loop %for.body: backedge-taken count is (-1 + %n)
-; CHECK-NEXT:  Loop %for.body: constant max backedge-taken count is i32 -2
+; CHECK-NEXT:  Loop %for.body: constant max backedge-taken count is i32 2147483646
 ; CHECK-NEXT:  Loop %for.body: symbolic max backedge-taken count is (-1 + %n)
 ; CHECK-NEXT:  Loop %for.body: Trip multiple is 1
 ;

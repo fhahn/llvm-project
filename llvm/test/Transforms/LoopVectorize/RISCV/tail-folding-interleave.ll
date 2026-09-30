@@ -253,7 +253,7 @@ define void @store_factor_4_with_gap(i32 %n, ptr noalias %a) vscale_range(2, 102
 ; IF-EVL-NEXT:    call void @llvm.experimental.vp.strided.store.nxv4i32.p0.i64(<vscale x 4 x i32> [[VEC_IND]], ptr align 4 [[TMP7]], i64 16, <vscale x 4 x i1> splat (i1 true), i32 [[TMP3]])
 ; IF-EVL-NEXT:    [[TMP8:%.*]] = getelementptr nuw i8, ptr [[TMP1]], i64 [[TMP5]]
 ; IF-EVL-NEXT:    call void @llvm.experimental.vp.strided.store.nxv4i32.p0.i64(<vscale x 4 x i32> [[VEC_IND]], ptr align 4 [[TMP8]], i64 16, <vscale x 4 x i1> splat (i1 true), i32 [[TMP3]])
-; IF-EVL-NEXT:    [[CURRENT_ITERATION_NEXT]] = add i32 [[TMP3]], [[INDEX]]
+; IF-EVL-NEXT:    [[CURRENT_ITERATION_NEXT]] = add nuw i32 [[TMP3]], [[INDEX]]
 ; IF-EVL-NEXT:    [[AVL_NEXT]] = sub nuw i32 [[AVL]], [[TMP3]]
 ; IF-EVL-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <vscale x 4 x i32> [[VEC_IND]], [[BROADCAST_SPLAT]]
 ; IF-EVL-NEXT:    [[TMP9:%.*]] = icmp eq i32 [[AVL_NEXT]], 0
@@ -489,7 +489,7 @@ define void @store_factor_4_with_tail_gap(i32 %n, ptr noalias %a) vscale_range(2
 ; IF-EVL-NEXT:    call void @llvm.experimental.vp.strided.store.nxv4i32.p0.i64(<vscale x 4 x i32> [[VEC_IND]], ptr align 4 [[TMP7]], i64 16, <vscale x 4 x i1> splat (i1 true), i32 [[TMP3]])
 ; IF-EVL-NEXT:    [[TMP8:%.*]] = getelementptr nuw i8, ptr [[TMP1]], i64 [[TMP5]]
 ; IF-EVL-NEXT:    call void @llvm.experimental.vp.strided.store.nxv4i32.p0.i64(<vscale x 4 x i32> [[VEC_IND]], ptr align 4 [[TMP8]], i64 16, <vscale x 4 x i1> splat (i1 true), i32 [[TMP3]])
-; IF-EVL-NEXT:    [[CURRENT_ITERATION_NEXT]] = add i32 [[TMP3]], [[INDEX]]
+; IF-EVL-NEXT:    [[CURRENT_ITERATION_NEXT]] = add nuw i32 [[TMP3]], [[INDEX]]
 ; IF-EVL-NEXT:    [[AVL_NEXT]] = sub nuw i32 [[AVL]], [[TMP3]]
 ; IF-EVL-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <vscale x 4 x i32> [[VEC_IND]], [[BROADCAST_SPLAT]]
 ; IF-EVL-NEXT:    [[TMP9:%.*]] = icmp eq i32 [[AVL_NEXT]], 0

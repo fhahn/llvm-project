@@ -145,7 +145,7 @@ define void @dual_sext_ne_with_slt_guard(i8 %s, i8 %n) {
 ; CHECK-LABEL: 'dual_sext_ne_with_slt_guard'
 ; CHECK-NEXT:  Determining loop execution counts for: @dual_sext_ne_with_slt_guard
 ; CHECK-NEXT:  Loop %for.body: backedge-taken count is (-1 + (sext i8 %n to i64) + (-1 * (sext i8 %s to i64))<nsw>)
-; CHECK-NEXT:  Loop %for.body: constant max backedge-taken count is i64 -2
+; CHECK-NEXT:  Loop %for.body: constant max backedge-taken count is i64 254
 ; CHECK-NEXT:  Loop %for.body: symbolic max backedge-taken count is (-1 + (sext i8 %n to i64) + (-1 * (sext i8 %s to i64))<nsw>)
 ; CHECK-NEXT:  Loop %for.body: Trip multiple is 1
 ;
@@ -172,7 +172,7 @@ define void @dual_sext_ne_with_nsw_inc(i8 %s, i64 %n) {
 ; CHECK-LABEL: 'dual_sext_ne_with_nsw_inc'
 ; CHECK-NEXT:  Determining loop execution counts for: @dual_sext_ne_with_nsw_inc
 ; CHECK-NEXT:  Loop %for.body: backedge-taken count is (-1 + (-1 * (sext i8 %s to i64))<nsw> + %n)
-; CHECK-NEXT:  Loop %for.body: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %for.body: constant max backedge-taken count is i64 -9223372036854775682
 ; CHECK-NEXT:  Loop %for.body: symbolic max backedge-taken count is (-1 + (-1 * (sext i8 %s to i64))<nsw> + %n)
 ; CHECK-NEXT:  Loop %for.body: Trip multiple is 1
 ;
@@ -194,7 +194,7 @@ define void @dual_sext_ne_with_nuw_inc(i8 %s, i64 %n) {
 ; CHECK-LABEL: 'dual_sext_ne_with_nuw_inc'
 ; CHECK-NEXT:  Determining loop execution counts for: @dual_sext_ne_with_nuw_inc
 ; CHECK-NEXT:  Loop %for.body: backedge-taken count is (-1 + (-1 * (sext i8 %s to i64))<nsw> + %n)
-; CHECK-NEXT:  Loop %for.body: constant max backedge-taken count is i64 -1
+; CHECK-NEXT:  Loop %for.body: constant max backedge-taken count is i64 -2
 ; CHECK-NEXT:  Loop %for.body: symbolic max backedge-taken count is (-1 + (-1 * (sext i8 %s to i64))<nsw> + %n)
 ; CHECK-NEXT:  Loop %for.body: Trip multiple is 1
 ;

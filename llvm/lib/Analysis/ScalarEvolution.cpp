@@ -75,6 +75,7 @@
 #include "llvm/Analysis/ConstantFolding.h"
 #include "llvm/Analysis/InstructionSimplify.h"
 #include "llvm/Analysis/LoopInfo.h"
+#include "llvm/Analysis/LoopIterator.h"
 #include "llvm/Analysis/MemoryBuiltins.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/Analysis/ScalarEvolutionPatternMatch.h"
@@ -9474,6 +9475,12 @@ ScalarEvolution::ExitLimit ScalarEvolution::computeExitLimitFromICmp(
     }
     ExitLimit EL = howFarToZero(getMinusSCEV(LHS, RHS), L, ControlsOnlyExit,
                                 AllowPredicates);
+    if (auto *ELMax = dyn_cast<SCEVConstant>(EL.ConstantMaxNotTaken);
+        ELMax && !isa<SCEVConstant>(EL.ExactNotTaken))
+      if (const SCEV *Max = getNEExitMaxViaLessThan(
+              LHS, RHS, L, ControlsOnlyExit, ELMax->getAPInt()))
+        EL = ExitLimit(EL.ExactNotTaken, Max, EL.SymbolicMaxNotTaken,
+                       /*MaxOrZero=*/false, EL.Predicates);
     if (EL.hasAnyInfo())
       return EL;
     break;
@@ -13361,6 +13368,79 @@ ScalarEvolution::computeMaxBECountForLT(const SCEV *Start, const SCEV *Stride,
   Delta = APIntOps::umin(Delta, getUnsignedRangeMax(DeltaExpr));
 
   return getUDivCeilSCEV(getConstant(Delta), getConstant(StrideForMaxBECount));
+}
+
+/// Return true if every cycle in \p L passes through its header, i.e. each
+/// iteration either returns to the header or leaves the loop.
+static bool allCyclesContainHeader(const Loop *L, LoopInfo &LI) {
+  // Subloops may not terminate.
+  if (!L->isInnermost())
+    return false;
+  // Every cycle has a retreating edge in RPO. If they all go to the header,
+  // there is no irreducible cycle inside the loop.
+  LoopBlocksRPO RPO(const_cast<Loop *>(L));
+  RPO.perform(&LI);
+  SmallPtrSet<const BasicBlock *, 16> Visited;
+  for (const BasicBlock *BB : RPO) {
+    Visited.insert(BB);
+    for (const BasicBlock *Succ : successors(BB))
+      if (Succ != L->getHeader() && Visited.contains(Succ))
+        return false;
+  }
+  return true;
+}
+
+const SCEV *ScalarEvolution::getNEExitMaxViaLessThan(const SCEV *LHS,
+                                                     const SCEV *RHS,
+                                                     const Loop *L,
+                                                     bool ControlsOnlyExit,
+                                                     const APInt &CurMax) {
+  // If a unit-stride IV starts at or below RHS, it reaches RHS before it can
+  // wrap, so LHS != RHS exits on the same iteration as LHS < RHS does. The
+  // latter's max is bounded by the range of RHS, whereas howFarToZero only
+  // uses the unsigned range of RHS - Start, which wraps if RHS may be below
+  // Start. No wrap flags are needed.
+  auto *AR = dyn_cast<SCEVAddRecExpr>(LHS);
+  if (!AR || AR->getLoop() != L || !AR->isAffine() ||
+      !AR->getStepRecurrence(*this)->isOne() || !isLoopInvariant(RHS, L))
+    return nullptr;
+
+  // If this is the only exit, every iteration completes and the IV cannot
+  // wrap, then starting above RHS would be UB: the IV would never reach RHS,
+  // so the loop would run until the IV wraps.
+  std::optional<bool> ExitIsReached;
+  auto StartAboveRHSIsUB = [&](bool IsSigned) {
+    if (!ControlsOnlyExit ||
+        !(IsSigned ? AR->hasNoSignedWrap() : AR->hasNoUnsignedWrap()))
+      return false;
+    if (!ExitIsReached)
+      ExitIsReached =
+          loopHasNoAbnormalExits(L) && allCyclesContainHeader(L, LI);
+    return *ExitIsReached;
+  };
+
+  const SCEV *Start = AR->getStart();
+  const SCEV *One = getOne(Start->getType());
+  const SCEVConstant *Max = nullptr;
+  for (bool IsSigned : {true, false}) {
+    // The constant max of the LHS < RHS exit, as computed by howManyLessThans.
+    // Only check whether it applies if it is an improvement.
+    auto *LTMax = dyn_cast<SCEVConstant>(computeMaxBECountForLT(
+        Start, One, RHS, getTypeSizeInBits(AR->getType()), IsSigned,
+        /*Invert=*/false));
+    if (!LTMax || LTMax->getAPInt().uge(Max ? Max->getAPInt() : CurMax))
+      continue;
+    // Guards on the pre-incremented IV take the form Start - 1 < RHS, which
+    // implies Start <= RHS: if Start - 1 wraps, the guard cannot hold.
+    if (StartAboveRHSIsUB(IsSigned) ||
+        isLoopEntryGuardedByCond(
+            L, IsSigned ? ICmpInst::ICMP_SLT : ICmpInst::ICMP_ULT,
+            getMinusSCEV(Start, One), RHS) ||
+        isLoopEntryGuardedByCond(
+            L, IsSigned ? ICmpInst::ICMP_SLE : ICmpInst::ICMP_ULE, Start, RHS))
+      Max = LTMax;
+  }
+  return Max;
 }
 
 ScalarEvolution::ExitLimit

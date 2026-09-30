@@ -2240,6 +2240,16 @@ private:
                              bool IsSigned, bool Invert, bool ControlsOnlyExit,
                              bool AllowPredicates = false);
 
+  /// Return a constant max for the number of times an exit condition
+  /// LHS != RHS, with LHS a unit-stride AddRec in \p L, is not taken, using
+  /// the max of the equivalent LHS < RHS exit. Only valid if LHS starts at or
+  /// below RHS, which must be known on loop entry or follow from the exit
+  /// being the only one (\p ControlsOnlyExit). Returns nullptr if that cannot
+  /// be shown or the max is not smaller than \p CurMax.
+  const SCEV *getNEExitMaxViaLessThan(const SCEV *LHS, const SCEV *RHS,
+                                      const Loop *L, bool ControlsOnlyExit,
+                                      const APInt &CurMax);
+
   /// Return a predecessor of BB (which may not be an immediate predecessor)
   /// which has exactly one successor from which BB is reachable, or null if
   /// no such block is found.

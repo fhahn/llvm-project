@@ -17,14 +17,14 @@ define void @subrecurrences(i32 %outer_l, i32 %inner_l, i32 %val) {
 ; CHECK-NEXT:    %i_idx = phi i32 [ 0, %outer ], [ %i_idx.inc, %inner ]
 ; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%inner> U: [0,-2147483648) S: [0,-2147483648) Exits: %inner_l LoopDispositions: { %inner: Computable, %outer: Uniform }
 ; CHECK-NEXT:    %i_idx.inc = add nsw i32 %i_idx, 1
-; CHECK-NEXT:    --> {1,+,1}<nuw><%inner> U: [1,0) S: [1,0) Exits: (1 + %inner_l)<u nuw> LoopDispositions: { %inner: Computable, %outer: Uniform }
+; CHECK-NEXT:    --> {1,+,1}<nuw><%inner> U: [1,-2147483647) S: [1,-2147483647) Exits: (1 + %inner_l)<u nuw> LoopDispositions: { %inner: Computable, %outer: Uniform }
 ; CHECK-NEXT:    %v = sub nsw i32 %i_idx, %o_idx.inc
 ; CHECK-NEXT:    --> {{\{\{}}-1,+,-1}<nw><%outer>,+,1}<nsw><%inner> U: full-set S: full-set Exits: {(-1 + %inner_l),+,-1}<nw><%outer> LoopDispositions: { %inner: Computable, %outer: Variant }
 ; CHECK-NEXT:    %forub = udiv i32 1, %v
 ; CHECK-NEXT:    --> (1 /u {{\{\{}}-1,+,-1}<nw><%outer>,+,1}<nsw><%inner>) U: [0,2) S: [0,2) Exits: (1 /u {(-1 + %inner_l),+,-1}<nw><%outer>) LoopDispositions: { %inner: Computable, %outer: Variant }
 ; CHECK-NEXT:  Determining loop execution counts for: @subrecurrences
 ; CHECK-NEXT:  Loop %inner: backedge-taken count is %inner_l
-; CHECK-NEXT:  Loop %inner: constant max backedge-taken count is i32 -1
+; CHECK-NEXT:  Loop %inner: constant max backedge-taken count is i32 2147483647
 ; CHECK-NEXT:  Loop %inner: symbolic max backedge-taken count is %inner_l
 ; CHECK-NEXT:  Loop %inner: Trip multiple is 1
 ; CHECK-NEXT:  Loop %outer: backedge-taken count is %outer_l
