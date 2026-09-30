@@ -192,6 +192,53 @@ TEST(ConstraintSolverTest, IsImpliedBySingleRow) {
   EXPECT_FALSE(CS.isImpliedBySingleRow(toRow({5, 1, 0})));
 }
 
+TEST(ConstraintSolverTest, NormalizeByGCD) {
+  {
+    // 2x = 1 does not have an integer solution.
+    ConstraintSystem CS;
+    addVariableRow(CS, {1, 2});
+    addVariableRow(CS, {-1, -2});
+    EXPECT_FALSE(CS.mayHaveSolution());
+  }
+
+  {
+    // 3x <= 7 implies x <= 2, but not x <= 1.
+    ConstraintSystem CS;
+    addVariableRow(CS, {7, 3});
+    EXPECT_TRUE(isConditionImplied(CS, {2, 1}));
+    EXPECT_FALSE(isConditionImplied(CS, {1, 1}));
+  }
+
+  {
+    // 2x - 2y <= 1 implies x - y <= 0 and 4x - 4y <= 3, but not x - y <= -1.
+    ConstraintSystem CS;
+    addVariableRow(CS, {1, 2, -2});
+    EXPECT_TRUE(isConditionImplied(CS, {0, 1, -1}));
+    EXPECT_TRUE(isConditionImplied(CS, {3, 4, -4}));
+    EXPECT_FALSE(isConditionImplied(CS, {-1, 1, -1}));
+  }
+
+  {
+    // x - y <= 0, x + y <= 1, -x + z <= 0, -x - z <= -1 implies 2x <= 1 and
+    // 2x >= 1 after eliminating y and z, which only has a rational solution.
+    // Rows derived during elimination are normalized as well.
+    ConstraintSystem CS;
+    addVariableRow(CS, {0, 1, -1, 0});
+    addVariableRow(CS, {1, 1, 1, 0});
+    addVariableRow(CS, {0, -1, 0, 1});
+    addVariableRow(CS, {-1, -1, 0, -1});
+    EXPECT_FALSE(CS.mayHaveSolution());
+  }
+
+  {
+    // Coefficients of INT64_MIN are left unchanged.
+    ConstraintSystem CS;
+    int64_t Min = std::numeric_limits<int64_t>::min();
+    addVariableRow(CS, {1, Min, 2});
+    EXPECT_TRUE(CS.isImpliedBySingleRow(toRow({1, Min, 2})));
+  }
+}
+
 TEST(ConstraintSolverTest, IsConditionImpliedOverflow) {
   ConstraintSystem CS;
   // Make sure isConditionImplied returns false when there is an overflow.
