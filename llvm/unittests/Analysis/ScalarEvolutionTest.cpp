@@ -1337,6 +1337,62 @@ TEST_F(ScalarEvolutionsTest, SCEVUseDropsRedundantFlags) {
   });
 }
 
+TEST_F(ScalarEvolutionsTest, SCEVUseGetCommon) {
+  LLVMContext C;
+  SMDiagnostic Err;
+  std::unique_ptr<Module> M =
+      parseAssemblyString("define void @foo(i32 %x, i32 %y, i32 %z, i32 %w) { "
+                          "  ret void "
+                          "} ",
+                          Err, C);
+
+  ASSERT_TRUE(M && "Could not parse module?");
+  ASSERT_TRUE(!verifyModule(*M) && "Must have been well formed!");
+
+  runWithSE(*M, "foo", [](Function &F, LoopInfo &LI, ScalarEvolution &SE) {
+    const SCEV *X = SE.getSCEV(getArgByName(F, "x"));
+    const SCEV *Y = SE.getSCEV(getArgByName(F, "y"));
+    const SCEV *Z = SE.getSCEV(getArgByName(F, "z"));
+    const SCEV *W = SE.getSCEV(getArgByName(F, "w"));
+    const SCEV *Add = SE.getAddExpr(X, Y);
+    SCEVUse NUW(Add, SCEV::FlagNUW);
+    SCEVUse NUWNSW(Add, SCEV::FlagNUW | SCEV::FlagNSW);
+
+    // Uses of the same SCEV are merged with the union of their flags.
+    EXPECT_EQ(SCEVUse::getCommon(NUW, NUW), NUW);
+    EXPECT_EQ(SCEVUse::getCommon(NUW, NUWNSW), NUWNSW);
+    EXPECT_EQ(SCEVUse::getCommon(NUWNSW, NUW), NUWNSW);
+    EXPECT_EQ(SCEVUse::getCommon(NUW, Add), NUW);
+
+    // Different SCEVs with the same canonical SCEV are merged to the canonical
+    // SCEV.
+    const SCEV *MaxNUW = SE.getUMaxExpr(NUW, Z);
+    const SCEV *MaxNUWNSW = SE.getUMaxExpr(NUWNSW, Z);
+    ASSERT_NE(MaxNUW, MaxNUWNSW);
+    EXPECT_EQ(SCEVUse::getCommon(MaxNUW, MaxNUWNSW),
+              SCEVUse(SE.getUMaxExpr(Add, Z)));
+
+    // Unrelated SCEVs have nothing in common.
+    EXPECT_FALSE(SCEVUse::getCommon(NUW, Z));
+
+    // Z + (X + Y) + (X + Y) --> Z + 2 * (X + Y) keeps the union of the use
+    // flags of both (X + Y).
+    const SCEV *Two = SE.getConstant(X->getType(), 2);
+    EXPECT_EQ(SE.getAddExpr(Z, NUW, NUWNSW),
+              SE.getAddExpr(Z, SE.getMulExpr(Two, NUWNSW)));
+
+    // umax((X + Y), (X + Y), Z) --> umax((X + Y), Z) keeps the union of the
+    // use flags of both (X + Y).
+    SmallVector<SCEVUse, 3> MaxOps = {NUW, NUWNSW, Z};
+    EXPECT_EQ(SE.getUMaxExpr(MaxOps), MaxNUWNSW);
+
+    // (X + Y) * Z + (X + Y) * W --> (X + Y) * (Z + W) keeps the union of the
+    // use flags of both (X + Y).
+    EXPECT_EQ(SE.getAddExpr(SE.getMulExpr(NUW, Z), SE.getMulExpr(NUWNSW, W)),
+              SE.getMulExpr(NUWNSW, SE.getAddExpr(Z, W)));
+  });
+}
+
 TEST_F(ScalarEvolutionsTest, ProveUMinULT) {
   LLVMContext C;
   SMDiagnostic Err;

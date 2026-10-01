@@ -2241,7 +2241,7 @@ static bool CollectAddOperandsWithScales(SmallDenseMap<SCEVUse, APInt, 16> &M,
         // A multiplication of a constant with some other value. Update
         // the map.
         SmallVector<SCEVUse, 4> MulOps(drop_begin(Mul->operands()));
-        const SCEV *Key = SE.getMulExpr(MulOps);
+        const SCEV *Key = SE.getMulExpr(MulOps)->getCanonical();
         auto Pair = M.insert({Key, NewScale});
         if (Pair.second) {
           NewOps.push_back(Pair.first->first);
@@ -2254,7 +2254,7 @@ static bool CollectAddOperandsWithScales(SmallDenseMap<SCEVUse, APInt, 16> &M,
       }
     } else {
       // An ordinary operand. Update the map.
-      auto Pair = M.insert({Ops[i], Scale});
+      auto Pair = M.insert({Ops[i]->getCanonical(), Scale});
       if (Pair.second) {
         NewOps.push_back(Pair.first->first);
       } else {
@@ -2543,14 +2543,19 @@ SCEVUse ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
   Type *Ty = Ops[0]->getType();
   bool FoundMatch = false;
   for (unsigned i = 0, e = Ops.size(); i != e-1; ++i)
-    if (Ops[i] == Ops[i+1]) {      //  X + Y + Y  -->  X + Y*2
+    if (SCEVUse Op = SCEVUse::getCommon(Ops[i], Ops[i + 1])) {
+      //  X + Y + Y  -->  X + Y*2
       // Scan ahead to count how many equal operands there are.
       unsigned Count = 2;
-      while (i+Count != e && Ops[i+Count] == Ops[i])
-        ++Count;
+      for (; i + Count != e; ++Count) {
+        SCEVUse Common = SCEVUse::getCommon(Op, Ops[i + Count]);
+        if (!Common)
+          break;
+        Op = Common;
+      }
       // Merge the values into a multiply.
       SCEVUse Scale = getConstant(Ty, Count);
-      const SCEV *Mul = getMulExpr(Scale, Ops[i], SCEV::FlagNone, Depth + 1);
+      SCEVUse Mul = getMulExpr(Scale, Op, SCEV::FlagNone, Depth + 1);
       if (Ops.size() == Count)
         return Mul;
       Ops[i] = Mul;
@@ -2784,7 +2789,7 @@ SCEVUse ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
       // Scan all terms to find every occurrence of common factor MulOpSCEV
       // and fold them in one shot:
       //   A1*X + A2*X + ... + An*X  -->  X * (A1 + A2 + ... + An)
-      const SCEV *MulOpSCEV = Mul->getOperand(MulOp);
+      SCEVUse MulOpSCEV = Mul->getOperand(MulOp);
       if (isa<SCEVConstant>(MulOpSCEV))
         continue;
 
@@ -2793,8 +2798,9 @@ SCEVUse ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
       SmallVector<SCEVUse, 4> Cofactors;
       SmallVector<unsigned, 4> DeadIndices;
       for (unsigned AddOp = 0, e = Ops.size(); AddOp != e; ++AddOp) {
-        if (MulOpSCEV == Ops[AddOp]) {
+        if (SCEVUse Common = SCEVUse::getCommon(MulOpSCEV, Ops[AddOp])) {
           // W + X + (X * Y * Z)  -->  W + (X * ((Y*Z)+1))
+          MulOpSCEV = Common;
           Cofactors.push_back(getOne(Ty));
           DeadIndices.push_back(AddOp);
           continue;
@@ -2806,8 +2812,10 @@ SCEVUse ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
         const SCEVMulExpr *OtherMul = cast<SCEVMulExpr>(Ops[AddOp]);
         for (unsigned OMulOp = 0, OE = OtherMul->getNumOperands(); OMulOp != OE;
              ++OMulOp) {
-          if (OtherMul->getOperand(OMulOp) == MulOpSCEV) {
+          if (SCEVUse Common =
+                  SCEVUse::getCommon(MulOpSCEV, OtherMul->getOperand(OMulOp))) {
             // (A*B*C) + (A*D*E)  -->  A * (B*C + D*E)
+            MulOpSCEV = Common;
             Cofactors.push_back(StripFactor(OtherMul, OMulOp));
             DeadIndices.push_back(AddOp);
             break;
@@ -3946,6 +3954,8 @@ const SCEV *ScalarEvolution::getMinMaxExpr(SCEVTypes Kind,
   llvm::CmpInst::Predicate FirstPred = IsMax ? GEPred : LEPred;
   llvm::CmpInst::Predicate SecondPred = IsMax ? LEPred : GEPred;
   for (unsigned i = 0, e = Ops.size() - 1; i != e; ++i) {
+    if (SCEVUse Common = SCEVUse::getCommon(Ops[i], Ops[i + 1]))
+      Ops[i] = Ops[i + 1] = Common;
     if (Ops[i] == Ops[i + 1] ||
         isKnownViaNonRecursiveReasoning(FirstPred, Ops[i], Ops[i + 1])) {
       //  X op Y op Y  -->  X op Y
@@ -4635,7 +4645,7 @@ const SCEV *ScalarEvolution::removePointerBase(const SCEV *P) {
 const SCEV *ScalarEvolution::getMinusSCEV(SCEVUse LHS, SCEVUse RHS,
                                           SCEVFlags Flags, unsigned Depth) {
   // Fast path: X - X --> 0.
-  if (LHS == RHS)
+  if (LHS->getCanonical() == RHS->getCanonical())
     return getZero(LHS->getType());
 
   // If we subtract two pointers with different pointer bases, bail.
