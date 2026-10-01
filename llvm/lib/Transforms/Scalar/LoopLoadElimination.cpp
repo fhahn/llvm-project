@@ -37,6 +37,7 @@
 #include "llvm/Analysis/ProfileSummaryInfo.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
+#include "llvm/Analysis/ScalarEvolutionPatternMatch.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/DataLayout.h"
@@ -61,6 +62,7 @@
 #include <utility>
 
 using namespace llvm;
+using namespace llvm::SCEVPatternMatch;
 
 #define LLE_OPTION "loop-load-elim"
 #define DEBUG_TYPE LLE_OPTION
@@ -74,6 +76,16 @@ static cl::opt<unsigned> LoadElimSCEVCheckThreshold(
     "loop-load-elimination-scev-check-threshold", cl::init(8), cl::Hidden,
     cl::desc("The maximum number of SCEV checks allowed for Loop "
              "Load Elimination"));
+
+static cl::opt<bool> VerifyCandidateFilter(
+    "lle-verify-candidate-filter", cl::Hidden,
+#ifdef EXPENSIVE_CHECKS
+    cl::init(true),
+#else
+    cl::init(false),
+#endif
+    cl::desc("Verify that loops skipped by the candidate filter of Loop Load "
+             "Elimination have no forwarding candidates (slow)"));
 
 STATISTIC(NumLoopLoadEliminted, "Number of loads eliminated by LLE");
 
@@ -489,34 +501,13 @@ public:
     PHI->setDebugLoc(Cand.Load->getDebugLoc());
   }
 
-  /// Top-level driver for each loop: find store->load forwarding
-  /// candidates, add run-time checks and perform transformation.
-  bool processLoop() {
-    LLVM_DEBUG(dbgs() << "\nIn \"" << L->getHeader()->getParent()->getName()
-                      << "\" checking " << *L << "\n");
-
-    // Look for store-to-load forwarding cases across the
-    // backedge. E.g.:
-    //
-    // loop:
-    //      %x = load %gep_i
-    //         = ... %x
-    //      store %y, %gep_i_plus_1
-    //
-    // =>
-    //
-    // ph:
-    //      %x.initial = load %gep_0
-    // loop:
-    //      %x.storeforward = phi [%x.initial, %ph] [%y, %loop]
-    //      %x = load %gep_i            <---- now dead
-    //         = ... %x.storeforward
-    //      store %y, %gep_i_plus_1
-
+  /// Find the store-to-load forwarding candidates across the loop backedge
+  /// that processLoop acts on.
+  SmallVector<StoreToLoadForwardingCandidate, 4> findCandidates() {
     // First start with store->load dependences.
     auto StoreToLoadDependences = findStoreToLoadDependences(LAI);
     if (StoreToLoadDependences.empty())
-      return false;
+      return {};
 
     // Generate an index for each load and store according to the original
     // program order.  This will be used later.
@@ -526,7 +517,7 @@ public:
     // fed by multiple stores.
     removeDependencesFromMultipleStores(StoreToLoadDependences);
     if (StoreToLoadDependences.empty())
-      return false;
+      return {};
 
     // Filter the candidates further.
     SmallVector<StoreToLoadForwardingCandidate, 4> Candidates;
@@ -561,6 +552,35 @@ public:
           << Candidates.size()
           << ". Valid store-to-load forwarding across the loop backedge\n");
     }
+    return Candidates;
+  }
+
+  /// Top-level driver for each loop: find store->load forwarding
+  /// candidates, add run-time checks and perform transformation.
+  bool processLoop() {
+    LLVM_DEBUG(dbgs() << "\nIn \"" << L->getHeader()->getParent()->getName()
+                      << "\" checking " << *L << "\n");
+
+    // Look for store-to-load forwarding cases across the
+    // backedge. E.g.:
+    //
+    // loop:
+    //      %x = load %gep_i
+    //         = ... %x
+    //      store %y, %gep_i_plus_1
+    //
+    // =>
+    //
+    // ph:
+    //      %x.initial = load %gep_0
+    // loop:
+    //      %x.storeforward = phi [%x.initial, %ph] [%y, %loop]
+    //      %x = load %gep_i            <---- now dead
+    //         = ... %x.storeforward
+    //      store %y, %gep_i_plus_1
+
+    SmallVector<StoreToLoadForwardingCandidate, 4> Candidates =
+        findCandidates();
     if (Candidates.empty())
       return false;
 
@@ -651,6 +671,49 @@ private:
 
 } // end anonymous namespace
 
+/// Return true if \p L may have a store-to-load forwarding candidate: a load in
+/// the header and a store dominating the latch whose pointer SCEVs differ but
+/// have the same pointer base, where the load may have a unit stride. This is
+/// necessary for isDependenceDistanceOfOne, which evaluates the pointers under
+/// LAA's predicates. Those only rewrite integer sub-expressions, preserving
+/// pointer bases, SCEV identity and constant AddRec steps.
+static bool mayHaveStoreToLoadForwardingCandidate(Loop *L, DominatorTree &DT,
+                                                  ScalarEvolution &SE) {
+  const DataLayout &DL = L->getHeader()->getDataLayout();
+  SmallVector<const SCEV *> LoadPtrs;
+  for (Instruction &I : *L->getHeader()) {
+    auto *LI = dyn_cast<LoadInst>(&I);
+    if (!LI)
+      continue;
+    const SCEV *Ptr = SE.getSCEV(LI->getPointerOperand());
+    const APInt *Step;
+    if (!match(Ptr, m_scev_AffineAddRec(m_SCEV(), m_scev_APInt(Step),
+                                        m_SpecificLoop(L))) ||
+        Step->abs() == DL.getTypeAllocSize(LI->getType()).getKnownMinValue())
+      LoadPtrs.push_back(Ptr);
+  }
+  if (LoadPtrs.empty())
+    return false;
+
+  BasicBlock *Latch = L->getLoopLatch();
+  for (BasicBlock *BB : L->blocks()) {
+    if (!DT.dominates(BB, Latch))
+      continue;
+    for (Instruction &I : *BB) {
+      auto *SI = dyn_cast<StoreInst>(&I);
+      if (!SI)
+        continue;
+      const SCEV *StorePtr = SE.getSCEV(SI->getPointerOperand());
+      if (any_of(LoadPtrs, [&](const SCEV *LoadPtr) {
+            return LoadPtr != StorePtr &&
+                   SE.getPointerBase(LoadPtr) == SE.getPointerBase(StorePtr);
+          }))
+        return true;
+    }
+  }
+  return false;
+}
+
 static bool eliminateLoadsAcrossLoops(Function &F, LoopInfo &LI,
                                       DominatorTree &DT,
                                       BlockFrequencyInfo *BFI,
@@ -679,8 +742,17 @@ static bool eliminateLoadsAcrossLoops(Function &F, LoopInfo &LI,
     // Match historical behavior
     if (!L->isRotatedForm() || !L->getExitingBlock())
       continue;
+    bool MayHaveCandidate = mayHaveStoreToLoadForwardingCandidate(L, DT, *SE);
+    if (!MayHaveCandidate && !VerifyCandidateFilter)
+      continue;
     // The actual work is performed by LoadEliminationForLoop.
     LoadEliminationForLoop LEL(L, &LI, LAIs.getInfo(*L), &DT, BFI, PSI);
+    if (!MayHaveCandidate) {
+      if (!LEL.findCandidates().empty())
+        reportFatalInternalError("LoopLoadElimination candidate filter skipped "
+                                 "a loop with forwarding candidates");
+      continue;
+    }
     Changed |= LEL.processLoop();
     if (Changed)
       LAIs.clear();
