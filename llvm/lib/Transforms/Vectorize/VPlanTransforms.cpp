@@ -39,6 +39,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/TypeSize.h"
 #include "llvm/Transforms/Utils/LoopUtils.h"
+#include <map>
 
 using namespace llvm;
 using namespace LoopVectorizationUtils;
@@ -4212,9 +4213,7 @@ static bool canNarrowLoad(VPSingleDefRecipe *WideMember0, unsigned OpIdx,
   return false;
 }
 
-static bool
-canNarrowOps(ArrayRef<VPValue *> Ops, bool IsScalable,
-             DenseMap<VPValue *, SmallVector<VPValue *>> &MembersOf) {
+static bool canNarrowOps(ArrayRef<VPValue *> Ops, bool IsScalable) {
   SmallVector<VPValue *> Ops0;
   auto *WideMember0 = dyn_cast<VPRecipeWithIRFlags>(Ops[0]);
   if (!WideMember0)
@@ -4231,23 +4230,12 @@ canNarrowOps(ArrayRef<VPValue *> Ops, bool IsScalable,
       return false;
   }
 
-  // The first member is narrowed in place, so it cannot also be used with
-  // different members.
-  for (VPValue *V : Ops) {
-    if (V->isDefinedOutsideLoopRegions())
-      continue;
-    auto [It, Inserted] = MembersOf.try_emplace(V, Ops);
-    if (!Inserted && (It->second.front() == V || Ops.front() == V) &&
-        !equal(It->second, Ops))
-      return false;
-  }
-
   for (unsigned Idx = 0; Idx != WideMember0->getNumOperands(); ++Idx) {
     SmallVector<VPValue *> OpsI;
     for (VPValue *Op : Ops)
       OpsI.push_back(Op->getDefiningRecipe()->getOperand(Idx));
 
-    if (canNarrowOps(OpsI, IsScalable, MembersOf))
+    if (canNarrowOps(OpsI, IsScalable))
       continue;
 
     if (any_of(enumerate(OpsI), [WideMember0, Idx, IsScalable](const auto &P) {
@@ -4315,17 +4303,19 @@ static bool isAlreadyNarrow(VPValue *VPV) {
   return RepR && RepR->isSingleScalar();
 }
 
-// Convert the wide recipes defining the VPValues in \p Members feeding an
-// interleave group to a single narrow variant. The first member is reused as
-// the narrowed recipe. BuildVectors for live-in operands are inserted into \p
-// Preheader.
-static VPValue *narrowInterleaveGroupOp(ArrayRef<VPValue *> Members,
-                                        SmallPtrSetImpl<VPValue *> &NarrowedOps,
-                                        VPBasicBlock *Preheader) {
-  VPValue *V = Members.front();
-  if (NarrowedOps.contains(V))
-    return V;
+using NarrowedOpsMap = std::map<SmallVector<VPValue *>, VPValue *>;
 
+static VPValue *narrowInterleaveGroupOp(ArrayRef<VPValue *> Members,
+                                        NarrowedOpsMap &NarrowedOps,
+                                        VPBasicBlock *Preheader);
+
+// Create a single narrow variant of the recipes defining the VPValues in \p
+// Members feeding an interleave group. BuildVectors for live-in operands are
+// inserted into \p Preheader.
+static VPValue *createNarrowedOp(ArrayRef<VPValue *> Members,
+                                 NarrowedOpsMap &NarrowedOps,
+                                 VPBasicBlock *Preheader) {
+  VPValue *V = Members.front();
   if (V->isDefinedOutsideLoopRegions()) {
     assert(all_of(Members,
                   [V](VPValue *M) {
@@ -4335,7 +4325,6 @@ static VPValue *narrowInterleaveGroupOp(ArrayRef<VPValue *> Members,
            "expected distinct loop-invariant values of matching scalar type");
     auto *BV = new VPInstruction(VPInstruction::BuildVector, Members);
     Preheader->appendRecipe(BV);
-    NarrowedOps.insert(BV);
     return BV;
   }
 
@@ -4344,17 +4333,18 @@ static VPValue *narrowInterleaveGroupOp(ArrayRef<VPValue *> Members,
 
   VPRecipeBase *R = V->getDefiningRecipe();
   if (isa<VPWidenRecipe, VPWidenCastRecipe>(R)) {
-    auto *WideMember0 = cast<VPRecipeWithIRFlags>(R);
+    auto *Narrowed = cast<VPRecipeWithIRFlags>(R->clone());
     for (VPValue *Member : Members.drop_front())
-      WideMember0->intersectFlags(*cast<VPRecipeWithIRFlags>(Member));
-    for (unsigned Idx = 0, E = WideMember0->getNumOperands(); Idx != E; ++Idx) {
+      Narrowed->intersectFlags(*cast<VPRecipeWithIRFlags>(Member));
+    for (unsigned Idx = 0, E = Narrowed->getNumOperands(); Idx != E; ++Idx) {
       SmallVector<VPValue *> OpsI;
       for (VPValue *Member : Members)
         OpsI.push_back(Member->getDefiningRecipe()->getOperand(Idx));
-      WideMember0->setOperand(
+      Narrowed->setOperand(
           Idx, narrowInterleaveGroupOp(OpsI, NarrowedOps, Preheader));
     }
-    return V;
+    Narrowed->insertBefore(R);
+    return Narrowed;
   }
 
   if (auto *LoadGroup = dyn_cast<VPInterleaveRecipe>(R)) {
@@ -4364,14 +4354,12 @@ static VPValue *narrowInterleaveGroupOp(ArrayRef<VPValue *> Members,
     auto *L = VPBuilder(LoadGroup).createWidenLoad(
         *LI, LoadGroup->getAddr(), LoadGroup->getMask(), /*Consecutive=*/true,
         *LoadGroup, LoadGroup->getDebugLoc());
-    NarrowedOps.insert(L);
     return L;
   }
 
   if (auto *RepR = dyn_cast<VPReplicateRecipe>(R)) {
     assert(RepR->isSingleScalar() && RepR->getOpcode() == Instruction::Load &&
            "must be a single scalar load");
-    NarrowedOps.insert(RepR);
     return RepR;
   }
 
@@ -4385,8 +4373,19 @@ static VPValue *narrowInterleaveGroupOp(ArrayRef<VPValue *> Members,
                                   /*IsUniform*/ true,
                                   /*Mask*/ nullptr, {}, *WideLoad);
   N->insertBefore(WideLoad);
-  NarrowedOps.insert(N);
   return N;
+}
+
+// Return the narrow variant of \p Members, creating it if \p Members has not
+// been narrowed yet.
+static VPValue *narrowInterleaveGroupOp(ArrayRef<VPValue *> Members,
+                                        NarrowedOpsMap &NarrowedOps,
+                                        VPBasicBlock *Preheader) {
+  auto [It, Inserted] =
+      NarrowedOps.try_emplace(SmallVector<VPValue *>(Members), nullptr);
+  if (Inserted)
+    It->second = createNarrowedOp(Members, NarrowedOps, Preheader);
+  return It->second;
 }
 
 std::unique_ptr<VPlan>
@@ -4412,7 +4411,6 @@ VPlanTransforms::narrowInterleaveGroups(VPlan &Plan,
          "unexpected branch-on-count");
 
   SmallVector<VPInterleaveRecipe *> StoreGroups;
-  DenseMap<VPValue *, SmallVector<VPValue *>> MembersOf;
   std::optional<ElementCount> VFToOptimize;
   for (auto &R : *VectorLoop->getEntryBasicBlock()) {
     if (isa<VPDerivedIVRecipe, VPScalarIVStepsRecipe>(&R) &&
@@ -4488,7 +4486,7 @@ VPlanTransforms::narrowInterleaveGroups(VPlan &Plan,
     // Check if all values feeding InterleaveR are matching wide recipes, which
     // operands that can be narrowed.
     if (!canNarrowOps(InterleaveR->getStoredValues(),
-                      VFToOptimize->isScalable(), MembersOf))
+                      VFToOptimize->isScalable()))
       return nullptr;
     StoreGroups.push_back(InterleaveR);
   }
@@ -4516,7 +4514,7 @@ VPlanTransforms::narrowInterleaveGroups(VPlan &Plan,
   }
 
   // Convert InterleaveGroup \p R to a single VPWidenLoadRecipe.
-  SmallPtrSet<VPValue *, 4> NarrowedOps;
+  NarrowedOpsMap NarrowedOps;
   VPBasicBlock *Preheader = Plan.getVectorPreheader();
   // Narrow operation tree rooted at store groups.
   for (auto *StoreGroup : StoreGroups) {

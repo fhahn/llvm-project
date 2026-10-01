@@ -1663,31 +1663,22 @@ define void @multiple_store_groups_sharing_member_0(ptr noalias %A, ptr noalias 
 ; VF2-NEXT:    br label %[[VECTOR_PH:.*]]
 ; VF2:       [[VECTOR_PH]]:
 ; VF2-NEXT:    [[TMP0:%.*]] = insertelement <2 x i64> poison, i64 [[S_0]], i64 0
-; VF2-NEXT:    [[TMP1:%.*]] = shufflevector <2 x i64> [[TMP0]], <2 x i64> poison, <2 x i32> zeroinitializer
-; VF2-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <2 x i64> poison, i64 [[S_1]], i64 0
-; VF2-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <2 x i64> [[BROADCAST_SPLATINSERT1]], <2 x i64> poison, <2 x i32> zeroinitializer
-; VF2-NEXT:    [[BROADCAST_SPLATINSERT3:%.*]] = insertelement <2 x i64> poison, i64 [[T_1]], i64 0
-; VF2-NEXT:    [[BROADCAST_SPLAT4:%.*]] = shufflevector <2 x i64> [[BROADCAST_SPLATINSERT3]], <2 x i64> poison, <2 x i32> zeroinitializer
+; VF2-NEXT:    [[BROADCAST_SPLAT2:%.*]] = insertelement <2 x i64> [[TMP0]], i64 [[S_1]], i64 1
+; VF2-NEXT:    [[TMP4:%.*]] = insertelement <2 x i64> poison, i64 [[S_0]], i64 0
+; VF2-NEXT:    [[BROADCAST_SPLAT4:%.*]] = insertelement <2 x i64> [[TMP4]], i64 [[T_1]], i64 1
 ; VF2-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; VF2:       [[VECTOR_BODY]]:
 ; VF2-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; VF2-NEXT:    [[TMP2:%.*]] = shl nuw nsw i64 [[INDEX]], 1
 ; VF2-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i64, ptr [[B]], i64 [[TMP2]]
-; VF2-NEXT:    [[WIDE_VEC:%.*]] = load <4 x i64>, ptr [[TMP3]], align 8
-; VF2-NEXT:    [[WIDE_LOAD:%.*]] = shufflevector <4 x i64> [[WIDE_VEC]], <4 x i64> poison, <2 x i32> <i32 0, i32 2>
-; VF2-NEXT:    [[STRIDED_VEC5:%.*]] = shufflevector <4 x i64> [[WIDE_VEC]], <4 x i64> poison, <2 x i32> <i32 1, i32 3>
-; VF2-NEXT:    [[TMP4:%.*]] = mul <2 x i64> [[WIDE_LOAD]], [[TMP1]]
+; VF2-NEXT:    [[STRIDED_VEC5:%.*]] = load <2 x i64>, ptr [[TMP3]], align 8
 ; VF2-NEXT:    [[TMP9:%.*]] = mul <2 x i64> [[STRIDED_VEC5]], [[BROADCAST_SPLAT2]]
 ; VF2-NEXT:    [[TMP10:%.*]] = mul <2 x i64> [[STRIDED_VEC5]], [[BROADCAST_SPLAT4]]
 ; VF2-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP2]]
-; VF2-NEXT:    [[TMP11:%.*]] = shufflevector <2 x i64> [[TMP4]], <2 x i64> [[TMP9]], <4 x i32> <i32 0, i32 1, i32 2, i32 3>
-; VF2-NEXT:    [[INTERLEAVED_VEC:%.*]] = shufflevector <4 x i64> [[TMP11]], <4 x i64> poison, <4 x i32> <i32 0, i32 2, i32 1, i32 3>
-; VF2-NEXT:    store <4 x i64> [[INTERLEAVED_VEC]], ptr [[TMP5]], align 8
+; VF2-NEXT:    store <2 x i64> [[TMP9]], ptr [[TMP5]], align 8
 ; VF2-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i64, ptr [[C]], i64 [[TMP2]]
-; VF2-NEXT:    [[TMP8:%.*]] = shufflevector <2 x i64> [[TMP4]], <2 x i64> [[TMP10]], <4 x i32> <i32 0, i32 1, i32 2, i32 3>
-; VF2-NEXT:    [[INTERLEAVED_VEC6:%.*]] = shufflevector <4 x i64> [[TMP8]], <4 x i64> poison, <4 x i32> <i32 0, i32 2, i32 1, i32 3>
-; VF2-NEXT:    store <4 x i64> [[INTERLEAVED_VEC6]], ptr [[TMP6]], align 8
-; VF2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
+; VF2-NEXT:    store <2 x i64> [[TMP10]], ptr [[TMP6]], align 8
+; VF2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 1
 ; VF2-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[INDEX_NEXT]], 100
 ; VF2-NEXT:    br i1 [[TMP7]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP25:![0-9]+]]
 ; VF2:       [[MIDDLE_BLOCK]]:
@@ -1868,26 +1859,24 @@ define void @multiple_store_groups_sharing_members_at_different_indices(ptr noal
 ; VF2-NEXT:    br label %[[VECTOR_PH:.*]]
 ; VF2:       [[VECTOR_PH]]:
 ; VF2-NEXT:    [[TMP0:%.*]] = insertelement <2 x i64> poison, i64 [[S_0]], i64 0
-; VF2-NEXT:    [[TMP1:%.*]] = shufflevector <2 x i64> [[TMP0]], <2 x i64> poison, <2 x i32> zeroinitializer
+; VF2-NEXT:    [[TMP1:%.*]] = insertelement <2 x i64> [[TMP0]], i64 [[S_1]], i64 1
 ; VF2-NEXT:    [[TMP2:%.*]] = insertelement <2 x i64> poison, i64 [[S_1]], i64 0
-; VF2-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <2 x i64> [[TMP2]], <2 x i64> poison, <2 x i32> zeroinitializer
+; VF2-NEXT:    [[BROADCAST_SPLAT2:%.*]] = insertelement <2 x i64> [[TMP2]], i64 [[S_0]], i64 1
 ; VF2-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; VF2:       [[VECTOR_BODY]]:
 ; VF2-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; VF2-NEXT:    [[TMP4:%.*]] = shl nuw nsw i64 [[INDEX]], 1
 ; VF2-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i64, ptr [[B]], i64 [[INDEX]]
-; VF2-NEXT:    [[BROADCAST_SPLAT:%.*]] = load <2 x i64>, ptr [[TMP5]], align 8
+; VF2-NEXT:    [[TMP6:%.*]] = load i64, ptr [[TMP5]], align 8
+; VF2-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i64> poison, i64 [[TMP6]], i64 0
+; VF2-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x i64> [[BROADCAST_SPLATINSERT]], <2 x i64> poison, <2 x i32> zeroinitializer
 ; VF2-NEXT:    [[TMP8:%.*]] = mul <2 x i64> [[BROADCAST_SPLAT]], [[TMP1]]
 ; VF2-NEXT:    [[TMP3:%.*]] = mul <2 x i64> [[BROADCAST_SPLAT]], [[BROADCAST_SPLAT2]]
 ; VF2-NEXT:    [[TMP10:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP4]]
-; VF2-NEXT:    [[TMP6:%.*]] = shufflevector <2 x i64> [[TMP8]], <2 x i64> [[TMP3]], <4 x i32> <i32 0, i32 1, i32 2, i32 3>
-; VF2-NEXT:    [[INTERLEAVED_VEC:%.*]] = shufflevector <4 x i64> [[TMP6]], <4 x i64> poison, <4 x i32> <i32 0, i32 2, i32 1, i32 3>
-; VF2-NEXT:    store <4 x i64> [[INTERLEAVED_VEC]], ptr [[TMP10]], align 8
+; VF2-NEXT:    store <2 x i64> [[TMP8]], ptr [[TMP10]], align 8
 ; VF2-NEXT:    [[TMP11:%.*]] = getelementptr inbounds i64, ptr [[C]], i64 [[TMP4]]
-; VF2-NEXT:    [[TMP7:%.*]] = shufflevector <2 x i64> [[TMP3]], <2 x i64> [[TMP8]], <4 x i32> <i32 0, i32 1, i32 2, i32 3>
-; VF2-NEXT:    [[INTERLEAVED_VEC3:%.*]] = shufflevector <4 x i64> [[TMP7]], <4 x i64> poison, <4 x i32> <i32 0, i32 2, i32 1, i32 3>
-; VF2-NEXT:    store <4 x i64> [[INTERLEAVED_VEC3]], ptr [[TMP11]], align 8
-; VF2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
+; VF2-NEXT:    store <2 x i64> [[TMP3]], ptr [[TMP11]], align 8
+; VF2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 1
 ; VF2-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[INDEX_NEXT]], 100
 ; VF2-NEXT:    br i1 [[TMP12]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP27:![0-9]+]]
 ; VF2:       [[MIDDLE_BLOCK]]:
@@ -1962,29 +1951,21 @@ define void @wide_op_used_with_different_members(ptr noalias %A, ptr noalias %B,
 ; VF2-NEXT:    br label %[[VECTOR_PH:.*]]
 ; VF2:       [[VECTOR_PH]]:
 ; VF2-NEXT:    [[TMP0:%.*]] = insertelement <2 x i64> poison, i64 [[S_0]], i64 0
-; VF2-NEXT:    [[TMP1:%.*]] = shufflevector <2 x i64> [[TMP0]], <2 x i64> poison, <2 x i32> zeroinitializer
-; VF2-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <2 x i64> poison, i64 [[S_1]], i64 0
-; VF2-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <2 x i64> [[BROADCAST_SPLATINSERT1]], <2 x i64> poison, <2 x i32> zeroinitializer
-; VF2-NEXT:    [[BROADCAST_SPLATINSERT3:%.*]] = insertelement <2 x i64> poison, i64 [[T_1]], i64 0
-; VF2-NEXT:    [[BROADCAST_SPLAT4:%.*]] = shufflevector <2 x i64> [[BROADCAST_SPLATINSERT3]], <2 x i64> poison, <2 x i32> zeroinitializer
+; VF2-NEXT:    [[BROADCAST_SPLAT2:%.*]] = insertelement <2 x i64> [[TMP0]], i64 [[S_1]], i64 1
+; VF2-NEXT:    [[TMP4:%.*]] = insertelement <2 x i64> poison, i64 [[S_0]], i64 0
+; VF2-NEXT:    [[BROADCAST_SPLAT4:%.*]] = insertelement <2 x i64> [[TMP4]], i64 [[T_1]], i64 1
 ; VF2-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; VF2:       [[VECTOR_BODY]]:
 ; VF2-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; VF2-NEXT:    [[TMP2:%.*]] = shl nuw nsw i64 [[INDEX]], 1
 ; VF2-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i64, ptr [[B]], i64 [[TMP2]]
-; VF2-NEXT:    [[WIDE_VEC:%.*]] = load <4 x i64>, ptr [[TMP3]], align 8
-; VF2-NEXT:    [[WIDE_LOAD:%.*]] = shufflevector <4 x i64> [[WIDE_VEC]], <4 x i64> poison, <2 x i32> <i32 0, i32 2>
-; VF2-NEXT:    [[STRIDED_VEC5:%.*]] = shufflevector <4 x i64> [[WIDE_VEC]], <4 x i64> poison, <2 x i32> <i32 1, i32 3>
-; VF2-NEXT:    [[TMP4:%.*]] = add <2 x i64> [[WIDE_LOAD]], [[TMP1]]
+; VF2-NEXT:    [[STRIDED_VEC5:%.*]] = load <2 x i64>, ptr [[TMP3]], align 8
 ; VF2-NEXT:    [[TMP9:%.*]] = add <2 x i64> [[STRIDED_VEC5]], [[BROADCAST_SPLAT2]]
 ; VF2-NEXT:    [[TMP10:%.*]] = add <2 x i64> [[STRIDED_VEC5]], [[BROADCAST_SPLAT4]]
-; VF2-NEXT:    [[TMP5:%.*]] = mul <2 x i64> [[TMP4]], [[TMP4]]
 ; VF2-NEXT:    [[TMP11:%.*]] = mul <2 x i64> [[TMP9]], [[TMP10]]
 ; VF2-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP2]]
-; VF2-NEXT:    [[TMP8:%.*]] = shufflevector <2 x i64> [[TMP5]], <2 x i64> [[TMP11]], <4 x i32> <i32 0, i32 1, i32 2, i32 3>
-; VF2-NEXT:    [[INTERLEAVED_VEC:%.*]] = shufflevector <4 x i64> [[TMP8]], <4 x i64> poison, <4 x i32> <i32 0, i32 2, i32 1, i32 3>
-; VF2-NEXT:    store <4 x i64> [[INTERLEAVED_VEC]], ptr [[TMP6]], align 8
-; VF2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
+; VF2-NEXT:    store <2 x i64> [[TMP11]], ptr [[TMP6]], align 8
+; VF2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 1
 ; VF2-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[INDEX_NEXT]], 100
 ; VF2-NEXT:    br i1 [[TMP7]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP28:![0-9]+]]
 ; VF2:       [[MIDDLE_BLOCK]]:
