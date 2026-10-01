@@ -235,11 +235,16 @@ struct VPTransformState {
     }
     assert((VF.isScalar() || isVectorizedTy(V->getType())) &&
            "scalar values must be stored as (0, 0)");
+    assert((!Def->getMaterializedVectorType() ||
+            Def->getMaterializedVectorType() == V->getType()) &&
+           "materialized result type must match the generated value");
     Data.VPV2Vector[Def] = V;
   }
 
   /// Set the generated scalar \p V for \p Def and the given \p Lane.
   void set(const VPValue *Def, Value *V, const VPLane &Lane) {
+    assert(!Def->getMaterializedVectorType() &&
+           "value with a materialized vector result type stored as a scalar");
     auto &Scalars = Data.VPV2Scalars[Def];
     unsigned CacheIdx = Lane.mapToCacheIndex(VF);
     if (Scalars.size() <= CacheIdx)

@@ -513,6 +513,12 @@ struct VPlanTransforms {
   static void materializeFactors(VPlan &Plan, VPBasicBlock *VectorPH,
                                  ElementCount VF);
 
+  /// Make the vector result type of recipes reading it while executing
+  /// explicit, so code generation does not have to re-derive it from the plan's
+  /// VF. Results already widened to an explicit vector type, e.g. by
+  /// narrowInterleaveGroups, are left alone.
+  static void materializeVectorTypes(VPlan &Plan, ElementCount VF);
+
   /// Attaches the alias-mask to the existing header-mask.
   static void attachAliasMaskToHeaderMask(VPlan &Plan);
 

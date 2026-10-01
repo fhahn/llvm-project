@@ -5862,6 +5862,10 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
                           &BestVPlan);
   RUN_VPLAN_PASS(VPlanTransforms::removeDeadRecipes, BestVPlan);
 
+  // Materialize vector result types last, as recipes carrying an explicit
+  // vector result type are not rewritten by the simplification passes above.
+  RUN_VPLAN_PASS(VPlanTransforms::materializeVectorTypes, BestVPlan, BestVF);
+
   assert(verifyVPlanIsValid(BestVPlan) && "final VPlan is invalid");
 
   // After vectorization, the exit blocks of the original loop will have

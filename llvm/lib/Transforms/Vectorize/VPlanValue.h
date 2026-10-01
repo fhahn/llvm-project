@@ -202,6 +202,10 @@ public:
   /// Returns the type of this VPValue when widened to \p VF.
   Type *getWideType(ElementCount VF) const;
 
+  /// Returns the explicit vector type this value's result has been materialized
+  /// to, or nullptr if the result is implicitly widened to the plan's VF.
+  VectorType *getMaterializedVectorType() const;
+
   /// Returns the element count of this value's explicit vector result type, or
   /// \p VF if it has none.
   ElementCount getWideningVF(ElementCount VF) const;

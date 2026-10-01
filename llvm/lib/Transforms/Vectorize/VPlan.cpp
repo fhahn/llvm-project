@@ -150,10 +150,14 @@ Type *VPValue::getWideType(ElementCount VF) const {
   return toVectorTy(getScalarType(), getWideningVF(VF));
 }
 
+VectorType *VPValue::getMaterializedVectorType() const {
+  const auto *RV = dyn_cast<VPRecipeValue>(this);
+  return RV ? dyn_cast_if_present<VectorType>(RV->getResultType()) : nullptr;
+}
+
 ElementCount VPValue::getWideningVF(ElementCount VF) const {
-  if (const auto *RV = dyn_cast<VPRecipeValue>(this))
-    if (auto *VecTy = dyn_cast_if_present<VectorType>(RV->getResultType()))
-      return VecTy->getElementCount();
+  if (VectorType *VecTy = getMaterializedVectorType())
+    return VecTy->getElementCount();
   return VF;
 }
 

@@ -2947,13 +2947,6 @@ void VPWidenRecipe::execute(VPTransformState &State) {
                       << Instruction::getOpcodeName(Opcode));
     llvm_unreachable("Unhandled instruction!");
   } // end of switch.
-
-#if !defined(NDEBUG)
-  // Verify that VPlan type inference results agree with the type of the
-  // generated values.
-  assert(getWideType(State.VF) == State.get(this)->getType() &&
-         "inferred type and type from generated instructions do not match");
-#endif
 }
 
 InstructionCost VPWidenRecipe::computeCost(ElementCount VF,
@@ -3007,8 +3000,8 @@ void VPWidenRecipe::printRecipe(raw_ostream &O, const Twine &Indent,
 void VPWidenCastRecipe::execute(VPTransformState &State) {
   auto &Builder = State.Builder;
   /// Vectorize casts.
-  assert(State.VF.isVector() && "Not vectorizing?");
-  Type *DestTy = getWideType(State.VF);
+  Type *DestTy = getResultType();
+  assert(DestTy->isVectorTy() && "Not vectorizing?");
   VPValue *Op = getOperand(0);
   Value *A = State.get(Op);
   Value *Cast = Builder.CreateCast(Instruction::CastOps(Opcode), A, DestTy);
@@ -4364,7 +4357,7 @@ InstructionCost VPWidenMemoryRecipe::computeCost(ElementCount VF,
 }
 
 void VPWidenLoadRecipe::execute(VPTransformState &State) {
-  Type *DataTy = getWideType(State.VF);
+  Type *DataTy = getResultType();
   bool CreateGather = !isConsecutive();
 
   auto &Builder = State.Builder;
@@ -4399,8 +4392,7 @@ void VPWidenLoadRecipe::printRecipe(raw_ostream &O, const Twine &Indent,
 #endif
 
 void VPWidenLoadEVLRecipe::execute(VPTransformState &State) {
-  Type *ScalarDataTy = getScalarType();
-  auto *DataTy = VectorType::get(ScalarDataTy, State.VF);
+  auto *DataTy = cast<VectorType>(getResultType());
   bool CreateGather = !isConsecutive();
 
   auto &Builder = State.Builder;
@@ -4411,7 +4403,7 @@ void VPWidenLoadEVLRecipe::execute(VPTransformState &State) {
   if (VPValue *VPMask = getMask())
     Mask = State.get(VPMask);
   else
-    Mask = Builder.CreateVectorSplat(State.VF, Builder.getTrue());
+    Mask = Builder.getAllOnesMask(DataTy->getElementCount());
 
   if (CreateGather) {
     NewLI = Builder.CreateIntrinsicWithoutFolding(DataTy, Intrinsic::vp_gather,
@@ -4728,7 +4720,7 @@ void VPInterleaveRecipe::execute(VPTransformState &State) {
 
       // If this member has different type, cast the result type.
       if (Member->getType() != ScalarTy) {
-        VectorType *OtherVTy = VectorType::get(Member->getType(), State.VF);
+        auto *OtherVTy = cast<VectorType>(VPDefs[J]->getResultType());
         StridedVec =
             createBitOrPointerCast(State.Builder, StridedVec, OtherVTy, DL);
       }
@@ -5069,25 +5061,22 @@ void VPFirstOrderRecurrencePHIRecipe::execute(VPTransformState &State) {
   // Create a vector from the initial value.
   auto *VectorInit = getStartValue()->getLiveInIRValue();
 
-  Type *VecTy = State.VF.isScalar()
-                    ? VectorInit->getType()
-                    : VectorType::get(VectorInit->getType(), State.VF);
-
+  Type *ResTy = getResultType();
   BasicBlock *VectorPH =
       State.CFG.VPBB2IRBB.at(getParent()->getCFGPredecessor(0));
-  if (State.VF.isVector()) {
+  if (auto *VecTy = dyn_cast<VectorType>(ResTy)) {
     auto *IdxTy = Builder.getInt32Ty();
     auto *One = ConstantInt::get(IdxTy, 1);
     IRBuilder<>::InsertPointGuard Guard(Builder);
     Builder.SetInsertPoint(VectorPH->getTerminator());
-    auto *RuntimeVF = getRuntimeVF(Builder, IdxTy, State.VF);
+    auto *RuntimeVF = getRuntimeVF(Builder, IdxTy, VecTy->getElementCount());
     auto *LastIdx = Builder.CreateSub(RuntimeVF, One);
     VectorInit = Builder.CreateInsertElement(
         PoisonValue::get(VecTy), VectorInit, LastIdx, "vector.recur.init");
   }
 
   // Create a phi node for the new recurrence.
-  PHINode *Phi = PHINode::Create(VecTy, 2, "vector.recur");
+  PHINode *Phi = PHINode::Create(ResTy, 2, "vector.recur");
   Phi->insertBefore(State.CFG.PrevBB->getFirstInsertionPt());
   Phi->addIncoming(VectorInit, VectorPH);
   State.set(this, Phi);
@@ -5123,7 +5112,7 @@ void VPReductionPHIRecipe::execute(VPTransformState &State) {
   // this value when we vectorize all of the instructions that use the PHI.
   BasicBlock *VectorPH =
       State.CFG.VPBB2IRBB.at(getParent()->getCFGPredecessor(0));
-  bool ScalarPHI = State.VF.isScalar() || isInLoop();
+  bool ScalarPHI = !getResultType()->isVectorTy();
   Value *StartV = State.get(StartVPV, ScalarPHI);
   Type *VecTy = StartV->getType();
 

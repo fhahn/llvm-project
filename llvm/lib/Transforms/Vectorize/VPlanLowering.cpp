@@ -946,6 +946,44 @@ void VPlanTransforms::materializeVectorTripCount(
   VectorTC.replaceAllUsesWith(Res);
 }
 
+/// Returns the number of elements of the vector generated for \p R's result at
+/// vectorization factor \p VF, or std::nullopt if \p R does not generate a
+/// vector or does not read its result type when executing.
+static std::optional<ElementCount>
+getGeneratedVectorWidth(const VPRecipeBase *R, ElementCount VF) {
+  if (const auto *Phi = dyn_cast<VPReductionPHIRecipe>(R)) {
+    if (Phi->isInLoop())
+      return std::nullopt;
+    return VF.divideCoefficientBy(Phi->getVFScaleFactor());
+  }
+  if (isa<VPWidenRecipe, VPWidenCastRecipe, VPWidenLoadRecipe,
+          VPWidenLoadEVLRecipe, VPFirstOrderRecurrencePHIRecipe,
+          VPInterleaveRecipe>(R))
+    return VF;
+  return std::nullopt;
+}
+
+void VPlanTransforms::materializeVectorTypes(VPlan &Plan, ElementCount VF) {
+  if (VF.isScalar())
+    return;
+
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_deep(Plan.getEntry()))) {
+    for (VPRecipeBase &R : *VPBB) {
+      std::optional<ElementCount> WideVF = getGeneratedVectorWidth(&R, VF);
+      if (!WideVF)
+        continue;
+      for (VPRecipeValue *Def : R.definedValues()) {
+        // Skip results already widened to an explicit vector type, e.g. the
+        // members of a narrowed interleave group.
+        if (Def->getResultType()->isVectorTy())
+          continue;
+        Def->materializeVectorType(*WideVF);
+      }
+    }
+  }
+}
+
 void VPlanTransforms::materializeFactors(VPlan &Plan, VPBasicBlock *VectorPH,
                                          ElementCount VFEC) {
   // If VF and VFxUF have already been materialized (no remaining users),
