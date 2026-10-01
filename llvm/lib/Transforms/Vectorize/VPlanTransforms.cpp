@@ -4212,7 +4212,9 @@ static bool canNarrowLoad(VPSingleDefRecipe *WideMember0, unsigned OpIdx,
   return false;
 }
 
-static bool canNarrowOps(ArrayRef<VPValue *> Ops, bool IsScalable) {
+static bool
+canNarrowOps(ArrayRef<VPValue *> Ops, bool IsScalable,
+             DenseMap<VPValue *, SmallVector<VPValue *>> &MembersOf) {
   SmallVector<VPValue *> Ops0;
   auto *WideMember0 = dyn_cast<VPRecipeWithIRFlags>(Ops[0]);
   if (!WideMember0)
@@ -4229,12 +4231,23 @@ static bool canNarrowOps(ArrayRef<VPValue *> Ops, bool IsScalable) {
       return false;
   }
 
+  // The first member is narrowed in place, so it cannot also be used with
+  // different members.
+  for (VPValue *V : Ops) {
+    if (V->isDefinedOutsideLoopRegions())
+      continue;
+    auto [It, Inserted] = MembersOf.try_emplace(V, Ops);
+    if (!Inserted && (It->second.front() == V || Ops.front() == V) &&
+        !equal(It->second, Ops))
+      return false;
+  }
+
   for (unsigned Idx = 0; Idx != WideMember0->getNumOperands(); ++Idx) {
     SmallVector<VPValue *> OpsI;
     for (VPValue *Op : Ops)
       OpsI.push_back(Op->getDefiningRecipe()->getOperand(Idx));
 
-    if (canNarrowOps(OpsI, IsScalable))
+    if (canNarrowOps(OpsI, IsScalable, MembersOf))
       continue;
 
     if (any_of(enumerate(OpsI), [WideMember0, Idx, IsScalable](const auto &P) {
@@ -4399,6 +4412,7 @@ VPlanTransforms::narrowInterleaveGroups(VPlan &Plan,
          "unexpected branch-on-count");
 
   SmallVector<VPInterleaveRecipe *> StoreGroups;
+  DenseMap<VPValue *, SmallVector<VPValue *>> MembersOf;
   std::optional<ElementCount> VFToOptimize;
   for (auto &R : *VectorLoop->getEntryBasicBlock()) {
     if (isa<VPDerivedIVRecipe, VPScalarIVStepsRecipe>(&R) &&
@@ -4474,7 +4488,7 @@ VPlanTransforms::narrowInterleaveGroups(VPlan &Plan,
     // Check if all values feeding InterleaveR are matching wide recipes, which
     // operands that can be narrowed.
     if (!canNarrowOps(InterleaveR->getStoredValues(),
-                      VFToOptimize->isScalable()))
+                      VFToOptimize->isScalable(), MembersOf))
       return nullptr;
     StoreGroups.push_back(InterleaveR);
   }
