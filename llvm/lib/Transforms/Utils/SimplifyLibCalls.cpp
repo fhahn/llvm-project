@@ -1935,11 +1935,19 @@ Value *LibCallSimplifier::optimizeNew(CallInst *CI, IRBuilderBase &B,
 // Math Library Optimizations
 //===----------------------------------------------------------------------===//
 
+/// Preserve the accuracy requirement of \p Old on the replacement \p New.
+static void copyFPMath(const CallInst &Old, Value *New) {
+  if (auto *NewI = dyn_cast<Instruction>(New))
+    if (MDNode *MD = Old.getMetadata(LLVMContext::MD_fpmath))
+      NewI->setMetadata(LLVMContext::MD_fpmath, MD);
+}
+
 // Replace a libcall \p CI with a call to intrinsic \p IID
 static Value *replaceUnaryCall(CallInst *CI, IRBuilderBase &B,
                                Intrinsic::ID IID) {
   Value *NewCall = B.CreateUnaryIntrinsic(IID, CI->getArgOperand(0), CI);
   NewCall->takeName(CI);
+  copyFPMath(*CI, NewCall);
   return copyFlags(*CI, NewCall);
 }
 
@@ -1948,6 +1956,7 @@ static Value *replaceBinaryCall(CallInst *CI, IRBuilderBase &B,
   Value *NewCall = B.CreateBinaryIntrinsic(IID, CI->getArgOperand(0),
                                            CI->getArgOperand(1), CI);
   NewCall->takeName(CI);
+  copyFPMath(*CI, NewCall);
   return copyFlags(*CI, NewCall);
 }
 
