@@ -7,11 +7,11 @@ define i32 @scaled_nuw(ptr %dst, i32 %a, i32 %b, i32 %n, i1 %c) {
 ; CHECK-NEXT:    %iv = phi i32 [ %a, %ph ], [ %iv.next, %loop ]
 ; CHECK-NEXT:    --> {%a,+,1}<nuw><%loop> U: full-set S: full-set Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %index = mul nuw i32 %iv, %b
-; CHECK-NEXT:    --> {(%a * %b),+,%b}<nuw><%loop> U: full-set S: full-set Exits: ((-1 + %n) * %b) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(%a * %b)<u nuw>,+,%b}<nuw><%loop> U: full-set S: full-set Exits: ((-1 + %n) * %b) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %wide = zext i32 %index to i64
-; CHECK-NEXT:    --> {(zext i32 (%a * %b) to i64),+,(zext i32 %b to i64)}<nuw><%loop> U: [0,-4294967295) S: [0,-4294967295) Exits: ((zext i32 (%a * %b) to i64) + ((zext i32 (-1 + (-1 * %a) + %n) to i64) * (zext i32 %b to i64))<u nuw>)<u nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(zext i32 (%a * %b)<u nuw> to i64),+,(zext i32 %b to i64)}<nuw><%loop> U: [0,-4294967295) S: [0,-4294967295) Exits: ((zext i32 (%a * %b)<u nuw> to i64) + ((zext i32 (-1 + (-1 * %a) + %n) to i64) * (zext i32 %b to i64))<u nuw>)<u nuw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %p = getelementptr i8, ptr %dst, i64 %wide
-; CHECK-NEXT:    --> {((zext i32 (%a * %b) to i64) + %dst),+,(zext i32 %b to i64)}<nw><%loop> U: full-set S: full-set Exits: ((zext i32 (%a * %b) to i64) + ((zext i32 (-1 + (-1 * %a) + %n) to i64) * (zext i32 %b to i64)) + %dst) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {((zext i32 (%a * %b)<u nuw> to i64) + %dst),+,(zext i32 %b to i64)}<nw><%loop> U: full-set S: full-set Exits: ((zext i32 (%a * %b)<u nuw> to i64) + ((zext i32 (-1 + (-1 * %a) + %n) to i64) * (zext i32 %b to i64)) + %dst) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = add nuw i32 %iv, 1
 ; CHECK-NEXT:    --> {(1 + %a),+,1}<nuw><%loop> U: full-set S: full-set Exits: %n LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %bare = mul i32 %a, %b
@@ -49,11 +49,11 @@ define i32 @scaled_nuw_bypass_first(ptr %dst, i32 %a, i32 %b, i32 %n, i1 %c) {
 ; CHECK-NEXT:    %iv = phi i32 [ %a, %ph ], [ %iv.next, %loop ]
 ; CHECK-NEXT:    --> {%a,+,1}<nuw><%loop> U: full-set S: full-set Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %index = mul nuw i32 %iv, %b
-; CHECK-NEXT:    --> {(%a * %b),+,%b}<nuw><%loop> U: full-set S: full-set Exits: ((-1 + %n) * %b) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(%a * %b)<u nuw>,+,%b}<nuw><%loop> U: full-set S: full-set Exits: ((-1 + %n) * %b) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %wide = zext i32 %index to i64
-; CHECK-NEXT:    --> {(zext i32 (%a * %b) to i64),+,(zext i32 %b to i64)}<nuw><%loop> U: [0,-4294967295) S: [0,-4294967295) Exits: ((zext i32 (%a * %b) to i64) + ((zext i32 (-1 + (-1 * %a) + %n) to i64) * (zext i32 %b to i64))<u nuw>)<u nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(zext i32 (%a * %b)<u nuw> to i64),+,(zext i32 %b to i64)}<nuw><%loop> U: [0,-4294967295) S: [0,-4294967295) Exits: ((zext i32 (%a * %b)<u nuw> to i64) + ((zext i32 (-1 + (-1 * %a) + %n) to i64) * (zext i32 %b to i64))<u nuw>)<u nuw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %p = getelementptr i8, ptr %dst, i64 %wide
-; CHECK-NEXT:    --> {((zext i32 (%a * %b) to i64) + %dst),+,(zext i32 %b to i64)}<nw><%loop> U: full-set S: full-set Exits: ((zext i32 (%a * %b) to i64) + ((zext i32 (-1 + (-1 * %a) + %n) to i64) * (zext i32 %b to i64)) + %dst) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {((zext i32 (%a * %b)<u nuw> to i64) + %dst),+,(zext i32 %b to i64)}<nw><%loop> U: full-set S: full-set Exits: ((zext i32 (%a * %b)<u nuw> to i64) + ((zext i32 (-1 + (-1 * %a) + %n) to i64) * (zext i32 %b to i64)) + %dst) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = add nuw i32 %iv, 1
 ; CHECK-NEXT:    --> {(1 + %a),+,1}<nuw><%loop> U: full-set S: full-set Exits: %n LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %bare = mul i32 %a, %b
@@ -92,11 +92,11 @@ define void @scaled_nuw_exit_count(ptr %dst, i32 %a, i32 %n) {
 ; CHECK-NEXT:    %iv = phi i32 [ %a, %entry ], [ %iv.next, %loop ]
 ; CHECK-NEXT:    --> {%a,+,1}<nuw><%loop> U: full-set S: full-set Exits: ((((-3 * %a) + (-1 * (1 umin ((-3 * %a) + ((3 * %a) umax %n))))<nuw><nsw> + ((3 * %a) umax %n)) /u 3) + (1 umin ((-3 * %a) + ((3 * %a) umax %n))) + %a) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %index = mul nuw i32 %iv, 3
-; CHECK-NEXT:    --> {(3 * %a),+,3}<nuw><%loop> U: full-set S: full-set Exits: ((3 * ((((-3 * %a) + (-1 * (1 umin ((-3 * %a) + ((3 * %a) umax %n))))<nuw><nsw> + ((3 * %a) umax %n)) /u 3) + (1 umin ((-3 * %a) + ((3 * %a) umax %n)))))<u nuw> + (3 * %a))<u nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(3 * %a)<u nuw>,+,3}<nuw><%loop> U: full-set S: full-set Exits: ((3 * ((((-3 * %a) + (-1 * (1 umin ((-3 * %a) + ((3 * %a) umax %n))))<nuw><nsw> + ((3 * %a) umax %n)) /u 3) + (1 umin ((-3 * %a) + ((3 * %a) umax %n)))))<u nuw> + (3 * %a))<u nuw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %wide = zext i32 %index to i64
-; CHECK-NEXT:    --> {(zext i32 (3 * %a) to i64),+,3}<nuw><%loop> U: [0,8589934591) S: [0,8589934591) Exits: ((zext i32 (3 * %a) to i64) + (3 * (zext i32 ((((-3 * %a) + (-1 * (1 umin ((-3 * %a) + ((3 * %a) umax %n))))<nuw><nsw> + ((3 * %a) umax %n)) /u 3) + (1 umin ((-3 * %a) + ((3 * %a) umax %n)))) to i64))<nuw><nsw>)<u nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(zext i32 (3 * %a)<u nuw> to i64),+,3}<nuw><%loop> U: [0,8589934591) S: [0,8589934591) Exits: ((zext i32 (3 * %a)<u nuw> to i64) + (3 * (zext i32 ((((-3 * %a) + (-1 * (1 umin ((-3 * %a) + ((3 * %a) umax %n))))<nuw><nsw> + ((3 * %a) umax %n)) /u 3) + (1 umin ((-3 * %a) + ((3 * %a) umax %n)))) to i64))<nuw><nsw>)<u nuw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %p = getelementptr i8, ptr %dst, i64 %wide
-; CHECK-NEXT:    --> {((zext i32 (3 * %a) to i64) + %dst),+,3}<nw><%loop> U: full-set S: full-set Exits: ((zext i32 (3 * %a) to i64) + (3 * (zext i32 ((((-3 * %a) + (-1 * (1 umin ((-3 * %a) + ((3 * %a) umax %n))))<nuw><nsw> + ((3 * %a) umax %n)) /u 3) + (1 umin ((-3 * %a) + ((3 * %a) umax %n)))) to i64))<nuw><nsw> + %dst) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {((zext i32 (3 * %a)<u nuw> to i64) + %dst),+,3}<nw><%loop> U: full-set S: full-set Exits: ((zext i32 (3 * %a)<u nuw> to i64) + (3 * (zext i32 ((((-3 * %a) + (-1 * (1 umin ((-3 * %a) + ((3 * %a) umax %n))))<nuw><nsw> + ((3 * %a) umax %n)) /u 3) + (1 umin ((-3 * %a) + ((3 * %a) umax %n)))) to i64))<nuw><nsw> + %dst) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = add nuw i32 %iv, 1
 ; CHECK-NEXT:    --> {(1 + %a),+,1}<nw><%loop> U: full-set S: full-set Exits: (1 + (((-3 * %a) + (-1 * (1 umin ((-3 * %a) + ((3 * %a) umax %n))))<nuw><nsw> + ((3 * %a) umax %n)) /u 3) + (1 umin ((-3 * %a) + ((3 * %a) umax %n))) + %a) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @scaled_nuw_exit_count
@@ -130,15 +130,15 @@ define void @scaled_nuw_plain_sibling(ptr %dst, i32 %a, i32 %b, i32 %n) {
 ; CHECK-NEXT:    %iv = phi i32 [ %a, %entry ], [ %iv.next, %loop ]
 ; CHECK-NEXT:    --> {%a,+,1}<nuw><%loop> U: full-set S: full-set Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %index = mul nuw i32 %iv, %b
-; CHECK-NEXT:    --> {(%a * %b),+,%b}<nuw><%loop> U: full-set S: full-set Exits: ((-1 + %n) * %b) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(%a * %b)<u nuw>,+,%b}<nuw><%loop> U: full-set S: full-set Exits: ((-1 + %n) * %b) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %plain = mul i32 %iv, %b
 ; CHECK-NEXT:    --> {(%a * %b),+,%b}<nuw><%loop> U: full-set S: full-set Exits: ((-1 + %n) * %b) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %wide = zext i32 %index to i64
-; CHECK-NEXT:    --> {(zext i32 (%a * %b) to i64),+,(zext i32 %b to i64)}<nuw><%loop> U: [0,-4294967295) S: [0,-4294967295) Exits: ((zext i32 (%a * %b) to i64) + ((zext i32 (-1 + (-1 * %a) + %n) to i64) * (zext i32 %b to i64))<u nuw>)<u nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(zext i32 (%a * %b)<u nuw> to i64),+,(zext i32 %b to i64)}<nuw><%loop> U: [0,-4294967295) S: [0,-4294967295) Exits: ((zext i32 (%a * %b)<u nuw> to i64) + ((zext i32 (-1 + (-1 * %a) + %n) to i64) * (zext i32 %b to i64))<u nuw>)<u nuw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %plain.wide = zext i32 %plain to i64
 ; CHECK-NEXT:    --> {(zext i32 (%a * %b) to i64),+,(zext i32 %b to i64)}<nuw><%loop> U: [0,-4294967295) S: [0,-4294967295) Exits: ((zext i32 (%a * %b) to i64) + ((zext i32 (-1 + (-1 * %a) + %n) to i64) * (zext i32 %b to i64))<u nuw>)<u nuw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %p = getelementptr i8, ptr %dst, i64 %wide
-; CHECK-NEXT:    --> {((zext i32 (%a * %b) to i64) + %dst),+,(zext i32 %b to i64)}<nw><%loop> U: full-set S: full-set Exits: ((zext i32 (%a * %b) to i64) + ((zext i32 (-1 + (-1 * %a) + %n) to i64) * (zext i32 %b to i64)) + %dst) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {((zext i32 (%a * %b)<u nuw> to i64) + %dst),+,(zext i32 %b to i64)}<nw><%loop> U: full-set S: full-set Exits: ((zext i32 (%a * %b)<u nuw> to i64) + ((zext i32 (-1 + (-1 * %a) + %n) to i64) * (zext i32 %b to i64)) + %dst) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %q = getelementptr i8, ptr %dst, i64 %plain.wide
 ; CHECK-NEXT:    --> {((zext i32 (%a * %b) to i64) + %dst),+,(zext i32 %b to i64)}<nw><%loop> U: full-set S: full-set Exits: ((zext i32 (%a * %b) to i64) + ((zext i32 (-1 + (-1 * %a) + %n) to i64) * (zext i32 %b to i64)) + %dst) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = add nuw i32 %iv, 1
@@ -261,15 +261,15 @@ define void @scaled_nuw_canonical_flags_first(ptr %dst, i32 %a, i32 %n) mustprog
 ; CHECK-NEXT:    %iv = phi i32 [ %a, %entry ], [ %iv.next, %loop ]
 ; CHECK-NEXT:    --> {%a,+,1}<nuw><%loop> U: full-set S: full-set Exits: (((3 + (-4 * %a) + ((4 * %a) smax %n)) /u 4) + %a)<u nuw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %index = mul nuw i32 %iv, 4
-; CHECK-NEXT:    --> {(4 * %a),+,4}<nuw><nsw><%loop> U: [0,-3) S: [-2147483648,2147483645) Exits: ((4 * ((3 + (-4 * %a) + ((4 * %a) smax %n)) /u 4))<nuw> + (4 * %a))<u nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(4 * %a)<u nuw>,+,4}<nuw><nsw><%loop> U: [0,-3) S: [-2147483648,2147483645) Exits: ((4 * ((3 + (-4 * %a) + ((4 * %a) smax %n)) /u 4))<nuw> + (4 * %a))<u nuw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %plain = mul i32 %iv, 4
 ; CHECK-NEXT:    --> {(4 * %a),+,4}<nuw><nsw><%loop> U: [0,-3) S: [-2147483648,2147483645) Exits: ((4 * ((3 + (-4 * %a) + ((4 * %a) smax %n)) /u 4))<nuw> + (4 * %a))<u nuw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %index.zext = zext i32 %index to i64
-; CHECK-NEXT:    --> {(zext i32 (4 * %a) to i64),+,4}<nuw><nsw><%loop> U: [0,8589934585) S: [0,8589934585) Exits: ((zext i32 (4 * %a) to i64) + (4 * ((zext i32 (3 + (-4 * %a) + ((4 * %a) smax %n)) to i64) /u 4))<nuw><nsw>)<u nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(zext i32 (4 * %a)<u nuw> to i64),+,4}<nuw><nsw><%loop> U: [0,8589934585) S: [0,8589934585) Exits: ((zext i32 (4 * %a)<u nuw> to i64) + (4 * ((zext i32 (3 + (-4 * %a) + ((4 * %a) smax %n)) to i64) /u 4))<nuw><nsw>)<u nuw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %gep = getelementptr i8, ptr %dst, i64 %index.zext
-; CHECK-NEXT:    --> {((zext i32 (4 * %a) to i64) + %dst),+,4}<nw><%loop> U: full-set S: full-set Exits: ((zext i32 (4 * %a) to i64) + (4 * ((zext i32 (3 + (-4 * %a) + ((4 * %a) smax %n)) to i64) /u 4))<nuw><nsw> + %dst) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {((zext i32 (4 * %a)<u nuw> to i64) + %dst),+,4}<nw><%loop> U: full-set S: full-set Exits: ((zext i32 (4 * %a)<u nuw> to i64) + (4 * ((zext i32 (3 + (-4 * %a) + ((4 * %a) smax %n)) to i64) /u 4))<nuw><nsw> + %dst) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %index.sext = sext i32 %index to i64
-; CHECK-NEXT:    --> {(sext i32 (4 * %a) to i64),+,4}<nuw><nsw><%loop> U: [0,-3) S: [-2147483648,6442450937) Exits: ((sext i32 (4 * %a) to i64) + (4 * ((zext i32 (3 + (-4 * %a) + ((4 * %a) smax %n)) to i64) /u 4))<nuw><nsw>)<u nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(sext i32 (4 * %a)<u nuw> to i64),+,4}<nuw><nsw><%loop> U: [0,-3) S: [-2147483648,6442450937) Exits: ((sext i32 (4 * %a)<u nuw> to i64) + (4 * ((zext i32 (3 + (-4 * %a) + ((4 * %a) smax %n)) to i64) /u 4))<nuw><nsw>)<u nuw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = add nuw i32 %iv, 1
 ; CHECK-NEXT:    --> {(1 + %a),+,1}<nw><%loop> U: full-set S: full-set Exits: (1 + ((3 + (-4 * %a) + ((4 * %a) smax %n)) /u 4) + %a) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:  Determining loop execution counts for: @scaled_nuw_canonical_flags_first
@@ -305,13 +305,13 @@ define void @scaled_nuw_variant_flags_first(ptr %dst, i32 %a, i32 %n) mustprogre
 ; CHECK-NEXT:    %iv = phi i32 [ %a, %entry ], [ %iv.next, %loop ]
 ; CHECK-NEXT:    --> {%a,+,1}<nuw><%loop> U: full-set S: full-set Exits: ((((-3 * %a) + (-1 * (1 umin ((-3 * %a) + ((3 * %a) smax %n))))<nuw><nsw> + ((3 * %a) smax %n)) /u 3) + (1 umin ((-3 * %a) + ((3 * %a) smax %n))) + %a) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %index = mul nuw i32 %iv, 3
-; CHECK-NEXT:    --> {(3 * %a),+,3}<nuw><nsw><%loop> U: full-set S: full-set Exits: ((3 * ((((-3 * %a) + (-1 * (1 umin ((-3 * %a) + ((3 * %a) smax %n))))<nuw><nsw> + ((3 * %a) smax %n)) /u 3) + (1 umin ((-3 * %a) + ((3 * %a) smax %n)))))<u nuw> + (3 * %a))<u nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(3 * %a)<u nuw>,+,3}<nuw><nsw><%loop> U: full-set S: full-set Exits: ((3 * ((((-3 * %a) + (-1 * (1 umin ((-3 * %a) + ((3 * %a) smax %n))))<nuw><nsw> + ((3 * %a) smax %n)) /u 3) + (1 umin ((-3 * %a) + ((3 * %a) smax %n)))))<u nuw> + (3 * %a))<u nuw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %plain = mul i32 %iv, 3
 ; CHECK-NEXT:    --> {(3 * %a),+,3}<nuw><nsw><%loop> U: full-set S: full-set Exits: ((3 * ((((-3 * %a) + (-1 * (1 umin ((-3 * %a) + ((3 * %a) smax %n))))<nuw><nsw> + ((3 * %a) smax %n)) /u 3) + (1 umin ((-3 * %a) + ((3 * %a) smax %n)))))<u nuw> + (3 * %a))<u nuw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %index.zext = zext i32 %index to i64
-; CHECK-NEXT:    --> {(zext i32 (3 * %a) to i64),+,3}<nuw><nsw><%loop> U: [0,8589934591) S: [0,8589934591) Exits: ((zext i32 (3 * %a) to i64) + (3 * (zext i32 ((((-3 * %a) + (-1 * (1 umin ((-3 * %a) + ((3 * %a) smax %n))))<nuw><nsw> + ((3 * %a) smax %n)) /u 3) + (1 umin ((-3 * %a) + ((3 * %a) smax %n)))) to i64))<nuw><nsw>)<u nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {(zext i32 (3 * %a)<u nuw> to i64),+,3}<nuw><nsw><%loop> U: [0,8589934591) S: [0,8589934591) Exits: ((zext i32 (3 * %a)<u nuw> to i64) + (3 * (zext i32 ((((-3 * %a) + (-1 * (1 umin ((-3 * %a) + ((3 * %a) smax %n))))<nuw><nsw> + ((3 * %a) smax %n)) /u 3) + (1 umin ((-3 * %a) + ((3 * %a) smax %n)))) to i64))<nuw><nsw>)<u nuw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %gep = getelementptr i8, ptr %dst, i64 %index.zext
-; CHECK-NEXT:    --> {((zext i32 (3 * %a) to i64) + %dst),+,3}<nw><%loop> U: full-set S: full-set Exits: ((zext i32 (3 * %a) to i64) + (3 * (zext i32 ((((-3 * %a) + (-1 * (1 umin ((-3 * %a) + ((3 * %a) smax %n))))<nuw><nsw> + ((3 * %a) smax %n)) /u 3) + (1 umin ((-3 * %a) + ((3 * %a) smax %n)))) to i64))<nuw><nsw> + %dst) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    --> {((zext i32 (3 * %a)<u nuw> to i64) + %dst),+,3}<nw><%loop> U: full-set S: full-set Exits: ((zext i32 (3 * %a)<u nuw> to i64) + (3 * (zext i32 ((((-3 * %a) + (-1 * (1 umin ((-3 * %a) + ((3 * %a) smax %n))))<nuw><nsw> + ((3 * %a) smax %n)) /u 3) + (1 umin ((-3 * %a) + ((3 * %a) smax %n)))) to i64))<nuw><nsw> + %dst) LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %plain.sext = sext i32 %plain to i64
 ; CHECK-NEXT:    --> {(sext i32 (3 * %a) to i64),+,3}<nuw><nsw><%loop> U: [-2147483648,6442450943) S: [-2147483648,6442450943) Exits: ((sext i32 (3 * %a) to i64) + (3 * (zext i32 ((((-3 * %a) + (-1 * (1 umin ((-3 * %a) + ((3 * %a) smax %n))))<nuw><nsw> + ((3 * %a) smax %n)) /u 3) + (1 umin ((-3 * %a) + ((3 * %a) smax %n)))) to i64))<nuw><nsw>)<u nuw> LoopDispositions: { %loop: Computable }
 ; CHECK-NEXT:    %iv.next = add nuw i32 %iv, 1
@@ -350,27 +350,27 @@ define void @cancelled_step_quadratic(ptr %dst, i32 %a, i32 %b, i32 %n) {
 ; CHECK-NEXT:    %outer.iv = phi i32 [ %a, %entry ], [ %outer.iv.next, %outer.latch ]
 ; CHECK-NEXT:    --> {%a,+,1}<nuw><%outer> U: full-set S: full-set Exits: (-1 + %n) LoopDispositions: { %outer: Computable, %inner: Invariant }
 ; CHECK-NEXT:    %index = mul nuw i32 %outer.iv, %b
-; CHECK-NEXT:    --> {(%a * %b),+,%b}<nuw><%outer> U: full-set S: full-set Exits: ((-1 + %n) * %b) LoopDispositions: { %outer: Computable, %inner: Invariant }
+; CHECK-NEXT:    --> {(%a * %b)<u nuw>,+,%b}<nuw><%outer> U: full-set S: full-set Exits: ((-1 + %n) * %b) LoopDispositions: { %outer: Computable, %inner: Invariant }
 ; CHECK-NEXT:    %index.ext = zext i32 %index to i64
-; CHECK-NEXT:    --> {(zext i32 (%a * %b) to i64),+,(zext i32 %b to i64)}<nuw><%outer> U: [0,-4294967295) S: [0,-4294967295) Exits: ((zext i32 (%a * %b) to i64) + ((zext i32 (-1 + (-1 * %a) + %n) to i64) * (zext i32 %b to i64))<u nuw>)<u nuw> LoopDispositions: { %outer: Computable, %inner: Invariant }
+; CHECK-NEXT:    --> {(zext i32 (%a * %b)<u nuw> to i64),+,(zext i32 %b to i64)}<nuw><%outer> U: [0,-4294967295) S: [0,-4294967295) Exits: ((zext i32 (%a * %b)<u nuw> to i64) + ((zext i32 (-1 + (-1 * %a) + %n) to i64) * (zext i32 %b to i64))<u nuw>)<u nuw> LoopDispositions: { %outer: Computable, %inner: Invariant }
 ; CHECK-NEXT:    %gep = getelementptr i8, ptr %dst, i64 %index.ext
-; CHECK-NEXT:    --> {((zext i32 (%a * %b) to i64) + %dst),+,(zext i32 %b to i64)}<nw><%outer> U: full-set S: full-set Exits: ((zext i32 (%a * %b) to i64) + ((zext i32 (-1 + (-1 * %a) + %n) to i64) * (zext i32 %b to i64)) + %dst) LoopDispositions: { %outer: Computable, %inner: Invariant }
+; CHECK-NEXT:    --> {((zext i32 (%a * %b)<u nuw> to i64) + %dst),+,(zext i32 %b to i64)}<nw><%outer> U: full-set S: full-set Exits: ((zext i32 (%a * %b)<u nuw> to i64) + ((zext i32 (-1 + (-1 * %a) + %n) to i64) * (zext i32 %b to i64)) + %dst) LoopDispositions: { %outer: Computable, %inner: Invariant }
 ; CHECK-NEXT:    %plain = mul i32 %outer.iv, %b
 ; CHECK-NEXT:    --> {(%a * %b),+,%b}<nuw><%outer> U: full-set S: full-set Exits: ((-1 + %n) * %b) LoopDispositions: { %outer: Computable, %inner: Invariant }
 ; CHECK-NEXT:    %plain.ext = zext i32 %plain to i64
 ; CHECK-NEXT:    --> {(zext i32 (%a * %b) to i64),+,(zext i32 %b to i64)}<nuw><%outer> U: [0,-4294967295) S: [0,-4294967295) Exits: ((zext i32 (%a * %b) to i64) + ((zext i32 (-1 + (-1 * %a) + %n) to i64) * (zext i32 %b to i64))<u nuw>)<u nuw> LoopDispositions: { %outer: Computable, %inner: Invariant }
 ; CHECK-NEXT:    %d = sub i64 %index.ext, %plain.ext
-; CHECK-NEXT:    --> 0 U: [0,1) S: [0,1) Exits: 0 LoopDispositions: { %outer: Invariant, %inner: Invariant }
+; CHECK-NEXT:    --> ((zext i32 (%a * %b)<u nuw> to i64) + (-1 * (zext i32 (%a * %b) to i64))<nsw>) U: [-4294967295,4294967296) S: [-4294967295,4294967296) Exits: ((zext i32 (%a * %b)<u nuw> to i64) + (-1 * (zext i32 (%a * %b) to i64))<nsw>) LoopDispositions: { %outer: Invariant, %inner: Invariant }
 ; CHECK-NEXT:    %i = phi i64 [ 0, %outer ], [ %i.next, %inner ]
 ; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%inner> U: [0,100) S: [0,100) Exits: 99 LoopDispositions: { %inner: Computable, %outer: Uniform }
 ; CHECK-NEXT:    %j = phi i64 [ 1, %outer ], [ %j.next, %inner ]
-; CHECK-NEXT:    --> 1 U: [1,2) S: [1,2) Exits: 1 LoopDispositions: { %inner: Invariant, %outer: Invariant }
+; CHECK-NEXT:    --> {1,+,((zext i32 (%a * %b)<u nuw> to i64) + (-1 * (zext i32 (%a * %b) to i64))<nsw>)}<nsw><%inner> U: [-425201762204,425201762207) S: [-425201762204,425201762207) Exits: (1 + (99 * (zext i32 (%a * %b)<u nuw> to i64))<nuw><nsw> + (-99 * (zext i32 (%a * %b) to i64))<nsw>) LoopDispositions: { %inner: Computable, %outer: Uniform }
 ; CHECK-NEXT:    %k = phi i64 [ 0, %outer ], [ %k.next, %inner ]
-; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%inner> U: [0,100) S: [0,100) Exits: 99 LoopDispositions: { %inner: Computable, %outer: Uniform }
+; CHECK-NEXT:    --> {0,+,1,+,((zext i32 (%a * %b)<u nuw> to i64) + (-1 * (zext i32 (%a * %b) to i64))<nsw>)}<%inner> U: full-set S: full-set Exits: (99 + (4851 * (zext i32 (%a * %b)<u nuw> to i64))<nuw><nsw> + (-4851 * (zext i32 (%a * %b) to i64))<nsw>) LoopDispositions: { %inner: Computable, %outer: Uniform }
 ; CHECK-NEXT:    %j.next = add i64 %j, %d
-; CHECK-NEXT:    --> 1 U: [1,2) S: [1,2) Exits: 1 LoopDispositions: { %inner: Invariant, %outer: Invariant }
+; CHECK-NEXT:    --> {(1 + (zext i32 (%a * %b)<u nuw> to i64) + (-1 * (zext i32 (%a * %b) to i64))<nsw>),+,((zext i32 (%a * %b)<u nuw> to i64) + (-1 * (zext i32 (%a * %b) to i64))<nsw>)}<nw><%inner> U: [-429496729499,429496729502) S: [-429496729499,429496729502) Exits: (1 + (100 * (zext i32 (%a * %b)<u nuw> to i64))<nuw><nsw> + (-100 * (zext i32 (%a * %b) to i64))<nsw>) LoopDispositions: { %inner: Computable, %outer: Uniform }
 ; CHECK-NEXT:    %k.next = add i64 %k, %j
-; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%inner> U: [1,101) S: [1,101) Exits: 100 LoopDispositions: { %inner: Computable, %outer: Uniform }
+; CHECK-NEXT:    --> {1,+,(1 + (zext i32 (%a * %b)<u nuw> to i64) + (-1 * (zext i32 (%a * %b) to i64))<nsw>),+,((zext i32 (%a * %b)<u nuw> to i64) + (-1 * (zext i32 (%a * %b) to i64))<nsw>)}<%inner> U: full-set S: full-set Exits: (100 + (4950 * (zext i32 (%a * %b)<u nuw> to i64))<nuw><nsw> + (-4950 * (zext i32 (%a * %b) to i64))<nsw>) LoopDispositions: { %inner: Computable, %outer: Uniform }
 ; CHECK-NEXT:    %i.next = add nuw nsw i64 %i, 1
 ; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%inner> U: [1,101) S: [1,101) Exits: 100 LoopDispositions: { %inner: Computable, %outer: Uniform }
 ; CHECK-NEXT:    %outer.iv.next = add nuw i32 %outer.iv, 1
@@ -429,25 +429,25 @@ define void @cancelled_step_outer_start(ptr %dst, i32 %a, i32 %b, i64 %x, i32 %n
 ; CHECK-NEXT:    %outer.iv.2 = phi i64 [ %x, %entry ], [ %outer.iv.2.next, %outer.latch ]
 ; CHECK-NEXT:    --> {%x,+,1}<nw><%outer> U: full-set S: full-set Exits: ((zext i32 (-1 + (-1 * %a) + %n) to i64) + %x) LoopDispositions: { %outer: Computable, %inner: Invariant }
 ; CHECK-NEXT:    %index = mul nuw i32 %outer.iv.1, %b
-; CHECK-NEXT:    --> {(%a * %b),+,%b}<nuw><%outer> U: full-set S: full-set Exits: ((-1 + %n) * %b) LoopDispositions: { %outer: Computable, %inner: Invariant }
+; CHECK-NEXT:    --> {(%a * %b)<u nuw>,+,%b}<nuw><%outer> U: full-set S: full-set Exits: ((-1 + %n) * %b) LoopDispositions: { %outer: Computable, %inner: Invariant }
 ; CHECK-NEXT:    %index.ext = zext i32 %index to i64
-; CHECK-NEXT:    --> {(zext i32 (%a * %b) to i64),+,(zext i32 %b to i64)}<nuw><%outer> U: [0,-4294967295) S: [0,-4294967295) Exits: ((zext i32 (%a * %b) to i64) + ((zext i32 (-1 + (-1 * %a) + %n) to i64) * (zext i32 %b to i64))<u nuw>)<u nuw> LoopDispositions: { %outer: Computable, %inner: Invariant }
+; CHECK-NEXT:    --> {(zext i32 (%a * %b)<u nuw> to i64),+,(zext i32 %b to i64)}<nuw><%outer> U: [0,-4294967295) S: [0,-4294967295) Exits: ((zext i32 (%a * %b)<u nuw> to i64) + ((zext i32 (-1 + (-1 * %a) + %n) to i64) * (zext i32 %b to i64))<u nuw>)<u nuw> LoopDispositions: { %outer: Computable, %inner: Invariant }
 ; CHECK-NEXT:    %gep = getelementptr i8, ptr %dst, i64 %index.ext
-; CHECK-NEXT:    --> {((zext i32 (%a * %b) to i64) + %dst),+,(zext i32 %b to i64)}<nw><%outer> U: full-set S: full-set Exits: ((zext i32 (%a * %b) to i64) + ((zext i32 (-1 + (-1 * %a) + %n) to i64) * (zext i32 %b to i64)) + %dst) LoopDispositions: { %outer: Computable, %inner: Invariant }
+; CHECK-NEXT:    --> {((zext i32 (%a * %b)<u nuw> to i64) + %dst),+,(zext i32 %b to i64)}<nw><%outer> U: full-set S: full-set Exits: ((zext i32 (%a * %b)<u nuw> to i64) + ((zext i32 (-1 + (-1 * %a) + %n) to i64) * (zext i32 %b to i64)) + %dst) LoopDispositions: { %outer: Computable, %inner: Invariant }
 ; CHECK-NEXT:    %plain = mul i32 %outer.iv.1, %b
 ; CHECK-NEXT:    --> {(%a * %b),+,%b}<nuw><%outer> U: full-set S: full-set Exits: ((-1 + %n) * %b) LoopDispositions: { %outer: Computable, %inner: Invariant }
 ; CHECK-NEXT:    %plain.ext = zext i32 %plain to i64
 ; CHECK-NEXT:    --> {(zext i32 (%a * %b) to i64),+,(zext i32 %b to i64)}<nuw><%outer> U: [0,-4294967295) S: [0,-4294967295) Exits: ((zext i32 (%a * %b) to i64) + ((zext i32 (-1 + (-1 * %a) + %n) to i64) * (zext i32 %b to i64))<u nuw>)<u nuw> LoopDispositions: { %outer: Computable, %inner: Invariant }
 ; CHECK-NEXT:    %d = sub i64 %index.ext, %plain.ext
-; CHECK-NEXT:    --> 0 U: [0,1) S: [0,1) Exits: 0 LoopDispositions: { %outer: Invariant, %inner: Invariant }
+; CHECK-NEXT:    --> ((zext i32 (%a * %b)<u nuw> to i64) + (-1 * (zext i32 (%a * %b) to i64))<nsw>) U: [-4294967295,4294967296) S: [-4294967295,4294967296) Exits: ((zext i32 (%a * %b)<u nuw> to i64) + (-1 * (zext i32 (%a * %b) to i64))<nsw>) LoopDispositions: { %outer: Invariant, %inner: Invariant }
 ; CHECK-NEXT:    %i = phi i64 [ 0, %outer ], [ %i.next, %inner ]
 ; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%inner> U: [0,100) S: [0,100) Exits: 99 LoopDispositions: { %inner: Computable, %outer: Uniform }
 ; CHECK-NEXT:    %inner.iv = phi i64 [ %outer.iv.2, %outer ], [ %inner.iv.next, %inner ]
-; CHECK-NEXT:    --> {%x,+,1}<nw><%outer> U: full-set S: full-set Exits: {%x,+,1}<nw><%outer> LoopDispositions: { %inner: Invariant, %outer: Computable }
+; CHECK-NEXT:    --> {{\{\{}}%x,+,1}<nw><%outer>,+,((zext i32 (%a * %b)<u nuw> to i64) + (-1 * (zext i32 (%a * %b) to i64))<nsw>)}<nuw><nsw><%inner> U: full-set S: full-set Exits: {((99 * (zext i32 (%a * %b)<u nuw> to i64))<nuw><nsw> + (-99 * (zext i32 (%a * %b) to i64))<nsw> + %x),+,1}<nw><%outer> LoopDispositions: { %inner: Computable, %outer: Variant }
 ; CHECK-NEXT:    %inner.iv.next = add nuw nsw i64 %inner.iv, %d
-; CHECK-NEXT:    --> {%x,+,1}<nw><%outer> U: full-set S: full-set Exits: {%x,+,1}<nw><%outer> LoopDispositions: { %inner: Invariant, %outer: Computable }
+; CHECK-NEXT:    --> {{\{\{}}((zext i32 (%a * %b)<u nuw> to i64) + (-1 * (zext i32 (%a * %b) to i64))<nsw> + %x),+,1}<nw><%outer>,+,((zext i32 (%a * %b)<u nuw> to i64) + (-1 * (zext i32 (%a * %b) to i64))<nsw>)}<nuw><nsw><%inner> U: full-set S: full-set Exits: {((100 * (zext i32 (%a * %b)<u nuw> to i64))<nuw><nsw> + (-100 * (zext i32 (%a * %b) to i64))<nsw> + %x),+,1}<nw><%outer> LoopDispositions: { %inner: Computable, %outer: Variant }
 ; CHECK-NEXT:    %inner.gep = getelementptr i8, ptr %dst, i64 %inner.iv.next
-; CHECK-NEXT:    --> {(%x + %dst),+,1}<nw><%outer> U: full-set S: full-set Exits: {(%x + %dst),+,1}<nw><%outer> LoopDispositions: { %inner: Invariant, %outer: Computable }
+; CHECK-NEXT:    --> {{\{\{}}((zext i32 (%a * %b)<u nuw> to i64) + (-1 * (zext i32 (%a * %b) to i64))<nsw> + %x + %dst),+,1}<nw><%outer>,+,((zext i32 (%a * %b)<u nuw> to i64) + (-1 * (zext i32 (%a * %b) to i64))<nsw>)}<nw><%inner> U: full-set S: full-set Exits: {((100 * (zext i32 (%a * %b)<u nuw> to i64))<nuw><nsw> + (-100 * (zext i32 (%a * %b) to i64))<nsw> + %x + %dst),+,1}<nw><%outer> LoopDispositions: { %inner: Computable, %outer: Variant }
 ; CHECK-NEXT:    %i.next = add nuw nsw i64 %i, 1
 ; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%inner> U: [1,101) S: [1,101) Exits: 100 LoopDispositions: { %inner: Computable, %outer: Uniform }
 ; CHECK-NEXT:    %outer.iv.1.next = add nuw i32 %outer.iv.1, 1
