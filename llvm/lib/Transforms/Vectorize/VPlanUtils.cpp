@@ -352,12 +352,18 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
                 SE.getMulExpr(
                     IV, SE.getTruncateOrSignExtend(Scale, IV->getType())));
           })
-          .Case([&SE, &PSE, L](const VPScalarIVStepsRecipe *R) {
-            const SCEV *IV = getSCEVExprForVPValue(R->getOperand(0), PSE, L);
-            const SCEV *Step = getSCEVExprForVPValue(R->getOperand(1), PSE, L);
-            if (isa<SCEVCouldNotCompute>(IV) || !isa<SCEVConstant>(Step))
+          .Case([&SE, &PSE, L](const VPScalarIVStepsRecipe *R) -> const SCEV * {
+            // Unrolled parts other than the first add StartIndex * Step, which
+            // is not modeled.
+            if (R->getStartIndex())
               return SE.getCouldNotCompute();
-            return SE.getTruncateOrSignExtend(IV, Step->getType());
+            // The IV operand already advances by R's step in each iteration,
+            // so it is R's value for the current scalar iteration, independent
+            // of the step.
+            const SCEV *IV = getSCEVExprForVPValue(R->getOperand(0), PSE, L);
+            if (isa<SCEVCouldNotCompute>(IV))
+              return IV;
+            return SE.getTruncateOrSignExtend(IV, R->getScalarType());
           })
           .Default(
               [&SE](const VPRecipeBase *) { return SE.getCouldNotCompute(); });
