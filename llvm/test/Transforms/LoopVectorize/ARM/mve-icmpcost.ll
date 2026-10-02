@@ -154,9 +154,9 @@ define void @cheap_icmp(ptr nocapture readonly %pSrcA, ptr nocapture readonly %p
 ; CHECK:  LV: Found an estimated cost of 1 for VF 1 For instruction: %cmp.not = icmp eq i32 %dec, 0
 ; CHECK:  LV: Found an estimated cost of 0 for VF 1 For instruction: br i1 %cmp.not, label %while.end.loopexit, label %while.body
 ; CHECK:  Cost of 0 for VF 2: vp<[[VP8:%[0-9]+]]> = SCALAR-STEPS vp<[[VP7:%[0-9]+]]>, ir<1>, vp<[[VP0:%[0-9]+]]>
-; CHECK:  Cost of 0 for VF 2: EMIT vp<%next.gep> = ptradd ir<%pSrcA>, vp<[[VP8]]>
-; CHECK:  Cost of 0 for VF 2: EMIT vp<%next.gep>.1 = ptradd ir<%pDst>, vp<[[VP8]]>
-; CHECK:  Cost of 0 for VF 2: EMIT vp<%next.gep>.2 = ptradd ir<%pSrcB>, vp<[[VP8]]>
+; CHECK:  Cost of 0 for VF 2: EMIT-SCALAR vp<%next.gep> = ptradd ir<%pSrcA>, vp<[[VP8]]>
+; CHECK:  Cost of 0 for VF 2: EMIT-SCALAR vp<%next.gep>.1 = ptradd ir<%pDst>, vp<[[VP8]]>
+; CHECK:  Cost of 0 for VF 2: EMIT-SCALAR vp<%next.gep>.2 = ptradd ir<%pSrcB>, vp<[[VP8]]>
 ; CHECK:  Cost of 0 for VF 2: vp<[[VP9:%[0-9]+]]> = vector-pointer i8, vp<%next.gep>, ir<1>
 ; CHECK:  Cost of 18 for VF 2: WIDEN ir<%0> = load vp<[[VP9]]>
 ; CHECK:  Cost of 4 for VF 2: EMIT ir<%conv1> = sext ir<%0> to i32
@@ -205,9 +205,9 @@ define void @cheap_icmp(ptr nocapture readonly %pSrcA, ptr nocapture readonly %p
 ; CHECK:  Cost of 0 for VF 2: EMIT branch-on-cond vp<%cmp.n>
 ; CHECK:  Cost for VF 2: 130 (Estimated cost per lane: 65)
 ; CHECK:  Cost of 0 for VF 4: vp<[[VP8]]> = SCALAR-STEPS vp<[[VP7]]>, ir<1>, vp<[[VP0]]>
-; CHECK:  Cost of 0 for VF 4: EMIT vp<%next.gep> = ptradd ir<%pSrcA>, vp<[[VP8]]>
-; CHECK:  Cost of 0 for VF 4: EMIT vp<%next.gep>.1 = ptradd ir<%pDst>, vp<[[VP8]]>
-; CHECK:  Cost of 0 for VF 4: EMIT vp<%next.gep>.2 = ptradd ir<%pSrcB>, vp<[[VP8]]>
+; CHECK:  Cost of 0 for VF 4: EMIT-SCALAR vp<%next.gep> = ptradd ir<%pSrcA>, vp<[[VP8]]>
+; CHECK:  Cost of 0 for VF 4: EMIT-SCALAR vp<%next.gep>.1 = ptradd ir<%pDst>, vp<[[VP8]]>
+; CHECK:  Cost of 0 for VF 4: EMIT-SCALAR vp<%next.gep>.2 = ptradd ir<%pSrcB>, vp<[[VP8]]>
 ; CHECK:  Cost of 0 for VF 4: vp<[[VP9]]> = vector-pointer i8, vp<%next.gep>, ir<1>
 ; CHECK:  Cost of 2 for VF 4: WIDEN ir<%0> = load vp<[[VP9]]>
 ; CHECK:  Cost of 0 for VF 4: EMIT ir<%conv1> = sext ir<%0> to i32
@@ -256,9 +256,9 @@ define void @cheap_icmp(ptr nocapture readonly %pSrcA, ptr nocapture readonly %p
 ; CHECK:  Cost of 0 for VF 4: EMIT branch-on-cond vp<%cmp.n>
 ; CHECK:  Cost for VF 4: 14 (Estimated cost per lane: 3.5)
 ; CHECK:  Cost of 0 for VF 8: vp<[[VP8]]> = SCALAR-STEPS vp<[[VP7]]>, ir<1>, vp<[[VP0]]>
-; CHECK:  Cost of 0 for VF 8: EMIT vp<%next.gep> = ptradd ir<%pSrcA>, vp<[[VP8]]>
-; CHECK:  Cost of 0 for VF 8: EMIT vp<%next.gep>.1 = ptradd ir<%pDst>, vp<[[VP8]]>
-; CHECK:  Cost of 0 for VF 8: EMIT vp<%next.gep>.2 = ptradd ir<%pSrcB>, vp<[[VP8]]>
+; CHECK:  Cost of 0 for VF 8: EMIT-SCALAR vp<%next.gep> = ptradd ir<%pSrcA>, vp<[[VP8]]>
+; CHECK:  Cost of 0 for VF 8: EMIT-SCALAR vp<%next.gep>.1 = ptradd ir<%pDst>, vp<[[VP8]]>
+; CHECK:  Cost of 0 for VF 8: EMIT-SCALAR vp<%next.gep>.2 = ptradd ir<%pSrcB>, vp<[[VP8]]>
 ; CHECK:  Cost of 0 for VF 8: vp<[[VP9]]> = vector-pointer i8, vp<%next.gep>, ir<1>
 ; CHECK:  Cost of 2 for VF 8: WIDEN ir<%0> = load vp<[[VP9]]>
 ; CHECK:  Cost of 2 for VF 8: EMIT ir<%conv1> = sext ir<%0> to i32
@@ -307,9 +307,9 @@ define void @cheap_icmp(ptr nocapture readonly %pSrcA, ptr nocapture readonly %p
 ; CHECK:  Cost of 0 for VF 8: EMIT branch-on-cond vp<%cmp.n>
 ; CHECK:  Cost for VF 8: 26 (Estimated cost per lane: 3.25)
 ; CHECK:  Cost of 0 for VF 16: vp<[[VP8]]> = SCALAR-STEPS vp<[[VP7]]>, ir<1>, vp<[[VP0]]>
-; CHECK:  Cost of 0 for VF 16: EMIT vp<%next.gep> = ptradd ir<%pSrcA>, vp<[[VP8]]>
-; CHECK:  Cost of 0 for VF 16: EMIT vp<%next.gep>.1 = ptradd ir<%pDst>, vp<[[VP8]]>
-; CHECK:  Cost of 0 for VF 16: EMIT vp<%next.gep>.2 = ptradd ir<%pSrcB>, vp<[[VP8]]>
+; CHECK:  Cost of 0 for VF 16: EMIT-SCALAR vp<%next.gep> = ptradd ir<%pSrcA>, vp<[[VP8]]>
+; CHECK:  Cost of 0 for VF 16: EMIT-SCALAR vp<%next.gep>.1 = ptradd ir<%pDst>, vp<[[VP8]]>
+; CHECK:  Cost of 0 for VF 16: EMIT-SCALAR vp<%next.gep>.2 = ptradd ir<%pSrcB>, vp<[[VP8]]>
 ; CHECK:  Cost of 0 for VF 16: vp<[[VP9]]> = vector-pointer i8, vp<%next.gep>, ir<1>
 ; CHECK:  Cost of 2 for VF 16: WIDEN ir<%0> = load vp<[[VP9]]>
 ; CHECK:  Cost of 6 for VF 16: EMIT ir<%conv1> = sext ir<%0> to i32
@@ -414,10 +414,10 @@ define void @floatcmp(ptr nocapture readonly %pSrc, ptr nocapture %pDst, i32 %bl
 ; CHECK:  LV: Found an estimated cost of 0 for VF 1 For instruction: br i1 %cmp.not, label %while.end.loopexit, label %while.body
 ; CHECK:  Cost of 1 for VF 2: vp<[[VP7:%[0-9]+]]> = DERIVED-IV ir<0> + vp<[[VP6:%[0-9]+]]> * ir<4>
 ; CHECK:  Cost of 0 for VF 2: vp<[[VP8:%[0-9]+]]> = SCALAR-STEPS vp<[[VP7]]>, ir<4>, vp<[[VP0:%[0-9]+]]>
-; CHECK:  Cost of 0 for VF 2: EMIT vp<%next.gep> = ptradd ir<%pSrc>, vp<[[VP8]]>
+; CHECK:  Cost of 0 for VF 2: EMIT-SCALAR vp<%next.gep> = ptradd ir<%pSrc>, vp<[[VP8]]>
 ; CHECK:  Cost of 1 for VF 2: vp<[[VP9:%[0-9]+]]> = DERIVED-IV ir<0> + vp<[[VP6]]> * ir<4>
 ; CHECK:  Cost of 0 for VF 2: vp<[[VP10:%[0-9]+]]> = SCALAR-STEPS vp<[[VP9]]>, ir<4>, vp<[[VP0]]>
-; CHECK:  Cost of 0 for VF 2: EMIT vp<%next.gep>.1 = ptradd ir<%pDst>, vp<[[VP10]]>
+; CHECK:  Cost of 0 for VF 2: EMIT-SCALAR vp<%next.gep>.1 = ptradd ir<%pDst>, vp<[[VP10]]>
 ; CHECK:  Cost of 0 for VF 2: vp<[[VP11:%[0-9]+]]> = vector-pointer float, vp<%next.gep>, ir<1>
 ; CHECK:  Cost of 6 for VF 2: WIDEN ir<%0> = load vp<[[VP11]]>
 ; CHECK:  Cost of 12 for VF 2: WIDEN ir<%cmp1> = fcmp olt nnan ninf nsz ir<%0>, ir<0.000000e+00>
@@ -452,10 +452,10 @@ define void @floatcmp(ptr nocapture readonly %pSrc, ptr nocapture %pDst, i32 %bl
 ; CHECK:  Cost for VF 2: 84 (Estimated cost per lane: 42)
 ; CHECK:  Cost of 1 for VF 4: vp<[[VP7]]> = DERIVED-IV ir<0> + vp<[[VP6]]> * ir<4>
 ; CHECK:  Cost of 0 for VF 4: vp<[[VP8]]> = SCALAR-STEPS vp<[[VP7]]>, ir<4>, vp<[[VP0]]>
-; CHECK:  Cost of 0 for VF 4: EMIT vp<%next.gep> = ptradd ir<%pSrc>, vp<[[VP8]]>
+; CHECK:  Cost of 0 for VF 4: EMIT-SCALAR vp<%next.gep> = ptradd ir<%pSrc>, vp<[[VP8]]>
 ; CHECK:  Cost of 1 for VF 4: vp<[[VP9]]> = DERIVED-IV ir<0> + vp<[[VP6]]> * ir<4>
 ; CHECK:  Cost of 0 for VF 4: vp<[[VP10]]> = SCALAR-STEPS vp<[[VP9]]>, ir<4>, vp<[[VP0]]>
-; CHECK:  Cost of 0 for VF 4: EMIT vp<%next.gep>.1 = ptradd ir<%pDst>, vp<[[VP10]]>
+; CHECK:  Cost of 0 for VF 4: EMIT-SCALAR vp<%next.gep>.1 = ptradd ir<%pDst>, vp<[[VP10]]>
 ; CHECK:  Cost of 0 for VF 4: vp<[[VP11]]> = vector-pointer float, vp<%next.gep>, ir<1>
 ; CHECK:  Cost of 2 for VF 4: WIDEN ir<%0> = load vp<[[VP11]]>
 ; CHECK:  Cost of 24 for VF 4: WIDEN ir<%cmp1> = fcmp olt nnan ninf nsz ir<%0>, ir<0.000000e+00>

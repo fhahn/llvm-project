@@ -22,8 +22,8 @@ define void @switch4_default_common_dest_with_case(ptr %start, ptr %end) {
 ; CHECK-NEXT:  vector.body:
 ; CHECK-NEXT:    EMIT-SCALAR vp<%index> = phi [ ir<0>, vector.ph ], [ vp<%index.next>, pred.store.continue ]
 ; CHECK-NEXT:    vp<[[VP6:%[0-9]+]]> = SCALAR-STEPS vp<%index>, ir<1>, ir<2>, ir<1>
-; CHECK-NEXT:    EMIT vp<%next.gep> = ptradd ir<%start>, vp<%index>
-; CHECK-NEXT:    EMIT vp<%next.gep>.1 = ptradd ir<%start>, vp<[[VP6]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%next.gep> = ptradd ir<%start>, vp<%index>
+; CHECK-NEXT:    EMIT-SCALAR vp<%next.gep>.1 = ptradd ir<%start>, vp<[[VP6]]>
 ; CHECK-NEXT:    WIDEN ir<%l> = load vp<%next.gep>
 ; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = icmp eq ir<%l>, ir<-12>
 ; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = icmp eq ir<%l>, ir<13>

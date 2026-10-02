@@ -1879,6 +1879,19 @@ void VPlanTransforms::narrowToSingleScalarRecipes(VPlan &Plan) {
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
            vp_depth_first_deep(Plan.getEntry()))) {
     for (VPRecipeBase &R : make_early_inc_range(reverse(*VPBB))) {
+      auto *VPI = dyn_cast<VPInstruction>(&R);
+      if (VPI && !VPI->doesGenerateSingleScalar() &&
+          VPInstruction::canGenerateScalarForFirstLane(VPI->getOpcode()) &&
+          vputils::onlyFirstLaneUsed(VPI)) {
+        auto *Clone = new VPInstruction(
+            VPI->getOpcode(), VPI->operands(), *VPI, *VPI, VPI->getDebugLoc(),
+            VPI->getName(), VPI->getScalarType(), /*GeneratesSingleScalar=*/true);
+        Clone->setUnderlyingValue(VPI->getUnderlyingValue());
+        Clone->insertBefore(VPI);
+        VPI->replaceAllUsesWith(Clone);
+        VPI->eraseFromParent();
+        continue;
+      }
       if (!isa<VPWidenRecipe, VPWidenGEPRecipe, VPReplicateRecipe,
                VPWidenIntrinsicRecipe>(&R))
         continue;

@@ -731,7 +731,7 @@ unsigned VPInstruction::getNumOperandsForOpcode() const {
 
 bool VPInstruction::doesGeneratePerAllLanes() const {
   return Opcode == VPInstruction::Unpack ||
-         (Opcode == VPInstruction::PtrAdd && !vputils::onlyFirstLaneUsed(this));
+         (Opcode == VPInstruction::PtrAdd && !doesGenerateSingleScalar());
 }
 
 bool VPInstruction::canGenerateScalarForFirstLane(unsigned Opcode) {
@@ -746,13 +746,6 @@ bool VPInstruction::canGenerateScalarForFirstLane(unsigned Opcode) {
   default:
     return Instruction::isBinaryOp(Opcode);
   }
-}
-
-bool VPInstruction::inferGeneratesSingleScalar() const {
-  if (doesGenerateSingleScalar() || isVectorToScalar() || !hasResult())
-    return true;
-  return canGenerateScalarForFirstLane(Opcode) &&
-         vputils::onlyFirstLaneUsed(this);
 }
 
 static Instruction::BinaryOps getSubRecurOpcode(RecurKind Kind) {
@@ -1710,8 +1703,9 @@ void VPInstruction::execute(VPTransformState &State) {
   assert(hasRequiredFlagsForOpcode(getOpcode(), getScalarType()) &&
          "Opcode requires specific flags to be set");
   State.Builder.setFastMathFlags(getFastMathFlagsOrNone());
-  bool GenerateSingleScalar =
-      State.VF.isScalar() || inferGeneratesSingleScalar();
+  bool GenerateSingleScalar = State.VF.isScalar() ||
+                              doesGenerateSingleScalar() || isVectorToScalar() ||
+                              !hasResult();
   Value *GeneratedValue = generate(State, GenerateSingleScalar);
   if (!hasResult())
     return;

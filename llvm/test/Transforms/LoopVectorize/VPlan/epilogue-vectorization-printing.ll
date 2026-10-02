@@ -788,7 +788,7 @@ define i32 @nested_loop(ptr noalias %p, ptr noalias %end, ptr noalias %dst, i64 
 ; CHECK-NEXT:    EMIT-SCALAR vp<%index> = phi [ ir<0>, vector.ph ], [ vp<%index.next>, vector.body ]
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP7:%[0-9]+]]> = mul vp<%index>, ir<24>
 ; CHECK-NEXT:    vp<[[VP8:%[0-9]+]]> = SCALAR-STEPS vp<[[VP7]]>, ir<24>, ir<8>, ir<7>
-; CHECK-NEXT:    EMIT vp<%next.gep> = ptradd ir<%p>, vp<[[VP8]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%next.gep> = ptradd ir<%p>, vp<[[VP8]]>
 ; CHECK-NEXT:    CLONE ir<%l> = load vp<%next.gep>
 ; CHECK-NEXT:    CLONE store ir<%l>, ir<%dst>
 ; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<8>
@@ -857,7 +857,7 @@ define i32 @nested_loop(ptr noalias %p, ptr noalias %end, ptr noalias %dst, i64 
 ; CHECK-NEXT:    EMIT-SCALAR vp<%index> = phi [ vp<%vec.epilog.resume.val>, vec.epilog.ph ], [ vp<%index.next>, vec.epilog.vector.body ]
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP6:%[0-9]+]]> = mul vp<%index>, ir<24>
 ; CHECK-NEXT:    vp<[[VP7:%[0-9]+]]> = SCALAR-STEPS vp<[[VP6]]>, ir<24>, ir<4>, ir<3>
-; CHECK-NEXT:    EMIT vp<%next.gep> = ptradd ir<%p>, vp<[[VP7]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%next.gep> = ptradd ir<%p>, vp<[[VP7]]>
 ; CHECK-NEXT:    CLONE ir<%l> = load vp<%next.gep>
 ; CHECK-NEXT:    CLONE store ir<%l>, ir<%dst>
 ; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<4>

@@ -27,7 +27,7 @@ define void @wide_or_replaced_with_add_vpinstruction(ptr %src, ptr noalias %dst)
 ; CHECK:  Cost of 1 for VF 2: WIDEN ir<%l> = load vp<[[VP5]]>
 ; CHECK:  Cost of 1 for VF 2: WIDEN ir<%iv.4> = add ir<%iv>, ir<4>
 ; CHECK:  Cost of 1 for VF 2: WIDEN ir<%c> = icmp ule ir<%l>, ir<128>
-; CHECK:  Cost of 1 for VF 2: EMIT ir<%or> = add ir<%iv.4>, ir<1>
+; CHECK:  Cost of 1 for VF 2: EMIT-SCALAR ir<%or> = add ir<%iv.4>, ir<1>
 ; CHECK:  Cost of 0 for VF 2: CLONE ir<%g.dst> = getelementptr ir<%dst>, ir<%or>
 ; CHECK:  Cost of 0 for VF 2: vp<[[VP6:%[0-9]+]]> = vector-pointer i64, ir<%g.dst>, ir<1>
 ; CHECK:  Cost of 1 for VF 2: WIDEN store vp<[[VP6]]>, ir<%iv.4>, ir<%c>
@@ -50,7 +50,7 @@ define void @wide_or_replaced_with_add_vpinstruction(ptr %src, ptr noalias %dst)
 ; CHECK:  Cost of 1 for VF 4: WIDEN ir<%l> = load vp<[[VP5]]>
 ; CHECK:  Cost of 1 for VF 4: WIDEN ir<%iv.4> = add ir<%iv>, ir<4>
 ; CHECK:  Cost of 1 for VF 4: WIDEN ir<%c> = icmp ule ir<%l>, ir<128>
-; CHECK:  Cost of 1 for VF 4: EMIT ir<%or> = add ir<%iv.4>, ir<1>
+; CHECK:  Cost of 1 for VF 4: EMIT-SCALAR ir<%or> = add ir<%iv.4>, ir<1>
 ; CHECK:  Cost of 0 for VF 4: CLONE ir<%g.dst> = getelementptr ir<%dst>, ir<%or>
 ; CHECK:  Cost of 0 for VF 4: vp<[[VP6]]> = vector-pointer i64, ir<%g.dst>, ir<1>
 ; CHECK:  Cost of 1 for VF 4: WIDEN store vp<[[VP6]]>, ir<%iv.4>, ir<%c>
@@ -191,7 +191,7 @@ define void @test_vpinstruction_switch_cost(ptr %start, ptr %end) {
 ; CHECK:  LV: Found an estimated cost of 0 for VF 1 For instruction: br i1 %ec, label %exit, label %loop.header
 ; CHECK:  Cost of 1 for VF 2: vp<[[VP6:%[0-9]+]]> = DERIVED-IV ir<0> + vp<[[VP5:%[0-9]+]]> * ir<8>
 ; CHECK:  Cost of 0 for VF 2: vp<[[VP7:%[0-9]+]]> = SCALAR-STEPS vp<[[VP6]]>, ir<8>, vp<[[VP0:%[0-9]+]]>
-; CHECK:  Cost of 0 for VF 2: EMIT vp<%next.gep> = ptradd ir<%start>, vp<[[VP7]]>
+; CHECK:  Cost of 0 for VF 2: EMIT-SCALAR vp<%next.gep> = ptradd ir<%start>, vp<[[VP7]]>
 ; CHECK:  Cost of 0 for VF 2: vp<[[VP8:%[0-9]+]]> = vector-pointer i64, vp<%next.gep>, ir<1>
 ; CHECK:  Cost of 1 for VF 2: WIDEN ir<%l> = load vp<[[VP8]]>
 ; CHECK:  Cost of 1 for VF 2: EMIT vp<[[VP9:%[0-9]+]]> = icmp eq ir<%l>, ir<-12>
@@ -217,7 +217,7 @@ define void @test_vpinstruction_switch_cost(ptr %start, ptr %end) {
 ; CHECK:  Cost of 0 for VF 2: EMIT branch-on-cond vp<%cmp.n>
 ; CHECK:  Cost of 1 for VF 4: vp<[[VP6]]> = DERIVED-IV ir<0> + vp<[[VP5]]> * ir<8>
 ; CHECK:  Cost of 0 for VF 4: vp<[[VP7]]> = SCALAR-STEPS vp<[[VP6]]>, ir<8>, vp<[[VP0]]>
-; CHECK:  Cost of 0 for VF 4: EMIT vp<%next.gep> = ptradd ir<%start>, vp<[[VP7]]>
+; CHECK:  Cost of 0 for VF 4: EMIT-SCALAR vp<%next.gep> = ptradd ir<%start>, vp<[[VP7]]>
 ; CHECK:  Cost of 0 for VF 4: vp<[[VP8]]> = vector-pointer i64, vp<%next.gep>, ir<1>
 ; CHECK:  Cost of 1 for VF 4: WIDEN ir<%l> = load vp<[[VP8]]>
 ; CHECK:  Cost of 1 for VF 4: EMIT vp<[[VP9]]> = icmp eq ir<%l>, ir<-12>
