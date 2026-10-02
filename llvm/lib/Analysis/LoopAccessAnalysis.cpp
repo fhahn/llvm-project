@@ -2318,7 +2318,13 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
     }
 
     for (auto &Access : AccessInfos) {
-      for (const auto &AccessTy : Accesses[Access]) {
+      // A written pointer is only checked via its write access, so its bounds
+      // must also cover the types it is loaded with.
+      SmallSetVector<Type *, 1> AccessTys = Accesses.lookup(Access);
+      if (Access.getInt())
+        AccessTys.insert_range(
+            Accesses.lookup(MemAccessInfo(Access.getPointer(), false)));
+      for (Type *AccessTy : AccessTys) {
         if (!createCheckForAccess(RtCheck, Access, AccessTy, StridesMap,
                                   DepSetId, TheLoop, RunningDepId, ASId,
                                   false)) {

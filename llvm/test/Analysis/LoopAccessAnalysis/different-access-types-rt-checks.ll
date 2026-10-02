@@ -178,11 +178,15 @@ define void @load_store_same_pointer_with_different_sizes(ptr %A, ptr %B, i64 %N
 ; CHECK-NEXT:        Comparing group GRP0:
 ; CHECK-NEXT:          %gep.A = getelementptr inbounds i8, ptr %A, i64 %off
 ; CHECK-NEXT:          %gep.A = getelementptr inbounds i8, ptr %A, i64 %off
+; CHECK-NEXT:          %gep.A = getelementptr inbounds i8, ptr %A, i64 %off
+; CHECK-NEXT:          %gep.A = getelementptr inbounds i8, ptr %A, i64 %off
 ; CHECK-NEXT:        Against group GRP1:
 ; CHECK-NEXT:          %gep.B = getelementptr inbounds i8, ptr %B, i64 %off
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %A High: (-3 + (4 * %N) + %A))
+; CHECK-NEXT:          (Low: %A High: ((4 * %N) + %A))
+; CHECK-NEXT:            Member: {%A,+,4}<nuw><%loop>
+; CHECK-NEXT:            Member: {%A,+,4}<nuw><%loop>
 ; CHECK-NEXT:            Member: {%A,+,4}<nuw><%loop>
 ; CHECK-NEXT:            Member: {%A,+,4}<nuw><%loop>
 ; CHECK-NEXT:        Group GRP1:
