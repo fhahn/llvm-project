@@ -15426,6 +15426,22 @@ bool SCEVWrapPredicate::implies(const SCEVPredicate *N,
 
   const SCEV *Step = AR->getStepRecurrence(SE);
   const SCEV *OpStep = Op->AR->getStepRecurrence(SE);
+  bool IsNUSW = Flags == SCEVWrapPredicate::IncrementNUSW;
+
+  // If N's AddRec is this' AddRec extended to a wider type, i.e. N's AddRec is
+  // {ext(Start),+,sext(Step)} with ext being zext for NUSW and sext for NSSW,
+  // then N's AddRec evaluates to ext(this' AddRec), so it does not wrap either.
+  // The Step of AddRecs created for inductions with casts is always
+  // sign-extended, see createAddRecFromPHIWithCastsImpl.
+  if (!AR->getType()->isPointerTy() && AR->isAffine() && Op->AR->isAffine() &&
+      AR->getLoop() == Op->AR->getLoop()) {
+    Type *WideTy = Op->AR->getType();
+    const SCEV *ExtStart = IsNUSW ? SE.getNoopOrZeroExtend(Start, WideTy)
+                                  : SE.getNoopOrSignExtend(Start, WideTy);
+    if (ExtStart == OpStart && SE.getNoopOrSignExtend(Step, WideTy) == OpStep)
+      return true;
+  }
+
   if (!SE.isKnownPositive(Step) || !SE.isKnownPositive(OpStep))
     return false;
 
@@ -15435,12 +15451,11 @@ bool SCEVWrapPredicate::implies(const SCEVPredicate *N,
   Step = SE.getNoopOrZeroExtend(Step, WiderTy);
   OpStep = SE.getNoopOrZeroExtend(OpStep, WiderTy);
 
-  bool IsNUW = Flags == SCEVWrapPredicate::IncrementNUSW;
-  OpStart = IsNUW ? SE.getNoopOrZeroExtend(OpStart, WiderTy)
-                  : SE.getNoopOrSignExtend(OpStart, WiderTy);
-  Start = IsNUW ? SE.getNoopOrZeroExtend(Start, WiderTy)
-                : SE.getNoopOrSignExtend(Start, WiderTy);
-  CmpInst::Predicate Pred = IsNUW ? CmpInst::ICMP_ULE : CmpInst::ICMP_SLE;
+  OpStart = IsNUSW ? SE.getNoopOrZeroExtend(OpStart, WiderTy)
+                   : SE.getNoopOrSignExtend(OpStart, WiderTy);
+  Start = IsNUSW ? SE.getNoopOrZeroExtend(Start, WiderTy)
+                 : SE.getNoopOrSignExtend(Start, WiderTy);
+  CmpInst::Predicate Pred = IsNUSW ? CmpInst::ICMP_ULE : CmpInst::ICMP_SLE;
   return SE.isKnownPredicate(Pred, OpStep, Step) &&
          SE.isKnownPredicate(Pred, OpStart, Start);
 }

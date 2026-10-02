@@ -31,7 +31,6 @@ define void @narrow_nusw_implies_wide_zext_nusw(ptr %src, ptr %dst, i8 %s, i64 %
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
 ; CHECK-NEXT:      {0,+,%s}<%loop> Added Flags: <nusw>
-; CHECK-NEXT:      {0,+,(sext i8 %s to i32)}<%loop> Added Flags: <nusw>
 ; CHECK-NEXT:      {%src,+,(4 * (sext i8 %s to i64))<nsw>}<%loop> Added Flags: <nusw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Expressions re-written:
@@ -85,7 +84,6 @@ define void @narrow_nssw_implies_wide_sext_nssw(ptr %src, ptr %dst, i8 %s, i64 %
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
 ; CHECK-NEXT:      {0,+,%s}<%loop> Added Flags: <nssw>
-; CHECK-NEXT:      {0,+,(sext i8 %s to i32)}<%loop> Added Flags: <nssw>
 ; CHECK-NEXT:      {%src,+,(4 * (sext i8 %s to i64))<nsw>}<%loop> Added Flags: <nusw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Expressions re-written:
