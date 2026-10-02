@@ -20,7 +20,7 @@ define void @if_then(ptr noalias %a, ptr noalias %idx) {
 ; VPLAN0-NEXT:  Successor(s): loop
 ; VPLAN0-EMPTY:
 ; VPLAN0-NEXT:  loop:
-; VPLAN0-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, latch ]
+; VPLAN0-NEXT:    EMIT ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, latch ]
 ; VPLAN0-NEXT:    EMIT ir<%gep.idx> = getelementptr inbounds ir<%idx>, ir<%iv>
 ; VPLAN0-NEXT:    EMIT ir<%i> = load ir<%gep.idx>
 ; VPLAN0-NEXT:    EMIT ir<%c> = icmp sgt ir<%i>, ir<0>
@@ -120,7 +120,7 @@ define void @if_else(ptr noalias %a, ptr noalias %b, ptr noalias %idx) {
 ; VPLAN0-NEXT:  Successor(s): loop
 ; VPLAN0-EMPTY:
 ; VPLAN0-NEXT:  loop:
-; VPLAN0-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, latch ]
+; VPLAN0-NEXT:    EMIT ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, latch ]
 ; VPLAN0-NEXT:    EMIT ir<%gep.idx> = getelementptr inbounds ir<%idx>, ir<%iv>
 ; VPLAN0-NEXT:    EMIT ir<%i> = load ir<%gep.idx>
 ; VPLAN0-NEXT:    EMIT ir<%c> = icmp sgt ir<%i>, ir<0>

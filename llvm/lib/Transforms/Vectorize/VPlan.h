@@ -1723,9 +1723,10 @@ public:
 
 struct LLVM_ABI_FOR_TEST VPPhi : public VPInstruction, public VPPhiAccessors {
   VPPhi(ArrayRef<VPValue *> Operands, const VPIRFlags &Flags, DebugLoc DL,
-        const Twine &Name = "", Type *ResultTy = nullptr)
-      : VPInstruction(Instruction::PHI, Operands, Flags, {}, DL, Name,
-                      ResultTy) {}
+        const Twine &Name = "", Type *ResultTy = nullptr,
+        bool GeneratesSingleScalar = true)
+      : VPInstruction(Instruction::PHI, Operands, Flags, {}, DL, Name, ResultTy,
+                      GeneratesSingleScalar) {}
 
   static inline bool classof(const VPUser *U) {
     auto *VPI = dyn_cast<VPInstruction>(U);
@@ -1743,7 +1744,8 @@ struct LLVM_ABI_FOR_TEST VPPhi : public VPInstruction, public VPPhiAccessors {
   }
 
   VPPhi *clone() override {
-    auto *PhiR = new VPPhi(operands(), *this, getDebugLoc(), getName());
+    auto *PhiR = new VPPhi(operands(), *this, getDebugLoc(), getName(),
+                           getScalarType(), doesGenerateSingleScalar());
     PhiR->setUnderlyingValue(getUnderlyingValue());
     return PhiR;
   }

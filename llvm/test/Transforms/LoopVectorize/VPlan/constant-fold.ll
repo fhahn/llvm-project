@@ -24,7 +24,7 @@ define void @f1() {
 ; CHECK-NEXT:  Successor(s): bb2
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  bb2:
-; CHECK-NEXT:    EMIT-SCALAR ir<%c.1.0> = phi [ ir<0>, vector.ph ], [ ir<%_tmp9>, bb2 ]
+; CHECK-NEXT:    EMIT ir<%c.1.0> = phi [ ir<0>, vector.ph ], [ ir<%_tmp9>, bb2 ]
 ; CHECK-NEXT:    EMIT ir<%_tmp6> = sext ir<%c.1.0> to i64
 ; CHECK-NEXT:    EMIT ir<%_tmp7> = getelementptr ir<@b>, ir<0>, ir<%_tmp6>
 ; CHECK-NEXT:    EMIT store ir<@a>, ir<%_tmp7>
@@ -66,7 +66,7 @@ define void @redundant_or_1(ptr %dst, i1 %c.0, i1 %c.1) {
 ; CHECK-NEXT:  Successor(s): loop.header
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  loop.header:
-; CHECK-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, loop.latch ]
+; CHECK-NEXT:    EMIT ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, loop.latch ]
 ; CHECK-NEXT:    EMIT branch-on-cond ir<%c.0>
 ; CHECK-NEXT:  Successor(s): loop.latch, then.1
 ; CHECK-EMPTY:
@@ -126,7 +126,7 @@ define void @redundant_or_2(ptr %dst, i1 %c.0, i1 %c.1) {
 ; CHECK-NEXT:  Successor(s): loop.header
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  loop.header:
-; CHECK-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, loop.latch ]
+; CHECK-NEXT:    EMIT ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, loop.latch ]
 ; CHECK-NEXT:    EMIT branch-on-cond ir<%c.0>
 ; CHECK-NEXT:  Successor(s): loop.latch, then.1
 ; CHECK-EMPTY:
@@ -186,7 +186,7 @@ define void @redundant_and_1(ptr %dst, i1 %c.0, i1 %c.1) {
 ; CHECK-NEXT:  Successor(s): loop.header
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  loop.header:
-; CHECK-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, loop.latch ]
+; CHECK-NEXT:    EMIT ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, loop.latch ]
 ; CHECK-NEXT:    EMIT branch-on-cond ir<%c.0>
 ; CHECK-NEXT:  Successor(s): loop.latch, then.1
 ; CHECK-EMPTY:
@@ -248,7 +248,7 @@ define void @redundant_and_2(ptr %dst, i1 %c.0, i1 %c.1) {
 ; CHECK-NEXT:  Successor(s): loop.header
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  loop.header:
-; CHECK-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, loop.latch ]
+; CHECK-NEXT:    EMIT ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, loop.latch ]
 ; CHECK-NEXT:    EMIT branch-on-cond ir<%c.0>
 ; CHECK-NEXT:  Successor(s): loop.latch, then.1
 ; CHECK-EMPTY:
@@ -307,7 +307,7 @@ define void @fold_replicating_umax_equal_live_ins(ptr noalias %dst, ptr %cond, i
 ; CHECK-NEXT:  Successor(s): loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  loop:
-; CHECK-NEXT:    EMIT-SCALAR ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, latch ]
+; CHECK-NEXT:    EMIT ir<%iv> = phi [ ir<0>, vector.ph ], [ ir<%iv.next>, latch ]
 ; CHECK-NEXT:    EMIT ir<%cond.gep> = getelementptr ir<%cond>, ir<%iv>
 ; CHECK-NEXT:    EMIT ir<%c> = load ir<%cond.gep>
 ; CHECK-NEXT:    EMIT ir<%tobool> = icmp ne ir<%c>, ir<0>

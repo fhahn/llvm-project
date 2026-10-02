@@ -122,7 +122,7 @@ define i32 @conditional_live_out(ptr noalias %p, i32 %n, i1 %c) {
 ; CHECK-NEXT:    Successor(s): latch
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    latch:
-; CHECK-NEXT:      EMIT-SCALAR ir<%phi> = phi [ ir<%y>, if ], [ ir<0>, vector.body.split ]
+; CHECK-NEXT:      EMIT ir<%phi> = phi [ ir<%y>, if ], [ ir<0>, vector.body.split ]
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add ir<%iv>, ir<1>
 ; CHECK-NEXT:      EMIT ir<%ec> = icmp eq ir<%iv.next>, ir<%n>
 ; CHECK-NEXT:    Successor(s): vector.latch

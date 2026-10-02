@@ -139,7 +139,7 @@ compound=true
     "vp\<%2\> = CANONICAL-IV"
     N4 [label =
       "vector.body:\l" +
-      "  EMIT-SCALAR ir\<%indvars.iv\> = phi [ ir\<0\>, vector.ph ], [ ir\<%indvars.iv.next\>, vector.body ]\l" +
+      "  EMIT ir\<%indvars.iv\> = phi [ ir\<0\>, vector.ph ], [ ir\<%indvars.iv.next\>, vector.body ]\l" +
       "  EMIT ir\<%arr.idx\> = getelementptr inbounds ir\<%A\>, ir\<%indvars.iv\>\l" +
       "  EMIT ir\<%l1\> = load ir\<%arr.idx\>\l" +
       "  EMIT ir\<%res\> = add ir\<%l1\>, ir\<10\>\l" +
@@ -309,7 +309,7 @@ compound=true
     "vp\<%2\> = CANONICAL-IV"
     N4 [label =
       "vector.body:\l" +
-      "  EMIT-SCALAR ir\<%iv\> = phi [ ir\<0\>, vector.ph ], [ ir\<%iv.next\>, loop.latch ]\l" +
+      "  EMIT ir\<%iv\> = phi [ ir\<0\>, vector.ph ], [ ir\<%iv.next\>, loop.latch ]\l" +
       "  EMIT ir\<%arr.idx\> = getelementptr inbounds ir\<%A\>, ir\<%iv\>\l" +
       "  EMIT ir\<%l1\> = load ir\<%arr.idx\>\l" +
       "  EMIT ir\<%c\> = icmp eq ir\<%l1\>, ir\<0\>\l" +
