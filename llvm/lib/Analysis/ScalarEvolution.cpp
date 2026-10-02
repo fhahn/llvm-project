@@ -15504,12 +15504,19 @@ bool SCEVUnionPredicate::implies(const SCEVPredicate *N,
     return true;
 
   // A wrap predicate may be implied by a wrap predicate in Preds after applying
-  // equal predicates.
+  // equal predicates, to either of them.
   const auto *NWrap = dyn_cast<SCEVWrapPredicate>(N);
   if (!NWrap)
     return false;
   const Loop *L = NWrap->getExpr()->getLoop();
+  const SCEVPredicate *RewrittenN = nullptr;
+  if (const auto *RewrittenNAR = dyn_cast<SCEVAddRecExpr>(
+          SE.rewriteUsingPredicate(NWrap->getExpr(), L, *this));
+      RewrittenNAR && RewrittenNAR != NWrap->getExpr())
+    RewrittenN = SE.getWrapPredicate(RewrittenNAR, NWrap->getFlags());
   return any_of(Preds, [&](const SCEVPredicate *I) {
+    if (RewrittenN && I->implies(RewrittenN, SE))
+      return true;
     const auto *IWrap = dyn_cast<SCEVWrapPredicate>(I);
     if (!IWrap)
       return false;

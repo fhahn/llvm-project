@@ -194,7 +194,6 @@ define void @narrow_nusw_implies_wide_zext_nusw_step_equal_pred(ptr %src, ptr %d
 ; CHECK-NEXT:      SCEV assumptions:
 ; CHECK-NEXT:      {0,+,(trunc i32 %step to i8)}<%loop> Added Flags: <nusw>
 ; CHECK-NEXT:      Equal predicate: %step == (sext i8 (trunc i32 %step to i8) to i32)
-; CHECK-NEXT:      {0,+,%step}<%loop> Added Flags: <nusw>
 ; CHECK-NEXT:      {%src,+,(4 * (sext i32 %step to i64))<nsw>}<%loop> Added Flags: <nusw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Expressions re-written:
@@ -248,7 +247,6 @@ define void @narrow_nusw_implies_wide_zext_nusw_start_equal_pred(ptr %src, ptr %
 ; CHECK-NEXT:      SCEV assumptions:
 ; CHECK-NEXT:      {(trunc i32 %start to i8),+,%s}<%loop> Added Flags: <nusw>
 ; CHECK-NEXT:      Equal predicate: %start == (zext i8 (trunc i32 %start to i8) to i32)
-; CHECK-NEXT:      {%start,+,(sext i8 %s to i32)}<%loop> Added Flags: <nusw>
 ; CHECK-NEXT:      {((4 * (zext i32 %start to i64))<nuw><nsw> + %src),+,(4 * (sext i8 %s to i64))<nsw>}<%loop> Added Flags: <nusw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Expressions re-written:
@@ -303,7 +301,6 @@ define void @narrow_nssw_implies_wide_sext_nssw_step_equal_pred(ptr %src, ptr %d
 ; CHECK-NEXT:      SCEV assumptions:
 ; CHECK-NEXT:      {0,+,(trunc i32 %step to i8)}<%loop> Added Flags: <nssw>
 ; CHECK-NEXT:      Equal predicate: %step == (sext i8 (trunc i32 %step to i8) to i32)
-; CHECK-NEXT:      {0,+,%step}<%loop> Added Flags: <nssw>
 ; CHECK-NEXT:      {%src,+,(4 * (sext i32 %step to i64))<nsw>}<%loop> Added Flags: <nusw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Expressions re-written:
