@@ -6664,8 +6664,7 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan(VPlanPtr Plan,
     for (VPInstruction &VPI :
          make_early_inc_range(make_isa_range<VPInstruction>(*VPBB))) {
       // We represent single-scalar casts directly as VPInstructions.
-      if (Instruction::isCast(VPI.getOpcode()) &&
-          vputils::onlyFirstLaneUsed(&VPI))
+      if (Instruction::isCast(VPI.getOpcode()) && VPI.isSingleScalar())
         continue;
 
       // Only VPInstrutions with an underlying value need to be processed.
