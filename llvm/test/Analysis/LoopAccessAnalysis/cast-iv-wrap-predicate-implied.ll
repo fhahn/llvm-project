@@ -168,3 +168,167 @@ loop:
 exit:
   ret void
 }
+
+; Same as @narrow_nusw_implies_wide_zext_nusw, but with a non-constant i32 step.
+; The step is guarded by %step == sext(trunc %step to i8).
+define void @narrow_nusw_implies_wide_zext_nusw_step_equal_pred(ptr %src, ptr %dst, i32 %step, i64 %n) {
+; CHECK-LABEL: 'narrow_nusw_implies_wide_zext_nusw_step_equal_pred'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.dst = getelementptr float, ptr %dst, i64 %iv.0
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %gep.src = getelementptr float, ptr %src, i64 %iv.ext
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: %dst High: ((4 * %n) + %dst))
+; CHECK-NEXT:            Member: {%dst,+,4}<%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: (((4 * (sext i32 %step to i64) * (-1 + %n)) + %src) umin %src) High: (4 + (((4 * (sext i32 %step to i64) * (-1 + %n)) + %src) umax %src)))
+; CHECK-NEXT:            Member: {%src,+,(4 * (sext i32 %step to i64))<nsw>}<%loop>
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-NEXT:      {0,+,(trunc i32 %step to i8)}<%loop> Added Flags: <nusw>
+; CHECK-NEXT:      Equal predicate: %step == (sext i8 (trunc i32 %step to i8) to i32)
+; CHECK-NEXT:      {0,+,%step}<%loop> Added Flags: <nusw>
+; CHECK-NEXT:      {%src,+,(4 * (sext i32 %step to i64))<nsw>}<%loop> Added Flags: <nusw>
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+; CHECK-NEXT:      [PSE] %gep.src = getelementptr float, ptr %src, i64 %iv.ext:
+; CHECK-NEXT:        ((4 * (zext i32 %iv.1 to i64))<nuw><nsw> + %src)
+; CHECK-NEXT:        --> {%src,+,(4 * (sext i32 %step to i64))<nsw>}<%loop>
+;
+entry:
+  br label %loop
+
+loop:
+  %iv.0 = phi i64 [ 0, %entry ], [ %iv.0.next, %loop ]
+  %iv.1 = phi i32 [ 0, %entry ], [ %iv.1.next, %loop ]
+  %iv.ext = zext i32 %iv.1 to i64
+  %gep.src = getelementptr float, ptr %src, i64 %iv.ext
+  %l = load float, ptr %gep.src, align 4
+  %gep.dst = getelementptr float, ptr %dst, i64 %iv.0
+  store float %l, ptr %gep.dst, align 4
+  %iv.1.and = and i32 %iv.1, 255
+  %iv.1.next = add i32 %iv.1.and, %step
+  %iv.0.next = add i64 %iv.0, 1
+  %ec = icmp eq i64 %iv.0.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; Same as @narrow_nusw_implies_wide_zext_nusw, but with a non-constant i32
+; start. The start is guarded by %start == zext(trunc %start to i8).
+define void @narrow_nusw_implies_wide_zext_nusw_start_equal_pred(ptr %src, ptr %dst, i8 %s, i32 %start, i64 %n) {
+; CHECK-LABEL: 'narrow_nusw_implies_wide_zext_nusw_start_equal_pred'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.dst = getelementptr float, ptr %dst, i64 %iv.0
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %gep.src = getelementptr float, ptr %src, i64 %iv.ext
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: %dst High: ((4 * %n) + %dst))
+; CHECK-NEXT:            Member: {%dst,+,4}<%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: (((4 * (zext i32 %start to i64))<nuw><nsw> + %src) umin ((4 * (zext i32 %start to i64))<nuw><nsw> + (4 * (sext i8 %s to i64) * (-1 + %n)) + %src)) High: (4 + (((4 * (zext i32 %start to i64))<nuw><nsw> + %src) umax ((4 * (zext i32 %start to i64))<nuw><nsw> + (4 * (sext i8 %s to i64) * (-1 + %n)) + %src))))
+; CHECK-NEXT:            Member: {((4 * (zext i32 %start to i64))<nuw><nsw> + %src),+,(4 * (sext i8 %s to i64))<nsw>}<%loop>
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-NEXT:      {(trunc i32 %start to i8),+,%s}<%loop> Added Flags: <nusw>
+; CHECK-NEXT:      Equal predicate: %start == (zext i8 (trunc i32 %start to i8) to i32)
+; CHECK-NEXT:      {%start,+,(sext i8 %s to i32)}<%loop> Added Flags: <nusw>
+; CHECK-NEXT:      {((4 * (zext i32 %start to i64))<nuw><nsw> + %src),+,(4 * (sext i8 %s to i64))<nsw>}<%loop> Added Flags: <nusw>
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+; CHECK-NEXT:      [PSE] %gep.src = getelementptr float, ptr %src, i64 %iv.ext:
+; CHECK-NEXT:        ((4 * (zext i32 %iv.1 to i64))<nuw><nsw> + %src)
+; CHECK-NEXT:        --> {((4 * (zext i32 %start to i64))<nuw><nsw> + %src),+,(4 * (sext i8 %s to i64))<nsw>}<%loop>
+;
+entry:
+  %step = sext i8 %s to i32
+  br label %loop
+
+loop:
+  %iv.0 = phi i64 [ 0, %entry ], [ %iv.0.next, %loop ]
+  %iv.1 = phi i32 [ %start, %entry ], [ %iv.1.next, %loop ]
+  %iv.ext = zext i32 %iv.1 to i64
+  %gep.src = getelementptr float, ptr %src, i64 %iv.ext
+  %l = load float, ptr %gep.src, align 4
+  %gep.dst = getelementptr float, ptr %dst, i64 %iv.0
+  store float %l, ptr %gep.dst, align 4
+  %iv.1.and = and i32 %iv.1, 255
+  %iv.1.next = add i32 %iv.1.and, %step
+  %iv.0.next = add i64 %iv.0, 1
+  %ec = icmp eq i64 %iv.0.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; Same as @narrow_nssw_implies_wide_sext_nssw, but with a non-constant i32 step.
+; The step is guarded by %step == sext(trunc %step to i8).
+define void @narrow_nssw_implies_wide_sext_nssw_step_equal_pred(ptr %src, ptr %dst, i32 %step, i64 %n) {
+; CHECK-LABEL: 'narrow_nssw_implies_wide_sext_nssw_step_equal_pred'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.dst = getelementptr float, ptr %dst, i64 %iv.0
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %gep.src = getelementptr float, ptr %src, i64 %iv.ext
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: %dst High: ((4 * %n) + %dst))
+; CHECK-NEXT:            Member: {%dst,+,4}<%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: (((4 * (sext i32 %step to i64) * (-1 + %n)) + %src) umin %src) High: (4 + (((4 * (sext i32 %step to i64) * (-1 + %n)) + %src) umax %src)))
+; CHECK-NEXT:            Member: {%src,+,(4 * (sext i32 %step to i64))<nsw>}<%loop>
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-NEXT:      {0,+,(trunc i32 %step to i8)}<%loop> Added Flags: <nssw>
+; CHECK-NEXT:      Equal predicate: %step == (sext i8 (trunc i32 %step to i8) to i32)
+; CHECK-NEXT:      {0,+,%step}<%loop> Added Flags: <nssw>
+; CHECK-NEXT:      {%src,+,(4 * (sext i32 %step to i64))<nsw>}<%loop> Added Flags: <nusw>
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+; CHECK-NEXT:      [PSE] %gep.src = getelementptr float, ptr %src, i64 %iv.ext:
+; CHECK-NEXT:        ((4 * (sext i32 %iv.1 to i64))<nsw> + %src)
+; CHECK-NEXT:        --> {%src,+,(4 * (sext i32 %step to i64))<nsw>}<%loop>
+;
+entry:
+  br label %loop
+
+loop:
+  %iv.0 = phi i64 [ 0, %entry ], [ %iv.0.next, %loop ]
+  %iv.1 = phi i32 [ 0, %entry ], [ %iv.1.next, %loop ]
+  %iv.ext = sext i32 %iv.1 to i64
+  %gep.src = getelementptr float, ptr %src, i64 %iv.ext
+  %l = load float, ptr %gep.src, align 4
+  %gep.dst = getelementptr float, ptr %dst, i64 %iv.0
+  store float %l, ptr %gep.dst, align 4
+  %shl = shl i32 %iv.1, 24
+  %iv.1.sext = ashr exact i32 %shl, 24
+  %iv.1.next = add i32 %iv.1.sext, %step
+  %iv.0.next = add i64 %iv.0, 1
+  %ec = icmp eq i64 %iv.0.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
