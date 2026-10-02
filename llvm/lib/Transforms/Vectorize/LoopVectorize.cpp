@@ -5612,6 +5612,7 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
           : "scalar.ph");
   if (VPBasicBlock *ScalarPH = BestVPlan.getScalarPreheader())
     replaceVPBBWithIRVPBB(ScalarPH, ScalarPHBB, &BestVPlan);
+  RUN_VPLAN_PASS(VPlanTransforms::narrowToSingleScalarRecipes, BestVPlan);
   RUN_VPLAN_PASS(VPlanTransforms::removeDeadRecipes, BestVPlan);
 
   assert(verifyVPlanIsValid(BestVPlan) && "final VPlan is invalid");

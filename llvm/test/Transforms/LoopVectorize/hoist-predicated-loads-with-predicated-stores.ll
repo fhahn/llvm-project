@@ -655,9 +655,9 @@ define void @test_stores_not_sunk_aliasing_load_between(ptr %dst, ptr %mid, ptr 
 ; CHECK:       [[PRED_STORE_IF]]:
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[INDEX]]
 ; CHECK-NEXT:    store i32 20, ptr [[TMP5]], align 4, !alias.scope [[META71:![0-9]+]], !noalias [[META73:![0-9]+]]
-; CHECK-NEXT:    [[TMP6:%.*]] = load i32, ptr [[TMP5]], align 4, !alias.scope [[META71]], !noalias [[META73]]
+; CHECK-NEXT:    [[TMP10:%.*]] = load i32, ptr [[TMP5]], align 4, !alias.scope [[META71]], !noalias [[META73]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds i32, ptr [[MID]], i32 [[INDEX]]
-; CHECK-NEXT:    store i32 [[TMP6]], ptr [[TMP7]], align 4, !alias.scope [[META75:![0-9]+]], !noalias [[META68]]
+; CHECK-NEXT:    store i32 [[TMP10]], ptr [[TMP7]], align 4, !alias.scope [[META75:![0-9]+]], !noalias [[META68]]
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE]]
 ; CHECK:       [[PRED_STORE_CONTINUE]]:
 ; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <2 x i1> [[TMP3]], i64 1
@@ -665,9 +665,9 @@ define void @test_stores_not_sunk_aliasing_load_between(ptr %dst, ptr %mid, ptr 
 ; CHECK:       [[PRED_STORE_IF10]]:
 ; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[TMP0]]
 ; CHECK-NEXT:    store i32 20, ptr [[TMP9]], align 4, !alias.scope [[META71]], !noalias [[META73]]
-; CHECK-NEXT:    [[TMP10:%.*]] = load i32, ptr [[TMP9]], align 4, !alias.scope [[META71]], !noalias [[META73]]
+; CHECK-NEXT:    [[TMP17:%.*]] = load i32, ptr [[TMP9]], align 4, !alias.scope [[META71]], !noalias [[META73]]
 ; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr inbounds i32, ptr [[MID]], i32 [[TMP0]]
-; CHECK-NEXT:    store i32 [[TMP10]], ptr [[TMP11]], align 4, !alias.scope [[META75]], !noalias [[META68]]
+; CHECK-NEXT:    store i32 [[TMP17]], ptr [[TMP11]], align 4, !alias.scope [[META75]], !noalias [[META68]]
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE11]]
 ; CHECK:       [[PRED_STORE_CONTINUE11]]:
 ; CHECK-NEXT:    [[TMP12:%.*]] = extractelement <2 x i1> [[TMP2]], i64 0
@@ -1616,13 +1616,9 @@ define void @sink_stores_cse_select_dropping_fmf(ptr %dst, ptr %src, ptr %invar.
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[N]], 1
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[N_MOD_VF]]
-; CHECK-NEXT:    [[TMP1:%.*]] = load float, ptr [[SRC]], align 4, !alias.scope [[META119:![0-9]+]]
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x float> poison, float [[TMP1]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x float> [[BROADCAST_SPLATINSERT]], <2 x float> poison, <2 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP2:%.*]] = fmul <2 x float> [[BROADCAST_SPLAT]], splat (float 3.000000e+00)
-; CHECK-NEXT:    [[TMP3:%.*]] = fmul nnan <2 x float> [[BROADCAST_SPLAT]], splat (float 2.000000e+00)
-; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <2 x float> [[TMP3]], i64 0
-; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <2 x float> [[TMP2]], i64 0
+; CHECK-NEXT:    [[TMP12:%.*]] = load float, ptr [[SRC]], align 4, !alias.scope [[META119:![0-9]+]]
+; CHECK-NEXT:    [[TMP5:%.*]] = fmul float [[TMP12]], 3.000000e+00
+; CHECK-NEXT:    [[TMP4:%.*]] = fmul nnan float [[TMP12]], 2.000000e+00
 ; CHECK-NEXT:    [[TMP6:%.*]] = select i1 [[C]], float [[TMP4]], float [[TMP5]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = fmul nnan float [[TMP6]], 5.000000e+00
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]

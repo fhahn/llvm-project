@@ -371,6 +371,10 @@ struct VPlanTransforms {
   /// Remove dead recipes from \p Plan.
   static void removeDeadRecipes(VPlan &Plan);
 
+  /// Narrow recipes in \p Plan that produce a single scalar or only have their
+  /// first lane used to single-scalar recipes.
+  static void narrowToSingleScalarRecipes(VPlan &Plan);
+
   /// Check if all loads in the loop are dereferenceable. Iterates over the
   /// loop body blocks reachable from \p HeaderVPBB. Returns false if any
   /// non-dereferenceable load is found.

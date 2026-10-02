@@ -97,6 +97,7 @@
 ; CHECK: VPlan for loop in 'foo' [[BEFORE_OR_AFTER]] VPlanTransforms::removeBranchOnConst@4
 ; CHECK: VPlan for loop in 'foo' [[BEFORE_OR_AFTER]] VPlanTransforms::simplifyKnownEVL
 ; CHECK: VPlan for loop in 'foo' [[BEFORE_OR_AFTER]] VPlanTransforms::expandSCEVs
+; CHECK: VPlan for loop in 'foo' [[BEFORE_OR_AFTER]] VPlanTransforms::narrowToSingleScalarRecipes
 ; CHECK: VPlan for loop in 'foo' [[BEFORE_OR_AFTER]] VPlanTransforms::removeDeadRecipes@3
 ; CHECK: VPlan for loop in 'foo' [[BEFORE_OR_AFTER]] printFinalVPlan
 
