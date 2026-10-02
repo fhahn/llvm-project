@@ -183,7 +183,9 @@ define void @test_exit_branch_cost(ptr %dst, ptr noalias %x.ptr, ptr noalias %y.
 ; COMMON-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x i1> [[BROADCAST_SPLATINSERT]], <2 x i1> poison, <2 x i32> zeroinitializer
 ; COMMON-NEXT:    [[BROADCAST_SPLATINSERT2:%.*]] = insertelement <2 x i1> poison, i1 [[C_4]], i64 0
 ; COMMON-NEXT:    [[BROADCAST_SPLAT3:%.*]] = shufflevector <2 x i1> [[BROADCAST_SPLATINSERT2]], <2 x i1> poison, <2 x i32> zeroinitializer
-; COMMON-NEXT:    [[TMP0:%.*]] = select i1 [[C_4]], <2 x i1> [[BROADCAST_SPLAT]], <2 x i1> zeroinitializer
+; COMMON-NEXT:    [[TMP4:%.*]] = select i1 [[C_4]], i1 [[C_3]], i1 false
+; COMMON-NEXT:    [[BROADCAST_SPLATINSERT4:%.*]] = insertelement <2 x i1> poison, i1 [[TMP4]], i64 0
+; COMMON-NEXT:    [[TMP0:%.*]] = shufflevector <2 x i1> [[BROADCAST_SPLATINSERT4]], <2 x i1> poison, <2 x i32> zeroinitializer
 ; COMMON-NEXT:    [[TMP1:%.*]] = xor <2 x i1> [[TMP0]], splat (i1 true)
 ; COMMON-NEXT:    [[TMP3:%.*]] = xor <2 x i1> [[BROADCAST_SPLAT3]], splat (i1 true)
 ; COMMON-NEXT:    br label %[[VECTOR_BODY:.*]]

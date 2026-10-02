@@ -952,16 +952,14 @@ define void @test_2xi64_sub_of_wide_loads(ptr noalias %data, ptr noalias %A, ptr
 ; VF2-NEXT:    [[TMP0:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[IV_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; VF2-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP0]]
 ; VF2-NEXT:    [[TMP2:%.*]] = load i64, ptr [[TMP6]], align 8
-; VF2-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i64> poison, i64 [[TMP2]], i64 0
-; VF2-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x i64> [[BROADCAST_SPLATINSERT]], <2 x i64> poison, <2 x i32> zeroinitializer
 ; VF2-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i64, ptr [[B]], i64 [[TMP0]]
 ; VF2-NEXT:    [[TMP5:%.*]] = load i64, ptr [[TMP3]], align 8
-; VF2-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <2 x i64> poison, i64 [[TMP5]], i64 0
+; VF2-NEXT:    [[TMP4:%.*]] = sub i64 [[TMP2]], [[TMP5]]
+; VF2-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <2 x i64> poison, i64 [[TMP4]], i64 0
 ; VF2-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <2 x i64> [[BROADCAST_SPLATINSERT1]], <2 x i64> poison, <2 x i32> zeroinitializer
-; VF2-NEXT:    [[TMP13:%.*]] = sub <2 x i64> [[BROADCAST_SPLAT]], [[BROADCAST_SPLAT2]]
 ; VF2-NEXT:    [[TMP20:%.*]] = shl nsw i64 [[TMP0]], 1
 ; VF2-NEXT:    [[DATA_1:%.*]] = getelementptr inbounds i64, ptr [[DATA]], i64 [[TMP20]]
-; VF2-NEXT:    store <2 x i64> [[TMP13]], ptr [[DATA_1]], align 8
+; VF2-NEXT:    store <2 x i64> [[BROADCAST_SPLAT2]], ptr [[DATA_1]], align 8
 ; VF2-NEXT:    [[IV_NEXT]] = add nuw i64 [[TMP0]], 1
 ; VF2-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], 100
 ; VF2-NEXT:    br i1 [[EC]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP16:![0-9]+]]

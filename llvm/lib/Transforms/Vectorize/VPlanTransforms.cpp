@@ -1878,7 +1878,7 @@ getUnmaskedDivRemOpcode(Intrinsic::ID ID) {
   }
 }
 
-static void narrowToSingleScalarRecipes(VPlan &Plan) {
+void VPlanTransforms::narrowToSingleScalarRecipes(VPlan &Plan) {
   if (Plan.hasScalarVFOnly())
     return;
 
@@ -1965,8 +1965,13 @@ static void narrowToSingleScalarRecipes(VPlan &Plan) {
           }))
         continue;
 
+      // Broadcasts may already be materialized; use their scalar operands.
+      auto Ops = to_vector(map_range(RepOrWidenR->operands(), [](VPValue *Op) {
+        VPValue *X;
+        return match(Op, m_Broadcast(m_VPValue(X))) ? X : Op;
+      }));
       auto *Clone = VPBuilder::createSingleScalarOp(
-          vputils::getOpcode(RepOrWidenR), RepOrWidenR->operands(),
+          vputils::getOpcode(RepOrWidenR), Ops,
           /*Mask=*/nullptr, *RepOrWidenR, getMetadataOf(RepOrWidenR),
           DebugLoc::getUnknown(), RepOrWidenR->getScalarType(),
           RepOrWidenR->getUnderlyingInstr());
