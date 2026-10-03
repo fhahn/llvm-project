@@ -3280,22 +3280,23 @@ MemoryDepChecker::isDependent(const MemAccessInfo &A, unsigned AIdx,
       return Dependence::Unknown;
     }
     ConstDist = *Val;
-  }
-
-  // Attempt to prove strided accesses independent.
-  if (APDist) {
-    // If the distance between accesses and their strides are known constants,
-    // check whether the accesses interlace each other.
-    if (ConstDist > 0 && CommonStride && CommonStride > 1 && HasSameSize &&
-        areStridedAccessesIndependent(ConstDist, *CommonStride, TypeByteSize)) {
-      LLVM_DEBUG(dbgs() << "LAA: Strided accesses are independent\n");
-      return Dependence::NoDep;
-    }
   } else {
     if (!LoopGuards)
       LoopGuards.emplace(
           ScalarEvolution::LoopGuards::collect(InnermostLoop, SE));
     Dist = SE.applyLoopGuards(Dist, *LoopGuards);
+    // The loop guards may fold the distance to a constant. Keep treating it as
+    // non-constant if it does not fit in 64 bits.
+    if (match(Dist, m_scev_APInt(APDist)))
+      ConstDist = APDist->abs().tryZExtValue().value_or(0);
+  }
+
+  // If the distance between accesses and their strides are known constants,
+  // check whether the accesses interlace each other.
+  if (ConstDist > 0 && CommonStride && CommonStride > 1 && HasSameSize &&
+      areStridedAccessesIndependent(ConstDist, *CommonStride, TypeByteSize)) {
+    LLVM_DEBUG(dbgs() << "LAA: Strided accesses are independent\n");
+    return Dependence::NoDep;
   }
 
   // Negative distances are not plausible dependencies.

@@ -17,21 +17,16 @@ target triple = "arm64-apple-macosx"
 define void @interleave_distance_constant_via_guard(ptr %A, i32 %n, i32 %k) {
 ; CHECK-LABEL: 'interleave_distance_constant_via_guard'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Memory dependences are safe
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:      Run-time memory checks:
-; CHECK-NEXT:      Check 0:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.store = getelementptr inbounds i32, ptr %A, i64 %store.idx
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %gep.load = getelementptr inbounds i32, ptr %A, i64 %load.idx
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: ((4 * (zext i32 %k to i64))<nuw><nsw> + %A) High: (4 + (4 * (zext i32 %k to i64))<nuw><nsw> + (8 * (zext i32 (-1 + %n) to i64))<nuw><nsw> + %A))
-; CHECK-NEXT:            Member: {((4 * (zext i32 %k to i64))<nuw><nsw> + %A),+,8}<nw><%loop>
-; CHECK-NEXT:        Group GRP1:
 ; CHECK-NEXT:          (Low: %A High: (4 + (8 * (zext i32 (-1 + %n) to i64))<nuw><nsw> + %A))
 ; CHECK-NEXT:            Member: {%A,+,8}<nuw><%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: ((4 * (zext i32 %k to i64))<nuw><nsw> + %A) High: (4 + (4 * (zext i32 %k to i64))<nuw><nsw> + (8 * (zext i32 (-1 + %n) to i64))<nuw><nsw> + %A))
+; CHECK-NEXT:            Member: {((4 * (zext i32 %k to i64))<nuw><nsw> + %A),+,8}<nw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
@@ -79,21 +74,20 @@ exit:
 define void @backward_distance_constant_via_guard(ptr %A, i32 %n, i32 %k) {
 ; CHECK-LABEL: 'backward_distance_constant_via_guard'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Memory dependences are safe with a maximum safe vector width of 128 bits, with a maximum safe store-load forward width of 128 bits
 ; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        BackwardVectorizable:
+; CHECK-NEXT:            %v = load i32, ptr %gep.load, align 4 ->
+; CHECK-NEXT:            store i32 %add, ptr %gep.store, align 4
+; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
-; CHECK-NEXT:      Check 0:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.store = getelementptr inbounds i32, ptr %A, i64 %ik64
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %gep.load = getelementptr inbounds i32, ptr %A, i64 %i64
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: ((4 * (zext i32 %k to i64))<nuw><nsw> + %A) High: (4 + (4 * (zext i32 (-1 + %n) to i64))<nuw><nsw> + (4 * (zext i32 %k to i64))<nuw><nsw> + %A))
-; CHECK-NEXT:            Member: {((4 * (zext i32 %k to i64))<nuw><nsw> + %A),+,4}<nw><%loop>
-; CHECK-NEXT:        Group GRP1:
 ; CHECK-NEXT:          (Low: %A High: (4 + (4 * (zext i32 (-1 + %n) to i64))<nuw><nsw> + %A))
 ; CHECK-NEXT:            Member: {%A,+,4}<nuw><%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: ((4 * (zext i32 %k to i64))<nuw><nsw> + %A) High: (4 + (4 * (zext i32 (-1 + %n) to i64))<nuw><nsw> + (4 * (zext i32 %k to i64))<nuw><nsw> + %A))
+; CHECK-NEXT:            Member: {((4 * (zext i32 %k to i64))<nuw><nsw> + %A),+,4}<nw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
@@ -139,21 +133,21 @@ exit:
 define void @backward_distance_constant_via_guard_too_small(ptr %A, i32 %n, i32 %k) {
 ; CHECK-LABEL: 'backward_distance_constant_via_guard_too_small'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Backward loop carried data dependence.
 ; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Backward:
+; CHECK-NEXT:            %v = load i32, ptr %gep.load, align 4 ->
+; CHECK-NEXT:            store i32 %add, ptr %gep.store, align 4
+; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
-; CHECK-NEXT:      Check 0:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.store = getelementptr inbounds i32, ptr %A, i64 %ik64
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %gep.load = getelementptr inbounds i32, ptr %A, i64 %i64
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: ((4 * (zext i32 %k to i64))<nuw><nsw> + %A) High: (4 + (4 * (zext i32 (-1 + %n) to i64))<nuw><nsw> + (4 * (zext i32 %k to i64))<nuw><nsw> + %A))
-; CHECK-NEXT:            Member: {((4 * (zext i32 %k to i64))<nuw><nsw> + %A),+,4}<nw><%loop>
-; CHECK-NEXT:        Group GRP1:
 ; CHECK-NEXT:          (Low: %A High: (4 + (4 * (zext i32 (-1 + %n) to i64))<nuw><nsw> + %A))
 ; CHECK-NEXT:            Member: {%A,+,4}<nuw><%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: ((4 * (zext i32 %k to i64))<nuw><nsw> + %A) High: (4 + (4 * (zext i32 (-1 + %n) to i64))<nuw><nsw> + (4 * (zext i32 %k to i64))<nuw><nsw> + %A))
+; CHECK-NEXT:            Member: {((4 * (zext i32 %k to i64))<nuw><nsw> + %A),+,4}<nw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
