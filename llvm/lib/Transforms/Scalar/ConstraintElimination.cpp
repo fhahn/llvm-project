@@ -144,6 +144,9 @@ struct FactOrCheck {
   unsigned NumIn;
   unsigned NumOut;
   EntryTy Ty;
+  /// Set for condition facts that are added to both the signed and unsigned
+  /// systems directly and need no transfer to the other one.
+  bool SkipTransfer = false;
 
   FactOrCheck(EntryTy Ty, DomTreeNode *DTN, Instruction *Inst,
               Instruction *ContextInst = nullptr)
@@ -1274,9 +1277,11 @@ void State::addInfoForInductions(BasicBlock &BB) {
       Step->isOne() &&
       (ContinuePred == CmpInst::ICMP_NE || ICmpInst::isLT(ContinuePred));
   if (HasHeaderBound) {
-    for (CmpInst::Predicate BoundPred : {CmpInst::ICMP_ULE, CmpInst::ICMP_SLE})
+    for (CmpInst::Predicate BoundPred : {CmpInst::ICMP_ULE, CmpInst::ICMP_SLE}) {
       WorkList.push_back(FactOrCheck::getConditionFact(
           HeaderDTN, BoundPred, PN, B, ConditionTy(BoundPred, StartValue, B)));
+      WorkList.back().SkipTransfer = true;
+    }
   }
 
   // For latch conditions, we need to inject the condition that holds for the
@@ -2525,7 +2530,7 @@ static bool eliminateConstraints(Function &F, DominatorTree &DT, LoopInfo &LI,
       if (ReproducerModule && DFSInStack.size() > ReproducerCondStack.size())
         ReproducerCondStack.emplace_back(Pred, A, B);
 
-      if (ICmpInst::isRelational(Pred)) {
+      if (ICmpInst::isRelational(Pred) && !CB.SkipTransfer) {
         // If samesign is present on the ICmp, simply flip the sign of the
         // predicate, transferring the information from the signed system to the
         // unsigned system, and viceversa.
