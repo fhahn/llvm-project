@@ -3298,6 +3298,20 @@ MemoryDepChecker::isDependent(const MemAccessInfo &A, unsigned AIdx,
     // non-constant if it does not fit in 64 bits.
     if (match(Dist, m_scev_APInt(APDist)))
       ConstDist = APDist->abs().tryZExtValue().value_or(0);
+
+    // With a power-of-2 common stride, the accesses interlace if the distance
+    // modulo the stride is a non-zero multiple of the access size. This also
+    // holds if the distance wraps, as the stride divides 2^BitWidth.
+    if (CommonStride && isPowerOf2_64(*CommonStride) && HasSameSize) {
+      Type *Ty = Dist->getType();
+      const SCEV *Rem = SE.applyLoopGuards(
+          SE.getURemExpr(Dist, SE.getConstant(Ty, *CommonStride)), *LoopGuards);
+      if (SE.isKnownNonZero(Rem) &&
+          SE.getURemExpr(Rem, SE.getConstant(Ty, TypeByteSize))->isZero()) {
+        LLVM_DEBUG(dbgs() << "LAA: Strided accesses are independent\n");
+        return Dependence::NoDep;
+      }
+    }
   }
 
   // If the distance between accesses and their strides are known constants,

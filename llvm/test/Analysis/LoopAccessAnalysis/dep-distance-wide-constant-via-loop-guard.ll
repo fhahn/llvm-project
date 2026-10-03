@@ -19,21 +19,10 @@ target triple = "arm64-apple-macosx"
 define void @guarded_wide_constant_distance(ptr %A, i128 %k) {
 ; CHECK-LABEL: 'guarded_wide_constant_distance'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Memory dependences are safe
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:      Run-time memory checks:
-; CHECK-NEXT:      Check 0:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.store = getelementptr inbounds i32, ptr %A, i128 %store.i
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %gep.load = getelementptr inbounds i32, ptr %A, i128 %two.i
 ; CHECK-NEXT:      Grouped accesses:
-; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: ((4 * %k) + %A) High: (73786976294838206460 + (4 * %k) + %A))
-; CHECK-NEXT:            Member: {((4 * %k) + %A),+,8}<%loop>
-; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %A High: (73786976294838206460 + %A))
-; CHECK-NEXT:            Member: {%A,+,8}<nuw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:

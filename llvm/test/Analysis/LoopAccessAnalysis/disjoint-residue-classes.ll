@@ -16,21 +16,10 @@ target triple = "arm64-apple-macosx"
 define void @common_stride_odd_offset(ptr %a, i64 %n, i64 %off) {
 ; CHECK-LABEL: 'common_stride_odd_offset'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Memory dependences are safe
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:      Run-time memory checks:
-; CHECK-NEXT:      Check 0:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gs = getelementptr inbounds i32, ptr %a, i64 %si
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %gl = getelementptr inbounds i32, ptr %a, i64 %two.i
 ; CHECK-NEXT:      Grouped accesses:
-; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: ((4 * %off) + %a) High: (-4 + (4 * %off) + (8 * %n) + %a))
-; CHECK-NEXT:            Member: {((4 * %off) + %a),+,8}<%loop>
-; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %a High: (-4 + (8 * %n) + %a))
-; CHECK-NEXT:            Member: {%a,+,8}<nuw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
@@ -126,21 +115,10 @@ exit:
 define void @common_stride_residue_between_elements(ptr %a, i64 %n, i64 %off) {
 ; CHECK-LABEL: 'common_stride_residue_between_elements'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Memory dependences are safe
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:      Run-time memory checks:
-; CHECK-NEXT:      Check 0:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gs = getelementptr inbounds i8, ptr %a, i64 %sb
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %gl = getelementptr inbounds i8, ptr %a, i64 %lb
 ; CHECK-NEXT:      Grouped accesses:
-; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: (%off + %a) High: (-4 + (8 * %n) + %off + %a))
-; CHECK-NEXT:            Member: {(%off + %a),+,8}<nw><%loop>
-; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %a High: (-4 + (8 * %n) + %a))
-; CHECK-NEXT:            Member: {%a,+,8}<nuw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
