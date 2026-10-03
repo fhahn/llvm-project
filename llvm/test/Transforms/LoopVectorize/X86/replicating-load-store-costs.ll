@@ -1411,6 +1411,107 @@ exit:
   ret void
 }
 
+; The address of the complementary predicated loads of %src, hoisted out of the
+; branches, is based on an induction with a non-constant step that cannot be
+; versioned.
+define void @hoisted_loads_non_constant_iv_step(ptr noalias %dst, ptr noalias %src, ptr noalias %cond, i64 %s, i64 %n) #0 {
+; I64-LABEL: define void @hoisted_loads_non_constant_iv_step(
+; I64-SAME: ptr noalias [[DST:%.*]], ptr noalias [[SRC:%.*]], ptr noalias [[COND:%.*]], i64 [[S:%.*]], i64 [[N:%.*]]) #[[ATTR0]] {
+; I64-NEXT:  [[ENTRY:.*]]:
+; I64-NEXT:    [[STEP:%.*]] = mul i64 [[S]], [[S]]
+; I64-NEXT:    br label %[[LOOP:.*]]
+; I64:       [[LOOP]]:
+; I64-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
+; I64-NEXT:    [[IV_2:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_2_NEXT:%.*]], %[[LOOP_LATCH]] ]
+; I64-NEXT:    [[GEP_COND:%.*]] = getelementptr i32, ptr [[COND]], i64 [[IV]]
+; I64-NEXT:    [[C:%.*]] = load i32, ptr [[GEP_COND]], align 4
+; I64-NEXT:    [[C_0:%.*]] = icmp eq i32 [[C]], 0
+; I64-NEXT:    [[GEP_SRC:%.*]] = getelementptr i32, ptr [[SRC]], i64 [[IV_2]]
+; I64-NEXT:    br i1 [[C_0]], label %[[THEN:.*]], label %[[ELSE:.*]]
+; I64:       [[THEN]]:
+; I64-NEXT:    [[L_THEN:%.*]] = load i32, ptr [[GEP_SRC]], align 4
+; I64-NEXT:    [[ADD:%.*]] = add i32 [[L_THEN]], 1
+; I64-NEXT:    br label %[[LOOP_LATCH]]
+; I64:       [[ELSE]]:
+; I64-NEXT:    [[L_ELSE:%.*]] = load i32, ptr [[GEP_SRC]], align 4
+; I64-NEXT:    br label %[[LOOP_LATCH]]
+; I64:       [[LOOP_LATCH]]:
+; I64-NEXT:    [[MERGE:%.*]] = phi i32 [ [[ADD]], %[[THEN]] ], [ [[L_ELSE]], %[[ELSE]] ]
+; I64-NEXT:    [[GEP_DST:%.*]] = getelementptr i32, ptr [[DST]], i64 [[IV]]
+; I64-NEXT:    store i32 [[MERGE]], ptr [[GEP_DST]], align 4
+; I64-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 1
+; I64-NEXT:    [[IV_2_NEXT]] = add i64 [[IV_2]], [[STEP]]
+; I64-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
+; I64-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[LOOP]]
+; I64:       [[EXIT]]:
+; I64-NEXT:    ret void
+;
+; I32-LABEL: define void @hoisted_loads_non_constant_iv_step(
+; I32-SAME: ptr noalias [[DST:%.*]], ptr noalias [[SRC:%.*]], ptr noalias [[COND:%.*]], i64 [[S:%.*]], i64 [[N:%.*]]) #[[ATTR0]] {
+; I32-NEXT:  [[ENTRY:.*]]:
+; I32-NEXT:    [[STEP:%.*]] = mul i64 [[S]], [[S]]
+; I32-NEXT:    br label %[[LOOP:.*]]
+; I32:       [[LOOP]]:
+; I32-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
+; I32-NEXT:    [[IV_2:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_2_NEXT:%.*]], %[[LOOP_LATCH]] ]
+; I32-NEXT:    [[GEP_COND:%.*]] = getelementptr i32, ptr [[COND]], i64 [[IV]]
+; I32-NEXT:    [[C:%.*]] = load i32, ptr [[GEP_COND]], align 4
+; I32-NEXT:    [[C_0:%.*]] = icmp eq i32 [[C]], 0
+; I32-NEXT:    [[GEP_SRC:%.*]] = getelementptr i32, ptr [[SRC]], i64 [[IV_2]]
+; I32-NEXT:    br i1 [[C_0]], label %[[THEN:.*]], label %[[ELSE:.*]]
+; I32:       [[THEN]]:
+; I32-NEXT:    [[L_THEN:%.*]] = load i32, ptr [[GEP_SRC]], align 4
+; I32-NEXT:    [[ADD:%.*]] = add i32 [[L_THEN]], 1
+; I32-NEXT:    br label %[[LOOP_LATCH]]
+; I32:       [[ELSE]]:
+; I32-NEXT:    [[L_ELSE:%.*]] = load i32, ptr [[GEP_SRC]], align 4
+; I32-NEXT:    br label %[[LOOP_LATCH]]
+; I32:       [[LOOP_LATCH]]:
+; I32-NEXT:    [[MERGE:%.*]] = phi i32 [ [[ADD]], %[[THEN]] ], [ [[L_ELSE]], %[[ELSE]] ]
+; I32-NEXT:    [[GEP_DST:%.*]] = getelementptr i32, ptr [[DST]], i64 [[IV]]
+; I32-NEXT:    store i32 [[MERGE]], ptr [[GEP_DST]], align 4
+; I32-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 1
+; I32-NEXT:    [[IV_2_NEXT]] = add i64 [[IV_2]], [[STEP]]
+; I32-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
+; I32-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[LOOP]]
+; I32:       [[EXIT]]:
+; I32-NEXT:    ret void
+;
+entry:
+  %step = mul i64 %s, %s
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop.latch ]
+  %iv.2 = phi i64 [ 0, %entry ], [ %iv.2.next, %loop.latch ]
+  %gep.cond = getelementptr i32, ptr %cond, i64 %iv
+  %c = load i32, ptr %gep.cond, align 4
+  %c.0 = icmp eq i32 %c, 0
+  %gep.src = getelementptr i32, ptr %src, i64 %iv.2
+  br i1 %c.0, label %then, label %else
+
+then:
+  %l.then = load i32, ptr %gep.src, align 4
+  %add = add i32 %l.then, 1
+  br label %loop.latch
+
+else:
+  %l.else = load i32, ptr %gep.src, align 4
+  br label %loop.latch
+
+loop.latch:
+  %merge = phi i32 [ %add, %then ], [ %l.else, %else ]
+  %gep.dst = getelementptr i32, ptr %dst, i64 %iv
+  store i32 %merge, ptr %gep.dst, align 4
+  %iv.next = add i64 %iv, 1
+  %iv.2.next = add i64 %iv.2, %step
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
 attributes #0 = { "target-cpu"="znver2" }
 attributes #1 = { "target-cpu"="slm" }
 
