@@ -2879,12 +2879,14 @@ void MemoryDepChecker::mergeInStatus(VectorizationSafetyStatus S) {
 ///       out[i+D] =
 ///     }
 static bool isSafeDependenceDistance(ScalarEvolution &SE, const SCEV &MaxBTC,
-                                     const SCEV &Dist, uint64_t MaxStride) {
+                                     const SCEV &Dist, uint64_t MaxStride,
+                                     uint64_t AccessSize) {
 
   // If we can prove that
-  //      (**) |Dist| > MaxBTC * Step
+  //      (**) |Dist| >= MaxBTC * Step + AccessSize
   // where Step is the absolute stride of the memory accesses in bytes,
-  // then there is no dependence.
+  // then there is no dependence. Adding AccessSize is needed, as the
+  // distance may not be a multiple of the access size.
   //
   // Rationale:
   // We basically want to check if the absolute distance (|Dist/Step|)
@@ -2908,18 +2910,20 @@ static bool isSafeDependenceDistance(ScalarEvolution &SE, const SCEV &MaxBTC,
   const SCEV *CastedDist = SE.getNoopOrSignExtend(&Dist, WideTy);
   const SCEV *CastedProduct =
       SE.getMulExpr(SE.getNoopOrZeroExtend(&MaxBTC, WideTy), Step);
+  const SCEV *Bound =
+      SE.getAddExpr(CastedProduct, SE.getConstant(WideTy, AccessSize));
 
-  // Is  Dist - (MaxBTC * Step) > 0 ?
+  // Is  Dist - (MaxBTC * Step + AccessSize) >= 0 ?
   // (If so, then we have proven (**) because |Dist| >= Dist)
-  const SCEV *Minus = SE.getMinusSCEV(CastedDist, CastedProduct);
-  if (SE.isKnownPositive(Minus))
+  const SCEV *Minus = SE.getMinusSCEV(CastedDist, Bound);
+  if (SE.isKnownNonNegative(Minus))
     return true;
 
-  // Second try: Is  -Dist - (MaxBTC * Step) > 0 ?
+  // Second try: Is  -Dist - (MaxBTC * Step + AccessSize) >= 0 ?
   // (If so, then we have proven (**) because |Dist| >= -1*Dist)
   const SCEV *NegDist = SE.getNegativeSCEV(CastedDist);
-  Minus = SE.getMinusSCEV(NegDist, CastedProduct);
-  return SE.isKnownPositive(Minus);
+  Minus = SE.getMinusSCEV(NegDist, Bound);
+  return SE.isKnownNonNegative(Minus);
 }
 
 /// Check the dependence for two accesses with the same stride \p Stride.
@@ -3146,10 +3150,25 @@ MemoryDepChecker::isDependent(const MemAccessInfo &A, unsigned AIdx,
   // upper bound of the number of iterations), the accesses are independet, i.e.
   // they are far enough appart that accesses won't access the same location
   // across all loop ierations.
-  if (HasSameSize &&
-      isSafeDependenceDistance(SE, *(PSE.getSymbolicMaxBackedgeTakenCount()),
-                               *Dist, MaxStride))
-    return Dependence::NoDep;
+  if (HasSameSize) {
+    const SCEV &MaxBTC = *PSE.getSymbolicMaxBackedgeTakenCount();
+    if (isSafeDependenceDistance(SE, MaxBTC, *Dist, MaxStride, TypeByteSize))
+      return Dependence::NoDep;
+    // If |Dist| > MaxBTC * Step, only the first and last iterations can
+    // overlap. A forward dependence is safe. A backward one with a constant
+    // distance is safe for VFs up to Dist / Step, see areDepsSafe.
+    if (isSafeDependenceDistance(SE, MaxBTC, *Dist, MaxStride,
+                                 /*AccessSize=*/1)) {
+      if (SE.isKnownNegative(Dist))
+        return Dependence::Forward;
+      const APInt *C;
+      if (!match(Dist, m_scev_APInt(C)))
+        return Dependence::Unknown;
+      FirstLastIterDeps.emplace_back(
+          AIdx, BIdx, C->getLimitedValue() / MaxStride * TypeByteSize * 8);
+      return Dependence::BackwardVectorizable;
+    }
+  }
 
   const APInt *APDist = nullptr;
   uint64_t ConstDist = 0;
@@ -3348,6 +3367,7 @@ bool MemoryDepChecker::areDepsSafe(const DepCandidates &DepCands,
       continue;
 
     // Check accesses within this set.
+    bool HasUnknownDep = false;
     EquivalenceClasses<MemAccessInfo>::member_iterator AI =
         DepCands.findLeader(CurAccess);
     EquivalenceClasses<MemAccessInfo>::member_iterator AE =
@@ -3383,6 +3403,7 @@ bool MemoryDepChecker::areDepsSafe(const DepCandidates &DepCands,
             Dependence::DepType Type =
                 isDependent(*A.first, A.second, *B.first, B.second);
             mergeInStatus(Dependence::isSafeForVectorization(Type));
+            HasUnknownDep |= Type == Dependence::Unknown;
 
             // Gather dependences unless we accumulated MaxDependences
             // dependences.  In that case return as soon as we find the first
@@ -3406,6 +3427,20 @@ bool MemoryDepChecker::areDepsSafe(const DepCandidates &DepCands,
       }
       ++AI;
     }
+
+    // If the set has unknown dependences, it is checked at runtime. Check its
+    // dependences between the first and last iteration too, instead of
+    // limiting the vector width.
+    for (auto [Src, Dst, MaxVFInBits] : FirstLastIterDeps) {
+      if (!HasUnknownDep)
+        MaxSafeVectorWidthInBits =
+            std::min(MaxSafeVectorWidthInBits, MaxVFInBits);
+      else if (RecordDependences)
+        find_if(Dependences, [&](const Dependence &D) {
+          return D.Source == Src && D.Destination == Dst;
+        })->Type = Dependence::Unknown;
+    }
+    FirstLastIterDeps.clear();
   }
 
   LLVM_DEBUG(dbgs() << "Total Dependences: " << Dependences.size() << "\n");

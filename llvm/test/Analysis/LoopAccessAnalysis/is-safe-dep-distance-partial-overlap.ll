@@ -3,12 +3,15 @@
 
 ; MaxBTC * 4 = 60 and the distance is 61 bytes, so the i32 store in iteration 0
 ; overlaps the load in iteration 15.
-; FIXME: The accesses are incorrectly reported as independent.
 define void @partial_overlap_pos_dist(ptr %a) {
 ; CHECK-LABEL: 'partial_overlap_pos_dist'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Memory dependences are safe with a maximum safe vector width of 480 bits
 ; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        BackwardVectorizable:
+; CHECK-NEXT:            %l.a = load i32, ptr %gep.a, align 1 ->
+; CHECK-NEXT:            store i32 %l.a, ptr %gep.a.61, align 1
+; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-EMPTY:
@@ -126,12 +129,15 @@ exit:
   ret void
 }
 
-; FIXME: The accesses are incorrectly reported as independent.
 define void @partial_overlap_neg_dist(ptr %a) {
 ; CHECK-LABEL: 'partial_overlap_neg_dist'
 ; CHECK-NEXT:    loop:
 ; CHECK-NEXT:      Memory dependences are safe
 ; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Forward:
+; CHECK-NEXT:            %l.a = load i32, ptr %gep.a.61, align 1 ->
+; CHECK-NEXT:            store i32 %l.a, ptr %gep.a, align 1
+; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-EMPTY:

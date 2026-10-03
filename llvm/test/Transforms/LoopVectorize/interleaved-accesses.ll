@@ -1438,7 +1438,6 @@ for.end:
 ; Ensure a strided load is not moved before a store it partially overlaps. The
 ; distance is 25 > MaxBTC * 8 = 24, but the store in iteration 0 writes [0, 4)
 ; and the load %l.1 in iteration 3 reads [-1, 3).
-; FIXME: %l.1 is moved before the store in an interleave group.
 define void @load_partially_overlapping_store(ptr %a, ptr noalias %b) {
 ; CHECK-LABEL: @load_partially_overlapping_store(
 ; CHECK-NEXT:  entry:
@@ -1449,19 +1448,39 @@ define void @load_partially_overlapping_store(ptr %a, ptr noalias %b) {
 ; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK:       vector.body:
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds i8, ptr [[A_M29]], i64 0
-; CHECK-NEXT:    [[WIDE_VEC:%.*]] = load <8 x i32>, ptr [[TMP0]], align 1
-; CHECK-NEXT:    [[STRIDED_VEC:%.*]] = shufflevector <8 x i32> [[WIDE_VEC]], <8 x i32> poison, <4 x i32> <i32 0, i32 2, i32 4, i32 6>
-; CHECK-NEXT:    [[STRIDED_VEC1:%.*]] = shufflevector <8 x i32> [[WIDE_VEC]], <8 x i32> poison, <4 x i32> <i32 1, i32 3, i32 5, i32 7>
-; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i8, ptr [[A]], i64 0
-; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds i8, ptr [[A]], i64 8
-; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i8, ptr [[A]], i64 16
-; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds i8, ptr [[A]], i64 24
-; CHECK-NEXT:    store i32 0, ptr [[TMP1]], align 1
-; CHECK-NEXT:    store i32 0, ptr [[TMP2]], align 1
-; CHECK-NEXT:    store i32 0, ptr [[TMP3]], align 1
-; CHECK-NEXT:    store i32 0, ptr [[TMP4]], align 1
-; CHECK-NEXT:    [[TMP5:%.*]] = add <4 x i32> [[STRIDED_VEC]], [[STRIDED_VEC1]]
-; CHECK-NEXT:    store <4 x i32> [[TMP5]], ptr [[B:%.*]], align 4
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i8, ptr [[A_M29]], i64 8
+; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds i8, ptr [[A_M29]], i64 16
+; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i8, ptr [[A_M29]], i64 24
+; CHECK-NEXT:    [[TMP4:%.*]] = load i32, ptr [[TMP0]], align 1
+; CHECK-NEXT:    [[TMP5:%.*]] = load i32, ptr [[TMP1]], align 1
+; CHECK-NEXT:    [[TMP6:%.*]] = load i32, ptr [[TMP2]], align 1
+; CHECK-NEXT:    [[TMP7:%.*]] = load i32, ptr [[TMP3]], align 1
+; CHECK-NEXT:    [[TMP8:%.*]] = insertelement <4 x i32> poison, i32 [[TMP4]], i64 0
+; CHECK-NEXT:    [[TMP9:%.*]] = insertelement <4 x i32> [[TMP8]], i32 [[TMP5]], i64 1
+; CHECK-NEXT:    [[TMP10:%.*]] = insertelement <4 x i32> [[TMP9]], i32 [[TMP6]], i64 2
+; CHECK-NEXT:    [[TMP11:%.*]] = insertelement <4 x i32> [[TMP10]], i32 [[TMP7]], i64 3
+; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds i8, ptr [[A]], i64 0
+; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr inbounds i8, ptr [[A]], i64 8
+; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr inbounds i8, ptr [[A]], i64 16
+; CHECK-NEXT:    [[TMP15:%.*]] = getelementptr inbounds i8, ptr [[A]], i64 24
+; CHECK-NEXT:    store i32 0, ptr [[TMP12]], align 1
+; CHECK-NEXT:    store i32 0, ptr [[TMP13]], align 1
+; CHECK-NEXT:    store i32 0, ptr [[TMP14]], align 1
+; CHECK-NEXT:    store i32 0, ptr [[TMP15]], align 1
+; CHECK-NEXT:    [[TMP16:%.*]] = getelementptr inbounds i8, ptr [[A_M25]], i64 0
+; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr inbounds i8, ptr [[A_M25]], i64 8
+; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr inbounds i8, ptr [[A_M25]], i64 16
+; CHECK-NEXT:    [[TMP19:%.*]] = getelementptr inbounds i8, ptr [[A_M25]], i64 24
+; CHECK-NEXT:    [[TMP20:%.*]] = load i32, ptr [[TMP16]], align 1
+; CHECK-NEXT:    [[TMP21:%.*]] = load i32, ptr [[TMP17]], align 1
+; CHECK-NEXT:    [[TMP22:%.*]] = load i32, ptr [[TMP18]], align 1
+; CHECK-NEXT:    [[TMP23:%.*]] = load i32, ptr [[TMP19]], align 1
+; CHECK-NEXT:    [[TMP24:%.*]] = insertelement <4 x i32> poison, i32 [[TMP20]], i64 0
+; CHECK-NEXT:    [[TMP25:%.*]] = insertelement <4 x i32> [[TMP24]], i32 [[TMP21]], i64 1
+; CHECK-NEXT:    [[TMP26:%.*]] = insertelement <4 x i32> [[TMP25]], i32 [[TMP22]], i64 2
+; CHECK-NEXT:    [[TMP27:%.*]] = insertelement <4 x i32> [[TMP26]], i32 [[TMP23]], i64 3
+; CHECK-NEXT:    [[TMP28:%.*]] = add <4 x i32> [[TMP11]], [[TMP27]]
+; CHECK-NEXT:    store <4 x i32> [[TMP28]], ptr [[B:%.*]], align 4
 ; CHECK-NEXT:    br label [[MIDDLE_BLOCK:%.*]]
 ; CHECK:       middle.block:
 ; CHECK-NEXT:    br label [[EXIT:%.*]]
