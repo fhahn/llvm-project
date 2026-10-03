@@ -3285,6 +3285,15 @@ MemoryDepChecker::isDependent(const MemAccessInfo &A, unsigned AIdx,
       LoopGuards.emplace(
           ScalarEvolution::LoopGuards::collect(InnermostLoop, SE));
     Dist = SE.applyLoopGuards(Dist, *LoopGuards);
+    // Retry with loop guards, which may bound the distance or the maximum
+    // backedge-taken count.
+    if (HasSameSize &&
+        isSafeDependenceDistance(
+            SE,
+            *SE.applyLoopGuards(PSE.getSymbolicMaxBackedgeTakenCount(),
+                                *LoopGuards),
+            *Dist, MaxStride, TypeByteSize))
+      return Dependence::NoDep;
     // The loop guards may fold the distance to a constant. Keep treating it as
     // non-constant if it does not fit in 64 bits.
     if (match(Dist, m_scev_APInt(APDist)))

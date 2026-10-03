@@ -22,21 +22,10 @@ target triple = "arm64-apple-macosx"
 define void @strong_siv_distance_via_guard_i8(ptr %a, ptr noalias %b, i64 %m) {
 ; CHECK-LABEL: 'strong_siv_distance_via_guard_i8'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Memory dependences are safe
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:      Run-time memory checks:
-; CHECK-NEXT:      Check 0:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.store = getelementptr inbounds i8, ptr %a, i64 %im
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %gep.load = getelementptr inbounds i8, ptr %a, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
-; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: (%m + %a) High: (100 + %m + %a))
-; CHECK-NEXT:            Member: {(%m + %a),+,1}<nw><%loop>
-; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %a High: (100 + %a))
-; CHECK-NEXT:            Member: {%a,+,1}<nuw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
@@ -116,21 +105,10 @@ exit:
 define void @strong_siv_distance_and_trip_count_via_guard_i8(ptr %a, ptr noalias %b, i64 %m, i64 %n) {
 ; CHECK-LABEL: 'strong_siv_distance_and_trip_count_via_guard_i8'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Memory dependences are safe
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:      Run-time memory checks:
-; CHECK-NEXT:      Check 0:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.store = getelementptr inbounds i8, ptr %a, i64 %im
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %gep.load = getelementptr inbounds i8, ptr %a, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
-; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: (%m + %a) High: ((1 umax %n) + %m + %a))
-; CHECK-NEXT:            Member: {(%m + %a),+,1}<nw><%loop>
-; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %a High: ((1 umax %n) + %a))
-; CHECK-NEXT:            Member: {%a,+,1}<nuw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
