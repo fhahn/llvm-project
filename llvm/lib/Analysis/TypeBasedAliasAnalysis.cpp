@@ -100,7 +100,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Analysis/TypeBasedAliasAnalysis.h"
-#include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/MemoryLocation.h"
 #include "llvm/IR/Constants.h"
@@ -452,36 +453,26 @@ static const MDNode *getLeastCommonType(const MDNode *A, const MDNode *B) {
   if (A == B)
     return A;
 
-  SmallSetVector<const MDNode *, 4> PathA;
+  SmallPtrSet<const MDNode *, 4> PathA;
   TBAANode TA(A);
   while (TA.getNode()) {
-    [[maybe_unused]] bool Inserted = PathA.insert(TA.getNode());
+    [[maybe_unused]] bool Inserted = PathA.insert(TA.getNode()).second;
     assert(Inserted && "Cycle found in TBAA metadata.");
     TA = TA.getParent();
   }
 
-  SmallSetVector<const MDNode *, 4> PathB;
+  SmallPtrSet<const MDNode *, 4> PathB;
   TBAANode TB(B);
   while (TB.getNode()) {
-    [[maybe_unused]] bool Inserted = PathB.insert(TB.getNode());
+    // A common node also has an acyclic suffix, already checked above.
+    if (PathA.contains(TB.getNode()))
+      return TB.getNode();
+    [[maybe_unused]] bool Inserted = PathB.insert(TB.getNode()).second;
     assert(Inserted && "Cycle found in TBAA metadata.");
     TB = TB.getParent();
   }
 
-  int IA = PathA.size() - 1;
-  int IB = PathB.size() - 1;
-
-  const MDNode *Ret = nullptr;
-  while (IA >= 0 && IB >= 0) {
-    if (PathA[IA] == PathB[IB])
-      Ret = PathA[IA];
-    else
-      break;
-    --IA;
-    --IB;
-  }
-
-  return Ret;
+  return nullptr;
 }
 
 AAMDNodes AAMDNodes::merge(const AAMDNodes &Other) const {
