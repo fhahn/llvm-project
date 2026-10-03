@@ -26,9 +26,7 @@ define void @widen_lshr_use_flags_in_start(i32 %start, i32 %off, i32 %n, ptr %ds
 ; CHECK-NEXT:    br label %[[INNER:.*]]
 ; CHECK:       [[INNER]]:
 ; CHECK-NEXT:    [[INDVARS_IV1:%.*]] = phi i64 [ [[TMP2]], %[[INNER_PREHEADER]] ], [ [[INDVARS_IV_NEXT2:%.*]], %[[INNER]] ]
-; CHECK-NEXT:    [[TMP3:%.*]] = trunc nuw i64 [[INDVARS_IV1]] to i32
-; CHECK-NEXT:    [[HALF:%.*]] = lshr i32 [[TMP3]], 1
-; CHECK-NEXT:    [[HALF_EXT:%.*]] = zext i32 [[HALF]] to i64
+; CHECK-NEXT:    [[HALF_EXT:%.*]] = lshr i64 [[INDVARS_IV1]], 1
 ; CHECK-NEXT:    [[GEP:%.*]] = getelementptr i8, ptr [[DST]], i64 [[HALF_EXT]]
 ; CHECK-NEXT:    store i8 0, ptr [[GEP]], align 1
 ; CHECK-NEXT:    [[INDVARS_IV_NEXT2]] = add nuw nsw i64 [[INDVARS_IV1]], 2

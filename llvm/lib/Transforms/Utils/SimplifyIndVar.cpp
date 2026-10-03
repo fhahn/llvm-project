@@ -1960,7 +1960,8 @@ Instruction *WidenIV::widenIVUse(WidenIV::NarrowIVDefUse DU,
               OrigPhi, WidePhi, DU.NarrowUse, WideInc) ||
           DU.NarrowUse->hasNoUnsignedWrap() != WideInc->hasNoUnsignedWrap() ||
           DU.NarrowUse->hasNoSignedWrap() != WideInc->hasNoSignedWrap();
-      return WideAddRec.first == WideIncExpr &&
+      return WideAddRec.first->getCanonical() ==
+                 WideIncExpr->getCanonical() &&
              Rewriter.hoistIVInc(WideInc, DU.NarrowUse, NeedToRecomputeFlags);
     };
 
@@ -1976,8 +1977,10 @@ Instruction *WidenIV::widenIVUse(WidenIV::NarrowIVDefUse DU,
     // extended outside the loop without overflow. This suggests that the wide use
     // evaluates to the same expression as the extended narrow use, but doesn't
     // absolutely guarantee it. Hence the following failsafe check. In rare cases
-    // where it fails, we simply throw away the newly created wide use.
-    if (WideAddRec.first != SE->getSCEV(WideUse)) {
+    // where it fails, we simply throw away the newly created wide use. Compare
+    // canonical SCEVs, which ignore use-specific flags on the operands.
+    if (WideAddRec.first->getCanonical() !=
+        SE->getSCEV(WideUse)->getCanonical()) {
       LLVM_DEBUG(dbgs() << "Wide use expression mismatch: " << *WideUse << ": "
                  << *SE->getSCEV(WideUse) << " != " << *WideAddRec.first
                  << "\n");
