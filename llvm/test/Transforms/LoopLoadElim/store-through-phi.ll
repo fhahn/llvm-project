@@ -6,32 +6,95 @@
 ; iteration. LAA checks the incoming values of %p, which need to be checked
 ; against A.
 define void @store_through_phi(ptr %A, ptr %B, ptr %C, i64 %N, i1 %cond) {
-; CHECK-LABEL: define void @store_through_phi(
-; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], ptr [[C:%.*]], i64 [[N:%.*]], i1 [[COND:%.*]]) {
-; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    [[LOAD_INITIAL:%.*]] = load i32, ptr [[A]], align 4
-; CHECK-NEXT:    br label %[[LOOP:.*]]
-; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[STORE_FORWARDED:%.*]] = phi i32 [ [[LOAD_INITIAL]], %[[ENTRY]] ], [ [[ADD:%.*]], %[[LATCH:.*]] ]
-; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LATCH]] ]
-; CHECK-NEXT:    [[GEP_A:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[IV]]
-; CHECK-NEXT:    [[L:%.*]] = load i32, ptr [[GEP_A]], align 4
-; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
-; CHECK-NEXT:    [[GEP_A_NEXT:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[IV_NEXT]]
-; CHECK-NEXT:    [[ADD]] = add i32 [[STORE_FORWARDED]], 1
-; CHECK-NEXT:    store i32 [[ADD]], ptr [[GEP_A_NEXT]], align 4
-; CHECK-NEXT:    [[GEP_B:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[IV]]
-; CHECK-NEXT:    [[GEP_C:%.*]] = getelementptr inbounds i32, ptr [[C]], i64 [[IV]]
-; CHECK-NEXT:    br i1 [[COND]], label %[[THEN:.*]], label %[[LATCH]]
-; CHECK:       [[THEN]]:
-; CHECK-NEXT:    br label %[[LATCH]]
-; CHECK:       [[LATCH]]:
-; CHECK-NEXT:    [[P:%.*]] = phi ptr [ [[GEP_B]], %[[THEN]] ], [ [[GEP_C]], %[[LOOP]] ]
-; CHECK-NEXT:    store i32 0, ptr [[P]], align 4
-; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
-; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[LOOP]]
-; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    ret void
+; DEFAULT-LABEL: define void @store_through_phi(
+; DEFAULT-SAME: ptr [[A:%.*]], ptr [[B:%.*]], ptr [[C:%.*]], i64 [[N:%.*]], i1 [[COND:%.*]]) {
+; DEFAULT-NEXT:  [[ENTRY:.*]]:
+; DEFAULT-NEXT:    br label %[[LOOP:.*]]
+; DEFAULT:       [[LOOP]]:
+; DEFAULT-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LATCH:.*]] ]
+; DEFAULT-NEXT:    [[GEP_A:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[IV]]
+; DEFAULT-NEXT:    [[L:%.*]] = load i32, ptr [[GEP_A]], align 4
+; DEFAULT-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; DEFAULT-NEXT:    [[GEP_A_NEXT:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[IV_NEXT]]
+; DEFAULT-NEXT:    [[ADD:%.*]] = add i32 [[L]], 1
+; DEFAULT-NEXT:    store i32 [[ADD]], ptr [[GEP_A_NEXT]], align 4
+; DEFAULT-NEXT:    [[GEP_B:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[IV]]
+; DEFAULT-NEXT:    [[GEP_C:%.*]] = getelementptr inbounds i32, ptr [[C]], i64 [[IV]]
+; DEFAULT-NEXT:    br i1 [[COND]], label %[[THEN:.*]], label %[[LATCH]]
+; DEFAULT:       [[THEN]]:
+; DEFAULT-NEXT:    br label %[[LATCH]]
+; DEFAULT:       [[LATCH]]:
+; DEFAULT-NEXT:    [[P:%.*]] = phi ptr [ [[GEP_B]], %[[THEN]] ], [ [[GEP_C]], %[[LOOP]] ]
+; DEFAULT-NEXT:    store i32 0, ptr [[P]], align 4
+; DEFAULT-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
+; DEFAULT-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[LOOP]]
+; DEFAULT:       [[EXIT]]:
+; DEFAULT-NEXT:    ret void
+;
+; AGGRESSIVE-LABEL: define void @store_through_phi(
+; AGGRESSIVE-SAME: ptr [[A:%.*]], ptr [[B:%.*]], ptr [[C:%.*]], i64 [[N:%.*]], i1 [[COND:%.*]]) {
+; AGGRESSIVE-NEXT:  [[LOOP_LVER_CHECK:.*:]]
+; AGGRESSIVE-NEXT:    [[TMP0:%.*]] = shl i64 [[N]], 2
+; AGGRESSIVE-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], 4
+; AGGRESSIVE-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP1]]
+; AGGRESSIVE-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[C]], i64 [[TMP0]]
+; AGGRESSIVE-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP0]]
+; AGGRESSIVE-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[A]], [[SCEVGEP1]]
+; AGGRESSIVE-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[C]], [[SCEVGEP]]
+; AGGRESSIVE-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; AGGRESSIVE-NEXT:    [[BOUND03:%.*]] = icmp ult ptr [[A]], [[SCEVGEP2]]
+; AGGRESSIVE-NEXT:    [[BOUND14:%.*]] = icmp ult ptr [[B]], [[SCEVGEP]]
+; AGGRESSIVE-NEXT:    [[FOUND_CONFLICT5:%.*]] = and i1 [[BOUND03]], [[BOUND14]]
+; AGGRESSIVE-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT5]]
+; AGGRESSIVE-NEXT:    br i1 [[CONFLICT_RDX]], label %[[LOOP_PH_LVER_ORIG:.*]], label %[[LOOP_PH:.*]]
+; AGGRESSIVE:       [[LOOP_PH_LVER_ORIG]]:
+; AGGRESSIVE-NEXT:    br label %[[LOOP_LVER_ORIG:.*]]
+; AGGRESSIVE:       [[LOOP_LVER_ORIG]]:
+; AGGRESSIVE-NEXT:    [[IV_LVER_ORIG:%.*]] = phi i64 [ 0, %[[LOOP_PH_LVER_ORIG]] ], [ [[IV_NEXT_LVER_ORIG:%.*]], %[[LATCH_LVER_ORIG:.*]] ]
+; AGGRESSIVE-NEXT:    [[GEP_A_LVER_ORIG:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[IV_LVER_ORIG]]
+; AGGRESSIVE-NEXT:    [[L_LVER_ORIG:%.*]] = load i32, ptr [[GEP_A_LVER_ORIG]], align 4
+; AGGRESSIVE-NEXT:    [[IV_NEXT_LVER_ORIG]] = add nuw nsw i64 [[IV_LVER_ORIG]], 1
+; AGGRESSIVE-NEXT:    [[GEP_A_NEXT_LVER_ORIG:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[IV_NEXT_LVER_ORIG]]
+; AGGRESSIVE-NEXT:    [[ADD_LVER_ORIG:%.*]] = add i32 [[L_LVER_ORIG]], 1
+; AGGRESSIVE-NEXT:    store i32 [[ADD_LVER_ORIG]], ptr [[GEP_A_NEXT_LVER_ORIG]], align 4
+; AGGRESSIVE-NEXT:    [[GEP_B_LVER_ORIG:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[IV_LVER_ORIG]]
+; AGGRESSIVE-NEXT:    [[GEP_C_LVER_ORIG:%.*]] = getelementptr inbounds i32, ptr [[C]], i64 [[IV_LVER_ORIG]]
+; AGGRESSIVE-NEXT:    br i1 [[COND]], label %[[THEN_LVER_ORIG:.*]], label %[[LATCH_LVER_ORIG]]
+; AGGRESSIVE:       [[THEN_LVER_ORIG]]:
+; AGGRESSIVE-NEXT:    br label %[[LATCH_LVER_ORIG]]
+; AGGRESSIVE:       [[LATCH_LVER_ORIG]]:
+; AGGRESSIVE-NEXT:    [[P_LVER_ORIG:%.*]] = phi ptr [ [[GEP_B_LVER_ORIG]], %[[THEN_LVER_ORIG]] ], [ [[GEP_C_LVER_ORIG]], %[[LOOP_LVER_ORIG]] ]
+; AGGRESSIVE-NEXT:    store i32 0, ptr [[P_LVER_ORIG]], align 4
+; AGGRESSIVE-NEXT:    [[EC_LVER_ORIG:%.*]] = icmp eq i64 [[IV_NEXT_LVER_ORIG]], [[N]]
+; AGGRESSIVE-NEXT:    br i1 [[EC_LVER_ORIG]], label %[[EXIT_LOOPEXIT:.*]], label %[[LOOP_LVER_ORIG]]
+; AGGRESSIVE:       [[LOOP_PH]]:
+; AGGRESSIVE-NEXT:    [[LOAD_INITIAL:%.*]] = load i32, ptr [[A]], align 4
+; AGGRESSIVE-NEXT:    br label %[[LOOP:.*]]
+; AGGRESSIVE:       [[LOOP]]:
+; AGGRESSIVE-NEXT:    [[STORE_FORWARDED:%.*]] = phi i32 [ [[LOAD_INITIAL]], %[[LOOP_PH]] ], [ [[ADD:%.*]], %[[LATCH:.*]] ]
+; AGGRESSIVE-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[LOOP_PH]] ], [ [[IV_NEXT:%.*]], %[[LATCH]] ]
+; AGGRESSIVE-NEXT:    [[GEP_A:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[IV]]
+; AGGRESSIVE-NEXT:    [[L:%.*]] = load i32, ptr [[GEP_A]], align 4
+; AGGRESSIVE-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; AGGRESSIVE-NEXT:    [[GEP_A_NEXT:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[IV_NEXT]]
+; AGGRESSIVE-NEXT:    [[ADD]] = add i32 [[STORE_FORWARDED]], 1
+; AGGRESSIVE-NEXT:    store i32 [[ADD]], ptr [[GEP_A_NEXT]], align 4
+; AGGRESSIVE-NEXT:    [[GEP_B:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[IV]]
+; AGGRESSIVE-NEXT:    [[GEP_C:%.*]] = getelementptr inbounds i32, ptr [[C]], i64 [[IV]]
+; AGGRESSIVE-NEXT:    br i1 [[COND]], label %[[THEN:.*]], label %[[LATCH]]
+; AGGRESSIVE:       [[THEN]]:
+; AGGRESSIVE-NEXT:    br label %[[LATCH]]
+; AGGRESSIVE:       [[LATCH]]:
+; AGGRESSIVE-NEXT:    [[P:%.*]] = phi ptr [ [[GEP_B]], %[[THEN]] ], [ [[GEP_C]], %[[LOOP]] ]
+; AGGRESSIVE-NEXT:    store i32 0, ptr [[P]], align 4
+; AGGRESSIVE-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
+; AGGRESSIVE-NEXT:    br i1 [[EC]], label %[[EXIT_LOOPEXIT6:.*]], label %[[LOOP]]
+; AGGRESSIVE:       [[EXIT_LOOPEXIT]]:
+; AGGRESSIVE-NEXT:    br label %[[EXIT:.*]]
+; AGGRESSIVE:       [[EXIT_LOOPEXIT6]]:
+; AGGRESSIVE-NEXT:    br label %[[EXIT]]
+; AGGRESSIVE:       [[EXIT]]:
+; AGGRESSIVE-NEXT:    ret void
 ;
 entry:
   br label %loop
@@ -117,6 +180,3 @@ latch:
 exit:
   ret void
 }
-;; NOTE: These prefixes are unused and the list is autogenerated. Do not add tests below this line:
-; AGGRESSIVE: {{.*}}
-; DEFAULT: {{.*}}
