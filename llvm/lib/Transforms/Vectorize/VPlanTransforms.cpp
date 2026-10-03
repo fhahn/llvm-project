@@ -5871,6 +5871,40 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
                            });
 }
 
+/// Replace \p VPI by a single-scalar recipe, if only its first lane is used.
+static VPSingleDefRecipe *scalarizeIfOnlyFirstLaneUsed(VPInstruction &VPI) {
+  auto *I = cast_or_null<Instruction>(VPI.getUnderlyingValue());
+  // Wouldn't be able to create a `VPReplicateRecipe` anyway.
+  if (!I)
+    return nullptr;
+
+  // If executing other lanes produces side-effects we can't avoid them.
+  if (VPI.mayHaveSideEffects())
+    return nullptr;
+
+  // We want to drop the mask operand, verify we can safely do that.
+  if (VPI.isMasked() && !VPI.isSafeToSpeculativelyExecute())
+    return nullptr;
+
+  // Avoid rewriting IV increment as that interferes with
+  // `removeRedundantCanonicalIVs`.
+  if (VPI.getOpcode() == Instruction::Add &&
+      any_of(VPI.operands(), IsaPred<VPWidenIntOrFpInductionRecipe>))
+    return nullptr;
+
+  // Other lanes are needed - can't drop them.
+  if (!vputils::onlyFirstLaneUsed(&VPI))
+    return nullptr;
+
+  auto *Recipe = VPBuilder::createSingleScalarOp(
+      VPI.getOpcode(), VPI.operandsWithoutMask(), /*Mask=*/nullptr, VPI, VPI,
+      VPI.getDebugLoc(), VPI.getScalarType(), I);
+  Recipe->insertBefore(&VPI);
+  VPI.replaceAllUsesWith(Recipe);
+  VPI.eraseFromParent();
+  return Recipe;
+}
+
 void VPlanTransforms::makeScalarizationDecisions(VPlan &Plan, VFRange &Range) {
   if (LoopVectorizationPlanner::getDecisionAndClampRange(
           [&](ElementCount VF) { return VF.isScalar(); }, Range))
@@ -5878,40 +5912,10 @@ void VPlanTransforms::makeScalarizationDecisions(VPlan &Plan, VFRange &Range) {
 
   PostOrderTraversal<VPBlockDeepTraversalWrapper<VPBlockBase *>> POT(
       Plan.getEntry());
-  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(POT)) {
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(POT))
     for (VPInstruction &VPI :
-         make_early_inc_range(make_isa_range<VPInstruction>(reverse(*VPBB)))) {
-      auto *I = cast_or_null<Instruction>(VPI.getUnderlyingValue());
-      // Wouldn't be able to create a `VPReplicateRecipe` anyway.
-      if (!I)
-        continue;
-
-      // If executing other lanes produces side-effects we can't avoid them.
-      if (VPI.mayHaveSideEffects())
-        continue;
-
-      // We want to drop the mask operand, verify we can safely do that.
-      if (VPI.isMasked() && !VPI.isSafeToSpeculativelyExecute())
-        continue;
-
-      // Avoid rewriting IV increment as that interferes with
-      // `removeRedundantCanonicalIVs`.
-      if (VPI.getOpcode() == Instruction::Add &&
-          any_of(VPI.operands(), IsaPred<VPWidenIntOrFpInductionRecipe>))
-        continue;
-
-      // Other lanes are needed - can't drop them.
-      if (!vputils::onlyFirstLaneUsed(&VPI))
-        continue;
-
-      auto *Recipe = VPBuilder::createSingleScalarOp(
-          VPI.getOpcode(), VPI.operandsWithoutMask(), /*Mask=*/nullptr, VPI,
-          VPI, VPI.getDebugLoc(), VPI.getScalarType(), I);
-      Recipe->insertBefore(&VPI);
-      VPI.replaceAllUsesWith(Recipe);
-      VPI.eraseFromParent();
-    }
-  }
+         make_early_inc_range(make_isa_range<VPInstruction>(reverse(*VPBB))))
+      scalarizeIfOnlyFirstLaneUsed(VPI);
 }
 
 /// Returns true if \p Info's parameter kinds are compatible with \p Args.
@@ -6097,6 +6101,14 @@ void VPlanTransforms::makeCallWideningDecisions(VPlan &Plan, VFRange &Range,
       Replacement->insertBefore(&VPI);
       VPI.replaceAllUsesWith(Replacement);
       VPI.eraseFromParent();
+
+      // Scalarize operands that now only have their first lane used.
+      SmallVector<VPRecipeBase *> Worklist = {Replacement};
+      while (!Range.Start.isScalar() && !Worklist.empty())
+        for (VPValue *Op : Worklist.pop_back_val()->operands())
+          if (auto *OpVPI = dyn_cast<VPInstruction>(Op))
+            if (auto *Scalar = scalarizeIfOnlyFirstLaneUsed(*OpVPI))
+              Worklist.push_back(Scalar);
     }
   }
 }
