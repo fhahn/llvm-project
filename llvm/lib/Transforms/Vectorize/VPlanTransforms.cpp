@@ -253,6 +253,12 @@ static bool
 canHoistOrSinkWithNoAliasCheck(const MemoryLocation &MemLoc,
                                VPBasicBlock *FirstBB, VPBasicBlock *LastBB,
                                std::optional<SinkStoreInfo> SinkInfo = {}) {
+  // The alias scan requires an unconditional chain between the blocks. This
+  // also prevents moving memory accesses across conditionally executed blocks.
+  for (VPBlockBase *BB = FirstBB; BB != LastBB; BB = BB->getSingleSuccessor())
+    if (!BB)
+      return false;
+
   bool CheckReads = SinkInfo.has_value();
   for (VPBasicBlock *VPBB :
        VPBlockUtils::blocksInSingleSuccessorChainBetween(FirstBB, LastBB)) {
@@ -277,9 +283,9 @@ canHoistOrSinkWithNoAliasCheck(const MemoryLocation &MemLoc,
   return true;
 }
 
-/// Get the value type of the replicate load or store. \p IsLoad indicates
-/// whether it is a load.
-static Type *getLoadStoreValueType(VPReplicateRecipe *R, bool IsLoad) {
+/// Get the value type of the load or store \p R. \p IsLoad indicates whether it
+/// is a load.
+static Type *getLoadStoreValueType(VPSingleDefRecipe *R, bool IsLoad) {
   return (IsLoad ? R : R->getOperand(0))->getScalarType();
 }
 
@@ -2453,12 +2459,19 @@ static void licm(VPlan &Plan) {
 
   // Hoist any loop invariant recipes from the vector loop region to the
   // preheader. Preform a shallow traversal of the vector loop region, to
-  // exclude recipes in replicate regions. Since the top-level blocks in the
-  // vector loop region are guaranteed to execute if the vector pre-header is,
-  // we don't need to check speculation safety.
+  // exclude recipes in replicate regions. The top-level blocks in the vector
+  // loop region execute whenever the vector pre-header does, except for the
+  // body skipped on early exits by convertMaskedEarlyExitToBailToScalar.
+  // Legality requires its non-memory recipes to be safe to speculate, and
+  // memory accesses are not hoisted, as canHoistOrSinkWithNoAliasCheck requires
+  // a single-successor chain through the region. Hence we don't need to check
+  // speculation safety.
   VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
   assert(Preheader->getSingleSuccessor() == LoopRegion &&
          "Expected vector prehader's successor to be the vector loop region");
+#ifndef NDEBUG
+  VPDominatorTree VPDT(Plan);
+#endif
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
            vp_depth_first_shallow(LoopRegion->getEntry()))) {
     for (VPRecipeBase &R : make_early_inc_range(*VPBB)) {
@@ -2469,13 +2482,14 @@ static void licm(VPlan &Plan) {
       if (cannotHoistOrSinkRecipe(R, LoopRegion->getEntryBasicBlock(),
                                   LoopRegion->getExitingBasicBlock()))
         continue;
+      assert((!R.mayReadOrWriteMemory() ||
+              VPDT.dominates(VPBB, LoopRegion->getExitingBasicBlock())) &&
+             "must not hoist memory accesses from conditionally executed "
+             "blocks");
       R.moveBefore(*Preheader, Preheader->end());
     }
   }
 
-#ifndef NDEBUG
-  VPDominatorTree VPDT(Plan);
-#endif
   // Sink recipes with no users inside the vector loop region if all users are
   // in the same exit block of the region.
   // TODO: Extend to sink recipes from inner loops.
@@ -3745,6 +3759,131 @@ bool VPlanTransforms::handleUncountableEarlyExits(
   }
 
   return true;
+}
+
+void VPlanTransforms::convertMaskedEarlyExitToBailToScalar(
+    VPlan &Plan, const VFSelectionContext &Config,
+    PredicatedScalarEvolution &PSE, const Loop *L) {
+  VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
+  VPBasicBlock *HeaderVPBB = LoopRegion->getEntryBasicBlock();
+  VPBasicBlock *LatchVPBB = LoopRegion->getExitingBasicBlock();
+  // Only support a header directly followed by the latch.
+  if (HeaderVPBB->getSingleSuccessor() != LatchVPBB)
+    return;
+
+  // Match the any-of of the uncountable exit condition in the latch.
+  VPInstruction *AnyOfR;
+  VPValue *Cond;
+  if (!match(LatchVPBB->getTerminator(),
+             m_BranchOnTwoConds(m_CombineAnd(m_VPInstruction(AnyOfR),
+                                             m_AnyOf(m_VPValue(Cond))),
+                                m_VPValue())))
+    return;
+
+  // Match the mask on the memory operations to skip on a bail; the
+  // first-active-lane may be cast to the IV's type.
+  auto *MaskR = find_singleton<VPInstruction>(
+      *HeaderVPBB, [Cond](VPRecipeBase &R, bool) -> VPInstruction * {
+        return match(&R, m_VPInstruction<VPInstruction::ActiveLaneMask>(
+                             m_ZeroInt(), m_ZExtOrTruncOrSelf(m_FirstActiveLane(
+                                              m_Specific(Cond)))))
+                   ? cast<VPInstruction>(&R)
+                   : nullptr;
+      });
+  if (!MaskR)
+    return;
+
+  // Skip the recipes after the mask whose values are only used by skipped
+  // recipes, which must include the masked accesses. The other recipes keep
+  // executing unconditionally, as in the masked loop. Visit users before their
+  // operands. Unskipped latch recipes preceding a skipped one may feed it, so
+  // collect them for hoisting to the header.
+  auto HeaderBody =
+      make_range(std::next(MaskR->getIterator()), HeaderVPBB->end());
+  auto LatchBody = drop_end(*LatchVPBB);
+  SetVector<VPRecipeBase *> Skipped;
+  SmallVector<VPRecipeBase *> ToHoist;
+  for (VPRecipeBase &R :
+       concat<VPRecipeBase>(reverse(LatchBody), reverse(HeaderBody))) {
+    if (all_of(R.definedValues(), [&Skipped](VPValue *Def) {
+          return all_of(Def->users(), [&Skipped](VPUser *U) {
+            return Skipped.contains(cast<VPRecipeBase>(U));
+          });
+        }))
+      Skipped.insert(&R);
+    else if (R.getParent() == LatchVPBB && !Skipped.empty())
+      ToHoist.push_back(&R);
+  }
+
+  // The producer masks every access except the condition load. All mask users
+  // must be skipped accesses.
+  if (any_of(MaskR->users(), [&Skipped, MaskR](VPUser *U) {
+        auto *VPI = dyn_cast<VPInstruction>(U);
+        return !VPI || !Skipped.contains(VPI) || VPI->getMask() != MaskR ||
+               !is_contained({Instruction::Load, Instruction::Store},
+                             VPI->getOpcode());
+      }))
+    return;
+
+  // Keep the masked plan if the target supports native masked loads and stores
+  // for all accesses. Only consecutive accesses of regular types can use them;
+  // the others are scalarized or need a masked gather or scatter, whose
+  // legality depends on the VF, so treat them as unsupported.
+  // TODO: Account for masked gather/scatter support.
+  bool MaskingIsLegal = all_of(MaskR->users(), [&](VPUser *U) {
+    auto *VPI = cast<VPInstruction>(U);
+    bool IsLoad = VPI->getOpcode() == Instruction::Load;
+    VPValue *Ptr = VPI->getOperand(!IsLoad);
+    Type *ValTy = getLoadStoreValueType(VPI, IsLoad);
+    if (hasIrregularType(ValTy, Plan.getDataLayout()))
+      return false;
+    std::optional<int64_t> Stride =
+        vputils::getConstantStride(Ptr, ValTy, PSE, L);
+    if (Stride != 1 && Stride != -1)
+      return false;
+    // TODO: Model alignment directly on the recipe.
+    return Config.isLegalMaskedLoadOrStore(
+        IsLoad, ValTy, getLoadStoreAlignment(VPI->getUnderlyingInstr()),
+        cast<PointerType>(Ptr->getScalarType())->getAddressSpace());
+  });
+  if (MaskingIsLegal)
+    return;
+
+  // Move the skipped recipes to a new block, branched around on a bail.
+  auto *NonBailingVPBB = Plan.createVPBasicBlock("vector.body.nonbailing");
+  VPBlockUtils::insertBlockAfter(NonBailingVPBB, HeaderVPBB);
+  for (VPRecipeBase *R : reverse(ToHoist))
+    R->moveBefore(*HeaderVPBB, HeaderVPBB->end());
+  for (VPRecipeBase *R : reverse(Skipped))
+    R->moveBefore(*NonBailingVPBB, NonBailingVPBB->end());
+
+  // No lane exits on the non-bailing path, so its mask is all-ones and the
+  // accesses always execute there.
+  for (VPUser *U : to_vector(MaskR->users()))
+    cast<VPInstruction>(U)->dropMask();
+  VPValue *FirstActive = MaskR->getOperand(1);
+  MaskR->eraseFromParent();
+
+  // Reuse the latch reduction to branch around the body.
+  AnyOfR->moveBefore(*HeaderVPBB, HeaderVPBB->end());
+
+  VPBlockUtils::connectBlocks(HeaderVPBB, LatchVPBB);
+  HeaderVPBB->swapSuccessors();
+  VPBuilder(HeaderVPBB).createNaryOp(VPInstruction::BranchOnCond, AnyOfR);
+
+  // Resume at IV + select(AnyOf, 0, VF), replaying the entire bailing chunk.
+  VPBasicBlock *MiddleVPBB = Plan.getMiddleBlock();
+  Type *IVScalarTy = FirstActive->getScalarType();
+  VPBuilder MiddleBuilder(MiddleVPBB, MiddleVPBB->getFirstNonPhi());
+  VPValue *VFAsIVTy = MiddleBuilder.createScalarZExtOrTrunc(
+      &Plan.getVF(), IVScalarTy, DebugLoc());
+  VPValue *CommittedLanes =
+      MiddleBuilder.createSelect(AnyOfR, Plan.getZero(IVScalarTy), VFAsIVTy);
+  FirstActive->replaceAllUsesWith(CommittedLanes);
+  vputils::recursivelyDeleteDeadRecipes(FirstActive);
+
+  // Early-exit loops use UF=1. Expose this before costing as well.
+  Plan.setUF(1);
 }
 
 /// This function tries convert extended in-loop reductions to
@@ -5921,7 +6060,8 @@ void VPlanTransforms::makeMemOpWideningDecisions(VPlan &Plan, VFRange &Range,
         // A predicated access can only be widened (rather than scalarized) if
         // the target supports a masked load/store for it.
         // TODO: Determine if a load/store needs predication directly in VPlan.
-        bool IsPredicated = RecipeBuilder.isPredicatedInst(I);
+        bool IsPredicated =
+            RecipeBuilder.isPredicatedInst(I) && VPI->isMasked();
         if (IsPredicated && !CostCtx.Config.isLegalMaskedLoadOrStore(
                                 IsLoad, ScalarTy, getLoadStoreAlignment(I),
                                 getLoadStoreAddressSpace(I)))

@@ -1552,6 +1552,13 @@ public:
     VPUser::addOperand(Mask);
   }
 
+  /// Remove the mask from a masked VPInstruction, which then always executes.
+  void dropMask() {
+    assert(isMasked() && "recipe is not masked");
+    VPUser::removeOperand(getNumOperands() - 1);
+    clearExecutionFrequency();
+  }
+
   /// Returns the mask for the VPInstruction. Returns nullptr for unmasked
   /// VPInstructions.
   VPValue *getMask() const { return isMasked() ? getLastOperand() : nullptr; }

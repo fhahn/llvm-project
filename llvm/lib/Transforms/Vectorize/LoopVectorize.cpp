@@ -6017,6 +6017,16 @@ bool VPRecipeBuilder::isPredicatedInst(Instruction *I) const {
   return CM.isPredicatedInst(I);
 }
 
+/// Returns true if \p VPI is in a block guarded by a branch kept in the vector
+/// loop region, like the body skipped on early exits by
+/// convertMaskedEarlyExitToBailToScalar. Such blocks execute for either all
+/// lanes or none, so the cost model's decisions for predicated instructions,
+/// which are based on the original control flow, do not apply.
+static bool isUnderRetainedBranch(const VPInstruction *VPI) {
+  auto *Pred = VPI->getParent()->getSinglePredecessor();
+  return Pred && Pred->getNumSuccessors() == 2;
+}
+
 bool VPRecipeBuilder::prefersVectorizedAddressing() const {
   return CM.TTI.prefersVectorizedAddressing();
 }
@@ -6028,6 +6038,7 @@ VPRecipeBase *VPRecipeBuilder::tryToWidenMemory(VPInstruction *VPI,
          "Must be called with either a load or store");
   Instruction *I = VPI->getUnderlyingInstr();
 
+  bool UnderRetainedBranch = isUnderRetainedBranch(VPI);
   auto WillWiden = [&](ElementCount VF) -> bool {
     LoopVectorizationCostModel::InstWidening Decision =
         CM.getWideningDecision(I, VF);
@@ -6036,7 +6047,7 @@ VPRecipeBase *VPRecipeBuilder::tryToWidenMemory(VPInstruction *VPI,
     if (Decision == LoopVectorizationCostModel::CM_Interleave)
       return true;
     if (CM.isScalarAfterVectorization(I, VF) ||
-        CM.isProfitableToScalarize(I, VF))
+        (!UnderRetainedBranch && CM.isProfitableToScalarize(I, VF)))
       return false;
     return Decision != LoopVectorizationCostModel::CM_Scalarize;
   };
@@ -6086,15 +6097,17 @@ VPRecipeBase *VPRecipeBuilder::tryToWidenMemory(VPInstruction *VPI,
                                   *VPI, Store->getDebugLoc());
 }
 
-bool VPRecipeBuilder::shouldWiden(Instruction *I, VFRange &Range) const {
+bool VPRecipeBuilder::shouldWiden(VPInstruction *VPI, VFRange &Range) const {
+  Instruction *I = VPI->getUnderlyingInstr();
   assert((!isa<UncondBrInst, CondBrInst, PHINode, LoadInst, StoreInst>(I)) &&
          "Instruction should have been handled earlier");
   // Instruction should be widened, unless it is scalar after vectorization,
   // scalarization is profitable or it is predicated.
-  auto WillScalarize = [this, I](ElementCount VF) -> bool {
+  bool UnderRetainedBranch = isUnderRetainedBranch(VPI);
+  auto WillScalarize = [this, I, UnderRetainedBranch](ElementCount VF) -> bool {
     return CM.isScalarAfterVectorization(I, VF) ||
-           CM.isProfitableToScalarize(I, VF) ||
-           CM.isScalarWithPredication(I, VF);
+           (!UnderRetainedBranch && (CM.isProfitableToScalarize(I, VF) ||
+                                     CM.isScalarWithPredication(I, VF)));
   };
   return !LoopVectorizationPlanner::getDecisionAndClampRange(WillScalarize,
                                                              Range);
@@ -6303,7 +6316,7 @@ VPRecipeBuilder::tryToCreateWidenNonPhiRecipe(VPSingleDefRecipe *R,
           OpR->getParent() != VPI->getParent())
         return tryToWiden(VPI);
 
-  if (!shouldWiden(Instr, Range))
+  if (!shouldWiden(VPI, Range))
     return nullptr;
 
   if (VPI->getOpcode() == Instruction::GetElementPtr) {
@@ -6483,6 +6496,10 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
     RUN_VPLAN_PASS(VPlanTransforms::foldTailByMasking, *VPlan0);
 
   RUN_VPLAN_PASS(VPlanTransforms::introduceMasksAndLinearize, *VPlan0);
+
+  if (Legal->hasUncountableExitWithSideEffects())
+    RUN_VPLAN_PASS(VPlanTransforms::convertMaskedEarlyExitToBailToScalar,
+                   *VPlan0, Config, PSE, OrigLoop);
 
   return VPlan0;
 }
