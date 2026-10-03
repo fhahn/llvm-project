@@ -83,5 +83,42 @@ TEST_F(TBAATest, checkTBAAMerging) {
   EXPECT_TRUE(!verifyFunction(*F));
 }
 
+TEST_F(TBAATest, mergeTagsWithCommonAncestors) {
+  auto *Root = MD.createTBAARoot("root");
+  auto *Common = MD.createTBAANode("common", Root);
+  auto *A = Common;
+  for (unsigned I = 0; I != 8; ++I)
+    A = MD.createTBAANode("a", A);
+  auto *B = MD.createTBAANode("b", Common);
+  auto *TagA = MD.createTBAAStructTagNode(A, A, 0);
+  auto *TagB = MD.createTBAAStructTagNode(B, B, 0);
+  auto *CommonTag = MD.createTBAAStructTagNode(Common, Common, 0);
+
+  EXPECT_EQ(MDNode::getMostGenericTBAA(TagA, TagB), CommonTag);
+  EXPECT_EQ(MDNode::getMostGenericTBAA(TagB, TagA), CommonTag);
+  EXPECT_EQ(MDNode::getMostGenericTBAA(TagA, CommonTag), CommonTag);
+  EXPECT_EQ(MDNode::getMostGenericTBAA(CommonTag, TagA), CommonTag);
+
+  auto *OtherRoot = MD.createTBAARoot("other root");
+  auto *Other = MD.createTBAANode("other", OtherRoot);
+  auto *OtherTag = MD.createTBAAStructTagNode(Other, Other, 0);
+  EXPECT_EQ(MDNode::getMostGenericTBAA(TagA, OtherTag), nullptr);
+  EXPECT_EQ(MDNode::getMostGenericTBAA(OtherTag, TagA), nullptr);
+}
+
+TEST_F(TBAATest, mergeTagsWithCyclicAncestors) {
+  auto *Root = MD.createTBAARoot("root");
+  auto *A = MD.createTBAANode("a", Root);
+  auto *TagA = MD.createTBAAStructTagNode(A, A, 0);
+  auto *Cycle = MDNode::getDistinct(C, {MDString::get(C, "cycle"), Root});
+  Cycle->replaceOperandWith(1, Cycle);
+  auto *CyclicTag = MD.createTBAAStructTagNode(Cycle, Cycle, 0);
+
+  EXPECT_DEATH_IF_SUPPORTED(MDNode::getMostGenericTBAA(CyclicTag, TagA),
+                           "Cycle found in TBAA metadata");
+  EXPECT_DEATH_IF_SUPPORTED(MDNode::getMostGenericTBAA(TagA, CyclicTag),
+                           "Cycle found in TBAA metadata");
+}
+
 } // end anonymous namspace
 } // end llvm namespace
