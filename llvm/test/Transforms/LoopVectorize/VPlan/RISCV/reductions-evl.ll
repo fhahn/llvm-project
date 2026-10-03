@@ -32,9 +32,9 @@ define float @print_reduction(i64 %n, ptr noalias %y) vscale_range(2, 1024) {
 ; CHECK-NEXT:      WIDEN ir<%lv> = vp.load vp<[[VP8]]>, vp<%evl>
 ; CHECK-NEXT:      REDUCE ir<%red.next> = ir<%red> + fast  vp.reduce.fadd (ir<%lv>, vp<%evl>)
 ; CHECK-NEXT:      EMIT-SCALAR vp<[[VP9:%[0-9]+]]> = zext vp<%evl> to i64
-; CHECK-NEXT:      EMIT vp<%current.iteration.next> = add vp<[[VP9]]>, vp<[[VP5]]>
-; CHECK-NEXT:      EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP9]]>
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP3]]>, vp<[[VP0]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%current.iteration.next> = add vp<[[VP9]]>, vp<[[VP5]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP9]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP3]]>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -90,9 +90,9 @@ define void @print_reduction_with_invariant_store(i64 %n, ptr noalias %y, ptr no
 ; CHECK-NEXT:      WIDEN ir<%lv> = vp.load vp<[[VP8]]>, vp<%evl>
 ; CHECK-NEXT:      REDUCE ir<%red.next> = ir<%red> + fast  vp.reduce.fadd (ir<%lv>, vp<%evl>)
 ; CHECK-NEXT:      EMIT-SCALAR vp<[[VP9:%[0-9]+]]> = zext vp<%evl> to i64
-; CHECK-NEXT:      EMIT vp<%current.iteration.next> = add vp<[[VP9]]>, vp<[[VP5]]>
-; CHECK-NEXT:      EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP9]]>
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP3]]>, vp<[[VP0]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%current.iteration.next> = add vp<[[VP9]]>, vp<[[VP5]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP9]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP3]]>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -154,9 +154,9 @@ define float @print_fmuladd_strict(ptr %a, ptr %b, i64 %n) vscale_range(2, 1024)
 ; CHECK-NEXT:      EMIT vp<[[VP10:%[0-9]+]]> = fmul reassoc nnan ninf nsz ir<%l.a>, ir<%l.b>
 ; CHECK-NEXT:      REDUCE ir<%muladd> = ir<%sum.07> + reassoc nnan ninf nsz  vp.reduce.fadd (vp<[[VP10]]>, vp<%evl>)
 ; CHECK-NEXT:      EMIT-SCALAR vp<[[VP11:%[0-9]+]]> = zext vp<%evl> to i64
-; CHECK-NEXT:      EMIT vp<%current.iteration.next> = add vp<[[VP11]]>, vp<[[VP5]]>
-; CHECK-NEXT:      EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP11]]>
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP3]]>, vp<[[VP0]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%current.iteration.next> = add vp<[[VP11]]>, vp<[[VP5]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP11]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP3]]>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -215,9 +215,9 @@ define i64 @find_last_iv(ptr %a, i64 %n, i64 %start) vscale_range(2, 1024) {
 ; CHECK-NEXT:      WIDEN ir<%cmp2> = icmp eq ir<%l.a>, ir<%start>
 ; CHECK-NEXT:      WIDEN-INTRINSIC vp<[[VP8]]> = call llvm.vp.merge(ir<%cmp2>, ir<%iv>, ir<%rdx>, vp<%evl>)
 ; CHECK-NEXT:      EMIT-SCALAR vp<[[VP9:%[0-9]+]]> = zext vp<%evl> to i64
-; CHECK-NEXT:      EMIT vp<%current.iteration.next> = add vp<[[VP9]]>, vp<[[VP4]]>
-; CHECK-NEXT:      EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP9]]>
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP2]]>, vp<[[VP0]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%current.iteration.next> = add vp<[[VP9]]>, vp<[[VP4]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP9]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP2]]>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -225,8 +225,8 @@ define i64 @find_last_iv(ptr %a, i64 %n, i64 %start) vscale_range(2, 1024) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
 ; CHECK-NEXT:    EMIT vp<[[VP11:%[0-9]+]]> = compute-reduction-result (smax) vp<[[VP8]]>
-; CHECK-NEXT:    EMIT vp<[[VP12:%[0-9]+]]> = icmp ne vp<[[VP11]]>, ir<-9223372036854775808>
-; CHECK-NEXT:    EMIT vp<[[VP13:%[0-9]+]]> = select vp<[[VP12]]>, vp<[[VP11]]>, ir<%start>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP12:%[0-9]+]]> = icmp ne vp<[[VP11]]>, ir<-9223372036854775808>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP13:%[0-9]+]]> = select vp<[[VP12]]>, vp<[[VP11]]>, ir<%start>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>
 ;
 entry:
@@ -274,9 +274,9 @@ define i64 @print_extended_reduction(ptr nocapture readonly %x, ptr nocapture re
 ; CHECK-NEXT:      vp<[[VP7:%[0-9]+]]> = vector-pointer inbounds i32, ir<%arrayidx>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%load0> = vp.load vp<[[VP7]]>, vp<%evl>
 ; CHECK-NEXT:      EXPRESSION vp<[[VP8]]> = vp<%evl> + reduce.add (ir<%load0> zext to i64, vp<%evl>)
-; CHECK-NEXT:      EMIT vp<%current.iteration.next> = add vp<%evl>, vp<[[VP5]]>
-; CHECK-NEXT:      EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<%evl>
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP3]]>, vp<[[VP0]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%current.iteration.next> = add vp<%evl>, vp<[[VP5]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%avl.next> = sub nuw vp<%avl>, vp<%evl>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP3]]>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -336,9 +336,9 @@ define i64 @print_mulacc(ptr nocapture readonly %x, ptr nocapture readonly %y, i
 ; CHECK-NEXT:      WIDEN ir<%load1> = vp.load vp<[[VP8]]>, vp<%evl>
 ; CHECK-NEXT:      WIDEN ir<%mul> = mul nsw ir<%load0>, ir<%load1>
 ; CHECK-NEXT:      REDUCE ir<%rdx.next> = ir<%rdx> +  vp.reduce.add (ir<%mul>, vp<%evl>)
-; CHECK-NEXT:      EMIT vp<%current.iteration.next> = add vp<%evl>, vp<[[VP5]]>
-; CHECK-NEXT:      EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<%evl>
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP3]]>, vp<[[VP0]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%current.iteration.next> = add vp<%evl>, vp<[[VP5]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%avl.next> = sub nuw vp<%avl>, vp<%evl>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP3]]>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -402,9 +402,9 @@ define i64 @print_mulacc_extended(ptr nocapture readonly %x, ptr nocapture reado
 ; CHECK-NEXT:      EMIT ir<%conv1> = sext ir<%load1> to i32
 ; CHECK-NEXT:      WIDEN ir<%mul> = mul nsw ir<%conv0>, ir<%conv1>
 ; CHECK-NEXT:      EXPRESSION vp<[[VP9]]> = vp<%evl> + reduce.add (ir<%mul> sext to i64, vp<%evl>)
-; CHECK-NEXT:      EMIT vp<%current.iteration.next> = add vp<%evl>, vp<[[VP5]]>
-; CHECK-NEXT:      EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<%evl>
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP3]]>, vp<[[VP0]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%current.iteration.next> = add vp<%evl>, vp<[[VP5]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%avl.next> = sub nuw vp<%avl>, vp<%evl>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP3]]>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -474,9 +474,9 @@ define i32 @print_mulacc_negated(ptr %a, ptr %b) vscale_range(2, 1024) {
 ; CHECK-NEXT:      WIDEN ir<%sub> = sub ir<0>, ir<%mul>
 ; CHECK-NEXT:      REDUCE ir<%add> = ir<%accum> +  vp.reduce.add (ir<%sub>, vp<%evl>)
 ; CHECK-NEXT:      EMIT-SCALAR vp<[[VP10:%[0-9]+]]> = zext vp<%evl> to i64
-; CHECK-NEXT:      EMIT vp<%current.iteration.next> = add nuw vp<[[VP10]]>, vp<[[VP5]]>
-; CHECK-NEXT:      EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP10]]>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP0]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%current.iteration.next> = add nuw vp<[[VP10]]>, vp<[[VP5]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP10]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -541,9 +541,9 @@ define i32 @print_mulacc_extended_const(ptr %start, ptr %end) vscale_range(2, 10
 ; CHECK-NEXT:      WIDEN ir<%mul> = mul ir<%l.ext>, ir<63>
 ; CHECK-NEXT:      REDUCE ir<%red.next> = ir<%red> +  vp.reduce.add (ir<%mul>, vp<%evl>)
 ; CHECK-NEXT:      EMIT-SCALAR vp<[[VP10:%[0-9]+]]> = zext vp<%evl> to i64
-; CHECK-NEXT:      EMIT vp<%current.iteration.next> = add vp<[[VP10]]>, vp<[[VP6]]>
-; CHECK-NEXT:      EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP10]]>
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP4]]>, vp<[[VP0]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%current.iteration.next> = add vp<[[VP10]]>, vp<[[VP6]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP10]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP4]]>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -603,9 +603,9 @@ define i32 @print_mulacc_extended_const_lhs(ptr %start, ptr %end) vscale_range(2
 ; CHECK-NEXT:      WIDEN ir<%mul> = mul ir<63>, ir<%l.ext>
 ; CHECK-NEXT:      REDUCE ir<%red.next> = ir<%red> +  vp.reduce.add (ir<%mul>, vp<%evl>)
 ; CHECK-NEXT:      EMIT-SCALAR vp<[[VP10:%[0-9]+]]> = zext vp<%evl> to i64
-; CHECK-NEXT:      EMIT vp<%current.iteration.next> = add vp<[[VP10]]>, vp<[[VP6]]>
-; CHECK-NEXT:      EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP10]]>
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP4]]>, vp<[[VP0]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%current.iteration.next> = add vp<[[VP10]]>, vp<[[VP6]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP10]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP4]]>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -666,9 +666,9 @@ define i32 @print_mulacc_not_extended_const(ptr %start, ptr %end) vscale_range(2
 ; CHECK-NEXT:      EMIT vp<[[VP10:%[0-9]+]]> = shl ir<%l.ext>, ir<7>
 ; CHECK-NEXT:      REDUCE ir<%red.next> = ir<%red> +  vp.reduce.add (vp<[[VP10]]>, vp<%evl>)
 ; CHECK-NEXT:      EMIT-SCALAR vp<[[VP11:%[0-9]+]]> = zext vp<%evl> to i64
-; CHECK-NEXT:      EMIT vp<%current.iteration.next> = add vp<[[VP11]]>, vp<[[VP6]]>
-; CHECK-NEXT:      EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP11]]>
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP4]]>, vp<[[VP0]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%current.iteration.next> = add vp<[[VP11]]>, vp<[[VP6]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP11]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP4]]>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -729,9 +729,9 @@ define i64 @print_ext_mulacc_extended_const(ptr %start, ptr %end) vscale_range(2
 ; CHECK-NEXT:      WIDEN ir<%mul> = mul ir<%l.ext>, ir<63>
 ; CHECK-NEXT:      EXPRESSION vp<[[VP10]]> = vp<%evl> + reduce.add (ir<%mul> zext to i64, vp<%evl>)
 ; CHECK-NEXT:      EMIT-SCALAR vp<[[VP11:%[0-9]+]]> = zext vp<%evl> to i64
-; CHECK-NEXT:      EMIT vp<%current.iteration.next> = add vp<[[VP11]]>, vp<[[VP6]]>
-; CHECK-NEXT:      EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP11]]>
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP4]]>, vp<[[VP0]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%current.iteration.next> = add vp<[[VP11]]>, vp<[[VP6]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP11]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP4]]>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -793,9 +793,9 @@ define i64 @print_ext_mulacc_not_extended_const(ptr %start, ptr %end) vscale_ran
 ; CHECK-NEXT:      EMIT vp<[[VP10:%[0-9]+]]> = shl ir<%l.ext>, ir<7>
 ; CHECK-NEXT:      EXPRESSION vp<[[VP11]]> = vp<%evl> + reduce.add (vp<[[VP10]]> sext to i64, vp<%evl>)
 ; CHECK-NEXT:      EMIT-SCALAR vp<[[VP12:%[0-9]+]]> = zext vp<%evl> to i64
-; CHECK-NEXT:      EMIT vp<%current.iteration.next> = add vp<[[VP12]]>, vp<[[VP6]]>
-; CHECK-NEXT:      EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP12]]>
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP4]]>, vp<[[VP0]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%current.iteration.next> = add vp<[[VP12]]>, vp<[[VP6]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP12]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP4]]>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -856,9 +856,9 @@ define i64 @print_ext_mul_two_uses(i64 %n, ptr %a, i16 %b, i32 %c) vscale_range(
 ; CHECK-NEXT:      EMIT-SCALAR vp<%evl> = EXPLICIT-VECTOR-LENGTH vp<%avl>
 ; CHECK-NEXT:      EXPRESSION vp<[[VP7]]> = vp<%evl> + reduce.add (ir<%mul> zext to i64, vp<%evl>)
 ; CHECK-NEXT:      EMIT-SCALAR vp<[[VP8:%[0-9]+]]> = zext vp<%evl> to i64
-; CHECK-NEXT:      EMIT vp<%current.iteration.next> = add vp<[[VP8]]>, vp<[[VP6]]>
-; CHECK-NEXT:      EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP8]]>
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP4]]>, vp<[[VP0]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%current.iteration.next> = add vp<[[VP8]]>, vp<[[VP6]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP8]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP4]]>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -920,9 +920,9 @@ define i32 @print_umax_reduction(ptr %y) vscale_range(2, 1024) {
 ; CHECK-NEXT:      WIDEN-INTRINSIC ir<%red.next> = call llvm.umax(ir<%lv>, ir<%red>)
 ; CHECK-NEXT:      WIDEN-INTRINSIC vp<[[VP8]]> = call llvm.vp.merge(ir<true>, ir<%red.next>, ir<%red>, vp<%evl>)
 ; CHECK-NEXT:      EMIT-SCALAR vp<[[VP9:%[0-9]+]]> = zext vp<%evl> to i64
-; CHECK-NEXT:      EMIT vp<%current.iteration.next> = add nuw vp<[[VP9]]>, vp<[[VP4]]>
-; CHECK-NEXT:      EMIT vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP9]]>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP2]]>, vp<[[VP0]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%current.iteration.next> = add nuw vp<[[VP9]]>, vp<[[VP4]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%avl.next> = sub nuw vp<%avl>, vp<[[VP9]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP2]]>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }

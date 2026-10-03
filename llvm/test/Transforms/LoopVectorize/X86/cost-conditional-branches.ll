@@ -672,9 +672,9 @@ define i64 @test_predicated_udiv(i32 %d, i1 %c) #2 {
 ; CHECK:       vector.main.loop.iter.check:
 ; CHECK-NEXT:    br i1 false, label [[VEC_EPILOG_PH:%.*]], label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT2:%.*]] = insertelement <32 x i1> poison, i1 [[C:%.*]], i64 0
+; CHECK-NEXT:    [[C:%.*]] = xor i1 [[C1:%.*]], true
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT2:%.*]] = insertelement <32 x i1> poison, i1 [[C]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT1:%.*]] = shufflevector <32 x i1> [[BROADCAST_SPLATINSERT2]], <32 x i1> poison, <32 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP0:%.*]] = xor <32 x i1> [[BROADCAST_SPLAT1]], splat (i1 true)
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <32 x i32> poison, i32 [[D:%.*]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <32 x i32> [[BROADCAST_SPLATINSERT1]], <32 x i32> poison, <32 x i32> zeroinitializer
 ; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
@@ -690,18 +690,18 @@ define i64 @test_predicated_udiv(i32 %d, i1 %c) #2 {
 ; CHECK-NEXT:    br i1 [[TMP1]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP10:![0-9]+]]
 ; CHECK:       middle.block:
 ; CHECK-NEXT:    [[TMP2:%.*]] = call <32 x i32> @llvm.usub.sat.v32i32(<32 x i32> [[STEP_ADD_3]], <32 x i32> splat (i32 1))
-; CHECK-NEXT:    [[TMP3:%.*]] = call <32 x i32> @llvm.masked.udiv.v32i32(<32 x i32> [[TMP2]], <32 x i32> [[BROADCAST_SPLAT2]], <32 x i1> [[TMP0]])
+; CHECK-NEXT:    [[TMP3:%.*]] = call <32 x i32> @llvm.masked.udiv.v32i32(<32 x i32> [[TMP2]], <32 x i32> [[BROADCAST_SPLAT2]], <32 x i1> [[BROADCAST_SPLAT1]])
 ; CHECK-NEXT:    [[TMP4:%.*]] = zext <32 x i32> [[TMP3]] to <32 x i64>
-; CHECK-NEXT:    [[PREDPHI:%.*]] = select i1 [[C]], <32 x i64> zeroinitializer, <32 x i64> [[TMP4]]
+; CHECK-NEXT:    [[PREDPHI:%.*]] = select i1 [[C1]], <32 x i64> zeroinitializer, <32 x i64> [[TMP4]]
 ; CHECK-NEXT:    [[TMP132:%.*]] = extractelement <32 x i64> [[PREDPHI]], i64 31
 ; CHECK-NEXT:    br i1 false, label [[EXIT:%.*]], label [[VEC_EPILOG_ITER_CHECK:%.*]]
 ; CHECK:       vec.epilog.iter.check:
 ; CHECK-NEXT:    br i1 false, label [[VEC_EPILOG_SCALAR_PH]], label [[VEC_EPILOG_PH]], !prof [[PROF11:![0-9]+]]
 ; CHECK:       vec.epilog.ph:
 ; CHECK-NEXT:    [[VEC_EPILOG_RESUME_VAL:%.*]] = phi i32 [ 896, [[VEC_EPILOG_ITER_CHECK]] ], [ 0, [[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT3:%.*]] = insertelement <8 x i1> poison, i1 [[C]], i64 0
+; CHECK-NEXT:    [[TMP6:%.*]] = xor i1 [[C1]], true
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT3:%.*]] = insertelement <8 x i1> poison, i1 [[TMP6]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT4:%.*]] = shufflevector <8 x i1> [[BROADCAST_SPLATINSERT3]], <8 x i1> poison, <8 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP6:%.*]] = xor <8 x i1> [[BROADCAST_SPLAT4]], splat (i1 true)
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <8 x i32> poison, i32 [[D]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <8 x i32> [[BROADCAST_SPLATINSERT]], <8 x i32> poison, <8 x i32> zeroinitializer
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT7:%.*]] = insertelement <8 x i32> poison, i32 [[VEC_EPILOG_RESUME_VAL]], i64 0
@@ -717,9 +717,9 @@ define i64 @test_predicated_udiv(i32 %d, i1 %c) #2 {
 ; CHECK-NEXT:    br i1 [[TMP167]], label [[VEC_EPILOG_MIDDLE_BLOCK:%.*]], label [[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP12:![0-9]+]]
 ; CHECK:       vec.epilog.middle.block:
 ; CHECK-NEXT:    [[TMP8:%.*]] = call <8 x i32> @llvm.usub.sat.v8i32(<8 x i32> [[VEC_IND64]], <8 x i32> splat (i32 1))
-; CHECK-NEXT:    [[TMP166:%.*]] = call <8 x i32> @llvm.masked.udiv.v8i32(<8 x i32> [[TMP8]], <8 x i32> [[BROADCAST_SPLAT]], <8 x i1> [[TMP6]])
+; CHECK-NEXT:    [[TMP166:%.*]] = call <8 x i32> @llvm.masked.udiv.v8i32(<8 x i32> [[TMP8]], <8 x i32> [[BROADCAST_SPLAT]], <8 x i1> [[BROADCAST_SPLAT4]])
 ; CHECK-NEXT:    [[TMP168:%.*]] = zext <8 x i32> [[TMP166]] to <8 x i64>
-; CHECK-NEXT:    [[PREDPHI83:%.*]] = select i1 [[C]], <8 x i64> zeroinitializer, <8 x i64> [[TMP168]]
+; CHECK-NEXT:    [[PREDPHI83:%.*]] = select i1 [[C1]], <8 x i64> zeroinitializer, <8 x i64> [[TMP168]]
 ; CHECK-NEXT:    [[TMP169:%.*]] = extractelement <8 x i64> [[PREDPHI83]], i64 7
 ; CHECK-NEXT:    br i1 false, label [[EXIT]], label [[VEC_EPILOG_SCALAR_PH]]
 ; CHECK:       vec.epilog.scalar.ph:
@@ -727,7 +727,7 @@ define i64 @test_predicated_udiv(i32 %d, i1 %c) #2 {
 ; CHECK-NEXT:    br label [[LOOP_HEADER:%.*]]
 ; CHECK:       loop.header:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ [[BC_RESUME_VAL]], [[VEC_EPILOG_SCALAR_PH]] ], [ [[IV_NEXT:%.*]], [[LOOP_LATCH:%.*]] ]
-; CHECK-NEXT:    br i1 [[C]], label [[LOOP_LATCH]], label [[THEN:%.*]]
+; CHECK-NEXT:    br i1 [[C1]], label [[LOOP_LATCH]], label [[THEN:%.*]]
 ; CHECK:       then:
 ; CHECK-NEXT:    [[CALL:%.*]] = tail call i32 @llvm.usub.sat.i32(i32 [[IV]], i32 1)
 ; CHECK-NEXT:    [[UDIV:%.*]] = udiv i32 [[CALL]], [[D]]

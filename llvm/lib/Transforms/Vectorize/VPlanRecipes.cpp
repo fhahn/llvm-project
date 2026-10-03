@@ -734,23 +734,25 @@ bool VPInstruction::doesGeneratePerAllLanes() const {
          (Opcode == VPInstruction::PtrAdd && !vputils::onlyFirstLaneUsed(this));
 }
 
-bool VPInstruction::inferGeneratesSingleScalar() const {
-  if (doesGenerateSingleScalar() || isVectorToScalar())
-    return true;
+bool VPInstruction::canGenerateScalarForFirstLane(unsigned Opcode) {
   switch (Opcode) {
-  case Instruction::Freeze:
   case Instruction::ICmp:
+  case Instruction::FCmp:
   case Instruction::Select:
-  case VPInstruction::BranchOnCond:
-  case VPInstruction::BranchOnTwoConds:
-  case VPInstruction::BranchOnCount:
-  case VPInstruction::CanonicalIVIncrementForPart:
+  case Instruction::Freeze:
   case VPInstruction::PtrAdd:
   case VPInstruction::Not:
-    return vputils::onlyFirstLaneUsed(this);
+    return true;
   default:
-    return Instruction::isBinaryOp(Opcode) && vputils::onlyFirstLaneUsed(this);
+    return Instruction::isBinaryOp(Opcode);
   }
+}
+
+bool VPInstruction::inferGeneratesSingleScalar() const {
+  if (doesGenerateSingleScalar() || isVectorToScalar() || !hasResult())
+    return true;
+  return canGenerateScalarForFirstLane(Opcode) &&
+         vputils::onlyFirstLaneUsed(this);
 }
 
 static Instruction::BinaryOps getSubRecurOpcode(RecurKind Kind) {

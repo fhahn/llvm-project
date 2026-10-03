@@ -27,8 +27,8 @@ define void @dup_gather(ptr noalias %a, ptr noalias %b, ptr noalias %out) {
 ; CHECK-NEXT:    WIDEN ir<%sum> = add ir<%x>, ir<%x>
 ; CHECK-NEXT:    CLONE ir<%gep.o> = getelementptr inbounds ir<%out>, vp<%index>
 ; CHECK-NEXT:    WIDEN store ir<%gep.o>, ir<%sum>
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<4>
-; CHECK-NEXT:    EMIT vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP1]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
 ;
@@ -78,8 +78,8 @@ define void @dup_gather_diff_index(ptr noalias %a, ptr noalias %b, ptr noalias %
 ; CHECK-NEXT:    WIDEN ir<%sum> = add ir<%x>, ir<%y>
 ; CHECK-NEXT:    CLONE ir<%gep.o> = getelementptr inbounds ir<%out>, vp<%index>
 ; CHECK-NEXT:    WIDEN store ir<%gep.o>, ir<%sum>
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<4>
-; CHECK-NEXT:    EMIT vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP1]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
 ;

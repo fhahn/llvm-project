@@ -30,7 +30,7 @@ define void @expensive_icmp(ptr noalias nocapture %d, ptr nocapture readonly %s,
 ; CHECK:  Cost of 0 for VF 2: CLONE ir<%arrayidx7> = getelementptr ir<%d>, vp<[[VP4]]>
 ; CHECK:  Cost of 0 for VF 2: vp<[[VP6:%[0-9]+]]> = vector-pointer i16, ir<%arrayidx7>, ir<1>
 ; CHECK:  Cost of 16 for VF 2: WIDEN store vp<[[VP6]]>, ir<%conv6>, ir<%cmp2> (!vplan.execution.frequency 9223372036854775807 (50%, estimated))
-; CHECK:  Cost of 0 for VF 2: EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
+; CHECK:  Cost of 0 for VF 2: EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
 ; CHECK:  Cost of 1 for VF 2: EMIT branch-on-count vp<%index.next>, vp<[[VP2:%[0-9]+]]>
 ; CHECK:  Cost of 0 for VF 2: vector loop backedge
 ; CHECK:  Cost of 1 for VF 2: canonical IV increment
@@ -42,7 +42,7 @@ define void @expensive_icmp(ptr noalias nocapture %d, ptr nocapture readonly %s,
 ; CHECK:  Cost of 0 for VF 2: IR %1 = load i16, ptr %arrayidx, align 2
 ; CHECK:  Cost of 0 for VF 2: IR %conv = sext i16 %1 to i32
 ; CHECK:  Cost of 0 for VF 2: IR %cmp2 = icmp sgt i32 %conv, %conv1
-; CHECK:  Cost of 1 for VF 2: EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
+; CHECK:  Cost of 1 for VF 2: EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 2: EMIT branch-on-cond vp<%cmp.n>
 ; CHECK:  Cost for VF 2: 86 (Estimated cost per lane: 43)
 ; CHECK:  Cost of 0 for VF 4: vp<[[VP4]]> = SCALAR-STEPS vp<[[VP3]]>, ir<1>, vp<[[VP0]]>
@@ -55,7 +55,7 @@ define void @expensive_icmp(ptr noalias nocapture %d, ptr nocapture readonly %s,
 ; CHECK:  Cost of 0 for VF 4: CLONE ir<%arrayidx7> = getelementptr ir<%d>, vp<[[VP4]]>
 ; CHECK:  Cost of 0 for VF 4: vp<[[VP6]]> = vector-pointer i16, ir<%arrayidx7>, ir<1>
 ; CHECK:  Cost of 2 for VF 4: WIDEN store vp<[[VP6]]>, ir<%conv6>, ir<%cmp2> (!vplan.execution.frequency 9223372036854775807 (50%, estimated))
-; CHECK:  Cost of 0 for VF 4: EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK:  Cost of 0 for VF 4: EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK:  Cost of 1 for VF 4: EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 4: vector loop backedge
 ; CHECK:  Cost of 1 for VF 4: canonical IV increment
@@ -67,7 +67,7 @@ define void @expensive_icmp(ptr noalias nocapture %d, ptr nocapture readonly %s,
 ; CHECK:  Cost of 0 for VF 4: IR %1 = load i16, ptr %arrayidx, align 2
 ; CHECK:  Cost of 0 for VF 4: IR %conv = sext i16 %1 to i32
 ; CHECK:  Cost of 0 for VF 4: IR %cmp2 = icmp sgt i32 %conv, %conv1
-; CHECK:  Cost of 1 for VF 4: EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
+; CHECK:  Cost of 1 for VF 4: EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 4: EMIT branch-on-cond vp<%cmp.n>
 ; CHECK:  Cost for VF 4: 10 (Estimated cost per lane: 2.5)
 ; CHECK:  Cost of 0 for VF 8: vp<[[VP4]]> = SCALAR-STEPS vp<[[VP3]]>, ir<1>, vp<[[VP0]]>
@@ -80,7 +80,7 @@ define void @expensive_icmp(ptr noalias nocapture %d, ptr nocapture readonly %s,
 ; CHECK:  Cost of 0 for VF 8: CLONE ir<%arrayidx7> = getelementptr ir<%d>, vp<[[VP4]]>
 ; CHECK:  Cost of 0 for VF 8: vp<[[VP6]]> = vector-pointer i16, ir<%arrayidx7>, ir<1>
 ; CHECK:  Cost of 2 for VF 8: WIDEN store vp<[[VP6]]>, ir<%conv6>, ir<%cmp2> (!vplan.execution.frequency 9223372036854775807 (50%, estimated))
-; CHECK:  Cost of 0 for VF 8: EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK:  Cost of 0 for VF 8: EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK:  Cost of 1 for VF 8: EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 8: vector loop backedge
 ; CHECK:  Cost of 1 for VF 8: canonical IV increment
@@ -92,11 +92,11 @@ define void @expensive_icmp(ptr noalias nocapture %d, ptr nocapture readonly %s,
 ; CHECK:  Cost of 0 for VF 8: IR %1 = load i16, ptr %arrayidx, align 2
 ; CHECK:  Cost of 0 for VF 8: IR %conv = sext i16 %1 to i32
 ; CHECK:  Cost of 0 for VF 8: IR %cmp2 = icmp sgt i32 %conv, %conv1
-; CHECK:  Cost of 1 for VF 8: EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
+; CHECK:  Cost of 1 for VF 8: EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 8: EMIT branch-on-cond vp<%cmp.n>
 ; CHECK:  Cost for VF 8: 46 (Estimated cost per lane: 5.75)
 ; CHECK:  LV: Selecting VF: 4.
-; CHECK:  Cost of 1 for VF 4: EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
+; CHECK:  Cost of 1 for VF 4: EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 4: EMIT branch-on-cond vp<%cmp.n>
 ;
 entry:
@@ -170,7 +170,7 @@ define void @cheap_icmp(ptr nocapture readonly %pSrcA, ptr nocapture readonly %p
 ; CHECK:  Cost of 0 for VF 2: EMIT ir<%conv4> = trunc ir<%spec.select.i> to i8
 ; CHECK:  Cost of 0 for VF 2: vp<[[VP11:%[0-9]+]]> = vector-pointer i8, vp<%next.gep>.1, ir<1>
 ; CHECK:  Cost of 18 for VF 2: WIDEN store vp<[[VP11]]>, ir<%conv4>
-; CHECK:  Cost of 0 for VF 2: EMIT vp<%index.next> = add nuw vp<[[VP7]]>, vp<[[VP1:%[0-9]+]]>
+; CHECK:  Cost of 0 for VF 2: EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP7]]>, vp<[[VP1:%[0-9]+]]>
 ; CHECK:  Cost of 1 for VF 2: EMIT branch-on-count vp<%index.next>, vp<[[VP2:%[0-9]+]]>
 ; CHECK:  Cost of 0 for VF 2: vector loop backedge
 ; CHECK:  Cost of 1 for VF 2: canonical IV increment
@@ -201,7 +201,7 @@ define void @cheap_icmp(ptr nocapture readonly %pSrcA, ptr nocapture readonly %p
 ; CHECK:  Cost of 0 for VF 2: vp<[[VP4]]> = DERIVED-IV ir<%pSrcA> + vp<[[VP2]]> * ir<1>
 ; CHECK:  Cost of 0 for VF 2: vp<[[VP5]]> = DERIVED-IV ir<%pDst> + vp<[[VP2]]> * ir<1>
 ; CHECK:  Cost of 0 for VF 2: vp<[[VP6]]> = DERIVED-IV ir<%pSrcB> + vp<[[VP2]]> * ir<1>
-; CHECK:  Cost of 1 for VF 2: EMIT vp<%cmp.n> = icmp eq ir<%blockSize>, vp<[[VP2]]>
+; CHECK:  Cost of 1 for VF 2: EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%blockSize>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 2: EMIT branch-on-cond vp<%cmp.n>
 ; CHECK:  Cost for VF 2: 130 (Estimated cost per lane: 65)
 ; CHECK:  Cost of 0 for VF 4: vp<[[VP8]]> = SCALAR-STEPS vp<[[VP7]]>, ir<1>, vp<[[VP0]]>
@@ -221,7 +221,7 @@ define void @cheap_icmp(ptr nocapture readonly %pSrcA, ptr nocapture readonly %p
 ; CHECK:  Cost of 0 for VF 4: EMIT ir<%conv4> = trunc ir<%spec.select.i> to i8
 ; CHECK:  Cost of 0 for VF 4: vp<[[VP11]]> = vector-pointer i8, vp<%next.gep>.1, ir<1>
 ; CHECK:  Cost of 2 for VF 4: WIDEN store vp<[[VP11]]>, ir<%conv4>
-; CHECK:  Cost of 0 for VF 4: EMIT vp<%index.next> = add nuw vp<[[VP7]]>, vp<[[VP1]]>
+; CHECK:  Cost of 0 for VF 4: EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP7]]>, vp<[[VP1]]>
 ; CHECK:  Cost of 1 for VF 4: EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 4: vector loop backedge
 ; CHECK:  Cost of 1 for VF 4: canonical IV increment
@@ -252,7 +252,7 @@ define void @cheap_icmp(ptr nocapture readonly %pSrcA, ptr nocapture readonly %p
 ; CHECK:  Cost of 0 for VF 4: vp<[[VP4]]> = DERIVED-IV ir<%pSrcA> + vp<[[VP2]]> * ir<1>
 ; CHECK:  Cost of 0 for VF 4: vp<[[VP5]]> = DERIVED-IV ir<%pDst> + vp<[[VP2]]> * ir<1>
 ; CHECK:  Cost of 0 for VF 4: vp<[[VP6]]> = DERIVED-IV ir<%pSrcB> + vp<[[VP2]]> * ir<1>
-; CHECK:  Cost of 1 for VF 4: EMIT vp<%cmp.n> = icmp eq ir<%blockSize>, vp<[[VP2]]>
+; CHECK:  Cost of 1 for VF 4: EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%blockSize>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 4: EMIT branch-on-cond vp<%cmp.n>
 ; CHECK:  Cost for VF 4: 14 (Estimated cost per lane: 3.5)
 ; CHECK:  Cost of 0 for VF 8: vp<[[VP8]]> = SCALAR-STEPS vp<[[VP7]]>, ir<1>, vp<[[VP0]]>
@@ -272,7 +272,7 @@ define void @cheap_icmp(ptr nocapture readonly %pSrcA, ptr nocapture readonly %p
 ; CHECK:  Cost of 2 for VF 8: EMIT ir<%conv4> = trunc ir<%spec.select.i> to i8
 ; CHECK:  Cost of 0 for VF 8: vp<[[VP11]]> = vector-pointer i8, vp<%next.gep>.1, ir<1>
 ; CHECK:  Cost of 2 for VF 8: WIDEN store vp<[[VP11]]>, ir<%conv4>
-; CHECK:  Cost of 0 for VF 8: EMIT vp<%index.next> = add nuw vp<[[VP7]]>, vp<[[VP1]]>
+; CHECK:  Cost of 0 for VF 8: EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP7]]>, vp<[[VP1]]>
 ; CHECK:  Cost of 1 for VF 8: EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 8: vector loop backedge
 ; CHECK:  Cost of 1 for VF 8: canonical IV increment
@@ -303,7 +303,7 @@ define void @cheap_icmp(ptr nocapture readonly %pSrcA, ptr nocapture readonly %p
 ; CHECK:  Cost of 0 for VF 8: vp<[[VP4]]> = DERIVED-IV ir<%pSrcA> + vp<[[VP2]]> * ir<1>
 ; CHECK:  Cost of 0 for VF 8: vp<[[VP5]]> = DERIVED-IV ir<%pDst> + vp<[[VP2]]> * ir<1>
 ; CHECK:  Cost of 0 for VF 8: vp<[[VP6]]> = DERIVED-IV ir<%pSrcB> + vp<[[VP2]]> * ir<1>
-; CHECK:  Cost of 1 for VF 8: EMIT vp<%cmp.n> = icmp eq ir<%blockSize>, vp<[[VP2]]>
+; CHECK:  Cost of 1 for VF 8: EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%blockSize>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 8: EMIT branch-on-cond vp<%cmp.n>
 ; CHECK:  Cost for VF 8: 26 (Estimated cost per lane: 3.25)
 ; CHECK:  Cost of 0 for VF 16: vp<[[VP8]]> = SCALAR-STEPS vp<[[VP7]]>, ir<1>, vp<[[VP0]]>
@@ -323,7 +323,7 @@ define void @cheap_icmp(ptr nocapture readonly %pSrcA, ptr nocapture readonly %p
 ; CHECK:  Cost of 6 for VF 16: EMIT ir<%conv4> = trunc ir<%spec.select.i> to i8
 ; CHECK:  Cost of 0 for VF 16: vp<[[VP11]]> = vector-pointer i8, vp<%next.gep>.1, ir<1>
 ; CHECK:  Cost of 2 for VF 16: WIDEN store vp<[[VP11]]>, ir<%conv4>
-; CHECK:  Cost of 0 for VF 16: EMIT vp<%index.next> = add nuw vp<[[VP7]]>, vp<[[VP1]]>
+; CHECK:  Cost of 0 for VF 16: EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP7]]>, vp<[[VP1]]>
 ; CHECK:  Cost of 1 for VF 16: EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 16: vector loop backedge
 ; CHECK:  Cost of 1 for VF 16: canonical IV increment
@@ -354,11 +354,11 @@ define void @cheap_icmp(ptr nocapture readonly %pSrcA, ptr nocapture readonly %p
 ; CHECK:  Cost of 0 for VF 16: vp<[[VP4]]> = DERIVED-IV ir<%pSrcA> + vp<[[VP2]]> * ir<1>
 ; CHECK:  Cost of 0 for VF 16: vp<[[VP5]]> = DERIVED-IV ir<%pDst> + vp<[[VP2]]> * ir<1>
 ; CHECK:  Cost of 0 for VF 16: vp<[[VP6]]> = DERIVED-IV ir<%pSrcB> + vp<[[VP2]]> * ir<1>
-; CHECK:  Cost of 1 for VF 16: EMIT vp<%cmp.n> = icmp eq ir<%blockSize>, vp<[[VP2]]>
+; CHECK:  Cost of 1 for VF 16: EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%blockSize>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 16: EMIT branch-on-cond vp<%cmp.n>
 ; CHECK:  Cost for VF 16: 50 (Estimated cost per lane: 3.13)
 ; CHECK:  LV: Selecting VF: 16.
-; CHECK:  Cost of 1 for VF 16: EMIT vp<%cmp.n> = icmp eq ir<%blockSize>, vp<[[VP2]]>
+; CHECK:  Cost of 1 for VF 16: EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%blockSize>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 16: EMIT branch-on-cond vp<%cmp.n>
 ;
 entry:
@@ -425,7 +425,7 @@ define void @floatcmp(ptr nocapture readonly %pSrc, ptr nocapture %pDst, i32 %bl
 ; CHECK:  Cost of 36 for VF 2: EMIT ir<%conv> = fptosi ir<%cond> to i32
 ; CHECK:  Cost of 0 for VF 2: vp<[[VP12:%[0-9]+]]> = vector-pointer i32, vp<%next.gep>.1, ir<1>
 ; CHECK:  Cost of 18 for VF 2: WIDEN store vp<[[VP12]]>, ir<%conv>
-; CHECK:  Cost of 0 for VF 2: EMIT vp<%index.next> = add nuw vp<[[VP6]]>, vp<[[VP1:%[0-9]+]]>
+; CHECK:  Cost of 0 for VF 2: EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP6]]>, vp<[[VP1:%[0-9]+]]>
 ; CHECK:  Cost of 1 for VF 2: EMIT branch-on-count vp<%index.next>, vp<[[VP2:%[0-9]+]]>
 ; CHECK:  Cost of 0 for VF 2: vector loop backedge
 ; CHECK:  Cost of 1 for VF 2: canonical IV increment
@@ -447,7 +447,7 @@ define void @floatcmp(ptr nocapture readonly %pSrc, ptr nocapture %pDst, i32 %bl
 ; CHECK:  Cost of 0 for VF 2: vp<[[VP3]]> = DERIVED-IV ir<%pSrc> + vp<[[VP2]]> * ir<4>
 ; CHECK:  Cost of 1 for VF 2: vp<[[VP4]]> = DERIVED-IV ir<%blockSize> + vp<[[VP2]]> * ir<-1>
 ; CHECK:  Cost of 0 for VF 2: vp<[[VP5]]> = DERIVED-IV ir<%pDst> + vp<[[VP2]]> * ir<4>
-; CHECK:  Cost of 1 for VF 2: EMIT vp<%cmp.n> = icmp eq ir<%blockSize>, vp<[[VP2]]>
+; CHECK:  Cost of 1 for VF 2: EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%blockSize>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 2: EMIT branch-on-cond vp<%cmp.n>
 ; CHECK:  Cost for VF 2: 84 (Estimated cost per lane: 42)
 ; CHECK:  Cost of 1 for VF 4: vp<[[VP7]]> = DERIVED-IV ir<0> + vp<[[VP6]]> * ir<4>
@@ -463,7 +463,7 @@ define void @floatcmp(ptr nocapture readonly %pSrc, ptr nocapture %pDst, i32 %bl
 ; CHECK:  Cost of 72 for VF 4: EMIT ir<%conv> = fptosi ir<%cond> to i32
 ; CHECK:  Cost of 0 for VF 4: vp<[[VP12]]> = vector-pointer i32, vp<%next.gep>.1, ir<1>
 ; CHECK:  Cost of 2 for VF 4: WIDEN store vp<[[VP12]]>, ir<%conv>
-; CHECK:  Cost of 0 for VF 4: EMIT vp<%index.next> = add nuw vp<[[VP6]]>, vp<[[VP1]]>
+; CHECK:  Cost of 0 for VF 4: EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP6]]>, vp<[[VP1]]>
 ; CHECK:  Cost of 1 for VF 4: EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 4: vector loop backedge
 ; CHECK:  Cost of 1 for VF 4: canonical IV increment
@@ -485,7 +485,7 @@ define void @floatcmp(ptr nocapture readonly %pSrc, ptr nocapture %pDst, i32 %bl
 ; CHECK:  Cost of 0 for VF 4: vp<[[VP3]]> = DERIVED-IV ir<%pSrc> + vp<[[VP2]]> * ir<4>
 ; CHECK:  Cost of 1 for VF 4: vp<[[VP4]]> = DERIVED-IV ir<%blockSize> + vp<[[VP2]]> * ir<-1>
 ; CHECK:  Cost of 0 for VF 4: vp<[[VP5]]> = DERIVED-IV ir<%pDst> + vp<[[VP2]]> * ir<4>
-; CHECK:  Cost of 1 for VF 4: EMIT vp<%cmp.n> = icmp eq ir<%blockSize>, vp<[[VP2]]>
+; CHECK:  Cost of 1 for VF 4: EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%blockSize>, vp<[[VP2]]>
 ; CHECK:  Cost of 0 for VF 4: EMIT branch-on-cond vp<%cmp.n>
 ; CHECK:  Cost for VF 4: 120 (Estimated cost per lane: 30)
 ; CHECK:  LV: Selecting VF: 1.

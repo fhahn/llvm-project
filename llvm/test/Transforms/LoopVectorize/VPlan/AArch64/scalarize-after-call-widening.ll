@@ -27,7 +27,7 @@ define void @uniform_arg(ptr noalias %src, ptr noalias %dst, i64 %a, i64 %b) {
 ; CHECK-NEXT:      WIDEN store vp<[[VP5]]>, ir<%call>
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add nuw nsw ir<%iv>, ir<1>
 ; CHECK-NEXT:      CLONE ir<%ec> = icmp eq ir<%iv.next>, ir<1000>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2:%[0-9]+]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -66,7 +66,7 @@ define void @linear_arg(ptr noalias %dst) {
 ; CHECK-NEXT:      WIDEN store vp<[[VP4]]>, ir<%call>
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add nuw nsw ir<%iv>, ir<1>
 ; CHECK-NEXT:      CLONE ir<%ec> = icmp eq ir<%iv.next>, ir<1000>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2:%[0-9]+]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }

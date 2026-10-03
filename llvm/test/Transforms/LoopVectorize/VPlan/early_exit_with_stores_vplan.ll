@@ -36,8 +36,8 @@ define void @loop_contains_store_condition_load_has_single_user(ptr dereferencea
 ; CHECK-NEXT:      WIDEN ir<%inc> = add nsw ir<%data>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP8]]>, ir<%inc>, vp<%uncountable.exit.mask>
 ; CHECK-NEXT:      EMIT vp<[[VP9:%[0-9]+]]> = any-of vp<[[VP6]]>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT vp<[[VP10:%[0-9]+]]> = icmp eq vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<[[VP10:%[0-9]+]]> = icmp eq vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:      EMIT branch-on-two-conds vp<[[VP9]]>, vp<[[VP10]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -45,8 +45,8 @@ define void @loop_contains_store_condition_load_has_single_user(ptr dereferencea
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
 ; CHECK-NEXT:    EMIT vp<[[VP12:%[0-9]+]]> = extract-lane ir<0>, ir<%iv>
-; CHECK-NEXT:    EMIT vp<[[VP13:%[0-9]+]]> = add vp<[[VP12]]>, vp<[[VP7]]>
-; CHECK-NEXT:    EMIT vp<[[VP14:%[0-9]+]]> = icmp eq vp<[[VP13]]>, ir<20>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP13:%[0-9]+]]> = add vp<[[VP12]]>, vp<[[VP7]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP14:%[0-9]+]]> = icmp eq vp<[[VP13]]>, ir<20>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP14]]>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
@@ -125,8 +125,8 @@ define void @loop_contains_store_after_uncountable_exit(ptr dereferenceable(40) 
 ; CHECK-NEXT:      WIDEN ir<%inc> = add nsw ir<%data>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP8]]>, ir<%inc>, vp<%uncountable.exit.mask> (!vplan.execution.frequency 17870283321406128127 (96.88%, estimated))
 ; CHECK-NEXT:      EMIT vp<[[VP9:%[0-9]+]]> = any-of vp<[[VP6]]>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT vp<[[VP10:%[0-9]+]]> = icmp eq vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<[[VP10:%[0-9]+]]> = icmp eq vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:      EMIT branch-on-two-conds vp<[[VP9]]>, vp<[[VP10]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -134,8 +134,8 @@ define void @loop_contains_store_after_uncountable_exit(ptr dereferenceable(40) 
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
 ; CHECK-NEXT:    EMIT vp<[[VP12:%[0-9]+]]> = extract-lane ir<0>, ir<%iv>
-; CHECK-NEXT:    EMIT vp<[[VP13:%[0-9]+]]> = add vp<[[VP12]]>, vp<[[VP7]]>
-; CHECK-NEXT:    EMIT vp<[[VP14:%[0-9]+]]> = icmp eq vp<[[VP13]]>, ir<20>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP13:%[0-9]+]]> = add vp<[[VP12]]>, vp<[[VP7]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP14:%[0-9]+]]> = icmp eq vp<[[VP13]]>, ir<20>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP14]]>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
@@ -210,8 +210,8 @@ define i16 @uncountable_exit_with_live_out(ptr dereferenceable(40) noalias %arra
 ; CHECK-NEXT:      WIDEN ir<%inc> = add nsw ir<%data>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP8]]>, ir<%inc>, vp<%uncountable.exit.mask>
 ; CHECK-NEXT:      EMIT vp<[[VP9:%[0-9]+]]> = any-of vp<[[VP6]]>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT vp<[[VP10:%[0-9]+]]> = icmp eq vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<[[VP10:%[0-9]+]]> = icmp eq vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:      EMIT branch-on-two-conds vp<[[VP9]]>, vp<[[VP10]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -221,8 +221,8 @@ define i16 @uncountable_exit_with_live_out(ptr dereferenceable(40) noalias %arra
 ; CHECK-NEXT:    EMIT vp<[[VP12:%[0-9]+]]> = extract-last-part ir<%data>
 ; CHECK-NEXT:    EMIT vp<[[VP13:%[0-9]+]]> = extract-last-lane vp<[[VP12]]>
 ; CHECK-NEXT:    EMIT vp<[[VP14:%[0-9]+]]> = extract-lane ir<0>, ir<%iv>
-; CHECK-NEXT:    EMIT vp<[[VP15:%[0-9]+]]> = add vp<[[VP14]]>, vp<[[VP7]]>
-; CHECK-NEXT:    EMIT vp<[[VP16:%[0-9]+]]> = icmp eq vp<[[VP15]]>, ir<20>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP15:%[0-9]+]]> = add vp<[[VP14]]>, vp<[[VP7]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP16:%[0-9]+]]> = icmp eq vp<[[VP15]]>, ir<20>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP16]]>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
@@ -305,8 +305,8 @@ define void @combined_exit_conditions(ptr align 4 dereferenceable(80) readonly %
 ; CHECK-NEXT:      vp<[[VP10:%[0-9]+]]> = vector-pointer i32, ir<%dst.ptr>, ir<1>
 ; CHECK-NEXT:      WIDEN store vp<[[VP10]]>, ir<%add>, vp<%uncountable.exit.mask>
 ; CHECK-NEXT:      EMIT vp<[[VP11:%[0-9]+]]> = any-of vp<[[VP7]]>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT vp<[[VP12:%[0-9]+]]> = icmp eq vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<[[VP12:%[0-9]+]]> = icmp eq vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:      EMIT branch-on-two-conds vp<[[VP11]]>, vp<[[VP12]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -314,8 +314,8 @@ define void @combined_exit_conditions(ptr align 4 dereferenceable(80) readonly %
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
 ; CHECK-NEXT:    EMIT vp<[[VP14:%[0-9]+]]> = extract-lane ir<0>, ir<%iv>
-; CHECK-NEXT:    EMIT vp<[[VP15:%[0-9]+]]> = add vp<[[VP14]]>, vp<[[VP8]]>
-; CHECK-NEXT:    EMIT vp<[[VP16:%[0-9]+]]> = icmp eq vp<[[VP15]]>, ir<20>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP15:%[0-9]+]]> = add vp<[[VP14]]>, vp<[[VP8]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP16:%[0-9]+]]> = icmp eq vp<[[VP15]]>, ir<20>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP16]]>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:

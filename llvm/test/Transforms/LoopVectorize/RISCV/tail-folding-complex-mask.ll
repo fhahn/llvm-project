@@ -14,7 +14,9 @@ define void @test(i64 %n, ptr noalias %src0, ptr noalias %src1, ptr noalias %src
 ; IF-EVL:       [[VECTOR_PH]]:
 ; IF-EVL-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 4 x i1> poison, i1 [[C1]], i64 0
 ; IF-EVL-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 4 x i1> [[BROADCAST_SPLATINSERT]], <vscale x 4 x i1> poison, <vscale x 4 x i32> zeroinitializer
-; IF-EVL-NEXT:    [[TMP2:%.*]] = xor <vscale x 4 x i1> [[BROADCAST_SPLAT]], splat (i1 true)
+; IF-EVL-NEXT:    [[TMP1:%.*]] = xor i1 [[C1]], true
+; IF-EVL-NEXT:    [[BROADCAST_SPLATINSERT2:%.*]] = insertelement <vscale x 4 x i1> poison, i1 [[TMP1]], i64 0
+; IF-EVL-NEXT:    [[TMP2:%.*]] = shufflevector <vscale x 4 x i1> [[BROADCAST_SPLATINSERT2]], <vscale x 4 x i1> poison, <vscale x 4 x i32> zeroinitializer
 ; IF-EVL-NEXT:    [[TMP0:%.*]] = xor i1 [[C2]], true
 ; IF-EVL-NEXT:    [[TMP6:%.*]] = or i1 [[C1]], [[TMP0]]
 ; IF-EVL-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <vscale x 4 x i1> poison, i1 [[TMP6]], i64 0
@@ -64,7 +66,9 @@ define void @test(i64 %n, ptr noalias %src0, ptr noalias %src1, ptr noalias %src
 ; NO-VP-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[N_MOD_VF]]
 ; NO-VP-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <vscale x 4 x i1> poison, i1 [[C1]], i64 0
 ; NO-VP-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <vscale x 4 x i1> [[BROADCAST_SPLATINSERT1]], <vscale x 4 x i1> poison, <vscale x 4 x i32> zeroinitializer
-; NO-VP-NEXT:    [[TMP6:%.*]] = xor <vscale x 4 x i1> [[BROADCAST_SPLAT2]], splat (i1 true)
+; NO-VP-NEXT:    [[TMP3:%.*]] = xor i1 [[C1]], true
+; NO-VP-NEXT:    [[BROADCAST_SPLATINSERT2:%.*]] = insertelement <vscale x 4 x i1> poison, i1 [[TMP3]], i64 0
+; NO-VP-NEXT:    [[TMP6:%.*]] = shufflevector <vscale x 4 x i1> [[BROADCAST_SPLATINSERT2]], <vscale x 4 x i1> poison, <vscale x 4 x i32> zeroinitializer
 ; NO-VP-NEXT:    [[TMP4:%.*]] = xor i1 [[C2]], true
 ; NO-VP-NEXT:    [[TMP7:%.*]] = or i1 [[C1]], [[TMP4]]
 ; NO-VP-NEXT:    [[BROADCAST_SPLATINSERT3:%.*]] = insertelement <vscale x 4 x i1> poison, i1 [[TMP7]], i64 0

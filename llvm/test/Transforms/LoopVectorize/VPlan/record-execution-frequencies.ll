@@ -73,7 +73,7 @@ define void @if_then(ptr noalias %a, ptr noalias %idx) {
 ; MASKED-NEXT:    latch:
 ; MASKED-NEXT:      EMIT ir<%iv.next> = add ir<%iv>, ir<1>
 ; MASKED-NEXT:      EMIT ir<%ec> = icmp eq ir<%iv.next>, ir<1024>
-; MASKED-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; MASKED-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; MASKED-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; MASKED-NEXT:    No successors
 ; MASKED-NEXT:  }
@@ -182,7 +182,7 @@ define void @if_else(ptr noalias %a, ptr noalias %b, ptr noalias %idx) {
 ; MASKED-NEXT:    latch:
 ; MASKED-NEXT:      EMIT ir<%iv.next> = add ir<%iv>, ir<1>
 ; MASKED-NEXT:      EMIT ir<%ec> = icmp eq ir<%iv.next>, ir<1024>
-; MASKED-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; MASKED-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; MASKED-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; MASKED-NEXT:    No successors
 ; MASKED-NEXT:  }

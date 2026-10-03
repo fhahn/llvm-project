@@ -15,9 +15,9 @@ define void @cse_duplicate_masked_load(ptr noalias %a, ptr noalias %b, i64 %n) {
 ; CHECK-NEXT:  Successor(s): vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
-; CHECK-NEXT:    EMIT vp<%n.rnd.up> = add ir<%n>, ir<3>
-; CHECK-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = and vp<%n.rnd.up>, ir<3>
-; CHECK-NEXT:    EMIT vp<%n.vec> = sub vp<%n.rnd.up>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%n.rnd.up> = add ir<%n>, ir<3>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = and vp<%n.rnd.up>, ir<3>
+; CHECK-NEXT:    EMIT-SCALAR vp<%n.vec> = sub vp<%n.rnd.up>, vp<[[VP2]]>
 ; CHECK-NEXT:  Successor(s): vector.body
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.body:
@@ -28,8 +28,8 @@ define void @cse_duplicate_masked_load(ptr noalias %a, ptr noalias %b, i64 %n) {
 ; CHECK-NEXT:    WIDEN ir<%sum> = add ir<%x>, ir<%x>
 ; CHECK-NEXT:    CLONE ir<%gep.b> = getelementptr inbounds ir<%b>, vp<%index>
 ; CHECK-NEXT:    WIDEN store ir<%gep.b>, ir<%sum>, vp<%active.lane.mask>
-; CHECK-NEXT:    EMIT vp<%index.next> = add vp<%index>, ir<4>
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = icmp eq vp<%index.next>, vp<%n.vec>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add vp<%index>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP3:%[0-9]+]]> = icmp eq vp<%index.next>, vp<%n.vec>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP3]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
 ;

@@ -147,7 +147,7 @@ compound=true
       "  EMIT ir\<%indvars.iv.next\> = add ir\<%indvars.iv\>, ir\<1\>\l" +
       "  EMIT ir\<%exitcond\> = icmp ne ir\<%indvars.iv.next\>, ir\<%N\>\l" +
       "  EMIT vp\<%3\> = not ir\<%exitcond\>\l" +
-      "  EMIT vp\<%index.next\> = add nuw vp\<%2\>, vp\<%0\>\l" +
+      "  EMIT-SCALAR vp\<%index.next\> = add nuw vp\<%2\>, vp\<%0\>\l" +
       "  EMIT branch-on-count vp\<%index.next\>, vp\<%1\>\l" +
       "No successors\l"
     ]
@@ -157,7 +157,7 @@ compound=true
     "middle.block:\l" +
     "  EMIT vp\<%5\> = extract-last-part ir\<%indvars.iv.next\>\l" +
     "  EMIT vp\<%6\> = extract-last-lane vp\<%5\>\l" +
-    "  EMIT vp\<%cmp.n\> = icmp eq ir\<%N\>, vp\<%1\>\l" +
+    "  EMIT-SCALAR vp\<%cmp.n\> = icmp eq ir\<%N\>, vp\<%1\>\l" +
     "  EMIT branch-on-cond vp\<%cmp.n\>\l" +
     "Successor(s): ir-bb\<for.end\>, scalar.ph\l"
   ]
@@ -323,7 +323,7 @@ compound=true
       "  EMIT ir\<%iv.next\> = add ir\<%iv\>, ir\<1\>\l" +
       "  EMIT ir\<%exitcond\> = icmp ne ir\<%iv.next\>, ir\<%N\>\l" +
       "  EMIT vp\<%3\> = not ir\<%exitcond\>\l" +
-      "  EMIT vp\<%index.next\> = add nuw vp\<%2\>, vp\<%0\>\l" +
+      "  EMIT-SCALAR vp\<%index.next\> = add nuw vp\<%2\>, vp\<%0\>\l" +
       "  EMIT branch-on-count vp\<%index.next\>, vp\<%1\>\l" +
       "No successors\l"
     ]
@@ -333,7 +333,7 @@ compound=true
     "middle.block:\l" +
     "  EMIT vp\<%5\> = extract-last-part ir\<%iv.next\>\l" +
     "  EMIT vp\<%6\> = extract-last-lane vp\<%5\>\l" +
-    "  EMIT vp\<%cmp.n\> = icmp eq ir\<%N\>, vp\<%1\>\l" +
+    "  EMIT-SCALAR vp\<%cmp.n\> = icmp eq ir\<%N\>, vp\<%1\>\l" +
     "  EMIT branch-on-cond vp\<%cmp.n\>\l" +
     "Successor(s): ir-bb\<exit.2\>, scalar.ph\l"
   ]

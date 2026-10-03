@@ -223,8 +223,8 @@ define i16 @tc_overflow(i32 %x) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.body:
 ; CHECK-NEXT:    EMIT-SCALAR vp<%index> = phi [ ir<0>, vector.ph ], [ vp<%index.next>, vector.body ]
-; CHECK-NEXT:    EMIT vp<%index.next> = add vp<%index>, ir<8>
-; CHECK-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1180591620717411303432>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add vp<%index>, ir<8>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1180591620717411303432>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP2]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
 ; CHECK-EMPTY:

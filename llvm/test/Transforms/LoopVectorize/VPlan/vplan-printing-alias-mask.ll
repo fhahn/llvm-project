@@ -42,7 +42,7 @@ define void @alias_mask(ptr noalias %a, ptr %b, ptr %c, i64 %n) {
 ; INITIAL-NEXT:    Successor(s): vector.latch
 ; INITIAL-EMPTY:
 ; INITIAL-NEXT:    vector.latch:
-; INITIAL-NEXT:      EMIT vp<%index.next> = add vp<[[VP3]]>, vp<[[VP1]]>
+; INITIAL-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP3]]>, vp<[[VP1]]>
 ; INITIAL-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; INITIAL-NEXT:    No successors
 ; INITIAL-NEXT:  }
@@ -62,19 +62,19 @@ define void @alias_mask(ptr noalias %a, ptr %b, ptr %c, i64 %n) {
 ; FINAL-NEXT:  vector.clamped.vf.check:
 ; FINAL-NEXT:    WIDEN-INTRINSIC vp<[[VP4:%[0-9]+]]> = call llvm.loop.dependence.war.mask(ir<%b1>, ir<%c2>, ir<1>)
 ; FINAL-NEXT:    EMIT vp<%num.active.lanes> = num-active-lanes vp<[[VP4]]>
-; FINAL-NEXT:    EMIT vp<%vf.is.scalar> = icmp ule vp<%num.active.lanes>, ir<1>
-; FINAL-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = sub ir<-1>, ir<%n>
-; FINAL-NEXT:    EMIT vp<%vf.step.overflow> = icmp ult vp<[[VP5]]>, vp<%num.active.lanes>
-; FINAL-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = or vp<%vf.is.scalar>, vp<%vf.step.overflow>
+; FINAL-NEXT:    EMIT-SCALAR vp<%vf.is.scalar> = icmp ule vp<%num.active.lanes>, ir<1>
+; FINAL-NEXT:    EMIT-SCALAR vp<[[VP5:%[0-9]+]]> = sub ir<-1>, ir<%n>
+; FINAL-NEXT:    EMIT-SCALAR vp<%vf.step.overflow> = icmp ult vp<[[VP5]]>, vp<%num.active.lanes>
+; FINAL-NEXT:    EMIT-SCALAR vp<[[VP6:%[0-9]+]]> = or vp<%vf.is.scalar>, vp<%vf.step.overflow>
 ; FINAL-NEXT:    EMIT branch-on-cond vp<[[VP6]]>
 ; FINAL-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ; FINAL-EMPTY:
 ; FINAL-NEXT:  vector.ph:
-; FINAL-NEXT:    EMIT vp<%trip.count.minus.1> = sub ir<%n>, ir<1>
-; FINAL-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = sub vp<%num.active.lanes>, ir<1>
-; FINAL-NEXT:    EMIT vp<%n.rnd.up> = add ir<%n>, vp<[[VP8]]>
-; FINAL-NEXT:    EMIT vp<%n.mod.vf> = urem vp<%n.rnd.up>, vp<%num.active.lanes>
-; FINAL-NEXT:    EMIT vp<%n.vec> = sub vp<%n.rnd.up>, vp<%n.mod.vf>
+; FINAL-NEXT:    EMIT-SCALAR vp<%trip.count.minus.1> = sub ir<%n>, ir<1>
+; FINAL-NEXT:    EMIT-SCALAR vp<[[VP8:%[0-9]+]]> = sub vp<%num.active.lanes>, ir<1>
+; FINAL-NEXT:    EMIT-SCALAR vp<%n.rnd.up> = add ir<%n>, vp<[[VP8]]>
+; FINAL-NEXT:    EMIT-SCALAR vp<%n.mod.vf> = urem vp<%n.rnd.up>, vp<%num.active.lanes>
+; FINAL-NEXT:    EMIT-SCALAR vp<%n.vec> = sub vp<%n.rnd.up>, vp<%n.mod.vf>
 ; FINAL-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = broadcast vp<%trip.count.minus.1>
 ; FINAL-NEXT:    EMIT vp<[[VP10:%[0-9]+]]> = step-vector i64
 ; FINAL-NEXT:    EMIT vp<[[VP11:%[0-9]+]]> = broadcast vp<%num.active.lanes>
@@ -92,9 +92,9 @@ define void @alias_mask(ptr noalias %a, ptr %b, ptr %c, i64 %n) {
 ; FINAL-NEXT:    WIDEN ir<%add> = add ir<%ld.b>, ir<%ld.a>
 ; FINAL-NEXT:    CLONE ir<%ptr.c> = getelementptr inbounds ir<%c>, vp<%index>
 ; FINAL-NEXT:    WIDEN store ir<%ptr.c>, ir<%add>, vp<[[VP14]]>
-; FINAL-NEXT:    EMIT vp<%index.next> = add vp<%index>, vp<%num.active.lanes>
+; FINAL-NEXT:    EMIT-SCALAR vp<%index.next> = add vp<%index>, vp<%num.active.lanes>
 ; FINAL-NEXT:    EMIT vp<%vec.ind.next> = add nuw vp<[[VP12]]>, vp<[[VP11]]>
-; FINAL-NEXT:    EMIT vp<[[VP15:%[0-9]+]]> = icmp eq vp<%index.next>, vp<%n.vec>
+; FINAL-NEXT:    EMIT-SCALAR vp<[[VP15:%[0-9]+]]> = icmp eq vp<%index.next>, vp<%n.vec>
 ; FINAL-NEXT:    EMIT branch-on-cond vp<[[VP15]]>
 ; FINAL-NEXT:  Successor(s): middle.block, vector.body
 ; FINAL-EMPTY:

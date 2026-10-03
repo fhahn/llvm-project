@@ -24,8 +24,8 @@ define void @cse_duplicate_load(ptr noalias %a, ptr noalias %b) {
 ; CHECK-NEXT:    WIDEN ir<%sum> = add ir<%x>, ir<%x>
 ; CHECK-NEXT:    CLONE ir<%gep.b> = getelementptr inbounds ir<%b>, vp<%index>
 ; CHECK-NEXT:    WIDEN store ir<%gep.b>, ir<%sum>
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<4>
-; CHECK-NEXT:    EMIT vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP1]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
 ;
@@ -68,8 +68,8 @@ define void @cse_three_duplicate_loads(ptr noalias %a, ptr noalias %b) {
 ; CHECK-NEXT:    WIDEN ir<%sum> = add ir<%t>, ir<%x>
 ; CHECK-NEXT:    CLONE ir<%gep.b> = getelementptr inbounds ir<%b>, vp<%index>
 ; CHECK-NEXT:    WIDEN store ir<%gep.b>, ir<%sum>
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<4>
-; CHECK-NEXT:    EMIT vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP1]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
 ;
@@ -117,8 +117,8 @@ define void @two_dup_groups(ptr noalias %a, ptr noalias %b, ptr noalias %out) {
 ; CHECK-NEXT:    WIDEN ir<%s> = add ir<%sa>, ir<%sb>
 ; CHECK-NEXT:    CLONE ir<%po> = getelementptr inbounds ir<%out>, vp<%index>
 ; CHECK-NEXT:    WIDEN store ir<%po>, ir<%s>
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<4>
-; CHECK-NEXT:    EMIT vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP1]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
 ;
@@ -166,8 +166,8 @@ define void @load_then_dup_add(ptr noalias %a, ptr noalias %out) {
 ; CHECK-NEXT:    WIDEN ir<%m> = mul ir<%ax>, ir<%ax>
 ; CHECK-NEXT:    CLONE ir<%po> = getelementptr inbounds ir<%out>, vp<%index>
 ; CHECK-NEXT:    WIDEN store ir<%po>, ir<%m>
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<4>
-; CHECK-NEXT:    EMIT vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP1]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
 ;
@@ -213,8 +213,8 @@ define void @no_cse_across_store(ptr %a) {
 ; CHECK-NEXT:    WIDEN ir<%y> = load ir<%gep>
 ; CHECK-NEXT:    WIDEN ir<%sink> = add ir<%y>, ir<2>
 ; CHECK-NEXT:    WIDEN store ir<%gep>, ir<%sink>
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<4>
-; CHECK-NEXT:    EMIT vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP1]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
 ;
@@ -262,8 +262,8 @@ define void @cse_duplicate_loads_after_store(ptr noalias %a, ptr noalias %b) {
 ; CHECK-NEXT:    WIDEN ir<%sum> = add ir<%y>, ir<%y>
 ; CHECK-NEXT:    CLONE ir<%gep.b> = getelementptr inbounds ir<%b>, vp<%index>
 ; CHECK-NEXT:    WIDEN store ir<%gep.b>, ir<%sum>
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<4>
-; CHECK-NEXT:    EMIT vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP1]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
 ;
@@ -310,8 +310,8 @@ define void @no_cse_different_address(ptr noalias %a, ptr noalias %b, ptr noalia
 ; CHECK-NEXT:    WIDEN ir<%sum> = add ir<%x>, ir<%y>
 ; CHECK-NEXT:    CLONE ir<%gep.c> = getelementptr inbounds ir<%c>, vp<%index>
 ; CHECK-NEXT:    WIDEN store ir<%gep.c>, ir<%sum>
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<4>
-; CHECK-NEXT:    EMIT vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP1]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
 ;
@@ -366,8 +366,8 @@ define void @no_cse_different_type(ptr noalias %a, ptr noalias %b) {
 ; CHECK-NEXT:    WIDEN ir<%sum> = add ir<%xe>, ir<%y>
 ; CHECK-NEXT:    CLONE ir<%gep.b> = getelementptr inbounds ir<%b>, vp<%index>
 ; CHECK-NEXT:    WIDEN store ir<%gep.b>, ir<%sum>
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<4>
-; CHECK-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP5:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP5]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
 ;
@@ -411,8 +411,8 @@ define void @cse_stronger_align_first(ptr noalias %a, ptr noalias %b) {
 ; CHECK-NEXT:    WIDEN ir<%sum> = add ir<%x>, ir<%x>
 ; CHECK-NEXT:    CLONE ir<%gep.b> = getelementptr inbounds ir<%b>, vp<%index>
 ; CHECK-NEXT:    WIDEN store ir<%gep.b>, ir<%sum>
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<4>
-; CHECK-NEXT:    EMIT vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP1]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
 ;
@@ -456,8 +456,8 @@ define void @no_cse_weaker_align_first(ptr noalias %a, ptr noalias %b) {
 ; CHECK-NEXT:    WIDEN ir<%sum> = add ir<%x>, ir<%y>
 ; CHECK-NEXT:    CLONE ir<%gep.b> = getelementptr inbounds ir<%b>, vp<%index>
 ; CHECK-NEXT:    WIDEN store ir<%gep.b>, ir<%sum>
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<4>
-; CHECK-NEXT:    EMIT vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP1]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
 ;
@@ -500,8 +500,8 @@ define void @dup_load_diff_tbaa(ptr noalias %a, ptr noalias %out) {
 ; CHECK-NEXT:    WIDEN ir<%sum> = add ir<%x>, ir<%x>
 ; CHECK-NEXT:    CLONE ir<%po> = getelementptr inbounds ir<%out>, vp<%index>
 ; CHECK-NEXT:    WIDEN store ir<%po>, ir<%sum>
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<4>
-; CHECK-NEXT:    EMIT vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP1]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
 ;
@@ -547,8 +547,8 @@ define void @no_cse_across_noalias_store(ptr %a, ptr %b) {
 ; CHECK-NEXT:    WIDEN ir<%y> = load ir<%gep.a> (!alias.scope ![[SCOPE]], !noalias ![[NOALIAS]])
 ; CHECK-NEXT:    WIDEN ir<%sum> = add ir<%x>, ir<%y>
 ; CHECK-NEXT:    WIDEN store ir<%gep.b>, ir<%sum> (!alias.scope ![[NOALIAS]], !noalias ![[SCOPE]])
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<4>
-; CHECK-NEXT:    EMIT vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP1]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
 ;
@@ -594,8 +594,8 @@ define void @no_cse_across_store_without_scopes(ptr noalias %a, ptr noalias %b) 
 ; CHECK-NEXT:    WIDEN ir<%y> = load ir<%gep.a> (!alias.scope ![[SCOPE2]], !noalias ![[NOALIAS2]])
 ; CHECK-NEXT:    WIDEN ir<%sum> = add ir<%x>, ir<%y>
 ; CHECK-NEXT:    WIDEN store ir<%gep.b>, ir<%sum>
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<4>
-; CHECK-NEXT:    EMIT vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP1]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
 ;
@@ -694,8 +694,8 @@ define void @dup_load_across_replicate_region(ptr noalias %a, ptr noalias %b, pt
 ; CHECK-NEXT:    WIDEN ir<%sum> = add vp<%predphi>, ir<%y>
 ; CHECK-NEXT:    CLONE ir<%po> = getelementptr inbounds ir<%out>, vp<%index>
 ; CHECK-NEXT:    WIDEN store ir<%po>, ir<%sum>
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<4>
-; CHECK-NEXT:    EMIT vp<[[VP21:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP21:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP21]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
 ;
@@ -751,8 +751,8 @@ define void @cse_after_weaker_align_first(ptr noalias %a, ptr noalias %b) {
 ; CHECK-NEXT:    WIDEN ir<%sum> = add ir<%s1>, ir<%y>
 ; CHECK-NEXT:    CLONE ir<%gep.b> = getelementptr inbounds ir<%b>, vp<%index>
 ; CHECK-NEXT:    WIDEN store ir<%gep.b>, ir<%sum>
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<4>
-; CHECK-NEXT:    EMIT vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP1]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
 ;
@@ -802,8 +802,8 @@ define void @dup_load_across_reverse_load(ptr noalias %a, ptr noalias %b, ptr no
 ; CHECK-NEXT:    WIDEN ir<%sum> = add ir<%s1>, ir<%x>
 ; CHECK-NEXT:    CLONE ir<%gep.out> = getelementptr inbounds ir<%out>, vp<%index>
 ; CHECK-NEXT:    WIDEN store ir<%gep.out>, ir<%sum>
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<4>
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP3:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP3]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
 ;

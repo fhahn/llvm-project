@@ -252,14 +252,14 @@ define void @byte_gep_scaled_stride(ptr noalias %p.out, ptr %p, i64 %stride) {
 ; COMPARE-NO-MV-NEXT:  [[ENTRY:.*:]]
 ; COMPARE-NO-MV-NEXT:    br label %[[VECTOR_PH:.*]]
 ; COMPARE-NO-MV:       [[VECTOR_PH]]:
-; COMPARE-NO-MV-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[STRIDE]], i64 0
+; COMPARE-NO-MV-NEXT:    [[TMP0:%.*]] = shl i64 [[STRIDE]], 3
+; COMPARE-NO-MV-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[TMP0]], i64 0
 ; COMPARE-NO-MV-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT]], <4 x i64> poison, <4 x i32> zeroinitializer
-; COMPARE-NO-MV-NEXT:    [[TMP0:%.*]] = shl <4 x i64> [[BROADCAST_SPLAT]], splat (i64 3)
 ; COMPARE-NO-MV-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; COMPARE-NO-MV:       [[VECTOR_BODY]]:
 ; COMPARE-NO-MV-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; COMPARE-NO-MV-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; COMPARE-NO-MV-NEXT:    [[TMP1:%.*]] = mul <4 x i64> [[VEC_IND]], [[TMP0]]
+; COMPARE-NO-MV-NEXT:    [[TMP1:%.*]] = mul <4 x i64> [[VEC_IND]], [[BROADCAST_SPLAT]]
 ; COMPARE-NO-MV-NEXT:    [[WIDE_GEP:%.*]] = getelementptr i8, ptr [[P]], <4 x i64> [[TMP1]]
 ; COMPARE-NO-MV-NEXT:    [[TMP17:%.*]] = call <4 x i64> @llvm.masked.gather.v4i64.v4p0(<4 x ptr> align 8 [[WIDE_GEP]], <4 x i1> splat (i1 true), <4 x i64> poison)
 ; COMPARE-NO-MV-NEXT:    [[TMP18:%.*]] = getelementptr i64, ptr [[P_OUT]], i64 [[INDEX]]
@@ -278,14 +278,14 @@ define void @byte_gep_scaled_stride(ptr noalias %p.out, ptr %p, i64 %stride) {
 ; COMPARE-LAA-MV-NEXT:  [[ENTRY:.*:]]
 ; COMPARE-LAA-MV-NEXT:    br label %[[VECTOR_PH:.*]]
 ; COMPARE-LAA-MV:       [[VECTOR_PH]]:
-; COMPARE-LAA-MV-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[STRIDE]], i64 0
+; COMPARE-LAA-MV-NEXT:    [[TMP0:%.*]] = shl i64 [[STRIDE]], 3
+; COMPARE-LAA-MV-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[TMP0]], i64 0
 ; COMPARE-LAA-MV-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT]], <4 x i64> poison, <4 x i32> zeroinitializer
-; COMPARE-LAA-MV-NEXT:    [[TMP0:%.*]] = shl <4 x i64> [[BROADCAST_SPLAT]], splat (i64 3)
 ; COMPARE-LAA-MV-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; COMPARE-LAA-MV:       [[VECTOR_BODY]]:
 ; COMPARE-LAA-MV-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; COMPARE-LAA-MV-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; COMPARE-LAA-MV-NEXT:    [[TMP1:%.*]] = mul <4 x i64> [[VEC_IND]], [[TMP0]]
+; COMPARE-LAA-MV-NEXT:    [[TMP1:%.*]] = mul <4 x i64> [[VEC_IND]], [[BROADCAST_SPLAT]]
 ; COMPARE-LAA-MV-NEXT:    [[WIDE_GEP:%.*]] = getelementptr i8, ptr [[P]], <4 x i64> [[TMP1]]
 ; COMPARE-LAA-MV-NEXT:    [[TMP17:%.*]] = call <4 x i64> @llvm.masked.gather.v4i64.v4p0(<4 x ptr> align 8 [[WIDE_GEP]], <4 x i1> splat (i1 true), <4 x i64> poison)
 ; COMPARE-LAA-MV-NEXT:    [[TMP18:%.*]] = getelementptr i64, ptr [[P_OUT]], i64 [[INDEX]]
@@ -330,14 +330,14 @@ define void @byte_gep_under_scaled_stride(ptr noalias %p.out, ptr %p, i64 %strid
 ; COMPARE-NO-MV-NEXT:  [[ENTRY:.*:]]
 ; COMPARE-NO-MV-NEXT:    br label %[[VECTOR_PH:.*]]
 ; COMPARE-NO-MV:       [[VECTOR_PH]]:
-; COMPARE-NO-MV-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[STRIDE]], i64 0
+; COMPARE-NO-MV-NEXT:    [[TMP0:%.*]] = shl i64 [[STRIDE]], 2
+; COMPARE-NO-MV-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[TMP0]], i64 0
 ; COMPARE-NO-MV-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT]], <4 x i64> poison, <4 x i32> zeroinitializer
-; COMPARE-NO-MV-NEXT:    [[TMP0:%.*]] = shl <4 x i64> [[BROADCAST_SPLAT]], splat (i64 2)
 ; COMPARE-NO-MV-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; COMPARE-NO-MV:       [[VECTOR_BODY]]:
 ; COMPARE-NO-MV-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; COMPARE-NO-MV-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; COMPARE-NO-MV-NEXT:    [[TMP1:%.*]] = mul <4 x i64> [[VEC_IND]], [[TMP0]]
+; COMPARE-NO-MV-NEXT:    [[TMP1:%.*]] = mul <4 x i64> [[VEC_IND]], [[BROADCAST_SPLAT]]
 ; COMPARE-NO-MV-NEXT:    [[WIDE_GEP:%.*]] = getelementptr i8, ptr [[P]], <4 x i64> [[TMP1]]
 ; COMPARE-NO-MV-NEXT:    [[TMP17:%.*]] = call <4 x i64> @llvm.masked.gather.v4i64.v4p0(<4 x ptr> align 8 [[WIDE_GEP]], <4 x i1> splat (i1 true), <4 x i64> poison)
 ; COMPARE-NO-MV-NEXT:    [[TMP18:%.*]] = getelementptr i64, ptr [[P_OUT]], i64 [[INDEX]]
@@ -356,14 +356,14 @@ define void @byte_gep_under_scaled_stride(ptr noalias %p.out, ptr %p, i64 %strid
 ; COMPARE-LAA-MV-NEXT:  [[ENTRY:.*:]]
 ; COMPARE-LAA-MV-NEXT:    br label %[[VECTOR_PH:.*]]
 ; COMPARE-LAA-MV:       [[VECTOR_PH]]:
-; COMPARE-LAA-MV-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[STRIDE]], i64 0
+; COMPARE-LAA-MV-NEXT:    [[TMP0:%.*]] = shl i64 [[STRIDE]], 2
+; COMPARE-LAA-MV-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[TMP0]], i64 0
 ; COMPARE-LAA-MV-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT]], <4 x i64> poison, <4 x i32> zeroinitializer
-; COMPARE-LAA-MV-NEXT:    [[TMP0:%.*]] = shl <4 x i64> [[BROADCAST_SPLAT]], splat (i64 2)
 ; COMPARE-LAA-MV-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; COMPARE-LAA-MV:       [[VECTOR_BODY]]:
 ; COMPARE-LAA-MV-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; COMPARE-LAA-MV-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; COMPARE-LAA-MV-NEXT:    [[TMP1:%.*]] = mul <4 x i64> [[VEC_IND]], [[TMP0]]
+; COMPARE-LAA-MV-NEXT:    [[TMP1:%.*]] = mul <4 x i64> [[VEC_IND]], [[BROADCAST_SPLAT]]
 ; COMPARE-LAA-MV-NEXT:    [[WIDE_GEP:%.*]] = getelementptr i8, ptr [[P]], <4 x i64> [[TMP1]]
 ; COMPARE-LAA-MV-NEXT:    [[TMP17:%.*]] = call <4 x i64> @llvm.masked.gather.v4i64.v4p0(<4 x ptr> align 8 [[WIDE_GEP]], <4 x i1> splat (i1 true), <4 x i64> poison)
 ; COMPARE-LAA-MV-NEXT:    [[TMP18:%.*]] = getelementptr i64, ptr [[P_OUT]], i64 [[INDEX]]
@@ -409,14 +409,14 @@ define void @byte_gep_under_scaled_stride_extra_narrow_use(ptr noalias %p.out, p
 ; COMPARE-NO-MV-NEXT:    [[STRIDE_I1:%.*]] = trunc i64 [[STRIDE]] to i1
 ; COMPARE-NO-MV-NEXT:    br label %[[STRIDES_CHECK:.*]]
 ; COMPARE-NO-MV:       [[STRIDES_CHECK]]:
-; COMPARE-NO-MV-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[STRIDE]], i64 0
+; COMPARE-NO-MV-NEXT:    [[TMP0:%.*]] = shl i64 [[STRIDE]], 2
+; COMPARE-NO-MV-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[TMP0]], i64 0
 ; COMPARE-NO-MV-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT]], <4 x i64> poison, <4 x i32> zeroinitializer
-; COMPARE-NO-MV-NEXT:    [[TMP0:%.*]] = shl <4 x i64> [[BROADCAST_SPLAT]], splat (i64 2)
 ; COMPARE-NO-MV-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; COMPARE-NO-MV:       [[VECTOR_BODY]]:
 ; COMPARE-NO-MV-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[STRIDES_CHECK]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; COMPARE-NO-MV-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[STRIDES_CHECK]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; COMPARE-NO-MV-NEXT:    [[TMP19:%.*]] = mul <4 x i64> [[VEC_IND]], [[TMP0]]
+; COMPARE-NO-MV-NEXT:    [[TMP19:%.*]] = mul <4 x i64> [[VEC_IND]], [[BROADCAST_SPLAT]]
 ; COMPARE-NO-MV-NEXT:    [[WIDE_GEP:%.*]] = getelementptr i8, ptr [[P]], <4 x i64> [[TMP19]]
 ; COMPARE-NO-MV-NEXT:    [[WIDE_LOAD:%.*]] = call <4 x i64> @llvm.masked.gather.v4i64.v4p0(<4 x ptr> align 8 [[WIDE_GEP]], <4 x i1> splat (i1 true), <4 x i64> poison)
 ; COMPARE-NO-MV-NEXT:    [[TMP3:%.*]] = shl <4 x i64> [[WIDE_LOAD]], splat (i64 1)
@@ -438,14 +438,14 @@ define void @byte_gep_under_scaled_stride_extra_narrow_use(ptr noalias %p.out, p
 ; COMPARE-LAA-MV-NEXT:    [[STRIDE_I1:%.*]] = trunc i64 [[STRIDE]] to i1
 ; COMPARE-LAA-MV-NEXT:    br label %[[STRIDES_CHECK:.*]]
 ; COMPARE-LAA-MV:       [[STRIDES_CHECK]]:
-; COMPARE-LAA-MV-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[STRIDE]], i64 0
+; COMPARE-LAA-MV-NEXT:    [[TMP0:%.*]] = shl i64 [[STRIDE]], 2
+; COMPARE-LAA-MV-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[TMP0]], i64 0
 ; COMPARE-LAA-MV-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT]], <4 x i64> poison, <4 x i32> zeroinitializer
-; COMPARE-LAA-MV-NEXT:    [[TMP0:%.*]] = shl <4 x i64> [[BROADCAST_SPLAT]], splat (i64 2)
 ; COMPARE-LAA-MV-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; COMPARE-LAA-MV:       [[VECTOR_BODY]]:
 ; COMPARE-LAA-MV-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[STRIDES_CHECK]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; COMPARE-LAA-MV-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[STRIDES_CHECK]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; COMPARE-LAA-MV-NEXT:    [[TMP19:%.*]] = mul <4 x i64> [[VEC_IND]], [[TMP0]]
+; COMPARE-LAA-MV-NEXT:    [[TMP19:%.*]] = mul <4 x i64> [[VEC_IND]], [[BROADCAST_SPLAT]]
 ; COMPARE-LAA-MV-NEXT:    [[WIDE_GEP:%.*]] = getelementptr i8, ptr [[P]], <4 x i64> [[TMP19]]
 ; COMPARE-LAA-MV-NEXT:    [[WIDE_LOAD:%.*]] = call <4 x i64> @llvm.masked.gather.v4i64.v4p0(<4 x ptr> align 8 [[WIDE_GEP]], <4 x i1> splat (i1 true), <4 x i64> poison)
 ; COMPARE-LAA-MV-NEXT:    [[TMP3:%.*]] = shl <4 x i64> [[WIDE_LOAD]], splat (i64 1)
@@ -497,14 +497,14 @@ define void @byte_gep_over_scaled_stride(ptr noalias %p.out, ptr %p, i64 %stride
 ; COMPARE-NO-MV-NEXT:  [[ENTRY:.*:]]
 ; COMPARE-NO-MV-NEXT:    br label %[[VECTOR_PH:.*]]
 ; COMPARE-NO-MV:       [[VECTOR_PH]]:
-; COMPARE-NO-MV-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[STRIDE]], i64 0
+; COMPARE-NO-MV-NEXT:    [[TMP0:%.*]] = shl i64 [[STRIDE]], 4
+; COMPARE-NO-MV-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[TMP0]], i64 0
 ; COMPARE-NO-MV-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT]], <4 x i64> poison, <4 x i32> zeroinitializer
-; COMPARE-NO-MV-NEXT:    [[TMP0:%.*]] = shl <4 x i64> [[BROADCAST_SPLAT]], splat (i64 4)
 ; COMPARE-NO-MV-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; COMPARE-NO-MV:       [[VECTOR_BODY]]:
 ; COMPARE-NO-MV-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; COMPARE-NO-MV-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; COMPARE-NO-MV-NEXT:    [[TMP1:%.*]] = mul <4 x i64> [[VEC_IND]], [[TMP0]]
+; COMPARE-NO-MV-NEXT:    [[TMP1:%.*]] = mul <4 x i64> [[VEC_IND]], [[BROADCAST_SPLAT]]
 ; COMPARE-NO-MV-NEXT:    [[WIDE_GEP:%.*]] = getelementptr i8, ptr [[P]], <4 x i64> [[TMP1]]
 ; COMPARE-NO-MV-NEXT:    [[TMP17:%.*]] = call <4 x i64> @llvm.masked.gather.v4i64.v4p0(<4 x ptr> align 8 [[WIDE_GEP]], <4 x i1> splat (i1 true), <4 x i64> poison)
 ; COMPARE-NO-MV-NEXT:    [[TMP18:%.*]] = getelementptr i64, ptr [[P_OUT]], i64 [[INDEX]]
@@ -523,14 +523,14 @@ define void @byte_gep_over_scaled_stride(ptr noalias %p.out, ptr %p, i64 %stride
 ; COMPARE-LAA-MV-NEXT:  [[ENTRY:.*:]]
 ; COMPARE-LAA-MV-NEXT:    br label %[[VECTOR_PH:.*]]
 ; COMPARE-LAA-MV:       [[VECTOR_PH]]:
-; COMPARE-LAA-MV-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[STRIDE]], i64 0
+; COMPARE-LAA-MV-NEXT:    [[TMP0:%.*]] = shl i64 [[STRIDE]], 4
+; COMPARE-LAA-MV-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[TMP0]], i64 0
 ; COMPARE-LAA-MV-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT]], <4 x i64> poison, <4 x i32> zeroinitializer
-; COMPARE-LAA-MV-NEXT:    [[TMP0:%.*]] = shl <4 x i64> [[BROADCAST_SPLAT]], splat (i64 4)
 ; COMPARE-LAA-MV-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; COMPARE-LAA-MV:       [[VECTOR_BODY]]:
 ; COMPARE-LAA-MV-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; COMPARE-LAA-MV-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; COMPARE-LAA-MV-NEXT:    [[TMP1:%.*]] = mul <4 x i64> [[VEC_IND]], [[TMP0]]
+; COMPARE-LAA-MV-NEXT:    [[TMP1:%.*]] = mul <4 x i64> [[VEC_IND]], [[BROADCAST_SPLAT]]
 ; COMPARE-LAA-MV-NEXT:    [[WIDE_GEP:%.*]] = getelementptr i8, ptr [[P]], <4 x i64> [[TMP1]]
 ; COMPARE-LAA-MV-NEXT:    [[TMP17:%.*]] = call <4 x i64> @llvm.masked.gather.v4i64.v4p0(<4 x ptr> align 8 [[WIDE_GEP]], <4 x i1> splat (i1 true), <4 x i64> poison)
 ; COMPARE-LAA-MV-NEXT:    [[TMP18:%.*]] = getelementptr i64, ptr [[P_OUT]], i64 [[INDEX]]

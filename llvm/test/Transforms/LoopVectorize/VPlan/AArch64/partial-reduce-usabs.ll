@@ -37,7 +37,7 @@ define i32 @unsigned_absolute_difference(ptr noalias %x, ptr noalias %y) {
 ; CHECK-NEXT:      WIDEN-INTRINSIC vp<[[VP11:%[0-9]+]]> = call llvm.umin(vp<[[VP8]]>, vp<[[VP9]]>)
 ; CHECK-NEXT:      WIDEN vp<[[VP12:%[0-9]+]]> = sub vp<[[VP10]]>, vp<[[VP11]]>
 ; CHECK-NEXT:      EXPRESSION vp<[[VP13]]> = ir<%sum.0> + partial.reduce.add (vp<[[VP12]]> zext to i32)
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -45,7 +45,7 @@ define i32 @unsigned_absolute_difference(ptr noalias %x, ptr noalias %y) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
 ; CHECK-NEXT:    EMIT vp<[[VP15:%[0-9]+]]> = compute-reduction-result (add) vp<[[VP13]]>
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<8000>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<8000>, vp<[[VP2]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
@@ -111,7 +111,7 @@ define i32 @signed_absolute_difference(ptr noalias %x, ptr noalias %y) {
 ; CHECK-NEXT:      WIDEN-INTRINSIC vp<[[VP11:%[0-9]+]]> = call llvm.smin(vp<[[VP8]]>, vp<[[VP9]]>)
 ; CHECK-NEXT:      WIDEN vp<[[VP12:%[0-9]+]]> = sub vp<[[VP10]]>, vp<[[VP11]]>
 ; CHECK-NEXT:      EXPRESSION vp<[[VP13]]> = ir<%sum.0> + partial.reduce.add (vp<[[VP12]]> zext to i32)
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -119,7 +119,7 @@ define i32 @signed_absolute_difference(ptr noalias %x, ptr noalias %y) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
 ; CHECK-NEXT:    EMIT vp<[[VP15:%[0-9]+]]> = compute-reduction-result (add) vp<[[VP13]]>
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<8000>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<8000>, vp<[[VP2]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:

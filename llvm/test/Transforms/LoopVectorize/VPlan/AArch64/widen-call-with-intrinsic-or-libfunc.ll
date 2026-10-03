@@ -30,14 +30,14 @@ target triple = "arm64-apple-ios"
 ; CHECK-NEXT:     WIDEN-CALL ir<%s> = call fast @llvm.sin.f64(ir<%conv>) (using library function: __simd_sin_v2f64)
 ; CHECK-NEXT:     REPLICATE ir<%gep.dst> = getelementptr inbounds ir<%dst>, vp<[[STEPS]]>
 ; CHECK-NEXT:     REPLICATE store ir<%s>, ir<%gep.dst>
-; CHECK-NEXT:     EMIT vp<[[CAN_IV_NEXT:%.+]]> = add nuw vp<[[CAN_IV]]>, vp<[[VFxUF]]>
+; CHECK-NEXT:     EMIT-SCALAR vp<[[CAN_IV_NEXT:%.+]]> = add nuw vp<[[CAN_IV]]>, vp<[[VFxUF]]>
 ; CHECK-NEXT:     EMIT branch-on-count vp<[[CAN_IV_NEXT]]>, vp<[[VTC]]>
 ; CHECK-NEXT:   No successors
 ; CHECK-NEXT: }
 ; CHECK-NEXT: Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT: middle.block:
-; CHECK-NEXT:   EMIT vp<[[CMP:%.+]]> = icmp eq ir<1024>, vp<[[VTC]]>
+; CHECK-NEXT:   EMIT-SCALAR vp<[[CMP:%.+]]> = icmp eq ir<1024>, vp<[[VTC]]>
 ; CHECK-NEXT:   EMIT branch-on-cond vp<[[CMP]]>
 ; CHECK-NEXT: Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
@@ -78,14 +78,14 @@ target triple = "arm64-apple-ios"
 ; CHECK-NEXT:     WIDEN-INTRINSIC ir<%s> = call fast llvm.sin(ir<%conv>)
 ; CHECK-NEXT:     REPLICATE ir<%gep.dst> = getelementptr inbounds ir<%dst>, vp<[[STEPS]]>
 ; CHECK-NEXT:     REPLICATE store ir<%s>, ir<%gep.dst>
-; CHECK-NEXT:     EMIT vp<[[CAN_IV_NEXT:%.+]]> = add nuw vp<[[CAN_IV]]>, vp<[[VFxUF]]>
+; CHECK-NEXT:     EMIT-SCALAR vp<[[CAN_IV_NEXT:%.+]]> = add nuw vp<[[CAN_IV]]>, vp<[[VFxUF]]>
 ; CHECK-NEXT:     EMIT branch-on-count vp<[[CAN_IV_NEXT]]>, vp<[[VTC]]>
 ; CHECK-NEXT:   No successors
 ; CHECK-NEXT: }
 ; CHECK-NEXT: Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT: middle.block:
-; CHECK-NEXT:   EMIT vp<[[CMP:%.+]]> = icmp eq ir<1024>, vp<[[VTC]]>
+; CHECK-NEXT:   EMIT-SCALAR vp<[[CMP:%.+]]> = icmp eq ir<1024>, vp<[[VTC]]>
 ; CHECK-NEXT:   EMIT branch-on-cond vp<[[CMP]]>
 ; CHECK-NEXT: Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:

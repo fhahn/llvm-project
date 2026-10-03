@@ -7,32 +7,32 @@ define void @three_groups_shared_bounds(ptr %a, ptr %b, ptr %c, i64 %n) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = call i64 @llvm.umax(ir<%n>, ir<1>)
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP2]]>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult vp<[[VP2]]>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.memcheck
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.memcheck:
-; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = shl vp<[[VP2]]>, ir<2>
-; CHECK-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = ptradd ir<%c>, vp<[[VP4]]>
-; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = ptradd ir<%a>, vp<[[VP4]]>
-; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = ptradd ir<%b>, vp<[[VP4]]>
-; CHECK-NEXT:    EMIT vp<%bound0> = icmp ult ir<%c>, vp<[[VP6]]>
-; CHECK-NEXT:    EMIT vp<%bound1> = icmp ult ir<%a>, vp<[[VP5]]>
-; CHECK-NEXT:    EMIT vp<%found.conflict> = and vp<%bound0>, vp<%bound1>
-; CHECK-NEXT:    EMIT vp<%bound0>.1 = icmp ult ir<%c>, vp<[[VP7]]>
-; CHECK-NEXT:    EMIT vp<%bound1>.1 = icmp ult ir<%b>, vp<[[VP5]]>
-; CHECK-NEXT:    EMIT vp<%found.conflict>.1 = and vp<%bound0>.1, vp<%bound1>.1
-; CHECK-NEXT:    EMIT vp<%conflict.rdx> = or vp<%found.conflict>, vp<%found.conflict>.1
-; CHECK-NEXT:    EMIT vp<%bound0>.2 = icmp ult ir<%a>, vp<[[VP7]]>
-; CHECK-NEXT:    EMIT vp<%bound1>.2 = icmp ult ir<%b>, vp<[[VP6]]>
-; CHECK-NEXT:    EMIT vp<%found.conflict>.2 = and vp<%bound0>.2, vp<%bound1>.2
-; CHECK-NEXT:    EMIT vp<%conflict.rdx>.1 = or vp<%conflict.rdx>, vp<%found.conflict>.2
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP4:%[0-9]+]]> = shl vp<[[VP2]]>, ir<2>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP5:%[0-9]+]]> = ptradd ir<%c>, vp<[[VP4]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP6:%[0-9]+]]> = ptradd ir<%a>, vp<[[VP4]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP7:%[0-9]+]]> = ptradd ir<%b>, vp<[[VP4]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%bound0> = icmp ult ir<%c>, vp<[[VP6]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%bound1> = icmp ult ir<%a>, vp<[[VP5]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%found.conflict> = and vp<%bound0>, vp<%bound1>
+; CHECK-NEXT:    EMIT-SCALAR vp<%bound0>.1 = icmp ult ir<%c>, vp<[[VP7]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%bound1>.1 = icmp ult ir<%b>, vp<[[VP5]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%found.conflict>.1 = and vp<%bound0>.1, vp<%bound1>.1
+; CHECK-NEXT:    EMIT-SCALAR vp<%conflict.rdx> = or vp<%found.conflict>, vp<%found.conflict>.1
+; CHECK-NEXT:    EMIT-SCALAR vp<%bound0>.2 = icmp ult ir<%a>, vp<[[VP7]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%bound1>.2 = icmp ult ir<%b>, vp<[[VP6]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%found.conflict>.2 = and vp<%bound0>.2, vp<%bound1>.2
+; CHECK-NEXT:    EMIT-SCALAR vp<%conflict.rdx>.1 = or vp<%conflict.rdx>, vp<%found.conflict>.2
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%conflict.rdx>.1
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
-; CHECK-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = and vp<[[VP2]]>, ir<3>
-; CHECK-NEXT:    EMIT vp<%n.vec> = sub vp<[[VP2]]>, vp<[[VP9]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP9:%[0-9]+]]> = and vp<[[VP2]]>, ir<3>
+; CHECK-NEXT:    EMIT-SCALAR vp<%n.vec> = sub vp<[[VP2]]>, vp<[[VP9]]>
 ; CHECK-NEXT:  Successor(s): vector.body
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.body:
@@ -65,32 +65,32 @@ define void @ptr_minmax_bounds(ptr %a, ptr %b, i64 %n, i64 %s, i64 %t) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:    IR   %step = mul i64 %s, %t
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult ir<%n>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult ir<%n>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.memcheck
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.memcheck:
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = shl ir<%n>, ir<2>
-; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = ptradd ir<%b>, vp<[[VP3]]>
-; CHECK-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = add ir<%n>, ir<-1>
-; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = mul ir<%t>, ir<%s>
-; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = mul vp<[[VP6]]>, vp<[[VP5]]>
-; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = shl vp<[[VP7]]>, ir<2>
-; CHECK-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = ptradd ir<%a>, vp<[[VP8]]>
-; CHECK-NEXT:    EMIT vp<[[VP10:%[0-9]+]]> = icmp ult ir<%a>, vp<[[VP9]]>
-; CHECK-NEXT:    EMIT vp<[[VP11:%[0-9]+]]> = select vp<[[VP10]]>, ir<%a>, vp<[[VP9]]>
-; CHECK-NEXT:    EMIT vp<[[VP12:%[0-9]+]]> = icmp ugt ir<%a>, vp<[[VP9]]>
-; CHECK-NEXT:    EMIT vp<[[VP13:%[0-9]+]]> = select vp<[[VP12]]>, ir<%a>, vp<[[VP9]]>
-; CHECK-NEXT:    EMIT vp<[[VP14:%[0-9]+]]> = ptradd vp<[[VP13]]>, ir<4>
-; CHECK-NEXT:    EMIT vp<%bound0> = icmp ult ir<%b>, vp<[[VP14]]>
-; CHECK-NEXT:    EMIT vp<%bound1> = icmp ult vp<[[VP11]]>, vp<[[VP4]]>
-; CHECK-NEXT:    EMIT vp<%found.conflict> = and vp<%bound0>, vp<%bound1>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP3:%[0-9]+]]> = shl ir<%n>, ir<2>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP4:%[0-9]+]]> = ptradd ir<%b>, vp<[[VP3]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP5:%[0-9]+]]> = add ir<%n>, ir<-1>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP6:%[0-9]+]]> = mul ir<%t>, ir<%s>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP7:%[0-9]+]]> = mul vp<[[VP6]]>, vp<[[VP5]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP8:%[0-9]+]]> = shl vp<[[VP7]]>, ir<2>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP9:%[0-9]+]]> = ptradd ir<%a>, vp<[[VP8]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP10:%[0-9]+]]> = icmp ult ir<%a>, vp<[[VP9]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP11:%[0-9]+]]> = select vp<[[VP10]]>, ir<%a>, vp<[[VP9]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP12:%[0-9]+]]> = icmp ugt ir<%a>, vp<[[VP9]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP13:%[0-9]+]]> = select vp<[[VP12]]>, ir<%a>, vp<[[VP9]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP14:%[0-9]+]]> = ptradd vp<[[VP13]]>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<%bound0> = icmp ult ir<%b>, vp<[[VP14]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%bound1> = icmp ult vp<[[VP11]]>, vp<[[VP4]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%found.conflict> = and vp<%bound0>, vp<%bound1>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%found.conflict>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
-; CHECK-NEXT:    EMIT vp<[[VP16:%[0-9]+]]> = and ir<%n>, ir<3>
-; CHECK-NEXT:    EMIT vp<%n.vec> = sub ir<%n>, vp<[[VP16]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP16:%[0-9]+]]> = and ir<%n>, ir<3>
+; CHECK-NEXT:    EMIT-SCALAR vp<%n.vec> = sub ir<%n>, vp<[[VP16]]>
 ; CHECK-NEXT:    EMIT vp<[[VP17:%[0-9]+]]> = broadcast ir<%step>
 ; CHECK-NEXT:    EMIT vp<[[VP18:%[0-9]+]]> = step-vector i64
 ; CHECK-NEXT:    EMIT vp<[[VP19:%[0-9]+]]> = broadcast ir<4>
@@ -126,24 +126,24 @@ define void @diff_check(ptr %a, ptr %b, ptr %c, i64 %n) {
 ; CHECK-NEXT:    IR   %a6 = ptrtoaddr ptr %a to i64
 ; CHECK-NEXT:    IR   %c5 = ptrtoaddr ptr %c to i64
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP2:%[0-9]+]]> = call i64 @llvm.umax(ir<%n>, ir<1>)
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP2]]>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult vp<[[VP2]]>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.memcheck
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.memcheck:
-; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = sub ir<%c5>, ir<%a6>
-; CHECK-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = sub vp<[[VP4]]>, ir<1>
-; CHECK-NEXT:    EMIT vp<%diff.check> = icmp ult vp<[[VP5]]>, ir<15>
-; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = sub ir<%c5>, ir<%b7>
-; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = sub vp<[[VP6]]>, ir<1>
-; CHECK-NEXT:    EMIT vp<%diff.check>.1 = icmp ult vp<[[VP7]]>, ir<15>
-; CHECK-NEXT:    EMIT vp<%conflict.rdx> = or vp<%diff.check>, vp<%diff.check>.1
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP4:%[0-9]+]]> = sub ir<%c5>, ir<%a6>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP5:%[0-9]+]]> = sub vp<[[VP4]]>, ir<1>
+; CHECK-NEXT:    EMIT-SCALAR vp<%diff.check> = icmp ult vp<[[VP5]]>, ir<15>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP6:%[0-9]+]]> = sub ir<%c5>, ir<%b7>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP7:%[0-9]+]]> = sub vp<[[VP6]]>, ir<1>
+; CHECK-NEXT:    EMIT-SCALAR vp<%diff.check>.1 = icmp ult vp<[[VP7]]>, ir<15>
+; CHECK-NEXT:    EMIT-SCALAR vp<%conflict.rdx> = or vp<%diff.check>, vp<%diff.check>.1
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%conflict.rdx>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
-; CHECK-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = and vp<[[VP2]]>, ir<3>
-; CHECK-NEXT:    EMIT vp<%n.vec> = sub vp<[[VP2]]>, vp<[[VP9]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP9:%[0-9]+]]> = and vp<[[VP2]]>, ir<3>
+; CHECK-NEXT:    EMIT-SCALAR vp<%n.vec> = sub vp<[[VP2]]>, vp<[[VP9]]>
 ; CHECK-NEXT:  Successor(s): vector.body
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.body:
@@ -177,7 +177,7 @@ define void @bound_is_addrec_of_sibling_loop(ptr %a, ptr %b, i64 %n, i64 %d, i1 
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<ph.2>:
 ; CHECK-NEXT:    IR   %iv.1.lcssa = phi i64 [ %iv.1, %loop.1 ]
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult ir<%n>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult ir<%n>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, ir-bb<vector.scevcheck>
 ; CHECK-EMPTY:
@@ -212,8 +212,8 @@ define void @bound_is_addrec_of_sibling_loop(ptr %a, ptr %b, i64 %n, i64 %d, i1 
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
-; CHECK-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = and ir<%n>, ir<3>
-; CHECK-NEXT:    EMIT vp<%n.vec> = sub ir<%n>, vp<[[VP5]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP5:%[0-9]+]]> = and ir<%n>, ir<3>
+; CHECK-NEXT:    EMIT-SCALAR vp<%n.vec> = sub ir<%n>, vp<[[VP5]]>
 ; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = broadcast ir<%d>
 ; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = broadcast ir<%n>
 ; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = broadcast ir<%cond>
@@ -269,7 +269,7 @@ define void @bound_is_addrec_of_sibling_loop_non_unit_step(ptr %a, ptr %b, i64 %
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<ph.2>:
 ; CHECK-NEXT:    IR   %iv.1.lcssa = phi i64 [ %iv.1, %loop.1 ]
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult ir<%n>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult ir<%n>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, ir-bb<vector.memcheck>
 ; CHECK-EMPTY:
@@ -291,8 +291,8 @@ define void @bound_is_addrec_of_sibling_loop_non_unit_step(ptr %a, ptr %b, i64 %
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
-; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = and ir<%n>, ir<3>
-; CHECK-NEXT:    EMIT vp<%n.vec> = sub ir<%n>, vp<[[VP4]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP4:%[0-9]+]]> = and ir<%n>, ir<3>
+; CHECK-NEXT:    EMIT-SCALAR vp<%n.vec> = sub ir<%n>, vp<[[VP4]]>
 ; CHECK-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = step-vector i64
 ; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = broadcast ir<4>
 ; CHECK-NEXT:  Successor(s): vector.body
@@ -335,7 +335,7 @@ define void @bound_is_ptr_iv_of_sibling_loop(ptr %a, ptr %b, i64 %n, i64 %m) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<ph.2>:
 ; CHECK-NEXT:    IR   %ptr.iv.lcssa = phi ptr [ %ptr.iv, %loop.1 ]
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult ir<%n>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult ir<%n>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, ir-bb<vector.memcheck>
 ; CHECK-EMPTY:
@@ -356,8 +356,8 @@ define void @bound_is_ptr_iv_of_sibling_loop(ptr %a, ptr %b, i64 %n, i64 %m) {
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
-; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = and ir<%n>, ir<3>
-; CHECK-NEXT:    EMIT vp<%n.vec> = sub ir<%n>, vp<[[VP4]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP4:%[0-9]+]]> = and ir<%n>, ir<3>
+; CHECK-NEXT:    EMIT-SCALAR vp<%n.vec> = sub ir<%n>, vp<[[VP4]]>
 ; CHECK-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = step-vector i64
 ; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = broadcast ir<4>
 ; CHECK-NEXT:  Successor(s): vector.body
@@ -403,24 +403,24 @@ define void @diff_check_dedup(ptr %dst, i64 %off, i64 %n) {
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:    IR   %off.mul.2 = shl i64 %off, 1
 ; CHECK-NEXT:    IR   %off.mul.3 = mul i64 %off, 3
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult ir<%n>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult ir<%n>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.memcheck
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.memcheck:
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = shl ir<%off>, ir<3>
-; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = sub vp<[[VP3]]>, ir<1>
-; CHECK-NEXT:    EMIT vp<%diff.check> = icmp ult vp<[[VP4]]>, ir<31>
-; CHECK-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = shl ir<%off>, ir<4>
-; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = sub vp<[[VP5]]>, ir<1>
-; CHECK-NEXT:    EMIT vp<%diff.check>.1 = icmp ult vp<[[VP6]]>, ir<31>
-; CHECK-NEXT:    EMIT vp<%conflict.rdx> = or vp<%diff.check>, vp<%diff.check>.1
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP3:%[0-9]+]]> = shl ir<%off>, ir<3>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP4:%[0-9]+]]> = sub vp<[[VP3]]>, ir<1>
+; CHECK-NEXT:    EMIT-SCALAR vp<%diff.check> = icmp ult vp<[[VP4]]>, ir<31>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP5:%[0-9]+]]> = shl ir<%off>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP6:%[0-9]+]]> = sub vp<[[VP5]]>, ir<1>
+; CHECK-NEXT:    EMIT-SCALAR vp<%diff.check>.1 = icmp ult vp<[[VP6]]>, ir<31>
+; CHECK-NEXT:    EMIT-SCALAR vp<%conflict.rdx> = or vp<%diff.check>, vp<%diff.check>.1
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%conflict.rdx>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
-; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = and ir<%n>, ir<3>
-; CHECK-NEXT:    EMIT vp<%n.vec> = sub ir<%n>, vp<[[VP8]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP8:%[0-9]+]]> = and ir<%n>, ir<3>
+; CHECK-NEXT:    EMIT-SCALAR vp<%n.vec> = sub ir<%n>, vp<[[VP8]]>
 ; CHECK-NEXT:  Successor(s): vector.body
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.body:
@@ -459,26 +459,26 @@ define void @diff_check_needs_freeze(ptr %src.1, ptr %src.2, ptr %dst, i1 %c, i6
 ; CHECK-NEXT:    IR   %src.27 = ptrtoaddr ptr %src.2 to i64
 ; CHECK-NEXT:    IR   %src.16 = ptrtoaddr ptr %src.1 to i64
 ; CHECK-NEXT:    IR   %dst5 = ptrtoaddr ptr %dst to i64
-; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult ir<%n>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult ir<%n>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.memcheck
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.memcheck:
-; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = sub ir<%dst5>, ir<%src.16>
-; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = sub vp<[[VP3]]>, ir<1>
-; CHECK-NEXT:    EMIT vp<%diff.check> = icmp ult vp<[[VP4]]>, ir<15>
-; CHECK-NEXT:    EMIT vp<%diff.check.fr> = freeze vp<%diff.check>
-; CHECK-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = sub ir<%dst5>, ir<%src.27>
-; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = sub vp<[[VP5]]>, ir<1>
-; CHECK-NEXT:    EMIT vp<%diff.check>.1 = icmp ult vp<[[VP6]]>, ir<15>
-; CHECK-NEXT:    EMIT vp<%diff.check.fr>.1 = freeze vp<%diff.check>.1
-; CHECK-NEXT:    EMIT vp<%conflict.rdx> = or vp<%diff.check.fr>, vp<%diff.check.fr>.1
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP3:%[0-9]+]]> = sub ir<%dst5>, ir<%src.16>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP4:%[0-9]+]]> = sub vp<[[VP3]]>, ir<1>
+; CHECK-NEXT:    EMIT-SCALAR vp<%diff.check> = icmp ult vp<[[VP4]]>, ir<15>
+; CHECK-NEXT:    EMIT-SCALAR vp<%diff.check.fr> = freeze vp<%diff.check>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP5:%[0-9]+]]> = sub ir<%dst5>, ir<%src.27>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP6:%[0-9]+]]> = sub vp<[[VP5]]>, ir<1>
+; CHECK-NEXT:    EMIT-SCALAR vp<%diff.check>.1 = icmp ult vp<[[VP6]]>, ir<15>
+; CHECK-NEXT:    EMIT-SCALAR vp<%diff.check.fr>.1 = freeze vp<%diff.check>.1
+; CHECK-NEXT:    EMIT-SCALAR vp<%conflict.rdx> = or vp<%diff.check.fr>, vp<%diff.check.fr>.1
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%conflict.rdx>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
-; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = and ir<%n>, ir<3>
-; CHECK-NEXT:    EMIT vp<%n.vec> = sub ir<%n>, vp<[[VP8]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP8:%[0-9]+]]> = and ir<%n>, ir<3>
+; CHECK-NEXT:    EMIT-SCALAR vp<%n.vec> = sub ir<%n>, vp<[[VP8]]>
 ; CHECK-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = step-vector i64
 ; CHECK-NEXT:    EMIT vp<[[VP10:%[0-9]+]]> = broadcast ir<4>
 ; CHECK-NEXT:  Successor(s): vector.body

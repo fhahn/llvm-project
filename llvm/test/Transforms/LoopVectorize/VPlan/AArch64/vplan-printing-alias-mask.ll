@@ -17,10 +17,10 @@ define void @alias_mask(ptr noalias %a, ptr %b, ptr %c, i64 %n) {
 ; FINAL-NEXT:  vector.clamped.vf.check:
 ; FINAL-NEXT:    WIDEN-INTRINSIC vp<[[VP4:%[0-9]+]]> = call llvm.loop.dependence.war.mask(ir<%b1>, ir<%c2>, ir<1>)
 ; FINAL-NEXT:    EMIT vp<%num.active.lanes> = num-active-lanes vp<[[VP4]]>
-; FINAL-NEXT:    EMIT vp<%vf.is.scalar> = icmp ule vp<%num.active.lanes>, ir<1>
-; FINAL-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = sub ir<-1>, ir<%n>
-; FINAL-NEXT:    EMIT vp<%vf.step.overflow> = icmp ult vp<[[VP5]]>, vp<%num.active.lanes>
-; FINAL-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = or vp<%vf.is.scalar>, vp<%vf.step.overflow>
+; FINAL-NEXT:    EMIT-SCALAR vp<%vf.is.scalar> = icmp ule vp<%num.active.lanes>, ir<1>
+; FINAL-NEXT:    EMIT-SCALAR vp<[[VP5:%[0-9]+]]> = sub ir<-1>, ir<%n>
+; FINAL-NEXT:    EMIT-SCALAR vp<%vf.step.overflow> = icmp ult vp<[[VP5]]>, vp<%num.active.lanes>
+; FINAL-NEXT:    EMIT-SCALAR vp<[[VP6:%[0-9]+]]> = or vp<%vf.is.scalar>, vp<%vf.step.overflow>
 ; FINAL-NEXT:    EMIT branch-on-cond vp<[[VP6]]>
 ; FINAL-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.ph
 ; FINAL-EMPTY:
@@ -40,7 +40,7 @@ define void @alias_mask(ptr noalias %a, ptr %b, ptr %c, i64 %n) {
 ; FINAL-NEXT:    WIDEN ir<%add> = add ir<%ld.b>, ir<%ld.a>
 ; FINAL-NEXT:    CLONE ir<%ptr.c> = getelementptr inbounds ir<%c>, vp<%index>
 ; FINAL-NEXT:    WIDEN store ir<%ptr.c>, ir<%add>, vp<[[VP9]]>
-; FINAL-NEXT:    EMIT vp<%index.next> = add vp<%index>, vp<%num.active.lanes>
+; FINAL-NEXT:    EMIT-SCALAR vp<%index.next> = add vp<%index>, vp<%num.active.lanes>
 ; FINAL-NEXT:    EMIT vp<%active.lane.mask.next> = wide active lane mask vp<%index.next>, ir<%n>, ir<1>
 ; FINAL-NEXT:    EMIT vp<%extract.next.alm.part> = extract-vector-for-part vp<%active.lane.mask.next>, ir<0>
 ; FINAL-NEXT:    EMIT vp<[[VP10:%[0-9]+]]> = not vp<%extract.next.alm.part>

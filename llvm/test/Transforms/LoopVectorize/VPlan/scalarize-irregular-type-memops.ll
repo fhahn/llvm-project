@@ -27,7 +27,7 @@ define void @scalarize_irregular_types(ptr noalias %p1, ptr noalias %p2) {
 ; CHECK-NEXT:      EMIT store ir<%add>, ir<%gep1>
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add ir<%iv>, ir<1>
 ; CHECK-NEXT:      EMIT ir<%ec> = icmp eq ir<%iv.next>, ir<100>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2:%[0-9]+]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -50,7 +50,7 @@ define void @scalarize_irregular_types(ptr noalias %p1, ptr noalias %p2) {
 ; ALL-MEMOP-WIDEN-NEXT:      WIDEN store vp<[[VP5]]>, ir<%add>
 ; ALL-MEMOP-WIDEN-NEXT:      EMIT ir<%iv.next> = add ir<%iv>, ir<1>
 ; ALL-MEMOP-WIDEN-NEXT:      EMIT ir<%ec> = icmp eq ir<%iv.next>, ir<100>
-; ALL-MEMOP-WIDEN-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
+; ALL-MEMOP-WIDEN-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
 ; ALL-MEMOP-WIDEN-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2:%[0-9]+]]>
 ; ALL-MEMOP-WIDEN-NEXT:    No successors
 ; ALL-MEMOP-WIDEN-NEXT:  }
@@ -91,7 +91,7 @@ define void @irregular_gather(ptr noalias %p, ptr noalias %idx, ptr noalias %out
 ; CHECK-NEXT:      REPLICATE store ir<%v>, ir<%gep.out>
 ; CHECK-NEXT:      EMIT ir<%iv.next> = add ir<%iv>, ir<1>
 ; CHECK-NEXT:      EMIT ir<%ec> = icmp eq ir<%iv.next>, ir<100>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2:%[0-9]+]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -112,7 +112,7 @@ define void @irregular_gather(ptr noalias %p, ptr noalias %idx, ptr noalias %out
 ; ALL-MEMOP-WIDEN-NEXT:      REPLICATE store ir<%v>, ir<%gep.out>
 ; ALL-MEMOP-WIDEN-NEXT:      EMIT ir<%iv.next> = add ir<%iv>, ir<1>
 ; ALL-MEMOP-WIDEN-NEXT:      EMIT ir<%ec> = icmp eq ir<%iv.next>, ir<100>
-; ALL-MEMOP-WIDEN-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
+; ALL-MEMOP-WIDEN-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
 ; ALL-MEMOP-WIDEN-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2:%[0-9]+]]>
 ; ALL-MEMOP-WIDEN-NEXT:    No successors
 ; ALL-MEMOP-WIDEN-NEXT:  }

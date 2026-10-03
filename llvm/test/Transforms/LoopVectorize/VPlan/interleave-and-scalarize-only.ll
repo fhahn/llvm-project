@@ -27,14 +27,14 @@ define void @test_scalarize_call(i32 %start, ptr %dst) {
 ; CHECK-NEXT:      CLONE ir<%min> = call @llvm.smin.i32(vp<[[VP7]]>, ir<65535>)
 ; CHECK-NEXT:      CLONE ir<%arrayidx> = getelementptr inbounds ir<%dst>, vp<[[VP7]]>
 ; CHECK-NEXT:      CLONE store ir<%min>, ir<%arrayidx>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP5]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP5]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq vp<[[VP3]]>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq vp<[[VP3]]>, vp<[[VP2]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
@@ -113,14 +113,14 @@ define void @test_scalarize_with_branch_cond(ptr %src, ptr %dst) {
 ; CHECK-NEXT:    Successor(s): cond.false.1
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    cond.false.1:
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<1000>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<1000>, vp<[[VP2]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
@@ -190,7 +190,7 @@ define void @first_order_recurrence_using_induction(i32 %n, ptr %dst) {
 ; CHECK-NEXT:      FIRST-ORDER-RECURRENCE-PHI ir<%for> = phi ir<0>, vp<[[VP6:%[0-9]+]]>
 ; CHECK-NEXT:      EMIT-SCALAR vp<[[VP5:%[0-9]+]]> = trunc vp<[[VP4]]> to i32
 ; CHECK-NEXT:      vp<[[VP6]]> = SCALAR-STEPS vp<[[VP5]]>, ir<1>, vp<[[VP0]]>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -200,7 +200,7 @@ define void @first_order_recurrence_using_induction(i32 %n, ptr %dst) {
 ; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = first-order splice ir<%for>, vp<[[VP6]]>
 ; CHECK-NEXT:    CLONE store vp<[[VP8]]>, ir<%dst>
 ; CHECK-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = extract-last-part vp<[[VP6]]>
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq vp<[[VP3]]>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq vp<[[VP3]]>, vp<[[VP2]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
@@ -262,7 +262,7 @@ define i16 @reduction_with_casts() {
 ; CHECK-NEXT:      WIDEN-REDUCTION-PHI ir<%count.0.in1> = phi (add) vp<[[VP3]]>, ir<%add>
 ; CHECK-NEXT:      CLONE ir<%conv1> = and ir<%count.0.in1>, ir<65535>
 ; CHECK-NEXT:      CLONE ir<%add> = add ir<%conv1>, ir<1>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP0]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -270,7 +270,7 @@ define i16 @reduction_with_casts() {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
 ; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = compute-reduction-result (add) ir<%add>
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<9999>, vp<[[VP1]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<9999>, vp<[[VP1]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
@@ -333,7 +333,7 @@ define void @scalarize_ptrtoint(ptr %src, ptr %dst) {
 ; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = SCALAR-STEPS vp<[[VP3]]>, ir<1>, vp<[[VP0]]>
 ; CHECK-NEXT:      CLONE ir<%gep> = getelementptr ir<%src>, vp<[[VP4]]>
 ; CHECK-NEXT:      CLONE ir<%l> = load ir<%gep> (!alias.scope !19)
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -344,7 +344,7 @@ define void @scalarize_ptrtoint(ptr %src, ptr %dst) {
 ; CHECK-NEXT:    CLONE ir<%add> = add ir<%cast>, ir<10>
 ; CHECK-NEXT:    EMIT-SCALAR ir<%cast.2> = inttoptr ir<%add> to ptr
 ; CHECK-NEXT:    CLONE store ir<%cast.2>, ir<%dst> (!alias.scope !20, !noalias !19)
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<1024>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<1024>, vp<[[VP2]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
@@ -413,14 +413,14 @@ define void @pr76986_trunc_sext_interleaving_only(i16 %arg, ptr noalias %src, pt
 ; CHECK-NEXT:      CLONE ir<%sdiv> = sdiv ir<%sext>, ir<%arg>
 ; CHECK-NEXT:      CLONE ir<%gep.dst> = getelementptr inbounds ir<%dst>, vp<[[VP4]]>
 ; CHECK-NEXT:      CLONE store ir<%sdiv>, ir<%gep.dst>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<14934>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<14934>, vp<[[VP2]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
@@ -498,7 +498,7 @@ define void @pr179671(ptr align 8 dereferenceable(120) %p, ptr %a, i32 %b) {
 ; CHECK-NEXT:      CLONE store vp<%next.gep>, ir<%inv_ptr>
 ; CHECK-NEXT:      CLONE ir<%sadd_val> = add vp<[[VP8]]>, ir<3>
 ; CHECK-NEXT:      CLONE store ir<%sadd_val>, ir<%inv_ptr2>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP6]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP6]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }

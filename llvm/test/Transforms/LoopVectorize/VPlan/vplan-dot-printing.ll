@@ -46,7 +46,7 @@ define void @print_call_and_memory(i64 %n, ptr noalias %y, ptr noalias %x) {
 ; CHECK-NEXT:    "  CLONE ir\<%arrayidx2\> = getelementptr inbounds ir\<%x\>, vp\<[[STEPS]]\>\l" +
 ; CHECK-NEXT:    "  vp\<[[VEC_PTR2:%.+]]\> = vector-pointer inbounds float, ir\<%arrayidx2\>, ir\<1\>\l" +
 ; CHECK-NEXT:    "  WIDEN store vp\<[[VEC_PTR2]]\>, ir\<%call\>\l" +
-; CHECK-NEXT:    "  EMIT vp\<[[CAN_IV_NEXT:%.+]]\> = add nuw vp\<[[CAN_IV]]\>, vp\<[[VFxUF]]\>\l" +
+; CHECK-NEXT:    "  EMIT-SCALAR vp\<[[CAN_IV_NEXT:%.+]]\> = add nuw vp\<[[CAN_IV]]\>, vp\<[[VFxUF]]\>\l" +
 ; CHECK-NEXT:    "  EMIT branch-on-count vp\<[[CAN_IV_NEXT]]\>, vp\<[[VEC_TC]]\>\l" +
 ; CHECK-NEXT:    "No successors\l"
 ; CHECK-NEXT:  ]

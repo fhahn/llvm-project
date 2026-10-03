@@ -10,7 +10,7 @@ define void @int_induction(ptr noalias %dst, i64 %n) {
 ; FORCED1:  Cost of 1 for VF 2: CLONE ir<%gep> = getelementptr inbounds ir<%dst>, vp<[[VP4]]>
 ; FORCED1:  Cost of 0 for VF 2: vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds i64, ir<%gep>, ir<1>
 ; FORCED1:  Cost of 1 for VF 2: WIDEN store vp<[[VP5]]>, ir<%iv>
-; FORCED1:  Cost of 0 for VF 2: EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
+; FORCED1:  Cost of 0 for VF 2: EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
 ; FORCED1:  Cost of 0 for VF 2: EMIT branch-on-count vp<%index.next>, vp<[[VP2:%[0-9]+]]>
 ;
 ; FORCED3-LABEL: 'int_induction'
@@ -19,7 +19,7 @@ define void @int_induction(ptr noalias %dst, i64 %n) {
 ; FORCED3:  Cost of 3 for VF 2: CLONE ir<%gep> = getelementptr inbounds ir<%dst>, vp<[[VP4]]>
 ; FORCED3:  Cost of 0 for VF 2: vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds i64, ir<%gep>, ir<1>
 ; FORCED3:  Cost of 3 for VF 2: WIDEN store vp<[[VP5]]>, ir<%iv>
-; FORCED3:  Cost of 0 for VF 2: EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
+; FORCED3:  Cost of 0 for VF 2: EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1:%[0-9]+]]>
 ; FORCED3:  Cost of 0 for VF 2: EMIT branch-on-count vp<%index.next>, vp<[[VP2:%[0-9]+]]>
 ;
 entry:
@@ -45,7 +45,7 @@ define void @fp_induction_scalar_users(ptr noalias %dst, i64 %n) {
 ; FORCED1:  Cost of 1 for VF 2: WIDEN ir<%idx> = mul ir<%iv>, ir<3>
 ; FORCED1:  Cost of 1 for VF 2: REPLICATE ir<%gep> = getelementptr inbounds ir<%dst>, ir<%idx>
 ; FORCED1:  Cost of 1 for VF 2: REPLICATE store vp<[[VP6]]>, ir<%gep>
-; FORCED1:  Cost of 0 for VF 2: EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1:%[0-9]+]]>
+; FORCED1:  Cost of 0 for VF 2: EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1:%[0-9]+]]>
 ; FORCED1:  Cost of 0 for VF 2: EMIT branch-on-count vp<%index.next>, vp<[[VP2:%[0-9]+]]>
 ;
 ; FORCED3-LABEL: 'fp_induction_scalar_users'
@@ -55,7 +55,7 @@ define void @fp_induction_scalar_users(ptr noalias %dst, i64 %n) {
 ; FORCED3:  Cost of 3 for VF 2: WIDEN ir<%idx> = mul ir<%iv>, ir<3>
 ; FORCED3:  Cost of 3 for VF 2: REPLICATE ir<%gep> = getelementptr inbounds ir<%dst>, ir<%idx>
 ; FORCED3:  Cost of 3 for VF 2: REPLICATE store vp<[[VP6]]>, ir<%gep>
-; FORCED3:  Cost of 0 for VF 2: EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1:%[0-9]+]]>
+; FORCED3:  Cost of 0 for VF 2: EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1:%[0-9]+]]>
 ; FORCED3:  Cost of 0 for VF 2: EMIT branch-on-count vp<%index.next>, vp<[[VP2:%[0-9]+]]>
 ;
 entry:

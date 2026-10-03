@@ -278,13 +278,15 @@ define void @const_tc_with_predicated_store(i1 %c1, i1 %c2, i1 %c3, ptr %dst) #1
 ; CHECK:       vector.ph:
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <vscale x 4 x i1> poison, i1 [[C2:%.*]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <vscale x 4 x i1> [[BROADCAST_SPLATINSERT1]], <vscale x 4 x i1> poison, <vscale x 4 x i32> zeroinitializer
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT3:%.*]] = insertelement <vscale x 4 x i1> poison, i1 [[C1:%.*]], i64 0
+; CHECK-NEXT:    [[C1:%.*]] = xor i1 [[C2]], true
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT3:%.*]] = insertelement <vscale x 4 x i1> poison, i1 [[C1]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT4:%.*]] = shufflevector <vscale x 4 x i1> [[BROADCAST_SPLATINSERT3]], <vscale x 4 x i1> poison, <vscale x 4 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP12:%.*]] = xor <vscale x 4 x i1> [[BROADCAST_SPLAT4]], splat (i1 true)
-; CHECK-NEXT:    [[TMP1:%.*]] = xor <vscale x 4 x i1> [[BROADCAST_SPLAT2]], splat (i1 true)
-; CHECK-NEXT:    [[TMP13:%.*]] = select <vscale x 4 x i1> [[TMP12]], <vscale x 4 x i1> [[TMP1]], <vscale x 4 x i1> zeroinitializer
-; CHECK-NEXT:    [[TMP2:%.*]] = or <vscale x 4 x i1> [[TMP13]], [[BROADCAST_SPLAT4]]
-; CHECK-NEXT:    [[PREDPHI:%.*]] = select i1 [[C1]], <vscale x 4 x float> splat (float 1.000000e+00), <vscale x 4 x float> zeroinitializer
+; CHECK-NEXT:    [[TMP1:%.*]] = xor i1 [[C4:%.*]], true
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT5:%.*]] = insertelement <vscale x 4 x i1> poison, i1 [[TMP1]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT5:%.*]] = shufflevector <vscale x 4 x i1> [[BROADCAST_SPLATINSERT5]], <vscale x 4 x i1> poison, <vscale x 4 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP3:%.*]] = select <vscale x 4 x i1> [[BROADCAST_SPLAT4]], <vscale x 4 x i1> [[BROADCAST_SPLAT5]], <vscale x 4 x i1> zeroinitializer
+; CHECK-NEXT:    [[TMP2:%.*]] = or <vscale x 4 x i1> [[TMP3]], [[BROADCAST_SPLAT2]]
+; CHECK-NEXT:    [[PREDPHI:%.*]] = select i1 [[C2]], <vscale x 4 x float> splat (float 1.000000e+00), <vscale x 4 x float> zeroinitializer
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT4:%.*]] = insertelement <vscale x 4 x i1> poison, i1 [[C3:%.*]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 4 x i1> [[BROADCAST_SPLATINSERT4]], <vscale x 4 x i1> poison, <vscale x 4 x i32> zeroinitializer
 ; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
@@ -360,7 +362,7 @@ define i8 @mul_non_pow_2_low_trip_count(ptr noalias %a) {
 ; CHECK-NEXT:    [[MUL]] = mul i8 [[TMP5]], [[RDX]]
 ; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 1
 ; CHECK-NEXT:    [[EXITCOND_NOT:%.*]] = icmp eq i64 [[IV_NEXT]], 10
-; CHECK-NEXT:    br i1 [[EXITCOND_NOT]], label [[FOR_END:%.*]], label [[FOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
+; CHECK-NEXT:    br i1 [[EXITCOND_NOT]], label [[FOR_END:%.*]], label [[FOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       for.end:
 ; CHECK-NEXT:    [[MUL_LCSSA:%.*]] = phi i8 [ [[MUL]], [[FOR_BODY]] ]
 ; CHECK-NEXT:    ret i8 [[MUL_LCSSA]]

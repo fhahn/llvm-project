@@ -44,7 +44,7 @@ define i32 @simple_csa_int_select(i64 %N, ptr %data, i32 %a) {
 ; CHECK-NEXT:      EMIT vp<[[VP8:%[0-9]+]]> = any-of vp<[[VP7]]>
 ; CHECK-NEXT:      EMIT vp<[[VP9]]> = select vp<[[VP8]]>, vp<[[VP7]]>, vp<[[VP4]]>
 ; CHECK-NEXT:      EMIT vp<[[VP10]]> = select vp<[[VP8]]>, ir<%ld>, ir<%data.phi>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -52,7 +52,7 @@ define i32 @simple_csa_int_select(i64 %N, ptr %data, i32 %a) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
 ; CHECK-NEXT:    EMIT vp<[[VP12:%[0-9]+]]> = extract-last-active ir<-1>, vp<[[VP10]]>, vp<[[VP9]]>
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<%N>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%N>, vp<[[VP2]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
@@ -108,7 +108,7 @@ define i32 @simple_csa_int_select(i64 %N, ptr %data, i32 %a) {
 ; CHECK-TF-NEXT:      EMIT vp<[[VP13:%[0-9]+]]> = any-of vp<[[VP12]]>
 ; CHECK-TF-NEXT:      EMIT vp<[[VP14]]> = select vp<[[VP13]]>, vp<[[VP12]]>, vp<[[VP6]]>
 ; CHECK-TF-NEXT:      EMIT vp<[[VP15]]> = select vp<[[VP13]]>, ir<%ld>, ir<%data.phi>
-; CHECK-TF-NEXT:      EMIT vp<%index.next> = add vp<[[VP4]]>, vp<[[VP1]]>
+; CHECK-TF-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP4]]>, vp<[[VP1]]>
 ; CHECK-TF-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-TF-NEXT:    No successors
 ; CHECK-TF-NEXT:  }
@@ -212,7 +212,7 @@ define i32 @simple_csa_int_load(ptr noalias %a, ptr noalias %b, i32 %default_val
 ; CHECK-NEXT:      EMIT vp<[[VP10:%[0-9]+]]> = any-of vp<[[VP9]]>
 ; CHECK-NEXT:      EMIT vp<[[VP11]]> = select vp<[[VP10]]>, vp<[[VP9]]>, vp<[[VP4]]>
 ; CHECK-NEXT:      EMIT vp<[[VP12]]> = select vp<[[VP10]]>, vp<[[VP8]]>, ir<%data.phi>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -220,7 +220,7 @@ define i32 @simple_csa_int_load(ptr noalias %a, ptr noalias %b, i32 %default_val
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
 ; CHECK-NEXT:    EMIT vp<[[VP14:%[0-9]+]]> = extract-last-active ir<%default_val>, vp<[[VP12]]>, vp<[[VP11]]>
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<%N>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%N>, vp<[[VP2]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
@@ -276,7 +276,7 @@ define i32 @simple_csa_int_load(ptr noalias %a, ptr noalias %b, i32 %default_val
 ; CHECK-TF-NEXT:      EMIT vp<[[VP14:%[0-9]+]]> = any-of vp<[[VP13]]>
 ; CHECK-TF-NEXT:      EMIT vp<[[VP15]]> = select vp<[[VP14]]>, vp<[[VP13]]>, vp<[[VP6]]>
 ; CHECK-TF-NEXT:      EMIT vp<[[VP16]]> = select vp<[[VP14]]>, ir<%ld.b>, ir<%data.phi>
-; CHECK-TF-NEXT:      EMIT vp<%index.next> = add vp<[[VP4]]>, vp<[[VP1]]>
+; CHECK-TF-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP4]]>, vp<[[VP1]]>
 ; CHECK-TF-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-TF-NEXT:    No successors
 ; CHECK-TF-NEXT:  }

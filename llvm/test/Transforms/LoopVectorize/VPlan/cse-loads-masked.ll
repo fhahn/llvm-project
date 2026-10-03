@@ -29,8 +29,8 @@ define void @two_masked_same_mask(ptr noalias %a, ptr noalias %b, ptr noalias %c
 ; CHECK-NEXT:    EMIT vp<%predphi> = select ir<%cmp>, ir<%s>, ir<0>
 ; CHECK-NEXT:    CLONE ir<%gep.b> = getelementptr inbounds ir<%b>, vp<%index>
 ; CHECK-NEXT:    WIDEN store ir<%gep.b>, vp<%predphi>
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<4>
-; CHECK-NEXT:    EMIT vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP1]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
 ;
@@ -91,8 +91,8 @@ define void @two_masked_diff_mask(ptr noalias %a, ptr noalias %b, ptr noalias %c
 ; CHECK-NEXT:    WIDEN ir<%sum> = add vp<%predphi>, vp<%predphi>.1
 ; CHECK-NEXT:    CLONE ir<%gep.b> = getelementptr inbounds ir<%b>, vp<%index>
 ; CHECK-NEXT:    WIDEN store ir<%gep.b>, ir<%sum>
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<4>
-; CHECK-NEXT:    EMIT vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP1]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
 ;
@@ -163,8 +163,8 @@ define void @masked_and_regular_mix(ptr noalias %a, ptr noalias %b, ptr noalias 
 ; CHECK-NEXT:    WIDEN ir<%sum> = add ir<%rr>, vp<%predphi>
 ; CHECK-NEXT:    CLONE ir<%gep.o> = getelementptr inbounds ir<%out>, vp<%index>
 ; CHECK-NEXT:    WIDEN store ir<%gep.o>, ir<%sum>
-; CHECK-NEXT:    EMIT vp<%index.next> = add nuw vp<%index>, ir<4>
-; CHECK-NEXT:    EMIT vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
+; CHECK-NEXT:    EMIT-SCALAR vp<%index.next> = add nuw vp<%index>, ir<4>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP1:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1024>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP1]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
 ;

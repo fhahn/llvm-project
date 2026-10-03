@@ -501,8 +501,8 @@ bool vputils::doesGenerateSingleScalar(const VPValue *VPV) {
     return VPI->doesGenerateSingleScalar() || VPI->isVectorToScalar();
   if (auto *RR = dyn_cast<VPReductionRecipe>(VPV))
     return !RR->isPartialReduction();
-  if (isa<VPVectorPointerRecipe, VPVectorEndPointerRecipe, VPDerivedIVRecipe>(
-          VPV))
+  if (isa<VPVectorPointerRecipe, VPVectorEndPointerRecipe, VPDerivedIVRecipe,
+          VPCurrentIterationPHIRecipe>(VPV))
     return true;
   if (auto *Expr = dyn_cast<VPExpressionRecipe>(VPV))
     return Expr->isVectorToScalar();

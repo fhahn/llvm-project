@@ -17,8 +17,8 @@ define void @i64_load_store(ptr noalias %x, i64 %n) {
 ; BEFORE-SCALE-NEXT:  ir-bb<entry>:
 ; BEFORE-SCALE-NEXT:    EMIT vp<[[VP3]]> = EXPAND SCEV (1 umax %n)
 ; BEFORE-SCALE-NEXT:    EMIT-SCALAR vp<[[VP4:%[0-9]+]]> = call i64 @llvm.vscale()
-; BEFORE-SCALE-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = mul nuw vp<[[VP4]]>, ir<16>
-; BEFORE-SCALE-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP3]]>, vp<[[VP5]]>
+; BEFORE-SCALE-NEXT:    EMIT-SCALAR vp<[[VP5:%[0-9]+]]> = mul nuw vp<[[VP4]]>, ir<16>
+; BEFORE-SCALE-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult vp<[[VP3]]>, vp<[[VP5]]>
 ; BEFORE-SCALE-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; BEFORE-SCALE-NEXT:  Successor(s): scalar.ph, vector.ph
 ; BEFORE-SCALE-EMPTY:
@@ -35,7 +35,7 @@ define void @i64_load_store(ptr noalias %x, i64 %n) {
 ; BEFORE-SCALE-NEXT:      WIDEN ir<%ld> = load vp<[[VP9]]>
 ; BEFORE-SCALE-NEXT:      WIDEN ir<%add> = add ir<%ld>, ir<1>
 ; BEFORE-SCALE-NEXT:      WIDEN store vp<[[VP9]]>, ir<%add>
-; BEFORE-SCALE-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP7]]>, vp<[[VP1]]>
+; BEFORE-SCALE-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP7]]>, vp<[[VP1]]>
 ; BEFORE-SCALE-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; BEFORE-SCALE-NEXT:    No successors
 ; BEFORE-SCALE-NEXT:  }
@@ -53,8 +53,8 @@ define void @i64_load_store(ptr noalias %x, i64 %n) {
 ; AFTER-SCALE-NEXT:  ir-bb<entry>:
 ; AFTER-SCALE-NEXT:    EMIT vp<[[VP3]]> = EXPAND SCEV (1 umax %n)
 ; AFTER-SCALE-NEXT:    EMIT-SCALAR vp<[[VP4:%[0-9]+]]> = call i64 @llvm.vscale()
-; AFTER-SCALE-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = mul nuw vp<[[VP4]]>, ir<16>
-; AFTER-SCALE-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP3]]>, vp<[[VP5]]>
+; AFTER-SCALE-NEXT:    EMIT-SCALAR vp<[[VP5:%[0-9]+]]> = mul nuw vp<[[VP4]]>, ir<16>
+; AFTER-SCALE-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult vp<[[VP3]]>, vp<[[VP5]]>
 ; AFTER-SCALE-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; AFTER-SCALE-NEXT:  Successor(s): scalar.ph, vector.ph
 ; AFTER-SCALE-EMPTY:
@@ -73,7 +73,7 @@ define void @i64_load_store(ptr noalias %x, i64 %n) {
 ; AFTER-SCALE-NEXT:      WIDEN ir<%add> = add vp<[[VP11]]>, ir<1>
 ; AFTER-SCALE-NEXT:      EMIT vp<[[VP12:%[0-9]+]]> = concat-vectors ir<%add>
 ; AFTER-SCALE-NEXT:      EMIT wide vector store ir<1>, vp<[[VP9]]>, ir<8>, vp<[[VP12]]>
-; AFTER-SCALE-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP7]]>, vp<[[VP1]]>
+; AFTER-SCALE-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP7]]>, vp<[[VP1]]>
 ; AFTER-SCALE-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; AFTER-SCALE-NEXT:    No successors
 ; AFTER-SCALE-NEXT:  }
@@ -91,8 +91,8 @@ define void @i64_load_store(ptr noalias %x, i64 %n) {
 ; AFTER-UNROLL-NEXT:  ir-bb<entry>:
 ; AFTER-UNROLL-NEXT:    EMIT vp<[[VP3]]> = EXPAND SCEV (1 umax %n)
 ; AFTER-UNROLL-NEXT:    EMIT-SCALAR vp<[[VP4:%[0-9]+]]> = call i64 @llvm.vscale()
-; AFTER-UNROLL-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = mul nuw vp<[[VP4]]>, ir<16>
-; AFTER-UNROLL-NEXT:    EMIT vp<%min.iters.check> = icmp ult vp<[[VP3]]>, vp<[[VP5]]>
+; AFTER-UNROLL-NEXT:    EMIT-SCALAR vp<[[VP5:%[0-9]+]]> = mul nuw vp<[[VP4]]>, ir<16>
+; AFTER-UNROLL-NEXT:    EMIT-SCALAR vp<%min.iters.check> = icmp ult vp<[[VP3]]>, vp<[[VP5]]>
 ; AFTER-UNROLL-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
 ; AFTER-UNROLL-NEXT:  Successor(s): scalar.ph, vector.ph
 ; AFTER-UNROLL-EMPTY:
@@ -117,7 +117,7 @@ define void @i64_load_store(ptr noalias %x, i64 %n) {
 ; AFTER-UNROLL-NEXT:      WIDEN ir<%add>.3 = add vp<[[VP14]]>, ir<1>
 ; AFTER-UNROLL-NEXT:      EMIT vp<[[VP15:%[0-9]+]]> = concat-vectors ir<%add>, ir<%add>.1, ir<%add>.2, ir<%add>.3
 ; AFTER-UNROLL-NEXT:      EMIT wide vector store ir<4>, vp<[[VP9]]>, ir<8>, vp<[[VP15]]>
-; AFTER-UNROLL-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP7]]>, vp<[[VP1]]>
+; AFTER-UNROLL-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP7]]>, vp<[[VP1]]>
 ; AFTER-UNROLL-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; AFTER-UNROLL-NEXT:    No successors
 ; AFTER-UNROLL-NEXT:  }

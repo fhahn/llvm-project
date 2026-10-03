@@ -40,7 +40,7 @@ define void @foo(ptr noalias %a, ptr noalias %b, ptr noalias %c, i64 %N) {
 ; IF-EVL-NEXT:      CLONE ir<%arrayidx4> = getelementptr inbounds ir<%a>, vp<[[VP8]]>
 ; IF-EVL-NEXT:      vp<[[VP11:%[0-9]+]]> = vector-pointer inbounds i32, ir<%arrayidx4>, ir<1>
 ; IF-EVL-NEXT:      WIDEN store vp<[[VP11]]>, ir<%add>, vp<[[VP7]]>
-; IF-EVL-NEXT:      EMIT vp<%index.next> = add vp<[[VP4]]>, vp<[[VP1]]>
+; IF-EVL-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP4]]>, vp<[[VP1]]>
 ; IF-EVL-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; IF-EVL-NEXT:    No successors
 ; IF-EVL-NEXT:  }
@@ -74,7 +74,7 @@ define void @foo(ptr noalias %a, ptr noalias %b, ptr noalias %c, i64 %N) {
 ; NO-VP-NEXT:      CLONE ir<%arrayidx4> = getelementptr inbounds ir<%a>, vp<[[VP4]]>
 ; NO-VP-NEXT:      vp<[[VP7:%[0-9]+]]> = vector-pointer inbounds i32, ir<%arrayidx4>, ir<1>
 ; NO-VP-NEXT:      WIDEN store vp<[[VP7]]>, ir<%add>
-; NO-VP-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
+; NO-VP-NEXT:      EMIT-SCALAR vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP1]]>
 ; NO-VP-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; NO-VP-NEXT:    No successors
 ; NO-VP-NEXT:  }

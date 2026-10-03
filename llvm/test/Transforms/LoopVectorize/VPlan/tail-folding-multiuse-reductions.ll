@@ -39,7 +39,7 @@ define i64 @argmin_first_index(ptr %arr, i64 %n, i64 %start) {
 ; CHECK-NEXT:      EMIT vp<[[VP5:%[0-9]+]]> = not vp<[[VP4]]>
 ; CHECK-NEXT:      EMIT vp<[[VP6]]> = select vp<[[VP4]]>, ir<%min.next>, ir<%min>
 ; CHECK-NEXT:      EMIT vp<[[VP7]]> = select vp<[[VP4]]>, ir<%min.loc.next>, ir<%min.loc>
-; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP3]]>, vp<[[VP1]]>
+; CHECK-NEXT:      EMIT-SCALAR vp<%index.next> = add vp<[[VP3]]>, vp<[[VP1]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
@@ -50,15 +50,15 @@ define i64 @argmin_first_index(ptr %arr, i64 %n, i64 %start) {
 ; CHECK-NEXT:    EMIT vp<[[VP10:%[0-9]+]]> = icmp eq vp<[[VP6]]>, vp<[[VP9]]>
 ; CHECK-NEXT:    EMIT vp<[[VP11:%[0-9]+]]> = select vp<[[VP10]]>, vp<[[VP7]]>, ir<-1>
 ; CHECK-NEXT:    EMIT vp<[[VP12:%[0-9]+]]> = compute-reduction-result (umin) vp<[[VP11]]>
-; CHECK-NEXT:    EMIT vp<[[VP13:%[0-9]+]]> = icmp eq vp<[[VP9]]>, ir<%start>
-; CHECK-NEXT:    EMIT vp<[[VP14:%[0-9]+]]> = select vp<[[VP13]]>, ir<0>, vp<[[VP12]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP13:%[0-9]+]]> = icmp eq vp<[[VP9]]>, ir<%start>
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP14:%[0-9]+]]> = select vp<[[VP13]]>, ir<0>, vp<[[VP12]]>
 ; CHECK-NEXT:    EMIT vp<[[VP15:%[0-9]+]]> = extract-last-part vp<[[VP9]]>
 ; CHECK-NEXT:    EMIT vp<[[VP16:%[0-9]+]]> = extract-last-lane vp<[[VP15]]>
 ; CHECK-NEXT:    EMIT vp<[[VP17:%[0-9]+]]> = extract-last-part vp<[[VP14]]>
 ; CHECK-NEXT:    EMIT vp<[[VP18:%[0-9]+]]> = extract-last-lane vp<[[VP17]]>
 ; CHECK-NEXT:    EMIT vp<[[VP19:%[0-9]+]]> = extract-last-part vp<[[VP14]]>
 ; CHECK-NEXT:    EMIT vp<[[VP20:%[0-9]+]]> = extract-last-lane vp<[[VP19]]>
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT-SCALAR vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
 ; CHECK-NEXT:    EMIT vp<[[VP21:%[0-9]+]]> = last-active-lane vp<[[VP4]]>
 ; CHECK-NEXT:    EMIT vp<[[VP22:%[0-9]+]]> = extract-lane vp<[[VP21]]>, vp<[[VP9]]>
 ; CHECK-NEXT:    EMIT vp<[[VP23:%[0-9]+]]> = last-active-lane vp<[[VP4]]>

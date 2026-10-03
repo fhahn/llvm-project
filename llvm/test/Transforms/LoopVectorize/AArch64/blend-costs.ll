@@ -207,9 +207,9 @@ define void @test_blend_feeding_replicated_store_2(ptr noalias %src, ptr %dst, i
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <16 x i1> poison, i1 [[C_0]], i64 0
+; CHECK-NEXT:    [[TMP0:%.*]] = xor i1 [[C_0]], true
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <16 x i1> poison, i1 [[TMP0]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <16 x i1> [[BROADCAST_SPLATINSERT]], <16 x i1> poison, <16 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP5:%.*]] = xor <16 x i1> [[BROADCAST_SPLAT]], splat (i1 true)
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_STORE_CONTINUE30:.*]] ]
@@ -217,7 +217,7 @@ define void @test_blend_feeding_replicated_store_2(ptr noalias %src, ptr %dst, i
 ; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <16 x i8>, ptr [[GEP_SRC]], align 1
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq <16 x i8> [[WIDE_LOAD]], zeroinitializer
 ; CHECK-NEXT:    [[TMP4:%.*]] = xor <16 x i1> [[TMP3]], splat (i1 true)
-; CHECK-NEXT:    [[TMP6:%.*]] = select <16 x i1> [[TMP4]], <16 x i1> [[TMP5]], <16 x i1> zeroinitializer
+; CHECK-NEXT:    [[TMP6:%.*]] = select <16 x i1> [[TMP4]], <16 x i1> [[BROADCAST_SPLAT]], <16 x i1> zeroinitializer
 ; CHECK-NEXT:    [[TMP7:%.*]] = or <16 x i1> [[TMP6]], [[TMP3]]
 ; CHECK-NEXT:    [[PREDPHI:%.*]] = select <16 x i1> [[TMP3]], <16 x i8> splat (i8 1), <16 x i8> zeroinitializer
 ; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <16 x i1> [[TMP7]], i64 0

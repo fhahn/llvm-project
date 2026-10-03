@@ -1623,6 +1623,10 @@ public:
   /// e.g. by performing a reduction or extracting a lane.
   bool isVectorToScalar() const;
 
+  /// Returns true if a VPInstruction with \p Opcode can generate a single
+  /// scalar for its first lane instead of a vector.
+  static bool canGenerateScalarForFirstLane(unsigned Opcode);
+
   /// Returns true if the recipe produces a single scalar value.
   bool doesGenerateSingleScalar() const { return GeneratesSingleScalar; }
 
