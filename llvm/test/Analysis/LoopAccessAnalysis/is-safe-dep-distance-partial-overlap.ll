@@ -9,12 +9,16 @@ target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 ; i32 accesses with a 4-byte stride and MaxBTC = 15, so MaxBTC * 4 = 60. The
 ; distance of 61 bytes is larger than 60, but the store in iteration 0 writes
 ; bytes [61, 65), which overlaps the load in iteration 15 reading [60, 64).
-; FIXME: The accesses are incorrectly reported as independent.
 define void @partial_overlap_pos_dist(ptr %A) {
 ; CHECK-LABEL: 'partial_overlap_pos_dist'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Backward loop carried data dependence that prevents store-to-load forwarding.
 ; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        BackwardVectorizableButPreventsForwarding:
+; CHECK-NEXT:            %l = load i32, ptr %gep.ld.iv, align 1 ->
+; CHECK-NEXT:            store i32 %l, ptr %gep.st.iv, align 1
+; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-EMPTY:
@@ -78,12 +82,15 @@ exit:
 ; As @partial_overlap_pos_dist, but with a distance of -61 bytes: the load in
 ; iteration 0 reads [61, 65), which overlaps the store in iteration 15 writing
 ; [60, 64).
-; FIXME: The accesses are incorrectly reported as independent.
 define void @partial_overlap_neg_dist(ptr %A) {
 ; CHECK-LABEL: 'partial_overlap_neg_dist'
 ; CHECK-NEXT:    loop:
 ; CHECK-NEXT:      Memory dependences are safe
 ; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Forward:
+; CHECK-NEXT:            %l = load i32, ptr %gep.ld.iv, align 1 ->
+; CHECK-NEXT:            store i32 %l, ptr %gep.st.iv, align 1
+; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-EMPTY:
