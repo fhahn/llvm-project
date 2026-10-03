@@ -1734,8 +1734,9 @@ public:
                        const MemoryDepChecker &DepChecker);
 
   /// Goes over all memory accesses, checks whether a RT check is needed
-  /// and builds sets of dependent accesses.
-  void buildDependenceSets();
+  /// and builds sets of dependent accesses. \p DepChecker is used to find
+  /// pointers accessed by multiple stores.
+  void buildDependenceSets(const MemoryDepChecker &DepChecker);
 
   /// Initial processing of memory accesses determined that we need to
   /// perform dependency checking.
@@ -2420,7 +2421,7 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
   return CanDoRTIfNeeded;
 }
 
-void AccessAnalysis::buildDependenceSets() {
+void AccessAnalysis::buildDependenceSets(const MemoryDepChecker &DepChecker) {
   // We process the set twice: first we process read-write pointers, last we
   // process read-only pointers. This allows us to skip dependence tests for
   // read-only pointers.
@@ -2502,7 +2503,23 @@ void AccessAnalysis::buildDependenceSets() {
           // this is a read only check other writes for conflicts (but only if
           // there is no other write to the ptr - this is an optimization to
           // catch "a[i] = a[i] + " without having to do a dependence check).
-          if ((IsWrite || IsReadOnlyPtr) && AliasSetHasWrite) {
+          // Multiple stores through the same pointer may write the same
+          // location in different iterations, so they also need to be checked
+          // against each other if there is no other write. Stores with a
+          // loop-invariant pointer operand are handled separately via
+          // StoresToInvariantAddresses.
+          ArrayRef<unsigned> StoreIdxs =
+              DepChecker.getOrderForAccess(Ptr, true);
+          bool HasMultipleStores =
+              IsWrite && StoreIdxs.size() > 1 &&
+              any_of(StoreIdxs, [&](unsigned Idx) {
+                Value *StorePtr = getLoadStorePointerOperand(
+                    DepChecker.getMemoryInstructions()[Idx]);
+                ScalarEvolution *SE = PSE.getSE();
+                return !SE->isLoopInvariant(SE->getSCEV(StorePtr), TheLoop);
+              });
+          if (((IsWrite || IsReadOnlyPtr) && AliasSetHasWrite) ||
+              HasMultipleStores) {
             CheckDeps.push_back(Access);
             IsRTCheckAnalysisNeeded = true;
           }
@@ -3501,7 +3518,6 @@ bool LoopAccessInfo::analyzeLoop(AAResults *AA, const LoopInfo *LI,
 
   // Holds all the different accesses in the loop.
   unsigned NumReads = 0;
-  unsigned NumReadWrites = 0;
 
   bool HasComplexMemInst = false;
 
@@ -3659,8 +3675,6 @@ bool LoopAccessInfo::analyzeLoop(AAResults *AA, const LoopInfo *LI,
     // list. At this phase it is only a 'write' list.
     Type *AccessTy = getLoadStoreType(ST);
     if (Seen.insert({Ptr, AccessTy}).second) {
-      ++NumReadWrites;
-
       MemoryLocation Loc = MemoryLocation::get(ST);
       // The TBAA metadata could have a control dependency on the predication
       // condition, so we cannot rely on it when determining whether or not we
@@ -3728,17 +3742,17 @@ bool LoopAccessInfo::analyzeLoop(AAResults *AA, const LoopInfo *LI,
                   });
   }
 
-  // If we write (or read-write) to a single destination and there are no other
-  // reads in this loop then is it safe to vectorize: the vectorized stores
-  // preserve ordering via replication or order-preserving @llvm.masked.scatter.
-  if (NumReadWrites == 1 && NumReads == 0) {
+  // If there is a single store and there are no other reads in this loop then
+  // it is safe to vectorize: the vectorized store preserves ordering via
+  // replication or order-preserving @llvm.masked.scatter.
+  if (Stores.size() == 1 && NumReads == 0) {
     LLVM_DEBUG(dbgs() << "LAA: Found a write-only loop!\n");
     return true;
   }
 
   // Build dependence sets and check whether we need a runtime pointer bounds
   // check.
-  Accesses.buildDependenceSets();
+  Accesses.buildDependenceSets(*DepChecker);
 
   // Find pointers with computable bounds. We are going to use this information
   // to place a runtime bound check.
