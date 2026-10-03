@@ -2857,11 +2857,17 @@ void MemoryDepChecker::mergeInStatus(VectorizationSafetyStatus S) {
 ///       out[i+D] =
 ///     }
 static bool isSafeDependenceDistance(ScalarEvolution &SE, const SCEV &MaxBTC,
-                                     const SCEV &Dist, uint64_t MaxStride) {
+                                    const SCEV &Dist, uint64_t MaxStride,
+                                    uint64_t TypeByteSize) {
+  assert(TypeByteSize > 0 && "The type size in bytes must be non-zero");
+
   // If we can prove that
-  //      (**) |Dist| > MaxBTC * Step
-  // where Step is the absolute stride of the memory accesses in bytes,
-  // then there is no dependence.
+  //      (**) |Dist| >= MaxBTC * Step + TypeByteSize
+  // where Step is the absolute stride of the memory accesses in bytes and
+  // TypeByteSize is at least the store size of both accesses, then there is no
+  // dependence: both accesses move in the same direction by at most Step bytes
+  // per iteration, so their start addresses in any two iterations differ by at
+  // least TypeByteSize bytes and the accessed bytes cannot overlap.
   //
   // Rationale:
   // We basically want to check if the absolute distance (|Dist/Step|)
@@ -2880,25 +2886,29 @@ static bool isSafeDependenceDistance(ScalarEvolution &SE, const SCEV &MaxBTC,
   // and the product does not wrap in a narrow backedge-taken count type
   // (e.g. i8). MaxBTC is a non-negative iteration count, so zero-extend it;
   // the distance may be negative, so sign-extend it.
-  // FIXME: The checks below can still wrap if MaxBTC * MaxStride does not fit
-  // in WideTy with two bits to spare, e.g. for an unbounded i64 MaxBTC.
+  // TypeByteSize is at most the byte stride of one of the accesses, so
+  // MaxBTC * Step + TypeByteSize <= (MaxBTC + 1) * Step.
+  // FIXME: The checks below can still wrap if (MaxBTC + 1) * MaxStride does not
+  // fit in WideTy with two bits to spare, e.g. for an unbounded i64 MaxBTC.
   Type *WideTy = SE.getWiderType(Dist.getType(), MaxBTC.getType());
   const SCEV *Step = SE.getConstant(WideTy, MaxStride);
   const SCEV *Product =
       SE.getMulExpr(SE.getNoopOrZeroExtend(&MaxBTC, WideTy), Step);
   const SCEV *CastedDist = SE.getNoopOrSignExtend(&Dist, WideTy);
+  const SCEV *Bound =
+      SE.getAddExpr(Product, SE.getConstant(WideTy, TypeByteSize));
 
-  // Is  Dist - (MaxBTC * Step) > 0 ?
+  // Is  Dist - (MaxBTC * Step + TypeByteSize) >= 0 ?
   // (If so, then we have proven (**) because |Dist| >= Dist)
-  const SCEV *Minus = SE.getMinusSCEV(CastedDist, Product);
-  if (SE.isKnownPositive(Minus))
+  const SCEV *Minus = SE.getMinusSCEV(CastedDist, Bound);
+  if (SE.isKnownNonNegative(Minus))
     return true;
 
-  // Second try: Is  -Dist - (MaxBTC * Step) > 0 ?
+  // Second try: Is  -Dist - (MaxBTC * Step + TypeByteSize) >= 0 ?
   // (If so, then we have proven (**) because |Dist| >= -1*Dist)
   const SCEV *NegDist = SE.getNegativeSCEV(CastedDist);
-  Minus = SE.getMinusSCEV(NegDist, Product);
-  return SE.isKnownPositive(Minus);
+  Minus = SE.getMinusSCEV(NegDist, Bound);
+  return SE.isKnownNonNegative(Minus);
 }
 
 /// Check the dependence for two accesses with the same stride \p Stride.
@@ -3123,11 +3133,11 @@ MemoryDepChecker::isDependent(const MemAccessInfo &A, unsigned AIdx,
   ScalarEvolution &SE = *PSE.getSE();
   auto &DL = InnermostLoop->getHeader()->getDataLayout();
 
-  // If the distance between accesses exceeds their maximum absolute stride
-  // times the maximum backedge-taken count, they are independent.
+  // If the distance between accesses is at least their maximum absolute stride
+  // times the maximum backedge-taken count plus their size, they are independent.
   if (HasSameSize &&
       isSafeDependenceDistance(SE, *PSE.getSymbolicMaxBackedgeTakenCount(), *Dist,
-                               MaxStride))
+                               MaxStride, TypeByteSize))
     return Dependence::NoDep;
 
   const APInt *APDist = nullptr;
