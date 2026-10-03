@@ -212,13 +212,21 @@ define void @two_stores_same_bounded(ptr %a, i32 %x, i32 %y) {
 ; CHECK-NEXT:    loop:
 ; CHECK-NEXT:      Memory dependences are safe
 ; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Forward:
+; CHECK-NEXT:            store i32 %x, ptr %gep, align 4 ->
+; CHECK-NEXT:            store i32 %y, ptr %gep, align 4
+; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
+; CHECK-NEXT:      {0,+,1}<%loop> Added Flags: <nusw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Expressions re-written:
+; CHECK-NEXT:      [PSE] %gep = getelementptr inbounds i32, ptr %a, i64 %idx:
+; CHECK-NEXT:        ((4 * (zext i3 {0,+,1}<%loop> to i64))<nuw><nsw> + %a)<nuw>
+; CHECK-NEXT:        --> {%a,+,4}<nw><%loop>
 ;
 entry:
   br label %loop

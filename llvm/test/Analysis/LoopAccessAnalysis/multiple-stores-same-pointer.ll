@@ -12,8 +12,13 @@ target datalayout = "e-m:o-i64:64-i128:128-n32:64-S128"
 define void @stores_indirect_different_blocks(ptr noalias %p, ptr noalias %idx, ptr noalias %c, i64 %n) {
 ; CHECK-LABEL: 'stores_indirect_different_blocks'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unsafe indirect dependence.
 ; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        IndirectUnsafe:
+; CHECK-NEXT:            store i32 2, ptr %gep.p, align 4 ->
+; CHECK-NEXT:            store i32 1, ptr %gep.p, align 4
+; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-EMPTY:
@@ -58,8 +63,13 @@ exit:
 define void @stores_byte_stride_different_blocks(ptr noalias %p, ptr noalias %c, i64 %n) {
 ; CHECK-LABEL: 'stores_byte_stride_different_blocks'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unsafe indirect dependence.
 ; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        IndirectUnsafe:
+; CHECK-NEXT:            store i32 33686018, ptr %gep.p, align 1 ->
+; CHECK-NEXT:            store i32 16843009, ptr %gep.p, align 1
+; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-EMPTY:
@@ -100,8 +110,13 @@ exit:
 define void @stores_byte_stride_different_blocks_no_loads(ptr %p, i64 %n) {
 ; CHECK-LABEL: 'stores_byte_stride_different_blocks_no_loads'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unsafe indirect dependence.
 ; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        IndirectUnsafe:
+; CHECK-NEXT:            store i32 33686018, ptr %gep.p, align 1 ->
+; CHECK-NEXT:            store i32 16843009, ptr %gep.p, align 1
+; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-EMPTY:
@@ -176,6 +191,10 @@ define void @stores_unit_stride_different_blocks(ptr noalias %p, ptr noalias %c,
 ; CHECK-NEXT:    loop:
 ; CHECK-NEXT:      Memory dependences are safe
 ; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Forward:
+; CHECK-NEXT:            store i32 2, ptr %gep.p, align 4 ->
+; CHECK-NEXT:            store i32 1, ptr %gep.p, align 4
+; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-EMPTY:
@@ -218,6 +237,10 @@ define void @stores_unit_stride_different_blocks_no_loads(ptr %p, i64 %n) {
 ; CHECK-NEXT:    loop:
 ; CHECK-NEXT:      Memory dependences are safe
 ; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Forward:
+; CHECK-NEXT:            store i32 2, ptr %gep.p, align 4 ->
+; CHECK-NEXT:            store i32 1, ptr %gep.p, align 4
+; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-EMPTY:
@@ -258,8 +281,13 @@ exit:
 define void @stores_invariant_address_direct_and_through_phi(ptr %a, ptr %b, ptr noalias %c, i64 %n) {
 ; CHECK-LABEL: 'stores_invariant_address_direct_and_through_phi'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unsafe dependence on loop-invariant address.
 ; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        InvariantUnsafe:
+; CHECK-NEXT:            store i32 1, ptr %a, align 4 ->
+; CHECK-NEXT:            store i32 2, ptr %p, align 4
+; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Check 0:
 ; CHECK-NEXT:        Comparing group GRP0:
@@ -274,7 +302,7 @@ define void @stores_invariant_address_direct_and_through_phi(ptr %a, ptr %b, ptr
 ; CHECK-NEXT:          (Low: %b High: (4 + %b))
 ; CHECK-NEXT:            Member: %b
 ; CHECK-EMPTY:
-; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      Non vectorizable stores to invariant address were found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Expressions re-written:
