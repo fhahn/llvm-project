@@ -23,20 +23,14 @@ define void @bounded_offset_reads(ptr %a, ptr %b, i64 %n, i64 %o) {
 ; CHECK-NEXT:          %gb = getelementptr inbounds i32, ptr %b, i64 %iv
 ; CHECK-NEXT:        Against group GRP1:
 ; CHECK-NEXT:          %ga1 = getelementptr inbounds i32, ptr %a, i64 %io
-; CHECK-NEXT:      Check 1:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gb = getelementptr inbounds i32, ptr %b, i64 %iv
-; CHECK-NEXT:        Against group GRP2:
 ; CHECK-NEXT:          %ga0 = getelementptr inbounds i32, ptr %a, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
 ; CHECK-NEXT:          (Low: %b High: ((4 * %n) + %b))
 ; CHECK-NEXT:            Member: {%b,+,4}<nuw><%loop>
 ; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: ((4 * %o) + %a) High: ((4 * %n) + (4 * %o) + %a))
+; CHECK-NEXT:          (Low: %a High: ((4 * %n) + (4 * %o) + %a))
 ; CHECK-NEXT:            Member: {((4 * %o) + %a),+,4}<%loop>
-; CHECK-NEXT:        Group GRP2:
-; CHECK-NEXT:          (Low: %a High: ((4 * %n) + %a))
 ; CHECK-NEXT:            Member: {%a,+,4}<nuw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.

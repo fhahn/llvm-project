@@ -22,10 +22,8 @@ define void @interleave_distance_constant_via_guard(ptr %A, i32 %n, i32 %k) {
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %A High: (4 + (8 * (zext i32 (-1 + %n) to i64))<nuw><nsw> + %A))
+; CHECK-NEXT:          (Low: %A High: (4 + (4 * (zext i32 %k to i64))<nuw><nsw> + (8 * (zext i32 (-1 + %n) to i64))<nuw><nsw> + %A))
 ; CHECK-NEXT:            Member: {%A,+,8}<nuw><%loop>
-; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: ((4 * (zext i32 %k to i64))<nuw><nsw> + %A) High: (4 + (4 * (zext i32 %k to i64))<nuw><nsw> + (8 * (zext i32 (-1 + %n) to i64))<nuw><nsw> + %A))
 ; CHECK-NEXT:            Member: {((4 * (zext i32 %k to i64))<nuw><nsw> + %A),+,8}<nw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
@@ -83,10 +81,8 @@ define void @backward_distance_constant_via_guard(ptr %A, i32 %n, i32 %k) {
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %A High: (4 + (4 * (zext i32 (-1 + %n) to i64))<nuw><nsw> + %A))
+; CHECK-NEXT:          (Low: %A High: (4 + (4 * (zext i32 (-1 + %n) to i64))<nuw><nsw> + (4 * (zext i32 %k to i64))<nuw><nsw> + %A))
 ; CHECK-NEXT:            Member: {%A,+,4}<nuw><%loop>
-; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: ((4 * (zext i32 %k to i64))<nuw><nsw> + %A) High: (4 + (4 * (zext i32 (-1 + %n) to i64))<nuw><nsw> + (4 * (zext i32 %k to i64))<nuw><nsw> + %A))
 ; CHECK-NEXT:            Member: {((4 * (zext i32 %k to i64))<nuw><nsw> + %A),+,4}<nw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
@@ -143,10 +139,8 @@ define void @backward_distance_constant_via_guard_too_small(ptr %A, i32 %n, i32 
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %A High: (4 + (4 * (zext i32 (-1 + %n) to i64))<nuw><nsw> + %A))
+; CHECK-NEXT:          (Low: %A High: (4 + (4 * (zext i32 (-1 + %n) to i64))<nuw><nsw> + (4 * (zext i32 %k to i64))<nuw><nsw> + %A))
 ; CHECK-NEXT:            Member: {%A,+,4}<nuw><%loop>
-; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: ((4 * (zext i32 %k to i64))<nuw><nsw> + %A) High: (4 + (4 * (zext i32 (-1 + %n) to i64))<nuw><nsw> + (4 * (zext i32 %k to i64))<nuw><nsw> + %A))
 ; CHECK-NEXT:            Member: {((4 * (zext i32 %k to i64))<nuw><nsw> + %A),+,4}<nw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.

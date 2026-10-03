@@ -724,14 +724,28 @@ bool RuntimePointerChecking::needsChecking(
   return false;
 }
 
-/// Compare \p I and \p J and return the minimum.
+/// Compare \p I and \p J and return the minimum. If their difference is not
+/// constant, try to determine its sign using the loop guards of \p L.
 /// Return nullptr in case we couldn't find an answer.
-static const SCEV *getMinFromExprs(const SCEV *I, const SCEV *J,
-                                   ScalarEvolution *SE) {
+static const SCEV *
+getMinFromExprs(const SCEV *I, const SCEV *J, ScalarEvolution *SE,
+                const Loop *L,
+                std::optional<ScalarEvolution::LoopGuards> &LoopGuards) {
   std::optional<APInt> Diff = SE->computeConstantDifference(J, I);
-  if (!Diff)
+  if (Diff)
+    return Diff->isNegative() ? J : I;
+
+  const SCEV *SymDiff = SE->getMinusSCEV(J, I);
+  if (isa<SCEVCouldNotCompute>(SymDiff))
     return nullptr;
-  return Diff->isNegative() ? J : I;
+  if (!LoopGuards)
+    LoopGuards.emplace(ScalarEvolution::LoopGuards::collect(L, *SE));
+  SymDiff = SE->applyLoopGuards(SymDiff, *LoopGuards);
+  if (SE->isKnownNonNegative(SymDiff))
+    return I;
+  if (SE->isKnownNonNegative(SE->getNegativeSCEV(SymDiff)))
+    return J;
+  return nullptr;
 }
 
 /// Returns true if the bounds of \p P and \p Q do not wrap around the address
@@ -756,7 +770,7 @@ haveNonWrappingDistance(const RuntimePointerChecking::PointerInfo &P,
 
 bool RuntimeCheckingPtrGroup::addPointer(
     unsigned Index, const RuntimePointerChecking &RtCheck) {
-  // addPointer orders bounds by the sign of their constant difference. This
+  // The bounds are ordered below by the sign of their difference. This
   // matches the unsigned order used by the runtime checks only if the bounds
   // do not wrap around the address space relative to each other. Otherwise,
   // e.g. for a conditional access at a large negative offset, the group's Low
@@ -764,47 +778,40 @@ bool RuntimeCheckingPtrGroup::addPointer(
   // add pointers that do not wrap relative to any member, or that have the
   // group's bounds and thus are covered by them.
   const RuntimePointerChecking::PointerInfo &Ptr = RtCheck.Pointers[Index];
+  const Loop *L = RtCheck.DC.getInnermostLoop();
   if ((Ptr.Start != Low || Ptr.End != High) &&
       !all_of(Members, [&](unsigned M) {
-        return haveNonWrappingDistance(Ptr, RtCheck.Pointers[M],
-                                       RtCheck.DC.getInnermostLoop(),
+        return haveNonWrappingDistance(Ptr, RtCheck.Pointers[M], L,
                                        *RtCheck.SE);
       }))
     return false;
-  return addPointer(
-      Index, RtCheck.Pointers[Index].Start, RtCheck.Pointers[Index].End,
-      RtCheck.Pointers[Index].PointerValue->getType()->getPointerAddressSpace(),
-      RtCheck.Pointers[Index].NeedsFreeze, *RtCheck.SE);
-}
-
-bool RuntimeCheckingPtrGroup::addPointer(unsigned Index, const SCEV *Start,
-                                         const SCEV *End, unsigned AS,
-                                         bool NeedsFreeze,
-                                         ScalarEvolution &SE) {
-  assert(AddressSpace == AS &&
+  assert(AddressSpace ==
+             Ptr.PointerValue->getType()->getPointerAddressSpace() &&
          "all pointers in a checking group must be in the same address space");
 
   // Compare the starts and ends with the known minimum and maximum
   // of this set. We need to know how we compare against the min/max
   // of the set in order to be able to emit memchecks.
-  const SCEV *Min0 = getMinFromExprs(Start, Low, &SE);
+  const SCEV *Min0 =
+      getMinFromExprs(Ptr.Start, Low, RtCheck.SE, L, RtCheck.LoopGuards);
   if (!Min0)
     return false;
 
-  const SCEV *Min1 = getMinFromExprs(End, High, &SE);
+  const SCEV *Min1 =
+      getMinFromExprs(Ptr.End, High, RtCheck.SE, L, RtCheck.LoopGuards);
   if (!Min1)
     return false;
 
   // Update the low bound  expression if we've found a new min value.
-  if (Min0 == Start)
-    Low = Start;
+  if (Min0 == Ptr.Start)
+    Low = Ptr.Start;
 
   // Update the high bound expression if we've found a new max value.
-  if (Min1 != End)
-    High = End;
+  if (Min1 != Ptr.End)
+    High = Ptr.End;
 
   Members.push_back(Index);
-  this->NeedsFreeze |= NeedsFreeze;
+  NeedsFreeze |= Ptr.NeedsFreeze;
   return true;
 }
 
@@ -823,9 +830,9 @@ void RuntimePointerChecking::groupChecks(
   // We use the following (greedy) algorithm to construct the groups
   // For every pointer in the equivalence class:
   //   For each existing group:
-  //   - if the difference between this pointer and the min/max bounds
-  //     of the group is a constant, then make the pointer part of the
-  //     group and update the min/max bounds of that group as required.
+  //   - if this pointer can be ordered against the min/max bounds of the
+  //     group, then make the pointer part of the group and update the
+  //     min/max bounds of that group as required.
 
   CheckingGroups.clear();
 
@@ -1330,11 +1337,11 @@ void RuntimePointerChecking::mergeStencilGroups() {
   if (CheckingGroups.size() < 2)
     return;
 
-  // groupChecks merges two pointers only when their bounds differ by a
-  // compile-time constant, because only then it can tell which bound is
-  // lower or higher. A stencil kernel reads one object at several
-  // loop-invariant offsets, so its bounds differ by expressions like
-  // -40 - 40*s1, and every such pointer stays in its own group - often
+  // groupChecks merges two pointers only when it can tell which of their
+  // bounds is lower or higher at compile time. A stencil kernel reads one
+  // object at several loop-invariant offsets, so its bounds differ by
+  // expressions like -40 - 40*s1, and every such pointer stays in its own
+  // group if the sign of s1 is unknown - often
   // too many checks. Here we merge those groups anyway: what we cannot
   // compare at compile time we compare at runtime, with a umin/umax over
   // the few members that can be lowest or highest. The cost: the merged

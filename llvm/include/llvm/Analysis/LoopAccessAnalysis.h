@@ -510,8 +510,6 @@ struct RuntimeCheckingPtrGroup {
   /// of success, false otherwise.
   LLVM_ABI bool addPointer(unsigned Index,
                            const RuntimePointerChecking &RtCheck);
-  LLVM_ABI bool addPointer(unsigned Index, const SCEV *Start, const SCEV *End,
-                           unsigned AS, bool NeedsFreeze, ScalarEvolution &SE);
 
   /// The SCEV expression which represents the upper bound of all the
   /// pointers in this group.
