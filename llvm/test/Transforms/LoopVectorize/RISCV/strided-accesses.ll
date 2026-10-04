@@ -1947,7 +1947,7 @@ define void @lshr_exact_stride_nonconstant(ptr noalias %in, ptr noalias %out, i6
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 4 x i64> poison, i64 [[SHIFT]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 4 x i64> [[BROADCAST_SPLATINSERT]], <vscale x 4 x i64> poison, <vscale x 4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP0:%.*]] = call <vscale x 4 x i64> @llvm.stepvector.nxv4i64()
-; CHECK-NEXT:    [[TMP1:%.*]] = mul nuw <vscale x 4 x i64> [[TMP0]], splat (i64 4)
+; CHECK-NEXT:    [[TMP1:%.*]] = shl nuw <vscale x 4 x i64> [[TMP0]], splat (i64 2)
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[CURRENT_ITERATION_NEXT:%.*]], %[[VECTOR_BODY]] ]
@@ -1993,7 +1993,7 @@ define void @lshr_exact_stride_nonconstant(ptr noalias %in, ptr noalias %out, i6
 ; CHECK-UF2-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <vscale x 4 x i64> poison, i64 [[SHIFT]], i64 0
 ; CHECK-UF2-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <vscale x 4 x i64> [[BROADCAST_SPLATINSERT1]], <vscale x 4 x i64> poison, <vscale x 4 x i32> zeroinitializer
 ; CHECK-UF2-NEXT:    [[TMP6:%.*]] = call <vscale x 4 x i64> @llvm.stepvector.nxv4i64()
-; CHECK-UF2-NEXT:    [[TMP7:%.*]] = mul nuw <vscale x 4 x i64> [[TMP6]], splat (i64 4)
+; CHECK-UF2-NEXT:    [[TMP7:%.*]] = shl nuw <vscale x 4 x i64> [[TMP6]], splat (i64 2)
 ; CHECK-UF2-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK-UF2:       [[VECTOR_BODY]]:
 ; CHECK-UF2-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]

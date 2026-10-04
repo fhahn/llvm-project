@@ -4009,10 +4009,10 @@ define void @test_rewrite_iv_scevs(i32 %start, ptr %dst) {
 ; COMPARE-NO-MV:       [[VECTOR_PH]]:
 ; COMPARE-NO-MV-NEXT:    [[TMP1:%.*]] = and i64 [[TMP0]], 3
 ; COMPARE-NO-MV-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[TMP1]]
-; COMPARE-NO-MV-NEXT:    [[TMP2:%.*]] = add i64 [[START_EXT]], [[N_VEC]]
-; COMPARE-NO-MV-NEXT:    [[TMP3:%.*]] = mul i64 [[N_VEC]], [[START_EXT]]
 ; COMPARE-NO-MV-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[START_EXT]], i64 0
 ; COMPARE-NO-MV-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT]], <4 x i64> poison, <4 x i32> zeroinitializer
+; COMPARE-NO-MV-NEXT:    [[TMP2:%.*]] = add i64 [[START_EXT]], [[N_VEC]]
+; COMPARE-NO-MV-NEXT:    [[TMP3:%.*]] = mul i64 [[N_VEC]], [[START_EXT]]
 ; COMPARE-NO-MV-NEXT:    [[TMP4:%.*]] = mul <4 x i64> <i64 0, i64 1, i64 2, i64 3>, [[BROADCAST_SPLAT]]
 ; COMPARE-NO-MV-NEXT:    [[TMP5:%.*]] = shl i64 [[START_EXT]], 2
 ; COMPARE-NO-MV-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x i64> poison, i64 [[TMP5]], i64 0

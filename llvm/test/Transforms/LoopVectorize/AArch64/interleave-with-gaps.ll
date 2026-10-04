@@ -294,7 +294,7 @@ define void @main_vector_loop_fixed_single_vector_iteration_with_runtime_checks(
 ; CHECK-TF-NEXT:    [[TMP1:%.*]] = shl nuw i64 [[TMP0]], 3
 ; CHECK-TF-NEXT:    [[ACTIVE_LANE_MASK_ENTRY:%.*]] = call <vscale x 8 x i1> @llvm.get.active.lane.mask.nxv8i1.i64(i64 0, i64 8)
 ; CHECK-TF-NEXT:    [[TMP2:%.*]] = call <vscale x 8 x i64> @llvm.stepvector.nxv8i64()
-; CHECK-TF-NEXT:    [[TMP3:%.*]] = mul <vscale x 8 x i64> [[TMP2]], splat (i64 2)
+; CHECK-TF-NEXT:    [[TMP3:%.*]] = shl <vscale x 8 x i64> [[TMP2]], splat (i64 1)
 ; CHECK-TF-NEXT:    [[TMP4:%.*]] = shl i64 [[TMP1]], 1
 ; CHECK-TF-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 8 x i64> poison, i64 [[TMP4]], i64 0
 ; CHECK-TF-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 8 x i64> [[BROADCAST_SPLATINSERT]], <vscale x 8 x i64> poison, <vscale x 8 x i32> zeroinitializer

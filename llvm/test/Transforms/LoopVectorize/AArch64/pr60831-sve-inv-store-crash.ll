@@ -115,10 +115,10 @@ define void @test_invar_gep_var_start(i64 %start, ptr %dst) #0 {
 ; CHECK:       vector.ph:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[TMP0]], [[TMP2]]
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[N_MOD_VF]]
-; CHECK-NEXT:    [[TMP5:%.*]] = add i64 [[START]], [[N_VEC]]
-; CHECK-NEXT:    [[TMP6:%.*]] = call <vscale x 4 x i64> @llvm.stepvector.nxv4i64()
 ; CHECK-NEXT:    [[DOTSPLATINSERT:%.*]] = insertelement <vscale x 4 x i64> poison, i64 [[START]], i64 0
 ; CHECK-NEXT:    [[DOTSPLAT:%.*]] = shufflevector <vscale x 4 x i64> [[DOTSPLATINSERT]], <vscale x 4 x i64> poison, <vscale x 4 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP5:%.*]] = add i64 [[START]], [[N_VEC]]
+; CHECK-NEXT:    [[TMP6:%.*]] = call <vscale x 4 x i64> @llvm.stepvector.nxv4i64()
 ; CHECK-NEXT:    [[INDUCTION:%.*]] = add nsw <vscale x 4 x i64> [[DOTSPLAT]], [[TMP6]]
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <vscale x 4 x i64> poison, i64 [[TMP2]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <vscale x 4 x i64> [[BROADCAST_SPLATINSERT1]], <vscale x 4 x i64> poison, <vscale x 4 x i32> zeroinitializer
@@ -164,10 +164,10 @@ define void @test_invar_gep_var_start(i64 %start, ptr %dst) #0 {
 ; IC2-NEXT:    [[TMP9:%.*]] = shufflevector <vscale x 4 x i64> [[BROADCAST_SPLATINSERT]], <vscale x 4 x i64> poison, <vscale x 4 x i32> zeroinitializer
 ; IC2-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[TMP0]], [[TMP2]]
 ; IC2-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[N_MOD_VF]]
-; IC2-NEXT:    [[TMP6:%.*]] = add i64 [[START]], [[N_VEC]]
-; IC2-NEXT:    [[BROADCAST_SPLAT:%.*]] = call <vscale x 4 x i64> @llvm.stepvector.nxv4i64()
 ; IC2-NEXT:    [[DOTSPLATINSERT1:%.*]] = insertelement <vscale x 4 x i64> poison, i64 [[START]], i64 0
 ; IC2-NEXT:    [[VEC_IND:%.*]] = shufflevector <vscale x 4 x i64> [[DOTSPLATINSERT1]], <vscale x 4 x i64> poison, <vscale x 4 x i32> zeroinitializer
+; IC2-NEXT:    [[TMP6:%.*]] = add i64 [[START]], [[N_VEC]]
+; IC2-NEXT:    [[BROADCAST_SPLAT:%.*]] = call <vscale x 4 x i64> @llvm.stepvector.nxv4i64()
 ; IC2-NEXT:    [[INDUCTION:%.*]] = add nsw <vscale x 4 x i64> [[VEC_IND]], [[BROADCAST_SPLAT]]
 ; IC2-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; IC2:       vector.body:
@@ -227,12 +227,12 @@ define void @test_invar_gep_var_start_step_2(i64 %start, ptr %dst) #0 {
 ; CHECK:       vector.ph:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[TMP2]], [[TMP4]]
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP2]], [[N_MOD_VF]]
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 4 x i64> poison, i64 [[START]], i64 0
+; CHECK-NEXT:    [[DOTSPLAT:%.*]] = shufflevector <vscale x 4 x i64> [[BROADCAST_SPLATINSERT]], <vscale x 4 x i64> poison, <vscale x 4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP9:%.*]] = shl i64 [[N_VEC]], 1
 ; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i64 [[START]], [[TMP9]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = call <vscale x 4 x i64> @llvm.stepvector.nxv4i64()
-; CHECK-NEXT:    [[DOTSPLATINSERT:%.*]] = insertelement <vscale x 4 x i64> poison, i64 [[START]], i64 0
-; CHECK-NEXT:    [[DOTSPLAT:%.*]] = shufflevector <vscale x 4 x i64> [[DOTSPLATINSERT]], <vscale x 4 x i64> poison, <vscale x 4 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP18:%.*]] = mul nsw <vscale x 4 x i64> [[TMP10]], splat (i64 2)
+; CHECK-NEXT:    [[TMP18:%.*]] = shl nsw <vscale x 4 x i64> [[TMP10]], splat (i64 1)
 ; CHECK-NEXT:    [[INDUCTION:%.*]] = add nsw <vscale x 4 x i64> [[DOTSPLAT]], [[TMP18]]
 ; CHECK-NEXT:    [[TMP11:%.*]] = shl nsw i64 [[TMP4]], 1
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <vscale x 4 x i64> poison, i64 [[TMP11]], i64 0
@@ -281,13 +281,13 @@ define void @test_invar_gep_var_start_step_2(i64 %start, ptr %dst) #0 {
 ; IC2-NEXT:    [[BROADCAST_SPLAT1:%.*]] = shufflevector <vscale x 4 x i64> [[BROADCAST_SPLATINSERT]], <vscale x 4 x i64> poison, <vscale x 4 x i32> zeroinitializer
 ; IC2-NEXT:    [[N_MOD_VF:%.*]] = urem i64 [[TMP2]], [[TMP4]]
 ; IC2-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP2]], [[N_MOD_VF]]
+; IC2-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <vscale x 4 x i64> poison, i64 [[START]], i64 0
+; IC2-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 4 x i64> [[BROADCAST_SPLATINSERT1]], <vscale x 4 x i64> poison, <vscale x 4 x i32> zeroinitializer
 ; IC2-NEXT:    [[TMP10:%.*]] = shl i64 [[N_VEC]], 1
 ; IC2-NEXT:    [[OFFSET_IDX:%.*]] = add i64 [[START]], [[TMP10]]
 ; IC2-NEXT:    [[TMP13:%.*]] = shl <vscale x 4 x i64> [[BROADCAST_SPLAT1]], splat (i64 1)
 ; IC2-NEXT:    [[TMP11:%.*]] = call <vscale x 4 x i64> @llvm.stepvector.nxv4i64()
-; IC2-NEXT:    [[DOTSPLATINSERT1:%.*]] = insertelement <vscale x 4 x i64> poison, i64 [[START]], i64 0
-; IC2-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 4 x i64> [[DOTSPLATINSERT1]], <vscale x 4 x i64> poison, <vscale x 4 x i32> zeroinitializer
-; IC2-NEXT:    [[TMP12:%.*]] = mul nsw <vscale x 4 x i64> [[TMP11]], splat (i64 2)
+; IC2-NEXT:    [[TMP12:%.*]] = shl nsw <vscale x 4 x i64> [[TMP11]], splat (i64 1)
 ; IC2-NEXT:    [[INDUCTION:%.*]] = add nsw <vscale x 4 x i64> [[BROADCAST_SPLAT]], [[TMP12]]
 ; IC2-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; IC2:       vector.body:

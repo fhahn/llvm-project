@@ -66,10 +66,10 @@ define void @doit1(i32 %n, i32 %step) {
 ; CHECK:       vector.ph:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[WIDE_TRIP_COUNT]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[WIDE_TRIP_COUNT]], [[N_MOD_VF]]
-; CHECK-NEXT:    [[DOTCAST:%.*]] = trunc i64 [[N_VEC]] to i32
-; CHECK-NEXT:    [[IND_END:%.*]] = mul i32 [[DOTCAST]], [[STEP]]
 ; CHECK-NEXT:    [[DOTSPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[STEP]], i64 0
 ; CHECK-NEXT:    [[DOTSPLAT:%.*]] = shufflevector <4 x i32> [[DOTSPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP21:%.*]] = trunc i64 [[N_VEC]] to i32
+; CHECK-NEXT:    [[IND_END:%.*]] = mul i32 [[TMP21]], [[STEP]]
 ; CHECK-NEXT:    [[TMP19:%.*]] = mul <4 x i32> <i32 0, i32 1, i32 2, i32 3>, [[DOTSPLAT]]
 ; CHECK-NEXT:    [[TMP18:%.*]] = shl i32 [[STEP]], 2
 ; CHECK-NEXT:    [[DOTSPLATINSERT2:%.*]] = insertelement <4 x i32> poison, i32 [[TMP18]], i64 0
@@ -185,10 +185,10 @@ define void @doit2(i32 %n, i32 %step)  {
 ; CHECK:       vector.ph:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[WIDE_TRIP_COUNT]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[WIDE_TRIP_COUNT]], [[N_MOD_VF]]
-; CHECK-NEXT:    [[DOTCAST:%.*]] = trunc i64 [[N_VEC]] to i32
-; CHECK-NEXT:    [[IND_END:%.*]] = mul i32 [[DOTCAST]], [[STEP]]
 ; CHECK-NEXT:    [[DOTSPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[STEP]], i64 0
 ; CHECK-NEXT:    [[DOTSPLAT:%.*]] = shufflevector <4 x i32> [[DOTSPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP20:%.*]] = trunc i64 [[N_VEC]] to i32
+; CHECK-NEXT:    [[IND_END:%.*]] = mul i32 [[TMP20]], [[STEP]]
 ; CHECK-NEXT:    [[TMP18:%.*]] = mul <4 x i32> <i32 0, i32 1, i32 2, i32 3>, [[DOTSPLAT]]
 ; CHECK-NEXT:    [[TMP17:%.*]] = shl i32 [[STEP]], 2
 ; CHECK-NEXT:    [[DOTSPLATINSERT2:%.*]] = insertelement <4 x i32> poison, i32 [[TMP17]], i64 0
@@ -375,10 +375,10 @@ define void @doit4(i32 %n, i8 signext %cstep) {
 ; CHECK:       vector.ph:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[WIDE_TRIP_COUNT]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[WIDE_TRIP_COUNT]], [[N_MOD_VF]]
-; CHECK-NEXT:    [[DOTCAST:%.*]] = trunc i64 [[N_VEC]] to i32
-; CHECK-NEXT:    [[IND_END:%.*]] = mul i32 [[DOTCAST]], [[CONV]]
 ; CHECK-NEXT:    [[DOTSPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[CONV]], i64 0
 ; CHECK-NEXT:    [[DOTSPLAT:%.*]] = shufflevector <4 x i32> [[DOTSPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP18:%.*]] = trunc i64 [[N_VEC]] to i32
+; CHECK-NEXT:    [[IND_END:%.*]] = mul i32 [[TMP18]], [[CONV]]
 ; CHECK-NEXT:    [[TMP16:%.*]] = mul <4 x i32> <i32 0, i32 1, i32 2, i32 3>, [[DOTSPLAT]]
 ; CHECK-NEXT:    [[TMP15:%.*]] = shl i32 [[CONV]], 2
 ; CHECK-NEXT:    [[DOTSPLATINSERT2:%.*]] = insertelement <4 x i32> poison, i32 [[TMP15]], i64 0

@@ -48,10 +48,10 @@ define void @expand(ptr %src, ptr %dst, i64 %0) {
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP8]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP8]], [[N_MOD_VF]]
-; CHECK-NEXT:    [[TMP18:%.*]] = add i64 [[TMP0]], [[N_VEC]]
-; CHECK-NEXT:    [[TMP22:%.*]] = load double, ptr [[SRC]], align 8, !alias.scope [[META0:![0-9]+]], !noalias [[META3:![0-9]+]]
 ; CHECK-NEXT:    [[DOTSPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[TMP0]], i64 0
 ; CHECK-NEXT:    [[DOTSPLAT:%.*]] = shufflevector <4 x i64> [[DOTSPLATINSERT]], <4 x i64> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP19:%.*]] = add i64 [[TMP0]], [[N_VEC]]
+; CHECK-NEXT:    [[TMP22:%.*]] = load double, ptr [[SRC]], align 8, !alias.scope [[META0:![0-9]+]], !noalias [[META3:![0-9]+]]
 ; CHECK-NEXT:    [[INDUCTION:%.*]] = add <4 x i64> [[DOTSPLAT]], <i64 0, i64 1, i64 2, i64 3>
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
@@ -91,7 +91,7 @@ define void @expand(ptr %src, ptr %dst, i64 %0) {
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP8]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[OUTER_LATCH]], label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:
-; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[TMP18]], %[[MIDDLE_BLOCK]] ], [ [[TMP0]], %[[OUTER_HEADER]] ], [ [[TMP0]], %[[VECTOR_SCEVCHECK]] ], [ [[TMP0]], %[[VECTOR_MEMCHECK]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[TMP19]], %[[MIDDLE_BLOCK]] ], [ [[TMP0]], %[[OUTER_HEADER]] ], [ [[TMP0]], %[[VECTOR_SCEVCHECK]] ], [ [[TMP0]], %[[VECTOR_MEMCHECK]] ]
 ; CHECK-NEXT:    br label %[[INNER:.*]]
 ; CHECK:       [[INNER]]:
 ; CHECK-NEXT:    [[INNER_IV:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[INNER_IV_NEXT:%.*]], %[[INNER]] ]

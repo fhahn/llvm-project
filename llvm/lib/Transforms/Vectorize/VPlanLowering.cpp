@@ -220,6 +220,11 @@ void VPlanTransforms::materializeHeaderMask(
   HeaderMask->replaceAllUsesWith(Mask);
 }
 
+// Materialize broadcasts for scalar values available in or before the vector
+// preheader.
+static void materializeBroadcastsForValues(VPlan &Plan,
+                                           ArrayRef<VPValue *> VPValues);
+
 /// Expand a VPWidenIntOrFpInduction into executable recipes, for the initial
 /// value, phi and backedge value. In the following example:
 ///
@@ -292,11 +297,8 @@ expandVPWidenIntOrFpInduction(VPWidenIntOrFpInductionRecipe *WidenIVR) {
   if (StepTy->isFloatingPointTy())
     Init = Builder.createWidenCast(Instruction::UIToFP, Init, StepTy);
 
-  VPValue *SplatStart = Builder.createNaryOp(VPInstruction::Broadcast, Start);
-  VPValue *SplatStep = Builder.createNaryOp(VPInstruction::Broadcast, Step);
-
-  Init = Builder.createNaryOp(MulOp, {Init, SplatStep}, Flags);
-  Init = Builder.createNaryOp(AddOp, {SplatStart, Init}, Flags,
+  Init = Builder.createNaryOp(MulOp, {Init, Step}, Flags);
+  Init = Builder.createNaryOp(AddOp, {Start, Init}, Flags,
                               DebugLoc::getUnknown(), "induction");
 
   // Create the widened phi of the vector IV.
@@ -338,6 +340,7 @@ expandVPWidenIntOrFpInduction(VPWidenIntOrFpInductionRecipe *WidenIVR) {
   WidePHI->addIncoming(Next);
 
   WidenIVR->replaceAllUsesWith(WidePHI);
+  materializeBroadcastsForValues(*Plan, {Start, Step});
 }
 
 /// Expand a VPWidenPointerInductionRecipe into executable recipes, for the
@@ -712,7 +715,8 @@ void VPlanTransforms::convertToConcreteRecipes(VPlan &Plan) {
   }
 }
 
-void VPlanTransforms::materializeBroadcasts(VPlan &Plan) {
+static void materializeBroadcastsForValues(VPlan &Plan,
+                                           ArrayRef<VPValue *> VPValues) {
   if (Plan.hasScalarVFOnly())
     return;
 
@@ -721,17 +725,6 @@ void VPlanTransforms::materializeBroadcasts(VPlan &Plan) {
 #endif
 
   auto *VectorPreheader = Plan.getVectorPreheader();
-  SmallVector<VPValue *> VPValues;
-  // Only materialize broadcasts for recipes that unconditionally produce
-  // scalars. Uniform vector expressions may be cheaper to keep as vectors.
-  for (VPInstruction &R : make_isa_range<VPInstruction>(*VectorPreheader))
-    if (R.isSingleScalar() || R.isVectorToScalar())
-      VPValues.push_back(&R);
-  if (VPValue *BTC = Plan.getBackedgeTakenCount())
-    VPValues.push_back(BTC);
-  append_range(VPValues, Plan.getLiveIns());
-  for (VPRecipeBase &R : *Plan.getEntry())
-    append_range(VPValues, R.definedValues());
 
   for (VPValue *VPV : VPValues) {
     if (vputils::onlyScalarValuesUsed(VPV) || isa<VPConstant>(VPV))
@@ -764,6 +757,26 @@ void VPlanTransforms::materializeBroadcasts(VPlan &Plan) {
                              return Broadcast != &U && !U.usesScalars(VPV);
                            });
   }
+}
+
+void VPlanTransforms::materializeBroadcasts(VPlan &Plan) {
+  if (Plan.hasScalarVFOnly())
+    return;
+
+  auto *VectorPreheader = Plan.getVectorPreheader();
+  SmallVector<VPValue *> VPValues;
+  // Only materialize broadcasts for recipes that unconditionally produce
+  // scalars. Uniform vector expressions may be cheaper to keep as vectors.
+  for (VPInstruction &R : make_isa_range<VPInstruction>(*VectorPreheader))
+    if (R.isSingleScalar() || R.isVectorToScalar())
+      VPValues.push_back(&R);
+  if (VPValue *BTC = Plan.getBackedgeTakenCount())
+    VPValues.push_back(BTC);
+  append_range(VPValues, Plan.getLiveIns());
+  for (VPRecipeBase &R : *Plan.getEntry())
+    append_range(VPValues, R.definedValues());
+
+  materializeBroadcastsForValues(Plan, VPValues);
 }
 
 void VPlanTransforms::materializeConstantVectorTripCount(

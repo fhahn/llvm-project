@@ -446,10 +446,10 @@ define void @test_stride_noninvar3_4i32(ptr readonly %data, ptr noalias nocaptur
 ; CHECK:       vector.ph:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[N]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i32 [[N]], [[N_MOD_VF]]
-; CHECK-NEXT:    [[TMP0:%.*]] = mul i32 [[N_VEC]], [[X:%.*]]
-; CHECK-NEXT:    [[IND_END:%.*]] = add i32 3, [[TMP0]]
-; CHECK-NEXT:    [[DOTSPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[X]], i64 0
+; CHECK-NEXT:    [[DOTSPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[X:%.*]], i64 0
 ; CHECK-NEXT:    [[DOTSPLAT:%.*]] = shufflevector <4 x i32> [[DOTSPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP1:%.*]] = mul i32 [[N_VEC]], [[X]]
+; CHECK-NEXT:    [[IND_END:%.*]] = add i32 3, [[TMP1]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = mul nuw nsw <4 x i32> <i32 0, i32 1, i32 2, i32 3>, [[DOTSPLAT]]
 ; CHECK-NEXT:    [[INDUCTION:%.*]] = add nuw nsw <4 x i32> splat (i32 3), [[TMP3]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = shl nuw nsw i32 [[X]], 2

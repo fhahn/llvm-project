@@ -1113,9 +1113,9 @@ define i64 @select_decreasing_induction_icmp_non_const_start(ptr %a, ptr %b, i64
 ; IC1VF4:       [[VECTOR_PH]]:
 ; IC1VF4-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP1]], 3
 ; IC1VF4-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP1]], [[N_MOD_VF]]
-; IC1VF4-NEXT:    [[TMP2:%.*]] = sub i64 [[N]], [[N_VEC]]
 ; IC1VF4-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x i64> poison, i64 [[N]], i64 0
 ; IC1VF4-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT1]], <4 x i64> poison, <4 x i32> zeroinitializer
+; IC1VF4-NEXT:    [[TMP9:%.*]] = sub i64 [[N]], [[N_VEC]]
 ; IC1VF4-NEXT:    [[TMP3:%.*]] = sub nsw <4 x i64> [[BROADCAST_SPLAT2]], <i64 0, i64 1, i64 2, i64 3>
 ; IC1VF4-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; IC1VF4:       [[VECTOR_BODY]]:
@@ -1149,7 +1149,7 @@ define i64 @select_decreasing_induction_icmp_non_const_start(ptr %a, ptr %b, i64
 ; IC1VF4-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP1]], [[N_VEC]]
 ; IC1VF4-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; IC1VF4:       [[SCALAR_PH]]:
-; IC1VF4-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[TMP2]], %[[MIDDLE_BLOCK]] ], [ [[N]], %[[ENTRY]] ]
+; IC1VF4-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[TMP9]], %[[MIDDLE_BLOCK]] ], [ [[N]], %[[ENTRY]] ]
 ; IC1VF4-NEXT:    [[BC_MERGE_RDX:%.*]] = phi i64 [ [[RDX_SELECT]], %[[MIDDLE_BLOCK]] ], [ [[RDX_START]], %[[ENTRY]] ]
 ; IC1VF4-NEXT:    br label %[[LOOP:.*]]
 ; IC1VF4:       [[LOOP]]:
@@ -1179,9 +1179,9 @@ define i64 @select_decreasing_induction_icmp_non_const_start(ptr %a, ptr %b, i64
 ; IC4VF4:       [[VECTOR_PH]]:
 ; IC4VF4-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP1]], 15
 ; IC4VF4-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP1]], [[N_MOD_VF]]
-; IC4VF4-NEXT:    [[TMP2:%.*]] = sub i64 [[N]], [[N_VEC]]
 ; IC4VF4-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x i64> poison, i64 [[N]], i64 0
 ; IC4VF4-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT1]], <4 x i64> poison, <4 x i32> zeroinitializer
+; IC4VF4-NEXT:    [[TMP7:%.*]] = sub i64 [[N]], [[N_VEC]]
 ; IC4VF4-NEXT:    [[TMP3:%.*]] = sub nsw <4 x i64> [[BROADCAST_SPLAT2]], <i64 0, i64 1, i64 2, i64 3>
 ; IC4VF4-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; IC4VF4:       [[VECTOR_BODY]]:
@@ -1257,7 +1257,7 @@ define i64 @select_decreasing_induction_icmp_non_const_start(ptr %a, ptr %b, i64
 ; IC4VF4-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP1]], [[N_VEC]]
 ; IC4VF4-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; IC4VF4:       [[SCALAR_PH]]:
-; IC4VF4-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[TMP2]], %[[MIDDLE_BLOCK]] ], [ [[N]], %[[ENTRY]] ]
+; IC4VF4-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[TMP7]], %[[MIDDLE_BLOCK]] ], [ [[N]], %[[ENTRY]] ]
 ; IC4VF4-NEXT:    [[BC_MERGE_RDX:%.*]] = phi i64 [ [[RDX_SELECT]], %[[MIDDLE_BLOCK]] ], [ [[RDX_START]], %[[ENTRY]] ]
 ; IC4VF4-NEXT:    br label %[[LOOP:.*]]
 ; IC4VF4:       [[LOOP]]:

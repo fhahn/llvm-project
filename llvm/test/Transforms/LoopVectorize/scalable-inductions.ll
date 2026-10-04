@@ -172,7 +172,7 @@ define void @add_unique_ind32(ptr noalias nocapture %a, i64 %n) {
 ; CHECK-NEXT:    [[DOTCAST:%.*]] = trunc i64 [[N_VEC]] to i32
 ; CHECK-NEXT:    [[IND_END:%.*]] = shl i32 [[DOTCAST]], 1
 ; CHECK-NEXT:    [[TMP6:%.*]] = call <vscale x 4 x i32> @llvm.stepvector.nxv4i32()
-; CHECK-NEXT:    [[TMP7:%.*]] = mul nuw nsw <vscale x 4 x i32> [[TMP6]], splat (i32 2)
+; CHECK-NEXT:    [[TMP7:%.*]] = shl nuw nsw <vscale x 4 x i32> [[TMP6]], splat (i32 1)
 ; CHECK-NEXT:    [[TMP9:%.*]] = trunc i64 [[TMP1]] to i32
 ; CHECK-NEXT:    [[TMP8:%.*]] = shl nuw nsw i32 [[TMP9]], 1
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 4 x i32> poison, i32 [[TMP8]], i64 0

@@ -288,7 +288,7 @@ define void @narrow_iv_i8_sext_i64_wrapping(ptr noalias %arr, ptr noalias %out) 
 ; RV64-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 8 x ptr> poison, ptr [[OUT]], i64 0
 ; RV64-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 8 x ptr> [[BROADCAST_SPLATINSERT]], <vscale x 8 x ptr> poison, <vscale x 8 x i32> zeroinitializer
 ; RV64-NEXT:    [[TMP0:%.*]] = call <vscale x 8 x i8> @llvm.stepvector.nxv8i8()
-; RV64-NEXT:    [[TMP1:%.*]] = mul <vscale x 8 x i8> [[TMP0]], splat (i8 4)
+; RV64-NEXT:    [[TMP1:%.*]] = shl <vscale x 8 x i8> [[TMP0]], splat (i8 2)
 ; RV64-NEXT:    br label %[[EXIT:.*]]
 ; RV64:       [[EXIT]]:
 ; RV64-NEXT:    [[VEC_IND:%.*]] = phi <vscale x 8 x i8> [ [[TMP1]], %[[LOOP]] ], [ [[VEC_IND_NEXT:%.*]], %[[EXIT]] ]
@@ -319,7 +319,7 @@ define void @narrow_iv_i8_sext_i64_wrapping(ptr noalias %arr, ptr noalias %out) 
 ; RV32-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 16 x ptr> poison, ptr [[OUT]], i64 0
 ; RV32-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 16 x ptr> [[BROADCAST_SPLATINSERT]], <vscale x 16 x ptr> poison, <vscale x 16 x i32> zeroinitializer
 ; RV32-NEXT:    [[TMP0:%.*]] = call <vscale x 16 x i8> @llvm.stepvector.nxv16i8()
-; RV32-NEXT:    [[TMP1:%.*]] = mul <vscale x 16 x i8> [[TMP0]], splat (i8 4)
+; RV32-NEXT:    [[TMP1:%.*]] = shl <vscale x 16 x i8> [[TMP0]], splat (i8 2)
 ; RV32-NEXT:    br label %[[EXIT:.*]]
 ; RV32:       [[EXIT]]:
 ; RV32-NEXT:    [[VEC_IND:%.*]] = phi <vscale x 16 x i8> [ [[TMP1]], %[[LOOP]] ], [ [[VEC_IND_NEXT:%.*]], %[[EXIT]] ]

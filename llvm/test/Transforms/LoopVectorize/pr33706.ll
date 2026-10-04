@@ -52,6 +52,14 @@ define void @PR33706(ptr nocapture readonly %arg, ptr nocapture %arg1, i32 %arg2
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[TMP22:%.*]] = and i64 [[TMP4]], 1
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP4]], [[TMP22]]
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i32> poison, i32 [[ARG2]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT]], <2 x i32> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <2 x i32> poison, i32 [[TMP]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT3:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT1]], <2 x i32> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT3:%.*]] = insertelement <2 x i32> poison, i32 [[TMP1]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT4:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT3]], <2 x i32> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT5:%.*]] = insertelement <2 x i32> poison, i32 [[VAR_TMP5]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT5]], <2 x i32> poison, <2 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP23:%.*]] = trunc i64 [[N_VEC]] to i32
 ; CHECK-NEXT:    [[TMP24:%.*]] = mul i32 [[TMP23]], [[TMP1]]
 ; CHECK-NEXT:    [[TMP25:%.*]] = add i32 [[VAR_TMP5]], [[TMP24]]
@@ -60,21 +68,13 @@ define void @PR33706(ptr nocapture readonly %arg, ptr nocapture %arg1, i32 %arg2
 ; CHECK-NEXT:    [[TMP28:%.*]] = sub i32 [[VAR_TMP10]], [[TMP23]]
 ; CHECK-NEXT:    [[TMP29:%.*]] = mul i32 [[TMP23]], [[ARG2]]
 ; CHECK-NEXT:    [[TMP30:%.*]] = add i32 [[TMP]], [[TMP29]]
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i32> poison, i32 [[ARG2]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT]], <2 x i32> poison, <2 x i32> zeroinitializer
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <2 x i32> poison, i32 [[VAR_TMP5]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT1]], <2 x i32> poison, <2 x i32> zeroinitializer
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT3:%.*]] = insertelement <2 x i32> poison, i32 [[TMP1]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT4:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT3]], <2 x i32> poison, <2 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP31:%.*]] = mul <2 x i32> <i32 0, i32 1>, [[BROADCAST_SPLAT4]]
 ; CHECK-NEXT:    [[INDUCTION:%.*]] = add <2 x i32> [[BROADCAST_SPLAT2]], [[TMP31]]
 ; CHECK-NEXT:    [[TMP32:%.*]] = shl i32 [[TMP1]], 1
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT5:%.*]] = insertelement <2 x i32> poison, i32 [[TMP32]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT6:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT5]], <2 x i32> poison, <2 x i32> zeroinitializer
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT7:%.*]] = insertelement <2 x i32> poison, i32 [[TMP]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT7:%.*]] = insertelement <2 x i32> poison, i32 [[TMP32]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT8:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT7]], <2 x i32> poison, <2 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP33:%.*]] = mul <2 x i32> <i32 0, i32 1>, [[BROADCAST_SPLAT]]
-; CHECK-NEXT:    [[INDUCTION9:%.*]] = add <2 x i32> [[BROADCAST_SPLAT8]], [[TMP33]]
+; CHECK-NEXT:    [[INDUCTION9:%.*]] = add <2 x i32> [[BROADCAST_SPLAT3]], [[TMP33]]
 ; CHECK-NEXT:    [[TMP34:%.*]] = shl i32 [[ARG2]], 1
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT10:%.*]] = insertelement <2 x i32> poison, i32 [[TMP34]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT11:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT10]], <2 x i32> poison, <2 x i32> zeroinitializer
@@ -88,7 +88,7 @@ define void @PR33706(ptr nocapture readonly %arg, ptr nocapture %arg1, i32 %arg2
 ; CHECK-NEXT:    [[TMP36:%.*]] = sitofp <2 x i32> [[VEC_IND]] to <2 x float>
 ; CHECK-NEXT:    store <2 x float> [[TMP36]], ptr [[NEXT_GEP]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
-; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <2 x i32> [[VEC_IND]], [[BROADCAST_SPLAT6]]
+; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <2 x i32> [[VEC_IND]], [[BROADCAST_SPLAT8]]
 ; CHECK-NEXT:    [[VEC_IND_NEXT13]] = add <2 x i32> [[VEC_IND12]], [[BROADCAST_SPLAT11]]
 ; CHECK-NEXT:    [[TMP37:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP37]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]

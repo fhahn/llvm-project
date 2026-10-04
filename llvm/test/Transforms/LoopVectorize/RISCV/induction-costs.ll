@@ -112,7 +112,7 @@ define void @test_3_inductions(ptr noalias %dst, ptr noalias %src, i64 %n) #1 {
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 2 x ptr> poison, ptr [[DST]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 2 x ptr> [[BROADCAST_SPLATINSERT]], <vscale x 2 x ptr> poison, <vscale x 2 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP1:%.*]] = call <vscale x 2 x i32> @llvm.stepvector.nxv2i32()
-; CHECK-NEXT:    [[TMP2:%.*]] = mul <vscale x 2 x i32> [[TMP1]], splat (i32 2)
+; CHECK-NEXT:    [[TMP2:%.*]] = shl <vscale x 2 x i32> [[TMP1]], splat (i32 1)
 ; CHECK-NEXT:    [[INDUCTION:%.*]] = add <vscale x 2 x i32> splat (i32 1), [[TMP2]]
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:

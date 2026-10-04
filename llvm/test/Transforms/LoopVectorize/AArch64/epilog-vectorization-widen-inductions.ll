@@ -196,9 +196,9 @@ define void @test_widen_induction_variable_start(ptr %A, i64 %N, i64 %start) {
 ; CHECK:       vector.ph:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP0]], 7
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[N_MOD_VF]]
-; CHECK-NEXT:    [[IND_END:%.*]] = add i64 [[START]], [[N_VEC]]
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[START]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT]], <4 x i64> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[IND_END:%.*]] = add i64 [[START]], [[N_VEC]]
 ; CHECK-NEXT:    [[INDUCTION:%.*]] = add nuw nsw <4 x i64> [[BROADCAST_SPLAT]], <i64 0, i64 1, i64 2, i64 3>
 ; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK:       vector.body:
@@ -225,9 +225,9 @@ define void @test_widen_induction_variable_start(ptr %A, i64 %N, i64 %start) {
 ; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[IND_END]], [[VEC_EPILOG_ITER_CHECK]] ], [ [[START]], [[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
 ; CHECK-NEXT:    [[N_MOD_VF2:%.*]] = and i64 [[TMP0]], 1
 ; CHECK-NEXT:    [[N_VEC3:%.*]] = sub i64 [[TMP0]], [[N_MOD_VF2]]
-; CHECK-NEXT:    [[IND_END4:%.*]] = add i64 [[START]], [[N_VEC3]]
 ; CHECK-NEXT:    [[DOTSPLATINSERT8:%.*]] = insertelement <2 x i64> poison, i64 [[BC_RESUME_VAL]], i64 0
 ; CHECK-NEXT:    [[DOTSPLAT9:%.*]] = shufflevector <2 x i64> [[DOTSPLATINSERT8]], <2 x i64> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    [[IND_END4:%.*]] = add i64 [[START]], [[N_VEC3]]
 ; CHECK-NEXT:    [[INDUCTION10:%.*]] = add nuw nsw <2 x i64> [[DOTSPLAT9]], <i64 0, i64 1>
 ; CHECK-NEXT:    br label [[VEC_EPILOG_VECTOR_BODY:%.*]]
 ; CHECK:       vec.epilog.vector.body:

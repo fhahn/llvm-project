@@ -866,9 +866,9 @@ define i32 @PR27246() {
 ; UNROLL-NO-IC:       [[VECTOR_PH]]:
 ; UNROLL-NO-IC-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[I_016]], 7
 ; UNROLL-NO-IC-NEXT:    [[N_VEC:%.*]] = sub i32 [[I_016]], [[N_MOD_VF]]
-; UNROLL-NO-IC-NEXT:    [[IND_END:%.*]] = sub i32 [[I_016]], [[N_VEC]]
 ; UNROLL-NO-IC-NEXT:    [[DOTSPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[I_016]], i64 0
 ; UNROLL-NO-IC-NEXT:    [[DOTSPLAT:%.*]] = shufflevector <4 x i32> [[DOTSPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
+; UNROLL-NO-IC-NEXT:    [[TMP1:%.*]] = sub i32 [[I_016]], [[N_VEC]]
 ; UNROLL-NO-IC-NEXT:    [[INDUCTION:%.*]] = sub nsw <4 x i32> [[DOTSPLAT]], <i32 0, i32 1, i32 2, i32 3>
 ; UNROLL-NO-IC-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; UNROLL-NO-IC:       [[VECTOR_BODY]]:
@@ -886,7 +886,7 @@ define i32 @PR27246() {
 ; UNROLL-NO-IC-NEXT:    br i1 [[CMP_N]], label %[[FOR_COND_CLEANUP3]], label %[[SCALAR_PH]]
 ; UNROLL-NO-IC:       [[SCALAR_PH]]:
 ; UNROLL-NO-IC-NEXT:    [[SCALAR_RECUR_INIT:%.*]] = phi i32 [ [[VECTOR_RECUR_EXTRACT]], %[[MIDDLE_BLOCK]] ], [ [[E_015]], %[[FOR_COND1_PREHEADER]] ]
-; UNROLL-NO-IC-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i32 [ [[IND_END]], %[[MIDDLE_BLOCK]] ], [ [[I_016]], %[[FOR_COND1_PREHEADER]] ]
+; UNROLL-NO-IC-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i32 [ [[TMP1]], %[[MIDDLE_BLOCK]] ], [ [[I_016]], %[[FOR_COND1_PREHEADER]] ]
 ; UNROLL-NO-IC-NEXT:    br label %[[FOR_COND1:.*]]
 ; UNROLL-NO-IC:       [[FOR_COND_CLEANUP:.*]]:
 ; UNROLL-NO-IC-NEXT:    [[E_1_LCSSA_LCSSA:%.*]] = phi i32 [ [[E_1_LCSSA]], %[[FOR_COND_CLEANUP3]] ]
@@ -956,9 +956,9 @@ define i32 @PR27246() {
 ; SINK-AFTER:       [[VECTOR_PH]]:
 ; SINK-AFTER-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[I_016]], 3
 ; SINK-AFTER-NEXT:    [[N_VEC:%.*]] = sub i32 [[I_016]], [[N_MOD_VF]]
-; SINK-AFTER-NEXT:    [[IND_END:%.*]] = sub i32 [[I_016]], [[N_VEC]]
 ; SINK-AFTER-NEXT:    [[DOTSPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[I_016]], i64 0
 ; SINK-AFTER-NEXT:    [[DOTSPLAT:%.*]] = shufflevector <4 x i32> [[DOTSPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
+; SINK-AFTER-NEXT:    [[TMP1:%.*]] = sub i32 [[I_016]], [[N_VEC]]
 ; SINK-AFTER-NEXT:    [[INDUCTION:%.*]] = sub nsw <4 x i32> [[DOTSPLAT]], <i32 0, i32 1, i32 2, i32 3>
 ; SINK-AFTER-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; SINK-AFTER:       [[VECTOR_BODY]]:
@@ -975,7 +975,7 @@ define i32 @PR27246() {
 ; SINK-AFTER-NEXT:    br i1 [[CMP_N]], label %[[FOR_COND_CLEANUP3]], label %[[SCALAR_PH]]
 ; SINK-AFTER:       [[SCALAR_PH]]:
 ; SINK-AFTER-NEXT:    [[SCALAR_RECUR_INIT:%.*]] = phi i32 [ [[VECTOR_RECUR_EXTRACT]], %[[MIDDLE_BLOCK]] ], [ [[E_015]], %[[FOR_COND1_PREHEADER]] ]
-; SINK-AFTER-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i32 [ [[IND_END]], %[[MIDDLE_BLOCK]] ], [ [[I_016]], %[[FOR_COND1_PREHEADER]] ]
+; SINK-AFTER-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i32 [ [[TMP1]], %[[MIDDLE_BLOCK]] ], [ [[I_016]], %[[FOR_COND1_PREHEADER]] ]
 ; SINK-AFTER-NEXT:    br label %[[FOR_COND1:.*]]
 ; SINK-AFTER:       [[FOR_COND_CLEANUP:.*]]:
 ; SINK-AFTER-NEXT:    [[E_1_LCSSA_LCSSA:%.*]] = phi i32 [ [[E_1_LCSSA]], %[[FOR_COND_CLEANUP3]] ]

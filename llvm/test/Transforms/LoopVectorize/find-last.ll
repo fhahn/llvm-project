@@ -211,14 +211,14 @@ define i32 @loop_inv_select_condition_issue_182152(i32 %iv.start, i32 %a, i32 %b
 ; CHECK:       vector.ph:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[TMP11]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i32 [[TMP11]], [[N_MOD_VF]]
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x i32> poison, i32 [[IV_START]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT1]], <4 x i32> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i1> poison, i1 [[INV_COND]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i1> [[BROADCAST_SPLATINSERT]], <4 x i1> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i32 [[IV_START]], [[N_VEC]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = xor <4 x i1> [[BROADCAST_SPLAT]], splat (i1 true)
 ; CHECK-NEXT:    [[TMP4:%.*]] = freeze <4 x i1> [[TMP3]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP4]])
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x i32> poison, i32 [[IV_START]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT1]], <4 x i32> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[INDUCTION:%.*]] = add <4 x i32> [[BROADCAST_SPLAT2]], <i32 0, i32 1, i32 2, i32 3>
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       vector.body:

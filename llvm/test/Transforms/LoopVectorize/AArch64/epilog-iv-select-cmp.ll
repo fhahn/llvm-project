@@ -54,13 +54,13 @@ define i8 @select_icmp_var_start(ptr %a, i8 %n, i8 %start) {
 ; CHECK-NEXT:    [[BC_MERGE_RDX:%.*]] = phi i8 [ [[RDX_SELECT]], %[[VEC_EPILOG_ITER_CHECK]] ], [ [[FR]], %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
 ; CHECK-NEXT:    [[N_MOD_VF4:%.*]] = and i32 [[TMP2]], 7
 ; CHECK-NEXT:    [[N_VEC5:%.*]] = sub i32 [[TMP2]], [[N_MOD_VF4]]
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <8 x i8> poison, i8 [[BC_RESUME_VAL]], i64 0
+; CHECK-NEXT:    [[DOTSPLAT11:%.*]] = shufflevector <8 x i8> [[BROADCAST_SPLATINSERT]], <8 x i8> poison, <8 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP14:%.*]] = icmp eq i8 [[BC_MERGE_RDX]], [[FR]]
 ; CHECK-NEXT:    [[TMP15:%.*]] = select i1 [[TMP14]], i8 -128, i8 [[BC_MERGE_RDX]]
 ; CHECK-NEXT:    [[DOTSPLATINSERT:%.*]] = insertelement <8 x i8> poison, i8 [[TMP15]], i64 0
 ; CHECK-NEXT:    [[DOTSPLAT:%.*]] = shufflevector <8 x i8> [[DOTSPLATINSERT]], <8 x i8> poison, <8 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP16:%.*]] = trunc i32 [[N_VEC5]] to i8
-; CHECK-NEXT:    [[DOTSPLATINSERT10:%.*]] = insertelement <8 x i8> poison, i8 [[BC_RESUME_VAL]], i64 0
-; CHECK-NEXT:    [[DOTSPLAT11:%.*]] = shufflevector <8 x i8> [[DOTSPLATINSERT10]], <8 x i8> poison, <8 x i32> zeroinitializer
 ; CHECK-NEXT:    [[INDUCTION:%.*]] = add nuw nsw <8 x i8> [[DOTSPLAT11]], <i8 0, i8 1, i8 2, i8 3, i8 4, i8 5, i8 6, i8 7>
 ; CHECK-NEXT:    br label %[[VEC_EPILOG_VECTOR_BODY:.*]]
 ; CHECK:       [[VEC_EPILOG_VECTOR_BODY]]:

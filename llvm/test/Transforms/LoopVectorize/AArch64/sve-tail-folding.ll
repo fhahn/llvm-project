@@ -146,7 +146,7 @@ define void @copy_stride4(ptr noalias %dst, ptr noalias %src, i64 %n) #0 {
 ; CHECK-NEXT:    [[TMP9:%.*]] = shl nuw i64 [[TMP8]], 2
 ; CHECK-NEXT:    [[ACTIVE_LANE_MASK_ENTRY:%.*]] = call <vscale x 4 x i1> @llvm.get.active.lane.mask.nxv4i1.i64(i64 0, i64 [[TMP2]])
 ; CHECK-NEXT:    [[TMP13:%.*]] = call <vscale x 4 x i64> @llvm.stepvector.nxv4i64()
-; CHECK-NEXT:    [[TMP14:%.*]] = mul nsw <vscale x 4 x i64> [[TMP13]], splat (i64 4)
+; CHECK-NEXT:    [[TMP14:%.*]] = shl nsw <vscale x 4 x i64> [[TMP13]], splat (i64 2)
 ; CHECK-NEXT:    [[TMP17:%.*]] = shl nsw i64 [[TMP9]], 2
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 4 x i64> poison, i64 [[TMP17]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 4 x i64> [[BROADCAST_SPLATINSERT]], <vscale x 4 x i64> poison, <vscale x 4 x i32> zeroinitializer

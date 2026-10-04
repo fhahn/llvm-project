@@ -12,9 +12,9 @@ define void @reverse_store(ptr %a, i64 %n) !dbg !3 {
 ; CHECK-NEXT:    [[TMP9:%.*]] = sub i64 [[TMP1]], [[UMIN]]
 ; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
-; CHECK-NEXT:    [[TMP2:%.*]] = call <vscale x 2 x i64> @llvm.stepvector.nxv2i64()
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 2 x i64> poison, i64 [[N]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 2 x i64> [[BROADCAST_SPLATINSERT]], <vscale x 2 x i64> poison, <vscale x 2 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP2:%.*]] = call <vscale x 2 x i64> @llvm.stepvector.nxv2i64()
 ; CHECK-NEXT:    [[TMP3:%.*]] = sub nsw <vscale x 2 x i64> [[BROADCAST_SPLAT]], [[TMP2]]
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:

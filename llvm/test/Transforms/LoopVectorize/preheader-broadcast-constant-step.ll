@@ -8,10 +8,10 @@ define void @constant_step_induction(ptr %dst, i32 %start) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = call <vscale x 4 x i32> @llvm.stepvector.nxv4i32()
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 4 x i32> poison, i32 [[START]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 4 x i32> [[BROADCAST_SPLATINSERT]], <vscale x 4 x i32> poison, <vscale x 4 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP1:%.*]] = mul <vscale x 4 x i32> [[TMP0]], splat (i32 4)
+; CHECK-NEXT:    [[TMP0:%.*]] = call <vscale x 4 x i32> @llvm.stepvector.nxv4i32()
+; CHECK-NEXT:    [[TMP1:%.*]] = shl <vscale x 4 x i32> [[TMP0]], splat (i32 2)
 ; CHECK-NEXT:    [[INDUCTION:%.*]] = add <vscale x 4 x i32> [[BROADCAST_SPLAT]], [[TMP1]]
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:

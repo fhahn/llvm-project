@@ -721,6 +721,8 @@ define void @store_factor_4_reverse(i32 %n, ptr noalias %a) vscale_range(2, 1024
 ; IF-EVL-NEXT:    [[TMP2:%.*]] = sub i32 [[N]], [[TMP1]]
 ; IF-EVL-NEXT:    br label [[VECTOR_PH:%.*]]
 ; IF-EVL:       vector.ph:
+; IF-EVL-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 4 x i32> poison, i32 [[N]], i64 0
+; IF-EVL-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 4 x i32> [[BROADCAST_SPLATINSERT]], <vscale x 4 x i32> poison, <vscale x 4 x i32> zeroinitializer
 ; IF-EVL-NEXT:    [[TMP3:%.*]] = sext i32 [[N]] to i64
 ; IF-EVL-NEXT:    [[TMP4:%.*]] = shl nsw i64 [[TMP3]], 4
 ; IF-EVL-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr [[A:%.*]], i64 [[TMP4]]
@@ -731,8 +733,6 @@ define void @store_factor_4_reverse(i32 %n, ptr noalias %a) vscale_range(2, 1024
 ; IF-EVL-NEXT:    [[TMP10:%.*]] = add nuw nsw i64 [[TMP4]], 12
 ; IF-EVL-NEXT:    [[TMP11:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP10]]
 ; IF-EVL-NEXT:    [[TMP12:%.*]] = call <vscale x 4 x i32> @llvm.stepvector.nxv4i32()
-; IF-EVL-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 4 x i32> poison, i32 [[N]], i64 0
-; IF-EVL-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 4 x i32> [[BROADCAST_SPLATINSERT]], <vscale x 4 x i32> poison, <vscale x 4 x i32> zeroinitializer
 ; IF-EVL-NEXT:    [[TMP13:%.*]] = sub nsw <vscale x 4 x i32> [[BROADCAST_SPLAT]], [[TMP12]]
 ; IF-EVL-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; IF-EVL:       vector.body:
@@ -775,6 +775,8 @@ define void @store_factor_4_reverse(i32 %n, ptr noalias %a) vscale_range(2, 1024
 ; NO-VP:       vector.ph:
 ; NO-VP-NEXT:    [[N_MOD_VF:%.*]] = urem i32 [[TMP2]], [[TMP4]]
 ; NO-VP-NEXT:    [[N_VEC:%.*]] = sub i32 [[TMP2]], [[N_MOD_VF]]
+; NO-VP-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 4 x i32> poison, i32 [[N]], i64 0
+; NO-VP-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 4 x i32> [[BROADCAST_SPLATINSERT]], <vscale x 4 x i32> poison, <vscale x 4 x i32> zeroinitializer
 ; NO-VP-NEXT:    [[TMP7:%.*]] = sub i32 [[N]], [[N_VEC]]
 ; NO-VP-NEXT:    [[TMP8:%.*]] = sext i32 [[N]] to i64
 ; NO-VP-NEXT:    [[TMP9:%.*]] = shl nsw i64 [[TMP8]], 4
@@ -786,8 +788,6 @@ define void @store_factor_4_reverse(i32 %n, ptr noalias %a) vscale_range(2, 1024
 ; NO-VP-NEXT:    [[TMP15:%.*]] = add nuw nsw i64 [[TMP9]], 12
 ; NO-VP-NEXT:    [[TMP16:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP15]]
 ; NO-VP-NEXT:    [[TMP17:%.*]] = call <vscale x 4 x i32> @llvm.stepvector.nxv4i32()
-; NO-VP-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 4 x i32> poison, i32 [[N]], i64 0
-; NO-VP-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 4 x i32> [[BROADCAST_SPLATINSERT]], <vscale x 4 x i32> poison, <vscale x 4 x i32> zeroinitializer
 ; NO-VP-NEXT:    [[TMP18:%.*]] = sub nsw <vscale x 4 x i32> [[BROADCAST_SPLAT]], [[TMP17]]
 ; NO-VP-NEXT:    [[TMP19:%.*]] = sub nsw i32 0, [[TMP4]]
 ; NO-VP-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <vscale x 4 x i32> poison, i32 [[TMP19]], i64 0

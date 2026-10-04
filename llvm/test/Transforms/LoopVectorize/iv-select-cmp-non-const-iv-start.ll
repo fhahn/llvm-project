@@ -16,9 +16,9 @@ define i64 @select_non_const_iv_start_signed_guard(ptr %a, i64 %rdx_start, i64 %
 ; CHECK-VF4IC1:       [[VECTOR_PH]]:
 ; CHECK-VF4IC1-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP0]], 3
 ; CHECK-VF4IC1-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[N_MOD_VF]]
-; CHECK-VF4IC1-NEXT:    [[TMP1:%.*]] = add i64 [[IV_START]], [[N_VEC]]
 ; CHECK-VF4IC1-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x i64> poison, i64 [[IV_START]], i64 0
 ; CHECK-VF4IC1-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT1]], <4 x i64> poison, <4 x i32> zeroinitializer
+; CHECK-VF4IC1-NEXT:    [[TMP6:%.*]] = add i64 [[IV_START]], [[N_VEC]]
 ; CHECK-VF4IC1-NEXT:    [[INDUCTION:%.*]] = add nsw <4 x i64> [[BROADCAST_SPLAT2]], <i64 0, i64 1, i64 2, i64 3>
 ; CHECK-VF4IC1-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK-VF4IC1:       [[VECTOR_BODY]]:
@@ -44,7 +44,7 @@ define i64 @select_non_const_iv_start_signed_guard(ptr %a, i64 %rdx_start, i64 %
 ; CHECK-VF4IC1-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
 ; CHECK-VF4IC1-NEXT:    br i1 [[CMP_N]], label %[[EXIT_LOOPEXIT:.*]], label %[[SCALAR_PH]]
 ; CHECK-VF4IC1:       [[SCALAR_PH]]:
-; CHECK-VF4IC1-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[TMP1]], %[[MIDDLE_BLOCK]] ], [ [[IV_START]], %[[FOR_BODY_PREHEADER]] ]
+; CHECK-VF4IC1-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[TMP6]], %[[MIDDLE_BLOCK]] ], [ [[IV_START]], %[[FOR_BODY_PREHEADER]] ]
 ; CHECK-VF4IC1-NEXT:    [[BC_MERGE_RDX:%.*]] = phi i64 [ [[RDX_SELECT]], %[[MIDDLE_BLOCK]] ], [ [[RDX_START]], %[[FOR_BODY_PREHEADER]] ]
 ; CHECK-VF4IC1-NEXT:    br label %[[FOR_BODY:.*]]
 ; CHECK-VF4IC1:       [[FOR_BODY]]:
@@ -76,9 +76,9 @@ define i64 @select_non_const_iv_start_signed_guard(ptr %a, i64 %rdx_start, i64 %
 ; CHECK-VF4IC4:       [[VECTOR_PH]]:
 ; CHECK-VF4IC4-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP0]], 15
 ; CHECK-VF4IC4-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[N_MOD_VF]]
-; CHECK-VF4IC4-NEXT:    [[TMP1:%.*]] = add i64 [[IV_START]], [[N_VEC]]
 ; CHECK-VF4IC4-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x i64> poison, i64 [[IV_START]], i64 0
 ; CHECK-VF4IC4-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT1]], <4 x i64> poison, <4 x i32> zeroinitializer
+; CHECK-VF4IC4-NEXT:    [[TMP23:%.*]] = add i64 [[IV_START]], [[N_VEC]]
 ; CHECK-VF4IC4-NEXT:    [[INDUCTION:%.*]] = add nsw <4 x i64> [[BROADCAST_SPLAT2]], <i64 0, i64 1, i64 2, i64 3>
 ; CHECK-VF4IC4-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK-VF4IC4:       [[VECTOR_BODY]]:
@@ -134,7 +134,7 @@ define i64 @select_non_const_iv_start_signed_guard(ptr %a, i64 %rdx_start, i64 %
 ; CHECK-VF4IC4-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
 ; CHECK-VF4IC4-NEXT:    br i1 [[CMP_N]], label %[[EXIT_LOOPEXIT:.*]], label %[[SCALAR_PH]]
 ; CHECK-VF4IC4:       [[SCALAR_PH]]:
-; CHECK-VF4IC4-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[TMP1]], %[[MIDDLE_BLOCK]] ], [ [[IV_START]], %[[FOR_BODY_PREHEADER]] ]
+; CHECK-VF4IC4-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[TMP23]], %[[MIDDLE_BLOCK]] ], [ [[IV_START]], %[[FOR_BODY_PREHEADER]] ]
 ; CHECK-VF4IC4-NEXT:    [[BC_MERGE_RDX:%.*]] = phi i64 [ [[RDX_SELECT]], %[[MIDDLE_BLOCK]] ], [ [[RDX_START]], %[[FOR_BODY_PREHEADER]] ]
 ; CHECK-VF4IC4-NEXT:    br label %[[FOR_BODY:.*]]
 ; CHECK-VF4IC4:       [[FOR_BODY]]:

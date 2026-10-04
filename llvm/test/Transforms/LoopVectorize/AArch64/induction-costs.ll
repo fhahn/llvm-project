@@ -663,15 +663,15 @@ define void@sext_sub_nsw_for_address(ptr %base, i64 %n, ptr %src) #0 {
 ; CHECK-NEXT:    br i1 [[MIN_EPILOG_ITERS_CHECK]], label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF23:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_PH]]:
 ; CHECK-NEXT:    [[VEC_EPILOG_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
-; CHECK-NEXT:    [[BC_RESUME_VAL21:%.*]] = phi i32 [ [[TMP29]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL15:%.*]] = phi i32 [ [[TMP29]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
 ; CHECK-NEXT:    [[N_MOD_VF22:%.*]] = and i64 [[TMP1]], 1
 ; CHECK-NEXT:    [[N_VEC23:%.*]] = sub i64 [[TMP1]], [[N_MOD_VF22]]
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i32> poison, i32 [[BC_RESUME_VAL15]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT]], <2 x i32> poison, <2 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP87:%.*]] = shl i64 [[N_VEC23]], 1
 ; CHECK-NEXT:    [[TMP88:%.*]] = sub i64 [[N]], [[N_VEC23]]
 ; CHECK-NEXT:    [[TMP89:%.*]] = trunc i64 [[N_VEC23]] to i32
 ; CHECK-NEXT:    [[TMP90:%.*]] = shl i32 [[TMP89]], 1
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i32> poison, i32 [[BC_RESUME_VAL21]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT]], <2 x i32> poison, <2 x i32> zeroinitializer
 ; CHECK-NEXT:    [[INDUCTION:%.*]] = add <2 x i32> [[BROADCAST_SPLAT]], <i32 0, i32 2>
 ; CHECK-NEXT:    br label %[[VEC_EPILOG_VECTOR_BODY:.*]]
 ; CHECK:       [[VEC_EPILOG_VECTOR_BODY]]:

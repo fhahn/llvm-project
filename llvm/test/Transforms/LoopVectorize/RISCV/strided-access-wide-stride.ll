@@ -15,11 +15,11 @@ define void @stride_sext_exceeds_i32_max(ptr noalias readonly %src, ptr noalias 
 ; CHECK-NEXT:    [[TMP2:%.*]] = add nuw nsw i32 [[TMP1]], 1
 ; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <vscale x 8 x i16> poison, i16 [[START]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <vscale x 8 x i16> [[BROADCAST_SPLATINSERT1]], <vscale x 8 x i16> poison, <vscale x 8 x i32> zeroinitializer
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 8 x ptr> poison, ptr [[DST]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 8 x ptr> [[BROADCAST_SPLATINSERT]], <vscale x 8 x ptr> poison, <vscale x 8 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP3:%.*]] = call <vscale x 8 x i16> @llvm.stepvector.nxv8i16()
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <vscale x 8 x i16> poison, i16 [[START]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <vscale x 8 x i16> [[BROADCAST_SPLATINSERT1]], <vscale x 8 x i16> poison, <vscale x 8 x i32> zeroinitializer
 ; CHECK-NEXT:    [[INDUCTION:%.*]] = add <vscale x 8 x i16> [[BROADCAST_SPLAT2]], [[TMP3]]
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:

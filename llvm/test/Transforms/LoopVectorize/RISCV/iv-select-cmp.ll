@@ -67,9 +67,9 @@ define i64 @select_decreasing_induction_icmp_non_const_start(ptr %a, ptr %b, i64
 ; CHECK-NEXT:    [[TMP8:%.*]] = sub i64 [[TMP1]], [[UMIN]]
 ; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
-; CHECK-NEXT:    [[TMP2:%.*]] = call <vscale x 4 x i64> @llvm.stepvector.nxv4i64()
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 4 x i64> poison, i64 [[N]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 4 x i64> [[BROADCAST_SPLATINSERT]], <vscale x 4 x i64> poison, <vscale x 4 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP2:%.*]] = call <vscale x 4 x i64> @llvm.stepvector.nxv4i64()
 ; CHECK-NEXT:    [[TMP3:%.*]] = sub nsw <vscale x 4 x i64> [[BROADCAST_SPLAT]], [[TMP2]]
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:

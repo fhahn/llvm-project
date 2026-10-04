@@ -17,11 +17,11 @@ define void @test(ptr %base_a, ptr %base_b, i32 %ntypes) {
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[N_RND_UP]], 3
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N_RND_UP]], [[N_MOD_VF]]
 ; CHECK-NEXT:    [[TRIP_COUNT_MINUS_1:%.*]] = sub i64 [[N]], 1
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[TRIP_COUNT_MINUS_1]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[N]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT]], <4 x i64> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x i64> poison, i64 [[N]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x i64> poison, i64 [[TRIP_COUNT_MINUS_1]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT1]], <4 x i64> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP2:%.*]] = mul nuw nsw <4 x i64> <i64 0, i64 1, i64 2, i64 3>, [[BROADCAST_SPLAT2]]
+; CHECK-NEXT:    [[TMP2:%.*]] = mul nuw nsw <4 x i64> <i64 0, i64 1, i64 2, i64 3>, [[BROADCAST_SPLAT]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = shl nuw nsw i64 [[N]], 2
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT3:%.*]] = insertelement <4 x i64> poison, i64 [[TMP1]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT4:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT3]], <4 x i64> poison, <4 x i32> zeroinitializer
@@ -30,7 +30,7 @@ define void @test(ptr %base_a, ptr %base_b, i32 %ntypes) {
 ; CHECK-NEXT:    [[TMP20:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_IND1:%.*]] = phi <4 x i64> [ [[TMP2]], %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT6:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[TMP0:%.*]] = icmp ule <4 x i64> [[VEC_IND]], [[BROADCAST_SPLAT]]
+; CHECK-NEXT:    [[TMP0:%.*]] = icmp ule <4 x i64> [[VEC_IND]], [[BROADCAST_SPLAT2]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [4 x i8], ptr [[BASE_A]], <4 x i64> [[VEC_IND1]]
 ; CHECK-NEXT:    [[TMP23:%.*]] = getelementptr inbounds [8 x i8], ptr [[BASE_B]], i64 [[TMP20]]
 ; CHECK-NEXT:    call void @llvm.masked.store.v4p0.p0(<4 x ptr> [[TMP3]], ptr align 8 [[TMP23]], <4 x i1> [[TMP0]])

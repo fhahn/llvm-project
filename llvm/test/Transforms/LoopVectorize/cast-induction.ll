@@ -443,10 +443,10 @@ define i64 @induction_cast_chain_cleared_by_dce(i64 %n, i64 %mask.init) {
 ; VF4:       [[VECTOR_PH]]:
 ; VF4-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP1]], 3
 ; VF4-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP1]], [[N_MOD_VF]]
-; VF4-NEXT:    [[TMP14:%.*]] = mul i64 [[N_VEC]], [[TMP3]]
-; VF4-NEXT:    [[TMP15:%.*]] = add i64 1, [[TMP14]]
 ; VF4-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[TMP3]], i64 0
 ; VF4-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT]], <4 x i64> poison, <4 x i32> zeroinitializer
+; VF4-NEXT:    [[TMP21:%.*]] = mul i64 [[N_VEC]], [[TMP3]]
+; VF4-NEXT:    [[TMP22:%.*]] = add i64 1, [[TMP21]]
 ; VF4-NEXT:    [[TMP16:%.*]] = mul <4 x i64> <i64 0, i64 1, i64 2, i64 3>, [[BROADCAST_SPLAT]]
 ; VF4-NEXT:    [[INDUCTION:%.*]] = add <4 x i64> splat (i64 1), [[TMP16]]
 ; VF4-NEXT:    [[TMP17:%.*]] = shl i64 [[TMP3]], 2
@@ -467,7 +467,7 @@ define i64 @induction_cast_chain_cleared_by_dce(i64 %n, i64 %mask.init) {
 ; VF4-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP1]], [[N_VEC]]
 ; VF4-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; VF4:       [[SCALAR_PH]]:
-; VF4-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[TMP15]], %[[MIDDLE_BLOCK]] ], [ 1, %[[ENTRY]] ], [ 1, %[[VECTOR_SCEVCHECK]] ]
+; VF4-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[TMP22]], %[[MIDDLE_BLOCK]] ], [ 1, %[[ENTRY]] ], [ 1, %[[VECTOR_SCEVCHECK]] ]
 ; VF4-NEXT:    [[BC_MERGE_RDX:%.*]] = phi i64 [ [[TMP20]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ], [ 0, %[[VECTOR_SCEVCHECK]] ]
 ; VF4-NEXT:    br label %[[LOOP:.*]]
 ; VF4:       [[LOOP]]:

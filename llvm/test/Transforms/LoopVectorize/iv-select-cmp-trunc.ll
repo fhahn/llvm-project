@@ -2184,9 +2184,9 @@ define i1 @select_with_trunc_i1_iv(i64 %n, i64 %start) {
 ; CHECK-VF4IC1:       [[VECTOR_PH]]:
 ; CHECK-VF4IC1-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP0]], 3
 ; CHECK-VF4IC1-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[N_MOD_VF]]
-; CHECK-VF4IC1-NEXT:    [[TMP1:%.*]] = add i64 [[START]], [[N_VEC]]
 ; CHECK-VF4IC1-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[START]], i64 0
 ; CHECK-VF4IC1-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT]], <4 x i64> poison, <4 x i32> zeroinitializer
+; CHECK-VF4IC1-NEXT:    [[TMP10:%.*]] = add i64 [[START]], [[N_VEC]]
 ; CHECK-VF4IC1-NEXT:    [[INDUCTION:%.*]] = add <4 x i64> [[BROADCAST_SPLAT]], <i64 0, i64 1, i64 2, i64 3>
 ; CHECK-VF4IC1-NEXT:    br label %[[LOOP:.*]]
 ; CHECK-VF4IC1:       [[LOOP]]:
@@ -2209,7 +2209,7 @@ define i1 @select_with_trunc_i1_iv(i64 %n, i64 %start) {
 ; CHECK-VF4IC1-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
 ; CHECK-VF4IC1-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; CHECK-VF4IC1:       [[SCALAR_PH]]:
-; CHECK-VF4IC1-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[TMP1]], %[[MIDDLE_BLOCK]] ], [ [[START]], %[[ENTRY]] ]
+; CHECK-VF4IC1-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[TMP10]], %[[MIDDLE_BLOCK]] ], [ [[START]], %[[ENTRY]] ]
 ; CHECK-VF4IC1-NEXT:    [[BC_RESUME_VAL2:%.*]] = phi i64 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ]
 ; CHECK-VF4IC1-NEXT:    [[BC_MERGE_RDX:%.*]] = phi i1 [ [[TMP9]], %[[MIDDLE_BLOCK]] ], [ false, %[[ENTRY]] ]
 ; CHECK-VF4IC1-NEXT:    br label %[[LOOP1:.*]]
@@ -2237,9 +2237,9 @@ define i1 @select_with_trunc_i1_iv(i64 %n, i64 %start) {
 ; CHECK-VF4IC4:       [[VECTOR_PH]]:
 ; CHECK-VF4IC4-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP0]], 15
 ; CHECK-VF4IC4-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[N_MOD_VF]]
-; CHECK-VF4IC4-NEXT:    [[TMP1:%.*]] = add i64 [[START]], [[N_VEC]]
 ; CHECK-VF4IC4-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[START]], i64 0
 ; CHECK-VF4IC4-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT]], <4 x i64> poison, <4 x i32> zeroinitializer
+; CHECK-VF4IC4-NEXT:    [[TMP12:%.*]] = add i64 [[START]], [[N_VEC]]
 ; CHECK-VF4IC4-NEXT:    [[INDUCTION:%.*]] = add <4 x i64> [[BROADCAST_SPLAT]], <i64 0, i64 1, i64 2, i64 3>
 ; CHECK-VF4IC4-NEXT:    br label %[[LOOP:.*]]
 ; CHECK-VF4IC4:       [[LOOP]]:
@@ -2289,7 +2289,7 @@ define i1 @select_with_trunc_i1_iv(i64 %n, i64 %start) {
 ; CHECK-VF4IC4-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
 ; CHECK-VF4IC4-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; CHECK-VF4IC4:       [[SCALAR_PH]]:
-; CHECK-VF4IC4-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[TMP1]], %[[MIDDLE_BLOCK]] ], [ [[START]], %[[ENTRY]] ]
+; CHECK-VF4IC4-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[TMP12]], %[[MIDDLE_BLOCK]] ], [ [[START]], %[[ENTRY]] ]
 ; CHECK-VF4IC4-NEXT:    [[BC_RESUME_VAL5:%.*]] = phi i64 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ]
 ; CHECK-VF4IC4-NEXT:    [[BC_MERGE_RDX:%.*]] = phi i1 [ [[TMP30]], %[[MIDDLE_BLOCK]] ], [ false, %[[ENTRY]] ]
 ; CHECK-VF4IC4-NEXT:    br label %[[LOOP1:.*]]

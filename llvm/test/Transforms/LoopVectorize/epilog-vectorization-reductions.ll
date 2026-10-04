@@ -516,15 +516,15 @@ define i64 @test_reduction_with_widen_induction_order_1(ptr %A, i64 %N) {
 ; CHECK-NEXT:    [[BC_MERGE_RDX:%.*]] = phi i64 [ [[TMP3]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
 ; CHECK-NEXT:    [[N_MOD_VF2:%.*]] = and i64 [[N]], 3
 ; CHECK-NEXT:    [[N_VEC3:%.*]] = sub i64 [[N]], [[N_MOD_VF2]]
-; CHECK-NEXT:    [[TMP4:%.*]] = insertelement <4 x i64> zeroinitializer, i64 [[BC_MERGE_RDX]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[BC_RESUME_VAL]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT]], <4 x i64> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP9:%.*]] = insertelement <4 x i64> zeroinitializer, i64 [[BC_MERGE_RDX]], i64 0
 ; CHECK-NEXT:    [[INDUCTION:%.*]] = add nuw nsw <4 x i64> [[BROADCAST_SPLAT]], <i64 0, i64 1, i64 2, i64 3>
 ; CHECK-NEXT:    br label %[[VEC_EPILOG_VECTOR_BODY:.*]]
 ; CHECK:       [[VEC_EPILOG_VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX4:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[VEC_EPILOG_PH]] ], [ [[INDEX_NEXT8:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_IND5:%.*]] = phi <4 x i64> [ [[INDUCTION]], %[[VEC_EPILOG_PH]] ], [ [[VEC_IND_NEXT9:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
-; CHECK-NEXT:    [[VEC_PHI6:%.*]] = phi <4 x i64> [ [[TMP4]], %[[VEC_EPILOG_PH]] ], [ [[TMP6:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_PHI6:%.*]] = phi <4 x i64> [ [[TMP9]], %[[VEC_EPILOG_PH]] ], [ [[TMP6:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[INDEX4]]
 ; CHECK-NEXT:    [[WIDE_LOAD7:%.*]] = load <4 x i64>, ptr [[TMP5]], align 4
 ; CHECK-NEXT:    [[TMP6]] = add <4 x i64> [[VEC_PHI6]], [[WIDE_LOAD7]]
@@ -611,14 +611,14 @@ define i64 @test_reduction_with_widen_induction_order_2(ptr %A, i64 %N) {
 ; CHECK-NEXT:    [[BC_MERGE_RDX:%.*]] = phi i64 [ [[TMP3]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
 ; CHECK-NEXT:    [[N_MOD_VF2:%.*]] = and i64 [[N]], 3
 ; CHECK-NEXT:    [[N_VEC3:%.*]] = sub i64 [[N]], [[N_MOD_VF2]]
-; CHECK-NEXT:    [[TMP4:%.*]] = insertelement <4 x i64> zeroinitializer, i64 [[BC_MERGE_RDX]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[BC_RESUME_VAL]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT]], <4 x i64> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP9:%.*]] = insertelement <4 x i64> zeroinitializer, i64 [[BC_MERGE_RDX]], i64 0
 ; CHECK-NEXT:    [[INDUCTION:%.*]] = add nuw nsw <4 x i64> [[BROADCAST_SPLAT]], <i64 0, i64 1, i64 2, i64 3>
 ; CHECK-NEXT:    br label %[[VEC_EPILOG_VECTOR_BODY:.*]]
 ; CHECK:       [[VEC_EPILOG_VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX4:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[VEC_EPILOG_PH]] ], [ [[INDEX_NEXT8:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
-; CHECK-NEXT:    [[VEC_PHI5:%.*]] = phi <4 x i64> [ [[TMP4]], %[[VEC_EPILOG_PH]] ], [ [[TMP6:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_PHI5:%.*]] = phi <4 x i64> [ [[TMP9]], %[[VEC_EPILOG_PH]] ], [ [[TMP6:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_IND6:%.*]] = phi <4 x i64> [ [[INDUCTION]], %[[VEC_EPILOG_PH]] ], [ [[VEC_IND_NEXT9:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[INDEX4]]
 ; CHECK-NEXT:    [[WIDE_LOAD7:%.*]] = load <4 x i64>, ptr [[TMP5]], align 4
@@ -706,9 +706,9 @@ define i1 @reduction_with_const_or(ptr %A, i8 %n) {
 ; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i8 [ [[TMP2]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
 ; CHECK-NEXT:    [[N_MOD_VF2:%.*]] = and i32 [[TMP1]], 3
 ; CHECK-NEXT:    [[N_VEC3:%.*]] = sub i32 [[TMP1]], [[N_MOD_VF2]]
-; CHECK-NEXT:    [[TMP8:%.*]] = trunc i32 [[N_VEC3]] to i8
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i8> poison, i8 [[BC_RESUME_VAL]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i8> [[BROADCAST_SPLATINSERT]], <4 x i8> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP13:%.*]] = trunc i32 [[N_VEC3]] to i8
 ; CHECK-NEXT:    [[INDUCTION:%.*]] = add <4 x i8> [[BROADCAST_SPLAT]], <i8 0, i8 1, i8 2, i8 3>
 ; CHECK-NEXT:    br label %[[VEC_EPILOG_VECTOR_BODY:.*]]
 ; CHECK:       [[VEC_EPILOG_VECTOR_BODY]]:
@@ -727,7 +727,7 @@ define i1 @reduction_with_const_or(ptr %A, i8 %n) {
 ; CHECK-NEXT:    br i1 [[CMP_N8]], label %[[EXIT]], label %[[VEC_EPILOG_SCALAR_PH]]
 ; CHECK:       [[VEC_EPILOG_SCALAR_PH]]:
 ; CHECK-NEXT:    [[TMP15:%.*]] = phi i1 [ true, %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ true, %[[VEC_EPILOG_ITER_CHECK]] ], [ false, %[[ITER_CHECK]] ]
-; CHECK-NEXT:    [[TMP16:%.*]] = phi i8 [ [[TMP8]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[TMP2]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[ITER_CHECK]] ]
+; CHECK-NEXT:    [[TMP16:%.*]] = phi i8 [ [[TMP13]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[TMP2]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[ITER_CHECK]] ]
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[OR_RED:%.*]] = phi i1 [ [[TMP15]], %[[VEC_EPILOG_SCALAR_PH]] ], [ [[OR_NEXT:%.*]], %[[LOOP]] ]

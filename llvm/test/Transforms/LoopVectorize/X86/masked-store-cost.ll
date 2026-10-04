@@ -52,12 +52,12 @@ define i32 @test_scalar_predicated_cost(i64 %x, i64 %y, ptr %A) #0 {
 ; CHECK-NEXT:    br i1 false, label %[[VEC_EPILOG_SCALAR_PH]], label %[[VEC_EPILOG_PH]], !prof [[PROF3:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_PH]]:
 ; CHECK-NEXT:    [[VEC_EPILOG_RESUME_VAL:%.*]] = phi i64 [ 96, %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT4:%.*]] = insertelement <4 x i64> poison, i64 [[VEC_EPILOG_RESUME_VAL]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT8:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT4]], <4 x i64> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT3:%.*]] = insertelement <4 x i64> poison, i64 [[Y]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT4:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT3]], <4 x i64> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT5:%.*]] = insertelement <4 x i64> poison, i64 [[X]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT6:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT5]], <4 x i64> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT7:%.*]] = insertelement <4 x i64> poison, i64 [[VEC_EPILOG_RESUME_VAL]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT8:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT7]], <4 x i64> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[INDUCTION:%.*]] = add <4 x i64> [[BROADCAST_SPLAT8]], <i64 0, i64 1, i64 2, i64 3>
 ; CHECK-NEXT:    br label %[[VEC_EPILOG_VECTOR_BODY:.*]]
 ; CHECK:       [[VEC_EPILOG_VECTOR_BODY]]:

@@ -149,9 +149,9 @@ define void @loop_never_executes_precondition_order_1(i64 %start, ptr %dst) {
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP0]], 1
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[N_MOD_VF]]
-; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[START]], [[N_VEC]]
 ; CHECK-NEXT:    [[DOTSPLATINSERT:%.*]] = insertelement <2 x i64> poison, i64 [[START]], i64 0
 ; CHECK-NEXT:    [[DOTSPLAT:%.*]] = shufflevector <2 x i64> [[DOTSPLATINSERT]], <2 x i64> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP3:%.*]] = add i64 [[START]], [[N_VEC]]
 ; CHECK-NEXT:    [[INDUCTION:%.*]] = add <2 x i64> [[DOTSPLAT]], <i64 0, i64 1>
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
@@ -168,7 +168,7 @@ define void @loop_never_executes_precondition_order_1(i64 %start, ptr %dst) {
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT_LOOPEXIT:.*]], label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:
-; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[TMP1]], %[[MIDDLE_BLOCK]] ], [ [[START]], %[[LOOP_PREHEADER]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[TMP3]], %[[MIDDLE_BLOCK]] ], [ [[START]], %[[LOOP_PREHEADER]] ]
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[IV_NEXT:%.*]], %[[LOOP]] ], [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ]
@@ -222,9 +222,9 @@ define void @loop_never_executes_precondition_order_1_predicates_flipped(i64 %st
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[TMP0]], 1
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP0]], [[N_MOD_VF]]
-; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[START]], [[N_VEC]]
 ; CHECK-NEXT:    [[DOTSPLATINSERT:%.*]] = insertelement <2 x i64> poison, i64 [[START]], i64 0
 ; CHECK-NEXT:    [[DOTSPLAT:%.*]] = shufflevector <2 x i64> [[DOTSPLATINSERT]], <2 x i64> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP3:%.*]] = add i64 [[START]], [[N_VEC]]
 ; CHECK-NEXT:    [[INDUCTION:%.*]] = add <2 x i64> [[DOTSPLAT]], <i64 0, i64 1>
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
@@ -241,7 +241,7 @@ define void @loop_never_executes_precondition_order_1_predicates_flipped(i64 %st
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT_LOOPEXIT:.*]], label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:
-; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[TMP1]], %[[MIDDLE_BLOCK]] ], [ [[START]], %[[LOOP_PREHEADER]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[TMP3]], %[[MIDDLE_BLOCK]] ], [ [[START]], %[[LOOP_PREHEADER]] ]
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[IV_NEXT:%.*]], %[[LOOP]] ], [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ]

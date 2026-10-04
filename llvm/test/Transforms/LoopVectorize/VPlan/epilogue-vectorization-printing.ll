@@ -970,6 +970,7 @@ define i64 @find_iv_resume(ptr noalias %a, i64 %n) {
 ; CHECK:       vec.epilog.ph:
 ; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = and ir<%n>, ir<3>
 ; CHECK-NEXT:    EMIT vp<%n.vec> = sub ir<%n>, vp<[[VP3]]>
+; CHECK-NEXT:    EMIT vp<[[IV_START:%[0-9]+]]> = broadcast ir<%vec.epilog.resume.val>
 ; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = icmp eq ir<%bc.merge.rdx>, ir<3>
 ; CHECK-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = select vp<[[VP4]]>, ir<-9223372036854775808>, ir<%bc.merge.rdx>
 ; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = broadcast vp<[[VP5]]>
