@@ -14,14 +14,12 @@ define void @loads_of_same_pointer_with_different_sizes1(ptr %A, ptr %B, i64 %N)
 ; CHECK-NEXT:          %gep.B = getelementptr inbounds i32, ptr %B, i64 %iv
 ; CHECK-NEXT:        Against group GRP1:
 ; CHECK-NEXT:          %gep.A = getelementptr inbounds i8, ptr %A, i64 %iv
-; CHECK-NEXT:          %gep.A = getelementptr inbounds i8, ptr %A, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
 ; CHECK-NEXT:          (Low: %B High: ((4 * %N) + %B))
 ; CHECK-NEXT:            Member: {%B,+,4}<nuw><%loop>
 ; CHECK-NEXT:        Group GRP1:
 ; CHECK-NEXT:          (Low: %A High: (3 + %N + %A))
-; CHECK-NEXT:            Member: {%A,+,1}<nuw><%loop>
 ; CHECK-NEXT:            Member: {%A,+,1}<nuw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
@@ -62,14 +60,12 @@ define void @loads_of_same_pointer_with_different_sizes2(ptr %A, ptr %B, i64 %N)
 ; CHECK-NEXT:          %gep.B = getelementptr inbounds i32, ptr %B, i64 %iv
 ; CHECK-NEXT:        Against group GRP1:
 ; CHECK-NEXT:          %gep.A = getelementptr inbounds i8, ptr %A, i64 %iv
-; CHECK-NEXT:          %gep.A = getelementptr inbounds i8, ptr %A, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
 ; CHECK-NEXT:          (Low: %B High: ((4 * %N) + %B))
 ; CHECK-NEXT:            Member: {%B,+,4}<nuw><%loop>
 ; CHECK-NEXT:        Group GRP1:
 ; CHECK-NEXT:          (Low: %A High: (3 + %N + %A))
-; CHECK-NEXT:            Member: {%A,+,1}<nuw><%loop>
 ; CHECK-NEXT:            Member: {%A,+,1}<nuw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
@@ -115,12 +111,10 @@ define void @loads_of_same_pointer_with_different_sizes_retry_with_runtime_check
 ; CHECK-NEXT:          %gep.B.iv = getelementptr inbounds i32, ptr %B, i64 %iv
 ; CHECK-NEXT:        Against group GRP2:
 ; CHECK-NEXT:          %gep.A = getelementptr inbounds i8, ptr %A, i64 %iv
-; CHECK-NEXT:          %gep.A = getelementptr inbounds i8, ptr %A, i64 %iv
 ; CHECK-NEXT:      Check 2:
 ; CHECK-NEXT:        Comparing group GRP1:
 ; CHECK-NEXT:          %gep.B.inc = getelementptr inbounds i32, ptr %B, i64 %inc
 ; CHECK-NEXT:        Against group GRP2:
-; CHECK-NEXT:          %gep.A = getelementptr inbounds i8, ptr %A, i64 %iv
 ; CHECK-NEXT:          %gep.A = getelementptr inbounds i8, ptr %A, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
@@ -131,7 +125,6 @@ define void @loads_of_same_pointer_with_different_sizes_retry_with_runtime_check
 ; CHECK-NEXT:            Member: {((4 * %off) + %B),+,4}<%loop>
 ; CHECK-NEXT:        Group GRP2:
 ; CHECK-NEXT:          (Low: %A High: (3 + %N + %A))
-; CHECK-NEXT:            Member: {%A,+,1}<nuw><%loop>
 ; CHECK-NEXT:            Member: {%A,+,1}<nuw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
@@ -182,7 +175,7 @@ define void @load_store_same_pointer_with_different_sizes(ptr %A, ptr %B, i64 %N
 ; CHECK-NEXT:          %gep.B = getelementptr inbounds i8, ptr %B, i64 %off
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %A High: (-3 + (4 * %N) + %A))
+; CHECK-NEXT:          (Low: %A High: ((4 * %N) + %A))
 ; CHECK-NEXT:            Member: {%A,+,4}<nuw><%loop>
 ; CHECK-NEXT:            Member: {%A,+,4}<nuw><%loop>
 ; CHECK-NEXT:        Group GRP1:
@@ -281,7 +274,7 @@ define void @load_store_same_pointer_with_different_sizes_read_only_group(ptr %A
 ; CHECK-NEXT:          %gep.B = getelementptr inbounds i8, ptr %B, i64 %off
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %A High: (-3 + (4 * %N) + %A))
+; CHECK-NEXT:          (Low: %A High: ((4 * %N) + %A))
 ; CHECK-NEXT:            Member: {%A,+,4}<nuw><%loop>
 ; CHECK-NEXT:            Member: {%A,+,4}<nuw><%loop>
 ; CHECK-NEXT:        Group GRP1:
@@ -347,7 +340,7 @@ define void @load_store_same_pointer_with_different_sizes_unknown_dep(ptr %A, pt
 ; CHECK-NEXT:          %gep.B = getelementptr inbounds i8, ptr %B, i64 %off
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %A High: (-3 + (4 * %N) + %A))
+; CHECK-NEXT:          (Low: %A High: ((4 * %N) + %A))
 ; CHECK-NEXT:            Member: {%A,+,4}<nuw><%loop>
 ; CHECK-NEXT:        Group GRP1:
 ; CHECK-NEXT:          (Low: (%k + %A) High: (-3 + (4 * %N) + %k + %A))
@@ -400,25 +393,12 @@ define void @stores_same_pointer_with_different_sizes_unknown_dep(ptr %A, i64 %k
 ; CHECK-NEXT:        Comparing group GRP0:
 ; CHECK-NEXT:          %gep.A = getelementptr inbounds i8, ptr %A, i64 %off
 ; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %gep.A = getelementptr inbounds i8, ptr %A, i64 %off
-; CHECK-NEXT:      Check 1:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.A = getelementptr inbounds i8, ptr %A, i64 %off
-; CHECK-NEXT:        Against group GRP2:
-; CHECK-NEXT:          %gep.K = getelementptr inbounds i8, ptr %A.k, i64 %off
-; CHECK-NEXT:      Check 2:
-; CHECK-NEXT:        Comparing group GRP1:
-; CHECK-NEXT:          %gep.A = getelementptr inbounds i8, ptr %A, i64 %off
-; CHECK-NEXT:        Against group GRP2:
 ; CHECK-NEXT:          %gep.K = getelementptr inbounds i8, ptr %A.k, i64 %off
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
 ; CHECK-NEXT:          (Low: %A High: ((4 * %N) + %A))
 ; CHECK-NEXT:            Member: {%A,+,4}<nuw><%loop>
 ; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %A High: (-3 + (4 * %N) + %A))
-; CHECK-NEXT:            Member: {%A,+,4}<nuw><%loop>
-; CHECK-NEXT:        Group GRP2:
 ; CHECK-NEXT:          (Low: (%k + %A) High: (-3 + (4 * %N) + %k + %A))
 ; CHECK-NEXT:            Member: {(%k + %A),+,4}<nw><%loop>
 ; CHECK-EMPTY:

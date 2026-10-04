@@ -2330,8 +2330,23 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
       continue;
     }
 
+    const DataLayout &DL = TheLoop->getHeader()->getDataLayout();
+    auto StoreSize = [&DL](Type *Ty) { return DL.getTypeStoreSize(Ty); };
     for (auto &Access : AccessInfos) {
-      for (const auto &AccessTy : Accesses[Access]) {
+      // A written pointer is only checked via its write access, so its bounds
+      // must also cover the types it is loaded with. If all sizes are fixed or
+      // all are scalable, the bounds of the widest type cover all others.
+      SmallSetVector<Type *, 1> AccessTys = Accesses.lookup(Access);
+      if (Access.getInt())
+        AccessTys.insert_range(
+            Accesses.lookup(MemAccessInfo(Access.getPointer(), false)));
+      ArrayRef<Type *> Tys = AccessTys.getArrayRef();
+      if (all_equal(map_range(
+              Tys, [&](Type *Ty) { return StoreSize(Ty).isScalable(); })))
+        Tys = *max_element(Tys, [&](Type *A, Type *B) {
+          return TypeSize::isKnownLT(StoreSize(A), StoreSize(B));
+        });
+      for (Type *AccessTy : Tys) {
         if (!createCheckForAccess(RtCheck, Access, AccessTy, StridesMap,
                                   DepSetId, TheLoop, RunningDepId, ASId,
                                   false)) {
