@@ -6072,6 +6072,28 @@ void VPlanTransforms::makeCallWideningDecisions(VPlan &Plan, VFRange &Range,
         break;
       }
 
+      // A widened struct-returning call produces a struct of vectors, from
+      // which no lane can be extracted directly. Turn single-scalar
+      // extractvalue users back into VPInstructions, so they get widened like
+      // the other extractvalue users and their users extract lanes from the
+      // extracted vector instead.
+      if (Decision.Kind != CallWideningDecision::KindTy::Scalarize &&
+          isa<StructType>(VPI.getScalarType())) {
+        for (VPUser *U : to_vector(VPI.users())) {
+          auto *RepR = dyn_cast<VPReplicateRecipe>(U);
+          if (!RepR)
+            continue;
+          assert(RepR->getOpcode() == Instruction::ExtractValue &&
+                 RepR->isSingleScalar() && "unexpected user of struct call");
+          VPInstruction *Extract = VPBuilder(RepR).createNaryOp(
+              Instruction::ExtractValue, RepR->operands(),
+              RepR->getUnderlyingInstr(), *RepR, *RepR, RepR->getDebugLoc(),
+              "", RepR->getScalarType());
+          RepR->replaceAllUsesWith(Extract);
+          RepR->eraseFromParent();
+        }
+      }
+
       Replacement->insertBefore(&VPI);
       VPI.replaceAllUsesWith(Replacement);
       VPI.eraseFromParent();
