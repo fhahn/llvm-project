@@ -466,7 +466,9 @@ struct VPlanTransforms {
                                             PredicatedScalarEvolution &PSE,
                                             const Loop *L);
 
-  /// Add explicit broadcasts for live-ins and VPValues defined in \p Plan's entry block if they are used as vectors.
+  /// Add explicit broadcasts for live-ins and \p Plan's entry block definitions
+  /// used as vectors. Also handle VPInstructions in the vector preheader that
+  /// unconditionally produce scalars.
   static void materializeBroadcasts(VPlan &Plan);
 
   /// Hoist predicated loads from the same address to the loop entry block, if

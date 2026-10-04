@@ -7494,8 +7494,8 @@ static void preparePlanForEpilogueVectorLoop(
               PHBuilder.createICmp(CmpInst::ICMP_EQ, ResumeVPV, StartV);
           ResumeVPV = PHBuilder.createSelect(Cmp, SentinelVPV, ResumeVPV);
         }
-        // TODO: materializeBroadcasts does not cover values in the vector
-        // preheader.
+        // The compare/select can generate vectors. An explicit broadcast
+        // makes it generate a scalar before broadcasting the resume value.
         ReductionPhi->setStartValue(
             PHBuilder.createNaryOp(VPInstruction::Broadcast, ResumeVPV));
         continue;

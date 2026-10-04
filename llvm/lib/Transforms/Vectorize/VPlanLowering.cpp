@@ -720,33 +720,44 @@ void VPlanTransforms::materializeBroadcasts(VPlan &Plan) {
   VPDominatorTree VPDT(Plan);
 #endif
 
+  auto *VectorPreheader = Plan.getVectorPreheader();
   SmallVector<VPValue *> VPValues;
+  // Only materialize broadcasts for recipes that unconditionally produce
+  // scalars. Uniform vector expressions may be cheaper to keep as vectors.
+  for (VPInstruction &R : make_isa_range<VPInstruction>(*VectorPreheader))
+    if (R.isSingleScalar() || R.isVectorToScalar())
+      VPValues.push_back(&R);
   if (VPValue *BTC = Plan.getBackedgeTakenCount())
     VPValues.push_back(BTC);
   append_range(VPValues, Plan.getLiveIns());
   for (VPRecipeBase &R : *Plan.getEntry())
     append_range(VPValues, R.definedValues());
 
-  auto *VectorPreheader = Plan.getVectorPreheader();
   for (VPValue *VPV : VPValues) {
     if (vputils::onlyScalarValuesUsed(VPV) || isa<VPConstant>(VPV))
       continue;
 
     // Add explicit broadcast at the insert point that dominates all users.
-    VPBasicBlock *HoistBlock = VectorPreheader;
+    auto *DefR = VPV->getDefiningRecipe();
+    bool DefinedInPreheader = DefR && DefR->getParent() == VectorPreheader;
     VPBasicBlock::iterator HoistPoint = VectorPreheader->end();
+    if (DefinedInPreheader)
+      HoistPoint = DefR->isPhi() ? VectorPreheader->getFirstNonPhi()
+                                : std::next(DefR->getIterator());
     for (VPUser *User : VPV->users()) {
       if (User->usesScalars(VPV))
         continue;
-      if (cast<VPRecipeBase>(User)->getParent() == VectorPreheader)
-        HoistPoint = HoistBlock->getFirstNonPhi();
-      else
+      if (cast<VPRecipeBase>(User)->getParent() == VectorPreheader) {
+        if (!DefinedInPreheader)
+          HoistPoint = VectorPreheader->getFirstNonPhi();
+      } else {
         assert(VPDT.dominates(VectorPreheader,
                               cast<VPRecipeBase>(User)->getParent()) &&
                "All users must be in the vector preheader or dominated by it");
+      }
     }
 
-    VPBuilder Builder(cast<VPBasicBlock>(HoistBlock), HoistPoint);
+    VPBuilder Builder(VectorPreheader, HoistPoint);
     auto *Broadcast = Builder.createNaryOp(VPInstruction::Broadcast, {VPV});
     VPV->replaceUsesWithIf(Broadcast,
                            [VPV, Broadcast](VPUser &U, unsigned Idx) {
