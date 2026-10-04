@@ -2986,8 +2986,10 @@ SCEVUse ScalarEvolution::getAddExpr(SmallVectorImpl<SCEVUse> &Ops,
 /// flags on the operands.
 static const SCEVAddRecExpr *
 getCanonicalAddRecWithSameShape(const SCEVAddRecExpr *AR) {
+  if (AR->getCanonical() == AR)
+    return nullptr;
   auto *Canonical = dyn_cast<SCEVAddRecExpr>(AR->getCanonical());
-  if (!Canonical || Canonical == AR || Canonical->getLoop() != AR->getLoop() ||
+  if (!Canonical || Canonical->getLoop() != AR->getLoop() ||
       Canonical->getNumOperands() != AR->getNumOperands())
     return nullptr;
   for (auto [CanonicalOp, Op] : zip(Canonical->operands(), AR->operands()))
@@ -6468,9 +6470,10 @@ void ScalarEvolution::setNoWrapFlags(SCEVAddRecExpr *AddRec, SCEVFlags Flags) {
     UnsignedRanges.erase(AddRec);
     SignedRanges.erase(AddRec);
     ConstantMultipleCache.erase(AddRec);
+    if (const SCEVAddRecExpr *Canonical =
+            getCanonicalAddRecWithSameShape(AddRec))
+      setNoWrapFlags(const_cast<SCEVAddRecExpr *>(Canonical), NWFlags);
   }
-  if (const SCEVAddRecExpr *Canonical = getCanonicalAddRecWithSameShape(AddRec))
-    setNoWrapFlags(const_cast<SCEVAddRecExpr *>(Canonical), NWFlags);
 }
 
 ConstantRange ScalarEvolution::
