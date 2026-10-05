@@ -948,24 +948,48 @@ Align DataLayout::getAlignment(Type *Ty, bool abi_or_pref) const {
   }
 }
 
+// The less common cases of getTypeAllocSize are kept out of line and reached
+// by tail calls. Their non-tail calls (getStructLayout, the recursive
+// getTypeAllocSize, getTypeStoreSize, getABITypeAlign and
+// TargetExtType::getLayoutType) need callee-saved registers. Keeping these
+// calls out of getTypeAllocSize means the hot integer and pointer cases do not
+// save and restore those registers on every call.
+LLVM_ATTRIBUTE_NOINLINE static TypeSize
+getArrayAllocSize(const DataLayout &DL, ArrayType *ATy) {
+  // The alignment of the array is the alignment of the element, so there
+  // is no need for further adjustment.
+  return ATy->getNumElements() * DL.getTypeAllocSize(ATy->getElementType());
+}
+
+LLVM_ATTRIBUTE_NOINLINE static TypeSize
+getStructAllocSize(const DataLayout &DL, StructType *STy,
+                   Align StructABIAlignment) {
+  const StructLayout *Layout = DL.getStructLayout(STy);
+  TypeSize Size = Layout->getSizeInBytes();
+
+  if (STy->isPacked())
+    return Size;
+
+  Align A = std::max(StructABIAlignment, Layout->getAlignment());
+  return alignTo(Size, A.value());
+}
+
+LLVM_ATTRIBUTE_NOINLINE static TypeSize
+getOtherTypeAllocSize(const DataLayout &DL, Type *Ty) {
+  // Target extension types are handled here, not in getTypeAllocSize: there,
+  // the recursive tail call becomes a loop around the getLayoutType call,
+  // which brings back the callee-saved register save and restore.
+  if (auto *TTy = dyn_cast<TargetExtType>(Ty))
+    return DL.getTypeAllocSize(TTy->getLayoutType());
+  return alignTo(DL.getTypeStoreSize(Ty), DL.getABITypeAlign(Ty).value());
+}
+
 TypeSize DataLayout::getTypeAllocSize(Type *Ty) const {
   switch (Ty->getTypeID()) {
-  case Type::ArrayTyID: {
-    // The alignment of the array is the alignment of the element, so there
-    // is no need for further adjustment.
-    auto *ATy = cast<ArrayType>(Ty);
-    return ATy->getNumElements() * getTypeAllocSize(ATy->getElementType());
-  }
-  case Type::StructTyID: {
-    const StructLayout *Layout = getStructLayout(cast<StructType>(Ty));
-    TypeSize Size = Layout->getSizeInBytes();
-
-    if (cast<StructType>(Ty)->isPacked())
-      return Size;
-
-    Align A = std::max(StructABIAlignment, Layout->getAlignment());
-    return alignTo(Size, A.value());
-  }
+  case Type::ArrayTyID:
+    return getArrayAllocSize(*this, cast<ArrayType>(Ty));
+  case Type::StructTyID:
+    return getStructAllocSize(*this, cast<StructType>(Ty), StructABIAlignment);
   case Type::IntegerTyID: {
     unsigned BitWidth = Ty->getIntegerBitWidth();
     TypeSize Size = TypeSize::getFixed(divideCeil(BitWidth, 8));
@@ -977,12 +1001,8 @@ TypeSize DataLayout::getTypeAllocSize(Type *Ty) const {
     TypeSize Size = TypeSize::getFixed(getPointerSize(AS));
     return alignTo(Size, getPointerABIAlignment(AS).value());
   }
-  case Type::TargetExtTyID: {
-    Type *LayoutTy = cast<TargetExtType>(Ty)->getLayoutType();
-    return getTypeAllocSize(LayoutTy);
-  }
   default:
-    return alignTo(getTypeStoreSize(Ty), getABITypeAlign(Ty).value());
+    return getOtherTypeAllocSize(*this, Ty);
   }
 }
 
