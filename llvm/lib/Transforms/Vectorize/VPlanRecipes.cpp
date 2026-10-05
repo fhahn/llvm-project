@@ -605,6 +605,21 @@ Type *VPReplicateRecipe::computeScalarType(const Instruction *I,
   return computeScalarTypeForInstruction(Opcode, Operands);
 }
 
+/// Returns true if VPInstructions with \p Opcode always produce a single
+/// scalar.
+static bool isAlwaysSingleScalar(unsigned Opcode) {
+  switch (Opcode) {
+  case Instruction::Load:
+  case Instruction::PHI:
+  case VPInstruction::ExplicitVectorLength:
+  case VPInstruction::ResumeForEpilogue:
+  case VPInstruction::Intrinsic:
+    return true;
+  default:
+    return Instruction::isCast(Opcode);
+  }
+}
+
 VPInstruction::VPInstruction(unsigned Opcode, ArrayRef<VPValue *> Operands,
                              const VPIRFlags &Flags, const VPIRMetadata &MD,
                              DebugLoc DL, const Twine &Name, Type *ResultTy)
@@ -1618,16 +1633,7 @@ bool VPInstruction::isVectorToScalar() const {
 }
 
 bool VPInstruction::isSingleScalar() const {
-  switch (getOpcode()) {
-  case Instruction::Load:
-  case Instruction::PHI:
-  case VPInstruction::ExplicitVectorLength:
-  case VPInstruction::ResumeForEpilogue:
-  case VPInstruction::Intrinsic:
-    return true;
-  default:
-    return Instruction::isCast(getOpcode());
-  }
+  return isAlwaysSingleScalar(getOpcode());
 }
 
 void VPInstruction::addOperand(VPValue *Op) {
