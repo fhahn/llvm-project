@@ -481,7 +481,9 @@ static const MDNode *getLeastCommonType(const MDNode *A, const MDNode *B) {
   SmallPtrSet<const MDNode *, 4> PathB;
   TBAANode TB(B);
   while (TB.getNode()) {
-    // A common node also has an acyclic suffix, already checked above.
+    // Each type node has a unique parent, so the first node on B's chain that
+    // is also on A's chain is the nearest common ancestor, and the rest of
+    // B's chain is A's suffix, which was already checked for cycles.
     if (PathA.contains(TB.getNode()))
       return TB.getNode();
     if (!PathB.insert(TB.getNode()).second)
