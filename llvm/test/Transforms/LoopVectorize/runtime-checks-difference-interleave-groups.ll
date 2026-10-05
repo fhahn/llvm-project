@@ -14,83 +14,87 @@ define void @interleave_group_reorders_diff_checked_accesses(ptr %a, ptr %c, ptr
 ; CHECK-LABEL: define void @interleave_group_reorders_diff_checked_accesses(
 ; CHECK-SAME: ptr [[A:%.*]], ptr [[C:%.*]], ptr [[E:%.*]], ptr [[P:%.*]], i64 [[S:%.*]], i64 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    [[A7:%.*]] = ptrtoaddr ptr [[A]] to i64
-; CHECK-NEXT:    [[P3:%.*]] = ptrtoaddr ptr [[P]] to i64
-; CHECK-NEXT:    [[C2:%.*]] = ptrtoaddr ptr [[C]] to i64
-; CHECK-NEXT:    [[E1:%.*]] = ptrtoaddr ptr [[E]] to i64
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 [[E1]], [[C2]]
-; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], 1
-; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP1]], 31
-; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[S]], [[P3]]
-; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[C2]], [[TMP2]]
-; CHECK-NEXT:    [[TMP4:%.*]] = sub i64 [[TMP3]], 1
-; CHECK-NEXT:    [[DIFF_CHECK4:%.*]] = icmp ult i64 [[TMP4]], 31
-; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[DIFF_CHECK]], [[DIFF_CHECK4]]
-; CHECK-NEXT:    [[TMP5:%.*]] = sub i64 [[C2]], [[P3]]
-; CHECK-NEXT:    [[TMP6:%.*]] = sub i64 [[TMP5]], 1
-; CHECK-NEXT:    [[DIFF_CHECK5:%.*]] = icmp ult i64 [[TMP6]], 31
-; CHECK-NEXT:    [[CONFLICT_RDX6:%.*]] = or i1 [[CONFLICT_RDX]], [[DIFF_CHECK5]]
-; CHECK-NEXT:    [[TMP7:%.*]] = sub i64 [[A7]], [[C2]]
-; CHECK-NEXT:    [[TMP8:%.*]] = sub i64 [[TMP7]], 1
-; CHECK-NEXT:    [[DIFF_CHECK8:%.*]] = icmp ult i64 [[TMP8]], 31
-; CHECK-NEXT:    [[CONFLICT_RDX9:%.*]] = or i1 [[CONFLICT_RDX6]], [[DIFF_CHECK8]]
-; CHECK-NEXT:    [[TMP9:%.*]] = add i64 [[C2]], -4
-; CHECK-NEXT:    [[TMP10:%.*]] = sub i64 [[TMP9]], [[A7]]
-; CHECK-NEXT:    [[TMP11:%.*]] = sub i64 [[TMP10]], 1
-; CHECK-NEXT:    [[DIFF_CHECK10:%.*]] = icmp ult i64 [[TMP11]], 31
-; CHECK-NEXT:    [[CONFLICT_RDX11:%.*]] = or i1 [[CONFLICT_RDX9]], [[DIFF_CHECK10]]
-; CHECK-NEXT:    [[TMP12:%.*]] = sub i64 [[E1]], [[TMP2]]
-; CHECK-NEXT:    [[TMP13:%.*]] = sub i64 [[TMP12]], 1
-; CHECK-NEXT:    [[DIFF_CHECK12:%.*]] = icmp ult i64 [[TMP13]], 31
-; CHECK-NEXT:    [[CONFLICT_RDX13:%.*]] = or i1 [[CONFLICT_RDX11]], [[DIFF_CHECK12]]
-; CHECK-NEXT:    [[TMP14:%.*]] = sub i64 [[E1]], [[P3]]
-; CHECK-NEXT:    [[TMP15:%.*]] = sub i64 [[TMP14]], 1
-; CHECK-NEXT:    [[DIFF_CHECK14:%.*]] = icmp ult i64 [[TMP15]], 31
-; CHECK-NEXT:    [[CONFLICT_RDX15:%.*]] = or i1 [[CONFLICT_RDX13]], [[DIFF_CHECK14]]
-; CHECK-NEXT:    [[TMP16:%.*]] = sub i64 [[E1]], [[A7]]
-; CHECK-NEXT:    [[TMP17:%.*]] = sub i64 [[TMP16]], 1
-; CHECK-NEXT:    [[DIFF_CHECK16:%.*]] = icmp ult i64 [[TMP17]], 31
-; CHECK-NEXT:    [[CONFLICT_RDX17:%.*]] = or i1 [[CONFLICT_RDX15]], [[DIFF_CHECK16]]
-; CHECK-NEXT:    [[TMP18:%.*]] = add i64 [[E1]], -4
-; CHECK-NEXT:    [[TMP19:%.*]] = sub i64 [[TMP18]], [[A7]]
-; CHECK-NEXT:    [[TMP20:%.*]] = sub i64 [[TMP19]], 1
-; CHECK-NEXT:    [[DIFF_CHECK18:%.*]] = icmp ult i64 [[TMP20]], 31
-; CHECK-NEXT:    [[CONFLICT_RDX19:%.*]] = or i1 [[CONFLICT_RDX17]], [[DIFF_CHECK18]]
-; CHECK-NEXT:    br i1 [[CONFLICT_RDX19]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[N]], 3
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[C]], i64 [[TMP0]]
+; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr [[E]], i64 [[TMP0]]
+; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr [[P]], i64 [[S]]
+; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[S]], [[TMP0]]
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr [[P]], i64 [[TMP4]]
+; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr i8, ptr [[P]], i64 [[TMP0]]
+; CHECK-NEXT:    [[TMP7:%.*]] = add i64 [[TMP0]], -4
+; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP7]]
+; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr nuw i8, ptr [[A]], i64 4
+; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP0]]
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[C]], [[TMP2]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[E]], [[TMP1]]
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    [[BOUND039:%.*]] = icmp ult ptr [[C]], [[TMP5]]
+; CHECK-NEXT:    [[BOUND140:%.*]] = icmp ult ptr [[TMP3]], [[TMP1]]
+; CHECK-NEXT:    [[FOUND_CONFLICT41:%.*]] = and i1 [[BOUND039]], [[BOUND140]]
+; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT41]]
+; CHECK-NEXT:    [[BOUND042:%.*]] = icmp ult ptr [[C]], [[TMP6]]
+; CHECK-NEXT:    [[BOUND143:%.*]] = icmp ult ptr [[P]], [[TMP1]]
+; CHECK-NEXT:    [[FOUND_CONFLICT44:%.*]] = and i1 [[BOUND042]], [[BOUND143]]
+; CHECK-NEXT:    [[CONFLICT_RDX45:%.*]] = or i1 [[CONFLICT_RDX]], [[FOUND_CONFLICT44]]
+; CHECK-NEXT:    [[BOUND046:%.*]] = icmp ult ptr [[C]], [[TMP8]]
+; CHECK-NEXT:    [[BOUND147:%.*]] = icmp ult ptr [[A]], [[TMP1]]
+; CHECK-NEXT:    [[FOUND_CONFLICT48:%.*]] = and i1 [[BOUND046]], [[BOUND147]]
+; CHECK-NEXT:    [[CONFLICT_RDX49:%.*]] = or i1 [[CONFLICT_RDX45]], [[FOUND_CONFLICT48]]
+; CHECK-NEXT:    [[BOUND050:%.*]] = icmp ult ptr [[C]], [[TMP10]]
+; CHECK-NEXT:    [[BOUND151:%.*]] = icmp ult ptr [[TMP9]], [[TMP1]]
+; CHECK-NEXT:    [[FOUND_CONFLICT52:%.*]] = and i1 [[BOUND050]], [[BOUND151]]
+; CHECK-NEXT:    [[CONFLICT_RDX53:%.*]] = or i1 [[CONFLICT_RDX49]], [[FOUND_CONFLICT52]]
+; CHECK-NEXT:    [[BOUND054:%.*]] = icmp ult ptr [[E]], [[TMP5]]
+; CHECK-NEXT:    [[BOUND155:%.*]] = icmp ult ptr [[TMP3]], [[TMP2]]
+; CHECK-NEXT:    [[FOUND_CONFLICT56:%.*]] = and i1 [[BOUND054]], [[BOUND155]]
+; CHECK-NEXT:    [[CONFLICT_RDX57:%.*]] = or i1 [[CONFLICT_RDX53]], [[FOUND_CONFLICT56]]
+; CHECK-NEXT:    [[BOUND058:%.*]] = icmp ult ptr [[E]], [[TMP6]]
+; CHECK-NEXT:    [[BOUND159:%.*]] = icmp ult ptr [[P]], [[TMP2]]
+; CHECK-NEXT:    [[FOUND_CONFLICT60:%.*]] = and i1 [[BOUND058]], [[BOUND159]]
+; CHECK-NEXT:    [[CONFLICT_RDX61:%.*]] = or i1 [[CONFLICT_RDX57]], [[FOUND_CONFLICT60]]
+; CHECK-NEXT:    [[BOUND062:%.*]] = icmp ult ptr [[E]], [[TMP8]]
+; CHECK-NEXT:    [[BOUND163:%.*]] = icmp ult ptr [[A]], [[TMP2]]
+; CHECK-NEXT:    [[FOUND_CONFLICT64:%.*]] = and i1 [[BOUND062]], [[BOUND163]]
+; CHECK-NEXT:    [[CONFLICT_RDX65:%.*]] = or i1 [[CONFLICT_RDX61]], [[FOUND_CONFLICT64]]
+; CHECK-NEXT:    [[BOUND066:%.*]] = icmp ult ptr [[E]], [[TMP10]]
+; CHECK-NEXT:    [[BOUND167:%.*]] = icmp ult ptr [[TMP9]], [[TMP2]]
+; CHECK-NEXT:    [[FOUND_CONFLICT68:%.*]] = and i1 [[BOUND066]], [[BOUND167]]
+; CHECK-NEXT:    [[CONFLICT_RDX69:%.*]] = or i1 [[CONFLICT_RDX65]], [[FOUND_CONFLICT68]]
+; CHECK-NEXT:    br i1 [[CONFLICT_RDX69]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
-; CHECK-NEXT:    [[TMP21:%.*]] = and i64 [[N]], 3
-; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[TMP21]]
-; CHECK-NEXT:    [[TMP22:%.*]] = getelementptr inbounds i8, ptr [[P]], i64 [[S]]
+; CHECK-NEXT:    [[TMP11:%.*]] = and i64 [[N]], 3
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[TMP11]]
+; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds i8, ptr [[P]], i64 [[S]]
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i64> [ <i64 0, i64 1, i64 2, i64 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[TMP23:%.*]] = getelementptr inbounds i64, ptr [[P]], i64 [[INDEX]]
-; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i64>, ptr [[TMP23]], align 8
-; CHECK-NEXT:    [[TMP24:%.*]] = getelementptr inbounds i64, ptr [[TMP22]], i64 [[INDEX]]
-; CHECK-NEXT:    [[WIDE_LOAD20:%.*]] = load <4 x i64>, ptr [[TMP24]], align 8
-; CHECK-NEXT:    [[TMP25:%.*]] = shl nuw nsw i64 [[INDEX]], 1
-; CHECK-NEXT:    [[TMP26:%.*]] = or disjoint i64 [[TMP25]], 1
-; CHECK-NEXT:    [[TMP27:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[TMP26]]
-; CHECK-NEXT:    [[TMP28:%.*]] = getelementptr inbounds i8, ptr [[TMP27]], i32 -4
-; CHECK-NEXT:    [[WIDE_VEC:%.*]] = load <8 x i32>, ptr [[TMP28]], align 4
+; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr inbounds i64, ptr [[P]], i64 [[INDEX]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i64>, ptr [[TMP13]], align 8, !alias.scope [[META0:![0-9]+]]
+; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr inbounds i64, ptr [[TMP12]], i64 [[INDEX]]
+; CHECK-NEXT:    [[WIDE_LOAD70:%.*]] = load <4 x i64>, ptr [[TMP14]], align 8, !alias.scope [[META3:![0-9]+]]
+; CHECK-NEXT:    [[TMP15:%.*]] = shl nuw nsw i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP16:%.*]] = or disjoint i64 [[TMP15]], 1
+; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[TMP16]]
+; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr inbounds i8, ptr [[TMP17]], i32 -4
+; CHECK-NEXT:    [[WIDE_VEC:%.*]] = load <8 x i32>, ptr [[TMP18]], align 4
 ; CHECK-NEXT:    [[STRIDED_VEC:%.*]] = shufflevector <8 x i32> [[WIDE_VEC]], <8 x i32> poison, <4 x i32> <i32 0, i32 2, i32 4, i32 6>
-; CHECK-NEXT:    [[STRIDED_VEC21:%.*]] = shufflevector <8 x i32> [[WIDE_VEC]], <8 x i32> poison, <4 x i32> <i32 1, i32 3, i32 5, i32 7>
-; CHECK-NEXT:    [[TMP29:%.*]] = getelementptr inbounds i64, ptr [[C]], i64 [[INDEX]]
-; CHECK-NEXT:    store <4 x i64> [[VEC_IND]], ptr [[TMP29]], align 8
-; CHECK-NEXT:    [[TMP30:%.*]] = add <4 x i32> [[STRIDED_VEC]], [[STRIDED_VEC21]]
-; CHECK-NEXT:    [[TMP31:%.*]] = zext <4 x i32> [[TMP30]] to <4 x i64>
-; CHECK-NEXT:    [[TMP32:%.*]] = add <4 x i64> [[WIDE_LOAD]], [[WIDE_LOAD20]]
-; CHECK-NEXT:    [[TMP33:%.*]] = add <4 x i64> [[TMP31]], [[TMP32]]
-; CHECK-NEXT:    [[TMP34:%.*]] = getelementptr inbounds i64, ptr [[E]], i64 [[INDEX]]
-; CHECK-NEXT:    store <4 x i64> [[TMP33]], ptr [[TMP34]], align 8
+; CHECK-NEXT:    [[STRIDED_VEC71:%.*]] = shufflevector <8 x i32> [[WIDE_VEC]], <8 x i32> poison, <4 x i32> <i32 1, i32 3, i32 5, i32 7>
+; CHECK-NEXT:    [[TMP19:%.*]] = getelementptr inbounds i64, ptr [[C]], i64 [[INDEX]]
+; CHECK-NEXT:    store <4 x i64> [[VEC_IND]], ptr [[TMP19]], align 8, !alias.scope [[META5:![0-9]+]], !noalias [[META7:![0-9]+]]
+; CHECK-NEXT:    [[TMP20:%.*]] = add <4 x i32> [[STRIDED_VEC]], [[STRIDED_VEC71]]
+; CHECK-NEXT:    [[TMP21:%.*]] = zext <4 x i32> [[TMP20]] to <4 x i64>
+; CHECK-NEXT:    [[TMP22:%.*]] = add <4 x i64> [[WIDE_LOAD]], [[WIDE_LOAD70]]
+; CHECK-NEXT:    [[TMP23:%.*]] = add <4 x i64> [[TMP21]], [[TMP22]]
+; CHECK-NEXT:    [[TMP24:%.*]] = getelementptr inbounds i64, ptr [[E]], i64 [[INDEX]]
+; CHECK-NEXT:    store <4 x i64> [[TMP23]], ptr [[TMP24]], align 8, !alias.scope [[META11:![0-9]+]], !noalias [[META12:![0-9]+]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[VEC_IND]], splat (i64 4)
-; CHECK-NEXT:    [[TMP35:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP35]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
+; CHECK-NEXT:    [[TMP25:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP25]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP13:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
@@ -120,7 +124,7 @@ define void @interleave_group_reorders_diff_checked_accesses(ptr %a, ptr %c, ptr
 ; CHECK-NEXT:    store i64 [[RES]], ptr [[GEP_E]], align 8
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
 ; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
-; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP3:![0-9]+]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP16:![0-9]+]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void
 ;
@@ -233,7 +237,7 @@ define void @access_sizes_match_step(ptr %a, ptr %b, ptr %c, ptr %e, ptr %p, i64
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <4 x i64> [[VEC_IND]], splat (i64 4)
 ; CHECK-NEXT:    [[TMP30:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP30]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP30]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP17:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
@@ -260,7 +264,7 @@ define void @access_sizes_match_step(ptr %a, ptr %b, ptr %c, ptr %e, ptr %p, i64
 ; CHECK-NEXT:    store i64 [[RES]], ptr [[GEP_E]], align 8
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
 ; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
-; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP5:![0-9]+]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP18:![0-9]+]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void
 ;
@@ -293,10 +297,23 @@ exit:
   ret void
 }
 ;.
-; CHECK: [[LOOP0]] = distinct !{[[LOOP0]], [[META1:![0-9]+]], [[META2:![0-9]+]]}
-; CHECK: [[META1]] = !{!"llvm.loop.isvectorized", i32 1}
-; CHECK: [[META2]] = !{!"llvm.loop.unroll.runtime.disable"}
-; CHECK: [[LOOP3]] = distinct !{[[LOOP3]], [[META1]]}
-; CHECK: [[LOOP4]] = distinct !{[[LOOP4]], [[META1]], [[META2]]}
-; CHECK: [[LOOP5]] = distinct !{[[LOOP5]], [[META1]]}
+; CHECK: [[META0]] = !{[[META1:![0-9]+]]}
+; CHECK: [[META1]] = distinct !{[[META1]], [[META2:![0-9]+]]}
+; CHECK: [[META2]] = distinct !{[[META2]], i1 false, !"LVerDomain"}
+; CHECK: [[META3]] = !{[[META4:![0-9]+]]}
+; CHECK: [[META4]] = distinct !{[[META4]], [[META2]]}
+; CHECK: [[META5]] = !{[[META6:![0-9]+]]}
+; CHECK: [[META6]] = distinct !{[[META6]], [[META2]]}
+; CHECK: [[META7]] = !{[[META8:![0-9]+]], [[META4]], [[META1]], [[META9:![0-9]+]], [[META10:![0-9]+]]}
+; CHECK: [[META8]] = distinct !{[[META8]], [[META2]]}
+; CHECK: [[META9]] = distinct !{[[META9]], [[META2]]}
+; CHECK: [[META10]] = distinct !{[[META10]], [[META2]]}
+; CHECK: [[META11]] = !{[[META8]]}
+; CHECK: [[META12]] = !{[[META4]], [[META1]], [[META9]], [[META10]]}
+; CHECK: [[LOOP13]] = distinct !{[[LOOP13]], [[META14:![0-9]+]], [[META15:![0-9]+]]}
+; CHECK: [[META14]] = !{!"llvm.loop.isvectorized", i32 1}
+; CHECK: [[META15]] = !{!"llvm.loop.unroll.runtime.disable"}
+; CHECK: [[LOOP16]] = distinct !{[[LOOP16]], [[META14]]}
+; CHECK: [[LOOP17]] = distinct !{[[LOOP17]], [[META14]], [[META15]]}
+; CHECK: [[LOOP18]] = distinct !{[[LOOP18]], [[META14]]}
 ;.

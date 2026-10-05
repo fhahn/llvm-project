@@ -604,13 +604,14 @@ bool RuntimePointerChecking::tryToCreateDiffCheck(
     return false;
 
   const DataLayout &DL = InnerLoop->getHeader()->getDataLayout();
-  unsigned AllocSize =
-      std::max(DL.getTypeAllocSize(SrcTy), DL.getTypeAllocSize(DstTy));
+  unsigned AllocSize = DL.getTypeAllocSize(SrcTy);
 
-  // Only matching constant steps matching the AllocSize are supported at the
-  // moment. This simplifies the difference computation. Can be extended in the
-  // future.
-  if (Step->getAPInt().abs() != AllocSize)
+  // Only constant steps matching the alloc sizes of both accesses are
+  // supported. The diff check treats equal start addresses as safe, which
+  // requires Src to stay before Sink within an iteration. Accesses smaller
+  // than the step may be part of interleave groups, which can reorder them.
+  if (Step->getAPInt().abs() != AllocSize ||
+      DL.getTypeAllocSize(DstTy) != AllocSize)
     return false;
 
   // When counting down, the dependence distance needs to be swapped.
