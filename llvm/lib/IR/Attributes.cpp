@@ -1353,12 +1353,17 @@ bool AttributeSetNode::hasAttribute(StringRef Kind) const {
   return StringAttrs.count(Kind);
 }
 
-std::optional<Attribute>
+inline std::optional<Attribute>
 AttributeSetNode::findEnumAttribute(Attribute::AttrKind Kind) const {
-  // Do a quick presence check.
+  // Do a quick presence check. The search is a separate function, which keeps
+  // this one small enough for GCC to inline into its callers.
   if (!hasAttribute(Kind))
     return std::nullopt;
+  return findPresentEnumAttribute(Kind);
+}
 
+Attribute
+AttributeSetNode::findPresentEnumAttribute(Attribute::AttrKind Kind) const {
   // Attributes in a set are sorted by enum value, followed by string
   // attributes. Binary search the one we want.
   const Attribute *I =
@@ -1366,7 +1371,7 @@ AttributeSetNode::findEnumAttribute(Attribute::AttrKind Kind) const {
                        [](Attribute A, Attribute::AttrKind Kind) {
                          return A.getKindAsEnum() < Kind;
                        });
-  assert(I != end() && I->hasAttribute(Kind) && "Presence check failed?");
+  assert(I != end() && I->hasAttribute(Kind) && "Attribute must be present");
   return *I;
 }
 
