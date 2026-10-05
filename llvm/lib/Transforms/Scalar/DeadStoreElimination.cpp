@@ -1192,6 +1192,49 @@ LocationSize DSEState::strengthenLocationSize(const Instruction *I,
   return Size;
 }
 
+/// Return how an access of \p KillingSize bytes at \p KillingOff overwrites an
+/// access of \p DeadSize bytes at \p DeadOff. Both offsets must be relative to
+/// the same base pointer and taken in the same index width, and both accesses
+/// must end at or before the largest signed index of that width.
+static OverwriteResult isOverwriteAtConstantOffsets(int64_t KillingOff,
+                                                    uint64_t KillingSize,
+                                                    int64_t DeadOff,
+                                                    uint64_t DeadSize) {
+  // The killing access completely overlaps the dead store if and only if
+  // both start and end of the dead one is "inside" the killing one:
+  //    |<->|--dead--|<->|
+  //    |-----killing------|
+  // Accesses may overlap if and only if start of one of them is "inside"
+  // another one:
+  //    |<->|--dead--|<-------->|
+  //    |-------killing--------|
+  //           OR
+  //    |-------dead-------|
+  //    |<->|---killing---|<----->|
+  //
+  // We have to be careful here as *Off is signed while *Size is unsigned.
+
+  // Check if the dead access starts "not before" the killing one.
+  if (DeadOff >= KillingOff) {
+    // If the dead access ends "not after" the killing access then the
+    // dead one is completely overwritten by the killing one.
+    if (uint64_t(DeadOff) - uint64_t(KillingOff) + DeadSize <= KillingSize)
+      return OW_Complete;
+    // If start of the dead access is "before" end of the killing access
+    // then accesses overlap.
+    else if (uint64_t(DeadOff) - uint64_t(KillingOff) < KillingSize)
+      return OW_MaybePartial;
+  }
+  // If start of the killing access is "before" end of the dead access then
+  // accesses overlap.
+  else if (uint64_t(KillingOff) - uint64_t(DeadOff) < DeadSize) {
+    return OW_MaybePartial;
+  }
+
+  // Can reach here only if accesses are known not to overlap.
+  return OW_None;
+}
+
 OverwriteResult DSEState::isOverwrite(const Instruction *KillingI,
                                       const Instruction *DeadI,
                                       const MemoryLocation &KillingLoc,
@@ -1247,6 +1290,40 @@ OverwriteResult DSEState::isOverwrite(const Instruction *KillingI,
 
   if (AnyScalable)
     return OW_Unknown;
+
+  // If both accesses are to the same object, try to decompose the pointers
+  // into a "base + constant_offset" form. If the base pointers are equal, the
+  // offsets and sizes determine how the accesses overlap, and the AA-based
+  // checks below can only return OW_Complete if the offsets do too, so skip
+  // the AA query.
+  if (DeadUndObj == KillingUndObj) {
+    const Value *DeadBasePtr =
+        GetPointerBaseWithConstantOffset(DeadPtr, DeadOff, DL);
+    const Value *KillingBasePtr =
+        GetPointerBaseWithConstantOffset(KillingPtr, KillingOff, DL);
+    // The offsets are taken in the index width of DeadPtr and KillingPtr
+    // respectively, which can differ if the base was reached through an
+    // addrspacecast. Offsets modulo different widths cannot be compared.
+    unsigned IdxWidth = DL.getIndexTypeSizeInBits(DeadPtr->getType());
+    // The offsets are signed values of the index width, and the addresses
+    // they describe wrap around modulo 2^IndexWidth. Only reason about
+    // accesses whose (exclusive) end does not exceed the largest signed index:
+    // then neither access wraps, the int64_t arithmetic in
+    // isOverwriteAtConstantOffsets and isPartialOverwrite does not overflow,
+    // and comparing offsets as integers matches comparing addresses.
+    uint64_t MaxOff = maxIntN(std::min(IdxWidth, 64u));
+    auto EndsInIndexRange = [MaxOff](int64_t Off, uint64_t Size) {
+      return Size <= MaxOff - uint64_t(Off);
+    };
+    if (DeadBasePtr == KillingBasePtr &&
+        IdxWidth == DL.getIndexTypeSizeInBits(KillingPtr->getType()) &&
+        EndsInIndexRange(DeadOff, DeadSize.getFixedValue()) &&
+        EndsInIndexRange(KillingOff, KillingSize.getFixedValue()))
+      return isOverwriteAtConstantOffsets(
+          KillingOff, KillingSize.getFixedValue(), DeadOff,
+          DeadSize.getFixedValue());
+  }
+
   // Query the alias information
   AliasResult AAR = BatchAA.alias(KillingLoc, DeadLoc);
 
@@ -1265,85 +1342,14 @@ OverwriteResult DSEState::isOverwrite(const Instruction *KillingI,
       return OW_Complete;
   }
 
-  // If we can't resolve the same pointers to the same object, then we can't
-  // analyze them at all.
-  if (DeadUndObj != KillingUndObj) {
-    // Non aliasing stores to different objects don't overlap. Note that
-    // if the killing store is known to overwrite whole object (out of
-    // bounds access overwrites whole object as well) then it is assumed to
-    // completely overwrite any store to the same object even if they don't
-    // actually alias (see next check).
-    if (AAR == AliasResult::NoAlias)
-      return OW_None;
-    return OW_Unknown;
-  }
-
-  // Okay, we have stores to two completely different pointers.  Try to
-  // decompose the pointer into a "base + constant_offset" form.  If the base
-  // pointers are equal, then we can reason about the two stores.
-  DeadOff = 0;
-  KillingOff = 0;
-  const Value *DeadBasePtr =
-      GetPointerBaseWithConstantOffset(DeadPtr, DeadOff, DL);
-  const Value *KillingBasePtr =
-      GetPointerBaseWithConstantOffset(KillingPtr, KillingOff, DL);
-
-  // If the base pointers still differ, we have two completely different
-  // stores. The offsets are taken in the index width of DeadPtr and KillingPtr
-  // respectively, which can differ if the base was reached through an
-  // addrspacecast. Offsets modulo different widths cannot be compared.
-  unsigned IdxWidth = DL.getIndexTypeSizeInBits(DeadPtr->getType());
-  if (DeadBasePtr != KillingBasePtr ||
-      IdxWidth != DL.getIndexTypeSizeInBits(KillingPtr->getType()))
-    return OW_Unknown;
-
-  // The offsets are signed values of the index width, and the addresses they
-  // describe wrap around modulo 2^IndexWidth. Only reason about accesses whose
-  // (exclusive) end does not exceed the largest signed index: then neither
-  // access wraps, the int64_t arithmetic below and in isPartialOverwrite does
-  // not overflow, and comparing offsets as integers matches comparing
-  // addresses.
-  uint64_t MaxOff = maxIntN(std::min(IdxWidth, 64u));
-  auto EndsInIndexRange = [MaxOff](int64_t Off, uint64_t Size) {
-    return Size <= MaxOff - uint64_t(Off);
-  };
-  if (!EndsInIndexRange(DeadOff, DeadSize.getFixedValue()) ||
-      !EndsInIndexRange(KillingOff, KillingSize.getFixedValue()))
-    return OW_Unknown;
-
-  // The killing access completely overlaps the dead store if and only if
-  // both start and end of the dead one is "inside" the killing one:
-  //    |<->|--dead--|<->|
-  //    |-----killing------|
-  // Accesses may overlap if and only if start of one of them is "inside"
-  // another one:
-  //    |<->|--dead--|<-------->|
-  //    |-------killing--------|
-  //           OR
-  //    |-------dead-------|
-  //    |<->|---killing---|<----->|
-  //
-  // We have to be careful here as *Off is signed while *.Size is unsigned.
-
-  // Check if the dead access starts "not before" the killing one.
-  if (DeadOff >= KillingOff) {
-    // If the dead access ends "not after" the killing access then the
-    // dead one is completely overwritten by the killing one.
-    if (uint64_t(DeadOff) - uint64_t(KillingOff) + DeadSize <= KillingSize)
-      return OW_Complete;
-    // If start of the dead access is "before" end of the killing access
-    // then accesses overlap.
-    else if (uint64_t(DeadOff) - uint64_t(KillingOff) < KillingSize)
-      return OW_MaybePartial;
-  }
-  // If start of the killing access is "before" end of the dead access then
-  // accesses overlap.
-  else if (uint64_t(KillingOff) - uint64_t(DeadOff) < DeadSize) {
-    return OW_MaybePartial;
-  }
-
-  // Can reach here only if accesses are known not to overlap.
-  return OW_None;
+  // Non aliasing stores to different objects don't overlap. Note that
+  // if the killing store is known to overwrite whole object (out of
+  // bounds access overwrites whole object as well) then it is assumed to
+  // completely overwrite any store to the same object even if they don't
+  // actually alias.
+  if (DeadUndObj != KillingUndObj && AAR == AliasResult::NoAlias)
+    return OW_None;
+  return OW_Unknown;
 }
 
 bool DSEState::isInvisibleToCallerAfterRet(const Value *V, const Value *Ptr,
