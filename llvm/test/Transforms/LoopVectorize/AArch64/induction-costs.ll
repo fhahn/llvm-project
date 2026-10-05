@@ -1054,4 +1054,106 @@ exit:
   ret i32 %load
 }
 
+; The pre-increment IV live-out is computed by a sub in the middle block, whose
+; cost is included in the minimum profitable trip count with runtime checks.
+define i64 @pre_inc_iv_live_out_with_runtime_checks(ptr %dst.0, ptr %dst.1, ptr %dst.2, ptr %src, i64 %n) {
+; CHECK-LABEL: define i64 @pre_inc_iv_live_out_with_runtime_checks(
+; CHECK-SAME: ptr [[DST_0:%.*]], ptr [[DST_1:%.*]], ptr [[DST_2:%.*]], ptr [[SRC:%.*]], i64 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[SRC17:%.*]] = ptrtoaddr ptr [[SRC]] to i64
+; CHECK-NEXT:    [[DST_216:%.*]] = ptrtoaddr ptr [[DST_2]] to i64
+; CHECK-NEXT:    [[DST_015:%.*]] = ptrtoaddr ptr [[DST_0]] to i64
+; CHECK-NEXT:    [[DST_114:%.*]] = ptrtoaddr ptr [[DST_1]] to i64
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 26
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]]
+; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 [[DST_114]], [[DST_015]]
+; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], 1
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP1]], 15
+; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[DST_216]], [[DST_015]]
+; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[TMP2]], 1
+; CHECK-NEXT:    [[DIFF_CHECK18:%.*]] = icmp ult i64 [[TMP3]], 15
+; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[DIFF_CHECK]], [[DIFF_CHECK18]]
+; CHECK-NEXT:    [[TMP4:%.*]] = sub i64 [[DST_015]], [[SRC17]]
+; CHECK-NEXT:    [[TMP5:%.*]] = sub i64 [[TMP4]], 1
+; CHECK-NEXT:    [[DIFF_CHECK19:%.*]] = icmp ult i64 [[TMP5]], 15
+; CHECK-NEXT:    [[CONFLICT_RDX20:%.*]] = or i1 [[CONFLICT_RDX]], [[DIFF_CHECK19]]
+; CHECK-NEXT:    [[TMP6:%.*]] = sub i64 [[DST_216]], [[DST_114]]
+; CHECK-NEXT:    [[TMP7:%.*]] = sub i64 [[TMP6]], 1
+; CHECK-NEXT:    [[DIFF_CHECK21:%.*]] = icmp ult i64 [[TMP7]], 15
+; CHECK-NEXT:    [[CONFLICT_RDX22:%.*]] = or i1 [[CONFLICT_RDX20]], [[DIFF_CHECK21]]
+; CHECK-NEXT:    [[TMP8:%.*]] = sub i64 [[DST_114]], [[SRC17]]
+; CHECK-NEXT:    [[TMP9:%.*]] = sub i64 [[TMP8]], 1
+; CHECK-NEXT:    [[DIFF_CHECK23:%.*]] = icmp ult i64 [[TMP9]], 15
+; CHECK-NEXT:    [[CONFLICT_RDX24:%.*]] = or i1 [[CONFLICT_RDX22]], [[DIFF_CHECK23]]
+; CHECK-NEXT:    [[TMP10:%.*]] = sub i64 [[DST_216]], [[SRC17]]
+; CHECK-NEXT:    [[TMP11:%.*]] = sub i64 [[TMP10]], 1
+; CHECK-NEXT:    [[DIFF_CHECK25:%.*]] = icmp ult i64 [[TMP11]], 15
+; CHECK-NEXT:    [[CONFLICT_RDX26:%.*]] = or i1 [[CONFLICT_RDX24]], [[DIFF_CHECK25]]
+; CHECK-NEXT:    br i1 [[CONFLICT_RDX26]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[TMP12:%.*]] = and i64 [[N]], 1
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[TMP12]]
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr i64, ptr [[SRC]], i64 [[INDEX]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x i64>, ptr [[TMP13]], align 8
+; CHECK-NEXT:    [[TMP14:%.*]] = mul <2 x i64> [[WIDE_LOAD]], splat (i64 3)
+; CHECK-NEXT:    [[TMP15:%.*]] = getelementptr i64, ptr [[DST_0]], i64 [[INDEX]]
+; CHECK-NEXT:    store <2 x i64> [[TMP14]], ptr [[TMP15]], align 8
+; CHECK-NEXT:    [[TMP16:%.*]] = getelementptr i64, ptr [[DST_1]], i64 [[INDEX]]
+; CHECK-NEXT:    store <2 x i64> [[TMP14]], ptr [[TMP16]], align 8
+; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr i64, ptr [[DST_2]], i64 [[INDEX]]
+; CHECK-NEXT:    store <2 x i64> [[TMP14]], ptr [[TMP17]], align 8
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
+; CHECK-NEXT:    [[TMP18:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP18]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP32:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[IND_ESCAPE:%.*]] = sub i64 [[N_VEC]], 1
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
+; CHECK:       [[SCALAR_PH]]:
+; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i64 [ [[N_VEC]], %[[MIDDLE_BLOCK]] ], [ 0, %[[ENTRY]] ], [ 0, %[[VECTOR_MEMCHECK]] ]
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[GEP_SRC:%.*]] = getelementptr i64, ptr [[SRC]], i64 [[IV]]
+; CHECK-NEXT:    [[L:%.*]] = load i64, ptr [[GEP_SRC]], align 8
+; CHECK-NEXT:    [[MUL:%.*]] = mul i64 [[L]], 3
+; CHECK-NEXT:    [[GEP_DST_0:%.*]] = getelementptr i64, ptr [[DST_0]], i64 [[IV]]
+; CHECK-NEXT:    store i64 [[MUL]], ptr [[GEP_DST_0]], align 8
+; CHECK-NEXT:    [[GEP_DST_1:%.*]] = getelementptr i64, ptr [[DST_1]], i64 [[IV]]
+; CHECK-NEXT:    store i64 [[MUL]], ptr [[GEP_DST_1]], align 8
+; CHECK-NEXT:    [[GEP_DST_2:%.*]] = getelementptr i64, ptr [[DST_2]], i64 [[IV]]
+; CHECK-NEXT:    store i64 [[MUL]], ptr [[GEP_DST_2]], align 8
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP]], !llvm.loop [[LOOP33:![0-9]+]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    [[IV_LCSSA:%.*]] = phi i64 [ [[IV]], %[[LOOP]] ], [ [[IND_ESCAPE]], %[[MIDDLE_BLOCK]] ]
+; CHECK-NEXT:    ret i64 [[IV_LCSSA]]
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.src = getelementptr i64, ptr %src, i64 %iv
+  %l = load i64, ptr %gep.src, align 8
+  %mul = mul i64 %l, 3
+  %gep.dst.0 = getelementptr i64, ptr %dst.0, i64 %iv
+  store i64 %mul, ptr %gep.dst.0, align 8
+  %gep.dst.1 = getelementptr i64, ptr %dst.1, i64 %iv
+  store i64 %mul, ptr %gep.dst.1, align 8
+  %gep.dst.2 = getelementptr i64, ptr %dst.2, i64 %iv
+  store i64 %mul, ptr %gep.dst.2, align 8
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret i64 %iv
+}
+
 attributes #0 = { "target-cpu"="neoverse-v2" }
