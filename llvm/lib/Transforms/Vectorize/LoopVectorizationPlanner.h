@@ -442,7 +442,7 @@ public:
                                   const VPIRMetadata &Metadata = {}) {
     return tryInsertInstruction(new VPInstruction(
         Opcode, Op, Flags.value_or(VPIRFlags::getDefaultFlags(Opcode)),
-        Metadata, DL, "", ResultTy, /*IsSingleScalar=*/true));
+        Metadata, DL, "", ResultTy, /*GeneratesSingleScalar=*/true));
   }
 
   /// Create a scalar call to the intrinsic \p IntrinsicID with \p Operands, and
@@ -510,7 +510,7 @@ public:
       assert(!Mask && "Cast cannot be predicated");
       auto *VPI = new VPInstruction(Opcode, Operands, Flags, Metadata, DL,
                                     UV->getName(), ResultTy,
-                                    /*IsSingleScalar=*/true);
+                                    /*GeneratesSingleScalar=*/true);
       VPI->setUnderlyingValue(UV);
       return VPI;
     }
