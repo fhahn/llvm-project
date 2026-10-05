@@ -281,7 +281,13 @@ class AttributeSetNode final
 
   AttributeSetNode(ArrayRef<Attribute> Attrs);
 
-  std::optional<Attribute> findEnumAttribute(Attribute::AttrKind Kind) const;
+  /// Find the enum attribute of kind \p Kind, or return std::nullopt if it
+  /// is absent. Defined in Attributes.cpp, its only user.
+  inline std::optional<Attribute>
+  findEnumAttribute(Attribute::AttrKind Kind) const;
+
+  /// Find the enum attribute of kind \p Kind, which must be present.
+  Attribute findPresentEnumAttribute(Attribute::AttrKind Kind) const;
 
 public:
   // AttributesSetNode is uniqued, these should not be available.
