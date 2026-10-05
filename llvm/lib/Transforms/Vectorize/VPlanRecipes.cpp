@@ -1483,9 +1483,14 @@ InstructionCost VPInstruction::computeCost(ElementCount VF,
   }
 
   if (Instruction::isBinaryOp(getOpcode())) {
-    if (!getUnderlyingValue() && getOpcode() != Instruction::FMul) {
-      // TODO: Compute cost for VPInstructions without underlying values once
-      // the legacy cost model has been retired.
+    assert(getParent()->getPlan()->getVectorLoopRegion() &&
+           "must be costed before loop regions are dissolved");
+    if (getRegion() && !getUnderlyingValue() &&
+        getOpcode() != Instruction::FMul) {
+      // Not costed in loop regions yet, as VF selection compares the vector
+      // loop cost against the legacy cost model's scalar loop cost.
+      // TODO: Also cost them in loop regions once the legacy cost model has
+      // been retired.
       return 0;
     }
 
