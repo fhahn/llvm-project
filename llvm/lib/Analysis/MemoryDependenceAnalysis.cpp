@@ -487,6 +487,12 @@ MemDepResult MemoryDependenceResults::getSimplePointerDependencyFrom(
       }
 
       MemoryLocation LoadLoc = MemoryLocation::get(LI);
+      // For a load query, only MustAlias and PartialAlias with a known offset
+      // create a dependency, see below. AA metadata can only prove NoAlias,
+      // which is treated like MayAlias, so drop it to skip the metadata-based
+      // AA checks.
+      if (isLoad)
+        LoadLoc = LoadLoc.getWithoutAATags();
 
       // If we found a pointer, check if it could be the same as our pointer.
       AliasResult R = BatchAA.alias(LoadLoc, MemLoc);
