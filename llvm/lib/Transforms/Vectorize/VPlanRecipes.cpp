@@ -1456,7 +1456,11 @@ InstructionCost VPInstruction::computeCost(ElementCount VF,
   }
 
   if (Instruction::isBinaryOp(getOpcode())) {
-    if (!getUnderlyingValue() && getOpcode() != Instruction::FMul) {
+    if (!getUnderlyingValue() && getOpcode() != Instruction::FMul &&
+        getRegion()) {
+      // The legacy cost model, which the cost of loop regions is compared
+      // against, has no cost for VPInstructions without underlying values.
+      // Recipes outside loop regions are not compared against it.
       // TODO: Compute cost for VPInstructions without underlying values once
       // the legacy cost model has been retired.
       return 0;
