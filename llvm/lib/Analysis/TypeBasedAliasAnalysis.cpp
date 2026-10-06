@@ -100,7 +100,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Analysis/TypeBasedAliasAnalysis.h"
-#include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/MemoryLocation.h"
 #include "llvm/IR/Constants.h"
@@ -469,36 +470,24 @@ static const MDNode *getLeastCommonType(const MDNode *A, const MDNode *B) {
     return A;
 
   // The verifier rejects cyclic type chains, so both walks terminate.
-  SmallSetVector<const MDNode *, 4> PathA;
+  SmallPtrSet<const MDNode *, 4> PathA;
   TBAANode TA(A);
   while (TA.getNode()) {
-    [[maybe_unused]] bool Inserted = PathA.insert(TA.getNode());
+    [[maybe_unused]] bool Inserted = PathA.insert(TA.getNode()).second;
     assert(Inserted && "Cycle found in TBAA metadata.");
     TA = TA.getParent();
   }
 
-  SmallSetVector<const MDNode *, 4> PathB;
   TBAANode TB(B);
   while (TB.getNode()) {
-    [[maybe_unused]] bool Inserted = PathB.insert(TB.getNode());
-    assert(Inserted && "Cycle found in TBAA metadata.");
+    // Each type node has a unique parent, so the first node on B's chain that
+    // is also on A's chain is the nearest common ancestor.
+    if (PathA.contains(TB.getNode()))
+      return TB.getNode();
     TB = TB.getParent();
   }
 
-  int IA = PathA.size() - 1;
-  int IB = PathB.size() - 1;
-
-  const MDNode *Ret = nullptr;
-  while (IA >= 0 && IB >= 0) {
-    if (PathA[IA] == PathB[IB])
-      Ret = PathA[IA];
-    else
-      break;
-    --IA;
-    --IB;
-  }
-
-  return Ret;
+  return nullptr;
 }
 
 AAMDNodes AAMDNodes::merge(const AAMDNodes &Other) const {
