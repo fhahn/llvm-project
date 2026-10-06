@@ -9,7 +9,9 @@
 #include "llvm/IR/Value.h"
 #include "llvm-c/Core.h"
 #include "llvm/AsmParser/Parser.h"
+#include "llvm/IR/DataLayout.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/InstIterator.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
@@ -338,6 +340,71 @@ TEST(ValueTest, replaceUsesOutsideBlock) {
   EXPECT_TRUE(DVR1->getVariableLocationOp(0) == cast<Value>(A));
   // These users are outside Entry so should be changed.
   EXPECT_TRUE(DVR2->getVariableLocationOp(0) == cast<Value>(B));
+}
+
+TEST(ValueTest, stripAndAccumulateConstantOffsetsAddrSpaceCast) {
+  LLVMContext C;
+  // Address space 1 has a 32-bit index width, address spaces 0 and 2 a 64-bit
+  // one.
+  const char *ModuleString =
+      "target datalayout = \"p1:32:32\"\n"
+      "define void @f(ptr addrspace(1) %b, ptr addrspace(2) %b2, ptr %b0) {\n"
+      "  %x = getelementptr i8, ptr addrspace(1) %b, i32 2147483647\n"
+      "  %x1 = getelementptr i8, ptr addrspace(1) %x, i32 1\n"
+      "  %c = addrspacecast ptr addrspace(1) %x1 to ptr\n"
+      "  %d = getelementptr i8, ptr %c, i64 1\n"
+      "  %ib = getelementptr inbounds i8, ptr addrspace(1) %b, i32 2147483647\n"
+      "  %ib1 = getelementptr inbounds i8, ptr addrspace(1) %ib, i32 1\n"
+      "  %ci = addrspacecast ptr addrspace(1) %ib1 to ptr\n"
+      "  %di = getelementptr i8, ptr %ci, i64 1\n"
+      "  %y = getelementptr i8, ptr addrspace(2) %b2, i64 -8\n"
+      "  %c2 = addrspacecast ptr addrspace(2) %y to ptr\n"
+      "  %d2 = getelementptr i8, ptr %c2, i64 1\n"
+      "  %w = getelementptr i8, ptr %b0, i64 -8\n"
+      "  %cw = addrspacecast ptr %w to ptr addrspace(1)\n"
+      "  %dw = getelementptr i8, ptr addrspace(1) %cw, i32 1\n"
+      "  ret void\n"
+      "}\n";
+  SMDiagnostic Err;
+  std::unique_ptr<Module> M = parseAssemblyString(ModuleString, Err, C);
+  ASSERT_TRUE(M);
+  const DataLayout &DL = M->getDataLayout();
+  Function *F = M->getFunction("f");
+  auto GetInst = [&](StringRef Name) -> Value * {
+    for (Instruction &I : instructions(F))
+      if (I.getName() == Name)
+        return &I;
+    return nullptr;
+  };
+
+  // The non-inbounds offsets in address space 1 wrap modulo 2^32 and are not
+  // accumulated past the cast.
+  APInt Offset(64, 0);
+  EXPECT_EQ(GetInst("d")->stripAndAccumulateConstantOffsets(
+                DL, Offset, /*AllowNonInbounds=*/true),
+            GetInst("x1"));
+  EXPECT_EQ(Offset, 1);
+
+  // Inbounds offsets do not wrap.
+  Offset = APInt(64, 0);
+  EXPECT_EQ(GetInst("di")->stripAndAccumulateConstantOffsets(
+                DL, Offset, /*AllowNonInbounds=*/true),
+            F->getArg(0));
+  EXPECT_EQ(Offset, (1ULL << 31) + 1);
+
+  // Casts between address spaces with the same index width are looked through.
+  Offset = APInt(64, 0);
+  EXPECT_EQ(GetInst("d2")->stripAndAccumulateConstantOffsets(
+                DL, Offset, /*AllowNonInbounds=*/true),
+            F->getArg(1));
+  EXPECT_EQ(Offset.getSExtValue(), -7);
+
+  // Offsets in a wider address space are exact modulo 2^32.
+  Offset = APInt(32, 0);
+  EXPECT_EQ(GetInst("dw")->stripAndAccumulateConstantOffsets(
+                DL, Offset, /*AllowNonInbounds=*/true),
+            F->getArg(2));
+  EXPECT_EQ(Offset.getSExtValue(), -7);
 }
 
 TEST(GlobalTest, Initializer) {
