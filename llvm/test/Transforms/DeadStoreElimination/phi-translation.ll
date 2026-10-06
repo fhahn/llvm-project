@@ -621,6 +621,143 @@ kill:
   ret i8 %l
 }
 
+; The store in %entry can be eliminated: the killing store in the loop header
+; overwrites %a in the first iteration.
+define void @memoryphi_translate_loop_header_kill_in_header(ptr noalias %a, ptr noalias %b, i1 %ec) {
+; CHECK-LABEL: @memoryphi_translate_loop_header_kill_in_header(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    br label [[LOOP:%.*]]
+; CHECK:       loop:
+; CHECK-NEXT:    [[P:%.*]] = phi ptr [ [[A:%.*]], [[ENTRY:%.*]] ], [ [[B:%.*]], [[LOOP]] ]
+; CHECK-NEXT:    store i8 1, ptr [[P]], align 1
+; CHECK-NEXT:    br i1 [[EC:%.*]], label [[EXIT:%.*]], label [[LOOP]]
+; CHECK:       exit:
+; CHECK-NEXT:    ret void
+;
+entry:
+  store i8 0, ptr %a
+  br label %loop
+
+loop:
+  %p = phi ptr [ %a, %entry ], [ %b, %loop ]
+  store i8 1, ptr %p
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The stores in %then and %else can be eliminated: the killing store is in the
+; phi block, so the phi cannot change before it executes.
+define void @memoryphi_translate_diamond_in_loop(ptr noalias %a, ptr noalias %b, i1 %c, i1 %ec) {
+; CHECK-LABEL: @memoryphi_translate_diamond_in_loop(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    br label [[LOOP:%.*]]
+; CHECK:       loop:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, [[ENTRY:%.*]] ], [ [[IV_NEXT:%.*]], [[MERGE:%.*]] ]
+; CHECK-NEXT:    [[GEP_A:%.*]] = getelementptr inbounds i8, ptr [[A:%.*]], i64 [[IV]]
+; CHECK-NEXT:    [[GEP_B:%.*]] = getelementptr inbounds i8, ptr [[B:%.*]], i64 [[IV]]
+; CHECK-NEXT:    br i1 [[C:%.*]], label [[THEN:%.*]], label [[ELSE:%.*]]
+; CHECK:       then:
+; CHECK-NEXT:    br label [[MERGE]]
+; CHECK:       else:
+; CHECK-NEXT:    br label [[MERGE]]
+; CHECK:       merge:
+; CHECK-NEXT:    [[P:%.*]] = phi ptr [ [[GEP_A]], [[THEN]] ], [ [[GEP_B]], [[ELSE]] ]
+; CHECK-NEXT:    store i8 10, ptr [[P]], align 1
+; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 1
+; CHECK-NEXT:    br i1 [[EC:%.*]], label [[EXIT:%.*]], label [[LOOP]]
+; CHECK:       exit:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %merge ]
+  %gep.a = getelementptr inbounds i8, ptr %a, i64 %iv
+  %gep.b = getelementptr inbounds i8, ptr %b, i64 %iv
+  br i1 %c, label %then, label %else
+
+then:
+  store i8 0, ptr %gep.a
+  br label %merge
+
+else:
+  store i8 9, ptr %gep.b
+  br label %merge
+
+merge:
+  %p = phi ptr [ %gep.a, %then ], [ %gep.b, %else ]
+  store i8 10, ptr %p
+  %iv.next = add i64 %iv, 1
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The store to %a in %entry cannot be eliminated: %pred is in a cycle with the
+; phi block, so the killing store first executes with %p == %b and the
+; following load reads the stored value.
+define void @memoryphi_translate_pred_in_cycle(i1 %c, ptr noalias %b) {
+; CHECK-LABEL: @memoryphi_translate_pred_in_cycle(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[A:%.*]] = alloca i8, align 1
+; CHECK-NEXT:    store i8 0, ptr [[A]], align 1
+; CHECK-NEXT:    br i1 [[C:%.*]], label [[PRED:%.*]], label [[LOOP:%.*]]
+; CHECK:       pred:
+; CHECK-NEXT:    br label [[LOOP]]
+; CHECK:       loop:
+; CHECK-NEXT:    [[P:%.*]] = phi ptr [ [[A]], [[PRED]] ], [ [[B:%.*]], [[ENTRY:%.*]] ]
+; CHECK-NEXT:    store i8 1, ptr [[P]], align 1
+; CHECK-NEXT:    [[L:%.*]] = load i8, ptr [[A]], align 1
+; CHECK-NEXT:    call void @use.i8(i8 [[L]])
+; CHECK-NEXT:    br label [[PRED]]
+;
+entry:
+  %a = alloca i8
+  store i8 0, ptr %a
+  br i1 %c, label %pred, label %loop
+
+pred:
+  br label %loop
+
+loop:
+  %p = phi ptr [ %a, %pred ], [ %b, %entry ]
+  store i8 1, ptr %p
+  %l = load i8, ptr %a
+  call void @use.i8(i8 %l)
+  br label %pred
+}
+
+; The killing store must not be merged into the store in %entry: it may write
+; %b in later iterations.
+define void @memoryphi_translate_loop_header_no_merge(ptr noalias %a, ptr noalias %b, i1 %ec) {
+; CHECK-LABEL: @memoryphi_translate_loop_header_no_merge(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    store i32 0, ptr [[A:%.*]], align 4
+; CHECK-NEXT:    br label [[LOOP:%.*]]
+; CHECK:       loop:
+; CHECK-NEXT:    [[P:%.*]] = phi ptr [ [[A]], [[ENTRY:%.*]] ], [ [[B:%.*]], [[LOOP]] ]
+; CHECK-NEXT:    store i8 1, ptr [[P]], align 1
+; CHECK-NEXT:    br i1 [[EC:%.*]], label [[EXIT:%.*]], label [[LOOP]]
+; CHECK:       exit:
+; CHECK-NEXT:    ret void
+;
+entry:
+  store i32 0, ptr %a
+  br label %loop
+
+loop:
+  %p = phi ptr [ %a, %entry ], [ %b, %loop ]
+  store i8 1, ptr %p
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
 ; The memset in %then is partially overwritten by the killing store translated
 ; to %a and can be shortened.
 define void @memoryphi_translate_partial_memset(i1 %c, ptr noalias %a, ptr noalias %b) {

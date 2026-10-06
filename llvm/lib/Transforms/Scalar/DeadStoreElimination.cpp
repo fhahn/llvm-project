@@ -1093,14 +1093,17 @@ struct DSEState {
   /// MemoryLocation during execution of the containing function.
   bool isGuaranteedLoopInvariant(const Value *Ptr);
 
-  /// Returns true if a killing location translated through the phis of an
-  /// acyclic block to its predecessor \p TransPred, which branches
-  /// unconditionally to it, is written by the killing def on all paths from
-  /// \p BB to the killing def. This is the case if all paths from \p BB pass
-  /// through \p TransPred.
+  /// Returns true if a killing location translated through the phis of a
+  /// block to its predecessor \p TransPred, which branches unconditionally to
+  /// it, is written by the killing def on all paths from \p BB to the killing
+  /// def. This is the case if all paths from \p BB pass through \p TransPred
+  /// and, if \p TransPred is in a cycle (with the phi block), \p BB is
+  /// \p TransPred. Otherwise paths from \p BB could enter the phi block from
+  /// another predecessor first.
   bool isInTranslationRegion(const BasicBlock *BB,
                              const BasicBlock *TransPred) const {
-    return PDT.dominates(TransPred, BB);
+    return BB == TransPred ||
+           (!CI.getCycle(TransPred) && PDT.dominates(TransPred, BB));
   }
 
   // Find a MemoryDef writing to \p KillingLoc and dominating \p StartAccess,
@@ -2673,12 +2676,15 @@ DSEState::eliminateDeadDefs(const MemoryLocationWrapper &KillingLocWrapper) {
       LLVM_DEBUG(dbgs() << "\n  ... adding incoming values to worklist\n");
       BasicBlock *PhiBlock = Phi->getBlock();
       // If the killing pointer depends on phis in PhiBlock, translate it to
-      // the predecessors. As PhiBlock is not in a cycle, the phis cannot change
-      // before the killing def executes. Memory terminators only kill accesses
-      // to their own underlying object, so there is no point in translating
-      // them. Translated pointers are not translated again.
+      // the predecessors. The phis must not change before the killing def
+      // executes, i.e. PhiBlock must not be in a cycle or must contain the
+      // killing def. Memory terminators only kill accesses to their own
+      // underlying object, so there is no point in translating them.
+      // Translated pointers are not translated again.
       PHITransAddr Addr(const_cast<Value *>(KillingPtr), DL, nullptr);
-      bool Translate = !IsMemTerm && !TransPred && !CI.getCycle(PhiBlock) &&
+      bool Translate = !IsMemTerm && !TransPred &&
+                       (!CI.getCycle(PhiBlock) ||
+                        PhiBlock == KillingLocWrapper.MemDef->getBlock()) &&
                        Addr.needsPHITranslationFromBlock(PhiBlock) &&
                        Addr.isPotentiallyPHITranslatable();
       for (auto [Pred, IncomingVal] :
@@ -2752,7 +2758,10 @@ DSEState::eliminateDeadDefs(const MemoryLocationWrapper &KillingLocWrapper) {
             isPartialOverwrite(KillingLoc, DeadLocWrapper.MemLoc, KillingOffset,
                                DeadOffset, DeadLocWrapper.DefInst, IOL);
       }
-      if (EnablePartialStoreMerging && OR == OW_PartialEarlierWithFullLater) {
+      // Merging removes the killing store, which a translated location does
+      // not justify.
+      if (EnablePartialStoreMerging && !TransPred &&
+          OR == OW_PartialEarlierWithFullLater) {
         auto *DeadSI = dyn_cast<StoreInst>(DeadLocWrapper.DefInst);
         auto *KillingSI = dyn_cast<StoreInst>(KillingLocWrapper.DefInst);
         // We are re-using tryToMergePartialOverlappingStores, which requires
