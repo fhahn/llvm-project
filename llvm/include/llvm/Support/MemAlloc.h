@@ -64,8 +64,8 @@ LLVM_ATTRIBUTE_RETURNS_NONNULL inline void *safe_realloc(void *Ptr, size_t Sz) {
 
 /// Allocate a buffer of memory with the given size and alignment.
 ///
-/// When the compiler supports aligned operator new, this will use it to
-/// handle even over-aligned allocations.
+/// Uses plain operator new when it already guarantees \p Alignment for
+/// \p Size, and aligned operator new (if available) otherwise.
 ///
 /// However, this doesn't make any attempt to leverage the fancier techniques
 /// like posix_memalign due to portability. It is mostly intended to allow
@@ -74,13 +74,9 @@ LLVM_ATTRIBUTE_RETURNS_NONNULL inline void *safe_realloc(void *Ptr, size_t Sz) {
 LLVM_ABI LLVM_ATTRIBUTE_RETURNS_NONNULL LLVM_ATTRIBUTE_RETURNS_NOALIAS void *
 allocate_buffer(size_t Size, size_t Alignment);
 
-/// Deallocate a buffer of memory with the given size and alignment.
-///
-/// If supported, this will used the sized delete operator. Also if supported,
-/// this will pass the alignment to the delete operator.
-///
-/// The pointer must have been allocated with the corresponding new operator,
-/// most likely using the above helper.
+/// Deallocate a buffer allocated by allocate_buffer. \p Size and \p Alignment
+/// must be the values passed to allocate_buffer; they select the matching
+/// (sized, and if needed aligned) delete operator.
 LLVM_ABI void deallocate_buffer(void *Ptr, size_t Size, size_t Alignment);
 
 } // namespace llvm
