@@ -48,38 +48,27 @@ int access1(S *p) {
 // CHECK-NEXT:    [[ADD_PTR_IDX:%.*]] = shl nsw i64 [[IDX_EXT]], 2, !annotation [[META12:![0-9]+]]
 // CHECK-NEXT:    [[ADD_PTR:%.*]] = getelementptr inbounds i8, ptr [[TMP1]], i64 [[ADD_PTR_IDX]], !annotation [[META14:![0-9]+]]
 // CHECK-NEXT:    [[CMP:%.*]] = icmp slt i32 [[TMP0]], 2
-// CHECK-NEXT:    br i1 [[CMP]], label [[CLEANUP:%.*]], label [[IF_END:%.*]]
-// CHECK:       if.end:
+// CHECK-NEXT:    br i1 [[CMP]], label [[CLEANUP:%.*]], label [[BOUNDSCHECK_NULL:%.*]]
+// CHECK:       trap:
+// CHECK-NEXT:    tail call void @llvm.ubsantrap(i8 25) #[[ATTR4:[0-9]+]], !annotation [[META15:![0-9]+]]
+// CHECK-NEXT:    unreachable, !annotation [[META15]]
+// CHECK:       boundscheck.null:
 // CHECK-NEXT:    [[BOUND_PTR_ARITH:%.*]] = getelementptr i8, ptr [[TMP1]], i64 4
 // CHECK-NEXT:    [[TMP2:%.*]] = load i32, ptr [[TMP1]], align 4, !tbaa [[TBAA11]]
-// CHECK-NEXT:    [[DOTNOT:%.*]] = icmp eq ptr [[BOUND_PTR_ARITH]], null, !annotation [[META15:![0-9]+]]
-// CHECK-NEXT:    br i1 [[DOTNOT]], label [[BOUNDSCHECK_NULL:%.*]], label [[BOUNDSCHECK_NOTNULL:%.*]], !annotation [[META15]]
-// CHECK:       trap:
-// CHECK-NEXT:    tail call void @llvm.ubsantrap(i8 25) #[[ATTR4:[0-9]+]], !annotation [[META16:![0-9]+]]
-// CHECK-NEXT:    unreachable, !annotation [[META16]]
-// CHECK:       boundscheck.notnull:
-// CHECK-NEXT:    [[TMP3:%.*]] = icmp ult ptr [[BOUND_PTR_ARITH]], [[ADD_PTR]], !annotation [[META14]]
-// CHECK-NEXT:    [[TMP4:%.*]] = icmp uge ptr [[BOUND_PTR_ARITH]], [[TMP1]], !annotation [[META17:![0-9]+]]
-// CHECK-NEXT:    [[OR_COND35:%.*]] = and i1 [[TMP4]], [[TMP3]], !annotation [[META17]]
-// CHECK-NEXT:    br i1 [[OR_COND35]], label [[BOUNDSCHECK_NULL]], label [[TRAP:%.*]], {{!prof ![0-9]+}}, !annotation [[META14]]
-// CHECK:       boundscheck.null:
 // CHECK-NEXT:    tail call void @use(ptr noundef [[BOUND_PTR_ARITH]], i32 noundef [[TMP2]]) #[[ATTR3]]
 // CHECK-NEXT:    [[BOUND_PTR_ARITH14:%.*]] = getelementptr i8, ptr [[TMP1]], i64 8
-// CHECK-NEXT:    [[TMP5:%.*]] = icmp ult ptr [[BOUND_PTR_ARITH]], [[ADD_PTR]], !annotation [[META14]]
-// CHECK-NEXT:    [[TMP6:%.*]] = icmp uge ptr [[BOUND_PTR_ARITH]], [[TMP1]], !annotation [[META17]]
-// CHECK-NEXT:    [[OR_COND36:%.*]] = and i1 [[TMP6]], [[TMP5]], !annotation [[META17]]
-// CHECK-NEXT:    br i1 [[OR_COND36]], label [[CONT22:%.*]], label [[TRAP]], {{!prof ![0-9]+}}, !annotation [[META14]]
+// CHECK-NEXT:    [[TMP3:%.*]] = icmp ult ptr [[BOUND_PTR_ARITH]], [[ADD_PTR]], !annotation [[META14]]
+// CHECK-NEXT:    [[TMP4:%.*]] = icmp uge ptr [[BOUND_PTR_ARITH]], [[TMP1]], !annotation [[META16:![0-9]+]]
+// CHECK-NEXT:    [[OR_COND36:%.*]] = and i1 [[TMP4]], [[TMP3]], !annotation [[META16]]
+// CHECK-NEXT:    br i1 [[OR_COND36]], label [[CONT22:%.*]], label [[TRAP:%.*]], {{!prof ![0-9]+}}, !annotation [[META14]]
 // CHECK:       cont22:
-// CHECK-NEXT:    [[TMP7:%.*]] = load i32, ptr [[BOUND_PTR_ARITH]], align 4, !tbaa [[TBAA11]]
-// CHECK-NEXT:    [[DOTNOT40:%.*]] = icmp eq ptr [[BOUND_PTR_ARITH14]], null, !annotation [[META15]]
-// CHECK-NEXT:    br i1 [[DOTNOT40]], label [[BOUNDSCHECK_NULL33:%.*]], label [[BOUNDSCHECK_NOTNULL30:%.*]], !annotation [[META15]]
-// CHECK:       boundscheck.notnull30:
-// CHECK-NEXT:    [[TMP8:%.*]] = icmp ult ptr [[BOUND_PTR_ARITH14]], [[ADD_PTR]], !annotation [[META14]]
-// CHECK-NEXT:    [[TMP9:%.*]] = icmp uge ptr [[BOUND_PTR_ARITH14]], [[TMP1]], !annotation [[META17]]
-// CHECK-NEXT:    [[OR_COND37:%.*]] = and i1 [[TMP9]], [[TMP8]], !annotation [[META17]]
-// CHECK-NEXT:    br i1 [[OR_COND37]], label [[BOUNDSCHECK_NULL33]], label [[TRAP]], {{!prof ![0-9]+}}, !annotation [[META14]]
+// CHECK-NEXT:    [[DOTNOT40:%.*]] = icmp eq ptr [[BOUND_PTR_ARITH14]], null, !annotation [[META18:![0-9]+]]
+// CHECK-NEXT:    [[TMP5:%.*]] = icmp ult ptr [[BOUND_PTR_ARITH14]], [[ADD_PTR]], !annotation [[META14]]
+// CHECK-NEXT:    [[OR_COND41:%.*]] = select i1 [[DOTNOT40]], i1 true, i1 [[TMP5]], {{!prof ![0-9]+}}, !annotation [[META14]]
+// CHECK-NEXT:    br i1 [[OR_COND41]], label [[BOUNDSCHECK_NULL33:%.*]], label [[TRAP]], {{!prof ![0-9]+}}, !annotation [[META18]]
 // CHECK:       boundscheck.null33:
-// CHECK-NEXT:    tail call void @use(ptr noundef [[BOUND_PTR_ARITH14]], i32 noundef [[TMP7]]) #[[ATTR3]]
+// CHECK-NEXT:    [[TMP6:%.*]] = load i32, ptr [[BOUND_PTR_ARITH]], align 4, !tbaa [[TBAA11]]
+// CHECK-NEXT:    tail call void @use(ptr noundef [[BOUND_PTR_ARITH14]], i32 noundef [[TMP6]]) #[[ATTR3]]
 // CHECK-NEXT:    br label [[CLEANUP]]
 // CHECK:       cleanup:
 // CHECK-NEXT:    [[RETVAL_0:%.*]] = phi i32 [ 0, [[BOUNDSCHECK_NULL33]] ], [ -1, [[ENTRY:%.*]] ]
