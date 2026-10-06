@@ -317,7 +317,7 @@ return:
 define void @test7(i32 %N, ptr nocapture %G) nounwind ssp {
 ; CHECK-LABEL: @test7(
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds double, ptr [[G:%.*]], i64 1
+; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr double, ptr [[G:%.*]], i64 1
 ; CHECK-NEXT:    store double 1.000000e+00, ptr [[TMP0]], align 8
 ; CHECK-NEXT:    [[TMP1:%.*]] = add i32 [[N:%.*]], -1
 ; CHECK-NEXT:    [[TMP2:%.*]] = icmp sgt i32 [[TMP1]], 1

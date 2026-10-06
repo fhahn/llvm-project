@@ -26,6 +26,29 @@ static cl::opt<bool> EnableAddPhiTranslation(
     "gvn-add-phi-translation", cl::init(false), cl::Hidden,
     cl::desc("Enable phi-translation of add instructions"));
 
+/// Return true if \p Avail, an existing instruction computing the translated
+/// \p Orig, has no poison-generating flags \p Orig lacks. Otherwise \p Avail
+/// may be poison where \p Orig is not, and cannot be used in its place.
+static bool hasNoExtraPoisonFlags(const Instruction *Avail,
+                                  const Instruction *Orig) {
+  if (!Avail->hasPoisonGeneratingFlags())
+    return true;
+  if (isa<FPMathOperator>(Avail))
+    return false;
+  if (isa<PossiblyNonNegInst>(Avail))
+    return Orig->hasNonNeg();
+  if (auto *Trunc = dyn_cast<TruncInst>(Avail)) {
+    auto *OrigTrunc = cast<TruncInst>(Orig);
+    return (!Trunc->hasNoUnsignedWrap() || OrigTrunc->hasNoUnsignedWrap()) &&
+           (!Trunc->hasNoSignedWrap() || OrigTrunc->hasNoSignedWrap());
+  }
+  if (auto *GEP = dyn_cast<GetElementPtrInst>(Avail)) {
+    GEPNoWrapFlags NW = GEP->getNoWrapFlags();
+    return (NW & cast<GetElementPtrInst>(Orig)->getNoWrapFlags()) == NW;
+  }
+  return false;
+}
+
 static bool canPHITrans(Instruction *Inst) {
   if (isa<PHINode>(Inst) || isa<GetElementPtrInst>(Inst) || isa<CastInst>(Inst))
     return true;
@@ -208,6 +231,7 @@ Value *PHITransAddr::translateSubExpr(Value *V, BasicBlock *CurBB,
         if (CastInst *CastI = dyn_cast<CastInst>(U))
           if (CastI->getOpcode() == Cast->getOpcode() &&
               CastI->getType() == Cast->getType() &&
+              hasNoExtraPoisonFlags(CastI, Cast) &&
               (!DT || DT->dominates(CastI->getParent(), PredBB)))
             return CastI;
       }
@@ -251,6 +275,7 @@ Value *PHITransAddr::translateSubExpr(Value *V, BasicBlock *CurBB,
             GEPI->getSourceElementType() == GEP->getSourceElementType() &&
             GEPI->getNumOperands() == GEPOps.size() &&
             GEPI->getParent()->getParent() == CurBB->getParent() &&
+            hasNoExtraPoisonFlags(GEPI, GEP) &&
             (!DT || DT->dominates(GEPI->getParent(), PredBB))) {
           if (std::equal(GEPOps.begin(), GEPOps.end(), GEPI->op_begin()))
             return GEPI;
@@ -303,6 +328,8 @@ Value *PHITransAddr::translateSubExpr(Value *V, BasicBlock *CurBB,
       if (BinaryOperator *BO = dyn_cast<BinaryOperator>(U))
         if (BO->getOpcode() == Instruction::Add &&
             BO->getOperand(0) == LHS && BO->getOperand(1) == RHS &&
+            (!BO->hasNoSignedWrap() || isNSW) &&
+            (!BO->hasNoUnsignedWrap() || isNUW) &&
             BO->getParent()->getParent() == CurBB->getParent() &&
             (!DT || DT->dominates(BO->getParent(), PredBB)))
           return BO;
