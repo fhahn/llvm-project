@@ -286,3 +286,263 @@ exit:
 }
 
 declare void @foo()
+
+; The lower bound on %n from the first guard must be preserved when applying
+; the upper bound %len from the second guard.
+define void @sgt_0_sle_var_order_1(i64 %n, i64 %len) {
+; CHECK-LABEL: 'sgt_0_sle_var_order_1'
+; CHECK-NEXT:  Classifying expressions for: @sgt_0_sle_var_order_1
+; CHECK-NEXT:    %iv = phi i64 [ 0, %ph ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,9223372036854775807) S: [0,9223372036854775807) Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add i64 %iv, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,-9223372036854775808) S: [1,-9223372036854775808) Exits: %n LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @sgt_0_sle_var_order_1
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + %n)
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 9223372036854775806
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + %n)
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %pre.0 = icmp sgt i64 %n, 0
+  br i1 %pre.0, label %ph, label %exit
+
+ph:
+  %pre.1 = icmp sle i64 %n, %len
+  br i1 %pre.1, label %loop, label %exit
+
+loop:
+  %iv = phi i64 [ 0, %ph ], [ %iv.next, %loop ]
+  %iv.next = add i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+define void @sgt_0_sle_var_order_2(i64 %n, i64 %len) {
+; CHECK-LABEL: 'sgt_0_sle_var_order_2'
+; CHECK-NEXT:  Classifying expressions for: @sgt_0_sle_var_order_2
+; CHECK-NEXT:    %iv = phi i64 [ 0, %ph ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,9223372036854775807) S: [0,9223372036854775807) Exits: (-1 + %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add i64 %iv, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,-9223372036854775808) S: [1,-9223372036854775808) Exits: %n LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @sgt_0_sle_var_order_2
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + %n)
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 9223372036854775806
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + %n)
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %pre.1 = icmp sle i64 %n, %len
+  br i1 %pre.1, label %ph, label %exit
+
+ph:
+  %pre.0 = icmp sgt i64 %n, 0
+  br i1 %pre.0, label %loop, label %exit
+
+loop:
+  %iv = phi i64 [ 0, %ph ], [ %iv.next, %loop ]
+  %iv.next = add i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+define void @uge_10_ule_var_order_1(i64 %n, i64 %m) {
+; CHECK-LABEL: 'uge_10_ule_var_order_1'
+; CHECK-NEXT:  Classifying expressions for: @uge_10_ule_var_order_1
+; CHECK-NEXT:    %iv = phi i64 [ 10, %g1 ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {10,+,1}<nuw><%loop> U: [10,0) S: [10,0) Exits: %n LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add i64 %iv, 1
+; CHECK-NEXT:    --> {11,+,1}<nw><%loop> U: [11,1) S: [11,1) Exits: (1 + %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @uge_10_ule_var_order_1
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-10 + %n)
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -11
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-10 + %n)
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %pre.0 = icmp uge i64 %n, 10
+  br i1 %pre.0, label %g1, label %exit
+
+g1:
+  %pre.1 = icmp ule i64 %n, %m
+  br i1 %pre.1, label %loop, label %exit
+
+loop:
+  %iv = phi i64 [ 10, %g1 ], [ %iv.next, %loop ]
+  %iv.next = add i64 %iv, 1
+  %ec = icmp eq i64 %iv, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+define void @uge_10_ule_var_order_2(i64 %n, i64 %m) {
+; CHECK-LABEL: 'uge_10_ule_var_order_2'
+; CHECK-NEXT:  Classifying expressions for: @uge_10_ule_var_order_2
+; CHECK-NEXT:    %iv = phi i64 [ 10, %g1 ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {10,+,1}<nuw><%loop> U: [10,0) S: [10,0) Exits: %n LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add i64 %iv, 1
+; CHECK-NEXT:    --> {11,+,1}<nw><%loop> U: [11,1) S: [11,1) Exits: (1 + %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @uge_10_ule_var_order_2
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-10 + %n)
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 -11
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-10 + %n)
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %pre.0 = icmp ule i64 %n, %m
+  br i1 %pre.0, label %g1, label %exit
+
+g1:
+  %pre.1 = icmp uge i64 %n, 10
+  br i1 %pre.1, label %loop, label %exit
+
+loop:
+  %iv = phi i64 [ 10, %g1 ], [ %iv.next, %loop ]
+  %iv.next = add i64 %iv, 1
+  %ec = icmp eq i64 %iv, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The upper bound on %n from the earlier guards must be preserved when applying
+; the lower bound %m from the last guard.
+define void @ult_101_uge_var_order_1(i64 %n, i64 %m) {
+; CHECK-LABEL: 'ult_101_uge_var_order_1'
+; CHECK-NEXT:  Classifying expressions for: @ult_101_uge_var_order_1
+; CHECK-NEXT:    %iv = phi i64 [ 0, %g1 ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,101) S: [0,101) Exits: %n LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add i64 %iv, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,102) S: [1,102) Exits: (1 + %n)<u nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @ult_101_uge_var_order_1
+; CHECK-NEXT:  Loop %loop: backedge-taken count is %n
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 100
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is %n
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %pre.0 = icmp ult i64 %n, 101
+  br i1 %pre.0, label %g1, label %exit
+
+g1:
+  %pre.1 = icmp uge i64 %n, %m
+  br i1 %pre.1, label %loop, label %exit
+
+loop:
+  %iv = phi i64 [ 0, %g1 ], [ %iv.next, %loop ]
+  %iv.next = add i64 %iv, 1
+  %ec = icmp eq i64 %iv, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+define void @ult_101_uge_var_order_2(i64 %n, i64 %m) {
+; CHECK-LABEL: 'ult_101_uge_var_order_2'
+; CHECK-NEXT:  Classifying expressions for: @ult_101_uge_var_order_2
+; CHECK-NEXT:    %iv = phi i64 [ 0, %g1 ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,101) S: [0,101) Exits: %n LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add i64 %iv, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,102) S: [1,102) Exits: (1 + %n)<u nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @ult_101_uge_var_order_2
+; CHECK-NEXT:  Loop %loop: backedge-taken count is %n
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 100
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is %n
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %pre.0 = icmp uge i64 %n, %m
+  br i1 %pre.0, label %g1, label %exit
+
+g1:
+  %pre.1 = icmp ult i64 %n, 101
+  br i1 %pre.1, label %loop, label %exit
+
+loop:
+  %iv = phi i64 [ 0, %g1 ], [ %iv.next, %loop ]
+  %iv.next = add i64 %iv, 1
+  %ec = icmp eq i64 %iv, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+define void @sge_0_slt_101_sge_var_order_1(i64 %n, i64 %m) {
+; CHECK-LABEL: 'sge_0_slt_101_sge_var_order_1'
+; CHECK-NEXT:  Classifying expressions for: @sge_0_slt_101_sge_var_order_1
+; CHECK-NEXT:    %iv = phi i64 [ 0, %g2 ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,101) S: [0,101) Exits: %n LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add i64 %iv, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,102) S: [1,102) Exits: (1 + %n)<u nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @sge_0_slt_101_sge_var_order_1
+; CHECK-NEXT:  Loop %loop: backedge-taken count is %n
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 100
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is %n
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %pre.0 = icmp sge i64 %n, 0
+  br i1 %pre.0, label %g1, label %exit
+
+g1:
+  %pre.1 = icmp slt i64 %n, 101
+  br i1 %pre.1, label %g2, label %exit
+
+g2:
+  %pre.2 = icmp sge i64 %n, %m
+  br i1 %pre.2, label %loop, label %exit
+
+loop:
+  %iv = phi i64 [ 0, %g2 ], [ %iv.next, %loop ]
+  %iv.next = add i64 %iv, 1
+  %ec = icmp eq i64 %iv, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+define void @sge_0_slt_101_sge_var_order_2(i64 %n, i64 %m) {
+; CHECK-LABEL: 'sge_0_slt_101_sge_var_order_2'
+; CHECK-NEXT:  Classifying expressions for: @sge_0_slt_101_sge_var_order_2
+; CHECK-NEXT:    %iv = phi i64 [ 0, %g2 ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,101) S: [0,101) Exits: %n LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add i64 %iv, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,102) S: [1,102) Exits: (1 + %n)<u nuw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:  Determining loop execution counts for: @sge_0_slt_101_sge_var_order_2
+; CHECK-NEXT:  Loop %loop: backedge-taken count is %n
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 100
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is %n
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  %pre.0 = icmp sge i64 %n, %m
+  br i1 %pre.0, label %g1, label %exit
+
+g1:
+  %pre.1 = icmp sge i64 %n, 0
+  br i1 %pre.1, label %g2, label %exit
+
+g2:
+  %pre.2 = icmp slt i64 %n, 101
+  br i1 %pre.2, label %loop, label %exit
+
+loop:
+  %iv = phi i64 [ 0, %g2 ], [ %iv.next, %loop ]
+  %iv.next = add i64 %iv, 1
+  %ec = icmp eq i64 %iv, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}

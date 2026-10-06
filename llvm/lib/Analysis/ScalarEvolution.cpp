@@ -16020,31 +16020,67 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
       const SCEV *FromRewritten = GetMaybeRewritten(From);
       const SCEV *To = nullptr;
 
+      // From is known to be in the range of FromRewritten. When adding an
+      // upper bound, min(FromRewritten, RHS) loses the lower bound L of
+      // FromRewritten if RHS may be less than L. As From <= RHS and From >= L
+      // imply RHS >= L, use max(RHS, L) instead to preserve it, unless L is
+      // greater than RHS's maximum, i.e. the conditions are contradictory.
+      // Similarly, use min(RHS, U) when adding a lower bound.
+      const SCEV *Bound = RHS;
+      bool CanClamp = !isa<SCEVConstant>(RHS) && !RHS->getType()->isPointerTy();
       switch (Predicate) {
       case CmpInst::ICMP_ULT:
-      case CmpInst::ICMP_ULE:
-        To = SE.getUMinExpr(FromRewritten, RHS);
+      case CmpInst::ICMP_ULE: {
+        if (CanClamp) {
+          APInt L = SE.getUnsignedRangeMin(FromRewritten);
+          if (L.ugt(SE.getUnsignedRangeMin(RHS)) &&
+              L.ule(SE.getUnsignedRangeMax(RHS)))
+            Bound = SE.getUMaxExpr(RHS, SE.getConstant(L));
+        }
+        To = SE.getUMinExpr(FromRewritten, Bound);
         if (auto *UMax = dyn_cast<SCEVUMaxExpr>(FromRewritten))
           EnqueueOperands(UMax);
         break;
+      }
       case CmpInst::ICMP_SLT:
-      case CmpInst::ICMP_SLE:
-        To = SE.getSMinExpr(FromRewritten, RHS);
+      case CmpInst::ICMP_SLE: {
+        if (CanClamp) {
+          APInt L = SE.getSignedRangeMin(FromRewritten);
+          if (L.sgt(SE.getSignedRangeMin(RHS)) &&
+              L.sle(SE.getSignedRangeMax(RHS)))
+            Bound = SE.getSMaxExpr(RHS, SE.getConstant(L));
+        }
+        To = SE.getSMinExpr(FromRewritten, Bound);
         if (auto *SMax = dyn_cast<SCEVSMaxExpr>(FromRewritten))
           EnqueueOperands(SMax);
         break;
+      }
       case CmpInst::ICMP_UGT:
-      case CmpInst::ICMP_UGE:
-        To = SE.getUMaxExpr(FromRewritten, RHS);
+      case CmpInst::ICMP_UGE: {
+        if (CanClamp) {
+          APInt U = SE.getUnsignedRangeMax(FromRewritten);
+          if (U.ult(SE.getUnsignedRangeMax(RHS)) &&
+              U.uge(SE.getUnsignedRangeMin(RHS)))
+            Bound = SE.getUMinExpr(RHS, SE.getConstant(U));
+        }
+        To = SE.getUMaxExpr(FromRewritten, Bound);
         if (auto *UMin = dyn_cast<SCEVUMinExpr>(FromRewritten))
           EnqueueOperands(UMin);
         break;
+      }
       case CmpInst::ICMP_SGT:
-      case CmpInst::ICMP_SGE:
-        To = SE.getSMaxExpr(FromRewritten, RHS);
+      case CmpInst::ICMP_SGE: {
+        if (CanClamp) {
+          APInt U = SE.getSignedRangeMax(FromRewritten);
+          if (U.slt(SE.getSignedRangeMax(RHS)) &&
+              U.sge(SE.getSignedRangeMin(RHS)))
+            Bound = SE.getSMinExpr(RHS, SE.getConstant(U));
+        }
+        To = SE.getSMaxExpr(FromRewritten, Bound);
         if (auto *SMin = dyn_cast<SCEVSMinExpr>(FromRewritten))
           EnqueueOperands(SMin);
         break;
+      }
       case CmpInst::ICMP_EQ:
         if (isa<SCEVConstant>(RHS))
           To = RHS;
