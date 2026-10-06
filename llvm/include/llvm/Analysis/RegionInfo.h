@@ -585,7 +585,7 @@ public:
       // Mark the exit of the region as visited, so that the children of the
       // exit and the exit itself, i.e. the block outside the region will never
       // be visited.
-      super::Visited.insert(Exit);
+      super::markVisited(Exit);
     }
 
     // Construct the end iterator.

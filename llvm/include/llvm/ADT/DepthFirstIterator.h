@@ -38,6 +38,7 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/iterator_range.h"
+#include <cassert>
 #include <iterator>
 #include <optional>
 #include <type_traits>
@@ -47,12 +48,10 @@
 namespace llvm {
 
 // df_iterator_storage - A private class which is used to figure out where to
-// store the visited set.
+// store the visited set. A non-external set is part of the traversal state of
+// df_iterator instead.
 template<class SetType, bool External>   // Non-external set
-class df_iterator_storage {
-public:
-  SetType Visited;
-};
+class df_iterator_storage {};
 
 template<class SetType>
 class df_iterator_storage<SetType, true> {
@@ -104,28 +103,63 @@ private:
   // DFS.
   using StackElement = std::pair<NodeRef, std::optional<ChildItTy>>;
 
-  // VisitStack - Used to maintain the ordering.  Top = current block
-  SmallVector<StackElement, 8> VisitStack;
+  // The state of a traversal that has started at Root. With an external set,
+  // the set already contains Root.
+  struct StackState {
+    // VisitStack - Used to maintain the ordering.  Top = current block
+    SmallVector<StackElement, 8> VisitStack;
 
-  inline df_iterator(NodeRef Node) {
-    this->Visited.insert(Node);
-    VisitStack.push_back(StackElement(Node, std::nullopt));
-  }
+    explicit StackState(NodeRef Root) {
+      VisitStack.push_back(StackElement(Root, std::nullopt));
+    }
+  };
+  struct StackAndSetState : StackState {
+    SetType Visited;
 
-  inline df_iterator() = default; // End is when stack is empty
+    explicit StackAndSetState(NodeRef Root) : StackState(Root) {
+      Visited.insert(Root);
+    }
+  };
+
+  // The traversal state is created when the iterator is first incremented or
+  // modified. Until then, the iterator only holds the root in PendingRoot, so
+  // that copying it is cheap: iterator adaptors copy iterators many times
+  // before using them. At most one of PendingRoot and State is engaged.
+  std::optional<NodeRef> PendingRoot;
+  std::optional<std::conditional_t<ExtStorage, StackState, StackAndSetState>>
+      State;
+
+  inline df_iterator(NodeRef Node) : PendingRoot(Node) {}
+
+  // End is when there is no pending root and the stack is empty or absent.
+  inline df_iterator() = default;
 
   inline df_iterator(NodeRef Node, SetType &S)
       : df_iterator_storage<SetType, ExtStorage>(S) {
     if (this->Visited.insert(Node).second)
-      VisitStack.push_back(StackElement(Node, std::nullopt));
+      PendingRoot = Node;
   }
 
   inline df_iterator(SetType &S)
     : df_iterator_storage<SetType, ExtStorage>(S) {
-    // End is when stack is empty
+    // End is when there is no pending root and the stack is empty or absent.
+  }
+
+  SetType &visited() {
+    if constexpr (ExtStorage)
+      return this->Visited;
+    else
+      return State->Visited;
+  }
+
+  void startTraversal() {
+    assert(PendingRoot && !State && "Traversal already started or at the end");
+    State.emplace(*PendingRoot);
+    PendingRoot.reset();
   }
 
   inline void toNext() {
+    SmallVectorImpl<StackElement> &VisitStack = State->VisitStack;
     do {
       NodeRef Node = VisitStack.back().first;
       std::optional<ChildItTy> &Opt = VisitStack.back().second;
@@ -139,13 +173,13 @@ private:
       while (*Opt != GT::child_end(Node)) {
         NodeRef Next = *(*Opt)++;
         // Has our next sibling been visited?
-        if (this->Visited.insert(Next).second) {
+        if (visited().insert(Next).second) {
           // No, do it now.
           VisitStack.push_back(StackElement(Next, std::nullopt));
           return;
         }
       }
-      this->Visited.completed(Node);
+      visited().completed(Node);
 
       // Oops, ran out of successors... go up a level on the stack.
       VisitStack.pop_back();
@@ -166,11 +200,23 @@ public:
   static df_iterator end(const GraphT &G, SetType &S) { return df_iterator(S); }
 
   bool operator==(const df_iterator &x) const {
-    return VisitStack == x.VisitStack;
+    if (State && x.State)
+      return State->VisitStack == x.State->VisitStack;
+    if (!State && !x.State)
+      return PendingRoot == x.PendingRoot;
+    // An iterator that has not started stands for the stack
+    // [(PendingRoot, nullopt)]. A started iterator only has such a stack if
+    // markVisited started it before the first increment.
+    const auto &Stack = State ? State->VisitStack : x.State->VisitStack;
+    const std::optional<NodeRef> &R = State ? x.PendingRoot : PendingRoot;
+    return R ? Stack.size() == 1 && Stack[0].first == *R && !Stack[0].second
+             : Stack.empty();
   }
   bool operator!=(const df_iterator &x) const { return !(*this == x); }
 
-  reference operator*() const { return VisitStack.back().first; }
+  reference operator*() const {
+    return State ? State->VisitStack.back().first : *PendingRoot;
+  }
 
   // This is a nonstandard operator-> that dereferences the pointer an extra
   // time... so that you can actually call methods ON the Node, because
@@ -179,6 +225,8 @@ public:
   NodeRef operator->() const { return **this; }
 
   df_iterator &operator++() { // Preincrement
+    if (!State)
+      startTraversal();
     toNext();
     return *this;
   }
@@ -188,8 +236,10 @@ public:
   /// Note: This function takes care of incrementing the iterator. If you
   /// always increment and call this function, you risk walking off the end.
   df_iterator &skipChildren() {
-    VisitStack.pop_back();
-    if (!VisitStack.empty())
+    if (!State)
+      startTraversal();
+    State->VisitStack.pop_back();
+    if (!State->VisitStack.empty())
       toNext();
     return *this;
   }
@@ -200,20 +250,40 @@ public:
     return tmp;
   }
 
+  /// Mark \p Node as visited, so that the traversal does not visit it and the
+  /// nodes that are only reachable through it. Must not be called on an end
+  /// iterator with an internal visited set.
+  void markVisited(NodeRef Node) {
+    if constexpr (!ExtStorage)
+      if (!State)
+        startTraversal();
+    visited().insert(Node);
+  }
+
   // nodeVisited - return true if this iterator has already visited the
   // specified node.  This is public, and will probably be used to iterate over
   // nodes that a depth first iteration did not find: ie unreachable nodes.
   //
   bool nodeVisited(NodeRef Node) const {
-    return this->Visited.contains(Node);
+    if constexpr (ExtStorage)
+      return this->Visited.contains(Node);
+    else
+      return State ? State->Visited.contains(Node) : PendingRoot == Node;
   }
 
   /// Return the length of the path from the entry node to the current node,
   /// counting both nodes.
-  unsigned getPathLength() const { return VisitStack.size(); }
+  unsigned getPathLength() const {
+    if (State)
+      return State->VisitStack.size();
+    return PendingRoot ? 1 : 0;
+  }
 
   /// Return the n'th node in the path from the entry node to the current node.
-  NodeRef getPath(unsigned n) const { return VisitStack[n].first; }
+  NodeRef getPath(unsigned n) const {
+    assert(n < getPathLength() && "Path index out of range");
+    return State ? State->VisitStack[n].first : *PendingRoot;
+  }
 };
 
 // Provide global constructors that automatically figure out correct types...
