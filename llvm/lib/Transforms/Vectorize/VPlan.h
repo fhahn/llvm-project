@@ -4823,6 +4823,31 @@ inline const VPRegionBlock *VPRecipeBase::getRegion() const {
   return getParent()->getParent();
 }
 
+/// A condition that must hold to execute the vector loop of a VPlan, turned
+/// into a runtime check by VPlanTransforms::materializePredicates().
+struct VPPredicate {
+  virtual ~VPPredicate() = default;
+
+  /// Expand the condition under which the predicate fails into \p VPBB.
+  virtual VPValue *expandNegated(VPBasicBlock *VPBB, ScalarEvolution &SE,
+                                 DebugLoc DL) const = 0;
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+  virtual void print(raw_ostream &O) const = 0;
+#endif
+};
+
+/// The pointer groups of \p Checks, owned by LoopAccessInfo, do not overlap.
+struct VPMemoryChecksPredicate : public VPPredicate {
+  ArrayRef<RuntimePointerCheck> Checks;
+  VPMemoryChecksPredicate(ArrayRef<RuntimePointerCheck> Checks)
+      : Checks(Checks) {}
+  VPValue *expandNegated(VPBasicBlock *VPBB, ScalarEvolution &SE,
+                         DebugLoc DL) const override;
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+  void print(raw_ostream &O) const override;
+#endif
+};
+
 /// VPlan models a candidate for vectorization, encoding various decisions take
 /// to produce efficient output IR, including which branches, basic-blocks and
 /// output IR instructions to generate, and their cost. VPlan holds a
@@ -4884,6 +4909,9 @@ class VPlan {
   /// Blocks allocated and owned by the VPlan. They will be deleted once the
   /// VPlan is destroyed.
   SmallVector<VPBlockBase *> CreatedBlocks;
+
+  /// Predicates that must hold to execute the vector loop, shared by clones.
+  SmallVector<std::shared_ptr<const VPPredicate>> Predicates;
 
   /// Construct a VPlan with \p Entry to the plan and with \p ScalarHeader
   /// wrapping the original header of the scalar loop. The vector loop will have
@@ -4994,6 +5022,8 @@ public:
 
   /// Returns true if \p VPBB is an exit block.
   bool isExitBlock(VPBlockBase *VPBB);
+
+  auto &predicates() { return Predicates; }
 
   /// The trip count of the original loop.
   VPValue *getTripCount() const {

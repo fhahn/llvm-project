@@ -233,11 +233,9 @@ struct VPlanTransforms {
   static void attachCheckBlock(VPlan &Plan, Value *Cond, BasicBlock *CheckBlock,
                                bool AddBranchWeights);
 
-  /// Generate \p Checks as recipes and attach the check block to \p Plan.
-  static void attachMemoryChecks(VPlan &Plan,
-                                 ArrayRef<RuntimePointerCheck> Checks,
-                                 ScalarEvolution &SE, DebugLoc DL,
-                                 bool AddBranchWeights);
+  /// Turn the predicates of \p Plan into checks bypassing the vector loop.
+  static void materializePredicates(VPlan &Plan, ScalarEvolution &SE,
+                                    DebugLoc DL, bool AddBranchWeights);
 
   /// Model the blocks the executed \p MainPlan generated for the main vector
   /// loop in \p EpiPlan during epilogue vectorization, wrapping each in a

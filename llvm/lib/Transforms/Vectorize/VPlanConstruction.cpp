@@ -1554,14 +1554,12 @@ void VPlanTransforms::attachCheckBlock(VPlan &Plan, Value *Cond,
   attachVPCheckBlock(Plan, CondVPV, CheckBlockVPBB, AddBranchWeights);
 }
 
-void VPlanTransforms::attachMemoryChecks(VPlan &Plan,
-                                         ArrayRef<RuntimePointerCheck> Checks,
-                                         ScalarEvolution &SE, DebugLoc DL,
-                                         bool AddBranchWeights) {
+VPValue *VPMemoryChecksPredicate::expandNegated(VPBasicBlock *VPBB,
+                                                ScalarEvolution &SE,
+                                                DebugLoc DL) const {
   assert(!Checks.empty() && "No checks to generate");
 
-  auto *MemCheckVPBB = Plan.createVPBasicBlock("vector.memcheck");
-  VPBuilder Builder(MemCheckVPBB);
+  VPBuilder Builder(VPBB);
   VPSCEVExpander Expander(Builder, SE, DL);
 
   // Expand each group's bounds once so all checks reuse the same frozen values.
@@ -1581,7 +1579,7 @@ void VPlanTransforms::attachMemoryChecks(VPlan &Plan,
       }
     }
 
-  VPValue *Cond = Plan.getFalse();
+  VPValue *Cond = Builder.getPlan().getFalse();
   for (const auto &[A, B] : Checks) {
     auto [AStart, AEnd] = GroupToBounds[A];
     auto [BStart, BEnd] = GroupToBounds[B];
@@ -1593,7 +1591,18 @@ void VPlanTransforms::attachMemoryChecks(VPlan &Plan,
         Builder.createAnd(Bound0, Bound1, DL, "found.conflict");
     Cond = Builder.createOr(Cond, IsConflict, DL, "conflict.rdx");
   }
-  attachVPCheckBlock(Plan, Cond, MemCheckVPBB, AddBranchWeights);
+  return Cond;
+}
+
+void VPlanTransforms::materializePredicates(VPlan &Plan, ScalarEvolution &SE,
+                                            DebugLoc DL,
+                                            bool AddBranchWeights) {
+  for (const auto &P : Plan.predicates()) {
+    auto *CheckVPBB = Plan.createVPBasicBlock("vector.memcheck");
+    attachVPCheckBlock(Plan, P->expandNegated(CheckVPBB, SE, DL), CheckVPBB,
+                       AddBranchWeights);
+  }
+  Plan.predicates().clear();
 }
 
 void VPlanTransforms::addMinimumIterationCheck(

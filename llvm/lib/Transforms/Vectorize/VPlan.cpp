@@ -1072,6 +1072,17 @@ bool VPlan::isOuterLoop() const {
 }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+void VPMemoryChecksPredicate::print(raw_ostream &O) const {
+  for (const auto &[A, B] : Checks) {
+    O << "  No overlap between ";
+    ListSeparator LS(" and ");
+    for (const RuntimeCheckingPtrGroup *CG : {A, B})
+      O << LS << "[" << *CG->Low << ", " << *CG->High << ")"
+        << (CG->NeedsFreeze ? " (frozen)" : "");
+    O << "\n";
+  }
+}
+
 void VPlan::printLiveIns(raw_ostream &O) const {
   VPSlotTracker SlotTracker(this);
 
@@ -1122,6 +1133,11 @@ void VPlan::print(raw_ostream &O) const {
   O << "VPlan '" << getName() << "' {";
 
   printLiveIns(O);
+
+  if (!Predicates.empty())
+    O << "Predicates:\n";
+  for (const auto &P : Predicates)
+    P->print(O);
 
   ReversePostOrderTraversal<VPBlockShallowTraversalWrapper<const VPBlockBase *>>
       RPOT(getEntry());
@@ -1268,6 +1284,7 @@ VPlan *VPlan::duplicate() {
   // Initialize remaining fields of cloned VPlan.
   NewPlan->VFs = VFs;
   NewPlan->UFs = UFs;
+  NewPlan->Predicates = Predicates;
   // TODO: Adjust names.
   NewPlan->Name = Name;
   if (TripCount) {

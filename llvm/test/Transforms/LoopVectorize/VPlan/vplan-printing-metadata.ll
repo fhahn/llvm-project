@@ -311,6 +311,8 @@ define void @test_noalias_metadata(ptr %a, ptr %b, i64 %n) {
 ; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  Live-in ir<%n> = original trip-count
+; CHECK-NEXT:  Predicates:
+; CHECK-NEXT:    No overlap between [%a, ((4 * %n) + %a)) and [%b, ((4 * %n) + %b))
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph

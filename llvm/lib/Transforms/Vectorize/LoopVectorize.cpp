@@ -5781,6 +5781,8 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
          "Trying to execute plan with unsupported VF");
   assert(BestVPlan.hasUF(BestUF) &&
          "Trying to execute plan with unsupported UF");
+  assert(BestVPlan.predicates().empty() &&
+         "predicates must be materialized before executing the plan");
   if (BestVPlan.hasEarlyExit())
     ++LoopsEarlyExitVectorized;
 
@@ -6451,6 +6453,20 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
                       OptForSize, SCEVCheckThreshold, ORE, OrigLoop))
     return nullptr;
 
+  // VPlan does not model diff checks. VPSCEVExpander cannot hoist bounds out of
+  // an enclosing loop and expands AddRecs in the plan's entry, not the check
+  // block. GeneratedRTChecks' IR block is used for those.
+  if (IsInnerLoop && OrigLoop->isOutermost()) {
+    const auto &RtPtrChecking = *Legal->getRuntimePointerChecking();
+    if (RtPtrChecking.Need && !RtPtrChecking.getDiffChecks() &&
+        none_of(RtPtrChecking.CheckingGroups, [](const auto &CG) {
+          return SCEVExprContains(CG.Low, IsaPred<SCEVAddRecExpr>) ||
+                 SCEVExprContains(CG.High, IsaPred<SCEVAddRecExpr>);
+        }))
+      VPlan0->predicates().push_back(
+          std::make_shared<VPMemoryChecksPredicate>(RtPtrChecking.getChecks()));
+  }
+
   RUN_VPLAN_PASS(VPlanTransforms::addMiddleCheck, *VPlan0);
 
   // If we're vectorizing a loop with an uncountable exit, make sure that the
@@ -7013,26 +7029,17 @@ void LoopVectorizationPlanner::attachRuntimeChecks(
                   "(e.g., adding 'restrict').";
       });
     }
-    // VPSCEVExpander expands AddRecs in the plan's entry, not the check block.
-    auto IsUnsupported = IsaPred<SCEVAddRecExpr>;
-    // Diff checks are not modelled in VPlan yet, and the VPlan expander cannot
-    // hoist bounds out of an enclosing loop.
-    const auto &RtPtrChecking = *Legal->getRuntimePointerChecking();
-    if (RtPtrChecking.getDiffChecks() || OrigLoop->getParentLoop() ||
-        any_of(RtPtrChecking.CheckingGroups,
-               [&](const RuntimeCheckingPtrGroup &CG) {
-                 return SCEVExprContains(CG.Low, IsUnsupported) ||
-                        SCEVExprContains(CG.High, IsUnsupported);
-               }))
+    if (Plan.predicates().empty())
       return RUN_VPLAN_PASS(VPlanTransforms::attachCheckBlock, Plan,
                             MemCheckCond, MemCheckBlock, HasBranchWeights);
-
-    // Erase the temporary IR before recipe expansion can reuse its values.
-    RTChecks.eraseMemCheckBlock();
-    RUN_VPLAN_PASS(VPlanTransforms::attachMemoryChecks, Plan,
-                   RtPtrChecking.getChecks(), *PSE.getSE(),
-                   OrigLoop->getStartLoc(), HasBranchWeights);
   }
+  if (Plan.predicates().empty())
+    return;
+
+  // Erase the temporary IR before recipe expansion can reuse its values.
+  RTChecks.eraseMemCheckBlock();
+  RUN_VPLAN_PASS(VPlanTransforms::materializePredicates, Plan, *PSE.getSE(),
+                 OrigLoop->getStartLoc(), HasBranchWeights);
 }
 
 void LoopVectorizationPlanner::addMinimumIterationCheck(
@@ -7383,6 +7390,9 @@ static void preparePlanForEpilogueVectorLoop(
     ElementCount MainLoopVF, unsigned MainLoopUF, ElementCount EpilogueVF,
     LoopVectorizationPlanner &LVP, VFSelectionContext &Config,
     ScalarEvolution &SE, const MainPlanResumeMarkers &Markers) {
+  // The runtime checks of the main plan bypass both vector loops.
+  Plan.predicates().clear();
+
   // Build a map from the scalar-header PHI to the ResumeForEpilogue markers
   // from the main plan.
   // TODO: Replace the IR PHI key.
