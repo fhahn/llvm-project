@@ -529,21 +529,30 @@ static bool dominatesMergePoint(
   return true;
 }
 
+/// Return true if \p V is a constant int, a null pointer or an IntToPtr of a
+/// constant int, i.e. if getConstantInt succeeds on it.
+static bool isConstantIntLike(Value *V, const DataLayout &DL) {
+  if (isa<ConstantInt>(V))
+    return true;
+  // It is not safe to look through inttoptr or ptrtoint when using unstable
+  // pointer types.
+  if (!isa<Constant>(V) || !V->getType()->isPointerTy() ||
+      DL.hasUnstableRepresentation(V->getType()))
+    return false;
+  return isa<ConstantPointerNull>(V) || match(V, m_IntToPtr(m_ConstantInt()));
+}
+
 /// Extract ConstantInt from value, looking through IntToPtr
 /// and PointerNullValue. Return NULL if value is not a constant int.
 static ConstantInt *getConstantInt(Value *V, const DataLayout &DL) {
+  if (!isConstantIntLike(V, DL))
+    return nullptr;
   // Normal constant int.
-  ConstantInt *CI = dyn_cast<ConstantInt>(V);
-  if (CI || !isa<Constant>(V) || !V->getType()->isPointerTy())
+  if (auto *CI = dyn_cast<ConstantInt>(V))
     return CI;
 
-  // It is not safe to look through inttoptr or ptrtoint when using unstable
-  // pointer types.
-  if (DL.hasUnstableRepresentation(V->getType()))
-    return nullptr;
-
   // This is some kind of pointer constant. Turn it into a pointer-sized
-  // ConstantInt if possible.
+  // ConstantInt.
   IntegerType *IntPtrTy = cast<IntegerType>(DL.getIntPtrType(V->getType()));
 
   // Null pointer means 0, see SelectionDAGBuilder::getValue(const Value*).
@@ -552,17 +561,12 @@ static ConstantInt *getConstantInt(Value *V, const DataLayout &DL) {
 
   // IntToPtr const int, we can look through this if the semantics of
   // inttoptr for this address space are a simple (truncating) bitcast.
-  if (ConstantExpr *CE = dyn_cast<ConstantExpr>(V))
-    if (CE->getOpcode() == Instruction::IntToPtr)
-      if (ConstantInt *CI = dyn_cast<ConstantInt>(CE->getOperand(0))) {
-        // The constant is very likely to have the right type already.
-        if (CI->getType() == IntPtrTy)
-          return CI;
-        else
-          return cast<ConstantInt>(
-              ConstantFoldIntegerCast(CI, IntPtrTy, /*isSigned=*/false, DL));
-      }
-  return nullptr;
+  auto *CI = cast<ConstantInt>(cast<ConstantExpr>(V)->getOperand(0));
+  // The constant is very likely to have the right type already.
+  if (CI->getType() == IntPtrTy)
+    return CI;
+  return cast<ConstantInt>(
+      ConstantFoldIntegerCast(CI, IntPtrTy, /*isSigned=*/false, DL));
 }
 
 namespace {
@@ -873,7 +877,7 @@ Value *SimplifyCFGOpt::isValueEqualityComparison(Instruction *TI) {
   } else if (CondBrInst *BI = dyn_cast<CondBrInst>(TI))
     if (BI->getCondition()->hasOneUse()) {
       if (ICmpInst *ICI = dyn_cast<ICmpInst>(BI->getCondition())) {
-        if (ICI->isEquality() && getConstantInt(ICI->getOperand(1), DL))
+        if (ICI->isEquality() && isConstantIntLike(ICI->getOperand(1), DL))
           CV = ICI->getOperand(0);
       } else if (auto *Trunc = dyn_cast<TruncInst>(BI->getCondition())) {
         if (Trunc->hasNoUnsignedWrap())
@@ -3560,12 +3564,17 @@ static bool blockIsSimpleEnoughToThreadThrough(BasicBlock *BB,
   return true;
 }
 
+/// Return true if \p V is an instruction in \p BB.
+static bool isDefinedIn(Value *V, BasicBlock *BB) {
+  auto *I = dyn_cast<Instruction>(V);
+  return I && I->getParent() == BB;
+}
+
 static ConstantInt *getKnownValueOnEdge(Value *V, BasicBlock *From,
                                         BasicBlock *To) {
   // Don't look past the block defining the value, we might get the value from
   // a previous loop iteration.
-  auto *I = dyn_cast<Instruction>(V);
-  if (I && I->getParent() == To)
+  if (isDefinedIn(V, To))
     return nullptr;
 
   // We know the value if the From block branches on it.
@@ -3837,9 +3846,16 @@ static std::optional<bool> foldCondBranchOnValueKnownInPredecessorImpl(
 }
 
 bool SimplifyCFGOpt::foldCondBranchOnValueKnownInPredecessor(CondBrInst *BI) {
+  // getKnownValueOnEdge knows nothing about a non-PHI condition defined in
+  // this block, so there is nothing to thread.
+  Value *Cond = BI->getCondition();
+  if (!isa<PHINode>(Cond) && isDefinedIn(Cond, BI->getParent()))
+    return false;
+
   // Note: If BB is a loop header then there is a risk that threading introduces
   // a non-canonical loop by moving a back edge. So we avoid this optimization
   // for loop headers if NeedCanonicalLoop is set.
+  // TODO: is_contained on LoopHeaders is a linear scan.
   if (Options.NeedCanonicalLoop && is_contained(LoopHeaders, BI->getParent()))
     return false;
 
@@ -4715,14 +4731,19 @@ static bool mergeConditionalStores(CondBrInst *PBI, CondBrInst *QBI,
       if (StoreInst *SI = dyn_cast<StoreInst>(&I))
         PStoreAddresses.insert(SI->getPointerOperand());
   }
+  if (PStoreAddresses.empty())
+    return false;
   for (auto *BB : {QTB, QFB}) {
     if (!BB)
       continue;
     for (auto &I : *BB)
       if (StoreInst *SI = dyn_cast<StoreInst>(&I))
-        QStoreAddresses.insert(SI->getPointerOperand());
+        if (PStoreAddresses.contains(SI->getPointerOperand()))
+          QStoreAddresses.insert(SI->getPointerOperand());
   }
 
+  // QStoreAddresses already holds just the common addresses. Intersect anyway,
+  // so that the merge order below is the iteration order of PStoreAddresses.
   set_intersect(PStoreAddresses, QStoreAddresses);
   // set_intersect mutates PStoreAddresses in place. Rename it here to make it
   // clear what it contains.
