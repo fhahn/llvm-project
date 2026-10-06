@@ -187,6 +187,7 @@ define i32 @cross_width_not_redundant(ptr addrspace(1) %b) {
 ; CHECK-NEXT:    store i32 1, ptr [[K]], align 1
 ; CHECK-NEXT:    store i32 2, ptr [[BP]], align 1
 ; CHECK-NEXT:    [[V:%.*]] = load i32, ptr [[K]], align 1
+; CHECK-NEXT:    store i32 1, ptr [[K]], align 1
 ; CHECK-NEXT:    ret i32 [[V]]
 ;
   %q2 = getelementptr i8, ptr addrspace(1) %b, i32 2147483640
@@ -231,6 +232,9 @@ define i32 @same_width_redundant(ptr addrspace(1) %b) {
 define void @dead_on_return_narrower_ptr(ptr dead_on_return(16) %b) {
 ; CHECK-LABEL: define void @dead_on_return_narrower_ptr(
 ; CHECK-SAME: ptr dead_on_return(16) [[B:%.*]]) {
+; CHECK-NEXT:    [[C:%.*]] = addrspacecast ptr [[B]] to ptr addrspace(1)
+; CHECK-NEXT:    [[G:%.*]] = getelementptr i8, ptr addrspace(1) [[C]], i32 12
+; CHECK-NEXT:    store i32 0, ptr addrspace(1) [[G]], align 1
 ; CHECK-NEXT:    ret void
 ;
   %c = addrspacecast ptr %b to ptr addrspace(1)
@@ -244,6 +248,9 @@ define void @dead_on_return_narrower_ptr(ptr dead_on_return(16) %b) {
 define void @dead_on_return_wider_ptr(ptr addrspace(1) dead_on_return(16) %b) {
 ; CHECK-LABEL: define void @dead_on_return_wider_ptr(
 ; CHECK-SAME: ptr addrspace(1) dead_on_return(16) [[B:%.*]]) {
+; CHECK-NEXT:    [[C:%.*]] = addrspacecast ptr addrspace(1) [[B]] to ptr
+; CHECK-NEXT:    [[G:%.*]] = getelementptr i8, ptr [[C]], i64 12
+; CHECK-NEXT:    store i32 0, ptr [[G]], align 1
 ; CHECK-NEXT:    ret void
 ;
   %c = addrspacecast ptr addrspace(1) %b to ptr

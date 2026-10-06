@@ -1289,8 +1289,12 @@ OverwriteResult DSEState::isOverwrite(const Instruction *KillingI,
       GetPointerBaseWithConstantOffset(KillingPtr, KillingOff, DL);
 
   // If the base pointers still differ, we have two completely different
-  // stores.
-  if (DeadBasePtr != KillingBasePtr)
+  // stores. The offsets are taken in the index width of DeadPtr and KillingPtr
+  // respectively, which can differ if the base was reached through an
+  // addrspacecast. Offsets modulo different widths cannot be compared.
+  unsigned IdxWidth = DL.getIndexTypeSizeInBits(DeadPtr->getType());
+  if (DeadBasePtr != KillingBasePtr ||
+      IdxWidth != DL.getIndexTypeSizeInBits(KillingPtr->getType()))
     return OW_Unknown;
 
   // The offsets are signed values of the index width, and the addresses they
@@ -1299,13 +1303,12 @@ OverwriteResult DSEState::isOverwrite(const Instruction *KillingI,
   // access wraps, the int64_t arithmetic below and in isPartialOverwrite does
   // not overflow, and comparing offsets as integers matches comparing
   // addresses.
-  auto EndsInIndexRange = [&](const Value *Ptr, int64_t Off, uint64_t Size) {
-    unsigned IdxWidth =
-        std::min(DL.getIndexTypeSizeInBits(Ptr->getType()), 64u);
-    return Size <= uint64_t(maxIntN(IdxWidth)) - uint64_t(Off);
+  uint64_t MaxOff = maxIntN(std::min(IdxWidth, 64u));
+  auto EndsInIndexRange = [MaxOff](int64_t Off, uint64_t Size) {
+    return Size <= MaxOff - uint64_t(Off);
   };
-  if (!EndsInIndexRange(DeadPtr, DeadOff, DeadSize.getFixedValue()) ||
-      !EndsInIndexRange(KillingPtr, KillingOff, KillingSize.getFixedValue()))
+  if (!EndsInIndexRange(DeadOff, DeadSize.getFixedValue()) ||
+      !EndsInIndexRange(KillingOff, KillingSize.getFixedValue()))
     return OW_Unknown;
 
   // The killing access completely overlaps the dead store if and only if
@@ -1357,6 +1360,12 @@ bool DSEState::isInvisibleToCallerAfterRet(const Value *V, const Value *Ptr,
     // pessimistically assume that the store writes to memory out of the
     // dead_on_return bounds.
     if (BaseValue != V)
+      return false;
+    // The offset is taken in the index width of Ptr. If V has a different one
+    // (it was reached through an addrspacecast), the offset cannot be compared
+    // with V's dead bytes.
+    if (DL.getIndexTypeSizeInBits(Ptr->getType()) !=
+        DL.getIndexTypeSizeInBits(V->getType()))
       return false;
     // This store is only invisible after return if we are in bounds of the
     // range marked dead.
