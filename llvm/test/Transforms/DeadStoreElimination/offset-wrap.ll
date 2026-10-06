@@ -12,7 +12,9 @@ target datalayout = "p1:32:32-p2:32:32"
 define void @wrap_i64(ptr %b) {
 ; CHECK-LABEL: define void @wrap_i64(
 ; CHECK-SAME: ptr [[B:%.*]]) {
+; CHECK-NEXT:    [[D:%.*]] = getelementptr i8, ptr [[B]], i64 9223372036854775807
 ; CHECK-NEXT:    [[K:%.*]] = getelementptr i8, ptr [[B]], i64 -9223372036854775808
+; CHECK-NEXT:    store i32 1, ptr [[D]], align 1
 ; CHECK-NEXT:    store i64 2, ptr [[K]], align 1
 ; CHECK-NEXT:    ret void
 ;
@@ -50,6 +52,7 @@ define i32 @wrap_i32_not_redundant(ptr addrspace(1) %b) {
 ; CHECK-NEXT:    store i32 1, ptr addrspace(1) [[K]], align 1
 ; CHECK-NEXT:    store i32 2, ptr addrspace(1) [[D]], align 1
 ; CHECK-NEXT:    [[V:%.*]] = load i32, ptr addrspace(1) [[K]], align 1
+; CHECK-NEXT:    store i32 1, ptr addrspace(1) [[K]], align 1
 ; CHECK-NEXT:    ret i32 [[V]]
 ;
   %d = getelementptr i8, ptr addrspace(1) %b, i32 2147483647
@@ -68,6 +71,7 @@ define i64 @wrap_i64_killing_not_redundant(ptr %b) {
 ; CHECK-SAME: ptr [[B:%.*]]) {
 ; CHECK-NEXT:    [[D:%.*]] = getelementptr i8, ptr [[B]], i64 9223372036854775807
 ; CHECK-NEXT:    [[K:%.*]] = getelementptr i8, ptr [[B]], i64 -9223372036854775808
+; CHECK-NEXT:    store i64 1, ptr [[D]], align 1
 ; CHECK-NEXT:    store i64 2, ptr [[K]], align 1
 ; CHECK-NEXT:    [[V:%.*]] = load i64, ptr [[D]], align 1
 ; CHECK-NEXT:    store i64 1, ptr [[D]], align 1
@@ -90,6 +94,7 @@ define i32 @wrap_i32_killing_not_redundant(ptr addrspace(1) %b) {
 ; CHECK-NEXT:    store i32 1, ptr addrspace(1) [[D]], align 1
 ; CHECK-NEXT:    store i32 2, ptr addrspace(1) [[K]], align 1
 ; CHECK-NEXT:    [[V:%.*]] = load i32, ptr addrspace(1) [[D]], align 1
+; CHECK-NEXT:    store i32 1, ptr addrspace(1) [[D]], align 1
 ; CHECK-NEXT:    ret i32 [[V]]
 ;
   %d = getelementptr i8, ptr addrspace(1) %b, i32 2147483647

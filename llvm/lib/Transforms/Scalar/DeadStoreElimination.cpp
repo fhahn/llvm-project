@@ -1293,6 +1293,21 @@ OverwriteResult DSEState::isOverwrite(const Instruction *KillingI,
   if (DeadBasePtr != KillingBasePtr)
     return OW_Unknown;
 
+  // The offsets are signed values of the index width, and the addresses they
+  // describe wrap around modulo 2^IndexWidth. Only reason about accesses whose
+  // (exclusive) end does not exceed the largest signed index: then neither
+  // access wraps, the int64_t arithmetic below and in isPartialOverwrite does
+  // not overflow, and comparing offsets as integers matches comparing
+  // addresses.
+  auto EndsInIndexRange = [&](const Value *Ptr, int64_t Off, uint64_t Size) {
+    unsigned IdxWidth =
+        std::min(DL.getIndexTypeSizeInBits(Ptr->getType()), 64u);
+    return Size <= uint64_t(maxIntN(IdxWidth)) - uint64_t(Off);
+  };
+  if (!EndsInIndexRange(DeadPtr, DeadOff, DeadSize.getFixedValue()) ||
+      !EndsInIndexRange(KillingPtr, KillingOff, KillingSize.getFixedValue()))
+    return OW_Unknown;
+
   // The killing access completely overlaps the dead store if and only if
   // both start and end of the dead one is "inside" the killing one:
   //    |<->|--dead--|<->|
@@ -1311,16 +1326,16 @@ OverwriteResult DSEState::isOverwrite(const Instruction *KillingI,
   if (DeadOff >= KillingOff) {
     // If the dead access ends "not after" the killing access then the
     // dead one is completely overwritten by the killing one.
-    if (uint64_t(DeadOff - KillingOff) + DeadSize <= KillingSize)
+    if (uint64_t(DeadOff) - uint64_t(KillingOff) + DeadSize <= KillingSize)
       return OW_Complete;
     // If start of the dead access is "before" end of the killing access
     // then accesses overlap.
-    else if ((uint64_t)(DeadOff - KillingOff) < KillingSize)
+    else if (uint64_t(DeadOff) - uint64_t(KillingOff) < KillingSize)
       return OW_MaybePartial;
   }
   // If start of the killing access is "before" end of the dead access then
   // accesses overlap.
-  else if ((uint64_t)(KillingOff - DeadOff) < DeadSize) {
+  else if (uint64_t(KillingOff) - uint64_t(DeadOff) < DeadSize) {
     return OW_MaybePartial;
   }
 
