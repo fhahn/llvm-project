@@ -1026,7 +1026,25 @@ public:
   /// instruction must be a terminator.
   LLVM_ABI void setSuccessor(unsigned Idx, BasicBlock *BB);
 
-  LLVM_ABI iterator_range<const_succ_iterator> successors() const LLVM_READONLY;
+  iterator_range<const_succ_iterator> successors() const {
+    // Handle branches (where successors are trailing operands) in-line and
+    // other uncommon terminators out-of-line.
+    const_op_iterator OpEnd = reinterpret_cast<const Use *>(this);
+    switch (getOpcode()) {
+    case UncondBr:
+      assert(OpEnd == op_end() && getNumOperands() == 1 &&
+             "UncondBr must have exactly one co-allocated operand");
+      return make_range(const_succ_iterator(OpEnd - 1),
+                        const_succ_iterator(OpEnd));
+    case CondBr:
+      assert(OpEnd == op_end() && getNumOperands() == 3 &&
+             "CondBr must have exactly three co-allocated operands");
+      return make_range(const_succ_iterator(OpEnd - 2),
+                        const_succ_iterator(OpEnd));
+    default:
+      return successorsImpl();
+    }
+  }
   iterator_range<succ_iterator> successors() {
     auto Ops = static_cast<const Instruction *>(this)->successors();
     Use *Begin = const_cast<Use *>(Ops.begin().getUse());
@@ -1038,6 +1056,12 @@ public:
   /// This instruction must be a terminator.
   LLVM_ABI void replaceSuccessorWith(BasicBlock *OldBB, BasicBlock *NewBB);
 
+private:
+  /// Return successors for non-branch terminators.
+  LLVM_ABI iterator_range<const_succ_iterator>
+  successorsImpl() const LLVM_READONLY;
+
+public:
   /// Methods for support type inquiry through isa, cast, and dyn_cast:
   static bool classof(const Value *V) {
     return V->getValueID() >= Value::InstructionVal;

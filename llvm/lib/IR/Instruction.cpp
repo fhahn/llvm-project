@@ -1463,7 +1463,7 @@ void Instruction::setSuccessor(unsigned idx, BasicBlock *B) {
 }
 
 iterator_range<Instruction::const_succ_iterator>
-Instruction::successors() const {
+Instruction::successorsImpl() const {
   switch (getOpcode()) {
 #define HANDLE_TERM_INST(N, OPC, CLASS)                                        \
   case Instruction::OPC:                                                       \

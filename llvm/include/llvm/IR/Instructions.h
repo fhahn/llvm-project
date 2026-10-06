@@ -3203,6 +3203,10 @@ template <>
 struct OperandTraits<UncondBrInst>
     : public FixedNumOperandTraits<UncondBrInst, 1> {};
 
+// Instruction::successors() relies on successors being the trailing operands.
+static_assert(std::is_base_of_v<FixedNumOperandTraits<UncondBrInst, 1>,
+                                OperandTraits<UncondBrInst>>);
+
 DEFINE_TRANSPARENT_OPERAND_ACCESSORS(UncondBrInst, Value)
 
 //===----------------------------------------------------------------------===//
@@ -3259,6 +3263,8 @@ public:
   /// continues to map correctly to each operand.
   LLVM_ABI void swapSuccessors();
 
+  // Instruction::successors() returns the same range inline; keep them in
+  // sync.
   iterator_range<succ_iterator> successors() {
     return make_range(succ_iterator(std::next(op_begin())),
                       succ_iterator(op_end()));
@@ -3281,6 +3287,10 @@ public:
 template <>
 struct OperandTraits<CondBrInst> : public FixedNumOperandTraits<CondBrInst, 3> {
 };
+
+// Instruction::successors() relies on successors being the trailing operands.
+static_assert(std::is_base_of_v<FixedNumOperandTraits<CondBrInst, 3>,
+                                OperandTraits<CondBrInst>>);
 
 DEFINE_TRANSPARENT_OPERAND_ACCESSORS(CondBrInst, Value)
 
