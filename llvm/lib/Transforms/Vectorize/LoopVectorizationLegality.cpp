@@ -814,8 +814,8 @@ bool LoopVectorizationLegality::canVectorizeInstrs() {
   }
 
   // Now we know the widest induction type, check if our found induction
-  // is the same size. If it's not, unset it here and InnerLoopVectorizer
-  // will create another.
+  // is the same size. If it's not, unset it here and the vectorizer will
+  // create another.
   if (PrimaryInduction && WidestIndTy != PrimaryInduction->getType())
     PrimaryInduction = nullptr;
 

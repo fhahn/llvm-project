@@ -19,8 +19,8 @@
 // 1. The main loop pass that drives the different parts.
 // 2. LoopVectorizationLegality - A unit that checks for the legality
 //    of the vectorization.
-// 3. InnerLoopVectorizer - A unit that performs the actual
-//    widening of instructions.
+// 3. LoopVectorizationPlanner - A unit that builds VPlans and executes the
+//    best one, performing the actual widening of instructions.
 // 4. LoopVectorizationCostModel - A unit that checks for the profitability
 //    of vectorization. It decides on the optimal vector width, which
 //    can be one, if vectorization is not profitable.
@@ -514,9 +514,6 @@ static std::optional<ElementCount> getSmallBestKnownTC(
 }
 
 namespace {
-// Forward declare GeneratedRTChecks.
-class GeneratedRTChecks;
-
 using SCEV2ValueTy = DenseMap<const SCEV *, Value *>;
 } // namespace
 
@@ -524,74 +521,6 @@ namespace llvm {
 
 AnalysisKey ShouldRunExtraVectorPasses::Key;
 
-/// InnerLoopVectorizer vectorizes loops which contain only one basic
-/// block to a specified vectorization factor (VF).
-/// This class performs the widening of scalars into vectors, or multiple
-/// scalars. This class also implements the following features:
-/// * It inserts an epilogue loop for handling loops that don't have iteration
-///   counts that are known to be a multiple of the vectorization factor.
-/// * It handles the code generation for reduction variables.
-/// * Scalarization (implementation using scalars) of un-vectorizable
-///   instructions.
-/// InnerLoopVectorizer does not perform any vectorization-legality
-/// checks, and relies on the caller to check for the different legality
-/// aspects. The InnerLoopVectorizer relies on the
-/// LoopVectorizationLegality class to provide information about the induction
-/// and reduction variables that were found to a given vectorization factor.
-class InnerLoopVectorizer {
-public:
-  InnerLoopVectorizer(Loop *OrigLoop, PredicatedScalarEvolution &PSE,
-                      LoopInfo *LI, DominatorTree *DT,
-                      const TargetTransformInfo *TTI, AssumptionCache *AC,
-                      ElementCount VecWidth, unsigned UnrollFactor,
-                      GeneratedRTChecks &RTChecks)
-      : OrigLoop(OrigLoop), PSE(PSE), LI(LI), DT(DT), TTI(TTI), AC(AC),
-        VF(VecWidth), UF(UnrollFactor), Builder(PSE.getSE()->getContext()),
-        RTChecks(RTChecks) {}
-
-  /// Fix the vectorized code, taking care of header phi's, and more.
-  void fixVectorizedLoop(VPTransformState &State);
-
-protected:
-  friend class LoopVectorizationPlanner;
-
-  /// The original loop.
-  Loop *OrigLoop;
-
-  /// A wrapper around ScalarEvolution used to add runtime SCEV checks. Applies
-  /// dynamic knowledge to simplify SCEV expressions and converts them to a
-  /// more usable form.
-  PredicatedScalarEvolution &PSE;
-
-  /// Loop Info.
-  LoopInfo *LI;
-
-  /// Dominator Tree.
-  DominatorTree *DT;
-
-  /// Target Transform Info.
-  const TargetTransformInfo *TTI;
-
-  /// Assumption Cache.
-  AssumptionCache *AC;
-
-  /// The vectorization SIMD factor to use. Each vector will have this many
-  /// vector elements.
-  ElementCount VF;
-
-  /// The vectorization unroll factor to use. Each scalar is vectorized to this
-  /// many different vector instructions.
-  unsigned UF;
-
-  /// The builder that we use
-  IRBuilder<> Builder;
-
-  // --- Vectorization state ---
-
-  /// Structure to hold information about generated runtime checks, responsible
-  /// for cleaning the checks, if vectorization turns out unprofitable.
-  GeneratedRTChecks &RTChecks;
-};
 } // end namespace llvm
 
 /// Look for a meaningful debug location on the instruction or its operands.
@@ -1797,8 +1726,8 @@ static void collectSupportedLoops(Loop &L, LoopInfo *LI,
 }
 
 //===----------------------------------------------------------------------===//
-// Implementation of LoopVectorizationLegality, InnerLoopVectorizer and
-// LoopVectorizationCostModel and LoopVectorizationPlanner.
+// Implementation of LoopVectorizationLegality, LoopVectorizationCostModel and
+// LoopVectorizationPlanner.
 //===----------------------------------------------------------------------===//
 
 /// For the given VF and UF and maximum trip count computed for the loop, return
@@ -2042,20 +1971,6 @@ LoopVectorizationCostModel::getVectorIntrinsicCost(CallInst *CI,
                                     dyn_cast<IntrinsicInst>(CI),
                                     InstructionCost::getInvalid());
   return TTI.getIntrinsicInstrCost(CostAttrs, Config.CostKind);
-}
-
-void InnerLoopVectorizer::fixVectorizedLoop(VPTransformState &State) {
-  // Don't apply optimizations below when no (vector) loop remains, as they all
-  // require one at the moment.
-  VPBasicBlock *HeaderVPBB =
-      vputils::getFirstLoopHeader(*State.Plan, State.VPDT);
-  if (!HeaderVPBB)
-    return;
-
-  BasicBlock *HeaderBB = State.CFG.VPBB2IRBB[HeaderVPBB];
-
-  // Remove redundant induction instructions.
-  legacyCSE(HeaderBB);
 }
 
 void LoopVectorizationCostModel::collectLoopScalars(ElementCount VF) {
@@ -5699,9 +5614,8 @@ LoopVectorizationPlanner::~LoopVectorizationPlanner() = default;
 void LoopVectorizationPlanner::clearCostModel() { CM.reset(); }
 
 DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
-    ElementCount BestVF, unsigned BestUF, VPlan &BestVPlan,
-    InnerLoopVectorizer &ILV, DominatorTree *DT,
-    EpilogueVectorizationKind EpilogueVecKind) {
+    ElementCount BestVF, unsigned BestUF, VPlan &BestVPlan, AssumptionCache *AC,
+    bool HasRuntimeChecks, EpilogueVectorizationKind EpilogueVecKind) {
   assert(BestVPlan.hasVF(BestVF) &&
          "Trying to execute plan with unsupported VF");
   assert(BestVPlan.hasUF(BestUF) &&
@@ -5812,7 +5726,8 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
       RUN_VPLAN_PASS(VPlanTransforms::expandSCEVs, BestVPlan, *PSE.getSE());
 
   // Perform the actual loop transformation.
-  VPTransformState State(&TTI, BestVF, LI, DT, ILV.AC, ILV.Builder, &BestVPlan,
+  IRBuilder<> Builder(OrigLoop->getHeader()->getContext());
+  VPTransformState State(&TTI, BestVF, LI, DT, AC, Builder, &BestVPlan,
                          OrigLoop->getParentLoop());
 
 #ifdef EXPENSIVE_CHECKS
@@ -5879,7 +5794,7 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
   // Add metadata to disable runtime unrolling a scalar loop when there
   // are no runtime checks about strides and memory. A scalar loop that is
   // rarely used is not worth unrolling.
-  bool DisableRuntimeUnroll = !ILV.RTChecks.hasChecks() && !BestVF.isScalar();
+  bool DisableRuntimeUnroll = !HasRuntimeChecks && !BestVF.isScalar();
   updateLoopMetadataAndProfileInfo(
       HeaderVPBB ? LI->getLoopFor(State.CFG.VPBB2IRBB.lookup(HeaderVPBB))
                  : nullptr,
@@ -5888,9 +5803,9 @@ DenseMap<const SCEV *, Value *> LoopVectorizationPlanner::executePlan(
       estimateElementCount(BestVF * BestUF, Config.getVScaleForTuning()),
       DisableRuntimeUnroll, UnrollVectorizedLoop);
 
-  // 3. Fix the vectorized code: take care of header phi's, live-outs,
-  //    predication, updating analyses.
-  ILV.fixVectorizedLoop(State);
+  // 3. Remove redundant induction instructions.
+  if (HeaderVPBB)
+    legacyCSE(State.CFG.VPBB2IRBB.lookup(HeaderVPBB));
 
   // Wrap the generated blocks in VPIRBasicBlocks, so they can be used in the
   // epilogue plan.
@@ -7913,9 +7828,8 @@ bool LoopVectorizePass::processLoop(Loop *L) {
              << "Main Loop VF:" << VF.Width << ", Main Loop UF:" << IC
              << ", Epilogue Loop VF:" << EpilogueVF << ", Epilogue Loop UF:1\n";
     });
-    InnerLoopVectorizer MainILV(L, PSE, LI, DT, TTI, AC, VF.Width, IC, Checks);
     auto ExpandedSCEVs = LVP.executePlan(
-        VF.Width, IC, BestMainPlan, MainILV, DT,
+        VF.Width, IC, BestMainPlan, AC, Checks.hasChecks(),
         LoopVectorizationPlanner::EpilogueVectorizationKind::MainLoop);
     ++LoopsVectorized;
     DEBUG_WITH_TYPE(VerboseDebug, {
@@ -7923,8 +7837,6 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     });
 
     // Second pass vectorizes the epilogue.
-    InnerLoopVectorizer EpilogILV(L, PSE, LI, DT, TTI, AC, EpilogueVF,
-                                  /*UnrollFactor=*/1, Checks);
     preparePlanForEpilogueVectorLoop(BestEpiPlan, BestMainPlan, ExpandedSCEVs,
                                      VF.Width, IC, EpilogueVF, Config,
                                      *PSE.getSE(), Markers);
@@ -7934,14 +7846,13 @@ bool LoopVectorizePass::processLoop(Loop *L) {
              << "Epilogue Loop VF:" << EpilogueVF << ", Epilogue Loop UF:1\n";
     });
     LVP.executePlan(
-        EpilogueVF, /*BestUF=*/1, BestEpiPlan, EpilogILV, DT,
+        EpilogueVF, /*BestUF=*/1, BestEpiPlan, AC, Checks.hasChecks(),
         LoopVectorizationPlanner::EpilogueVectorizationKind::Epilogue);
     DEBUG_WITH_TYPE(VerboseDebug, {
       dbgs() << "final fn:\n" << *L->getHeader()->getParent() << "\n";
     });
     ++LoopsEpilogueVectorized;
   } else {
-    InnerLoopVectorizer LB(L, PSE, LI, DT, TTI, AC, VF.Width, IC, Checks);
     LVP.addMinimumIterationCheck(BestPlan, VF.Width, IC,
                                  VF.MinProfitableTripCount);
     LVP.attachRuntimeChecks(BestPlan, Checks, HasBranchWeights);
@@ -7949,7 +7860,7 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     if (!IsInnerLoop)
       LLVM_DEBUG(dbgs() << "Vectorizing outer loop in \"" << F->getName()
                         << "\"\n");
-    LVP.executePlan(VF.Width, IC, BestPlan, LB, DT);
+    LVP.executePlan(VF.Width, IC, BestPlan, AC, Checks.hasChecks());
     ++LoopsVectorized;
   }
 

@@ -53,7 +53,6 @@ namespace llvm {
 
 class BasicBlock;
 class DominatorTree;
-class InnerLoopVectorizer;
 class IRBuilderBase;
 struct VPTransformState;
 class raw_ostream;
