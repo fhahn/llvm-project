@@ -1093,18 +1093,30 @@ struct DSEState {
   /// MemoryLocation during execution of the containing function.
   bool isGuaranteedLoopInvariant(const Value *Ptr);
 
+  /// Returns true if a killing location translated through the phis of an
+  /// acyclic block to its predecessor \p TransPred, which branches
+  /// unconditionally to it, is written by the killing def on all paths from
+  /// \p BB to the killing def. This is the case if all paths from \p BB pass
+  /// through \p TransPred.
+  bool isInTranslationRegion(const BasicBlock *BB,
+                             const BasicBlock *TransPred) const {
+    return PDT.dominates(TransPred, BB);
+  }
+
   // Find a MemoryDef writing to \p KillingLoc and dominating \p StartAccess,
   // with no read access between them or on any other path to a function exit
   // block if \p KillingLoc is not accessible after the function returns. If
   // there is no such MemoryDef, return std::nullopt. The returned value may not
   // (completely) overwrite \p KillingLoc. Currently we bail out when we
-  // encounter an aliasing MemoryUse (read).
+  // encounter an aliasing MemoryUse (read). If \p KillingLoc has been
+  // translated through phis to \p TransPred, only accesses in its translation
+  // region are considered.
   std::optional<MemoryAccess *>
   getDomMemoryDef(MemoryDef *KillingDef, MemoryAccess *StartAccess,
                   const MemoryLocation &KillingLoc, const Value *KillingUndObj,
                   unsigned &ScanLimit, unsigned &WalkerStepLimit,
                   bool IsMemTerm, unsigned &PartialLimit,
-                  bool IsInitializesAttrMemLoc);
+                  bool IsInitializesAttrMemLoc, BasicBlock *TransPred);
 
   /// Delete dead memory defs and recursively add their operands to ToRemove if
   /// they became dead.
@@ -1645,11 +1657,13 @@ bool DSEState::isGuaranteedLoopInvariant(const Value *Ptr) {
   return true;
 }
 
-std::optional<MemoryAccess *> DSEState::getDomMemoryDef(
-    MemoryDef *KillingDef, MemoryAccess *StartAccess,
-    const MemoryLocation &KillingLoc, const Value *KillingUndObj,
-    unsigned &ScanLimit, unsigned &WalkerStepLimit, bool IsMemTerm,
-    unsigned &PartialLimit, bool IsInitializesAttrMemLoc) {
+std::optional<MemoryAccess *>
+DSEState::getDomMemoryDef(MemoryDef *KillingDef, MemoryAccess *StartAccess,
+                          const MemoryLocation &KillingLoc,
+                          const Value *KillingUndObj, unsigned &ScanLimit,
+                          unsigned &WalkerStepLimit, bool IsMemTerm,
+                          unsigned &PartialLimit, bool IsInitializesAttrMemLoc,
+                          BasicBlock *TransPred) {
   if (ScanLimit == 0 || WalkerStepLimit == 0) {
     LLVM_DEBUG(dbgs() << "\n    ...  hit scan limit\n");
     return std::nullopt;
@@ -1685,6 +1699,11 @@ std::optional<MemoryAccess *> DSEState::getDomMemoryDef(
       if (CanOptimize && Current != KillingDef->getDefiningAccess())
         // The first clobbering def is... none.
         KillingDef->setOptimized(Current);
+      return std::nullopt;
+    }
+
+    if (TransPred && !isInTranslationRegion(Current->getBlock(), TransPred)) {
+      LLVM_DEBUG(dbgs() << "   ...  outside translation region\n");
       return std::nullopt;
     }
 
@@ -2615,26 +2634,34 @@ DSEState::eliminateDeadDefs(const MemoryLocationWrapper &KillingLocWrapper) {
   unsigned WalkerStepLimit = MemorySSAUpwardsStepLimit;
   unsigned PartialLimit = MemorySSAPartialStoreLimit;
   // Worklist of MemoryAccesses that may be killed by
-  // "KillingLocWrapper.MemDef".
-  SmallSetVector<MemoryAccess *, 8> ToCheck;
+  // "KillingLocWrapper.MemDef", together with the pointer of the killing
+  // location to check them against and, if the pointer has been translated
+  // through phis, the predecessor it has been translated to.
+  SmallSetVector<std::tuple<MemoryAccess *, const Value *, BasicBlock *>, 8>
+      ToCheck;
   // Track MemoryAccesses that have been deleted in the loop below, so we can
   // skip them. Don't use SkipStores for this, which may contain reused
   // MemoryAccess addresses.
   SmallPtrSet<MemoryAccess *, 8> Deleted;
   [[maybe_unused]] unsigned OrigNumSkipStores = SkipStores.size();
-  ToCheck.insert(KillingLocWrapper.MemDef->getDefiningAccess());
+  bool IsMemTerm = isMemTerminatorInst(KillingLocWrapper.DefInst);
+  ToCheck.insert({KillingLocWrapper.MemDef->getDefiningAccess(),
+                  KillingLocWrapper.MemLoc.Ptr, nullptr});
 
   // Check if MemoryAccesses in the worklist are killed by
   // "KillingLocWrapper.MemDef".
   for (unsigned I = 0; I < ToCheck.size(); I++) {
-    MemoryAccess *Current = ToCheck[I];
+    auto [Current, KillingPtr, TransPred] = ToCheck[I];
     if (Deleted.contains(Current))
       continue;
+    MemoryLocation KillingLoc =
+        KillingLocWrapper.MemLoc.getWithNewPtr(KillingPtr);
+    const Value *KillingUndObj = TransPred ? getUnderlyingObject(KillingPtr)
+                                           : KillingLocWrapper.UnderlyingObject;
     std::optional<MemoryAccess *> MaybeDeadAccess = getDomMemoryDef(
-        KillingLocWrapper.MemDef, Current, KillingLocWrapper.MemLoc,
-        KillingLocWrapper.UnderlyingObject, ScanLimit, WalkerStepLimit,
-        isMemTerminatorInst(KillingLocWrapper.DefInst), PartialLimit,
-        KillingLocWrapper.DefByInitializesAttr);
+        KillingLocWrapper.MemDef, Current, KillingLoc, KillingUndObj, ScanLimit,
+        WalkerStepLimit, IsMemTerm, PartialLimit,
+        KillingLocWrapper.DefByInitializesAttr, TransPred);
 
     if (!MaybeDeadAccess) {
       LLVM_DEBUG(dbgs() << "  finished walk\n");
@@ -2642,18 +2669,43 @@ DSEState::eliminateDeadDefs(const MemoryLocationWrapper &KillingLocWrapper) {
     }
     MemoryAccess *DeadAccess = *MaybeDeadAccess;
     LLVM_DEBUG(dbgs() << " Checking if we can kill " << *DeadAccess);
-    if (isa<MemoryPhi>(DeadAccess)) {
+    if (auto *Phi = dyn_cast<MemoryPhi>(DeadAccess)) {
       LLVM_DEBUG(dbgs() << "\n  ... adding incoming values to worklist\n");
-      for (Value *V : cast<MemoryPhi>(DeadAccess)->incoming_values()) {
-        MemoryAccess *IncomingAccess = cast<MemoryAccess>(V);
+      BasicBlock *PhiBlock = Phi->getBlock();
+      // If the killing pointer depends on phis in PhiBlock, translate it to
+      // the predecessors. As PhiBlock is not in a cycle, the phis cannot change
+      // before the killing def executes. Memory terminators only kill accesses
+      // to their own underlying object, so there is no point in translating
+      // them. Translated pointers are not translated again.
+      PHITransAddr Addr(const_cast<Value *>(KillingPtr), DL, nullptr);
+      bool Translate = !IsMemTerm && !TransPred && !CI.getCycle(PhiBlock) &&
+                       Addr.needsPHITranslationFromBlock(PhiBlock) &&
+                       Addr.isPotentiallyPHITranslatable();
+      for (auto [Pred, IncomingVal] :
+           zip_equal(Phi->blocks(), Phi->incoming_values())) {
+        auto *IncomingAccess = cast<MemoryAccess>(IncomingVal);
         BasicBlock *IncomingBlock = IncomingAccess->getBlock();
-        BasicBlock *PhiBlock = DeadAccess->getBlock();
 
         // We only consider incoming MemoryAccesses that come before the
         // MemoryPhi. Otherwise we could discover candidates that do not
         // strictly dominate our starting def.
-        if (PostOrderNumbers[IncomingBlock] > PostOrderNumbers[PhiBlock])
-          ToCheck.insert(IncomingAccess);
+        if (PostOrderNumbers[IncomingBlock] <= PostOrderNumbers[PhiBlock])
+          continue;
+
+        // The translated pointer is only written by the killing def on paths
+        // entering PhiBlock from Pred, so only candidates in the translation
+        // region of Pred are considered for it (see getDomMemoryDef). If it
+        // does not include IncomingBlock, keep the untranslated pointer.
+        if (Translate && Pred->getSingleSuccessor() == PhiBlock &&
+            isInTranslationRegion(IncomingBlock, Pred)) {
+          PHITransAddr PredAddr = Addr;
+          if (PredAddr.translateValue(PhiBlock, Pred, &DT,
+                                      /*MustDominate=*/true)) {
+            ToCheck.insert({IncomingAccess, PredAddr.getAddr(), Pred});
+            continue;
+          }
+        }
+        ToCheck.insert({IncomingAccess, KillingPtr, TransPred});
       }
       continue;
     }
@@ -2672,12 +2724,13 @@ DSEState::eliminateDeadDefs(const MemoryLocationWrapper &KillingLocWrapper) {
     MemoryLocationWrapper &DeadLocWrapper =
         DeadDefWrapper.DefinedLocations.front();
     LLVM_DEBUG(dbgs() << " (" << *DeadLocWrapper.DefInst << ")\n");
-    ToCheck.insert(DeadLocWrapper.MemDef->getDefiningAccess());
+    ToCheck.insert(
+        {DeadLocWrapper.MemDef->getDefiningAccess(), KillingPtr, TransPred});
     NumGetDomMemoryDefPassed++;
 
     if (!DebugCounter::shouldExecute(MemorySSACounter))
       continue;
-    if (isMemTerminatorInst(KillingLocWrapper.DefInst)) {
+    if (IsMemTerm) {
       if (KillingLocWrapper.UnderlyingObject != DeadLocWrapper.UnderlyingObject)
         continue;
       LLVM_DEBUG(dbgs() << "DSE: Remove Dead Store:\n  DEAD: "
@@ -2690,15 +2743,14 @@ DSEState::eliminateDeadDefs(const MemoryLocationWrapper &KillingLocWrapper) {
       // Check if DeadI overwrites KillingI.
       int64_t KillingOffset = 0;
       int64_t DeadOffset = 0;
-      OverwriteResult OR =
-          isOverwrite(KillingLocWrapper.DefInst, DeadLocWrapper.DefInst,
-                      KillingLocWrapper.MemLoc, DeadLocWrapper.MemLoc,
-                      KillingOffset, DeadOffset);
+      OverwriteResult OR = isOverwrite(
+          KillingLocWrapper.DefInst, DeadLocWrapper.DefInst, KillingLoc,
+          DeadLocWrapper.MemLoc, KillingOffset, DeadOffset);
       if (OR == OW_MaybePartial) {
         auto &IOL = IOLs[DeadLocWrapper.DefInst->getParent()];
-        OR = isPartialOverwrite(KillingLocWrapper.MemLoc, DeadLocWrapper.MemLoc,
-                                KillingOffset, DeadOffset,
-                                DeadLocWrapper.DefInst, IOL);
+        OR =
+            isPartialOverwrite(KillingLoc, DeadLocWrapper.MemLoc, KillingOffset,
+                               DeadOffset, DeadLocWrapper.DefInst, IOL);
       }
       if (EnablePartialStoreMerging && OR == OW_PartialEarlierWithFullLater) {
         auto *DeadSI = dyn_cast<StoreInst>(DeadLocWrapper.DefInst);
