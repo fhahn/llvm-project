@@ -1358,6 +1358,11 @@ OverwriteResult DSEState::isOverwrite(const Instruction *KillingI,
   if (DeadBasePtr != KillingBasePtr)
     return OW_Unknown;
 
+  // The common base may be reached through addrspacecasts. Offsets in
+  // different address spaces may wrap at different widths, so give up.
+  if (DeadPtr->getType() != KillingPtr->getType())
+    return OW_Unknown;
+
   // The killing access completely overlaps the dead store if and only if
   // both start and end of the dead one is "inside" the killing one:
   //    |<->|--dead--|<->|
@@ -1370,24 +1375,53 @@ OverwriteResult DSEState::isOverwrite(const Instruction *KillingI,
   //    |-------dead-------|
   //    |<->|---killing---|<----->|
   //
-  // We have to be careful here as *Off is signed while *.Size is unsigned.
-
-  // Check if the dead access starts "not before" the killing one.
-  if (DeadOff >= KillingOff) {
-    // If the dead access ends "not after" the killing access then the
-    // dead one is completely overwritten by the killing one.
-    if (uint64_t(DeadOff - KillingOff) + DeadSize <= KillingSize)
-      return OW_Complete;
-    // If start of the dead access is "before" end of the killing access
-    // then accesses overlap.
-    else if ((uint64_t)(DeadOff - KillingOff) < KillingSize)
+  // Offsets wrap around in the index width. If neither access crosses the end
+  // of the signed index range, both lie in one contiguous range of
+  // 2^IdxWidth addresses and int64_t math is exact.
+  unsigned IdxWidth = DL.getIndexTypeSizeInBits(DeadPtr->getType());
+  uint64_t DeadSz = DeadSize.getFixedValue();
+  uint64_t KillingSz = KillingSize.getFixedValue();
+  int64_t DeadEnd, KillingEnd;
+  if (isUInt<63>(DeadSz) && isUInt<63>(KillingSz) &&
+      !AddOverflow(DeadOff, int64_t(DeadSz), DeadEnd) &&
+      !AddOverflow(KillingOff, int64_t(KillingSz), KillingEnd) &&
+      isIntN(IdxWidth, DeadEnd) && isIntN(IdxWidth, KillingEnd)) {
+    // Check if the dead access starts "not before" the killing one.
+    if (DeadOff >= KillingOff) {
+      // If the dead access ends "not after" the killing access then the
+      // dead one is completely overwritten by the killing one.
+      if (uint64_t(DeadOff) - uint64_t(KillingOff) + DeadSz <= KillingSz)
+        return OW_Complete;
+      // If start of the dead access is "before" end of the killing access
+      // then accesses overlap.
+      if (uint64_t(DeadOff) - uint64_t(KillingOff) < KillingSz)
+        return OW_MaybePartial;
+    }
+    // If start of the killing access is "before" end of the dead access then
+    // accesses overlap.
+    else if (uint64_t(KillingOff) - uint64_t(DeadOff) < DeadSz) {
       return OW_MaybePartial;
+    }
+    return OW_None;
   }
-  // If start of the killing access is "before" end of the dead access then
-  // accesses overlap.
-  else if ((uint64_t)(KillingOff - DeadOff) < DeadSize) {
-    return OW_MaybePartial;
-  }
+
+  // Otherwise do the math modulo the index width.
+  if (!isUIntN(IdxWidth, DeadSz) || !isUIntN(IdxWidth, KillingSz))
+    return OW_Unknown;
+
+  // Delta is the offset of the start of the dead access from the start of the
+  // killing access.
+  APInt DeadStart(IdxWidth, DeadOff, /*isSigned=*/true);
+  APInt KillingStart(IdxWidth, KillingOff, /*isSigned=*/true);
+  APInt Delta = DeadStart - KillingStart;
+  if (Delta.ule(KillingSz) && DeadSz <= KillingSz - Delta.getZExtValue())
+    return OW_Complete;
+
+  // Partial overlaps are analyzed using int64_t offsets, which do not account
+  // for the wrap, so give up.
+  APInt NegDelta = KillingStart - DeadStart;
+  if (Delta.ult(KillingSz) || NegDelta.ult(DeadSz))
+    return OW_Unknown;
 
   // Can reach here only if accesses are known not to overlap.
   return OW_None;
