@@ -758,6 +758,171 @@ exit:
   ret void
 }
 
+; All stores can be eliminated by translating %p through both phis.
+define void @memoryphi_translate_chain(i1 %c.0, i1 %c.1, ptr noalias %a, ptr noalias %b, ptr noalias %x) {
+; CHECK-LABEL: @memoryphi_translate_chain(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    br i1 [[C_0:%.*]], label [[INNER:%.*]], label [[OTHER:%.*]]
+; CHECK:       inner:
+; CHECK-NEXT:    br i1 [[C_1:%.*]], label [[INNER_THEN:%.*]], label [[INNER_ELSE:%.*]]
+; CHECK:       inner.then:
+; CHECK-NEXT:    br label [[INNER_END:%.*]]
+; CHECK:       inner.else:
+; CHECK-NEXT:    br label [[INNER_END]]
+; CHECK:       inner.end:
+; CHECK-NEXT:    [[Q:%.*]] = phi ptr [ [[A:%.*]], [[INNER_THEN]] ], [ [[X:%.*]], [[INNER_ELSE]] ]
+; CHECK-NEXT:    br label [[END:%.*]]
+; CHECK:       other:
+; CHECK-NEXT:    br label [[END]]
+; CHECK:       end:
+; CHECK-NEXT:    [[P:%.*]] = phi ptr [ [[Q]], [[INNER_END]] ], [ [[B:%.*]], [[OTHER]] ]
+; CHECK-NEXT:    store i8 10, ptr [[P]], align 1
+; CHECK-NEXT:    ret void
+;
+entry:
+  br i1 %c.0, label %inner, label %other
+
+inner:
+  br i1 %c.1, label %inner.then, label %inner.else
+
+inner.then:
+  store i8 0, ptr %a
+  br label %inner.end
+
+inner.else:
+  store i8 1, ptr %x
+  br label %inner.end
+
+inner.end:
+  %q = phi ptr [ %a, %inner.then ], [ %x, %inner.else ]
+  br label %end
+
+other:
+  store i8 2, ptr %b
+  br label %end
+
+end:
+  %p = phi ptr [ %q, %inner.end ], [ %b, %other ]
+  store i8 10, ptr %p
+  ret void
+}
+
+; The store to %a in %inner.then cannot be eliminated: %inner.end can branch to
+; %other, so the killing store may write %b.
+define void @memoryphi_translate_chain_not_postdominated(i1 %c.0, i1 %c.1, i1 %c.2, ptr noalias %a, ptr noalias %b, ptr noalias %x, ptr noalias %z) {
+; CHECK-LABEL: @memoryphi_translate_chain_not_postdominated(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    br i1 [[C_0:%.*]], label [[INNER:%.*]], label [[OTHER:%.*]]
+; CHECK:       inner:
+; CHECK-NEXT:    br i1 [[C_1:%.*]], label [[INNER_THEN:%.*]], label [[INNER_ELSE:%.*]]
+; CHECK:       inner.then:
+; CHECK-NEXT:    store i8 0, ptr [[A:%.*]], align 1
+; CHECK-NEXT:    br label [[INNER_END:%.*]]
+; CHECK:       inner.else:
+; CHECK-NEXT:    store i8 1, ptr [[X:%.*]], align 1
+; CHECK-NEXT:    br label [[INNER_END]]
+; CHECK:       inner.end:
+; CHECK-NEXT:    [[Q:%.*]] = phi ptr [ [[A]], [[INNER_THEN]] ], [ [[X]], [[INNER_ELSE]] ]
+; CHECK-NEXT:    br i1 [[C_2:%.*]], label [[INNER_EXIT:%.*]], label [[OTHER]]
+; CHECK:       inner.exit:
+; CHECK-NEXT:    store i8 3, ptr [[Z:%.*]], align 1
+; CHECK-NEXT:    br label [[PRED:%.*]]
+; CHECK:       pred:
+; CHECK-NEXT:    br label [[END:%.*]]
+; CHECK:       other:
+; CHECK-NEXT:    br label [[END]]
+; CHECK:       end:
+; CHECK-NEXT:    [[P:%.*]] = phi ptr [ [[Q]], [[PRED]] ], [ [[B:%.*]], [[OTHER]] ]
+; CHECK-NEXT:    store i8 10, ptr [[P]], align 1
+; CHECK-NEXT:    ret void
+;
+entry:
+  br i1 %c.0, label %inner, label %other
+
+inner:
+  br i1 %c.1, label %inner.then, label %inner.else
+
+inner.then:
+  store i8 0, ptr %a
+  br label %inner.end
+
+inner.else:
+  store i8 1, ptr %x
+  br label %inner.end
+
+inner.end:
+  %q = phi ptr [ %a, %inner.then ], [ %x, %inner.else ]
+  br i1 %c.2, label %inner.exit, label %other
+
+inner.exit:
+  store i8 3, ptr %z
+  br label %pred
+
+pred:
+  br label %end
+
+other:
+  store i8 2, ptr %b
+  br label %end
+
+end:
+  %p = phi ptr [ %q, %pred ], [ %b, %other ]
+  store i8 10, ptr %p
+  ret void
+}
+
+; The store to %a in %pre cannot be eliminated: %q changes on the backedge of
+; %loop, so the killing store may write %b.
+define void @memoryphi_translate_chain_loop(i1 %c.0, i1 %c.1, ptr noalias %a, ptr noalias %b, ptr noalias %c, ptr noalias %x) {
+; CHECK-LABEL: @memoryphi_translate_chain_loop(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    br i1 [[C_0:%.*]], label [[PRE:%.*]], label [[OTHER:%.*]]
+; CHECK:       pre:
+; CHECK-NEXT:    store i8 0, ptr [[A:%.*]], align 1
+; CHECK-NEXT:    br label [[LOOP:%.*]]
+; CHECK:       loop:
+; CHECK-NEXT:    [[Q:%.*]] = phi ptr [ [[A]], [[PRE]] ], [ [[B:%.*]], [[LATCH:%.*]] ]
+; CHECK-NEXT:    br i1 [[C_1:%.*]], label [[LATCH]], label [[LOOP_EXIT:%.*]]
+; CHECK:       latch:
+; CHECK-NEXT:    store i8 7, ptr [[X:%.*]], align 1
+; CHECK-NEXT:    br label [[LOOP]]
+; CHECK:       loop.exit:
+; CHECK-NEXT:    br label [[END:%.*]]
+; CHECK:       other:
+; CHECK-NEXT:    br label [[END]]
+; CHECK:       end:
+; CHECK-NEXT:    [[P:%.*]] = phi ptr [ [[Q]], [[LOOP_EXIT]] ], [ [[C:%.*]], [[OTHER]] ]
+; CHECK-NEXT:    store i8 1, ptr [[P]], align 1
+; CHECK-NEXT:    ret void
+;
+entry:
+  br i1 %c.0, label %pre, label %other
+
+pre:
+  store i8 0, ptr %a
+  br label %loop
+
+loop:
+  %q = phi ptr [ %a, %pre ], [ %b, %latch ]
+  br i1 %c.1, label %latch, label %loop.exit
+
+latch:
+  store i8 7, ptr %x
+  br label %loop
+
+loop.exit:
+  br label %end
+
+other:
+  store i8 5, ptr %c
+  br label %end
+
+end:
+  %p = phi ptr [ %q, %loop.exit ], [ %c, %other ]
+  store i8 1, ptr %p
+  ret void
+}
+
 ; The memset in %then is partially overwritten by the killing store translated
 ; to %a and can be shortened.
 define void @memoryphi_translate_partial_memset(i1 %c, ptr noalias %a, ptr noalias %b) {

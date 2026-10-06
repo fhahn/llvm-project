@@ -2678,11 +2678,14 @@ DSEState::eliminateDeadDefs(const MemoryLocationWrapper &KillingLocWrapper) {
       // If the killing pointer depends on phis in PhiBlock, translate it to
       // the predecessors. The phis must not change before the killing def
       // executes, i.e. PhiBlock must not be in a cycle or must contain the
-      // killing def. Memory terminators only kill accesses to their own
-      // underlying object, so there is no point in translating them.
-      // Translated pointers are not translated again.
+      // killing def (which is only possible before translating). A translated
+      // pointer can be translated again, as PhiBlock is in the translation
+      // region of TransPred and Pred only branches to PhiBlock, so the
+      // translation region of Pred is contained in the one of TransPred.
+      // Memory terminators only kill accesses to their own underlying object,
+      // so there is no point in translating them.
       PHITransAddr Addr(const_cast<Value *>(KillingPtr), DL, nullptr);
-      bool Translate = !IsMemTerm && !TransPred &&
+      bool Translate = !IsMemTerm &&
                        (!CI.getCycle(PhiBlock) ||
                         PhiBlock == KillingLocWrapper.MemDef->getBlock()) &&
                        Addr.needsPHITranslationFromBlock(PhiBlock) &&
