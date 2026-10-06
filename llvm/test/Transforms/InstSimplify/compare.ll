@@ -3760,6 +3760,39 @@ define i1 @icmp_eq_arg_derefable_and_global(ptr dereferenceable(24) %p) {
   ret i1 %c
 }
 
+; %x1 and %y are both %b - 2^31 (mod 2^32). The non-inbounds offsets in the
+; 32-bit index address space cannot be accumulated into 64-bit offsets.
+define i1 @icmp_eq_addrspacecast_wrapping_offsets(ptr %b) {
+; CHECK-LABEL: @icmp_eq_addrspacecast_wrapping_offsets(
+; CHECK-NEXT:    [[X:%.*]] = getelementptr i8, ptr [[B:%.*]], i32 2147483647
+; CHECK-NEXT:    [[X1:%.*]] = getelementptr i8, ptr [[X]], i32 1
+; CHECK-NEXT:    [[Y:%.*]] = getelementptr i8, ptr [[B]], i32 -2147483648
+; CHECK-NEXT:    [[C1:%.*]] = addrspacecast ptr [[X1]] to ptr addrspace(1)
+; CHECK-NEXT:    [[C2:%.*]] = addrspacecast ptr [[Y]] to ptr addrspace(1)
+; CHECK-NEXT:    [[R:%.*]] = icmp eq ptr addrspace(1) [[C1]], [[C2]]
+; CHECK-NEXT:    ret i1 [[R]]
+;
+  %x = getelementptr i8, ptr %b, i32 2147483647
+  %x1 = getelementptr i8, ptr %x, i32 1
+  %y = getelementptr i8, ptr %b, i32 -2147483648
+  %c1 = addrspacecast ptr %x1 to ptr addrspace(1)
+  %c2 = addrspacecast ptr %y to ptr addrspace(1)
+  %r = icmp eq ptr addrspace(1) %c1, %c2
+  ret i1 %r
+}
+
+; The inttoptr truncates the address of @A plus 2^32 to the address of @A, so
+; both operands are the same pointer. The offset in the 32-bit index address
+; space cannot be accumulated into a 64-bit offset.
+define i1 @icmp_eq_addrspacecast_inttoptr_wrapping_offset() {
+; CHECK-LABEL: @icmp_eq_addrspacecast_inttoptr_wrapping_offset(
+; CHECK-NEXT:    [[R:%.*]] = icmp eq ptr addrspace(1) addrspacecast (ptr inttoptr (i64 add (i64 ptrtoint (ptr @A to i64), i64 4294967296) to ptr) to ptr addrspace(1)), addrspacecast (ptr @A to ptr addrspace(1))
+; CHECK-NEXT:    ret i1 [[R]]
+;
+  %r = icmp eq ptr addrspace(1) addrspacecast (ptr inttoptr (i64 add (i64 ptrtoint (ptr @A to i64), i64 4294967296) to ptr) to ptr addrspace(1)), addrspacecast (ptr @A to ptr addrspace(1))
+  ret i1 %r
+}
+
 declare void @escape(ptr)
 
 attributes #0 = { null_pointer_is_valid }

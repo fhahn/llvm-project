@@ -789,7 +789,13 @@ const Value *Value::stripAndAccumulateConstantOffsets(
         return V;
       V = Src;
     } else if (Operator::getOpcode(V) == Instruction::AddrSpaceCast) {
-      V = cast<Operator>(V)->getOperand(0);
+      const Value *Src = cast<Operator>(V)->getOperand(0);
+      // Offsets in an address space with a narrower index width wrap modulo a
+      // smaller power of two, which Offset does not model. Past such a cast,
+      // only accumulate inbounds offsets, which do not wrap.
+      if (DL.getIndexTypeSizeInBits(Src->getType()) < BitWidth)
+        AllowNonInbounds = false;
+      V = Src;
     } else if (auto *GA = dyn_cast<GlobalAlias>(V)) {
       if (!GA->isInterposable())
         V = GA->getAliasee();
