@@ -4278,10 +4278,8 @@ bool llvm::foldBranchToCommonDest(CondBrInst *BI, DomTreeUpdater *DTU,
   for (BasicBlock *PredBlock : predecessors(BB)) {
     CondBrInst *PBI = dyn_cast<CondBrInst>(PredBlock->getTerminator());
 
-    // Check that we have two conditional branches.  If there is a PHI node in
-    // the common successor, verify that the same value flows in from both
-    // blocks.
-    if (!PBI || !safeToMergeTerminators(BI, PBI))
+    // Check that we have two conditional branches.
+    if (!PBI)
       continue;
 
     // Determine if the two branches share a common destination.
@@ -4291,6 +4289,11 @@ bool llvm::foldBranchToCommonDest(CondBrInst *BI, DomTreeUpdater *DTU,
     if (auto Recipe = shouldFoldCondBranchesToCommonDestination(BI, PBI, TTI))
       std::tie(CommonSucc, Opc, InvertPredCond) = *Recipe;
     else
+      continue;
+
+    // If there is a PHI node in the common successor, verify that the same
+    // value flows in from both blocks.
+    if (!safeToMergeTerminators(BI, PBI))
       continue;
 
     // Check the cost of inserting the necessary logic before performing the
@@ -4343,6 +4346,17 @@ bool llvm::foldBranchToCommonDest(CondBrInst *BI, DomTreeUpdater *DTU,
       return false;
     SawVectorOp |= isVectorOp(I);
 
+    auto IsBCSSAUse = [BB, &I](Use &U) {
+      auto *UI = cast<Instruction>(U.getUser());
+      if (auto *PN = dyn_cast<PHINode>(UI))
+        return PN->getIncomingBlock(U) == BB;
+      return UI->getParent() == BB && I.comesBefore(UI);
+    };
+
+    // Does this instruction require rewriting of uses?
+    if (!all_of(I.uses(), IsBCSSAUse))
+      return false;
+
     // Account for the cost of duplicating this instruction into each
     // predecessor. Ignore free instructions.
     if (!TTI || TTI->getInstructionCost(&I, CostKind) !=
@@ -4354,17 +4368,6 @@ bool llvm::foldBranchToCommonDest(CondBrInst *BI, DomTreeUpdater *DTU,
           BonusInstThreshold * BranchFoldToCommonDestVectorMultiplier)
         return false;
     }
-
-    auto IsBCSSAUse = [BB, &I](Use &U) {
-      auto *UI = cast<Instruction>(U.getUser());
-      if (auto *PN = dyn_cast<PHINode>(UI))
-        return PN->getIncomingBlock(U) == BB;
-      return UI->getParent() == BB && I.comesBefore(UI);
-    };
-
-    // Does this instruction require rewriting of uses?
-    if (!all_of(I.uses(), IsBCSSAUse))
-      return false;
   }
   if (NumBonusInsts >
       BonusInstThreshold *
@@ -4650,7 +4653,9 @@ static bool mergeConditionalStores(CondBrInst *PBI, CondBrInst *QBI,
   //   QTB  QFB             |  QFB
   //    \  /                | /
   //    PostBB            PostBB
-  //
+  if (!QBI->getParent()->hasNUses(2))
+    return false;
+
   // We model triangles as a type of diamond with a nullptr "true" block.
   // Triangles are canonicalized so that the fallthrough edge is represented by
   // a true condition, as in the diagram above.
@@ -4698,8 +4703,6 @@ static bool mergeConditionalStores(CondBrInst *PBI, CondBrInst *QBI,
     return false;
   if ((PTB && !HasOnePredAndOneSucc(PTB, PBI->getParent(), QBI->getParent())) ||
       (QTB && !HasOnePredAndOneSucc(QTB, QBI->getParent(), PostBB)))
-    return false;
-  if (!QBI->getParent()->hasNUses(2))
     return false;
 
   // OK, this is a sequence of two diamonds or triangles.
@@ -8161,13 +8164,6 @@ static bool simplifySwitchOfPowersOfTwo(SwitchInst *SI, IRBuilder<> &Builder,
       !DL.fitsInLegalInteger(CondTy->getIntegerBitWidth()))
     return false;
 
-  // Ensure trailing zeroes count intrinsic emission is not too expensive.
-  IntrinsicCostAttributes Attrs(Intrinsic::cttz, CondTy,
-                                {Condition, ConstantInt::getTrue(Context)});
-  if (TTI.getIntrinsicInstrCost(Attrs, TTI::TCK_SizeAndLatency) >
-      TTI::TCC_Basic * 2)
-    return false;
-
   // Only bother with this optimization if there are more than 3 switch cases.
   // SDAG will start emitting jump tables for 4 or more cases.
   if (SI->getNumCases() < 4)
@@ -8190,6 +8186,13 @@ static bool simplifySwitchOfPowersOfTwo(SwitchInst *SI, IRBuilder<> &Builder,
                          llvm::countr_zero(Values.front()) + 1,
                      SI->getFunction()->hasOptSize()))
     // Transform is unable to generate dense switch.
+    return false;
+
+  // Ensure trailing zeroes count intrinsic emission is not too expensive.
+  IntrinsicCostAttributes Attrs(Intrinsic::cttz, CondTy,
+                                {Condition, ConstantInt::getTrue(Context)});
+  if (TTI.getIntrinsicInstrCost(Attrs, TTI::TCK_SizeAndLatency) >
+      TTI::TCC_Basic * 2)
     return false;
 
   Builder.SetInsertPoint(SI);
