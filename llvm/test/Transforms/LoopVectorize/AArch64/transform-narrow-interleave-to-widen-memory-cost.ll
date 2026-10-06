@@ -503,11 +503,12 @@ define void @test_interleave_group_epilogue_with_preheader_phi(ptr %src, ptr %ds
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP2]], 2
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[VEC_EPILOG_SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
-; CHECK-NEXT:    [[TMP3:%.*]] = trunc i64 [[SRC1]] to i4
+; CHECK-NEXT:    [[TMP24:%.*]] = ptrtoaddr ptr [[SRC]] to i64
+; CHECK-NEXT:    [[TMP3:%.*]] = trunc i64 [[TMP24]] to i4
 ; CHECK-NEXT:    [[TMP4:%.*]] = sub i4 0, [[TMP3]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = zext i4 [[TMP4]] to i64
 ; CHECK-NEXT:    [[IDENT_CHECK:%.*]] = icmp ne i64 [[TMP5]], 0
-; CHECK-NEXT:    [[TMP6:%.*]] = sub i64 0, [[SRC1]]
+; CHECK-NEXT:    [[TMP6:%.*]] = sub i64 0, [[TMP24]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = lshr i64 [[TMP6]], 4
 ; CHECK-NEXT:    [[MUL:%.*]] = call { i64, i1 } @llvm.umul.with.overflow.i64(i64 16, i64 [[TMP7]])
 ; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i64, i1 } [[MUL]], 0

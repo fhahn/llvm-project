@@ -250,6 +250,32 @@ outer.exit:
   ret void
 }
 
+; The SCEV predicates of both IVs are known to hold, so there are no runtime
+; checks to cost.
+define void @scev_predicates_known_to_pass(ptr noalias %dst, i8 %n) {
+; CHECK-LABEL: LV: Checking a loop in 'scev_predicates_known_to_pass'
+; CHECK:       LV: Minimum required TC for runtime checks to be profitable:4
+entry:
+  %n.ext = sext i8 %n to i16
+  %bound = add nsw i16 %n.ext, 125
+  br label %loop
+
+loop:
+  %iv = phi i8 [ 0, %entry ], [ %iv.next, %loop ]
+  %iv.32 = phi i32 [ 0, %entry ], [ %iv.32.next, %loop ]
+  %idx = sext i32 %iv.32 to i64
+  %gep = getelementptr inbounds i32, ptr %dst, i64 %idx
+  store i32 0, ptr %gep, align 4
+  %iv.next = add i8 %iv, 4
+  %iv.32.next = add i32 %iv.32, 1
+  %iv.next.ext = zext i8 %iv.next to i16
+  %ec = icmp slt i16 %iv.next.ext, %bound
+  br i1 %ec, label %loop, label %exit
+
+exit:
+  ret void
+}
+
 
 !0 = !{!"branch_weights", i32 10, i32 20}
 !1 = !{!"branch_weights", i32 1, i32 -1}

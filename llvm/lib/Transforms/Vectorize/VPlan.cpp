@@ -1072,6 +1072,11 @@ bool VPlan::isOuterLoop() const {
 }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+void VPSCEVPredicate::print(raw_ostream &O) const {
+  for (const SCEVPredicate *P : Preds)
+    P->print(O, 2);
+}
+
 void VPMemoryChecksPredicate::print(raw_ostream &O) const {
   for (const auto &[A, B] : Checks) {
     O << "  No overlap between ";

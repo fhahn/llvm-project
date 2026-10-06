@@ -5,12 +5,12 @@ define void @test_runtime_check_known_false_after_construction(ptr %start.1, ptr
 ; CHECK-LABEL: define void @test_runtime_check_known_false_after_construction(
 ; CHECK-SAME: ptr [[START_1:%.*]], ptr [[START_2:%.*]], ptr [[END:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    [[END1:%.*]] = ptrtoaddr ptr [[END]] to i64
 ; CHECK-NEXT:    [[GEP_START_2:%.*]] = getelementptr i8, ptr [[START_2]], i64 8
 ; CHECK-NEXT:    [[START_1_INT:%.*]] = ptrtoint ptr [[START_1]] to i64
 ; CHECK-NEXT:    [[START_2_INT:%.*]] = ptrtoint ptr [[GEP_START_2]] to i64
 ; CHECK-NEXT:    [[DIFF:%.*]] = sub i64 [[START_1_INT]], [[START_2_INT]]
 ; CHECK-NEXT:    [[START_2_DIFF:%.*]] = getelementptr i8, ptr [[START_2]], i64 [[DIFF]]
+; CHECK-NEXT:    [[END1:%.*]] = ptrtoaddr ptr [[END]] to i64
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[END1]], 8
 ; CHECK-NEXT:    [[TMP12:%.*]] = sub i64 [[TMP0]], [[START_1_INT]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = mul i64 [[TMP12]], 2305843009213693951
@@ -79,6 +79,50 @@ loop:
   %l = load i64, ptr %ptr.iv.2, align 8
   store i64 %l, ptr %ptr.iv.1, align 8
   %ec = icmp eq ptr %ptr.iv.2, %end
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The no-wrap checks of the pointer AddRecs are known to fail, as |Step| * BTC
+; overflows. The vector loop would never execute, so don't vectorize.
+define void @test_pointer_wrap_check_known_true(ptr %A) {
+; CHECK-LABEL: define void @test_pointer_wrap_check_known_true(
+; CHECK-SAME: ptr [[A:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[OFF_0:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[OFF_0_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[OFF_1:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[OFF_1_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[GEP_0:%.*]] = getelementptr i8, ptr [[A]], i64 [[OFF_0]]
+; CHECK-NEXT:    [[GEP_1:%.*]] = getelementptr i8, ptr [[A]], i64 [[OFF_1]]
+; CHECK-NEXT:    store i8 0, ptr [[GEP_0]], align 1
+; CHECK-NEXT:    store i8 1, ptr [[GEP_1]], align 1
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; CHECK-NEXT:    [[OFF_0_NEXT]] = add i64 [[OFF_0]], 4611686018427387905
+; CHECK-NEXT:    [[OFF_1_NEXT]] = add i64 [[OFF_1]], 4611686018427387906
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], 100
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[LOOP]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %off.0 = phi i64 [ 0, %entry ], [ %off.0.next, %loop ]
+  %off.1 = phi i64 [ 0, %entry ], [ %off.1.next, %loop ]
+  %gep.0 = getelementptr i8, ptr %A, i64 %off.0
+  %gep.1 = getelementptr i8, ptr %A, i64 %off.1
+  store i8 0, ptr %gep.0, align 1
+  store i8 1, ptr %gep.1, align 1
+  %iv.next = add nuw nsw i64 %iv, 1
+  %off.0.next = add i64 %off.0, 4611686018427387905
+  %off.1.next = add i64 %off.1, 4611686018427387906
+  %ec = icmp eq i64 %iv.next, 100
   br i1 %ec, label %exit, label %loop
 
 exit:

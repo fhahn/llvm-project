@@ -19,8 +19,8 @@ define void @test(i64 %R, i64 %C, ptr %Ax) {
 ; CHECK-NEXT:    br i1 [[CMP1]], label %[[OUTER_HEADER_PREHEADER:.*]], label %[[EXIT_SPLIT:.*]]
 ; CHECK:       [[OUTER_HEADER_PREHEADER]]:
 ; CHECK-NEXT:    [[SMAX:%.*]] = tail call i64 @llvm.smax.i64(i64 [[R]], i64 1)
-; CHECK-NEXT:    [[TMP0:%.*]] = add nsw i64 [[C]], -1
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[C]], 4
+; CHECK-NEXT:    [[TMP0:%.*]] = add nsw i64 [[C]], -1
 ; CHECK-NEXT:    [[MUL_RESULT:%.*]] = shl i64 [[TMP0]], 4
 ; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = icmp ugt i64 [[TMP0]], 1152921504606846975
 ; CHECK-NEXT:    [[N_VEC:%.*]] = and i64 [[C]], 2305843009213693948

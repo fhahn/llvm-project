@@ -512,7 +512,9 @@ define i32 @smax_reduction_multiple_incoming(ptr %src, i32 %n, i1 %cond) {
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[TMP1]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
-; CHECK-NEXT:    [[TMP2:%.*]] = icmp slt i32 [[N]], [[IV_PH]]
+; CHECK-NEXT:    [[TMP8:%.*]] = sub i32 [[N]], [[IV_PH]]
+; CHECK-NEXT:    [[TMP9:%.*]] = add i32 [[IV_PH]], [[TMP8]]
+; CHECK-NEXT:    [[TMP2:%.*]] = icmp slt i32 [[TMP9]], [[IV_PH]]
 ; CHECK-NEXT:    br i1 [[TMP2]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i32 [[TMP1]], 3

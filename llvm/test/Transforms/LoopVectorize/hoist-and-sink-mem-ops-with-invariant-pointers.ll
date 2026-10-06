@@ -209,9 +209,9 @@ define void @load_store_noalias_via_tbaa(ptr %p, ptr %q, ptr %n) {
 ; CHECK-LABEL: define void @load_store_noalias_via_tbaa(
 ; CHECK-SAME: ptr [[P:%.*]], ptr [[Q:%.*]], ptr [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[P6:%.*]] = ptrtoaddr ptr [[P]] to i64
 ; CHECK-NEXT:    [[N5:%.*]] = ptrtoaddr ptr [[N]] to i64
 ; CHECK-NEXT:    [[TMP17:%.*]] = mul i64 [[N5]], 3074457345618258603
+; CHECK-NEXT:    [[P6:%.*]] = ptrtoaddr ptr [[P]] to i64
 ; CHECK-NEXT:    [[TMP1:%.*]] = mul i64 [[P6]], 3074457345618258603
 ; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[TMP17]], [[TMP1]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = lshr i64 [[TMP2]], 2
@@ -224,10 +224,7 @@ define void @load_store_noalias_via_tbaa(ptr %p, ptr %q, ptr %n) {
 ; CHECK-NEXT:    [[TMP7:%.*]] = sub i2 [[TMP5]], [[TMP6]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = zext i2 [[TMP7]] to i64
 ; CHECK-NEXT:    [[IDENT_CHECK:%.*]] = icmp ne i64 [[TMP8]], 0
-; CHECK-NEXT:    [[TMP9:%.*]] = mul i64 [[N5]], 3074457345618258603
-; CHECK-NEXT:    [[TMP10:%.*]] = mul i64 [[P6]], 3074457345618258603
-; CHECK-NEXT:    [[TMP11:%.*]] = sub i64 [[TMP9]], [[TMP10]]
-; CHECK-NEXT:    [[TMP12:%.*]] = lshr i64 [[TMP11]], 2
+; CHECK-NEXT:    [[TMP12:%.*]] = lshr i64 [[TMP2]], 2
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[P]], i64 4
 ; CHECK-NEXT:    [[MUL:%.*]] = call { i64, i1 } @llvm.umul.with.overflow.i64(i64 12, i64 [[TMP12]])
 ; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i64, i1 } [[MUL]], 0
@@ -238,10 +235,9 @@ define void @load_store_noalias_via_tbaa(ptr %p, ptr %q, ptr %n) {
 ; CHECK-NEXT:    [[TMP16:%.*]] = or i1 [[IDENT_CHECK]], [[TMP15]]
 ; CHECK-NEXT:    br i1 [[TMP16]], label %[[SCALAR_PH]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[P]], i64 4
 ; CHECK-NEXT:    [[SCEVGEP4:%.*]] = getelementptr i8, ptr [[Q]], i64 4
 ; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[P]], [[SCEVGEP4]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[Q]], [[SCEVGEP3]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[Q]], [[SCEVGEP]]
 ; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
 ; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:

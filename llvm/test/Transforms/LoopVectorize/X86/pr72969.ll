@@ -37,8 +37,7 @@ define void @test(ptr %p) {
 ; VEC-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP4]], 8
 ; VEC-NEXT:    br i1 [[MIN_ITERS_CHECK]], label [[SCALAR_PH:%.*]], label [[VECTOR_SCEVCHECK:%.*]]
 ; VEC:       vector.scevcheck:
-; VEC-NEXT:    [[TMP5:%.*]] = add i64 [[TMP0]], 16
-; VEC-NEXT:    [[UMAX:%.*]] = call i64 @llvm.umax.i64(i64 [[TMP5]], i64 add (i64 ptrtoaddr (ptr @h to i64), i64 1))
+; VEC-NEXT:    [[UMAX:%.*]] = call i64 @llvm.umax.i64(i64 [[TMP1]], i64 add (i64 ptrtoaddr (ptr @h to i64), i64 1))
 ; VEC-NEXT:    [[TMP6:%.*]] = add i64 [[UMAX]], -9
 ; VEC-NEXT:    [[TMP7:%.*]] = sub i64 [[TMP6]], [[TMP0]]
 ; VEC-NEXT:    [[TMP8:%.*]] = lshr i64 [[TMP7]], 3

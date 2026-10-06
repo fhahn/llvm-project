@@ -84,6 +84,74 @@ exit:
   ret void
 }
 
+; The outer loop's trip count is only computable assuming the i32 IV does not
+; wrap, which needs a SCEV check.
+define void @outer_loop_scev_check(ptr noalias %dst, i64 %n) {
+; CHECK-LABEL: define void @outer_loop_scev_check(
+; CHECK-SAME: ptr noalias [[DST:%.*]], i64 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[TMP0:%.*]] = trunc i64 [[N]] to i32
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[TMP0]], 4
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
+; CHECK:       [[VECTOR_SCEVCHECK]]:
+; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[N]], -1
+; CHECK-NEXT:    [[TMP2:%.*]] = trunc i64 [[TMP1]] to i32
+; CHECK-NEXT:    [[TMP3:%.*]] = add i32 1, [[TMP2]]
+; CHECK-NEXT:    [[TMP4:%.*]] = icmp ult i32 [[TMP3]], 1
+; CHECK-NEXT:    [[TMP5:%.*]] = icmp ugt i64 [[TMP1]], 4294967295
+; CHECK-NEXT:    [[TMP6:%.*]] = or i1 [[TMP4]], [[TMP5]]
+; CHECK-NEXT:    br i1 [[TMP6]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[TMP7:%.*]] = and i32 [[TMP0]], 3
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i32 [[TMP0]], [[TMP7]]
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[OUTER_LATCH3:.*]] ]
+; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i32> [ <i32 0, i32 1, i32 2, i32 3>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[OUTER_LATCH3]] ]
+; CHECK-NEXT:    br label %[[INNER1:.*]]
+; CHECK:       [[INNER1]]:
+; CHECK-NEXT:    [[IV_INNER2:%.*]] = phi <4 x i64> [ zeroinitializer, %[[VECTOR_BODY]] ], [ [[TMP8:%.*]], %[[INNER1]] ]
+; CHECK-NEXT:    [[WIDE_GEP:%.*]] = getelementptr inbounds [8 x i32], ptr [[DST]], <4 x i64> [[IV_INNER2]], <4 x i32> [[VEC_IND]]
+; CHECK-NEXT:    call void @llvm.masked.scatter.v4i32.v4p0(<4 x i32> [[VEC_IND]], <4 x ptr> align 4 [[WIDE_GEP]], <4 x i1> splat (i1 true))
+; CHECK-NEXT:    [[TMP8]] = add nuw nsw <4 x i64> [[IV_INNER2]], splat (i64 1)
+; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq <4 x i64> [[TMP8]], splat (i64 8)
+; CHECK-NEXT:    [[TMP10:%.*]] = extractelement <4 x i1> [[TMP9]], i64 0
+; CHECK-NEXT:    br i1 [[TMP10]], label %[[OUTER_LATCH3]], label %[[INNER1]]
+; CHECK:       [[OUTER_LATCH3]]:
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
+; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i32> [[VEC_IND]], splat (i32 4)
+; CHECK-NEXT:    [[TMP11:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP11]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i32 [[TMP0]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[CMP_N]], [[EXIT:label %.*]], label %[[SCALAR_PH]]
+; CHECK:       [[SCALAR_PH]]:
+;
+entry:
+  br label %outer.header
+
+outer.header:
+  %iv.outer = phi i32 [ 0, %entry ], [ %iv.outer.next, %outer.latch ]
+  br label %inner
+
+inner:
+  %iv.inner = phi i64 [ 0, %outer.header ], [ %iv.inner.next, %inner ]
+  %gep = getelementptr inbounds [8 x i32], ptr %dst, i64 %iv.inner, i32 %iv.outer
+  store i32 %iv.outer, ptr %gep, align 4
+  %iv.inner.next = add nuw nsw i64 %iv.inner, 1
+  %inner.ec = icmp eq i64 %iv.inner.next, 8
+  br i1 %inner.ec, label %outer.latch, label %inner
+
+outer.latch:
+  %iv.outer.next = add i32 %iv.outer, 1
+  %iv.outer.next.ext = zext i32 %iv.outer.next to i64
+  %outer.ec = icmp eq i64 %iv.outer.next.ext, %n
+  br i1 %outer.ec, label %exit, label %outer.header, !llvm.loop !1
+
+exit:
+  ret void
+}
+
 !1 = distinct !{!1, !2, !3}
 !2 = !{!"llvm.loop.vectorize.width", i32 4}
 !3 = !{!"llvm.loop.vectorize.enable"}

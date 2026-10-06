@@ -63,6 +63,8 @@ define void @sink_replicate_region_with_cast(ptr %dst, i64 %n) {
 ; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
 ; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
 ; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = original trip-count
+; CHECK-NEXT:  Predicates:
+; CHECK-NEXT:    {0,+,1}<%loop.header> Added Flags: <nusw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:    EMIT vp<[[VP3]]> = EXPAND SCEV (1 + (trunc i64 %n to i32))

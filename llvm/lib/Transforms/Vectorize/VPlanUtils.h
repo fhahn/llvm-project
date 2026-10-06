@@ -60,6 +60,11 @@ std::optional<int64_t> getConstantStride(VPValue *Addr, Type *AccessTy,
 /// sign-extended AddRec.
 bool isAddressSCEVForCost(const SCEV *Addr, ScalarEvolution &SE, const Loop *L);
 
+/// Return true if the runtime check for \p Pred is known to pass, false if it
+/// is known to fail, or std::nullopt otherwise.
+std::optional<bool> evaluateSCEVCheck(const SCEVPredicate &Pred,
+                                      ScalarEvolution &SE);
+
 /// Returns true if \p VPV is a single scalar, either because it produces the
 /// same value for all lanes or only has its first lane used.
 bool isSingleScalar(const VPValue *VPV);
@@ -284,6 +289,10 @@ public:
 
   /// Expand \p S into recipes and live-ins using the builder.
   VPValue *expand(const SCEV *S);
+
+  /// Expand the condition that \p AR wraps, signed if \p Signed. Mirrors
+  /// SCEVExpander::generateOverflowCheck.
+  VPValue *generateOverflowCheck(const SCEVAddRecExpr *AR, bool Signed);
 };
 //===----------------------------------------------------------------------===//
 // Utilities for modifying predecessors and successors of VPlan blocks.

@@ -506,7 +506,7 @@ define void @exit_cond_zext_iv_store32(ptr %dst, i64 %N) {
 ; DEFAULT-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP0]], 4
 ; DEFAULT-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; DEFAULT:       [[VECTOR_SCEVCHECK]]:
-; DEFAULT-NEXT:    [[TMP1:%.*]] = call i64 @llvm.usub.sat.i64(i64 [[N]], i64 1)
+; DEFAULT-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], -1
 ; DEFAULT-NEXT:    [[TMP2:%.*]] = trunc i64 [[TMP1]] to i32
 ; DEFAULT-NEXT:    [[TMP3:%.*]] = add i32 1, [[TMP2]]
 ; DEFAULT-NEXT:    [[TMP4:%.*]] = icmp ult i32 [[TMP3]], 1
@@ -559,7 +559,7 @@ define void @exit_cond_zext_iv_store32(ptr %dst, i64 %N) {
 ; PRED-NEXT:    [[TMP0:%.*]] = call i64 @llvm.umax.i64(i64 [[N]], i64 1)
 ; PRED-NEXT:    br label %[[VECTOR_SCEVCHECK:.*]]
 ; PRED:       [[VECTOR_SCEVCHECK]]:
-; PRED-NEXT:    [[TMP1:%.*]] = call i64 @llvm.usub.sat.i64(i64 [[N]], i64 1)
+; PRED-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], -1
 ; PRED-NEXT:    [[TMP2:%.*]] = trunc i64 [[TMP1]] to i32
 ; PRED-NEXT:    [[TMP3:%.*]] = add i32 1, [[TMP2]]
 ; PRED-NEXT:    [[TMP4:%.*]] = icmp ult i32 [[TMP3]], 1
@@ -654,7 +654,7 @@ define void @exit_cond_zext_iv_store64(ptr %dst, i64 %N) {
 ; DEFAULT-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP0]], 16
 ; DEFAULT-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; DEFAULT:       [[VECTOR_SCEVCHECK]]:
-; DEFAULT-NEXT:    [[TMP1:%.*]] = call i64 @llvm.usub.sat.i64(i64 [[N]], i64 1)
+; DEFAULT-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], -1
 ; DEFAULT-NEXT:    [[TMP2:%.*]] = trunc i64 [[TMP1]] to i32
 ; DEFAULT-NEXT:    [[TMP3:%.*]] = add i32 1, [[TMP2]]
 ; DEFAULT-NEXT:    [[TMP4:%.*]] = icmp ult i32 [[TMP3]], 1

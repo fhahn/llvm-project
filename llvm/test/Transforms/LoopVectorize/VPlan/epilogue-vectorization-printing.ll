@@ -165,18 +165,18 @@ define i64 @bypass_blocks(ptr %A, ptr %B, i32 %n) {
 ; CHECK-NEXT:    IR   %B1 = ptrtoaddr ptr %B to i64
 ; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult ir<%n>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
-; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, ir-bb<vector.scevcheck>
+; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.scevcheck
 ; CHECK-EMPTY:
-; CHECK-NEXT:  ir-bb<vector.scevcheck>:
-; CHECK-NEXT:    IR   %0 = add i32 %n, -1
-; CHECK-NEXT:    IR   %1 = icmp slt i32 %0, 0
-; CHECK-NEXT:    EMIT branch-on-cond ir<%1>
+; CHECK-NEXT:  vector.scevcheck:
+; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = add ir<%n>, ir<-1>
+; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = icmp slt vp<[[VP3]]>, ir<0>
+; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP4]]>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, ir-bb<vector.memcheck>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<vector.memcheck>:
-; CHECK-NEXT:    IR   %2 = sub i64 %B1, %A2
-; CHECK-NEXT:    IR   %3 = sub i64 %2, 1
-; CHECK-NEXT:    IR   %diff.check = icmp ult i64 %3, 63
+; CHECK-NEXT:    IR   %0 = sub i64 %B1, %A2
+; CHECK-NEXT:    IR   %1 = sub i64 %0, 1
+; CHECK-NEXT:    IR   %diff.check = icmp ult i64 %1, 63
 ; CHECK-NEXT:    EMIT branch-on-cond ir<%diff.check>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.main.loop.iter.check
 ; CHECK-EMPTY:
@@ -217,8 +217,8 @@ define i64 @bypass_blocks(ptr %A, ptr %B, i32 %n) {
 ; CHECK-NEXT:  No successors
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<scalar.ph>:
-; CHECK-NEXT:    EMIT-SCALAR vp<%vec.epilog.resume.val> = phi [ vp<%n.vec>, middle.block ], [ ir<0>, ir-bb<entry> ], [ ir<0>, ir-bb<vector.scevcheck> ], [ ir<0>, ir-bb<vector.memcheck> ], [ ir<0>, vector.main.loop.iter.check ]
-; CHECK-NEXT:    EMIT-SCALAR vp<%bc.merge.rdx> = phi [ vp<[[VP10]]>, middle.block ], [ ir<0>, ir-bb<entry> ], [ ir<0>, ir-bb<vector.scevcheck> ], [ ir<0>, ir-bb<vector.memcheck> ], [ ir<0>, vector.main.loop.iter.check ]
+; CHECK-NEXT:    EMIT-SCALAR vp<%vec.epilog.resume.val> = phi [ vp<%n.vec>, middle.block ], [ ir<0>, ir-bb<entry> ], [ ir<0>, vector.scevcheck ], [ ir<0>, ir-bb<vector.memcheck> ], [ ir<0>, vector.main.loop.iter.check ]
+; CHECK-NEXT:    EMIT-SCALAR vp<%bc.merge.rdx> = phi [ vp<[[VP10]]>, middle.block ], [ ir<0>, ir-bb<entry> ], [ ir<0>, vector.scevcheck ], [ ir<0>, ir-bb<vector.memcheck> ], [ ir<0>, vector.main.loop.iter.check ]
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP12:%[0-9]+]]> = resume-for-epilogue vp<%vec.epilog.resume.val>, ir<0>
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP13:%[0-9]+]]> = resume-for-epilogue vp<%vec.epilog.resume.val>, ir<0>
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP14:%[0-9]+]]> = resume-for-epilogue vp<%bc.merge.rdx>, ir<0>
@@ -505,12 +505,12 @@ define void @all_iterations_in_main_loop_with_scevcheck(ptr %p, i32 %off) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
 ; CHECK-NEXT:    EMIT branch-on-cond ir<false>
-; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, ir-bb<vector.scevcheck>
+; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.scevcheck
 ; CHECK-EMPTY:
-; CHECK-NEXT:  ir-bb<vector.scevcheck>:
-; CHECK-NEXT:    IR   %0 = add i32 %off, 15
-; CHECK-NEXT:    IR   %1 = icmp ult i32 %0, %off
-; CHECK-NEXT:    EMIT branch-on-cond ir<%1>
+; CHECK-NEXT:  vector.scevcheck:
+; CHECK-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = add ir<%off>, ir<15>
+; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = icmp ult vp<[[VP2]]>, ir<%off>
+; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP3]]>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.main.loop.iter.check
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.main.loop.iter.check:
@@ -542,8 +542,8 @@ define void @all_iterations_in_main_loop_with_scevcheck(ptr %p, i32 %off) {
 ; CHECK-NEXT:  No successors
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<scalar.ph>:
-; CHECK-NEXT:    EMIT-SCALAR vp<%vec.epilog.resume.val> = phi [ ir<16>, middle.block ], [ ir<0>, ir-bb<entry> ], [ ir<0>, ir-bb<vector.scevcheck> ], [ ir<0>, vector.main.loop.iter.check ]
-; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP4]]>, middle.block ], [ ir<%off>, ir-bb<entry> ], [ ir<%off>, ir-bb<vector.scevcheck> ], [ ir<%off>, vector.main.loop.iter.check ]
+; CHECK-NEXT:    EMIT-SCALAR vp<%vec.epilog.resume.val> = phi [ ir<16>, middle.block ], [ ir<0>, ir-bb<entry> ], [ ir<0>, vector.scevcheck ], [ ir<0>, vector.main.loop.iter.check ]
+; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP4]]>, middle.block ], [ ir<%off>, ir-bb<entry> ], [ ir<%off>, vector.scevcheck ], [ ir<%off>, vector.main.loop.iter.check ]
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP10:%[0-9]+]]> = resume-for-epilogue vp<%vec.epilog.resume.val>, ir<0>
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP11:%[0-9]+]]> = resume-for-epilogue vp<%vec.epilog.resume.val>, ir<0>
 ; CHECK-NEXT:    EMIT-SCALAR vp<[[VP12:%[0-9]+]]> = resume-for-epilogue vp<%bc.resume.val>, ir<%off>

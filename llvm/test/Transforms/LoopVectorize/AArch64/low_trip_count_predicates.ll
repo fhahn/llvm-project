@@ -53,7 +53,7 @@ define void @low_vf_ic_is_better(ptr nocapture noundef %p, i32 %tc, i16 noundef 
 ; CHECK-VS1:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-VS1-NEXT:    [[TMP6:%.*]] = add i32 [[TC]], 1
 ; CHECK-VS1-NEXT:    [[TMP7:%.*]] = zext i32 [[TMP6]] to i64
-; CHECK-VS1-NEXT:    [[TMP8:%.*]] = sub i64 19, [[TMP7]]
+; CHECK-VS1-NEXT:    [[TMP8:%.*]] = sub nsw i64 19, [[TMP7]]
 ; CHECK-VS1-NEXT:    [[TMP9:%.*]] = trunc i64 [[TMP8]] to i32
 ; CHECK-VS1-NEXT:    [[TMP10:%.*]] = add i32 [[TMP6]], [[TMP9]]
 ; CHECK-VS1-NEXT:    [[TMP11:%.*]] = icmp ult i32 [[TMP10]], [[TMP6]]
@@ -144,7 +144,7 @@ define void @low_vf_ic_is_better(ptr nocapture noundef %p, i32 %tc, i16 noundef 
 ; CHECK-VS2:       [[VECTOR_SCEVCHECK]]:
 ; CHECK-VS2-NEXT:    [[TMP6:%.*]] = add i32 [[TC]], 1
 ; CHECK-VS2-NEXT:    [[TMP7:%.*]] = zext i32 [[TMP6]] to i64
-; CHECK-VS2-NEXT:    [[TMP8:%.*]] = sub i64 19, [[TMP7]]
+; CHECK-VS2-NEXT:    [[TMP8:%.*]] = sub nsw i64 19, [[TMP7]]
 ; CHECK-VS2-NEXT:    [[TMP9:%.*]] = trunc i64 [[TMP8]] to i32
 ; CHECK-VS2-NEXT:    [[TMP10:%.*]] = add i32 [[TMP6]], [[TMP9]]
 ; CHECK-VS2-NEXT:    [[TMP11:%.*]] = icmp ult i32 [[TMP10]], [[TMP6]]
@@ -378,12 +378,10 @@ define void @overflow_indvar_known_false(ptr nocapture noundef %p, i32 noundef %
 ; CHECK-NEXT:    [[TMP1:%.*]] = sub nsw i64 1028, [[TMP20]]
 ; CHECK-NEXT:    br label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
-; CHECK-NEXT:    [[TMP21:%.*]] = add i32 [[TC]], 1
-; CHECK-NEXT:    [[TMP22:%.*]] = zext i32 [[TMP21]] to i64
-; CHECK-NEXT:    [[TMP23:%.*]] = sub i64 1027, [[TMP22]]
+; CHECK-NEXT:    [[TMP23:%.*]] = sub nsw i64 1027, [[TMP20]]
 ; CHECK-NEXT:    [[TMP24:%.*]] = trunc i64 [[TMP23]] to i32
-; CHECK-NEXT:    [[TMP25:%.*]] = add i32 [[TMP21]], [[TMP24]]
-; CHECK-NEXT:    [[TMP26:%.*]] = icmp ult i32 [[TMP25]], [[TMP21]]
+; CHECK-NEXT:    [[TMP25:%.*]] = add i32 [[TMP19]], [[TMP24]]
+; CHECK-NEXT:    [[TMP26:%.*]] = icmp ult i32 [[TMP25]], [[TMP19]]
 ; CHECK-NEXT:    [[TMP27:%.*]] = icmp ugt i64 [[TMP23]], 4294967295
 ; CHECK-NEXT:    [[TMP28:%.*]] = or i1 [[TMP26]], [[TMP27]]
 ; CHECK-NEXT:    br i1 [[TMP28]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]

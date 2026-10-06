@@ -1348,6 +1348,9 @@ public:
     /// scalars extracted from a vector, to be replaced by VF ExtractElement
     /// VPInstructions.
     Unpack,
+    /// Like Instruction::ExtractValue on a scalar struct, but with the index as
+    /// constant second operand, so no underlying instruction is needed.
+    ExtractStructField,
     /// Reduce the operands to the final reduction result using the operation
     /// specified via the operation's VPIRFlags.
     ComputeReductionResult,
@@ -4826,6 +4829,9 @@ inline const VPRegionBlock *VPRecipeBase::getRegion() const {
 /// A condition that must hold to execute the vector loop of a VPlan, turned
 /// into a runtime check by VPlanTransforms::materializePredicates().
 struct VPPredicate {
+  enum VPPredicateKind { SCEVKind, MemChecksKind };
+  const VPPredicateKind Kind;
+  VPPredicate(VPPredicateKind Kind) : Kind(Kind) {}
   virtual ~VPPredicate() = default;
 
   /// Expand the condition under which the predicate fails into \p VPBB.
@@ -4836,11 +4842,25 @@ struct VPPredicate {
 #endif
 };
 
+/// The assumptions \p Preds made using PredicatedScalarEvolution hold.
+struct VPSCEVPredicate : public VPPredicate {
+  SmallVector<const SCEVPredicate *> Preds;
+  VPSCEVPredicate(ArrayRef<const SCEVPredicate *> Preds)
+      : VPPredicate(SCEVKind), Preds(Preds) {}
+  static bool classof(const VPPredicate *P) { return P->Kind == SCEVKind; }
+  VPValue *expandNegated(VPBasicBlock *VPBB, ScalarEvolution &SE,
+                         DebugLoc DL) const override;
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+  void print(raw_ostream &O) const override;
+#endif
+};
+
 /// The pointer groups of \p Checks, owned by LoopAccessInfo, do not overlap.
 struct VPMemoryChecksPredicate : public VPPredicate {
   ArrayRef<RuntimePointerCheck> Checks;
   VPMemoryChecksPredicate(ArrayRef<RuntimePointerCheck> Checks)
-      : Checks(Checks) {}
+      : VPPredicate(MemChecksKind), Checks(Checks) {}
+  static bool classof(const VPPredicate *P) { return P->Kind == MemChecksKind; }
   VPValue *expandNegated(VPBasicBlock *VPBB, ScalarEvolution &SE,
                          DebugLoc DL) const override;
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)

@@ -1987,7 +1987,7 @@ define i32 @added_step(i32 %n, i32 %step_base, ptr %p) {
 ; VEC-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i32 [[UMAX1]], 2
 ; VEC-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; VEC:       [[VECTOR_SCEVCHECK]]:
-; VEC-NEXT:    [[TMP0:%.*]] = call i32 @llvm.usub.sat.i32(i32 [[N]], i32 1)
+; VEC-NEXT:    [[TMP0:%.*]] = add i32 [[UMAX1]], -1
 ; VEC-NEXT:    [[TMP1:%.*]] = icmp slt i32 [[TMP0]], 0
 ; VEC-NEXT:    br i1 [[TMP1]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; VEC:       [[VECTOR_PH]]:
@@ -2076,7 +2076,7 @@ define i32 @added_step(i32 %n, i32 %step_base, ptr %p) {
 ; TAILFOLD-NEXT:    [[TMP0:%.*]] = call i32 @llvm.umax.i32(i32 [[N]], i32 1)
 ; TAILFOLD-NEXT:    br label %[[VECTOR_SCEVCHECK:.*]]
 ; TAILFOLD:       [[VECTOR_SCEVCHECK]]:
-; TAILFOLD-NEXT:    [[TMP1:%.*]] = call i32 @llvm.usub.sat.i32(i32 [[N]], i32 1)
+; TAILFOLD-NEXT:    [[TMP1:%.*]] = add i32 [[TMP0]], -1
 ; TAILFOLD-NEXT:    [[TMP2:%.*]] = icmp slt i32 [[TMP1]], 0
 ; TAILFOLD-NEXT:    br i1 [[TMP2]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; TAILFOLD:       [[VECTOR_PH]]:

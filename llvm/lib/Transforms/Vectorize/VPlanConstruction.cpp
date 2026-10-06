@@ -1071,6 +1071,24 @@ bool VPlanTransforms::finalizeSCEVPredicates(VPlan &Plan,
     return false;
   }
 
+  // Record the predicates whose runtime checks are not known to pass. If a
+  // check is known to fail, the vector loop would never be executed.
+  SmallVector<const SCEVPredicate *> Preds;
+  for (const SCEVPredicate *P :
+       cast<SCEVUnionPredicate>(PSE.getPredicate()).getPredicates()) {
+    std::optional<bool> Passes = vputils::evaluateSCEVCheck(*P, *PSE.getSE());
+    if (Passes == false) {
+      reportVectorizationFailure(
+          "runtime checks are known to fail, so we will never enter the "
+          "vector loop",
+          "RuntimeChecksNeverEnterVectorLoop", ORE, TheLoop);
+      return false;
+    }
+    if (!Passes)
+      Preds.push_back(P);
+  }
+  if (!Preds.empty())
+    Plan.predicates().push_back(std::make_shared<VPSCEVPredicate>(Preds));
   return true;
 }
 
@@ -1554,6 +1572,38 @@ void VPlanTransforms::attachCheckBlock(VPlan &Plan, Value *Cond,
   attachVPCheckBlock(Plan, CondVPV, CheckBlockVPBB, AddBranchWeights);
 }
 
+VPValue *VPSCEVPredicate::expandNegated(VPBasicBlock *VPBB, ScalarEvolution &SE,
+                                        DebugLoc DL) const {
+  VPBuilder Builder(VPBB);
+  VPSCEVExpander Expander(Builder, SE, DL);
+  // Expand all predicates before combining them, like SCEVExpander.
+  SmallVector<VPValue *> Checks;
+  for (const SCEVPredicate *P : Preds) {
+    if (const auto *CP = dyn_cast<SCEVComparePredicate>(P)) {
+      VPValue *LHS = Expander.expand(CP->getLHS());
+      VPValue *RHS = Expander.expand(CP->getRHS());
+      Checks.push_back(
+          Builder.createICmp(ICmpInst::getInversePredicate(CP->getPredicate()),
+                             LHS, RHS, DL, "ident.check"));
+      continue;
+    }
+    const auto *WP = cast<SCEVWrapPredicate>(P);
+    VPValue *Check = nullptr;
+    for (bool Signed : {false, true}) {
+      if (!(WP->getFlags() & (Signed ? SCEVWrapPredicate::IncrementNSSW
+                                     : SCEVWrapPredicate::IncrementNUSW)))
+        continue;
+      VPValue *C = Expander.generateOverflowCheck(WP->getExpr(), Signed);
+      Check = Check ? Builder.createOr(Check, C, DL) : C;
+    }
+    Checks.push_back(Check ? Check : Builder.getPlan().getFalse());
+  }
+  VPValue *Cond = nullptr;
+  for (VPValue *C : Checks)
+    Cond = Cond ? Builder.createOr(Cond, C, DL) : C;
+  return Cond;
+}
+
 VPValue *VPMemoryChecksPredicate::expandNegated(VPBasicBlock *VPBB,
                                                 ScalarEvolution &SE,
                                                 DebugLoc DL) const {
@@ -1598,7 +1648,8 @@ void VPlanTransforms::materializePredicates(VPlan &Plan, ScalarEvolution &SE,
                                             DebugLoc DL,
                                             bool AddBranchWeights) {
   for (const auto &P : Plan.predicates()) {
-    auto *CheckVPBB = Plan.createVPBasicBlock("vector.memcheck");
+    auto *CheckVPBB = Plan.createVPBasicBlock(
+        isa<VPSCEVPredicate>(P.get()) ? "vector.scevcheck" : "vector.memcheck");
     attachVPCheckBlock(Plan, P->expandNegated(CheckVPBB, SE, DL), CheckVPBB,
                        AddBranchWeights);
   }

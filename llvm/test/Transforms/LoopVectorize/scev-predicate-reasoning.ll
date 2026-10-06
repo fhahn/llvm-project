@@ -111,8 +111,8 @@ define void @implied_wrap_predicate(ptr %A, ptr %B, ptr %C) {
 ; CHECK-LABEL: define void @implied_wrap_predicate(
 ; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], ptr [[C:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[C2:%.*]] = ptrtoaddr ptr [[C]] to i64
 ; CHECK-NEXT:    [[A3:%.*]] = ptrtoaddr ptr [[A]] to i64
+; CHECK-NEXT:    [[C2:%.*]] = ptrtoaddr ptr [[C]] to i64
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[A3]], 16
 ; CHECK-NEXT:    [[TMP1:%.*]] = call i64 @llvm.umax.i64(i64 [[TMP0]], i64 add (i64 ptrtoaddr (ptr @h to i64), i64 1))
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[TMP1]], -9
@@ -122,8 +122,7 @@ define void @implied_wrap_predicate(ptr %A, ptr %B, ptr %C) {
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP4]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_SCEVCHECK:.*]]
 ; CHECK:       [[VECTOR_SCEVCHECK]]:
-; CHECK-NEXT:    [[TMP5:%.*]] = add i64 [[A3]], 16
-; CHECK-NEXT:    [[UMAX:%.*]] = call i64 @llvm.umax.i64(i64 [[TMP5]], i64 add (i64 ptrtoaddr (ptr @h to i64), i64 1))
+; CHECK-NEXT:    [[UMAX:%.*]] = call i64 @llvm.umax.i64(i64 [[TMP0]], i64 add (i64 ptrtoaddr (ptr @h to i64), i64 1))
 ; CHECK-NEXT:    [[TMP6:%.*]] = add i64 [[UMAX]], -9
 ; CHECK-NEXT:    [[TMP7:%.*]] = sub i64 [[TMP6]], [[A3]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = lshr i64 [[TMP7]], 3

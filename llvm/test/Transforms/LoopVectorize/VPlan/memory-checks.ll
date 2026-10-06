@@ -179,32 +179,32 @@ define void @bound_is_addrec_of_sibling_loop(ptr %a, ptr %b, i64 %n, i64 %d, i1 
 ; CHECK-NEXT:    IR   %iv.1.lcssa = phi i64 [ %iv.1, %loop.1 ]
 ; CHECK-NEXT:    EMIT vp<%min.iters.check> = icmp ult ir<%n>, ir<4>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%min.iters.check>
-; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, ir-bb<vector.scevcheck>
+; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, vector.scevcheck
 ; CHECK-EMPTY:
-; CHECK-NEXT:  ir-bb<vector.scevcheck>:
-; CHECK-NEXT:    IR   %0 = add i64 %n, -1
-; CHECK-NEXT:    IR   %mul = call { i64, i1 } @llvm.umul.with.overflow.i64(i64 8, i64 %0)
-; CHECK-NEXT:    IR   %mul.result = extractvalue { i64, i1 } %mul, 0
-; CHECK-NEXT:    IR   %mul.overflow = extractvalue { i64, i1 } %mul, 1
-; CHECK-NEXT:    IR   %1 = getelementptr i8, ptr %a, i64 %mul.result
-; CHECK-NEXT:    IR   %2 = icmp ult ptr %1, %a
-; CHECK-NEXT:    IR   %3 = or i1 %2, %mul.overflow
-; CHECK-NEXT:    EMIT branch-on-cond ir<%3>
+; CHECK-NEXT:  vector.scevcheck:
+; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = add ir<%n>, ir<-1>
+; CHECK-NEXT:    EMIT-SCALAR vp<%mul> = call { i64, i1 } @llvm.umul.with.overflow(ir<8>, vp<[[VP3]]>)
+; CHECK-NEXT:    EMIT-SCALAR vp<%mul.result> = extract-struct-field vp<%mul>, ir<0>
+; CHECK-NEXT:    EMIT-SCALAR vp<%mul.overflow> = extract-struct-field vp<%mul>, ir<1>
+; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = ptradd ir<%a>, vp<%mul.result>
+; CHECK-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = icmp ult vp<[[VP4]]>, ir<%a>
+; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = or vp<[[VP5]]>, vp<%mul.overflow>
+; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP6]]>
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, ir-bb<vector.memcheck>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<vector.memcheck>:
-; CHECK-NEXT:    IR   %4 = udiv i64 %n, %d
-; CHECK-NEXT:    IR   %5 = shl i64 %4, 2
-; CHECK-NEXT:    IR   %6 = shl i64 %iv.1, 2
-; CHECK-NEXT:    IR   %7 = add i64 %6, %5
-; CHECK-NEXT:    IR   %scevgep = getelementptr i8, ptr %b, i64 %7
-; CHECK-NEXT:    IR   %8 = shl i64 %n, 2
-; CHECK-NEXT:    IR   %9 = add i64 %8, %5
-; CHECK-NEXT:    IR   %10 = add i64 %6, %9
-; CHECK-NEXT:    IR   %scevgep1 = getelementptr i8, ptr %b, i64 %10
-; CHECK-NEXT:    IR   %11 = shl i64 %n, 3
-; CHECK-NEXT:    IR   %12 = add i64 %11, -4
-; CHECK-NEXT:    IR   %scevgep2 = getelementptr i8, ptr %a, i64 %12
+; CHECK-NEXT:    IR   %0 = udiv i64 %n, %d
+; CHECK-NEXT:    IR   %1 = shl i64 %0, 2
+; CHECK-NEXT:    IR   %2 = shl i64 %iv.1, 2
+; CHECK-NEXT:    IR   %3 = add i64 %2, %1
+; CHECK-NEXT:    IR   %scevgep = getelementptr i8, ptr %b, i64 %3
+; CHECK-NEXT:    IR   %4 = shl i64 %n, 2
+; CHECK-NEXT:    IR   %5 = add i64 %4, %1
+; CHECK-NEXT:    IR   %6 = add i64 %2, %5
+; CHECK-NEXT:    IR   %scevgep1 = getelementptr i8, ptr %b, i64 %6
+; CHECK-NEXT:    IR   %7 = shl i64 %n, 3
+; CHECK-NEXT:    IR   %8 = add i64 %7, -4
+; CHECK-NEXT:    IR   %scevgep2 = getelementptr i8, ptr %a, i64 %8
 ; CHECK-NEXT:    IR   %bound0 = icmp ult ptr %scevgep, %scevgep2
 ; CHECK-NEXT:    IR   %bound1 = icmp ult ptr %a, %scevgep1
 ; CHECK-NEXT:    IR   %found.conflict = and i1 %bound0, %bound1

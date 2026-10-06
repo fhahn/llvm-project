@@ -1471,12 +1471,8 @@ namespace {
 /// vectorize, the checks are attached to VPlan as IR or recipes. If deciding
 /// not to vectorize, the temporary blocks are completely removed.
 class GeneratedRTChecks {
-  /// Basic block which contains the generated SCEV checks, if any.
-  BasicBlock *SCEVCheckBlock = nullptr;
-
-  /// The value representing the result of the generated SCEV checks. If it is
-  /// nullptr no SCEV checks have been generated.
-  Value *SCEVCheckCond = nullptr;
+  /// The cost of the SCEV checks.
+  InstructionCost SCEVCheckCost = 0;
 
   /// Basic block which contains the generated memory runtime checks, if any.
   BasicBlock *MemCheckBlock = nullptr;
@@ -1493,7 +1489,6 @@ class GeneratedRTChecks {
   LoopInfo *LI;
   TargetTransformInfo *TTI;
 
-  SCEVExpander SCEVExp;
   SCEVExpander MemCheckExp;
 
   bool CostTooHigh = false;
@@ -1514,15 +1509,14 @@ public:
                     TTI::TargetCostKind CostKind,
                     bool LoopUsesPartialAliasMasking)
       : DT(DT), LI(LI), TTI(TTI),
-        SCEVExp(*PSE.getSE(), "scev.check", /*PreserveLCSSA=*/false),
         MemCheckExp(*PSE.getSE(), "scev.check", /*PreserveLCSSA=*/false),
         PSE(PSE), CostKind(CostKind),
         LoopUsesPartialAliasMasking(LoopUsesPartialAliasMasking) {}
 
-  /// Generate runtime checks in SCEVCheckBlock and MemCheckBlock, so we can
-  /// accurately estimate the cost of the runtime checks. The blocks are
-  /// un-linked from the IR and attached to VPlan as IR or recipes if
-  /// profitable. Otherwise, the check blocks are removed completely.
+  /// Generate memory runtime checks in MemCheckBlock, so we can accurately
+  /// estimate their cost. The block is un-linked from the IR and attached to
+  /// VPlan as IR or recipes if profitable. Otherwise, it is removed completely.
+  /// The SCEV checks of \p UnionPred are only expanded to cost them.
   void create(Loop *L, const LoopAccessInfo &LAI,
               const SCEVPredicate &UnionPred, ElementCount VF, unsigned IC,
               OptimizationRemarkEmitter &ORE) {
@@ -1536,7 +1530,6 @@ public:
     if (CostTooHigh) {
       // Mark runtime checks as never succeeding when they exceed the threshold.
       MemRuntimeCheckCond = ConstantInt::getTrue(L->getHeader()->getContext());
-      SCEVCheckCond = ConstantInt::getTrue(L->getHeader()->getContext());
       ORE.emit([&]() {
         return OptimizationRemarkAnalysisAliasing(
                    DEBUG_TYPE, "TooManyMemoryRuntimeChecks", L->getStartLoc(),
@@ -1550,32 +1543,29 @@ public:
     BasicBlock *LoopHeader = L->getHeader();
     BasicBlock *Preheader = L->getLoopPreheader();
 
-    // Use SplitBlock to create blocks for SCEV & memory runtime checks to
-    // ensure the blocks are properly added to LoopInfo & DominatorTree. Those
-    // may be used by SCEVExpander. The blocks will be un-linked from their
-    // predecessors and removed from LI & DT at the end of the function.
     if (!UnionPred.isAlwaysTrue()) {
-      SCEVCheckBlock = SplitBlock(Preheader, Preheader->getTerminator(), DT, LI,
-                                  nullptr, "vector.scevcheck");
-
-      SCEVCheckCond = SCEVExp.expandCodeForPredicate(
-          &UnionPred, SCEVCheckBlock->getTerminator());
-      if (isa<Constant>(SCEVCheckCond)) {
-        // Clean up directly after expanding the predicate to a constant, to
-        // avoid further expansions re-using anything left over from SCEVExp.
-        SCEVExpanderCleaner SCEVCleaner(SCEVExp);
-        SCEVCleaner.cleanup();
-      }
+      SCEVExpander SCEVExp(*PSE.getSE(), "scev.check", /*PreserveLCSSA=*/false);
+      // Remove the expanded checks after costing them, so further expansions
+      // cannot re-use them.
+      SCEVExpanderCleaner SCEVCleaner(SCEVExp);
+      SCEVExp.eraseDeadInstructions(SCEVExp.expandCodeForPredicate(
+          &UnionPred, Preheader->getTerminator()));
+      for (Instruction &I : *Preheader)
+        if (SCEVExp.isInsertedInstruction(&I))
+          SCEVCheckCost += TTI->getInstructionCost(&I, CostKind);
     }
 
+    // Use SplitBlock to create a block for memory runtime checks to ensure the
+    // block is properly added to LoopInfo & DominatorTree. Those may be used by
+    // SCEVExpander. The block will be un-linked from its predecessors and
+    // removed from LI & DT at the end of the function.
     const auto &RtPtrChecking = *LAI.getRuntimePointerChecking();
     // TODO: We need to estimate the cost of alias-masking in
     // GeneratedRTChecks::getCost(). We can't check the MemCheckBlock as the
     // alias-mask is generated later in VPlan.
     if (RtPtrChecking.Need && !LoopUsesPartialAliasMasking) {
-      auto *Pred = SCEVCheckBlock ? SCEVCheckBlock : Preheader;
-      MemCheckBlock = SplitBlock(Pred, Pred->getTerminator(), DT, LI, nullptr,
-                                 "vector.memcheck");
+      MemCheckBlock = SplitBlock(Preheader, Preheader->getTerminator(), DT, LI,
+                                 nullptr, "vector.memcheck");
 
       auto DiffChecks = RtPtrChecking.getDiffChecks();
       if (DiffChecks) {
@@ -1591,52 +1581,27 @@ public:
              "claimed checks are required");
     }
 
-    SCEVExp.eraseDeadInstructions(SCEVCheckCond);
-    HasChecks = getSCEVChecks().first || getMemRuntimeChecks().first;
-
-    if (!MemCheckBlock && !SCEVCheckBlock)
+    if (!MemCheckBlock)
       return;
 
     // Unhook the temporary block with the checks, update various places
     // accordingly.
-    if (SCEVCheckBlock)
-      SCEVCheckBlock->replaceAllUsesWith(Preheader);
-    if (MemCheckBlock)
-      MemCheckBlock->replaceAllUsesWith(Preheader);
-
-    if (SCEVCheckBlock) {
-      SCEVCheckBlock->getTerminator()->moveBefore(
-          Preheader->getTerminator()->getIterator());
-      auto *UI = new UnreachableInst(Preheader->getContext(), SCEVCheckBlock);
-      UI->setDebugLoc(DebugLoc::getTemporary());
-      Preheader->getTerminator()->eraseFromParent();
-    }
-    if (MemCheckBlock) {
-      MemCheckBlock->getTerminator()->moveBefore(
-          Preheader->getTerminator()->getIterator());
-      auto *UI = new UnreachableInst(Preheader->getContext(), MemCheckBlock);
-      UI->setDebugLoc(DebugLoc::getTemporary());
-      Preheader->getTerminator()->eraseFromParent();
-    }
+    MemCheckBlock->replaceAllUsesWith(Preheader);
+    MemCheckBlock->getTerminator()->moveBefore(
+        Preheader->getTerminator()->getIterator());
+    auto *UI = new UnreachableInst(Preheader->getContext(), MemCheckBlock);
+    UI->setDebugLoc(DebugLoc::getTemporary());
+    Preheader->getTerminator()->eraseFromParent();
 
     DT->changeImmediateDominator(LoopHeader, Preheader);
-    if (MemCheckBlock) {
-      DT->eraseNode(MemCheckBlock);
-      LI->removeBlock(MemCheckBlock);
-    }
-    if (SCEVCheckBlock) {
-      DT->eraseNode(SCEVCheckBlock);
-      LI->removeBlock(SCEVCheckBlock);
-    }
+    DT->eraseNode(MemCheckBlock);
+    LI->removeBlock(MemCheckBlock);
 
     // Outer loop is used as part of the later cost calculations.
     OuterLoop = L->getParentLoop();
   }
 
   InstructionCost getCost() {
-    if (SCEVCheckBlock || MemCheckBlock)
-      LLVM_DEBUG(dbgs() << "Calculating cost of runtime checks:\n");
-
     if (CostTooHigh) {
       InstructionCost Cost;
       Cost.setInvalid();
@@ -1644,16 +1609,9 @@ public:
       return Cost;
     }
 
-    InstructionCost RTCheckCost = 0;
-    if (SCEVCheckBlock)
-      for (Instruction &I : *SCEVCheckBlock) {
-        if (SCEVCheckBlock->getTerminator() == &I)
-          continue;
-        InstructionCost C = TTI->getInstructionCost(&I, CostKind);
-        LLVM_DEBUG(dbgs() << "  " << C << "  for " << I << "\n");
-        RTCheckCost += C;
-      }
+    InstructionCost RTCheckCost = SCEVCheckCost;
     if (MemCheckBlock) {
+      LLVM_DEBUG(dbgs() << "Calculating cost of runtime checks:\n");
       InstructionCost MemCheckCost = 0;
       for (Instruction &I : *MemCheckBlock) {
         if (MemCheckBlock->getTerminator() == &I)
@@ -1703,40 +1661,16 @@ public:
       }
 
       RTCheckCost += MemCheckCost;
-    }
-
-    if (SCEVCheckBlock || MemCheckBlock)
       LLVM_DEBUG(dbgs() << "Total cost of runtime checks: " << RTCheckCost
                         << "\n");
-
+    }
     return RTCheckCost;
   }
 
-  /// Remove the created SCEV & memory runtime check blocks & instructions, if
-  /// unused.
+  /// Remove the created memory runtime check block & instructions, if unused.
   ~GeneratedRTChecks() {
-    SCEVExpanderCleaner SCEVCleaner(SCEVExp);
-    bool SCEVChecksUsed = !SCEVCheckBlock || !pred_empty(SCEVCheckBlock);
-    if (SCEVChecksUsed)
-      SCEVCleaner.markResultUsed();
-
     if (MemCheckBlock && pred_empty(MemCheckBlock))
       eraseMemCheckBlock();
-
-    SCEVCleaner.cleanup();
-
-    if (!SCEVChecksUsed)
-      SCEVCheckBlock->eraseFromParent();
-  }
-
-  /// Retrieves the SCEVCheckCond and SCEVCheckBlock that were generated as IR
-  /// outside VPlan.
-  std::pair<Value *, BasicBlock *> getSCEVChecks() const {
-    using namespace llvm::PatternMatch;
-    if (!SCEVCheckCond || match(SCEVCheckCond, m_ZeroInt()))
-      return {nullptr, nullptr};
-
-    return {SCEVCheckCond, SCEVCheckBlock};
   }
 
   /// Retrieves the MemCheckCond and MemCheckBlock that were generated as IR
@@ -1751,8 +1685,13 @@ public:
   /// Return true if any runtime checks have been added
   bool hasChecks() const { return HasChecks; }
 
+  /// Record whether runtime checks have been added to the plan.
+  void setHasChecks(bool V) { HasChecks = V; }
+
   /// Erase the memory check block, its instructions and their SCEV expansions.
   void eraseMemCheckBlock() {
+    if (!MemCheckBlock)
+      return;
     SCEVExpanderCleaner MemCheckCleaner(MemCheckExp);
     auto &SE = *MemCheckExp.getSE();
     // Memory runtime check generation creates compares that use expanded
@@ -6999,15 +6938,8 @@ void LoopVectorizationPlanner::addReductionResultComputation(
 
 void LoopVectorizationPlanner::attachRuntimeChecks(
     VPlan &Plan, GeneratedRTChecks &RTChecks, bool HasBranchWeights) const {
-  const auto &[SCEVCheckCond, SCEVCheckBlock] = RTChecks.getSCEVChecks();
-  if (SCEVCheckBlock && SCEVCheckBlock->hasNPredecessors(0)) {
-    assert((!Config.OptForSize ||
-            Config.getHints().getForce() == LoopVectorizeHints::FK_Enabled) &&
-           "Cannot SCEV check stride or overflow when optimizing for size");
-    RUN_VPLAN_PASS(VPlanTransforms::attachCheckBlock, Plan, SCEVCheckCond,
-                   SCEVCheckBlock, HasBranchWeights);
-  }
   const auto &[MemCheckCond, MemCheckBlock] = RTChecks.getMemRuntimeChecks();
+  bool UsePrebuiltMemChecks = false;
   if (MemCheckBlock && MemCheckBlock->hasNPredecessors(0)) {
     // VPlan-native path does not do any analysis for runtime checks
     // currently.
@@ -7029,17 +6961,21 @@ void LoopVectorizationPlanner::attachRuntimeChecks(
                   "(e.g., adding 'restrict').";
       });
     }
-    if (Plan.predicates().empty())
-      return RUN_VPLAN_PASS(VPlanTransforms::attachCheckBlock, Plan,
-                            MemCheckCond, MemCheckBlock, HasBranchWeights);
+    UsePrebuiltMemChecks = none_of(Plan.predicates(), [](const auto &P) {
+      return isa<VPMemoryChecksPredicate>(P.get());
+    });
   }
-  if (Plan.predicates().empty())
-    return;
 
   // Erase the temporary IR before recipe expansion can reuse its values.
-  RTChecks.eraseMemCheckBlock();
-  RUN_VPLAN_PASS(VPlanTransforms::materializePredicates, Plan, *PSE.getSE(),
-                 OrigLoop->getStartLoc(), HasBranchWeights);
+  if (!UsePrebuiltMemChecks)
+    RTChecks.eraseMemCheckBlock();
+  RTChecks.setHasChecks(UsePrebuiltMemChecks || !Plan.predicates().empty());
+  if (!Plan.predicates().empty())
+    RUN_VPLAN_PASS(VPlanTransforms::materializePredicates, Plan, *PSE.getSE(),
+                   OrigLoop->getStartLoc(), HasBranchWeights);
+  if (UsePrebuiltMemChecks)
+    RUN_VPLAN_PASS(VPlanTransforms::attachCheckBlock, Plan, MemCheckCond,
+                   MemCheckBlock, HasBranchWeights);
 }
 
 void LoopVectorizationPlanner::addMinimumIterationCheck(
@@ -7888,16 +7824,26 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     //  Optimistically generate runtime checks if they are needed. Drop them if
     //  they turn out to not be profitable.
     if (VF.Width.isVector() || SelectedIC > 1) {
-      Checks.create(L, *LVL.getLAI(), PSE.getPredicate(), VF.Width, SelectedIC,
-                    *ORE);
+      // Cost the SCEV checks of the plan, not all predicates of PSE.
+      SmallVector<const SCEVPredicate *> SCEVPreds;
+      for (const auto &P : BestPlanPtr->predicates())
+        if (const auto *SCEVP = dyn_cast<VPSCEVPredicate>(P.get()))
+          append_range(SCEVPreds, SCEVP->Preds);
+      assert(
+          all_of(cast<SCEVUnionPredicate>(PSE.getPredicate()).getPredicates(),
+                 [&](const SCEVPredicate *P) {
+                   return is_contained(SCEVPreds, P) ||
+                          vputils::evaluateSCEVCheck(*P, *SE) == true;
+                 }) &&
+          "SCEV predicate added after finalizeSCEVPredicates");
+      Checks.create(L, *LVL.getLAI(), SCEVUnionPredicate(SCEVPreds, *SE),
+                    VF.Width, SelectedIC, *ORE);
 
-      // Bail out early if either the SCEV or memory runtime checks are known to
-      // fail. In that case, the vector loop would never execute.
+      // Bail out early if the memory runtime checks are known to fail. In
+      // that case, the vector loop would never execute.
       using namespace llvm::PatternMatch;
-      if ((Checks.getSCEVChecks().first &&
-           match(Checks.getSCEVChecks().first, m_One())) ||
-          (Checks.getMemRuntimeChecks().first &&
-           match(Checks.getMemRuntimeChecks().first, m_One()))) {
+      if (Checks.getMemRuntimeChecks().first &&
+          match(Checks.getMemRuntimeChecks().first, m_One())) {
         reportVectorizationFailure(
             "runtime checks are known to fail, so we will never enter the "
             "vector loop",

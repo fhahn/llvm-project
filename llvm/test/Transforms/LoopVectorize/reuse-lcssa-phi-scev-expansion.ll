@@ -535,3 +535,233 @@ exit:
   store i64 %iv.lcssa, ptr %dst
   ret void
 }
+
+; The start of the SCEV check's AddRec of %loop.1 contains a udiv executed
+; only if %c is true. Make sure it is expanded in the SCEV check block, not
+; unconditionally in the preheader.
+define void @sibling_addrec_with_udiv_in_scev_check(ptr %dst, i32 %n, i32 %d, i1 %c, i1 %c.1) {
+; CHECK-LABEL: define void @sibling_addrec_with_udiv_in_scev_check(
+; CHECK-SAME: ptr [[DST:%.*]], i32 [[N:%.*]], i32 [[D:%.*]], i1 [[C:%.*]], i1 [[C_1:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    br label %[[LOOP_1:.*]]
+; CHECK:       [[LOOP_1]]:
+; CHECK-NEXT:    [[INDVAR:%.*]] = phi i32 [ [[INDVAR_NEXT:%.*]], %[[LOOP_1]] ], [ 0, %[[ENTRY]] ]
+; CHECK-NEXT:    [[IV_1:%.*]] = phi i32 [ 0, %[[ENTRY]] ], [ [[IV_1_NEXT:%.*]], %[[LOOP_1]] ]
+; CHECK-NEXT:    [[IV_1_NEXT]] = add nuw nsw i32 [[IV_1]], 2
+; CHECK-NEXT:    [[INDVAR_NEXT]] = add i32 [[INDVAR]], 1
+; CHECK-NEXT:    br i1 [[C_1]], label %[[PH_2:.*]], label %[[LOOP_1]]
+; CHECK:       [[PH_2]]:
+; CHECK-NEXT:    [[IV_1_LCSSA:%.*]] = phi i32 [ [[IV_1]], %[[LOOP_1]] ]
+; CHECK-NEXT:    br label %[[VECTOR_SCEVCHECK:.*]]
+; CHECK:       [[VECTOR_SCEVCHECK]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = udiv i32 [[N]], [[D]]
+; CHECK-NEXT:    [[TMP1:%.*]] = shl i32 [[INDVAR]], 1
+; CHECK-NEXT:    [[TMP2:%.*]] = add i32 [[TMP0]], [[TMP1]]
+; CHECK-NEXT:    [[TMP3:%.*]] = add i32 [[TMP2]], 99
+; CHECK-NEXT:    [[TMP4:%.*]] = icmp slt i32 [[TMP3]], [[TMP2]]
+; CHECK-NEXT:    br i1 [[TMP4]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i32> poison, i32 [[D]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT]], <2 x i32> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <2 x i32> poison, i32 [[N]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT1]], <2 x i32> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT3:%.*]] = insertelement <2 x i1> poison, i1 [[C]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT4:%.*]] = shufflevector <2 x i1> [[BROADCAST_SPLATINSERT3]], <2 x i1> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP5:%.*]] = call <2 x i32> @llvm.masked.udiv.v2i32(<2 x i32> [[BROADCAST_SPLAT2]], <2 x i32> [[BROADCAST_SPLAT]], <2 x i1> [[BROADCAST_SPLAT4]])
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT5:%.*]] = insertelement <2 x i32> poison, i32 [[IV_1_LCSSA]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT6:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT5]], <2 x i32> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_STORE_CONTINUE8:.*]] ]
+; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <2 x i32> [ <i32 0, i32 1>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[PRED_STORE_CONTINUE8]] ]
+; CHECK-NEXT:    [[TMP6:%.*]] = add <2 x i32> [[VEC_IND]], [[BROADCAST_SPLAT6]]
+; CHECK-NEXT:    [[TMP7:%.*]] = add <2 x i32> [[TMP6]], [[TMP5]]
+; CHECK-NEXT:    [[TMP8:%.*]] = sext <2 x i32> [[TMP7]] to <2 x i64>
+; CHECK-NEXT:    br i1 [[C]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
+; CHECK:       [[PRED_STORE_IF]]:
+; CHECK-NEXT:    [[TMP9:%.*]] = extractelement <2 x i64> [[TMP8]], i64 0
+; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[TMP9]]
+; CHECK-NEXT:    store i32 0, ptr [[TMP10]], align 4
+; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE]]
+; CHECK:       [[PRED_STORE_CONTINUE]]:
+; CHECK-NEXT:    br i1 [[C]], label %[[PRED_STORE_IF7:.*]], label %[[PRED_STORE_CONTINUE8]]
+; CHECK:       [[PRED_STORE_IF7]]:
+; CHECK-NEXT:    [[TMP11:%.*]] = extractelement <2 x i64> [[TMP8]], i64 1
+; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[TMP11]]
+; CHECK-NEXT:    store i32 0, ptr [[TMP12]], align 4
+; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE8]]
+; CHECK:       [[PRED_STORE_CONTINUE8]]:
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
+; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <2 x i32> [[VEC_IND]], splat (i32 2)
+; CHECK-NEXT:    [[TMP13:%.*]] = icmp eq i32 [[INDEX_NEXT]], 100
+; CHECK-NEXT:    br i1 [[TMP13]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP14:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    br label %[[EXIT:.*]]
+; CHECK:       [[SCALAR_PH]]:
+; CHECK-NEXT:    br label %[[LOOP_2:.*]]
+; CHECK:       [[LOOP_2]]:
+; CHECK-NEXT:    [[IV_2:%.*]] = phi i32 [ 0, %[[SCALAR_PH]] ], [ [[IV_2_NEXT:%.*]], %[[LOOP_2_LATCH:.*]] ]
+; CHECK-NEXT:    br i1 [[C]], label %[[THEN:.*]], label %[[LOOP_2_LATCH]]
+; CHECK:       [[THEN]]:
+; CHECK-NEXT:    [[Q:%.*]] = udiv i32 [[N]], [[D]]
+; CHECK-NEXT:    [[OFF:%.*]] = add i32 [[IV_2]], [[IV_1_LCSSA]]
+; CHECK-NEXT:    [[IDX:%.*]] = add i32 [[OFF]], [[Q]]
+; CHECK-NEXT:    [[IDX_EXT:%.*]] = sext i32 [[IDX]] to i64
+; CHECK-NEXT:    [[GEP:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[IDX_EXT]]
+; CHECK-NEXT:    store i32 0, ptr [[GEP]], align 4
+; CHECK-NEXT:    br label %[[LOOP_2_LATCH]]
+; CHECK:       [[LOOP_2_LATCH]]:
+; CHECK-NEXT:    [[IV_2_NEXT]] = add nuw nsw i32 [[IV_2]], 1
+; CHECK-NEXT:    [[EC_2:%.*]] = icmp eq i32 [[IV_2_NEXT]], 100
+; CHECK-NEXT:    br i1 [[EC_2]], label %[[EXIT]], label %[[LOOP_2]], !llvm.loop [[LOOP15:![0-9]+]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %loop.1
+
+loop.1:
+  %iv.1 = phi i32 [ 0, %entry ], [ %iv.1.next, %loop.1 ]
+  %iv.1.next = add nuw nsw i32 %iv.1, 2
+  br i1 %c.1, label %ph.2, label %loop.1
+
+ph.2:
+  %iv.1.lcssa = phi i32 [ %iv.1, %loop.1 ]
+  br label %loop.2
+
+loop.2:
+  %iv.2 = phi i32 [ 0, %ph.2 ], [ %iv.2.next, %loop.2.latch ]
+  br i1 %c, label %then, label %loop.2.latch
+
+then:
+  %q = udiv i32 %n, %d
+  %off = add i32 %iv.2, %iv.1.lcssa
+  %idx = add i32 %off, %q
+  %idx.ext = sext i32 %idx to i64
+  %gep = getelementptr inbounds i32, ptr %dst, i64 %idx.ext
+  store i32 0, ptr %gep, align 4
+  br label %loop.2.latch
+
+loop.2.latch:
+  %iv.2.next = add nuw nsw i32 %iv.2, 1
+  %ec.2 = icmp eq i32 %iv.2.next, 100
+  br i1 %ec.2, label %exit, label %loop.2
+
+exit:
+  ret void
+}
+
+; Same as above, but for the pointer AddRec of %loop.1 starting the AddRec of
+; the pointer wrap check.
+define void @sibling_ptr_addrec_with_udiv_in_scev_check(ptr %a, i64 %n, i64 %d, i1 %c, i1 %c.1) null_pointer_is_valid {
+; CHECK-LABEL: define void @sibling_ptr_addrec_with_udiv_in_scev_check(
+; CHECK-SAME: ptr [[A:%.*]], i64 [[N:%.*]], i64 [[D:%.*]], i1 [[C:%.*]], i1 [[C_1:%.*]]) #[[ATTR1:[0-9]+]] {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    br label %[[LOOP_1:.*]]
+; CHECK:       [[LOOP_1]]:
+; CHECK-NEXT:    [[IV_1:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_1_NEXT:%.*]], %[[LOOP_1]] ]
+; CHECK-NEXT:    [[IV_1_NEXT]] = add nuw nsw i64 [[IV_1]], 1
+; CHECK-NEXT:    br i1 [[C_1]], label %[[PH_2:.*]], label %[[LOOP_1]]
+; CHECK:       [[PH_2]]:
+; CHECK-NEXT:    [[IV_1_LCSSA:%.*]] = phi i64 [ [[IV_1]], %[[LOOP_1]] ]
+; CHECK-NEXT:    br label %[[VECTOR_SCEVCHECK:.*]]
+; CHECK:       [[VECTOR_SCEVCHECK]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = udiv i64 [[N]], [[D]]
+; CHECK-NEXT:    [[TMP1:%.*]] = shl i64 [[TMP0]], 2
+; CHECK-NEXT:    [[TMP2:%.*]] = shl i64 [[IV_1_LCSSA]], 2
+; CHECK-NEXT:    [[TMP3:%.*]] = add i64 [[TMP1]], [[TMP2]]
+; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP3]]
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr [[TMP4]], i64 396
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp ult ptr [[TMP5]], [[TMP4]]
+; CHECK-NEXT:    br i1 [[TMP6]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i64> poison, i64 [[D]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x i64> [[BROADCAST_SPLATINSERT]], <2 x i64> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <2 x i64> poison, i64 [[N]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <2 x i64> [[BROADCAST_SPLATINSERT1]], <2 x i64> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT3:%.*]] = insertelement <2 x i1> poison, i1 [[C]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT4:%.*]] = shufflevector <2 x i1> [[BROADCAST_SPLATINSERT3]], <2 x i1> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP7:%.*]] = call <2 x i64> @llvm.masked.udiv.v2i64(<2 x i64> [[BROADCAST_SPLAT2]], <2 x i64> [[BROADCAST_SPLAT]], <2 x i1> [[BROADCAST_SPLAT4]])
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT5:%.*]] = insertelement <2 x i64> poison, i64 [[IV_1_LCSSA]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT6:%.*]] = shufflevector <2 x i64> [[BROADCAST_SPLATINSERT5]], <2 x i64> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_STORE_CONTINUE8:.*]] ]
+; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <2 x i64> [ <i64 0, i64 1>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[PRED_STORE_CONTINUE8]] ]
+; CHECK-NEXT:    [[TMP8:%.*]] = add <2 x i64> [[VEC_IND]], [[BROADCAST_SPLAT6]]
+; CHECK-NEXT:    [[TMP9:%.*]] = add <2 x i64> [[TMP8]], [[TMP7]]
+; CHECK-NEXT:    br i1 [[C]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
+; CHECK:       [[PRED_STORE_IF]]:
+; CHECK-NEXT:    [[TMP10:%.*]] = extractelement <2 x i64> [[TMP9]], i64 0
+; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr i32, ptr [[A]], i64 [[TMP10]]
+; CHECK-NEXT:    [[TMP12:%.*]] = load i32, ptr [[TMP11]], align 4
+; CHECK-NEXT:    store i32 [[TMP12]], ptr [[TMP11]], align 4
+; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE]]
+; CHECK:       [[PRED_STORE_CONTINUE]]:
+; CHECK-NEXT:    br i1 [[C]], label %[[PRED_STORE_IF7:.*]], label %[[PRED_STORE_CONTINUE8]]
+; CHECK:       [[PRED_STORE_IF7]]:
+; CHECK-NEXT:    [[TMP13:%.*]] = extractelement <2 x i64> [[TMP9]], i64 1
+; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr i32, ptr [[A]], i64 [[TMP13]]
+; CHECK-NEXT:    [[TMP15:%.*]] = load i32, ptr [[TMP14]], align 4
+; CHECK-NEXT:    store i32 [[TMP15]], ptr [[TMP14]], align 4
+; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE8]]
+; CHECK:       [[PRED_STORE_CONTINUE8]]:
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
+; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <2 x i64> [[VEC_IND]], splat (i64 2)
+; CHECK-NEXT:    [[TMP16:%.*]] = icmp eq i64 [[INDEX_NEXT]], 100
+; CHECK-NEXT:    br i1 [[TMP16]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP16:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    br label %[[EXIT:.*]]
+; CHECK:       [[SCALAR_PH]]:
+; CHECK-NEXT:    br label %[[LOOP_2:.*]]
+; CHECK:       [[LOOP_2]]:
+; CHECK-NEXT:    [[IV_2:%.*]] = phi i64 [ 0, %[[SCALAR_PH]] ], [ [[IV_2_NEXT:%.*]], %[[LOOP_2_LATCH:.*]] ]
+; CHECK-NEXT:    br i1 [[C]], label %[[THEN:.*]], label %[[LOOP_2_LATCH]]
+; CHECK:       [[THEN]]:
+; CHECK-NEXT:    [[Q:%.*]] = udiv i64 [[N]], [[D]]
+; CHECK-NEXT:    [[OFF:%.*]] = add i64 [[IV_2]], [[IV_1_LCSSA]]
+; CHECK-NEXT:    [[IDX:%.*]] = add i64 [[OFF]], [[Q]]
+; CHECK-NEXT:    [[GEP:%.*]] = getelementptr i32, ptr [[A]], i64 [[IDX]]
+; CHECK-NEXT:    [[L:%.*]] = load i32, ptr [[GEP]], align 4
+; CHECK-NEXT:    store i32 [[L]], ptr [[GEP]], align 4
+; CHECK-NEXT:    br label %[[LOOP_2_LATCH]]
+; CHECK:       [[LOOP_2_LATCH]]:
+; CHECK-NEXT:    [[IV_2_NEXT]] = add nuw nsw i64 [[IV_2]], 1
+; CHECK-NEXT:    [[EC_2:%.*]] = icmp eq i64 [[IV_2_NEXT]], 100
+; CHECK-NEXT:    br i1 [[EC_2]], label %[[EXIT]], label %[[LOOP_2]], !llvm.loop [[LOOP17:![0-9]+]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %loop.1
+
+loop.1:
+  %iv.1 = phi i64 [ 0, %entry ], [ %iv.1.next, %loop.1 ]
+  %iv.1.next = add nuw nsw i64 %iv.1, 1
+  br i1 %c.1, label %ph.2, label %loop.1
+
+ph.2:
+  %iv.1.lcssa = phi i64 [ %iv.1, %loop.1 ]
+  br label %loop.2
+
+loop.2:
+  %iv.2 = phi i64 [ 0, %ph.2 ], [ %iv.2.next, %loop.2.latch ]
+  br i1 %c, label %then, label %loop.2.latch
+
+then:
+  %q = udiv i64 %n, %d
+  %off = add i64 %iv.2, %iv.1.lcssa
+  %idx = add i64 %off, %q
+  %gep = getelementptr i32, ptr %a, i64 %idx
+  %l = load i32, ptr %gep, align 4
+  store i32 %l, ptr %gep, align 4
+  br label %loop.2.latch
+
+loop.2.latch:
+  %iv.2.next = add nuw nsw i64 %iv.2, 1
+  %ec.2 = icmp eq i64 %iv.2.next, 100
+  br i1 %ec.2, label %exit, label %loop.2
+
+exit:
+  ret void
+}

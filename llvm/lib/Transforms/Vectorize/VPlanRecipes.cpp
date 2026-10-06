@@ -565,7 +565,8 @@ Type *llvm::computeScalarTypeForInstruction(unsigned Opcode,
     assert(Operands[1]->getScalarType()->isIntegerTy() &&
            "expected integer operand");
     return Op0Ty;
-  case Instruction::ExtractValue: {
+  case Instruction::ExtractValue:
+  case VPInstruction::ExtractStructField: {
     assert(Operands.size() == 2 && "expected single level extractvalue");
     auto *StructTy = cast<StructType>(Op0Ty);
     return StructTy->getTypeAtIndex(
@@ -671,6 +672,7 @@ unsigned VPInstruction::getNumOperandsForOpcode() const {
   case VPInstruction::FirstOrderRecurrenceSplice:
   case VPInstruction::LogicalAnd:
   case VPInstruction::LogicalOr:
+  case VPInstruction::ExtractStructField:
   case VPInstruction::PtrAdd:
   case VPInstruction::WidePtrAdd:
   case VPInstruction::WideIVStep:
@@ -1226,6 +1228,10 @@ Value *VPInstruction::generate(VPTransformState &State,
     applyMetadata(*WideSI);
     return WideSI;
   }
+  case VPInstruction::ExtractStructField:
+    return Builder.CreateExtractValue(
+        State.get(getOperand(0), /*IsSingleScalar=*/true),
+        cast<VPConstantInt>(getOperand(1))->getZExtValue(), Name);
   default:
     llvm_unreachable("Unsupported opcode for instruction");
   }
@@ -1670,6 +1676,7 @@ bool VPInstruction::isSingleScalar() const {
   case VPInstruction::ExplicitVectorLength:
   case VPInstruction::ResumeForEpilogue:
   case VPInstruction::Intrinsic:
+  case VPInstruction::ExtractStructField:
     return true;
   default:
     return Instruction::isCast(getOpcode());
@@ -1731,8 +1738,7 @@ void VPInstruction::execute(VPTransformState &State) {
   if (!hasResult())
     return;
   assert(GeneratedValue && "generate must produce a value");
-  assert(((GeneratedValue->getType()->isVectorTy() ||
-           GeneratedValue->getType()->isStructTy()) == !GenerateSingleScalar) &&
+  assert((isVectorizedTy(GeneratedValue->getType()) == !GenerateSingleScalar) &&
          "scalar value but not only first lane defined");
   State.set(this, GeneratedValue, GenerateSingleScalar);
   if (getOpcode() == VPInstruction::ResumeForEpilogue ||
@@ -1771,6 +1777,7 @@ bool VPInstruction::opcodeMayReadOrWriteFromMemory() const {
   case VPInstruction::CanonicalIVIncrementForPart:
   case VPInstruction::ComputeReductionResult:
   case VPInstruction::ExtractLane:
+  case VPInstruction::ExtractStructField:
   case VPInstruction::ExtractLastLane:
   case VPInstruction::ExtractLastPart:
   case VPInstruction::ExtractPenultimateElement:
@@ -1957,6 +1964,9 @@ void VPInstruction::printRecipe(raw_ostream &O, const Twine &Indent,
     break;
   case VPInstruction::MaskedCond:
     O << "masked-cond";
+    break;
+  case VPInstruction::ExtractStructField:
+    O << "extract-struct-field";
     break;
   case VPInstruction::ExtractLane:
     O << "extract-lane";
