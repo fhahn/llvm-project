@@ -434,6 +434,10 @@ static bool isEqualImpl(SimpleValue LHS, SimpleValue RHS) {
 }
 
 bool DenseMapInfo<SimpleValue>::isEqual(SimpleValue LHS, SimpleValue RHS) {
+  // ScopedHashTable compares each entry with its own key when popping a scope,
+  // so check for identical instructions first.
+  if (LHS.Inst == RHS.Inst)
+    return true;
   // These comparisons are nontrivial, so assert that equality implies
   // hash equality (DenseMap demands this as an invariant).
   bool Result = isEqualImpl(LHS, RHS);
@@ -487,6 +491,9 @@ unsigned DenseMapInfo<CallValue>::getHashValue(CallValue Val) {
 }
 
 bool DenseMapInfo<CallValue>::isEqual(CallValue LHS, CallValue RHS) {
+  // See DenseMapInfo<SimpleValue>::isEqual.
+  if (LHS.Inst == RHS.Inst)
+    return true;
   CallInst *LHSI = cast<CallInst>(LHS.Inst);
   CallInst *RHSI = cast<CallInst>(RHS.Inst);
 
@@ -540,6 +547,9 @@ unsigned DenseMapInfo<GEPValue>::getHashValue(const GEPValue &Val) {
 }
 
 bool DenseMapInfo<GEPValue>::isEqual(const GEPValue &LHS, const GEPValue &RHS) {
+  // See DenseMapInfo<SimpleValue>::isEqual.
+  if (LHS.Inst == RHS.Inst)
+    return true;
   auto *LGEP = cast<GetElementPtrInst>(LHS.Inst);
   auto *RGEP = cast<GetElementPtrInst>(RHS.Inst);
   if (LGEP->getPointerOperand() != RGEP->getPointerOperand())
