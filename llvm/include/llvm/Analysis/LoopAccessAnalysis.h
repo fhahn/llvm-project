@@ -292,12 +292,16 @@ public:
 
   /// Returns the memory dependences.  If null is returned we exceeded
   /// the MaxDependences threshold and this information is not
-  /// available.
+  /// available. Unknown dependences covered by runtime checks are not included.
   const SmallVectorImpl<Dependence> *getDependences() const {
     return RecordDependences ? &Dependences : nullptr;
   }
 
-  void clearDependences() { Dependences.clear(); }
+  void removeUnknownDependences() {
+    erase_if(Dependences, [](const Dependence &D) {
+      return D.Type == Dependence::Unknown;
+    });
+  }
 
   /// The vector of memory access instructions.  The indices are used as
   /// instruction identifiers in the Dependence class.

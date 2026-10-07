@@ -28,10 +28,27 @@ define void @dep_between_interleaved_store_and_load_with_runtime_checks(ptr %a, 
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP15:%.*]] = add i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP16:%.*]] = add i64 [[INDEX]], 2
+; CHECK-NEXT:    [[TMP17:%.*]] = add i64 [[INDEX]], 3
 ; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [2 x i32], ptr [[A]], i64 [[INDEX]]
-; CHECK-NEXT:    [[WIDE_VEC:%.*]] = load <8 x i32>, ptr [[TMP4]], align 4, !alias.scope [[META0:![0-9]+]], !noalias [[META3:![0-9]+]]
+; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [2 x i32], ptr [[A]], i64 [[TMP15]]
+; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds [2 x i32], ptr [[A]], i64 [[TMP16]]
+; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [2 x i32], ptr [[A]], i64 [[TMP17]]
+; CHECK-NEXT:    store i32 1, ptr [[TMP4]], align 4, !alias.scope [[META0:![0-9]+]], !noalias [[META3:![0-9]+]]
+; CHECK-NEXT:    store i32 1, ptr [[TMP8]], align 4, !alias.scope [[META0]], !noalias [[META3]]
+; CHECK-NEXT:    store i32 1, ptr [[TMP9]], align 4, !alias.scope [[META0]], !noalias [[META3]]
+; CHECK-NEXT:    store i32 1, ptr [[TMP10]], align 4, !alias.scope [[META0]], !noalias [[META3]]
+; CHECK-NEXT:    [[WIDE_VEC:%.*]] = load <8 x i32>, ptr [[TMP4]], align 4, !alias.scope [[META0]], !noalias [[META3]]
 ; CHECK-NEXT:    [[STRIDED_VEC:%.*]] = shufflevector <8 x i32> [[WIDE_VEC]], <8 x i32> poison, <4 x i32> <i32 0, i32 2, i32 4, i32 6>
-; CHECK-NEXT:    store <8 x i32> <i32 1, i32 3, i32 1, i32 3, i32 1, i32 3, i32 1, i32 3>, ptr [[TMP4]], align 4, !alias.scope [[META0]], !noalias [[META3]]
+; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr inbounds [2 x i32], ptr [[A]], i64 [[INDEX]], i64 1
+; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds [2 x i32], ptr [[A]], i64 [[TMP15]], i64 1
+; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr inbounds [2 x i32], ptr [[A]], i64 [[TMP16]], i64 1
+; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr inbounds [2 x i32], ptr [[A]], i64 [[TMP17]], i64 1
+; CHECK-NEXT:    store i32 3, ptr [[TMP11]], align 4, !alias.scope [[META0]], !noalias [[META3]]
+; CHECK-NEXT:    store i32 3, ptr [[TMP12]], align 4, !alias.scope [[META0]], !noalias [[META3]]
+; CHECK-NEXT:    store i32 3, ptr [[TMP13]], align 4, !alias.scope [[META0]], !noalias [[META3]]
+; CHECK-NEXT:    store i32 3, ptr [[TMP14]], align 4, !alias.scope [[META0]], !noalias [[META3]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[INDEX]]
 ; CHECK-NEXT:    store <4 x i32> [[STRIDED_VEC]], ptr [[TMP5]], align 4, !alias.scope [[META6:![0-9]+]], !noalias [[META7:![0-9]+]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i32, ptr [[B_OFF]], i64 [[INDEX]]

@@ -1758,10 +1758,11 @@ public:
   /// dependency checking (i.e. ShouldRetryWithRuntimeChecks).
   bool isDependencyCheckNeeded() const { return !CheckDeps.empty(); }
 
-  /// We decided that no dependence analysis would be used.  Reset the state.
+  /// Clear the pending dependence checks and drop Unknown dependences, which
+  /// must be covered by runtime checks. Other dependences remain valid.
   void resetDepChecks(MemoryDepChecker &DepChecker) {
     CheckDeps.clear();
-    DepChecker.clearDependences();
+    DepChecker.removeUnknownDependences();
   }
 
   ArrayRef<MemAccessInfo> getDependenciesToCheck() const { return CheckDeps; }
@@ -3780,7 +3781,6 @@ bool LoopAccessInfo::analyzeLoop(AAResults *AA, const LoopInfo *LI,
         return false;
       }
 
-      // Clear the dependency checks. They are no longer needed.
       Accesses.resetDepChecks(*DepChecker);
 
       DepsAreSafe = true;
