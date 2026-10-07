@@ -575,10 +575,14 @@ class LLVM_ABI SCEVUnknown final : public SCEV, private CallbackVH {
   /// instances owned by a ScalarEvolution.
   SCEVUnknown *Next;
 
+  /// Creation index within the parent ScalarEvolution, used to order
+  /// SCEVUnknowns that are otherwise indistinguishable by complexity.
+  unsigned OrderID;
+
   SCEVUnknown(const FoldingSetNodeIDRef ID, Value *V, ScalarEvolution *se,
-              SCEVUnknown *next)
-      : SCEV(ID, scUnknown, 1, V->getType()), CallbackVH(V), SE(se),
-        Next(next) {}
+              SCEVUnknown *next, unsigned OrderID)
+      : SCEV(ID, scUnknown, 1, V->getType()), CallbackVH(V), SE(se), Next(next),
+        OrderID(OrderID) {}
 
   // Implement CallbackVH.
   void deleted() override;
@@ -586,6 +590,8 @@ class LLVM_ABI SCEVUnknown final : public SCEV, private CallbackVH {
 
 public:
   Value *getValue() const { return getValPtr(); }
+
+  unsigned getOrderID() const { return OrderID; }
 
   /// Methods for support type inquiry through isa, cast, and dyn_cast:
   static bool classof(const SCEV *S) { return S->getSCEVType() == scUnknown; }
