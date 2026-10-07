@@ -80,6 +80,35 @@ DEBUG_COUNTER(CSECounter, "early-cse",
 
 namespace {
 
+/// Hashes the keys of EarlyCSE's scoped hash tables. hash_combine goes through
+/// an out-of-line xxh3 call, which shows up because ScopedHashTable rehashes
+/// keys on every insert, lookup and scope pop. The tables are only probed,
+/// never iterated, so the hash cannot affect the output.
+class ExprHasher {
+  static constexpr uint64_t GoldenRatio64 = 0x9e3779b97f4a7c15; // 2^64 / phi
+  uint64_t H;
+
+  void addOne(uint64_t V) { H = (H ^ V) * GoldenRatio64; }
+  void addOne(const void *P) { addOne(reinterpret_cast<uintptr_t>(P)); }
+
+public:
+  explicit ExprHasher(unsigned Opcode) : H(Opcode) {}
+
+  template <typename... Ts> ExprHasher &add(Ts... Vs) {
+    (addOne(Vs), ...);
+    return *this;
+  }
+
+  template <typename RangeT> ExprHasher &addRange(RangeT &&R) {
+    for (auto V : R)
+      addOne(V);
+    return *this;
+  }
+
+  /// Relies on hash_value's splitmix64 finalizer for avalanche.
+  unsigned get() const { return hash_value(H); }
+};
+
 /// Struct representing the available values in the scoped hash table.
 struct SimpleValue {
   Instruction *Inst;
@@ -194,14 +223,12 @@ static bool matchSelectWithOptionalNotCond(Value *V, Value *&Cond, Value *&A,
 }
 
 static unsigned hashCallInst(CallInst *CI) {
+  ExprHasher H(CI->getOpcode());
   // Don't CSE convergent calls in different basic blocks, because they
   // implicitly depend on the set of threads that is currently executing.
-  if (CI->isConvergent()) {
-    return hash_combine(CI->getOpcode(), CI->getParent(),
-                        hash_combine_range(CI->operand_values()));
-  }
-  return hash_combine(CI->getOpcode(),
-                      hash_combine_range(CI->operand_values()));
+  if (CI->isConvergent())
+    H.add(CI->getParent());
+  return H.addRange(CI->operand_values()).get();
 }
 
 static unsigned getHashValueImpl(SimpleValue Val) {
@@ -213,7 +240,7 @@ static unsigned getHashValueImpl(SimpleValue Val) {
     if (BinOp->isCommutative() && BinOp->getOperand(0) > BinOp->getOperand(1))
       std::swap(LHS, RHS);
 
-    return hash_combine(BinOp->getOpcode(), LHS, RHS);
+    return ExprHasher(BinOp->getOpcode()).add(LHS, RHS).get();
   }
 
   if (CmpInst *CI = dyn_cast<CmpInst>(Inst)) {
@@ -229,7 +256,7 @@ static unsigned getHashValueImpl(SimpleValue Val) {
       std::swap(LHS, RHS);
       Pred = SwappedPred;
     }
-    return hash_combine(Inst->getOpcode(), Pred, LHS, RHS);
+    return ExprHasher(Inst->getOpcode()).add(Pred, LHS, RHS).get();
   }
 
   // Hash general selects to allow matching commuted true/false operands.
@@ -245,7 +272,7 @@ static unsigned getHashValueImpl(SimpleValue Val) {
         SPF == SPF_UMIN || SPF == SPF_UMAX) {
       if (A > B)
         std::swap(A, B);
-      return hash_combine(Inst->getOpcode(), SPF, A, B);
+      return ExprHasher(Inst->getOpcode()).add(SPF, A, B).get();
     }
 
     // Hash general selects to allow matching commuted true/false operands.
@@ -254,7 +281,7 @@ static unsigned getHashValueImpl(SimpleValue Val) {
     CmpPredicate Pred;
     Value *X, *Y;
     if (!match(Cond, m_Cmp(Pred, m_Value(X), m_Value(Y))))
-      return hash_combine(Inst->getOpcode(), Cond, A, B);
+      return ExprHasher(Inst->getOpcode()).add(Cond, A, B).get();
 
     // Similar to cmp normalization (above) - canonicalize the predicate value:
     // select (icmp Pred, X, Y), A, B --> select (icmp InvPred, X, Y), B, A
@@ -262,23 +289,30 @@ static unsigned getHashValueImpl(SimpleValue Val) {
       Pred = CmpInst::getInversePredicate(Pred);
       std::swap(A, B);
     }
-    return hash_combine(Inst->getOpcode(),
-                        static_cast<CmpInst::Predicate>(Pred), X, Y, A, B);
+    return ExprHasher(Inst->getOpcode())
+        .add(static_cast<CmpInst::Predicate>(Pred), X, Y, A, B)
+        .get();
   }
 
   if (CastInst *CI = dyn_cast<CastInst>(Inst))
-    return hash_combine(CI->getOpcode(), CI->getType(), CI->getOperand(0));
+    return ExprHasher(CI->getOpcode())
+        .add(CI->getType(), CI->getOperand(0))
+        .get();
 
   if (FreezeInst *FI = dyn_cast<FreezeInst>(Inst))
-    return hash_combine(FI->getOpcode(), FI->getOperand(0));
+    return ExprHasher(FI->getOpcode()).add(FI->getOperand(0)).get();
 
   if (const ExtractValueInst *EVI = dyn_cast<ExtractValueInst>(Inst))
-    return hash_combine(EVI->getOpcode(), EVI->getOperand(0),
-                        hash_combine_range(EVI->indices()));
+    return ExprHasher(EVI->getOpcode())
+        .add(EVI->getOperand(0))
+        .addRange(EVI->indices())
+        .get();
 
   if (const InsertValueInst *IVI = dyn_cast<InsertValueInst>(Inst))
-    return hash_combine(IVI->getOpcode(), IVI->getOperand(0),
-                        IVI->getOperand(1), hash_combine_range(IVI->indices()));
+    return ExprHasher(IVI->getOpcode())
+        .add(IVI->getOperand(0), IVI->getOperand(1))
+        .addRange(IVI->indices())
+        .get();
 
   assert((isa<CallInst>(Inst) || isa<ExtractElementInst>(Inst) ||
           isa<InsertElementInst>(Inst) || isa<ShuffleVectorInst>(Inst) ||
@@ -291,17 +325,19 @@ static unsigned getHashValueImpl(SimpleValue Val) {
     Value *LHS = II->getArgOperand(0), *RHS = II->getArgOperand(1);
     if (LHS > RHS)
       std::swap(LHS, RHS);
-    return hash_combine(
-        II->getOpcode(), LHS, RHS,
-        hash_combine_range(drop_begin(II->operand_values(), 2)));
+    return ExprHasher(II->getOpcode())
+        .add(LHS, RHS)
+        .addRange(drop_begin(II->operand_values(), 2))
+        .get();
   }
 
   // gc.relocate is 'special' call: its second and third operands are
   // not real values, but indices into statepoint's argument list.
   // Get values they point to.
   if (const GCRelocateInst *GCR = dyn_cast<GCRelocateInst>(Inst))
-    return hash_combine(GCR->getOpcode(), GCR->getOperand(0),
-                        GCR->getBasePtr(), GCR->getDerivedPtr());
+    return ExprHasher(GCR->getOpcode())
+        .add(GCR->getOperand(0), GCR->getBasePtr(), GCR->getDerivedPtr())
+        .get();
 
   // Don't CSE convergent calls in different basic blocks, because they
   // implicitly depend on the set of threads that is currently executing.
@@ -309,8 +345,7 @@ static unsigned getHashValueImpl(SimpleValue Val) {
     return hashCallInst(CI);
 
   // Mix in the opcode.
-  return hash_combine(Inst->getOpcode(),
-                      hash_combine_range(Inst->operand_values()));
+  return ExprHasher(Inst->getOpcode()).addRange(Inst->operand_values()).get();
 }
 
 unsigned DenseMapInfo<SimpleValue>::getHashValue(SimpleValue Val) {
@@ -539,11 +574,10 @@ template <> struct llvm::DenseMapInfo<GEPValue> {
 
 unsigned DenseMapInfo<GEPValue>::getHashValue(const GEPValue &Val) {
   auto *GEP = cast<GetElementPtrInst>(Val.Inst);
+  ExprHasher H(GEP->getOpcode());
   if (Val.ConstantOffset.has_value())
-    return hash_combine(GEP->getOpcode(), GEP->getPointerOperand(),
-                        Val.ConstantOffset.value());
-  return hash_combine(GEP->getOpcode(),
-                      hash_combine_range(GEP->operand_values()));
+    return H.add(GEP->getPointerOperand(), Val.ConstantOffset.value()).get();
+  return H.addRange(GEP->operand_values()).get();
 }
 
 bool DenseMapInfo<GEPValue>::isEqual(const GEPValue &LHS, const GEPValue &RHS) {
