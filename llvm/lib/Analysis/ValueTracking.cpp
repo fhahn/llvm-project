@@ -1587,7 +1587,17 @@ static void computeKnownBitsFromOperator(const Operator *I,
     if (auto *Inst = dyn_cast<PossiblyNonNegInst>(I);
         Inst && Inst->hasNonNeg() && !Known.isNegative())
       Known.makeNonNegative();
+    bool SignBitsKnownZero = false, SignBitsKnownOne = false;
+    if (auto *TI = dyn_cast<TruncInst>(I); TI && Q.IIQ.hasNoSignedWrap(TI)) {
+      APInt SignBits = APInt::getBitsSetFrom(SrcBitWidth, BitWidth - 1);
+      SignBitsKnownZero = Known.Zero.intersects(SignBits);
+      SignBitsKnownOne = Known.One.intersects(SignBits);
+    }
     Known = Known.zextOrTrunc(BitWidth);
+    if (SignBitsKnownZero && !Known.isNegative())
+      Known.makeNonNegative();
+    else if (SignBitsKnownOne && !Known.isNonNegative())
+      Known.makeNegative();
     break;
   }
   case Instruction::BitCast: {

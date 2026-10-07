@@ -10,26 +10,7 @@ target datalayout = "n32:64"
 define i1 @caller(ptr %a, i16 %n) {
 ; CHECK-LABEL: define noundef i1 @caller(
 ; CHECK-SAME: ptr nofree readonly captures(none) [[A:%.*]], i16 [[N:%.*]]) local_unnamed_addr #[[ATTR0:[0-9]+]] {
-; CHECK-NEXT:    [[SWITCH_I:%.*]] = icmp ult i16 [[N]], 2
-; CHECK-NEXT:    br i1 [[SWITCH_I]], label %[[FIND_EXIT:.*]], label %[[BODY_PREHEADER_I:.*]]
-; CHECK:       [[BODY_PREHEADER_I]]:
-; CHECK-NEXT:    [[N_EXT_I:%.*]] = zext i16 [[N]] to i64
-; CHECK-NEXT:    [[TMP1:%.*]] = add nsw i64 [[N_EXT_I]], -2
-; CHECK-NEXT:    [[V_I1:%.*]] = load i8, ptr [[A]], align 1
-; CHECK-NEXT:    [[FOUND_I2:%.*]] = icmp eq i8 [[V_I1]], 0
-; CHECK-NEXT:    [[EXITCOND_NOT_I7:%.*]] = icmp eq i64 [[TMP1]], 0
-; CHECK-NEXT:    [[OR_COND:%.*]] = select i1 [[FOUND_I2]], i1 true, i1 [[EXITCOND_NOT_I7]]
-; CHECK-NEXT:    br i1 [[OR_COND]], label %[[FIND_EXIT]], label %[[BODY_I:.*]]
-; CHECK:       [[BODY_I]]:
-; CHECK-NEXT:    [[INDVARS_IV_I38:%.*]] = phi i64 [ [[INDVARS_IV_NEXT_I:%.*]], %[[BODY_I]] ], [ 0, %[[BODY_PREHEADER_I]] ]
-; CHECK-NEXT:    [[INDVARS_IV_NEXT_I]] = add nuw nsw i64 [[INDVARS_IV_I38]], 1
-; CHECK-NEXT:    [[GEP_I:%.*]] = getelementptr i8, ptr [[A]], i64 [[INDVARS_IV_NEXT_I]]
-; CHECK-NEXT:    [[V_I:%.*]] = load i8, ptr [[GEP_I]], align 1
-; CHECK-NEXT:    [[FOUND_I:%.*]] = icmp eq i8 [[V_I]], 0
-; CHECK-NEXT:    [[EXITCOND_NOT_I:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT_I]], [[TMP1]]
-; CHECK-NEXT:    [[OR_COND9:%.*]] = select i1 [[FOUND_I]], i1 true, i1 [[EXITCOND_NOT_I]]
-; CHECK-NEXT:    br i1 [[OR_COND9]], label %[[FIND_EXIT]], label %[[BODY_I]]
-; CHECK:       [[FIND_EXIT]]:
+; CHECK-NEXT:  [[FIND_EXIT:.*:]]
 ; CHECK-NEXT:    ret i1 true
 ;
   %r = call i32 @find(ptr %a, i16 %n)
@@ -39,7 +20,7 @@ define i1 @caller(ptr %a, i16 %n) {
 
 define i32 @find(ptr %a, i16 %n) {
 ; CHECK-LABEL: define range(i32 0, 65534) i32 @find(
-; CHECK-SAME: ptr nofree readonly captures(none) [[A:%.*]], i16 [[N:%.*]]) local_unnamed_addr #[[ATTR0]] {
+; CHECK-SAME: ptr nofree readonly captures(none) [[A:%.*]], i16 [[N:%.*]]) local_unnamed_addr #[[ATTR1:[0-9]+]] {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[SWITCH:%.*]] = icmp ult i16 [[N]], 2
 ; CHECK-NEXT:    br i1 [[SWITCH]], label %[[RET:.*]], label %[[BODY_PREHEADER:.*]]

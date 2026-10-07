@@ -77,6 +77,39 @@ define i64 @sext_of_trunc_nsw(i64 %x) {
   ret i64 %s
 }
 
+define i1 @trunc_nsw_high_bits_known_zero(i64 %x) {
+; CHECK-LABEL: @trunc_nsw_high_bits_known_zero(
+; CHECK-NEXT:    ret i1 true
+;
+  %y = and i64 %x, 4294967295
+  %t = trunc nsw i64 %y to i32
+  %c = icmp sgt i32 %t, -1
+  ret i1 %c
+}
+
+define i1 @trunc_nsw_high_bits_known_one(i64 %x) {
+; CHECK-LABEL: @trunc_nsw_high_bits_known_one(
+; CHECK-NEXT:    ret i1 true
+;
+  %y = or i64 %x, 1099511627776
+  %t = trunc nsw i64 %y to i32
+  %c = icmp slt i32 %t, 0
+  ret i1 %c
+}
+
+define i1 @trunc_high_bits_known_zero_no_nsw(i64 %x) {
+; CHECK-LABEL: @trunc_high_bits_known_zero_no_nsw(
+; CHECK-NEXT:    [[Y:%.*]] = and i64 [[X:%.*]], 4294967295
+; CHECK-NEXT:    [[T:%.*]] = trunc nuw i64 [[Y]] to i32
+; CHECK-NEXT:    [[C:%.*]] = icmp sgt i32 [[T]], -1
+; CHECK-NEXT:    ret i1 [[C]]
+;
+  %y = and i64 %x, 4294967295
+  %t = trunc nuw i64 %y to i32
+  %c = icmp sgt i32 %t, -1
+  ret i1 %c
+}
+
 ; Same folds work on vectors.
 define <2 x i64> @zext_of_trunc_nuw_vec(<2 x i64> %x) {
 ; CHECK-LABEL: @zext_of_trunc_nuw_vec(

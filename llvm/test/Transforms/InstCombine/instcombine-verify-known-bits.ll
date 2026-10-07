@@ -23,3 +23,27 @@ bb:
   %i8 = trunc i32 %i7 to i16
   ret i16 %i8
 }
+
+define i32 @trunc_nsw_high_bits_known_zero(i64 range(i64 0, 4294967296) %x) {
+; CHECK-LABEL: define i32 @trunc_nsw_high_bits_known_zero(
+; CHECK-SAME: i64 range(i64 0, 4294967296) [[X:%.*]]) {
+; CHECK-NEXT:    [[T:%.*]] = trunc nuw nsw i64 [[X]] to i32
+; CHECK-NEXT:    [[R:%.*]] = xor i32 [[T]], 1
+; CHECK-NEXT:    ret i32 [[R]]
+;
+  %t = trunc nsw i64 %x to i32
+  %r = xor i32 %t, 1
+  ret i32 %r
+}
+
+define i32 @trunc_nsw_high_bits_known_one(i64 range(i64 -4294967296, 0) %x) {
+; CHECK-LABEL: define i32 @trunc_nsw_high_bits_known_one(
+; CHECK-SAME: i64 range(i64 -4294967296, 0) [[X:%.*]]) {
+; CHECK-NEXT:    [[T:%.*]] = trunc nsw i64 [[X]] to i32
+; CHECK-NEXT:    [[R:%.*]] = xor i32 [[T]], 1
+; CHECK-NEXT:    ret i32 [[R]]
+;
+  %t = trunc nsw i64 %x to i32
+  %r = xor i32 %t, 1
+  ret i32 %r
+}
