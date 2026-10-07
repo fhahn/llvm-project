@@ -248,13 +248,13 @@ define dso_local i32 @test_loop(i32 %0) nounwind {
 ; CHECK-NEXT:    tilestored %tmm0, (%r13,%r15)
 ; CHECK-NEXT:    callq foo
 ; CHECK-NEXT:    ldtilecfg (%rsp)
-; CHECK-NEXT:    decl %ebp
+; CHECK-NEXT:    incl %ebp
 ; CHECK-NEXT:    jne .LBB2_2
 ; CHECK-NEXT:  # %bb.3:
 ; CHECK-NEXT:    cmpl $3, %ebx
 ; CHECK-NEXT:    jne .LBB2_4
 ; CHECK-NEXT:  # %bb.6:
-; CHECK-NEXT:    cmpl $-7, %ebp
+; CHECK-NEXT:    cmpl $7, %ebp
 ; CHECK-NEXT:    jne .LBB2_5
 ; CHECK-NEXT:  # %bb.7:
 ; CHECK-NEXT:    incl %ebx
@@ -306,13 +306,13 @@ define dso_local i32 @test_loop(i32 %0) nounwind {
 ; IPRA-NEXT:    callq foo
 ; IPRA-NEXT:    tilestored %tmm0, (%r8,%rsi)
 ; IPRA-NEXT:    callq foo
-; IPRA-NEXT:    decl %ecx
+; IPRA-NEXT:    incl %ecx
 ; IPRA-NEXT:    jne .LBB2_2
 ; IPRA-NEXT:  # %bb.3:
 ; IPRA-NEXT:    cmpl $3, %eax
 ; IPRA-NEXT:    jne .LBB2_4
 ; IPRA-NEXT:  # %bb.6:
-; IPRA-NEXT:    cmpl $-7, %ecx
+; IPRA-NEXT:    cmpl $7, %ecx
 ; IPRA-NEXT:    jne .LBB2_5
 ; IPRA-NEXT:  # %bb.7:
 ; IPRA-NEXT:    incl %eax

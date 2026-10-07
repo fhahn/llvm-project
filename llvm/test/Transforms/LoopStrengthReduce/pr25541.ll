@@ -11,14 +11,14 @@ define void @f() personality ptr @__CxxFrameHandler3 {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    br label %[[FOR_COND_I:.*]]
 ; CHECK:       [[FOR_COND_I]]:
-; CHECK-NEXT:    [[LSR_IV:%.*]] = phi i64 [ [[LSR_IV_NEXT:%.*]], %[[FOR_INC_I:.*]] ], [ 0, %[[ENTRY]] ]
+; CHECK-NEXT:    [[_FIRST_ADDR_0_I:%.*]] = phi ptr [ null, %[[ENTRY]] ], [ [[INCDEC_PTR_I:%.*]], %[[FOR_INC_I:.*]] ]
 ; CHECK-NEXT:    invoke void @g()
 ; CHECK-NEXT:            to label %[[FOR_INC_I]] unwind label %[[CATCH_DISPATCH_I:.*]]
 ; CHECK:       [[CATCH_DISPATCH_I]]:
 ; CHECK-NEXT:    [[CS:%.*]] = catchswitch within none [label %[[FOR_COND_1_PREHEADER_I:.*]]] unwind to caller
 ; CHECK:       [[FOR_COND_1_PREHEADER_I]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = catchpad within [[CS]] [ptr null, i32 64, ptr null]
-; CHECK-NEXT:    [[CMP_I:%.*]] = icmp eq i64 [[LSR_IV]], 0
+; CHECK-NEXT:    [[CMP_I:%.*]] = icmp eq ptr [[_FIRST_ADDR_0_I]], null
 ; CHECK-NEXT:    br label %[[FOR_COND_1_I:.*]]
 ; CHECK:       [[FOR_COND_1_I]]:
 ; CHECK-NEXT:    br i1 [[CMP_I]], label %[[FOR_END_I:.*]], label %[[FOR_BODY_I:.*]]
@@ -26,7 +26,7 @@ define void @f() personality ptr @__CxxFrameHandler3 {
 ; CHECK-NEXT:    call void @g()
 ; CHECK-NEXT:    br label %[[FOR_COND_1_I]]
 ; CHECK:       [[FOR_INC_I]]:
-; CHECK-NEXT:    [[LSR_IV_NEXT]] = add i64 [[LSR_IV]], -4
+; CHECK-NEXT:    [[INCDEC_PTR_I]] = getelementptr inbounds i32, ptr [[_FIRST_ADDR_0_I]], i64 1
 ; CHECK-NEXT:    br label %[[FOR_COND_I]]
 ; CHECK:       [[FOR_END_I]]:
 ; CHECK-NEXT:    catchret from [[TMP0]] to label %[[LEAVE:.*]]

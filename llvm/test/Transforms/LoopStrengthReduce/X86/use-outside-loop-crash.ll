@@ -11,26 +11,29 @@ define i64 @invalid_offset_outside_loop(ptr %ptr.arg, i64 %iv.arg) {
 ; CHECK-LABEL: define i64 @invalid_offset_outside_loop(
 ; CHECK-SAME: ptr [[PTR_ARG:%.*]], i64 [[IV_ARG:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[IV_ARG]], -2
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[IV_ARG]], 1
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[LSR_IV:%.*]] = phi i64 [ [[LSR_IV_NEXT:%.*]], %[[LOOP_INC:.*]] ], [ [[TMP0]], %[[ENTRY]] ]
+; CHECK-NEXT:    [[LSR_IV1:%.*]] = phi i64 [ [[LSR_IV_NEXT:%.*]], %[[LOOP_INC:.*]] ], [ 0, %[[ENTRY]] ]
 ; CHECK-NEXT:    [[PTR:%.*]] = phi ptr [ [[PTR_ARG]], %[[ENTRY]] ], [ [[PTR_NEXT:%.*]], %[[LOOP_INC]] ]
 ; CHECK-NEXT:    [[CALL:%.*]] = call i1 @otherfn(ptr [[PTR]])
 ; CHECK-NEXT:    br i1 [[CALL]], label %[[EXIT:.*]], label %[[LOOP_INC]]
 ; CHECK:       [[LOOP_INC]]:
 ; CHECK-NEXT:    [[PTR_NEXT]] = getelementptr i8, ptr [[PTR]], i64 16
-; CHECK-NEXT:    [[LSR_IV_NEXT]] = add i64 [[LSR_IV]], -1
-; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp eq i64 [[LSR_IV_NEXT]], -3
+; CHECK-NEXT:    [[LSR_IV_NEXT]] = add i64 [[LSR_IV1]], 1
+; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp eq i64 [[TMP0]], [[LSR_IV_NEXT]]
 ; CHECK-NEXT:    br i1 [[EXITCOND]], label %[[EXIT]], label %[[LOOP]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[LSR_IV]], 2
+; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[IV_ARG]], [[LSR_IV1]]
 ; CHECK-NEXT:    [[CMP1:%.*]] = icmp slt i64 [[TMP1]], [[IV_ARG]]
-; CHECK-NEXT:    [[CMP2:%.*]] = icmp eq i64 [[LSR_IV]], -1
+; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[IV_ARG]], [[LSR_IV1]]
+; CHECK-NEXT:    [[CMP2:%.*]] = icmp eq i64 [[TMP2]], 1
 ; CHECK-NEXT:    [[SEL1:%.*]] = select i1 [[CMP1]], i64 1, i64 2
 ; CHECK-NEXT:    [[SEL2:%.*]] = select i1 [[CMP2]], i64 [[SEL1]], i64 3
 ; CHECK-NEXT:    [[GEP:%.*]] = getelementptr i8, ptr [[PTR]], i64 8
 ; CHECK-NEXT:    store i64 [[SEL2]], ptr [[GEP]], align 8
+; CHECK-NEXT:    [[TMP3:%.*]] = add i64 [[IV_ARG]], -2
+; CHECK-NEXT:    [[LSR_IV:%.*]] = sub i64 [[TMP3]], [[LSR_IV1]]
 ; CHECK-NEXT:    ret i64 [[LSR_IV]]
 ;
 entry:

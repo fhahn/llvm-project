@@ -3624,7 +3624,7 @@ void LSRInstance::CollectFixupsAndInitialFormulae() {
       // in PowerPC, no need to generate initial formulae for it.
       if (SaveCmp && CI == dyn_cast<ICmpInst>(ExitBranch->getCondition()))
         continue;
-      if (CI->isEquality()) {
+      if (CI->isEquality() && L->getOutermostLoop()->contains(CI)) {
         // Swap the operands if needed to put the OperandValToReplace on the
         // left, for consistency.
         Value *NV = CI->getOperand(1);

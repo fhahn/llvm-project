@@ -644,30 +644,27 @@ define i1 @icmpzero_outside_loop(ptr %p, i64 %n) {
 ; CHECK-NEXT:    [[ARRAYIDX3:%.*]] = getelementptr inbounds nuw ptr, ptr [[P]], i64 3
 ; CHECK-NEXT:    [[P3_LOAD:%.*]] = load ptr, ptr [[ARRAYIDX3]], align 8
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[N]], 1
-; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr nuw i8, ptr [[P0_LOAD]], i64 128
-; CHECK-NEXT:    [[SCEVGEP3:%.*]] = getelementptr nuw i8, ptr [[P1_LOAD]], i64 128
-; CHECK-NEXT:    [[SCEVGEP6:%.*]] = getelementptr nuw i8, ptr [[P2_LOAD]], i64 128
-; CHECK-NEXT:    [[SCEVGEP9:%.*]] = getelementptr nuw i8, ptr [[P3_LOAD]], i64 128
 ; CHECK-NEXT:    br label %[[FOR_BODY:.*]]
 ; CHECK:       [[FOR_BODY]]:
-; CHECK-NEXT:    [[LSR_IV10:%.*]] = phi ptr [ [[SCEVGEP11:%.*]], %[[FOR_BODY]] ], [ [[SCEVGEP9]], %[[ENTRY]] ]
-; CHECK-NEXT:    [[LSR_IV7:%.*]] = phi ptr [ [[SCEVGEP8:%.*]], %[[FOR_BODY]] ], [ [[SCEVGEP6]], %[[ENTRY]] ]
-; CHECK-NEXT:    [[LSR_IV4:%.*]] = phi ptr [ [[SCEVGEP5:%.*]], %[[FOR_BODY]] ], [ [[SCEVGEP3]], %[[ENTRY]] ]
-; CHECK-NEXT:    [[LSR_IV1:%.*]] = phi ptr [ [[SCEVGEP2:%.*]], %[[FOR_BODY]] ], [ [[SCEVGEP]], %[[ENTRY]] ]
 ; CHECK-NEXT:    [[LSR_IV:%.*]] = phi i64 [ [[LSR_IV_NEXT:%.*]], %[[FOR_BODY]] ], [ [[TMP0]], %[[ENTRY]] ]
+; CHECK-NEXT:    [[OFF:%.*]] = phi i64 [ [[OFF_NEXT:%.*]], %[[FOR_BODY]] ], [ 32, %[[ENTRY]] ]
+; CHECK-NEXT:    [[OFF_NEXT]] = add nuw i64 [[OFF]], 1
 ; CHECK-NEXT:    [[LSR_IV_NEXT]] = add i64 [[LSR_IV]], -1
-; CHECK-NEXT:    [[SCEVGEP2]] = getelementptr i8, ptr [[LSR_IV1]], i64 4
-; CHECK-NEXT:    [[SCEVGEP5]] = getelementptr i8, ptr [[LSR_IV4]], i64 4
-; CHECK-NEXT:    [[SCEVGEP8]] = getelementptr i8, ptr [[LSR_IV7]], i64 4
-; CHECK-NEXT:    [[SCEVGEP11]] = getelementptr i8, ptr [[LSR_IV10]], i64 4
 ; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp ult i64 [[LSR_IV_NEXT]], 1
 ; CHECK-NEXT:    br i1 [[EXITCOND]], label %[[EXIT:.*]], label %[[FOR_BODY]]
 ; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    [[TMP1:%.*]] = shl i64 [[OFF_NEXT]], 2
+; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[P0_LOAD]], i64 [[TMP1]]
 ; CHECK-NEXT:    store ptr [[SCEVGEP2]], ptr [[P]], align 8
+; CHECK-NEXT:    [[SCEVGEP5:%.*]] = getelementptr i8, ptr [[P1_LOAD]], i64 [[TMP1]]
 ; CHECK-NEXT:    store ptr [[SCEVGEP5]], ptr [[ARRAYIDX1]], align 8
+; CHECK-NEXT:    [[TMP2:%.*]] = shl i64 [[OFF_NEXT]], 2
+; CHECK-NEXT:    [[SCEVGEP8:%.*]] = getelementptr i8, ptr [[P2_LOAD]], i64 [[TMP2]]
 ; CHECK-NEXT:    store ptr [[SCEVGEP8]], ptr [[ARRAYIDX2]], align 8
+; CHECK-NEXT:    [[SCEVGEP11:%.*]] = getelementptr i8, ptr [[P3_LOAD]], i64 [[TMP2]]
 ; CHECK-NEXT:    store ptr [[SCEVGEP11]], ptr [[ARRAYIDX3]], align 8
-; CHECK-NEXT:    [[CMP:%.*]] = icmp eq i64 [[LSR_IV_NEXT]], 0
+; CHECK-NEXT:    [[TMP3:%.*]] = add i64 [[OFF_NEXT]], -33
+; CHECK-NEXT:    [[CMP:%.*]] = icmp eq i64 [[TMP3]], [[N]]
 ; CHECK-NEXT:    ret i1 [[CMP]]
 ;
 entry:
@@ -729,30 +726,29 @@ define i1 @icmpzero_inside_outside_loop(ptr %p, i64 %n) {
 ; CHECK-NEXT:    [[ARRAYIDX3:%.*]] = getelementptr inbounds nuw ptr, ptr [[P]], i64 3
 ; CHECK-NEXT:    [[P3_LOAD:%.*]] = load ptr, ptr [[ARRAYIDX3]], align 8
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[N]], 1
-; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr nuw i8, ptr [[P0_LOAD]], i64 128
-; CHECK-NEXT:    [[SCEVGEP3:%.*]] = getelementptr nuw i8, ptr [[P1_LOAD]], i64 128
-; CHECK-NEXT:    [[SCEVGEP6:%.*]] = getelementptr nuw i8, ptr [[P2_LOAD]], i64 128
-; CHECK-NEXT:    [[SCEVGEP9:%.*]] = getelementptr nuw i8, ptr [[P3_LOAD]], i64 128
 ; CHECK-NEXT:    br label %[[FOR_BODY:.*]]
 ; CHECK:       [[FOR_BODY]]:
-; CHECK-NEXT:    [[LSR_IV10:%.*]] = phi ptr [ [[SCEVGEP11:%.*]], %[[FOR_BODY]] ], [ [[SCEVGEP9]], %[[ENTRY]] ]
-; CHECK-NEXT:    [[LSR_IV7:%.*]] = phi ptr [ [[SCEVGEP8:%.*]], %[[FOR_BODY]] ], [ [[SCEVGEP6]], %[[ENTRY]] ]
-; CHECK-NEXT:    [[LSR_IV4:%.*]] = phi ptr [ [[SCEVGEP5:%.*]], %[[FOR_BODY]] ], [ [[SCEVGEP3]], %[[ENTRY]] ]
-; CHECK-NEXT:    [[LSR_IV1:%.*]] = phi ptr [ [[SCEVGEP2:%.*]], %[[FOR_BODY]] ], [ [[SCEVGEP]], %[[ENTRY]] ]
-; CHECK-NEXT:    [[LSR_IV:%.*]] = phi i64 [ [[LSR_IV_NEXT:%.*]], %[[FOR_BODY]] ], [ [[TMP0]], %[[ENTRY]] ]
-; CHECK-NEXT:    [[LSR_IV_NEXT]] = add i64 [[LSR_IV]], -1
-; CHECK-NEXT:    [[SCEVGEP2]] = getelementptr i8, ptr [[LSR_IV1]], i64 4
-; CHECK-NEXT:    [[SCEVGEP5]] = getelementptr i8, ptr [[LSR_IV4]], i64 4
-; CHECK-NEXT:    [[SCEVGEP8]] = getelementptr i8, ptr [[LSR_IV7]], i64 4
-; CHECK-NEXT:    [[SCEVGEP11]] = getelementptr i8, ptr [[LSR_IV10]], i64 4
-; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp eq i64 [[LSR_IV_NEXT]], 0
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[IV_NEXT:%.*]], %[[FOR_BODY]] ], [ 0, %[[ENTRY]] ]
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw i64 [[IV]], 1
+; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp eq i64 [[TMP0]], [[IV_NEXT]]
 ; CHECK-NEXT:    br i1 [[EXITCOND]], label %[[EXIT:.*]], label %[[FOR_BODY]]
 ; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    [[SCEVGEP3:%.*]] = getelementptr nuw i8, ptr [[P0_LOAD]], i64 128
+; CHECK-NEXT:    [[TMP1:%.*]] = shl i64 [[IV_NEXT]], 2
+; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[SCEVGEP3]], i64 [[TMP1]]
 ; CHECK-NEXT:    store ptr [[SCEVGEP2]], ptr [[P]], align 8
+; CHECK-NEXT:    [[SCEVGEP6:%.*]] = getelementptr nuw i8, ptr [[P1_LOAD]], i64 128
+; CHECK-NEXT:    [[SCEVGEP5:%.*]] = getelementptr i8, ptr [[SCEVGEP6]], i64 [[TMP1]]
 ; CHECK-NEXT:    store ptr [[SCEVGEP5]], ptr [[ARRAYIDX1]], align 8
+; CHECK-NEXT:    [[SCEVGEP10:%.*]] = getelementptr nuw i8, ptr [[P2_LOAD]], i64 128
+; CHECK-NEXT:    [[TMP2:%.*]] = shl i64 [[IV_NEXT]], 2
+; CHECK-NEXT:    [[SCEVGEP8:%.*]] = getelementptr i8, ptr [[SCEVGEP10]], i64 [[TMP2]]
 ; CHECK-NEXT:    store ptr [[SCEVGEP8]], ptr [[ARRAYIDX2]], align 8
+; CHECK-NEXT:    [[SCEVGEP14:%.*]] = getelementptr nuw i8, ptr [[P3_LOAD]], i64 128
+; CHECK-NEXT:    [[SCEVGEP11:%.*]] = getelementptr i8, ptr [[SCEVGEP14]], i64 [[TMP2]]
 ; CHECK-NEXT:    store ptr [[SCEVGEP11]], ptr [[ARRAYIDX3]], align 8
-; CHECK-NEXT:    [[CMP:%.*]] = icmp eq i64 [[LSR_IV_NEXT]], 0
+; CHECK-NEXT:    [[TMP3:%.*]] = add i64 [[IV_NEXT]], -1
+; CHECK-NEXT:    [[CMP:%.*]] = icmp eq i64 [[TMP3]], [[N]]
 ; CHECK-NEXT:    ret i1 [[CMP]]
 ;
 entry:
@@ -797,4 +793,101 @@ exit:
   store ptr %p3.last, ptr %arrayidx3, align 8
   %cmp = icmp eq i64 %iv, %n
   ret i1 %cmp
+}
+
+; The compare is outside the inner loop but inside the outer loop, so it still
+; forms an ICmpZero use that must not be merged with uses inside the loop.
+define void @icmpzero_outside_inner_loop(ptr %p, i64 %n, ptr %out, i1 %c) {
+; CHECK-LABEL: define void @icmpzero_outside_inner_loop(
+; CHECK-SAME: ptr [[P:%.*]], i64 [[N:%.*]], ptr [[OUT:%.*]], i1 [[C:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[P0_LOAD:%.*]] = load ptr, ptr [[P]], align 8
+; CHECK-NEXT:    [[ARRAYIDX1:%.*]] = getelementptr inbounds nuw ptr, ptr [[P]], i64 1
+; CHECK-NEXT:    [[P1_LOAD:%.*]] = load ptr, ptr [[ARRAYIDX1]], align 8
+; CHECK-NEXT:    [[ARRAYIDX2:%.*]] = getelementptr inbounds nuw ptr, ptr [[P]], i64 2
+; CHECK-NEXT:    [[P2_LOAD:%.*]] = load ptr, ptr [[ARRAYIDX2]], align 8
+; CHECK-NEXT:    [[ARRAYIDX3:%.*]] = getelementptr inbounds nuw ptr, ptr [[P]], i64 3
+; CHECK-NEXT:    [[P3_LOAD:%.*]] = load ptr, ptr [[ARRAYIDX3]], align 8
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[N]], 1
+; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[P0_LOAD]], i64 128
+; CHECK-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[P1_LOAD]], i64 128
+; CHECK-NEXT:    [[SCEVGEP6:%.*]] = getelementptr i8, ptr [[P2_LOAD]], i64 128
+; CHECK-NEXT:    [[SCEVGEP9:%.*]] = getelementptr i8, ptr [[P3_LOAD]], i64 128
+; CHECK-NEXT:    br label %[[OUTER:.*]]
+; CHECK:       [[OUTER]]:
+; CHECK-NEXT:    br label %[[FOR_BODY:.*]]
+; CHECK:       [[FOR_BODY]]:
+; CHECK-NEXT:    [[LSR_IV10:%.*]] = phi ptr [ [[SCEVGEP11:%.*]], %[[FOR_BODY]] ], [ [[SCEVGEP9]], %[[OUTER]] ]
+; CHECK-NEXT:    [[LSR_IV7:%.*]] = phi ptr [ [[SCEVGEP8:%.*]], %[[FOR_BODY]] ], [ [[SCEVGEP6]], %[[OUTER]] ]
+; CHECK-NEXT:    [[LSR_IV4:%.*]] = phi ptr [ [[SCEVGEP5:%.*]], %[[FOR_BODY]] ], [ [[SCEVGEP3]], %[[OUTER]] ]
+; CHECK-NEXT:    [[LSR_IV1:%.*]] = phi ptr [ [[SCEVGEP2:%.*]], %[[FOR_BODY]] ], [ [[SCEVGEP]], %[[OUTER]] ]
+; CHECK-NEXT:    [[LSR_IV:%.*]] = phi i64 [ [[LSR_IV_NEXT:%.*]], %[[FOR_BODY]] ], [ [[TMP0]], %[[OUTER]] ]
+; CHECK-NEXT:    [[LSR_IV_NEXT]] = add i64 [[LSR_IV]], -1
+; CHECK-NEXT:    [[SCEVGEP2]] = getelementptr i8, ptr [[LSR_IV1]], i64 4
+; CHECK-NEXT:    [[SCEVGEP5]] = getelementptr i8, ptr [[LSR_IV4]], i64 4
+; CHECK-NEXT:    [[SCEVGEP8]] = getelementptr i8, ptr [[LSR_IV7]], i64 4
+; CHECK-NEXT:    [[SCEVGEP11]] = getelementptr i8, ptr [[LSR_IV10]], i64 4
+; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp ult i64 [[LSR_IV_NEXT]], 1
+; CHECK-NEXT:    br i1 [[EXITCOND]], label %[[OUTER_LATCH:.*]], label %[[FOR_BODY]]
+; CHECK:       [[OUTER_LATCH]]:
+; CHECK-NEXT:    store ptr [[SCEVGEP2]], ptr [[P]], align 8
+; CHECK-NEXT:    store ptr [[SCEVGEP5]], ptr [[ARRAYIDX1]], align 8
+; CHECK-NEXT:    store ptr [[SCEVGEP8]], ptr [[ARRAYIDX2]], align 8
+; CHECK-NEXT:    store ptr [[SCEVGEP11]], ptr [[ARRAYIDX3]], align 8
+; CHECK-NEXT:    [[CMP:%.*]] = icmp eq i64 [[LSR_IV_NEXT]], 0
+; CHECK-NEXT:    store i1 [[CMP]], ptr [[OUT]], align 1
+; CHECK-NEXT:    br i1 [[C]], label %[[OUTER]], label %[[EXIT:.*]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  %p0.load = load ptr, ptr %p, align 8
+  %arrayidx1 = getelementptr inbounds nuw ptr, ptr %p, i64 1
+  %p1.load = load ptr, ptr %arrayidx1, align 8
+  %arrayidx2 = getelementptr inbounds nuw ptr, ptr %p, i64 2
+  %p2.load = load ptr, ptr %arrayidx2, align 8
+  %arrayidx3 = getelementptr inbounds nuw ptr, ptr %p, i64 3
+  %p3.load = load ptr, ptr %arrayidx3, align 8
+  br label %outer
+
+outer:
+  br label %for.body
+
+for.body:
+  %iv = phi i64 [ %iv.next, %for.body ], [ 0, %outer ]
+  %off = phi i64 [ %off.next, %for.body ], [ 32, %outer ]
+  %ret.0 = phi i32 [ %ret.4, %for.body ], [ 0, %outer ]
+  %p0 = getelementptr inbounds nuw i32, ptr %p0.load, i64 %off
+  %val0 = load i32, ptr %p0, align 4
+  %ret.1 = add nsw i32 %val0, %ret.0
+  %p1 = getelementptr inbounds nuw i32, ptr %p1.load, i64 %off
+  %val1 = load i32, ptr %p1, align 4
+  %ret.2 = add nsw i32 %val1, %ret.1
+  %p2 = getelementptr inbounds nuw i32, ptr %p2.load, i64 %off
+  %val2 = load i32, ptr %p2, align 4
+  %ret.3 = add nsw i32 %val2, %ret.2
+  %p3 = getelementptr inbounds nuw i32, ptr %p3.load, i64 %off
+  %val3 = load i32, ptr %p3, align 4
+  %ret.4 = add nsw i32 %val3, %ret.3
+  %iv.next = add nuw nsw i64 %iv, 1
+  %off.next = add nuw nsw i64 %off, 1
+  %sub = sub i64 %n, %iv
+  %exitcond = icmp ult i64 %sub, 1
+  br i1 %exitcond, label %outer.latch, label %for.body
+
+outer.latch:
+  %p0.last = getelementptr inbounds nuw i32, ptr %p0.load, i64 %off.next
+  store ptr %p0.last, ptr %p, align 8
+  %p1.last = getelementptr inbounds nuw i32, ptr %p1.load, i64 %off.next
+  store ptr %p1.last, ptr %arrayidx1, align 8
+  %p2.last = getelementptr inbounds nuw i32, ptr %p2.load, i64 %off.next
+  store ptr %p2.last, ptr %arrayidx2, align 8
+  %p3.last = getelementptr inbounds nuw i32, ptr %p3.load, i64 %off.next
+  store ptr %p3.last, ptr %arrayidx3, align 8
+  %cmp = icmp eq i64 %iv, %n
+  store i1 %cmp, ptr %out
+  br i1 %c, label %outer, label %exit
+
+exit:
+  ret void
 }
