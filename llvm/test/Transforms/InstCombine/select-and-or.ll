@@ -1468,6 +1468,72 @@ define i8 @test_logical_commuted_and_ne_a_b(i1 %other_cond, i8 %a, i8 %b)  {
 !0 = !{!"function_entry_count", i64 1000}
 !1 = !{!"branch_weights", i32 2, i32 3}
 !2 = !{!"branch_weights", i32 3, i32 2}
+
+define i1 @logical_and_phi_incoming_used_by_incoming_block_branch(i32 noundef %x, i32 noundef %y, i1 %b, i1 %c, i1 %d) {
+; CHECK-LABEL: @logical_and_phi_incoming_used_by_incoming_block_branch(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[V:%.*]] = icmp samesign ult i32 [[X:%.*]], [[Y:%.*]]
+; CHECK-NEXT:    call void @use(i1 [[V]])
+; CHECK-NEXT:    br i1 [[B:%.*]], label [[BB:%.*]], label [[OTHER:%.*]]
+; CHECK:       bb:
+; CHECK-NEXT:    [[A:%.*]] = and i1 [[V]], [[D:%.*]]
+; CHECK-NEXT:    br i1 [[A]], label [[EXIT:%.*]], label [[OTHER]]
+; CHECK:       other:
+; CHECK-NEXT:    br label [[EXIT]]
+; CHECK:       exit:
+; CHECK-NEXT:    [[P:%.*]] = phi i1 [ [[V]], [[BB]] ], [ false, [[OTHER]] ]
+; CHECK-NEXT:    [[S:%.*]] = and i1 [[C:%.*]], [[P]]
+; CHECK-NEXT:    ret i1 [[S]]
+;
+entry:
+  %v = icmp samesign ult i32 %x, %y
+  call void @use(i1 %v)
+  br i1 %b, label %bb, label %other
+
+bb:
+  %a = and i1 %v, %d
+  br i1 %a, label %exit, label %other
+
+other:
+  br label %exit
+
+exit:
+  %p = phi i1 [ %v, %bb ], [ false, %other ]
+  %s = select i1 %c, i1 %p, i1 false
+  ret i1 %s
+}
+
+define i1 @logical_and_phi_incoming_not_used_by_incoming_block_branch(i32 noundef %x, i32 noundef %y, i1 %b, i1 %c, i1 %d) {
+; CHECK-LABEL: @logical_and_phi_incoming_not_used_by_incoming_block_branch(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[V:%.*]] = icmp samesign ult i32 [[X:%.*]], [[Y:%.*]]
+; CHECK-NEXT:    call void @use(i1 [[V]])
+; CHECK-NEXT:    br i1 [[B:%.*]], label [[BB:%.*]], label [[OTHER:%.*]]
+; CHECK:       bb:
+; CHECK-NEXT:    br i1 [[D:%.*]], label [[EXIT:%.*]], label [[OTHER]]
+; CHECK:       other:
+; CHECK-NEXT:    br label [[EXIT]]
+; CHECK:       exit:
+; CHECK-NEXT:    [[P:%.*]] = phi i1 [ [[V]], [[BB]] ], [ false, [[OTHER]] ]
+; CHECK-NEXT:    [[S:%.*]] = select i1 [[C:%.*]], i1 [[P]], i1 false
+; CHECK-NEXT:    ret i1 [[S]]
+;
+entry:
+  %v = icmp samesign ult i32 %x, %y
+  call void @use(i1 %v)
+  br i1 %b, label %bb, label %other
+
+bb:
+  br i1 %d, label %exit, label %other
+
+other:
+  br label %exit
+
+exit:
+  %p = phi i1 [ %v, %bb ], [ false, %other ]
+  %s = select i1 %c, i1 %p, i1 false
+  ret i1 %s
+}
 ;.
 ; CHECK: attributes #[[ATTR0:[0-9]+]] = { nocallback nocreateundeforpoison nofree nosync nounwind speculatable willreturn memory(none) }
 ; CHECK: attributes #[[ATTR1:[0-9]+]] = { nocallback nofree nosync nounwind speculatable willreturn memory(none) }

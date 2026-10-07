@@ -240,3 +240,154 @@ if.exit:
   %ret.fr = freeze float %ret
   ret float %ret.fr
 }
+
+define i32 @incoming_used_by_incoming_block_branch(i32 noundef %x, i32 noundef %n) {
+; CHECK-LABEL: @incoming_used_by_incoming_block_branch(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[ADD:%.*]] = add nsw i32 [[X:%.*]], 1
+; CHECK-NEXT:    [[CMP:%.*]] = icmp slt i32 [[ADD]], [[N:%.*]]
+; CHECK-NEXT:    br i1 [[CMP]], label [[EXIT:%.*]], label [[OTHER:%.*]]
+; CHECK:       other:
+; CHECK-NEXT:    br label [[EXIT]]
+; CHECK:       exit:
+; CHECK-NEXT:    [[P:%.*]] = phi i32 [ [[ADD]], [[ENTRY:%.*]] ], [ 0, [[OTHER]] ]
+; CHECK-NEXT:    ret i32 [[P]]
+;
+entry:
+  %add = add nsw i32 %x, 1
+  %cmp = icmp slt i32 %add, %n
+  br i1 %cmp, label %exit, label %other
+
+other:
+  br label %exit
+
+exit:
+  %p = phi i32 [ %add, %entry ], [ 0, %other ]
+  %p.fr = freeze i32 %p
+  ret i32 %p.fr
+}
+
+define i32 @incoming_used_by_incoming_block_branch_maybe_undef(i32 %x, i32 noundef %n) {
+; CHECK-LABEL: @incoming_used_by_incoming_block_branch_maybe_undef(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[AND:%.*]] = and i32 [[X:%.*]], 1
+; CHECK-NEXT:    [[CMP:%.*]] = icmp slt i32 [[AND]], [[N:%.*]]
+; CHECK-NEXT:    br i1 [[CMP]], label [[EXIT:%.*]], label [[OTHER:%.*]]
+; CHECK:       other:
+; CHECK-NEXT:    br label [[EXIT]]
+; CHECK:       exit:
+; CHECK-NEXT:    [[P:%.*]] = phi i32 [ [[AND]], [[ENTRY:%.*]] ], [ 0, [[OTHER]] ]
+; CHECK-NEXT:    [[P_FR:%.*]] = freeze i32 [[P]]
+; CHECK-NEXT:    ret i32 [[P_FR]]
+;
+entry:
+  %and = and i32 %x, 1
+  %cmp = icmp slt i32 %and, %n
+  br i1 %cmp, label %exit, label %other
+
+other:
+  br label %exit
+
+exit:
+  %p = phi i32 [ %and, %entry ], [ 0, %other ]
+  %p.fr = freeze i32 %p
+  ret i32 %p.fr
+}
+
+define i32 @incoming_not_used_by_incoming_block_branch(i32 noundef %x, i32 noundef %n, i1 %c) {
+; CHECK-LABEL: @incoming_not_used_by_incoming_block_branch(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[ADD:%.*]] = add nsw i32 [[X:%.*]], 1
+; CHECK-NEXT:    br i1 [[C:%.*]], label [[OTHER:%.*]], label [[EXIT:%.*]]
+; CHECK:       other:
+; CHECK-NEXT:    [[CMP:%.*]] = icmp slt i32 [[ADD]], [[N:%.*]]
+; CHECK-NEXT:    br i1 [[CMP]], label [[EXIT]], label [[RET:%.*]]
+; CHECK:       exit:
+; CHECK-NEXT:    [[P:%.*]] = phi i32 [ [[ADD]], [[ENTRY:%.*]] ], [ 0, [[OTHER]] ]
+; CHECK-NEXT:    [[P_FR:%.*]] = freeze i32 [[P]]
+; CHECK-NEXT:    ret i32 [[P_FR]]
+; CHECK:       ret:
+; CHECK-NEXT:    ret i32 0
+;
+entry:
+  %add = add nsw i32 %x, 1
+  br i1 %c, label %other, label %exit
+
+other:
+  %cmp = icmp slt i32 %add, %n
+  br i1 %cmp, label %exit, label %ret
+
+exit:
+  %p = phi i32 [ %add, %entry ], [ 0, %other ]
+  %p.fr = freeze i32 %p
+  ret i32 %p.fr
+
+ret:
+  ret i32 0
+}
+
+define i32 @incoming_used_by_incoming_block_switch(i32 noundef %x) {
+; CHECK-LABEL: @incoming_used_by_incoming_block_switch(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[ADD:%.*]] = add nsw i32 [[X:%.*]], 1
+; CHECK-NEXT:    [[MUL:%.*]] = mul i32 [[ADD]], 3
+; CHECK-NEXT:    switch i32 [[MUL]], label [[OTHER:%.*]] [
+; CHECK-NEXT:      i32 3, label [[EXIT:%.*]]
+; CHECK-NEXT:      i32 5, label [[RET:%.*]]
+; CHECK-NEXT:    ]
+; CHECK:       other:
+; CHECK-NEXT:    br label [[EXIT]]
+; CHECK:       exit:
+; CHECK-NEXT:    [[P:%.*]] = phi i32 [ [[ADD]], [[ENTRY:%.*]] ], [ 0, [[OTHER]] ]
+; CHECK-NEXT:    ret i32 [[P]]
+; CHECK:       ret:
+; CHECK-NEXT:    ret i32 0
+;
+entry:
+  %add = add nsw i32 %x, 1
+  %mul = mul i32 %add, 3
+  switch i32 %mul, label %other [
+  i32 3, label %exit
+  i32 5, label %ret
+  ]
+
+other:
+  br label %exit
+
+exit:
+  %p = phi i32 [ %add, %entry ], [ 0, %other ]
+  %p.fr = freeze i32 %p
+  ret i32 %p.fr
+
+ret:
+  ret i32 0
+}
+
+define i32 @incoming_used_by_incoming_block_branch_select_arm(i32 noundef %x, i32 noundef %y, i1 noundef %c) {
+; CHECK-LABEL: @incoming_used_by_incoming_block_branch_select_arm(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[ADD:%.*]] = add nsw i32 [[X:%.*]], 1
+; CHECK-NEXT:    [[SEL:%.*]] = select i1 [[C:%.*]], i32 [[ADD]], i32 [[Y:%.*]]
+; CHECK-NEXT:    [[CMP:%.*]] = icmp eq i32 [[SEL]], 7
+; CHECK-NEXT:    br i1 [[CMP]], label [[EXIT:%.*]], label [[OTHER:%.*]]
+; CHECK:       other:
+; CHECK-NEXT:    br label [[EXIT]]
+; CHECK:       exit:
+; CHECK-NEXT:    [[P:%.*]] = phi i32 [ [[ADD]], [[ENTRY:%.*]] ], [ 0, [[OTHER]] ]
+; CHECK-NEXT:    [[P_FR:%.*]] = freeze i32 [[P]]
+; CHECK-NEXT:    ret i32 [[P_FR]]
+;
+entry:
+  %add = add nsw i32 %x, 1
+  %sel = select i1 %c, i32 %add, i32 %y
+  %cmp = icmp eq i32 %sel, 7
+  br i1 %cmp, label %exit, label %other
+
+other:
+  br label %exit
+
+exit:
+  %p = phi i32 [ %add, %entry ], [ 0, %other ]
+  %p.fr = freeze i32 %p
+  ret i32 %p.fr
+}

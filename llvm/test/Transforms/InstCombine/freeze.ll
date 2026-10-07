@@ -1526,7 +1526,7 @@ define void @fold_phi_invoke_noundef_start_value(i32 %n) personality ptr undef {
 ; CHECK-NEXT:            to label %[[LOOP:.*]] unwind label %[[UNWIND:.*]]
 ; CHECK:       [[LOOP]]:
 ; CHECK-NEXT:    [[I:%.*]] = phi i32 [ [[INIT]], %[[ENTRY]] ], [ [[I_NEXT:%.*]], %[[LOOP]] ]
-; CHECK-NEXT:    [[I_NEXT]] = add i32 [[I]], 1
+; CHECK-NEXT:    [[I_NEXT]] = add nuw nsw i32 [[I]], 1
 ; CHECK-NEXT:    [[COND:%.*]] = icmp eq i32 [[I_NEXT]], [[N]]
 ; CHECK-NEXT:    br i1 [[COND]], label %[[LOOP]], label %[[EXIT:.*]]
 ; CHECK:       [[UNWIND]]:
@@ -1545,6 +1545,43 @@ loop:
   %i.fr = freeze i32 %i
   %i.next = add nsw nuw i32 %i.fr, 1
   %cond = icmp eq i32 %i.next, %n
+  br i1 %cond, label %loop, label %exit
+
+unwind:
+  landingpad i8 cleanup
+  unreachable
+
+exit:
+  ret void
+}
+
+define void @fold_phi_invoke_noundef_start_value_exit_cond_on_phi(i32 %n) personality ptr undef {
+; CHECK-LABEL: define void @fold_phi_invoke_noundef_start_value_exit_cond_on_phi(
+; CHECK-SAME: i32 [[N:%.*]]) personality ptr undef {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[INIT:%.*]] = invoke noundef i32 @get_i32()
+; CHECK-NEXT:            to label %[[LOOP:.*]] unwind label %[[UNWIND:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[I:%.*]] = phi i32 [ [[INIT]], %[[ENTRY]] ], [ [[I_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[I_NEXT]] = add i32 [[I]], 1
+; CHECK-NEXT:    [[COND:%.*]] = icmp eq i32 [[I]], [[N]]
+; CHECK-NEXT:    br i1 [[COND]], label %[[LOOP]], label %[[EXIT:.*]]
+; CHECK:       [[UNWIND]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = landingpad i8
+; CHECK-NEXT:            cleanup
+; CHECK-NEXT:    unreachable
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  %init = invoke noundef i32 @get_i32()
+  to label %loop unwind label %unwind
+
+loop:
+  %i = phi i32 [ %init, %entry ], [ %i.next, %loop ]
+  %i.fr = freeze i32 %i
+  %i.next = add nsw nuw i32 %i.fr, 1
+  %cond = icmp eq i32 %i, %n
   br i1 %cond, label %loop, label %exit
 
 unwind:

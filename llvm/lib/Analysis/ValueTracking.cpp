@@ -8203,6 +8203,29 @@ bool llvm::impliesPoison(const Value *ValAssumedPoison, const Value *V) {
 
 static bool programUndefinedIfUndefOrPoison(const Value *V, bool PoisonOnly);
 
+static bool terminatorRequiresWellDefined(const Value *V,
+                                          const Instruction *TI,
+                                          UndefPoisonKind Kind) {
+  Value *Cond = nullptr;
+  if (auto *BI = dyn_cast_or_null<CondBrInst>(TI))
+    Cond = BI->getCondition();
+  else if (auto *SI = dyn_cast_or_null<SwitchInst>(TI))
+    Cond = SI->getCondition();
+
+  if (!Cond)
+    return false;
+  if (Cond == V)
+    return true;
+  if (!includesUndef(Kind) && isa<Operator>(Cond)) {
+    // For poison, we can analyze further
+    auto *Opr = cast<Operator>(Cond);
+    return any_of(Opr->operands(), [V](const Use &U) {
+      return V == U && propagatesPoison(U);
+    });
+  }
+  return false;
+}
+
 static bool isGuaranteedNotToBeUndefOrPoison(
     const Value *V, AssumptionCache *AC, const Instruction *CtxI,
     const DominatorTree *DT, unsigned Depth, UndefPoisonKind Kind) {
@@ -8285,8 +8308,16 @@ static bool isGuaranteedNotToBeUndefOrPoison(
           if (PN == PN->getIncomingValue(i))
             continue;
           auto *TI = PN->getIncomingBlock(i)->getTerminator();
+          UndefPoisonKind IncKind = Kind;
+          if (includesPoison(Kind) &&
+              terminatorRequiresWellDefined(PN->getIncomingValue(i), TI,
+                                            UndefPoisonKind::PoisonOnly)) {
+            if (!includesUndef(Kind))
+              continue;
+            IncKind = UndefPoisonKind::UndefOnly;
+          }
           if (!isGuaranteedNotToBeUndefOrPoison(PN->getIncomingValue(i), AC, TI,
-                                                DT, Depth + 1, Kind)) {
+                                                DT, Depth + 1, IncKind)) {
             IsWellDefined = false;
             break;
           }
@@ -8331,27 +8362,9 @@ static bool isGuaranteedNotToBeUndefOrPoison(
   // if what we are checking for includes undef and the value is not an integer.
   if (!includesUndef(Kind) || V->getType()->isIntegerTy())
     while (Dominator) {
-      auto *TI = Dominator->getBlock()->getTerminatorOrNull();
-
-      Value *Cond = nullptr;
-      if (auto BI = dyn_cast_or_null<CondBrInst>(TI)) {
-        Cond = BI->getCondition();
-      } else if (auto SI = dyn_cast_or_null<SwitchInst>(TI)) {
-        Cond = SI->getCondition();
-      }
-
-      if (Cond) {
-        if (Cond == V)
-          return true;
-        else if (!includesUndef(Kind) && isa<Operator>(Cond)) {
-          // For poison, we can analyze further
-          auto *Opr = cast<Operator>(Cond);
-          if (any_of(Opr->operands(), [V](const Use &U) {
-                return V == U && propagatesPoison(U);
-              }))
-            return true;
-        }
-      }
+      if (terminatorRequiresWellDefined(
+              V, Dominator->getBlock()->getTerminatorOrNull(), Kind))
+        return true;
 
       Dominator = Dominator->getIDom();
     }
