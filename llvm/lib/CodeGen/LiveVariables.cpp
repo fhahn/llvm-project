@@ -229,7 +229,7 @@ void LiveVariables::HandlePhysRegKill(Register Reg, MachineInstr *MI) {
   }
 }
 
-void LiveVariables::HandleRegMask(const MachineOperand &MO, unsigned NumRegs) {
+void LiveVariables::HandleRegMask(const uint32_t *Mask, unsigned NumRegs) {
   // Call HandlePhysRegKill() for all live registers clobbered by Mask.
   // Clobbered registers are always dead, sp there is no need to use
   // HandlePhysRegDef().
@@ -238,14 +238,14 @@ void LiveVariables::HandleRegMask(const MachineOperand &MO, unsigned NumRegs) {
     if (!PhysRegDef[Reg] && !PhysRegUse[Reg])
       continue;
     // Skip mask-preserved regs.
-    if (!MO.clobbersPhysReg(Reg))
+    if (!MachineOperand::clobbersPhysReg(Mask, Reg))
       continue;
     // Kill the largest clobbered super-register.
     // This avoids needless implicit operands.
     unsigned Super = Reg;
     for (MCPhysReg SR : TRI->superregs(Reg))
       if (SR < NumRegs && (PhysRegDef[SR] || PhysRegUse[SR]) &&
-          MO.clobbersPhysReg(SR))
+          MachineOperand::clobbersPhysReg(Mask, SR))
         Super = SR;
     HandlePhysRegKill(Super, nullptr);
   }
@@ -328,7 +328,7 @@ void LiveVariables::runOnInstr(MachineInstr &MI, unsigned NumRegs) {
 
   // Process all masked registers. (Call clobbers).
   for (unsigned Mask : RegMasks)
-    HandleRegMask(MI.getOperand(Mask), NumRegs);
+    HandleRegMask(MI.getOperand(Mask).getRegMask(), NumRegs);
 
   // Process all defs.
   for (Register MOReg : DefRegs)

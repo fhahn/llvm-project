@@ -66,7 +66,9 @@ class LiveVariables {
   void HandlePhysRegKill(Register Reg, MachineInstr *MI);
 
   /// HandleRegMask - Call HandlePhysRegKill for all registers clobbered by Mask.
-  void HandleRegMask(const MachineOperand &, unsigned);
+  /// This takes the mask instead of its operand, because HandlePhysRegKill may
+  /// add operands to the instruction holding it.
+  void HandleRegMask(const uint32_t *Mask, unsigned NumRegs);
 
   void HandlePhysRegUse(Register Reg, MachineInstr &MI);
   void HandlePhysRegDef(Register Reg, MachineInstr *MI);
