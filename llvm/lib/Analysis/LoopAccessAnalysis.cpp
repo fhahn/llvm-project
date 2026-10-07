@@ -1751,16 +1751,7 @@ public:
 
   /// Initial processing of memory accesses determined that we need to
   /// perform dependency checking.
-  ///
-  /// Note that this can later be cleared if we retry memcheck analysis without
-  /// dependency checking (i.e. ShouldRetryWithRuntimeChecks).
   bool isDependencyCheckNeeded() const { return !CheckDeps.empty(); }
-
-  /// We decided that no dependence analysis would be used.  Reset the state.
-  void resetDepChecks(MemoryDepChecker &DepChecker) {
-    CheckDeps.clear();
-    DepChecker.clearDependences();
-  }
 
   ArrayRef<MemAccessInfo> getDependenciesToCheck() const { return CheckDeps; }
 
@@ -1829,11 +1820,6 @@ private:
 
   /// Initial processing of memory accesses determined that we may need
   /// to add memchecks.  Perform the analysis to determine the necessary checks.
-  ///
-  /// Note that, this is different from isDependencyCheckNeeded.  When we retry
-  /// memcheck analysis without dependency checking
-  /// (i.e. ShouldRetryWithRuntimeChecks), isDependencyCheckNeeded is
-  /// cleared while this remains set if we have potentially dependent accesses.
   bool IsRTCheckAnalysisNeeded = false;
 
   /// The SCEV predicate containing all the SCEV-related assumptions.
@@ -2281,7 +2267,6 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
       DepCands.eraseClass(DepChecker.getAccess(Dep.Destination));
     }
   } else {
-    CheckDeps.clear();
     DepCands = {};
   }
 
@@ -3790,8 +3775,9 @@ bool LoopAccessInfo::analyzeLoop(AAResults *AA, const LoopInfo *LI,
         return false;
       }
 
-      // Clear the dependency checks. They are no longer needed.
-      Accesses.resetDepChecks(*DepChecker);
+      // Unknown dependences are now covered by runtime checks. Preserve the
+      // other dependences, which may still constrain instruction reordering.
+      DepChecker->removeUnknownDependences();
 
       DepsAreSafe = true;
     }
