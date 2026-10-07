@@ -1672,9 +1672,9 @@ define i1 @neg_test_logical_and_trunc_nuw_no_noundef(i1 %c, i8 range(i8 0,2) %x)
   ret i1 %and
 }
 
-define i1 @neg_test_logical_and_trunc_nsw(i1 %c, i8 noundef range(i8 0,2) %x) {
+define i1 @neg_test_logical_and_trunc_nsw(i1 %c, i8 noundef range(i8 -1,2) %x) {
 ; CHECK-LABEL: @neg_test_logical_and_trunc_nsw(
-; CHECK-NEXT:    [[TRUNC:%.*]] = trunc nuw nsw i8 [[X:%.*]] to i1
+; CHECK-NEXT:    [[TRUNC:%.*]] = trunc nsw i8 [[X:%.*]] to i1
 ; CHECK-NEXT:    [[AND:%.*]] = select i1 [[C:%.*]], i1 [[TRUNC]], i1 false
 ; CHECK-NEXT:    ret i1 [[AND]]
 ;
@@ -1683,9 +1683,9 @@ define i1 @neg_test_logical_and_trunc_nsw(i1 %c, i8 noundef range(i8 0,2) %x) {
   ret i1 %and
 }
 
-define i1 @neg_test_logical_or_trunc_nsw(i1 %c, i8 noundef range(i8 0,2) %x) {
+define i1 @neg_test_logical_or_trunc_nsw(i1 %c, i8 noundef range(i8 -1,2) %x) {
 ; CHECK-LABEL: @neg_test_logical_or_trunc_nsw(
-; CHECK-NEXT:    [[TRUNC:%.*]] = trunc nuw nsw i8 [[X:%.*]] to i1
+; CHECK-NEXT:    [[TRUNC:%.*]] = trunc nsw i8 [[X:%.*]] to i1
 ; CHECK-NEXT:    [[OR:%.*]] = select i1 [[C:%.*]], i1 true, i1 [[TRUNC]]
 ; CHECK-NEXT:    ret i1 [[OR]]
 ;
@@ -1694,7 +1694,7 @@ define i1 @neg_test_logical_or_trunc_nsw(i1 %c, i8 noundef range(i8 0,2) %x) {
   ret i1 %or
 }
 
-define <2 x i1> @neg_test_logical_and_trunc_nuw_nsw_vec(<2 x i1> %c, <2 x i8> noundef range(i8 0,2) %x) {
+define <2 x i1> @neg_test_logical_and_trunc_nuw_nsw_vec(<2 x i1> %c, <2 x i8> noundef range(i8 -1,2) %x) {
 ; CHECK-LABEL: @neg_test_logical_and_trunc_nuw_nsw_vec(
 ; CHECK-NEXT:    [[TRUNC:%.*]] = trunc nuw nsw <2 x i8> [[X:%.*]] to <2 x i1>
 ; CHECK-NEXT:    [[AND:%.*]] = select <2 x i1> [[C:%.*]], <2 x i1> [[TRUNC]], <2 x i1> zeroinitializer

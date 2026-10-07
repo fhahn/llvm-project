@@ -516,7 +516,17 @@ Value *InstCombinerImpl::SimplifyDemandedUseBits(Instruction *I,
     if (I->getOpcode() == Instruction::ZExt && I->hasNonNeg() &&
         !InputKnown.isNegative())
       InputKnown.makeNonNegative();
+    bool SignBitsKnownZero = false, SignBitsKnownOne = false;
+    if (auto *TI = dyn_cast<TruncInst>(I); TI && TI->hasNoSignedWrap()) {
+      APInt SignBits = APInt::getBitsSetFrom(SrcBitWidth, BitWidth - 1);
+      SignBitsKnownZero = InputKnown.Zero.intersects(SignBits);
+      SignBitsKnownOne = InputKnown.One.intersects(SignBits);
+    }
     Known = InputKnown.zextOrTrunc(BitWidth);
+    if (SignBitsKnownZero && !Known.isNegative())
+      Known.makeNonNegative();
+    else if (SignBitsKnownOne && !Known.isNonNegative())
+      Known.makeNegative();
 
     break;
   }
