@@ -329,6 +329,9 @@ public:
     return {};
   }
 
+  /// Return the access location with program order index \p Idx.
+  MemAccessInfo getAccess(unsigned Idx) const { return AccessLocs[Idx]; }
+
   const Loop *getInnermostLoop() const { return InnermostLoop; }
 
   PredicatedScalarEvolution &getPSE() const { return PSE; }
@@ -372,8 +375,9 @@ private:
   /// Memory access instructions in program order.
   SmallVector<Instruction *, 16> InstMap;
 
-  /// The program order index to be used for the next instruction.
-  unsigned AccessIdx = 0;
+  /// Access locations in program order. For non-header phis, these are the
+  /// incoming pointers.
+  SmallVector<MemAccessInfo> AccessLocs;
 
   /// The smallest dependence distance in bytes in the loop. This may not be
   /// the same as the maximum number of bytes that are safe to operate on

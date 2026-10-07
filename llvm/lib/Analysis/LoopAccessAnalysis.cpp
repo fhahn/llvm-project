@@ -2277,10 +2277,8 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
                "Should only skip safe dependences");
         continue;
       }
-      Instruction *Src = Dep.getSource(DepChecker);
-      Instruction *Dst = Dep.getDestination(DepChecker);
-      DepCands.eraseClass({getPointerOperand(Src), Src->mayWriteToMemory()});
-      DepCands.eraseClass({getPointerOperand(Dst), Dst->mayWriteToMemory()});
+      DepCands.eraseClass(DepChecker.getAccess(Dep.Source));
+      DepCands.eraseClass(DepChecker.getAccess(Dep.Destination));
     }
   } else {
     CheckDeps.clear();
@@ -2746,18 +2744,18 @@ bool llvm::isConsecutiveAccess(Value *A, Value *B, const DataLayout &DL,
 void MemoryDepChecker::addAccess(StoreInst *SI) {
   visitPointers(SI->getPointerOperand(), *InnermostLoop,
                 [this, SI](Value *Ptr) {
-                  Accesses[MemAccessInfo(Ptr, true)].push_back(AccessIdx);
+                  Accesses[MemAccessInfo(Ptr, true)].push_back(InstMap.size());
                   InstMap.push_back(SI);
-                  ++AccessIdx;
+                  AccessLocs.emplace_back(Ptr, true);
                 });
 }
 
 void MemoryDepChecker::addAccess(LoadInst *LI) {
   visitPointers(LI->getPointerOperand(), *InnermostLoop,
                 [this, LI](Value *Ptr) {
-                  Accesses[MemAccessInfo(Ptr, false)].push_back(AccessIdx);
+                  Accesses[MemAccessInfo(Ptr, false)].push_back(InstMap.size());
                   InstMap.push_back(LI);
-                  ++AccessIdx;
+                  AccessLocs.emplace_back(Ptr, false);
                 });
 }
 
