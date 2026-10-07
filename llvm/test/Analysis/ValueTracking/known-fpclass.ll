@@ -54,3 +54,35 @@ define i1 @vector_reverse_fpclass_demanded_fail(<4 x double> %vec, double nofpcl
   %cmp = fcmp oge double %ele, 0.0
   ret i1 %cmp
 }
+
+define i1 @merge_single_incoming_phi_cycle_in_dead_code(i1 %c) {
+; CHECK-LABEL: @merge_single_incoming_phi_cycle_in_dead_code(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    br label [[EXIT:%.*]]
+; CHECK:       dead1:
+; CHECK-NEXT:    [[P1:%.*]] = phi double [ [[P2:%.*]], [[DEAD2:%.*]] ]
+; CHECK-NEXT:    br i1 [[C:%.*]], label [[DEAD2]], label [[EXIT]]
+; CHECK:       dead2:
+; CHECK-NEXT:    [[P2]] = phi double [ [[P1]], [[DEAD1:%.*]] ]
+; CHECK-NEXT:    br label [[DEAD1]]
+; CHECK:       exit:
+; CHECK-NEXT:    [[M:%.*]] = phi double [ [[P1]], [[DEAD1]] ], [ 1.000000e+00, [[ENTRY:%.*]] ]
+; CHECK-NEXT:    [[R:%.*]] = fcmp olt double [[M]], 0.000000e+00
+; CHECK-NEXT:    ret i1 [[R]]
+;
+entry:
+  br label %exit
+
+dead1:
+  %p1 = phi double [ %p2, %dead2 ]
+  br i1 %c, label %dead2, label %exit
+
+dead2:
+  %p2 = phi double [ %p1, %dead1 ]
+  br label %dead1
+
+exit:
+  %m = phi double [ %p1, %dead1 ], [ 1.0, %entry ]
+  %r = fcmp olt double %m, 0.0
+  ret i1 %r
+}
