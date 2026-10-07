@@ -545,3 +545,61 @@ for.body:                                         ; preds = %for.body.lr.ph, %fo
   %cmp = icmp slt i32 %add2, %n
   br i1 %cmp, label %for.body, label %for.cond.cleanup.loopexit
 }
+
+define i32 @zext_narrow_iv_to_i32_trunc_of_wide_iv(ptr %a, i16 %n) {
+; CHECK-LABEL: @zext_narrow_iv_to_i32_trunc_of_wide_iv(
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    [[N_ZERO:%.*]] = icmp eq i16 [[N:%.*]], 0
+; CHECK-NEXT:    br i1 [[N_ZERO]], label [[EXIT:%.*]], label [[LOOP_PREHEADER:%.*]]
+; CHECK:       loop.preheader:
+; CHECK-NEXT:    [[N_EXT:%.*]] = zext i16 [[N]] to i32
+; CHECK-NEXT:    [[BOUND:%.*]] = add i32 [[N_EXT]], -1
+; CHECK-NEXT:    [[WIDE_TRIP_COUNT:%.*]] = zext i32 [[BOUND]] to i64
+; CHECK-NEXT:    br label [[LOOP:%.*]]
+; CHECK:       loop:
+; CHECK-NEXT:    [[INDVARS_IV:%.*]] = phi i64 [ 0, [[LOOP_PREHEADER]] ], [ [[INDVARS_IV_NEXT:%.*]], [[LATCH:%.*]] ]
+; CHECK-NEXT:    [[TMP0:%.*]] = trunc nuw nsw i64 [[INDVARS_IV]] to i32
+; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp ne i64 [[INDVARS_IV]], [[WIDE_TRIP_COUNT]]
+; CHECK-NEXT:    br i1 [[EXITCOND]], label [[BODY:%.*]], label [[EXIT_LOOPEXIT:%.*]]
+; CHECK:       body:
+; CHECK-NEXT:    [[GEP:%.*]] = getelementptr i8, ptr [[A:%.*]], i64 [[INDVARS_IV]]
+; CHECK-NEXT:    [[V:%.*]] = load i8, ptr [[GEP]], align 1
+; CHECK-NEXT:    [[FOUND:%.*]] = icmp eq i8 [[V]], 0
+; CHECK-NEXT:    br i1 [[FOUND]], label [[EXIT_LOOPEXIT]], label [[LATCH]]
+; CHECK:       latch:
+; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add nuw nsw i64 [[INDVARS_IV]], 1
+; CHECK-NEXT:    br label [[LOOP]]
+; CHECK:       exit.loopexit:
+; CHECK-NEXT:    [[RES_PH:%.*]] = phi i32 [ [[TMP0]], [[BODY]] ], [ 0, [[LOOP]] ]
+; CHECK-NEXT:    br label [[EXIT]]
+; CHECK:       exit:
+; CHECK-NEXT:    [[RES:%.*]] = phi i32 [ 0, [[ENTRY:%.*]] ], [ [[RES_PH]], [[EXIT_LOOPEXIT]] ]
+; CHECK-NEXT:    ret i32 [[RES]]
+;
+entry:
+  %n.zero = icmp eq i16 %n, 0
+  br i1 %n.zero, label %exit, label %loop
+
+loop:
+  %iv = phi i16 [ %iv.next, %latch ], [ 0, %entry ]
+  %iv.ext = zext i16 %iv to i32
+  %n.ext = zext i16 %n to i32
+  %bound = add i32 %n.ext, -1
+  %c = icmp sgt i32 %bound, %iv.ext
+  br i1 %c, label %body, label %exit
+
+body:
+  %idx = zext i16 %iv to i64
+  %gep = getelementptr i8, ptr %a, i64 %idx
+  %v = load i8, ptr %gep, align 1
+  %found = icmp eq i8 %v, 0
+  br i1 %found, label %exit, label %latch
+
+latch:
+  %iv.next = add nuw i16 %iv, 1
+  br label %loop
+
+exit:
+  %res = phi i32 [ 0, %entry ], [ 0, %loop ], [ %iv.ext, %body ]
+  ret i32 %res
+}
