@@ -2066,8 +2066,12 @@ static void computeKnownBitsFromOperator(const Operator *I,
         // want to waste time spinning around in loops.
         // TODO: See if we can base recursion limiter on number of incoming phi
         // edges so we don't overly clamp analysis.
-        computeKnownBits(IncValue, DemandedElts, Known2, RecQ,
-                         MaxAnalysisRecursionDepth - 1);
+        unsigned IncDepth = MaxAnalysisRecursionDepth - 1;
+        if (auto *IncPhi = dyn_cast<PHINode>(IncValue);
+            IncPhi && IncPhi->getNumIncomingValues() == 1 &&
+            Depth + 1 < IncDepth)
+          --IncDepth;
+        computeKnownBits(IncValue, DemandedElts, Known2, RecQ, IncDepth);
 
         // See if we can further use a conditional branch into the phi
         // to help us determine the range of the value.
@@ -6452,9 +6456,14 @@ void computeKnownFPClass(const Value *V, const APInt &DemandedElts,
         // Recurse, but cap the recursion to two levels, because we don't want
         // to waste time spinning around in loops. We need at least depth 2 to
         // detect known sign bits.
+        unsigned IncDepth = PhiRecursionLimit;
+        if (auto *IncPhi = dyn_cast<PHINode>(IncValue);
+            IncPhi && IncPhi->getNumIncomingValues() == 1 &&
+            Depth + 1 < IncDepth)
+          --IncDepth;
         computeKnownFPClass(IncValue, DemandedElts, InterestedClasses, KnownSrc,
                             Q.getWithoutCondContext().getWithInstruction(CtxI),
-                            PhiRecursionLimit);
+                            IncDepth);
 
         if (First) {
           Known = KnownSrc;

@@ -233,6 +233,37 @@ define nofpclass(nan) float @compute_not_nofpclass(float noundef nofpclass(nan) 
   ret float %y
 }
 
+define nofpclass(ninf nsub nnorm nzero) double @merge_single_incoming_phi_fabs(double noundef %x, i1 noundef %c0) {
+; CHECK-LABEL: define noundef nofpclass(ninf nzero nsub nnorm) double @merge_single_incoming_phi_fabs(
+; CHECK-SAME: double noundef [[X:%.*]], i1 noundef [[C0:%.*]]) #[[ATTR0]] {
+; CHECK-NEXT:  entry:
+; CHECK-NEXT:    br i1 [[C0]], label [[E:%.*]], label [[MERGE:%.*]]
+; CHECK:       e:
+; CHECK-NEXT:    [[V:%.*]] = call double @llvm.fabs.f64(double [[X]])
+; CHECK-NEXT:    br label [[L:%.*]]
+; CHECK:       l:
+; CHECK-NEXT:    [[P1:%.*]] = phi double [ [[V]], [[E]] ]
+; CHECK-NEXT:    br label [[MERGE]]
+; CHECK:       merge:
+; CHECK-NEXT:    [[P:%.*]] = phi double [ [[P1]], [[L]] ], [ 1.000000e+00, [[ENTRY:%.*]] ]
+; CHECK-NEXT:    ret double [[P]]
+;
+entry:
+  br i1 %c0, label %e, label %merge
+
+e:
+  %v = call double @llvm.fabs.f64(double %x)
+  br label %l
+
+l:
+  %p1 = phi double [ %v, %e ]
+  br label %merge
+
+merge:
+  %p = phi double [ %p1, %l ], [ 1.0, %entry ]
+  ret double %p
+}
+
 define nofpclass(nan) float @definitely_nofpclass(float noundef nofpclass(nan) %x) {
 ; CHECK-LABEL: define noundef nofpclass(nan) float @definitely_nofpclass(
 ; CHECK-SAME: float noundef returned nofpclass(nan) [[X:%.*]]) #[[ATTR0]] {

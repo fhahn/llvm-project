@@ -71,4 +71,103 @@ exit:
 }
 
 
+define void @merge_lcssa_phi_of_nsw_iv(i32 %n, i1 %c0, i1 %c1) {
+; CHECK-LABEL: 'merge_lcssa_phi_of_nsw_iv'
+; CHECK-NEXT:  Classifying expressions for: @merge_lcssa_phi_of_nsw_iv
+; CHECK-NEXT:    %iv = phi i32 [ 0, %check ], [ %iv.next, %loop ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,2147483647) S: [0,2147483647) Exits: (-1 + (1 smax %n))<nsw> LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.next = add nuw nsw i32 %iv, 1
+; CHECK-NEXT:    --> {1,+,1}<nuw><nsw><%loop> U: [1,-2147483648) S: [1,-2147483648) Exits: (1 smax %n) LoopDispositions: { %loop: Computable }
+; CHECK-NEXT:    %iv.lcssa = phi i32 [ %iv, %loop ]
+; CHECK-NEXT:    --> {0,+,1}<nuw><nsw><%loop> U: [0,2147483647) S: [0,2147483647) --> (-1 + (1 smax %n))<nsw> U: [0,2147483647) S: [0,2147483647)
+; CHECK-NEXT:    %m = phi i32 [ 0, %entry ], [ 0, %check ], [ %iv.lcssa, %exit ]
+; CHECK-NEXT:    --> %m U: [0,-2147483648) S: [0,-2147483648)
+; CHECK-NEXT:  Determining loop execution counts for: @merge_lcssa_phi_of_nsw_iv
+; CHECK-NEXT:  Loop %loop: backedge-taken count is (-1 + (1 smax %n))<nsw>
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 2147483646
+; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (-1 + (1 smax %n))<nsw>
+; CHECK-NEXT:  Loop %loop: Trip multiple is 1
+;
+entry:
+  br i1 %c0, label %merge, label %check
+
+check:
+  br i1 %c1, label %merge, label %loop
+
+loop:
+  %iv = phi i32 [ 0, %check ], [ %iv.next, %loop ]
+  %iv.next = add nuw nsw i32 %iv, 1
+  %ec = icmp slt i32 %iv.next, %n
+  br i1 %ec, label %loop, label %exit
+
+exit:
+  %iv.lcssa = phi i32 [ %iv, %loop ]
+  br label %merge
+
+merge:
+  %m = phi i32 [ 0, %entry ], [ 0, %check ], [ %iv.lcssa, %exit ]
+  ret void
+}
+
+define void @merge_single_incoming_phi_edge_cond(ptr %q, i1 %c0) {
+; CHECK-LABEL: 'merge_single_incoming_phi_edge_cond'
+; CHECK-NEXT:  Classifying expressions for: @merge_single_incoming_phi_edge_cond
+; CHECK-NEXT:    %v = load i8, ptr %q, align 1
+; CHECK-NEXT:    --> %v U: full-set S: full-set
+; CHECK-NEXT:    %p1 = phi i8 [ %v, %e ]
+; CHECK-NEXT:    --> %v U: full-set S: full-set
+; CHECK-NEXT:    %p = phi i8 [ %p1, %l ], [ 0, %entry ]
+; CHECK-NEXT:    --> %p U: [0,16) S: [0,16)
+; CHECK-NEXT:  Determining loop execution counts for: @merge_single_incoming_phi_edge_cond
+;
+entry:
+  br i1 %c0, label %e, label %merge
+
+e:
+  %v = load i8, ptr %q
+  br label %l
+
+l:
+  %p1 = phi i8 [ %v, %e ]
+  %c = icmp ult i8 %p1, 16
+  br i1 %c, label %merge, label %other
+
+other:
+  ret void
+
+merge:
+  %p = phi i8 [ %p1, %l ], [ 0, %entry ]
+  ret void
+}
+
+define void @merge_single_incoming_phi_cycle_in_dead_code(i32 %a, i1 %c) {
+; CHECK-LABEL: 'merge_single_incoming_phi_cycle_in_dead_code'
+; CHECK-NEXT:  Classifying expressions for: @merge_single_incoming_phi_cycle_in_dead_code
+; CHECK-NEXT:    %p1 = phi i32 [ %p2, %dead2 ]
+; CHECK-NEXT:    --> poison U: full-set S: full-set
+; CHECK-NEXT:    %p2 = phi i32 [ %p1, %dead1 ]
+; CHECK-NEXT:    --> poison U: full-set S: full-set
+; CHECK-NEXT:    %m = phi i32 [ %p1, %dead1 ], [ 0, %entry ], [ %a, %other ]
+; CHECK-NEXT:    --> %m U: full-set S: full-set
+; CHECK-NEXT:  Determining loop execution counts for: @merge_single_incoming_phi_cycle_in_dead_code
+;
+entry:
+  br i1 %c, label %exit, label %other
+
+other:
+  br label %exit
+
+dead1:
+  %p1 = phi i32 [ %p2, %dead2 ]
+  br i1 %c, label %dead2, label %exit
+
+dead2:
+  %p2 = phi i32 [ %p1, %dead1 ]
+  br label %dead1
+
+exit:
+  %m = phi i32 [ %p1, %dead1 ], [ 0, %entry ], [ %a, %other ]
+  ret void
+}
+
 !0 = !{i32 0, i32 2147483647}
