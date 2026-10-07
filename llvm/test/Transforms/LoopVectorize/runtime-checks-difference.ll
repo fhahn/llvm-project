@@ -663,6 +663,42 @@ exit:
   ret void
 }
 
+define void @use_diff_checks_when_retrying_with_load_and_store_one_step_apart(ptr %a, i64 %offset, i64 %n) {
+; CHECK-LABEL: define void @use_diff_checks_when_retrying_with_load_and_store_one_step_apart(
+; CHECK-SAME: ptr [[A:%.*]], i64 [[OFFSET:%.*]], i64 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
+; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[OFFSET]], 2
+; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], 1
+; CHECK-NEXT:    [[DIFF_CHECK:%.*]] = icmp ult i64 [[TMP1]], 15
+; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[TMP0]], -4
+; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[TMP2]], 1
+; CHECK-NEXT:    [[DIFF_CHECK1:%.*]] = icmp ult i64 [[TMP3]], 15
+; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[DIFF_CHECK]], [[DIFF_CHECK1]]
+; CHECK-NEXT:    br i1 [[CONFLICT_RDX]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
+  %gep.a.1 = getelementptr inbounds i32, ptr %gep.a, i64 1
+  %l.a.1 = load i32, ptr %gep.a.1, align 4
+  store i32 %l.a.1, ptr %gep.a, align 4
+  %iv.off = add nsw i64 %iv, %offset
+  %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.off
+  store i32 0, ptr %gep.a.off, align 4
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, %n
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
 
 define void @remove_diff_checks_via_guards(i32 %x, i32 %y, ptr %A) {
 ; CHECK-LABEL: define void @remove_diff_checks_via_guards(
