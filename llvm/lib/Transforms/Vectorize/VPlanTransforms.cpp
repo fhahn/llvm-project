@@ -1263,6 +1263,9 @@ static VPValue *simplifyRecipe(VPlan &Plan, VPSingleDefRecipe *Def) {
   if (match(Def, m_c_Mul(m_VPValue(), m_ZeroInt())))
     return Plan.getZero(Def->getScalarType());
 
+  if (match(Def, m_SpecificICmp(CmpInst::ICMP_ULT, m_VPValue(), m_ZeroInt())))
+    return Plan.getFalse();
+
   // A bitcast to the same type is a no-op.
   if (match(Def, m_BitCast(m_VPValue(A))) &&
       Def->getScalarType() == A->getScalarType())
