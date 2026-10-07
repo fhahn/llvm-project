@@ -1907,7 +1907,7 @@ Instruction *WidenIV::widenIVUse(WidenIV::NarrowIVDefUse DU,
         // The cast isn't as wide as the IV, so insert a Trunc.
         IRBuilder<> Builder(DU.NarrowUse);
         NewDef = Builder.CreateTrunc(DU.WideDef, DU.NarrowUse->getType(), "",
-                                     CanWidenByZExt, CanWidenBySExt);
+                                     CanWidenByZExt, /*IsNSW=*/true);
       }
       else {
         // A wider extend was hidden behind a narrower one. This may induce
