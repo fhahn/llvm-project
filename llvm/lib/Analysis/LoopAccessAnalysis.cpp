@@ -2279,10 +2279,8 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
                "Should only skip safe dependences");
         continue;
       }
-      Instruction *Src = Dep.getSource(DepChecker);
-      Instruction *Dst = Dep.getDestination(DepChecker);
-      DepCands.eraseClass({getPointerOperand(Src), Src->mayWriteToMemory()});
-      DepCands.eraseClass({getPointerOperand(Dst), Dst->mayWriteToMemory()});
+      DepCands.eraseClass(DepChecker.getAccess(Dep.Source));
+      DepCands.eraseClass(DepChecker.getAccess(Dep.Destination));
     }
   } else {
     CheckDeps.clear();
@@ -2726,6 +2724,7 @@ void MemoryDepChecker::addAccess(StoreInst *SI) {
                 [this, SI](Value *Ptr) {
                   Accesses[MemAccessInfo(Ptr, true)].push_back(AccessIdx);
                   InstMap.push_back(SI);
+                  AccessLocs.emplace_back(Ptr, true);
                   ++AccessIdx;
                 });
 }
@@ -2735,6 +2734,7 @@ void MemoryDepChecker::addAccess(LoadInst *LI) {
                 [this, LI](Value *Ptr) {
                   Accesses[MemAccessInfo(Ptr, false)].push_back(AccessIdx);
                   InstMap.push_back(LI);
+                  AccessLocs.emplace_back(Ptr, false);
                   ++AccessIdx;
                 });
 }
