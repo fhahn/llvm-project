@@ -233,6 +233,7 @@ void LiveVariables::HandleRegMask(const uint32_t *Mask, unsigned NumRegs) {
   // Call HandlePhysRegKill() for all live registers clobbered by Mask.
   // Clobbered registers are always dead, sp there is no need to use
   // HandlePhysRegDef().
+  SmallSet<unsigned, 8> KilledUsedSupers;
   for (unsigned Reg : TrackedRegs.set_bits()) {
     // Skip dead regs.
     if (!PhysRegDef[Reg] && !PhysRegUse[Reg])
@@ -247,6 +248,16 @@ void LiveVariables::HandleRegMask(const uint32_t *Mask, unsigned NumRegs) {
       if (SR < NumRegs && (PhysRegDef[SR] || PhysRegUse[SR]) &&
           MachineOperand::clobbersPhysReg(Mask, SR))
         Super = SR;
+    // The live sub-registers of a clobbered Super typically select it again.
+    // If Super is used, HandlePhysRegKill() only marks the last use of Super
+    // or one of its sub-registers as a kill, which needs doing only once.
+    // Don't skip an unused Super: each call may add another implicit-def of a
+    // sub-register on targets whose sub-register lists are not topologically
+    // ordered, e.g. AArch64, ARM and RISC-V register tuples.
+    // TODO: Fix HandlePhysRegKill() adding duplicate implicit-defs, then skip
+    // unused supers as well.
+    if (PhysRegUse[Super] && !KilledUsedSupers.insert(Super).second)
+      continue;
     HandlePhysRegKill(Super, nullptr);
   }
 }
