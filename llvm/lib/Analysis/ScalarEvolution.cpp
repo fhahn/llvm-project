@@ -15379,25 +15379,10 @@ const SCEVAddRecExpr *ScalarEvolution::convertSCEVToAddRecWithPredicates(
   // Check if any of the transformed predicates is known to be false. In that
   // case, it doesn't make sense to convert to a predicated AddRec, as the
   // versioned loop will never execute.
-  for (const SCEVPredicate *Pred : TransformPreds) {
-    auto *WrapPred = dyn_cast<SCEVWrapPredicate>(Pred);
-    if (!WrapPred || WrapPred->getFlags() != SCEVWrapPredicate::IncrementNSSW)
-      continue;
-
-    const SCEVAddRecExpr *AddRecToCheck = WrapPred->getExpr();
-    const SCEV *ExitCount = getBackedgeTakenCount(AddRecToCheck->getLoop());
-    if (isa<SCEVCouldNotCompute>(ExitCount))
-      continue;
-
-    const SCEV *Step = AddRecToCheck->getStepRecurrence(*this);
-    if (!Step->isOne())
-      continue;
-
-    ExitCount = getTruncateOrSignExtend(ExitCount, Step->getType());
-    const SCEV *Add = getAddExpr(AddRecToCheck->getStart(), ExitCount);
-    if (isKnownPredicate(CmpInst::ICMP_SLT, Add, AddRecToCheck->getStart()))
-      return nullptr;
-  }
+  if (any_of(TransformPreds, [this](const SCEVPredicate *P) {
+        return isKnownWrapPredicate(*this, P) == false;
+      }))
+    return nullptr;
 
   // Since the transformation was successful, we can now transfer the SCEV
   // predicates.
