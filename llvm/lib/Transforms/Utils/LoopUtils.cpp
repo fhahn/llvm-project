@@ -2153,17 +2153,27 @@ static PointerBounds expandBounds(const RuntimeCheckingPtrGroup *CG,
       const SCEV *OuterExitCount = SE.getExitCount(OuterLoop, OuterLoopLatch);
       if (!isa<SCEVCouldNotCompute>(OuterExitCount) &&
           OuterExitCount->getType()->isIntegerTy()) {
-        const SCEV *NewHigh =
-            cast<SCEVAddRecExpr>(High)->evaluateAtIteration(OuterExitCount, SE);
-        if (!isa<SCEVCouldNotCompute>(NewHigh)) {
+        // With a negative stride, the range covered by the outer loop starts
+        // at Low in the last iteration and ends at High in the first one.
+        const SCEV *GuardedRecur = SE.applyLoopGuards(Recur, OuterLoop);
+        bool IsNegStride = SE.isKnownNegative(GuardedRecur);
+        const SCEV *NewLow, *NewHigh;
+        if (IsNegStride) {
+          NewLow = LowAR->evaluateAtIteration(OuterExitCount, SE);
+          NewHigh = HighAR->getStart();
+        } else {
+          NewLow = LowAR->getStart();
+          NewHigh = HighAR->evaluateAtIteration(OuterExitCount, SE);
+        }
+        if (!isa<SCEVCouldNotCompute>(NewLow) &&
+            !isa<SCEVCouldNotCompute>(NewHigh)) {
           LLVM_DEBUG(dbgs() << "LAA: Expanded RT check for range to include "
                                "outer loop in order to permit hoisting\n");
+          Low = NewLow;
           High = NewHigh;
-          Low = cast<SCEVAddRecExpr>(Low)->getStart();
           // If there is a possibility that the stride is negative then we have
           // to generate extra checks to ensure the stride is positive.
-          if (!SE.isKnownNonNegative(
-                  SE.applyLoopGuards(Recur, HighAR->getLoop()))) {
+          if (!IsNegStride && !SE.isKnownNonNegative(GuardedRecur)) {
             Stride = Recur;
             LLVM_DEBUG(dbgs() << "LAA: ... but need to check stride is "
                                  "positive: "
