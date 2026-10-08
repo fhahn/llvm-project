@@ -419,59 +419,57 @@ exit:
   ret void
 }
 
-; TODO: Should not try to create dead main vector loop.
 define void @trip_count_based_on_ptrtoint(i64 %x) "target-cpu"="apple-m1" {
 ; CHECK-LABEL: @trip_count_based_on_ptrtoint(
-; CHECK-NEXT:  iter.check:
+; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[PTR_START:%.*]] = inttoptr i64 [[X:%.*]] to ptr
 ; CHECK-NEXT:    [[ADD:%.*]] = add i64 [[X]], 40
 ; CHECK-NEXT:    [[PTR_END:%.*]] = inttoptr i64 [[ADD]] to ptr
-; CHECK-NEXT:    br i1 false, label [[VEC_EPILOG_SCALAR_PH:%.*]], label [[VECTOR_SCEVCHECK:%.*]]
-; CHECK:       vector.main.loop.iter.check:
-; CHECK-NEXT:    br i1 true, label [[VEC_EPILOG_PH:%.*]], label [[VECTOR_PH:%.*]]
+; CHECK-NEXT:    br label [[VECTOR_PH:%.*]]
 ; CHECK:       vector.ph:
-; CHECK-NEXT:    [[IND_END:%.*]] = getelementptr i8, ptr [[PTR_START]], i64 0
 ; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
 ; CHECK:       vector.body:
-; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[PRED_STORE_CONTINUE9:%.*]] ]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[INDEX]], 2
+; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[INDEX]], 3
+; CHECK-NEXT:    [[TMP3:%.*]] = icmp ule i64 [[INDEX]], 10
+; CHECK-NEXT:    [[TMP4:%.*]] = icmp ule i64 [[TMP0]], 10
+; CHECK-NEXT:    [[TMP5:%.*]] = icmp ule i64 [[TMP1]], 10
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp ule i64 [[TMP2]], 10
 ; CHECK-NEXT:    [[TMP7:%.*]] = shl i64 [[INDEX]], 2
+; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = add i64 [[TMP7]], 4
+; CHECK-NEXT:    [[TMP9:%.*]] = add i64 [[TMP7]], 8
+; CHECK-NEXT:    [[TMP10:%.*]] = add i64 [[TMP7]], 12
 ; CHECK-NEXT:    [[NEXT_GEP:%.*]] = getelementptr i8, ptr [[PTR_START]], i64 [[TMP7]]
-; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr i32, ptr [[NEXT_GEP]], i64 4
-; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr i32, ptr [[NEXT_GEP]], i64 8
-; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr i32, ptr [[NEXT_GEP]], i64 12
-; CHECK-NEXT:    store <4 x i32> zeroinitializer, ptr [[NEXT_GEP]], align 4
-; CHECK-NEXT:    store <4 x i32> zeroinitializer, ptr [[TMP8]], align 4
-; CHECK-NEXT:    store <4 x i32> zeroinitializer, ptr [[TMP9]], align 4
-; CHECK-NEXT:    store <4 x i32> zeroinitializer, ptr [[TMP10]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 16
-; CHECK-NEXT:    [[TMP11:%.*]] = icmp eq i64 [[INDEX_NEXT]], 0
+; CHECK-NEXT:    [[NEXT_GEP4:%.*]] = getelementptr i8, ptr [[PTR_START]], i64 [[OFFSET_IDX]]
+; CHECK-NEXT:    [[IV:%.*]] = getelementptr i8, ptr [[PTR_START]], i64 [[TMP9]]
+; CHECK-NEXT:    [[NEXT_GEP3:%.*]] = getelementptr i8, ptr [[PTR_START]], i64 [[TMP10]]
+; CHECK-NEXT:    br i1 [[TMP3]], label [[PRED_STORE_IF:%.*]], label [[LOOP:%.*]]
+; CHECK:       pred.store.if:
+; CHECK-NEXT:    store i32 0, ptr [[NEXT_GEP]], align 4
+; CHECK-NEXT:    br label [[LOOP]]
+; CHECK:       pred.store.continue:
+; CHECK-NEXT:    br i1 [[TMP4]], label [[PRED_STORE_IF4:%.*]], label [[PRED_STORE_CONTINUE5:%.*]]
+; CHECK:       pred.store.if4:
+; CHECK-NEXT:    store i32 0, ptr [[NEXT_GEP4]], align 4
+; CHECK-NEXT:    br label [[PRED_STORE_CONTINUE5]]
+; CHECK:       pred.store.continue5:
+; CHECK-NEXT:    br i1 [[TMP5]], label [[PRED_STORE_IF6:%.*]], label [[PRED_STORE_CONTINUE7:%.*]]
+; CHECK:       pred.store.if6:
+; CHECK-NEXT:    store i32 0, ptr [[IV]], align 4
+; CHECK-NEXT:    br label [[PRED_STORE_CONTINUE7]]
+; CHECK:       pred.store.continue7:
+; CHECK-NEXT:    br i1 [[TMP6]], label [[PRED_STORE_IF8:%.*]], label [[PRED_STORE_CONTINUE9]]
+; CHECK:       pred.store.if8:
+; CHECK-NEXT:    store i32 0, ptr [[NEXT_GEP3]], align 4
+; CHECK-NEXT:    br label [[PRED_STORE_CONTINUE9]]
+; CHECK:       pred.store.continue9:
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; CHECK-NEXT:    [[TMP11:%.*]] = icmp eq i64 [[INDEX_NEXT]], 12
 ; CHECK-NEXT:    br i1 [[TMP11]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP16:![0-9]+]]
 ; CHECK:       middle.block:
-; CHECK-NEXT:    br i1 false, label [[EXIT:%.*]], label [[VEC_EPILOG_ITER_CHECK:%.*]]
-; CHECK:       vec.epilog.iter.check:
-; CHECK-NEXT:    br i1 false, label [[VEC_EPILOG_SCALAR_PH]], label [[VEC_EPILOG_PH]], !prof [[PROF11]]
-; CHECK:       vec.epilog.ph:
-; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr i8, ptr [[PTR_START]], i64 32
-; CHECK-NEXT:    br label [[VEC_EPILOG_VECTOR_BODY:%.*]]
-; CHECK:       vec.epilog.vector.body:
-; CHECK-NEXT:    [[INDEX3:%.*]] = phi i64 [ 0, [[VEC_EPILOG_PH]] ], [ [[INDEX_NEXT5:%.*]], [[VEC_EPILOG_VECTOR_BODY]] ]
-; CHECK-NEXT:    [[OFFSET_IDX:%.*]] = shl i64 [[INDEX3]], 2
-; CHECK-NEXT:    [[NEXT_GEP4:%.*]] = getelementptr i8, ptr [[PTR_START]], i64 [[OFFSET_IDX]]
-; CHECK-NEXT:    store <4 x i32> zeroinitializer, ptr [[NEXT_GEP4]], align 4
-; CHECK-NEXT:    [[INDEX_NEXT5]] = add nuw i64 [[INDEX3]], 4
-; CHECK-NEXT:    [[TMP15:%.*]] = icmp eq i64 [[INDEX_NEXT5]], 8
-; CHECK-NEXT:    br i1 [[TMP15]], label [[VEC_EPILOG_MIDDLE_BLOCK:%.*]], label [[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP17:![0-9]+]]
-; CHECK:       vec.epilog.middle.block:
-; CHECK-NEXT:    br i1 false, label [[EXIT]], label [[VEC_EPILOG_SCALAR_PH]]
-; CHECK:       vec.epilog.scalar.ph:
-; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi ptr [ [[TMP14]], [[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[IND_END]], [[VEC_EPILOG_ITER_CHECK]] ], [ [[PTR_START]], [[ITER_CHECK:%.*]] ]
-; CHECK-NEXT:    br label [[LOOP:%.*]]
-; CHECK:       loop:
-; CHECK-NEXT:    [[IV:%.*]] = phi ptr [ [[BC_RESUME_VAL]], [[VEC_EPILOG_SCALAR_PH]] ], [ [[IV_NEXT:%.*]], [[LOOP]] ]
-; CHECK-NEXT:    store i32 0, ptr [[IV]], align 4
-; CHECK-NEXT:    [[IV_NEXT]] = getelementptr i8, ptr [[IV]], i64 4
-; CHECK-NEXT:    [[EC:%.*]] = icmp eq ptr [[IV]], [[PTR_END]]
-; CHECK-NEXT:    br i1 [[EC]], label [[EXIT]], label [[LOOP]], !llvm.loop [[LOOP18:![0-9]+]]
+; CHECK-NEXT:    br label [[EXIT:%.*]]
 ; CHECK:       exit:
 ; CHECK-NEXT:    ret void
 ;
