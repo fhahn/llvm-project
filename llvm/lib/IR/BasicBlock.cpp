@@ -417,7 +417,8 @@ bool BasicBlock::hasNPredecessorsOrMore(unsigned N) const {
 }
 
 const BasicBlock *BasicBlock::getSingleSuccessor() const {
-  const_succ_iterator SI = succ_begin(this), E = succ_end(this);
+  auto Succs = successors(this);
+  const_succ_iterator SI = Succs.begin(), E = Succs.end();
   if (SI == E) return nullptr; // no successors
   const BasicBlock *TheSucc = *SI;
   ++SI;
@@ -425,7 +426,8 @@ const BasicBlock *BasicBlock::getSingleSuccessor() const {
 }
 
 const BasicBlock *BasicBlock::getUniqueSuccessor() const {
-  const_succ_iterator SI = succ_begin(this), E = succ_end(this);
+  auto Succs = successors(this);
+  const_succ_iterator SI = Succs.begin(), E = Succs.end();
   if (SI == E) return nullptr; // No successors
   const BasicBlock *SuccBB = *SI;
   ++SI;
