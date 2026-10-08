@@ -306,3 +306,26 @@ loop:
 exit:
   ret void
 }
+
+define i64 @umax_umin_of_masks(i64 %n) {
+; CHECK-LABEL: 'umax_umin_of_masks'
+; CHECK-NEXT:  Classifying expressions for: @umax_umin_of_masks
+; CHECK-NEXT:    %lo6 = and i64 %n, 63
+; CHECK-NEXT:    --> (zext i6 (trunc i64 %n to i6) to i64) U: [0,64) S: [0,64)
+; CHECK-NEXT:    %lo8 = and i64 %n, 255
+; CHECK-NEXT:    --> (zext i8 (trunc i64 %n to i8) to i64) U: [0,256) S: [0,256)
+; CHECK-NEXT:    %max = call i64 @llvm.umax.i64(i64 %lo6, i64 %lo8)
+; CHECK-NEXT:    --> (zext i8 (trunc i64 %n to i8) to i64) U: [0,256) S: [0,256)
+; CHECK-NEXT:    %min = call i64 @llvm.umin.i64(i64 %lo8, i64 %lo6)
+; CHECK-NEXT:    --> (zext i6 (trunc i64 %n to i6) to i64) U: [0,64) S: [0,64)
+; CHECK-NEXT:    %r = add i64 %max, %min
+; CHECK-NEXT:    --> ((zext i6 (trunc i64 %n to i6) to i64) + (zext i8 (trunc i64 %n to i8) to i64)) U: [0,319) S: [0,319)
+; CHECK-NEXT:  Determining loop execution counts for: @umax_umin_of_masks
+;
+  %lo6 = and i64 %n, 63
+  %lo8 = and i64 %n, 255
+  %max = call i64 @llvm.umax.i64(i64 %lo6, i64 %lo8)
+  %min = call i64 @llvm.umin.i64(i64 %lo8, i64 %lo6)
+  %r = add i64 %max, %min
+  ret i64 %r
+}
