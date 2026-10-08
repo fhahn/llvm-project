@@ -4099,29 +4099,29 @@ struct MBBPriorityInfo {
 
 } // end anonymous namespace
 
-/// C-style comparator that sorts first based on the loop depth of the basic
-/// block (the unsigned), and then on the MBB number.
+/// Order blocks for coalescing: deeper loops first, then split critical edges,
+/// then blocks with more CFG edges, and finally by block number.
 ///
 /// EnableGlobalCopies assumes that the primary sort key is loop depth.
-static int compareMBBPriority(const MBBPriorityInfo *LHS,
-                              const MBBPriorityInfo *RHS) {
+static bool compareMBBPriority(const MBBPriorityInfo &LHS,
+                               const MBBPriorityInfo &RHS) {
   // Deeper loops first
-  if (LHS->Depth != RHS->Depth)
-    return LHS->Depth > RHS->Depth ? -1 : 1;
+  if (LHS.Depth != RHS.Depth)
+    return LHS.Depth > RHS.Depth;
 
   // Try to unsplit critical edges next.
-  if (LHS->IsSplit != RHS->IsSplit)
-    return LHS->IsSplit ? -1 : 1;
+  if (LHS.IsSplit != RHS.IsSplit)
+    return LHS.IsSplit;
 
   // Prefer blocks that are more connected in the CFG. This takes care of
   // the most difficult copies first while intervals are short.
-  unsigned cl = LHS->MBB->pred_size() + LHS->MBB->succ_size();
-  unsigned cr = RHS->MBB->pred_size() + RHS->MBB->succ_size();
+  unsigned cl = LHS.MBB->pred_size() + LHS.MBB->succ_size();
+  unsigned cr = RHS.MBB->pred_size() + RHS.MBB->succ_size();
   if (cl != cr)
-    return cl > cr ? -1 : 1;
+    return cl > cr;
 
   // As a last resort, sort by block number.
-  return LHS->MBB->getNumber() < RHS->MBB->getNumber() ? -1 : 1;
+  return LHS.MBB->getNumber() < RHS.MBB->getNumber();
 }
 
 /// \returns true if the given copy uses or defines a local live range.
@@ -4320,7 +4320,7 @@ void RegisterCoalescer::joinAllIntervals() {
     MBBs.push_back(MBBPriorityInfo(&MBB, Loops->getLoopDepth(&MBB),
                                    JoinSplitEdges && isSplitEdge(&MBB)));
   }
-  array_pod_sort(MBBs.begin(), MBBs.end(), compareMBBPriority);
+  llvm::sort(MBBs, compareMBBPriority);
 
   // Coalesce intervals in MBB priority order.
   unsigned CurrDepth = std::numeric_limits<unsigned>::max();

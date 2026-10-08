@@ -179,7 +179,8 @@ void SplitAnalysis::analyzeUses() {
     if (!MO.isUndef())
       UseSlots.push_back(LIS.getInstructionIndex(*MO.getParent()).getRegSlot());
 
-  array_pod_sort(UseSlots.begin(), UseSlots.end());
+  // This is hot: a comparator makes llvm::sort use std::sort rather than qsort.
+  llvm::sort(UseSlots, std::less<>());
 
   // Remove duplicates, keeping the smaller slot for each instruction.
   // That is what we want for early clobbers.
