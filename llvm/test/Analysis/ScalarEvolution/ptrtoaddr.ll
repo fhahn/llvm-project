@@ -158,3 +158,57 @@ define void @ptrtoaddr_nonintegral_stable_gep(ptr addrspace(3) %in, ptr %out) {
   store i64 %p, ptr %out
   ret void
 }
+
+define void @ptrtoaddr_of_inttoptr(i64 %x, ptr %out) {
+; CHECK-LABEL: 'ptrtoaddr_of_inttoptr'
+; CHECK-NEXT:  Classifying expressions for: @ptrtoaddr_of_inttoptr
+; CHECK-NEXT:    %p = inttoptr i64 %x to ptr
+; CHECK-NEXT:    --> %p U: full-set S: full-set
+; CHECK-NEXT:    %gep = getelementptr i8, ptr %p, i64 8
+; CHECK-NEXT:    --> (8 + %p) U: full-set S: full-set
+; CHECK-NEXT:    %a = ptrtoaddr ptr %gep to i64
+; CHECK-NEXT:    --> (8 + %x) U: full-set S: full-set
+; CHECK-NEXT:  Determining loop execution counts for: @ptrtoaddr_of_inttoptr
+;
+  %p = inttoptr i64 %x to ptr
+  %gep = getelementptr i8, ptr %p, i64 8
+  %a = ptrtoaddr ptr %gep to i64
+  store i64 %a, ptr %out
+  ret void
+}
+
+define void @ptrtoaddr_of_inttoptr_narrow(i32 %x, ptr %out) {
+; CHECK-LABEL: 'ptrtoaddr_of_inttoptr_narrow'
+; CHECK-NEXT:  Classifying expressions for: @ptrtoaddr_of_inttoptr_narrow
+; CHECK-NEXT:    %p = inttoptr i32 %x to ptr
+; CHECK-NEXT:    --> %p U: [0,4294967296) S: [0,4294967296)
+; CHECK-NEXT:    %a = ptrtoaddr ptr %p to i64
+; CHECK-NEXT:    --> (ptrtoaddr ptr %p to i64) U: [0,4294967296) S: [0,4294967296)
+; CHECK-NEXT:  Determining loop execution counts for: @ptrtoaddr_of_inttoptr_narrow
+;
+  %p = inttoptr i32 %x to ptr
+  %a = ptrtoaddr ptr %p to i64
+  store i64 %a, ptr %out
+  ret void
+}
+
+define void @ptrtoaddr_of_inttoptr_of_ptrtoint(ptr %in, ptr %out) {
+; CHECK-LABEL: 'ptrtoaddr_of_inttoptr_of_ptrtoint'
+; CHECK-NEXT:  Classifying expressions for: @ptrtoaddr_of_inttoptr_of_ptrtoint
+; CHECK-NEXT:    %i = ptrtoint ptr %in to i64
+; CHECK-NEXT:    --> %i U: full-set S: full-set
+; CHECK-NEXT:    %add = add i64 %i, 8
+; CHECK-NEXT:    --> (8 + %i) U: full-set S: full-set
+; CHECK-NEXT:    %p = inttoptr i64 %add to ptr
+; CHECK-NEXT:    --> %p U: full-set S: full-set
+; CHECK-NEXT:    %a = ptrtoaddr ptr %p to i64
+; CHECK-NEXT:    --> (8 + (ptrtoaddr ptr %in to i64)) U: full-set S: full-set
+; CHECK-NEXT:  Determining loop execution counts for: @ptrtoaddr_of_inttoptr_of_ptrtoint
+;
+  %i = ptrtoint ptr %in to i64
+  %add = add i64 %i, 8
+  %p = inttoptr i64 %add to ptr
+  %a = ptrtoaddr ptr %p to i64
+  store i64 %a, ptr %out
+  ret void
+}

@@ -1085,7 +1085,29 @@ const SCEV *ScalarEvolution::getPtrToAddrExpr(const SCEV *Op) {
   // Use the rewriter to sink the cast down to SCEVUnknown leaves.
   // The rewriter handles null pointer constant folding.
   const SCEV *IntOp = SCEVCastSinkingRewriter::rewrite(
-      Op, *this, Ty, [this, Ty](const SCEVUnknown *U) {
+      Op, *this, Ty, [this, Ty](const SCEVUnknown *U) -> const SCEV * {
+        // ptrtoaddr (inttoptr X) -> X, if X has the address type. To relate X
+        // to other ptrtoaddr expressions, replace each ptrtoint P in X with
+        // ptrtoaddr P; they are equal if P's pointer and address sizes match.
+        Value *X;
+        if (match(U->getValue(), m_IntToPtr(m_Value(X))) &&
+            X->getType() == Ty) {
+          const SCEV *XS = getSCEV(X);
+          ValueToSCEVMapTy Map;
+          SCEVExprContains(XS, [&](const SCEV *S) {
+            auto *SU = dyn_cast<SCEVUnknown>(S);
+            Value *P;
+            if (!SU ||
+                !match(SU->getValue(), m_PtrToIntSameSize(DL, m_Value(P))))
+              return false;
+            const SCEV *Addr = getPtrToAddrExpr(getSCEV(P));
+            if (!isa<SCEVCouldNotCompute>(Addr) &&
+                Addr->getType() == SU->getType())
+              Map[SU->getValue()] = Addr;
+            return false;
+          });
+          return SCEVParameterRewriter::rewrite(XS, *this, Map);
+        }
         FoldingSetNodeID ID;
         ID.AddInteger(scPtrToAddr);
         ID.AddPointer(U);
