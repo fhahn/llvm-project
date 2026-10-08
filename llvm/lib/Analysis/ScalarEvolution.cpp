@@ -4184,19 +4184,21 @@ bool ScalarEvolution::canReuseInstruction(
   SmallVector<Value *> Worklist;
   SmallPtrSet<Value *, 8> Visited;
   Worklist.push_back(I);
+  // Avoid walking large instruction graphs. Only instructions we recurse
+  // through count against the budget.
+  unsigned Budget = 16;
   while (!Worklist.empty()) {
     Value *V = Worklist.pop_back_val();
     if (!Visited.insert(V).second)
       continue;
 
-    // Avoid walking large instruction graphs.
-    if (Visited.size() > 16)
-      return false;
-
     // Either the value can't be poison, or the S would also be poison if it
     // is.
     if (PoisonVals.contains(V) || ::isGuaranteedNotToBePoison(V))
       continue;
+
+    if (Budget-- == 0)
+      return false;
 
     auto *I = dyn_cast<Instruction>(V);
     if (!I)
