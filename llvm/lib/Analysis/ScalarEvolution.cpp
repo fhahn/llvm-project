@@ -4185,8 +4185,9 @@ bool ScalarEvolution::canReuseInstruction(
   SmallPtrSet<Value *, 8> Visited;
   Worklist.push_back(I);
   // Avoid walking large instruction graphs. Only instructions we recurse
-  // through count against the budget.
-  unsigned Budget = 16;
+  // through count against the budget, which scales with the size of S, as an
+  // instruction computing S has roughly one instruction per SCEV node.
+  unsigned Budget = std::max<unsigned>(16, S->getExpressionSize());
   while (!Worklist.empty()) {
     Value *V = Worklist.pop_back_val();
     if (!Visited.insert(V).second)
