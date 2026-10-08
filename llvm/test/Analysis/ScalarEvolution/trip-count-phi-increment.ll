@@ -90,3 +90,32 @@ exit:                                                ; preds = %5
   ret void
 }
 
+define i64 @phi_of_identical_casts(i1 %c, i32 %x) {
+; CHECK-LABEL: 'phi_of_identical_casts'
+; CHECK-NEXT:  Classifying expressions for: @phi_of_identical_casts
+; CHECK-NEXT:    %and = and i32 %x, -32
+; CHECK-NEXT:    --> (32 * (%x /u 32))<nuw> U: [0,-31) S: [-2147483648,2147483617)
+; CHECK-NEXT:    %ext.1 = sext i32 %and to i64
+; CHECK-NEXT:    --> (sext i32 (32 * (%x /u 32))<nuw> to i64) U: [0,-31) S: [-2147483648,2147483617)
+; CHECK-NEXT:    %ext.2 = sext i32 %and to i64
+; CHECK-NEXT:    --> (sext i32 (32 * (%x /u 32))<nuw> to i64) U: [0,-31) S: [-2147483648,2147483617)
+; CHECK-NEXT:    %p = phi i64 [ %ext.1, %then ], [ %ext.2, %else ]
+; CHECK-NEXT:    --> (sext i32 (32 * (%x /u 32))<nuw> to i64) U: [0,-31) S: [-2147483648,2147483617)
+; CHECK-NEXT:  Determining loop execution counts for: @phi_of_identical_casts
+;
+entry:
+  %and = and i32 %x, -32
+  br i1 %c, label %then, label %else
+
+then:
+  %ext.1 = sext i32 %and to i64
+  br label %join
+
+else:
+  %ext.2 = sext i32 %and to i64
+  br label %join
+
+join:
+  %p = phi i64 [ %ext.1, %then ], [ %ext.2, %else ]
+  ret i64 %p
+}
