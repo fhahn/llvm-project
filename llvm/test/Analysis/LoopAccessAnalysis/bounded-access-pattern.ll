@@ -8,9 +8,10 @@ target datalayout = "e-m:o-i64:64-p1:128:128-f80:128-n8:16:32:64-S128"
 define void @load_store_same_bounded_i32(ptr %a) {
 ; CHECK-LABEL: 'load_store_same_bounded_i32'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unsafe indirect dependence.
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Forward:
+; CHECK-NEXT:        IndirectUnsafe:
 ; CHECK-NEXT:            %lv = load i32, ptr %gep, align 4 ->
 ; CHECK-NEXT:            store i32 %add, ptr %gep, align 4
 ; CHECK-EMPTY:
@@ -19,12 +20,8 @@ define void @load_store_same_bounded_i32(ptr %a) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
-; CHECK-NEXT:      {0,+,1}<%loop> Added Flags: <nusw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Expressions re-written:
-; CHECK-NEXT:      [PSE] %gep = getelementptr inbounds i32, ptr %a, i64 %idx:
-; CHECK-NEXT:        ((4 * (zext i4 {0,+,1}<%loop> to i64))<nuw><nsw> + %a)<nuw>
-; CHECK-NEXT:        --> {%a,+,4}<nw><%loop>
 ;
 entry:
   br label %loop
@@ -49,30 +46,15 @@ exit:
 define void @store_bounded_load_linear(ptr %a, ptr %b) {
 ; CHECK-LABEL: 'store_bounded_load_linear'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Report: cannot identify array bounds
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:      Run-time memory checks:
-; CHECK-NEXT:      Check 0:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.b = getelementptr inbounds i32, ptr %b, i64 %iv
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %gep.a = getelementptr inbounds i32, ptr %a, i64 %idx.mod
 ; CHECK-NEXT:      Grouped accesses:
-; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %b High: (4096 + %b))
-; CHECK-NEXT:            Member: {%b,+,4}<nuw><%loop>
-; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %a High: (4096 + %a))
-; CHECK-NEXT:            Member: {%a,+,4}<nw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
-; CHECK-NEXT:      {0,+,1}<%loop> Added Flags: <nusw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Expressions re-written:
-; CHECK-NEXT:      [PSE] %gep.a = getelementptr inbounds i32, ptr %a, i64 %idx.mod:
-; CHECK-NEXT:        ((4 * (zext i3 {0,+,1}<%loop> to i64))<nuw><nsw> + %a)<nuw>
-; CHECK-NEXT:        --> {%a,+,4}<nw><%loop>
 ;
 entry:
   br label %loop
@@ -129,9 +111,10 @@ exit:
 define void @bounded_power_of_2(ptr %a) {
 ; CHECK-LABEL: 'bounded_power_of_2'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unsafe indirect dependence.
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Forward:
+; CHECK-NEXT:        IndirectUnsafe:
 ; CHECK-NEXT:            %lv = load i32, ptr %gep, align 4 ->
 ; CHECK-NEXT:            store i32 %add, ptr %gep, align 4
 ; CHECK-EMPTY:
@@ -140,12 +123,8 @@ define void @bounded_power_of_2(ptr %a) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
-; CHECK-NEXT:      {0,+,1}<%loop> Added Flags: <nusw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Expressions re-written:
-; CHECK-NEXT:      [PSE] %gep = getelementptr inbounds i32, ptr %a, i64 %idx:
-; CHECK-NEXT:        ((4 * (zext i3 {0,+,1}<%loop> to i64))<nuw><nsw> + %a)<nuw>
-; CHECK-NEXT:        --> {%a,+,4}<nw><%loop>
 ;
 entry:
   br label %loop
@@ -242,30 +221,15 @@ exit:
 define void @bounded_offset_load(ptr %a) {
 ; CHECK-LABEL: 'bounded_offset_load'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Report: cannot identify array bounds
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Forward:
-; CHECK-NEXT:            %lv = load i32, ptr %gep.load, align 4 ->
-; CHECK-NEXT:            store i32 %lv, ptr %gep.store, align 4
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
-; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %a High: (4100 + %a))
-; CHECK-NEXT:            Member: {(4 + %a),+,4}<nw><%loop>
-; CHECK-NEXT:            Member: {%a,+,4}<nw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
-; CHECK-NEXT:      {1,+,1}<%loop> Added Flags: <nusw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Expressions re-written:
-; CHECK-NEXT:      [PSE] %gep.load = getelementptr inbounds i32, ptr %a, i64 %idx.load:
-; CHECK-NEXT:        ((4 * (zext i3 {1,+,1}<%loop> to i64))<nuw><nsw> + %a)<nuw>
-; CHECK-NEXT:        --> {(4 + %a),+,4}<nw><%loop>
-; CHECK-NEXT:      [PSE] %gep.store = getelementptr inbounds i32, ptr %a, i64 %idx.store:
-; CHECK-NEXT:        ((4 * (zext i3 {0,+,1}<%loop> to i64))<nuw><nsw> + %a)<nuw>
-; CHECK-NEXT:        --> {%a,+,4}<nw><%loop>
 ;
 entry:
   br label %loop
@@ -292,9 +256,10 @@ exit:
 define void @bounded_small_bound(ptr %a) {
 ; CHECK-LABEL: 'bounded_small_bound'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unsafe indirect dependence.
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Forward:
+; CHECK-NEXT:        IndirectUnsafe:
 ; CHECK-NEXT:            %lv = load i32, ptr %gep, align 4 ->
 ; CHECK-NEXT:            store i32 %add, ptr %gep, align 4
 ; CHECK-EMPTY:
@@ -303,12 +268,8 @@ define void @bounded_small_bound(ptr %a) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
-; CHECK-NEXT:      {false,+,true}<%loop> Added Flags: <nusw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Expressions re-written:
-; CHECK-NEXT:      [PSE] %gep = getelementptr inbounds i32, ptr %a, i64 %idx:
-; CHECK-NEXT:        ((4 * (zext i1 {false,+,true}<%loop> to i64))<nuw><nsw> + %a)<nuw>
-; CHECK-NEXT:        --> {%a,+,-4}<nw><%loop>
 ;
 entry:
   br label %loop
@@ -366,27 +327,15 @@ exit:
 define void @bounded_and_linear_same_array(ptr %a) {
 ; CHECK-LABEL: 'bounded_and_linear_same_array'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Report: cannot identify array bounds
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Forward:
-; CHECK-NEXT:            %lv = load i32, ptr %gep.load, align 4 ->
-; CHECK-NEXT:            store i32 %add, ptr %gep.store, align 4
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
-; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %a High: (4096 + %a))
-; CHECK-NEXT:            Member: {%a,+,4}<nuw><%loop>
-; CHECK-NEXT:            Member: {%a,+,4}<nuw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
-; CHECK-NEXT:      {0,+,1}<%loop> Added Flags: <nusw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Expressions re-written:
-; CHECK-NEXT:      [PSE] %gep.store = getelementptr inbounds i32, ptr %a, i64 %idx.mod:
-; CHECK-NEXT:        ((4 * (zext i3 {0,+,1}<%loop> to i64))<nuw><nsw> + %a)<nuw>
-; CHECK-NEXT:        --> {%a,+,4}<nuw><%loop>
 ;
 entry:
   br label %loop
@@ -444,30 +393,15 @@ exit:
 define void @different_bounded_bounds_same_array(ptr %a) {
 ; CHECK-LABEL: 'different_bounded_bounds_same_array'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Report: cannot identify array bounds
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Forward:
-; CHECK-NEXT:            %lv = load i32, ptr %gep.load, align 4 ->
-; CHECK-NEXT:            store i32 %add, ptr %gep.store, align 4
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
-; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %a High: (4096 + %a))
-; CHECK-NEXT:            Member: {%a,+,4}<nw><%loop>
-; CHECK-NEXT:            Member: {%a,+,4}<nw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
-; CHECK-NEXT:      {0,+,1}<%loop> Added Flags: <nusw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Expressions re-written:
-; CHECK-NEXT:      [PSE] %gep.load = getelementptr inbounds i32, ptr %a, i64 %idx.load:
-; CHECK-NEXT:        ((4 * (zext i3 {0,+,1}<%loop> to i64))<nuw><nsw> + %a)<nuw>
-; CHECK-NEXT:        --> {%a,+,4}<nw><%loop>
-; CHECK-NEXT:      [PSE] %gep.store = getelementptr inbounds i32, ptr %a, i64 %idx.store:
-; CHECK-NEXT:        ((4 * (zext i2 {0,+,1}<%loop> to i64))<nuw><nsw> + %a)<nuw>
-; CHECK-NEXT:        --> {%a,+,4}<nw><%loop>
 ;
 entry:
   br label %loop
@@ -559,9 +493,10 @@ exit:
 define void @bounded_i64_type(ptr %a) {
 ; CHECK-LABEL: 'bounded_i64_type'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unsafe indirect dependence.
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Forward:
+; CHECK-NEXT:        IndirectUnsafe:
 ; CHECK-NEXT:            %lv = load i64, ptr %gep, align 8 ->
 ; CHECK-NEXT:            store i64 %add, ptr %gep, align 8
 ; CHECK-EMPTY:
@@ -570,12 +505,8 @@ define void @bounded_i64_type(ptr %a) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
-; CHECK-NEXT:      {0,+,1}<%loop> Added Flags: <nusw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Expressions re-written:
-; CHECK-NEXT:      [PSE] %gep = getelementptr inbounds i64, ptr %a, i64 %idx:
-; CHECK-NEXT:        ((8 * (zext i2 {0,+,1}<%loop> to i64))<nuw><nsw> + %a)<nuw>
-; CHECK-NEXT:        --> {%a,+,8}<nw><%loop>
 ;
 entry:
   br label %loop
@@ -633,33 +564,15 @@ exit:
 define void @bounded_different_arrays_same_bound(ptr %a, ptr %b) {
 ; CHECK-LABEL: 'bounded_different_arrays_same_bound'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Report: cannot identify array bounds
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:      Run-time memory checks:
-; CHECK-NEXT:      Check 0:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.a = getelementptr inbounds i32, ptr %a, i64 %idx
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %gep.b = getelementptr inbounds i32, ptr %b, i64 %idx
 ; CHECK-NEXT:      Grouped accesses:
-; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %a High: (4096 + %a))
-; CHECK-NEXT:            Member: {%a,+,4}<nw><%loop>
-; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %b High: (4096 + %b))
-; CHECK-NEXT:            Member: {%b,+,4}<nw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
-; CHECK-NEXT:      {0,+,1}<%loop> Added Flags: <nusw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Expressions re-written:
-; CHECK-NEXT:      [PSE] %gep.b = getelementptr inbounds i32, ptr %b, i64 %idx:
-; CHECK-NEXT:        ((4 * (zext i4 {0,+,1}<%loop> to i64))<nuw><nsw> + %b)<nuw>
-; CHECK-NEXT:        --> {%b,+,4}<nw><%loop>
-; CHECK-NEXT:      [PSE] %gep.a = getelementptr inbounds i32, ptr %a, i64 %idx:
-; CHECK-NEXT:        ((4 * (zext i4 {0,+,1}<%loop> to i64))<nuw><nsw> + %a)<nuw>
-; CHECK-NEXT:        --> {%a,+,4}<nw><%loop>
 ;
 entry:
   br label %loop
@@ -688,30 +601,15 @@ exit:
 define void @two_stores_different_bounded(ptr %a, i32 %x, i32 %y) {
 ; CHECK-LABEL: 'two_stores_different_bounded'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Report: cannot identify array bounds
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Forward:
-; CHECK-NEXT:            store i32 %x, ptr %gep4, align 4 ->
-; CHECK-NEXT:            store i32 %y, ptr %gep8, align 4
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
-; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %a High: (4096 + %a))
-; CHECK-NEXT:            Member: {%a,+,4}<nw><%loop>
-; CHECK-NEXT:            Member: {%a,+,4}<nw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
-; CHECK-NEXT:      {0,+,1}<%loop> Added Flags: <nusw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Expressions re-written:
-; CHECK-NEXT:      [PSE] %gep4 = getelementptr inbounds i32, ptr %a, i64 %idx4:
-; CHECK-NEXT:        ((4 * (zext i2 {0,+,1}<%loop> to i64))<nuw><nsw> + %a)<nuw>
-; CHECK-NEXT:        --> {%a,+,4}<nw><%loop>
-; CHECK-NEXT:      [PSE] %gep8 = getelementptr inbounds i32, ptr %a, i64 %idx8:
-; CHECK-NEXT:        ((4 * (zext i3 {0,+,1}<%loop> to i64))<nuw><nsw> + %a)<nuw>
-; CHECK-NEXT:        --> {%a,+,4}<nw><%loop>
 ;
 entry:
   br label %loop
@@ -795,9 +693,10 @@ exit:
 define void @bounded_mod_256_narrow_cutoff(ptr %a) {
 ; CHECK-LABEL: 'bounded_mod_256_narrow_cutoff'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unsafe indirect dependence.
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Forward:
+; CHECK-NEXT:        IndirectUnsafe:
 ; CHECK-NEXT:            %lv = load i32, ptr %gep, align 4 ->
 ; CHECK-NEXT:            store i32 %add, ptr %gep, align 4
 ; CHECK-EMPTY:
@@ -806,12 +705,8 @@ define void @bounded_mod_256_narrow_cutoff(ptr %a) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
-; CHECK-NEXT:      {0,+,1}<%loop> Added Flags: <nusw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Expressions re-written:
-; CHECK-NEXT:      [PSE] %gep = getelementptr inbounds i32, ptr %a, i64 %idx:
-; CHECK-NEXT:        ((4 * (zext i8 {0,+,1}<%loop> to i64))<nuw><nsw> + %a)<nuw>
-; CHECK-NEXT:        --> {%a,+,4}<nw><%loop>
 ;
 entry:
   br label %loop
@@ -834,9 +729,10 @@ exit:
 define void @bounded_with_const_offset(ptr %a) {
 ; CHECK-LABEL: 'bounded_with_const_offset'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unsafe indirect dependence.
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Forward:
+; CHECK-NEXT:        IndirectUnsafe:
 ; CHECK-NEXT:            %lv = load i32, ptr %gep.off, align 4 ->
 ; CHECK-NEXT:            store i32 %add, ptr %gep.off, align 4
 ; CHECK-EMPTY:
@@ -845,12 +741,8 @@ define void @bounded_with_const_offset(ptr %a) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
-; CHECK-NEXT:      {0,+,1}<%loop> Added Flags: <nusw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Expressions re-written:
-; CHECK-NEXT:      [PSE] %gep.off = getelementptr inbounds i8, ptr %gep, i64 16:
-; CHECK-NEXT:        (16 + (4 * (zext i2 {0,+,1}<%loop> to i64))<nuw><nsw> + %a)<nuw>
-; CHECK-NEXT:        --> {(16 + %a),+,4}<nw><%loop>
 ;
 entry:
   br label %loop
@@ -874,31 +766,15 @@ exit:
 define void @bounded_load_bounded_store_same(ptr %a) {
 ; CHECK-LABEL: 'bounded_load_bounded_store_same'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
-; CHECK-NEXT:  Backward loop carried data dependence.
+; CHECK-NEXT:      Report: cannot identify array bounds
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Backward:
-; CHECK-NEXT:            %lv = load i32, ptr %gep.l, align 4 ->
-; CHECK-NEXT:            store i32 %add, ptr %gep.s, align 4
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
-; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %a High: (4100 + %a))
-; CHECK-NEXT:            Member: {%a,+,4}<nw><%loop>
-; CHECK-NEXT:            Member: {(4 + %a),+,4}<nw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
-; CHECK-NEXT:      {1,+,1}<%loop> Added Flags: <nusw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Expressions re-written:
-; CHECK-NEXT:      [PSE] %gep.l = getelementptr inbounds i32, ptr %a, i64 %idx.l:
-; CHECK-NEXT:        ((4 * (zext i2 {0,+,1}<%loop> to i64))<nuw><nsw> + %a)<nuw>
-; CHECK-NEXT:        --> {%a,+,4}<nw><%loop>
-; CHECK-NEXT:      [PSE] %gep.s = getelementptr inbounds i32, ptr %a, i64 %idx.s:
-; CHECK-NEXT:        ((4 * (zext i2 {1,+,1}<%loop> to i64))<nuw><nsw> + %a)<nuw>
-; CHECK-NEXT:        --> {(4 + %a),+,4}<nw><%loop>
 ;
 entry:
   br label %loop
@@ -924,34 +800,15 @@ exit:
 define void @bounded_i24_store_size(ptr %a, ptr %b) {
 ; CHECK-LABEL: 'bounded_i24_store_size'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Report: cannot identify array bounds
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        Forward:
-; CHECK-NEXT:            %lv = load i24, ptr %gep.a, align 4 ->
-; CHECK-NEXT:            store i24 %add, ptr %gep.a, align 4
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
-; CHECK-NEXT:      Check 0:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.b = getelementptr inbounds i24, ptr %b, i64 %iv
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %gep.a = getelementptr inbounds i24, ptr %a, i64 %idx
 ; CHECK-NEXT:      Grouped accesses:
-; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %b High: (4095 + %b))
-; CHECK-NEXT:            Member: {%b,+,4}<nuw><%loop>
-; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: %a High: (4095 + %a))
-; CHECK-NEXT:            Member: {%a,+,4}<nw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
-; CHECK-NEXT:      {0,+,1}<%loop> Added Flags: <nusw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Expressions re-written:
-; CHECK-NEXT:      [PSE] %gep.a = getelementptr inbounds i24, ptr %a, i64 %idx:
-; CHECK-NEXT:        ((4 * (zext i2 {0,+,1}<%loop> to i64))<nuw><nsw> + %a)<nuw>
-; CHECK-NEXT:        --> {%a,+,4}<nw><%loop>
 ;
 entry:
   br label %loop
@@ -976,43 +833,15 @@ exit:
 define void @bounded_scalable_with_dep(ptr %a, ptr %b) {
 ; CHECK-LABEL: 'bounded_scalable_with_dep'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
-; CHECK-NEXT:  Unsafe indirect dependence.
+; CHECK-NEXT:      Report: cannot identify array bounds
 ; CHECK-NEXT:      Dependences:
-; CHECK-NEXT:        IndirectUnsafe:
-; CHECK-NEXT:            store <vscale x 4 x i32> zeroinitializer, ptr %gep.a, align 16 ->
-; CHECK-NEXT:            store i32 %lv, ptr %gep.b2, align 4
-; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
-; CHECK-NEXT:      Check 0:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.b2 = getelementptr inbounds i32, ptr %a, i64 %iv
-; CHECK-NEXT:        Against group GRP2:
-; CHECK-NEXT:          %gep.b = getelementptr inbounds i32, ptr %b, i64 %iv
-; CHECK-NEXT:      Check 1:
-; CHECK-NEXT:        Comparing group GRP1:
-; CHECK-NEXT:          %gep.a = getelementptr inbounds <vscale x 4 x i32>, ptr %a, i64 %idx
-; CHECK-NEXT:        Against group GRP2:
-; CHECK-NEXT:          %gep.b = getelementptr inbounds i32, ptr %b, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
-; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %a High: (4096 + %a))
-; CHECK-NEXT:            Member: {%a,+,4}<nuw><%loop>
-; CHECK-NEXT:        Group GRP1:
-; CHECK-NEXT:          (Low: (((16368 * vscale) + %a) umin %a) High: ((16 * vscale) + (((16368 * vscale) + %a) umax %a)))
-; CHECK-NEXT:            Member: {%a,+,(16 * vscale)}<%loop>
-; CHECK-NEXT:        Group GRP2:
-; CHECK-NEXT:          (Low: %b High: (4096 + %b))
-; CHECK-NEXT:            Member: {%b,+,4}<nuw><%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
-; CHECK-NEXT:      {0,+,1}<%loop> Added Flags: <nusw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Expressions re-written:
-; CHECK-NEXT:      [PSE] %gep.a = getelementptr inbounds <vscale x 4 x i32>, ptr %a, i64 %idx:
-; CHECK-NEXT:        ((16 * vscale * (zext i2 {0,+,1}<%loop> to i64)) + %a)
-; CHECK-NEXT:        --> {%a,+,(16 * vscale)}<%loop>
 ;
 entry:
   br label %loop
@@ -1049,12 +878,8 @@ define void @bounded_mul_huge_scale_as1(ptr addrspace(1) %a) {
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
-; CHECK-NEXT:      {0,+,1}<%loop> Added Flags: <nusw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Expressions re-written:
-; CHECK-NEXT:      [PSE] %gep = getelementptr inbounds i8, ptr addrspace(1) %a, i128 %off:
-; CHECK-NEXT:        ((36893488147419103232 * (zext i2 {0,+,1}<%loop> to i128))<nuw><nsw> + %a)<nuw>
-; CHECK-NEXT:        --> {%a,+,36893488147419103232}<nw><%loop>
 ;
 entry:
   br label %loop

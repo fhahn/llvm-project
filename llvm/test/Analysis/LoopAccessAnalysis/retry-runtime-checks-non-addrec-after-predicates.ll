@@ -2,7 +2,7 @@
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
 
-define void @retry_do_not_cast_non_addrec(ptr %p) {
+define void @retry_do_not_cast_non_addrec(ptr %p, i32 %n) {
 ; CHECK-LABEL: 'retry_do_not_cast_non_addrec'
 ; CHECK-NEXT:    loop:
 ; CHECK-NEXT:      Memory dependences are safe
@@ -10,7 +10,7 @@ define void @retry_do_not_cast_non_addrec(ptr %p) {
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
-; CHECK-NEXT:          (Low: %p High: (68719476722 + %p))
+; CHECK-NEXT:          (Low: %p High: (2 + (16 * (zext i32 (-1 + %n) to i64))<nuw><nsw> + %p))
 ; CHECK-NEXT:            Member: {(1 + %p),+,16}<%loop>
 ; CHECK-NEXT:            Member: {%p,+,16}<%loop>
 ; CHECK-EMPTY:
@@ -44,7 +44,7 @@ loop:
   %and = and i32 %iv, 511
   %iv.next = add i32 %and, 16
   %count.next = add i32 %count, 1
-  %ec = icmp eq i32 %count.next, 0
+  %ec = icmp eq i32 %count.next, %n
   br i1 %ec, label %exit, label %loop
 
 exit:
