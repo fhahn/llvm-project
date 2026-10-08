@@ -1463,6 +1463,23 @@ public:
 };
 } // end namespace llvm
 
+/// Returns true if the runtime check emitted by addDiffRuntimeChecks for \p
+/// Check, (Diff - 1) <u (VF * IC * AccessSize - 1), is known to conflict, and
+/// false if it is known to never conflict.
+static std::optional<bool>
+isKnownDiffCheckConflict(ScalarEvolution &SE, const PointerDiffInfo &Check,
+                         ElementCount VF, unsigned IC) {
+  // Bounds that need freezing may not match their SCEV expressions.
+  if (Check.NeedsFreeze)
+    return std::nullopt;
+  Type *Ty = Check.SinkStart->getType();
+  const SCEV *One = SE.getOne(Ty);
+  const SCEV *Diff = SE.getMinusSCEV(Check.SinkStart, Check.SrcStart);
+  const SCEV *Threshold = SE.getElementCount(Ty, VF * IC * Check.AccessSize);
+  return SE.evaluatePredicate(ICmpInst::ICMP_ULT, SE.getMinusSCEV(Diff, One),
+                              SE.getMinusSCEV(Threshold, One));
+}
+
 namespace {
 /// Helper struct to manage generating runtime checks for vectorization.
 ///
@@ -1574,8 +1591,14 @@ public:
 
       auto DiffChecks = RtPtrChecking.getDiffChecks();
       if (DiffChecks) {
+        // Skip diff checks known to never conflict.
+        auto Checks =
+            to_vector(make_filter_range(*DiffChecks, [&](const auto &Check) {
+              return isKnownDiffCheckConflict(*PSE.getSE(), Check, VF, IC) !=
+                     false;
+            }));
         MemRuntimeCheckCond = addDiffRuntimeChecks(
-            MemCheckBlock->getTerminator(), *DiffChecks, MemCheckExp, VF, IC);
+            MemCheckBlock->getTerminator(), Checks, MemCheckExp, VF, IC);
       } else {
         MemRuntimeCheckCond = addRuntimeChecks(
             MemCheckBlock->getTerminator(), L, RtPtrChecking.getChecks(),
