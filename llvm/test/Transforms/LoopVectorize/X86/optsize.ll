@@ -277,32 +277,30 @@ exit:
 define void @can_prove_scev_predicate_is_always_true(ptr %dst) {
 ; CHECK-LABEL: define void @can_prove_scev_predicate_is_always_true(
 ; CHECK-SAME: ptr [[DST:%.*]]) #[[ATTR2]] {
-; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[IV:%.*]] = phi i32 [ 0, %[[ENTRY]] ], [ [[ADD:%.*]], %[[LOOP]] ]
-; CHECK-NEXT:    [[GEP:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[IV]]
-; CHECK-NEXT:    store i32 [[IV]], ptr [[GEP]], align 4
-; CHECK-NEXT:    [[CONV:%.*]] = and i32 [[IV]], 65535
-; CHECK-NEXT:    [[CMP:%.*]] = icmp ult i32 [[CONV]], 4
-; CHECK-NEXT:    [[ADD]] = add nuw nsw i32 [[CONV]], 1
-; CHECK-NEXT:    br i1 [[CMP]], label %[[LOOP]], label %[[EXIT:.*]]
+; CHECK-NEXT:    br label %[[EXIT:.*]]
 ; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    call void @llvm.masked.store.v64i32.p0(<64 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7, i32 8, i32 9, i32 10, i32 11, i32 12, i32 13, i32 14, i32 15, i32 16, i32 17, i32 18, i32 19, i32 20, i32 21, i32 22, i32 23, i32 24, i32 25, i32 26, i32 27, i32 28, i32 29, i32 30, i32 31, i32 32, i32 33, i32 34, i32 35, i32 36, i32 37, i32 38, i32 39, i32 40, i32 41, i32 42, i32 43, i32 44, i32 45, i32 46, i32 47, i32 48, i32 49, i32 50, i32 51, i32 52, i32 53, i32 54, i32 55, i32 56, i32 57, i32 58, i32 59, i32 60, i32 61, i32 62, i32 63>, ptr align 4 [[DST]], <64 x i1> <i1 true, i1 true, i1 true, i1 true, i1 true, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false>)
+; CHECK-NEXT:    br label %[[MIDDLE_BLOCK:.*]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    br label %[[EXIT1:.*]]
+; CHECK:       [[EXIT1]]:
 ; CHECK-NEXT:    ret void
 ;
 ; AUTOVF-LABEL: define void @can_prove_scev_predicate_is_always_true(
 ; AUTOVF-SAME: ptr [[DST:%.*]]) #[[ATTR2]] {
-; AUTOVF-NEXT:  [[ENTRY:.*]]:
+; AUTOVF-NEXT:  [[ENTRY:.*:]]
 ; AUTOVF-NEXT:    br label %[[LOOP:.*]]
 ; AUTOVF:       [[LOOP]]:
-; AUTOVF-NEXT:    [[IV:%.*]] = phi i32 [ 0, %[[ENTRY]] ], [ [[ADD:%.*]], %[[LOOP]] ]
-; AUTOVF-NEXT:    [[GEP:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[IV]]
-; AUTOVF-NEXT:    store i32 [[IV]], ptr [[GEP]], align 4
-; AUTOVF-NEXT:    [[CONV:%.*]] = and i32 [[IV]], 65535
-; AUTOVF-NEXT:    [[CMP:%.*]] = icmp ult i32 [[CONV]], 4
-; AUTOVF-NEXT:    [[ADD]] = add nuw nsw i32 [[CONV]], 1
-; AUTOVF-NEXT:    br i1 [[CMP]], label %[[LOOP]], label %[[EXIT:.*]]
+; AUTOVF-NEXT:    br label %[[EXIT:.*]]
 ; AUTOVF:       [[EXIT]]:
+; AUTOVF-NEXT:    call void @llvm.masked.store.v8i32.p0(<8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7>, ptr align 4 [[DST]], <8 x i1> <i1 true, i1 true, i1 true, i1 true, i1 true, i1 false, i1 false, i1 false>)
+; AUTOVF-NEXT:    br label %[[MIDDLE_BLOCK:.*]]
+; AUTOVF:       [[MIDDLE_BLOCK]]:
+; AUTOVF-NEXT:    br label %[[EXIT1:.*]]
+; AUTOVF:       [[EXIT1]]:
 ; AUTOVF-NEXT:    ret void
 ;
 entry:
