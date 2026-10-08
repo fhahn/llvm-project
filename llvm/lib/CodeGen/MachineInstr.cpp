@@ -2350,17 +2350,28 @@ void MachineInstr::setPhysRegsDeadExcept(ArrayRef<Register> UsedRegs,
 
 unsigned
 MachineInstrExpressionTrait::getHashValue(const MachineInstr* const &MI) {
-  // Build up a buffer of hash code components.
-  SmallVector<size_t, 16> HashComponents;
-  HashComponents.reserve(MI->getNumOperands() + 1);
-  HashComponents.push_back(MI->getOpcode());
+  // Hash register and immediate operands inline rather than through
+  // hash_combine, which is costly for these small, frequently hashed keys.
+  // Only the low bits of detail::combineHashValue's first argument reach the
+  // low bits of its result, which index the table, so the register and the
+  // running hash go second.
+  unsigned Hash = MI->getOpcode();
   for (const MachineOperand &MO : MI->operands()) {
-    if (MO.isReg() && MO.isDef() && MO.getReg().isVirtual())
-      continue;  // Skip virtual register defs.
-
-    HashComponents.push_back(hash_value(MO));
+    unsigned OpHash;
+    if (MO.isReg()) {
+      if (MO.isDef() && MO.getReg().isVirtual())
+        continue; // Skip virtual register defs.
+      OpHash = detail::combineHashValue(MO.getSubReg() << 1 | MO.isDef(),
+                                        MO.getReg().id());
+    } else if (MO.isImm()) {
+      OpHash = static_cast<unsigned>(hash_value(MO.getImm())) ^
+               MO.getTargetFlags();
+    } else {
+      OpHash = hash_value(MO);
+    }
+    Hash = detail::combineHashValue(OpHash, Hash);
   }
-  return hash_combine_range(HashComponents);
+  return Hash;
 }
 
 const MDNode *MachineInstr::getLocCookieMD() const {
