@@ -13173,8 +13173,18 @@ static bool isKnownPredicateExtendIdiom(CmpPredicate Pred, const SCEV *LHS,
     [[fallthrough]];
   case ICmpInst::ICMP_ULE: {
     // If operand >=u 0 then ZExt == SExt.  If operand <u 0 then ZExt <u SExt.
-    return match(LHS, m_scev_ZExt(m_SCEV(Op))) &&
-           match(RHS, m_scev_SExt(m_scev_Specific(Op)));
+    if (match(LHS, m_scev_ZExt(m_SCEV(Op))) &&
+        match(RHS, m_scev_SExt(m_scev_Specific(Op))))
+      return true;
+    // zext (trunc x to iA) u<= zext (trunc x to iB) if A <= B, as the low A
+    // bits of x are at most its low B bits.
+    const SCEV *LTrunc, *RTrunc;
+    return match(LHS, m_scev_ZExt(m_SCEV(LTrunc))) &&
+           match(RHS, m_scev_ZExt(m_SCEV(RTrunc))) &&
+           match(LTrunc, m_scev_Trunc(m_SCEV(Op))) &&
+           match(RTrunc, m_scev_Trunc(m_scev_Specific(Op))) &&
+           LTrunc->getType()->getIntegerBitWidth() <=
+               RTrunc->getType()->getIntegerBitWidth();
   }
   default:
     return false;
