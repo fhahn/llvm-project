@@ -1567,3 +1567,87 @@ outer.latch:
 exit:
   ret void
 }
+
+; The outer-loop stride of src's bounds is a negative constant. The hoisted range
+; must start at the last outer iteration, without a (always true) stride check.
+define void @neg_outer_stride(ptr %dst, ptr %src) {
+; CHECK-LABEL: define void @neg_outer_stride(
+; CHECK-SAME: ptr [[DST:%.*]], ptr [[SRC:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DST]], i64 256
+; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr nuw i8, ptr [[SRC]], i64 4
+; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[SRC]], i64 656
+; CHECK-NEXT:    br label %[[OUTER:.*]]
+; CHECK:       [[OUTER]]:
+; CHECK-NEXT:    [[I:%.*]] = phi i64 [ 100, %[[ENTRY]] ], [ [[I_NEXT:%.*]], %[[OUTER_LATCH:.*]] ]
+; CHECK-NEXT:    br label %[[VECTOR_MEMCHECK:.*]]
+; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DST]], [[SCEVGEP2]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SCEVGEP1]], [[SCEVGEP]]
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP0:%.*]] = add nuw nsw i64 [[I]], [[INDEX]]
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[TMP0]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP1]], align 4, !alias.scope [[META76:![0-9]+]]
+; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[INDEX]]
+; CHECK-NEXT:    [[WIDE_LOAD3:%.*]] = load <4 x i32>, ptr [[TMP2]], align 4, !alias.scope [[META79:![0-9]+]], !noalias [[META76]]
+; CHECK-NEXT:    [[TMP3:%.*]] = add <4 x i32> [[WIDE_LOAD3]], [[WIDE_LOAD]]
+; CHECK-NEXT:    store <4 x i32> [[TMP3]], ptr [[TMP2]], align 4, !alias.scope [[META79]], !noalias [[META76]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq i64 [[INDEX_NEXT]], 64
+; CHECK-NEXT:    br i1 [[TMP4]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP81:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    br label %[[OUTER_LATCH]]
+; CHECK:       [[SCALAR_PH]]:
+; CHECK-NEXT:    br label %[[INNER:.*]]
+; CHECK:       [[INNER]]:
+; CHECK-NEXT:    [[J:%.*]] = phi i64 [ 0, %[[SCALAR_PH]] ], [ [[J_NEXT:%.*]], %[[INNER]] ]
+; CHECK-NEXT:    [[IDX:%.*]] = add nuw nsw i64 [[I]], [[J]]
+; CHECK-NEXT:    [[GEP_SRC:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[IDX]]
+; CHECK-NEXT:    [[L_SRC:%.*]] = load i32, ptr [[GEP_SRC]], align 4
+; CHECK-NEXT:    [[GEP_DST:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[J]]
+; CHECK-NEXT:    [[L_DST:%.*]] = load i32, ptr [[GEP_DST]], align 4
+; CHECK-NEXT:    [[ADD:%.*]] = add i32 [[L_DST]], [[L_SRC]]
+; CHECK-NEXT:    store i32 [[ADD]], ptr [[GEP_DST]], align 4
+; CHECK-NEXT:    [[J_NEXT]] = add nuw nsw i64 [[J]], 1
+; CHECK-NEXT:    [[EC_INNER:%.*]] = icmp eq i64 [[J_NEXT]], 64
+; CHECK-NEXT:    br i1 [[EC_INNER]], label %[[OUTER_LATCH]], label %[[INNER]], !llvm.loop [[LOOP82:![0-9]+]]
+; CHECK:       [[OUTER_LATCH]]:
+; CHECK-NEXT:    [[I_NEXT]] = add nsw i64 [[I]], -1
+; CHECK-NEXT:    [[EC_OUTER:%.*]] = icmp eq i64 [[I_NEXT]], 0
+; CHECK-NEXT:    br i1 [[EC_OUTER]], label %[[EXIT:.*]], label %[[OUTER]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %outer
+
+outer:
+  %i = phi i64 [ 100, %entry ], [ %i.next, %outer.latch ]
+  br label %inner
+
+inner:
+  %j = phi i64 [ 0, %outer ], [ %j.next, %inner ]
+  %idx = add nuw nsw i64 %i, %j
+  %gep.src = getelementptr inbounds i32, ptr %src, i64 %idx
+  %l.src = load i32, ptr %gep.src, align 4
+  %gep.dst = getelementptr inbounds i32, ptr %dst, i64 %j
+  %l.dst = load i32, ptr %gep.dst, align 4
+  %add = add i32 %l.dst, %l.src
+  store i32 %add, ptr %gep.dst, align 4
+  %j.next = add nuw nsw i64 %j, 1
+  %ec.inner = icmp eq i64 %j.next, 64
+  br i1 %ec.inner, label %outer.latch, label %inner
+
+outer.latch:
+  %i.next = add nsw i64 %i, -1
+  %ec.outer = icmp eq i64 %i.next, 0
+  br i1 %ec.outer, label %exit, label %outer
+
+exit:
+  ret void
+}
