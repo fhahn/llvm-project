@@ -137,10 +137,10 @@ define void @multiple_incoming_phi_with_blend_mask(i64 %a, ptr noalias %dst) {
 ; CHECK:       vector.body:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <2 x i64> [ <i64 0, i64 1>, [[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], [[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[VEC_IND1:%.*]] = phi <2 x i16> [ <i16 0, i16 1>, [[VECTOR_PH]] ], [ [[VEC_IND_NEXT2:%.*]], [[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_IND3:%.*]] = phi <2 x i16> [ <i16 0, i16 1>, [[VECTOR_PH]] ], [ [[VEC_IND_NEXT4:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP0:%.*]] = add <2 x i16> [[VEC_IND3]], splat (i16 1)
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ugt <2 x i64> [[VEC_IND]], [[BROADCAST_SPLAT]]
-; CHECK-NEXT:    [[PREDPHI:%.*]] = select <2 x i1> [[TMP1]], <2 x i16> [[VEC_IND3]], <2 x i16> [[VEC_IND1]]
+; CHECK-NEXT:    [[PREDPHI:%.*]] = select <2 x i1> [[TMP1]], <2 x i16> [[TMP0]], <2 x i16> [[VEC_IND3]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = extractelement <2 x i16> [[PREDPHI]], i64 0
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [32 x i16], ptr @src, i16 0, i16 [[TMP2]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <2 x i16> [[PREDPHI]], i64 1
@@ -153,7 +153,6 @@ define void @multiple_incoming_phi_with_blend_mask(i64 %a, ptr noalias %dst) {
 ; CHECK-NEXT:    store <2 x i16> [[TMP9]], ptr [[TMP10]], align 2
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw nsw <2 x i64> [[VEC_IND]], splat (i64 2)
-; CHECK-NEXT:    [[VEC_IND_NEXT2]] = add <2 x i16> [[VEC_IND1]], splat (i16 2)
 ; CHECK-NEXT:    [[VEC_IND_NEXT4]] = add <2 x i16> [[VEC_IND3]], splat (i16 2)
 ; CHECK-NEXT:    [[TMP12:%.*]] = icmp eq i64 [[INDEX_NEXT]], 32
 ; CHECK-NEXT:    br i1 [[TMP12]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
@@ -168,7 +167,7 @@ entry:
 loop.header:
   %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop.latch ]
   %iv.trunc = trunc i64 %iv to i16
-  %iv.trunc.2 = trunc i64 %iv to i16
+  %iv.trunc.2 = add i16 %iv.trunc, 1
   %cmp.a = icmp ugt i64 %iv, %a
   br i1 %cmp.a, label %loop.next, label %loop.latch
 

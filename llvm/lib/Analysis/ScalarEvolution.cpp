@@ -5991,18 +5991,18 @@ const SCEV *ScalarEvolution::createNodeFromSelectLikePHI(PHINode *PN) {
   return nullptr;
 }
 
-static BinaryOperator *getCommonInstForPHI(PHINode *PN) {
-  BinaryOperator *CommonInst = nullptr;
+static Instruction *getCommonInstForPHI(PHINode *PN) {
+  Instruction *CommonInst = nullptr;
   // Check if instructions are identical.
   for (Value *Incoming : PN->incoming_values()) {
-    auto *IncomingInst = dyn_cast<BinaryOperator>(Incoming);
-    if (!IncomingInst)
+    auto *IncomingInst = dyn_cast<Instruction>(Incoming);
+    if (!isa_and_nonnull<BinaryOperator, CastInst>(IncomingInst))
       return nullptr;
     if (CommonInst) {
       if (!CommonInst->isIdenticalToWhenDefined(IncomingInst))
         return nullptr; // Not identical, give up
     } else {
-      // Remember binary operator
+      // Remember binary operator or cast
       CommonInst = IncomingInst;
     }
   }
@@ -6020,7 +6020,7 @@ static BinaryOperator *getCommonInstForPHI(PHINode *PN) {
 /// scev(%phi) => scev(%add)
 const SCEV *
 ScalarEvolution::createNodeForPHIWithIdenticalOperands(PHINode *PN) {
-  BinaryOperator *CommonInst = getCommonInstForPHI(PN);
+  Instruction *CommonInst = getCommonInstForPHI(PN);
   if (!CommonInst)
     return nullptr;
 
@@ -7723,9 +7723,9 @@ ScalarEvolution::getOperandsToCreate(Value *V, SmallVectorImpl<Value *> &Ops) {
     // The second is createNodeForPHIWithIdenticalOperands: this looks for
     // operands which all perform the same operation, but haven't been
     // CSE'ed for whatever reason.
-    if (BinaryOperator *BO = getCommonInstForPHI(cast<PHINode>(U))) {
-      assert(BO);
-      Ops.push_back(BO);
+    if (Instruction *I = getCommonInstForPHI(cast<PHINode>(U))) {
+      assert(I);
+      Ops.push_back(I);
       return nullptr;
     }
     // The third is createNodeFromSelectLikePHI; this takes a PHI which
