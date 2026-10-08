@@ -644,17 +644,23 @@ static int CompareValueComplexity(const LoopInfo *const LI, Value *LV,
 // more efficient.
 //
 // The result is a total order on SCEVUses of uniqued SCEVs: it returns 0 iff
-// LHS == RHS. Uses of the same SCEV are ordered by their use flags. Distinct
-// nodes of the same kind differ in their uniquing profile, i.e. in an operand,
-// the loop (AddRecs), the result type (casts) or the underlying value (leaves).
-// SCEVUnknowns not ordered by CompareValueComplexity are ordered by creation.
-// As each distinct operand pair is decisive, a comparison follows a single path
-// from the roots to the first difference, so no depth limit is needed.
+// LHS == RHS. Uses are ordered by their canonical SCEVs first, so uses with the
+// same canonical SCEV are adjacent after sorting. Uses of the same SCEV are
+// ordered by their use flags. Distinct nodes of the same kind differ in their
+// uniquing profile, i.e. in an operand, the loop (AddRecs), the result type
+// (casts) or the underlying value (leaves). SCEVUnknowns not ordered by
+// CompareValueComplexity are ordered by creation. As each distinct operand pair
+// is decisive, a comparison follows a single path from the roots to the first
+// difference, so no depth limit is needed.
 static int CompareSCEVComplexity(const LoopInfo *const LI, SCEVUse LHS,
                                  SCEVUse RHS, DominatorTree &DT) {
   // Fast-path: SCEVs are uniqued so we can do a quick equality check.
   if (LHS == RHS)
     return 0;
+
+  const SCEV *LCanon = LHS.getCanonical(), *RCanon = RHS.getCanonical();
+  if (LCanon != RCanon && (LHS != LCanon || RHS != RCanon))
+    return CompareSCEVComplexity(LI, LCanon, RCanon, DT);
 
   if (LHS.getPointer() == RHS.getPointer())
     return (int)LHS.getUseNoWrapFlags() - (int)RHS.getUseNoWrapFlags();
