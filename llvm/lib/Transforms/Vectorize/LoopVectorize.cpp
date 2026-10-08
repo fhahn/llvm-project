@@ -1563,6 +1563,19 @@ public:
       return;
     }
 
+    // If a diff check always conflicts, the vector loop would never execute.
+    const auto &RtPtrChecking = *LAI.getRuntimePointerChecking();
+    auto DiffChecks = RtPtrChecking.getDiffChecks();
+    if (RtPtrChecking.Need && !LoopUsesPartialAliasMasking && DiffChecks &&
+        any_of(*DiffChecks, [&](const PointerDiffInfo &Check) {
+          return isKnownDiffCheckConflict(*PSE.getSE(), Check, VF, IC) == true;
+        })) {
+      MemRuntimeCheckCond = ConstantInt::getTrue(L->getHeader()->getContext());
+      LLVM_DEBUG(dbgs() << "LV: Memory runtime checks always fail.\n");
+      CostTooHigh = true;
+      return;
+    }
+
     BasicBlock *LoopHeader = L->getHeader();
     BasicBlock *Preheader = L->getLoopPreheader();
 
@@ -1580,7 +1593,6 @@ public:
              "SCEV predicates should not be known to hold or fail");
     }
 
-    const auto &RtPtrChecking = *LAI.getRuntimePointerChecking();
     // TODO: We need to estimate the cost of alias-masking in
     // GeneratedRTChecks::getCost(). We can't check the MemCheckBlock as the
     // alias-mask is generated later in VPlan.
@@ -1589,7 +1601,6 @@ public:
       MemCheckBlock = SplitBlock(Pred, Pred->getTerminator(), DT, LI, nullptr,
                                  "vector.memcheck");
 
-      auto DiffChecks = RtPtrChecking.getDiffChecks();
       if (DiffChecks) {
         // Skip diff checks known to never conflict.
         auto Checks =
