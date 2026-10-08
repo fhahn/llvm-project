@@ -1651,3 +1651,74 @@ outer.latch:
 exit:
   ret void
 }
+
+@g = external global [96000 x double]
+
+; The hoisted bounds of %gep.a and %gep.b are known to be disjoint, so no runtime
+; checks are needed.
+define void @hoisted_bounds_known_disjoint() {
+; CHECK-LABEL: define void @hoisted_bounds_known_disjoint() {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    br label %[[OUTER:.*]]
+; CHECK:       [[OUTER]]:
+; CHECK-NEXT:    [[K:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[K_NEXT:%.*]], %[[OUTER_LATCH:.*]] ]
+; CHECK-NEXT:    [[GEP_C:%.*]] = getelementptr inbounds nuw [8 x i8], ptr getelementptr inbounds nuw (i8, ptr @g, i64 512064), i64 [[K]]
+; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = load double, ptr [[GEP_C]], align 8, !alias.scope [[META83:![0-9]+]]
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x double> poison, double [[TMP0]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x double> [[BROADCAST_SPLATINSERT]], <4 x double> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP1:%.*]] = sub nsw i64 [[INDEX]], [[K]]
+; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr [8 x i8], ptr getelementptr inbounds nuw (i8, ptr @g, i64 256032), i64 [[TMP1]]
+; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr [[TMP2]], i64 127992
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x double>, ptr [[TMP3]], align 8, !alias.scope [[META86:![0-9]+]]
+; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds nuw [8 x i8], ptr @g, i64 [[INDEX]]
+; CHECK-NEXT:    [[WIDE_LOAD1:%.*]] = load <4 x double>, ptr [[TMP4]], align 8, !alias.scope [[META88:![0-9]+]], !noalias [[META90:![0-9]+]]
+; CHECK-NEXT:    [[TMP5:%.*]] = call <4 x double> @llvm.fmuladd.v4f64(<4 x double> [[WIDE_LOAD]], <4 x double> [[BROADCAST_SPLAT]], <4 x double> [[WIDE_LOAD1]])
+; CHECK-NEXT:    store <4 x double> [[TMP5]], ptr [[TMP4]], align 8, !alias.scope [[META88]], !noalias [[META90]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], 16000
+; CHECK-NEXT:    br i1 [[TMP6]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP91:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    br label %[[OUTER_LATCH]]
+; CHECK:       [[OUTER_LATCH]]:
+; CHECK-NEXT:    [[K_NEXT]] = add nuw nsw i64 [[K]], 1
+; CHECK-NEXT:    [[EC_OUTER:%.*]] = icmp eq i64 [[K_NEXT]], 16000
+; CHECK-NEXT:    br i1 [[EC_OUTER]], label %[[EXIT:.*]], label %[[OUTER]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %outer
+
+outer:
+  %k = phi i64 [ 0, %entry ], [ %k.next, %outer.latch ]
+  %gep.c = getelementptr inbounds nuw [8 x i8], ptr getelementptr inbounds nuw (i8, ptr @g, i64 512064), i64 %k
+  br label %inner
+
+inner:
+  %i = phi i64 [ 0, %outer ], [ %i.next, %inner ]
+  %idx = sub nsw i64 %i, %k
+  %gep.b.base = getelementptr [8 x i8], ptr getelementptr inbounds nuw (i8, ptr @g, i64 256032), i64 %idx
+  %gep.b = getelementptr i8, ptr %gep.b.base, i64 127992
+  %l.b = load double, ptr %gep.b, align 8
+  %l.c = load double, ptr %gep.c, align 8
+  %gep.a = getelementptr inbounds nuw [8 x i8], ptr @g, i64 %i
+  %l.a = load double, ptr %gep.a, align 8
+  %fma = call double @llvm.fmuladd.f64(double %l.b, double %l.c, double %l.a)
+  store double %fma, ptr %gep.a, align 8
+  %i.next = add nuw nsw i64 %i, 1
+  %ec.inner = icmp eq i64 %i.next, 16000
+  br i1 %ec.inner, label %outer.latch, label %inner
+
+outer.latch:
+  %k.next = add nuw nsw i64 %k, 1
+  %ec.outer = icmp eq i64 %k.next, 16000
+  br i1 %ec.outer, label %exit, label %outer
+
+exit:
+  ret void
+}

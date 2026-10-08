@@ -1581,9 +1581,6 @@ public:
             MemCheckBlock->getTerminator(), L, RtPtrChecking.getChecks(),
             MemCheckExp, VectorizerParams::HoistRuntimeChecks);
       }
-      assert(MemRuntimeCheckCond &&
-             "no RT checks generated although RtPtrChecking "
-             "claimed checks are required");
     }
 
     SCEVExp.eraseDeadInstructions(SCEVCheckCond);
@@ -1668,8 +1665,8 @@ public:
         // individual memory check, since there could be a mixture of loop
         // variant and invariant checks that mean the final condition is
         // variant.
-        const SCEV *Cond = SE->getSCEV(MemRuntimeCheckCond);
-        if (SE->isLoopInvariant(Cond, OuterLoop)) {
+        if (MemRuntimeCheckCond &&
+            SE->isLoopInvariant(SE->getSCEV(MemRuntimeCheckCond), OuterLoop)) {
           // It seems reasonable to assume that we can reduce the effective
           // cost of the checks even when we know nothing about the trip
           // count. Assume that the outer loop executes at least twice.
@@ -1737,7 +1734,7 @@ public:
   /// outside VPlan.
   std::pair<Value *, BasicBlock *> getMemRuntimeChecks() const {
     using namespace llvm::PatternMatch;
-    if (MemRuntimeCheckCond && match(MemRuntimeCheckCond, m_ZeroInt()))
+    if (!MemRuntimeCheckCond || match(MemRuntimeCheckCond, m_ZeroInt()))
       return {nullptr, nullptr};
     return {MemRuntimeCheckCond, MemCheckBlock};
   }
