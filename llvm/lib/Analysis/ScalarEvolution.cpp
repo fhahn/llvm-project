@@ -15703,6 +15703,12 @@ const SCEVPredicate &PredicatedScalarEvolution::getPredicate() const {
   return *Preds;
 }
 
+bool PredicatedScalarEvolution::isKnownToFail() const {
+  return any_of(Preds->getPredicates(), [this](const SCEVPredicate *P) {
+    return isKnownWrapPredicate(SE, P) == false;
+  });
+}
+
 void PredicatedScalarEvolution::updateGeneration() {
   // If the generation number wrapped recompute everything.
   if (++Generation == 0) {

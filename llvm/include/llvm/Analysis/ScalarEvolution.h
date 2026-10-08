@@ -2682,6 +2682,10 @@ public:
 
   LLVM_ABI const SCEVPredicate &getPredicate() const;
 
+  /// Returns true if the predicate is known to fail, i.e. a runtime check for
+  /// it would always fail.
+  LLVM_ABI bool isKnownToFail() const;
+
   /// Returns the SCEV expression of V, in the context of the current SCEV
   /// predicate.  The order of transformations applied on the expression of V
   /// returned by ScalarEvolution is guaranteed to be preserved, even when
