@@ -1551,8 +1551,6 @@ public:
     CostTooHigh = LAI.getNumRuntimePointerChecks() >
                   VectorizerParams::VectorizeMemoryCheckThreshold;
     if (CostTooHigh) {
-      // Mark runtime checks as never succeeding when they exceed the threshold.
-      MemRuntimeCheckCond = ConstantInt::getTrue(L->getHeader()->getContext());
       ORE.emit([&]() {
         return OptimizationRemarkAnalysisAliasing(
                    DEBUG_TYPE, "TooManyMemoryRuntimeChecks", L->getStartLoc(),
@@ -1570,7 +1568,6 @@ public:
         any_of(*DiffChecks, [&](const PointerDiffInfo &Check) {
           return isKnownDiffCheckConflict(*PSE.getSE(), Check, VF, IC) == true;
         })) {
-      MemRuntimeCheckCond = ConstantInt::getTrue(L->getHeader()->getContext());
       LLVM_DEBUG(dbgs() << "LV: Memory runtime checks always fail.\n");
       CostTooHigh = true;
       return;
@@ -1615,6 +1612,8 @@ public:
             MemCheckBlock->getTerminator(), L, RtPtrChecking.getChecks(),
             MemCheckExp, VectorizerParams::HoistRuntimeChecks);
       }
+      assert(!isa_and_nonnull<Constant>(MemRuntimeCheckCond) &&
+             "memory runtime checks should not be known to pass or fail");
     }
 
     SCEVExp.eraseDeadInstructions(SCEVCheckCond);
@@ -1767,14 +1766,16 @@ public:
   /// Retrieves the MemCheckCond and MemCheckBlock that were generated as IR
   /// outside VPlan.
   std::pair<Value *, BasicBlock *> getMemRuntimeChecks() const {
-    using namespace llvm::PatternMatch;
-    if (!MemRuntimeCheckCond || match(MemRuntimeCheckCond, m_ZeroInt()))
+    if (!MemRuntimeCheckCond)
       return {nullptr, nullptr};
     return {MemRuntimeCheckCond, MemCheckBlock};
   }
 
   /// Return true if any runtime checks have been added
   bool hasChecks() const { return HasChecks; }
+
+  /// Return true if the runtime checks exceed the threshold or always fail.
+  bool isCostTooHigh() const { return CostTooHigh; }
 
   /// Erase the memory check block, its instructions and their SCEV expansions.
   void eraseMemCheckBlock() {
@@ -7914,11 +7915,8 @@ bool LoopVectorizePass::processLoop(Loop *L) {
       Checks.create(L, *LVL.getLAI(), PSE.getPredicate(), VF.Width, SelectedIC,
                     *ORE);
 
-      // Bail out early if the memory runtime checks are known to fail. In that
-      // case, the vector loop would never execute.
-      using namespace llvm::PatternMatch;
-      if (Checks.getMemRuntimeChecks().first &&
-          match(Checks.getMemRuntimeChecks().first, m_One()))
+      // Bail out early if the runtime checks are too costly or always fail.
+      if (Checks.isCostTooHigh())
         return false;
     }
 
