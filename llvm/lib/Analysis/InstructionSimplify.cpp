@@ -5387,7 +5387,14 @@ static Value *simplifyGEPInst(Type *SrcTy, Value *Ptr,
     }
   }
 
-  if (!IsScalableVec && Q.DL.getTypeAllocSize(LastType) == 1 &&
+  // gep (gep V, C), (sub 0, V) -> C
+  // gep (gep V, C), (xor V, -1) -> C-1
+  // Match the index before stripping the base, which is more expensive.
+  Value *V;
+  bool IsNeg = match(Indices.back(), m_Neg(m_PtrToInt(m_Value(V))));
+  if ((IsNeg ||
+       match(Indices.back(), m_Xor(m_PtrToInt(m_Value(V)), m_AllOnes()))) &&
+      !IsScalableVec && Q.DL.getTypeAllocSize(LastType) == 1 &&
       all_of(Indices.drop_back(1), match_fn(m_Zero()))) {
     unsigned IdxWidth =
         Q.DL.getIndexSizeInBits(Ptr->getType()->getPointerAddressSpace());
@@ -5395,23 +5402,14 @@ static Value *simplifyGEPInst(Type *SrcTy, Value *Ptr,
       APInt BasePtrOffset(IdxWidth, 0);
       Value *StrippedBasePtr =
           Ptr->stripAndAccumulateInBoundsConstantOffsets(Q.DL, BasePtrOffset);
+      if (!IsNeg)
+        --BasePtrOffset;
 
       // Avoid creating inttoptr of zero here: While LLVMs treatment of
       // inttoptr is generally conservative, this particular case is folded to
       // a null pointer, which will have incorrect provenance.
-
-      // gep (gep V, C), (sub 0, V) -> C
-      if (match(Indices.back(),
-                m_Neg(m_PtrToInt(m_Specific(StrippedBasePtr)))) &&
-          !BasePtrOffset.isZero()) {
+      if (V == StrippedBasePtr && !BasePtrOffset.isZero()) {
         auto *CI = ConstantInt::get(GEPTy->getContext(), BasePtrOffset);
-        return ConstantExpr::getIntToPtr(CI, GEPTy);
-      }
-      // gep (gep V, C), (xor V, -1) -> C-1
-      if (match(Indices.back(),
-                m_Xor(m_PtrToInt(m_Specific(StrippedBasePtr)), m_AllOnes())) &&
-          !BasePtrOffset.isOne()) {
-        auto *CI = ConstantInt::get(GEPTy->getContext(), BasePtrOffset - 1);
         return ConstantExpr::getIntToPtr(CI, GEPTy);
       }
     }
