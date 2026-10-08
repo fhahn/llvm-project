@@ -2116,6 +2116,10 @@ struct PointerBounds {
   TrackingVH<Value> Start;
   TrackingVH<Value> End;
   Value *StrideToCheck;
+  /// SCEV expressions for Start and End, if the checked range is exactly
+  /// [Low, High), i.e. neither a stride check nor freezing is needed.
+  const SCEV *Low;
+  const SCEV *High;
 };
 
 /// Expand code for the lower and upper bound of the pointer group \p CG
@@ -2194,7 +2198,9 @@ static PointerBounds expandBounds(const RuntimeCheckingPtrGroup *CG,
   Value *StrideVal =
       Stride ? Exp.expandCodeFor(Stride, Stride->getType(), Loc) : nullptr;
   LLVM_DEBUG(dbgs() << "Start: " << *Low << " End: " << *High << "\n");
-  return {Start, End, StrideVal};
+  if (Stride || CG->NeedsFreeze)
+    return {Start, End, StrideVal, nullptr, nullptr};
+  return {Start, End, StrideVal, Low, High};
 }
 
 /// Turns a collection of checks into a collection of expanded upper and
@@ -2232,7 +2238,14 @@ Value *llvm::addRuntimeChecks(
   // Our instructions might fold to a constant.
   Value *MemoryRuntimeCheck = nullptr;
 
+  ScalarEvolution &SE = *Exp.getSE();
   for (const auto &[A, B] : ExpandedChecks) {
+    // Skip checks known to never conflict.
+    if (A.Low && B.Low &&
+        (SE.isKnownPredicate(ICmpInst::ICMP_ULE, A.High, B.Low) ||
+         SE.isKnownPredicate(ICmpInst::ICMP_ULE, B.High, A.Low)))
+      continue;
+
     // Check if two pointers (A and B) conflict where conflict is computed as:
     // start(A) <= end(B) && start(B) <= end(A)
 
