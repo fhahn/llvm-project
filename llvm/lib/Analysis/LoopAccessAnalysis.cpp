@@ -4060,6 +4060,13 @@ void LoopAccessInfo::collectStridedAccess(Value *MemAccess) {
                   "at most once.\n");
     return;
   }
+
+  // Avoid adding the "Stride == 1" predicate if it is known to fail.
+  if (SE->isKnownPredicate(ICmpInst::ICMP_NE, StrideExpr,
+                           SE->getOne(StrideExpr->getType()))) {
+    LLVM_DEBUG(dbgs() << "LAA: Stride is known to be != 1.\n");
+    return;
+  }
   LLVM_DEBUG(dbgs() << "LAA: Found a strided access that we can version.\n");
 
   // Strip back off the integer cast, and check that our result is a
