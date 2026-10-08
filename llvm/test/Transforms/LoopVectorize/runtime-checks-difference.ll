@@ -907,3 +907,49 @@ loop:
 exit:
   ret void
 }
+
+; The difference between the pointers is 8 bytes, so the diff check always
+; conflicts for VF * IC * 8 bytes.
+define void @diff_check_always_conflicts(ptr %start.1, ptr %start.2, ptr %end) {
+; CHECK-LABEL: define void @diff_check_always_conflicts(
+; CHECK-SAME: ptr [[START_1:%.*]], ptr [[START_2:%.*]], ptr [[END:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[GEP_START_2:%.*]] = getelementptr i8, ptr [[START_2]], i64 8
+; CHECK-NEXT:    [[START_1_INT:%.*]] = ptrtoint ptr [[START_1]] to i64
+; CHECK-NEXT:    [[START_2_INT:%.*]] = ptrtoint ptr [[GEP_START_2]] to i64
+; CHECK-NEXT:    [[DIFF:%.*]] = sub i64 [[START_1_INT]], [[START_2_INT]]
+; CHECK-NEXT:    [[START_2_DIFF:%.*]] = getelementptr i8, ptr [[START_2]], i64 [[DIFF]]
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[PTR_IV_1:%.*]] = phi ptr [ [[PTR_IV_1_NEXT:%.*]], %[[LOOP]] ], [ [[START_1]], %[[ENTRY]] ]
+; CHECK-NEXT:    [[PTR_IV_2:%.*]] = phi ptr [ [[PTR_IV_2_NEXT:%.*]], %[[LOOP]] ], [ [[START_2_DIFF]], %[[ENTRY]] ]
+; CHECK-NEXT:    [[PTR_IV_2_NEXT]] = getelementptr i8, ptr [[PTR_IV_2]], i64 8
+; CHECK-NEXT:    [[PTR_IV_1_NEXT]] = getelementptr i8, ptr [[PTR_IV_1]], i64 8
+; CHECK-NEXT:    [[L:%.*]] = load i64, ptr [[PTR_IV_2]], align 8
+; CHECK-NEXT:    store i64 [[L]], ptr [[PTR_IV_1]], align 8
+; CHECK-NEXT:    [[EC:%.*]] = icmp eq ptr [[PTR_IV_2]], [[END]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[LOOP]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  %gep.start.2 = getelementptr i8, ptr %start.2, i64 8
+  %start.1.int = ptrtoint ptr %start.1 to i64
+  %start.2.int = ptrtoint ptr %gep.start.2 to i64
+  %diff = sub i64 %start.1.int, %start.2.int
+  %start.2.diff = getelementptr i8, ptr %start.2, i64 %diff
+  br label %loop
+
+loop:
+  %ptr.iv.1 = phi ptr [ %ptr.iv.1.next, %loop ], [ %start.1, %entry ]
+  %ptr.iv.2 = phi ptr [ %ptr.iv.2.next, %loop ], [ %start.2.diff, %entry ]
+  %ptr.iv.2.next = getelementptr i8, ptr %ptr.iv.2, i64 8
+  %ptr.iv.1.next = getelementptr i8, ptr %ptr.iv.1, i64 8
+  %l = load i64, ptr %ptr.iv.2, align 8
+  store i64 %l, ptr %ptr.iv.1, align 8
+  %ec = icmp eq ptr %ptr.iv.2, %end
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
