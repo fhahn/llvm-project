@@ -554,6 +554,9 @@ bool RuntimePointerChecking::insert(Loop *Lp, Value *Ptr, const SCEV *PtrExpr,
       &DC.getPointerBounds(), DC.getDT(), DC.getAC(), LoopGuards);
   if (isa<SCEVCouldNotCompute>(ScStart) || isa<SCEVCouldNotCompute>(ScEnd))
     return false;
+  // Bounds containing undef or poison must be frozen before checking them.
+  NeedsFreeze |= PSE.getSE()->containsUndefs(ScStart) ||
+                 PSE.getSE()->containsUndefs(ScEnd);
   Pointers.emplace_back(Ptr, ScStart, ScEnd, WritePtr, DepSetId, ASId, PtrExpr,
                         NeedsFreeze, IsForked);
   return true;
