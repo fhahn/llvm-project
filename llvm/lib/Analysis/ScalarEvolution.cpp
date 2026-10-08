@@ -15312,6 +15312,60 @@ ScalarEvolution::rewriteUsingPredicate(const SCEV *S, const Loop *L,
   return SCEVPredicateRewriter::rewrite(S, L, *this, nullptr, &Preds);
 }
 
+/// Returns true if the wrap predicate \p P is known to hold and false if it is
+/// known to fail, mirroring the runtime check emitted by
+/// SCEVExpander::generateOverflowCheck. Like the expander, this assumes the
+/// loop of \p P takes at most its predicated symbolic maximum backedge-taken
+/// count backedges.
+static std::optional<bool> isKnownWrapPredicate(ScalarEvolution &SE,
+                                                const SCEVPredicate *P) {
+  auto *WP = dyn_cast<SCEVWrapPredicate>(P);
+  if (!WP || !WP->getExpr()->isAffine())
+    return std::nullopt;
+  const SCEVAddRecExpr *AR = WP->getExpr();
+  SmallVector<const SCEVPredicate *> BTCPreds;
+  const SCEV *BTC =
+      SE.getPredicatedSymbolicMaxBackedgeTakenCount(AR->getLoop(), BTCPreds);
+  if (isa<SCEVCouldNotCompute>(BTC))
+    return std::nullopt;
+  const SCEV *Step = AR->getStepRecurrence(SE);
+  bool IsNeg = SE.isKnownNegative(Step);
+  if (!IsNeg && !SE.isKnownPositive(Step))
+    return std::nullopt;
+
+  // Compute the distance |Step| * BTC covered by AR in a type wide enough to
+  // not overflow. If it does not fit in AR's type, AR must wrap.
+  unsigned BW = SE.getTypeSizeInBits(AR->getType());
+  unsigned WideBW =
+      BW + std::max<unsigned>(BW, SE.getTypeSizeInBits(BTC->getType()));
+  Type *WideTy = IntegerType::get(SE.getContext(), WideBW);
+  const SCEV *AbsStep = IsNeg ? SE.getNegativeSCEV(Step) : Step;
+  const SCEV *Dist = SE.getMulExpr(SE.getZeroExtendExpr(AbsStep, WideTy),
+                                   SE.getZeroExtendExpr(BTC, WideTy));
+  std::optional<bool> Fits =
+      SE.evaluatePredicate(ICmpInst::ICMP_ULE, Dist,
+                           SE.getConstant(APInt::getLowBitsSet(WideBW, BW)));
+  if (Fits != true)
+    return Fits;
+
+  // Otherwise AR wraps iff its value End after BTC backedges crosses Start.
+  const SCEV *Start = AR->getStart();
+  const SCEV *End = AR->evaluateAtIteration(BTC, SE);
+  ICmpInst::Predicate NoWrapPred =
+      IsNeg ? ICmpInst::ICMP_ULE : ICmpInst::ICMP_UGE;
+  std::optional<bool> NUSW = true, NSSW = true;
+  if (WP->getFlags() & SCEVWrapPredicate::IncrementNUSW)
+    NUSW = SE.evaluatePredicate(NoWrapPred, End, Start);
+  if (WP->getFlags() & SCEVWrapPredicate::IncrementNSSW)
+    NSSW = SE.evaluatePredicate(ICmpInst::getSignedPredicate(NoWrapPred), End,
+                                Start);
+  if (NUSW == false || NSSW == false)
+    return false;
+  if (NUSW && NSSW)
+    return true;
+  return std::nullopt;
+}
+
 const SCEVAddRecExpr *ScalarEvolution::convertSCEVToAddRecWithPredicates(
     const SCEV *S, const Loop *L,
     SmallVectorImpl<const SCEVPredicate *> &Preds) {
@@ -15486,6 +15540,10 @@ bool SCEVUnionPredicate::implies(const SCEVPredicate *N,
 
   if (any_of(Preds,
              [N, &SE](const SCEVPredicate *I) { return I->implies(N, SE); }))
+    return true;
+
+  // A wrap predicate known to hold is implied by any predicate.
+  if (isKnownWrapPredicate(SE, N) == true)
     return true;
 
   // A wrap predicate may be implied by a wrap predicate in Preds after applying

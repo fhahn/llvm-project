@@ -6,8 +6,9 @@
 
 @x = external global [2 x [3 x [5 x i16]]]
 
-define void @phi_with_poison() {
-; CHECK-LABEL: define void @phi_with_poison() {
+define void @phi_with_poison(i64 %n) {
+; CHECK-LABEL: define void @phi_with_poison(
+; CHECK-SAME: i64 [[N:%.*]]) {
 ; CHECK-NEXT:  [[BB6_LVER_CHECK:.*:]]
 ; CHECK-NEXT:    br i1 poison, label %[[BB6_PH_LVER_ORIG:.*]], label %[[BB6_PH:.*]]
 ; CHECK:       [[BB6_PH_LVER_ORIG]]:
@@ -20,7 +21,8 @@ define void @phi_with_poison() {
 ; CHECK-NEXT:    [[_TMP130_LVER_ORIG:%.*]] = load i16, ptr [[_TMP129_LVER_ORIG]], align 2
 ; CHECK-NEXT:    store i16 poison, ptr @x, align 2
 ; CHECK-NEXT:    [[_TMP142_LVER_ORIG]] = add i64 [[_TMP1423_LVER_ORIG]], 1
-; CHECK-NEXT:    br i1 false, label %[[BB6_LVER_ORIG]], label %[[LOOP_EXIT_LOOPEXIT:.*]]
+; CHECK-NEXT:    [[EC_LVER_ORIG:%.*]] = icmp ne i64 [[_TMP142_LVER_ORIG]], [[N]]
+; CHECK-NEXT:    br i1 [[EC_LVER_ORIG]], label %[[BB6_LVER_ORIG]], label %[[LOOP_EXIT_LOOPEXIT:.*]]
 ; CHECK:       [[BB6_PH]]:
 ; CHECK-NEXT:    br label %[[BB6:.*]]
 ; CHECK:       [[BB6]]:
@@ -31,7 +33,8 @@ define void @phi_with_poison() {
 ; CHECK-NEXT:    [[_TMP130:%.*]] = load i16, ptr [[_TMP129]], align 2, !alias.scope [[META0:![0-9]+]]
 ; CHECK-NEXT:    store i16 poison, ptr @x, align 2, !alias.scope [[META3:![0-9]+]]
 ; CHECK-NEXT:    [[_TMP142]] = add i64 [[_TMP1423]], 1
-; CHECK-NEXT:    br i1 false, label %[[BB6]], label %[[LOOP_EXIT_LOOPEXIT1:.*]]
+; CHECK-NEXT:    [[EC:%.*]] = icmp ne i64 [[_TMP142]], [[N]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[BB6]], label %[[LOOP_EXIT_LOOPEXIT1:.*]]
 ; CHECK:       [[LOOP_EXIT_LOOPEXIT]]:
 ; CHECK-NEXT:    [[_TMP142_LCSSA_PH:%.*]] = phi i64 [ [[_TMP142_LVER_ORIG]], %[[BB6_LVER_ORIG]] ]
 ; CHECK-NEXT:    [[SPLIT_PH:%.*]] = phi i16 [ poison, %[[BB6_LVER_ORIG]] ]
@@ -58,7 +61,8 @@ bb6:                                              ; preds = %bb6.lr.ph, %bb6
   %_tmp130 = load i16, ptr %_tmp129
   store i16 poison, ptr getelementptr ([2 x [3 x [5 x i16]]], ptr @x, i64 0, i64 poison, i64 poison, i64 poison)
   %_tmp142 = add i64 %_tmp1423, 1
-  br i1 false, label %bb6, label %loop.exit
+  %ec = icmp ne i64 %_tmp142, %n
+  br i1 %ec, label %bb6, label %loop.exit
 
 loop.exit:                                ; preds = %bb6
   %_tmp142.lcssa = phi i64 [ %_tmp142, %bb6 ]
@@ -69,8 +73,9 @@ bb9:                                              ; preds = %bb9.loopexit, %bb1
   ret void
 }
 
-define void @phi_with_non_loop_defined_value() {
-; CHECK-LABEL: define void @phi_with_non_loop_defined_value() {
+define void @phi_with_non_loop_defined_value(i64 %n) {
+; CHECK-LABEL: define void @phi_with_non_loop_defined_value(
+; CHECK-SAME: i64 [[N:%.*]]) {
 ; CHECK-NEXT:  [[BB6_LVER_CHECK:.*:]]
 ; CHECK-NEXT:    [[T:%.*]] = add i16 1, 1
 ; CHECK-NEXT:    br i1 poison, label %[[BB6_PH_LVER_ORIG:.*]], label %[[BB6_PH:.*]]
@@ -84,7 +89,8 @@ define void @phi_with_non_loop_defined_value() {
 ; CHECK-NEXT:    [[_TMP130_LVER_ORIG:%.*]] = load i16, ptr [[_TMP129_LVER_ORIG]], align 2
 ; CHECK-NEXT:    store i16 poison, ptr @x, align 2
 ; CHECK-NEXT:    [[_TMP142_LVER_ORIG]] = add i64 [[_TMP1423_LVER_ORIG]], 1
-; CHECK-NEXT:    br i1 false, label %[[BB6_LVER_ORIG]], label %[[LOOP_EXIT_LOOPEXIT:.*]]
+; CHECK-NEXT:    [[EC_LVER_ORIG:%.*]] = icmp ne i64 [[_TMP142_LVER_ORIG]], [[N]]
+; CHECK-NEXT:    br i1 [[EC_LVER_ORIG]], label %[[BB6_LVER_ORIG]], label %[[LOOP_EXIT_LOOPEXIT:.*]]
 ; CHECK:       [[BB6_PH]]:
 ; CHECK-NEXT:    br label %[[BB6:.*]]
 ; CHECK:       [[BB6]]:
@@ -95,7 +101,8 @@ define void @phi_with_non_loop_defined_value() {
 ; CHECK-NEXT:    [[_TMP130:%.*]] = load i16, ptr [[_TMP129]], align 2, !alias.scope [[META5:![0-9]+]]
 ; CHECK-NEXT:    store i16 poison, ptr @x, align 2, !alias.scope [[META8:![0-9]+]]
 ; CHECK-NEXT:    [[_TMP142]] = add i64 [[_TMP1423]], 1
-; CHECK-NEXT:    br i1 false, label %[[BB6]], label %[[LOOP_EXIT_LOOPEXIT1:.*]]
+; CHECK-NEXT:    [[EC:%.*]] = icmp ne i64 [[_TMP142]], [[N]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[BB6]], label %[[LOOP_EXIT_LOOPEXIT1:.*]]
 ; CHECK:       [[LOOP_EXIT_LOOPEXIT]]:
 ; CHECK-NEXT:    [[_TMP142_LCSSA_PH:%.*]] = phi i64 [ [[_TMP142_LVER_ORIG]], %[[BB6_LVER_ORIG]] ]
 ; CHECK-NEXT:    [[SPLIT_PH:%.*]] = phi i16 [ [[T]], %[[BB6_LVER_ORIG]] ]
@@ -123,7 +130,8 @@ bb6:                                              ; preds = %bb6.lr.ph, %bb6
   %_tmp130 = load i16, ptr %_tmp129
   store i16 poison, ptr getelementptr ([2 x [3 x [5 x i16]]], ptr @x, i64 0, i64 poison, i64 poison, i64 poison)
   %_tmp142 = add i64 %_tmp1423, 1
-  br i1 false, label %bb6, label %loop.exit
+  %ec = icmp ne i64 %_tmp142, %n
+  br i1 %ec, label %bb6, label %loop.exit
 
 loop.exit:                                ; preds = %bb6
   %_tmp142.lcssa = phi i64 [ %_tmp142, %bb6 ]
