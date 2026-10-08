@@ -660,6 +660,18 @@ bool RuntimePointerChecking::tryToCreateDiffCheck(
   return true;
 }
 
+/// Returns true if the address ranges of \p A and \p B are known to be
+/// disjoint, i.e. a runtime check between them would always pass.
+static bool areKnownDisjoint(const RuntimeCheckingPtrGroup &A,
+                             const RuntimeCheckingPtrGroup &B,
+                             ScalarEvolution &SE) {
+  // Bounds that need freezing may not match their SCEV expressions.
+  if (A.NeedsFreeze || B.NeedsFreeze)
+    return false;
+  return SE.isKnownPredicate(ICmpInst::ICMP_ULE, A.High, B.Low) ||
+         SE.isKnownPredicate(ICmpInst::ICMP_ULE, B.High, A.Low);
+}
+
 SmallVector<RuntimePointerCheck, 4> RuntimePointerChecking::generateChecks() {
   SmallVector<RuntimePointerCheck, 4> Checks;
 
@@ -668,7 +680,7 @@ SmallVector<RuntimePointerCheck, 4> RuntimePointerChecking::generateChecks() {
       const RuntimeCheckingPtrGroup &CGI = CheckingGroups[I];
       const RuntimeCheckingPtrGroup &CGJ = CheckingGroups[J];
 
-      if (needsChecking(CGI, CGJ)) {
+      if (needsChecking(CGI, CGJ) && !areKnownDisjoint(CGI, CGJ, *SE)) {
         CanUseDiffCheck = CanUseDiffCheck && tryToCreateDiffCheck(CGI, CGJ);
         Checks.emplace_back(&CGI, &CGJ);
       }
