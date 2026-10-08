@@ -10,18 +10,19 @@ define i64 @reuse_long_sum(i32 %a, i8 %x, i8 %y, ptr %p) {
 ; CHECK-SAME: i32 [[A:%.*]], i8 [[X:%.*]], i8 [[Y:%.*]], ptr [[P:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    [[L0:%.*]] = load i8, ptr [[P]], align 1
+; CHECK-NEXT:    [[A_0:%.*]] = add i32 0, [[A]]
 ; CHECK-NEXT:    [[Z0:%.*]] = zext i8 [[L0]] to i32
+; CHECK-NEXT:    [[S0:%.*]] = add i32 [[A_0]], [[Z0]]
 ; CHECK-NEXT:    [[ZX:%.*]] = zext i8 [[X]] to i32
+; CHECK-NEXT:    [[S1:%.*]] = add i32 [[S0]], [[ZX]]
 ; CHECK-NEXT:    [[ZY:%.*]] = zext i8 [[Y]] to i32
+; CHECK-NEXT:    [[S2:%.*]] = add i32 [[S1]], [[ZY]]
 ; CHECK-NEXT:    [[L1:%.*]] = load i8, ptr [[P]], align 1
 ; CHECK-NEXT:    [[Z1:%.*]] = zext i8 [[L1]] to i32
-; CHECK-NEXT:    store volatile i32 0, ptr [[P]], align 4
-; CHECK-NEXT:    [[TMP0:%.*]] = add i32 [[A]], [[Z0]]
-; CHECK-NEXT:    [[TMP1:%.*]] = add i32 [[TMP0]], [[Z1]]
-; CHECK-NEXT:    [[TMP2:%.*]] = add i32 [[TMP1]], [[ZY]]
-; CHECK-NEXT:    [[TMP3:%.*]] = add i32 [[TMP2]], [[ZX]]
+; CHECK-NEXT:    [[TMP3:%.*]] = add i32 [[S2]], [[Z1]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = add i32 [[TMP3]], 1
 ; CHECK-NEXT:    [[TMP5:%.*]] = zext i32 [[TMP4]] to i64
+; CHECK-NEXT:    store volatile i32 0, ptr [[P]], align 4
 ; CHECK-NEXT:    [[TMP6:%.*]] = add nuw nsw i64 [[TMP5]], 1
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
