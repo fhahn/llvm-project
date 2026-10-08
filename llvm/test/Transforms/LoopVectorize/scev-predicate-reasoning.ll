@@ -244,3 +244,95 @@ loop:
 exit:
   ret void
 }
+
+; {%dst,+,160} wraps for the BTC of 3689348814741910335; its no-wrap predicate
+; is known to fail.
+define void @wrap_predicate_known_to_fail(ptr %dst) {
+; CHECK-LABEL: define void @wrap_predicate_known_to_fail(
+; CHECK-SAME: ptr [[DST:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    br label %[[LOOP:.*]]
+; CHECK:       [[LOOP]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[GEP:%.*]] = getelementptr i64, ptr [[DST]], i64 [[IV]]
+; CHECK-NEXT:    store i64 0, ptr [[GEP]], align 8
+; CHECK-NEXT:    [[GEP_OFF:%.*]] = getelementptr i8, ptr [[GEP]], i64 -8
+; CHECK-NEXT:    store i64 1, ptr [[GEP_OFF]], align 8
+; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 20
+; CHECK-NEXT:    [[EC:%.*]] = icmp ne i64 [[IV_NEXT]], 256
+; CHECK-NEXT:    br i1 [[EC]], label %[[LOOP]], label %[[EXIT:.*]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep = getelementptr i64, ptr %dst, i64 %iv
+  store i64 0, ptr %gep, align 8
+  %gep.off = getelementptr i8, ptr %gep, i64 -8
+  store i64 1, ptr %gep.off, align 8
+  %iv.next = add i64 %iv, 20
+  %ec = icmp ne i64 %iv.next, 256
+  br i1 %ec, label %loop, label %exit
+
+exit:
+  ret void
+}
+
+; The wrap predicate for %iv from the latch exit count holds, because the
+; header exit bounds the backedge-taken count by 127.
+define void @wrap_predicate_known_to_hold_multi_exit(ptr %dst, i64 %n) {
+; CHECK-LABEL: define void @wrap_predicate_known_to_hold_multi_exit(
+; CHECK-SAME: ptr [[DST:%.*]], i64 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[TMP0:%.*]] = call i64 @llvm.smin.i64(i64 [[N]], i64 255)
+; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 255, [[TMP0]]
+; CHECK-NEXT:    [[TMP2:%.*]] = call i64 @llvm.umin.i64(i64 [[TMP1]], i64 127)
+; CHECK-NEXT:    [[TMP3:%.*]] = trunc i64 [[TMP2]] to i32
+; CHECK-NEXT:    [[TMP4:%.*]] = add nuw nsw i32 [[TMP3]], 1
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ule i32 [[TMP4]], 4
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[TMP5:%.*]] = and i32 [[TMP4]], 3
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i32 [[TMP5]], 0
+; CHECK-NEXT:    [[TMP7:%.*]] = select i1 [[TMP6]], i32 4, i32 [[TMP5]]
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i32 [[TMP4]], [[TMP7]]
+; CHECK-NEXT:    [[TMP8:%.*]] = trunc i32 [[N_VEC]] to i8
+; CHECK-NEXT:    [[TMP9:%.*]] = sub i8 -1, [[TMP8]]
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP10:%.*]] = trunc i32 [[INDEX]] to i8
+; CHECK-NEXT:    [[TMP11:%.*]] = sub i8 -1, [[TMP10]]
+; CHECK-NEXT:    [[TMP12:%.*]] = zext i8 [[TMP11]] to i64
+; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr i32, ptr [[DST]], i64 [[TMP12]]
+; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr i32, ptr [[TMP13]], i64 -3
+; CHECK-NEXT:    store <4 x i32> zeroinitializer, ptr [[TMP14]], align 4
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 4
+; CHECK-NEXT:    [[TMP15:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP15]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP9:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    br label %[[SCALAR_PH]]
+; CHECK:       [[SCALAR_PH]]:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i8 [ -1, %entry ], [ %iv.next, %latch ]
+  %c.0 = icmp eq i8 %iv, -128
+  br i1 %c.0, label %exit, label %latch
+
+latch:
+  %iv.ext = zext i8 %iv to i64
+  %gep = getelementptr i32, ptr %dst, i64 %iv.ext
+  store i32 0, ptr %gep, align 4
+  %iv.next = add i8 %iv, -1
+  %c.1 = icmp sgt i64 %iv.ext, %n
+  br i1 %c.1, label %loop, label %exit
+
+exit:
+  ret void
+}

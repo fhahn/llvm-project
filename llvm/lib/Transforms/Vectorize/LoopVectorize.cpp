@@ -1536,7 +1536,6 @@ public:
     if (CostTooHigh) {
       // Mark runtime checks as never succeeding when they exceed the threshold.
       MemRuntimeCheckCond = ConstantInt::getTrue(L->getHeader()->getContext());
-      SCEVCheckCond = ConstantInt::getTrue(L->getHeader()->getContext());
       ORE.emit([&]() {
         return OptimizationRemarkAnalysisAliasing(
                    DEBUG_TYPE, "TooManyMemoryRuntimeChecks", L->getStartLoc(),
@@ -1560,12 +1559,8 @@ public:
 
       SCEVCheckCond = SCEVExp.expandCodeForPredicate(
           &UnionPred, SCEVCheckBlock->getTerminator());
-      if (isa<Constant>(SCEVCheckCond)) {
-        // Clean up directly after expanding the predicate to a constant, to
-        // avoid further expansions re-using anything left over from SCEVExp.
-        SCEVExpanderCleaner SCEVCleaner(SCEVExp);
-        SCEVCleaner.cleanup();
-      }
+      assert(!isa<Constant>(SCEVCheckCond) &&
+             "SCEV predicates should not be known to hold or fail");
     }
 
     const auto &RtPtrChecking = *LAI.getRuntimePointerChecking();
@@ -1732,8 +1727,7 @@ public:
   /// Retrieves the SCEVCheckCond and SCEVCheckBlock that were generated as IR
   /// outside VPlan.
   std::pair<Value *, BasicBlock *> getSCEVChecks() const {
-    using namespace llvm::PatternMatch;
-    if (!SCEVCheckCond || match(SCEVCheckCond, m_ZeroInt()))
+    if (!SCEVCheckCond)
       return {nullptr, nullptr};
 
     return {SCEVCheckCond, SCEVCheckBlock};
@@ -7887,12 +7881,9 @@ bool LoopVectorizePass::processLoop(Loop *L) {
       Checks.create(L, *LVL.getLAI(), PSE.getPredicate(), VF.Width, SelectedIC,
                     *ORE);
 
-      // Bail out early if either the SCEV or memory runtime checks are known to
-      // fail. In that case, the vector loop would never execute.
+      // Bail out early if the memory runtime checks are known to fail. In that
+      // case, the vector loop would never execute.
       using namespace llvm::PatternMatch;
-      if (Checks.getSCEVChecks().first &&
-          match(Checks.getSCEVChecks().first, m_One()))
-        return false;
       if (Checks.getMemRuntimeChecks().first &&
           match(Checks.getMemRuntimeChecks().first, m_One()))
         return false;

@@ -1048,6 +1048,13 @@ bool VPlanTransforms::finalizeSCEVPredicates(VPlan &Plan,
       PSE.addPredicate(*P);
   }
 
+  if (PSE.isKnownToFail()) {
+    reportVectorizationFailure("SCEV predicates are known to fail",
+                               "runtime SCEV checks would always fail",
+                               "SCEVChecksAlwaysFail", ORE, TheLoop);
+    return false;
+  }
+
   unsigned TotalComplexity = PSE.getPredicate().getComplexity();
   if (TotalComplexity && OptForSize) {
     LLVM_DEBUG(
