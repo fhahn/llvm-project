@@ -138,11 +138,9 @@ inline succ_iterator succ_end(Instruction *I) { return I->successors().end(); }
 inline const_succ_iterator succ_end(const Instruction *I) {
   return I->successors().end();
 }
-inline bool succ_empty(const Instruction *I) {
-  return succ_begin(I) == succ_end(I);
-}
+inline bool succ_empty(const Instruction *I) { return I->successors().empty(); }
 inline unsigned succ_size(const Instruction *I) {
-  return std::distance(succ_begin(I), succ_end(I));
+  return llvm::size(I->successors());
 }
 inline succ_range successors(Instruction *I) { return I->successors(); }
 inline const_succ_range successors(const Instruction *I) {
@@ -162,10 +160,10 @@ inline const_succ_iterator succ_end(const BasicBlock *BB) {
   return succ_end(BB->getTerminator());
 }
 inline bool succ_empty(const BasicBlock *BB) {
-  return succ_begin(BB) == succ_end(BB);
+  return succ_empty(BB->getTerminator());
 }
 inline unsigned succ_size(const BasicBlock *BB) {
-  return std::distance(succ_begin(BB), succ_end(BB));
+  return succ_size(BB->getTerminator());
 }
 inline succ_range successors(BasicBlock *BB) {
   return successors(BB->getTerminator());
@@ -186,6 +184,7 @@ template <> struct GraphTraits<BasicBlock*> {
   using ChildIteratorType = succ_iterator;
 
   static NodeRef getEntryNode(BasicBlock *BB) { return BB; }
+  // children<BasicBlock *>() is specialized below to match these.
   static ChildIteratorType child_begin(NodeRef N) { return succ_begin(N); }
   static ChildIteratorType child_end(NodeRef N) { return succ_end(N); }
 
@@ -201,6 +200,7 @@ template <> struct GraphTraits<const BasicBlock*> {
 
   static NodeRef getEntryNode(const BasicBlock *BB) { return BB; }
 
+  // children<const BasicBlock *>() is specialized below to match these.
   static ChildIteratorType child_begin(NodeRef N) { return succ_begin(N); }
   static ChildIteratorType child_end(NodeRef N) { return succ_end(N); }
 
@@ -209,6 +209,18 @@ template <> struct GraphTraits<const BasicBlock*> {
 
 static_assert(GraphHasNodeNumbers<const BasicBlock *>,
               "GraphTraits getNumber() not detected");
+
+// Specialize the generic children() from GraphTraits.h, which calls
+// child_begin() and child_end() separately, so that the range comes from one
+// out-of-line Instruction::successors() call.
+template <> inline succ_range children<BasicBlock *>(BasicBlock *const &BB) {
+  return successors(BB);
+}
+template <>
+inline const_succ_range
+children<const BasicBlock *>(const BasicBlock *const &BB) {
+  return successors(BB);
+}
 
 // Provide specializations of GraphTraits to be able to treat a function as a
 // graph of basic blocks... and to walk it in inverse order.  Inverse order for
