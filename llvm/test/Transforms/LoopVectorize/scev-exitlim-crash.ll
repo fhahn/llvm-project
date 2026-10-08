@@ -10,6 +10,9 @@ target datalayout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f3
 @c = common global i32 0, align 4
 
 ; CHECK-LABEL: @fn1(
+; CHECK:      vector.memcheck:
+; CHECK-NEXT:   [[FR:%.*]] = freeze i1 poison
+; CHECK-NEXT:   br i1 [[FR]], label %scalar.ph, label %vector.ph
 ; CHECK: vector.body
 define void @fn1() #0 {
 entry:
