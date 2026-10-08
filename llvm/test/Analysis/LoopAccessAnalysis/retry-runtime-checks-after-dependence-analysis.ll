@@ -346,14 +346,9 @@ define void @retry_after_dep_check_with_unknown_offset(ptr %A, i32 %offset) {
 ; CHECK-NEXT:      Check 0:
 ; CHECK-NEXT:        Comparing group GRP0:
 ; CHECK-NEXT:          %A.100.iv = getelementptr { float, float }, ptr %A.100, i64 %iv
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %A.100.iv.offset.3 = getelementptr i8, ptr %A.100, i64 %iv.offset.3
-; CHECK-NEXT:      Check 1:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %A.100.iv = getelementptr { float, float }, ptr %A.100, i64 %iv
 ; CHECK-NEXT:        Against group GRP2:
 ; CHECK-NEXT:        ptr %A
-; CHECK-NEXT:      Check 2:
+; CHECK-NEXT:      Check 1:
 ; CHECK-NEXT:        Comparing group GRP1:
 ; CHECK-NEXT:          %A.100.iv.offset.3 = getelementptr i8, ptr %A.100, i64 %iv.offset.3
 ; CHECK-NEXT:        Against group GRP2:
@@ -533,14 +528,9 @@ define void @independent_interleaved_stores(ptr %a, i64 %offset, i64 %n) {
 ; CHECK-NEXT:      Check 0:
 ; CHECK-NEXT:        Comparing group GRP0:
 ; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
-; CHECK-NEXT:      Check 1:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
 ; CHECK-NEXT:        Against group GRP2:
 ; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
-; CHECK-NEXT:      Check 2:
+; CHECK-NEXT:      Check 1:
 ; CHECK-NEXT:        Comparing group GRP1:
 ; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
 ; CHECK-NEXT:        Against group GRP2:
@@ -591,14 +581,9 @@ define void @independent_interleaved_stores_negative_step(ptr %a, i64 %offset, i
 ; CHECK-NEXT:      Check 0:
 ; CHECK-NEXT:        Comparing group GRP0:
 ; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %idx.0
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
-; CHECK-NEXT:      Check 1:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %idx.0
 ; CHECK-NEXT:        Against group GRP2:
 ; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %idx.off
-; CHECK-NEXT:      Check 2:
+; CHECK-NEXT:      Check 1:
 ; CHECK-NEXT:        Comparing group GRP1:
 ; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
 ; CHECK-NEXT:        Against group GRP2:
@@ -706,11 +691,6 @@ define void @independent_accesses_more_than_step_apart(ptr %a, i64 %offset) {
 ; CHECK-NEXT:        Against group GRP1:
 ; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i16, ptr %a, i64 %iv.off
 ; CHECK-NEXT:      Check 1:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.a = getelementptr inbounds i16, ptr %a, i64 %iv
-; CHECK-NEXT:        Against group GRP2:
-; CHECK-NEXT:          %gep.a.10000 = getelementptr inbounds i16, ptr %gep.a, i64 10000
-; CHECK-NEXT:      Check 2:
 ; CHECK-NEXT:        Comparing group GRP1:
 ; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i16, ptr %a, i64 %iv.off
 ; CHECK-NEXT:        Against group GRP2:
@@ -924,14 +904,9 @@ define void @interleaved_stores_multiple_sizes_same_ptr_overlapping(ptr %a, i64 
 ; CHECK-NEXT:      Check 0:
 ; CHECK-NEXT:        Comparing group GRP0:
 ; CHECK-NEXT:          %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %gep.a.2 = getelementptr inbounds i8, ptr %gep.a, i64 2
-; CHECK-NEXT:      Check 1:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
 ; CHECK-NEXT:        Against group GRP2:
 ; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.off
-; CHECK-NEXT:      Check 2:
+; CHECK-NEXT:      Check 1:
 ; CHECK-NEXT:        Comparing group GRP1:
 ; CHECK-NEXT:          %gep.a.2 = getelementptr inbounds i8, ptr %gep.a, i64 2
 ; CHECK-NEXT:        Against group GRP2:
@@ -986,14 +961,9 @@ define void @interleaved_stores_with_load_from_same_ptr(ptr %a, i64 %offset, i64
 ; CHECK-NEXT:      Check 0:
 ; CHECK-NEXT:        Comparing group GRP0:
 ; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
-; CHECK-NEXT:      Check 1:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
 ; CHECK-NEXT:        Against group GRP2:
 ; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
-; CHECK-NEXT:      Check 2:
+; CHECK-NEXT:      Check 1:
 ; CHECK-NEXT:        Comparing group GRP1:
 ; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
 ; CHECK-NEXT:        Against group GRP2:
@@ -1052,11 +1022,6 @@ define void @interleaved_loads_with_store_to_same_ptr(ptr %a, i64 %offset, i64 %
 ; CHECK-NEXT:        Against group GRP1:
 ; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
 ; CHECK-NEXT:      Check 1:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
-; CHECK-NEXT:        Against group GRP2:
-; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
-; CHECK-NEXT:      Check 2:
 ; CHECK-NEXT:        Comparing group GRP1:
 ; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
 ; CHECK-NEXT:        Against group GRP2:
@@ -1115,11 +1080,6 @@ define void @same_address_complementary_stores(ptr %a, i64 %offset, i1 %c, i64 %
 ; CHECK-NEXT:        Against group GRP1:
 ; CHECK-NEXT:          %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
 ; CHECK-NEXT:      Check 1:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.a.off.0 = getelementptr inbounds i8, ptr %a.off, i64 %iv
-; CHECK-NEXT:        Against group GRP2:
-; CHECK-NEXT:          %gep.a.off.1 = getelementptr inbounds i8, ptr %a.off, i64 %iv
-; CHECK-NEXT:      Check 2:
 ; CHECK-NEXT:        Comparing group GRP1:
 ; CHECK-NEXT:          %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
 ; CHECK-NEXT:        Against group GRP2:
@@ -1189,11 +1149,6 @@ define void @same_address_load_store(ptr %a, i64 %offset, i64 %n) {
 ; CHECK-NEXT:          %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
 ; CHECK-NEXT:        Against group GRP2:
 ; CHECK-NEXT:          %gep.a.off.0 = getelementptr inbounds i8, ptr %a.off, i64 %iv
-; CHECK-NEXT:      Check 2:
-; CHECK-NEXT:        Comparing group GRP1:
-; CHECK-NEXT:          %gep.a.off.1 = getelementptr inbounds i8, ptr %a.off, i64 %iv
-; CHECK-NEXT:        Against group GRP2:
-; CHECK-NEXT:          %gep.a.off.0 = getelementptr inbounds i8, ptr %a.off, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
 ; CHECK-NEXT:          (Low: %a High: ((4 * %n) + %a))
@@ -1248,11 +1203,6 @@ define void @same_address_negative_stride(ptr %a, i64 %offset, i64 %n) {
 ; CHECK-NEXT:      Check 1:
 ; CHECK-NEXT:        Comparing group GRP0:
 ; CHECK-NEXT:          %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv.next
-; CHECK-NEXT:        Against group GRP2:
-; CHECK-NEXT:          %gep.a.off.1 = getelementptr inbounds i8, ptr %a.off, i64 %iv.next
-; CHECK-NEXT:      Check 2:
-; CHECK-NEXT:        Comparing group GRP1:
-; CHECK-NEXT:          %gep.a.off.0 = getelementptr inbounds i8, ptr %a.off, i64 %iv.next
 ; CHECK-NEXT:        Against group GRP2:
 ; CHECK-NEXT:          %gep.a.off.1 = getelementptr inbounds i8, ptr %a.off, i64 %iv.next
 ; CHECK-NEXT:      Grouped accesses:
@@ -1311,11 +1261,6 @@ define void @same_address_different_sizes(ptr %a, i64 %offset, i64 %n) {
 ; CHECK-NEXT:          %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
 ; CHECK-NEXT:        Against group GRP2:
 ; CHECK-NEXT:          %gep.a.off.1 = getelementptr inbounds [2 x i8], ptr %a.off, i64 %iv
-; CHECK-NEXT:      Check 2:
-; CHECK-NEXT:        Comparing group GRP1:
-; CHECK-NEXT:          %gep.a.off.0 = getelementptr inbounds i16, ptr %a.off, i64 %iv
-; CHECK-NEXT:        Against group GRP2:
-; CHECK-NEXT:          %gep.a.off.1 = getelementptr inbounds [2 x i8], ptr %a.off, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
 ; CHECK-NEXT:          (Low: %a High: ((4 * %n) + %a))
@@ -1372,11 +1317,6 @@ define void @same_address_strided(ptr %a, i64 %offset, i64 %n) {
 ; CHECK-NEXT:          %gep.a = getelementptr inbounds [2 x i32], ptr %a, i64 %iv
 ; CHECK-NEXT:        Against group GRP2:
 ; CHECK-NEXT:          %gep.a.off.1 = getelementptr inbounds [2 x i8], ptr %a.off, i64 %iv
-; CHECK-NEXT:      Check 2:
-; CHECK-NEXT:        Comparing group GRP1:
-; CHECK-NEXT:          %gep.a.off.0 = getelementptr inbounds [2 x i8], ptr %a.off, i64 %iv
-; CHECK-NEXT:        Against group GRP2:
-; CHECK-NEXT:          %gep.a.off.1 = getelementptr inbounds [2 x i8], ptr %a.off, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
 ; CHECK-NEXT:          (Low: %a High: (-4 + (8 * %n) + %a))
@@ -1431,11 +1371,6 @@ define void @same_address_different_types(ptr %a, i64 %offset, i64 %n) {
 ; CHECK-NEXT:      Check 1:
 ; CHECK-NEXT:        Comparing group GRP0:
 ; CHECK-NEXT:          %gep.a = getelementptr inbounds i8, ptr %a, i64 %iv
-; CHECK-NEXT:        Against group GRP2:
-; CHECK-NEXT:          %gep.a.off.1 = getelementptr inbounds float, ptr %a.off, i64 %iv
-; CHECK-NEXT:      Check 2:
-; CHECK-NEXT:        Comparing group GRP1:
-; CHECK-NEXT:          %gep.a.off.0 = getelementptr inbounds i32, ptr %a.off, i64 %iv
 ; CHECK-NEXT:        Against group GRP2:
 ; CHECK-NEXT:          %gep.a.off.1 = getelementptr inbounds float, ptr %a.off, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
@@ -1550,29 +1485,14 @@ define void @interleaved_stores_and_load_more_than_step_apart(ptr %a, i64 %offse
 ; CHECK-NEXT:      Check 0:
 ; CHECK-NEXT:        Comparing group GRP0:
 ; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
+; CHECK-NEXT:        Against group GRP2:
+; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
 ; CHECK-NEXT:      Check 1:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
+; CHECK-NEXT:        Comparing group GRP1:
+; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
 ; CHECK-NEXT:        Against group GRP2:
 ; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
 ; CHECK-NEXT:      Check 2:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
-; CHECK-NEXT:        Against group GRP3:
-; CHECK-NEXT:          %gep.a.3 = getelementptr inbounds i32, ptr %gep.a.0, i64 3
-; CHECK-NEXT:      Check 3:
-; CHECK-NEXT:        Comparing group GRP1:
-; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
-; CHECK-NEXT:        Against group GRP2:
-; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
-; CHECK-NEXT:      Check 4:
-; CHECK-NEXT:        Comparing group GRP1:
-; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
-; CHECK-NEXT:        Against group GRP3:
-; CHECK-NEXT:          %gep.a.3 = getelementptr inbounds i32, ptr %gep.a.0, i64 3
-; CHECK-NEXT:      Check 5:
 ; CHECK-NEXT:        Comparing group GRP2:
 ; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
 ; CHECK-NEXT:        Against group GRP3:
@@ -1632,29 +1552,14 @@ define void @interleaved_stores_and_load_more_than_step_apart_reordered(ptr %a, 
 ; CHECK-NEXT:      Check 0:
 ; CHECK-NEXT:        Comparing group GRP0:
 ; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
+; CHECK-NEXT:        Against group GRP2:
+; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
 ; CHECK-NEXT:      Check 1:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
+; CHECK-NEXT:        Comparing group GRP1:
+; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
 ; CHECK-NEXT:        Against group GRP2:
 ; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
 ; CHECK-NEXT:      Check 2:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
-; CHECK-NEXT:        Against group GRP3:
-; CHECK-NEXT:          %gep.a.3 = getelementptr inbounds i32, ptr %gep.a.0, i64 3
-; CHECK-NEXT:      Check 3:
-; CHECK-NEXT:        Comparing group GRP1:
-; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
-; CHECK-NEXT:        Against group GRP2:
-; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
-; CHECK-NEXT:      Check 4:
-; CHECK-NEXT:        Comparing group GRP1:
-; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
-; CHECK-NEXT:        Against group GRP3:
-; CHECK-NEXT:          %gep.a.3 = getelementptr inbounds i32, ptr %gep.a.0, i64 3
-; CHECK-NEXT:      Check 5:
 ; CHECK-NEXT:        Comparing group GRP2:
 ; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
 ; CHECK-NEXT:        Against group GRP3:
@@ -1778,11 +1683,6 @@ define void @same_address_store_size_less_than_alloc_size(ptr %a, i64 %offset, i
 ; CHECK-NEXT:          %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
 ; CHECK-NEXT:        Against group GRP2:
 ; CHECK-NEXT:          %gep.a.off.1 = getelementptr inbounds i24, ptr %a.off, i64 %iv
-; CHECK-NEXT:      Check 2:
-; CHECK-NEXT:        Comparing group GRP1:
-; CHECK-NEXT:          %gep.a.off.0 = getelementptr inbounds i24, ptr %a.off, i64 %iv
-; CHECK-NEXT:        Against group GRP2:
-; CHECK-NEXT:          %gep.a.off.1 = getelementptr inbounds i24, ptr %a.off, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
 ; CHECK-NEXT:          (Low: %a High: ((4 * %n) + %a))
@@ -1840,29 +1740,24 @@ define void @written_ptr_with_wider_load_and_stores_within_step(ptr %a, i64 %off
 ; CHECK-NEXT:      Check 0:
 ; CHECK-NEXT:        Comparing group GRP0:
 ; CHECK-NEXT:          %gep.a.13 = getelementptr inbounds i8, ptr %gep.a, i64 13
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %gep.a.10 = getelementptr inbounds i8, ptr %gep.a, i64 10
+; CHECK-NEXT:        Against group GRP2:
+; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i64, ptr %a.off, i64 %iv
 ; CHECK-NEXT:      Check 1:
 ; CHECK-NEXT:        Comparing group GRP0:
 ; CHECK-NEXT:          %gep.a.13 = getelementptr inbounds i8, ptr %gep.a, i64 13
-; CHECK-NEXT:        Against group GRP2:
-; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i64, ptr %a.off, i64 %iv
-; CHECK-NEXT:      Check 2:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.a.13 = getelementptr inbounds i8, ptr %gep.a, i64 13
 ; CHECK-NEXT:        Against group GRP3:
 ; CHECK-NEXT:          %gep.a = getelementptr inbounds i64, ptr %a, i64 %iv
+; CHECK-NEXT:      Check 2:
+; CHECK-NEXT:        Comparing group GRP1:
+; CHECK-NEXT:          %gep.a.10 = getelementptr inbounds i8, ptr %gep.a, i64 10
+; CHECK-NEXT:        Against group GRP2:
+; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i64, ptr %a.off, i64 %iv
 ; CHECK-NEXT:      Check 3:
 ; CHECK-NEXT:        Comparing group GRP1:
 ; CHECK-NEXT:          %gep.a.10 = getelementptr inbounds i8, ptr %gep.a, i64 10
-; CHECK-NEXT:        Against group GRP2:
-; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i64, ptr %a.off, i64 %iv
-; CHECK-NEXT:      Check 4:
-; CHECK-NEXT:        Comparing group GRP1:
-; CHECK-NEXT:          %gep.a.10 = getelementptr inbounds i8, ptr %gep.a, i64 10
 ; CHECK-NEXT:        Against group GRP3:
 ; CHECK-NEXT:          %gep.a = getelementptr inbounds i64, ptr %a, i64 %iv
-; CHECK-NEXT:      Check 5:
+; CHECK-NEXT:      Check 4:
 ; CHECK-NEXT:        Comparing group GRP2:
 ; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i64, ptr %a.off, i64 %iv
 ; CHECK-NEXT:        Against group GRP3:
@@ -1988,11 +1883,6 @@ define void @load_and_store_one_step_apart(ptr %a, i64 %offset, i64 %n) {
 ; CHECK-NEXT:        Against group GRP1:
 ; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.off
 ; CHECK-NEXT:      Check 1:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
-; CHECK-NEXT:        Against group GRP2:
-; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a, i64 1
-; CHECK-NEXT:      Check 2:
 ; CHECK-NEXT:        Comparing group GRP1:
 ; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.off
 ; CHECK-NEXT:        Against group GRP2:
@@ -2049,11 +1939,6 @@ define void @load_and_store_two_steps_apart(ptr %a, i64 %offset, i64 %n) {
 ; CHECK-NEXT:        Against group GRP1:
 ; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.off
 ; CHECK-NEXT:      Check 1:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
-; CHECK-NEXT:        Against group GRP2:
-; CHECK-NEXT:          %gep.a.2 = getelementptr inbounds i32, ptr %gep.a, i64 2
-; CHECK-NEXT:      Check 2:
 ; CHECK-NEXT:        Comparing group GRP1:
 ; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.off
 ; CHECK-NEXT:        Against group GRP2:
@@ -2126,36 +2011,6 @@ define void @stores_more_than_step_apart_chained_within_step(ptr %a, i64 %offset
 ; CHECK-NEXT:      Check 3:
 ; CHECK-NEXT:        Comparing group GRP0:
 ; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
-; CHECK-NEXT:        Against group GRP4:
-; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
-; CHECK-NEXT:      Check 4:
-; CHECK-NEXT:        Comparing group GRP1:
-; CHECK-NEXT:          %gep.a.3 = getelementptr inbounds i32, ptr %gep.a.0, i64 3
-; CHECK-NEXT:        Against group GRP2:
-; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
-; CHECK-NEXT:      Check 5:
-; CHECK-NEXT:        Comparing group GRP1:
-; CHECK-NEXT:          %gep.a.3 = getelementptr inbounds i32, ptr %gep.a.0, i64 3
-; CHECK-NEXT:        Against group GRP3:
-; CHECK-NEXT:          %gep.a.2 = getelementptr inbounds i32, ptr %gep.a.0, i64 2
-; CHECK-NEXT:      Check 6:
-; CHECK-NEXT:        Comparing group GRP1:
-; CHECK-NEXT:          %gep.a.3 = getelementptr inbounds i32, ptr %gep.a.0, i64 3
-; CHECK-NEXT:        Against group GRP4:
-; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
-; CHECK-NEXT:      Check 7:
-; CHECK-NEXT:        Comparing group GRP2:
-; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
-; CHECK-NEXT:        Against group GRP3:
-; CHECK-NEXT:          %gep.a.2 = getelementptr inbounds i32, ptr %gep.a.0, i64 2
-; CHECK-NEXT:      Check 8:
-; CHECK-NEXT:        Comparing group GRP2:
-; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
-; CHECK-NEXT:        Against group GRP4:
-; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
-; CHECK-NEXT:      Check 9:
-; CHECK-NEXT:        Comparing group GRP3:
-; CHECK-NEXT:          %gep.a.2 = getelementptr inbounds i32, ptr %gep.a.0, i64 2
 ; CHECK-NEXT:        Against group GRP4:
 ; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
 ; CHECK-NEXT:      Grouped accesses:
@@ -2235,16 +2090,6 @@ define void @unknown_dep_with_one_of_stores_within_step(ptr %a, i64 %offset, i64
 ; CHECK-NEXT:          %gep.a = getelementptr inbounds i64, ptr %a, i64 %iv
 ; CHECK-NEXT:        Against group GRP2:
 ; CHECK-NEXT:          %gep.a.10 = getelementptr inbounds i8, ptr %gep.a, i64 10
-; CHECK-NEXT:      Check 4:
-; CHECK-NEXT:        Comparing group GRP1:
-; CHECK-NEXT:          %gep.a = getelementptr inbounds i64, ptr %a, i64 %iv
-; CHECK-NEXT:        Against group GRP3:
-; CHECK-NEXT:          %gep.a.4 = getelementptr inbounds i8, ptr %gep.a, i64 4
-; CHECK-NEXT:      Check 5:
-; CHECK-NEXT:        Comparing group GRP2:
-; CHECK-NEXT:          %gep.a.10 = getelementptr inbounds i8, ptr %gep.a, i64 10
-; CHECK-NEXT:        Against group GRP3:
-; CHECK-NEXT:          %gep.a.4 = getelementptr inbounds i8, ptr %gep.a, i64 4
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
 ; CHECK-NEXT:          (Low: (%offset + %a) High: (-4 + (8 * %n) + %offset + %a))
@@ -2311,16 +2156,6 @@ define void @same_address_load_store_pairs_in_branches(ptr %a, i64 %offset, i1 %
 ; CHECK-NEXT:        Against group GRP2:
 ; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds [2 x i32], ptr %a, i64 %iv
 ; CHECK-NEXT:      Check 2:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.a.off.1 = getelementptr inbounds [2 x i32], ptr %a, i64 %iv.off
-; CHECK-NEXT:        Against group GRP3:
-; CHECK-NEXT:          %gep.a.off.0 = getelementptr inbounds [2 x i32], ptr %a, i64 %iv.off
-; CHECK-NEXT:      Check 3:
-; CHECK-NEXT:        Comparing group GRP1:
-; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds [2 x i32], ptr %a, i64 %iv
-; CHECK-NEXT:        Against group GRP2:
-; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds [2 x i32], ptr %a, i64 %iv
-; CHECK-NEXT:      Check 4:
 ; CHECK-NEXT:        Comparing group GRP1:
 ; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds [2 x i32], ptr %a, i64 %iv
 ; CHECK-NEXT:        Against group GRP3:
@@ -2395,19 +2230,14 @@ define void @same_address_store_and_load_with_unknown_deps(ptr %a, i64 %offset, 
 ; CHECK-NEXT:      Check 1:
 ; CHECK-NEXT:        Comparing group GRP0:
 ; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv
-; CHECK-NEXT:        Against group GRP2:
-; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %a, i64 %iv
-; CHECK-NEXT:      Check 2:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv
 ; CHECK-NEXT:        Against group GRP3:
 ; CHECK-NEXT:          %gep.a.sub = getelementptr inbounds i32, ptr %a, i64 %iv.sub
-; CHECK-NEXT:      Check 3:
+; CHECK-NEXT:      Check 2:
 ; CHECK-NEXT:        Comparing group GRP1:
 ; CHECK-NEXT:          %gep.a.add = getelementptr inbounds i32, ptr %a, i64 %iv.add
 ; CHECK-NEXT:        Against group GRP2:
 ; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %a, i64 %iv
-; CHECK-NEXT:      Check 4:
+; CHECK-NEXT:      Check 3:
 ; CHECK-NEXT:        Comparing group GRP1:
 ; CHECK-NEXT:          %gep.a.add = getelementptr inbounds i32, ptr %a, i64 %iv.add
 ; CHECK-NEXT:        Against group GRP3:
@@ -2479,11 +2309,6 @@ define void @backward_vectorizable_dep_and_unknown_deps(ptr %a, i64 %offset, i64
 ; CHECK-NEXT:        Against group GRP1:
 ; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.off
 ; CHECK-NEXT:      Check 1:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.a.4 = getelementptr inbounds i32, ptr %gep.a, i64 4
-; CHECK-NEXT:        Against group GRP2:
-; CHECK-NEXT:          %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
-; CHECK-NEXT:      Check 2:
 ; CHECK-NEXT:        Comparing group GRP1:
 ; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.off
 ; CHECK-NEXT:        Against group GRP2:
@@ -2537,74 +2362,64 @@ define void @interleaved_stores_with_unknown_deps_to_two_objects(ptr %a, ptr %b,
 ; CHECK-NEXT:      Check 0:
 ; CHECK-NEXT:        Comparing group GRP0:
 ; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
-; CHECK-NEXT:        Against group GRP1:
-; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
+; CHECK-NEXT:        Against group GRP2:
+; CHECK-NEXT:          %gep.b.0 = getelementptr inbounds i32, ptr %b, i64 %iv.2
 ; CHECK-NEXT:      Check 1:
 ; CHECK-NEXT:        Comparing group GRP0:
 ; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
-; CHECK-NEXT:        Against group GRP2:
-; CHECK-NEXT:          %gep.b.0 = getelementptr inbounds i32, ptr %b, i64 %iv.2
+; CHECK-NEXT:        Against group GRP3:
+; CHECK-NEXT:          %gep.b.1 = getelementptr inbounds i32, ptr %gep.b.0, i64 1
 ; CHECK-NEXT:      Check 2:
 ; CHECK-NEXT:        Comparing group GRP0:
 ; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
-; CHECK-NEXT:        Against group GRP3:
-; CHECK-NEXT:          %gep.b.1 = getelementptr inbounds i32, ptr %gep.b.0, i64 1
-; CHECK-NEXT:      Check 3:
-; CHECK-NEXT:        Comparing group GRP0:
-; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
 ; CHECK-NEXT:        Against group GRP4:
 ; CHECK-NEXT:          %gep.b.off = getelementptr inbounds i32, ptr %b, i64 %iv.2.off.b
-; CHECK-NEXT:      Check 4:
+; CHECK-NEXT:      Check 3:
 ; CHECK-NEXT:        Comparing group GRP0:
 ; CHECK-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
 ; CHECK-NEXT:        Against group GRP5:
 ; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off.a
-; CHECK-NEXT:      Check 5:
+; CHECK-NEXT:      Check 4:
 ; CHECK-NEXT:        Comparing group GRP1:
 ; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
 ; CHECK-NEXT:        Against group GRP2:
 ; CHECK-NEXT:          %gep.b.0 = getelementptr inbounds i32, ptr %b, i64 %iv.2
+; CHECK-NEXT:      Check 5:
+; CHECK-NEXT:        Comparing group GRP1:
+; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
+; CHECK-NEXT:        Against group GRP3:
+; CHECK-NEXT:          %gep.b.1 = getelementptr inbounds i32, ptr %gep.b.0, i64 1
 ; CHECK-NEXT:      Check 6:
 ; CHECK-NEXT:        Comparing group GRP1:
 ; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
-; CHECK-NEXT:        Against group GRP3:
-; CHECK-NEXT:          %gep.b.1 = getelementptr inbounds i32, ptr %gep.b.0, i64 1
+; CHECK-NEXT:        Against group GRP4:
+; CHECK-NEXT:          %gep.b.off = getelementptr inbounds i32, ptr %b, i64 %iv.2.off.b
 ; CHECK-NEXT:      Check 7:
 ; CHECK-NEXT:        Comparing group GRP1:
 ; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
-; CHECK-NEXT:        Against group GRP4:
-; CHECK-NEXT:          %gep.b.off = getelementptr inbounds i32, ptr %b, i64 %iv.2.off.b
-; CHECK-NEXT:      Check 8:
-; CHECK-NEXT:        Comparing group GRP1:
-; CHECK-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
 ; CHECK-NEXT:        Against group GRP5:
 ; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off.a
+; CHECK-NEXT:      Check 8:
+; CHECK-NEXT:        Comparing group GRP2:
+; CHECK-NEXT:          %gep.b.0 = getelementptr inbounds i32, ptr %b, i64 %iv.2
+; CHECK-NEXT:        Against group GRP4:
+; CHECK-NEXT:          %gep.b.off = getelementptr inbounds i32, ptr %b, i64 %iv.2.off.b
 ; CHECK-NEXT:      Check 9:
 ; CHECK-NEXT:        Comparing group GRP2:
 ; CHECK-NEXT:          %gep.b.0 = getelementptr inbounds i32, ptr %b, i64 %iv.2
-; CHECK-NEXT:        Against group GRP3:
-; CHECK-NEXT:          %gep.b.1 = getelementptr inbounds i32, ptr %gep.b.0, i64 1
+; CHECK-NEXT:        Against group GRP5:
+; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off.a
 ; CHECK-NEXT:      Check 10:
-; CHECK-NEXT:        Comparing group GRP2:
-; CHECK-NEXT:          %gep.b.0 = getelementptr inbounds i32, ptr %b, i64 %iv.2
+; CHECK-NEXT:        Comparing group GRP3:
+; CHECK-NEXT:          %gep.b.1 = getelementptr inbounds i32, ptr %gep.b.0, i64 1
 ; CHECK-NEXT:        Against group GRP4:
 ; CHECK-NEXT:          %gep.b.off = getelementptr inbounds i32, ptr %b, i64 %iv.2.off.b
 ; CHECK-NEXT:      Check 11:
-; CHECK-NEXT:        Comparing group GRP2:
-; CHECK-NEXT:          %gep.b.0 = getelementptr inbounds i32, ptr %b, i64 %iv.2
+; CHECK-NEXT:        Comparing group GRP3:
+; CHECK-NEXT:          %gep.b.1 = getelementptr inbounds i32, ptr %gep.b.0, i64 1
 ; CHECK-NEXT:        Against group GRP5:
 ; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off.a
 ; CHECK-NEXT:      Check 12:
-; CHECK-NEXT:        Comparing group GRP3:
-; CHECK-NEXT:          %gep.b.1 = getelementptr inbounds i32, ptr %gep.b.0, i64 1
-; CHECK-NEXT:        Against group GRP4:
-; CHECK-NEXT:          %gep.b.off = getelementptr inbounds i32, ptr %b, i64 %iv.2.off.b
-; CHECK-NEXT:      Check 13:
-; CHECK-NEXT:        Comparing group GRP3:
-; CHECK-NEXT:          %gep.b.1 = getelementptr inbounds i32, ptr %gep.b.0, i64 1
-; CHECK-NEXT:        Against group GRP5:
-; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off.a
-; CHECK-NEXT:      Check 14:
 ; CHECK-NEXT:        Comparing group GRP4:
 ; CHECK-NEXT:          %gep.b.off = getelementptr inbounds i32, ptr %b, i64 %iv.2.off.b
 ; CHECK-NEXT:        Against group GRP5:

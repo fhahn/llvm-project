@@ -1257,9 +1257,10 @@ collectCandidateMembers(ArrayRef<StencilDecomposition> Offsets, bool ForMin) {
 /// Before = NumGroups * NumExternalChecks, where NumExternalChecks is the
 /// number of groups outside this DepSet that need a check against it. The
 /// product is exact: needsChecking() looks only at (DependencySetId,
-/// AliasSetId) and at whether a group writes, and all groups in this
-/// DepSet agree on those, so an external group is checked against all of
-/// them or against none.
+/// AliasSetId), at whether a group writes and at UnknownDepClassId, and all
+/// groups in this DepSet agree on those, as pointers with a non-zero
+/// UnknownDepClassId have their own DependencySetId. So an external group is
+/// checked against all of them or against none.
 ///
 /// After = NumExternalChecks + NewPredicates + NumBoundOperands:
 /// - the merged group keeps the same IDs, so it is checked against exactly
@@ -1696,7 +1697,16 @@ bool RuntimePointerChecking::needsChecking(unsigned I, unsigned J) const {
     return false;
 
   // Only need to check pointers in the same alias set.
-  return PointerI.AliasSetId == PointerJ.AliasSetId;
+  if (PointerI.AliasSetId != PointerJ.AliasSetId)
+    return false;
+
+  // Pointers of the same class with unknown dependences only need checking if
+  // there is an unknown dependence between them.
+  unsigned ClassId = PointerI.UnknownDepClassId;
+  if (!ClassId || ClassId != PointerJ.UnknownDepClassId)
+    return true;
+  return UnknownDepPtrPairs.contains(
+      std::minmax<const Value *>(PointerI.PointerValue, PointerJ.PointerValue));
 }
 
 /// Assign each RuntimeCheckingPtrGroup pointer an index for stable UTC output.
@@ -2314,12 +2324,15 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
   bool MayNeedRTCheck = false;
   if (!IsRTCheckAnalysisNeeded) return true;
 
+  DenseMap<MemAccessInfo, unsigned> UnknownDepClassIds;
   if (auto *Deps = DepChecker.getDependences()) {
     // If there are unknown dependences, this means runtime checks are needed to
     // ensure there's no overlap between accesses to the same underlying object.
     // Remove the equivalence classes containing both source and destination
     // accesses from DepCands. This ensures runtime checks will be generated
     // between those accesses and prevents them from being grouped together.
+    // Record the pairs with unknown dependences and the members of the removed
+    // classes, so needsChecking only checks those pairs within a class.
     for (const auto &Dep : *Deps) {
       if (Dep.Type != MemoryDepChecker::Dependence::Unknown) {
         assert(MemoryDepChecker::Dependence::isSafeForVectorization(Dep.Type) ==
@@ -2327,8 +2340,17 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
                "Should only skip safe dependences");
         continue;
       }
-      DepCands.eraseClass(DepChecker.getAccess(Dep.Source));
-      DepCands.eraseClass(DepChecker.getAccess(Dep.Destination));
+      MemAccessInfo Src = DepChecker.getAccess(Dep.Source);
+      MemAccessInfo Dst = DepChecker.getAccess(Dep.Destination);
+      RtCheck.addUnknownDep(Src.getPointer(), Dst.getPointer());
+      if (!DepCands.contains(Src))
+        continue;
+      assert(DepCands.isEquivalent(Src, Dst) &&
+             "Dependences must be between accesses in the same class");
+      unsigned ClassId = UnknownDepClassIds.size() + 1;
+      for (MemAccessInfo M : DepCands.members(Src))
+        UnknownDepClassIds[M] = ClassId;
+      DepCands.eraseClass(Src);
     }
   } else {
     DepCands = {};
@@ -2452,6 +2474,10 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
     MayNeedRTCheck |= NeedsAliasSetRTCheck;
     ++ASId;
   }
+
+  for (RuntimePointerChecking::PointerInfo &P : RtCheck.Pointers)
+    P.UnknownDepClassId =
+        UnknownDepClassIds.lookup({P.PointerValue, P.IsWritePtr});
 
   // If the pointers that we would use for the bounds comparison have different
   // address spaces, assume the values aren't directly comparable, so we can't

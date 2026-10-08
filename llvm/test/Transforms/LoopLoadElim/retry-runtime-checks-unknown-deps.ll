@@ -5,10 +5,29 @@
 define void @forward_with_unknown_dep(ptr %a, ptr %b, i64 %off, i64 %n) {
 ; CHECK-LABEL: define void @forward_with_unknown_dep(
 ; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[OFF:%.*]], i64 [[N:%.*]]) {
-; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr nuw i8, ptr [[B]], i64 4
+; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[N]], 2
+; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP0]]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], -4
+; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP1]]
+; CHECK-NEXT:    [[TMP2:%.*]] = shl i64 [[OFF]], 2
+; CHECK-NEXT:    [[TMP3:%.*]] = add i64 [[TMP2]], 4
+; CHECK-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP3]]
+; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[TMP0]], [[TMP2]]
+; CHECK-NEXT:    [[SCEVGEP4:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP4]]
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[SCEVGEP]], [[SCEVGEP2]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[A]], [[SCEVGEP1]]
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    [[BOUND05:%.*]] = icmp ult ptr [[SCEVGEP3]], [[SCEVGEP2]]
+; CHECK-NEXT:    [[BOUND16:%.*]] = icmp ult ptr [[A]], [[SCEVGEP4]]
+; CHECK-NEXT:    [[FOUND_CONFLICT7:%.*]] = and i1 [[BOUND05]], [[BOUND16]]
+; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT7]]
+; CHECK-NEXT:    br i1 [[CONFLICT_RDX]], label %[[LOOP_PH_LVER_ORIG:.*]], label %[[LOOP_PH:.*]]
+; CHECK:       [[LOOP_PH_LVER_ORIG]]:
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 1, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 1, %[[LOOP_PH_LVER_ORIG]] ], [ [[IV_NEXT:%.*]], %[[LOOP]] ]
 ; CHECK-NEXT:    [[GEP_A:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[IV]]
 ; CHECK-NEXT:    store i32 0, ptr [[GEP_A]], align 4
 ; CHECK-NEXT:    [[GEP_A_I8:%.*]] = getelementptr inbounds [4 x i8], ptr [[A]], i64 [[IV]]
@@ -24,7 +43,32 @@ define void @forward_with_unknown_dep(ptr %a, ptr %b, i64 %off, i64 %n) {
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
 ; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
 ; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[LOOP]]
+; CHECK:       [[LOOP_PH]]:
+; CHECK-NEXT:    [[LOAD_INITIAL:%.*]] = load i32, ptr [[A]], align 4
+; CHECK-NEXT:    br label %[[LOOP1:.*]]
+; CHECK:       [[LOOP1]]:
+; CHECK-NEXT:    [[STORE_FORWARDED:%.*]] = phi i32 [ [[LOAD_INITIAL]], %[[LOOP_PH]] ], [ 1, %[[LOOP1]] ]
+; CHECK-NEXT:    [[IV1:%.*]] = phi i64 [ 1, %[[LOOP_PH]] ], [ [[IV_NEXT1:%.*]], %[[LOOP1]] ]
+; CHECK-NEXT:    [[GEP_A1:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[IV1]]
+; CHECK-NEXT:    store i32 0, ptr [[GEP_A1]], align 4
+; CHECK-NEXT:    [[GEP_A_I9:%.*]] = getelementptr inbounds [4 x i8], ptr [[A]], i64 [[IV1]]
+; CHECK-NEXT:    store i32 1, ptr [[GEP_A_I9]], align 4
+; CHECK-NEXT:    [[IV_PREV1:%.*]] = add nsw i64 [[IV1]], -1
+; CHECK-NEXT:    [[GEP_A_PREV1:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[IV_PREV1]]
+; CHECK-NEXT:    [[L_A_PREV1:%.*]] = load i32, ptr [[GEP_A_PREV1]], align 4
+; CHECK-NEXT:    [[GEP_B1:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[IV1]]
+; CHECK-NEXT:    store i32 [[STORE_FORWARDED]], ptr [[GEP_B1]], align 4
+; CHECK-NEXT:    [[IV_OFF1:%.*]] = add i64 [[IV1]], [[OFF]]
+; CHECK-NEXT:    [[GEP_A_OFF1:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[IV_OFF1]]
+; CHECK-NEXT:    store i32 2, ptr [[GEP_A_OFF1]], align 4
+; CHECK-NEXT:    [[IV_NEXT1]] = add nuw nsw i64 [[IV1]], 1
+; CHECK-NEXT:    [[EC1:%.*]] = icmp eq i64 [[IV_NEXT1]], [[N]]
+; CHECK-NEXT:    br i1 [[EC1]], label %[[EXIT_LOOPEXIT8:.*]], label %[[LOOP1]]
 ; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    br label %[[EXIT1:.*]]
+; CHECK:       [[EXIT_LOOPEXIT8]]:
+; CHECK-NEXT:    br label %[[EXIT1]]
+; CHECK:       [[EXIT1]]:
 ; CHECK-NEXT:    ret void
 ;
 entry:

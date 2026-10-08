@@ -14,6 +14,7 @@
 #ifndef LLVM_ANALYSIS_LOOPACCESSANALYSIS_H
 #define LLVM_ANALYSIS_LOOPACCESSANALYSIS_H
 
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/IR/DiagnosticInfo.h"
@@ -583,6 +584,11 @@ public:
     const BasicBlock *AccessBlock;
     /// True if the loop accesses both Start and the element ending at End.
     bool BoundsAreAccessed;
+    /// If not 0, the id of the dependence candidate class with unknown
+    /// dependences the pointer was in. Only set when retrying with recorded
+    /// dependences, which erases those classes, so such pointers have their
+    /// own DependencySetId and checking group.
+    unsigned UnknownDepClassId = 0;
 
     PointerInfo(Value *PointerValue, const SCEV *Start, const SCEV *End,
                 bool IsWritePtr, unsigned DependencySetId, unsigned AliasSetId,
@@ -607,6 +613,7 @@ public:
     Checks.clear();
     DiffChecks.clear();
     CheckingGroups.clear();
+    UnknownDepPtrPairs.clear();
   }
 
   /// Insert a pointer and calculate the start and end SCEVs.
@@ -687,7 +694,16 @@ public:
 
   ScalarEvolution *getSE() const { return SE; }
 
+  /// Record an unknown dependence between \p A and \p B. Pointers with the
+  /// same non-zero UnknownDepClassId only need checking if they have one.
+  void addUnknownDep(const Value *A, const Value *B) {
+    UnknownDepPtrPairs.insert(std::minmax(A, B));
+  }
+
 private:
+  /// Pairs of pointers with an unknown dependence, ordered by address.
+  DenseSet<std::pair<const Value *, const Value *>> UnknownDepPtrPairs;
+
   /// Groups pointers such that a single memcheck is required
   /// between two different groups. This will clear the CheckingGroups vector
   /// and re-compute it.
