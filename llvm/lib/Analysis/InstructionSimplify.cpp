@@ -5397,7 +5397,11 @@ static Value *simplifyGEPInst(Type *SrcTy, Value *Ptr,
     }
   }
 
-  if (!IsScalableVec && Q.DL.getTypeAllocSize(LastType) == 1 &&
+  // Match the index before stripping the base below, which is more expensive.
+  if (match(Indices.back(),
+            m_CombineOr(m_Neg(m_PtrToInt(m_Value())),
+                        m_Xor(m_PtrToInt(m_Value()), m_AllOnes()))) &&
+      !IsScalableVec && Q.DL.getTypeAllocSize(LastType) == 1 &&
       all_of(Indices.drop_back(1), match_fn(m_Zero()))) {
     unsigned IdxWidth =
         Q.DL.getIndexSizeInBits(Ptr->getType()->getPointerAddressSpace());
