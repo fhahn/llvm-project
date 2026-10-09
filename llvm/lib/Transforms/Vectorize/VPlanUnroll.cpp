@@ -648,12 +648,6 @@ cloneForLane(VPlan &Plan, VPBuilder &Builder, Type *IdxTy,
       continue;
     }
 
-    // Look through buildvector to avoid unnecessary extracts.
-    if (match(Op, m_BuildVector())) {
-      NewOps.push_back(
-          cast<VPInstruction>(Op)->getOperand(Lane.getKnownLane()));
-      continue;
-    }
     VPValue *Idx = Plan.getConstantInt(IdxTy, Lane.getKnownLane());
     VPValue *Ext = Builder.createNaryOp(Instruction::ExtractElement, {Op, Idx});
     NewOps.push_back(Ext);
@@ -929,8 +923,9 @@ static void dissolveReplicateRegion(VPRegionBlock *Region, ElementCount VF,
 
 /// Collect and dissolve all replicate regions in the vector loop, replicating
 /// their blocks and recipes for each lane of \p VF.
-static void replicateReplicateRegionsByVF(VPlan &Plan, ElementCount VF,
-                                          Type *IdxTy) {
+static void replicateReplicateRegionsByVF(
+    VPlan &Plan, ElementCount VF, Type *IdxTy,
+    const DenseMap<VPValue *, SmallVector<VPValue *>> &Def2LaneDefs = {}) {
   // Collect all replicate regions before modifying the CFG.
   SmallVector<VPRegionBlock *> ReplicateRegions;
   for (VPRegionBlock *Region : VPBlockUtils::blocksOnly<VPRegionBlock>(
@@ -947,6 +942,20 @@ static void replicateReplicateRegionsByVF(VPlan &Plan, ElementCount VF,
   // being processed is a basic-block, rather than another region.
   for (VPRegionBlock *Region : reverse(ReplicateRegions))
     dissolveReplicateRegion(Region, VF, Plan, IdxTy);
+
+  // Replace lane extracts of values replicated by VF with their lane value.
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_shallow(Plan.getVectorLoopRegion()->getEntry()))) {
+    for (VPRecipeBase &R : make_early_inc_range(*VPBB)) {
+      VPValue *Op;
+      uint64_t Lane;
+      if (!match(&R, m_ExtractElement(m_VPValue(Op), m_ConstantInt(Lane))) ||
+          !Def2LaneDefs.contains(Op))
+        continue;
+      R.getVPSingleValue()->replaceAllUsesWith(Def2LaneDefs.lookup(Op)[Lane]);
+      R.eraseFromParent();
+    }
+  }
 
   VPlanTransforms::mergeBlocksIntoPredecessors(Plan);
 }
@@ -998,6 +1007,15 @@ void VPlanTransforms::replicateByVF(VPlan &Plan, ElementCount VF) {
             cloneForLane(Plan, Builder, IdxTy, DefR, VPLane(I), Def2LaneDefs));
 
       Def2LaneDefs[DefR] = LaneDefs;
+      // Pack the lanes for vector users.
+      auto UsesVector = [DefR](VPUser &U) { return !U.usesScalars(DefR); };
+      if (any_of(DefR->users(), [&](VPUser *U) { return UsesVector(*U); })) {
+        unsigned Opcode = DefR->getScalarType()->isStructTy()
+                              ? VPInstruction::BuildStructVector
+                              : VPInstruction::BuildVector;
+        DefR->replaceUsesWithIf(Builder.createNaryOp(Opcode, LaneDefs),
+                                UsesVector);
+      }
       /// Users that only demand the first lane can use the definition for lane
       /// 0.
       DefR->replaceUsesWithIf(LaneDefs[0], [DefR](VPUser &U) {
@@ -1006,26 +1024,10 @@ void VPlanTransforms::replicateByVF(VPlan &Plan, ElementCount VF) {
         auto *VPI = dyn_cast<VPInstruction>(&U);
         return VPI && Instruction::isCast(VPI->getOpcode());
       });
-
-      // Update each build vector user that currently has DefR as its only
-      // operand, to have all LaneDefs as its operands.
-      for (VPUser *U : to_vector(DefR->users())) {
-        auto *VPI = dyn_cast<VPInstruction>(U);
-        if (!VPI || (VPI->getOpcode() != VPInstruction::BuildVector &&
-                     VPI->getOpcode() != VPInstruction::BuildStructVector))
-          continue;
-        assert(VPI->getNumOperands() == 1 &&
-               "Build(Struct)Vector must have a single operand before "
-               "replicating by VF");
-        VPI->setOperand(0, LaneDefs[0]);
-        for (VPValue *LaneDef : drop_begin(LaneDefs))
-          VPI->addOperand(LaneDef);
-      }
       ToRemove.push_back(DefR);
     }
   }
+  replicateReplicateRegionsByVF(Plan, VF, IdxTy, Def2LaneDefs);
   for (auto *R : reverse(ToRemove))
     R->eraseFromParent();
-
-  replicateReplicateRegionsByVF(Plan, VF, IdxTy);
 }

@@ -508,10 +508,8 @@ struct VPlanTransforms {
   static void materializeBackedgeTakenCount(VPlan &Plan,
                                             VPBasicBlock *VectorPH);
 
-  /// Add explicit Build[Struct]Vector recipes to Pack multiple scalar values
-  /// into vectors and Unpack recipes to extract scalars from vectors as
-  /// needed.
-  static void materializePacksAndUnpacks(VPlan &Plan);
+  /// Add explicit Unpack recipes to extract scalars from vectors as needed.
+  static void materializeUnpacks(VPlan &Plan);
 
   /// Materialize UF, VF and VFxUF to be computed explicitly using
   /// VPInstructions.
