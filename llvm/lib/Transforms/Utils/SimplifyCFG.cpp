@@ -4711,7 +4711,9 @@ static bool mergeConditionalStores(CondBrInst *PBI, CondBrInst *QBI,
   //   QTB  QFB             |  QFB
   //    \  /                | /
   //    PostBB            PostBB
-  //
+  if (!QBI->getParent()->hasNUses(2))
+    return false;
+
   // We model triangles as a type of diamond with a nullptr "true" block.
   // Triangles are canonicalized so that the fallthrough edge is represented by
   // a true condition, as in the diagram above.
@@ -4759,8 +4761,6 @@ static bool mergeConditionalStores(CondBrInst *PBI, CondBrInst *QBI,
     return false;
   if ((PTB && !HasOnePredAndOneSucc(PTB, PBI->getParent(), QBI->getParent())) ||
       (QTB && !HasOnePredAndOneSucc(QTB, QBI->getParent(), PostBB)))
-    return false;
-  if (!QBI->getParent()->hasNUses(2))
     return false;
 
   // OK, this is a sequence of two diamonds or triangles.
