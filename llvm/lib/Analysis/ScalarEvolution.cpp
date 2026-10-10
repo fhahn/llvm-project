@@ -9350,8 +9350,13 @@ ScalarEvolution::computeExitLimitFromCondFromBinOp(ExitLimitCacheTy &Cache,
   } else {
     // Both conditions must be same at the same time for the loop to exit.
     // For now, be conservative.
-    if (EL0.ExactNotTaken == EL1.ExactNotTaken)
+    if (EL0.ExactNotTaken == EL1.ExactNotTaken) {
       BECount = EL0.ExactNotTaken;
+      // Both constant maxes are upper bounds of the shared exact count.
+      if (!isa<SCEVCouldNotCompute>(BECount))
+        ConstantMaxBECount = getUMinFromMismatchedTypes(
+            EL0.ConstantMaxNotTaken, EL1.ConstantMaxNotTaken);
+    }
   }
 
   // There are cases (e.g. PR26207) where computeExitLimitFromCond is able
