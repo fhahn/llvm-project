@@ -79,26 +79,10 @@ public:
   }
   RPOIterator endRPO() const { return PostBlocks.rend(); }
 
-  /// Return true if this block has been preorder visited.
-  bool hasPreorder(BasicBlock *BB) const { return PostNumbers.count(BB); }
-
   /// Return true if this block has a postorder number.
   bool hasPostorder(BasicBlock *BB) const {
     auto I = PostNumbers.find(BB);
     return I != PostNumbers.end() && I->second;
-  }
-
-  /// Get a block's postorder number.
-  unsigned getPostorder(BasicBlock *BB) const {
-    auto I = PostNumbers.find(BB);
-    assert(I != PostNumbers.end() && "block not visited by DFS");
-    assert(I->second && "block not finished by DFS");
-    return I->second;
-  }
-
-  /// Get a block's reverse postorder number.
-  unsigned getRPO(BasicBlock *BB) const {
-    return 1 + PostBlocks.size() - getPostorder(BB);
   }
 
   void clear() {
