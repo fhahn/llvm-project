@@ -435,10 +435,6 @@ class LowerMatrixIntrinsics {
     }
 
     void addVector(Value *V) { Vectors.push_back(V); }
-    FixedVectorType *getColumnTy() {
-      assert(isColumnMajor() && "only supported for column-major matrixes");
-      return getVectorTy();
-    }
 
     FixedVectorType *getVectorTy() const {
       return cast<FixedVectorType>(Vectors[0]->getType());
@@ -466,8 +462,6 @@ class LowerMatrixIntrinsics {
       return *this;
     }
 
-    void setNumLoads(unsigned N) { OpInfo.NumLoads = N; }
-
     MatrixTy &addNumStores(unsigned N) {
       OpInfo.NumStores += N;
       return *this;
@@ -482,10 +476,6 @@ class LowerMatrixIntrinsics {
       OpInfo.NumComputeOps += N;
       return *this;
     }
-
-    unsigned getNumStores() const { return OpInfo.NumStores; }
-    unsigned getNumLoads() const { return OpInfo.NumLoads; }
-    unsigned getNumComputeOps() const { return OpInfo.NumComputeOps; }
 
     const OpInfoTy &getOpInfo() const { return OpInfo; }
 
