@@ -1099,29 +1099,17 @@ bool VPlan::isOuterLoop() const {
 void VPlan::printLiveIns(raw_ostream &O) const {
   VPSlotTracker SlotTracker(this);
 
-  if (!VF.user_empty()) {
+  auto PrintLiveIn = [&](const VPValue &V, StringRef Name) {
+    if (V.user_empty())
+      return;
     O << "\nLive-in ";
-    VF.printAsOperand(O, SlotTracker);
-    O << " = VF";
-  }
-
-  if (!UF.user_empty()) {
-    O << "\nLive-in ";
-    UF.printAsOperand(O, SlotTracker);
-    O << " = UF";
-  }
-
-  if (!VFxUF.user_empty()) {
-    O << "\nLive-in ";
-    VFxUF.printAsOperand(O, SlotTracker);
-    O << " = VF * UF";
-  }
-
-  if (!VectorTripCount.user_empty()) {
-    O << "\nLive-in ";
-    VectorTripCount.printAsOperand(O, SlotTracker);
-    O << " = vector-trip-count";
-  }
+    V.printAsOperand(O, SlotTracker);
+    O << " = " << Name;
+  };
+  PrintLiveIn(VF, "VF");
+  PrintLiveIn(UF, "UF");
+  PrintLiveIn(VFxUF, "VF * UF");
+  PrintLiveIn(VectorTripCount, "vector-trip-count");
 
   O << "\n";
   if (TripCount && !TripCount->user_empty()) {
