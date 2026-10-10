@@ -982,7 +982,7 @@ public:
 
   /// Returns true if an artificially high cost for emulated masked memrefs
   /// should be used.
-  bool useEmulatedMaskMemRefHack(Instruction *I, ElementCount VF) const;
+  bool useEmulatedMaskMemRefHack(Instruction *I) const;
 
   /// Return the costs for our two available strategies for lowering a
   /// div/rem operation which requires speculating at least one lane.
@@ -1005,7 +1005,7 @@ public:
   /// Returns true if the target machine supports masked loads or stores
   /// for \p I's data type and alignment. The caller must ensure the access is
   /// consecutive or part of an interleave group.
-  bool isLegalMaskedLoadOrStore(Instruction *I, ElementCount VF) const;
+  bool isLegalMaskedLoadOrStore(Instruction *I) const;
 
   /// Returns true if the target machine supports gather or scatter for \p I's
   /// data type and alignment.
@@ -1852,17 +1852,16 @@ static void collectSupportedLoops(Loop &L, LoopInfo *LI,
 // LoopVectorizationCostModel and LoopVectorizationPlanner.
 //===----------------------------------------------------------------------===//
 
-/// For the given VF and UF and maximum trip count computed for the loop, return
-/// whether the induction variable might overflow in the vectorized loop. If not,
-/// then we know a runtime overflow check always evaluates to false and can be
-/// removed.
-static bool isIndvarOverflowCheckKnownFalse(
-    const LoopVectorizationCostModel *Cost,
-    ElementCount VF, std::optional<unsigned> UF = std::nullopt) {
-  // Always be conservative if we don't know the exact unroll factor.
-  uint64_t MaxUF = UF ? *UF
-                      : std::max(Cost->TTI.getMaxInterleaveFactor(VF, false),
-                                 Cost->TTI.getMaxInterleaveFactor(VF, true));
+/// For the given VF and maximum trip count computed for the loop, return
+/// whether the induction variable might overflow in the vectorized loop. If
+/// not, then we know a runtime overflow check always evaluates to false and can
+/// be removed.
+static bool
+isIndvarOverflowCheckKnownFalse(const LoopVectorizationCostModel *Cost,
+                                ElementCount VF) {
+  // Always be conservative and assume the maximum unroll factor.
+  uint64_t MaxUF = std::max(Cost->TTI.getMaxInterleaveFactor(VF, false),
+                            Cost->TTI.getMaxInterleaveFactor(VF, true));
 
   IntegerType *IdxTy = Cost->Legal->getWidestInductionType();
   APInt MaxUIntTripCount = IdxTy->getMask();
@@ -2314,7 +2313,7 @@ void LoopVectorizationCostModel::collectLoopScalars(ElementCount VF) {
 }
 
 bool LoopVectorizationCostModel::isLegalMaskedLoadOrStore(
-    Instruction *I, ElementCount VF) const {
+    Instruction *I) const {
   assert(isa<LoadInst>(I) || isa<StoreInst>(I));
   return Config.isLegalMaskedLoadOrStore(isa<LoadInst>(I), getLoadStoreType(I),
                                          getLoadStoreAlignment(I),
@@ -2350,7 +2349,7 @@ bool LoopVectorizationCostModel::isScalarWithPredication(Instruction *I,
   case Instruction::Store: {
     bool IsConsecutive = Legal->isConsecutivePtr(getLoadStoreType(I),
                                                  getLoadStorePointerOperand(I));
-    return !(IsConsecutive && isLegalMaskedLoadOrStore(I, VF)) &&
+    return !(IsConsecutive && isLegalMaskedLoadOrStore(I)) &&
            !isLegalGatherOrScatter(I, VF);
   }
   case Instruction::UDiv:
@@ -2577,7 +2576,7 @@ bool LoopVectorizationCostModel::interleavedAccessCanBeWidened(
   if (VF.isScalable() && NeedsMaskForGaps)
     return false;
 
-  return isLegalMaskedLoadOrStore(I, VF);
+  return isLegalMaskedLoadOrStore(I);
 }
 
 std::optional<LoopVectorizationCostModel::InstWidening>
@@ -4012,7 +4011,7 @@ LoopVectorizationPlanner::selectInterleaveCount(VPlan &Plan, ElementCount VF,
 }
 
 bool LoopVectorizationCostModel::useEmulatedMaskMemRefHack(
-    Instruction *I, ElementCount VF) const {
+    Instruction *I) const {
   // TODO: Cost model for emulated masked load/store is completely
   // broken. This hack guides the cost model to use an artificially
   // high enough value to practically disable vectorization with such
@@ -4059,7 +4058,7 @@ void LoopVectorizationCostModel::collectInstsToScalarize(ElementCount VF) {
         // 2. Scalable VF, as that would lead to invalid scalarization costs.
         // 3. Emulated masked memrefs, if a hacked cost is needed.
         if (!isScalarAfterVectorization(&I, VF) && !VF.isScalable() &&
-            !useEmulatedMaskMemRefHack(&I, VF) &&
+            !useEmulatedMaskMemRefHack(&I) &&
             computePredInstDiscount(&I, ScalarCosts, VF) >= 0) {
           for (const auto &[I, IC] : ScalarCosts)
             ScalarCostsVF.insert({I, IC});
@@ -4298,7 +4297,7 @@ LoopVectorizationCostModel::getMemInstScalarizationCost(Instruction *I,
         /*Insert=*/false, /*Extract=*/true, Config.CostKind);
     Cost += TTI.getCFInstrCost(Instruction::CondBr, Config.CostKind);
 
-    if (useEmulatedMaskMemRefHack(I, VF))
+    if (useEmulatedMaskMemRefHack(I))
       // Artificially setting to a high enough value to practically disable
       // vectorization with such operations.
       Cost = 3000000;
