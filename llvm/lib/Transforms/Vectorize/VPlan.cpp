@@ -1069,35 +1069,18 @@ bool VPlan::isOuterLoop() const {
 void VPlan::printLiveIns(raw_ostream &O) const {
   VPSlotTracker SlotTracker(this);
 
-  if (!VF.user_empty()) {
+  auto PrintLiveIn = [&](const VPValue *V, StringRef Name) {
+    if (!V || V->user_empty())
+      return;
     O << "\nLive-in ";
-    VF.printAsOperand(O, SlotTracker);
-    O << " = VF";
-  }
-
-  if (!UF.user_empty()) {
-    O << "\nLive-in ";
-    UF.printAsOperand(O, SlotTracker);
-    O << " = UF";
-  }
-
-  if (!VFxUF.user_empty()) {
-    O << "\nLive-in ";
-    VFxUF.printAsOperand(O, SlotTracker);
-    O << " = VF * UF";
-  }
-
-  if (!VectorTripCount.user_empty()) {
-    O << "\nLive-in ";
-    VectorTripCount.printAsOperand(O, SlotTracker);
-    O << " = vector-trip-count";
-  }
-
-  if (BackedgeTakenCount && !BackedgeTakenCount->user_empty()) {
-    O << "\nLive-in ";
-    BackedgeTakenCount->printAsOperand(O, SlotTracker);
-    O << " = backedge-taken count";
-  }
+    V->printAsOperand(O, SlotTracker);
+    O << " = " << Name;
+  };
+  PrintLiveIn(&VF, "VF");
+  PrintLiveIn(&UF, "UF");
+  PrintLiveIn(&VFxUF, "VF * UF");
+  PrintLiveIn(&VectorTripCount, "vector-trip-count");
+  PrintLiveIn(BackedgeTakenCount, "backedge-taken count");
 
   O << "\n";
   if (TripCount && !TripCount->user_empty()) {
