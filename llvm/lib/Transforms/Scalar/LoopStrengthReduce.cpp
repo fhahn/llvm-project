@@ -6499,7 +6499,6 @@ struct SCEVDbgValueBuilder {
   SmallVector<Value *, 2> LocationOps;
 
   void pushOperator(uint64_t Op) { Expr.push_back(Op); }
-  void pushUInt(uint64_t Operand) { Expr.push_back(Operand); }
 
   /// Add a DW_OP_LLVM_arg to the expression, followed by the index of the value
   /// in the set of values referenced by the expression.
