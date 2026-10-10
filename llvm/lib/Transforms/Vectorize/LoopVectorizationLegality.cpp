@@ -346,21 +346,11 @@ static IntegerType *getWiderInductionTy(const DataLayout &DL, Type *Ty0,
   return TyA->getScalarSizeInBits() > TyB->getScalarSizeInBits() ? TyA : TyB;
 }
 
-/// Returns true if A and B have same pointer operands or same SCEVs addresses
+/// Returns true if A and B store to addresses with the same SCEV.
 static bool storeToSameAddress(ScalarEvolution *SE, StoreInst *A,
                                StoreInst *B) {
-  // Compare store
-  if (A == B)
-    return true;
-
-  // Otherwise Compare pointers
-  Value *APtr = A->getPointerOperand();
-  Value *BPtr = B->getPointerOperand();
-  if (APtr == BPtr)
-    return true;
-
-  // Otherwise compare address SCEVs
-  return SE->getSCEV(APtr) == SE->getSCEV(BPtr);
+  return SE->getSCEV(A->getPointerOperand()) ==
+         SE->getSCEV(B->getPointerOperand());
 }
 
 void LoopVectorizationLegality::collectUnitStridePredicates() const {
