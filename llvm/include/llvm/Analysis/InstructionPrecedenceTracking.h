@@ -98,12 +98,6 @@ public:
 class LLVM_ABI ImplicitControlFlowTracking
     : public InstructionPrecedenceTracking {
 public:
-  /// Returns the topmost instruction with implicit control flow from the given
-  /// basic block. Returns nullptr if there is no such instructions in the block.
-  const Instruction *getFirstICFI(const BasicBlock *BB) {
-    return getFirstSpecialInstruction(BB);
-  }
-
   /// Returns true if at least one instruction from the given basic block has
   /// implicit control flow.
   bool hasICF(const BasicBlock *BB) {
@@ -120,12 +114,6 @@ public:
 
 class LLVM_ABI MemoryWriteTracking : public InstructionPrecedenceTracking {
 public:
-  /// Returns the topmost instruction that may write memory from the given
-  /// basic block. Returns nullptr if there is no such instructions in the block.
-  const Instruction *getFirstMemoryWrite(const BasicBlock *BB) {
-    return getFirstSpecialInstruction(BB);
-  }
-
   /// Returns true if at least one instruction from the given basic block may
   /// write memory.
   bool mayWriteToMemory(const BasicBlock *BB) {
