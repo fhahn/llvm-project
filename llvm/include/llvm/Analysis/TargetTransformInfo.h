@@ -2120,9 +2120,6 @@ public:
     // The 'Discard' strategy is invalid.
     VPTransform OpStrategy;
 
-    bool shouldDoNothing() const {
-      return (EVLParamStrategy == Legal) && (OpStrategy == Legal);
-    }
     VPLegalization(VPTransform EVLParamStrategy, VPTransform OpStrategy)
         : EVLParamStrategy(EVLParamStrategy), OpStrategy(OpStrategy) {}
   };
