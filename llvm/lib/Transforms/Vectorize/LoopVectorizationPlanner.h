@@ -26,7 +26,6 @@
 
 #include "VPlan.h"
 #include "VPlanUtils.h"
-#include "llvm/ADT/SmallSet.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Support/InstructionCost.h"
 #include <optional>
