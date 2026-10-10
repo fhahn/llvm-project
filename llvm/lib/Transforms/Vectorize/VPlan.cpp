@@ -186,10 +186,7 @@ VPMultiDefValue::~VPMultiDefValue() {
 
 /// \return the VPBasicBlock that is the entry of Block, possibly indirectly.
 const VPBasicBlock *VPBlockBase::getEntryBasicBlock() const {
-  const VPBlockBase *Block = this;
-  while (const VPRegionBlock *Region = dyn_cast<VPRegionBlock>(Block))
-    Block = Region->getEntry();
-  return cast<VPBasicBlock>(Block);
+  return const_cast<VPBlockBase *>(this)->getEntryBasicBlock();
 }
 
 VPBasicBlock *VPBlockBase::getEntryBasicBlock() {
@@ -201,10 +198,7 @@ VPBasicBlock *VPBlockBase::getEntryBasicBlock() {
 
 /// \return the VPBasicBlock that is the exit of Block, possibly indirectly.
 const VPBasicBlock *VPBlockBase::getExitingBasicBlock() const {
-  const VPBlockBase *Block = this;
-  while (const VPRegionBlock *Region = dyn_cast<VPRegionBlock>(Block))
-    Block = Region->getExiting();
-  return cast<VPBasicBlock>(Block);
+  return const_cast<VPBlockBase *>(this)->getExitingBasicBlock();
 }
 
 VPBasicBlock *VPBlockBase::getExitingBasicBlock() {
