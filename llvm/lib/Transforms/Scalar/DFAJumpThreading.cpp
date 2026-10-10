@@ -367,13 +367,10 @@ struct ThreadingPath {
   APInt getExitValue() const { return ExitVal; }
   void setExitValue(const ConstantInt *V) {
     ExitVal = V->getValue();
-    IsExitValSet = true;
   }
   void setExitValue(const APInt &V) {
     ExitVal = V;
-    IsExitValSet = true;
   }
-  bool isExitValueSet() const { return IsExitValSet; }
 
   /// Determinator is the basic block that determines the next state of the DFA.
   const BasicBlock *getDeterminatorBB() const { return DBB; }
@@ -381,7 +378,6 @@ struct ThreadingPath {
 
   /// Path is a list of basic blocks.
   const PathType &getPath() const { return Path; }
-  void setPath(const PathType &NewPath) { Path = NewPath; }
   void push_back(BasicBlock *BB) { Path.push_back(BB); }
   void push_front(BasicBlock *BB) { Path.push_front(BB); }
   void appendExcludingFirst(const PathType &OtherPath) {
@@ -396,7 +392,6 @@ private:
   PathType Path;
   APInt ExitVal;
   const BasicBlock *DBB = nullptr;
-  bool IsExitValSet = false;
 };
 
 #ifndef NDEBUG
