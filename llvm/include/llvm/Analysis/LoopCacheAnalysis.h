@@ -62,10 +62,6 @@ public:
     assert(SubNum < getNumSubscripts() && "Invalid subscript number");
     return Subscripts[SubNum];
   }
-  const SCEV *getFirstSubscript() const {
-    assert(!Subscripts.empty() && "Expecting non-empty container");
-    return Subscripts.front();
-  }
   const SCEV *getLastSubscript() const {
     assert(!Subscripts.empty() && "Expecting non-empty container");
     return Subscripts.back();
