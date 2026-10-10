@@ -292,42 +292,21 @@ vp_depth_first_deep(const VPBlockBase *G) {
 }
 
 // The following set of template specializations implement GraphTraits to treat
-// any VPBlockBase as a node in a graph of VPBlockBases. It's important to note
-// that VPBlockBase traits don't recurse into VPRegioBlocks, i.e., if the
-// VPBlockBase is a VPRegionBlock, this specialization provides access to its
-// successors/predecessors but not to the blocks inside the region.
+// any VPBlockBase as a node in a graph of VPBlockBases. They traverse the same
+// hierarchical CFG as the VPBlockDeepTraversalWrapper specializations, i.e.
+// a VPRegionBlock's child is its entry block.
 
-template <> struct GraphTraits<VPBlockBase *> {
-  using NodeRef = VPBlockBase *;
-  using ChildIteratorType = VPHierarchicalChildrenIterator<VPBlockBase *>;
-
+template <>
+struct GraphTraits<VPBlockBase *>
+    : GraphTraits<VPBlockDeepTraversalWrapper<VPBlockBase *>> {
   static NodeRef getEntryNode(NodeRef N) { return N; }
-
-  static inline ChildIteratorType child_begin(NodeRef N) {
-    return ChildIteratorType(N);
-  }
-
-  static inline ChildIteratorType child_end(NodeRef N) {
-    return ChildIteratorType::end(N);
-  }
-
   static unsigned getNumber(NodeRef N) { return N->getNumber(); }
 };
 
-template <> struct GraphTraits<const VPBlockBase *> {
-  using NodeRef = const VPBlockBase *;
-  using ChildIteratorType = VPHierarchicalChildrenIterator<const VPBlockBase *>;
-
+template <>
+struct GraphTraits<const VPBlockBase *>
+    : GraphTraits<VPBlockDeepTraversalWrapper<const VPBlockBase *>> {
   static NodeRef getEntryNode(NodeRef N) { return N; }
-
-  static inline ChildIteratorType child_begin(NodeRef N) {
-    return ChildIteratorType(N);
-  }
-
-  static inline ChildIteratorType child_end(NodeRef N) {
-    return ChildIteratorType::end(N);
-  }
-
   static unsigned getNumber(NodeRef N) { return N->getNumber(); }
 };
 
