@@ -174,7 +174,7 @@ define void @sgt_stride_4_no_overflow(i32 %n) {
 ; CHECK-LABEL: 'sgt_stride_4_no_overflow'
 ; CHECK-NEXT:  Determining loop execution counts for: @sgt_stride_4_no_overflow
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is ((3 + %n)<nsw> /u 4)
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 536870912
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i32 536870911
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is ((3 + %n)<nsw> /u 4)
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
