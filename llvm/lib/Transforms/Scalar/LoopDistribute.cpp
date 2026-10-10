@@ -157,10 +157,6 @@ public:
     return ClonedLoop;
   }
 
-  /// The cloned loop.  If this partition is mapped to the original loop,
-  /// this is null.
-  const Loop *getClonedLoop() const { return ClonedLoop; }
-
   /// Returns the loop where this partition ends up after distribution.
   /// If this partition is mapped to the original loop then use the block from
   /// the loop.
