@@ -13339,6 +13339,59 @@ const SCEV *ScalarEvolution::getUDivCeilSCEV(const SCEV *N, const SCEV *D) {
   return getAddExpr(MinNOne, getUDivExpr(NMinusOne, D));
 }
 
+/// Return true if loop guards for \p L may refine the ranges of \p Exprs.
+/// Collecting loop guards is expensive, so this cheaply checks for a guard
+/// that may bound \p Exprs: a value used by \p Exprs compared against a
+/// constant or another such value, or a cast or binary operator of such a
+/// value compared against a constant, by an icmp in a block dominating the
+/// header. This is a heuristic: loop guards may also refine \p Exprs in other
+/// cases, e.g. through phis in the predecessors of the loop.
+static bool mayRefineWithLoopGuards(ArrayRef<const SCEV *> Exprs,
+                                    const Loop *L, DominatorTree &DT) {
+  struct CollectUnknowns {
+    SmallPtrSet<const Value *, 8> Values;
+
+    bool follow(const SCEV *S) {
+      if (auto *U = dyn_cast<SCEVUnknown>(S))
+        if (!isa<Constant>(U->getValue()))
+          Values.insert(U->getValue());
+      return true;
+    }
+
+    bool isDone() const { return false; }
+  } Collector;
+  SCEVTraversal<CollectUnknowns> Traversal(Collector);
+  for (const SCEV *E : Exprs)
+    if (!isa<SCEVConstant>(E))
+      Traversal.visitAll(E);
+  const auto &Values = Collector.Values;
+  auto IsGuard = [&](const ICmpInst *Cmp) {
+    return !L->contains(Cmp) &&
+           DT.dominates(Cmp->getParent(), L->getHeader());
+  };
+  auto IsBound = [&](const Value *V) {
+    return isa<Constant>(V) || Values.contains(V);
+  };
+  for (const Value *V : Values) {
+    for (const User *U : V->users()) {
+      if (const auto *Cmp = dyn_cast<ICmpInst>(U)) {
+        const Value *Other =
+            Cmp->getOperand(0) == V ? Cmp->getOperand(1) : Cmp->getOperand(0);
+        if (IsBound(Other) && IsGuard(Cmp))
+          return true;
+      }
+      if (isa<CastInst, BinaryOperator>(U) &&
+          any_of(U->users(), [&](const User *CmpU) {
+            const auto *Cmp = dyn_cast<ICmpInst>(CmpU);
+            return Cmp && any_of(Cmp->operands(), IsaPred<Constant>) &&
+                   IsGuard(Cmp);
+          }))
+        return true;
+    }
+  }
+  return false;
+}
+
 const SCEV *
 ScalarEvolution::computeMaxBECountForLT(const SCEV *Start, const SCEV *Stride,
                                         const SCEV *End, unsigned BitWidth,
@@ -13360,9 +13413,14 @@ ScalarEvolution::computeMaxBECountForLT(const SCEV *Start, const SCEV *Stride,
   // need inverting. Stride was already negated by the caller. Both the ranges
   // of the expressions and of the expressions with loop guards applied are
   // valid bounds, use the tighter one. Loop guards never rewrite constants, and
-  // an expression the guards leave unchanged has the same range.
+  // an expression the guards leave unchanged has the same range. Only collect
+  // the loop guards if they may refine the ranges.
+  bool UseGuards =
+      Guards.isCollected() ||
+      mayRefineWithLoopGuards({Start, Stride, End}, Guards.getLoop(), DT);
   auto ApplyGuards = [&](const SCEV *S) {
-    return isa<SCEVConstant>(S) ? S : applyLoopGuards(S, Guards.get());
+    return !UseGuards || isa<SCEVConstant>(S) ? S
+                                              : applyLoopGuards(S, Guards.get());
   };
   auto GetMin = [&](const SCEV *S, bool Invert) {
     APInt Min = getRangeMin(S, IsSigned, Invert);
@@ -13936,9 +13994,11 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
       APInt Max = APIntOps::umin(
           cast<SCEVConstant>(ConstantMaxBECount)->getAPInt(),
           getUnsignedRangeMax(BECount));
-      const SCEV *Guarded = applyLoopGuards(BECount, Guards.get());
-      if (Guarded != BECount)
-        Max = APIntOps::umin(Max, getUnsignedRangeMax(Guarded));
+      if (Guards.isCollected() || mayRefineWithLoopGuards({BECount}, L, DT)) {
+        const SCEV *Guarded = applyLoopGuards(BECount, Guards.get());
+        if (Guarded != BECount)
+          Max = APIntOps::umin(Max, getUnsignedRangeMax(Guarded));
+      }
       ConstantMaxBECount = getConstant(Max);
     }
     // If we know exactly how many times the backedge will be taken if it's
