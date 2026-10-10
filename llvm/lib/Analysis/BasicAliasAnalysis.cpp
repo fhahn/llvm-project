@@ -141,10 +141,12 @@ static TypeSize getMinimalExtentFrom(const Value &V,
 
 /// Returns the size of the object specified by \p V, rounded up to its
 /// alignment. Returns std::nullopt if the size is unknown or \p V is not an
-/// identified object.
+/// identified object. \p IsIdentified must equal isIdentifiedObject(\p V).
 static std::optional<TypeSize>
-getIdentifiedObjectSize(const Value *V, const DataLayout &DL,
+getIdentifiedObjectSize(const Value *V, bool IsIdentified, const DataLayout &DL,
                         const TargetLibraryInfo &TLI, bool NullIsValidLoc) {
+  assert(IsIdentified == isIdentifiedObject(V) &&
+         "IsIdentified must match isIdentifiedObject");
   // Note that the meanings of the "object" are slightly different in the
   // following contexts:
   //    c1: llvm::getObjectSize()
@@ -163,8 +165,8 @@ getIdentifiedObjectSize(const Value *V, const DataLayout &DL,
   // In the context of c3, the "object" refers to the chunk of memory being
   // allocated. So, the "object" has 100 bytes, and q points to the middle the
   // "object". However, unless p, the root object, is passed as \p V, the
-  // isIdentifiedObject() check makes this function bail out early.
-  if (!isIdentifiedObject(V))
+  // \p IsIdentified check makes this function bail out early.
+  if (!IsIdentified)
     return std::nullopt;
 
   // This function needs to use the aligned object size because we allow
@@ -1599,15 +1601,24 @@ AliasResult BasicAAResult::aliasCheck(const Value *V1, LocationSize V1Size,
     if (!NullPointerIsDefined(&F, CPN->getPointerType()->getAddressSpace()))
       return AliasResult::NoAlias;
 
+  bool O1IsIdentified = isIdentifiedObject(O1);
+  bool O2IsIdentified = O1 == O2 ? O1IsIdentified : isIdentifiedObject(O2);
   if (O1 != O2) {
     // If V1/V2 point to two different objects, we know that we have no alias.
-    if (isIdentifiedObject(O1) && isIdentifiedObject(O2))
+    if (O1IsIdentified && O2IsIdentified)
       return AliasResult::NoAlias;
 
     // Function arguments can't alias with things that are known to be
     // unambigously identified at the function level.
-    if ((isArgumentOrArgumentLike(O1) && isIdentifiedFunctionLocal(O2)) ||
-        (isArgumentOrArgumentLike(O2) && isIdentifiedFunctionLocal(O1)))
+    // isIdentifiedFunctionLocal() is isIdentifiedObject() minus globals.
+    bool O1IsFunctionLocal = O1IsIdentified && !isa<GlobalValue>(O1);
+    bool O2IsFunctionLocal = O2IsIdentified && !isa<GlobalValue>(O2);
+    assert(O1IsFunctionLocal == isIdentifiedFunctionLocal(O1) &&
+           "O1IsFunctionLocal must match isIdentifiedFunctionLocal");
+    assert(O2IsFunctionLocal == isIdentifiedFunctionLocal(O2) &&
+           "O2IsFunctionLocal must match isIdentifiedFunctionLocal");
+    if ((isArgumentOrArgumentLike(O1) && O2IsFunctionLocal) ||
+        (isArgumentOrArgumentLike(O2) && O1IsFunctionLocal))
       return AliasResult::NoAlias;
 
     // If one pointer is the result of a call/invoke or load and the other is a
@@ -1633,14 +1644,15 @@ AliasResult BasicAAResult::aliasCheck(const Value *V1, LocationSize V1Size,
   // side, then we know such behavior is undefined and can assume no alias.
   bool NullIsValidLocation = NullPointerIsDefined(&F);
   std::optional<TypeSize> O2Size =
-      getIdentifiedObjectSize(O2, DL, TLI, NullIsValidLocation);
+      getIdentifiedObjectSize(O2, O2IsIdentified, DL, TLI, NullIsValidLocation);
   if (O2Size &&
       isObjectSmallerThan(*O2Size, *V1, V1Size, DL, NullIsValidLocation))
     return AliasResult::NoAlias;
   // Both pointers often share an underlying object; reuse its size then.
   std::optional<TypeSize> O1Size =
       O1 == O2 ? O2Size
-               : getIdentifiedObjectSize(O1, DL, TLI, NullIsValidLocation);
+               : getIdentifiedObjectSize(O1, O1IsIdentified, DL, TLI,
+                                         NullIsValidLocation);
   if (O1Size &&
       isObjectSmallerThan(*O1Size, *V2, V2Size, DL, NullIsValidLocation))
     return AliasResult::NoAlias;
