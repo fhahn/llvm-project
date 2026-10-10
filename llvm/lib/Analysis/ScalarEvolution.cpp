@@ -9032,6 +9032,8 @@ ScalarEvolution::computeBackedgeTakenCount(const Loop *L,
   const SCEV *MayExitMaxBECount = nullptr;
   bool MustExitMaxOrZero = false;
   bool IsOnlyExit = ExitingBlocks.size() == 1;
+  // Loop guards for L, shared by the exit limit computations for all exits.
+  LazyLoopGuards Guards(L, *this);
 
   // Compute the ExitLimit for each loop exit. Use this to populate ExitCounts
   // and compute maxBECount.
@@ -9047,7 +9049,8 @@ ScalarEvolution::computeBackedgeTakenCount(const Loop *L,
           continue;
       }
 
-    ExitLimit EL = computeExitLimit(L, ExitBB, IsOnlyExit, AllowPredicates);
+    ExitLimit EL =
+        computeExitLimit(L, ExitBB, IsOnlyExit, Guards, AllowPredicates);
 
     assert((AllowPredicates || EL.Predicates.empty()) &&
            "Predicated exit limit when predicates are not allowed!");
@@ -9122,7 +9125,8 @@ ScalarEvolution::computeBackedgeTakenCount(const Loop *L,
 
 ScalarEvolution::ExitLimit
 ScalarEvolution::computeExitLimit(const Loop *L, BasicBlock *ExitingBlock,
-                                  bool IsOnlyExit, bool AllowPredicates) {
+                                  bool IsOnlyExit, LazyLoopGuards &Guards,
+                                  bool AllowPredicates) {
   assert(L->contains(ExitingBlock) && "Exit count for non-loop block?");
   // If our exiting block does not dominate the latch, then its connection with
   // loop's exit limit may be far from trivial.
@@ -9138,7 +9142,7 @@ ScalarEvolution::computeExitLimit(const Loop *L, BasicBlock *ExitingBlock,
     // Proceed to the next level to examine the exit condition expression.
     return computeExitLimitFromCond(L, BI->getCondition(), ExitIfTrue,
                                     /*ControlsOnlyExit=*/IsOnlyExit,
-                                    AllowPredicates);
+                                    AllowPredicates, Guards);
   }
 
   if (SwitchInst *SI = dyn_cast<SwitchInst>(Term)) {
@@ -9152,7 +9156,7 @@ ScalarEvolution::computeExitLimit(const Loop *L, BasicBlock *ExitingBlock,
       }
     assert(Exit && "Exiting block must have at least one exit");
     return computeExitLimitFromSingleExitSwitch(
-        L, SI, Exit, /*ControlsOnlyExit=*/IsOnlyExit);
+        L, SI, Exit, /*ControlsOnlyExit=*/IsOnlyExit, Guards);
   }
 
   return getCouldNotCompute();
@@ -9161,9 +9165,18 @@ ScalarEvolution::computeExitLimit(const Loop *L, BasicBlock *ExitingBlock,
 ScalarEvolution::ExitLimit ScalarEvolution::computeExitLimitFromCond(
     const Loop *L, Value *ExitCond, bool ExitIfTrue, bool ControlsOnlyExit,
     bool AllowPredicates) {
+  LazyLoopGuards Guards(L, *this);
+  return computeExitLimitFromCond(L, ExitCond, ExitIfTrue, ControlsOnlyExit,
+                                  AllowPredicates, Guards);
+}
+
+ScalarEvolution::ExitLimit ScalarEvolution::computeExitLimitFromCond(
+    const Loop *L, Value *ExitCond, bool ExitIfTrue, bool ControlsOnlyExit,
+    bool AllowPredicates, LazyLoopGuards &Guards) {
   ScalarEvolution::ExitLimitCacheTy Cache(L, ExitIfTrue, AllowPredicates);
   return computeExitLimitFromCondCached(Cache, L, ExitCond, ExitIfTrue,
-                                        ControlsOnlyExit, AllowPredicates);
+                                        ControlsOnlyExit, AllowPredicates,
+                                        Guards);
 }
 
 std::optional<ScalarEvolution::ExitLimit>
@@ -9200,37 +9213,37 @@ void ScalarEvolution::ExitLimitCache::insert(const Loop *L, Value *ExitCond,
 
 ScalarEvolution::ExitLimit ScalarEvolution::computeExitLimitFromCondCached(
     ExitLimitCacheTy &Cache, const Loop *L, Value *ExitCond, bool ExitIfTrue,
-    bool ControlsOnlyExit, bool AllowPredicates) {
+    bool ControlsOnlyExit, bool AllowPredicates, LazyLoopGuards &Guards) {
 
   if (auto MaybeEL = Cache.find(L, ExitCond, ExitIfTrue, ControlsOnlyExit,
                                 AllowPredicates))
     return *MaybeEL;
 
   ExitLimit EL = computeExitLimitFromCondImpl(
-      Cache, L, ExitCond, ExitIfTrue, ControlsOnlyExit, AllowPredicates);
+      Cache, L, ExitCond, ExitIfTrue, ControlsOnlyExit, AllowPredicates, Guards);
   Cache.insert(L, ExitCond, ExitIfTrue, ControlsOnlyExit, AllowPredicates, EL);
   return EL;
 }
 
 ScalarEvolution::ExitLimit ScalarEvolution::computeExitLimitFromCondImpl(
     ExitLimitCacheTy &Cache, const Loop *L, Value *ExitCond, bool ExitIfTrue,
-    bool ControlsOnlyExit, bool AllowPredicates) {
+    bool ControlsOnlyExit, bool AllowPredicates, LazyLoopGuards &Guards) {
   // Handle BinOp conditions (And, Or).
   if (auto LimitFromBinOp = computeExitLimitFromCondFromBinOp(
-          Cache, L, ExitCond, ExitIfTrue, AllowPredicates))
+          Cache, L, ExitCond, ExitIfTrue, AllowPredicates, Guards))
     return *LimitFromBinOp;
 
   // With an icmp, it may be feasible to compute an exact backedge-taken count.
   // Proceed to the next level to examine the icmp.
   if (ICmpInst *ExitCondICmp = dyn_cast<ICmpInst>(ExitCond)) {
-    ExitLimit EL =
-        computeExitLimitFromICmp(L, ExitCondICmp, ExitIfTrue, ControlsOnlyExit);
+    ExitLimit EL = computeExitLimitFromICmp(L, ExitCondICmp, ExitIfTrue,
+                                            ControlsOnlyExit, Guards);
     if (EL.hasFullInfo() || !AllowPredicates)
       return EL;
 
     // Try again, but use SCEV predicates this time.
     return computeExitLimitFromICmp(L, ExitCondICmp, ExitIfTrue,
-                                    ControlsOnlyExit,
+                                    ControlsOnlyExit, Guards,
                                     /*AllowPredicates=*/true);
   }
 
@@ -9265,7 +9278,8 @@ ScalarEvolution::ExitLimit ScalarEvolution::computeExitLimitFromCondImpl(
     if (Offset != 0)
       LHS = getAddExpr(LHS, getConstant(Offset));
     auto EL = computeExitLimitFromICmp(L, Pred, LHS, getConstant(NewRHSC),
-                                       ControlsOnlyExit, AllowPredicates);
+                                       ControlsOnlyExit, Guards,
+                                       AllowPredicates);
     if (EL.hasAnyInfo())
       return EL;
   }
@@ -9279,7 +9293,8 @@ ScalarEvolution::computeExitLimitFromCondFromBinOp(ExitLimitCacheTy &Cache,
                                                    const Loop *L,
                                                    Value *ExitCond,
                                                    bool ExitIfTrue,
-                                                   bool AllowPredicates) {
+                                                   bool AllowPredicates,
+                                                   LazyLoopGuards &Guards) {
   // Check if the controlling expression for this loop is an And or Or.
   Value *Op0, *Op1;
   bool IsAnd;
@@ -9292,10 +9307,14 @@ ScalarEvolution::computeExitLimitFromCondFromBinOp(ExitLimitCacheTy &Cache,
 
   // A sub-condition of a non-trivial binop never solely controls the exit,
   // whether we exit always depends on both conditions.
-  ExitLimit EL0 = computeExitLimitFromCondCached(
-      Cache, L, Op0, ExitIfTrue, /*ControlsOnlyExit=*/false, AllowPredicates);
-  ExitLimit EL1 = computeExitLimitFromCondCached(
-      Cache, L, Op1, ExitIfTrue, /*ControlsOnlyExit=*/false, AllowPredicates);
+  ExitLimit EL0 =
+      computeExitLimitFromCondCached(Cache, L, Op0, ExitIfTrue,
+                                     /*ControlsOnlyExit=*/false,
+                                     AllowPredicates, Guards);
+  ExitLimit EL1 =
+      computeExitLimitFromCondCached(Cache, L, Op1, ExitIfTrue,
+                                     /*ControlsOnlyExit=*/false,
+                                     AllowPredicates, Guards);
 
   // EitherMayExit is true in these two cases:
   //   br (and Op0 Op1), loop, exit
@@ -9353,7 +9372,7 @@ ScalarEvolution::computeExitLimitFromCondFromBinOp(ExitLimitCacheTy &Cache,
 
 ScalarEvolution::ExitLimit ScalarEvolution::computeExitLimitFromICmp(
     const Loop *L, ICmpInst *ExitCond, bool ExitIfTrue, bool ControlsOnlyExit,
-    bool AllowPredicates) {
+    LazyLoopGuards &Guards, bool AllowPredicates) {
   // If the condition was exit on true, convert the condition to exit on false
   CmpPredicate Pred;
   if (!ExitIfTrue)
@@ -9366,7 +9385,7 @@ ScalarEvolution::ExitLimit ScalarEvolution::computeExitLimitFromICmp(
   const SCEV *RHS = getSCEV(ExitCond->getOperand(1));
 
   ExitLimit EL = computeExitLimitFromICmp(L, Pred, LHS, RHS, ControlsOnlyExit,
-                                          AllowPredicates);
+                                          Guards, AllowPredicates);
   if (EL.hasAnyInfo())
     return EL;
 
@@ -9381,7 +9400,7 @@ ScalarEvolution::ExitLimit ScalarEvolution::computeExitLimitFromICmp(
 }
 ScalarEvolution::ExitLimit ScalarEvolution::computeExitLimitFromICmp(
     const Loop *L, CmpPredicate Pred, SCEVUse LHS, SCEVUse RHS,
-    bool ControlsOnlyExit, bool AllowPredicates) {
+    bool ControlsOnlyExit, LazyLoopGuards &Guards, bool AllowPredicates) {
 
   // Try to evaluate any dependencies out of the loop.
   LHS = getSCEVAtScope(LHS, L);
@@ -9470,7 +9489,7 @@ ScalarEvolution::ExitLimit ScalarEvolution::computeExitLimitFromICmp(
         return RHS;
     }
     ExitLimit EL = howFarToZero(getMinusSCEV(LHS, RHS), L, ControlsOnlyExit,
-                                AllowPredicates);
+                                Guards, AllowPredicates);
     if (EL.hasAnyInfo())
       return EL;
     break;
@@ -9521,7 +9540,7 @@ ScalarEvolution::ExitLimit ScalarEvolution::computeExitLimitFromICmp(
   case ICmpInst::ICMP_ULT: { // while (X < Y)
     bool IsSigned = ICmpInst::isSigned(Pred);
     ExitLimit EL = howManyLessThans(LHS, RHS, L, IsSigned, /*Invert=*/false,
-                                    ControlsOnlyExit, AllowPredicates);
+                                    ControlsOnlyExit, Guards, AllowPredicates);
     if (EL.hasAnyInfo())
       return EL;
     break;
@@ -9540,7 +9559,7 @@ ScalarEvolution::ExitLimit ScalarEvolution::computeExitLimitFromICmp(
     // "X > Y" is analyzed as the equivalent "~X < ~Y".
     bool IsSigned = ICmpInst::isSigned(Pred);
     ExitLimit EL = howManyLessThans(LHS, RHS, L, IsSigned, /*Invert=*/true,
-                                    ControlsOnlyExit, AllowPredicates);
+                                    ControlsOnlyExit, Guards, AllowPredicates);
     if (EL.hasAnyInfo())
       return EL;
     break;
@@ -9556,7 +9575,8 @@ ScalarEvolution::ExitLimit
 ScalarEvolution::computeExitLimitFromSingleExitSwitch(const Loop *L,
                                                       SwitchInst *Switch,
                                                       BasicBlock *ExitingBlock,
-                                                      bool ControlsOnlyExit) {
+                                                      bool ControlsOnlyExit,
+                                                      LazyLoopGuards &Guards) {
   assert(!L->contains(ExitingBlock) && "Not an exiting block!");
 
   // Give up if the exit is the default dest of a switch.
@@ -9569,7 +9589,8 @@ ScalarEvolution::computeExitLimitFromSingleExitSwitch(const Loop *L,
   const SCEV *RHS = getConstant(Switch->findCaseDest(ExitingBlock));
 
   // while (X != Y) --> while (X-Y != 0)
-  ExitLimit EL = howFarToZero(getMinusSCEV(LHS, RHS), L, ControlsOnlyExit);
+  ExitLimit EL =
+      howFarToZero(getMinusSCEV(LHS, RHS), L, ControlsOnlyExit, Guards);
   if (EL.hasAnyInfo())
     return EL;
 
@@ -10759,6 +10780,7 @@ SolveQuadraticAddRecRange(const SCEVAddRecExpr *AddRec,
 ScalarEvolution::ExitLimit ScalarEvolution::howFarToZero(const SCEV *V,
                                                          const Loop *L,
                                                          bool ControlsOnlyExit,
+                                                         LazyLoopGuards &LG,
                                                          bool AllowPredicates) {
 
   // This is only used for loops with a "x != y" exit test. The exit condition
@@ -10821,7 +10843,7 @@ ScalarEvolution::ExitLimit ScalarEvolution::howFarToZero(const SCEV *V,
   if (!isLoopInvariant(Step, L))
     return getCouldNotCompute();
 
-  LoopGuards Guards = LoopGuards::collect(L, *this);
+  const LoopGuards &Guards = LG.get();
   // Specialize step for this loop so we get context sensitive facts below.
   const SCEV *StepWLG = applyLoopGuards(Step, Guards);
 
@@ -13363,16 +13385,9 @@ ScalarEvolution::computeMaxBECountForLT(const SCEV *Start, const SCEV *Stride,
 ScalarEvolution::ExitLimit
 ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
                                   const Loop *L, bool IsSigned, bool Invert,
-                                  bool ControlsOnlyExit, bool AllowPredicates) {
+                                  bool ControlsOnlyExit, LazyLoopGuards &Guards,
+                                  bool AllowPredicates) {
   SmallVector<const SCEVPredicate *> Predicates;
-
-  // Loop guards for L, collected on demand.
-  std::optional<LoopGuards> CachedGuards;
-  auto getGuards = [&]() -> const LoopGuards & {
-    if (!CachedGuards)
-      CachedGuards.emplace(LoopGuards::collect(L, *this));
-    return *CachedGuards;
-  };
 
   // FIXME: Extend the non-invariant RHS analysis to greater-than comparisons.
   if (Invert && !isLoopInvariant(RHS, L))
@@ -13410,7 +13425,7 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
           APInt StrideMax = getUnsignedRangeMax(AR->getStepRecurrence(*this));
           APInt Limit = APInt::getMaxValue(InnerBitWidth) - (StrideMax - 1);
           Limit = Limit.zext(OuterBitWidth);
-          return getUnsignedRangeMax(applyLoopGuards(RHS, getGuards()))
+          return getUnsignedRangeMax(applyLoopGuards(RHS, Guards.get()))
               .ule(Limit);
         };
         auto Flags = AR->getNoWrapFlags();
@@ -13474,7 +13489,7 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
   bool PositiveStride = isKnownPositive(Stride);
   // A dominating guard may prove the stride positive.
   if (!PositiveStride) {
-    const SCEV *LoopGuardedStride = applyLoopGuards(Stride, getGuards());
+    const SCEV *LoopGuardedStride = applyLoopGuards(Stride, Guards.get());
     if (isKnownPositive(LoopGuardedStride)) {
       GuardedStride = LoopGuardedStride;
       PositiveStride = true;
@@ -13802,8 +13817,8 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
         };
 
         auto CondGE = IsSigned ? ICmpInst::ICMP_SGE : ICmpInst::ICMP_UGE;
-        const SCEV *GuardedRHS = applyLoopGuards(OrigRHS, getGuards());
-        const SCEV *GuardedStart = applyLoopGuards(OrigStart, getGuards());
+        const SCEV *GuardedRHS = applyLoopGuards(OrigRHS, Guards.get());
+        const SCEV *GuardedStart = applyLoopGuards(OrigStart, Guards.get());
         if (Invert)
           std::swap(GuardedRHS, GuardedStart);
 

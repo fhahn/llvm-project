@@ -2120,8 +2120,33 @@ private:
   /// execute if it exits via the specified block. If AllowPredicates is set,
   /// this call will try to use a minimal set of SCEV predicates in order to
   /// return an exact answer.
+  /// Loop guards for a loop, collected on first use. This allows the exit
+  /// limit computations for all exits of a loop to share a single collection.
+  class LazyLoopGuards {
+    const Loop *L;
+    ScalarEvolution &SE;
+    std::optional<LoopGuards> Guards;
+
+  public:
+    LazyLoopGuards(const Loop *L, ScalarEvolution &SE) : L(L), SE(SE) {}
+
+    /// Return the loop guards for the loop, collecting them on first use.
+    const LoopGuards &get() {
+      if (!Guards)
+        Guards.emplace(LoopGuards::collect(L, SE));
+      return *Guards;
+    }
+  };
+
   ExitLimit computeExitLimit(const Loop *L, BasicBlock *ExitingBlock,
-                             bool IsOnlyExit, bool AllowPredicates = false);
+                             bool IsOnlyExit, LazyLoopGuards &Guards,
+                             bool AllowPredicates = false);
+
+  /// Variant of the public computeExitLimitFromCond which uses \p Guards.
+  ExitLimit computeExitLimitFromCond(const Loop *L, Value *ExitCond,
+                                     bool ExitIfTrue, bool ControlsOnlyExit,
+                                     bool AllowPredicates,
+                                     LazyLoopGuards &Guards);
 
   // Helper functions for computeExitLimitFromCond to avoid exponential time
   // complexity.
@@ -2158,15 +2183,18 @@ private:
                                            const Loop *L, Value *ExitCond,
                                            bool ExitIfTrue,
                                            bool ControlsOnlyExit,
-                                           bool AllowPredicates);
+                                           bool AllowPredicates,
+                                           LazyLoopGuards &Guards);
   ExitLimit computeExitLimitFromCondImpl(ExitLimitCacheTy &Cache, const Loop *L,
                                          Value *ExitCond, bool ExitIfTrue,
                                          bool ControlsOnlyExit,
-                                         bool AllowPredicates);
+                                         bool AllowPredicates,
+                                         LazyLoopGuards &Guards);
   std::optional<ScalarEvolution::ExitLimit>
   computeExitLimitFromCondFromBinOp(ExitLimitCacheTy &Cache, const Loop *L,
                                     Value *ExitCond, bool ExitIfTrue,
-                                    bool AllowPredicates);
+                                    bool AllowPredicates,
+                                    LazyLoopGuards &Guards);
 
   /// Compute the number of times the backedge of the specified loop will
   /// execute if its exit condition were a conditional branch of the ICmpInst
@@ -2174,8 +2202,8 @@ private:
   /// to use a minimal set of SCEV predicates in order to return an exact
   /// answer.
   ExitLimit computeExitLimitFromICmp(const Loop *L, ICmpInst *ExitCond,
-                                     bool ExitIfTrue,
-                                     bool IsSubExpr,
+                                     bool ExitIfTrue, bool IsSubExpr,
+                                     LazyLoopGuards &Guards,
                                      bool AllowPredicates = false);
 
   /// Variant of previous which takes the components representing an ICmp
@@ -2184,6 +2212,7 @@ private:
   /// has a materialized ICmp.
   ExitLimit computeExitLimitFromICmp(const Loop *L, CmpPredicate Pred,
                                      SCEVUse LHS, SCEVUse RHS, bool IsSubExpr,
+                                     LazyLoopGuards &Guards,
                                      bool AllowPredicates = false);
 
   /// Compute the number of times the backedge of the specified loop will
@@ -2192,7 +2221,8 @@ private:
   ExitLimit computeExitLimitFromSingleExitSwitch(const Loop *L,
                                                  SwitchInst *Switch,
                                                  BasicBlock *ExitingBB,
-                                                 bool IsSubExpr);
+                                                 bool IsSubExpr,
+                                                 LazyLoopGuards &Guards);
 
   /// Compute the exit limit of a loop that is controlled by a
   /// "(IV >> 1) != 0" type comparison.  We cannot compute the exact trip
@@ -2217,7 +2247,7 @@ private:
   /// If AllowPredicates is set, this call will try to use a minimal set of
   /// SCEV predicates in order to return an exact answer.
   ExitLimit howFarToZero(const SCEV *V, const Loop *L, bool IsSubExpr,
-                         bool AllowPredicates = false);
+                         LazyLoopGuards &Guards, bool AllowPredicates = false);
 
   /// Return the number of times an exit condition checking the specified
   /// value for nonzero will execute.  If not computable, return
@@ -2240,6 +2270,7 @@ private:
   /// SCEV predicates in order to return an exact answer.
   ExitLimit howManyLessThans(const SCEV *LHS, const SCEV *RHS, const Loop *L,
                              bool IsSigned, bool Invert, bool ControlsOnlyExit,
+                             LazyLoopGuards &Guards,
                              bool AllowPredicates = false);
 
   /// Return a predecessor of BB (which may not be an immediate predecessor)
