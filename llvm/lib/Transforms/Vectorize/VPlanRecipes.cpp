@@ -1498,19 +1498,7 @@ InstructionCost VPInstruction::computeCost(ElementCount VF,
     return Ctx.TTI.getArithmeticReductionCost(
         Instruction::Or, cast<VectorType>(VecTy), std::nullopt, Ctx.CostKind);
   }
-  case VPInstruction::FirstActiveLane: {
-    Type *Ty = this->getScalarType();
-    Type *ScalarTy = getOperand(0)->getScalarType();
-    if (VF.isScalar())
-      return Ctx.TTI.getCmpSelInstrCost(Instruction::ICmp, ScalarTy,
-                                        CmpInst::makeCmpResultType(ScalarTy),
-                                        CmpInst::ICMP_EQ, Ctx.CostKind);
-    // Calculate the cost of determining the lane index.
-    auto *PredTy = toVectorTy(ScalarTy, VF);
-    IntrinsicCostAttributes Attrs(Intrinsic::experimental_cttz_elts, Ty,
-                                  {PredTy, Type::getInt1Ty(Ctx.LLVMCtx)});
-    return Ctx.TTI.getIntrinsicInstrCost(Attrs, Ctx.CostKind);
-  }
+  case VPInstruction::FirstActiveLane:
   case VPInstruction::LastActiveLane: {
     Type *Ty = this->getScalarType();
     Type *ScalarTy = getOperand(0)->getScalarType();
@@ -1518,18 +1506,19 @@ InstructionCost VPInstruction::computeCost(ElementCount VF,
       return Ctx.TTI.getCmpSelInstrCost(Instruction::ICmp, ScalarTy,
                                         CmpInst::makeCmpResultType(ScalarTy),
                                         CmpInst::ICMP_EQ, Ctx.CostKind);
-    // Calculate the cost of determining the lane index: NOT + cttz_elts + SUB.
+    // Calculate the cost of determining the lane index: cttz.elts, plus NOT on
+    // the predicate and SUB on the index for LastActiveLane.
     auto *PredTy = toVectorTy(ScalarTy, VF);
     IntrinsicCostAttributes Attrs(Intrinsic::experimental_cttz_elts, Ty,
                                   {PredTy, Type::getInt1Ty(Ctx.LLVMCtx)});
     InstructionCost Cost = Ctx.TTI.getIntrinsicInstrCost(Attrs, Ctx.CostKind);
-    // Add cost of NOT operation on the predicate.
+    if (getOpcode() == VPInstruction::FirstActiveLane)
+      return Cost;
     Cost += Ctx.TTI.getArithmeticInstrCost(
         Instruction::Xor, PredTy, Ctx.CostKind,
         {TargetTransformInfo::OK_AnyValue, TargetTransformInfo::OP_None},
         {TargetTransformInfo::OK_UniformConstantValue,
          TargetTransformInfo::OP_None});
-    // Add cost of SUB operation on the index.
     Cost += Ctx.TTI.getArithmeticInstrCost(Instruction::Sub, Ty, Ctx.CostKind);
     return Cost;
   }
