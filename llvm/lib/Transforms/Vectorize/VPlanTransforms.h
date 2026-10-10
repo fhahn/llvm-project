@@ -447,9 +447,6 @@ struct VPlanTransforms {
   /// Perform instcombine-like simplifications on recipes in \p Plan.
   static void combineRecipes(VPlan &Plan);
 
-  /// Cancel out redundant reverses in \p Plan, e.g. reverse(reverse(x)) -> x.
-  static void simplifyReverses(VPlan &Plan);
-
   /// Remove BranchOnCond recipes with true or false conditions together with
   /// removing dead edges to their successors. If \p OnlyLatches is true, only
   /// process loop latches. Returns true if incoming values from any phi-like

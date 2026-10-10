@@ -1773,7 +1773,8 @@ void VPlanTransforms::combineRecipes(VPlan &Plan) {
   }
 }
 
-void VPlanTransforms::simplifyReverses(VPlan &Plan) {
+/// Cancel out redundant reverses in \p Plan, e.g. reverse(reverse(x)) -> x.
+static void simplifyReverses(VPlan &Plan) {
   // Pull out reverses from any elementwise op.
   // binop(reverse(x), reverse(y)) -> reverse(binop(x,y))
   vputils::pullOutPermutations(
