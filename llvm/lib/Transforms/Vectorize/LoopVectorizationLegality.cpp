@@ -309,23 +309,6 @@ static IntegerType *getWiderInductionTy(const DataLayout &DL, Type *Ty0,
   return TyA->getScalarSizeInBits() > TyB->getScalarSizeInBits() ? TyA : TyB;
 }
 
-/// Returns true if A and B have same pointer operands or same SCEVs addresses
-static bool storeToSameAddress(ScalarEvolution *SE, StoreInst *A,
-                               StoreInst *B) {
-  // Compare store
-  if (A == B)
-    return true;
-
-  // Otherwise Compare pointers
-  Value *APtr = A->getPointerOperand();
-  Value *BPtr = B->getPointerOperand();
-  if (APtr == BPtr)
-    return true;
-
-  // Otherwise compare address SCEVs
-  return SE->getSCEV(APtr) == SE->getSCEV(BPtr);
-}
-
 void LoopVectorizationLegality::collectUnitStridePredicates() const {
   if (!AllowRuntimeSCEVChecks || !TheLoop->isInnermost())
     return;
@@ -1265,7 +1248,8 @@ bool LoopVectorizationLegality::canVectorizeMemory() {
           // TODO: Check that bitwidth of unhandled store is smaller then the
           // one that overwrites it and add a test.
           erase_if(UnhandledStores, [SE, SI](StoreInst *I) {
-            return storeToSameAddress(SE, SI, I) &&
+            return SE->getSCEV(SI->getPointerOperand()) ==
+                       SE->getSCEV(I->getPointerOperand()) &&
                    I->getValueOperand()->getType() ==
                        SI->getValueOperand()->getType();
           });
