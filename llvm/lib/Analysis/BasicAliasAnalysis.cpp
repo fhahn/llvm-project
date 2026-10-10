@@ -1630,13 +1630,18 @@ AliasResult BasicAAResult::aliasCheck(const Value *V1, LocationSize V1Size,
     // temporary store the nocapture argument's value in a temporary memory
     // location if that memory location doesn't escape. Or it may pass a
     // nocapture value to other functions as long as they don't capture it.
-    if (isEscapeSource(O1) && capturesNothing(AAQI.CA->getCapturesBefore(
-                                  O2, dyn_cast<Instruction>(O1), /*OrAt=*/true,
-                                  /*ReturnCaptures=*/false)))
+    //
+    // Per its contract, getCapturesBefore() returns Provenance for objects
+    // that are not identified function-local, so skip the query for those.
+    if (O2IsFunctionLocal && isEscapeSource(O1) &&
+        capturesNothing(AAQI.CA->getCapturesBefore(
+            O2, dyn_cast<Instruction>(O1), /*OrAt=*/true,
+            /*ReturnCaptures=*/false)))
       return AliasResult::NoAlias;
-    if (isEscapeSource(O2) && capturesNothing(AAQI.CA->getCapturesBefore(
-                                  O1, dyn_cast<Instruction>(O2), /*OrAt=*/true,
-                                  /*ReturnCaptures=*/false)))
+    if (O1IsFunctionLocal && isEscapeSource(O2) &&
+        capturesNothing(AAQI.CA->getCapturesBefore(
+            O1, dyn_cast<Instruction>(O2), /*OrAt=*/true,
+            /*ReturnCaptures=*/false)))
       return AliasResult::NoAlias;
   }
 
