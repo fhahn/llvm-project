@@ -2312,7 +2312,7 @@ define void @and_exit_same_exact_count(i16 %start) {
 ; CHECK-NEXT:    --> (%c.1 umin %c.2) U: full-set S: full-set Exits: true LoopDispositions: { %loop: Variant }
 ; CHECK-NEXT:  Determining loop execution counts for: @and_exit_same_exact_count
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is (1 + (-1 * %start))
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i16 -1
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i16 10
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (1 + (-1 * %start))
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;
