@@ -5118,13 +5118,7 @@ public:
         It->second = new VPIRValue(V);
     }
 
-    assert(isa<VPIRValue>(It->second) &&
-           "Only VPIRValues should be in mapping");
     return It->second;
-  }
-  VPIRValue *getOrAddLiveIn(VPIRValue *V) {
-    assert(V && "Trying to get or add the VPIRValue of a null VPIRValue");
-    return getOrAddLiveIn(V->getValue());
   }
 
   /// Return a VPIRValue wrapping i1 true.

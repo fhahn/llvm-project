@@ -1225,10 +1225,11 @@ VPlan *VPlan::duplicate() {
       new VPlan(cast<VPBasicBlock>(NewEntry), NewScalarHeader, getIndexType());
   DenseMap<VPValue *, VPValue *> Old2NewVPValues;
   for (VPIRValue *OldLiveIn : getLiveIns())
-    Old2NewVPValues[OldLiveIn] = NewPlan->getOrAddLiveIn(OldLiveIn);
+    Old2NewVPValues[OldLiveIn] = NewPlan->getOrAddLiveIn(OldLiveIn->getValue());
 
   if (auto *TripCountIRV = dyn_cast_or_null<VPIRValue>(TripCount))
-    Old2NewVPValues[TripCountIRV] = NewPlan->getOrAddLiveIn(TripCountIRV);
+    Old2NewVPValues[TripCountIRV] =
+        NewPlan->getOrAddLiveIn(TripCountIRV->getValue());
   // else NewTripCount will be created and inserted into Old2NewVPValues when
   // TripCount is cloned. In any case NewPlan->TripCount is updated below.
 
