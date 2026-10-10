@@ -1755,12 +1755,6 @@ public:
 
   Instruction &getInstruction() const { return I; }
 
-  bool usesScalars(const VPValue *Op) const override {
-    assert(is_contained(operands(), Op) &&
-           "Op must be an operand of the recipe");
-    return true;
-  }
-
   bool usesFirstPartOnly(const VPValue *Op) const override {
     assert(is_contained(operands(), Op) &&
            "Op must be an operand of the recipe");
@@ -2564,7 +2558,7 @@ public:
   const VPValue *getVFValue() const { return getOperand(2); }
 
   /// Returns the number of incoming values, also number of incoming blocks.
-  /// Note that at the moment, VPWidenPointerInductionRecipe only has a single
+  /// Note that at the moment, VPWidenInductionRecipes only have a single
   /// incoming value, its start value.
   unsigned getNumIncoming() const override { return 1; }
 
@@ -2655,11 +2649,6 @@ public:
   VPValue *getSplatVFValue() const {
     return isUnrolled() ? getOperand(getNumOperands() - 2) : nullptr;
   }
-
-  /// Returns the number of incoming values, also number of incoming blocks.
-  /// Note that at the moment, VPWidenIntOrFpInductionRecipes only have a single
-  /// incoming value, its start value.
-  unsigned getNumIncoming() const override { return 1; }
 
   /// Returns the first defined value as TruncInst, if it is one or nullptr
   /// otherwise.
