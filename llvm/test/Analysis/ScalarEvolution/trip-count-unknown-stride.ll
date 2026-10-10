@@ -518,7 +518,7 @@ define void @start_and_stride_correlated(i1 %g, ptr %dst) mustprogress {
 ; CHECK-LABEL: 'start_and_stride_correlated'
 ; CHECK-NEXT:  Determining loop execution counts for: @start_and_stride_correlated
 ; CHECK-NEXT:  Loop %loop: backedge-taken count is (15 /u (zext i1 %g to i64))
-; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 16
+; CHECK-NEXT:  Loop %loop: constant max backedge-taken count is i64 15
 ; CHECK-NEXT:  Loop %loop: symbolic max backedge-taken count is (15 /u (zext i1 %g to i64))
 ; CHECK-NEXT:  Loop %loop: Trip multiple is 1
 ;

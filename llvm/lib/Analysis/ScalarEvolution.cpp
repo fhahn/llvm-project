@@ -13927,6 +13927,14 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
     ConstantMaxBECount = computeMaxBECountForLT(
         Start, Stride, RHS, getTypeSizeInBits(LHS->getType()), IsSigned,
         Invert, Guards);
+    // The range of the exact count may be tighter than the range-based bound,
+    // e.g. if Start and Stride are correlated.
+    if (!isa<SCEVCouldNotCompute>(BECount) &&
+        !isa<SCEVCouldNotCompute>(ConstantMaxBECount) &&
+        BECount->getType() == ConstantMaxBECount->getType())
+      ConstantMaxBECount = getConstant(
+          APIntOps::umin(cast<SCEVConstant>(ConstantMaxBECount)->getAPInt(),
+                         getUnsignedRangeMax(BECount)));
     // If we know exactly how many times the backedge will be taken if it's
     // taken at least once, then the backedge count will either be that or
     // zero. If that count exceeds the range-based bound, the backedge can
