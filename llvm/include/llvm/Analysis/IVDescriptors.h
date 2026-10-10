@@ -129,8 +129,6 @@ public:
 
     bool isRecurrence() const { return IsRecurrence; }
 
-    bool needsExactFPMath() const { return ExactFPMathInst != nullptr; }
-
     Instruction *getExactFPMathInst() const { return ExactFPMathInst; }
 
     RecurKind getRecKind() const { return RecKind; }
@@ -233,8 +231,6 @@ public:
   FastMathFlags getFastMathFlags() const { return FMF; }
 
   TrackingVH<Value> getRecurrenceStartValue() const { return StartValue; }
-
-  Instruction *getLoopExitInstr() const { return LoopExitInstr; }
 
   /// Returns true if the recurrence has floating-point math that requires
   /// precise (ordered) operations.
