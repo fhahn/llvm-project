@@ -967,6 +967,133 @@ class InstExecutor : public InstVisitor<InstExecutor, void>,
     return Ctx.fromBytes(Bytes, RetTy);
   }
 
+  /// Returns the in-memory representation of a vector of \p VecTy's shape with
+  /// the bits of lanes enabled by \p Mask set to one and the bits of disabled
+  /// lanes poison. Like for any vector, toBytes sets the padding bits to zero.
+  /// Thus the concrete bits of each byte are the bits accessed by a masked
+  /// load/store and its set bits are the bits of enabled lanes. Poison mask
+  /// lanes may be enabled, so they are treated as enabled.
+  SmallVector<Byte> getMaskedAccessLayout(VectorType *VecTy,
+                                          const AnyValue &Mask) {
+    const uint32_t ElemBits =
+        DL.getTypeSizeInBits(VecTy->getElementType()).getFixedValue();
+    auto *IntVecTy =
+        VectorType::get(IntegerType::get(VecTy->getContext(), ElemBits),
+                        VecTy->getElementCount());
+    std::vector<AnyValue> Lanes;
+    Lanes.reserve(Mask.asAggregate().size());
+    for (const AnyValue &Lane : Mask.asAggregate())
+      Lanes.push_back(Lane.asBoolean() == BooleanKind::False
+                          ? AnyValue::poison()
+                          : AnyValue(APInt::getAllOnes(ElemBits)));
+    SmallVector<Byte> Layout(Ctx.getEffectiveTypeStoreSize(IntVecTy),
+                             Byte::poison());
+    Ctx.toBytes(AnyValue(std::move(Lanes)), IntVecTy, Layout);
+    return Layout;
+  }
+
+  /// Verifies a masked load/store at \p Ptr accessing \p Layout, as returned by
+  /// getMaskedAccessLayout. Returns the index of the first accessed byte of
+  /// \p Layout and the memory holding the accessed bytes, or std::nullopt if
+  /// no lane may be enabled or UB was reported.
+  std::optional<std::pair<uint64_t, MutableArrayRef<Byte>>>
+  verifyMaskedMemAccess(const AnyValue &Ptr, ArrayRef<Byte> Layout,
+                        bool IsStore) {
+    auto HasLaneBits = [](const Byte &B) { return B.Value != 0; };
+    auto First = find_if(Layout, HasLaneBits);
+    if (First == Layout.end())
+      return std::nullopt;
+    if (Ptr.isPoison()) {
+      reportImmediateUB() << (IsStore ? "llvm.masked.store"
+                                      : "llvm.masked.load")
+                          << " with poison pointer.";
+      return std::nullopt;
+    }
+
+    // All enabled lanes must be in bounds of the same allocation, which is
+    // equivalent to the bytes between the first and the last byte with bits
+    // of enabled lanes being in bounds. The alignment is enforced by the align
+    // attribute.
+    const uint64_t Lo = std::distance(Layout.begin(), First);
+    const uint64_t Hi = std::distance(
+        Layout.begin(), find_if(reverse(Layout), HasLaneBits).base());
+    const Pointer &PtrVal = Ptr.asPointer();
+    auto [MO, Offset] =
+        verifyMemAccess(PtrVal.getWithNewAddr(PtrVal.address() + Lo), Hi - Lo,
+                        Align(1), IsStore);
+    if (!MO)
+      return std::nullopt;
+
+    // Bytes outside [Lo, Hi) only contain padding bits and bits of disabled
+    // lanes. Padding bits are accessed as long as they are in bounds of the
+    // object, but never cause UB. Before and After are the number of such
+    // bytes in bounds before and after [Lo, Hi); the subtraction cannot wrap as
+    // verifyMemAccess ensures Offset + (Hi - Lo) <= MO->getSize().
+    const uint64_t Before = std::min(Lo, Offset);
+    const uint64_t After =
+        std::min(Layout.size() - Hi, MO->getSize() - Offset - (Hi - Lo));
+    return std::make_pair(
+        Lo - Before,
+        MO->getBytes().slice(Offset - Before, Before + (Hi - Lo) + After));
+  }
+
+  AnyValue callMaskedLoadIntrinsic(CallBase &CB, const AnyValue &Ptr,
+                                   const AnyValue &Mask,
+                                   const AnyValue &PassThru) {
+    auto *VecTy = cast<VectorType>(CB.getType());
+    SmallVector<Byte> Layout = getMaskedAccessLayout(VecTy, Mask);
+    auto Access = verifyMaskedMemAccess(Ptr, Layout, /*IsStore=*/false);
+    if (!Access)
+      return PassThru;
+
+    // Bits not read from memory are zero. They are either bits of disabled
+    // lanes, which are replaced by PassThru below, or padding bits outside of
+    // the accessed object.
+    auto [Begin, Mem] = *Access;
+    SmallVector<Byte> Bytes(Layout.size(), Byte::concrete(0));
+    for (auto [I, B] : enumerate(Mem))
+      Bytes[Begin + I].writeByte(Layout[Begin + I].ConcreteMask, B);
+    AnyValue Res = Ctx.fromBytes(Bytes, VecTy);
+    // A poison mask lane may select either the loaded value or PassThru.
+    for (auto [Lane, M, P] : zip_equal(Res.asAggregate(), Mask.asAggregate(),
+                                       PassThru.asAggregate())) {
+      if (M.asBoolean() == BooleanKind::False)
+        Lane = P;
+      else if (M.asBoolean() == BooleanKind::Poison)
+        Lane = AnyValue::getPoisonValue(Ctx, VecTy->getElementType());
+    }
+    return Res;
+  }
+
+  AnyValue callMaskedStoreIntrinsic(CallBase &CB, const AnyValue &Val,
+                                    const AnyValue &Ptr, const AnyValue &Mask) {
+    auto *VecTy = cast<VectorType>(CB.getArgOperand(0)->getType());
+    SmallVector<Byte> Layout = getMaskedAccessLayout(VecTy, Mask);
+    auto Access = verifyMaskedMemAccess(Ptr, Layout, /*IsStore=*/true);
+    if (!Access)
+      return AnyValue();
+
+    // The bits of a poison mask lane may either be written or left unchanged,
+    // so they become poison. The padding bits are zeroed if any lane is
+    // enabled. If no lane is definitely enabled, they may also be left
+    // unchanged and become poison as well.
+    auto [Begin, Mem] = *Access;
+    SmallVector<Byte> Bytes(Layout.size(), Byte::poison());
+    if (any_of(Mask.asAggregate(), [](const AnyValue &M) {
+          return M.asBoolean() == BooleanKind::True;
+        })) {
+      AnyValue StoredVal = Val;
+      for (auto [Lane, M] :
+           zip_equal(StoredVal.asAggregate(), Mask.asAggregate()))
+        if (M.asBoolean() == BooleanKind::Poison)
+          Lane = AnyValue::getPoisonValue(Ctx, VecTy->getElementType());
+      Ctx.toBytes(StoredVal, VecTy, Bytes);
+    }
+    for (auto [I, B] : enumerate(Mem))
+      B.writeByte(Layout[Begin + I].ConcreteMask, Bytes[Begin + I]);
+    return AnyValue();
+  }
+
 public:
   InstExecutor(Context &C, EventHandler &H, Function &F,
                ArrayRef<AnyValue> Args, AnyValue &RetVal)
@@ -1839,6 +1966,10 @@ public:
       assert(!getSpeculativeLoadOracle(CB) &&
              "oracle form must be handled earlier");
       return callSpeculativeLoadIntrinsic(CB, Args[0], Args[2]);
+    case Intrinsic::masked_load:
+      return callMaskedLoadIntrinsic(CB, Args[0], Args[1], Args[2]);
+    case Intrinsic::masked_store:
+      return callMaskedStoreIntrinsic(CB, Args[0], Args[1], Args[2]);
     case Intrinsic::experimental_noalias_scope_decl:
       // FIXME: Not implemented yet. Currently it acts as a noop.
       return AnyValue();
