@@ -2325,15 +2325,19 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
       // must also cover the types it is loaded with. If all sizes are fixed or
       // all are scalable, the bounds of the widest type cover all others.
       SmallSetVector<Type *, 1> AccessTys = Accesses.lookup(Access);
-      if (Access.getInt())
-        AccessTys.insert_range(
-            Accesses.lookup(MemAccessInfo(Access.getPointer(), false)));
+      if (Access.getInt()) {
+        auto ReadIt = Accesses.find(MemAccessInfo(Access.getPointer(), false));
+        if (ReadIt != Accesses.end())
+          AccessTys.insert_range(ReadIt->second);
+      }
       ArrayRef<Type *> Tys = AccessTys.getArrayRef();
       if (all_equal(map_range(
-              Tys, [&](Type *Ty) { return StoreSize(Ty).isScalable(); })))
-        Tys = *max_element(Tys, [&](Type *A, Type *B) {
+              Tys, [&](Type *Ty) { return StoreSize(Ty).isScalable(); }))) {
+        auto WidestTyIt = max_element(Tys, [&](Type *A, Type *B) {
           return TypeSize::isKnownLT(StoreSize(A), StoreSize(B));
         });
+        Tys = {WidestTyIt, 1};
+      }
       for (Type *AccessTy : Tys) {
         if (!createCheckForAccess(RtCheck, Access, AccessTy, StridesMap,
                                   DepSetId, TheLoop, RunningDepId, ASId,
