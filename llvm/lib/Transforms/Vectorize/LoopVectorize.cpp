@@ -6136,14 +6136,6 @@ VPRecipeWithIRFlags *VPRecipeBuilder::tryToWiden(VPInstruction *VPI) {
   case Instruction::Freeze:
     return new VPWidenRecipe(*I, VPI->operandsWithoutMask(), *VPI, *VPI,
                              VPI->getDebugLoc());
-  case Instruction::ExtractValue: {
-    SmallVector<VPValue *> NewOps(VPI->operandsWithoutMask());
-    auto *EVI = cast<ExtractValueInst>(I);
-    assert(EVI->getNumIndices() == 1 && "Expected one extractvalue index");
-    unsigned Idx = EVI->getIndices()[0];
-    NewOps.push_back(Plan.getConstantInt(32, Idx));
-    return new VPWidenRecipe(*I, NewOps, *VPI, *VPI, VPI->getDebugLoc());
-  }
   };
 }
 
@@ -6293,15 +6285,22 @@ VPRecipeBuilder::tryToCreateWidenNonPhiRecipe(VPSingleDefRecipe *R,
                        VPI->getOpcode()) &&
          "Should have been handled prior to this!");
 
-  // We can only replicate an extractvalue if its operand generates per lane in
-  // the same block, otherwise we would need to extract a lane from its struct
-  // operand which is invalid.
-  if (VPI->getOpcode() == Instruction::ExtractValue &&
-      !vputils::isSingleScalar(VPI->getOperand(0)))
-    if (VPRecipeBase *OpR = VPI->getOperand(0)->getDefiningRecipe())
-      if (!vputils::doesGeneratePerAllLanes(OpR) ||
-          OpR->getParent() != VPI->getParent())
-        return tryToWiden(VPI);
+  // An ExtractValue takes the shape of its aggregate: a lane cannot be
+  // extracted from a widened struct, nor are structs built from scalar lanes.
+  if (VPI->getOpcode() == Instruction::ExtractValue) {
+    VPValue *Agg = VPI->getOperand(0);
+    bool AggIsSingleScalar = vputils::isSingleScalar(Agg);
+    if (AggIsSingleScalar ||
+        vputils::doesGeneratePerAllLanes(Agg->getDefiningRecipe()))
+      return new VPReplicateRecipe(
+          Instr, {Agg}, AggIsSingleScalar || vputils::onlyFirstLaneUsed(VPI),
+          /*Mask=*/nullptr, *VPI, *VPI, VPI->getDebugLoc());
+    auto *EVI = cast<ExtractValueInst>(Instr);
+    assert(EVI->getNumIndices() == 1 && "Expected one extractvalue index");
+    VPValue *Idx = Plan.getConstantInt(32, EVI->getIndices()[0]);
+    return new VPWidenRecipe(*Instr, {Agg, Idx}, *VPI, *VPI,
+                             VPI->getDebugLoc());
+  }
 
   if (!shouldWiden(Instr, Range))
     return nullptr;

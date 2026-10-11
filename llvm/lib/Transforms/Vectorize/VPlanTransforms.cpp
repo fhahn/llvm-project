@@ -584,11 +584,26 @@ static VPRegionBlock *createReplicateRegion(VPReplicateRecipe *PredRecipe,
   VPBlockUtils::insertTwoBlocksAfter(Pred, Exiting, Entry);
   VPBlockUtils::connectBlocks(Pred, Exiting);
 
-  if (!PredRecipe->user_empty()) {
-    auto *PHIRecipe = new VPPredInstPHIRecipe(RecipeWithoutMask,
-                                              RecipeWithoutMask->getDebugLoc());
+  // Move the extracts of a struct result into the region, so only scalars
+  // leave it.
+  PredRecipe->replaceAllUsesWith(RecipeWithoutMask);
+  SmallVector<VPSingleDefRecipe *> Defs = {RecipeWithoutMask};
+  if (RecipeWithoutMask->getScalarType()->isStructTy()) {
+    Defs.clear();
+    for (VPUser *U : RecipeWithoutMask->users()) {
+      auto *EVI = cast<VPReplicateRecipe>(U);
+      EVI->moveBefore(*Pred, Pred->end());
+      EVI->clearExecutionFrequency();
+      Defs.push_back(EVI);
+    }
+  }
+  for (VPSingleDefRecipe *Def : Defs) {
+    if (Def->user_empty())
+      continue;
+    auto *PHIRecipe = new VPPredInstPHIRecipe(Def, Def->getDebugLoc());
     Exiting->appendRecipe(PHIRecipe);
-    PredRecipe->replaceAllUsesWith(PHIRecipe);
+    Def->replaceAllUsesWith(PHIRecipe);
+    PHIRecipe->setOperand(0, Def);
   }
   PredRecipe->eraseFromParent();
   return Region;
@@ -803,9 +818,9 @@ static void legalizeAndOptimizeInductions(VPlan &Plan) {
       if (!vputils::isSingleScalar(Def) && !vputils::onlyFirstLaneUsed(Def))
         continue;
 
-      // TODO: Support scalarizing ExtractValue.
-      if (match(Def,
-                m_Binary<Instruction::ExtractValue>(m_VPValue(), m_VPValue())))
+      // The aggregate of a widened ExtractValue is a struct of vectors, whose
+      // lanes cannot be extracted.
+      if (!RepR && vputils::getOpcode(Def) == Instruction::ExtractValue)
         continue;
 
       auto *Clone = VPBuilder::createSingleScalarOp(
@@ -5987,6 +6002,11 @@ void VPlanTransforms::makeScalarizationDecisions(VPlan &Plan, VFRange &Range) {
 
       // If executing other lanes produces side-effects we can't avoid them.
       if (VPI.mayHaveSideEffects())
+        continue;
+
+      // ExtractValue takes the shape of its aggregate, decided in
+      // tryToCreateWidenNonPhiRecipe.
+      if (VPI.getOpcode() == Instruction::ExtractValue)
         continue;
 
       // We want to drop the mask operand, verify we can safely do that.
