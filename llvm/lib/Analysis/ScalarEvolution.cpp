@@ -8433,16 +8433,15 @@ unsigned ScalarEvolution::getSmallConstantTripMultiple(const Loop *L) {
   return Res;
 }
 
-unsigned
-ScalarEvolution::getSmallConstantTripMultiple(const SCEV *ExitCount,
-                                              const LoopGuards &Guards) {
+static unsigned
+getSmallConstantTripMultipleFromExitCount(const SCEV *ExitCount,
+                                         ScalarEvolution &SE) {
   assert(!isa<SCEVCouldNotCompute>(ExitCount) && "Must be computable!");
 
   // Get the trip count
-  const SCEV *TCExpr =
-      getTripCountFromExitCount(applyLoopGuards(ExitCount, Guards));
+  const SCEV *TCExpr = SE.getTripCountFromExitCount(ExitCount);
 
-  APInt Multiple = getNonZeroConstantMultiple(TCExpr);
+  APInt Multiple = SE.getNonZeroConstantMultiple(TCExpr);
   // If a trip multiple is huge (>=2^32), the trip count is still divisible by
   // the greatest power of 2 divisor less than 2^32.
   return Multiple.getActiveBits() > 32
@@ -8450,10 +8449,20 @@ ScalarEvolution::getSmallConstantTripMultiple(const SCEV *ExitCount,
              : (unsigned)Multiple.getZExtValue();
 }
 
+unsigned
+ScalarEvolution::getSmallConstantTripMultiple(const SCEV *ExitCount,
+                                              const LoopGuards &Guards) {
+  return getSmallConstantTripMultipleFromExitCount(
+      applyLoopGuards(ExitCount, Guards), *this);
+}
+
 unsigned ScalarEvolution::getSmallConstantTripMultiple(const Loop *L,
                                                        const SCEV *ExitCount) {
   if (isa<SCEVCouldNotCompute>(ExitCount))
     return 1;
+
+  if (isa<SCEVConstant>(ExitCount))
+    return getSmallConstantTripMultipleFromExitCount(ExitCount, *this);
 
   return getSmallConstantTripMultiple(ExitCount, LoopGuards::collect(L, *this));
 }
@@ -16444,6 +16453,8 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
 }
 
 const SCEV *ScalarEvolution::applyLoopGuards(const SCEV *Expr, const Loop *L) {
+  if (isa<SCEVConstant, SCEVAddRecExpr, SCEVVScale>(Expr))
+    return Expr;
   return applyLoopGuards(Expr, LoopGuards::collect(L, *this));
 }
 
