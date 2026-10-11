@@ -171,26 +171,26 @@ define void @histogram_uniform_condition(ptr noalias %buckets, ptr readonly %ind
 ; CHECK-NEXT:    ret void
 ;
 entry:
-  br label %loop
+  br label %loop.header
 
-loop:
-  %iv = phi i64 [ 0, %entry ], [ %iv.next, %latch ]
-  br i1 %enabled, label %body, label %latch
+loop.header:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop.latch ]
+  br i1 %enabled, label %loop.body, label %loop.latch
 
-body:
+loop.body:
   %gep.indices = getelementptr inbounds i32, ptr %indices, i64 %iv
-  %l.idx = load i32, ptr %gep.indices, align 4
-  %idxprom1 = zext i32 %l.idx to i64
-  %gep.bucket = getelementptr inbounds i32, ptr %buckets, i64 %idxprom1
-  %l.bucket = load i32, ptr %gep.bucket, align 4
-  %inc = add i32 %l.bucket, 1
+  %ld.idx = load i32, ptr %gep.indices, align 4
+  %idx.ext = zext i32 %ld.idx to i64
+  %gep.bucket = getelementptr inbounds i32, ptr %buckets, i64 %idx.ext
+  %ld.bucket = load i32, ptr %gep.bucket, align 4
+  %inc = add i32 %ld.bucket, 1
   store i32 %inc, ptr %gep.bucket, align 4
-  br label %latch
+  br label %loop.latch
 
-latch:
+loop.latch:
   %iv.next = add nuw nsw i64 %iv, 1
-  %exitcond = icmp eq i64 %iv.next, 1000
-  br i1 %exitcond, label %exit, label %loop
+  %ec = icmp eq i64 %iv.next, 1000
+  br i1 %ec, label %exit, label %loop.header
 
 exit:
   ret void

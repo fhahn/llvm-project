@@ -159,31 +159,31 @@ define void @test_uniform_conditional(ptr noalias %dst, ptr readonly %src, i64 %
 ; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq i64 [[INDEX_NEXT]], 20
 ; CHECK-NEXT:    br i1 [[TMP9]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    br label %[[FOR_COND_CLEANUP:.*]]
-; CHECK:       [[FOR_COND_CLEANUP]]:
+; CHECK-NEXT:    br label %[[EXIT:.*]]
+; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void
 ;
 entry:
-  br label %for.body
+  br label %loop.header
 
-for.body:
-  %indvars.iv = phi i64 [ 0, %entry ], [ %indvars.iv.next, %for.inc ]
-  br i1 %enabled, label %for.then, label %for.inc
+loop.header:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop.latch ]
+  br i1 %enabled, label %loop.body, label %loop.latch
 
-for.then:
-  %gepsrc = getelementptr double, ptr %src, i64 %indvars.iv
-  %data = load double, ptr %gepsrc, align 8
-  %call = call double @foo(double %data, i64 %uniform) #1
-  %gepdst = getelementptr double, ptr %dst, i64 %indvars.iv
-  store double %call, ptr %gepdst, align 8
-  br label %for.inc
+loop.body:
+  %gep.src = getelementptr double, ptr %src, i64 %iv
+  %ld.src = load double, ptr %gep.src, align 8
+  %call = call double @foo(double %ld.src, i64 %uniform) #1
+  %gep.dst = getelementptr double, ptr %dst, i64 %iv
+  store double %call, ptr %gep.dst, align 8
+  br label %loop.latch
 
-for.inc:
-  %indvars.iv.next = add nuw i64 %indvars.iv, 1
-  %exitcond = icmp eq i64 %indvars.iv.next, 20
-  br i1 %exitcond, label %for.cond.cleanup, label %for.body
+loop.latch:
+  %iv.next = add nuw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, 20
+  br i1 %ec, label %exit, label %loop.header
 
-for.cond.cleanup:
+exit:
   ret void
 }
 
