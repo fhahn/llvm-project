@@ -2858,7 +2858,6 @@ void MemoryDepChecker::mergeInStatus(VectorizationSafetyStatus S) {
 ///     }
 static bool isSafeDependenceDistance(ScalarEvolution &SE, const SCEV &MaxBTC,
                                      const SCEV &Dist, uint64_t MaxStride) {
-
   // If we can prove that
   //      (**) |Dist| > MaxBTC * Step
   // where Step is the absolute stride of the memory accesses in bytes,
@@ -2885,20 +2884,20 @@ static bool isSafeDependenceDistance(ScalarEvolution &SE, const SCEV &MaxBTC,
   // in WideTy with two bits to spare, e.g. for an unbounded i64 MaxBTC.
   Type *WideTy = SE.getWiderType(Dist.getType(), MaxBTC.getType());
   const SCEV *Step = SE.getConstant(WideTy, MaxStride);
-  const SCEV *CastedProduct =
+  const SCEV *Product =
       SE.getMulExpr(SE.getNoopOrZeroExtend(&MaxBTC, WideTy), Step);
   const SCEV *CastedDist = SE.getNoopOrSignExtend(&Dist, WideTy);
 
   // Is  Dist - (MaxBTC * Step) > 0 ?
   // (If so, then we have proven (**) because |Dist| >= Dist)
-  const SCEV *Minus = SE.getMinusSCEV(CastedDist, CastedProduct);
+  const SCEV *Minus = SE.getMinusSCEV(CastedDist, Product);
   if (SE.isKnownPositive(Minus))
     return true;
 
   // Second try: Is  -Dist - (MaxBTC * Step) > 0 ?
   // (If so, then we have proven (**) because |Dist| >= -1*Dist)
   const SCEV *NegDist = SE.getNegativeSCEV(CastedDist);
-  Minus = SE.getMinusSCEV(NegDist, CastedProduct);
+  Minus = SE.getMinusSCEV(NegDist, Product);
   return SE.isKnownPositive(Minus);
 }
 
@@ -3124,14 +3123,11 @@ MemoryDepChecker::isDependent(const MemAccessInfo &A, unsigned AIdx,
   ScalarEvolution &SE = *PSE.getSE();
   auto &DL = InnermostLoop->getHeader()->getDataLayout();
 
-  // If the distance between the acecsses is larger than their maximum absolute
-  // stride multiplied by the symbolic maximum backedge taken count (which is an
-  // upper bound of the number of iterations), the accesses are independet, i.e.
-  // they are far enough appart that accesses won't access the same location
-  // across all loop ierations.
+  // If the distance between accesses exceeds their maximum absolute stride
+  // times the maximum backedge-taken count, they are independent.
   if (HasSameSize &&
-      isSafeDependenceDistance(SE, *(PSE.getSymbolicMaxBackedgeTakenCount()),
-                               *Dist, MaxStride))
+      isSafeDependenceDistance(SE, *PSE.getSymbolicMaxBackedgeTakenCount(), *Dist,
+                               MaxStride))
     return Dependence::NoDep;
 
   const APInt *APDist = nullptr;
