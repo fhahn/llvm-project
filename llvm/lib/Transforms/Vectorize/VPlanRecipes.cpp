@@ -938,9 +938,8 @@ Value *VPInstruction::generate(VPTransformState &State,
   case VPInstruction::BuildVector: {
     assert(!GenerateSingleScalar &&
            "Cannot generate scalar value for BuildVector");
-    auto *ScalarTy = getOperand(0)->getScalarType();
-    Value *Res =
-        PoisonValue::get(FixedVectorType::get(ScalarTy, getNumOperands()));
+    Value *Res = PoisonValue::get(
+        FixedVectorType::get(getScalarType(), getNumOperands()));
     for (const auto &[Idx, Op] : enumerate(operands()))
       Res = Builder.CreateInsertElement(Res, State.get(Op, true),
                                         Builder.getInt64(Idx));

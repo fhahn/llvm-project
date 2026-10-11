@@ -584,20 +584,20 @@ static VPRegionBlock *createReplicateRegion(VPReplicateRecipe *PredRecipe,
   VPBlockUtils::insertTwoBlocksAfter(Pred, Exiting, Entry);
   VPBlockUtils::connectBlocks(Pred, Exiting);
 
+  PredRecipe->replaceAllUsesWith(RecipeWithoutMask);
   // Move the extracts of a struct result into the region, so only scalars
   // leave it.
-  PredRecipe->replaceAllUsesWith(RecipeWithoutMask);
-  SmallVector<VPSingleDefRecipe *> Defs = {RecipeWithoutMask};
-  if (RecipeWithoutMask->getScalarType()->isStructTy()) {
-    Defs.clear();
-    for (VPUser *U : RecipeWithoutMask->users()) {
-      auto *EVI = cast<VPReplicateRecipe>(U);
-      EVI->moveBefore(*Pred, Pred->end());
-      EVI->clearExecutionFrequency();
-      Defs.push_back(EVI);
-    }
-  }
-  for (VPSingleDefRecipe *Def : Defs) {
+  SmallVector<VPUser *> Defs = {RecipeWithoutMask};
+  if (RecipeWithoutMask->getScalarType()->isStructTy())
+    Defs = to_vector(RecipeWithoutMask->users());
+  for (VPUser *U : Defs) {
+    auto *Def = cast<VPSingleDefRecipe>(U);
+    assert((Def == RecipeWithoutMask ||
+            vputils::getOpcode(Def) == Instruction::ExtractValue) &&
+           "only extracts can use a predicated struct");
+    Def->moveBefore(*Pred, Pred->end());
+    cast<VPIRMetadata>(static_cast<VPRecipeBase *>(Def))
+        ->clearExecutionFrequency();
     if (Def->user_empty())
       continue;
     auto *PHIRecipe = new VPPredInstPHIRecipe(Def, Def->getDebugLoc());

@@ -848,8 +848,8 @@ static void dissolveReplicateRegion(VPRegionBlock *Region, ElementCount VF,
   // Create a BuildVector in successor block for every VPPhi in (first lane's)
   // exiting block having vector uses. All their operands are initialized to
   // poison and will be replaced when processing each clone, except for the
-  // operand of the first lane which set here. BuildVectors are recorded to be
-  // replaced later by chains of insert-element and widen phi's.
+  // operand of the first lane which is set here. BuildVectors are recorded to
+  // be replaced later by chains of insert-element and widen phis.
   unsigned NumLanes = VF.getFixedValue();
   SmallVector<VPInstruction *> BuildVectors;
   for (auto &R : FirstLaneExiting->phis()) {
@@ -986,10 +986,11 @@ void VPlanTransforms::replicateByVF(VPlan &Plan, ElementCount VF) {
 
       Def2LaneDefs[DefR] = LaneDefs;
       // Pack the lanes for vector users.
-      if (!vputils::onlyScalarValuesUsed(DefR))
+      if (!vputils::onlyScalarValuesUsed(DefR)) {
         DefR->replaceUsesWithIf(
             Builder.createNaryOp(VPInstruction::BuildVector, LaneDefs),
             [DefR](VPUser &U) { return !U.usesScalars(DefR); });
+      }
       /// Users that only demand the first lane can use the definition for lane
       /// 0.
       DefR->replaceUsesWithIf(LaneDefs[0], [DefR](VPUser &U) {

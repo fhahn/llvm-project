@@ -6293,7 +6293,8 @@ VPRecipeBuilder::tryToCreateWidenNonPhiRecipe(VPSingleDefRecipe *R,
     if (AggIsSingleScalar ||
         vputils::doesGeneratePerAllLanes(Agg->getDefiningRecipe()))
       return new VPReplicateRecipe(
-          Instr, {Agg}, AggIsSingleScalar || vputils::onlyFirstLaneUsed(VPI),
+          Instr, {Agg},
+          /*IsSingleScalar=*/AggIsSingleScalar || vputils::onlyFirstLaneUsed(VPI),
           /*Mask=*/nullptr, *VPI, *VPI, VPI->getDebugLoc());
     auto *EVI = cast<ExtractValueInst>(Instr);
     assert(EVI->getNumIndices() == 1 && "Expected one extractvalue index");
