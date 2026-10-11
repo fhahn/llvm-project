@@ -2319,7 +2319,6 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
     }
 
     const DataLayout &DL = TheLoop->getHeader()->getDataLayout();
-    auto StoreSize = [&DL](Type *Ty) { return DL.getTypeStoreSize(Ty); };
     for (auto &Access : AccessInfos) {
       // A written pointer is only checked via its write access, so its bounds
       // must also cover the types it is loaded with.
@@ -2329,16 +2328,21 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
         if (ReadIt != Accesses.end())
           AccessTys.insert_range(ReadIt->second);
       }
-      // Pick a candidate widest type, then check that it covers every access.
-      // Sizes may be incomparable, so keep all types if the check fails.
+      // Track a bound on all access sizes and a type that realizes it. A later
+      // type can cover sizes that were previously incomparable.
       Type *WidestTy = AccessTys.front();
-      for (Type *Ty : drop_begin(AccessTys))
-        if (!TypeSize::isKnownGE(StoreSize(WidestTy), StoreSize(Ty)))
-          WidestTy = Ty;
+      TypeSize SizeBound = DL.getTypeStoreSize(WidestTy);
+      for (Type *Ty : drop_begin(AccessTys)) {
+        TypeSize Size = DL.getTypeStoreSize(Ty);
+        if (WidestTy && TypeSize::isKnownGE(SizeBound, Size))
+          continue;
+        SizeBound = TypeSize::get(
+            std::max(SizeBound.getKnownMinValue(), Size.getKnownMinValue()),
+            SizeBound.isScalable() || Size.isScalable());
+        WidestTy = Size == SizeBound ? Ty : nullptr;
+      }
       ArrayRef<Type *> Tys = AccessTys.getArrayRef();
-      if (all_of(Tys, [&](Type *Ty) {
-            return TypeSize::isKnownGE(StoreSize(WidestTy), StoreSize(Ty));
-          }))
+      if (WidestTy)
         Tys = {&WidestTy, 1};
       for (Type *AccessTy : Tys) {
         if (!createCheckForAccess(RtCheck, Access, AccessTy, StridesMap,
