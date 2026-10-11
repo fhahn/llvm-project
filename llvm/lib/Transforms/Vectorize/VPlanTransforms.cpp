@@ -6090,7 +6090,7 @@ static CallWideningDecision decideCallWidening(VPInstruction &VPI,
       VPI.getOperand(VPI.getNumOperandsWithoutMask() - 1)->getLiveInIRValue());
   Type *ResultTy = VPI.getScalarType();
   Intrinsic::ID ID = getVectorIntrinsicIDForCall(CI, &CostCtx.TLI);
-  bool MaskRequired = CostCtx.isMaskRequired(CI);
+  bool MaskRequired = VPI.isMasked() && CostCtx.isMaskRequired(CI);
 
   // Pseudo intrinsics (assume, lifetime, ...) are always scalarized.
   if (ID && VPCostContext::isFreeScalarIntrinsic(ID))
