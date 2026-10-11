@@ -6358,8 +6358,8 @@ APInt ScalarEvolution::getConstantMultipleImpl(const SCEV *S,
         return GetGCDMultiple(N);
     // Find the trailing bits, which is the minimum of its operands.
     uint32_t TZ = getMinTrailingZeros(N->getOperand(0), CtxI);
-    for (const SCEV *Operand : N->operands().drop_front())
-      TZ = std::min(TZ, getMinTrailingZeros(Operand, CtxI));
+    for (unsigned I = 1, E = N->getNumOperands(); I < E && TZ != 0; ++I)
+      TZ = std::min(TZ, getMinTrailingZeros(N->getOperand(I), CtxI));
     return GetShiftedByZeros(TZ);
   }
   case scUMaxExpr:
