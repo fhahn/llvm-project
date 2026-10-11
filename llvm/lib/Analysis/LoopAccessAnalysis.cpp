@@ -2869,18 +2869,6 @@ static bool isSafeDependenceDistance(ScalarEvolution &SE, const SCEV &MaxBTC,
   // per iteration, so their start addresses in any two iterations differ by at
   // least TypeByteSize bytes and the accessed bytes cannot overlap.
   //
-  // Rationale:
-  // We basically want to check if the absolute distance (|Dist/Step|)
-  // is >= the loop iteration count (or > MaxBTC).
-  // This is equivalent to the Strong SIV Test (Practical Dependence Testing,
-  // Section 4.2.1); Note, that for vectorization it is sufficient to prove
-  // that the dependence distance is >= VF; This is checked elsewhere.
-  // But in some cases we can prune dependence distances early, and
-  // even before selecting the VF, and without a runtime test, by comparing
-  // the distance against the loop iteration count. Since the vectorized code
-  // will be executed only if LoopCount >= VF, proving distance >= LoopCount
-  // also guarantees that distance >= VF.
-  //
   // Compute the product in the wider of the types of the distance and MaxBTC,
   // so MaxStride, a byte step in the type of the distance, is not truncated
   // and the product does not wrap in a narrow backedge-taken count type
