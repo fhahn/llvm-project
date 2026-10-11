@@ -16382,9 +16382,17 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
           if (match(Expr->getOperand(0), m_scev_AllOnes())) {
             S = Map.lookup(Expr->getOperand(1));
           } else {
-            const SCEV *NewC =
-                SE.getAddExpr(Expr->getOperand(0), SE.getOne(Expr->getType()));
-            S = Map.lookup(SE.getAddExpr(NewC, Expr->getOperand(1)));
+            const SCEV *NewC = SE.getConstant(
+                cast<SCEVConstant>(Expr->getOperand(0))->getAPInt() + 1);
+            if (isa<SCEVUnknown>(Expr->getOperand(1))) {
+              // A nonzero constant plus an unknown cannot fold. Only an
+              // existing add expression can be a key in the rewrite map.
+              if (const SCEV *Add = SE.findExistingSCEVInCache(
+                      scAddExpr, {NewC, Expr->getOperand(1)}))
+                S = Map.lookup(Add);
+            } else {
+              S = Map.lookup(SE.getAddExpr(NewC, Expr->getOperand(1)));
+            }
           }
           if (S)
             return SE.getAddExpr(S, SE.getMinusOne(Expr->getType()));
