@@ -125,19 +125,10 @@ for.cond.cleanup:
   ret void
 }
 
-; Scalar functions
-declare double @foo(double, i64)
-
-; Vector variants
-declare <2 x double> @foo_uniform(<2 x double>, i64)
-
-; Mappings
-attributes #0 = { nounwind "vector-function-abi-variant"="_ZGV_LLVM_N2vu_foo(foo_uniform)" }
-
 ; The masked VF=4 variant lets legality accept the conditional call.
 ; At VF=2, only the unmasked vector variant is available.
-define void @uniform_branch_call(ptr noalias %dst, ptr readonly %src, i64 %uniform, i1 %enabled) {
-; CHECK-LABEL: define void @uniform_branch_call(
+define void @test_uniform_conditional(ptr noalias %dst, ptr readonly %src, i64 %uniform, i1 %enabled) {
+; CHECK-LABEL: define void @test_uniform_conditional(
 ; CHECK-SAME: ptr noalias [[DST:%.*]], ptr readonly [[SRC:%.*]], i64 [[UNIFORM:%.*]], i1 [[ENABLED:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
@@ -145,15 +136,15 @@ define void @uniform_branch_call(ptr noalias %dst, ptr readonly %src, i64 %unifo
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_STORE_CONTINUE2:.*]] ]
-; CHECK-NEXT:    br i1 [[ENABLED]], label %[[BODY1:.*]], label %[[LATCH2:.*]]
-; CHECK:       [[BODY1]]:
+; CHECK-NEXT:    br i1 [[ENABLED]], label %[[PRED_STORE_IF:.*]], label %[[PRED_STORE_CONTINUE:.*]]
+; CHECK:       [[PRED_STORE_IF]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr double, ptr [[SRC]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = load double, ptr [[TMP0]], align 8
-; CHECK-NEXT:    [[TMP9:%.*]] = call double @foo(double [[TMP1]], i64 [[UNIFORM]]) #[[ATTR1:[0-9]+]]
-; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr double, ptr [[DST]], i64 [[INDEX]]
-; CHECK-NEXT:    store double [[TMP9]], ptr [[TMP2]], align 8
-; CHECK-NEXT:    br label %[[LATCH2]]
-; CHECK:       [[LATCH2]]:
+; CHECK-NEXT:    [[TMP2:%.*]] = call double @foo(double [[TMP1]], i64 [[UNIFORM]]) #[[ATTR1:[0-9]+]]
+; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr double, ptr [[DST]], i64 [[INDEX]]
+; CHECK-NEXT:    store double [[TMP2]], ptr [[TMP3]], align 8
+; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE]]
+; CHECK:       [[PRED_STORE_CONTINUE]]:
 ; CHECK-NEXT:    br i1 [[ENABLED]], label %[[PRED_STORE_IF1:.*]], label %[[PRED_STORE_CONTINUE2]]
 ; CHECK:       [[PRED_STORE_IF1]]:
 ; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[INDEX]], 1
@@ -165,33 +156,44 @@ define void @uniform_branch_call(ptr noalias %dst, ptr readonly %src, i64 %unifo
 ; CHECK-NEXT:    br label %[[PRED_STORE_CONTINUE2]]
 ; CHECK:       [[PRED_STORE_CONTINUE2]]:
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
-; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq i64 [[INDEX_NEXT]], 20
-; CHECK-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
+; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq i64 [[INDEX_NEXT]], 20
+; CHECK-NEXT:    br i1 [[TMP9]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    br label %[[EXIT:.*]]
-; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    br label %[[FOR_COND_CLEANUP:.*]]
+; CHECK:       [[FOR_COND_CLEANUP]]:
 ; CHECK-NEXT:    ret void
 ;
 entry:
-  br label %loop
-loop:
-  %iv = phi i64 [ 0, %entry ], [ %next, %latch ]
-  br i1 %enabled, label %body, label %latch
-body:
-  %src.addr = getelementptr double, ptr %src, i64 %iv
-  %value = load double, ptr %src.addr, align 8
-  %result = call double @foo(double %value, i64 %uniform) #1
-  %dst.addr = getelementptr double, ptr %dst, i64 %iv
-  store double %result, ptr %dst.addr, align 8
-  br label %latch
-latch:
-  %next = add nuw i64 %iv, 1
-  %done = icmp eq i64 %next, 20
-  br i1 %done, label %exit, label %loop
-exit:
+  br label %for.body
+
+for.body:
+  %indvars.iv = phi i64 [ 0, %entry ], [ %indvars.iv.next, %for.inc ]
+  br i1 %enabled, label %for.then, label %for.inc
+
+for.then:
+  %gepsrc = getelementptr double, ptr %src, i64 %indvars.iv
+  %data = load double, ptr %gepsrc, align 8
+  %call = call double @foo(double %data, i64 %uniform) #1
+  %gepdst = getelementptr double, ptr %dst, i64 %indvars.iv
+  store double %call, ptr %gepdst, align 8
+  br label %for.inc
+
+for.inc:
+  %indvars.iv.next = add nuw i64 %indvars.iv, 1
+  %exitcond = icmp eq i64 %indvars.iv.next, 20
+  br i1 %exitcond, label %for.cond.cleanup, label %for.body
+
+for.cond.cleanup:
   ret void
 }
 
-declare <4 x double> @foo_masked(<4 x double>, i64, <4 x i1>)
+; Scalar functions
+declare double @foo(double, i64)
 
-attributes #1 = { nounwind memory(read) "vector-function-abi-variant"="_ZGV_LLVM_N2vu_foo(foo_uniform),_ZGV_LLVM_M4vu_foo(foo_masked)" }
+; Vector variants
+declare <2 x double> @foo_uniform(<2 x double>, i64)
+declare <4 x double> @foo_uniform_masked(<4 x double>, i64, <4 x i1>)
+
+; Mappings
+attributes #0 = { nounwind "vector-function-abi-variant"="_ZGV_LLVM_N2vu_foo(foo_uniform)" }
+attributes #1 = { nounwind memory(read) "vector-function-abi-variant"="_ZGV_LLVM_N2vu_foo(foo_uniform),_ZGV_LLVM_M4vu_foo(foo_uniform_masked)" }

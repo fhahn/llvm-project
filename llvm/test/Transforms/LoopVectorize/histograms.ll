@@ -131,9 +131,8 @@ exit:
   ret void
 }
 
-; Histogram update guarded by a loop-invariant condition.
-define void @uniform_histogram(ptr noalias %buckets, ptr readonly %indices, i1 %enabled) {
-; CHECK-LABEL: define void @uniform_histogram(
+define void @histogram_uniform_condition(ptr noalias %buckets, ptr readonly %indices, i1 %enabled) {
+; CHECK-LABEL: define void @histogram_uniform_condition(
 ; CHECK-SAME: ptr noalias [[BUCKETS:%.*]], ptr readonly [[INDICES:%.*]], i1 [[ENABLED:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
@@ -143,14 +142,14 @@ define void @uniform_histogram(ptr noalias %buckets, ptr readonly %indices, i1 %
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[PRED_LOAD_CONTINUE2:.*]] ]
-; CHECK-NEXT:    br i1 [[ENABLED]], label %[[BODY1:.*]], label %[[LATCH2:.*]]
-; CHECK:       [[BODY1]]:
+; CHECK-NEXT:    br i1 [[ENABLED]], label %[[PRED_LOAD_IF:.*]], label %[[PRED_LOAD_CONTINUE:.*]]
+; CHECK:       [[PRED_LOAD_IF]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds i32, ptr [[INDICES]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr [[TMP0]], align 4
-; CHECK-NEXT:    [[TMP10:%.*]] = insertelement <2 x i32> poison, i32 [[TMP1]], i64 0
-; CHECK-NEXT:    br label %[[LATCH2]]
-; CHECK:       [[LATCH2]]:
-; CHECK-NEXT:    [[TMP3:%.*]] = phi <2 x i32> [ poison, %[[VECTOR_BODY]] ], [ [[TMP10]], %[[BODY1]] ]
+; CHECK-NEXT:    [[TMP2:%.*]] = insertelement <2 x i32> poison, i32 [[TMP1]], i64 0
+; CHECK-NEXT:    br label %[[PRED_LOAD_CONTINUE]]
+; CHECK:       [[PRED_LOAD_CONTINUE]]:
+; CHECK-NEXT:    [[TMP3:%.*]] = phi <2 x i32> [ poison, %[[VECTOR_BODY]] ], [ [[TMP2]], %[[PRED_LOAD_IF]] ]
 ; CHECK-NEXT:    br i1 [[ENABLED]], label %[[PRED_LOAD_IF1:.*]], label %[[PRED_LOAD_CONTINUE2]]
 ; CHECK:       [[PRED_LOAD_IF1]]:
 ; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[INDEX]], 1
@@ -159,13 +158,13 @@ define void @uniform_histogram(ptr noalias %buckets, ptr readonly %indices, i1 %
 ; CHECK-NEXT:    [[TMP7:%.*]] = insertelement <2 x i32> [[TMP3]], i32 [[TMP6]], i64 1
 ; CHECK-NEXT:    br label %[[PRED_LOAD_CONTINUE2]]
 ; CHECK:       [[PRED_LOAD_CONTINUE2]]:
-; CHECK-NEXT:    [[TMP8:%.*]] = phi <2 x i32> [ [[TMP3]], %[[LATCH2]] ], [ [[TMP7]], %[[PRED_LOAD_IF1]] ]
+; CHECK-NEXT:    [[TMP8:%.*]] = phi <2 x i32> [ [[TMP3]], %[[PRED_LOAD_CONTINUE]] ], [ [[TMP7]], %[[PRED_LOAD_IF1]] ]
 ; CHECK-NEXT:    [[TMP9:%.*]] = zext <2 x i32> [[TMP8]] to <2 x i64>
 ; CHECK-NEXT:    [[WIDE_GEP:%.*]] = getelementptr inbounds i32, ptr [[BUCKETS]], <2 x i64> [[TMP9]]
 ; CHECK-NEXT:    call void @llvm.experimental.vector.histogram.add.v2p0.i32(<2 x ptr> [[WIDE_GEP]], i32 1, <2 x i1> [[BROADCAST_SPLAT]])
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
-; CHECK-NEXT:    [[TMP2:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1000
-; CHECK-NEXT:    br i1 [[TMP2]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
+; CHECK-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1000
+; CHECK-NEXT:    br i1 [[TMP10]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    br label %[[EXIT:.*]]
 ; CHECK:       [[EXIT]]:
@@ -173,22 +172,26 @@ define void @uniform_histogram(ptr noalias %buckets, ptr readonly %indices, i1 %
 ;
 entry:
   br label %loop
+
 loop:
   %iv = phi i64 [ 0, %entry ], [ %iv.next, %latch ]
   br i1 %enabled, label %body, label %latch
+
 body:
   %gep.indices = getelementptr inbounds i32, ptr %indices, i64 %iv
-  %idx = load i32, ptr %gep.indices, align 4
-  %idxprom = zext i32 %idx to i64
-  %gep.bucket = getelementptr inbounds i32, ptr %buckets, i64 %idxprom
-  %old = load i32, ptr %gep.bucket, align 4
-  %inc = add i32 %old, 1
+  %l.idx = load i32, ptr %gep.indices, align 4
+  %idxprom1 = zext i32 %l.idx to i64
+  %gep.bucket = getelementptr inbounds i32, ptr %buckets, i64 %idxprom1
+  %l.bucket = load i32, ptr %gep.bucket, align 4
+  %inc = add i32 %l.bucket, 1
   store i32 %inc, ptr %gep.bucket, align 4
   br label %latch
+
 latch:
   %iv.next = add nuw nsw i64 %iv, 1
-  %done = icmp eq i64 %iv.next, 1000
-  br i1 %done, label %exit, label %loop
+  %exitcond = icmp eq i64 %iv.next, 1000
+  br i1 %exitcond, label %exit, label %loop
+
 exit:
   ret void
 }
