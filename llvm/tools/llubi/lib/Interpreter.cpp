@@ -825,6 +825,57 @@ class InstExecutor : public InstVisitor<InstExecutor, void>,
     return Mask.asAggregate()[I].asBoolean();
   }
 
+  struct MaskedLaneAccess {
+    size_t LaneIdx;
+    MemoryObject *MO;
+    uint64_t Offset;
+    /// The mask lane is poison, so the lane may be enabled or disabled.
+    bool IsPoisonLane;
+  };
+
+  /// Verifies scalar accesses of type \p ElemTy through the pointers in \p Ptrs
+  /// of the lanes enabled by \p Mask, in lane order. Pointers of disabled lanes
+  /// are not accessed. A poison mask lane may be enabled, so it is verified
+  /// like an enabled lane, unless \p PoisonMaskLaneIsUB is set, in which case
+  /// it is UB. \p Name is the intrinsic name used in UB reports. Returns the
+  /// memory object and offset accessed by each enabled or poison lane, or
+  /// std::nullopt if UB was reported.
+  std::optional<SmallVector<MaskedLaneAccess>>
+  verifyMaskedLaneAccesses(StringRef Name, const AnyValue &Ptrs,
+                           const AnyValue &Mask, Type *ElemTy, bool IsStore,
+                           bool PoisonMaskLaneIsUB = false) {
+    const uint64_t AccessSize = Ctx.getEffectiveTypeStoreSize(ElemTy);
+    SmallVector<MaskedLaneAccess> Accesses;
+    for (auto [I, Ptr, M] : enumerate(Ptrs.asAggregate(), Mask.asAggregate())) {
+      switch (M.asBoolean()) {
+      case BooleanKind::False:
+        continue;
+      case BooleanKind::Poison:
+        if (!PoisonMaskLaneIsUB)
+          break;
+        reportImmediateUB() << Name << " with poison mask lane.";
+        return std::nullopt;
+      case BooleanKind::True:
+        break;
+      }
+
+      if (Ptr.isPoison()) {
+        reportImmediateUB() << Name << " with poison pointer lane.";
+        return std::nullopt;
+      }
+
+      // The accesses only require byte alignment. A stricter alignment is
+      // given by an align attribute on the pointer vector operand, which makes
+      // misaligned lane pointers poison.
+      auto [MO, Offset] =
+          verifyMemAccess(Ptr.asPointer(), AccessSize, Align(1), IsStore);
+      if (!MO)
+        return std::nullopt;
+      Accesses.push_back({I, MO, Offset, M.asBoolean() == BooleanKind::Poison});
+    }
+    return Accesses;
+  }
+
   AnyValue callExperimentalVectorHistogramIntrinsic(CallBase &CB,
                                                     ArrayRef<AnyValue> Args,
                                                     Intrinsic::ID IID) {
@@ -836,40 +887,19 @@ class InstExecutor : public InstVisitor<InstExecutor, void>,
       AnyValue New;
     };
 
-    const auto &Ptrs = Args[0].asAggregate();
     const AnyValue &Update = Args[1];
     const AnyValue &Mask = Args[2];
     Type *ElemTy = CB.getArgOperand(1)->getType();
-    const uint64_t AccessSize = Ctx.getEffectiveTypeStoreSize(ElemTy);
+    auto Accesses = verifyMaskedLaneAccesses(
+        "experimental vector histogram intrinsic", Args[0], Mask, ElemTy,
+        /*IsStore=*/true, /*PoisonMaskLaneIsUB=*/true);
+    if (!Accesses)
+      return AnyValue();
 
     SmallVector<LaneUpdate, 8> Lanes;
-    Lanes.reserve(Ptrs.size());
-    for (size_t I = 0, E = Ptrs.size(); I != E; ++I) {
-      switch (getMaskLane(Mask, I)) {
-      case BooleanKind::False:
-        continue;
-      case BooleanKind::Poison:
-        reportImmediateUB()
-            << "Poison mask lane in experimental vector histogram intrinsic.";
-        return AnyValue();
-      case BooleanKind::True:
-        break;
-      }
-
-      if (Ptrs[I].isPoison()) {
-        reportImmediateUB() << "Poison pointer lane in experimental vector "
-                               "histogram intrinsic.";
-        return AnyValue();
-      }
-
-      auto [MO, Offset] =
-          verifyMemAccess(Ptrs[I].asPointer(), AccessSize, Align(1),
-                          /*IsStore=*/true);
-      if (!MO)
-        return AnyValue();
-
-      Lanes.push_back({MO, Offset, 0, AnyValue(), AnyValue()});
-    }
+    Lanes.reserve(Accesses->size());
+    for (const MaskedLaneAccess &Access : *Accesses)
+      Lanes.push_back({Access.MO, Access.Offset, 0, AnyValue(), AnyValue()});
 
     for (LaneUpdate &Lane : Lanes) {
       Lane.Count = count_if(Lanes, [&](const LaneUpdate &Other) {
@@ -1091,6 +1121,44 @@ class InstExecutor : public InstVisitor<InstExecutor, void>,
     }
     for (auto [I, B] : enumerate(Mem))
       B.writeByte(Layout[Begin + I].ConcreteMask, Bytes[Begin + I]);
+    return AnyValue();
+  }
+
+  AnyValue callMaskedGatherIntrinsic(CallBase &CB, const AnyValue &Ptrs,
+                                     const AnyValue &Mask,
+                                     const AnyValue &PassThru) {
+    Type *ElemTy = CB.getType()->getScalarType();
+    auto Accesses = verifyMaskedLaneAccesses("llvm.masked.gather", Ptrs, Mask,
+                                             ElemTy, /*IsStore=*/false);
+    if (!Accesses)
+      return AnyValue();
+
+    // A poison mask lane may select either the loaded value or PassThru.
+    AnyValue Res = PassThru;
+    for (auto [LaneIdx, MO, Offset, IsPoisonLane] : *Accesses)
+      Res.asAggregate()[LaneIdx] = IsPoisonLane
+                                       ? AnyValue::getPoisonValue(Ctx, ElemTy)
+                                       : Ctx.load(*MO, Offset, ElemTy);
+    return Res;
+  }
+
+  AnyValue callMaskedScatterIntrinsic(CallBase &CB, const AnyValue &Val,
+                                      const AnyValue &Ptrs,
+                                      const AnyValue &Mask) {
+    Type *ElemTy = CB.getArgOperand(0)->getType()->getScalarType();
+    auto Accesses = verifyMaskedLaneAccesses("llvm.masked.scatter", Ptrs, Mask,
+                                             ElemTy, /*IsStore=*/true);
+    if (!Accesses)
+      return AnyValue();
+
+    // Lanes are stored in order, so later lanes win for overlapping addresses.
+    // A poison mask lane may either store its value or leave memory unchanged,
+    // so it stores poison.
+    for (auto [LaneIdx, MO, Offset, IsPoisonLane] : *Accesses)
+      Ctx.store(*MO, Offset,
+                IsPoisonLane ? AnyValue::getPoisonValue(Ctx, ElemTy)
+                             : Val.asAggregate()[LaneIdx],
+                ElemTy);
     return AnyValue();
   }
 
@@ -1970,6 +2038,10 @@ public:
       return callMaskedLoadIntrinsic(CB, Args[0], Args[1], Args[2]);
     case Intrinsic::masked_store:
       return callMaskedStoreIntrinsic(CB, Args[0], Args[1], Args[2]);
+    case Intrinsic::masked_gather:
+      return callMaskedGatherIntrinsic(CB, Args[0], Args[1], Args[2]);
+    case Intrinsic::masked_scatter:
+      return callMaskedScatterIntrinsic(CB, Args[0], Args[1], Args[2]);
     case Intrinsic::experimental_noalias_scope_decl:
       // FIXME: Not implemented yet. Currently it acts as a noop.
       return AnyValue();
