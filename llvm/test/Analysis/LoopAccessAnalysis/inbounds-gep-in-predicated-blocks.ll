@@ -15,8 +15,13 @@
 define void @test_inbounds_gep_used_in_predicated_block(ptr %A, i64 %n) {
 ; CHECK-LABEL: 'test_inbounds_gep_used_in_predicated_block'
 ; CHECK-NEXT:    loop.header:
-; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unknown data dependence.
 ; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Unknown:
+; CHECK-NEXT:            store i8 2, ptr %idx.0, align 1 ->
+; CHECK-NEXT:            store i8 1, ptr %idx.1, align 1
+; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
@@ -66,8 +71,13 @@ exit:
 define void @test_inbounds_gep_used_in_predicated_block_stored_value_operand(ptr %A, i64 %n, ptr noalias %B) {
 ; CHECK-LABEL: 'test_inbounds_gep_used_in_predicated_block_stored_value_operand'
 ; CHECK-NEXT:    loop.header:
-; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unknown data dependence.
 ; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Unknown:
+; CHECK-NEXT:            store i8 2, ptr %idx.0, align 1 ->
+; CHECK-NEXT:            store i8 1, ptr %idx.1, align 1
+; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:
@@ -119,8 +129,13 @@ exit:
 define void @test_inbounds_gep_used_in_predicated_block_non_memop_user(ptr %A, i64 %n) {
 ; CHECK-LABEL: 'test_inbounds_gep_used_in_predicated_block_non_memop_user'
 ; CHECK-NEXT:    loop.header:
-; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Report: unsafe dependent memory operations in loop. Use #pragma clang loop distribute(enable) to allow loop distribution to attempt to isolate the offending operations into a separate loop
+; CHECK-NEXT:  Unknown data dependence.
 ; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:        Unknown:
+; CHECK-NEXT:            store i8 2, ptr %idx.0, align 1 ->
+; CHECK-NEXT:            store i8 1, ptr %idx.1, align 1
+; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
 ; CHECK-NEXT:      Grouped accesses:
 ; CHECK-NEXT:        Group GRP0:

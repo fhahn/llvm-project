@@ -228,7 +228,10 @@ RuntimeCheckingPtrGroup::RuntimeCheckingPtrGroup(
 /// Returns \p A + \p B, if it is guaranteed not to unsigned wrap. Otherwise
 /// return nullptr. \p A and \p B must have the same type.
 static const SCEV *addSCEVNoOverflow(const SCEV *A, const SCEV *B,
-                                     ScalarEvolution &SE) {
+                                   ScalarEvolution &SE) {
+  // The overflow query uses an integer type twice as wide.
+  if (SE.getTypeSizeInBits(A->getType()) > IntegerType::MAX_INT_BITS / 2)
+    return nullptr;
   if (!SE.willNotOverflow(Instruction::Add, /*IsSigned=*/false, A, B))
     return nullptr;
   return SE.getAddExpr(A, B);
@@ -237,7 +240,10 @@ static const SCEV *addSCEVNoOverflow(const SCEV *A, const SCEV *B,
 /// Returns \p A * \p B, if it is guaranteed not to unsigned wrap. Otherwise
 /// return nullptr. \p A and \p B must have the same type.
 static const SCEV *mulSCEVNoOverflow(const SCEV *A, const SCEV *B,
-                                     ScalarEvolution &SE) {
+                                   ScalarEvolution &SE) {
+  // The overflow query uses an integer type twice as wide.
+  if (SE.getTypeSizeInBits(A->getType()) > IntegerType::MAX_INT_BITS / 2)
+    return nullptr;
   if (!SE.willNotOverflow(Instruction::Mul, /*IsSigned=*/false, A, B))
     return nullptr;
   return SE.getMulExpr(A, B);
@@ -2982,34 +2988,27 @@ static bool isSafeDependenceDistance(ScalarEvolution &SE, const SCEV &MaxBTC,
   // per iteration, so their start addresses in any two iterations differ by at
   // least TypeByteSize bytes and the accessed bytes cannot overlap.
   //
-  // Compute the product in the wider of the types of the distance and MaxBTC,
-  // so MaxStride, a byte step in the type of the distance, is not truncated
-  // and the product does not wrap in a narrow backedge-taken count type
-  // (e.g. i8). MaxBTC is a non-negative iteration count, so zero-extend it;
-  // the distance may be negative, so sign-extend it.
-  // TypeByteSize is at most the byte stride of one of the accesses, so
-  // MaxBTC * Step + TypeByteSize <= (MaxBTC + 1) * Step.
-  // FIXME: The checks below can still wrap if (MaxBTC + 1) * MaxStride does not
-  // fit in WideTy with two bits to spare, e.g. for an unbounded i64 MaxBTC.
+  // Zero-extend the unsigned count before multiplying, and check that neither
+  // the stride nor the access size is truncated in the common type.
   Type *WideTy = SE.getWiderType(Dist.getType(), MaxBTC.getType());
-  const SCEV *Step = SE.getConstant(WideTy, MaxStride);
-  const SCEV *Product =
-      SE.getMulExpr(SE.getNoopOrZeroExtend(&MaxBTC, WideTy), Step);
-  const SCEV *CastedDist = SE.getNoopOrSignExtend(&Dist, WideTy);
+  unsigned WideBits = SE.getTypeSizeInBits(WideTy);
+  if (!isUIntN(WideBits, MaxStride) || !isUIntN(WideBits, TypeByteSize))
+    return false;
+  const SCEV *Product = mulSCEVNoOverflow(
+      SE.getNoopOrZeroExtend(&MaxBTC, WideTy),
+      SE.getConstant(WideTy, MaxStride), SE);
+  if (!Product)
+    return false;
   const SCEV *Bound =
-      SE.getAddExpr(Product, SE.getConstant(WideTy, TypeByteSize));
+      addSCEVNoOverflow(Product, SE.getConstant(WideTy, TypeByteSize), SE);
+  if (!Bound)
+    return false;
 
-  // Is  Dist - (MaxBTC * Step + TypeByteSize) >= 0 ?
-  // (If so, then we have proven (**) because |Dist| >= Dist)
-  const SCEV *Minus = SE.getMinusSCEV(CastedDist, Bound);
-  if (SE.isKnownNonNegative(Minus))
-    return true;
-
-  // Second try: Is  -Dist - (MaxBTC * Step + TypeByteSize) >= 0 ?
-  // (If so, then we have proven (**) because |Dist| >= -1*Dist)
-  const SCEV *NegDist = SE.getNegativeSCEV(CastedDist);
-  Minus = SE.getMinusSCEV(NegDist, Bound);
-  return SE.isKnownNonNegative(Minus);
+  // The absolute value is unsigned, including for the minimum signed distance.
+  // Compare directly instead of subtracting, which could wrap.
+  const SCEV *AbsDist = SE.getNoopOrZeroExtend(
+      SE.getAbsExpr(&Dist, /*IsNSW=*/false), WideTy);
+  return SE.isKnownPredicate(ICmpInst::ICMP_UGE, AbsDist, Bound);
 }
 
 /// Check the dependence for two accesses with the same stride \p Stride.

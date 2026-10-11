@@ -11,7 +11,7 @@
 define void @backdep_type_size_equivalence(ptr nocapture %vec, i64 %n) {
 ; CHECK-LABEL: 'backdep_type_size_equivalence'
 ; CHECK-NEXT:    loop:
-; CHECK-NEXT:      Memory dependences are safe with a maximum safe vector width of 3200 bits
+; CHECK-NEXT:      Memory dependences are safe with a maximum safe vector width of 3200 bits with run-time checks
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:        Forward:
 ; CHECK-NEXT:            %ld.f32 = load float, ptr %gep.iv, align 8 ->
@@ -26,7 +26,34 @@ define void @backdep_type_size_equivalence(ptr nocapture %vec, i64 %n) {
 ; CHECK-NEXT:            store i32 %indvars.iv.i32, ptr %gep.iv, align 8
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.iv.min.100 = getelementptr inbounds %int_pair, ptr %vec, i64 %indvars.iv.min.100, i32 0
+; CHECK-NEXT:        Against group GRP3:
+; CHECK-NEXT:          %gep.iv.n = getelementptr inbounds %int_pair, ptr %vec, i64 %indvars.iv.n, i32 1
+; CHECK-NEXT:      Check 1:
+; CHECK-NEXT:        Comparing group GRP1:
+; CHECK-NEXT:          %gep.iv = getelementptr inbounds %int_pair, ptr %vec, i64 %indvars.iv, i32 0
+; CHECK-NEXT:        Against group GRP3:
+; CHECK-NEXT:          %gep.iv.n = getelementptr inbounds %int_pair, ptr %vec, i64 %indvars.iv.n, i32 1
+; CHECK-NEXT:      Check 2:
+; CHECK-NEXT:        Comparing group GRP2:
+; CHECK-NEXT:          %gep.iv.1 = getelementptr inbounds %int_pair, ptr %vec, i64 %indvars.iv, i32 1
+; CHECK-NEXT:        Against group GRP3:
+; CHECK-NEXT:          %gep.iv.n = getelementptr inbounds %int_pair, ptr %vec, i64 %indvars.iv.n, i32 1
 ; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: (-800 + %vec) High: (-804 + (8 * %n) + %vec))
+; CHECK-NEXT:            Member: {(-800 + %vec),+,8}<nw><%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: %vec High: (-4 + (8 * %n) + %vec))
+; CHECK-NEXT:            Member: {%vec,+,8}<nuw><%loop>
+; CHECK-NEXT:        Group GRP2:
+; CHECK-NEXT:          (Low: (4 + %vec)<nuw> High: ((8 * %n) + %vec))
+; CHECK-NEXT:            Member: {(4 + %vec)<nuw>,+,8}<nuw><%loop>
+; CHECK-NEXT:        Group GRP3:
+; CHECK-NEXT:          (Low: (4 + (8 * %n) + %vec) High: ((16 * %n) + %vec))
+; CHECK-NEXT:            Member: {(4 + (8 * %n) + %vec),+,8}<%loop>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:

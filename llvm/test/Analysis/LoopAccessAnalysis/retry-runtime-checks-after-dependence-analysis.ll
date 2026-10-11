@@ -346,9 +346,14 @@ define void @retry_after_dep_check_with_unknown_offset(ptr %A, i32 %offset) {
 ; CHECK-NEXT:      Check 0:
 ; CHECK-NEXT:        Comparing group GRP0:
 ; CHECK-NEXT:          %A.100.iv = getelementptr { float, float }, ptr %A.100, i64 %iv
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %A.100.iv.offset.3 = getelementptr i8, ptr %A.100, i64 %iv.offset.3
+; CHECK-NEXT:      Check 1:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %A.100.iv = getelementptr { float, float }, ptr %A.100, i64 %iv
 ; CHECK-NEXT:        Against group GRP2:
 ; CHECK-NEXT:        ptr %A
-; CHECK-NEXT:      Check 1:
+; CHECK-NEXT:      Check 2:
 ; CHECK-NEXT:        Comparing group GRP1:
 ; CHECK-NEXT:          %A.100.iv.offset.3 = getelementptr i8, ptr %A.100, i64 %iv.offset.3
 ; CHECK-NEXT:        Against group GRP2:

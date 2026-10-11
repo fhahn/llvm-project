@@ -208,14 +208,26 @@ exit:
   ret void
 }
 
-; FIXME: MaxBTC * 8 wraps in i64, so a[iv + n + 1] may alias a[iv + 1].
+; MaxBTC * 8 can wrap in i64: for n = 2^61, a[iv + n + 1] aliases a[iv + 1].
+; The distance proof must not discard this possible dependence.
 define void @backward_dep_i64_btc_product_wraps(ptr %a, i64 %n) {
 ; CHECK-LABEL: 'backward_dep_i64_btc_product_wraps'
 ; CHECK-NEXT:    loop.header:
-; CHECK-NEXT:      Memory dependences are safe
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
 ; CHECK-NEXT:      Dependences:
 ; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.a.n.1 = getelementptr i64, ptr %a, i64 %iv.n.1
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %gep.a = getelementptr i64, ptr %a, i64 %iv
 ; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: (8 + (8 * %n) + %a) High: inttoptr (i64 -1 to ptr))
+; CHECK-NEXT:            Member: {(8 + (8 * %n) + %a),+,8}<%loop.header>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: %a High: inttoptr (i64 -1 to ptr))
+; CHECK-NEXT:            Member: {%a,+,8}<%loop.header>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
 ; CHECK-NEXT:      SCEV assumptions:
