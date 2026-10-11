@@ -15841,13 +15841,6 @@ static bool collectDivisibilityInformation(
   return true;
 }
 
-// Check if the condition is a divisibility guard (A % B == 0).
-static bool isDivisibilityGuard(const SCEV *LHS, const SCEV *RHS,
-                                ScalarEvolution &SE) {
-  const SCEV *X, *Y;
-  return match(LHS, m_scev_URem(m_SCEV(X), m_SCEV(Y), SE)) && RHS->isZero();
-}
-
 // Apply divisibility by \p Divisor on MinMaxExpr with constant values,
 // recursively. This is done by aligning up/down the constant value to the
 // Divisor.
@@ -16207,8 +16200,6 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
   DenseMap<const SCEV *, APInt> Multiples;
   LoopGuards DivGuards(SE);
   for (const auto &[Predicate, LHS, RHS] : GuardsToProcess) {
-    if (!isDivisibilityGuard(LHS, RHS, SE))
-      continue;
     collectDivisibilityInformation(Predicate, LHS, RHS, DivGuards.RewriteMap,
                                    Multiples, SE);
   }
