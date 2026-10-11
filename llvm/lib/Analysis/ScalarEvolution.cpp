@@ -15970,9 +15970,17 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
     }
 
     const SCEV *RewrittenLHS = GetMaybeRewritten(LHS);
-    // Apply divisibility information when computing the constant multiple.
-    const APInt &DividesBy =
-        SE.getConstantMultiple(DivGuards.rewrite(RewrittenLHS));
+    auto AlignToMultiple = [&](const SCEV *Expr, bool RoundUp) {
+      // The alignment helpers only change positive constants. Avoid rewriting
+      // LHS and computing its multiple when alignment is a no-op.
+      const auto *C = dyn_cast<SCEVConstant>(Expr);
+      if (!C || C->getAPInt().isNonPositive())
+        return Expr;
+      const APInt &DividesBy =
+          SE.getConstantMultiple(DivGuards.rewrite(RewrittenLHS));
+      return RoundUp ? getNextSCEVDivisibleByDivisor(Expr, DividesBy, SE)
+                     : getPreviousSCEVDivisibleByDivisor(Expr, DividesBy, SE);
+    };
 
     // Collect rewrites for LHS and its transitive operands based on the
     // condition.
@@ -15994,21 +16002,21 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
       [[fallthrough]];
     case CmpInst::ICMP_SLT: {
       RHS = SE.getMinusSCEV(RHS, One);
-      RHS = getPreviousSCEVDivisibleByDivisor(RHS, DividesBy, SE);
+      RHS = AlignToMultiple(RHS, /*RoundUp=*/false);
       break;
     }
     case CmpInst::ICMP_UGT:
     case CmpInst::ICMP_SGT:
       RHS = SE.getAddExpr(RHS, One);
-      RHS = getNextSCEVDivisibleByDivisor(RHS, DividesBy, SE);
+      RHS = AlignToMultiple(RHS, /*RoundUp=*/true);
       break;
     case CmpInst::ICMP_ULE:
     case CmpInst::ICMP_SLE:
-      RHS = getPreviousSCEVDivisibleByDivisor(RHS, DividesBy, SE);
+      RHS = AlignToMultiple(RHS, /*RoundUp=*/false);
       break;
     case CmpInst::ICMP_UGE:
     case CmpInst::ICMP_SGE:
-      RHS = getNextSCEVDivisibleByDivisor(RHS, DividesBy, SE);
+      RHS = AlignToMultiple(RHS, /*RoundUp=*/true);
       break;
     default:
       break;
@@ -16062,7 +16070,7 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
       case CmpInst::ICMP_NE:
         if (match(RHS, m_scev_Zero())) {
           const SCEV *OneAlignedUp =
-              getNextSCEVDivisibleByDivisor(One, DividesBy, SE);
+              AlignToMultiple(One, /*RoundUp=*/true);
           To = SE.getUMaxExpr(FromRewritten, OneAlignedUp);
         } else {
           // LHS != RHS can be rewritten as (LHS - RHS) = UMax(1, LHS - RHS),
