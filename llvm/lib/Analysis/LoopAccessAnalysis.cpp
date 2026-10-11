@@ -2322,22 +2322,24 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
     auto StoreSize = [&DL](Type *Ty) { return DL.getTypeStoreSize(Ty); };
     for (auto &Access : AccessInfos) {
       // A written pointer is only checked via its write access, so its bounds
-      // must also cover the types it is loaded with. If all sizes are fixed or
-      // all are scalable, the bounds of the widest type cover all others.
+      // must also cover the types it is loaded with.
       SmallSetVector<Type *, 1> AccessTys = Accesses.lookup(Access);
       if (Access.getInt()) {
         auto ReadIt = Accesses.find(MemAccessInfo(Access.getPointer(), false));
         if (ReadIt != Accesses.end())
           AccessTys.insert_range(ReadIt->second);
       }
+      // Pick a candidate widest type, then check that it covers every access.
+      // Sizes may be incomparable, so keep all types if the check fails.
+      Type *WidestTy = AccessTys.front();
+      for (Type *Ty : drop_begin(AccessTys))
+        if (!TypeSize::isKnownGE(StoreSize(WidestTy), StoreSize(Ty)))
+          WidestTy = Ty;
       ArrayRef<Type *> Tys = AccessTys.getArrayRef();
-      if (all_equal(map_range(
-              Tys, [&](Type *Ty) { return StoreSize(Ty).isScalable(); }))) {
-        auto WidestTyIt = max_element(Tys, [&](Type *A, Type *B) {
-          return TypeSize::isKnownLT(StoreSize(A), StoreSize(B));
-        });
-        Tys = {WidestTyIt, 1};
-      }
+      if (all_of(Tys, [&](Type *Ty) {
+            return TypeSize::isKnownGE(StoreSize(WidestTy), StoreSize(Ty));
+          }))
+        Tys = {&WidestTy, 1};
       for (Type *AccessTy : Tys) {
         if (!createCheckForAccess(RtCheck, Access, AccessTy, StridesMap,
                                   DepSetId, TheLoop, RunningDepId, ASId,
