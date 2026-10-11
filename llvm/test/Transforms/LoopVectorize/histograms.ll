@@ -130,3 +130,52 @@ loop:
 exit:
   ret void
 }
+
+; A retained uniform branch does not need a histogram mask operand.
+define void @uniform_histogram(ptr noalias %buckets, ptr readonly %indices, i1 %enabled) {
+; CHECK-LABEL: define void @uniform_histogram(
+; CHECK-SAME: ptr noalias [[BUCKETS:%.*]], ptr readonly [[INDICES:%.*]], i1 [[ENABLED:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[LATCH2:.*]] ]
+; CHECK-NEXT:    br i1 [[ENABLED]], label %[[BODY1:.*]], label %[[LATCH2]]
+; CHECK:       [[BODY1]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds i32, ptr [[INDICES]], i64 [[INDEX]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x i32>, ptr [[TMP0]], align 4
+; CHECK-NEXT:    [[TMP1:%.*]] = zext <2 x i32> [[WIDE_LOAD]] to <2 x i64>
+; CHECK-NEXT:    [[WIDE_GEP:%.*]] = getelementptr inbounds i32, ptr [[BUCKETS]], <2 x i64> [[TMP1]]
+; CHECK-NEXT:    call void @llvm.experimental.vector.histogram.add.v2p0.i32(<2 x ptr> [[WIDE_GEP]], i32 1, <2 x i1> splat (i1 true))
+; CHECK-NEXT:    br label %[[LATCH2]]
+; CHECK:       [[LATCH2]]:
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
+; CHECK-NEXT:    [[TMP2:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1000
+; CHECK-NEXT:    br i1 [[TMP2]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP3:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    br label %[[EXIT:.*]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %loop
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %latch ]
+  br i1 %enabled, label %body, label %latch
+body:
+  %gep.indices = getelementptr inbounds i32, ptr %indices, i64 %iv
+  %idx = load i32, ptr %gep.indices, align 4
+  %idxprom = zext i32 %idx to i64
+  %gep.bucket = getelementptr inbounds i32, ptr %buckets, i64 %idxprom
+  %old = load i32, ptr %gep.bucket, align 4
+  %inc = add i32 %old, 1
+  store i32 %inc, ptr %gep.bucket, align 4
+  br label %latch
+latch:
+  %iv.next = add nuw nsw i64 %iv, 1
+  %done = icmp eq i64 %iv.next, 1000
+  br i1 %done, label %exit, label %loop
+exit:
+  ret void
+}
