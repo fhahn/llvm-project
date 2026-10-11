@@ -1471,9 +1471,6 @@ namespace {
 /// vectorize, the checks are attached to VPlan as IR or recipes. If deciding
 /// not to vectorize, the temporary blocks are completely removed.
 class GeneratedRTChecks {
-  /// The cost of the SCEV checks.
-  InstructionCost SCEVCheckCost = 0;
-
   /// Basic block which contains the generated memory runtime checks, if any.
   BasicBlock *MemCheckBlock = nullptr;
 
@@ -1516,9 +1513,7 @@ public:
   /// Generate memory runtime checks in MemCheckBlock, so we can accurately
   /// estimate their cost. The block is un-linked from the IR and attached to
   /// VPlan as IR or recipes if profitable. Otherwise, it is removed completely.
-  /// The SCEV checks of \p UnionPred are only expanded to cost them.
-  void create(Loop *L, const LoopAccessInfo &LAI,
-              const SCEVPredicate &UnionPred, ElementCount VF, unsigned IC,
+  void create(Loop *L, const LoopAccessInfo &LAI, ElementCount VF, unsigned IC,
               OptimizationRemarkEmitter &ORE) {
 
     // Hard cutoff to limit compile-time increase in case a very large number of
@@ -1542,18 +1537,6 @@ public:
 
     BasicBlock *LoopHeader = L->getHeader();
     BasicBlock *Preheader = L->getLoopPreheader();
-
-    if (!UnionPred.isAlwaysTrue()) {
-      SCEVExpander SCEVExp(*PSE.getSE(), "scev.check", /*PreserveLCSSA=*/false);
-      // Remove the expanded checks after costing them, so further expansions
-      // cannot re-use them.
-      SCEVExpanderCleaner SCEVCleaner(SCEVExp);
-      SCEVExp.eraseDeadInstructions(SCEVExp.expandCodeForPredicate(
-          &UnionPred, Preheader->getTerminator()));
-      for (Instruction &I : *Preheader)
-        if (SCEVExp.isInsertedInstruction(&I))
-          SCEVCheckCost += TTI->getInstructionCost(&I, CostKind);
-    }
 
     // Use SplitBlock to create a block for memory runtime checks to ensure the
     // block is properly added to LoopInfo & DominatorTree. Those may be used by
@@ -1609,7 +1592,7 @@ public:
       return Cost;
     }
 
-    InstructionCost RTCheckCost = SCEVCheckCost;
+    InstructionCost RTCheckCost = 0;
     if (MemCheckBlock) {
       LLVM_DEBUG(dbgs() << "Calculating cost of runtime checks:\n");
       InstructionCost MemCheckCost = 0;
@@ -7115,13 +7098,12 @@ static InstructionCost calculateEarlyExitCost(VPCostContext &CostCtx,
 ///     extra work when exiting the loop early, such as calculating the final
 ///     exit values of variables used outside the loop.
 ///  3. The middle block.
-static bool isOutsideLoopWorkProfitable(GeneratedRTChecks &Checks,
+static bool isOutsideLoopWorkProfitable(InstructionCost RtC,
                                         VectorizationFactor &VF, Loop *L,
                                         PredicatedScalarEvolution &PSE,
                                         VPCostContext &CostCtx, VPlan &Plan,
                                         EpilogueLowering SEL,
                                         std::optional<unsigned> VScale) {
-  InstructionCost RtC = Checks.getCost();
   if (!RtC.isValid())
     return false;
 
@@ -7821,10 +7803,13 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     IC = LVP.selectInterleaveCount(*BestPlanPtr, VF.Width, VF.Cost);
 
     unsigned SelectedIC = UserIC > 0 ? UserIC : IC;
+    VPCostContext CostCtx(*TLI, *BestPlanPtr, LVP.getCostModel(), Config,
+                          /*ReusePrintingSlotTracker=*/true);
+    InstructionCost SCEVChecksCost = 0;
     //  Optimistically generate runtime checks if they are needed. Drop them if
     //  they turn out to not be profitable.
     if (VF.Width.isVector() || SelectedIC > 1) {
-      // Cost the SCEV checks of the plan, not all predicates of PSE.
+#ifndef NDEBUG
       SmallVector<const SCEVPredicate *> SCEVPreds;
       for (const auto &P : BestPlanPtr->predicates())
         if (const auto *SCEVP = dyn_cast<VPSCEVPredicate>(P.get()))
@@ -7836,8 +7821,12 @@ bool LoopVectorizePass::processLoop(Loop *L) {
                           vputils::evaluateSCEVCheck(*P, *SE) == true;
                  }) &&
           "SCEV predicate added after finalizeSCEVPredicates");
-      Checks.create(L, *LVL.getLAI(), SCEVUnionPredicate(SCEVPreds, *SE),
-                    VF.Width, SelectedIC, *ORE);
+#endif
+      // Cost the SCEV checks before generating the memory checks, so their
+      // expansion cannot reuse values of the latter, which may be removed.
+      SCEVChecksCost =
+          VPlanTransforms::computeSCEVChecksCost(*BestPlanPtr, CostCtx);
+      Checks.create(L, *LVL.getLAI(), VF.Width, SelectedIC, *ORE);
 
       // Bail out early if the memory runtime checks are known to fail. In
       // that case, the vector loop would never execute.
@@ -7855,11 +7844,10 @@ bool LoopVectorizePass::processLoop(Loop *L) {
     // Check if it is profitable to vectorize with runtime checks.
     bool ForceVectorization =
         Hints.getForce() == LoopVectorizeHints::FK_Enabled;
-    VPCostContext CostCtx(*TLI, *BestPlanPtr, LVP.getCostModel(), Config,
-                          /*ReusePrintingSlotTracker=*/true);
     if (!ForceVectorization &&
-        !isOutsideLoopWorkProfitable(Checks, VF, L, PSE, CostCtx, *BestPlanPtr,
-                                     SEL, Config.getVScaleForTuning())) {
+        !isOutsideLoopWorkProfitable(Checks.getCost() + SCEVChecksCost, VF, L,
+                                     PSE, CostCtx, *BestPlanPtr, SEL,
+                                     Config.getVScaleForTuning())) {
       ORE->emit([&]() {
         return OptimizationRemarkAnalysisAliasing(
                    DEBUG_TYPE, "CantReorderMemOps", L->getStartLoc(),

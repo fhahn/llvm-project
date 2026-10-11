@@ -237,6 +237,11 @@ struct VPlanTransforms {
   static void materializePredicates(VPlan &Plan, ScalarEvolution &SE,
                                     DebugLoc DL, bool AddBranchWeights);
 
+  /// Return the cost of the SCEV checks materializePredicates() generates for
+  /// \p Plan, after simplifying them like the plan is simplified before
+  /// execution.
+  static InstructionCost computeSCEVChecksCost(VPlan &Plan, VPCostContext &Ctx);
+
   /// Model the blocks the executed \p MainPlan generated for the main vector
   /// loop in \p EpiPlan during epilogue vectorization, wrapping each in a
   /// VPIRBasicBlock, with \p EnteredFrom the block \p EpiPlan is entered from.
