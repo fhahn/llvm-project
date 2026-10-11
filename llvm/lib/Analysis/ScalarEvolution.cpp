@@ -16233,9 +16233,11 @@ void ScalarEvolution::LoopGuards::collectFromBlock(
   Guards.PreserveNSW = true;
   for (const SCEV *Expr : ExprsToRewrite) {
     const SCEV *RewriteTo = Guards.RewriteMap[Expr];
-    Guards.PreserveNUW &=
+    Guards.PreserveNUW =
+        Guards.PreserveNUW &&
         SE.getUnsignedRange(Expr).contains(SE.getUnsignedRange(RewriteTo));
-    Guards.PreserveNSW &=
+    Guards.PreserveNSW =
+        Guards.PreserveNSW &&
         SE.getSignedRange(Expr).contains(SE.getSignedRange(RewriteTo));
   }
 
@@ -16287,6 +16289,9 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
     }
 
     const SCEV *visitZeroExtendExpr(const SCEVZeroExtendExpr *Expr) {
+      if (Map.empty())
+        return SCEVRewriteVisitor<SCEVLoopGuardRewriter>::visitZeroExtendExpr(
+            Expr);
       if (const SCEV *S = Map.lookup(Expr))
         return S;
 
@@ -16335,7 +16340,7 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
       // return UMax(S, 1).
       auto RewriteSubtraction = [&](const SCEV *S) -> const SCEV * {
         SCEVUse LHS, RHS;
-        if (MatchBinarySub(S, LHS, RHS)) {
+        if (!NotEqual.empty() && MatchBinarySub(S, LHS, RHS)) {
           if (LHS > RHS)
             std::swap(LHS, RHS);
           if (NotEqual.contains({LHS, RHS})) {
@@ -16371,7 +16376,7 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
         // for (Const + 1 + A), and rewrite to ((Const + 1 + A) - 1). This makes
         // sure we don't lose information when rewriting expressions based on
         // back-edge taken counts in some cases.
-        if (Expr->getNumOperands() == 2) {
+        if (Expr->getNumOperands() == 2 && !Map.empty()) {
           const SCEV *S = nullptr;
           // Handle (-1 + 1 + A) without constructing SCEVs.
           if (match(Expr->getOperand(0), m_scev_AllOnes())) {
