@@ -3298,48 +3298,36 @@ struct EarlyExitInfo {
   VPValue *CondToExit;
 };
 
-/// Returns the recipes to skip if any lane exits, if the vector loop should
-/// bail to the scalar loop instead of masking: the recipes from \p BodyStart to
-/// the end of \p Header and the non-terminator recipes of \p Latch, except
-/// those needed to compute the latch terminator or the backedge values of
-/// header phis. Bailing is possible if all memory operations other than the
-/// exit condition load are skipped and no skipped value is used outside of the
-/// skipped recipes. It is preferred if they contain a consecutive access that
-/// the target cannot mask. Otherwise returns std::nullopt.
+/// Collect recipes after \p BodyStart in \p Header and before the terminator of
+/// \p Latch whose values are only used by other collected recipes. Return
+/// std::nullopt if the remaining recipes access memory or have side effects,
+/// or no collected consecutive access requires scalarized masking.
 static std::optional<SmallVector<VPRecipeBase *>>
-shouldBailToScalar(VPBasicBlock *Header, VPBasicBlock *Latch,
-                   VPBasicBlock::iterator BodyStart,
-                   const VFSelectionContext &Config) {
+collectScalarReplayBody(VPBasicBlock *Header, VPBasicBlock *Latch,
+                        VPBasicBlock::iterator BodyStart,
+                        const VFSelectionContext &Config) {
   if (Header->getSingleSuccessor() != Latch || !Latch->phis().empty())
     return std::nullopt;
 
-  // Visit users before their operands. Recipes needed on every iteration, e.g.
-  // the countable exit condition when it was split from a combined exit in the
-  // header, remain unconditional and must not access memory.
-  VPRecipeBase *LatchTerm = Latch->getTerminator();
-  SmallVector<VPRecipeBase *> Body;
-  SmallPtrSet<VPRecipeBase *, 16> BodySet, Needed;
+  // Visit users before their operands. Keep recipes with users outside the
+  // skipped body unconditional. Early-exit legality requires non-memory
+  // operations to be safe to speculate.
+  SmallSetVector<VPRecipeBase *, 16> Body;
   bool HasUnmaskableConsecutiveAccess = false;
   for (VPRecipeBase &R : concat<VPRecipeBase>(
-           reverse(make_range(Latch->begin(), LatchTerm->getIterator())),
+           reverse(drop_end(*Latch)),
            reverse(make_range(BodyStart, Header->end())))) {
-    bool OnlyUsedInBody = true, IsNeeded = false;
-    for (VPValue *Def : R.definedValues()) {
-      for (VPUser *U : Def->users()) {
-        auto *UserR = cast<VPRecipeBase>(U);
-        OnlyUsedInBody &= BodySet.contains(UserR);
-        IsNeeded |= Needed.contains(UserR) || UserR == LatchTerm ||
-                    (UserR->isPhi() && UserR->getParent() == Header);
-      }
-    }
+    bool OnlyUsedInBody = all_of(R.definedValues(), [&Body](VPValue *Def) {
+      return all_of(Def->users(), [&Body](VPUser *U) {
+        return Body.contains(cast<VPRecipeBase>(U));
+      });
+    });
     if (!OnlyUsedInBody) {
-      if (!IsNeeded || R.mayReadOrWriteMemory() || R.mayHaveSideEffects())
+      if (R.mayReadOrWriteMemory() || R.mayHaveSideEffects())
         return std::nullopt;
-      Needed.insert(&R);
       continue;
     }
-    BodySet.insert(&R);
-    Body.push_back(&R);
+    Body.insert(&R);
     if (!R.mayReadOrWriteMemory())
       continue;
     auto *VPI = cast<VPInstruction>(&R);
@@ -3364,8 +3352,7 @@ shouldBailToScalar(VPBasicBlock *Header, VPBasicBlock *Latch,
   }
   if (!HasUnmaskableConsecutiveAccess)
     return std::nullopt;
-  std::reverse(Body.begin(), Body.end());
-  return Body;
+  return to_vector(reverse(Body));
 }
 
 /// Update \p Plan to mask memory operations in the loop based on whether the
@@ -3524,7 +3511,7 @@ static bool handleUncountableExitsWithSideEffects(
 
   std::optional<SmallVector<VPRecipeBase *>> Body;
   if (Exits.size() == 1 && Exits[0].EarlyExitingVPBB == HeaderVPBB)
-    Body = shouldBailToScalar(HeaderVPBB, LatchVPBB, InsertIt, Config);
+    Body = collectScalarReplayBody(HeaderVPBB, LatchVPBB, InsertIt, Config);
 
   Type *IVScalarTy = IV->getScalarType();
   VPValue *Zero = Plan.getZero(IVScalarTy);

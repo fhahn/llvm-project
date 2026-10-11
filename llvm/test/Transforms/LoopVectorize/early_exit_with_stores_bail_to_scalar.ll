@@ -512,7 +512,8 @@ exit:
   ret void
 }
 
-; A load from a loop-invariant address (%cfg) in the body.
+; The loop-invariant load is after the early-exit check, so %cfg need not be
+; dereferenceable if the first iteration exits. Keep it in the non-bailing body.
 define void @single_store_with_invariant_load(ptr dereferenceable(40) noalias %array, ptr align 2 dereferenceable(40) readonly %pred, ptr noalias readonly %cfg) {
 ; CHECK-LABEL: define void @single_store_with_invariant_load(
 ; CHECK-SAME: ptr noalias dereferenceable(40) [[ARRAY:%.*]], ptr readonly align 2 dereferenceable(40) [[PRED:%.*]], ptr noalias readonly [[CFG:%.*]]) {
@@ -552,17 +553,17 @@ define void @single_store_with_invariant_load(ptr dereferenceable(40) noalias %a
 ; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
 ; CHECK:       [[LOOP_HEADER]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[TMP37]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
+; CHECK-NEXT:    [[EE_ADDR:%.*]] = getelementptr inbounds nuw i16, ptr [[PRED]], i64 [[IV]]
+; CHECK-NEXT:    [[EE_VAL:%.*]] = load i16, ptr [[EE_ADDR]], align 2
+; CHECK-NEXT:    [[EE_COND:%.*]] = icmp sgt i16 [[EE_VAL]], 500
+; CHECK-NEXT:    br i1 [[EE_COND]], label %[[EXIT]], label %[[LOOP_LATCH]]
+; CHECK:       [[LOOP_LATCH]]:
 ; CHECK-NEXT:    [[CFGVAL:%.*]] = load i16, ptr [[CFG]], align 2
 ; CHECK-NEXT:    [[ST_ADDR:%.*]] = getelementptr inbounds nuw i16, ptr [[ARRAY]], i64 [[IV]]
 ; CHECK-NEXT:    [[DATA:%.*]] = load i16, ptr [[ST_ADDR]], align 2
 ; CHECK-NEXT:    [[INC0:%.*]] = add nsw i16 [[DATA]], 1
 ; CHECK-NEXT:    [[INC:%.*]] = add nsw i16 [[INC0]], [[CFGVAL]]
 ; CHECK-NEXT:    store i16 [[INC]], ptr [[ST_ADDR]], align 2
-; CHECK-NEXT:    [[EE_ADDR:%.*]] = getelementptr inbounds nuw i16, ptr [[PRED]], i64 [[IV]]
-; CHECK-NEXT:    [[EE_VAL:%.*]] = load i16, ptr [[EE_ADDR]], align 2
-; CHECK-NEXT:    [[EE_COND:%.*]] = icmp sgt i16 [[EE_VAL]], 500
-; CHECK-NEXT:    br i1 [[EE_COND]], label %[[EXIT]], label %[[LOOP_LATCH]]
-; CHECK:       [[LOOP_LATCH]]:
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
 ; CHECK-NEXT:    [[COUNTED_COND:%.*]] = icmp eq i64 [[IV_NEXT]], 20
 ; CHECK-NEXT:    br i1 [[COUNTED_COND]], label %[[EXIT]], label %[[LOOP_HEADER]], !llvm.loop [[LOOP15:![0-9]+]]
@@ -574,18 +575,18 @@ entry:
 
 loop.header:
   %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop.latch ]
-  %cfgval = load i16, ptr %cfg, align 2
-  %st.addr = getelementptr inbounds nuw i16, ptr %array, i64 %iv
-  %data = load i16, ptr %st.addr, align 2
-  %inc0 = add nsw i16 %data, 1
-  %inc = add nsw i16 %inc0, %cfgval
-  store i16 %inc, ptr %st.addr, align 2
   %ee.addr = getelementptr inbounds nuw i16, ptr %pred, i64 %iv
   %ee.val = load i16, ptr %ee.addr, align 2
   %ee.cond = icmp sgt i16 %ee.val, 500
   br i1 %ee.cond, label %exit, label %loop.latch
 
 loop.latch:
+  %cfgval = load i16, ptr %cfg, align 2
+  %st.addr = getelementptr inbounds nuw i16, ptr %array, i64 %iv
+  %data = load i16, ptr %st.addr, align 2
+  %inc0 = add nsw i16 %data, 1
+  %inc = add nsw i16 %inc0, %cfgval
+  store i16 %inc, ptr %st.addr, align 2
   %iv.next = add nuw nsw i64 %iv, 1
   %counted.cond = icmp eq i64 %iv.next, 20
   br i1 %counted.cond, label %exit, label %loop.header
@@ -1181,4 +1182,82 @@ loop:
 
 exit:
   ret void
+}
+
+; Pure computations with live-out users stay unconditional during scalar replay.
+define i64 @pure_arithmetic_live_out(ptr dereferenceable(40) noalias %array, ptr align 2 dereferenceable(40) readonly %pred) {
+; CHECK-LABEL: define i64 @pure_arithmetic_live_out(
+; CHECK-SAME: ptr noalias dereferenceable(40) [[ARRAY:%.*]], ptr readonly align 2 dereferenceable(40) [[PRED:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[LOOP_LATCH2:.*]] ]
+; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw i16, ptr [[PRED]], i64 [[INDEX]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i16>, ptr [[TMP0]], align 2
+; CHECK-NEXT:    [[TMP1:%.*]] = icmp sgt <4 x i16> [[WIDE_LOAD]], splat (i16 500)
+; CHECK-NEXT:    [[TMP2:%.*]] = freeze <4 x i1> [[TMP1]]
+; CHECK-NEXT:    [[TMP3:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP2]])
+; CHECK-NEXT:    br i1 [[TMP3]], label %[[LOOP_LATCH2]], label %[[VECTOR_BODY_NONBAILING:.*]]
+; CHECK:       [[VECTOR_BODY_NONBAILING]]:
+; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds nuw i16, ptr [[ARRAY]], i64 [[INDEX]]
+; CHECK-NEXT:    [[WIDE_LOAD1:%.*]] = load <4 x i16>, ptr [[TMP4]], align 2
+; CHECK-NEXT:    [[TMP5:%.*]] = add nsw <4 x i16> [[WIDE_LOAD1]], splat (i16 1)
+; CHECK-NEXT:    store <4 x i16> [[TMP5]], ptr [[TMP4]], align 2
+; CHECK-NEXT:    br label %[[LOOP_LATCH2]]
+; CHECK:       [[LOOP_LATCH2]]:
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i64 [[INDEX_NEXT]], 20
+; CHECK-NEXT:    [[TMP7:%.*]] = or i1 [[TMP3]], [[TMP6]]
+; CHECK-NEXT:    br i1 [[TMP7]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP30:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[TMP8:%.*]] = select i1 [[TMP3]], i64 0, i64 4
+; CHECK-NEXT:    [[TMP9:%.*]] = add i64 [[INDEX]], [[TMP8]]
+; CHECK-NEXT:    [[TMP10:%.*]] = icmp eq i64 [[TMP9]], 20
+; CHECK-NEXT:    br i1 [[TMP10]], label %[[EXIT:.*]], label %[[SCALAR_PH:.*]]
+; CHECK:       [[SCALAR_PH]]:
+; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
+; CHECK:       [[LOOP_HEADER]]:
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[TMP9]], %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
+; CHECK-NEXT:    [[ST_ADDR:%.*]] = getelementptr inbounds nuw i16, ptr [[ARRAY]], i64 [[IV]]
+; CHECK-NEXT:    [[DATA:%.*]] = load i16, ptr [[ST_ADDR]], align 2
+; CHECK-NEXT:    [[INC:%.*]] = add nsw i16 [[DATA]], 1
+; CHECK-NEXT:    store i16 [[INC]], ptr [[ST_ADDR]], align 2
+; CHECK-NEXT:    [[VALUE:%.*]] = add i64 [[IV]], 42
+; CHECK-NEXT:    [[EE_ADDR:%.*]] = getelementptr inbounds nuw i16, ptr [[PRED]], i64 [[IV]]
+; CHECK-NEXT:    [[EE_VAL:%.*]] = load i16, ptr [[EE_ADDR]], align 2
+; CHECK-NEXT:    [[EE_COND:%.*]] = icmp sgt i16 [[EE_VAL]], 500
+; CHECK-NEXT:    br i1 [[EE_COND]], label %[[EXIT]], label %[[LOOP_LATCH]]
+; CHECK:       [[LOOP_LATCH]]:
+; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
+; CHECK-NEXT:    [[COUNTED_COND:%.*]] = icmp eq i64 [[IV_NEXT]], 20
+; CHECK-NEXT:    br i1 [[COUNTED_COND]], label %[[EXIT]], label %[[LOOP_HEADER]], !llvm.loop [[LOOP31:![0-9]+]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    [[VALUE_LCSSA:%.*]] = phi i64 [ [[VALUE]], %[[LOOP_HEADER]] ], [ [[VALUE]], %[[LOOP_LATCH]] ], [ 61, %[[MIDDLE_BLOCK]] ]
+; CHECK-NEXT:    ret i64 [[VALUE_LCSSA]]
+;
+entry:
+  br label %loop.header
+
+loop.header:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop.latch ]
+  %st.addr = getelementptr inbounds nuw i16, ptr %array, i64 %iv
+  %data = load i16, ptr %st.addr, align 2
+  %inc = add nsw i16 %data, 1
+  store i16 %inc, ptr %st.addr, align 2
+  %value = add i64 %iv, 42
+  %ee.addr = getelementptr inbounds nuw i16, ptr %pred, i64 %iv
+  %ee.val = load i16, ptr %ee.addr, align 2
+  %ee.cond = icmp sgt i16 %ee.val, 500
+  br i1 %ee.cond, label %exit, label %loop.latch
+
+loop.latch:
+  %iv.next = add nuw nsw i64 %iv, 1
+  %counted.cond = icmp eq i64 %iv.next, 20
+  br i1 %counted.cond, label %exit, label %loop.header
+
+exit:
+  %value.lcssa = phi i64 [ %value, %loop.header ], [ %value, %loop.latch ]
+  ret i64 %value.lcssa
 }
