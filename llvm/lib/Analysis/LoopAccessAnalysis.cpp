@@ -762,6 +762,21 @@ haveNonWrappingDistance(const RuntimePointerChecking::PointerInfo &P,
 
 bool RuntimeCheckingPtrGroup::addPointer(
     unsigned Index, const RuntimePointerChecking &RtCheck) {
+  const RuntimePointerChecking::PointerInfo &Ptr = RtCheck.Pointers[Index];
+  assert(AddressSpace == Ptr.PointerValue->getType()->getPointerAddressSpace() &&
+         "all pointers in a checking group must be in the same address space");
+
+  // Compare the starts and ends with the known minimum and maximum
+  // of this set. We need to know how we compare against the min/max
+  // of the set in order to be able to emit memchecks.
+  const SCEV *Min0 = getMinFromExprs(Ptr.Start, Low, RtCheck.SE);
+  if (!Min0)
+    return false;
+
+  const SCEV *Min1 = getMinFromExprs(Ptr.End, High, RtCheck.SE);
+  if (!Min1)
+    return false;
+
   // addPointer orders bounds by the sign of their constant difference. This
   // matches the unsigned order used by the runtime checks only if the bounds
   // do not wrap around the address space relative to each other. Otherwise,
@@ -769,7 +784,6 @@ bool RuntimeCheckingPtrGroup::addPointer(
   // may wrap to above its High and the checks never detect a conflict. Only
   // add pointers that do not wrap relative to any member, or that have the
   // group's bounds and thus are covered by them.
-  const RuntimePointerChecking::PointerInfo &Ptr = RtCheck.Pointers[Index];
   if ((Ptr.Start != Low || Ptr.End != High) &&
       !all_of(Members, [&](unsigned M) {
         return haveNonWrappingDistance(Ptr, RtCheck.Pointers[M],
@@ -777,40 +791,17 @@ bool RuntimeCheckingPtrGroup::addPointer(
                                        *RtCheck.SE);
       }))
     return false;
-  return addPointer(
-      Index, RtCheck.Pointers[Index].Start, RtCheck.Pointers[Index].End,
-      RtCheck.Pointers[Index].PointerValue->getType()->getPointerAddressSpace(),
-      RtCheck.Pointers[Index].NeedsFreeze, *RtCheck.SE);
-}
 
-bool RuntimeCheckingPtrGroup::addPointer(unsigned Index, const SCEV *Start,
-                                         const SCEV *End, unsigned AS,
-                                         bool NeedsFreeze,
-                                         ScalarEvolution &SE) {
-  assert(AddressSpace == AS &&
-         "all pointers in a checking group must be in the same address space");
-
-  // Compare the starts and ends with the known minimum and maximum
-  // of this set. We need to know how we compare against the min/max
-  // of the set in order to be able to emit memchecks.
-  const SCEV *Min0 = getMinFromExprs(Start, Low, &SE);
-  if (!Min0)
-    return false;
-
-  const SCEV *Min1 = getMinFromExprs(End, High, &SE);
-  if (!Min1)
-    return false;
-
-  // Update the low bound  expression if we've found a new min value.
-  if (Min0 == Start)
-    Low = Start;
+  // Update the low bound expression if we've found a new min value.
+  if (Min0 == Ptr.Start)
+    Low = Ptr.Start;
 
   // Update the high bound expression if we've found a new max value.
-  if (Min1 != End)
-    High = End;
+  if (Min1 != Ptr.End)
+    High = Ptr.End;
 
   Members.push_back(Index);
-  this->NeedsFreeze |= NeedsFreeze;
+  NeedsFreeze |= Ptr.NeedsFreeze;
   return true;
 }
 
