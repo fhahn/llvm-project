@@ -1874,6 +1874,32 @@ public:
           [](const AnyValue &V) -> const APFloat * { return &V.asFloat(); });
       return applyNaNPropagation(FRes, InputVec);
     }
+    case Intrinsic::vector_partial_reduce_add:
+    case Intrinsic::vector_partial_reduce_fadd: {
+      // The way the concatenated arguments are reduced is unspecified. Model a
+      // subset of the allowed reductions: keep accumulator lane I in result
+      // lane I and add each element of the second argument to a lane chosen
+      // independently at random. getRandomUInt64() returns 0 in deterministic
+      // mode, so element J goes to lane J % Res.size(), the lane assignment of
+      // constant folding and the generic SelectionDAG expansion. Zero-element
+      // vectors are invalid, so Res.size() >= 1.
+      std::vector<AnyValue> Res = Args[0].asAggregate();
+      Type *ElemTy = RetTy->getScalarType();
+      for (const auto &[J, V] : enumerate(Args[1].asAggregate())) {
+        AnyValue &Lane = Res[(J + Ctx.getRandomUInt64()) % Res.size()];
+        Lane =
+            IID == Intrinsic::vector_partial_reduce_add
+                ? visitIntBinOpWithResult(
+                      ElemTy, Lane, V,
+                      [](const APInt &L, const APInt &R) -> AnyValue {
+                        return L + R;
+                      })
+                : visitFPBinOpWithResult(
+                      ElemTy, FMF, Lane, V,
+                      [](const APFloat &L, const APFloat &R) { return L + R; });
+      }
+      return std::move(Res);
+    }
     case Intrinsic::vector_reduce_fmax:
     case Intrinsic::vector_reduce_fmin: {
       const auto DenormMode = getCurrentDenormalMode(RetTy);
