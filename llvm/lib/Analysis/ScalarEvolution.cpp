@@ -10844,6 +10844,13 @@ ScalarEvolution::ExitLimit ScalarEvolution::howFarToZero(const SCEV *V,
     return getCouldNotCompute();
 
   const LoopGuards &Guards = LG.get();
+  auto GetMaxWithGuards = [&](const SCEV *S) {
+    const SCEV *Guarded = applyLoopGuards(S, Guards);
+    APInt Max = getUnsignedRangeMax(Guarded);
+    if (Guarded == S)
+      return Max;
+    return APIntOps::umin(Max, getUnsignedRangeMax(S));
+  };
   // Specialize step for this loop so we get context sensitive facts below.
   const SCEV *StepWLG = applyLoopGuards(Step, Guards);
 
@@ -10862,8 +10869,7 @@ ScalarEvolution::ExitLimit ScalarEvolution::howFarToZero(const SCEV *V,
   //   N = Distance (as unsigned)
 
   if (match(Step, m_CombineOr(m_scev_One(), m_scev_AllOnes()))) {
-    APInt MaxBECount = getUnsignedRangeMax(applyLoopGuards(Distance, Guards));
-    MaxBECount = APIntOps::umin(MaxBECount, getUnsignedRangeMax(Distance));
+    APInt MaxBECount = GetMaxWithGuards(Distance);
 
     // When a loop like "for (int i = 0; i != n; ++i) { /* body */ }" is rotated,
     // we end up with a loop whose backedge-taken count is n - 1.  Detect this
@@ -10880,9 +10886,7 @@ ScalarEvolution::ExitLimit ScalarEvolution::howFarToZero(const SCEV *V,
       // as "unsigned_max(Distance + 1) - 1". Also apply the loop guards to
       // Distance + 1; the range of Distance itself may be a wrapped set even
       // when the guards bound Distance + 1 tightly.
-      APInt Max = APIntOps::umin(
-          getUnsignedRangeMax(applyLoopGuards(DistancePlusOne, Guards)),
-          getUnsignedRangeMax(DistancePlusOne));
+      APInt Max = GetMaxWithGuards(DistancePlusOne);
       MaxBECount = APIntOps::umin(MaxBECount, Max - 1);
     }
     return ExitLimit(Distance, getConstant(MaxBECount), Distance, false,
@@ -10907,11 +10911,8 @@ ScalarEvolution::ExitLimit ScalarEvolution::howFarToZero(const SCEV *V,
     const SCEV *Exact =
         getUDivExpr(Distance, CountDown ? getNegativeSCEV(Step) : Step);
     const SCEV *ConstantMax = getCouldNotCompute();
-    if (Exact != getCouldNotCompute()) {
-      APInt MaxInt = getUnsignedRangeMax(applyLoopGuards(Exact, Guards));
-      ConstantMax =
-          getConstant(APIntOps::umin(MaxInt, getUnsignedRangeMax(Exact)));
-    }
+    if (Exact != getCouldNotCompute())
+      ConstantMax = getConstant(GetMaxWithGuards(Exact));
     const SCEV *SymbolicMax =
         isa<SCEVCouldNotCompute>(Exact) ? ConstantMax : Exact;
     return ExitLimit(Exact, ConstantMax, SymbolicMax, false, Predicates);
@@ -10926,10 +10927,8 @@ ScalarEvolution::ExitLimit ScalarEvolution::howFarToZero(const SCEV *V,
       AllowPredicates ? &Predicates : nullptr, *this, L);
 
   const SCEV *M = E;
-  if (E != getCouldNotCompute()) {
-    APInt MaxWithGuards = getUnsignedRangeMax(applyLoopGuards(E, Guards));
-    M = getConstant(APIntOps::umin(MaxWithGuards, getUnsignedRangeMax(E)));
-  }
+  if (E != getCouldNotCompute())
+    M = getConstant(GetMaxWithGuards(E));
   auto *S = isa<SCEVCouldNotCompute>(E) ? M : E;
   return ExitLimit(E, M, S, false, Predicates);
 }
@@ -16420,6 +16419,12 @@ const SCEV *ScalarEvolution::LoopGuards::rewrite(const SCEV *Expr) const {
 
   if (RewriteMap.empty() && NotEqual.empty())
     return Expr;
+
+  // These roots do not recurse into operands or need the visitor's cache.
+  if (isa<SCEVConstant, SCEVAddRecExpr, SCEVVScale>(Expr))
+    return Expr;
+  if (isa<SCEVUnknown>(Expr))
+    return RewriteMap.lookup_or(Expr, Expr);
 
   SCEVLoopGuardRewriter Rewriter(SE, *this);
   return Rewriter.visit(Expr);
