@@ -1706,7 +1706,8 @@ bool RuntimePointerChecking::needsChecking(unsigned I, unsigned J) const {
   if (!ClassId || ClassId != PointerJ.UnknownDepClassId)
     return true;
   return UnknownDepPtrPairs.contains(
-      std::minmax<const Value *>(PointerI.PointerValue, PointerJ.PointerValue));
+      std::minmax<const Value *>(PointerI.PointerValue, PointerJ.PointerValue,
+                                std::less<const Value *>{}));
 }
 
 /// Assign each RuntimeCheckingPtrGroup pointer an index for stable UTC output.

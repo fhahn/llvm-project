@@ -20,6 +20,7 @@
 #include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/TypeSize.h"
+#include <functional>
 #include <optional>
 #include <variant>
 
@@ -697,11 +698,11 @@ public:
   /// Record an unknown dependence between \p A and \p B. Pointers with the
   /// same non-zero UnknownDepClassId only need checking if they have one.
   void addUnknownDep(const Value *A, const Value *B) {
-    UnknownDepPtrPairs.insert(std::minmax(A, B));
+    UnknownDepPtrPairs.insert(std::minmax(A, B, std::less<const Value *>{}));
   }
 
 private:
-  /// Pairs of pointers with an unknown dependence, ordered by address.
+  /// Pairs of pointers with an unknown dependence, in a canonical order.
   DenseSet<std::pair<const Value *, const Value *>> UnknownDepPtrPairs;
 
   /// Groups pointers such that a single memcheck is required
