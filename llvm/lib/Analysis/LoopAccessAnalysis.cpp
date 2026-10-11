@@ -541,13 +541,17 @@ std::pair<const SCEV *, const SCEV *> llvm::getStartAndEndForAccess(
 }
 
 /// Returns a block of \p L that executes in exactly the iterations in which
-/// \p Insts access \p Ptr, or nullptr if there is no such block.
-static const BasicBlock *getAccessBlock(ArrayRef<Instruction *> Insts,
-                                        Value *Ptr, const Loop *L,
-                                        const DominatorTree &DT) {
+/// \p Ptr is accessed, or nullptr if there is no such block.
+static const BasicBlock *getAccessBlock(Value *Ptr, const Loop *L,
+                                       const MemoryDepChecker &DC) {
   const BasicBlock *Latch = L->getLoopLatch();
+  bool ExitsAtLatch = L->getExitingBlock() == Latch;
   const BasicBlock *AccessBlock = nullptr;
-  for (Instruction *I : Insts) {
+  // The entries of a written pointer also cover the loads through it.
+  for (unsigned Idx : concat<const unsigned>(
+           DC.getOrderForAccess(Ptr, /*IsWrite=*/false),
+           DC.getOrderForAccess(Ptr, /*IsWrite=*/true))) {
+    Instruction *I = DC.getMemoryInstructions()[Idx];
     // Ptr is one of multiple incoming values of I's pointer operand, and may
     // not be accessed whenever I executes.
     if (getLoadStorePointerOperand(I) != Ptr)
@@ -555,7 +559,7 @@ static const BasicBlock *getAccessBlock(ArrayRef<Instruction *> Insts,
     const BasicBlock *BB = I->getParent();
     // If the latch is the only exiting block, all blocks dominating it
     // execute in every iteration.
-    if (L->getExitingBlock() == Latch && DT.dominates(BB, Latch))
+    if (ExitsAtLatch && DC.getDT()->dominates(BB, Latch))
       BB = Latch;
     if (AccessBlock && AccessBlock != BB)
       return nullptr;
@@ -578,12 +582,8 @@ bool RuntimePointerChecking::insert(Loop *Lp, Value *Ptr, const SCEV *PtrExpr,
       &DC.getPointerBounds(), DC.getDT(), DC.getAC(), LoopGuards);
   if (isa<SCEVCouldNotCompute>(ScStart) || isa<SCEVCouldNotCompute>(ScEnd))
     return false;
-  // The entries of a written pointer also cover the loads through it.
-  SmallVector<Instruction *, 4> Insts =
-      DC.getInstructionsForAccess(Ptr, /*IsWrite=*/false);
-  append_range(Insts, DC.getInstructionsForAccess(Ptr, /*IsWrite=*/true));
   const BasicBlock *AccessBlock =
-      IsForked ? nullptr : getAccessBlock(Insts, Ptr, Lp, *DC.getDT());
+      IsForked ? nullptr : getAccessBlock(Ptr, Lp, DC);
   // With an exact backedge-taken count, the bounds of a pointer accessed in
   // every iteration are accessed in the first and last iteration.
   const BasicBlock *Latch = Lp->getLoopLatch();
