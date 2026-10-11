@@ -1256,11 +1256,11 @@ collectCandidateMembers(ArrayRef<StencilDecomposition> Offsets, bool ForMin) {
 ///
 /// Before = NumGroups * NumExternalChecks, where NumExternalChecks is the
 /// number of groups outside this DepSet that need a check against it. The
-/// product is exact: needsChecking() looks only at (DependencySetId,
-/// AliasSetId), at whether a group writes and at UnknownDepClassId, and all
-/// groups in this DepSet agree on those, as pointers with a non-zero
-/// UnknownDepClassId have their own DependencySetId. So an external group is
-/// checked against all of them or against none.
+/// product is exact: pointers with a non-zero UnknownDepClassId have their
+/// own DependencySetId and cannot be merged. For the remaining DepSets,
+/// needsChecking() depends only on (DependencySetId, AliasSetId) and whether
+/// a group writes. All groups being merged agree on those, so an external
+/// group is checked against all of them or against none.
 ///
 /// After = NumExternalChecks + NewPredicates + NumBoundOperands:
 /// - the merged group keeps the same IDs, so it is checked against exactly
@@ -2326,13 +2326,11 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
 
   DenseMap<MemAccessInfo, unsigned> UnknownDepClassIds;
   if (auto *Deps = DepChecker.getDependences()) {
-    // If there are unknown dependences, this means runtime checks are needed to
-    // ensure there's no overlap between accesses to the same underlying object.
-    // Remove the equivalence classes containing both source and destination
-    // accesses from DepCands. This ensures runtime checks will be generated
-    // between those accesses and prevents them from being grouped together.
-    // Record the pairs with unknown dependences and the members of the removed
-    // classes, so needsChecking only checks those pairs within a class.
+    // Separate accesses in classes containing unknown dependences. With complete
+    // dependence records, only unknown pointer pairs within such a class need
+    // checks: the other pairs are independent or have a retained safe dependence.
+    // Record the removed classes so needsChecking can distinguish these pairs
+    // from pairs in different classes, which still need runtime checks.
     for (const auto &Dep : *Deps) {
       if (Dep.Type != MemoryDepChecker::Dependence::Unknown) {
         assert(MemoryDepChecker::Dependence::isSafeForVectorization(Dep.Type) ==
@@ -2353,6 +2351,7 @@ bool AccessAnalysis::canCheckPtrAtRT(RuntimePointerChecking &RtCheck,
       DepCands.eraseClass(Src);
     }
   } else {
+    // Without complete dependence records, conservatively check every pair.
     DepCands = {};
   }
 
