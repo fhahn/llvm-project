@@ -379,9 +379,6 @@ private:
   /// incoming pointers.
   SmallVector<MemAccessInfo> AccessLocs;
 
-  /// The program order index to be used for the next instruction.
-  unsigned AccessIdx = 0;
-
   /// The smallest dependence distance in bytes in the loop. This may not be
   /// the same as the maximum number of bytes that are safe to operate on
   /// simultaneously.

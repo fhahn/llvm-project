@@ -2722,20 +2722,18 @@ bool llvm::isConsecutiveAccess(Value *A, Value *B, const DataLayout &DL,
 void MemoryDepChecker::addAccess(StoreInst *SI) {
   visitPointers(SI->getPointerOperand(), *InnermostLoop,
                 [this, SI](Value *Ptr) {
-                  Accesses[MemAccessInfo(Ptr, true)].push_back(AccessIdx);
+                  Accesses[MemAccessInfo(Ptr, true)].push_back(InstMap.size());
                   InstMap.push_back(SI);
                   AccessLocs.emplace_back(Ptr, true);
-                  ++AccessIdx;
                 });
 }
 
 void MemoryDepChecker::addAccess(LoadInst *LI) {
   visitPointers(LI->getPointerOperand(), *InnermostLoop,
                 [this, LI](Value *Ptr) {
-                  Accesses[MemAccessInfo(Ptr, false)].push_back(AccessIdx);
+                  Accesses[MemAccessInfo(Ptr, false)].push_back(InstMap.size());
                   InstMap.push_back(LI);
                   AccessLocs.emplace_back(Ptr, false);
-                  ++AccessIdx;
                 });
 }
 
