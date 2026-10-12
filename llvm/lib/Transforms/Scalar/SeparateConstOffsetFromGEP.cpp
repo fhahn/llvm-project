@@ -990,10 +990,14 @@ void SeparateConstOffsetFromGEP::lowerToSingleIndexGEPs(
         if (CI->isZero())
           continue;
 
-      APInt ElementSize = APInt(PtrIndexTy->getIntegerBitWidth(),
-                                GTI.getSequentialElementStride(*DL));
+      TypeSize Stride = GTI.getSequentialElementStride(*DL);
       // Scale the index by element size.
-      if (ElementSize != 1) {
+      if (Stride.isScalable()) {
+        Idx =
+            Builder.CreateMul(Idx, Builder.CreateTypeSize(PtrIndexTy, Stride));
+      } else if (Stride.getFixedValue() != 1) {
+        APInt ElementSize(PtrIndexTy->getIntegerBitWidth(),
+                          Stride.getFixedValue());
         if (ElementSize.isPowerOf2()) {
           Idx = Builder.CreateShl(
               Idx, ConstantInt::get(PtrIndexTy, ElementSize.logBase2()));
