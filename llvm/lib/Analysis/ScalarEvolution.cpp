@@ -13284,7 +13284,8 @@ const SCEV *ScalarEvolution::getUDivCeilSCEV(const SCEV *N, const SCEV *D) {
 const SCEV *
 ScalarEvolution::computeMaxBECountForLT(const SCEV *Start, const SCEV *Stride,
                                         const SCEV *End, unsigned BitWidth,
-                                        bool IsSigned, bool Invert) {
+                                        bool IsSigned, bool Invert,
+                                        LoopGuards &Guards) {
   // The logic in this function assumes we can represent a positive stride.
   // If we can't, the backedge-taken count must be zero.
   if (IsSigned && BitWidth == 1)
@@ -13298,11 +13299,34 @@ ScalarEvolution::computeMaxBECountForLT(const SCEV *Start, const SCEV *Stride,
 
   // Calculate the maximum backedge count based on the range of values
   // permitted by Start, End, and Stride. If Invert is true, both Start and End
-  // need inverting. Stride was already negated by the caller.
-  APInt MinStart = getRangeMin(Start, IsSigned, Invert);
+  // need inverting. Stride was already negated by the caller. Both the ranges
+  // of the expressions and of the expressions with loop guards applied are
+  // valid bounds, use the tighter one. Loop guards never rewrite constants, and
+  // an expression the guards leave unchanged has the same range.
+  auto ApplyGuards = [&](const SCEV *S) {
+    return isa<SCEVConstant>(S) ? S : applyLoopGuards(S, Guards);
+  };
+  auto GetMin = [&](const SCEV *S, bool Invert) {
+    APInt Min = getRangeMin(S, IsSigned, Invert);
+    const SCEV *Guarded = ApplyGuards(S);
+    if (Guarded == S)
+      return Min;
+    APInt GuardedMin = getRangeMin(Guarded, IsSigned, Invert);
+    return IsSigned ? APIntOps::smax(Min, GuardedMin)
+                    : APIntOps::umax(Min, GuardedMin);
+  };
+  auto GetMax = [&](const SCEV *S, bool Invert) {
+    APInt Max = getRangeMax(S, IsSigned, Invert);
+    const SCEV *Guarded = ApplyGuards(S);
+    if (Guarded == S)
+      return Max;
+    APInt GuardedMax = getRangeMax(Guarded, IsSigned, Invert);
+    return IsSigned ? APIntOps::smin(Max, GuardedMax)
+                    : APIntOps::umin(Max, GuardedMax);
+  };
+  APInt MinStart = GetMin(Start, Invert);
 
-  APInt MinStride =
-      IsSigned ? getSignedRangeMin(Stride) : getUnsignedRangeMin(Stride);
+  APInt MinStride = GetMin(Stride, /*Invert=*/false);
 
   // We assume either the stride is positive, or the backedge-taken count
   // is zero. So force StrideForMaxBECount to be at least one.
@@ -13318,7 +13342,7 @@ ScalarEvolution::computeMaxBECountForLT(const SCEV *Start, const SCEV *Stride,
   // the case End = RHS of the loop termination condition. This is safe because
   // in the other case (End - Start) is zero, leading to a zero maximum backedge
   // taken count.
-  APInt MaxEnd = getRangeMax(End, IsSigned, Invert);
+  APInt MaxEnd = GetMax(End, Invert);
   MaxEnd =
       IsSigned ? APIntOps::smin(MaxEnd, Limit) : APIntOps::umin(MaxEnd, Limit);
 
@@ -13333,6 +13357,9 @@ ScalarEvolution::computeMaxBECountForLT(const SCEV *Start, const SCEV *Stride,
   const SCEV *DeltaExpr =
       Invert ? getMinusSCEV(Start, End) : getMinusSCEV(End, Start);
   Delta = APIntOps::umin(Delta, getUnsignedRangeMax(DeltaExpr));
+  if (const SCEV *GuardedDeltaExpr = ApplyGuards(DeltaExpr);
+      GuardedDeltaExpr != DeltaExpr)
+    Delta = APIntOps::umin(Delta, getUnsignedRangeMax(GuardedDeltaExpr));
 
   return getUDivCeilSCEV(getConstant(Delta), getConstant(StrideForMaxBECount));
 }
@@ -13841,7 +13868,7 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
   } else {
     ConstantMaxBECount = computeMaxBECountForLT(
         Start, Stride, RHS, getTypeSizeInBits(LHS->getType()), IsSigned,
-        Invert);
+        Invert, Guards);
     // If we know exactly how many times the backedge will be taken if it's
     // taken at least once, then the backedge count will either be that or
     // zero. If that count exceeds the range-based bound, the backedge can
