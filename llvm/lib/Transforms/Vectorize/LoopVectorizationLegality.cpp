@@ -836,9 +836,17 @@ bool LoopVectorizationLegality::canVectorizeInstr(Instruction &I) {
       return false;
     }
 
+    // Reduction phis may be used on early exits. Prefer treating such phis as
+    // inductions, if possible.
+    InductionDescriptor ID;
     RecurrenceDescriptor RedDes;
     if (RecurrenceDescriptor::isReductionPHI(Phi, TheLoop, RedDes, DB, AC, DT,
-                                             PSE.getSE())) {
+                                             PSE.getSE()) &&
+        (all_of(Phi->users(),
+                [this](User *U) {
+                  return TheLoop->contains(cast<Instruction>(U));
+                }) ||
+         !InductionDescriptor::isInductionPHI(Phi, TheLoop, PSE, ID))) {
       Requirements->addExactFPMathInst(RedDes.getExactFPMathInst());
       Reductions[Phi] = std::move(RedDes);
       assert((!RedDes.hasUsesOutsideReductionChain() ||
@@ -861,7 +869,6 @@ bool LoopVectorizationLegality::canVectorizeInstr(Instruction &I) {
                  ID.getConstIntStepValue() == nullptr;
         };
 
-    InductionDescriptor ID;
     if (InductionDescriptor::isInductionPHI(Phi, TheLoop, PSE, ID) &&
         !IsDisallowedStridedPointerInduction(ID)) {
       addInductionPhi(Phi, ID);

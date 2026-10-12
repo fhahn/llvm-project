@@ -3572,7 +3572,7 @@ bool VPlanTransforms::handleUncountableEarlyExits(
           cast<VPIRPhi>(&R)->getIncomingValueForBlock(EarlyExitingVPBB);
       for (VPReductionPHIRecipe &PhiR :
            make_isa_range<VPReductionPHIRecipe>(HeaderVPBB->phis())) {
-        if (ExitV != PhiR.getBackedgeValue())
+        if (ExitV != &PhiR && ExitV != PhiR.getBackedgeValue())
           continue;
         RecurKind Kind = PhiR.getRecurrenceKind();
         if (Style == UncountableExitStyle::MaskedHandleExitInScalarLoop ||

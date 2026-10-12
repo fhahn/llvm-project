@@ -6694,20 +6694,23 @@ void LoopVectorizationPlanner::addReductionResultComputation(
             ExtendOpc, FinalReductionResult, PhiTy, {});
 
       // The value at the first active lane on an early exit is computed from
-      // the accumulators of the exiting vector iteration: lanes up to and
-      // including the exiting lane use the updated values, the other lanes the
-      // values of the phi.
-      for (VPUser *U : to_vector(OrigExitingVPV->users())) {
-        VPValue *Lane;
+      // the accumulators of the exiting vector iteration: lanes before the
+      // exiting lane use the updated values, the other lanes the values of the
+      // phi. The updated value of the exiting lane is also used for extracts
+      // of the updated value.
+      for (VPUser *U : to_vector(
+               concat<VPUser *>(OrigExitingVPV->users(), PhiR->users()))) {
+        VPValue *Lane, *ExtractedV;
         if (!match(U, m_ExtractLane(
                           m_VPValue(Lane, m_FirstActiveLane(m_VPValue())),
-                          m_Specific(OrigExitingVPV))))
+                          m_VPValue(ExtractedV))))
           continue;
         auto *ExtractR = cast<VPInstruction>(U);
         VPBuilder EEBuilder(ExtractR);
         Type *LaneTy = Lane->getScalarType();
         VPValue *One = Plan->getConstantInt(LaneTy, 1);
-        VPValue *NumLanes = EEBuilder.createAdd(Lane, One);
+        VPValue *NumLanes =
+            ExtractedV == PhiR ? Lane : EEBuilder.createAdd(Lane, One);
         VPValue *Mask =
             EEBuilder.createNaryOp(VPInstruction::WideActiveLaneMask,
                                    {Plan->getZero(LaneTy), NumLanes, One});

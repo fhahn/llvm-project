@@ -1228,18 +1228,34 @@ exit:
 define i32 @me_reduction2(ptr %addr) {
 ; CHECK-LABEL: @me_reduction2(
 ; CHECK-NEXT:  entry:
+; CHECK-NEXT:    br label [[VECTOR_PH:%.*]]
+; CHECK:       vector.ph:
+; CHECK-NEXT:    br label [[VECTOR_BODY:%.*]]
+; CHECK:       vector.body:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, [[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi <2 x i32> [ zeroinitializer, [[VECTOR_PH]] ], [ [[TMP1:%.*]], [[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr i32, ptr [[ADDR:%.*]], i64 [[INDEX]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x i32>, ptr [[TMP0]], align 4
+; CHECK-NEXT:    [[TMP1]] = add <2 x i32> [[VEC_PHI]], [[WIDE_LOAD]]
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
+; CHECK-NEXT:    [[TMP2:%.*]] = icmp eq i64 [[INDEX_NEXT]], 200
+; CHECK-NEXT:    br i1 [[TMP2]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP24:![0-9]+]]
+; CHECK:       middle.block:
+; CHECK-NEXT:    [[TMP3:%.*]] = call i32 @llvm.vector.reduce.add.v2i32(<2 x i32> [[TMP1]])
+; CHECK-NEXT:    br label [[SCALAR_PH:%.*]]
+; CHECK:       scalar.ph:
 ; CHECK-NEXT:    br label [[LOOP_HEADER:%.*]]
 ; CHECK:       loop.header:
-; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, [[ENTRY:%.*]] ], [ [[IV_NEXT:%.*]], [[LOOP_LATCH:%.*]] ]
-; CHECK-NEXT:    [[ACCUM:%.*]] = phi i32 [ 0, [[ENTRY]] ], [ [[ACCUM_NEXT:%.*]], [[LOOP_LATCH]] ]
-; CHECK-NEXT:    [[GEP:%.*]] = getelementptr i32, ptr [[ADDR:%.*]], i64 [[IV]]
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 200, [[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], [[LOOP_LATCH:%.*]] ]
+; CHECK-NEXT:    [[ACCUM:%.*]] = phi i32 [ [[TMP3]], [[SCALAR_PH]] ], [ [[ACCUM_NEXT:%.*]], [[LOOP_LATCH]] ]
+; CHECK-NEXT:    [[GEP:%.*]] = getelementptr i32, ptr [[ADDR]], i64 [[IV]]
 ; CHECK-NEXT:    [[EXITCOND_NOT:%.*]] = icmp eq i64 [[IV]], 200
 ; CHECK-NEXT:    br i1 [[EXITCOND_NOT]], label [[EXIT:%.*]], label [[LOOP_LATCH]]
 ; CHECK:       loop.latch:
-; CHECK-NEXT:    [[TMP0:%.*]] = load i32, ptr [[GEP]], align 4
-; CHECK-NEXT:    [[ACCUM_NEXT]] = add i32 [[ACCUM]], [[TMP0]]
+; CHECK-NEXT:    [[TMP4:%.*]] = load i32, ptr [[GEP]], align 4
+; CHECK-NEXT:    [[ACCUM_NEXT]] = add i32 [[ACCUM]], [[TMP4]]
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
-; CHECK-NEXT:    br label [[LOOP_HEADER]]
+; CHECK-NEXT:    br label [[LOOP_HEADER]], !llvm.loop [[LOOP25:![0-9]+]]
 ; CHECK:       exit:
 ; CHECK-NEXT:    [[ACCUM_LCSSA:%.*]] = phi i32 [ [[ACCUM]], [[LOOP_HEADER]] ]
 ; CHECK-NEXT:    ret i32 [[ACCUM_LCSSA]]
@@ -1304,7 +1320,7 @@ define i16 @multiple_exit_none_via_latch(ptr %dst, i64 %x) {
 ; CHECK-NEXT:    store i64 0, ptr [[TMP6]], align 8
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP7]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP24:![0-9]+]]
+; CHECK-NEXT:    br i1 [[TMP7]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP26:![0-9]+]]
 ; CHECK:       middle.block:
 ; CHECK-NEXT:    br label [[SCALAR_PH]]
 ; CHECK:       scalar.ph:
@@ -1321,7 +1337,7 @@ define i16 @multiple_exit_none_via_latch(ptr %dst, i64 %x) {
 ; CHECK-NEXT:    br i1 [[CMP3]], label [[LOOP_LATCH]], label [[EXIT_1:%.*]]
 ; CHECK:       loop.latch:
 ; CHECK-NEXT:    [[IV_NEXT]] = add i64 [[IV]], 1
-; CHECK-NEXT:    br label [[LOOP_HEADER]], !llvm.loop [[LOOP25:![0-9]+]]
+; CHECK-NEXT:    br label [[LOOP_HEADER]], !llvm.loop [[LOOP27:![0-9]+]]
 ; CHECK:       exit.1:
 ; CHECK-NEXT:    ret i16 0
 ; CHECK:       exit.2:

@@ -717,8 +717,8 @@ loop.end:
 ;; Vectorizeable, need to handle reductions.
 define i16 @uncountable_exit_with_reduction(ptr dereferenceable(40) noalias %array, ptr align 2 dereferenceable(40) readonly %pred) !dbg !56 {
 ; CHECK-DEBUG-LABEL: LV: Checking a loop in 'uncountable_exit_with_reduction'
-; CHECK-DEBUG:       LV: Not vectorizing: Found an unidentified PHI %rdx = phi i16 [ 0, %entry ], [ %rdx.next, %for.inc ]
-; CHECK-REMARK:      foo.c:240:3: loop not vectorized: value that could not be identified as reduction is used outside the loop
+; CHECK-DEBUG:       LV: Not vectorizing: Found reduction used on an early exit.
+; CHECK-REMARK:      foo.c:240:3: loop not vectorized: Cannot vectorize early exit loop with reduction used on an early exit
 entry:
   br label %for.body, !dbg !57
 

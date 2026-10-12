@@ -187,7 +187,8 @@ static void collectCastInstrs(Loop *TheLoop, Instruction *Exit,
 // Check if a given Phi node can be recognized as an ordered reduction for
 // vectorizing floating point operations without unsafe math.
 static bool checkOrderedReduction(RecurKind Kind, Instruction *ExactFPMathInst,
-                                  Instruction *Exit, PHINode *Phi) {
+                                  Instruction *Exit, PHINode *Phi,
+                                  Loop *TheLoop) {
   // Currently only FAdd and FMulAdd are supported.
   if (Kind != RecurKind::FAdd && Kind != RecurKind::FMulAdd)
     return false;
@@ -201,6 +202,13 @@ static bool checkOrderedReduction(RecurKind Kind, Instruction *ExactFPMathInst,
 
   // Ensure the exit instruction has only one user other than the reduction PHI
   if (Exit != ExactFPMathInst || Exit->hasNUsesOrMore(3))
+    return false;
+
+  // Ordered reductions are computed in the loop; the reduction PHI must not be
+  // used outside the loop.
+  if (any_of(Phi->users(), [TheLoop](User *U) {
+        return !TheLoop->contains(cast<Instruction>(U));
+      }))
     return false;
 
   // The only pattern accepted is the one in which the reduction PHI
@@ -258,6 +266,20 @@ hasRequiredFastMathFlags(FPMathOperator *FPOp, RecurKind &RK) {
     return std::nullopt;
   }
   return collectMinMaxFMF(FPOp);
+}
+
+/// Returns true if \p UI, which is outside \p TheLoop, is a phi using \p V
+/// only for incoming blocks in \p TheLoop other than its latch.
+static bool isUsedOnlyOnNonLatchExits(Value *V, Instruction *UI,
+                                      Loop *TheLoop) {
+  auto *ExitPhi = dyn_cast<PHINode>(UI);
+  if (!ExitPhi)
+    return false;
+  BasicBlock *Latch = TheLoop->getLoopLatch();
+  for (auto [In, BB] : zip(ExitPhi->incoming_values(), ExitPhi->blocks()))
+    if (In == V && (BB == Latch || !TheLoop->contains(BB)))
+      return false;
+  return true;
 }
 
 static RecurrenceDescriptor getMinMaxRecurrence(PHINode *Phi, Loop *TheLoop,
@@ -375,7 +397,8 @@ static RecurrenceDescriptor getMinMaxRecurrence(PHINode *Phi, Loop *TheLoop,
       if (Chain.contains(U))
         continue;
       auto *I = dyn_cast<Instruction>(U);
-      if (!I || (!TheLoop->contains(I) && V != BackedgeValue))
+      if (!I || (!TheLoop->contains(I) && V != BackedgeValue &&
+                 (V != Phi || !isUsedOnlyOnNonLatchExits(Phi, I, TheLoop))))
         return {};
       if (!TheLoop->contains(I))
         continue;
@@ -690,10 +713,19 @@ bool RecurrenceDescriptor::AddReductionVar(
         if (ExitInstruction == Cur)
           continue;
 
+        // The header phi may be used on exits from blocks other than the
+        // latch, which observe the value at the start of an iteration. The
+        // final value of the reduction is the value fed back to the phi.
+        if (Cur == Phi && isUsedOnlyOnNonLatchExits(Phi, UI, TheLoop)) {
+          ExitInstruction = dyn_cast<Instruction>(
+              Phi->getIncomingValueForBlock(TheLoop->getLoopLatch()));
+          continue;
+        }
+
         // Exit if you find multiple values used outside or if the header phi
-        // node is being used. In this case the user uses the value of the
-        // previous iteration, in which case we would loose "VF-1" iterations of
-        // the reduction operation if we vectorize.
+        // node is being used on the latch exit. In this case the user uses the
+        // value of the previous iteration, in which case we would loose "VF-1"
+        // iterations of the reduction operation if we vectorize.
         if (ExitInstruction != nullptr || Cur == Phi)
           return false;
 
@@ -775,8 +807,8 @@ bool RecurrenceDescriptor::AddReductionVar(
   if (!FoundStartPHI || !FoundReduxOp || !ExitInstruction)
     return false;
 
-  const bool IsOrdered =
-      checkOrderedReduction(Kind, ExactFPMathInst, ExitInstruction, Phi);
+  const bool IsOrdered = checkOrderedReduction(Kind, ExactFPMathInst,
+                                               ExitInstruction, Phi, TheLoop);
 
   if (Start != Phi) {
     // If the starting value is not the same as the phi node, we speculatively
