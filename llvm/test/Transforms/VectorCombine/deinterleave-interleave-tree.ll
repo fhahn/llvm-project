@@ -223,6 +223,21 @@ define <4 x i32> @negative_deinterleave2_shared_non_splat_operand(<4 x i32> %a, 
   ret <4 x i32> %r
 }
 
+; Bitcasts from a scalar cannot be widened.
+define <4 x i32> @negative_interleave2_bitcast_from_scalar(i64 %s) {
+; CHECK-LABEL: define <4 x i32> @negative_interleave2_bitcast_from_scalar(
+; CHECK-SAME: i64 [[S:%.*]]) {
+; CHECK-NEXT:    [[U0:%.*]] = bitcast i64 [[S]] to <2 x i32>
+; CHECK-NEXT:    [[U1:%.*]] = bitcast i64 [[S]] to <2 x i32>
+; CHECK-NEXT:    [[R:%.*]] = call <4 x i32> @llvm.vector.interleave2.v4i32(<2 x i32> [[U0]], <2 x i32> [[U1]])
+; CHECK-NEXT:    ret <4 x i32> [[R]]
+;
+  %u0 = bitcast i64 %s to <2 x i32>
+  %u1 = bitcast i64 %s to <2 x i32>
+  %r = call <4 x i32> @llvm.vector.interleave2.v4i32(<2 x i32> %u0, <2 x i32> %u1)
+  ret <4 x i32> %r
+}
+
 define <4 x i32> @deinterleave2_extract_with_unfolded_user(<4 x i32> %a, ptr %p) {
 ; CHECK-LABEL: define <4 x i32> @deinterleave2_extract_with_unfolded_user(
 ; CHECK-SAME: <4 x i32> [[A:%.*]], ptr [[P:%.*]]) {

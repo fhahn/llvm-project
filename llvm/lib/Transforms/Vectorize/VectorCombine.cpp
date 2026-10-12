@@ -6184,6 +6184,11 @@ static bool isSupportedElementwise(Instruction *Inst) {
     return false;
   }
 
+  // Reject casts from scalars, which cannot be widened.
+  // E.g., bitcast i64 %s to <2 x i32>
+  if (isa<CastInst>(Inst) && !isa<VectorType>(Inst->getOperand(0)->getType()))
+    return false;
+
   // Reject operations that change the element-count.
   // E.g., bitcast <vscale x 4 x i16> %v to <vscale x 8 x i8>
   for (unsigned Op = 0, E = getNumDataOperands(Inst); Op != E; ++Op) {
