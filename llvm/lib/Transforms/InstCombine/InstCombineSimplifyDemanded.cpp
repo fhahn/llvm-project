@@ -2000,8 +2000,12 @@ Value *InstCombinerImpl::SimplifyDemandedVectorElts(Value *V,
         APInt PoisonEltsAcc(VWidth, 0);
         for (Use &Arg : II->args()) {
           unsigned OpNo = Arg.getOperandNo();
-          // Scalar operands do not carry per-lane demand.
-          if (isVectorIntrinsicWithScalarOpAtArg(IID, OpNo, /*TTI=*/nullptr))
+          // Scalar operands do not carry per-lane demand. Also skip operands
+          // that are not vectors with the result's element count, e.g. the
+          // scalar exponent the verifier accepts for a vector ldexp.
+          auto *OpTy = dyn_cast<FixedVectorType>(Arg->getType());
+          if (isVectorIntrinsicWithScalarOpAtArg(IID, OpNo, /*TTI=*/nullptr) ||
+              !OpTy || OpTy->getNumElements() != VWidth)
             continue;
           APInt OpPoisonElts(VWidth, 0);
           simplifyAndSetOp(II, OpNo, DemandedElts, OpPoisonElts);
