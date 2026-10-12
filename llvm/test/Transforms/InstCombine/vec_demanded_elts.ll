@@ -1373,3 +1373,33 @@ define <4 x i1> @is_fpclass_undemanded_elt(<4 x float> %a, float %x) {
   %r = shufflevector <4 x i1> %cls, <4 x i1> poison, <4 x i32> <i32 0, i32 1, i32 2, i32 poison>
   ret <4 x i1> %r
 }
+
+; The verifier accepts a scalar exponent for a vector ldexp. The demand still
+; passes through to the vector operand; the exponent must be left alone.
+define <4 x float> @ldexp_scalar_exp_undemanded_elt(<4 x float> %a, float %x, i32 %k) {
+; CHECK-LABEL: @ldexp_scalar_exp_undemanded_elt(
+; CHECK-NEXT:    [[LDEXP:%.*]] = call <4 x float> @llvm.ldexp.v4f32.i32(<4 x float> [[A:%.*]], i32 [[K:%.*]])
+; CHECK-NEXT:    [[R:%.*]] = shufflevector <4 x float> [[LDEXP]], <4 x float> poison, <4 x i32> <i32 0, i32 1, i32 2, i32 poison>
+; CHECK-NEXT:    ret <4 x float> [[R]]
+;
+  %a3 = insertelement <4 x float> %a, float %x, i64 3
+  %ldexp = call <4 x float> @llvm.ldexp.v4f32.i32(<4 x float> %a3, i32 %k)
+  %r = shufflevector <4 x float> %ldexp, <4 x float> poison, <4 x i32> <i32 0, i32 1, i32 2, i32 poison>
+  ret <4 x float> %r
+}
+
+; The verifier accepts fptosi.sat with different element counts for the
+; argument and the result. The argument lanes do not match the result lanes,
+; so the demand must not be passed through.
+define <2 x i8> @fptosi_sat_mismatched_elts(<4 x float> %a, float %x) {
+; CHECK-LABEL: @fptosi_sat_mismatched_elts(
+; CHECK-NEXT:    [[A3:%.*]] = insertelement <4 x float> [[A:%.*]], float [[X:%.*]], i64 3
+; CHECK-NEXT:    [[FP:%.*]] = call <2 x i8> @llvm.fptosi.sat.v2i8.v4f32(<4 x float> [[A3]])
+; CHECK-NEXT:    [[R:%.*]] = shufflevector <2 x i8> [[FP]], <2 x i8> poison, <2 x i32> <i32 0, i32 poison>
+; CHECK-NEXT:    ret <2 x i8> [[R]]
+;
+  %a3 = insertelement <4 x float> %a, float %x, i64 3
+  %fp = call <2 x i8> @llvm.fptosi.sat.v2i8.v4f32(<4 x float> %a3)
+  %r = shufflevector <2 x i8> %fp, <2 x i8> poison, <2 x i32> <i32 0, i32 poison>
+  ret <2 x i8> %r
+}
