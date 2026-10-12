@@ -6336,9 +6336,16 @@ static Value *widenDeinterleavedOperations(ArrayRef<Value *> Members,
   Builder.SetCurrentDebugLocation(NarrowInst->getDebugLoc());
   auto *WideResultTy =
       VectorType::get(NarrowInst->getType()->getScalarType(), WideEC);
+  // The wide instruction may be folded to an existing value, either from the
+  // input or created for another set of members, whose flags and metadata
+  // must not change. Only a newly created instruction is inserted between
+  // PrevInst and InsertPt.
+  Instruction *InsertPt = &*Builder.GetInsertPoint();
+  Instruction *PrevInst = InsertPt->getPrevNode();
   Value *NewValue =
       createWideInstruction(NarrowInst, NewOperands, WideResultTy, Builder);
-  if (auto *NewInst = dyn_cast<Instruction>(NewValue)) {
+  auto *NewInst = dyn_cast<Instruction>(NewValue);
+  if (NewInst && NewInst != PrevInst && NewInst->getNextNode() == InsertPt) {
     propagateIRFlags(NewInst, Members);
     propagateMetadata(NewInst, Members);
   }
