@@ -13333,7 +13333,7 @@ const SCEV *ScalarEvolution::getUDivCeilSCEV(const SCEV *N, const SCEV *D) {
 /// constant, by an icmp in a block dominating the header. This is a heuristic;
 /// guards on incoming PHI values may also refine \p Exprs.
 static bool mayRefineWithLoopGuards(ArrayRef<const SCEV *> Exprs,
-                                    const Loop *L, DominatorTree &DT) {
+                                  const Loop *L, DominatorTree &DT) {
   struct FindGuard {
     const Loop *L;
     DominatorTree &DT;
