@@ -548,8 +548,8 @@ loop.end:
 
 define i64 @same_exit_block_pre_inc_use1_with_reduction() !dbg !61 {
 ; CHECK-DEBUG-LABEL: LV: Checking a loop in 'same_exit_block_pre_inc_use1_with_reduction'
-; CHECK-DEBUG:       LV: Not vectorizing: Found reduction used on an early exit.
-; CHECK-REMARK:      foo.c:170:3: loop not vectorized: Cannot vectorize early exit loop with reduction used on an early exit
+; CHECK-DEBUG:       LV: Loop passed LoopVectorizationLegality checks!
+; CHECK-DEBUG:       LV: VPlan created successfully. Loop can be vectorized.
 entry:
   %p1 = alloca [1024 x i8]
   %p2 = alloca [1024 x i8]

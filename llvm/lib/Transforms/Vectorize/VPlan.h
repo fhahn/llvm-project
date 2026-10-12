@@ -2927,6 +2927,12 @@ public:
     Style = RdxUnordered{ScaleFactor};
   }
 
+  /// Compute the reduction outside the loop instead of in-loop.
+  void setOutOfLoop() {
+    assert(!isOrdered() && "ordered reductions must be in-loop");
+    Style = RdxUnordered{/*VFScaleFactor=*/1};
+  }
+
   /// Returns the recurrence kind of the reduction.
   RecurKind getRecurrenceKind() const { return Kind; }
 

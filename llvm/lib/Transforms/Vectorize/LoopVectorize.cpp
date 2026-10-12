@@ -6692,13 +6692,46 @@ void LoopVectorizationPlanner::addReductionResultComputation(
       if (ExtendOpc != Instruction::CastOpsEnd)
         FinalReductionResult = Builder.createScalarCast(
             ExtendOpc, FinalReductionResult, PhiTy, {});
+
+      // The value at the first active lane on an early exit is computed from
+      // the accumulators of the exiting vector iteration: lanes up to and
+      // including the exiting lane use the updated values, the other lanes the
+      // values of the phi.
+      for (VPUser *U : to_vector(OrigExitingVPV->users())) {
+        VPValue *Lane;
+        if (!match(U, m_ExtractLane(
+                          m_VPValue(Lane, m_FirstActiveLane(m_VPValue())),
+                          m_Specific(OrigExitingVPV))))
+          continue;
+        auto *ExtractR = cast<VPInstruction>(U);
+        VPBuilder EEBuilder(ExtractR);
+        Type *LaneTy = Lane->getScalarType();
+        VPValue *One = Plan->getConstantInt(LaneTy, 1);
+        VPValue *NumLanes = EEBuilder.createAdd(Lane, One);
+        VPValue *Mask =
+            EEBuilder.createNaryOp(VPInstruction::WideActiveLaneMask,
+                                   {Plan->getZero(LaneTy), NumLanes, One});
+        Mask = EEBuilder.createNaryOp(VPInstruction::ExtractVectorForPart,
+                                      {Mask, Plan->getConstantInt(64, 0)});
+        VPValue *Blend =
+            EEBuilder.createSelect(Mask, OrigExitingVPV, PhiR, ExitDL);
+        if (ExtendOpc != Instruction::CastOpsEnd)
+          Blend = EEBuilder.createWidenCast(Instruction::Trunc, Blend,
+                                            RdxDesc.getRecurrenceType());
+        VPValue *Res = EEBuilder.createNaryOp(
+            VPInstruction::ComputeReductionResult, {Blend}, Flags, ExitDL);
+        if (ExtendOpc != Instruction::CastOpsEnd)
+          Res = EEBuilder.createScalarCast(ExtendOpc, Res, PhiTy, {});
+        ExtractR->replaceAllUsesWith(Res);
+        ExtractR->eraseFromParent();
+      }
     }
 
-    // Update all users outside the vector region. Also replace redundant
-    // extracts.
+    // Update all users in the middle block, which computes the final result.
+    // Also replace redundant extracts.
     for (auto *U : to_vector(OrigExitingVPV->users())) {
       auto *Parent = cast<VPRecipeBase>(U)->getParent();
-      if (FinalReductionResult == U || Parent->getParent())
+      if (FinalReductionResult == U || Parent != MiddleVPBB)
         continue;
       // Skip ComputeReductionResult and FindIV reductions when they are not the
       // final result.
