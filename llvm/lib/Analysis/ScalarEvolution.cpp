@@ -13326,6 +13326,55 @@ const SCEV *ScalarEvolution::getUDivCeilSCEV(const SCEV *N, const SCEV *D) {
   return getAddExpr(MinNOne, getUDivExpr(NMinusOne, D));
 }
 
+/// Return true if loop guards for \p L may refine the ranges of \p Exprs.
+/// Collecting loop guards is expensive, so this cheaply checks for a guard
+/// that may bound \p Exprs: a value used by \p Exprs compared against another
+/// value, or a cast or binary operator of such a value compared against a
+/// constant, by an icmp in a block dominating the header. This is a heuristic;
+/// guards on incoming PHI values may also refine \p Exprs.
+static bool mayRefineWithLoopGuards(ArrayRef<const SCEV *> Exprs,
+                                    const Loop *L, DominatorTree &DT) {
+  struct FindGuard {
+    const Loop *L;
+    DominatorTree &DT;
+    bool Found = false;
+
+    bool follow(const SCEV *S) {
+      const auto *Unknown = dyn_cast<SCEVUnknown>(S);
+      if (!Unknown)
+        return true;
+      if (isa<Constant>(Unknown->getValue()))
+        return false;
+
+      auto IsGuard = [&](const ICmpInst *Cmp) {
+        return !L->contains(Cmp) &&
+               DT.dominates(Cmp->getParent(), L->getHeader());
+      };
+      Found = any_of(Unknown->getValue()->users(), [&](const User *U) {
+        if (const auto *Cmp = dyn_cast<ICmpInst>(U))
+          return IsGuard(Cmp);
+        return isa<CastInst, BinaryOperator>(U) &&
+               any_of(U->users(), [&](const User *CmpU) {
+                 const auto *Cmp = dyn_cast<ICmpInst>(CmpU);
+                 return Cmp && any_of(Cmp->operands(), IsaPred<Constant>) &&
+                        IsGuard(Cmp);
+               });
+      });
+      return false;
+    }
+
+    bool isDone() const { return Found; }
+  } Finder{L, DT};
+  SCEVTraversal<FindGuard> Traversal(Finder);
+  for (const SCEV *E : Exprs) {
+    if (!isa<SCEVConstant>(E))
+      Traversal.visitAll(E);
+    if (Finder.Found)
+      return true;
+  }
+  return false;
+}
+
 const SCEV *
 ScalarEvolution::computeMaxBECountForLT(const SCEV *Start, const SCEV *Stride,
                                         const SCEV *End, unsigned BitWidth,
@@ -13348,8 +13397,12 @@ ScalarEvolution::computeMaxBECountForLT(const SCEV *Start, const SCEV *Stride,
   // of the expressions and of the expressions with loop guards applied are
   // valid bounds, use the tighter one. Loop guards never rewrite constants, and
   // an expression the guards leave unchanged has the same range.
+  bool UseGuards =
+      Guards.isCollected() ||
+      mayRefineWithLoopGuards({Start, Stride, End}, Guards.getLoop(), DT);
   auto ApplyGuards = [&](const SCEV *S) {
-    return isa<SCEVConstant>(S) ? S : applyLoopGuards(S, Guards.get());
+    return !UseGuards || isa<SCEVConstant>(S) ? S
+                                           : applyLoopGuards(S, Guards.get());
   };
   auto GetMin = [&](const SCEV *S, bool Invert) {
     APInt Min = getRangeMin(S, IsSigned, Invert);
