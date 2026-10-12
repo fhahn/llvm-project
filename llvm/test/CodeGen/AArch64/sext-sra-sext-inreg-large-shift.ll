@@ -2,21 +2,22 @@
 ; RUN: llc -mtriple=aarch64 -O2 < %s | FileCheck %s --check-prefix=CHECK-SD
 ; RUN: llc -mtriple=aarch64 -O0 < %s | FileCheck %s --check-prefix=CHECK-GI
 
-; FIXME: For shift amounts >= 8 (i8) / >= 16 (i16), the ashr result is 0 or -1,
-; but the sext(sra(sext_inreg)) patterns select an SBFIZ (immr > imms).
+; The sext(sra(sext_inreg)) patterns must not match shift amounts >= 8 (i8) /
+; >= 16 (i16): with immr > imms the SBFM would be an SBFIZ, not an extract.
 
 define i64 @sext_ashr_i8_12(i8 %x) {
 ; CHECK-SD-LABEL: sext_ashr_i8_12:
 ; CHECK-SD:       // %bb.0:
-; CHECK-SD-NEXT:    // kill: def $w0 killed $w0 def $x0
-; CHECK-SD-NEXT:    sbfiz x0, x0, #52, #8
+; CHECK-SD-NEXT:    sxtb w8, w0
+; CHECK-SD-NEXT:    sbfx x0, x8, #12, #20
 ; CHECK-SD-NEXT:    ret
 ;
 ; CHECK-GI-LABEL: sext_ashr_i8_12:
 ; CHECK-GI:       // %bb.0:
+; CHECK-GI-NEXT:    sxtb w9, w0
 ; CHECK-GI-NEXT:    // implicit-def: $x8
-; CHECK-GI-NEXT:    mov w8, w0
-; CHECK-GI-NEXT:    sbfiz x0, x8, #52, #8
+; CHECK-GI-NEXT:    mov w8, w9
+; CHECK-GI-NEXT:    sbfx x0, x8, #12, #20
 ; CHECK-GI-NEXT:    ret
   %s = sext i8 %x to i32
   %sra = ashr i32 %s, 12
@@ -27,15 +28,16 @@ define i64 @sext_ashr_i8_12(i8 %x) {
 define i64 @sext_ashr_i16_20(i16 %x) {
 ; CHECK-SD-LABEL: sext_ashr_i16_20:
 ; CHECK-SD:       // %bb.0:
-; CHECK-SD-NEXT:    // kill: def $w0 killed $w0 def $x0
-; CHECK-SD-NEXT:    sbfiz x0, x0, #44, #16
+; CHECK-SD-NEXT:    sxth w8, w0
+; CHECK-SD-NEXT:    sbfx x0, x8, #20, #12
 ; CHECK-SD-NEXT:    ret
 ;
 ; CHECK-GI-LABEL: sext_ashr_i16_20:
 ; CHECK-GI:       // %bb.0:
+; CHECK-GI-NEXT:    sxth w9, w0
 ; CHECK-GI-NEXT:    // implicit-def: $x8
-; CHECK-GI-NEXT:    mov w8, w0
-; CHECK-GI-NEXT:    sbfiz x0, x8, #44, #16
+; CHECK-GI-NEXT:    mov w8, w9
+; CHECK-GI-NEXT:    sbfx x0, x8, #20, #12
 ; CHECK-GI-NEXT:    ret
   %s = sext i16 %x to i32
   %sra = ashr i32 %s, 20
