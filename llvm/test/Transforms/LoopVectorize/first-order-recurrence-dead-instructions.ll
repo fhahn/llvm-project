@@ -218,22 +218,16 @@ define void @unused_recurrence(ptr %a) {
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <4 x i16> [ <i16 -27, i16 -26, i16 -25, i16 -24>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[STEP_ADD:%.*]] = add <4 x i16> [[VEC_IND]], splat (i16 4)
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 8
-; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <4 x i16> [[STEP_ADD]], splat (i16 4)
 ; CHECK-NEXT:    [[TMP2:%.*]] = icmp eq i32 [[INDEX_NEXT]], 1024
 ; CHECK-NEXT:    br i1 [[TMP2]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[TMP3:%.*]] = add <4 x i16> [[STEP_ADD]], splat (i16 1)
-; CHECK-NEXT:    [[TMP1:%.*]] = add <4 x i16> [[TMP3]], splat (i16 5)
-; CHECK-NEXT:    [[VECTOR_RECUR_EXTRACT:%.*]] = extractelement <4 x i16> [[TMP1]], i64 3
 ; CHECK-NEXT:    br label %[[SCALAR_PH:.*]]
 ; CHECK:       [[SCALAR_PH]]:
 ; CHECK-NEXT:    br label %[[FOR_COND:.*]]
 ; CHECK:       [[FOR_COND]]:
 ; CHECK-NEXT:    [[IV:%.*]] = phi i16 [ 997, %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[FOR_COND]] ]
-; CHECK-NEXT:    [[REC_1:%.*]] = phi i16 [ [[VECTOR_RECUR_EXTRACT]], %[[SCALAR_PH]] ], [ [[REC_1_PREV:%.*]], %[[FOR_COND]] ]
+; CHECK-NEXT:    [[REC_1:%.*]] = phi i16 [ 1002, %[[SCALAR_PH]] ], [ [[REC_1_PREV:%.*]], %[[FOR_COND]] ]
 ; CHECK-NEXT:    [[USE_REC_1:%.*]] = sub i16 [[REC_1]], 10
 ; CHECK-NEXT:    [[IV_NEXT]] = add i16 [[IV]], 1
 ; CHECK-NEXT:    [[REC_1_PREV]] = add i16 [[IV_NEXT]], 5

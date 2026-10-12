@@ -6479,6 +6479,8 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
 
   RUN_VPLAN_PASS(VPlanTransforms::createLoopRegions, *VPlan0,
                  getDebugLocFromInstOrOperands(Legal->getPrimaryInduction()));
+  RUN_VPLAN_PASS(VPlanTransforms::licm, *VPlan0);
+  RUN_VPLAN_PASS(VPlanTransforms::convertToSingleScalarsOutsideLoops, *VPlan0);
   if (CM->foldTailByMasking())
     RUN_VPLAN_PASS(VPlanTransforms::foldTailByMasking, *VPlan0);
 

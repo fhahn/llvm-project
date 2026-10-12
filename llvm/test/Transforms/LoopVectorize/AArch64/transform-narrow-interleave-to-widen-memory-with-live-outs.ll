@@ -81,8 +81,8 @@ define i64 @test_wide_op_live_out(ptr noalias %res, ptr noalias %A) {
 ; VF2-NEXT:    [[TMP2:%.*]] = icmp eq i64 [[INDEX_NEXT]], 100
 ; VF2-NEXT:    br i1 [[TMP2]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; VF2:       [[MIDDLE_BLOCK]]:
-; VF2-NEXT:    [[TMP3:%.*]] = add <2 x i64> [[STRIDED_VEC]], splat (i64 1)
-; VF2-NEXT:    [[TMP4:%.*]] = extractelement <2 x i64> [[TMP3]], i64 1
+; VF2-NEXT:    [[TMP6:%.*]] = extractelement <2 x i64> [[STRIDED_VEC]], i64 1
+; VF2-NEXT:    [[TMP4:%.*]] = add i64 [[TMP6]], 1
 ; VF2-NEXT:    br label %[[EXIT:.*]]
 ; VF2:       [[EXIT]]:
 ; VF2-NEXT:    ret i64 [[TMP4]]
@@ -107,8 +107,8 @@ define i64 @test_wide_op_live_out(ptr noalias %res, ptr noalias %A) {
 ; VF4-NEXT:    [[TMP3:%.*]] = icmp eq i64 [[INDEX_NEXT]], 100
 ; VF4-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; VF4:       [[MIDDLE_BLOCK]]:
-; VF4-NEXT:    [[TMP4:%.*]] = add <4 x i64> [[STRIDED_VEC]], splat (i64 1)
-; VF4-NEXT:    [[TMP5:%.*]] = extractelement <4 x i64> [[TMP4]], i64 3
+; VF4-NEXT:    [[TMP4:%.*]] = extractelement <4 x i64> [[STRIDED_VEC]], i64 3
+; VF4-NEXT:    [[TMP5:%.*]] = add i64 [[TMP4]], 1
 ; VF4-NEXT:    br label %[[EXIT:.*]]
 ; VF4:       [[EXIT]]:
 ; VF4-NEXT:    ret i64 [[TMP5]]

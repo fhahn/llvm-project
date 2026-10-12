@@ -226,6 +226,17 @@ struct VPlanTransforms {
   /// BranchOnCond with BranchOnCount, using \p DL for the canonical IV.
   LLVM_ABI_FOR_TEST static void createLoopRegions(VPlan &Plan, DebugLoc DL);
 
+  /// Hoist loop-invariant recipes out of \p Plan's vector loop region into the
+  /// vector preheader and sink recipes whose users are all outside the region
+  /// into the region's successor.
+  static void licm(VPlan &Plan);
+
+  /// Replace VPInstructions with underlying values in the vector preheader and
+  /// middle block of \p Plan, which execute once, by single-scalar recipes.
+  /// Operands defined in the loop region or producing vectors are replaced by
+  /// their last lane in the last iteration.
+  static void convertToSingleScalarsOutsideLoops(VPlan &Plan);
+
   /// Connect \p CheckBlock to \p Plan, branching on \p Cond.
   static void attachVPCheckBlock(VPlan &Plan, VPValue *Cond,
                                  VPBasicBlock *CheckBlock,

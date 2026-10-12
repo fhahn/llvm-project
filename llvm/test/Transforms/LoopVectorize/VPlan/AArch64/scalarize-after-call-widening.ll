@@ -20,7 +20,6 @@ define void @uniform_arg(ptr noalias %src, ptr noalias %dst, i64 %a, i64 %b) {
 ; CHECK-NEXT:      CLONE ir<%gep.src> = getelementptr inbounds ir<%src>, ir<%iv>
 ; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = vector-pointer inbounds i64, ir<%gep.src>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%l> = load vp<[[VP4]]>
-; CHECK-NEXT:      CLONE ir<%u> = add ir<%a>, ir<%b>
 ; CHECK-NEXT:      WIDEN-CALL ir<%call> = call @foo_uniform(ir<%l>, ir<%u>) (using library function: foo_uniform_vec)
 ; CHECK-NEXT:      CLONE ir<%gep.dst> = getelementptr inbounds ir<%dst>, ir<%iv>
 ; CHECK-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds i64, ir<%gep.dst>, ir<1>

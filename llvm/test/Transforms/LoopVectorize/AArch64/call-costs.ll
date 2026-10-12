@@ -261,20 +261,18 @@ define void @widen_intrinsics_with_mixed_return_types(ptr noalias %src, ptr noal
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_MOD_VF:%.*]] = and i64 [[N]], 7
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[N]], [[N_MOD_VF]]
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[X]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x i32> poison, i32 [[Y]], i64 0
+; CHECK-NEXT:    [[TMP1:%.*]] = tail call i32 @llvm.ctlz.i32(i32 [[Y]], i1 true)
+; CHECK-NEXT:    [[TMP2:%.*]] = xor i32 [[TMP1]], 31
+; CHECK-NEXT:    [[TMP6:%.*]] = tail call i32 @llvm.smin.i32(i32 [[TMP2]], i32 [[X]])
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <4 x i32> poison, i32 [[TMP6]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT1]], <4 x i32> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP0:%.*]] = call <4 x i32> @llvm.ctlz.v4i32(<4 x i32> [[BROADCAST_SPLAT2]], i1 true)
-; CHECK-NEXT:    [[TMP1:%.*]] = xor <4 x i32> [[TMP0]], splat (i32 31)
-; CHECK-NEXT:    [[TMP2:%.*]] = call <4 x i32> @llvm.smin.v4i32(<4 x i32> [[TMP1]], <4 x i32> [[BROADCAST_SPLAT]])
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[INDEX]]
 ; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds i32, ptr [[TMP3]], i64 4
-; CHECK-NEXT:    store <4 x i32> [[TMP2]], ptr [[TMP3]], align 4
-; CHECK-NEXT:    store <4 x i32> [[TMP2]], ptr [[TMP4]], align 4
+; CHECK-NEXT:    store <4 x i32> [[BROADCAST_SPLAT2]], ptr [[TMP3]], align 4
+; CHECK-NEXT:    store <4 x i32> [[BROADCAST_SPLAT2]], ptr [[TMP4]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP5]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]

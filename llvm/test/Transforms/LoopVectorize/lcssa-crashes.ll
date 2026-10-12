@@ -223,11 +223,10 @@ define i32 @exit_phi_sunk_def(ptr noalias %src, ptr noalias %dst) {
 ; CHECK-NEXT:    br label [[MIDDLE_BLOCK:%.*]]
 ; CHECK:       middle.block:
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp eq i32 [[TMP0]], 0
-; CHECK-NEXT:    [[SEL:%.*]] = select i1 [[TMP1]], <4 x i32> zeroinitializer, <4 x i32> splat (i32 2)
-; CHECK-NEXT:    [[EXT:%.*]] = extractelement <4 x i32> [[SEL]], i64 0
+; CHECK-NEXT:    [[TMP2:%.*]] = select i1 [[TMP1]], i32 0, i32 2
 ; CHECK-NEXT:    br label [[EXIT:%.*]]
 ; CHECK:       exit:
-; CHECK-NEXT:    ret i32 [[EXT]]
+; CHECK-NEXT:    ret i32 [[TMP2]]
 ;
 entry:
   br label %loop

@@ -22,32 +22,21 @@ define void @invariant_pow(ptr %dst, ptr %e, double %x, i64 %n) {
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_VEC:%.*]] = and i64 [[N]], -8
 ; CHECK-NEXT:    [[TMP3:%.*]] = load float, ptr [[E]], align 4, !alias.scope [[META0:![0-9]+]]
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x float> poison, float [[TMP3]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x float> [[BROADCAST_SPLATINSERT]], <4 x float> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP4:%.*]] = fpext <4 x float> [[BROADCAST_SPLAT]] to <4 x double>
-; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <4 x double> [[TMP4]], i64 0
-; CHECK-NEXT:    [[TMP6:%.*]] = tail call double @llvm.pow.f64(double [[X]], double [[TMP5]])
-; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <4 x double> [[TMP4]], i64 1
-; CHECK-NEXT:    [[TMP8:%.*]] = tail call double @llvm.pow.f64(double [[X]], double [[TMP7]])
-; CHECK-NEXT:    [[TMP9:%.*]] = extractelement <4 x double> [[TMP4]], i64 2
-; CHECK-NEXT:    [[TMP10:%.*]] = tail call double @llvm.pow.f64(double [[X]], double [[TMP9]])
-; CHECK-NEXT:    [[TMP11:%.*]] = extractelement <4 x double> [[TMP4]], i64 3
-; CHECK-NEXT:    [[TMP12:%.*]] = tail call double @llvm.pow.f64(double [[X]], double [[TMP11]])
-; CHECK-NEXT:    [[TMP13:%.*]] = insertelement <4 x double> poison, double [[TMP6]], i64 0
-; CHECK-NEXT:    [[TMP14:%.*]] = insertelement <4 x double> [[TMP13]], double [[TMP8]], i64 1
-; CHECK-NEXT:    [[TMP15:%.*]] = insertelement <4 x double> [[TMP14]], double [[TMP10]], i64 2
-; CHECK-NEXT:    [[TMP16:%.*]] = insertelement <4 x double> [[TMP15]], double [[TMP12]], i64 3
-; CHECK-NEXT:    [[TMP17:%.*]] = fptrunc <4 x double> [[TMP16]] to <4 x float>
+; CHECK-NEXT:    [[TMP4:%.*]] = fpext float [[TMP3]] to double
+; CHECK-NEXT:    [[TMP5:%.*]] = tail call double @llvm.pow.f64(double [[X]], double [[TMP4]])
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT2:%.*]] = insertelement <4 x double> poison, double [[TMP5]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT3:%.*]] = shufflevector <4 x double> [[BROADCAST_SPLATINSERT2]], <4 x double> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP6:%.*]] = fptrunc <4 x double> [[BROADCAST_SPLAT3]] to <4 x float>
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[DST]], i64 [[INDEX]]
-; CHECK-NEXT:    [[TMP19:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP18]], i64 16
-; CHECK-NEXT:    store <4 x float> [[TMP17]], ptr [[TMP18]], align 4, !alias.scope [[META3:![0-9]+]], !noalias [[META0]]
-; CHECK-NEXT:    store <4 x float> [[TMP17]], ptr [[TMP19]], align 4, !alias.scope [[META3]], !noalias [[META0]]
+; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[DST]], i64 [[INDEX]]
+; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP7]], i64 16
+; CHECK-NEXT:    store <4 x float> [[TMP6]], ptr [[TMP7]], align 4, !alias.scope [[META3:![0-9]+]], !noalias [[META0]]
+; CHECK-NEXT:    store <4 x float> [[TMP6]], ptr [[TMP8]], align 4, !alias.scope [[META3]], !noalias [[META0]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
-; CHECK-NEXT:    [[TMP20:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP20]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
+; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP9]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP5:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[LOOP_PREHEADER]]
@@ -113,41 +102,31 @@ define void @uniform_fpext_chain(ptr %dst, ptr %src, double %a, double %b, i32 %
 ; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], label %[[LOOP_LATCH_PREHEADER11]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[N_VEC:%.*]] = and i64 [[WIDE_TRIP_COUNT]], 2147483644
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x double> poison, double [[A]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x double> [[BROADCAST_SPLATINSERT]], <2 x double> poison, <2 x i32> zeroinitializer
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT5:%.*]] = insertelement <2 x double> poison, double [[B]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT6:%.*]] = shufflevector <2 x double> [[BROADCAST_SPLATINSERT5]], <2 x double> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP7:%.*]] = insertelement <2 x double> poison, double [[A]], i64 0
+; CHECK-NEXT:    [[TMP8:%.*]] = shufflevector <2 x double> [[TMP7]], <2 x double> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP9:%.*]] = insertelement <2 x double> poison, double [[B]], i64 0
+; CHECK-NEXT:    [[TMP10:%.*]] = shufflevector <2 x double> [[TMP9]], <2 x double> poison, <2 x i32> zeroinitializer
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[TMP7:%.*]] = lshr exact i64 [[INDEX]], 1
-; CHECK-NEXT:    [[TMP8:%.*]] = lshr exact i64 [[INDEX]], 1
-; CHECK-NEXT:    [[TMP9:%.*]] = and i64 [[TMP7]], 2147483646
-; CHECK-NEXT:    [[TMP10:%.*]] = and i64 [[TMP8]], 2147483646
-; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[SRC]], i64 [[TMP9]]
-; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[SRC]], i64 [[TMP10]]
-; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP12]], i64 4
-; CHECK-NEXT:    [[TMP14:%.*]] = load float, ptr [[TMP11]], align 4, !alias.scope [[META9:![0-9]+]]
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT7:%.*]] = insertelement <2 x float> poison, float [[TMP14]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT8:%.*]] = shufflevector <2 x float> [[BROADCAST_SPLATINSERT7]], <2 x float> poison, <2 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP15:%.*]] = load float, ptr [[TMP13]], align 4, !alias.scope [[META9]]
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT9:%.*]] = insertelement <2 x float> poison, float [[TMP15]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT10:%.*]] = shufflevector <2 x float> [[BROADCAST_SPLATINSERT9]], <2 x float> poison, <2 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP16:%.*]] = fpext <2 x float> [[BROADCAST_SPLAT8]] to <2 x double>
-; CHECK-NEXT:    [[TMP17:%.*]] = fpext <2 x float> [[BROADCAST_SPLAT10]] to <2 x double>
-; CHECK-NEXT:    [[TMP18:%.*]] = fmul <2 x double> [[BROADCAST_SPLAT]], [[TMP16]]
-; CHECK-NEXT:    [[TMP19:%.*]] = fmul <2 x double> [[BROADCAST_SPLAT]], [[TMP17]]
-; CHECK-NEXT:    [[TMP20:%.*]] = fmul <2 x double> [[BROADCAST_SPLAT6]], [[TMP18]]
-; CHECK-NEXT:    [[TMP21:%.*]] = fmul <2 x double> [[BROADCAST_SPLAT6]], [[TMP19]]
-; CHECK-NEXT:    [[TMP22:%.*]] = fptrunc <2 x double> [[TMP20]] to <2 x float>
-; CHECK-NEXT:    [[TMP23:%.*]] = fptrunc <2 x double> [[TMP21]] to <2 x float>
-; CHECK-NEXT:    [[TMP24:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[DST]], i64 [[INDEX]]
-; CHECK-NEXT:    [[TMP25:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP24]], i64 8
-; CHECK-NEXT:    store <2 x float> [[TMP22]], ptr [[TMP24]], align 4, !alias.scope [[META12:![0-9]+]], !noalias [[META9]]
-; CHECK-NEXT:    store <2 x float> [[TMP23]], ptr [[TMP25]], align 4, !alias.scope [[META12]], !noalias [[META9]]
+; CHECK-NEXT:    [[TMP11:%.*]] = lshr exact i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP12:%.*]] = and i64 [[TMP11]], 2147483646
+; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[SRC]], i64 [[TMP12]]
+; CHECK-NEXT:    [[TMP14:%.*]] = load <2 x float>, ptr [[TMP13]], align 4, !alias.scope [[META9:![0-9]+]]
+; CHECK-NEXT:    [[TMP15:%.*]] = fpext <2 x float> [[TMP14]] to <2 x double>
+; CHECK-NEXT:    [[TMP16:%.*]] = fmul <2 x double> [[TMP8]], [[TMP15]]
+; CHECK-NEXT:    [[TMP17:%.*]] = fmul <2 x double> [[TMP10]], [[TMP16]]
+; CHECK-NEXT:    [[BROADCAST_SPLAT8:%.*]] = shufflevector <2 x double> [[TMP17]], <2 x double> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    [[BROADCAST_SPLAT10:%.*]] = shufflevector <2 x double> [[TMP17]], <2 x double> poison, <2 x i32> <i32 1, i32 1>
+; CHECK-NEXT:    [[TMP18:%.*]] = fptrunc <2 x double> [[BROADCAST_SPLAT8]] to <2 x float>
+; CHECK-NEXT:    [[TMP19:%.*]] = fptrunc <2 x double> [[BROADCAST_SPLAT10]] to <2 x float>
+; CHECK-NEXT:    [[TMP20:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[DST]], i64 [[INDEX]]
+; CHECK-NEXT:    [[TMP21:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP20]], i64 8
+; CHECK-NEXT:    store <2 x float> [[TMP18]], ptr [[TMP20]], align 4, !alias.scope [[META12:![0-9]+]], !noalias [[META9]]
+; CHECK-NEXT:    store <2 x float> [[TMP19]], ptr [[TMP21]], align 4, !alias.scope [[META12]], !noalias [[META9]]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
-; CHECK-NEXT:    [[TMP26:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
-; CHECK-NEXT:    br i1 [[TMP26]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP14:![0-9]+]]
+; CHECK-NEXT:    [[TMP22:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP22]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP14:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N_VEC]], [[WIDE_TRIP_COUNT]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT]], label %[[LOOP_LATCH_PREHEADER11]]

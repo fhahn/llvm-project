@@ -2458,8 +2458,7 @@ static bool cannotHoistOrSinkRecipe(VPRecipeBase &R,
   return !MemLoc || !canHoistOrSinkWithNoAliasCheck(*MemLoc, Blocks, SinkInfo);
 }
 
-/// Move loop-invariant recipes out of the vector loop region in \p Plan.
-static void licm(VPlan &Plan) {
+void VPlanTransforms::licm(VPlan &Plan) {
   VPBasicBlock *Preheader = Plan.getVectorPreheader();
   VPRegionBlock *LoopRegion = Plan.getVectorLoopRegion();
   VPBasicBlock *Exiting = LoopRegion->getExitingBasicBlock();
@@ -2561,6 +2560,47 @@ static void licm(VPlan &Plan) {
       // TODO: Clone the recipe if users are on multiple exit paths, instead of
       // just moving.
       Def->moveBefore(*SinkBB, SinkBB->getFirstNonPhi());
+    }
+  }
+}
+
+void VPlanTransforms::convertToSingleScalarsOutsideLoops(VPlan &Plan) {
+  for (VPBasicBlock *VPBB :
+       {Plan.getVectorPreheader(), Plan.getMiddleBlock()}) {
+    for (VPInstruction &VPI :
+         make_early_inc_range(make_isa_range<VPInstruction>(*VPBB))) {
+      if (!VPI.getUnderlyingValue())
+        continue;
+      VPBuilder Builder(&VPI);
+      // Keep hoisted casts used in the loop region widened, as transforms
+      // matching extends of reduction operands expect widened casts.
+      if (Instruction::isCast(VPI.getOpcode()) &&
+          any_of(VPI.users(), [](VPUser *U) {
+            return cast<VPRecipeBase>(U)->getRegion();
+          })) {
+        auto *Cast = Builder.insert(new VPWidenCastRecipe(
+            Instruction::CastOps(VPI.getOpcode()), VPI.getOperand(0),
+            VPI.getScalarType(), cast<CastInst>(VPI.getUnderlyingInstr()), VPI,
+            VPI, VPI.getDebugLoc()));
+        VPI.replaceAllUsesWith(Cast);
+        VPI.eraseFromParent();
+        continue;
+      }
+      SmallVector<VPValue *> Ops;
+      for (VPValue *Op : VPI.operands()) {
+        if (!Op->isDefinedOutsideLoopRegions() || !vputils::isSingleScalar(Op))
+          Op = Builder.createNaryOp(
+              VPInstruction::ExtractLastLane,
+              Builder.createNaryOp(VPInstruction::ExtractLastPart, Op));
+        Ops.push_back(Op);
+      }
+      VPSingleDefRecipe *SingleScalar =
+          Builder.insert(VPBuilder::createSingleScalarOp(
+              VPI.getOpcode(), Ops, /*Mask=*/nullptr, VPI, VPI,
+              VPI.getDebugLoc(), VPI.getScalarType(),
+              VPI.getUnderlyingInstr()));
+      VPI.replaceAllUsesWith(SingleScalar);
+      VPI.eraseFromParent();
     }
   }
 }

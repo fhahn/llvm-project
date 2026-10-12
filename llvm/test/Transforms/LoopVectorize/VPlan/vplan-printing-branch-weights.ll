@@ -242,6 +242,7 @@ define void @selects(ptr noalias %a, ptr noalias %b, i1 %c, i64 %n) {
 ; PREDICATE-NEXT:  Successor(s): scalar.ph, vector.ph
 ; PREDICATE-EMPTY:
 ; PREDICATE-NEXT:  vector.ph:
+; PREDICATE-NEXT:    CLONE ir<%sel.uniform> = select ir<%c>, ir<20>, ir<10> (!prof {5, 3})
 ; PREDICATE-NEXT:  Successor(s): vector loop
 ; PREDICATE-EMPTY:
 ; PREDICATE-NEXT:  <x1> vector loop: {
@@ -254,7 +255,6 @@ define void @selects(ptr noalias %a, ptr noalias %b, i1 %c, i64 %n) {
 ; PREDICATE-NEXT:      EMIT ir<%cmp> = icmp sgt ir<%l>, ir<0>
 ; PREDICATE-NEXT:      EMIT ir<%sel.varying> = select ir<%cmp>, ir<%l>, ir<0> (!prof {3, 5})
 ; PREDICATE-NEXT:      EMIT store ir<%sel.varying>, ir<%gep.a>
-; PREDICATE-NEXT:      EMIT ir<%sel.uniform> = select ir<%c>, ir<20>, ir<10> (!prof {5, 3})
 ; PREDICATE-NEXT:      EMIT ir<%gep.b> = getelementptr inbounds ir<%b>, ir<%iv>
 ; PREDICATE-NEXT:      EMIT store ir<%sel.uniform>, ir<%gep.b>
 ; PREDICATE-NEXT:      EMIT ir<%iv.next> = add ir<%iv>, ir<1>
@@ -278,6 +278,7 @@ define void @selects(ptr noalias %a, ptr noalias %b, i1 %c, i64 %n) {
 ; CONSTRUCT-NEXT:  Successor(s): scalar.ph, vector.ph
 ; CONSTRUCT-EMPTY:
 ; CONSTRUCT-NEXT:  vector.ph:
+; CONSTRUCT-NEXT:    CLONE ir<%sel.uniform> = select ir<%c>, ir<20>, ir<10> (!prof {5, 3})
 ; CONSTRUCT-NEXT:  Successor(s): vector loop
 ; CONSTRUCT-EMPTY:
 ; CONSTRUCT-NEXT:  <x1> vector loop: {
@@ -292,7 +293,6 @@ define void @selects(ptr noalias %a, ptr noalias %b, i1 %c, i64 %n) {
 ; CONSTRUCT-NEXT:      EMIT ir<%sel.varying> = select ir<%cmp>, ir<%l>, ir<0> (!prof {3, 5})
 ; CONSTRUCT-NEXT:      vp<[[VP5:%[0-9]+]]> = vector-pointer inbounds i32, ir<%gep.a>, ir<1>
 ; CONSTRUCT-NEXT:      WIDEN store vp<[[VP5]]>, ir<%sel.varying>
-; CONSTRUCT-NEXT:      EMIT ir<%sel.uniform> = select ir<%c>, ir<20>, ir<10> (!prof {5, 3})
 ; CONSTRUCT-NEXT:      CLONE ir<%gep.b> = getelementptr inbounds ir<%b>, ir<%iv>
 ; CONSTRUCT-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer inbounds i32, ir<%gep.b>, ir<1>
 ; CONSTRUCT-NEXT:      WIDEN store vp<[[VP6]]>, ir<%sel.uniform>
@@ -317,6 +317,7 @@ define void @selects(ptr noalias %a, ptr noalias %b, i1 %c, i64 %n) {
 ; REGION-NEXT:  Successor(s): scalar.ph, vector.ph
 ; REGION-EMPTY:
 ; REGION-NEXT:  vector.ph:
+; REGION-NEXT:    CLONE ir<%sel.uniform> = select ir<%c>, ir<20>, ir<10> (!prof {5, 3})
 ; REGION-NEXT:  Successor(s): vector loop
 ; REGION-EMPTY:
 ; REGION-NEXT:  <x1> vector loop: {
@@ -331,7 +332,6 @@ define void @selects(ptr noalias %a, ptr noalias %b, i1 %c, i64 %n) {
 ; REGION-NEXT:      WIDEN ir<%sel.varying> = select ir<%cmp>, ir<%l>, ir<0> (!prof {3, 5})
 ; REGION-NEXT:      vp<[[VP6:%[0-9]+]]> = vector-pointer inbounds i32, ir<%gep.a>, ir<1>
 ; REGION-NEXT:      WIDEN store vp<[[VP6]]>, ir<%sel.varying>
-; REGION-NEXT:      CLONE ir<%sel.uniform> = select ir<%c>, ir<20>, ir<10> (!prof {5, 3})
 ; REGION-NEXT:      CLONE ir<%gep.b> = getelementptr inbounds ir<%b>, vp<[[VP4]]>
 ; REGION-NEXT:      vp<[[VP7:%[0-9]+]]> = vector-pointer inbounds i32, ir<%gep.b>, ir<1>
 ; REGION-NEXT:      WIDEN store vp<[[VP7]]>, ir<%sel.uniform>

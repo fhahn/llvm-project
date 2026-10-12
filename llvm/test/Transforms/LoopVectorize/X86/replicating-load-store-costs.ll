@@ -557,14 +557,14 @@ define double @test_load_used_by_other_load_scev_low_trip_count(ptr %ptr.a, ptr 
 ; I64:       [[OUTER_LOOP_LOOPEXIT:.*]]:
 ; I64-NEXT:    br label %[[OUTER_LOOP]]
 ; I64:       [[OUTER_LOOP]]:
-; I64-NEXT:    [[ACCUM:%.*]] = phi double [ 0.000000e+00, %[[ENTRY]] ], [ [[TMP28:%.*]], %[[OUTER_LOOP_LOOPEXIT]] ]
+; I64-NEXT:    [[ACCUM:%.*]] = phi double [ 0.000000e+00, %[[ENTRY]] ], [ [[TMP17:%.*]], %[[OUTER_LOOP_LOOPEXIT]] ]
 ; I64-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <2 x double> poison, double [[ACCUM]], i64 0
 ; I64-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <2 x double> [[BROADCAST_SPLATINSERT1]], <2 x double> poison, <2 x i32> zeroinitializer
 ; I64-NEXT:    [[COND:%.*]] = call i1 @cond()
 ; I64-NEXT:    br i1 [[COND]], label %[[INNER_LOOP_PREHEADER:.*]], label %[[EXIT:.*]]
 ; I64:       [[INNER_LOOP_PREHEADER]]:
-; I64-NEXT:    br label %[[INNER_LOOP:.*]]
-; I64:       [[INNER_LOOP]]:
+; I64-NEXT:    br label %[[VECTOR_PH:.*]]
+; I64:       [[VECTOR_PH]]:
 ; I64-NEXT:    [[TMP0:%.*]] = load double, ptr [[PTR_A]], align 8
 ; I64-NEXT:    [[TMP1:%.*]] = fadd double [[TMP0]], 0.000000e+00
 ; I64-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x double> poison, double [[TMP1]], i64 0
@@ -572,34 +572,23 @@ define double @test_load_used_by_other_load_scev_low_trip_count(ptr %ptr.a, ptr 
 ; I64-NEXT:    [[TMP2:%.*]] = fmul <2 x double> [[BROADCAST_SPLAT]], zeroinitializer
 ; I64-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; I64:       [[VECTOR_BODY]]:
-; I64-NEXT:    [[IDX_PLUS1:%.*]] = add i64 1, 1
-; I64-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr [[PTR_C]], i64 1
-; I64-NEXT:    [[GEP_C:%.*]] = getelementptr i8, ptr [[PTR_C]], i64 [[IDX_PLUS1]]
-; I64-NEXT:    [[TMP6:%.*]] = getelementptr i64, ptr [[PTR_A]], i64 1
-; I64-NEXT:    [[GEP_A_I64:%.*]] = getelementptr i64, ptr [[PTR_A]], i64 [[IDX_PLUS1]]
-; I64-NEXT:    [[LOAD_IDX:%.*]] = load i64, ptr [[TMP6]], align 8
-; I64-NEXT:    [[TMP9:%.*]] = load i64, ptr [[GEP_A_I64]], align 8
-; I64-NEXT:    [[GEP_B:%.*]] = getelementptr double, ptr [[PTR_B]], i64 [[LOAD_IDX]]
-; I64-NEXT:    [[TMP11:%.*]] = getelementptr double, ptr [[PTR_B]], i64 [[TMP9]]
-; I64-NEXT:    [[GEP_C_OFFSET:%.*]] = getelementptr i8, ptr [[TMP4]], i64 8
-; I64-NEXT:    [[TMP13:%.*]] = getelementptr i8, ptr [[GEP_C]], i64 8
-; I64-NEXT:    [[LOAD_C:%.*]] = load double, ptr [[GEP_C_OFFSET]], align 8
-; I64-NEXT:    [[TMP15:%.*]] = load double, ptr [[TMP13]], align 8
-; I64-NEXT:    [[TMP16:%.*]] = insertelement <2 x double> poison, double [[LOAD_C]], i64 0
-; I64-NEXT:    [[TMP17:%.*]] = insertelement <2 x double> [[TMP16]], double [[TMP15]], i64 1
-; I64-NEXT:    [[LOAD_B:%.*]] = load double, ptr [[GEP_B]], align 8
-; I64-NEXT:    [[TMP19:%.*]] = load double, ptr [[TMP11]], align 8
-; I64-NEXT:    [[TMP20:%.*]] = insertelement <2 x double> poison, double [[LOAD_B]], i64 0
-; I64-NEXT:    [[TMP21:%.*]] = insertelement <2 x double> [[TMP20]], double [[TMP19]], i64 1
+; I64-NEXT:    [[TMP3:%.*]] = add i64 1, 1
+; I64-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr [[PTR_C]], i64 [[TMP3]]
+; I64-NEXT:    [[TMP5:%.*]] = getelementptr i64, ptr [[PTR_A]], i64 [[TMP3]]
+; I64-NEXT:    [[TMP6:%.*]] = load i64, ptr [[TMP5]], align 8
+; I64-NEXT:    [[TMP7:%.*]] = getelementptr double, ptr [[PTR_B]], i64 [[TMP6]]
+; I64-NEXT:    [[TMP8:%.*]] = getelementptr i8, ptr [[TMP4]], i64 8
+; I64-NEXT:    [[TMP9:%.*]] = load double, ptr [[TMP8]], align 8
+; I64-NEXT:    [[TMP10:%.*]] = load double, ptr [[TMP7]], align 8
 ; I64-NEXT:    br label %[[MIDDLE_BLOCK:.*]]
 ; I64:       [[MIDDLE_BLOCK]]:
-; I64-NEXT:    [[TMP22:%.*]] = shufflevector <2 x double> [[BROADCAST_SPLAT2]], <2 x double> [[TMP2]], <2 x i32> <i32 1, i32 2>
-; I64-NEXT:    [[TMP23:%.*]] = fmul <2 x double> [[TMP17]], zeroinitializer
-; I64-NEXT:    [[TMP24:%.*]] = fadd <2 x double> [[TMP23]], zeroinitializer
-; I64-NEXT:    [[TMP25:%.*]] = fadd <2 x double> [[TMP24]], splat (double 1.000000e+00)
-; I64-NEXT:    [[TMP26:%.*]] = fdiv <2 x double> [[TMP21]], [[TMP25]]
-; I64-NEXT:    [[TMP27:%.*]] = fsub <2 x double> [[TMP22]], [[TMP26]]
-; I64-NEXT:    [[TMP28]] = extractelement <2 x double> [[TMP27]], i64 1
+; I64-NEXT:    [[TMP11:%.*]] = shufflevector <2 x double> [[BROADCAST_SPLAT2]], <2 x double> [[TMP2]], <2 x i32> <i32 1, i32 2>
+; I64-NEXT:    [[TMP12:%.*]] = fmul double [[TMP9]], 0.000000e+00
+; I64-NEXT:    [[TMP13:%.*]] = fadd double [[TMP12]], 0.000000e+00
+; I64-NEXT:    [[TMP14:%.*]] = fadd double [[TMP13]], 1.000000e+00
+; I64-NEXT:    [[TMP15:%.*]] = fdiv double [[TMP10]], [[TMP14]]
+; I64-NEXT:    [[TMP16:%.*]] = extractelement <2 x double> [[TMP11]], i64 1
+; I64-NEXT:    [[TMP17]] = fsub double [[TMP16]], [[TMP15]]
 ; I64-NEXT:    br label %[[OUTER_LOOP_LOOPEXIT]]
 ; I64:       [[EXIT]]:
 ; I64-NEXT:    ret double [[ACCUM]]

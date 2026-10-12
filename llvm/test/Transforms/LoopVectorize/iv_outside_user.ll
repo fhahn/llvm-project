@@ -820,8 +820,8 @@ define i32 @postinc_not_iv_backedge_value(i32 %k)  {
 ; NOTAILFOLD-NEXT:    [[TMP0:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; NOTAILFOLD-NEXT:    br i1 [[TMP0]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], {{!llvm.loop ![0-9]+}}
 ; NOTAILFOLD:       [[MIDDLE_BLOCK]]:
-; NOTAILFOLD-NEXT:    [[TMP1:%.*]] = sub nuw i32 [[N_VEC]], 1
-; NOTAILFOLD-NEXT:    [[TMP2:%.*]] = add i32 2, [[TMP1]]
+; NOTAILFOLD-NEXT:    [[IND_ESCAPE:%.*]] = sub i32 [[N_VEC]], 1
+; NOTAILFOLD-NEXT:    [[TMP2:%.*]] = add i32 [[IND_ESCAPE]], 2
 ; NOTAILFOLD-NEXT:    [[CMP_N:%.*]] = icmp eq i32 [[K]], [[N_VEC]]
 ; NOTAILFOLD-NEXT:    br i1 [[CMP_N]], label %[[FOR_END:.*]], label %[[SCALAR_PH]]
 ; NOTAILFOLD:       [[SCALAR_PH]]:
@@ -852,8 +852,8 @@ define i32 @postinc_not_iv_backedge_value(i32 %k)  {
 ; TAILFOLD-NEXT:    [[TMP0:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; TAILFOLD-NEXT:    br i1 [[TMP0]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], {{!llvm.loop ![0-9]+}}
 ; TAILFOLD:       [[MIDDLE_BLOCK]]:
-; TAILFOLD-NEXT:    [[TMP1:%.*]] = sub nuw i32 [[K]], 1
-; TAILFOLD-NEXT:    [[TMP3:%.*]] = add i32 2, [[TMP1]]
+; TAILFOLD-NEXT:    [[IND_ESCAPE:%.*]] = sub i32 [[K]], 1
+; TAILFOLD-NEXT:    [[TMP3:%.*]] = add i32 [[IND_ESCAPE]], 2
 ; TAILFOLD-NEXT:    br label %[[FOR_END:.*]]
 ; TAILFOLD:       [[FOR_END]]:
 ; TAILFOLD-NEXT:    ret i32 [[TMP3]]
@@ -879,6 +879,7 @@ define ptr @postinc_not_iv_backedge_value_ptr_induction(ptr %p.init)  {
 ; COMMON-NEXT:    [[P_END:%.*]] = getelementptr nusw nuw i8, ptr [[P_INIT]], i64 1024
 ; COMMON-NEXT:    br label %[[VECTOR_PH:.*]]
 ; COMMON:       [[VECTOR_PH]]:
+; COMMON-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[P_INIT]], i64 1024
 ; COMMON-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; COMMON:       [[VECTOR_BODY]]:
 ; COMMON-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
@@ -886,8 +887,8 @@ define ptr @postinc_not_iv_backedge_value_ptr_induction(ptr %p.init)  {
 ; COMMON-NEXT:    [[TMP0:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1024
 ; COMMON-NEXT:    br i1 [[TMP0]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], {{!llvm.loop ![0-9]+}}
 ; COMMON:       [[MIDDLE_BLOCK]]:
-; COMMON-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[P_INIT]], i64 2
-; COMMON-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr [[TMP1]], i64 1023
+; COMMON-NEXT:    [[IND_ESCAPE:%.*]] = getelementptr i8, ptr [[TMP1]], i64 -1
+; COMMON-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr [[IND_ESCAPE]], i64 2
 ; COMMON-NEXT:    br label %[[END:.*]]
 ; COMMON:       [[END]]:
 ; COMMON-NEXT:    ret ptr [[TMP2]]
@@ -925,9 +926,8 @@ define ptr @postinc_not_iv_backedge_value_ptr_runtime_tc(ptr %p.init, i64 %n)  {
 ; NOTAILFOLD-NEXT:    [[TMP2:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; NOTAILFOLD-NEXT:    br i1 [[TMP2]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], {{!llvm.loop ![0-9]+}}
 ; NOTAILFOLD:       [[MIDDLE_BLOCK]]:
-; NOTAILFOLD-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr [[P_INIT]], i64 2
-; NOTAILFOLD-NEXT:    [[TMP4:%.*]] = sub nuw i64 [[N_VEC]], 1
-; NOTAILFOLD-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr [[TMP3]], i64 [[TMP4]]
+; NOTAILFOLD-NEXT:    [[IND_ESCAPE:%.*]] = getelementptr i8, ptr [[TMP1]], i64 -1
+; NOTAILFOLD-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr [[IND_ESCAPE]], i64 2
 ; NOTAILFOLD-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[N]], [[N_VEC]]
 ; NOTAILFOLD-NEXT:    br i1 [[CMP_N]], label %[[END:.*]], label %[[SCALAR_PH]]
 ; NOTAILFOLD:       [[SCALAR_PH]]:
@@ -940,7 +940,7 @@ define ptr @postinc_not_iv_backedge_value_ptr_runtime_tc(ptr %p.init, i64 %n)  {
 ; NOTAILFOLD-NEXT:    [[EC:%.*]] = icmp eq ptr [[P_NEXT]], [[P_END]]
 ; NOTAILFOLD-NEXT:    br i1 [[EC]], label %[[END]], label %[[LOOP]], {{!llvm.loop ![0-9]+}}
 ; NOTAILFOLD:       [[END]]:
-; NOTAILFOLD-NEXT:    [[RET_LCSSA:%.*]] = phi ptr [ [[RET]], %[[LOOP]] ], [ [[TMP5]], %[[MIDDLE_BLOCK]] ]
+; NOTAILFOLD-NEXT:    [[RET_LCSSA:%.*]] = phi ptr [ [[RET]], %[[LOOP]] ], [ [[TMP3]], %[[MIDDLE_BLOCK]] ]
 ; NOTAILFOLD-NEXT:    ret ptr [[RET_LCSSA]]
 ;
 ; TAILFOLD-LABEL: define ptr @postinc_not_iv_backedge_value_ptr_runtime_tc(
@@ -952,6 +952,7 @@ define ptr @postinc_not_iv_backedge_value_ptr_runtime_tc(ptr %p.init, i64 %n)  {
 ; TAILFOLD-NEXT:    [[N_RND_UP:%.*]] = add i64 [[N]], 1
 ; TAILFOLD-NEXT:    [[TMP0:%.*]] = and i64 [[N_RND_UP]], 1
 ; TAILFOLD-NEXT:    [[N_VEC:%.*]] = sub i64 [[N_RND_UP]], [[TMP0]]
+; TAILFOLD-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr [[P_INIT]], i64 [[N]]
 ; TAILFOLD-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; TAILFOLD:       [[VECTOR_BODY]]:
 ; TAILFOLD-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
@@ -959,9 +960,8 @@ define ptr @postinc_not_iv_backedge_value_ptr_runtime_tc(ptr %p.init, i64 %n)  {
 ; TAILFOLD-NEXT:    [[TMP1:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; TAILFOLD-NEXT:    br i1 [[TMP1]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], {{!llvm.loop ![0-9]+}}
 ; TAILFOLD:       [[MIDDLE_BLOCK]]:
-; TAILFOLD-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr [[P_INIT]], i64 2
-; TAILFOLD-NEXT:    [[TMP3:%.*]] = sub nuw i64 [[N]], 1
-; TAILFOLD-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr [[TMP2]], i64 [[TMP3]]
+; TAILFOLD-NEXT:    [[IND_ESCAPE:%.*]] = getelementptr i8, ptr [[TMP2]], i64 -1
+; TAILFOLD-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr [[IND_ESCAPE]], i64 2
 ; TAILFOLD-NEXT:    br label %[[END:.*]]
 ; TAILFOLD:       [[END]]:
 ; TAILFOLD-NEXT:    ret ptr [[TMP4]]

@@ -53,18 +53,18 @@ define i64 @argmin_first_index(ptr %arr, i64 %n, i64 %start) {
 ; CHECK-NEXT:    EMIT vp<[[VP13:%[0-9]+]]> = icmp eq vp<[[VP9]]>, ir<%start>
 ; CHECK-NEXT:    EMIT vp<[[VP14:%[0-9]+]]> = select vp<[[VP13]]>, ir<0>, vp<[[VP12]]>
 ; CHECK-NEXT:    EMIT vp<[[VP15:%[0-9]+]]> = extract-last-part vp<[[VP9]]>
-; CHECK-NEXT:    EMIT vp<[[VP16:%[0-9]+]]> = extract-last-lane vp<[[VP15]]>
-; CHECK-NEXT:    EMIT vp<[[VP17:%[0-9]+]]> = extract-last-part vp<[[VP14]]>
-; CHECK-NEXT:    EMIT vp<[[VP18:%[0-9]+]]> = extract-last-lane vp<[[VP17]]>
+; CHECK-NEXT:    EMIT vp<[[VP16:%[0-9]+]]> = last-active-lane vp<[[VP4]]>
+; CHECK-NEXT:    EMIT vp<[[VP17:%[0-9]+]]> = extract-lane vp<[[VP16]]>, vp<[[VP9]]>
+; CHECK-NEXT:    EMIT vp<[[VP18:%[0-9]+]]> = extract-last-lane vp<[[VP15]]>
 ; CHECK-NEXT:    EMIT vp<[[VP19:%[0-9]+]]> = extract-last-part vp<[[VP14]]>
-; CHECK-NEXT:    EMIT vp<[[VP20:%[0-9]+]]> = extract-last-lane vp<[[VP19]]>
+; CHECK-NEXT:    EMIT vp<[[VP20:%[0-9]+]]> = last-active-lane vp<[[VP4]]>
+; CHECK-NEXT:    EMIT vp<[[VP21:%[0-9]+]]> = extract-lane vp<[[VP20]]>, vp<[[VP14]]>
+; CHECK-NEXT:    EMIT vp<[[VP22:%[0-9]+]]> = extract-last-lane vp<[[VP19]]>
+; CHECK-NEXT:    EMIT vp<[[VP23:%[0-9]+]]> = extract-last-part vp<[[VP14]]>
+; CHECK-NEXT:    EMIT vp<[[VP24:%[0-9]+]]> = last-active-lane vp<[[VP4]]>
+; CHECK-NEXT:    EMIT vp<[[VP25:%[0-9]+]]> = extract-lane vp<[[VP24]]>, vp<[[VP14]]>
+; CHECK-NEXT:    EMIT vp<[[VP26:%[0-9]+]]> = extract-last-lane vp<[[VP23]]>
 ; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<%n>, vp<[[VP2]]>
-; CHECK-NEXT:    EMIT vp<[[VP21:%[0-9]+]]> = last-active-lane vp<[[VP4]]>
-; CHECK-NEXT:    EMIT vp<[[VP22:%[0-9]+]]> = extract-lane vp<[[VP21]]>, vp<[[VP9]]>
-; CHECK-NEXT:    EMIT vp<[[VP23:%[0-9]+]]> = last-active-lane vp<[[VP4]]>
-; CHECK-NEXT:    EMIT vp<[[VP24:%[0-9]+]]> = extract-lane vp<[[VP23]]>, vp<[[VP14]]>
-; CHECK-NEXT:    EMIT vp<[[VP25:%[0-9]+]]> = last-active-lane vp<[[VP4]]>
-; CHECK-NEXT:    EMIT vp<[[VP26:%[0-9]+]]> = extract-lane vp<[[VP25]]>, vp<[[VP14]]>
 ; CHECK-NEXT:    EMIT branch-on-cond ir<true>
 ; CHECK-NEXT:  Successor(s): ir-bb<for.end>, scalar.ph
 ; CHECK-EMPTY:

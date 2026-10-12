@@ -60,8 +60,6 @@ define void @PR33706(ptr nocapture readonly %arg, ptr nocapture %arg1, i32 %arg2
 ; CHECK-NEXT:    [[TMP28:%.*]] = sub i32 [[VAR_TMP10]], [[TMP23]]
 ; CHECK-NEXT:    [[TMP29:%.*]] = mul i32 [[TMP23]], [[ARG2]]
 ; CHECK-NEXT:    [[TMP30:%.*]] = add i32 [[TMP]], [[TMP29]]
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i32> poison, i32 [[ARG2]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT]], <2 x i32> poison, <2 x i32> zeroinitializer
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <2 x i32> poison, i32 [[VAR_TMP5]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT1]], <2 x i32> poison, <2 x i32> zeroinitializer
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT3:%.*]] = insertelement <2 x i32> poison, i32 [[TMP1]], i64 0
@@ -69,46 +67,37 @@ define void @PR33706(ptr nocapture readonly %arg, ptr nocapture %arg1, i32 %arg2
 ; CHECK-NEXT:    [[TMP31:%.*]] = mul <2 x i32> <i32 0, i32 1>, [[BROADCAST_SPLAT4]]
 ; CHECK-NEXT:    [[INDUCTION:%.*]] = add <2 x i32> [[BROADCAST_SPLAT2]], [[TMP31]]
 ; CHECK-NEXT:    [[TMP32:%.*]] = shl i32 [[TMP1]], 1
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT5:%.*]] = insertelement <2 x i32> poison, i32 [[TMP32]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT6:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT5]], <2 x i32> poison, <2 x i32> zeroinitializer
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT7:%.*]] = insertelement <2 x i32> poison, i32 [[TMP]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT8:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT7]], <2 x i32> poison, <2 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP33:%.*]] = mul <2 x i32> <i32 0, i32 1>, [[BROADCAST_SPLAT]]
-; CHECK-NEXT:    [[INDUCTION9:%.*]] = add <2 x i32> [[BROADCAST_SPLAT8]], [[TMP33]]
-; CHECK-NEXT:    [[TMP34:%.*]] = shl i32 [[ARG2]], 1
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT10:%.*]] = insertelement <2 x i32> poison, i32 [[TMP34]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT10:%.*]] = insertelement <2 x i32> poison, i32 [[TMP32]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT11:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT10]], <2 x i32> poison, <2 x i32> zeroinitializer
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <2 x i32> [ [[INDUCTION]], %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[VEC_IND12:%.*]] = phi <2 x i32> [ [[INDUCTION9]], %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT13:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP35:%.*]] = shl i64 [[INDEX]], 2
 ; CHECK-NEXT:    [[NEXT_GEP:%.*]] = getelementptr i8, ptr [[VAR_TMP4]], i64 [[TMP35]]
 ; CHECK-NEXT:    [[TMP36:%.*]] = sitofp <2 x i32> [[VEC_IND]] to <2 x float>
 ; CHECK-NEXT:    store <2 x float> [[TMP36]], ptr [[NEXT_GEP]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 2
-; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <2 x i32> [[VEC_IND]], [[BROADCAST_SPLAT6]]
-; CHECK-NEXT:    [[VEC_IND_NEXT13]] = add <2 x i32> [[VEC_IND12]], [[BROADCAST_SPLAT11]]
+; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <2 x i32> [[VEC_IND]], [[BROADCAST_SPLAT11]]
 ; CHECK-NEXT:    [[TMP37:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP37]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[TMP38:%.*]] = add <2 x i32> [[VEC_IND12]], [[BROADCAST_SPLAT]]
-; CHECK-NEXT:    [[TMP39:%.*]] = and <2 x i32> [[TMP38]], splat (i32 65535)
-; CHECK-NEXT:    [[TMP40:%.*]] = extractelement <2 x i32> [[TMP39]], i64 1
+; CHECK-NEXT:    [[IND_ESCAPE:%.*]] = sub i32 [[TMP30]], [[ARG2]]
+; CHECK-NEXT:    [[TMP38:%.*]] = add i32 [[IND_ESCAPE]], [[ARG2]]
+; CHECK-NEXT:    [[TMP39:%.*]] = and i32 [[TMP38]], 65535
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP4]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[VAR_BB22:.*]], label %[[SCALAR_PH]]
 ; CHECK:       [[SCALAR_PH]]:
 ; CHECK-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i32 [ [[TMP25]], %[[MIDDLE_BLOCK]] ], [ [[VAR_TMP5]], %[[VAR_BB9]] ], [ [[VAR_TMP5]], %[[VECTOR_SCEVCHECK]] ]
-; CHECK-NEXT:    [[BC_RESUME_VAL14:%.*]] = phi ptr [ [[TMP27]], %[[MIDDLE_BLOCK]] ], [ [[VAR_TMP4]], %[[VAR_BB9]] ], [ [[VAR_TMP4]], %[[VECTOR_SCEVCHECK]] ]
-; CHECK-NEXT:    [[BC_RESUME_VAL15:%.*]] = phi i32 [ [[TMP28]], %[[MIDDLE_BLOCK]] ], [ [[VAR_TMP10]], %[[VAR_BB9]] ], [ [[VAR_TMP10]], %[[VECTOR_SCEVCHECK]] ]
-; CHECK-NEXT:    [[BC_RESUME_VAL16:%.*]] = phi i32 [ [[TMP30]], %[[MIDDLE_BLOCK]] ], [ [[TMP]], %[[VAR_BB9]] ], [ [[TMP]], %[[VECTOR_SCEVCHECK]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL5:%.*]] = phi ptr [ [[TMP27]], %[[MIDDLE_BLOCK]] ], [ [[VAR_TMP4]], %[[VAR_BB9]] ], [ [[VAR_TMP4]], %[[VECTOR_SCEVCHECK]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL6:%.*]] = phi i32 [ [[TMP28]], %[[MIDDLE_BLOCK]] ], [ [[VAR_TMP10]], %[[VAR_BB9]] ], [ [[VAR_TMP10]], %[[VECTOR_SCEVCHECK]] ]
+; CHECK-NEXT:    [[BC_RESUME_VAL7:%.*]] = phi i32 [ [[TMP30]], %[[MIDDLE_BLOCK]] ], [ [[TMP]], %[[VAR_BB9]] ], [ [[TMP]], %[[VECTOR_SCEVCHECK]] ]
 ; CHECK-NEXT:    br label %[[VAR_BB11:.*]]
 ; CHECK:       [[VAR_BB11]]:
 ; CHECK-NEXT:    [[VAR_TMP12:%.*]] = phi i32 [ [[VAR_TMP20:%.*]], %[[VAR_BB11]] ], [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ]
-; CHECK-NEXT:    [[VAR_TMP13:%.*]] = phi ptr [ [[VAR_TMP18:%.*]], %[[VAR_BB11]] ], [ [[BC_RESUME_VAL14]], %[[SCALAR_PH]] ]
-; CHECK-NEXT:    [[VAR_TMP14:%.*]] = phi i32 [ [[VAR_TMP16:%.*]], %[[VAR_BB11]] ], [ [[BC_RESUME_VAL15]], %[[SCALAR_PH]] ]
-; CHECK-NEXT:    [[VAR_TMP15:%.*]] = phi i32 [ [[VAR_TMP19:%.*]], %[[VAR_BB11]] ], [ [[BC_RESUME_VAL16]], %[[SCALAR_PH]] ]
+; CHECK-NEXT:    [[VAR_TMP13:%.*]] = phi ptr [ [[VAR_TMP18:%.*]], %[[VAR_BB11]] ], [ [[BC_RESUME_VAL5]], %[[SCALAR_PH]] ]
+; CHECK-NEXT:    [[VAR_TMP14:%.*]] = phi i32 [ [[VAR_TMP16:%.*]], %[[VAR_BB11]] ], [ [[BC_RESUME_VAL6]], %[[SCALAR_PH]] ]
+; CHECK-NEXT:    [[VAR_TMP15:%.*]] = phi i32 [ [[VAR_TMP19:%.*]], %[[VAR_BB11]] ], [ [[BC_RESUME_VAL7]], %[[SCALAR_PH]] ]
 ; CHECK-NEXT:    [[VAR_TMP16]] = add nsw i32 [[VAR_TMP14]], -1
 ; CHECK-NEXT:    [[VAR_TMP17:%.*]] = sitofp i32 [[VAR_TMP12]] to float
 ; CHECK-NEXT:    store float [[VAR_TMP17]], ptr [[VAR_TMP13]], align 4
@@ -120,7 +109,7 @@ define void @PR33706(ptr nocapture readonly %arg, ptr nocapture %arg1, i32 %arg2
 ; CHECK:       [[VAR_BB22]]:
 ; CHECK-NEXT:    [[VAR_TMP23:%.*]] = phi ptr [ [[VAR_TMP18]], %[[VAR_BB11]] ], [ [[TMP27]], %[[MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    [[VAR_TMP24:%.*]] = phi i32 [ [[VAR_TMP19]], %[[VAR_BB11]] ], [ [[TMP30]], %[[MIDDLE_BLOCK]] ]
-; CHECK-NEXT:    [[VAR_TMP25:%.*]] = phi i32 [ [[VAR_TMP20]], %[[VAR_BB11]] ], [ [[TMP40]], %[[MIDDLE_BLOCK]] ]
+; CHECK-NEXT:    [[VAR_TMP25:%.*]] = phi i32 [ [[VAR_TMP20]], %[[VAR_BB11]] ], [ [[TMP39]], %[[MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    [[VAR_TMP26:%.*]] = ashr i32 [[VAR_TMP24]], 16
 ; CHECK-NEXT:    store i32 [[VAR_TMP26]], ptr @global, align 4
 ; CHECK-NEXT:    br label %[[VAR_BB27]]

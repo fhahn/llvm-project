@@ -841,9 +841,9 @@ define i64 @print_ext_mul_two_uses(i64 %n, ptr %a, i16 %b, i32 %c) vscale_range(
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
+; CHECK-NEXT:    EMIT-SCALAR ir<%conv> = sext ir<%b> to i32
+; CHECK-NEXT:    CLONE ir<%mul> = mul ir<%conv>, ir<%conv>
 ; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = reduction-start-vector ir<0>, ir<0>, ir<1>
-; CHECK-NEXT:    WIDEN-CAST ir<%conv> = sext ir<%b> to i32
-; CHECK-NEXT:    WIDEN ir<%mul> = mul ir<%conv>, ir<%conv>
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {

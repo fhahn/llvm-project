@@ -1124,6 +1124,8 @@ define i64 @print_ext_mul_two_uses(i64 %n, ptr %a, i16 %b, i32 %c) {
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
+; CHECK-NEXT:    EMIT-SCALAR ir<%conv> = sext ir<%b> to i32
+; CHECK-NEXT:    CLONE ir<%mul> = mul ir<%conv>, ir<%conv>
 ; CHECK-NEXT:    EMIT vp<[[VP4:%[0-9]+]]> = reduction-start-vector ir<0>, ir<0>, ir<1>
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
@@ -1134,7 +1136,7 @@ define i64 @print_ext_mul_two_uses(i64 %n, ptr %a, i16 %b, i32 %c) {
 ; CHECK-NEXT:      WIDEN-REDUCTION-PHI ir<%res2> = phi (add) vp<[[VP4]]>, vp<[[VP9:%[0-9]+]]>
 ; CHECK-NEXT:      EMIT vp<[[VP7:%[0-9]+]]> = WIDEN-CANONICAL-INDUCTION nuw vp<[[VP5]]>
 ; CHECK-NEXT:      EMIT vp<[[VP8:%[0-9]+]]> = icmp ule vp<[[VP7]]>, vp<[[VP2]]>
-; CHECK-NEXT:      EXPRESSION vp<[[VP9]]> = ir<%res2> + reduce.add (mul (ir<%b> sext to i64), (ir<%b> sext to i64), vp<[[VP8]]>)
+; CHECK-NEXT:      EXPRESSION vp<[[VP9]]> = vp<[[VP8]]> + reduce.add (ir<%mul> zext to i64, vp<[[VP8]]>)
 ; CHECK-NEXT:      EMIT vp<%index.next> = add vp<[[VP5]]>, vp<[[VP0]]>
 ; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors

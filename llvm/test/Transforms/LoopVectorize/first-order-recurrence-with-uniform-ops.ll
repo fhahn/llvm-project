@@ -265,14 +265,14 @@ define i32 @uniform_widened_recurrence_resume(ptr %src, ptr %dst, i64 %n) {
 ; UNROLL-NO-IC-NEXT:    [[TMP3:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; UNROLL-NO-IC-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP9:![0-9]+]]
 ; UNROLL-NO-IC:       [[MIDDLE_BLOCK]]:
-; UNROLL-NO-IC-NEXT:    [[TMP4:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLAT]], <4 x i32> [[BROADCAST_SPLAT]], <4 x i32> <i32 3, i32 4, i32 5, i32 6>
 ; UNROLL-NO-IC-NEXT:    store i8 0, ptr [[DST]], align 1, !alias.scope [[META10:![0-9]+]], !noalias [[META6]]
+; UNROLL-NO-IC-NEXT:    [[TMP4:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLAT]], <4 x i32> [[BROADCAST_SPLAT]], <4 x i32> <i32 3, i32 4, i32 5, i32 6>
 ; UNROLL-NO-IC-NEXT:    [[TMP5:%.*]] = shufflevector <4 x i32> [[TMP2]], <4 x i32> [[TMP2]], <4 x i32> <i32 3, i32 4, i32 5, i32 6>
-; UNROLL-NO-IC-NEXT:    [[TMP6:%.*]] = trunc <4 x i32> [[TMP5]] to <4 x i8>
-; UNROLL-NO-IC-NEXT:    [[TMP7:%.*]] = or <4 x i32> splat (i32 1), [[TMP4]]
+; UNROLL-NO-IC-NEXT:    [[TMP9:%.*]] = extractelement <4 x i32> [[TMP5]], i64 3
+; UNROLL-NO-IC-NEXT:    [[TMP10:%.*]] = trunc i32 [[TMP9]] to i8
+; UNROLL-NO-IC-NEXT:    [[TMP11:%.*]] = extractelement <4 x i32> [[TMP4]], i64 3
+; UNROLL-NO-IC-NEXT:    [[TMP12:%.*]] = or i32 1, [[TMP11]]
 ; UNROLL-NO-IC-NEXT:    [[VECTOR_RECUR_EXTRACT:%.*]] = extractelement <4 x i32> [[TMP2]], i64 3
-; UNROLL-NO-IC-NEXT:    [[TMP8:%.*]] = extractelement <4 x i32> [[TMP7]], i64 3
-; UNROLL-NO-IC-NEXT:    [[TMP9:%.*]] = extractelement <4 x i8> [[TMP6]], i64 3
 ; UNROLL-NO-IC-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
 ; UNROLL-NO-IC-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; UNROLL-NO-IC:       [[SCALAR_PH]]:
@@ -293,8 +293,8 @@ define i32 @uniform_widened_recurrence_resume(ptr %src, ptr %dst, i64 %n) {
 ; UNROLL-NO-IC-NEXT:    [[ICMP:%.*]] = icmp ult i64 [[IV]], [[N]]
 ; UNROLL-NO-IC-NEXT:    br i1 [[ICMP]], label %[[LOOP]], label %[[EXIT]], !llvm.loop [[LOOP12:![0-9]+]]
 ; UNROLL-NO-IC:       [[EXIT]]:
-; UNROLL-NO-IC-NEXT:    [[OR_LCSSA:%.*]] = phi i32 [ [[OR]], %[[LOOP]] ], [ [[TMP8]], %[[MIDDLE_BLOCK]] ]
-; UNROLL-NO-IC-NEXT:    [[TRUNC_LCSSA:%.*]] = phi i8 [ [[TRUNC]], %[[LOOP]] ], [ [[TMP9]], %[[MIDDLE_BLOCK]] ]
+; UNROLL-NO-IC-NEXT:    [[OR_LCSSA:%.*]] = phi i32 [ [[OR]], %[[LOOP]] ], [ [[TMP12]], %[[MIDDLE_BLOCK]] ]
+; UNROLL-NO-IC-NEXT:    [[TRUNC_LCSSA:%.*]] = phi i8 [ [[TRUNC]], %[[LOOP]] ], [ [[TMP10]], %[[MIDDLE_BLOCK]] ]
 ; UNROLL-NO-IC-NEXT:    [[EXT:%.*]] = zext i8 [[TRUNC_LCSSA]] to i32
 ; UNROLL-NO-IC-NEXT:    [[RES:%.*]] = add i32 [[OR_LCSSA]], [[EXT]]
 ; UNROLL-NO-IC-NEXT:    ret i32 [[RES]]
@@ -382,14 +382,14 @@ define i32 @uniform_widened_recurrence_resume(ptr %src, ptr %dst, i64 %n) {
 ; SINK-AFTER-NEXT:    [[TMP3:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; SINK-AFTER-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP9:![0-9]+]]
 ; SINK-AFTER:       [[MIDDLE_BLOCK]]:
-; SINK-AFTER-NEXT:    [[TMP4:%.*]] = shufflevector <4 x i32> [[VECTOR_RECUR2]], <4 x i32> [[BROADCAST_SPLAT]], <4 x i32> <i32 3, i32 4, i32 5, i32 6>
 ; SINK-AFTER-NEXT:    store i8 0, ptr [[DST]], align 1, !alias.scope [[META10:![0-9]+]], !noalias [[META6]]
+; SINK-AFTER-NEXT:    [[TMP4:%.*]] = shufflevector <4 x i32> [[VECTOR_RECUR2]], <4 x i32> [[BROADCAST_SPLAT]], <4 x i32> <i32 3, i32 4, i32 5, i32 6>
 ; SINK-AFTER-NEXT:    [[TMP5:%.*]] = shufflevector <4 x i32> [[VECTOR_RECUR]], <4 x i32> [[TMP2]], <4 x i32> <i32 3, i32 4, i32 5, i32 6>
-; SINK-AFTER-NEXT:    [[TMP6:%.*]] = trunc <4 x i32> [[TMP5]] to <4 x i8>
-; SINK-AFTER-NEXT:    [[TMP7:%.*]] = or <4 x i32> splat (i32 1), [[TMP4]]
+; SINK-AFTER-NEXT:    [[TMP9:%.*]] = extractelement <4 x i32> [[TMP5]], i64 3
+; SINK-AFTER-NEXT:    [[TMP10:%.*]] = trunc i32 [[TMP9]] to i8
+; SINK-AFTER-NEXT:    [[TMP11:%.*]] = extractelement <4 x i32> [[TMP4]], i64 3
+; SINK-AFTER-NEXT:    [[TMP12:%.*]] = or i32 1, [[TMP11]]
 ; SINK-AFTER-NEXT:    [[VECTOR_RECUR_EXTRACT:%.*]] = extractelement <4 x i32> [[TMP2]], i64 3
-; SINK-AFTER-NEXT:    [[TMP8:%.*]] = extractelement <4 x i32> [[TMP7]], i64 3
-; SINK-AFTER-NEXT:    [[TMP9:%.*]] = extractelement <4 x i8> [[TMP6]], i64 3
 ; SINK-AFTER-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[TMP0]], [[N_VEC]]
 ; SINK-AFTER-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[SCALAR_PH]]
 ; SINK-AFTER:       [[SCALAR_PH]]:
@@ -410,8 +410,8 @@ define i32 @uniform_widened_recurrence_resume(ptr %src, ptr %dst, i64 %n) {
 ; SINK-AFTER-NEXT:    [[ICMP:%.*]] = icmp ult i64 [[IV]], [[N]]
 ; SINK-AFTER-NEXT:    br i1 [[ICMP]], label %[[LOOP]], label %[[EXIT]], !llvm.loop [[LOOP12:![0-9]+]]
 ; SINK-AFTER:       [[EXIT]]:
-; SINK-AFTER-NEXT:    [[OR_LCSSA:%.*]] = phi i32 [ [[OR]], %[[LOOP]] ], [ [[TMP8]], %[[MIDDLE_BLOCK]] ]
-; SINK-AFTER-NEXT:    [[TRUNC_LCSSA:%.*]] = phi i8 [ [[TRUNC]], %[[LOOP]] ], [ [[TMP9]], %[[MIDDLE_BLOCK]] ]
+; SINK-AFTER-NEXT:    [[OR_LCSSA:%.*]] = phi i32 [ [[OR]], %[[LOOP]] ], [ [[TMP12]], %[[MIDDLE_BLOCK]] ]
+; SINK-AFTER-NEXT:    [[TRUNC_LCSSA:%.*]] = phi i8 [ [[TRUNC]], %[[LOOP]] ], [ [[TMP10]], %[[MIDDLE_BLOCK]] ]
 ; SINK-AFTER-NEXT:    [[EXT:%.*]] = zext i8 [[TRUNC_LCSSA]] to i32
 ; SINK-AFTER-NEXT:    [[RES:%.*]] = add i32 [[OR_LCSSA]], [[EXT]]
 ; SINK-AFTER-NEXT:    ret i32 [[RES]]

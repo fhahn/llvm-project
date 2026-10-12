@@ -421,9 +421,9 @@ define i64 @hoisted_replicate_urem_outside_replicate_region(i64 %x, i1 %c) {
 ; CHECK:       [[VECTOR_PH]]:
 ; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <8 x i1> poison, i1 [[C]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <8 x i1> [[BROADCAST_SPLATINSERT]], <8 x i1> poison, <8 x i32> zeroinitializer
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <8 x i64> poison, i64 [[X]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <8 x i64> [[BROADCAST_SPLATINSERT1]], <8 x i64> poison, <8 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP0:%.*]] = icmp eq <8 x i64> [[BROADCAST_SPLAT2]], splat (i64 1)
+; CHECK-NEXT:    [[TMP56:%.*]] = icmp eq i64 [[X]], 1
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <8 x i1> poison, i1 [[TMP56]], i64 0
+; CHECK-NEXT:    [[TMP0:%.*]] = shufflevector <8 x i1> [[BROADCAST_SPLATINSERT1]], <8 x i1> poison, <8 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP1:%.*]] = xor <8 x i1> [[TMP0]], splat (i1 true)
 ; CHECK-NEXT:    [[TMP2:%.*]] = xor <8 x i1> [[BROADCAST_SPLAT]], splat (i1 true)
 ; CHECK-NEXT:    [[TMP3:%.*]] = select <8 x i1> [[TMP0]], <8 x i1> [[TMP2]], <8 x i1> zeroinitializer
@@ -515,8 +515,8 @@ define i64 @hoisted_replicate_urem_outside_replicate_region(i64 %x, i1 %c) {
 ; CHECK-NEXT:    br label %[[MIDDLE_BLOCK:.*]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
 ; CHECK-NEXT:    [[TMP53:%.*]] = shufflevector <8 x i64> zeroinitializer, <8 x i64> [[TMP52]], <8 x i32> <i32 7, i32 8, i32 9, i32 10, i32 11, i32 12, i32 13, i32 14>
-; CHECK-NEXT:    [[TMP54:%.*]] = or <8 x i64> [[TMP53]], [[BROADCAST_SPLAT2]]
-; CHECK-NEXT:    [[TMP55:%.*]] = extractelement <8 x i64> [[TMP54]], i64 7
+; CHECK-NEXT:    [[TMP54:%.*]] = extractelement <8 x i64> [[TMP53]], i64 7
+; CHECK-NEXT:    [[TMP55:%.*]] = or i64 [[TMP54]], [[X]]
 ; CHECK-NEXT:    br label %[[EXIT:.*]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret i64 [[TMP55]]

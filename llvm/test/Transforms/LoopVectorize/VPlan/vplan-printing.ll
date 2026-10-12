@@ -580,8 +580,10 @@ define i32 @print_exit_value(ptr %ptr, i32 %off) {
 ; CHECK-NEXT:  Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = sub nuw vp<[[VP2]]>, ir<1>
-; CHECK-NEXT:    vp<[[VP8:%[0-9]+]]> = DERIVED-IV ir<%off> + vp<[[VP7]]> * ir<1>
+; CHECK-NEXT:    EMIT vp<%ind.escape> = sub vp<[[VP2]]>, ir<1>
+; CHECK-NEXT:    CLONE ir<%add> = add vp<%ind.escape>, ir<%off>
+; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = extract-last-part ir<%add>
+; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = extract-last-lane vp<[[VP7]]>
 ; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq ir<1000>, vp<[[VP2]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph

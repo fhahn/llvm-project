@@ -31,7 +31,9 @@ define void @combined_stripped_uniform_ptr(ptr noalias %p, ptr noalias %out) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = call <2 x i32> @vec_fn_uniform_ptr(ptr [[P]])
+; CHECK-NEXT:    [[TMP3:%.*]] = call i32 @scalar_fn_uniform_ptr(ptr dead_on_unwind noalias noundef writable captures(none) dead_on_return dereferenceable(16) dereferenceable_or_null(16) [[P]])
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i32> poison, i32 [[TMP3]], i64 0
+; CHECK-NEXT:    [[TMP0:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT]], <2 x i32> poison, <2 x i32> zeroinitializer
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
@@ -234,7 +236,9 @@ define void @align_uniform_ptr_propagated(ptr noalias %p, ptr noalias %out) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = call <2 x i32> @vec_fn_uniform_ptr(ptr [[P]])
+; CHECK-NEXT:    [[TMP3:%.*]] = call i32 @scalar_fn_uniform_ptr(ptr align 16 [[P]])
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i32> poison, i32 [[TMP3]], i64 0
+; CHECK-NEXT:    [[TMP0:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT]], <2 x i32> poison, <2 x i32> zeroinitializer
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
@@ -271,7 +275,9 @@ define void @nonnull_uniform_ptr_propagated(ptr noalias %p, ptr noalias %out) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = call <2 x i32> @vec_fn_uniform_ptr(ptr [[P]])
+; CHECK-NEXT:    [[TMP3:%.*]] = call i32 @scalar_fn_uniform_ptr(ptr nonnull [[P]])
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i32> poison, i32 [[TMP3]], i64 0
+; CHECK-NEXT:    [[TMP0:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT]], <2 x i32> poison, <2 x i32> zeroinitializer
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
@@ -309,7 +315,9 @@ define void @byval_stripped(ptr noalias %p, ptr noalias %out) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = call <2 x i32> @vec_byval_fn(ptr [[P]])
+; CHECK-NEXT:    [[TMP3:%.*]] = call i32 @scalar_byval_fn(ptr byval(i32) [[P]])
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i32> poison, i32 [[TMP3]], i64 0
+; CHECK-NEXT:    [[TMP0:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT]], <2 x i32> poison, <2 x i32> zeroinitializer
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
@@ -391,7 +399,9 @@ define void @align_uniform_ptr_variant_decl_wins(ptr noalias %p, ptr noalias %ou
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = call <2 x i32> @vec_fn_uniform_ptr_variant_attrs(ptr [[P]])
+; CHECK-NEXT:    [[TMP3:%.*]] = call i32 @scalar_fn_uniform_ptr_variant_attrs(ptr align 16 [[P]])
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i32> poison, i32 [[TMP3]], i64 0
+; CHECK-NEXT:    [[TMP0:%.*]] = shufflevector <2 x i32> [[BROADCAST_SPLATINSERT]], <2 x i32> poison, <2 x i32> zeroinitializer
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]

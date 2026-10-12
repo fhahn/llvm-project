@@ -14,9 +14,9 @@ define i64 @vector_loop_with_remaining_iterations(ptr %src, ptr noalias %dst, i3
 ; CHECK-NOTF-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NOTF-NEXT:    br label %[[VECTOR_PH:.*]]
 ; CHECK-NOTF:       [[VECTOR_PH]]:
-; CHECK-NOTF-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <16 x i32> poison, i32 [[X]], i64 0
+; CHECK-NOTF-NEXT:    [[TMP0:%.*]] = call i32 @llvm.abs.i32(i32 [[X]], i1 false)
+; CHECK-NOTF-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <16 x i32> poison, i32 [[TMP0]], i64 0
 ; CHECK-NOTF-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <16 x i32> [[BROADCAST_SPLATINSERT]], <16 x i32> poison, <16 x i32> zeroinitializer
-; CHECK-NOTF-NEXT:    [[TMP0:%.*]] = call <16 x i32> @llvm.abs.v16i32(<16 x i32> [[BROADCAST_SPLAT]], i1 false)
 ; CHECK-NOTF-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK-NOTF:       [[VECTOR_BODY]]:
 ; CHECK-NOTF-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
@@ -25,8 +25,8 @@ define i64 @vector_loop_with_remaining_iterations(ptr %src, ptr noalias %dst, i3
 ; CHECK-NOTF-NEXT:    [[WIDE_VEC:%.*]] = load <64 x i8>, ptr [[TMP1]], align 1
 ; CHECK-NOTF-NEXT:    [[STRIDED_VEC:%.*]] = shufflevector <64 x i8> [[WIDE_VEC]], <64 x i8> poison, <16 x i32> <i32 0, i32 4, i32 8, i32 12, i32 16, i32 20, i32 24, i32 28, i32 32, i32 36, i32 40, i32 44, i32 48, i32 52, i32 56, i32 60>
 ; CHECK-NOTF-NEXT:    [[TMP2:%.*]] = zext <16 x i8> [[STRIDED_VEC]] to <16 x i32>
-; CHECK-NOTF-NEXT:    [[TMP3:%.*]] = call <16 x i32> @llvm.umin.v16i32(<16 x i32> [[TMP0]], <16 x i32> [[TMP2]])
-; CHECK-NOTF-NEXT:    [[TMP4:%.*]] = call <16 x i32> @llvm.umin.v16i32(<16 x i32> [[TMP0]], <16 x i32> [[TMP3]])
+; CHECK-NOTF-NEXT:    [[TMP3:%.*]] = call <16 x i32> @llvm.umin.v16i32(<16 x i32> [[BROADCAST_SPLAT]], <16 x i32> [[TMP2]])
+; CHECK-NOTF-NEXT:    [[TMP4:%.*]] = call <16 x i32> @llvm.umin.v16i32(<16 x i32> [[BROADCAST_SPLAT]], <16 x i32> [[TMP3]])
 ; CHECK-NOTF-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i8, ptr [[DST]], i64 [[INDEX]]
 ; CHECK-NOTF-NEXT:    store <16 x i8> zeroinitializer, ptr [[TMP5]], align 1
 ; CHECK-NOTF-NEXT:    [[TMP6:%.*]] = zext <16 x i32> [[TMP4]] to <16 x i64>
@@ -119,9 +119,9 @@ define i64 @main_vector_loop_fixed_with_no_remaining_iterations(ptr %src, ptr no
 ; CHECK-NOTF-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NOTF-NEXT:    br label %[[VECTOR_PH:.*]]
 ; CHECK-NOTF:       [[VECTOR_PH]]:
-; CHECK-NOTF-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <16 x i32> poison, i32 [[X]], i64 0
+; CHECK-NOTF-NEXT:    [[TMP0:%.*]] = call i32 @llvm.abs.i32(i32 [[X]], i1 false)
+; CHECK-NOTF-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <16 x i32> poison, i32 [[TMP0]], i64 0
 ; CHECK-NOTF-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <16 x i32> [[BROADCAST_SPLATINSERT]], <16 x i32> poison, <16 x i32> zeroinitializer
-; CHECK-NOTF-NEXT:    [[TMP0:%.*]] = call <16 x i32> @llvm.abs.v16i32(<16 x i32> [[BROADCAST_SPLAT]], i1 false)
 ; CHECK-NOTF-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK-NOTF:       [[VECTOR_BODY]]:
 ; CHECK-NOTF-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
@@ -130,8 +130,8 @@ define i64 @main_vector_loop_fixed_with_no_remaining_iterations(ptr %src, ptr no
 ; CHECK-NOTF-NEXT:    [[WIDE_VEC:%.*]] = load <64 x i8>, ptr [[TMP1]], align 1
 ; CHECK-NOTF-NEXT:    [[STRIDED_VEC:%.*]] = shufflevector <64 x i8> [[WIDE_VEC]], <64 x i8> poison, <16 x i32> <i32 0, i32 4, i32 8, i32 12, i32 16, i32 20, i32 24, i32 28, i32 32, i32 36, i32 40, i32 44, i32 48, i32 52, i32 56, i32 60>
 ; CHECK-NOTF-NEXT:    [[TMP2:%.*]] = zext <16 x i8> [[STRIDED_VEC]] to <16 x i32>
-; CHECK-NOTF-NEXT:    [[TMP3:%.*]] = call <16 x i32> @llvm.umin.v16i32(<16 x i32> [[TMP0]], <16 x i32> [[TMP2]])
-; CHECK-NOTF-NEXT:    [[TMP4:%.*]] = call <16 x i32> @llvm.umin.v16i32(<16 x i32> [[TMP0]], <16 x i32> [[TMP3]])
+; CHECK-NOTF-NEXT:    [[TMP3:%.*]] = call <16 x i32> @llvm.umin.v16i32(<16 x i32> [[BROADCAST_SPLAT]], <16 x i32> [[TMP2]])
+; CHECK-NOTF-NEXT:    [[TMP4:%.*]] = call <16 x i32> @llvm.umin.v16i32(<16 x i32> [[BROADCAST_SPLAT]], <16 x i32> [[TMP3]])
 ; CHECK-NOTF-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i8, ptr [[DST]], i64 [[INDEX]]
 ; CHECK-NOTF-NEXT:    store <16 x i8> zeroinitializer, ptr [[TMP5]], align 1
 ; CHECK-NOTF-NEXT:    [[TMP6:%.*]] = zext <16 x i32> [[TMP4]] to <16 x i64>

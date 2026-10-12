@@ -33,8 +33,9 @@ define signext i32 @f1(ptr noalias %A, ptr noalias %B, i32 signext %n) {
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP3]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[TMP4:%.*]] = add nsw <4 x i32> [[WIDE_LOAD]], [[WIDE_LOAD2]]
-; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <4 x i32> [[TMP4]], i64 3
+; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <4 x i32> [[WIDE_LOAD]], i64 3
+; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <4 x i32> [[WIDE_LOAD2]], i64 3
+; CHECK-NEXT:    [[TMP10:%.*]] = add nsw i32 [[TMP4]], [[TMP5]]
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 [[WIDE_TRIP_COUNT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[FOR_END_LOOPEXIT:.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]]
 ; CHECK:       [[VEC_EPILOG_ITER_CHECK]]:
@@ -55,8 +56,9 @@ define signext i32 @f1(ptr noalias %A, ptr noalias %B, i32 signext %n) {
 ; CHECK-NEXT:    [[TMP9:%.*]] = icmp eq i64 [[INDEX_NEXT7]], [[N_VEC3]]
 ; CHECK-NEXT:    br i1 [[TMP9]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[TMP10:%.*]] = add nsw <2 x i32> [[WIDE_LOAD5]], [[WIDE_LOAD6]]
-; CHECK-NEXT:    [[TMP11:%.*]] = extractelement <2 x i32> [[TMP10]], i64 1
+; CHECK-NEXT:    [[TMP11:%.*]] = extractelement <2 x i32> [[WIDE_LOAD5]], i64 1
+; CHECK-NEXT:    [[TMP14:%.*]] = extractelement <2 x i32> [[WIDE_LOAD6]], i64 1
+; CHECK-NEXT:    [[TMP15:%.*]] = add nsw i32 [[TMP11]], [[TMP14]]
 ; CHECK-NEXT:    [[CMP_N8:%.*]] = icmp eq i64 [[WIDE_TRIP_COUNT]], [[N_VEC3]]
 ; CHECK-NEXT:    br i1 [[CMP_N8]], label %[[FOR_END_LOOPEXIT]], label %[[VEC_EPILOG_SCALAR_PH]]
 ; CHECK:       [[VEC_EPILOG_SCALAR_PH]]:
@@ -73,7 +75,7 @@ define signext i32 @f1(ptr noalias %A, ptr noalias %B, i32 signext %n) {
 ; CHECK-NEXT:    [[EXITCOND:%.*]] = icmp ne i64 [[INDVARS_IV_NEXT]], [[WIDE_TRIP_COUNT]]
 ; CHECK-NEXT:    br i1 [[EXITCOND]], label %[[FOR_BODY]], label %[[FOR_END_LOOPEXIT]], !llvm.loop [[LOOP5:![0-9]+]]
 ; CHECK:       [[FOR_END_LOOPEXIT]]:
-; CHECK-NEXT:    [[ADD_LCSSA:%.*]] = phi i32 [ [[ADD]], %[[FOR_BODY]] ], [ [[TMP5]], %[[MIDDLE_BLOCK]] ], [ [[TMP11]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ]
+; CHECK-NEXT:    [[ADD_LCSSA:%.*]] = phi i32 [ [[ADD]], %[[FOR_BODY]] ], [ [[TMP10]], %[[MIDDLE_BLOCK]] ], [ [[TMP15]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    br label %[[FOR_END]]
 ; CHECK:       [[FOR_END]]:
 ; CHECK-NEXT:    [[RES_0_LCSSA:%.*]] = phi i32 [ 0, %[[ENTRY]] ], [ [[ADD_LCSSA]], %[[FOR_END_LOOPEXIT]] ]

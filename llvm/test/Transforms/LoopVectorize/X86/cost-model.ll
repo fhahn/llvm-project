@@ -630,7 +630,6 @@ define i64 @cost_assume(ptr %end, i64 %N) {
 ; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 [[TMP2]], [[N_MOD_VF]]
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp ne i64 [[N]], 0
 ; CHECK-NEXT:    tail call void @llvm.assume(i1 [[TMP3]])
-; CHECK-NEXT:    tail call void @llvm.assume(i1 [[TMP3]])
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
@@ -680,10 +679,10 @@ define void @reduction_store(ptr noalias %src, ptr %dst, i1 %x) #2 {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i1> poison, i1 [[X]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i1> [[BROADCAST_SPLATINSERT]], <4 x i1> poison, <4 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP0:%.*]] = zext <4 x i1> [[BROADCAST_SPLAT]] to <4 x i64>
-; CHECK-NEXT:    [[TMP1:%.*]] = lshr <4 x i64> [[TMP0]], splat (i64 12)
+; CHECK-NEXT:    [[TMP0:%.*]] = zext i1 [[X]] to i64
+; CHECK-NEXT:    [[TMP7:%.*]] = lshr i64 [[TMP0]], 12
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i64> poison, i64 [[TMP7]], i64 0
+; CHECK-NEXT:    [[TMP1:%.*]] = shufflevector <4 x i64> [[BROADCAST_SPLATINSERT]], <4 x i64> poison, <4 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP2:%.*]] = trunc <4 x i64> [[TMP1]] to <4 x i32>
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
@@ -778,13 +777,11 @@ define i64 @cost_loop_invariant_recipes(i1 %x, i64 %y) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i64> poison, i64 [[Y]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x i64> [[BROADCAST_SPLATINSERT]], <2 x i64> poison, <2 x i32> zeroinitializer
 ; CHECK-NEXT:    [[TMP0:%.*]] = xor i1 [[X]], true
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <2 x i1> poison, i1 [[TMP0]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <2 x i1> [[BROADCAST_SPLATINSERT1]], <2 x i1> poison, <2 x i32> zeroinitializer
-; CHECK-NEXT:    [[TMP1:%.*]] = zext <2 x i1> [[BROADCAST_SPLAT2]] to <2 x i64>
-; CHECK-NEXT:    [[TMP2:%.*]] = shl <2 x i64> [[BROADCAST_SPLAT]], [[TMP1]]
+; CHECK-NEXT:    [[TMP1:%.*]] = zext i1 [[TMP0]] to i64
+; CHECK-NEXT:    [[TMP5:%.*]] = shl i64 [[Y]], [[TMP1]]
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x i64> poison, i64 [[TMP5]], i64 0
+; CHECK-NEXT:    [[TMP2:%.*]] = shufflevector <2 x i64> [[BROADCAST_SPLATINSERT]], <2 x i64> poison, <2 x i32> zeroinitializer
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[TMP3:%.*]] = mul <2 x i64> [[TMP2]], splat (i64 1)
@@ -979,26 +976,26 @@ define void @replicating_sdiv_operand_profitable_to_scalarize(i32 %x) #3 {
 ; CHECK-LABEL: define void @replicating_sdiv_operand_profitable_to_scalarize(
 ; CHECK-SAME: i32 [[X:%.*]]) #[[ATTR4:[0-9]+]] {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    br label %[[LOOP:.*]]
-; CHECK:       [[LOOP]]:
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <16 x i32> poison, i32 [[X]], i64 0
+; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = sdiv i32 2, [[X]]
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <16 x i32> poison, i32 [[TMP0]], i64 0
 ; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <16 x i32> [[BROADCAST_SPLATINSERT]], <16 x i32> poison, <16 x i32> zeroinitializer
-; CHECK-NEXT:    br label %[[EXIT:.*]]
-; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = call <16 x i32> @llvm.masked.sdiv.v16i32(<16 x i32> splat (i32 2), <16 x i32> [[BROADCAST_SPLAT]], <16 x i1> <i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 false, i1 false, i1 false>)
+; CHECK-NEXT:    [[TMP1:%.*]] = sub i32 [[X]], [[TMP0]]
+; CHECK-NEXT:    [[TMP2:%.*]] = or i32 [[TMP0]], 3
+; CHECK-NEXT:    [[TMP3:%.*]] = sdiv i32 [[TMP0]], [[TMP2]]
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    br label %[[MIDDLE_BLOCK:.*]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[TMP1:%.*]] = shufflevector <16 x i32> zeroinitializer, <16 x i32> [[TMP0]], <16 x i32> <i32 15, i32 16, i32 17, i32 18, i32 19, i32 20, i32 21, i32 22, i32 23, i32 24, i32 25, i32 26, i32 27, i32 28, i32 29, i32 30>
-; CHECK-NEXT:    [[TMP2:%.*]] = sub <16 x i32> [[BROADCAST_SPLAT]], [[TMP0]]
-; CHECK-NEXT:    [[TMP3:%.*]] = or <16 x i32> [[TMP2]], [[TMP1]]
-; CHECK-NEXT:    [[TMP4:%.*]] = or <16 x i32> [[TMP0]], splat (i32 3)
-; CHECK-NEXT:    [[TMP5:%.*]] = call <16 x i32> @llvm.masked.sdiv.v16i32(<16 x i32> [[TMP0]], <16 x i32> [[TMP4]], <16 x i1> <i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 true, i1 false, i1 false, i1 false>)
-; CHECK-NEXT:    [[TMP6:%.*]] = or <16 x i32> [[TMP3]], [[TMP5]]
+; CHECK-NEXT:    [[TMP4:%.*]] = shufflevector <16 x i32> zeroinitializer, <16 x i32> [[BROADCAST_SPLAT]], <16 x i32> <i32 15, i32 16, i32 17, i32 18, i32 19, i32 20, i32 21, i32 22, i32 23, i32 24, i32 25, i32 26, i32 27, i32 28, i32 29, i32 30>
 ; CHECK-NEXT:    [[FIRST_INACTIVE_LANE:%.*]] = call i64 @llvm.experimental.cttz.elts.i64.v16i1(<16 x i1> <i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 false, i1 true, i1 true, i1 true>, i1 false)
 ; CHECK-NEXT:    [[LAST_ACTIVE_LANE:%.*]] = sub i64 [[FIRST_INACTIVE_LANE]], 1
-; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <16 x i32> [[TMP6]], i64 [[LAST_ACTIVE_LANE]]
-; CHECK-NEXT:    br label %[[EXIT1:.*]]
-; CHECK:       [[EXIT1]]:
+; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <16 x i32> [[TMP4]], i64 [[LAST_ACTIVE_LANE]]
+; CHECK-NEXT:    [[TMP6:%.*]] = or i32 [[TMP1]], [[TMP5]]
+; CHECK-NEXT:    [[TMP7:%.*]] = or i32 [[TMP6]], [[TMP3]]
+; CHECK-NEXT:    br label %[[EXIT:.*]]
+; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void
 ;
 entry:

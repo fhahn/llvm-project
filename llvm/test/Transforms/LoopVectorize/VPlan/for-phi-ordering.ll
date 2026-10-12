@@ -4,49 +4,48 @@
 define i32 @test(i32 %limit, i1 %guard, i32 %divisor) {
 ; CHECK-LABEL: VPlan for loop in 'test'
 ; CHECK:  VPlan 'Initial VPlan for VF={4},UF>=1' {
-; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF
-; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = VF * UF
-; CHECK-NEXT:  Live-in vp<[[VP2:%[0-9]+]]> = vector-trip-count
-; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = original trip-count
+; CHECK-NEXT:  Live-in vp<[[VP0:%[0-9]+]]> = VF * UF
+; CHECK-NEXT:  Live-in vp<[[VP1:%[0-9]+]]> = vector-trip-count
+; CHECK-NEXT:  vp<[[VP2:%[0-9]+]]> = original trip-count
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<entry>:
-; CHECK-NEXT:    EMIT vp<[[VP3]]> = EXPAND SCEV (1 + (0 smax %limit))<nuw>
+; CHECK-NEXT:    EMIT vp<[[VP2]]> = EXPAND SCEV (1 + (0 smax %limit))<nuw>
 ; CHECK-NEXT:  Successor(s): scalar.ph, vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
 ; CHECK-NEXT:  Successor(s): vector loop
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  <x1> vector loop: {
-; CHECK-NEXT:  vp<[[VP4:%[0-9]+]]> = CANONICAL-IV
+; CHECK-NEXT:  vp<[[VP3:%[0-9]+]]> = CANONICAL-IV
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    vector.body:
-; CHECK-NEXT:      ir<%iv> = WIDEN-INDUCTION nuw nsw ir<0>, ir<1>, vp<[[VP0]]>
-; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP4]]>, vp<[[VP1]]>
-; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP2]]>
+; CHECK-NEXT:      EMIT vp<%index.next> = add nuw vp<[[VP3]]>, vp<[[VP0]]>
+; CHECK-NEXT:      EMIT branch-on-count vp<%index.next>, vp<[[VP1]]>
 ; CHECK-NEXT:    No successors
 ; CHECK-NEXT:  }
 ; CHECK-NEXT:  Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    WIDEN ir<%prev.iv> = add nsw ir<%iv>, ir<-1>
-; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = extract-last-part ir<%prev.iv>
-; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = extract-last-lane vp<[[VP6]]>
-; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = extract-last-part ir<0>
-; CHECK-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = extract-last-lane vp<[[VP8]]>
-; CHECK-NEXT:    EMIT vp<[[VP10:%[0-9]+]]> = extract-last-part ir<0>
-; CHECK-NEXT:    EMIT vp<[[VP11:%[0-9]+]]> = extract-last-lane vp<[[VP10]]>
-; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq vp<[[VP3]]>, vp<[[VP2]]>
+; CHECK-NEXT:    EMIT vp<%ind.escape> = sub vp<[[VP1]]>, ir<1>
+; CHECK-NEXT:    CLONE ir<%prev.iv> = add nsw vp<%ind.escape>, ir<-1>
+; CHECK-NEXT:    EMIT vp<[[VP5:%[0-9]+]]> = extract-last-part ir<%prev.iv>
+; CHECK-NEXT:    EMIT vp<[[VP6:%[0-9]+]]> = extract-last-lane vp<[[VP5]]>
+; CHECK-NEXT:    EMIT vp<[[VP7:%[0-9]+]]> = extract-last-part ir<0>
+; CHECK-NEXT:    EMIT vp<[[VP8:%[0-9]+]]> = extract-last-lane vp<[[VP7]]>
+; CHECK-NEXT:    EMIT vp<[[VP9:%[0-9]+]]> = extract-last-part ir<0>
+; CHECK-NEXT:    EMIT vp<[[VP10:%[0-9]+]]> = extract-last-lane vp<[[VP9]]>
+; CHECK-NEXT:    EMIT vp<%cmp.n> = icmp eq vp<[[VP2]]>, vp<[[VP1]]>
 ; CHECK-NEXT:    EMIT branch-on-cond vp<%cmp.n>
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>, scalar.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<exit>:
-; CHECK-NEXT:    IR   %sum.next.lcssa = phi i32 [ %sum.next, %loop.latch ] (extra operand: vp<[[VP11]]> from middle.block)
+; CHECK-NEXT:    IR   %sum.next.lcssa = phi i32 [ %sum.next, %loop.latch ] (extra operand: vp<[[VP10]]> from middle.block)
 ; CHECK-NEXT:  No successors
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  scalar.ph:
-; CHECK-NEXT:    EMIT-SCALAR vp<[[VP13:%[0-9]+]]> = phi [ vp<[[VP2]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
-; CHECK-NEXT:    EMIT-SCALAR vp<[[VP14:%[0-9]+]]> = phi [ vp<[[VP7]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
-; CHECK-NEXT:    EMIT-SCALAR vp<[[VP15:%[0-9]+]]> = phi [ vp<[[VP9]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP12:%[0-9]+]]> = phi [ vp<[[VP1]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP13:%[0-9]+]]> = phi [ vp<[[VP6]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
+; CHECK-NEXT:    EMIT-SCALAR vp<[[VP14:%[0-9]+]]> = phi [ vp<[[VP8]]>, middle.block ], [ ir<0>, ir-bb<entry> ]
 ; CHECK-NEXT:  Successor(s): ir-bb<loop.header>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<loop.header>:

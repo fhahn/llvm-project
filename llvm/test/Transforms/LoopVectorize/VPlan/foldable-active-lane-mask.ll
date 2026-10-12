@@ -219,21 +219,23 @@ define i16 @tc_overflow(i32 %x) {
 ; CHECK-NEXT:  Successor(s): vector.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.ph:
+; CHECK-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = shl ir<%x>, ir<1>
 ; CHECK-NEXT:  Successor(s): vector.body
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  vector.body:
 ; CHECK-NEXT:    EMIT-SCALAR vp<%index> = phi [ ir<0>, vector.ph ], [ vp<%index.next>, vector.body ]
 ; CHECK-NEXT:    EMIT vp<%index.next> = add vp<%index>, ir<8>
-; CHECK-NEXT:    EMIT vp<[[VP2:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1180591620717411303432>
-; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP2]]>
+; CHECK-NEXT:    EMIT vp<[[VP3:%[0-9]+]]> = icmp eq vp<%index.next>, ir<1180591620717411303432>
+; CHECK-NEXT:    EMIT branch-on-cond vp<[[VP3]]>
 ; CHECK-NEXT:  Successor(s): middle.block, vector.body
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    EMIT-SCALAR vp<[[VP4:%[0-9]+]]> = trunc ir<%x> to i16
+; CHECK-NEXT:    EMIT vp<%ind.escape> = sub vp<[[VP2]]>, ir<%x>
+; CHECK-NEXT:    EMIT-SCALAR ir<%t> = trunc vp<%ind.escape> to i16
 ; CHECK-NEXT:  Successor(s): ir-bb<exit>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<exit>:
-; CHECK-NEXT:    IR   %t.lcssa = phi i16 [ %t, %loop ] (extra operand: vp<[[VP4]]> from middle.block)
+; CHECK-NEXT:    IR   %t.lcssa = phi i16 [ %t, %loop ] (extra operand: ir<%t> from middle.block)
 ; CHECK-NEXT:  No successors
 ; CHECK-NEXT:  }
 ;

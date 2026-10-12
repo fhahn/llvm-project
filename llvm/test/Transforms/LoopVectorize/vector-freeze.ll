@@ -4,11 +4,17 @@
 define i64 @test(ptr noalias readonly %addr) {
 ; CHECK-LABEL: @test(
 ; CHECK:       vector.body:
-; CHECK:       freeze <16 x i64>
+; CHECK:       [[L:%.*]] = load <16 x i64>
+; CHECK:       middle.block:
+; CHECK-NEXT:  [[E:%.*]] = extractelement <16 x i64> [[L]], i64 15
+; CHECK-NEXT:  freeze i64 [[E]]
 
 ; SVE-LABEL: @test(
 ; SVE:       vector.body:
-; SVE:       freeze <vscale x 16 x i64>
+; SVE:       [[L:%.*]] = load <vscale x 16 x i64>
+; SVE:       middle.block:
+; SVE:       [[E:%.*]] = extractelement <vscale x 16 x i64> [[L]], i32
+; SVE-NEXT:  freeze i64 [[E]]
 
 entry:
   br label %loop
