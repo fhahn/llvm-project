@@ -13385,8 +13385,11 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
           APInt StrideMax = getUnsignedRangeMax(AR->getStepRecurrence(*this));
           APInt Limit = APInt::getMaxValue(InnerBitWidth) - (StrideMax - 1);
           Limit = Limit.zext(OuterBitWidth);
-          return getUnsignedRangeMax(applyLoopGuards(RHS, getGuards()))
-              .ule(Limit);
+          // Applying loop guards may lose information, e.g. by dropping
+          // no-wrap flags, so check RHS without loop guards first.
+          return getUnsignedRangeMax(RHS).ule(Limit) ||
+                 getUnsignedRangeMax(applyLoopGuards(RHS, getGuards()))
+                     .ule(Limit);
         };
         auto Flags = AR->getNoWrapFlags();
         if (!hasFlags(Flags, SCEV::FlagNUW) && canProveNUW())

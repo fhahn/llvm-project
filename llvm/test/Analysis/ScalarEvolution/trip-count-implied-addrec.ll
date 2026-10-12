@@ -477,18 +477,10 @@ for.end:                                          ; preds = %for.body, %entry
 define void @ult_rhs_udiv_divisibility_guard(i16 %x, i16 range(i16 1, 0) %n) {
 ; CHECK-LABEL: 'ult_rhs_udiv_divisibility_guard'
 ; CHECK-NEXT:  Determining loop execution counts for: @ult_rhs_udiv_divisibility_guard
-; CHECK-NEXT:  Loop %for.body: Unpredictable backedge-taken count.
-; CHECK-NEXT:  Loop %for.body: Unpredictable constant max backedge-taken count.
-; CHECK-NEXT:  Loop %for.body: Unpredictable symbolic max backedge-taken count.
-; CHECK-NEXT:  Loop %for.body: Predicated backedge-taken count is (-1 + (1 umax ((zext i9 (trunc i16 %x to i9) to i16) /u (4 + %n)<nuw>)))<nsw>
-; CHECK-NEXT:   Predicates:
-; CHECK-NEXT:      {1,+,1}<%for.body> Added Flags: <nusw>
-; CHECK-NEXT:  Loop %for.body: Predicated constant max backedge-taken count is i16 101
-; CHECK-NEXT:   Predicates:
-; CHECK-NEXT:      {1,+,1}<%for.body> Added Flags: <nusw>
-; CHECK-NEXT:  Loop %for.body: Predicated symbolic max backedge-taken count is (-1 + (1 umax ((zext i9 (trunc i16 %x to i9) to i16) /u (4 + %n)<nuw>)))<nsw>
-; CHECK-NEXT:   Predicates:
-; CHECK-NEXT:      {1,+,1}<%for.body> Added Flags: <nusw>
+; CHECK-NEXT:  Loop %for.body: backedge-taken count is (-1 + (1 umax ((zext i9 (trunc i16 %x to i9) to i16) /u (4 + %n)<nuw>)))<nsw>
+; CHECK-NEXT:  Loop %for.body: constant max backedge-taken count is i16 101
+; CHECK-NEXT:  Loop %for.body: symbolic max backedge-taken count is (-1 + (1 umax ((zext i9 (trunc i16 %x to i9) to i16) /u (4 + %n)<nuw>)))<nsw>
+; CHECK-NEXT:  Loop %for.body: Trip multiple is 1
 ;
 entry:
   %num = and i16 %x, 511
