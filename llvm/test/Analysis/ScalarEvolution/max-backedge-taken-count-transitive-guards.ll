@@ -190,7 +190,7 @@ exit:
   ret void
 }
 
-; Exhausting the search budget must enable collection.
+; Recover guards behind long chains without a fixed-depth cutoff.
 define void @deep_arithmetic_80(i8 range(i8 1, 64) %n, ptr %out) {
 ; CHECK-LABEL: 'deep_arithmetic_80'
 ; CHECK-NEXT:  Determining loop execution counts for: @deep_arithmetic_80
