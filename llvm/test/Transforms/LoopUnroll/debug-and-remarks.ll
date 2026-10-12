@@ -602,8 +602,8 @@ exit:
 ; CHECK-NEXT: Trying partial unroll...
 ; CHECK-NEXT: Trying runtime unroll...
 ; CHECK-NEXT:  Runtime unrolling with count: 8
-; CHECK-NEXT:  Exiting block %for.body: TripCount=0, TripMultiple=1, BreakoutTrip=1
-; CHECK:UNROLLING loop %for.body by 8 with run-time trip count!
+; CHECK:  Exiting block %for.body: TripCount=0, TripMultiple=8, BreakoutTrip=8
+; CHECK-NEXT:UNROLLING loop %for.body by 8 with run-time trip count!
 ; CHECK-NEXT:remark: <unknown>:0:0: unrolled loop by a factor of 8 with run-time trip count
 ;
 ; REMAINDER-LABEL:Loop Unroll: F[runtime_unroll_simple] Loop %for.body (depth=1)
@@ -617,8 +617,8 @@ exit:
 ; REMAINDER-NEXT: Trying partial unroll...
 ; REMAINDER-NEXT: Trying runtime unroll...
 ; REMAINDER-NEXT:  Runtime unrolling with count: 8
-; REMAINDER-NEXT:  Exiting block %for.body: TripCount=0, TripMultiple=1, BreakoutTrip=1
-; REMAINDER:UNROLLING loop %for.body by 8 with run-time trip count (remainder unrolled)!
+; REMAINDER:  Exiting block %for.body: TripCount=0, TripMultiple=8, BreakoutTrip=8
+; REMAINDER-NEXT:UNROLLING loop %for.body by 8 with run-time trip count (remainder unrolled)!
 ; REMAINDER-NEXT:remark: <unknown>:0:0: unrolled loop by a factor of 8 with run-time trip count (remainder unrolled)
 ;
 ; RUNTIME-NOPROFIT-LABEL:Loop Unroll: F[runtime_unroll_simple] Loop %for.body (depth=1)
