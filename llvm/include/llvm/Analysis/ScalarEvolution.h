@@ -2136,6 +2136,11 @@ private:
         Guards.emplace(LoopGuards::collect(L, SE));
       return *Guards;
     }
+
+    /// Return true if the loop guards have already been collected.
+    bool isCollected() const { return Guards.has_value(); }
+
+    const Loop *getLoop() const { return L; }
   };
 
   ExitLimit computeExitLimit(const Loop *L, BasicBlock *ExitingBlock,
