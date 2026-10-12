@@ -2316,13 +2316,13 @@ Instruction *InstCombinerImpl::visitFPTrunc(FPTruncInst &FPT) {
     // This is more than comparing the significand widths: the source type may
     // have a larger exponent range (e.g. bfloat has fewer significand bits than
     // half, but a much wider range).
-    auto IsLosslesslyConvertibleToDst = [&](Type *SrcTy) {
+    auto IsLosslesslyConvertible = [](Type *SrcTy, Type *DstTy) {
       return APFloat::isLosslesslyConvertibleTo(
           SrcTy->getScalarType()->getFltSemantics(),
-          Ty->getScalarType()->getFltSemantics(), /*IgnoreNaNs=*/true);
+          DstTy->getScalarType()->getFltSemantics(), /*IgnoreNaNs=*/true);
     };
-    bool OperandsFitDst = IsLosslesslyConvertibleToDst(LHSMinType) &&
-                          IsLosslesslyConvertibleToDst(RHSMinType);
+    bool OperandsFitDst = IsLosslesslyConvertible(LHSMinType, Ty) &&
+                          IsLosslesslyConvertible(RHSMinType, Ty);
 
     // Narrowing recomputes the binop in a smaller type, which can overflow to
     // inf where the wide op was finite. Therefore we can only keep ninf if
@@ -2388,19 +2388,25 @@ Instruction *InstCombinerImpl::visitFPTrunc(FPTruncInst &FPT) {
       case Instruction::FRem: {
         // Remainder is straightforward.  Remainder is always exact, so the
         // type of OpI doesn't enter into things at all.  We simply evaluate
-        // in whichever source type is larger, then convert to the
-        // destination type.
+        // in whichever source type can represent both sources, then convert
+        // to the destination type. FP types are not totally ordered (e.g.
+        // bfloat and half), so there may be no such source type.
         if (SrcWidth == OpWidth)
           break;
-        Value *LHS, *RHS;
-        if (LHSWidth == SrcWidth) {
-           LHS = Builder.CreateFPTrunc(BO->getOperand(0), LHSMinType);
-           RHS = Builder.CreateFPTrunc(BO->getOperand(1), LHSMinType);
-        } else {
-           LHS = Builder.CreateFPTrunc(BO->getOperand(0), RHSMinType);
-           RHS = Builder.CreateFPTrunc(BO->getOperand(1), RHSMinType);
-        }
+        Type *NarrowTy;
+        if (IsLosslesslyConvertible(RHSMinType, LHSMinType))
+          NarrowTy = LHSMinType;
+        else if (IsLosslesslyConvertible(LHSMinType, RHSMinType))
+          NarrowTy = RHSMinType;
+        else
+          break;
+        // A same-width conversion (e.g. bfloat to half) is not an FP cast.
+        if (NarrowTy->getScalarType() != Ty->getScalarType() &&
+            NarrowTy->getScalarSizeInBits() == Ty->getScalarSizeInBits())
+          break;
 
+        Value *LHS = Builder.CreateFPTrunc(BO->getOperand(0), NarrowTy);
+        Value *RHS = Builder.CreateFPTrunc(BO->getOperand(1), NarrowTy);
         Value *ExactResult = Builder.CreateFRemFMF(LHS, RHS, BO);
         return CastInst::CreateFPCast(ExactResult, Ty);
       }
