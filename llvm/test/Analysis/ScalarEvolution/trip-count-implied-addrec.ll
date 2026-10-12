@@ -471,7 +471,46 @@ for.end:                                          ; preds = %for.body, %entry
   ret void
 }
 
+; Without loop guards, rhs <=u 102 (511 /u 5), so the IV exits before wrapping.
+; The divisibility guard rewrites %n to (4 * (%n /u 4)), dropping nuw from the
+; rewritten (4 + %n), so with loop guards rhs is only known to be <=u 511.
+define void @ult_rhs_udiv_divisibility_guard(i16 %x, i16 range(i16 1, 0) %n) {
+; CHECK-LABEL: 'ult_rhs_udiv_divisibility_guard'
+; CHECK-NEXT:  Determining loop execution counts for: @ult_rhs_udiv_divisibility_guard
+; CHECK-NEXT:  Loop %for.body: Unpredictable backedge-taken count.
+; CHECK-NEXT:  Loop %for.body: Unpredictable constant max backedge-taken count.
+; CHECK-NEXT:  Loop %for.body: Unpredictable symbolic max backedge-taken count.
+; CHECK-NEXT:  Loop %for.body: Predicated backedge-taken count is (-1 + (1 umax ((zext i9 (trunc i16 %x to i9) to i16) /u (4 + %n)<nuw>)))<nsw>
+; CHECK-NEXT:   Predicates:
+; CHECK-NEXT:      {1,+,1}<%for.body> Added Flags: <nusw>
+; CHECK-NEXT:  Loop %for.body: Predicated constant max backedge-taken count is i16 101
+; CHECK-NEXT:   Predicates:
+; CHECK-NEXT:      {1,+,1}<%for.body> Added Flags: <nusw>
+; CHECK-NEXT:  Loop %for.body: Predicated symbolic max backedge-taken count is (-1 + (1 umax ((zext i9 (trunc i16 %x to i9) to i16) /u (4 + %n)<nuw>)))<nsw>
+; CHECK-NEXT:   Predicates:
+; CHECK-NEXT:      {1,+,1}<%for.body> Added Flags: <nusw>
+;
+entry:
+  %num = and i16 %x, 511
+  %den = add nuw i16 %n, 4
+  call void @use(i16 noundef %den)
+  %rhs = udiv i16 %num, %den
+  %rem = urem i16 %n, 4
+  %n.mul4 = icmp eq i16 %rem, 0
+  br i1 %n.mul4, label %for.body, label %for.end
 
+for.body:
+  %iv = phi i8 [ %iv.next, %for.body ], [ 0, %entry ]
+  %iv.next = add i8 %iv, 1
+  %zext = zext i8 %iv.next to i16
+  %cmp = icmp ult i16 %zext, %rhs
+  br i1 %cmp, label %for.body, label %for.end
+
+for.end:
+  ret void
+}
+
+declare void @use(i16)
 
 declare void @llvm.assume(i1)
 
