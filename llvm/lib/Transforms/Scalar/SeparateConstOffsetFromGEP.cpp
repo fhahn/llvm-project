@@ -744,13 +744,13 @@ Value *ConstantOffsetExtractor::applyCasts(Value *V, const CastState &Casts) {
 
     Instruction *Cast = I->clone();
     Cast->setOperand(0, Current);
-    // In ConstantOffsetExtractor::find we do not analyze nuw/nsw for trunc, so
-    // we assume that it is ok to redistribute trunc over add/sub/or. But for
-    // example (add (trunc nuw A), (trunc nuw B)) is more poisonous than (trunc
-    // nuw (add A, B))). To make such redistributions legal we drop all the
-    // poison generating flags from cloned trunc instructions here.
-    if (isa<TruncInst>(Cast))
-      Cast->dropPoisonGeneratingFlags();
+    // The flags of the original cast only hold for its original operand, not
+    // for the operands the cast is redistributed over. For example, (add
+    // (trunc nuw A), (trunc nuw B)) is more poisonous than (trunc nuw (add A,
+    // B)), and (sub C, (zext nneg A)) is more poisonous than (zext nneg (sub
+    // nuw C, A)). To make such redistributions legal we drop all the poison
+    // generating flags from cloned casts here.
+    Cast->dropPoisonGeneratingFlags();
     Cast->insertBefore(*IP->getParent(), IP);
     Current = Cast;
   }
