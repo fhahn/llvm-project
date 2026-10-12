@@ -4832,16 +4832,27 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
   ScalarEvolution &SE = *PSE.getSE();
   VPRegionBlock *VectorLoopRegion = Plan.getVectorLoopRegion();
 
-  // Helper lambda to check if the IV range excludes the sentinel value. Try
-  // signed first, then unsigned. Return an excluded sentinel if found,
-  // otherwise return std::nullopt.
-  auto CheckSentinel = [&SE](const SCEV *IVSCEV,
-                             bool UseMax) -> std::optional<APSInt> {
+  // Returns true if the AddRec \p IVSCEV does not wrap in the signed
+  // (\p Signed) or unsigned sense, i.e. it is monotonic.
+  auto IsNoWrap = [&SE](const SCEV *IVSCEV, bool Signed) {
+    Type *WideTy = IntegerType::get(
+        SE.getContext(), IVSCEV->getType()->getScalarSizeInBits() + 1);
+    return isa<SCEVAddRecExpr>(Signed ? SE.getSignExtendExpr(IVSCEV, WideTy)
+                                      : SE.getZeroExtendExpr(IVSCEV, WideTy));
+  };
+
+  // Helper lambda to check if the IV does not wrap and its range excludes the
+  // sentinel value. Try signed first, then unsigned. Return an excluded
+  // sentinel if found, otherwise return std::nullopt.
+  auto CheckSentinel = [&SE, &IsNoWrap](const SCEV *IVSCEV,
+                                        bool UseMax) -> std::optional<APSInt> {
     unsigned BW = IVSCEV->getType()->getScalarSizeInBits();
     for (bool Signed : {true, false}) {
       APSInt Sentinel = UseMax ? APSInt::getMinValue(BW, /*Unsigned=*/!Signed)
                                : APSInt::getMaxValue(BW, /*Unsigned=*/!Signed);
 
+      if (!IsNoWrap(IVSCEV, Signed))
+        continue;
       ConstantRange IVRange =
           Signed ? SE.getSignedRange(IVSCEV) : SE.getUnsignedRange(IVSCEV);
       if (!IVRange.contains(Sentinel))
@@ -4933,10 +4944,9 @@ void VPlanTransforms::optimizeFindIVReductions(VPlan &Plan,
     // if the condition was ever true. Requires the IV to not wrap, otherwise we
     // cannot use min/max.
     if (!SentinelVal) {
-      auto *AR = cast<SCEVAddRecExpr>(IVSCEV);
-      if (AR->hasNoSignedWrap())
+      if (IsNoWrap(IVSCEV, /*Signed=*/true))
         UseSigned = true;
-      else if (AR->hasNoUnsignedWrap())
+      else if (IsNoWrap(IVSCEV, /*Signed=*/false))
         UseSigned = false;
       else
         continue;
