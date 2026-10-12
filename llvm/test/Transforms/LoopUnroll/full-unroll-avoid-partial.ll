@@ -18,10 +18,10 @@
 ; LOOP-UNROLL-NEXT:  Trying partial unroll...
 ; LOOP-UNROLL-NEXT:  Trying runtime unroll...
 ; LOOP-UNROLL-NEXT:   Runtime unrolling with count: 8
-; LOOP-UNROLL-NEXT:   Exiting block %for.body: TripCount=0, TripMultiple=1, BreakoutTrip=1
 ; LOOP-UNROLL-NEXT: Trying runtime unrolling on Loop:
 ; LOOP-UNROLL-NEXT: Loop at depth 1 containing: %for.body<header><latch><exiting>
 ; LOOP-UNROLL-NEXT: Using epilog remainder.
+; LOOP-UNROLL-NEXT:   Exiting block %for.body: TripCount=0, TripMultiple=8, BreakoutTrip=8
 ; LOOP-UNROLL-NEXT: UNROLLING loop %for.body by 8 with run-time trip count!
 
 ; LOOP-UNROLL-FULL-LABEL: Loop Unroll: F[pragma_unroll] Loop %for.body
@@ -69,10 +69,10 @@ for.body:                                         ; preds = %for.body.preheader,
 ; LOOP-UNROLL-NEXT:  Explicit unroll requested: pragma-count(5)
 ; LOOP-UNROLL-NEXT:  Trying pragma unroll...
 ; LOOP-UNROLL-NEXT:   Unrolling with pragma count: 5.
-; LOOP-UNROLL-NEXT:   Exiting block %for.body: TripCount=0, TripMultiple=1, BreakoutTrip=1
 ; LOOP-UNROLL-NEXT: Trying runtime unrolling on Loop:
 ; LOOP-UNROLL-NEXT: Loop at depth 1 containing: %for.body<header><latch><exiting>
 ; LOOP-UNROLL-NEXT: Using epilog remainder.
+; LOOP-UNROLL-NEXT:   Exiting block %for.body: TripCount=0, TripMultiple=1, BreakoutTrip=1
 ; LOOP-UNROLL-NEXT: UNROLLING loop %for.body by 5 with run-time trip count!
 
 ; LOOP-UNROLL-FULL-LABEL: Loop Unroll: F[pragma_unroll_count1] Loop %for.body
@@ -115,11 +115,11 @@ for.body:                                         ; preds = %for.body.preheader,
 ; LOOP-UNROLL-NEXT:  Explicit unroll requested: pragma-count(5)
 ; LOOP-UNROLL-NEXT:  Trying pragma unroll...
 ; LOOP-UNROLL-NEXT:   Unrolling with pragma count: 5.
-; LOOP-UNROLL-NEXT:   Exiting block %for.body: TripCount=0, TripMultiple=1, BreakoutTrip=1
 ; LOOP-UNROLL-NEXT: Trying runtime unrolling on Loop:
 ; LOOP-UNROLL-NEXT: Parallel Loop at depth 1 containing: %for.body<header><exiting>,%for.cond<latch>
 ; LOOP-UNROLL-NEXT: Using epilog remainder.
 ; LOOP-UNROLL-NEXT: Loop latch not terminated by a conditional branch.
+; LOOP-UNROLL-NEXT:   Exiting block %for.body: TripCount=0, TripMultiple=1, BreakoutTrip=1
 ; LOOP-UNROLL-NEXT: UNROLLING loop %for.body by 5!
 
 ; LOOP-UNROLL-FULL-LABEL: Loop Unroll: F[pragma_unroll_count2] Loop %for.body
