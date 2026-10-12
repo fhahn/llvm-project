@@ -506,12 +506,12 @@ define void @pr179671(ptr align 8 dereferenceable(120) %p, ptr %a, i32 %b) {
 ; CHECK-NEXT:  Successor(s): middle.block
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  middle.block:
-; CHECK-NEXT:    EMIT vp<[[VP13:%[0-9]+]]> = extract-last-part vp<%next.gep>
+; CHECK-NEXT:    EMIT vp<%ind.escape> = ptradd vp<[[VP5]]>, ir<-128>
 ; CHECK-NEXT:  Successor(s): scalar.ph
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  scalar.ph:
 ; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val> = phi [ vp<[[VP4]]>, middle.block ], [ ir<%b>, ir-bb<entry> ]
-; CHECK-NEXT:    EMIT-SCALAR vp<%scalar.recur.init> = phi [ vp<[[VP13]]>, middle.block ], [ ir<%a>, ir-bb<entry> ]
+; CHECK-NEXT:    EMIT-SCALAR vp<%scalar.recur.init> = phi [ vp<%ind.escape>, middle.block ], [ ir<%a>, ir-bb<entry> ]
 ; CHECK-NEXT:    EMIT-SCALAR vp<%bc.resume.val>.1 = phi [ vp<[[VP5]]>, middle.block ], [ ir<null>, ir-bb<entry> ]
 ; CHECK-NEXT:  Successor(s): ir-bb<loop.header>
 ; CHECK-EMPTY:

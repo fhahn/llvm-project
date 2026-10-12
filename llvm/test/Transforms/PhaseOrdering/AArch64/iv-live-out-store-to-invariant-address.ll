@@ -23,41 +23,37 @@ define void @store_iv_to_invariant_addr(ptr %dst, i32 %n) {
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i32 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[VEC_IND:%.*]] = phi <16 x i32> [ <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7, i32 8, i32 9, i32 10, i32 11, i32 12, i32 13, i32 14, i32 15>, %[[VECTOR_PH]] ], [ [[VEC_IND_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP4:%.*]] = phi i32 [ 14, %[[VECTOR_PH]] ], [ [[TMP8:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 32
-; CHECK-NEXT:    [[VEC_IND_NEXT]] = add <16 x i32> [[VEC_IND]], splat (i32 32)
+; CHECK-NEXT:    [[TMP8]] = add i32 [[TMP4]], 32
 ; CHECK-NEXT:    [[TMP2:%.*]] = icmp eq i32 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP2]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       [[MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[STEP_ADD:%.*]] = add nuw <16 x i32> [[VEC_IND]], <i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 16, i32 16>
-; CHECK-NEXT:    [[VECTOR_RECUR_EXTRACT_FOR_PHI:%.*]] = extractelement <16 x i32> [[STEP_ADD]], i64 14
+; CHECK-NEXT:    [[VECTOR_RECUR_EXTRACT_FOR_PHI:%.*]] = add nuw i32 [[TMP4]], 16
 ; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i32 [[TMP0]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[CMP_N]], label %[[EXIT:.*]], label %[[VEC_EPILOG_ITER_CHECK:.*]]
 ; CHECK:       [[VEC_EPILOG_ITER_CHECK]]:
-; CHECK-NEXT:    [[VECTOR_RECUR_EXTRACT:%.*]] = extractelement <16 x i32> [[STEP_ADD]], i64 15
+; CHECK-NEXT:    [[IND_ESCAPE:%.*]] = add i32 [[N_VEC]], -1
 ; CHECK-NEXT:    [[MIN_EPILOG_ITERS_CHECK:%.*]] = icmp eq i32 [[TMP1]], 0
 ; CHECK-NEXT:    br i1 [[MIN_EPILOG_ITERS_CHECK]], label %[[LOOP_HEADER_PREHEADER]], label %[[VEC_EPILOG_PH]], !prof [[PROF3:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_PH]]:
 ; CHECK-NEXT:    [[VEC_EPILOG_RESUME_VAL:%.*]] = phi i32 [ [[N_VEC]], %[[VEC_EPILOG_ITER_CHECK]] ], [ 0, %[[VECTOR_MAIN_LOOP_ITER_CHECK]] ]
 ; CHECK-NEXT:    [[N_VEC3:%.*]] = and i32 [[TMP0]], -8
-; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <8 x i32> poison, i32 [[VEC_EPILOG_RESUME_VAL]], i64 0
-; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <8 x i32> [[BROADCAST_SPLATINSERT]], <8 x i32> poison, <8 x i32> zeroinitializer
-; CHECK-NEXT:    [[INDUCTION:%.*]] = or disjoint <8 x i32> [[BROADCAST_SPLAT]], <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7>
+; CHECK-NEXT:    [[TMP5:%.*]] = or disjoint i32 [[VEC_EPILOG_RESUME_VAL]], 6
 ; CHECK-NEXT:    br label %[[VEC_EPILOG_VECTOR_BODY:.*]]
 ; CHECK:       [[VEC_EPILOG_VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX4:%.*]] = phi i32 [ [[VEC_EPILOG_RESUME_VAL]], %[[VEC_EPILOG_PH]] ], [ [[INDEX_NEXT6:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
-; CHECK-NEXT:    [[VEC_IND5:%.*]] = phi <8 x i32> [ [[INDUCTION]], %[[VEC_EPILOG_PH]] ], [ [[VEC_IND_NEXT7:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP6:%.*]] = phi i32 [ [[TMP5]], %[[VEC_EPILOG_PH]] ], [ [[TMP7:%.*]], %[[VEC_EPILOG_VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[INDEX_NEXT6]] = add nuw i32 [[INDEX4]], 8
-; CHECK-NEXT:    [[VEC_IND_NEXT7]] = add <8 x i32> [[VEC_IND5]], splat (i32 8)
+; CHECK-NEXT:    [[TMP7]] = add i32 [[TMP6]], 8
 ; CHECK-NEXT:    [[TMP3:%.*]] = icmp eq i32 [[INDEX_NEXT6]], [[N_VEC3]]
 ; CHECK-NEXT:    br i1 [[TMP3]], label %[[VEC_EPILOG_MIDDLE_BLOCK:.*]], label %[[VEC_EPILOG_VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
 ; CHECK:       [[VEC_EPILOG_MIDDLE_BLOCK]]:
-; CHECK-NEXT:    [[VECTOR_RECUR_EXTRACT_FOR_PHI8:%.*]] = extractelement <8 x i32> [[VEC_IND5]], i64 6
-; CHECK-NEXT:    [[VECTOR_RECUR_EXTRACT9:%.*]] = extractelement <8 x i32> [[VEC_IND5]], i64 7
+; CHECK-NEXT:    [[IND_ESCAPE9:%.*]] = add i32 [[N_VEC3]], -1
 ; CHECK-NEXT:    [[CMP_N10:%.*]] = icmp eq i32 [[TMP0]], [[N_VEC3]]
 ; CHECK-NEXT:    br i1 [[CMP_N10]], label %[[EXIT]], label %[[LOOP_HEADER_PREHEADER]]
 ; CHECK:       [[LOOP_HEADER_PREHEADER]]:
-; CHECK-NEXT:    [[IV1_PH:%.*]] = phi i32 [ poison, %[[ITER_CHECK]] ], [ [[VECTOR_RECUR_EXTRACT]], %[[VEC_EPILOG_ITER_CHECK]] ], [ [[VECTOR_RECUR_EXTRACT9]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ]
+; CHECK-NEXT:    [[IV1_PH:%.*]] = phi i32 [ poison, %[[ITER_CHECK]] ], [ [[IND_ESCAPE]], %[[VEC_EPILOG_ITER_CHECK]] ], [ [[IND_ESCAPE9]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    [[IV_PH:%.*]] = phi i32 [ 0, %[[ITER_CHECK]] ], [ [[N_VEC]], %[[VEC_EPILOG_ITER_CHECK]] ], [ [[N_VEC3]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
 ; CHECK:       [[LOOP_HEADER]]:
@@ -67,7 +63,7 @@ define void @store_iv_to_invariant_addr(ptr %dst, i32 %n) {
 ; CHECK-NEXT:    [[IV_NEXT]] = add i32 [[IV]], 1
 ; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP_HEADER]], !llvm.loop [[LOOP5:![0-9]+]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[IV1_LCSSA:%.*]] = phi i32 [ [[VECTOR_RECUR_EXTRACT_FOR_PHI8]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[VECTOR_RECUR_EXTRACT_FOR_PHI]], %[[MIDDLE_BLOCK]] ], [ [[IV1]], %[[LOOP_HEADER]] ]
+; CHECK-NEXT:    [[IV1_LCSSA:%.*]] = phi i32 [ [[TMP6]], %[[VEC_EPILOG_MIDDLE_BLOCK]] ], [ [[VECTOR_RECUR_EXTRACT_FOR_PHI]], %[[MIDDLE_BLOCK]] ], [ [[IV1]], %[[LOOP_HEADER]] ]
 ; CHECK-NEXT:    store i32 [[IV1_LCSSA]], ptr [[DST]], align 4
 ; CHECK-NEXT:    ret void
 ;

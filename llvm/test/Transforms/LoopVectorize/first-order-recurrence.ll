@@ -881,11 +881,11 @@ define i32 @PR27246() {
 ; UNROLL-NO-IC-NEXT:    br i1 [[TMP0]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; UNROLL-NO-IC:       [[MIDDLE_BLOCK]]:
 ; UNROLL-NO-IC-NEXT:    [[VECTOR_RECUR_EXTRACT_FOR_PHI:%.*]] = extractelement <4 x i32> [[STEP_ADD]], i64 2
-; UNROLL-NO-IC-NEXT:    [[VECTOR_RECUR_EXTRACT:%.*]] = extractelement <4 x i32> [[STEP_ADD]], i64 3
+; UNROLL-NO-IC-NEXT:    [[IND_ESCAPE:%.*]] = sub i32 [[IND_END]], -1
 ; UNROLL-NO-IC-NEXT:    [[CMP_N:%.*]] = icmp eq i32 [[I_016]], [[N_VEC]]
 ; UNROLL-NO-IC-NEXT:    br i1 [[CMP_N]], label %[[FOR_COND_CLEANUP3]], label %[[SCALAR_PH]]
 ; UNROLL-NO-IC:       [[SCALAR_PH]]:
-; UNROLL-NO-IC-NEXT:    [[SCALAR_RECUR_INIT:%.*]] = phi i32 [ [[VECTOR_RECUR_EXTRACT]], %[[MIDDLE_BLOCK]] ], [ [[E_015]], %[[FOR_COND1_PREHEADER]] ]
+; UNROLL-NO-IC-NEXT:    [[SCALAR_RECUR_INIT:%.*]] = phi i32 [ [[IND_ESCAPE]], %[[MIDDLE_BLOCK]] ], [ [[E_015]], %[[FOR_COND1_PREHEADER]] ]
 ; UNROLL-NO-IC-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i32 [ [[IND_END]], %[[MIDDLE_BLOCK]] ], [ [[I_016]], %[[FOR_COND1_PREHEADER]] ]
 ; UNROLL-NO-IC-NEXT:    br label %[[FOR_COND1:.*]]
 ; UNROLL-NO-IC:       [[FOR_COND_CLEANUP:.*]]:
@@ -923,11 +923,11 @@ define i32 @PR27246() {
 ; UNROLL-NO-VF-NEXT:    br i1 [[TMP2]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; UNROLL-NO-VF:       [[MIDDLE_BLOCK]]:
 ; UNROLL-NO-VF-NEXT:    [[TMP4:%.*]] = sub i32 [[I_016]], [[INDEX]]
-; UNROLL-NO-VF-NEXT:    [[TMP3:%.*]] = add i32 [[TMP4]], -1
+; UNROLL-NO-VF-NEXT:    [[IND_ESCAPE:%.*]] = sub i32 [[IND_END]], -1
 ; UNROLL-NO-VF-NEXT:    [[CMP_N:%.*]] = icmp eq i32 [[I_016]], [[N_VEC]]
 ; UNROLL-NO-VF-NEXT:    br i1 [[CMP_N]], label %[[FOR_COND_CLEANUP3]], label %[[SCALAR_PH]]
 ; UNROLL-NO-VF:       [[SCALAR_PH]]:
-; UNROLL-NO-VF-NEXT:    [[SCALAR_RECUR_INIT:%.*]] = phi i32 [ [[TMP3]], %[[MIDDLE_BLOCK]] ], [ [[E_015]], %[[FOR_COND1_PREHEADER]] ]
+; UNROLL-NO-VF-NEXT:    [[SCALAR_RECUR_INIT:%.*]] = phi i32 [ [[IND_ESCAPE]], %[[MIDDLE_BLOCK]] ], [ [[E_015]], %[[FOR_COND1_PREHEADER]] ]
 ; UNROLL-NO-VF-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i32 [ [[IND_END]], %[[MIDDLE_BLOCK]] ], [ [[I_016]], %[[FOR_COND1_PREHEADER]] ]
 ; UNROLL-NO-VF-NEXT:    br label %[[FOR_COND1:.*]]
 ; UNROLL-NO-VF:       [[FOR_COND_CLEANUP:.*]]:
@@ -970,11 +970,11 @@ define i32 @PR27246() {
 ; SINK-AFTER-NEXT:    br i1 [[TMP0]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP8:![0-9]+]]
 ; SINK-AFTER:       [[MIDDLE_BLOCK]]:
 ; SINK-AFTER-NEXT:    [[VECTOR_RECUR_EXTRACT_FOR_PHI:%.*]] = extractelement <4 x i32> [[VEC_IND]], i64 2
-; SINK-AFTER-NEXT:    [[VECTOR_RECUR_EXTRACT:%.*]] = extractelement <4 x i32> [[VEC_IND]], i64 3
+; SINK-AFTER-NEXT:    [[IND_ESCAPE:%.*]] = sub i32 [[IND_END]], -1
 ; SINK-AFTER-NEXT:    [[CMP_N:%.*]] = icmp eq i32 [[I_016]], [[N_VEC]]
 ; SINK-AFTER-NEXT:    br i1 [[CMP_N]], label %[[FOR_COND_CLEANUP3]], label %[[SCALAR_PH]]
 ; SINK-AFTER:       [[SCALAR_PH]]:
-; SINK-AFTER-NEXT:    [[SCALAR_RECUR_INIT:%.*]] = phi i32 [ [[VECTOR_RECUR_EXTRACT]], %[[MIDDLE_BLOCK]] ], [ [[E_015]], %[[FOR_COND1_PREHEADER]] ]
+; SINK-AFTER-NEXT:    [[SCALAR_RECUR_INIT:%.*]] = phi i32 [ [[IND_ESCAPE]], %[[MIDDLE_BLOCK]] ], [ [[E_015]], %[[FOR_COND1_PREHEADER]] ]
 ; SINK-AFTER-NEXT:    [[BC_RESUME_VAL:%.*]] = phi i32 [ [[IND_END]], %[[MIDDLE_BLOCK]] ], [ [[I_016]], %[[FOR_COND1_PREHEADER]] ]
 ; SINK-AFTER-NEXT:    br label %[[FOR_COND1:.*]]
 ; SINK-AFTER:       [[FOR_COND_CLEANUP:.*]]:

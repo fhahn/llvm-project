@@ -1142,6 +1142,14 @@ void VPlanTransforms::optimizeInductionLiveOutUsers(
       }
     }
   }
+
+  // Finally, optimize other users of IV values of the last iteration in the
+  // middle block.
+  for (VPInstruction &VPI :
+       make_early_inc_range(make_isa_range<VPInstruction>(*MiddleVPBB)))
+    if (VPValue *Escape =
+            optimizeLatchExitInductionUser(Plan, &VPI, EndValues, PSE))
+      VPI.replaceAllUsesWith(Escape);
 }
 
 /// Remove redundant ExpandSCEVRecipes in \p Plan's entry block by replacing
