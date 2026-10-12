@@ -468,8 +468,11 @@ void UnrollState::unrollBlock(VPBlockBase *VPB) {
         bool IsPenultimatePart =
             I->getOpcode() == VPInstruction::ExtractPenultimateElement;
         unsigned PartIdx = IsPenultimatePart ? UF - 2 : UF - 1;
-        // For scalar VF, directly use the scalar part value.
-        I->replaceAllUsesWith(getValueForPart(Op0, PartIdx));
+        // For scalar VF, directly use the scalar part value, which is the same
+        // for all parts of its users outside the loop region.
+        VPValue *PartV = getValueForPart(Op0, PartIdx);
+        VPV2Parts.try_emplace(PartV, UF, PartV);
+        I->replaceAllUsesWith(PartV);
         continue;
       }
     }

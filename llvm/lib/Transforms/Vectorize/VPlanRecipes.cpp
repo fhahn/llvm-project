@@ -189,6 +189,9 @@ bool VPRecipeBase::mayHaveSideEffects() const {
     return false;
   case VPInstructionSC: {
     auto *VPI = cast<VPInstruction>(this);
+    auto *CI = dyn_cast_or_null<CallInst>(VPI->getUnderlyingValue());
+    if (VPI->getOpcode() == Instruction::Call && CI)
+      return CI->mayHaveSideEffects();
     return mayWriteToMemory() ||
            VPI->getOpcode() == VPInstruction::BranchOnCount ||
            VPI->getOpcode() == VPInstruction::BranchOnCond ||
@@ -1803,6 +1806,9 @@ bool VPInstruction::opcodeMayReadOrWriteFromMemory() const {
     return !Attrs.getMemoryEffects().doesNotAccessMemory();
   }
   case Instruction::Call:
+    // Operand bundles and call-site attributes may add memory effects.
+    if (auto *CI = dyn_cast_or_null<CallInst>(getUnderlyingValue()))
+      return CI->mayReadOrWriteMemory();
     return !getCalledFunction(operands())->doesNotAccessMemory();
   default:
     return true;
@@ -3059,8 +3065,7 @@ void VPWidenRecipe::printRecipe(raw_ostream &O, const Twine &Indent,
 void VPWidenCastRecipe::execute(VPTransformState &State) {
   auto &Builder = State.Builder;
   /// Vectorize casts.
-  assert(State.VF.isVector() && "Not vectorizing?");
-  Type *DestTy = VectorType::get(getScalarType(), State.VF);
+  Type *DestTy = toVectorTy(getScalarType(), State.VF);
   VPValue *Op = getOperand(0);
   Value *A = State.get(Op);
   Value *Cast = Builder.CreateCast(Instruction::CastOps(Opcode), A, DestTy);

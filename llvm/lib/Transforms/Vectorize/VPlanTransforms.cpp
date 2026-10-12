@@ -1838,8 +1838,12 @@ static void narrowToSingleScalarRecipes(VPlan &Plan) {
   for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
            vp_depth_first_deep(Plan.getEntry()))) {
     for (VPRecipeBase &R : make_early_inc_range(reverse(*VPBB))) {
-      if (!isa<VPWidenRecipe, VPWidenGEPRecipe, VPReplicateRecipe,
-               VPWidenIntrinsicRecipe>(&R))
+      if (!isa<VPWidenRecipe, VPWidenCastRecipe, VPWidenGEPRecipe,
+               VPReplicateRecipe, VPWidenIntrinsicRecipe>(&R))
+        continue;
+      if (isa<VPWidenCastRecipe>(&R) &&
+          (R.getRegion() ||
+           !vputils::onlyScalarValuesUsed(R.getVPSingleValue())))
         continue;
       auto *RepR = dyn_cast<VPReplicateRecipe>(&R);
       if (RepR && (RepR->isSingleScalar() || RepR->isPredicated()))
@@ -2492,7 +2496,7 @@ static void licm(VPlan &Plan) {
       // TODO: Use R.definedValues() instead of casting to VPSingleDefRecipe to
       // support recipes with multiple defined values (e.g., interleaved loads).
       auto *Def = dyn_cast<VPSingleDefRecipe>(&R);
-      if (!Def)
+      if (!Def || (Def->user_empty() && !R.mayHaveSideEffects()))
         continue;
 
       if (auto *RepR = dyn_cast<VPReplicateRecipe>(&R)) {
@@ -3904,7 +3908,7 @@ tryToMatchAndCreateMulAccumulateReduction(VPReductionRecipe *Red,
   };
 
   // Try to match reduce.add(mul(...)).
-  if (match(VecOp, m_Mul(m_VPValue(A), m_VPValue(B)))) {
+  if (match(VecOp, m_Isa<VPWidenRecipe>(m_Mul(m_VPValue(A), m_VPValue(B))))) {
     auto *RecipeA = dyn_cast<VPWidenCastRecipe>(A);
     auto *RecipeB = dyn_cast<VPWidenCastRecipe>(B);
     auto *Mul = cast<VPWidenRecipe>(VecOp);
@@ -3931,7 +3935,8 @@ tryToMatchAndCreateMulAccumulateReduction(VPReductionRecipe *Red,
     return nullptr;
 
   // Match reduce.add(ext(mul(A, B))).
-  if (match(VecOp, m_ZExtOrSExt(m_Mul(m_VPValue(A), m_VPValue(B))))) {
+  if (match(VecOp, m_Isa<VPWidenCastRecipe>(m_ZExtOrSExt(m_Isa<VPWidenRecipe>(
+                       m_Mul(m_VPValue(A), m_VPValue(B))))))) {
     auto *Ext = cast<VPWidenCastRecipe>(VecOp);
     auto *Mul = cast<VPWidenRecipe>(Ext->getOperand(0));
     auto *Ext0 = dyn_cast<VPWidenCastRecipe>(A);
