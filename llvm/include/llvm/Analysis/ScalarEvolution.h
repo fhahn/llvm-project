@@ -1597,7 +1597,6 @@ public:
     static void collectFromPHI(
         ScalarEvolution &SE, ScalarEvolution::LoopGuards &Guards,
         const PHINode &Phi, SmallPtrSetImpl<const BasicBlock *> &VisitedBlocks,
-        SmallDenseMap<const BasicBlock *, LoopGuards> &IncomingGuards,
         unsigned Depth);
 
   public:
