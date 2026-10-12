@@ -13327,17 +13327,53 @@ const SCEV *ScalarEvolution::getUDivCeilSCEV(const SCEV *N, const SCEV *D) {
 }
 
 /// Return true if loop guards for \p L may refine the ranges of \p Exprs.
-/// Collecting loop guards is expensive, so this cheaply checks for a guard
-/// that may bound \p Exprs: a value used by \p Exprs compared against another
-/// value, or a cast or binary operator of such a value compared against a
-/// constant, by an icmp in a block dominating the header. This is a heuristic;
-/// guards on incoming PHI values may also refine \p Exprs.
+/// Collecting loop guards is expensive, so first look for comparisons and
+/// merging PHIs reachable from the values used by \p Exprs. This remains a
+/// heuristic: collecting unrelated guards may also strengthen cached SCEVs.
 static bool mayRefineWithLoopGuards(ArrayRef<const SCEV *> Exprs,
                                   const Loop *L, DominatorTree &DT) {
   struct FindGuard {
     const Loop *L;
     DominatorTree &DT;
+    SmallPtrSet<const Value *, 32> Visited;
+    unsigned RemainingUses = 64;
     bool Found = false;
+
+    bool hasGuard(const Value *Root) {
+      SmallVector<const Value *, 8> Worklist{Root};
+      while (!Worklist.empty()) {
+        const Value *V = Worklist.pop_back_val();
+        if (!Visited.insert(V).second)
+          continue;
+        if (const auto *Phi = dyn_cast<PHINode>(V))
+          if (!L->contains(Phi) &&
+              DT.dominates(Phi->getParent(), L->getHeader()))
+            return true;
+
+        for (const User *U : V->users()) {
+          // Budget exhaustion must enable collection, not hide a distant guard.
+          if (!RemainingUses--)
+            return true;
+          const auto *I = dyn_cast<Instruction>(U);
+          if (!I)
+            return true;
+          if (L->contains(I))
+            continue;
+          if (isa<ICmpInst>(I) &&
+              DT.dominates(I->getParent(), L->getHeader()))
+            return true;
+          if (I->getType()->isVoidTy())
+            continue;
+          // Intermediate computations need not dominate the header: they may
+          // feed a merging PHI on the path to the loop.
+          if (!isa<CastInst, BinaryOperator, SelectInst, FreezeInst,
+                   GetElementPtrInst, MinMaxIntrinsic, PHINode, ICmpInst>(I))
+            return true;
+          Worklist.push_back(I);
+        }
+      }
+      return false;
+    }
 
     bool follow(const SCEV *S) {
       const auto *Unknown = dyn_cast<SCEVUnknown>(S);
@@ -13345,21 +13381,7 @@ static bool mayRefineWithLoopGuards(ArrayRef<const SCEV *> Exprs,
         return true;
       if (isa<Constant>(Unknown->getValue()))
         return false;
-
-      auto IsGuard = [&](const ICmpInst *Cmp) {
-        return !L->contains(Cmp) &&
-               DT.dominates(Cmp->getParent(), L->getHeader());
-      };
-      Found = any_of(Unknown->getValue()->users(), [&](const User *U) {
-        if (const auto *Cmp = dyn_cast<ICmpInst>(U))
-          return IsGuard(Cmp);
-        return isa<CastInst, BinaryOperator>(U) &&
-               any_of(U->users(), [&](const User *CmpU) {
-                 const auto *Cmp = dyn_cast<ICmpInst>(CmpU);
-                 return Cmp && any_of(Cmp->operands(), IsaPred<Constant>) &&
-                        IsGuard(Cmp);
-               });
-      });
+      Found = hasGuard(Unknown->getValue());
       return false;
     }
 
