@@ -968,6 +968,66 @@ exit:
   ret void
 }
 
+define void @nested_loop_bound_reuses_iv_and_drops_exact_on_start(ptr %a, ptr %b, ptr %c, i64 noundef %x) {
+; CHECK-LABEL: define void @nested_loop_bound_reuses_iv_and_drops_exact_on_start(
+; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], ptr [[C:%.*]], i64 noundef [[X:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[START:%.*]] = ashr i64 [[X]], 3
+; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[B]], i64 4
+; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 0, [[START]]
+; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[A]], i64 4
+; CHECK-NEXT:    br label %[[OUTER_HEADER:.*]]
+; CHECK:       [[OUTER_HEADER]]:
+; CHECK-NEXT:    [[START_IV:%.*]] = phi i64 [ [[START]], %[[ENTRY]] ], [ [[START_IV_NEXT:%.*]], [[OUTER_LATCH:%.*]] ]
+; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i32 [ 1, %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], [[OUTER_LATCH]] ]
+; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], [[START_IV]]
+; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[TMP0]], [[START_IV]]
+; CHECK-NEXT:    [[TMP3:%.*]] = lshr i64 [[TMP2]], 1
+; CHECK-NEXT:    [[TMP4:%.*]] = shl nuw nsw i64 [[TMP3]], 3
+; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[SCEVGEP]], i64 [[TMP4]]
+; CHECK-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[SCEVGEP2]], i64 [[TMP4]]
+; CHECK-NEXT:    [[OUTER_IV_EXT:%.*]] = zext i32 [[OUTER_IV]] to i64
+; CHECK-NEXT:    [[TMP5:%.*]] = lshr i64 [[TMP1]], 1
+; CHECK-NEXT:    [[TMP6:%.*]] = add nuw nsw i64 [[TMP5]], 1
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP6]], 4
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
+; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[B]], [[SCEVGEP3]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[A]], [[SCEVGEP1]]
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
+;
+entry:
+  %start = ashr exact i64 %x, 3
+  br label %outer.header
+
+outer.header:
+  %start.iv = phi i64 [ %start, %entry ], [ %start.iv.next, %outer.latch ]
+  %outer.iv = phi i32 [ 1, %entry ], [ %outer.iv.next, %outer.latch ]
+  %outer.iv.ext = zext i32 %outer.iv to i64
+  br label %inner.body
+
+inner.body:
+  %inner.iv = phi i64 [ 0, %outer.header ], [ %inner.iv.next, %inner.body ]
+  %gep.a = getelementptr inbounds i32, ptr %a, i64 %inner.iv
+  %l = load i32, ptr %gep.a, align 4
+  %gep.b = getelementptr inbounds i32, ptr %b, i64 %inner.iv
+  store i32 %l, ptr %gep.b, align 4
+  %inner.iv.next = add nuw nsw i64 %inner.iv, 2
+  %inner.cond = icmp ult i64 %inner.iv.next, %outer.iv.ext
+  br i1 %inner.cond, label %inner.body, label %outer.latch
+
+outer.latch:
+  store i64 %start.iv, ptr %c, align 8
+  %start.iv.next = add i64 %start.iv, 1
+  %outer.iv.next = add nuw i32 %outer.iv, 1
+  %outer.cond = icmp ult i32 %outer.iv.next, 64
+  br i1 %outer.cond, label %outer.header, label %exit
+
+exit:
+  ret void
+}
+
 ; Test case where the AddRec for the pointers in the inner loop have the AddRec
 ; of the outer loop as start value. It is sufficient to subtract the start
 ; values (%dst, %src) of the outer AddRecs.

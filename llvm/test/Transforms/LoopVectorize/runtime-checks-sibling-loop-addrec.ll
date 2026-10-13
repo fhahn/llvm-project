@@ -8,7 +8,6 @@ define void @bound_is_ptr_iv_of_sibling_loop(ptr %a, ptr %b, i64 %n, i64 %m) {
 ; CHECK-LABEL: define void @bound_is_ptr_iv_of_sibling_loop(
 ; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[N:%.*]], i64 [[M:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    [[B1:%.*]] = ptrtoaddr ptr [[B]] to i64
 ; CHECK-NEXT:    br label %[[LOOP_1:.*]]
 ; CHECK:       [[LOOP_1]]:
 ; CHECK-NEXT:    [[PTR_IV:%.*]] = phi ptr [ [[B]], %[[ENTRY]] ], [ [[PTR_IV_NEXT:%.*]], %[[LOOP_1]] ]
@@ -24,9 +23,7 @@ define void @bound_is_ptr_iv_of_sibling_loop(ptr %a, ptr %b, i64 %n, i64 %m) {
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[N]], 2
-; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 0, [[B1]]
-; CHECK-NEXT:    [[TMP2:%.*]] = ptrtoaddr ptr [[PTR_IV_LCSSA]] to i64
-; CHECK-NEXT:    [[TMP3:%.*]] = add i64 [[TMP2]], [[TMP1]]
+; CHECK-NEXT:    [[TMP3:%.*]] = mul i64 [[IV_1]], 12
 ; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[TMP0]], [[TMP3]]
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP4]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = shl i64 [[N]], 3
@@ -135,7 +132,7 @@ define void @bound_is_trunc_of_sibling_loop_iv_multi_exit(ptr %a, ptr %b, i64 %n
 ; CHECK-NEXT:    br label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[A]], i64 508
-; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[IV_1_LCSSA]], 1
+; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[IV_1]], 1
 ; CHECK-NEXT:    [[TMP1:%.*]] = trunc i64 [[TMP0]] to i32
 ; CHECK-NEXT:    [[TMP2:%.*]] = zext i32 [[TMP1]] to i64
 ; CHECK-NEXT:    [[TMP3:%.*]] = shl nuw nsw i64 [[TMP2]], 2

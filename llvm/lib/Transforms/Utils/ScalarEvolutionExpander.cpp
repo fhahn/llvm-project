@@ -1393,14 +1393,15 @@ Value *SCEVExpander::visitAddRecExpr(SCEVUseT<const SCEVAddRecExpr *> S) {
   }
 
   // Look for an existing IV {B,+,G} of L with F == K * G, to express
-  // S = {A,+,F} as (A - K * B) + K * IV. Prefer IVs that need no scaling, then
-  // IVs starting at 0.
+  // S = {A,+,F} as (A - K * B) + K * IV. Prefer IVs needing no offset, then a
+  // constant offset, then no scaling.
   const SCEV *Step = S->getStepRecurrence(SE);
   PHINode *IV = nullptr;
   const SCEV *IVSCEV = nullptr;
   const SCEV *K = nullptr;
+  const SCEV *Offset = nullptr;
   SmallVector<Instruction *> DropPoisonGeneratingInsts;
-  unsigned BestRank = 3;
+  unsigned BestRank = 6;
   for (PHINode &PN : L->getHeader()->phis()) {
     if (PN.getType() != Ty || !PN.isComplete())
       continue;
@@ -1410,18 +1411,28 @@ Value *SCEVExpander::visitAddRecExpr(SCEVUseT<const SCEVAddRecExpr *> S) {
     const SCEV *ARStep = AR->getStepRecurrence(SE);
     const SCEV *Q, *R;
     SCEVDivision::divide(SE, Step, ARStep, &Q, &R);
-    if (!R->isZero() || SE.getMulExpr(Q, ARStep) != Step)
+    if (SE.getMulExpr(Q, ARStep) != Step)
       continue;
-    unsigned Rank = Q->isOne() ? 0 : AR->getStart()->isZero() ? 1 : 2;
-    // The IV must not be more poisonous than S, which it replaces.
+    const SCEV *Diff = SE.getMinusSCEV(S, SE.getMulExpr(Q, AR));
+    unsigned Rank = (Diff->isZero() ? 0 : isa<SCEVConstant>(Diff) ? 2 : 4) +
+                    !Q->isOne();
+    if (Rank >= BestRank)
+      continue;
+    // The IV must not be more poisonous than S, which it replaces. The
+    // canonical IV has always been reused as is.
     SmallVector<Instruction *> Drop;
-    if (Rank >= BestRank || !SE.canReuseInstruction(S, &PN, Drop))
+    if (&PN != CanonicalIV && !SE.canReuseInstruction(S, &PN, Drop))
       continue;
     IV = &PN;
     IVSCEV = AR;
     K = Q;
+    Offset = Diff;
     DropPoisonGeneratingInsts = std::move(Drop);
     BestRank = Rank;
+  }
+  for (Instruction *I : DropPoisonGeneratingInsts) {
+    rememberFlags(I);
+    dropPoisonGeneratingAnnotationsAndReinfer(SE, I);
   }
 
   // If there is no suitable IV, create a canonical one.
@@ -1462,44 +1473,27 @@ Value *SCEVExpander::visitAddRecExpr(SCEVUseT<const SCEVAddRecExpr *> S) {
     IVSCEV = SE.getAddRecExpr(SE.getZero(Ty), SE.getOne(Ty), L,
                               SCEVFlags::FlagNone);
     K = Step;
+    Offset = S->getStart();
   }
 
-  // {A,+,F} --> (A - K * B) + {K * B,+,F}
-  const SCEV *Scaled = SE.getMulExpr(K, IVSCEV);
-  if (Scaled != S) {
-    const SCEV *Offset = SE.getMinusSCEV(S, Scaled);
-    assert(SE.isLoopInvariant(Offset, L) && "offset must be loop-invariant");
-    // Just do a normal add. Pre-expand the operands to suppress folding.
-    //
-    // The LHS and RHS values are factored out of the expand call to make the
-    // output independent of the argument evaluation order.
-    const SCEV *AddExprLHS = SE.getUnknown(expand(Offset));
-    const SCEV *AddExprRHS = SE.getUnknown(expand(Scaled));
-    return expand(SE.getAddExpr(AddExprLHS, AddExprRHS));
+  // {A,+,F} --> (A - K * B) + K * {B,+,G}
+  assert(SE.isLoopInvariant(Offset, L) && "offset must be loop-invariant");
+  Value *OffsetV = Offset->isZero() ? nullptr : expand(Offset);
+
+  Value *V = IV;
+  if (!K->isOne()) {
+    SCEVFlags Flags = SCEVFlags::FlagNone;
+    if (SE.willNotOverflow(Instruction::Mul, /*Signed=*/false, IVSCEV, K))
+      Flags = ScalarEvolution::setFlags(Flags, SCEV::FlagNUW);
+    if (SE.willNotOverflow(Instruction::Mul, /*Signed=*/true, IVSCEV, K))
+      Flags = ScalarEvolution::setFlags(Flags, SCEV::FlagNSW);
+    V = expand(SCEVUse(SE.getMulExpr(SE.getUnknown(V), K), Flags));
   }
+  if (!OffsetV)
+    return V;
 
-  // Prefer an existing expansion of the IV, like an LCSSA phi.
-  Value *IVV = findExistingExpansionAndDropPoisonFlags(
-      IVSCEV, &*Builder.GetInsertPoint());
-  if (!IVV) {
-    for (Instruction *I : DropPoisonGeneratingInsts) {
-      rememberFlags(I);
-      dropPoisonGeneratingAnnotationsAndReinfer(SE, I);
-    }
-    IVV = IV;
-  }
-
-  // {B,+,F} --> IV
-  if (K->isOne())
-    return IVV;
-
-  // {K * B,+,F} --> K * IV
-  SCEVFlags Flags = SCEVFlags::FlagNone;
-  if (SE.willNotOverflow(Instruction::Mul, /*Signed=*/false, IVSCEV, K))
-    Flags = ScalarEvolution::setFlags(Flags, SCEV::FlagNUW);
-  if (SE.willNotOverflow(Instruction::Mul, /*Signed=*/true, IVSCEV, K))
-    Flags = ScalarEvolution::setFlags(Flags, SCEV::FlagNSW);
-  return expand(SCEVUse(SE.getMulExpr(SE.getUnknown(IVV), K), Flags));
+  // Just do a normal add. Use the pre-expanded operands to suppress folding.
+  return expand(SE.getAddExpr(SE.getUnknown(OffsetV), SE.getUnknown(V)));
 }
 
 /// Return true if \p CI computes the same value as a `ptrtoaddr` of its
