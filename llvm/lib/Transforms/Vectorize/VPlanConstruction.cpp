@@ -1389,24 +1389,29 @@ void VPlanTransforms::foldTailByMasking(VPlan &Plan) {
   Latch->setName("vector.latch");
   VPBlockUtils::connectBlocks(Header, Latch);
 
-  // Collect any values defined in the loop that need a phi. Currently this
-  // includes header phi backedges and live-outs extracted in the middle block.
-  // TODO: Handle early exits via Plan.getExitBlocks()
+  // Uses reached via the latch, i.e. header phi backedges and users after the
+  // loop region, need a phi in the latch for loop values whose definitions no
+  // longer dominate it.
+  VPDominatorTree VPDT(Plan);
   MapVector<VPValue *, SmallVector<VPUser *>> NeedsPhi;
+  auto CollectBypassedOperands = [&](VPRecipeBase &R) {
+    for (VPValue *Op : R.operands()) {
+      auto *DefR = Op->getDefiningRecipe();
+      if (DefR && DefR->getParent()->getEnclosingLoopRegion() == LoopRegion &&
+          !VPDT.dominates(DefR->getParent(), Latch))
+        NeedsPhi[Op].push_back(&R);
+    }
+  };
   for (VPRecipeBase &R : Header->phis())
-    if (!isa<VPWidenInductionRecipe>(R))
-      NeedsPhi[cast<VPHeaderPHIRecipe>(R).getBackedgeValue()].push_back(&R);
-
-  VPValue *V;
-  for (VPRecipeBase &R : *Plan.getMiddleBlock())
-    if (match(&R, m_ExtractLastPart(m_VPValue(V))))
-      NeedsPhi[V].push_back(&R);
+    CollectBypassedOperands(R);
+  for (VPBasicBlock *VPBB : VPBlockUtils::blocksOnly<VPBasicBlock>(
+           vp_depth_first_shallow(Plan.getMiddleBlock())))
+    for (VPRecipeBase &R : *VPBB)
+      CollectBypassedOperands(R);
 
   // Insert phis for values coming past the end of the tail.
   Builder.setInsertPoint(Latch, Latch->begin());
   for (const auto &[V, Users] : NeedsPhi) {
-    if (isa<VPIRValue>(V))
-      continue;
     VPValue *TailVal = Plan.getPoison(V->getScalarType());
     std::optional<VPIRFlags> Flags;
     assert(llvm::count_if(Users, IsaPred<VPReductionPHIRecipe>) <= 1 &&
