@@ -104,7 +104,7 @@ for.cond.cleanup:
 define void @test_i32_store(ptr nocapture %ddst) {
 ; CHECK-LE-LABEL: define void @test_i32_store(
 ; CHECK-LE-LABEL: vector.body:
-; CHECK-LE:         store <16 x i32> {{.*}} !nontemporal !0
+; CHECK-LE:         store <4 x i32> {{.*}} !nontemporal !0
 ; CHECK-LE:         br
 ;
 ; CHECK-BE-LABEL: define void @test_i32_store(
