@@ -37,6 +37,7 @@
 #include "llvm/IR/ValueMap.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/KnownBits.h"
 #include <cassert>
 #include <cstdint>
 #include <memory>
@@ -1988,6 +1989,10 @@ private:
 
   /// Memoized results from getRange
   DenseMap<const SCEV *, ConstantRange> SignedRanges;
+
+  /// Memoized known bits and number of sign bits of SCEVUnknowns, shared by
+  /// the unsigned and signed range computations.
+  DenseMap<const SCEV *, std::pair<KnownBits, unsigned>> UnknownKnownBits;
 
   /// Used to parameterize getRange
   enum RangeSignHint { HINT_RANGE_UNSIGNED, HINT_RANGE_SIGNED };
