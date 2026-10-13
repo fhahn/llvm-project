@@ -1480,7 +1480,14 @@ Value *SCEVExpander::visitAddRecExpr(SCEVUseT<const SCEVAddRecExpr *> S) {
   assert(SE.isLoopInvariant(Offset, L) && "offset must be loop-invariant");
   Value *OffsetV = Offset->isZero() ? nullptr : expand(Offset);
 
-  Value *V = IV;
+  // Outside of L, prefer an existing LCSSA phi for the IV.
+  Value *V = nullptr;
+  if (!L->contains(Builder.GetInsertBlock()))
+    V = findExistingExpansionAndDropPoisonFlags(IVSCEV,
+                                                &*Builder.GetInsertPoint());
+  if (!V)
+    V = IV;
+
   if (!K->isOne()) {
     SCEVFlags Flags = SCEVFlags::FlagNone;
     if (SE.willNotOverflow(Instruction::Mul, /*Signed=*/false, IVSCEV, K))

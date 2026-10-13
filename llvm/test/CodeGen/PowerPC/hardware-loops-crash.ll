@@ -32,10 +32,10 @@ define void @test() {
 ; CHECK-NEXT:    [[C_1:%.*]] = call i1 @cond()
 ; CHECK-NEXT:    br i1 [[C_1]], label [[WHILE_COND25]], label [[WHILE_END:%.*]]
 ; CHECK:       while.end:
-; CHECK-NEXT:    [[TMP1:%.*]] = phi i64 [ [[INDVARS_IV349]], [[LAND_RHS]] ]
 ; CHECK-NEXT:    [[C_2:%.*]] = call i1 @cond()
 ; CHECK-NEXT:    br i1 [[C_2]], label [[WHILE_END187]], label [[WHILE_COND35_PREHEADER:%.*]]
 ; CHECK:       while.cond35.preheader:
+; CHECK-NEXT:    [[TMP1:%.*]] = and i64 [[INDVARS_IV349]], 4294967295
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[TMP1]], 1
 ; CHECK-NEXT:    call void @llvm.set.loop.iterations.i64(i64 [[TMP2]])
 ; CHECK-NEXT:    br label [[WHILE_COND35:%.*]]
