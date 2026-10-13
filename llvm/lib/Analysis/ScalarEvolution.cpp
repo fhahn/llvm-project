@@ -13281,11 +13281,38 @@ const SCEV *ScalarEvolution::getUDivCeilSCEV(const SCEV *N, const SCEV *D) {
   return getAddExpr(MinNOne, getUDivExpr(NMinusOne, D));
 }
 
+/// Return true if loop guards for \p L may refine the ranges of \p Exprs.
+/// This is a heuristic: \p Exprs may be refined if they contain vscale, a PHI
+/// outside \p L or a value with a non-void user outside \p L.
+static bool mayRefineWithLoopGuards(ArrayRef<const SCEV *> Exprs,
+                                    const Loop *L) {
+  unsigned RemainingUses = 64;
+  return any_of(Exprs, [&](const SCEV *E) {
+    return SCEVExprContains(E, [&](const SCEV *S) {
+      if (isa<SCEVVScale>(S))
+        return true;
+      const auto *Unknown = dyn_cast<SCEVUnknown>(S);
+      if (!Unknown || isa<Constant>(Unknown->getValue()))
+        return false;
+      const Value *V = Unknown->getValue();
+      if (isa<PHINode>(V) && !L->contains(cast<PHINode>(V)))
+        return true;
+      return any_of(V->users(), [&](const User *U) {
+        // Conservatively collect guards once the budget is exhausted.
+        if (!RemainingUses--)
+          return true;
+        const auto *I = cast<Instruction>(U);
+        return !L->contains(I) && !I->getType()->isVoidTy();
+      });
+    });
+  });
+}
+
 const SCEV *
 ScalarEvolution::computeMaxBECountForLT(const SCEV *Start, const SCEV *Stride,
                                         const SCEV *End, unsigned BitWidth,
                                         bool IsSigned, bool Invert,
-                                        LoopGuards &Guards) {
+                                        const Loop *L, LoopGuards &Guards) {
   // The logic in this function assumes we can represent a positive stride.
   // If we can't, the backedge-taken count must be zero.
   if (IsSigned && BitWidth == 1)
@@ -13303,8 +13330,10 @@ ScalarEvolution::computeMaxBECountForLT(const SCEV *Start, const SCEV *Stride,
   // of the expressions and of the expressions with loop guards applied are
   // valid bounds, use the tighter one. Loop guards never rewrite constants, and
   // an expression the guards leave unchanged has the same range.
+  bool UseGuards =
+      Guards.isCollected() || mayRefineWithLoopGuards({Start, Stride, End}, L);
   auto ApplyGuards = [&](const SCEV *S) {
-    return isa<SCEVConstant>(S) ? S : applyLoopGuards(S, Guards);
+    return !UseGuards || isa<SCEVConstant>(S) ? S : applyLoopGuards(S, Guards);
   };
   auto GetMin = [&](const SCEV *S, bool Invert) {
     APInt Min = getRangeMin(S, IsSigned, Invert);
@@ -13868,7 +13897,7 @@ ScalarEvolution::howManyLessThans(const SCEV *LHS, const SCEV *RHS,
   } else {
     ConstantMaxBECount = computeMaxBECountForLT(
         Start, Stride, RHS, getTypeSizeInBits(LHS->getType()), IsSigned,
-        Invert, Guards);
+        Invert, L, Guards);
     // If we know exactly how many times the backedge will be taken if it's
     // taken at least once, then the backedge count will either be that or
     // zero. If that count exceeds the range-based bound, the backedge can
