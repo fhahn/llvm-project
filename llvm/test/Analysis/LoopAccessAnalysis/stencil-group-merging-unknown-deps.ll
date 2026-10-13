@@ -13,48 +13,43 @@ define void @stencil_loads_and_independent_stores_with_unknown_deps(ptr %a, ptr 
 ; FORCE-NEXT:      Check 0:
 ; FORCE-NEXT:        Comparing group GRP0:
 ; FORCE-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
-; FORCE-NEXT:        Against group GRP1:
-; FORCE-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
+; FORCE-NEXT:        Against group GRP2:
+; FORCE-NEXT:          %gep.c = getelementptr inbounds i32, ptr %c, i64 %iv
 ; FORCE-NEXT:      Check 1:
 ; FORCE-NEXT:        Comparing group GRP0:
 ; FORCE-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
-; FORCE-NEXT:        Against group GRP2:
-; FORCE-NEXT:          %gep.c = getelementptr inbounds i32, ptr %c, i64 %iv
+; FORCE-NEXT:        Against group GRP3:
+; FORCE-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
 ; FORCE-NEXT:      Check 2:
 ; FORCE-NEXT:        Comparing group GRP0:
 ; FORCE-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
-; FORCE-NEXT:        Against group GRP3:
-; FORCE-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
-; FORCE-NEXT:      Check 3:
-; FORCE-NEXT:        Comparing group GRP0:
-; FORCE-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
 ; FORCE-NEXT:        Against group GRP4:
 ; FORCE-NEXT:          %gep.b.2 = getelementptr inbounds i32, ptr %b, i64 %iv.m.2
 ; FORCE-NEXT:          %gep.b.1 = getelementptr inbounds i32, ptr %b, i64 %iv.m
 ; FORCE-NEXT:          %gep.b.0 = getelementptr inbounds i32, ptr %b, i64 %iv
-; FORCE-NEXT:      Check 4:
+; FORCE-NEXT:      Check 3:
 ; FORCE-NEXT:        Comparing group GRP1:
 ; FORCE-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
 ; FORCE-NEXT:        Against group GRP2:
 ; FORCE-NEXT:          %gep.c = getelementptr inbounds i32, ptr %c, i64 %iv
-; FORCE-NEXT:      Check 5:
+; FORCE-NEXT:      Check 4:
 ; FORCE-NEXT:        Comparing group GRP1:
 ; FORCE-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
 ; FORCE-NEXT:        Against group GRP3:
 ; FORCE-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
-; FORCE-NEXT:      Check 6:
+; FORCE-NEXT:      Check 5:
 ; FORCE-NEXT:        Comparing group GRP1:
 ; FORCE-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
 ; FORCE-NEXT:        Against group GRP4:
 ; FORCE-NEXT:          %gep.b.2 = getelementptr inbounds i32, ptr %b, i64 %iv.m.2
 ; FORCE-NEXT:          %gep.b.1 = getelementptr inbounds i32, ptr %b, i64 %iv.m
 ; FORCE-NEXT:          %gep.b.0 = getelementptr inbounds i32, ptr %b, i64 %iv
-; FORCE-NEXT:      Check 7:
+; FORCE-NEXT:      Check 6:
 ; FORCE-NEXT:        Comparing group GRP2:
 ; FORCE-NEXT:          %gep.c = getelementptr inbounds i32, ptr %c, i64 %iv
 ; FORCE-NEXT:        Against group GRP3:
 ; FORCE-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
-; FORCE-NEXT:      Check 8:
+; FORCE-NEXT:      Check 7:
 ; FORCE-NEXT:        Comparing group GRP2:
 ; FORCE-NEXT:          %gep.c = getelementptr inbounds i32, ptr %c, i64 %iv
 ; FORCE-NEXT:        Against group GRP4:
@@ -97,48 +92,43 @@ define void @stencil_loads_and_independent_stores_with_unknown_deps(ptr %a, ptr 
 ; AUTO-NEXT:      Check 0:
 ; AUTO-NEXT:        Comparing group GRP0:
 ; AUTO-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
-; AUTO-NEXT:        Against group GRP1:
-; AUTO-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
+; AUTO-NEXT:        Against group GRP2:
+; AUTO-NEXT:          %gep.c = getelementptr inbounds i32, ptr %c, i64 %iv
 ; AUTO-NEXT:      Check 1:
 ; AUTO-NEXT:        Comparing group GRP0:
 ; AUTO-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
-; AUTO-NEXT:        Against group GRP2:
-; AUTO-NEXT:          %gep.c = getelementptr inbounds i32, ptr %c, i64 %iv
+; AUTO-NEXT:        Against group GRP3:
+; AUTO-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
 ; AUTO-NEXT:      Check 2:
 ; AUTO-NEXT:        Comparing group GRP0:
 ; AUTO-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
-; AUTO-NEXT:        Against group GRP3:
-; AUTO-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
-; AUTO-NEXT:      Check 3:
-; AUTO-NEXT:        Comparing group GRP0:
-; AUTO-NEXT:          %gep.a.0 = getelementptr inbounds i32, ptr %a, i64 %iv.2
 ; AUTO-NEXT:        Against group GRP4:
 ; AUTO-NEXT:          %gep.b.2 = getelementptr inbounds i32, ptr %b, i64 %iv.m.2
 ; AUTO-NEXT:          %gep.b.1 = getelementptr inbounds i32, ptr %b, i64 %iv.m
 ; AUTO-NEXT:          %gep.b.0 = getelementptr inbounds i32, ptr %b, i64 %iv
-; AUTO-NEXT:      Check 4:
+; AUTO-NEXT:      Check 3:
 ; AUTO-NEXT:        Comparing group GRP1:
 ; AUTO-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
 ; AUTO-NEXT:        Against group GRP2:
 ; AUTO-NEXT:          %gep.c = getelementptr inbounds i32, ptr %c, i64 %iv
-; AUTO-NEXT:      Check 5:
+; AUTO-NEXT:      Check 4:
 ; AUTO-NEXT:        Comparing group GRP1:
 ; AUTO-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
 ; AUTO-NEXT:        Against group GRP3:
 ; AUTO-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
-; AUTO-NEXT:      Check 6:
+; AUTO-NEXT:      Check 5:
 ; AUTO-NEXT:        Comparing group GRP1:
 ; AUTO-NEXT:          %gep.a.1 = getelementptr inbounds i32, ptr %gep.a.0, i64 1
 ; AUTO-NEXT:        Against group GRP4:
 ; AUTO-NEXT:          %gep.b.2 = getelementptr inbounds i32, ptr %b, i64 %iv.m.2
 ; AUTO-NEXT:          %gep.b.1 = getelementptr inbounds i32, ptr %b, i64 %iv.m
 ; AUTO-NEXT:          %gep.b.0 = getelementptr inbounds i32, ptr %b, i64 %iv
-; AUTO-NEXT:      Check 7:
+; AUTO-NEXT:      Check 6:
 ; AUTO-NEXT:        Comparing group GRP2:
 ; AUTO-NEXT:          %gep.c = getelementptr inbounds i32, ptr %c, i64 %iv
 ; AUTO-NEXT:        Against group GRP3:
 ; AUTO-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.2.off
-; AUTO-NEXT:      Check 8:
+; AUTO-NEXT:      Check 7:
 ; AUTO-NEXT:        Comparing group GRP2:
 ; AUTO-NEXT:          %gep.c = getelementptr inbounds i32, ptr %c, i64 %iv
 ; AUTO-NEXT:        Against group GRP4:

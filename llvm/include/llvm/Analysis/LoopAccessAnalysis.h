@@ -289,7 +289,9 @@ public:
 
   /// Returns the memory dependences.  If null is returned we exceeded
   /// the MaxDependences threshold and this information is not
-  /// available.
+  /// available. Otherwise, all dependences other than NoDep in the sets
+  /// checked by areDepsSafe are recorded, except that Unknown ones are
+  /// removed after a successful retry with runtime checks.
   const SmallVectorImpl<Dependence> *getDependences() const {
     return RecordDependences ? &Dependences : nullptr;
   }
@@ -601,6 +603,8 @@ public:
     Checks.clear();
     DiffChecks.clear();
     CheckingGroups.clear();
+    ErasedDepClasses = {};
+    UnknownDeps.clear();
   }
 
   /// Insert a pointer and calculate the start and end SCEVs.
@@ -658,6 +662,12 @@ public:
   /// Information about the pointers that may require checking.
   SmallVector<PointerInfo, 2> Pointers;
 
+  /// DepCands classes erased on retry, by pointer.
+  EquivalenceClasses<Value *> ErasedDepClasses;
+
+  /// The pointers with an unknown dependence on each pointer.
+  DenseMap<Value *, SmallPtrSet<Value *, 4>> UnknownDeps;
+
   /// Holds a partitioning of pointers into "check groups".
   SmallVector<RuntimeCheckingPtrGroup, 2> CheckingGroups;
 
@@ -672,6 +682,12 @@ public:
   /// Decide whether we need to issue a run-time check for pointer at
   /// index \p I and \p J to prove their independence.
   LLVM_ABI bool needsChecking(unsigned I, unsigned J) const;
+
+  /// Returns true if \p A and \p B have an unknown dependence.
+  bool hasUnknownDep(Value *A, Value *B) const {
+    auto It = UnknownDeps.find(A);
+    return It != UnknownDeps.end() && It->second.contains(B);
+  }
 
   /// Return PointerInfo for pointer at index \p PtrIdx.
   const PointerInfo &getPointerInfo(unsigned PtrIdx) const {
