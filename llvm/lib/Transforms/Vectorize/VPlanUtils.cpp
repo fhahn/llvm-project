@@ -353,11 +353,12 @@ const SCEV *vputils::getSCEVExprForVPValue(const VPValue *V,
                     IV, SE.getTruncateOrSignExtend(Scale, IV->getType())));
           })
           .Case([&SE, &PSE, L](const VPScalarIVStepsRecipe *R) {
+            // A start index, set for parts and lanes other than the first,
+            // adds StartIndex * Step, which is not modeled.
             const SCEV *IV = getSCEVExprForVPValue(R->getOperand(0), PSE, L);
-            const SCEV *Step = getSCEVExprForVPValue(R->getOperand(1), PSE, L);
-            if (isa<SCEVCouldNotCompute>(IV) || !isa<SCEVConstant>(Step))
+            if (isa<SCEVCouldNotCompute>(IV) || R->getStartIndex())
               return SE.getCouldNotCompute();
-            return SE.getTruncateOrSignExtend(IV, Step->getType());
+            return SE.getTruncateOrSignExtend(IV, R->getScalarType());
           })
           .Default(
               [&SE](const VPRecipeBase *) { return SE.getCouldNotCompute(); });
