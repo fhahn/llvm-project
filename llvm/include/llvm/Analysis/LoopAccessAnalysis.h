@@ -14,6 +14,7 @@
 #ifndef LLVM_ANALYSIS_LOOPACCESSANALYSIS_H
 #define LLVM_ANALYSIS_LOOPACCESSANALYSIS_H
 
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/IR/DiagnosticInfo.h"
@@ -584,6 +585,9 @@ public:
     bool NeedsFreeze;
     /// True if this entry represents one arm of a forked pointer.
     bool IsForked;
+    /// If not 0, the id of the erased DepCands class with unknown dependences
+    /// the pointer belongs to.
+    unsigned UnknownDepClassId = 0;
 
     PointerInfo(Value *PointerValue, const SCEV *Start, const SCEV *End,
                 bool IsWritePtr, unsigned DependencySetId, unsigned AliasSetId,
@@ -606,6 +610,7 @@ public:
     Checks.clear();
     DiffChecks.clear();
     CheckingGroups.clear();
+    UnknownDepPtrPairs.clear();
   }
 
   /// Insert a pointer and calculate the start and end SCEVs.
@@ -685,6 +690,12 @@ public:
 
   ScalarEvolution *getSE() const { return SE; }
 
+  /// Record an unknown dependence between \p A and \p B.
+  void addUnknownDep(const Value *A, const Value *B) {
+    UnknownDepPtrPairs.insert({A, B});
+    UnknownDepPtrPairs.insert({B, A});
+  }
+
 private:
   /// Groups pointers such that a single memcheck is required
   /// between two different groups. This will clear the CheckingGroups vector
@@ -723,6 +734,9 @@ private:
   /// A list of (pointer-difference, access size) pairs that can be used to
   /// prove that there are no vectorization-preventing dependencies.
   SmallVector<PointerDiffInfo> DiffChecks;
+
+  /// Pointer pairs with an unknown dependence, in both orders.
+  DenseSet<std::pair<const Value *, const Value *>> UnknownDepPtrPairs;
 };
 
 /// Drive the analysis of memory accesses in the loop
