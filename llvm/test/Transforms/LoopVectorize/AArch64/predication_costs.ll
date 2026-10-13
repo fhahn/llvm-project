@@ -317,13 +317,12 @@ exit:
 ; Check the costs of an add and trunc feeding a store in an early-exit loop,
 ; which are not masked.
 ;
-; CHECK: Cost of 4 for VF 2: profitable to scalarize   store i16 %add.trunc, ptr %gep.dst, align 2
-; CHECK: Cost of 0 for VF 2: profitable to scalarize   %add.trunc = trunc i64 %add to i16
-; CHECK: Cost of 6 for VF 2: profitable to scalarize   %add = add i64 %iv, %x
-; CHECK: Precomputed costs for VF 2: 14
-; CHECK: Cost of 0 for VF 2: REPLICATE ir<%add> = add vp<{{.+}}>, ir<%x>
+; CHECK-NOT: profitable to scalarize
+; CHECK: Precomputed costs for VF 2: 4
+; CHECK: Cost of 2 for VF 2: REPLICATE ir<%add> = add vp<{{.+}}>, ir<%x>
 ; CHECK: Cost of 0 for VF 2: REPLICATE ir<%add.trunc> = trunc ir<%add>
-; CHECK: Cost for VF 2: 32
+; CHECK: Cost of 12 for VF 2: REPLICATE store ir<%add.trunc>, ir<%gep.dst>
+; CHECK: Cost for VF 2: 26
 ;
 define void @early_exit_store_trunc(ptr noalias %dst, ptr align 4 dereferenceable(4000) %src, i64 %x) {
 entry:
