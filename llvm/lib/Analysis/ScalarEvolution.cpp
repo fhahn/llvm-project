@@ -6904,30 +6904,37 @@ const ConstantRange &ScalarEvolution::getRangeRef(
     auto CR = getRangeForUnknownRecurrence(U);
     ConservativeResult = ConservativeResult.intersectWith(CR);
 
-    // See if ValueTracking can give us a useful range.
+    // See if ValueTracking can give us a useful range. The known bits do not
+    // depend on the sign hint, so compute them only once for both ranges.
     const DataLayout &DL = getDataLayout();
-    KnownBits Known = computeKnownBits(V, DL, &AC, nullptr, &DT);
-    if (Known.getBitWidth() != BitWidth)
-      Known = Known.zextOrTrunc(BitWidth);
+    auto [It, Inserted] = UnknownKnownBits.try_emplace(U);
+    if (Inserted) {
+      KnownBits Known = computeKnownBits(V, DL, &AC, nullptr, &DT);
+      if (Known.getBitWidth() != BitWidth)
+        Known = Known.zextOrTrunc(BitWidth);
 
-    // ValueTracking may be able to compute a tighter result for the number of
-    // sign bits than for the value of those sign bits.
-    unsigned NS = ComputeNumSignBits(V, DL, &AC, nullptr, &DT);
-    if (U->getType()->isPointerTy()) {
-      // NS counts the sign bits of the whole pointer; drop those above the
-      // index bits.
-      unsigned PtrIdxDiff =
-          DL.getPointerTypeSizeInBits(U->getType()) - BitWidth;
-      NS = NS > PtrIdxDiff ? NS - PtrIdxDiff : 1;
-    }
+      // ValueTracking may be able to compute a tighter result for the number
+      // of sign bits than for the value of those sign bits.
+      unsigned NS = ComputeNumSignBits(V, DL, &AC, nullptr, &DT);
+      if (U->getType()->isPointerTy()) {
+        // NS counts the sign bits of the whole pointer; drop those above the
+        // index bits.
+        unsigned PtrIdxDiff =
+            DL.getPointerTypeSizeInBits(U->getType()) - BitWidth;
+        NS = NS > PtrIdxDiff ? NS - PtrIdxDiff : 1;
+      }
 
-    if (NS > 1) {
-      // If we know any of the sign bits, we know all of the sign bits.
-      if (!Known.Zero.getHiBits(NS).isZero())
-        Known.Zero.setHighBits(NS);
-      if (!Known.One.getHiBits(NS).isZero())
-        Known.One.setHighBits(NS);
+      if (NS > 1) {
+        // If we know any of the sign bits, we know all of the sign bits.
+        if (!Known.Zero.getHiBits(NS).isZero())
+          Known.Zero.setHighBits(NS);
+        if (!Known.One.getHiBits(NS).isZero())
+          Known.One.setHighBits(NS);
+      }
+      It->second = {std::move(Known), NS};
     }
+    // Copy, as the recursive queries below may grow the cache.
+    auto [Known, NS] = It->second;
 
     if (Known.getMinValue() != Known.getMaxValue() + 1)
       ConservativeResult = ConservativeResult.intersectWith(
@@ -8616,6 +8623,7 @@ void ScalarEvolution::forgetAllLoops() {
   BlockDispositions.clear();
   UnsignedRanges.clear();
   SignedRanges.clear();
+  UnknownKnownBits.clear();
   ExprValueMap.clear();
   HasRecMap.clear();
   ConstantMultipleCache.clear();
@@ -14071,6 +14079,7 @@ ScalarEvolution::ScalarEvolution(ScalarEvolution &&Arg)
       SCEVUsers(std::move(Arg.SCEVUsers)),
       UnsignedRanges(std::move(Arg.UnsignedRanges)),
       SignedRanges(std::move(Arg.SignedRanges)),
+      UnknownKnownBits(std::move(Arg.UnknownKnownBits)),
       UniqueSCEVs(std::move(Arg.UniqueSCEVs)),
       UniquePreds(std::move(Arg.UniquePreds)),
       SCEVAllocator(std::move(Arg.SCEVAllocator)),
@@ -14643,6 +14652,7 @@ void ScalarEvolution::forgetMemoizedResultsImpl(const SCEV *S) {
   BlockDispositions.erase(S);
   UnsignedRanges.erase(S);
   SignedRanges.erase(S);
+  UnknownKnownBits.erase(S);
   HasRecMap.erase(S);
   ConstantMultipleCache.erase(S);
 
