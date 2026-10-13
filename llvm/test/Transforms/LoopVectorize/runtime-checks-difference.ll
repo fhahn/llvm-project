@@ -679,6 +679,318 @@ exit:
   ret void
 }
 
+; Same as @nested_loop_bound_needs_constant_correction, but with an outer
+; induction variable starting at %start and stepping by 2. The bounds are
+; expanded by scaling the IV.
+define void @nested_loop_bound_iv_with_non_unit_step(ptr %a, ptr %b, i64 %start, i64 %n) {
+; CHECK-LABEL: define void @nested_loop_bound_iv_with_non_unit_step(
+; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[START:%.*]], i64 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[START]], 2
+; CHECK-NEXT:    [[TMP1:%.*]] = shl i64 [[N]], 2
+; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP1]]
+; CHECK-NEXT:    [[TMP2:%.*]] = shl i64 [[START]], 3
+; CHECK-NEXT:    [[TMP3:%.*]] = add nuw nsw i64 [[TMP2]], 4
+; CHECK-NEXT:    [[TMP4:%.*]] = shl i64 [[N]], 3
+; CHECK-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP4]]
+; CHECK-NEXT:    [[TMP5:%.*]] = sub i64 [[N]], [[START]]
+; CHECK-NEXT:    br label %[[OUTER_HEADER:.*]]
+; CHECK:       [[OUTER_HEADER]]:
+; CHECK-NEXT:    [[INDVAR:%.*]] = phi i64 [ [[INDVAR_NEXT:%.*]], [[OUTER_LATCH:%.*]] ], [ 0, %[[ENTRY]] ]
+; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i64 [ [[START]], %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], [[OUTER_LATCH]] ]
+; CHECK-NEXT:    [[TMP6:%.*]] = mul i64 [[INDVAR]], -2
+; CHECK-NEXT:    [[TMP7:%.*]] = add i64 [[TMP5]], [[TMP6]]
+; CHECK-NEXT:    [[TMP8:%.*]] = shl i64 [[INDVAR]], 3
+; CHECK-NEXT:    [[TMP9:%.*]] = add i64 [[TMP0]], [[TMP8]]
+; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP9]]
+; CHECK-NEXT:    [[TMP10:%.*]] = shl i64 [[INDVAR]], 4
+; CHECK-NEXT:    [[TMP11:%.*]] = add i64 [[TMP3]], [[TMP10]]
+; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP11]]
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP7]], 4
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
+; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[SCEVGEP]], [[SCEVGEP3]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SCEVGEP2]], [[SCEVGEP1]]
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
+;
+entry:
+  br label %outer.header
+
+outer.header:
+  %outer.iv = phi i64 [ %start, %entry ], [ %outer.iv.next, %outer.latch ]
+  br label %inner.body
+
+inner.body:
+  %inner.iv = phi i64 [ %outer.iv, %outer.header ], [ %inner.iv.next, %inner.body ]
+  %gep.a = getelementptr inbounds { i32, i32 }, ptr %a, i64 %inner.iv, i32 1
+  %l = load i32, ptr %gep.a, align 4
+  %gep.b = getelementptr inbounds i32, ptr %b, i64 %inner.iv
+  store i32 %l, ptr %gep.b, align 4
+  %inner.iv.next = add nuw nsw i64 %inner.iv, 1
+  %inner.cond = icmp eq i64 %inner.iv.next, %n
+  br i1 %inner.cond, label %outer.latch, label %inner.body
+
+outer.latch:
+  %outer.iv.next = add nuw nsw i64 %outer.iv, 2
+  %outer.cond = icmp sge i64 %outer.iv.next, %n
+  br i1 %outer.cond, label %exit, label %outer.header
+
+exit:
+  ret void
+}
+
+; Same as @nested_loop_bound_needs_constant_correction, but the inner loop
+; starts at %outer.iv + %off. The bounds are expanded as a loop-invariant
+; offset from the scaled IV.
+define void @nested_loop_bound_needs_invariant_correction(ptr %a, ptr %b, i64 %start, i64 %off, i64 %n) {
+; CHECK-LABEL: define void @nested_loop_bound_needs_invariant_correction(
+; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[START:%.*]], i64 [[OFF:%.*]], i64 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[OFF]], [[START]]
+; CHECK-NEXT:    [[TMP1:%.*]] = shl i64 [[TMP0]], 2
+; CHECK-NEXT:    [[TMP2:%.*]] = shl i64 [[N]], 2
+; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP2]]
+; CHECK-NEXT:    [[TMP3:%.*]] = shl i64 [[TMP0]], 3
+; CHECK-NEXT:    [[TMP4:%.*]] = add nuw nsw i64 [[TMP3]], 4
+; CHECK-NEXT:    [[TMP5:%.*]] = shl i64 [[N]], 3
+; CHECK-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP5]]
+; CHECK-NEXT:    [[TMP6:%.*]] = sub i64 [[N]], [[OFF]]
+; CHECK-NEXT:    [[TMP7:%.*]] = sub i64 [[TMP6]], [[START]]
+; CHECK-NEXT:    br label %[[OUTER_HEADER:.*]]
+; CHECK:       [[OUTER_HEADER]]:
+; CHECK-NEXT:    [[INDVAR:%.*]] = phi i64 [ [[INDVAR_NEXT:%.*]], [[OUTER_LATCH:%.*]] ], [ 0, %[[ENTRY]] ]
+; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i64 [ [[START]], %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], [[OUTER_LATCH]] ]
+; CHECK-NEXT:    [[TMP8:%.*]] = mul i64 [[INDVAR]], -1
+; CHECK-NEXT:    [[TMP9:%.*]] = add i64 [[TMP7]], [[TMP8]]
+; CHECK-NEXT:    [[TMP10:%.*]] = shl i64 [[INDVAR]], 2
+; CHECK-NEXT:    [[TMP11:%.*]] = add i64 [[TMP1]], [[TMP10]]
+; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP11]]
+; CHECK-NEXT:    [[TMP12:%.*]] = shl i64 [[INDVAR]], 3
+; CHECK-NEXT:    [[TMP13:%.*]] = add i64 [[TMP4]], [[TMP12]]
+; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP13]]
+; CHECK-NEXT:    [[INNER_START:%.*]] = add i64 [[OUTER_IV]], [[OFF]]
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP9]], 4
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
+; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[SCEVGEP]], [[SCEVGEP3]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SCEVGEP2]], [[SCEVGEP1]]
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
+;
+entry:
+  br label %outer.header
+
+outer.header:
+  %outer.iv = phi i64 [ %start, %entry ], [ %outer.iv.next, %outer.latch ]
+  %inner.start = add i64 %outer.iv, %off
+  br label %inner.body
+
+inner.body:
+  %inner.iv = phi i64 [ %inner.start, %outer.header ], [ %inner.iv.next, %inner.body ]
+  %gep.a = getelementptr inbounds { i32, i32 }, ptr %a, i64 %inner.iv, i32 1
+  %l = load i32, ptr %gep.a, align 4
+  %gep.b = getelementptr inbounds i32, ptr %b, i64 %inner.iv
+  store i32 %l, ptr %gep.b, align 4
+  %inner.iv.next = add nuw nsw i64 %inner.iv, 1
+  %inner.cond = icmp eq i64 %inner.iv.next, %n
+  br i1 %inner.cond, label %outer.latch, label %inner.body
+
+outer.latch:
+  %outer.iv.next = add nuw nsw i64 %outer.iv, 1
+  %outer.cond = icmp eq i64 %outer.iv.next, %n
+  br i1 %outer.cond, label %exit, label %outer.header
+
+exit:
+  ret void
+}
+
+; Same as @nested_loop_bound_needs_constant_correction, but the inner loop
+; starts at %outer.iv * %s, so the bounds have a loop-invariant step. The
+; bounds are expanded by scaling the IV by a loop-invariant factor.
+define void @nested_loop_bound_with_invariant_step(ptr %a, ptr %b, i64 %start, i64 %s, i64 %n) {
+; CHECK-LABEL: define void @nested_loop_bound_with_invariant_step(
+; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[START:%.*]], i64 [[S:%.*]], i64 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = mul i64 [[S]], [[START]]
+; CHECK-NEXT:    [[TMP1:%.*]] = shl i64 [[TMP0]], 2
+; CHECK-NEXT:    [[TMP2:%.*]] = shl i64 [[S]], 2
+; CHECK-NEXT:    [[TMP3:%.*]] = shl i64 [[N]], 2
+; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP3]]
+; CHECK-NEXT:    [[TMP4:%.*]] = shl i64 [[TMP0]], 3
+; CHECK-NEXT:    [[TMP5:%.*]] = add nuw nsw i64 [[TMP4]], 4
+; CHECK-NEXT:    [[TMP6:%.*]] = shl i64 [[S]], 3
+; CHECK-NEXT:    [[TMP7:%.*]] = shl i64 [[N]], 3
+; CHECK-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP7]]
+; CHECK-NEXT:    [[TMP8:%.*]] = mul i64 [[S]], [[START]]
+; CHECK-NEXT:    [[TMP9:%.*]] = sub i64 [[N]], [[TMP8]]
+; CHECK-NEXT:    [[TMP10:%.*]] = sub i64 0, [[S]]
+; CHECK-NEXT:    br label %[[OUTER_HEADER:.*]]
+; CHECK:       [[OUTER_HEADER]]:
+; CHECK-NEXT:    [[INDVAR:%.*]] = phi i64 [ [[INDVAR_NEXT:%.*]], [[OUTER_LATCH:%.*]] ], [ 0, %[[ENTRY]] ]
+; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i64 [ [[START]], %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], [[OUTER_LATCH]] ]
+; CHECK-NEXT:    [[TMP11:%.*]] = mul i64 [[TMP10]], [[INDVAR]]
+; CHECK-NEXT:    [[TMP12:%.*]] = add i64 [[TMP9]], [[TMP11]]
+; CHECK-NEXT:    [[TMP13:%.*]] = mul i64 [[TMP2]], [[INDVAR]]
+; CHECK-NEXT:    [[TMP14:%.*]] = add i64 [[TMP1]], [[TMP13]]
+; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP14]]
+; CHECK-NEXT:    [[TMP15:%.*]] = mul i64 [[TMP6]], [[INDVAR]]
+; CHECK-NEXT:    [[TMP16:%.*]] = add i64 [[TMP5]], [[TMP15]]
+; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP16]]
+; CHECK-NEXT:    [[INNER_START:%.*]] = mul i64 [[OUTER_IV]], [[S]]
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP12]], 4
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
+; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[SCEVGEP]], [[SCEVGEP3]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SCEVGEP2]], [[SCEVGEP1]]
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
+;
+entry:
+  br label %outer.header
+
+outer.header:
+  %outer.iv = phi i64 [ %start, %entry ], [ %outer.iv.next, %outer.latch ]
+  %inner.start = mul i64 %outer.iv, %s
+  br label %inner.body
+
+inner.body:
+  %inner.iv = phi i64 [ %inner.start, %outer.header ], [ %inner.iv.next, %inner.body ]
+  %gep.a = getelementptr inbounds { i32, i32 }, ptr %a, i64 %inner.iv, i32 1
+  %l = load i32, ptr %gep.a, align 4
+  %gep.b = getelementptr inbounds i32, ptr %b, i64 %inner.iv
+  store i32 %l, ptr %gep.b, align 4
+  %inner.iv.next = add nuw nsw i64 %inner.iv, 1
+  %inner.cond = icmp eq i64 %inner.iv.next, %n
+  br i1 %inner.cond, label %outer.latch, label %inner.body
+
+outer.latch:
+  %outer.iv.next = add nuw nsw i64 %outer.iv, 1
+  %outer.cond = icmp eq i64 %outer.iv.next, %n
+  br i1 %outer.cond, label %exit, label %outer.header
+
+exit:
+  ret void
+}
+
+; Same as @nested_loop_bound_reuses_scaled_iv, but the start of %scaled.iv is
+; a disjoint or, which may be poison where its SCEV is not. %scaled.iv must
+; not be reused for the bound.
+define void @nested_loop_bound_does_not_reuse_scaled_iv_with_disjoint_or_start(ptr %a, ptr %b, ptr %c, i64 %x, i64 %n) {
+; CHECK-LABEL: define void @nested_loop_bound_does_not_reuse_scaled_iv_with_disjoint_or_start(
+; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], ptr [[C:%.*]], i64 [[X:%.*]], i64 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[SCALED_START:%.*]] = or disjoint i64 [[X]], 1
+; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[N]], 2
+; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP0]]
+; CHECK-NEXT:    [[TMP1:%.*]] = shl i64 [[N]], 3
+; CHECK-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP1]]
+; CHECK-NEXT:    br label %[[OUTER_HEADER:.*]]
+; CHECK:       [[OUTER_HEADER]]:
+; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], [[OUTER_LATCH:%.*]] ]
+; CHECK-NEXT:    [[SCALED_IV:%.*]] = phi i64 [ [[SCALED_START]], %[[ENTRY]] ], [ [[SCALED_IV_NEXT:%.*]], [[OUTER_LATCH]] ]
+; CHECK-NEXT:    [[TMP2:%.*]] = shl i64 [[OUTER_IV]], 2
+; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP2]]
+; CHECK-NEXT:    [[TMP3:%.*]] = shl i64 [[OUTER_IV]], 3
+; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[TMP3]], 4
+; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP4]]
+; CHECK-NEXT:    [[TMP5:%.*]] = sub i64 [[N]], [[OUTER_IV]]
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP5]], 4
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
+; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[SCEVGEP]], [[SCEVGEP3]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SCEVGEP2]], [[SCEVGEP1]]
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
+;
+entry:
+  %scaled.start = or disjoint i64 %x, 1
+  br label %outer.header
+
+outer.header:
+  %outer.iv = phi i64 [ 0, %entry ], [ %outer.iv.next, %outer.latch ]
+  %scaled.iv = phi i64 [ %scaled.start, %entry ], [ %scaled.iv.next, %outer.latch ]
+  br label %inner.body
+
+inner.body:
+  %inner.iv = phi i64 [ %outer.iv, %outer.header ], [ %inner.iv.next, %inner.body ]
+  %gep.a = getelementptr inbounds { i32, i32 }, ptr %a, i64 %inner.iv, i32 1
+  %l = load i32, ptr %gep.a, align 4
+  %gep.b = getelementptr inbounds i32, ptr %b, i64 %inner.iv
+  store i32 %l, ptr %gep.b, align 4
+  %inner.iv.next = add nuw nsw i64 %inner.iv, 1
+  %inner.cond = icmp eq i64 %inner.iv.next, %n
+  br i1 %inner.cond, label %outer.latch, label %inner.body
+
+outer.latch:
+  store i64 %scaled.iv, ptr %c, align 8
+  %scaled.iv.next = add i64 %scaled.iv, 8
+  %outer.iv.next = add nuw nsw i64 %outer.iv, 1
+  %outer.cond = icmp eq i64 %outer.iv.next, %n
+  br i1 %outer.cond, label %exit, label %outer.header
+
+exit:
+  ret void
+}
+
+; Same as @nested_loop_bound_reuses_scaled_iv, but %scaled.iv starts at %x,
+; which the bound does not depend on. %scaled.iv must not be reused for the
+; bound, as %x may be poison.
+define void @nested_loop_bound_does_not_reuse_scaled_iv_with_unrelated_start(ptr %a, ptr %b, ptr %c, i64 %x, i64 %n) {
+; CHECK-LABEL: define void @nested_loop_bound_does_not_reuse_scaled_iv_with_unrelated_start(
+; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], ptr [[C:%.*]], i64 [[X:%.*]], i64 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[N]], 2
+; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP0]]
+; CHECK-NEXT:    [[TMP1:%.*]] = shl i64 [[N]], 3
+; CHECK-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP1]]
+; CHECK-NEXT:    br label %[[OUTER_HEADER:.*]]
+; CHECK:       [[OUTER_HEADER]]:
+; CHECK-NEXT:    [[SCALED_IV:%.*]] = phi i64 [ [[X]], %[[ENTRY]] ], [ [[SCALED_IV_NEXT:%.*]], [[OUTER_LATCH:%.*]] ]
+; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], [[OUTER_LATCH]] ]
+; CHECK-NEXT:    [[TMP2:%.*]] = shl i64 [[OUTER_IV]], 2
+; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP2]]
+; CHECK-NEXT:    [[TMP3:%.*]] = shl i64 [[OUTER_IV]], 3
+; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[TMP3]], 4
+; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP4]]
+; CHECK-NEXT:    [[TMP5:%.*]] = sub i64 [[N]], [[OUTER_IV]]
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP5]], 4
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
+; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[SCEVGEP]], [[SCEVGEP3]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[SCEVGEP2]], [[SCEVGEP1]]
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], [[VECTOR_PH:label %.*]]
+;
+entry:
+  br label %outer.header
+
+outer.header:
+  %scaled.iv = phi i64 [ %x, %entry ], [ %scaled.iv.next, %outer.latch ]
+  %outer.iv = phi i64 [ 0, %entry ], [ %outer.iv.next, %outer.latch ]
+  br label %inner.body
+
+inner.body:
+  %inner.iv = phi i64 [ %outer.iv, %outer.header ], [ %inner.iv.next, %inner.body ]
+  %gep.a = getelementptr inbounds { i32, i32 }, ptr %a, i64 %inner.iv, i32 1
+  %l = load i32, ptr %gep.a, align 4
+  %gep.b = getelementptr inbounds i32, ptr %b, i64 %inner.iv
+  store i32 %l, ptr %gep.b, align 4
+  %inner.iv.next = add nuw nsw i64 %inner.iv, 1
+  %inner.cond = icmp eq i64 %inner.iv.next, %n
+  br i1 %inner.cond, label %outer.latch, label %inner.body
+
+outer.latch:
+  store i64 %scaled.iv, ptr %c, align 8
+  %scaled.iv.next = add i64 %scaled.iv, 8
+  %outer.iv.next = add nuw nsw i64 %outer.iv, 1
+  %outer.cond = icmp eq i64 %outer.iv.next, %n
+  br i1 %outer.cond, label %exit, label %outer.header
+
+exit:
+  ret void
+}
+
 ; Test case where the AddRec for the pointers in the inner loop have the AddRec
 ; of the outer loop as start value. It is sufficient to subtract the start
 ; values (%dst, %src) of the outer AddRecs.
