@@ -10,22 +10,45 @@
 define i32 @add_reduction_shared_exit_block(ptr align 4 dereferenceable(4092) %src) {
 ; CHECK-LABEL: define i32 @add_reduction_shared_exit_block(
 ; CHECK-SAME: ptr align 4 dereferenceable(4092) [[SRC:%.*]]) {
-; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY_INTERIM:.*]] ]
+; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[TMP2:%.*]], %[[VECTOR_BODY_INTERIM]] ]
+; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[SRC]], i64 [[INDEX]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP0]], align 4
+; CHECK-NEXT:    [[TMP1:%.*]] = icmp eq <4 x i32> [[WIDE_LOAD]], zeroinitializer
+; CHECK-NEXT:    [[TMP2]] = add <4 x i32> [[VEC_PHI]], [[WIDE_LOAD]]
+; CHECK-NEXT:    [[TMP3:%.*]] = freeze <4 x i1> [[TMP1]]
+; CHECK-NEXT:    [[TMP4:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP3]])
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; CHECK-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1020
+; CHECK-NEXT:    br i1 [[TMP4]], label %[[VECTOR_EARLY_EXIT:.*]], label %[[VECTOR_BODY_INTERIM]]
+; CHECK:       [[VECTOR_BODY_INTERIM]]:
+; CHECK-NEXT:    br i1 [[TMP5]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP0:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[TMP6:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[TMP2]])
+; CHECK-NEXT:    br label %[[SCALAR_PH:.*]]
+; CHECK:       [[VECTOR_EARLY_EXIT]]:
+; CHECK-NEXT:    br label %[[EXIT:.*]]
+; CHECK:       [[SCALAR_PH]]:
 ; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
 ; CHECK:       [[LOOP_HEADER]]:
-; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
-; CHECK-NEXT:    [[RED:%.*]] = phi i32 [ 0, %[[ENTRY]] ], [ [[RED_NEXT:%.*]], %[[LOOP_LATCH]] ]
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 1020, %[[SCALAR_PH]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
+; CHECK-NEXT:    [[RED:%.*]] = phi i32 [ [[TMP6]], %[[SCALAR_PH]] ], [ [[RED_NEXT:%.*]], %[[LOOP_LATCH]] ]
 ; CHECK-NEXT:    [[GEP:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[SRC]], i64 [[IV]]
 ; CHECK-NEXT:    [[L:%.*]] = load i32, ptr [[GEP]], align 4
 ; CHECK-NEXT:    [[CMP:%.*]] = icmp eq i32 [[L]], 0
-; CHECK-NEXT:    br i1 [[CMP]], label %[[EXIT:.*]], label %[[LOOP_LATCH]]
+; CHECK-NEXT:    br i1 [[CMP]], label %[[EXIT]], label %[[LOOP_LATCH]]
 ; CHECK:       [[LOOP_LATCH]]:
 ; CHECK-NEXT:    [[RED_NEXT]] = add i32 [[RED]], [[L]]
 ; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
 ; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], 1023
-; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP_HEADER]]
+; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT]], label %[[LOOP_HEADER]], !llvm.loop [[LOOP3:![0-9]+]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[RES:%.*]] = phi i32 [ -1, %[[LOOP_HEADER]] ], [ [[RED_NEXT]], %[[LOOP_LATCH]] ]
+; CHECK-NEXT:    [[RES:%.*]] = phi i32 [ -1, %[[LOOP_HEADER]] ], [ [[RED_NEXT]], %[[LOOP_LATCH]] ], [ -1, %[[VECTOR_EARLY_EXIT]] ]
 ; CHECK-NEXT:    ret i32 [[RES]]
 ;
 entry:
@@ -54,28 +77,38 @@ exit:
 define i32 @add_reduction_early_exit_to_trap(ptr align 4 dereferenceable(4096) %src, i32 %off) {
 ; CHECK-LABEL: define i32 @add_reduction_early_exit_to_trap(
 ; CHECK-SAME: ptr align 4 dereferenceable(4096) [[SRC:%.*]], i32 [[OFF:%.*]]) {
-; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    br label %[[LOOP_HEADER:.*]]
-; CHECK:       [[LOOP_HEADER]]:
-; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[IV_NEXT:%.*]], %[[LOOP_LATCH:.*]] ]
-; CHECK-NEXT:    [[RED:%.*]] = phi i32 [ 0, %[[ENTRY]] ], [ [[RED_NEXT:%.*]], %[[LOOP_LATCH]] ]
-; CHECK-NEXT:    [[GEP:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[SRC]], i64 [[IV]]
-; CHECK-NEXT:    [[L:%.*]] = load i32, ptr [[GEP]], align 4
-; CHECK-NEXT:    [[SUB:%.*]] = call { i32, i1 } @llvm.usub.with.overflow.i32(i32 [[L]], i32 [[OFF]])
-; CHECK-NEXT:    [[OV:%.*]] = extractvalue { i32, i1 } [[SUB]], 1
-; CHECK-NEXT:    br i1 [[OV]], label %[[TRAP:.*]], label %[[LOOP_LATCH]]
-; CHECK:       [[LOOP_LATCH]]:
-; CHECK-NEXT:    [[VAL:%.*]] = extractvalue { i32, i1 } [[SUB]], 0
-; CHECK-NEXT:    [[RED_NEXT]] = add i32 [[RED]], [[VAL]]
-; CHECK-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
-; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], 1024
-; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT:.*]], label %[[LOOP_HEADER]]
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    br label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <4 x i32> poison, i32 [[OFF]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <4 x i32> [[BROADCAST_SPLATINSERT]], <4 x i32> poison, <4 x i32> zeroinitializer
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY_INTERIM:.*]] ]
+; CHECK-NEXT:    [[VEC_PHI:%.*]] = phi <4 x i32> [ zeroinitializer, %[[VECTOR_PH]] ], [ [[TMP4:%.*]], %[[VECTOR_BODY_INTERIM]] ]
+; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw [4 x i8], ptr [[SRC]], i64 [[INDEX]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP0]], align 4
+; CHECK-NEXT:    [[TMP1:%.*]] = call { <4 x i32>, <4 x i1> } @llvm.usub.with.overflow.v4i32(<4 x i32> [[WIDE_LOAD]], <4 x i32> [[BROADCAST_SPLAT]])
+; CHECK-NEXT:    [[TMP2:%.*]] = extractvalue { <4 x i32>, <4 x i1> } [[TMP1]], 1
+; CHECK-NEXT:    [[TMP3:%.*]] = extractvalue { <4 x i32>, <4 x i1> } [[TMP1]], 0
+; CHECK-NEXT:    [[TMP4]] = add <4 x i32> [[VEC_PHI]], [[TMP3]]
+; CHECK-NEXT:    [[TMP5:%.*]] = freeze <4 x i1> [[TMP2]]
+; CHECK-NEXT:    [[TMP6:%.*]] = call i1 @llvm.vector.reduce.or.v4i1(<4 x i1> [[TMP5]])
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
+; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[INDEX_NEXT]], 1024
+; CHECK-NEXT:    br i1 [[TMP6]], label %[[VECTOR_EARLY_EXIT:.*]], label %[[VECTOR_BODY_INTERIM]]
+; CHECK:       [[VECTOR_BODY_INTERIM]]:
+; CHECK-NEXT:    br i1 [[TMP7]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[TMP8:%.*]] = call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[TMP4]])
+; CHECK-NEXT:    br label %[[EXIT:.*]]
+; CHECK:       [[VECTOR_EARLY_EXIT]]:
+; CHECK-NEXT:    br label %[[TRAP:.*]]
 ; CHECK:       [[TRAP]]:
 ; CHECK-NEXT:    call void @llvm.trap()
 ; CHECK-NEXT:    unreachable
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[RED_NEXT_LCSSA:%.*]] = phi i32 [ [[RED_NEXT]], %[[LOOP_LATCH]] ]
-; CHECK-NEXT:    ret i32 [[RED_NEXT_LCSSA]]
+; CHECK-NEXT:    ret i32 [[TMP8]]
 ;
 entry:
   br label %loop.header
@@ -152,3 +185,10 @@ early.exit:
 exit:
   ret float %red.next
 }
+;.
+; CHECK: [[LOOP0]] = distinct !{[[LOOP0]], [[META1:![0-9]+]], [[META2:![0-9]+]]}
+; CHECK: [[META1]] = !{!"llvm.loop.isvectorized", i32 1}
+; CHECK: [[META2]] = !{!"llvm.loop.unroll.runtime.disable"}
+; CHECK: [[LOOP3]] = distinct !{[[LOOP3]], [[META2]], [[META1]]}
+; CHECK: [[LOOP4]] = distinct !{[[LOOP4]], [[META1]], [[META2]]}
+;.
