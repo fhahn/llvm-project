@@ -200,6 +200,10 @@ protected:
   /// Called to account for a load or store.
   virtual void onMemAccess(){};
 
+  /// Called for a live loop whose full unrolling was deferred until after
+  /// vectorization; \p ExtraCost is the size the unroll will add.
+  virtual void onDeferredLoopUnroll(int64_t ExtraCost) {}
+
   /// Called to account for the expectation the inlining would result in a load
   /// elimination.
   virtual void onLoadEliminationOpportunity() {}
@@ -595,6 +599,8 @@ class InlineCostCallAnalyzer final : public CallAnalyzer {
   void onCallPenalty() override { addCost(Opts.inline_call_penalty); }
 
   void onMemAccess() override { addCost(Opts.inline_memaccess_cost); }
+
+  void onDeferredLoopUnroll(int64_t ExtraCost) override { addCost(ExtraCost); }
 
   void onCallArgumentSetup(const CallBase &Call) override {
     // Pay the price of the argument setup. We account for the average 1
@@ -2637,6 +2643,17 @@ bool CallAnalyzer::visitInstruction(Instruction &I) {
 InlineResult
 CallAnalyzer::analyzeBlock(BasicBlock *BB,
                            const SmallPtrSetImpl<const Value *> &EphValues) {
+  // A loop deferred for vectorization is still rolled, but will be fully
+  // unrolled if it is not vectorized. Account for the size it will grow to, so
+  // a callee that is about to be expanded is not inlined into every caller.
+  if (MDNode *LoopID = BB->getTerminator()->getMetadata(LLVMContext::MD_loop))
+    if (MDNode *MD = findOptionMDForLoopID(
+            LoopID, LLVMLoopUnrollDeferredForVectorization);
+        MD && MD->getNumOperands() == 2)
+      if (auto *ExtraCost =
+              mdconst::dyn_extract<ConstantInt>(MD->getOperand(1)))
+        onDeferredLoopUnroll(ExtraCost->getSExtValue());
+
   for (Instruction &I : *BB) {
     // FIXME: Currently, the number of instructions in a function regardless of
     // our ability to simplify them during inline to constants or dead code,

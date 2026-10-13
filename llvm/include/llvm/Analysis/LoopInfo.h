@@ -647,6 +647,13 @@ public:
 LLVM_ABI void printLoop(const Loop &L, raw_ostream &OS,
                         const std::string &Banner = "");
 
+/// Loop attribute marking a loop whose full unrolling has been deferred until
+/// after the loop vectorizer. The operand is the extra cost (in inline cost
+/// units) the eventual full unroll will add, which the inliner charges while
+/// the loop is still rolled.
+inline constexpr char LLVMLoopUnrollDeferredForVectorization[] =
+    "llvm.loop.unroll.deferred_for_vectorization";
+
 /// Find and return the loop attribute node for the attribute @p Name in
 /// @p LoopID. Return nullptr if there is no such attribute.
 LLVM_ABI MDNode *findOptionMDForLoopID(MDNode *LoopID, StringRef Name);
