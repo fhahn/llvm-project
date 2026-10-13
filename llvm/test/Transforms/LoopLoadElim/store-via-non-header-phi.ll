@@ -4,12 +4,44 @@
 ; The store through %ptr.phi may write to %a[iv + 1] between the store and the
 ; load of it in the next iteration, so its incoming pointers must be checked
 ; against %a.
-; FIXME: The load is forwarded without checking the incoming pointers of
-; %ptr.phi.
 define void @store_via_non_header_phi(ptr %a, ptr %b, ptr %c, i1 %cond, i64 %n) {
 ; CHECK-LABEL: define void @store_via_non_header_phi(
 ; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], ptr [[C:%.*]], i1 [[COND:%.*]], i64 [[N:%.*]]) {
-; CHECK-NEXT:  [[LOOP_PH:.*]]:
+; CHECK-NEXT:  [[LOOP_LVER_CHECK:.*:]]
+; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[N]], 2
+; CHECK-NEXT:    [[TMP1:%.*]] = add i64 [[TMP0]], 4
+; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP1]]
+; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[C]], i64 [[TMP0]]
+; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP0]]
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[A]], [[SCEVGEP1]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[C]], [[SCEVGEP]]
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    [[BOUND03:%.*]] = icmp ult ptr [[A]], [[SCEVGEP2]]
+; CHECK-NEXT:    [[BOUND14:%.*]] = icmp ult ptr [[B]], [[SCEVGEP]]
+; CHECK-NEXT:    [[FOUND_CONFLICT5:%.*]] = and i1 [[BOUND03]], [[BOUND14]]
+; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT5]]
+; CHECK-NEXT:    br i1 [[CONFLICT_RDX]], label %[[LOOP_PH_LVER_ORIG:.*]], label %[[LOOP_PH:.*]]
+; CHECK:       [[LOOP_PH_LVER_ORIG]]:
+; CHECK-NEXT:    br label %[[LOOP_LVER_ORIG:.*]]
+; CHECK:       [[LOOP_LVER_ORIG]]:
+; CHECK-NEXT:    [[IV_LVER_ORIG:%.*]] = phi i64 [ 0, %[[LOOP_PH_LVER_ORIG]] ], [ [[IV_NEXT_LVER_ORIG:%.*]], %[[LOOP_LATCH_LVER_ORIG:.*]] ]
+; CHECK-NEXT:    [[IV_NEXT_LVER_ORIG]] = add nuw nsw i64 [[IV_LVER_ORIG]], 1
+; CHECK-NEXT:    [[GEP_A_NEXT_LVER_ORIG:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[IV_NEXT_LVER_ORIG]]
+; CHECK-NEXT:    [[IV_TRUNC_LVER_ORIG:%.*]] = trunc i64 [[IV_LVER_ORIG]] to i32
+; CHECK-NEXT:    store i32 [[IV_TRUNC_LVER_ORIG]], ptr [[GEP_A_NEXT_LVER_ORIG]], align 4
+; CHECK-NEXT:    [[GEP_A_LVER_ORIG:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[IV_LVER_ORIG]]
+; CHECK-NEXT:    [[L_A_LVER_ORIG:%.*]] = load i32, ptr [[GEP_A_LVER_ORIG]], align 4
+; CHECK-NEXT:    [[GEP_B_LVER_ORIG:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[IV_LVER_ORIG]]
+; CHECK-NEXT:    [[GEP_C_LVER_ORIG:%.*]] = getelementptr inbounds i32, ptr [[C]], i64 [[IV_LVER_ORIG]]
+; CHECK-NEXT:    br i1 [[COND]], label %[[LOOP_THEN_LVER_ORIG:.*]], label %[[LOOP_LATCH_LVER_ORIG]]
+; CHECK:       [[LOOP_THEN_LVER_ORIG]]:
+; CHECK-NEXT:    br label %[[LOOP_LATCH_LVER_ORIG]]
+; CHECK:       [[LOOP_LATCH_LVER_ORIG]]:
+; CHECK-NEXT:    [[PTR_PHI_LVER_ORIG:%.*]] = phi ptr [ [[GEP_B_LVER_ORIG]], %[[LOOP_THEN_LVER_ORIG]] ], [ [[GEP_C_LVER_ORIG]], %[[LOOP_LVER_ORIG]] ]
+; CHECK-NEXT:    store i32 [[L_A_LVER_ORIG]], ptr [[PTR_PHI_LVER_ORIG]], align 4
+; CHECK-NEXT:    [[EC_LVER_ORIG:%.*]] = icmp eq i64 [[IV_NEXT_LVER_ORIG]], [[N]]
+; CHECK-NEXT:    br i1 [[EC_LVER_ORIG]], label %[[EXIT_LOOPEXIT:.*]], label %[[LOOP_LVER_ORIG]]
+; CHECK:       [[LOOP_PH]]:
 ; CHECK-NEXT:    [[LOAD_INITIAL:%.*]] = load i32, ptr [[A]], align 4
 ; CHECK-NEXT:    br label %[[LOOP:.*]]
 ; CHECK:       [[LOOP]]:
@@ -31,7 +63,11 @@ define void @store_via_non_header_phi(ptr %a, ptr %b, ptr %c, i1 %cond, i64 %n) 
 ; CHECK-NEXT:    store i32 [[STORE_FORWARDED]], ptr [[PTR_PHI]], align 4
 ; CHECK-NEXT:    [[EC:%.*]] = icmp eq i64 [[IV_NEXT]], [[N]]
 ; CHECK-NEXT:    br i1 [[EC]], label %[[EXIT_LOOPEXIT6:.*]], label %[[LOOP]]
+; CHECK:       [[EXIT_LOOPEXIT]]:
+; CHECK-NEXT:    br label %[[EXIT:.*]]
 ; CHECK:       [[EXIT_LOOPEXIT6]]:
+; CHECK-NEXT:    br label %[[EXIT]]
+; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void
 ;
 entry:

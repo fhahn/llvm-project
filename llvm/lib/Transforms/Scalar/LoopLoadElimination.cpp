@@ -366,18 +366,16 @@ public:
 
     // We're looking for stores after the first forwarding store until the end
     // of the loop, then from the beginning of the loop until the last
-    // forwarded-to load.  Collect the pointer for the stores.
+    // forwarded-to load.  Collect the store pointers as used by the runtime
+    // checks, i.e. the incoming pointers for stores through non-header phis.
     SmallPtrSet<Value *, 4> PtrsWrittenOnFwdingPath;
 
-    auto InsertStorePtr = [&](Instruction *I) {
-      if (auto *S = dyn_cast<StoreInst>(I))
-        PtrsWrittenOnFwdingPath.insert(S->getPointerOperand());
-    };
-    const auto &MemInstrs = LAI.getDepChecker().getMemoryInstructions();
-    std::for_each(MemInstrs.begin() + getInstrIndex(FirstStore) + 1,
-                  MemInstrs.end(), InsertStorePtr);
-    std::for_each(MemInstrs.begin(), &MemInstrs[getInstrIndex(LastLoad)],
-                  InsertStorePtr);
+    const MemoryDepChecker &DepChecker = LAI.getDepChecker();
+    unsigned FirstStoreIdx = getInstrIndex(FirstStore);
+    unsigned LastLoadIdx = getInstrIndex(LastLoad);
+    for (auto [Idx, I] : enumerate(DepChecker.getMemoryInstructions()))
+      if (isa<StoreInst>(I) && (Idx > FirstStoreIdx || Idx < LastLoadIdx))
+        PtrsWrittenOnFwdingPath.insert(DepChecker.getAccess(Idx).getPointer());
 
     return PtrsWrittenOnFwdingPath;
   }
