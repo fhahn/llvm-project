@@ -300,7 +300,6 @@ define void @narrow_i8_nusw_implies_wide_i32_nusw_step_equal_pred(ptr %src, ptr 
 ; CHECK-NEXT:      SCEV assumptions:
 ; CHECK-NEXT:      {-56,+,(trunc i32 %step to i8)}<%loop> Added Flags: <nusw>
 ; CHECK-NEXT:      Equal predicate: %step == (sext i8 (trunc i32 %step to i8) to i32)
-; CHECK-NEXT:      {200,+,%step}<%loop> Added Flags: <nusw>
 ; CHECK-NEXT:      {(800 + %src),+,(4 * (sext i32 %step to i64))<nsw>}<%loop> Added Flags: <nusw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Expressions re-written:
@@ -354,7 +353,6 @@ define void @narrow_i8_nusw_implies_wide_i32_nusw_start_equal_pred(ptr %src, ptr
 ; CHECK-NEXT:      SCEV assumptions:
 ; CHECK-NEXT:      {(trunc i32 %start to i8),+,%s}<%loop> Added Flags: <nusw>
 ; CHECK-NEXT:      Equal predicate: %start == (zext i8 (trunc i32 %start to i8) to i32)
-; CHECK-NEXT:      {%start,+,(sext i8 %s to i32)}<%loop> Added Flags: <nusw>
 ; CHECK-NEXT:      {((4 * (zext i32 %start to i64))<nuw><nsw> + %src),+,(4 * (sext i8 %s to i64))<nsw>}<%loop> Added Flags: <nusw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Expressions re-written:
@@ -410,7 +408,6 @@ define void @narrow_i8_nusw_implies_wide_i32_nssw_step_equal_pred(ptr %src, ptr 
 ; CHECK-NEXT:      SCEV assumptions:
 ; CHECK-NEXT:      {-56,+,(trunc i32 %step to i8)}<%loop> Added Flags: <nusw>
 ; CHECK-NEXT:      Equal predicate: %step == (sext i8 (trunc i32 %step to i8) to i32)
-; CHECK-NEXT:      {200,+,%step}<%loop> Added Flags: <nssw>
 ; CHECK-NEXT:      {(800 + %src),+,(4 * (sext i32 %step to i64))<nsw>}<%loop> Added Flags: <nusw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Expressions re-written:
@@ -464,7 +461,6 @@ define void @narrow_i8_nssw_implies_wide_i32_nssw_step_equal_pred(ptr %src, ptr 
 ; CHECK-NEXT:      SCEV assumptions:
 ; CHECK-NEXT:      {-56,+,(trunc i32 %step to i8)}<%loop> Added Flags: <nssw>
 ; CHECK-NEXT:      Equal predicate: %step == (sext i8 (trunc i32 %step to i8) to i32)
-; CHECK-NEXT:      {-56,+,%step}<%loop> Added Flags: <nssw>
 ; CHECK-NEXT:      {(-224 + %src),+,(4 * (sext i32 %step to i64))<nsw>}<%loop> Added Flags: <nusw>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:      Expressions re-written:
