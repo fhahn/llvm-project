@@ -394,9 +394,8 @@ define void @test_expand_new_canonical_iv_non_zero_start(ptr %dst) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    br label %[[OUTER:.*]]
 ; CHECK:       [[OUTER]]:
-; CHECK-NEXT:    [[INDVAR:%.*]] = phi i64 [ [[INDVAR_NEXT:%.*]], %[[OUTER_LATCH:.*]] ], [ 0, %[[ENTRY]] ]
-; CHECK-NEXT:    [[O:%.*]] = phi i64 [ 10, %[[ENTRY]] ], [ [[O_NEXT:%.*]], %[[OUTER_LATCH]] ]
-; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[INDVAR]], 17
+; CHECK-NEXT:    [[O:%.*]] = phi i64 [ 10, %[[ENTRY]] ], [ [[O_NEXT:%.*]], %[[OUTER_LATCH:.*]] ]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[O]], 7
 ; CHECK-NEXT:    [[BOUND:%.*]] = add i64 [[O]], 8
 ; CHECK-NEXT:    [[TMP1:%.*]] = udiv i64 [[TMP0]], 3
 ; CHECK-NEXT:    [[TMP2:%.*]] = add nuw nsw i64 [[TMP1]], 1
@@ -438,7 +437,6 @@ define void @test_expand_new_canonical_iv_non_zero_start(ptr %dst) {
 ; CHECK:       [[OUTER_LATCH]]:
 ; CHECK-NEXT:    [[O_NEXT]] = add nuw i64 [[O]], 1
 ; CHECK-NEXT:    [[EC_OUTER:%.*]] = icmp ult i64 [[O_NEXT]], 110
-; CHECK-NEXT:    [[INDVAR_NEXT]] = add i64 [[INDVAR]], 1
 ; CHECK-NEXT:    br i1 [[EC_OUTER]], label %[[OUTER]], label %[[EXIT:.*]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void

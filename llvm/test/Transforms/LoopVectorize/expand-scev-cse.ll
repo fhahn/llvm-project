@@ -220,11 +220,9 @@ define i32 @nested_loop_min_iters_check_expanded_repeatedly(i64 %n) {
 ; CHECK-NEXT:  [[ENTRY:.*]]:
 ; CHECK-NEXT:    br label %[[OUTER:.*]]
 ; CHECK:       [[OUTER]]:
-; CHECK-NEXT:    [[INDVAR:%.*]] = phi i64 [ [[INDVAR_NEXT:%.*]], %[[OUTER_LATCH:.*]] ], [ 0, %[[ENTRY]] ]
-; CHECK-NEXT:    [[COUNT:%.*]] = phi i32 [ 0, %[[ENTRY]] ], [ [[COUNT_NEXT:%.*]], %[[OUTER_LATCH]] ]
+; CHECK-NEXT:    [[COUNT:%.*]] = phi i32 [ 0, %[[ENTRY]] ], [ [[COUNT_NEXT:%.*]], %[[OUTER_LATCH:.*]] ]
 ; CHECK-NEXT:    [[I:%.*]] = phi i64 [ 2, %[[ENTRY]] ], [ [[I_NEXT:%.*]], %[[OUTER_LATCH]] ]
-; CHECK-NEXT:    [[TMP2:%.*]] = mul i64 [[INDVAR]], -2
-; CHECK-NEXT:    [[TMP3:%.*]] = add i64 [[TMP2]], -4
+; CHECK-NEXT:    [[TMP2:%.*]] = mul i64 [[I]], -2
 ; CHECK-NEXT:    [[OUTER_COND:%.*]] = icmp ne i64 [[I]], [[N]]
 ; CHECK-NEXT:    br i1 [[OUTER_COND]], label %[[OUTER_BODY:.*]], label %[[EXIT:.*]]
 ; CHECK:       [[OUTER_BODY]]:
@@ -235,11 +233,11 @@ define i32 @nested_loop_min_iters_check_expanded_repeatedly(i64 %n) {
 ; CHECK:       [[INNER_PH]]:
 ; CHECK-NEXT:    [[K_START:%.*]] = shl nuw i64 [[I]], 1
 ; CHECK-NEXT:    [[TMP28:%.*]] = call i64 @llvm.umax.i64(i64 [[N]], i64 [[K_START]])
-; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[TMP28]], [[TMP3]]
+; CHECK-NEXT:    [[TMP4:%.*]] = add i64 [[TMP28]], [[TMP2]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = call i64 @llvm.umin.i64(i64 [[TMP4]], i64 1)
-; CHECK-NEXT:    [[TMP29:%.*]] = add i64 [[TMP28]], [[TMP3]]
+; CHECK-NEXT:    [[TMP29:%.*]] = add i64 [[TMP28]], [[TMP2]]
 ; CHECK-NEXT:    [[TMP30:%.*]] = call i64 @llvm.umin.i64(i64 [[TMP29]], i64 1)
-; CHECK-NEXT:    [[TMP31:%.*]] = add i64 [[TMP28]], [[TMP3]]
+; CHECK-NEXT:    [[TMP31:%.*]] = add i64 [[TMP28]], [[TMP2]]
 ; CHECK-NEXT:    [[TMP5:%.*]] = sub i64 [[TMP31]], [[TMP30]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = udiv i64 [[TMP5]], [[I]]
 ; CHECK-NEXT:    [[TMP9:%.*]] = add i64 [[TMP7]], [[TMP8]]
@@ -295,7 +293,6 @@ define i32 @nested_loop_min_iters_check_expanded_repeatedly(i64 %n) {
 ; CHECK:       [[OUTER_LATCH]]:
 ; CHECK-NEXT:    [[COUNT_NEXT]] = phi i32 [ [[COUNT_INC]], %[[INNER_EXIT]] ], [ [[COUNT]], %[[OUTER_BODY]] ]
 ; CHECK-NEXT:    [[I_NEXT]] = add nuw nsw i64 [[I]], 1
-; CHECK-NEXT:    [[INDVAR_NEXT]] = add i64 [[INDVAR]], 1
 ; CHECK-NEXT:    br label %[[OUTER]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    [[COUNT_LCSSA:%.*]] = phi i32 [ [[COUNT]], %[[OUTER]] ]

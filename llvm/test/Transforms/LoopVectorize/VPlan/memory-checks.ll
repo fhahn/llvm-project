@@ -195,7 +195,7 @@ define void @bound_is_addrec_of_sibling_loop(ptr %a, ptr %b, i64 %n, i64 %d, i1 
 ; CHECK-NEXT:  ir-bb<vector.memcheck>:
 ; CHECK-NEXT:    IR   %4 = udiv i64 %n, %d
 ; CHECK-NEXT:    IR   %5 = shl i64 %4, 2
-; CHECK-NEXT:    IR   %6 = shl i64 %iv.1, 2
+; CHECK-NEXT:    IR   %6 = shl i64 %iv.1.lcssa, 2
 ; CHECK-NEXT:    IR   %7 = add i64 %6, %5
 ; CHECK-NEXT:    IR   %scevgep = getelementptr i8, ptr %b, i64 %7
 ; CHECK-NEXT:    IR   %8 = shl i64 %n, 2
@@ -274,16 +274,14 @@ define void @bound_is_addrec_of_sibling_loop_non_unit_step(ptr %a, ptr %b, i64 %
 ; CHECK-NEXT:  Successor(s): ir-bb<scalar.ph>, ir-bb<vector.memcheck>
 ; CHECK-EMPTY:
 ; CHECK-NEXT:  ir-bb<vector.memcheck>:
-; CHECK-NEXT:    IR   %0 = mul i64 %indvar, 12
-; CHECK-NEXT:    IR   %1 = add i64 %0, 20
-; CHECK-NEXT:    IR   %scevgep = getelementptr i8, ptr %b, i64 %1
-; CHECK-NEXT:    IR   %2 = shl i64 %n, 2
-; CHECK-NEXT:    IR   %3 = add i64 %2, 20
-; CHECK-NEXT:    IR   %4 = add i64 %0, %3
-; CHECK-NEXT:    IR   %scevgep1 = getelementptr i8, ptr %b, i64 %4
-; CHECK-NEXT:    IR   %5 = shl i64 %n, 3
-; CHECK-NEXT:    IR   %6 = add i64 %5, -4
-; CHECK-NEXT:    IR   %scevgep2 = getelementptr i8, ptr %a, i64 %6
+; CHECK-NEXT:    IR   %0 = shl i64 %iv.1.lcssa, 2
+; CHECK-NEXT:    IR   %scevgep = getelementptr i8, ptr %b, i64 %0
+; CHECK-NEXT:    IR   %1 = shl i64 %n, 2
+; CHECK-NEXT:    IR   %2 = add i64 %0, %1
+; CHECK-NEXT:    IR   %scevgep1 = getelementptr i8, ptr %b, i64 %2
+; CHECK-NEXT:    IR   %3 = shl i64 %n, 3
+; CHECK-NEXT:    IR   %4 = add i64 %3, -4
+; CHECK-NEXT:    IR   %scevgep2 = getelementptr i8, ptr %a, i64 %4
 ; CHECK-NEXT:    IR   %bound0 = icmp ult ptr %scevgep, %scevgep2
 ; CHECK-NEXT:    IR   %bound1 = icmp ult ptr %a, %scevgep1
 ; CHECK-NEXT:    IR   %found.conflict = and i1 %bound0, %bound1

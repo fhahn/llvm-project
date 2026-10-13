@@ -13,17 +13,15 @@ define void @test(i32 %arg, i32 %L1.limit, i32 %L2.switch, i1 %c, ptr %dst) {
 ; CHECK-NEXT:    br label [[L1_HEADER:%.*]]
 ; CHECK:       L1.header:
 ; CHECK-NEXT:    [[INDUCTION_IV:%.*]] = phi i32 [ [[INDUCTION_IV_NEXT:%.*]], [[L1_BACKEDGE:%.*]] ], [ [[TMP0]], [[L1_PREHEADER:%.*]] ]
-; CHECK-NEXT:    [[INDVAR:%.*]] = phi i32 [ [[INDVAR_NEXT:%.*]], [[L1_BACKEDGE]] ], [ 0, [[L1_PREHEADER]] ]
 ; CHECK-NEXT:    [[L1_SUM:%.*]] = phi i32 [ [[ARG]], [[L1_PREHEADER]] ], [ [[L1_SUM_NEXT:%.*]], [[L1_BACKEDGE]] ]
 ; CHECK-NEXT:    [[L1_IV:%.*]] = phi i32 [ 1, [[L1_PREHEADER]] ], [ [[L1_IV_NEXT:%.*]], [[L1_BACKEDGE]] ]
-; CHECK-NEXT:    [[TMP1:%.*]] = mul i32 [[INDVAR]], -1
-; CHECK-NEXT:    [[TMP2:%.*]] = add i32 [[TMP1]], -2
+; CHECK-NEXT:    [[TMP1:%.*]] = mul nsw i32 [[L1_IV]], -1
+; CHECK-NEXT:    [[TMP2:%.*]] = add i32 [[TMP1]], -1
 ; CHECK-NEXT:    br i1 [[C:%.*]], label [[L1_BACKEDGE]], label [[L1_EARLY_EXIT:%.*]]
 ; CHECK:       L1.backedge:
 ; CHECK-NEXT:    [[L1_SUM_NEXT]] = add i32 [[L1_IV]], [[L1_SUM]]
 ; CHECK-NEXT:    [[L1_IV_NEXT]] = add nuw nsw i32 [[L1_IV]], 1
 ; CHECK-NEXT:    [[L1_EXIT_COND:%.*]] = icmp ult i32 [[L1_IV_NEXT]], [[L1_LIMIT:%.*]]
-; CHECK-NEXT:    [[INDVAR_NEXT]] = add i32 [[INDVAR]], 1
 ; CHECK-NEXT:    [[INDUCTION_IV_NEXT]] = add i32 [[INDUCTION_IV]], [[TMP2]]
 ; CHECK-NEXT:    br i1 [[L1_EXIT_COND]], label [[L1_HEADER]], label [[L1_EXIT:%.*]]
 ; CHECK:       L1.early.exit:

@@ -17,6 +17,7 @@
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/Analysis/InstructionSimplify.h"
 #include "llvm/Analysis/LoopInfo.h"
+#include "llvm/Analysis/ScalarEvolutionDivision.h"
 #include "llvm/Analysis/ScalarEvolutionPatternMatch.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Analysis/ValueTracking.h"
@@ -1344,13 +1345,13 @@ Value *SCEVExpander::tryToReuseLCSSAPhi(SCEVUseT<const SCEVAddRecExpr *> S) {
 }
 
 Value *SCEVExpander::visitAddRecExpr(SCEVUseT<const SCEVAddRecExpr *> S) {
-  // In canonical mode we compute the addrec as an expression of a canonical IV
-  // using evaluateAtIteration and expand the resulting SCEV expression. This
-  // way we avoid introducing new IVs to carry on the computation of the addrec
-  // throughout the loop.
+  // In canonical mode we compute the addrec as an expression of an existing IV
+  // of the loop, or of a new canonical IV, and expand the resulting SCEV
+  // expression. This way we avoid introducing new IVs to carry on the
+  // computation of the addrec throughout the loop.
   //
-  // For nested addrecs evaluateAtIteration might need a canonical IV of a
-  // type wider than the addrec itself. Emitting a canonical IV of the
+  // Nested addrecs would need a canonical IV of a type wider than the addrec
+  // itself to be evaluated in terms of it. Emitting a canonical IV of the
   // proper type might produce non-legal types, for example expanding an i64
   // {0,+,2,+,1} addrec would need an i65 canonical IV. To avoid this just fall
   // back to non-canonical mode for nested addrecs.
@@ -1360,14 +1361,9 @@ Value *SCEVExpander::visitAddRecExpr(SCEVUseT<const SCEVAddRecExpr *> S) {
   Type *Ty = SE.getEffectiveSCEVType(S->getType());
   const Loop *L = S->getLoop();
 
-  // First check for an existing canonical IV in a suitable type.
-  PHINode *CanonicalIV = nullptr;
-  if (PHINode *PN = L->getCanonicalInductionVariable())
-    if (SE.getTypeSizeInBits(PN->getType()) >= SE.getTypeSizeInBits(Ty))
-      CanonicalIV = PN;
-
   // Rewrite an AddRec in terms of the canonical induction variable, if
   // its type is more narrow.
+  PHINode *CanonicalIV = L->getCanonicalInductionVariable();
   if (CanonicalIV &&
       SE.getTypeSizeInBits(CanonicalIV->getType()) > SE.getTypeSizeInBits(Ty) &&
       !S->getType()->isPointerTy()) {
@@ -1390,29 +1386,46 @@ Value *SCEVExpander::visitAddRecExpr(SCEVUseT<const SCEVAddRecExpr *> S) {
     return V;
 
   // {X,+,F} --> X + {0,+,F}
-  if (!S->getStart()->isZero()) {
-    if (isa<PointerType>(S->getType())) {
-      Value *StartV = expand(SE.getPointerBase(S));
-      return expandAddToGEP(SE.removePointerBase(S), StartV,
-                            S.getNoWrapFlags(SCEV::FlagNUW));
-    }
-
-    SmallVector<SCEVUse, 4> NewOps(S->operands());
-    NewOps[0] = SE.getConstant(Ty, 0);
-    const SCEV *Rest =
-        SE.getAddRecExpr(NewOps, L, S.getNoWrapFlags(SCEV::FlagNW));
-
-    // Just do a normal add. Pre-expand the operands to suppress folding.
-    //
-    // The LHS and RHS values are factored out of the expand call to make the
-    // output independent of the argument evaluation order.
-    const SCEV *AddExprLHS = SE.getUnknown(expand(S->getStart()));
-    const SCEV *AddExprRHS = SE.getUnknown(expand(Rest));
-    return expand(SE.getAddExpr(AddExprLHS, AddExprRHS));
+  if (isa<PointerType>(S->getType())) {
+    Value *StartV = expand(SE.getPointerBase(S));
+    return expandAddToGEP(SE.removePointerBase(S), StartV,
+                          S.getNoWrapFlags(SCEV::FlagNUW));
   }
 
-  // If we don't yet have a canonical IV, create one.
-  if (!CanonicalIV) {
+  // Look for an existing IV {B,+,G} of L with F == K * G, to express
+  // S = {A,+,F} as (A - K * B) + K * IV. Prefer IVs that need no scaling, then
+  // IVs starting at 0.
+  const SCEV *Step = S->getStepRecurrence(SE);
+  PHINode *IV = nullptr;
+  const SCEV *IVSCEV = nullptr;
+  const SCEV *K = nullptr;
+  SmallVector<Instruction *> DropPoisonGeneratingInsts;
+  unsigned BestRank = 3;
+  for (PHINode &PN : L->getHeader()->phis()) {
+    if (PN.getType() != Ty || !PN.isComplete())
+      continue;
+    auto *AR = dyn_cast<SCEVAddRecExpr>(SE.getSCEV(&PN));
+    if (!AR || AR->getLoop() != L || !AR->isAffine())
+      continue;
+    const SCEV *ARStep = AR->getStepRecurrence(SE);
+    const SCEV *Q, *R;
+    SCEVDivision::divide(SE, Step, ARStep, &Q, &R);
+    if (!R->isZero() || SE.getMulExpr(Q, ARStep) != Step)
+      continue;
+    unsigned Rank = Q->isOne() ? 0 : AR->getStart()->isZero() ? 1 : 2;
+    // The IV must not be more poisonous than S, which it replaces.
+    SmallVector<Instruction *> Drop;
+    if (Rank >= BestRank || !SE.canReuseInstruction(S, &PN, Drop))
+      continue;
+    IV = &PN;
+    IVSCEV = AR;
+    K = Q;
+    DropPoisonGeneratingInsts = std::move(Drop);
+    BestRank = Rank;
+  }
+
+  // If there is no suitable IV, create a canonical one.
+  if (!IV) {
     // Create and insert the PHI node for the induction variable in the
     // specified loop.
     BasicBlock *Header = L->getHeader();
@@ -1445,44 +1458,48 @@ Value *SCEVExpander::visitAddRecExpr(SCEVUseT<const SCEVAddRecExpr *> S) {
         CanonicalIV->addIncoming(Constant::getNullValue(Ty), HP);
       }
     }
+    IV = CanonicalIV;
+    IVSCEV = SE.getAddRecExpr(SE.getZero(Ty), SE.getOne(Ty), L,
+                              SCEVFlags::FlagNone);
+    K = Step;
   }
 
-  // {0,+,1} --> Insert a canonical induction variable into the loop!
-  if (S->isAffine() && S->getOperand(1)->isOne()) {
-    assert(Ty == SE.getEffectiveSCEVType(CanonicalIV->getType()) &&
-           "IVs with types different from the canonical IV should "
-           "already have been handled!");
-    return CanonicalIV;
+  // {A,+,F} --> (A - K * B) + {K * B,+,F}
+  const SCEV *Scaled = SE.getMulExpr(K, IVSCEV);
+  if (Scaled != S) {
+    const SCEV *Offset = SE.getMinusSCEV(S, Scaled);
+    assert(SE.isLoopInvariant(Offset, L) && "offset must be loop-invariant");
+    // Just do a normal add. Pre-expand the operands to suppress folding.
+    //
+    // The LHS and RHS values are factored out of the expand call to make the
+    // output independent of the argument evaluation order.
+    const SCEV *AddExprLHS = SE.getUnknown(expand(Offset));
+    const SCEV *AddExprRHS = SE.getUnknown(expand(Scaled));
+    return expand(SE.getAddExpr(AddExprLHS, AddExprRHS));
   }
 
-  // {0,+,F} --> {0,+,1} * F
+  // Prefer an existing expansion of the IV, like an LCSSA phi.
+  Value *IVV = findExistingExpansionAndDropPoisonFlags(
+      IVSCEV, &*Builder.GetInsertPoint());
+  if (!IVV) {
+    for (Instruction *I : DropPoisonGeneratingInsts) {
+      rememberFlags(I);
+      dropPoisonGeneratingAnnotationsAndReinfer(SE, I);
+    }
+    IVV = IV;
+  }
 
-  // If this is a simple linear addrec, emit it now as a special case.
-  if (S->isAffine())    // {0,+,F} --> i*F
-    return
-      expand(SE.getTruncateOrNoop(
-        SE.getMulExpr(SE.getUnknown(CanonicalIV),
-                      SE.getNoopOrAnyExtend(S->getOperand(1),
-                                            CanonicalIV->getType())),
-        Ty));
+  // {B,+,F} --> IV
+  if (K->isOne())
+    return IVV;
 
-  // If this is a chain of recurrences, turn it into a closed form, using the
-  // folders, then expandCodeFor the closed form.  This allows the folders to
-  // simplify the expression without having to build a bunch of special code
-  // into this folder.
-  const SCEV *IH = SE.getUnknown(CanonicalIV);   // Get I as a "symbolic" SCEV.
-
-  // Promote S up to the canonical IV type, if the cast is foldable.
-  const SCEV *NewS = S;
-  const SCEV *Ext = SE.getNoopOrAnyExtend(S, CanonicalIV->getType());
-  if (isa<SCEVAddRecExpr>(Ext))
-    NewS = Ext;
-
-  const SCEV *V = cast<SCEVAddRecExpr>(NewS)->evaluateAtIteration(IH, SE);
-
-  // Truncate the result down to the original type, if needed.
-  const SCEV *T = SE.getTruncateOrNoop(V, Ty);
-  return expand(T);
+  // {K * B,+,F} --> K * IV
+  SCEVFlags Flags = SCEVFlags::FlagNone;
+  if (SE.willNotOverflow(Instruction::Mul, /*Signed=*/false, IVSCEV, K))
+    Flags = ScalarEvolution::setFlags(Flags, SCEV::FlagNUW);
+  if (SE.willNotOverflow(Instruction::Mul, /*Signed=*/true, IVSCEV, K))
+    Flags = ScalarEvolution::setFlags(Flags, SCEV::FlagNSW);
+  return expand(SCEVUse(SE.getMulExpr(SE.getUnknown(IVV), K), Flags));
 }
 
 /// Return true if \p CI computes the same value as a `ptrtoaddr` of its
