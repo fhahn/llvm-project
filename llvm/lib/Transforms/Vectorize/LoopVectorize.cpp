@@ -6235,6 +6235,10 @@ VPlanPtr LoopVectorizationPlanner::tryToBuildVPlan1() {
 
   RUN_VPLAN_PASS(VPlanTransforms::introduceMasksAndLinearize, *VPlan0);
 
+  if (Legal->hasUncountableExitWithSideEffects())
+    RUN_VPLAN_PASS(VPlanTransforms::convertMaskedEarlyExitToBailToScalar,
+                   *VPlan0, Config, PSE, OrigLoop);
+
   return VPlan0;
 }
 
