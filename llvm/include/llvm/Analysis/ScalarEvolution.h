@@ -601,7 +601,8 @@ public:
   /// and the given predicate \p N.
   SCEVUnionPredicate getUnionWith(const SCEVPredicate *N,
                                   ScalarEvolution &SE) const {
-    SCEVUnionPredicate Result(Preds, SE);
+    // The predicates of this union are already pruned, only add N.
+    SCEVUnionPredicate Result = *this;
     Result.add(N, SE);
     return Result;
   }
