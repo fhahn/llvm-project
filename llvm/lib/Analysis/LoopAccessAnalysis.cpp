@@ -596,25 +596,40 @@ bool RuntimePointerChecking::tryToCreateDiffCheck(
   // and whether CG has a single member whose accesses all cover the step.
   auto GetExtent =
       [&](const RuntimeCheckingPtrGroup &CG) -> std::optional<GroupExtent> {
-    if (CG.Members.size() != 1)
-      return std::nullopt;
-    const PointerInfo &P = Pointers[CG.Members[0]];
-    const SCEV *Start;
-    if (!match(P.Expr,
-               m_scev_AffineAddRec(m_SCEV(Start), m_scev_Specific(Step),
-                                   m_SpecificLoop(InnerLoop))))
-      return std::nullopt;
-    GroupExtent Extent = {Start, 0, true};
-    for (bool IsWrite : {false, true}) {
-      for (Instruction *I :
-           DC.getInstructionsForAccess(P.PointerValue, IsWrite)) {
-        TypeSize Size = DL.getTypeAllocSize(getLoadStoreType(I));
-        if (Size.isScalable())
-          return std::nullopt;
-        Extent.Span = std::max(Extent.Span, Size.getFixedValue());
-        Extent.IsConsecutive &= Size.getFixedValue() == AbsStep;
+    const SCEV *FirstStart = nullptr;
+    GroupExtent Extent = {nullptr, 0, CG.Members.size() == 1};
+    int64_t Low = 0, High = 0;
+    for (unsigned M : CG.Members) {
+      const PointerInfo &P = Pointers[M];
+      const SCEV *Start;
+      if (!match(P.Expr,
+                 m_scev_AffineAddRec(m_SCEV(Start), m_scev_Specific(Step),
+                                     m_SpecificLoop(InnerLoop))))
+        return std::nullopt;
+      if (!FirstStart)
+        FirstStart = Extent.Start = Start;
+      // Bound offsets and sizes so that High - Low cannot overflow.
+      std::optional<APInt> Diff =
+          SE->computeConstantDifference(Start, FirstStart);
+      if (!Diff || !Diff->isSignedIntN(32))
+        return std::nullopt;
+      int64_t Offset = Diff->getSExtValue();
+      if (Offset < Low) {
+        Low = Offset;
+        Extent.Start = Start;
+      }
+      for (bool IsWrite : {false, true}) {
+        for (Instruction *I :
+             DC.getInstructionsForAccess(P.PointerValue, IsWrite)) {
+          TypeSize Size = DL.getTypeAllocSize(getLoadStoreType(I));
+          if (Size.isScalable() || !isUInt<32>(Size.getFixedValue()))
+            return std::nullopt;
+          High = std::max(High, Offset + int64_t(Size.getFixedValue()));
+          Extent.IsConsecutive &= Size.getFixedValue() == AbsStep;
+        }
       }
     }
+    Extent.Span = High - Low;
     return Extent;
   };
 
