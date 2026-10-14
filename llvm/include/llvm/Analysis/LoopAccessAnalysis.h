@@ -320,8 +320,9 @@ public:
   LLVM_ABI SmallVector<Instruction *, 4>
   getInstructionsForAccess(Value *Ptr, bool isWrite) const;
 
-  /// Return the program order indices for the access location (Ptr, IsWrite).
-  /// Returns an empty ArrayRef if there are no accesses for the location.
+  /// Return the program order indices for the access location (Ptr, IsWrite),
+  /// in increasing order. Returns an empty ArrayRef if there are no accesses
+  /// for the location.
   ArrayRef<unsigned> getOrderForAccess(Value *Ptr, bool IsWrite) const {
     auto I = Accesses.find({Ptr, IsWrite});
     if (I != Accesses.end())
