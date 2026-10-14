@@ -80,11 +80,10 @@ declare void @inc(ptr)
 
 ; When we have a chain of phis in nested loops we should recognise if there's
 ; actually only one underlying value.
-; FIXME: All of these could be NoAlias.
 ; CHECK-LABEL: loop_phi_chain
-; CHECK: MayAlias: i32* %val1, i32* @Y
-; CHECK: MayAlias: i32* %val2, i32* @Y
-; CHECK: MayAlias: i32* %val3, i32* @Y
+; CHECK: NoAlias: i32* %val1, i32* @Y
+; CHECK: NoAlias: i32* %val2, i32* @Y
+; CHECK: NoAlias: i32* %val3, i32* @Y
 define void @loop_phi_chain(i32 %a, i32 %b, i32 %c) {
 entry:
   br label %loop1
@@ -292,7 +291,7 @@ declare void @escape(ptr)
 
 ; %ptr.inner is based on argument %start.
 ; CHECK-LABEL: nested_loop_arg
-; CHECK: MayAlias: i8* %buf, i8* %ptr.inner
+; CHECK: NoAlias: i8* %buf, i8* %ptr.inner
 define void @nested_loop_arg(ptr %start, i1 %c) {
 entry:
   %buf = alloca [16 x i8]
@@ -319,7 +318,7 @@ exit:
 
 ; %ptr.inner is based on a load and %buf is never captured.
 ; CHECK-LABEL: nested_loop_load_not_captured
-; CHECK: MayAlias: i8* %buf, i8* %ptr.inner
+; CHECK: NoAlias: i8* %buf, i8* %ptr.inner
 define void @nested_loop_load_not_captured(ptr %p, i1 %c) {
 entry:
   %buf = alloca [16 x i8]
@@ -347,7 +346,7 @@ exit:
 
 ; %ptr.inner is based on a select of arguments.
 ; CHECK-LABEL: nested_loop_select_of_args
-; CHECK: MayAlias: i8* %buf, i8* %ptr.inner
+; CHECK: NoAlias: i8* %buf, i8* %ptr.inner
 define void @nested_loop_select_of_args(ptr %a, ptr %b, i1 %c) {
 entry:
   %buf = alloca [16 x i8]

@@ -1436,7 +1436,8 @@ static bool isArgumentOrArgumentLike(const Value *V) {
 }
 
 /// Return true if \p O1 and \p O2 are distinct underlying objects and pointers
-/// based on them cannot alias.
+/// based on them cannot alias. Must only depend on the objects, as it is also
+/// used for underlying objects of phis, which may be from different iterations.
 static bool areDistinctObjectsNoAlias(const Value *O1, const Value *O2,
                                       AAQueryInfo &AAQI) {
   if (O1 == O2)
@@ -1469,6 +1470,34 @@ static bool areDistinctObjectsNoAlias(const Value *O1, const Value *O2,
                                 /*ReturnCaptures=*/false)))
     return true;
   return false;
+}
+
+/// Return true if no pointer based on \p V can alias a pointer based on the
+/// underlying object \p Obj, looking through phis and selects. Gives up after
+/// visiting a small number of values.
+static bool allUnderlyingObjectsNoAlias(const Value *V, const Value *Obj,
+                                        AAQueryInfo &AAQI) {
+  const unsigned MaxVisited = 8;
+  SmallPtrSet<const Value *, 8> Visited;
+  SmallVector<const Value *, 8> Worklist({V});
+  do {
+    const Value *P = getUnderlyingObject(Worklist.pop_back_val());
+    if (!Visited.insert(P).second)
+      continue;
+    if (Visited.size() > MaxVisited)
+      return false;
+    if (const auto *SI = dyn_cast<SelectInst>(P)) {
+      Worklist.append({SI->getTrueValue(), SI->getFalseValue()});
+      continue;
+    }
+    if (const auto *PN = dyn_cast<PHINode>(P)) {
+      append_range(Worklist, PN->incoming_values());
+      continue;
+    }
+    if (!areDistinctObjectsNoAlias(P, Obj, AAQI))
+      return false;
+  } while (!Worklist.empty());
+  return true;
 }
 
 /// Provide a bunch of ad-hoc rules to disambiguate a PHI instruction against
@@ -1517,35 +1546,27 @@ AliasResult BasicAAResult::aliasPHI(const PHINode *PN, LocationSize PNSize,
   };
 
   SmallPtrSet<Value *, 4> UniqueSrc;
-  Value *OnePhi = nullptr;
+  bool HasPhiSrc = false;
   for (Value *PV1 : PN->incoming_values()) {
     // Skip the phi itself being the incoming value.
     if (PV1 == PN)
       continue;
-
-    if (isa<PHINode>(PV1)) {
-      if (OnePhi && OnePhi != PV1) {
-        // To control potential compile time explosion, we choose to be
-        // conserviate when we have more than one Phi input.  It is important
-        // that we handle the single phi case as that lets us handle LCSSA
-        // phi nodes and (combined with the recursive phi handling) simple
-        // pointer induction variable patterns.
-        return AliasResult::MayAlias;
-      }
-      OnePhi = PV1;
-    }
 
     if (CheckForRecPhi(PV1))
       continue;
 
     if (UniqueSrc.insert(PV1).second)
       V1Srcs.push_back(PV1);
-  }
 
-  if (OnePhi && UniqueSrc.size() > 1)
-    // Out of an abundance of caution, allow only the trivial lcssa and
-    // recursive phi cases.
-    return AliasResult::MayAlias;
+    // To control compile time, only recurse into phi sources for the trivial
+    // lcssa and recursive phi cases. Otherwise check if all underlying objects
+    // of the phi are known not to alias the underlying object of V2.
+    HasPhiSrc |= isa<PHINode>(PV1);
+    if (HasPhiSrc && V1Srcs.size() > 1)
+      return allUnderlyingObjectsNoAlias(PN, getUnderlyingObject(V2), AAQI)
+                 ? AliasResult::NoAlias
+                 : AliasResult::MayAlias;
+  }
 
   // If V1Srcs is empty then that means that the phi has no underlying non-phi
   // value. This should only be possible in blocks unreachable from the entry
