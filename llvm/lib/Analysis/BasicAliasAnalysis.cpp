@@ -1417,6 +1417,61 @@ BasicAAResult::aliasSelect(const SelectInst *SI, LocationSize SISize,
   return MergeAliasResults(ThisAlias, Alias);
 }
 
+// Return true for an Argument or extractvalue(Argument). These are all known
+// to not alias with FunctionLocal objects and can come up from coerced function
+// arguments.
+static bool isArgumentOrArgumentLike(const Value *V) {
+  if (isa<Argument>(V))
+    return true;
+  auto *E = dyn_cast<ExtractValueInst>(V);
+  return E && isa<Argument>(E->getOperand(0));
+}
+
+/// Return true if \p V is a null pointer that is not valid in \p F.
+static bool isInvalidNullPointer(const Value *V, const Function &F) {
+  const auto *CPN = dyn_cast<ConstantPointerNull>(V);
+  return CPN &&
+         !NullPointerIsDefined(&F, CPN->getPointerType()->getAddressSpace());
+}
+
+/// Return true if \p O1 and \p O2 are known to be distinct underlying objects,
+/// so pointers based on them cannot alias. Returns false if \p O1 == \p O2.
+/// Must hold for any dynamic instances of \p O1 and \p O2, which may be from
+/// different loop iterations.
+static bool areDistinctObjectsNoAlias(const Value *O1, const Value *O2,
+                                      const AAQueryInfo &AAQI) {
+  if (O1 == O2)
+    return false;
+  // Two different identified objects cannot alias.
+  if (isIdentifiedObject(O1) && isIdentifiedObject(O2))
+    return true;
+
+  // Function arguments can't alias with things that are known to be
+  // unambigously identified at the function level.
+  if ((isArgumentOrArgumentLike(O1) && isIdentifiedFunctionLocal(O2)) ||
+      (isArgumentOrArgumentLike(O2) && isIdentifiedFunctionLocal(O1)))
+    return true;
+
+  // If one pointer is the result of a call/invoke or load and the other is a
+  // non-escaping local object within the same function, then we know the
+  // object couldn't escape to a point where the call could return it.
+  //
+  // Note that if the pointers are in different functions, there are a
+  // variety of complications. A call with a nocapture argument may still
+  // temporary store the nocapture argument's value in a temporary memory
+  // location if that memory location doesn't escape. Or it may pass a
+  // nocapture value to other functions as long as they don't capture it.
+  if (isEscapeSource(O1) && capturesNothing(AAQI.CA->getCapturesBefore(
+                                O2, dyn_cast<Instruction>(O1), /*OrAt=*/true,
+                                /*ReturnCaptures=*/false)))
+    return true;
+  if (isEscapeSource(O2) && capturesNothing(AAQI.CA->getCapturesBefore(
+                                O1, dyn_cast<Instruction>(O2), /*OrAt=*/true,
+                                /*ReturnCaptures=*/false)))
+    return true;
+  return false;
+}
+
 /// Provide a bunch of ad-hoc rules to disambiguate a PHI instruction against
 /// another.
 AliasResult BasicAAResult::aliasPHI(const PHINode *PN, LocationSize PNSize,
@@ -1463,23 +1518,10 @@ AliasResult BasicAAResult::aliasPHI(const PHINode *PN, LocationSize PNSize,
   };
 
   SmallPtrSet<Value *, 4> UniqueSrc;
-  Value *OnePhi = nullptr;
   for (Value *PV1 : PN->incoming_values()) {
     // Skip the phi itself being the incoming value.
     if (PV1 == PN)
       continue;
-
-    if (isa<PHINode>(PV1)) {
-      if (OnePhi && OnePhi != PV1) {
-        // To control potential compile time explosion, we choose to be
-        // conserviate when we have more than one Phi input.  It is important
-        // that we handle the single phi case as that lets us handle LCSSA
-        // phi nodes and (combined with the recursive phi handling) simple
-        // pointer induction variable patterns.
-        return AliasResult::MayAlias;
-      }
-      OnePhi = PV1;
-    }
 
     if (CheckForRecPhi(PV1))
       continue;
@@ -1488,9 +1530,10 @@ AliasResult BasicAAResult::aliasPHI(const PHINode *PN, LocationSize PNSize,
       V1Srcs.push_back(PV1);
   }
 
-  if (OnePhi && UniqueSrc.size() > 1)
-    // Out of an abundance of caution, allow only the trivial lcssa and
-    // recursive phi cases.
+  // To control compile time, only recurse into a phi source if it is the only
+  // non-recursive source. This handles LCSSA phis and (with the recursive phi
+  // handling) simple pointer induction variables.
+  if (V1Srcs.size() > 1 && any_of(V1Srcs, IsaPred<PHINode>))
     return AliasResult::MayAlias;
 
   // If V1Srcs is empty then that means that the phi has no underlying non-phi
@@ -1536,16 +1579,6 @@ AliasResult BasicAAResult::aliasPHI(const PHINode *PN, LocationSize PNSize,
   return Alias;
 }
 
-// Return true for an Argument or extractvalue(Argument). These are all known
-// to not alias with FunctionLocal objects and can come up from coerced function
-// arguments.
-static bool isArgumentOrArgumentLike(const Value *V) {
-  if (isa<Argument>(V))
-    return true;
-  auto *E = dyn_cast<ExtractValueInst>(V);
-  return E && isa<Argument>(E->getOperand(0));
-}
-
 /// Provides a bunch of ad-hoc rules to disambiguate in common cases, such as
 /// array references.
 AliasResult BasicAAResult::aliasCheck(const Value *V1, LocationSize V1Size,
@@ -1581,42 +1614,11 @@ AliasResult BasicAAResult::aliasCheck(const Value *V1, LocationSize V1Size,
 
   // Null values in the default address space don't point to any object, so they
   // don't alias any other pointer.
-  if (const ConstantPointerNull *CPN = dyn_cast<ConstantPointerNull>(O1))
-    if (!NullPointerIsDefined(&F, CPN->getPointerType()->getAddressSpace()))
-      return AliasResult::NoAlias;
-  if (const ConstantPointerNull *CPN = dyn_cast<ConstantPointerNull>(O2))
-    if (!NullPointerIsDefined(&F, CPN->getPointerType()->getAddressSpace()))
-      return AliasResult::NoAlias;
+  if (isInvalidNullPointer(O1, F) || isInvalidNullPointer(O2, F))
+    return AliasResult::NoAlias;
 
-  if (O1 != O2) {
-    // If V1/V2 point to two different objects, we know that we have no alias.
-    if (isIdentifiedObject(O1) && isIdentifiedObject(O2))
-      return AliasResult::NoAlias;
-
-    // Function arguments can't alias with things that are known to be
-    // unambigously identified at the function level.
-    if ((isArgumentOrArgumentLike(O1) && isIdentifiedFunctionLocal(O2)) ||
-        (isArgumentOrArgumentLike(O2) && isIdentifiedFunctionLocal(O1)))
-      return AliasResult::NoAlias;
-
-    // If one pointer is the result of a call/invoke or load and the other is a
-    // non-escaping local object within the same function, then we know the
-    // object couldn't escape to a point where the call could return it.
-    //
-    // Note that if the pointers are in different functions, there are a
-    // variety of complications. A call with a nocapture argument may still
-    // temporary store the nocapture argument's value in a temporary memory
-    // location if that memory location doesn't escape. Or it may pass a
-    // nocapture value to other functions as long as they don't capture it.
-    if (isEscapeSource(O1) && capturesNothing(AAQI.CA->getCapturesBefore(
-                                  O2, dyn_cast<Instruction>(O1), /*OrAt=*/true,
-                                  /*ReturnCaptures=*/false)))
-      return AliasResult::NoAlias;
-    if (isEscapeSource(O2) && capturesNothing(AAQI.CA->getCapturesBefore(
-                                  O1, dyn_cast<Instruction>(O2), /*OrAt=*/true,
-                                  /*ReturnCaptures=*/false)))
-      return AliasResult::NoAlias;
-  }
+  if (areDistinctObjectsNoAlias(O1, O2, AAQI))
+    return AliasResult::NoAlias;
 
   // If the size of one access is larger than the entire object on the other
   // side, then we know such behavior is undefined and can assume no alias.
