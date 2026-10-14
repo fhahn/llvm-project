@@ -217,8 +217,458 @@ outer.latch:
 exit:
   ret void
 }
+
+; %j's step is not a multiple of %outer.iv's step, so don't reuse %outer.iv.
+define void @inner_trip_count_step_not_multiple_of_outer_iv_step(ptr %p, i8 %n, i8 %g) {
+; CHECK-LABEL: define void @inner_trip_count_step_not_multiple_of_outer_iv_step(
+; CHECK-SAME: ptr [[P:%.*]], i8 [[N:%.*]], i8 [[G:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[UMIN:%.*]] = call i8 @llvm.umin.i8(i8 [[G]], i8 3)
+; CHECK-NEXT:    [[TMP0:%.*]] = shl i8 [[UMIN]], 1
+; CHECK-NEXT:    br label %[[OUTER_HEADER:.*]]
+; CHECK:       [[OUTER_HEADER]]:
+; CHECK-NEXT:    [[INDVAR:%.*]] = phi i8 [ [[INDVAR_NEXT:%.*]], %[[OUTER_LATCH:.*]] ], [ 0, %[[ENTRY]] ]
+; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], %[[OUTER_LATCH]] ]
+; CHECK-NEXT:    [[J:%.*]] = phi i8 [ 1, %[[ENTRY]] ], [ [[J_NEXT:%.*]], %[[OUTER_LATCH]] ]
+; CHECK-NEXT:    [[TMP1:%.*]] = mul i8 [[TMP0]], [[INDVAR]]
+; CHECK-NEXT:    [[XTRAITER:%.*]] = and i8 [[J]], 7
+; CHECK-NEXT:    [[TMP2:%.*]] = icmp ult i8 [[TMP1]], 7
+; CHECK-NEXT:    br i1 [[TMP2]], label %[[INNER_EPIL_PREHEADER:.*]], label %[[OUTER_HEADER_NEW:.*]]
+; CHECK:       [[OUTER_HEADER_NEW]]:
+; CHECK-NEXT:    [[UNROLL_ITER:%.*]] = sub i8 [[J]], [[XTRAITER]]
+; CHECK-NEXT:    br label %[[INNER:.*]]
+; CHECK:       [[INNER]]:
+; CHECK-NEXT:    [[INNER_IV:%.*]] = phi i8 [ 0, %[[OUTER_HEADER_NEW]] ], [ [[INNER_IV_NEXT_7:%.*]], %[[INNER]] ]
+; CHECK-NEXT:    [[NITER:%.*]] = phi i8 [ 0, %[[OUTER_HEADER_NEW]] ], [ [[NITER_NEXT_7:%.*]], %[[INNER]] ]
+; CHECK-NEXT:    [[L:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD:%.*]] = add i32 [[L]], 1
+; CHECK-NEXT:    store i32 [[ADD]], ptr [[P]], align 4
+; CHECK-NEXT:    [[L_1:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD_1:%.*]] = add i32 [[L_1]], 1
+; CHECK-NEXT:    store i32 [[ADD_1]], ptr [[P]], align 4
+; CHECK-NEXT:    [[L_2:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD_2:%.*]] = add i32 [[L_2]], 1
+; CHECK-NEXT:    store i32 [[ADD_2]], ptr [[P]], align 4
+; CHECK-NEXT:    [[L_3:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD_3:%.*]] = add i32 [[L_3]], 1
+; CHECK-NEXT:    store i32 [[ADD_3]], ptr [[P]], align 4
+; CHECK-NEXT:    [[L_4:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD_4:%.*]] = add i32 [[L_4]], 1
+; CHECK-NEXT:    store i32 [[ADD_4]], ptr [[P]], align 4
+; CHECK-NEXT:    [[L_5:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD_5:%.*]] = add i32 [[L_5]], 1
+; CHECK-NEXT:    store i32 [[ADD_5]], ptr [[P]], align 4
+; CHECK-NEXT:    [[L_6:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD_6:%.*]] = add i32 [[L_6]], 1
+; CHECK-NEXT:    store i32 [[ADD_6]], ptr [[P]], align 4
+; CHECK-NEXT:    [[L_7:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD_7:%.*]] = add i32 [[L_7]], 1
+; CHECK-NEXT:    store i32 [[ADD_7]], ptr [[P]], align 4
+; CHECK-NEXT:    [[INNER_IV_NEXT_7]] = add i8 [[INNER_IV]], 8
+; CHECK-NEXT:    [[NITER_NEXT_7]] = add i8 [[NITER]], 8
+; CHECK-NEXT:    [[NITER_NCMP_7:%.*]] = icmp eq i8 [[NITER_NEXT_7]], [[UNROLL_ITER]]
+; CHECK-NEXT:    br i1 [[NITER_NCMP_7]], label %[[OUTER_LATCH_UNR_LCSSA:.*]], label %[[INNER]]
+; CHECK:       [[OUTER_LATCH_UNR_LCSSA]]:
+; CHECK-NEXT:    [[INNER_IV_UNR:%.*]] = phi i8 [ [[INNER_IV_NEXT_7]], %[[INNER]] ]
+; CHECK-NEXT:    [[LCMP_MOD:%.*]] = icmp ne i8 [[XTRAITER]], 0
+; CHECK-NEXT:    br i1 [[LCMP_MOD]], label %[[INNER_EPIL_PREHEADER]], label %[[OUTER_LATCH]]
+; CHECK:       [[INNER_EPIL_PREHEADER]]:
+; CHECK-NEXT:    [[INNER_IV_EPIL_INIT:%.*]] = phi i8 [ 0, %[[OUTER_HEADER]] ], [ [[INNER_IV_UNR]], %[[OUTER_LATCH_UNR_LCSSA]] ]
+; CHECK-NEXT:    [[LCMP_MOD1:%.*]] = icmp ne i8 [[XTRAITER]], 0
+; CHECK-NEXT:    call void @llvm.assume(i1 [[LCMP_MOD1]])
+; CHECK-NEXT:    br label %[[INNER_EPIL:.*]]
+; CHECK:       [[INNER_EPIL]]:
+; CHECK-NEXT:    [[INNER_IV_EPIL:%.*]] = phi i8 [ [[INNER_IV_EPIL_INIT]], %[[INNER_EPIL_PREHEADER]] ], [ [[INNER_IV_NEXT_EPIL:%.*]], %[[INNER_EPIL]] ]
+; CHECK-NEXT:    [[EPIL_ITER:%.*]] = phi i8 [ 0, %[[INNER_EPIL_PREHEADER]] ], [ [[EPIL_ITER_NEXT:%.*]], %[[INNER_EPIL]] ]
+; CHECK-NEXT:    [[L_EPIL:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD_EPIL:%.*]] = add i32 [[L_EPIL]], 1
+; CHECK-NEXT:    store i32 [[ADD_EPIL]], ptr [[P]], align 4
+; CHECK-NEXT:    [[INNER_IV_NEXT_EPIL]] = add i8 [[INNER_IV_EPIL]], 1
+; CHECK-NEXT:    [[EC_INNER_EPIL:%.*]] = icmp eq i8 [[INNER_IV_NEXT_EPIL]], [[J]]
+; CHECK-NEXT:    [[EPIL_ITER_NEXT]] = add i8 [[EPIL_ITER]], 1
+; CHECK-NEXT:    [[EPIL_ITER_CMP:%.*]] = icmp ne i8 [[EPIL_ITER_NEXT]], [[XTRAITER]]
+; CHECK-NEXT:    br i1 [[EPIL_ITER_CMP]], label %[[INNER_EPIL]], label %[[OUTER_LATCH_EPILOG_LCSSA:.*]], !llvm.loop [[LOOP3:![0-9]+]]
+; CHECK:       [[OUTER_LATCH_EPILOG_LCSSA]]:
+; CHECK-NEXT:    br label %[[OUTER_LATCH]]
+; CHECK:       [[OUTER_LATCH]]:
+; CHECK-NEXT:    [[OUTER_IV_NEXT]] = add i8 [[OUTER_IV]], [[G]]
+; CHECK-NEXT:    [[M:%.*]] = call i8 @llvm.umin.i8(i8 [[G]], i8 3)
+; CHECK-NEXT:    [[STEP:%.*]] = shl i8 [[M]], 1
+; CHECK-NEXT:    [[J_NEXT]] = add i8 [[J]], [[STEP]]
+; CHECK-NEXT:    [[EC_OUTER:%.*]] = icmp eq i8 [[OUTER_IV_NEXT]], [[N]]
+; CHECK-NEXT:    [[INDVAR_NEXT]] = add i8 [[INDVAR]], 1
+; CHECK-NEXT:    br i1 [[EC_OUTER]], label %[[EXIT:.*]], label %[[OUTER_HEADER]], !llvm.loop [[LOOP4:![0-9]+]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %outer.header
+
+outer.header:
+  %outer.iv = phi i8 [ 0, %entry ], [ %outer.iv.next, %outer.latch ]
+  %j = phi i8 [ 1, %entry ], [ %j.next, %outer.latch ]
+  br label %inner
+
+inner:
+  %inner.iv = phi i8 [ 0, %outer.header ], [ %inner.iv.next, %inner ]
+  %l = load i32, ptr %p
+  %add = add i32 %l, 1
+  store i32 %add, ptr %p
+  %inner.iv.next = add i8 %inner.iv, 1
+  %ec.inner = icmp eq i8 %inner.iv.next, %j
+  br i1 %ec.inner, label %outer.latch, label %inner
+
+outer.latch:
+  %outer.iv.next = add i8 %outer.iv, %g
+  %m = call i8 @llvm.umin.i8(i8 %g, i8 3)
+  %step = shl i8 %m, 1
+  %j.next = add i8 %j, %step
+  %ec.outer = icmp eq i8 %outer.iv.next, %n
+  br i1 %ec.outer, label %exit, label %outer.header, !llvm.loop !0
+
+exit:
+  ret void
+}
+
+; %j's step contains undef and must be expanded once, so don't reuse %outer.iv.
+define void @inner_trip_count_step_contains_undef(ptr %p, i8 %n, i8 %g) {
+; CHECK-LABEL: define void @inner_trip_count_step_contains_undef(
+; CHECK-SAME: ptr [[P:%.*]], i8 [[N:%.*]], i8 [[G:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[STEP:%.*]] = add i8 [[G]], undef
+; CHECK-NEXT:    br label %[[OUTER_HEADER:.*]]
+; CHECK:       [[OUTER_HEADER]]:
+; CHECK-NEXT:    [[INDVAR:%.*]] = phi i8 [ [[INDVAR_NEXT:%.*]], %[[OUTER_LATCH:.*]] ], [ 0, %[[ENTRY]] ]
+; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i8 [ 1, %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], %[[OUTER_LATCH]] ]
+; CHECK-NEXT:    [[J:%.*]] = phi i8 [ 1, %[[ENTRY]] ], [ [[J_NEXT:%.*]], %[[OUTER_LATCH]] ]
+; CHECK-NEXT:    [[TMP0:%.*]] = mul i8 [[STEP]], [[INDVAR]]
+; CHECK-NEXT:    [[XTRAITER:%.*]] = and i8 [[J]], 7
+; CHECK-NEXT:    [[TMP1:%.*]] = icmp ult i8 [[TMP0]], 7
+; CHECK-NEXT:    br i1 [[TMP1]], label %[[INNER_EPIL_PREHEADER:.*]], label %[[OUTER_HEADER_NEW:.*]]
+; CHECK:       [[OUTER_HEADER_NEW]]:
+; CHECK-NEXT:    [[UNROLL_ITER:%.*]] = sub i8 [[J]], [[XTRAITER]]
+; CHECK-NEXT:    br label %[[INNER:.*]]
+; CHECK:       [[INNER]]:
+; CHECK-NEXT:    [[INNER_IV:%.*]] = phi i8 [ 0, %[[OUTER_HEADER_NEW]] ], [ [[INNER_IV_NEXT_7:%.*]], %[[INNER]] ]
+; CHECK-NEXT:    [[NITER:%.*]] = phi i8 [ 0, %[[OUTER_HEADER_NEW]] ], [ [[NITER_NEXT_7:%.*]], %[[INNER]] ]
+; CHECK-NEXT:    [[L:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD:%.*]] = add i32 [[L]], 1
+; CHECK-NEXT:    store i32 [[ADD]], ptr [[P]], align 4
+; CHECK-NEXT:    [[L_1:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD_1:%.*]] = add i32 [[L_1]], 1
+; CHECK-NEXT:    store i32 [[ADD_1]], ptr [[P]], align 4
+; CHECK-NEXT:    [[L_2:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD_2:%.*]] = add i32 [[L_2]], 1
+; CHECK-NEXT:    store i32 [[ADD_2]], ptr [[P]], align 4
+; CHECK-NEXT:    [[L_3:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD_3:%.*]] = add i32 [[L_3]], 1
+; CHECK-NEXT:    store i32 [[ADD_3]], ptr [[P]], align 4
+; CHECK-NEXT:    [[L_4:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD_4:%.*]] = add i32 [[L_4]], 1
+; CHECK-NEXT:    store i32 [[ADD_4]], ptr [[P]], align 4
+; CHECK-NEXT:    [[L_5:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD_5:%.*]] = add i32 [[L_5]], 1
+; CHECK-NEXT:    store i32 [[ADD_5]], ptr [[P]], align 4
+; CHECK-NEXT:    [[L_6:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD_6:%.*]] = add i32 [[L_6]], 1
+; CHECK-NEXT:    store i32 [[ADD_6]], ptr [[P]], align 4
+; CHECK-NEXT:    [[L_7:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD_7:%.*]] = add i32 [[L_7]], 1
+; CHECK-NEXT:    store i32 [[ADD_7]], ptr [[P]], align 4
+; CHECK-NEXT:    [[INNER_IV_NEXT_7]] = add i8 [[INNER_IV]], 8
+; CHECK-NEXT:    [[NITER_NEXT_7]] = add i8 [[NITER]], 8
+; CHECK-NEXT:    [[NITER_NCMP_7:%.*]] = icmp eq i8 [[NITER_NEXT_7]], [[UNROLL_ITER]]
+; CHECK-NEXT:    br i1 [[NITER_NCMP_7]], label %[[OUTER_LATCH_UNR_LCSSA:.*]], label %[[INNER]]
+; CHECK:       [[OUTER_LATCH_UNR_LCSSA]]:
+; CHECK-NEXT:    [[INNER_IV_UNR:%.*]] = phi i8 [ [[INNER_IV_NEXT_7]], %[[INNER]] ]
+; CHECK-NEXT:    [[LCMP_MOD:%.*]] = icmp ne i8 [[XTRAITER]], 0
+; CHECK-NEXT:    br i1 [[LCMP_MOD]], label %[[INNER_EPIL_PREHEADER]], label %[[OUTER_LATCH]]
+; CHECK:       [[INNER_EPIL_PREHEADER]]:
+; CHECK-NEXT:    [[INNER_IV_EPIL_INIT:%.*]] = phi i8 [ 0, %[[OUTER_HEADER]] ], [ [[INNER_IV_UNR]], %[[OUTER_LATCH_UNR_LCSSA]] ]
+; CHECK-NEXT:    [[LCMP_MOD1:%.*]] = icmp ne i8 [[XTRAITER]], 0
+; CHECK-NEXT:    call void @llvm.assume(i1 [[LCMP_MOD1]])
+; CHECK-NEXT:    br label %[[INNER_EPIL:.*]]
+; CHECK:       [[INNER_EPIL]]:
+; CHECK-NEXT:    [[INNER_IV_EPIL:%.*]] = phi i8 [ [[INNER_IV_EPIL_INIT]], %[[INNER_EPIL_PREHEADER]] ], [ [[INNER_IV_NEXT_EPIL:%.*]], %[[INNER_EPIL]] ]
+; CHECK-NEXT:    [[EPIL_ITER:%.*]] = phi i8 [ 0, %[[INNER_EPIL_PREHEADER]] ], [ [[EPIL_ITER_NEXT:%.*]], %[[INNER_EPIL]] ]
+; CHECK-NEXT:    [[L_EPIL:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD_EPIL:%.*]] = add i32 [[L_EPIL]], 1
+; CHECK-NEXT:    store i32 [[ADD_EPIL]], ptr [[P]], align 4
+; CHECK-NEXT:    [[INNER_IV_NEXT_EPIL]] = add i8 [[INNER_IV_EPIL]], 1
+; CHECK-NEXT:    [[EC_INNER_EPIL:%.*]] = icmp eq i8 [[INNER_IV_NEXT_EPIL]], [[J]]
+; CHECK-NEXT:    [[EPIL_ITER_NEXT]] = add i8 [[EPIL_ITER]], 1
+; CHECK-NEXT:    [[EPIL_ITER_CMP:%.*]] = icmp ne i8 [[EPIL_ITER_NEXT]], [[XTRAITER]]
+; CHECK-NEXT:    br i1 [[EPIL_ITER_CMP]], label %[[INNER_EPIL]], label %[[OUTER_LATCH_EPILOG_LCSSA:.*]], !llvm.loop [[LOOP5:![0-9]+]]
+; CHECK:       [[OUTER_LATCH_EPILOG_LCSSA]]:
+; CHECK-NEXT:    br label %[[OUTER_LATCH]]
+; CHECK:       [[OUTER_LATCH]]:
+; CHECK-NEXT:    [[J_NEXT]] = add i8 [[J]], [[STEP]]
+; CHECK-NEXT:    [[OUTER_IV_NEXT]] = add i8 [[OUTER_IV]], 1
+; CHECK-NEXT:    [[EC_OUTER:%.*]] = icmp eq i8 [[OUTER_IV_NEXT]], [[N]]
+; CHECK-NEXT:    [[INDVAR_NEXT]] = add i8 [[INDVAR]], 1
+; CHECK-NEXT:    br i1 [[EC_OUTER]], label %[[EXIT:.*]], label %[[OUTER_HEADER]], !llvm.loop [[LOOP6:![0-9]+]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %outer.header
+
+outer.header:
+  %outer.iv = phi i8 [ 1, %entry ], [ %outer.iv.next, %outer.latch ]
+  %j = phi i8 [ 1, %entry ], [ %j.next, %outer.latch ]
+  br label %inner
+
+inner:
+  %inner.iv = phi i8 [ 0, %outer.header ], [ %inner.iv.next, %inner ]
+  %l = load i32, ptr %p
+  %add = add i32 %l, 1
+  store i32 %add, ptr %p
+  %inner.iv.next = add i8 %inner.iv, 1
+  %ec.inner = icmp eq i8 %inner.iv.next, %j
+  br i1 %ec.inner, label %outer.latch, label %inner
+
+outer.latch:
+  %step = add i8 %g, undef
+  %j.next = add i8 %j, %step
+  %outer.iv.next = add i8 %outer.iv, 1
+  %ec.outer = icmp eq i8 %outer.iv.next, %n
+  br i1 %ec.outer, label %exit, label %outer.header, !llvm.loop !2
+
+exit:
+  ret void
+}
+
+; Reuse %j for the inner trip count %j + 5 instead of using %outer.iv.
+define void @inner_trip_count_reuses_existing_value(ptr %p, i8 %n, i8 %step) {
+; CHECK-LABEL: define void @inner_trip_count_reuses_existing_value(
+; CHECK-SAME: ptr [[P:%.*]], i8 [[N:%.*]], i8 [[STEP:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    br label %[[OUTER_HEADER:.*]]
+; CHECK:       [[OUTER_HEADER]]:
+; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i8 [ 1, %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], %[[OUTER_LATCH:.*]] ]
+; CHECK-NEXT:    [[J:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[J_NEXT:%.*]], %[[OUTER_LATCH]] ]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i8 [[J]], 4
+; CHECK-NEXT:    [[TC:%.*]] = add i8 [[J]], 5
+; CHECK-NEXT:    [[XTRAITER:%.*]] = and i8 [[TC]], 7
+; CHECK-NEXT:    [[TMP1:%.*]] = icmp ult i8 [[TMP0]], 7
+; CHECK-NEXT:    br i1 [[TMP1]], label %[[INNER_EPIL_PREHEADER:.*]], label %[[OUTER_HEADER_NEW:.*]]
+; CHECK:       [[OUTER_HEADER_NEW]]:
+; CHECK-NEXT:    [[UNROLL_ITER:%.*]] = sub i8 [[TC]], [[XTRAITER]]
+; CHECK-NEXT:    br label %[[INNER:.*]]
+; CHECK:       [[INNER]]:
+; CHECK-NEXT:    [[INNER_IV:%.*]] = phi i8 [ 0, %[[OUTER_HEADER_NEW]] ], [ [[INNER_IV_NEXT_7:%.*]], %[[INNER]] ]
+; CHECK-NEXT:    [[NITER:%.*]] = phi i8 [ 0, %[[OUTER_HEADER_NEW]] ], [ [[NITER_NEXT_7:%.*]], %[[INNER]] ]
+; CHECK-NEXT:    [[L:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD:%.*]] = add i32 [[L]], 1
+; CHECK-NEXT:    store i32 [[ADD]], ptr [[P]], align 4
+; CHECK-NEXT:    [[L_1:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD_1:%.*]] = add i32 [[L_1]], 1
+; CHECK-NEXT:    store i32 [[ADD_1]], ptr [[P]], align 4
+; CHECK-NEXT:    [[L_2:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD_2:%.*]] = add i32 [[L_2]], 1
+; CHECK-NEXT:    store i32 [[ADD_2]], ptr [[P]], align 4
+; CHECK-NEXT:    [[L_3:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD_3:%.*]] = add i32 [[L_3]], 1
+; CHECK-NEXT:    store i32 [[ADD_3]], ptr [[P]], align 4
+; CHECK-NEXT:    [[L_4:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD_4:%.*]] = add i32 [[L_4]], 1
+; CHECK-NEXT:    store i32 [[ADD_4]], ptr [[P]], align 4
+; CHECK-NEXT:    [[L_5:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD_5:%.*]] = add i32 [[L_5]], 1
+; CHECK-NEXT:    store i32 [[ADD_5]], ptr [[P]], align 4
+; CHECK-NEXT:    [[L_6:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD_6:%.*]] = add i32 [[L_6]], 1
+; CHECK-NEXT:    store i32 [[ADD_6]], ptr [[P]], align 4
+; CHECK-NEXT:    [[L_7:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD_7:%.*]] = add i32 [[L_7]], 1
+; CHECK-NEXT:    store i32 [[ADD_7]], ptr [[P]], align 4
+; CHECK-NEXT:    [[INNER_IV_NEXT_7]] = add i8 [[INNER_IV]], 8
+; CHECK-NEXT:    [[NITER_NEXT_7]] = add i8 [[NITER]], 8
+; CHECK-NEXT:    [[NITER_NCMP_7:%.*]] = icmp eq i8 [[NITER_NEXT_7]], [[UNROLL_ITER]]
+; CHECK-NEXT:    br i1 [[NITER_NCMP_7]], label %[[OUTER_LATCH_UNR_LCSSA:.*]], label %[[INNER]]
+; CHECK:       [[OUTER_LATCH_UNR_LCSSA]]:
+; CHECK-NEXT:    [[INNER_IV_UNR:%.*]] = phi i8 [ [[INNER_IV_NEXT_7]], %[[INNER]] ]
+; CHECK-NEXT:    [[LCMP_MOD:%.*]] = icmp ne i8 [[XTRAITER]], 0
+; CHECK-NEXT:    br i1 [[LCMP_MOD]], label %[[INNER_EPIL_PREHEADER]], label %[[OUTER_LATCH]]
+; CHECK:       [[INNER_EPIL_PREHEADER]]:
+; CHECK-NEXT:    [[INNER_IV_EPIL_INIT:%.*]] = phi i8 [ 0, %[[OUTER_HEADER]] ], [ [[INNER_IV_UNR]], %[[OUTER_LATCH_UNR_LCSSA]] ]
+; CHECK-NEXT:    [[LCMP_MOD1:%.*]] = icmp ne i8 [[XTRAITER]], 0
+; CHECK-NEXT:    call void @llvm.assume(i1 [[LCMP_MOD1]])
+; CHECK-NEXT:    br label %[[INNER_EPIL:.*]]
+; CHECK:       [[INNER_EPIL]]:
+; CHECK-NEXT:    [[INNER_IV_EPIL:%.*]] = phi i8 [ [[INNER_IV_EPIL_INIT]], %[[INNER_EPIL_PREHEADER]] ], [ [[INNER_IV_NEXT_EPIL:%.*]], %[[INNER_EPIL]] ]
+; CHECK-NEXT:    [[EPIL_ITER:%.*]] = phi i8 [ 0, %[[INNER_EPIL_PREHEADER]] ], [ [[EPIL_ITER_NEXT:%.*]], %[[INNER_EPIL]] ]
+; CHECK-NEXT:    [[L_EPIL:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD_EPIL:%.*]] = add i32 [[L_EPIL]], 1
+; CHECK-NEXT:    store i32 [[ADD_EPIL]], ptr [[P]], align 4
+; CHECK-NEXT:    [[INNER_IV_NEXT_EPIL]] = add i8 [[INNER_IV_EPIL]], 1
+; CHECK-NEXT:    [[EC_INNER_EPIL:%.*]] = icmp eq i8 [[INNER_IV_NEXT_EPIL]], [[TC]]
+; CHECK-NEXT:    [[EPIL_ITER_NEXT]] = add i8 [[EPIL_ITER]], 1
+; CHECK-NEXT:    [[EPIL_ITER_CMP:%.*]] = icmp ne i8 [[EPIL_ITER_NEXT]], [[XTRAITER]]
+; CHECK-NEXT:    br i1 [[EPIL_ITER_CMP]], label %[[INNER_EPIL]], label %[[OUTER_LATCH_EPILOG_LCSSA:.*]], !llvm.loop [[LOOP7:![0-9]+]]
+; CHECK:       [[OUTER_LATCH_EPILOG_LCSSA]]:
+; CHECK-NEXT:    br label %[[OUTER_LATCH]]
+; CHECK:       [[OUTER_LATCH]]:
+; CHECK-NEXT:    [[J_NEXT]] = add i8 [[J]], [[STEP]]
+; CHECK-NEXT:    [[OUTER_IV_NEXT]] = add i8 [[OUTER_IV]], 1
+; CHECK-NEXT:    [[EC_OUTER:%.*]] = icmp eq i8 [[OUTER_IV_NEXT]], [[N]]
+; CHECK-NEXT:    br i1 [[EC_OUTER]], label %[[EXIT:.*]], label %[[OUTER_HEADER]], !llvm.loop [[LOOP8:![0-9]+]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  br label %outer.header
+
+outer.header:
+  %outer.iv = phi i8 [ 1, %entry ], [ %outer.iv.next, %outer.latch ]
+  %j = phi i8 [ 0, %entry ], [ %j.next, %outer.latch ]
+  %tc = add i8 %j, 5
+  br label %inner
+
+inner:
+  %inner.iv = phi i8 [ 0, %outer.header ], [ %inner.iv.next, %inner ]
+  %l = load i32, ptr %p
+  %add = add i32 %l, 1
+  store i32 %add, ptr %p
+  %inner.iv.next = add i8 %inner.iv, 1
+  %ec.inner = icmp eq i8 %inner.iv.next, %tc
+  br i1 %ec.inner, label %outer.latch, label %inner
+
+outer.latch:
+  %j.next = add i8 %j, %step
+  %outer.iv.next = add i8 %outer.iv, 1
+  %ec.outer = icmp eq i8 %outer.iv.next, %n
+  br i1 %ec.outer, label %exit, label %outer.header, !llvm.loop !3
+
+exit:
+  ret void
+}
+
+; %outer.iv's start folds to 1 but is poison if %x is, so don't use %outer.iv.
+define void @inner_trip_count_outer_iv_start_hides_poison(ptr %p, i8 %x, i8 %n) {
+; CHECK-LABEL: define void @inner_trip_count_outer_iv_start_hides_poison(
+; CHECK-SAME: ptr [[P:%.*]], i8 [[X:%.*]], i8 [[N:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-NEXT:    [[SUB:%.*]] = sub i8 [[X]], [[X]]
+; CHECK-NEXT:    [[START:%.*]] = add i8 [[SUB]], 1
+; CHECK-NEXT:    [[TMP0:%.*]] = add i8 [[X]], -1
+; CHECK-NEXT:    br label %[[OUTER_HEADER:.*]]
+; CHECK:       [[OUTER_HEADER]]:
+; CHECK-NEXT:    [[INDVAR:%.*]] = phi i8 [ [[INDVAR_NEXT:%.*]], %[[OUTER_LATCH:.*]] ], [ 0, %[[ENTRY]] ]
+; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i8 [ [[START]], %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], %[[OUTER_LATCH]] ]
+; CHECK-NEXT:    [[J:%.*]] = phi i8 [ [[X]], %[[ENTRY]] ], [ [[J_NEXT:%.*]], %[[OUTER_LATCH]] ]
+; CHECK-NEXT:    [[TMP1:%.*]] = shl i8 [[INDVAR]], 2
+; CHECK-NEXT:    [[TMP2:%.*]] = add i8 [[TMP0]], [[TMP1]]
+; CHECK-NEXT:    [[XTRAITER:%.*]] = and i8 [[J]], 7
+; CHECK-NEXT:    [[TMP3:%.*]] = icmp ult i8 [[TMP2]], 7
+; CHECK-NEXT:    br i1 [[TMP3]], label %[[INNER_EPIL_PREHEADER:.*]], label %[[OUTER_HEADER_NEW:.*]]
+; CHECK:       [[OUTER_HEADER_NEW]]:
+; CHECK-NEXT:    [[UNROLL_ITER:%.*]] = sub i8 [[J]], [[XTRAITER]]
+; CHECK-NEXT:    br label %[[INNER:.*]]
+; CHECK:       [[INNER]]:
+; CHECK-NEXT:    [[INNER_IV:%.*]] = phi i8 [ 0, %[[OUTER_HEADER_NEW]] ], [ [[INNER_IV_NEXT_7:%.*]], %[[INNER]] ]
+; CHECK-NEXT:    [[NITER:%.*]] = phi i8 [ 0, %[[OUTER_HEADER_NEW]] ], [ [[NITER_NEXT_7:%.*]], %[[INNER]] ]
+; CHECK-NEXT:    [[L:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD:%.*]] = add i32 [[L]], 1
+; CHECK-NEXT:    store i32 [[ADD]], ptr [[P]], align 4
+; CHECK-NEXT:    [[L_1:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD_1:%.*]] = add i32 [[L_1]], 1
+; CHECK-NEXT:    store i32 [[ADD_1]], ptr [[P]], align 4
+; CHECK-NEXT:    [[L_2:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD_2:%.*]] = add i32 [[L_2]], 1
+; CHECK-NEXT:    store i32 [[ADD_2]], ptr [[P]], align 4
+; CHECK-NEXT:    [[L_3:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD_3:%.*]] = add i32 [[L_3]], 1
+; CHECK-NEXT:    store i32 [[ADD_3]], ptr [[P]], align 4
+; CHECK-NEXT:    [[L_4:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD_4:%.*]] = add i32 [[L_4]], 1
+; CHECK-NEXT:    store i32 [[ADD_4]], ptr [[P]], align 4
+; CHECK-NEXT:    [[L_5:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD_5:%.*]] = add i32 [[L_5]], 1
+; CHECK-NEXT:    store i32 [[ADD_5]], ptr [[P]], align 4
+; CHECK-NEXT:    [[L_6:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD_6:%.*]] = add i32 [[L_6]], 1
+; CHECK-NEXT:    store i32 [[ADD_6]], ptr [[P]], align 4
+; CHECK-NEXT:    [[L_7:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD_7:%.*]] = add i32 [[L_7]], 1
+; CHECK-NEXT:    store i32 [[ADD_7]], ptr [[P]], align 4
+; CHECK-NEXT:    [[INNER_IV_NEXT_7]] = add i8 [[INNER_IV]], 8
+; CHECK-NEXT:    [[NITER_NEXT_7]] = add i8 [[NITER]], 8
+; CHECK-NEXT:    [[NITER_NCMP_7:%.*]] = icmp eq i8 [[NITER_NEXT_7]], [[UNROLL_ITER]]
+; CHECK-NEXT:    br i1 [[NITER_NCMP_7]], label %[[OUTER_LATCH_UNR_LCSSA:.*]], label %[[INNER]]
+; CHECK:       [[OUTER_LATCH_UNR_LCSSA]]:
+; CHECK-NEXT:    [[INNER_IV_UNR:%.*]] = phi i8 [ [[INNER_IV_NEXT_7]], %[[INNER]] ]
+; CHECK-NEXT:    [[LCMP_MOD:%.*]] = icmp ne i8 [[XTRAITER]], 0
+; CHECK-NEXT:    br i1 [[LCMP_MOD]], label %[[INNER_EPIL_PREHEADER]], label %[[OUTER_LATCH]]
+; CHECK:       [[INNER_EPIL_PREHEADER]]:
+; CHECK-NEXT:    [[INNER_IV_EPIL_INIT:%.*]] = phi i8 [ 0, %[[OUTER_HEADER]] ], [ [[INNER_IV_UNR]], %[[OUTER_LATCH_UNR_LCSSA]] ]
+; CHECK-NEXT:    [[LCMP_MOD1:%.*]] = icmp ne i8 [[XTRAITER]], 0
+; CHECK-NEXT:    call void @llvm.assume(i1 [[LCMP_MOD1]])
+; CHECK-NEXT:    br label %[[INNER_EPIL:.*]]
+; CHECK:       [[INNER_EPIL]]:
+; CHECK-NEXT:    [[INNER_IV_EPIL:%.*]] = phi i8 [ [[INNER_IV_EPIL_INIT]], %[[INNER_EPIL_PREHEADER]] ], [ [[INNER_IV_NEXT_EPIL:%.*]], %[[INNER_EPIL]] ]
+; CHECK-NEXT:    [[EPIL_ITER:%.*]] = phi i8 [ 0, %[[INNER_EPIL_PREHEADER]] ], [ [[EPIL_ITER_NEXT:%.*]], %[[INNER_EPIL]] ]
+; CHECK-NEXT:    [[L_EPIL:%.*]] = load i32, ptr [[P]], align 4
+; CHECK-NEXT:    [[ADD_EPIL:%.*]] = add i32 [[L_EPIL]], 1
+; CHECK-NEXT:    store i32 [[ADD_EPIL]], ptr [[P]], align 4
+; CHECK-NEXT:    [[INNER_IV_NEXT_EPIL]] = add i8 [[INNER_IV_EPIL]], 1
+; CHECK-NEXT:    [[EC_INNER_EPIL:%.*]] = icmp eq i8 [[INNER_IV_NEXT_EPIL]], [[J]]
+; CHECK-NEXT:    [[EPIL_ITER_NEXT]] = add i8 [[EPIL_ITER]], 1
+; CHECK-NEXT:    [[EPIL_ITER_CMP:%.*]] = icmp ne i8 [[EPIL_ITER_NEXT]], [[XTRAITER]]
+; CHECK-NEXT:    br i1 [[EPIL_ITER_CMP]], label %[[INNER_EPIL]], label %[[OUTER_LATCH_EPILOG_LCSSA:.*]], !llvm.loop [[LOOP9:![0-9]+]]
+; CHECK:       [[OUTER_LATCH_EPILOG_LCSSA]]:
+; CHECK-NEXT:    br label %[[OUTER_LATCH]]
+; CHECK:       [[OUTER_LATCH]]:
+; CHECK-NEXT:    [[OUTER_IV_NEXT]] = add i8 [[OUTER_IV]], 2
+; CHECK-NEXT:    [[J_NEXT]] = add i8 [[J]], 4
+; CHECK-NEXT:    [[EC_OUTER:%.*]] = icmp ult i8 [[OUTER_IV_NEXT]], [[N]]
+; CHECK-NEXT:    [[INDVAR_NEXT]] = add i8 [[INDVAR]], 1
+; CHECK-NEXT:    br i1 [[EC_OUTER]], label %[[OUTER_HEADER]], label %[[EXIT:.*]]
+; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    ret void
+;
+entry:
+  %sub = sub i8 %x, %x
+  %start = add i8 %sub, 1
+  br label %outer.header
+
+outer.header:
+  %outer.iv = phi i8 [ %start, %entry ], [ %outer.iv.next, %outer.latch ]
+  %j = phi i8 [ %x, %entry ], [ %j.next, %outer.latch ]
+  br label %inner
+
+inner:
+  %inner.iv = phi i8 [ 0, %outer.header ], [ %inner.iv.next, %inner ]
+  %l = load i32, ptr %p
+  %add = add i32 %l, 1
+  store i32 %add, ptr %p
+  %inner.iv.next = add i8 %inner.iv, 1
+  %ec.inner = icmp eq i8 %inner.iv.next, %j
+  br i1 %ec.inner, label %outer.latch, label %inner
+
+outer.latch:
+  %outer.iv.next = add i8 %outer.iv, 2
+  %j.next = add i8 %j, 4
+  %ec.outer = icmp ult i8 %outer.iv.next, %n
+  br i1 %ec.outer, label %outer.header, label %exit
+
+exit:
+  ret void
+}
+
+!0 = distinct !{!0, !1}
+!1 = !{!"llvm.loop.unroll.disable"}
+!2 = distinct !{!2, !1}
+!3 = distinct !{!3, !1}
 ;.
 ; CHECK: [[LOOP0]] = distinct !{[[LOOP0]], [[META1:![0-9]+]]}
 ; CHECK: [[META1]] = !{!"llvm.loop.unroll.disable"}
 ; CHECK: [[LOOP2]] = distinct !{[[LOOP2]], [[META1]]}
+; CHECK: [[LOOP3]] = distinct !{[[LOOP3]], [[META1]]}
+; CHECK: [[LOOP4]] = distinct !{[[LOOP4]], [[META1]]}
+; CHECK: [[LOOP5]] = distinct !{[[LOOP5]], [[META1]]}
+; CHECK: [[LOOP6]] = distinct !{[[LOOP6]], [[META1]]}
+; CHECK: [[LOOP7]] = distinct !{[[LOOP7]], [[META1]]}
+; CHECK: [[LOOP8]] = distinct !{[[LOOP8]], [[META1]]}
+; CHECK: [[LOOP9]] = distinct !{[[LOOP9]], [[META1]]}
 ;.
