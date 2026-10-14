@@ -17,25 +17,30 @@ target triple = "arm64-apple-macosx"
 ; loop store to a constant-offset load via SCEV evaluateAtIteration is possible
 ; but not worth it.
 define i32 @fwd_const(ptr noalias %p) {
-; CHECK-LABEL: define noundef i32 @fwd_const(
-; CHECK-SAME: ptr noalias nofree writeonly captures(none) initializes((0, 128)) [[P:%.*]]) local_unnamed_addr #[[ATTR0:[0-9]+]] {
+; CHECK-LABEL: define i32 @fwd_const(
+; CHECK-SAME: ptr noalias nofree captures(none) initializes((0, 128)) [[P:%.*]]) local_unnamed_addr #[[ATTR0:[0-9]+]] {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    store <4 x i32> <i32 0, i32 1, i32 4, i32 9>, ptr [[P]], align 4
 ; CHECK-NEXT:    [[GEP_P_4:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 16
+; CHECK-NEXT:    store <4 x i32> <i32 0, i32 1, i32 4, i32 9>, ptr [[P]], align 4
 ; CHECK-NEXT:    store <4 x i32> <i32 16, i32 25, i32 36, i32 49>, ptr [[GEP_P_4]], align 4
 ; CHECK-NEXT:    [[GEP_P_8:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 32
-; CHECK-NEXT:    store <4 x i32> <i32 64, i32 81, i32 100, i32 121>, ptr [[GEP_P_8]], align 4
 ; CHECK-NEXT:    [[GEP_P_12:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 48
+; CHECK-NEXT:    store <4 x i32> <i32 64, i32 81, i32 100, i32 121>, ptr [[GEP_P_8]], align 4
 ; CHECK-NEXT:    store <4 x i32> <i32 144, i32 169, i32 196, i32 225>, ptr [[GEP_P_12]], align 4
 ; CHECK-NEXT:    [[GEP_P_16:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 64
-; CHECK-NEXT:    store <4 x i32> <i32 256, i32 289, i32 324, i32 361>, ptr [[GEP_P_16]], align 4
 ; CHECK-NEXT:    [[GEP_P_20:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 80
+; CHECK-NEXT:    store <4 x i32> <i32 256, i32 289, i32 324, i32 361>, ptr [[GEP_P_16]], align 4
 ; CHECK-NEXT:    store <4 x i32> <i32 400, i32 441, i32 484, i32 529>, ptr [[GEP_P_20]], align 4
 ; CHECK-NEXT:    [[GEP_P_24:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 96
-; CHECK-NEXT:    store <4 x i32> <i32 576, i32 625, i32 676, i32 729>, ptr [[GEP_P_24]], align 4
 ; CHECK-NEXT:    [[GEP_P_28:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 112
+; CHECK-NEXT:    store <4 x i32> <i32 576, i32 625, i32 676, i32 729>, ptr [[GEP_P_24]], align 4
 ; CHECK-NEXT:    store <4 x i32> <i32 784, i32 841, i32 900, i32 961>, ptr [[GEP_P_28]], align 4
-; CHECK-NEXT:    ret i32 909
+; CHECK-NEXT:    [[P_3:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 12
+; CHECK-NEXT:    [[L_3:%.*]] = load i32, ptr [[P_3]], align 4
+; CHECK-NEXT:    [[P_30:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 120
+; CHECK-NEXT:    [[L_30:%.*]] = load i32, ptr [[P_30]], align 4
+; CHECK-NEXT:    [[RES:%.*]] = add nsw i32 [[L_30]], [[L_3]]
+; CHECK-NEXT:    ret i32 [[RES]]
 ;
 entry:
   br label %loop
@@ -66,23 +71,54 @@ exit:
 ; unroll. Fix: GVN, followed by DSE, in the cleanup chain.
 define void @scale_i(ptr %w) {
 ; CHECK-LABEL: define void @scale_i(
-; CHECK-SAME: ptr nofree writeonly captures(none) initializes((0, 128)) [[W:%.*]]) local_unnamed_addr #[[ATTR0]] {
+; CHECK-SAME: ptr nofree captures(none) initializes((0, 128)) [[W:%.*]]) local_unnamed_addr #[[ATTR0]] {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    [[GEP_1_4:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 16
+; CHECK-NEXT:    store <4 x i32> <i32 0, i32 1, i32 4, i32 9>, ptr [[W]], align 4
+; CHECK-NEXT:    store <4 x i32> <i32 16, i32 25, i32 36, i32 49>, ptr [[GEP_1_4]], align 4
 ; CHECK-NEXT:    [[GEP_1_8:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 32
 ; CHECK-NEXT:    [[GEP_1_12:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 48
+; CHECK-NEXT:    store <4 x i32> <i32 64, i32 81, i32 100, i32 121>, ptr [[GEP_1_8]], align 4
+; CHECK-NEXT:    store <4 x i32> <i32 144, i32 169, i32 196, i32 225>, ptr [[GEP_1_12]], align 4
 ; CHECK-NEXT:    [[GEP_1_16:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 64
 ; CHECK-NEXT:    [[GEP_1_20:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 80
+; CHECK-NEXT:    store <4 x i32> <i32 256, i32 289, i32 324, i32 361>, ptr [[GEP_1_16]], align 4
+; CHECK-NEXT:    store <4 x i32> <i32 400, i32 441, i32 484, i32 529>, ptr [[GEP_1_20]], align 4
 ; CHECK-NEXT:    [[GEP_1_24:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 96
 ; CHECK-NEXT:    [[GEP_1_28:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 112
-; CHECK-NEXT:    store <4 x i32> <i32 7, i32 8, i32 11, i32 16>, ptr [[W]], align 4
-; CHECK-NEXT:    store <4 x i32> <i32 23, i32 32, i32 43, i32 56>, ptr [[GEP_1_4]], align 4
-; CHECK-NEXT:    store <4 x i32> <i32 71, i32 88, i32 107, i32 128>, ptr [[GEP_1_8]], align 4
-; CHECK-NEXT:    store <4 x i32> <i32 151, i32 176, i32 203, i32 232>, ptr [[GEP_1_12]], align 4
-; CHECK-NEXT:    store <4 x i32> <i32 263, i32 296, i32 331, i32 368>, ptr [[GEP_1_16]], align 4
-; CHECK-NEXT:    store <4 x i32> <i32 407, i32 448, i32 491, i32 536>, ptr [[GEP_1_20]], align 4
-; CHECK-NEXT:    store <4 x i32> <i32 583, i32 632, i32 683, i32 736>, ptr [[GEP_1_24]], align 4
-; CHECK-NEXT:    store <4 x i32> <i32 791, i32 848, i32 907, i32 968>, ptr [[GEP_1_28]], align 4
+; CHECK-NEXT:    store <4 x i32> <i32 576, i32 625, i32 676, i32 729>, ptr [[GEP_1_24]], align 4
+; CHECK-NEXT:    store <4 x i32> <i32 784, i32 841, i32 900, i32 961>, ptr [[GEP_1_28]], align 4
+; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 16
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[W]], align 4
+; CHECK-NEXT:    [[WIDE_LOAD4:%.*]] = load <4 x i32>, ptr [[TMP7]], align 4
+; CHECK-NEXT:    [[TMP8:%.*]] = add nsw <4 x i32> [[WIDE_LOAD]], splat (i32 7)
+; CHECK-NEXT:    [[TMP9:%.*]] = add nsw <4 x i32> [[WIDE_LOAD4]], splat (i32 7)
+; CHECK-NEXT:    store <4 x i32> [[TMP8]], ptr [[W]], align 4
+; CHECK-NEXT:    store <4 x i32> [[TMP9]], ptr [[TMP7]], align 4
+; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 32
+; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 48
+; CHECK-NEXT:    [[WIDE_LOAD_1:%.*]] = load <4 x i32>, ptr [[TMP10]], align 4
+; CHECK-NEXT:    [[WIDE_LOAD4_1:%.*]] = load <4 x i32>, ptr [[TMP11]], align 4
+; CHECK-NEXT:    [[TMP12:%.*]] = add nsw <4 x i32> [[WIDE_LOAD_1]], splat (i32 7)
+; CHECK-NEXT:    [[TMP13:%.*]] = add nsw <4 x i32> [[WIDE_LOAD4_1]], splat (i32 7)
+; CHECK-NEXT:    store <4 x i32> [[TMP12]], ptr [[TMP10]], align 4
+; CHECK-NEXT:    store <4 x i32> [[TMP13]], ptr [[TMP11]], align 4
+; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 64
+; CHECK-NEXT:    [[TMP15:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 80
+; CHECK-NEXT:    [[WIDE_LOAD_2:%.*]] = load <4 x i32>, ptr [[TMP14]], align 4
+; CHECK-NEXT:    [[WIDE_LOAD4_2:%.*]] = load <4 x i32>, ptr [[TMP15]], align 4
+; CHECK-NEXT:    [[TMP16:%.*]] = add nsw <4 x i32> [[WIDE_LOAD_2]], splat (i32 7)
+; CHECK-NEXT:    [[TMP17:%.*]] = add nsw <4 x i32> [[WIDE_LOAD4_2]], splat (i32 7)
+; CHECK-NEXT:    store <4 x i32> [[TMP16]], ptr [[TMP14]], align 4
+; CHECK-NEXT:    store <4 x i32> [[TMP17]], ptr [[TMP15]], align 4
+; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 96
+; CHECK-NEXT:    [[TMP19:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 112
+; CHECK-NEXT:    [[WIDE_LOAD_3:%.*]] = load <4 x i32>, ptr [[TMP18]], align 4
+; CHECK-NEXT:    [[WIDE_LOAD4_3:%.*]] = load <4 x i32>, ptr [[TMP19]], align 4
+; CHECK-NEXT:    [[TMP20:%.*]] = add nsw <4 x i32> [[WIDE_LOAD_3]], splat (i32 7)
+; CHECK-NEXT:    [[TMP21:%.*]] = add nsw <4 x i32> [[WIDE_LOAD4_3]], splat (i32 7)
+; CHECK-NEXT:    store <4 x i32> [[TMP20]], ptr [[TMP18]], align 4
+; CHECK-NEXT:    store <4 x i32> [[TMP21]], ptr [[TMP19]], align 4
 ; CHECK-NEXT:    ret void
 ;
 entry:
@@ -120,29 +156,86 @@ exit:
 ; constant folding of those reductions.
 define void @normalize(ptr %w) {
 ; CHECK-LABEL: define void @normalize(
-; CHECK-SAME: ptr nofree writeonly captures(none) initializes((0, 168)) [[W:%.*]]) local_unnamed_addr #[[ATTR0]] {
+; CHECK-SAME: ptr nofree captures(none) initializes((0, 168)) [[W:%.*]]) local_unnamed_addr #[[ATTR0]] {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    [[GEP_1_2:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 16
+; CHECK-NEXT:    store <2 x double> <double 1.000000e+02, double 8.100000e+01>, ptr [[W]], align 8
+; CHECK-NEXT:    store <2 x double> <double 6.400000e+01, double 4.900000e+01>, ptr [[GEP_1_2]], align 8
 ; CHECK-NEXT:    [[GEP_1_4:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 32
 ; CHECK-NEXT:    [[GEP_1_6:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 48
+; CHECK-NEXT:    store <2 x double> <double 3.600000e+01, double 2.500000e+01>, ptr [[GEP_1_4]], align 8
+; CHECK-NEXT:    store <2 x double> <double 1.600000e+01, double 9.000000e+00>, ptr [[GEP_1_6]], align 8
 ; CHECK-NEXT:    [[GEP_1_8:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 64
 ; CHECK-NEXT:    [[GEP_1_10:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 80
+; CHECK-NEXT:    store <2 x double> <double 4.000000e+00, double 1.000000e+00>, ptr [[GEP_1_8]], align 8
+; CHECK-NEXT:    store <2 x double> <double 0.000000e+00, double 1.000000e+00>, ptr [[GEP_1_10]], align 8
 ; CHECK-NEXT:    [[GEP_1_12:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 96
 ; CHECK-NEXT:    [[GEP_1_14:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 112
+; CHECK-NEXT:    store <2 x double> <double 4.000000e+00, double 9.000000e+00>, ptr [[GEP_1_12]], align 8
+; CHECK-NEXT:    store <2 x double> <double 1.600000e+01, double 2.500000e+01>, ptr [[GEP_1_14]], align 8
 ; CHECK-NEXT:    [[GEP_1_16:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 128
 ; CHECK-NEXT:    [[GEP_1_18:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 144
+; CHECK-NEXT:    store <2 x double> <double 3.600000e+01, double 4.900000e+01>, ptr [[GEP_1_16]], align 8
+; CHECK-NEXT:    store <2 x double> <double 6.400000e+01, double 8.100000e+01>, ptr [[GEP_1_18]], align 8
+; CHECK-NEXT:    [[TMP9:%.*]] = tail call double @llvm.vector.reduce.fadd.v2f64(double 0.000000e+00, <2 x double> <double 1.000000e+02, double 8.100000e+01>)
+; CHECK-NEXT:    [[TMP10:%.*]] = tail call double @llvm.vector.reduce.fadd.v2f64(double [[TMP9]], <2 x double> <double 6.400000e+01, double 4.900000e+01>)
+; CHECK-NEXT:    [[TMP11:%.*]] = tail call double @llvm.vector.reduce.fadd.v2f64(double [[TMP10]], <2 x double> <double 3.600000e+01, double 2.500000e+01>)
+; CHECK-NEXT:    [[TMP12:%.*]] = tail call double @llvm.vector.reduce.fadd.v2f64(double [[TMP11]], <2 x double> <double 1.600000e+01, double 9.000000e+00>)
+; CHECK-NEXT:    [[TMP13:%.*]] = tail call double @llvm.vector.reduce.fadd.v2f64(double [[TMP12]], <2 x double> <double 4.000000e+00, double 1.000000e+00>)
+; CHECK-NEXT:    [[TMP14:%.*]] = tail call double @llvm.vector.reduce.fadd.v2f64(double [[TMP13]], <2 x double> <double 0.000000e+00, double 1.000000e+00>)
+; CHECK-NEXT:    [[TMP15:%.*]] = tail call double @llvm.vector.reduce.fadd.v2f64(double [[TMP14]], <2 x double> <double 4.000000e+00, double 9.000000e+00>)
+; CHECK-NEXT:    [[TMP16:%.*]] = tail call double @llvm.vector.reduce.fadd.v2f64(double [[TMP15]], <2 x double> <double 1.600000e+01, double 2.500000e+01>)
+; CHECK-NEXT:    [[TMP17:%.*]] = tail call double @llvm.vector.reduce.fadd.v2f64(double [[TMP16]], <2 x double> <double 3.600000e+01, double 4.900000e+01>)
+; CHECK-NEXT:    [[TMP18:%.*]] = tail call double @llvm.vector.reduce.fadd.v2f64(double [[TMP17]], <2 x double> <double 6.400000e+01, double 8.100000e+01>)
 ; CHECK-NEXT:    [[GEP_1_20:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 160
-; CHECK-NEXT:    store <2 x double> <double f0x3FC09F959C427E56, double f0x3FBAEE0BF80551C9>, ptr [[W]], align 8
-; CHECK-NEXT:    store <2 x double> <double f0x3FB54725E6BB82FE, double f0x3FB04A7904A7904A>, ptr [[GEP_1_2]], align 8
-; CHECK-NEXT:    store <2 x double> <double f0x3FA7F00AA392F35E, double f0x3FA09F959C427E56>, ptr [[GEP_1_4]], align 8
-; CHECK-NEXT:    store <2 x double> <double f0x3F954725E6BB82FE, double f0x3F87F00AA392F35E>, ptr [[GEP_1_6]], align 8
-; CHECK-NEXT:    store <2 x double> <double f0x3F754725E6BB82FE, double f0x3F554725E6BB82FE>, ptr [[GEP_1_8]], align 8
-; CHECK-NEXT:    store <2 x double> <double 0.000000e+00, double f0x3F554725E6BB82FE>, ptr [[GEP_1_10]], align 8
-; CHECK-NEXT:    store <2 x double> <double f0x3F754725E6BB82FE, double f0x3F87F00AA392F35E>, ptr [[GEP_1_12]], align 8
-; CHECK-NEXT:    store <2 x double> <double f0x3F954725E6BB82FE, double f0x3FA09F959C427E56>, ptr [[GEP_1_14]], align 8
-; CHECK-NEXT:    store <2 x double> <double f0x3FA7F00AA392F35E, double f0x3FB04A7904A7904A>, ptr [[GEP_1_16]], align 8
-; CHECK-NEXT:    store <2 x double> <double f0x3FB54725E6BB82FE, double f0x3FBAEE0BF80551C9>, ptr [[GEP_1_18]], align 8
-; CHECK-NEXT:    store double f0x3FC09F959C427E56, ptr [[GEP_1_20]], align 8
+; CHECK-NEXT:    store double 1.000000e+02, ptr [[GEP_1_20]], align 8
+; CHECK-NEXT:    [[SUM_NEXT:%.*]] = fadd double [[TMP18]], 1.000000e+02
+; CHECK-NEXT:    [[SCALE:%.*]] = fdiv double 1.000000e+00, [[SUM_NEXT]]
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <2 x double> poison, double [[SCALE]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <2 x double> [[BROADCAST_SPLATINSERT]], <2 x double> poison, <2 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP19:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 16
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x double>, ptr [[W]], align 8
+; CHECK-NEXT:    [[WIDE_LOAD5:%.*]] = load <2 x double>, ptr [[TMP19]], align 8
+; CHECK-NEXT:    [[TMP20:%.*]] = fmul <2 x double> [[BROADCAST_SPLAT]], [[WIDE_LOAD]]
+; CHECK-NEXT:    [[TMP21:%.*]] = fmul <2 x double> [[BROADCAST_SPLAT]], [[WIDE_LOAD5]]
+; CHECK-NEXT:    store <2 x double> [[TMP20]], ptr [[W]], align 8
+; CHECK-NEXT:    store <2 x double> [[TMP21]], ptr [[TMP19]], align 8
+; CHECK-NEXT:    [[TMP22:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 32
+; CHECK-NEXT:    [[TMP23:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 48
+; CHECK-NEXT:    [[WIDE_LOAD_1:%.*]] = load <2 x double>, ptr [[TMP22]], align 8
+; CHECK-NEXT:    [[WIDE_LOAD5_1:%.*]] = load <2 x double>, ptr [[TMP23]], align 8
+; CHECK-NEXT:    [[TMP24:%.*]] = fmul <2 x double> [[BROADCAST_SPLAT]], [[WIDE_LOAD_1]]
+; CHECK-NEXT:    [[TMP25:%.*]] = fmul <2 x double> [[BROADCAST_SPLAT]], [[WIDE_LOAD5_1]]
+; CHECK-NEXT:    store <2 x double> [[TMP24]], ptr [[TMP22]], align 8
+; CHECK-NEXT:    store <2 x double> [[TMP25]], ptr [[TMP23]], align 8
+; CHECK-NEXT:    [[TMP26:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 64
+; CHECK-NEXT:    [[TMP27:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 80
+; CHECK-NEXT:    [[WIDE_LOAD_2:%.*]] = load <2 x double>, ptr [[TMP26]], align 8
+; CHECK-NEXT:    [[WIDE_LOAD5_2:%.*]] = load <2 x double>, ptr [[TMP27]], align 8
+; CHECK-NEXT:    [[TMP28:%.*]] = fmul <2 x double> [[BROADCAST_SPLAT]], [[WIDE_LOAD_2]]
+; CHECK-NEXT:    [[TMP29:%.*]] = fmul <2 x double> [[BROADCAST_SPLAT]], [[WIDE_LOAD5_2]]
+; CHECK-NEXT:    store <2 x double> [[TMP28]], ptr [[TMP26]], align 8
+; CHECK-NEXT:    store <2 x double> [[TMP29]], ptr [[TMP27]], align 8
+; CHECK-NEXT:    [[TMP30:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 96
+; CHECK-NEXT:    [[TMP31:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 112
+; CHECK-NEXT:    [[WIDE_LOAD_3:%.*]] = load <2 x double>, ptr [[TMP30]], align 8
+; CHECK-NEXT:    [[WIDE_LOAD5_3:%.*]] = load <2 x double>, ptr [[TMP31]], align 8
+; CHECK-NEXT:    [[TMP32:%.*]] = fmul <2 x double> [[BROADCAST_SPLAT]], [[WIDE_LOAD_3]]
+; CHECK-NEXT:    [[TMP33:%.*]] = fmul <2 x double> [[BROADCAST_SPLAT]], [[WIDE_LOAD5_3]]
+; CHECK-NEXT:    store <2 x double> [[TMP32]], ptr [[TMP30]], align 8
+; CHECK-NEXT:    store <2 x double> [[TMP33]], ptr [[TMP31]], align 8
+; CHECK-NEXT:    [[TMP34:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 128
+; CHECK-NEXT:    [[TMP35:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 144
+; CHECK-NEXT:    [[WIDE_LOAD_4:%.*]] = load <2 x double>, ptr [[TMP34]], align 8
+; CHECK-NEXT:    [[WIDE_LOAD5_4:%.*]] = load <2 x double>, ptr [[TMP35]], align 8
+; CHECK-NEXT:    [[TMP36:%.*]] = fmul <2 x double> [[BROADCAST_SPLAT]], [[WIDE_LOAD_4]]
+; CHECK-NEXT:    [[TMP37:%.*]] = fmul <2 x double> [[BROADCAST_SPLAT]], [[WIDE_LOAD5_4]]
+; CHECK-NEXT:    store <2 x double> [[TMP36]], ptr [[TMP34]], align 8
+; CHECK-NEXT:    store <2 x double> [[TMP37]], ptr [[TMP35]], align 8
+; CHECK-NEXT:    [[GEP_2:%.*]] = getelementptr inbounds nuw i8, ptr [[W]], i64 160
+; CHECK-NEXT:    [[L:%.*]] = load double, ptr [[GEP_2]], align 8
+; CHECK-NEXT:    [[MUL:%.*]] = fmul double [[SCALE]], [[L]]
+; CHECK-NEXT:    store double [[MUL]], ptr [[GEP_2]], align 8
 ; CHECK-NEXT:    ret void
 ;
 entry:
@@ -188,23 +281,155 @@ exit:
 ; peelToTurnInvariantLoadsDereferenceable does not fire here; unverified why).
 define void @search_early_exit(ptr %this) {
 ; CHECK-LABEL: define void @search_early_exit(
-; CHECK-SAME: ptr nofree readonly captures(none) [[THIS:%.*]]) local_unnamed_addr #[[ATTR1:[0-9]+]] {
-; CHECK-NEXT:  [[ENTRY:.*]]:
+; CHECK-SAME: ptr nofree readonly captures(address) [[THIS:%.*]]) local_unnamed_addr #[[ATTR1:[0-9]+]] {
+; CHECK-NEXT:  [[ENTRY:.*:]]
 ; CHECK-NEXT:    [[V_I_PRE:%.*]] = load i16, ptr [[THIS]], align 2
+; CHECK-NEXT:    [[VALID_I_NOT1:%.*]] = icmp eq i16 [[V_I_PRE]], 0
+; CHECK-NEXT:    [[PTR_NEXT:%.*]] = getelementptr i8, ptr [[THIS]], i64 4
+; CHECK-NEXT:    [[PTR_NEXT_1:%.*]] = getelementptr i8, ptr [[THIS]], i64 8
+; CHECK-NEXT:    [[PTR_NEXT_2:%.*]] = getelementptr i8, ptr [[THIS]], i64 12
+; CHECK-NEXT:    [[PTR_NEXT_3:%.*]] = getelementptr i8, ptr [[THIS]], i64 16
+; CHECK-NEXT:    [[PTR_NEXT_4:%.*]] = getelementptr i8, ptr [[THIS]], i64 20
+; CHECK-NEXT:    [[PTR_NEXT_5:%.*]] = getelementptr i8, ptr [[THIS]], i64 24
+; CHECK-NEXT:    [[PTR_NEXT_6:%.*]] = getelementptr i8, ptr [[THIS]], i64 28
+; CHECK-NEXT:    [[PTR_NEXT_7:%.*]] = getelementptr i8, ptr [[THIS]], i64 32
+; CHECK-NEXT:    [[PTR_NEXT_8:%.*]] = getelementptr i8, ptr [[THIS]], i64 36
+; CHECK-NEXT:    [[PTR_NEXT_9:%.*]] = getelementptr i8, ptr [[THIS]], i64 40
+; CHECK-NEXT:    [[PTR_NEXT_10:%.*]] = getelementptr i8, ptr [[THIS]], i64 44
+; CHECK-NEXT:    [[PTR_NEXT_11:%.*]] = getelementptr i8, ptr [[THIS]], i64 48
+; CHECK-NEXT:    [[PTR_NEXT_12:%.*]] = getelementptr i8, ptr [[THIS]], i64 52
+; CHECK-NEXT:    [[PTR_NEXT_13:%.*]] = getelementptr i8, ptr [[THIS]], i64 56
+; CHECK-NEXT:    [[PTR_NEXT_14:%.*]] = getelementptr i8, ptr [[THIS]], i64 60
 ; CHECK-NEXT:    br label %[[OUTER:.*]]
-; CHECK:       [[OUTER]]:
-; CHECK-NEXT:    [[V_I:%.*]] = phi i16 [ [[V_I_PRE]], %[[ENTRY]] ], [ [[V_I_BE:%.*]], %[[OUTER_BACKEDGE:.*]] ]
+; CHECK:       [[OUTER_BACKEDGE:.*]]:
+; CHECK-NEXT:    br label %[[OUTER]]
+; CHECK:       [[INNER:.*]]:
+; CHECK-NEXT:    [[V_I:%.*]] = load i16, ptr [[PTR_NEXT]], align 4
 ; CHECK-NEXT:    [[VALID_I_NOT:%.*]] = icmp eq i16 [[V_I]], 0
 ; CHECK-NEXT:    br i1 [[VALID_I_NOT]], label %[[OUTER_BACKEDGE]], label %[[BODY:.*]]
 ; CHECK:       [[BODY]]:
 ; CHECK-NEXT:    [[V_I1:%.*]] = load i32, ptr [[THIS]], align 4
 ; CHECK-NEXT:    [[IS_ZERO:%.*]] = icmp eq i32 [[V_I1]], 0
-; CHECK-NEXT:    [[TMP0:%.*]] = trunc i32 [[V_I1]] to i16
-; CHECK-NEXT:    br i1 [[IS_ZERO]], label %[[EXIT:.*]], label %[[OUTER_BACKEDGE]]
-; CHECK:       [[OUTER_BACKEDGE]]:
-; CHECK-NEXT:    [[V_I_BE]] = phi i16 [ 0, %[[OUTER]] ], [ [[TMP0]], %[[BODY]] ]
-; CHECK-NEXT:    br label %[[OUTER]]
+; CHECK-NEXT:    br i1 [[IS_ZERO]], label %[[EXIT1:.*]], label %[[INNER_1:.*]]
+; CHECK:       [[INNER_1]]:
+; CHECK-NEXT:    [[V_I_2:%.*]] = load i16, ptr [[PTR_NEXT_1]], align 4
+; CHECK-NEXT:    [[VALID_I_NOT_2:%.*]] = icmp eq i16 [[V_I_2]], 0
+; CHECK-NEXT:    br i1 [[VALID_I_NOT_2]], label %[[OUTER_BACKEDGE]], label %[[EXIT:.*]]
 ; CHECK:       [[EXIT]]:
+; CHECK-NEXT:    [[V_I1_2:%.*]] = load i32, ptr [[THIS]], align 4
+; CHECK-NEXT:    [[IS_ZERO_2:%.*]] = icmp eq i32 [[V_I1_2]], 0
+; CHECK-NEXT:    br i1 [[IS_ZERO_2]], label %[[EXIT1]], label %[[INNER_2:.*]]
+; CHECK:       [[INNER_2]]:
+; CHECK-NEXT:    [[V_I_3:%.*]] = load i16, ptr [[PTR_NEXT_2]], align 4
+; CHECK-NEXT:    [[VALID_I_NOT_3:%.*]] = icmp eq i16 [[V_I_3]], 0
+; CHECK-NEXT:    br i1 [[VALID_I_NOT_3]], label %[[OUTER_BACKEDGE]], label %[[BODY_3:.*]]
+; CHECK:       [[BODY_3]]:
+; CHECK-NEXT:    [[V_I1_3:%.*]] = load i32, ptr [[THIS]], align 4
+; CHECK-NEXT:    [[IS_ZERO_3:%.*]] = icmp eq i32 [[V_I1_3]], 0
+; CHECK-NEXT:    br i1 [[IS_ZERO_3]], label %[[EXIT1]], label %[[INNER_3:.*]]
+; CHECK:       [[INNER_3]]:
+; CHECK-NEXT:    [[V_I_4:%.*]] = load i16, ptr [[PTR_NEXT_3]], align 4
+; CHECK-NEXT:    [[VALID_I_NOT_4:%.*]] = icmp eq i16 [[V_I_4]], 0
+; CHECK-NEXT:    br i1 [[VALID_I_NOT_4]], label %[[OUTER_BACKEDGE]], label %[[BODY_4:.*]]
+; CHECK:       [[BODY_4]]:
+; CHECK-NEXT:    [[V_I1_4:%.*]] = load i32, ptr [[THIS]], align 4
+; CHECK-NEXT:    [[IS_ZERO_4:%.*]] = icmp eq i32 [[V_I1_4]], 0
+; CHECK-NEXT:    br i1 [[IS_ZERO_4]], label %[[EXIT1]], label %[[INNER_4:.*]]
+; CHECK:       [[INNER_4]]:
+; CHECK-NEXT:    [[V_I_5:%.*]] = load i16, ptr [[PTR_NEXT_4]], align 4
+; CHECK-NEXT:    [[VALID_I_NOT_5:%.*]] = icmp eq i16 [[V_I_5]], 0
+; CHECK-NEXT:    br i1 [[VALID_I_NOT_5]], label %[[OUTER_BACKEDGE]], label %[[BODY_5:.*]]
+; CHECK:       [[BODY_5]]:
+; CHECK-NEXT:    [[V_I1_5:%.*]] = load i32, ptr [[THIS]], align 4
+; CHECK-NEXT:    [[IS_ZERO_5:%.*]] = icmp eq i32 [[V_I1_5]], 0
+; CHECK-NEXT:    br i1 [[IS_ZERO_5]], label %[[EXIT1]], label %[[INNER_5:.*]]
+; CHECK:       [[INNER_5]]:
+; CHECK-NEXT:    [[V_I_6:%.*]] = load i16, ptr [[PTR_NEXT_5]], align 4
+; CHECK-NEXT:    [[VALID_I_NOT_6:%.*]] = icmp eq i16 [[V_I_6]], 0
+; CHECK-NEXT:    br i1 [[VALID_I_NOT_6]], label %[[OUTER_BACKEDGE]], label %[[BODY_6:.*]]
+; CHECK:       [[BODY_6]]:
+; CHECK-NEXT:    [[V_I1_6:%.*]] = load i32, ptr [[THIS]], align 4
+; CHECK-NEXT:    [[IS_ZERO_6:%.*]] = icmp eq i32 [[V_I1_6]], 0
+; CHECK-NEXT:    br i1 [[IS_ZERO_6]], label %[[EXIT1]], label %[[INNER_6:.*]]
+; CHECK:       [[INNER_6]]:
+; CHECK-NEXT:    [[V_I_7:%.*]] = load i16, ptr [[PTR_NEXT_6]], align 4
+; CHECK-NEXT:    [[VALID_I_NOT_7:%.*]] = icmp eq i16 [[V_I_7]], 0
+; CHECK-NEXT:    br i1 [[VALID_I_NOT_7]], label %[[OUTER_BACKEDGE]], label %[[BODY_7:.*]]
+; CHECK:       [[BODY_7]]:
+; CHECK-NEXT:    [[V_I1_7:%.*]] = load i32, ptr [[THIS]], align 4
+; CHECK-NEXT:    [[IS_ZERO_7:%.*]] = icmp eq i32 [[V_I1_7]], 0
+; CHECK-NEXT:    br i1 [[IS_ZERO_7]], label %[[EXIT1]], label %[[INNER_7:.*]]
+; CHECK:       [[INNER_7]]:
+; CHECK-NEXT:    [[V_I_8:%.*]] = load i16, ptr [[PTR_NEXT_7]], align 4
+; CHECK-NEXT:    [[VALID_I_NOT_8:%.*]] = icmp eq i16 [[V_I_8]], 0
+; CHECK-NEXT:    br i1 [[VALID_I_NOT_8]], label %[[OUTER_BACKEDGE]], label %[[BODY_8:.*]]
+; CHECK:       [[BODY_8]]:
+; CHECK-NEXT:    [[V_I1_8:%.*]] = load i32, ptr [[THIS]], align 4
+; CHECK-NEXT:    [[IS_ZERO_8:%.*]] = icmp eq i32 [[V_I1_8]], 0
+; CHECK-NEXT:    br i1 [[IS_ZERO_8]], label %[[EXIT1]], label %[[INNER_8:.*]]
+; CHECK:       [[INNER_8]]:
+; CHECK-NEXT:    [[V_I_9:%.*]] = load i16, ptr [[PTR_NEXT_8]], align 4
+; CHECK-NEXT:    [[VALID_I_NOT_9:%.*]] = icmp eq i16 [[V_I_9]], 0
+; CHECK-NEXT:    br i1 [[VALID_I_NOT_9]], label %[[OUTER_BACKEDGE]], label %[[BODY_9:.*]]
+; CHECK:       [[BODY_9]]:
+; CHECK-NEXT:    [[V_I1_9:%.*]] = load i32, ptr [[THIS]], align 4
+; CHECK-NEXT:    [[IS_ZERO_9:%.*]] = icmp eq i32 [[V_I1_9]], 0
+; CHECK-NEXT:    br i1 [[IS_ZERO_9]], label %[[EXIT1]], label %[[INNER_9:.*]]
+; CHECK:       [[INNER_9]]:
+; CHECK-NEXT:    [[V_I_10:%.*]] = load i16, ptr [[PTR_NEXT_9]], align 4
+; CHECK-NEXT:    [[VALID_I_NOT_10:%.*]] = icmp eq i16 [[V_I_10]], 0
+; CHECK-NEXT:    br i1 [[VALID_I_NOT_10]], label %[[OUTER_BACKEDGE]], label %[[BODY_10:.*]]
+; CHECK:       [[BODY_10]]:
+; CHECK-NEXT:    [[V_I1_10:%.*]] = load i32, ptr [[THIS]], align 4
+; CHECK-NEXT:    [[IS_ZERO_10:%.*]] = icmp eq i32 [[V_I1_10]], 0
+; CHECK-NEXT:    br i1 [[IS_ZERO_10]], label %[[EXIT1]], label %[[INNER_10:.*]]
+; CHECK:       [[INNER_10]]:
+; CHECK-NEXT:    [[V_I_11:%.*]] = load i16, ptr [[PTR_NEXT_10]], align 4
+; CHECK-NEXT:    [[VALID_I_NOT_11:%.*]] = icmp eq i16 [[V_I_11]], 0
+; CHECK-NEXT:    br i1 [[VALID_I_NOT_11]], label %[[OUTER_BACKEDGE]], label %[[BODY_11:.*]]
+; CHECK:       [[BODY_11]]:
+; CHECK-NEXT:    [[V_I1_11:%.*]] = load i32, ptr [[THIS]], align 4
+; CHECK-NEXT:    [[IS_ZERO_11:%.*]] = icmp eq i32 [[V_I1_11]], 0
+; CHECK-NEXT:    br i1 [[IS_ZERO_11]], label %[[EXIT1]], label %[[INNER_11:.*]]
+; CHECK:       [[INNER_11]]:
+; CHECK-NEXT:    [[V_I_12:%.*]] = load i16, ptr [[PTR_NEXT_11]], align 4
+; CHECK-NEXT:    [[VALID_I_NOT_12:%.*]] = icmp eq i16 [[V_I_12]], 0
+; CHECK-NEXT:    br i1 [[VALID_I_NOT_12]], label %[[OUTER_BACKEDGE]], label %[[BODY_12:.*]]
+; CHECK:       [[BODY_12]]:
+; CHECK-NEXT:    [[V_I1_12:%.*]] = load i32, ptr [[THIS]], align 4
+; CHECK-NEXT:    [[IS_ZERO_12:%.*]] = icmp eq i32 [[V_I1_12]], 0
+; CHECK-NEXT:    br i1 [[IS_ZERO_12]], label %[[EXIT1]], label %[[INNER_12:.*]]
+; CHECK:       [[INNER_12]]:
+; CHECK-NEXT:    [[V_I_13:%.*]] = load i16, ptr [[PTR_NEXT_12]], align 4
+; CHECK-NEXT:    [[VALID_I_NOT_13:%.*]] = icmp eq i16 [[V_I_13]], 0
+; CHECK-NEXT:    br i1 [[VALID_I_NOT_13]], label %[[OUTER_BACKEDGE]], label %[[BODY_13:.*]]
+; CHECK:       [[BODY_13]]:
+; CHECK-NEXT:    [[V_I1_13:%.*]] = load i32, ptr [[THIS]], align 4
+; CHECK-NEXT:    [[IS_ZERO_13:%.*]] = icmp eq i32 [[V_I1_13]], 0
+; CHECK-NEXT:    br i1 [[IS_ZERO_13]], label %[[EXIT1]], label %[[INNER_13:.*]]
+; CHECK:       [[INNER_13]]:
+; CHECK-NEXT:    [[V_I_14:%.*]] = load i16, ptr [[PTR_NEXT_13]], align 4
+; CHECK-NEXT:    [[VALID_I_NOT_14:%.*]] = icmp eq i16 [[V_I_14]], 0
+; CHECK-NEXT:    br i1 [[VALID_I_NOT_14]], label %[[OUTER_BACKEDGE]], label %[[BODY_14:.*]]
+; CHECK:       [[BODY_14]]:
+; CHECK-NEXT:    [[V_I1_14:%.*]] = load i32, ptr [[THIS]], align 4
+; CHECK-NEXT:    [[IS_ZERO_14:%.*]] = icmp eq i32 [[V_I1_14]], 0
+; CHECK-NEXT:    br i1 [[IS_ZERO_14]], label %[[EXIT1]], label %[[INNER_14:.*]]
+; CHECK:       [[INNER_14]]:
+; CHECK-NEXT:    [[V_I_15:%.*]] = load i16, ptr [[PTR_NEXT_14]], align 4
+; CHECK-NEXT:    [[VALID_I_NOT_15:%.*]] = icmp eq i16 [[V_I_15]], 0
+; CHECK-NEXT:    br i1 [[VALID_I_NOT_15]], label %[[OUTER_BACKEDGE]], label %[[BODY_15:.*]]
+; CHECK:       [[BODY_15]]:
+; CHECK-NEXT:    [[V_I1_15:%.*]] = load i32, ptr [[THIS]], align 4
+; CHECK-NEXT:    [[IS_ZERO_15:%.*]] = icmp eq i32 [[V_I1_15]], 0
+; CHECK-NEXT:    br i1 [[IS_ZERO_15]], label %[[EXIT1]], label %[[OUTER_BACKEDGE]]
+; CHECK:       [[OUTER]]:
+; CHECK-NEXT:    br i1 [[VALID_I_NOT1]], label %[[OUTER_BACKEDGE]], label %[[BODY1:.*]]
+; CHECK:       [[BODY1]]:
+; CHECK-NEXT:    [[V_I2:%.*]] = load i32, ptr [[THIS]], align 4
+; CHECK-NEXT:    [[IS_ZERO1:%.*]] = icmp eq i32 [[V_I2]], 0
+; CHECK-NEXT:    br i1 [[IS_ZERO1]], label %[[EXIT1]], label %[[INNER]]
+; CHECK:       [[EXIT1]]:
 ; CHECK-NEXT:    ret void
 ;
 entry:
@@ -288,8 +513,138 @@ define void @consensus(ptr noundef %aseq, i32 noundef %nseq, i32 noundef %alen, 
 ; CHECK-NEXT:    [[NSEQ_FP:%.*]] = sitofp i32 [[NSEQ]] to float
 ; CHECK-NEXT:    br i1 [[COUNT_CMP2]], label %[[CLEAR_LOOP_PREHEADER_US_PREHEADER:.*]], label %[[CLEAR_LOOP_PREHEADER_PREHEADER:.*]]
 ; CHECK:       [[CLEAR_LOOP_PREHEADER_PREHEADER]]:
+; CHECK-NEXT:    call void @llvm.memset.p0.i64(ptr noundef nonnull align 4 dereferenceable(108) [[COUNT]], i8 0, i64 108, i1 false)
 ; CHECK-NEXT:    [[FRAC:%.*]] = fdiv float 0.000000e+00, [[NSEQ_FP]]
 ; CHECK-NEXT:    [[FEW_GAPS:%.*]] = fcmp ugt float [[FRAC]], 5.000000e-01
+; CHECK-NEXT:    [[C:%.*]] = load i32, ptr [[COUNT]], align 4
+; CHECK-NEXT:    [[SPEC_SELECT:%.*]] = tail call i32 @llvm.smax.i32(i32 [[C]], i32 -1)
+; CHECK-NEXT:    [[C_LOBIT:%.*]] = ashr i32 [[C]], 31
+; CHECK-NEXT:    [[GEP_MAX_1:%.*]] = getelementptr inbounds nuw i8, ptr [[COUNT]], i64 4
+; CHECK-NEXT:    [[C_1:%.*]] = load i32, ptr [[GEP_MAX_1]], align 4
+; CHECK-NEXT:    [[IS_MAX_1:%.*]] = icmp sgt i32 [[C_1]], [[SPEC_SELECT]]
+; CHECK-NEXT:    [[SPEC_SELECT_1:%.*]] = tail call i32 @llvm.smax.i32(i32 [[C_1]], i32 [[SPEC_SELECT]])
+; CHECK-NEXT:    [[GEP_MAX_2:%.*]] = getelementptr inbounds nuw i8, ptr [[COUNT]], i64 8
+; CHECK-NEXT:    [[C_2:%.*]] = load i32, ptr [[GEP_MAX_2]], align 4
+; CHECK-NEXT:    [[IS_MAX_2:%.*]] = icmp sgt i32 [[C_2]], [[SPEC_SELECT_1]]
+; CHECK-NEXT:    [[SPEC_SELECT_2:%.*]] = tail call i32 @llvm.smax.i32(i32 [[C_2]], i32 [[SPEC_SELECT_1]])
+; CHECK-NEXT:    [[GEP_MAX_3:%.*]] = getelementptr inbounds nuw i8, ptr [[COUNT]], i64 12
+; CHECK-NEXT:    [[C_3:%.*]] = load i32, ptr [[GEP_MAX_3]], align 4
+; CHECK-NEXT:    [[IS_MAX_3:%.*]] = icmp sgt i32 [[C_3]], [[SPEC_SELECT_2]]
+; CHECK-NEXT:    [[SPEC_SELECT_3:%.*]] = tail call i32 @llvm.smax.i32(i32 [[C_3]], i32 [[SPEC_SELECT_2]])
+; CHECK-NEXT:    [[GEP_MAX_4:%.*]] = getelementptr inbounds nuw i8, ptr [[COUNT]], i64 16
+; CHECK-NEXT:    [[C_4:%.*]] = load i32, ptr [[GEP_MAX_4]], align 4
+; CHECK-NEXT:    [[IS_MAX_4:%.*]] = icmp sgt i32 [[C_4]], [[SPEC_SELECT_3]]
+; CHECK-NEXT:    [[SPEC_SELECT_4:%.*]] = tail call i32 @llvm.smax.i32(i32 [[C_4]], i32 [[SPEC_SELECT_3]])
+; CHECK-NEXT:    [[GEP_MAX_5:%.*]] = getelementptr inbounds nuw i8, ptr [[COUNT]], i64 20
+; CHECK-NEXT:    [[C_5:%.*]] = load i32, ptr [[GEP_MAX_5]], align 4
+; CHECK-NEXT:    [[IS_MAX_5:%.*]] = icmp sgt i32 [[C_5]], [[SPEC_SELECT_4]]
+; CHECK-NEXT:    [[SPEC_SELECT_5:%.*]] = tail call i32 @llvm.smax.i32(i32 [[C_5]], i32 [[SPEC_SELECT_4]])
+; CHECK-NEXT:    [[GEP_MAX_6:%.*]] = getelementptr inbounds nuw i8, ptr [[COUNT]], i64 24
+; CHECK-NEXT:    [[C_6:%.*]] = load i32, ptr [[GEP_MAX_6]], align 4
+; CHECK-NEXT:    [[IS_MAX_6:%.*]] = icmp sgt i32 [[C_6]], [[SPEC_SELECT_5]]
+; CHECK-NEXT:    [[SPEC_SELECT_6:%.*]] = tail call i32 @llvm.smax.i32(i32 [[C_6]], i32 [[SPEC_SELECT_5]])
+; CHECK-NEXT:    [[GEP_MAX_7:%.*]] = getelementptr inbounds nuw i8, ptr [[COUNT]], i64 28
+; CHECK-NEXT:    [[C_7:%.*]] = load i32, ptr [[GEP_MAX_7]], align 4
+; CHECK-NEXT:    [[IS_MAX_7:%.*]] = icmp sgt i32 [[C_7]], [[SPEC_SELECT_6]]
+; CHECK-NEXT:    [[SPEC_SELECT_7:%.*]] = tail call i32 @llvm.smax.i32(i32 [[C_7]], i32 [[SPEC_SELECT_6]])
+; CHECK-NEXT:    [[GEP_MAX_8:%.*]] = getelementptr inbounds nuw i8, ptr [[COUNT]], i64 32
+; CHECK-NEXT:    [[C_8:%.*]] = load i32, ptr [[GEP_MAX_8]], align 4
+; CHECK-NEXT:    [[IS_MAX_8:%.*]] = icmp sgt i32 [[C_8]], [[SPEC_SELECT_7]]
+; CHECK-NEXT:    [[SPEC_SELECT_8:%.*]] = tail call i32 @llvm.smax.i32(i32 [[C_8]], i32 [[SPEC_SELECT_7]])
+; CHECK-NEXT:    [[GEP_MAX_9:%.*]] = getelementptr inbounds nuw i8, ptr [[COUNT]], i64 36
+; CHECK-NEXT:    [[C_9:%.*]] = load i32, ptr [[GEP_MAX_9]], align 4
+; CHECK-NEXT:    [[IS_MAX_9:%.*]] = icmp sgt i32 [[C_9]], [[SPEC_SELECT_8]]
+; CHECK-NEXT:    [[SPEC_SELECT_9:%.*]] = tail call i32 @llvm.smax.i32(i32 [[C_9]], i32 [[SPEC_SELECT_8]])
+; CHECK-NEXT:    [[GEP_MAX_10:%.*]] = getelementptr inbounds nuw i8, ptr [[COUNT]], i64 40
+; CHECK-NEXT:    [[C_10:%.*]] = load i32, ptr [[GEP_MAX_10]], align 4
+; CHECK-NEXT:    [[IS_MAX_10:%.*]] = icmp sgt i32 [[C_10]], [[SPEC_SELECT_9]]
+; CHECK-NEXT:    [[SPEC_SELECT_10:%.*]] = tail call i32 @llvm.smax.i32(i32 [[C_10]], i32 [[SPEC_SELECT_9]])
+; CHECK-NEXT:    [[GEP_MAX_11:%.*]] = getelementptr inbounds nuw i8, ptr [[COUNT]], i64 44
+; CHECK-NEXT:    [[C_11:%.*]] = load i32, ptr [[GEP_MAX_11]], align 4
+; CHECK-NEXT:    [[IS_MAX_11:%.*]] = icmp sgt i32 [[C_11]], [[SPEC_SELECT_10]]
+; CHECK-NEXT:    [[SPEC_SELECT_11:%.*]] = tail call i32 @llvm.smax.i32(i32 [[C_11]], i32 [[SPEC_SELECT_10]])
+; CHECK-NEXT:    [[GEP_MAX_12:%.*]] = getelementptr inbounds nuw i8, ptr [[COUNT]], i64 48
+; CHECK-NEXT:    [[C_12:%.*]] = load i32, ptr [[GEP_MAX_12]], align 4
+; CHECK-NEXT:    [[IS_MAX_12:%.*]] = icmp sgt i32 [[C_12]], [[SPEC_SELECT_11]]
+; CHECK-NEXT:    [[SPEC_SELECT_12:%.*]] = tail call i32 @llvm.smax.i32(i32 [[C_12]], i32 [[SPEC_SELECT_11]])
+; CHECK-NEXT:    [[GEP_MAX_13:%.*]] = getelementptr inbounds nuw i8, ptr [[COUNT]], i64 52
+; CHECK-NEXT:    [[C_13:%.*]] = load i32, ptr [[GEP_MAX_13]], align 4
+; CHECK-NEXT:    [[IS_MAX_13:%.*]] = icmp sgt i32 [[C_13]], [[SPEC_SELECT_12]]
+; CHECK-NEXT:    [[SPEC_SELECT_13:%.*]] = tail call i32 @llvm.smax.i32(i32 [[C_13]], i32 [[SPEC_SELECT_12]])
+; CHECK-NEXT:    [[GEP_MAX_14:%.*]] = getelementptr inbounds nuw i8, ptr [[COUNT]], i64 56
+; CHECK-NEXT:    [[C_14:%.*]] = load i32, ptr [[GEP_MAX_14]], align 4
+; CHECK-NEXT:    [[IS_MAX_14:%.*]] = icmp sgt i32 [[C_14]], [[SPEC_SELECT_13]]
+; CHECK-NEXT:    [[SPEC_SELECT_14:%.*]] = tail call i32 @llvm.smax.i32(i32 [[C_14]], i32 [[SPEC_SELECT_13]])
+; CHECK-NEXT:    [[GEP_MAX_15:%.*]] = getelementptr inbounds nuw i8, ptr [[COUNT]], i64 60
+; CHECK-NEXT:    [[C_15:%.*]] = load i32, ptr [[GEP_MAX_15]], align 4
+; CHECK-NEXT:    [[IS_MAX_15:%.*]] = icmp sgt i32 [[C_15]], [[SPEC_SELECT_14]]
+; CHECK-NEXT:    [[SPEC_SELECT_15:%.*]] = tail call i32 @llvm.smax.i32(i32 [[C_15]], i32 [[SPEC_SELECT_14]])
+; CHECK-NEXT:    [[GEP_MAX_16:%.*]] = getelementptr inbounds nuw i8, ptr [[COUNT]], i64 64
+; CHECK-NEXT:    [[C_16:%.*]] = load i32, ptr [[GEP_MAX_16]], align 4
+; CHECK-NEXT:    [[IS_MAX_16:%.*]] = icmp sgt i32 [[C_16]], [[SPEC_SELECT_15]]
+; CHECK-NEXT:    [[SPEC_SELECT_16:%.*]] = tail call i32 @llvm.smax.i32(i32 [[C_16]], i32 [[SPEC_SELECT_15]])
+; CHECK-NEXT:    [[GEP_MAX_17:%.*]] = getelementptr inbounds nuw i8, ptr [[COUNT]], i64 68
+; CHECK-NEXT:    [[C_17:%.*]] = load i32, ptr [[GEP_MAX_17]], align 4
+; CHECK-NEXT:    [[IS_MAX_17:%.*]] = icmp sgt i32 [[C_17]], [[SPEC_SELECT_16]]
+; CHECK-NEXT:    [[SPEC_SELECT_17:%.*]] = tail call i32 @llvm.smax.i32(i32 [[C_17]], i32 [[SPEC_SELECT_16]])
+; CHECK-NEXT:    [[GEP_MAX_18:%.*]] = getelementptr inbounds nuw i8, ptr [[COUNT]], i64 72
+; CHECK-NEXT:    [[C_18:%.*]] = load i32, ptr [[GEP_MAX_18]], align 4
+; CHECK-NEXT:    [[IS_MAX_18:%.*]] = icmp sgt i32 [[C_18]], [[SPEC_SELECT_17]]
+; CHECK-NEXT:    [[SPEC_SELECT_18:%.*]] = tail call i32 @llvm.smax.i32(i32 [[C_18]], i32 [[SPEC_SELECT_17]])
+; CHECK-NEXT:    [[GEP_MAX_19:%.*]] = getelementptr inbounds nuw i8, ptr [[COUNT]], i64 76
+; CHECK-NEXT:    [[C_19:%.*]] = load i32, ptr [[GEP_MAX_19]], align 4
+; CHECK-NEXT:    [[IS_MAX_19:%.*]] = icmp sgt i32 [[C_19]], [[SPEC_SELECT_18]]
+; CHECK-NEXT:    [[SPEC_SELECT_19:%.*]] = tail call i32 @llvm.smax.i32(i32 [[C_19]], i32 [[SPEC_SELECT_18]])
+; CHECK-NEXT:    [[GEP_MAX_20:%.*]] = getelementptr inbounds nuw i8, ptr [[COUNT]], i64 80
+; CHECK-NEXT:    [[C_20:%.*]] = load i32, ptr [[GEP_MAX_20]], align 4
+; CHECK-NEXT:    [[IS_MAX_20:%.*]] = icmp sgt i32 [[C_20]], [[SPEC_SELECT_19]]
+; CHECK-NEXT:    [[SPEC_SELECT_20:%.*]] = tail call i32 @llvm.smax.i32(i32 [[C_20]], i32 [[SPEC_SELECT_19]])
+; CHECK-NEXT:    [[GEP_MAX_21:%.*]] = getelementptr inbounds nuw i8, ptr [[COUNT]], i64 84
+; CHECK-NEXT:    [[C_21:%.*]] = load i32, ptr [[GEP_MAX_21]], align 4
+; CHECK-NEXT:    [[IS_MAX_21:%.*]] = icmp sgt i32 [[C_21]], [[SPEC_SELECT_20]]
+; CHECK-NEXT:    [[SPEC_SELECT_21:%.*]] = tail call i32 @llvm.smax.i32(i32 [[C_21]], i32 [[SPEC_SELECT_20]])
+; CHECK-NEXT:    [[GEP_MAX_22:%.*]] = getelementptr inbounds nuw i8, ptr [[COUNT]], i64 88
+; CHECK-NEXT:    [[C_22:%.*]] = load i32, ptr [[GEP_MAX_22]], align 4
+; CHECK-NEXT:    [[IS_MAX_22:%.*]] = icmp sgt i32 [[C_22]], [[SPEC_SELECT_21]]
+; CHECK-NEXT:    [[SPEC_SELECT_22:%.*]] = tail call i32 @llvm.smax.i32(i32 [[C_22]], i32 [[SPEC_SELECT_21]])
+; CHECK-NEXT:    [[GEP_MAX_23:%.*]] = getelementptr inbounds nuw i8, ptr [[COUNT]], i64 92
+; CHECK-NEXT:    [[C_23:%.*]] = load i32, ptr [[GEP_MAX_23]], align 4
+; CHECK-NEXT:    [[IS_MAX_23:%.*]] = icmp sgt i32 [[C_23]], [[SPEC_SELECT_22]]
+; CHECK-NEXT:    [[SPEC_SELECT_23:%.*]] = tail call i32 @llvm.smax.i32(i32 [[C_23]], i32 [[SPEC_SELECT_22]])
+; CHECK-NEXT:    [[GEP_MAX_24:%.*]] = getelementptr inbounds nuw i8, ptr [[COUNT]], i64 96
+; CHECK-NEXT:    [[C_24:%.*]] = load i32, ptr [[GEP_MAX_24]], align 4
+; CHECK-NEXT:    [[IS_MAX_24:%.*]] = icmp sgt i32 [[C_24]], [[SPEC_SELECT_23]]
+; CHECK-NEXT:    [[SPEC_SELECT_24:%.*]] = tail call i32 @llvm.smax.i32(i32 [[C_24]], i32 [[SPEC_SELECT_23]])
+; CHECK-NEXT:    [[GEP_MAX_25:%.*]] = getelementptr inbounds nuw i8, ptr [[COUNT]], i64 100
+; CHECK-NEXT:    [[C_25:%.*]] = load i32, ptr [[GEP_MAX_25]], align 4
+; CHECK-NEXT:    [[IS_MAX_25:%.*]] = icmp sgt i32 [[C_25]], [[SPEC_SELECT_24]]
+; CHECK-NEXT:    [[TMP26:%.*]] = trunc nsw i32 [[C_LOBIT]] to i8
+; CHECK-NEXT:    [[TMP27:%.*]] = add nsw i8 [[TMP26]], 65
+; CHECK-NEXT:    [[TMP28:%.*]] = select i1 [[IS_MAX_1]], i8 66, i8 [[TMP27]]
+; CHECK-NEXT:    [[TMP29:%.*]] = select i1 [[IS_MAX_2]], i8 67, i8 [[TMP28]]
+; CHECK-NEXT:    [[TMP30:%.*]] = select i1 [[IS_MAX_3]], i8 68, i8 [[TMP29]]
+; CHECK-NEXT:    [[TMP31:%.*]] = select i1 [[IS_MAX_4]], i8 69, i8 [[TMP30]]
+; CHECK-NEXT:    [[TMP32:%.*]] = select i1 [[IS_MAX_5]], i8 70, i8 [[TMP31]]
+; CHECK-NEXT:    [[TMP33:%.*]] = select i1 [[IS_MAX_6]], i8 71, i8 [[TMP32]]
+; CHECK-NEXT:    [[TMP34:%.*]] = select i1 [[IS_MAX_7]], i8 72, i8 [[TMP33]]
+; CHECK-NEXT:    [[TMP35:%.*]] = select i1 [[IS_MAX_8]], i8 73, i8 [[TMP34]]
+; CHECK-NEXT:    [[TMP36:%.*]] = select i1 [[IS_MAX_9]], i8 74, i8 [[TMP35]]
+; CHECK-NEXT:    [[TMP37:%.*]] = select i1 [[IS_MAX_10]], i8 75, i8 [[TMP36]]
+; CHECK-NEXT:    [[TMP38:%.*]] = select i1 [[IS_MAX_11]], i8 76, i8 [[TMP37]]
+; CHECK-NEXT:    [[TMP39:%.*]] = select i1 [[IS_MAX_12]], i8 77, i8 [[TMP38]]
+; CHECK-NEXT:    [[TMP40:%.*]] = select i1 [[IS_MAX_13]], i8 78, i8 [[TMP39]]
+; CHECK-NEXT:    [[TMP41:%.*]] = select i1 [[IS_MAX_14]], i8 79, i8 [[TMP40]]
+; CHECK-NEXT:    [[TMP42:%.*]] = select i1 [[IS_MAX_15]], i8 80, i8 [[TMP41]]
+; CHECK-NEXT:    [[TMP43:%.*]] = select i1 [[IS_MAX_16]], i8 81, i8 [[TMP42]]
+; CHECK-NEXT:    [[TMP44:%.*]] = select i1 [[IS_MAX_17]], i8 82, i8 [[TMP43]]
+; CHECK-NEXT:    [[TMP45:%.*]] = select i1 [[IS_MAX_18]], i8 83, i8 [[TMP44]]
+; CHECK-NEXT:    [[TMP46:%.*]] = select i1 [[IS_MAX_19]], i8 84, i8 [[TMP45]]
+; CHECK-NEXT:    [[TMP47:%.*]] = select i1 [[IS_MAX_20]], i8 85, i8 [[TMP46]]
+; CHECK-NEXT:    [[TMP48:%.*]] = select i1 [[IS_MAX_21]], i8 86, i8 [[TMP47]]
+; CHECK-NEXT:    [[TMP49:%.*]] = select i1 [[IS_MAX_22]], i8 87, i8 [[TMP48]]
+; CHECK-NEXT:    [[TMP50:%.*]] = select i1 [[IS_MAX_23]], i8 88, i8 [[TMP49]]
+; CHECK-NEXT:    [[TMP51:%.*]] = select i1 [[IS_MAX_24]], i8 89, i8 [[TMP50]]
+; CHECK-NEXT:    [[RES_TRUNC:%.*]] = select i1 [[IS_MAX_25]], i8 90, i8 [[TMP51]]
 ; CHECK-NEXT:    br label %[[CLEAR_LOOP_PREHEADER:.*]]
 ; CHECK:       [[CLEAR_LOOP_PREHEADER_US_PREHEADER]]:
 ; CHECK-NEXT:    [[WIDE_TRIP_COUNT20:%.*]] = zext nneg i32 [[ALEN]] to i64
@@ -321,7 +676,7 @@ define void @consensus(ptr noundef %aseq, i32 noundef %nseq, i32 noundef %alen, 
 ; CHECK-NEXT:    [[GEP_MAX_US_25:%.*]] = getelementptr inbounds nuw i8, ptr [[COUNT]], i64 100
 ; CHECK-NEXT:    br label %[[CLEAR_LOOP_PREHEADER_US:.*]]
 ; CHECK:       [[CLEAR_LOOP_PREHEADER_US]]:
-; CHECK-NEXT:    [[INDVARS_IV17:%.*]] = phi i64 [ 0, %[[CLEAR_LOOP_PREHEADER_US_PREHEADER]] ], [ [[INDVARS_IV_NEXT18:%.*]], %[[COL_LATCH_US:.*]] ]
+; CHECK-NEXT:    [[INDVARS_IV17:%.*]] = phi i64 [ 0, %[[CLEAR_LOOP_PREHEADER_US_PREHEADER]] ], [ [[INDVARS_IV_NEXT23:%.*]], %[[COL_LATCH_US:.*]] ]
 ; CHECK-NEXT:    [[SPOS6_US:%.*]] = phi i32 [ 0, %[[CLEAR_LOOP_PREHEADER_US_PREHEADER]] ], [ [[SPOS_NEXT_US:%.*]], %[[COL_LATCH_US]] ]
 ; CHECK-NEXT:    call void @llvm.memset.p0.i64(ptr noundef nonnull align 4 dereferenceable(108) [[COUNT]], i8 0, i64 108, i1 false)
 ; CHECK-NEXT:    br label %[[COUNT_BODY_US:.*]]
@@ -350,19 +705,8 @@ define void @consensus(ptr noundef %aseq, i32 noundef %nseq, i32 noundef %alen, 
 ; CHECK:       [[COUNT_LATCH_US]]:
 ; CHECK-NEXT:    [[INDVARS_IV_NEXT]] = add nuw nsw i64 [[INDVARS_IV]], 1
 ; CHECK-NEXT:    [[EXITCOND12_NOT:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT]], [[WIDE_TRIP_COUNT]]
-; CHECK-NEXT:    br i1 [[EXITCOND12_NOT]], label %[[COUNT_LOOP_COUNT_EXIT_CRIT_EDGE_US:.*]], label %[[COUNT_BODY_US]]
-; CHECK:       [[COL_LATCH_US]]:
-; CHECK-NEXT:    [[SPOS_NEXT_US]] = phi i32 [ [[SPOS_INC_US:%.*]], %[[MAX_LOOP_US_PREHEADER:.*]] ], [ [[SPOS6_US]], %[[COUNT_LOOP_COUNT_EXIT_CRIT_EDGE_US]] ]
-; CHECK-NEXT:    [[INDVARS_IV_NEXT18]] = add nuw nsw i64 [[INDVARS_IV17]], 1
-; CHECK-NEXT:    [[EXITCOND21_NOT:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT18]], [[WIDE_TRIP_COUNT20]]
-; CHECK-NEXT:    br i1 [[EXITCOND21_NOT]], label %[[EXIT]], label %[[CLEAR_LOOP_PREHEADER_US]]
-; CHECK:       [[COUNT_LOOP_COUNT_EXIT_CRIT_EDGE_US]]:
-; CHECK-NEXT:    [[GAPS_US:%.*]] = load i32, ptr [[GEP_GAP]], align 4
-; CHECK-NEXT:    [[GAPS_FP_US:%.*]] = sitofp i32 [[GAPS_US]] to float
-; CHECK-NEXT:    [[FRAC_US:%.*]] = fdiv float [[GAPS_FP_US]], [[NSEQ_FP]]
-; CHECK-NEXT:    [[FEW_GAPS_US:%.*]] = fcmp ugt float [[FRAC_US]], 5.000000e-01
-; CHECK-NEXT:    br i1 [[FEW_GAPS_US]], label %[[COL_LATCH_US]], label %[[MAX_LOOP_US_PREHEADER]]
-; CHECK:       [[MAX_LOOP_US_PREHEADER]]:
+; CHECK-NEXT:    br i1 [[EXITCOND12_NOT]], label %[[MAX_LOOP_PREHEADER:.*]], label %[[COUNT_BODY_US]]
+; CHECK:       [[MAX_LOOP_US_PREHEADER:.*]]:
 ; CHECK-NEXT:    [[C_US:%.*]] = load i32, ptr [[COUNT]], align 4
 ; CHECK-NEXT:    [[SPEC_SELECT_US:%.*]] = tail call i32 @llvm.smax.i32(i32 [[C_US]], i32 -1)
 ; CHECK-NEXT:    [[C_US_LOBIT:%.*]] = ashr i32 [[C_US]], 31
@@ -467,23 +811,34 @@ define void @consensus(ptr noundef %aseq, i32 noundef %nseq, i32 noundef %alen, 
 ; CHECK-NEXT:    [[TMP24:%.*]] = select i1 [[IS_MAX_US_23]], i8 88, i8 [[TMP23]]
 ; CHECK-NEXT:    [[TMP25:%.*]] = select i1 [[IS_MAX_US_24]], i8 89, i8 [[TMP24]]
 ; CHECK-NEXT:    [[RES_TRUNC_US:%.*]] = select i1 [[IS_MAX_US_25]], i8 90, i8 [[TMP25]]
-; CHECK-NEXT:    [[SPOS_INC_US]] = add nsw i32 [[SPOS6_US]], 1
+; CHECK-NEXT:    [[SPOS_INC_US:%.*]] = add nsw i32 [[SPOS6_US]], 1
 ; CHECK-NEXT:    [[SPOS_EXT_US:%.*]] = sext i32 [[SPOS6_US]] to i64
 ; CHECK-NEXT:    [[GEP_CS_US:%.*]] = getelementptr inbounds i8, ptr [[CS]], i64 [[SPOS_EXT_US]]
 ; CHECK-NEXT:    store i8 [[RES_TRUNC_US]], ptr [[GEP_CS_US]], align 1
 ; CHECK-NEXT:    br label %[[COL_LATCH_US]]
+; CHECK:       [[COL_LATCH_US]]:
+; CHECK-NEXT:    [[SPOS_NEXT_US]] = phi i32 [ [[SPOS_INC_US]], %[[MAX_LOOP_US_PREHEADER]] ], [ [[SPOS6_US]], %[[MAX_LOOP_PREHEADER]] ]
+; CHECK-NEXT:    [[INDVARS_IV_NEXT23]] = add nuw nsw i64 [[INDVARS_IV17]], 1
+; CHECK-NEXT:    [[EXITCOND26_NOT:%.*]] = icmp eq i64 [[INDVARS_IV_NEXT23]], [[WIDE_TRIP_COUNT20]]
+; CHECK-NEXT:    br i1 [[EXITCOND26_NOT]], label %[[EXIT]], label %[[CLEAR_LOOP_PREHEADER_US]]
+; CHECK:       [[MAX_LOOP_PREHEADER]]:
+; CHECK-NEXT:    [[GAPS_US:%.*]] = load i32, ptr [[GEP_GAP]], align 4
+; CHECK-NEXT:    [[GAPS_FP_US:%.*]] = sitofp i32 [[GAPS_US]] to float
+; CHECK-NEXT:    [[FRAC_US:%.*]] = fdiv float [[GAPS_FP_US]], [[NSEQ_FP]]
+; CHECK-NEXT:    [[FEW_GAPS_US:%.*]] = fcmp ugt float [[FRAC_US]], 5.000000e-01
+; CHECK-NEXT:    br i1 [[FEW_GAPS_US]], label %[[COL_LATCH_US]], label %[[MAX_LOOP_US_PREHEADER]]
 ; CHECK:       [[CLEAR_LOOP_PREHEADER]]:
 ; CHECK-NEXT:    [[SPOS6:%.*]] = phi i32 [ [[SPOS_NEXT:%.*]], %[[COL_LATCH:.*]] ], [ 0, %[[CLEAR_LOOP_PREHEADER_PREHEADER]] ]
 ; CHECK-NEXT:    [[APOS5:%.*]] = phi i32 [ [[APOS_NEXT:%.*]], %[[COL_LATCH]] ], [ 0, %[[CLEAR_LOOP_PREHEADER_PREHEADER]] ]
-; CHECK-NEXT:    br i1 [[FEW_GAPS]], label %[[COL_LATCH]], label %[[MAX_LOOP_PREHEADER:.*]]
-; CHECK:       [[MAX_LOOP_PREHEADER]]:
+; CHECK-NEXT:    br i1 [[FEW_GAPS]], label %[[COL_LATCH]], label %[[MAX_LOOP:.*]]
+; CHECK:       [[MAX_LOOP]]:
 ; CHECK-NEXT:    [[SPOS_INC:%.*]] = add nsw i32 [[SPOS6]], 1
 ; CHECK-NEXT:    [[SPOS_EXT:%.*]] = sext i32 [[SPOS6]] to i64
 ; CHECK-NEXT:    [[GEP_CS:%.*]] = getelementptr inbounds i8, ptr [[CS]], i64 [[SPOS_EXT]]
-; CHECK-NEXT:    store i8 65, ptr [[GEP_CS]], align 1
+; CHECK-NEXT:    store i8 [[RES_TRUNC]], ptr [[GEP_CS]], align 1
 ; CHECK-NEXT:    br label %[[COL_LATCH]]
 ; CHECK:       [[COL_LATCH]]:
-; CHECK-NEXT:    [[SPOS_NEXT]] = phi i32 [ [[SPOS_INC]], %[[MAX_LOOP_PREHEADER]] ], [ [[SPOS6]], %[[CLEAR_LOOP_PREHEADER]] ]
+; CHECK-NEXT:    [[SPOS_NEXT]] = phi i32 [ [[SPOS_INC]], %[[MAX_LOOP]] ], [ [[SPOS6]], %[[CLEAR_LOOP_PREHEADER]] ]
 ; CHECK-NEXT:    [[APOS_NEXT]] = add nuw nsw i32 [[APOS5]], 1
 ; CHECK-NEXT:    [[EXITCOND_NOT:%.*]] = icmp eq i32 [[APOS_NEXT]], [[ALEN]]
 ; CHECK-NEXT:    br i1 [[EXITCOND_NOT]], label %[[EXIT]], label %[[CLEAR_LOOP_PREHEADER]]

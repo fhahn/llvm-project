@@ -17,28 +17,28 @@ define void @fill16(ptr noalias %p, ptr noalias %q) {
 ; CHECK-LABEL: define void @fill16(
 ; CHECK-SAME: ptr noalias nofree writeonly captures(none) initializes((0, 64)) [[P:%.*]], ptr noalias nofree readonly captures(none) [[Q:%.*]]) local_unnamed_addr #[[ATTR0:[0-9]+]] {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[TMP0:%.*]] = load <4 x i32>, ptr [[Q]], align 4
-; CHECK-NEXT:    [[TMP1:%.*]] = mul nsw <4 x i32> [[TMP0]], splat (i32 3)
-; CHECK-NEXT:    [[TMP2:%.*]] = add nsw <4 x i32> [[TMP1]], splat (i32 1)
-; CHECK-NEXT:    store <4 x i32> [[TMP2]], ptr [[P]], align 4
 ; CHECK-NEXT:    [[GEP_Q_4:%.*]] = getelementptr inbounds nuw i8, ptr [[Q]], i64 16
-; CHECK-NEXT:    [[GEP_P_4:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 16
+; CHECK-NEXT:    [[TMP6:%.*]] = load <4 x i32>, ptr [[Q]], align 4
 ; CHECK-NEXT:    [[TMP3:%.*]] = load <4 x i32>, ptr [[GEP_Q_4]], align 4
-; CHECK-NEXT:    [[TMP4:%.*]] = mul nsw <4 x i32> [[TMP3]], splat (i32 3)
-; CHECK-NEXT:    [[TMP5:%.*]] = add nsw <4 x i32> [[TMP4]], splat (i32 1)
-; CHECK-NEXT:    store <4 x i32> [[TMP5]], ptr [[GEP_P_4]], align 4
-; CHECK-NEXT:    [[GEP_Q_8:%.*]] = getelementptr inbounds nuw i8, ptr [[Q]], i64 32
-; CHECK-NEXT:    [[GEP_P_8:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 32
-; CHECK-NEXT:    [[TMP6:%.*]] = load <4 x i32>, ptr [[GEP_Q_8]], align 4
 ; CHECK-NEXT:    [[TMP7:%.*]] = mul nsw <4 x i32> [[TMP6]], splat (i32 3)
+; CHECK-NEXT:    [[TMP2:%.*]] = mul nsw <4 x i32> [[TMP3]], splat (i32 3)
 ; CHECK-NEXT:    [[TMP8:%.*]] = add nsw <4 x i32> [[TMP7]], splat (i32 1)
-; CHECK-NEXT:    store <4 x i32> [[TMP8]], ptr [[GEP_P_8]], align 4
+; CHECK-NEXT:    [[TMP4:%.*]] = add nsw <4 x i32> [[TMP2]], splat (i32 1)
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 16
+; CHECK-NEXT:    store <4 x i32> [[TMP8]], ptr [[P]], align 4
+; CHECK-NEXT:    store <4 x i32> [[TMP4]], ptr [[TMP5]], align 4
+; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds nuw i8, ptr [[Q]], i64 32
 ; CHECK-NEXT:    [[GEP_Q_12:%.*]] = getelementptr inbounds nuw i8, ptr [[Q]], i64 48
-; CHECK-NEXT:    [[GEP_P_12:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 48
-; CHECK-NEXT:    [[TMP9:%.*]] = load <4 x i32>, ptr [[GEP_Q_12]], align 4
+; CHECK-NEXT:    [[TMP9:%.*]] = load <4 x i32>, ptr [[TMP12]], align 4
+; CHECK-NEXT:    [[WIDE_LOAD1_1:%.*]] = load <4 x i32>, ptr [[GEP_Q_12]], align 4
 ; CHECK-NEXT:    [[TMP10:%.*]] = mul nsw <4 x i32> [[TMP9]], splat (i32 3)
+; CHECK-NEXT:    [[TMP14:%.*]] = mul nsw <4 x i32> [[WIDE_LOAD1_1]], splat (i32 3)
 ; CHECK-NEXT:    [[TMP11:%.*]] = add nsw <4 x i32> [[TMP10]], splat (i32 1)
+; CHECK-NEXT:    [[TMP15:%.*]] = add nsw <4 x i32> [[TMP14]], splat (i32 1)
+; CHECK-NEXT:    [[GEP_P_12:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 32
+; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 48
 ; CHECK-NEXT:    store <4 x i32> [[TMP11]], ptr [[GEP_P_12]], align 4
+; CHECK-NEXT:    store <4 x i32> [[TMP15]], ptr [[TMP13]], align 4
 ; CHECK-NEXT:    ret void
 ;
 entry:
@@ -67,14 +67,16 @@ exit:
 ; heuristic, e.g. no charge if the loop accesses a caller alloca argument.
 define i32 @use_first_last(ptr %q) {
 ; CHECK-LABEL: define i32 @use_first_last(
-; CHECK-SAME: ptr nofree readonly captures(none) [[Q:%.*]]) local_unnamed_addr #[[ATTR1:[0-9]+]] {
+; CHECK-SAME: ptr nofree readonly captures(none) [[Q:%.*]]) local_unnamed_addr #[[ATTR0]] {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[L_I:%.*]] = load i32, ptr [[Q]], align 4, !alias.scope [[META0:![0-9]+]]
-; CHECK-NEXT:    [[GEP_Q_15_I:%.*]] = getelementptr inbounds nuw i8, ptr [[Q]], i64 60
-; CHECK-NEXT:    [[L_15_I:%.*]] = load i32, ptr [[GEP_Q_15_I]], align 4, !alias.scope [[META0]]
-; CHECK-NEXT:    [[MUL_I1:%.*]] = add i32 [[L_15_I]], [[L_I]]
-; CHECK-NEXT:    [[ADD_15_I:%.*]] = mul i32 [[MUL_I1]], 3
-; CHECK-NEXT:    [[RES:%.*]] = add i32 [[ADD_15_I]], 2
+; CHECK-NEXT:    [[A:%.*]] = alloca [16 x i32], align 4
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr nonnull [[A]])
+; CHECK-NEXT:    call void @fill16(ptr nonnull [[A]], ptr [[Q]])
+; CHECK-NEXT:    [[L_0:%.*]] = load i32, ptr [[A]], align 4
+; CHECK-NEXT:    [[GEP_15:%.*]] = getelementptr inbounds nuw i8, ptr [[A]], i64 60
+; CHECK-NEXT:    [[L_15:%.*]] = load i32, ptr [[GEP_15]], align 4
+; CHECK-NEXT:    [[RES:%.*]] = add nsw i32 [[L_15]], [[L_0]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr nonnull [[A]])
 ; CHECK-NEXT:    ret i32 [[RES]]
 ;
 entry:
@@ -94,17 +96,17 @@ entry:
 ; the deferred unroll size. Fix: the inline-cost heuristic of @use_first_last.
 define i32 @use_two(ptr %q) {
 ; CHECK-LABEL: define i32 @use_two(
-; CHECK-SAME: ptr nofree readonly captures(none) [[Q:%.*]]) local_unnamed_addr #[[ATTR1]] {
+; CHECK-SAME: ptr nofree readonly captures(none) [[Q:%.*]]) local_unnamed_addr #[[ATTR0]] {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[GEP_Q_3_I:%.*]] = getelementptr inbounds nuw i8, ptr [[Q]], i64 12
-; CHECK-NEXT:    [[L_3_I:%.*]] = load i32, ptr [[GEP_Q_3_I]], align 4, !alias.scope [[META3:![0-9]+]]
-; CHECK-NEXT:    [[MUL_3_I:%.*]] = mul nsw i32 [[L_3_I]], 3
-; CHECK-NEXT:    [[ADD_3_I:%.*]] = add nsw i32 [[MUL_3_I]], 1
-; CHECK-NEXT:    [[GEP_Q_7_I:%.*]] = getelementptr inbounds nuw i8, ptr [[Q]], i64 28
-; CHECK-NEXT:    [[L_7_I:%.*]] = load i32, ptr [[GEP_Q_7_I]], align 4, !alias.scope [[META3]]
-; CHECK-NEXT:    [[MUL_7_I:%.*]] = mul nsw i32 [[L_7_I]], 3
-; CHECK-NEXT:    [[ADD_7_I:%.*]] = add nsw i32 [[MUL_7_I]], 1
+; CHECK-NEXT:    [[A:%.*]] = alloca [16 x i32], align 4
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr nonnull [[A]])
+; CHECK-NEXT:    call void @fill16(ptr nonnull [[A]], ptr [[Q]])
+; CHECK-NEXT:    [[GEP_3:%.*]] = getelementptr inbounds nuw i8, ptr [[A]], i64 12
+; CHECK-NEXT:    [[ADD_3_I:%.*]] = load i32, ptr [[GEP_3]], align 4
+; CHECK-NEXT:    [[GEP_7:%.*]] = getelementptr inbounds nuw i8, ptr [[A]], i64 28
+; CHECK-NEXT:    [[ADD_7_I:%.*]] = load i32, ptr [[GEP_7]], align 4
 ; CHECK-NEXT:    [[RES:%.*]] = mul nsw i32 [[ADD_7_I]], [[ADD_3_I]]
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr nonnull [[A]])
 ; CHECK-NEXT:    ret i32 [[RES]]
 ;
 entry:
@@ -122,11 +124,3 @@ entry:
 
 declare void @llvm.lifetime.start.p0(ptr)
 declare void @llvm.lifetime.end.p0(ptr)
-;.
-; CHECK: [[META0]] = !{[[META1:![0-9]+]]}
-; CHECK: [[META1]] = distinct !{[[META1]], [[META2:![0-9]+]], !"fill16: %q"}
-; CHECK: [[META2]] = distinct !{[[META2]], i1 true, !"fill16"}
-; CHECK: [[META3]] = !{[[META4:![0-9]+]]}
-; CHECK: [[META4]] = distinct !{[[META4]], [[META5:![0-9]+]], !"fill16: %q"}
-; CHECK: [[META5]] = distinct !{[[META5]], i1 true, !"fill16"}
-;.

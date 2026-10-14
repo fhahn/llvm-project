@@ -36,17 +36,59 @@ target triple = "arm64-apple-macosx"
 define ptr @find_name(i32 %x) {
 ; CHECK-LABEL: define ptr @find_name(
 ; CHECK-SAME: i32 [[X:%.*]]) local_unnamed_addr #[[ATTR0:[0-9]+]] {
-; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    [[SWITCH_TABLEIDX:%.*]] = add i32 [[X]], -235
-; CHECK-NEXT:    [[TMP0:%.*]] = icmp ult i32 [[SWITCH_TABLEIDX]], 16
-; CHECK-NEXT:    br i1 [[TMP0]], label %[[SWITCH_LOOKUP:.*]], label %[[EXIT:.*]]
-; CHECK:       [[SWITCH_LOOKUP]]:
-; CHECK-NEXT:    [[TMP1:%.*]] = zext nneg i32 [[SWITCH_TABLEIDX]] to i64
-; CHECK-NEXT:    [[SWITCH_GEP:%.*]] = getelementptr inbounds nuw [8 x i8], ptr @switch.table.find_name, i64 [[TMP1]]
-; CHECK-NEXT:    [[SWITCH_LOAD:%.*]] = load ptr, ptr [[SWITCH_GEP]], align 8
+; CHECK-NEXT:  [[LOOP:.*]]:
+; CHECK-NEXT:    switch i32 [[X]], label %[[LOOP_LATCH_15:.*]] [
+; CHECK-NEXT:      i32 235, label %[[EXIT:.*]]
+; CHECK-NEXT:      i32 236, label %[[EXIT_FOLD_SPLIT:.*]]
+; CHECK-NEXT:      i32 237, label %[[EXIT_FOLD_SPLIT1:.*]]
+; CHECK-NEXT:      i32 238, label %[[EXIT_FOLD_SPLIT2:.*]]
+; CHECK-NEXT:      i32 239, label %[[EXIT_FOLD_SPLIT3:.*]]
+; CHECK-NEXT:      i32 240, label %[[EXIT_FOLD_SPLIT4:.*]]
+; CHECK-NEXT:      i32 241, label %[[EXIT_FOLD_SPLIT5:.*]]
+; CHECK-NEXT:      i32 242, label %[[EXIT_FOLD_SPLIT6:.*]]
+; CHECK-NEXT:      i32 243, label %[[EXIT_FOLD_SPLIT7:.*]]
+; CHECK-NEXT:      i32 244, label %[[EXIT_FOLD_SPLIT8:.*]]
+; CHECK-NEXT:      i32 245, label %[[EXIT_FOLD_SPLIT9:.*]]
+; CHECK-NEXT:      i32 246, label %[[EXIT_FOLD_SPLIT10:.*]]
+; CHECK-NEXT:      i32 247, label %[[EXIT_FOLD_SPLIT11:.*]]
+; CHECK-NEXT:      i32 248, label %[[EXIT_FOLD_SPLIT12:.*]]
+; CHECK-NEXT:      i32 249, label %[[EXIT_FOLD_SPLIT13:.*]]
+; CHECK-NEXT:      i32 250, label %[[EXIT_FOLD_SPLIT14:.*]]
+; CHECK-NEXT:    ]
+; CHECK:       [[LOOP_LATCH_15]]:
+; CHECK-NEXT:    br label %[[EXIT]]
+; CHECK:       [[EXIT_FOLD_SPLIT]]:
+; CHECK-NEXT:    br label %[[EXIT]]
+; CHECK:       [[EXIT_FOLD_SPLIT1]]:
+; CHECK-NEXT:    br label %[[EXIT]]
+; CHECK:       [[EXIT_FOLD_SPLIT2]]:
+; CHECK-NEXT:    br label %[[EXIT]]
+; CHECK:       [[EXIT_FOLD_SPLIT3]]:
+; CHECK-NEXT:    br label %[[EXIT]]
+; CHECK:       [[EXIT_FOLD_SPLIT4]]:
+; CHECK-NEXT:    br label %[[EXIT]]
+; CHECK:       [[EXIT_FOLD_SPLIT5]]:
+; CHECK-NEXT:    br label %[[EXIT]]
+; CHECK:       [[EXIT_FOLD_SPLIT6]]:
+; CHECK-NEXT:    br label %[[EXIT]]
+; CHECK:       [[EXIT_FOLD_SPLIT7]]:
+; CHECK-NEXT:    br label %[[EXIT]]
+; CHECK:       [[EXIT_FOLD_SPLIT8]]:
+; CHECK-NEXT:    br label %[[EXIT]]
+; CHECK:       [[EXIT_FOLD_SPLIT9]]:
+; CHECK-NEXT:    br label %[[EXIT]]
+; CHECK:       [[EXIT_FOLD_SPLIT10]]:
+; CHECK-NEXT:    br label %[[EXIT]]
+; CHECK:       [[EXIT_FOLD_SPLIT11]]:
+; CHECK-NEXT:    br label %[[EXIT]]
+; CHECK:       [[EXIT_FOLD_SPLIT12]]:
+; CHECK-NEXT:    br label %[[EXIT]]
+; CHECK:       [[EXIT_FOLD_SPLIT13]]:
+; CHECK-NEXT:    br label %[[EXIT]]
+; CHECK:       [[EXIT_FOLD_SPLIT14]]:
 ; CHECK-NEXT:    br label %[[EXIT]]
 ; CHECK:       [[EXIT]]:
-; CHECK-NEXT:    [[R:%.*]] = phi ptr [ getelementptr inbounds nuw (i8, ptr @table, i64 256), %[[ENTRY]] ], [ [[SWITCH_LOAD]], %[[SWITCH_LOOKUP]] ]
+; CHECK-NEXT:    [[R:%.*]] = phi ptr [ getelementptr inbounds nuw (i8, ptr @table, i64 256), %[[LOOP_LATCH_15]] ], [ @table, %[[LOOP]] ], [ getelementptr inbounds nuw (i8, ptr @table, i64 112), %[[EXIT_FOLD_SPLIT6]] ], [ getelementptr inbounds nuw (i8, ptr @table, i64 224), %[[EXIT_FOLD_SPLIT13]] ], [ getelementptr inbounds nuw (i8, ptr @table, i64 16), %[[EXIT_FOLD_SPLIT]] ], [ getelementptr inbounds nuw (i8, ptr @table, i64 144), %[[EXIT_FOLD_SPLIT8]] ], [ getelementptr inbounds nuw (i8, ptr @table, i64 32), %[[EXIT_FOLD_SPLIT1]] ], [ getelementptr inbounds nuw (i8, ptr @table, i64 208), %[[EXIT_FOLD_SPLIT12]] ], [ getelementptr inbounds nuw (i8, ptr @table, i64 48), %[[EXIT_FOLD_SPLIT2]] ], [ getelementptr inbounds nuw (i8, ptr @table, i64 128), %[[EXIT_FOLD_SPLIT7]] ], [ getelementptr inbounds nuw (i8, ptr @table, i64 64), %[[EXIT_FOLD_SPLIT3]] ], [ getelementptr inbounds nuw (i8, ptr @table, i64 192), %[[EXIT_FOLD_SPLIT11]] ], [ getelementptr inbounds nuw (i8, ptr @table, i64 80), %[[EXIT_FOLD_SPLIT4]] ], [ getelementptr inbounds nuw (i8, ptr @table, i64 160), %[[EXIT_FOLD_SPLIT9]] ], [ getelementptr inbounds nuw (i8, ptr @table, i64 96), %[[EXIT_FOLD_SPLIT5]] ], [ getelementptr inbounds nuw (i8, ptr @table, i64 176), %[[EXIT_FOLD_SPLIT10]] ], [ getelementptr inbounds nuw (i8, ptr @table, i64 240), %[[EXIT_FOLD_SPLIT14]] ]
 ; CHECK-NEXT:    [[NAME:%.*]] = load ptr, ptr [[R]], align 8
 ; CHECK-NEXT:    ret ptr [[NAME]]
 ;

@@ -22,44 +22,51 @@ define void @dead_straight(ptr noalias %p, ptr noalias %q) {
 ; CHECK-LABEL: define void @dead_straight(
 ; CHECK-SAME: ptr noalias nofree writeonly captures(none) initializes((0, 128)) [[P:%.*]], ptr noalias nofree readonly captures(none) [[Q:%.*]]) local_unnamed_addr #[[ATTR0:[0-9]+]] {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[TMP0:%.*]] = load <4 x i32>, ptr [[Q]], align 4
-; CHECK-NEXT:    [[TMP1:%.*]] = mul nsw <4 x i32> [[TMP0]], splat (i32 3)
-; CHECK-NEXT:    store <4 x i32> [[TMP1]], ptr [[P]], align 4
+; CHECK-NEXT:    store i32 1, ptr [[P]], align 4
+; CHECK-NEXT:    [[P_5:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 20
+; CHECK-NEXT:    store i32 2, ptr [[P_5]], align 4
+; CHECK-NEXT:    [[P_17:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 68
+; CHECK-NEXT:    store i32 3, ptr [[P_17]], align 4
+; CHECK-NEXT:    [[P_31:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 124
+; CHECK-NEXT:    store i32 4, ptr [[P_31]], align 4
 ; CHECK-NEXT:    [[GEP_Q_4:%.*]] = getelementptr inbounds nuw i8, ptr [[Q]], i64 16
-; CHECK-NEXT:    [[GEP_P_4:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 16
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[Q]], align 4
 ; CHECK-NEXT:    [[TMP2:%.*]] = load <4 x i32>, ptr [[GEP_Q_4]], align 4
+; CHECK-NEXT:    [[TMP1:%.*]] = mul nsw <4 x i32> [[WIDE_LOAD]], splat (i32 3)
 ; CHECK-NEXT:    [[TMP3:%.*]] = mul nsw <4 x i32> [[TMP2]], splat (i32 3)
+; CHECK-NEXT:    [[GEP_P_4:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 16
+; CHECK-NEXT:    store <4 x i32> [[TMP1]], ptr [[P]], align 4
 ; CHECK-NEXT:    store <4 x i32> [[TMP3]], ptr [[GEP_P_4]], align 4
 ; CHECK-NEXT:    [[GEP_Q_8:%.*]] = getelementptr inbounds nuw i8, ptr [[Q]], i64 32
-; CHECK-NEXT:    [[GEP_P_8:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 32
-; CHECK-NEXT:    [[TMP4:%.*]] = load <4 x i32>, ptr [[GEP_Q_8]], align 4
-; CHECK-NEXT:    [[TMP5:%.*]] = mul nsw <4 x i32> [[TMP4]], splat (i32 3)
-; CHECK-NEXT:    store <4 x i32> [[TMP5]], ptr [[GEP_P_8]], align 4
 ; CHECK-NEXT:    [[GEP_Q_12:%.*]] = getelementptr inbounds nuw i8, ptr [[Q]], i64 48
-; CHECK-NEXT:    [[GEP_P_12:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 48
+; CHECK-NEXT:    [[TMP8:%.*]] = load <4 x i32>, ptr [[GEP_Q_8]], align 4
 ; CHECK-NEXT:    [[TMP6:%.*]] = load <4 x i32>, ptr [[GEP_Q_12]], align 4
-; CHECK-NEXT:    [[TMP7:%.*]] = mul nsw <4 x i32> [[TMP6]], splat (i32 3)
-; CHECK-NEXT:    store <4 x i32> [[TMP7]], ptr [[GEP_P_12]], align 4
-; CHECK-NEXT:    [[GEP_Q_16:%.*]] = getelementptr inbounds nuw i8, ptr [[Q]], i64 64
-; CHECK-NEXT:    [[GEP_P_16:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 64
-; CHECK-NEXT:    [[TMP8:%.*]] = load <4 x i32>, ptr [[GEP_Q_16]], align 4
 ; CHECK-NEXT:    [[TMP9:%.*]] = mul nsw <4 x i32> [[TMP8]], splat (i32 3)
+; CHECK-NEXT:    [[TMP7:%.*]] = mul nsw <4 x i32> [[TMP6]], splat (i32 3)
+; CHECK-NEXT:    [[GEP_P_16:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 32
+; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 48
 ; CHECK-NEXT:    store <4 x i32> [[TMP9]], ptr [[GEP_P_16]], align 4
+; CHECK-NEXT:    store <4 x i32> [[TMP7]], ptr [[TMP10]], align 4
+; CHECK-NEXT:    [[GEP_Q_24:%.*]] = getelementptr inbounds nuw i8, ptr [[Q]], i64 64
 ; CHECK-NEXT:    [[GEP_Q_20:%.*]] = getelementptr inbounds nuw i8, ptr [[Q]], i64 80
-; CHECK-NEXT:    [[GEP_P_20:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 80
-; CHECK-NEXT:    [[TMP10:%.*]] = load <4 x i32>, ptr [[GEP_Q_20]], align 4
-; CHECK-NEXT:    [[TMP11:%.*]] = mul nsw <4 x i32> [[TMP10]], splat (i32 3)
-; CHECK-NEXT:    store <4 x i32> [[TMP11]], ptr [[GEP_P_20]], align 4
-; CHECK-NEXT:    [[GEP_Q_24:%.*]] = getelementptr inbounds nuw i8, ptr [[Q]], i64 96
-; CHECK-NEXT:    [[GEP_P_24:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 96
 ; CHECK-NEXT:    [[TMP12:%.*]] = load <4 x i32>, ptr [[GEP_Q_24]], align 4
+; CHECK-NEXT:    [[WIDE_LOAD1_2:%.*]] = load <4 x i32>, ptr [[GEP_Q_20]], align 4
 ; CHECK-NEXT:    [[TMP13:%.*]] = mul nsw <4 x i32> [[TMP12]], splat (i32 3)
+; CHECK-NEXT:    [[TMP17:%.*]] = mul nsw <4 x i32> [[WIDE_LOAD1_2]], splat (i32 3)
+; CHECK-NEXT:    [[GEP_P_24:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 64
+; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 80
 ; CHECK-NEXT:    store <4 x i32> [[TMP13]], ptr [[GEP_P_24]], align 4
+; CHECK-NEXT:    store <4 x i32> [[TMP17]], ptr [[TMP18]], align 4
+; CHECK-NEXT:    [[TMP16:%.*]] = getelementptr inbounds nuw i8, ptr [[Q]], i64 96
 ; CHECK-NEXT:    [[GEP_Q_28:%.*]] = getelementptr inbounds nuw i8, ptr [[Q]], i64 112
-; CHECK-NEXT:    [[GEP_P_28:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 112
+; CHECK-NEXT:    [[WIDE_LOAD_3:%.*]] = load <4 x i32>, ptr [[TMP16]], align 4
 ; CHECK-NEXT:    [[TMP14:%.*]] = load <4 x i32>, ptr [[GEP_Q_28]], align 4
-; CHECK-NEXT:    [[TMP15:%.*]] = mul nsw <4 x i32> [[TMP14]], splat (i32 3)
+; CHECK-NEXT:    [[TMP15:%.*]] = mul nsw <4 x i32> [[WIDE_LOAD_3]], splat (i32 3)
+; CHECK-NEXT:    [[TMP19:%.*]] = mul nsw <4 x i32> [[TMP14]], splat (i32 3)
+; CHECK-NEXT:    [[GEP_P_28:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 96
+; CHECK-NEXT:    [[TMP21:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 112
 ; CHECK-NEXT:    store <4 x i32> [[TMP15]], ptr [[GEP_P_28]], align 4
+; CHECK-NEXT:    store <4 x i32> [[TMP19]], ptr [[TMP21]], align 4
 ; CHECK-NEXT:    ret void
 ;
 entry:
@@ -94,44 +101,45 @@ define void @dead_memset(ptr noalias %p, ptr noalias %q) {
 ; CHECK-LABEL: define void @dead_memset(
 ; CHECK-SAME: ptr noalias nofree writeonly captures(none) initializes((0, 128)) [[P:%.*]], ptr noalias nofree readonly captures(none) [[Q:%.*]]) local_unnamed_addr #[[ATTR0]] {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[TMP0:%.*]] = load <4 x i32>, ptr [[Q]], align 4
-; CHECK-NEXT:    [[TMP1:%.*]] = add nsw <4 x i32> [[TMP0]], splat (i32 1)
-; CHECK-NEXT:    store <4 x i32> [[TMP1]], ptr [[P]], align 4
+; CHECK-NEXT:    tail call void @llvm.memset.p0.i64(ptr noundef nonnull align 4 dereferenceable(128) [[P]], i8 0, i64 128, i1 false)
 ; CHECK-NEXT:    [[GEP_Q_4:%.*]] = getelementptr inbounds nuw i8, ptr [[Q]], i64 16
-; CHECK-NEXT:    [[GEP_P_4:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 16
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[Q]], align 4
 ; CHECK-NEXT:    [[TMP2:%.*]] = load <4 x i32>, ptr [[GEP_Q_4]], align 4
+; CHECK-NEXT:    [[TMP1:%.*]] = add nsw <4 x i32> [[WIDE_LOAD]], splat (i32 1)
 ; CHECK-NEXT:    [[TMP3:%.*]] = add nsw <4 x i32> [[TMP2]], splat (i32 1)
+; CHECK-NEXT:    [[GEP_P_4:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 16
+; CHECK-NEXT:    store <4 x i32> [[TMP1]], ptr [[P]], align 4
 ; CHECK-NEXT:    store <4 x i32> [[TMP3]], ptr [[GEP_P_4]], align 4
 ; CHECK-NEXT:    [[GEP_Q_8:%.*]] = getelementptr inbounds nuw i8, ptr [[Q]], i64 32
-; CHECK-NEXT:    [[GEP_P_8:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 32
-; CHECK-NEXT:    [[TMP4:%.*]] = load <4 x i32>, ptr [[GEP_Q_8]], align 4
-; CHECK-NEXT:    [[TMP5:%.*]] = add nsw <4 x i32> [[TMP4]], splat (i32 1)
-; CHECK-NEXT:    store <4 x i32> [[TMP5]], ptr [[GEP_P_8]], align 4
 ; CHECK-NEXT:    [[GEP_Q_12:%.*]] = getelementptr inbounds nuw i8, ptr [[Q]], i64 48
-; CHECK-NEXT:    [[GEP_P_12:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 48
+; CHECK-NEXT:    [[TMP8:%.*]] = load <4 x i32>, ptr [[GEP_Q_8]], align 4
 ; CHECK-NEXT:    [[TMP6:%.*]] = load <4 x i32>, ptr [[GEP_Q_12]], align 4
-; CHECK-NEXT:    [[TMP7:%.*]] = add nsw <4 x i32> [[TMP6]], splat (i32 1)
-; CHECK-NEXT:    store <4 x i32> [[TMP7]], ptr [[GEP_P_12]], align 4
-; CHECK-NEXT:    [[GEP_Q_16:%.*]] = getelementptr inbounds nuw i8, ptr [[Q]], i64 64
-; CHECK-NEXT:    [[GEP_P_16:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 64
-; CHECK-NEXT:    [[TMP8:%.*]] = load <4 x i32>, ptr [[GEP_Q_16]], align 4
 ; CHECK-NEXT:    [[TMP9:%.*]] = add nsw <4 x i32> [[TMP8]], splat (i32 1)
+; CHECK-NEXT:    [[TMP7:%.*]] = add nsw <4 x i32> [[TMP6]], splat (i32 1)
+; CHECK-NEXT:    [[GEP_P_16:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 32
+; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 48
 ; CHECK-NEXT:    store <4 x i32> [[TMP9]], ptr [[GEP_P_16]], align 4
+; CHECK-NEXT:    store <4 x i32> [[TMP7]], ptr [[TMP10]], align 4
+; CHECK-NEXT:    [[GEP_Q_24:%.*]] = getelementptr inbounds nuw i8, ptr [[Q]], i64 64
 ; CHECK-NEXT:    [[GEP_Q_20:%.*]] = getelementptr inbounds nuw i8, ptr [[Q]], i64 80
-; CHECK-NEXT:    [[GEP_P_20:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 80
-; CHECK-NEXT:    [[TMP10:%.*]] = load <4 x i32>, ptr [[GEP_Q_20]], align 4
-; CHECK-NEXT:    [[TMP11:%.*]] = add nsw <4 x i32> [[TMP10]], splat (i32 1)
-; CHECK-NEXT:    store <4 x i32> [[TMP11]], ptr [[GEP_P_20]], align 4
-; CHECK-NEXT:    [[GEP_Q_24:%.*]] = getelementptr inbounds nuw i8, ptr [[Q]], i64 96
-; CHECK-NEXT:    [[GEP_P_24:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 96
 ; CHECK-NEXT:    [[TMP12:%.*]] = load <4 x i32>, ptr [[GEP_Q_24]], align 4
+; CHECK-NEXT:    [[WIDE_LOAD1_2:%.*]] = load <4 x i32>, ptr [[GEP_Q_20]], align 4
 ; CHECK-NEXT:    [[TMP13:%.*]] = add nsw <4 x i32> [[TMP12]], splat (i32 1)
+; CHECK-NEXT:    [[TMP17:%.*]] = add nsw <4 x i32> [[WIDE_LOAD1_2]], splat (i32 1)
+; CHECK-NEXT:    [[GEP_P_24:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 64
+; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 80
 ; CHECK-NEXT:    store <4 x i32> [[TMP13]], ptr [[GEP_P_24]], align 4
+; CHECK-NEXT:    store <4 x i32> [[TMP17]], ptr [[TMP18]], align 4
+; CHECK-NEXT:    [[TMP16:%.*]] = getelementptr inbounds nuw i8, ptr [[Q]], i64 96
 ; CHECK-NEXT:    [[GEP_Q_28:%.*]] = getelementptr inbounds nuw i8, ptr [[Q]], i64 112
-; CHECK-NEXT:    [[GEP_P_28:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 112
+; CHECK-NEXT:    [[WIDE_LOAD_3:%.*]] = load <4 x i32>, ptr [[TMP16]], align 4
 ; CHECK-NEXT:    [[TMP14:%.*]] = load <4 x i32>, ptr [[GEP_Q_28]], align 4
-; CHECK-NEXT:    [[TMP15:%.*]] = add nsw <4 x i32> [[TMP14]], splat (i32 1)
+; CHECK-NEXT:    [[TMP15:%.*]] = add nsw <4 x i32> [[WIDE_LOAD_3]], splat (i32 1)
+; CHECK-NEXT:    [[TMP19:%.*]] = add nsw <4 x i32> [[TMP14]], splat (i32 1)
+; CHECK-NEXT:    [[GEP_P_28:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 96
+; CHECK-NEXT:    [[TMP21:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 112
 ; CHECK-NEXT:    store <4 x i32> [[TMP15]], ptr [[GEP_P_28]], align 4
+; CHECK-NEXT:    store <4 x i32> [[TMP19]], ptr [[TMP21]], align 4
 ; CHECK-NEXT:    ret void
 ;
 entry:
@@ -163,6 +171,21 @@ define void @dead_init_memcpy(ptr noalias %p, ptr noalias %q) {
 ; CHECK-LABEL: define void @dead_init_memcpy(
 ; CHECK-SAME: ptr noalias nofree writeonly captures(none) initializes((0, 128)) [[P:%.*]], ptr noalias nofree readonly captures(none) [[Q:%.*]]) local_unnamed_addr #[[ATTR0]] {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 16
+; CHECK-NEXT:    store <4 x i32> <i32 0, i32 1, i32 2, i32 3>, ptr [[P]], align 4
+; CHECK-NEXT:    store <4 x i32> <i32 4, i32 5, i32 6, i32 7>, ptr [[TMP0]], align 4
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 32
+; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 48
+; CHECK-NEXT:    store <4 x i32> <i32 8, i32 9, i32 10, i32 11>, ptr [[TMP1]], align 4
+; CHECK-NEXT:    store <4 x i32> <i32 12, i32 13, i32 14, i32 15>, ptr [[TMP2]], align 4
+; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 64
+; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 80
+; CHECK-NEXT:    store <4 x i32> <i32 16, i32 17, i32 18, i32 19>, ptr [[TMP3]], align 4
+; CHECK-NEXT:    store <4 x i32> <i32 20, i32 21, i32 22, i32 23>, ptr [[TMP4]], align 4
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 96
+; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 112
+; CHECK-NEXT:    store <4 x i32> <i32 24, i32 25, i32 26, i32 27>, ptr [[TMP5]], align 4
+; CHECK-NEXT:    store <4 x i32> <i32 28, i32 29, i32 30, i32 31>, ptr [[TMP6]], align 4
 ; CHECK-NEXT:    tail call void @llvm.memcpy.p0.p0.i64(ptr noundef nonnull align 4 dereferenceable(128) [[P]], ptr noundef nonnull align 4 dereferenceable(128) [[Q]], i64 128, i1 false)
 ; CHECK-NEXT:    ret void
 ;

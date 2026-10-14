@@ -15,14 +15,26 @@ target triple = "arm64-apple-macosx"
 ; willreturn for counted loops with a constant bound; this is independent of
 ; deferral.
 define i32 @sum16(ptr %p) noinline {
-; CHECK: Function Attrs: mustprogress nofree noinline norecurse nosync nounwind willreturn memory(argmem: read)
+; CHECK: Function Attrs: nofree noinline norecurse nosync nounwind memory(argmem: read)
 ; CHECK-LABEL: define i32 @sum16(
 ; CHECK-SAME: ptr nofree readonly captures(none) [[P:%.*]]) local_unnamed_addr #[[ATTR0:[0-9]+]] {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[TMP0:%.*]] = load <16 x i32>, ptr [[P]], align 4
-; CHECK-NEXT:    [[TMP1:%.*]] = mul nsw <16 x i32> [[TMP0]], [[TMP0]]
-; CHECK-NEXT:    [[TMP2:%.*]] = tail call i32 @llvm.vector.reduce.add.v16i32(<16 x i32> [[TMP1]])
-; CHECK-NEXT:    ret i32 [[TMP2]]
+; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 48
+; CHECK-NEXT:    [[WIDE_LOAD3:%.*]] = load <4 x i32>, ptr [[TMP0]], align 4
+; CHECK-NEXT:    [[TMP1:%.*]] = mul nsw <4 x i32> [[WIDE_LOAD3]], [[WIDE_LOAD3]]
+; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 32
+; CHECK-NEXT:    [[WIDE_LOAD2:%.*]] = load <4 x i32>, ptr [[TMP2]], align 4
+; CHECK-NEXT:    [[TMP3:%.*]] = mul nsw <4 x i32> [[WIDE_LOAD2]], [[WIDE_LOAD2]]
+; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds nuw i8, ptr [[P]], i64 16
+; CHECK-NEXT:    [[WIDE_LOAD1:%.*]] = load <4 x i32>, ptr [[TMP4]], align 4
+; CHECK-NEXT:    [[TMP5:%.*]] = mul nsw <4 x i32> [[WIDE_LOAD1]], [[WIDE_LOAD1]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[P]], align 4
+; CHECK-NEXT:    [[TMP6:%.*]] = mul nsw <4 x i32> [[WIDE_LOAD]], [[WIDE_LOAD]]
+; CHECK-NEXT:    [[BIN_RDX:%.*]] = add nuw <4 x i32> [[TMP5]], [[TMP6]]
+; CHECK-NEXT:    [[BIN_RDX4:%.*]] = add <4 x i32> [[TMP3]], [[BIN_RDX]]
+; CHECK-NEXT:    [[BIN_RDX5:%.*]] = add <4 x i32> [[TMP1]], [[BIN_RDX4]]
+; CHECK-NEXT:    [[TMP7:%.*]] = tail call i32 @llvm.vector.reduce.add.v4i32(<4 x i32> [[BIN_RDX5]])
+; CHECK-NEXT:    ret i32 [[TMP7]]
 ;
 entry:
   br label %loop
@@ -45,10 +57,11 @@ exit:
 ; Base: the call to the read-only, willreturn @sum16 is dead and deleted.
 ; Deferred: @sum16 is not willreturn, so the call is kept. Fix: as for @sum16.
 define void @caller(ptr %p) {
-; CHECK: Function Attrs: mustprogress nofree norecurse nosync nounwind willreturn memory(none)
+; CHECK: Function Attrs: nofree norecurse nosync nounwind memory(argmem: read)
 ; CHECK-LABEL: define void @caller(
 ; CHECK-SAME: ptr nofree readonly captures(none) [[P:%.*]]) local_unnamed_addr #[[ATTR1:[0-9]+]] {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[R:%.*]] = tail call i32 @sum16(ptr [[P]])
 ; CHECK-NEXT:    ret void
 ;
 entry:

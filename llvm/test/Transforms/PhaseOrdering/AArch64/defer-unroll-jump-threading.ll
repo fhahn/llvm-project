@@ -16,177 +16,207 @@ target triple = "arm64-apple-macosx"
 ; chain's single JumpThreading leaves icmp sgt tests on phis of constants.
 ; Fix: SCCP, or JumpThreading + CVP, after GVN in the cleanup chain.
 define i32 @find_unique_caller(ptr %sps) {
-; CHECK-LABEL: define range(i32 -1, 16) i32 @find_unique_caller(
+; CHECK-LABEL: define i32 @find_unique_caller(
 ; CHECK-SAME: ptr nofree readonly captures(none) [[SPS:%.*]]) local_unnamed_addr #[[ATTR0:[0-9]+]] {
-; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:  [[LOOP_I:.*:]]
 ; CHECK-NEXT:    [[L_I:%.*]] = load ptr, ptr [[SPS]], align 8
-; CHECK-NEXT:    [[IS_NULL_NOT_I:%.*]] = icmp eq ptr [[L_I]], null
-; CHECK-NEXT:    [[GEP_1_I:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 8
-; CHECK-NEXT:    [[L_1_I:%.*]] = load ptr, ptr [[GEP_1_I]], align 8
-; CHECK-NEXT:    [[IS_NULL_1_I:%.*]] = icmp eq ptr [[L_1_I]], null
-; CHECK-NEXT:    br i1 [[IS_NULL_NOT_I]], label %[[LOOP_LATCH_I:.*]], label %[[LOOP_LATCH_THREAD_I:.*]]
+; CHECK-NEXT:    [[IS_NULL_I_NOT:%.*]] = icmp eq ptr [[L_I]], null
+; CHECK-NEXT:    [[GEP_I_1:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 8
+; CHECK-NEXT:    [[L_I_1:%.*]] = load ptr, ptr [[GEP_I_1]], align 8
+; CHECK-NEXT:    [[IS_NULL_I_1:%.*]] = icmp eq ptr [[L_I_1]], null
+; CHECK-NEXT:    br i1 [[IS_NULL_I_NOT]], label %[[LOOP_LATCH_I:.*]], label %[[LOOP_LATCH_I_THREAD:.*]]
 ; CHECK:       [[LOOP_LATCH_I]]:
-; CHECK-NEXT:    br i1 [[IS_NULL_1_I]], label %[[LOOP_LATCH_1_THREAD_I:.*]], label %[[LOOP_LATCH_1_I:.*]]
-; CHECK:       [[LOOP_LATCH_THREAD_I]]:
-; CHECK-NEXT:    br i1 [[IS_NULL_1_I]], label %[[LOOP_LATCH_1_I]], label %[[FIND_UNIQUE_EXIT:.*]]
-; CHECK:       [[LOOP_LATCH_1_I]]:
-; CHECK-NEXT:    [[K_NEXT_1_I:%.*]] = phi i32 [ 0, %[[LOOP_LATCH_THREAD_I]] ], [ 1, %[[LOOP_LATCH_I]] ]
-; CHECK-NEXT:    [[GEP_2_I:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 16
-; CHECK-NEXT:    [[L_2_I:%.*]] = load ptr, ptr [[GEP_2_I]], align 8
-; CHECK-NEXT:    [[IS_NULL_2_I:%.*]] = icmp eq ptr [[L_2_I]], null
-; CHECK-NEXT:    br i1 [[IS_NULL_2_I]], label %[[LOOP_LATCH_2_I:.*]], label %[[FIND_UNIQUE_EXIT]]
-; CHECK:       [[LOOP_LATCH_1_THREAD_I]]:
-; CHECK-NEXT:    [[GEP_210_I:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 16
-; CHECK-NEXT:    [[L_211_I:%.*]] = load ptr, ptr [[GEP_210_I]], align 8
-; CHECK-NEXT:    [[IS_NULL_212_I:%.*]] = icmp eq ptr [[L_211_I]], null
-; CHECK-NEXT:    br i1 [[IS_NULL_212_I]], label %[[LOOP_LATCH_2_THREAD_I:.*]], label %[[LOOP_LATCH_2_I]]
-; CHECK:       [[LOOP_LATCH_2_I]]:
-; CHECK-NEXT:    [[K_NEXT_2_I:%.*]] = phi i32 [ [[K_NEXT_1_I]], %[[LOOP_LATCH_1_I]] ], [ 2, %[[LOOP_LATCH_1_THREAD_I]] ]
-; CHECK-NEXT:    [[GEP_3_I:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 24
-; CHECK-NEXT:    [[L_3_I:%.*]] = load ptr, ptr [[GEP_3_I]], align 8
-; CHECK-NEXT:    [[IS_NULL_3_I:%.*]] = icmp eq ptr [[L_3_I]], null
-; CHECK-NEXT:    br i1 [[IS_NULL_3_I]], label %[[LOOP_LATCH_3_I:.*]], label %[[FIND_UNIQUE_EXIT]]
-; CHECK:       [[LOOP_LATCH_2_THREAD_I]]:
-; CHECK-NEXT:    [[GEP_317_I:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 24
-; CHECK-NEXT:    [[L_318_I:%.*]] = load ptr, ptr [[GEP_317_I]], align 8
-; CHECK-NEXT:    [[IS_NULL_319_I:%.*]] = icmp eq ptr [[L_318_I]], null
-; CHECK-NEXT:    br i1 [[IS_NULL_319_I]], label %[[LOOP_LATCH_3_THREAD_I:.*]], label %[[LOOP_LATCH_3_I]]
-; CHECK:       [[LOOP_LATCH_3_I]]:
-; CHECK-NEXT:    [[K_NEXT_3_I:%.*]] = phi i32 [ [[K_NEXT_2_I]], %[[LOOP_LATCH_2_I]] ], [ 3, %[[LOOP_LATCH_2_THREAD_I]] ]
-; CHECK-NEXT:    [[GEP_4_I:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 32
-; CHECK-NEXT:    [[L_4_I:%.*]] = load ptr, ptr [[GEP_4_I]], align 8
-; CHECK-NEXT:    [[IS_NULL_4_I:%.*]] = icmp eq ptr [[L_4_I]], null
-; CHECK-NEXT:    br i1 [[IS_NULL_4_I]], label %[[LOOP_LATCH_4_I:.*]], label %[[FIND_UNIQUE_EXIT]]
-; CHECK:       [[LOOP_LATCH_3_THREAD_I]]:
-; CHECK-NEXT:    [[GEP_424_I:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 32
-; CHECK-NEXT:    [[L_425_I:%.*]] = load ptr, ptr [[GEP_424_I]], align 8
-; CHECK-NEXT:    [[IS_NULL_426_I:%.*]] = icmp eq ptr [[L_425_I]], null
-; CHECK-NEXT:    br i1 [[IS_NULL_426_I]], label %[[LOOP_LATCH_4_THREAD_I:.*]], label %[[LOOP_LATCH_4_I]]
-; CHECK:       [[LOOP_LATCH_4_I]]:
-; CHECK-NEXT:    [[K_NEXT_4_I:%.*]] = phi i32 [ [[K_NEXT_3_I]], %[[LOOP_LATCH_3_I]] ], [ 4, %[[LOOP_LATCH_3_THREAD_I]] ]
-; CHECK-NEXT:    [[GEP_5_I:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 40
-; CHECK-NEXT:    [[L_5_I:%.*]] = load ptr, ptr [[GEP_5_I]], align 8
-; CHECK-NEXT:    [[IS_NULL_5_I:%.*]] = icmp eq ptr [[L_5_I]], null
-; CHECK-NEXT:    br i1 [[IS_NULL_5_I]], label %[[LOOP_LATCH_5_I:.*]], label %[[FIND_UNIQUE_EXIT]]
-; CHECK:       [[LOOP_LATCH_4_THREAD_I]]:
-; CHECK-NEXT:    [[GEP_531_I:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 40
-; CHECK-NEXT:    [[L_532_I:%.*]] = load ptr, ptr [[GEP_531_I]], align 8
-; CHECK-NEXT:    [[IS_NULL_533_I:%.*]] = icmp eq ptr [[L_532_I]], null
-; CHECK-NEXT:    br i1 [[IS_NULL_533_I]], label %[[LOOP_LATCH_5_THREAD_I:.*]], label %[[LOOP_LATCH_5_I]]
-; CHECK:       [[LOOP_LATCH_5_I]]:
-; CHECK-NEXT:    [[K_NEXT_5_I:%.*]] = phi i32 [ [[K_NEXT_4_I]], %[[LOOP_LATCH_4_I]] ], [ 5, %[[LOOP_LATCH_4_THREAD_I]] ]
-; CHECK-NEXT:    [[GEP_6_I:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 48
-; CHECK-NEXT:    [[L_6_I:%.*]] = load ptr, ptr [[GEP_6_I]], align 8
-; CHECK-NEXT:    [[IS_NULL_6_I:%.*]] = icmp eq ptr [[L_6_I]], null
-; CHECK-NEXT:    br i1 [[IS_NULL_6_I]], label %[[LOOP_LATCH_6_I:.*]], label %[[FIND_UNIQUE_EXIT]]
-; CHECK:       [[LOOP_LATCH_5_THREAD_I]]:
-; CHECK-NEXT:    [[GEP_638_I:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 48
-; CHECK-NEXT:    [[L_639_I:%.*]] = load ptr, ptr [[GEP_638_I]], align 8
-; CHECK-NEXT:    [[IS_NULL_640_I:%.*]] = icmp eq ptr [[L_639_I]], null
-; CHECK-NEXT:    br i1 [[IS_NULL_640_I]], label %[[LOOP_LATCH_6_THREAD_I:.*]], label %[[LOOP_LATCH_6_I]]
-; CHECK:       [[LOOP_LATCH_6_I]]:
-; CHECK-NEXT:    [[K_NEXT_6_I:%.*]] = phi i32 [ [[K_NEXT_5_I]], %[[LOOP_LATCH_5_I]] ], [ 6, %[[LOOP_LATCH_5_THREAD_I]] ]
-; CHECK-NEXT:    [[GEP_7_I:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 56
-; CHECK-NEXT:    [[L_7_I:%.*]] = load ptr, ptr [[GEP_7_I]], align 8
-; CHECK-NEXT:    [[IS_NULL_7_I:%.*]] = icmp eq ptr [[L_7_I]], null
-; CHECK-NEXT:    br i1 [[IS_NULL_7_I]], label %[[LOOP_LATCH_7_I:.*]], label %[[FIND_UNIQUE_EXIT]]
-; CHECK:       [[LOOP_LATCH_6_THREAD_I]]:
-; CHECK-NEXT:    [[GEP_745_I:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 56
-; CHECK-NEXT:    [[L_746_I:%.*]] = load ptr, ptr [[GEP_745_I]], align 8
-; CHECK-NEXT:    [[IS_NULL_747_I:%.*]] = icmp eq ptr [[L_746_I]], null
-; CHECK-NEXT:    br i1 [[IS_NULL_747_I]], label %[[LOOP_LATCH_7_THREAD_I:.*]], label %[[LOOP_LATCH_7_I]]
-; CHECK:       [[LOOP_LATCH_7_I]]:
-; CHECK-NEXT:    [[K_NEXT_7_I:%.*]] = phi i32 [ [[K_NEXT_6_I]], %[[LOOP_LATCH_6_I]] ], [ 7, %[[LOOP_LATCH_6_THREAD_I]] ]
-; CHECK-NEXT:    [[GEP_8_I:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 64
-; CHECK-NEXT:    [[L_8_I:%.*]] = load ptr, ptr [[GEP_8_I]], align 8
-; CHECK-NEXT:    [[IS_NULL_8_I:%.*]] = icmp eq ptr [[L_8_I]], null
-; CHECK-NEXT:    br i1 [[IS_NULL_8_I]], label %[[LOOP_LATCH_8_I:.*]], label %[[FIND_UNIQUE_EXIT]]
-; CHECK:       [[LOOP_LATCH_7_THREAD_I]]:
-; CHECK-NEXT:    [[GEP_852_I:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 64
-; CHECK-NEXT:    [[L_853_I:%.*]] = load ptr, ptr [[GEP_852_I]], align 8
-; CHECK-NEXT:    [[IS_NULL_854_I:%.*]] = icmp eq ptr [[L_853_I]], null
-; CHECK-NEXT:    br i1 [[IS_NULL_854_I]], label %[[LOOP_LATCH_8_THREAD_I:.*]], label %[[LOOP_LATCH_8_I]]
-; CHECK:       [[LOOP_LATCH_8_I]]:
-; CHECK-NEXT:    [[K_NEXT_8_I:%.*]] = phi i32 [ [[K_NEXT_7_I]], %[[LOOP_LATCH_7_I]] ], [ 8, %[[LOOP_LATCH_7_THREAD_I]] ]
-; CHECK-NEXT:    [[GEP_9_I:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 72
-; CHECK-NEXT:    [[L_9_I:%.*]] = load ptr, ptr [[GEP_9_I]], align 8
-; CHECK-NEXT:    [[IS_NULL_9_I:%.*]] = icmp eq ptr [[L_9_I]], null
-; CHECK-NEXT:    br i1 [[IS_NULL_9_I]], label %[[LOOP_LATCH_9_I:.*]], label %[[FIND_UNIQUE_EXIT]]
-; CHECK:       [[LOOP_LATCH_8_THREAD_I]]:
-; CHECK-NEXT:    [[GEP_959_I:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 72
-; CHECK-NEXT:    [[L_960_I:%.*]] = load ptr, ptr [[GEP_959_I]], align 8
-; CHECK-NEXT:    [[IS_NULL_961_I:%.*]] = icmp eq ptr [[L_960_I]], null
-; CHECK-NEXT:    br i1 [[IS_NULL_961_I]], label %[[LOOP_LATCH_9_THREAD_I:.*]], label %[[LOOP_LATCH_9_I]]
-; CHECK:       [[LOOP_LATCH_9_I]]:
-; CHECK-NEXT:    [[K_NEXT_9_I:%.*]] = phi i32 [ [[K_NEXT_8_I]], %[[LOOP_LATCH_8_I]] ], [ 9, %[[LOOP_LATCH_8_THREAD_I]] ]
-; CHECK-NEXT:    [[GEP_10_I:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 80
-; CHECK-NEXT:    [[L_10_I:%.*]] = load ptr, ptr [[GEP_10_I]], align 8
-; CHECK-NEXT:    [[IS_NULL_10_I:%.*]] = icmp eq ptr [[L_10_I]], null
-; CHECK-NEXT:    br i1 [[IS_NULL_10_I]], label %[[LOOP_LATCH_10_I:.*]], label %[[FIND_UNIQUE_EXIT]]
-; CHECK:       [[LOOP_LATCH_9_THREAD_I]]:
-; CHECK-NEXT:    [[GEP_1066_I:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 80
-; CHECK-NEXT:    [[L_1067_I:%.*]] = load ptr, ptr [[GEP_1066_I]], align 8
-; CHECK-NEXT:    [[IS_NULL_1068_I:%.*]] = icmp eq ptr [[L_1067_I]], null
-; CHECK-NEXT:    br i1 [[IS_NULL_1068_I]], label %[[LOOP_LATCH_10_THREAD_I:.*]], label %[[LOOP_LATCH_10_I]]
-; CHECK:       [[LOOP_LATCH_10_I]]:
-; CHECK-NEXT:    [[K_NEXT_10_I:%.*]] = phi i32 [ [[K_NEXT_9_I]], %[[LOOP_LATCH_9_I]] ], [ 10, %[[LOOP_LATCH_9_THREAD_I]] ]
-; CHECK-NEXT:    [[GEP_11_I:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 88
-; CHECK-NEXT:    [[L_11_I:%.*]] = load ptr, ptr [[GEP_11_I]], align 8
-; CHECK-NEXT:    [[IS_NULL_11_I:%.*]] = icmp eq ptr [[L_11_I]], null
-; CHECK-NEXT:    br i1 [[IS_NULL_11_I]], label %[[LOOP_LATCH_11_I:.*]], label %[[FIND_UNIQUE_EXIT]]
-; CHECK:       [[LOOP_LATCH_10_THREAD_I]]:
-; CHECK-NEXT:    [[GEP_1173_I:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 88
-; CHECK-NEXT:    [[L_1174_I:%.*]] = load ptr, ptr [[GEP_1173_I]], align 8
-; CHECK-NEXT:    [[IS_NULL_1175_I:%.*]] = icmp eq ptr [[L_1174_I]], null
-; CHECK-NEXT:    br i1 [[IS_NULL_1175_I]], label %[[LOOP_LATCH_11_THREAD_I:.*]], label %[[LOOP_LATCH_11_I]]
-; CHECK:       [[LOOP_LATCH_11_I]]:
-; CHECK-NEXT:    [[K_NEXT_11_I:%.*]] = phi i32 [ [[K_NEXT_10_I]], %[[LOOP_LATCH_10_I]] ], [ 11, %[[LOOP_LATCH_10_THREAD_I]] ]
-; CHECK-NEXT:    [[GEP_12_I:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 96
-; CHECK-NEXT:    [[L_12_I:%.*]] = load ptr, ptr [[GEP_12_I]], align 8
-; CHECK-NEXT:    [[IS_NULL_12_I:%.*]] = icmp eq ptr [[L_12_I]], null
-; CHECK-NEXT:    br i1 [[IS_NULL_12_I]], label %[[LOOP_LATCH_12_I:.*]], label %[[FIND_UNIQUE_EXIT]]
-; CHECK:       [[LOOP_LATCH_11_THREAD_I]]:
-; CHECK-NEXT:    [[GEP_1280_I:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 96
-; CHECK-NEXT:    [[L_1281_I:%.*]] = load ptr, ptr [[GEP_1280_I]], align 8
-; CHECK-NEXT:    [[IS_NULL_1282_I:%.*]] = icmp eq ptr [[L_1281_I]], null
-; CHECK-NEXT:    br i1 [[IS_NULL_1282_I]], label %[[LOOP_LATCH_12_THREAD_I:.*]], label %[[LOOP_LATCH_12_I]]
-; CHECK:       [[LOOP_LATCH_12_I]]:
-; CHECK-NEXT:    [[K_NEXT_12_I:%.*]] = phi i32 [ [[K_NEXT_11_I]], %[[LOOP_LATCH_11_I]] ], [ 12, %[[LOOP_LATCH_11_THREAD_I]] ]
-; CHECK-NEXT:    [[GEP_13_I:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 104
-; CHECK-NEXT:    [[L_13_I:%.*]] = load ptr, ptr [[GEP_13_I]], align 8
-; CHECK-NEXT:    [[IS_NULL_13_I:%.*]] = icmp eq ptr [[L_13_I]], null
-; CHECK-NEXT:    br i1 [[IS_NULL_13_I]], label %[[LOOP_LATCH_13_I:.*]], label %[[FIND_UNIQUE_EXIT]]
-; CHECK:       [[LOOP_LATCH_12_THREAD_I]]:
-; CHECK-NEXT:    [[GEP_1387_I:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 104
-; CHECK-NEXT:    [[L_1388_I:%.*]] = load ptr, ptr [[GEP_1387_I]], align 8
-; CHECK-NEXT:    [[IS_NULL_1389_I:%.*]] = icmp eq ptr [[L_1388_I]], null
-; CHECK-NEXT:    br i1 [[IS_NULL_1389_I]], label %[[LOOP_LATCH_13_THREAD_I:.*]], label %[[LOOP_LATCH_13_I]]
-; CHECK:       [[LOOP_LATCH_13_I]]:
-; CHECK-NEXT:    [[K_NEXT_13_I:%.*]] = phi i32 [ [[K_NEXT_12_I]], %[[LOOP_LATCH_12_I]] ], [ 13, %[[LOOP_LATCH_12_THREAD_I]] ]
-; CHECK-NEXT:    [[GEP_14_I:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 112
-; CHECK-NEXT:    [[L_14_I:%.*]] = load ptr, ptr [[GEP_14_I]], align 8
-; CHECK-NEXT:    [[IS_NULL_14_I:%.*]] = icmp eq ptr [[L_14_I]], null
-; CHECK-NEXT:    br i1 [[IS_NULL_14_I]], label %[[LOOP_LATCH_14_I:.*]], label %[[FIND_UNIQUE_EXIT]]
-; CHECK:       [[LOOP_LATCH_13_THREAD_I]]:
-; CHECK-NEXT:    [[GEP_1494_I:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 112
-; CHECK-NEXT:    [[L_1495_I:%.*]] = load ptr, ptr [[GEP_1494_I]], align 8
-; CHECK-NEXT:    [[IS_NULL_1496_I:%.*]] = icmp eq ptr [[L_1495_I]], null
-; CHECK-NEXT:    br i1 [[IS_NULL_1496_I]], label %[[LOOP_LATCH_14_THREAD_I:.*]], label %[[LOOP_LATCH_14_I]]
-; CHECK:       [[LOOP_LATCH_14_I]]:
-; CHECK-NEXT:    [[K_NEXT_14_I:%.*]] = phi i32 [ [[K_NEXT_13_I]], %[[LOOP_LATCH_13_I]] ], [ 14, %[[LOOP_LATCH_13_THREAD_I]] ]
-; CHECK-NEXT:    [[GEP_15_I:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 120
-; CHECK-NEXT:    [[L_15_I:%.*]] = load ptr, ptr [[GEP_15_I]], align 8
-; CHECK-NEXT:    [[IS_NULL_15_I:%.*]] = icmp eq ptr [[L_15_I]], null
-; CHECK-NEXT:    [[SPEC_SELECT:%.*]] = select i1 [[IS_NULL_15_I]], i32 [[K_NEXT_14_I]], i32 -1
+; CHECK-NEXT:    br i1 [[IS_NULL_I_1]], label %[[LOOP_LATCH_I_1_THREAD:.*]], label %[[LOOP_LATCH_I_1:.*]]
+; CHECK:       [[LOOP_LATCH_I_THREAD]]:
+; CHECK-NEXT:    br i1 [[IS_NULL_I_1]], label %[[LOOP_LATCH_I_1]], label %[[FIND_UNIQUE_EXIT:.*]]
+; CHECK:       [[LOOP_LATCH_I_1]]:
+; CHECK-NEXT:    [[K_NEXT_I_1:%.*]] = phi i32 [ 0, %[[LOOP_LATCH_I_THREAD]] ], [ 1, %[[LOOP_LATCH_I]] ]
+; CHECK-NEXT:    [[GEP_I_2:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 16
+; CHECK-NEXT:    [[L_I_2:%.*]] = load ptr, ptr [[GEP_I_2]], align 8
+; CHECK-NEXT:    [[IS_NULL_I_2:%.*]] = icmp eq ptr [[L_I_2]], null
+; CHECK-NEXT:    br i1 [[IS_NULL_I_2]], label %[[LOOP_LATCH_I_2:.*]], label %[[FIND_UNIQUE_EXIT]]
+; CHECK:       [[LOOP_LATCH_I_1_THREAD]]:
+; CHECK-NEXT:    [[GEP_I_210:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 16
+; CHECK-NEXT:    [[L_I_211:%.*]] = load ptr, ptr [[GEP_I_210]], align 8
+; CHECK-NEXT:    [[IS_NULL_I_212:%.*]] = icmp eq ptr [[L_I_211]], null
+; CHECK-NEXT:    br i1 [[IS_NULL_I_212]], label %[[LOOP_LATCH_I_2_THREAD:.*]], label %[[LOOP_LATCH_I_2]]
+; CHECK:       [[LOOP_LATCH_I_2]]:
+; CHECK-NEXT:    [[K_NEXT_I_2:%.*]] = phi i32 [ [[K_NEXT_I_1]], %[[LOOP_LATCH_I_1]] ], [ 2, %[[LOOP_LATCH_I_1_THREAD]] ]
+; CHECK-NEXT:    [[GEP_I_3:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 24
+; CHECK-NEXT:    [[L_I_3:%.*]] = load ptr, ptr [[GEP_I_3]], align 8
+; CHECK-NEXT:    [[IS_NULL_I_3:%.*]] = icmp eq ptr [[L_I_3]], null
+; CHECK-NEXT:    br i1 [[IS_NULL_I_3]], label %[[LOOP_LATCH_I_3:.*]], label %[[FIND_UNIQUE_EXIT]]
+; CHECK:       [[LOOP_LATCH_I_2_THREAD]]:
+; CHECK-NEXT:    [[GEP_I_317:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 24
+; CHECK-NEXT:    [[L_I_318:%.*]] = load ptr, ptr [[GEP_I_317]], align 8
+; CHECK-NEXT:    [[IS_NULL_I_319:%.*]] = icmp eq ptr [[L_I_318]], null
+; CHECK-NEXT:    br i1 [[IS_NULL_I_319]], label %[[LOOP_LATCH_I_3_THREAD:.*]], label %[[LOOP_LATCH_I_3]]
+; CHECK:       [[LOOP_LATCH_I_3]]:
+; CHECK-NEXT:    [[K_NEXT_I_3:%.*]] = phi i32 [ [[K_NEXT_I_2]], %[[LOOP_LATCH_I_2]] ], [ 3, %[[LOOP_LATCH_I_2_THREAD]] ]
+; CHECK-NEXT:    [[GEP_I_4:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 32
+; CHECK-NEXT:    [[L_I_4:%.*]] = load ptr, ptr [[GEP_I_4]], align 8
+; CHECK-NEXT:    [[IS_NULL_I_4:%.*]] = icmp eq ptr [[L_I_4]], null
+; CHECK-NEXT:    br i1 [[IS_NULL_I_4]], label %[[LOOP_LATCH_I_4:.*]], label %[[FIND_UNIQUE_EXIT]]
+; CHECK:       [[LOOP_LATCH_I_3_THREAD]]:
+; CHECK-NEXT:    [[GEP_I_424:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 32
+; CHECK-NEXT:    [[L_I_425:%.*]] = load ptr, ptr [[GEP_I_424]], align 8
+; CHECK-NEXT:    [[IS_NULL_I_426:%.*]] = icmp eq ptr [[L_I_425]], null
+; CHECK-NEXT:    br i1 [[IS_NULL_I_426]], label %[[LOOP_LATCH_I_4_THREAD:.*]], label %[[LOOP_LATCH_I_4]]
+; CHECK:       [[LOOP_LATCH_I_4]]:
+; CHECK-NEXT:    [[K_NEXT_I_4:%.*]] = phi i32 [ [[K_NEXT_I_3]], %[[LOOP_LATCH_I_3]] ], [ 4, %[[LOOP_LATCH_I_3_THREAD]] ]
+; CHECK-NEXT:    [[GEP_I_5:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 40
+; CHECK-NEXT:    [[L_I_5:%.*]] = load ptr, ptr [[GEP_I_5]], align 8
+; CHECK-NEXT:    [[IS_NULL_I_5:%.*]] = icmp eq ptr [[L_I_5]], null
+; CHECK-NEXT:    br i1 [[IS_NULL_I_5]], label %[[LOOP_LATCH_I_5:.*]], label %[[FIND_UNIQUE_EXIT]]
+; CHECK:       [[LOOP_LATCH_I_4_THREAD]]:
+; CHECK-NEXT:    [[GEP_I_531:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 40
+; CHECK-NEXT:    [[L_I_532:%.*]] = load ptr, ptr [[GEP_I_531]], align 8
+; CHECK-NEXT:    [[IS_NULL_I_533:%.*]] = icmp eq ptr [[L_I_532]], null
+; CHECK-NEXT:    br i1 [[IS_NULL_I_533]], label %[[LOOP_LATCH_I_5_THREAD:.*]], label %[[LOOP_LATCH_I_5]]
+; CHECK:       [[LOOP_LATCH_I_5]]:
+; CHECK-NEXT:    [[K_NEXT_I_5:%.*]] = phi i32 [ [[K_NEXT_I_4]], %[[LOOP_LATCH_I_4]] ], [ 5, %[[LOOP_LATCH_I_4_THREAD]] ]
+; CHECK-NEXT:    [[GEP_I_6:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 48
+; CHECK-NEXT:    [[L_I_6:%.*]] = load ptr, ptr [[GEP_I_6]], align 8
+; CHECK-NEXT:    [[IS_NULL_I_6:%.*]] = icmp eq ptr [[L_I_6]], null
+; CHECK-NEXT:    br i1 [[IS_NULL_I_6]], label %[[LOOP_LATCH_I_6:.*]], label %[[IF_NONNULL_I_6:.*]]
+; CHECK:       [[LOOP_LATCH_I_5_THREAD]]:
+; CHECK-NEXT:    [[GEP_I_638:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 48
+; CHECK-NEXT:    [[L_I_639:%.*]] = load ptr, ptr [[GEP_I_638]], align 8
+; CHECK-NEXT:    [[IS_NULL_I_640:%.*]] = icmp eq ptr [[L_I_639]], null
+; CHECK-NEXT:    br i1 [[IS_NULL_I_640]], label %[[LOOP_LATCH_I_6_THREAD:.*]], label %[[LOOP_LATCH_I_6]]
+; CHECK:       [[IF_NONNULL_I_6]]:
+; CHECK-NEXT:    [[FOUND_I_6:%.*]] = icmp sgt i32 [[K_NEXT_I_5]], -1
+; CHECK-NEXT:    br i1 [[FOUND_I_6]], label %[[FIND_UNIQUE_EXIT]], label %[[LOOP_LATCH_I_6]]
+; CHECK:       [[LOOP_LATCH_I_6]]:
+; CHECK-NEXT:    [[K_NEXT_I_6:%.*]] = phi i32 [ [[K_NEXT_I_5]], %[[LOOP_LATCH_I_5]] ], [ 6, %[[IF_NONNULL_I_6]] ], [ 6, %[[LOOP_LATCH_I_5_THREAD]] ]
+; CHECK-NEXT:    [[GEP_I_7:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 56
+; CHECK-NEXT:    [[L_I_7:%.*]] = load ptr, ptr [[GEP_I_7]], align 8
+; CHECK-NEXT:    [[IS_NULL_I_7:%.*]] = icmp eq ptr [[L_I_7]], null
+; CHECK-NEXT:    br i1 [[IS_NULL_I_7]], label %[[LOOP_LATCH_I_7:.*]], label %[[IF_NONNULL_I_7:.*]]
+; CHECK:       [[LOOP_LATCH_I_6_THREAD]]:
+; CHECK-NEXT:    [[GEP_I_745:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 56
+; CHECK-NEXT:    [[L_I_746:%.*]] = load ptr, ptr [[GEP_I_745]], align 8
+; CHECK-NEXT:    [[IS_NULL_I_747:%.*]] = icmp eq ptr [[L_I_746]], null
+; CHECK-NEXT:    br i1 [[IS_NULL_I_747]], label %[[LOOP_LATCH_I_7_THREAD:.*]], label %[[LOOP_LATCH_I_7]]
+; CHECK:       [[IF_NONNULL_I_7]]:
+; CHECK-NEXT:    [[FOUND_I_7:%.*]] = icmp sgt i32 [[K_NEXT_I_6]], -1
+; CHECK-NEXT:    br i1 [[FOUND_I_7]], label %[[FIND_UNIQUE_EXIT]], label %[[LOOP_LATCH_I_7]]
+; CHECK:       [[LOOP_LATCH_I_7]]:
+; CHECK-NEXT:    [[K_NEXT_I_7:%.*]] = phi i32 [ [[K_NEXT_I_6]], %[[LOOP_LATCH_I_6]] ], [ 7, %[[IF_NONNULL_I_7]] ], [ 7, %[[LOOP_LATCH_I_6_THREAD]] ]
+; CHECK-NEXT:    [[GEP_I_8:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 64
+; CHECK-NEXT:    [[L_I_8:%.*]] = load ptr, ptr [[GEP_I_8]], align 8
+; CHECK-NEXT:    [[IS_NULL_I_8:%.*]] = icmp eq ptr [[L_I_8]], null
+; CHECK-NEXT:    br i1 [[IS_NULL_I_8]], label %[[LOOP_LATCH_I_8:.*]], label %[[IF_NONNULL_I_8:.*]]
+; CHECK:       [[LOOP_LATCH_I_7_THREAD]]:
+; CHECK-NEXT:    [[GEP_I_852:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 64
+; CHECK-NEXT:    [[L_I_853:%.*]] = load ptr, ptr [[GEP_I_852]], align 8
+; CHECK-NEXT:    [[IS_NULL_I_854:%.*]] = icmp eq ptr [[L_I_853]], null
+; CHECK-NEXT:    br i1 [[IS_NULL_I_854]], label %[[LOOP_LATCH_I_8_THREAD:.*]], label %[[LOOP_LATCH_I_8]]
+; CHECK:       [[IF_NONNULL_I_8]]:
+; CHECK-NEXT:    [[FOUND_I_8:%.*]] = icmp sgt i32 [[K_NEXT_I_7]], -1
+; CHECK-NEXT:    br i1 [[FOUND_I_8]], label %[[FIND_UNIQUE_EXIT]], label %[[LOOP_LATCH_I_8]]
+; CHECK:       [[LOOP_LATCH_I_8]]:
+; CHECK-NEXT:    [[K_NEXT_I_8:%.*]] = phi i32 [ [[K_NEXT_I_7]], %[[LOOP_LATCH_I_7]] ], [ 8, %[[IF_NONNULL_I_8]] ], [ 8, %[[LOOP_LATCH_I_7_THREAD]] ]
+; CHECK-NEXT:    [[GEP_I_9:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 72
+; CHECK-NEXT:    [[L_I_9:%.*]] = load ptr, ptr [[GEP_I_9]], align 8
+; CHECK-NEXT:    [[IS_NULL_I_9:%.*]] = icmp eq ptr [[L_I_9]], null
+; CHECK-NEXT:    br i1 [[IS_NULL_I_9]], label %[[LOOP_LATCH_I_9:.*]], label %[[IF_NONNULL_I_9:.*]]
+; CHECK:       [[LOOP_LATCH_I_8_THREAD]]:
+; CHECK-NEXT:    [[GEP_I_959:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 72
+; CHECK-NEXT:    [[L_I_960:%.*]] = load ptr, ptr [[GEP_I_959]], align 8
+; CHECK-NEXT:    [[IS_NULL_I_961:%.*]] = icmp eq ptr [[L_I_960]], null
+; CHECK-NEXT:    br i1 [[IS_NULL_I_961]], label %[[LOOP_LATCH_I_9_THREAD:.*]], label %[[LOOP_LATCH_I_9]]
+; CHECK:       [[IF_NONNULL_I_9]]:
+; CHECK-NEXT:    [[FOUND_I_9:%.*]] = icmp sgt i32 [[K_NEXT_I_8]], -1
+; CHECK-NEXT:    br i1 [[FOUND_I_9]], label %[[FIND_UNIQUE_EXIT]], label %[[LOOP_LATCH_I_9]]
+; CHECK:       [[LOOP_LATCH_I_9]]:
+; CHECK-NEXT:    [[K_NEXT_I_9:%.*]] = phi i32 [ [[K_NEXT_I_8]], %[[LOOP_LATCH_I_8]] ], [ 9, %[[IF_NONNULL_I_9]] ], [ 9, %[[LOOP_LATCH_I_8_THREAD]] ]
+; CHECK-NEXT:    [[GEP_I_10:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 80
+; CHECK-NEXT:    [[L_I_10:%.*]] = load ptr, ptr [[GEP_I_10]], align 8
+; CHECK-NEXT:    [[IS_NULL_I_10:%.*]] = icmp eq ptr [[L_I_10]], null
+; CHECK-NEXT:    br i1 [[IS_NULL_I_10]], label %[[LOOP_LATCH_I_10:.*]], label %[[IF_NONNULL_I_10:.*]]
+; CHECK:       [[LOOP_LATCH_I_9_THREAD]]:
+; CHECK-NEXT:    [[GEP_I_1066:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 80
+; CHECK-NEXT:    [[L_I_1067:%.*]] = load ptr, ptr [[GEP_I_1066]], align 8
+; CHECK-NEXT:    [[IS_NULL_I_1068:%.*]] = icmp eq ptr [[L_I_1067]], null
+; CHECK-NEXT:    br i1 [[IS_NULL_I_1068]], label %[[LOOP_LATCH_I_10_THREAD:.*]], label %[[LOOP_LATCH_I_10]]
+; CHECK:       [[IF_NONNULL_I_10]]:
+; CHECK-NEXT:    [[FOUND_I_10:%.*]] = icmp sgt i32 [[K_NEXT_I_9]], -1
+; CHECK-NEXT:    br i1 [[FOUND_I_10]], label %[[FIND_UNIQUE_EXIT]], label %[[LOOP_LATCH_I_10]]
+; CHECK:       [[LOOP_LATCH_I_10]]:
+; CHECK-NEXT:    [[K_NEXT_I_10:%.*]] = phi i32 [ [[K_NEXT_I_9]], %[[LOOP_LATCH_I_9]] ], [ 10, %[[IF_NONNULL_I_10]] ], [ 10, %[[LOOP_LATCH_I_9_THREAD]] ]
+; CHECK-NEXT:    [[GEP_I_11:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 88
+; CHECK-NEXT:    [[L_I_11:%.*]] = load ptr, ptr [[GEP_I_11]], align 8
+; CHECK-NEXT:    [[IS_NULL_I_11:%.*]] = icmp eq ptr [[L_I_11]], null
+; CHECK-NEXT:    br i1 [[IS_NULL_I_11]], label %[[LOOP_LATCH_I_11:.*]], label %[[IF_NONNULL_I_11:.*]]
+; CHECK:       [[LOOP_LATCH_I_10_THREAD]]:
+; CHECK-NEXT:    [[GEP_I_1173:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 88
+; CHECK-NEXT:    [[L_I_1174:%.*]] = load ptr, ptr [[GEP_I_1173]], align 8
+; CHECK-NEXT:    [[IS_NULL_I_1175:%.*]] = icmp eq ptr [[L_I_1174]], null
+; CHECK-NEXT:    br i1 [[IS_NULL_I_1175]], label %[[LOOP_LATCH_I_11_THREAD:.*]], label %[[LOOP_LATCH_I_11]]
+; CHECK:       [[IF_NONNULL_I_11]]:
+; CHECK-NEXT:    [[FOUND_I_11:%.*]] = icmp sgt i32 [[K_NEXT_I_10]], -1
+; CHECK-NEXT:    br i1 [[FOUND_I_11]], label %[[FIND_UNIQUE_EXIT]], label %[[LOOP_LATCH_I_11]]
+; CHECK:       [[LOOP_LATCH_I_11]]:
+; CHECK-NEXT:    [[K_NEXT_I_11:%.*]] = phi i32 [ [[K_NEXT_I_10]], %[[LOOP_LATCH_I_10]] ], [ 11, %[[IF_NONNULL_I_11]] ], [ 11, %[[LOOP_LATCH_I_10_THREAD]] ]
+; CHECK-NEXT:    [[GEP_I_12:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 96
+; CHECK-NEXT:    [[L_I_12:%.*]] = load ptr, ptr [[GEP_I_12]], align 8
+; CHECK-NEXT:    [[IS_NULL_I_12:%.*]] = icmp eq ptr [[L_I_12]], null
+; CHECK-NEXT:    br i1 [[IS_NULL_I_12]], label %[[LOOP_LATCH_I_12:.*]], label %[[IF_NONNULL_I_12:.*]]
+; CHECK:       [[LOOP_LATCH_I_11_THREAD]]:
+; CHECK-NEXT:    [[GEP_I_1280:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 96
+; CHECK-NEXT:    [[L_I_1281:%.*]] = load ptr, ptr [[GEP_I_1280]], align 8
+; CHECK-NEXT:    [[IS_NULL_I_1282:%.*]] = icmp eq ptr [[L_I_1281]], null
+; CHECK-NEXT:    br i1 [[IS_NULL_I_1282]], label %[[LOOP_LATCH_I_12_THREAD:.*]], label %[[LOOP_LATCH_I_12]]
+; CHECK:       [[IF_NONNULL_I_12]]:
+; CHECK-NEXT:    [[FOUND_I_12:%.*]] = icmp sgt i32 [[K_NEXT_I_11]], -1
+; CHECK-NEXT:    br i1 [[FOUND_I_12]], label %[[FIND_UNIQUE_EXIT]], label %[[LOOP_LATCH_I_12]]
+; CHECK:       [[LOOP_LATCH_I_12]]:
+; CHECK-NEXT:    [[K_NEXT_I_12:%.*]] = phi i32 [ [[K_NEXT_I_11]], %[[LOOP_LATCH_I_11]] ], [ 12, %[[IF_NONNULL_I_12]] ], [ 12, %[[LOOP_LATCH_I_11_THREAD]] ]
+; CHECK-NEXT:    [[GEP_I_13:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 104
+; CHECK-NEXT:    [[L_I_13:%.*]] = load ptr, ptr [[GEP_I_13]], align 8
+; CHECK-NEXT:    [[IS_NULL_I_13:%.*]] = icmp eq ptr [[L_I_13]], null
+; CHECK-NEXT:    br i1 [[IS_NULL_I_13]], label %[[LOOP_LATCH_I_13:.*]], label %[[IF_NONNULL_I_13:.*]]
+; CHECK:       [[LOOP_LATCH_I_12_THREAD]]:
+; CHECK-NEXT:    [[GEP_I_1387:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 104
+; CHECK-NEXT:    [[L_I_1388:%.*]] = load ptr, ptr [[GEP_I_1387]], align 8
+; CHECK-NEXT:    [[IS_NULL_I_1389:%.*]] = icmp eq ptr [[L_I_1388]], null
+; CHECK-NEXT:    br i1 [[IS_NULL_I_1389]], label %[[LOOP_LATCH_I_13_THREAD:.*]], label %[[LOOP_LATCH_I_13]]
+; CHECK:       [[IF_NONNULL_I_13]]:
+; CHECK-NEXT:    [[FOUND_I_13:%.*]] = icmp sgt i32 [[K_NEXT_I_12]], -1
+; CHECK-NEXT:    br i1 [[FOUND_I_13]], label %[[FIND_UNIQUE_EXIT]], label %[[LOOP_LATCH_I_13]]
+; CHECK:       [[LOOP_LATCH_I_13]]:
+; CHECK-NEXT:    [[K_NEXT_I_13:%.*]] = phi i32 [ [[K_NEXT_I_12]], %[[LOOP_LATCH_I_12]] ], [ 13, %[[IF_NONNULL_I_13]] ], [ 13, %[[LOOP_LATCH_I_12_THREAD]] ]
+; CHECK-NEXT:    [[GEP_I_14:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 112
+; CHECK-NEXT:    [[L_I_14:%.*]] = load ptr, ptr [[GEP_I_14]], align 8
+; CHECK-NEXT:    [[IS_NULL_I_14:%.*]] = icmp eq ptr [[L_I_14]], null
+; CHECK-NEXT:    br i1 [[IS_NULL_I_14]], label %[[LOOP_LATCH_I_14:.*]], label %[[IF_NONNULL_I_14:.*]]
+; CHECK:       [[LOOP_LATCH_I_13_THREAD]]:
+; CHECK-NEXT:    [[GEP_I_1494:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 112
+; CHECK-NEXT:    [[L_I_1495:%.*]] = load ptr, ptr [[GEP_I_1494]], align 8
+; CHECK-NEXT:    [[IS_NULL_I_1496:%.*]] = icmp eq ptr [[L_I_1495]], null
+; CHECK-NEXT:    br i1 [[IS_NULL_I_1496]], label %[[LOOP_LATCH_I_14_THREAD:.*]], label %[[LOOP_LATCH_I_14]]
+; CHECK:       [[IF_NONNULL_I_14]]:
+; CHECK-NEXT:    [[FOUND_I_14:%.*]] = icmp sgt i32 [[K_NEXT_I_13]], -1
+; CHECK-NEXT:    br i1 [[FOUND_I_14]], label %[[FIND_UNIQUE_EXIT]], label %[[LOOP_LATCH_I_14]]
+; CHECK:       [[LOOP_LATCH_I_14]]:
+; CHECK-NEXT:    [[K_NEXT_I_14:%.*]] = phi i32 [ [[K_NEXT_I_13]], %[[LOOP_LATCH_I_13]] ], [ 14, %[[IF_NONNULL_I_14]] ], [ 14, %[[LOOP_LATCH_I_13_THREAD]] ]
+; CHECK-NEXT:    [[GEP_I_15:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 120
+; CHECK-NEXT:    [[L_I_15:%.*]] = load ptr, ptr [[GEP_I_15]], align 8
+; CHECK-NEXT:    [[IS_NULL_I_15:%.*]] = icmp eq ptr [[L_I_15]], null
+; CHECK-NEXT:    br i1 [[IS_NULL_I_15]], label %[[FIND_UNIQUE_EXIT]], label %[[IF_NONNULL_I_15:.*]]
+; CHECK:       [[LOOP_LATCH_I_14_THREAD]]:
+; CHECK-NEXT:    [[GEP_I_15101:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 120
+; CHECK-NEXT:    [[L_I_15102:%.*]] = load ptr, ptr [[GEP_I_15101]], align 8
+; CHECK-NEXT:    [[IS_NULL_I_15103:%.*]] = icmp eq ptr [[L_I_15102]], null
+; CHECK-NEXT:    [[SPEC_SELECT:%.*]] = select i1 [[IS_NULL_I_15103]], i32 -1, i32 15
 ; CHECK-NEXT:    br label %[[FIND_UNIQUE_EXIT]]
-; CHECK:       [[LOOP_LATCH_14_THREAD_I]]:
-; CHECK-NEXT:    [[GEP_15101_I:%.*]] = getelementptr inbounds nuw i8, ptr [[SPS]], i64 120
-; CHECK-NEXT:    [[L_15102_I:%.*]] = load ptr, ptr [[GEP_15101_I]], align 8
-; CHECK-NEXT:    [[IS_NULL_15103_I:%.*]] = icmp eq ptr [[L_15102_I]], null
-; CHECK-NEXT:    [[SPEC_SELECT_I:%.*]] = select i1 [[IS_NULL_15103_I]], i32 -1, i32 15
+; CHECK:       [[IF_NONNULL_I_15]]:
+; CHECK-NEXT:    [[FOUND_I_15:%.*]] = icmp sgt i32 [[K_NEXT_I_14]], -1
+; CHECK-NEXT:    [[SPEC_SELECT107:%.*]] = select i1 [[FOUND_I_15]], i32 -1, i32 15
 ; CHECK-NEXT:    br label %[[FIND_UNIQUE_EXIT]]
 ; CHECK:       [[FIND_UNIQUE_EXIT]]:
-; CHECK-NEXT:    [[RES_I:%.*]] = phi i32 [ -1, %[[LOOP_LATCH_6_I]] ], [ -1, %[[LOOP_LATCH_4_I]] ], [ -1, %[[LOOP_LATCH_THREAD_I]] ], [ -1, %[[LOOP_LATCH_13_I]] ], [ -1, %[[LOOP_LATCH_10_I]] ], [ -1, %[[LOOP_LATCH_8_I]] ], [ -1, %[[LOOP_LATCH_1_I]] ], [ -1, %[[LOOP_LATCH_12_I]] ], [ -1, %[[LOOP_LATCH_2_I]] ], [ -1, %[[LOOP_LATCH_7_I]] ], [ -1, %[[LOOP_LATCH_3_I]] ], [ -1, %[[LOOP_LATCH_11_I]] ], [ [[SPEC_SELECT_I]], %[[LOOP_LATCH_14_THREAD_I]] ], [ -1, %[[LOOP_LATCH_9_I]] ], [ -1, %[[LOOP_LATCH_5_I]] ], [ [[SPEC_SELECT]], %[[LOOP_LATCH_14_I]] ]
+; CHECK-NEXT:    [[RES_I:%.*]] = phi i32 [ -1, %[[IF_NONNULL_I_8]] ], [ -1, %[[LOOP_LATCH_I_4]] ], [ -1, %[[LOOP_LATCH_I_THREAD]] ], [ [[SPEC_SELECT107]], %[[IF_NONNULL_I_15]] ], [ -1, %[[IF_NONNULL_I_12]] ], [ -1, %[[IF_NONNULL_I_10]] ], [ -1, %[[LOOP_LATCH_I_1]] ], [ -1, %[[IF_NONNULL_I_14]] ], [ -1, %[[LOOP_LATCH_I_2]] ], [ -1, %[[IF_NONNULL_I_9]] ], [ -1, %[[LOOP_LATCH_I_3]] ], [ -1, %[[IF_NONNULL_I_13]] ], [ -1, %[[IF_NONNULL_I_6]] ], [ -1, %[[IF_NONNULL_I_11]] ], [ -1, %[[IF_NONNULL_I_7]] ], [ [[K_NEXT_I_14]], %[[LOOP_LATCH_I_14]] ], [ [[SPEC_SELECT]], %[[LOOP_LATCH_I_14_THREAD]] ]
 ; CHECK-NEXT:    ret i32 [[RES_I]]
 ;
 entry:

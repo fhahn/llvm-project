@@ -9,11 +9,30 @@ target triple = "aarch64"
 define dso_local nofpclass(nan inf) float @vmlaq(ptr noundef %0, ptr noundef %1) {
 ; CHECK-LABEL: define dso_local nofpclass(nan inf) float @vmlaq
 ; CHECK-SAME: (ptr nofree noundef readonly captures(none) [[TMP0:%.*]], ptr nofree noundef readonly captures(none) [[TMP1:%.*]]) local_unnamed_addr #[[ATTR0:[0-9]+]] {
-; CHECK-NEXT:    [[TMP3:%.*]] = load <16 x float>, ptr [[TMP0]], align 4, !tbaa [[TBAA4:![0-9]+]]
-; CHECK-NEXT:    [[TMP4:%.*]] = load <16 x float>, ptr [[TMP1]], align 4, !tbaa [[TBAA4]]
-; CHECK-NEXT:    [[TMP5:%.*]] = fmul fast <16 x float> [[TMP4]], [[TMP3]]
-; CHECK-NEXT:    [[TMP6:%.*]] = tail call fast float @llvm.vector.reduce.fadd.v16f32(float 0.000000e+00, <16 x float> [[TMP5]])
-; CHECK-NEXT:    ret float [[TMP6]]
+; CHECK-NEXT:  vector.ph:
+; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP1]], i64 48
+; CHECK-NEXT:    [[WIDE_LOAD17:%.*]] = load <4 x float>, ptr [[TMP2]], align 4, !tbaa [[TBAA4:![0-9]+]]
+; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP0]], i64 48
+; CHECK-NEXT:    [[WIDE_LOAD13:%.*]] = load <4 x float>, ptr [[TMP3]], align 4, !tbaa [[TBAA4]]
+; CHECK-NEXT:    [[TMP4:%.*]] = fmul fast <4 x float> [[WIDE_LOAD17]], [[WIDE_LOAD13]]
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP1]], i64 32
+; CHECK-NEXT:    [[WIDE_LOAD16:%.*]] = load <4 x float>, ptr [[TMP5]], align 4, !tbaa [[TBAA4]]
+; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP0]], i64 32
+; CHECK-NEXT:    [[WIDE_LOAD12:%.*]] = load <4 x float>, ptr [[TMP6]], align 4, !tbaa [[TBAA4]]
+; CHECK-NEXT:    [[TMP7:%.*]] = fmul fast <4 x float> [[WIDE_LOAD16]], [[WIDE_LOAD12]]
+; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP1]], i64 16
+; CHECK-NEXT:    [[WIDE_LOAD15:%.*]] = load <4 x float>, ptr [[TMP8]], align 4, !tbaa [[TBAA4]]
+; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds nuw i8, ptr [[TMP0]], i64 16
+; CHECK-NEXT:    [[WIDE_LOAD11:%.*]] = load <4 x float>, ptr [[TMP9]], align 4, !tbaa [[TBAA4]]
+; CHECK-NEXT:    [[TMP10:%.*]] = fmul fast <4 x float> [[WIDE_LOAD15]], [[WIDE_LOAD11]]
+; CHECK-NEXT:    [[WIDE_LOAD14:%.*]] = load <4 x float>, ptr [[TMP1]], align 4, !tbaa [[TBAA4]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x float>, ptr [[TMP0]], align 4, !tbaa [[TBAA4]]
+; CHECK-NEXT:    [[TMP11:%.*]] = fmul fast <4 x float> [[WIDE_LOAD14]], [[WIDE_LOAD]]
+; CHECK-NEXT:    [[BIN_RDX:%.*]] = fadd fast <4 x float> [[TMP10]], [[TMP11]]
+; CHECK-NEXT:    [[BIN_RDX18:%.*]] = fadd fast <4 x float> [[TMP7]], [[BIN_RDX]]
+; CHECK-NEXT:    [[BIN_RDX19:%.*]] = fadd fast <4 x float> [[TMP4]], [[BIN_RDX18]]
+; CHECK-NEXT:    [[TMP12:%.*]] = tail call fast float @llvm.vector.reduce.fadd.v4f32(float 0.000000e+00, <4 x float> [[BIN_RDX19]])
+; CHECK-NEXT:    ret float [[TMP12]]
 ;
   %3 = alloca ptr, align 8
   %4 = alloca ptr, align 8

@@ -448,9 +448,12 @@ PassBuilder::buildO1FunctionSimplificationPipeline(OptimizationLevel Level,
   // attention to it.
   if (!isThinLTOPreLink(Phase) || !PGOOpt ||
       PGOOpt->Action != PGOOptions::SampleUse)
-    LPM2.addPass(LoopFullUnrollPass(static_cast<int>(Level),
-                                    /* OnlyWhenForced= */ !PTO.LoopUnrolling,
-                                    *PTO.ForgetAllSCEVInLoopUnroll));
+    LPM2.addPass(LoopFullUnrollPass(
+        static_cast<int>(Level),
+        /* OnlyWhenForced= */ !PTO.LoopUnrolling,
+        *PTO.ForgetAllSCEVInLoopUnroll,
+        /* PrepareForLTO= */ false,
+        /* SkipVectorizableLoops= */ PTO.LoopVectorization));
 
   invokeLoopOptimizerEndEPCallbacks(LPM2, Level);
 
@@ -628,9 +631,12 @@ PassBuilder::buildFunctionSimplificationPipeline(OptimizationLevel Level,
   // attention to it.
   if (!isThinLTOPreLink(Phase) || !PGOOpt ||
       PGOOpt->Action != PGOOptions::SampleUse)
-    LPM2.addPass(LoopFullUnrollPass(static_cast<int>(Level),
-                                    /* OnlyWhenForced= */ !PTO.LoopUnrolling,
-                                    *PTO.ForgetAllSCEVInLoopUnroll));
+    LPM2.addPass(LoopFullUnrollPass(
+        static_cast<int>(Level),
+        /* OnlyWhenForced= */ !PTO.LoopUnrolling,
+        *PTO.ForgetAllSCEVInLoopUnroll,
+        /* PrepareForLTO= */ false,
+        /* SkipVectorizableLoops= */ PTO.LoopVectorization));
 
   invokeLoopOptimizerEndEPCallbacks(LPM2, Level);
 
@@ -1246,10 +1252,39 @@ ModulePassManager PassBuilder::buildModuleSimplificationPipeline(
   return MPM;
 }
 
+/// Append the late on-demand full-unroll block: an
+/// ExtraFunctionPassManager<ShouldRunExtraUnrollAfterVectorize> that runs
+/// LoopFullUnrollPass on the loops the early pipeline deferred (those
+/// carrying the deferred-for-vectorization marker), followed by SROA to
+/// promote any allocas the unroll exposes. The marker analysis is set by
+/// MarkLoopsDeferredForVectorizationPass before LoopVectorize, so this
+/// block is a no-op for functions that had no deferred loops.
+static void addLateUnrollAfterVectorize(FunctionPassManager &FPM,
+                                        OptimizationLevel Level,
+                                        const PipelineTuningOptions &PTO) {
+  ExtraFunctionPassManager<ShouldRunExtraUnrollAfterVectorize> ExtraPasses;
+  ExtraPasses.addPass(createFunctionToLoopPassAdaptor(
+      LoopFullUnrollPass(static_cast<int>(Level),
+                         /*OnlyWhenForced=*/!PTO.LoopUnrolling,
+                         *PTO.ForgetAllSCEVInLoopUnroll,
+                         /*PrepareForLTO=*/false,
+                         /*SkipVectorizableLoops=*/false,
+                         /*OnlyDeferredLoops=*/true),
+      /*UseMemorySSA=*/false));
+  ExtraPasses.addPass(SROAPass(SROAOptions::PreserveCFG));
+  FPM.addPass(std::move(ExtraPasses));
+}
+
 /// TODO: Should LTO cause any differences to this set of passes?
 void PassBuilder::addVectorPasses(OptimizationLevel Level,
                                   FunctionPassManager &FPM,
                                   ThinOrFullLTOPhase LTOPhase) {
+  const bool IsFullLTO = LTOPhase == ThinOrFullLTOPhase::FullLTOPostLink;
+
+  // Mark functions where the early LoopFullUnrollPass deferred a loop, so the
+  // late unroll + cleanup pipeline can be gated per-function.
+  FPM.addPass(MarkLoopsDeferredForVectorizationPass());
+
   FPM.addPass(LoopVectorizePass(
       LoopVectorizeOptions(!PTO.LoopInterleaving, !PTO.LoopVectorization)));
 
@@ -1271,6 +1306,16 @@ void PassBuilder::addVectorPasses(OptimizationLevel Level,
     if (Opts.enable_unroll_and_jam && PTO.LoopUnrolling)
       FPM.addPass(createFunctionToLoopPassAdaptor(
           LoopUnrollAndJamPass(static_cast<int>(Level))));
+    // Run full unrolling for loops that were deferred in the early pipeline
+    // because they looked vectorizable. Now that the vectorizer has run, fully
+    // unroll the marked loops that remain. Guarded by a marker so this only
+    // runs on functions that actually had a deferred loop. The post-unroll
+    // cleanup chain below is gated separately on whether an unroll actually
+    // happened, so that functions where every deferred loop was handled by
+    // the vectorizer (or rejected by the cost model) do not pay the cleanup
+    // cost.
+    addLateUnrollAfterVectorize(FPM, Level, PTO);
+    FPM.addPass(MarkLateUnrollCleanupPass());
     FPM.addPass(LoopUnrollPass(LoopUnrollOptions(
         static_cast<int>(Level), /*OnlyWhenForced=*/!PTO.LoopUnrolling,
         *PTO.ForgetAllSCEVInLoopUnroll)));
@@ -1347,6 +1392,59 @@ void PassBuilder::addVectorPasses(OptimizationLevel Level,
     FPM.addPass(SCCPPass());
     FPM.addPass(InstCombinePass());
     FPM.addPass(BDCEPass());
+  }
+
+  if (!IsFullLTO) {
+    // Run full unrolling for loops that were deferred in the early pipeline
+    // because they looked vectorizable. Now that the vectorizer has run, fully
+    // unroll the marked loops that remain before SLP, so the unrolled
+    // straight-line code can be SLP-vectorized. Guarded by a marker so this
+    // only runs on functions that actually had a deferred loop.
+    addLateUnrollAfterVectorize(FPM, Level, PTO);
+    // Latch the cleanup-chain gate only if the late unroller above actually
+    // unrolled a deferred loop. When the vectorizer handled every deferred
+    // loop (or the unroll cost model rejected them), the attribute is not
+    // set and the cleanup chain below is skipped.
+    FPM.addPass(MarkLateUnrollCleanupPass());
+    // Recover code quality on the deferred loops after vectorization + late
+    // full unroll. The late transformations (either LoopVectorize turning
+    // the loop into a vector body, or LoopFullUnroll turning it into
+    // straight-line code) can leave behind redundant memsets/stores,
+    // chains of identical-condition branches, and duplicated conditional
+    // stores. A small cleanup sequence recovers that: InstCombine restores
+    // the if/else structure, JumpThreading collapses the repeated
+    // equal-condition branches, DSE drops the now-redundant stores
+    // (including LV-generated memsets shadowed by a subsequent full-width
+    // store), and SimplifyCFG with hoist/sink moves common straight-line
+    // code to the merge point. A standard LoopUnrollPass follows to fully
+    // unroll any leftover LV-produced vector.body loops inside an outer
+    // loop that we kept (because its inner was deferred), turning them
+    // into straight-line stores; LoopIdiomRecognize then re-runs on the
+    // outer loop to fold the resulting nested init pattern into a memset
+    // (e.g. the doubly-nested screen-init idiom). Without these two steps
+    // those nested init patterns bottom out as a wide chain of scalar
+    // stores.
+    {
+      ExtraFunctionPassManager<ShouldRunLateUnrollCleanup> ExtraPasses;
+      ExtraPasses.addPass(InstCombinePass());
+      ExtraPasses.addPass(JumpThreadingPass());
+      ExtraPasses.addPass(InstCombinePass());
+      ExtraPasses.addPass(DSEPass());
+      ExtraPasses.addPass(MergedLoadStoreMotionPass());
+      ExtraPasses.addPass(SimplifyCFGPass(SimplifyCFGOptions()
+                                              .convertSwitchRangeToICmp(true)
+                                              .hoistCommonInsts(true)
+                                              .sinkCommonInsts(true)));
+      ExtraPasses.addPass(LoopUnrollPass(LoopUnrollOptions(
+          static_cast<int>(Level), /*OnlyWhenForced=*/!PTO.LoopUnrolling,
+          *PTO.ForgetAllSCEVInLoopUnroll)));
+      LoopPassManager LIRPM;
+      LIRPM.addPass(LoopIdiomRecognizePass());
+      ExtraPasses.addPass(createFunctionToLoopPassAdaptor(std::move(LIRPM),
+                                                         /*UseMemorySSA=*/true));
+      ExtraPasses.addPass(MemCpyOptPass());
+      FPM.addPass(std::move(ExtraPasses));
+    }
   }
 
   // Optimize parallel scalar instruction chains into SIMD instructions.

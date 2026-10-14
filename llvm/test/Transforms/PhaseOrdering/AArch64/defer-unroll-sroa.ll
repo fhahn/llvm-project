@@ -20,26 +20,201 @@ target triple = "arm64-apple-macosx"
 define void @ctr_xor(ptr %p, ptr %data, i64 %n) {
 ; CHECK-LABEL: define void @ctr_xor(
 ; CHECK-SAME: ptr [[P:%.*]], ptr nofree captures(none) [[DATA:%.*]], i64 [[N:%.*]]) local_unnamed_addr {
-; CHECK-NEXT:  [[ENTRY:.*]]:
-; CHECK-NEXT:    [[TEMP:%.*]] = alloca [4 x i32], align 16
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[TEMP:%.*]] = alloca [4 x i32], align 4
+; CHECK-NEXT:    [[BUF:%.*]] = alloca [16 x i8], align 16
+; CHECK-NEXT:    [[BUF8:%.*]] = ptrtoaddr ptr [[BUF]] to i64
 ; CHECK-NEXT:    [[OUTER_CMP_NOT1:%.*]] = icmp eq i64 [[N]], 0
 ; CHECK-NEXT:    br i1 [[OUTER_CMP_NOT1]], label %[[EXIT:.*]], label %[[OUTER_BODY:.*]]
 ; CHECK:       [[OUTER_BODY]]:
-; CHECK-NEXT:    [[DATA_CUR3:%.*]] = phi ptr [ [[DATA_PTR_NEXT_15:%.*]], %[[OUTER_BODY]] ], [ [[DATA]], %[[ENTRY]] ]
-; CHECK-NEXT:    [[N_CUR2:%.*]] = phi i64 [ [[N_NEXT:%.*]], %[[OUTER_BODY]] ], [ [[N]], %[[ENTRY]] ]
+; CHECK-NEXT:    [[SCEVGEP4:%.*]] = getelementptr inbounds nuw i8, ptr [[BUF]], i64 16
+; CHECK-NEXT:    [[TMP6:%.*]] = add nuw i64 [[BUF8]], 16
+; CHECK-NEXT:    [[GEP_BUF_8:%.*]] = getelementptr inbounds nuw i8, ptr [[BUF]], i64 8
+; CHECK-NEXT:    [[GEP_BUF_9:%.*]] = getelementptr inbounds nuw i8, ptr [[BUF]], i64 9
+; CHECK-NEXT:    [[GEP_BUF_10:%.*]] = getelementptr inbounds nuw i8, ptr [[BUF]], i64 10
+; CHECK-NEXT:    [[GEP_BUF_11:%.*]] = getelementptr inbounds nuw i8, ptr [[BUF]], i64 11
+; CHECK-NEXT:    [[GEP_BUF_12:%.*]] = getelementptr inbounds nuw i8, ptr [[BUF]], i64 12
+; CHECK-NEXT:    [[GEP_BUF_13:%.*]] = getelementptr inbounds nuw i8, ptr [[BUF]], i64 13
+; CHECK-NEXT:    [[GEP_BUF_14:%.*]] = getelementptr inbounds nuw i8, ptr [[BUF]], i64 14
+; CHECK-NEXT:    [[GEP_BUF_15:%.*]] = getelementptr inbounds nuw i8, ptr [[BUF]], i64 15
+; CHECK-NEXT:    [[GEP_BUF_1_SCALAR:%.*]] = getelementptr inbounds nuw i8, ptr [[BUF]], i64 1
+; CHECK-NEXT:    [[GEP_BUF_2_SCALAR:%.*]] = getelementptr inbounds nuw i8, ptr [[BUF]], i64 2
+; CHECK-NEXT:    [[GEP_BUF_3_SCALAR:%.*]] = getelementptr inbounds nuw i8, ptr [[BUF]], i64 3
+; CHECK-NEXT:    [[GEP_BUF_4_SCALAR:%.*]] = getelementptr inbounds nuw i8, ptr [[BUF]], i64 4
+; CHECK-NEXT:    [[GEP_BUF_5_SCALAR:%.*]] = getelementptr inbounds nuw i8, ptr [[BUF]], i64 5
+; CHECK-NEXT:    [[GEP_BUF_6_SCALAR:%.*]] = getelementptr inbounds nuw i8, ptr [[BUF]], i64 6
+; CHECK-NEXT:    [[GEP_BUF_7_SCALAR:%.*]] = getelementptr inbounds nuw i8, ptr [[BUF]], i64 7
+; CHECK-NEXT:    [[GEP_BUF_8_SCALAR:%.*]] = getelementptr inbounds nuw i8, ptr [[BUF]], i64 8
+; CHECK-NEXT:    [[GEP_BUF_9_SCALAR:%.*]] = getelementptr inbounds nuw i8, ptr [[BUF]], i64 9
+; CHECK-NEXT:    [[GEP_BUF_10_SCALAR:%.*]] = getelementptr inbounds nuw i8, ptr [[BUF]], i64 10
+; CHECK-NEXT:    [[GEP_BUF_11_SCALAR:%.*]] = getelementptr inbounds nuw i8, ptr [[BUF]], i64 11
+; CHECK-NEXT:    [[GEP_BUF_12_SCALAR:%.*]] = getelementptr inbounds nuw i8, ptr [[BUF]], i64 12
+; CHECK-NEXT:    [[GEP_BUF_13_SCALAR:%.*]] = getelementptr inbounds nuw i8, ptr [[BUF]], i64 13
+; CHECK-NEXT:    [[GEP_BUF_14_SCALAR:%.*]] = getelementptr inbounds nuw i8, ptr [[BUF]], i64 14
+; CHECK-NEXT:    [[GEP_BUF_15_SCALAR:%.*]] = getelementptr inbounds nuw i8, ptr [[BUF]], i64 15
+; CHECK-NEXT:    br label %[[OUTER_BODY1:.*]]
+; CHECK:       [[OUTER_BODY1]]:
+; CHECK-NEXT:    [[DATA_CUR3:%.*]] = phi ptr [ [[DATA_PTR_NEXT_LCSSA:%.*]], %[[XOR_EXIT:.*]] ], [ [[DATA]], %[[OUTER_BODY]] ]
+; CHECK-NEXT:    [[N_CUR2:%.*]] = phi i64 [ [[N_NEXT:%.*]], %[[XOR_EXIT]] ], [ [[N]], %[[OUTER_BODY]] ]
+; CHECK-NEXT:    [[DATA_CUR39:%.*]] = ptrtoaddr ptr [[DATA_CUR3]] to i64
 ; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr nonnull [[TEMP]])
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr nonnull [[BUF]])
 ; CHECK-NEXT:    call void @encode(ptr nonnull [[TEMP]], ptr [[P]])
-; CHECK-NEXT:    [[TMP0:%.*]] = load <16 x i8>, ptr [[TEMP]], align 16
-; CHECK-NEXT:    [[TMP1:%.*]] = load <16 x i8>, ptr [[DATA_CUR3]], align 1
+; CHECK-NEXT:    call void @llvm.memcpy.p0.p0.i64(ptr noundef nonnull align 16 dereferenceable(16) [[BUF]], ptr noundef nonnull align 4 dereferenceable(16) [[TEMP]], i64 16, i1 false)
+; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DATA_CUR3]], i64 16
+; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DATA_CUR3]], [[SCEVGEP4]]
+; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[BUF]], [[SCEVGEP]]
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], label %[[XOR_LOOP:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = load <16 x i8>, ptr [[BUF]], align 16, !alias.scope [[META0:![0-9]+]]
+; CHECK-NEXT:    [[TMP1:%.*]] = load <16 x i8>, ptr [[DATA_CUR3]], align 1, !alias.scope [[META3:![0-9]+]], !noalias [[META0]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = xor <16 x i8> [[TMP1]], [[TMP0]]
-; CHECK-NEXT:    store <16 x i8> [[TMP2]], ptr [[DATA_CUR3]], align 1
-; CHECK-NEXT:    [[DATA_PTR_NEXT_15]] = getelementptr inbounds nuw i8, ptr [[DATA_CUR3]], i64 16
+; CHECK-NEXT:    store <16 x i8> [[TMP2]], ptr [[DATA_CUR3]], align 1, !alias.scope [[META3]], !noalias [[META0]]
+; CHECK-NEXT:    br label %[[XOR_EXIT]]
+; CHECK:       [[XOR_LOOP]]:
+; CHECK-NEXT:    [[TMP7:%.*]] = add i64 [[DATA_CUR39]], 11
+; CHECK-NEXT:    [[RT_BOUND0:%.*]] = icmp ugt i64 [[TMP6]], [[DATA_CUR39]]
+; CHECK-NEXT:    [[RT_BOUND1:%.*]] = icmp ugt i64 [[TMP7]], [[BUF8]]
+; CHECK-NEXT:    [[RT_CONFLICT:%.*]] = and i1 [[RT_BOUND0]], [[RT_BOUND1]]
+; CHECK-NEXT:    [[RT_GUARD:%.*]] = freeze i1 [[RT_CONFLICT]]
+; CHECK-NEXT:    br i1 [[RT_GUARD]], label %[[XOR_LOOP_RTSCALAR:.*]], label %[[XOR_LOOP_RTVEC:.*]], !prof [[PROF5:![0-9]+]]
+; CHECK:       [[XOR_EXIT]]:
+; CHECK-NEXT:    [[DATA_PTR_NEXT_LCSSA]] = getelementptr i8, ptr [[DATA_CUR3]], i64 16
+; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr nonnull [[BUF]])
 ; CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr nonnull [[TEMP]])
 ; CHECK-NEXT:    [[N_NEXT]] = add i64 [[N_CUR2]], -1
 ; CHECK-NEXT:    [[OUTER_CMP_NOT:%.*]] = icmp eq i64 [[N_NEXT]], 0
-; CHECK-NEXT:    br i1 [[OUTER_CMP_NOT]], label %[[EXIT]], label %[[OUTER_BODY]]
+; CHECK-NEXT:    br i1 [[OUTER_CMP_NOT]], label %[[EXIT]], label %[[OUTER_BODY1]]
 ; CHECK:       [[EXIT]]:
 ; CHECK-NEXT:    ret void
+; CHECK:       [[XOR_LOOP_RTVEC]]:
+; CHECK-NEXT:    [[TMP3:%.*]] = load <8 x i8>, ptr [[BUF]], align 16
+; CHECK-NEXT:    [[TMP4:%.*]] = load <8 x i8>, ptr [[DATA_CUR3]], align 1
+; CHECK-NEXT:    [[TMP5:%.*]] = xor <8 x i8> [[TMP4]], [[TMP3]]
+; CHECK-NEXT:    store <8 x i8> [[TMP5]], ptr [[DATA_CUR3]], align 1
+; CHECK-NEXT:    [[DATA_PTR_NEXT_7:%.*]] = getelementptr inbounds nuw i8, ptr [[DATA_CUR3]], i64 8
+; CHECK-NEXT:    [[B_8:%.*]] = load i8, ptr [[GEP_BUF_8]], align 8
+; CHECK-NEXT:    [[D_8:%.*]] = load i8, ptr [[DATA_PTR_NEXT_7]], align 1
+; CHECK-NEXT:    [[XOR_8:%.*]] = xor i8 [[D_8]], [[B_8]]
+; CHECK-NEXT:    store i8 [[XOR_8]], ptr [[DATA_PTR_NEXT_7]], align 1
+; CHECK-NEXT:    [[DATA_PTR_NEXT_8:%.*]] = getelementptr inbounds nuw i8, ptr [[DATA_CUR3]], i64 9
+; CHECK-NEXT:    [[B_9:%.*]] = load i8, ptr [[GEP_BUF_9]], align 1
+; CHECK-NEXT:    [[D_9:%.*]] = load i8, ptr [[DATA_PTR_NEXT_8]], align 1
+; CHECK-NEXT:    [[XOR_9:%.*]] = xor i8 [[D_9]], [[B_9]]
+; CHECK-NEXT:    store i8 [[XOR_9]], ptr [[DATA_PTR_NEXT_8]], align 1
+; CHECK-NEXT:    [[DATA_PTR_NEXT_9:%.*]] = getelementptr inbounds nuw i8, ptr [[DATA_CUR3]], i64 10
+; CHECK-NEXT:    [[B_10:%.*]] = load i8, ptr [[GEP_BUF_10]], align 2
+; CHECK-NEXT:    [[D_10:%.*]] = load i8, ptr [[DATA_PTR_NEXT_9]], align 1
+; CHECK-NEXT:    [[XOR_10:%.*]] = xor i8 [[D_10]], [[B_10]]
+; CHECK-NEXT:    store i8 [[XOR_10]], ptr [[DATA_PTR_NEXT_9]], align 1
+; CHECK-NEXT:    [[DATA_PTR_NEXT_10:%.*]] = getelementptr inbounds nuw i8, ptr [[DATA_CUR3]], i64 11
+; CHECK-NEXT:    [[B_11:%.*]] = load i8, ptr [[GEP_BUF_11]], align 1
+; CHECK-NEXT:    [[D_11:%.*]] = load i8, ptr [[DATA_PTR_NEXT_10]], align 1
+; CHECK-NEXT:    [[XOR_11:%.*]] = xor i8 [[D_11]], [[B_11]]
+; CHECK-NEXT:    store i8 [[XOR_11]], ptr [[DATA_PTR_NEXT_10]], align 1
+; CHECK-NEXT:    [[DATA_PTR_NEXT_11:%.*]] = getelementptr inbounds nuw i8, ptr [[DATA_CUR3]], i64 12
+; CHECK-NEXT:    [[B_12:%.*]] = load i8, ptr [[GEP_BUF_12]], align 4
+; CHECK-NEXT:    [[D_12:%.*]] = load i8, ptr [[DATA_PTR_NEXT_11]], align 1
+; CHECK-NEXT:    [[XOR_12:%.*]] = xor i8 [[D_12]], [[B_12]]
+; CHECK-NEXT:    store i8 [[XOR_12]], ptr [[DATA_PTR_NEXT_11]], align 1
+; CHECK-NEXT:    [[DATA_PTR_NEXT_12:%.*]] = getelementptr inbounds nuw i8, ptr [[DATA_CUR3]], i64 13
+; CHECK-NEXT:    [[B_13:%.*]] = load i8, ptr [[GEP_BUF_13]], align 1
+; CHECK-NEXT:    [[D_13:%.*]] = load i8, ptr [[DATA_PTR_NEXT_12]], align 1
+; CHECK-NEXT:    [[XOR_13:%.*]] = xor i8 [[D_13]], [[B_13]]
+; CHECK-NEXT:    store i8 [[XOR_13]], ptr [[DATA_PTR_NEXT_12]], align 1
+; CHECK-NEXT:    [[DATA_PTR_NEXT_13:%.*]] = getelementptr inbounds nuw i8, ptr [[DATA_CUR3]], i64 14
+; CHECK-NEXT:    [[B_14:%.*]] = load i8, ptr [[GEP_BUF_14]], align 2
+; CHECK-NEXT:    [[D_14:%.*]] = load i8, ptr [[DATA_PTR_NEXT_13]], align 1
+; CHECK-NEXT:    [[XOR_14:%.*]] = xor i8 [[D_14]], [[B_14]]
+; CHECK-NEXT:    store i8 [[XOR_14]], ptr [[DATA_PTR_NEXT_13]], align 1
+; CHECK-NEXT:    [[DATA_PTR_NEXT_14:%.*]] = getelementptr inbounds nuw i8, ptr [[DATA_CUR3]], i64 15
+; CHECK-NEXT:    [[B_15:%.*]] = load i8, ptr [[GEP_BUF_15]], align 1
+; CHECK-NEXT:    [[D_15:%.*]] = load i8, ptr [[DATA_PTR_NEXT_14]], align 1
+; CHECK-NEXT:    [[XOR_15:%.*]] = xor i8 [[D_15]], [[B_15]]
+; CHECK-NEXT:    store i8 [[XOR_15]], ptr [[DATA_PTR_NEXT_14]], align 1
+; CHECK-NEXT:    br label %[[XOR_EXIT]]
+; CHECK:       [[XOR_LOOP_RTSCALAR]]:
+; CHECK-NEXT:    [[B_SCALAR:%.*]] = load i8, ptr [[BUF]], align 16
+; CHECK-NEXT:    [[D_SCALAR:%.*]] = load i8, ptr [[DATA_CUR3]], align 1
+; CHECK-NEXT:    [[XOR_SCALAR:%.*]] = xor i8 [[D_SCALAR]], [[B_SCALAR]]
+; CHECK-NEXT:    store i8 [[XOR_SCALAR]], ptr [[DATA_CUR3]], align 1
+; CHECK-NEXT:    [[DATA_PTR_NEXT_SCALAR:%.*]] = getelementptr inbounds nuw i8, ptr [[DATA_CUR3]], i64 1
+; CHECK-NEXT:    [[B_1_SCALAR:%.*]] = load i8, ptr [[GEP_BUF_1_SCALAR]], align 1
+; CHECK-NEXT:    [[D_1_SCALAR:%.*]] = load i8, ptr [[DATA_PTR_NEXT_SCALAR]], align 1
+; CHECK-NEXT:    [[XOR_1_SCALAR:%.*]] = xor i8 [[D_1_SCALAR]], [[B_1_SCALAR]]
+; CHECK-NEXT:    store i8 [[XOR_1_SCALAR]], ptr [[DATA_PTR_NEXT_SCALAR]], align 1
+; CHECK-NEXT:    [[DATA_PTR_NEXT_1_SCALAR:%.*]] = getelementptr inbounds nuw i8, ptr [[DATA_CUR3]], i64 2
+; CHECK-NEXT:    [[B_2_SCALAR:%.*]] = load i8, ptr [[GEP_BUF_2_SCALAR]], align 2
+; CHECK-NEXT:    [[D_2_SCALAR:%.*]] = load i8, ptr [[DATA_PTR_NEXT_1_SCALAR]], align 1
+; CHECK-NEXT:    [[XOR_2_SCALAR:%.*]] = xor i8 [[D_2_SCALAR]], [[B_2_SCALAR]]
+; CHECK-NEXT:    store i8 [[XOR_2_SCALAR]], ptr [[DATA_PTR_NEXT_1_SCALAR]], align 1
+; CHECK-NEXT:    [[DATA_PTR_NEXT_2_SCALAR:%.*]] = getelementptr inbounds nuw i8, ptr [[DATA_CUR3]], i64 3
+; CHECK-NEXT:    [[B_3_SCALAR:%.*]] = load i8, ptr [[GEP_BUF_3_SCALAR]], align 1
+; CHECK-NEXT:    [[D_3_SCALAR:%.*]] = load i8, ptr [[DATA_PTR_NEXT_2_SCALAR]], align 1
+; CHECK-NEXT:    [[XOR_3_SCALAR:%.*]] = xor i8 [[D_3_SCALAR]], [[B_3_SCALAR]]
+; CHECK-NEXT:    store i8 [[XOR_3_SCALAR]], ptr [[DATA_PTR_NEXT_2_SCALAR]], align 1
+; CHECK-NEXT:    [[DATA_PTR_NEXT_3_SCALAR:%.*]] = getelementptr inbounds nuw i8, ptr [[DATA_CUR3]], i64 4
+; CHECK-NEXT:    [[B_4_SCALAR:%.*]] = load i8, ptr [[GEP_BUF_4_SCALAR]], align 4
+; CHECK-NEXT:    [[D_4_SCALAR:%.*]] = load i8, ptr [[DATA_PTR_NEXT_3_SCALAR]], align 1
+; CHECK-NEXT:    [[XOR_4_SCALAR:%.*]] = xor i8 [[D_4_SCALAR]], [[B_4_SCALAR]]
+; CHECK-NEXT:    store i8 [[XOR_4_SCALAR]], ptr [[DATA_PTR_NEXT_3_SCALAR]], align 1
+; CHECK-NEXT:    [[DATA_PTR_NEXT_4_SCALAR:%.*]] = getelementptr inbounds nuw i8, ptr [[DATA_CUR3]], i64 5
+; CHECK-NEXT:    [[B_5_SCALAR:%.*]] = load i8, ptr [[GEP_BUF_5_SCALAR]], align 1
+; CHECK-NEXT:    [[D_5_SCALAR:%.*]] = load i8, ptr [[DATA_PTR_NEXT_4_SCALAR]], align 1
+; CHECK-NEXT:    [[XOR_5_SCALAR:%.*]] = xor i8 [[D_5_SCALAR]], [[B_5_SCALAR]]
+; CHECK-NEXT:    store i8 [[XOR_5_SCALAR]], ptr [[DATA_PTR_NEXT_4_SCALAR]], align 1
+; CHECK-NEXT:    [[DATA_PTR_NEXT_5_SCALAR:%.*]] = getelementptr inbounds nuw i8, ptr [[DATA_CUR3]], i64 6
+; CHECK-NEXT:    [[B_6_SCALAR:%.*]] = load i8, ptr [[GEP_BUF_6_SCALAR]], align 2
+; CHECK-NEXT:    [[D_6_SCALAR:%.*]] = load i8, ptr [[DATA_PTR_NEXT_5_SCALAR]], align 1
+; CHECK-NEXT:    [[XOR_6_SCALAR:%.*]] = xor i8 [[D_6_SCALAR]], [[B_6_SCALAR]]
+; CHECK-NEXT:    store i8 [[XOR_6_SCALAR]], ptr [[DATA_PTR_NEXT_5_SCALAR]], align 1
+; CHECK-NEXT:    [[DATA_PTR_NEXT_6_SCALAR:%.*]] = getelementptr inbounds nuw i8, ptr [[DATA_CUR3]], i64 7
+; CHECK-NEXT:    [[B_7_SCALAR:%.*]] = load i8, ptr [[GEP_BUF_7_SCALAR]], align 1
+; CHECK-NEXT:    [[D_7_SCALAR:%.*]] = load i8, ptr [[DATA_PTR_NEXT_6_SCALAR]], align 1
+; CHECK-NEXT:    [[XOR_7_SCALAR:%.*]] = xor i8 [[D_7_SCALAR]], [[B_7_SCALAR]]
+; CHECK-NEXT:    store i8 [[XOR_7_SCALAR]], ptr [[DATA_PTR_NEXT_6_SCALAR]], align 1
+; CHECK-NEXT:    [[DATA_PTR_NEXT_7_SCALAR:%.*]] = getelementptr inbounds nuw i8, ptr [[DATA_CUR3]], i64 8
+; CHECK-NEXT:    [[B_8_SCALAR:%.*]] = load i8, ptr [[GEP_BUF_8_SCALAR]], align 8
+; CHECK-NEXT:    [[D_8_SCALAR:%.*]] = load i8, ptr [[DATA_PTR_NEXT_7_SCALAR]], align 1
+; CHECK-NEXT:    [[XOR_8_SCALAR:%.*]] = xor i8 [[D_8_SCALAR]], [[B_8_SCALAR]]
+; CHECK-NEXT:    store i8 [[XOR_8_SCALAR]], ptr [[DATA_PTR_NEXT_7_SCALAR]], align 1
+; CHECK-NEXT:    [[DATA_PTR_NEXT_8_SCALAR:%.*]] = getelementptr inbounds nuw i8, ptr [[DATA_CUR3]], i64 9
+; CHECK-NEXT:    [[B_9_SCALAR:%.*]] = load i8, ptr [[GEP_BUF_9_SCALAR]], align 1
+; CHECK-NEXT:    [[D_9_SCALAR:%.*]] = load i8, ptr [[DATA_PTR_NEXT_8_SCALAR]], align 1
+; CHECK-NEXT:    [[XOR_9_SCALAR:%.*]] = xor i8 [[D_9_SCALAR]], [[B_9_SCALAR]]
+; CHECK-NEXT:    store i8 [[XOR_9_SCALAR]], ptr [[DATA_PTR_NEXT_8_SCALAR]], align 1
+; CHECK-NEXT:    [[DATA_PTR_NEXT_9_SCALAR:%.*]] = getelementptr inbounds nuw i8, ptr [[DATA_CUR3]], i64 10
+; CHECK-NEXT:    [[B_10_SCALAR:%.*]] = load i8, ptr [[GEP_BUF_10_SCALAR]], align 2
+; CHECK-NEXT:    [[D_10_SCALAR:%.*]] = load i8, ptr [[DATA_PTR_NEXT_9_SCALAR]], align 1
+; CHECK-NEXT:    [[XOR_10_SCALAR:%.*]] = xor i8 [[D_10_SCALAR]], [[B_10_SCALAR]]
+; CHECK-NEXT:    store i8 [[XOR_10_SCALAR]], ptr [[DATA_PTR_NEXT_9_SCALAR]], align 1
+; CHECK-NEXT:    [[DATA_PTR_NEXT_10_SCALAR:%.*]] = getelementptr inbounds nuw i8, ptr [[DATA_CUR3]], i64 11
+; CHECK-NEXT:    [[B_11_SCALAR:%.*]] = load i8, ptr [[GEP_BUF_11_SCALAR]], align 1
+; CHECK-NEXT:    [[D_11_SCALAR:%.*]] = load i8, ptr [[DATA_PTR_NEXT_10_SCALAR]], align 1
+; CHECK-NEXT:    [[XOR_11_SCALAR:%.*]] = xor i8 [[D_11_SCALAR]], [[B_11_SCALAR]]
+; CHECK-NEXT:    store i8 [[XOR_11_SCALAR]], ptr [[DATA_PTR_NEXT_10_SCALAR]], align 1
+; CHECK-NEXT:    [[DATA_PTR_NEXT_11_SCALAR:%.*]] = getelementptr inbounds nuw i8, ptr [[DATA_CUR3]], i64 12
+; CHECK-NEXT:    [[B_12_SCALAR:%.*]] = load i8, ptr [[GEP_BUF_12_SCALAR]], align 4
+; CHECK-NEXT:    [[D_12_SCALAR:%.*]] = load i8, ptr [[DATA_PTR_NEXT_11_SCALAR]], align 1
+; CHECK-NEXT:    [[XOR_12_SCALAR:%.*]] = xor i8 [[D_12_SCALAR]], [[B_12_SCALAR]]
+; CHECK-NEXT:    store i8 [[XOR_12_SCALAR]], ptr [[DATA_PTR_NEXT_11_SCALAR]], align 1
+; CHECK-NEXT:    [[DATA_PTR_NEXT_12_SCALAR:%.*]] = getelementptr inbounds nuw i8, ptr [[DATA_CUR3]], i64 13
+; CHECK-NEXT:    [[B_13_SCALAR:%.*]] = load i8, ptr [[GEP_BUF_13_SCALAR]], align 1
+; CHECK-NEXT:    [[D_13_SCALAR:%.*]] = load i8, ptr [[DATA_PTR_NEXT_12_SCALAR]], align 1
+; CHECK-NEXT:    [[XOR_13_SCALAR:%.*]] = xor i8 [[D_13_SCALAR]], [[B_13_SCALAR]]
+; CHECK-NEXT:    store i8 [[XOR_13_SCALAR]], ptr [[DATA_PTR_NEXT_12_SCALAR]], align 1
+; CHECK-NEXT:    [[DATA_PTR_NEXT_13_SCALAR:%.*]] = getelementptr inbounds nuw i8, ptr [[DATA_CUR3]], i64 14
+; CHECK-NEXT:    [[B_14_SCALAR:%.*]] = load i8, ptr [[GEP_BUF_14_SCALAR]], align 2
+; CHECK-NEXT:    [[D_14_SCALAR:%.*]] = load i8, ptr [[DATA_PTR_NEXT_13_SCALAR]], align 1
+; CHECK-NEXT:    [[XOR_14_SCALAR:%.*]] = xor i8 [[D_14_SCALAR]], [[B_14_SCALAR]]
+; CHECK-NEXT:    store i8 [[XOR_14_SCALAR]], ptr [[DATA_PTR_NEXT_13_SCALAR]], align 1
+; CHECK-NEXT:    [[DATA_PTR_NEXT_14_SCALAR:%.*]] = getelementptr inbounds nuw i8, ptr [[DATA_CUR3]], i64 15
+; CHECK-NEXT:    [[B_15_SCALAR:%.*]] = load i8, ptr [[GEP_BUF_15_SCALAR]], align 1
+; CHECK-NEXT:    [[D_15_SCALAR:%.*]] = load i8, ptr [[DATA_PTR_NEXT_14_SCALAR]], align 1
+; CHECK-NEXT:    [[XOR_15_SCALAR:%.*]] = xor i8 [[D_15_SCALAR]], [[B_15_SCALAR]]
+; CHECK-NEXT:    store i8 [[XOR_15_SCALAR]], ptr [[DATA_PTR_NEXT_14_SCALAR]], align 1
+; CHECK-NEXT:    br label %[[XOR_EXIT]]
 ;
 entry:
   %temp = alloca [4 x i32], align 4
@@ -112,3 +287,11 @@ exit:
 declare void @encode(ptr, ptr)
 declare void @llvm.lifetime.start.p0(ptr)
 declare void @llvm.lifetime.end.p0(ptr)
+;.
+; CHECK: [[META0]] = !{[[META1:![0-9]+]]}
+; CHECK: [[META1]] = distinct !{[[META1]], [[META2:![0-9]+]]}
+; CHECK: [[META2]] = distinct !{[[META2]], i1 false, !"LVerDomain"}
+; CHECK: [[META3]] = !{[[META4:![0-9]+]]}
+; CHECK: [[META4]] = distinct !{[[META4]], [[META2]]}
+; CHECK: [[PROF5]] = !{!"branch_weights", i32 1, i32 1048575}
+;.

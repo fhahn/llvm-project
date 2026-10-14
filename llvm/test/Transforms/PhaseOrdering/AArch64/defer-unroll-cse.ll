@@ -18,75 +18,107 @@ define void @fill_rows(ptr %dst, i64 %stride, i16 %v) {
 ; CHECK-LABEL: define void @fill_rows(
 ; CHECK-SAME: ptr nofree writeonly captures(none) [[DST:%.*]], i64 [[STRIDE:%.*]], i16 [[V:%.*]]) local_unnamed_addr #[[ATTR0:[0-9]+]] {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
-; CHECK-NEXT:    [[TMP0:%.*]] = insertelement <8 x i16> poison, i16 [[V]], i64 0
-; CHECK-NEXT:    [[TMP1:%.*]] = shufflevector <8 x i16> [[TMP0]], <8 x i16> poison, <8 x i32> zeroinitializer
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[DST]], align 2
-; CHECK-NEXT:    [[GEP_8:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 16
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[GEP_8]], align 2
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <8 x i16> poison, i16 [[V]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <8 x i16> [[BROADCAST_SPLATINSERT]], <8 x i16> poison, <8 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr inbounds nuw i8, ptr [[DST]], i64 16
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT]], ptr [[DST]], align 2
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT]], ptr [[TMP0]], align 2
 ; CHECK-NEXT:    [[ROW_NEXT:%.*]] = getelementptr inbounds [2 x i8], ptr [[DST]], i64 [[STRIDE]]
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[ROW_NEXT]], align 2
-; CHECK-NEXT:    [[GEP_8_1:%.*]] = getelementptr inbounds nuw i8, ptr [[ROW_NEXT]], i64 16
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[GEP_8_1]], align 2
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT_1:%.*]] = insertelement <8 x i16> poison, i16 [[V]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT_1:%.*]] = shufflevector <8 x i16> [[BROADCAST_SPLATINSERT_1]], <8 x i16> poison, <8 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds nuw i8, ptr [[ROW_NEXT]], i64 16
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT_1]], ptr [[ROW_NEXT]], align 2
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT_1]], ptr [[TMP1]], align 2
 ; CHECK-NEXT:    [[ROW_NEXT_1:%.*]] = getelementptr inbounds [2 x i8], ptr [[ROW_NEXT]], i64 [[STRIDE]]
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[ROW_NEXT_1]], align 2
-; CHECK-NEXT:    [[GEP_8_2:%.*]] = getelementptr inbounds nuw i8, ptr [[ROW_NEXT_1]], i64 16
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[GEP_8_2]], align 2
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT_2:%.*]] = insertelement <8 x i16> poison, i16 [[V]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT_2:%.*]] = shufflevector <8 x i16> [[BROADCAST_SPLATINSERT_2]], <8 x i16> poison, <8 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds nuw i8, ptr [[ROW_NEXT_1]], i64 16
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT_2]], ptr [[ROW_NEXT_1]], align 2
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT_2]], ptr [[TMP2]], align 2
 ; CHECK-NEXT:    [[ROW_NEXT_2:%.*]] = getelementptr inbounds [2 x i8], ptr [[ROW_NEXT_1]], i64 [[STRIDE]]
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[ROW_NEXT_2]], align 2
-; CHECK-NEXT:    [[GEP_8_3:%.*]] = getelementptr inbounds nuw i8, ptr [[ROW_NEXT_2]], i64 16
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[GEP_8_3]], align 2
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT_3:%.*]] = insertelement <8 x i16> poison, i16 [[V]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT_3:%.*]] = shufflevector <8 x i16> [[BROADCAST_SPLATINSERT_3]], <8 x i16> poison, <8 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds nuw i8, ptr [[ROW_NEXT_2]], i64 16
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT_3]], ptr [[ROW_NEXT_2]], align 2
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT_3]], ptr [[TMP3]], align 2
 ; CHECK-NEXT:    [[ROW_NEXT_3:%.*]] = getelementptr inbounds [2 x i8], ptr [[ROW_NEXT_2]], i64 [[STRIDE]]
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[ROW_NEXT_3]], align 2
-; CHECK-NEXT:    [[GEP_8_4:%.*]] = getelementptr inbounds nuw i8, ptr [[ROW_NEXT_3]], i64 16
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[GEP_8_4]], align 2
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT_4:%.*]] = insertelement <8 x i16> poison, i16 [[V]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT_4:%.*]] = shufflevector <8 x i16> [[BROADCAST_SPLATINSERT_4]], <8 x i16> poison, <8 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds nuw i8, ptr [[ROW_NEXT_3]], i64 16
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT_4]], ptr [[ROW_NEXT_3]], align 2
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT_4]], ptr [[TMP4]], align 2
 ; CHECK-NEXT:    [[ROW_NEXT_4:%.*]] = getelementptr inbounds [2 x i8], ptr [[ROW_NEXT_3]], i64 [[STRIDE]]
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[ROW_NEXT_4]], align 2
-; CHECK-NEXT:    [[GEP_8_5:%.*]] = getelementptr inbounds nuw i8, ptr [[ROW_NEXT_4]], i64 16
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[GEP_8_5]], align 2
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT_5:%.*]] = insertelement <8 x i16> poison, i16 [[V]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT_5:%.*]] = shufflevector <8 x i16> [[BROADCAST_SPLATINSERT_5]], <8 x i16> poison, <8 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds nuw i8, ptr [[ROW_NEXT_4]], i64 16
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT_5]], ptr [[ROW_NEXT_4]], align 2
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT_5]], ptr [[TMP5]], align 2
 ; CHECK-NEXT:    [[ROW_NEXT_5:%.*]] = getelementptr inbounds [2 x i8], ptr [[ROW_NEXT_4]], i64 [[STRIDE]]
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[ROW_NEXT_5]], align 2
-; CHECK-NEXT:    [[GEP_8_6:%.*]] = getelementptr inbounds nuw i8, ptr [[ROW_NEXT_5]], i64 16
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[GEP_8_6]], align 2
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT_6:%.*]] = insertelement <8 x i16> poison, i16 [[V]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT_6:%.*]] = shufflevector <8 x i16> [[BROADCAST_SPLATINSERT_6]], <8 x i16> poison, <8 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds nuw i8, ptr [[ROW_NEXT_5]], i64 16
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT_6]], ptr [[ROW_NEXT_5]], align 2
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT_6]], ptr [[TMP6]], align 2
 ; CHECK-NEXT:    [[ROW_NEXT_6:%.*]] = getelementptr inbounds [2 x i8], ptr [[ROW_NEXT_5]], i64 [[STRIDE]]
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[ROW_NEXT_6]], align 2
-; CHECK-NEXT:    [[GEP_8_7:%.*]] = getelementptr inbounds nuw i8, ptr [[ROW_NEXT_6]], i64 16
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[GEP_8_7]], align 2
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT_7:%.*]] = insertelement <8 x i16> poison, i16 [[V]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT_7:%.*]] = shufflevector <8 x i16> [[BROADCAST_SPLATINSERT_7]], <8 x i16> poison, <8 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds nuw i8, ptr [[ROW_NEXT_6]], i64 16
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT_7]], ptr [[ROW_NEXT_6]], align 2
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT_7]], ptr [[TMP7]], align 2
 ; CHECK-NEXT:    [[ROW_NEXT_7:%.*]] = getelementptr inbounds [2 x i8], ptr [[ROW_NEXT_6]], i64 [[STRIDE]]
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[ROW_NEXT_7]], align 2
-; CHECK-NEXT:    [[GEP_8_8:%.*]] = getelementptr inbounds nuw i8, ptr [[ROW_NEXT_7]], i64 16
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[GEP_8_8]], align 2
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT_8:%.*]] = insertelement <8 x i16> poison, i16 [[V]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT_8:%.*]] = shufflevector <8 x i16> [[BROADCAST_SPLATINSERT_8]], <8 x i16> poison, <8 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds nuw i8, ptr [[ROW_NEXT_7]], i64 16
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT_8]], ptr [[ROW_NEXT_7]], align 2
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT_8]], ptr [[TMP8]], align 2
 ; CHECK-NEXT:    [[ROW_NEXT_8:%.*]] = getelementptr inbounds [2 x i8], ptr [[ROW_NEXT_7]], i64 [[STRIDE]]
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[ROW_NEXT_8]], align 2
-; CHECK-NEXT:    [[GEP_8_9:%.*]] = getelementptr inbounds nuw i8, ptr [[ROW_NEXT_8]], i64 16
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[GEP_8_9]], align 2
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT_9:%.*]] = insertelement <8 x i16> poison, i16 [[V]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT_9:%.*]] = shufflevector <8 x i16> [[BROADCAST_SPLATINSERT_9]], <8 x i16> poison, <8 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds nuw i8, ptr [[ROW_NEXT_8]], i64 16
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT_9]], ptr [[ROW_NEXT_8]], align 2
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT_9]], ptr [[TMP9]], align 2
 ; CHECK-NEXT:    [[ROW_NEXT_9:%.*]] = getelementptr inbounds [2 x i8], ptr [[ROW_NEXT_8]], i64 [[STRIDE]]
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[ROW_NEXT_9]], align 2
-; CHECK-NEXT:    [[GEP_8_10:%.*]] = getelementptr inbounds nuw i8, ptr [[ROW_NEXT_9]], i64 16
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[GEP_8_10]], align 2
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT_10:%.*]] = insertelement <8 x i16> poison, i16 [[V]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT_10:%.*]] = shufflevector <8 x i16> [[BROADCAST_SPLATINSERT_10]], <8 x i16> poison, <8 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds nuw i8, ptr [[ROW_NEXT_9]], i64 16
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT_10]], ptr [[ROW_NEXT_9]], align 2
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT_10]], ptr [[TMP10]], align 2
 ; CHECK-NEXT:    [[ROW_NEXT_10:%.*]] = getelementptr inbounds [2 x i8], ptr [[ROW_NEXT_9]], i64 [[STRIDE]]
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[ROW_NEXT_10]], align 2
-; CHECK-NEXT:    [[GEP_8_11:%.*]] = getelementptr inbounds nuw i8, ptr [[ROW_NEXT_10]], i64 16
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[GEP_8_11]], align 2
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT_11:%.*]] = insertelement <8 x i16> poison, i16 [[V]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT_11:%.*]] = shufflevector <8 x i16> [[BROADCAST_SPLATINSERT_11]], <8 x i16> poison, <8 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr inbounds nuw i8, ptr [[ROW_NEXT_10]], i64 16
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT_11]], ptr [[ROW_NEXT_10]], align 2
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT_11]], ptr [[TMP11]], align 2
 ; CHECK-NEXT:    [[ROW_NEXT_11:%.*]] = getelementptr inbounds [2 x i8], ptr [[ROW_NEXT_10]], i64 [[STRIDE]]
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[ROW_NEXT_11]], align 2
-; CHECK-NEXT:    [[GEP_8_12:%.*]] = getelementptr inbounds nuw i8, ptr [[ROW_NEXT_11]], i64 16
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[GEP_8_12]], align 2
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT_12:%.*]] = insertelement <8 x i16> poison, i16 [[V]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT_12:%.*]] = shufflevector <8 x i16> [[BROADCAST_SPLATINSERT_12]], <8 x i16> poison, <8 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds nuw i8, ptr [[ROW_NEXT_11]], i64 16
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT_12]], ptr [[ROW_NEXT_11]], align 2
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT_12]], ptr [[TMP12]], align 2
 ; CHECK-NEXT:    [[ROW_NEXT_12:%.*]] = getelementptr inbounds [2 x i8], ptr [[ROW_NEXT_11]], i64 [[STRIDE]]
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[ROW_NEXT_12]], align 2
-; CHECK-NEXT:    [[GEP_8_13:%.*]] = getelementptr inbounds nuw i8, ptr [[ROW_NEXT_12]], i64 16
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[GEP_8_13]], align 2
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT_13:%.*]] = insertelement <8 x i16> poison, i16 [[V]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT_13:%.*]] = shufflevector <8 x i16> [[BROADCAST_SPLATINSERT_13]], <8 x i16> poison, <8 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr inbounds nuw i8, ptr [[ROW_NEXT_12]], i64 16
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT_13]], ptr [[ROW_NEXT_12]], align 2
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT_13]], ptr [[TMP13]], align 2
 ; CHECK-NEXT:    [[ROW_NEXT_13:%.*]] = getelementptr inbounds [2 x i8], ptr [[ROW_NEXT_12]], i64 [[STRIDE]]
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[ROW_NEXT_13]], align 2
-; CHECK-NEXT:    [[GEP_8_14:%.*]] = getelementptr inbounds nuw i8, ptr [[ROW_NEXT_13]], i64 16
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[GEP_8_14]], align 2
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT_14:%.*]] = insertelement <8 x i16> poison, i16 [[V]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT_14:%.*]] = shufflevector <8 x i16> [[BROADCAST_SPLATINSERT_14]], <8 x i16> poison, <8 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr inbounds nuw i8, ptr [[ROW_NEXT_13]], i64 16
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT_14]], ptr [[ROW_NEXT_13]], align 2
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT_14]], ptr [[TMP14]], align 2
 ; CHECK-NEXT:    [[ROW_NEXT_14:%.*]] = getelementptr inbounds [2 x i8], ptr [[ROW_NEXT_13]], i64 [[STRIDE]]
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[ROW_NEXT_14]], align 2
-; CHECK-NEXT:    [[GEP_8_15:%.*]] = getelementptr inbounds nuw i8, ptr [[ROW_NEXT_14]], i64 16
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[GEP_8_15]], align 2
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT_15:%.*]] = insertelement <8 x i16> poison, i16 [[V]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT_15:%.*]] = shufflevector <8 x i16> [[BROADCAST_SPLATINSERT_15]], <8 x i16> poison, <8 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP15:%.*]] = getelementptr inbounds nuw i8, ptr [[ROW_NEXT_14]], i64 16
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT_15]], ptr [[ROW_NEXT_14]], align 2
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT_15]], ptr [[TMP15]], align 2
 ; CHECK-NEXT:    [[ROW_NEXT_15:%.*]] = getelementptr inbounds [2 x i8], ptr [[ROW_NEXT_14]], i64 [[STRIDE]]
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[ROW_NEXT_15]], align 2
-; CHECK-NEXT:    [[GEP_8_16:%.*]] = getelementptr inbounds nuw i8, ptr [[ROW_NEXT_15]], i64 16
-; CHECK-NEXT:    store <8 x i16> [[TMP1]], ptr [[GEP_8_16]], align 2
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT_16:%.*]] = insertelement <8 x i16> poison, i16 [[V]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT_16:%.*]] = shufflevector <8 x i16> [[BROADCAST_SPLATINSERT_16]], <8 x i16> poison, <8 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP16:%.*]] = getelementptr inbounds nuw i8, ptr [[ROW_NEXT_15]], i64 16
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT_16]], ptr [[ROW_NEXT_15]], align 2
+; CHECK-NEXT:    store <8 x i16> [[BROADCAST_SPLAT_16]], ptr [[TMP16]], align 2
 ; CHECK-NEXT:    ret void
 ;
 entry:
