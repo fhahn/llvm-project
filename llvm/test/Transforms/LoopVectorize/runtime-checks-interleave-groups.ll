@@ -17,15 +17,15 @@ define void @load_pair_store_pair(ptr %a, ptr %b, i64 %n) {
 ; CHECK-LABEL: define void @load_pair_store_pair(
 ; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[B2:%.*]] = ptrtoaddr ptr [[B]] to i64
+; CHECK-NEXT:    [[A1:%.*]] = ptrtoaddr ptr [[A]] to i64
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[N]], 3
-; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP0]]
-; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP0]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[B]], [[TMP2]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[A]], [[TMP1]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[A1]], 32
+; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], [[B2]]
+; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[TMP1]], 1
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP2]], 63
 ; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ;
@@ -65,21 +65,18 @@ define void @negative_stride(ptr %a, ptr %b, i64 %n) {
 ; CHECK-LABEL: define void @negative_stride(
 ; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[B2:%.*]] = ptrtoaddr ptr [[B]] to i64
+; CHECK-NEXT:    [[A1:%.*]] = ptrtoaddr ptr [[A]] to i64
 ; CHECK-NEXT:    [[START:%.*]] = add i64 [[N]], -1
 ; CHECK-NEXT:    [[TMP0:%.*]] = call i64 @llvm.smin.i64(i64 [[START]], i64 0)
 ; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[N]], [[TMP0]]
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[TMP1]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP2:%.*]] = shl i64 [[TMP0]], 3
-; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP2]]
-; CHECK-NEXT:    [[TMP4:%.*]] = shl i64 [[N]], 3
-; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP4]]
-; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP2]]
-; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP4]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP3]], [[TMP7]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[TMP6]], [[TMP5]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[A1]], 32
+; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[TMP2]], [[B2]]
+; CHECK-NEXT:    [[TMP4:%.*]] = sub i64 [[TMP3]], 1
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP4]], 63
 ; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ;
@@ -119,15 +116,15 @@ define void @in_place_update(ptr %a, ptr %b, i64 %n) {
 ; CHECK-LABEL: define void @in_place_update(
 ; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i64 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[A2:%.*]] = ptrtoaddr ptr [[A]] to i64
+; CHECK-NEXT:    [[B1:%.*]] = ptrtoaddr ptr [[B]] to i64
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[N]], 4
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], [[SCALAR_PH:label %.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[TMP0:%.*]] = shl i64 [[N]], 3
-; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP0]]
-; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP0]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[A]], [[TMP2]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[B]], [[TMP1]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[B1]], 32
+; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], [[A2]]
+; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[TMP1]], 1
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP2]], 63
 ; CHECK-NEXT:    br i1 [[FOUND_CONFLICT]], [[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
 ;
