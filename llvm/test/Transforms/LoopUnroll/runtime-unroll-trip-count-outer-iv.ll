@@ -74,7 +74,7 @@ define void @inner_trip_count_uses_wrapping_outer_iv(ptr %p, i32 %n) {
 ; CHECK-NEXT:    br label %[[OUTER_LATCH]]
 ; CHECK:       [[OUTER_LATCH]]:
 ; CHECK-NEXT:    [[ADD_LCSSA:%.*]] = phi i32 [ [[ADD_LCSSA_PH]], %[[OUTER_LATCH_UNR_LCSSA]] ], [ [[ADD_LCSSA_PH1]], %[[OUTER_LATCH_EPILOG_LCSSA]] ]
-; CHECK-NEXT:    [[OUTER_IV_NEXT]] = add nuw i8 [[OUTER_IV]], 1
+; CHECK-NEXT:    [[OUTER_IV_NEXT]] = add i8 [[OUTER_IV]], 1
 ; CHECK-NEXT:    [[J_NEXT]] = add i8 [[J]], 1
 ; CHECK-NEXT:    [[EC_OUTER:%.*]] = icmp ugt i32 [[ADD_LCSSA]], [[N]]
 ; CHECK-NEXT:    br i1 [[EC_OUTER]], label %[[EXIT:.*]], label %[[OUTER_HEADER]]
@@ -120,7 +120,7 @@ define void @inner_trip_count_uses_wrapping_outer_iv_nuw_nsw_step_2(ptr %p, i32 
 ; CHECK:       [[OUTER_HEADER]]:
 ; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i8 [ 0, %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], %[[OUTER_LATCH:.*]] ]
 ; CHECK-NEXT:    [[J:%.*]] = phi i8 [ 1, %[[ENTRY]] ], [ [[J_NEXT:%.*]], %[[OUTER_LATCH]] ]
-; CHECK-NEXT:    [[TMP0:%.*]] = shl nuw i8 [[OUTER_IV]], 1
+; CHECK-NEXT:    [[TMP0:%.*]] = shl i8 [[OUTER_IV]], 1
 ; CHECK-NEXT:    [[XTRAITER:%.*]] = and i8 [[J]], 7
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ult i8 [[TMP0]], 7
 ; CHECK-NEXT:    br i1 [[TMP1]], label %[[INNER_EPIL_PREHEADER:.*]], label %[[OUTER_HEADER_NEW:.*]]
@@ -184,7 +184,7 @@ define void @inner_trip_count_uses_wrapping_outer_iv_nuw_nsw_step_2(ptr %p, i32 
 ; CHECK-NEXT:    br label %[[OUTER_LATCH]]
 ; CHECK:       [[OUTER_LATCH]]:
 ; CHECK-NEXT:    [[ADD_LCSSA:%.*]] = phi i32 [ [[ADD_LCSSA_PH]], %[[OUTER_LATCH_UNR_LCSSA]] ], [ [[ADD_LCSSA_PH1]], %[[OUTER_LATCH_EPILOG_LCSSA]] ]
-; CHECK-NEXT:    [[OUTER_IV_NEXT]] = add nuw nsw i8 [[OUTER_IV]], 1
+; CHECK-NEXT:    [[OUTER_IV_NEXT]] = add i8 [[OUTER_IV]], 1
 ; CHECK-NEXT:    [[J_NEXT]] = add i8 [[J]], 2
 ; CHECK-NEXT:    [[EC_OUTER:%.*]] = icmp ugt i32 [[ADD_LCSSA]], [[N]]
 ; CHECK-NEXT:    br i1 [[EC_OUTER]], label %[[EXIT:.*]], label %[[OUTER_HEADER]]

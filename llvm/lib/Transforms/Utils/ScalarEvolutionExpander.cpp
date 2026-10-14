@@ -1409,8 +1409,18 @@ Value *SCEVExpander::visitAddRecExpr(SCEVUseT<const SCEVAddRecExpr *> S) {
     return expand(SE.getAddExpr(AddExprLHS, AddExprRHS));
   }
 
-  // If we don't yet have a canonical IV, create one.
-  if (!CanonicalIV) {
+  if (CanonicalIV) {
+    // The canonical IV must not be more poisonous than S, which it replaces.
+    SmallVector<Instruction *> DropPoisonGeneratingInsts;
+    [[maybe_unused]] bool CanReuse =
+        SE.canReuseInstruction(S, CanonicalIV, DropPoisonGeneratingInsts);
+    assert(CanReuse && "canonical IV can only be poison via its increment");
+    for (Instruction *I : DropPoisonGeneratingInsts) {
+      rememberFlags(I);
+      // FIXME: Flags re-inferred from a cached SCEV of the IV can undo this.
+      dropPoisonGeneratingAnnotationsAndReinfer(SE, I);
+    }
+  } else {
     // Create and insert the PHI node for the induction variable in the
     // specified loop.
     BasicBlock *Header = L->getHeader();
