@@ -1476,7 +1476,7 @@ static bool areDistinctObjectsNoAlias(const Value *O1, const Value *O2,
 /// underlying object \p Obj, looking through phis and selects. Gives up after
 /// visiting a small number of values.
 static bool allUnderlyingObjectsNoAlias(const Value *V, const Value *Obj,
-                                        AAQueryInfo &AAQI) {
+                                        const Function &F, AAQueryInfo &AAQI) {
   const unsigned MaxVisited = 8;
   SmallPtrSet<const Value *, 8> Visited;
   SmallVector<const Value *, 8> Worklist({V});
@@ -1494,6 +1494,11 @@ static bool allUnderlyingObjectsNoAlias(const Value *V, const Value *Obj,
       append_range(Worklist, PN->incoming_values());
       continue;
     }
+    // Undef, and null if it is not a valid pointer, point to no object.
+    if (isa<UndefValue>(P) ||
+        (isa<ConstantPointerNull>(P) &&
+         !NullPointerIsDefined(&F, P->getType()->getPointerAddressSpace())))
+      continue;
     if (!areDistinctObjectsNoAlias(P, Obj, AAQI))
       return false;
   } while (!Worklist.empty());
@@ -1563,7 +1568,7 @@ AliasResult BasicAAResult::aliasPHI(const PHINode *PN, LocationSize PNSize,
     // of the phi are known not to alias the underlying object of V2.
     HasPhiSrc |= isa<PHINode>(PV1);
     if (HasPhiSrc && V1Srcs.size() > 1)
-      return allUnderlyingObjectsNoAlias(PN, getUnderlyingObject(V2), AAQI)
+      return allUnderlyingObjectsNoAlias(PN, getUnderlyingObject(V2), F, AAQI)
                  ? AliasResult::NoAlias
                  : AliasResult::MayAlias;
   }
