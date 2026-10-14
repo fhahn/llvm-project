@@ -707,24 +707,22 @@ define void @use_diff_checks_when_retrying_with_rt_checks(i64 %off, ptr %dst, pt
 ; CHECK-LABEL: define void @use_diff_checks_when_retrying_with_rt_checks(
 ; CHECK-SAME: i64 [[OFF:%.*]], ptr [[DST:%.*]], ptr [[SRC:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[DST2:%.*]] = ptrtoaddr ptr [[DST]] to i64
+; CHECK-NEXT:    [[SRC1:%.*]] = ptrtoaddr ptr [[SRC]] to i64
 ; CHECK-NEXT:    br label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = mul i64 [[OFF]], -8
+; CHECK-NEXT:    [[TMP4:%.*]] = sub i64 [[TMP0]], 1
+; CHECK-NEXT:    [[CONFLICT_RDX5:%.*]] = icmp ult i64 [[TMP4]], 31
 ; CHECK-NEXT:    [[TMP1:%.*]] = shl i64 [[OFF]], 3
-; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP1]]
-; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[TMP1]], 8000
-; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP2]]
-; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr [[DST]], i64 8000
-; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr [[SRC]], i64 8008
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[TMP6]], [[TMP4]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[DST]], [[TMP3]]
-; CHECK-NEXT:    [[CONFLICT_RDX5:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
-; CHECK-NEXT:    [[BOUND011:%.*]] = icmp ult ptr [[TMP6]], [[TMP5]]
-; CHECK-NEXT:    [[BOUND112:%.*]] = icmp ult ptr [[SRC]], [[TMP3]]
-; CHECK-NEXT:    [[DIFF_CHECK6:%.*]] = and i1 [[BOUND011]], [[BOUND112]]
+; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[SRC1]], 40
+; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[TMP2]], [[DST2]]
+; CHECK-NEXT:    [[TMP5:%.*]] = sub i64 [[TMP3]], [[TMP1]]
+; CHECK-NEXT:    [[TMP6:%.*]] = sub i64 [[TMP5]], 1
+; CHECK-NEXT:    [[DIFF_CHECK6:%.*]] = icmp ult i64 [[TMP6]], 79
 ; CHECK-NEXT:    [[CONFLICT_RDX7:%.*]] = or i1 [[CONFLICT_RDX5]], [[DIFF_CHECK6]]
-; CHECK-NEXT:    [[BOUND014:%.*]] = icmp ult ptr [[DST]], [[TMP5]]
-; CHECK-NEXT:    [[BOUND115:%.*]] = icmp ult ptr [[SRC]], [[TMP4]]
-; CHECK-NEXT:    [[DIFF_CHECK8:%.*]] = and i1 [[BOUND014]], [[BOUND115]]
+; CHECK-NEXT:    [[TMP9:%.*]] = sub i64 [[TMP3]], 1
+; CHECK-NEXT:    [[DIFF_CHECK8:%.*]] = icmp ult i64 [[TMP9]], 79
 ; CHECK-NEXT:    [[CONFLICT_RDX9:%.*]] = or i1 [[CONFLICT_RDX7]], [[DIFF_CHECK8]]
 ; CHECK-NEXT:    br i1 [[CONFLICT_RDX9]], [[SCALAR_PH:label %.*]], [[VECTOR_PH:label %.*]]
 ;
