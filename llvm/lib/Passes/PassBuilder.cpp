@@ -1318,6 +1318,41 @@ Expected<LoopVectorizeOptions> parseLoopVectorizeOptions(StringRef Params) {
   return Opts;
 }
 
+/// Mode of LoopFullUnrollPass with respect to loops whose full unrolling is
+/// deferred until after the loop vectorizer.
+enum class LoopFullUnrollMode {
+  /// Fully unroll any loop the cost model accepts.
+  Default,
+  /// Defer full unrolling of likely-vectorizable loops (SkipVectorizableLoops).
+  DeferVectorizable,
+  /// Only fully unroll loops deferred earlier (OnlyDeferredLoops).
+  OnlyDeferred,
+};
+
+Expected<LoopFullUnrollMode> parseLoopFullUnrollOptions(StringRef Params) {
+  LoopFullUnrollMode Mode = LoopFullUnrollMode::Default;
+  while (!Params.empty()) {
+    StringRef ParamName;
+    std::tie(ParamName, Params) = Params.split(';');
+    LoopFullUnrollMode NewMode;
+    if (ParamName == "defer-vectorizable")
+      NewMode = LoopFullUnrollMode::DeferVectorizable;
+    else if (ParamName == "only-deferred")
+      NewMode = LoopFullUnrollMode::OnlyDeferred;
+    else
+      return make_error<StringError>(
+          formatv("invalid LoopFullUnrollPass parameter '{}'", ParamName).str(),
+          inconvertibleErrorCode());
+    if (Mode != LoopFullUnrollMode::Default && Mode != NewMode)
+      return make_error<StringError>(
+          "LoopFullUnrollPass parameters 'defer-vectorizable' and "
+          "'only-deferred' are mutually exclusive",
+          inconvertibleErrorCode());
+    Mode = NewMode;
+  }
+  return Mode;
+}
+
 Expected<std::pair<bool, bool>> parseLoopUnswitchOptions(StringRef Params) {
   std::pair<bool, bool> Result = {false, true};
   while (!Params.empty()) {

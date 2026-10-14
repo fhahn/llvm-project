@@ -16,6 +16,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/DepthFirstIterator.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -24,6 +25,7 @@
 #include "llvm/Analysis/AssumptionCache.h"
 #include "llvm/Analysis/BlockFrequencyInfo.h"
 #include "llvm/Analysis/CodeMetrics.h"
+#include "llvm/Analysis/InlineCost.h"
 #include "llvm/Analysis/LoopAnalysisManager.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/LoopPass.h"
@@ -79,10 +81,133 @@ bool llvm::getForgetSCEVInLoopUnroll(
   return LibraryOptions.get<ScalarOptions>().forget_scev_loop_unroll;
 }
 
+AnalysisKey ShouldRunExtraUnrollAfterVectorize::Key;
+AnalysisKey ShouldRunLateUnrollCleanup::Key;
+
 /// A magic value for use with the Threshold parameter to indicate
 /// that the loop unroll should be performed regardless of how much
 /// code expansion would result.
 static const unsigned NoThreshold = std::numeric_limits<unsigned>::max();
+
+/// Predicate used by LoopFullUnrollPass to decide which innermost loops to
+/// defer until after the loop vectorizer.
+///
+/// Deferral lets LoopVectorize see the loop instead of the straight-line
+/// code that the early full unroller would otherwise produce. That helps
+/// for medium-to-large constant-trip-count innermost loops where
+/// LoopVectorize generates a clean vector body and the late on-demand
+/// LoopFullUnrollPass can finish off any leftover scalar epilogue.
+///
+/// It hurts in two patterns the post-vectorize cleanup chain cannot
+/// recover from. This predicate excludes them up front:
+///
+///   (1) Loops with a constant trip count below LoopVectorize's tiny
+///       trip count threshold (16). LV rarely vectorizes them (no runtime
+///       checks or scalar epilogue allowed), so deferral would only move
+///       their full unroll past the scalar simplification pipeline. For
+///       deferred loops, PostOrderFunctionAttrs recovers writeonly /
+///       initializes for in-loop stores via the loop-range helper in
+///       LoopUtils.
+///
+///   (2) FIXME -- workaround for an AArch64 TTI cost-model hole.
+///       Innermost loops whose enclosing loop has a small constant trip
+///       count (<= 16). On a 16x16 SAD example the unroll-then-SLP path
+///       and the defer-then-LV path lower to identical
+///       `uabd + udot + addv` AArch64 asm; there is *no* codegen
+///       difference. The regression is purely in the unroll cost
+///       model: `Intrinsic::vector_partial_reduce_add` has no case in
+///       the TTI intrinsic-cost dispatch, so it falls through to a
+///       scalarised-fallback estimate of ~64 size-latency units. With
+///       the outer's trip count summed in, the late LoopUnrollPass
+///       refuses to fully unroll an outer it would otherwise have
+///       happily unrolled. Drop this case once
+///       `AArch64TTIImpl::getIntrinsicInstrCost` (or the generic
+///       dispatch in BasicTTIImpl) returns a UDOT-aware cost for
+///       `vector_partial_reduce_add`. Until then, this case keeps the
+///       early unroll-then-SLP path for the udotabd / aom_sad-style
+///       shapes. We walk every ancestor (not just the immediate parent)
+///       because after inlining the deferred inner can sit several loop
+///       levels below the small-TC outer.
+static bool isDeferredVectorizableLoop(Loop &L, ScalarEvolution &SE) {
+  if (!L.isInnermost())
+    return false;
+  if (hasUnrollTransformation(&L) == TM_ForcedByUser)
+    return false;
+  TransformationMode VecMode = hasVectorizeTransformation(&L);
+  if (VecMode == TM_SuppressedByUser || VecMode == TM_Disable)
+    return false;
+
+  // Determine a trip count we can reason about. For a single-exit loop this
+  // is the latch's exact trip count. For multi-exit (early-exit) loops --
+  // which LV can still vectorize using its early-exit vectorization path --
+  // there is no single dominating exit, so fall back to the upper bound.
+  // Restrict the early-exit case to read-only bodies with a countable latch
+  // because those are the loops LV's early-exit vectorization actually
+  // accepts (it relies on speculative loads and a known iteration bound);
+  // without that gate the predicate would defer loops LV can never reach,
+  // leaving them as a long scalar chain.
+  unsigned TripCount = SE.getSmallConstantTripCount(&L);
+  if (TripCount == 0) {
+    BasicBlock *Latch = L.getLoopLatch();
+    if (!Latch || !L.isLoopExiting(Latch) ||
+        SE.getSmallConstantTripCount(&L, Latch) == 0)
+      return false;
+    for (BasicBlock *BB : L.blocks())
+      for (Instruction &I : *BB)
+        if (I.mayWriteToMemory())
+          return false;
+    TripCount = SE.getSmallConstantMaxTripCount(&L);
+  }
+  if (TripCount <= 1)
+    return false;
+
+  // (1) Small constant trip count: LoopVectorize treats loops with a trip
+  // count below its tiny-trip-count threshold (-vectorizer-min-trip-count,
+  // 16) like optsize loops: it refuses runtime checks and scalar epilogues,
+  // so most of them are not vectorized and are fully unrolled late, without
+  // the simplification pipeline that runs after the early unroll. The few it
+  // does vectorize cover at most a few vectors, which SLP handles equally well
+  // on the unrolled code.
+  if (TripCount < 16)
+    return false;
+
+  // (2) An ancestor with a small constant trip count would be the natural
+  // full-unroll target after the inner is resolved. Deferring this loop
+  // leaves an LV-vectorized body that pushes the ancestor past the late
+  // unroll cost threshold, so the ancestor stays as a loop. Ancestors
+  // with unknown trip counts are deliberately not treated as small: a
+  // genuinely large/runtime ancestor is a fine context for deferral, and
+  // the stale-marker re-evaluation in run() recovers the post-inlining
+  // case where SCEV later proves a small constant bound.
+  for (Loop *Parent = L.getParentLoop(); Parent;
+       Parent = Parent->getParentLoop()) {
+    unsigned ParentTC = SE.getSmallConstantTripCount(Parent);
+    if (ParentTC > 0 && ParentTC <= 16)
+      return false;
+  }
+
+  return true;
+}
+
+/// Drop the deferred-for-vectorization marker from \p L, if present.
+static void clearDeferredMarker(Loop &L) {
+  if (!findOptionMDForLoop(&L, LLVMLoopUnrollDeferredForVectorization))
+    return;
+  L.setLoopID(makePostTransformationMetadata(
+      L.getHeader()->getContext(), L.getLoopID(),
+      {LLVMLoopUnrollDeferredForVectorization}, {}));
+}
+
+/// Mark \p L as deferred for vectorization, recording \p ExtraCost, the inline
+/// cost its eventual full unroll adds.
+static void setDeferredMarker(Loop &L, uint64_t ExtraCost) {
+  unsigned Cost = std::min<uint64_t>(ExtraCost, INT32_MAX);
+  if (getOptionalIntLoopAttribute(&L, LLVMLoopUnrollDeferredForVectorization) ==
+      int(Cost))
+    return;
+  L.addIntLoopAttribute(LLVMLoopUnrollDeferredForVectorization, Cost,
+                        {LLVMLoopUnrollDeferredForVectorization});
+}
 
 /// Gather the various unrolling parameters based on the defaults, compiler
 /// flags, TTI overrides and user specified parameters.
@@ -1133,7 +1258,8 @@ tryToUnrollLoop(Loop *L, DominatorTree &DT, LoopInfo *LI, ScalarEvolution &SE,
                 std::optional<bool> ProvidedAllowPeeling,
                 std::optional<bool> ProvidedAllowProfileBasedPeeling,
                 std::optional<unsigned> ProvidedFullUnrollMaxCount,
-                UniformityInfo *UI = nullptr, AAResults *AA = nullptr) {
+                UniformityInfo *UI = nullptr, AAResults *AA = nullptr,
+                uint64_t *DeferredUnrollExtraSize = nullptr) {
 
   LLVM_DEBUG(dbgs() << "Loop Unroll: F["
                     << L->getHeader()->getParent()->getName() << "] Loop %"
@@ -1338,6 +1464,15 @@ tryToUnrollLoop(Loop *L, DominatorTree &DT, LoopInfo *LI, ScalarEvolution &SE,
                          Count < MaxTripCount)) {
     LLVM_DEBUG(dbgs().indent(1)
                << "Not attempting partial/runtime unroll in FullLoopUnroll.\n");
+    return LoopUnrollResult::Unmodified;
+  }
+
+  // The caller defers full unrolling until after the vectorizer. Report the
+  // size the full unroll would add instead of performing it.
+  if (DeferredUnrollExtraSize) {
+    assert(OnlyFullUnroll && "deferral is only supported for full unrolling");
+    *DeferredUnrollExtraSize = std::max<uint64_t>(
+        UCE.getUnrolledLoopSize(UP, Count) - UCE.getRolledLoopSize(), 1);
     return LoopUnrollResult::Unmodified;
   }
 
@@ -1556,6 +1691,52 @@ PreservedAnalyses LoopFullUnrollPass::run(Loop &L, LoopAnalysisManager &AM,
   OptimizationRemarkEmitter ORE(L.getHeader()->getParent());
   const ScalarOptions &Opts = getScalarOptions(L);
 
+  if (OnlyDeferredLoops) {
+    // The late on-demand pass only targets loops the early unroller deferred.
+    if (!findOptionMDForLoop(&L, LLVMLoopUnrollDeferredForVectorization))
+      return PreservedAnalyses::all();
+    // A deferred loop handled by LoopVectorize (the vector loop and its scalar
+    // remainder both inherit the marker) must not be fully unrolled, but may
+    // still leave patterns for the post-unroll cleanup chain (e.g. an
+    // LV-generated memset shadowed by a subsequent full-width store).
+    if (getBooleanLoopAttribute(&L, "llvm.loop.isvectorized")) {
+      L.getHeader()->getParent()->addFnAttr("late-unroll-performed");
+      clearDeferredMarker(L);
+      return PreservedAnalyses::all();
+    }
+  }
+
+  if (SkipVectorizableLoops) {
+    // Do not fully unroll outer loops whose inner loops have been deferred for
+    // vectorization. Replicating the deferred inner loop across outer unroll
+    // iterations destroys the nested structure that LoopIdiomRecognize relies
+    // on (e.g. a doubly-nested init loop collapsing to a single memset) and
+    // forces LoopVectorize to process each copy in isolation. Inner loops are
+    // visited before \p L, so their markers reflect the current decision.
+    if (any_of(depth_first(&L), [&L](Loop *Sub) {
+          return Sub != &L && findOptionMDForLoop(
+                                  Sub, LLVMLoopUnrollDeferredForVectorization);
+        })) {
+      LLVM_DEBUG(dbgs()
+                 << "LoopFullUnrollPass: skipping full unroll of outer loop "
+                 << L.getHeader()->getName()
+                 << " because an inner loop is deferred\n");
+      return PreservedAnalyses::all();
+    }
+  }
+
+  // Defer full unrolling of innermost loops that are likely vectorizable, so
+  // the vectorizer gets a chance to process them first. Peeling is still
+  // performed because it often canonicalizes loops (eliminating constant PHIs
+  // or special first/last iterations) so the vectorizer can handle them.
+  // Loops that are not vectorized will be fully unrolled after the vectorizer.
+  bool TryDefer = SkipVectorizableLoops && isDeferredVectorizableLoop(L, AR.SE);
+  // A marker from an earlier run (e.g. before inlining moved the loop into a
+  // new context) is re-derived below, or dropped if deferral no longer applies.
+  if (SkipVectorizableLoops && !TryDefer)
+    clearDeferredMarker(L);
+  uint64_t DeferredExtraSize = 0;
+
   // Keep track of the previous loop structure so we can identify new loops
   // created by unrolling.
   Loop *ParentL = L.getParentLoop();
@@ -1566,19 +1747,48 @@ PreservedAnalyses LoopFullUnrollPass::run(Loop &L, LoopAnalysisManager &AM,
     OldLoops.insert_range(AR.LI);
 
   std::string LoopName = std::string(L.getName());
+  // Capture the containing function up-front: after full unrolling the loop
+  // and its header may be gone, so dereferencing L below would be unsafe.
+  Function *ContainingF = L.getHeader()->getParent();
 
-  bool Changed =
-      tryToUnrollLoop(&L, AR.DT, &AR.LI, AR.SE, AR.TTI, AR.AC, ORE,
-                      /*BFI*/ nullptr, /*PSI*/ nullptr,
-                      /*PreserveLCSSA*/ true, OptLevel, /*OnlyFullUnroll*/ true,
-                      OnlyWhenForced, ForgetSCEV, PrepareForLTO,
-                      /*Threshold*/ std::nullopt, /*AllowPartial*/ false,
-                      /*Runtime*/ false, /*UpperBound*/ false,
-                      /*AllowPeeling*/ true,
-                      /*AllowProfileBasedPeeling*/ false,
-                      /*FullUnrollMaxCount*/ std::nullopt) !=
-      LoopUnrollResult::Unmodified;
-  if (!Changed)
+  LoopUnrollResult Result = tryToUnrollLoop(
+      &L, AR.DT, &AR.LI, AR.SE, AR.TTI, AR.AC, ORE,
+      /*BFI*/ nullptr, /*PSI*/ nullptr,
+      /*PreserveLCSSA*/ true, OptLevel, /*OnlyFullUnroll*/ true, OnlyWhenForced,
+      ForgetSCEV, PrepareForLTO,
+      /*Threshold*/ std::nullopt, /*AllowPartial*/ false,
+      /*Runtime*/ false, /*UpperBound*/ false,
+      /*AllowPeeling*/ true,
+      /*AllowProfileBasedPeeling*/ false,
+      /*FullUnrollMaxCount*/ std::nullopt,
+      /*UI*/ nullptr, /*AA*/ nullptr, TryDefer ? &DeferredExtraSize : nullptr);
+
+  if (TryDefer) {
+    // Deferral only matters for loops this pass would have fully unrolled.
+    // Record the size the unroll would add on the loop itself: the marker
+    // travels with the loop through inlining, so the inliner charges it in
+    // every function the still-rolled loop ends up in.
+    if (DeferredExtraSize) {
+      LLVM_DEBUG(dbgs() << "LoopFullUnrollPass: deferring full unroll for "
+                           "likely-vectorizable loop "
+                        << L.getHeader()->getName() << "\n");
+      setDeferredMarker(L, DeferredExtraSize * InlineConstants::getInstrCost(
+                               L.getHeader()->getContext()));
+    } else {
+      clearDeferredMarker(L);
+    }
+  } else if (OnlyDeferredLoops) {
+    // Record on the containing function that the late on-demand full unroller
+    // fully unrolled a deferred loop. The post-unroll cleanup chain is gated
+    // on this attribute. A deferred loop that stays a loop is no longer
+    // deferred.
+    if (Result == LoopUnrollResult::FullyUnrolled)
+      ContainingF->addFnAttr("late-unroll-performed");
+    else
+      clearDeferredMarker(L);
+  }
+
+  if (Result == LoopUnrollResult::Unmodified)
     return PreservedAnalyses::all();
 
   // The parent must not be damaged by unrolling!
@@ -1632,6 +1842,51 @@ PreservedAnalyses LoopFullUnrollPass::run(Loop &L, LoopAnalysisManager &AM,
   }
 
   return getLoopPassPreservedAnalyses();
+}
+
+void LoopFullUnrollPass::printPipeline(
+    raw_ostream &OS, function_ref<StringRef(StringRef)> MapClassName2PassName) {
+  static_cast<PassInfoMixin<LoopFullUnrollPass> *>(this)->printPipeline(
+      OS, MapClassName2PassName);
+  if (SkipVectorizableLoops)
+    OS << "<defer-vectorizable>";
+  else if (OnlyDeferredLoops)
+    OS << "<only-deferred>";
+}
+
+PreservedAnalyses
+MarkLoopsDeferredForVectorizationPass::run(Function &F,
+                                           FunctionAnalysisManager &AM) {
+  // Walk every loop looking for the per-loop deferred-for-vectorization
+  // marker the early LoopFullUnrollPass(SkipVectorizableLoops=true) wrote.
+  // We deliberately walk the loops rather than checking a function-level
+  // attribute: the marker travels with the IR through inlining (it's loop
+  // metadata) but a function-level attribute would not carry from the
+  // callee into the caller, so a deferred inner inlined into a fresh
+  // caller would silently miss the late-unroll-after-vectorize gate.
+  auto &LI = AM.getResult<LoopAnalysis>(F);
+  auto PA = PreservedAnalyses::all();
+  if (any_of(LI.getLoopsInPreorder(), [](Loop *L) {
+        return findOptionMDForLoop(L, LLVMLoopUnrollDeferredForVectorization);
+      })) {
+    AM.getResult<ShouldRunExtraUnrollAfterVectorize>(F);
+    PA.preserve<ShouldRunExtraUnrollAfterVectorize>();
+  }
+  return PA;
+}
+
+PreservedAnalyses
+MarkLateUnrollCleanupPass::run(Function &F, FunctionAnalysisManager &AM) {
+  if (!F.hasFnAttribute("late-unroll-performed"))
+    return PreservedAnalyses::all();
+
+  // Consume the marker: the cleanup chain runs once per function.
+  F.removeFnAttr("late-unroll-performed");
+
+  AM.getResult<ShouldRunLateUnrollCleanup>(F);
+  auto PA = PreservedAnalyses::all();
+  PA.preserve<ShouldRunLateUnrollCleanup>();
+  return PA;
 }
 
 PreservedAnalyses LoopUnrollPass::run(Function &F,

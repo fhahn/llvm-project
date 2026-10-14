@@ -11,6 +11,8 @@
 
 #include "llvm/Analysis/LoopAnalysisManager.h"
 #include "llvm/IR/PassManager.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Transforms/Utils/ExtraPassManager.h"
 #include <optional>
 
 namespace llvm {
@@ -26,6 +28,47 @@ getForgetSCEVInLoopUnroll(const cl::LibraryOptionsContext &LibraryOptions);
 class Function;
 class Loop;
 class LPMUpdater;
+
+/// A marker analysis set when LoopFullUnrollPass defers a likely-vectorizable
+/// loop. It is used by the late on-demand unroll + cleanup pipeline so that
+/// it only runs on functions that actually had a deferred loop.
+struct ShouldRunExtraUnrollAfterVectorize
+    : public ShouldRunExtraPasses<ShouldRunExtraUnrollAfterVectorize>,
+      public AnalysisInfoMixin<ShouldRunExtraUnrollAfterVectorize> {
+  LLVM_ABI static AnalysisKey Key;
+};
+
+/// A marker analysis set only when the late on-demand LoopFullUnrollPass
+/// actually unrolled a deferred loop. Gates the post-unroll cleanup chain
+/// so it does not run when no late unrolling took place (e.g. because the
+/// vectorizer handled all deferred loops or the unroll cost model rejected
+/// them).
+struct ShouldRunLateUnrollCleanup
+    : public ShouldRunExtraPasses<ShouldRunLateUnrollCleanup>,
+      public AnalysisInfoMixin<ShouldRunLateUnrollCleanup> {
+  LLVM_ABI static AnalysisKey Key;
+};
+
+/// Function pass that triggers \c ShouldRunExtraUnrollAfterVectorize on
+/// functions where LoopFullUnrollPass previously deferred at least one loop
+/// (recorded via a function attribute). Running this pass close to the
+/// late on-demand cleanup pipeline ensures the marker analysis is cached
+/// right before it is queried.
+class MarkLoopsDeferredForVectorizationPass
+    : public OptionalPassInfoMixin<MarkLoopsDeferredForVectorizationPass> {
+public:
+  LLVM_ABI PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
+};
+
+/// Function pass that triggers \c ShouldRunLateUnrollCleanup on functions
+/// where the late on-demand LoopFullUnrollPass actually unrolled a deferred
+/// loop (recorded via a function attribute). If no unrolling took place the
+/// attribute is absent and the cleanup pipeline is skipped.
+class MarkLateUnrollCleanupPass
+    : public OptionalPassInfoMixin<MarkLateUnrollCleanupPass> {
+public:
+  LLVM_ABI PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
+};
 
 /// Loop unroll pass that only does full loop unrolling and peeling.
 class LoopFullUnrollPass : public OptionalPassInfoMixin<LoopFullUnrollPass> {
@@ -45,16 +88,34 @@ class LoopFullUnrollPass : public OptionalPassInfoMixin<LoopFullUnrollPass> {
   /// LTO post-link inlining can consider them first.
   const bool PrepareForLTO;
 
+  /// If true, skip unrolling innermost loops that are likely vectorizable
+  /// (i.e., vectorization has not been explicitly disabled). Those loops will
+  /// be fully unrolled later, after the vectorizer has had a chance to act.
+  const bool SkipVectorizableLoops;
+
+  /// If true, only process loops tagged with the deferral metadata written by
+  /// the early LoopFullUnrollPass; all other loops are left untouched. Used
+  /// by the late on-demand unroll pass that runs after the loop vectorizer
+  /// to finish the job on loops that were deferred but not vectorized.
+  const bool OnlyDeferredLoops;
+
 public:
   explicit LoopFullUnrollPass(int OptLevel = 2, bool OnlyWhenForced = false,
                               bool ForgetSCEV = false,
-                              bool PrepareForLTO = false)
+                              bool PrepareForLTO = false,
+                              bool SkipVectorizableLoops = false,
+                              bool OnlyDeferredLoops = false)
       : OptLevel(OptLevel), OnlyWhenForced(OnlyWhenForced),
-        ForgetSCEV(ForgetSCEV), PrepareForLTO(PrepareForLTO) {}
+        ForgetSCEV(ForgetSCEV), PrepareForLTO(PrepareForLTO),
+        SkipVectorizableLoops(SkipVectorizableLoops),
+        OnlyDeferredLoops(OnlyDeferredLoops) {}
 
   LLVM_ABI PreservedAnalyses run(Loop &L, LoopAnalysisManager &AM,
                                  LoopStandardAnalysisResults &AR,
                                  LPMUpdater &U);
+  LLVM_ABI void
+  printPipeline(raw_ostream &OS,
+                function_ref<StringRef(StringRef)> MapClassName2PassName);
 };
 
 /// A set of parameters used to control various transforms performed by the

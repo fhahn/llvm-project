@@ -386,6 +386,10 @@ FUNCTION_ANALYSIS("should-not-run-function-passes",
                   ShouldNotRunFunctionPassesAnalysis())
 FUNCTION_ANALYSIS("should-run-extra-vector-passes",
                   ShouldRunExtraVectorPasses())
+FUNCTION_ANALYSIS("should-run-extra-unroll-after-vectorize",
+                  ShouldRunExtraUnrollAfterVectorize())
+FUNCTION_ANALYSIS("should-run-late-unroll-cleanup",
+                  ShouldRunLateUnrollCleanup())
 FUNCTION_ANALYSIS("ssp-layout", SSPLayoutAnalysis())
 FUNCTION_ANALYSIS("stack-safety-local", StackSafetyAnalysis())
 FUNCTION_ANALYSIS("target-ir",
@@ -448,6 +452,10 @@ FUNCTION_PASS("expand-memcmp", ExpandMemCmpPass())
 FUNCTION_PASS("expand-reductions", ExpandReductionsPass())
 FUNCTION_PASS("extra-vector-passes",
               ExtraFunctionPassManager<ShouldRunExtraVectorPasses>())
+FUNCTION_PASS("extra-unroll-after-vectorize-passes",
+              ExtraFunctionPassManager<ShouldRunExtraUnrollAfterVectorize>())
+FUNCTION_PASS("extra-late-unroll-cleanup-passes",
+              ExtraFunctionPassManager<ShouldRunLateUnrollCleanup>())
 FUNCTION_PASS("fix-irreducible", FixIrreduciblePass())
 FUNCTION_PASS("flatten-cfg", FlattenCFGPass())
 FUNCTION_PASS("float2int", Float2IntPass())
@@ -490,6 +498,10 @@ FUNCTION_PASS("lower-invoke", LowerInvokePass())
 FUNCTION_PASS("lower-switch", LowerSwitchPass())
 FUNCTION_PASS("lower-widenable-condition", LowerWidenableConditionPass())
 FUNCTION_PASS("make-guards-explicit", MakeGuardsExplicitPass())
+FUNCTION_PASS("mark-loops-deferred-for-vectorization",
+              MarkLoopsDeferredForVectorizationPass())
+FUNCTION_PASS("mark-late-unroll-cleanup",
+              MarkLateUnrollCleanupPass())
 FUNCTION_PASS("mem2reg", PromotePass())
 FUNCTION_PASS("memcpyopt", MemCpyOptPass())
 FUNCTION_PASS("memprof", MemProfilerPass())
@@ -795,7 +807,6 @@ LOOP_PASS("loop-predication", LoopPredicationPass())
 LOOP_PASS("loop-reduce", LoopStrengthReducePass())
 LOOP_PASS("loop-term-fold", LoopTermFoldPass())
 LOOP_PASS("loop-simplifycfg", LoopSimplifyCFGPass())
-LOOP_PASS("loop-unroll-full", LoopFullUnrollPass())
 LOOP_PASS("loop-versioning-licm", LoopVersioningLICMPass())
 LOOP_PASS("no-op-loop", NoOpLoopPass())
 LOOP_PASS("print", PrintLoopPass(errs()))
@@ -825,6 +836,16 @@ LOOP_PASS_WITH_PARAMS(
     "no-header-duplication;header-duplication;"
     "no-prepare-for-lto;prepare-for-lto;"
     "no-check-exit-count;check-exit-count")
+LOOP_PASS_WITH_PARAMS(
+    "loop-unroll-full", "LoopFullUnrollPass",
+    [](LoopFullUnrollMode Mode) {
+      return LoopFullUnrollPass(
+          /*OptLevel=*/2, /*OnlyWhenForced=*/false, /*ForgetSCEV=*/false,
+          /*PrepareForLTO=*/false,
+          /*SkipVectorizableLoops=*/Mode == LoopFullUnrollMode::DeferVectorizable,
+          /*OnlyDeferredLoops=*/Mode == LoopFullUnrollMode::OnlyDeferred);
+    },
+    parseLoopFullUnrollOptions, "defer-vectorizable;only-deferred")
 LOOP_PASS_WITH_PARAMS(
     "simple-loop-unswitch", "SimpleLoopUnswitchPass",
     [](std::pair<bool, bool> Params) {
