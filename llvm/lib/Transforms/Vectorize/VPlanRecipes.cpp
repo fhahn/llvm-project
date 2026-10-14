@@ -247,16 +247,27 @@ bool VPRecipeBase::isSafeToSpeculativelyExecute() const {
     return false;
   case VPInstructionSC: {
     unsigned Opcode = cast<VPInstruction>(this)->getOpcode();
-    if (Instruction::isCast(Opcode))
+    if (Instruction::isCast(Opcode) || Instruction::isUnaryOp(Opcode) ||
+        (Instruction::isBinaryOp(Opcode) && !Instruction::isIntDivRem(Opcode)))
       return true;
 
     switch (Opcode) {
     default:
       return false;
-    case Instruction::Add:
-    case Instruction::Sub:
-    case Instruction::Mul:
+    case Instruction::ICmp:
+    case Instruction::FCmp:
+    case Instruction::Select:
+    case Instruction::Freeze:
+    case Instruction::ExtractValue:
     case Instruction::GetElementPtr:
+    case VPInstruction::Not:
+    case VPInstruction::LogicalAnd:
+    case VPInstruction::LogicalOr:
+    case VPInstruction::PtrAdd:
+    case VPInstruction::FirstOrderRecurrenceSplice:
+    case VPInstruction::ExtractLastPart:
+    case VPInstruction::ExtractLastLane:
+    case VPInstruction::Reverse:
       return true;
     }
   }

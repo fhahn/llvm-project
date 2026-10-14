@@ -17,7 +17,7 @@ define void @first_lane_only_masked_shl(ptr noalias align 4 dereferenceable(400)
 ; CHECK-NEXT:    Successor(s): then
 ; CHECK-EMPTY:
 ; CHECK-NEXT:    then:
-; CHECK-NEXT:      EMIT ir<%off> = shl ir<%iv>, ir<2>, ir<%c> (!vplan.execution.frequency 9223372036854775807 (50%, estimated))
+; CHECK-NEXT:      CLONE ir<%off> = shl ir<%iv>, ir<2> (!vplan.execution.frequency 9223372036854775807 (50%, estimated))
 ; CHECK-NEXT:      CLONE ir<%gep.src> = getelementptr ir<%src>, ir<%off>
 ; CHECK-NEXT:      vp<[[VP4:%[0-9]+]]> = vector-pointer i32, ir<%gep.src>, ir<1>
 ; CHECK-NEXT:      WIDEN ir<%l> = load vp<[[VP4]]> (!vplan.execution.frequency 9223372036854775807 (50%, estimated))
