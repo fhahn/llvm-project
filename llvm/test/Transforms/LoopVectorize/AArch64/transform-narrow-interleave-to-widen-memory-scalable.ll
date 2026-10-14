@@ -563,3 +563,133 @@ loop:
 exit:
   ret void
 }
+
+define void @load_store_interleave_group_and_same_invariant_store_group(ptr noalias %data, ptr noalias %dst, double %x, double %y) {
+; CHECK-LABEL: define void @load_store_interleave_group_and_same_invariant_store_group(
+; CHECK-SAME: ptr noalias [[DATA:%.*]], ptr noalias [[DST:%.*]], double [[X:%.*]], double [[Y:%.*]]) #[[ATTR0]] {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[TMP0:%.*]] = call i64 @llvm.vscale.i64()
+; CHECK-NEXT:    [[TMP1:%.*]] = shl nuw i64 [[TMP0]], 1
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 100, [[TMP1]]
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i64 100, [[TMP1]]
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 100, [[N_MOD_VF]]
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 2 x double> poison, double [[Y]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 2 x double> [[BROADCAST_SPLATINSERT]], <vscale x 2 x double> poison, <vscale x 2 x i32> zeroinitializer
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <vscale x 2 x double> poison, double [[X]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <vscale x 2 x double> [[BROADCAST_SPLATINSERT1]], <vscale x 2 x double> poison, <vscale x 2 x i32> zeroinitializer
+; CHECK-NEXT:    [[TMP2:%.*]] = call <vscale x 2 x double> @llvm.minnum.nxv2f64(<vscale x 2 x double> [[BROADCAST_SPLAT2]], <vscale x 2 x double> [[BROADCAST_SPLAT]])
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP4:%.*]] = shl nsw i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds double, ptr [[DATA]], i64 [[TMP4]]
+; CHECK-NEXT:    [[WIDE_VEC:%.*]] = load <vscale x 4 x double>, ptr [[TMP5]], align 8
+; CHECK-NEXT:    [[STRIDED_VEC:%.*]] = call { <vscale x 2 x double>, <vscale x 2 x double> } @llvm.vector.deinterleave2.nxv4f64(<vscale x 4 x double> [[WIDE_VEC]])
+; CHECK-NEXT:    [[TMP8:%.*]] = extractvalue { <vscale x 2 x double>, <vscale x 2 x double> } [[STRIDED_VEC]], 0
+; CHECK-NEXT:    [[TMP9:%.*]] = extractvalue { <vscale x 2 x double>, <vscale x 2 x double> } [[STRIDED_VEC]], 1
+; CHECK-NEXT:    [[INTERLEAVED_VEC:%.*]] = call <vscale x 4 x double> @llvm.vector.interleave2.nxv4f64(<vscale x 2 x double> [[TMP8]], <vscale x 2 x double> [[TMP9]])
+; CHECK-NEXT:    store <vscale x 4 x double> [[INTERLEAVED_VEC]], ptr [[TMP5]], align 8
+; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds double, ptr [[DST]], i64 [[TMP4]]
+; CHECK-NEXT:    [[INTERLEAVED_VEC3:%.*]] = call <vscale x 4 x double> @llvm.vector.interleave2.nxv4f64(<vscale x 2 x double> [[TMP2]], <vscale x 2 x double> [[TMP2]])
+; CHECK-NEXT:    store <vscale x 4 x double> [[INTERLEAVED_VEC3]], ptr [[TMP6]], align 8
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP1]]
+; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP7]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP24:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 100, [[N_VEC]]
+; CHECK-NEXT:    br i1 [[CMP_N]], [[EXIT:label %.*]], label %[[SCALAR_PH]]
+; CHECK:       [[SCALAR_PH]]:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %mul.2 = shl nsw i64 %iv, 1
+  %data.0 = getelementptr inbounds double, ptr %data, i64 %mul.2
+  %l.0 = load double, ptr %data.0, align 8
+  store double %l.0, ptr %data.0, align 8
+  %add.1 = or disjoint i64 %mul.2, 1
+  %data.1 = getelementptr inbounds double, ptr %data, i64 %add.1
+  %l.1 = load double, ptr %data.1, align 8
+  store double %l.1, ptr %data.1, align 8
+  %min = call double @llvm.minnum.f64(double %x, double %y)
+  %dst.0 = getelementptr inbounds double, ptr %dst, i64 %mul.2
+  store double %min, ptr %dst.0, align 8
+  %dst.1 = getelementptr inbounds double, ptr %dst, i64 %add.1
+  store double %min, ptr %dst.1, align 8
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, 100
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+define void @load_store_interleave_group_and_different_live_ins_store_group(ptr noalias %data, ptr noalias %dst, double %x, double %y) {
+; CHECK-LABEL: define void @load_store_interleave_group_and_different_live_ins_store_group(
+; CHECK-SAME: ptr noalias [[DATA:%.*]], ptr noalias [[DST:%.*]], double [[X:%.*]], double [[Y:%.*]]) #[[ATTR0]] {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[TMP0:%.*]] = call i64 @llvm.vscale.i64()
+; CHECK-NEXT:    [[TMP1:%.*]] = shl nuw i64 [[TMP0]], 1
+; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 100, [[TMP1]]
+; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[EXIT:.*]], label %[[VECTOR_PH:.*]]
+; CHECK:       [[VECTOR_PH]]:
+; CHECK-NEXT:    [[N_MOD_VF:%.*]] = urem i64 100, [[TMP1]]
+; CHECK-NEXT:    [[N_VEC:%.*]] = sub i64 100, [[N_MOD_VF]]
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT:%.*]] = insertelement <vscale x 2 x double> poison, double [[X]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT:%.*]] = shufflevector <vscale x 2 x double> [[BROADCAST_SPLATINSERT]], <vscale x 2 x double> poison, <vscale x 2 x i32> zeroinitializer
+; CHECK-NEXT:    [[BROADCAST_SPLATINSERT1:%.*]] = insertelement <vscale x 2 x double> poison, double [[Y]], i64 0
+; CHECK-NEXT:    [[BROADCAST_SPLAT2:%.*]] = shufflevector <vscale x 2 x double> [[BROADCAST_SPLATINSERT1]], <vscale x 2 x double> poison, <vscale x 2 x i32> zeroinitializer
+; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
+; CHECK:       [[VECTOR_BODY]]:
+; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
+; CHECK-NEXT:    [[TMP2:%.*]] = shl nsw i64 [[INDEX]], 1
+; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds double, ptr [[DATA]], i64 [[TMP2]]
+; CHECK-NEXT:    [[WIDE_VEC:%.*]] = load <vscale x 4 x double>, ptr [[TMP3]], align 8
+; CHECK-NEXT:    [[STRIDED_VEC:%.*]] = call { <vscale x 2 x double>, <vscale x 2 x double> } @llvm.vector.deinterleave2.nxv4f64(<vscale x 4 x double> [[WIDE_VEC]])
+; CHECK-NEXT:    [[TMP6:%.*]] = extractvalue { <vscale x 2 x double>, <vscale x 2 x double> } [[STRIDED_VEC]], 0
+; CHECK-NEXT:    [[TMP5:%.*]] = extractvalue { <vscale x 2 x double>, <vscale x 2 x double> } [[STRIDED_VEC]], 1
+; CHECK-NEXT:    [[INTERLEAVED_VEC:%.*]] = call <vscale x 4 x double> @llvm.vector.interleave2.nxv4f64(<vscale x 2 x double> [[TMP6]], <vscale x 2 x double> [[TMP5]])
+; CHECK-NEXT:    store <vscale x 4 x double> [[INTERLEAVED_VEC]], ptr [[TMP3]], align 8
+; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds double, ptr [[DST]], i64 [[TMP2]]
+; CHECK-NEXT:    [[INTERLEAVED_VEC3:%.*]] = call <vscale x 4 x double> @llvm.vector.interleave2.nxv4f64(<vscale x 2 x double> [[BROADCAST_SPLAT]], <vscale x 2 x double> [[BROADCAST_SPLAT2]])
+; CHECK-NEXT:    store <vscale x 4 x double> [[INTERLEAVED_VEC3]], ptr [[TMP4]], align 8
+; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP1]]
+; CHECK-NEXT:    [[TMP7:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
+; CHECK-NEXT:    br i1 [[TMP7]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP26:![0-9]+]]
+; CHECK:       [[MIDDLE_BLOCK]]:
+; CHECK-NEXT:    [[CMP_N:%.*]] = icmp eq i64 100, [[N_VEC]]
+; CHECK-NEXT:    br i1 [[CMP_N]], [[EXIT1:label %.*]], label %[[EXIT]]
+; CHECK:       [[EXIT]]:
+;
+entry:
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %mul.2 = shl nsw i64 %iv, 1
+  %data.0 = getelementptr inbounds double, ptr %data, i64 %mul.2
+  %l.0 = load double, ptr %data.0, align 8
+  store double %l.0, ptr %data.0, align 8
+  %add.1 = or disjoint i64 %mul.2, 1
+  %data.1 = getelementptr inbounds double, ptr %data, i64 %add.1
+  %l.1 = load double, ptr %data.1, align 8
+  store double %l.1, ptr %data.1, align 8
+  %dst.0 = getelementptr inbounds double, ptr %dst, i64 %mul.2
+  store double %x, ptr %dst.0, align 8
+  %dst.1 = getelementptr inbounds double, ptr %dst, i64 %add.1
+  store double %y, ptr %dst.1, align 8
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, 100
+  br i1 %ec, label %exit, label %loop, !llvm.loop !0
+
+exit:
+  ret void
+}
+
+!0 = distinct !{!0, !1, !2}
+!1 = !{!"llvm.loop.vectorize.width", i32 2}
+!2 = !{!"llvm.loop.vectorize.scalable.enable"}
