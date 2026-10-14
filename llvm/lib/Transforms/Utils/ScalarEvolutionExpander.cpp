@@ -15,8 +15,10 @@
 #include "llvm/Transforms/Utils/ScalarEvolutionExpander.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
+#include "llvm/Analysis/IVDescriptors.h"
 #include "llvm/Analysis/InstructionSimplify.h"
 #include "llvm/Analysis/LoopInfo.h"
+#include "llvm/Analysis/ScalarEvolutionDivision.h"
 #include "llvm/Analysis/ScalarEvolutionPatternMatch.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Analysis/ValueTracking.h"
@@ -1395,16 +1397,53 @@ Value *SCEVExpander::visitAddRecExpr(SCEVUseT<const SCEVAddRecExpr *> S) {
                           S.getNoWrapFlags(SCEV::FlagNUW));
   }
 
-  // {X,+,F} --> X + {0,+,F}
-  if (!S->getStart()->isZero()) {
-    const SCEV *Rest = SE.getAddRecExpr(SE.getZero(Ty), S->getOperand(1), L,
-                                        S.getNoWrapFlags(SCEV::FlagNW));
+  // Compute S from an IV {B,+,G} with F == K * G: the canonical IV (B = 0,
+  // K = F) if there is one, else the loop's IV if suitable, else a new
+  // canonical IV.
+  const SCEV *F = S->getOperand(1);
+  const SCEV *Zero = SE.getZero(Ty);
+  PHINode *IV = CanonicalIV;
+  const SCEV *K = F, *KB = Zero;
+  PHINode *PN = CanonicalIV ? nullptr : L->getInductionVariable(SE);
+  InductionDescriptor ID;
+  if (PN && PN->getType() == Ty &&
+      InductionDescriptor::isInductionPHI(PN, L, &SE, ID)) {
+    const SCEV *B = SE.getSCEV(ID.getStartValue());
+    const SCEV *G = ID.getStep();
+    const SCEV *Q, *R;
+    SCEVDivision::divide(SE, F, G, &Q, &R);
+    const SCEV *QB = SE.getMulExpr(Q, B);
+    // F (hence K) and B are used twice, so neither may contain undef. PN must
+    // not be more poisonous than S (which covers B in A - K * B), nor than
+    // {K * B,+,F}, which the split below expands through here again. Its
+    // cached SCEV would re-infer dropped flags, so drop none. If B != 0, keep
+    // the split into A + {0,+,F} if {0,+,F} has a value to reuse.
+    SmallVector<Instruction *> Drop;
+    if (!SE.containsUndefs(F) && !SE.containsUndefs(B) &&
+        SE.getMulExpr(Q, G) == F && SE.canReuseInstruction(S, PN, Drop) &&
+        SE.canReuseInstruction(SE.getAddRecExpr(QB, F, L, SCEV::FlagNone), PN,
+                               Drop) &&
+        Drop.empty() &&
+        (B->isZero() ||
+         !FindValueInExprValueMap(SE.getAddRecExpr(Zero, F, L, SCEV::FlagNone),
+                                  &*Builder.GetInsertPoint(), Drop))) {
+      IV = PN;
+      K = Q;
+      KB = QB;
+    }
+  }
+
+  // {A,+,F} --> (A - K * B) + {K * B,+,F}
+  if (S->getStart() != KB) {
+    const SCEV *Rest =
+        SE.getAddRecExpr(KB, F, L, S.getNoWrapFlags(SCEV::FlagNW));
 
     // Just do a normal add. Pre-expand the operands to suppress folding.
     //
     // The LHS and RHS values are factored out of the expand call to make the
     // output independent of the argument evaluation order.
-    const SCEV *AddExprLHS = SE.getUnknown(expand(S->getStart()));
+    const SCEV *AddExprLHS =
+        SE.getUnknown(expand(SE.getMinusSCEV(S->getStart(), KB)));
     const SCEV *AddExprRHS = SE.getUnknown(expand(Rest));
     return expand(SE.getAddExpr(AddExprLHS, AddExprRHS));
   }
@@ -1420,7 +1459,7 @@ Value *SCEVExpander::visitAddRecExpr(SCEVUseT<const SCEVAddRecExpr *> S) {
       // FIXME: Flags re-inferred from a cached SCEV of the IV can undo this.
       dropPoisonGeneratingAnnotationsAndReinfer(SE, I);
     }
-  } else {
+  } else if (!IV) {
     // Create and insert the PHI node for the induction variable in the
     // specified loop.
     BasicBlock *Header = L->getHeader();
@@ -1453,10 +1492,11 @@ Value *SCEVExpander::visitAddRecExpr(SCEVUseT<const SCEVAddRecExpr *> S) {
         CanonicalIV->addIncoming(Constant::getNullValue(Ty), HP);
       }
     }
+    IV = CanonicalIV;
   }
 
-  // {0,+,F} --> {0,+,1} * F
-  return expand(SE.getMulExpr(SE.getUnknown(CanonicalIV), S->getOperand(1)));
+  // {K * B,+,F} --> IV * K
+  return expand(SE.getMulExpr(SE.getUnknown(IV), K));
 }
 
 /// Return true if \p CI computes the same value as a `ptrtoaddr` of its
