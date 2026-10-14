@@ -35,6 +35,66 @@ exit:
   ret void
 }
 
+; As above, but the store to %a + 4 * %off has unknown dependences, so the
+; accesses are checked at runtime.
+define void @partial_overlap_pos_dist_unknown_dep(ptr %a, i64 %off) {
+; CHECK-LABEL: 'partial_overlap_pos_dist_unknown_dep'
+; CHECK-NEXT:    loop:
+; CHECK-NEXT:      Memory dependences are safe with run-time checks
+; CHECK-NEXT:      Dependences:
+; CHECK-NEXT:      Run-time memory checks:
+; CHECK-NEXT:      Check 0:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.a.61 = getelementptr inbounds i32, ptr %a.61, i64 %iv
+; CHECK-NEXT:        Against group GRP1:
+; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.off
+; CHECK-NEXT:      Check 1:
+; CHECK-NEXT:        Comparing group GRP0:
+; CHECK-NEXT:          %gep.a.61 = getelementptr inbounds i32, ptr %a.61, i64 %iv
+; CHECK-NEXT:        Against group GRP2:
+; CHECK-NEXT:          %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
+; CHECK-NEXT:      Check 2:
+; CHECK-NEXT:        Comparing group GRP1:
+; CHECK-NEXT:          %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.off
+; CHECK-NEXT:        Against group GRP2:
+; CHECK-NEXT:          %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
+; CHECK-NEXT:      Grouped accesses:
+; CHECK-NEXT:        Group GRP0:
+; CHECK-NEXT:          (Low: (61 + %a) High: (125 + %a))
+; CHECK-NEXT:            Member: {(61 + %a),+,4}<nw><%loop>
+; CHECK-NEXT:        Group GRP1:
+; CHECK-NEXT:          (Low: ((4 * %off) + %a) High: (64 + (4 * %off) + %a))
+; CHECK-NEXT:            Member: {((4 * %off) + %a),+,4}<%loop>
+; CHECK-NEXT:        Group GRP2:
+; CHECK-NEXT:          (Low: %a High: (64 + %a))
+; CHECK-NEXT:            Member: {%a,+,4}<nuw><%loop>
+; CHECK-EMPTY:
+; CHECK-NEXT:      Non vectorizable stores to invariant address were not found in loop.
+; CHECK-NEXT:      SCEV assumptions:
+; CHECK-EMPTY:
+; CHECK-NEXT:      Expressions re-written:
+;
+entry:
+  %a.61 = getelementptr i8, ptr %a, i64 61
+  br label %loop
+
+loop:
+  %iv = phi i64 [ 0, %entry ], [ %iv.next, %loop ]
+  %gep.a = getelementptr inbounds i32, ptr %a, i64 %iv
+  %l.a = load i32, ptr %gep.a, align 1
+  %gep.a.61 = getelementptr inbounds i32, ptr %a.61, i64 %iv
+  store i32 %l.a, ptr %gep.a.61, align 1
+  %iv.off = add i64 %iv, %off
+  %gep.a.off = getelementptr inbounds i32, ptr %a, i64 %iv.off
+  store i32 0, ptr %gep.a.off, align 1
+  %iv.next = add nuw nsw i64 %iv, 1
+  %ec = icmp eq i64 %iv.next, 16
+  br i1 %ec, label %exit, label %loop
+
+exit:
+  ret void
+}
+
 define void @no_overlap_pos_dist(ptr %a) {
 ; CHECK-LABEL: 'no_overlap_pos_dist'
 ; CHECK-NEXT:    loop:
