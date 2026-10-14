@@ -739,27 +739,27 @@ define void @low_trip_count_needs_runtime_checks(ptr %p, ptr %q) {
 ; DEFAULT-LABEL: define void @low_trip_count_needs_runtime_checks(
 ; DEFAULT-SAME: ptr [[P:%.*]], ptr [[Q:%.*]]) {
 ; DEFAULT-NEXT:  [[ENTRY:.*:]]
+; DEFAULT-NEXT:    [[Q4:%.*]] = ptrtoaddr ptr [[Q]] to i64
+; DEFAULT-NEXT:    [[P3:%.*]] = ptrtoaddr ptr [[P]] to i64
 ; DEFAULT-NEXT:    br label %[[VECTOR_MEMCHECK:.*]]
 ; DEFAULT:       [[VECTOR_MEMCHECK]]:
-; DEFAULT-NEXT:    [[TMP0:%.*]] = getelementptr i8, ptr [[P]], i64 48
-; DEFAULT-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr [[Q]], i64 48
-; DEFAULT-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[P]], [[TMP1]]
-; DEFAULT-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[Q]], [[TMP0]]
-; DEFAULT-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
+; DEFAULT-NEXT:    [[TMP0:%.*]] = sub i64 [[P3]], [[Q4]]
+; DEFAULT-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], 1
+; DEFAULT-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP1]], 15
 ; DEFAULT-NEXT:    br i1 [[FOUND_CONFLICT]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; DEFAULT:       [[VECTOR_PH]]:
 ; DEFAULT-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; DEFAULT:       [[VECTOR_BODY]]:
 ; DEFAULT-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; DEFAULT-NEXT:    [[TMP2:%.*]] = getelementptr inbounds i32, ptr [[P]], i64 [[INDEX]]
-; DEFAULT-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP2]], align 4, !alias.scope [[META6:![0-9]+]], !noalias [[META9:![0-9]+]]
+; DEFAULT-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP2]], align 4
 ; DEFAULT-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i32, ptr [[Q]], i64 [[INDEX]]
-; DEFAULT-NEXT:    [[WIDE_LOAD2:%.*]] = load <4 x i32>, ptr [[TMP3]], align 4, !alias.scope [[META9]]
+; DEFAULT-NEXT:    [[WIDE_LOAD2:%.*]] = load <4 x i32>, ptr [[TMP3]], align 4
 ; DEFAULT-NEXT:    [[TMP4:%.*]] = add <4 x i32> [[WIDE_LOAD]], [[WIDE_LOAD2]]
-; DEFAULT-NEXT:    store <4 x i32> [[TMP4]], ptr [[TMP2]], align 4, !alias.scope [[META6]], !noalias [[META9]]
+; DEFAULT-NEXT:    store <4 x i32> [[TMP4]], ptr [[TMP2]], align 4
 ; DEFAULT-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 4
 ; DEFAULT-NEXT:    [[TMP5:%.*]] = icmp eq i64 [[INDEX_NEXT]], 12
-; DEFAULT-NEXT:    br i1 [[TMP5]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP11:![0-9]+]]
+; DEFAULT-NEXT:    br i1 [[TMP5]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP6:![0-9]+]]
 ; DEFAULT:       [[MIDDLE_BLOCK]]:
 ; DEFAULT-NEXT:    br label %[[FOR_COND_CLEANUP:.*]]
 ; DEFAULT:       [[SCALAR_PH]]:
@@ -774,7 +774,7 @@ define void @low_trip_count_needs_runtime_checks(ptr %p, ptr %q) {
 ; DEFAULT-NEXT:    store i32 [[ADD]], ptr [[ARRAYIDX]], align 4
 ; DEFAULT-NEXT:    [[IV_NEXT]] = add nuw nsw i64 [[IV]], 1
 ; DEFAULT-NEXT:    [[EXITCOND_NOT:%.*]] = icmp eq i64 [[IV_NEXT]], 12
-; DEFAULT-NEXT:    br i1 [[EXITCOND_NOT]], label %[[FOR_COND_CLEANUP]], label %[[FOR_BODY]], !llvm.loop [[LOOP12:![0-9]+]]
+; DEFAULT-NEXT:    br i1 [[EXITCOND_NOT]], label %[[FOR_COND_CLEANUP]], label %[[FOR_BODY]], !llvm.loop [[LOOP7:![0-9]+]]
 ; DEFAULT:       [[FOR_COND_CLEANUP]]:
 ; DEFAULT-NEXT:    ret void
 ;

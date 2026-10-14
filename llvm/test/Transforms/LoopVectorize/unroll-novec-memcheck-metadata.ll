@@ -1,7 +1,8 @@
 ; RUN: opt < %s -passes=loop-vectorize -force-vector-interleave=2 -force-vector-width=1 -S | FileCheck --enable-var-scope %s
 
 ; Make sure we attach memcheck metadata to scalarized memory operations even if
-; we're only unrolling.
+; we're only unrolling. %a and %b are accessed with different steps, so range
+; checks are used instead of diff checks.
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 
@@ -19,7 +20,7 @@ entry:
 
 for.body:
   %indvars.iv = phi i64 [ 0, %entry ], [ %indvars.iv.next, %for.body ]
-  %arrayidx = getelementptr inbounds i32, ptr %a, i64 %indvars.iv
+  %arrayidx = getelementptr inbounds i64, ptr %a, i64 %indvars.iv
   %l.1 = load i32, ptr %arrayidx, align 4
   %arrayidx2 = getelementptr inbounds i32, ptr %b, i64 %indvars.iv
   %l.2 = load i32, ptr %arrayidx2
