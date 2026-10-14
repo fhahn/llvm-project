@@ -346,8 +346,9 @@ exit:
   ret void
 }
 
-; The bounds of the inner loop's accesses are 4 and 8 times the outer induction
-; variable, which is already available.
+; The bounds of the inner loop's accesses are 4, 8 and 16 times the outer
+; induction variable, which is already available. %b is accessed with twice the
+; step of %a, so range checks are used.
 define void @nested_loop_bounds_are_scaled_outer_iv(ptr %a, ptr %b, i32 %n, i32 %is, i32 %js) {
 ; CHECK-LABEL: define void @nested_loop_bounds_are_scaled_outer_iv(
 ; CHECK-SAME: ptr [[A:%.*]], ptr [[B:%.*]], i32 [[N:%.*]], i32 [[IS:%.*]], i32 [[JS:%.*]]) {
@@ -368,8 +369,10 @@ define void @nested_loop_bounds_are_scaled_outer_iv(ptr %a, ptr %b, i32 %n, i32 
 ; CHECK-NEXT:    [[TMP1:%.*]] = shl nuw nsw i64 [[OUTER_IV]], 3
 ; CHECK-NEXT:    [[TMP3:%.*]] = add i64 [[TMP1]], 8
 ; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP3]]
-; CHECK-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP4]]
-; CHECK-NEXT:    [[SCEVGEP4:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP3]]
+; CHECK-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP3]]
+; CHECK-NEXT:    [[TMP6:%.*]] = shl nuw nsw i64 [[OUTER_IV]], 4
+; CHECK-NEXT:    [[TMP5:%.*]] = add i64 [[TMP6]], 12
+; CHECK-NEXT:    [[SCEVGEP4:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP5]]
 ; CHECK-NEXT:    [[OUTER_OFF_IS:%.*]] = mul nsw i64 [[OUTER_IV1]], [[IS_EXT]]
 ; CHECK-NEXT:    [[OUTER_OFF_JS:%.*]] = mul nsw i64 [[OUTER_IV1]], [[JS_EXT]]
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[OUTER_IV1]], 4
@@ -407,13 +410,13 @@ inner.body:
   %idx.1 = add nsw i64 %inner.off.js, %outer.off.is
   %gep.a.1 = getelementptr inbounds [4 x i8], ptr %a, i64 %idx.1
   %l.a.1 = load float, ptr %gep.a.1, align 4
-  %gep.b.1 = getelementptr inbounds [4 x i8], ptr %b, i64 %idx.1
+  %gep.b.1 = getelementptr inbounds [8 x i8], ptr %b, i64 %idx.1
   %l.b.1 = load float, ptr %gep.b.1, align 4
   %inner.off.is = mul nsw i64 %inner.iv, %is.ext
   %idx.2 = add nsw i64 %inner.off.is, %outer.off.js
   %gep.a.2 = getelementptr inbounds [4 x i8], ptr %a, i64 %idx.2
   %l.a.2 = load float, ptr %gep.a.2, align 4
-  %gep.b.2 = getelementptr inbounds [4 x i8], ptr %b, i64 %idx.2
+  %gep.b.2 = getelementptr inbounds [8 x i8], ptr %b, i64 %idx.2
   %l.b.2 = load float, ptr %gep.b.2, align 4
   store float %l.a.1, ptr %gep.a.2, align 4
   store float %l.b.1, ptr %gep.b.2, align 4
@@ -453,8 +456,11 @@ define void @nested_loop_only_one_bound_is_scaled_outer_iv(ptr %a, ptr %b, i32 %
 ; CHECK-NEXT:    [[TMP1:%.*]] = mul nuw nsw i64 [[OUTER_IV]], 24
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[TMP1]], 16
 ; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP2]]
-; CHECK-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP4]]
-; CHECK-NEXT:    [[SCEVGEP4:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP2]]
+; CHECK-NEXT:    [[TMP7:%.*]] = add i64 [[TMP1]], 24
+; CHECK-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP7]]
+; CHECK-NEXT:    [[TMP5:%.*]] = mul nuw nsw i64 [[OUTER_IV]], 48
+; CHECK-NEXT:    [[TMP6:%.*]] = add i64 [[TMP5]], 28
+; CHECK-NEXT:    [[SCEVGEP4:%.*]] = getelementptr i8, ptr [[B]], i64 [[TMP6]]
 ; CHECK-NEXT:    [[OUTER_OFF_IS:%.*]] = mul nsw i64 [[OUTER_IV1]], [[IS_EXT]]
 ; CHECK-NEXT:    [[OUTER_OFF_JS:%.*]] = mul nsw i64 [[OUTER_IV1]], [[JS_EXT]]
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[OUTER_IV1]], 4
@@ -492,13 +498,13 @@ inner.body:
   %idx.1 = add nsw i64 %inner.off.js, %outer.off.is
   %gep.a.1 = getelementptr inbounds [12 x i8], ptr %a, i64 %idx.1
   %l.a.1 = load float, ptr %gep.a.1, align 4
-  %gep.b.1 = getelementptr inbounds [12 x i8], ptr %b, i64 %idx.1
+  %gep.b.1 = getelementptr inbounds [24 x i8], ptr %b, i64 %idx.1
   %l.b.1 = load float, ptr %gep.b.1, align 4
   %inner.off.is = mul nsw i64 %inner.iv, %is.ext
   %idx.2 = add nsw i64 %inner.off.is, %outer.off.js
   %gep.a.2 = getelementptr inbounds [12 x i8], ptr %a, i64 %idx.2
   %l.a.2 = load float, ptr %gep.a.2, align 4
-  %gep.b.2 = getelementptr inbounds [12 x i8], ptr %b, i64 %idx.2
+  %gep.b.2 = getelementptr inbounds [24 x i8], ptr %b, i64 %idx.2
   %l.b.2 = load float, ptr %gep.b.2, align 4
   store float %l.a.1, ptr %gep.a.2, align 4
   store float %l.b.1, ptr %gep.b.2, align 4
