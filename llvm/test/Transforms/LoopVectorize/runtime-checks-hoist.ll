@@ -275,6 +275,7 @@ outer.exit:
 ; DEBUG-LABEL: 'full_checks_diff_strides'
 ; DEBUG: LAA: Found an analyzable loop: inner.loop
 ; DEBUG-NOT: LAA: Creating diff runtime check for:
+; DEBUG: LAA: Not creating diff runtime check, since these cannot be hoisted out of the outer loop
 ; DEBUG: LAA: Adding RT check for range:
 ; DEBUG-NEXT: LAA: Expanded RT check for range to include outer loop in order to permit hoisting
 ; DEBUG-NEXT: Start: %dst End: ((4 * (zext i32 %n to i64))<nuw><nsw> + ((4 + (4 * (zext i32 %n to i64))<nuw><nsw>)<nuw><nsw> * (-1 + (zext i32 %m to i64))<nsw>) + %dst)

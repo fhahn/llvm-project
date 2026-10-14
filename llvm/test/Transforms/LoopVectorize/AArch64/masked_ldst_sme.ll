@@ -6,6 +6,11 @@ define void @wombat(i32 %arg, ptr %arg1, ptr %arg2, ptr %arg3, ptr %arg4, ptr %a
 ; CHECK-LABEL: define void @wombat(
 ; CHECK-SAME: i32 [[ARG:%.*]], ptr [[ARG1:%.*]], ptr [[ARG2:%.*]], ptr [[ARG3:%.*]], ptr [[ARG4:%.*]], ptr [[ARG5:%.*]], i8 [[ARG6:%.*]]) #[[ATTR0:[0-9]+]] {
 ; CHECK-NEXT:  [[BB:.*:]]
+; CHECK-NEXT:    [[ARG48:%.*]] = ptrtoaddr ptr [[ARG4]] to i64
+; CHECK-NEXT:    [[ARG35:%.*]] = ptrtoaddr ptr [[ARG3]] to i64
+; CHECK-NEXT:    [[ARG53:%.*]] = ptrtoaddr ptr [[ARG5]] to i64
+; CHECK-NEXT:    [[ARG12:%.*]] = ptrtoaddr ptr [[ARG1]] to i64
+; CHECK-NEXT:    [[ARG21:%.*]] = ptrtoaddr ptr [[ARG2]] to i64
 ; CHECK-NEXT:    [[ICMP:%.*]] = icmp sgt i32 [[ARG]], 0
 ; CHECK-NEXT:    br i1 [[ICMP]], label %[[BB7:.*]], label %[[BB25:.*]]
 ; CHECK:       [[BB7]]:
@@ -15,37 +20,33 @@ define void @wombat(i32 %arg, ptr %arg1, ptr %arg2, ptr %arg3, ptr %arg4, ptr %a
 ; CHECK-NEXT:    [[MIN_ITERS_CHECK:%.*]] = icmp ult i64 [[ZEXT]], [[TMP1]]
 ; CHECK-NEXT:    br i1 [[MIN_ITERS_CHECK]], label %[[SCALAR_PH:.*]], label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[ARG1]], i64 [[ZEXT]]
-; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[ARG2]], i64 [[ZEXT]]
-; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[ARG5]], i64 [[ZEXT]]
-; CHECK-NEXT:    [[SCEVGEP3:%.*]] = getelementptr i8, ptr [[ARG3]], i64 [[ZEXT]]
-; CHECK-NEXT:    [[SCEVGEP4:%.*]] = getelementptr i8, ptr [[ARG4]], i64 [[ZEXT]]
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[ARG1]], [[SCEVGEP1]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[ARG2]], [[SCEVGEP]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
-; CHECK-NEXT:    [[BOUND05:%.*]] = icmp ult ptr [[ARG1]], [[SCEVGEP2]]
-; CHECK-NEXT:    [[BOUND16:%.*]] = icmp ult ptr [[ARG5]], [[SCEVGEP]]
-; CHECK-NEXT:    [[FOUND_CONFLICT7:%.*]] = and i1 [[BOUND05]], [[BOUND16]]
+; CHECK-NEXT:    [[TMP19:%.*]] = add nsw i64 [[TMP1]], -1
+; CHECK-NEXT:    [[TMP20:%.*]] = sub i64 [[ARG21]], [[ARG12]]
+; CHECK-NEXT:    [[TMP21:%.*]] = sub i64 [[TMP20]], 1
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP21]], [[TMP19]]
+; CHECK-NEXT:    [[TMP22:%.*]] = sub i64 [[ARG12]], [[ARG53]]
+; CHECK-NEXT:    [[TMP23:%.*]] = sub i64 [[TMP22]], 1
+; CHECK-NEXT:    [[FOUND_CONFLICT7:%.*]] = icmp ult i64 [[TMP23]], [[TMP19]]
 ; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT7]]
-; CHECK-NEXT:    [[BOUND08:%.*]] = icmp ult ptr [[ARG1]], [[SCEVGEP3]]
-; CHECK-NEXT:    [[BOUND19:%.*]] = icmp ult ptr [[ARG3]], [[SCEVGEP]]
-; CHECK-NEXT:    [[FOUND_CONFLICT10:%.*]] = and i1 [[BOUND08]], [[BOUND19]]
+; CHECK-NEXT:    [[TMP24:%.*]] = sub i64 [[ARG12]], [[ARG35]]
+; CHECK-NEXT:    [[TMP25:%.*]] = sub i64 [[TMP24]], 1
+; CHECK-NEXT:    [[FOUND_CONFLICT10:%.*]] = icmp ult i64 [[TMP25]], [[TMP19]]
 ; CHECK-NEXT:    [[CONFLICT_RDX11:%.*]] = or i1 [[CONFLICT_RDX]], [[FOUND_CONFLICT10]]
-; CHECK-NEXT:    [[BOUND012:%.*]] = icmp ult ptr [[ARG1]], [[SCEVGEP4]]
-; CHECK-NEXT:    [[BOUND113:%.*]] = icmp ult ptr [[ARG4]], [[SCEVGEP]]
-; CHECK-NEXT:    [[FOUND_CONFLICT14:%.*]] = and i1 [[BOUND012]], [[BOUND113]]
+; CHECK-NEXT:    [[TMP26:%.*]] = sub i64 [[ARG12]], [[ARG48]]
+; CHECK-NEXT:    [[TMP27:%.*]] = sub i64 [[TMP26]], 1
+; CHECK-NEXT:    [[FOUND_CONFLICT14:%.*]] = icmp ult i64 [[TMP27]], [[TMP19]]
 ; CHECK-NEXT:    [[CONFLICT_RDX15:%.*]] = or i1 [[CONFLICT_RDX11]], [[FOUND_CONFLICT14]]
-; CHECK-NEXT:    [[BOUND016:%.*]] = icmp ult ptr [[ARG2]], [[SCEVGEP2]]
-; CHECK-NEXT:    [[BOUND117:%.*]] = icmp ult ptr [[ARG5]], [[SCEVGEP1]]
-; CHECK-NEXT:    [[FOUND_CONFLICT18:%.*]] = and i1 [[BOUND016]], [[BOUND117]]
+; CHECK-NEXT:    [[TMP28:%.*]] = sub i64 [[ARG21]], [[ARG53]]
+; CHECK-NEXT:    [[TMP29:%.*]] = sub i64 [[TMP28]], 1
+; CHECK-NEXT:    [[FOUND_CONFLICT18:%.*]] = icmp ult i64 [[TMP29]], [[TMP19]]
 ; CHECK-NEXT:    [[CONFLICT_RDX19:%.*]] = or i1 [[CONFLICT_RDX15]], [[FOUND_CONFLICT18]]
-; CHECK-NEXT:    [[BOUND020:%.*]] = icmp ult ptr [[ARG2]], [[SCEVGEP3]]
-; CHECK-NEXT:    [[BOUND121:%.*]] = icmp ult ptr [[ARG3]], [[SCEVGEP1]]
-; CHECK-NEXT:    [[FOUND_CONFLICT22:%.*]] = and i1 [[BOUND020]], [[BOUND121]]
+; CHECK-NEXT:    [[TMP15:%.*]] = sub i64 [[ARG21]], [[ARG35]]
+; CHECK-NEXT:    [[TMP16:%.*]] = sub i64 [[TMP15]], 1
+; CHECK-NEXT:    [[FOUND_CONFLICT22:%.*]] = icmp ult i64 [[TMP16]], [[TMP19]]
 ; CHECK-NEXT:    [[CONFLICT_RDX23:%.*]] = or i1 [[CONFLICT_RDX19]], [[FOUND_CONFLICT22]]
-; CHECK-NEXT:    [[BOUND024:%.*]] = icmp ult ptr [[ARG2]], [[SCEVGEP4]]
-; CHECK-NEXT:    [[BOUND125:%.*]] = icmp ult ptr [[ARG4]], [[SCEVGEP1]]
-; CHECK-NEXT:    [[FOUND_CONFLICT26:%.*]] = and i1 [[BOUND024]], [[BOUND125]]
+; CHECK-NEXT:    [[TMP17:%.*]] = sub i64 [[ARG21]], [[ARG48]]
+; CHECK-NEXT:    [[TMP18:%.*]] = sub i64 [[TMP17]], 1
+; CHECK-NEXT:    [[FOUND_CONFLICT26:%.*]] = icmp ult i64 [[TMP18]], [[TMP19]]
 ; CHECK-NEXT:    [[CONFLICT_RDX27:%.*]] = or i1 [[CONFLICT_RDX23]], [[FOUND_CONFLICT26]]
 ; CHECK-NEXT:    br i1 [[CONFLICT_RDX27]], label %[[SCALAR_PH]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
@@ -57,22 +58,22 @@ define void @wombat(i32 %arg, ptr %arg1, ptr %arg2, ptr %arg3, ptr %arg4, ptr %a
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds nuw i8, ptr [[ARG5]], i64 [[INDEX]]
-; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <vscale x 16 x i8>, ptr [[TMP4]], align 1, !alias.scope [[META0:![0-9]+]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <vscale x 16 x i8>, ptr [[TMP4]], align 1
 ; CHECK-NEXT:    [[TMP5:%.*]] = icmp uge <vscale x 16 x i8> [[WIDE_LOAD]], [[BROADCAST_SPLAT]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr i8, ptr [[ARG1]], i64 [[INDEX]]
-; CHECK-NEXT:    [[WIDE_MASKED_LOAD:%.*]] = call <vscale x 16 x i8> @llvm.masked.load.nxv16i8.p0(ptr align 1 [[TMP6]], <vscale x 16 x i1> [[TMP5]], <vscale x 16 x i8> poison), !alias.scope [[META3:![0-9]+]], !noalias [[META5:![0-9]+]]
+; CHECK-NEXT:    [[WIDE_MASKED_LOAD:%.*]] = call <vscale x 16 x i8> @llvm.masked.load.nxv16i8.p0(ptr align 1 [[TMP6]], <vscale x 16 x i1> [[TMP5]], <vscale x 16 x i8> poison)
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr [[ARG3]], i64 [[INDEX]]
-; CHECK-NEXT:    [[WIDE_MASKED_LOAD28:%.*]] = call <vscale x 16 x i8> @llvm.masked.load.nxv16i8.p0(ptr align 1 [[TMP7]], <vscale x 16 x i1> [[TMP5]], <vscale x 16 x i8> poison), !alias.scope [[META9:![0-9]+]]
+; CHECK-NEXT:    [[WIDE_MASKED_LOAD28:%.*]] = call <vscale x 16 x i8> @llvm.masked.load.nxv16i8.p0(ptr align 1 [[TMP7]], <vscale x 16 x i1> [[TMP5]], <vscale x 16 x i8> poison)
 ; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr i8, ptr [[ARG4]], i64 [[INDEX]]
-; CHECK-NEXT:    [[WIDE_MASKED_LOAD29:%.*]] = call <vscale x 16 x i8> @llvm.masked.load.nxv16i8.p0(ptr align 1 [[TMP8]], <vscale x 16 x i1> [[TMP5]], <vscale x 16 x i8> poison), !alias.scope [[META10:![0-9]+]]
+; CHECK-NEXT:    [[WIDE_MASKED_LOAD29:%.*]] = call <vscale x 16 x i8> @llvm.masked.load.nxv16i8.p0(ptr align 1 [[TMP8]], <vscale x 16 x i1> [[TMP5]], <vscale x 16 x i8> poison)
 ; CHECK-NEXT:    [[TMP9:%.*]] = mul <vscale x 16 x i8> [[WIDE_MASKED_LOAD29]], [[WIDE_MASKED_LOAD28]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = add <vscale x 16 x i8> [[TMP9]], [[WIDE_MASKED_LOAD]]
-; CHECK-NEXT:    call void @llvm.masked.store.nxv16i8.p0(<vscale x 16 x i8> [[TMP10]], ptr align 1 [[TMP6]], <vscale x 16 x i1> [[TMP5]]), !alias.scope [[META3]], !noalias [[META5]]
+; CHECK-NEXT:    call void @llvm.masked.store.nxv16i8.p0(<vscale x 16 x i8> [[TMP10]], ptr align 1 [[TMP6]], <vscale x 16 x i1> [[TMP5]])
 ; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr i8, ptr [[ARG2]], i64 [[INDEX]]
-; CHECK-NEXT:    [[WIDE_MASKED_LOAD30:%.*]] = call <vscale x 16 x i8> @llvm.masked.load.nxv16i8.p0(ptr align 1 [[TMP11]], <vscale x 16 x i1> [[TMP5]], <vscale x 16 x i8> poison), !alias.scope [[META11:![0-9]+]], !noalias [[META12:![0-9]+]]
+; CHECK-NEXT:    [[WIDE_MASKED_LOAD30:%.*]] = call <vscale x 16 x i8> @llvm.masked.load.nxv16i8.p0(ptr align 1 [[TMP11]], <vscale x 16 x i1> [[TMP5]], <vscale x 16 x i8> poison)
 ; CHECK-NEXT:    [[TMP12:%.*]] = mul <vscale x 16 x i8> [[WIDE_MASKED_LOAD28]], [[WIDE_MASKED_LOAD28]]
 ; CHECK-NEXT:    [[TMP13:%.*]] = add <vscale x 16 x i8> [[WIDE_MASKED_LOAD30]], [[TMP12]]
-; CHECK-NEXT:    call void @llvm.masked.store.nxv16i8.p0(<vscale x 16 x i8> [[TMP13]], ptr align 1 [[TMP11]], <vscale x 16 x i1> [[TMP5]]), !alias.scope [[META11]], !noalias [[META12]]
+; CHECK-NEXT:    call void @llvm.masked.store.nxv16i8.p0(<vscale x 16 x i8> [[TMP13]], ptr align 1 [[TMP11]], <vscale x 16 x i1> [[TMP5]])
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], [[TMP1]]
 ; CHECK-NEXT:    [[TMP14:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; CHECK-NEXT:    br i1 [[TMP14]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP13:![0-9]+]]
@@ -165,19 +166,6 @@ attributes #0 = { uwtable vscale_range(1,16) "aarch64_pstate_sm_body" "target-fe
 !3 = !{!"llvm.loop.vectorize.scalable.enable"}
 !4 = !{!"llvm.loop.vectorize.enable"}
 ;.
-; CHECK: [[META0]] = !{[[META1:![0-9]+]]}
-; CHECK: [[META1]] = distinct !{[[META1]], [[META2:![0-9]+]]}
-; CHECK: [[META2]] = distinct !{[[META2]], i1 false, !"LVerDomain"}
-; CHECK: [[META3]] = !{[[META4:![0-9]+]]}
-; CHECK: [[META4]] = distinct !{[[META4]], [[META2]]}
-; CHECK: [[META5]] = !{[[META6:![0-9]+]], [[META1]], [[META7:![0-9]+]], [[META8:![0-9]+]]}
-; CHECK: [[META6]] = distinct !{[[META6]], [[META2]]}
-; CHECK: [[META7]] = distinct !{[[META7]], [[META2]]}
-; CHECK: [[META8]] = distinct !{[[META8]], [[META2]]}
-; CHECK: [[META9]] = !{[[META7]]}
-; CHECK: [[META10]] = !{[[META8]]}
-; CHECK: [[META11]] = !{[[META6]]}
-; CHECK: [[META12]] = !{[[META1]], [[META7]], [[META8]]}
 ; CHECK: [[LOOP13]] = distinct !{[[LOOP13]], [[META14:![0-9]+]], [[META15:![0-9]+]], [[META16:![0-9]+]]}
 ; CHECK: [[META14]] = !{!"llvm.loop.mustprogress"}
 ; CHECK: [[META15]] = !{!"llvm.loop.isvectorized", i32 1}
