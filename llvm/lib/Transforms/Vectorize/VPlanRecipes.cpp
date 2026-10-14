@@ -243,19 +243,12 @@ bool VPRecipeBase::isSafeToSpeculativelyExecute() const {
   default:
     return false;
   case VPInstructionSC: {
+    // Exclude integer division and calls (may raise UB), phis, memory reads,
+    // and memory writes and branches (side effects).
     unsigned Opcode = cast<VPInstruction>(this)->getOpcode();
-    if (Instruction::isCast(Opcode))
-      return true;
-
-    switch (Opcode) {
-    default:
-      return false;
-    case Instruction::Add:
-    case Instruction::Sub:
-    case Instruction::Mul:
-    case Instruction::GetElementPtr:
-      return true;
-    }
+    return !Instruction::isIntDivRem(Opcode) && Opcode != Instruction::Call &&
+           Opcode != VPInstruction::Intrinsic && Opcode != Instruction::PHI &&
+           !mayReadFromMemory() && !mayHaveSideEffects();
   }
   }
 }
