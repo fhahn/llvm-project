@@ -137,15 +137,15 @@ outer.exit:
 
 
 ; Equivalent example in C:
-; void full_checks(int32_t *dst, int32_t *src, int m, int n) {
+; void full_checks(int32_t *dst, int16_t *src, int m, int n) {
 ;   for (int i = 0; i < m; i++) {
 ;     for (int j = 0; j < n; j++) {
 ;       dst[(i * n) + j] += src[(i * n) + j];
 ;     }
 ;   }
 ; }
-; We decide to do full runtime checks here (as opposed to diff checks) due to
-; the additional load of 'dst[(i * n) + j]' in the loop.
+; We decide to do full runtime checks here (as opposed to diff checks), as dst
+; and src are accessed with different steps.
 
 ; DEBUG-LABEL: 'full_checks'
 ; DEBUG: LAA: Found an analyzable loop: inner.loop
@@ -155,7 +155,7 @@ outer.exit:
 ; DEBUG-NEXT: Start: %dst End: ((4 * (zext i32 %m to i64) * (zext i32 %n to i64)) + %dst)
 ; DEBUG-NEXT: LAA: Adding RT check for range:
 ; DEBUG-NEXT: LAA: Expanded RT check for range to include outer loop in order to permit hoisting
-; DEBUG-NEXT: Start: %src End: ((4 * (zext i32 %m to i64) * (zext i32 %n to i64)) + %src)
+; DEBUG-NEXT: Start: %src End: ((2 * (zext i32 %m to i64) * (zext i32 %n to i64)) + %src)
 
 define void @full_checks(ptr nocapture noundef %dst, ptr nocapture noundef readonly %src, i32 noundef %m, i32 noundef %n) {
 ; CHECK-LABEL: define void @full_checks(
@@ -167,7 +167,8 @@ define void @full_checks(ptr nocapture noundef %dst, ptr nocapture noundef reado
 ; CHECK-NEXT:    [[TMP1:%.*]] = mul i64 [[WIDE_N]], [[WIDE_M]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = shl i64 [[TMP1]], 2
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP2]]
-; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[SRC]], i64 [[TMP2]]
+; CHECK-NEXT:    [[TMP5:%.*]] = shl i64 [[TMP1]], 1
+; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[SRC]], i64 [[TMP5]]
 ; CHECK-NEXT:    br label %[[OUTER_LOOP:.*]]
 ; CHECK:       [[OUTER_LOOP]]:
 ; CHECK-NEXT:    [[OUTER_IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[OUTER_IV_NEXT:%.*]], %[[INNER_EXIT:.*]] ]
@@ -186,8 +187,9 @@ define void @full_checks(ptr nocapture noundef %dst, ptr nocapture noundef reado
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP4:%.*]] = add nuw nsw i64 [[INDEX]], [[TMP3]]
-; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[TMP4]]
-; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP5]], align 4, !alias.scope [[META9:![0-9]+]]
+; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds i16, ptr [[SRC]], i64 [[TMP4]]
+; CHECK-NEXT:    [[WIDE_LOAD1:%.*]] = load <4 x i16>, ptr [[TMP12]], align 2, !alias.scope [[META9:![0-9]+]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = sext <4 x i16> [[WIDE_LOAD1]] to <4 x i32>
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[TMP4]]
 ; CHECK-NEXT:    [[WIDE_LOAD2:%.*]] = load <4 x i32>, ptr [[TMP6]], align 4, !alias.scope [[META12:![0-9]+]], !noalias [[META9]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = add nsw <4 x i32> [[WIDE_LOAD2]], [[WIDE_LOAD]]
@@ -204,8 +206,9 @@ define void @full_checks(ptr nocapture noundef %dst, ptr nocapture noundef reado
 ; CHECK:       [[INNER_LOOP]]:
 ; CHECK-NEXT:    [[IV_INNER:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_INNER_NEXT:%.*]], %[[INNER_LOOP]] ]
 ; CHECK-NEXT:    [[TMP9:%.*]] = add nuw nsw i64 [[IV_INNER]], [[TMP3]]
-; CHECK-NEXT:    [[ARRAYIDX_US:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[TMP9]]
-; CHECK-NEXT:    [[TMP10:%.*]] = load i32, ptr [[ARRAYIDX_US]], align 4
+; CHECK-NEXT:    [[ARRAYIDX_US:%.*]] = getelementptr inbounds i16, ptr [[SRC]], i64 [[TMP9]]
+; CHECK-NEXT:    [[TMP13:%.*]] = load i16, ptr [[ARRAYIDX_US]], align 2
+; CHECK-NEXT:    [[TMP10:%.*]] = sext i16 [[TMP13]] to i32
 ; CHECK-NEXT:    [[ARRAYIDX8_US:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[TMP9]]
 ; CHECK-NEXT:    [[TMP11:%.*]] = load i32, ptr [[ARRAYIDX8_US]], align 4
 ; CHECK-NEXT:    [[ADD9_US:%.*]] = add nsw i32 [[TMP11]], [[TMP10]]
@@ -234,11 +237,12 @@ outer.loop:
 inner.loop:
   %iv.inner = phi i64 [ 0, %outer.loop ], [ %iv.inner.next, %inner.loop ]
   %2 = add nuw nsw i64 %iv.inner, %1
-  %arrayidx.us = getelementptr inbounds i32, ptr %src, i64 %2
-  %3 = load i32, ptr %arrayidx.us, align 4
+  %arrayidx.us = getelementptr inbounds i16, ptr %src, i64 %2
+  %3 = load i16, ptr %arrayidx.us, align 2
+  %src.ext = sext i16 %3 to i32
   %arrayidx8.us = getelementptr inbounds i32, ptr %dst, i64 %2
   %4 = load i32, ptr %arrayidx8.us, align 4
-  %add9.us = add nsw i32 %4, %3
+  %add9.us = add nsw i32 %4, %src.ext
   store i32 %add9.us, ptr %arrayidx8.us, align 4
   %iv.inner.next = add nuw nsw i64 %iv.inner, 1
   %inner.exit.cond = icmp eq i64 %iv.inner.next, %wide.n
@@ -262,8 +266,8 @@ outer.exit:
 ;     }
 ;   }
 ; }
-; We decide to do full runtime checks here (as opposed to diff checks) due to
-; the additional load of 'dst[(i * n) + j]' in the loop.
+; We decide to do full runtime checks here (as opposed to diff checks), which
+; can be hoisted.
 ; NOTE: This is different to the test above (@full_checks) because the dst array
 ; is accessed with a higher stride compared src, and therefore the inner loop
 ; runtime checks will vary for each outer loop iteration.
@@ -493,13 +497,15 @@ outer.loop.exit:
 
 
 ; Equivalent example in C:
-; void full_checks_src_start_invariant(int32_t *dst, int32_t *src, int m, int n) {
+; void full_checks_src_start_invariant(int32_t *dst, int16_t *src, int m, int n) {
 ;   for (int i = 0; i < m; i++) {
 ;     for (int j = 0; j < n; j++) {
 ;       dst[(i * n) + j] += src[j];
 ;     }
 ;   }
 ; }
+; We decide to do full runtime checks here (as opposed to diff checks), as dst
+; and src are accessed with different steps.
 
 ; DEBUG-LABEL: 'full_checks_src_start_invariant'
 ; DEBUG:      LAA: Found an analyzable loop: inner.loop
@@ -507,7 +513,7 @@ outer.loop.exit:
 ; DEBUG-NEXT: LAA: Expanded RT check for range to include outer loop in order to permit hoisting
 ; DEBUG-NEXT: Start: %dst End: ((4 * (zext i32 %m to i64) * (zext i32 %n to i64)) + %dst)
 ; DEBUG-NEXT: LAA: Adding RT check for range:
-; DEBUG-NEXT: Start: %src End: ((4 * (zext i32 %n to i64))<nuw><nsw> + %src)
+; DEBUG-NEXT: Start: %src End: ((2 * (zext i32 %n to i64))<nuw><nsw> + %src)
 
 define void @full_checks_src_start_invariant(ptr nocapture noundef %dst, ptr nocapture noundef readonly %src, i32 noundef %m, i32 noundef %n) {
 ; CHECK-LABEL: define void @full_checks_src_start_invariant(
@@ -519,7 +525,7 @@ define void @full_checks_src_start_invariant(ptr nocapture noundef %dst, ptr noc
 ; CHECK-NEXT:    [[TMP1:%.*]] = mul i64 [[WIDE_N]], [[WIDE_M]]
 ; CHECK-NEXT:    [[TMP2:%.*]] = shl i64 [[TMP1]], 2
 ; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DST]], i64 [[TMP2]]
-; CHECK-NEXT:    [[TMP3:%.*]] = shl nuw nsw i64 [[WIDE_N]], 2
+; CHECK-NEXT:    [[TMP3:%.*]] = shl nuw nsw i64 [[WIDE_N]], 1
 ; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[SRC]], i64 [[TMP3]]
 ; CHECK-NEXT:    br label %[[OUTER_LOOP:.*]]
 ; CHECK:       [[OUTER_LOOP]]:
@@ -538,8 +544,9 @@ define void @full_checks_src_start_invariant(ptr nocapture noundef %dst, ptr noc
 ; CHECK-NEXT:    br label %[[VECTOR_BODY:.*]]
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
-; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[INDEX]]
-; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP5]], align 4, !alias.scope [[META25:![0-9]+]]
+; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr inbounds i16, ptr [[SRC]], i64 [[INDEX]]
+; CHECK-NEXT:    [[WIDE_LOAD1:%.*]] = load <4 x i16>, ptr [[TMP13]], align 2, !alias.scope [[META25:![0-9]+]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = sext <4 x i16> [[WIDE_LOAD1]] to <4 x i32>
 ; CHECK-NEXT:    [[TMP6:%.*]] = add nuw nsw i64 [[INDEX]], [[TMP4]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[TMP6]]
 ; CHECK-NEXT:    [[WIDE_LOAD2:%.*]] = load <4 x i32>, ptr [[TMP7]], align 4, !alias.scope [[META28:![0-9]+]], !noalias [[META25]]
@@ -556,8 +563,9 @@ define void @full_checks_src_start_invariant(ptr nocapture noundef %dst, ptr noc
 ; CHECK-NEXT:    br label %[[INNER_LOOP:.*]]
 ; CHECK:       [[INNER_LOOP]]:
 ; CHECK-NEXT:    [[IV_INNER:%.*]] = phi i64 [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ], [ [[IV_INNER_NEXT:%.*]], %[[INNER_LOOP]] ]
-; CHECK-NEXT:    [[ARRAYIDX_US:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[IV_INNER]]
-; CHECK-NEXT:    [[TMP10:%.*]] = load i32, ptr [[ARRAYIDX_US]], align 4
+; CHECK-NEXT:    [[ARRAYIDX_US:%.*]] = getelementptr inbounds i16, ptr [[SRC]], i64 [[IV_INNER]]
+; CHECK-NEXT:    [[TMP14:%.*]] = load i16, ptr [[ARRAYIDX_US]], align 2
+; CHECK-NEXT:    [[TMP10:%.*]] = sext i16 [[TMP14]] to i32
 ; CHECK-NEXT:    [[TMP11:%.*]] = add nuw nsw i64 [[IV_INNER]], [[TMP4]]
 ; CHECK-NEXT:    [[ARRAYIDX6_US:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[TMP11]]
 ; CHECK-NEXT:    [[TMP12:%.*]] = load i32, ptr [[ARRAYIDX6_US]], align 4
@@ -586,12 +594,13 @@ outer.loop:
 
 inner.loop:
   %iv.inner = phi i64 [ 0, %outer.loop ], [ %iv.inner.next, %inner.loop ]
-  %arrayidx.us = getelementptr inbounds i32, ptr %src, i64 %iv.inner
-  %2 = load i32, ptr %arrayidx.us, align 4
+  %arrayidx.us = getelementptr inbounds i16, ptr %src, i64 %iv.inner
+  %2 = load i16, ptr %arrayidx.us, align 2
+  %src.ext = sext i16 %2 to i32
   %3 = add nuw nsw i64 %iv.inner, %1
   %arrayidx6.us = getelementptr inbounds i32, ptr %dst, i64 %3
   %4 = load i32, ptr %arrayidx6.us, align 4
-  %add7.us = add nsw i32 %4, %2
+  %add7.us = add nsw i32 %4, %src.ext
   store i32 %add7.us, ptr %arrayidx6.us, align 4
   %iv.inner.next = add nuw nsw i64 %iv.inner, 1
   %inner.exit.cond = icmp eq i64 %iv.inner.next, %wide.n
@@ -608,7 +617,7 @@ outer.loop.exit:
 
 
 ; Equivalent example in C:
-; void triple_nested_loop_mixed_access(int *dst, int *src, int m, int n, int o) {
+; void triple_nested_loop_mixed_access(int *dst, short *src, int m, int n, int o) {
 ;   for (int i = 0; i < m; i++) {
 ;     for (int j = 0; j < n; j++) {
 ;       for (int l = 0; l < o; l++) {
@@ -627,7 +636,7 @@ outer.loop.exit:
 ; DEBUG-NEXT: LAA: Expanded RT check for range to include outer loop in order to permit hoisting
 ; DEBUG-NEXT: Start: {%dst,+,(4 * (zext i32 (1 + %o)<nsw> to i64) * (zext i32 %n to i64))}<%outer.outer.loop> End: {((4 * (zext i32 %n to i64) * (zext i32 %o to i64)) + %dst),+,(4 * (zext i32 (1 + %o)<nsw> to i64) * (zext i32 %n to i64))}<%outer.outer.loop>
 ; DEBUG-NEXT: LAA: Adding RT check for range:
-; DEBUG-NEXT: Start: {%src,+,(4 * (zext i32 %n to i64) * (zext i32 %o to i64))}<%outer.outer.loop> End: {((4 * (zext i32 %o to i64))<nuw><nsw> + %src),+,(4 * (zext i32 %n to i64) * (zext i32 %o to i64))}<%outer.outer.loop>
+; DEBUG-NEXT: Start: {%src,+,(2 * (zext i32 %n to i64) * (zext i32 %o to i64))}<%outer.outer.loop> End: {((2 * (zext i32 %o to i64))<nuw><nsw> + %src),+,(2 * (zext i32 %n to i64) * (zext i32 %o to i64))}<%outer.outer.loop>
 
 define void @triple_nested_loop_mixed_access(ptr nocapture noundef %dst, ptr nocapture noundef readonly %src, i32 noundef %m, i32 noundef %n, i32 noundef %o) {
 ; CHECK-LABEL: define void @triple_nested_loop_mixed_access(
@@ -645,8 +654,8 @@ define void @triple_nested_loop_mixed_access(ptr nocapture noundef %dst, ptr noc
 ; CHECK-NEXT:    [[TMP5:%.*]] = mul i64 [[WIDE_TRIP_COUNT]], [[TMP1]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = shl i64 [[TMP5]], 2
 ; CHECK-NEXT:    [[TMP7:%.*]] = mul i64 [[WIDE_TRIP_COUNT]], [[TMP1]]
-; CHECK-NEXT:    [[TMP8:%.*]] = shl i64 [[TMP7]], 2
-; CHECK-NEXT:    [[TMP9:%.*]] = shl nuw nsw i64 [[WIDE_TRIP_COUNT]], 2
+; CHECK-NEXT:    [[TMP8:%.*]] = shl i64 [[TMP7]], 1
+; CHECK-NEXT:    [[TMP9:%.*]] = shl nuw nsw i64 [[WIDE_TRIP_COUNT]], 1
 ; CHECK-NEXT:    br label %[[OUTER_OUTER_LOOP:.*]]
 ; CHECK:       [[OUTER_OUTER_LOOP]]:
 ; CHECK-NEXT:    [[OUTER_OUTER_IV:%.*]] = phi i64 [ 0, %[[ENTRY]] ], [ [[OUTER_OUTER_IV_NEXT:%.*]], %[[OUTER_LOOP_END:.*]] ]
@@ -680,8 +689,9 @@ define void @triple_nested_loop_mixed_access(ptr nocapture noundef %dst, ptr noc
 ; CHECK:       [[VECTOR_BODY]]:
 ; CHECK-NEXT:    [[INDEX:%.*]] = phi i64 [ 0, %[[VECTOR_PH]] ], [ [[INDEX_NEXT:%.*]], %[[VECTOR_BODY]] ]
 ; CHECK-NEXT:    [[TMP19:%.*]] = add nuw nsw i64 [[INDEX]], [[TMP15]]
-; CHECK-NEXT:    [[TMP20:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[TMP19]]
-; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <4 x i32>, ptr [[TMP20]], align 4, !alias.scope [[META32:![0-9]+]]
+; CHECK-NEXT:    [[TMP29:%.*]] = getelementptr inbounds i16, ptr [[SRC]], i64 [[TMP19]]
+; CHECK-NEXT:    [[WIDE_LOAD1:%.*]] = load <4 x i16>, ptr [[TMP29]], align 2, !alias.scope [[META32:![0-9]+]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = sext <4 x i16> [[WIDE_LOAD1]] to <4 x i32>
 ; CHECK-NEXT:    [[TMP21:%.*]] = add nuw nsw i64 [[TMP18]], [[INDEX]]
 ; CHECK-NEXT:    [[TMP22:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[TMP21]]
 ; CHECK-NEXT:    [[WIDE_LOAD4:%.*]] = load <4 x i32>, ptr [[TMP22]], align 4, !alias.scope [[META35:![0-9]+]], !noalias [[META32]]
@@ -699,8 +709,9 @@ define void @triple_nested_loop_mixed_access(ptr nocapture noundef %dst, ptr noc
 ; CHECK:       [[INNER_LOOP]]:
 ; CHECK-NEXT:    [[INNER_IV:%.*]] = phi i64 [ [[INNER_IV_NEXT:%.*]], %[[INNER_LOOP]] ], [ [[BC_RESUME_VAL]], %[[SCALAR_PH]] ]
 ; CHECK-NEXT:    [[TMP25:%.*]] = add nuw nsw i64 [[INNER_IV]], [[TMP15]]
-; CHECK-NEXT:    [[ARRAYIDX_US_US_US:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i64 [[TMP25]]
-; CHECK-NEXT:    [[TMP26:%.*]] = load i32, ptr [[ARRAYIDX_US_US_US]], align 4
+; CHECK-NEXT:    [[ARRAYIDX_US_US_US:%.*]] = getelementptr inbounds i16, ptr [[SRC]], i64 [[TMP25]]
+; CHECK-NEXT:    [[TMP30:%.*]] = load i16, ptr [[ARRAYIDX_US_US_US]], align 2
+; CHECK-NEXT:    [[TMP26:%.*]] = sext i16 [[TMP30]] to i32
 ; CHECK-NEXT:    [[TMP27:%.*]] = add nuw nsw i64 [[TMP18]], [[INNER_IV]]
 ; CHECK-NEXT:    [[ARRAYIDX17_US_US_US:%.*]] = getelementptr inbounds i32, ptr [[DST]], i64 [[TMP27]]
 ; CHECK-NEXT:    [[TMP28:%.*]] = load i32, ptr [[ARRAYIDX17_US_US_US]], align 4
@@ -746,12 +757,13 @@ outer.loop:
 inner.loop:
   %inner.iv = phi i64 [ %inner.iv.next, %inner.loop ], [ 0, %outer.loop ]
   %8 = add nuw nsw i64 %inner.iv, %4
-  %arrayidx.us.us.us = getelementptr inbounds i32, ptr %src, i64 %8
-  %9 = load i32, ptr %arrayidx.us.us.us, align 4
+  %arrayidx.us.us.us = getelementptr inbounds i16, ptr %src, i64 %8
+  %9 = load i16, ptr %arrayidx.us.us.us, align 2
+  %src.ext = sext i16 %9 to i32
   %10 = add nuw nsw i64 %7, %inner.iv
   %arrayidx17.us.us.us = getelementptr inbounds i32, ptr %dst, i64 %10
   %11 = load i32, ptr %arrayidx17.us.us.us, align 4
-  %add18.us.us.us = add nsw i32 %11, %9
+  %add18.us.us.us = add nsw i32 %11, %src.ext
   store i32 %add18.us.us.us, ptr %arrayidx17.us.us.us, align 4
   %inner.iv.next = add nuw nsw i64 %inner.iv, 1
   %exitcond.not = icmp eq i64 %inner.iv.next, %wide.trip.count
