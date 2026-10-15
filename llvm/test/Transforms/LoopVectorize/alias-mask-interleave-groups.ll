@@ -9,26 +9,24 @@ define i32 @load_group_reordered_with_store(ptr %a, ptr %c, i64 %n) {
 ; CHECK-LABEL: define i32 @load_group_reordered_with_store(
 ; CHECK-SAME: ptr [[A:%.*]], ptr [[C:%.*]], i64 [[N:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[C7:%.*]] = ptrtoaddr ptr [[C]] to i64
+; CHECK-NEXT:    [[A6:%.*]] = ptrtoaddr ptr [[A]] to i64
 ; CHECK-NEXT:    br label %[[VECTOR_CLAMPED_VF_CHECK:.*]]
 ; CHECK:       [[VECTOR_CLAMPED_VF_CHECK]]:
+; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[A6]], 32
+; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[TMP0]], [[C7]]
+; CHECK-NEXT:    [[TMP2:%.*]] = sub i64 [[TMP3]], 1
+; CHECK-NEXT:    [[VF_IS_SCALAR:%.*]] = icmp ult i64 [[TMP2]], 63
 ; CHECK-NEXT:    [[TMP1:%.*]] = shl i64 [[N]], 3
-; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr i8, ptr [[C]], i64 [[TMP1]]
-; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[TMP1]], -4
-; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP2]]
-; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP1]]
-; CHECK-NEXT:    [[TMP5:%.*]] = shl i64 [[N]], 4
-; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr i8, ptr [[A]], i64 [[TMP5]]
-; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr nuw i8, ptr [[A]], i64 4
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[C]], [[TMP3]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[A]], [[TMP8]]
-; CHECK-NEXT:    [[VF_IS_SCALAR:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
-; CHECK-NEXT:    [[BOUND012:%.*]] = icmp ult ptr [[C]], [[TMP6]]
-; CHECK-NEXT:    [[BOUND113:%.*]] = icmp ult ptr [[TMP4]], [[TMP8]]
-; CHECK-NEXT:    [[VF_STEP_OVERFLOW:%.*]] = and i1 [[BOUND012]], [[BOUND113]]
+; CHECK-NEXT:    [[TMP4:%.*]] = sub i64 [[C7]], [[A6]]
+; CHECK-NEXT:    [[TMP5:%.*]] = sub i64 [[TMP4]], [[TMP1]]
+; CHECK-NEXT:    [[TMP6:%.*]] = sub i64 [[TMP5]], 1
+; CHECK-NEXT:    [[VF_STEP_OVERFLOW:%.*]] = icmp ult i64 [[TMP6]], 31
 ; CHECK-NEXT:    [[TMP11:%.*]] = or i1 [[VF_IS_SCALAR]], [[VF_STEP_OVERFLOW]]
-; CHECK-NEXT:    [[BOUND015:%.*]] = icmp ult ptr [[C]], [[TMP4]]
-; CHECK-NEXT:    [[BOUND116:%.*]] = icmp ult ptr [[TMP7]], [[TMP8]]
-; CHECK-NEXT:    [[FOUND_CONFLICT17:%.*]] = and i1 [[BOUND015]], [[BOUND116]]
+; CHECK-NEXT:    [[TMP7:%.*]] = add i64 [[A6]], 36
+; CHECK-NEXT:    [[TMP8:%.*]] = sub i64 [[TMP7]], [[C7]]
+; CHECK-NEXT:    [[TMP9:%.*]] = sub i64 [[TMP8]], 1
+; CHECK-NEXT:    [[FOUND_CONFLICT17:%.*]] = icmp ult i64 [[TMP9]], 63
 ; CHECK-NEXT:    [[CONFLICT_RDX18:%.*]] = or i1 [[TMP11]], [[FOUND_CONFLICT17]]
 ; CHECK-NEXT:    br i1 [[CONFLICT_RDX18]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
@@ -53,9 +51,9 @@ define i32 @load_group_reordered_with_store(ptr %a, ptr %c, i64 %n) {
 ; CHECK-NEXT:    [[STRIDED_VEC5:%.*]] = shufflevector <8 x i32> [[WIDE_MASKED_VEC]], <8 x i32> poison, <4 x i32> <i32 1, i32 3, i32 5, i32 7>
 ; CHECK-NEXT:    [[TMP19:%.*]] = add nuw nsw i64 [[INDEX]], [[N]]
 ; CHECK-NEXT:    [[TMP20:%.*]] = getelementptr inbounds i64, ptr [[A]], i64 [[TMP19]]
-; CHECK-NEXT:    [[WIDE_MASKED_LOAD:%.*]] = call <4 x i64> @llvm.masked.load.v4i64.p0(ptr align 8 [[TMP20]], <4 x i1> [[TMP13]], <4 x i64> poison), !alias.scope [[META0:![0-9]+]]
+; CHECK-NEXT:    [[WIDE_MASKED_LOAD:%.*]] = call <4 x i64> @llvm.masked.load.v4i64.p0(ptr align 8 [[TMP20]], <4 x i1> [[TMP13]], <4 x i64> poison)
 ; CHECK-NEXT:    [[TMP21:%.*]] = getelementptr inbounds i64, ptr [[C]], i64 [[INDEX]]
-; CHECK-NEXT:    call void @llvm.masked.store.v4i64.p0(<4 x i64> [[WIDE_MASKED_LOAD]], ptr align 8 [[TMP21]], <4 x i1> [[TMP13]]), !alias.scope [[META3:![0-9]+]], !noalias [[META5:![0-9]+]]
+; CHECK-NEXT:    call void @llvm.masked.store.v4i64.p0(<4 x i64> [[WIDE_MASKED_LOAD]], ptr align 8 [[TMP21]], <4 x i1> [[TMP13]])
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add i64 [[INDEX]], 4
 ; CHECK-NEXT:    [[VEC_IND_NEXT]] = add nuw <4 x i64> [[VEC_IND]], splat (i64 4)
 ; CHECK-NEXT:    [[TMP22:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]

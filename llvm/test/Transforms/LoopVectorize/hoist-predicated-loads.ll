@@ -313,17 +313,18 @@ define void @different_access_sizes(ptr %dst, ptr %src, ptr %cond) {
 ; CHECK-LABEL: define void @different_access_sizes(
 ; CHECK-SAME: ptr [[DST:%.*]], ptr [[SRC:%.*]], ptr [[COND:%.*]]) {
 ; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[SRC3:%.*]] = ptrtoaddr ptr [[SRC]] to i64
+; CHECK-NEXT:    [[COND2:%.*]] = ptrtoaddr ptr [[COND]] to i64
+; CHECK-NEXT:    [[DST1:%.*]] = ptrtoaddr ptr [[DST]] to i64
 ; CHECK-NEXT:    br label %[[VECTOR_MEMCHECK:.*]]
 ; CHECK:       [[VECTOR_MEMCHECK]]:
-; CHECK-NEXT:    [[SCEVGEP:%.*]] = getelementptr i8, ptr [[DST]], i64 400
-; CHECK-NEXT:    [[SCEVGEP1:%.*]] = getelementptr i8, ptr [[COND]], i64 400
-; CHECK-NEXT:    [[SCEVGEP2:%.*]] = getelementptr i8, ptr [[SRC]], i64 400
-; CHECK-NEXT:    [[BOUND0:%.*]] = icmp ult ptr [[DST]], [[SCEVGEP1]]
-; CHECK-NEXT:    [[BOUND1:%.*]] = icmp ult ptr [[COND]], [[SCEVGEP]]
-; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = and i1 [[BOUND0]], [[BOUND1]]
-; CHECK-NEXT:    [[BOUND03:%.*]] = icmp ult ptr [[DST]], [[SCEVGEP2]]
-; CHECK-NEXT:    [[BOUND14:%.*]] = icmp ult ptr [[SRC]], [[SCEVGEP]]
-; CHECK-NEXT:    [[FOUND_CONFLICT5:%.*]] = and i1 [[BOUND03]], [[BOUND14]]
+; CHECK-NEXT:    [[TMP0:%.*]] = sub i64 [[DST1]], [[COND2]]
+; CHECK-NEXT:    [[TMP1:%.*]] = sub i64 [[TMP0]], 1
+; CHECK-NEXT:    [[FOUND_CONFLICT:%.*]] = icmp ult i64 [[TMP1]], 7
+; CHECK-NEXT:    [[TMP2:%.*]] = add i64 [[SRC3]], 8
+; CHECK-NEXT:    [[TMP3:%.*]] = sub i64 [[TMP2]], [[DST1]]
+; CHECK-NEXT:    [[TMP4:%.*]] = sub i64 [[TMP3]], 1
+; CHECK-NEXT:    [[FOUND_CONFLICT5:%.*]] = icmp ult i64 [[TMP4]], 15
 ; CHECK-NEXT:    [[CONFLICT_RDX:%.*]] = or i1 [[FOUND_CONFLICT]], [[FOUND_CONFLICT5]]
 ; CHECK-NEXT:    br i1 [[CONFLICT_RDX]], label %[[SCALAR_PH:.*]], label %[[VECTOR_PH:.*]]
 ; CHECK:       [[VECTOR_PH]]:
@@ -334,13 +335,13 @@ define void @different_access_sizes(ptr %dst, ptr %src, ptr %cond) {
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i32 [[INDEX]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds i32, ptr [[SRC]], i32 [[TMP5]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds i32, ptr [[COND]], i32 [[INDEX]]
-; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x i32>, ptr [[TMP10]], align 4, !alias.scope [[META26:![0-9]+]]
+; CHECK-NEXT:    [[WIDE_LOAD:%.*]] = load <2 x i32>, ptr [[TMP10]], align 4
 ; CHECK-NEXT:    [[TMP11:%.*]] = icmp ule <2 x i32> [[WIDE_LOAD]], splat (i32 11)
 ; CHECK-NEXT:    [[TMP12:%.*]] = xor <2 x i1> [[TMP11]], splat (i1 true)
 ; CHECK-NEXT:    [[TMP13:%.*]] = extractelement <2 x i1> [[TMP12]], i64 0
 ; CHECK-NEXT:    br i1 [[TMP13]], label %[[PRED_LOAD_IF:.*]], label %[[PRED_LOAD_CONTINUE:.*]]
 ; CHECK:       [[PRED_LOAD_IF]]:
-; CHECK-NEXT:    [[TMP15:%.*]] = load i32, ptr [[TMP6]], align 4, !alias.scope [[META29:![0-9]+]]
+; CHECK-NEXT:    [[TMP15:%.*]] = load i32, ptr [[TMP6]], align 4
 ; CHECK-NEXT:    [[TMP16:%.*]] = insertelement <2 x i32> poison, i32 [[TMP15]], i64 0
 ; CHECK-NEXT:    br label %[[PRED_LOAD_CONTINUE]]
 ; CHECK:       [[PRED_LOAD_CONTINUE]]:
@@ -348,7 +349,7 @@ define void @different_access_sizes(ptr %dst, ptr %src, ptr %cond) {
 ; CHECK-NEXT:    [[TMP17:%.*]] = extractelement <2 x i1> [[TMP12]], i64 1
 ; CHECK-NEXT:    br i1 [[TMP17]], label %[[PRED_LOAD_IF6:.*]], label %[[PRED_LOAD_CONTINUE7:.*]]
 ; CHECK:       [[PRED_LOAD_IF6]]:
-; CHECK-NEXT:    [[TMP25:%.*]] = load i32, ptr [[TMP7]], align 4, !alias.scope [[META29]]
+; CHECK-NEXT:    [[TMP25:%.*]] = load i32, ptr [[TMP7]], align 4
 ; CHECK-NEXT:    [[TMP14:%.*]] = insertelement <2 x i32> [[TMP24]], i32 [[TMP25]], i64 1
 ; CHECK-NEXT:    br label %[[PRED_LOAD_CONTINUE7]]
 ; CHECK:       [[PRED_LOAD_CONTINUE7]]:
@@ -357,7 +358,7 @@ define void @different_access_sizes(ptr %dst, ptr %src, ptr %cond) {
 ; CHECK-NEXT:    [[TMP22:%.*]] = extractelement <2 x i1> [[TMP11]], i64 0
 ; CHECK-NEXT:    br i1 [[TMP22]], label %[[PRED_LOAD_IF8:.*]], label %[[PRED_LOAD_CONTINUE9:.*]]
 ; CHECK:       [[PRED_LOAD_IF8]]:
-; CHECK-NEXT:    [[TMP18:%.*]] = load i8, ptr [[TMP6]], align 4, !alias.scope [[META29]]
+; CHECK-NEXT:    [[TMP18:%.*]] = load i8, ptr [[TMP6]], align 4
 ; CHECK-NEXT:    [[TMP19:%.*]] = insertelement <2 x i8> poison, i8 [[TMP18]], i64 0
 ; CHECK-NEXT:    br label %[[PRED_LOAD_CONTINUE9]]
 ; CHECK:       [[PRED_LOAD_CONTINUE9]]:
@@ -365,7 +366,7 @@ define void @different_access_sizes(ptr %dst, ptr %src, ptr %cond) {
 ; CHECK-NEXT:    [[TMP26:%.*]] = extractelement <2 x i1> [[TMP11]], i64 1
 ; CHECK-NEXT:    br i1 [[TMP26]], label %[[PRED_LOAD_IF10:.*]], label %[[PRED_LOAD_CONTINUE11]]
 ; CHECK:       [[PRED_LOAD_IF10]]:
-; CHECK-NEXT:    [[TMP28:%.*]] = load i8, ptr [[TMP7]], align 4, !alias.scope [[META29]]
+; CHECK-NEXT:    [[TMP28:%.*]] = load i8, ptr [[TMP7]], align 4
 ; CHECK-NEXT:    [[TMP23:%.*]] = insertelement <2 x i8> [[TMP27]], i8 [[TMP28]], i64 1
 ; CHECK-NEXT:    br label %[[PRED_LOAD_CONTINUE11]]
 ; CHECK:       [[PRED_LOAD_CONTINUE11]]:
@@ -373,7 +374,7 @@ define void @different_access_sizes(ptr %dst, ptr %src, ptr %cond) {
 ; CHECK-NEXT:    [[TMP30:%.*]] = zext <2 x i8> [[TMP29]] to <2 x i32>
 ; CHECK-NEXT:    [[PREDPHI:%.*]] = select <2 x i1> [[TMP11]], <2 x i32> [[TMP30]], <2 x i32> [[TMP21]]
 ; CHECK-NEXT:    [[TMP31:%.*]] = getelementptr inbounds i32, ptr [[DST]], i32 [[INDEX]]
-; CHECK-NEXT:    store <2 x i32> [[PREDPHI]], ptr [[TMP31]], align 4, !alias.scope [[META31:![0-9]+]], !noalias [[META33:![0-9]+]]
+; CHECK-NEXT:    store <2 x i32> [[PREDPHI]], ptr [[TMP31]], align 4
 ; CHECK-NEXT:    [[INDEX_NEXT]] = add nuw i32 [[INDEX]], 2
 ; CHECK-NEXT:    [[TMP32:%.*]] = icmp eq i32 [[INDEX_NEXT]], 100
 ; CHECK-NEXT:    br i1 [[TMP32]], label %[[MIDDLE_BLOCK:.*]], label %[[VECTOR_BODY]], !llvm.loop [[LOOP34:![0-9]+]]
