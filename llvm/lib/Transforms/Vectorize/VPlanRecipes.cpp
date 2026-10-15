@@ -4251,10 +4251,13 @@ void VPReplicateRecipe::printRecipe(raw_ostream &O, const Twine &Indent,
     printAsOperand(O, SlotTracker);
     O << " = ";
   }
-  if (auto *CB = dyn_cast<CallBase>(getUnderlyingInstr())) {
+  if (getOpcode() == Instruction::Call) {
+    // The callee is the last operand, excluding the mask if predicated.
+    auto *Callee = cast<Function>(
+        getOperand(getNumOperandsWithoutMask() - 1)->getLiveInIRValue());
     O << "call";
     printFlags(O);
-    O << "@" << CB->getCalledFunction()->getName() << "(";
+    O << "@" << Callee->getName() << "(";
     interleaveComma(drop_end(operands()), O, [&O, &SlotTracker](VPValue *Op) {
       Op->printAsOperand(O, SlotTracker);
     });
